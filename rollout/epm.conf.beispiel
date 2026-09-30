@@ -1,0 +1,24 @@
+# EPM – zentrale Einstellungen für alle Rollout-Skripte
+# Für den VPS nur diese Datei anpassen, die Skripte bleiben gleich.
+
+EPM_HOSTNAME="epm-test"            # VPS: epm
+EPM_ADMIN_USER="epmadmin"          # Linux-Admin (SSH-Login)
+
+# Verwaltungsnetz: nur von hier sind SSH und HTTPS erreichbar
+EPM_MGMT_IF="enp0s8"               # Netzwerkkarte (VM: Host-only-Adapter)
+EPM_MGMT_IP="192.168.56.10"        # IP dieser Karte, darauf lauscht HTTPS
+EPM_MGMT_NET="192.168.56.0/24"     # erlaubtes Quellnetz (VPS: VPN-Netz der OPNsense)
+EPM_SSH_PORT="22"
+
+# Name im Browser (muss zum Zertifikat passen)
+EPM_WEB_NAME="epm.test"
+
+# Projektverzeichnis
+EPM_BASE="/srv/epm"
+
+# Nur VPS: in der VM leer lassen
+EPM_APT_PROXY=""                   # z. B. http://10.0.0.1:3128 (Squid auf der OPNsense)
+EPM_NTP_SERVER=""                  # z. B. 10.0.0.1 (OPNsense)
+
+# UID, unter der das Backend im Container läuft (muss zum Dockerfile passen)
+EPM_APP_UID="10001"

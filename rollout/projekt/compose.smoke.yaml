@@ -1,0 +1,48 @@
+# EPM – Rauchtest: prüft Docker, Netz, Firewall, TLS und PostgreSQL,
+# bevor Backend und Frontend existieren. Gleiche Datenbank wie später.
+name: epm
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: epm
+      POSTGRES_USER: epm
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      TZ: Europe/Berlin
+    secrets: [db_password]
+    volumes:
+      - db-data:/var/lib/postgresql
+    networks: [intern]
+    shm_size: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U epm -d epm"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  web:
+    image: nginxinc/nginx-unprivileged:stable-alpine
+    restart: unless-stopped
+    ports:
+      - "${EPM_BIND_IP}:443:8443"
+    volumes:
+      - ./nginx/rauchtest.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    networks: [extern]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+
+networks:
+  intern:
+    internal: true
+  extern: {}
+
+volumes:
+  db-data:
+
+secrets:
+  db_password:
+    file: ./secrets/db_password

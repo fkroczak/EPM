@@ -1,0 +1,83 @@
+# EPM – Betrieb: Datenbank, Backend (Django), Webserver (Nginx)
+# Aktivieren: in .env  COMPOSE_FILE=compose.yaml
+name: epm
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: epm
+      POSTGRES_USER: epm
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      TZ: Europe/Berlin
+    secrets: [db_password]
+    volumes:
+      - db-data:/var/lib/postgresql
+    networks: [intern]
+    shm_size: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U epm -d epm"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  backend:
+    image: epm-backend:${EPM_VERSION}
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    user: "10001:101"                    # Gruppe 101 = Nginx, darf Dokumente lesen
+    env_file: backend.env
+    environment:
+      DB_HOST: db
+      DB_NAME: epm
+      DB_USER: epm
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
+      EPM_DOKUMENTE: /data/dokumente
+      TZ: Europe/Berlin
+    secrets: [db_password, django_secret_key]
+    volumes:
+      - ./data/dokumente:/data/dokumente
+      - static:/app/staticfiles
+    networks: [intern]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  web:
+    # Bis zum Frontend (Schritt 5) das Standard-Nginx-Image mit Platzhalterseite;
+    # danach: image: epm-web:${EPM_VERSION}
+    image: nginxinc/nginx-unprivileged:stable-alpine
+    restart: unless-stopped
+    depends_on: [backend]
+    ports:
+      - "${EPM_BIND_IP}:443:8443"        # nur an die Verwaltungs-IP gebunden
+    volumes:
+      - ./nginx/epm.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./web:/srv/web:ro
+      - ./data/dokumente:/data/dokumente:ro
+      - static:/srv/static:ro
+    networks: [intern, extern]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+networks:
+  intern:
+    internal: true      # kein Weg nach außen für db und backend
+  extern: {}
+
+volumes:
+  db-data:
+  static:
+
+secrets:
+  db_password:
+    file: ./secrets/db_password
+  django_secret_key:
+    file: ./secrets/django_secret_key

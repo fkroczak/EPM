@@ -1,0 +1,10 @@
+# EPM Backend – Abhängigkeiten (LTS bzw. stabile Hauptversionen, Updates nur innerhalb der Reihe)
+Django>=5.2.17,<5.3            # LTS bis April 2028; danach 6.2 LTS
+djangorestframework>=3.18,<3.19
+django-filter>=26.1,<27
+django-otp>=1.7,<1.8
+django-simple-history>=3.13,<4
+psycopg[binary]>=3.3,<3.4
+nh3>=0.3,<0.4
+qrcode>=8.2,<9
+gunicorn>=26,<27

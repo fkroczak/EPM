@@ -1,0 +1,193 @@
+"""
+EPM – Django-Einstellungen.
+
+Alle umgebungsabhängigen Werte kommen aus Umgebungsvariablen (backend.env).
+Geheimnisse (DB-Passwort, SECRET_KEY) werden aus Dateien gelesen
+(Docker Secrets unter /run/secrets), nie aus Variablen.
+"""
+from datetime import timedelta
+from pathlib import Path
+import os
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def env(name, default=None):
+    return os.environ.get(name, default)
+
+
+def env_bool(name, default=False):
+    return env(name, str(default)).strip().lower() in ("1", "true", "yes", "ja", "on")
+
+
+def env_list(name, default=""):
+    return [x.strip() for x in env(name, default).split(",") if x.strip()]
+
+
+def geheimnis(name, default=None):
+    """Liest NAME_FILE (Pfad) oder, nur in der Entwicklung, NAME direkt."""
+    pfad = env(f"{name}_FILE")
+    if pfad:
+        return Path(pfad).read_text(encoding="utf-8").strip()
+    wert = env(name, default)
+    if wert is None:
+        raise RuntimeError(f"{name}_FILE oder {name} muss gesetzt sein")
+    return wert
+
+
+DEBUG = env_bool("DJANGO_DEBUG", False)
+SECRET_KEY = geheimnis("DJANGO_SECRET_KEY", "nur-fuer-entwicklung-unsicher" if DEBUG else None)
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "")
+
+# Django-Admin (/verwaltung/) nur zum Prüfen der Daten, bis das Frontend steht.
+EPM_DJANGO_ADMIN = env_bool("EPM_DJANGO_ADMIN", True)
+
+INSTALLED_APPS = [
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "rest_framework",
+    "django_filters",
+    "django_otp",
+    "django_otp.plugins.otp_totp",
+    "django_otp.plugins.otp_static",
+    "simple_history",
+    "accounts",
+    "stammdaten",
+    "patienten",
+    "infusionen",
+    "audit",
+]
+if EPM_DJANGO_ADMIN:
+    INSTALLED_APPS.insert(0, "django.contrib.admin")
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django_otp.middleware.OTPMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
+]
+
+ROOT_URLCONF = "epm.urls"
+WSGI_APPLICATION = "epm.wsgi.application"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "HOST": env("DB_HOST", "localhost"),
+        "PORT": env("DB_PORT", "5432"),
+        "NAME": env("DB_NAME", "epm"),
+        "USER": env("DB_USER", "epm"),
+        "PASSWORD": geheimnis("DB_PASSWORD", "epm" if DEBUG else None),
+        "CONN_MAX_AGE": 60,
+        "CONN_HEALTH_CHECKS": True,
+        "ATOMIC_REQUESTS": True,
+    }
+}
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+AUTH_USER_MODEL = "accounts.User"
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 12}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+LANGUAGE_CODE = "de-de"
+TIME_ZONE = "Europe/Berlin"
+USE_I18N = True
+USE_TZ = True
+
+STATIC_URL = "/static/"
+STATIC_ROOT = env("DJANGO_STATIC_ROOT", str(BASE_DIR / "staticfiles"))
+
+# Patientendokumente: Dateisystem, Auslieferung über Nginx (X-Accel-Redirect)
+EPM_DOKUMENTE = Path(env("EPM_DOKUMENTE", str(BASE_DIR / "dokumente")))
+EPM_X_ACCEL = env_bool("EPM_X_ACCEL", not DEBUG)
+EPM_X_ACCEL_PREFIX = "/_geschuetzt/dokumente/"
+EPM_UPLOAD_MAX_MB = int(env("EPM_UPLOAD_MAX_MB", "50"))
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
+FILE_UPLOAD_TEMP_DIR = env("EPM_UPLOAD_TMP", "/tmp")
+FILE_UPLOAD_PERMISSIONS = 0o640
+
+# Sitzung: 30 Minuten ohne Aktivität, dann neu anmelden
+SESSION_COOKIE_AGE = int(env("EPM_SITZUNG_MINUTEN", "30")) * 60
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Strict"
+SESSION_COOKIE_NAME = "epm_sitzung"
+CSRF_COOKIE_SAMESITE = "Strict"
+CSRF_COOKIE_NAME = "epm_csrf"
+CSRF_COOKIE_HTTPONLY = False  # das Frontend liest das Token und sendet es als X-CSRFToken
+
+# Hinter Nginx mit TLS
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = False
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
+
+# Anmeldung: Sperre nach Fehlversuchen (je Benutzername)
+EPM_LOGIN_MAX_FEHLVERSUCHE = 5
+EPM_LOGIN_SPERRE = timedelta(minutes=15)
+
+OTP_TOTP_ISSUER = env("EPM_OTP_ISSUER", "EPM")
+OTP_TOTP_TOLERANCE = 1
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
+    "DEFAULT_PERMISSION_CLASSES": ["accounts.permissions.Angemeldet"],
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 50,
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"]
+    + (["rest_framework.renderers.BrowsableAPIRenderer"] if env_bool("EPM_API_BROWSABLE", True) else []),
+    "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
+    "DEFAULT_THROTTLE_RATES": {"anmeldung": "30/min"},
+    "COERCE_DECIMAL_TO_STRING": False,
+    "EXCEPTION_HANDLER": "epm.api_basis.exception_handler",
+}
+
+# Nur ein Prozess schreibt Cache-Werte (Drosselung); lokaler Speicher reicht.
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"kurz": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}},
+    "handlers": {"konsole": {"class": "logging.StreamHandler", "formatter": "kurz"}},
+    "root": {"handlers": ["konsole"], "level": env("EPM_LOGLEVEL", "INFO")},
+    "loggers": {"django.security": {"level": "WARNING"}},
+}
