@@ -29,6 +29,7 @@ Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests. Beide laufe
   Musterdaten und eigenen Testkonten je Rolle.
 
 Stand 02.10.2026: **100 von 100 Backend-Tests** und **49 von 49 Browsertests grün** (Lauf 36943685896, Commit `e74f4ff`).
+Stand 02.10.2026 (Runde 4, Systemseite/Kalender/Infusionspläne): **121 von 121 Backend-Tests** und **60 von 60 Browsertests grün** (Lauf 36939957368, Commit `1534dee`).
 
 ## Übersicht
 
@@ -107,8 +108,14 @@ Stand 02.10.2026: **100 von 100 Backend-Tests** und **49 von 49 Browsertests gr�
 | F71 | Nicht Erlaubtes ausblenden, Rechteänderung sofort in der Oberfläche | alle Ansichten | ABGESCHLOSSEN UND GETESTET |
 | F72 | Dokument dem richtigen Patienten zuordnen | 9 Dokumente, 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
 | F73 | Dokument endgültig löschen (nur Mediziner, Kennwort + 2FA + Bestätigungscode) | 9 Dokumente, 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
+| F80 | Globaler Kalender mit Fälligkeiten und Feiertagen | Kalender (neu) | ABGESCHLOSSEN UND GETESTET |
+| F81 | Übersicht aller Infusionspläne | Infusionspläne (neu) | ABGESCHLOSSEN UND GETESTET |
+| F82 | Systemverwaltung: Auslastung, Updates, Container, EPM-Zustand | System (neu) | ABGESCHLOSSEN UND GETESTET |
+| F83 | Tätigkeiten für den Server über den Systemagenten (Update, Neustart, Sicherung, Aufräumen) | System | ABGESCHLOSSEN UND GETESTET |
+| F84 | Wartung des EPM (Sitzungen, Datenbank, Dokumente, Unveränderlichkeit, Konfiguration, alle abmelden) | System | ABGESCHLOSSEN UND GETESTET |
+| F85 | Hinweis an alle Benutzer, angemeldete Benutzer abmelden | System, alle Ansichten | ABGESCHLOSSEN UND GETESTET |
 
-Summe (71 Funktionen): 57 abgeschlossen und getestet · 3 teilweise abgeschlossen · 11 nicht abgeschlossen · 0 blockiert.
+Summe (79 Funktionen, gezählt aus der Tabelle): 73 abgeschlossen und getestet · 2 teilweise abgeschlossen · 4 nicht abgeschlossen · 0 blockiert.
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 
@@ -150,6 +157,7 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 | Benutzer und Rechte verwalten | – | – | – | ● |
 | Sicherungen verwalten | – | – | – | ✓ |
 | Testdaten zurücksetzen | – | – | – | ✓ |
+| Systemverwaltung (Server und EPM) | – | – | – | ✓ (nur Admin, anderen Rollen nicht erteilbar) |
 
   Testbenutzer bekommen nie Rechte, die über Testpatienten hinaus wirken (Versorger, Vorlagen, Audit-Log, Benutzer,
   Sicherungen, Testdaten, Wiederöffnen). Fehlendes Recht → 403 „Dafür fehlt das Recht „…“.“; abgelaufene Sitzung → 403
@@ -1149,6 +1157,134 @@ gemeinsame Ärzteliste; „kein“ und „nicht erfasst“ getrennt; Bezugsperso
   eine schwarze Leiste ein); große Ansicht mit Zoom. Offline, ohne eval/WebAssembly (CSP unverändert). Browsertest `dokumente.spec.ts`
   „PDF-Vorschau und Ansicht in EPM …“.
 
+## M · Kalender, Infusionspläne, Systemverwaltung (Runde 4, Wunsch 02.10.2026)
+
+Wünsche: „Sysadmin-Seite unter Administration für typische Tätigkeiten an der VM und am EPM, mit Übersicht über die
+aktuelle Auslastung, natürlich nur für Admin; Rollen und Rechte anpassen und erweitern“, „durch Termine und Fälligkeiten
+ein globaler Kalender als Menüpunkt“, „Infusion vielleicht auch als Menüpunkt“. Grundlage für die Systemseite sind die
+Festlegungen S12–S14 vom 01.10.2026 (`claude/startseite-erweiterungen.md`): nur Ubuntu-Pakete, Update und Neustart mit
+Admin-Kennwort + 2FA, vorher automatische Sicherung, angemeldete Benutzer vorher warnen; der Container bekommt keinen
+Zugriff auf den Server (Auftrag und Status über ein gemeinsames Verzeichnis, ausgeführt von systemd-Diensten).
+
+**Recht „Systemverwaltung (Server und EPM)“** (`system_verwalten`): nur Admin. Anderen Rollen kann es nicht erteilt
+werden (`NUR_ROLLEN` in `accounts/rechte.py`, gemeinsam mit „Dokumente endgültig löschen“ – nur Mediziner); die
+Rechte-Matrix zeigt es für andere Rollen ausgegraut, `PUT /api/rechte/` lehnt es mit 400 ab, auch ein Eintrag direkt in
+der Datenbank wirkt nicht. Testzugänge erhalten es nie. Der Admin kann es sich selbst entziehen und wieder geben.
+Kalender und Infusionspläne brauchen kein neues Recht: Lesen mit „Akten lesen“, Termine mit „Kontakte, Gewichte,
+Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie in der Akte.
+
+### F80 Globaler Kalender
+- **Ansicht:** Menüpunkt „Kalender“ (Seitenleiste, für alle mit „Akten lesen“): Monat (6 Wochen, Klick auf einen Tag zeigt
+  ihn rechts), Woche, Liste; „Überfällig“ (offene Termine, Kontakt fällig, Plan prüfen); Filter nach Art; „Erledigte zeigen“.
+  Eintrag anklicken → Einzelheiten, „Akte öffnen“/„Pläne öffnen“, „Ändern“, „Erledigt“, bei Fälligkeiten „Termin anlegen“.
+  Neuer Termin mit dem Tag als Vorgabe (gleicher Dialog wie Startseite und Akte).
+- **Endpunkt:** `GET /api/kalender/?von=JJJJ-MM-TT&bis=JJJJ-MM-TT&erledigte=0|1&faelligkeiten=0|1` →
+  `{von, bis, heute, termine: [Termin], termine_ueberfaellig: [Termin], faelligkeiten: [{art: kontakt|plan, patient, name,
+  nummer, ist_test, faellig_am, seit, ueberfaellig, text}], grenzen: {kontakt_monate, plan_monate}, feiertage: [{datum, name}]}`.
+  Termine anlegen, ändern, erledigen weiter über F29/F30.
+- **Logik:** Fälligkeiten nur für Akten in Betreuung: Kontakt fällig = letzter Kontakt (sonst Anlage der Akte) +
+  Grenzwert „Kontakt überfällig“; Plan prüfen = gültig ab des aktuellen Plans + Grenzwert „Infusionsplan gilt als alt
+  nach“ (je 30 Tage pro Monat wie in der Patientenliste). Feiertage bundesweit plus NRW (Fronleichnam, Allerheiligen),
+  siehe U16. Überfällige Termine nur offener Akten. Testzugang: nur Testpatienten.
+- **Validierung:** von/bis Pflicht, bis ≥ von, höchstens 400 Tage → sonst 400.
+- **Tabellen:** `patienten_termin`, `patienten_kontakt`, `infusionen_infusionsplan`, `stammdaten_einstellungen`
+- **Teststatus:** Backend-Tests `patienten/test_kalender.py` (`Feiertage.test_ostern_und_nrw`, `Kalender.*`). Browsertests
+  `kalender.spec.ts` (Menüpunkt, Überfälliges, Fälligkeit „Plan prüfen“ öffnen, Woche/Liste, Feiertage; Termin an einem Tag
+  anlegen, öffnen, abhaken, Erledigte ausblenden; Betrachter ohne Anlegen); Neustart in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F81 Übersicht aller Infusionspläne
+- **Ansicht:** Menüpunkt „Infusionspläne“: Gruppen „Zur Freigabe“ (Entwürfe), „Aktuell“, „Älter als n Mon.“ (Grenzwert),
+  „Abgelöst“, „Alle“ mit Anzahl; Suche nach Name/Nummer; „auch abgeschlossene Akten“; Spalten Patient, Status, gültig ab,
+  Energie, Laufzeit/Rate, Tage/Woche, erstellt, freigegeben; „PDF“ (gespeicherte PDF mit Prüfsumme wie F37), „Öffnen“ (Akte ›
+  Pläne mit diesem Plan). „Neuer Plan“ (Recht „Infusionspläne anlegen“): Patient wählen; gibt es schon einen Entwurf, wird
+  dieser geöffnet statt einen zweiten anzulegen. Bearbeiten und Freigeben bleiben in der Akte.
+- **Endpunkt:** `GET /api/infusionsplaene/uebersicht/?gruppe=entwuerfe|aktuell|alt|abgeloest|alle&suche=&abgeschlossene=1` →
+  `{zaehler: {gruppe: n}, grenze_monate, ergebnisse: [{id, patient, name, nummer, ist_test, patient_abgeschlossen, status,
+  gueltig_ab, kcal, laufzeit_h, rate_ml_h, tage_pro_woche, erstellt_am, erstellt_von, freigegeben_am, freigegeben_von, pdf,
+  pdf_sha256, aelter_als_grenze}]}` (höchstens 1.000 Zeilen). Unbekannte Gruppe → 400.
+- **Tabellen:** `infusionen_infusionsplan`, `patienten_patient`
+- **Teststatus:** Backend-Tests `infusionen/test_uebersicht.py`. Browsertests `infusionsplaene.spec.ts` (Gruppen, Suche, PDF
+  mit Prüfsumme, Öffnen in der Akte; vorhandener Entwurf statt Doppelanlage; Betrachter ohne „Neuer Plan“).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F82 Systemverwaltung: Übersicht
+- **Ansicht:** Administration › System (nur mit Recht „Systemverwaltung“): Kennzahlen CPU, Arbeitsspeicher, Platte,
+  Laufzeit, Ubuntu-Updates (davon Sicherheit), letzte Sicherung – mit Balken und Text „hoch“/„kritisch“ ab 75/90 %;
+  Auslastung der letzten 24 Stunden (CPU und RAM, Fadenkreuz mit Werten); Server (Betriebssystem, Kernel, Swap, Platten,
+  Belegung durch Dokumente/Sicherungen/Image-Dateien, Dienste, Container mit Zustand, ausstehende Pakete); EPM (Version,
+  Django/Python/PostgreSQL, Datenbankgröße, Verbindungen, letzte Pflege, Migrationen, Unveränderlichkeit n von n Tabellen,
+  Patienten, Dokumente, Konten gesperrt/ohne 2FA/Einmal-Kennwort offen, größte Tabellen); Hinweis bei „Neustart nötig“.
+- **Endpunkte:** `GET /api/system/uebersicht/` → `{host (Status vom Systemagenten mit alter_s, aktuell), container (eigene
+  Messung: Last, Speicher, Laufzeit, Platz), agent: {verzeichnis, erreichbar}, epm, angemeldet, hinweis, aktionen, aufgaben,
+  minuten}`; `GET /api/system/verlauf/` → `{felder, punkte: [[zeit, cpu, ram, last, platte]]}` (1.440 Punkte = 24 h).
+- **Logik:** Der Systemagent (`rollout/epm-systemagent.py`, systemd-Timer jede Minute) schreibt `system.json` und
+  `verlauf.json` nach `/srv/epm/system/status/` (im Container nur lesbar). Älter als 3 Minuten = Agent läuft nicht: die
+  Seite zeigt das und, was das Backend selbst sieht (Last und Speicher aus `/proc`, Platz im Dokumentenverzeichnis).
+  Updates: Simulation `apt-get -s upgrade --with-new-pkgs`, zwischengespeichert bis sich Paketlisten oder Paketstand ändern.
+- **Fehlerfälle:** 403 ohne Recht (Seite ausgeblendet, F71)
+- **Teststatus:** Backend-Tests `system/tests.py` (`Rechte.*`, `Uebersicht.*`). Browsertests `system.spec.ts` „nur für Admin“
+  (Menü, Seite, Matrix) und „Auslastung und Status vom Systemagenten“ (CI startet den Agenten im Probelauf).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F83 Tätigkeiten für den Server (Systemagent)
+- **Ansicht:** System › Tätigkeiten › Server: Status neu einlesen, Nach Updates suchen, **Ubuntu-Updates installieren**,
+  **Server neu starten**, **EPM neu starten** (alle drei mit Passwort + Code aus der Authenticator-App oder Notfall-Code; Beginn
+  sofort oder in 5–60 Minuten; Hinweistext an die Benutzer), Sicherung erstellen (zusätzlich Recht „Sicherungen verwalten“),
+  Docker aufräumen, Paketreste entfernen. Verlauf der Tätigkeiten mit Status, Ergebnis und Ausgabe; „Zurückziehen“, solange
+  der Server den Auftrag nicht übernommen hat. Die Seite fragt alle 3 Sekunden nach, solange ein Auftrag läuft.
+- **Endpunkte:** `POST /api/system/auftraege/` `{aktion, kennwort?, code?, minuten?, hinweis?}` → 201 Auftrag;
+  `GET /api/system/auftraege/` (letzte 30, übernimmt vorher die Ergebnisse des Agenten);
+  `POST /api/system/auftraege/<kennung>/abbrechen/`.
+- **Logik:** Das Backend legt `<kennung>.json` in `/srv/epm/system/auftraege/` ab (atomar); die systemd-Pfad-Einheit
+  `epm-systemagent.path` startet den Agenten. Der Agent führt nur seine feste Liste aus (nichts aus der Datei wird als
+  Befehl benutzt, Dateien ohne Folgen symbolischer Links gelesen), schreibt Zwischenstand und Ergebnis nach
+  `status/auftraege/<kennung>.json`. Update und Neustart: vorher `epm-backup` – schlägt die Sicherung fehl, wird nichts
+  verändert. Updates: `apt-get update` und `apt-get -y upgrade --with-new-pkgs` (nicht interaktiv, Konfiguration bleibt).
+  Mit „warnen“ setzt das Backend einen Hinweis an alle Benutzer mit Uhrzeit des Beginns (F85); er endet mit dem Auftrag
+  (beim Neustart nach Ablauf). Derselbe Auftrag nicht doppelt (409). Abschluss steht im Audit-Log (Gruppe „System“).
+  Fehlversuche bei Passwort/Code stehen im Audit-Log, sperren das Konto aber nicht.
+- **Validierung / Fehlerfälle:** unbekannte Aktion 400; Passwort falsch 400 `{kennwort}`; Code falsch 400 `{code}`; Minuten
+  nicht 0/5/10/15/30/60 → 400; 403 ohne Recht; 409 schon beauftragt bzw. nicht mehr zurückziehbar; 503 Auftragsverzeichnis
+  fehlt (dann wird nichts gespeichert).
+- **Server:** `rollout/04-projekt.sh` installiert `/usr/local/sbin/epm-systemagent`, `epm-systemstatus.timer`,
+  `epm-systemagent.path`/`.service` und die Verzeichnisse (`auftraege` 0770 für das Backend, `status` 0755 root);
+  `compose.yaml` bindet `auftraege` schreibend und `status` nur lesend ein. `sudo epm-update` richtet das mit ein.
+- **Tabellen:** `system_systemauftrag`, `system_systemhinweis`, `audit_systemereignis`
+- **Teststatus:** Backend-Tests `system/tests.py` (`Auftraege.*`, darunter `test_echter_agent_im_probelauf`: Backend legt
+  ab → Agent führt aus → Backend übernimmt). Browsertests `system.spec.ts` „Status neu einlesen“ (Ergebnis erscheint ohne
+  Neuladen) und „Neustart nur mit Passwort und 2FA, vorher Warnung an alle Benutzer“ (falscher Code abgelehnt, Notfall-Code,
+  Beginn in 15 Minuten, Warnung beim Mitarbeiter); Neustart in `zz-neustart.spec.ts`. In CI läuft der Agent mit `--trocken`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F84 Wartung des EPM
+- **Ansicht:** System › Tätigkeiten › EPM: Abgelaufene Sitzungen bereinigen, Datenbank optimieren (VACUUM ANALYZE),
+  Dokumente prüfen (vorhanden, Größe; wahlweise Prüfsummen; Dateien ohne Eintrag werden nur gemeldet), Unveränderlichkeit
+  prüfen (fehlende Schutz-Trigger werden wieder gesetzt), Konfiguration prüfen (Django-Sicherheitsprüfung; HSTS und
+  HTTPS-Umleitung macht Nginx), Alle anderen Benutzer abmelden.
+- **Endpunkt:** `POST /api/system/epm/` `{aufgabe, pruefsummen?}` → Auftrag (Ziel „EPM“) mit Status, Ergebnis, Einzelheiten;
+  läuft ohne umschließende Transaktion (VACUUM).
+- **Teststatus:** Backend-Tests `system/tests.py` (`EpmWartung.*`: alle Aufgaben, fehlende und veränderte Dateien, gelöschter
+  Trigger wird wieder gesetzt, andere Sitzung beendet). Browsertest `system.spec.ts` „Unveränderlichkeit prüfen“.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F85 Hinweis an alle Benutzer, Anmeldungen beenden
+- **Ansicht:** Banner oben auf jeder Seite für alle Angemeldeten (Information/Warnung, „Ausblenden“ für die Sitzung), alle
+  60 Sekunden abgefragt. System › Hinweis an alle Benutzer: setzen (Dauer 1 h … 1 Woche oder bis zum Beenden), beenden.
+  System › Angemeldet: alle gültigen Anmeldungen mit Browser, Adresse, zuletzt aktiv; „Abmelden“ (nicht die eigene).
+- **Endpunkte:** `GET /api/system/hinweis/` (jeder Angemeldete), `POST` `{text, art, minuten?}`, `DELETE` (Systemverwaltung);
+  `DELETE /api/system/sitzungen/<id>/`.
+- **Teststatus:** Backend-Tests `system/tests.py` (`Hinweise.test_hinweis_an_alle`, `Uebersicht.test_angemeldete_sitzungen`).
+  Browsertest `system.spec.ts` „eigener Hinweis an alle Benutzer und Eintrag im Audit-Log“.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+Hinweise zur Abgrenzung: Die Systemseite zeigt die letzte Sicherung (aus dem Backup-Ordner, gemessen vom Systemagenten) und
+kann eine Sicherung mit dem bestehenden `epm-backup` anstoßen; die Backup-Seite mit Verschlüsselung, Wiederherstellen und
+Übertragung (F61–F64, O-23) bleibt offen und nutzt künftig denselben Systemagenten. Die Kacheln der Admin-Startseite
+(S12–S14 in `claude/startseite-erweiterungen.md`) folgen mit den Startseiten-Erweiterungen; sie lesen dieselben Endpunkte.
+Ein Auftrag mit Wartezeit (Beginn in n Minuten) ist ab der Übernahme durch den Server nicht mehr zurückziehbar; die Warnung
+lässt sich jederzeit beenden.
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -1191,11 +1327,13 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 | U13 | ~~Energie im Infusionsplan: Lipide 9 oder 9,15 kcal/g, Albumin mit oder ohne Energie?~~ **Geklärt 01.10.2026:** wie in `EPM_infuplan.php`: Lipide 9,15 kcal/g, Humanalbumin in ml ohne Energie | F33, F39 | – |
 | U14 | ~~Stabilitätsprüfung Calcium + Magnesium und Vorbelegung des ersten Plans je kg übernehmen?~~ **Geklärt 01.10.2026:** ja, beides wie im Altsystem (Stabilität als Hinweis, Speichern bleibt möglich); Präparate werden beim ersten Plan **nicht** vorausgewählt | F32, F33 | – |
 | U15 | ~~Muss beim endgültigen Löschen auch der Titel aus Historie und Audit-Log verschwinden?~~ **Geklärt 02.10.2026: nach geltender DSGVO.** Titel, Dateiname, Notiz und Datum werden überall entfernt (Art. 17 Abs. 1 d, Art. 5 Abs. 1 c/e); es bleibt der Nachweis ohne Inhalt (Art. 5 Abs. 2, Art. 33 Abs. 5; § 630f BGB); Sicherungen laufen nach 14 Tagen ab, nach einer Wiederherstellung wird erneut gelöscht | F73 | – |
+| U16 | Feiertage im Kalender: welches Bundesland? | F80 | NRW (Sitz der Stiftung in Altenberge, aus der Anschrift abgeleitet) – bitte bestätigen |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 02.10.2026 | Runde 4 (Systemseite, Kalender, Infusionspläne) | Neues Recht „Systemverwaltung“ (nur Admin); Administration › System mit Systemagent auf dem Server (F82–F85, Festlegungen S12–S14); globaler Kalender mit Fälligkeiten und Feiertagen (F80); Übersicht aller Infusionspläne (F81); Audit-Gruppe „System“; Feiertage NRW (U16). Nummern ab F80, damit parallele Arbeiten (F72 ff.) nicht kollidieren |
 | 01.10.2026 | Runde 1 (`c387b7b`–`0e25377`) | Backend für F01–F22, F25–F36, F40–F48, F52–F54, F56–F58, F60 mit Backend-Tests; Nachweis angelegt |
 | 01.10.2026 | Runde 2 (`9eae348`) | Rechte je Gruppe (F66) nach Festlegung: Mediziner wie Admin außer Benutzerverwaltung, Wiederöffnen, Sicherungen, Testdaten; U10 erledigt, U11 bestätigt, U12 neu; Briefkopf und Logo (F49) |
 | 01.10.2026 | Runde 2 (`2b76a0a`–`39b86b9`) | Frontend: Anmeldung, Start, Patientenliste, Neuer Patient, Versorger, Akte (Übersicht, Diagnose & Therapie, Kontakte, Pläne, Dokumente, Verlauf); Browsertests im echten Stack in GitHub Actions |
