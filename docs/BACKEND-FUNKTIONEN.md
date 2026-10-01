@@ -100,8 +100,12 @@ Stand 01.10.2026: **73 von 73 Backend-Tests** und **40 von 40 Browsertests grün
 | F64 | Übertragung zur Nextcloud/NAS mit Status | 11 Backup | NICHT ABGESCHLOSSEN |
 | F65 | Import der Altdaten | – (Rollout-Schritt 7) | NICHT ABGESCHLOSSEN |
 | F66 | Rechte je Gruppe einstellen | 17 Benutzer (Rechte) | ABGESCHLOSSEN UND GETESTET |
+| F67 | Gemeinsame Ärzteliste pflegen | Ärzte (neu) | ABGESCHLOSSEN UND GETESTET |
+| F68 | Ärzte eines Patienten (Rolle, Hausarzt im Kopf) | 4 Akte, 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
+| F69 | Bezugspersonen mit „Auskunft erlaubt“ | 4 Akte | ABGESCHLOSSEN UND GETESTET |
+| F70 | „kein“ Katheter/Versorger, Nickelallergie als Auswahl | 4 Akte, 12 Neuer Patient, 3 Liste | ABGESCHLOSSEN UND GETESTET |
 
-Summe (66 Funktionen): 52 abgeschlossen und getestet · 3 teilweise abgeschlossen · 11 nicht abgeschlossen · 0 blockiert.
+Summe (70 Funktionen): 56 abgeschlossen und getestet · 3 teilweise abgeschlossen · 11 nicht abgeschlossen · 0 blockiert.
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 
@@ -913,6 +917,72 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 
 ---
 
+## L · Kontaktdaten der Akte (Runde 3, Festlegung 01.10.2026)
+
+Rückmeldung aus dem Testsystem: Unter den Stammdaten stand nur ein Telefon; je Patient gibt es aber mehrere
+Ansprechpersonen (Mutter, Vater, Betreuer/in …), und Ärzte brauchen gepflegte Kontaktdaten. Entscheidungen des Nutzers:
+gemeinsame Ärzteliste; „kein“ und „nicht erfasst“ getrennt; Bezugspersonen mit Beziehung als pflegbarer Liste und
+„Auskunft erlaubt“. Nichts wird gelöscht: Nicht mehr Aktuelles wird markiert und bleibt im Verlauf der Akte.
+
+### F67 Gemeinsame Ärzteliste pflegen
+- **Ansicht:** Ärzte (Seitenleiste, neu), Link „Neu anlegen“ bei „Neuer Patient“
+- **Endpunkte:** `GET/POST /api/aerzte/?aktiv&search`, `PATCH /api/aerzte/{id}/`, `GET /api/aerzte/{id}/patienten/`;
+  kein Löschen (405), Deaktivieren über `aktiv: false`
+- **Felder:** `name` (Pflicht), `praxis`, `fachrichtung`, `strasse`, `plz`, `ort`, `telefon`, `fax`, `email`, `notiz`, `aktiv`;
+  nur lesend `patienten_anzahl` (Patienten in Betreuung ohne Testpatienten)
+- **Rechte:** Recht „Versorger, Ansprechpartner und Ärzte pflegen“ (bisher „Versorger und Ansprechpartner pflegen“), lesen alle
+- **Tabellen:** `stammdaten_arzt` (+ Historie), Audit-Log „Stammdaten“
+- **Teststatus:** Backend-Test grün (`Kontaktdaten.test_aerzteliste_und_zuordnung`). Browsertest grün: `akte.spec.ts`
+  „Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pflegen“ (anlegen, Telefon ändern wirkt in der Akte,
+  Liste der Patienten); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F68 Ärzte eines Patienten
+- **Endpunkte:** `GET/POST /api/patient-aerzte/?patient&aktiv`, `PATCH /api/patient-aerzte/{id}/` (Rolle, Notiz, `aktiv`); 405 bei DELETE;
+  beim Anlegen eines Patienten `aufnahme_hausarzt` (Arzt-ID) → Zuordnung „Hausarzt“ in derselben Transaktion
+- **Rollen:** hausarzt, facharzt, ueberweisend, klinik, sonstige; je Arzt und Rolle nur eine aktive Zuordnung (DB-Constraint)
+- **Kopf der Akte:** `kopf.hausarzt {id, name, praxis, telefon}`, `zaehler.aerzte`
+- **Validierung:** Arzt nicht tauschbar (neu zuordnen); deaktivierte Ärzte nicht neu zuordenbar; Recht „Patienten anlegen, Diagnose,
+  Therapie, Stammdaten ändern“; Admin nur bei Testpatienten; Akte offen (409)
+- **Verlauf:** Bereich `aerzte`, Aktionen angelegt / geändert / nicht mehr zuständig / wieder zuständig
+- **Bestand:** Das bisherige Freitextfeld `hausarzt` bleibt (Altdaten) und wird angezeigt, solange es gefüllt ist.
+- **Tabellen:** `patienten_patientarzt` (+ Historie)
+- **Teststatus:** Backend-Test grün (`Kontaktdaten.test_aerzteliste_und_zuordnung`). Browsertests grün: `akte.spec.ts` (s. F67),
+  `patienten.spec.ts` „Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme“ (Hausarzt beim Anlegen).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F69 Bezugspersonen
+- **Endpunkte:** `GET/POST /api/bezugspersonen/?patient&aktiv`, `PATCH /api/bezugspersonen/{id}/`; 405 bei DELETE
+- **Felder:** `beziehung` (Liste „beziehung“: Mutter, Vater, Ehepartner/in, Kind, Betreuer/in (gesetzlich), Pflegedienst, Sonstige –
+  unter Vorlagen › Auswahllisten erweiterbar), `name` (Pflicht), `telefon`, `mobil`, `email`, `strasse`, `plz`, `ort`, `notiz`,
+  `auskunft_erlaubt` (Schweigepflichtentbindung liegt vor), `aktiv`
+- **Kopf der Akte:** „Auskunft an“ = aktive Personen mit `auskunft_erlaubt` (`kopf.auskunft`), `zaehler.bezugspersonen`
+- **Validierung/Rechte:** wie F68; Beziehung nur aus der Liste „beziehung“
+- **Verlauf:** Bereich `bezugspersonen`, Aktionen angelegt / geändert / nicht mehr aktuell / wieder aktuell
+- **Tabellen:** `patienten_bezugsperson` (+ Historie)
+- **Teststatus:** Backend-Tests grün (`Kontaktdaten.test_bezugspersonen_*`, `test_beziehungsliste_wie_festgelegt`, `Musterdaten`).
+  Browsertest grün: `akte.spec.ts` (s. F67); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F70 „kein“ Katheter/Versorger, Nickelallergie als Auswahl
+- **Felder:** `kein_katheter`, `kein_versorger` (bool) am Patienten; DB-Constraints verhindern „kein“ zusammen mit einer Auswahl.
+  Wer einen Katheter/Versorger wählt, hebt „kein“ auf.
+- **Wirkung:** Hinweis „Versorger nicht erfasst“ und Prüfliste nur noch, wenn weder Versorger noch „kein“ gesetzt ist; Kopf und Liste
+  zeigen „kein“ bzw. „nicht erfasst“. Nickelallergie im Dialog „Stammdaten bearbeiten“ als Auswahlliste (nicht erfasst/ja/nein).
+- **Teststatus:** Backend-Test grün (`Kontaktdaten.test_kein_katheter_und_kein_versorger`). Browsertest grün: `akte.spec.ts`
+  „Stammdaten bearbeiten, Akte abschließen …“; Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### Weitere Rückmeldungen aus dem Testsystem (Runde 3)
+- **Blau auf Blau:** Links mit Knopf-Stil („Neuer Patient“, „Neuer Plan“, „Öffnen“) erbten die Linkfarbe, weil die Grundregel
+  `a { color }` außerhalb einer CSS-Ebene stand und damit jede Komponentenregel schlug. Grundregeln liegen jetzt in `@layer base`.
+  Browsertests prüfen den Kontrast ≥ 4,5:1 (`patienten.spec.ts`, `dokumente.spec.ts`).
+- **Zähler „0 in Betreuung“:** Testpatienten zählen weiterhin nicht. Nur die Administration sieht ihre Anzahl getrennt
+  („zusätzlich n Testpatienten“, „+n Test“; `GET /api/patienten/zaehler/` liefert `testpatienten` nur für Admins).
+- **PDF-Vorschau:** Dokumente zeigen PDFs mit pdf.js in EPM (Canvas) statt mit dem PDF-Programm des Browsers (Adobe Reader blendete
+  eine schwarze Leiste ein); große Ansicht mit Zoom. Offline, ohne eval/WebAssembly (CSP unverändert). Browsertest `dokumente.spec.ts`
+  „PDF-Vorschau und Ansicht in EPM …“.
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -969,3 +1039,4 @@ Browser reichen). Funktionen, die noch fehlen, zeigt die Oberfläche als „folg
 | 01.10.2026 | Runde 2 (`d7b3411`) | Plan-Editor: „Energie manuell“ ergänzt (war im Backend vorhanden, fehlte in der Oberfläche); Browsertests für Kopfzeilensuche, Testzugang, Vorlage und Leer beginnen, alle Elektrolyte, Praxistermin mit Ort, Diagramm |
 | 01.10.2026 | Runde 2 (`eae8bc3`–`a985fa5`) | Klärung U1, U2, U8, U9 umgesetzt: Protonenpumpenhemmer mit Zeiten (F38) und berechnetes Gesamtvolumen mit Rate und Grenze (F39, F48) auf ABGESCHLOSSEN UND GETESTET; F11/F58 ohne Gerätename-Lücke; F64 nicht mehr blockiert. U13/U14 gestellt |
 | 01.10.2026 | Runde 2 (`f865cde`–`a985fa5`) | Klärung U13/U14 umgesetzt: Energie mit Lipiden 9,15 kcal/g, Humanalbumin in ml ohne Energie (Feld `albumin_ml`), Hinweis zur Ca/Mg-Stabilität, erster Plan je kg Körpergewicht vorbelegt (`GET /api/infusionsplaene/vorbelegung/?patient=`) |
+| 01.10.2026 | Runde 3 (`c3aacfa`–`1718dc3`) | Rückmeldungen aus dem Testsystem: Blau auf Blau behoben, Testpatienten-Zahl nur für Admin, PDF-Anzeige mit pdf.js, Ärzteliste (F67/F68), Bezugspersonen (F69), „kein“ Katheter/Versorger und Nickelallergie als Auswahl (F70); Backend-Image mit IBM Plex aus dem Repo (Debian 13 hat kein `fonts-ibm-plex`) |
