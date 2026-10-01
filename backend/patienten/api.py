@@ -328,11 +328,20 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
         anlass = request.data.get("anlass")
         if anlass not in Patient.Abschlussanlass.values:
             return Response({"anlass": "Bitte Anlass wählen."}, status=status.HTTP_400_BAD_REQUEST)
-        patient.abgeschlossen_am = request.data.get("datum") or timezone.localdate()
+        datum = timezone.localdate()
+        if request.data.get("datum"):
+            try:
+                datum = serializers.DateField().to_internal_value(request.data["datum"])
+            except serializers.ValidationError as fehler_datum:
+                return Response({"datum": fehler_datum.detail}, status=status.HTTP_400_BAD_REQUEST)
+            if datum > timezone.localdate():
+                return Response({"datum": ["Das Datum liegt in der Zukunft."]}, status=status.HTTP_400_BAD_REQUEST)
+        patient.abgeschlossen_am = datum
         patient.abschluss_anlass = anlass
         patient.abschluss_notiz = str(request.data.get("notiz", ""))[:2000]
         patient.save()
-        protokolliere(SystemEreignis.Art.AKTE_ABGESCHLOSSEN, request, objekt=patient.nummer, anlass=anlass)
+        protokolliere(SystemEreignis.Art.AKTE_ABGESCHLOSSEN, request, objekt=patient.nummer, anlass=anlass,
+                      name=f"{patient.nachname}, {patient.vorname}")
         patient.refresh_from_db()
         return Response(PatientSerializer(patient, context=self.get_serializer_context()).data)
 
@@ -351,7 +360,7 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
         patient._change_reason = f"Wieder geöffnet: {grund}"
         patient.save()
         protokolliere(SystemEreignis.Art.AKTE_GEOEFFNET, request, objekt=patient.nummer, grund=grund,
-                      vorheriger_anlass=vorher)
+                      vorheriger_anlass=vorher, name=f"{patient.nachname}, {patient.vorname}")
         return Response(PatientSerializer(patient, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=["get"])

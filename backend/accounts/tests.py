@@ -88,6 +88,18 @@ class Anmeldung(TestCase):
         self.assertEqual(r.json()["fehlversuche"], 0)
         self.assertEqual(a.get("/api/benutzer/hinweise/").json(), [])
         self.assertEqual(self.anmelden(self.kennwort).json()["schritt"], "kennwort_aendern")
+        # Audit-Log wie im Entwurf 20
+        log = a.get("/api/protokoll/?gruppe=fehlversuch").json()["results"]
+        texte = [e["beschreibung"] for e in log]
+        self.assertIn("Falsches Passwort (3. Versuch)", texte)
+        gesperrt = [e for e in log if e["art"] == "anmeldung_gesperrt" and "Konto gesperrt" in e["beschreibung"]]
+        self.assertEqual(len(gesperrt), 1)
+        self.assertRegex(gesperrt[0]["beschreibung"], r"^5 falsche Passwörter in \d+ Minuten, Konto gesperrt$")
+        self.assertEqual({e["gruppe_name"] for e in log}, {"Fehlversuch"})
+        self.assertTrue(all("geraet" in e for e in log))
+        entsperrt = a.get("/api/protokoll/?gruppe=benutzer").json()["results"][0]
+        self.assertEqual(entsperrt["beschreibung"], "Benutzer neu entsperrt")
+        self.assertEqual(a.get("/api/protokoll/?gruppe=unbekannt").status_code, 400)
 
     def test_einmal_kennwort_laeuft_ab(self):
         self.user.einmal_kennwort_gueltig_bis = timezone.now() - timedelta(minutes=1)

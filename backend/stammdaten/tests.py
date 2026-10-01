@@ -105,3 +105,7 @@ class EinstellungenPruefen(Grundlage):
         self.assertEqual(r.status_code, 200, r.content)
         e = Einstellungen.aktuell()
         self.assertEqual((e.kontakt_ueberfaellig_monate, e.kalium_max_mmol), (6, 250))
+        eintrag = a.get("/api/protokoll/?gruppe=vorlage").json()["results"][0]
+        self.assertEqual(eintrag["gruppe_name"], "Vorlage")
+        self.assertIn("„Kontakt überfällig“ von 12 auf 6 Monate geändert", eintrag["beschreibung"])
+        self.assertIn("„Kalium maximal“ von 300 auf 250 mmol geändert", eintrag["beschreibung"])

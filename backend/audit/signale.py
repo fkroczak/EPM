@@ -18,7 +18,10 @@ def _logout(sender, request, user, **kwargs):
 
 @receiver(user_login_failed, dispatch_uid="epm_login_failed")
 def _login_failed(sender, credentials, request=None, **kwargs):
-    protokolliere(
-        SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request,
-        benutzername=str(credentials.get("username", ""))[:150],
-    )
+    from accounts.models import User
+
+    name = str(credentials.get("username", ""))[:150]
+    bisher = (User.objects.filter(username=name, nur_historisch=False, is_active=True)
+              .values_list("fehlversuche", flat=True).first())
+    details = {"versuch": bisher + 1} if bisher is not None else {}
+    protokolliere(SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request, benutzername=name, **details)

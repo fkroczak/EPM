@@ -158,13 +158,24 @@ class Akte(Grundlage):
                                           {"anlass": "therapie_beendet"}, format="json")
                 self.assertEqual(r.status_code, 403)
         c = client_fuer(self.mediziner)
-        self.assertEqual(c.post(f"/api/patienten/{self.patient.id}/abschliessen/", {"anlass": "x"},
-                                format="json").status_code, 400)
+        url = f"/api/patienten/{self.patient.id}/abschliessen/"
+        self.assertEqual(c.post(url, {"anlass": "x"}, format="json").status_code, 400)
+        morgen = str(timezone.localdate() + timedelta(days=1))
+        for datum in ("kein-datum", morgen):
+            with self.subTest(datum=datum):
+                r = c.post(url, {"anlass": "verstorben", "datum": datum}, format="json")
+                self.assertEqual(r.status_code, 400)
+                self.assertIn("datum", r.json())
         r = c.post(f"/api/patienten/{self.patient.id}/abschliessen/", {"anlass": "therapie_beendet",
                                                                      "notiz": "HPE beendet"}, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         self.assertTrue(r.json()["ist_abgeschlossen"])
-        self.assertTrue(SystemEreignis.objects.filter(art="akte_abgeschlossen").exists())
+        log = client_fuer(self.admin).get("/api/protokoll/?gruppe=abschluss").json()["results"]
+        self.assertEqual(log[0]["beschreibung"],
+                         f"Akte Echt, Anna (Nr. {self.patient.nummer:04d}) abgeschlossen, Anlass: Therapie beendet")
+        self.assertEqual(log[0]["person"], self.mediziner.anzeigename)
+        r = c.post(f"/api/patienten/{self.patient.id}/abschliessen/", {"anlass": "verstorben"}, format="json")
+        self.assertEqual(r.status_code, 409)  # bereits abgeschlossen
 
     def test_plausibilitaet_gewicht(self):
         c = client_fuer(self.mitarbeiter)

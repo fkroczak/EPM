@@ -6,23 +6,50 @@ from rest_framework.response import Response
 from accounts.permissions import NurAdmin
 
 from .models import SystemEreignis, protokolliere
+from .texte import GRUPPEN, beschreibung, gruppe, gruppe_name
 
 
 class SystemEreignisSerializer(serializers.ModelSerializer):
     art_name = serializers.CharField(source="get_art_display", read_only=True)
     person = serializers.SerializerMethodField()
+    gruppe = serializers.SerializerMethodField()
+    gruppe_name = serializers.SerializerMethodField()
+    beschreibung = serializers.SerializerMethodField()
 
     class Meta:
         model = SystemEreignis
-        fields = ["id", "zeitpunkt", "art", "art_name", "benutzer", "person", "benutzername", "objekt", "details", "ip"]
+        fields = ["id", "zeitpunkt", "art", "art_name", "gruppe", "gruppe_name", "beschreibung", "benutzer", "person",
+                  "benutzername", "objekt", "details", "ip", "geraet"]
 
     def get_person(self, obj):
-        return obj.benutzer.anzeigename if obj.benutzer else obj.benutzername
+        if obj.benutzer:
+            return obj.benutzer.anzeigename
+        return obj.benutzername or "System"
+
+    def get_gruppe(self, obj):
+        return gruppe(obj.art)
+
+    def get_gruppe_name(self, obj):
+        return gruppe_name(obj.art)
+
+    def get_beschreibung(self, obj):
+        return beschreibung(obj)
 
 
 class SystemEreignisFilter(filters.FilterSet):
     von = filters.DateFilter(field_name="zeitpunkt", lookup_expr="date__gte")
     bis = filters.DateFilter(field_name="zeitpunkt", lookup_expr="date__lte")
+    gruppe = filters.CharFilter(method="filter_gruppe", label="Gruppen, mit Komma getrennt: " + ", ".join(GRUPPEN))
+
+    def filter_gruppe(self, qs, name, wert):
+        arten = []
+        for g in (t.strip() for t in wert.split(",") if t.strip()):
+            if g not in GRUPPEN:
+                from rest_framework.exceptions import ValidationError
+
+                raise ValidationError({"gruppe": f"Unbekannte Gruppe „{g}“. Erlaubt: {', '.join(GRUPPEN)}."})
+            arten += GRUPPEN[g][1]
+        return qs.filter(art__in=arten) if arten else qs
 
     class Meta:
         model = SystemEreignis

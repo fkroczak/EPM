@@ -132,33 +132,34 @@ class Einstellungen(models.Model):
         STIFTUNG = "stiftung", "Stiftung"
         GUG = "gug", "gUG"
 
-    absender = models.CharField(max_length=10, choices=Absender.choices, default=Absender.STIFTUNG)
+    absender = models.CharField("Absender", max_length=10, choices=Absender.choices, default=Absender.STIFTUNG)
 
     # Warnungen
-    gewicht_warnung_prozent = models.DecimalField(max_digits=4, decimal_places=1, default=Decimal("5.0"))
-    gewicht_warnung_monate = models.PositiveSmallIntegerField(default=3)
-    plan_alter_warnung_monate = models.PositiveSmallIntegerField(default=12)
-    kontakt_ueberfaellig_monate = models.PositiveSmallIntegerField(default=12)
+    gewicht_warnung_prozent = models.DecimalField("Warnung Gewichtsverlust", max_digits=4, decimal_places=1,
+                                                  default=Decimal("5.0"))
+    gewicht_warnung_monate = models.PositiveSmallIntegerField("Zeitraum Gewichtsverlust", default=3)
+    plan_alter_warnung_monate = models.PositiveSmallIntegerField("Infusionsplan gilt als alt nach", default=12)
+    kontakt_ueberfaellig_monate = models.PositiveSmallIntegerField("Kontakt überfällig", default=12)
 
     # Plausibilitätsgrenzen (Eingaben außerhalb werden abgelehnt)
-    gewicht_min_kg = models.DecimalField(max_digits=5, decimal_places=1, default=Decimal("20.0"))
-    gewicht_max_kg = models.DecimalField(max_digits=5, decimal_places=1, default=Decimal("250.0"))
-    groesse_min_cm = models.DecimalField(max_digits=5, decimal_places=1, default=Decimal("100.0"))
-    groesse_max_cm = models.DecimalField(max_digits=5, decimal_places=1, default=Decimal("230.0"))
-    kcal_max_tag = models.PositiveIntegerField(default=5000)
+    gewicht_min_kg = models.DecimalField("Gewicht minimal", max_digits=5, decimal_places=1, default=Decimal("20.0"))
+    gewicht_max_kg = models.DecimalField("Gewicht maximal", max_digits=5, decimal_places=1, default=Decimal("250.0"))
+    groesse_min_cm = models.DecimalField("Größe minimal", max_digits=5, decimal_places=1, default=Decimal("100.0"))
+    groesse_max_cm = models.DecimalField("Größe maximal", max_digits=5, decimal_places=1, default=Decimal("230.0"))
+    kcal_max_tag = models.PositiveIntegerField("Energie maximal", default=5000)
     # Grenzen je Planwert (Entwurf 18 · Vorlagen › Grenzwerte). Die Standardwerte sind bewusst weit
     # gefasst und werden von der Administration festgelegt.
-    kcal_min_tag = models.PositiveIntegerField(default=0)
-    glucose_min_g = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("0"))
-    glucose_max_g = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("1000"))
-    aminosaeuren_min_g = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("0"))
-    aminosaeuren_max_g = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("300"))
-    lipide_min_g = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("0"))
-    lipide_max_g = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("200"))
-    natrium_min_mmol = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("0"))
-    natrium_max_mmol = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("500"))
-    kalium_min_mmol = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("0"))
-    kalium_max_mmol = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("300"))
+    kcal_min_tag = models.PositiveIntegerField("Energie minimal", default=0)
+    glucose_min_g = models.DecimalField("Glucose minimal", max_digits=6, decimal_places=1, default=Decimal("0"))
+    glucose_max_g = models.DecimalField("Glucose maximal", max_digits=6, decimal_places=1, default=Decimal("1000"))
+    aminosaeuren_min_g = models.DecimalField("Aminosäuren minimal", max_digits=6, decimal_places=1, default=Decimal("0"))
+    aminosaeuren_max_g = models.DecimalField("Aminosäuren maximal", max_digits=6, decimal_places=1, default=Decimal("300"))
+    lipide_min_g = models.DecimalField("Lipide minimal", max_digits=6, decimal_places=1, default=Decimal("0"))
+    lipide_max_g = models.DecimalField("Lipide maximal", max_digits=6, decimal_places=1, default=Decimal("200"))
+    natrium_min_mmol = models.DecimalField("Natrium minimal", max_digits=6, decimal_places=1, default=Decimal("0"))
+    natrium_max_mmol = models.DecimalField("Natrium maximal", max_digits=6, decimal_places=1, default=Decimal("500"))
+    kalium_min_mmol = models.DecimalField("Kalium minimal", max_digits=6, decimal_places=1, default=Decimal("0"))
+    kalium_max_mmol = models.DecimalField("Kalium maximal", max_digits=6, decimal_places=1, default=Decimal("300"))
 
     history = HistoricalRecords()
 

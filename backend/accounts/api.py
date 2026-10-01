@@ -18,6 +18,7 @@ import qrcode.image.svg
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout, password_validation, update_session_auth_hash
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import Q
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from django.utils.decorators import method_decorator
@@ -63,8 +64,16 @@ def fehlversuch(user, request, art):
     if user.fehlversuche >= settings.EPM_LOGIN_MAX_FEHLVERSUCHE:
         user.sperren(f"{user.fehlversuche} Fehlversuche bei der Anmeldung")
         user.save(update_fields=User.SPERR_FELDER)
+        # „5 falsche Passwörter in 4 Minuten“: Zeit seit dem ersten der gezählten Fehlversuche
+        zeiten = list(
+            SystemEreignis.objects.filter(
+                Q(benutzer=user) | Q(benutzername=user.username),
+                art__in=[SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN],
+            ).order_by("-zeitpunkt").values_list("zeitpunkt", flat=True)[:user.fehlversuche]
+        )
+        minuten = max(1, round((timezone.now() - zeiten[-1]).total_seconds() / 60)) if zeiten else None
         protokolliere(SystemEreignis.Art.ANMELDUNG_GESPERRT, request, benutzer=user,
-                      fehlversuche=user.fehlversuche, letzter_fehler=art)
+                      fehlversuche=user.fehlversuche, minuten=minuten, letzter_fehler=art)
         return True
     user.save(update_fields=["fehlversuche"])
     return False
@@ -169,7 +178,7 @@ class ZweiterFaktorView(OffenerView):
                 else:
                     protokolliere(SystemEreignis.Art.ANMELDUNG, request, schritt="2fa")
                 return status_antwort(request)
-        protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request)
+        protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request, versuch=user.fehlversuche + 1)
         if fehlversuch(user, request, "2fa"):
             logout(request)
             return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
@@ -475,7 +484,8 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         """Gesperrte Konten für den Hinweis im Audit-Log."""
         gesperrt = User.objects.filter(gesperrt_am__isnull=False, nur_historisch=False).order_by("-gesperrt_am")
         return Response([{"id": u.id, "benutzername": u.username, "anzeigename": u.anzeigename,
-                          "gesperrt_am": u.gesperrt_am, "sperrgrund": u.sperrgrund} for u in gesperrt])
+                          "gesperrt_am": u.gesperrt_am, "sperrgrund": u.sperrgrund, "fehlversuche": u.fehlversuche}
+                         for u in gesperrt])
 
     def perform_update(self, serializer):
         user = serializer.instance

@@ -10,6 +10,36 @@ from audit.models import SystemEreignis, protokolliere
 from .models import Ansprechpartner, Auswahlwert, Einstellungen, Praeparat, Versorger
 
 
+def _text(wert):
+    from decimal import Decimal
+
+    if wert is None or isinstance(wert, (bool, int, str)):
+        return wert
+    if isinstance(wert, Decimal):
+        text = f"{wert:f}"
+        return text.rstrip("0").rstrip(".").replace(".", ",") if "." in text else text
+    return str(wert)
+
+
+EINHEITEN = {"_monate": "Monate", "_prozent": "%", "_kg": "kg", "_cm": "cm", "_mmol": "mmol", "_g": "g",
+             "_tag": "kcal"}
+
+
+def aenderungen_von(obj, vorher: dict):
+    """{feld: [alt, neu, einheit]} und Feldbezeichnungen für das Audit-Log („von 6 auf 12 Monate geändert“)."""
+    aenderungen, namen = {}, {}
+    for feld, alt in vorher.items():
+        neu = getattr(obj, feld)
+        if alt != neu:
+            einheit = next((e for endung, e in EINHEITEN.items() if feld.endswith(endung)), "")
+            aenderungen[feld] = [_text(alt), _text(neu), einheit]
+            try:
+                namen[feld] = str(obj._meta.get_field(feld).verbose_name)
+            except Exception:  # noqa: BLE001 – nur Beschriftung
+                namen[feld] = feld
+    return aenderungen, namen
+
+
 class OhneLoeschen(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.CreateModelMixin,
                    mixins.UpdateModelMixin, viewsets.GenericViewSet):
     permission_classes = [StammdatenRecht]
@@ -20,9 +50,12 @@ class OhneLoeschen(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Crea
                       aktion="angelegt")
 
     def perform_update(self, serializer):
+        vorher = {f: getattr(serializer.instance, f) for f in serializer.validated_data}
         obj = serializer.save()
+        aenderungen, namen = aenderungen_von(obj, vorher)
         protokolliere(SystemEreignis.Art.STAMMDATEN, self.request, objekt=f"{obj._meta.verbose_name}: {obj}",
-                      aktion="geändert", felder=sorted(serializer.validated_data))
+                      aktion="geändert", felder=sorted(serializer.validated_data), aenderungen=aenderungen,
+                      bezeichnungen=namen)
 
 
 class AuswahlwertSerializer(serializers.ModelSerializer):
@@ -167,8 +200,12 @@ class EinstellungenView(APIView):
         return Response(EinstellungenSerializer(Einstellungen.aktuell()).data)
 
     def patch(self, request):
-        s = EinstellungenSerializer(Einstellungen.aktuell(), data=request.data, partial=True)
+        e = Einstellungen.aktuell()
+        s = EinstellungenSerializer(e, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
+        vorher = {f: getattr(e, f) for f in s.validated_data}
         s.save()
-        protokolliere(SystemEreignis.Art.STAMMDATEN, request, objekt="Einstellungen", felder=sorted(s.validated_data))
+        aenderungen, namen = aenderungen_von(s.instance, vorher)
+        protokolliere(SystemEreignis.Art.STAMMDATEN, request, objekt="Einstellungen", felder=sorted(s.validated_data),
+                      aenderungen=aenderungen, bezeichnungen=namen)
         return Response(s.data)
