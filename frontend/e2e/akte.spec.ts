@@ -209,6 +209,18 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   await expect(page.getByTestId("aktentermine")).toContainText("Rückruf Trinkmenge");
   const geaendert = await api.get(`termine/${termine.results[0].id}/`);
   expect([geaendert.titel, geaendert.uhrzeit]).toEqual(["Rückruf Trinkmenge", "11:15:00"]);
+
+  // Praxistermin mit Terminort aus der pflegbaren Liste
+  await page.getByTestId("aktenkopf").getByRole("button", { name: "Termin" }).click();
+  const pt = page.getByRole("dialog");
+  await pt.getByLabel("Art").selectOption("praxistermin");
+  await pt.getByLabel("Ort").selectOption({ label: "Praxis Dr. Holtmeier" });
+  await pt.getByLabel("Titel").fill("Kontrolle in der Praxis");
+  await pt.getByRole("button", { name: "Termin speichern" }).click();
+  await expect(page.getByText("Termin angelegt.")).toBeVisible();
+  await expect(page.getByTestId("aktentermine")).toContainText("Kontrolle in der Praxis");
+  const praxis = (await api.get(`termine/?patient=${p.id}&offen=true`)).results.find((t: { titel: string }) => t.titel === "Kontrolle in der Praxis");
+  expect([praxis.art, praxis.ort_name]).toEqual(["praxistermin", "Praxis Dr. Holtmeier"]);
   await api.ende();
   merken("kontakte", { id: p.id });
 });

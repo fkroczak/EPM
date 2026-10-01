@@ -30,7 +30,6 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await editor.getByLabel("Magnesium").fill("6");
   await editor.getByLabel("Spurenelemente").selectOption({ label: "Addel N" });
   await editor.getByLabel("Katheterblock / Medikament").selectOption({ label: "Taurolin 2 %" });
-  await editor.getByLabel("Katheterblock / Medikament").selectOption({ label: "Taurolin 2 %" });
   await editor.getByRole("button", { name: "+ Soluvit N" }).click();
   await editor.getByRole("button", { name: "+ Vitalipid adult" }).click();
   await editor.getByLabel("Laufzeit").fill("12");
@@ -97,10 +96,15 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(editor).toContainText("Vorlage geladen");
   await expect(editor.getByLabel("Menge Aminosäuren in g")).toHaveValue("80");
   await expect(editor.getByLabel("Phosphat")).toHaveValue("12");
+  // Energie manuell setzen: gilt statt der berechneten, auch für die Grenzen
+  await editor.getByLabel("Energie manuell").fill("1600");
+  await expect(summe).toContainText("1.600 kcal (manuell)");
+  await expect(summe).toContainText("berechnet wären 1.500 kcal");
   await editor.getByRole("button", { name: "Als Entwurf speichern" }).click();
   await expect(page.getByText("Entwurf gespeichert.").last()).toBeVisible();
   const ausVorlage = (await api.get(`infusionsplaene/?patient=${patient.id}&status=entwurf`)).results[0];
   expect([ausVorlage.aminosaeuren_g, ausVorlage.phosphat_mmol, ausVorlage.magnesium_mmol]).toEqual([80, 12, 6]);
+  expect([ausVorlage.kcal_manuell, ausVorlage.kcal, ausVorlage.kcal_berechnet]).toEqual([1600, 1600, 1500]);
   await detail.getByRole("button", { name: "Verwerfen" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Verwerfen" }).click();
   await expect(page.getByTestId("planliste").getByRole("listitem")).toHaveCount(1);

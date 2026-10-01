@@ -87,6 +87,12 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   await expect(page.getByRole("heading", { name: "Neuer Patient" })).toBeVisible();
   await expect(page.getByTestId("naechste-nummer")).toHaveText(/^\d{4}$/);
 
+  // Versorger direkt aus dem Formular neu anlegen
+  await page.getByRole("link", { name: "Neu anlegen" }).click();
+  await expect(page.getByTestId("versorger-detail").getByRole("heading", { name: "Neuer Versorger" })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Neuer Patient" })).toBeVisible();
+
   // Pflichtfelder (Prüfung in der Oberfläche)
   await page.getByRole("button", { name: "Anlegen und Akte öffnen" }).click();
   await expect(page.getByText("Bitte Nachnamen eingeben.")).toBeVisible();
@@ -113,6 +119,7 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   await page.getByLabel("Katheter").selectOption({ label: "Port" });
   await page.getByRole("radio", { name: "ja" }).check();
   await page.getByLabel("Diagnose").fill("Kurzdarmsyndrom (E2E)");
+  await page.getByLabel("Überweisung / Kontaktaufnahme durch").fill("Praxis Dr. Holtmeier");
   await page.getByRole("button", { name: "Anlegen und Akte öffnen" }).click();
   await expect(page.getByText(/Größe muss zwischen/)).toBeVisible();
   await page.getByLabel("Größe").fill("168");
@@ -128,6 +135,7 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   expect(p.kopf.ansprechpartner).toBe("Frau Beispiel");
   expect(p.kopf.katheter).toBe("Port");
   expect(p.diagnose).toContain("Kurzdarmsyndrom (E2E)");
+  expect(p.ueberweisung_durch).toBe("Praxis Dr. Holtmeier");
   const gewichte = await api.get(`gewichte/?patient=${id}`);
   expect(gewichte.results.map((g: { gewicht_kg: number }) => g.gewicht_kg)).toEqual([61.4]);
   await api.ende();

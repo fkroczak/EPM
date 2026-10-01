@@ -16,7 +16,7 @@ import { Editor } from "@/components/Editor";
 import { name, useAkte } from "./Akte";
 
 const ZAHLEN = ["basis_ml", "glucose_g", "aminosaeuren_g", "lipide_g", "albumin_g", "natrium_mmol", "kalium_mmol",
-  "phosphat_mmol", "calcium_mmol", "magnesium_mmol", "laufzeit_h", "tage_pro_woche", "pantozol_tage"] as const;
+  "phosphat_mmol", "calcium_mmol", "magnesium_mmol", "laufzeit_h", "tage_pro_woche", "pantozol_tage", "kcal_manuell"] as const;
 const AUSWAHL = ["basis_praeparat", "glucose_praeparat", "aminosaeuren_praeparat", "lipide_praeparat", "albumin_praeparat",
   "spurenelemente", "katheterschutz"] as const;
 type ZahlFeld = (typeof ZAHLEN)[number];
@@ -190,8 +190,12 @@ export function PlanEditor() {
   const p = praeparate.data ?? [];
   const setze = (k: keyof Formular) => (wert: string) => setF((a) => ({ ...a!, [k]: wert }));
   const kcalZeile = (feld: string, faktor: number) => { const g = zahlWert(f[`${feld}_g` as ZahlFeld]); return g == null ? null : Math.round(g * faktor); };
-  const kcal = MAKRO.reduce((s, m) => s + (kcalZeile(m.feld, m.kcal) ?? 0), 0);
-  const kcalVorher = vorher ? MAKRO.reduce((s, m) => s + (zahlWert(vorher[`${m.feld}_g` as ZahlFeld]) ?? 0) * m.kcal, 0) : null;
+  // Energie: berechnet wie im Altsystem, außer sie ist manuell gesetzt (dann gilt der manuelle Wert, auch für die Grenzen)
+  const kcalBerechnet = MAKRO.reduce((s, m) => s + (kcalZeile(m.feld, m.kcal) ?? 0), 0);
+  const kcalManuell = zahlWert(f.kcal_manuell);
+  const kcal = kcalManuell ?? kcalBerechnet;
+  const kcalVorher = vorher ? zahlWert(vorher.kcal_manuell)
+    ?? MAKRO.reduce((s, m) => s + (zahlWert(vorher[`${m.feld}_g` as ZahlFeld]) ?? 0) * m.kcal, 0) : null;
   const gewicht = patient.kopf?.gewicht ? Number(patient.kopf.gewicht.kg) : null;
   const anzahlGeaendert = vorher ? ([...ZAHLEN, ...AUSWAHL, "vitamine", "bemerkung", "pantozol_stufe"] as (keyof Formular)[]).filter(geaendert).length : 0;
   const es = einstellungen.data;
@@ -345,9 +349,11 @@ export function PlanEditor() {
           </Karte>
           <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="plan-summe">
             <h3 className="lbl m-0">Summe</h3>
+            {zahlFeld("kcal_manuell", "Energie manuell", "kcal", kcalManuell != null
+              ? `berechnet wären ${zahl(kcalBerechnet)} kcal` : "leer = berechnet aus den Makronährstoffen")}
             <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-sm">
               <span className="gedaempft">Energie</span>
-              <span className="num">{zahl(kcal)} kcal{kcalVorher != null && Math.round(kcalVorher) !== kcal ? <span className="text-warn"> {kcal - Math.round(kcalVorher) > 0 ? "+" : "−"}{zahl(Math.abs(kcal - Math.round(kcalVorher)))}</span> : null}</span>
+              <span className="num">{zahl(kcal)} kcal{kcalManuell != null ? " (manuell)" : ""}{kcalVorher != null && Math.round(kcalVorher) !== kcal ? <span className="text-warn"> {kcal - Math.round(kcalVorher) > 0 ? "+" : "−"}{zahl(Math.abs(kcal - Math.round(kcalVorher)))}</span> : null}</span>
               <span className="gedaempft">je kg Körpergewicht</span><span className="num">{gewicht ? `${zahl(kcal / gewicht, 1)} kcal/kg` : "—"}</span>
               <span className="gedaempft">Geänderte Werte</span><span className="num">{anzahlGeaendert}</span>
             </div>
@@ -356,7 +362,7 @@ export function PlanEditor() {
             ) : <div className="meldung ok flex items-center gap-2 text-sm"><Icon name="haken" />Alle Werte im üblichen Bereich</div>}
           </Karte>
           {speichern.error && !Object.keys(server).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
-          {Object.keys(e).length ? <Meldung art="fehler">Bitte die markierten Felder prüfen.{e.fehler ? ` ${e.fehler}` : ""}{e.kcal_manuell ? ` ${e.kcal_manuell}` : ""}</Meldung> : null}
+          {Object.keys(e).length ? <Meldung art="fehler">Bitte die markierten Felder prüfen.{e.fehler ? ` ${e.fehler}` : ""}</Meldung> : null}
           <div className="flex flex-col gap-2">
             {darfBei("plaene_freigeben", patient) ? (
               <Knopf variante="pri" icon="haken" laedt={speichern.isPending && speichern.variables === true} disabled={speichern.isPending}
