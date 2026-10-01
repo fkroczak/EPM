@@ -13,7 +13,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 
 from .bloecke import PLATZHALTER
-from .felder import FELDER, TABELLEN, Kontext, tabellenzeilen
+from .felder import FELDER, TABELLEN, Fett, Kontext, tabellenspalten, tabellenzeilen
 
 STANDARD_LOGO = Path(__file__).resolve().parent / "statisch" / "logo-stiftung.png"
 LEER = "—"
@@ -25,22 +25,27 @@ CSS = """
                  width: 150mm; }
   @bottom-right { content: %(rechts)s; vertical-align: top; padding-top: 4mm;
                   font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif; font-size: 7pt; color: #00325a; } }
-html { font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif; font-size: 9.5pt; color: #1b1932; line-height: 1.4; }
+html { font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif; font-size: 9.5pt; color: #1b1932; line-height: 1.4;
+       font-feature-settings: "tnum"; }
 body { margin: 0; }
 .block { margin: 0 0 3.5mm 0; }
 .briefkopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 8mm; padding-bottom: 3mm;
              border-bottom: 0.5mm solid; }
+.briefkopf.ohne-linie { border-bottom: 0; padding-bottom: 1mm; }
 .briefkopf img { height: 19mm; max-width: 62mm; object-fit: contain; object-position: left bottom; }
 .falzmarke { position: fixed; left: -12mm; width: 2mm; height: 0; border-top: 0.2mm solid #828282; }
 .spalten { display: flex; justify-content: space-between; gap: 10mm; }
 .spalten .rechts { text-align: right; color: #00325a; }
 .spalten .rechts.klein { font-size: 8pt; line-height: 1.5; }
 .absender { text-align: right; font-size: 7.5pt; color: #3b3953; line-height: 1.45; }
-.titel { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 1mm; }
-.titel h1 { font-size: 15pt; font-weight: 600; margin: 0; }
+.titel { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 1.2mm;
+         border-bottom: 1.2pt solid #00325a; }
+.titel h1 { font-size: 14.5pt; font-weight: 600; margin: 0; color: #00325a; }
 .titel .zusatz { font-size: 9.5pt; }
 .titel .zusatz span { color: #5d5b72; }
-h2 { font-size: 8pt; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #5d5b72; margin: 0 0 1.5mm 0; }
+/* Bereichsüberschrift als Balken wie im Laborbefund („Klinische Chemie“) */
+h2 { font-size: 7.5pt; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #00325a;
+     background: #eef0f6; border-left: 1.2mm solid #EE8D4D; padding: 1mm 2.5mm; margin: 0 0 0.6mm 0; }
 table { width: 100%%; border-collapse: collapse; }
 .felder td { vertical-align: top; padding: 0.7mm 2.5mm 0.7mm 0; border-bottom: 0.4pt solid #ececf2; }
 .felder td.label { color: #5d5b72; }
@@ -50,6 +55,36 @@ table { width: 100%%; border-collapse: collapse; }
 .tabelle th { text-align: left; font-size: 7.5pt; font-weight: 600; color: #5d5b72; border-bottom: 0.6pt solid #c9c8d4;
               padding: 1mm 2mm 1mm 0; }
 .tabelle td { border-bottom: 0.4pt solid #e6e5ee; padding: 1.2mm 2mm 1.2mm 0; vertical-align: top; }
+/* Laborbefund: Bezeichnung, Wert rechtsbündig, Einheit in eigener Spalte, Rest */
+.befund { font-size: 9pt; }
+/* fax-tauglich (Pläne gehen per Fax/Mail): Einheiten und Bezeichnungen dunkel, nichts nur über Farbe */
+.befund th { text-align: left; font-size: 7pt; font-weight: 500; color: #3b3953; border-bottom: 0.6pt solid #c9c8d4;
+             padding: 0.9mm 2.5mm 0.6mm 2.5mm; }
+.befund td { border-bottom: 0.4pt solid #ececf2; padding: 0.75mm 2.5mm; vertical-align: top; line-height: 1.3; }
+.befund .b { width: 40mm; }
+.befund .zahl { text-align: right; width: 17mm; white-space: nowrap; }
+.befund .einheit { width: 12mm; white-space: nowrap; }
+.befund .fett { font-weight: 600; }
+.befund td.leer { font-style: italic; }
+.befund .wert p { margin: 0 0 1mm 0; }
+.bilanz .zahl { width: 30mm; }
+/* zwei Blöcke nebeneinander */
+.paar { display: flex; justify-content: space-between; align-items: flex-start; }
+.paar .b, .paar .befund .b { width: auto; white-space: nowrap; }
+/* Kopfkarte wie der Kopf der Akte in EPM */
+.kopfkarte { border: 0.5pt solid #c9c8d4; border-radius: 1.5mm; padding: 2.6mm 3.5mm 2.4mm; }
+.kopfkarte .oben { display: flex; justify-content: space-between; gap: 8mm; align-items: flex-start; }
+.kopfkarte .name { font-size: 13pt; font-weight: 600; line-height: 1.25; }
+.kopfkarte .unter { color: #3b3953; font-size: 9pt; margin-top: 0.6mm; line-height: 1.45; }
+.kopfkarte .rechts { text-align: right; font-size: 7.5pt; color: #00325a; line-height: 1.45; }
+.kopfkarte .zahlen { width: 100%%; border-collapse: collapse; margin-top: 2.4mm; border-top: 0.4pt solid #ececf2; }
+.kopfkarte .zahlen td { vertical-align: top; padding: 1.6mm 3mm 0 3mm; border-left: 0.5pt solid #e1e0ea; }
+.kopfkarte .zahlen td:first-child { padding-left: 0; border-left: 0; }
+.kopfkarte .zahlen .l { display: block; font-size: 7pt; color: #3b3953; font-weight: 500; }
+.kopfkarte .zahlen .w { display: block; font-size: 9.5pt; }
+.unter-balken { padding: 0.8mm 2.5mm 0 2.5mm; }
+.unter-balken .richtext p { margin: 0 0 1mm 0; }
+.linie-oben { border-top: 0.6pt solid #c9c8d4; padding-top: 2mm; margin-top: 4mm; }
 .leer { color: #5d5b72; font-style: italic; }
 hr { border: 0; border-top: 0.6pt solid #c9c8d4; margin: 0 0 3.5mm 0; }
 .unterschrift .linie { margin-top: 12mm; width: 75mm; border-top: 0.6pt solid #1b1932; padding-top: 1mm;
@@ -93,7 +128,7 @@ def _absender():
     return Absenderangaben.alle()[Einstellungen.aktuell().absender]
 
 
-def briefkopf_html(absender_zeigen=True, linienfarbe="#251F53", falzmarken=False) -> str:
+def briefkopf_html(absender_zeigen=True, linienfarbe="#251F53", falzmarken=False, linie=True) -> str:
     a = _absender()
     zeilen = [a.name, f"{a.strasse} · {a.plz} {a.ort}".strip(" ·"),
               " · ".join(t for t in (a.telefon and f"Tel. {a.telefon}", a.fax and f"Fax {a.fax}") if t),
@@ -102,7 +137,8 @@ def briefkopf_html(absender_zeigen=True, linienfarbe="#251F53", falzmarken=False
     farbe = linienfarbe if re.fullmatch(r"#[0-9A-Fa-f]{6}", linienfarbe or "") else "#251F53"
     # Falzmarken (DIN 5008, wie im Altsystem bei 99 / 148,5 / 198 mm); bezogen auf den Seitenbereich ab 15 mm Rand
     marken = "".join(f'<div class="falzmarke" style="top:{y - 15}mm"></div>' for y in (99, 148.5, 198)) if falzmarken else ""
-    return (f'{marken}<div class="briefkopf" style="border-color:{farbe}"><img src="{logo_data_uri()}" alt="Logo">'
+    klasse = "briefkopf" if linie else "briefkopf ohne-linie"
+    return (f'{marken}<div class="{klasse}" style="border-color:{farbe}"><img src="{logo_data_uri()}" alt="Logo">'
             f'<div class="absender">{absender}</div></div>')
 
 
@@ -170,6 +206,7 @@ class Ersetzer:
         ausgabe, alle_leer, gesehen = [], True, False
         for zeile in (text or "").split("\n"):
             inhalt, leer = self(zeile, leer_zeichen="")
+            inhalt = _trenner(inhalt)
             if PLATZHALTER.search(zeile):
                 gesehen = True
                 rest = PLATZHALTER.sub("", zeile).strip(" *·,:;-–/")
@@ -188,6 +225,15 @@ class Ersetzer:
         return html.escape(t).replace("\n", "<br>")
 
 
+def _trenner(text: str) -> str:
+    """Trennpunkte um leere Werte entfernen: „weiblich ·  · Münster“ → „weiblich · Münster“."""
+    text = re.sub(r"(?:\s*·\s*){2,}", " · ", text)
+    return re.sub(r"^\s*·\s*|\s*·\s*$", "", text)
+
+
+ZAHL_EINHEIT = re.compile(r"^(−?-?[\d.,]+)\s+([^\s<>]{1,12})$")
+
+
 def _klassen(b) -> str:
     o = b.get("optionen") or {}
     k = ["block"]
@@ -201,6 +247,8 @@ def _klassen(b) -> str:
         k.append(f"a-{o['ausrichtung']}")
     if o.get("nicht_teilen"):
         k.append("zusammen")
+    if o.get("linie_oben"):
+        k.append("linie-oben")
     return " ".join(k)
 
 
@@ -218,6 +266,67 @@ def _feldtabelle(ersetze, eintraege, spalten) -> tuple[str, bool]:
     return f'<table class="{klasse}">{"".join(zeilen)}</table>', alle_leer
 
 
+def _befundliste(ersetze, eintraege, spaltenkoepfe=False) -> tuple[str, bool]:
+    """Datenfelder wie im Laborbefund: Bezeichnung | Wert rechtsbündig | Einheit; Texte über die Wertspalten."""
+    zeilen, alle_leer = [], True
+    for e in eintraege:
+        wert, leer = ersetze(e.get("wert", ""))
+        alle_leer = alle_leer and leer
+        label = f'<td class="b">{html.escape(e.get("label") or "")}</td>'
+        m = ZAHL_EINHEIT.match(wert)
+        if m:
+            zeilen.append(f'<tr>{label}<td class="zahl">{m.group(1)}</td><td class="einheit">{m.group(2)}</td><td></td></tr>')
+        elif leer:
+            zeilen.append(f'<tr>{label}<td class="zahl">{LEER}</td><td class="einheit"></td><td></td></tr>')
+        else:
+            zeilen.append(f'<tr>{label}<td class="wert" colspan="3">{wert}</td></tr>')
+    kopf = ('<thead><tr><th class="b">Bestandteil</th><th class="zahl">Menge</th><th class="einheit">Einheit</th>'
+            '<th></th></tr></thead>') if spaltenkoepfe else ""
+    return f'<table class="befund">{kopf}<tbody>{"".join(zeilen)}</tbody></table>', alle_leer
+
+
+def _kopfkarte(ersetze, b) -> str:
+    name, _ = ersetze(b.get("text", ""), html_erlaubt=False)
+    unter, _ = ersetze.zeilen(b.get("untertitel", ""))
+    rechts, _ = ersetze.zeilen(b.get("rechts", ""))
+    zellen = []
+    for e in b.get("felder") or []:
+        wert, _ = ersetze(e.get("wert", ""), html_erlaubt=False)
+        zellen.append(f'<td><span class="l">{html.escape(e.get("label") or "")}</span><span class="w">{wert}</span></td>')
+    zahlen = f'<table class="zahlen"><tr>{"".join(zellen)}</tr></table>' if zellen else ""
+    return (f'<div class="kopfkarte"><div class="oben"><div><div class="name">{name}</div>'
+            f'{f"<div class=unter>{unter}</div>" if unter else ""}</div>'
+            f'{f"<div class=rechts>{rechts}</div>" if rechts else ""}</div>{zahlen}</div>')
+
+
+BREITEN = {"drittel": 34, "haelfte": 48.5, "zwei_drittel": 63}
+
+
+def _nebeneinander(teile: list[tuple[str, str | None]]) -> str:
+    """Blöcke mit „neben_vorherigem“ mit dem Block davor in eine Zeile setzen."""
+    gruppen: list[list[tuple[str, str | None]]] = []
+    for inhalt, neben in teile:
+        if neben and gruppen:
+            gruppen[-1].append((inhalt, neben))
+        else:
+            gruppen.append([(inhalt, None)])
+    ausgabe = []
+    for g in gruppen:
+        if len(g) == 1:
+            ausgabe.append(g[0][0])
+            continue
+        abstand = 4
+        rechts = [BREITEN[n] for _, n in g[1:]]
+        erste = 100 - sum(rechts) - abstand * (len(g) - 1)
+        if erste < 15:  # zu schmal: gleich verteilen
+            rechts = [(100 - abstand * (len(g) - 1)) / len(g)] * (len(g) - 1)
+            erste = rechts[0]
+        breiten = [erste, *rechts]
+        ausgabe.append('<div class="paar">' + "".join(f'<div style="width:{w:.1f}%">{inhalt}</div>'
+                                                      for (inhalt, _), w in zip(g, breiten)) + "</div>")
+    return "".join(ausgabe)
+
+
 def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | None, str | None]:
     """→ (Inhalt als HTML, Fußzeilentext links, Fußzeile rechts)."""
     ersetze = Ersetzer(art, kontext)
@@ -225,10 +334,11 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | 
     for b in bloecke:
         typ = b.get("typ")
         o = b.get("optionen") or {}
+        anzahl = len(teile)
         ausblenden = o.get("ausblenden_wenn_leer", False)
         kopf = f"<h2>{html.escape(b['bezeichnung'])}</h2>" if o.get("ueberschrift") and b.get("bezeichnung") else ""
         if typ == "briefkopf":
-            teile.append(f'<div class="{_klassen(b)}">{briefkopf_html(b.get("absender", True), b.get("linienfarbe"), b.get("falzmarken", False))}</div>')
+            teile.append(f'<div class="{_klassen(b)}">{briefkopf_html(b.get("absender", True), b.get("linienfarbe"), b.get("falzmarken", False), b.get("mit_linie", True))}</div>')
         elif typ == "zweispaltig":
             links, _ = ersetze.zeilen(b.get("links", ""))
             rechts, _ = ersetze.zeilen(b.get("rechts", ""))
@@ -246,22 +356,36 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | 
             inhalt, leer = ersetze.zeilen(b.get("text", ""))
             if leer and ausblenden:
                 continue
+            if kopf:  # unter dem Bereichsbalken eingerückt wie die Tabellen
+                inhalt = f'<div class="unter-balken">{inhalt}</div>'
             teile.append(f'<div class="{_klassen(b)}">{kopf}{inhalt}</div>')
+        elif typ == "kopfkarte":
+            teile.append(f'<div class="{_klassen(b)}">{kopf}{_kopfkarte(ersetze, b)}</div>')
         elif typ == "datenfelder":
-            tabelle, leer = _feldtabelle(ersetze, b.get("felder") or [], b.get("spalten", 2))
+            if b.get("darstellung") == "befund":
+                tabelle, leer = _befundliste(ersetze, b.get("felder") or [], b.get("spaltenkoepfe", False))
+            else:
+                tabelle, leer = _feldtabelle(ersetze, b.get("felder") or [], b.get("spalten", 2))
             if leer and ausblenden:
                 continue
             teile.append(f'<div class="{_klassen(b)}">{kopf}{tabelle}</div>')
         elif typ == "tabelle":
             quelle = b.get("quelle")
-            spalten = TABELLEN[art][quelle][1]
+            spalten = tabellenspalten(art, quelle, kontext)
+            ausrichtung = TABELLEN[art][quelle][2]
             zeilen = tabellenzeilen(art, quelle, kontext)
             if not zeilen and ausblenden:
                 continue
-            kopfzeile = "".join(f"<th>{html.escape(s)}</th>" for s in spalten)
-            koerper = ("".join("<tr>" + "".join(f"<td>{html.escape(str(z))}</td>" for z in zeile) + "</tr>" for zeile in zeilen)
+            klassen = [(" b" if i == 0 else f" {a}" if a else "") for i, a in enumerate(ausrichtung)]
+
+            def zelle(z, k):
+                return f'<td class="{(k + (" fett" if isinstance(z, Fett) else "")).strip()}">{html.escape(str(z))}</td>'
+
+            kopfzeile = "".join(f'<th class="{k.strip()}">{html.escape(s)}</th>' for s, k in zip(spalten, klassen))
+            koerper = ("".join("<tr>" + "".join(zelle(z, k) for z, k in zip(zeile, klassen)) + "</tr>" for zeile in zeilen)
                        or f'<tr><td class="leer" colspan="{len(spalten)}">keine Einträge</td></tr>')
-            teile.append(f'<div class="{_klassen(b)}">{kopf}<table class="tabelle"><thead><tr>{kopfzeile}</tr></thead>'
+            art_klasse = "befund bilanz" if quelle == "bilanz" else "befund"
+            teile.append(f'<div class="{_klassen(b)}">{kopf}<table class="{art_klasse}"><thead><tr>{kopfzeile}</tr></thead>'
                          f"<tbody>{koerper}</tbody></table></div>")
         elif typ == "trennlinie":
             teile.append("<hr>")
@@ -278,7 +402,9 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | 
         elif typ == "fusszeile":
             fuss = ersetze.text(b.get("text", ""))
             rechts = ersetze.text(b.get("rechts", ""))
-    return "".join(teile), fuss, rechts
+        if len(teile) > anzahl:
+            teile[-1] = (teile[-1], o.get("neben_vorherigem"))
+    return _nebeneinander(teile), fuss, rechts
 
 
 def seite(titel: str, inhalt: str, fusszeile: str | None = None, wasserzeichen: str | None = None,

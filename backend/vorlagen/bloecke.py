@@ -24,13 +24,19 @@ TYPEN = {
     "unterschrift": "Unterschrift",
     "seitenumbruch": "Seitenumbruch",
     "fusszeile": "Fußzeile",
+    "kopfkarte": "Kopfkarte",
 }
 OPTIONEN = {
     "schrift": {"klein", "normal", "gross"},
     "ausrichtung": {"links", "mitte", "rechts"},
     "fett": bool, "kursiv": bool, "ausblenden_wenn_leer": bool, "nicht_teilen": bool,
     "ueberschrift": bool,  # Bezeichnung als Überschrift über dem Block drucken
+    "linie_oben": bool,  # dünne Linie über dem Block (z. B. Freigabevermerk wie „validiert von“ im Laborbefund)
+    # neben den vorherigen Block setzen; Wert = Breite dieses Blocks, der vorherige erhält den Rest
+    "neben_vorherigem": {"drittel", "haelfte", "zwei_drittel"},
 }
+NEBENEINANDER = {"text", "datenfelder", "tabelle", "unterschrift"}
+DARSTELLUNGEN = {"paare", "befund"}
 MAX_BLOECKE = 60
 MAX_FELDER = 30
 MAX_TEXT = 4000
@@ -109,8 +115,8 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
         if typ in zaehler:
             zaehler[typ] += 1
         if typ == "briefkopf":
-            erlaubt |= {"absender", "linienfarbe", "falzmarken"}
-            for k in ("absender", "falzmarken"):
+            erlaubt |= {"absender", "linienfarbe", "falzmarken", "mit_linie"}
+            for k in ("absender", "falzmarken", "mit_linie"):
                 if k in b and not isinstance(b[k], bool):
                     fehler.append(f"{name}: „{k}“ ja oder nein.")
             if "linienfarbe" in b and not (isinstance(b["linienfarbe"], str) and FARBE.match(b["linienfarbe"])):
@@ -140,10 +146,26 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
                 _felder_pruefen(art, b.get("rechts"), name, fehler)
                 if (b.get("text") or "").count("\n") > 7:
                     fehler.append(f"{name}: höchstens 8 Zeilen.")
+        elif typ == "kopfkarte":
+            # wie der Kopf der Akte in EPM: Name groß, darunter eine Zeile, rechts ein kleiner Text, unten Kennzahlen
+            erlaubt |= {"text", "untertitel", "rechts", "felder"}
+            _text(b.get("text"), f"{name} (Text)", fehler, pflicht=True, laenge=200)
+            _text(b.get("untertitel"), f"{name} (Zeile darunter)", fehler, laenge=300)
+            _text(b.get("rechts"), f"{name} (rechts)", fehler, laenge=1000)
+            for feld in ("text", "untertitel", "rechts"):
+                _felder_pruefen(art, b.get(feld), name, fehler)
+            if b.get("felder"):
+                _eintraege(art, b.get("felder"), name, fehler)
+                if len(b["felder"]) > 8:
+                    fehler.append(f"{name}: höchstens 8 Kennzahlen.")
         elif typ == "datenfelder":
-            erlaubt |= {"spalten", "felder"}
+            erlaubt |= {"spalten", "felder", "darstellung", "spaltenkoepfe"}
             if b.get("spalten", 2) not in (1, 2, 3, 4, 5, 6):
                 fehler.append(f"{name}: 1 bis 6 Spalten.")
+            if b.get("darstellung", "paare") not in DARSTELLUNGEN:
+                fehler.append(f"{name}: Darstellung „paare“ oder „befund“.")
+            if "spaltenkoepfe" in b and not isinstance(b["spaltenkoepfe"], bool):
+                fehler.append(f"{name}: „spaltenkoepfe“ ja oder nein.")
             _eintraege(art, b.get("felder"), name, fehler)
         elif typ == "unterschrift":
             erlaubt |= {"felder", "linie"}
@@ -159,6 +181,11 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
             h = b.get("hoehe_mm", 6)
             if not isinstance(h, int) or isinstance(h, bool) or not 1 <= h <= 100:
                 fehler.append(f"{name}: Höhe 1 bis 100 mm.")
+        if optionen.get("neben_vorherigem"):
+            vorher = bloecke[nr - 2] if nr > 1 and isinstance(bloecke[nr - 2], dict) else None
+            if typ not in NEBENEINANDER or vorher is None or vorher.get("typ") not in NEBENEINANDER:
+                fehler.append(f"{name}: „neben dem vorherigen Block“ geht nur bei Text, Datenfeldern, Tabellen und "
+                              f"Unterschrift, wenn davor ebenfalls ein solcher Block steht.")
         unbekannt = set(b) - erlaubt
         if unbekannt:
             fehler.append(f"{name}: unbekannte Angaben {', '.join(sorted(unbekannt))}.")
@@ -184,49 +211,47 @@ STARTVORLAGEN = {
     # Aufbau wie die bisherige PDF des Altsystems (EPM_infuPDF.php mit fpdf_layout.php), moderner gesetzt
     # (Festlegung 01.10.2026); Freigabevermerk statt eingescannter Unterschrift
     "infusionsplan": [
-        {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF},
+        # Überarbeitung 01.10.2026 im Stil eines Laborbefunds: Werte rechtsbündig mit eigener Einheitenspalte,
+        # Bereiche mit Kopfbalken, Kopf wie die Patientenansicht in EPM (Name, Patienten-Nr., Anschrift, Plan-Nr.),
+        # Freigabevermerk unten wie „validiert von“. Ohne Linie unter dem Logo (Wunsch, mehr Platz).
+        {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF, "mit_linie": False},
         {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Empfehlung eines Infusionsplans",
          "zusatz_label": "gültig ab", "zusatz": "{{Plan.gültig_ab}}"},
-        {"id": "anschrift", "typ": "zweispaltig", "bezeichnung": "Patient und Zeichen", "rechts_klein": True,
-         "links": "{{Patient.Anrede}}\n{{Patient.Name}}\n{{Patient.Straße}}\n{{Patient.PLZ_Ort}}\n* {{Patient.Geburtsdatum}}",
+        {"id": "patient", "typ": "kopfkarte", "bezeichnung": "Patient",
+         "text": "{{Patient.Name}}",
+         "untertitel": "{{Patient.Geschlecht}} · geb. {{Patient.Geburtsdatum}} ({{Patient.Alter}})\n{{Patient.Anschrift}}",
          "rechts": "Prof. Dr. Markus Masin\nDeutsche Stiftung Krankheitsbedingte Mangelernährung · Vorstand\n"
-                   "Medical Institut for Nutrition Science & Technology · Director\n\n"
-                   "Patienten-Nr.: {{Patient.Nummer}}\nInfusionsplan-Nr.: {{Plan.Nummer}}\n"
-                   "erstellt von: {{Plan.erstellt_von}}\nerstellt am: {{Plan.erstellt_am}}"},
-        {"id": "koerper", "typ": "datenfelder", "bezeichnung": "Größe und Gewicht", "spalten": 2, "felder": [
-            {"label": "Größe", "wert": "{{Patient.Größe}}"}, {"label": "Gewicht", "wert": "{{Patient.Gewicht}}"}]},
+                   "Medical Institut for Nutrition Science & Technology · Director",
+         "felder": [{"label": "Patienten-Nr.", "wert": "{{Patient.Nummer}}"},
+                    {"label": "Infusionsplan-Nr.", "wert": "{{Plan.Nummer}}"},
+                    {"label": "Größe", "wert": "{{Patient.Größe}}"}, {"label": "Gewicht", "wert": "{{Patient.Gewicht}}"},
+                    {"label": "erstellt am", "wert": "{{Plan.erstellt_am}}"},
+                    {"label": "erstellt von", "wert": "{{Plan.erstellt_von}}"}]},
         {"id": "zusammensetzung", "typ": "tabelle", "bezeichnung": "Zusammensetzung der Infusionslösung",
          "quelle": "zusammensetzung", "optionen": {"ueberschrift": True}},
-        # mehrspaltig (Wunsch 01.10.2026), damit mehr Platz für Bemerkungen bleibt
-        {"id": "mineralstoffe", "typ": "datenfelder", "bezeichnung": "Mineralstoffe", "spalten": 3,
-         "optionen": {"ueberschrift": True}, "felder": [
+        {"id": "mineralstoffe", "typ": "datenfelder", "bezeichnung": "Mineralstoffe", "spalten": 1,
+         "darstellung": "befund", "spaltenkoepfe": True,
+         "optionen": {"ueberschrift": True, "neben_vorherigem": "drittel"}, "felder": [
             {"label": "Natrium", "wert": "{{Na}}"}, {"label": "Kalium", "wert": "{{K}}"},
             {"label": "Calcium", "wert": "{{Ca}}"}, {"label": "Magnesium", "wert": "{{Mg}}"},
             {"label": "Phosphat", "wert": "{{PO4}}"}]},
-        {"id": "inhaltsstoffe", "typ": "datenfelder", "bezeichnung": "Weitere Inhaltsstoffe", "spalten": 2,
-         "optionen": {"ueberschrift": True}, "felder": [
+        {"id": "inhaltsstoffe", "typ": "datenfelder", "bezeichnung": "Weitere Inhaltsstoffe", "spalten": 1,
+         "darstellung": "befund", "optionen": {"ueberschrift": True}, "felder": [
             {"label": "Spurenelemente", "wert": "{{Spurenelemente}}"}, {"label": "Vitamine", "wert": "{{Vitamine}}"},
             {"label": "Medikament zur Blockung", "wert": "{{Katheterblock}}"},
             {"label": "Protonenpumpenhemmer", "wert": "{{Plan.Protonenpumpenhemmer_Anordnung}}"}]},
         {"id": "positionen", "typ": "tabelle", "bezeichnung": "Weitere Bestandteile", "quelle": "positionen",
          "optionen": {"ueberschrift": True, "ausblenden_wenn_leer": True}},
-        # Spalten: Mischbeutel | Zusatzlösung | Gesamt; darunter Laufzeit und Laufmenge
-        {"id": "laufzeit", "typ": "datenfelder", "bezeichnung": "Laufzeit und Volumen", "spalten": 3,
-         "optionen": {"ueberschrift": True, "nicht_teilen": True}, "felder": [
-            {"label": "Kalorien im Mischbeutel", "wert": "{{Plan.kcal}}"},
-            {"label": "Zusatzlösung", "wert": "{{Basis.Präparat}}"},
-            {"label": "Gesamtkalorien", "wert": "{{Plan.kcal}}"},
-            {"label": "Volumen im Mischbeutel", "wert": "{{Plan.Mischbeutel}}"},
-            {"label": "Zusatzvolumen", "wert": "{{Plan.Zusatzvolumen}}"},
-            {"label": "Gesamtvolumen", "wert": "{{Plan.ml}}"},
-            {"label": "Laufzeit", "wert": "{{Plan.Stunden}}"}, {"label": "Laufmenge je Stunde", "wert": "{{Plan.Rate}}"}]},
+        # Laufzeit und Laufmenge stehen bei vielen Altplänen auf 0: normale Zeilen, nicht hervorgehoben
+        {"id": "laufzeit", "typ": "tabelle", "bezeichnung": "Laufzeit und Volumen", "quelle": "bilanz",
+         "optionen": {"ueberschrift": True, "nicht_teilen": True}},
         {"id": "bemerkung", "typ": "text", "bezeichnung": "Weitere Anordnungen/Bemerkungen", "text": "{{Plan.Bemerkung}}",
          "optionen": {"ueberschrift": True, "ausblenden_wenn_leer": True}},
         {"id": "diagnose", "typ": "text", "bezeichnung": "Diagnose", "text": "{{Patient.Diagnose}}",
          "optionen": {"ueberschrift": True, "ausblenden_wenn_leer": True}},
         {"id": "freigabe", "typ": "text", "bezeichnung": "Freigabevermerk",
          "text": "Maschinell erstellt, geprüft und freigegeben von {{Plan.freigegeben_von}} am {{Plan.freigegeben_datum}}.",
-         "optionen": {"nicht_teilen": True}},
+         "optionen": {"nicht_teilen": True, "linie_oben": True}},
         {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
     ],
     "patientendatenblatt": [

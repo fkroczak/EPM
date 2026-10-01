@@ -7,6 +7,7 @@ PUT    /api/vorlagen/{art}/entwurf/           {"bloecke": [...]} → Entwurf spe
 DELETE /api/vorlagen/{art}/entwurf/           Entwurf verwerfen
 POST   /api/vorlagen/{art}/veroeffentlichen/  Entwurf wird neue aktive Version
 GET    /api/vorlagen/{art}/versionen/{n}/     Blöcke einer Version
+GET    /api/vorlagen/{art}/startvorlage/      Blöcke der mitgelieferten Startvorlage (als Grundlage für einen Entwurf)
 POST   /api/vorlagen/{art}/vorschau/          {"patient": ID (Testpatient), "bloecke"?} → PDF mit Wasserzeichen ENTWURF
 """
 from django.db import transaction
@@ -137,6 +138,16 @@ class VersionView(APIView):
         if v is None:
             raise Http404("Version nicht gefunden.")
         return Response({**_version(v), "bloecke": v.bloecke})
+
+
+class StartvorlageView(APIView):
+    """Mitgelieferte Startvorlage, z. B. wenn sie nach einem Update neu gestaltet ist und schon eine Version aktiv ist."""
+    permission_classes = [VorlagenRecht]
+
+    def get(self, request, art):
+        from .bloecke import STARTVORLAGEN
+
+        return Response({"bloecke": STARTVORLAGEN[_art(art)]})
 
 
 def pdf_antwort(pdf: bytes, dateiname: str, inline=True) -> HttpResponse:

@@ -19,6 +19,15 @@ test("Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau, Ver
   await expect(aufbau).toContainText("Laufzeit und Volumen");
   await expect(editor.getByTestId("vorlage-seite")).toContainText("Empfehlung eines Infusionsplans");
   await expect(editor.getByTestId("vorlage-seite")).toContainText("Plan.gültig_ab");
+  // Aufbau wie ein Laborbefund: Mineralstoffe neben der Zusammensetzung, Kopf wie in der Akte
+  await expect(editor.getByTestId("nebeneinander")).toContainText("Natrium");
+  await aufbau.getByRole("button", { name: /Mineralstoffe/ }).click();
+  await expect(editor.getByTestId("block-eigenschaften").getByLabel("Neben dem vorherigen Block")).toHaveValue("drittel");
+  await expect(editor.getByTestId("block-eigenschaften").getByLabel("Darstellung")).toHaveValue("befund");
+  await aufbau.getByRole("button", { name: /Briefkopf/ }).click();
+  await expect(editor.getByTestId("block-eigenschaften").getByLabel("Linie unter dem Logo")).not.toBeChecked();
+  await aufbau.getByRole("button", { name: /Patient/ }).click();
+  await expect(editor.getByTestId("block-eigenschaften").getByRole("group", { name: "Felder" })).toContainText("Kennzahlen");
 
   // Block „Freigabevermerk“ ändern, Datenfeld an der Schreibmarke einsetzen
   await aufbau.getByRole("button", { name: /Freigabevermerk/ }).click();
@@ -67,6 +76,10 @@ test("Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau, Ver
   const nachher = (await api.get("vorlagen/")).find((v: { art: string }) => v.art === "infusionsplan");
   expect([nachher.aktiv.version, nachher.entwurf]).toEqual([vorher.aktiv.version + 1, null]);
   expect(nachher.versionen.map((v: { status: string }) => v.status)).toEqual(["aktiv", ...vorher.versionen.map(() => "abgeloest")]);
+  // mitgelieferte Startvorlage als Grundlage laden (z. B. nach einem Update mit neuem Aufbau)
+  await editor.getByRole("button", { name: "Mitgelieferte Startvorlage laden" }).click();
+  await expect(page.getByText("Mitgelieferte Startvorlage als Grundlage geladen")).toBeVisible();
+  await expect(editor.getByTestId("vorlage-stand")).toHaveText("Ungespeicherte Änderungen");
   await api.ende();
   merken("vorlage", { version: nachher.aktiv.version });
 });

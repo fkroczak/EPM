@@ -152,15 +152,66 @@ class Vorlagen(Grundlage):
         pdf, version = erzeuge_aus_vorlage("infusionsplan", Kontext(patient=p, plan=plan), wasserzeichen="TESTDATEN")
         self.assertEqual(version, 1)
         text = pdf_text(pdf)
+        # Aufbau wie ein Laborbefund (Überarbeitung 01.10.2026): Menge und Einheit in eigenen Spalten
         for erwartet in ["Empfehlung eines Infusionsplans", "Probe, Paula", "Sterofundin", "Glamin 13,4 %", "80 g",
-                         "1.509 kcal", "2.100 ml", "500 ml", "2.600 ml", "216,7 ml/h", "78 mmol", "heimparenteralen",
+                         "1.509 kcal", "2.100", "500 ml", "2.600 ml", "216,7 ml/h", "78 mmol", "heimparenteralen",
                          "Pantozol® Kurzinfusion 1 Amp. 40 mg in 50 ml Trägerlösung · 1-0-1",
-                         "Patienten-Nr.: 9", "Infusionsplan-Nr.:", "Volumen im Mischbeutel", "Laufmenge je Stunde",
+                         "Patienten-Nr.", "Infusionsplan-Nr.", str(p.nummer), "Mischbeutel", "Zusatzlösung · Sterofundin",
+                         "Laufmenge je Stunde", "Laufzeit 12 h", "Phosphat —",
                          "Deutsche Stiftung Krankheitsbedingte Mangelernährung", "Telefon 0251 98 11 400",
                          "Spendenkonto", "1/1", "Maschinell erstellt, geprüft und freigegeben von"]:
             self.assertIn(kompakt(erwartet), kompakt(text))
         self.assertIn("TESTDATEN", wasserzeichen(pdf))
         self.assertNotIn("{{", text)
+
+    @unittest.skipUnless(PDFTOTEXT, "pdftotext fehlt")
+    def test_plan_ohne_laufzeit_zeigt_striche(self):
+        """Viele Altpläne haben Laufzeit 0: dann „—“ statt „0 h“ bzw. „0 ml/h“."""
+        p, plan = self.testpatient_mit_plan()
+        Infusionsplan.objects.filter(pk=plan.pk).update(laufzeit_h=0)
+        plan.refresh_from_db()
+        text = kompakt(pdf_text(erzeuge_aus_vorlage("infusionsplan", Kontext(patient=p, plan=plan))[0]))
+        self.assertIn(kompakt("Laufzeit —"), text)
+        self.assertIn(kompakt("Laufmenge je Stunde —"), text)
+        self.assertNotIn(kompakt("0 ml/h"), text)
+
+    def test_neue_bausteine_und_startvorlage(self):
+        c = client_fuer(self.admin)
+        start = STARTVORLAGEN["infusionsplan"]
+        r = c.get("/api/vorlagen/infusionsplan/startvorlage/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()["bloecke"], start)
+        self.assertEqual(client_fuer(self.betrachter).get("/api/vorlagen/infusionsplan/startvorlage/").status_code, 403)
+        self.assertIn("kopfkarte", [b["typ"] for b in c.get("/api/vorlagen/infusionsplan/").json()["bausteine"]])
+        # „neben dem vorherigen Block“ nur, wenn davor ein Text-, Daten- oder Tabellenblock steht
+        bloecke = [dict(b) for b in start]
+        bloecke[2] = {**bloecke[2], "optionen": {"neben_vorherigem": "drittel"}}  # Kopfkarte
+        self.assertTrue(any("neben dem vorherigen" in f for f in pruefe_bloecke("infusionsplan", bloecke)))
+        bloecke = [dict(b) for b in start]
+        bloecke[4] = {**bloecke[4], "optionen": {"neben_vorherigem": "viertel"}}
+        self.assertTrue(any("Option „neben_vorherigem“ ungültig" in f for f in pruefe_bloecke("infusionsplan", bloecke)))
+        bloecke = [dict(b) for b in start]
+        bloecke[4] = {**bloecke[4], "darstellung": "kacheln"}
+        self.assertTrue(any("Darstellung" in f for f in pruefe_bloecke("infusionsplan", bloecke)))
+        bloecke = [dict(b) for b in start]
+        bloecke[2] = {**bloecke[2], "felder": [{"label": "X", "wert": "{{Gibtsnicht}}"}]}
+        self.assertTrue(any("unbekanntes Datenfeld „Gibtsnicht“" in f for f in pruefe_bloecke("infusionsplan", bloecke)))
+        # Entwurf aus der Startvorlage speichern und veröffentlichen (Ende-zu-Ende über die API)
+        self.assertEqual(c.put("/api/vorlagen/infusionsplan/entwurf/", {"bloecke": start}, format="json").status_code, 200)
+        self.assertEqual(c.post("/api/vorlagen/infusionsplan/veroeffentlichen/").status_code, 200)
+        self.assertEqual(Dokumentvorlage.aktive("infusionsplan").bloecke, start)
+
+    def test_befund_html_und_nebeneinander(self):
+        from .pdf import bloecke_html
+
+        p, plan = self.testpatient_mit_plan()
+        inhalt, _, _ = bloecke_html("infusionsplan", STARTVORLAGEN["infusionsplan"], Kontext(patient=p, plan=plan))
+        self.assertIn('<td class="b">Natrium</td><td class="zahl">78</td><td class="einheit">mmol</td>', inhalt)
+        self.assertIn('class="paar"', inhalt)  # Mineralstoffe neben der Zusammensetzung
+        self.assertIn('class="kopfkarte"', inhalt)
+        self.assertIn('briefkopf ohne-linie', inhalt)
+        self.assertIn('<td class="zahl fett">2.600</td>', inhalt)
+        self.assertNotIn("·  ·", inhalt)
 
     def test_freigabe_speichert_pdf_mit_pruefsumme(self):
         p, plan = self.testpatient_mit_plan(freigeben=True)

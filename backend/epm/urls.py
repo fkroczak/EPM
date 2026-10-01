@@ -59,6 +59,7 @@ urlpatterns = [
     path("api/vorlagen/<str:art>/entwurf/", vorlagen.EntwurfView.as_view()),
     path("api/vorlagen/<str:art>/veroeffentlichen/", vorlagen.VeroeffentlichenView.as_view()),
     path("api/vorlagen/<str:art>/versionen/<int:version>/", vorlagen.VersionView.as_view()),
+    path("api/vorlagen/<str:art>/startvorlage/", vorlagen.StartvorlageView.as_view()),
     path("api/vorlagen/<str:art>/vorschau/", vorlagen.VorschauView.as_view()),
     path("api/", include(router.urls)),
 ]

@@ -18,7 +18,8 @@ def _kopf_fuss(patient=None):
     kopf = next((b for b in v.bloecke if b.get("typ") == "briefkopf"), None)
     fuss = next((b for b in v.bloecke if b.get("typ") == "fusszeile"), None)
     ersetze = Ersetzer("patientendatenblatt", Kontext(patient=patient)) if patient is not None else None
-    kopf_html = briefkopf_html(kopf.get("absender", True), kopf.get("linienfarbe"), kopf.get("falzmarken", False)) \
+    kopf_html = briefkopf_html(kopf.get("absender", True), kopf.get("linienfarbe"), kopf.get("falzmarken", False),
+                               kopf.get("mit_linie", True)) \
         if kopf else briefkopf_html()
     text = rechts = None
     if fuss and ersetze is not None:

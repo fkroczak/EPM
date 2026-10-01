@@ -22,14 +22,17 @@ import { PdfLeser } from "@/components/PdfAnsicht";
 type Art = "infusionsplan" | "patientendatenblatt";
 type Optionen = {
   schrift?: "klein" | "normal" | "gross"; ausrichtung?: "links" | "mitte" | "rechts"; fett?: boolean; kursiv?: boolean;
-  ausblenden_wenn_leer?: boolean; nicht_teilen?: boolean; ueberschrift?: boolean;
+  ausblenden_wenn_leer?: boolean; nicht_teilen?: boolean; ueberschrift?: boolean; linie_oben?: boolean;
+  neben_vorherigem?: Breite;
 };
+type Breite = "drittel" | "haelfte" | "zwei_drittel";
 type Eintrag = { label: string; wert: string };
 export type Block = {
   id: string; typ: string; bezeichnung?: string; optionen?: Optionen;
   text?: string; zusatz_label?: string; zusatz?: string; spalten?: number; felder?: Eintrag[]; quelle?: string;
   linie?: string; hoehe_mm?: number; links?: string; rechts?: string; rechts_klein?: boolean;
-  absender?: boolean; linienfarbe?: string; falzmarken?: boolean;
+  absender?: boolean; linienfarbe?: string; falzmarken?: boolean; mit_linie?: boolean;
+  untertitel?: string; darstellung?: "paare" | "befund"; spaltenkoepfe?: boolean;
 };
 type Version = {
   id: number; version: number | null; status: "entwurf" | "aktiv" | "abgeloest"; notiz: string; erstellt_am: string;
@@ -45,14 +48,15 @@ type Entwurf = Version & { ist_entwurf: boolean; grundlage?: number; bloecke: Bl
 
 const TYPNAME: Record<string, string> = {
   briefkopf: "Briefkopf", titel: "Titel", text: "Text", zweispaltig: "Zwei Spalten", datenfelder: "Datenfelder", tabelle: "Tabelle", trennlinie: "Trennlinie",
-  leerraum: "Leerraum", unterschrift: "Unterschrift", seitenumbruch: "Seitenumbruch", fusszeile: "Fußzeile",
+  leerraum: "Leerraum", unterschrift: "Unterschrift", seitenumbruch: "Seitenumbruch", fusszeile: "Fußzeile", kopfkarte: "Kopfkarte",
 };
 const HINWEIS: Record<string, string> = {
-  briefkopf: "Logo (und auf Wunsch Absender) aus „Briefkopf und Logo“, darunter eine farbige Linie; Falzmarken am linken Rand.",
+  briefkopf: "Logo (und auf Wunsch Absender) aus „Briefkopf und Logo“, auf Wunsch darunter eine farbige Linie; Falzmarken am linken Rand.",
+  kopfkarte: "Kasten wie der Kopf der Akte in EPM: Name groß, darunter weitere Zeilen, rechts ein kleiner Text, unten Kennzahlen nebeneinander.",
   titel: "Überschrift des Dokuments, rechts daneben ein Zusatz wie „gültig ab“.",
   text: "Freier Text. Datenfelder werden beim Erzeugen eingesetzt; Zeilen ohne Wert entfallen.",
   zweispaltig: "Zwei Textspalten nebeneinander, z. B. Anschrift links und „Unsere Zeichen“ rechts. Zeilen ohne Wert entfallen.",
-  datenfelder: "Bezeichnung links, Wert rechts. Mehrere Spalten setzen Paare nebeneinander.",
+  datenfelder: "Bezeichnung links, Wert rechts. Mehrere Spalten setzen Paare nebeneinander. „Wie Laborbefund“: Menge rechtsbündig, Einheit in eigener Spalte.",
   tabelle: "Feste Spalten; die Zeilen kommen aus der Akte bzw. dem Plan.",
   trennlinie: "Waagerechte Linie.",
   leerraum: "Abstand in Millimetern.",
@@ -61,8 +65,24 @@ const HINWEIS: Record<string, string> = {
   fusszeile: "Steht auf jeder Seite unten (bis 8 Zeilen links, rechts z. B. die Seitenzahl). {Seite} und {Seiten} werden zur Seitenzahl.",
 };
 /** Bausteine aus dem Entwurf; Briefkopf, Titel und Fußzeile gibt es je Vorlage einmal */
-const BAUSTEINE = ["text", "zweispaltig", "datenfelder", "tabelle", "trennlinie", "leerraum", "unterschrift", "seitenumbruch", "titel", "briefkopf", "fusszeile"];
+const BAUSTEINE = ["text", "zweispaltig", "datenfelder", "tabelle", "kopfkarte", "trennlinie", "leerraum", "unterschrift", "seitenumbruch", "titel", "briefkopf", "fusszeile"];
+/** Diese Blöcke lassen sich neben den vorherigen setzen (wie auf dem Server geprüft) */
+const NEBENEINANDER = ["text", "datenfelder", "tabelle", "unterschrift"];
+const BREITE: Record<Breite, number> = { drittel: 34, haelfte: 48.5, zwei_drittel: 63 };
+const BREITE_TEXT: Record<Breite, string> = { drittel: "ein Drittel", haelfte: "die Hälfte", zwei_drittel: "zwei Drittel" };
 const PLATZHALTER = /\{\{\s*([^{}]+?)\s*\}\}/g;
+
+/** Breiten in % wie auf dem Server (pdf._nebeneinander): die rechten Blöcke nach Wahl, der erste den Rest */
+function breitenFuer(gruppe: Block[]): number[] {
+  const abstand = 4;
+  let rechts = gruppe.slice(1).map((b) => BREITE[b.optionen?.neben_vorherigem ?? "haelfte"]);
+  let erste = 100 - rechts.reduce((x, y) => x + y, 0) - abstand * (gruppe.length - 1);
+  if (erste < 15) {
+    rechts = rechts.map(() => (100 - abstand * (gruppe.length - 1)) / gruppe.length);
+    erste = rechts[0];
+  }
+  return [erste, ...rechts];
+}
 
 function neueId(typ: string, bloecke: Block[]): string {
   let i = 1;
@@ -76,7 +96,8 @@ function neuerBlock(typ: string, bloecke: Block[], tabellen: Aufbau["tabellen"])
   if (typ === "text") b.text = "Text";
   if (typ === "fusszeile") Object.assign(b, { text: "{{Absender.Name}}", rechts: "{Seite}/{Seiten}" });
   if (typ === "zweispaltig") Object.assign(b, { links: "{{Patient.Name}}", rechts: "Patienten-Nr.: {{Patient.Nummer}}", rechts_klein: true });
-  if (typ === "briefkopf") Object.assign(b, { absender: false, linienfarbe: "#EE8D4D", falzmarken: true });
+  if (typ === "briefkopf") Object.assign(b, { absender: false, linienfarbe: "#EE8D4D", falzmarken: true, mit_linie: true });
+  if (typ === "kopfkarte") Object.assign(b, { text: "{{Patient.Name}}", untertitel: "", rechts: "", felder: [{ label: "Patienten-Nr.", wert: "{{Patient.Nummer}}" }] });
   if (typ === "datenfelder") Object.assign(b, { spalten: 1, felder: [{ label: "Bezeichnung", wert: "{{Heute}}" }] });
   if (typ === "tabelle") b.quelle = tabellen[0]?.quelle;
   if (typ === "unterschrift") Object.assign(b, { felder: [], linie: "Unterschrift" });
@@ -105,11 +126,12 @@ function stil(o?: Optionen): string {
 function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] }) {
   const briefkopf = useBriefkopf();
   const a = briefkopf.data ? briefkopf.data.absender[briefkopf.data.aktiv] : null;
-  const kopf = b.optionen?.ueberschrift && b.bezeichnung ? <div className="text-[8.5px] font-semibold uppercase tracking-wider text-[#5d5b72] mb-1">{b.bezeichnung}</div> : null;
+  const kopf = b.optionen?.ueberschrift && b.bezeichnung
+    ? <div className="text-[8px] font-semibold uppercase tracking-wider text-[#00325a] bg-[#eef0f6] border-l-[3px] border-[#EE8D4D] px-1.5 py-[2px] mb-0.5">{b.bezeichnung}</div> : null;
   switch (b.typ) {
     case "briefkopf":
       return (
-        <div className="flex justify-between items-end pb-2 border-b-2" style={{ borderColor: /^#[0-9a-f]{6}$/i.test(b.linienfarbe ?? "") ? b.linienfarbe : "#251F53" }}>
+        <div className={cx("flex justify-between items-end pb-2", b.mit_linie !== false && "border-b-2")} style={{ borderColor: /^#[0-9a-f]{6}$/i.test(b.linienfarbe ?? "") ? b.linienfarbe : "#251F53" }}>
           <Logo className="w-[150px] h-[53px]" version={briefkopf.data?.logo.sha256} />
           {b.absender !== false ? <div className="flex flex-col items-end text-[9px] text-[#555]">
             {a ? <><span>{a.strasse} · {a.plz} {a.ort}</span><span>Tel. {a.telefon}</span><span>{a.email}</span></> : null}
@@ -118,13 +140,27 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
       );
     case "titel":
       return (
-        <div className={cx("flex justify-between items-baseline", stil(b.optionen))}>
-          <span className="text-[16px] font-semibold"><MitFeldern text={b.text} /></span>
+        <div className={cx("flex justify-between items-baseline border-b border-[#00325a] pb-0.5", stil(b.optionen))}>
+          <span className="text-[16px] font-semibold text-[#00325a]"><MitFeldern text={b.text} /></span>
           <span className="text-[10px] text-[#555]">{b.zusatz_label} <MitFeldern text={b.zusatz} /></span>
         </div>
       );
     case "text":
-      return <div className={cx("text-[10px] leading-relaxed", stil(b.optionen))}>{kopf}<MitFeldern text={b.text} /></div>;
+      return <div className={cx("text-[10px] leading-relaxed", b.optionen?.linie_oben && "border-t border-[#c9c8d4] pt-1", stil(b.optionen))}>{kopf}<MitFeldern text={b.text} /></div>;
+    case "kopfkarte":
+      return (
+        <div className={stil(b.optionen)}>{kopf}<div className="border border-[#c9c8d4] rounded px-2.5 py-2 text-[10px]">
+          <div className="flex justify-between gap-3 items-start">
+            <div><div className="text-[13px] font-semibold"><MitFeldern text={b.text} /></div>
+              {b.untertitel ? <div className="text-[#3b3953]"><MitFeldern text={b.untertitel} /></div> : null}</div>
+            {b.rechts ? <div className="text-right text-[8px] text-[#00325a]"><MitFeldern text={b.rechts} /></div> : null}
+          </div>
+          {b.felder?.length ? <div className="flex mt-1.5 pt-1 border-t border-[#ececf2]">
+            {b.felder.map((e, i) => <div key={i} className={cx("flex flex-col px-2 min-w-0", i ? "border-l border-[#e1e0ea]" : "pl-0")}>
+              <span className="text-[8px] text-[#5d5b72]">{e.label}</span><span className="truncate"><MitFeldern text={e.wert} /></span></div>)}
+          </div> : null}
+        </div></div>
+      );
     case "fusszeile":
       return <div className="flex justify-between gap-3 text-[8px] text-[#00325a] leading-snug"><span><MitFeldern text={b.text} /></span><span><MitFeldern text={b.rechts} /></span></div>;
     case "zweispaltig":
@@ -136,6 +172,20 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
       );
     case "datenfelder":
     case "unterschrift": {
+      if (b.typ === "datenfelder" && b.darstellung === "befund") {
+        return (
+          <div className={stil(b.optionen)}>
+            {kopf}
+            <table className="w-full border-collapse text-[10px]">
+              {b.spaltenkoepfe ? <thead><tr>{["Bestandteil", "Menge", "Einheit"].map((t, i) => <th key={t} className={cx("font-medium text-[8px] text-[#666] border-b border-[#ccc] py-[2px] px-1.5", i === 1 ? "text-right" : "text-left")}>{t}</th>)}</tr></thead> : null}
+              <tbody>{(b.felder ?? []).map((e, i) => (
+                <tr key={i}><td className="py-[2px] px-1.5 border-b border-[#eee] align-top">{e.label}</td>
+                  <td colSpan={2} className="py-[2px] px-1.5 border-b border-[#eee] align-top text-right"><MitFeldern text={e.wert} /></td></tr>
+              ))}</tbody>
+            </table>
+          </div>
+        );
+      }
       const n = b.typ === "unterschrift" ? Math.min(Math.max(b.felder?.length ?? 1, 1), 4) : b.spalten ?? 1;
       const felder = b.felder ?? [];
       const zeilen = Array.from({ length: Math.ceil(felder.length / n) }, (_, i) => felder.slice(i * n, i * n + n));
@@ -160,7 +210,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
         <div className={stil(b.optionen)}>
           {kopf}
           <table className="w-full border-collapse text-[10px]">
-            <thead><tr>{(t?.spalten ?? []).map((s) => <th key={s} className="text-left font-semibold text-[#666] border-b border-[#ccc] py-[3px] pr-2">{s}</th>)}</tr></thead>
+            <thead><tr>{(t?.spalten ?? []).map((s, i) => <th key={i} className="text-left font-semibold text-[#666] border-b border-[#ccc] py-[3px] pr-2">{s}</th>)}</tr></thead>
             <tbody><tr><td colSpan={t?.spalten.length ?? 1} className="py-[3px] text-[#888] italic">{t?.name ?? "unbekannte Tabelle"}</td></tr></tbody>
           </table>
         </div>
@@ -244,6 +294,10 @@ function EditorFuerArt({ art, setArt }: { art: Art; setArt: (a: Art) => void }) 
     mutationFn: (v: number) => api<Entwurf>(`vorlagen/${art}/versionen/${v}/`),
     onSuccess: (v) => { setBloecke(structuredClone(v.bloecke)); setAuswahl(v.bloecke[0]?.id ?? null); melden(`Version ${v.version} als Grundlage geladen – noch nicht gespeichert.`); },
   });
+  const startvorlage = useMutation({
+    mutationFn: () => api<{ bloecke: Block[] }>(`vorlagen/${art}/startvorlage/`),
+    onSuccess: (v) => { setBloecke(structuredClone(v.bloecke)); setAuswahl(v.bloecke[0]?.id ?? null); melden("Mitgelieferte Startvorlage als Grundlage geladen – noch nicht gespeichert."); },
+  });
 
   const sort = useSortierbar(bloecke ?? [], (neu) => setBloecke(neu));
   if (!aufbau.data || !entwurf.data || !bloecke) return <><Fehleranzeige fehler={aufbau.error ?? entwurf.error} /><Laden /></>;
@@ -268,6 +322,27 @@ function EditorFuerArt({ art, setArt }: { art: Art; setArt: (a: Art) => void }) 
     setBloecke(neu);
     setAuswahl(b.id);
   };
+  // Blöcke mit „neben dem vorherigen“ in eine Zeile setzen, wie im PDF
+  const gruppen: number[][] = [];
+  bloecke.forEach((b, i) => {
+    if (b.optionen?.neben_vorherigem && gruppen.length) gruppen[gruppen.length - 1].push(i);
+    else gruppen.push([i]);
+  });
+  const rahmen = (b: Block, i: number) => (
+    <div key={b.id} role="button" tabIndex={0} aria-label={`Block ${b.bezeichnung || TYPNAME[b.typ]}`}
+      onClick={() => setAuswahl(b.id)} onKeyDown={(e) => { if (e.key === "Enter") setAuswahl(b.id); }}
+      className={cx("relative px-2 py-1.5 rounded cursor-pointer", b.id === auswahl ? "outline outline-2 outline-[#251F53]" : "hover:outline hover:outline-1 hover:outline-[#c9c8d4]")}>
+      {b.id === auswahl ? <>
+        <span className="absolute -top-2.5 left-1.5 text-[10px] bg-[#251F53] text-white px-1.5 rounded-sm">{b.bezeichnung || TYPNAME[b.typ]}</span>
+        <span className="absolute -top-3 right-1 flex gap-0.5">
+          <button type="button" aria-label="nach oben" disabled={i === 0} onClick={(e) => { e.stopPropagation(); verschiebe(i, i - 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[11px] p-0 cursor-pointer">↑</button>
+          <button type="button" aria-label="nach unten" disabled={i === bloecke.length - 1} onClick={(e) => { e.stopPropagation(); verschiebe(i, i + 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[11px] p-0 cursor-pointer">↓</button>
+          <button type="button" aria-label="entfernen" onClick={(e) => { e.stopPropagation(); entferne(b.id); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[11px] p-0 cursor-pointer">×</button>
+        </span>
+      </> : null}
+      <BlockAnsicht b={b} tabellen={a.tabellen} />
+    </div>
+  );
   const einmal = (typ: string) => ["briefkopf", "fusszeile"].includes(typ) && bloecke.some((b) => b.typ === typ);
   const serverFehler = [speichern.error, freigeben.error].find((e) => e instanceof ApiFehler) as ApiFehler | undefined;
   const fehlerListe = serverFehler ? (Array.isArray((serverFehler.daten as { bloecke?: string[] })?.bloecke)
@@ -329,24 +404,16 @@ function EditorFuerArt({ art, setArt }: { art: Art; setArt: (a: Art) => void }) 
                 </li>
               ))}
             </ul>
+            <button type="button" className="self-start text-xs underline bg-transparent border-0 cursor-pointer text-akzent-text p-0 mt-1"
+              onClick={() => startvorlage.mutate()} title="Aufbau, wie er mit EPM ausgeliefert wird, in den Editor laden">Mitgelieferte Startvorlage laden</button>
           </Karte>
         </aside>
 
         <div className="py-6 bg-[#E6E5EE] rounded-xl overflow-auto min-w-0" data-testid="vorlage-seite">
           <div className="w-[560px] min-h-[792px] mx-auto px-[38px] py-[34px] bg-white text-[#1a1a1a] shadow-md flex flex-col gap-2.5">
-            {bloecke.map((b, i) => (
-              <div key={b.id} role="button" tabIndex={0} aria-label={`Block ${b.bezeichnung || TYPNAME[b.typ]}`}
-                onClick={() => setAuswahl(b.id)} onKeyDown={(e) => { if (e.key === "Enter") setAuswahl(b.id); }}
-                className={cx("relative px-2 py-1.5 rounded cursor-pointer", b.id === auswahl ? "outline outline-2 outline-[#251F53]" : "hover:outline hover:outline-1 hover:outline-[#c9c8d4]")}>
-                {b.id === auswahl ? <>
-                  <span className="absolute -top-2.5 left-1.5 text-[10px] bg-[#251F53] text-white px-1.5 rounded-sm">{b.bezeichnung || TYPNAME[b.typ]}</span>
-                  <span className="absolute -top-3 right-1 flex gap-0.5">
-                    <button type="button" aria-label="nach oben" disabled={i === 0} onClick={(e) => { e.stopPropagation(); verschiebe(i, i - 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[11px] p-0 cursor-pointer">↑</button>
-                    <button type="button" aria-label="nach unten" disabled={i === bloecke.length - 1} onClick={(e) => { e.stopPropagation(); verschiebe(i, i + 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[11px] p-0 cursor-pointer">↓</button>
-                    <button type="button" aria-label="entfernen" onClick={(e) => { e.stopPropagation(); entferne(b.id); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[11px] p-0 cursor-pointer">×</button>
-                  </span>
-                </> : null}
-                <BlockAnsicht b={b} tabellen={a.tabellen} />
+            {gruppen.map((g) => g.length === 1 ? rahmen(bloecke[g[0]], g[0]) : (
+              <div key={`paar-${bloecke[g[0]].id}`} className="flex justify-between items-start" data-testid="nebeneinander">
+                {g.map((i, j) => <div key={bloecke[i].id} style={{ width: `${breitenFuer(g.map((x) => bloecke[x]))[j]}%` }}>{rahmen(bloecke[i], i)}</div>)}
               </div>
             ))}
           </div>
@@ -449,16 +516,27 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
       {b.typ === "briefkopf" ? <>
         <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={b.absender !== false} onChange={(e) => aendere({ absender: e.target.checked })} />Absender neben dem Logo</label>
         <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!b.falzmarken} onChange={(e) => aendere({ falzmarken: e.target.checked })} />Falzmarken am linken Rand</label>
-        <label className="flex items-center gap-2 text-[13.5px]">Linienfarbe
-          <input type="color" aria-label="Linienfarbe" value={(b.linienfarbe ?? "#251F53").toLowerCase()} onChange={(e) => aendere({ linienfarbe: e.target.value.toUpperCase() })} /></label>
+        <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={b.mit_linie !== false} onChange={(e) => aendere({ mit_linie: e.target.checked })} />Linie unter dem Logo</label>
+        {b.mit_linie !== false ? <label className="flex items-center gap-2 text-[13.5px]">Linienfarbe
+          <input type="color" aria-label="Linienfarbe" value={(b.linienfarbe ?? "#251F53").toLowerCase()} onChange={(e) => aendere({ linienfarbe: e.target.value.toUpperCase() })} /></label> : null}
       </> : null}
-      {b.typ === "datenfelder" ? (
-        <Feld label="Spalten">{(p) => <Auswahl {...p} value={b.spalten ?? 1} onChange={(e) => aendere({ spalten: Number(e.target.value) })}>
-          {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}</Auswahl>}</Feld>
-      ) : null}
-      {b.typ === "datenfelder" || b.typ === "unterschrift" ? (
+      {b.typ === "kopfkarte" ? <>
+        <FeldText label="Name (groß)" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} />
+        <FeldText label="Zeilen darunter" wert={b.untertitel ?? ""} onWert={(w) => aendere({ untertitel: w })} fokus={fokus} mehrzeilig />
+        <FeldText label="Rechts (klein)" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} mehrzeilig />
+      </> : null}
+      {b.typ === "datenfelder" ? <>
+        <Feld label="Darstellung">{(p) => <Auswahl {...p} value={b.darstellung ?? "paare"} onChange={(e) => aendere({ darstellung: e.target.value as Block["darstellung"] })}>
+          <option value="paare">Bezeichnung und Wert, auch nebeneinander</option>
+          <option value="befund">Wie Laborbefund (Menge rechtsbündig, Einheit eigene Spalte)</option></Auswahl>}</Feld>
+        {b.darstellung === "befund"
+          ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!b.spaltenkoepfe} onChange={(e) => aendere({ spaltenkoepfe: e.target.checked })} />Spaltenköpfe (Bestandteil, Menge, Einheit)</label>
+          : <Feld label="Spalten">{(p) => <Auswahl {...p} value={b.spalten ?? 1} onChange={(e) => aendere({ spalten: Number(e.target.value) })}>
+            {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}</Auswahl>}</Feld>}
+      </> : null}
+      {b.typ === "datenfelder" || b.typ === "unterschrift" || b.typ === "kopfkarte" ? (
         <div className="flex flex-col gap-2" role="group" aria-label="Felder">
-          <span className="text-sm font-medium">Felder</span>
+          <span className="text-sm font-medium">{b.typ === "kopfkarte" ? "Kennzahlen" : "Felder"}</span>
           {eintraege.map((e, i) => (
             <div key={i} className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto] gap-1.5 items-start">
               <Eingabe aria-label={`Bezeichnung ${i + 1}`} value={e.label} onChange={(ev) => setzeEintrag(i, { label: ev.target.value })} />
@@ -496,6 +574,12 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
       {textartig && b.typ !== "fusszeile" && b.typ !== "titel" ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.ueberschrift} onChange={(e) => aendereOptionen({ ueberschrift: e.target.checked })} />Bezeichnung als Überschrift drucken</label> : null}
       {["text", "datenfelder", "tabelle"].includes(b.typ) ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.ausblenden_wenn_leer} onChange={(e) => aendereOptionen({ ausblenden_wenn_leer: e.target.checked })} />Ausblenden, wenn leer</label> : null}
       {b.typ !== "fusszeile" && b.typ !== "seitenumbruch" ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.nicht_teilen} onChange={(e) => aendereOptionen({ nicht_teilen: e.target.checked })} />Nicht über Seitenumbruch teilen</label> : null}
+      {textartig && b.typ !== "fusszeile" ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.linie_oben} onChange={(e) => aendereOptionen({ linie_oben: e.target.checked })} />Linie darüber</label> : null}
+      {NEBENEINANDER.includes(b.typ) ? (
+        <Feld label="Neben dem vorherigen Block">{(p) => <Auswahl {...p} value={o.neben_vorherigem ?? ""} onChange={(e) => aendereOptionen({ neben_vorherigem: (e.target.value || undefined) as Breite | undefined })}>
+          <option value="">nein, darunter</option>
+          {(Object.keys(BREITE_TEXT) as Breite[]).map((k) => <option key={k} value={k}>ja, dieser Block {BREITE_TEXT[k]} breit</option>)}</Auswahl>}</Feld>
+      ) : null}
     </Karte>
   );
 }

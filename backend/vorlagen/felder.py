@@ -66,6 +66,14 @@ def _hausarzt(k):
     return p.hausarzt or None
 
 
+def _alter(k):
+    g = k.patient.geburtsdatum
+    if not g:
+        return None
+    h = k.heute
+    return f"{h.year - g.year - ((h.month, h.day) < (g.month, g.day))} J."
+
+
 def _anschrift(p):
     teile = [p.strasse, f"{p.plz} {p.ort}".strip()]
     return ", ".join(t for t in teile if t) or None
@@ -134,6 +142,9 @@ GEMEINSAM = {
                                     lambda k: (k.patient.ansprechpartner.telefon or None)
                                     if k.patient.ansprechpartner_id else None),
     "Heute": Feld("Datum der Erstellung", lambda k: datum(k.heute)),
+    "Patient.Geschlecht": Feld("weiblich / männlich / divers",
+                               lambda k: k.patient.get_geschlecht_display() if k.patient.geschlecht else None),
+    "Patient.Alter": Feld("Alter in Jahren am Erstellungstag (z. B. 52 J.)", lambda k: _alter(k)),
     "Patient.Anrede": Feld("Frau / Herr (aus dem Geschlecht)",
                            lambda k: {"w": "Frau", "m": "Herr"}.get(k.patient.geschlecht)),
     "Patient.Straße": Feld("Straße", lambda k: k.patient.strasse or None),
@@ -227,16 +238,37 @@ PATIENTENDATENBLATT = {
 
 FELDER = {"infusionsplan": INFUSIONSPLAN, "patientendatenblatt": PATIENTENDATENBLATT}
 
-# Tabellen mit festem Aufbau je Art (Spalten stehen fest, damit nichts Falsches gedruckt werden kann)
+# Tabellen mit festem Aufbau je Art (Spalten stehen fest, damit nichts Falsches gedruckt werden kann).
+# (Name, Spalten, Ausrichtung je Spalte): "zahl" rechtsbündig, "einheit" schmal und grau – wie im Laborbefund.
 TABELLEN = {
     "infusionsplan": {
-        "zusammensetzung": ("Zusammensetzung (Komponente, Präparat, Menge)", ["Komponente", "Präparat", "Menge"]),
-        "positionen": ("Weitere Bestandteile des Plans", ["Präparat", "Menge", "Häufigkeit", "Bemerkung"]),
+        "zusammensetzung": ("Zusammensetzung (Bestandteil, Menge, Einheit, Präparat)",
+                            ["Bestandteil", "Menge", "Einheit", "Präparat"], ["", "zahl", "einheit", ""]),
+        "positionen": ("Weitere Bestandteile des Plans", ["Präparat", "Menge", "Einheit", "Häufigkeit", "Bemerkung"],
+                       ["", "zahl", "einheit", "", ""]),
+        "bilanz": ("Laufzeit und Volumen (Mischbeutel, Zusatzlösung, Gesamt)",
+                   ["", "Mischbeutel", "Zusatzlösung", "Gesamt", ""], ["", "zahl", "zahl", "zahl", "einheit"]),
     },
     "patientendatenblatt": {
-        "termine": ("Nächste offene Termine (bis zu 3)", ["Datum", "Art", "Titel", "Ort"]),
+        "termine": ("Nächste offene Termine (bis zu 3)", ["Datum", "Art", "Titel", "Ort"], ["", "", "", ""]),
     },
 }
+
+
+class Fett(str):
+    """Zelle, die fett gedruckt wird (z. B. Gesamtwerte)."""
+
+
+def tabellenspalten(art: str, quelle: str, k: Kontext) -> list[str]:
+    spalten = list(TABELLEN[art][quelle][1])
+    if quelle == "bilanz" and k.plan is not None and k.plan.basis_praeparat_id:
+        spalten[2] = f"Zusatzlösung · {k.plan.basis_praeparat}"
+    return spalten
+
+
+def _zahl_ohne(wert):
+    """Zahl ohne Einheit, 0 und leer als „—“ (viele Altpläne haben keine Laufzeit)."""
+    return _zahl(wert) if wert else "—"
 
 
 def tabellenzeilen(art: str, quelle: str, k: Kontext) -> list[list[str]]:
@@ -245,18 +277,32 @@ def tabellenzeilen(art: str, quelle: str, k: Kontext) -> list[list[str]]:
             return []
         p = k.plan
         zeilen = [
-            ("Basislösung", p.basis_praeparat if p.basis_praeparat_id else None, _zahl(p.basis_ml, "ml")),
-            ("Glucose", p.glucose_praeparat if p.glucose_praeparat_id else None, _zahl(p.glucose_g, "g")),
-            ("Aminosäuren", p.aminosaeuren_praeparat if p.aminosaeuren_praeparat_id else None, _zahl(p.aminosaeuren_g, "g")),
-            ("Lipide", p.lipide_praeparat if p.lipide_praeparat_id else None, _zahl(p.lipide_g, "g")),
-            ("Humanalbumin", p.albumin_praeparat if p.albumin_praeparat_id else None, _zahl(p.albumin_ml, "ml")),
+            ("Basislösung", p.basis_praeparat if p.basis_praeparat_id else None, p.basis_ml, "ml"),
+            ("Glucose", p.glucose_praeparat if p.glucose_praeparat_id else None, p.glucose_g, "g"),
+            ("Aminosäuren", p.aminosaeuren_praeparat if p.aminosaeuren_praeparat_id else None, p.aminosaeuren_g, "g"),
+            ("Lipide", p.lipide_praeparat if p.lipide_praeparat_id else None, p.lipide_g, "g"),
+            ("Humanalbumin", p.albumin_praeparat if p.albumin_praeparat_id else None, p.albumin_ml, "ml"),
         ]
-        return [[a, str(b) if b else "—", c or "—"] for a, b, c in zeilen if b or c]
+        return [[a, _zahl(c) if c is not None else "—", e if c is not None else "", str(b) if b else "—"]
+                for a, b, c, e in zeilen if b or c is not None]
     if quelle == "positionen":
         if k.plan is None or not k.plan.pk:
             return []
-        return [[str(x.praeparat), _zahl(x.menge, x.einheit) or "—", x.haeufigkeit or "—", x.bemerkung or "—"]
+        return [[str(x.praeparat), _zahl(x.menge) if x.menge is not None else "—", x.einheit if x.menge is not None else "",
+                 x.haeufigkeit or "—", x.bemerkung or "—"]
                 for x in k.plan.positionen.select_related("praeparat")]
+    if quelle == "bilanz":
+        if k.plan is None:
+            return []
+        p = k.plan
+        kcal = _zahl(p.kcal) if p.kcal else "—"
+        laufzeit, rate = _zahl_ohne(p.laufzeit_h), _zahl_ohne(p.rate_ml_h)
+        return [
+            ["Kalorien", kcal, "—", Fett(kcal), "kcal"],
+            ["Volumen", _zahl_ohne(p.gesamtvolumen_ml), _zahl_ohne(p.basis_ml), Fett(_zahl_ohne(p.volumen_summe_ml)), "ml"],
+            ["Laufzeit", "", "", laufzeit, "h" if laufzeit != "—" else ""],
+            ["Laufmenge je Stunde", "", "", rate, "ml/h" if rate != "—" else ""],
+        ]
     if quelle == "termine":
         from patienten.models import Termin
 
