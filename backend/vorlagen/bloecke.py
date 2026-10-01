@@ -131,7 +131,9 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
             if "rechts_klein" in b and not isinstance(b["rechts_klein"], bool):
                 fehler.append(f"{name}: „rechts_klein“ ja oder nein.")
         elif typ == "titel":
-            erlaubt |= {"text", "zusatz_label", "zusatz"}
+            erlaubt |= {"text", "zusatz_label", "zusatz", "neben_logo"}
+            if "neben_logo" in b and not isinstance(b["neben_logo"], bool):
+                fehler.append(f"{name}: „neben_logo“ ja oder nein.")
             _text(b.get("text"), f"{name} (Text)", fehler, pflicht=True, laenge=200)
             _text(b.get("zusatz_label"), f"{name} (Zusatz)", fehler, laenge=80)
             _text(b.get("zusatz"), f"{name} (Zusatz)", fehler, laenge=200)
@@ -216,7 +218,7 @@ STARTVORLAGEN = {
         # Freigabevermerk unten wie „validiert von“. Ohne Linie unter dem Logo (Wunsch, mehr Platz).
         {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF, "mit_linie": False},
         {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Empfehlung eines Infusionsplans",
-         "zusatz_label": "gültig ab", "zusatz": "{{Plan.gültig_ab}}"},
+         "zusatz_label": "gültig ab", "zusatz": "{{Plan.gültig_ab}}", "neben_logo": True},
         {"id": "patient", "typ": "kopfkarte", "bezeichnung": "Patient",
          "text": "{{Patient.Name}}",
          "untertitel": "{{Patient.Geschlecht}} · geb. {{Patient.Geburtsdatum}} ({{Patient.Alter}})\n{{Patient.Anschrift}}",

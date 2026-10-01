@@ -26,6 +26,8 @@ test("Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau, Ver
   await expect(editor.getByTestId("block-eigenschaften").getByLabel("Darstellung")).toHaveValue("befund");
   await aufbau.getByRole("button", { name: /Briefkopf/ }).click();
   await expect(editor.getByTestId("block-eigenschaften").getByLabel("Linie unter dem Logo")).not.toBeChecked();
+  await aufbau.getByRole("button", { name: /Titel/ }).click();
+  await expect(editor.getByTestId("block-eigenschaften").getByLabel("Rechts neben dem Logo")).toBeChecked();
   await aufbau.getByRole("button", { name: /Patient/ }).click();
   await expect(editor.getByTestId("block-eigenschaften").getByRole("group", { name: "Felder" })).toContainText("Kennzahlen");
 

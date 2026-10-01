@@ -32,7 +32,7 @@ export type Block = {
   text?: string; zusatz_label?: string; zusatz?: string; spalten?: number; felder?: Eintrag[]; quelle?: string;
   linie?: string; hoehe_mm?: number; links?: string; rechts?: string; rechts_klein?: boolean;
   absender?: boolean; linienfarbe?: string; falzmarken?: boolean; mit_linie?: boolean;
-  untertitel?: string; darstellung?: "paare" | "befund"; spaltenkoepfe?: boolean;
+  untertitel?: string; darstellung?: "paare" | "befund"; spaltenkoepfe?: boolean; neben_logo?: boolean;
 };
 type Version = {
   id: number; version: number | null; status: "entwurf" | "aktiv" | "abgeloest"; notiz: string; erstellt_am: string;
@@ -127,7 +127,9 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
   const briefkopf = useBriefkopf();
   const a = briefkopf.data ? briefkopf.data.absender[briefkopf.data.aktiv] : null;
   const kopf = b.optionen?.ueberschrift && b.bezeichnung
-    ? <div className="text-[8px] font-semibold uppercase tracking-wider text-[#00325a] bg-[#eef0f6] border-l-[3px] border-[#EE8D4D] px-1.5 py-[2px] mb-0.5">{b.bezeichnung}</div> : null;
+    ? <div className="text-[10.5px] font-semibold pb-1 mb-1 border-b border-[#e6e5ee]">{b.bezeichnung}</div> : null;
+  // Bereiche mit Überschrift erscheinen im PDF als Karte wie in der Oberfläche
+  const karte = b.optionen?.ueberschrift && b.bezeichnung ? "border border-[#d9d8e3] rounded-md px-2 py-1.5" : "";
   switch (b.typ) {
     case "briefkopf":
       return (
@@ -140,16 +142,16 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
       );
     case "titel":
       return (
-        <div className={cx("flex justify-between items-baseline border-b border-[#00325a] pb-0.5", stil(b.optionen))}>
-          <span className="text-[16px] font-semibold text-[#00325a]"><MitFeldern text={b.text} /></span>
+        <div className={cx("flex items-baseline", b.neben_logo ? "flex-col items-end" : "justify-between", stil(b.optionen))}>
+          <span className="text-[16px] font-semibold"><MitFeldern text={b.text} /></span>
           <span className="text-[10px] text-[#555]">{b.zusatz_label} <MitFeldern text={b.zusatz} /></span>
         </div>
       );
     case "text":
-      return <div className={cx("text-[10px] leading-relaxed", b.optionen?.linie_oben && "border-t border-[#c9c8d4] pt-1", stil(b.optionen))}>{kopf}<MitFeldern text={b.text} /></div>;
+      return <div className={cx("text-[10px] leading-relaxed", karte, b.optionen?.linie_oben && "border-t border-[#c9c8d4] pt-1", stil(b.optionen))}>{kopf}<MitFeldern text={b.text} /></div>;
     case "kopfkarte":
       return (
-        <div className={stil(b.optionen)}>{kopf}<div className="border border-[#c9c8d4] rounded px-2.5 py-2 text-[10px]">
+        <div className={stil(b.optionen)}>{kopf}<div className="border border-[#d9d8e3] rounded-md px-2.5 py-2 text-[10px]">
           <div className="flex justify-between gap-3 items-start">
             <div><div className="text-[13px] font-semibold"><MitFeldern text={b.text} /></div>
               {b.untertitel ? <div className="text-[#3b3953]"><MitFeldern text={b.untertitel} /></div> : null}</div>
@@ -174,7 +176,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
     case "unterschrift": {
       if (b.typ === "datenfelder" && b.darstellung === "befund") {
         return (
-          <div className={stil(b.optionen)}>
+          <div className={cx(karte, stil(b.optionen))}>
             {kopf}
             <table className="w-full border-collapse text-[10px]">
               {b.spaltenkoepfe ? <thead><tr>{["Bestandteil", "Menge", "Einheit"].map((t, i) => <th key={t} className={cx("font-medium text-[8px] text-[#666] border-b border-[#ccc] py-[2px] px-1.5", i === 1 ? "text-right" : "text-left")}>{t}</th>)}</tr></thead> : null}
@@ -190,7 +192,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
       const felder = b.felder ?? [];
       const zeilen = Array.from({ length: Math.ceil(felder.length / n) }, (_, i) => felder.slice(i * n, i * n + n));
       return (
-        <div className={stil(b.optionen)}>
+        <div className={cx(karte, stil(b.optionen))}>
           {kopf}
           <table className="w-full border-collapse text-[10px]"><tbody>
             {zeilen.map((z, i) => (
@@ -207,7 +209,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
     case "tabelle": {
       const t = tabellen.find((x) => x.quelle === b.quelle);
       return (
-        <div className={stil(b.optionen)}>
+        <div className={cx(karte, stil(b.optionen))}>
           {kopf}
           <table className="w-full border-collapse text-[10px]">
             <thead><tr>{(t?.spalten ?? []).map((s, i) => <th key={i} className="text-left font-semibold text-[#666] border-b border-[#ccc] py-[3px] pr-2">{s}</th>)}</tr></thead>
@@ -505,6 +507,7 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
           <Feld label="Zusatz">{(p) => <Eingabe {...p} value={b.zusatz_label ?? ""} onChange={(e) => aendere({ zusatz_label: e.target.value })} />}</Feld>
           <FeldText label="Wert" wert={b.zusatz ?? ""} onWert={(w) => aendere({ zusatz: w })} fokus={fokus} />
         </div>
+        <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!b.neben_logo} onChange={(e) => aendere({ neben_logo: e.target.checked })} />Rechts neben dem Logo</label>
       </> : null}
       {b.typ === "text" || b.typ === "fusszeile" ? <FeldText label="Text" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} mehrzeilig /> : null}
       {b.typ === "fusszeile" ? <FeldText label="Rechts" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} /> : null}

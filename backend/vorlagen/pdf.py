@@ -28,7 +28,7 @@ CSS = """
 html { font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif; font-size: 9.5pt; color: #1b1932; line-height: 1.4;
        font-feature-settings: "tnum"; }
 body { margin: 0; }
-.block { margin: 0 0 3.5mm 0; }
+.block { margin: 0 0 3mm 0; }
 .briefkopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 8mm; padding-bottom: 3mm;
              border-bottom: 0.5mm solid; }
 .briefkopf.ohne-linie { border-bottom: 0; padding-bottom: 1mm; }
@@ -38,14 +38,28 @@ body { margin: 0; }
 .spalten .rechts { text-align: right; color: #00325a; }
 .spalten .rechts.klein { font-size: 8pt; line-height: 1.5; }
 .absender { text-align: right; font-size: 7.5pt; color: #3b3953; line-height: 1.45; }
-.titel { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 1.2mm;
-         border-bottom: 1.2pt solid #00325a; }
-.titel h1 { font-size: 14.5pt; font-weight: 600; margin: 0; color: #00325a; }
+.titel { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 1mm; }
+.titel h1 { font-size: 15pt; font-weight: 600; margin: 0; }
+/* Titel rechts neben dem Logo */
+.kopftitel { text-align: right; }
+.kopftitel h1 { font-size: 15pt; font-weight: 600; margin: 0 0 0.6mm 0; line-height: 1.2; }
+.kopftitel .zusatz { font-size: 9.5pt; }
+.kopftitel .zusatz span { color: #3b3953; }
 .titel .zusatz { font-size: 9.5pt; }
 .titel .zusatz span { color: #5d5b72; }
-/* Bereichsüberschrift als Balken wie im Laborbefund („Klinische Chemie“) */
-h2 { font-size: 7.5pt; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #00325a;
-     background: #eef0f6; border-left: 1.2mm solid #EE8D4D; padding: 1mm 2.5mm; margin: 0 0 0.6mm 0; }
+h2 { font-size: 9.5pt; font-weight: 600; margin: 0 0 1.5mm 0; }
+/* Bereiche mit Überschrift als Karte wie in der Oberfläche von EPM (Rand, runde Ecken, Kopfzeile der Tabelle hinterlegt) */
+.karte { border: 0.6pt solid #d9d8e3; border-radius: 2mm; }
+.karte > h2 { padding: 1.5mm 3.5mm 1.1mm 3.5mm; margin: 0; }
+.karte > table { width: 100%%; }
+.karte .befund th { background: #f1f0f6; border-top: 0.5pt solid #e6e5ee; border-bottom: 0.5pt solid #d9d8e3; }
+.karte .befund tr:last-child td { border-bottom: 0; }
+.karte .befund th:first-child, .karte .befund td:first-child,
+.karte .felder td:first-child { padding-left: 3.5mm; }
+.karte .befund th:last-child, .karte .befund td:last-child { padding-right: 3.5mm; }
+.karte .ohne-kopf tr:first-child td { border-top: 0.5pt solid #e6e5ee; }
+.karten-inhalt { padding: 1.2mm 3.5mm 1.6mm 3.5mm; border-top: 0.5pt solid #e6e5ee; }
+.karten-inhalt .richtext p { margin: 0 0 1mm 0; }
 table { width: 100%%; border-collapse: collapse; }
 .felder td { vertical-align: top; padding: 0.7mm 2.5mm 0.7mm 0; border-bottom: 0.4pt solid #ececf2; }
 .felder td.label { color: #5d5b72; }
@@ -58,9 +72,9 @@ table { width: 100%%; border-collapse: collapse; }
 /* Laborbefund: Bezeichnung, Wert rechtsbündig, Einheit in eigener Spalte, Rest */
 .befund { font-size: 9pt; }
 /* fax-tauglich (Pläne gehen per Fax/Mail): Einheiten und Bezeichnungen dunkel, nichts nur über Farbe */
-.befund th { text-align: left; font-size: 7pt; font-weight: 500; color: #3b3953; border-bottom: 0.6pt solid #c9c8d4;
-             padding: 0.9mm 2.5mm 0.6mm 2.5mm; }
-.befund td { border-bottom: 0.4pt solid #ececf2; padding: 0.75mm 2.5mm; vertical-align: top; line-height: 1.3; }
+.befund th { text-align: left; font-size: 7.5pt; font-weight: 500; color: #3b3953; border-bottom: 0.6pt solid #d9d8e3;
+             padding: 0.9mm 2.5mm 0.8mm 2.5mm; }
+.befund td { border-bottom: 0.4pt solid #ececf2; padding: 0.6mm 2.5mm; vertical-align: top; line-height: 1.3; }
 .befund .b { width: 40mm; }
 .befund .zahl { text-align: right; width: 17mm; white-space: nowrap; }
 .befund .einheit { width: 12mm; white-space: nowrap; }
@@ -72,19 +86,17 @@ table { width: 100%%; border-collapse: collapse; }
 .paar { display: flex; justify-content: space-between; align-items: flex-start; }
 .paar .b, .paar .befund .b { width: auto; white-space: nowrap; }
 /* Kopfkarte wie der Kopf der Akte in EPM */
-.kopfkarte { border: 0.5pt solid #c9c8d4; border-radius: 1.5mm; padding: 2.6mm 3.5mm 2.4mm; }
+.kopfkarte { border: 0.6pt solid #d9d8e3; border-radius: 2mm; padding: 2.3mm 3.5mm 2mm; }
 .kopfkarte .oben { display: flex; justify-content: space-between; gap: 8mm; align-items: flex-start; }
 .kopfkarte .name { font-size: 13pt; font-weight: 600; line-height: 1.25; }
 .kopfkarte .unter { color: #3b3953; font-size: 9pt; margin-top: 0.6mm; line-height: 1.45; }
 .kopfkarte .rechts { text-align: right; font-size: 7.5pt; color: #00325a; line-height: 1.45; }
-.kopfkarte .zahlen { width: 100%%; border-collapse: collapse; margin-top: 2.4mm; border-top: 0.4pt solid #ececf2; }
+.kopfkarte .zahlen { width: 100%%; border-collapse: collapse; margin-top: 2mm; border-top: 0.5pt solid #e6e5ee; }
 .kopfkarte .zahlen td { vertical-align: top; padding: 1.6mm 3mm 0 3mm; border-left: 0.5pt solid #e1e0ea; }
 .kopfkarte .zahlen td:first-child { padding-left: 0; border-left: 0; }
 .kopfkarte .zahlen .l { display: block; font-size: 7pt; color: #3b3953; font-weight: 500; }
 .kopfkarte .zahlen .w { display: block; font-size: 9.5pt; }
-.unter-balken { padding: 0.8mm 2.5mm 0 2.5mm; }
-.unter-balken .richtext p { margin: 0 0 1mm 0; }
-.linie-oben { border-top: 0.6pt solid #c9c8d4; padding-top: 2mm; margin-top: 4mm; }
+.linie-oben { border-top: 0.6pt solid #d9d8e3; padding-top: 1.8mm; margin-top: 3mm; }
 .leer { color: #5d5b72; font-style: italic; }
 hr { border: 0; border-top: 0.6pt solid #c9c8d4; margin: 0 0 3.5mm 0; }
 .unterschrift .linie { margin-top: 12mm; width: 75mm; border-top: 0.6pt solid #1b1932; padding-top: 1mm;
@@ -128,18 +140,19 @@ def _absender():
     return Absenderangaben.alle()[Einstellungen.aktuell().absender]
 
 
-def briefkopf_html(absender_zeigen=True, linienfarbe="#251F53", falzmarken=False, linie=True) -> str:
+def briefkopf_html(absender_zeigen=True, linienfarbe="#251F53", falzmarken=False, linie=True, rechts_html=None) -> str:
     a = _absender()
     zeilen = [a.name, f"{a.strasse} · {a.plz} {a.ort}".strip(" ·"),
               " · ".join(t for t in (a.telefon and f"Tel. {a.telefon}", a.fax and f"Fax {a.fax}") if t),
               " · ".join(t for t in (a.email, a.internet) if t)]
     absender = "<br>".join(html.escape(z) for z in zeilen if z) if absender_zeigen else ""
+    rechts = rechts_html if rechts_html is not None else f'<div class="absender">{absender}</div>'
     farbe = linienfarbe if re.fullmatch(r"#[0-9A-Fa-f]{6}", linienfarbe or "") else "#251F53"
     # Falzmarken (DIN 5008, wie im Altsystem bei 99 / 148,5 / 198 mm); bezogen auf den Seitenbereich ab 15 mm Rand
     marken = "".join(f'<div class="falzmarke" style="top:{y - 15}mm"></div>' for y in (99, 148.5, 198)) if falzmarken else ""
     klasse = "briefkopf" if linie else "briefkopf ohne-linie"
     return (f'{marken}<div class="{klasse}" style="border-color:{farbe}"><img src="{logo_data_uri()}" alt="Logo">'
-            f'<div class="absender">{absender}</div></div>')
+            f'{rechts}</div>')
 
 
 def _css_string(text: str) -> str:
@@ -282,7 +295,8 @@ def _befundliste(ersetze, eintraege, spaltenkoepfe=False) -> tuple[str, bool]:
             zeilen.append(f'<tr>{label}<td class="wert" colspan="3">{wert}</td></tr>')
     kopf = ('<thead><tr><th class="b">Bestandteil</th><th class="zahl">Menge</th><th class="einheit">Einheit</th>'
             '<th></th></tr></thead>') if spaltenkoepfe else ""
-    return f'<table class="befund">{kopf}<tbody>{"".join(zeilen)}</tbody></table>', alle_leer
+    klasse = "befund" if spaltenkoepfe else "befund ohne-kopf"
+    return f'<table class="{klasse}">{kopf}<tbody>{"".join(zeilen)}</tbody></table>', alle_leer
 
 
 def _kopfkarte(ersetze, b) -> str:
@@ -327,18 +341,32 @@ def _nebeneinander(teile: list[tuple[str, str | None]]) -> str:
     return "".join(ausgabe)
 
 
+def _titel_html(ersetze, b) -> str:
+    titel, _ = ersetze(b.get("text", ""), html_erlaubt=False)
+    zusatz = ""
+    if b.get("zusatz") or b.get("zusatz_label"):
+        wert, _ = ersetze(b.get("zusatz", ""), html_erlaubt=False)
+        zusatz = f'<div class="zusatz"><span>{html.escape(b.get("zusatz_label") or "")}</span> {wert}</div>'
+    return f"<h1>{titel}</h1>{zusatz}"
+
+
 def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | None, str | None]:
     """→ (Inhalt als HTML, Fußzeilentext links, Fußzeile rechts)."""
     ersetze = Ersetzer(art, kontext)
     teile, fuss, rechts = [], None, None
+    # Titel „neben dem Logo“: steht rechts im Briefkopf statt in einer eigenen Zeile
+    hat_kopf = any(b.get("typ") == "briefkopf" for b in bloecke)
+    titel_neben = next((b for b in bloecke if b.get("typ") == "titel" and b.get("neben_logo") and hat_kopf), None)
     for b in bloecke:
         typ = b.get("typ")
         o = b.get("optionen") or {}
         anzahl = len(teile)
         ausblenden = o.get("ausblenden_wenn_leer", False)
         kopf = f"<h2>{html.escape(b['bezeichnung'])}</h2>" if o.get("ueberschrift") and b.get("bezeichnung") else ""
+        karte = " karte" if kopf else ""  # Bereich mit Überschrift als Karte wie in der Oberfläche von EPM
         if typ == "briefkopf":
-            teile.append(f'<div class="{_klassen(b)}">{briefkopf_html(b.get("absender", True), b.get("linienfarbe"), b.get("falzmarken", False), b.get("mit_linie", True))}</div>')
+            neben = f'<div class="kopftitel">{_titel_html(ersetze, titel_neben)}</div>' if titel_neben else None
+            teile.append(f'<div class="{_klassen(b)}">{briefkopf_html(b.get("absender", True), b.get("linienfarbe"), b.get("falzmarken", False), b.get("mit_linie", True), neben)}</div>')
         elif typ == "zweispaltig":
             links, _ = ersetze.zeilen(b.get("links", ""))
             rechts, _ = ersetze.zeilen(b.get("rechts", ""))
@@ -346,19 +374,16 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | 
             teile.append(f'<div class="{_klassen(b)} spalten"><div class="links">{links}</div>'
                          f'<div class="rechts{klein}">{rechts}</div></div>')
         elif typ == "titel":
-            titel, _ = ersetze(b.get("text", ""), html_erlaubt=False)
-            zusatz = ""
-            if b.get("zusatz") or b.get("zusatz_label"):
-                wert, leer = ersetze(b.get("zusatz", ""), html_erlaubt=False)
-                zusatz = (f'<div class="zusatz"><span>{html.escape(b.get("zusatz_label") or "")}</span> {wert}</div>')
-            teile.append(f'<div class="{_klassen(b)} titel"><h1>{titel}</h1>{zusatz}</div>')
+            if b is titel_neben:
+                continue
+            teile.append(f'<div class="{_klassen(b)} titel">{_titel_html(ersetze, b)}</div>')
         elif typ == "text":
             inhalt, leer = ersetze.zeilen(b.get("text", ""))
             if leer and ausblenden:
                 continue
-            if kopf:  # unter dem Bereichsbalken eingerückt wie die Tabellen
-                inhalt = f'<div class="unter-balken">{inhalt}</div>'
-            teile.append(f'<div class="{_klassen(b)}">{kopf}{inhalt}</div>')
+            if kopf:
+                inhalt = f'<div class="karten-inhalt">{inhalt}</div>'
+            teile.append(f'<div class="{_klassen(b)}{karte}">{kopf}{inhalt}</div>')
         elif typ == "kopfkarte":
             teile.append(f'<div class="{_klassen(b)}">{kopf}{_kopfkarte(ersetze, b)}</div>')
         elif typ == "datenfelder":
@@ -368,7 +393,7 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | 
                 tabelle, leer = _feldtabelle(ersetze, b.get("felder") or [], b.get("spalten", 2))
             if leer and ausblenden:
                 continue
-            teile.append(f'<div class="{_klassen(b)}">{kopf}{tabelle}</div>')
+            teile.append(f'<div class="{_klassen(b)}{karte}">{kopf}{tabelle}</div>')
         elif typ == "tabelle":
             quelle = b.get("quelle")
             spalten = tabellenspalten(art, quelle, kontext)
@@ -385,7 +410,7 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | 
             koerper = ("".join("<tr>" + "".join(zelle(z, k) for z, k in zip(zeile, klassen)) + "</tr>" for zeile in zeilen)
                        or f'<tr><td class="leer" colspan="{len(spalten)}">keine Einträge</td></tr>')
             art_klasse = "befund bilanz" if quelle == "bilanz" else "befund"
-            teile.append(f'<div class="{_klassen(b)}">{kopf}<table class="{art_klasse}"><thead><tr>{kopfzeile}</tr></thead>'
+            teile.append(f'<div class="{_klassen(b)}{karte}">{kopf}<table class="{art_klasse}"><thead><tr>{kopfzeile}</tr></thead>'
                          f"<tbody>{koerper}</tbody></table></div>")
         elif typ == "trennlinie":
             teile.append("<hr>")
