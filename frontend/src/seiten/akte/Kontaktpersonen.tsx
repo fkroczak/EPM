@@ -6,7 +6,7 @@
  * Nichts wird gelöscht: Nicht mehr Aktuelles wird markiert und bleibt im Verlauf.
  */
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
@@ -260,6 +260,19 @@ export function BezugspersonenKarte() {
   });
   const alle = liste.data ?? [];
   const sichtbar = alle.filter((b) => frueher || b.aktiv);
+  // „Auskunft an“ im Aktenkopf führt hierher: Person anspringen und kurz hervorheben
+  const ort = useLocation();
+  const ziel = (ort.state as { bezugsperson?: number; zeit?: number } | null);
+  const [markiert, setMarkiert] = useState<number | null>(null);
+  useEffect(() => {
+    if (!ziel?.bezugsperson || !liste.data) return;
+    const id = ziel.bezugsperson;
+    if (!liste.data.some((b) => b.id === id && b.aktiv)) setFrueher(true);
+    setMarkiert(id);
+    window.requestAnimationFrame(() => document.getElementById(`bezugsperson-${id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }));
+    const t = window.setTimeout(() => setMarkiert(null), 2500);
+    return () => window.clearTimeout(t);
+  }, [ziel?.bezugsperson, ziel?.zeit, liste.data]);
   const anzahlFrueher = alle.filter((b) => !b.aktiv).length;
   return (
     <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="bezugspersonen">
@@ -270,7 +283,9 @@ export function BezugspersonenKarte() {
           {sichtbar.map((b) => {
             const adresse = [b.strasse, [b.plz, b.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
             return (
-              <li key={b.id} className={cx("flex flex-col gap-0.5 text-sm", !b.aktiv && "opacity-60")} data-testid="bezugsperson">
+              <li key={b.id} id={`bezugsperson-${b.id}`} aria-current={markiert === b.id ? "true" : undefined}
+                className={cx("flex flex-col gap-0.5 text-sm rounded-md transition-shadow", !b.aktiv && "opacity-60",
+                  markiert === b.id && "outline outline-2 outline-akzent outline-offset-4")} data-testid="bezugsperson">
                 <span className="flex items-center gap-2 flex-wrap">
                   {bearbeiten ? (
                     <button type="button" className="bg-transparent border-0 p-0 text-left font-medium text-akzent-text cursor-pointer"

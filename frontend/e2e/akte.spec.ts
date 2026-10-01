@@ -332,6 +332,8 @@ test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pfl
 
   // Bezugspersonen: zwei Personen, eine mit Schweigepflichtentbindung → „Auskunft an“ im Kopf
   const personen = page.getByTestId("bezugspersonen");
+  // Höhe des Kopfs ohne Bezugspersonen merken: mit Personen bleibt sie gleich (festes Raster)
+  const kopfHoehe = (await page.getByTestId("kennzahlen").boundingBox())!.height;
   await personen.getByRole("button", { name: "Person", exact: true }).click();
   dialog = page.getByRole("dialog");
   await dialog.getByLabel("Beziehung").selectOption({ label: "Mutter" });
@@ -351,6 +353,10 @@ test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pfl
   await expect(personen.getByTestId("bezugsperson")).toHaveCount(2);
   await expect(page.getByTestId("auskunft")).toContainText("Margit Akte (Mutter)");
   await expect(page.getByTestId("auskunft")).not.toContainText("Bernd Betreuer");
+  // „Auskunft an“ im Kopf führt zu den Kontaktdaten der Person; der Kopf behält seine Höhe
+  await page.getByTestId("auskunft").getByRole("button", { name: "Margit Akte (Mutter)" }).click();
+  await expect(personen.getByTestId("bezugsperson").filter({ hasText: "Margit Akte" })).toHaveAttribute("aria-current", "true");
+  expect((await page.getByTestId("kennzahlen").boundingBox())!.height).toBeCloseTo(kopfHoehe, 0);
 
   // nicht löschen, sondern „nicht mehr aktuell“ – bleibt unter „Frühere anzeigen“ und im Verlauf
   await personen.getByRole("button", { name: "Margit Akte" }).click();

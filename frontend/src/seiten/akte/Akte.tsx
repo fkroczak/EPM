@@ -39,9 +39,10 @@ function richtung(p: number) {
   return p <= -1 ? "↓" : p >= 1 ? "↑" : "→"; // U11: unter ±1 % gleichbleibend
 }
 
-function Kennzahl({ titel, children, erste }: { titel: string; children: ReactNode; erste?: boolean }) {
+/** Eine Kennzahl im Aktenkopf: feste Spalte, eine Zeile (zu Langes wird gekürzt, ganz im Tooltip) – der Kopf springt nicht */
+function Kennzahl({ titel, children, hinweis }: { titel: string; children: ReactNode; hinweis?: string }) {
   return (
-    <div className={cx("flex flex-col gap-0.5 min-w-0 px-[18px]", !erste && "border-l border-rand")}>
+    <div className="flex flex-col gap-0.5 min-w-0 px-[18px] border-l border-rand" title={hinweis}>
       <span className="lbl text-[0.78rem] gedaempft font-medium">{titel}</span>
       <span className="text-sm truncate">{children}</span>
     </div>
@@ -318,8 +319,10 @@ export function Akte() {
           </div>
         </div>
         {k ? (
-          <div className="flex flex-wrap gap-y-3 -mx-[18px]" data-testid="kennzahlen">
-            <Kennzahl titel="Gewicht" erste>
+          <div className="overflow-hidden -mx-[18px]">
+          {/* festes Raster (2 Zeilen à 5 auf breiten Bildschirmen): mehr Ärzte oder Personen verändern die Höhe nicht */}
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-y-3 -ml-px" data-testid="kennzahlen">
+            <Kennzahl titel="Gewicht">
               {k.gewicht ? <>{kg(k.gewicht.kg)} {trend ? (
                 <span className={cx("font-semibold", trend.warnung ? "text-warn" : "gedaempft")} title={`seit ${datum(trend.von)}`}>
                   {richtung(Number(trend.prozent))} {prozent(trend.prozent, false)}
@@ -327,20 +330,26 @@ export function Akte() {
               ) : null}</> : "—"}
             </Kennzahl>
             <Kennzahl titel="BMI"><span className="num">{k.bmi != null ? zahl(k.bmi, 1) : "—"}</span></Kennzahl>
-            <Kennzahl titel="Katheter">{k.katheter ?? <span className="gedaempft">nicht erfasst</span>}</Kennzahl>
-            <Kennzahl titel="Versorger">{k.versorger ?? <span className="gedaempft">nicht erfasst</span>}</Kennzahl>
-            <Kennzahl titel="Ansprechpartner">{k.ansprechpartner ? <>{k.ansprechpartner}{k.ansprechpartner_telefon ? <> · <span className="num">{k.ansprechpartner_telefon}</span></> : null}</> : "—"}</Kennzahl>
+            <Kennzahl titel="Katheter" hinweis={k.katheter ?? undefined}>{k.katheter ?? <span className="gedaempft">nicht erfasst</span>}</Kennzahl>
+            <Kennzahl titel="Versorger" hinweis={k.versorger ?? undefined}>{k.versorger ?? <span className="gedaempft">nicht erfasst</span>}</Kennzahl>
+            <Kennzahl titel="Ansprechpartner" hinweis={k.ansprechpartner ? [k.ansprechpartner, k.ansprechpartner_telefon].filter(Boolean).join(" · ") : undefined}>
+              {k.ansprechpartner ? <>{k.ansprechpartner}{k.ansprechpartner_telefon ? <> · <span className="num">{k.ansprechpartner_telefon}</span></> : null}</> : "—"}</Kennzahl>
             <Kennzahl titel="Aktueller Plan">{k.aktueller_plan ? `${zahl(k.aktueller_plan.kcal)} kcal${k.aktueller_plan.laufzeit_h ? ` · ${zahl(k.aktueller_plan.laufzeit_h)} h` : ""}` : "—"}</Kennzahl>
-            <Kennzahl titel="Nächster Termin">
+            <Kennzahl titel="Nächster Termin" hinweis={k.naechster_termin ? `${terminZeit(k.naechster_termin.faellig_am, k.naechster_termin.uhrzeit)} · ${k.naechster_termin.ort ?? TERMINARTEN[k.naechster_termin.art]}` : undefined}>
               {k.naechster_termin ? `${terminZeit(k.naechster_termin.faellig_am, k.naechster_termin.uhrzeit)} · ${k.naechster_termin.ort ?? TERMINARTEN[k.naechster_termin.art]}` : "—"}
             </Kennzahl>
-            <Kennzahl titel="Hausarzt">
+            <Kennzahl titel="Hausarzt" hinweis={k.hausarzt ? [k.hausarzt.name, k.hausarzt.telefon].filter(Boolean).join(" · ") : undefined}>
               {k.hausarzt ? <>{k.hausarzt.name}{k.hausarzt.telefon ? <> · <span className="num">{k.hausarzt.telefon}</span></> : null}</> : "—"}
             </Kennzahl>
-            <Kennzahl titel="Auskunft an">
-              {/* Bezugspersonen mit Schweigepflichtentbindung – am Telefon sofort sichtbar */}
+            <Kennzahl titel={k.auskunft.length > 1 ? `Auskunft an (${k.auskunft.length})` : "Auskunft an"}
+              hinweis={k.auskunft.map((a) => `${a.name}${a.beziehung ? ` (${a.beziehung})` : ""}${a.telefon ? ` ${a.telefon}` : ""}`).join("\n") || undefined}>
+              {/* Bezugspersonen mit Schweigepflichtentbindung – am Telefon sofort sichtbar; ein Klick führt zu den Kontaktdaten */}
               <span data-testid="auskunft">{k.auskunft.length ? k.auskunft.map((a, i) => (
-                <span key={a.id}>{i ? " · " : ""}{a.name}{a.beziehung ? ` (${a.beziehung})` : ""}{a.telefon ? <> <span className="num">{a.telefon}</span></> : null}</span>
+                <span key={a.id}>{i ? " · " : ""}
+                  <button type="button" className="bg-transparent border-0 p-0 text-akzent-text cursor-pointer hover:underline"
+                    onClick={() => navigate(basis, { state: { bezugsperson: a.id, zeit: Date.now() } })}>
+                    {a.name}{a.beziehung ? ` (${a.beziehung})` : ""}</button>
+                  {a.telefon ? <> <span className="num">{a.telefon}</span></> : null}</span>
               )) : <span className="gedaempft">niemand eingetragen</span>}</span>
             </Kennzahl>
             <Kennzahl titel="Nickelallergie">
@@ -351,6 +360,7 @@ export function Akte() {
                     onClick={() => setDialog("stammdaten")}><Icon name="warnung" /> nicht erfasst</button>
                 ) : <span className="text-warn">nicht erfasst</span>}
             </Kennzahl>
+          </div>
           </div>
         ) : null}
       </Karte>
