@@ -13,11 +13,14 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     DJANGO_SETTINGS_MODULE=epm.settings \
     DJANGO_STATIC_ROOT=/app/staticfiles
-# Pango/HarfBuzz für WeasyPrint (PDF-Erzeugung), Schrift IBM Plex wie in der Oberfläche
+# Pango/HarfBuzz für WeasyPrint (PDF-Erzeugung). Die Schrift IBM Plex liegt im Repo (schriften/, OFL-Lizenz):
+# Debian 13 (trixie) hat kein Paket fonts-ibm-plex mehr, so baut das Image auch offline und unabhängig davon.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 \
-      fonts-ibm-plex fonts-dejavu-core \
+      fontconfig fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
+COPY schriften/ /usr/local/share/fonts/ibm-plex/
+RUN fc-cache -f /usr/local/share/fonts && fc-list | grep -q "IBM Plex Sans"
 RUN groupadd --gid 10001 epm && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin epm
 COPY --from=bau /opt/venv /opt/venv
 WORKDIR /app

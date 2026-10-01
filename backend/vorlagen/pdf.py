@@ -1,7 +1,7 @@
 """PDF-Erzeugung (F51): Vorlagenblöcke → HTML → PDF mit WeasyPrint.
 
 Offline: Es werden keine externen Ressourcen geladen (nur eingebettete data:-URLs, z. B. das Logo).
-Schrift: IBM Plex Sans aus dem Image (Paket fonts-ibm-plex), wie in der Oberfläche.
+Schrift: IBM Plex Sans aus dem Image (backend/schriften/, ins Image kopiert), wie in der Oberfläche.
 """
 import base64
 import hashlib
