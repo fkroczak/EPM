@@ -1,6 +1,6 @@
 /** Entwurf 3 · Patientenliste und Entwurf 12 · Neuer Patient – gegen echtes Backend und PostgreSQL. */
 import { expect, test } from "@playwright/test";
-import { apiAls, eindeutig, zustand } from "./hilfen";
+import { apiAls, eindeutig, merken, zustand } from "./hilfen";
 
 test.use({ storageState: zustand("mitarbeiter") });
 
@@ -64,8 +64,11 @@ test("Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten", 
   // Sortierung nach Name
   await page.getByRole("button", { name: /^Name/ }).click();
   await expect(page.getByRole("columnheader", { name: /Name/ })).toHaveAttribute("aria-sort", "ascending");
-  const namen = await liste.locator("tbody tr td:nth-child(2) a").allTextContents();
-  expect(namen).toEqual([...namen].sort((a, b) => a.localeCompare(b, "de")));
+  // die Liste wird nachgeladen (bis dahin bleibt die alte Reihenfolge stehen)
+  await expect.poll(async () => {
+    const namen = await liste.locator("tbody tr td:nth-child(2) a").allTextContents();
+    return namen.length > 1 && namen.join("|") === [...namen].sort((a, b) => a.localeCompare(b, "de")).join("|");
+  }).toBe(true);
 
   // Abgeschlossene Akten
   await page.getByRole("button", { name: /^Abgeschlossen/ }).click();
@@ -127,6 +130,7 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   // erscheint in der Liste
   await page.goto(`/patienten?suche=${nachname}`);
   await expect(page.getByTestId("patientenliste").getByRole("link", { name: `${nachname}, Nele` })).toBeVisible();
+  merken("neuer_patient", { id, nachname, name: `${nachname}, Nele` });
 });
 
 test("Betrachter sieht die Liste, aber keinen Knopf „Neuer Patient“", async ({ browser }) => {

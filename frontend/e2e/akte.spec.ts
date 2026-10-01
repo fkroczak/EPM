@@ -1,7 +1,7 @@
 /** Entwürfe 4, 5, 6 · Patientenakte: Kopf, Übersicht mit Gewicht, Diagnose & Therapie, Kontakte, Abschluss. */
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { apiAls, eindeutig, stackNeuStarten, zustand } from "./hilfen";
+import { apiAls, eindeutig, merken, stackNeuStarten, zustand } from "./hilfen";
 
 test.use({ storageState: zustand("mitarbeiter") });
 
@@ -87,6 +87,7 @@ test("Gewicht erfassen, Plausibilität, korrigieren, Zeitraum", async ({ page })
   expect(werte.results.map((g: { gewicht_kg: number }) => g.gewicht_kg)).toEqual([60.6, 61, 61.5, 62]);
   expect(werte.results[0].quelle).toBe("versorger");
   await api.ende();
+  merken("gewicht", { id: p.id });
 });
 
 test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => {
@@ -133,6 +134,7 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   expect(akte.diagnose).toBe("<p>Kurzdarmsyndrom nach Resektion</p><p><strong>Typ II</strong></p>");
   expect(akte.therapie).toBe("<ul><li><p>HPE 5×/Woche über Port</p></li></ul>");
   await api.ende();
+  merken("diagnose", { id: p.id });
 });
 
 test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) => {
@@ -198,6 +200,7 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   const geaendert = await api.get(`termine/${termine.results[0].id}/`);
   expect([geaendert.titel, geaendert.uhrzeit]).toEqual(["Rückruf Trinkmenge", "11:15:00"]);
   await api.ende();
+  merken("kontakte", { id: p.id });
 });
 
 test("Stammdaten bearbeiten, Akte abschließen (Mediziner) und wieder öffnen (Admin)", async ({ browser, page }) => {
@@ -251,4 +254,5 @@ test("Stammdaten bearbeiten, Akte abschließen (Mediziner) und wieder öffnen (A
   const akte = await api.get(`patienten/${p.id}/`);
   expect([akte.ist_abgeschlossen, akte.telefon, akte.nickelallergie]).toEqual([false, "0251 98765", "nein"]);
   await api.ende();
+  merken("abschluss", { id: p.id });
 });

@@ -54,6 +54,7 @@ function DarstellungKarten({ zuruecksetzenRef }: { zuruecksetzenRef: { current: 
   const [d, setD] = useState<Darstellung>({ ...STANDARD_DARSTELLUNG, ...ich.darstellung });
   const [fehler, setFehler] = useState("");
   const timer = useRef<number>(0);
+  const offen = useRef<Darstellung | null>(null); // Eingabe, deren verzögertes Speichern noch aussteht
   const speichern = useMutation({
     mutationFn: (neu: Darstellung) => api<Ich>("auth/ich/", { method: "PATCH", body: { darstellung: neu } }),
     onSuccess: (neu) => { setIch(neu); setFehler(""); },
@@ -68,11 +69,19 @@ function DarstellungKarten({ zuruecksetzenRef }: { zuruecksetzenRef: { current: 
     const ungueltig = (neu.akzent === "eigen" && (!istHex(neu.akzent_eigen) || aufAkzent(neu.akzent_eigen) === null))
       || (neu.hintergrund === "eigen" && (!istHex(neu.hintergrund_eigen) || luminanz(neu.hintergrund_eigen) < 0.6));
     window.clearTimeout(timer.current);
+    offen.current = null;
     if (ungueltig) return;
     if (sofort) speichern.mutate(neu);
-    else timer.current = window.setTimeout(() => speichern.mutate(neu), 400);
+    else {
+      offen.current = neu;
+      timer.current = window.setTimeout(() => { offen.current = null; speichern.mutate(neu); }, 400);
+    }
   };
-  useEffect(() => () => window.clearTimeout(timer.current), []);
+  // Wer die Seite direkt nach einer Eingabe verlässt, verliert sie nicht: Ausstehendes wird sofort gespeichert
+  useEffect(() => () => {
+    window.clearTimeout(timer.current);
+    if (offen.current) void api("auth/ich/", { method: "PATCH", body: { darstellung: offen.current } }).catch(() => undefined);
+  }, []);
   zuruecksetzenRef.current = () => { aendern({ ...STANDARD_DARSTELLUNG }); melden("Darstellung zurückgesetzt."); };
   const akzentName = d.akzent === "eigen" ? `Eigene Farbe ${d.akzent_eigen ?? ""}` : AKZENTE[d.akzent]?.[0] ?? "";
   return (

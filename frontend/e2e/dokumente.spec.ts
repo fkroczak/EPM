@@ -1,6 +1,6 @@
 /** Entwurf 9 · Dokumente und Entwurf 10 · Verlauf – Upload über Nginx bis in den Dateispeicher und zurück. */
 import { expect, test } from "@playwright/test";
-import { apiAls, eindeutig, zustand } from "./hilfen";
+import { apiAls, eindeutig, merken, zustand } from "./hilfen";
 
 test.use({ storageState: zustand("mitarbeiter") });
 
@@ -71,6 +71,7 @@ test("Dokumente hochladen, Typ am Inhalt prüfen, Metadaten ändern, ausblenden,
   await page.getByLabel("Person").selectOption({ label: "S. Mitarbeit" });
   await expect(verlauf.getByRole("row").filter({ hasText: "hochgeladen" })).toHaveCount(2);
   await api.ende();
+  merken("dokumente", { id: p.id });
 });
 
 test("Altdokument prüfen: Typ und Datum bestätigen", async ({ page }) => {
@@ -89,4 +90,5 @@ test("Altdokument prüfen: Typ und Datum bestätigen", async ({ page }) => {
   await expect(page.getByText("Typ und Datum bestätigt.")).toBeVisible();
   await expect(alt).not.toContainText("Typ prüfen");
   await expect(alt).toContainText("Labor");
+  merken("altdokument", { patient: Number(new URL(page.url()).pathname.split("/")[2]) });
 });

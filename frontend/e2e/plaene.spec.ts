@@ -1,6 +1,6 @@
 /** Entwürfe 7 und 8 · Infusionsplan anlegen, Plausibilität, freigeben, Vorbelegung, Vergleich, Verwerfen. */
 import { expect, test } from "@playwright/test";
-import { apiAls, eindeutig, zustand } from "./hilfen";
+import { apiAls, eindeutig, merken, zustand } from "./hilfen";
 
 test.use({ storageState: zustand("mediziner") });
 
@@ -92,6 +92,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
     .toEqual([["aktuell", 80, 1500]]);
   expect(plaene.results[0].vitamine_namen).toEqual(["Soluvit N", "Vitalipid adult"]);
   await api.ende();
+  merken("plan", { patient: patient.id });
 });
 
 test("Mitarbeiter sieht Pläne, legt aber keine an", async ({ browser }) => {

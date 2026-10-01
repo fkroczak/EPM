@@ -1,0 +1,189 @@
+/**
+ * Nachweis „Das Ergebnis bleibt nach einem Neustart erhalten“ – läuft als letzte Datei.
+ *
+ * Die übrigen Tests merken sich, was sie über die Oberfläche angelegt oder geändert haben (merken()). Hier werden
+ * zusätzlich einige Einstellungen direkt vor dem Neustart in der Oberfläche geändert. Danach starten Backend und
+ * Webserver neu, und alles wird erneut über die Oberfläche geprüft – gelesen aus PostgreSQL, nicht aus einem Speicher.
+ */
+import { expect, test } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
+import { apiAls, apiAnmelden, gemerkt, stackNeuStarten, totpBase32, zustand } from "./hilfen";
+import type { Rolle } from "./hilfen";
+
+test.describe.configure({ mode: "serial" });
+
+async function seiteAls(browser: Browser, wer: Rolle | { zustand: string }) {
+  const ctx = await browser.newContext({ storageState: typeof wer === "string" ? zustand(wer) : wer.zustand, ignoreHTTPSErrors: true });
+  return { ctx, page: await ctx.newPage() };
+}
+
+function gespeichert(page: Page, pfad: string) {
+  return page.waitForResponse((a) => a.url().endsWith(`/api/${pfad}`) && a.request().method() !== "GET" && a.ok());
+}
+
+test("Vor dem Neustart: Grenzwert, Rechte, Darstellung und Startseite in der Oberfläche ändern", async ({ browser }) => {
+  const { ctx, page } = await seiteAls(browser, "admin");
+  await page.goto("/admin/vorlagen");
+  await page.getByRole("button", { name: "Grenzwerte" }).click();
+  await page.getByTestId("grenzwerte").getByLabel("Kontakt überfällig nach").fill("14");
+  await page.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Grenzwerte gespeichert.")).toBeVisible();
+
+  await page.goto("/admin/benutzer");
+  const rechte = page.getByTestId("rechte");
+  await rechte.getByRole("checkbox", { name: "Betrachter: Versorger und Ansprechpartner pflegen" }).check();
+  await rechte.getByRole("button", { name: "Speichern (1)" }).click();
+  await expect(page.getByText("Rechte gespeichert. Sie gelten ab sofort.")).toBeVisible();
+  await ctx.close();
+
+  const d = await seiteAls(browser, gemerkt("darstellung"));
+  await d.page.goto("/konto");
+  let antwort = gespeichert(d.page, "auth/ich/");
+  await d.page.getByRole("radio", { name: "Darstellung Dunkel" }).click();
+  await antwort;
+  await d.page.goto("/");
+  await d.page.getByRole("button", { name: "Startseite anpassen" }).click();
+  antwort = gespeichert(d.page, "auth/ich/");
+  await d.page.getByRole("checkbox", { name: "Zuletzt eingetragen" }).uncheck();
+  await antwort;
+  await d.page.getByRole("button", { name: "Fertig" }).click();
+  await expect(d.page.getByRole("heading", { name: "Zuletzt eingetragen" })).toHaveCount(0);
+  await d.ctx.close();
+});
+
+test("Neustart von Backend und Webserver", () => {
+  stackNeuStarten();
+});
+
+test("Nach dem Neustart: Akten mit Gewicht, Diagnose und Versionen, Kontakten, Termin, Abschluss und Verlauf", async ({ browser }) => {
+  const { ctx, page } = await seiteAls(browser, "mitarbeiter");
+
+  await page.goto(`/patienten/${gemerkt("gewicht").id}`);
+  await expect(page.getByTestId("gewichtskarte").getByTestId("aktuelles-gewicht")).toHaveText("60,6 kg");
+
+  await page.goto(`/patienten/${gemerkt("diagnose").id}/therapie`);
+  const diagnose = page.getByTestId("karte-diagnose");
+  await expect(diagnose.locator(".richtext strong")).toHaveText("Typ II");
+  await expect(diagnose.getByTestId("version-diagnose")).toContainText("Version 2");
+  await expect(page.getByTestId("karte-therapie")).toContainText("HPE 5×/Woche über Port");
+
+  const kontakte = gemerkt("kontakte").id;
+  await page.goto(`/patienten/${kontakte}/kontakte`);
+  const liste = page.getByTestId("kontaktliste");
+  await expect(liste.getByTestId("kontakt").filter({ hasText: "Lieferung" })).toContainText("Grund: falscher Patient");
+  await expect(liste.getByTestId("kontakt").filter({ hasText: "Appetit schlechter" })).toContainText("Rückruf");
+  await page.goto(`/patienten/${kontakte}`);
+  await expect(page.getByTestId("aktentermine")).toContainText("Rückruf Trinkmenge");
+
+  const abschluss = gemerkt("abschluss").id;
+  await page.goto(`/patienten/${abschluss}`);
+  await expect(page.getByTestId("stammdaten")).toContainText("0251 98765");
+  await expect(page.getByTestId("gewichtskarte").getByLabel("Neues Gewicht")).toBeVisible(); // wieder geöffnet
+  await page.goto(`/patienten/${abschluss}/verlauf`);
+  const verlauf = page.getByTestId("verlauf");
+  await expect(verlauf).toContainText("abgeschlossen");
+  await expect(verlauf).toContainText("wieder geöffnet");
+  await ctx.close();
+});
+
+test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", async ({ browser }) => {
+  const { ctx, page } = await seiteAls(browser, "mitarbeiter");
+
+  const neu = gemerkt("neuer_patient");
+  await page.goto(`/patienten?suche=${encodeURIComponent(neu.nachname)}`);
+  await page.getByTestId("patientenliste").getByRole("link", { name: neu.name }).click();
+  await expect(page.getByTestId("aktuelles-gewicht")).toHaveText("61,4 kg");
+  await expect(page.getByTestId("kennzahlen")).toContainText("Port");
+
+  await page.goto(`/patienten/${gemerkt("plan").patient}/plaene`);
+  await expect(page.getByTestId("planliste").getByRole("listitem")).toHaveCount(1);
+  await expect(page.getByTestId("planliste")).toContainText("aktuell gültig");
+  await expect(page.getByTestId("pdf-ansicht")).toContainText("Glamin 13,4 % · 80 g");
+
+  const dok = gemerkt("dokumente").id;
+  await page.goto(`/patienten/${dok}/dokumente`);
+  const doks = page.getByTestId("dokumentliste");
+  await expect(doks.getByRole("row").filter({ hasText: "Arztbrief Klinikum Nord" })).toContainText("15.09.2026");
+  await expect(doks.getByRole("button", { name: "Port-Foto" })).toHaveCount(0);
+  await page.getByLabel("Ausgeblendete anzeigen").check();
+  await expect(doks.getByRole("button", { name: "Port-Foto" })).toBeVisible();
+  const api = await apiAls("mitarbeiter");
+  const brief = (await api.get(`dokumente/?patient=${dok}`)).results.find((d: { titel: string }) => d.titel === "Arztbrief Klinikum Nord");
+  await api.ende();
+  const datei = await page.request.get(`/api/dokumente/${brief.id}/datei/`);
+  expect(await datei.text()).toBe("Arztbrief (E2E)\nAlles gut.\n");
+
+  await page.goto(`/patienten/${gemerkt("altdokument").patient}/dokumente`);
+  const alt = page.getByTestId("dokumentliste").getByRole("row").filter({ hasText: "Altdokument aus dem bisherigen System" });
+  await expect(alt).toContainText("Labor");
+  await expect(alt).not.toContainText("Typ prüfen");
+  await ctx.close();
+});
+
+test("Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Rechte", async ({ browser }) => {
+  const { ctx, page } = await seiteAls(browser, "admin");
+
+  const { name, anzeige } = gemerkt("benutzer");
+  await page.goto("/admin/benutzer");
+  const benutzer = page.getByTestId("benutzerliste");
+  await expect(benutzer.getByRole("row").filter({ hasText: name })).toContainText("Mitarbeiter");
+  await benutzer.getByRole("button", { name: anzeige, exact: true }).click();
+  await expect(page.getByTestId("benutzer-detail").getByLabel("Funktion")).toHaveValue("Oberärztin");
+  const { benutzername } = gemerkt("gesperrt");
+  const entsperrt = benutzer.getByRole("row").filter({ hasText: benutzername });
+  await expect(entsperrt).toContainText("2FA: nicht eingerichtet");
+  await expect(entsperrt).not.toContainText("gesperrt");
+
+  // Rechte: Änderung von vor dem Neustart gilt, auch für den Betrachter
+  const rechte = page.getByTestId("rechte");
+  await expect(rechte.getByRole("checkbox", { name: "Betrachter: Versorger und Ansprechpartner pflegen" })).toBeChecked();
+  const b = await seiteAls(browser, "betrachter");
+  await b.page.goto("/versorger");
+  await expect(b.page.getByRole("button", { name: "Neuer Versorger" })).toBeVisible();
+  await b.ctx.close();
+  await rechte.getByRole("button", { name: "Standard" }).click();
+  await rechte.getByRole("button", { name: /^Speichern \(\d+\)$/ }).click();
+  await expect(page.getByText("Rechte gespeichert. Sie gelten ab sofort.")).toBeVisible();
+
+  await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Audit-Log" }).click();
+  await page.getByRole("button", { name: "Benutzer", exact: true }).click();
+  await expect(page.getByTestId("auditlog")).toContainText(name);
+
+  const { ort, vitamin } = gemerkt("vorlagen");
+  await page.goto("/admin/vorlagen");
+  await expect(page.getByTestId("logo")).toContainText("öffnen");
+  await page.getByRole("button", { name: "Auswahllisten" }).click();
+  const listen = page.getByRole("navigation", { name: "Listen" });
+  const liste = page.getByTestId("liste");
+  await listen.getByRole("button", { name: /^Terminorte/ }).click();
+  await expect(liste.getByRole("row").filter({ hasText: ort })).toContainText("ausgeblendet");
+  await listen.getByRole("button", { name: /^Vitamine/ }).click();
+  await expect(liste.getByRole("row").filter({ hasText: vitamin })).toContainText("ausgeblendet");
+
+  await page.getByRole("button", { name: "Grenzwerte" }).click();
+  const grenzen = page.getByTestId("grenzwerte");
+  await expect(grenzen.getByLabel("Kontakt überfällig nach")).toHaveValue("14");
+  await grenzen.getByLabel("Kontakt überfällig nach").fill("12");
+  await page.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Grenzwerte gespeichert.")).toBeVisible();
+  await ctx.close();
+});
+
+test("Nach dem Neustart: Konto mit neuem Passwort und Gerät, Notfall-Codes, Darstellung, Startseite", async ({ browser }) => {
+  const k = gemerkt("konto");
+  const anmeldung = await apiAnmelden(k.benutzername, k.kennwort, totpBase32(k.geheim));
+  expect(anmeldung.schritt).toBe("fertig");
+  const ctx = await browser.newContext({ storageState: await anmeldung.ctx.storageState(), ignoreHTTPSErrors: true });
+  await anmeldung.ctx.dispose();
+  const page = await ctx.newPage();
+  await page.goto("/konto");
+  await expect(page.getByTestId("sicherheit")).toContainText("10 von 10 übrig");
+  await ctx.close();
+
+  const d = await seiteAls(browser, gemerkt("darstellung"));
+  await d.page.goto("/");
+  await expect(d.page.locator("html")).toHaveAttribute("data-schema", "dunkel");
+  await expect(d.page.getByRole("heading", { name: "Auffällige Gewichte" })).toBeVisible();
+  await expect(d.page.getByRole("heading", { name: "Zuletzt eingetragen" })).toHaveCount(0);
+  await d.ctx.close();
+});

@@ -1,6 +1,6 @@
 /** Entwurf 14 · Mein Konto: Darstellung (gespeichert je Person), Passwort, Notfall-Codes, neues Gerät, Sitzungen. */
 import { expect, test } from "@playwright/test";
-import { apiAnmelden, neuesKonto, totpBase32 } from "./hilfen";
+import { apiAnmelden, merken, neuesKonto, totpBase32 } from "./hilfen";
 
 test("Darstellung wählen, eigene Farben prüfen, nach Neuladen erhalten, zurücksetzen", async ({ browser }) => {
   const konto = await neuesKonto("mitarbeiter", "Dora", "Darstellung");
@@ -43,6 +43,7 @@ test("Darstellung wählen, eigene Farben prüfen, nach Neuladen erhalten, zurüc
   await expect(html).toHaveAttribute("data-schema", "standard");
   await expect(html).toHaveAttribute("data-dichte", "normal");
   await ctx.close();
+  merken("darstellung", { zustand: konto.zustand });
 });
 
 test("Passwort ändern, Notfall-Codes neu, neues Gerät, andere Sitzung beenden", async ({ browser }) => {
@@ -99,4 +100,5 @@ test("Passwort ändern, Notfall-Codes neu, neues Gerät, andere Sitzung beenden"
   await expect(page.getByText("Neues Gerät eingerichtet.")).toBeVisible();
   await expect(sicherheit).toContainText("aktiv");
   await ctx.close();
+  merken("konto", { benutzername: konto.benutzername, kennwort: `${konto.kennwort}-2`, geheim });
 });

@@ -109,6 +109,24 @@ export function stackNeuStarten() {
   throw new Error("Stack nach Neustart nicht erreichbar");
 }
 
+const NACHWEIS = "e2e/.auth/nachweis.json";
+
+/** Ergebnis eines Tests merken; `zz-neustart.spec.ts` prüft es nach einem Neustart erneut in der Oberfläche. */
+export function merken(schluessel: string, wert: unknown) {
+  const stand: Record<string, unknown> = existsSync(NACHWEIS) ? JSON.parse(readFileSync(NACHWEIS, "utf8")) : {};
+  stand[schluessel] = wert;
+  mkdirSync("e2e/.auth", { recursive: true });
+  writeFileSync(NACHWEIS, JSON.stringify(stand, null, 1));
+}
+
+/** Gemerktes Ergebnis; fehlt es, ist der Test davor nicht bis zum Ende gelaufen. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function gemerkt(schluessel: string): any {
+  const stand = existsSync(NACHWEIS) ? JSON.parse(readFileSync(NACHWEIS, "utf8")) : {};
+  if (!(schluessel in stand)) throw new Error(`Kein Ergebnis „${schluessel}“ gemerkt – der zugehörige Test ist vorher fehlgeschlagen.`);
+  return stand[schluessel];
+}
+
 /** Sitzung in der Datenbank ablaufen lassen – genau das, was nach 30 Minuten ohne Anfrage passiert. */
 export function sitzungAblaufenLassen(schluessel: string) {
   if (!/^[a-z0-9]+$/.test(schluessel)) throw new Error(`Unerwarteter Sitzungsschlüssel: ${schluessel}`);

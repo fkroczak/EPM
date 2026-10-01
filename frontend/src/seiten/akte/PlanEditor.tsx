@@ -99,7 +99,15 @@ export function PlanEditor() {
   const [neueId, setNeueId] = useState<number | null>(null); // Entwurf, der beim ersten Speichern angelegt wurde
 
   const entwurf = useQuery({ queryKey: ["plan", planId], queryFn: () => api<Plan>(`infusionsplaene/${planId}/`), enabled: !!planId });
-  const aktuellId = patient.kopf?.aktueller_plan?.id;
+  // aktueller Plan frisch vom Server: Der Aktenkopf kann direkt nach einer Freigabe noch den alten Stand zeigen,
+  // dann würde das Formular leer statt mit dem gerade freigegebenen Plan beginnen
+  const aktuellAbfrage = useQuery({
+    queryKey: ["patient", patient.id, "plaene", "aktuell"],
+    queryFn: () => api<{ results: Plan[] }>(`infusionsplaene/?patient=${patient.id}&status=aktuell`),
+    enabled: !planId,
+  });
+  const aktuellBekannt = aktuellAbfrage.isFetchedAfterMount && !aktuellAbfrage.isFetching;
+  const aktuellId = aktuellBekannt ? aktuellAbfrage.data?.results[0]?.id : undefined;
   const vorgaengerId = planId ? entwurf.data?.vorgaenger : aktuellId;
   const vorgaenger = useQuery({ queryKey: ["plan", vorgaengerId], queryFn: () => api<Plan>(`infusionsplaene/${vorgaengerId}/`), enabled: !!vorgaengerId });
   const quelleId = vorlageId ?? (aktuellId ? String(aktuellId) : null);
@@ -109,9 +117,10 @@ export function PlanEditor() {
   useEffect(() => {
     if (f) return;
     if (planId) { if (entwurf.data) setF(ausPlan(entwurf.data)); return; }
+    if (!vorlageId && !aktuellBekannt) return; // erst wissen, ob es einen aktuellen Plan gibt
     if (quelleId) { if (quelle.data) setF(ausPlan(quelle.data, datum(heuteIso()))); return; }
     setF(leer());
-  }, [f, planId, entwurf.data, quelleId, quelle.data]);
+  }, [f, planId, entwurf.data, vorlageId, aktuellBekannt, quelleId, quelle.data]);
 
   // höchstens ein Entwurf je Patient: einen vorhandenen Entwurf bearbeiten statt einen zweiten anzulegen
   const offeneEntwuerfe = useQuery({

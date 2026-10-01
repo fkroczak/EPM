@@ -191,7 +191,10 @@ function ListenBereich() {
   });
   const aktiv = useMutation({
     mutationFn: (e: Praeparat | Auswahlwert) => api(`${pfad}/${e.id}/`, { method: "PATCH", body: { aktiv: !e.aktiv } }),
-    onSuccess: () => neuLaden(),
+    // Häkchen sofort umschalten; bei einem Fehler den gespeicherten Stand wieder anzeigen
+    onMutate: (e) => setReihe((r) => r.map((x) => (x.id === e.id ? { ...x, aktiv: !e.aktiv } : x))),
+    onError: (_f, e) => setReihe((r) => r.map((x) => (x.id === e.id ? { ...x, aktiv: e.aktiv } : x))),
+    onSettled: () => neuLaden(),
   });
   const sort = useSortierbar(reihe, (neu) => { setReihe(neu); reihenfolge.mutate(neu.map((e) => e.id)); });
   const anzahl = (l: Liste) => l.art === "praeparat" ? (praeparate.data ?? []).filter((p) => p.kategorie === l.schluessel).length

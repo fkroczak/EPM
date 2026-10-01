@@ -1,6 +1,6 @@
 /** Entwürfe 17, 18, 20 · Administration: Benutzer, Rechte je Gruppe, Vorlagen, Audit-Log; Zugriff nur mit Recht. */
 import { expect, test } from "@playwright/test";
-import { BASIS, OHNE_ANMELDUNG, apiAls, eindeutig, neuesKonto, sitzungGilt, zustand } from "./hilfen";
+import { BASIS, OHNE_ANMELDUNG, apiAls, eindeutig, merken, neuesKonto, sitzungGilt, zustand } from "./hilfen";
 import { request } from "@playwright/test";
 
 test.use({ storageState: zustand("admin") });
@@ -75,6 +75,7 @@ test("Benutzer anlegen, Einmal-Kennwort, sperren und entsperren", async ({ page 
   const log = page.getByTestId("auditlog");
   await expect(log).toContainText(name);
   await expect(log.getByRole("row").filter({ hasText: name }).first()).toContainText("Benutzer");
+  merken("benutzer", { name, anzeige: "Dr. med. H. Heilmann" });
 });
 
 test("Rechte je Gruppe: Admin erlaubt Mitarbeitern Pläne, wirkt sofort, Standard wiederherstellen", async ({ page }) => {
@@ -159,7 +160,7 @@ test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", asyn
   expect(orte.map((o: { wert: string }) => o.wert).indexOf(ort)).toBe(orte.length - 2);
   await liste.getByRole("checkbox", { name: `${ort} in der Auswahl` }).uncheck();
   await expect(liste.getByRole("row").filter({ hasText: ort })).toContainText("ausgeblendet");
-  expect((await admin.get("auswahlwerte/?liste=terminort")).find((o: { wert: string }) => o.wert === ort).aktiv).toBe(false);
+  await expect.poll(async () => (await admin.get("auswahlwerte/?liste=terminort")).find((o: { wert: string }) => o.wert === ort).aktiv).toBe(false);
 
   // Präparate: neues Vitamin anlegen und ausblenden (bleibt in alten Plänen, nicht mehr wählbar)
   await page.getByRole("navigation", { name: "Listen" }).getByRole("button", { name: /^Vitamine/ }).click();
@@ -170,8 +171,10 @@ test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", asyn
   await expect(liste.getByRole("button", { name: vitamin, exact: true })).toBeVisible();
   await liste.getByRole("checkbox", { name: `${vitamin} in der Auswahl` }).uncheck();
   await expect(liste.getByRole("row").filter({ hasText: vitamin })).toContainText("ausgeblendet");
-  const vit = (await admin.get("praeparate/?kategorie=vitamine")).find((x: { name: string }) => x.name === vitamin);
-  expect([vit.aktiv, vit.kategorie]).toEqual([false, "vitamine"]);
+  await expect.poll(async () => {
+    const vit = (await admin.get("praeparate/?kategorie=vitamine")).find((x: { name: string }) => x.name === vitamin);
+    return [vit.aktiv, vit.kategorie];
+  }).toEqual([false, "vitamine"]);
 
   // Grenzwerte: untere Grenze größer als obere wird abgewiesen, gültiger Wert gespeichert
   await page.getByRole("button", { name: "Grenzwerte" }).click();
@@ -186,6 +189,7 @@ test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", asyn
   expect((await admin.get("einstellungen/")).kontakt_ueberfaellig_monate).toBe(13);
   await admin.patch("einstellungen/", { kontakt_ueberfaellig_monate: 12 });
   await admin.ende();
+  merken("vorlagen", { ort, vitamin });
 });
 
 test("Ohne Recht keine Administration: Mitarbeiter sieht nichts, Mediziner Vorlagen und Audit-Log", async ({ browser }) => {
@@ -237,6 +241,7 @@ test("Fünf falsche Passwörter sperren das Konto; Admin sieht den Hinweis, setz
   await detail.getByRole("button", { name: "Entsperren" }).click();
   await expect(page.getByText("Benutzer entsperrt.")).toBeVisible();
   await expect(page.getByTestId("benutzerliste").getByRole("row").filter({ hasText: konto.benutzername })).toContainText("2FA: nicht eingerichtet");
+  merken("gesperrt", { benutzername: konto.benutzername });
 });
 
 test("Testdaten auf Ausgangsstand zurücksetzen (nur Testpatienten)", async ({ page }) => {
