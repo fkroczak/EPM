@@ -356,8 +356,8 @@ test("Recht während der Sitzung entzogen: Aktion verschwindet ohne neue Anmeldu
 
     // Klick auf „Akte abschließen“: Server lehnt ab → Dialog verschwindet, neutraler Hinweis ohne Rechte-Namen
     await dialog.getByRole("button", { name: "Akte abschließen" }).click();
-    await expect(mp.getByText("Diese Aktion steht nicht mehr zur Verfügung. Die Ansicht wurde aktualisiert.")).toBeVisible();
     await expect(mp.getByRole("dialog")).toHaveCount(0);
+    await expect(mp.getByRole("alert").filter({ hasText: "Diese Aktion steht nicht mehr zur Verfügung. Die Ansicht wurde aktualisiert." })).toBeVisible();
     await expect(mp.getByText(/fehlt das Recht/)).toHaveCount(0);
     await mp.getByRole("button", { name: "Weitere Aktionen" }).click();
     await expect(mp.getByRole("menuitem", { name: "Akte abschließen" })).toHaveCount(0);
