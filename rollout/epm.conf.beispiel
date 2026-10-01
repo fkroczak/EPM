@@ -20,5 +20,10 @@ EPM_BASE="/srv/epm"
 EPM_APT_PROXY=""                   # z. B. http://10.0.0.1:3128 (Squid auf der OPNsense)
 EPM_NTP_SERVER=""                  # z. B. 10.0.0.1 (OPNsense)
 
+# Woher Updates kommen: "git" = sudo epm-update holt den Code von GitHub und baut (Test-VM);
+# "paket" = Server ohne Internet (VPS), nur Update-Pakete einspielen: sudo epm-update --paket DATEI
+# (Paket auf der Test-VM mit  sudo epm-update --paket-erstellen  erzeugen und per scp übertragen)
+EPM_UPDATE_QUELLE="git"            # VPS: paket
+
 # UID, unter der das Backend im Container läuft (muss zum Dockerfile passen)
 EPM_APP_UID="10001"
