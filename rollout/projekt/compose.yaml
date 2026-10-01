@@ -36,10 +36,12 @@ services:
       DB_PASSWORD_FILE: /run/secrets/db_password
       DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
       EPM_DOKUMENTE: /data/dokumente
+      EPM_LOESCHLISTE: /data/loeschliste/loeschliste.jsonl
       TZ: Europe/Berlin
     secrets: [db_password, django_secret_key]
     volumes:
       - ./data/dokumente:/data/dokumente
+      - ./data/loeschliste:/data/loeschliste   # Art. 17 DSGVO: übersteht eine Wiederherstellung
       - static:/app/staticfiles
     networks: [intern]
     read_only: true

@@ -134,8 +134,8 @@ function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean
         <Knopf variante="dng" laedt={loeschen.isPending} onClick={() => loeschen.mutate()}
           disabled={!vorbereiten.data || grund.trim().length < 10 || !kennwort || code.trim().length < 6 || bestaetigung.trim().length < 6}>Endgültig löschen</Knopf></>}>
       <div className="flex flex-col gap-3" data-testid="loeschen">
-        <Meldung art="fehler">Datei und Inhalt werden unwiederbringlich gelöscht. Im Verlauf der Akte bleibt nur „endgültig gelöscht“ mit Grund, im Audit-Log der Vorgang. Gehört das Dokument einem anderen Patienten, bitte stattdessen „Anderem Patienten zuordnen“.</Meldung>
-        <Feld label="Grund" fehler={f.grund} hinweis="mindestens 10 Zeichen">
+        <Meldung art="fehler">Datei, Inhalt, Titel, Dateiname, Notiz und Datum werden unwiederbringlich gelöscht – auch aus Historie und Audit-Log (Art. 17 DSGVO). Es bleibt nur der Nachweis ohne Inhalt: im Verlauf „endgültig gelöscht“ mit Grund, im Audit-Log Dokumentnummer, Typ, Prüfsumme, Person und Zeitpunkt. Ältere Sicherungen enthalten das Dokument noch bis zu ihrem Ablauf; nach einer Wiederherstellung wird es automatisch erneut gelöscht. Gehört das Dokument einem anderen Patienten der Stiftung, bitte stattdessen „Anderem Patienten zuordnen“.</Meldung>
+        <Feld label="Grund" fehler={f.grund} hinweis="mindestens 10 Zeichen · ohne Namen oder Gesundheitsangaben der fremden Person – der Grund bleibt im Protokoll">
           {(p) => <Textfeld {...p} rows={2} value={grund} onChange={(e) => setGrund(e.target.value)} />}
         </Feld>
         <div className="grid grid-cols-2 gap-3">

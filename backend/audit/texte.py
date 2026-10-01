@@ -21,7 +21,7 @@ GRUPPEN = {
     "abschluss": ("Abschluss", [A.AKTE_ABGESCHLOSSEN, A.AKTE_GEOEFFNET]),
     # ohne eigenen Filterknopf im Entwurf, erscheint unter „alle“
     "infusionsplan": ("Infusionsplan", [A.PLAN_FREIGEGEBEN]),
-    "dokument": ("Dokument", [A.DOKUMENT_UMGEHAENGT, A.DOKUMENT_GELOESCHT]),
+    "dokument": ("Dokument", [A.DOKUMENT_UMGEHAENGT, A.DOKUMENT_GELOESCHT, A.DOKUMENT_LOESCHUNG_NACHGEHOLT]),
 }
 GRUPPE_JE_ART = {art: schluessel for schluessel, (_, arten) in GRUPPEN.items() for art in arten}
 
@@ -32,6 +32,33 @@ def gruppe(art: str) -> str:
 
 def gruppe_name(art: str) -> str:
     return GRUPPEN[GRUPPE_JE_ART[art]][0] if art in GRUPPE_JE_ART else ""
+
+
+def _dokument(e) -> str:
+    """„Dokument „Titel““ – nach dem endgültigen Löschen (Art. 17 DSGVO) nur noch Nummer, Typ und Prüfsumme."""
+    from patienten.loeschung import PLATZHALTER
+
+    d = e.details or {}
+    titel = d.get("titel")
+    if titel and titel != PLATZHALTER:
+        return f"Dokument „{titel}“"
+    nummer = e.objekt.removeprefix("Dokument ").strip()
+    teile = [t for t in (d.get("typ"), f"SHA-256 {d['sha256'][:8]}…" if d.get("sha256") else "") if t]
+    return f"Dokument Nr. {nummer}" + (f" ({', '.join(teile)})" if teile else "")
+
+
+def _datum(wert: str) -> str:
+    from datetime import datetime
+
+    from django.utils import timezone
+
+    try:
+        zeit = datetime.fromisoformat(wert)
+    except (TypeError, ValueError):
+        return str(wert or "")
+    if timezone.is_aware(zeit):
+        zeit = timezone.localtime(zeit)
+    return zeit.strftime("%d.%m.%Y %H:%M")
 
 
 def _akte(e) -> str:
@@ -140,10 +167,14 @@ def beschreibung(e) -> str:
     if art == A.TESTDATEN:
         return f"Testdaten zurückgesetzt: {d.get('geloescht', 0)} Testpatienten gelöscht, {d.get('angelegt', 0)} neu angelegt"
     if art == A.DOKUMENT_UMGEHAENGT:
-        return (f"Dokument „{d.get('titel', '')}“ von {d.get('von', '')} zu {d.get('nach', '')} verschoben, "
+        return (f"{_dokument(e)} von {d.get('von', '')} zu {d.get('nach', '')} verschoben, "
                 f"Grund: {d.get('grund', '')}")
     if art == A.DOKUMENT_GELOESCHT:
-        return f"Dokument „{d.get('titel', '')}“ aus {d.get('akte', '')} endgültig gelöscht, Grund: {d.get('grund', '')}"
+        return (f"{_dokument(e)} aus {d.get('akte', '')} endgültig gelöscht – Datei, Titel und Inhalt entfernt "
+                f"(Art. 17 DSGVO), Grund: {d.get('grund', '')}")
     if art == A.DOKUMENT_LOESCHEN_ABGELEHNT:
-        return f"Löschen von Dokument „{d.get('titel', '')}“ abgelehnt: {d.get('fehler', '')}"
+        return f"Löschen von {_dokument(e)} abgelehnt: {d.get('fehler', '')}"
+    if art == A.DOKUMENT_LOESCHUNG_NACHGEHOLT:
+        return (f"{_dokument(e)} war durch eine Wiederherstellung zurückgekommen und wurde erneut gelöscht "
+                f"(Löschung vom {_datum(d.get('geloescht_am', ''))})")
     return e.get_art_display() + (f" {e.objekt}" if e.objekt else "")

@@ -29,6 +29,7 @@ from stammdaten.models import Auswahlwert
 from .kennzahlen import kennzahlen, pruefliste, schnellfilter, zaehler
 from stammdaten.models import Arzt
 
+from .loeschung import PLATZHALTER, schwaerze_dokument, trage_ein
 from .models import (Bezugsperson, Dokument, DokumentVorgang, Gewichtsmessung, Kontakt, Patient, PatientArzt, Termin,
                      dokument_pfad)
 
@@ -528,7 +529,8 @@ def _beschreibung(name, h, aktion) -> str:
             return f"{dict(Termin.Art.choices).get(h.art, h.art)} · {h.faellig_am:%d.%m.%Y}{zeit} · {h.titel}"
         if name == "dokumente":
             groesse = f"{_deutsch(h.groesse / 1024 / 1024, 1)} MB" if h.groesse >= 1024 * 1024 else f"{max(1, round(h.groesse / 1024))} KB"
-            return f"{h.titel} · {groesse} · SHA-256 {h.sha256[:4]}…{h.sha256[-4:]}"
+            titel = "Titel entfernt (DSGVO)" if h.titel == PLATZHALTER else h.titel
+            return f"{titel} · {groesse} · SHA-256 {h.sha256[:4]}…{h.sha256[-4:]}"
         if name == "infusionsplaene":
             plan = h.instance
             teile = [f"{_deutsch(plan.kcal)} kcal"]
@@ -592,9 +594,13 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         if vorher is not None:
             diff = h.diff_against(vorher)
             aenderungen = [{"feld": c.field, "alt": _kurz(c.old), "neu": _kurz(c.new)} for c in diff.changes]
-        if name == "dokumente" and (h.id in weg or h.id in her):
-            ergebnis.append(_dokument_vorgang_eintrag(h, weg.get(h.id), her.get(h.id), vorher, aenderungen))
-            continue
+        if name == "dokumente":
+            # gleiche Nummer UND gleiche Prüfsumme (nach einer Wiederherstellung kann eine Nummer neu vergeben sein)
+            w, n = (v if v is not None and (not v.sha256 or v.sha256 == h.sha256) else None
+                    for v in (weg.get(h.id), her.get(h.id)))
+            if w is not None or n is not None:
+                ergebnis.append(_dokument_vorgang_eintrag(h, w, n, vorher, aenderungen))
+                continue
         basis = {
             "objekt_id": h.id,
             "art": {"+": "angelegt", "~": "geändert", "-": "gelöscht"}[h.history_type],
@@ -1055,7 +1061,8 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
                 dok._change_reason = "Von einer anderen Akte übernommen"
                 dok.save()
                 DokumentVorgang.objects.create(art=DokumentVorgang.Art.UMGEHAENGT, dokument_id=dok.id, von_patient=alt,
-                                               nach_patient=ziel, grund=grund, person=request.user)
+                                               nach_patient=ziel, grund=grund, person=request.user, sha256=dok.sha256,
+                                               datei=neu_relativ)
                 protokolliere(SystemEreignis.Art.DOKUMENT_UMGEHAENGT, request, objekt=f"Dokument {dok.id}",
                               titel=dok.titel, von=f"{alt.nachname}, {alt.vorname} (Nr. {alt.nummer})",
                               nach=f"{ziel.nachname}, {ziel.vorname} (Nr. {ziel.nummer})", grund=grund,
@@ -1105,7 +1112,7 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
 
         def abgelehnt(feld, meldung):
             protokolliere(SystemEreignis.Art.DOKUMENT_LOESCHEN_ABGELEHNT, request, objekt=f"Dokument {dok.id}",
-                          titel=dok.titel, fehler=meldung)
+                          titel=dok.titel, fehler=meldung, sha256=dok.sha256)
             return Response({feld: meldung}, status=status.HTTP_400_BAD_REQUEST)
 
         sitzung = request.session.get(self.LOESCHCODE) or {}
@@ -1127,16 +1134,24 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
             return abgelehnt("code", "Code aus der Authenticator-App falsch oder schon verwendet.")
         request.session.pop(self.LOESCHCODE, None)
         pfad = dok.pfad
+        dok_id, sha, datei = dok.id, dok.sha256, dok.datei
         akte = f"{dok.patient.nachname}, {dok.patient.vorname} (Nr. {dok.patient.nummer})"
         with transaction.atomic():
-            DokumentVorgang.objects.create(art=DokumentVorgang.Art.GELOESCHT, dokument_id=dok.id,
-                                           von_patient=dok.patient, grund=grund, person=request.user)
-            protokolliere(SystemEreignis.Art.DOKUMENT_GELOESCHT, request, objekt=f"Dokument {dok.id}", titel=dok.titel,
-                          akte=akte, grund=grund, sha256=dok.sha256, groesse=dok.groesse)
+            vorgang = DokumentVorgang.objects.create(art=DokumentVorgang.Art.GELOESCHT, dokument_id=dok_id,
+                                                     von_patient=dok.patient, grund=grund, person=request.user,
+                                                     sha256=sha, datei=datei)
+            # Art. 17 DSGVO (U15): kein Titel, kein Dateiname im Nachweis – nur Typ, Größe, Prüfsumme, Zeitpunkte
+            protokolliere(SystemEreignis.Art.DOKUMENT_GELOESCHT, request, objekt=f"Dokument {dok_id}", akte=akte,
+                          grund=grund, sha256=sha, groesse=dok.groesse, typ=dok.typ.wert if dok.typ else "",
+                          hochgeladen_am=dok.hochgeladen_am.isoformat() if dok.hochgeladen_am else "")
             dok._history_user = request.user
             dok._change_reason = "Endgültig gelöscht"
             dok.delete()
-            transaction.on_commit(lambda: pfad.unlink(missing_ok=True))
+            schwaerze_dokument(dok_id, sha)
+            eintrag = {"dokument": dok_id, "sha256": sha, "datei": datei, "patient": vorgang.von_patient_id,
+                       "person": request.user.id, "geloescht_am": timezone.now().isoformat(timespec="seconds")}
+            transaction.on_commit(lambda: trage_ein(eintrag), robust=True)
+            transaction.on_commit(lambda: pfad.unlink(missing_ok=True), robust=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["get"])

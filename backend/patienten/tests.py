@@ -4,6 +4,8 @@ Prüft die fachlichen Regeln der Patientenakte gegen die echte PostgreSQL-Datenb
 Aufruf im Container:
     sudo docker compose run --rm backend python manage.py test
 """
+import io
+import json
 from datetime import date, time, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -699,10 +701,15 @@ class Musterdaten(TestCase):
         self.assertTrue(Arzt.objects.filter(name__endswith="(fiktiv)").exists())
 
 
+LOESCHLISTE = Path(TMP) / "loeschliste" / "loeschliste.jsonl"
+
+
+@override_settings(EPM_LOESCHLISTE=LOESCHLISTE)
 class FalschZugeordneteDokumente(Grundlage):
     """Dokument beim falschen Patienten (Festlegung 02.10.2026): richtig zuordnen oder endgültig löschen."""
 
     def setUp(self):
+        LOESCHLISTE.unlink(missing_ok=True)
         self.sabine = Patient.objects.create(nachname="Falsch", vorname="Sabine", geburtsdatum="1970-01-01")
         self.bernd = Patient.objects.create(nachname="Richtig", vorname="Bernd", geburtsdatum="1960-06-06")
 
@@ -754,19 +761,40 @@ class FalschZugeordneteDokumente(Grundlage):
         with self.assertRaises(DatabaseError), transaction.atomic():
             DokumentVorgang.objects.update(grund="geändert")
 
-    def test_endgueltig_loeschen(self):
+    def totp_code(self):
         from django_otp.oath import totp
         from django_otp.plugins.otp_totp.models import TOTPDevice
 
-        from epm.pruefhilfen import KENNWORT, mit_zweitem_faktor
+        from epm.pruefhilfen import mit_zweitem_faktor
 
-        mit_zweitem_faktor(self.mediziner)
+        if not TOTPDevice.objects.filter(user=self.mediziner).exists():
+            mit_zweitem_faktor(self.mediziner)
         geraet = TOTPDevice.objects.get(user=self.mediziner)
+        return geraet, lambda: f"{totp(geraet.bin_key, geraet.step, geraet.t0, geraet.digits):06d}"
 
-        def code(versatz=0):
-            return f"{totp(geraet.bin_key, geraet.step, geraet.t0, geraet.digits, drift=versatz):06d}"
+    def endgueltig_loeschen(self, dok, grund="Dokument eines fremden Patienten, nicht aus der Stiftung"):
+        from epm.pruefhilfen import KENNWORT
+
+        _, code = self.totp_code()
+        c = client_fuer(self.mediziner)
+        bestaetigung = c.post(f"/api/dokumente/{dok.id}/loeschen-vorbereiten/").json()["code"]
+        with self.captureOnCommitCallbacks(execute=True):
+            r = c.post(f"/api/dokumente/{dok.id}/loeschen/", {"grund": grund, "kennwort": KENNWORT, "code": code(),
+                                                              "bestaetigung": bestaetigung}, format="json")
+        self.assertEqual(r.status_code, 204, r.content)
+
+    def test_endgueltig_loeschen(self):
+        from epm.pruefhilfen import KENNWORT
+
+        geraet, code = self.totp_code()
+        TOTPDevice = type(geraet)
 
         dok = self.hochladen(self.sabine)
+        # Notiz und Datum mit Angaben zur fremden Person: auch sie müssen nach dem Löschen überall verschwinden
+        r = client_fuer(self.mitarbeiter).patch(f"/api/dokumente/{dok.id}/", {"notiz": "Bernd Richtig, Kurzdarm",
+                                                                             "datum": "2026-09-01"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        dok.refresh_from_db()
         pfad = dok.pfad
         basis = f"/api/dokumente/{dok.id}/"
         # nur Mediziner: Admin und Mitarbeiter nicht
@@ -798,12 +826,139 @@ class FalschZugeordneteDokumente(Grundlage):
         self.assertFalse(Dokument.objects.filter(pk=dok.id).exists())
         self.assertFalse(pfad.exists())
         e = SystemEreignis.objects.filter(art=SystemEreignis.Art.DOKUMENT_GELOESCHT).get()
-        self.assertEqual((e.details["titel"], e.details["grund"]), ("Arztbrief Bernd Richtig", grund))
+        self.assertEqual((e.details["grund"], e.details["sha256"], e.details["groesse"]), (grund, dok.sha256, dok.groesse))
+        self.assertNotIn("titel", e.details)
         verlauf = c.get(f"/api/patienten/{self.sabine.id}/verlauf/?bereich=dokumente").json()
-        self.assertEqual([(e["aktion"], e["grund"]) for e in verlauf], [("endgültig gelöscht", grund), ("hochgeladen", None)])
+        self.assertEqual([(e["aktion"], e["grund"]) for e in verlauf],
+                         [("endgültig gelöscht", grund), ("geändert", None), ("hochgeladen", None)])
         self.assertNotIn("Arztbrief", str(verlauf))
+        # Art. 17 DSGVO (U15): Titel, Dateiname, Notiz und Datum stehen nirgends mehr – auch nicht in der Historie
+        # und im Audit-Log. Es bleibt der Nachweis ohne Inhalt: Nummer, Prüfsumme, Größe, Zeitpunkte, Person, Grund.
+        historie = Dokument.history.filter(id=dok.id)
+        self.assertEqual(historie.count(), 3)
+        self.assertEqual(set(historie.values_list("titel", "originalname", "notiz", "datum")),
+                         {("[entfernt]", "[entfernt]", "", None)})
+        self.assertEqual(set(historie.values_list("sha256", "groesse")), {(dok.sha256, dok.groesse)})
+        protokoll = c.get("/api/protokoll/?gruppe=dokument,fehlversuch").json()["results"]
+        texte = "\n".join(p["beschreibung"] for p in protokoll)
+        for verboten in ("Arztbrief", "Bernd", "brief.pdf", "Kurzdarm"):
+            self.assertNotIn(verboten, texte)
+            for ereignis in SystemEreignis.objects.filter(objekt=f"Dokument {dok.id}"):
+                self.assertNotIn(verboten, json.dumps(ereignis.details, ensure_ascii=False))
+        self.assertIn(f"Dokument Nr. {dok.id} (SHA-256 {dok.sha256[:8]}…) aus Falsch, Sabine", texte)
+        self.assertIn("abgelehnt: Kennwort falsch.", texte)
+        # Löschliste: eine Zeile, ohne Titel und Dateinamen
+        zeilen = LOESCHLISTE.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(zeilen), 1)
+        eintrag = json.loads(zeilen[0])
+        self.assertEqual((eintrag["dokument"], eintrag["sha256"], eintrag["patient"]), (dok.id, dok.sha256, self.sabine.id))
+        self.assertNotIn("Arztbrief", zeilen[0])
+        self.assertNotIn("brief.pdf", zeilen[0])
+        # Die Trigger lassen nur genau diese Schwärzung zu: keine andere Spalte, kein anderes Dokument
+        anderes = self.hochladen(self.bernd, "Bleibt bei Bernd")
+        for sql, nummer in [("UPDATE patienten_historicaldokument SET titel = 'anders' WHERE id = %s", dok.id),
+                            ("UPDATE patienten_historicaldokument SET groesse = 1 WHERE id = %s", dok.id),
+                            ("UPDATE patienten_historicaldokument SET titel = '[entfernt]', originalname = '[entfernt]', "
+                             "notiz = '', datum = NULL WHERE id = %s", anderes.id),
+                            ("DELETE FROM patienten_historicaldokument WHERE id = %s", dok.id),
+                            ("UPDATE audit_systemereignis SET details = details || '{\"grund\": \"x\"}' "
+                             "WHERE objekt = 'Dokument ' || %s", dok.id)]:
+            with self.subTest(sql=sql), self.assertRaises(DatabaseError), transaction.atomic(), connection.cursor() as cur:
+                cur.execute("SELECT set_config('epm.schwaerzen', %s, true)", [f"dokument:{dok.id}:{dok.sha256}"])
+                cur.execute(sql, [nummer])
+        self.assertEqual(Dokument.history.filter(id=anderes.id).get().titel, "Bleibt bei Bernd")
         # der Bestätigungscode gilt nur einmal
         self.assertEqual(c.post(basis + "loeschen/", {"grund": grund}, format="json").status_code, 404)
+
+    def test_loeschung_nach_wiederherstellung_nachholen(self):
+        """Eine Sicherung von vor der Löschung wird zurückgespielt: Beim Start löscht und schwärzt das Backend erneut
+        (Art. 17 DSGVO). Ein neues Dokument, das dieselbe Nummer bekommen hat, bleibt unberührt."""
+        from audit.schutz import wartungsmodus
+
+        from .management.commands.epm_loeschungen_nachholen import nachholen
+        from .models import DokumentVorgang
+
+        dok = self.hochladen(self.sabine)
+        werte = {f.attname: getattr(dok, f.attname) for f in Dokument._meta.concrete_fields}
+        inhalt = dok.pfad.read_bytes()
+        self.endgueltig_loeschen(dok)
+        # Ohne Befund passiert nichts
+        self.assertEqual(nachholen(), {"dokumente": 0, "dateien": 0, "geschwaerzt": 0, "liste_ergaenzt": 0})
+
+        # „Wiederherstellung“: Datensatz, Datei und Historie sind zurück, Vorgang und Protokoll der Löschung nicht
+        with wartungsmodus():
+            DokumentVorgang.objects.filter(dokument_id=dok.id).delete()
+            SystemEreignis.objects.filter(objekt=f"Dokument {dok.id}").delete()
+        Dokument.objects.create(**werte)
+        Path(dok.pfad).parent.mkdir(parents=True, exist_ok=True)
+        dok.pfad.write_bytes(inhalt)
+        self.assertEqual(Dokument.history.filter(id=dok.id, titel="Arztbrief Bernd Richtig").count(), 1)
+
+        call_command("epm_loeschungen_nachholen", stdout=io.StringIO())
+        self.assertFalse(Dokument.objects.filter(pk=dok.id).exists())
+        self.assertFalse(dok.pfad.exists())
+        self.assertFalse(Dokument.history.filter(id=dok.id).exclude(titel="[entfernt]").exists())
+        vorgang = DokumentVorgang.objects.get(dokument_id=dok.id)
+        self.assertIn("nach einer Wiederherstellung erneut ausgeführt", vorgang.grund)
+        self.assertEqual((vorgang.sha256, vorgang.person_id), (dok.sha256, self.mediziner.id))
+        e = SystemEreignis.objects.get(art=SystemEreignis.Art.DOKUMENT_LOESCHUNG_NACHGEHOLT)
+        self.assertEqual(e.objekt, f"Dokument {dok.id}")
+        protokoll = client_fuer(self.mediziner).get("/api/protokoll/?gruppe=dokument").json()["results"]
+        self.assertIn("war durch eine Wiederherstellung zurückgekommen", protokoll[0]["beschreibung"])
+        verlauf = client_fuer(self.mediziner).get(f"/api/patienten/{self.sabine.id}/verlauf/?bereich=dokumente").json()
+        self.assertEqual(verlauf[0]["aktion"], "endgültig gelöscht")
+        self.assertNotIn("Arztbrief", str(verlauf))
+
+        # Nur die Datei kommt zurück (ältere Dokumentsicherung, neuere Datenbank): sie wird entfernt
+        dok.pfad.write_bytes(inhalt)
+        self.assertEqual(nachholen()["dateien"], 1)
+        self.assertFalse(dok.pfad.exists())
+
+        # Neues Dokument mit derselben Nummer, anderer Inhalt: bleibt
+        neu = {**werte, "titel": "Neuer Befund", "sha256": "0" * 64, "datei": f"{self.sabine.nummer}/neu.pdf"}
+        Dokument.objects.create(**neu)
+        self.assertEqual(nachholen()["dokumente"], 0)
+        self.assertEqual(Dokument.objects.get(pk=dok.id).titel, "Neuer Befund")
+        self.assertEqual(Dokument.history.filter(id=dok.id, titel="Neuer Befund").count(), 1)
+
+        # Löschliste verloren: wird aus der Datenbank ergänzt
+        LOESCHLISTE.unlink()
+        self.assertEqual(nachholen()["liste_ergaenzt"], 1)
+        self.assertIn(dok.sha256, LOESCHLISTE.read_text(encoding="utf-8"))
+
+    def test_migration_schwaerzt_bestehende_loeschungen(self):
+        """Vor U15 gelöschte Dokumente (Titel noch in Historie und Audit-Log) werden beim Update nachträglich
+        geschwärzt; der Vorgang bekommt Prüfsumme und Pfad, der Start ergänzt die Löschliste."""
+        import importlib
+        import types
+
+        from django.apps import apps as django_apps
+
+        from .management.commands.epm_loeschungen_nachholen import nachholen
+        from .models import DokumentVorgang
+
+        migration = importlib.import_module("patienten.migrations.0006_geloeschte_dokumente_schwaerzen")
+        dok = self.hochladen(self.sabine)
+        sha, datei = dok.sha256, dok.datei
+        # so hat die Version vor U15 gelöscht: Vorgang ohne Prüfsumme, Titel im Audit-Log
+        DokumentVorgang.objects.create(art=DokumentVorgang.Art.GELOESCHT, dokument_id=dok.id, von_patient=self.sabine,
+                                       grund="fremdes Dokument", person=self.mediziner)
+        protokolliere(SystemEreignis.Art.DOKUMENT_LOESCHEN_ABGELEHNT, objekt=f"Dokument {dok.id}", titel=dok.titel,
+                      fehler="Kennwort falsch.")
+        protokolliere(SystemEreignis.Art.DOKUMENT_GELOESCHT, objekt=f"Dokument {dok.id}", titel=dok.titel,
+                      akte="Falsch, Sabine", grund="fremdes Dokument", sha256=sha, groesse=dok.groesse)
+        dok.delete()
+        migration.vorwaerts(django_apps, types.SimpleNamespace(connection=connection))
+        self.assertFalse(Dokument.history.filter(id=dok.id).exclude(titel="[entfernt]").exists())
+        self.assertEqual(set(Dokument.history.filter(id=dok.id).values_list("originalname", flat=True)), {"[entfernt]"})
+        for e in SystemEreignis.objects.filter(objekt=f"Dokument {dok.id}"):
+            self.assertEqual((e.details["titel"], e.details["sha256"]), ("[entfernt]", sha))
+        v = DokumentVorgang.objects.get(dokument_id=dok.id)
+        self.assertEqual((v.sha256, v.datei), (sha, datei))
+        self.assertEqual(nachholen()["liste_ergaenzt"], 1)
+        # danach greift wieder der volle Schutz
+        with self.assertRaises(DatabaseError), transaction.atomic():
+            DokumentVorgang.objects.update(grund="geändert")
 
     def test_systemdokumente_bleiben(self):
         dok = self.hochladen(self.sabine)

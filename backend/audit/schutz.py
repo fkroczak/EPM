@@ -4,7 +4,9 @@ Revisionssicherheit auf Datenbankebene.
 Ein Trigger verhindert UPDATE und DELETE auf allen Historientabellen (simple-history)
 und auf dem Systemprotokoll. Kontakte dürfen nur die Storno-Felder ändern.
 Ausnahme nur im Wartungsmodus (SET LOCAL epm.wartung = 'on'), z. B. beim
-Zurücksetzen der Testdaten.
+Zurücksetzen der Testdaten, und beim Schwärzen eines endgültig gelöschten Dokuments
+(Art. 17 DSGVO, `patienten.loeschung.schwaerze_dokument`): dann dürfen genau Titel,
+Dateiname, Notiz und Datum dieses einen Dokuments durch „[entfernt]“ ersetzt werden.
 
 Die Trigger werden nach jeder Migration neu gesetzt (post_migrate), damit auch
 künftige Historientabellen automatisch geschützt sind.
@@ -15,9 +17,34 @@ from django.db import connection, transaction
 
 FUNKTIONEN_SQL = r"""
 CREATE OR REPLACE FUNCTION epm_nur_anfuegen() RETURNS trigger AS $$
+DECLARE
+    -- Schwärzen nach Art. 17 DSGVO: 'dokument:<Nummer>:<SHA-256>' (SET LOCAL, nur in der Löschtransaktion)
+    ziel text := coalesce(current_setting('epm.schwaerzen', true), '');
 BEGIN
     IF coalesce(current_setting('epm.wartung', true), '') = 'on' THEN
         RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    END IF;
+    -- Einzige Ausnahme: Titel, Dateiname, Notiz und Datum eines endgültig gelöschten Dokuments werden durch den
+    -- Platzhalter ersetzt. Alles andere an der Zeile muss gleich bleiben; nur dieses eine Dokument (Nummer + Prüfsumme).
+    IF TG_OP = 'UPDATE' AND ziel LIKE 'dokument:%:%' THEN
+        IF TG_TABLE_NAME = 'patienten_historicaldokument' THEN
+            IF OLD.id::text = split_part(ziel, ':', 2) AND OLD.sha256 = split_part(ziel, ':', 3)
+               AND NEW.titel = '[entfernt]' AND NEW.originalname = '[entfernt]' AND NEW.notiz = ''
+               AND NEW.datum IS NULL
+               AND (to_jsonb(NEW) - 'titel' - 'originalname' - 'notiz' - 'datum')
+                   = (to_jsonb(OLD) - 'titel' - 'originalname' - 'notiz' - 'datum') THEN
+                RETURN NEW;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'audit_systemereignis' THEN
+            IF OLD.objekt = 'Dokument ' || split_part(ziel, ':', 2)
+               AND OLD.art IN ('dokument_umgehaengt', 'dokument_geloescht', 'dokument_loeschen_abgelehnt')
+               AND OLD.details ->> 'sha256' = split_part(ziel, ':', 3)
+               AND NEW.details ->> 'titel' = '[entfernt]'
+               AND (NEW.details - 'titel') = (OLD.details - 'titel')
+               AND (to_jsonb(NEW) - 'details') = (to_jsonb(OLD) - 'details') THEN
+                RETURN NEW;
+            END IF;
+        END IF;
     END IF;
     RAISE EXCEPTION 'EPM: % auf % ist nicht erlaubt (Protokoll ist unveränderlich)', TG_OP, TG_TABLE_NAME
         USING ERRCODE = 'insufficient_privilege';

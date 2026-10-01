@@ -467,7 +467,12 @@ class DokumentVorgang(models.Model):
     nach_patient = models.ForeignKey(Patient, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
     grund = models.TextField()
     zeitpunkt = models.DateTimeField(auto_now_add=True)
-    person = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    # leer nur, wenn eine Löschung nach einer Wiederherstellung nachgeholt wurde und die Person dort fehlt
+    person = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                               related_name="+")
+    # Nachweis ohne Inhalt (Art. 17 DSGVO): welche Datei es war
+    sha256 = models.CharField(max_length=64, blank=True, default="")
+    datei = models.CharField(max_length=255, blank=True, default="")
 
     class Meta:
         verbose_name = "Dokument-Vorgang"

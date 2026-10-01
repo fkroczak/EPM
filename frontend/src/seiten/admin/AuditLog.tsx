@@ -15,7 +15,7 @@ import { Seite } from "@/components/layout/Shell";
 const GRUPPEN: { wert: string; text: string }[] = [
   { wert: "anmeldung", text: "Anmeldung" }, { wert: "fehlversuch", text: "Fehlversuch" }, { wert: "benutzer", text: "Benutzer" },
   { wert: "vorlage", text: "Vorlage" }, { wert: "backup", text: "Backup" }, { wert: "export", text: "Export" },
-  { wert: "abschluss", text: "Abschluss" }, { wert: "infusionsplan", text: "Infusionsplan" },
+  { wert: "abschluss", text: "Abschluss" }, { wert: "infusionsplan", text: "Infusionsplan" }, { wert: "dokument", text: "Dokument" },
 ];
 const ZEITRAEUME: Record<string, { text: string; tage: number | null }> = {
   "7": { text: "Letzte 7 Tage", tage: 7 }, "30": { text: "Letzte 30 Tage", tage: 30 }, jahr: { text: "Dieses Jahr", tage: null }, alles: { text: "Alles", tage: null },

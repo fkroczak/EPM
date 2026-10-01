@@ -16,6 +16,9 @@ install -d -m 0700 "$B/secrets" "$B/backup"
 install -d -m 0750 -o "$EPM_APP_UID" -g 101 "$B/data"
 install -d -m 2750 -o "$EPM_APP_UID" -g 101 "$B/data/dokumente"
 chown "$EPM_APP_UID:101" "$B/data" "$B/data/dokumente"; chmod 0750 "$B/data"; chmod 2750 "$B/data/dokumente"
+# Löschliste (Art. 17 DSGVO): nur das Backend; bewusst nicht im Dokumentordner, damit eine Wiederherstellung sie nicht ersetzt
+install -d -m 0700 -o "$EPM_APP_UID" -g 101 "$B/data/loeschliste"
+chown "$EPM_APP_UID:101" "$B/data/loeschliste"; chmod 0700 "$B/data/loeschliste"
 install -d -m 0750 -o 101 -g 101 "$B/nginx/certs"
 
 echo "==> Projektdateien kopieren"

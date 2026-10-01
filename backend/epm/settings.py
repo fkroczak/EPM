@@ -129,6 +129,10 @@ STATIC_ROOT = env("DJANGO_STATIC_ROOT", str(BASE_DIR / "staticfiles"))
 
 # Patientendokumente: Dateisystem, Auslieferung über Nginx (X-Accel-Redirect)
 EPM_DOKUMENTE = Path(env("EPM_DOKUMENTE", str(BASE_DIR / "dokumente")))
+# Löschliste (Art. 17 DSGVO): endgültig gelöschte Dokumente, nur Nummer, Prüfsumme und Pfad. Liegt bewusst außerhalb
+# von Datenbank und Dokumentordner, damit eine Wiederherstellung aus einer älteren Sicherung sie nicht zurücksetzt;
+# beim Start holt `epm_loeschungen_nachholen` jede Löschung nach, die eine Wiederherstellung zurückgebracht hat.
+EPM_LOESCHLISTE = Path(env("EPM_LOESCHLISTE", str(EPM_DOKUMENTE.parent / "loeschliste" / "loeschliste.jsonl")))
 EPM_X_ACCEL = env_bool("EPM_X_ACCEL", not DEBUG)
 EPM_X_ACCEL_PREFIX = "/_geschuetzt/dokumente/"
 EPM_UPLOAD_MAX_MB = int(env("EPM_UPLOAD_MAX_MB", "50"))

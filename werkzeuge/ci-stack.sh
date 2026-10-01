@@ -54,7 +54,7 @@ done
 
 echo "==> Projektverzeichnis $B"
 sudo rm -rf "$B"
-mkdir -p "$B/secrets" "$B/nginx/certs" "$B/data/dokumente"
+mkdir -p "$B/secrets" "$B/nginx/certs" "$B/data/dokumente" "$B/data/loeschliste"
 cp rollout/projekt/compose.yaml "$B/"
 cp rollout/projekt/nginx/epm.conf "$B/nginx/"
 openssl rand -hex 24 > "$B/secrets/db_password"
@@ -72,7 +72,7 @@ EPM_VERSION=$TAG
 EOF
 chmod 0644 "$B/secrets/"*
 sudo chown -R 10001:101 "$B/data"
-sudo chmod 0750 "$B/data"; sudo chmod 2770 "$B/data/dokumente"
+sudo chmod 0750 "$B/data"; sudo chmod 2770 "$B/data/dokumente"; sudo chmod 0700 "$B/data/loeschliste"
 sudo chown 101:101 "$B/nginx/certs/"*
 sudo chmod 0400 "$B/nginx/certs/epm.key"
 

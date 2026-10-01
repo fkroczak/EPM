@@ -1,7 +1,7 @@
 /** Falsch zugeordnete Dokumente (Festlegung 02.10.2026): dem richtigen Patienten zuordnen; endgültig löschen nur
  *  Mediziner mit Kennwort, Code aus der Authenticator-App und abgetipptem Bestätigungscode. */
 import { expect, test } from "@playwright/test";
-import { apiAls, eindeutig, neuesKonto, totpBase32, zustand } from "./hilfen";
+import { apiAls, eindeutig, merken, neuesKonto, totpBase32, zustand } from "./hilfen";
 
 test.use({ storageState: zustand("mediziner") });
 
@@ -82,11 +82,18 @@ test("Endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code und B
   const zeile = page.getByTestId("verlauf").getByRole("row").filter({ hasText: "Datei und Inhalt entfernt" });
   await expect(zeile).toContainText("Grund: Dokument eines fremden Patienten");
   await expect(page.getByTestId("verlauf")).not.toContainText("Fremdes Dokument");
+  // Art. 17 DSGVO (U15): Titel und Dateiname stehen auch im Audit-Log nicht mehr – nur Nummer, Prüfsumme, Grund
+  await page.goto("/admin/audit-log");
+  await page.getByRole("button", { name: "Dokument", exact: true }).click();
+  await page.getByRole("button", { name: "Fehlversuch", exact: true }).click();
+  const log = page.getByTestId("auditlog");
+  await expect(log).toContainText(/Dokument Nr\. \d+ \(SHA-256 [0-9a-f]{8}…\) aus .+ endgültig gelöscht – Datei, Titel und Inhalt entfernt \(Art\. 17 DSGVO\), Grund: Dokument eines fremden Patienten/);
+  await expect(log).toContainText(/Löschen von Dokument Nr\. \d+ \(SHA-256 [0-9a-f]{8}…\) abgelehnt: Kennwort falsch\./);
+  await expect(log).not.toContainText("Fremdes Dokument");
   const protokoll = await api.get("protokoll/?gruppe=dokument,fehlversuch");
   const texte = protokoll.results.map((e: { beschreibung: string }) => e.beschreibung).join("\n");
-  expect(texte).toContain("„Fremdes Dokument“");
-  expect(texte).toContain("endgültig gelöscht");
-  expect(texte).toContain("abgelehnt: Kennwort falsch.");
+  expect(texte).not.toContain("Fremdes Dokument");
   await api.ende();
+  merken("geloescht", { patient: p.id, titel: "Fremdes Dokument" });
   await ctx.close();
 });

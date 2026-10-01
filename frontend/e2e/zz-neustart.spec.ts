@@ -140,6 +140,14 @@ test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", 
   const datei = await page.request.get(`/api/dokumente/${brief.id}/datei/`);
   expect(await datei.text()).toBe("Arztbrief (E2E)\nAlles gut.\n");
 
+  // endgültig gelöschtes Dokument (Art. 17 DSGVO): bleibt nach dem Neustart weg, Verlauf nur mit dem Nachweis
+  const weg = gemerkt("geloescht");
+  await page.goto(`/patienten/${weg.patient}/dokumente`);
+  await expect(page.getByText("Noch keine Dokumente.")).toBeVisible();
+  await page.goto(`/patienten/${weg.patient}/verlauf`);
+  await expect(page.getByTestId("verlauf")).toContainText("Datei und Inhalt entfernt");
+  await expect(page.getByTestId("verlauf")).not.toContainText(weg.titel);
+
   await page.goto(`/patienten/${gemerkt("altdokument").patient}/dokumente`);
   const alt = page.getByTestId("dokumentliste").getByRole("row").filter({ hasText: "Altdokument aus dem bisherigen System" });
   await expect(alt).toContainText("Labor");
@@ -175,6 +183,9 @@ test("Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Re
   await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Audit-Log" }).click();
   await page.getByRole("button", { name: "Benutzer", exact: true }).click();
   await expect(page.getByTestId("auditlog")).toContainText(name);
+  await page.getByRole("button", { name: "Dokument", exact: true }).click();
+  await expect(page.getByTestId("auditlog")).toContainText("endgültig gelöscht – Datei, Titel und Inhalt entfernt (Art. 17 DSGVO)");
+  await expect(page.getByTestId("auditlog")).not.toContainText(gemerkt("geloescht").titel);
 
   const { ort, vitamin } = gemerkt("vorlagen");
   await page.goto("/admin/vorlagen");
