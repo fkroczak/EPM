@@ -115,7 +115,8 @@ function FreigabeDialog({ plan, offen, onOffen }: { plan: Plan; offen: boolean; 
 }
 
 /** Gespeicherte PDF (F37): vor der Anzeige prüft der Server die Prüfsumme. */
-function PlanPdfDialog({ plan, offen, onOffen }: { plan: Plan; offen: boolean; onOffen: (o: boolean) => void }) {
+export function PlanPdfDialog({ plan, offen, onOffen }: { plan: Pick<Plan, "id" | "gueltig_ab" | "pdf_sha256">; offen: boolean;
+  onOffen: (o: boolean) => void }) {
   const datei = useQuery({
     queryKey: ["plan", plan.id, "pdf"],
     queryFn: () => apiDatei(`infusionsplaene/${plan.id}/pdf/`),

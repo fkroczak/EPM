@@ -225,3 +225,20 @@ test("Nach dem Neustart: Konto mit neuem Passwort und Gerät, Notfall-Codes, Dar
   await expect(d.page.getByRole("heading", { name: "Zuletzt eingetragen" })).toHaveCount(0);
   await d.ctx.close();
 });
+
+test("Nach dem Neustart: Termin im Kalender (erledigt) und Tätigkeiten der Systemverwaltung", async ({ browser }) => {
+  const k = gemerkt("kalender");
+  const m = await seiteAls(browser, "mitarbeiter");
+  await m.page.goto(`/kalender?datum=${k.datum}`);
+  await expect(m.page.getByTestId(`tag-${k.datum}`).getByRole("button", { name: new RegExp(`${k.titel} \\(erledigt\\)`) })).toBeVisible();
+  await m.ctx.close();
+
+  const s = gemerkt("system");
+  const a = await seiteAls(browser, "admin");
+  await a.page.goto("/admin/system");
+  const zeilen = a.page.getByTestId("auftraege");
+  await expect(zeilen.getByRole("row", { name: new RegExp(s.taetigkeit) }).first()).toContainText("erledigt");
+  await expect(zeilen.getByRole("row", { name: /Server neu starten/ }).first()).toContainText("erledigt");
+  await expect(zeilen.getByRole("row", { name: /Unveränderlichkeit prüfen/ }).first()).toContainText("erledigt");
+  await a.ctx.close();
+});

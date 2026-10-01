@@ -22,6 +22,8 @@ GRUPPEN = {
     # ohne eigenen Filterknopf im Entwurf, erscheint unter „alle“
     "infusionsplan": ("Infusionsplan", [A.PLAN_FREIGEGEBEN]),
     "dokument": ("Dokument", [A.DOKUMENT_UMGEHAENGT, A.DOKUMENT_GELOESCHT, A.DOKUMENT_LOESCHUNG_NACHGEHOLT]),
+    # Administration › System: Aufträge an den Server, Wartung des EPM, Hinweise an alle Benutzer
+    "system": ("System", [A.SYSTEM]),
 }
 GRUPPE_JE_ART = {art: schluessel for schluessel, (_, arten) in GRUPPEN.items() for art in arten}
 
@@ -104,10 +106,14 @@ def beschreibung(e) -> str:
     if art == A.ANMELDUNG_FEHLGESCHLAGEN:
         if d.get("grund") == "einmal_kennwort_abgelaufen":
             return "Einmal-Kennwort abgelaufen"
+        if d.get("grund") == "bestaetigung":
+            return f"Falsches Passwort bei der Bestätigung: {d.get('was', 'Systemaktion')}"
         return "Falsches Passwort" + (f" ({d['versuch']}. Versuch)" if d.get("versuch") else "")
     if art == A.ZWEITER_FAKTOR_FEHLGESCHLAGEN:
         if d.get("schritt") == "einrichten":
             return "Falscher Code bei der Einrichtung des Authenticators"
+        if d.get("schritt") == "bestaetigung":
+            return f"Falscher 2FA-Code bei der Bestätigung: {d.get('was', 'Systemaktion')}"
         return "Falscher 2FA-Code" + (f" ({d['versuch']}. Versuch)" if d.get("versuch") else "")
     if art == A.ANMELDUNG_GESPERRT:
         if d.get("versuch_trotz_sperre"):
@@ -177,4 +183,32 @@ def beschreibung(e) -> str:
     if art == A.DOKUMENT_LOESCHUNG_NACHGEHOLT:
         return (f"{_dokument(e)} war durch eine Wiederherstellung zurückgekommen und wurde erneut gelöscht "
                 f"(Löschung vom {_datum(d.get('geloescht_am', ''))})")
+    if art == A.SYSTEM:
+        return _system(e, d)
     return e.get_art_display() + (f" {e.objekt}" if e.objekt else "")
+
+
+def _system(e, d) -> str:
+    name = d.get("name") or e.objekt or "Systemaktion"
+    ereignis = d.get("ereignis")
+    if ereignis == "angefordert":
+        teile = [f"{name} angefordert"]
+        if d.get("minuten"):
+            teile.append(f"Beginn in {d['minuten']} Min.")
+        if d.get("bestaetigt"):
+            teile.append("mit Passwort und 2FA bestätigt")
+        return ", ".join(teile)
+    if ereignis == "abgeschlossen":
+        zustand = {"erledigt": "erledigt", "fehler": "fehlgeschlagen"}.get(d.get("status"), d.get("status", ""))
+        return f"{name} {zustand}" + (f": {d['ergebnis']}" if d.get("ergebnis") else "")
+    if ereignis == "abgebrochen":
+        return f"{name} zurückgezogen, bevor der Server ihn ausgeführt hat"
+    if ereignis == "epm_aufgabe":
+        return f"{name}" + (f": {d['ergebnis']}" if d.get("ergebnis") else "")
+    if ereignis == "hinweis":
+        return f"Hinweis an alle Benutzer: „{d.get('text', '')}“"
+    if ereignis == "hinweis_beendet":
+        return "Hinweis an alle Benutzer beendet"
+    if ereignis == "sitzung_beendet":
+        return f"Sitzung von {e.objekt} beendet ({d.get('browser') or 'Browser unbekannt'})"
+    return name

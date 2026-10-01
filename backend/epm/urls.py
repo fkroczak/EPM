@@ -1,14 +1,16 @@
 from django.conf import settings
+from django.db import transaction
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from accounts import api as konto
 from audit.api import SystemEreignisViewSet, TestdatenViewSet
+from system import api as system
 from infusionen.api import InfusionsplanViewSet
 from vorlagen import api as vorlagen
 from patienten.api import (
-    BezugspersonViewSet, DokumentViewSet, GewichtViewSet, KontaktViewSet, PatientArztViewSet, PatientViewSet,
-    StartseiteViewSet, TerminViewSet,
+    BezugspersonViewSet, DokumentViewSet, GewichtViewSet, KalenderViewSet, KontaktViewSet, PatientArztViewSet,
+    PatientViewSet, StartseiteViewSet, TerminViewSet,
 )
 from stammdaten.api import (
     AnsprechpartnerViewSet, ArztViewSet, AuswahlwertViewSet, BriefkopfView, EinstellungenView, LogoView, PraeparatViewSet,
@@ -21,6 +23,7 @@ router.register("patienten", PatientViewSet, basename="patient")
 router.register("gewichte", GewichtViewSet, basename="gewicht")
 router.register("kontakte", KontaktViewSet, basename="kontakt")
 router.register("termine", TerminViewSet, basename="termin")
+router.register("kalender", KalenderViewSet, basename="kalender")
 router.register("dokumente", DokumentViewSet, basename="dokument")
 router.register("bezugspersonen", BezugspersonViewSet, basename="bezugsperson")
 router.register("patient-aerzte", PatientArztViewSet, basename="patientarzt")
@@ -61,6 +64,14 @@ urlpatterns = [
     path("api/vorlagen/<str:art>/versionen/<int:version>/", vorlagen.VersionView.as_view()),
     path("api/vorlagen/<str:art>/startvorlage/", vorlagen.StartvorlageView.as_view()),
     path("api/vorlagen/<str:art>/vorschau/", vorlagen.VorschauView.as_view()),
+    # Administration › System (nur Admin); Wartung des EPM ohne umschließende Transaktion (VACUUM)
+    path("api/system/uebersicht/", system.UebersichtView.as_view()),
+    path("api/system/verlauf/", system.VerlaufView.as_view()),
+    path("api/system/auftraege/", system.AuftraegeView.as_view()),
+    path("api/system/auftraege/<uuid:kennung>/abbrechen/", system.AuftragAbbrechenView.as_view()),
+    path("api/system/epm/", transaction.non_atomic_requests(system.EpmAufgabeView.as_view())),
+    path("api/system/hinweis/", system.HinweisView.as_view()),
+    path("api/system/sitzungen/<int:pk>/", system.SitzungBeendenView.as_view()),
     path("api/", include(router.urls)),
 ]
 

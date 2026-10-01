@@ -14,6 +14,9 @@ import { Therapie } from "./seiten/akte/Therapie";
 import { Uebersicht } from "./seiten/akte/Uebersicht";
 import { Verlauf } from "./seiten/akte/Verlauf";
 import { AuditLog } from "./seiten/admin/AuditLog";
+import { System } from "./seiten/admin/System";
+import { Infusionsplaene } from "./seiten/Infusionsplaene";
+import { Kalender } from "./seiten/Kalender";
 import { Benutzer } from "./seiten/admin/Benutzer";
 import { Vorlagen } from "./seiten/admin/Vorlagen";
 import { Konto } from "./seiten/Konto";
@@ -61,6 +64,8 @@ const router = createBrowserRouter([
           { path: "verlauf", element: <Verlauf /> },
         ],
       },
+      { path: "kalender", element: <MitRecht recht="akten_lesen" titel="Kalender"><Kalender /></MitRecht> },
+      { path: "infusionsplaene", element: <MitRecht recht="akten_lesen" titel="Infusionspläne"><Infusionsplaene /></MitRecht> },
       { path: "versorger", element: <Versorger /> },
       { path: "aerzte", element: <Aerzte /> },
       { path: "konto", element: <Konto /> },
@@ -68,6 +73,7 @@ const router = createBrowserRouter([
       { path: "admin/vorlagen", element: <MitRecht recht="vorlagen_pflegen" titel="Vorlagen"><Vorlagen /></MitRecht> },
       { path: "admin/vorlagen/dokumente", element: <MitRecht recht="vorlagen_pflegen" titel="Dokumentvorlagen"><Vorlagen /></MitRecht> },
       { path: "admin/audit-log", element: <MitRecht recht="audit_lesen" titel="Audit-Log"><AuditLog /></MitRecht> },
+      { path: "admin/system", element: <MitRecht recht="system_verwalten" titel="System"><System /></MitRecht> },
       { path: "*", element: <NichtGefunden /> },
     ],
   },

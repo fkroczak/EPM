@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "infusionen",
     "vorlagen",
     "audit",
+    "system",
 ]
 if EPM_DJANGO_ADMIN:
     INSTALLED_APPS.insert(0, "django.contrib.admin")
@@ -135,6 +136,10 @@ EPM_DOKUMENTE = Path(env("EPM_DOKUMENTE", str(BASE_DIR / "dokumente")))
 EPM_LOESCHLISTE = Path(env("EPM_LOESCHLISTE", str(EPM_DOKUMENTE.parent / "loeschliste" / "loeschliste.jsonl")))
 EPM_X_ACCEL = env_bool("EPM_X_ACCEL", not DEBUG)
 EPM_X_ACCEL_PREFIX = "/_geschuetzt/dokumente/"
+# Systemverwaltung (Administration › System): Aufträge an den Server und dessen Status, gemeinsames Verzeichnis mit
+# dem Systemagenten auf dem Server (rollout/epm-systemagent.py). Der Container hat keinen Zugriff auf den Server selbst.
+EPM_SYSTEM = Path(env("EPM_SYSTEM", "/data/system"))
+EPM_VERSION = env("EPM_VERSION", "")
 EPM_UPLOAD_MAX_MB = int(env("EPM_UPLOAD_MAX_MB", "50"))
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024

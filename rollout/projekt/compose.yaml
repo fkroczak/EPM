@@ -37,11 +37,16 @@ services:
       DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
       EPM_DOKUMENTE: /data/dokumente
       EPM_LOESCHLISTE: /data/loeschliste/loeschliste.jsonl
+      EPM_SYSTEM: /data/system
+      EPM_VERSION: ${EPM_VERSION}
       TZ: Europe/Berlin
     secrets: [db_password, django_secret_key]
     volumes:
       - ./data/dokumente:/data/dokumente
       - ./data/loeschliste:/data/loeschliste   # Art. 17 DSGVO: übersteht eine Wiederherstellung
+      # Administration › System: Aufträge an den Systemagenten (schreiben), dessen Status (nur lesen)
+      - ./system/auftraege:/data/system/auftraege
+      - ./system/status:/data/system/status:ro
       - static:/app/staticfiles
     networks: [intern]
     read_only: true

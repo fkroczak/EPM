@@ -178,6 +178,60 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
         return Response(self.get_serializer(plan).data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["get"])
+    def uebersicht(self, request):
+        """Alle Pläne aller Patienten (Menüpunkt „Infusionspläne“, Wunsch 02.10.2026).
+
+        GET /api/infusionsplaene/uebersicht/?gruppe=entwuerfe|aktuell|alt|abgeloest|alle&suche=&abgeschlossene=1
+        → {"zaehler": {gruppe: n}, "grenze_monate", "ergebnisse": [kompakte Zeilen]} – höchstens 1.000 Zeilen.
+        Ohne „abgeschlossene=1“ nur Pläne von Akten in Betreuung."""
+        from datetime import timedelta
+
+        from django.db.models import Q
+        from django.utils import timezone
+
+        from stammdaten.models import Einstellungen
+
+        p = request.query_params
+        gruppe = p.get("gruppe") or "aktuell"
+        if gruppe not in ("entwuerfe", "aktuell", "alt", "abgeloest", "alle"):
+            return Response({"gruppe": "Erlaubt: entwuerfe, aktuell, alt, abgeloest, alle."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        e = Einstellungen.aktuell()
+        grenze = timezone.localdate() - timedelta(days=30 * e.plan_alter_warnung_monate)
+        qs = (Infusionsplan.objects.filter(patient__in=patienten_fuer(request.user))
+              .select_related("patient", "erstellt_von", "freigegeben_von"))
+        if str(p.get("abgeschlossene", "")).lower() not in ("1", "true", "ja"):
+            qs = qs.filter(patient__abgeschlossen_am__isnull=True)
+        suche = (p.get("suche") or "").strip()
+        if suche:
+            bedingung = Q(patient__nachname__icontains=suche) | Q(patient__vorname__icontains=suche)
+            if suche.isdigit():
+                bedingung |= Q(patient__nummer=int(suche))
+            qs = qs.filter(bedingung)
+        gruppen = {
+            "entwuerfe": qs.filter(status=Infusionsplan.Status.ENTWURF),
+            "aktuell": qs.filter(status=Infusionsplan.Status.AKTUELL),
+            "alt": qs.filter(status=Infusionsplan.Status.AKTUELL, gueltig_ab__lt=grenze),
+            "abgeloest": qs.filter(status=Infusionsplan.Status.ABGELOEST),
+            "alle": qs,
+        }
+        reihenfolge = {"entwuerfe": ["-erstellt_am"], "aktuell": ["patient__nachname", "patient__vorname"],
+                       "alt": ["gueltig_ab"], "abgeloest": ["-gueltig_ab"], "alle": ["-gueltig_ab", "-id"]}[gruppe]
+        zeilen = [{
+            "id": x.id, "patient": x.patient_id, "name": f"{x.patient.nachname}, {x.patient.vorname}",
+            "nummer": x.patient.nummer, "ist_test": x.patient.ist_test,
+            "patient_abgeschlossen": x.patient.abgeschlossen_am is not None,
+            "status": x.status, "gueltig_ab": x.gueltig_ab, "kcal": x.kcal, "laufzeit_h": x.laufzeit_h,
+            "rate_ml_h": x.rate_ml_h, "tage_pro_woche": x.tage_pro_woche,
+            "erstellt_am": x.erstellt_am, "erstellt_von": benutzername(x.erstellt_von),
+            "freigegeben_am": x.freigegeben_am, "freigegeben_von": benutzername(x.freigegeben_von),
+            "pdf": bool(x.pdf_sha256), "pdf_sha256": x.pdf_sha256 or None,
+            "aelter_als_grenze": x.status == Infusionsplan.Status.AKTUELL and x.gueltig_ab < grenze,
+        } for x in gruppen[gruppe].order_by(*reihenfolge, "id")[:1000]]
+        return Response({"zaehler": {k: v.count() for k, v in gruppen.items()},
+                         "grenze_monate": e.plan_alter_warnung_monate, "ergebnisse": zeilen})
+
+    @action(detail=False, methods=["get"])
     def vorbelegung(self, request):
         patient = patienten_fuer(request.user).filter(pk=request.query_params.get("patient")).first()
         if patient is None:
