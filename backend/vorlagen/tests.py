@@ -218,7 +218,7 @@ class WeiterePdfs(Grundlage):
             for erwartet in ["Verlauf der Akte", "Probe, Paula", "Bereich Gewicht", "Gewicht", "angelegt"]:
                 self.assertIn(kompakt(erwartet), kompakt(text))
             self.assertIn("TESTDATEN", wasserzeichen(r.content))
-            self.assertIn("Infusionsplan", kompakt(pdf_text(c.get(f"/api/patienten/{p.id}/pdf/").content)))
+            self.assertIn("1.509kcal·2.600ml·12h", kompakt(pdf_text(c.get(f"/api/patienten/{p.id}/pdf/").content)))  # aktueller Plan im Datenblatt
         # auch abgeschlossene Akten lassen sich ausgeben
         Patient.objects.filter(pk=p.pk).update(abgeschlossen_am=timezone.localdate(), abschluss_anlass="therapie_beendet")
         self.assertEqual(c.get(f"/api/patienten/{p.id}/pdf/").status_code, 200)
