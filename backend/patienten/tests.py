@@ -356,6 +356,20 @@ class Patientenliste(Grundlage):
         self.assertEqual(z, {"in_betreuung": 3, "abgeschlossen": 0, "mit_hinweisen": 2, "gewichtsverlust": 1,
                              "termin_woche": 1})
 
+    def test_sortierung_ohne_kontakt_immer_am_ende(self):
+        c = client_fuer(self.mitarbeiter)
+        for ordnung in ("-letzter_kontakt", "letzter_kontakt"):
+            ids = [p["id"] for p in c.get(f"/api/patienten/?test=ohne&ordering={ordnung}").json()["results"]]
+            self.assertEqual(ids[-1], self.patient.id, ordnung)
+            self.assertEqual(set(ids), {self.patient.id, self.verlust.id, self.stabil.id})
+        Patient.objects.filter(pk=self.verlust.pk).update(abgeschlossen_am=timezone.localdate(),
+                                                           abschluss_anlass="verstorben")
+        r = c.get("/api/patienten/?status=abgeschlossen&ordering=-abgeschlossen_am").json()
+        self.assertEqual([p["id"] for p in r["results"]], [self.verlust.id])
+        # Versorger zählt nur Patienten in Betreuung (ohne Testpatienten), wie der Ansprechpartner
+        v = c.get(f"/api/versorger/{self.versorger.id}/").json()
+        self.assertEqual((v["patienten_anzahl"], v["ansprechpartner"][0]["patienten_anzahl"]), (1, 1))
+
     def test_suche(self):
         c = client_fuer(self.mitarbeiter)
 
