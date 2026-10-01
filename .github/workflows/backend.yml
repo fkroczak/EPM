@@ -1,0 +1,115 @@
+# EPM – Backend prüfen: bei jedem Push Tests gegen echtes PostgreSQL 18.
+# Fehlen Migrationen für geänderte Modelle, werden sie hier erzeugt und ins Repo übernommen.
+name: Backend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    name: Tests mit PostgreSQL
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: epm
+          POSTGRES_USER: epm
+          POSTGRES_PASSWORD: epm
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U epm -d epm"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DJANGO_SECRET_KEY: nur-fuer-ci-tests
+      DB_HOST: localhost
+      DB_PASSWORD: epm
+      DJANGO_ALLOWED_HOSTS: localhost,testserver
+      EPM_DOKUMENTE: /tmp/epm-dokumente
+      PYTHONUNBUFFERED: "1"
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Abhängigkeiten installieren
+        run: pip install -r requirements.txt && pip freeze > /tmp/versionen.txt
+
+      - name: Migrationen erzeugen, falls Modelle geändert wurden
+        id: mig
+        run: |
+          python manage.py makemigrations --noinput accounts stammdaten patienten infusionen audit
+          if [ -n "$(git status --porcelain -- '*/migrations/*.py')" ]; then
+            echo "neu=1" >> "$GITHUB_OUTPUT"
+            git status --porcelain -- '*/migrations/*.py'
+          fi
+
+      - name: Neue Migrationen ins Repo übernehmen
+        if: steps.mig.outputs.neu == '1' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "epm-ci"
+          git config user.email "epm-ci@users.noreply.github.com"
+          git add -- '*/migrations/*.py'
+          git commit -m "Migrationen automatisch erzeugt (CI)"
+          git push
+
+      - name: Migrationen vollständig
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Django-Prüfung
+        run: python manage.py check
+
+      - name: Tests gegen PostgreSQL
+        run: |
+          set -o pipefail
+          python manage.py test --verbosity 2 2>&1 | tee test-ausgabe.txt
+
+      - name: Zusammenfassung
+        if: always()
+        run: |
+          {
+            echo "### Backend-Tests"
+            echo '```'
+            grep -v " WARNING django.request: " test-ausgabe.txt | tail -60 || true
+            echo '```'
+            echo "<details><summary>Paketversionen</summary>"
+            echo
+            echo '```'
+            cat /tmp/versionen.txt || true
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-ausgabe
+          path: backend/test-ausgabe.txt
+
+  image:
+    name: Docker-Image bauen
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Image bauen
+        run: docker build -t epm-backend:ci backend
+      - name: Image startet und findet seine Module
+        run: docker run --rm -e DJANGO_DEBUG=1 epm-backend:ci python manage.py check
