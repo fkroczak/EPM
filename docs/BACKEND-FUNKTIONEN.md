@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 01.10.2026 · Code-Stand: Runde 3 (bis `ca9f858`: PDF-Erzeugung, Dokumentvorlagen, Rückmeldungen aus dem Testsystem) ·
+Stand: 02.10.2026 · Code-Stand: Runde 3 (bis `e709bee`: PDF-Erzeugung, Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026.
 
@@ -28,7 +28,7 @@ Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests. Beide laufe
   `werkzeuge/ci-stack.sh`: dieselbe Compose-Datei, Nginx-Konfiguration und dieselben Images wie auf dem Server, mit
   Musterdaten und eigenen Testkonten je Rolle.
 
-Stand 01.10.2026: **92 von 92 Backend-Tests** und **46 von 46 Browsertests grün** (Lauf 36921980921, Commit `ca9f858`).
+Stand 02.10.2026: **98 von 98 Backend-Tests** und **49 von 49 Browsertests grün** (Lauf 36938008996, Commit `e709bee`).
 
 ## Übersicht
 
@@ -105,6 +105,8 @@ Stand 01.10.2026: **92 von 92 Backend-Tests** und **46 von 46 Browsertests grün
 | F69 | Bezugspersonen mit „Auskunft erlaubt“ | 4 Akte | ABGESCHLOSSEN UND GETESTET |
 | F70 | „kein“ Katheter/Versorger, Nickelallergie als Auswahl | 4 Akte, 12 Neuer Patient, 3 Liste | ABGESCHLOSSEN UND GETESTET |
 | F71 | Nicht Erlaubtes ausblenden, Rechteänderung sofort in der Oberfläche | alle Ansichten | ABGESCHLOSSEN UND GETESTET |
+| F72 | Dokument dem richtigen Patienten zuordnen | 9 Dokumente, 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
+| F73 | Dokument endgültig löschen (nur Mediziner, Kennwort + 2FA + Bestätigungscode) | 9 Dokumente, 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
 
 Summe (71 Funktionen): 57 abgeschlossen und getestet · 3 teilweise abgeschlossen · 11 nicht abgeschlossen · 0 blockiert.
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -129,7 +131,7 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   Akten abschließen dürfen Mitarbeiter, Mediziner und Admin; Vorlagen pflegen auch Mitarbeiter und Mediziner.
   Admins dürfen alles, Patientendaten schreiben sie aber nur bei Testpatienten – echte Akten sind für sie nur
   lesbar, ein neuer Patient eines Admins wird Testpatient. Standard (✓ = erlaubt, ● = fest, nicht entziehbar,
-  T = nur bei Testpatienten, fest):
+  T = nur bei Testpatienten, fest; „nur Mediziner“ = keiner anderen Rolle zuweisbar):
 
 | Recht | Betrachter | Mitarbeiter | Mediziner | Admin |
 |---|---|---|---|---|
@@ -139,6 +141,8 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 | Infusionspläne anlegen | – | – | ✓ | ✓ T |
 | Infusionspläne freigeben | – | – | ✓ | ✓ T |
 | Akten abschließen | – | ✓ | ✓ | ✓ T |
+| Dokumente einem anderen Patienten zuordnen (F72) | – | – | ✓ | ✓ T |
+| Dokumente endgültig löschen (F73) | – | – | ✓ | – (nur Mediziner) |
 | Abgeschlossene Akten wieder öffnen | – | – | – | ✓ |
 | Versorger und Ansprechpartner pflegen | – | ✓ | ✓ | ✓ |
 | Vorlagen pflegen (Briefkopf, Auswahllisten, Präparate, Grenzwerte) | – | ✓ | ✓ | ✓ |
@@ -407,7 +411,12 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   termine_offen, infusionsplaene}}`
 - **Fehlerfälle:** 404 unbekannt oder außerhalb des Bereichs
 - **Teststatus:** Backend-Tests grün (`test_versionen_der_textfelder`, `test_termin_mit_ort`, `Infusionsplaene.test_ablauf`). Browsertests grün:
-  `akte.spec.ts` „Akte aus der Liste öffnen: Kopf mit Kerndaten und Gewichtswarnung“, `layout.spec.ts` „Unter 1280 px stehen die Karten der Akte untereinander“.
+  `akte.spec.ts` „Akte aus der Liste öffnen: Kopf mit Kerndaten und Gewichtswarnung“, `layout.spec.ts` „Unter 1280 px stehen die Karten der Akte untereinander“,
+  `akte.spec.ts` „Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pflegen“ (Kopfhöhe bleibt mit Personen gleich;
+  „Auskunft an“ führt zur Person).
+- **Oberfläche (02.10.2026):** Kennzahlen im festen Raster (2 Zeilen à 5, schmaler 3 bzw. 2 Spalten), je eine Zeile, Langes
+  gekürzt mit vollem Text im Tooltip – mehr Ärzte oder Personen verändern die Höhe nicht. „Auskunft an“: Klick springt zur
+  Bezugsperson mit Anschrift und Kontaktdaten und hebt sie kurz hervor.
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F18 Stammdaten, Diagnose, Therapie, Empfehlung ändern
@@ -547,10 +556,12 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 ## E · Infusionspläne
 
 ### F31 Infusionspläne eines Patienten lesen
-- **Ansicht:** 8 Infusionspläne
+- **Ansicht:** 8 Infusionspläne. „Ansicht wie PDF“ zeigt die echte PDF (02.10.2026): freigegeben = gespeicherte PDF der Freigabe
+  (F37, mit Prüfsumme), Entwurf oder ohne gespeicherte PDF = `GET /api/infusionsplaene/{id}/ansicht/` (aktive Dokumentvorlage,
+  Wasserzeichen „ENTWURF“ bzw. „TESTDATEN“, nicht zum Versand). Der Text der Seiten liegt für Bildschirmleser unter der Seite.
 - **Endpunkt:** `GET /api/infusionsplaene/?patient=<id>&status=` → Pläne mit allen Werten, `vitamine`, `vitamine_namen`,
   Positionen, `kcal_berechnet`, `kcal`, `gesamtvolumen_ml`, `volumen_gewicht_kg`, `rate_ml_h`, `geaenderte_felder`
-- **Teststatus:** Backend-Tests grün (`infusionen.tests.*`). Browsertests grün: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“, `plaene.spec.ts` „Mitarbeiter sieht Pläne, legt aber keine an“; Neustart geprüft in `zz-neustart.spec.ts`.
+- **Teststatus:** Backend-Tests grün (`infusionen.tests.*`, `vorlagen.Vorlagen.test_ansicht_in_der_akte_im_layout_der_vorlage`). Browsertests grün: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“ (Entwurf als PDF-Ansicht, nach der Freigabe die gespeicherte PDF), `plaene.spec.ts` „Mitarbeiter sieht Pläne, legt aber keine an“; Neustart geprüft in `zz-neustart.spec.ts` (gespeicherte PDF, Prüfsumme stimmt) (Lauf 36938008996, Commit `e709bee`).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F32 Neuer Plan als Entwurf
@@ -622,7 +633,9 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - **Ansicht:** 8 Infusionspläne („PDF öffnen“ am freigegebenen Plan)
 - **Endpunkt:** `GET /api/infusionsplaene/{id}/pdf/` → gespeicherte PDF über X-Accel-Redirect; vorher Prüfsumme gegen
   `pdf_sha256`, Ergebnis im Kopf `X-EPM-Pruefung: ok|abweichend` und `X-EPM-Vorlage-Version`. Die PDF wird nie neu erzeugt.
-  Nginx reicht beide Köpfe nach dem internen Umleiten weiter (`rollout/projekt/nginx/epm.conf`).
+  Nginx reicht beide Köpfe nach dem internen Umleiten weiter (`rollout/projekt/nginx/epm.conf`; zuvor gingen sie dabei
+  verloren). Ohne gespeicherte PDF (Entwurf) zeigt die Akte `GET /api/infusionsplaene/{id}/ansicht/` – mit der aktiven
+  Dokumentvorlage erzeugt, Wasserzeichen „ENTWURF“, nicht gespeichert (F31).
 - **Anzeige:** „Prüfsumme stimmt: unverändert seit der Freigabe · Dokumentvorlage Version n“ bzw. rote Warnung bei Abweichung.
 - **Teststatus:** Backend-Test grün (`vorlagen.Vorlagen.test_freigabe_speichert_pdf_mit_pruefsumme`, auch veränderte Datei →
   „abweichend“). Browsertest grün: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“;
@@ -676,6 +689,47 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - **Tabellen:** `patienten_dokument`, `patienten_historicaldokument`
 - **Teststatus:** Backend-Tests grün (`test_dokument_upload_und_download`, `test_dokumenttyp_am_inhalt`). Browsertest grün: `dokumente.spec.ts` „Dokumente hochladen, Typ am Inhalt prüfen, Metadaten ändern, ausblenden, herunterladen; Verlauf“ (.exe
   abgewiesen, Text und PNG am Inhalt erkannt); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F72 Dokument dem richtigen Patienten zuordnen
+- **Zweck:** Ein Dokument liegt beim falschen Patienten (Bernds Unterlagen bei Sabine). Festlegung 02.10.2026: umhängen statt
+  nur ausblenden – Sabines Akte zeigt danach weder Inhalt noch Titel noch Bernd.
+- **Ansicht:** 9 Dokumente (Dokument markieren › „Anderem Patienten zuordnen“: Patient suchen, Grund, Bestätigung „gehört zu …“)
+- **Endpunkt:** `POST /api/dokumente/{id}/umhaengen/` `{"patient": ID, "grund": "…"}` → 200 Dokument
+- **Logik:** Datei wandert in den Ordner des richtigen Patienten (atomar), Prüfsumme, Datum, Typ bleiben. Unveränderlicher Eintrag
+  `DokumentVorgang` (Trigger). Verlauf der bisherigen Akte: „einer anderen Akte zugeordnet“, frühere Einträge dieses Dokuments
+  ohne Titel und Werte; Verlauf der neuen Akte: „von einer anderen Akte übernommen“ mit Grund. Audit-Log (Gruppe „Dokument“):
+  Titel, von, nach, Grund.
+- **Validierung:** Recht „Dokumente einem anderen Patienten zuordnen“ (Standard: Mediziner; Admin nur bei Testpatienten);
+  Grund mindestens 5 Zeichen; Zielpatient sichtbar, nicht derselbe, Testpatient nur zu Testpatient; beide Akten offen;
+  von EPM erzeugte Dokumente (Plan-PDFs) nicht.
+- **Tabellen:** `patienten_dokument` (+ Historie), `patienten_dokumentvorgang`, `audit_systemereignis`; Migrationen
+  `patienten/0004_dokumentvorgang`, `audit/0004_dokumente_umhaengen_loeschen`
+- **Fehlerfälle:** 400 Grund/Patient · 403 ohne Recht bzw. Admin bei echten Akten · 409 Datei fehlt
+- **Teststatus:** Backend-Tests grün (`FalschZugeordneteDokumente.test_umhaengen`, `test_systemdokumente_bleiben`). Browsertest
+  grün: `dokumente-falsch.spec.ts` „Dokument beim falschen Patienten dem richtigen zuordnen; Verlauf neutral bzw. mit Grund“
+  (Datei bei Bernd unverändert, Verlauf beider Akten, Audit-Log); `dokumente.spec.ts`: Mitarbeiter sehen die Aktion nicht
+  (Lauf 36938008996, Commit `e709bee`).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F73 Dokument endgültig löschen
+- **Zweck:** Ein Dokument gehört zu keinem Patienten der Stiftung. Festlegung 02.10.2026: nur Mediziner, doppelt bestätigt
+  (Kennwort + Code aus der Authenticator-App + abgetippter Bestätigungscode), im Audit-Log.
+- **Ansicht:** 9 Dokumente › „Endgültig löschen“ (Grund, Kennwort, Code, 6-stelliger Bestätigungscode zum Abtippen – nicht
+  markierbar)
+- **Endpunkte:** `POST /api/dokumente/{id}/loeschen-vorbereiten/` → `{code, gueltig_bis}` (5 Minuten, in der Sitzung);
+  `POST /api/dokumente/{id}/loeschen/` `{"grund", "kennwort", "code", "bestaetigung"}` → 204
+- **Logik:** Datensatz und Datei werden entfernt (Datei nach dem Commit). Bleibt: Historie (unveränderlich), `DokumentVorgang`,
+  Audit-Log mit Titel, Akte, Grund, Prüfsumme, Größe. Verlauf: „endgültig gelöscht“ mit Grund, frühere Einträge ohne Titel.
+  Jede Ablehnung (Code abgelaufen/falsch, Kennwort, 2FA) steht im Audit-Log (Gruppe „Fehlversuch“); dreimal falscher
+  Bestätigungscode macht ihn ungültig. Der Titel bleibt nur im unveränderlichen Protokoll.
+- **Validierung:** Rolle Mediziner und Recht „Dokumente endgültig löschen“ (nur Mediziner, keiner anderen Rolle zuweisbar);
+  Grund mindestens 10 Zeichen; Akte offen; keine von EPM erzeugten Dokumente.
+- **Fehlerfälle:** 400 je Feld · 403 nicht Mediziner/ohne Recht · 404 schon gelöscht
+- **Teststatus:** Backend-Tests grün (`FalschZugeordneteDokumente.test_endgueltig_loeschen`, `RechteJeGruppe.test_standard`).
+  Browsertest grün: `dokumente-falsch.spec.ts` „Endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code und
+  Bestätigungscode“ (falsches Kennwort abgelehnt und protokolliert, dann gelöscht; Verlauf und Audit-Log)
+  (Lauf 36938008996, Commit `e709bee`).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F41 Dokumente lesen, Metadaten ändern, ausblenden
@@ -796,6 +850,9 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   Browsertests grün: `dokumentvorlagen.spec.ts` „Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau,
   Veröffentlichen“, „Betrachter hat keinen Zugang zu den Dokumentvorlagen“; Neustart geprüft in `zz-neustart.spec.ts`
   (veröffentlichte Version) (Lauf 36921980921, Commit `ca9f858`).
+- **Überarbeitung 02.10.2026:** Dokumentvorlagen sind ein Bereich der Seite Vorlagen (wie Briefkopf, Auswahllisten, Grenzwerte;
+  Adresse `/admin/vorlagen/dokumente`), Knöpfe oben rechts, Rückfrage bei ungespeicherten Änderungen; Felder per Griff oder ▲ ▼
+  verschiebbar; Schrift klein/groß wirkt in Vorschau und PDF auf den ganzen Block (Größen in em); Titel-Ausrichtung mitte/rechts.
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F51 PDF-Erzeugung
@@ -879,7 +936,9 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   der Akte und der Pläne, `schreibt_nur_testpatienten` in `Ich`, in der Matrix als „nur Testpatienten“ markiert); ein neuer
   Patient eines Admins wird Testpatient. GET liefert dazu `nur_testpatienten: {rollen, rechte}`.
 - **Validierung:** nur mit Recht „Benutzer und Rechte verwalten“; unbekannte Rolle oder Recht → 400; feste Rechte (Admin: Akten lesen,
-  Benutzer und Rechte verwalten) nicht entziehbar → 400; Testbenutzer ohne Rechte über Testpatienten hinaus.
+  Benutzer und Rechte verwalten) nicht entziehbar → 400; Rechte, die einer Rolle vorbehalten sind (`nur_rollen` in GET;
+  02.10.2026: „Dokumente endgültig löschen“ nur Mediziner), anderen Rollen nicht zuweisbar → 400 „Dieses Recht ist Mediziner
+  vorbehalten.“, in der Matrix ausgegraut; Testbenutzer ohne Rechte über Testpatienten hinaus.
 - **Tabellen:** `accounts_gruppenrecht`, `accounts_historicalgruppenrecht`, `audit_systemereignis` („Rechte geändert“)
 - **Fehlerfälle:** 400 · 403 ohne Recht
 - **Teststatus:** Backend-Tests grün (`RechteJeGruppe.*`, `Rollen.test_admin_schreibt_nur_bei_testpatienten`,
@@ -1100,7 +1159,8 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 | U11 | ~~Ab welcher Änderung zeigt der Trend-Pfeil „gleich“?~~ **Bestätigt 01.10.2026:** weniger als ±1 % = gleich | F14 | – |
 | U12 | ~~Darf der Admin auch Patientendaten schreiben?~~ **Geklärt 01.10.2026:** Admins dürfen alles, Patientendaten schreiben sie nur bei Testpatienten; echte Akten nur lesen, Wiederöffnen, Benutzer und Sicherungen bleiben | F66 | – |
 | U13 | ~~Energie im Infusionsplan: Lipide 9 oder 9,15 kcal/g, Albumin mit oder ohne Energie?~~ **Geklärt 01.10.2026:** wie in `EPM_infuplan.php`: Lipide 9,15 kcal/g, Humanalbumin in ml ohne Energie | F33, F39 | – |
-| U14 | ~~Stabilitätsprüfung Calcium + Magnesium und Vorbelegung des ersten Plans je kg übernehmen?~~ **Geklärt 01.10.2026:** ja, beides wie im Altsystem (Stabilität als Hinweis, Speichern bleibt möglich); Präparate werden beim ersten Plan **nicht** vorausgewählt | F32, F33 | – ||
+| U14 | ~~Stabilitätsprüfung Calcium + Magnesium und Vorbelegung des ersten Plans je kg übernehmen?~~ **Geklärt 01.10.2026:** ja, beides wie im Altsystem (Stabilität als Hinweis, Speichern bleibt möglich); Präparate werden beim ersten Plan **nicht** vorausgewählt | F32, F33 | – |
+| U15 | Endgültig gelöschtes Dokument (F73): Der Titel bleibt im unveränderlichen Audit-Log und in der Historie des Datensatzes (nur Mediziner/Admin mit Audit-Recht sehen ihn; im Verlauf der Akte nicht). Muss auch er verschwinden? | F73 | Titel bleibt im Protokoll (Nachweis, was gelöscht wurde); Inhalt und Datei sind weg |
 
 ## Änderungsprotokoll
 
@@ -1118,6 +1178,7 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 | 01.10.2026 | Runde 2 (`eae8bc3`–`a985fa5`) | Klärung U1, U2, U8, U9 umgesetzt: Protonenpumpenhemmer mit Zeiten (F38) und berechnetes Gesamtvolumen mit Rate und Grenze (F39, F48) auf ABGESCHLOSSEN UND GETESTET; F11/F58 ohne Gerätename-Lücke; F64 nicht mehr blockiert. U13/U14 gestellt |
 | 01.10.2026 | Runde 2 (`f865cde`–`a985fa5`) | Klärung U13/U14 umgesetzt: Energie mit Lipiden 9,15 kcal/g, Humanalbumin in ml ohne Energie (Feld `albumin_ml`), Hinweis zur Ca/Mg-Stabilität, erster Plan je kg Körpergewicht vorbelegt (`GET /api/infusionsplaene/vorbelegung/?patient=`) |
 | 01.10.2026 | Runde 3 (`c3aacfa`–`1718dc3`) | Rückmeldungen aus dem Testsystem: Blau auf Blau behoben, Testpatienten-Zahl nur für Admin, PDF-Anzeige mit pdf.js, Ärzteliste (F67/F68), Bezugspersonen (F69), „kein“ Katheter/Versorger und Nickelallergie als Auswahl (F70); Backend-Image mit IBM Plex aus dem Repo (Debian 13 hat kein `fonts-ibm-plex`) |
+| 02.10.2026 | Runde 3 (`df02dda`–`e709bee`) | Rückmeldungen zur PDF-Funktion: Dokumentvorlagen als Bereich der Vorlagen, Felder verschiebbar, Schriftgröße und Titel-Ausrichtung wirksam, Planansicht in der Akte = echte PDF (F31), Aktenkopf mit festem Raster und anklickbarem „Auskunft an“ (F17). Neu: Dokument dem richtigen Patienten zuordnen (F72) und endgültig löschen nur durch Mediziner mit Kennwort, 2FA und Bestätigungscode (F73). Fehler behoben: Datenmigration „Kontakt überfällig“ brach auf bestehender Datenbank ab (Grund > 100 Zeichen); Grund beim Wiederöffnen begrenzt |
 | 01.10.2026 | Runde 3 (`0624527`–`ca9f858`) | PDF-Erzeugung mit WeasyPrint (F51), Dokumentvorlagen mit Editor (F50), Freigabe-PDF mit SHA-256 und Prüfung beim Öffnen (F35, F37; Nginx reicht `X-EPM-Pruefung` weiter), Akte, Verlauf, Audit-Log und Zugangsblatt als PDF (F23, F24, F59, F55). Infusionsplan-PDF nach dem Altsystem, auf Wunsch neu gestaltet wie ein Laborbefund und wie die Oberfläche (Kopfkarte, Karten, Menge/Einheit in eigenen Spalten, Titel neben dem Logo, ohne Linie, fax-tauglich, einseitig); Laufzeit 0 als „—“; neue Bausteine und Optionen im Editor; Datenfeld-Einfügen nimmt den aktuellen Feldinhalt (Fehler behoben) |
 | 01.10.2026 | Runde 3 (`a30b26d`) | „Kein Kontakt seit …“ nach 4 statt 12 Monaten (Patienten kommen meist quartalsweise): Standard in den Einstellungen, Datenmigration stellt einen unveränderten Wert 12 um (mit Grund in der Historie); wirkt auf Hinweis in der Patientenliste und „Nach und nach prüfen“ auf der Startseite; Backend-Test `test_kontakt_ueberfaellig_nach_4_monaten` |
 | 01.10.2026 | Runde 3 (`b37d606` und folgende) | Nicht Erlaubtes ausblenden (F71): keine Fenster oder Meldungen mit „Dafür fehlt das Recht“ mehr; Rechteänderungen wirken in der Oberfläche ohne neue Anmeldung (Kopf `X-EPM-Rechte`); abgelehnte Aktionen nur mit neutralem Hinweis; ausgeblendete Fenster öffnen sich nicht von selbst wieder |
