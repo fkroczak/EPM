@@ -45,8 +45,12 @@ for e in E.objects.filter(art__in=arten).order_by('id')[:200]:
 esac
 
 echo "==> Images bauen (epm-backend:$TAG, epm-web:$TAG)"
-$DOCKER build --quiet -t "epm-backend:$TAG" backend >/dev/null
-$DOCKER build --quiet -t "epm-web:$TAG" frontend >/dev/null
+for bild in backend web; do
+  ordner=$([ "$bild" = web ] && echo frontend || echo backend)
+  if ! $DOCKER build --progress=plain -t "epm-$bild:$TAG" "$ordner" >"/tmp/bau-$bild.log" 2>&1; then
+    echo "Bau von epm-$bild fehlgeschlagen, letzte Zeilen:"; tail -80 "/tmp/bau-$bild.log"; exit 1
+  fi
+done
 
 echo "==> Projektverzeichnis $B"
 sudo rm -rf "$B"

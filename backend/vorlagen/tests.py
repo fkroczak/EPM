@@ -143,7 +143,7 @@ class Vorlagen(Grundlage):
         if PDFTOTEXT:
             text = pdf_text(r.content)
             for erwartet in ["Patientendatenblatt", "Probe, Paula", "60 kg am", "1/1", "Spendenkonto"]:
-                self.assertIn(erwartet, text)
+                self.assertIn(kompakt(erwartet), kompakt(text))
             self.assertIn("ENTWURF", wasserzeichen(r.content))
 
     @unittest.skipUnless(PDFTOTEXT, "pdftotext fehlt")
@@ -158,7 +158,7 @@ class Vorlagen(Grundlage):
                          "Patienten-Nr.: 9", "Infusionsplan-Nr.:", "Volumen im Mischbeutel", "Laufmenge je Stunde",
                          "Deutsche Stiftung Krankheitsbedingte Mangelernährung", "Telefon 0251 98 11 400",
                          "Spendenkonto", "1/1", "Maschinell erstellt, geprüft und freigegeben von"]:
-            self.assertIn(erwartet, text)
+            self.assertIn(kompakt(erwartet), kompakt(text))
         self.assertIn("TESTDATEN", wasserzeichen(pdf))
         self.assertNotIn("{{", text)
 
@@ -216,9 +216,9 @@ class WeiterePdfs(Grundlage):
         if PDFTOTEXT:
             text = pdf_text(r.content)
             for erwartet in ["Verlauf der Akte", "Probe, Paula", "Bereich Gewicht", "Gewicht", "angelegt"]:
-                self.assertIn(erwartet, text)
+                self.assertIn(kompakt(erwartet), kompakt(text))
             self.assertIn("TESTDATEN", wasserzeichen(r.content))
-            self.assertIn("Infusionsplan", pdf_text(c.get(f"/api/patienten/{p.id}/pdf/").content))
+            self.assertIn("Infusionsplan", kompakt(pdf_text(c.get(f"/api/patienten/{p.id}/pdf/").content)))
         # auch abgeschlossene Akten lassen sich ausgeben
         Patient.objects.filter(pk=p.pk).update(abgeschlossen_am=timezone.localdate(), abschluss_anlass="therapie_beendet")
         self.assertEqual(c.get(f"/api/patienten/{p.id}/pdf/").status_code, 200)
@@ -252,7 +252,7 @@ class WeiterePdfs(Grundlage):
         if PDFTOTEXT:
             text = pdf_text(r.content)
             for erwartet in ["Zugang zu EPM", "zugang.test", kennwort, "Authenticator", "Notfall-Codes"]:
-                self.assertIn(erwartet, text)
+                self.assertIn(kompakt(erwartet), kompakt(text))
         from accounts.models import User
 
         User.objects.filter(pk=uid).update(muss_kennwort_aendern=False)
