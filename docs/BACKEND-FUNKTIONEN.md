@@ -897,7 +897,8 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   Neuer Plan), Dokumente, Versorger, Ärzte, Administration.
 - **Endpunkte:** keine neuen. Jede Antwort unter `/api/` an angemeldete Benutzer trägt `X-EPM-Rechte: <12 Zeichen>` – Kennung aus den
   eigenen Rechten, „nur Testpatienten“ und Testbenutzer (`accounts.rechte.rechte_stand`, gesetzt von `RechteStandMiddleware`).
-- **Logik:** Die Oberfläche merkt sich die Kennung. Ändert sie sich oder lehnt der Server eine Anfrage wegen eines Rechts ab (403
+- **Logik:** Die Oberfläche merkt sich die Kennung. Ändert sie sich, wechselt die Person die Seite (auch zu Seiten aus dem
+  Zwischenspeicher, die keine Anfrage stellen) oder lehnt der Server eine Anfrage wegen eines Rechts ab (403
   „fehlt das Recht“ / „nur bei Testpatienten“), lädt sie `GET /api/auth/status/` neu und aktualisiert die Ansicht nur, wenn sich die
   Rechte tatsächlich geändert haben. Ohne Recht: Knöpfe, Menüeinträge, Fenster und Bearbeitungsfelder werden nicht angezeigt
   (Stammdaten von Versorgern, Ärzten und Dokumenten dann als reine Anzeige); Seiten ohne Recht (z. B. Neuer Patient,

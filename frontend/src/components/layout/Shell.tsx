@@ -1,9 +1,9 @@
 /** Seitenleiste und Kopfzeile wie im Entwurf (256 px Leiste, 60 px Kopf mit Pfad und Suche). */
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { abfrage, api } from "@/lib/api";
+import { RECHTE_GEAENDERT, abfrage, api } from "@/lib/api";
 import type { Seite as ApiSeite } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
 import { datum, initialen, nummer } from "@/lib/format";
@@ -194,7 +194,24 @@ export function Seite({ pfad, children, breit, className }: { pfad: Pfadteil[]; 
   );
 }
 
+/**
+ * Beim Seitenwechsel die eigenen Rechte prüfen: Seiten aus dem Zwischenspeicher laden ohne Anfrage, eine in der
+ * Administration geänderte Berechtigung soll trotzdem mit dem nächsten Klick sichtbar werden (F71).
+ */
+function useRechteAktuell() {
+  const { pathname } = useLocation();
+  const erster = useRef(true);
+  useEffect(() => {
+    if (erster.current) {
+      erster.current = false;
+      return;
+    }
+    window.dispatchEvent(new Event(RECHTE_GEAENDERT));
+  }, [pathname]);
+}
+
 export function Shell() {
+  useRechteAktuell();
   return (
     <div className="flex min-h-screen bg-grund">
       <Seitenleiste />
