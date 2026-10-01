@@ -14,7 +14,7 @@ KONTEN = [
     ("e2e.mitarbeiter", "", "Sven", "Mitarbeit", "SM", "Ernährungsberater", Rolle.MITARBEITER, False),
     ("e2e.betrachter", "", "Bea", "Betrachtung", "BB", "Verwaltung", Rolle.BETRACHTER, False),
     ("e2e.admin", "", "Ada", "Admin", "AA", "Systemverwaltung", Rolle.ADMIN, False),
-    ("e2e.test", "", "Tina", "Testzugang", "TT", "Schulung", Rolle.MEDIZINER, True),
+    ("e2e.test", "", "Tina", "Testzugang", "TZ", "Schulung", Rolle.MEDIZINER, True),
 ]
 
 for name, titel, vor, nach, kuerzel, funktion, rolle, test in KONTEN:

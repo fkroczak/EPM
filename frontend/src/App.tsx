@@ -5,6 +5,8 @@ import { Seite, Shell } from "./components/layout/Shell";
 import { Anmeldung } from "./seiten/Anmeldung";
 import { Akte } from "./seiten/akte/Akte";
 import { Kontakte } from "./seiten/akte/Kontakte";
+import { PlanEditor } from "./seiten/akte/PlanEditor";
+import { Plaene } from "./seiten/akte/Plaene";
 import { Therapie } from "./seiten/akte/Therapie";
 import { Uebersicht } from "./seiten/akte/Uebersicht";
 import { PatientNeu } from "./seiten/PatientNeu";
@@ -35,6 +37,9 @@ const router = createBrowserRouter([
           { index: true, element: <Uebersicht /> },
           { path: "therapie", element: <Therapie /> },
           { path: "kontakte", element: <Kontakte /> },
+          { path: "plaene", element: <Plaene /> },
+          { path: "plaene/neu", element: <PlanEditor /> },
+          { path: "plaene/:planId/bearbeiten", element: <PlanEditor key="bearbeiten" /> },
         ],
       },
       { path: "versorger", element: <Versorger /> },

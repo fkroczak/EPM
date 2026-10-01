@@ -34,3 +34,20 @@ export function useEinstellungen() {
     staleTime: 5 * 60_000,
   });
 }
+
+export type Absender = { name: string; strasse: string; plz: string; ort: string; telefon: string; fax: string; email: string;
+  internet: string; fusszeile: string };
+export type Briefkopf = {
+  aktiv: "stiftung" | "gug";
+  absender: Record<"stiftung" | "gug", Absender>;
+  arten: { code: string; name: string }[];
+  logo: { vorhanden: boolean; mime?: string; sha256?: string; breite?: number; hoehe?: number; hochgeladen_am?: string };
+};
+
+export function useBriefkopf() {
+  return useQuery({
+    queryKey: ["briefkopf"],
+    queryFn: () => api<Briefkopf>("briefkopf/"),
+    staleTime: 5 * 60_000,
+  });
+}
