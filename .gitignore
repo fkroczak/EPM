@@ -4,4 +4,6 @@ __pycache__/
 backend/staticfiles/
 backend/dokumente/
 .venv/
-epm.conf
+# Serverkonfiguration (Zugangsdaten) – nicht die Nginx-Konfiguration unter rollout/projekt/nginx/
+/epm.conf
+/rollout/epm.conf

@@ -111,6 +111,6 @@ fi
 echo
 echo "────────────────────────────────────────────"
 echo " EPM $TAG läuft – $ERGEBNIS"
-echo " https://$EPM_WEB_NAME/verwaltung/"
+echo " https://$EPM_WEB_NAME/"
 echo " Zurück auf die vorige Version: sudo epm-update --versionen"
 echo "────────────────────────────────────────────"

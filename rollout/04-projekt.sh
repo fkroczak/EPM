@@ -10,7 +10,7 @@ source "$KONF"
 B="$EPM_BASE"
 
 echo "==> Verzeichnisse unter $B"
-install -d -m 0755 "$B" "$B/nginx" "$B/images" "$B/web"
+install -d -m 0755 "$B" "$B/nginx" "$B/images"
 install -d -m 0700 "$B/secrets" "$B/backup"
 # Dokumente: Backend schreibt (UID $EPM_APP_UID), Nginx liest über Gruppe 101; setgid vererbt die Gruppe
 install -d -m 0750 -o "$EPM_APP_UID" -g 101 "$B/data"
@@ -21,7 +21,6 @@ install -d -m 0750 -o 101 -g 101 "$B/nginx/certs"
 echo "==> Projektdateien kopieren"
 install -m 0644 projekt/compose.yaml projekt/compose.smoke.yaml "$B/"
 install -m 0644 projekt/nginx/rauchtest.conf projekt/nginx/epm.conf "$B/nginx/"
-install -m 0644 projekt/web/index.html "$B/web/"
 if [[ ! -f "$B/backend.env" ]] || ! grep -q EPM_DJANGO_ADMIN "$B/backend.env"; then
   [[ -f "$B/backend.env" ]] && cp "$B/backend.env" "$B/backend.env.alt"
   sed -e "s/epm\.test/$EPM_WEB_NAME/g" projekt/backend.env.beispiel > "$B/backend.env"
