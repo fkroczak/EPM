@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "stammdaten",
     "patienten",
     "infusionen",
+    "vorlagen",
     "audit",
 ]
 if EPM_DJANGO_ADMIN:

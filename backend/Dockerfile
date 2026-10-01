@@ -13,6 +13,11 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     DJANGO_SETTINGS_MODULE=epm.settings \
     DJANGO_STATIC_ROOT=/app/staticfiles
+# Pango/HarfBuzz für WeasyPrint (PDF-Erzeugung), Schrift IBM Plex wie in der Oberfläche
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 \
+      fonts-ibm-plex fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/*
 RUN groupadd --gid 10001 epm && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin epm
 COPY --from=bau /opt/venv /opt/venv
 WORKDIR /app

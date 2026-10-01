@@ -8,3 +8,4 @@ psycopg[binary]>=3.3,<3.4
 nh3>=0.3,<0.4
 qrcode>=8.2,<9
 gunicorn>=26,<27
+weasyprint>=66,<70           # PDF-Erzeugung (offline, braucht Pango aus dem Image)

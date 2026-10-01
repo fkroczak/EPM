@@ -1,5 +1,10 @@
 """API der Infusionspläne: Entwurf anlegen (vorbelegt), bearbeiten, freigeben, verwerfen."""
+import hashlib
+from urllib.parse import quote
+
+from django.conf import settings
 from django.db import transaction
+from django.http import FileResponse, HttpResponse
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -181,6 +186,37 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
     @action(detail=True, methods=["get"])
     def vergleich(self, request, pk=None):
         return Response(self.get_object().vergleich())
+
+    @action(detail=True, methods=["get"])
+    def pdf(self, request, pk=None):
+        """Gespeicherte PDF des freigegebenen Plans (F37): vorher Prüfsumme gegen ``pdf_sha256``,
+        Ergebnis im Kopf ``X-EPM-Pruefung: ok|abweichend``. Die PDF wird nie neu erzeugt."""
+        plan = self.get_object()
+        if not plan.pdf_datei:
+            return Response({"fehler": "Für diesen Plan ist keine PDF gespeichert (vor Einführung der PDF-Erzeugung "
+                                       "freigegeben oder noch Entwurf)."}, status=status.HTTP_404_NOT_FOUND)
+        pfad = settings.EPM_DOKUMENTE / plan.pdf_datei
+        if not pfad.is_file():
+            return Response({"fehler": "Die gespeicherte PDF fehlt im Dokumentenverzeichnis."},
+                            status=status.HTTP_404_NOT_FOUND)
+        h = hashlib.sha256()
+        with open(pfad, "rb") as f:
+            for teil in iter(lambda: f.read(1 << 16), b""):
+                h.update(teil)
+        pruefung = "ok" if h.hexdigest() == plan.pdf_sha256 else "abweichend"
+        name = f"Infusionsplan-{plan.patient.nummer}-{plan.gueltig_ab:%Y-%m-%d}.pdf"
+        if settings.EPM_X_ACCEL:
+            antwort = HttpResponse(content_type="application/pdf")
+            antwort["X-Accel-Redirect"] = settings.EPM_X_ACCEL_PREFIX + plan.pdf_datei
+        else:
+            antwort = FileResponse(open(pfad, "rb"), content_type="application/pdf")
+        antwort["Content-Disposition"] = f"inline; filename*=UTF-8''{quote(name)}"
+        antwort["Cache-Control"] = "private, no-store"
+        antwort["X-Content-Type-Options"] = "nosniff"
+        antwort["X-EPM-Pruefung"] = pruefung
+        antwort["X-EPM-Vorlage-Version"] = str(plan.vorlage_version or "")
+        antwort["Access-Control-Expose-Headers"] = "X-EPM-Pruefung, X-EPM-Vorlage-Version"
+        return antwort
 
     @action(detail=True, methods=["post"], permission_classes=[FreigabeRecht])
     def freigeben(self, request, pk=None):

@@ -5,6 +5,7 @@ from rest_framework.routers import DefaultRouter
 from accounts import api as konto
 from audit.api import SystemEreignisViewSet, TestdatenViewSet
 from infusionen.api import InfusionsplanViewSet
+from vorlagen import api as vorlagen
 from patienten.api import (
     BezugspersonViewSet, DokumentViewSet, GewichtViewSet, KontaktViewSet, PatientArztViewSet, PatientViewSet,
     StartseiteViewSet, TerminViewSet,
@@ -53,6 +54,12 @@ urlpatterns = [
     path("api/rechte/", konto.RechteView.as_view()),
     path("api/briefkopf/", BriefkopfView.as_view()),
     path("api/briefkopf/logo/", LogoView.as_view()),
+    path("api/vorlagen/", vorlagen.VorlagenView.as_view()),
+    path("api/vorlagen/<str:art>/", vorlagen.VorlageView.as_view()),
+    path("api/vorlagen/<str:art>/entwurf/", vorlagen.EntwurfView.as_view()),
+    path("api/vorlagen/<str:art>/veroeffentlichen/", vorlagen.VeroeffentlichenView.as_view()),
+    path("api/vorlagen/<str:art>/versionen/<int:version>/", vorlagen.VersionView.as_view()),
+    path("api/vorlagen/<str:art>/vorschau/", vorlagen.VorschauView.as_view()),
     path("api/", include(router.urls)),
 ]
 

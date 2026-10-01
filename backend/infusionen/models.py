@@ -351,7 +351,28 @@ class Infusionsplan(AktenEintrag):
         self.status = self.Status.AKTUELL
         self.freigegeben_am = timezone.now()
         self.freigegeben_von = benutzer
-        super().save()  # letzter Schreibvorgang am Entwurf, danach gesperrt
+        # PDF mit der aktiven Vorlage erzeugen, als Dokument „Von EPM erzeugt“ ablegen, Prüfsumme und Vorlagenversion
+        # am Plan festhalten (F35/F51). Scheitert die PDF, wird nicht freigegeben.
+        dok = self._pdf_ablegen(benutzer)
+        try:
+            super().save()  # letzter Schreibvorgang am Entwurf, danach gesperrt
+        except BaseException:
+            dok.pfad.unlink(missing_ok=True)
+            raise
+
+    def _pdf_ablegen(self, benutzer):
+        from vorlagen.felder import Kontext
+        from vorlagen.pdf import als_dokument, erzeuge_aus_vorlage, wasserzeichen_fuer
+
+        p = self.patient
+        titel = f"Infusionsplan gültig ab {self.gueltig_ab:%d.%m.%Y}"
+        pdf, version = erzeuge_aus_vorlage("infusionsplan", Kontext(patient=p, plan=self),
+                                           wasserzeichen=wasserzeichen_fuer(p, self),
+                                           titel=f"{titel} – {p.nachname}, {p.vorname}")
+        dok = als_dokument(p, pdf, titel, "Infusionsplan", self.gueltig_ab, benutzer,
+                           f"Infusionsplan-{p.nummer}-{self.gueltig_ab:%Y-%m-%d}.pdf")
+        self.pdf_datei, self.pdf_sha256, self.vorlage_version = dok.datei, dok.sha256, version
+        return dok
 
 
 class InfusionsplanPosition(models.Model):

@@ -71,6 +71,25 @@ END;
 $$ LANGUAGE plpgsql;
 """
 
+VORLAGE_SQL = r"""
+CREATE OR REPLACE FUNCTION epm_vorlage_schutz() RETURNS trigger AS $$
+BEGIN
+    IF coalesce(current_setting('epm.wartung', true), '') = 'on' THEN
+        RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    END IF;
+    IF OLD.status = 'entwurf' THEN
+        RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    END IF;
+    -- veröffentlicht: nur aktiv -> abgeloest, sonst nichts (jede gespeicherte PDF verweist auf ihre Version)
+    IF TG_OP = 'UPDATE' AND OLD.status = 'aktiv' AND NEW.status = 'abgeloest'
+       AND (to_jsonb(NEW) - 'status' - 'geaendert_am') = (to_jsonb(OLD) - 'status' - 'geaendert_am') THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'EPM: veröffentlichte Dokumentvorlagen sind unveränderlich' USING ERRCODE = 'insufficient_privilege';
+END;
+$$ LANGUAGE plpgsql;
+"""
+
 VITAMINE_SQL = r"""
 CREATE OR REPLACE FUNCTION epm_plan_zuordnung_schutz() RETURNS trigger AS $$
 DECLARE
@@ -93,6 +112,7 @@ $$ LANGUAGE plpgsql;
 SONDERREGELN = {
     "patienten_kontakt": "epm_kontakt_schutz",
     "infusionen_infusionsplan": "epm_plan_schutz",
+    "vorlagen_dokumentvorlage": "epm_vorlage_schutz",
 }
 # Zuordnungstabellen von Plänen: auch INSERT prüfen
 ZUORDNUNG = {"infusionen_infusionsplan_vitamine": "epm_plan_zuordnung_schutz"}
@@ -118,6 +138,7 @@ def installiere_trigger(using="default", **kwargs):
     with conn.cursor() as c:
         c.execute(FUNKTIONEN_SQL)
         c.execute(VITAMINE_SQL)
+        c.execute(VORLAGE_SQL)
         vorhandene = set(conn.introspection.table_names(c))
         ziele = {t: "epm_nur_anfuegen" for t in _historientabellen(c) + NUR_ANFUEGEN_FEST}
         ziele.update(SONDERREGELN)
