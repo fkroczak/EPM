@@ -359,11 +359,15 @@ class Patientenliste(Grundlage):
         self.assertIn(self.testpat.id, alle)  # ohne Filter „test=ohne“ sichtbar, aber nicht gezählt
         self.assertEqual(ids("hinweise"), {self.verlust.id, self.patient.id})
         z = c.get("/api/patienten/zaehler/").json()
+        # Testpatienten zählen nicht mit
+        self.assertEqual(z, {"in_betreuung": 3, "abgeschlossen": 0, "mit_hinweisen": 2, "gewichtsverlust": 1,
+                             "termin_woche": 1})
+        # nur die Administration sieht ihre Anzahl getrennt daneben
         test_offen = Patient.objects.filter(ist_test=True, abgeschlossen_am__isnull=True).count()
         self.assertGreaterEqual(test_offen, 1)
-        # Testpatienten zählen nicht mit; ihre Anzahl steht getrennt daneben
-        self.assertEqual(z, {"in_betreuung": 3, "abgeschlossen": 0, "mit_hinweisen": 2, "gewichtsverlust": 1,
-                             "termin_woche": 1, "testpatienten": {"in_betreuung": test_offen, "abgeschlossen": 0}})
+        za = client_fuer(self.admin).get("/api/patienten/zaehler/").json()
+        self.assertEqual(za["in_betreuung"], 3)
+        self.assertEqual(za["testpatienten"], {"in_betreuung": test_offen, "abgeschlossen": 0})
 
     def test_sortierung_ohne_kontakt_immer_am_ende(self):
         c = client_fuer(self.mitarbeiter)

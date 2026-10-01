@@ -26,9 +26,9 @@ test("Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten", 
   const echte = (await zaehlung.get("patienten/?status=in_betreuung&test=ohne&seitengroesse=1")).count;
   await zaehlung.ende();
   await expect(page.getByTestId("zahl-in-betreuung")).toContainText(`${echte} Patienten in Betreuung`);
-  // Testpatienten stehen getrennt daneben, damit „0“ neben einer vollen Liste nicht wie ein Fehler wirkt
-  await expect(page.getByTestId("zahl-in-betreuung")).toContainText(/zusätzlich \d+ Testpatienten/);
-  await expect(page.getByRole("group", { name: "Ansicht" }).getByRole("button", { name: /In Betreuung/ })).toContainText(/\+\d+ Test/);
+  // Die Zahl der Testpatienten sieht nur die Administration (Festlegung 01.10.2026)
+  await expect(page.getByTestId("zahl-in-betreuung")).not.toContainText("Testpatienten");
+  await expect(page.getByRole("group", { name: "Ansicht" }).getByRole("button", { name: /In Betreuung/ })).not.toContainText("Test");
   await expect(liste.getByRole("link", { name: "Demo, Karl" })).toHaveCount(0);
 
   // Freitext

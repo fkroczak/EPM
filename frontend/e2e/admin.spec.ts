@@ -266,6 +266,10 @@ test("Fünf falsche Passwörter sperren das Konto; Admin sieht den Hinweis, setz
 });
 
 test("Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten", async ({ page }) => {
+  // nur die Administration sieht die Zahl der Testpatienten neben „in Betreuung“ (zählen in keiner Statistik)
+  await page.goto("/patienten");
+  await expect(page.getByTestId("zahl-in-betreuung")).toContainText(/zusätzlich \d+ Testpatienten/);
+  await expect(page.getByRole("group", { name: "Ansicht" }).getByRole("button", { name: /In Betreuung/ })).toContainText(/\+\d+ Test/);
   const m = await apiAls("mitarbeiter");
   const echt = await m.post("patienten/", { nachname: eindeutig("Echt"), vorname: "Erna", geburtsdatum: "1960-06-06" });
   await m.ende();

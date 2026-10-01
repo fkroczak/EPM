@@ -17,6 +17,7 @@ from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
+from accounts.models import Rolle
 from accounts.permissions import AbschlussRecht, AktenRecht, EintragRecht, WiederOeffnenRecht, recht
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import (ModelClean, RichText, benutzername, legt_testpatienten_an, patienten_fuer,
@@ -316,13 +317,14 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
         if request.user.ist_test:
             return Response(zaehler(qs))
         daten = zaehler(qs.filter(ist_test=False))
-        # Testpatienten zählen nicht mit, stehen aber in der Liste. Ihre Anzahl wird getrennt geliefert,
-        # damit „0 in Betreuung“ neben sechs Testpatienten nicht wie ein Fehler aussieht.
-        test = qs.filter(ist_test=True)
-        daten["testpatienten"] = {
-            "in_betreuung": test.filter(abgeschlossen_am__isnull=True).count(),
-            "abgeschlossen": test.filter(abgeschlossen_am__isnull=False).count(),
-        }
+        # Testpatienten zählen nicht mit, stehen aber in der Liste. Die Administration sieht ihre Anzahl
+        # getrennt daneben (Festlegung 01.10.2026: nur für den Admin), alle anderen nur die echten Zahlen.
+        if getattr(request.user, "rolle", None) == Rolle.ADMIN:
+            test = qs.filter(ist_test=True)
+            daten["testpatienten"] = {
+                "in_betreuung": test.filter(abgeschlossen_am__isnull=True).count(),
+                "abgeschlossen": test.filter(abgeschlossen_am__isnull=False).count(),
+            }
         return Response(daten)
 
     @action(detail=False, methods=["get"], url_path="naechste-nummer")
