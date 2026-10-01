@@ -238,6 +238,8 @@ function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; daten: Ueb
   const name = wahl.art === "server" ? wahl.aktion.name : wahl.aufgabe.name;
   const a = wahl.art === "server" ? wahl.aktion : null;
   const andere = daten.angemeldet.filter((s) => !s.eigene);
+  // je Person nur einmal nennen (eine Person kann an mehreren Geräten angemeldet sein)
+  const namen = [...new Set(andere.map((s) => s.name))];
   const zfa = a?.bestaetigung === "2fa";
   return (
     <Dialog offen onOffen={(o) => { if (!o) onZu(); }} titel={name} breite={zfa ? 560 : 480}
@@ -254,7 +256,7 @@ function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; daten: Ueb
         ) : null}
         {a?.warnen ? (
           <>
-            <Feld label="Beginn" hinweis={andere.length ? `Angemeldet: ${andere.map((s) => s.name).join(", ")} – sie sehen den Hinweis oben auf jeder Seite.`
+            <Feld label="Beginn" hinweis={namen.length ? `Angemeldet: ${namen.join(", ")} – sie sehen den Hinweis oben auf jeder Seite.`
               : "Gerade ist niemand sonst angemeldet."}>
               {(p) => (
                 <Auswahl {...p} value={minuten} onChange={(e) => setMinuten(e.target.value)}>
