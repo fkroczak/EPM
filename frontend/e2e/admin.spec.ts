@@ -360,8 +360,11 @@ test("Recht während der Sitzung entzogen: Aktion verschwindet ohne neue Anmeldu
     await expect(mp.getByRole("alert").filter({ hasText: "Diese Aktion steht nicht mehr zur Verfügung. Die Ansicht wurde aktualisiert." })).toBeVisible();
     await expect(mp.getByText(/fehlt das Recht/)).toHaveCount(0);
     await mp.getByRole("button", { name: "Weitere Aktionen" }).click();
+    // erst warten, bis das Menü offen ist – sonst ist „0 Einträge“ sofort wahr und Escape kommt vor dem Menü
+    await expect(mp.getByRole("menuitem", { name: "Akte als PDF" })).toBeVisible();
     await expect(mp.getByRole("menuitem", { name: "Akte abschließen" })).toHaveCount(0);
     await mp.keyboard.press("Escape");
+    await expect(mp.getByRole("menu")).toHaveCount(0);
     expect((await admin.get(`patienten/${p.id}/`)).ist_abgeschlossen).toBe(false);
 
     // Recht zurück: erscheint mit der nächsten Anfrage wieder (Kopf X-EPM-Rechte), ohne neue Anmeldung
@@ -373,6 +376,7 @@ test("Recht während der Sitzung entzogen: Aktion verschwindet ohne neue Anmeldu
     await mp.getByRole("button", { name: "Weitere Aktionen" }).click();
     await expect(mp.getByRole("menuitem", { name: "Akte abschließen" })).toBeVisible();
     await mp.keyboard.press("Escape");
+    await expect(mp.getByRole("menu")).toHaveCount(0);
 
     // und umgekehrt: Recht entzogen, ohne dass die Person etwas tut → beim nächsten Seitenwechsel ausgeblendet
     const ohne = await standardMatrix();
