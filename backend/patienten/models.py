@@ -450,3 +450,27 @@ class Dokument(AktenEintrag):
     @property
     def pfad(self):
         return settings.EPM_DOKUMENTE / self.datei
+
+
+class DokumentVorgang(models.Model):
+    """Ein Dokument hat die Akte verlassen: einem anderen Patienten zugeordnet oder endgültig gelöscht
+    (Festlegung 02.10.2026). Unveränderlich (Trigger). Der Verlauf der bisherigen Akte zeigt das Dokument danach
+    nur noch neutral – ohne Titel und ohne den anderen Patienten."""
+
+    class Art(models.TextChoices):
+        UMGEHAENGT = "umgehaengt", "einem anderen Patienten zugeordnet"
+        GELOESCHT = "geloescht", "endgültig gelöscht"
+
+    art = models.CharField(max_length=20, choices=Art.choices)
+    dokument_id = models.PositiveIntegerField(db_index=True)
+    von_patient = models.ForeignKey(Patient, on_delete=models.PROTECT, related_name="+")
+    nach_patient = models.ForeignKey(Patient, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    grund = models.TextField()
+    zeitpunkt = models.DateTimeField(auto_now_add=True)
+    person = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+
+    class Meta:
+        verbose_name = "Dokument-Vorgang"
+        verbose_name_plural = "Dokument-Vorgänge"
+        ordering = ["-zeitpunkt"]
+

@@ -304,7 +304,17 @@ class RechteJeGruppe(TestCase):
             self.assertTrue(m["admin"][code], code)
         # Festlegung 01.10.2026: Admin alles (Patientendaten nur bei Testpatienten), Mitarbeiter schließen Akten ab
         # und pflegen Vorlagen
-        self.assertTrue(all(m["admin"].values()))
+        # Festlegung 02.10.2026: endgültig löschen nur Mediziner – sonst hat der Admin alles
+        self.assertEqual([c for c, v in m["admin"].items() if not v], ["dokumente_loeschen"])
+        self.assertTrue(m["mediziner"]["dokumente_loeschen"])
+        self.assertTrue(m["mediziner"]["dokumente_umhaengen"])
+        self.assertTrue(m["admin"]["dokumente_umhaengen"])
+        self.assertFalse(m["mitarbeiter"]["dokumente_loeschen"])
+        self.assertEqual(r["nur_rollen"], {"dokumente_loeschen": ["mediziner"]})
+        abgelehnt = client_fuer(self.admin).put("/api/rechte/", {"matrix": {"mitarbeiter": {"dokumente_loeschen": True}}},
+                                               format="json")
+        self.assertEqual(abgelehnt.status_code, 400)
+        self.assertIn("Mediziner vorbehalten", abgelehnt.json()["mitarbeiter.dokumente_loeschen"])
         self.assertEqual(r["nur_testpatienten"]["rollen"], ["admin"])
         self.assertIn("akten_abschliessen", r["nur_testpatienten"]["rechte"])
         for code in ("akten_abschliessen", "vorlagen_pflegen", "eintraege_erfassen", "akten_bearbeiten"):

@@ -598,7 +598,7 @@ class RechteView(APIView):
 
     def put(self, request):
         from .models import Gruppenrecht
-        from .rechte import CODES, FEST, NAMEN, matrix
+        from .rechte import CODES, FEST, NAMEN, NUR_ROLLEN, matrix
 
         eingabe = request.data.get("matrix")
         if not isinstance(eingabe, dict):
@@ -613,6 +613,9 @@ class RechteView(APIView):
                     fehlerliste[f"{rolle}.{code}"] = "Unbekanntes Recht oder kein Ja/Nein."
                 elif (rolle, code) in FEST and not wert:
                     fehlerliste[f"{rolle}.{code}"] = "Dieses Recht ist fest und kann nicht entzogen werden."
+                elif wert and code in NUR_ROLLEN and rolle not in NUR_ROLLEN[code]:
+                    namen = ", ".join(dict(Rolle.choices)[r] for r in sorted(NUR_ROLLEN[code]))
+                    fehlerliste[f"{rolle}.{code}"] = f"Dieses Recht ist {namen} vorbehalten."
         if fehlerliste:
             return Response(fehlerliste, status=status.HTTP_400_BAD_REQUEST)
         vorher = matrix()
@@ -634,7 +637,7 @@ class RechteView(APIView):
         return Response(self._daten())
 
     def _daten(self):
-        from .rechte import FEST, NUR_TESTPATIENTEN_SCHREIBEN, PATIENTENDATEN_SCHREIBEN, RECHTE, STANDARD, matrix
+        from .rechte import FEST, NUR_ROLLEN, NUR_TESTPATIENTEN_SCHREIBEN, PATIENTENDATEN_SCHREIBEN, RECHTE, STANDARD, matrix
 
         return {
             # Rollen, die Patientendaten nur bei Testpatienten schreiben, und welche Rechte das betrifft
@@ -643,5 +646,7 @@ class RechteView(APIView):
             "rollen": [{"code": c, "name": n} for c, n in Rolle.choices],
             "matrix": matrix(),
             "fest": sorted([r, c] for r, c in FEST),
+            # Rechte, die nur bestimmte Rollen haben können (z. B. endgültig löschen: nur Mediziner)
+            "nur_rollen": {c: sorted(r) for c, r in NUR_ROLLEN.items()},
             "standard": {str(r): sorted(v) for r, v in STANDARD.items()},
         }

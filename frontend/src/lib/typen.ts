@@ -2,7 +2,8 @@
 import type { Darstellung } from "./darstellung";
 
 export type Recht =
-  | "akten_lesen" | "eintraege_erfassen" | "akten_bearbeiten" | "plaene_anlegen" | "plaene_freigeben"
+  | "akten_lesen" | "eintraege_erfassen" | "akten_bearbeiten" | "dokumente_umhaengen" | "dokumente_loeschen"
+  | "plaene_anlegen" | "plaene_freigeben"
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
   | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen";
 

@@ -27,6 +27,9 @@ class SystemEreignis(models.Model):
         BACKUP = "backup", "Backup"
         EXPORT = "export", "Export"
         TESTDATEN = "testdaten", "Testdaten zurückgesetzt"
+        DOKUMENT_UMGEHAENGT = "dokument_umgehaengt", "Dokument anderem Patienten zugeordnet"
+        DOKUMENT_GELOESCHT = "dokument_geloescht", "Dokument endgültig gelöscht"
+        DOKUMENT_LOESCHEN_ABGELEHNT = "dokument_loeschen_abgelehnt", "Löschen eines Dokuments abgelehnt"
 
     zeitpunkt = models.DateTimeField(auto_now_add=True, db_index=True)
     art = models.CharField(max_length=40, choices=Art.choices, db_index=True)

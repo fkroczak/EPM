@@ -14,11 +14,13 @@ from django.utils import timezone
 from django_filters import rest_framework as filters
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from accounts.models import Rolle
-from accounts.permissions import AbschlussRecht, AktenRecht, EintragRecht, WiederOeffnenRecht, recht
+from accounts.permissions import (AbschlussRecht, AktenRecht, EintragRecht, LoeschenRecht, UmhaengenRecht,
+                                  WiederOeffnenRecht, recht)
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import (ModelClean, RichText, benutzername, legt_testpatienten_an, patienten_fuer,
                             pruefe_schreibbereich)
@@ -27,7 +29,8 @@ from stammdaten.models import Auswahlwert
 from .kennzahlen import kennzahlen, pruefliste, schnellfilter, zaehler
 from stammdaten.models import Arzt
 
-from .models import Bezugsperson, Dokument, Gewichtsmessung, Kontakt, Patient, PatientArzt, Termin, dokument_pfad
+from .models import (Bezugsperson, Dokument, DokumentVorgang, Gewichtsmessung, Kontakt, Patient, PatientArzt, Termin,
+                     dokument_pfad)
 
 
 # ================================================================= Patient
@@ -416,7 +419,7 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
         patient.abgeschlossen_am = None
         patient.abschluss_anlass = ""
         patient.abschluss_notiz = ""
-        patient._change_reason = f"Wieder geöffnet: {grund}"
+        patient._change_reason = f"Wieder geöffnet: {grund}"[:100]  # Feld der Historie fasst 100 Zeichen
         patient.save()
         protokolliere(SystemEreignis.Art.AKTE_GEOEFFNET, request, objekt=patient.nummer, grund=grund,
                       vorheriger_anlass=vorher, name=f"{patient.nachname}, {patient.vorname}")
@@ -577,6 +580,11 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         for h in qs.order_by("-history_date")[:grenze]:
             eintraege.append((name, h))
     eintraege.sort(key=lambda e: e[1].history_date, reverse=True)
+    # Dokumente, die diese Akte verlassen haben (einem anderen Patienten zugeordnet oder endgültig gelöscht), bzw. von
+    # einer anderen Akte übernommen wurden (Festlegung 02.10.2026)
+    vorgaenge = list(DokumentVorgang.objects.filter(Q(von_patient=patient) | Q(nach_patient=patient)).select_related("person"))
+    weg = {v.dokument_id: v for v in vorgaenge if v.von_patient_id == patient.id}
+    her = {v.dokument_id: v for v in vorgaenge if v.nach_patient_id == patient.id}
     ergebnis = []
     for name, h in eintraege[:grenze]:
         aenderungen = []
@@ -584,6 +592,9 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         if vorher is not None:
             diff = h.diff_against(vorher)
             aenderungen = [{"feld": c.field, "alt": _kurz(c.old), "neu": _kurz(c.new)} for c in diff.changes]
+        if name == "dokumente" and (h.id in weg or h.id in her):
+            ergebnis.append(_dokument_vorgang_eintrag(h, weg.get(h.id), her.get(h.id), vorher, aenderungen))
+            continue
         basis = {
             "objekt_id": h.id,
             "art": {"+": "angelegt", "~": "geändert", "-": "gelöscht"}[h.history_type],
@@ -609,7 +620,36 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
             aktion = _aktion("stammdaten", h, liste)
             ergebnis.append({**basis, "bereich": gruppe, "aktion": aktion, "aenderungen": liste,
                              "beschreibung": _beschreibung("akte", h, aktion)})
+    # die Zuordnung zu einer anderen Akte steht hier neutral, ohne den anderen Patienten und ohne Titel
+    for v in weg.values():
+        if v.art != DokumentVorgang.Art.UMGEHAENGT or (bereich and bereich != "dokumente") or (person and str(v.person_id) != str(person)):
+            continue
+        ergebnis.append({"objekt_id": v.dokument_id, "art": "geändert", "zeitpunkt": v.zeitpunkt,
+                         "person": benutzername(v.person), "person_id": v.person_id, "grund": None, "bereich": "dokumente",
+                         "aktion": "einer anderen Akte zugeordnet", "aenderungen": [],
+                         "beschreibung": "Dokument wurde einer anderen Akte zugeordnet."})
+    ergebnis.sort(key=lambda e: e["zeitpunkt"], reverse=True)
     return ergebnis
+
+
+def _dokument_vorgang_eintrag(h, weg, her, vorher, aenderungen) -> dict:
+    """Verlaufseintrag eines Dokuments, das umgehängt oder gelöscht wurde: in der bisherigen Akte neutral
+    (kein Titel, keine Werte), in der neuen Akte „von einer anderen Akte übernommen“ mit Grund."""
+    basis = {"objekt_id": h.id, "art": {"+": "angelegt", "~": "geändert", "-": "gelöscht"}[h.history_type],
+             "zeitpunkt": h.history_date, "person": benutzername(h.history_user), "person_id": h.history_user_id,
+             "bereich": "dokumente"}
+    if her is not None and h.patient_id == her.nach_patient_id and vorher is not None and vorher.patient_id != h.patient_id:
+        return {**basis, "aktion": "von einer anderen Akte übernommen", "grund": her.grund, "aenderungen": [],
+                "beschreibung": _beschreibung("dokumente", h, "übernommen")}
+    if weg is not None and h.patient_id == weg.von_patient_id:
+        if weg.art == DokumentVorgang.Art.GELOESCHT and h.history_type == "-":
+            return {**basis, "aktion": "endgültig gelöscht", "grund": weg.grund, "aenderungen": [],
+                    "beschreibung": "Dokument endgültig gelöscht (Datei und Inhalt entfernt)."}
+        spaeter = "später endgültig gelöscht" if weg.art == DokumentVorgang.Art.GELOESCHT else "später einer anderen Akte zugeordnet"
+        return {**basis, "aktion": _aktion("dokumente", h, aenderungen), "grund": None, "aenderungen": [],
+                "beschreibung": f"Dokument ({spaeter})"}
+    return {**basis, "aktion": _aktion("dokumente", h, aenderungen), "grund": h.history_change_reason,
+            "aenderungen": aenderungen, "beschreibung": _beschreibung("dokumente", h, _aktion("dokumente", h, aenderungen))}
 
 
 def _kurz(wert, laenge=300):
@@ -968,6 +1008,136 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
         dok._history_user = request.user
         dok.save()
         return Response(DokumentSerializer(dok, context=self.get_serializer_context()).data)
+
+    # ------------------------------------------------ falsch zugeordnet: umhängen oder endgültig löschen
+    def _nicht_systemdokument(self, dok):
+        if dok.herkunft == Dokument.Herkunft.SYSTEM:
+            raise serializers.ValidationError({"fehler": "Von EPM erzeugte Dokumente (z. B. die PDF eines freigegebenen "
+                                                         "Infusionsplans) gehören zu ihrem Plan und bleiben unverändert."})
+
+    @action(detail=True, methods=["post"], permission_classes=[UmhaengenRecht])
+    def umhaengen(self, request, pk=None):
+        """Dokument beim falschen Patienten: dem richtigen zuordnen (Festlegung 02.10.2026).
+        ``{"patient": ID, "grund": "…"}``. Datei und Prüfsumme bleiben; die bisherige Akte zeigt das Dokument danach
+        nur noch neutral, die neue „von einer anderen Akte übernommen“ mit Grund; vollständig im Audit-Log."""
+        dok = self.get_object()
+        self._nicht_systemdokument(dok)
+        grund = str(request.data.get("grund", "")).strip()
+        ziel_id = str(request.data.get("patient", ""))
+        ziel = patienten_fuer(request.user).filter(pk=ziel_id).first() if ziel_id.isdigit() else None
+        fehler = {}
+        if len(grund) < 5:
+            fehler["grund"] = "Bitte den Grund angeben (mindestens 5 Zeichen)."
+        if ziel is None:
+            fehler["patient"] = "Bitte den richtigen Patienten auswählen."
+        elif ziel.pk == dok.patient_id:
+            fehler["patient"] = "Das Dokument gehört bereits zu diesem Patienten."
+        elif ziel.ist_test != dok.patient.ist_test:
+            fehler["patient"] = "Dokumente wechseln nicht zwischen Testpatienten und echten Akten."
+        if fehler:
+            return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
+        alt = dok.patient
+        self.pruefe_patient(alt)
+        self.pruefe_patient(ziel)
+        quelle = dok.pfad
+        if not quelle.is_file():
+            return Response({"fehler": "Die Datei fehlt im Dokumentenverzeichnis. Bitte die Administration informieren."},
+                            status=status.HTTP_409_CONFLICT)
+        neu_relativ = dokument_pfad(ziel, dok.originalname)
+        ziel_pfad = settings.EPM_DOKUMENTE / neu_relativ
+        ziel_pfad.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
+        os.replace(quelle, ziel_pfad)  # gleiches Dateisystem: atomar
+        try:
+            with transaction.atomic():
+                dok.patient = ziel
+                dok.datei = neu_relativ
+                dok._history_user = request.user
+                dok._change_reason = "Von einer anderen Akte übernommen"
+                dok.save()
+                DokumentVorgang.objects.create(art=DokumentVorgang.Art.UMGEHAENGT, dokument_id=dok.id, von_patient=alt,
+                                               nach_patient=ziel, grund=grund, person=request.user)
+                protokolliere(SystemEreignis.Art.DOKUMENT_UMGEHAENGT, request, objekt=f"Dokument {dok.id}",
+                              titel=dok.titel, von=f"{alt.nachname}, {alt.vorname} (Nr. {alt.nummer})",
+                              nach=f"{ziel.nachname}, {ziel.vorname} (Nr. {ziel.nummer})", grund=grund,
+                              sha256=dok.sha256)
+        except BaseException:
+            os.replace(ziel_pfad, quelle)  # Datenbank unverändert → Datei zurück
+            raise
+        return Response(DokumentSerializer(dok, context=self.get_serializer_context()).data)
+
+    LOESCHCODE = "epm_loeschcode"
+    LOESCH_MINUTEN = 5
+
+    def _nur_mediziner(self, request):
+        if request.user.rolle != Rolle.MEDIZINER:
+            raise PermissionDenied("Endgültig löschen dürfen nur Mediziner.")
+
+    @action(detail=True, methods=["post"], url_path="loeschen-vorbereiten", permission_classes=[LoeschenRecht])
+    def loeschen_vorbereiten(self, request, pk=None):
+        """Schritt 1 des endgültigen Löschens: Bestätigungscode für dieses Dokument (5 Minuten, in der Sitzung)."""
+        import secrets
+
+        self._nur_mediziner(request)
+        dok = self.get_object()
+        self._nicht_systemdokument(dok)
+        self.pruefe_patient(dok.patient)
+        code = "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(6))
+        bis = timezone.now() + timedelta(minutes=self.LOESCH_MINUTEN)
+        request.session[self.LOESCHCODE] = {"dokument": dok.id, "code": code, "bis": bis.isoformat(), "versuche": 0}
+        return Response({"code": code, "gueltig_bis": bis})
+
+    @action(detail=True, methods=["post"], permission_classes=[LoeschenRecht])
+    def loeschen(self, request, pk=None):
+        """Schritt 2: endgültig löschen (nur Mediziner) mit Grund, Kennwort, Code aus der Authenticator-App und dem
+        abgetippten Bestätigungscode. Datei und Inhalt sind danach weg; Audit-Log und Verlauf („endgültig gelöscht“)
+        bleiben. Jede Ablehnung steht im Audit-Log."""
+        from datetime import datetime
+
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        self._nur_mediziner(request)
+        dok = self.get_object()
+        self._nicht_systemdokument(dok)
+        self.pruefe_patient(dok.patient)
+        grund = str(request.data.get("grund", "")).strip()
+        if len(grund) < 10:
+            return Response({"grund": "Bitte den Grund angeben (mindestens 10 Zeichen)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        def abgelehnt(feld, meldung):
+            protokolliere(SystemEreignis.Art.DOKUMENT_LOESCHEN_ABGELEHNT, request, objekt=f"Dokument {dok.id}",
+                          titel=dok.titel, fehler=meldung)
+            return Response({feld: meldung}, status=status.HTTP_400_BAD_REQUEST)
+
+        sitzung = request.session.get(self.LOESCHCODE) or {}
+        if sitzung.get("dokument") != dok.id or datetime.fromisoformat(sitzung["bis"]) < timezone.now():
+            request.session.pop(self.LOESCHCODE, None)
+            return abgelehnt("bestaetigung", "Der Bestätigungscode ist abgelaufen. Bitte einen neuen anfordern.")
+        eingabe = "".join(ch for ch in str(request.data.get("bestaetigung", "")).upper() if ch.isalnum())
+        if eingabe != sitzung["code"]:
+            sitzung["versuche"] = sitzung.get("versuche", 0) + 1
+            if sitzung["versuche"] >= 3:
+                request.session.pop(self.LOESCHCODE, None)
+                return abgelehnt("bestaetigung", "Bestätigungscode dreimal falsch. Bitte einen neuen anfordern.")
+            request.session[self.LOESCHCODE] = sitzung
+            return abgelehnt("bestaetigung", "Der Bestätigungscode stimmt nicht.")
+        if not request.user.check_password(str(request.data.get("kennwort", ""))):
+            return abgelehnt("kennwort", "Kennwort falsch.")
+        code = str(request.data.get("code", "")).replace(" ", "")
+        if not any(g.verify_token(code) for g in TOTPDevice.objects.filter(user=request.user, confirmed=True)):
+            return abgelehnt("code", "Code aus der Authenticator-App falsch oder schon verwendet.")
+        request.session.pop(self.LOESCHCODE, None)
+        pfad = dok.pfad
+        akte = f"{dok.patient.nachname}, {dok.patient.vorname} (Nr. {dok.patient.nummer})"
+        with transaction.atomic():
+            DokumentVorgang.objects.create(art=DokumentVorgang.Art.GELOESCHT, dokument_id=dok.id,
+                                           von_patient=dok.patient, grund=grund, person=request.user)
+            protokolliere(SystemEreignis.Art.DOKUMENT_GELOESCHT, request, objekt=f"Dokument {dok.id}", titel=dok.titel,
+                          akte=akte, grund=grund, sha256=dok.sha256, groesse=dok.groesse)
+            dok._history_user = request.user
+            dok._change_reason = "Endgültig gelöscht"
+            dok.delete()
+            transaction.on_commit(lambda: pfad.unlink(missing_ok=True))
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["get"])
     def datei(self, request, pk=None):

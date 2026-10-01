@@ -32,6 +32,8 @@ test("Dokumente hochladen, Typ am Inhalt prüfen, Metadaten ändern, ausblenden,
   await liste.getByRole("button", { name: "Arztbrief Klinik" }).click();
   const details = page.getByTestId("dokument-details");
   await expect(details.getByTitle("Vorschau Arztbrief Klinik")).toBeVisible();
+  // Umhängen und endgültig löschen nur mit eigenem Recht (Standard: Mediziner) – Mitarbeiter sehen es nicht
+  await expect(details.getByTestId("falsch-zugeordnet")).toHaveCount(0);
   await details.getByLabel("Typ").selectOption({ label: "Arztbrief" });
   await details.getByLabel("Datum").fill("15.09.2026");
   await details.getByLabel("Titel").fill("Arztbrief Klinikum Nord");

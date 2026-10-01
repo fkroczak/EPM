@@ -11,7 +11,8 @@ A = SystemEreignis.Art
 # Filterknöpfe im Entwurf: Anmeldung · Fehlversuch · Benutzer · Vorlage · Backup · Export · Abschluss
 GRUPPEN = {
     "anmeldung": ("Anmeldung", [A.ANMELDUNG, A.ABMELDUNG, A.KENNWORT_GEAENDERT, A.ZWEITER_FAKTOR_EINGERICHTET]),
-    "fehlversuch": ("Fehlversuch", [A.ANMELDUNG_FEHLGESCHLAGEN, A.ZWEITER_FAKTOR_FEHLGESCHLAGEN, A.ANMELDUNG_GESPERRT]),
+    "fehlversuch": ("Fehlversuch", [A.ANMELDUNG_FEHLGESCHLAGEN, A.ZWEITER_FAKTOR_FEHLGESCHLAGEN, A.ANMELDUNG_GESPERRT,
+                                    A.DOKUMENT_LOESCHEN_ABGELEHNT]),
     "benutzer": ("Benutzer", [A.BENUTZER_ANGELEGT, A.BENUTZER_GEAENDERT, A.BENUTZER_GESPERRT, A.EINMAL_KENNWORT,
                               A.ZWEITER_FAKTOR_ZURUECKGESETZT, A.TESTDATEN, A.RECHTE_GEAENDERT]),
     "vorlage": ("Vorlage", [A.VORLAGE, A.STAMMDATEN]),
@@ -20,6 +21,7 @@ GRUPPEN = {
     "abschluss": ("Abschluss", [A.AKTE_ABGESCHLOSSEN, A.AKTE_GEOEFFNET]),
     # ohne eigenen Filterknopf im Entwurf, erscheint unter „alle“
     "infusionsplan": ("Infusionsplan", [A.PLAN_FREIGEGEBEN]),
+    "dokument": ("Dokument", [A.DOKUMENT_UMGEHAENGT, A.DOKUMENT_GELOESCHT]),
 }
 GRUPPE_JE_ART = {art: schluessel for schluessel, (_, arten) in GRUPPEN.items() for art in arten}
 
@@ -137,4 +139,11 @@ def beschreibung(e) -> str:
         return f"{d.get('was', 'Export')} als PDF: {e.objekt}" if e.objekt else f"{d.get('was', 'Export')} als PDF"
     if art == A.TESTDATEN:
         return f"Testdaten zurückgesetzt: {d.get('geloescht', 0)} Testpatienten gelöscht, {d.get('angelegt', 0)} neu angelegt"
+    if art == A.DOKUMENT_UMGEHAENGT:
+        return (f"Dokument „{d.get('titel', '')}“ von {d.get('von', '')} zu {d.get('nach', '')} verschoben, "
+                f"Grund: {d.get('grund', '')}")
+    if art == A.DOKUMENT_GELOESCHT:
+        return f"Dokument „{d.get('titel', '')}“ aus {d.get('akte', '')} endgültig gelöscht, Grund: {d.get('grund', '')}"
+    if art == A.DOKUMENT_LOESCHEN_ABGELEHNT:
+        return f"Löschen von Dokument „{d.get('titel', '')}“ abgelehnt: {d.get('fehler', '')}"
     return e.get_art_display() + (f" {e.objekt}" if e.objekt else "")

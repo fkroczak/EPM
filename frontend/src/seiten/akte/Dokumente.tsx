@@ -5,13 +5,15 @@ import { ApiFehler, abfrage, alle, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuswahl } from "@/lib/daten";
 import { dateigroesse, datum, eingabeDatum, zeitpunkt } from "@/lib/format";
-import type { Dokument } from "@/lib/typen";
+import type { Dokument, PatientZeile } from "@/lib/typen";
+import { useAuth } from "@/lib/auth";
+import { PatientWahl } from "@/components/PatientWahl";
 import { Anzeige, Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Leer, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { Dialog } from "@/components/ui/dialog";
 import { PdfLeser, PdfVorschau } from "@/components/PdfAnsicht";
-import { useAkte } from "./Akte";
+import { name, useAkte } from "./Akte";
 
 const DATUMSQUELLE: Record<string, string> = {
   eingabe: "eingegeben", pdf: "aus PDF-Metadaten", exif: "aus EXIF", dateidatum: "Dateidatum (keine Metadaten)",
@@ -45,8 +47,127 @@ function Vorschau({ dok }: { dok: Dokument }) {
   return <div className="h-[120px] flex items-center justify-center text-sm gedaempft border border-dashed border-rand rounded-lg">Keine Vorschau</div>;
 }
 
+/** Falscher Patient: Dokument dem richtigen Patienten zuordnen (Festlegung 02.10.2026). */
+function UmhaengenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean; onOffen: (o: boolean) => void }) {
+  const { patient } = useAkte();
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const [ziel, setZiel] = useState<PatientZeile | null>(null);
+  const [grund, setGrund] = useState("");
+  const [geprueft, setGeprueft] = useState(false);
+  useEffect(() => { if (offen) { setZiel(null); setGrund(""); setGeprueft(false); } }, [offen]);
+  const umhaengen = useMutation({
+    mutationFn: () => api<Dokument>(`dokumente/${dok.id}/umhaengen/`, { body: { patient: ziel?.id, grund: grund.trim() } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["patient"] });
+      void qc.invalidateQueries({ queryKey: ["startseite"] });
+      melden(`Dokument ${ziel ? name(ziel) : ""} zugeordnet.`);
+      onOffen(false);
+    },
+  });
+  const f: Feldfehler = umhaengen.error instanceof ApiFehler ? umhaengen.error.felder : {};
+  return (
+    <Dialog offen={offen} onOffen={onOffen} titel="Dokument dem richtigen Patienten zuordnen" breite={620}
+      beschreibung={`„${dok.titel}“ ist bei ${name(patient)} abgelegt.`}
+      fuss={<><Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
+        <Knopf variante="pri" laedt={umhaengen.isPending} disabled={!ziel || grund.trim().length < 5 || !geprueft} onClick={() => umhaengen.mutate()}>Zuordnen</Knopf></>}>
+      <div className="flex flex-col gap-3" data-testid="umhaengen">
+        <Feld label="Richtiger Patient" fehler={f.patient}>
+          {(p) => <PatientWahl id={p.id} wert={ziel} onWahl={(z) => { setZiel(z); setGeprueft(false); }} fehler={!!f.patient}
+            test={patient.ist_test ? "nur" : "ohne"} ohne={patient.id} />}
+        </Feld>
+        <Feld label="Grund" fehler={f.grund} hinweis="z. B. „beim falschen Patienten hochgeladen“">
+          {(p) => <Textfeld {...p} rows={2} value={grund} onChange={(e) => setGrund(e.target.value)} />}
+        </Feld>
+        {ziel ? (
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" checked={geprueft} onChange={(e) => setGeprueft(e.target.checked)} className="mt-1" />
+            <span>Ich habe geprüft, dass das Dokument zu <strong>{name(ziel)}</strong> (Nr. {ziel.nummer}, geboren {datum(ziel.geburtsdatum)}) gehört.</span>
+          </label>
+        ) : null}
+        <span className="text-[0.8125rem] gedaempft leading-normal">
+          Datei und Prüfsumme bleiben unverändert. Hier im Verlauf steht danach nur „einer anderen Akte zugeordnet“ – ohne Titel
+          und ohne den anderen Patienten. Beim richtigen Patienten steht „von einer anderen Akte übernommen“ mit Grund. Das
+          Audit-Log hält den Vorgang vollständig fest.
+        </span>
+        {umhaengen.error && !Object.keys(f).length ? <Fehleranzeige fehler={umhaengen.error} /> : null}
+      </div>
+    </Dialog>
+  );
+}
+
+/** Endgültig löschen: nur Mediziner, mit Kennwort, Code aus der Authenticator-App und abgetipptem Bestätigungscode. */
+function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean; onOffen: (o: boolean) => void }) {
+  const { patient } = useAkte();
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const [grund, setGrund] = useState("");
+  const [kennwort, setKennwort] = useState("");
+  const [code, setCode] = useState("");
+  const [bestaetigung, setBestaetigung] = useState("");
+  const vorbereiten = useMutation({
+    mutationFn: () => api<{ code: string; gueltig_bis: string }>(`dokumente/${dok.id}/loeschen-vorbereiten/`, { method: "POST" }),
+  });
+  const { mutate: vorbereitenStarten, reset: vorbereitenZuruecksetzen } = vorbereiten;
+  useEffect(() => {
+    if (!offen) return;
+    setGrund(""); setKennwort(""); setCode(""); setBestaetigung("");
+    vorbereitenZuruecksetzen();
+    vorbereitenStarten();
+  }, [offen, vorbereitenStarten, vorbereitenZuruecksetzen]);
+  const loeschen = useMutation({
+    mutationFn: () => api(`dokumente/${dok.id}/loeschen/`, { body: { grund: grund.trim(), kennwort, code: code.trim(), bestaetigung } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["patient", patient.id] });
+      void qc.invalidateQueries({ queryKey: ["startseite"] });
+      melden("Dokument endgültig gelöscht.");
+      onOffen(false);
+    },
+    onError: () => { setKennwort(""); setCode(""); },
+  });
+  const f: Feldfehler = loeschen.error instanceof ApiFehler ? loeschen.error.felder : {};
+  const abgelaufen = /abgelaufen|neuen anfordern/.test(f.bestaetigung ?? "");
+  return (
+    <Dialog offen={offen} onOffen={onOffen} titel="Dokument endgültig löschen" breite={600}
+      beschreibung={`„${dok.titel}“ bei ${name(patient)}`}
+      fuss={<><Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
+        <Knopf variante="dng" laedt={loeschen.isPending} onClick={() => loeschen.mutate()}
+          disabled={!vorbereiten.data || grund.trim().length < 10 || !kennwort || code.trim().length < 6 || bestaetigung.trim().length < 6}>Endgültig löschen</Knopf></>}>
+      <div className="flex flex-col gap-3" data-testid="loeschen">
+        <Meldung art="fehler">Datei und Inhalt werden unwiederbringlich gelöscht. Im Verlauf der Akte bleibt nur „endgültig gelöscht“ mit Grund, im Audit-Log der Vorgang. Gehört das Dokument einem anderen Patienten, bitte stattdessen „Anderem Patienten zuordnen“.</Meldung>
+        <Feld label="Grund" fehler={f.grund} hinweis="mindestens 10 Zeichen">
+          {(p) => <Textfeld {...p} rows={2} value={grund} onChange={(e) => setGrund(e.target.value)} />}
+        </Feld>
+        <div className="grid grid-cols-2 gap-3">
+          <Feld label="Kennwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
+          <Feld label="Code aus der Authenticator-App" fehler={f.code}>{(p) => <Eingabe {...p} inputMode="numeric" autoComplete="one-time-code" className="num" value={code} onChange={(e) => setCode(e.target.value)} />}</Feld>
+        </div>
+        <div className="flex items-end gap-3 flex-wrap">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Bestätigungscode</span>
+            {/* abtippen statt kopieren: nicht markierbar */}
+            <span data-testid="bestaetigungscode" aria-label={vorbereiten.data ? `Bestätigungscode ${vorbereiten.data.code.split("").join(" ")}` : undefined}
+              className="select-none font-mono text-[1.375rem] font-semibold tracking-[0.3em] px-3 py-1 rounded-md bg-fein border border-rand">
+              {vorbereiten.data?.code ?? "······"}</span>
+          </div>
+          <Feld label="Code abtippen" fehler={f.bestaetigung} className="flex-1 min-w-[160px]">
+            {(p) => <Eingabe {...p} autoComplete="off" className="font-mono uppercase tracking-[0.2em]" value={bestaetigung} onChange={(e) => setBestaetigung(e.target.value)} />}
+          </Feld>
+        </div>
+        {abgelaufen ? <Knopf klein className="self-start" onClick={() => { loeschen.reset(); setBestaetigung(""); vorbereitenStarten(); }}>Neuen Bestätigungscode anfordern</Knopf> : null}
+        <Fehleranzeige fehler={vorbereiten.error} />
+        {loeschen.error && !Object.keys(f).length ? <Fehleranzeige fehler={loeschen.error} /> : null}
+      </div>
+    </Dialog>
+  );
+}
+
 function Details({ dok }: { dok: Dokument }) {
   const { patient, erfassen } = useAkte();
+  const { darfBei } = useAuth();
+  const [falsch, setFalsch] = useState<"umhaengen" | "loeschen" | null>(null);
+  const umhaengenErlaubt = dok.herkunft !== "system" && !patient.ist_abgeschlossen && darfBei("dokumente_umhaengen", patient);
+  const loeschenErlaubt = dok.herkunft !== "system" && !patient.ist_abgeschlossen && darfBei("dokumente_loeschen", patient);
   const typen = useAuswahl("dokumenttyp", false);
   const [titel, setTitel] = useState(dok.titel);
   const [typ, setTyp] = useState(dok.typ ? String(dok.typ) : "");
@@ -134,6 +255,17 @@ function Details({ dok }: { dok: Dokument }) {
           {!dok.typ_geprueft ? <Knopf variante="pri" laedt={speichern.isPending && speichern.variables === "pruefen"} onClick={() => speichern.mutate("pruefen")}>Typ und Datum bestätigen</Knopf> : null}
           <Knopf laedt={speichern.isPending && speichern.variables === "speichern"} onClick={() => speichern.mutate("speichern")}>Speichern</Knopf>
           <Knopf variante="geist" onClick={() => speichern.mutate(dok.ausgeblendet ? "einblenden" : "ausblenden")}>{dok.ausgeblendet ? "Wieder einblenden" : "Ausblenden"}</Knopf>
+        </div>
+      ) : null}
+      {umhaengenErlaubt || loeschenErlaubt ? (
+        <div className="flex flex-col gap-2 border-t border-rand pt-3" data-testid="falsch-zugeordnet">
+          <span className="text-[0.8125rem] gedaempft">Falscher Patient oder fremdes Dokument?</span>
+          <div className="flex gap-2 flex-wrap">
+            {umhaengenErlaubt ? <Knopf klein icon="pfeilRechts" onClick={() => setFalsch("umhaengen")}>Anderem Patienten zuordnen</Knopf> : null}
+            {loeschenErlaubt ? <Knopf klein variante="dng" onClick={() => setFalsch("loeschen")}>Endgültig löschen</Knopf> : null}
+          </div>
+          {umhaengenErlaubt ? <UmhaengenDialog dok={dok} offen={falsch === "umhaengen"} onOffen={(o) => setFalsch(o ? "umhaengen" : null)} /> : null}
+          {loeschenErlaubt ? <LoeschenDialog dok={dok} offen={falsch === "loeschen"} onOffen={(o) => setFalsch(o ? "loeschen" : null)} /> : null}
         </div>
       ) : null}
     </div>

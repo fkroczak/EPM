@@ -697,3 +697,118 @@ class Musterdaten(TestCase):
         self.assertTrue(Bezugsperson.objects.filter(patient__ist_test=True, auskunft_erlaubt=True).exists())
         self.assertTrue(PatientArzt.objects.filter(patient__ist_test=True, rolle="hausarzt").exists())
         self.assertTrue(Arzt.objects.filter(name__endswith="(fiktiv)").exists())
+
+
+class FalschZugeordneteDokumente(Grundlage):
+    """Dokument beim falschen Patienten (Festlegung 02.10.2026): richtig zuordnen oder endgültig löschen."""
+
+    def setUp(self):
+        self.sabine = Patient.objects.create(nachname="Falsch", vorname="Sabine", geburtsdatum="1970-01-01")
+        self.bernd = Patient.objects.create(nachname="Richtig", vorname="Bernd", geburtsdatum="1960-06-06")
+
+    def hochladen(self, patient, titel="Arztbrief Bernd Richtig"):
+        datei = SimpleUploadedFile("brief.pdf", b"%PDF-1.4 Bernd", content_type="application/pdf")
+        r = client_fuer(self.mitarbeiter).post("/api/dokumente/", {"patient": patient.id, "titel": titel, "datei": datei},
+                                               format="multipart")
+        self.assertEqual(r.status_code, 201, r.content)
+        return Dokument.objects.get(pk=r.json()["id"])
+
+    def test_umhaengen(self):
+        dok = self.hochladen(self.sabine)
+        alter_pfad, sha = dok.pfad, dok.sha256
+        url = f"/api/dokumente/{dok.id}/umhaengen/"
+        # Recht: Standard Mediziner (und Admin nur bei Testpatienten), nicht Mitarbeiter
+        self.assertEqual(client_fuer(self.mitarbeiter).post(url, {"patient": self.bernd.id, "grund": "falscher Patient"},
+                                                            format="json").status_code, 403)
+        self.assertEqual(client_fuer(self.admin).post(url, {"patient": self.bernd.id, "grund": "falscher Patient"},
+                                                      format="json").status_code, 403)
+        c = client_fuer(self.mediziner)
+        self.assertIn("grund", c.post(url, {"patient": self.bernd.id, "grund": ""}, format="json").json())
+        self.assertIn("patient", c.post(url, {"patient": self.sabine.id, "grund": "falscher Patient"}, format="json").json())
+        r = c.post(url, {"patient": self.bernd.id, "grund": "beim falschen Patienten hochgeladen"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        dok.refresh_from_db()
+        self.assertEqual((dok.patient_id, dok.sha256), (self.bernd.id, sha))
+        self.assertTrue(dok.pfad.is_file())
+        self.assertFalse(alter_pfad.exists())
+        self.assertTrue(dok.datei.startswith(f"{self.bernd.nummer}/"))
+        # Verlauf: Sabine sieht weder Titel noch Bernd, Bernd sieht die Übernahme mit Grund
+        bei_sabine = c.get(f"/api/patienten/{self.sabine.id}/verlauf/?bereich=dokumente").json()
+        self.assertEqual([e["aktion"] for e in bei_sabine], ["einer anderen Akte zugeordnet", "hochgeladen"])
+        self.assertNotIn("Bernd", str(bei_sabine))
+        self.assertNotIn("Arztbrief", str(bei_sabine))
+        bei_bernd = c.get(f"/api/patienten/{self.bernd.id}/verlauf/?bereich=dokumente").json()
+        self.assertEqual([(e["aktion"], e["grund"]) for e in bei_bernd],
+                         [("von einer anderen Akte übernommen", "beim falschen Patienten hochgeladen")])
+        self.assertIn("Arztbrief Bernd Richtig", bei_bernd[0]["beschreibung"])
+        self.assertNotIn("Sabine", str(bei_bernd))
+        # Audit-Log vollständig
+        e = SystemEreignis.objects.filter(art=SystemEreignis.Art.DOKUMENT_UMGEHAENGT).get()
+        self.assertEqual((e.details["von"][:13], e.details["nach"][:13]), ("Falsch, Sabin", "Richtig, Bern"))
+        # Liste: nur noch bei Bernd
+        self.assertEqual(c.get(f"/api/dokumente/?patient={self.sabine.id}").json()["count"], 0)
+        self.assertEqual(c.get(f"/api/dokumente/?patient={self.bernd.id}").json()["count"], 1)
+        # der Vorgang ist unveränderlich
+        from .models import DokumentVorgang
+
+        with self.assertRaises(DatabaseError), transaction.atomic():
+            DokumentVorgang.objects.update(grund="geändert")
+
+    def test_endgueltig_loeschen(self):
+        from django_otp.oath import totp
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        from epm.pruefhilfen import KENNWORT, mit_zweitem_faktor
+
+        mit_zweitem_faktor(self.mediziner)
+        geraet = TOTPDevice.objects.get(user=self.mediziner)
+
+        def code(versatz=0):
+            return f"{totp(geraet.bin_key, geraet.step, geraet.t0, geraet.digits, drift=versatz):06d}"
+
+        dok = self.hochladen(self.sabine)
+        pfad = dok.pfad
+        basis = f"/api/dokumente/{dok.id}/"
+        # nur Mediziner: Admin und Mitarbeiter nicht
+        self.assertEqual(client_fuer(self.admin).post(basis + "loeschen-vorbereiten/").status_code, 403)
+        self.assertEqual(client_fuer(self.mitarbeiter).post(basis + "loeschen-vorbereiten/").status_code, 403)
+        c = client_fuer(self.mediziner)
+        grund = "Dokument eines fremden Patienten, nicht aus der Stiftung"
+        # ohne vorbereiteten Bestätigungscode
+        r = c.post(basis + "loeschen/", {"grund": grund, "kennwort": KENNWORT, "code": code(), "bestaetigung": "X"}, format="json")
+        self.assertIn("abgelaufen", r.json()["bestaetigung"])
+        bestaetigung = c.post(basis + "loeschen-vorbereiten/").json()["code"]
+        self.assertEqual(len(bestaetigung), 6)
+        # falscher Bestätigungscode, falsches Kennwort, falscher 2FA-Code → abgelehnt und protokolliert
+        self.assertIn("bestaetigung", c.post(basis + "loeschen/", {"grund": grund, "kennwort": KENNWORT, "code": code(),
+                                                                   "bestaetigung": "AAAAAA" if bestaetigung != "AAAAAA" else "BBBBBB"},
+                                             format="json").json())
+        self.assertIn("kennwort", c.post(basis + "loeschen/", {"grund": grund, "kennwort": "falsch", "code": code(),
+                                                               "bestaetigung": bestaetigung}, format="json").json())
+        self.assertIn("code", c.post(basis + "loeschen/", {"grund": grund, "kennwort": KENNWORT, "code": "000000"
+                                                           if code() != "000000" else "111111",
+                                                           "bestaetigung": bestaetigung}, format="json").json())
+        self.assertEqual(SystemEreignis.objects.filter(art=SystemEreignis.Art.DOKUMENT_LOESCHEN_ABGELEHNT).count(), 4)
+        self.assertTrue(pfad.is_file())
+        TOTPDevice.objects.filter(pk=geraet.pk).update(throttling_failure_timestamp=None, throttling_failure_count=0)
+        with self.captureOnCommitCallbacks(execute=True):
+            r = c.post(basis + "loeschen/", {"grund": grund, "kennwort": KENNWORT, "code": code(),
+                                             "bestaetigung": bestaetigung.lower()}, format="json")
+        self.assertEqual(r.status_code, 204, r.content)
+        self.assertFalse(Dokument.objects.filter(pk=dok.id).exists())
+        self.assertFalse(pfad.exists())
+        e = SystemEreignis.objects.filter(art=SystemEreignis.Art.DOKUMENT_GELOESCHT).get()
+        self.assertEqual((e.details["titel"], e.details["grund"]), ("Arztbrief Bernd Richtig", grund))
+        verlauf = c.get(f"/api/patienten/{self.sabine.id}/verlauf/?bereich=dokumente").json()
+        self.assertEqual([(e["aktion"], e["grund"]) for e in verlauf], [("endgültig gelöscht", grund), ("hochgeladen", None)])
+        self.assertNotIn("Arztbrief", str(verlauf))
+        # der Bestätigungscode gilt nur einmal
+        self.assertEqual(c.post(basis + "loeschen/", {"grund": grund}, format="json").status_code, 404)
+
+    def test_systemdokumente_bleiben(self):
+        dok = self.hochladen(self.sabine)
+        Dokument.objects.filter(pk=dok.pk).update(herkunft=Dokument.Herkunft.SYSTEM)
+        r = client_fuer(self.mediziner).post(f"/api/dokumente/{dok.id}/umhaengen/",
+                                             {"patient": self.bernd.id, "grund": "falscher Patient"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("gehören zu ihrem Plan", r.json()["fehler"])

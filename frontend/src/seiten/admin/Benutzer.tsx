@@ -23,6 +23,8 @@ type Rechte = {
   standard: Record<string, string[]>;
   /** Rollen, die diese Rechte nur bei Testpatienten ausüben (Admin) */
   nur_testpatienten: { rollen: string[]; rechte: string[] };
+  /** Rechte, die nur bestimmte Rollen haben können (endgültig löschen: nur Mediziner) */
+  nur_rollen: Record<string, string[]>;
 };
 type Formular = { titel: string; first_name: string; last_name: string; kuerzel: string; funktion: string; username: string; rolle: string };
 const TITEL = ["", "Dr.", "Dr. med.", "Prof. Dr.", "Prof. Dr. med.", "Dipl.-Oec. troph."];
@@ -96,12 +98,14 @@ function RechteMatrix() {
               <td className="td"><span className="text-sm">{x.name}</span>{x.beschreibung ? <><br /><span className="text-xs gedaempft">{x.beschreibung}</span></> : null}</td>
               {d.rollen.map((r) => {
                 const istFest = fest.has(`${r.code}.${x.code}`);
+                const vorbehalten = !!d.nur_rollen[x.code] && !d.nur_rollen[x.code].includes(r.code);
                 const nurTest = d.nur_testpatienten.rollen.includes(r.code) && d.nur_testpatienten.rechte.includes(x.code);
                 const anders = m[r.code][x.code] !== d.matrix[r.code][x.code];
                 return (
                   <td key={r.code} className={cx("td text-center", anders && "bg-warn-bg")}>
-                    <input type="checkbox" aria-label={`${r.name}: ${x.name}`} checked={m[r.code][x.code]} disabled={istFest}
-                      title={istFest ? "festes Recht, damit sich die Administration nicht aussperrt" : undefined}
+                    <input type="checkbox" aria-label={`${r.name}: ${x.name}`} checked={m[r.code][x.code]} disabled={istFest || vorbehalten}
+                      title={istFest ? "festes Recht, damit sich die Administration nicht aussperrt"
+                        : vorbehalten ? `nur ${d.nur_rollen[x.code].map((c) => d.rollen.find((y) => y.code === c)?.name ?? c).join(", ")}` : undefined}
                       onChange={(e) => setM({ ...m, [r.code]: { ...m[r.code], [x.code]: e.target.checked } })} />
                     {nurTest ? <span className="block text-[0.6875rem] gedaempft leading-tight">nur Testpatienten</span> : null}
                   </td>

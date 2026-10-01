@@ -20,6 +20,10 @@ RECHTE = [
     ("eintraege_erfassen", "Kontakte, Gewichte, Termine, Dokumente erfassen",
      "Einträge in der Akte anlegen; Kontakte stornieren, Termine erledigen"),
     ("akten_bearbeiten", "Patienten anlegen, Diagnose, Therapie, Stammdaten ändern", ""),
+    ("dokumente_umhaengen", "Dokumente einem anderen Patienten zuordnen",
+     "bei falsch zugeordneten Dokumenten; mit Grund, im Verlauf beider Akten und im Audit-Log"),
+    ("dokumente_loeschen", "Dokumente endgültig löschen",
+     "nur Mediziner; mit Kennwort, Code aus der Authenticator-App und Bestätigungscode; im Audit-Log"),
     ("plaene_anlegen", "Infusionspläne anlegen", "Entwürfe anlegen, bearbeiten und verwerfen"),
     ("plaene_freigeben", "Infusionspläne freigeben", ""),
     ("akten_abschliessen", "Akten abschließen", ""),
@@ -41,14 +45,17 @@ _ADMIN_SPEZIAL = {"benutzer_verwalten", "akten_wieder_oeffnen", "backup_verwalte
 
 # Rechte, die Patientendaten verändern (Einträge, Stammdaten, Pläne, Abschluss)
 PATIENTENDATEN_SCHREIBEN = {"eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
-                            "akten_abschliessen"}
+                            "akten_abschliessen", "dokumente_umhaengen", "dokumente_loeschen"}
+
+# Rechte, die nur bestimmte Rollen haben können (Festlegung 02.10.2026: endgültig löschen nur Mediziner)
+NUR_ROLLEN = {"dokumente_loeschen": {Rolle.MEDIZINER}}
 
 STANDARD = {
     Rolle.BETRACHTER: {"akten_lesen"},
     Rolle.MITARBEITER: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
                         "versorger_pflegen", "vorlagen_pflegen"},
     Rolle.MEDIZINER: _ALLE - _ADMIN_SPEZIAL,
-    Rolle.ADMIN: set(_ALLE),
+    Rolle.ADMIN: _ALLE - set(NUR_ROLLEN),
 }
 
 # Diese Rollen schreiben Patientendaten nur bei Testpatienten (fest, unabhängig von der Matrix)
@@ -72,6 +79,10 @@ def matrix() -> dict:
             ergebnis[rolle][recht] = erlaubt
     for rolle, recht in FEST:
         ergebnis[rolle][recht] = True
+    for recht, rollen in NUR_ROLLEN.items():
+        for rolle in ergebnis:
+            if rolle not in rollen:
+                ergebnis[rolle][recht] = False
     return ergebnis
 
 

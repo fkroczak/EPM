@@ -116,7 +116,7 @@ SONDERREGELN = {
 }
 # Zuordnungstabellen von Plänen: auch INSERT prüfen
 ZUORDNUNG = {"infusionen_infusionsplan_vitamine": "epm_plan_zuordnung_schutz"}
-NUR_ANFUEGEN_FEST = ["audit_systemereignis"]
+NUR_ANFUEGEN_FEST = ["audit_systemereignis", "patienten_dokumentvorgang"]
 
 
 def _historientabellen(cursor):
