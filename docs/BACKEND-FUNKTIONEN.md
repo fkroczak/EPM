@@ -899,7 +899,7 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   Startseite (F13). Zugangsdaten nur auf dem Host (`/etc/epm`), nicht im Container.
 - **Festlegung 01.10.2026:** Ziel (WebDAV-Adresse, Benutzer, Kennwort, Zeitfenster) pflegt die Administration selbst in der
   Oberfläche und kann es jederzeit ändern; Zugangsdaten nicht im Code oder in Dateien von Hand.
-- **Offen:** Übertragungswerkzeug (rsync auf einen per davfs2 eingebundenen Ordner wie heute, oder rclone mit WebDAV direkt).
+- **Festlegung 01.10.2026:** Übertragung mit rclone (WebDAV direkt, ohne Einbinden per davfs2; nur geänderte Dateien, mit Prüfsumme).
 - **Status:** NICHT ABGESCHLOSSEN
 
 ---
@@ -947,7 +947,7 @@ Browser reichen). Funktionen, die noch fehlen, zeigt die Oberfläche als „folg
 | U6 | Kontaktart (nicht im Entwurf) | F26 | bleibt gespeichert, nicht angezeigt |
 | U7 | Rolle des Testbenutzers: Mitarbeiter (Entwurf) oder Mediziner (Code) | F57 | Mediziner |
 | U8 | ~~Gerätename im Audit-Log oder nur IP/Browser~~ **Geklärt 01.10.2026:** IP und Browser reichen | F11, F58 | – |
-| U9 | ~~Übertragung zur Nextcloud: Server schiebt oder Gegenseite holt ab~~ **Geklärt 01.10.2026:** Server schiebt per rsync in einen WebDAV-Ordner (wie heute) | F64 | – |
+| U9 | ~~Übertragung zur Nextcloud: Server schiebt oder Gegenseite holt ab~~ **Geklärt 01.10.2026:** Server schiebt in einen WebDAV-Ordner, Werkzeug rclone (Festlegung 01.10.2026) | F64 | – |
 | U10 | ~~Wer pflegt Versorger und Ansprechpartner?~~ **Erledigt 01.10.2026:** Rechte sind je Gruppe einstellbar (F66); Standard Mitarbeiter, Mediziner und Admin | F45, F46 | – |
 | U11 | ~~Ab welcher Änderung zeigt der Trend-Pfeil „gleich“?~~ **Bestätigt 01.10.2026:** weniger als ±1 % = gleich | F14 | – |
 | U12 | ~~Darf der Admin auch Patientendaten schreiben?~~ **Geklärt 01.10.2026:** Admins dürfen alles, Patientendaten schreiben sie nur bei Testpatienten; echte Akten nur lesen, Wiederöffnen, Benutzer und Sicherungen bleiben | F66 | – |
