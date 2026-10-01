@@ -340,13 +340,15 @@ test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pfl
   await dialog.getByLabel("Telefon").fill("0251 55555");
   await dialog.getByRole("checkbox", { name: /Auskunft erlaubt/ }).check();
   await dialog.getByRole("button", { name: "Speichern" }).click();
-  await expect(page.getByText("Bezugsperson angelegt.")).toBeVisible();
+  await expect(page.getByText("Bezugsperson angelegt.").last()).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await personen.getByRole("button", { name: "Person", exact: true }).click();
   dialog = page.getByRole("dialog");
   await dialog.getByLabel("Beziehung").selectOption({ label: "Betreuer/in (gesetzlich)" });
   await dialog.getByLabel("Name").fill("Bernd Betreuer");
   await dialog.getByRole("button", { name: "Speichern" }).click();
-  await expect(page.getByText("Bezugsperson angelegt.")).toBeVisible();
+  await expect(page.getByText("Bezugsperson angelegt.").last()).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(personen.getByTestId("bezugsperson")).toHaveCount(2);
   await expect(page.getByTestId("auskunft")).toContainText("Margit Akte (Mutter)");
   await expect(page.getByTestId("auskunft")).not.toContainText("Bernd Betreuer");
