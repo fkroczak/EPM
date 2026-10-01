@@ -29,12 +29,17 @@ PRAEPARAT_FELDER = {
     "aminosaeuren_praeparat": Praeparat.Kategorie.AMINOSAEUREN,
     "lipide_praeparat": Praeparat.Kategorie.LIPIDE,
     "albumin_praeparat": Praeparat.Kategorie.ALBUMIN,
+    "spurenelemente": Praeparat.Kategorie.SPURENELEMENTE,
     "katheterschutz": Praeparat.Kategorie.KATHETERSCHUTZ,
 }
 
 
 class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
     positionen = PositionSerializer(many=True, required=False)
+    vitamine = serializers.PrimaryKeyRelatedField(
+        many=True, required=False, queryset=Praeparat.objects.filter(kategorie=Praeparat.Kategorie.VITAMINE)
+    )
+    vitamine_namen = serializers.SerializerMethodField()
     bemerkung = RichText()
     kcal_berechnet = serializers.IntegerField(read_only=True)
     kcal = serializers.IntegerField(read_only=True)
@@ -49,6 +54,8 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
             "id", "patient", "patient_name", "status", "vorgaenger", "gueltig_ab",
             "basis_praeparat", "basis_ml", "glucose_praeparat", "glucose_g", "aminosaeuren_praeparat",
             "aminosaeuren_g", "lipide_praeparat", "lipide_g", "albumin_praeparat", "albumin_g",
+            "natrium_mmol", "kalium_mmol", "phosphat_mmol", "calcium_mmol", "magnesium_mmol",
+            "spurenelemente", "vitamine", "vitamine_namen",
             "kcal_manuell", "kcal_berechnet", "kcal", "laufzeit_h", "tage_pro_woche", "katheterschutz",
             "pantozol_stufe", "pantozol_tage", "bemerkung", "positionen", "geaenderte_felder",
             "erstellt_am", "erstellt_von_name", "freigegeben_am", "freigegeben_von_name",
@@ -56,6 +63,9 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
         ]
         read_only_fields = ["patient", "status", "vorgaenger", "erstellt_am", "freigegeben_am",
                             "pdf_datei", "pdf_sha256", "vorlage_version"]
+
+    def get_vitamine_namen(self, obj):
+        return [str(p) for p in obj.vitamine.all()]
 
     def get_geaenderte_felder(self, obj):
         return obj.geaenderte_felder()
@@ -74,12 +84,23 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
             p = attrs.get(feld)
             if p is not None and p.kategorie != kategorie:
                 raise serializers.ValidationError({feld: "Präparat passt nicht zu diesem Feld."})
+            # ausgeblendete Präparate nur behalten, nicht neu wählen (Entwurf 18)
+            if p is not None and not p.aktiv and (self.instance is None or getattr(self.instance, f"{feld}_id") != p.id):
+                raise serializers.ValidationError({feld: "Dieses Präparat ist ausgeblendet und kann nicht neu gewählt werden."})
+        if "vitamine" in attrs and self.instance is not None:
+            bisher = set(self.instance.vitamine.values_list("pk", flat=True))
+            neu_ausgeblendet = [str(p) for p in attrs["vitamine"] if not p.aktiv and p.pk not in bisher]
+            if neu_ausgeblendet:
+                raise serializers.ValidationError({"vitamine": f"Ausgeblendet: {', '.join(neu_ausgeblendet)}."})
         return super().validate(attrs)
 
     @transaction.atomic
     def update(self, instance, validated_data):
         positionen = validated_data.pop("positionen", None)
+        vitamine = validated_data.pop("vitamine", None)
         instance = super().update(instance, validated_data)
+        if vitamine is not None:
+            instance.vitamine.set(vitamine)
         if positionen is not None:
             # Positionen komplett ersetzen (einfach und eindeutig für den Editor)
             for alt in list(instance.positionen.all()):
@@ -94,7 +115,9 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
                            mixins.DestroyModelMixin, viewsets.GenericViewSet):
     """
     GET    /api/infusionsplaene/?patient=ID      Pläne eines Patienten
-    POST   /api/infusionsplaene/entwurf/          {"patient": ID} → neuer Entwurf (vorbelegt)
+    POST   /api/infusionsplaene/entwurf/          {"patient": ID, "leer"?: bool, "vorlage"?: Plan-ID}
+                                                  → neuer Entwurf (vorbelegt mit aktuellem Plan bzw. Vorlage)
+    GET    /api/infusionsplaene/ID/vergleich/     alle Werte neben denen des Vorgängers
     PATCH  /api/infusionsplaene/ID/               Entwurf bearbeiten
     POST   /api/infusionsplaene/ID/freigeben/     Entwurf wird aktueller Plan
     DELETE /api/infusionsplaene/ID/               Entwurf verwerfen
@@ -108,7 +131,7 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
         return (
             Infusionsplan.objects.filter(patient__in=patienten_fuer(self.request.user))
             .select_related("patient", "erstellt_von", "freigegeben_von", "vorgaenger")
-            .prefetch_related("positionen__praeparat")
+            .prefetch_related("positionen__praeparat", "vitamine")
         )
 
     def perform_update(self, serializer):
@@ -128,8 +151,18 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
         patient = patienten_fuer(request.user).filter(pk=request.data.get("patient")).first()
         if patient is None:
             return Response({"patient": "Patient nicht gefunden."}, status=status.HTTP_400_BAD_REQUEST)
-        plan = Infusionsplan.neuer_entwurf(patient, request.user)
+        vorlage = None
+        if request.data.get("vorlage"):
+            vorlage = Infusionsplan.objects.filter(pk=request.data["vorlage"], patient=patient).first()
+            if vorlage is None:
+                return Response({"vorlage": "Plan nicht gefunden."}, status=status.HTTP_400_BAD_REQUEST)
+        leer = str(request.data.get("leer", "")).lower() in ("1", "true", "ja")
+        plan = Infusionsplan.neuer_entwurf(patient, request.user, leer=leer, vorlage=vorlage)
         return Response(self.get_serializer(plan).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"])
+    def vergleich(self, request, pk=None):
+        return Response(self.get_object().vergleich())
 
     @action(detail=True, methods=["post"])
     def freigeben(self, request, pk=None):

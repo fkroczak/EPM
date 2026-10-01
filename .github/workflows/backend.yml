@@ -56,7 +56,8 @@ jobs:
       - name: Migrationen erzeugen, falls Modelle geändert wurden
         id: mig
         run: |
-          python manage.py makemigrations --noinput accounts stammdaten patienten infusionen audit
+          set -o pipefail
+          python manage.py makemigrations --noinput accounts stammdaten patienten infusionen audit 2>&1 | tee -a ci-protokoll.txt
           if [ -n "$(git status --porcelain -- '*/migrations/*.py')" ]; then
             echo "neu=1" >> "$GITHUB_OUTPUT"
             git status --porcelain -- '*/migrations/*.py'
@@ -72,10 +73,14 @@ jobs:
           git push
 
       - name: Migrationen vollständig
-        run: python manage.py makemigrations --check --dry-run
+        run: |
+          set -o pipefail
+          python manage.py makemigrations --check --dry-run 2>&1 | tee -a ci-protokoll.txt
 
       - name: Django-Prüfung
-        run: python manage.py check
+        run: |
+          set -o pipefail
+          python manage.py check 2>&1 | tee -a ci-protokoll.txt
 
       - name: Tests gegen PostgreSQL
         run: |
@@ -97,6 +102,25 @@ jobs:
             echo '```'
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Ergebnis als Kommentar am Commit
+        if: always() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "**Backend-Tests: ${{ job.status }}** (Lauf ${{ github.run_id }})"
+            echo
+            echo '```'
+            if [ -s test-ausgabe.txt ]; then
+              grep -v " WARNING django.request: " test-ausgabe.txt | tail -c 55000
+            else
+              echo "keine Testausgabe – Protokoll der Vorbereitung:"
+              tail -c 55000 ci-protokoll.txt 2>/dev/null || true
+            fi
+            echo '```'
+          } > kommentar.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@kommentar.md > /dev/null
 
       - uses: actions/upload-artifact@v7
         if: always()

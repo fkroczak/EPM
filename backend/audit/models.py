@@ -36,6 +36,7 @@ class SystemEreignis(models.Model):
     objekt = models.CharField(max_length=200, blank=True)
     details = models.JSONField(default=dict, blank=True)
     ip = models.GenericIPAddressField(null=True, blank=True)
+    geraet = models.CharField("Gerät / Browser", max_length=300, blank=True)
 
     class Meta:
         verbose_name = "Systemereignis"
@@ -52,6 +53,23 @@ class SystemEreignis(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Systemereignisse sind unveränderlich.")
+
+
+def browser_kurz(user_agent: str) -> str:
+    """„Firefox 131 · Windows“ statt der langen Browser-Kennung."""
+    ua = user_agent or ""
+    browser = next((name for kennung, name in [
+        ("Edg/", "Edge"), ("OPR/", "Opera"), ("Firefox/", "Firefox"), ("Chrome/", "Chrome"), ("Safari/", "Safari"),
+    ] if kennung in ua), "Browser" if ua else "")
+    version = ""
+    for kennung in ("Edg/", "OPR/", "Firefox/", "Chrome/", "Version/"):
+        if kennung in ua:
+            version = ua.split(kennung, 1)[1].split(" ", 1)[0].split(".", 1)[0]
+            break
+    system = next((name for kennung, name in [
+        ("Windows", "Windows"), ("Mac OS X", "macOS"), ("Android", "Android"), ("iPhone", "iOS"), ("Linux", "Linux"),
+    ] if kennung in ua), "")
+    return " · ".join(t for t in (f"{browser} {version}".strip(), system) if t)
 
 
 def client_ip(request):
@@ -71,4 +89,5 @@ def protokolliere(art, request=None, benutzer=None, benutzername="", objekt="", 
         objekt=str(objekt)[:200],
         details=details,
         ip=client_ip(request),
+        geraet=browser_kurz(request.META.get("HTTP_USER_AGENT", ""))[:300] if request is not None else "",
     )

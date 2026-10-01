@@ -32,7 +32,8 @@ from rest_framework.views import APIView
 
 from audit.models import SystemEreignis, protokolliere
 
-from .models import Rolle, User
+from .models import Rolle, Sitzung, User
+from .sitzungen import aktive_sitzungen, alle_sitzungen_beenden, schluessel_erneuert, sitzung_beenden
 from .permissions import Angemeldet, NurAdmin, ist_verifiziert
 
 ANZAHL_NOTFALLCODES = 10
@@ -56,20 +57,20 @@ def naechster_schritt(request) -> str:
     return "fertig"
 
 
-def zu_viele_fehlversuche(benutzername: str) -> bool:
-    seit = timezone.now() - settings.EPM_LOGIN_SPERRE
-    letzte_erfolgreiche = (
-        SystemEreignis.objects.filter(benutzername__iexact=benutzername, art=SystemEreignis.Art.ANMELDUNG)
-        .order_by("-zeitpunkt").values_list("zeitpunkt", flat=True).first()
-    )
-    if letzte_erfolgreiche and letzte_erfolgreiche > seit:
-        seit = letzte_erfolgreiche
-    fehler = SystemEreignis.objects.filter(
-        benutzername__iexact=benutzername,
-        zeitpunkt__gt=seit,
-        art__in=[SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN],
-    ).count()
-    return fehler >= settings.EPM_LOGIN_MAX_FEHLVERSUCHE
+def fehlversuch(user, request, art):
+    """Zählt einen Fehlversuch; beim fünften wird das Konto gesperrt (bis der Admin entsperrt)."""
+    user.fehlversuche += 1
+    if user.fehlversuche >= settings.EPM_LOGIN_MAX_FEHLVERSUCHE:
+        user.sperren(f"{user.fehlversuche} Fehlversuche bei der Anmeldung")
+        user.save(update_fields=User.SPERR_FELDER)
+        protokolliere(SystemEreignis.Art.ANMELDUNG_GESPERRT, request, benutzer=user,
+                      fehlversuche=user.fehlversuche, letzter_fehler=art)
+        return True
+    user.save(update_fields=["fehlversuche"])
+    return False
+
+
+GESPERRT_TEXT = "Das Konto ist gesperrt. Bitte an die Administration wenden."
 
 
 def fehler(text, code=status.HTTP_400_BAD_REQUEST, **extra):
@@ -128,12 +129,23 @@ class AnmeldenView(OffenerView):
         kennwort = str(request.data.get("kennwort", ""))
         if not name or not kennwort:
             return fehler("Benutzername und Kennwort angeben.")
-        if zu_viele_fehlversuche(name):
-            protokolliere(SystemEreignis.Art.ANMELDUNG_GESPERRT, request, benutzername=name)
-            return fehler("Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.", status.HTTP_429_TOO_MANY_REQUESTS)
+        konto = User.objects.filter(username=name, nur_historisch=False).first()
+        if konto is not None and konto.ist_gesperrt:
+            # Sperre nur verraten, wenn das Kennwort stimmt (sonst wie ein normaler Fehlversuch)
+            if konto.check_password(kennwort):
+                protokolliere(SystemEreignis.Art.ANMELDUNG_GESPERRT, request, benutzer=konto, versuch_trotz_sperre=True)
+                return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
+            protokolliere(SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request, benutzername=name)
+            return fehler("Benutzername oder Kennwort falsch.", status.HTTP_401_UNAUTHORIZED)
         user = authenticate(request, username=name, password=kennwort)  # Fehlversuch → Signal → Protokoll
         if user is None:
+            if konto is not None and konto.is_active and fehlversuch(konto, request, "kennwort"):
+                return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
             return fehler("Benutzername oder Kennwort falsch.", status.HTTP_401_UNAUTHORIZED)
+        if user.einmal_kennwort_abgelaufen:
+            protokolliere(SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request, benutzer=user, grund="einmal_kennwort_abgelaufen")
+            return fehler("Das Einmal-Kennwort ist abgelaufen. Bitte bei der Administration ein neues anfordern.",
+                          status.HTTP_401_UNAUTHORIZED, abgelaufen=True)
         login(request, user)  # Sitzungs-ID wird erneuert
         return status_antwort(request)
 
@@ -143,14 +155,14 @@ class ZweiterFaktorView(OffenerView):
         user = request.user
         if not user.is_authenticated:
             return fehler("Bitte zuerst mit Kennwort anmelden.", status.HTTP_401_UNAUTHORIZED)
-        if zu_viele_fehlversuche(user.username):
-            logout(request)
-            return fehler("Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.", status.HTTP_429_TOO_MANY_REQUESTS)
         code = str(request.data.get("code", "")).replace(" ", "")
         for geraet in [*TOTPDevice.objects.filter(user=user, confirmed=True),
                        *StaticDevice.objects.filter(user=user, confirmed=True)]:
             if geraet.verify_token(code):
                 otp_login(request, geraet)
+                if user.fehlversuche:
+                    user.fehlversuche = 0
+                    user.save(update_fields=["fehlversuche"])
                 if isinstance(geraet, StaticDevice):
                     protokolliere(SystemEreignis.Art.ANMELDUNG, request, schritt="notfallcode",
                                   verbleibend=geraet.token_set.count())
@@ -158,6 +170,9 @@ class ZweiterFaktorView(OffenerView):
                     protokolliere(SystemEreignis.Art.ANMELDUNG, request, schritt="2fa")
                 return status_antwort(request)
         protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request)
+        if fehlversuch(user, request, "2fa"):
+            logout(request)
+            return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
         return fehler("Code ungültig.", status.HTTP_401_UNAUTHORIZED)
 
 
@@ -183,8 +198,14 @@ class KennwortView(OffenerView):
             return fehler("Kennwort zu schwach.", details=e.messages)
         user.set_password(neu)
         user.muss_kennwort_aendern = False
-        user.save(update_fields=["password", "muss_kennwort_aendern"])
-        update_session_auth_hash(request, user)
+        user.einmal_kennwort_gueltig_bis = None
+        user.kennwort_geaendert_am = timezone.now()
+        user.save(update_fields=["password", "muss_kennwort_aendern", "einmal_kennwort_gueltig_bis",
+                                 "kennwort_geaendert_am"])
+        alter_schluessel = request.session.session_key
+        update_session_auth_hash(request, user)  # erneuert den Sitzungsschlüssel
+        schluessel_erneuert(alter_schluessel, request.session.session_key)
+        alle_sitzungen_beenden(user, ausser=request.session.session_key)
         protokolliere(SystemEreignis.Art.KENNWORT_GEAENDERT, request, erstanmeldung=erstanmeldung)
         return status_antwort(request)
 
@@ -248,8 +269,81 @@ class AbmeldenView(OffenerView):
         return Response({"schritt": "anmelden"})
 
 
+AKZENTE = ["nachtblau", "petrol", "blau", "gruen", "orange", "aubergine", "schiefer", "eigen"]
+HINTERGRUENDE = ["weissgrau", "hellgrau", "grau", "kraeftig", "blaugrau", "sand", "eigen"]
+KARTEN = ["termine", "gewicht", "plaene", "pruefen", "aktiv"]
+TINTE = "#1B1932"
+
+
+def _luminanz(hexfarbe: str) -> float:
+    werte = [int(hexfarbe[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    lin = [w / 12.92 if w <= 0.03928 else ((w + 0.055) / 1.055) ** 2.4 for w in werte]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def _kontrast(a: str, b: str) -> float:
+    x, y = _luminanz(a), _luminanz(b)
+    return (max(x, y) + 0.05) / (min(x, y) + 0.05)
+
+
+class DarstellungSerializer(serializers.Serializer):
+    """Darstellung je Person (Entwurf 14 · Mein Konto); unbekannte Schlüssel werden abgewiesen."""
+
+    schema = serializers.ChoiceField(["standard", "individuell", "kontrast", "dunkel"], default="standard")
+    auto_dunkel = serializers.BooleanField(default=False)
+    akzent = serializers.ChoiceField(AKZENTE, default="nachtblau")
+    akzent_eigen = serializers.RegexField(r"^#[0-9A-Fa-f]{6}$", required=False, allow_blank=True)
+    hintergrund = serializers.ChoiceField(HINTERGRUENDE, default="hellgrau")
+    hintergrund_eigen = serializers.RegexField(r"^#[0-9A-Fa-f]{6}$", required=False, allow_blank=True)
+    dichte = serializers.ChoiceField(["grosszuegig", "normal", "kompakt", "sehrkompakt"], default="normal")
+    schriftgroesse = serializers.ChoiceField(["klein", "normal", "gross", "sehrgross"], default="normal")
+    schriftstaerke = serializers.ChoiceField(["normal", "kraeftig"], default="normal")
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            unbekannt = set(data) - set(self.fields)
+            if unbekannt:
+                raise serializers.ValidationError({k: "Unbekannte Einstellung." for k in unbekannt})
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        if attrs.get("akzent") == "eigen":
+            farbe = attrs.get("akzent_eigen")
+            if not farbe:
+                raise serializers.ValidationError({"akzent_eigen": "Bitte eine Farbe wählen."})
+            if _kontrast(farbe, "#FFFFFF") < 4.5 and _kontrast(farbe, TINTE) < 4.5:
+                raise serializers.ValidationError({"akzent_eigen": "Auf dieser Farbe ist weder weiße noch dunkle "
+                                                   "Schrift gut lesbar. Bitte eine hellere oder dunklere wählen."})
+        if attrs.get("hintergrund") == "eigen":
+            farbe = attrs.get("hintergrund_eigen")
+            if not farbe:
+                raise serializers.ValidationError({"hintergrund_eigen": "Bitte eine Farbe wählen."})
+            if _luminanz(farbe) < 0.6:
+                raise serializers.ValidationError({"hintergrund_eigen": "Diese Farbe ist zu dunkel, Schrift wäre "
+                                                   "schlecht lesbar. Bitte eine hellere wählen oder „Dunkel“ nehmen."})
+        return attrs
+
+
+class KarteSerializer(serializers.Serializer):
+    id = serializers.ChoiceField(KARTEN)
+    sichtbar = serializers.BooleanField(default=True)
+
+
+class StartseiteSerializer(serializers.Serializer):
+    """Karten der Startseite in Anzeigereihenfolge (Entwurf 2 · „Startseite anpassen“)."""
+
+    karten = KarteSerializer(many=True)
+
+    def validate_karten(self, karten):
+        ids = [k["id"] for k in karten]
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError("Jede Karte darf nur einmal vorkommen.")
+        # fehlende Karten hinten sichtbar anhängen, damit nichts verloren geht
+        return karten + [{"id": k, "sichtbar": True} for k in KARTEN if k not in ids]
+
+
 class IchView(APIView):
-    """Eigenes Konto: Daten lesen, Darstellung und Startseite speichern, neue Notfall-Codes."""
+    """Eigenes Konto: Daten lesen, Darstellung und Startseite speichern."""
 
     permission_classes = [Angemeldet]
 
@@ -258,13 +352,68 @@ class IchView(APIView):
 
     def patch(self, request):
         user = request.user
-        for feld in ("darstellung", "startseite"):
-            if feld in request.data:
-                if not isinstance(request.data[feld], dict):
-                    return fehler(f"{feld} muss ein Objekt sein.")
-                setattr(user, feld, request.data[feld])
-        user.save(update_fields=["darstellung", "startseite"])
+        felder = []
+        if "darstellung" in request.data:
+            s = DarstellungSerializer(data=request.data["darstellung"])
+            s.is_valid(raise_exception=True)
+            user.darstellung = dict(s.validated_data)
+            felder.append("darstellung")
+        if "startseite" in request.data:
+            s = StartseiteSerializer(data=request.data["startseite"])
+            s.is_valid(raise_exception=True)
+            user.startseite = {"karten": [dict(k) for k in s.validated_data["karten"]]}
+            felder.append("startseite")
+        if felder:
+            user.save(update_fields=felder)
         return Response(ich_daten(user))
+
+
+class SicherheitView(APIView):
+    """„Anmeldung und Sicherheit“ in Mein Konto."""
+
+    permission_classes = [Angemeldet]
+
+    def get(self, request):
+        user = request.user
+        geraet = TOTPDevice.objects.filter(user=user, confirmed=True).first()
+        eingerichtet = (
+            SystemEreignis.objects.filter(benutzer=user, art=SystemEreignis.Art.ZWEITER_FAKTOR_EINGERICHTET)
+            .exclude(details__has_key="notfallcodes_neu").order_by("-zeitpunkt").values_list("zeitpunkt", flat=True).first()
+        )
+        return Response({
+            "kennwort_geaendert_am": user.kennwort_geaendert_am,
+            "authenticator_aktiv": geraet is not None,
+            "authenticator_eingerichtet_am": eingerichtet,
+            "notfallcodes_uebrig": StaticToken.objects.filter(device__user=user).count(),
+            "notfallcodes_gesamt": ANZAHL_NOTFALLCODES,
+        })
+
+
+class SitzungSerializer(serializers.ModelSerializer):
+    diese = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Sitzung
+        fields = ["id", "browser", "ip", "angemeldet_am", "zuletzt_am", "diese"]
+
+    def get_diese(self, obj):
+        return obj.sitzungsschluessel == self.context["request"].session.session_key
+
+
+class SitzungenViewSet(mixins.ListModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
+    """Eigene Anmeldungen anzeigen und einzeln beenden."""
+
+    serializer_class = SitzungSerializer
+    permission_classes = [Angemeldet]
+    pagination_class = None
+
+    def get_queryset(self):
+        return aktive_sitzungen(self.request.user)
+
+    def perform_destroy(self, instance):
+        if instance.sitzungsschluessel == self.request.session.session_key:
+            raise serializers.ValidationError({"fehler": "Die eigene Sitzung wird über „Abmelden“ beendet."})
+        sitzung_beenden(instance)
 
 
 class NotfallcodesView(APIView):
@@ -286,9 +435,11 @@ class BenutzerSerializer(serializers.ModelSerializer):
         fields = [
             "id", "username", "titel", "first_name", "last_name", "kuerzel", "funktion", "email",
             "rolle", "ist_test", "is_active", "nur_historisch", "anzeigename", "zweiter_faktor",
-            "muss_kennwort_aendern", "last_login", "date_joined",
+            "muss_kennwort_aendern", "einmal_kennwort_gueltig_bis", "gesperrt_am", "sperrgrund",
+            "fehlversuche", "last_login", "date_joined",
         ]
-        read_only_fields = ["is_active", "nur_historisch", "muss_kennwort_aendern", "last_login", "date_joined"]
+        read_only_fields = ["is_active", "nur_historisch", "muss_kennwort_aendern", "einmal_kennwort_gueltig_bis",
+                            "gesperrt_am", "sperrgrund", "fehlversuche", "last_login", "date_joined"]
 
     def get_zweiter_faktor(self, obj):
         return hat_zweiten_faktor(obj)
@@ -313,10 +464,18 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user = User(**s.validated_data)
         kennwort = user.neues_einmal_kennwort()
         user.save()
-        protokolliere(SystemEreignis.Art.BENUTZER_ANGELEGT, request, objekt=user.username, rolle=user.rolle)
+        protokolliere(SystemEreignis.Art.BENUTZER_ANGELEGT, request, objekt=user.username, rolle=user.rolle,
+                      einmal_kennwort_gueltig_bis=user.einmal_kennwort_gueltig_bis.isoformat())
         daten = self.get_serializer(user).data
         daten["einmal_kennwort"] = kennwort
         return Response(daten, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"])
+    def hinweise(self, request):
+        """Gesperrte Konten für den Hinweis im Audit-Log."""
+        gesperrt = User.objects.filter(gesperrt_am__isnull=False, nur_historisch=False).order_by("-gesperrt_am")
+        return Response([{"id": u.id, "benutzername": u.username, "anzeigename": u.anzeigename,
+                          "gesperrt_am": u.gesperrt_am, "sperrgrund": u.sperrgrund} for u in gesperrt])
 
     def perform_update(self, serializer):
         user = serializer.instance
@@ -332,8 +491,9 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user = self.get_object()
         if user == request.user:
             return fehler("Das eigene Konto kann nicht gesperrt werden.")
-        user.is_active = False
-        user.save(update_fields=["is_active"])
+        user.sperren("durch die Administration")
+        user.save(update_fields=User.SPERR_FELDER)
+        alle_sitzungen_beenden(user)
         protokolliere(SystemEreignis.Art.BENUTZER_GESPERRT, request, objekt=user.username)
         return Response(self.get_serializer(user).data)
 
@@ -342,9 +502,11 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user = self.get_object()
         if user.nur_historisch:
             return fehler("Historische Benutzer haben keinen Zugang.")
-        user.is_active = True
-        user.save(update_fields=["is_active"])
-        protokolliere(SystemEreignis.Art.BENUTZER_GEAENDERT, request, objekt=user.username, entsperrt=True)
+        vorher = user.sperrgrund
+        user.entsperren()
+        user.save(update_fields=User.SPERR_FELDER)
+        protokolliere(SystemEreignis.Art.BENUTZER_GEAENDERT, request, objekt=user.username, entsperrt=True,
+                      sperrgrund=vorher)
         return Response(self.get_serializer(user).data)
 
     @action(detail=True, methods=["post"], url_path="einmal-kennwort")
@@ -354,9 +516,10 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         if user.nur_historisch:
             return fehler("Historische Benutzer haben keinen Zugang.")
         kennwort = user.neues_einmal_kennwort()
-        user.save(update_fields=["password", "muss_kennwort_aendern"])
+        user.save(update_fields=User.EINMAL_FELDER)
+        alle_sitzungen_beenden(user)
         protokolliere(SystemEreignis.Art.EINMAL_KENNWORT, request, objekt=user.username)
-        return Response({"einmal_kennwort": kennwort})
+        return Response({"einmal_kennwort": kennwort, "gueltig_bis": user.einmal_kennwort_gueltig_bis})
 
     @action(detail=True, methods=["post"], url_path="2fa-zuruecksetzen")
     def zweiten_faktor_zuruecksetzen(self, request, pk=None):
@@ -371,6 +534,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         TOTPDevice.objects.filter(user=user).delete()
         StaticDevice.objects.filter(user=user).delete()
         kennwort = user.neues_einmal_kennwort()
-        user.save(update_fields=["password", "muss_kennwort_aendern"])
+        user.save(update_fields=User.EINMAL_FELDER)
+        alle_sitzungen_beenden(user)
         protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_ZURUECKGESETZT, request, objekt=user.username)
-        return Response({"einmal_kennwort": kennwort})
+        return Response({"einmal_kennwort": kennwort, "gueltig_bis": user.einmal_kennwort_gueltig_bis})

@@ -1,7 +1,10 @@
 import secrets
+from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
+from django.utils import timezone
 
 
 class Rolle(models.TextChoices):
@@ -43,6 +46,11 @@ class User(AbstractUser):
         help_text="Aus dem Altsystem übernommener Name ohne Login (Bearbeiter alter Einträge).",
     )
     muss_kennwort_aendern = models.BooleanField("Muss Kennwort ändern", default=True)
+    einmal_kennwort_gueltig_bis = models.DateTimeField("Einmal-Kennwort gültig bis", null=True, blank=True)
+    kennwort_geaendert_am = models.DateTimeField("Kennwort geändert am", null=True, blank=True)
+    fehlversuche = models.PositiveSmallIntegerField("Fehlversuche seit letzter Anmeldung", default=0)
+    gesperrt_am = models.DateTimeField("Gesperrt am", null=True, blank=True)
+    sperrgrund = models.CharField("Sperrgrund", max_length=200, blank=True)
     darstellung = models.JSONField("Darstellung", default=dict, blank=True)
     startseite = models.JSONField("Startseite (Karten)", default=dict, blank=True)
 
@@ -90,9 +98,56 @@ class User(AbstractUser):
     def darf_plaene_bearbeiten(self):
         return self.rolle == Rolle.MEDIZINER
 
+    EINMAL_FELDER = ["password", "muss_kennwort_aendern", "einmal_kennwort_gueltig_bis"]
+
     def neues_einmal_kennwort(self) -> str:
-        """Setzt ein Einmal-Kennwort; beim nächsten Login muss ein eigenes gewählt werden."""
+        """Setzt ein Einmal-Kennwort mit Ablaufzeit; beim nächsten Login muss ein eigenes gewählt werden."""
         kennwort = erzeuge_einmal_kennwort()
         self.set_password(kennwort)
         self.muss_kennwort_aendern = True
+        self.einmal_kennwort_gueltig_bis = timezone.now() + timedelta(hours=settings.EPM_EINMAL_KENNWORT_STUNDEN)
         return kennwort
+
+    @property
+    def einmal_kennwort_abgelaufen(self) -> bool:
+        return bool(
+            self.muss_kennwort_aendern
+            and self.einmal_kennwort_gueltig_bis
+            and self.einmal_kennwort_gueltig_bis < timezone.now()
+        )
+
+    @property
+    def ist_gesperrt(self) -> bool:
+        return self.gesperrt_am is not None
+
+    SPERR_FELDER = ["is_active", "gesperrt_am", "sperrgrund", "fehlversuche"]
+
+    def sperren(self, grund: str):
+        self.is_active = False
+        self.gesperrt_am = timezone.now()
+        self.sperrgrund = grund[:200]
+
+    def entsperren(self):
+        self.is_active = True
+        self.gesperrt_am = None
+        self.sperrgrund = ""
+        self.fehlversuche = 0
+
+
+class Sitzung(models.Model):
+    """Angemeldete Sitzung (für „Mein Konto“: Geräte anzeigen und abmelden)."""
+
+    benutzer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sitzungen")
+    sitzungsschluessel = models.CharField(max_length=40, unique=True)
+    browser = models.CharField(max_length=300, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    angemeldet_am = models.DateTimeField(auto_now_add=True)
+    zuletzt_am = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Sitzung"
+        verbose_name_plural = "Sitzungen"
+        ordering = ["-zuletzt_am"]
+
+    def __str__(self):
+        return f"{self.benutzer} · {self.browser[:40]}"

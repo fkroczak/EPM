@@ -23,28 +23,38 @@ from .models import Dokument, Gewichtsmessung, Kontakt, Patient, Termin
 
 TESTBENUTZER = "test"
 
+# Werte wie im Entwurf „EPM Oberfläche“ (18 · Vorlagen › Auswahllisten, 7 · Neuer Infusionsplan).
+# Die Administration pflegt sie danach selbst; gelöscht wird nichts.
 AUSWAHLWERTE = {
-    Auswahlwert.Liste.KATHETER: ["Port", "Hickman", "Broviac", "Groshong", "PICC", "ZVK", "Sonstiger"],
-    Auswahlwert.Liste.DOKUMENTTYP: ["Arztbrief", "Laborbefund", "Infusionsplan", "Verordnung", "Rezept",
-                                   "Korrespondenz", "Bild/Foto", "Patientendatenblatt", "Sonstiges"],
+    Auswahlwert.Liste.KATHETER: ["Port", "Hickman", "Broviac", "PICC", "Port 1-Kammer", "Port 2-Kammer"],
+    Auswahlwert.Liste.DOKUMENTTYP: ["Arztbrief", "Labor", "Infusionsplan", "Bild", "Patientendatenblatt", "Sonstiges"],
+    Auswahlwert.Liste.TERMINORT: ["Praxis Dr. Holtmeier"],
+    # Kontaktarten bleiben wie bisher angelegt – die Liste im Entwurf ist noch offen (U6).
     Auswahlwert.Liste.KONTAKTART: ["Telefon (Anruf erhalten)", "Telefon (angerufen)", "Persönlich", "E-Mail",
                                   "Brief/Fax", "Versorger", "Sonstiges"],
 }
 
 K = Praeparat.Kategorie
 PRAEPARATE = [
-    (K.BASISLOESUNG, "Sterofundin ISO", ""), (K.BASISLOESUNG, "NaCl", "0,9 %"),
-    (K.BASISLOESUNG, "Ringer-Lösung", ""), (K.BASISLOESUNG, "Jonosteril", ""),
-    (K.GLUCOSE, "Glucose", "20 %"), (K.GLUCOSE, "Glucose", "40 %"), (K.GLUCOSE, "Glucose", "50 %"),
+    (K.BASISLOESUNG, "Sterofundin", ""), (K.BASISLOESUNG, "NaCl", "0,9 %"),
+    (K.BASISLOESUNG, "Ringer-Infusionslösung", ""), (K.BASISLOESUNG, "Junosteril", ""),
     (K.GLUCOSE, "Glucose", "70 %"),
-    (K.AMINOSAEUREN, "Aminoplasmal", "10 %"), (K.AMINOSAEUREN, "Aminoven", "10 %"),
-    (K.LIPIDE, "SMOFlipid", "20 %"), (K.LIPIDE, "Lipofundin MCT", "20 %"), (K.LIPIDE, "Omegaven", "10 %"),
-    (K.ALBUMIN, "Albumin", "20 %"),
+    (K.AMINOSAEUREN, "Glamin", "13,4 %"), (K.AMINOSAEUREN, "Nephrotect", "10,0 %"),
+    (K.AMINOSAEUREN, "Aminoplasmal", "10 %"), (K.AMINOSAEUREN, "Aminosteril 8 % Hepa", "8,0 %"),
+    (K.AMINOSAEUREN, "Aminoplasmal E 15 % kohlenhydratfrei", "15,0 %"), (K.AMINOSAEUREN, "Nephrosteril", "7,0 %"),
+    (K.AMINOSAEUREN, "Aminoplasmal Hepa", "10,0 %"), (K.AMINOSAEUREN, "Aminomel Nephro", ""),
+    (K.LIPIDE, "Clinoleic", "20 %"), (K.LIPIDE, "Lipovenös MCT", "20 %"), (K.LIPIDE, "Lipofundin MCT", "20 %"),
+    (K.LIPIDE, "SMOF-Lipid", ""), (K.LIPIDE, "Lipidem", ""), (K.LIPIDE, "Lipovenös", "20 %"),
+    (K.LIPIDE, "Lipovenös MCT", "10 %"),
+    (K.ALBUMIN, "Humanalbumin", "20 %"),
+    (K.SPURENELEMENTE, "Addel N", ""), (K.SPURENELEMENTE, "Tracitrans plus", ""),
+    (K.SPURENELEMENTE, "Addel Trace", ""),
+    (K.VITAMINE, "Soluvit N", ""), (K.VITAMINE, "Vitalipid adult", ""), (K.VITAMINE, "Frekavit fettlöslich", ""),
+    (K.VITAMINE, "Frekavit wasserlöslich", ""), (K.VITAMINE, "Cernevit", ""),
+    (K.KATHETERSCHUTZ, "Taurolin", "2 %"), (K.KATHETERSCHUTZ, "Taurolidin Nova", "2,0 %"),
+    # Bisherige Einträge ohne Gegenstück im Entwurf bleiben im Katalog (Elektrolytzusätze, Medikamente).
     (K.ELEKTROLYTE, "Kaliumchlorid", "7,45 %"), (K.ELEKTROLYTE, "Natriumhydrogencarbonat", "8,4 %"),
     (K.ELEKTROLYTE, "Magnesiumsulfat", "10 %"), (K.ELEKTROLYTE, "Calciumgluconat", "10 %"),
-    (K.VITAMINE, "Cernevit", ""), (K.VITAMINE, "Vitalipid N Adult", ""), (K.VITAMINE, "Soluvit N", ""),
-    (K.SPURENELEMENTE, "Addel N", ""), (K.SPURENELEMENTE, "Tracutil", ""),
-    (K.KATHETERSCHUTZ, "Taurolidin-Lock", ""), (K.KATHETERSCHUTZ, "Heparin-Lock", ""),
     (K.MEDIKAMENT, "Pantozol i.v.", "40 mg"), (K.MEDIKAMENT, "Dipeptamin", "20 %"),
 ]
 
@@ -154,24 +164,24 @@ def _kontakte(patient, user, heute, rnd, art):
 
 
 def _plan(patient, user, p, gueltig_ab, glucose, aa, lipide, freigeben=True):
+    """Plan wie im Entwurf 8: Sterofundin, Glucose 70 %, Glamin, Clinoleic, Elektrolyte, Zusätze."""
     plan = Infusionsplan.neuer_entwurf(patient, user)
     plan.gueltig_ab = gueltig_ab
-    plan.basis_praeparat = p("basisloesung", "Sterofundin ISO")
-    plan.basis_ml = 1000
-    plan.glucose_praeparat, plan.glucose_g = p("glucose", "Glucose", "50 %"), Decimal(glucose)
-    plan.aminosaeuren_praeparat, plan.aminosaeuren_g = p("aminosaeuren", "Aminoplasmal"), Decimal(aa)
-    plan.lipide_praeparat, plan.lipide_g = p("lipide", "SMOFlipid"), Decimal(lipide)
+    plan.basis_praeparat = p("basisloesung", "Sterofundin")
+    plan.basis_ml = 500
+    plan.glucose_praeparat, plan.glucose_g = p("glucose", "Glucose", "70 %"), Decimal(glucose)
+    plan.aminosaeuren_praeparat, plan.aminosaeuren_g = p("aminosaeuren", "Glamin"), Decimal(aa)
+    plan.lipide_praeparat, plan.lipide_g = p("lipide", "Clinoleic"), Decimal(lipide)
+    plan.natrium_mmol, plan.kalium_mmol, plan.phosphat_mmol = Decimal(78), Decimal(40), Decimal(18)
+    plan.calcium_mmol, plan.magnesium_mmol = Decimal(7), Decimal(10)
+    plan.spurenelemente = p("spurenelemente", "Addel N")
+    plan.katheterschutz = p("katheterschutz", "Taurolin")
     plan.laufzeit_h = Decimal("12")
-    plan.tage_pro_woche = 7
-    plan.katheterschutz = p("katheterschutz", "Taurolidin-Lock")
+    plan.tage_pro_woche = 5
     plan.pantozol_stufe, plan.pantozol_tage = 1, 5
     plan.bemerkung = "<p>Testplan – keine echte Verordnung.</p>"
     _nutzer(user, plan).save()
-    if not plan.positionen.exists():
-        for i, (kat, name) in enumerate([("vitamine", "Cernevit"), ("spurenelemente", "Addel N"),
-                                         ("elektrolyte", "Kaliumchlorid")]):
-            _nutzer(user, InfusionsplanPosition(plan=plan, praeparat=p(kat, name), menge=Decimal("10" if i < 2 else "20"),
-                                                einheit="ml", haeufigkeit="täglich", reihenfolge=i)).save()
+    plan.vitamine.set([p("vitamine", "Soluvit N"), p("vitamine", "Vitalipid adult")])
     if freigeben:
         plan.freigeben(user)
     return plan
@@ -188,6 +198,8 @@ def testpatienten_anlegen() -> int:
     katheter = {a.wert: a for a in Auswahlwert.objects.filter(liste=Auswahlwert.Liste.KATHETER)}
     art = Auswahlwert.objects.filter(liste=Auswahlwert.Liste.KONTAKTART).first()
     doktyp = Auswahlwert.objects.filter(liste=Auswahlwert.Liste.DOKUMENTTYP, wert="Arztbrief").first()
+    terminort = Auswahlwert.objects.filter(liste=Auswahlwert.Liste.TERMINORT).first()
+    sonstiges = Auswahlwert.objects.filter(liste=Auswahlwert.Liste.DOKUMENTTYP, wert="Sonstiges").first()
 
     def p(kat, name, konz=None):
         qs = Praeparat.objects.filter(kategorie=kat, name=name)
@@ -224,7 +236,7 @@ def testpatienten_anlegen() -> int:
         _nutzer(user, Termin(
             patient=pat, art=arten[i % 4], faellig_am=faellig[i % 4],
             uhrzeit=time(10, 30) if arten[i % 4] == Termin.Art.PRAXISTERMIN else None,
-            bei="Praxis Dr. Holtmeier" if arten[i % 4] == Termin.Art.PRAXISTERMIN else "",
+            ort=terminort if arten[i % 4] == Termin.Art.PRAXISTERMIN else None,
             titel={Termin.Art.RUECKRUF: "Rückruf wegen Gewicht", Termin.Art.WIEDERVORLAGE: "Plan prüfen",
                    Termin.Art.PRAXISTERMIN: "Kontrolltermin"}[arten[i % 4]],
             kontakt=kontakte[0], angelegt_von=user,
@@ -232,6 +244,7 @@ def testpatienten_anlegen() -> int:
 
         if i == 0:
             _beispieldokument(pat, user, doktyp)
+            _beispieldokument(pat, None, sonstiges, altsystem=True)
 
         if profil == "abgeschlossen":
             pat.abgeschlossen_am = heute - timedelta(days=30)
@@ -241,23 +254,33 @@ def testpatienten_anlegen() -> int:
     return len(TESTPATIENTEN)
 
 
-def _beispieldokument(patient, user, typ):
+def _beispieldokument(patient, user, typ, altsystem=False):
+    """Ein hochgeladener Beispiel-Arztbrief; mit altsystem=True ein übernommenes Altdokument,
+    dessen Typ und Datum noch geprüft werden müssen (Startseite „Nach und nach prüfen“)."""
     import hashlib
 
     from .models import dokument_pfad
 
-    inhalt = (
-        "Beispiel-Arztbrief (TESTDATEN)\n\nDieser Brief ist frei erfunden und dient nur zum Testen "
-        "von Upload, Anzeige und Download im EPM.\n"
-    ).encode("utf-8")
-    relativ = dokument_pfad(patient, "Beispiel-Arztbrief.txt")
+    if altsystem:
+        name, titel = "Altdokument-Scan.txt", "Altdokument aus dem bisherigen System"
+        text = "Übernommenes Altdokument (TESTDATEN) – Typ und Datum bitte prüfen.\n"
+    else:
+        name, titel = "Beispiel-Arztbrief.txt", "Beispiel-Arztbrief"
+        text = ("Beispiel-Arztbrief (TESTDATEN)\n\nDieser Brief ist frei erfunden und dient nur zum Testen "
+                "von Upload, Anzeige und Download im EPM.\n")
+    inhalt = text.encode("utf-8")
+    relativ = dokument_pfad(patient, name)
     ziel = settings.EPM_DOKUMENTE / relativ
     ziel.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
     ziel.write_bytes(inhalt)
     _nutzer(user, Dokument(
-        patient=patient, typ=typ, titel="Beispiel-Arztbrief", datum=timezone.localdate() - timedelta(days=14),
-        datei=relativ, originalname="Beispiel-Arztbrief.txt", mime="text/plain; charset=utf-8",
+        patient=patient, typ=typ, titel=titel,
+        datum=timezone.localdate() - timedelta(days=400 if altsystem else 14),
+        datei=relativ, originalname=name, mime="text/plain; charset=utf-8",
         groesse=len(inhalt), sha256=hashlib.sha256(inhalt).hexdigest(), hochgeladen_von=user,
+        herkunft=Dokument.Herkunft.ALTSYSTEM if altsystem else Dokument.Herkunft.UPLOAD,
+        datum_quelle=Dokument.DatumQuelle.DATEIDATUM if altsystem else Dokument.DatumQuelle.EINGABE,
+        typ_geprueft=not altsystem,
     )).save()
 
 

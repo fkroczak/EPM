@@ -1,9 +1,10 @@
 """Stammdaten: lesen dürfen alle, ändern nur der Admin. Gelöscht wird nichts, nur deaktiviert."""
-from rest_framework import mixins, serializers, viewsets
+from rest_framework import mixins, serializers, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import StammdatenRecht
+from accounts.permissions import StammdatenRecht, VersorgerRecht
 from audit.models import SystemEreignis, protokolliere
 
 from .models import Ansprechpartner, Auswahlwert, Einstellungen, Praeparat, Versorger
@@ -38,18 +39,53 @@ class AuswahlwertViewSet(OhneLoeschen):
 
 
 class AnsprechpartnerSerializer(serializers.ModelSerializer):
-    patienten_anzahl = serializers.IntegerField(source="patienten.count", read_only=True)
+    patienten_anzahl = serializers.SerializerMethodField()
 
     class Meta:
         model = Ansprechpartner
-        fields = ["id", "versorger", "name", "telefon", "mobil", "email", "notiz", "aktiv", "patienten_anzahl"]
+        fields = ["id", "versorger", "name", "zustaendigkeit", "telefon", "mobil", "email", "notiz", "aktiv",
+                  "patienten_anzahl"]
+
+    def get_patienten_anzahl(self, obj):
+        return obj.patienten.filter(abgeschlossen_am__isnull=True, ist_test=False).count()
 
 
 class AnsprechpartnerViewSet(OhneLoeschen):
+    permission_classes = [VersorgerRecht]
     queryset = Ansprechpartner.objects.select_related("versorger")
     serializer_class = AnsprechpartnerSerializer
     filterset_fields = ["versorger", "aktiv"]
     pagination_class = None
+
+    @action(detail=True, methods=["get"])
+    def patienten(self, request, pk=None):
+        """Betreute Patienten (in Betreuung) – zum Neuzuordnen, z. B. vor dem Deaktivieren."""
+        from patienten.api import PatientListSerializer
+        from epm.api_basis import patienten_fuer
+
+        ap = self.get_object()
+        qs = patienten_fuer(request.user).filter(ansprechpartner=ap, abgeschlossen_am__isnull=True)
+        return Response(PatientListSerializer(qs, many=True).data)
+
+    @action(detail=True, methods=["post"], url_path="neu-zuordnen")
+    def neu_zuordnen(self, request, pk=None):
+        """Alle Patienten dieses Ansprechpartners einem anderen desselben Versorgers zuordnen."""
+        from patienten.models import Patient
+
+        ap = self.get_object()
+        ziel = Ansprechpartner.objects.filter(pk=request.data.get("ziel"), versorger=ap.versorger, aktiv=True).first()
+        if ziel is None or ziel == ap:
+            return Response({"ziel": "Bitte einen anderen, aktiven Ansprechpartner desselben Versorgers wählen."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        anzahl = 0
+        for p in Patient.objects.filter(ansprechpartner=ap, abgeschlossen_am__isnull=True):
+            p.ansprechpartner = ziel
+            p._history_user = request.user
+            p.save()  # einzeln, damit jede Änderung im Verlauf der Akte steht
+            anzahl += 1
+        protokolliere(SystemEreignis.Art.STAMMDATEN, request, objekt=f"Ansprechpartner: {ap}",
+                      aktion="Patienten neu zugeordnet", ziel=str(ziel), anzahl=anzahl)
+        return Response({"neu_zugeordnet": anzahl})
 
 
 class VersorgerSerializer(serializers.ModelSerializer):
@@ -63,6 +99,7 @@ class VersorgerSerializer(serializers.ModelSerializer):
 
 
 class VersorgerViewSet(OhneLoeschen):
+    permission_classes = [VersorgerRecht]
     queryset = Versorger.objects.prefetch_related("ansprechpartner")
     serializer_class = VersorgerSerializer
     filterset_fields = ["aktiv"]
@@ -72,10 +109,30 @@ class VersorgerViewSet(OhneLoeschen):
 
 class PraeparatSerializer(serializers.ModelSerializer):
     anzeige = serializers.CharField(source="__str__", read_only=True)
+    in_plaenen = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Praeparat
-        fields = ["id", "kategorie", "name", "konzentration", "einheit", "aktiv", "anzeige"]
+        fields = ["id", "kategorie", "name", "konzentration", "einheit", "reihenfolge", "aktiv", "anzeige", "in_plaenen"]
+
+
+def _praeparate_mit_nutzung():
+    """Anzahl der Pläne, in denen ein Präparat vorkommt (Entwurf 18: Spalte „in Plänen“)."""
+    from django.db.models import Count, IntegerField, OuterRef, Q, Subquery, Value
+    from django.db.models.functions import Coalesce
+
+    from infusionen.models import Infusionsplan
+
+    felder = ["basis_praeparat", "glucose_praeparat", "aminosaeuren_praeparat", "lipide_praeparat",
+              "albumin_praeparat", "katheterschutz", "spurenelemente", "vitamine"]
+    bedingung = Q()
+    for f in felder:
+        bedingung |= Q(**{f: OuterRef("pk")})
+    anzahl = (
+        Infusionsplan.objects.filter(bedingung).order_by().annotate(gruppe=Value(1))
+        .values("gruppe").annotate(n=Count("pk", distinct=True)).values("n")
+    )
+    return Praeparat.objects.annotate(in_plaenen=Coalesce(Subquery(anzahl, output_field=IntegerField()), 0))
 
 
 class PraeparatViewSet(OhneLoeschen):
@@ -84,6 +141,9 @@ class PraeparatViewSet(OhneLoeschen):
     filterset_fields = ["kategorie", "aktiv"]
     search_fields = ["name"]
     pagination_class = None
+
+    def get_queryset(self):
+        return _praeparate_mit_nutzung()
 
 
 class EinstellungenSerializer(serializers.ModelSerializer):
@@ -94,12 +154,9 @@ class EinstellungenSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
         e = self.instance
-        g_min = attrs.get("gewicht_min_kg", e.gewicht_min_kg)
-        g_max = attrs.get("gewicht_max_kg", e.gewicht_max_kg)
-        h_min = attrs.get("groesse_min_cm", e.groesse_min_cm)
-        h_max = attrs.get("groesse_max_cm", e.groesse_max_cm)
-        if g_min >= g_max or h_min >= h_max:
-            raise serializers.ValidationError("Untere Grenze muss kleiner als obere Grenze sein.")
+        for unten, oben in Einstellungen.GRENZPAARE:
+            if attrs.get(unten, getattr(e, unten)) >= attrs.get(oben, getattr(e, oben)):
+                raise serializers.ValidationError({unten: "Untere Grenze muss kleiner als obere Grenze sein."})
         return attrs
 
 

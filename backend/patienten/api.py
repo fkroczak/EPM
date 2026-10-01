@@ -6,7 +6,9 @@ import tempfile
 from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import Q
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
+from django.db.models import F, Max, Q
 from django.http import FileResponse, HttpResponse
 from django.utils import timezone
 from django_filters import rest_framework as filters
@@ -15,11 +17,12 @@ from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
-from accounts.permissions import NurAdmin, PatientendatenRecht
+from accounts.permissions import AbschlussRecht, NurAdmin, PatientendatenRecht
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import ModelClean, RichText, benutzername, patienten_fuer
 from stammdaten.models import Auswahlwert
 
+from .kennzahlen import kennzahlen, pruefliste, schnellfilter, zaehler
 from .models import Dokument, Gewichtsmessung, Kontakt, Patient, Termin, dokument_pfad
 
 
@@ -27,14 +30,27 @@ from .models import Dokument, Gewichtsmessung, Kontakt, Patient, Termin, dokumen
 class PatientListSerializer(serializers.ModelSerializer):
     versorger_name = serializers.CharField(source="versorger.name", read_only=True, default=None)
     ansprechpartner_name = serializers.CharField(source="ansprechpartner.name", read_only=True, default=None)
+    katheter_name = serializers.CharField(source="katheter.wert", read_only=True, default=None)
     ist_abgeschlossen = serializers.BooleanField(read_only=True)
+    alter = serializers.SerializerMethodField()
+    kennzahlen = serializers.SerializerMethodField()
 
     class Meta:
         model = Patient
         fields = [
-            "id", "nummer", "nachname", "vorname", "geburtsdatum", "ort", "versorger", "versorger_name",
-            "ansprechpartner", "ansprechpartner_name", "ist_abgeschlossen", "abschluss_anlass", "ist_test",
+            "id", "nummer", "nachname", "vorname", "geburtsdatum", "alter", "ort", "katheter", "katheter_name",
+            "versorger", "versorger_name", "ansprechpartner", "ansprechpartner_name", "nickelallergie",
+            "ist_abgeschlossen", "abgeschlossen_am", "abschluss_anlass", "ist_test", "kennzahlen",
         ]
+
+    def get_alter(self, obj):
+        heute = timezone.localdate()
+        g = obj.geburtsdatum
+        return heute.year - g.year - ((heute.month, heute.day) < (g.month, g.day))
+
+    def get_kennzahlen(self, obj):
+        """Gewicht + Trend, letzter Kontakt, Hinweise (nur wenn die Ansicht sie berechnet hat)."""
+        return self.context.get("kennzahlen", {}).get(obj.id)
 
 
 class PatientSerializer(ModelClean, serializers.ModelSerializer):
@@ -45,16 +61,22 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
     ist_abgeschlossen = serializers.BooleanField(read_only=True)
     kopf = serializers.SerializerMethodField()
     angelegt_von_name = serializers.SerializerMethodField()
+    # Nur beim Anlegen: „Gewicht bei Aufnahme“ (Entwurf 12) wird als erste Messung gespeichert
+    aufnahme_gewicht_kg = serializers.DecimalField(max_digits=5, decimal_places=1, required=False,
+                                                   allow_null=True, write_only=True)
+    aufnahme_gemessen_am = serializers.DateField(required=False, write_only=True)
+    aufnahme_quelle = serializers.ChoiceField(Gewichtsmessung.Quelle.choices, required=False, write_only=True)
 
     class Meta:
         model = Patient
         fields = [
             "id", "nummer", "nachname", "vorname", "geburtsdatum", "geschlecht",
             "strasse", "plz", "ort", "telefon", "telefon2", "email", "krankenkasse", "hausarzt",
-            "groesse_cm", "katheter", "versorger", "ansprechpartner", "nickelallergie",
+            "ueberweisung_durch", "groesse_cm", "katheter", "versorger", "ansprechpartner", "nickelallergie",
             "diagnose", "therapie", "empfehlung", "bemerkung",
             "abgeschlossen_am", "abschluss_anlass", "abschluss_notiz", "ist_abgeschlossen", "ist_test",
             "angelegt_am", "angelegt_von_name", "geaendert_am", "kopf",
+            "aufnahme_gewicht_kg", "aufnahme_gemessen_am", "aufnahme_quelle",
         ]
         read_only_fields = ["abgeschlossen_am", "abschluss_anlass", "abschluss_notiz", "angelegt_am", "geaendert_am"]
 
@@ -77,12 +99,17 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
             "katheter": obj.katheter.wert if obj.katheter_id else None,
             "versorger": obj.versorger.name if obj.versorger_id else None,
             "ansprechpartner": obj.ansprechpartner.name if obj.ansprechpartner_id else None,
+            "ansprechpartner_telefon": (obj.ansprechpartner.telefon or obj.ansprechpartner.mobil)
+            if obj.ansprechpartner_id else None,
             "nickelallergie": obj.nickelallergie,
-            "aktueller_plan": {"id": plan.id, "gueltig_ab": plan.gueltig_ab, "kcal": plan.kcal} if plan else None,
+            "aktueller_plan": {"id": plan.id, "gueltig_ab": plan.gueltig_ab, "kcal": plan.kcal,
+                               "laufzeit_h": plan.laufzeit_h} if plan else None,
             "naechster_termin": (
                 {"id": termin.id, "art": termin.art, "titel": termin.titel, "faellig_am": termin.faellig_am,
-                 "uhrzeit": termin.uhrzeit, "bei": termin.bei} if termin else None
+                 "uhrzeit": termin.uhrzeit, "ort": termin.ort.wert if termin.ort_id else None,
+                 "bei": termin.bei} if termin else None
             ),
+            "versionen": {feld: _versionskopf(obj, feld) for feld in TEXTFELDER},
             "zaehler": {
                 "kontakte": obj.kontakte.count(),
                 "gewichte": obj.gewichte.count(),
@@ -93,6 +120,21 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
         }
 
     def validate(self, attrs):
+        aufnahme = {k: attrs.pop(k) for k in ("aufnahme_gewicht_kg", "aufnahme_gemessen_am", "aufnahme_quelle")
+                    if k in attrs}
+        if aufnahme and self.instance is not None:
+            raise serializers.ValidationError({"aufnahme_gewicht_kg": "Nur beim Anlegen möglich."})
+        if aufnahme.get("aufnahme_gewicht_kg") is not None:
+            messung = Gewichtsmessung(
+                gewicht_kg=aufnahme["aufnahme_gewicht_kg"],
+                gemessen_am=aufnahme.get("aufnahme_gemessen_am") or timezone.localdate(),
+                quelle=aufnahme.get("aufnahme_quelle") or Gewichtsmessung.Quelle.TELEFONISCH,
+            )
+            try:
+                messung.clean()
+            except DjangoValidationError as fehler:
+                raise serializers.ValidationError({"aufnahme_gewicht_kg": fehler.messages})
+            self.aufnahme_messung = messung
         attrs = super().validate(attrs)
         for feld, liste in (("katheter", Auswahlwert.Liste.KATHETER),):
             wert = attrs.get(feld)
@@ -101,24 +143,85 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
         return attrs
 
 
+def _datum(text: str):
+    """„14.03.1968“ oder „1968-03-14“ als Datum, sonst None."""
+    from datetime import datetime
+
+    for muster in ("%d.%m.%Y", "%Y-%m-%d", "%d.%m.%y"):
+        try:
+            return datetime.strptime(text, muster).date()
+        except ValueError:
+            continue
+    return None
+
+
+TEXTFELDER = ("diagnose", "therapie", "empfehlung")
+
+
+def feldversionen(patient, feld: str) -> list:
+    """Fassungen eines Textfelds (neueste zuerst): Version, Zeitpunkt, Person, Text."""
+    fassungen = []
+    vorher = None
+    for h in patient.history.order_by("history_date", "history_id").select_related("history_user"):
+        text = getattr(h, feld)
+        if text != vorher and (text or vorher is not None):
+            fassungen.append({"version": len(fassungen) + 1, "zeitpunkt": h.history_date,
+                              "person": benutzername(h.history_user), "text": text})
+        vorher = text
+    return list(reversed(fassungen))
+
+
+def _versionskopf(patient, feld):
+    """„Version 12 · geändert 12.08.2026, 15:12 von Dr. M. Berger“"""
+    fassungen = feldversionen(patient, feld)
+    if not fassungen:
+        return None
+    return {"version": fassungen[0]["version"], "zeitpunkt": fassungen[0]["zeitpunkt"], "person": fassungen[0]["person"]}
+
+
 class PatientFilter(filters.FilterSet):
     status = filters.ChoiceFilter(
         choices=[("in_betreuung", "In Betreuung"), ("abgeschlossen", "Abgeschlossen")], method="filter_status"
     )
     test = filters.ChoiceFilter(choices=[("nur", "nur Testpatienten"), ("ohne", "ohne Testpatienten")],
                                 method="filter_test")
-    suche = filters.CharFilter(method="filter_suche", label="Name, Vorname, Ort oder Patientennummer")
+    suche = filters.CharFilter(method="filter_suche", label="Name, Vorname, Ort, Patientennummer oder Geburtsdatum")
+    pruefen = filters.ChoiceFilter(
+        choices=[("altdokumente", "Altdokumente prüfen"), ("nickelallergie", "Nickelallergie nicht erfasst"),
+                 ("kein_versorger", "Kein Versorger"), ("kein_kontakt", "Kein Kontakt seit X Monaten")],
+        method="filter_pruefen",
+    )
 
     class Meta:
         model = Patient
         fields = ["versorger", "ansprechpartner", "katheter", "nickelallergie"]
+
+    def filter_pruefen(self, qs, name, wert):
+        from .models import Dokument
+
+        if wert == "altdokumente":
+            return qs.filter(id__in=Dokument.objects.filter(typ_geprueft=False, ausgeblendet=False).values("patient_id"))
+        if wert == "nickelallergie":
+            return qs.filter(nickelallergie=Patient.Nickelallergie.UNBEKANNT)
+        if wert == "kein_versorger":
+            return qs.filter(versorger__isnull=True)
+        if wert == "kein_kontakt":
+            from stammdaten.models import Einstellungen
+
+            grenze = timezone.now() - timedelta(days=30 * Einstellungen.aktuell().kontakt_ueberfaellig_monate)
+            aktuell = Kontakt.objects.filter(storniert_am__isnull=True, zeitpunkt__gte=grenze).values("patient_id")
+            return qs.exclude(id__in=aktuell)
+        return qs
 
     def filter_status(self, qs, name, wert):
         return qs.filter(abgeschlossen_am__isnull=(wert == "in_betreuung"))
 
     def filter_suche(self, qs, name, wert):
         for wort in wert.split():
-            if wort.isdigit():
+            datum = _datum(wort)
+            if datum:
+                qs = qs.filter(geburtsdatum=datum)
+            elif wort.isdigit():
                 qs = qs.filter(nummer=int(wort))
             else:
                 qs = qs.filter(Q(nachname__icontains=wort) | Q(vorname__icontains=wort) | Q(ort__icontains=wort))
@@ -130,19 +233,71 @@ class PatientFilter(filters.FilterSet):
 
 class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.CreateModelMixin,
                      mixins.UpdateModelMixin, viewsets.GenericViewSet):
+    """
+    Liste: ``?status=in_betreuung|abgeschlossen``, ``schnellfilter=hinweise|gewichtsverlust|termin_woche``,
+    ``suche``, ``versorger``, ``ansprechpartner``, ``katheter``, ``nickelallergie``, ``pruefen``,
+    ``ordering=letzter_kontakt|-letzter_kontakt|nachname|nummer|geburtsdatum`` (Standard: letzter Kontakt, neueste zuerst).
+    """
+
     permission_classes = [PatientendatenRecht]
     filterset_class = PatientFilter
-    ordering_fields = ["nachname", "nummer", "geburtsdatum", "geaendert_am"]
+    ordering_fields = ["nachname", "nummer", "geburtsdatum", "geaendert_am", "letzter_kontakt"]
 
     def get_queryset(self):
-        return patienten_fuer(self.request.user).select_related("versorger", "ansprechpartner", "katheter",
-                                                                "angelegt_von")
+        qs = patienten_fuer(self.request.user).select_related("versorger", "ansprechpartner", "katheter",
+                                                              "angelegt_von")
+        if self.action == "list":
+            qs = qs.annotate(letzter_kontakt=Max("kontakte__zeitpunkt",
+                                                 filter=Q(kontakte__storniert_am__isnull=True)))
+            if not self.request.query_params.get("ordering"):
+                qs = qs.order_by(F("letzter_kontakt").desc(nulls_last=True), "nachname", "vorname")
+        return qs
 
     def get_serializer_class(self):
         return PatientListSerializer if self.action == "list" else PatientSerializer
 
+    def list(self, request, *args, **kwargs):
+        qs = self.filter_queryset(self.get_queryset())
+        art = request.query_params.get("schnellfilter")
+        if art in ("hinweise", "gewichtsverlust", "termin_woche"):
+            qs = qs.filter(id__in=schnellfilter(qs, art))
+        seite = self.paginate_queryset(qs)
+        eintraege = seite if seite is not None else list(qs)
+        context = self.get_serializer_context()
+        context["kennzahlen"] = kennzahlen(eintraege)
+        daten = PatientListSerializer(eintraege, many=True, context=context).data
+        return self.get_paginated_response(daten) if seite is not None else Response(daten)
+
+    @action(detail=False, methods=["get"])
+    def zaehler(self, request):
+        """Zahlen für „In Betreuung“, „Abgeschlossen“ und die Schnellfilter (Testpatienten zählen nicht)."""
+        qs = patienten_fuer(request.user)
+        if not request.user.ist_test:
+            qs = qs.filter(ist_test=False)
+        return Response(zaehler(qs))
+
+    @action(detail=False, methods=["get"], url_path="naechste-nummer")
+    def naechste_nummer(self, request):
+        """„Nr. 0300 wird automatisch vergeben“ (Entwurf 12)."""
+        return Response({"nummer": Patient.naechste_nummer(request.user.ist_test)})
+
+    @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save(angelegt_von=self.request.user, ist_test=self.request.user.ist_test)
+        patient = serializer.save(angelegt_von=self.request.user, ist_test=self.request.user.ist_test)
+        messung = getattr(serializer, "aufnahme_messung", None)
+        if messung is not None:
+            messung.patient = patient
+            messung.erfasst_von = self.request.user
+            messung.save()
+
+    @action(detail=True, methods=["get"])
+    def versionen(self, request, pk=None):
+        """Fassungen von Diagnose, Therapie oder Empfehlung (Entwurf 5 · „Versionen“)."""
+        feld = request.query_params.get("feld")
+        if feld not in TEXTFELDER:
+            return Response({"feld": f"Erlaubt: {', '.join(TEXTFELDER)}."}, status=status.HTTP_400_BAD_REQUEST)
+        fassungen = feldversionen(self.get_object(), feld)
+        return Response({"feld": feld, "version": fassungen[0]["version"] if fassungen else 0, "fassungen": fassungen})
 
     def perform_update(self, serializer):
         serializer.instance.pruefe_bearbeitbar()
@@ -166,7 +321,7 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
             qs = qs.filter(name)
         return Response(PatientListSerializer(qs[:10], many=True).data)
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], permission_classes=[AbschlussRecht])
     def abschliessen(self, request, pk=None):
         patient = self.get_object()
         patient.pruefe_bearbeitbar()
@@ -201,48 +356,90 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
 
     @action(detail=True, methods=["get"])
     def verlauf(self, request, pk=None):
-        """Alle Fassungen aller Einträge dieser Akte, neueste zuerst. Filter: bereich, person."""
-        patient = self.get_object()
-        from infusionen.models import Infusionsplan
+        """Alle Fassungen aller Einträge dieser Akte, neueste zuerst (Entwurf 10).
 
-        quellen = {
-            "stammdaten": Patient.history.filter(id=patient.id),
-            "gewichte": Gewichtsmessung.history.filter(patient_id=patient.id),
-            "kontakte": Kontakt.history.filter(patient_id=patient.id),
-            "termine": Termin.history.filter(patient_id=patient.id),
-            "dokumente": Dokument.history.filter(patient_id=patient.id),
-            "infusionsplaene": Infusionsplan.history.filter(patient_id=patient.id),
+        Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, gewichte, kontakte, termine,
+        dokumente, infusionsplaene; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
+        die Bereiche Stammdaten, Diagnose, Therapie und Empfehlung verteilt.
+        """
+        patient = self.get_object()
+        bereich = request.query_params.get("bereich") or None
+        person = request.query_params.get("person") or None
+        return Response(verlauf_eintraege(patient, bereich, person))
+
+
+def _aktion(name, h, aenderungen):
+    """Fachliche Bezeichnung der Aktion („storniert“, „freigegeben“ …)."""
+    felder = {a["feld"] for a in aenderungen}
+    if h.history_type == "+":
+        return {"dokumente": "hochgeladen"}.get(name, "angelegt")
+    if h.history_type == "-":
+        return "gelöscht"
+    if name == "kontakte" and "storniert_am" in felder:
+        return "storniert"
+    if name == "termine" and "erledigt_am" in felder:
+        return "erledigt"
+    if name == "infusionsplaene" and "status" in felder:
+        return {"aktuell": "freigegeben", "abgeloest": "abgelöst"}.get(h.status, "geändert")
+    if name == "stammdaten" and "abgeschlossen_am" in felder:
+        return "abgeschlossen" if h.abgeschlossen_am else "wieder geöffnet"
+    return "geändert"
+
+
+def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
+    from infusionen.models import Infusionsplan
+
+    quellen = {
+        "akte": Patient.history.filter(id=patient.id),
+        "gewichte": Gewichtsmessung.history.filter(patient_id=patient.id),
+        "kontakte": Kontakt.history.filter(patient_id=patient.id),
+        "termine": Termin.history.filter(patient_id=patient.id),
+        "dokumente": Dokument.history.filter(patient_id=patient.id),
+        "infusionsplaene": Infusionsplan.history.filter(patient_id=patient.id),
+    }
+    if bereich and bereich not in ("stammdaten", *TEXTFELDER):
+        quellen = {k: v for k, v in quellen.items() if k == bereich}
+    elif bereich:
+        quellen = {"akte": quellen["akte"]}
+    eintraege = []
+    for name, qs in quellen.items():
+        qs = qs.select_related("history_user")
+        if person:
+            qs = qs.filter(history_user_id=person)
+        for h in qs.order_by("-history_date")[:grenze]:
+            eintraege.append((name, h))
+    eintraege.sort(key=lambda e: e[1].history_date, reverse=True)
+    ergebnis = []
+    for name, h in eintraege[:grenze]:
+        aenderungen = []
+        vorher = h.prev_record if h.history_type == "~" else None
+        if vorher is not None:
+            diff = h.diff_against(vorher)
+            aenderungen = [{"feld": c.field, "alt": _kurz(c.old), "neu": _kurz(c.new)} for c in diff.changes]
+        basis = {
+            "objekt_id": h.id,
+            "art": {"+": "angelegt", "~": "geändert", "-": "gelöscht"}[h.history_type],
+            "zeitpunkt": h.history_date,
+            "person": benutzername(h.history_user),
+            "person_id": h.history_user_id,
+            "grund": h.history_change_reason,
         }
-        bereich = request.query_params.get("bereich")
-        if bereich:
-            quellen = {k: v for k, v in quellen.items() if k == bereich}
-        person = request.query_params.get("person")
-        eintraege = []
-        for name, qs in quellen.items():
-            qs = qs.select_related("history_user")
-            if person:
-                qs = qs.filter(history_user_id=person)
-            for h in qs.order_by("-history_date")[:500]:
-                eintraege.append((name, h))
-        eintraege.sort(key=lambda e: e[1].history_date, reverse=True)
-        ergebnis = []
-        for name, h in eintraege[:500]:
-            aenderungen = []
-            vorher = h.prev_record if h.history_type == "~" else None
-            if vorher is not None:
-                diff = h.diff_against(vorher)
-                aenderungen = [{"feld": c.field, "alt": _kurz(c.old), "neu": _kurz(c.new)} for c in diff.changes]
-            ergebnis.append({
-                "bereich": name,
-                "objekt_id": h.id,
-                "art": {"+": "angelegt", "~": "geändert", "-": "gelöscht"}[h.history_type],
-                "zeitpunkt": h.history_date,
-                "person": benutzername(h.history_user),
-                "person_id": h.history_user_id,
-                "grund": h.history_change_reason,
-                "aenderungen": aenderungen,
-            })
-        return Response(ergebnis)
+        if name != "akte":
+            ergebnis.append({**basis, "bereich": name, "aktion": _aktion(name, h, aenderungen),
+                             "aenderungen": aenderungen})
+            continue
+        # Akte: je Bereich ein Eintrag (Stammdaten / Diagnose / Therapie / Empfehlung)
+        gruppen = {}
+        for a in aenderungen:
+            gruppen.setdefault(a["feld"] if a["feld"] in TEXTFELDER else "stammdaten", []).append(a)
+        if h.history_type != "~":
+            gruppen = {"stammdaten": []}
+        for gruppe, liste in gruppen.items():
+            if bereich and bereich != gruppe:
+                continue
+            ergebnis.append({**basis, "bereich": gruppe, "aktion": _aktion("stammdaten", h, liste),
+                             "aenderungen": liste})
+    return ergebnis
 
 
 def _kurz(wert, laenge=300):
@@ -299,17 +496,68 @@ class GewichtViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retrieve
         serializer.save()
 
 
+def _pruefe_terminort(ort):
+    if ort is not None and ort.liste != Auswahlwert.Liste.TERMINORT:
+        raise serializers.ValidationError("Ungültiger Terminort.")
+    return ort
+
+
+class WiedervorlageSerializer(serializers.Serializer):
+    """Termin, der zusammen mit einem Kontakt angelegt wird (Entwurf 6 · „Wiedervorlage“)."""
+
+    art = serializers.ChoiceField(Termin.Art.choices, default=Termin.Art.WIEDERVORLAGE)
+    ort = serializers.PrimaryKeyRelatedField(queryset=Auswahlwert.objects.filter(aktiv=True), required=False,
+                                             allow_null=True)
+    faellig_am = serializers.DateField()
+    uhrzeit = serializers.TimeField(required=False, allow_null=True)
+    titel = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    notiz = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_ort(self, ort):
+        return _pruefe_terminort(ort)
+
+    def validate_faellig_am(self, datum):
+        if datum < timezone.localdate():
+            raise serializers.ValidationError("Das Datum liegt in der Vergangenheit.")
+        return datum
+
+
 class KontaktSerializer(serializers.ModelSerializer):
     text = RichText(required=True, allow_blank=False)
     erfasst_von_name = serializers.SerializerMethodField()
     storniert_von_name = serializers.SerializerMethodField()
     art_name = serializers.CharField(source="art.wert", read_only=True, default=None)
+    wiedervorlage = WiedervorlageSerializer(write_only=True, required=False, allow_null=True)
+    termine = serializers.SerializerMethodField()
 
     class Meta:
         model = Kontakt
         fields = ["id", "patient", "zeitpunkt", "art", "art_name", "text", "erfasst_am", "erfasst_von_name",
-                  "storniert_am", "storniert_von_name", "storno_grund"]
+                  "storniert_am", "storniert_von_name", "storno_grund", "wiedervorlage", "termine"]
         read_only_fields = ["erfasst_am", "storniert_am", "storno_grund"]
+
+    def get_termine(self, obj):
+        return [{"id": t.id, "art": t.art, "faellig_am": t.faellig_am, "uhrzeit": t.uhrzeit,
+                 "ort": t.ort.wert if t.ort_id else None, "erledigt": t.erledigt_am is not None}
+                for t in obj.termine.all()]
+
+    def validate_text(self, text):
+        if not text.strip():
+            raise serializers.ValidationError("Bitte einen Text eingeben.")
+        return text
+
+    @transaction.atomic
+    def create(self, validated_data):
+        wv = validated_data.pop("wiedervorlage", None)
+        kontakt = super().create(validated_data)
+        if wv:
+            titel = wv.get("titel") or dict(Termin.Art.choices)[wv["art"]]
+            Termin.objects.create(
+                patient=kontakt.patient, kontakt=kontakt, art=wv["art"], ort=wv.get("ort"),
+                faellig_am=wv["faellig_am"], uhrzeit=wv.get("uhrzeit"), titel=titel[:200],
+                notiz=wv.get("notiz", ""), angelegt_von=kontakt.erfasst_von,
+            )
+        return kontakt
 
     def get_erfasst_von_name(self, obj):
         return benutzername(obj.erfasst_von)
@@ -337,7 +585,8 @@ class KontaktViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retrieve
     search_fields = ["text"]
 
     def get_queryset(self):
-        return super().get_queryset().select_related("erfasst_von", "storniert_von", "art")
+        return (super().get_queryset().select_related("erfasst_von", "storniert_von", "art")
+                .prefetch_related("termine__ort"))
 
     def perform_create(self, serializer):
         self.pruefe_patient(serializer.validated_data["patient"])
@@ -352,14 +601,15 @@ class KontaktViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retrieve
 
 
 class TerminSerializer(serializers.ModelSerializer):
+    ort_name = serializers.CharField(source="ort.wert", read_only=True, default=None)
     erledigt_von_name = serializers.SerializerMethodField()
     angelegt_von_name = serializers.SerializerMethodField()
     patient_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Termin
-        fields = ["id", "patient", "patient_name", "art", "faellig_am", "uhrzeit", "bei", "titel", "notiz",
-                  "kontakt", "erledigt_am", "erledigt_von_name", "angelegt_am", "angelegt_von_name"]
+        fields = ["id", "patient", "patient_name", "art", "ort", "ort_name", "faellig_am", "uhrzeit", "bei", "titel",
+                  "notiz", "kontakt", "erledigt_am", "erledigt_von_name", "angelegt_am", "angelegt_von_name"]
         read_only_fields = ["erledigt_am", "angelegt_am"]
 
     def get_erledigt_von_name(self, obj):
@@ -370,6 +620,9 @@ class TerminSerializer(serializers.ModelSerializer):
 
     def get_patient_name(self, obj):
         return f"{obj.patient.nachname}, {obj.patient.vorname}"
+
+    def validate_ort(self, ort):
+        return _pruefe_terminort(ort)
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -427,9 +680,11 @@ class DokumentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Dokument
-        fields = ["id", "patient", "typ", "typ_name", "titel", "datum", "notiz", "ausgeblendet", "datei",
-                  "originalname", "mime", "groesse", "sha256", "herkunft", "hochgeladen_am", "hochgeladen_von_name"]
-        read_only_fields = ["originalname", "mime", "groesse", "sha256", "herkunft", "hochgeladen_am"]
+        fields = ["id", "patient", "typ", "typ_name", "titel", "datum", "datum_quelle", "typ_geprueft", "notiz",
+                  "ausgeblendet", "datei", "originalname", "mime", "groesse", "sha256", "herkunft", "hochgeladen_am",
+                  "hochgeladen_von_name"]
+        read_only_fields = ["originalname", "mime", "groesse", "sha256", "herkunft", "hochgeladen_am",
+                            "datum_quelle", "typ_geprueft"]
 
     def get_hochgeladen_von_name(self, obj):
         return benutzername(obj.hochgeladen_von)
@@ -448,10 +703,37 @@ class DokumentSerializer(serializers.ModelSerializer):
         datei = attrs.get("datei")
         if datei and datei.size > settings.EPM_UPLOAD_MAX_MB * 1024 * 1024:
             raise serializers.ValidationError({"datei": f"Datei größer als {settings.EPM_UPLOAD_MAX_MB} MB."})
+        if datei:
+            mime = erkenne_dateityp(datei)
+            if mime is None:
+                raise serializers.ValidationError({"datei": "Erlaubt sind PDF, JPG, PNG und TXT."})
+            self.erkannter_typ = mime
         return attrs
 
 
-def speichere_datei(patient, upload) -> dict:
+def erkenne_dateityp(upload):
+    """Dateityp am Inhalt erkennen (nicht an der Endung): PDF, JPEG, PNG oder Text. Sonst None."""
+    upload.seek(0)
+    kopf = upload.read(2048)
+    upload.seek(0)
+    if kopf.startswith(b"%PDF-"):
+        return "application/pdf"
+    if kopf.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if kopf.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if b"\x00" in kopf:
+        return None
+    for kodierung in ("utf-8", "cp1252"):
+        try:
+            kopf.decode(kodierung)
+            return f"text/plain; charset={'utf-8' if kodierung == 'utf-8' else 'windows-1252'}"
+        except UnicodeDecodeError:
+            continue
+    return None
+
+
+def speichere_datei(patient, upload, mime: str | None = None) -> dict:
     """Schreibt die Datei atomar ins Dokumentenverzeichnis und berechnet SHA-256."""
     relativ = dokument_pfad(patient, upload.name)
     ziel = settings.EPM_DOKUMENTE / relativ
@@ -473,7 +755,7 @@ def speichere_datei(patient, upload) -> dict:
         if os.path.exists(tmp):
             os.unlink(tmp)
         raise
-    mime = upload.content_type or mimetypes.guess_type(upload.name)[0] or "application/octet-stream"
+    mime = mime or upload.content_type or mimetypes.guess_type(upload.name)[0] or "application/octet-stream"
     return {"datei": relativ, "originalname": upload.name[:255], "mime": mime[:100], "groesse": groesse,
             "sha256": h.hexdigest()}
 
@@ -490,13 +772,30 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
         patient = serializer.validated_data["patient"]
         self.pruefe_patient(patient)
         upload = serializer.validated_data.pop("datei")
-        meta = speichere_datei(patient, upload)
+        meta = speichere_datei(patient, upload, getattr(serializer, "erkannter_typ", None))
         titel = serializer.validated_data.get("titel") or upload.name
         serializer.save(hochgeladen_von=self.request.user, titel=titel[:200], **meta)
 
     def perform_update(self, serializer):
         self.pruefe_patient(serializer.instance.patient)
         serializer.save()
+
+    @action(detail=True, methods=["post"])
+    def geprueft(self, request, pk=None):
+        """Altdokument bestätigen: Typ und Datum stimmen (optional mit Korrektur)."""
+        dok = self.get_object()
+        self.pruefe_patient(dok.patient)
+        s = DokumentSerializer(dok, data={k: v for k, v in request.data.items() if k in ("typ", "datum", "titel")},
+                               partial=True, context=self.get_serializer_context())
+        s.is_valid(raise_exception=True)
+        if "datum" in s.validated_data and s.validated_data["datum"] != dok.datum:
+            dok.datum_quelle = Dokument.DatumQuelle.EINGABE
+        for feld, wert in s.validated_data.items():
+            setattr(dok, feld, wert)
+        dok.typ_geprueft = True
+        dok._history_user = request.user
+        dok.save()
+        return Response(DokumentSerializer(dok, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=["get"])
     def datei(self, request, pk=None):
@@ -519,6 +818,40 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
 
 
 # ================================================================= Startseite
+def _zuletzt_eingetragen(patienten, anzahl=10):
+    """Neueste Einträge aus allen Bereichen (Entwurf 2 · „Zuletzt eingetragen“)."""
+    from infusionen.models import Infusionsplan
+
+    ids = list(patienten.values_list("id", flat=True))
+    quellen = [
+        ("kontakt", "Kontakt", Kontakt.history.filter(patient_id__in=ids, history_type="+")),
+        ("gewicht", "Gewicht", Gewichtsmessung.history.filter(patient_id__in=ids, history_type="+")),
+        ("dokument", "Dokument", Dokument.history.filter(patient_id__in=ids, history_type="+")),
+        ("plan", "Infusionsplan-Entwurf", Infusionsplan.history.filter(patient_id__in=ids, history_type="+")),
+        ("plan", "Infusionsplan freigegeben",
+         Infusionsplan.history.filter(patient_id__in=ids, history_type="~", status="aktuell", freigegeben_am__isnull=False)),
+    ]
+    eintraege = []
+    for bereich, bezeichnung, qs in quellen:
+        for h in qs.select_related("history_user").order_by("-history_date")[:anzahl]:
+            eintraege.append((h.history_date, bereich, bezeichnung, h))
+    eintraege.sort(key=lambda e: e[0], reverse=True)
+    namen = dict((p.id, f"{p.nachname}, {p.vorname}") for p in patienten.filter(id__in={e[3].patient_id for e in eintraege}))
+    ergebnis = []
+    gesehen = set()
+    for zeit, bereich, bezeichnung, h in eintraege:
+        schluessel = (bereich, h.id, bezeichnung)
+        if schluessel in gesehen:
+            continue
+        gesehen.add(schluessel)
+        ergebnis.append({"bereich": bereich, "bezeichnung": bezeichnung, "objekt_id": h.id,
+                         "patient": h.patient_id, "name": namen.get(h.patient_id), "zeitpunkt": zeit,
+                         "person": benutzername(h.history_user)})
+        if len(ergebnis) == anzahl:
+            break
+    return ergebnis
+
+
 def startseite_daten(user):
     from infusionen.models import Infusionsplan
     from stammdaten.models import Einstellungen
@@ -526,46 +859,51 @@ def startseite_daten(user):
     heute = timezone.localdate()
     e = Einstellungen.aktuell()
     patienten = patienten_fuer(user).filter(abgeschlossen_am__isnull=True)
-    termine = Termin.objects.filter(patient__in=patienten, erledigt_am__isnull=True).select_related("patient")
+    termine = Termin.objects.filter(patient__in=patienten, erledigt_am__isnull=True).select_related(
+        "patient", "ort", "angelegt_von")
 
     def t(qs):
-        return TerminSerializer(qs[:50], many=True).data
+        return TerminSerializer(qs.order_by("faellig_am", "uhrzeit")[:100], many=True).data
 
-    warnungen = []
-    for p in patienten.filter(gewichte__gemessen_am__gte=heute - timedelta(days=30 * e.gewicht_warnung_monate)).distinct():
-        trend = p.gewichtstrend()
-        if trend and trend["warnung"]:
-            warnungen.append({"patient": p.id, "name": f"{p.nachname}, {p.vorname}", "nummer": p.nummer, **trend})
+    werte = kennzahlen(patienten.only("id", "versorger", "nachname", "vorname", "nummer"))
+    gewicht_liste = {p.id: p for p in patienten.only("id", "nachname", "vorname", "nummer")}
+    warnungen = sorted(
+        ({"patient": pid, "name": f"{gewicht_liste[pid].nachname}, {gewicht_liste[pid].vorname}",
+          "nummer": gewicht_liste[pid].nummer, "gewicht": k["gewicht"], "prozent": k["trend"]["prozent"]}
+         for pid, k in werte.items() if k["trend"] and k["trend"]["warnung"]),
+        key=lambda w: w["prozent"],
+    )
 
     grenze = heute - timedelta(days=30 * e.plan_alter_warnung_monate)
-    plaene = Infusionsplan.objects.filter(patient__in=patienten).select_related("patient")
+    plaene = Infusionsplan.objects.filter(patient__in=patienten).select_related("patient", "erstellt_von",
+                                                                               "freigegeben_von")
 
     def pl(qs):
         return [{"id": x.id, "patient": x.patient_id, "name": f"{x.patient.nachname}, {x.patient.vorname}",
-                 "gueltig_ab": x.gueltig_ab, "status": x.status} for x in qs[:50]]
+                 "gueltig_ab": x.gueltig_ab, "status": x.status, "erstellt_am": x.erstellt_am,
+                 "erstellt_von": benutzername(x.erstellt_von), "freigegeben_am": x.freigegeben_am}
+                for x in qs[:50]]
 
-    zuletzt = (
-        Kontakt.objects.filter(patient__in=patienten).select_related("patient", "erfasst_von").order_by("-erfasst_am")[:10]
-    )
+    statistik = patienten if user.ist_test else patienten.filter(ist_test=False)
     return {
         "termine": {
             "ueberfaellig": t(termine.filter(faellig_am__lt=heute)),
             "heute": t(termine.filter(faellig_am=heute)),
-            "naechste_7_tage": t(termine.filter(faellig_am__gt=heute, faellig_am__lte=heute + timedelta(days=7))),
+            "naechste_7_tage": t(termine.filter(faellig_am__gte=heute, faellig_am__lte=heute + timedelta(days=7))),
         },
         "gewichtswarnungen": warnungen,
+        "gewicht_schwelle": {"prozent": e.gewicht_warnung_prozent, "monate": e.gewicht_warnung_monate},
         "infusionsplaene": {
-            "entwuerfe": pl(plaene.filter(status=Infusionsplan.Status.ENTWURF)),
-            "aelter_als_grenze": pl(plaene.filter(status=Infusionsplan.Status.AKTUELL, gueltig_ab__lt=grenze)),
+            "entwuerfe": pl(plaene.filter(status=Infusionsplan.Status.ENTWURF).order_by("-erstellt_am")),
+            "aelter_als_grenze": pl(plaene.filter(status=Infusionsplan.Status.AKTUELL, gueltig_ab__lt=grenze)
+                                    .order_by("gueltig_ab")),
+            "grenze_monate": e.plan_alter_warnung_monate,
         },
-        "zuletzt_eingetragen": [
-            {"patient": k.patient_id, "name": f"{k.patient.nachname}, {k.patient.vorname}",
-             "zeitpunkt": k.erfasst_am, "person": benutzername(k.erfasst_von), "text": _kurz(k.text, 160)}
-            for k in zuletzt
-        ],
+        "pruefen": pruefliste(statistik),
+        "zuletzt_eingetragen": _zuletzt_eingetragen(patienten),
         "zahlen": {
-            "in_betreuung": patienten.filter(ist_test=False).count(),
-            "mit_offenem_termin": patienten.filter(termine__erledigt_am__isnull=True).distinct().count(),
+            "in_betreuung": statistik.count(),
+            "mit_offenem_termin": statistik.filter(termine__erledigt_am__isnull=True).distinct().count(),
         },
     }
 

@@ -5,7 +5,6 @@ Alle umgebungsabhängigen Werte kommen aus Umgebungsvariablen (backend.env).
 Geheimnisse (DB-Passwort, SECRET_KEY) werden aus Dateien gelesen
 (Docker Secrets unter /run/secrets), nie aus Variablen.
 """
-from datetime import timedelta
 from pathlib import Path
 import os
 
@@ -71,6 +70,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django_otp.middleware.OTPMiddleware",
+    "accounts.sitzungen.SitzungMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
@@ -155,9 +155,9 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 
-# Anmeldung: Sperre nach Fehlversuchen (je Benutzername)
+# Anmeldung: nach 5 Fehlversuchen bleibt das Konto gesperrt, bis der Admin entsperrt
 EPM_LOGIN_MAX_FEHLVERSUCHE = 5
-EPM_LOGIN_SPERRE = timedelta(minutes=15)
+EPM_EINMAL_KENNWORT_STUNDEN = int(env("EPM_EINMAL_KENNWORT_STUNDEN", "48"))
 
 OTP_TOTP_ISSUER = env("EPM_OTP_ISSUER", "EPM")
 OTP_TOTP_TOLERANCE = 1

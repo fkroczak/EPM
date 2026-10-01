@@ -71,11 +71,31 @@ END;
 $$ LANGUAGE plpgsql;
 """
 
+VITAMINE_SQL = r"""
+CREATE OR REPLACE FUNCTION epm_plan_zuordnung_schutz() RETURNS trigger AS $$
+DECLARE
+    plan_status text;
+BEGIN
+    IF coalesce(current_setting('epm.wartung', true), '') = 'on' THEN
+        RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    END IF;
+    SELECT status INTO plan_status FROM infusionen_infusionsplan
+        WHERE id = CASE WHEN TG_OP = 'DELETE' THEN OLD.infusionsplan_id ELSE NEW.infusionsplan_id END;
+    IF plan_status IS DISTINCT FROM 'entwurf' THEN
+        RAISE EXCEPTION 'EPM: freigegebene Infusionspläne sind unveränderlich' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END;
+$$ LANGUAGE plpgsql;
+"""
+
 # Tabellen mit Sonderregeln (Name der Tabelle -> Funktion)
 SONDERREGELN = {
     "patienten_kontakt": "epm_kontakt_schutz",
     "infusionen_infusionsplan": "epm_plan_schutz",
 }
+# Zuordnungstabellen von Plänen: auch INSERT prüfen
+ZUORDNUNG = {"infusionen_infusionsplan_vitamine": "epm_plan_zuordnung_schutz"}
 NUR_ANFUEGEN_FEST = ["audit_systemereignis"]
 
 
@@ -97,6 +117,7 @@ def installiere_trigger(using="default", **kwargs):
         return
     with conn.cursor() as c:
         c.execute(FUNKTIONEN_SQL)
+        c.execute(VITAMINE_SQL)
         vorhandene = set(conn.introspection.table_names(c))
         ziele = {t: "epm_nur_anfuegen" for t in _historientabellen(c) + NUR_ANFUEGEN_FEST}
         ziele.update(SONDERREGELN)
@@ -107,12 +128,22 @@ def installiere_trigger(using="default", **kwargs):
                 f'CREATE OR REPLACE TRIGGER epm_schutz BEFORE UPDATE OR DELETE ON "{tabelle}" '
                 f"FOR EACH ROW EXECUTE FUNCTION {funktion}()"
             )
-            # Auch TRUNCATE verhindern
+            # Auch TRUNCATE verhindern (nur reine Protokolltabellen)
             if funktion == "epm_nur_anfuegen":
                 c.execute(
                     f'CREATE OR REPLACE TRIGGER epm_schutz_truncate BEFORE TRUNCATE ON "{tabelle}" '
                     f"FOR EACH STATEMENT EXECUTE FUNCTION epm_nur_anfuegen()"
                 )
+        _zuordnung(c, vorhandene)
+
+
+def _zuordnung(c, vorhandene):
+    for tabelle, funktion in ZUORDNUNG.items():
+        if tabelle in vorhandene:
+            c.execute(
+                f'CREATE OR REPLACE TRIGGER epm_schutz BEFORE INSERT OR UPDATE OR DELETE ON "{tabelle}" '
+                f"FOR EACH ROW EXECUTE FUNCTION {funktion}()"
+            )
 
 
 @contextmanager

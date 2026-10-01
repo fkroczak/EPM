@@ -27,6 +27,7 @@ router.register("auswahlwerte", AuswahlwertViewSet, basename="auswahlwert")
 router.register("benutzer", konto.BenutzerViewSet, basename="benutzer")
 router.register("protokoll", SystemEreignisViewSet, basename="protokoll")
 router.register("testdaten", TestdatenViewSet, basename="testdaten")
+router.register("sitzungen", konto.SitzungenViewSet, basename="sitzung")
 
 auth = [
     path("status/", konto.StatusView.as_view()),
@@ -38,6 +39,7 @@ auth = [
     path("abmelden/", konto.AbmeldenView.as_view()),
     path("ich/", konto.IchView.as_view()),
     path("notfallcodes/", konto.NotfallcodesView.as_view()),
+    path("sicherheit/", konto.SicherheitView.as_view()),
 ]
 
 urlpatterns = [

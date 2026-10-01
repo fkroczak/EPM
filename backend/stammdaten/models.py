@@ -11,6 +11,7 @@ class Auswahlwert(models.Model):
         KATHETER = "katheter", "Katheter"
         DOKUMENTTYP = "dokumenttyp", "Dokumenttyp"
         KONTAKTART = "kontaktart", "Kontaktart"
+        TERMINORT = "terminort", "Terminort"
 
     liste = models.CharField(max_length=30, choices=Liste.choices)
     wert = models.CharField(max_length=100)
@@ -64,6 +65,8 @@ class Ansprechpartner(models.Model):
 
     versorger = models.ForeignKey(Versorger, on_delete=models.PROTECT, related_name="ansprechpartner")
     name = models.CharField(max_length=150)
+    zustaendigkeit = models.CharField("Zuständigkeit", max_length=150, blank=True,
+                                      help_text="z. B. „Disposition · Patienten A–K“")
     telefon = models.CharField(max_length=50, blank=True)
     mobil = models.CharField(max_length=50, blank=True)
     email = models.EmailField("E-Mail", blank=True)
@@ -102,14 +105,15 @@ class Praeparat(models.Model):
     name = models.CharField(max_length=150)
     konzentration = models.CharField(max_length=60, blank=True, help_text="z. B. 50 %, 10 %, 20 %")
     einheit = models.CharField(max_length=10, default="ml", help_text="Standard-Einheit der Menge")
-    aktiv = models.BooleanField(default=True)
+    reihenfolge = models.PositiveSmallIntegerField(default=100)
+    aktiv = models.BooleanField(default=True, help_text="Ausgeblendete Präparate erscheinen nicht bei neuen Plänen")
 
     history = HistoricalRecords()
 
     class Meta:
         verbose_name = "Präparat"
         verbose_name_plural = "Präparate"
-        ordering = ["kategorie", "name", "konzentration"]
+        ordering = ["kategorie", "reihenfolge", "name", "konzentration"]
         constraints = [
             models.UniqueConstraint(fields=["kategorie", "name", "konzentration"], name="praeparat_eindeutig")
         ]
@@ -134,6 +138,7 @@ class Einstellungen(models.Model):
     gewicht_warnung_prozent = models.DecimalField(max_digits=4, decimal_places=1, default=Decimal("5.0"))
     gewicht_warnung_monate = models.PositiveSmallIntegerField(default=3)
     plan_alter_warnung_monate = models.PositiveSmallIntegerField(default=12)
+    kontakt_ueberfaellig_monate = models.PositiveSmallIntegerField(default=12)
 
     # Plausibilitätsgrenzen (Eingaben außerhalb werden abgelehnt)
     gewicht_min_kg = models.DecimalField(max_digits=5, decimal_places=1, default=Decimal("20.0"))
@@ -141,6 +146,19 @@ class Einstellungen(models.Model):
     groesse_min_cm = models.DecimalField(max_digits=5, decimal_places=1, default=Decimal("100.0"))
     groesse_max_cm = models.DecimalField(max_digits=5, decimal_places=1, default=Decimal("230.0"))
     kcal_max_tag = models.PositiveIntegerField(default=5000)
+    # Grenzen je Planwert (Entwurf 18 · Vorlagen › Grenzwerte). Die Standardwerte sind bewusst weit
+    # gefasst und werden von der Administration festgelegt.
+    kcal_min_tag = models.PositiveIntegerField(default=0)
+    glucose_min_g = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("0"))
+    glucose_max_g = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("1000"))
+    aminosaeuren_min_g = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("0"))
+    aminosaeuren_max_g = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("300"))
+    lipide_min_g = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("0"))
+    lipide_max_g = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("200"))
+    natrium_min_mmol = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("0"))
+    natrium_max_mmol = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("500"))
+    kalium_min_mmol = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("0"))
+    kalium_max_mmol = models.DecimalField(max_digits=6, decimal_places=1, default=Decimal("300"))
 
     history = HistoricalRecords()
 
@@ -148,10 +166,18 @@ class Einstellungen(models.Model):
         verbose_name = "Einstellungen"
         verbose_name_plural = "Einstellungen"
 
+    GRENZPAARE = [
+        ("gewicht_min_kg", "gewicht_max_kg"), ("groesse_min_cm", "groesse_max_cm"), ("kcal_min_tag", "kcal_max_tag"),
+        ("glucose_min_g", "glucose_max_g"), ("aminosaeuren_min_g", "aminosaeuren_max_g"),
+        ("lipide_min_g", "lipide_max_g"), ("natrium_min_mmol", "natrium_max_mmol"),
+        ("kalium_min_mmol", "kalium_max_mmol"),
+    ]
+
     def save(self, *args, **kwargs):
         self.pk = 1
-        if self.gewicht_min_kg >= self.gewicht_max_kg or self.groesse_min_cm >= self.groesse_max_cm:
-            raise ValidationError("Untere Grenze muss kleiner als obere Grenze sein.")
+        for unten, oben in self.GRENZPAARE:
+            if getattr(self, unten) >= getattr(self, oben):
+                raise ValidationError({unten: "Untere Grenze muss kleiner als obere Grenze sein."})
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):

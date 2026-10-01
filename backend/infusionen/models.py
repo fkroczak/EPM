@@ -22,8 +22,20 @@ KCAL_JE_G = {
 # Felder, die beim neuen Entwurf vom aktuellen Plan übernommen und auf Änderung verglichen werden
 PLANFELDER = [
     "basis_praeparat", "basis_ml", "glucose_praeparat", "glucose_g", "aminosaeuren_praeparat", "aminosaeuren_g",
-    "lipide_praeparat", "lipide_g", "albumin_praeparat", "albumin_g", "kcal_manuell",
-    "laufzeit_h", "tage_pro_woche", "katheterschutz", "pantozol_stufe", "pantozol_tage", "bemerkung",
+    "lipide_praeparat", "lipide_g", "albumin_praeparat", "albumin_g",
+    "natrium_mmol", "kalium_mmol", "phosphat_mmol", "calcium_mmol", "magnesium_mmol",
+    "spurenelemente", "katheterschutz", "kcal_manuell",
+    "laufzeit_h", "tage_pro_woche", "pantozol_stufe", "pantozol_tage", "bemerkung",
+]
+
+# Bezeichnungen und Einheiten für Vergleich und PDF (Reihenfolge wie im Entwurf 8)
+VERGLEICHSZEILEN = [
+    ("basis", "Basislösung"), ("glucose", "Glucose"), ("aminosaeuren", "Aminosäuren"), ("lipide", "Lipide"),
+    ("albumin", "Humanalbumin"), ("natrium_mmol", "Natrium"), ("kalium_mmol", "Kalium"),
+    ("phosphat_mmol", "Phosphat"), ("calcium_mmol", "Calcium"), ("magnesium_mmol", "Magnesium"),
+    ("spurenelemente", "Spurenelemente"), ("vitamine", "Vitamine"), ("katheterschutz", "Katheterblock"),
+    ("laufzeit_h", "Laufzeit"), ("tage_pro_woche", "Tage pro Woche"), ("kcal", "Energie"),
+    ("pantozol", "Pantozol"), ("bemerkung", "Bemerkung"),
 ]
 
 
@@ -56,7 +68,19 @@ class Infusionsplan(AktenEintrag):
     lipide_g = models.DecimalField("Lipide (g)", max_digits=6, decimal_places=1, null=True, blank=True)
     albumin_praeparat = _p(Praeparat.Kategorie.ALBUMIN, "Albumin-Präparat")
     albumin_g = models.DecimalField("Albumin (g)", max_digits=6, decimal_places=1, null=True, blank=True)
+    spurenelemente = _p(Praeparat.Kategorie.SPURENELEMENTE, "Spurenelemente")
     del _p
+
+    # Elektrolyte in mmol (Entwurf 7)
+    natrium_mmol = models.DecimalField("Natrium (mmol)", max_digits=6, decimal_places=1, null=True, blank=True)
+    kalium_mmol = models.DecimalField("Kalium (mmol)", max_digits=6, decimal_places=1, null=True, blank=True)
+    phosphat_mmol = models.DecimalField("Phosphat (mmol)", max_digits=6, decimal_places=1, null=True, blank=True)
+    calcium_mmol = models.DecimalField("Calcium (mmol)", max_digits=6, decimal_places=1, null=True, blank=True)
+    magnesium_mmol = models.DecimalField("Magnesium (mmol)", max_digits=6, decimal_places=1, null=True, blank=True)
+    vitamine = models.ManyToManyField(
+        Praeparat, blank=True, related_name="+", limit_choices_to={"kategorie": Praeparat.Kategorie.VITAMINE},
+        verbose_name="Vitamine",
+    )
 
     kcal_manuell = models.PositiveIntegerField(
         "kcal (manuell)", null=True, blank=True, help_text="Überschreibt die berechneten kcal"
@@ -84,7 +108,7 @@ class Infusionsplan(AktenEintrag):
     pdf_sha256 = models.CharField(max_length=64, blank=True)
     vorlage_version = models.PositiveIntegerField(null=True, blank=True)
 
-    history = HistoricalRecords()
+    history = HistoricalRecords(m2m_fields=[vitamine])
 
     class Meta:
         verbose_name = "Infusionsplan"
@@ -137,8 +161,19 @@ class Infusionsplan(AktenEintrag):
     def clean(self):
         fehler = {}
         e = Einstellungen.aktuell()
-        if self.kcal > e.kcal_max_tag:
-            fehler["kcal_manuell"] = f"{self.kcal} kcal liegen über der Plausibilitätsgrenze von {e.kcal_max_tag} kcal."
+        if not (e.kcal_min_tag <= self.kcal <= e.kcal_max_tag):
+            fehler["kcal_manuell"] = (f"{self.kcal} kcal liegen außerhalb der Plausibilitätsgrenzen "
+                                      f"({e.kcal_min_tag}–{e.kcal_max_tag} kcal).")
+        for feld, unten, oben, einheit in [
+            ("glucose_g", e.glucose_min_g, e.glucose_max_g, "g"),
+            ("aminosaeuren_g", e.aminosaeuren_min_g, e.aminosaeuren_max_g, "g"),
+            ("lipide_g", e.lipide_min_g, e.lipide_max_g, "g"),
+            ("natrium_mmol", e.natrium_min_mmol, e.natrium_max_mmol, "mmol"),
+            ("kalium_mmol", e.kalium_min_mmol, e.kalium_max_mmol, "mmol"),
+        ]:
+            wert = getattr(self, feld)
+            if wert is not None and not (unten <= wert <= oben):
+                fehler[feld] = f"Wert außerhalb der Plausibilitätsgrenzen ({unten}–{oben} {einheit})."
         if self.pantozol_stufe and not self.pantozol_tage:
             fehler["pantozol_tage"] = "Bitte Tage angeben, wenn Pantozol gesetzt ist."
         if not self.pantozol_stufe and self.pantozol_tage:
@@ -156,6 +191,8 @@ class Infusionsplan(AktenEintrag):
             return []
         v = self.vorgaenger
         felder = [f for f in PLANFELDER if getattr(self, _attr(f)) != getattr(v, _attr(f))]
+        if self.pk and set(self.vitamine.values_list("pk", flat=True)) != set(v.vitamine.values_list("pk", flat=True)):
+            felder.append("vitamine")
         if _positionen_signatur(self) != _positionen_signatur(v):
             felder.append("positionen")
         return felder
@@ -163,28 +200,52 @@ class Infusionsplan(AktenEintrag):
     # --- Abläufe ---
     @classmethod
     @transaction.atomic
-    def neuer_entwurf(cls, patient: Patient, benutzer) -> "Infusionsplan":
-        """Legt einen Entwurf an, vorbelegt mit dem aktuellen Plan (inkl. Positionen)."""
+    def neuer_entwurf(cls, patient: Patient, benutzer, leer: bool = False, vorlage: "Infusionsplan | None" = None):
+        """Legt einen Entwurf an.
+
+        Standard: vorbelegt mit dem aktuellen Plan. ``leer``: ohne Vorbelegung („Leer beginnen“).
+        ``vorlage``: vorbelegt mit einem früheren Plan desselben Patienten („Als Vorlage für neuen Plan“).
+        Vorgänger ist immer der aktuelle Plan, damit der Vergleich die tatsächliche Änderung zeigt.
+        """
         patient.pruefe_bearbeitbar()
         if cls.objects.filter(patient=patient, status=cls.Status.ENTWURF).exists():
             raise ValidationError("Für diesen Patienten gibt es bereits einen Entwurf.")
+        if vorlage is not None and vorlage.patient_id != patient.id:
+            raise ValidationError({"vorlage": "Die Vorlage gehört zu einem anderen Patienten."})
         aktuell = cls.objects.filter(patient=patient, status=cls.Status.AKTUELL).first()
+        quelle = None if leer else (vorlage or aktuell)
         entwurf = cls(patient=patient, erstellt_von=benutzer, vorgaenger=aktuell)
-        if aktuell:
+        if quelle:
             for f in PLANFELDER:
-                setattr(entwurf, _attr(f), getattr(aktuell, _attr(f)))
+                setattr(entwurf, _attr(f), getattr(quelle, _attr(f)))
+        entwurf._history_user = benutzer
         entwurf.save()
-        if aktuell:
+        if quelle:
+            entwurf.vitamine.set(quelle.vitamine.all())
             bulk_create_with_history(
                 [InfusionsplanPosition(
                     plan=entwurf, praeparat_id=p.praeparat_id, menge=p.menge, einheit=p.einheit,
                     haeufigkeit=p.haeufigkeit, bemerkung=p.bemerkung, reihenfolge=p.reihenfolge,
-                )
-                 for p in aktuell.positionen.all()],
+                ) for p in quelle.positionen.all()],
                 InfusionsplanPosition,
                 default_user=benutzer,
             )
         return entwurf
+
+    def vergleich(self) -> dict:
+        """Alle Werte neben denen des Vorgängers (Entwurf 8 · „Vergleich mit Vorgänger“)."""
+        v = self.vorgaenger
+        zeilen = []
+        for schluessel, bezeichnung in VERGLEICHSZEILEN:
+            jetzt = _anzeige(self, schluessel)
+            vorher = _anzeige(v, schluessel) if v else None
+            zeilen.append({"schluessel": schluessel, "wert": bezeichnung, "vorher": vorher, "jetzt": jetzt,
+                           "geaendert": v is not None and vorher != jetzt})
+        return {
+            "vorgaenger": {"id": v.id, "gueltig_ab": v.gueltig_ab, "status": v.status} if v else None,
+            "zeilen": zeilen,
+            "anzahl_geaendert": sum(z["geaendert"] for z in zeilen),
+        }
 
     @transaction.atomic
     def freigeben(self, benutzer):
@@ -241,7 +302,7 @@ class InfusionsplanPosition(models.Model):
 def _attr(feld: str) -> str:
     """Fremdschlüssel über die *_id-Spalte vergleichen/kopieren (keine Zusatzabfragen)."""
     fk = {"basis_praeparat", "glucose_praeparat", "aminosaeuren_praeparat", "lipide_praeparat",
-          "albumin_praeparat", "katheterschutz"}
+          "albumin_praeparat", "katheterschutz", "spurenelemente"}
     return f"{feld}_id" if feld in fk else feld
 
 
@@ -250,3 +311,55 @@ def _positionen_signatur(plan):
         (p.praeparat_id, p.menge, p.einheit, p.haeufigkeit, p.bemerkung)
         for p in plan.positionen.order_by("reihenfolge", "id")
     ]
+
+
+def _zahl(wert, einheit=""):
+    if wert is None:
+        return None
+    text = f"{wert:f}" if isinstance(wert, Decimal) else str(wert)
+    if isinstance(wert, Decimal) and "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return f"{text} {einheit}".strip()
+
+
+def _anzeige(plan, schluessel):
+    """Anzeigetext eines Planwerts, so wie er auf dem Plan steht."""
+    if plan is None:
+        return None
+    if schluessel == "basis":
+        teile = [str(plan.basis_praeparat) if plan.basis_praeparat_id else None, _zahl(plan.basis_ml, "ml")]
+        return " · ".join(t for t in teile if t) or None
+    if schluessel in ("glucose", "aminosaeuren", "lipide", "albumin"):
+        praep = getattr(plan, f"{schluessel}_praeparat")
+        teile = [str(praep) if praep else None, _zahl(getattr(plan, f"{schluessel}_g"), "g")]
+        return " · ".join(t for t in teile if t) or None
+    if schluessel.endswith("_mmol"):
+        return _zahl(getattr(plan, schluessel), "mmol")
+    if schluessel in ("spurenelemente", "katheterschutz"):
+        praep = getattr(plan, schluessel)
+        return str(praep) if praep else None
+    if schluessel == "vitamine":
+        namen = [str(p) for p in plan.vitamine.all()] if plan.pk else []
+        return " | ".join(namen) or None
+    if schluessel == "laufzeit_h":
+        return _zahl(plan.laufzeit_h, "h")
+    if schluessel == "tage_pro_woche":
+        return _zahl(plan.tage_pro_woche, "× pro Woche")
+    if schluessel == "kcal":
+        return f"{plan.kcal} kcal" + (" (manuell)" if plan.kcal_manuell is not None else "")
+    if schluessel == "pantozol":
+        return f"{plan.pantozol_stufe} · {plan.pantozol_tage}" if plan.pantozol_stufe else None
+    if schluessel == "bemerkung":
+        return plan.bemerkung or None
+    return None
+
+
+def _vitamine_schutz(sender, instance, action, **kwargs):
+    """Vitamine eines freigegebenen Plans dürfen nicht mehr geändert werden."""
+    if action in ("pre_add", "pre_remove", "pre_clear") and isinstance(instance, Infusionsplan):
+        if instance.status != Infusionsplan.Status.ENTWURF:
+            raise PermissionError("Freigegebene Pläne sind unveränderlich. Bitte einen neuen Plan anlegen.")
+
+
+models.signals.m2m_changed.connect(_vitamine_schutz, sender=Infusionsplan.vitamine.through,
+                                   dispatch_uid="epm_vitamine_schutz")

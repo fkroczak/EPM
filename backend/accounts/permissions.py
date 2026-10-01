@@ -8,6 +8,9 @@ Rollenrechte für die API.
 | Mediziner    | ja    | ja             | ja (Freigabe)  | –                   |
 | Admin        | ja    | –              | –              | ja                  |
 
+Akten abschließen dürfen nur Mediziner, wieder öffnen nur der Admin (Rollenmatrix Entwurf 17).
+Versorger und Ansprechpartner pflegen Mitarbeiter, Mediziner und Admin (siehe Unklarheit U10).
+
 Jeder Zugriff setzt eine vollständige Anmeldung voraus: Kennwort + zweiter Faktor
 und kein offenes Einmal-Kennwort.
 """
@@ -72,3 +75,15 @@ class NurAdmin(Angemeldet):
 
     def has_permission(self, request, view):
         return super().has_permission(request, view) and request.user.rolle == Rolle.ADMIN
+
+
+class AbschlussRecht(Angemeldet):
+    message = "Akten abschließen dürfen nur Mediziner."
+
+    def has_permission(self, request, view):
+        return super().has_permission(request, view) and request.user.rolle == Rolle.MEDIZINER
+
+
+class VersorgerRecht(_Schreibrecht):
+    message = "Versorger pflegen Mitarbeiter, Mediziner und Admin."
+    rollen = (Rolle.MITARBEITER, Rolle.MEDIZINER, Rolle.ADMIN)

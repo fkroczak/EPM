@@ -50,6 +50,7 @@ class Patient(models.Model):
     email = models.EmailField("E-Mail", blank=True)
     krankenkasse = models.CharField(max_length=100, blank=True)
     hausarzt = models.CharField(max_length=150, blank=True)
+    ueberweisung_durch = models.CharField("Überweisung / Kontaktaufnahme durch", max_length=200, blank=True)
 
     groesse_cm = models.DecimalField("Größe (cm)", max_digits=5, decimal_places=1, null=True, blank=True)
     katheter = models.ForeignKey(
@@ -149,34 +150,36 @@ class Patient(models.Model):
         return (m.gewicht_kg / (meter * meter)).quantize(Decimal("0.1"))
 
     def gewichtstrend(self):
-        """Veränderung zur Messung, die am nächsten vor dem Vergleichszeitraum liegt.
+        """Veränderung des Gewichts im eingestellten Zeitraum, siehe ``berechne_trend``."""
+        messungen = list(self.gewichte.order_by("gemessen_am", "id").values_list("gemessen_am", "gewicht_kg"))
+        return berechne_trend(messungen, Einstellungen.aktuell())
 
-        Liefert dict(prozent, von, bis, warnung) oder None. Warnung bei Abnahme
-        über der eingestellten Schwelle; nur echte Messwerte, keine Glättung.
-        """
-        e = Einstellungen.aktuell()
-        letzte = self.letzte_messung()
-        if not letzte:
-            return None
-        zeitraum = 30 * e.gewicht_warnung_monate
-        # Vergleich: jüngste Messung, die mindestens etwa den Zeitraum zurückliegt (±15 Tage Spielraum)
-        stichtag = letzte.gemessen_am - timedelta(days=zeitraum - 15)
-        vergleich = (
-            self.gewichte.filter(gemessen_am__lte=stichtag).order_by("-gemessen_am", "-id").first()
-            or self.gewichte.filter(gemessen_am__lt=letzte.gemessen_am).order_by("gemessen_am", "id").first()
-        )
-        if not vergleich or vergleich.gewicht_kg == 0:
-            return None
-        prozent = ((letzte.gewicht_kg - vergleich.gewicht_kg) / vergleich.gewicht_kg * 100).quantize(Decimal("0.1"))
-        tage = (letzte.gemessen_am - vergleich.gemessen_am).days
-        warnung = prozent <= -e.gewicht_warnung_prozent and tage <= zeitraum + 45
-        return {
-            "prozent": prozent,
-            "von": vergleich.gemessen_am,
-            "bis": letzte.gemessen_am,
-            "tage": tage,
-            "warnung": warnung,
-        }
+
+def berechne_trend(messungen, e):
+    """Veränderung zur Messung, die etwa den eingestellten Zeitraum zurückliegt.
+
+    ``messungen`` = [(datum, kg), …] aufsteigend sortiert. Liefert dict(prozent, von, bis, tage, warnung)
+    oder None. Warnung bei Abnahme über der Schwelle; nur echte Messwerte, keine Glättung.
+    """
+    if not messungen:
+        return None
+    letzte_datum, letzte_kg = messungen[-1]
+    zeitraum = 30 * e.gewicht_warnung_monate
+    # Vergleich: jüngste Messung, die mindestens etwa den Zeitraum zurückliegt (±15 Tage Spielraum)
+    stichtag = letzte_datum - timedelta(days=zeitraum - 15)
+    frueher = [m for m in messungen if m[0] <= stichtag]
+    if frueher:
+        vergleich = frueher[-1]
+    else:
+        aeltere = [m for m in messungen if m[0] < letzte_datum]
+        vergleich = aeltere[0] if aeltere else None
+    if not vergleich or vergleich[1] == 0:
+        return None
+    prozent = ((letzte_kg - vergleich[1]) / vergleich[1] * 100).quantize(Decimal("0.1"))
+    tage = (letzte_datum - vergleich[0]).days
+    warnung = prozent <= -e.gewicht_warnung_prozent and tage <= zeitraum + 45
+    return {"prozent": prozent, "von": vergleich[0], "bis": letzte_datum, "tage": tage, "warnung": warnung,
+            "vergleich_kg": vergleich[1], "aktuell_kg": letzte_kg}
 
 
 class AktenEintrag(models.Model):
@@ -280,7 +283,12 @@ class Termin(AktenEintrag):
     art = models.CharField(max_length=20, choices=Art.choices, default=Art.WIEDERVORLAGE)
     faellig_am = models.DateField()
     uhrzeit = models.TimeField(null=True, blank=True)
-    bei = models.CharField("bei/Ort", max_length=150, blank=True, help_text="z. B. Praxis Dr. Holtmeier")
+    ort = models.ForeignKey(
+        Auswahlwert, on_delete=models.PROTECT, null=True, blank=True, related_name="+",
+        limit_choices_to={"liste": Auswahlwert.Liste.TERMINORT}, verbose_name="Terminort",
+    )
+    bei = models.CharField("bei/Ort (Freitext)", max_length=150, blank=True,
+                           help_text="Ergänzung zum Terminort, z. B. Raum oder Ansprechperson")
     titel = models.CharField(max_length=200)
     notiz = models.TextField(blank=True)
     kontakt = models.ForeignKey(Kontakt, on_delete=models.SET_NULL, null=True, blank=True, related_name="termine")
@@ -331,6 +339,15 @@ class Dokument(AktenEintrag):
     groesse = models.PositiveBigIntegerField(editable=False)
     sha256 = models.CharField(max_length=64, editable=False)
     herkunft = models.CharField(max_length=20, choices=Herkunft.choices, default=Herkunft.UPLOAD, editable=False)
+
+    class DatumQuelle(models.TextChoices):
+        EINGABE = "eingabe", "Eingabe"
+        PDF = "pdf", "PDF-Metadaten"
+        EXIF = "exif", "EXIF"
+        DATEIDATUM = "dateidatum", "Dateidatum (keine Metadaten)"
+
+    datum_quelle = models.CharField(max_length=20, choices=DatumQuelle.choices, default=DatumQuelle.EINGABE)
+    typ_geprueft = models.BooleanField(default=True, help_text="Bei Altdokumenten erst nach Prüfung von Typ und Datum")
     notiz = models.TextField(blank=True)
     ausgeblendet = models.BooleanField(default=False, help_text="Ausgeblendet statt gelöscht")
     hochgeladen_am = models.DateTimeField(auto_now_add=True)
