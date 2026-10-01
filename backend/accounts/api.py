@@ -36,6 +36,7 @@ from audit.models import SystemEreignis, protokolliere
 from .models import Rolle, Sitzung, User
 from .sitzungen import aktive_sitzungen, alle_sitzungen_beenden, schluessel_erneuert, sitzung_beenden
 from .permissions import Angemeldet, BenutzerRecht, ist_verifiziert
+from .rechte import schreibt_nur_testpatienten
 
 ANZAHL_NOTFALLCODES = 10
 
@@ -101,6 +102,8 @@ def ich_daten(user):
         "darstellung": user.darstellung,
         "startseite": user.startseite,
         "rechte": user.rechte,
+        # Admins: Patientendaten nur bei Testpatienten schreiben (Oberfläche blendet Knöpfe bei echten Akten aus)
+        "schreibt_nur_testpatienten": schreibt_nur_testpatienten(user),
     }
 
 
@@ -613,9 +616,11 @@ class RechteView(APIView):
         return Response(self._daten())
 
     def _daten(self):
-        from .rechte import FEST, RECHTE, STANDARD, matrix
+        from .rechte import FEST, NUR_TESTPATIENTEN_SCHREIBEN, PATIENTENDATEN_SCHREIBEN, RECHTE, STANDARD, matrix
 
         return {
+            # Rollen, die Patientendaten nur bei Testpatienten schreiben, und welche Rechte das betrifft
+            "nur_testpatienten": {"rollen": sorted(NUR_TESTPATIENTEN_SCHREIBEN), "rechte": sorted(PATIENTENDATEN_SCHREIBEN)},
             "rechte": [{"code": c, "name": n, "beschreibung": b} for c, n, b in RECHTE],
             "rollen": [{"code": c, "name": n} for c, n in Rolle.choices],
             "matrix": matrix(),

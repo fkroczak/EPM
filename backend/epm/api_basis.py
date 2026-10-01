@@ -36,6 +36,24 @@ def patienten_fuer(user):
     return qs
 
 
+NUR_TESTPATIENTEN_TEXT = "Als Admin nur bei Testpatienten möglich. Echte Akten sind für die Administration nur lesbar."
+
+
+def pruefe_schreibbereich(user, patient):
+    """Admins schreiben Patientendaten nur bei Testpatienten (Festlegung 01.10.2026) → sonst 403."""
+    from accounts.rechte import schreibt_nur_testpatienten
+
+    if schreibt_nur_testpatienten(user) and not patient.ist_test:
+        raise PermissionError(NUR_TESTPATIENTEN_TEXT)
+
+
+def legt_testpatienten_an(user) -> bool:
+    """Testbenutzer und Admins legen nur Testpatienten an."""
+    from accounts.rechte import schreibt_nur_testpatienten
+
+    return bool(getattr(user, "ist_test", False) or schreibt_nur_testpatienten(user))
+
+
 class RichText(serializers.CharField):
     """Formatierter Text: wird beim Speichern auf erlaubte Tags bereinigt."""
 

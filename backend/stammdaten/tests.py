@@ -97,8 +97,11 @@ class EinstellungenPruefen(Grundlage):
     def test_grenzen_und_rechte(self):
         a = client_fuer(self.admin)
         self.assertEqual(client_fuer(self.mediziner).get("/api/einstellungen/").status_code, 200)
-        self.assertEqual(client_fuer(self.mitarbeiter).patch("/api/einstellungen/", {"kcal_max_tag": 3000},
-                                                             format="json").status_code, 403)
+        self.assertEqual(client_fuer(self.betrachter).patch("/api/einstellungen/", {"kcal_max_tag": 3000},
+                                                            format="json").status_code, 403)
+        # Vorlagen pflegen auch Mitarbeiter (Festlegung 01.10.2026)
+        self.assertEqual(client_fuer(self.mitarbeiter).patch("/api/einstellungen/", {"kcal_max_tag": 4900},
+                                                             format="json").status_code, 200)
         self.assertEqual(client_fuer(self.mediziner).patch("/api/einstellungen/", {"kcal_max_tag": 4800},
                                                            format="json").status_code, 200)
         r = a.patch("/api/einstellungen/", {"glucose_min_g": 1200}, format="json")

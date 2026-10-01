@@ -66,7 +66,7 @@ function Zeile({ links, rechts, unter, zu }: { links: ReactNode; rechts?: ReactN
 }
 
 function TermineKarte({ daten }: { daten: Startdaten }) {
-  const { darf } = useAuth();
+  const { darf, darfBei } = useAuth();
   const [tab, setTab] = useState<"heute" | "woche" | "ueber">("heute");
   const [dialog, setDialog] = useState(false);
   const [erledigt, setErledigt] = useState<Record<number, Termin>>({});
@@ -107,7 +107,8 @@ function TermineKarte({ daten }: { daten: Startdaten }) {
           return (
             <div key={t.id} className="grid grid-cols-[36px_150px_190px_minmax(0,1fr)] items-center gap-3 py-[11px] border-b border-rand last:border-b-0">
               <input type="checkbox" aria-label={`Erledigt: ${t.patient_name}, ${t.titel}`} className="!w-5 !h-5"
-                checked={!!fertig || laeuft.includes(t.id)} disabled={!!fertig || !schreiben || laeuft.includes(t.id)}
+                checked={!!fertig || laeuft.includes(t.id)}
+                disabled={!!fertig || !darfBei("eintraege_erfassen", { ist_test: t.patient_ist_test }) || laeuft.includes(t.id)}
                 onChange={() => abhaken.mutate(t)} />
               <span className="num text-[0.84375rem] text-text2">{terminZeit(t.faellig_am, t.uhrzeit)}</span>
               <span>{terminChip(t)}</span>

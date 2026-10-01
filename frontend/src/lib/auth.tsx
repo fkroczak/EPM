@@ -15,7 +15,12 @@ type AuthWert = {
   neuLaden: () => Promise<void>;
   abmelden: () => Promise<void>;
   darf: (recht: Recht) => boolean;
+  /** Recht für diesen Patienten: Admins schreiben Patientendaten nur bei Testpatienten */
+  darfBei: (recht: Recht, patient: { ist_test: boolean }) => boolean;
 };
+
+/** Rechte, die Patientendaten verändern (siehe backend/accounts/rechte.py) */
+const PATIENTENDATEN: Recht[] = ["eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben", "akten_abschliessen"];
 
 const AuthKontext = createContext<AuthWert | null>(null);
 
@@ -80,9 +85,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     darstellungAnwenden(neu.darstellung);
   }, []);
   const darf = useCallback((recht: Recht) => !!ich?.rechte.includes(recht), [ich]);
+  const darfBei = useCallback((recht: Recht, patient: { ist_test: boolean }) =>
+    darf(recht) && (patient.ist_test || !ich?.schreibt_nur_testpatienten || !PATIENTENDATEN.includes(recht)), [darf, ich]);
 
   return (
-    <AuthKontext.Provider value={{ status, ich, laedt, setStatus, setIch, neuLaden, abmelden, darf }}>
+    <AuthKontext.Provider value={{ status, ich, laedt, setStatus, setIch, neuLaden, abmelden, darf, darfBei }}>
       {children}
     </AuthKontext.Provider>
   );

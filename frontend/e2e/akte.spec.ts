@@ -203,7 +203,7 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   merken("kontakte", { id: p.id });
 });
 
-test("Stammdaten bearbeiten, Akte abschließen (Mediziner) und wieder öffnen (Admin)", async ({ browser, page }) => {
+test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen (Admin)", async ({ browser, page }) => {
   const p = await neuerPatient();
   await oeffnen(page, p.id);
   await page.getByTestId("kennzahlen").getByRole("button", { name: /nicht erfasst/ }).click();
@@ -215,26 +215,26 @@ test("Stammdaten bearbeiten, Akte abschließen (Mediziner) und wieder öffnen (A
   await expect(page.getByTestId("stammdaten")).toContainText("0251 98765");
   await expect(page.getByTestId("kennzahlen")).not.toContainText("nicht erfasst");
 
-  // Mitarbeiter darf nicht abschließen
-  await page.getByRole("button", { name: "Weitere Aktionen" }).click();
-  await expect(page.getByRole("menuitem", { name: "Akte abschließen" })).toHaveCount(0);
-  await expect(page.getByRole("menuitem", { name: /Akte als PDF/ })).toHaveAttribute("aria-disabled", "true");
-  await page.keyboard.press("Escape");
+  // Betrachter darf nicht abschließen
+  const bet = await browser.newContext({ storageState: zustand("betrachter"), ignoreHTTPSErrors: true });
+  const bp = await bet.newPage();
+  await oeffnen(bp, p.id);
+  await bp.getByRole("button", { name: "Weitere Aktionen" }).click();
+  await expect(bp.getByRole("menuitem", { name: "Akte abschließen" })).toHaveCount(0);
+  await expect(bp.getByRole("menuitem", { name: /Akte als PDF/ })).toHaveAttribute("aria-disabled", "true");
+  await bet.close();
 
-  const med = await browser.newContext({ storageState: zustand("mediziner"), ignoreHTTPSErrors: true });
-  const mp = await med.newPage();
-  await oeffnen(mp, p.id);
-  await mp.getByRole("button", { name: "Weitere Aktionen" }).click();
-  await mp.getByRole("menuitem", { name: "Akte abschließen" }).click();
-  const ad = mp.getByRole("dialog");
+  // Mitarbeiter schließt ab (Festlegung 01.10.2026: Mitarbeiter, Mediziner und Admin)
+  await page.getByRole("button", { name: "Weitere Aktionen" }).click();
+  await page.getByRole("menuitem", { name: "Akte abschließen" }).click();
+  const ad = page.getByRole("dialog");
   await ad.getByRole("radio", { name: "Therapie beendet" }).check();
   await ad.getByLabel("Notiz").fill("Darmfunktion ausreichend");
   await ad.getByRole("button", { name: "Akte abschließen" }).click();
-  await expect(mp.getByText(/Akte abgeschlossen am .* Therapie beendet/)).toBeVisible();
-  await expect(mp.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt" })).toHaveCount(0);
-  await med.close();
+  await expect(page.getByText(/Akte abgeschlossen am .* Therapie beendet/)).toBeVisible();
+  await expect(page.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt" })).toHaveCount(0);
 
-  // Mitarbeiter: Akte nur lesbar, in der Liste unter „Abgeschlossen“
+  // danach nur lesbar, in der Liste unter „Abgeschlossen“
   await page.reload();
   await expect(page.getByTestId("gewichtskarte").getByLabel("Neues Gewicht")).toHaveCount(0);
   await page.goto(`/patienten?status=abgeschlossen&suche=${p.name.split(",")[0]}`);
@@ -248,6 +248,9 @@ test("Stammdaten bearbeiten, Akte abschließen (Mediziner) und wieder öffnen (A
   await ap.getByRole("dialog").getByLabel("Grund").fill("versehentlich abgeschlossen");
   await ap.getByRole("dialog").getByRole("button", { name: "Wieder öffnen" }).click();
   await expect(ap.getByText("Akte wieder geöffnet.")).toBeVisible();
+  // echte Akte: für den Admin weiter nur lesbar
+  await expect(ap.getByTestId("aktenkopf").getByText("nur lesen")).toBeVisible();
+  await expect(ap.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt" })).toHaveCount(0);
   await adm.close();
 
   const api = await apiAls("mitarbeiter");

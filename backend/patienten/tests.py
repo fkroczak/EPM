@@ -156,13 +156,14 @@ class Akte(Grundlage):
         self.assertEqual(a.post(f"/api/patienten/{self.patient.id}/wieder-oeffnen/", {}, format="json").status_code, 400)
         self.assertEqual(a.post(f"/api/patienten/{self.patient.id}/wieder-oeffnen/", {"grund": "Irrtum"}, format="json").status_code, 200)
 
-    def test_abschliessen_nur_mediziner(self):
-        for wer in (self.mitarbeiter, self.betrachter, self.admin):
+    def test_abschliessen_mit_recht(self):
+        """Akten abschließen: Mitarbeiter, Mediziner, Admin (Admin nur bei Testpatienten); Betrachter nicht."""
+        for wer in (self.betrachter, self.admin):
             with self.subTest(rolle=wer.rolle):
                 r = client_fuer(wer).post(f"/api/patienten/{self.patient.id}/abschliessen/",
                                           {"anlass": "therapie_beendet"}, format="json")
                 self.assertEqual(r.status_code, 403)
-        c = client_fuer(self.mediziner)
+        c = client_fuer(self.mitarbeiter)
         url = f"/api/patienten/{self.patient.id}/abschliessen/"
         self.assertEqual(c.post(url, {"anlass": "x"}, format="json").status_code, 400)
         morgen = str(timezone.localdate() + timedelta(days=1))
@@ -178,7 +179,7 @@ class Akte(Grundlage):
         log = client_fuer(self.admin).get("/api/protokoll/?gruppe=abschluss").json()["results"]
         self.assertEqual(log[0]["beschreibung"],
                          f"Akte Echt, Anna (Nr. {self.patient.nummer:04d}) abgeschlossen, Anlass: Therapie beendet")
-        self.assertEqual(log[0]["person"], self.mediziner.anzeigename)
+        self.assertEqual(log[0]["person"], self.mitarbeiter.anzeigename)
         r = c.post(f"/api/patienten/{self.patient.id}/abschliessen/", {"anlass": "verstorben"}, format="json")
         self.assertEqual(r.status_code, 409)  # bereits abgeschlossen
 
@@ -422,8 +423,13 @@ class Rollen(Grundlage):
     def test_schreibrechte(self):
         daten = {"nachname": "Neu", "vorname": "Nora", "geburtsdatum": "1980-02-02"}
         self.assertEqual(client_fuer(self.betrachter).post("/api/patienten/", daten, format="json").status_code, 403)
-        self.assertEqual(client_fuer(self.admin).post("/api/patienten/", daten, format="json").status_code, 403)
         self.assertEqual(client_fuer(self.mitarbeiter).post("/api/patienten/", daten, format="json").status_code, 201)
+        # Admins legen nur Testpatienten an (Nummern ab 9001)
+        a = client_fuer(self.admin)
+        self.assertEqual(a.get("/api/patienten/naechste-nummer/").json()["testpatient"], True)
+        r = a.post("/api/patienten/", {**daten, "nachname": "Admin"}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual((r.json()["ist_test"], r.json()["nummer"] >= 9001), (True, True))
         self.assertEqual(client_fuer(self.betrachter).get("/api/patienten/").status_code, 200)
 
     def test_nur_admin_verwaltet_benutzer(self):
@@ -442,6 +448,46 @@ class Rollen(Grundlage):
         self.assertEqual(r.status_code, 403)
         # Meldung „Anmeldung …“ statt „Recht fehlt“: daran erkennt die Oberfläche, dass neu angemeldet werden muss
         self.assertIn("Anmeldung mit zweitem Faktor", r.json()["detail"])
+
+    def test_admin_schreibt_nur_bei_testpatienten(self):
+        """Festlegung 01.10.2026: Admins dürfen alles, Patientendaten schreiben aber nur bei Testpatienten."""
+        a = client_fuer(self.admin)
+        test = Patient.objects.create(nachname="Probe", vorname="P", geburtsdatum="1970-01-01", ist_test=True)
+        echt = self.patient
+        self.assertTrue(a.get("/api/auth/ich/").json()["schreibt_nur_testpatienten"])
+        self.assertFalse(client_fuer(self.mediziner).get("/api/auth/ich/").json()["schreibt_nur_testpatienten"])
+        # echte Akte: lesen ja, schreiben nein
+        self.assertEqual(a.get(f"/api/patienten/{echt.id}/").status_code, 200)
+        versuche = [
+            ("post", "/api/kontakte/", {"patient": echt.id, "text": "<p>x</p>"}),
+            ("post", "/api/gewichte/", {"patient": echt.id, "gewicht_kg": "60.0"}),
+            ("post", "/api/termine/", {"patient": echt.id, "art": "rueckruf", "faellig_am": str(timezone.localdate()),
+                                       "titel": "Rückruf"}),
+            ("patch", f"/api/patienten/{echt.id}/", {"ort": "Münster"}),
+            ("post", "/api/infusionsplaene/entwurf/", {"patient": echt.id}),
+            ("post", f"/api/patienten/{echt.id}/abschliessen/", {"anlass": "verstorben"}),
+        ]
+        for methode, url, daten in versuche:
+            with self.subTest(url=url):
+                r = getattr(a, methode)(url, daten, format="json")
+                self.assertEqual(r.status_code, 403, r.content)
+                self.assertIn("nur bei Testpatienten", r.json()["fehler"])
+        self.assertEqual(Kontakt.objects.filter(patient=echt).count(), 0)
+        # Einträge anderer Personen in echten Akten: nicht stornieren, nicht erledigen
+        kontakt = self.neuer_kontakt()
+        self.assertEqual(a.post(f"/api/kontakte/{kontakt['id']}/storno/", {"grund": "x"}, format="json").status_code, 403)
+        # Testpatient: alles erlaubt
+        self.assertEqual(a.post("/api/kontakte/", {"patient": test.id, "text": "<p>x</p>"}, format="json").status_code, 201)
+        e = a.post("/api/infusionsplaene/entwurf/", {"patient": test.id}, format="json")
+        self.assertEqual(e.status_code, 201, e.content)
+        self.assertEqual(a.patch(f"/api/patienten/{test.id}/", {"ort": "Münster"}, format="json").status_code, 200)
+        self.assertEqual(a.post(f"/api/patienten/{test.id}/abschliessen/", {"anlass": "therapie_beendet"},
+                                format="json").status_code, 200)
+        # Spezialeingriff bleibt: echte abgeschlossene Akte wieder öffnen
+        client_fuer(self.mediziner).post(f"/api/patienten/{echt.id}/abschliessen/", {"anlass": "verstorben"},
+                                         format="json")
+        self.assertEqual(a.post(f"/api/patienten/{echt.id}/wieder-oeffnen/", {"grund": "Irrtum"},
+                                format="json").status_code, 200)
 
     def test_testbenutzer_sieht_nur_testpatienten(self):
         tester = benutzer("tester", Rolle.MEDIZINER, ist_test=True)

@@ -302,7 +302,15 @@ class RechteJeGruppe(TestCase):
         for code in ("benutzer_verwalten", "akten_wieder_oeffnen", "backup_verwalten", "testdaten_zuruecksetzen"):
             self.assertFalse(m["mediziner"][code], code)
             self.assertTrue(m["admin"][code], code)
-        self.assertFalse(m["admin"]["akten_bearbeiten"])
+        # Festlegung 01.10.2026: Admin alles (Patientendaten nur bei Testpatienten), Mitarbeiter schließen Akten ab
+        # und pflegen Vorlagen
+        self.assertTrue(all(m["admin"].values()))
+        self.assertEqual(r["nur_testpatienten"]["rollen"], ["admin"])
+        self.assertIn("akten_abschliessen", r["nur_testpatienten"]["rechte"])
+        for code in ("akten_abschliessen", "vorlagen_pflegen", "eintraege_erfassen", "akten_bearbeiten"):
+            self.assertTrue(m["mitarbeiter"][code], code)
+        for code in ("plaene_anlegen", "plaene_freigeben", "audit_lesen", "akten_wieder_oeffnen"):
+            self.assertFalse(m["mitarbeiter"][code], code)
         self.assertEqual(m["betrachter"], {c["code"]: c["code"] == "akten_lesen" for c in r["rechte"]})
         self.assertIn(["admin", "benutzer_verwalten"], r["fest"])
         ich = client_fuer(self.mediziner).get("/api/auth/ich/").json()

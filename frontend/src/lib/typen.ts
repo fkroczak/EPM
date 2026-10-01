@@ -22,6 +22,8 @@ export type Ich = {
   darstellung: Partial<Darstellung>;
   startseite: { karten?: Karte[] };
   rechte: Recht[];
+  /** Admins: Patientendaten nur bei Testpatienten schreiben (echte Akten nur lesen) */
+  schreibt_nur_testpatienten: boolean;
 };
 
 export type Schritt = "anmelden" | "kennwort_aendern" | "2fa_einrichten" | "2fa" | "fertig";
@@ -141,6 +143,7 @@ export type Termin = {
   id: number;
   patient: number;
   patient_name: string;
+  patient_ist_test: boolean;
   art: "praxistermin" | "rueckruf" | "wiedervorlage" | "sonstiges";
   ort: number | null;
   ort_name: string | null;

@@ -1,9 +1,13 @@
 """
 Rechte je Gruppe (Rolle). Die Administration legt sie in der Oberfläche fest (Benutzer › Rechte).
 
-Grundsatz (Festlegung vom 01.10.2026): Mediziner sind dem Admin gleichgestellt, ausgenommen
-Benutzerverwaltung und sehr spezifische Eingriffe (abgeschlossene Akten wieder öffnen,
-Sicherungen, Testdaten). Für die übrigen Rollen gilt die Rollenmatrix aus dem Entwurf 17.
+Festlegungen vom 01.10.2026:
+- Mediziner sind dem Admin gleichgestellt, ausgenommen Benutzerverwaltung und sehr spezifische
+  Eingriffe (abgeschlossene Akten wieder öffnen, Sicherungen, Testdaten).
+- Akten abschließen: Mitarbeiter, Mediziner und Admin. Vorlagen pflegen: auch Mitarbeiter und Mediziner.
+- Admins dürfen alles, Patientendaten schreiben sie aber nur bei Testpatienten; echte Akten sind für
+  sie nur lesbar (Wieder öffnen, Benutzer, Sicherungen bleiben).
+Für Betrachter gilt die Rollenmatrix aus dem Entwurf 17.
 
 Was nicht ausdrücklich in der Datenbank steht, kommt aus STANDARD. Testbenutzer erhalten nie
 Rechte, die über Testpatienten hinaus wirken (Vorlagen, Versorger, Audit-Log, Verwaltung).
@@ -34,14 +38,20 @@ NAMEN = {code: name for code, name, _ in RECHTE}
 _ALLE = set(CODES)
 _ADMIN_SPEZIAL = {"benutzer_verwalten", "akten_wieder_oeffnen", "backup_verwalten", "testdaten_zuruecksetzen"}
 
+# Rechte, die Patientendaten verändern (Einträge, Stammdaten, Pläne, Abschluss)
+PATIENTENDATEN_SCHREIBEN = {"eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
+                            "akten_abschliessen"}
+
 STANDARD = {
     Rolle.BETRACHTER: {"akten_lesen"},
-    Rolle.MITARBEITER: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "versorger_pflegen"},
+    Rolle.MITARBEITER: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
+                        "versorger_pflegen", "vorlagen_pflegen"},
     Rolle.MEDIZINER: _ALLE - _ADMIN_SPEZIAL,
-    # Admin wie in der Rollenmatrix: keine Patientendaten und Pläne (Unklarheit U12), sonst alles
-    Rolle.ADMIN: _ALLE - {"eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
-                          "akten_abschliessen"},
+    Rolle.ADMIN: set(_ALLE),
 }
+
+# Diese Rollen schreiben Patientendaten nur bei Testpatienten (fest, unabhängig von der Matrix)
+NUR_TESTPATIENTEN_SCHREIBEN = {Rolle.ADMIN}
 
 # Diese Rechte kann niemand entziehen (sonst sperrt sich die Administration aus)
 FEST = {(Rolle.ADMIN, "benutzer_verwalten"), (Rolle.ADMIN, "akten_lesen")}
@@ -78,3 +88,8 @@ def rechte_fuer(user) -> frozenset:
 
 def hat_recht(user, code: str) -> bool:
     return code in rechte_fuer(user)
+
+
+def schreibt_nur_testpatienten(user) -> bool:
+    """Admins: Patientendaten nur bei Testpatienten schreiben (echte Akten nur lesen)."""
+    return getattr(user, "rolle", None) in NUR_TESTPATIENTEN_SCHREIBEN

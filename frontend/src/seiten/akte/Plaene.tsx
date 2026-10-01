@@ -143,7 +143,7 @@ function FreigabeDialog({ plan, offen, onOffen }: { plan: Plan; offen: boolean; 
 
 export function Plaene() {
   const { patient } = useAkte();
-  const { darf } = useAuth();
+  const { darfBei } = useAuth();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const [modus, setModus] = useState<"ansicht" | "vergleich">("ansicht");
@@ -173,7 +173,7 @@ export function Plaene() {
     },
   });
   const offen = !patient.ist_abgeschlossen;
-  const anlegen = offen && darf("plaene_anlegen");
+  const anlegen = offen && darfBei("plaene_anlegen", patient);
   const entwurfDa = liste.some((p) => p.status === "entwurf");
 
   return (
@@ -220,7 +220,7 @@ export function Plaene() {
               {gewaehlt.status === "entwurf" && anlegen ? <>
                 <Knopf icon="stift" onClick={() => navigate(`/patienten/${patient.id}/plaene/${gewaehlt.id}/bearbeiten`)}>Bearbeiten</Knopf>
                 <Knopf onClick={() => setVerwerfen(true)}>Verwerfen</Knopf>
-                {darf("plaene_freigeben") ? <Knopf variante="pri" icon="haken" onClick={() => setFreigabe(true)}>Freigeben</Knopf> : null}
+                {darfBei("plaene_freigeben", patient) ? <Knopf variante="pri" icon="haken" onClick={() => setFreigabe(true)}>Freigeben</Knopf> : null}
               </> : null}
               {gewaehlt.status !== "entwurf" ? <>
                 <Knopf icon="dokument" disabled title="folgt mit der PDF-Erzeugung (F37)">PDF öffnen</Knopf>

@@ -20,6 +20,8 @@ type Rechte = {
   matrix: Record<string, Record<string, boolean>>;
   fest: [string, string][];
   standard: Record<string, string[]>;
+  /** Rollen, die diese Rechte nur bei Testpatienten ausüben (Admin) */
+  nur_testpatienten: { rollen: string[]; rechte: string[] };
 };
 type Formular = { titel: string; first_name: string; last_name: string; kuerzel: string; funktion: string; username: string; rolle: string };
 const TITEL = ["", "Dr.", "Dr. med.", "Prof. Dr.", "Prof. Dr. med.", "Dipl.-Oec. troph."];
@@ -72,7 +74,8 @@ function RechteMatrix() {
         <div className="flex flex-col gap-1">
           <h2 className="lbl m-0">Was die Rollen dürfen</h2>
           <span className="text-[0.8125rem] gedaempft leading-normal max-w-[70ch]">Je Gruppe einstellbar. Mediziner sind dem Admin gleichgestellt, außer bei Benutzern,
-            dem Wiederöffnen abgeschlossener Akten, Sicherungen und Testdaten. Testbenutzer erhalten nie Rechte über Testpatienten hinaus.</span>
+            dem Wiederöffnen abgeschlossener Akten, Sicherungen und Testdaten. Admins dürfen alles, Patientendaten schreiben sie aber nur
+            bei Testpatienten. Testbenutzer erhalten nie Rechte über Testpatienten hinaus.</span>
         </div>
         <div className="flex gap-2">
           <Knopf klein onClick={standard}>Standard</Knopf>
@@ -89,12 +92,14 @@ function RechteMatrix() {
               <td className="td"><span className="text-sm">{x.name}</span>{x.beschreibung ? <><br /><span className="text-xs gedaempft">{x.beschreibung}</span></> : null}</td>
               {d.rollen.map((r) => {
                 const istFest = fest.has(`${r.code}.${x.code}`);
+                const nurTest = d.nur_testpatienten.rollen.includes(r.code) && d.nur_testpatienten.rechte.includes(x.code);
                 const anders = m[r.code][x.code] !== d.matrix[r.code][x.code];
                 return (
                   <td key={r.code} className={cx("td text-center", anders && "bg-warn-bg")}>
                     <input type="checkbox" aria-label={`${r.name}: ${x.name}`} checked={m[r.code][x.code]} disabled={istFest}
                       title={istFest ? "festes Recht, damit sich die Administration nicht aussperrt" : undefined}
                       onChange={(e) => setM({ ...m, [r.code]: { ...m[r.code], [x.code]: e.target.checked } })} />
+                    {nurTest ? <span className="block text-[0.6875rem] gedaempft leading-tight">nur Testpatienten</span> : null}
                   </td>
                 );
               })}

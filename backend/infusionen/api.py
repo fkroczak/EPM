@@ -6,7 +6,7 @@ from rest_framework.response import Response
 
 from accounts.permissions import FreigabeRecht, PlanRecht
 from audit.models import SystemEreignis, protokolliere
-from epm.api_basis import ModelClean, RichText, benutzername, patienten_fuer
+from epm.api_basis import ModelClean, RichText, benutzername, patienten_fuer, pruefe_schreibbereich
 from stammdaten.models import Praeparat
 
 from .models import Infusionsplan, InfusionsplanPosition
@@ -137,10 +137,12 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
     def perform_update(self, serializer):
         if serializer.instance.status != Infusionsplan.Status.ENTWURF:
             raise PermissionError("Freigegebene Pläne sind unveränderlich. Bitte einen neuen Plan anlegen.")
+        pruefe_schreibbereich(self.request.user, serializer.instance.patient)
         serializer.instance.patient.pruefe_bearbeitbar()
         serializer.save()
 
     def perform_destroy(self, instance):
+        pruefe_schreibbereich(self.request.user, instance.patient)
         instance.patient.pruefe_bearbeitbar()
         for p in list(instance.positionen.all()):
             p.delete()
@@ -151,6 +153,7 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
         patient = patienten_fuer(request.user).filter(pk=request.data.get("patient")).first()
         if patient is None:
             return Response({"patient": "Patient nicht gefunden."}, status=status.HTTP_400_BAD_REQUEST)
+        pruefe_schreibbereich(request.user, patient)
         vorlage = None
         if request.data.get("vorlage"):
             vorlage = Infusionsplan.objects.filter(pk=request.data["vorlage"], patient=patient).first()
@@ -167,6 +170,7 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
     @action(detail=True, methods=["post"], permission_classes=[FreigabeRecht])
     def freigeben(self, request, pk=None):
         plan = self.get_object()
+        pruefe_schreibbereich(request.user, plan.patient)
         plan.freigeben(request.user)
         protokolliere(SystemEreignis.Art.PLAN_FREIGEGEBEN, request, objekt=f"Plan {plan.id} / Patient {plan.patient.nummer}")
         plan.refresh_from_db()

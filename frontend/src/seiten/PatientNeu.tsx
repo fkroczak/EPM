@@ -11,7 +11,7 @@ import { datum, eingabeDatum, eingabeZahl, heuteIso, nummer } from "@/lib/format
 import { GESCHLECHTER } from "@/lib/typen";
 import type { Patient, PatientZeile } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
-import { Auswahl, Eingabe, Feld, Karte, Knopf, KnopfLink, Meldung, Textfeld, cx } from "@/components/ui/basis";
+import { Auswahl, Chip, Eingabe, Feld, Karte, Knopf, KnopfLink, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
 
 type Formular = {
@@ -60,7 +60,7 @@ export function PatientNeu() {
   const { darf } = useAuth();
   const setze = (feld: keyof Formular) => (e: { target: { value: string } }) => setF((alt) => ({ ...alt, [feld]: e.target.value }));
 
-  const naechste = useQuery({ queryKey: ["patienten", "naechste-nummer"], queryFn: () => api<{ nummer: number }>("patienten/naechste-nummer/") });
+  const naechste = useQuery({ queryKey: ["patienten", "naechste-nummer"], queryFn: () => api<{ nummer: number; testpatient: boolean }>("patienten/naechste-nummer/") });
   const versorger = useVersorgerListe();
   const katheter = useAuswahl("katheter");
   const gewaehlt = (versorger.data ?? []).find((v) => String(v.id) === f.versorger);
@@ -147,6 +147,7 @@ export function PatientNeu() {
             <span className="text-[0.84rem] gedaempft">
               Nr. <span className="num text-tinte font-semibold" data-testid="naechste-nummer">{naechste.data ? nummer(naechste.data.nummer) : "…"}</span> wird automatisch vergeben
             </span>
+            {naechste.data?.testpatient ? <Chip art="warn" title="Testbenutzer und Admins legen nur Testpatienten an">wird Testpatient</Chip> : null}
             <KnopfLink to="/patienten">Abbrechen</KnopfLink>
             <Knopf type="submit" variante="pri" laedt={anlegen.isPending}>Anlegen und Akte öffnen</Knopf>
           </div>

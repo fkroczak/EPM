@@ -5,6 +5,7 @@ import { abfrage, api } from "@/lib/api";
 import type { Seite } from "@/lib/api";
 import { datum, nummer } from "@/lib/format";
 import type { PatientZeile } from "@/lib/typen";
+import { useAuth } from "@/lib/auth";
 import { Knopf, cx } from "@/components/ui/basis";
 
 export function PatientWahl({ id, wert, onWahl, fehler }: {
@@ -12,9 +13,11 @@ export function PatientWahl({ id, wert, onWahl, fehler }: {
 }) {
   const [text, setText] = useState("");
   const begriff = text.trim();
+  // Admins schreiben nur bei Testpatienten – also nur diese zur Auswahl anbieten
+  const nurTest = !!useAuth().ich?.schreibt_nur_testpatienten;
   const treffer = useQuery({
-    queryKey: ["patientwahl", begriff],
-    queryFn: () => api<Seite<PatientZeile>>(`patienten/${abfrage({ suche: begriff, status: "in_betreuung", seitengroesse: 6, ordering: "nachname" })}`),
+    queryKey: ["patientwahl", begriff, nurTest],
+    queryFn: () => api<Seite<PatientZeile>>(`patienten/${abfrage({ suche: begriff, status: "in_betreuung", seitengroesse: 6, ordering: "nachname", test: nurTest ? "nur" : undefined })}`),
     enabled: begriff.length >= 2 && !wert,
   });
   if (wert) {
@@ -29,8 +32,8 @@ export function PatientWahl({ id, wert, onWahl, fehler }: {
   }
   return (
     <div className="flex flex-col gap-1">
-      <input id={id} className="inp" type="search" placeholder="Name, Nr. oder Geburtsdatum" value={text}
-        aria-invalid={fehler || undefined} onChange={(e) => setText(e.target.value)} autoComplete="off" />
+      <input id={id} className="inp" type="search" placeholder={nurTest ? "Testpatient: Name, Nr. oder Geburtsdatum" : "Name, Nr. oder Geburtsdatum"}
+        value={text} aria-invalid={fehler || undefined} onChange={(e) => setText(e.target.value)} autoComplete="off" />
       {begriff.length >= 2 ? (
         <ul className="m-0 p-0 list-none border border-rand rounded-lg max-h-56 overflow-auto" role="listbox" aria-label="Treffer">
           {(treffer.data?.results ?? []).map((p) => (

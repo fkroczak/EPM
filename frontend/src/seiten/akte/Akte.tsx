@@ -236,7 +236,7 @@ function Reiter({ zu, text, zahl: anzahl, ende }: { zu: string; text: string; za
 export function Akte() {
   const { id } = useParams();
   const pid = Number(id);
-  const { darf } = useAuth();
+  const { darf, darfBei, ich } = useAuth();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin">("");
   const akte = useQuery({ queryKey: ["patient", pid], queryFn: () => api<Patient>(`patienten/${pid}/`), enabled: !!pid });
@@ -252,8 +252,8 @@ export function Akte() {
   const offen = !p.ist_abgeschlossen;
   const kontext: AktenKontext = {
     patient: p,
-    erfassen: offen && darf("eintraege_erfassen"),
-    bearbeiten: offen && darf("akten_bearbeiten"),
+    erfassen: offen && darfBei("eintraege_erfassen", p),
+    bearbeiten: offen && darfBei("akten_bearbeiten", p),
     terminAnlegen: () => setDialog("termin"),
   };
   const k = p.kopf;
@@ -267,6 +267,8 @@ export function Akte() {
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="m-0 text-[1.625rem] font-semibold">{name(p)}</h1>
               {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
+              {ich?.schreibt_nur_testpatienten && !p.ist_test
+                ? <Chip title="Admins schreiben Patientendaten nur bei Testpatienten">nur lesen</Chip> : null}
               {p.ist_abgeschlossen ? <Chip>abgeschlossen</Chip> : null}
             </div>
             <span className="num text-sm gedaempft">
@@ -279,11 +281,11 @@ export function Akte() {
               <Knopf icon="waage" onClick={() => navigate(basis, { state: { gewicht: Date.now() } })}>Gewicht</Knopf>
               <Knopf icon="kalender" onClick={() => setDialog("termin")}>Termin</Knopf>
             </> : null}
-            {offen && darf("plaene_anlegen") ? <Knopf icon="tropfen" onClick={() => navigate(`${basis}/plaene/neu`)}>Neuer Plan</Knopf> : null}
+            {offen && darfBei("plaene_anlegen", p) ? <Knopf icon="tropfen" onClick={() => navigate(`${basis}/plaene/neu`)}>Neuer Plan</Knopf> : null}
             <Menue label="Weitere Aktionen" eintraege={[
               ...(kontext.bearbeiten ? [{ text: "Stammdaten bearbeiten", onClick: () => setDialog("stammdaten") }] : []),
               { text: "Akte als PDF", onClick: () => undefined, aus: true, hinweis: "folgt mit der PDF-Erzeugung (F23)" },
-              ...(offen && darf("akten_abschliessen") ? [{ text: "Akte abschließen", onClick: () => setDialog("abschluss"), gefaehrlich: true }] : []),
+              ...(offen && darfBei("akten_abschliessen", p) ? [{ text: "Akte abschließen", onClick: () => setDialog("abschluss"), gefaehrlich: true }] : []),
               ...(!offen && darf("akten_wieder_oeffnen") ? [{ text: "Akte wieder öffnen", onClick: () => setDialog("oeffnen") }] : []),
             ]} />
           </div>

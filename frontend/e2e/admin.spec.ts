@@ -102,7 +102,7 @@ test("Rechte je Gruppe: Admin erlaubt Mitarbeitern Pläne, wirkt sofort, Standar
 
     await rechte.getByRole("button", { name: "Standard" }).click();
     await rechte.getByRole("button", { name: /^Speichern \(\d+\)$/ }).click();
-    await expect(page.getByText("Rechte gespeichert. Sie gelten ab sofort.")).toBeVisible();
+    await expect(page.getByText("Rechte gespeichert. Sie gelten ab sofort.").last()).toBeVisible();
     expect((await mitarbeiter.get("auth/ich/")).rechte).not.toContain("plaene_anlegen");
   } finally {
     // Ausgangsstand für die übrigen Tests, auch wenn oben etwas fehlschlägt (ohne den ursprünglichen Fehler zu verdecken)
@@ -192,13 +192,24 @@ test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", asyn
   merken("vorlagen", { ort, vitamin });
 });
 
-test("Ohne Recht keine Administration: Mitarbeiter sieht nichts, Mediziner Vorlagen und Audit-Log", async ({ browser }) => {
+test("Administration je Recht: Betrachter sieht nichts, Mitarbeiter Vorlagen, Mediziner Vorlagen und Audit-Log", async ({ browser }) => {
+  const b = await browser.newContext({ storageState: zustand("betrachter"), ignoreHTTPSErrors: true });
+  const bp = await b.newPage();
+  await bp.goto("/");
+  await expect(bp.getByRole("navigation", { name: "Administration" })).toHaveCount(0);
+  await bp.goto("/admin/benutzer");
+  await expect(bp.getByText("Für „Benutzer“ fehlt das Recht.")).toBeVisible();
+  await b.close();
+  // Vorlagen pflegen auch Mitarbeiter (Festlegung 01.10.2026)
   const m = await browser.newContext({ storageState: zustand("mitarbeiter"), ignoreHTTPSErrors: true });
   const mp = await m.newPage();
   await mp.goto("/");
-  await expect(mp.getByRole("navigation", { name: "Administration" })).toHaveCount(0);
-  await mp.goto("/admin/benutzer");
-  await expect(mp.getByText("Für „Benutzer“ fehlt das Recht.")).toBeVisible();
+  const mnav = mp.getByRole("navigation", { name: "Administration" });
+  await expect(mnav.getByRole("link", { name: "Vorlagen" })).toBeVisible();
+  await expect(mnav.getByRole("link", { name: "Audit-Log" })).toHaveCount(0);
+  await expect(mnav.getByRole("link", { name: "Benutzer" })).toHaveCount(0);
+  await mnav.getByRole("link", { name: "Vorlagen" }).click();
+  await expect(mp.getByTestId("logo")).toBeVisible();
   await m.close();
   const d = await browser.newContext({ storageState: zustand("mediziner"), ignoreHTTPSErrors: true });
   const dp = await d.newPage();
@@ -242,6 +253,48 @@ test("Fünf falsche Passwörter sperren das Konto; Admin sieht den Hinweis, setz
   await expect(page.getByText("Benutzer entsperrt.")).toBeVisible();
   await expect(page.getByTestId("benutzerliste").getByRole("row").filter({ hasText: konto.benutzername })).toContainText("2FA: nicht eingerichtet");
   merken("gesperrt", { benutzername: konto.benutzername });
+});
+
+test("Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten", async ({ page }) => {
+  const m = await apiAls("mitarbeiter");
+  const echt = await m.post("patienten/", { nachname: eindeutig("Echt"), vorname: "Erna", geburtsdatum: "1960-06-06" });
+  await m.ende();
+  await page.goto(`/patienten/${echt.id}`);
+  const kopf = page.getByTestId("aktenkopf");
+  await expect(kopf.getByText("nur lesen")).toBeVisible();
+  await expect(kopf.getByRole("button", { name: "Kontakt" })).toHaveCount(0);
+  await expect(kopf.getByRole("button", { name: "Neuer Plan" })).toHaveCount(0);
+  await expect(page.getByTestId("gewichtskarte").getByLabel("Neues Gewicht")).toHaveCount(0);
+  await page.getByRole("button", { name: "Weitere Aktionen" }).click();
+  await expect(page.getByRole("menuitem", { name: "Akte abschließen" })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Stammdaten bearbeiten" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  // auch die API weist ab
+  const admin = await apiAls("admin");
+  const abgewiesen = await admin.roh.post("/api/kontakte/", { data: { patient: echt.id, text: "<p>x</p>" }, headers: await admin.kopf() });
+  expect(abgewiesen.status()).toBe(403);
+  expect((await abgewiesen.json()).fehler).toContain("nur bei Testpatienten");
+
+  // Neuer Patient wird Testpatient, dort darf der Admin alles
+  await page.goto("/patienten/neu");
+  await expect(page.getByText("wird Testpatient")).toBeVisible();
+  const nachname = eindeutig("Admintest");
+  await page.getByLabel("Nachname").fill(nachname);
+  await page.getByLabel("Vorname").fill("Anton");
+  await page.getByLabel("Geburtsdatum").fill("03.03.1973");
+  await page.getByRole("button", { name: "Anlegen und Akte öffnen" }).click();
+  await expect(page).toHaveURL(/\/patienten\/\d+$/);
+  const id = Number(page.url().split("/").pop());
+  await expect(kopf.getByText("Testpatient")).toBeVisible();
+  await kopf.getByRole("button", { name: "Kontakt" }).click();
+  const neu = page.getByTestId("neuer-kontakt");
+  await neu.getByRole("textbox", { name: "Neuer Kontakt" }).fill("Testkontakt der Administration");
+  await neu.getByRole("button", { name: "Kontakt speichern" }).click();
+  await expect(page.getByText("Kontakt gespeichert.")).toBeVisible();
+  const p = await admin.get(`patienten/${id}/`);
+  expect([p.ist_test, p.nummer >= 9001]).toEqual([true, true]);
+  expect((await admin.get(`kontakte/?patient=${id}`)).results).toHaveLength(1);
+  await admin.ende();
 });
 
 test("Testdaten auf Ausgangsstand zurücksetzen (nur Testpatienten)", async ({ page }) => {

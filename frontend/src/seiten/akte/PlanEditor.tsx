@@ -88,7 +88,7 @@ export function PlanEditor() {
   const [params] = useSearchParams();
   const vorlageId = params.get("vorlage");
   const navigate = useNavigate();
-  const { darf } = useAuth();
+  const { darfBei, ich } = useAuth();
   const qc = useQueryClient();
   const melden = useHinweis();
   const praeparate = usePraeparate();
@@ -176,8 +176,9 @@ export function PlanEditor() {
     },
   });
 
-  if (patient.ist_abgeschlossen || !darf("plaene_anlegen")) {
-    return <Meldung art="warn">Infusionspläne anlegen darf nur, wer das Recht „Pläne anlegen“ hat, und nur bei offenen Akten.</Meldung>;
+  if (patient.ist_abgeschlossen || !darfBei("plaene_anlegen", patient)) {
+    return <Meldung art="warn">Infusionspläne anlegen darf nur, wer das Recht „Pläne anlegen“ hat, und nur bei offenen Akten.
+      {ich?.schreibt_nur_testpatienten ? " Als Admin nur bei Testpatienten." : ""}</Meldung>;
   }
   if (!f || praeparate.isLoading) return <Laden />;
   if (planId && entwurf.data && entwurf.data.status !== "entwurf") {
@@ -357,7 +358,7 @@ export function PlanEditor() {
           {speichern.error && !Object.keys(server).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
           {Object.keys(e).length ? <Meldung art="fehler">Bitte die markierten Felder prüfen.{e.fehler ? ` ${e.fehler}` : ""}{e.kcal_manuell ? ` ${e.kcal_manuell}` : ""}</Meldung> : null}
           <div className="flex flex-col gap-2">
-            {darf("plaene_freigeben") ? (
+            {darfBei("plaene_freigeben", patient) ? (
               <Knopf variante="pri" icon="haken" laedt={speichern.isPending && speichern.variables === true} disabled={speichern.isPending}
                 onClick={() => speichern.mutate(true)}>Speichern und freigeben</Knopf>
             ) : null}

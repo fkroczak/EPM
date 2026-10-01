@@ -264,7 +264,7 @@ function TermineKarte() {
 
 function PlanKarte() {
   const { patient } = useAkte();
-  const { darf } = useAuth();
+  const { darfBei } = useAuth();
   const aktuell = patient.kopf?.aktueller_plan;
   const plan = useQuery({
     queryKey: ["patient", patient.id, "plan", aktuell?.id],
@@ -289,7 +289,7 @@ function PlanKarte() {
         </>
       ) : <span className="text-sm gedaempft">Noch kein freigegebener Plan.</span>}
       <div className="flex gap-2 flex-wrap">
-        {!patient.ist_abgeschlossen && darf("plaene_anlegen") ? <KnopfLink to={`/patienten/${patient.id}/plaene/neu`} variante="pri" klein>Neuer Plan</KnopfLink> : null}
+        {!patient.ist_abgeschlossen && darfBei("plaene_anlegen", patient) ? <KnopfLink to={`/patienten/${patient.id}/plaene/neu`} variante="pri" klein>Neuer Plan</KnopfLink> : null}
         <KnopfLink to={`/patienten/${patient.id}/plaene`} klein>Alle Pläne</KnopfLink>
       </div>
     </Karte>

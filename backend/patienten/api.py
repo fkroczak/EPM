@@ -19,7 +19,8 @@ from rest_framework.response import Response
 
 from accounts.permissions import AbschlussRecht, AktenRecht, EintragRecht, WiederOeffnenRecht, recht
 from audit.models import SystemEreignis, protokolliere
-from epm.api_basis import ModelClean, RichText, benutzername, patienten_fuer
+from epm.api_basis import (ModelClean, RichText, benutzername, legt_testpatienten_an, patienten_fuer,
+                            pruefe_schreibbereich)
 from stammdaten.models import Auswahlwert
 
 from .kennzahlen import kennzahlen, pruefliste, schnellfilter, zaehler
@@ -285,11 +286,13 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
     @action(detail=False, methods=["get"], url_path="naechste-nummer")
     def naechste_nummer(self, request):
         """„Nr. 0300 wird automatisch vergeben“ (Entwurf 12)."""
-        return Response({"nummer": Patient.naechste_nummer(request.user.ist_test)})
+        return Response({"nummer": Patient.naechste_nummer(legt_testpatienten_an(request.user)),
+                         "testpatient": legt_testpatienten_an(request.user)})
 
     @transaction.atomic
     def perform_create(self, serializer):
-        patient = serializer.save(angelegt_von=self.request.user, ist_test=self.request.user.ist_test)
+        # Testbenutzer und Admins legen nur Testpatienten an
+        patient = serializer.save(angelegt_von=self.request.user, ist_test=legt_testpatienten_an(self.request.user))
         messung = getattr(serializer, "aufnahme_messung", None)
         if messung is not None:
             messung.patient = patient
@@ -306,6 +309,7 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
         return Response({"feld": feld, "version": fassungen[0]["version"] if fassungen else 0, "fassungen": fassungen})
 
     def perform_update(self, serializer):
+        pruefe_schreibbereich(self.request.user, serializer.instance)
         serializer.instance.pruefe_bearbeitbar()
         serializer.save()
 
@@ -330,6 +334,7 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
     @action(detail=True, methods=["post"], permission_classes=[AbschlussRecht])
     def abschliessen(self, request, pk=None):
         patient = self.get_object()
+        pruefe_schreibbereich(request.user, patient)
         patient.pruefe_bearbeitbar()
         anlass = request.data.get("anlass")
         if anlass not in Patient.Abschlussanlass.values:
@@ -532,6 +537,7 @@ class AktenEintragViewSet(viewsets.GenericViewSet):
     def pruefe_patient(self, patient):
         if not patienten_fuer(self.request.user).filter(pk=patient.pk).exists():
             raise serializers.ValidationError({"patient": "Patient nicht gefunden."})
+        pruefe_schreibbereich(self.request.user, patient)
         patient.pruefe_bearbeitbar()
 
 
@@ -677,10 +683,11 @@ class TerminSerializer(serializers.ModelSerializer):
     erledigt_von_name = serializers.SerializerMethodField()
     angelegt_von_name = serializers.SerializerMethodField()
     patient_name = serializers.SerializerMethodField()
+    patient_ist_test = serializers.BooleanField(source="patient.ist_test", read_only=True)
 
     class Meta:
         model = Termin
-        fields = ["id", "patient", "patient_name", "art", "ort", "ort_name", "faellig_am", "uhrzeit", "bei", "titel",
+        fields = ["id", "patient", "patient_name", "patient_ist_test", "art", "ort", "ort_name", "faellig_am", "uhrzeit", "bei", "titel",
                   "notiz", "kontakt", "erledigt_am", "erledigt_von_name", "angelegt_am", "angelegt_von_name"]
         read_only_fields = ["erledigt_am", "angelegt_am"]
 
