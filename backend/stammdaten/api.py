@@ -149,12 +149,16 @@ class AnsprechpartnerViewSet(OhneLoeschen):
 
 class VersorgerSerializer(serializers.ModelSerializer):
     ansprechpartner = AnsprechpartnerSerializer(many=True, read_only=True)
-    patienten_anzahl = serializers.IntegerField(source="patienten.count", read_only=True)
+    patienten_anzahl = serializers.SerializerMethodField()
 
     class Meta:
         model = Versorger
         fields = ["id", "name", "strasse", "plz", "ort", "telefon", "fax", "email", "notiz", "aktiv",
                   "ansprechpartner", "patienten_anzahl"]
+
+    def get_patienten_anzahl(self, obj):
+        """„94 Patienten in Betreuung“ (Entwurf 13): ohne abgeschlossene Akten und Testpatienten."""
+        return obj.patienten.filter(abgeschlossen_am__isnull=True, ist_test=False).count()
 
 
 class VersorgerViewSet(OhneLoeschen):

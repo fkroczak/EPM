@@ -241,7 +241,7 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
 
     permission_classes = [AktenRecht]
     filterset_class = PatientFilter
-    ordering_fields = ["nachname", "nummer", "geburtsdatum", "geaendert_am", "letzter_kontakt"]
+    ordering_fields = ["nachname", "nummer", "geburtsdatum", "geaendert_am", "letzter_kontakt", "abgeschlossen_am"]
 
     def get_queryset(self):
         qs = patienten_fuer(self.request.user).select_related("versorger", "ansprechpartner", "katheter",
@@ -258,6 +258,12 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
 
     def list(self, request, *args, **kwargs):
         qs = self.filter_queryset(self.get_queryset())
+        ordnung = request.query_params.get("ordering", "")
+        if ordnung.lstrip("-") in ("letzter_kontakt", "abgeschlossen_am"):
+            # Akten ohne Kontakt bzw. Abschluss stehen immer am Ende, bei gleichem Wert nach Name
+            feld = F(ordnung.lstrip("-"))
+            qs = qs.order_by(feld.desc(nulls_last=True) if ordnung.startswith("-") else feld.asc(nulls_last=True),
+                             "nachname", "vorname")
         art = request.query_params.get("schnellfilter")
         if art in ("hinweise", "gewichtsverlust", "termin_woche"):
             qs = qs.filter(id__in=schnellfilter(qs, art))

@@ -40,6 +40,16 @@ export const ROLLEN: Record<string, string> = {
   admin: "Admin",
 };
 
+export const ABSCHLUSSANLAESSE: Record<string, string> = {
+  verstorben: "verstorben",
+  therapie_beendet: "Therapie beendet",
+  betreuung_gewechselt: "Betreuung gewechselt",
+};
+
+export const GESCHLECHTER: Record<string, string> = { w: "weiblich", m: "männlich", d: "divers", "": "—" };
+
+export const NICKEL: Record<string, string> = { ja: "ja", nein: "nein", unbekannt: "unbekannt" };
+
 export type Trend = { richtung: "down" | "up" | "flat" | null; prozent: number; warnung: boolean };
 
 export type Kennzahlen = {

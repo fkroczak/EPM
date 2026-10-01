@@ -3,7 +3,10 @@ import { useAuth } from "./lib/auth";
 import { Laden } from "./components/ui/basis";
 import { Seite, Shell } from "./components/layout/Shell";
 import { Anmeldung } from "./seiten/Anmeldung";
+import { PatientNeu } from "./seiten/PatientNeu";
+import { Patienten } from "./seiten/Patienten";
 import { Start } from "./seiten/Start";
+import { Versorger } from "./seiten/Versorger";
 
 function NichtGefunden() {
   return (
@@ -19,6 +22,9 @@ const router = createBrowserRouter([
     element: <Shell />,
     children: [
       { index: true, element: <Start /> },
+      { path: "patienten", element: <Patienten /> },
+      { path: "patienten/neu", element: <PatientNeu /> },
+      { path: "versorger", element: <Versorger /> },
       { path: "*", element: <NichtGefunden /> },
     ],
   },
