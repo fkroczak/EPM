@@ -99,6 +99,10 @@ test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", 
   await expect(page.getByTestId("planliste").getByRole("listitem")).toHaveCount(1);
   await expect(page.getByTestId("planliste")).toContainText("aktuell gültig");
   await expect(page.getByTestId("pdf-ansicht")).toContainText("Glamin 13,4 % · 80 g");
+  const blatt = page.getByTestId("pdf-ansicht");
+  await expect(blatt.getByRole("row").filter({ hasText: "Gesamtvolumen" })).toContainText("2.100 ml (35 ml/kg × 60 kg)");
+  await expect(blatt.getByRole("row").filter({ hasText: /^Rate/ })).toContainText("175 ml/h");
+  await expect(blatt.getByRole("row").filter({ hasText: "Protonenpumpenhemmer" })).toContainText("Pantozol® 40 mg · morgens, abends");
 
   const dok = gemerkt("dokumente").id;
   await page.goto(`/patienten/${dok}/dokumente`);

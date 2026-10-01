@@ -184,10 +184,15 @@ test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", asyn
   await expect(grenzen.getByText("Untere Grenze muss kleiner als obere Grenze sein.")).toBeVisible();
   await grenzen.getByLabel("Gewicht minimal").fill("20");
   await grenzen.getByLabel("Kontakt überfällig nach").fill("13");
+  // Grenze für das berechnete Gesamtvolumen (Gewicht × 35 ml)
+  await expect(grenzen.getByLabel("Gesamtvolumen minimal")).toHaveValue("0");
+  await expect(grenzen.getByLabel("Gesamtvolumen maximal")).toHaveValue("9000");
+  await grenzen.getByLabel("Gesamtvolumen maximal").fill("8000");
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Grenzwerte gespeichert.")).toBeVisible();
-  expect((await admin.get("einstellungen/")).kontakt_ueberfaellig_monate).toBe(13);
-  await admin.patch("einstellungen/", { kontakt_ueberfaellig_monate: 12 });
+  const einstellungen = await admin.get("einstellungen/");
+  expect([einstellungen.kontakt_ueberfaellig_monate, einstellungen.volumen_max_ml]).toEqual([13, 8000]);
+  await admin.patch("einstellungen/", { kontakt_ueberfaellig_monate: 12, volumen_max_ml: 9000 });
   await admin.ende();
   merken("vorlagen", { ort, vitamin });
 });
