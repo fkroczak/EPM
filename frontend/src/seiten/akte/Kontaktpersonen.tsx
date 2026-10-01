@@ -5,7 +5,7 @@
  *   Schweigepflichtentbindung liegt vor und steht im Patientenkopf.
  * Nichts wird gelöscht: Nicht mehr Aktuelles wird markiert und bleibt im Verlauf.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api } from "@/lib/api";
@@ -264,15 +264,21 @@ export function BezugspersonenKarte() {
   const ort = useLocation();
   const ziel = (ort.state as { bezugsperson?: number; zeit?: number } | null);
   const [markiert, setMarkiert] = useState<number | null>(null);
+  const erledigt = useRef<number | null>(null);
   useEffect(() => {
-    if (!ziel?.bezugsperson || !liste.data) return;
+    // je Klick nur einmal (sonst würde ein späteres Neuladen der Liste die Person erneut anspringen)
+    if (!ziel?.bezugsperson || !liste.data || erledigt.current === (ziel.zeit ?? 0)) return;
+    erledigt.current = ziel.zeit ?? 0;
     const id = ziel.bezugsperson;
     if (!liste.data.some((b) => b.id === id && b.aktiv)) setFrueher(true);
     setMarkiert(id);
     window.requestAnimationFrame(() => document.getElementById(`bezugsperson-${id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }));
+  }, [ziel?.bezugsperson, ziel?.zeit, liste.data]);
+  useEffect(() => {
+    if (markiert === null) return;
     const t = window.setTimeout(() => setMarkiert(null), 2500);
     return () => window.clearTimeout(t);
-  }, [ziel?.bezugsperson, ziel?.zeit, liste.data]);
+  }, [markiert]);
   const anzahlFrueher = alle.filter((b) => !b.aktiv).length;
   return (
     <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="bezugspersonen">
