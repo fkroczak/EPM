@@ -407,6 +407,27 @@ class Patientenliste(Grundlage):
         self.assertEqual(ids("ver"), [self.verlust.id])
         self.assertEqual(ids("Stefan Stabil"), [self.stabil.id])
 
+    def test_migration_stellt_bestehenden_wert_12_auf_4(self):
+        """Auf einer bestehenden Datenbank (Wert noch 12) stellt die Datenmigration um und schreibt den Grund in die
+        Historie. Fehler auf dem Testsystem 01.10.2026: der Grund war länger als 100 Zeichen → Migration brach ab."""
+        import importlib
+
+        from django.apps import apps as django_apps
+
+        from stammdaten.models import Einstellungen
+
+        migration = importlib.import_module("stammdaten.migrations.0007_kontakt_ueberfaellig_4_monate")
+        self.assertLessEqual(len(migration.GRUND), 100)
+        Einstellungen.objects.filter(pk=Einstellungen.aktuell().pk).update(kontakt_ueberfaellig_monate=12)
+        migration.umstellen(django_apps, None)
+        e = Einstellungen.objects.get(pk=1)
+        self.assertEqual(e.kontakt_ueberfaellig_monate, 4)
+        self.assertEqual(e.history.order_by("-history_id").first().history_change_reason, migration.GRUND)
+        # ein selbst eingetragener Wert bleibt
+        Einstellungen.objects.filter(pk=1).update(kontakt_ueberfaellig_monate=6)
+        migration.umstellen(django_apps, None)
+        self.assertEqual(Einstellungen.objects.get(pk=1).kontakt_ueberfaellig_monate, 6)
+
     def test_kontakt_ueberfaellig_nach_4_monaten(self):
         """Festlegung 01.10.2026: Patienten kommen meist quartalsweise → Hinweis nach 4 Monaten ohne Kontakt."""
         from stammdaten.models import Einstellungen

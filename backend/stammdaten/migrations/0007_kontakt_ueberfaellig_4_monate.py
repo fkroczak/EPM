@@ -6,7 +6,9 @@ bleibt er. Die Umstellung steht mit Grund in der Historie der Einstellungen.
 from django.db import migrations, models
 from django.utils import timezone
 
-GRUND = "Standard „Kontakt überfällig“ von 12 auf 4 Monate (Festlegung 01.10.2026: Patienten kommen meist quartalsweise)"
+# history_change_reason fasst höchstens 100 Zeichen (die erste Fassung war länger und brach die Migration auf einer
+# bestehenden Datenbank mit „value too long for type character varying(100)“ ab)
+GRUND = "Standard „Kontakt überfällig“ 12 → 4 Monate (Festlegung 01.10.2026: meist quartalsweise)"
 
 
 def umstellen(apps, schema_editor):
@@ -18,7 +20,7 @@ def umstellen(apps, schema_editor):
     e.kontakt_ueberfaellig_monate = 4
     e.save(update_fields=["kontakt_ueberfaellig_monate"])
     werte = {f.attname: getattr(e, f.attname) for f in Einstellungen._meta.concrete_fields}
-    Historie.objects.create(**werte, history_date=timezone.now(), history_type="~", history_change_reason=GRUND)
+    Historie.objects.create(**werte, history_date=timezone.now(), history_type="~", history_change_reason=GRUND[:100])
 
 
 class Migration(migrations.Migration):
