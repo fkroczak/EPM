@@ -97,7 +97,7 @@ class Infusionsplaene(Grundlage):
 
     def test_vitamine_freigegebener_plaene_in_der_datenbank_geschuetzt(self):
         plan = self.freigegebener_plan()
-        with self.assertRaises(PermissionError):
+        with self.assertRaises(PermissionError), transaction.atomic():
             plan.vitamine.clear()
         cernevit = praeparat("Cernevit")
         for sql, args in [

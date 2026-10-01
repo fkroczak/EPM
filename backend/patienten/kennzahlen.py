@@ -89,9 +89,14 @@ def kennzahlen(patienten) -> dict:
     return ergebnis
 
 
+def _nur_ids(patienten_qs):
+    """Nur die Spalten, die ``kennzahlen`` braucht (ohne select_related der Listenansicht)."""
+    return patienten_qs.select_related(None).only("id", "versorger")
+
+
 def schnellfilter(patienten_qs, art: str):
     """IDs für „Nur mit Hinweisen“, „Gewichtsverlust“, „Termin diese Woche“ (Entwurf 3)."""
-    werte = kennzahlen(patienten_qs.only("id", "versorger"))
+    werte = kennzahlen(_nur_ids(patienten_qs))
     if art == "hinweise":
         return [pid for pid, k in werte.items() if k["hinweise"]]
     if art == "gewichtsverlust":
@@ -104,7 +109,7 @@ def schnellfilter(patienten_qs, art: str):
 def zaehler(patienten_qs) -> dict:
     """Zahlen für die Knöpfe der Patientenliste. Testpatienten zählen nicht (außer für Testbenutzer)."""
     offen = patienten_qs.filter(abgeschlossen_am__isnull=True)
-    werte = kennzahlen(offen.only("id", "versorger"))
+    werte = kennzahlen(_nur_ids(offen))
     return {
         "in_betreuung": offen.count(),
         "abgeschlossen": patienten_qs.filter(abgeschlossen_am__isnull=False).count(),
