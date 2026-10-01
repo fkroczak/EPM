@@ -407,6 +407,25 @@ class Patientenliste(Grundlage):
         self.assertEqual(ids("ver"), [self.verlust.id])
         self.assertEqual(ids("Stefan Stabil"), [self.stabil.id])
 
+    def test_kontakt_ueberfaellig_nach_4_monaten(self):
+        """Festlegung 01.10.2026: Patienten kommen meist quartalsweise → Hinweis nach 4 Monaten ohne Kontakt."""
+        from stammdaten.models import Einstellungen
+
+        self.assertEqual(Einstellungen.aktuell().kontakt_ueberfaellig_monate, 4)
+        jetzt = timezone.now()
+        drei = Patient.objects.create(nachname="Quartal", vorname="Q", geburtsdatum="1970-02-02")
+        Kontakt.objects.create(patient=drei, text="<p>vor 3 Monaten</p>", zeitpunkt=jetzt - timedelta(days=90))
+        fuenf = Patient.objects.create(nachname="Lange", vorname="L", geburtsdatum="1970-03-03")
+        Kontakt.objects.create(patient=fuenf, text="<p>vor 5 Monaten</p>", zeitpunkt=jetzt - timedelta(days=150))
+        c = client_fuer(self.mitarbeiter)
+        ids = {p["id"] for p in c.get("/api/patienten/?pruefen=kein_kontakt&test=ohne").json()["results"]}
+        self.assertIn(fuenf.id, ids)
+        self.assertNotIn(drei.id, ids)
+        zeilen = {p["id"]: p for p in c.get("/api/patienten/?test=ohne&seitengroesse=200").json()["results"]}
+        self.assertIn("Kein Kontakt seit über 4 Mon.", [h["text"] for h in zeilen[fuenf.id]["kennzahlen"]["hinweise"]])
+        self.assertNotIn("kontakt", {h["art"] for h in zeilen[drei.id]["kennzahlen"]["hinweise"]})
+        self.assertEqual(c.get("/api/startseite/").json()["pruefen"]["kontakt_monate"], 4)
+
     def test_pruefen_filter(self):
         c = client_fuer(self.mitarbeiter)
         r = c.get("/api/patienten/?pruefen=kein_versorger&test=ohne").json()["results"]

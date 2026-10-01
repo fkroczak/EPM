@@ -171,7 +171,7 @@ class Einstellungen(models.Model):
                                                   default=Decimal("5.0"))
     gewicht_warnung_monate = models.PositiveSmallIntegerField("Zeitraum Gewichtsverlust", default=3)
     plan_alter_warnung_monate = models.PositiveSmallIntegerField("Infusionsplan gilt als alt nach", default=12)
-    kontakt_ueberfaellig_monate = models.PositiveSmallIntegerField("Kontakt überfällig", default=12)
+    kontakt_ueberfaellig_monate = models.PositiveSmallIntegerField("Kontakt überfällig", default=4)  # quartalsweise Kontakte + 1 Monat (Festlegung 01.10.2026)
 
     # Plausibilitätsgrenzen (Eingaben außerhalb werden abgelehnt)
     gewicht_min_kg = models.DecimalField("Gewicht minimal", max_digits=5, decimal_places=1, default=Decimal("20.0"))

@@ -188,7 +188,7 @@ test("Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Re
   await page.getByRole("button", { name: "Grenzwerte" }).click();
   const grenzen = page.getByTestId("grenzwerte");
   await expect(grenzen.getByLabel("Kontakt überfällig nach")).toHaveValue("14");
-  await grenzen.getByLabel("Kontakt überfällig nach").fill("12");
+  await grenzen.getByLabel("Kontakt überfällig nach").fill("4");
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Grenzwerte gespeichert.")).toBeVisible();
   await ctx.close();

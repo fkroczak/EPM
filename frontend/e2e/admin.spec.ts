@@ -197,7 +197,7 @@ test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", asyn
   await expect(page.getByText("Grenzwerte gespeichert.")).toBeVisible();
   const einstellungen = await admin.get("einstellungen/");
   expect([einstellungen.kontakt_ueberfaellig_monate, einstellungen.volumen_max_ml]).toEqual([13, 8000]);
-  await admin.patch("einstellungen/", { kontakt_ueberfaellig_monate: 12, volumen_max_ml: 9000 });
+  await admin.patch("einstellungen/", { kontakt_ueberfaellig_monate: 4, volumen_max_ml: 9000 });
   await admin.ende();
   merken("vorlagen", { ort, vitamin });
 });
