@@ -143,3 +143,20 @@ test("Betrachter sieht die Liste, aber keinen Knopf „Neuer Patient“", async 
   await expect(page.getByText("Patienten anlegen darf nur, wer das Recht „Akten bearbeiten“ hat.")).toBeVisible();
   await ctx.close();
 });
+
+test("Testzugang: Hinweis dauerhaft sichtbar, nur Testpatienten, neue Patienten werden Testpatienten", async ({ browser }) => {
+  const ctx = await browser.newContext({ storageState: zustand("test"), ignoreHTTPSErrors: true });
+  const page = await ctx.newPage();
+  await page.goto("/");
+  await expect(page.getByTestId("testzugang")).toBeVisible();
+  await page.getByRole("navigation", { name: "Hauptnavigation" }).getByRole("link", { name: "Patienten" }).click();
+  await expect(page.getByTestId("testzugang")).toBeVisible();
+  const liste = page.getByTestId("patientenliste");
+  await expect(liste.getByRole("link", { name: "Mustermann, Max" })).toBeVisible();
+  // jede Zeile ist ein Testpatient – echte Patienten sind für den Testzugang unsichtbar
+  await expect(liste.locator("tbody tr").filter({ hasNotText: "Testpatient" })).toHaveCount(0);
+  await page.goto("/patienten/neu");
+  await expect(page.getByText("wird Testpatient")).toBeVisible();
+  await expect(page.getByTestId("naechste-nummer")).toHaveText(/^9\d{3}$/);
+  await ctx.close();
+});
