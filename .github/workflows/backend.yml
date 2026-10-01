@@ -201,6 +201,26 @@ jobs:
           set -o pipefail
           npx playwright test 2>&1 | tee ../e2e-ausgabe.txt
 
+      - name: Bildschirmfotos (nur bei manuellem Start) in den Branch „bildschirmfotos“
+        if: success() && github.event_name == 'workflow_dispatch'
+        working-directory: frontend
+        env:
+          EPM_BILDER: "1"
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Testkonten neu (die Anmeldung vor jedem Lauf verbraucht Notfall-Codes)
+          (cd /tmp/epm-ci && sudo docker compose -p epm-ci exec -T backend python manage.py shell) < e2e/vorbereiten.py
+          npx playwright test e2e/bildschirmfotos.spec.ts 2>&1 | tail -5
+          ziel="$(mktemp -d)"
+          cp e2e/bildschirmfotos/*.png "$ziel/"
+          cd "$ziel"
+          git init -q -b bildschirmfotos
+          git config user.name "epm-ci"
+          git config user.email "epm-ci@users.noreply.github.com"
+          git add . && git commit -q -m "Bildschirmfotos von ${GITHUB_REF_NAME} (${GITHUB_SHA::7}, Lauf ${GITHUB_RUN_ID})"
+          git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" \
+            push -q -f "https://github.com/${GITHUB_REPOSITORY}.git" bildschirmfotos
+
       - name: Protokolle des Stacks
         if: failure()
         run: |
