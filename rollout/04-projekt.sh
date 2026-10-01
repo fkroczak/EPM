@@ -26,6 +26,14 @@ if [[ ! -f "$B/backend.env" ]] || ! grep -q EPM_DJANGO_ADMIN "$B/backend.env"; t
   sed -e "s/epm\.test/$EPM_WEB_NAME/g" projekt/backend.env.beispiel > "$B/backend.env"
   chmod 0600 "$B/backend.env"
 fi
+# Zugriff auch über die IP der Verwaltungskarte (das Zertifikat enthält sie): Django muss sie als Host und Herkunft kennen,
+# sonst weist es jede Anfrage mit 400 (Host) bzw. 403 (CSRF) ab. Ergänzt nur, was fehlt; eigene Einträge bleiben.
+if ! grep -qE "^DJANGO_ALLOWED_HOSTS=(.*,)?$EPM_MGMT_IP(,|$)" "$B/backend.env"; then
+  sed -i -E "s/^(DJANGO_ALLOWED_HOSTS=.*)$/\1,$EPM_MGMT_IP/" "$B/backend.env"
+fi
+if ! grep -qE "^DJANGO_CSRF_TRUSTED_ORIGINS=(.*,)?https://$EPM_MGMT_IP(,|$)" "$B/backend.env"; then
+  sed -i -E "s#^(DJANGO_CSRF_TRUSTED_ORIGINS=.*)\$#\1,https://$EPM_MGMT_IP#" "$B/backend.env"
+fi
 
 echo "==> Secrets (nur beim ersten Mal erzeugt)"
 [[ -s "$B/secrets/db_password" ]]       || openssl rand -base64 32 | tr -d '\n=/+' > "$B/secrets/db_password"
