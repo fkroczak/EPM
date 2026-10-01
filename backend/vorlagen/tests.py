@@ -22,11 +22,17 @@ from .pdf import erzeuge_aus_vorlage
 PDFTOTEXT = shutil.which("pdftotext")
 
 
-def pdf_text(pdf: bytes) -> str:
+def pdf_text(pdf: bytes, roh=False) -> str:
+    """Text der PDF; ``roh`` = Reihenfolge wie im Inhaltsstrom (für das schräge Wasserzeichen)."""
     with tempfile.NamedTemporaryFile(suffix=".pdf") as f:
         f.write(pdf)
         f.flush()
-        return subprocess.run([PDFTOTEXT, "-layout", f.name, "-"], capture_output=True, text=True, check=True).stdout
+        return subprocess.run([PDFTOTEXT, "-raw" if roh else "-layout", f.name, "-"], capture_output=True, text=True,
+                              check=True).stdout
+
+
+def wasserzeichen(pdf: bytes) -> str:
+    return re.sub(r"\s+", "", pdf_text(pdf, roh=True))
 
 
 def kompakt(text: str) -> str:
@@ -138,7 +144,7 @@ class Vorlagen(Grundlage):
             text = pdf_text(r.content)
             for erwartet in ["Patientendatenblatt", "Probe, Paula", "60 kg am", "1/1", "Spendenkonto"]:
                 self.assertIn(erwartet, text)
-            self.assertIn("ENTWURF", kompakt(text))
+            self.assertIn("ENTWURF", wasserzeichen(r.content))
 
     @unittest.skipUnless(PDFTOTEXT, "pdftotext fehlt")
     def test_inhalt_des_plan_pdfs(self):
@@ -153,7 +159,7 @@ class Vorlagen(Grundlage):
                          "Deutsche Stiftung Krankheitsbedingte Mangelernährung", "Telefon 0251 98 11 400",
                          "Spendenkonto", "1/1", "Maschinell erstellt, geprüft und freigegeben von"]:
             self.assertIn(erwartet, text)
-        self.assertIn("TESTDATEN", kompakt(text))
+        self.assertIn("TESTDATEN", wasserzeichen(pdf))
         self.assertNotIn("{{", text)
 
     def test_freigabe_speichert_pdf_mit_pruefsumme(self):
@@ -172,9 +178,9 @@ class Vorlagen(Grundlage):
         self.assertEqual(r["X-Accel-Redirect"], "/_geschuetzt/dokumente/" + plan.pdf_datei)
         if PDFTOTEXT:
             text = pdf_text(dok.pfad.read_bytes())
-            self.assertIn("TESTDATEN", kompakt(text))
+            self.assertIn("TESTDATEN", wasserzeichen(dok.pfad.read_bytes()))
             self.assertIn(timezone.localdate().strftime("%d.%m.%Y"), text)  # Freigabedatum
-            self.assertNotIn("ENTWURF", kompakt(text))
+            self.assertNotIn("ENTWURF", wasserzeichen(dok.pfad.read_bytes()))
         # eine neue Vorlagenversion ändert gespeicherte PDFs nicht
         a = client_fuer(self.admin)
         bloecke = a.get("/api/vorlagen/infusionsplan/entwurf/").json()["bloecke"]
