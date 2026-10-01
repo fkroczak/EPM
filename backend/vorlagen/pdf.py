@@ -44,6 +44,8 @@ h2 { font-size: 8pt; font-weight: 600; text-transform: uppercase; letter-spacing
 table { width: 100%%; border-collapse: collapse; }
 .felder td { vertical-align: top; padding: 0.9mm 2.5mm 0.9mm 0; border-bottom: 0.4pt solid #ececf2; }
 .felder td.label { color: #5d5b72; }
+/* mehrere Paare nebeneinander: Bezeichnung einzeilig („Volumen im Mischbeutel“ brach sonst mitten im Feld um) */
+.felder.mehrspaltig td.label { white-space: nowrap; padding-right: 3mm; }
 .felder .wert p { margin: 0 0 1mm 0; }
 .tabelle th { text-align: left; font-size: 7.5pt; font-weight: 600; color: #5d5b72; border-bottom: 0.6pt solid #c9c8d4;
               padding: 1mm 2mm 1mm 0; }
@@ -212,7 +214,8 @@ def _feldtabelle(ersetze, eintraege, spalten) -> tuple[str, bool]:
         zellen.append(f'<td class="label" style="width:{breite * 0.36:.2f}%">{html.escape(e.get("label") or "")}</td>'
                       f'<td class="wert" style="width:{breite * 0.64:.2f}%">{wert}</td>')
     zeilen = ["<tr>" + "".join(zellen[i:i + spalten]) + "</tr>" for i in range(0, len(zellen), spalten)]
-    return f'<table class="felder">{"".join(zeilen)}</table>', alle_leer
+    klasse = "felder mehrspaltig" if spalten > 1 else "felder"
+    return f'<table class="{klasse}">{"".join(zeilen)}</table>', alle_leer
 
 
 def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | None, str | None]:
