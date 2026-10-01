@@ -77,17 +77,19 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(page).toHaveURL(/\/plaene\?plan=\d+/);
   await expect(page.getByText("Entwurf gespeichert.")).toBeVisible();
   const detail = page.getByTestId("plan-detail");
-  const blatt = detail.getByTestId("pdf-ansicht");
-  await expect(blatt).toContainText("ENTWURF");
-  await expect(blatt).toContainText("Glamin 13,4 % · 80 g");
-  await expect(blatt).toContainText("1.509 kcal");
+  // Ansicht wie PDF: die echte PDF aus der aktiven Dokumentvorlage (Text für Bildschirmleser liegt unter der Seite)
+  const ansicht = detail.getByTestId("plan-ansicht");
+  await expect(ansicht.getByTestId("ansicht-herkunft")).toContainText("Vorschau mit der aktiven Dokumentvorlage");
+  const blatt = ansicht.getByTestId("pdf-text").first();
+  await expect(blatt).toContainText(/E\s*N\s*T\s*W\s*U\s*R\s*F/);
+  await expect(blatt).toContainText(/Aminosäuren\s+80\s+g\s+Glamin 13,4 %/);
+  await expect(blatt).toContainText(/Kalorien\s+1\.509/);
   await expect(blatt).toContainText("Soluvit N | Vitalipid adult");
   await expect(blatt).toContainText("Taurolin 2 %");
-  await expect(blatt.getByRole("row").filter({ hasText: "Weitere Bestandteile" })).toContainText("Dipeptamin 20 % 100 ml (täglich)");
-  await expect(blatt.getByRole("row").filter({ hasText: "Volumen im Mischbeutel" })).toContainText("2.100 ml (35 ml/kg × 60 kg)");
-  await expect(blatt.getByRole("row").filter({ hasText: /^Gesamtvolumen/ })).toContainText("2.600 ml");
-  await expect(blatt.getByRole("row").filter({ hasText: /^Rate/ })).toContainText("216,7 ml/h");
-  await expect(blatt.getByRole("row").filter({ hasText: "Protonenpumpenhemmer" })).toContainText("Pantozol® 40 mg · morgens, abends");
+  await expect(blatt).toContainText(/Dipeptamin 20 %\s+100\s+ml\s+täglich/);
+  await expect(blatt).toContainText(/Volumen\s+2\.100\s+500\s+2\.600\s+ml/);
+  await expect(blatt).toContainText(/Laufmenge je Stunde\s+216,7\s+ml\/h/);
+  await expect(blatt).toContainText("Pantozol® Kurzinfusion 1 Amp. 40 mg in 50 ml Trägerlösung · 1-0-1");
   await expect(detail.getByTestId("planvergleich")).toHaveCount(0);
 
   // Freigeben (Recht „Pläne freigeben“)
@@ -97,6 +99,8 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(page.getByTestId("planliste")).toContainText("aktuell gültig");
   await expect(detail).toContainText(/Freigegeben am .* von Dr\. med\. M\. Medizin/);
   await expect(detail.getByRole("button", { name: "Bearbeiten" })).toHaveCount(0);
+  // nach der Freigabe zeigt die Akte das gespeicherte Original
+  await expect(detail.getByTestId("ansicht-herkunft")).toContainText("Gespeicherte PDF der Freigabe · Prüfsumme stimmt");
   // gespeicherte PDF (F37): Prüfsumme wird vor der Anzeige geprüft, Seiten werden gezeichnet
   await detail.getByRole("button", { name: "PDF öffnen" }).click();
   const pdfDialog = page.getByRole("dialog");

@@ -39,15 +39,19 @@ body { margin: 0; }
 .spalten .rechts.klein { font-size: 8pt; line-height: 1.5; }
 .absender { text-align: right; font-size: 7.5pt; color: #3b3953; line-height: 1.45; }
 .titel { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 1mm; }
-.titel h1 { font-size: 15pt; font-weight: 600; margin: 0; }
+.titel h1 { font-size: 1.58em; font-weight: 600; margin: 0; }
+/* Ausrichtung des Titels: mitte/rechts stellt Titel und Zusatz untereinander */
+.titel.a-mitte { flex-direction: column; align-items: center; }
+.titel.a-rechts { flex-direction: column; align-items: flex-end; }
 /* Titel rechts neben dem Logo */
 .kopftitel { text-align: right; }
-.kopftitel h1 { font-size: 15pt; font-weight: 600; margin: 0 0 0.6mm 0; line-height: 1.2; }
-.kopftitel .zusatz { font-size: 9.5pt; }
+.kopftitel h1 { font-size: 1.58em; font-weight: 600; margin: 0 0 0.6mm 0; line-height: 1.2; }
+.kopftitel .zusatz { font-size: 1em; }
 .kopftitel .zusatz span { color: #3b3953; }
-.titel .zusatz { font-size: 9.5pt; }
+.titel .zusatz { font-size: 1em; }
 .titel .zusatz span { color: #5d5b72; }
-h2 { font-size: 9.5pt; font-weight: 600; margin: 0 0 1.5mm 0; }
+/* Größen in em: „Schrift klein/groß“ eines Blocks wirkt auf alles darin */
+h2 { font-size: 1em; font-weight: 600; margin: 0 0 1.5mm 0; }
 /* Bereiche mit Überschrift als Karte wie in der Oberfläche von EPM (Rand, runde Ecken, Kopfzeile der Tabelle hinterlegt) */
 .karte { border: 0.6pt solid #d9d8e3; border-radius: 2mm; }
 .karte > h2 { padding: 1.5mm 3.5mm 1.1mm 3.5mm; margin: 0; }
@@ -70,9 +74,9 @@ table { width: 100%%; border-collapse: collapse; }
               padding: 1mm 2mm 1mm 0; }
 .tabelle td { border-bottom: 0.4pt solid #e6e5ee; padding: 1.2mm 2mm 1.2mm 0; vertical-align: top; }
 /* Laborbefund: Bezeichnung, Wert rechtsbündig, Einheit in eigener Spalte, Rest */
-.befund { font-size: 9pt; }
+.befund { font-size: 0.95em; }
 /* fax-tauglich (Pläne gehen per Fax/Mail): Einheiten und Bezeichnungen dunkel, nichts nur über Farbe */
-.befund th { text-align: left; font-size: 7.5pt; font-weight: 500; color: #3b3953; border-bottom: 0.6pt solid #d9d8e3;
+.befund th { text-align: left; font-size: 0.83em; font-weight: 500; color: #3b3953; border-bottom: 0.6pt solid #d9d8e3;
              padding: 0.9mm 2.5mm 0.8mm 2.5mm; }
 .befund td { border-bottom: 0.4pt solid #ececf2; padding: 0.6mm 2.5mm; vertical-align: top; line-height: 1.3; }
 .befund .b { width: 40mm; }
@@ -88,14 +92,14 @@ table { width: 100%%; border-collapse: collapse; }
 /* Kopfkarte wie der Kopf der Akte in EPM */
 .kopfkarte { border: 0.6pt solid #d9d8e3; border-radius: 2mm; padding: 2.3mm 3.5mm 2mm; }
 .kopfkarte .oben { display: flex; justify-content: space-between; gap: 8mm; align-items: flex-start; }
-.kopfkarte .name { font-size: 13pt; font-weight: 600; line-height: 1.25; }
-.kopfkarte .unter { color: #3b3953; font-size: 9pt; margin-top: 0.6mm; line-height: 1.45; }
-.kopfkarte .rechts { text-align: right; font-size: 7.5pt; color: #00325a; line-height: 1.45; }
+.kopfkarte .name { font-size: 1.37em; font-weight: 600; line-height: 1.25; }
+.kopfkarte .unter { color: #3b3953; font-size: 0.95em; margin-top: 0.6mm; line-height: 1.45; }
+.kopfkarte .rechts { text-align: right; font-size: 0.79em; color: #00325a; line-height: 1.45; }
 .kopfkarte .zahlen { width: 100%%; border-collapse: collapse; margin-top: 2mm; border-top: 0.5pt solid #e6e5ee; }
 .kopfkarte .zahlen td { vertical-align: top; padding: 1.6mm 3mm 0 3mm; border-left: 0.5pt solid #e1e0ea; }
 .kopfkarte .zahlen td:first-child { padding-left: 0; border-left: 0; }
-.kopfkarte .zahlen .l { display: block; font-size: 7pt; color: #3b3953; font-weight: 500; }
-.kopfkarte .zahlen .w { display: block; font-size: 9.5pt; }
+.kopfkarte .zahlen .l { display: block; font-size: 0.74em; color: #3b3953; font-weight: 500; }
+.kopfkarte .zahlen .w { display: block; font-size: 1em; }
 .linie-oben { border-top: 0.6pt solid #d9d8e3; padding-top: 1.8mm; margin-top: 3mm; }
 .leer { color: #5d5b72; font-style: italic; }
 hr { border: 0; border-top: 0.6pt solid #c9c8d4; margin: 0 0 3.5mm 0; }
@@ -365,7 +369,10 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | 
         kopf = f"<h2>{html.escape(b['bezeichnung'])}</h2>" if o.get("ueberschrift") and b.get("bezeichnung") else ""
         karte = " karte" if kopf else ""  # Bereich mit Überschrift als Karte wie in der Oberfläche von EPM
         if typ == "briefkopf":
-            neben = f'<div class="kopftitel">{_titel_html(ersetze, titel_neben)}</div>' if titel_neben else None
+            schrift = " ".join(k for k in _klassen(titel_neben).split() if k.startswith("s-") or k in ("fett", "kursiv")) \
+                if titel_neben else ""
+            klasse = f"kopftitel {schrift}".strip()
+            neben = f'<div class="{klasse}">{_titel_html(ersetze, titel_neben)}</div>' if titel_neben else None
             teile.append(f'<div class="{_klassen(b)}">{briefkopf_html(b.get("absender", True), b.get("linienfarbe"), b.get("falzmarken", False), b.get("mit_linie", True), neben)}</div>')
         elif typ == "zweispaltig":
             links, _ = ersetze.zeilen(b.get("links", ""))

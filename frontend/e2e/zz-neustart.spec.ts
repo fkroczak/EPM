@@ -109,11 +109,13 @@ test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", 
   await page.goto(`/patienten/${gemerkt("plan").patient}/plaene`);
   await expect(page.getByTestId("planliste").getByRole("listitem")).toHaveCount(1);
   await expect(page.getByTestId("planliste")).toContainText("aktuell gültig");
-  await expect(page.getByTestId("pdf-ansicht")).toContainText("Glamin 13,4 % · 80 g");
-  const blatt = page.getByTestId("pdf-ansicht");
-  await expect(blatt.getByRole("row").filter({ hasText: "Volumen im Mischbeutel" })).toContainText("2.100 ml (35 ml/kg × 60 kg)");
-  await expect(blatt.getByRole("row").filter({ hasText: /^Rate/ })).toContainText("216,7 ml/h");
-  await expect(blatt.getByRole("row").filter({ hasText: "Protonenpumpenhemmer" })).toContainText("Pantozol® 40 mg · morgens, abends");
+  // Ansicht in der Akte = gespeicherte PDF der Freigabe, nach dem Neustart unverändert
+  await expect(page.getByTestId("ansicht-herkunft")).toContainText("Gespeicherte PDF der Freigabe · Prüfsumme stimmt");
+  const blatt = page.getByTestId("plan-ansicht").getByTestId("pdf-text").first();
+  await expect(blatt).toContainText(/Aminosäuren\s+80\s+g\s+Glamin 13,4 %/);
+  await expect(blatt).toContainText(/Volumen\s+2\.100\s+500\s+2\.600\s+ml/);
+  await expect(blatt).toContainText(/Laufmenge je Stunde\s+216,7\s+ml\/h/);
+  await expect(blatt).toContainText("Pantozol® Kurzinfusion 1 Amp. 40 mg in 50 ml Trägerlösung · 1-0-1");
   // gespeicherte PDF: nach dem Neustart unverändert (Prüfsumme)
   await page.getByTestId("plan-detail").getByRole("button", { name: "PDF öffnen" }).click();
   await expect(page.getByRole("dialog").getByTestId("pdf-pruefung")).toContainText("Prüfsumme stimmt");

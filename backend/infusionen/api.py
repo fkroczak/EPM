@@ -219,6 +219,23 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
         antwort["Access-Control-Expose-Headers"] = "X-EPM-Pruefung, X-EPM-Vorlage-Version"
         return antwort
 
+    @action(detail=True, methods=["get"])
+    def ansicht(self, request, pk=None):
+        """Plan im Layout der aktiven Dokumentvorlage, zum Anzeigen in der Akte (nicht zum Versand): Entwürfe mit
+        Wasserzeichen „ENTWURF“, Testpatienten „TESTDATEN“. Für freigegebene Pläne mit gespeicherter PDF gilt
+        ``pdf/`` (das Original); diese Ansicht dient Plänen ohne gespeicherte PDF (Entwurf, vor Einführung freigegeben)."""
+        from vorlagen.api import pdf_antwort
+        from vorlagen.felder import Kontext
+        from vorlagen.pdf import erzeuge_aus_vorlage, wasserzeichen_fuer
+
+        plan = self.get_object()
+        pdf, version = erzeuge_aus_vorlage("infusionsplan", Kontext(patient=plan.patient, plan=plan),
+                                           wasserzeichen=wasserzeichen_fuer(plan.patient, plan),
+                                           titel=f"Infusionsplan {plan.patient.nachname}, {plan.patient.vorname}")
+        antwort = pdf_antwort(pdf, f"Infusionsplan-{plan.patient.nummer}-{plan.gueltig_ab:%Y-%m-%d}-Ansicht.pdf")
+        antwort["X-EPM-Vorlage-Version"] = str(version or "")
+        return antwort
+
     @action(detail=True, methods=["post"], permission_classes=[FreigabeRecht])
     def freigeben(self, request, pk=None):
         plan = self.get_object()

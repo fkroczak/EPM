@@ -1,5 +1,6 @@
 /** Entwurf 18 · Vorlagen: Briefkopf und Logo, Auswahllisten und Präparate (Reihenfolge), Grenzwerte. */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
@@ -9,13 +10,14 @@ import type { Absender, Briefkopf } from "@/lib/daten";
 import { eingabeZahl, zahl } from "@/lib/format";
 import type { Auswahlwert, Einstellungen, Praeparat } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
-import { Eingabe, Fehleranzeige, Feld, Karte, Knopf, KnopfLink, Laden, Meldung, Seitenkopf, Segmente, cx } from "@/components/ui/basis";
+import { Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Seitenkopf, Segmente, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { useSortierbar } from "@/components/ui/sortierbar";
 import { LOGO_URL, Logo } from "@/components/layout/logo";
+import { DokumentvorlagenBereich } from "@/seiten/admin/Dokumentvorlagen";
 
-type Bereich = "briefkopf" | "listen" | "grenzwerte";
+type Bereich = "briefkopf" | "listen" | "grenzwerte" | "dokumente";
 type SpeichernRef = { current: (() => void) | null };
 
 const ABSENDER_FELDER: { k: keyof Absender; label: string; span: number; num?: boolean }[] = [
@@ -345,18 +347,37 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
 }
 
 export function Vorlagen() {
-  const [bereich, setBereich] = useState<Bereich>("briefkopf");
+  // Dokumentvorlagen sind ein Bereich wie die anderen; eigene Adresse /admin/vorlagen/dokumente (direkt aufrufbar)
+  const ort = useLocation();
+  const navigate = useNavigate();
+  const [lokal, setLokal] = useState<Exclude<Bereich, "dokumente">>("briefkopf");
+  const bereich: Bereich = ort.pathname.replace(/\/$/, "").endsWith("/vorlagen/dokumente") ? "dokumente" : lokal;
   const speichern = useRef<(() => void) | null>(null);
+  const [aktionen, setAktionen] = useState<HTMLElement | null>(null);
+  const dokUngespeichert = useRef(false);
+  const merkeGeaendert = useCallback((g: boolean) => { dokUngespeichert.current = g; }, []);
+  const waehle = (b: Bereich) => {
+    if (b === bereich) return;
+    if (bereich === "dokumente" && dokUngespeichert.current && !window.confirm("Ungespeicherte Änderungen an der Dokumentvorlage verwerfen?")) return;
+    if (b === "dokumente") {
+      navigate("/admin/vorlagen/dokumente");
+      return;
+    }
+    setLokal(b);
+    if (bereich === "dokumente") navigate("/admin/vorlagen");
+  };
   return (
     <Seite pfad={[{ text: "Administration" }, { text: "Vorlagen" }]}>
       <Seitenkopf titel="Vorlagen" unter="Alles, was sich ohne IT anpassen lassen soll. Jede Änderung steht im Audit-Log."
-        rechts={bereich !== "listen" ? <Knopf variante="pri" onClick={() => speichern.current?.()}>Speichern</Knopf> : null} />
-      <div className="flex items-center gap-3 flex-wrap">
-        <Segmente label="Bereich" wert={bereich} onWahl={setBereich}
-          werte={[{ wert: "briefkopf", text: "Briefkopf und Logo" }, { wert: "listen", text: "Auswahllisten" }, { wert: "grenzwerte", text: "Grenzwerte" }]} />
-        <KnopfLink to="/admin/vorlagen/dokumente" icon="dokument">Dokumentvorlagen</KnopfLink>
-      </div>
-      {bereich === "briefkopf" ? <BriefkopfBereich speichernRef={speichern} /> : bereich === "listen" ? <ListenBereich /> : <GrenzwerteBereich speichernRef={speichern} />}
+        rechts={bereich === "dokumente" ? <div ref={setAktionen} className="flex items-center gap-2.5 flex-wrap" />
+          : bereich !== "listen" ? <Knopf variante="pri" onClick={() => speichern.current?.()}>Speichern</Knopf> : null} />
+      <Segmente label="Bereich" wert={bereich} onWahl={waehle} className="self-start"
+        werte={[{ wert: "briefkopf", text: "Briefkopf und Logo" }, { wert: "listen", text: "Auswahllisten" }, { wert: "grenzwerte", text: "Grenzwerte" },
+          { wert: "dokumente", text: "Dokumentvorlagen" }]} />
+      {bereich === "briefkopf" ? <BriefkopfBereich speichernRef={speichern} />
+        : bereich === "listen" ? <ListenBereich />
+        : bereich === "grenzwerte" ? <GrenzwerteBereich speichernRef={speichern} />
+        : <DokumentvorlagenBereich aktionenZiel={aktionen} onGeaendert={merkeGeaendert} />}
     </Seite>
   );
 }

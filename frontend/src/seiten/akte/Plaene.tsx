@@ -4,15 +4,13 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { abfrage, alle, api, apiDatei } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
-import { useBriefkopf } from "@/lib/daten";
-import { datum, kg, zahl, zeitpunkt } from "@/lib/format";
+import { datum, zahl, zeitpunkt } from "@/lib/format";
 import type { Plan, Vergleich } from "@/lib/typen";
 import { Chip, Fehleranzeige, Karte, Knopf, Laden, Leer, Meldung, Segmente, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
-import { Logo } from "@/components/layout/logo";
-import { Richtext, klartext } from "@/components/Editor";
+import { klartext } from "@/components/Editor";
 import { PdfLeser } from "@/components/PdfAnsicht";
 import { name, useAkte } from "./Akte";
 
@@ -29,57 +27,31 @@ function kopfText(plan: Plan) {
   return `${s} · ${datum(plan.gueltig_ab)}`;
 }
 
-/** „Ansicht wie PDF“: Werte im Aufbau des Plans (die gespeicherte PDF öffnet „PDF öffnen“) */
-function PdfAnsicht({ plan, vergleich }: { plan: Plan; vergleich: Vergleich }) {
-  const { patient } = useAkte();
-  const briefkopf = useBriefkopf();
-  const a = briefkopf.data ? briefkopf.data.absender[briefkopf.data.aktiv] : null;
-  const zeilen = vergleich.zeilen.filter((z) => z.schluessel !== "bemerkung");
-  const bemerkung = plan.bemerkung;
-  const wasserzeichen = plan.status === "entwurf" ? "ENTWURF" : patient.ist_test ? "TESTDATEN" : "";
+/** „Ansicht wie PDF“: die echte PDF. Freigegebene Pläne zeigen das gespeicherte Original (Prüfsumme geprüft),
+ *  Entwürfe und Pläne ohne gespeicherte PDF werden mit der aktiven Dokumentvorlage gezeichnet – so sieht die Akte
+ *  immer genauso aus wie die PDF. */
+function PlanAnsicht({ plan }: { plan: Plan }) {
+  const original = !!plan.pdf_sha256;
+  const pfad = original ? `infusionsplaene/${plan.id}/pdf/` : `infusionsplaene/${plan.id}/ansicht/`;
+  const datei = useQuery({
+    queryKey: ["plan", plan.id, original ? "pdf" : "ansicht", plan.status],
+    queryFn: () => apiDatei(pfad),
+    staleTime: 0,
+    gcTime: 0,
+  });
+  const pruefung = datei.data?.kopf.get("X-EPM-Pruefung");
   return (
-    <div className="pdf-blatt relative mx-auto w-full max-w-[720px] px-12 py-10 flex flex-col gap-5 overflow-hidden" data-testid="pdf-ansicht">
-      {wasserzeichen ? (
-        <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-[96px] font-bold tracking-[.12em] text-black/[.06] -rotate-[30deg]">{wasserzeichen}</span>
-        </div>
+    <div className="flex flex-col gap-2" data-testid="plan-ansicht">
+      <span className="text-[0.8125rem] gedaempft" data-testid="ansicht-herkunft">
+        {original ? <>Gespeicherte PDF der Freigabe{pruefung === "ok" ? " · Prüfsumme stimmt" : ""}.</>
+          : plan.status === "entwurf" ? "Vorschau mit der aktiven Dokumentvorlage. Die PDF entsteht bei der Freigabe."
+          : "Für diesen Plan ist keine PDF gespeichert (vor Einführung der PDF-Erzeugung freigegeben). Ansicht mit der aktiven Dokumentvorlage."}
+      </span>
+      {pruefung === "abweichend" ? <Meldung art="fehler">Die gespeicherte PDF weicht von der Prüfsumme ab und wurde nach der Freigabe verändert. Bitte die Administration informieren.</Meldung> : null}
+      <Fehleranzeige fehler={datei.error} />
+      {datei.isLoading ? <Laden text="PDF wird geladen …" /> : datei.data ? (
+        <PdfLeser url={`plan-ansicht-${plan.id}-${datei.dataUpdatedAt}`} laden={() => Promise.resolve(datei.data.daten)} className="h-[78vh]" />
       ) : null}
-      <div className="flex items-start justify-between gap-6">
-        <Logo className="h-[64px] w-[220px]" version={briefkopf.data?.logo.sha256} />
-        {a ? (
-          <div className="flex flex-col items-end text-[11px] leading-snug text-[#3b3953]">
-            <span>{a.strasse} · {a.plz} {a.ort}</span>
-            <span>{[a.telefon && `Telefon ${a.telefon}`, a.fax && `Fax ${a.fax}`].filter(Boolean).join(" · ")}</span>
-            <span>{[a.email, a.internet].filter(Boolean).join(" · ")}</span>
-          </div>
-        ) : null}
-      </div>
-      <div className="flex items-baseline justify-between border-b border-[#1b1932] pb-1.5">
-        <span className="text-xl font-semibold">Infusionsplan</span>
-        <span className="text-sm">gültig ab {datum(plan.gueltig_ab)}</span>
-      </div>
-      <div className="grid grid-cols-[90px_minmax(0,1fr)_80px_minmax(0,1fr)] gap-x-2.5 gap-y-0.5 text-[13px]">
-        <span className="text-[#5d5b72]">Patient</span><span className="font-medium">{name(patient)}</span>
-        <span className="text-[#5d5b72]">Geboren</span><span>{datum(patient.geburtsdatum)}</span>
-        <span className="text-[#5d5b72]">Gewicht</span><span>{patient.kopf?.gewicht ? kg(patient.kopf.gewicht.kg) : "—"}</span>
-        <span className="text-[#5d5b72]">Versorger</span><span>{patient.kopf?.versorger ?? "—"}</span>
-      </div>
-      <table className="w-full border-collapse text-[13px]">
-        <tbody>
-          {zeilen.map((z) => (
-            <tr key={z.schluessel} className="border-b border-[#e6e5ee]">
-              <td className="py-1 pr-3 w-[38%] text-[#3b3953]">{z.wert}</td>
-              <td className="py-1">{z.jetzt ?? "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {bemerkung ? <div className="text-[13px] flex gap-1.5"><span className="font-semibold">Bemerkung:</span><Richtext html={bemerkung} /></div> : null}
-      <div className="flex justify-between text-[11px] text-[#5d5b72] border-t border-[#e6e5ee] pt-2">
-        <span>{plan.freigegeben_am ? `Freigegeben am ${zeitpunkt(plan.freigegeben_am)} Uhr${plan.freigegeben_von_name ? ` von ${plan.freigegeben_von_name}` : ""}` : "Noch nicht freigegeben"}</span>
-        <span>Seite 1/1</span>
-      </div>
-      {a?.fusszeile ? <div className="text-[10px] text-[#5d5b72] text-center">{a.fusszeile}</div> : null}
     </div>
   );
 }
@@ -264,9 +236,9 @@ export function Plaene() {
               </> : null}
             </div>
           </div>
-          {vergleich.isLoading ? <Laden /> : vergleich.data ? (
-            modus === "ansicht" ? <PdfAnsicht plan={gewaehlt} vergleich={vergleich.data} /> : <VergleichTabelle plan={gewaehlt} vergleich={vergleich.data} />
-          ) : <Fehleranzeige fehler={vergleich.error} />}
+          {modus === "ansicht" ? <PlanAnsicht key={gewaehlt.id} plan={gewaehlt} />
+            : vergleich.isLoading ? <Laden /> : vergleich.data ? <VergleichTabelle plan={gewaehlt} vergleich={vergleich.data} />
+            : <Fehleranzeige fehler={vergleich.error} />}
           {freigeben ? <FreigabeDialog plan={gewaehlt} offen={freigabe} onOffen={setFreigabe} /> : null}
           {gewaehlt.pdf_sha256 ? <PlanPdfDialog plan={gewaehlt} offen={pdf} onOffen={setPdf} /> : null}
           <Dialog offen={verwerfen && anlegen} onOffen={setVerwerfen} titel="Entwurf verwerfen" breite={480}

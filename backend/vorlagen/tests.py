@@ -216,6 +216,26 @@ class Vorlagen(Grundlage):
         self.assertEqual(inhalt.count(" karte"), 5)  # ohne Diagnose und weitere Bestandteile (leer → ausgeblendet)
         self.assertIn('<td class="zahl fett">2.600</td>', inhalt)
         self.assertNotIn("·  ·", inhalt)
+        # Titel in eigener Zeile mittig, Mineralstoffe in großer Schrift (Optionen wirken im PDF)
+        bloecke = [dict(b) for b in STARTVORLAGEN["infusionsplan"]]
+        bloecke[1] = {**bloecke[1], "neben_logo": False, "optionen": {"ausrichtung": "mitte"}}
+        bloecke[4] = {**bloecke[4], "optionen": {**bloecke[4]["optionen"], "schrift": "gross"}}
+        self.assertEqual(pruefe_bloecke("infusionsplan", bloecke), [])
+        inhalt, _, _ = bloecke_html("infusionsplan", bloecke, Kontext(patient=p, plan=plan))
+        self.assertIn('<div class="block a-mitte titel"><h1>Empfehlung eines Infusionsplans</h1>', inhalt)
+        self.assertIn('<div class="block s-gross karte"><h2>Mineralstoffe</h2>', inhalt)
+
+    @unittest.skipUnless(PDFTOTEXT, "pdftotext fehlt")
+    def test_ansicht_in_der_akte_im_layout_der_vorlage(self):
+        """Pläne-Reiter zeigt den Plan wie die PDF: Entwurf aus der aktiven Vorlage mit Wasserzeichen „ENTWURF“."""
+        p, plan = self.testpatient_mit_plan()
+        r = client_fuer(self.mitarbeiter).get(f"/api/infusionsplaene/{plan.id}/ansicht/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual([r["Content-Type"], r["X-EPM-Vorlage-Version"]], ["application/pdf", "1"])
+        text = kompakt(pdf_text(r.content))
+        for erwartet in ["Empfehlung eines Infusionsplans", "Probe, Paula", "Glamin 13,4 %", "Mischbeutel", "216,7"]:
+            self.assertIn(kompakt(erwartet), text)
+        self.assertIn("ENTWURF", wasserzeichen(r.content))
 
     def test_freigabe_speichert_pdf_mit_pruefsumme(self):
         p, plan = self.testpatient_mit_plan(freigeben=True)

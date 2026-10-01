@@ -9,8 +9,10 @@ test("Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau, Ver
   const vorher = (await api.get("vorlagen/")).find((v: { art: string }) => v.art === "infusionsplan");
 
   await page.goto("/admin/vorlagen");
-  await page.getByRole("link", { name: "Dokumentvorlagen" }).click();
+  // Dokumentvorlagen sind ein Bereich der Vorlagen wie Briefkopf, Auswahllisten und Grenzwerte
+  await page.getByRole("group", { name: "Bereich" }).getByRole("button", { name: "Dokumentvorlagen" }).click();
   await expect(page).toHaveURL(/\/admin\/vorlagen\/dokumente$/);
+  await expect(page.getByRole("group", { name: "Bereich" }).getByRole("button", { name: "Dokumentvorlagen" })).toHaveAttribute("aria-pressed", "true");
   const editor = page.getByTestId("dokumentvorlagen");
   await expect(editor.getByTestId("vorlage-stand")).toHaveText(`Version ${vorher.aktiv.version} ist aktiv`);
   const aufbau = editor.getByTestId("aufbau");
@@ -24,6 +26,14 @@ test("Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau, Ver
   await aufbau.getByRole("button", { name: /Mineralstoffe/ }).click();
   await expect(editor.getByTestId("block-eigenschaften").getByLabel("Neben dem vorherigen Block")).toHaveValue("drittel");
   await expect(editor.getByTestId("block-eigenschaften").getByLabel("Darstellung")).toHaveValue("befund");
+  // Reihenfolge der Felder ändern, ohne zu löschen und neu anzulegen
+  const eig = editor.getByTestId("block-eigenschaften");
+  await eig.getByRole("button", { name: "Feld 1 nach unten" }).click();
+  await expect(eig.getByLabel("Bezeichnung 1", { exact: true })).toHaveValue("Kalium");
+  await expect(eig.getByLabel("Bezeichnung 2", { exact: true })).toHaveValue("Natrium");
+  await expect(editor.getByTestId("nebeneinander")).toContainText(/Kalium[\s\S]*Natrium/);
+  await eig.getByRole("button", { name: "Feld 2 nach oben" }).click();
+  await expect(eig.getByLabel("Bezeichnung 1", { exact: true })).toHaveValue("Natrium");
   await aufbau.getByRole("button", { name: /Briefkopf/ }).click();
   await expect(editor.getByTestId("block-eigenschaften").getByLabel("Linie unter dem Logo")).not.toBeChecked();
   await aufbau.getByRole("button", { name: /Titel/ }).click();
@@ -82,6 +92,11 @@ test("Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau, Ver
   await editor.getByRole("button", { name: "Mitgelieferte Startvorlage laden" }).click();
   await expect(page.getByText("Mitgelieferte Startvorlage als Grundlage geladen")).toBeVisible();
   await expect(editor.getByTestId("vorlage-stand")).toHaveText("Ungespeicherte Änderungen");
+  // Wechsel in einen anderen Bereich fragt bei ungespeicherten Änderungen nach
+  page.once("dialog", (d) => { expect(d.message()).toContain("Ungespeicherte Änderungen"); void d.accept(); });
+  await page.getByRole("group", { name: "Bereich" }).getByRole("button", { name: "Grenzwerte" }).click();
+  await expect(page).toHaveURL(/\/admin\/vorlagen$/);
+  await expect(page.getByTestId("dokumentvorlagen")).toHaveCount(0);
   await api.ende();
   merken("vorlage", { version: nachher.aktiv.version });
 });

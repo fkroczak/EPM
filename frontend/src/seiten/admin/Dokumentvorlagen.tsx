@@ -4,19 +4,19 @@
  * des Servers. Entwurf → Veröffentlichen; jede Version bleibt erhalten, freigegebene Pläne behalten ihr PDF.
  */
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api, apiDatei } from "@/lib/api";
 import type { Seite as Seitenliste } from "@/lib/api";
 import { useBriefkopf } from "@/lib/daten";
 import { datum, zeitpunkt } from "@/lib/format";
-import { Seite } from "@/components/layout/Shell";
 import { Logo } from "@/components/layout/logo";
-import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Seitenkopf, Segmente, Textfeld, cx } from "@/components/ui/basis";
+import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Segmente, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
-import { useSortierbar } from "@/components/ui/sortierbar";
+import { useSortierbar, verschiebe } from "@/components/ui/sortierbar";
 import { PdfLeser } from "@/components/PdfAnsicht";
 
 type Art = "infusionsplan" | "patientendatenblatt";
@@ -119,15 +119,18 @@ function MitFeldern({ text }: { text?: string }) {
 }
 
 function stil(o?: Optionen): string {
-  return cx(o?.schrift === "klein" && "text-[9px]", o?.schrift === "gross" && "text-[13px]", o?.fett && "font-semibold",
-    o?.kursiv && "italic", o?.ausrichtung === "mitte" && "text-center", o?.ausrichtung === "rechts" && "text-right");
+  return cx(o?.fett && "font-semibold", o?.kursiv && "italic", o?.ausrichtung === "mitte" && "text-center",
+    o?.ausrichtung === "rechts" && "text-right");
 }
+
+/** Grundschrift eines Blocks in der Seitenvorschau; alles im Block ist relativ dazu (em), wie im PDF (9,5 / 8 / 11,5 pt) */
+const SCHRIFT_PX: Record<string, number> = { klein: 8.4, normal: 10, gross: 12.1 };
 
 function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] }) {
   const briefkopf = useBriefkopf();
   const a = briefkopf.data ? briefkopf.data.absender[briefkopf.data.aktiv] : null;
   const kopf = b.optionen?.ueberschrift && b.bezeichnung
-    ? <div className="text-[10.5px] font-semibold pb-1 mb-1 border-b border-[#e6e5ee]">{b.bezeichnung}</div> : null;
+    ? <div className="text-[1.05em] font-semibold pb-1 mb-1 border-b border-[#e6e5ee]">{b.bezeichnung}</div> : null;
   // Bereiche mit Überschrift erscheinen im PDF als Karte wie in der Oberfläche
   const karte = b.optionen?.ueberschrift && b.bezeichnung ? "border border-[#d9d8e3] rounded-md px-2 py-1.5" : "";
   switch (b.typ) {
@@ -135,41 +138,42 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
       return (
         <div className={cx("flex justify-between items-end pb-2", b.mit_linie !== false && "border-b-2")} style={{ borderColor: /^#[0-9a-f]{6}$/i.test(b.linienfarbe ?? "") ? b.linienfarbe : "#251F53" }}>
           <Logo className="w-[150px] h-[53px]" version={briefkopf.data?.logo.sha256} />
-          {b.absender !== false ? <div className="flex flex-col items-end text-[9px] text-[#555]">
+          {b.absender !== false ? <div className="flex flex-col items-end text-[0.9em] text-[#555]">
             {a ? <><span>{a.strasse} · {a.plz} {a.ort}</span><span>Tel. {a.telefon}</span><span>{a.email}</span></> : null}
           </div> : null}
         </div>
       );
     case "titel":
       return (
-        <div className={cx("flex items-baseline", b.neben_logo ? "flex-col items-end" : "justify-between", stil(b.optionen))}>
-          <span className="text-[16px] font-semibold"><MitFeldern text={b.text} /></span>
-          <span className="text-[10px] text-[#555]">{b.zusatz_label} <MitFeldern text={b.zusatz} /></span>
+        <div className={cx("flex", b.neben_logo || b.optionen?.ausrichtung === "rechts" ? "flex-col items-end"
+          : b.optionen?.ausrichtung === "mitte" ? "flex-col items-center" : "justify-between items-baseline", stil(b.optionen))}>
+          <span className="text-[1.6em] font-semibold"><MitFeldern text={b.text} /></span>
+          <span className="text-[1em] text-[#555]">{b.zusatz_label} <MitFeldern text={b.zusatz} /></span>
         </div>
       );
     case "text":
-      return <div className={cx("text-[10px] leading-relaxed", karte, b.optionen?.linie_oben && "border-t border-[#c9c8d4] pt-1", stil(b.optionen))}>{kopf}<MitFeldern text={b.text} /></div>;
+      return <div className={cx("text-[1em] leading-relaxed", karte, b.optionen?.linie_oben && "border-t border-[#c9c8d4] pt-1", stil(b.optionen))}>{kopf}<MitFeldern text={b.text} /></div>;
     case "kopfkarte":
       return (
-        <div className={stil(b.optionen)}>{kopf}<div className="border border-[#d9d8e3] rounded-md px-2.5 py-2 text-[10px]">
+        <div className={stil(b.optionen)}>{kopf}<div className="border border-[#d9d8e3] rounded-md px-2.5 py-2 text-[1em]">
           <div className="flex justify-between gap-3 items-start">
-            <div><div className="text-[13px] font-semibold"><MitFeldern text={b.text} /></div>
+            <div><div className="text-[1.3em] font-semibold"><MitFeldern text={b.text} /></div>
               {b.untertitel ? <div className="text-[#3b3953]"><MitFeldern text={b.untertitel} /></div> : null}</div>
-            {b.rechts ? <div className="text-right text-[8px] text-[#00325a]"><MitFeldern text={b.rechts} /></div> : null}
+            {b.rechts ? <div className="text-right text-[0.8em] text-[#00325a]"><MitFeldern text={b.rechts} /></div> : null}
           </div>
           {b.felder?.length ? <div className="flex mt-1.5 pt-1 border-t border-[#ececf2]">
             {b.felder.map((e, i) => <div key={i} className={cx("flex flex-col px-2 min-w-0", i ? "border-l border-[#e1e0ea]" : "pl-0")}>
-              <span className="text-[8px] text-[#5d5b72]">{e.label}</span><span className="truncate"><MitFeldern text={e.wert} /></span></div>)}
+              <span className="text-[0.8em] text-[#5d5b72]">{e.label}</span><span className="truncate"><MitFeldern text={e.wert} /></span></div>)}
           </div> : null}
         </div></div>
       );
     case "fusszeile":
-      return <div className="flex justify-between gap-3 text-[8px] text-[#00325a] leading-snug"><span><MitFeldern text={b.text} /></span><span><MitFeldern text={b.rechts} /></span></div>;
+      return <div className="flex justify-between gap-3 text-[0.8em] text-[#00325a] leading-snug"><span><MitFeldern text={b.text} /></span><span><MitFeldern text={b.rechts} /></span></div>;
     case "zweispaltig":
       return (
-        <div className={cx("flex justify-between gap-4 text-[10px]", stil(b.optionen))}>
+        <div className={cx("flex justify-between gap-4 text-[1em]", stil(b.optionen))}>
           <div><MitFeldern text={b.links} /></div>
-          <div className={cx("text-right text-[#00325a]", b.rechts_klein && "text-[8.5px]")}><MitFeldern text={b.rechts} /></div>
+          <div className={cx("text-right text-[#00325a]", b.rechts_klein && "text-[0.85em]")}><MitFeldern text={b.rechts} /></div>
         </div>
       );
     case "datenfelder":
@@ -178,8 +182,8 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
         return (
           <div className={cx(karte, stil(b.optionen))}>
             {kopf}
-            <table className="w-full border-collapse text-[10px]">
-              {b.spaltenkoepfe ? <thead><tr>{["Bestandteil", "Menge", "Einheit"].map((t, i) => <th key={t} className={cx("font-medium text-[8px] text-[#666] border-b border-[#ccc] py-[2px] px-1.5", i === 1 ? "text-right" : "text-left")}>{t}</th>)}</tr></thead> : null}
+            <table className="w-full border-collapse text-[1em]">
+              {b.spaltenkoepfe ? <thead><tr>{["Bestandteil", "Menge", "Einheit"].map((t, i) => <th key={t} className={cx("font-medium text-[0.8em] text-[#666] border-b border-[#ccc] py-[2px] px-1.5", i === 1 ? "text-right" : "text-left")}>{t}</th>)}</tr></thead> : null}
               <tbody>{(b.felder ?? []).map((e, i) => (
                 <tr key={i}><td className="py-[2px] px-1.5 border-b border-[#eee] align-top">{e.label}</td>
                   <td colSpan={2} className="py-[2px] px-1.5 border-b border-[#eee] align-top text-right"><MitFeldern text={e.wert} /></td></tr>
@@ -194,7 +198,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
       return (
         <div className={cx(karte, stil(b.optionen))}>
           {kopf}
-          <table className="w-full border-collapse text-[10px]"><tbody>
+          <table className="w-full border-collapse text-[1em]"><tbody>
             {zeilen.map((z, i) => (
               <tr key={i}>{z.map((e, j) => <Fragment key={j}>
                 <td className="py-[3px] pr-2 text-[#666] border-b border-[#eee] align-top" style={{ width: `${36 / n}%` }}>{e.label}</td>
@@ -202,7 +206,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
               </Fragment>)}</tr>
             ))}
           </tbody></table>
-          {b.typ === "unterschrift" ? <div className="mt-6 w-[200px] border-t border-[#1b1932] pt-0.5 text-[8.5px] text-[#5d5b72]">{b.linie || "Unterschrift"}</div> : null}
+          {b.typ === "unterschrift" ? <div className="mt-6 w-[200px] border-t border-[#1b1932] pt-0.5 text-[0.85em] text-[#5d5b72]">{b.linie || "Unterschrift"}</div> : null}
         </div>
       );
     }
@@ -211,7 +215,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
       return (
         <div className={cx(karte, stil(b.optionen))}>
           {kopf}
-          <table className="w-full border-collapse text-[10px]">
+          <table className="w-full border-collapse text-[1em]">
             <thead><tr>{(t?.spalten ?? []).map((s, i) => <th key={i} className="text-left font-semibold text-[#666] border-b border-[#ccc] py-[3px] pr-2">{s}</th>)}</tr></thead>
             <tbody><tr><td colSpan={t?.spalten.length ?? 1} className="py-[3px] text-[#888] italic">{t?.name ?? "unbekannte Tabelle"}</td></tr></tbody>
           </table>
@@ -223,22 +227,24 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
     case "leerraum":
       return <div style={{ height: (b.hoehe_mm ?? 6) * 2.1 }} className="bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,#f2f1f6_4px,#f2f1f6_8px)]" />;
     case "seitenumbruch":
-      return <div className="text-center text-[9px] text-[#888] border-t border-dashed border-[#bbb] pt-0.5">Seitenumbruch</div>;
+      return <div className="text-center text-[0.9em] text-[#888] border-t border-dashed border-[#bbb] pt-0.5">Seitenumbruch</div>;
     default:
       return null;
   }
 }
 
-export function Dokumentvorlagen() {
+/** Bereich „Dokumentvorlagen“ der Seite Vorlagen (wie Briefkopf, Auswahllisten, Grenzwerte). Die Knöpfe stehen oben
+ *  rechts im Seitenkopf, wo die anderen Bereiche „Speichern“ haben. */
+export function DokumentvorlagenBereich({ aktionenZiel, onGeaendert }: {
+  aktionenZiel: HTMLElement | null; onGeaendert: (geaendert: boolean) => void;
+}) {
   const [art, setArt] = useState<Art>("infusionsplan");
-  return (
-    <Seite pfad={[{ text: "Administration" }, { text: "Vorlagen", zu: "/admin/vorlagen" }, { text: "Dokumentvorlagen" }]}>
-      <EditorFuerArt key={art} art={art} setArt={setArt} />
-    </Seite>
-  );
+  return <EditorFuerArt key={art} art={art} setArt={setArt} aktionenZiel={aktionenZiel} onGeaendert={onGeaendert} />;
 }
 
-function EditorFuerArt({ art, setArt }: { art: Art; setArt: (a: Art) => void }) {
+function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
+  art: Art; setArt: (a: Art) => void; aktionenZiel: HTMLElement | null; onGeaendert: (geaendert: boolean) => void;
+}) {
   const qc = useQueryClient();
   const melden = useHinweis();
   const aufbau = useQuery({ queryKey: ["vorlagen", art], queryFn: () => api<Aufbau>(`vorlagen/${art}/`) });
@@ -261,6 +267,7 @@ function EditorFuerArt({ art, setArt }: { art: Art; setArt: (a: Art) => void }) 
 
   const neuLaden = (b: Block[]) => { setBloecke(structuredClone(b)); setGeladen(JSON.stringify(b)); };
   const geaendert = bloecke !== null && JSON.stringify(bloecke) !== geladen;
+  useEffect(() => { onGeaendert(geaendert); }, [geaendert, onGeaendert]);
 
   const speichern = useMutation({
     mutationFn: () => api<Entwurf>(`vorlagen/${art}/entwurf/`, { method: "PUT", body: { bloecke } }),
@@ -342,7 +349,7 @@ function EditorFuerArt({ art, setArt }: { art: Art; setArt: (a: Art) => void }) 
           <button type="button" aria-label="entfernen" onClick={(e) => { e.stopPropagation(); entferne(b.id); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[11px] p-0 cursor-pointer">×</button>
         </span>
       </> : null}
-      <BlockAnsicht b={b} tabellen={a.tabellen} />
+      <div style={{ fontSize: SCHRIFT_PX[b.optionen?.schrift ?? "normal"] }}><BlockAnsicht b={b} tabellen={a.tabellen} /></div>
     </div>
   );
   const einmal = (typ: string) => ["briefkopf", "fusszeile"].includes(typ) && bloecke.some((b) => b.typ === typ);
@@ -355,13 +362,12 @@ function EditorFuerArt({ art, setArt }: { art: Art; setArt: (a: Art) => void }) 
 
   return (
     <div className="flex flex-col gap-5" data-testid="dokumentvorlagen">
-      <Seitenkopf titel="Dokumentvorlagen bearbeiten" unter={<span>Vorlagen / Dokumentvorlagen</span>}
-        rechts={<div className="flex items-center gap-2.5 flex-wrap">
-          <span className="text-[0.8125rem] gedaempft" data-testid="vorlage-stand">{verInfo}</span>
-          <Knopf icon="dokument" onClick={() => setVorschau(true)}>Vorschau mit Testpatient</Knopf>
-          <Knopf laedt={speichern.isPending} disabled={!geaendert} onClick={() => speichern.mutate()}>Entwurf speichern</Knopf>
-          <Knopf variante="pri" icon="haken" onClick={() => setVeroeffentlichen(true)} disabled={!geaendert && !entwurf.data.ist_entwurf}>Veröffentlichen</Knopf>
-        </div>} />
+      {aktionenZiel ? createPortal(<>
+        <span className="text-[0.8125rem] gedaempft" data-testid="vorlage-stand">{verInfo}</span>
+        <Knopf icon="dokument" onClick={() => setVorschau(true)}>Vorschau mit Testpatient</Knopf>
+        <Knopf laedt={speichern.isPending} disabled={!geaendert} onClick={() => speichern.mutate()}>Entwurf speichern</Knopf>
+        <Knopf variante="pri" icon="haken" onClick={() => setVeroeffentlichen(true)} disabled={!geaendert && !entwurf.data.ist_entwurf}>Veröffentlichen</Knopf>
+      </>, aktionenZiel) : null}
       <Segmente label="Vorlage" wert={art} onWahl={(w) => { if (!geaendert || window.confirm("Ungespeicherte Änderungen verwerfen?")) setArt(w); }}
         werte={[{ wert: "infusionsplan", text: "Infusionsplan" }, { wert: "patientendatenblatt", text: "Patientendatenblatt" }]} className="self-start" />
       {fehlerListe.length ? <Meldung art="fehler"><ul className="m-0 pl-4" data-testid="vorlage-fehler">{fehlerListe.map((f) => <li key={f}>{f}</li>)}</ul></Meldung> : null}
@@ -494,6 +500,8 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
   const o = b.optionen ?? {};
   const eintraege = b.felder ?? [];
   const setzeEintrag = (i: number, neu: Partial<Eintrag>) => aendere({ felder: eintraege.map((e, j) => (j === i ? { ...e, ...neu } : e)) });
+  // Reihenfolge der Felder: Ziehen am Griff, Pfeiltasten am Griff oder ▲ ▼
+  const feldSort = useSortierbar(eintraege, (neu) => aendere({ felder: neu }));
   const textartig = !["briefkopf", "trennlinie", "leerraum", "seitenumbruch"].includes(b.typ);
   return (
     <Karte className="p-4 flex flex-col gap-3" data-testid="block-eigenschaften">
@@ -541,9 +549,18 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
         <div className="flex flex-col gap-2" role="group" aria-label="Felder">
           <span className="text-sm font-medium">{b.typ === "kopfkarte" ? "Kennzahlen" : "Felder"}</span>
           {eintraege.map((e, i) => (
-            <div key={i} className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto] gap-1.5 items-start">
+            <div key={i} {...feldSort.zeile(i)} draggable={false} data-testid="feldzeile"
+              className={cx("grid grid-cols-[auto_minmax(0,0.8fr)_minmax(0,1.2fr)_auto_auto] gap-1 items-center rounded-md", feldSort.ueber === i && "outline outline-2 outline-akzent")}>
+              {/* nur der Griff zieht, damit Text in den Eingabefeldern markierbar bleibt */}
+              <span tabIndex={0} draggable {...feldSort.griff(i, e.label || `Feld ${i + 1}`, `felder-${b.id}`)} className="cursor-grab gedaempft px-0.5"><Icon name="griff" /></span>
               <Eingabe aria-label={`Bezeichnung ${i + 1}`} value={e.label} onChange={(ev) => setzeEintrag(i, { label: ev.target.value })} />
               <FeldWert wert={e.wert} onWert={(w) => setzeEintrag(i, { wert: w })} fokus={fokus} nummer={i + 1} />
+              <span className="flex flex-col">
+                <button type="button" aria-label={`Feld ${i + 1} nach oben`} disabled={i === 0} onClick={() => aendere({ felder: verschiebe(eintraege, i, i - 1) })}
+                  className="h-[15px] w-5 p-0 border-0 bg-transparent text-[11px] leading-none cursor-pointer gedaempft disabled:opacity-30 disabled:cursor-default">▲</button>
+                <button type="button" aria-label={`Feld ${i + 1} nach unten`} disabled={i === eintraege.length - 1} onClick={() => aendere({ felder: verschiebe(eintraege, i, i + 1) })}
+                  className="h-[15px] w-5 p-0 border-0 bg-transparent text-[11px] leading-none cursor-pointer gedaempft disabled:opacity-30 disabled:cursor-default">▼</button>
+              </span>
               <Knopf klein variante="geist" icon="x" aria-label={`Feld ${i + 1} entfernen`} onClick={() => aendere({ felder: eintraege.filter((_, j) => j !== i) })} />
             </div>
           ))}
@@ -569,10 +586,12 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
             <Knopf aria-label="Kursiv" aria-pressed={!!o.kursiv} className={cx("w-[34px] px-0 justify-center italic", o.kursiv && "bg-akzent-weich")} onClick={() => aendereOptionen({ kursiv: !o.kursiv })}>I</Knopf>
           </div>
         </div>
-        <div className="flex flex-col gap-2"><span className="text-sm font-medium">Ausrichtung</span>
-          <Segmente label="Ausrichtung" wert={o.ausrichtung ?? "links"} onWahl={(w) => aendereOptionen({ ausrichtung: w })}
-            werte={[{ wert: "links", text: "Links" }, { wert: "mitte", text: "Mitte" }, { wert: "rechts", text: "Rechts" }]} />
-        </div>
+        {b.typ === "titel" && b.neben_logo
+          ? <span className="text-[12.5px] gedaempft">Ausrichtung: steht rechts neben dem Logo.</span>
+          : <div className="flex flex-col gap-2"><span className="text-sm font-medium">Ausrichtung</span>
+            <Segmente label="Ausrichtung" wert={o.ausrichtung ?? "links"} onWahl={(w) => aendereOptionen({ ausrichtung: w })}
+              werte={[{ wert: "links", text: "Links" }, { wert: "mitte", text: "Mitte" }, { wert: "rechts", text: "Rechts" }]} />
+          </div>}
       </> : null}
       {textartig && b.typ !== "fusszeile" && b.typ !== "titel" ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.ueberschrift} onChange={(e) => aendereOptionen({ ueberschrift: e.target.checked })} />Bezeichnung als Überschrift drucken</label> : null}
       {["text", "datenfelder", "tabelle"].includes(b.typ) ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.ausblenden_wenn_leer} onChange={(e) => aendereOptionen({ ausblenden_wenn_leer: e.target.checked })} />Ausblenden, wenn leer</label> : null}

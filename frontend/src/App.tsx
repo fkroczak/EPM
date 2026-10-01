@@ -16,7 +16,6 @@ import { Verlauf } from "./seiten/akte/Verlauf";
 import { AuditLog } from "./seiten/admin/AuditLog";
 import { Benutzer } from "./seiten/admin/Benutzer";
 import { Vorlagen } from "./seiten/admin/Vorlagen";
-import { Dokumentvorlagen } from "./seiten/admin/Dokumentvorlagen";
 import { Konto } from "./seiten/Konto";
 import { PatientNeu } from "./seiten/PatientNeu";
 import { Patienten } from "./seiten/Patienten";
@@ -67,7 +66,7 @@ const router = createBrowserRouter([
       { path: "konto", element: <Konto /> },
       { path: "admin/benutzer", element: <MitRecht recht="benutzer_verwalten" titel="Benutzer"><Benutzer /></MitRecht> },
       { path: "admin/vorlagen", element: <MitRecht recht="vorlagen_pflegen" titel="Vorlagen"><Vorlagen /></MitRecht> },
-      { path: "admin/vorlagen/dokumente", element: <MitRecht recht="vorlagen_pflegen" titel="Dokumentvorlagen"><Dokumentvorlagen /></MitRecht> },
+      { path: "admin/vorlagen/dokumente", element: <MitRecht recht="vorlagen_pflegen" titel="Dokumentvorlagen"><Vorlagen /></MitRecht> },
       { path: "admin/audit-log", element: <MitRecht recht="audit_lesen" titel="Audit-Log"><AuditLog /></MitRecht> },
       { path: "*", element: <NichtGefunden /> },
     ],

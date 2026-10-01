@@ -69,6 +69,16 @@ function useDokument(url: string, laden?: () => Promise<Uint8Array>) {
 function Seite({ doc, nummer, breite, zoom = 1 }: { doc: PDFDocumentProxy; nummer: number; breite: number; zoom?: number }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [fertig, setFertig] = useState(false);
+  // Text der Seite für Bildschirmleser (und Tests): die Seite selbst ist nur ein Bild
+  const [text, setText] = useState("");
+  useEffect(() => {
+    let aktiv = true;
+    void doc.getPage(nummer).then((seite) => seite.getTextContent()).then((inhalt) => {
+      if (!aktiv) return;
+      setText(inhalt.items.map((i) => ("str" in i ? i.str + (i.hasEOL ? "\n" : " ") : "")).join("").replace(/[ \t]+/g, " ").trim());
+    }).catch(() => undefined);
+    return () => { aktiv = false; };
+  }, [doc, nummer]);
   useEffect(() => {
     if (!breite || !canvas.current) return;
     let abbrechen: (() => void) | null = null;
@@ -97,6 +107,7 @@ function Seite({ doc, nummer, breite, zoom = 1 }: { doc: PDFDocumentProxy; numme
   return (
     <div className="relative bg-white shadow-sm border border-rand mx-auto" style={{ width: "fit-content" }}>
       <canvas ref={canvas} aria-label={`Seite ${nummer}`} role="img" data-testid="pdf-seite" data-fertig={fertig ? "1" : undefined} />
+      <div className="sr-only" data-testid="pdf-text">{text}</div>
       {!fertig ? <span className="absolute inset-0 flex items-center justify-center gedaempft"><Ladekreis /></span> : null}
     </div>
   );
