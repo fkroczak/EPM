@@ -1327,7 +1327,7 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 | U13 | ~~Energie im Infusionsplan: Lipide 9 oder 9,15 kcal/g, Albumin mit oder ohne Energie?~~ **Geklärt 01.10.2026:** wie in `EPM_infuplan.php`: Lipide 9,15 kcal/g, Humanalbumin in ml ohne Energie | F33, F39 | – |
 | U14 | ~~Stabilitätsprüfung Calcium + Magnesium und Vorbelegung des ersten Plans je kg übernehmen?~~ **Geklärt 01.10.2026:** ja, beides wie im Altsystem (Stabilität als Hinweis, Speichern bleibt möglich); Präparate werden beim ersten Plan **nicht** vorausgewählt | F32, F33 | – |
 | U15 | ~~Muss beim endgültigen Löschen auch der Titel aus Historie und Audit-Log verschwinden?~~ **Geklärt 02.10.2026: nach geltender DSGVO.** Titel, Dateiname, Notiz und Datum werden überall entfernt (Art. 17 Abs. 1 d, Art. 5 Abs. 1 c/e); es bleibt der Nachweis ohne Inhalt (Art. 5 Abs. 2, Art. 33 Abs. 5; § 630f BGB); Sicherungen laufen nach 14 Tagen ab, nach einer Wiederherstellung wird erneut gelöscht | F73 | – |
-| U16 | Feiertage im Kalender: welches Bundesland? | F80 | NRW (Sitz der Stiftung in Altenberge, aus der Anschrift abgeleitet) – bitte bestätigen |
+| U16 | ~~Feiertage im Kalender: welches Bundesland?~~ **Geklärt 02.10.2026:** NRW (Sitz der Stiftung in Altenberge) | F80 | – |
 
 ## Änderungsprotokoll
 
