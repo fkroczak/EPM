@@ -19,6 +19,11 @@ test("Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten", 
   await expect(zeile("Mustermann, Max").getByText(/Gewicht −\d+,\d % in \d+ Mon\./)).toBeVisible();
   await expect(zeile("Mustermann, Max").getByLabel(/Trend fallend/)).toBeVisible();
   await expect(zeile("Beispiel, Paula").getByText("Nickelallergie")).toBeVisible();
+  // Testpatienten zählen in keiner Statistik: Kopfzahl = echte Patienten in Betreuung
+  const zaehlung = await apiAls("mitarbeiter");
+  const echte = (await zaehlung.get("patienten/?status=in_betreuung&test=ohne&seitengroesse=1")).count;
+  await zaehlung.ende();
+  await expect(page.getByText(`${echte} Patienten in Betreuung`)).toBeVisible();
   await expect(liste.getByRole("link", { name: "Demo, Karl" })).toHaveCount(0);
 
   // Freitext
@@ -159,4 +164,21 @@ test("Testzugang: Hinweis dauerhaft sichtbar, nur Testpatienten, neue Patienten 
   await expect(page.getByText("wird Testpatient")).toBeVisible();
   await expect(page.getByTestId("naechste-nummer")).toHaveText(/^9\d{3}$/);
   await ctx.close();
+});
+
+test("Suche in der Kopfzeile (Strg K) nach Name, Nummer und Geburtsdatum", async ({ page }) => {
+  const api = await apiAls("mitarbeiter");
+  const max = (await api.get("patienten/?suche=Mustermann")).results.find((p: { vorname: string }) => p.vorname === "Max");
+  await api.ende();
+  const [jahr, monat, tag] = max.geburtsdatum.split("-");
+  await page.goto("/");
+  await page.keyboard.press("Control+k");
+  const suche = page.getByRole("combobox", { name: "Suchen" });
+  await expect(suche).toBeFocused();
+  for (const begriff of ["Mustermann", String(max.nummer).padStart(4, "0"), `${tag}.${monat}.${jahr}`]) {
+    await suche.fill(begriff);
+    await expect(page.getByRole("option", { name: /Mustermann, Max/ }), begriff).toBeVisible();
+  }
+  await page.getByRole("option", { name: /Mustermann, Max/ }).click();
+  await expect(page.getByTestId("aktenkopf").getByRole("heading", { name: "Mustermann, Max" })).toBeVisible();
 });

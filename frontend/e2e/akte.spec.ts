@@ -81,6 +81,16 @@ test("Gewicht erfassen, Plausibilität, korrigieren, Zeitraum", async ({ page })
   await expect(dialog).toHaveCount(0);
   await expect(karte.getByTestId("messwerte")).toContainText("60,6 kg");
 
+  // Diagramm: echte Zeitabstände (vor 400, 95, 10 Tagen, heute) und Glättung umschaltbar
+  const diagramm = page.getByTestId("gewichtsdiagramm");
+  const xs = (await diagramm.locator("circle:not([r='6'])").evaluateAll((k) => k.map((c) => Number(c.getAttribute("cx")))))
+    .sort((a, b) => a - b);
+  expect(xs).toHaveLength(4);
+  expect((xs[1] - xs[0]) / (xs[2] - xs[1])).toBeCloseTo(305 / 85, 1);
+  expect(await diagramm.locator("path").first().getAttribute("d")).toContain("C");
+  await karte.getByLabel("Geglättet").uncheck();
+  expect(await diagramm.locator("path").first().getAttribute("d")).not.toContain("C");
+
   // gespeichert in der Datenbank
   const api = await apiAls("mitarbeiter");
   const werte = await api.get(`gewichte/?patient=${p.id}`);

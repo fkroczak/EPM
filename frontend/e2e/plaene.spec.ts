@@ -25,7 +25,11 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await editor.getByLabel("Menge Lipide in g").fill("60");
   await editor.getByLabel("Natrium").fill("78");
   await editor.getByLabel("Kalium").fill("40");
+  await editor.getByLabel("Phosphat").fill("12");
+  await editor.getByLabel("Calcium").fill("9");
+  await editor.getByLabel("Magnesium").fill("6");
   await editor.getByLabel("Spurenelemente").selectOption({ label: "Addel N" });
+  await editor.getByLabel("Katheterblock / Medikament").selectOption({ label: "Taurolin 2 %" });
   await editor.getByLabel("Katheterblock / Medikament").selectOption({ label: "Taurolin 2 %" });
   await editor.getByRole("button", { name: "+ Soluvit N" }).click();
   await editor.getByRole("button", { name: "+ Vitalipid adult" }).click();
@@ -45,6 +49,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(blatt).toContainText("Glamin 13,4 % · 80 g");
   await expect(blatt).toContainText("1.500 kcal");
   await expect(blatt).toContainText("Soluvit N | Vitalipid adult");
+  await expect(blatt).toContainText("Taurolin 2 %");
   await expect(detail.getByTestId("planvergleich")).toHaveCount(0);
 
   // Freigeben (Recht „Pläne freigeben“)
@@ -87,9 +92,38 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(page.getByText("Entwurf verworfen.")).toBeVisible();
   await expect(page.getByTestId("planliste").getByRole("listitem")).toHaveCount(1);
 
+  // „Als Vorlage für neuen Plan“: ein früherer Plan mit allen Werten als Grundlage
+  await detail.getByRole("button", { name: "Als Vorlage für neuen Plan" }).click();
+  await expect(editor).toContainText("Vorlage geladen");
+  await expect(editor.getByLabel("Menge Aminosäuren in g")).toHaveValue("80");
+  await expect(editor.getByLabel("Phosphat")).toHaveValue("12");
+  await editor.getByRole("button", { name: "Als Entwurf speichern" }).click();
+  await expect(page.getByText("Entwurf gespeichert.").last()).toBeVisible();
+  const ausVorlage = (await api.get(`infusionsplaene/?patient=${patient.id}&status=entwurf`)).results[0];
+  expect([ausVorlage.aminosaeuren_g, ausVorlage.phosphat_mmol, ausVorlage.magnesium_mmol]).toEqual([80, 12, 6]);
+  await detail.getByRole("button", { name: "Verwerfen" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Verwerfen" }).click();
+  await expect(page.getByTestId("planliste").getByRole("listitem")).toHaveCount(1);
+
+  // „Leer beginnen“: alle Felder leer, Vergleich weiter gegen den aktuellen Plan
+  await page.getByTestId("aktenkopf").getByRole("button", { name: "Neuer Plan" }).click();
+  await expect(editor.getByLabel("Menge Aminosäuren in g")).toHaveValue("80");
+  await editor.getByRole("button", { name: "Leer beginnen" }).click();
+  await expect(editor).toContainText("Leer begonnen.");
+  await expect(editor.getByLabel("Menge Aminosäuren in g")).toHaveValue("");
+  await expect(editor.getByLabel("Phosphat")).toHaveValue("");
+  await editor.getByRole("button", { name: "Als Entwurf speichern" }).click();
+  await expect(page.getByText("Entwurf gespeichert.").last()).toBeVisible();
+  const leer = (await api.get(`infusionsplaene/?patient=${patient.id}&status=entwurf`)).results[0];
+  expect([leer.aminosaeuren_g, leer.phosphat_mmol, leer.basis_praeparat]).toEqual([null, null, null]);
+  await detail.getByRole("button", { name: "Verwerfen" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Verwerfen" }).click();
+  await expect(page.getByTestId("planliste").getByRole("listitem")).toHaveCount(1);
+
   const plaene = await api.get(`infusionsplaene/?patient=${patient.id}`);
   expect(plaene.results.map((p: { status: string; aminosaeuren_g: string; kcal: number }) => [p.status, p.aminosaeuren_g, p.kcal]))
     .toEqual([["aktuell", 80, 1500]]);
+  expect([plaene.results[0].phosphat_mmol, plaene.results[0].calcium_mmol, plaene.results[0].magnesium_mmol]).toEqual([12, 9, 6]);
   expect(plaene.results[0].vitamine_namen).toEqual(["Soluvit N", "Vitalipid adult"]);
   await api.ende();
   merken("plan", { patient: patient.id });
