@@ -80,8 +80,9 @@ function RechteMatrix() {
         <div className="flex flex-col gap-1">
           <h2 className="lbl m-0">Was die Rollen dürfen</h2>
           <span className="text-[0.8125rem] gedaempft leading-normal max-w-[70ch]">Je Gruppe einstellbar. Mediziner sind dem Admin gleichgestellt, außer bei Benutzern,
-            dem Wiederöffnen abgeschlossener Akten, Sicherungen und Testdaten. Admins dürfen alles, Patientendaten schreiben sie aber nur
-            bei Testpatienten. Testbenutzer erhalten nie Rechte über Testpatienten hinaus.</span>
+            dem Wiederöffnen abgeschlossener Akten, Sicherungen, Testdaten und der Systemverwaltung. Admins dürfen alles, Patientendaten schreiben sie aber nur
+            bei Testpatienten. Die Systemverwaltung (Server und EPM) gibt es nur für Admins. Testbenutzer erhalten nie Rechte über
+            Testpatienten hinaus.</span>
         </div>
         <div className="flex gap-2">
           <Knopf klein onClick={standard}>Standard</Knopf>

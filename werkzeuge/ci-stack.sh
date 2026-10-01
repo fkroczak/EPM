@@ -16,6 +16,7 @@ compose() { (cd "$B" && $DOCKER compose -p epm-ci "$@"); }
 
 case "${1:-start}" in
   stop)
+    sudo pkill -f "epm-systemagent.py schleife" 2>/dev/null || true
     compose down -v --remove-orphans 2>/dev/null || true
     sudo rm -rf "$B"
     exit 0 ;;
@@ -54,7 +55,7 @@ done
 
 echo "==> Projektverzeichnis $B"
 sudo rm -rf "$B"
-mkdir -p "$B/secrets" "$B/nginx/certs" "$B/data/dokumente" "$B/data/loeschliste"
+mkdir -p "$B/secrets" "$B/nginx/certs" "$B/data/dokumente" "$B/data/loeschliste" "$B/system/auftraege" "$B/system/status/auftraege"
 cp rollout/projekt/compose.yaml "$B/"
 cp rollout/projekt/nginx/epm.conf "$B/nginx/"
 openssl rand -hex 24 > "$B/secrets/db_password"
@@ -73,6 +74,8 @@ EOF
 chmod 0644 "$B/secrets/"*
 sudo chown -R 10001:101 "$B/data"
 sudo chmod 0750 "$B/data"; sudo chmod 2770 "$B/data/dokumente"; sudo chmod 0700 "$B/data/loeschliste"
+sudo chown 10001:101 "$B/system/auftraege"; sudo chmod 0770 "$B/system/auftraege"
+sudo chown -R root:root "$B/system/status"; sudo chmod -R 0755 "$B/system/status"
 sudo chown 101:101 "$B/nginx/certs/"*
 sudo chmod 0400 "$B/nginx/certs/epm.key"
 
@@ -86,6 +89,13 @@ done
 if [[ "$status" != "healthy" ]]; then
   echo "Backend startet nicht:"; compose logs --tail 80 backend; exit 1
 fi
+
+echo "==> Systemagent im Probelauf (wie auf dem Server, aber Updates, Neustart und Sicherung nur simuliert)"
+sudo pkill -f "epm-systemagent.py schleife" 2>/dev/null || true
+sudo nohup python3 "$REPO/rollout/epm-systemagent.py" schleife --basis "$B" --projekt epm-ci --trocken \
+  > /tmp/epm-systemagent.log 2>&1 &
+for _ in $(seq 1 30); do [[ -s "$B/system/status/system.json" ]] && break; sleep 1; done
+[[ -s "$B/system/status/system.json" ]] && echo "Systemagent misst" || { echo "Systemagent liefert keinen Status:"; cat /tmp/epm-systemagent.log; }
 
 echo "==> Musterdaten und Testkonten"
 compose exec -T backend python manage.py epm_musterdaten

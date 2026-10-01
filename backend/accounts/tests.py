@@ -310,7 +310,8 @@ class RechteJeGruppe(TestCase):
         self.assertTrue(m["mediziner"]["dokumente_umhaengen"])
         self.assertTrue(m["admin"]["dokumente_umhaengen"])
         self.assertFalse(m["mitarbeiter"]["dokumente_loeschen"])
-        self.assertEqual(r["nur_rollen"], {"dokumente_loeschen": ["mediziner"]})
+        # Festlegung 02.10.2026: Systemverwaltung (Server und EPM) nur Admin
+        self.assertEqual(r["nur_rollen"], {"dokumente_loeschen": ["mediziner"], "system_verwalten": ["admin"]})
         abgelehnt = client_fuer(self.admin).put("/api/rechte/", {"matrix": {"mitarbeiter": {"dokumente_loeschen": True}}},
                                                format="json")
         self.assertEqual(abgelehnt.status_code, 400)

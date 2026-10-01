@@ -20,6 +20,10 @@ chown "$EPM_APP_UID:101" "$B/data" "$B/data/dokumente"; chmod 0750 "$B/data"; ch
 install -d -m 0700 -o "$EPM_APP_UID" -g 101 "$B/data/loeschliste"
 chown "$EPM_APP_UID:101" "$B/data/loeschliste"; chmod 0700 "$B/data/loeschliste"
 install -d -m 0750 -o 101 -g 101 "$B/nginx/certs"
+# Systemverwaltung (Administration › System): das Backend legt Aufträge ab, der Systemagent (root) schreibt den Status
+install -d -m 0755 "$B/system" "$B/system/status" "$B/system/status/auftraege"
+install -d -m 0770 -o "$EPM_APP_UID" -g 101 "$B/system/auftraege"
+chown "$EPM_APP_UID:101" "$B/system/auftraege"; chmod 0770 "$B/system/auftraege"
 
 echo "==> Projektdateien kopieren"
 install -m 0644 projekt/compose.yaml projekt/compose.smoke.yaml "$B/"
@@ -85,6 +89,47 @@ WantedBy=timers.target
 EOF
 systemctl daemon-reload
 systemctl enable --now epm-backup.timer
+
+echo "==> Systemagent (Administration › System: Auslastung, Updates, Neustart aus der Oberfläche)"
+install -m 0750 epm-systemagent.py /usr/local/sbin/epm-systemagent
+cat > /etc/systemd/system/epm-systemstatus.service <<'EOF'
+[Unit]
+Description=EPM Systemstatus messen (Auslastung, Updates, Container, Sicherung)
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/epm-systemagent status
+Nice=10
+EOF
+cat > /etc/systemd/system/epm-systemstatus.timer <<'EOF'
+[Unit]
+Description=EPM Systemstatus jede Minute
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=5s
+[Install]
+WantedBy=timers.target
+EOF
+cat > /etc/systemd/system/epm-systemagent.service <<'EOF'
+[Unit]
+Description=EPM Systemagent: Aufträge aus der Oberfläche ausführen (feste Liste)
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/epm-systemagent auftraege
+TimeoutStartSec=6h
+EOF
+cat > /etc/systemd/system/epm-systemagent.path <<EOF
+[Unit]
+Description=EPM Systemagent: auf neue Aufträge warten
+[Path]
+PathExistsGlob=$B/system/auftraege/*.json
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable --now epm-systemstatus.timer epm-systemagent.path
 
 echo
 tree -a -L 2 "$B" 2>/dev/null || ls -la "$B"

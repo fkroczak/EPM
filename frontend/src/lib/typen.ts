@@ -5,7 +5,7 @@ export type Recht =
   | "akten_lesen" | "eintraege_erfassen" | "akten_bearbeiten" | "dokumente_umhaengen" | "dokumente_loeschen"
   | "plaene_anlegen" | "plaene_freigeben"
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
-  | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen";
+  | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "system_verwalten";
 
 export type Karte = { id: "termine" | "gewicht" | "plaene" | "pruefen" | "aktiv"; sichtbar: boolean };
 

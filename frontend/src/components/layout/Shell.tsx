@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { RECHTE_GEAENDERT, abfrage, api } from "@/lib/api";
 import type { Seite as ApiSeite } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
-import { datum, initialen, nummer } from "@/lib/format";
+import { datum, initialen, nummer, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
 import type { PatientZeile } from "@/lib/typen";
 import { Chip, cx } from "@/components/ui/basis";
@@ -39,6 +39,7 @@ function Seitenleiste() {
     darf("benutzer_verwalten") ? <NavEintrag key="u" zu="/admin/benutzer" icon="benutzer" text="Benutzer" /> : null,
     darf("vorlagen_pflegen") ? <NavEintrag key="v" zu="/admin/vorlagen" icon="vorlagen" text="Vorlagen" /> : null,
     darf("audit_lesen") ? <NavEintrag key="a" zu="/admin/audit-log" icon="uhr" text="Audit-Log" /> : null,
+    darf("system_verwalten") ? <NavEintrag key="s" zu="/admin/system" icon="server" text="System" /> : null,
   ].filter(Boolean);
   return (
     <aside className="w-16 hd:w-64 shrink-0 bg-flaeche border-r border-rand flex flex-col px-2 hd:px-3 py-4 gap-5 nicht-drucken sticky top-0 h-screen overflow-y-auto"
@@ -53,6 +54,8 @@ function Seitenleiste() {
       <nav aria-label="Hauptnavigation" className="flex flex-col gap-0.5">
         <NavEintrag zu="/" icon="start" text="Start" ende />
         <NavEintrag zu="/patienten" icon="patienten" text="Patienten" />
+        {darf("akten_lesen") ? <NavEintrag zu="/kalender" icon="kalender" text="Kalender" /> : null}
+        {darf("akten_lesen") ? <NavEintrag zu="/infusionsplaene" icon="tropfen" text="Infusionspläne" /> : null}
         <NavEintrag zu="/versorger" icon="versorger" text="Versorger" />
         <NavEintrag zu="/aerzte" icon="arzt" text="Ärzte" />
       </nav>
@@ -163,6 +166,39 @@ function Suche() {
   );
 }
 
+type Hinweis = { id: number; text: string; art: "info" | "warnung"; gueltig_bis: string | null; angelegt_am: string;
+  angelegt_von_name: string | null };
+
+/** Hinweis der Administration an alle Angemeldeten (z. B. vor Updates oder einem Neustart des Servers); jede Minute
+ *  neu abgefragt. Eigene Rolle „region“, damit er Meldungen der Seite (status/alert) nicht überdeckt. */
+let ausgeblendeterHinweis: number | null = null;
+
+function Systemhinweis() {
+  const [weg, setWeg] = useState<number | null>(ausgeblendeterHinweis);
+  const daten = useQuery({
+    queryKey: ["systemhinweis"],
+    queryFn: () => api<{ hinweis: Hinweis | null }>("system/hinweis/"),
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: true,
+    staleTime: 30_000,
+  });
+  const h = daten.data?.hinweis;
+  if (!h || weg === h.id) return null;
+  return (
+    <div role="region" aria-label="Hinweis der Administration" data-testid="systemhinweis"
+      className={cx("nicht-drucken flex items-start gap-3 px-8 py-2.5 text-sm border-b",
+        h.art === "warnung" ? "bg-warn-bg text-warn border-warn/30" : "bg-akzent-weich text-akzent-text border-rand")}>
+      <Icon name={h.art === "warnung" ? "warnung" : "info"} groesse={18} className="shrink-0 mt-0.5" />
+      <span className="grow leading-normal">
+        <strong className="font-semibold">Hinweis der Administration: </strong>{h.text}
+        {h.angelegt_von_name ? <span className="opacity-80"> – {h.angelegt_von_name}, {zeitpunkt(h.angelegt_am)}</span> : null}
+      </span>
+      <button type="button" className="btn geist klein shrink-0" onClick={() => { ausgeblendeterHinweis = h.id; setWeg(h.id); }}
+        aria-label="Hinweis ausblenden">Ausblenden</button>
+    </div>
+  );
+}
+
 export type Pfadteil = { text: string; zu?: string };
 
 /** Kopfzeile + Inhalt einer Seite */
@@ -189,6 +225,7 @@ export function Seite({ pfad, children, breit, className }: { pfad: Pfadteil[]; 
           {ich.ist_test ? <Chip art="warn" data-testid="testzugang">Testzugang</Chip> : null}
         </div>
       </header>
+      <Systemhinweis />
       <main className={cx("grow min-h-0 px-8 py-7 flex flex-col gap-5", !breit && "max-w-[1440px]", className)}>{children}</main>
     </div>
   );

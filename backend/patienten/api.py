@@ -1384,3 +1384,51 @@ class StartseiteViewSet(viewsets.ViewSet):
 
     def list(self, request):
         return Response(startseite_daten(request.user))
+
+
+class KalenderViewSet(viewsets.ViewSet):
+    """
+    GET /api/kalender/?von=JJJJ-MM-TT&bis=JJJJ-MM-TT&erledigte=1&faelligkeiten=0
+    Globaler Kalender: Termine aller Patienten im Zeitraum, offene überfällige Termine, berechnete Fälligkeiten
+    (Kontakt, Infusionsplan) und Feiertage. Lesen mit „Akten lesen“; Termine anlegen/ändern über /api/termine/.
+    """
+
+    permission_classes = [recht("akten_lesen")]
+
+    def list(self, request):
+        from .kalender import MAX_TAGE, faelligkeiten, feiertage_zwischen
+
+        p = request.query_params
+        von, bis = _datum(p.get("von", "")), _datum(p.get("bis", ""))
+        fehler = {}
+        if von is None:
+            fehler["von"] = "Bitte ein Datum (JJJJ-MM-TT) angeben."
+        if bis is None:
+            fehler["bis"] = "Bitte ein Datum (JJJJ-MM-TT) angeben."
+        if not fehler and bis < von:
+            fehler["bis"] = "„bis“ liegt vor „von“."
+        if not fehler and (bis - von).days > MAX_TAGE:
+            fehler["bis"] = f"Höchstens {MAX_TAGE} Tage auf einmal."
+        if fehler:
+            return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
+        heute = timezone.localdate()
+        patienten = patienten_fuer(request.user)
+        termine = (Termin.objects.filter(patient__in=patienten).select_related("patient", "ort", "angelegt_von",
+                                                                                "erledigt_von")
+                   .order_by("faellig_am", F("uhrzeit").asc(nulls_first=True), "id"))
+        im_zeitraum = termine.filter(faellig_am__range=(von, bis))
+        if str(p.get("erledigte", "1")).lower() in ("0", "false", "nein"):
+            im_zeitraum = im_zeitraum.filter(erledigt_am__isnull=True)
+        ueberfaellig = termine.filter(erledigt_am__isnull=True, faellig_am__lt=heute,
+                                      patient__abgeschlossen_am__isnull=True)
+        daten = {
+            "von": von, "bis": bis, "heute": heute,
+            "termine": TerminSerializer(im_zeitraum[:2000], many=True).data,
+            "termine_ueberfaellig": TerminSerializer(ueberfaellig[:300], many=True).data,
+            "faelligkeiten": [],
+            "grenzen": {},
+            "feiertage": feiertage_zwischen(von, bis),
+        }
+        if str(p.get("faelligkeiten", "1")).lower() not in ("0", "false", "nein"):
+            daten["faelligkeiten"], daten["grenzen"] = faelligkeiten(patienten, bis)
+        return Response(daten)

@@ -12,10 +12,12 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { PatientWahl } from "./PatientWahl";
 
-export function TerminDialog({ offen, onOffen, patientId, patientName, termin }: {
+export function TerminDialog({ offen, onOffen, patientId, patientName, termin, datum }: {
   offen: boolean; onOffen: (o: boolean) => void; patientId?: number; patientName?: string;
   /** vorhandener, offener Termin zum Ändern */
   termin?: Termin | null;
+  /** Vorgabe für das Datum eines neuen Termins (z. B. Klick auf einen Tag im Kalender), „JJJJ-MM-TT“ */
+  datum?: string;
 }) {
   const [patient, setPatient] = useState<PatientZeile | null>(null);
   const [art, setArt] = useState("rueckruf");
@@ -33,6 +35,9 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin }:
       setUhr(termin.uhrzeit ? termin.uhrzeit.slice(0, 5) : ""); setTitel(termin.titel); setNotiz(termin.notiz);
     }
   }, [offen, termin]);
+  useEffect(() => {
+    if (offen && !termin && datum) setFaellig(datum);
+  }, [offen, termin, datum]);
   const speichern = useMutation({
     mutationFn: () => {
       const daten = {
@@ -50,6 +55,7 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin }:
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["startseite"] });
       void qc.invalidateQueries({ queryKey: ["termine"] });
+      void qc.invalidateQueries({ queryKey: ["kalender"] });
       void qc.invalidateQueries({ queryKey: ["patient"] });
       melden(termin ? "Termin geändert." : "Termin angelegt.");
       onOffen(false);
@@ -62,7 +68,7 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin }:
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
     <Dialog offen={offen} onOffen={onOffen} titel={termin ? "Termin ändern" : "Termin anlegen"}
-      beschreibung={patientName ? `für ${patientName}` : "Erscheint auf der Startseite unter „Termine und Wiedervorlagen“."}
+      beschreibung={patientName ? `für ${patientName}` : "Erscheint im Kalender und auf der Startseite unter „Termine und Wiedervorlagen“."}
       fuss={<>
         <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
         <Knopf variante="pri" laedt={speichern.isPending} disabled={!termin && !patientId && !patient}

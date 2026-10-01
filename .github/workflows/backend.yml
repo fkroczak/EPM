@@ -60,7 +60,7 @@ jobs:
         id: mig
         run: |
           set -o pipefail
-          python manage.py makemigrations --noinput accounts stammdaten patienten infusionen vorlagen audit 2>&1 | tee -a ci-protokoll.txt
+          python manage.py makemigrations --noinput accounts stammdaten patienten infusionen vorlagen audit system 2>&1 | tee -a ci-protokoll.txt
           if [ -n "$(git status --porcelain -- '*/migrations/*.py')" ]; then
             echo "neu=1" >> "$GITHUB_OUTPUT"
             git status --porcelain -- '*/migrations/*.py'

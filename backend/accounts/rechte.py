@@ -7,6 +7,7 @@ Festlegungen vom 01.10.2026:
 - Akten abschließen: Mitarbeiter, Mediziner und Admin. Vorlagen pflegen: auch Mitarbeiter und Mediziner.
 - Admins dürfen alles, Patientendaten schreiben sie aber nur bei Testpatienten; echte Akten sind für
   sie nur lesbar (Wieder öffnen, Benutzer, Sicherungen bleiben).
+- Systemverwaltung (Server und EPM, Festlegung 02.10.2026): nur Admin; anderen Rollen nicht erteilbar.
 Für Betrachter gilt die Rollenmatrix aus dem Entwurf 17.
 
 Was nicht ausdrücklich in der Datenbank steht, kommt aus STANDARD. Testbenutzer erhalten nie
@@ -36,26 +37,30 @@ RECHTE = [
      "Benutzer anlegen, sperren, Einmal-Kennwort, 2FA zurücksetzen, Rechte der Gruppen"),
     ("backup_verwalten", "Sicherungen verwalten", "Sicherung starten, wiederherstellen"),
     ("testdaten_zuruecksetzen", "Testdaten zurücksetzen", ""),
+    ("system_verwalten", "Systemverwaltung (Server und EPM)",
+     "Auslastung, Ubuntu-Updates, Neustart, Wartung von Datenbank und Dateien, Hinweise an alle Benutzer – nur Admin"),
 ]
 CODES = [code for code, _, _ in RECHTE]
 NAMEN = {code: name for code, name, _ in RECHTE}
 
 _ALLE = set(CODES)
-_ADMIN_SPEZIAL = {"benutzer_verwalten", "akten_wieder_oeffnen", "backup_verwalten", "testdaten_zuruecksetzen"}
+_ADMIN_SPEZIAL = {"benutzer_verwalten", "akten_wieder_oeffnen", "backup_verwalten", "testdaten_zuruecksetzen",
+                  "system_verwalten"}
 
 # Rechte, die Patientendaten verändern (Einträge, Stammdaten, Pläne, Abschluss)
 PATIENTENDATEN_SCHREIBEN = {"eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
                             "akten_abschliessen", "dokumente_umhaengen", "dokumente_loeschen"}
 
-# Rechte, die nur bestimmte Rollen haben können (Festlegung 02.10.2026: endgültig löschen nur Mediziner)
-NUR_ROLLEN = {"dokumente_loeschen": {Rolle.MEDIZINER}}
+# Rechte, die nur bestimmte Rollen haben können; anderen Rollen nicht erteilbar (Festlegungen 02.10.2026:
+# endgültig löschen nur Mediziner; Systemverwaltung – Server und EPM – natürlich nur Admin)
+NUR_ROLLEN = {"dokumente_loeschen": {Rolle.MEDIZINER}, "system_verwalten": {Rolle.ADMIN}}
 
 STANDARD = {
     Rolle.BETRACHTER: {"akten_lesen"},
     Rolle.MITARBEITER: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
                         "versorger_pflegen", "vorlagen_pflegen"},
     Rolle.MEDIZINER: _ALLE - _ADMIN_SPEZIAL,
-    Rolle.ADMIN: _ALLE - set(NUR_ROLLEN),
+    Rolle.ADMIN: _ALLE - {c for c, rollen in NUR_ROLLEN.items() if Rolle.ADMIN not in rollen},
 }
 
 # Diese Rollen schreiben Patientendaten nur bei Testpatienten (fest, unabhängig von der Matrix)
@@ -66,7 +71,7 @@ FEST = {(Rolle.ADMIN, "benutzer_verwalten"), (Rolle.ADMIN, "akten_lesen")}
 
 # Testbenutzer arbeiten nur mit Testpatienten; alles, was darüber hinaus wirkt, bleibt verwehrt
 NUR_ECHTE_BENUTZER = {"versorger_pflegen", "vorlagen_pflegen", "audit_lesen", "benutzer_verwalten",
-                      "backup_verwalten", "testdaten_zuruecksetzen", "akten_wieder_oeffnen"}
+                      "backup_verwalten", "testdaten_zuruecksetzen", "akten_wieder_oeffnen", "system_verwalten"}
 
 
 def matrix() -> dict:
