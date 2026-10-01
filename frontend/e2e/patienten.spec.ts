@@ -29,10 +29,13 @@ test("Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten", 
 
   // Versorger und Ansprechpartner
   await page.getByLabel("Versorger").selectOption({ label: "Testversorger Süd (fiktiv)" });
+  await expect(page).toHaveURL(/versorger=\d+/);
   await expect(liste.getByRole("link", { name: "Probe, Jonas" })).toBeVisible();
   await expect(liste.getByRole("link", { name: "Musterfrau, Erika" })).toHaveCount(0);
   await page.getByLabel("Versorger").selectOption({ label: "Alle Versorger" });
+  await expect(page).not.toHaveURL(/versorger=/);
   await page.getByLabel("Ansprechpartner").selectOption({ label: "Herr Muster (Testversorger Nord (fiktiv))" });
+  await expect(page).toHaveURL(/ansprechpartner=\d+/);
   await expect(liste.getByRole("link", { name: "Mustermann, Max" })).toBeVisible();
   await expect(liste.getByRole("link", { name: "Musterfrau, Erika" })).toHaveCount(0);
   await page.getByRole("button", { name: "Filter zurücksetzen" }).click();
@@ -97,13 +100,13 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   // gespeichert in der Datenbank: Stammdaten, erste Gewichtsmessung, Diagnose
   const api = await apiAls("mitarbeiter");
   const p = await api.get(`patienten/${id}/`);
-  expect([p.nachname, p.vorname, p.geburtsdatum, p.nickelallergie, p.groesse_cm]).toEqual([nachname, "Nele", "1972-05-02", "ja", "168.0"]);
+  expect([p.nachname, p.vorname, p.geburtsdatum, p.nickelallergie, p.groesse_cm]).toEqual([nachname, "Nele", "1972-05-02", "ja", 168]);
   expect(p.kopf.versorger).toBe("Testversorger Nord (fiktiv)");
   expect(p.kopf.ansprechpartner).toBe("Frau Beispiel");
   expect(p.kopf.katheter).toBe("Port");
   expect(p.diagnose).toContain("Kurzdarmsyndrom (E2E)");
   const gewichte = await api.get(`gewichte/?patient=${id}`);
-  expect(gewichte.results.map((g: { gewicht_kg: string }) => g.gewicht_kg)).toEqual(["61.4"]);
+  expect(gewichte.results.map((g: { gewicht_kg: number }) => g.gewicht_kg)).toEqual([61.4]);
   await api.ende();
 
   // erscheint in der Liste

@@ -48,6 +48,8 @@ test("Erste Anmeldung: eigenes Passwort, Authenticator einrichten, Notfall-Codes
   await page.getByLabel("Code aus der App").fill("000000");
   await page.getByRole("button", { name: "Bestätigen" }).click();
   await expect(page.getByRole("alert")).toContainText("Code ungültig");
+  // nach einem Fehlversuch sperrt django-otp das Gerät kurz (Schutz gegen Durchprobieren)
+  await page.waitForTimeout(2100);
   await page.getByLabel("Code aus der App").fill(totpBase32(geheim));
   await page.getByRole("button", { name: "Bestätigen" }).click();
   await expect(page.getByRole("heading", { name: "Notfall-Codes" })).toBeVisible();

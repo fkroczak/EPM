@@ -84,7 +84,7 @@ test("Gewicht erfassen, Plausibilität, korrigieren, Zeitraum", async ({ page })
   // gespeichert in der Datenbank
   const api = await apiAls("mitarbeiter");
   const werte = await api.get(`gewichte/?patient=${p.id}`);
-  expect(werte.results.map((g: { gewicht_kg: string }) => g.gewicht_kg)).toEqual(["60.6", "61.0", "61.5", "62.0"]);
+  expect(werte.results.map((g: { gewicht_kg: number }) => g.gewicht_kg)).toEqual([60.6, 61, 61.5, 62]);
   expect(werte.results[0].quelle).toBe("versorger");
   await api.ende();
 });

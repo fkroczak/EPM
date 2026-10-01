@@ -128,6 +128,8 @@ class Infusionsplaene(Grundlage):
         self.assertEqual(zeilen["vitamine"]["jetzt"], "Soluvit N | Vitalipid adult")
         self.assertEqual(zeilen["laufzeit_h"]["jetzt"], "12 h")
         self.assertEqual(zeilen["basis"]["jetzt"], "Sterofundin · 500 ml")
+        self.assertEqual(zeilen["kcal"]["vorher"], "1.440 kcal")  # deutsche Schreibweise wie auf dem Plan
+        self.assertEqual(zeilen["kcal"]["jetzt"], "1.240 kcal")
         # erster Plan ohne Vorgänger
         v = c.get(f"/api/infusionsplaene/{alt.id}/vergleich/").json()
         self.assertIsNone(v["vorgaenger"])

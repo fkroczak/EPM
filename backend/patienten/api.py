@@ -401,6 +401,61 @@ def _aktion(name, h, aenderungen):
     return "geändert"
 
 
+def _deutsch(wert, stellen=None) -> str:
+    """1480 → „1.480“, Decimal("54.6") → „54,6“ (deutsche Schreibweise)."""
+    from decimal import Decimal
+
+    if wert is None:
+        return "—"
+    if stellen is not None:
+        text = f"{wert:,.{stellen}f}"
+    elif isinstance(wert, Decimal):
+        text = f"{wert.normalize():,f}"
+    else:
+        text = f"{wert:,}"
+    return text.replace(",", "§").replace(".", ",").replace("§", ".")
+
+
+def _klartext(html: str, laenge=200) -> str:
+    import html as html_mod
+    import re
+
+    text = html_mod.unescape(re.sub(r"<[^>]+>", " ", html or ""))
+    return _kurz(" ".join(text.split()), laenge)
+
+
+def _beschreibung(name, h, aktion) -> str:
+    """Kurzbeschreibung des Eintrags für die Spalte „Details“ (Entwurf 10)."""
+    try:
+        if name == "gewichte":
+            return f"{_deutsch(h.gewicht_kg, 1)} kg, gemessen am {h.gemessen_am:%d.%m.%Y}"
+        if name == "kontakte":
+            if aktion == "storniert":
+                return f"Kontakt vom {timezone.localtime(h.zeitpunkt):%d.%m.%Y, %H:%M} · Grund: {h.storno_grund}"
+            return _klartext(h.text)
+        if name == "termine":
+            zeit = f" {h.uhrzeit:%H:%M}" if h.uhrzeit else ""
+            return f"{dict(Termin.Art.choices).get(h.art, h.art)} · {h.faellig_am:%d.%m.%Y}{zeit} · {h.titel}"
+        if name == "dokumente":
+            groesse = f"{_deutsch(h.groesse / 1024 / 1024, 1)} MB" if h.groesse >= 1024 * 1024 else f"{max(1, round(h.groesse / 1024))} KB"
+            return f"{h.titel} · {groesse} · SHA-256 {h.sha256[:4]}…{h.sha256[-4:]}"
+        if name == "infusionsplaene":
+            plan = h.instance
+            teile = [f"{_deutsch(plan.kcal)} kcal"]
+            if h.laufzeit_h is not None:
+                teile.append(f"{_deutsch(h.laufzeit_h)} h")
+            teile.append(f"gültig ab {h.gueltig_ab:%d.%m.%Y}")
+            return " · ".join(teile)
+        if name == "akte":
+            if aktion == "abgeschlossen":
+                return f"Anlass: {dict(Patient.Abschlussanlass.choices).get(h.abschluss_anlass, h.abschluss_anlass)}"
+            if h.history_type == "+":
+                return "Akte angelegt"
+    except Exception:  # noqa: BLE001 – Beschreibung ist nur Anzeige
+        return ""
+    return ""
+
+
 def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
     from infusionen.models import Infusionsplan
 
@@ -440,8 +495,9 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
             "grund": h.history_change_reason,
         }
         if name != "akte":
-            ergebnis.append({**basis, "bereich": name, "aktion": _aktion(name, h, aenderungen),
-                             "aenderungen": aenderungen})
+            aktion = _aktion(name, h, aenderungen)
+            ergebnis.append({**basis, "bereich": name, "aktion": aktion, "aenderungen": aenderungen,
+                             "beschreibung": _beschreibung(name, h, aktion)})
             continue
         # Akte: je Bereich ein Eintrag (Stammdaten / Diagnose / Therapie / Empfehlung)
         gruppen = {}
@@ -452,8 +508,9 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         for gruppe, liste in gruppen.items():
             if bereich and bereich != gruppe:
                 continue
-            ergebnis.append({**basis, "bereich": gruppe, "aktion": _aktion("stammdaten", h, liste),
-                             "aenderungen": liste})
+            aktion = _aktion("stammdaten", h, liste)
+            ergebnis.append({**basis, "bereich": gruppe, "aktion": aktion, "aenderungen": liste,
+                             "beschreibung": _beschreibung("akte", h, aktion)})
     return ergebnis
 
 

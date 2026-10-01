@@ -118,6 +118,11 @@ class Revisionssicherheit(Grundlage):
         c.post(f"/api/kontakte/{k['id']}/storno/", {"grund": "doppelt"}, format="json")
         v = c.get(f"/api/patienten/{self.patient.id}/verlauf/?bereich=kontakte").json()
         self.assertEqual([e["aktion"] for e in v], ["storniert", "angelegt"])
+        self.assertIn("Grund: doppelt", v[0]["beschreibung"])
+        self.assertEqual(v[1]["beschreibung"], "Hallo")
+        c.post("/api/gewichte/", {"patient": self.patient.id, "gewicht_kg": "54.6", "gemessen_am": "2026-09-29"}, format="json")
+        v = c.get(f"/api/patienten/{self.patient.id}/verlauf/?bereich=gewichte").json()
+        self.assertEqual(v[0]["beschreibung"], "54,6 kg, gemessen am 29.09.2026")
         v = c.get(f"/api/patienten/{self.patient.id}/verlauf/?person={self.mediziner.id}").json()
         self.assertEqual({e["person_id"] for e in v}, {self.mediziner.id})
 

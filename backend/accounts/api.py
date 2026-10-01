@@ -253,6 +253,10 @@ class ZweiterFaktorBestaetigenView(OffenerView):
             return fehler("Bitte zuerst die Einrichtung starten.")
         if hat_zweiten_faktor(user) and not ist_verifiziert(user):
             return fehler("Authenticator ist bereits eingerichtet.", status.HTTP_403_FORBIDDEN)
+        erlaubt, _ = geraet.verify_is_allowed()
+        if not erlaubt:  # django-otp sperrt nach einem Fehlversuch kurz (1 s, 2 s, 4 s …)
+            return fehler("Zu schnell hintereinander. Bitte ein paar Sekunden warten und den neuen Code eingeben.",
+                          status.HTTP_429_TOO_MANY_REQUESTS)
         if not geraet.verify_token(str(request.data.get("code", "")).replace(" ", "")):
             protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request, schritt="einrichten")
             return fehler("Code ungültig. Bitte Uhrzeit des Telefons prüfen und erneut versuchen.")

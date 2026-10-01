@@ -314,11 +314,16 @@ def _positionen_signatur(plan):
 
 
 def _zahl(wert, einheit=""):
+    """Deutsche Schreibweise wie auf dem Plan: 1.480 kcal, 13,5 g, 500 ml."""
     if wert is None:
         return None
-    text = f"{wert:f}" if isinstance(wert, Decimal) else str(wert)
-    if isinstance(wert, Decimal) and "." in text:
-        text = text.rstrip("0").rstrip(".")
+    if isinstance(wert, Decimal):
+        text = f"{wert:,f}"
+        if "." in text:
+            text = text.rstrip("0").rstrip(".")
+    else:
+        text = f"{wert:,}"
+    text = text.replace(",", "§").replace(".", ",").replace("§", ".")
     return f"{text} {einheit}".strip()
 
 
@@ -346,7 +351,7 @@ def _anzeige(plan, schluessel):
     if schluessel == "tage_pro_woche":
         return _zahl(plan.tage_pro_woche, "× pro Woche")
     if schluessel == "kcal":
-        return f"{plan.kcal} kcal" + (" (manuell)" if plan.kcal_manuell is not None else "")
+        return _zahl(plan.kcal, "kcal") + (" (manuell)" if plan.kcal_manuell is not None else "")
     if schluessel == "pantozol":
         return f"{plan.pantozol_stufe} · {plan.pantozol_tage}" if plan.pantozol_stufe else None
     if schluessel == "bemerkung":

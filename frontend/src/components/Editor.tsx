@@ -19,6 +19,11 @@ const ERWEITERUNGEN = [
   }),
 ];
 
+/** HTML ohne leere Absätze am Ende (ProseMirror hängt nach Listen einen an) */
+function html(e: TiptapEditor): string {
+  return e.isEmpty ? "" : e.getHTML().replace(/(<p><\/p>)+$/, "");
+}
+
 function Werkzeugleiste({ editor }: { editor: TiptapEditor }) {
   const z = useEditorState({
     editor,
@@ -78,13 +83,13 @@ export function Editor({ wert, onAenderung, label, werkzeuge = true, platzhalter
         style: `min-height:${hoehe}px`,
       },
     },
-    onUpdate: ({ editor: e }: { editor: TiptapEditor }) => onAenderung(e.isEmpty ? "" : e.getHTML()),
+    onUpdate: ({ editor: e }: { editor: TiptapEditor }) => onAenderung(html(e)),
   });
 
   // Wert von außen (Verwerfen, Neuladen) übernehmen, ohne die eigene Eingabe zu überschreiben
   useEffect(() => {
     if (!editor) return;
-    const aktuell = editor.isEmpty ? "" : editor.getHTML();
+    const aktuell = html(editor);
     if (wert !== aktuell) editor.commands.setContent(wert || "", { emitUpdate: false });
   }, [wert, editor]);
 

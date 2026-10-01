@@ -4,11 +4,13 @@ import { Laden } from "./components/ui/basis";
 import { Seite, Shell } from "./components/layout/Shell";
 import { Anmeldung } from "./seiten/Anmeldung";
 import { Akte } from "./seiten/akte/Akte";
+import { Dokumente } from "./seiten/akte/Dokumente";
 import { Kontakte } from "./seiten/akte/Kontakte";
 import { PlanEditor } from "./seiten/akte/PlanEditor";
 import { Plaene } from "./seiten/akte/Plaene";
 import { Therapie } from "./seiten/akte/Therapie";
 import { Uebersicht } from "./seiten/akte/Uebersicht";
+import { Verlauf } from "./seiten/akte/Verlauf";
 import { PatientNeu } from "./seiten/PatientNeu";
 import { Patienten } from "./seiten/Patienten";
 import { Start } from "./seiten/Start";
@@ -40,6 +42,8 @@ const router = createBrowserRouter([
           { path: "plaene", element: <Plaene /> },
           { path: "plaene/neu", element: <PlanEditor /> },
           { path: "plaene/:planId/bearbeiten", element: <PlanEditor key="bearbeiten" /> },
+          { path: "dokumente", element: <Dokumente /> },
+          { path: "verlauf", element: <Verlauf /> },
         ],
       },
       { path: "versorger", element: <Versorger /> },

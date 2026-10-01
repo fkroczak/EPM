@@ -51,6 +51,13 @@ class Anmeldung(TestCase):
         self.assertIn("<svg", r.json()["qr_svg"])
         geraet = TOTPDevice.objects.get(user=self.user)
         code = f"{totp(geraet.bin_key, geraet.step, geraet.t0, geraet.digits):06d}"
+        # falscher Code, danach kurze Sperre mit eigener Meldung (nicht „Code ungültig“)
+        falsch = "000000" if code != "000000" else "111111"
+        self.assertIn("Code ungültig", self.c.post("/api/auth/2fa/bestaetigen/", {"code": falsch}, format="json").json()["fehler"])
+        r = self.c.post("/api/auth/2fa/bestaetigen/", {"code": code}, format="json")
+        self.assertEqual(r.status_code, 429)
+        self.assertIn("warten", r.json()["fehler"])
+        TOTPDevice.objects.filter(pk=geraet.pk).update(throttling_failure_timestamp=None, throttling_failure_count=0)
         r = self.c.post("/api/auth/2fa/bestaetigen/", {"code": code}, format="json")
         self.assertEqual(r.json()["schritt"], "fertig", r.content)
         self.assertEqual(len(r.json()["notfallcodes"]), 10)
