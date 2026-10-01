@@ -16,7 +16,7 @@ import { Icon } from "@/components/ui/icon";
 import { Editor } from "@/components/Editor";
 import { name, useAkte } from "./Akte";
 
-const ZAHLEN = ["basis_ml", "glucose_g", "aminosaeuren_g", "lipide_g", "albumin_g", "natrium_mmol", "kalium_mmol",
+const ZAHLEN = ["basis_ml", "glucose_g", "aminosaeuren_g", "lipide_g", "albumin_ml", "natrium_mmol", "kalium_mmol",
   "phosphat_mmol", "calcium_mmol", "magnesium_mmol", "laufzeit_h", "tage_pro_woche", "pantozol_tage", "kcal_manuell"] as const;
 const AUSWAHL = ["basis_praeparat", "glucose_praeparat", "aminosaeuren_praeparat", "lipide_praeparat", "albumin_praeparat",
   "spurenelemente", "katheterschutz"] as const;
@@ -24,14 +24,20 @@ type ZahlFeld = (typeof ZAHLEN)[number];
 type AuswahlFeld = (typeof AUSWAHL)[number];
 type Formular = Record<ZahlFeld | AuswahlFeld, string> & { vitamine: number[]; bemerkung: string; pantozol_stufe: string; gueltig_ab: string };
 
-const MAKRO: { feld: "glucose" | "aminosaeuren" | "lipide" | "albumin"; text: string; kategorie: string; kcal: number }[] = [
-  { feld: "glucose", text: "Glucose", kategorie: "glucose", kcal: 4 },
-  { feld: "aminosaeuren", text: "Aminosäuren", kategorie: "aminosaeuren", kcal: 4 },
-  { feld: "lipide", text: "Lipide", kategorie: "lipide", kcal: 9 },
-  { feld: "albumin", text: "Humanalbumin", kategorie: "albumin", kcal: 4 },
+// Energie wie im Altsystem (EPM_infuplan.php): Glucose und Aminosäuren 4 kcal/g, Lipide 9,15 kcal/g;
+// Humanalbumin wird dort in ml erfasst und zählt nicht zur Energie (Festlegung 01.10.2026)
+const MAKRO: { feld: "glucose" | "aminosaeuren" | "lipide" | "albumin"; menge: ZahlFeld; einheit: string; text: string; kategorie: string; kcal: number | null }[] = [
+  { feld: "glucose", menge: "glucose_g", einheit: "g", text: "Glucose", kategorie: "glucose", kcal: 4 },
+  { feld: "aminosaeuren", menge: "aminosaeuren_g", einheit: "g", text: "Aminosäuren", kategorie: "aminosaeuren", kcal: 4 },
+  { feld: "lipide", menge: "lipide_g", einheit: "g", text: "Lipide", kategorie: "lipide", kcal: 9.15 },
+  { feld: "albumin", menge: "albumin_ml", einheit: "ml", text: "Humanalbumin", kategorie: "albumin", kcal: null },
 ];
+/** Vorbelegung des ersten Plans je kg Körpergewicht – kommt vom Server (wie im Altsystem) */
+type Vorbelegung = { gewicht_kg: number | null; je_kg: Record<string, number>; werte: Record<string, number> | null };
 /** Gesamtvolumen wie im Altsystem: Körpergewicht × 35 ml, auf 2 Stellen gerundet */
 const ML_JE_KG = 35;
+/** Stabilität wie im Altsystem: Calcium + Magnesium (mmol) höchstens Gesamtvolumen ÷ 100 */
+const CA_MG_ML_JE_MMOL = 100;
 const ELEKTROLYTE: { feld: ZahlFeld; text: string }[] = [
   { feld: "natrium_mmol", text: "Natrium" }, { feld: "kalium_mmol", text: "Kalium" }, { feld: "phosphat_mmol", text: "Phosphat" },
   { feld: "calcium_mmol", text: "Calcium" }, { feld: "magnesium_mmol", text: "Magnesium" },
@@ -115,6 +121,13 @@ export function PlanEditor() {
   const vorgaenger = useQuery({ queryKey: ["plan", vorgaengerId], queryFn: () => api<Plan>(`infusionsplaene/${vorgaengerId}/`), enabled: !!vorgaengerId });
   const quelleId = vorlageId ?? (aktuellId ? String(aktuellId) : null);
   const quelle = useQuery({ queryKey: ["plan", quelleId], queryFn: () => api<Plan>(`infusionsplaene/${quelleId}/`), enabled: !planId && !!quelleId });
+  // erster Plan: je kg Körpergewicht vorbelegt wie im Altsystem
+  const ersterPlan = !planId && !vorlageId && aktuellBekannt && !aktuellId;
+  const vorbelegung = useQuery({
+    queryKey: ["patient", patient.id, "vorbelegung"],
+    queryFn: () => api<Vorbelegung>(`infusionsplaene/vorbelegung/?patient=${patient.id}`),
+    enabled: ersterPlan,
+  });
 
   // Formular einmal füllen: Entwurf, sonst Vorlage bzw. aktueller Plan, sonst leer
   useEffect(() => {
@@ -122,8 +135,10 @@ export function PlanEditor() {
     if (planId) { if (entwurf.data) setF(ausPlan(entwurf.data)); return; }
     if (!vorlageId && !aktuellBekannt) return; // erst wissen, ob es einen aktuellen Plan gibt
     if (quelleId) { if (quelle.data) setF(ausPlan(quelle.data, datum(heuteIso()))); return; }
-    setF(leer());
-  }, [f, planId, entwurf.data, vorlageId, aktuellBekannt, quelleId, quelle.data]);
+    if (!vorbelegung.isFetchedAfterMount || vorbelegung.isFetching) return;
+    const werte = vorbelegung.data?.werte;
+    setF(werte ? { ...leer(), ...Object.fromEntries(Object.entries(werte).map(([k, v]) => [k, zahl(v)])) } : leer());
+  }, [f, planId, entwurf.data, vorlageId, aktuellBekannt, quelleId, quelle.data, vorbelegung.data, vorbelegung.isFetching, vorbelegung.isFetchedAfterMount]);
 
   // höchstens ein Entwurf je Patient: einen vorhandenen Entwurf bearbeiten statt einen zweiten anzulegen
   const offeneEntwuerfe = useQuery({
@@ -193,13 +208,12 @@ export function PlanEditor() {
   const e: Feldfehler = { ...server, ...lokal };
   const p = praeparate.data ?? [];
   const setze = (k: keyof Formular) => (wert: string) => setF((a) => ({ ...a!, [k]: wert }));
-  const kcalZeile = (feld: string, faktor: number) => { const g = zahlWert(f[`${feld}_g` as ZahlFeld]); return g == null ? null : Math.round(g * faktor); };
+  const kcalRoh = (form: Formular) => MAKRO.reduce((s, m) => s + (m.kcal != null ? (zahlWert(form[m.menge]) ?? 0) * m.kcal : 0), 0);
   // Energie: berechnet wie im Altsystem, außer sie ist manuell gesetzt (dann gilt der manuelle Wert, auch für die Grenzen)
-  const kcalBerechnet = MAKRO.reduce((s, m) => s + (kcalZeile(m.feld, m.kcal) ?? 0), 0);
+  const kcalBerechnet = Math.round(kcalRoh(f));
   const kcalManuell = zahlWert(f.kcal_manuell);
   const kcal = kcalManuell ?? kcalBerechnet;
-  const kcalVorher = vorher ? zahlWert(vorher.kcal_manuell)
-    ?? MAKRO.reduce((s, m) => s + (zahlWert(vorher[`${m.feld}_g` as ZahlFeld]) ?? 0) * m.kcal, 0) : null;
+  const kcalVorher = vorher ? zahlWert(vorher.kcal_manuell) ?? kcalRoh(vorher) : null;
   const gewicht = patient.kopf?.gewicht ? Number(patient.kopf.gewicht.kg) : null;
   // Gesamtvolumen aus dem letzten Gewicht (der Server rechnet beim Speichern genauso und friert es bei Freigabe ein); Laufzeit manuell
   const volumen = gewicht != null ? Math.round(gewicht * ML_JE_KG * 100) / 100 : null;
@@ -208,6 +222,11 @@ export function PlanEditor() {
   const volumenVorher = vorgaenger.data?.gesamtvolumen_ml ?? null;
   const rateVorher = vorgaenger.data?.rate_ml_h ?? null;
   const ppiMaske = zahlWert(f.pantozol_tage) ?? 0;
+  const ca = zahlWert(f.calcium_mmol);
+  const mg = zahlWert(f.magnesium_mmol);
+  const caMg = ca == null && mg == null ? null : Math.round(((ca ?? 0) + (mg ?? 0)) * 10) / 10;
+  const caMgGrenze = volumen != null ? Math.round((volumen / CA_MG_ML_JE_MMOL) * 100) / 100 : null;
+  const caMgStabil = caMg != null && caMgGrenze != null ? caMg <= caMgGrenze : null;
   const anzahlGeaendert = vorher ? ([...ZAHLEN, ...AUSWAHL, "vitamine", "bemerkung", "pantozol_stufe"] as (keyof Formular)[]).filter(geaendert).length : 0;
   const es = einstellungen.data;
   const warnungen: string[] = [];
@@ -223,6 +242,7 @@ export function PlanEditor() {
     pruefe(zahlWert(f.natrium_mmol), es.natrium_min_mmol, es.natrium_max_mmol, "Natrium", "mmol");
     pruefe(zahlWert(f.kalium_mmol), es.kalium_min_mmol, es.kalium_max_mmol, "Kalium", "mmol");
   }
+  if (caMgStabil === false) warnungen.push(`Instabil: Calcium + Magnesium ${zahl(caMg)} mmol über ${zahl(caMgGrenze)} mmol (Gesamtvolumen ÷ 100)`);
   const vitamineListe = p.filter((x) => x.kategorie === "vitamine");
   const zahlFeld = (k: ZahlFeld, label: string, einheit: string, extra?: ReactNode) => (
     <Feld label={label} fehler={e[k]} hinweis={extra}>
@@ -241,7 +261,8 @@ export function PlanEditor() {
           </span>
           <h2 className="m-0 text-[1.625rem] font-semibold">{planId ? "Entwurf bearbeiten" : "Neuer Infusionsplan"}</h2>
           <span className="text-sm gedaempft">
-            {leerBegonnen ? "Leer begonnen. " : vorgaenger.data ? `${planId ? "Vorgänger" : vorlageId ? "Vorlage geladen, Vorgänger" : "Vorbelegt mit dem aktuellen Plan"} vom ${datum(vorgaenger.data.gueltig_ab)}. ` : "Erster Plan dieses Patienten. "}
+            {leerBegonnen ? "Leer begonnen. " : vorgaenger.data ? `${planId ? "Vorgänger" : vorlageId ? "Vorlage geladen, Vorgänger" : "Vorbelegt mit dem aktuellen Plan"} vom ${datum(vorgaenger.data.gueltig_ab)}. `
+              : `Erster Plan dieses Patienten. ${!planId && vorbelegung.data?.werte ? `Vorbelegt je kg Körpergewicht (${kg(vorbelegung.data.gewicht_kg)}) wie im Altsystem. ` : ""}`}
             {vorher ? <>Geänderte Werte sind <span className="bg-warn-bg border border-warn rounded px-1">markiert</span>.</> : null}
           </span>
         </div>
@@ -266,12 +287,13 @@ export function PlanEditor() {
           <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
             <h3 className="lbl m-0">Makronährstoffe</h3>
             <table className="tabelle">
-              <thead><tr><th className="th">Komponente</th><th className="th">Präparat</th><th className="th text-right">vorher</th><th className="th">Menge g</th><th className="th text-right">kcal/g</th><th className="th text-right">kcal</th></tr></thead>
+              <thead><tr><th className="th">Komponente</th><th className="th">Präparat</th><th className="th text-right">vorher</th><th className="th">Menge</th><th className="th text-right">kcal/g</th><th className="th text-right">kcal</th></tr></thead>
               <tbody>
                 {MAKRO.map((m) => {
-                  const gFeld = `${m.feld}_g` as ZahlFeld;
+                  const gFeld = m.menge;
                   const pFeld = `${m.feld}_praeparat` as AuswahlFeld;
-                  const z = kcalZeile(m.feld, m.kcal);
+                  const menge = zahlWert(f[gFeld]);
+                  const z = m.kcal != null && menge != null ? Math.round(menge * m.kcal) : null;
                   return (
                     <tr key={m.feld}>
                       <td className="td">{m.text}</td>
@@ -282,23 +304,27 @@ export function PlanEditor() {
                       </td>
                       <td className="td num text-right gedaempft">{vorher?.[gFeld] || "—"}</td>
                       <td className="td w-[120px]">
-                        <Eingabe aria-label={`Menge ${m.text} in g`} className={cx("num", geaendert(gFeld) && "border-warn bg-warn-bg")} value={f[gFeld]}
+                        <Eingabe aria-label={`Menge ${m.text} in ${m.einheit}`} className={cx("num", geaendert(gFeld) && "border-warn bg-warn-bg")} value={f[gFeld]}
                           onChange={(ev) => setze(gFeld)(ev.target.value)} inputMode="decimal" aria-invalid={e[gFeld] ? true : undefined} />
                         {e[gFeld] ? <span className="fehlertext" role="alert">{e[gFeld]}</span> : null}
                       </td>
-                      <td className="td num text-right">{m.kcal}</td>
+                      <td className="td num text-right">{m.kcal != null ? zahl(m.kcal) : "—"}</td>
                       <td className="td num text-right">{z != null ? zahl(z) : ""}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-            <span className="text-[0.8125rem] gedaempft">kcal werden berechnet wie im Altsystem: Glucose, Aminosäuren und Albumin 4 kcal/g, Lipide 9 kcal/g.</span>
+            <span className="text-[0.8125rem] gedaempft">kcal werden berechnet wie im Altsystem: Glucose und Aminosäuren 4 kcal/g, Lipide 9,15 kcal/g. Humanalbumin in ml, ohne Energie.</span>
           </Karte>
 
           <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
             <h3 className="lbl m-0">Elektrolyte</h3>
             <div className="grid grid-cols-5 gap-3">{ELEKTROLYTE.map((x) => <div key={x.feld}>{zahlFeld(x.feld, x.text, "mmol")}</div>)}</div>
+            <span className={cx("text-[0.8125rem]", caMgStabil === false ? "text-warn font-medium" : "gedaempft")} data-testid="ca-mg-stabilitaet">
+              {caMgStabil == null ? "Stabilität Calcium + Magnesium: wird geprüft, sobald Gesamtvolumen und Werte vorliegen."
+                : `Calcium + Magnesium ${zahl(caMg)} mmol, Grenze ${zahl(caMgGrenze)} mmol (Gesamtvolumen ÷ 100): ${caMgStabil ? "stabil" : "instabil"}`}
+            </span>
           </Karte>
 
           <Karte className="px-5 py-[18px] flex flex-col gap-3.5">

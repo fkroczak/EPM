@@ -35,7 +35,7 @@ const FELDER: Record<string, string> = {
   status: "Status", gueltig_ab: "gültig ab", basis_praeparat: "Basislösung", basis_ml: "Basislösung (ml)",
   glucose_praeparat: "Glucose-Präparat", glucose_g: "Glucose (g)", aminosaeuren_praeparat: "Aminosäuren-Präparat",
   aminosaeuren_g: "Aminosäuren (g)", lipide_praeparat: "Lipid-Präparat", lipide_g: "Lipide (g)", albumin_praeparat: "Albumin-Präparat",
-  albumin_g: "Albumin (g)", natrium_mmol: "Natrium", kalium_mmol: "Kalium", phosphat_mmol: "Phosphat", calcium_mmol: "Calcium",
+  albumin_ml: "Humanalbumin (ml)", albumin_g: "Albumin (g)", natrium_mmol: "Natrium", kalium_mmol: "Kalium", phosphat_mmol: "Phosphat", calcium_mmol: "Calcium",
   magnesium_mmol: "Magnesium", spurenelemente: "Spurenelemente", katheterschutz: "Katheterblock", laufzeit_h: "Laufzeit (h)",
   tage_pro_woche: "Tage pro Woche", pantozol_stufe: "Protonenpumpenhemmer", pantozol_tage: "PPI-Zeiten", kcal_manuell: "Energie (manuell)",
   gesamtvolumen_ml: "Gesamtvolumen (ml)", volumen_gewicht_kg: "Gewicht für das Gesamtvolumen (kg)",

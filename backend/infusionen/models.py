@@ -1,5 +1,5 @@
 """Infusionspläne: Entwurf → aktuell → abgelöst. Nach Freigabe unveränderlich."""
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -11,13 +11,28 @@ from simple_history.utils import bulk_create_with_history
 from patienten.models import AktenEintrag, Gewichtsmessung, Patient
 from stammdaten.models import Einstellungen, Praeparat
 
-# Energiegehalt je Gramm (wie im Altsystem)
+# Energiegehalt je Gramm wie im Altsystem (EPM_infuplan.php: amino*4 + gluco*4 + fett*9.15; Festlegung 01.10.2026).
+# Humanalbumin wird wie dort in ml erfasst und zählt nicht zur Energie.
 KCAL_JE_G = {
     "glucose_g": Decimal(4),
     "aminosaeuren_g": Decimal(4),
-    "albumin_g": Decimal(4),
-    "lipide_g": Decimal(9),
+    "lipide_g": Decimal("9.15"),
 }
+
+# Vorbelegung des ersten Plans je kg Körpergewicht wie im Altsystem (EPM_infuplan.php; Festlegung 01.10.2026)
+VORBELEGUNG_JE_KG = {
+    "glucose_g": Decimal("3.5"),
+    "aminosaeuren_g": Decimal("1.2"),
+    "lipide_g": Decimal("1"),
+    "natrium_mmol": Decimal("1.3"),
+    "kalium_mmol": Decimal("0.7"),
+    "phosphat_mmol": Decimal("0.3"),
+    "calcium_mmol": Decimal("0.15"),
+    "magnesium_mmol": Decimal("0.2"),
+}
+
+# Stabilität wie im Altsystem: Calcium + Magnesium (mmol) dürfen Gesamtvolumen ÷ 100 nicht übersteigen
+CA_MG_ML_JE_MMOL = Decimal(100)
 
 # Gesamtvolumen = Körpergewicht × 35 ml (wie im Altsystem: $volum = round($gewicht * 35, 2); Festlegung 01.10.2026)
 ML_JE_KG = Decimal(35)
@@ -41,7 +56,7 @@ def ppi_zeiten_text(maske) -> str:
 # Felder, die beim neuen Entwurf vom aktuellen Plan übernommen und auf Änderung verglichen werden
 PLANFELDER = [
     "basis_praeparat", "basis_ml", "glucose_praeparat", "glucose_g", "aminosaeuren_praeparat", "aminosaeuren_g",
-    "lipide_praeparat", "lipide_g", "albumin_praeparat", "albumin_g",
+    "lipide_praeparat", "lipide_g", "albumin_praeparat", "albumin_ml",
     "natrium_mmol", "kalium_mmol", "phosphat_mmol", "calcium_mmol", "magnesium_mmol",
     "spurenelemente", "katheterschutz", "kcal_manuell",
     "laufzeit_h", "tage_pro_woche", "pantozol_stufe", "pantozol_tage", "bemerkung",
@@ -87,7 +102,7 @@ class Infusionsplan(AktenEintrag):
     lipide_praeparat = _p(Praeparat.Kategorie.LIPIDE, "Lipid-Präparat")
     lipide_g = models.DecimalField("Lipide (g)", max_digits=6, decimal_places=1, null=True, blank=True)
     albumin_praeparat = _p(Praeparat.Kategorie.ALBUMIN, "Albumin-Präparat")
-    albumin_g = models.DecimalField("Albumin (g)", max_digits=6, decimal_places=1, null=True, blank=True)
+    albumin_ml = models.DecimalField("Humanalbumin (ml)", max_digits=6, decimal_places=1, null=True, blank=True)
     spurenelemente = _p(Praeparat.Kategorie.SPURENELEMENTE, "Spurenelemente")
     del _p
 
@@ -184,11 +199,28 @@ class Infusionsplan(AktenEintrag):
     @property
     def kcal_berechnet(self) -> int:
         summe = sum((getattr(self, f) or Decimal(0)) * faktor for f, faktor in KCAL_JE_G.items())
-        return int(summe.quantize(Decimal(1)))
+        return int(Decimal(summe).quantize(Decimal(1), rounding=ROUND_HALF_UP))
 
     @property
     def kcal(self) -> int:
         return self.kcal_manuell if self.kcal_manuell is not None else self.kcal_berechnet
+
+    @property
+    def ca_mg_mmol(self):
+        if self.calcium_mmol is None and self.magnesium_mmol is None:
+            return None
+        return (self.calcium_mmol or Decimal(0)) + (self.magnesium_mmol or Decimal(0))
+
+    @property
+    def ca_mg_grenze_mmol(self):
+        return None if self.gesamtvolumen_ml is None else (self.gesamtvolumen_ml / CA_MG_ML_JE_MMOL).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def ca_mg_stabil(self):
+        """Wie im Altsystem: instabil, wenn Ca + Mg (mmol) > Gesamtvolumen ÷ 100. Nur Hinweis, kein Speicherverbot."""
+        if self.ca_mg_mmol is None or self.ca_mg_grenze_mmol is None:
+            return None
+        return self.ca_mg_mmol <= self.ca_mg_grenze_mmol
 
     def berechne_volumen(self):
         """Gesamtvolumen aus dem letzten erfassten Gewicht (35 ml/kg); ohne Gewicht leer."""
@@ -234,7 +266,7 @@ class Infusionsplan(AktenEintrag):
         if not self.pantozol_stufe and self.pantozol_tage:
             fehler["pantozol_tage"] = "Zeiten nur angeben, wenn ein Protonenpumpenhemmer gewählt ist."
         for feld, praep in [("glucose_g", "glucose_praeparat"), ("aminosaeuren_g", "aminosaeuren_praeparat"),
-                            ("lipide_g", "lipide_praeparat"), ("albumin_g", "albumin_praeparat")]:
+                            ("lipide_g", "lipide_praeparat"), ("albumin_ml", "albumin_praeparat")]:
             if getattr(self, feld) and not getattr(self, f"{praep}_id"):
                 fehler[praep] = "Bitte das Präparat auswählen."
         if fehler:
@@ -391,7 +423,8 @@ def _anzeige(plan, schluessel):
         return " · ".join(t for t in teile if t) or None
     if schluessel in ("glucose", "aminosaeuren", "lipide", "albumin"):
         praep = getattr(plan, f"{schluessel}_praeparat")
-        teile = [str(praep) if praep else None, _zahl(getattr(plan, f"{schluessel}_g"), "g")]
+        menge = _zahl(plan.albumin_ml, "ml") if schluessel == "albumin" else _zahl(getattr(plan, f"{schluessel}_g"), "g")
+        teile = [str(praep) if praep else None, menge]
         return " · ".join(t for t in teile if t) or None
     if schluessel.endswith("_mmol"):
         return _zahl(getattr(plan, schluessel), "mmol")
@@ -432,3 +465,13 @@ def _vitamine_schutz(sender, instance, action, **kwargs):
 
 models.signals.m2m_changed.connect(_vitamine_schutz, sender=Infusionsplan.vitamine.through,
                                    dispatch_uid="epm_vitamine_schutz")
+
+
+def vorbelegung(patient):
+    """Werte für den ersten Plan aus dem letzten Gewicht (je kg wie im Altsystem), auf die Feldgenauigkeit 0,1 gerundet."""
+    gewicht = (Gewichtsmessung.objects.filter(patient=patient)
+               .order_by("-gemessen_am", "-id").values_list("gewicht_kg", flat=True).first())
+    werte = None
+    if gewicht is not None:
+        werte = {f: (gewicht * je_kg).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP) for f, je_kg in VORBELEGUNG_JE_KG.items()}
+    return {"gewicht_kg": gewicht, "je_kg": VORBELEGUNG_JE_KG, "werte": werte}

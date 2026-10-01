@@ -293,7 +293,11 @@ export type Plan = {
   lipide_praeparat: number | null;
   lipide_g: number | null;
   albumin_praeparat: number | null;
-  albumin_g: number | null;
+  albumin_ml: number | null;
+  ca_mg_mmol: number | null;
+  ca_mg_grenze_mmol: number | null;
+  /** wie im Altsystem: Ca + Mg ≤ Gesamtvolumen ÷ 100 */
+  ca_mg_stabil: boolean | null;
   natrium_mmol: number | null;
   kalium_mmol: number | null;
   phosphat_mmol: number | null;

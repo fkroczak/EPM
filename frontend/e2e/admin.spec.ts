@@ -103,7 +103,8 @@ test("Rechte je Gruppe: Admin erlaubt Mitarbeitern Pläne, wirkt sofort, Standar
     await rechte.getByRole("button", { name: "Standard" }).click();
     await rechte.getByRole("button", { name: /^Speichern \(\d+\)$/ }).click();
     await expect(page.getByText("Rechte gespeichert. Sie gelten ab sofort.").last()).toBeVisible();
-    expect((await mitarbeiter.get("auth/ich/")).rechte).not.toContain("plaene_anlegen");
+    // der erste Hinweis kann noch sichtbar sein – auf den gespeicherten Stand warten statt auf den Hinweis
+    await expect.poll(async () => (await mitarbeiter.get("auth/ich/")).rechte).not.toContain("plaene_anlegen");
   } finally {
     // Ausgangsstand für die übrigen Tests, auch wenn oben etwas fehlschlägt (ohne den ursprünglichen Fehler zu verdecken)
     try {

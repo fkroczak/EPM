@@ -9,7 +9,7 @@ from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import ModelClean, RichText, benutzername, patienten_fuer, pruefe_schreibbereich
 from stammdaten.models import Praeparat
 
-from .models import Infusionsplan, InfusionsplanPosition
+from .models import Infusionsplan, InfusionsplanPosition, vorbelegung
 
 
 class PositionSerializer(serializers.ModelSerializer):
@@ -46,6 +46,9 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
     gesamtvolumen_ml = serializers.DecimalField(max_digits=7, decimal_places=2, read_only=True)
     volumen_gewicht_kg = serializers.DecimalField(max_digits=5, decimal_places=1, read_only=True)
     rate_ml_h = serializers.DecimalField(max_digits=7, decimal_places=1, read_only=True)
+    ca_mg_mmol = serializers.DecimalField(max_digits=7, decimal_places=1, read_only=True)
+    ca_mg_grenze_mmol = serializers.DecimalField(max_digits=7, decimal_places=2, read_only=True)
+    ca_mg_stabil = serializers.BooleanField(read_only=True, allow_null=True)
     geaenderte_felder = serializers.SerializerMethodField()
     erstellt_von_name = serializers.SerializerMethodField()
     freigegeben_von_name = serializers.SerializerMethodField()
@@ -56,9 +59,9 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
         fields = [
             "id", "patient", "patient_name", "status", "vorgaenger", "gueltig_ab",
             "basis_praeparat", "basis_ml", "glucose_praeparat", "glucose_g", "aminosaeuren_praeparat",
-            "aminosaeuren_g", "lipide_praeparat", "lipide_g", "albumin_praeparat", "albumin_g",
+            "aminosaeuren_g", "lipide_praeparat", "lipide_g", "albumin_praeparat", "albumin_ml",
             "natrium_mmol", "kalium_mmol", "phosphat_mmol", "calcium_mmol", "magnesium_mmol",
-            "spurenelemente", "vitamine", "vitamine_namen",
+            "ca_mg_mmol", "ca_mg_grenze_mmol", "ca_mg_stabil", "spurenelemente", "vitamine", "vitamine_namen",
             "kcal_manuell", "kcal_berechnet", "kcal", "gesamtvolumen_ml", "volumen_gewicht_kg", "laufzeit_h", "rate_ml_h",
             "tage_pro_woche", "katheterschutz",
             "pantozol_stufe", "pantozol_tage", "bemerkung", "positionen", "geaenderte_felder",
@@ -121,6 +124,7 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
     GET    /api/infusionsplaene/?patient=ID      Pläne eines Patienten
     POST   /api/infusionsplaene/entwurf/          {"patient": ID, "leer"?: bool, "vorlage"?: Plan-ID}
                                                   → neuer Entwurf (vorbelegt mit aktuellem Plan bzw. Vorlage)
+    GET    /api/infusionsplaene/vorbelegung/?patient=ID  Werte für den ersten Plan je kg Körpergewicht (wie im Altsystem)
     GET    /api/infusionsplaene/ID/vergleich/     alle Werte neben denen des Vorgängers
     PATCH  /api/infusionsplaene/ID/               Entwurf bearbeiten
     POST   /api/infusionsplaene/ID/freigeben/     Entwurf wird aktueller Plan
@@ -166,6 +170,13 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
         leer = str(request.data.get("leer", "")).lower() in ("1", "true", "ja")
         plan = Infusionsplan.neuer_entwurf(patient, request.user, leer=leer, vorlage=vorlage)
         return Response(self.get_serializer(plan).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"])
+    def vorbelegung(self, request):
+        patient = patienten_fuer(request.user).filter(pk=request.query_params.get("patient")).first()
+        if patient is None:
+            return Response({"patient": "Patient nicht gefunden."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(vorbelegung(patient))
 
     @action(detail=True, methods=["get"])
     def vergleich(self, request, pk=None):

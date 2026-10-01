@@ -14,6 +14,14 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await page.getByTestId("aktenkopf").getByRole("button", { name: "Neuer Plan" }).click();
   const editor = page.getByTestId("plan-editor");
   await expect(editor).toContainText("Erster Plan dieses Patienten.");
+  // erster Plan je kg Körpergewicht vorbelegt wie im Altsystem (60 kg)
+  await expect(editor).toContainText("Vorbelegt je kg Körpergewicht (60,0 kg) wie im Altsystem.");
+  for (const [feld, wert] of [["Menge Glucose in g", "210"], ["Menge Aminosäuren in g", "72"], ["Menge Lipide in g", "60"],
+    ["Natrium", "78"], ["Kalium", "42"], ["Phosphat", "18"], ["Calcium", "9"], ["Magnesium", "12"]]) {
+    await expect(editor.getByLabel(feld)).toHaveValue(wert);
+  }
+  // Humanalbumin in ml ohne Energie, Lipide 9,15 kcal/g
+  await expect(editor.getByLabel("Menge Humanalbumin in ml")).toHaveValue("");
 
   await editor.getByLabel("Präparat", { exact: true }).selectOption({ label: "Sterofundin" });
   await editor.getByLabel("Volumen").fill("500");
@@ -27,7 +35,12 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await editor.getByLabel("Kalium").fill("40");
   await editor.getByLabel("Phosphat").fill("12");
   await editor.getByLabel("Calcium").fill("9");
+  // Stabilität wie im Altsystem: Ca + Mg ≤ Gesamtvolumen ÷ 100 (2.100 ml → 21 mmol)
+  await editor.getByLabel("Magnesium").fill("13");
+  await expect(editor.getByTestId("ca-mg-stabilitaet")).toContainText("Calcium + Magnesium 22 mmol, Grenze 21 mmol (Gesamtvolumen ÷ 100): instabil");
+  await expect(editor.getByTestId("plan-summe")).toContainText("Instabil: Calcium + Magnesium 22 mmol über 21 mmol");
   await editor.getByLabel("Magnesium").fill("6");
+  await expect(editor.getByTestId("ca-mg-stabilitaet")).toContainText("Calcium + Magnesium 15 mmol, Grenze 21 mmol (Gesamtvolumen ÷ 100): stabil");
   await editor.getByLabel("Spurenelemente").selectOption({ label: "Addel N" });
   await editor.getByLabel("Katheterblock / Medikament").selectOption({ label: "Taurolin 2 %" });
   await editor.getByRole("button", { name: "+ Soluvit N" }).click();
@@ -47,8 +60,8 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await editor.getByRole("checkbox", { name: "Abends" }).check();
   await editor.getByRole("textbox", { name: "Kommentar" }).fill("Start der heimparenteralen Ernährung");
   const summe = editor.getByTestId("plan-summe");
-  await expect(summe).toContainText("1.500 kcal");
-  await expect(summe).toContainText("25,0 kcal/kg");
+  await expect(summe).toContainText("1.509 kcal"); // 160·4 + 80·4 + 60·9,15
+  await expect(summe).toContainText(/25,[12] kcal\/kg/);
   await editor.getByRole("button", { name: "Als Entwurf speichern" }).click();
 
   await expect(page).toHaveURL(/\/plaene\?plan=\d+/);
@@ -57,7 +70,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   const blatt = detail.getByTestId("pdf-ansicht");
   await expect(blatt).toContainText("ENTWURF");
   await expect(blatt).toContainText("Glamin 13,4 % · 80 g");
-  await expect(blatt).toContainText("1.500 kcal");
+  await expect(blatt).toContainText("1.509 kcal");
   await expect(blatt).toContainText("Soluvit N | Vitalipid adult");
   await expect(blatt).toContainText("Taurolin 2 %");
   await expect(blatt.getByRole("row").filter({ hasText: "Gesamtvolumen" })).toContainText("2.100 ml (35 ml/kg × 60 kg)");
@@ -117,12 +130,12 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   // Energie manuell setzen: gilt statt der berechneten, auch für die Grenzen
   await editor.getByLabel("Energie manuell").fill("1600");
   await expect(summe).toContainText("1.600 kcal (manuell)");
-  await expect(summe).toContainText("berechnet wären 1.500 kcal");
+  await expect(summe).toContainText("berechnet wären 1.509 kcal");
   await editor.getByRole("button", { name: "Als Entwurf speichern" }).click();
   await expect(page.getByText("Entwurf gespeichert.").last()).toBeVisible();
   const ausVorlage = (await api.get(`infusionsplaene/?patient=${patient.id}&status=entwurf`)).results[0];
   expect([ausVorlage.aminosaeuren_g, ausVorlage.phosphat_mmol, ausVorlage.magnesium_mmol]).toEqual([80, 12, 6]);
-  expect([ausVorlage.kcal_manuell, ausVorlage.kcal, ausVorlage.kcal_berechnet]).toEqual([1600, 1600, 1500]);
+  expect([ausVorlage.kcal_manuell, ausVorlage.kcal, ausVorlage.kcal_berechnet]).toEqual([1600, 1600, 1509]);
   await detail.getByRole("button", { name: "Verwerfen" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Verwerfen" }).click();
   await expect(page.getByTestId("planliste").getByRole("listitem")).toHaveCount(1);
@@ -144,12 +157,13 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
 
   const plaene = await api.get(`infusionsplaene/?patient=${patient.id}`);
   expect(plaene.results.map((p: { status: string; aminosaeuren_g: string; kcal: number }) => [p.status, p.aminosaeuren_g, p.kcal]))
-    .toEqual([["aktuell", 80, 1500]]);
+    .toEqual([["aktuell", 80, 1509]]);
   expect([plaene.results[0].phosphat_mmol, plaene.results[0].calcium_mmol, plaene.results[0].magnesium_mmol]).toEqual([12, 9, 6]);
   expect(plaene.results[0].vitamine_namen).toEqual(["Soluvit N", "Vitalipid adult"]);
   expect([plaene.results[0].gesamtvolumen_ml, plaene.results[0].volumen_gewicht_kg, plaene.results[0].laufzeit_h, plaene.results[0].rate_ml_h])
     .toEqual([2100, 60, 12, 175]);
   expect([plaene.results[0].pantozol_stufe, plaene.results[0].pantozol_tage]).toEqual([1, 5]);
+  expect([plaene.results[0].ca_mg_mmol, plaene.results[0].ca_mg_grenze_mmol, plaene.results[0].ca_mg_stabil]).toEqual([15, 21, true]);
   // Übersicht der Akte zeigt Gesamtvolumen und Rate des aktuellen Plans
   await page.goto(`/patienten/${patient.id}`);
   await expect(page.getByTestId("plan-volumen")).toContainText("Gesamtvolumen 2.100 ml · Rate 175 ml/h");

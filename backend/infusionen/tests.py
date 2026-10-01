@@ -58,7 +58,7 @@ class Infusionsplaene(Grundlage):
         r = c.patch(f"/api/infusionsplaene/{e1['id']}/", self.plan_daten(), format="json")
         self.assertEqual(r.status_code, 200, r.content)
         plan = r.json()
-        self.assertEqual(plan["kcal"], 200 * 4 + 70 * 4 + 40 * 9)
+        self.assertEqual(plan["kcal"], 1446)  # 200·4 + 70·4 + 40·9,15 wie im Altsystem
         self.assertEqual(plan["vitamine_namen"], ["Soluvit N", "Vitalipid adult"])
         self.assertEqual(float(plan["natrium_mmol"]), 78.0)
         self.assertEqual(len(plan["positionen"]), 1)
@@ -128,8 +128,8 @@ class Infusionsplaene(Grundlage):
         self.assertEqual(zeilen["vitamine"]["jetzt"], "Soluvit N | Vitalipid adult")
         self.assertEqual(zeilen["laufzeit_h"]["jetzt"], "12 h")
         self.assertEqual(zeilen["basis"]["jetzt"], "Sterofundin · 500 ml")
-        self.assertEqual(zeilen["kcal"]["vorher"], "1.440 kcal")  # deutsche Schreibweise wie auf dem Plan
-        self.assertEqual(zeilen["kcal"]["jetzt"], "1.240 kcal")
+        self.assertEqual(zeilen["kcal"]["vorher"], "1.446 kcal")  # deutsche Schreibweise wie auf dem Plan
+        self.assertEqual(zeilen["kcal"]["jetzt"], "1.246 kcal")
         # erster Plan ohne Vorgänger
         v = c.get(f"/api/infusionsplaene/{alt.id}/vergleich/").json()
         self.assertIsNone(v["vorgaenger"])
@@ -201,6 +201,41 @@ class Infusionsplaene(Grundlage):
         zeilen = {z["schluessel"]: z for z in c.get(url2 + "vergleich/").json()["zeilen"]}
         self.assertEqual(zeilen["pantozol"]["jetzt"], "Pantozol® 20 mg · morgens, mittags, abends")
         self.assertEqual(zeilen["pantozol"]["vorher"], "Pantozol® 40 mg · morgens, abends")
+
+    def test_berechnung_wie_im_altsystem(self):
+        """Festlegung 01.10.2026: Lipide 9,15 kcal/g, Humanalbumin in ml ohne Energie; Ca + Mg ≤ Gesamtvolumen ÷ 100;
+        erster Plan je kg Körpergewicht vorbelegt."""
+        c = client_fuer(self.mediziner)
+        m = client_fuer(self.mitarbeiter)
+        url_vb = f"/api/infusionsplaene/vorbelegung/?patient={self.patient.id}"
+        self.assertEqual(c.get(url_vb).json()["werte"], None)  # ohne Gewicht keine Vorbelegung
+        m.post("/api/gewichte/", {"patient": self.patient.id, "gewicht_kg": "60.0"}, format="json")
+        vb = c.get(url_vb).json()
+        self.assertEqual(vb["gewicht_kg"], 60)
+        self.assertEqual(vb["werte"], {"glucose_g": 210, "aminosaeuren_g": 72, "lipide_g": 60, "natrium_mmol": 78,
+                                       "kalium_mmol": 42, "phosphat_mmol": 18, "calcium_mmol": 9, "magnesium_mmol": 12})
+        m.post("/api/gewichte/", {"patient": self.patient.id, "gewicht_kg": "73.5"}, format="json")
+        self.assertEqual(c.get(url_vb).json()["werte"]["calcium_mmol"], 11.0)  # 11,025 → Feldgenauigkeit 0,1
+        self.assertEqual(client_fuer(self.betrachter).get(url_vb).status_code, 200)
+
+        e = self.entwurf(c)
+        url = f"/api/infusionsplaene/{e['id']}/"
+        r = c.patch(url, {"glucose_g": "100", "glucose_praeparat": praeparat("Glucose", "70 %").id,
+                          "lipide_g": "50", "lipide_praeparat": praeparat("Clinoleic").id,
+                          "albumin_ml": "100", "albumin_praeparat": praeparat("Humanalbumin").id,
+                          "calcium_mmol": "10", "magnesium_mmol": "15"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        p = r.json()
+        self.assertEqual(p["kcal"], 858)  # 100·4 + 50·9,15 = 857,5 → 858; Albumin zählt nicht
+        self.assertEqual(p["albumin_ml"], 100)
+        # 73,5 kg × 35 = 2.572,5 ml → Grenze 25,73 mmol; 10 + 15 = 25 → stabil
+        self.assertEqual([p["ca_mg_mmol"], p["ca_mg_grenze_mmol"], p["ca_mg_stabil"]], [25, 25.73, True])
+        zeilen = {z["schluessel"]: z for z in c.get(url + "vergleich/").json()["zeilen"]}
+        self.assertEqual(zeilen["albumin"]["jetzt"], "Humanalbumin 20 % · 100 ml")
+        # instabil ist nur ein Hinweis wie im Altsystem, Speichern bleibt möglich
+        r = c.patch(url, {"magnesium_mmol": "16"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()["ca_mg_stabil"], False)
 
     def test_praeparate_werden_geprueft(self):
         c = client_fuer(self.mediziner)
