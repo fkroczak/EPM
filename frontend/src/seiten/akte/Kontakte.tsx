@@ -4,7 +4,7 @@ import { useLocation } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api } from "@/lib/api";
 import type { Feldfehler, Seite as ApiSeite } from "@/lib/api";
-import { useIch } from "@/lib/auth";
+import { useIch, useOhneRechtSchliessen } from "@/lib/auth";
 import { useAuswahl, useVersorgerListe } from "@/lib/daten";
 import { datum, eingabeDatum, heuteIso, terminZeit, uhrzeit, zahl, zeitpunkt } from "@/lib/format";
 import { TERMINARTEN } from "@/lib/typen";
@@ -147,6 +147,7 @@ export function Kontakte() {
   const [begriff, setBegriff] = useState("");
   const [anzahl, setAnzahl] = useState(50);
   const [storno, setStorno] = useState<Kontakt | null>(null);
+  useOhneRechtSchliessen(erfassen, () => setStorno(null));
   useEffect(() => {
     const t = window.setTimeout(() => setBegriff(suche.trim()), 300);
     return () => window.clearTimeout(t);

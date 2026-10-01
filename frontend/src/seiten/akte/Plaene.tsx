@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { abfrage, alle, api, apiDatei } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useBriefkopf } from "@/lib/daten";
 import { datum, kg, zahl, zeitpunkt } from "@/lib/format";
 import type { Plan, Vergleich } from "@/lib/typen";
@@ -206,6 +206,9 @@ export function Plaene() {
   });
   const offen = !patient.ist_abgeschlossen;
   const anlegen = offen && darfBei("plaene_anlegen", patient);
+  const freigeben = darfBei("plaene_freigeben", patient);
+  useOhneRechtSchliessen(anlegen, () => setVerwerfen(false));
+  useOhneRechtSchliessen(freigeben, () => setFreigabe(false));
   const entwurfDa = liste.some((p) => p.status === "entwurf");
 
   return (
@@ -264,7 +267,7 @@ export function Plaene() {
           {vergleich.isLoading ? <Laden /> : vergleich.data ? (
             modus === "ansicht" ? <PdfAnsicht plan={gewaehlt} vergleich={vergleich.data} /> : <VergleichTabelle plan={gewaehlt} vergleich={vergleich.data} />
           ) : <Fehleranzeige fehler={vergleich.error} />}
-          {darfBei("plaene_freigeben", patient) ? <FreigabeDialog plan={gewaehlt} offen={freigabe} onOffen={setFreigabe} /> : null}
+          {freigeben ? <FreigabeDialog plan={gewaehlt} offen={freigabe} onOffen={setFreigabe} /> : null}
           {gewaehlt.pdf_sha256 ? <PlanPdfDialog plan={gewaehlt} offen={pdf} onOffen={setPdf} /> : null}
           <Dialog offen={verwerfen && anlegen} onOffen={setVerwerfen} titel="Entwurf verwerfen" breite={480}
             beschreibung="Der Entwurf wird gelöscht. Im Verlauf der Akte bleibt sichtbar, dass es ihn gab."

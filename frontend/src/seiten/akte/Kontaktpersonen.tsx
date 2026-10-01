@@ -10,7 +10,7 @@ import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useAerzteListe, useAuswahl } from "@/lib/daten";
 import { ARZTROLLEN } from "@/lib/typen";
 import type { Bezugsperson, PatientArzt } from "@/lib/typen";
@@ -119,6 +119,7 @@ export function AerzteKarte() {
   const { patient, bearbeiten } = useAkte();
   const [frueher, setFrueher] = useState(false);
   const [dialog, setDialog] = useState<{ offen: boolean; z: PatientArzt | null }>({ offen: false, z: null });
+  useOhneRechtSchliessen(bearbeiten, () => setDialog({ offen: false, z: null }));
   const liste = useQuery({
     queryKey: ["patient", patient.id, "aerzte"],
     queryFn: () => api<PatientArzt[]>(`patient-aerzte/${abfrage({ patient: patient.id })}`),
@@ -252,6 +253,7 @@ export function BezugspersonenKarte() {
   const { patient, bearbeiten } = useAkte();
   const [frueher, setFrueher] = useState(false);
   const [dialog, setDialog] = useState<{ offen: boolean; p: Bezugsperson | null }>({ offen: false, p: null });
+  useOhneRechtSchliessen(bearbeiten, () => setDialog({ offen: false, p: null }));
   const liste = useQuery({
     queryKey: ["patient", patient.id, "bezugspersonen"],
     queryFn: () => api<Bezugsperson[]>(`bezugspersonen/${abfrage({ patient: patient.id })}`),

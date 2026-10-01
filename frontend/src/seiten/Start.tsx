@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { useAuth, useIch } from "@/lib/auth";
+import { useAuth, useIch, useOhneRechtSchliessen } from "@/lib/auth";
 import { datum, kg, langesDatum, prozent, relativ, terminZeit, uhrzeit } from "@/lib/format";
 import { TERMINARTEN } from "@/lib/typen";
 import type { Ich, Karte, Termin } from "@/lib/typen";
@@ -88,6 +88,7 @@ function TermineKarte({ daten }: { daten: Startdaten }) {
   const heute = daten.termine.heute, woche = daten.termine.naechste_7_tage, ueber = daten.termine.ueberfaellig;
   const zeilen = tab === "heute" ? heute : tab === "woche" ? woche : ueber;
   const schreiben = darf("eintraege_erfassen");
+  useOhneRechtSchliessen(schreiben, () => setDialog(false));
   return (
     <KarteBox className="col-span-3 lg:col-span-2 px-5 py-[18px] flex flex-col gap-3 min-w-0" aria-labelledby="k-termine">
       <div className="flex justify-between items-center gap-3 flex-wrap">

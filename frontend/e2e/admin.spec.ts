@@ -368,6 +368,7 @@ test("Recht während der Sitzung entzogen: Aktion verschwindet ohne neue Anmeldu
     await admin.put("rechte/", { matrix: await standardMatrix() });
     await mp.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Verlauf" }).click();
     await expect(mp.getByTestId("verlauf")).toBeVisible();
+    await expect(mp.getByRole("dialog")).toHaveCount(0); // der vorher ausgeblendete Dialog geht nicht von selbst wieder auf
     await mp.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Übersicht" }).click();
     await mp.getByRole("button", { name: "Weitere Aktionen" }).click();
     await expect(mp.getByRole("menuitem", { name: "Akte abschließen" })).toBeVisible();

@@ -126,3 +126,13 @@ export function useIch(): Ich {
   if (!ich) throw new Error("Nicht angemeldet");
   return ich;
 }
+
+/**
+ * Für Fenster, die nur mit einem Recht eingeblendet werden: Fällt das Recht weg, während das Fenster offen ist, wird
+ * es ausgeblendet und sein Zustand zurückgesetzt – sonst ginge es von selbst wieder auf, sobald das Recht zurückkommt.
+ */
+export function useOhneRechtSchliessen(erlaubt: boolean, schliessen: () => void) {
+  useEffect(() => {
+    if (!erlaubt) schliessen();
+  }, [erlaubt]); // eslint-disable-line react-hooks/exhaustive-deps
+}

@@ -104,8 +104,9 @@ Stand 01.10.2026: **92 von 92 Backend-Tests** und **46 von 46 Browsertests grün
 | F68 | Ärzte eines Patienten (Rolle, Hausarzt im Kopf) | 4 Akte, 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
 | F69 | Bezugspersonen mit „Auskunft erlaubt“ | 4 Akte | ABGESCHLOSSEN UND GETESTET |
 | F70 | „kein“ Katheter/Versorger, Nickelallergie als Auswahl | 4 Akte, 12 Neuer Patient, 3 Liste | ABGESCHLOSSEN UND GETESTET |
+| F71 | Nicht Erlaubtes ausblenden, Rechteänderung sofort in der Oberfläche | alle Ansichten | ABGESCHLOSSEN UND GETESTET |
 
-Summe (70 Funktionen): 56 abgeschlossen und getestet · 3 teilweise abgeschlossen · 11 nicht abgeschlossen · 0 blockiert.
+Summe (71 Funktionen): 57 abgeschlossen und getestet · 3 teilweise abgeschlossen · 11 nicht abgeschlossen · 0 blockiert.
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 
@@ -149,7 +150,9 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   Testbenutzer bekommen nie Rechte, die über Testpatienten hinaus wirken (Versorger, Vorlagen, Audit-Log, Benutzer,
   Sicherungen, Testdaten, Wiederöffnen). Fehlendes Recht → 403 „Dafür fehlt das Recht „…“.“; abgelaufene Sitzung → 403
   „Anmeldedaten fehlen.“ bzw. „Anmeldung mit zweitem Faktor erforderlich.“, die Oberfläche wechselt dann zur Anmeldung.
-  Admin bei einer echten Akte → 403 „Als Admin nur bei Testpatienten möglich …“; die Oberfläche zeigt „nur lesen“.
+  Admin bei einer echten Akte → 403 „Als Admin nur bei Testpatienten möglich …“. Die Oberfläche zeigt diese Meldungen nicht:
+  Was jemand nicht darf, wird ausgeblendet; lehnt der Server trotzdem ab (Recht gerade entzogen), erscheint nur ein
+  neutraler Hinweis (F71). Jede Antwort an angemeldete Benutzer trägt den Kopf `X-EPM-Rechte` (Kennung des Rechtestands).
 - Migrationen liegen im Repo (`backend/*/migrations/`). Ändert sich ein Modell, erzeugt GitHub Actions die Migration,
   legt sie als Commit „Migrationen automatisch erzeugt (CI)“ ab und prüft danach `makemigrations --check`.
   Schutz-Trigger werden nach jedem `migrate` gesetzt (`audit/schutz.py`).
@@ -871,7 +874,7 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   fest: [[rolle, recht]], standard: {rolle: [recht]}}`; `PUT /api/rechte/` `{matrix: {rolle: {recht: bool}}}` → wie GET. Die eigenen
   Rechte stehen in `GET /api/auth/status/` bzw. `/api/auth/ich/` (`rechte: [code]`).
 - **Logik:** Abweichungen vom Standard (Tabelle unter „Gemeinsame Regeln“) als `Gruppenrecht` gespeichert, mit Historie; jede
-  Anfrage liest die aktuelle Matrix, Änderungen gelten sofort; Oberfläche blendet Knöpfe und Bereiche ohne Recht aus.
+  Anfrage liest die aktuelle Matrix, Änderungen gelten sofort; Oberfläche blendet Knöpfe und Bereiche ohne Recht aus (F71).
   Fest: Admins schreiben Patientendaten nur bei Testpatienten (`pruefe_schreibbereich` an allen schreibenden Endpunkten
   der Akte und der Pläne, `schreibt_nur_testpatienten` in `Ich`, in der Matrix als „nur Testpatienten“ markiert); ein neuer
   Patient eines Admins wird Testpatient. GET liefert dazu `nur_testpatienten: {rollen, rechte}`.
@@ -883,6 +886,34 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   `Rollen.test_schreibrechte`). Browsertests grün: `admin.spec.ts` „Rechte je Gruppe: Admin erlaubt Mitarbeitern Pläne, wirkt sofort, Standard wiederherstellen“ (Mitarbeiter darf danach Pläne anlegen, sofort wirksam; feste
   Rechte nicht abwählbar; Standard wiederhergestellt), `admin.spec.ts` „Administration je Recht: Betrachter sieht nichts, Mitarbeiter Vorlagen, Mediziner Vorlagen und Audit-Log“, `admin.spec.ts` „Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten“, `akte.spec.ts` „Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen (Admin)“, `plaene.spec.ts` „Mitarbeiter sieht Pläne, legt aber keine an“; Neustart geprüft in `zz-neustart.spec.ts` (Recht vor dem Neustart in der
   Oberfläche gesetzt, danach wirksam: Betrachter sieht „Neuer Versorger“; zurück auf Standard).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F71 Nicht Erlaubtes ausblenden, Rechteänderung sofort in der Oberfläche
+- **Zweck:** Wunsch aus dem Testsystem (01.10.2026): „Was er nicht weiß, macht ihn nicht heiß“ – wer ein Recht nicht hat, sieht
+  die Aktion gar nicht, statt eines Fensters mit „Dafür fehlt das Recht …“. Wird ein Recht während der Arbeit entzogen, verschwindet
+  die Aktion ohne neue Anmeldung.
+- **Ansicht:** alle; Beispiele: Akte › „Weitere Aktionen“ (Akte abschließen/wieder öffnen, Stammdaten), Aktenkopf (Kontakt, Gewicht,
+  Termin), Startseite (Termin, Abhaken), Übersicht (Korrektur, Termin), Kontakte (Stornieren), Pläne (Freigeben, Verwerfen,
+  Neuer Plan), Dokumente, Versorger, Ärzte, Administration.
+- **Endpunkte:** keine neuen. Jede Antwort unter `/api/` an angemeldete Benutzer trägt `X-EPM-Rechte: <12 Zeichen>` – Kennung aus den
+  eigenen Rechten, „nur Testpatienten“ und Testbenutzer (`accounts.rechte.rechte_stand`, gesetzt von `RechteStandMiddleware`).
+- **Logik:** Die Oberfläche merkt sich die Kennung. Ändert sie sich oder lehnt der Server eine Anfrage wegen eines Rechts ab (403
+  „fehlt das Recht“ / „nur bei Testpatienten“), lädt sie `GET /api/auth/status/` neu und aktualisiert die Ansicht nur, wenn sich die
+  Rechte tatsächlich geändert haben. Ohne Recht: Knöpfe, Menüeinträge, Fenster und Bearbeitungsfelder werden nicht angezeigt
+  (Stammdaten von Versorgern, Ärzten und Dokumenten dann als reine Anzeige); Seiten ohne Recht (z. B. Neuer Patient,
+  Benutzerverwaltung, Plan-Editor) leiten still auf die übergeordnete Seite. Ist ein Fenster offen, während das Recht wegfällt,
+  schließt es und bleibt zu, auch wenn das Recht später zurückkommt. Abgelehnte Aktionen melden nur „Diese Aktion steht nicht mehr
+  zur Verfügung. Die Ansicht wurde aktualisiert.“ – ohne Namen des Rechts. Kein Chip „nur lesen“ mehr. Der Server prüft weiter jede
+  Anfrage (Ausblenden ersetzt keine Prüfung).
+- **Validierung / Fehlerfälle:** unverändert 403 vom Server; die Oberfläche übersetzt sie wie beschrieben.
+- **Tabellen:** keine
+- **Teststatus:** Backend-Test grün (`RechteJeGruppe.test_rechte_stand_im_antwortkopf`: Kopf stabil, ändert sich mit dem Entzug, fehlt
+  ohne Anmeldung). Browsertests grün: `admin.spec.ts` „Recht während der Sitzung entzogen: Aktion verschwindet ohne neue Anmeldung,
+  Ablehnung nur neutral“ (offenes Abschluss-Fenster, Admin entzieht das Recht, Klick → Fenster weg, neutraler Hinweis, Eintrag weg,
+  Akte nicht abgeschlossen; Recht zurück → Eintrag erscheint ohne Anmeldung, Fenster geht nicht von selbst auf; Erfassen entzogen →
+  Kontakt/Gewicht im Kopf beim nächsten Seitenwechsel weg), `admin.spec.ts` Betrachter auf `/admin/benutzer` → Startseite ohne
+  Rechte-Meldung, `patienten.spec.ts` `/patienten/neu` ohne Recht → Patientenliste, `versorger.spec.ts` Betrachter sieht
+  Stammdaten nur als Anzeige.
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ---
@@ -1088,3 +1119,4 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 | 01.10.2026 | Runde 3 (`c3aacfa`–`1718dc3`) | Rückmeldungen aus dem Testsystem: Blau auf Blau behoben, Testpatienten-Zahl nur für Admin, PDF-Anzeige mit pdf.js, Ärzteliste (F67/F68), Bezugspersonen (F69), „kein“ Katheter/Versorger und Nickelallergie als Auswahl (F70); Backend-Image mit IBM Plex aus dem Repo (Debian 13 hat kein `fonts-ibm-plex`) |
 | 01.10.2026 | Runde 3 (`0624527`–`ca9f858`) | PDF-Erzeugung mit WeasyPrint (F51), Dokumentvorlagen mit Editor (F50), Freigabe-PDF mit SHA-256 und Prüfung beim Öffnen (F35, F37; Nginx reicht `X-EPM-Pruefung` weiter), Akte, Verlauf, Audit-Log und Zugangsblatt als PDF (F23, F24, F59, F55). Infusionsplan-PDF nach dem Altsystem, auf Wunsch neu gestaltet wie ein Laborbefund und wie die Oberfläche (Kopfkarte, Karten, Menge/Einheit in eigenen Spalten, Titel neben dem Logo, ohne Linie, fax-tauglich, einseitig); Laufzeit 0 als „—“; neue Bausteine und Optionen im Editor; Datenfeld-Einfügen nimmt den aktuellen Feldinhalt (Fehler behoben) |
 | 01.10.2026 | Runde 3 (`a30b26d`) | „Kein Kontakt seit …“ nach 4 statt 12 Monaten (Patienten kommen meist quartalsweise): Standard in den Einstellungen, Datenmigration stellt einen unveränderten Wert 12 um (mit Grund in der Historie); wirkt auf Hinweis in der Patientenliste und „Nach und nach prüfen“ auf der Startseite; Backend-Test `test_kontakt_ueberfaellig_nach_4_monaten` |
+| 01.10.2026 | Runde 3 (`b37d606` und folgende) | Nicht Erlaubtes ausblenden (F71): keine Fenster oder Meldungen mit „Dafür fehlt das Recht“ mehr; Rechteänderungen wirken in der Oberfläche ohne neue Anmeldung (Kopf `X-EPM-Rechte`); abgelehnte Aktionen nur mit neutralem Hinweis; ausgeblendete Fenster öffnen sich nicht von selbst wieder |

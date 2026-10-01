@@ -6,11 +6,11 @@ import { NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useAuswahl, useVersorgerListe } from "@/lib/daten";
 import { alter, datum, eingabeDatum, eingabeZahl, heuteIso, kg, nummer, prozent, terminZeit, zahl } from "@/lib/format";
 import { ABSCHLUSSANLAESSE, GESCHLECHTER, TERMINARTEN } from "@/lib/typen";
-import type { Patient } from "@/lib/typen";
+import type { Patient, Recht } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog, Menue } from "@/components/ui/dialog";
@@ -259,6 +259,17 @@ export function Akte() {
   const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "pdf">("");
   const akte = useQuery({ queryKey: ["patient", pid], queryFn: () => api<Patient>(`patienten/${pid}/`), enabled: !!pid });
   const p = akte.data;
+  // Fenster, deren Recht wegfällt, verschwinden und bleiben zu – auch wenn das Recht später zurückkommt
+  const offenBei = (recht: Recht) => !!p && !p.ist_abgeschlossen && darfBei(recht, p);
+  const erlaubt: Record<typeof dialog, boolean> = {
+    "": true,
+    pdf: true,
+    stammdaten: offenBei("akten_bearbeiten"),
+    abschluss: offenBei("akten_abschliessen"),
+    oeffnen: !!p && p.ist_abgeschlossen && darf("akten_wieder_oeffnen"),
+    termin: offenBei("eintraege_erfassen"),
+  };
+  useOhneRechtSchliessen(erlaubt[dialog], () => setDialog(""));
   if (akte.isLoading) return <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: "…" }]}><Laden /></Seite>;
   if (!p) {
     return (
@@ -301,8 +312,8 @@ export function Akte() {
             <Menue label="Weitere Aktionen" eintraege={[
               ...(kontext.bearbeiten ? [{ text: "Stammdaten bearbeiten", onClick: () => setDialog("stammdaten") }] : []),
               { text: "Akte als PDF", onClick: () => setDialog("pdf") },
-              ...(offen && darfBei("akten_abschliessen", p) ? [{ text: "Akte abschließen", onClick: () => setDialog("abschluss"), gefaehrlich: true }] : []),
-              ...(!offen && darf("akten_wieder_oeffnen") ? [{ text: "Akte wieder öffnen", onClick: () => setDialog("oeffnen") }] : []),
+              ...(erlaubt.abschluss ? [{ text: "Akte abschließen", onClick: () => setDialog("abschluss"), gefaehrlich: true }] : []),
+              ...(erlaubt.oeffnen ? [{ text: "Akte wieder öffnen", onClick: () => setDialog("oeffnen") }] : []),
             ]} />
           </div>
         </div>
@@ -364,8 +375,8 @@ export function Akte() {
 
       {kontext.bearbeiten ? <StammdatenDialog patient={p} offen={dialog === "stammdaten"} onOffen={(o) => setDialog(o ? "stammdaten" : "")} /> : null}
       {/* Dialoge nur mit Recht: entzieht die Administration ein Recht, verschwindet auch ein offener Dialog */}
-      {offen && darfBei("akten_abschliessen", p) ? <AbschlussDialog patient={p} offen={dialog === "abschluss"} onOffen={(o) => setDialog(o ? "abschluss" : "")} /> : null}
-      {!offen && darf("akten_wieder_oeffnen") ? <WiederOeffnenDialog patient={p} offen={dialog === "oeffnen"} onOffen={(o) => setDialog(o ? "oeffnen" : "")} /> : null}
+      {erlaubt.abschluss ? <AbschlussDialog patient={p} offen={dialog === "abschluss"} onOffen={(o) => setDialog(o ? "abschluss" : "")} /> : null}
+      {erlaubt.oeffnen ? <WiederOeffnenDialog patient={p} offen={dialog === "oeffnen"} onOffen={(o) => setDialog(o ? "oeffnen" : "")} /> : null}
       <PdfDialog offen={dialog === "pdf"} onOffen={(o) => setDialog(o ? "pdf" : "")} titel={`Akte ${name(p)} als PDF`}
         pfad={`patienten/${p.id}/pdf/`} dateiname={`Patientendatenblatt-${p.nummer}.pdf`} />
       {kontext.erfassen ? <TerminDialog offen={dialog === "termin"} onOffen={(o) => setDialog(o ? "termin" : "")} patientId={p.id} patientName={name(p)} /> : null}

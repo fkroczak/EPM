@@ -4,7 +4,7 @@ import { Link, useLocation } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, alle, api } from "@/lib/api";
 import type { Feldfehler, Seite as ApiSeite } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useEinstellungen } from "@/lib/daten";
 import { datum, eingabeDatum, eingabeZahl, heuteIso, kg, prozent, terminZeit, uhrzeit, zahl, zeitpunkt } from "@/lib/format";
 import { GEWICHTSQUELLEN, TERMINARTEN } from "@/lib/typen";
@@ -89,6 +89,7 @@ function GewichtKarte() {
   const [quelle, setQuelle] = useState("telefonisch");
   const [liste, setListe] = useState(false);
   const [korrektur, setKorrektur] = useState<Gewicht | null>(null);
+  useOhneRechtSchliessen(erfassen, () => setKorrektur(null));
   const einstellungen = useEinstellungen();
   const neuLaden = useAkteNeuLaden();
   const melden = useHinweis();
@@ -227,6 +228,7 @@ function TherapieKarte() {
 function TermineKarte() {
   const { patient, erfassen, terminAnlegen } = useAkte();
   const [bearbeiten, setBearbeiten] = useState<Termin | null>(null);
+  useOhneRechtSchliessen(erfassen, () => setBearbeiten(null));
   const neuLaden = useAkteNeuLaden();
   const melden = useHinweis();
   const termine = useQuery({
