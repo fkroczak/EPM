@@ -1,5 +1,4 @@
 from django.conf import settings
-from django.db import transaction
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
@@ -64,12 +63,12 @@ urlpatterns = [
     path("api/vorlagen/<str:art>/versionen/<int:version>/", vorlagen.VersionView.as_view()),
     path("api/vorlagen/<str:art>/startvorlage/", vorlagen.StartvorlageView.as_view()),
     path("api/vorlagen/<str:art>/vorschau/", vorlagen.VorschauView.as_view()),
-    # Administration › System (nur Admin); Wartung des EPM ohne umschließende Transaktion (VACUUM)
+    # Administration › System (nur Admin)
     path("api/system/uebersicht/", system.UebersichtView.as_view()),
     path("api/system/verlauf/", system.VerlaufView.as_view()),
     path("api/system/auftraege/", system.AuftraegeView.as_view()),
     path("api/system/auftraege/<uuid:kennung>/abbrechen/", system.AuftragAbbrechenView.as_view()),
-    path("api/system/epm/", transaction.non_atomic_requests(system.EpmAufgabeView.as_view())),
+    path("api/system/epm/", system.EpmAufgabeView.as_view()),
     path("api/system/hinweis/", system.HinweisView.as_view()),
     path("api/system/sitzungen/<int:pk>/", system.SitzungBeendenView.as_view()),
     path("api/", include(router.urls)),

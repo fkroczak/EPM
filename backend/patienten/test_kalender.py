@@ -78,7 +78,8 @@ class Kalender(Grundlage):
         self.assertTrue(all(f["patient"] == self.test.id for f in d["faelligkeiten"]))
 
     def test_abgeschlossene_akten_ohne_faelligkeit(self):
-        Patient.objects.filter(pk=self.lange.pk).update(abgeschlossen_am=timezone.now())
+        Patient.objects.filter(pk=self.lange.pk).update(abgeschlossen_am=timezone.now(),
+                                                        abschluss_anlass=Patient.Abschlussanlass.THERAPIE_BEENDET)
         d = self.monat(client_fuer(self.mitarbeiter))
         self.assertNotIn(self.lange.id, {f["patient"] for f in d["faelligkeiten"]})
         self.assertNotIn(self.t_alt.id, {t["id"] for t in d["termine_ueberfaellig"]})
