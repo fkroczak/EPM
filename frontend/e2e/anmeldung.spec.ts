@@ -1,6 +1,6 @@
 /** Entwurf 1 · Anmeldung mit 2FA, erste Anmeldung mit eigenem Passwort und Authenticator, Abmeldung. */
 import { expect, test } from "@playwright/test";
-import { KENNWORT, SCHLUESSEL_HEX, anmeldenUI, apiAls, eindeutig, totpBase32, totpHex, zustand } from "./hilfen";
+import { KENNWORT, SCHLUESSEL_HEX, anmeldenUI, apiAls, apiAnmelden, eindeutig, naechsterNotfallcode, sitzungAblaufenLassen, totpBase32, totpHex } from "./hilfen";
 
 test("Anmeldung mit Passwort und Code aus der Authenticator-App, Abmelden", async ({ page }) => {
   await anmeldenUI(page, "e2e.betrachter", totpHex(SCHLUESSEL_HEX));
@@ -62,12 +62,17 @@ test("Erste Anmeldung: eigenes Passwort, Authenticator einrichten, Notfall-Codes
 });
 
 test("Abgelaufene Sitzung führt zurück zur Anmeldung", async ({ browser }) => {
-  const ctx = await browser.newContext({ storageState: zustand("betrachter"), ignoreHTTPSErrors: true });
+  // eigene Sitzung, damit die gemeinsame Sitzung des Betrachters für andere Tests gültig bleibt
+  const anmeldung = await apiAnmelden("e2e.betrachter", KENNWORT, naechsterNotfallcode("e2e.betrachter"));
+  expect(anmeldung.schritt).toBe("fertig");
+  const ctx = await browser.newContext({ storageState: await anmeldung.ctx.storageState(), ignoreHTTPSErrors: true });
+  await anmeldung.ctx.dispose();
   const page = await ctx.newPage();
   await page.goto("/");
   await expect(page.getByTestId("angemeldet-als")).toBeVisible();
-  // Sitzung ist weg (wie nach 30 Minuten ohne Aktivität): der nächste Aufruf meldet ab
-  await ctx.clearCookies();
+  await page.waitForLoadState("networkidle");
+  // 30 Minuten ohne Anfrage: die Sitzung ist in der Datenbank abgelaufen, der nächste Aufruf führt zur Anmeldung
+  sitzungAblaufenLassen((await ctx.cookies()).find((c) => c.name === "epm_sitzung")?.value ?? "");
   const abgewiesen = page.waitForResponse((a) => a.url().includes("/api/patienten/"));
   await page.getByRole("navigation", { name: "Hauptnavigation" }).getByRole("link", { name: "Patienten" }).click();
   expect((await abgewiesen).status()).toBe(403);

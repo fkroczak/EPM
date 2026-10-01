@@ -12,6 +12,11 @@ export type Rolle = "mediziner" | "mitarbeiter" | "betrachter" | "admin" | "test
 
 export const zustand = (rolle: Rolle) => `e2e/.auth/${rolle}.json`;
 
+/** Ohne Anmeldung. Wichtig: Innerhalb eines Tests übernimmt Playwright den storageState aus `test.use` auch für
+ *  `request.newContext()` und `browser.newContext()`. Ohne diese Angabe würde eine „frische“ Anmeldung in der Sitzung
+ *  der Rolle des Tests stattfinden – Django beendet dann deren Sitzung (Benutzerwechsel in derselben Sitzung). */
+export const OHNE_ANMELDUNG = { cookies: [], origins: [] };
+
 const ZAEHLER = "e2e/.auth/notfallcodes.json";
 
 /** Jeder Notfall-Code gilt einmal; vergeben der Reihe nach je Konto (vorbereiten.py legt 40 je Konto an). */
@@ -104,6 +109,17 @@ export function stackNeuStarten() {
   throw new Error("Stack nach Neustart nicht erreichbar");
 }
 
+/** Sitzung in der Datenbank ablaufen lassen – genau das, was nach 30 Minuten ohne Anfrage passiert. */
+export function sitzungAblaufenLassen(schluessel: string) {
+  if (!/^[a-z0-9]+$/.test(schluessel)) throw new Error(`Unerwarteter Sitzungsschlüssel: ${schluessel}`);
+  const befehl = "from datetime import timedelta; from django.utils import timezone; " +
+    "from django.contrib.sessions.models import Session; " +
+    `print(Session.objects.filter(session_key='${schluessel}').update(expire_date=timezone.now() - timedelta(seconds=1)))`;
+  const anzahl = execSync(`sudo docker compose -p epm-ci exec -T backend python manage.py shell -c "${befehl}"`,
+    { cwd: process.env.EPM_CI_BASIS ?? "/tmp/epm-ci" }).toString().trim();
+  if (anzahl !== "1") throw new Error(`Sitzung nicht gefunden (${anzahl})`);
+}
+
 /** Gilt die Sitzung der Seite noch? Bei einem Fehlschlag steht im Bericht, nach welchem Schritt sie endete. */
 export async function sitzungGilt(page: Page, nachSchritt: string) {
   const s = await (await page.request.get("/api/auth/status/")).json();
@@ -121,7 +137,7 @@ export async function neuesKonto(rolle = "mitarbeiter", vorname = "Konrad", nach
   const benutzername = eindeutig("e2e.konto");
   const neu = await admin.post("benutzer/", { username: benutzername, first_name: vorname, last_name: nachname, rolle });
   await admin.ende();
-  const ctx = await request.newContext({ baseURL: BASIS, ignoreHTTPSErrors: true });
+  const ctx = await request.newContext({ baseURL: BASIS, ignoreHTTPSErrors: true, storageState: OHNE_ANMELDUNG });
   await ctx.get("/api/auth/status/");
   const kopf = async () => ({
     "X-CSRFToken": (await ctx.storageState()).cookies.find((c) => c.name === "epm_csrf")?.value ?? "",
@@ -147,7 +163,7 @@ export async function neuesKonto(rolle = "mitarbeiter", vorname = "Konrad", nach
 
 /** Anmeldung per API mit Kennwort und Code (z. B. Notfall-Code für eine zweite Sitzung desselben Kontos) */
 export async function apiAnmelden(benutzername: string, kennwort: string, code: string) {
-  const ctx = await request.newContext({ baseURL: BASIS, ignoreHTTPSErrors: true });
+  const ctx = await request.newContext({ baseURL: BASIS, ignoreHTTPSErrors: true, storageState: OHNE_ANMELDUNG });
   await ctx.get("/api/auth/status/");
   const kopf = async () => ({
     "X-CSRFToken": (await ctx.storageState()).cookies.find((c) => c.name === "epm_csrf")?.value ?? "",

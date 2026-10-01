@@ -5,6 +5,8 @@ import { apiAls, eindeutig, zustand } from "./hilfen";
 test.use({ storageState: zustand("mitarbeiter") });
 
 test("Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten", async ({ page }) => {
+  const adressen: string[] = [];
+  page.on("framenavigated", (f) => { if (f === page.mainFrame()) adressen.push(f.url().replace(/^https:\/\/[^/]+/, "")); });
   await page.goto("/");
   await page.getByRole("navigation", { name: "Hauptnavigation" }).getByRole("link", { name: "Patienten" }).click();
   await expect(page.getByRole("heading", { name: "Patienten", level: 1 })).toBeVisible();
@@ -48,6 +50,8 @@ test("Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten", 
   expect(direkt.results.map((p: { nachname: string; ansprechpartner_name: string }) => `${p.nachname}/${p.ansprechpartner_name}`)).toEqual(["Mustermann/Herr Muster"]);
   await api.ende();
   await expect(liste.getByRole("link", { name: "Mustermann, Max" })).toBeVisible();
+  await expect(page, `Adressen seit dem Laden: ${adressen.join(" → ")}`).toHaveURL(/ansprechpartner=\d+/);
+  await expect(page.getByLabel("Ansprechpartner")).toHaveValue(apId ?? "");
   await expect(liste.getByRole("link", { name: "Musterfrau, Erika" })).toHaveCount(0);
   await page.getByRole("button", { name: "Filter zurücksetzen" }).click();
 

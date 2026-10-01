@@ -1,6 +1,6 @@
 /** Entwürfe 17, 18, 20 · Administration: Benutzer, Rechte je Gruppe, Vorlagen, Audit-Log; Zugriff nur mit Recht. */
 import { expect, test } from "@playwright/test";
-import { BASIS, apiAls, eindeutig, neuesKonto, sitzungGilt, zustand } from "./hilfen";
+import { BASIS, OHNE_ANMELDUNG, apiAls, eindeutig, neuesKonto, sitzungGilt, zustand } from "./hilfen";
 import { request } from "@playwright/test";
 
 test.use({ storageState: zustand("admin") });
@@ -35,7 +35,7 @@ test("Benutzer anlegen, Einmal-Kennwort, sperren und entsperren", async ({ page 
   await sitzungGilt(page, "Benutzer anlegen");
 
   // mit dem Einmal-Kennwort beginnt die erste Anmeldung
-  const ctx = await request.newContext({ baseURL: BASIS, ignoreHTTPSErrors: true });
+  const ctx = await request.newContext({ baseURL: BASIS, ignoreHTTPSErrors: true, storageState: OHNE_ANMELDUNG });
   await ctx.get("/api/auth/status/");
   const csrf = (await ctx.storageState()).cookies.find((c) => c.name === "epm_csrf")?.value ?? "";
   const r = await ctx.post("/api/auth/anmelden/", { data: { benutzername: name, kennwort: einmal }, headers: { "X-CSRFToken": csrf, Referer: `${BASIS}/` } });
@@ -208,7 +208,7 @@ test("Ohne Recht keine Administration: Mitarbeiter sieht nichts, Mediziner Vorla
 
 test("Fünf falsche Passwörter sperren das Konto; Admin sieht den Hinweis, setzt 2FA zurück und entsperrt", async ({ page, browser }) => {
   const konto = await neuesKonto("mitarbeiter", "Lotte", "Gesperrt");
-  const fremd = await browser.newContext({ ignoreHTTPSErrors: true });
+  const fremd = await browser.newContext({ ignoreHTTPSErrors: true, storageState: OHNE_ANMELDUNG });
   const fp = await fremd.newPage();
   await fp.goto("/");
   for (let i = 0; i < 5; i++) {
