@@ -107,3 +107,50 @@ export function stackNeuStarten() {
 export function eindeutig(prefix: string) {
   return `${prefix}${Date.now().toString(36).slice(-5)}`;
 }
+
+/** Neues Konto über die Administration anlegen und die erste Anmeldung (Passwort, Authenticator) per API abschließen.
+ *  Für Tests, die das eigene Konto verändern (Passwort, Gerät, Sitzungen), ohne die gemeinsamen Testkonten zu berühren. */
+export async function neuesKonto(rolle = "mitarbeiter", vorname = "Konrad", nachname = "Konto") {
+  const admin = await apiAls("admin");
+  const benutzername = eindeutig("e2e.konto");
+  const neu = await admin.post("benutzer/", { username: benutzername, first_name: vorname, last_name: nachname, rolle });
+  await admin.ende();
+  const ctx = await request.newContext({ baseURL: BASIS, ignoreHTTPSErrors: true });
+  await ctx.get("/api/auth/status/");
+  const kopf = async () => ({
+    "X-CSRFToken": (await ctx.storageState()).cookies.find((c) => c.name === "epm_csrf")?.value ?? "",
+    Referer: `${BASIS}/`,
+    Origin: BASIS,
+  });
+  const schritt = async (pfad: string, daten?: unknown) => {
+    const r = await ctx.post(`/api/${pfad}`, { data: daten, headers: await kopf() });
+    if (!r.ok()) throw new Error(`${pfad}: ${r.status()} ${await r.text()}`);
+    return r.json();
+  };
+  await schritt("auth/anmelden/", { benutzername, kennwort: neu.einmal_kennwort });
+  const kennwort = `${KENNWORT}-${Math.random().toString(36).slice(2, 8)}`;
+  await schritt("auth/kennwort/", { neu: kennwort });
+  const qr = await schritt("auth/2fa/einrichten/");
+  const geheim = new URL(qr.otpauth_url).searchParams.get("secret") ?? "";
+  const fertig = await schritt("auth/2fa/bestaetigen/", { code: totpBase32(geheim) });
+  const pfad = `e2e/.auth/${benutzername}.json`;
+  await ctx.storageState({ path: pfad });
+  await ctx.dispose();
+  return { id: neu.id as number, benutzername, kennwort, geheim, notfallcodes: fertig.notfallcodes as string[], zustand: pfad };
+}
+
+/** Anmeldung per API mit Kennwort und Code (z. B. Notfall-Code für eine zweite Sitzung desselben Kontos) */
+export async function apiAnmelden(benutzername: string, kennwort: string, code: string) {
+  const ctx = await request.newContext({ baseURL: BASIS, ignoreHTTPSErrors: true });
+  await ctx.get("/api/auth/status/");
+  const kopf = async () => ({
+    "X-CSRFToken": (await ctx.storageState()).cookies.find((c) => c.name === "epm_csrf")?.value ?? "",
+    Referer: `${BASIS}/`,
+    Origin: BASIS,
+  });
+  const a = await ctx.post("/api/auth/anmelden/", { data: { benutzername, kennwort }, headers: await kopf() });
+  const s1 = await a.json();
+  if (s1.schritt !== "2fa") return { ctx, schritt: s1.schritt as string, status: a.status() };
+  const b = await ctx.post("/api/auth/2fa/", { data: { code }, headers: await kopf() });
+  return { ctx, schritt: (await b.json()).schritt as string, status: b.status() };
+}

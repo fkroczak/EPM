@@ -1,7 +1,7 @@
 /** Entwurf 2 · Start (Varianten 16 über die Darstellung). */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
@@ -253,6 +253,10 @@ export function Start() {
   const { setIch } = useAuth();
   const melden = useHinweis();
   const [bearbeiten, setBearbeiten] = useState(false);
+  const location = useLocation();
+  useEffect(() => {
+    if ((location.state as { anpassen?: number } | null)?.anpassen) setBearbeiten(true); // „Startseite anpassen“ aus Mein Konto
+  }, [location.state]);
   const daten = useQuery({ queryKey: ["startseite"], queryFn: () => api<Startdaten>("startseite/") });
   const karten = kartenVon(ich);
   const speichern = useMutation({

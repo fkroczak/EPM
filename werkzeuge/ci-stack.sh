@@ -54,7 +54,7 @@ sudo chown 101:101 "$B/nginx/certs/"*
 sudo chmod 0400 "$B/nginx/certs/epm.key"
 
 echo "==> Stack starten"
-compose up -d
+compose up -d --quiet-pull
 for _ in $(seq 1 60); do
   status="$($DOCKER inspect -f '{{.State.Health.Status}}' "$(compose ps -q backend)" 2>/dev/null || true)"
   [[ "$status" == "healthy" ]] && break

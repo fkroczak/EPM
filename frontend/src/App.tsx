@@ -1,6 +1,8 @@
 import { createBrowserRouter, Link, RouterProvider } from "react-router";
+import type { ReactNode } from "react";
 import { useAuth } from "./lib/auth";
-import { Laden } from "./components/ui/basis";
+import type { Recht } from "./lib/typen";
+import { Laden, Meldung } from "./components/ui/basis";
 import { Seite, Shell } from "./components/layout/Shell";
 import { Anmeldung } from "./seiten/Anmeldung";
 import { Akte } from "./seiten/akte/Akte";
@@ -11,6 +13,10 @@ import { Plaene } from "./seiten/akte/Plaene";
 import { Therapie } from "./seiten/akte/Therapie";
 import { Uebersicht } from "./seiten/akte/Uebersicht";
 import { Verlauf } from "./seiten/akte/Verlauf";
+import { AuditLog } from "./seiten/admin/AuditLog";
+import { Benutzer } from "./seiten/admin/Benutzer";
+import { Vorlagen } from "./seiten/admin/Vorlagen";
+import { Konto } from "./seiten/Konto";
 import { PatientNeu } from "./seiten/PatientNeu";
 import { Patienten } from "./seiten/Patienten";
 import { Start } from "./seiten/Start";
@@ -21,6 +27,17 @@ function NichtGefunden() {
     <Seite pfad={[{ text: "Nicht gefunden" }]}>
       <h1 className="m-0 text-[1.625rem] font-semibold">Seite nicht gefunden</h1>
       <p className="m-0 text-sm">Diese Adresse gibt es im EPM nicht. <Link to="/">Zur Startseite</Link></p>
+    </Seite>
+  );
+}
+
+/** Seite nur mit dem passenden Recht (die API prüft zusätzlich jede Anfrage) */
+function MitRecht({ recht, titel, children }: { recht: Recht; titel: string; children: ReactNode }) {
+  const { darf } = useAuth();
+  if (darf(recht)) return <>{children}</>;
+  return (
+    <Seite pfad={[{ text: titel }]}>
+      <Meldung art="warn">Für „{titel}“ fehlt das Recht. Die Rechte der Gruppen legt die Administration unter „Benutzer“ fest.</Meldung>
     </Seite>
   );
 }
@@ -47,6 +64,10 @@ const router = createBrowserRouter([
         ],
       },
       { path: "versorger", element: <Versorger /> },
+      { path: "konto", element: <Konto /> },
+      { path: "admin/benutzer", element: <MitRecht recht="benutzer_verwalten" titel="Benutzer"><Benutzer /></MitRecht> },
+      { path: "admin/vorlagen", element: <MitRecht recht="vorlagen_pflegen" titel="Vorlagen"><Vorlagen /></MitRecht> },
+      { path: "admin/audit-log", element: <MitRecht recht="audit_lesen" titel="Audit-Log"><AuditLog /></MitRecht> },
       { path: "*", element: <NichtGefunden /> },
     ],
   },

@@ -11,7 +11,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
 
   await page.goto(`/patienten/${patient.id}/plaene`);
   await expect(page.getByText("Noch kein Infusionsplan.")).toBeVisible();
-  await page.getByRole("button", { name: "Neuer Plan" }).click();
+  await page.getByTestId("aktenkopf").getByRole("button", { name: "Neuer Plan" }).click();
   const editor = page.getByTestId("plan-editor");
   await expect(editor).toContainText("Erster Plan dieses Patienten.");
 
@@ -56,7 +56,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(detail.getByRole("button", { name: "Bearbeiten" })).toHaveCount(0);
 
   // Folgeplan: vorbelegt, Grenzwert wird im Backend geprüft, Änderungen markiert
-  await page.getByRole("button", { name: "Neuer Plan" }).click();
+  await page.getByTestId("aktenkopf").getByRole("button", { name: "Neuer Plan" }).click();
   await expect(editor).toContainText("Vorbelegt mit dem aktuellen Plan vom");
   await expect(editor.getByLabel("Menge Aminosäuren in g")).toHaveValue("80");
   await editor.getByLabel("Menge Glucose in g").fill("2000");
