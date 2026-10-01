@@ -142,16 +142,26 @@ def sitzungen_bereinigen(request, **_):
 
 
 def datenbank_optimieren(request, **_):
+    from django.db import connections
+
     vorher = datenbank_info()
     zeilen = []
-    with connection.cursor() as c:
-        if connection.in_atomic_block:
-            # VACUUM geht nicht innerhalb einer Transaktion (z. B. in Tests); ANALYZE allein schon
-            c.execute("ANALYZE")
-            zeilen.append("ANALYZE ausgeführt (VACUUM ist innerhalb einer Transaktion nicht möglich).")
-        else:
+    # VACUUM geht nicht innerhalb einer Transaktion (jede Anfrage läuft in einer): eigene Verbindung im Autocommit.
+    # Wartet höchstens 10 s auf Sperren, damit die Anfrage nie hängen bleibt.
+    eigene = connections.create_connection("default")
+    try:
+        eigene.ensure_connection()
+        eigene.set_autocommit(True)
+        with eigene.cursor() as c:
+            c.execute("SET lock_timeout = '10s'")
             c.execute("VACUUM (ANALYZE)")
-            zeilen.append("VACUUM (ANALYZE) ausgeführt.")
+        zeilen.append("VACUUM (ANALYZE) ausgeführt.")
+    except Exception as e:  # noqa: BLE001 – dann wenigstens die Statistiken erneuern
+        zeilen.append(f"VACUUM nicht möglich ({e}); nur ANALYZE ausgeführt.")
+        with connection.cursor() as c:
+            c.execute("ANALYZE")
+    finally:
+        eigene.close()
     nachher = datenbank_info()
     frei = max(0, vorher["groesse"] - nachher["groesse"])
     zeilen.append(f"Größe vorher {vorher['groesse']} Bytes, nachher {nachher['groesse']} Bytes.")

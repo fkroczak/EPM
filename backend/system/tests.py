@@ -291,7 +291,7 @@ class EpmWartung(Systemverzeichnis):
             Dokument.objects.create(patient=self.patient, titel=name, datei=f"{self.patient.nummer}/{name}",
                                     originalname=name, mime="application/pdf", groesse=len(inhalt),
                                     sha256=hashlib.sha256(inhalt).hexdigest())
-        (ordner / "geaendert.pdf").write_bytes(b"%PDF-1.4 nachh")  # gleiche Länge, anderer Inhalt
+        (ordner / "geaendert.pdf").write_bytes(b"%PDF-1.4 nacher")  # gleiche Länge, anderer Inhalt
         (ordner / "unbekannt.txt").write_bytes(b"?")
         a = self.aufgabe("dokumente_pruefen")
         self.assertEqual(a["status"], "fehler")

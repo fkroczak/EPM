@@ -45,7 +45,8 @@ class Uebersicht(Grundlage):
         self.assertEqual(c.get("/api/infusionsplaene/uebersicht/", {"gruppe": "x"}).status_code, 400)
 
     def test_abgeschlossene_und_testzugang(self):
-        Patient.objects.filter(pk=self.zweiter.pk).update(abgeschlossen_am=timezone.now())
+        Patient.objects.filter(pk=self.zweiter.pk).update(abgeschlossen_am=timezone.now(),
+                                                          abschluss_anlass=Patient.Abschlussanlass.THERAPIE_BEENDET)
         c = client_fuer(self.mitarbeiter)
         self.assertEqual(c.get("/api/infusionsplaene/uebersicht/", {"gruppe": "entwuerfe"}).json()["zaehler"]
                          ["entwuerfe"], 1)

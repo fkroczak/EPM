@@ -226,7 +226,7 @@ class AuftragAbbrechenView(APIView):
 
 
 class EpmAufgabeView(APIView):
-    """Läuft ohne umschließende Transaktion (urls.py: non_atomic_requests), damit VACUUM möglich ist."""
+    """Wartung des EPM, sofort ausgeführt (VACUUM über eine eigene Datenbankverbindung, siehe epm_aufgaben)."""
 
     permission_classes = [SystemRecht]
 
@@ -240,7 +240,8 @@ class EpmAufgabeView(APIView):
                                                status=Systemauftrag.Status.LAEUFT, begonnen_am=timezone.now(),
                                                parameter={"pruefsummen": True} if pruefsummen else {})
         try:
-            rc, kurz, details = epm_aufgaben.AUSFUEHRUNG[code](request, pruefsummen=pruefsummen)
+            with transaction.atomic():  # Datenbankfehler einer Aufgabe nur bis hierher zurückrollen
+                rc, kurz, details = epm_aufgaben.AUSFUEHRUNG[code](request, pruefsummen=pruefsummen)
         except Exception as e:  # noqa: BLE001 – Ergebnis soll im Auftrag stehen, nicht als 500
             rc, kurz, details = 1, f"Fehler: {e}", f"{type(e).__name__}: {e}"
         auftrag.status = Systemauftrag.Status.ERLEDIGT if rc == 0 else Systemauftrag.Status.FEHLER
@@ -279,7 +280,7 @@ class HinweisView(APIView):
             text=s.validated_data["text"], art=s.validated_data["art"], angelegt_von=request.user,
             gueltig_bis=timezone.now() + timedelta(minutes=minuten) if minuten else None)
         protokolliere(SystemEreignis.Art.SYSTEM, request, objekt="Hinweis an alle Benutzer", ereignis="hinweis",
-                      text=h.text, art=h.art, minuten=minuten)
+                      text=h.text, hinweis_art=h.art, minuten=minuten)
         return Response({"hinweis": hinweis_daten(h)}, status=status.HTTP_201_CREATED)
 
     def delete(self, request):
