@@ -153,7 +153,7 @@ export function PatientNeu() {
         </div>
         {ohneFeld ? <Meldung art="fehler">{anlegen.error?.message}</Meldung> : null}
 
-        <div className="grid grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
           <div className="flex flex-col gap-4 min-w-0">
             <Abschnitt titel="Person">
               <Feld label="Nachname" pflicht className="col-span-2" fehler={e.nachname}>

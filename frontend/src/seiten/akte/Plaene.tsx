@@ -177,7 +177,7 @@ export function Plaene() {
   const entwurfDa = liste.some((p) => p.status === "entwurf");
 
   return (
-    <div className="grid grid-cols-[300px_minmax(0,1fr)] gap-6 items-start">
+    <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-6 items-start">
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="lbl m-0">{liste.length} {liste.length === 1 ? "Plan" : "Pläne"} · neueste oben</h2>

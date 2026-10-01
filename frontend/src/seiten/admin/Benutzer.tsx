@@ -238,7 +238,7 @@ export function Benutzer() {
     <Seite pfad={[{ text: "Administration" }, { text: "Benutzer" }]}>
       <Seitenkopf titel="Benutzer" unter="Wer darf was im EPM. Benutzer werden nie gelöscht, nur gesperrt, damit ihre Einträge zuordenbar bleiben."
         rechts={<Knopf variante="pri" icon="plus" onClick={() => setNeu(true)}>Benutzer anlegen</Knopf>} />
-      <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 items-start">
         <div className="flex flex-col gap-5 min-w-0">
           <Karte className="overflow-hidden">
             {liste.isLoading ? <Laden /> : (

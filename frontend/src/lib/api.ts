@@ -52,6 +52,8 @@ const MELDUNGEN: Record<number, string> = {
 };
 
 export const ABGEMELDET = "epm:abgemeldet";
+/** Bei 401/403 prüft die Anwendung den Anmeldestatus (z. B. Sitzung nach 30 Minuten abgelaufen) */
+export const STATUS_PRUEFEN = "epm:status-pruefen";
 
 type Optionen = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -91,8 +93,8 @@ export async function api<T = unknown>(pfad: string, opt: Optionen = {}): Promis
       daten,
       felder,
     );
-    if (antwort.status === 403 && !opt.ohneAbmeldeSignal && /Anmeldung mit zweitem Faktor/.test(meldung)) {
-      window.dispatchEvent(new Event(ABGEMELDET));
+    if ((antwort.status === 401 || antwort.status === 403) && !opt.ohneAbmeldeSignal) {
+      window.dispatchEvent(new Event(/Anmeldung mit zweitem Faktor/.test(meldung) ? ABGEMELDET : STATUS_PRUEFEN));
     }
     throw fehler;
   }

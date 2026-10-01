@@ -31,6 +31,12 @@
   --font-serif: "IBM Plex Serif", Georgia, serif;
 }
 
+/* Entwürfe für 1440 px: darunter klappt die Seitenleiste zu Symbolen (Laptops 15"), unter 1280 px (xl)
+   rutschen die rechten Spalten nach unten */
+@theme {
+  --breakpoint-hd: 90rem;
+}
+
 :root {
   /* Standard: Stiftungsfarben */
   --grund: #f3f4f6;

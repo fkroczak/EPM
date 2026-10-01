@@ -50,7 +50,7 @@ function BriefkopfBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   const version = briefkopf.data.logo.sha256;
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_420px] gap-5 items-start">
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-5 items-start">
       <div className="flex flex-col gap-4 min-w-0">
         <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="logo">
           <h2 className="lbl m-0">Logo</h2>
@@ -197,7 +197,7 @@ function ListenBereich() {
   const anzahl = (l: Liste) => l.art === "praeparat" ? (praeparate.data ?? []).filter((p) => p.kategorie === l.schluessel).length
     : (auswahl.data ?? []).filter((a) => a.liste === l.schluessel).length;
   return (
-    <div className="grid grid-cols-[240px_minmax(0,1fr)] gap-5 items-start">
+    <div className="grid grid-cols-1 xl:grid-cols-[240px_minmax(0,1fr)] gap-5 items-start">
       <nav aria-label="Listen" className="card p-1.5 flex flex-col">
         {LISTEN.map((l) => (
           <button key={l.schluessel} type="button" aria-current={gewaehlt.schluessel === l.schluessel ? "true" : undefined}
@@ -303,7 +303,7 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
     <Eingabe aria-label={label} className="num" value={w[k] ?? ""} onChange={(e) => setW({ ...w, [k]: e.target.value })} aria-invalid={f[k] ? true : undefined} />
   );
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-5 items-start" data-testid="grenzwerte">
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-5 items-start" data-testid="grenzwerte">
       <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
         <h2 className="lbl m-0">Hinweise auf Startseite und in der Liste</h2>
         <div className="grid grid-cols-2 gap-3">

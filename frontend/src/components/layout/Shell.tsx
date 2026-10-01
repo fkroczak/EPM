@@ -16,17 +16,17 @@ import { Logo } from "./logo";
 function NavEintrag({ zu, icon, text, ende, folgt }: { zu: string; icon: string; text: string; ende?: boolean; folgt?: boolean }) {
   if (folgt) {
     return (
-      <span className="nav opacity-60 cursor-not-allowed" aria-disabled="true" title="Kommt mit der Backup-Steuerung">
+      <span className="nav opacity-60 cursor-not-allowed" aria-disabled="true" title={`${text}: kommt mit der Backup-Steuerung`}>
         <Icon name={icon} groesse={18} />
-        <span>{text}</span>
-        <span className="chip ml-auto">folgt</span>
+        <span className="sr-only hd:not-sr-only">{text}</span>
+        <span className="chip ml-auto hidden hd:inline-flex">folgt</span>
       </span>
     );
   }
   return (
-    <NavLink to={zu} end={ende} className={({ isActive }) => cx("nav", isActive && "aktiv")}>
+    <NavLink to={zu} end={ende} title={text} className={({ isActive }) => cx("nav", isActive && "aktiv")}>
       <Icon name={icon} groesse={18} />
-      <span>{text}</span>
+      <span className="sr-only hd:not-sr-only">{text}</span>
     </NavLink>
   );
 }
@@ -41,14 +41,15 @@ function Seitenleiste() {
     darf("audit_lesen") ? <NavEintrag key="a" zu="/admin/audit-log" icon="uhr" text="Audit-Log" /> : null,
   ].filter(Boolean);
   return (
-    <aside className="w-64 shrink-0 bg-flaeche border-r border-rand flex flex-col px-3 py-4 gap-5 nicht-drucken"
+    <aside className="w-16 hd:w-64 shrink-0 bg-flaeche border-r border-rand flex flex-col px-2 hd:px-3 py-4 gap-5 nicht-drucken sticky top-0 h-screen overflow-y-auto"
       style={{ borderRightWidth: "var(--randbreite)" }}>
-      <div className="flex flex-col gap-2">
+      <div className="hidden hd:flex flex-col gap-2">
         <Logo className="w-[204px] h-[72px] px-1.5 py-1 rounded-lg bg-white" />
         <span className="px-1 font-mono text-[0.6875rem] font-medium tracking-[.07em] uppercase gedaempft">
           EPM · Patientenmanagement
         </span>
       </div>
+      <span className="hd:hidden self-center font-mono text-xs font-semibold tracking-[.07em] text-akzent-text" title="EPM · Patientenmanagement">EPM</span>
       <nav aria-label="Hauptnavigation" className="flex flex-col gap-0.5">
         <NavEintrag zu="/" icon="start" text="Start" ende />
         <NavEintrag zu="/patienten" icon="patienten" text="Patienten" />
@@ -56,25 +57,26 @@ function Seitenleiste() {
       </nav>
       {admin.length ? (
         <nav aria-label="Administration" className="flex flex-col gap-0.5">
-          <div className="px-2 h-8 flex items-center text-xs font-medium gedaempft">Administration</div>
+          <div className="px-2 h-8 hidden hd:flex items-center text-xs font-medium gedaempft">Administration</div>
+          <div className="hd:hidden border-t border-rand my-1" aria-hidden="true" />
           {admin}
         </nav>
       ) : null}
-      <div className="mt-auto flex flex-col gap-2.5 border-t border-rand pt-3.5 px-1.5">
-        <div className="flex items-center gap-2.5">
+      <div className="mt-auto flex flex-col gap-2.5 border-t border-rand pt-3.5 hd:px-1.5">
+        <div className="flex items-center gap-2.5 justify-center hd:justify-start" title={ich.anzeigename}>
           <div className="w-[34px] h-[34px] rounded-full bg-akzent-weich text-akzent-text flex items-center justify-center font-semibold text-[0.8125rem]">
             {ich.kuerzel || initialen(ich.anzeigename)}
           </div>
-          <div className="flex flex-col min-w-0">
+          <div className="flex-col min-w-0 sr-only hd:not-sr-only hd:flex">
             <span className="text-sm font-medium truncate" data-testid="angemeldet-als">{ich.anzeigename}</span>
             <span className="text-xs gedaempft">{ROLLEN[ich.rolle]}{ich.ist_test ? " · Testzugang" : ""}</span>
           </div>
         </div>
-        <NavLink to="/konto" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
-          <Icon name="konto" /> <span>Mein Konto</span>
+        <NavLink to="/konto" title="Mein Konto" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
+          <Icon name="konto" /> <span className="sr-only hd:not-sr-only">Mein Konto</span>
         </NavLink>
-        <button type="button" className="nav border-0 bg-transparent cursor-pointer text-left" onClick={() => void abmelden()}>
-          <Icon name="abmelden" /> <span>Abmelden</span>
+        <button type="button" title="Abmelden" className="nav border-0 bg-transparent cursor-pointer text-left" onClick={() => void abmelden()}>
+          <Icon name="abmelden" /> <span className="sr-only hd:not-sr-only">Abmelden</span>
         </button>
       </div>
     </aside>

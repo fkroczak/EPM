@@ -41,6 +41,7 @@ class _Recht(Angemeldet):
 
     def has_permission(self, request, view):
         if not super().has_permission(request, view):
+            self.message = Angemeldet.message  # abgelaufene Sitzung, nicht fehlendes Recht
             return False
         if request.method in SAFE_METHODS:
             return self.lesen is None or request.user.hat_recht(self.lesen)

@@ -224,7 +224,7 @@ export function PlanEditor() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
         <div className="flex flex-col gap-4 min-w-0">
           <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
             <h3 className="lbl m-0">Basislösung</h3>

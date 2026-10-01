@@ -426,7 +426,10 @@ class Rollen(Grundlage):
 
         c = APIClient()
         c.force_authenticate(self.mitarbeiter)  # kein is_verified
-        self.assertEqual(c.get("/api/patienten/").status_code, 403)
+        r = c.get("/api/patienten/")
+        self.assertEqual(r.status_code, 403)
+        # Meldung „Anmeldung …“ statt „Recht fehlt“: daran erkennt die Oberfläche, dass neu angemeldet werden muss
+        self.assertIn("Anmeldung mit zweitem Faktor", r.json()["detail"])
 
     def test_testbenutzer_sieht_nur_testpatienten(self):
         tester = benutzer("tester", Rolle.MEDIZINER, ist_test=True)

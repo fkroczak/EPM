@@ -2,7 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ABGEMELDET, api } from "./api";
+import { ABGEMELDET, STATUS_PRUEFEN, api } from "./api";
 import { darstellungAnwenden } from "./darstellung";
 import type { Ich, Recht, Status } from "./typen";
 
@@ -45,9 +45,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.clear();
       void neuLaden();
     };
+    // 401/403 ohne eindeutige Meldung: nur abmelden, wenn die Sitzung wirklich nicht mehr gilt
+    const pruefen = async () => {
+      try {
+        const s = await api<Status>("auth/status/", { ohneAbmeldeSignal: true });
+        if (s.schritt !== "fertig") {
+          queryClient.clear();
+          setStatus(s);
+        }
+      } catch {
+        /* Netzwerkfehler: Zustand beibehalten */
+      }
+    };
     window.addEventListener(ABGEMELDET, abgemeldet);
-    return () => window.removeEventListener(ABGEMELDET, abgemeldet);
-  }, [neuLaden, queryClient]);
+    window.addEventListener(STATUS_PRUEFEN, pruefen);
+    return () => {
+      window.removeEventListener(ABGEMELDET, abgemeldet);
+      window.removeEventListener(STATUS_PRUEFEN, pruefen);
+    };
+  }, [neuLaden, queryClient, setStatus]);
 
   const abmelden = useCallback(async () => {
     try {

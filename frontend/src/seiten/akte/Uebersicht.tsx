@@ -331,7 +331,7 @@ function StammKarte() {
 
 export function Uebersicht() {
   return (
-    <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
       <div className="flex flex-col gap-5 min-w-0">
         <GewichtKarte />
         <TherapieKarte />

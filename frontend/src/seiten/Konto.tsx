@@ -290,7 +290,7 @@ export function Konto() {
       <Seitenkopf titel="Mein Konto"
         unter={<span className="max-w-[80ch] inline-block leading-normal">Deine Einstellungen werden für dich gespeichert und gelten an jedem PC, an dem du dich anmeldest. Rolle und Rechte vergibt die Administration.</span>}
         rechts={<Knopf onClick={() => zuruecksetzen.current?.()}>Auf Standard zurücksetzen</Knopf>} />
-      <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5 items-start">
         <div className="flex flex-col gap-5 min-w-0"><DarstellungKarten zuruecksetzenRef={zuruecksetzen} /></div>
         <div className="flex flex-col gap-5 min-w-0">
           <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="profil">

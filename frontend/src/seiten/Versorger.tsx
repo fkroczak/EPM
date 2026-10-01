@@ -213,7 +213,7 @@ export function Versorger() {
           {pflegen ? <Knopf variante="pri" icon="plus" onClick={() => setParams(new URLSearchParams({ neu: "1" }), { replace: true })}>Neuer Versorger</Knopf> : null}
         </>} />
       <Fehleranzeige fehler={liste.error} />
-      <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-5 items-start">
         <Karte className="overflow-hidden">
           {liste.isLoading ? <Laden /> : (
             <table className="tabelle" data-testid="versorgerliste">

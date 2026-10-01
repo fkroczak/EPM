@@ -1,6 +1,6 @@
 /** Entwurf 1 · Anmeldung mit 2FA, erste Anmeldung mit eigenem Passwort und Authenticator, Abmeldung. */
 import { expect, test } from "@playwright/test";
-import { KENNWORT, SCHLUESSEL_HEX, anmeldenUI, apiAls, eindeutig, totpBase32, totpHex } from "./hilfen";
+import { KENNWORT, SCHLUESSEL_HEX, anmeldenUI, apiAls, eindeutig, totpBase32, totpHex, zustand } from "./hilfen";
 
 test("Anmeldung mit Passwort und Code aus der Authenticator-App, Abmelden", async ({ page }) => {
   await anmeldenUI(page, "e2e.betrachter", totpHex(SCHLUESSEL_HEX));
@@ -59,4 +59,16 @@ test("Erste Anmeldung: eigenes Passwort, Authenticator einrichten, Notfall-Codes
   // Sitzung bleibt nach dem Neuladen bestehen
   await page.reload();
   await expect(page.getByTestId("angemeldet-als")).toHaveText("N. Neuling");
+});
+
+test("Abgelaufene Sitzung führt zurück zur Anmeldung", async ({ browser }) => {
+  const ctx = await browser.newContext({ storageState: zustand("betrachter"), ignoreHTTPSErrors: true });
+  const page = await ctx.newPage();
+  await page.goto("/");
+  await expect(page.getByTestId("angemeldet-als")).toBeVisible();
+  // Sitzung ist weg (wie nach 30 Minuten ohne Aktivität): der nächste Aufruf meldet ab
+  await ctx.clearCookies();
+  await page.getByRole("navigation", { name: "Hauptnavigation" }).getByRole("link", { name: "Patienten" }).click();
+  await expect(page.getByRole("heading", { name: "Anmelden" })).toBeVisible();
+  await ctx.close();
 });

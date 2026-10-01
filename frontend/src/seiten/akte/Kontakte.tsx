@@ -158,7 +158,7 @@ export function Kontakte() {
   });
   const daten = liste.data;
   return (
-    <div className="grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-5 items-start">
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-5 items-start">
       <Karte className="flex flex-col min-w-0 overflow-hidden">
         {erfassen ? <NeuerKontakt /> : null}
         <div className="flex items-center justify-between gap-3 px-[22px] pt-4 pb-2 flex-wrap">
