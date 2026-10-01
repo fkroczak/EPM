@@ -21,6 +21,16 @@
 sudo epm-update                # holen, bauen (Backend und Frontend), Backup, starten, Musterdaten, Tests
 sudo epm-update --versionen    # vorhandene Versionen
 sudo epm-update --zurueck TAG  # zurückschalten (beide Images)
+sudo epm-update --paket-erstellen  # Update-Paket der laufenden, getesteten Version für den VPS
+```
+
+## VPS ohne Internet (Festlegung 02.10.2026)
+Der VPS bekommt keine Verbindung zu GitHub und baut nichts selbst: In `/etc/epm/epm.conf` steht
+`EPM_UPDATE_QUELLE="paket"`. Auf der Test-VM erzeugt `sudo epm-update --paket-erstellen` aus der dort laufenden und
+getesteten Version eine Datei `epm-paket-<TAG>.tar` (Images, Rollout-Dateien, Systemagent, `epm-update`, Prüfsummen).
+```bash
+scp /srv/epm/images/epm-paket-<TAG>.tar epmadmin@VPS:~/      # vom PC bzw. der Test-VM
+sudo epm-update --paket ~/epm-paket-<TAG>.tar                 # auf dem VPS: prüfen, Backup, umstellen, Tests
 ```
 Die Konfiguration des Servers liegt in `/etc/epm/epm.conf` (nicht im Repo). Die Oberfläche ist danach unter
 `https://<EPM_WEB_NAME>/` erreichbar, die Django-Verwaltung unter `/verwaltung/` (nur Rolle Admin).

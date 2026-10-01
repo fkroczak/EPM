@@ -1334,6 +1334,7 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 | Datum | Stand | Änderung |
 |---|---|---|
 | 02.10.2026 | Runde 4 (Systemseite, Kalender, Infusionspläne) | Neues Recht „Systemverwaltung“ (nur Admin); Administration › System mit Systemagent auf dem Server (F82–F85, Festlegungen S12–S14); globaler Kalender mit Fälligkeiten und Feiertagen (F80); Übersicht aller Infusionspläne (F81); Audit-Gruppe „System“; Feiertage NRW (U16). Nummern ab F80, damit parallele Arbeiten (F72 ff.) nicht kollidieren |
+| 02.10.2026 | Runde 4 (Updates VPS) | Festlegung: VPS ohne Verbindung zu GitHub und ohne Build (`EPM_UPDATE_QUELLE="paket"`); `sudo epm-update --paket-erstellen` auf der Test-VM packt die dort laufende, getestete Version (Images, Rollout-Dateien, Systemagent, `epm-update`, SHA-256), `sudo epm-update --paket DATEI` spielt sie auf dem VPS ein (Prüfsummen, Backup, Umstellen, Tests) |
 | 01.10.2026 | Runde 1 (`c387b7b`–`0e25377`) | Backend für F01–F22, F25–F36, F40–F48, F52–F54, F56–F58, F60 mit Backend-Tests; Nachweis angelegt |
 | 01.10.2026 | Runde 2 (`9eae348`) | Rechte je Gruppe (F66) nach Festlegung: Mediziner wie Admin außer Benutzerverwaltung, Wiederöffnen, Sicherungen, Testdaten; U10 erledigt, U11 bestätigt, U12 neu; Briefkopf und Logo (F49) |
 | 01.10.2026 | Runde 2 (`2b76a0a`–`39b86b9`) | Frontend: Anmeldung, Start, Patientenliste, Neuer Patient, Versorger, Akte (Übersicht, Diagnose & Therapie, Kontakte, Pläne, Dokumente, Verlauf); Browsertests im echten Stack in GitHub Actions |
