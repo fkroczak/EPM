@@ -78,6 +78,20 @@ export function Feld({ label, hinweis, fehler, className, pflicht, children }: F
   );
 }
 
+/** Nur lesen: Bezeichnung und Wert als Text – statt eines ausgegrauten Eingabefelds, wenn jemand nichts ändern darf. */
+export function Anzeige({ label, children, className, mehrzeilig }: { label: ReactNode; children: ReactNode; className?: string;
+  mehrzeilig?: boolean }) {
+  const leer = children === null || children === undefined || children === "";
+  return (
+    <div className={cx("feld", className)}>
+      <span>{label}</span>
+      <span className={cx("font-normal text-sm min-h-[1.25rem] break-words", mehrzeilig && "whitespace-pre-line", leer && "gedaempft")}>
+        {leer ? "—" : children}
+      </span>
+    </div>
+  );
+}
+
 export const Eingabe = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Eingabe(
   { className, ...rest }, ref) {
   return <input ref={ref} className={cx("inp", className)} {...rest} />;

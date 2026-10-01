@@ -161,8 +161,10 @@ test("Betrachter sieht die Liste, aber keinen Knopf „Neuer Patient“", async 
   await page.goto("/patienten");
   await expect(page.getByTestId("patientenliste").getByRole("link", { name: "Mustermann, Max" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Neuer Patient" })).toHaveCount(0);
+  // ohne Recht gibt es die Seite nicht: zurück zur Liste, ohne Hinweis auf Rechte
   await page.goto("/patienten/neu");
-  await expect(page.getByText("Patienten anlegen darf nur, wer das Recht „Akten bearbeiten“ hat.")).toBeVisible();
+  await expect(page).toHaveURL(/\/patienten$/);
+  await expect(page.getByText(/darf nur|fehlt das Recht/)).toHaveCount(0);
   await ctx.close();
 });
 

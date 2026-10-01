@@ -1,8 +1,8 @@
-import { createBrowserRouter, Link, RouterProvider } from "react-router";
+import { createBrowserRouter, Link, Navigate, RouterProvider } from "react-router";
 import type { ReactNode } from "react";
 import { useAuth } from "./lib/auth";
 import type { Recht } from "./lib/typen";
-import { Laden, Meldung } from "./components/ui/basis";
+import { Laden } from "./components/ui/basis";
 import { Seite, Shell } from "./components/layout/Shell";
 import { Anmeldung } from "./seiten/Anmeldung";
 import { Akte } from "./seiten/akte/Akte";
@@ -33,15 +33,12 @@ function NichtGefunden() {
   );
 }
 
-/** Seite nur mit dem passenden Recht (die API prüft zusätzlich jede Anfrage) */
-function MitRecht({ recht, titel, children }: { recht: Recht; titel: string; children: ReactNode }) {
+/** Seite nur mit dem passenden Recht (die API prüft zusätzlich jede Anfrage). Ohne Recht gibt es die Seite für
+ *  diese Person nicht: weiter zur Startseite, ohne Hinweis auf Rechte (Festlegung 01.10.2026). */
+function MitRecht({ recht, children }: { recht: Recht; titel?: string; children: ReactNode }) {
   const { darf } = useAuth();
   if (darf(recht)) return <>{children}</>;
-  return (
-    <Seite pfad={[{ text: titel }]}>
-      <Meldung art="warn">Für „{titel}“ fehlt das Recht. Die Rechte der Gruppen legt die Administration unter „Benutzer“ fest.</Meldung>
-    </Seite>
-  );
+  return <Navigate to="/" replace />;
 }
 
 const router = createBrowserRouter([

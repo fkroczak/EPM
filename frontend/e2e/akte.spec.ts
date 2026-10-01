@@ -279,7 +279,6 @@ test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen 
   await ap.getByRole("dialog").getByRole("button", { name: "Wieder öffnen" }).click();
   await expect(ap.getByText("Akte wieder geöffnet.")).toBeVisible();
   // echte Akte: für den Admin weiter nur lesbar
-  await expect(ap.getByTestId("aktenkopf").getByText("nur lesen")).toBeVisible();
   await expect(ap.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt" })).toHaveCount(0);
   await adm.close();
 

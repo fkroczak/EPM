@@ -82,7 +82,10 @@ test("Betrachter sieht Versorger nur lesend", async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: zustand("betrachter"), ignoreHTTPSErrors: true });
   const page = await ctx.newPage();
   await page.goto("/versorger");
-  await expect(page.getByTestId("versorger-detail").getByLabel("Firma")).toBeDisabled();
+  // nur lesen: Werte als Text, keine (ausgegrauten) Eingabefelder
+  const detail = page.getByTestId("versorger-detail");
+  await expect(detail.getByText("Firma", { exact: true })).toBeVisible();
+  await expect(detail.getByRole("textbox")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Neuer Versorger" })).toHaveCount(0);
   await expect(page.getByTestId("versorger-detail").getByRole("button", { name: "Speichern" })).toHaveCount(0);
   await ctx.close();

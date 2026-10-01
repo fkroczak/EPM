@@ -204,16 +204,18 @@ function GewichtKarte() {
           </tbody>
         </table>
       ) : null}
-      <KorrekturDialog messung={korrektur} onZu={() => setKorrektur(null)} />
+      {erfassen ? <KorrekturDialog messung={korrektur} onZu={() => setKorrektur(null)} /> : null}
     </Karte>
   );
 }
 
 function TherapieKarte() {
-  const { patient } = useAkte();
+  const { patient, bearbeiten } = useAkte();
   return (
     <Karte className="px-[22px] py-[18px] flex flex-col gap-4">
-      <KartenKopf titel="Diagnose und Therapie" rechts={<KnopfLink to={`/patienten/${patient.id}/therapie`} klein icon="stift">Öffnen und bearbeiten</KnopfLink>} />
+      <KartenKopf titel="Diagnose und Therapie" rechts={bearbeiten
+        ? <KnopfLink to={`/patienten/${patient.id}/therapie`} klein icon="stift">Öffnen und bearbeiten</KnopfLink>
+        : <KnopfLink to={`/patienten/${patient.id}/therapie`} klein>Öffnen</KnopfLink>} />
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-5">
         <div className="flex flex-col gap-1.5 min-w-0"><span className="text-[0.8125rem] font-medium gedaempft">Diagnose</span><Richtext html={patient.diagnose} leer="Noch keine Diagnose eingetragen." /></div>
         <div className="flex flex-col gap-1.5 min-w-0"><span className="text-[0.8125rem] font-medium gedaempft">Therapie</span><Richtext html={patient.therapie} leer="Noch keine Therapie eingetragen." /></div>
@@ -257,7 +259,7 @@ function TermineKarte() {
         </ul>
       ) : <span className="text-sm gedaempft">Keine offenen Termine.</span>}
       <Fehleranzeige fehler={abhaken.error} />
-      <TerminDialog offen={!!bearbeiten} onOffen={(o) => { if (!o) setBearbeiten(null); }} termin={bearbeiten}
+      <TerminDialog offen={!!bearbeiten && erfassen} onOffen={(o) => { if (!o) setBearbeiten(null); }} termin={bearbeiten}
         patientId={patient.id} patientName={`${patient.nachname}, ${patient.vorname}`} />
     </Karte>
   );

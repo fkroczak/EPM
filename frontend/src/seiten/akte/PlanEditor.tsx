@@ -1,7 +1,7 @@
 /** Entwurf 7 · Neuer Infusionsplan bzw. Entwurf bearbeiten: vorbelegt, Änderungen markiert, kcal wie im Altsystem. */
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
@@ -158,7 +158,7 @@ export function PlanEditor() {
   const [params] = useSearchParams();
   const vorlageId = params.get("vorlage");
   const navigate = useNavigate();
-  const { darfBei, ich } = useAuth();
+  const { darfBei } = useAuth();
   const qc = useQueryClient();
   const melden = useHinweis();
   const praeparate = usePraeparate();
@@ -264,9 +264,9 @@ export function PlanEditor() {
     },
   });
 
+  // ohne Recht bzw. bei abgeschlossener Akte gibt es den Editor nicht: zurück zu den Plänen
   if (patient.ist_abgeschlossen || !darfBei("plaene_anlegen", patient)) {
-    return <Meldung art="warn">Infusionspläne anlegen darf nur, wer das Recht „Pläne anlegen“ hat, und nur bei offenen Akten.
-      {ich?.schreibt_nur_testpatienten ? " Als Admin nur bei Testpatienten." : ""}</Meldung>;
+    return <Navigate to={`/patienten/${patient.id}/plaene`} replace />;
   }
   if (!f || praeparate.isLoading) return <Laden />;
   if (planId && entwurf.data && entwurf.data.status !== "entwurf") {
@@ -517,8 +517,9 @@ export function PlanEditor() {
             ) : null}
             <Knopf type="submit" laedt={speichern.isPending && speichern.variables === false} disabled={speichern.isPending}>Als Entwurf speichern</Knopf>
             <span className="text-xs gedaempft leading-normal">
-              Freigeben darf, wer das Recht „Pläne freigeben“ hat (Mediziner). Der vorherige Plan bleibt im Verlauf erhalten.
-              Bei der Freigabe wird die PDF mit der aktiven Dokumentvorlage erzeugt und mit Prüfsumme gespeichert.
+              {darfBei("plaene_freigeben", patient)
+                ? "Der vorherige Plan bleibt im Verlauf erhalten. Bei der Freigabe wird die PDF mit der aktiven Dokumentvorlage erzeugt und mit Prüfsumme gespeichert."
+                : "Der Entwurf ist für das Team sichtbar und noch nicht beim Versorger."}
             </span>
           </div>
         </aside>

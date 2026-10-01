@@ -254,7 +254,7 @@ function Reiter({ zu, text, zahl: anzahl, ende }: { zu: string; text: string; za
 export function Akte() {
   const { id } = useParams();
   const pid = Number(id);
-  const { darf, darfBei, ich } = useAuth();
+  const { darf, darfBei } = useAuth();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "pdf">("");
   const akte = useQuery({ queryKey: ["patient", pid], queryFn: () => api<Patient>(`patienten/${pid}/`), enabled: !!pid });
@@ -285,8 +285,6 @@ export function Akte() {
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="m-0 text-[1.625rem] font-semibold">{name(p)}</h1>
               {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
-              {ich?.schreibt_nur_testpatienten && !p.ist_test
-                ? <Chip title="Admins schreiben Patientendaten nur bei Testpatienten">nur lesen</Chip> : null}
               {p.ist_abgeschlossen ? <Chip>abgeschlossen</Chip> : null}
             </div>
             <span className="num text-sm gedaempft">
@@ -365,11 +363,12 @@ export function Akte() {
       <Outlet context={kontext} />
 
       {kontext.bearbeiten ? <StammdatenDialog patient={p} offen={dialog === "stammdaten"} onOffen={(o) => setDialog(o ? "stammdaten" : "")} /> : null}
-      <AbschlussDialog patient={p} offen={dialog === "abschluss"} onOffen={(o) => setDialog(o ? "abschluss" : "")} />
-      <WiederOeffnenDialog patient={p} offen={dialog === "oeffnen"} onOffen={(o) => setDialog(o ? "oeffnen" : "")} />
+      {/* Dialoge nur mit Recht: entzieht die Administration ein Recht, verschwindet auch ein offener Dialog */}
+      {offen && darfBei("akten_abschliessen", p) ? <AbschlussDialog patient={p} offen={dialog === "abschluss"} onOffen={(o) => setDialog(o ? "abschluss" : "")} /> : null}
+      {!offen && darf("akten_wieder_oeffnen") ? <WiederOeffnenDialog patient={p} offen={dialog === "oeffnen"} onOffen={(o) => setDialog(o ? "oeffnen" : "")} /> : null}
       <PdfDialog offen={dialog === "pdf"} onOffen={(o) => setDialog(o ? "pdf" : "")} titel={`Akte ${name(p)} als PDF`}
         pfad={`patienten/${p.id}/pdf/`} dateiname={`Patientendatenblatt-${p.nummer}.pdf`} />
-      <TerminDialog offen={dialog === "termin"} onOffen={(o) => setDialog(o ? "termin" : "")} patientId={p.id} patientName={name(p)} />
+      {kontext.erfassen ? <TerminDialog offen={dialog === "termin"} onOffen={(o) => setDialog(o ? "termin" : "")} patientId={p.id} patientName={name(p)} /> : null}
     </Seite>
   );
 }

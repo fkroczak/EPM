@@ -6,7 +6,7 @@ import type { Feldfehler } from "@/lib/api";
 import { useAuswahl } from "@/lib/daten";
 import { dateigroesse, datum, eingabeDatum, zeitpunkt } from "@/lib/format";
 import type { Dokument } from "@/lib/typen";
-import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Leer, Meldung, Textfeld, cx } from "@/components/ui/basis";
+import { Anzeige, Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Leer, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { Dialog } from "@/components/ui/dialog";
@@ -84,23 +84,32 @@ function Details({ dok }: { dok: Dokument }) {
       <span className="text-[0.8125rem] font-medium gedaempft">Vorschau</span>
       <Vorschau dok={dok} />
       <span className="font-medium break-words">{dok.titel}</span>
-      {!dok.typ_geprueft ? (
+      {!dok.typ_geprueft && erfassen ? (
         <div className="meldung warn flex gap-2 items-start text-[0.8125rem]"><Icon name="warnung" /><span>Aus dem Altsystem übernommen. Bitte Typ und Datum prüfen.</span></div>
       ) : null}
       {dok.ausgeblendet ? <Chip>ausgeblendet</Chip> : null}
-      <Feld label="Titel" fehler={f.titel}>{(p) => <Eingabe {...p} value={titel} disabled={!erfassen} onChange={(e) => setTitel(e.target.value)} />}</Feld>
+      {erfassen ? <>
+      <Feld label="Titel" fehler={f.titel}>{(p) => <Eingabe {...p} value={titel} onChange={(e) => setTitel(e.target.value)} />}</Feld>
       <div className="grid grid-cols-2 gap-3">
         <Feld label="Typ" fehler={f.typ}>
           {(p) => (
-            <Auswahl {...p} value={typ} disabled={!erfassen} onChange={(e) => setTyp(e.target.value)}>
+            <Auswahl {...p} value={typ} onChange={(e) => setTyp(e.target.value)}>
               <option value="">—</option>
               {(typen.data ?? []).filter((t) => t.aktiv || String(t.id) === typ).map((t) => <option key={t.id} value={t.id}>{t.wert}</option>)}
             </Auswahl>
           )}
         </Feld>
-        <Feld label="Datum" fehler={f.datum}>{(p) => <Eingabe {...p} className="num" value={am} disabled={!erfassen} onChange={(e) => setAm(e.target.value)} placeholder="TT.MM.JJJJ" />}</Feld>
+        <Feld label="Datum" fehler={f.datum}>{(p) => <Eingabe {...p} className="num" value={am} onChange={(e) => setAm(e.target.value)} placeholder="TT.MM.JJJJ" />}</Feld>
       </div>
-      <Feld label="Notiz" fehler={f.notiz}>{(p) => <Textfeld {...p} rows={2} value={notiz} disabled={!erfassen} onChange={(e) => setNotiz(e.target.value)} />}</Feld>
+      <Feld label="Notiz" fehler={f.notiz}>{(p) => <Textfeld {...p} rows={2} value={notiz} onChange={(e) => setNotiz(e.target.value)} />}</Feld>
+      </> : <>
+        {/* nur lesen: Werte als Text statt ausgegrauter Felder */}
+        <div className="grid grid-cols-2 gap-3">
+          <Anzeige label="Typ">{dok.typ_name}</Anzeige>
+          <Anzeige label="Datum">{dok.datum ? datum(dok.datum) : null}</Anzeige>
+        </div>
+        <Anzeige label="Notiz" mehrzeilig>{dok.notiz}</Anzeige>
+      </>}
       <dl className="grid grid-cols-[90px_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[0.8125rem] m-0">
         <dt className="gedaempft">Quelle</dt><dd className="m-0">{quelle(dok)}{dok.hochgeladen_von_name ? ` · ${dok.hochgeladen_von_name}` : ""}</dd>
         <dt className="gedaempft">Datei</dt><dd className="m-0 break-all">{dok.originalname}</dd>

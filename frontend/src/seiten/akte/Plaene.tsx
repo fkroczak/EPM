@@ -244,7 +244,7 @@ export function Plaene() {
               <span className="text-lg font-semibold">{kopfText(gewaehlt)}</span>
               <span className="text-[0.8125rem] gedaempft max-w-[70ch]">
                 {gewaehlt.status === "entwurf"
-                  ? "Entwurf: nur für das Team sichtbar, noch nicht beim Versorger. Freigeben darf, wer das Recht „Pläne freigeben“ hat (Mediziner)."
+                  ? "Entwurf: nur für das Team sichtbar, noch nicht beim Versorger."
                   : `Freigegeben am ${zeitpunkt(gewaehlt.freigegeben_am)}${gewaehlt.freigegeben_von_name ? ` von ${gewaehlt.freigegeben_von_name}` : ""}. ${gewaehlt.pdf_sha256 ? " Die PDF ist mit Prüfsumme gespeichert und wird nie neu erzeugt." : " Für diesen Plan ist keine PDF gespeichert."}`}
               </span>
             </div>
@@ -264,9 +264,9 @@ export function Plaene() {
           {vergleich.isLoading ? <Laden /> : vergleich.data ? (
             modus === "ansicht" ? <PdfAnsicht plan={gewaehlt} vergleich={vergleich.data} /> : <VergleichTabelle plan={gewaehlt} vergleich={vergleich.data} />
           ) : <Fehleranzeige fehler={vergleich.error} />}
-          <FreigabeDialog plan={gewaehlt} offen={freigabe} onOffen={setFreigabe} />
+          {darfBei("plaene_freigeben", patient) ? <FreigabeDialog plan={gewaehlt} offen={freigabe} onOffen={setFreigabe} /> : null}
           {gewaehlt.pdf_sha256 ? <PlanPdfDialog plan={gewaehlt} offen={pdf} onOffen={setPdf} /> : null}
-          <Dialog offen={verwerfen} onOffen={setVerwerfen} titel="Entwurf verwerfen" breite={480}
+          <Dialog offen={verwerfen && anlegen} onOffen={setVerwerfen} titel="Entwurf verwerfen" breite={480}
             beschreibung="Der Entwurf wird gelöscht. Im Verlauf der Akte bleibt sichtbar, dass es ihn gab."
             fuss={<><Knopf onClick={() => setVerwerfen(false)}>Abbrechen</Knopf><Knopf variante="dng" laedt={verwerfenM.isPending} onClick={() => verwerfenM.mutate()}>Verwerfen</Knopf></>}>
             <Fehleranzeige fehler={verwerfenM.error} />

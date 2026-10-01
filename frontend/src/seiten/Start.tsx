@@ -106,10 +106,13 @@ function TermineKarte({ daten }: { daten: Startdaten }) {
           const fertig = erledigt[t.id];
           return (
             <div key={t.id} className="grid grid-cols-[36px_150px_190px_minmax(0,1fr)] items-center gap-3 py-[11px] border-b border-rand last:border-b-0">
-              <input type="checkbox" aria-label={`Erledigt: ${t.patient_name}, ${t.titel}`} className="!w-5 !h-5"
-                checked={!!fertig || laeuft.includes(t.id)}
-                disabled={!!fertig || !darfBei("eintraege_erfassen", { ist_test: t.patient_ist_test }) || laeuft.includes(t.id)}
-                onChange={() => abhaken.mutate(t)} />
+              {/* Abhaken nur mit Recht; ohne Recht kein (ausgegrautes) Kästchen */}
+              {darfBei("eintraege_erfassen", { ist_test: t.patient_ist_test }) ? (
+                <input type="checkbox" aria-label={`Erledigt: ${t.patient_name}, ${t.titel}`} className="!w-5 !h-5"
+                  checked={!!fertig || laeuft.includes(t.id)}
+                  disabled={!!fertig || laeuft.includes(t.id)}
+                  onChange={() => abhaken.mutate(t)} />
+              ) : <span aria-hidden="true" />}
               <span className="num text-[0.84375rem] text-text2">{terminZeit(t.faellig_am, t.uhrzeit)}</span>
               <span>{terminChip(t)}</span>
               <span className="flex flex-col gap-px min-w-0">
@@ -131,7 +134,7 @@ function TermineKarte({ daten }: { daten: Startdaten }) {
       <span className="text-[0.78125rem] gedaempft">
         Abhaken markiert als erledigt, mit Person und Uhrzeit. Termine lassen sich in der Akte, bei einem Kontakt oder hier anlegen.
       </span>
-      <TerminDialog offen={dialog} onOffen={setDialog} />
+      {schreiben ? <TerminDialog offen={dialog} onOffen={setDialog} /> : null}
     </KarteBox>
   );
 }

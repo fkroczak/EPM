@@ -1,5 +1,6 @@
 /** Kurze Rückmeldungen („Gespeichert“) unten rechts, für Screenreader angesagt. */
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { HINWEIS } from "@/lib/api";
 import type { ReactNode } from "react";
 import { cx } from "./basis";
 
@@ -16,6 +17,11 @@ export function HinweisProvider({ children }: { children: ReactNode }) {
     setListe((l) => [...l, { id, text, art }]);
     window.setTimeout(() => setListe((l) => l.filter((h) => h.id !== id)), art === "fehler" ? 7000 : 3500);
   }, []);
+  useEffect(() => {
+    const aufEreignis = (e: Event) => melden(String((e as CustomEvent).detail ?? ""), "fehler");
+    window.addEventListener(HINWEIS, aufEreignis);
+    return () => window.removeEventListener(HINWEIS, aufEreignis);
+  }, [melden]);
   return (
     <HinweisKontext.Provider value={{ melden }}>
       {children}

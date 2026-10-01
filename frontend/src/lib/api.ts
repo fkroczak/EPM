@@ -52,6 +52,32 @@ const MELDUNGEN: Record<number, string> = {
 };
 
 export const ABGEMELDET = "epm:abgemeldet";
+/** Rechte haben sich geändert (Kopf ``X-EPM-Rechte`` anders als bisher oder Anfrage wegen fehlenden Rechts abgelehnt):
+ *  die Anwendung lädt die eigenen Rechte neu und blendet nicht mehr erlaubte Aktionen aus. */
+export const RECHTE_GEAENDERT = "epm:rechte-geaendert";
+/** Kurzer Hinweis unten rechts von außerhalb einer Komponente (``detail`` = Text) */
+export const HINWEIS = "epm:hinweis";
+/** Neutrale Meldung, wenn eine Aktion nicht (mehr) erlaubt ist – ohne Rechte und Rollen aufzuzählen */
+export const NICHT_VERFUEGBAR = "Diese Aktion steht nicht mehr zur Verfügung. Die Ansicht wurde aktualisiert.";
+
+let rechteStand: string | null = null;
+
+function rechteStandPruefen(antwort: Response) {
+  const stand = antwort.headers.get("X-EPM-Rechte");
+  if (!stand) return;
+  if (rechteStand && stand !== rechteStand) window.dispatchEvent(new Event(RECHTE_GEAENDERT));
+  rechteStand = stand;
+}
+
+function rechtAbgelehnt(method: string) {
+  window.dispatchEvent(new Event(RECHTE_GEAENDERT));
+  if (method !== "GET") window.dispatchEvent(new CustomEvent(HINWEIS, { detail: NICHT_VERFUEGBAR }));
+}
+
+/** 403 wegen fehlenden Rechts (nicht wegen abgelaufener Anmeldung) */
+function rechtFehlt(status: number, meldung: string) {
+  return status === 403 && /fehlt das Recht|Als Admin nur bei Testpatienten/.test(meldung);
+}
 /** Bei 401/403 prüft die Anwendung den Anmeldestatus (z. B. Sitzung nach 30 Minuten abgelaufen) */
 export const STATUS_PRUEFEN = "epm:status-pruefen";
 
@@ -77,6 +103,7 @@ export async function api<T = unknown>(pfad: string, opt: Optionen = {}): Promis
   if (method !== "GET") headers["X-CSRFToken"] = csrfToken();
   const url = pfad.startsWith("/api/") ? pfad : `/api/${pfad.replace(/^\//, "")}`;
   const antwort = await fetch(url, { method, headers, body, credentials: "same-origin", signal: opt.signal });
+  rechteStandPruefen(antwort);
   if (antwort.status === 204) return undefined as T;
   const art = antwort.headers.get("Content-Type") ?? "";
   const daten: unknown = art.includes("application/json") ? await antwort.json().catch(() => null) : await antwort.text();
@@ -87,6 +114,11 @@ export async function api<T = unknown>(pfad: string, opt: Optionen = {}): Promis
     const felder = flach(objekt);
     delete felder.fehler;
     delete felder.detail;
+    if (rechtFehlt(antwort.status, meldung)) {
+      // Was jemand nicht darf, soll er nicht sehen: Rechte neu laden (Aktion verschwindet), bei Aktionen neutral melden
+      rechtAbgelehnt(method);
+      throw new ApiFehler(antwort.status, NICHT_VERFUEGBAR, daten, {});
+    }
     const fehler = new ApiFehler(
       antwort.status,
       meldung || Object.values(felder)[0] || `Fehler ${antwort.status}`,
@@ -113,6 +145,7 @@ export async function apiDatei(pfad: string, opt: Optionen = {}): Promise<{ date
   if (method !== "GET") headers["X-CSRFToken"] = csrfToken();
   const url = pfad.startsWith("/api/") ? pfad : `/api/${pfad.replace(/^\//, "")}`;
   const antwort = await fetch(url, { method, headers, body, credentials: "same-origin", signal: opt.signal });
+  rechteStandPruefen(antwort);
   if (!antwort.ok) {
     const daten: unknown = await antwort.json().catch(() => null);
     const objekt = (daten && typeof daten === "object" ? daten : {}) as Record<string, unknown>;
@@ -120,6 +153,10 @@ export async function apiDatei(pfad: string, opt: Optionen = {}): Promise<{ date
     delete felder.fehler;
     delete felder.detail;
     const meldung = text(objekt.fehler) || text(objekt.detail) || Object.values(felder)[0] || MELDUNGEN[antwort.status] || `Fehler ${antwort.status}`;
+    if (rechtFehlt(antwort.status, meldung)) {
+      rechtAbgelehnt(method);
+      throw new ApiFehler(antwort.status, NICHT_VERFUEGBAR, daten, {});
+    }
     if ((antwort.status === 401 || antwort.status === 403) && !opt.ohneAbmeldeSignal) {
       window.dispatchEvent(new Event(/Anmeldung mit zweitem Faktor/.test(meldung) ? ABGEMELDET : STATUS_PRUEFEN));
     }

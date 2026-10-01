@@ -94,3 +94,14 @@ def hat_recht(user, code: str) -> bool:
 def schreibt_nur_testpatienten(user) -> bool:
     """Admins: Patientendaten nur bei Testpatienten schreiben (echte Akten nur lesen)."""
     return getattr(user, "rolle", None) in NUR_TESTPATIENTEN_SCHREIBEN
+
+
+def rechte_stand(user) -> str:
+    """Kurzer Fingerabdruck der Rechte eines Benutzers. Steht in jeder API-Antwort (Kopf ``X-EPM-Rechte``);
+    ändert er sich (Administration ändert Rechte oder Rolle), lädt die Oberfläche die Rechte neu und blendet
+    nicht mehr erlaubte Aktionen aus – ohne neue Anmeldung."""
+    import hashlib
+
+    teile = sorted(rechte_fuer(user)) + [f"nur_test={schreibt_nur_testpatienten(user)}",
+                                         f"ist_test={getattr(user, 'ist_test', False)}"]
+    return hashlib.sha256("|".join(teile).encode()).hexdigest()[:12]

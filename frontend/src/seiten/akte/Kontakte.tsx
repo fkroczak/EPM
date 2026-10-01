@@ -210,7 +210,7 @@ export function Kontakte() {
         </div>
         <Erreichbarkeit />
       </div>
-      <StornoDialog kontakt={storno} onZu={() => setStorno(null)} />
+      {erfassen ? <StornoDialog kontakt={storno} onZu={() => setStorno(null)} /> : null}
     </div>
   );
 }

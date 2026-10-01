@@ -79,3 +79,19 @@ def alle_sitzungen_beenden(user, ausser: str | None = None):
     """z. B. nach Sperre oder neuem Einmal-Kennwort: alle anderen Anmeldungen beenden."""
     for s in Sitzung.objects.filter(benutzer=user).exclude(sitzungsschluessel=ausser or ""):
         sitzung_beenden(s)
+
+
+class RechteStandMiddleware:
+    """Setzt bei angemeldeten API-Anfragen den Kopf ``X-EPM-Rechte`` (siehe ``rechte.rechte_stand``)."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        antwort = self.get_response(request)
+        user = getattr(request, "user", None)
+        if request.path.startswith("/api/") and user is not None and user.is_authenticated:
+            from .rechte import rechte_stand
+
+            antwort["X-EPM-Rechte"] = rechte_stand(user)
+        return antwort

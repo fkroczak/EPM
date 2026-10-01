@@ -375,3 +375,18 @@ class RechteJeGruppe(TestCase):
         e = m.post("/api/infusionsplaene/entwurf/", {"patient": self.patient.id}, format="json").json()
         self.assertEqual(m.post(f"/api/infusionsplaene/{e['id']}/freigeben/").status_code, 403)
         self.assertEqual(Infusionsplan.objects.get(pk=e["id"]).status, "entwurf")
+
+    def test_rechte_stand_im_antwortkopf(self):
+        """Ändert die Administration die Rechte, merkt die Oberfläche es an der nächsten Antwort (ohne neue Anmeldung)."""
+        codes = mit_zweitem_faktor(self.mitarbeiter)
+        c = echte_anmeldung(self.mitarbeiter, codes[0])
+        vorher = c.get("/api/auth/ich/")["X-EPM-Rechte"]
+        self.assertEqual(len(vorher), 12)
+        self.assertEqual(c.get(f"/api/patienten/{self.patient.id}/")["X-EPM-Rechte"], vorher)
+        Gruppenrecht.objects.create(rolle=Rolle.MITARBEITER, recht="akten_abschliessen", erlaubt=False)
+        r = c.post(f"/api/patienten/{self.patient.id}/abschliessen/", {"anlass": "verstorben"}, format="json")
+        self.assertEqual(r.status_code, 403)
+        self.assertNotEqual(r["X-EPM-Rechte"], vorher)
+        self.assertNotIn("akten_abschliessen", c.get("/api/auth/ich/").json()["rechte"])
+        # ohne Anmeldung kein Kopf
+        self.assertNotIn("X-EPM-Rechte", APIClient().get("/api/auth/status/"))

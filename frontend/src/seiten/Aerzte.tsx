@@ -12,7 +12,7 @@ import { useAerzteListe } from "@/lib/daten";
 import { nummer, zahl } from "@/lib/format";
 import type { Arzt, PatientZeile } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
-import { Chip, Eingabe, Feld, Fehleranzeige, Karte, Knopf, Laden, Leer, Meldung, Seitenkopf, Segmente, Textfeld, cx } from "@/components/ui/basis";
+import { Anzeige, Chip, Eingabe, Feld, Fehleranzeige, Karte, Knopf, Laden, Leer, Meldung, Seitenkopf, Segmente, Textfeld, cx } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 
@@ -97,9 +97,11 @@ export function Aerzte() {
   const fehler: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   const geaendert = FELDER.some((k) => f[k] !== formularVon(cur)[k]);
 
-  const feld = (k: (typeof FELDER)[number], label: string, extra?: { num?: boolean; span?: boolean; typ?: string; hinweis?: string }) => (
+  const feld = (k: (typeof FELDER)[number], label: string, extra?: { num?: boolean; span?: boolean; typ?: string; hinweis?: string }) => !pflegen ? (
+    <Anzeige label={label} className={extra?.span ? "col-span-2" : undefined}>{f[k]}</Anzeige>
+  ) : (
     <Feld label={label} className={extra?.span ? "col-span-2" : undefined} fehler={fehler[k]} pflicht={k === "name"} hinweis={extra?.hinweis}>
-      {(p) => <Eingabe {...p} className={extra?.num ? "num" : undefined} type={extra?.typ} value={f[k]} disabled={!pflegen}
+      {(p) => <Eingabe {...p} className={extra?.num ? "num" : undefined} type={extra?.typ} value={f[k]}
         onChange={(e) => setF({ ...f, [k]: e.target.value })} />}
     </Feld>
   );
@@ -166,9 +168,11 @@ export function Aerzte() {
                 {feld("telefon", "Telefon", { num: true })}
                 {feld("fax", "Fax", { num: true })}
                 {feld("email", "E-Mail", { span: true, typ: "email" })}
-                <Feld label="Notiz" className="col-span-2" fehler={fehler.notiz}>
-                  {(p) => <Textfeld {...p} rows={2} value={f.notiz} disabled={!pflegen} onChange={(e) => setF({ ...f, notiz: e.target.value })} />}
-                </Feld>
+                {pflegen ? (
+                  <Feld label="Notiz" className="col-span-2" fehler={fehler.notiz}>
+                    {(p) => <Textfeld {...p} rows={2} value={f.notiz} onChange={(e) => setF({ ...f, notiz: e.target.value })} />}
+                  </Feld>
+                ) : <Anzeige label="Notiz" className="col-span-2" mehrzeilig>{f.notiz}</Anzeige>}
               </div>
               {speichern.error && !Object.keys(fehler).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
               {pflegen ? (

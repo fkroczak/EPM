@@ -1,7 +1,7 @@
 /** Entwurf 12 · Neuer Patient: Grunddaten, Doppelungsprüfung, Gewicht bei Aufnahme als erste Messung. */
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, Navigate, useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
@@ -135,13 +135,8 @@ export function PatientNeu() {
   const e: Feldfehler = { ...server, ...lokal };
   const ohneFeld = anlegen.error && !Object.keys(server).length;
 
-  if (!darf("akten_bearbeiten")) {
-    return (
-      <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: "Neu" }]}>
-        <Meldung art="warn">Patienten anlegen darf nur, wer das Recht „Akten bearbeiten“ hat.</Meldung>
-      </Seite>
-    );
-  }
+  // ohne Recht gibt es diese Seite nicht (Festlegung 01.10.2026: Nicht Erlaubtes wird nicht gezeigt)
+  if (!darf("akten_bearbeiten")) return <Navigate to="/patienten" replace />;
 
   return (
     <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: "Neu" }]}>

@@ -207,8 +207,10 @@ test("Administration je Recht: Betrachter sieht nichts, Mitarbeiter Vorlagen, Me
   const bp = await b.newPage();
   await bp.goto("/");
   await expect(bp.getByRole("navigation", { name: "Administration" })).toHaveCount(0);
+  // ohne Recht gibt es die Seite nicht: weiter zur Startseite, kein Hinweis auf Rechte (Festlegung 01.10.2026)
   await bp.goto("/admin/benutzer");
-  await expect(bp.getByText("Für „Benutzer“ fehlt das Recht.")).toBeVisible();
+  await expect(bp).toHaveURL(/\/$/);
+  await expect(bp.getByText(/fehlt das Recht/)).toHaveCount(0);
   await b.close();
   // Vorlagen pflegen auch Mitarbeiter (Festlegung 01.10.2026)
   const m = await browser.newContext({ storageState: zustand("mitarbeiter"), ignoreHTTPSErrors: true });
@@ -275,7 +277,8 @@ test("Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten", async
   await m.ende();
   await page.goto(`/patienten/${echt.id}`);
   const kopf = page.getByTestId("aktenkopf");
-  await expect(kopf.getByText("nur lesen")).toBeVisible();
+  // keine Hinweise auf fehlende Rechte, nur keine Aktionen
+  await expect(kopf.getByText("nur lesen")).toHaveCount(0);
   await expect(kopf.getByRole("button", { name: "Kontakt" })).toHaveCount(0);
   await expect(kopf.getByRole("button", { name: "Neuer Plan" })).toHaveCount(0);
   await expect(page.getByTestId("gewichtskarte").getByLabel("Neues Gewicht")).toHaveCount(0);
@@ -325,4 +328,65 @@ test("Testdaten auf Ausgangsstand zurücksetzen (nur Testpatienten)", async ({ p
   expect((await admin.get("patienten/?test=nur&seitengroesse=50")).results.map((p: { nachname: string }) => p.nachname).sort())
     .toEqual(["Beispiel", "Demo", "Musterfrau", "Mustermann", "Probe", "Test"]);
   await admin.ende();
+});
+
+test("Recht während der Sitzung entzogen: Aktion verschwindet ohne neue Anmeldung, Ablehnung nur neutral", async ({ page, browser }) => {
+  const admin = await apiAls("admin");
+  const m = await apiAls("mitarbeiter");
+  const p = await m.post("patienten/", { nachname: eindeutig("Rechtweg"), vorname: "Rita", geburtsdatum: "1971-07-07" });
+  await m.ende();
+  const standardMatrix = async () => {
+    const r = await admin.get("rechte/");
+    return Object.fromEntries(r.rollen.map((ro: { code: string }) => [ro.code,
+      Object.fromEntries(r.rechte.map((x: { code: string }) => [x.code, r.standard[ro.code].includes(x.code) || r.fest.some((f: string[]) => f[0] === ro.code && f[1] === x.code)]))]));
+  };
+  const ctx = await browser.newContext({ storageState: zustand("mitarbeiter"), ignoreHTTPSErrors: true });
+  const mp = await ctx.newPage();
+  try {
+    await mp.goto(`/patienten/${p.id}`);
+    await mp.getByRole("button", { name: "Weitere Aktionen" }).click();
+    await mp.getByRole("menuitem", { name: "Akte abschließen" }).click();
+    const dialog = mp.getByRole("dialog");
+    await dialog.getByRole("radio", { name: "Therapie beendet" }).check();
+
+    // Administration entzieht Mitarbeitern „Akten abschließen“, während der Dialog offen ist
+    const matrix = await standardMatrix();
+    matrix.mitarbeiter.akten_abschliessen = false;
+    await admin.put("rechte/", { matrix });
+
+    // Klick auf „Akte abschließen“: Server lehnt ab → Dialog verschwindet, neutraler Hinweis ohne Rechte-Namen
+    await dialog.getByRole("button", { name: "Akte abschließen" }).click();
+    await expect(mp.getByText("Diese Aktion steht nicht mehr zur Verfügung. Die Ansicht wurde aktualisiert.")).toBeVisible();
+    await expect(mp.getByRole("dialog")).toHaveCount(0);
+    await expect(mp.getByText(/fehlt das Recht/)).toHaveCount(0);
+    await mp.getByRole("button", { name: "Weitere Aktionen" }).click();
+    await expect(mp.getByRole("menuitem", { name: "Akte abschließen" })).toHaveCount(0);
+    await mp.keyboard.press("Escape");
+    expect((await admin.get(`patienten/${p.id}/`)).ist_abgeschlossen).toBe(false);
+
+    // Recht zurück: erscheint mit der nächsten Anfrage wieder (Kopf X-EPM-Rechte), ohne neue Anmeldung
+    await admin.put("rechte/", { matrix: await standardMatrix() });
+    await mp.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Verlauf" }).click();
+    await expect(mp.getByTestId("verlauf")).toBeVisible();
+    await mp.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Übersicht" }).click();
+    await mp.getByRole("button", { name: "Weitere Aktionen" }).click();
+    await expect(mp.getByRole("menuitem", { name: "Akte abschließen" })).toBeVisible();
+    await mp.keyboard.press("Escape");
+
+    // und umgekehrt: Recht entzogen, ohne dass die Person etwas tut → beim nächsten Seitenwechsel ausgeblendet
+    const ohne = await standardMatrix();
+    ohne.mitarbeiter.eintraege_erfassen = false;
+    await admin.put("rechte/", { matrix: ohne });
+    await mp.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Verlauf" }).click();
+    await expect(mp.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt" })).toHaveCount(0);
+    await expect(mp.getByTestId("aktenkopf").getByRole("button", { name: "Gewicht" })).toHaveCount(0);
+  } finally {
+    try {
+      await admin.put("rechte/", { matrix: await standardMatrix() });
+    } catch (fehler) {
+      console.error("Rechte nicht auf Standard zurückgesetzt:", fehler);
+    }
+    await ctx.close();
+    await admin.ende();
+  }
 });

@@ -1,8 +1,8 @@
 /** Anmeldestatus und eigener Benutzer; wendet die Darstellung der Person an. */
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ABGEMELDET, STATUS_PRUEFEN, api } from "./api";
+import { ABGEMELDET, RECHTE_GEAENDERT, STATUS_PRUEFEN, api } from "./api";
 import { darstellungAnwenden } from "./darstellung";
 import type { Ich, Recht, Status } from "./typen";
 
@@ -27,6 +27,7 @@ const AuthKontext = createContext<AuthWert | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatusRoh] = useState<Status | null>(null);
   const [laedt, setLaedt] = useState(true);
+  const rechteRef = useRef<unknown>(null);
   const queryClient = useQueryClient();
 
   const setStatus = useCallback((s: Status) => {
@@ -50,23 +51,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.clear();
       void neuLaden();
     };
-    // 401/403 ohne eindeutige Meldung: nur abmelden, wenn die Sitzung wirklich nicht mehr gilt
-    const pruefen = async () => {
+    // 401/403 ohne eindeutige Meldung: abmelden, wenn die Sitzung nicht mehr gilt; sonst Rechte aktualisieren
+    const pruefen = async (): Promise<Status | null> => {
       try {
         const s = await api<Status>("auth/status/", { ohneAbmeldeSignal: true });
-        if (s.schritt !== "fertig") {
-          queryClient.clear();
-          setStatus(s);
-        }
+        if (s.schritt !== "fertig") queryClient.clear();
+        setStatus(s);
+        return s;
       } catch {
-        /* Netzwerkfehler: Zustand beibehalten */
+        return null; /* Netzwerkfehler: Zustand beibehalten */
+      }
+    };
+    // Rechte geändert (Administration): neu laden; nur wenn sie sich wirklich geändert haben, alle Daten neu holen
+    // (sonst könnte eine abgelehnte Anfrage eine Schleife aus Neuladen und Ablehnung auslösen)
+    let laeuft = false;
+    const rechteNeu = async () => {
+      if (laeuft) return;
+      laeuft = true;
+      try {
+        const vorher = JSON.stringify(rechteRef.current);
+        const s = await pruefen();
+        const b = s?.schritt === "fertig" ? s.benutzer : null;
+        if (b && JSON.stringify([b.rechte, b.schreibt_nur_testpatienten, b.ist_test]) !== vorher) void queryClient.invalidateQueries();
+      } finally {
+        laeuft = false;
       }
     };
     window.addEventListener(ABGEMELDET, abgemeldet);
-    window.addEventListener(STATUS_PRUEFEN, pruefen);
+    const statusPruefen = () => void pruefen();
+    window.addEventListener(STATUS_PRUEFEN, statusPruefen);
+    window.addEventListener(RECHTE_GEAENDERT, rechteNeu);
     return () => {
       window.removeEventListener(ABGEMELDET, abgemeldet);
-      window.removeEventListener(STATUS_PRUEFEN, pruefen);
+      window.removeEventListener(STATUS_PRUEFEN, statusPruefen);
+      window.removeEventListener(RECHTE_GEAENDERT, rechteNeu);
     };
   }, [neuLaden, queryClient, setStatus]);
 
@@ -80,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [neuLaden, queryClient]);
 
   const ich = status?.schritt === "fertig" ? status.benutzer ?? null : null;
+  rechteRef.current = ich ? [ich.rechte, ich.schreibt_nur_testpatienten, ich.ist_test] : null;
   const setIch = useCallback((neu: Ich) => {
     setStatusRoh((s) => (s ? { ...s, benutzer: neu } : s));
     darstellungAnwenden(neu.darstellung);
