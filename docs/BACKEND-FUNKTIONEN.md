@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 01.10.2026 · Code-Stand: Runde 2 (Commits `9eae348` bis `a985fa5`: Frontend, Browsertests, Rechte je Gruppe) ·
+Stand: 01.10.2026 · Code-Stand: Runde 3 (bis `ca9f858`: PDF-Erzeugung, Dokumentvorlagen, Rückmeldungen aus dem Testsystem) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026.
 
@@ -28,7 +28,7 @@ Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests. Beide laufe
   `werkzeuge/ci-stack.sh`: dieselbe Compose-Datei, Nginx-Konfiguration und dieselben Images wie auf dem Server, mit
   Musterdaten und eigenen Testkonten je Rolle.
 
-Stand 01.10.2026: **73 von 73 Backend-Tests** und **40 von 40 Browsertests grün** (Lauf 36897457027, Commit `a985fa5`).
+Stand 01.10.2026: **92 von 92 Backend-Tests** und **46 von 46 Browsertests grün** (Lauf 36921980921, Commit `ca9f858`).
 
 ## Übersicht
 
@@ -56,8 +56,8 @@ Stand 01.10.2026: **73 von 73 Backend-Tests** und **40 von 40 Browsertests grün
 | F20 | Akte abschließen | 4 Akte (Menü ⋯) | ABGESCHLOSSEN UND GETESTET |
 | F21 | Akte wieder öffnen | 3 Liste (Abgeschlossen) | ABGESCHLOSSEN UND GETESTET |
 | F22 | Verlauf je Akte | 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
-| F23 | Akte als PDF | 3 Liste, 4 Akte | NICHT ABGESCHLOSSEN |
-| F24 | Verlauf als PDF | 10 Verlauf | NICHT ABGESCHLOSSEN |
+| F23 | Akte als PDF | 3 Liste, 4 Akte | ABGESCHLOSSEN UND GETESTET |
+| F24 | Verlauf als PDF | 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
 | F25 | Gewicht erfassen, korrigieren, lesen | 4 Akte | ABGESCHLOSSEN UND GETESTET |
 | F26 | Kontakte anlegen, lesen, durchsuchen | 6 Kontakte | ABGESCHLOSSEN UND GETESTET |
 | F27 | Kontakt stornieren | 6 Kontakte | ABGESCHLOSSEN UND GETESTET |
@@ -68,9 +68,9 @@ Stand 01.10.2026: **73 von 73 Backend-Tests** und **40 von 40 Browsertests grün
 | F32 | Neuer Plan als Entwurf | 7 Neuer Infusionsplan | ABGESCHLOSSEN UND GETESTET |
 | F33 | Entwurf bearbeiten | 7 Neuer Infusionsplan | ABGESCHLOSSEN UND GETESTET |
 | F34 | Entwurf verwerfen | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
-| F35 | Plan freigeben | 8 Infusionspläne | TEILWEISE ABGESCHLOSSEN |
+| F35 | Plan freigeben | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
 | F36 | Vergleich mit dem Vorgänger | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
-| F37 | Gespeicherte Plan-PDF öffnen mit SHA-256-Prüfung | 8 Infusionspläne | NICHT ABGESCHLOSSEN |
+| F37 | Gespeicherte Plan-PDF öffnen mit SHA-256-Prüfung | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
 | F38 | Protonenpumpenhemmer (Pantozol®/Nexium®) im Plan | 7, 8 | ABGESCHLOSSEN UND GETESTET |
 | F39 | Gesamtvolumen, Laufzeit und Rate | 7, 8 | ABGESCHLOSSEN UND GETESTET |
 | F40 | Dokument hochladen | 9 Dokumente | ABGESCHLOSSEN UND GETESTET |
@@ -83,16 +83,16 @@ Stand 01.10.2026: **73 von 73 Backend-Tests** und **40 von 40 Browsertests grün
 | F47 | Präparate pflegen | 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
 | F48 | Grenzwerte und Einstellungen | 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
 | F49 | Briefkopf, Absender und Logo | 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
-| F50 | Dokumentvorlagen (WYSIWYG) | 19 Dokumentvorlagen | NICHT ABGESCHLOSSEN |
-| F51 | PDF-Erzeugung | Grundlage für F23, F24, F35, F37, F50, F55, F59 | NICHT ABGESCHLOSSEN |
+| F50 | Dokumentvorlagen (WYSIWYG) | 19 Dokumentvorlagen | ABGESCHLOSSEN UND GETESTET |
+| F51 | PDF-Erzeugung | Grundlage für F23, F24, F35, F37, F50, F55, F59 | ABGESCHLOSSEN UND GETESTET |
 | F52 | Benutzer lesen, anlegen, ändern | 17 Benutzer | ABGESCHLOSSEN UND GETESTET |
 | F53 | Benutzer sperren und entsperren | 17 Benutzer | ABGESCHLOSSEN UND GETESTET |
 | F54 | Einmal-Kennwort erzeugen | 17 Benutzer | ABGESCHLOSSEN UND GETESTET |
-| F55 | Zugangsblatt drucken | 17 Benutzer | NICHT ABGESCHLOSSEN |
+| F55 | Zugangsblatt drucken | 17 Benutzer | ABGESCHLOSSEN UND GETESTET |
 | F56 | 2FA zurücksetzen | 17 Benutzer | ABGESCHLOSSEN UND GETESTET |
 | F57 | Testdaten zurücksetzen | 17 Benutzer | ABGESCHLOSSEN UND GETESTET |
 | F58 | Audit-Log lesen und filtern | 20 Audit-Log | ABGESCHLOSSEN UND GETESTET |
-| F59 | Audit-Log als PDF | 20 Audit-Log | NICHT ABGESCHLOSSEN |
+| F59 | Audit-Log als PDF | 20 Audit-Log | ABGESCHLOSSEN UND GETESTET |
 | F60 | Unveränderlichkeit von Verlauf, Protokoll, Kontakten, Plänen | 10 Verlauf, 20 Audit-Log | ABGESCHLOSSEN UND GETESTET |
 | F61 | Tägliche verschlüsselte Sicherung | 11 Backup | TEILWEISE ABGESCHLOSSEN |
 | F62 | Sicherungen anzeigen, „Jetzt sichern“ | 11 Backup, 2 Start | NICHT ABGESCHLOSSEN |
@@ -461,10 +461,17 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F23 Akte als PDF / F24 Verlauf als PDF
-- **Endpunkte (geplant):** `GET /api/patienten/{id}/pdf/`, `GET /api/patienten/{id}/verlauf/pdf/` → `application/pdf`; Export
-  wird im Audit-Log protokolliert (Art `export`).
-- **Abhängigkeit:** F51 PDF-Erzeugung, F50 Vorlage „Patientendatenblatt“.
-- **Status:** NICHT ABGESCHLOSSEN (beide)
+- **Ansicht:** 4 Akte (Menü ⋯ „Akte als PDF“), 10 Verlauf („Als PDF“, mit dem gewählten Bereichsfilter); Anzeige im EPM-eigenen
+  PDF-Leser (pdf.js) mit „Herunterladen“.
+- **Endpunkte:** `GET /api/patienten/{id}/pdf/` → Patientendatenblatt mit der aktiven Vorlage (auch abgeschlossene Akten, Lesen
+  genügt); `GET /api/patienten/{id}/verlauf/pdf/?bereich=…&person=` → Verlauf als Tabelle (Zeitpunkt, Person, Bereich, Aktion,
+  Änderungen alt → neu). Beide `application/pdf`; jeder Export steht im Audit-Log (Art `export`, „Akte … als PDF exportiert“).
+- **Logik:** Kopf und Fuß kommen aus der aktiven Vorlage „Patientendatenblatt“ (`vorlagen/listen.py`); Testpatienten mit Wasserzeichen
+  „TESTDATEN“.
+- **Teststatus:** Backend-Test grün (`vorlagen.WeiterePdfs.test_akte_und_verlauf_als_pdf`: Inhalt per `pdftotext`, Export im
+  Audit-Log). Browsertests grün: `akte.spec.ts` „Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen (Admin)“
+  (Betrachter öffnet die Akte als PDF), `pdf-ausgaben.spec.ts` „Verlauf der Akte als PDF, mit Bereichsfilter“ (Lauf 36921980921, Commit `ca9f858`).
+- **Status:** ABGESCHLOSSEN UND GETESTET (beide)
 
 ---
 
@@ -589,12 +596,15 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 ### F35 Plan freigeben
 - **Ansicht:** 8 Infusionspläne
 - **Endpunkt:** `POST /api/infusionsplaene/{id}/freigeben/` → Plan mit `status: "aktuell"`; bisheriger aktueller Plan → `abgeloest`
-- **Logik:** danach unveränderlich, auch die Vitamin-Zuordnung (Trigger auf `infusionen_infusionsplan_vitamine`).
-- **Fehlt:** PDF-Erzeugung bei Freigabe mit SHA-256 und Vorlagenversion, Ablage als Dokument „Von EPM erzeugt“ (F51, F50).
+- **Logik:** danach unveränderlich, auch die Vitamin-Zuordnung (Trigger auf `infusionen_infusionsplan_vitamine`). Bei der
+  Freigabe entsteht die PDF mit der aktiven Vorlage „Infusionsplan“ (F50/F51) und wird als Dokument „Von EPM erzeugt“ (Typ
+  „Infusionsplan“) in der Akte abgelegt; am Plan stehen `pdf_datei`, `pdf_sha256` und `vorlage_version`. Freigabevermerk statt
+  Unterschrift: „Maschinell erstellt, geprüft und freigegeben von <Mediziner> am <Datum>.“
 - **Validierung:** Recht „Infusionspläne freigeben“ (Standard: Mediziner; Admin nur bei Testpatienten); vollständige Prüfung aller Werte; Akte offen.
-- **Teststatus:** Backend-Tests grün ohne PDF (`test_ablauf`, `test_vitamine_freigegebener_plaene_in_der_datenbank_geschuetzt`). Browsertest grün
-  ohne PDF: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“; Neustart geprüft in `zz-neustart.spec.ts`. Die PDF bei Freigabe fehlt (F51), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_ablauf`, `test_vitamine_freigegebener_plaene_in_der_datenbank_geschuetzt`,
+  `vorlagen.Vorlagen.test_freigabe_speichert_pdf_mit_pruefsumme`). Browsertest grün: `plaene.spec.ts` „Erster Plan, Freigabe,
+  Folgeplan mit markierten Änderungen, Verwerfen“ (PDF einseitig, Prüfsumme); Neustart geprüft in `zz-neustart.spec.ts` (Lauf 36921980921, Commit `ca9f858`).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F36 Vergleich mit dem Vorgänger
 - **Ansicht:** 8 Infusionspläne
@@ -606,10 +616,15 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F37 Gespeicherte Plan-PDF öffnen mit SHA-256-Prüfung
-- **Endpunkt (geplant):** `GET /api/infusionsplaene/{id}/pdf/` → PDF über X-Accel-Redirect; vorher Prüfsumme gegen `pdf_sha256`,
-  Ergebnis im Kopf `X-EPM-Pruefung: ok|abweichend`.
-- **Abhängigkeit:** F35 mit PDF.
-- **Status:** NICHT ABGESCHLOSSEN
+- **Ansicht:** 8 Infusionspläne („PDF öffnen“ am freigegebenen Plan)
+- **Endpunkt:** `GET /api/infusionsplaene/{id}/pdf/` → gespeicherte PDF über X-Accel-Redirect; vorher Prüfsumme gegen
+  `pdf_sha256`, Ergebnis im Kopf `X-EPM-Pruefung: ok|abweichend` und `X-EPM-Vorlage-Version`. Die PDF wird nie neu erzeugt.
+  Nginx reicht beide Köpfe nach dem internen Umleiten weiter (`rollout/projekt/nginx/epm.conf`).
+- **Anzeige:** „Prüfsumme stimmt: unverändert seit der Freigabe · Dokumentvorlage Version n“ bzw. rote Warnung bei Abweichung.
+- **Teststatus:** Backend-Test grün (`vorlagen.Vorlagen.test_freigabe_speichert_pdf_mit_pruefsumme`, auch veränderte Datei →
+  „abweichend“). Browsertest grün: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“;
+  Neustart geprüft in `zz-neustart.spec.ts` (Prüfsumme nach dem Neustart) (Lauf 36921980921, Commit `ca9f858`).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F38 Protonenpumpenhemmer (Pantozol®/Nexium®) im Plan
 - **Ansicht:** 7 Neuer Infusionsplan (Karte „Protonenpumpenhemmer“), 8 Infusionspläne (Ansicht wie PDF, Vergleich)
@@ -755,16 +770,38 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F50 Dokumentvorlagen (WYSIWYG)
-- **Geplant:** Vorlagen „Infusionsplan“ und „Patientendatenblatt“ aus Blöcken (Briefkopf, Text, Datenfelder, Tabelle, Unterschrift,
-  Fußzeile, Trennlinie, Leerraum, Seitenumbruch); Platzhalter aus fester Liste; Entwurf → Veröffentlichen, je Art eine aktive
-  Version; Vorschau mit Testpatient. Endpunkte `GET /api/vorlagen/`, `GET/PUT /api/vorlagen/{art}/entwurf/`,
-  `POST /api/vorlagen/{art}/veroeffentlichen/`, `GET /api/vorlagen/{art}/vorschau/?patient=`.
-- **Status:** NICHT ABGESCHLOSSEN
+- **Ansicht:** 19 Dokumentvorlagen (Administration › Vorlagen › Dokumentvorlagen): Aufbau links, Seite in der Mitte, Eigenschaften
+  rechts, „Datenfeld einfügen“ an der Schreibmarke, Vorschau mit Testpatient, Versionen, „Mitgelieferte Startvorlage laden“.
+- **Endpunkte:** `GET /api/vorlagen/`, `GET /api/vorlagen/{art}/` (Bausteine, Felder, Tabellen, Optionen), `GET/PUT/DELETE
+  /api/vorlagen/{art}/entwurf/`, `POST /api/vorlagen/{art}/veroeffentlichen/`, `GET /api/vorlagen/{art}/versionen/{n}/`,
+  `GET /api/vorlagen/{art}/startvorlage/`, `POST /api/vorlagen/{art}/vorschau/` `{patient (nur Testpatient), bloecke?}`.
+- **Bausteine:** Briefkopf (Logo, Falzmarken, Linie wahlweise), Titel (wahlweise rechts neben dem Logo), Kopfkarte (wie der Kopf
+  der Akte: Name, Zeilen darunter, rechts kleiner Text, Kennzahlen), Text, Zwei Spalten, Datenfelder (Paare oder „wie
+  Laborbefund“: Menge rechtsbündig, Einheit eigene Spalte), Tabelle (Zusammensetzung, weitere Bestandteile, Laufzeit und
+  Volumen, Termine), Trennlinie, Leerraum, Unterschrift, Seitenumbruch, Fußzeile. Optionen: Schrift, Ausrichtung, fett/kursiv,
+  Überschrift (Bereich als Karte), ausblenden wenn leer, nicht teilen, Linie darüber, neben dem vorherigen Block (⅓, ½, ⅔).
+- **Logik:** Platzhalter `{{Feld}}` nur aus der festen Liste je Art (`vorlagen/felder.py`), Fußzeile mit `{Seite}/{Seiten}`;
+  Entwurf → Veröffentlichen, je Art eine aktive Version; veröffentlichte Versionen unveränderlich (Modell und Trigger
+  `epm_vorlage_schutz`); Änderungen im Audit-Log.
+- **Infusionsplan (Startvorlage, Überarbeitung 01.10.2026):** Aufbau wie die PDF des Altsystems, gesetzt wie ein Laborbefund und
+  wie die Oberfläche von EPM: Titel neben dem Logo, Kopfkarte (Name, Geschlecht, Geburtsdatum mit Alter, Anschrift; Patienten-Nr.,
+  Infusionsplan-Nr., Größe, Gewicht, erstellt am/von), Karten für Zusammensetzung (daneben Mineralstoffe), weitere
+  Inhaltsstoffe, weitere Bestandteile, Laufzeit und Volumen (Mischbeutel | Zusatzlösung | Gesamt; Laufzeit 0 → „—“),
+  Bemerkungen, Diagnose; Freigabevermerk; fax-tauglich (Pläne gehen per Mail oder Fax, nicht per Post).
+- **Teststatus:** Backend-Tests grün (`vorlagen.Vorlagen.*`: Startvorlagen gültig, Entwurf prüfen/veröffentlichen/unveränderlich,
+  Vorschau nur mit Testpatient, Inhalt der Plan-PDF, Laufzeit 0, neue Bausteine und Startvorlage, Laborbefund-Darstellung).
+  Browsertests grün: `dokumentvorlagen.spec.ts` „Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau,
+  Veröffentlichen“, „Betrachter hat keinen Zugang zu den Dokumentvorlagen“; Neustart geprüft in `zz-neustart.spec.ts`
+  (veröffentlichte Version) (Lauf 36921980921, Commit `ca9f858`).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F51 PDF-Erzeugung
-- **Geplant:** WeasyPrint im Backend-Image (offline, keine externen Ressourcen), HTML aus Vorlagenblöcken, Wasserzeichen für
-  Testpatienten, Ablage im Dokumentenverzeichnis mit SHA-256.
-- **Status:** NICHT ABGESCHLOSSEN
+- **Umsetzung:** WeasyPrint im Backend-Image (`vorlagen/pdf.py`), offline: nur eingebettete `data:`-Adressen, keine Netz- oder
+  Dateizugriffe; Schrift IBM Plex aus dem Repo (`backend/schriften/`); Kopf/Fuß per `@page`, Seitenzahl „x/y“; Wasserzeichen
+  „TESTDATEN“ bzw. „ENTWURF“ (Vorschau); Ablage im Dokumentenverzeichnis mit SHA-256 (`als_dokument`).
+- **Teststatus:** Backend-Tests grün (alle PDF-Tests prüfen den Inhalt mit `pdftotext`); Browsertests grün (F23, F24, F35, F37,
+  F50, F55, F59) (Lauf 36921980921, Commit `ca9f858`).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ---
 
@@ -802,9 +839,13 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F55 Zugangsblatt drucken
-- **Geplant:** `GET /api/benutzer/{id}/zugangsblatt/` → PDF mit Benutzername, Einmal-Kennwort (nur solange gültig), Anleitung zur Einrichtung.
-- **Abhängigkeit:** F51.
-- **Status:** NICHT ABGESCHLOSSEN
+- **Ansicht:** 17 Benutzer („Zugangsblatt drucken“ neben dem angezeigten Einmal-Kennwort)
+- **Endpunkt:** `POST /api/benutzer/{id}/zugangsblatt/` `{kennwort}` → PDF mit Name, Benutzername, Einmal-Kennwort, Gültigkeit,
+  Adresse und Anleitung zur Einrichtung (Kennwort, Authenticator, Notfall-Codes). Das Kennwort wird nicht gespeichert; es muss
+  zum gültigen Einmal-Kennwort passen. Export im Audit-Log.
+- **Teststatus:** Backend-Test grün (`vorlagen.WeiterePdfs.test_zugangsblatt`). Browsertest grün: `admin.spec.ts` „Benutzer
+  anlegen, Einmal-Kennwort, sperren und entsperren“ (Lauf 36921980921, Commit `ca9f858`).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F56 2FA zurücksetzen
 - **Ansicht:** 17 Benutzer
@@ -863,8 +904,12 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F59 Audit-Log als PDF
-- **Geplant:** `GET /api/protokoll/pdf/?von&bis` → PDF; Export wird protokolliert. Abhängigkeit F51.
-- **Status:** NICHT ABGESCHLOSSEN
+- **Ansicht:** 20 Audit-Log („Als PDF“ mit den gewählten Filtern)
+- **Endpunkt:** `GET /api/protokoll/pdf/?gruppe&benutzer&von&bis&search` → PDF (Zeitpunkt, Person, Art, Details, Gerät/Adresse);
+  der Export wird selbst protokolliert.
+- **Teststatus:** Backend-Test grün (`vorlagen.WeiterePdfs.test_audit_log_als_pdf`). Browsertest grün: `pdf-ausgaben.spec.ts`
+  „Audit-Log für den gewählten Zeitraum als PDF; der Export steht danach im Audit-Log“ (Lauf 36921980921, Commit `ca9f858`).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F60 Unveränderlichkeit
 - **Umsetzung:** PostgreSQL-Trigger (`audit/schutz.py`) auf allen Historientabellen und `audit_systemereignis` (kein UPDATE,
@@ -997,11 +1042,12 @@ GitHub Actions, Neustart-Nachweis), O-26 Tests für F05, F06, F41, F56 (als Brow
 Logo (F49), O-14 Gesamtvolumen im Plan und seine Grenzen (F39, F48; nach Klärung U2), O-22 Gerät im Audit-Log (U8: IP und
 Browser reichen). Funktionen, die noch fehlen, zeigt die Oberfläche als „folgt“ (ausgegraut) – nichts davon ist nachgebildet.
 
+Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, F24, F35, F37, F50, F51, F55, F59).
+
 | Nr. | Was fehlt | Warum | Betroffene Dateien | Abhängigkeiten | Nächster Schritt |
 |---|---|---|---|---|---|
 | O-07 | Backup-Status auf der Startseite (F13) | hängt an der Backup-Steuerung | `patienten/api.py` | O-23 | Status-Datei lesen |
-| O-17 | PDF-Erzeugung und Vorlagen (F23, F24, F35, F37, F49, F50, F51, F55, F59) | nicht umgesetzt | neu: `vorlagen/`; `backend/Dockerfile` (WeasyPrint) | – | Vorlagenmodell mit Blöcken, Renderer, Freigabe-PDF mit SHA-256 |
-| O-23 | Backup 02:00 verschlüsselt, Steuerung aus der Oberfläche, Übertragung per rsync in den WebDAV-Ordner (F61–F64) | nicht umgesetzt | `rollout/epm-backup.sh`, `rollout/04-projekt.sh`, neu: `audit/backup.py`, systemd-Dienste | für F64: WebDAV-Adresse, Zugang, Zeitfenster | `age`-Schlüssel, Auftragsverzeichnis, Status-Datei, Endpunkte, rsync-Dienst |
+| O-23 | Backup 02:00 verschlüsselt, Steuerung aus der Oberfläche, Übertragung mit rclone in den WebDAV-Ordner (F61–F64; U9) | nicht umgesetzt | `rollout/epm-backup.sh`, `rollout/04-projekt.sh`, neu: `audit/backup.py`, systemd-Dienste | WebDAV-Adresse und Zugang trägt die Administration selbst in der Oberfläche ein (Wunsch 01.10.2026; verschlüsselt gespeichert), Test gegen einen WebDAV-Testserver in CI | `age`-Schlüssel, Auftragsverzeichnis, Status-Datei, Endpunkte, rclone-Dienst |
 | O-24 | Serverskripte angleichen | Festlegungen aus „EPM-Server Aufbau“ fehlen | `rollout/01-basis.sh`, `rollout/02-docker.sh` | – | Adressbereiche, `epm.service`, needrestart, Swap |
 | O-25 | Import Altdaten (F65) | Rollout-Schritt 7 | neu: `patienten/management/commands/epm_import_alt.py` | frischer Dump | Import mit Protokoll, setzt `typ_geprueft`/`datum_quelle` |
 
@@ -1040,4 +1086,5 @@ Browser reichen). Funktionen, die noch fehlen, zeigt die Oberfläche als „folg
 | 01.10.2026 | Runde 2 (`eae8bc3`–`a985fa5`) | Klärung U1, U2, U8, U9 umgesetzt: Protonenpumpenhemmer mit Zeiten (F38) und berechnetes Gesamtvolumen mit Rate und Grenze (F39, F48) auf ABGESCHLOSSEN UND GETESTET; F11/F58 ohne Gerätename-Lücke; F64 nicht mehr blockiert. U13/U14 gestellt |
 | 01.10.2026 | Runde 2 (`f865cde`–`a985fa5`) | Klärung U13/U14 umgesetzt: Energie mit Lipiden 9,15 kcal/g, Humanalbumin in ml ohne Energie (Feld `albumin_ml`), Hinweis zur Ca/Mg-Stabilität, erster Plan je kg Körpergewicht vorbelegt (`GET /api/infusionsplaene/vorbelegung/?patient=`) |
 | 01.10.2026 | Runde 3 (`c3aacfa`–`1718dc3`) | Rückmeldungen aus dem Testsystem: Blau auf Blau behoben, Testpatienten-Zahl nur für Admin, PDF-Anzeige mit pdf.js, Ärzteliste (F67/F68), Bezugspersonen (F69), „kein“ Katheter/Versorger und Nickelallergie als Auswahl (F70); Backend-Image mit IBM Plex aus dem Repo (Debian 13 hat kein `fonts-ibm-plex`) |
+| 01.10.2026 | Runde 3 (`0624527`–`ca9f858`) | PDF-Erzeugung mit WeasyPrint (F51), Dokumentvorlagen mit Editor (F50), Freigabe-PDF mit SHA-256 und Prüfung beim Öffnen (F35, F37; Nginx reicht `X-EPM-Pruefung` weiter), Akte, Verlauf, Audit-Log und Zugangsblatt als PDF (F23, F24, F59, F55). Infusionsplan-PDF nach dem Altsystem, auf Wunsch neu gestaltet wie ein Laborbefund und wie die Oberfläche (Kopfkarte, Karten, Menge/Einheit in eigenen Spalten, Titel neben dem Logo, ohne Linie, fax-tauglich, einseitig); Laufzeit 0 als „—“; neue Bausteine und Optionen im Editor; Datenfeld-Einfügen nimmt den aktuellen Feldinhalt (Fehler behoben) |
 | 01.10.2026 | Runde 3 (`a30b26d`) | „Kein Kontakt seit …“ nach 4 statt 12 Monaten (Patienten kommen meist quartalsweise): Standard in den Einstellungen, Datenmigration stellt einen unveränderten Wert 12 um (mit Grund in der Historie); wirkt auf Hinweis in der Patientenliste und „Nach und nach prüfen“ auf der Startseite; Backend-Test `test_kontakt_ueberfaellig_nach_4_monaten` |
