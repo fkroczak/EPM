@@ -1,7 +1,8 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 01.10.2026 · Code-Stand: Runde 1 (Commits `c387b7b` bis `0e25377`) · Grundlage: Altsystem-Datenanalyse mit
-Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“.
+Stand: 01.10.2026 · Code-Stand: Runde 2 (Commits `9eae348` bis `a985fa5`: Frontend, Browsertests, Rechte je Gruppe) ·
+Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
+Festlegung zu den Rechten vom 01.10.2026.
 
 ## Statuswerte
 
@@ -12,86 +13,97 @@ Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufb
 | NICHT ABGESCHLOSSEN | beschlossen, aber noch nicht umgesetzt |
 | BLOCKIERT DURCH FEHLENDE INFORMATION | Umsetzung hängt an einer offenen fachlichen Frage |
 
-**Keine Funktion ist derzeit ABGESCHLOSSEN UND GETESTET**, weil es noch keinen React-Code gibt. Die Oberfläche liegt nur
-als klickbarer Entwurf vor.
+„ABGESCHLOSSEN UND GETESTET“ heißt: Ein Browsertest bedient die Oberfläche (React-Build hinter Nginx) gegen das echte
+Django-Backend und PostgreSQL 18 – Frontend → API-Aufruf → Endpunkt → Validierung → Logik → Datenbank → Antwort →
+Anzeige – und das Ergebnis ist nach einem Neustart von Backend und Webserver noch da. Den Neustart prüfen
+`akte.spec.ts`, `start.spec.ts`, `versorger.spec.ts` und als letzte Datei `zz-neustart.spec.ts`: Sie startet die Container
+neu und prüft die Ergebnisse aller anderen Browsertests erneut über die Oberfläche.
 
-Teststatus-Angaben beziehen sich auf die automatischen Tests in `backend/*/tests.py`. Sie laufen bei jedem Push in
-GitHub Actions gegen ein echtes PostgreSQL 18 (Workflow `.github/workflows/backend.yml`, Ergebnis als Kommentar am
-Commit) und nach jedem `sudo epm-update` auf dem Server. Stand 01.10.2026: **57 von 57 Tests grün** (Lauf 36827241798, Commit `0e25377`).
-„Backend-Test grün“ heißt: API-Aufruf → Validierung → Logik → Datenbank → Antwort geprüft, ohne Oberfläche.
+Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests. Beide laufen bei jedem Push in GitHub Actions
+(Workflow `.github/workflows/backend.yml`, Ergebnis als Kommentar am Commit):
+
+- **Backend-Tests** (`backend/*/tests.py`) gegen PostgreSQL 18: API-Aufruf → Validierung → Logik → Datenbank → Antwort,
+  ohne Oberfläche. Laufen auch nach jedem `sudo epm-update` auf dem Server.
+- **Browsertests** (`frontend/e2e/*.spec.ts`, Playwright mit Chromium) gegen den kompletten Stack aus
+  `werkzeuge/ci-stack.sh`: dieselbe Compose-Datei, Nginx-Konfiguration und dieselben Images wie auf dem Server, mit
+  Musterdaten und eigenen Testkonten je Rolle.
+
+Stand 01.10.2026: **73 von 73 Backend-Tests** und **40 von 40 Browsertests grün** (Lauf 36897457027, Commit `a985fa5`).
 
 ## Übersicht
 
 | Nr. | Funktion | Ansicht (Entwurf) | Status |
 |---|---|---|---|
-| F01 | Sitzungsstatus und CSRF-Token | 1 Anmeldung | TEILWEISE ABGESCHLOSSEN |
-| F02 | Anmeldung mit Benutzername und Kennwort | 1 Anmeldung | TEILWEISE ABGESCHLOSSEN |
-| F03 | Zweiter Faktor bei der Anmeldung | 1 Anmeldung | TEILWEISE ABGESCHLOSSEN |
-| F04 | Eigenes Kennwort setzen und ändern | 1 Anmeldung, 14 Mein Konto | TEILWEISE ABGESCHLOSSEN |
-| F05 | Authenticator einrichten und ersetzen | 1 Anmeldung, 14 Mein Konto | TEILWEISE ABGESCHLOSSEN |
-| F06 | Notfall-Codes neu erzeugen | 14 Mein Konto | TEILWEISE ABGESCHLOSSEN |
-| F07 | Abmelden | alle Ansichten (Seitenleiste) | TEILWEISE ABGESCHLOSSEN |
-| F08 | Konto sperren nach 5 Fehlversuchen | 1 Anmeldung, 17 Benutzer, 20 Audit-Log | TEILWEISE ABGESCHLOSSEN |
-| F09 | Eigenes Profil, Darstellung und Startseite speichern | 14 Mein Konto, 2 Start | TEILWEISE ABGESCHLOSSEN |
-| F10 | Sicherheitsstatus im Konto | 14 Mein Konto | TEILWEISE ABGESCHLOSSEN |
-| F11 | Angemeldete Sitzungen anzeigen und abmelden | 14 Mein Konto | TEILWEISE ABGESCHLOSSEN |
-| F12 | Automatische Abmeldung nach 30 Minuten | alle | TEILWEISE ABGESCHLOSSEN |
+| F01 | Sitzungsstatus und CSRF-Token | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
+| F02 | Anmeldung mit Benutzername und Kennwort | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
+| F03 | Zweiter Faktor bei der Anmeldung | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
+| F04 | Eigenes Kennwort setzen und ändern | 1 Anmeldung, 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
+| F05 | Authenticator einrichten und ersetzen | 1 Anmeldung, 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
+| F06 | Notfall-Codes neu erzeugen | 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
+| F07 | Abmelden | alle Ansichten (Seitenleiste) | ABGESCHLOSSEN UND GETESTET |
+| F08 | Konto sperren nach 5 Fehlversuchen | 1 Anmeldung, 17 Benutzer, 20 Audit-Log | ABGESCHLOSSEN UND GETESTET |
+| F09 | Eigenes Profil, Darstellung und Startseite speichern | 14 Mein Konto, 2 Start | ABGESCHLOSSEN UND GETESTET |
+| F10 | Sicherheitsstatus im Konto | 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
+| F11 | Angemeldete Sitzungen anzeigen und abmelden | 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
+| F12 | Automatische Abmeldung nach 30 Minuten | alle | ABGESCHLOSSEN UND GETESTET |
 | F13 | Startseite | 2 Start | TEILWEISE ABGESCHLOSSEN |
-| F14 | Patientenliste mit Filtern und Suche | 3 Patientenliste | TEILWEISE ABGESCHLOSSEN |
-| F15 | Doppelprüfung beim Anlegen | 12 Neuer Patient | TEILWEISE ABGESCHLOSSEN |
-| F16 | Patient anlegen | 12 Neuer Patient | TEILWEISE ABGESCHLOSSEN |
-| F17 | Akte lesen mit Patientenkopf | 4 Patientenakte | TEILWEISE ABGESCHLOSSEN |
-| F18 | Stammdaten, Diagnose, Therapie, Empfehlung ändern | 4 Akte, 5 Diagnose und Therapie | TEILWEISE ABGESCHLOSSEN |
-| F19 | Versionen je Textfeld | 5 Diagnose und Therapie | TEILWEISE ABGESCHLOSSEN |
-| F20 | Akte abschließen | 4 Akte (Menü ⋯) | TEILWEISE ABGESCHLOSSEN |
-| F21 | Akte wieder öffnen | 3 Liste (Abgeschlossen) | TEILWEISE ABGESCHLOSSEN |
-| F22 | Verlauf je Akte | 10 Verlauf | TEILWEISE ABGESCHLOSSEN |
+| F14 | Patientenliste mit Filtern und Suche | 3 Patientenliste | ABGESCHLOSSEN UND GETESTET |
+| F15 | Doppelprüfung beim Anlegen | 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
+| F16 | Patient anlegen | 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
+| F17 | Akte lesen mit Patientenkopf | 4 Patientenakte | ABGESCHLOSSEN UND GETESTET |
+| F18 | Stammdaten, Diagnose, Therapie, Empfehlung ändern | 4 Akte, 5 Diagnose und Therapie | ABGESCHLOSSEN UND GETESTET |
+| F19 | Versionen je Textfeld | 5 Diagnose und Therapie | ABGESCHLOSSEN UND GETESTET |
+| F20 | Akte abschließen | 4 Akte (Menü ⋯) | ABGESCHLOSSEN UND GETESTET |
+| F21 | Akte wieder öffnen | 3 Liste (Abgeschlossen) | ABGESCHLOSSEN UND GETESTET |
+| F22 | Verlauf je Akte | 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
 | F23 | Akte als PDF | 3 Liste, 4 Akte | NICHT ABGESCHLOSSEN |
 | F24 | Verlauf als PDF | 10 Verlauf | NICHT ABGESCHLOSSEN |
-| F25 | Gewicht erfassen, korrigieren, lesen | 4 Akte | TEILWEISE ABGESCHLOSSEN |
-| F26 | Kontakte anlegen, lesen, durchsuchen | 6 Kontakte | TEILWEISE ABGESCHLOSSEN |
-| F27 | Kontakt stornieren | 6 Kontakte | TEILWEISE ABGESCHLOSSEN |
-| F28 | Kontakt mit Wiedervorlage in einem Schritt | 6 Kontakte | TEILWEISE ABGESCHLOSSEN |
-| F29 | Termine anlegen, ändern, lesen | 2 Start, 4 Akte | TEILWEISE ABGESCHLOSSEN |
-| F30 | Termin als erledigt markieren | 2 Start | TEILWEISE ABGESCHLOSSEN |
-| F31 | Infusionspläne eines Patienten lesen | 8 Infusionspläne | TEILWEISE ABGESCHLOSSEN |
-| F32 | Neuer Plan als Entwurf | 7 Neuer Infusionsplan | TEILWEISE ABGESCHLOSSEN |
-| F33 | Entwurf bearbeiten | 7 Neuer Infusionsplan | TEILWEISE ABGESCHLOSSEN |
-| F34 | Entwurf verwerfen | 8 Infusionspläne | TEILWEISE ABGESCHLOSSEN |
+| F25 | Gewicht erfassen, korrigieren, lesen | 4 Akte | ABGESCHLOSSEN UND GETESTET |
+| F26 | Kontakte anlegen, lesen, durchsuchen | 6 Kontakte | ABGESCHLOSSEN UND GETESTET |
+| F27 | Kontakt stornieren | 6 Kontakte | ABGESCHLOSSEN UND GETESTET |
+| F28 | Kontakt mit Wiedervorlage in einem Schritt | 6 Kontakte | ABGESCHLOSSEN UND GETESTET |
+| F29 | Termine anlegen, ändern, lesen | 2 Start, 4 Akte | ABGESCHLOSSEN UND GETESTET |
+| F30 | Termin als erledigt markieren | 2 Start | ABGESCHLOSSEN UND GETESTET |
+| F31 | Infusionspläne eines Patienten lesen | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
+| F32 | Neuer Plan als Entwurf | 7 Neuer Infusionsplan | ABGESCHLOSSEN UND GETESTET |
+| F33 | Entwurf bearbeiten | 7 Neuer Infusionsplan | ABGESCHLOSSEN UND GETESTET |
+| F34 | Entwurf verwerfen | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
 | F35 | Plan freigeben | 8 Infusionspläne | TEILWEISE ABGESCHLOSSEN |
-| F36 | Vergleich mit dem Vorgänger | 8 Infusionspläne | TEILWEISE ABGESCHLOSSEN |
+| F36 | Vergleich mit dem Vorgänger | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
 | F37 | Gespeicherte Plan-PDF öffnen mit SHA-256-Prüfung | 8 Infusionspläne | NICHT ABGESCHLOSSEN |
-| F38 | Pantozol im Plan | 7, 8 | BLOCKIERT DURCH FEHLENDE INFORMATION |
-| F39 | Gesamtvolumen, Laufzeit und Rate | 7, 8 | BLOCKIERT DURCH FEHLENDE INFORMATION |
-| F40 | Dokument hochladen | 9 Dokumente | TEILWEISE ABGESCHLOSSEN |
-| F41 | Dokumente lesen, Metadaten ändern, ausblenden | 9 Dokumente | TEILWEISE ABGESCHLOSSEN |
-| F42 | Datei anzeigen und herunterladen | 9 Dokumente | TEILWEISE ABGESCHLOSSEN |
-| F43 | Altdokumente prüfen (Typ, Datumsquelle) | 9 Dokumente, 2 Start | TEILWEISE ABGESCHLOSSEN |
-| F44 | Auswahllisten pflegen | 18 Vorlagen | TEILWEISE ABGESCHLOSSEN |
-| F45 | Versorger pflegen | 13 Versorger | TEILWEISE ABGESCHLOSSEN |
-| F46 | Ansprechpartner pflegen | 13 Versorger | TEILWEISE ABGESCHLOSSEN |
-| F47 | Präparate pflegen | 18 Vorlagen | TEILWEISE ABGESCHLOSSEN |
-| F48 | Grenzwerte und Einstellungen | 18 Vorlagen | TEILWEISE ABGESCHLOSSEN |
-| F49 | Briefkopf, Absender und Logo | 18 Vorlagen | NICHT ABGESCHLOSSEN |
+| F38 | Protonenpumpenhemmer (Pantozol®/Nexium®) im Plan | 7, 8 | ABGESCHLOSSEN UND GETESTET |
+| F39 | Gesamtvolumen, Laufzeit und Rate | 7, 8 | ABGESCHLOSSEN UND GETESTET |
+| F40 | Dokument hochladen | 9 Dokumente | ABGESCHLOSSEN UND GETESTET |
+| F41 | Dokumente lesen, Metadaten ändern, ausblenden | 9 Dokumente | ABGESCHLOSSEN UND GETESTET |
+| F42 | Datei anzeigen und herunterladen | 9 Dokumente | ABGESCHLOSSEN UND GETESTET |
+| F43 | Altdokumente prüfen (Typ, Datumsquelle) | 9 Dokumente, 2 Start | ABGESCHLOSSEN UND GETESTET |
+| F44 | Auswahllisten pflegen | 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
+| F45 | Versorger pflegen | 13 Versorger | ABGESCHLOSSEN UND GETESTET |
+| F46 | Ansprechpartner pflegen | 13 Versorger | ABGESCHLOSSEN UND GETESTET |
+| F47 | Präparate pflegen | 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
+| F48 | Grenzwerte und Einstellungen | 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
+| F49 | Briefkopf, Absender und Logo | 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
 | F50 | Dokumentvorlagen (WYSIWYG) | 19 Dokumentvorlagen | NICHT ABGESCHLOSSEN |
 | F51 | PDF-Erzeugung | Grundlage für F23, F24, F35, F37, F50, F55, F59 | NICHT ABGESCHLOSSEN |
-| F52 | Benutzer lesen, anlegen, ändern | 17 Benutzer | TEILWEISE ABGESCHLOSSEN |
-| F53 | Benutzer sperren und entsperren | 17 Benutzer | TEILWEISE ABGESCHLOSSEN |
-| F54 | Einmal-Kennwort erzeugen | 17 Benutzer | TEILWEISE ABGESCHLOSSEN |
+| F52 | Benutzer lesen, anlegen, ändern | 17 Benutzer | ABGESCHLOSSEN UND GETESTET |
+| F53 | Benutzer sperren und entsperren | 17 Benutzer | ABGESCHLOSSEN UND GETESTET |
+| F54 | Einmal-Kennwort erzeugen | 17 Benutzer | ABGESCHLOSSEN UND GETESTET |
 | F55 | Zugangsblatt drucken | 17 Benutzer | NICHT ABGESCHLOSSEN |
-| F56 | 2FA zurücksetzen | 17 Benutzer | TEILWEISE ABGESCHLOSSEN |
-| F57 | Testdaten zurücksetzen | 17 Benutzer | TEILWEISE ABGESCHLOSSEN |
-| F58 | Audit-Log lesen und filtern | 20 Audit-Log | TEILWEISE ABGESCHLOSSEN |
+| F56 | 2FA zurücksetzen | 17 Benutzer | ABGESCHLOSSEN UND GETESTET |
+| F57 | Testdaten zurücksetzen | 17 Benutzer | ABGESCHLOSSEN UND GETESTET |
+| F58 | Audit-Log lesen und filtern | 20 Audit-Log | ABGESCHLOSSEN UND GETESTET |
 | F59 | Audit-Log als PDF | 20 Audit-Log | NICHT ABGESCHLOSSEN |
-| F60 | Unveränderlichkeit von Verlauf, Protokoll, Kontakten, Plänen | 10 Verlauf, 20 Audit-Log | TEILWEISE ABGESCHLOSSEN |
+| F60 | Unveränderlichkeit von Verlauf, Protokoll, Kontakten, Plänen | 10 Verlauf, 20 Audit-Log | ABGESCHLOSSEN UND GETESTET |
 | F61 | Tägliche verschlüsselte Sicherung | 11 Backup | TEILWEISE ABGESCHLOSSEN |
 | F62 | Sicherungen anzeigen, „Jetzt sichern“ | 11 Backup, 2 Start | NICHT ABGESCHLOSSEN |
 | F63 | Wiederherstellen mit Admin-Kennwort und 2FA | 11 Backup | NICHT ABGESCHLOSSEN |
-| F64 | Übertragung zur Nextcloud/NAS mit Status | 11 Backup | BLOCKIERT DURCH FEHLENDE INFORMATION |
+| F64 | Übertragung zur Nextcloud/NAS mit Status | 11 Backup | NICHT ABGESCHLOSSEN |
 | F65 | Import der Altdaten | – (Rollout-Schritt 7) | NICHT ABGESCHLOSSEN |
+| F66 | Rechte je Gruppe einstellen | 17 Benutzer (Rechte) | ABGESCHLOSSEN UND GETESTET |
 
-Summe (65 Funktionen): 0 abgeschlossen und getestet · 51 teilweise abgeschlossen · 11 nicht abgeschlossen · 3 blockiert.
-Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
+Summe (66 Funktionen): 52 abgeschlossen und getestet · 3 teilweise abgeschlossen · 11 nicht abgeschlossen · 0 blockiert.
+Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
+Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 
 ---
 
@@ -106,18 +118,34 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
   Datenbank-Trigger · 404 nicht vorhanden oder außerhalb des eigenen Bereichs (Testbenutzer) · 405 Aktion nicht
   vorgesehen (z. B. Kontakt ändern) · 409 Akte abgeschlossen · 429 zu viele Versuche.
 - Testbenutzer (`ist_test`) sehen und bearbeiten nur Testpatienten.
-- Rechte (Rollenmatrix aus dem Entwurf 17 · Benutzer):
+- Rechte je Gruppe (F66): Die Administration stellt sie in der Oberfläche ein (Benutzer › Rechte), Änderungen gelten ab
+  der nächsten Anfrage. Festlegungen vom 01.10.2026: Mediziner sind dem Admin gleichgestellt, ausgenommen
+  Benutzerverwaltung und sehr spezifische Eingriffe (abgeschlossene Akten wieder öffnen, Sicherungen, Testdaten).
+  Akten abschließen dürfen Mitarbeiter, Mediziner und Admin; Vorlagen pflegen auch Mitarbeiter und Mediziner.
+  Admins dürfen alles, Patientendaten schreiben sie aber nur bei Testpatienten – echte Akten sind für sie nur
+  lesbar, ein neuer Patient eines Admins wird Testpatient. Standard (✓ = erlaubt, ● = fest, nicht entziehbar,
+  T = nur bei Testpatienten, fest):
 
 | Recht | Betrachter | Mitarbeiter | Mediziner | Admin |
 |---|---|---|---|---|
-| Akten lesen | ✓ | ✓ | ✓ | ✓ |
-| Kontakte, Gewichte, Termine erfassen | – | ✓ | ✓ | – |
-| Diagnose, Therapie, Stammdaten ändern | – | ✓ | ✓ | – |
-| Infusionspläne anlegen und freigeben | – | – | ✓ | – |
-| Akten abschließen / wieder öffnen | – | – | ✓ / – | – / ✓ |
-| Versorger und Ansprechpartner pflegen (U10) | – | ✓ | ✓ | ✓ |
-| Benutzer, Vorlagen, Backup | – | – | – | ✓ |
+| Akten lesen | ✓ | ✓ | ✓ | ● |
+| Kontakte, Gewichte, Termine, Dokumente erfassen | – | ✓ | ✓ | ✓ T |
+| Patienten anlegen, Diagnose, Therapie, Stammdaten ändern | – | ✓ | ✓ | ✓ T |
+| Infusionspläne anlegen | – | – | ✓ | ✓ T |
+| Infusionspläne freigeben | – | – | ✓ | ✓ T |
+| Akten abschließen | – | ✓ | ✓ | ✓ T |
+| Abgeschlossene Akten wieder öffnen | – | – | – | ✓ |
+| Versorger und Ansprechpartner pflegen | – | ✓ | ✓ | ✓ |
+| Vorlagen pflegen (Briefkopf, Auswahllisten, Präparate, Grenzwerte) | – | ✓ | ✓ | ✓ |
+| Audit-Log lesen | – | – | ✓ | ✓ |
+| Benutzer und Rechte verwalten | – | – | – | ● |
+| Sicherungen verwalten | – | – | – | ✓ |
+| Testdaten zurücksetzen | – | – | – | ✓ |
 
+  Testbenutzer bekommen nie Rechte, die über Testpatienten hinaus wirken (Versorger, Vorlagen, Audit-Log, Benutzer,
+  Sicherungen, Testdaten, Wiederöffnen). Fehlendes Recht → 403 „Dafür fehlt das Recht „…“.“; abgelaufene Sitzung → 403
+  „Anmeldedaten fehlen.“ bzw. „Anmeldung mit zweitem Faktor erforderlich.“, die Oberfläche wechselt dann zur Anmeldung.
+  Admin bei einer echten Akte → 403 „Als Admin nur bei Testpatienten möglich …“; die Oberfläche zeigt „nur lesen“.
 - Migrationen liegen im Repo (`backend/*/migrations/`). Ändert sich ein Modell, erzeugt GitHub Actions die Migration,
   legt sie als Commit „Migrationen automatisch erzeugt (CI)“ ab und prüft danach `makemigrations --check`.
   Schutz-Trigger werden nach jedem `migrate` gesetzt (`audit/schutz.py`).
@@ -134,13 +162,15 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Request:** –
 - **Response 200:** `{"schritt": "anmelden" | "kennwort_aendern" | "2fa_einrichten" | "2fa" | "fertig", "benutzer"?: Ich}`;
   `Ich` = `{id, benutzername, anzeigename, titel, vorname, nachname, kuerzel, funktion, rolle, ist_test, darstellung,
-  startseite, rechte: {patienten_bearbeiten, plaene_bearbeiten, administration}}` (nur bei `fertig`).
+  startseite, rechte: [Recht-Code], schreibt_nur_testpatienten: bool}` (nur bei `fertig`; Rechte siehe F66).
 - **Validierung:** –
 - **Tabellen:** `django_session`, `accounts_user`, `otp_totp_totpdevice`
 - **Fehlerfälle:** keine (immer 200)
 - **Testschritte:** Aufruf ohne Sitzung → `anmelden`; nach Kennwort → nächster Schritt; nach 2FA → `fertig` mit Benutzer.
-- **Teststatus:** Backend-Test grün (`Anmeldung.test_erstanmeldung`, 01.10.2026). Frontend fehlt.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`Anmeldung.test_erstanmeldung`). Browsertests grün: jeder beginnt mit `GET /api/auth/status/` (Schritt und
+  CSRF-Cookie), dazu `anmeldung.spec.ts` „Anmeldung mit Passwort und Code aus der Authenticator-App, Abmelden“ und `anmeldung.spec.ts` „Erste Anmeldung: eigenes Passwort, Authenticator einrichten, Notfall-Codes“. Sitzungen liegen in PostgreSQL; die Tests mit Neustart arbeiten danach mit derselben
+  Sitzung weiter.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F02 Anmeldung mit Benutzername und Kennwort
 - **Zweck:** erster Anmeldeschritt.
@@ -155,8 +185,8 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
   Kennwort verraten) · 403 fehlendes CSRF-Token · 429 mehr als 30 Versuche je Minute
 - **Testschritte:** richtige Daten → nächster Schritt; falsches Kennwort → 401 und Eintrag „Falsches Passwort (n. Versuch)“;
   abgelaufenes Einmal-Kennwort → 401 `abgelaufen`.
-- **Teststatus:** Backend-Tests grün (`accounts.tests.Anmeldung.*`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`accounts.tests.Anmeldung.*`). Browsertests grün: `anmeldung.spec.ts` „Anmeldung mit Passwort und Code aus der Authenticator-App, Abmelden“, `anmeldung.spec.ts` „Falsches Passwort wird abgewiesen“, `admin.spec.ts` „Fünf falsche Passwörter sperren das Konto; Admin sieht den Hinweis, setzt 2FA zurück und entsperrt“ (Sperre).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F03 Zweiter Faktor bei der Anmeldung
 - **Zweck:** Anmeldung mit 6-stelligem Code aus der Authenticator-App oder einem Notfall-Code abschließen.
@@ -169,9 +199,9 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Tabellen:** `otp_totp_totpdevice`, `otp_static_staticdevice`, `otp_static_statictoken`, `accounts_user`, `audit_systemereignis`
 - **Fehlerfälle:** 401 nicht mit Kennwort angemeldet oder Code falsch · 403 `gesperrt` beim fünften Fehlversuch (Abmeldung) · 429
 - **Testschritte:** Anmeldung mit Kennwort, dann Notfall-Code → `fertig`, danach 9 Codes übrig.
-- **Teststatus:** Backend-Test grün für Notfall-Code (`test_erstanmeldung`, `Sitzungen.*`); TOTP-Code nur bei der Einrichtung getestet.
-  Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_erstanmeldung`, `Sitzungen.*`). Browsertests grün: `anmeldung.spec.ts` „Anmeldung mit Passwort und Code aus der Authenticator-App, Abmelden“ (Code aus der Authenticator-App),
+  Notfall-Code in `global-setup.ts` und `konto.spec.ts` „Passwort ändern, Notfall-Codes neu, neues Gerät, andere Sitzung beenden“; Neustart geprüft in `zz-neustart.spec.ts` (Anmeldung mit dem Code des neuen Geräts).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F04 Eigenes Kennwort setzen und ändern
 - **Zweck:** Einmal-Kennwort beim ersten Login ersetzen; später Kennwort im Konto ändern.
@@ -186,8 +216,9 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Tabellen:** `accounts_user`, `accounts_sitzung`, `django_session`, `audit_systemereignis`
 - **Fehlerfälle:** 400 zu schwach `{"fehler", "details": [...]}` · 400 altes Kennwort falsch · 401 nicht angemeldet · 403 ohne 2FA
 - **Testschritte:** Erstanmeldung → Kennwort setzen → `2fa_einrichten`; im Konto ändern → andere Sitzung abgemeldet.
-- **Teststatus:** Backend-Tests grün (`test_erstanmeldung`, `Sitzungen.test_kennwortwechsel_beendet_andere_sitzungen`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_erstanmeldung`, `Sitzungen.test_kennwortwechsel_beendet_andere_sitzungen`). Browsertests grün:
+  `anmeldung.spec.ts` „Erste Anmeldung: eigenes Passwort, Authenticator einrichten, Notfall-Codes“, `konto.spec.ts` „Passwort ändern, Notfall-Codes neu, neues Gerät, andere Sitzung beenden“ (altes Kennwort falsch → Meldung; danach geändert); Neustart geprüft in `zz-neustart.spec.ts` (Anmeldung mit dem neuen Passwort).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F05 Authenticator einrichten und ersetzen
 - **Zweck:** Authenticator-App verbinden (erste Anmeldung oder neues Telefon).
@@ -198,24 +229,25 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Tabellen:** `otp_totp_totpdevice`, `otp_static_*`, `audit_systemereignis`
 - **Fehlerfälle:** 403 Einmal-Kennwort offen oder Gerät vorhanden ohne 2FA · 400 Code falsch / Einrichtung nicht gestartet
 - **Testschritte:** siehe `test_erstanmeldung`; zusätzlich zu testen: Ersetzen im Konto.
-- **Teststatus:** Backend-Test grün für die Ersteinrichtung.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (Ersteinrichtung). Browsertests grün: `anmeldung.spec.ts` „Erste Anmeldung: eigenes Passwort, Authenticator einrichten, Notfall-Codes“ (Einrichten mit QR-Code/Schlüssel), `konto.spec.ts` „Passwort ändern, Notfall-Codes neu, neues Gerät, andere Sitzung beenden“ („Neues
+  Gerät“: neuer Schlüssel, danach neue Notfall-Codes); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F06 Notfall-Codes neu erzeugen
 - **Endpunkt:** `POST /api/auth/notfallcodes/` → `{"notfallcodes": [10 × string]}`
 - **Zweck/Validierung:** voll angemeldet; alte Codes werden ungültig.
 - **Tabellen:** `otp_static_staticdevice`, `otp_static_statictoken`, `audit_systemereignis`
 - **Fehlerfälle:** 403 nicht voll angemeldet
-- **Teststatus:** kein automatischer Test.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Browsertest grün: `konto.spec.ts` „Passwort ändern, Notfall-Codes neu, neues Gerät, andere Sitzung beenden“ (10 neue Codes, Anzeige „10 von 10 übrig“); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F07 Abmelden
 - **Ansicht:** alle Ansichten (Seitenleiste)
 - **Endpunkt:** `POST /api/auth/abmelden/` → `{"schritt": "anmelden"}`
 - **Logik:** Sitzung wird beendet, Eintrag in `accounts_sitzung` entfernt, Abmeldung protokolliert.
 - **Tabellen:** `django_session`, `accounts_sitzung`, `audit_systemereignis`
-- **Teststatus:** Backend-Test grün (`Sitzungen.test_abmelden_entfernt_sitzung`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`Sitzungen.test_abmelden_entfernt_sitzung`). Browsertest grün: `anmeldung.spec.ts` „Anmeldung mit Passwort und Code aus der Authenticator-App, Abmelden“ (danach `auth/status` = `anmelden`).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F08 Konto sperren nach 5 Fehlversuchen
 - **Zweck:** Schutz gegen Raten. **Beschluss (Entwurf 17, 20):** Konto bleibt gesperrt, bis der Admin entsperrt; Audit-Log
@@ -230,8 +262,9 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Fehlerfälle:** 403 `{"fehler": "Das Konto ist gesperrt …", "gesperrt": true}`
 - **Testschritte:** 4 × falsch → 401; 5. → 403 gesperrt; richtiges Kennwort → 403; falsches → 401; Admin entsperrt →
   Anmeldung klappt; Audit-Log zeigt „Falsches Passwort (3. Versuch)“ und „5 falsche Passwörter in n Minuten, Konto gesperrt“.
-- **Teststatus:** Backend-Test grün (`Anmeldung.test_sperre_nach_fehlversuchen`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`Anmeldung.test_sperre_nach_fehlversuchen`). Browsertest grün: `admin.spec.ts` „Fünf falsche Passwörter sperren das Konto; Admin sieht den Hinweis, setzt 2FA zurück und entsperrt“ (Meldung an der Anmeldung, Hinweis im
+  Audit-Log mit Link zum Benutzer, Entsperren); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F09 Eigenes Profil, Darstellung und Startseite speichern
 - **Ansicht:** 14 Mein Konto, 2 Start („Startseite anpassen“)
@@ -246,8 +279,9 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
   eigene Hintergrundfarbe muss hell genug sein (Leuchtdichte ≥ 0,6); Karten nur einmal.
 - **Tabellen:** `accounts_user` (`darstellung`, `startseite`)
 - **Fehlerfälle:** 400 `{"<schlüssel>": [...]}`
-- **Teststatus:** Backend-Tests grün (`MeinKonto.*`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`MeinKonto.*`). Browsertests grün: `konto.spec.ts` „Darstellung wählen, eigene Farben prüfen, nach Neuladen erhalten, zurücksetzen“, `start.spec.ts` „Startseite anpassen: Karte ausblenden bleibt gespeichert“; Neustart geprüft in `zz-neustart.spec.ts` (Darstellung „Dunkel“ und ausgeblendete Karte,
+  beide vor dem Neustart in der Oberfläche gewählt).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F10 Sicherheitsstatus im Konto
 - **Zweck:** „Passwort zuletzt geändert“, „Authenticator eingerichtet am“, „8 von 10 Notfall-Codes übrig“.
@@ -258,8 +292,9 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Tabellen:** `accounts_user` (`kennwort_geaendert_am`), `otp_totp_totpdevice`, `otp_static_statictoken`, `audit_systemereignis`
   (Zeitpunkt der Einrichtung)
 - **Fehlerfälle:** 403 nicht voll angemeldet
-- **Teststatus:** Backend-Test grün (in `test_erstanmeldung`: 10 von 10, nach Notfall-Code 9). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (in `test_erstanmeldung`). Browsertest grün: `konto.spec.ts` „Passwort ändern, Notfall-Codes neu, neues Gerät, andere Sitzung beenden“ („zuletzt geändert“, „x von 10 übrig“, Authenticator
+  „aktiv“); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F11 Angemeldete Sitzungen anzeigen und abmelden
 - **Zweck:** Liste „Dieser PC · Firefox jetzt“, „Praxis-PC 2 · Edge, zuletzt …“, einzeln abmelden.
@@ -272,13 +307,16 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Tabellen:** `accounts_sitzung` (neu), `django_session`
 - **Fehlerfälle:** 400 eigene Sitzung · 404 fremde oder abgelaufene Sitzung
 - **Testschritte:** zwei Anmeldungen → zwei Einträge, einer `diese`; fremde beenden → dort 403; abgelaufene verschwinden.
-- **Teststatus:** Backend-Tests grün (`Sitzungen.*`). Gerätename statt Browser: Unklarheit U8. Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`Sitzungen.*`). Browsertest grün: `konto.spec.ts` „Passwort ändern, Notfall-Codes neu, neues Gerät, andere Sitzung beenden“ (zweite Anmeldung erscheint als anderes Gerät, wird beendet,
+  dort danach `anmelden`). Angezeigt werden Browser und IP-Adresse – das reicht (U8 geklärt 01.10.2026).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F12 Automatische Abmeldung nach 30 Minuten
-- **Umsetzung:** `SESSION_COOKIE_AGE` = 30 min, bei jeder Anfrage verlängert (`EPM_SITZUNG_MINUTEN`).
-- **Teststatus:** nicht automatisch getestet.
-- **Status:** TEILWEISE ABGESCHLOSSEN (Frontend muss auf 403 mit Wechsel zur Anmeldung reagieren)
+- **Umsetzung:** `SESSION_COOKIE_AGE` = 30 min, bei jeder Anfrage verlängert (`EPM_SITZUNG_MINUTEN`). Die Oberfläche prüft
+  bei jedem 401/403 den Anmeldestatus und wechselt zur Anmeldung, wenn die Sitzung nicht mehr gilt.
+- **Teststatus:** Backend-Test grün (`Sitzungen.test_sitzung_laeuft_nach_30_minuten_ab`: 30 Minuten, jede Anfrage verlängert). Browsertest grün:
+  `anmeldung.spec.ts` „Abgelaufene Sitzung führt zurück zur Anmeldung“ (Sitzung in der Datenbank abgelaufen → nächste Anfrage 403 → Anmeldeseite).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ---
 
@@ -296,7 +334,8 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Validierung:** Testbenutzer sieht nur Testpatienten; Testpatienten fehlen in Zahlen und Prüfliste.
 - **Tabellen:** `patienten_*` (+ Historie), `infusionen_infusionsplan`, `stammdaten_einstellungen`
 - **Fehlt:** Backup-Status für die Kopfzeile (hängt an F62).
-- **Teststatus:** Backend-Tests grün (`Patientenliste.test_startseite`, `test_pruefen_filter`, `Musterdaten.*`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
+- **Teststatus:** Backend-Tests grün (`Patientenliste.test_startseite`, `test_pruefen_filter`, `Musterdaten.*`). Browsertests grün: `start.spec.ts` „Startseite zeigt Termine, Gewichte, Pläne, Prüfliste und Zuletzt eingetragen“,
+  `start.spec.ts` „Termin von der Startseite anlegen und als erledigt abhaken“ (mit Neustart), `start.spec.ts` „Startseite anpassen: Karte ausblenden bleibt gespeichert“. Es fehlt der Backup-Status (F62), daher nicht ABGESCHLOSSEN UND GETESTET.
 - **Status:** TEILWEISE ABGESCHLOSSEN
 
 ---
@@ -320,14 +359,16 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
   „Kein Kontakt seit über 12 Mon.“ (Monate aus den Einstellungen, U4).
 - **Tabellen:** `patienten_patient`, `patienten_gewichtsmessung`, `patienten_kontakt`, `patienten_termin`,
   `infusionen_infusionsplan`, `stammdaten_einstellungen`
-- **Teststatus:** Backend-Tests grün (`Patientenliste.*`, `test_testbenutzer_sieht_nur_testpatienten`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`Patientenliste.*`, `test_testbenutzer_sieht_nur_testpatienten`). Browsertests grün: `patienten.spec.ts` „Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten“ (Freitext,
+  Versorger, Ansprechpartner, Schnellfilter, Sortierung, abgeschlossene Akten, Zahl ohne Testpatienten), `patienten.spec.ts` „Betrachter sieht die Liste, aber keinen Knopf „Neuer Patient““, `patienten.spec.ts` „Testzugang: Hinweis dauerhaft sichtbar, nur Testpatienten, neue Patienten werden Testpatienten“, `patienten.spec.ts` „Suche in der Kopfzeile (Strg K) nach Name, Nummer und Geburtsdatum“;
+  Neustart geprüft in `zz-neustart.spec.ts` (Suche nach dem neuen Patienten).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F15 Doppelprüfung beim Anlegen
 - **Endpunkt:** `GET /api/patienten/doppelte/?geburtsdatum=JJJJ-MM-TT&nachname=&vorname=` → bis zu 10 Einträge wie F14
 - **Regel:** gleiches Geburtsdatum und Nach- oder Vorname beginnt mit denselben 3 Buchstaben.
-- **Teststatus:** Backend-Test grün (`test_doppelte`).
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`test_doppelte`). Browsertest grün: `patienten.spec.ts` „Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme“ (Hinweis auf Musterfrau, Erika; „Nein, andere Person“).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F16 Patient anlegen
 - **Ansicht:** 12 Neuer Patient
@@ -341,9 +382,12 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Validierung:** Geburtsdatum nicht in der Zukunft; Größe und Aufnahmegewicht in den Grenzen der Einstellungen;
   Ansprechpartner gehört zum Versorger; Katheter aus Liste „Katheter“; Aufnahmegewicht beim Ändern → 400.
 - **Tabellen:** `patienten_patient`, `patienten_gewichtsmessung` (+ Historie)
-- **Fehlerfälle:** 400 Pflichtfeld/Plausibilität (dann wird nichts gespeichert) · 403 Rolle Betrachter oder Admin
-- **Teststatus:** Backend-Tests grün (`test_schreibrechte`, `test_nummern`, `test_anlegen_mit_aufnahmegewicht`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Fehlerfälle:** 400 Pflichtfeld/Plausibilität (dann wird nichts gespeichert) · 403 ohne Recht „Patienten anlegen, Diagnose, Therapie, Stammdaten ändern“; ein
+  Admin legt automatisch einen Testpatienten an (`naechste-nummer` meldet `testpatient: true`)
+- **Teststatus:** Backend-Tests grün (`test_schreibrechte`, `test_nummern`, `test_anlegen_mit_aufnahmegewicht`). Browsertests grün: `patienten.spec.ts` „Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme“
+  (Pflichtfelder in der Oberfläche, Größe vom Backend abgewiesen, Anlegen mit Aufnahmegewicht und Überweisung, Versorger
+  aus dem Formular neu anlegen), `admin.spec.ts` „Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten“ (Admin legt Testpatienten an), `patienten.spec.ts` „Testzugang: Hinweis dauerhaft sichtbar, nur Testpatienten, neue Patienten werden Testpatienten“ (Testzugang: Nummer ab 9001); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F17 Akte lesen mit Patientenkopf
 - **Ansicht:** 4 Patientenakte
@@ -355,19 +399,19 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
   ort, bei}, versionen {diagnose|therapie|empfehlung: {version, zeitpunkt, person}}, zaehler {kontakte, gewichte, dokumente,
   termine_offen, infusionsplaene}}`
 - **Fehlerfälle:** 404 unbekannt oder außerhalb des Bereichs
-- **Teststatus:** Backend-Tests grün (Kopf geprüft in `test_versionen_der_textfelder`, `test_termin_mit_ort`,
-  `Infusionsplaene.test_ablauf`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_versionen_der_textfelder`, `test_termin_mit_ort`, `Infusionsplaene.test_ablauf`). Browsertests grün:
+  `akte.spec.ts` „Akte aus der Liste öffnen: Kopf mit Kerndaten und Gewichtswarnung“, `layout.spec.ts` „Unter 1280 px stehen die Karten der Akte untereinander“.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F18 Stammdaten, Diagnose, Therapie, Empfehlung ändern
 - **Ansicht:** 4 Akte, 5 Diagnose und Therapie
 - **Endpunkt:** `PATCH /api/patienten/{id}/`
 - **Validierung:** wie F16; Texte werden auf erlaubte Formatierung bereinigt (`epm/sanitize.py`); Akte darf nicht abgeschlossen sein.
 - **Tabellen:** `patienten_patient`, `patienten_historicalpatient`
-- **Fehlerfälle:** 400 · 403 Rolle · 409 Akte abgeschlossen
-- **Teststatus:** Backend-Tests grün (`test_verlauf_nach_bereichen`, `test_versionen_der_textfelder`,
-  `test_abgeschlossene_akte_ist_gesperrt`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Fehlerfälle:** 400 · 403 ohne Recht · 409 Akte abgeschlossen
+- **Teststatus:** Backend-Tests grün (`test_verlauf_nach_bereichen`, `test_versionen_der_textfelder`, `test_abgeschlossene_akte_ist_gesperrt`).
+  Browsertests grün: `akte.spec.ts` „Diagnose und Therapie bearbeiten, Versionen ansehen“, `akte.spec.ts` „Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen (Admin)“; Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F19 Versionen je Textfeld
 - **Zweck:** „Version 12 · geändert 12.08.2026, 15:12 von Dr. M. Berger · Versionen“ für Diagnose, Empfehlung, Therapie.
@@ -377,26 +421,29 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Logik:** jede tatsächliche Änderung des Feldes in der Historie ist eine Fassung.
 - **Tabellen:** `patienten_historicalpatient`
 - **Fehlerfälle:** 400 anderes Feld · 404
-- **Teststatus:** Backend-Test grün (`test_versionen_der_textfelder`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`test_versionen_der_textfelder`). Browsertest grün: `akte.spec.ts` „Diagnose und Therapie bearbeiten, Versionen ansehen“; Neustart geprüft in `zz-neustart.spec.ts` („Version 2“).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F20 Akte abschließen
 - **Ansicht:** 4 Akte (Menü ⋯)
 - **Endpunkt:** `POST /api/patienten/{id}/abschliessen/` `{"anlass": "verstorben"|"therapie_beendet"|"betreuung_gewechselt",
   "datum"?: Datum, "notiz"?: string}` → Akte wie F17
-- **Validierung:** **nur Mediziner** (Rollenmatrix, `AbschlussRecht`); Anlass Pflicht; Datum gültig und nicht in der Zukunft;
+- **Validierung:** Recht „Akten abschließen“ (Standard: Mitarbeiter, Mediziner, Admin – Admin nur bei Testpatienten); Anlass Pflicht; Datum gültig und nicht in der Zukunft;
   Akte noch offen.
 - **Tabellen:** `patienten_patient`, `audit_systemereignis` („Akte Name, Vorname (Nr. 0077) abgeschlossen, Anlass: …“)
-- **Fehlerfälle:** 400 Anlass/Datum · 403 Rolle · 409 bereits abgeschlossen
-- **Teststatus:** Backend-Tests grün (`test_abschliessen_nur_mediziner`, `test_abgeschlossene_akte_ist_gesperrt`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Fehlerfälle:** 400 Anlass/Datum · 403 ohne Recht · 409 bereits abgeschlossen
+- **Teststatus:** Backend-Tests grün (`test_abschliessen_mit_recht`, `test_abgeschlossene_akte_ist_gesperrt`,
+  `test_admin_schreibt_nur_bei_testpatienten`). Browsertests grün: `akte.spec.ts` „Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen (Admin)“ (Betrachter ohne Menüpunkt, Mitarbeiter schließt ab,
+  Akte danach nur lesbar und unter „Abgeschlossen“), `admin.spec.ts` „Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten“; Neustart geprüft in `zz-neustart.spec.ts` (Verlauf).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F21 Akte wieder öffnen
 - **Endpunkt:** `POST /api/patienten/{id}/wieder-oeffnen/` `{"grund": string}` → Akte
-- **Validierung:** nur Admin; Grund Pflicht; Akte muss abgeschlossen sein. Grund steht in der Historie.
+- **Validierung:** Recht „Abgeschlossene Akten wieder öffnen“ (Standard: Admin); Grund Pflicht; Akte muss abgeschlossen sein. Grund steht in der Historie.
 - **Fehlerfälle:** 400 · 403
-- **Teststatus:** Backend-Test grün.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_abgeschlossene_akte_ist_gesperrt`, `test_admin_schreibt_nur_bei_testpatienten`). Browsertest grün:
+  `akte.spec.ts` „Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen (Admin)“ (Admin öffnet eine echte Akte mit Grund wieder, danach für ihn wieder nur lesbar); Neustart geprüft in `zz-neustart.spec.ts` (Verlauf „wieder geöffnet“).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F22 Verlauf je Akte
 - **Ansicht:** 10 Verlauf
@@ -406,8 +453,8 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Logik:** Änderungen an der Akte werden nach Feld auf Stammdaten, Diagnose, Therapie und Empfehlung verteilt; `aktion`:
   angelegt, geändert, hochgeladen, storniert, erledigt, freigegeben, abgelöst, abgeschlossen, wieder geöffnet.
 - **Tabellen:** alle `*_historical*`
-- **Teststatus:** Backend-Test grün (`test_verlauf_nach_bereichen`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`test_verlauf_nach_bereichen`). Browsertest grün: `dokumente.spec.ts` „Dokumente hochladen, Typ am Inhalt prüfen, Metadaten ändern, ausblenden, herunterladen; Verlauf“ (Bereich, Person, Änderung mit alt/neu); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F23 Akte als PDF / F24 Verlauf als PDF
 - **Endpunkte (geplant):** `GET /api/patienten/{id}/pdf/`, `GET /api/patienten/{id}/verlauf/pdf/` → `application/pdf`; Export
@@ -428,8 +475,9 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
   Akte offen; Patient nicht änderbar.
 - **Tabellen:** `patienten_gewichtsmessung`, `patienten_historicalgewichtsmessung`
 - **Fehlerfälle:** 400 · 403 · 409
-- **Teststatus:** Backend-Tests grün (`test_plausibilitaet_gewicht`, `test_gewichtswarnung`, `test_anlegen_mit_aufnahmegewicht`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_plausibilitaet_gewicht`, `test_gewichtswarnung`, `test_anlegen_mit_aufnahmegewicht`). Browsertests grün:
+  `akte.spec.ts` „Gewicht erfassen, Plausibilität, korrigieren, Zeitraum“ (auch Diagramm mit echten Zeitabständen und Glättung), `akte.spec.ts` „Akte aus der Liste öffnen: Kopf mit Kerndaten und Gewichtswarnung“ (Warnung); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F26 Kontakte anlegen, lesen, durchsuchen
 - **Ansicht:** 6 Kontakte
@@ -439,15 +487,15 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
   storno_grund, termine: [{id, art, faellig_am, uhrzeit, ort, erledigt}]}`
 - **Validierung:** Text bereinigt; Zeitpunkt nicht in der Zukunft; Akte offen. Unveränderlich: Modell + Datenbank-Trigger.
 - **Tabellen:** `patienten_kontakt`, `patienten_historicalkontakt`
-- **Teststatus:** Backend-Tests grün (`KontaktRegeln.*`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`KontaktRegeln.*`). Browsertest grün: `akte.spec.ts` „Kontakt mit Wiedervorlage erfassen, suchen, stornieren“ (mit Neustart); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F27 Kontakt stornieren
 - **Endpunkt:** `POST /api/kontakte/{id}/storno/` `{"grund": string}` → Kontakt
 - **Validierung:** Grund Pflicht; nur einmal; Akte offen. Trigger erlaubt nur die Storno-Felder.
 - **Fehlerfälle:** 400 · 403 · 409
-- **Teststatus:** Backend-Test grün (`test_storno_genau_einmal`).
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`test_storno_genau_einmal`). Browsertest grün: `akte.spec.ts` „Kontakt mit Wiedervorlage erfassen, suchen, stornieren“ (Grund Pflicht, danach kein Storno-Knopf); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F28 Kontakt mit Wiedervorlage in einem Schritt
 - **Zweck:** Entwurf 6: Kontakt speichern und dabei Rückruf/Wiedervorlage/Praxistermin mit Datum und Uhrzeit anlegen.
@@ -458,8 +506,8 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Validierung:** Datum nicht in der Vergangenheit; Ort aus Liste „Terminort“; bei Fehler wird **nichts** gespeichert.
 - **Tabellen:** `patienten_kontakt`, `patienten_termin` (+ Historie)
 - **Fehlerfälle:** 400 `{"wiedervorlage": {...}}`
-- **Teststatus:** Backend-Tests grün (`test_kontakt_mit_wiedervorlage`, `test_wiedervorlage_wird_geprueft`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_kontakt_mit_wiedervorlage`, `test_wiedervorlage_wird_geprueft`). Browsertest grün: `akte.spec.ts` „Kontakt mit Wiedervorlage erfassen, suchen, stornieren“; Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F29 Termine anlegen, ändern, lesen
 - **Ansicht:** 2 Start, 4 Akte
@@ -469,15 +517,16 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Response:** zusätzlich `ort_name`, `patient_name`, `erledigt_am`, `erledigt_von_name`, `angelegt_von_name`
 - **Validierung:** Ort aus Liste „Terminort“; Kontakt gehört zum Patienten; erledigte Termine nicht änderbar; Akte offen.
 - **Tabellen:** `patienten_termin`, `patienten_historicaltermin`, `stammdaten_auswahlwert`
-- **Teststatus:** Backend-Test grün (`test_termin_mit_ort`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`test_termin_mit_ort`). Browsertests grün: `start.spec.ts` „Termin von der Startseite anlegen und als erledigt abhaken“ (Anlegen von der Startseite, mit Neustart), Termin ändern
+  und Praxistermin mit Terminort in `akte.spec.ts` „Kontakt mit Wiedervorlage erfassen, suchen, stornieren“; Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F30 Termin als erledigt markieren
 - **Ansicht:** 2 Start
 - **Endpunkt:** `POST /api/termine/{id}/erledigt/` → Termin mit `erledigt_am`, `erledigt_von_name`
 - **Fehlerfälle:** 400 bereits erledigt · 409 Akte abgeschlossen
-- **Teststatus:** Backend-Test grün (`test_termin_mit_ort`: erledigt, danach nicht mehr änderbar). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`test_termin_mit_ort`). Browsertest grün: `start.spec.ts` „Termin von der Startseite anlegen und als erledigt abhaken“ (Abhaken, nach Neustart erledigt).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ---
 
@@ -486,50 +535,61 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 ### F31 Infusionspläne eines Patienten lesen
 - **Ansicht:** 8 Infusionspläne
 - **Endpunkt:** `GET /api/infusionsplaene/?patient=<id>&status=` → Pläne mit allen Werten, `vitamine`, `vitamine_namen`,
-  Positionen, `kcal_berechnet`, `kcal`, `geaenderte_felder`
-- **Teststatus:** Backend-Tests grün (`infusionen.tests.*`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+  Positionen, `kcal_berechnet`, `kcal`, `gesamtvolumen_ml`, `volumen_gewicht_kg`, `rate_ml_h`, `geaenderte_felder`
+- **Teststatus:** Backend-Tests grün (`infusionen.tests.*`). Browsertests grün: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“, `plaene.spec.ts` „Mitarbeiter sieht Pläne, legt aber keine an“; Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F32 Neuer Plan als Entwurf
 - **Ansicht:** 7 Neuer Infusionsplan
 - **Endpunkt:** `POST /api/infusionsplaene/entwurf/` `{"patient", "leer"?: bool, "vorlage"?: Plan-ID}` → 201 Entwurf
 - **Logik:** Standard vorbelegt mit dem aktuellen Plan (Werte, Vitamine, Positionen); `leer` = „Leer beginnen“; `vorlage` =
   „Als Vorlage für neuen Plan“ aus einem früheren Plan desselben Patienten. Vorgänger ist immer der aktuelle Plan.
-- **Validierung:** nur Mediziner; höchstens ein Entwurf je Patient; Vorlage vom selben Patienten; Akte offen.
+  Erster Plan: Der Editor belegt wie im Altsystem je kg des letzten Gewichts vor (`GET /api/infusionsplaene/vorbelegung/?patient=`
+  → `{gewicht_kg, je_kg, werte}`: Glucose 3,5 g, Aminosäuren 1,2 g, Lipide 1 g, Natrium 1,3, Kalium 0,7, Phosphat 0,3,
+  Calcium 0,15, Magnesium 0,2 mmol je kg; gerundet auf 0,1 wie die Felder).
+- **Validierung:** Recht „Infusionspläne anlegen“ (Standard: Mediziner; Admin nur bei Testpatienten); höchstens ein Entwurf je Patient; Vorlage vom selben Patienten; Akte offen.
 - **Fehlerfälle:** 400 Entwurf vorhanden / Vorlage fremd · 403 · 409
-- **Teststatus:** Backend-Tests grün (`test_ablauf`, `test_leer_beginnen_und_vorlage`, `test_abgeschlossene_akte`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_ablauf`, `test_leer_beginnen_und_vorlage`, `test_abgeschlossene_akte`, `test_berechnung_wie_im_altsystem`). Browsertest grün: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“
+  (erster Plan je kg vorbelegt, Folgeplan vorbelegt mit dem aktuellen Plan, „Als Vorlage für neuen Plan“, „Leer beginnen“, nur ein Entwurf
+  je Patient).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F33 Entwurf bearbeiten
 - **Ansicht:** 7 Neuer Infusionsplan
 - **Endpunkt:** `PATCH /api/infusionsplaene/{id}/`
 - **Request:** `gueltig_ab, basis_praeparat, basis_ml, glucose_praeparat, glucose_g, aminosaeuren_praeparat, aminosaeuren_g,
-  lipide_praeparat, lipide_g, albumin_praeparat, albumin_g, natrium_mmol, kalium_mmol, phosphat_mmol, calcium_mmol,
+  lipide_praeparat, lipide_g, albumin_praeparat, albumin_ml, natrium_mmol, kalium_mmol, phosphat_mmol, calcium_mmol,
   magnesium_mmol, spurenelemente, vitamine[], katheterschutz, kcal_manuell, laufzeit_h, tage_pro_woche, pantozol_stufe,
   pantozol_tage, bemerkung, positionen[]`
 - **Validierung:** Präparat passt zur Kategorie (Vitamine nur Vitamin-Präparate); ausgeblendete Präparate nicht neu wählbar
   (bisherige bleiben); Präparat Pflicht, wenn Menge gesetzt; Energie, Glucose, Aminosäuren, Lipide, Natrium, Kalium in den
-  Grenzen der Einstellungen; Pantozol-Regeln.
+  Grenzen der Einstellungen; Regeln für den Protonenpumpenhemmer (F38); Gesamtvolumen in den Grenzen (F39).
+- **Berechnung wie im Altsystem:** Energie = Glucose·4 + Aminosäuren·4 + Lipide·9,15 kcal; Humanalbumin in ml, ohne Energie.
+  Stabilität: Calcium + Magnesium (mmol) ≤ Gesamtvolumen ÷ 100, sonst Hinweis „instabil“ (`ca_mg_mmol`, `ca_mg_grenze_mmol`,
+  `ca_mg_stabil`); Speichern bleibt möglich.
 - **Tabellen:** `infusionen_infusionsplan`, `infusionen_infusionsplan_vitamine`, `infusionen_infusionsplanposition`, Historientabellen
 - **Fehlerfälle:** 400 · 403 freigegeben oder Rolle · 409
-- **Fehlt:** Gesamtvolumen (F39, blockiert).
-- **Teststatus:** Backend-Tests grün (`test_ablauf`, `test_praeparate_werden_geprueft`,
-  `test_ausgeblendetes_praeparat_bleibt_im_neuen_entwurf`, `test_kcal_manuell_und_grenze`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_ablauf`, `test_praeparate_werden_geprueft`, `test_ausgeblendetes_praeparat_bleibt_im_neuen_entwurf`,
+  `test_kcal_manuell_und_grenze`, `test_gesamtvolumen_rate_und_protonenpumpenhemmer`, `test_berechnung_wie_im_altsystem`).
+  Browsertest grün: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“ (Energie mit 9,15 kcal/g, Ca/Mg stabil und instabil, alle
+  Elektrolyte, Spurenelemente, Katheterblock, Vitamine, Energie manuell, Protonenpumpenhemmer mit Zeiten, Gesamtvolumen und
+  Rate; Plausibilität im Editor und im Backend; geänderte Werte markiert).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F34 Entwurf verwerfen
 - **Ansicht:** 8 Infusionspläne
 - **Endpunkt:** `DELETE /api/infusionsplaene/{id}/` → 204; nur Entwürfe (Modell + Trigger), sonst 403
-- **Teststatus:** Backend-Tests grün (`test_entwurf_verwerfen`, `test_ablauf`: freigegebener Plan → 403). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_entwurf_verwerfen`, `test_ablauf`). Browsertest grün: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F35 Plan freigeben
 - **Ansicht:** 8 Infusionspläne
 - **Endpunkt:** `POST /api/infusionsplaene/{id}/freigeben/` → Plan mit `status: "aktuell"`; bisheriger aktueller Plan → `abgeloest`
 - **Logik:** danach unveränderlich, auch die Vitamin-Zuordnung (Trigger auf `infusionen_infusionsplan_vitamine`).
 - **Fehlt:** PDF-Erzeugung bei Freigabe mit SHA-256 und Vorlagenversion, Ablage als Dokument „Von EPM erzeugt“ (F51, F50).
-- **Validierung:** nur Mediziner; vollständige Prüfung aller Werte; Akte offen.
-- **Teststatus:** Backend-Tests grün ohne PDF (`test_ablauf`, `test_vitamine_freigegebener_plaene_in_der_datenbank_geschuetzt`).
+- **Validierung:** Recht „Infusionspläne freigeben“ (Standard: Mediziner; Admin nur bei Testpatienten); vollständige Prüfung aller Werte; Akte offen.
+- **Teststatus:** Backend-Tests grün ohne PDF (`test_ablauf`, `test_vitamine_freigegebener_plaene_in_der_datenbank_geschuetzt`). Browsertest grün
+  ohne PDF: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“; Neustart geprüft in `zz-neustart.spec.ts`. Die PDF bei Freigabe fehlt (F51), daher nicht ABGESCHLOSSEN UND GETESTET.
 - **Status:** TEILWEISE ABGESCHLOSSEN
 
 ### F36 Vergleich mit dem Vorgänger
@@ -538,8 +598,8 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
   [{"schluessel", "wert", "vorher", "jetzt", "geaendert"}], "anzahl_geaendert"}`; Zeilen in der Reihenfolge des Entwurfs
   (Basislösung … Bemerkung), Werte als Anzeigetext („Glucose 70 % · 200 g“, „80 mmol“, „Soluvit N | Vitalipid adult“).
 - **Tabellen:** `infusionen_infusionsplan`, `infusionen_infusionsplan_vitamine`
-- **Teststatus:** Backend-Test grün (`test_vergleich_mit_vorgaenger`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`test_vergleich_mit_vorgaenger`). Browsertest grün: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“ („2 Werte geändert …“).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F37 Gespeicherte Plan-PDF öffnen mit SHA-256-Prüfung
 - **Endpunkt (geplant):** `GET /api/infusionsplaene/{id}/pdf/` → PDF über X-Accel-Redirect; vorher Prüfsumme gegen `pdf_sha256`,
@@ -547,16 +607,37 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Abhängigkeit:** F35 mit PDF.
 - **Status:** NICHT ABGESCHLOSSEN
 
-### F38 Pantozol im Plan
-- **Ist:** Felder `pantozol_stufe` (0–3) und `pantozol_tage` (1–7) wie im Altsystem gespeichert und geprüft.
-- **Offen:** Bedeutung und Einheit (Entwurf: „[BEDEUTUNG?] · [EINHEIT?]“), davon hängen Beschriftung und PDF ab.
-- **Status:** BLOCKIERT DURCH FEHLENDE INFORMATION
+### F38 Protonenpumpenhemmer (Pantozol®/Nexium®) im Plan
+- **Ansicht:** 7 Neuer Infusionsplan (Karte „Protonenpumpenhemmer“), 8 Infusionspläne (Ansicht wie PDF, Vergleich)
+- **Festlegung 01.10.2026 (U1):** Protonenpumpenhemmer als Kurzinfusion, Auswahl wie im Altsystem (`EPM_infuplan.php`):
+  kein · Pantozol® 40 mg · Pantozol® 20 mg · Nexium®; Zeiten morgens, mittags, abends (mehrere möglich).
+- **Felder:** `pantozol_stufe` mit den Codes des Altsystems (0 kein, 1 Pantozol® 40 mg, 3 Pantozol® 20 mg, 2 Nexium®), damit
+  der Import die Werte unverändert übernimmt; `pantozol_tage` = Zeiten als Bitmaske wie `panzeit` im Altsystem
+  (4 morgens + 2 mittags + 1 abends, z. B. 5 = morgens und abends).
+- **Validierung:** unbekannter Code → 400 `pantozol_stufe`; Präparat gewählt ohne Zeiten → 400 „Bitte die Zeiten angeben
+  (morgens, mittags, abends).“; Zeiten ohne Präparat → 400; Zeiten außerhalb 1–7 → 400 (zusätzlich DB-Constraint).
+- **Anzeige:** „Pantozol® 40 mg · morgens, abends“ in der Ansicht wie PDF, im Vergleich und im Verlauf; geänderte Werte markiert.
+- **Teststatus:** Backend-Tests grün (`test_gesamtvolumen_rate_und_protonenpumpenhemmer`, `test_praeparate_werden_geprueft`). Browsertest grün:
+  `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“ (Präparat wählen, ohne Zeiten abgewiesen, morgens + abends; Folgeplan übernimmt beides; PDF-Ansicht „Pantozol® 40 mg ·
+  morgens, abends“; API `pantozol_stufe` 1, `pantozol_tage` 5); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F39 Gesamtvolumen, Laufzeit und Rate
-- **Ist:** `laufzeit_h` vorhanden; Gesamtvolumen und Rate (ml/h) fehlen.
-- **Offen:** Werden Gesamtvolumen und Laufzeit eingegeben oder aus den Präparaten berechnet? Der Entwurf zeigt sie auf dem Plan,
-  aber nicht im Eingabeformular.
-- **Status:** BLOCKIERT DURCH FEHLENDE INFORMATION
+- **Ansicht:** 7 Neuer Infusionsplan (Karte „Gültigkeit, Laufzeit“), 8 Infusionspläne, Übersicht der Akte
+- **Festlegung 01.10.2026 (U2):** Gesamtvolumen wird berechnet wie im Altsystem (`$volum = round($gewicht * 35, 2)`),
+  die Laufzeit wird eingegeben.
+- **Logik:** `gesamtvolumen_ml` = letztes erfasstes Gewicht (nach Messdatum) × 35 ml, auf 2 Stellen; `volumen_gewicht_kg` hält das
+  verwendete Gewicht fest. Im Entwurf bei jedem Speichern neu berechnet, mit der Freigabe eingefroren (spätere Gewichte ändern
+  einen freigegebenen Plan nicht). Ohne Gewicht bleiben Gesamtvolumen und Rate leer. `rate_ml_h` = Gesamtvolumen ÷ Laufzeit,
+  auf 0,1 ml/h. Beide Werte sind nicht eingebbar (nur lesend in der API). Der Editor zeigt sie schon während der Eingabe.
+- **Validierung:** Gesamtvolumen in den Grenzen der Einstellungen (`volumen_min_ml`/`volumen_max_ml`, Standard 0–9.000 ml),
+  sonst 400 `gesamtvolumen_ml`.
+- **Anzeige:** „2.100 ml (35 ml/kg × 60 kg)“ und „175 ml/h“ in der Ansicht wie PDF und im Vergleich; Übersicht der Akte
+  „Gesamtvolumen 2.100 ml · Rate 175 ml/h“.
+- **Teststatus:** Backend-Test grün (`test_gesamtvolumen_rate_und_protonenpumpenhemmer`: letztes Gewicht nach Messdatum, 60 kg → 2.100 ml,
+  12 h → 175 ml/h, nach Freigabe eingefroren, neuer Entwurf mit 70 kg → 2.450 ml, Grenze). Browsertests grün: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“ (Editor,
+  PDF-Ansicht, Übersicht der Akte, API), `admin.spec.ts` „Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte“ (Grenze); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ---
 
@@ -571,18 +652,20 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
   → 400, die Endung zählt nicht); Typ aus Liste „Dokumenttyp“; Akte offen.
 - **Speicherung:** `/data/dokumente/<nummer>/<zufällig>.<endung>`, atomar, SHA-256, MIME-Typ aus der Inhaltserkennung.
 - **Tabellen:** `patienten_dokument`, `patienten_historicaldokument`
-- **Teststatus:** Backend-Tests grün (`test_dokument_upload_und_download`, `test_dokumenttyp_am_inhalt`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_dokument_upload_und_download`, `test_dokumenttyp_am_inhalt`). Browsertest grün: `dokumente.spec.ts` „Dokumente hochladen, Typ am Inhalt prüfen, Metadaten ändern, ausblenden, herunterladen; Verlauf“ (.exe
+  abgewiesen, Text und PNG am Inhalt erkannt); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F41 Dokumente lesen, Metadaten ändern, ausblenden
 - **Endpunkte:** `GET /api/dokumente/?patient&typ&ausgeblendet&search`, `PATCH /api/dokumente/{id}/` (`titel`, `typ`, `datum`, `notiz`, `ausgeblendet`)
-- **Teststatus:** kein automatischer Test.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Browsertest grün: `dokumente.spec.ts` „Dokumente hochladen, Typ am Inhalt prüfen, Metadaten ändern, ausblenden, herunterladen; Verlauf“ (Typ, Datum, Titel; ausblenden und wieder anzeigen); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F42 Datei anzeigen und herunterladen
 - **Endpunkt:** `GET /api/dokumente/{id}/datei/[?anzeigen=1]` → Nginx liefert über `X-Accel-Redirect: /_geschuetzt/dokumente/…`
-- **Teststatus:** Kopfzeile getestet; Auslieferung durch Nginx nicht getestet.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (Kopfzeile). Browsertest grün: `dokumente.spec.ts` „Dokumente hochladen, Typ am Inhalt prüfen, Metadaten ändern, ausblenden, herunterladen; Verlauf“ (Vorschau; Download über Nginx mit X-Accel-Redirect, Inhalt
+  unverändert); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F43 Altdokumente prüfen
 - **Zweck:** importierte Dateien tragen „Typ prüfen“ und die Herkunft des Datums (PDF-Metadaten, EXIF, Dateidatum), bis jemand
@@ -593,8 +676,8 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Felder:** `typ_geprueft` (bool, nur über diese Aktion setzbar), `datum_quelle` (eingabe|pdf|exif|dateidatum)
 - **Tabellen:** `patienten_dokument` (+ Historie)
 - **Fehlerfälle:** 400 Typ aus falscher Liste · 409 Akte abgeschlossen
-- **Teststatus:** Backend-Test grün (`test_altdokument_pruefen`). Befüllung beim Import: F65. Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`test_altdokument_pruefen`). Browsertest grün: `dokumente.spec.ts` „Altdokument prüfen: Typ und Datum bestätigen“; Neustart geprüft in `zz-neustart.spec.ts`. Befüllung beim Import: F65.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ---
 
@@ -605,19 +688,20 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Endpunkte:** `GET/POST /api/auswahlwerte/?liste&aktiv`, `PATCH /api/auswahlwerte/{id}/` (kein Löschen)
 - **Listen:** `katheter`, `dokumenttyp`, `terminort`, `kontaktart` (U6). Musterwerte wie im Entwurf (Katheter 6, Terminorte 1,
   Dokumenttypen 6); bisher angelegte Werte bleiben erhalten.
-- **Validierung:** Wert je Liste eindeutig; nur Admin schreibt; Änderungen im Audit-Log mit alt/neu.
+- **Validierung:** Wert je Liste eindeutig; schreiben mit Recht „Vorlagen pflegen“ (Standard: Mitarbeiter, Mediziner, Admin); Änderungen im Audit-Log mit alt/neu.
 - **Tabellen:** `stammdaten_auswahlwert` (+ Historie)
-- **Teststatus:** Backend-Test grün für die Musterwerte (`test_auswahllisten_wie_im_entwurf`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_auswahllisten_wie_im_entwurf`, `Reihenfolge.*`). Browsertest grün: `admin.spec.ts` „Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte“ (Terminort anlegen,
+  Reihenfolge per Tastatur, ausblenden); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F45 Versorger pflegen
 - **Ansicht:** 13 Versorger, 12 Neuer Patient („Neu anlegen“)
 - **Endpunkte:** `GET/POST /api/versorger/`, `PATCH /api/versorger/{id}/`; Deaktivieren über `aktiv: false`; kein Löschen (405)
 - **Response:** mit `ansprechpartner[]` und `patienten_anzahl`
-- **Rechte:** Mitarbeiter, Mediziner, Admin (Unklarheit U10)
+- **Rechte:** Recht „Versorger und Ansprechpartner pflegen“ (Standard: Mitarbeiter, Mediziner, Admin; U10 erledigt)
 - **Tabellen:** `stammdaten_versorger` (+ Historie)
-- **Teststatus:** Backend-Test grün (`VersorgerUndAnsprechpartner.test_rechte`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`VersorgerUndAnsprechpartner.test_rechte`). Browsertests grün: `versorger.spec.ts` „Versorger anlegen, Ansprechpartner pflegen, deaktivieren mit Neuzuordnung“ (mit Neustart), `versorger.spec.ts` „Betrachter sieht Versorger nur lesend“.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F46 Ansprechpartner pflegen
 - **Ansicht:** 13 Versorger
@@ -628,8 +712,8 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Validierung:** Ziel aktiv, anderer Ansprechpartner desselben Versorgers; abgeschlossene Akten bleiben unverändert; jede
   Neuzuordnung steht im Verlauf der Akte.
 - **Tabellen:** `stammdaten_ansprechpartner`, `patienten_patient` (+ Historie), `audit_systemereignis`
-- **Teststatus:** Backend-Test grün (`test_patienten_und_neu_zuordnen`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`test_patienten_und_neu_zuordnen`). Browsertest grün: `versorger.spec.ts` „Versorger anlegen, Ansprechpartner pflegen, deaktivieren mit Neuzuordnung“ (Deaktivieren mit Neuzuordnung, mit Neustart).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F47 Präparate pflegen
 - **Ansicht:** 18 Vorlagen › Präparate
@@ -638,23 +722,33 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
   (Anzahl der Pläne, in denen das Präparat vorkommt, auch als Vitamin)
 - **Musterwerte:** wie im Entwurf (Basislösungen, Glucose 70 %, 8 Aminosäuren, 7 Lipide, Humanalbumin, 3 Spurenelemente,
   5 Vitamine, 2 Katheterblock); bisherige Einträge bleiben.
-- **Teststatus:** Backend-Tests grün (`Praeparate.*`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`Praeparate.*`). Browsertest grün: `admin.spec.ts` „Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte“ (Vitamin anlegen und ausblenden); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F48 Grenzwerte und Einstellungen
 - **Ansicht:** 18 Vorlagen › Grenzwerte
-- **Endpunkt:** `GET/PATCH /api/einstellungen/` (lesen alle, ändern Admin)
+- **Endpunkt:** `GET/PATCH /api/einstellungen/` (lesen alle, ändern mit Recht „Vorlagen pflegen“)
 - **Felder:** Absender; Warnung Gewichtsverlust %, Zeitraum, Plan alt nach Monaten, Kontakt überfällig nach Monaten;
-  Min/Max für Energie, Glucose, Aminosäuren, Lipide, Natrium, Kalium, Gewicht, Größe.
+  Min/Max für Energie, Gesamtvolumen, Glucose, Aminosäuren, Lipide, Natrium, Kalium, Gewicht, Größe.
 - **Validierung:** Minimum < Maximum je Paar; Audit-Log „Grenzwert „Kontakt überfällig“ von 6 auf 12 Monate geändert“.
-- **Fehlt:** Grenzen für das Gesamtvolumen (hängt an F39/U2).
-- **Teststatus:** Backend-Test grün (`EinstellungenPruefen.test_grenzen_und_rechte`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`EinstellungenPruefen.test_grenzen_und_rechte`, `test_gesamtvolumen_rate_und_protonenpumpenhemmer`).
+  Browsertests grün: `admin.spec.ts` „Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte“ (untere > obere Grenze abgewiesen, Grenze für das Gesamtvolumen geändert), Grenzen wirken in
+  `akte.spec.ts` „Gewicht erfassen, Plausibilität, korrigieren, Zeitraum“, `patienten.spec.ts` „Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme“, `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“; Neustart geprüft in `zz-neustart.spec.ts` (Grenzwert vor dem Neustart in der Oberfläche geändert).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F49 Briefkopf, Absender und Logo
-- **Geplant:** je Absender (Stiftung, gUG) Name, Straße, PLZ, Ort, Telefon, Fax, E-Mail, Internet, Fußzeile; Logo-Upload (PNG/SVG);
-  gilt für neue PDFs, freigegebene behalten ihren Briefkopf. Endpunkte `GET/PATCH /api/briefkopf/`, `POST /api/briefkopf/logo/`.
-- **Status:** NICHT ABGESCHLOSSEN
+- **Ansicht:** 18 Vorlagen (Briefkopf und Logo)
+- **Endpunkte:** `GET /api/briefkopf/` → `{aktiv: stiftung|gug, absender: {stiftung, gug: {name, strasse, plz, ort, telefon,
+  fax, email, internet, fusszeile}}, arten, logo: {vorhanden, mime, sha256, breite, hoehe, hochgeladen_am}}`;
+  `PATCH /api/briefkopf/` `{aktiv?, absender?: {stiftung?: {...}, gug?: {...}}}`; `GET /api/briefkopf/logo/` (öffentlich, auch
+  für die Anmeldeseite) und `POST /api/briefkopf/logo/` (multipart `datei`)
+- **Validierung:** Schreiben mit Recht „Vorlagen pflegen“; Logo PNG oder SVG bis 2 MB, mindestens 600 px breit, Querformat;
+  SVG ohne Skripte, Ereignisse, eingebettete Inhalte und externe Verweise; Änderungen im Audit-Log mit alt/neu.
+- **Tabellen:** `stammdaten_absenderangaben`, `stammdaten_logo`, `stammdaten_einstellungen` (+ Historie), Datei im Dokumentenspeicher
+- **Gilt für:** neue PDFs (F51); freigegebene behalten ihren Briefkopf. Die Ansicht „wie PDF“ eines Plans zeigt ihn schon jetzt.
+- **Teststatus:** Backend-Tests grün (`test_briefkopf_lesen_und_aendern`, `test_logo`). Browsertest grün: `admin.spec.ts` „Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte“ (zu kleines PNG und
+  SVG mit Skript abgewiesen, gültiges SVG gespeichert, Telefon geändert mit Vorschau); Neustart geprüft in `zz-neustart.spec.ts` (Logo).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F50 Dokumentvorlagen (WYSIWYG)
 - **Geplant:** Vorlagen „Infusionsplan“ und „Patientendatenblatt“ aus Blöcken (Briefkopf, Text, Datenfelder, Tabelle, Unterschrift,
@@ -679,26 +773,29 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Felder:** `username, titel, first_name, last_name, kuerzel, funktion, email, rolle, ist_test`; nur lesend: `is_active,
   nur_historisch, muss_kennwort_aendern, einmal_kennwort_gueltig_bis, gesperrt_am, sperrgrund, fehlversuche, last_login,
   date_joined, anzeigename, zweiter_faktor`
-- **Validierung:** nur Admin; Kürzel eindeutig; eigene Admin-Rolle nicht entziehbar; kein Löschen.
+- **Validierung:** Recht „Benutzer und Rechte verwalten“; Kürzel eindeutig; die eigene Rolle nicht auf eine ohne Benutzerverwaltung
+  änderbar; kein Löschen.
 - **Tabellen:** `accounts_user`, `audit_systemereignis`
-- **Teststatus:** Backend-Tests grün (`test_nur_admin_verwaltet_benutzer`, `test_neuer_benutzer_hat_frist`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_nur_admin_verwaltet_benutzer`, `test_neuer_benutzer_hat_frist`). Browsertest grün: `admin.spec.ts` „Benutzer anlegen, Einmal-Kennwort, sperren und entsperren“
+  (Anlegen, Anzeige in der Akte, Funktion und Rolle ändern, erste Anmeldung der neuen Person); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F53 Benutzer sperren und entsperren
 - **Ansicht:** 17 Benutzer, 20 Audit-Log (Hinweis)
 - **Endpunkte:** `POST /api/benutzer/{id}/sperren/`, `POST /api/benutzer/{id}/entsperren/`
 - **Logik:** Sperren beendet alle Sitzungen; Entsperren setzt Sperre und Fehlversuchszähler zurück.
 - **Validierung:** eigenes Konto nicht sperrbar; historische Benutzer nicht entsperrbar.
-- **Teststatus:** Backend-Tests grün (`test_sperre_nach_fehlversuchen`, `Sitzungen.test_sperre_beendet_alle_sitzungen`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Tests grün (`test_sperre_nach_fehlversuchen`, `Sitzungen.test_sperre_beendet_alle_sitzungen`,
+  `Sitzungen.test_admin_sitzung_bleibt_bei_benutzerverwaltung`). Browsertests grün: `admin.spec.ts` „Benutzer anlegen, Einmal-Kennwort, sperren und entsperren“, `admin.spec.ts` „Fünf falsche Passwörter sperren das Konto; Admin sieht den Hinweis, setzt 2FA zurück und entsperrt“; Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F54 Einmal-Kennwort erzeugen
 - **Ansicht:** 17 Benutzer
 - **Endpunkt:** `POST /api/benutzer/{id}/einmal-kennwort/` → `{"einmal_kennwort", "gueltig_bis"}`
 - **Logik:** gültig `EPM_EINMAL_KENNWORT_STUNDEN` (Standard 48 h); Ablauf wird bei der Anmeldung geprüft (F02); alle Sitzungen
   des Benutzers werden beendet.
-- **Teststatus:** Backend-Test grün (`test_einmal_kennwort_laeuft_ab`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`test_einmal_kennwort_laeuft_ab`). Browsertest grün: `admin.spec.ts` „Benutzer anlegen, Einmal-Kennwort, sperren und entsperren“ (neues Einmal-Kennwort, das alte gilt nicht mehr).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F55 Zugangsblatt drucken
 - **Geplant:** `GET /api/benutzer/{id}/zugangsblatt/` → PDF mit Benutzername, Einmal-Kennwort (nur solange gültig), Anleitung zur Einrichtung.
@@ -709,16 +806,39 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Ansicht:** 17 Benutzer
 - **Endpunkt:** `POST /api/benutzer/{id}/2fa-zuruecksetzen/` → `{"einmal_kennwort", "gueltig_bis"}` (löscht Authenticator und
   Notfall-Codes, beendet alle Sitzungen)
-- **Teststatus:** kein automatischer Test.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`Sitzungen.test_admin_sitzung_bleibt_bei_benutzerverwaltung`). Browsertest grün: `admin.spec.ts` „Fünf falsche Passwörter sperren das Konto; Admin sieht den Hinweis, setzt 2FA zurück und entsperrt“; Neustart geprüft in `zz-neustart.spec.ts`
+  („2FA: nicht eingerichtet“).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F57 Testdaten zurücksetzen
 - **Ansicht:** 17 Benutzer
-- **Endpunkt:** `POST /api/testdaten/zuruecksetzen/` → `{"geloescht", "angelegt"}`; nur Admin; im Wartungsmodus der Trigger
+- **Endpunkt:** `POST /api/testdaten/zuruecksetzen/` → `{"geloescht", "angelegt"}`; Recht „Testdaten zurücksetzen“ (Standard: Admin); im Wartungsmodus der Trigger
 - **Musterdaten:** 6 Testpatienten mit Plänen wie im Entwurf (Sterofundin, Glucose 70 %, Glamin, Clinoleic, Elektrolyte,
   Addel N, Soluvit N + Vitalipid adult, Taurolin 2 %), Termin in der „Praxis Dr. Holtmeier“, ein Altdokument „Typ prüfen“.
-- **Teststatus:** Backend-Test grün (`Musterdaten.test_anlegen_und_zuruecksetzen`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Teststatus:** Backend-Test grün (`Musterdaten.test_anlegen_und_zuruecksetzen`). Browsertests grün: `admin.spec.ts` „Testdaten auf Ausgangsstand zurücksetzen (nur Testpatienten)“ (echte Patienten unverändert),
+  `patienten.spec.ts` „Testzugang: Hinweis dauerhaft sichtbar, nur Testpatienten, neue Patienten werden Testpatienten“ (Testzugang sieht nur Testpatienten).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F66 Rechte je Gruppe einstellen
+- **Zweck:** Die Administration legt fest, welche Gruppe (Rolle) was darf (Festlegung 01.10.2026: granular je Gruppe).
+- **Ansicht:** 17 Benutzer, Bereich „Was die Rollen dürfen“
+- **Endpunkte:** `GET /api/rechte/` → `{rechte: [{code, name, beschreibung}], rollen: [{code, name}], matrix: {rolle: {recht: bool}},
+  fest: [[rolle, recht]], standard: {rolle: [recht]}}`; `PUT /api/rechte/` `{matrix: {rolle: {recht: bool}}}` → wie GET. Die eigenen
+  Rechte stehen in `GET /api/auth/status/` bzw. `/api/auth/ich/` (`rechte: [code]`).
+- **Logik:** Abweichungen vom Standard (Tabelle unter „Gemeinsame Regeln“) als `Gruppenrecht` gespeichert, mit Historie; jede
+  Anfrage liest die aktuelle Matrix, Änderungen gelten sofort; Oberfläche blendet Knöpfe und Bereiche ohne Recht aus.
+  Fest: Admins schreiben Patientendaten nur bei Testpatienten (`pruefe_schreibbereich` an allen schreibenden Endpunkten
+  der Akte und der Pläne, `schreibt_nur_testpatienten` in `Ich`, in der Matrix als „nur Testpatienten“ markiert); ein neuer
+  Patient eines Admins wird Testpatient. GET liefert dazu `nur_testpatienten: {rollen, rechte}`.
+- **Validierung:** nur mit Recht „Benutzer und Rechte verwalten“; unbekannte Rolle oder Recht → 400; feste Rechte (Admin: Akten lesen,
+  Benutzer und Rechte verwalten) nicht entziehbar → 400; Testbenutzer ohne Rechte über Testpatienten hinaus.
+- **Tabellen:** `accounts_gruppenrecht`, `accounts_historicalgruppenrecht`, `audit_systemereignis` („Rechte geändert“)
+- **Fehlerfälle:** 400 · 403 ohne Recht
+- **Teststatus:** Backend-Tests grün (`RechteJeGruppe.*`, `Rollen.test_admin_schreibt_nur_bei_testpatienten`,
+  `Rollen.test_schreibrechte`). Browsertests grün: `admin.spec.ts` „Rechte je Gruppe: Admin erlaubt Mitarbeitern Pläne, wirkt sofort, Standard wiederherstellen“ (Mitarbeiter darf danach Pläne anlegen, sofort wirksam; feste
+  Rechte nicht abwählbar; Standard wiederhergestellt), `admin.spec.ts` „Administration je Recht: Betrachter sieht nichts, Mitarbeiter Vorlagen, Mediziner Vorlagen und Audit-Log“, `admin.spec.ts` „Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten“, `akte.spec.ts` „Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen (Admin)“, `plaene.spec.ts` „Mitarbeiter sieht Pläne, legt aber keine an“; Neustart geprüft in `zz-neustart.spec.ts` (Recht vor dem Neustart in der
+  Oberfläche gesetzt, danach wirksam: Betrachter sieht „Neuer Versorger“; zurück auf Standard).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ---
 
@@ -732,11 +852,11 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
   4 Minuten, Konto gesperrt“, „Benutzer k.oezdemir angelegt (Mitarbeiter), Einmal-Kennwort erzeugt“, „Akte Weber, Anna
   (Nr. 0231) abgeschlossen, Anlass: verstorben“, „Grenzwert „Kontakt überfällig“ von 6 auf 12 Monate geändert“).
   Hinweis auf gesperrte Konten: F08.
-- **Validierung:** nur Admin; unbekannte Gruppe → 400.
-- **Fehlt:** Gerätename („Praxis-PC 1“) – Unklarheit U8; angezeigt werden Browser und Adresse.
-- **Teststatus:** Backend-Tests grün (`test_sperre_nach_fehlversuchen`, `test_abschliessen_nur_mediziner`,
-  `test_grenzen_und_rechte`). Frontend fehlt (noch kein React-Code), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Validierung:** Recht „Audit-Log lesen“ (Standard: Mediziner, Admin); unbekannte Gruppe → 400.
+- **Gerät:** IP-Adresse und Browser – das reicht (U8 geklärt 01.10.2026), kein eigener Gerätename.
+- **Teststatus:** Backend-Tests grün (`test_sperre_nach_fehlversuchen`, `test_abschliessen_mit_recht`, `test_grenzen_und_rechte`).
+  Browsertests grün: `admin.spec.ts` „Benutzer anlegen, Einmal-Kennwort, sperren und entsperren“ (Gruppe „Benutzer“), `admin.spec.ts` „Fünf falsche Passwörter sperren das Konto; Admin sieht den Hinweis, setzt 2FA zurück und entsperrt“ (Hinweis, Gruppe „Fehlversuch“), `admin.spec.ts` „Administration je Recht: Betrachter sieht nichts, Mitarbeiter Vorlagen, Mediziner Vorlagen und Audit-Log“; Neustart geprüft in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F59 Audit-Log als PDF
 - **Geplant:** `GET /api/protokoll/pdf/?von&bis` → PDF; Export wird protokolliert. Abhängigkeit F51.
@@ -747,8 +867,9 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
   DELETE, TRUNCATE), auf `patienten_kontakt` (nur einmaliges Storno), auf `infusionen_infusionsplan` (nach Freigabe nur
   „aktuell → abgelöst“), auf `infusionen_infusionsplan_vitamine` (Zuordnung nur im Entwurf). Ausnahme nur im Wartungsmodus.
 - **Teststatus:** Backend-Tests grün (`test_historie_ist_unveraenderlich`, `test_trigger_verhindert_aenderung_in_der_datenbank`,
-  `test_vitamine_freigegebener_plaene_in_der_datenbank_geschuetzt`).
-- **Status:** TEILWEISE ABGESCHLOSSEN (Anzeige über Verlauf/Audit-Log im Frontend fehlt)
+  `test_vitamine_freigegebener_plaene_in_der_datenbank_geschuetzt`). Browsertests grün: `akte.spec.ts` „Kontakt mit Wiedervorlage erfassen, suchen, stornieren“ (Kontakt nur stornieren),
+  `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“ (freigegebener Plan ohne „Bearbeiten“), `dokumente.spec.ts` „Dokumente hochladen, Typ am Inhalt prüfen, Metadaten ändern, ausblenden, herunterladen; Verlauf“ (Verlauf nur lesend).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ---
 
@@ -771,8 +892,14 @@ Gegenüber dem Stand vor Runde 1 ist keine Funktion zurückgestuft worden.
 - **Status:** NICHT ABGESCHLOSSEN
 
 ### F64 Übertragung zur Nextcloud/NAS
-- **Offen:** Schiebt der Server per rsync im Zeitfenster, oder holt die Gegenseite ab? Davon hängt der Status „übertragen …“ ab.
-- **Status:** BLOCKIERT DURCH FEHLENDE INFORMATION
+- **Festlegung 01.10.2026 (U9):** Der Server schiebt – wie heute: ein rsync-Dienst überträgt die Sicherungen in einen
+  WebDAV-Ordner (Nextcloud, von dort auf die NAS gespiegelt).
+- **Geplant:** nach der nächtlichen Sicherung (F61) überträgt ein systemd-Dienst auf dem Host die verschlüsselten Dateien per
+  rsync in den WebDAV-Ordner; Ergebnis („übertragen am …“ bzw. Fehler) in der Status-Datei, angezeigt in F62 und auf der
+  Startseite (F13). Zugangsdaten nur auf dem Host (`/etc/epm`), nicht im Container.
+- **Für die Umsetzung nötig:** WebDAV-Adresse des Zielordners, Zugang (z. B. Nextcloud-App-Passwort) und das Zeitfenster, in dem
+  die Verbindung offen ist; ob der WebDAV-Ordner wie heute per davfs2 eingebunden wird.
+- **Status:** NICHT ABGESCHLOSSEN
 
 ---
 
@@ -794,30 +921,50 @@ mit Wiedervorlage, O-13 Terminorte, O-14 Plan mit Elektrolyten/Spurenelementen/V
 O-15 Leer/Vorlage, O-16 Planvergleich, O-18 Altdokumente und Dateityp, O-19 Ansprechpartner, O-20 Präparate, O-21
 Einstellungen (ohne Gesamtvolumen), O-22 Audit-Log (ohne Gerätename). Alle mit Backend-Tests gegen PostgreSQL.
 
+Erledigt in Runde 2 (01.10.2026): O-01 Frontend für alle umgesetzten Funktionen (React, Browsertests gegen den echten Stack in
+GitHub Actions, Neustart-Nachweis), O-26 Tests für F05, F06, F41, F56 (als Browsertests), Rechte je Gruppe (F66), Briefkopf und
+Logo (F49), O-14 Gesamtvolumen im Plan und seine Grenzen (F39, F48; nach Klärung U2), O-22 Gerät im Audit-Log (U8: IP und
+Browser reichen). Funktionen, die noch fehlen, zeigt die Oberfläche als „folgt“ (ausgegraut) – nichts davon ist nachgebildet.
+
 | Nr. | Was fehlt | Warum | Betroffene Dateien | Abhängigkeiten | Nächster Schritt |
 |---|---|---|---|---|---|
-| O-01 | Frontend (alle Funktionen) | noch kein React-Code | neu: `frontend/` | API-Verträge in diesem Dokument | Grundgerüst React + shadcn/ui (Base UI), Anmeldung F01–F05 zuerst, Playwright-Tests in CI |
 | O-07 | Backup-Status auf der Startseite (F13) | hängt an der Backup-Steuerung | `patienten/api.py` | O-23 | Status-Datei lesen |
-| O-14 | Gesamtvolumen im Plan und seine Grenzen (F33, F39, F48) | fachlich offen | `infusionen/models.py`, `stammdaten/models.py` | U2 | nach Klärung Feld oder Berechnung |
 | O-17 | PDF-Erzeugung und Vorlagen (F23, F24, F35, F37, F49, F50, F51, F55, F59) | nicht umgesetzt | neu: `vorlagen/`; `backend/Dockerfile` (WeasyPrint) | – | Vorlagenmodell mit Blöcken, Renderer, Freigabe-PDF mit SHA-256 |
-| O-22 | Gerätename im Audit-Log (F58) | fachlich offen | `audit/models.py` | U8 | nach Klärung |
-| O-23 | Backup 02:00 verschlüsselt, Steuerung aus der Oberfläche (F61–F63) | nicht umgesetzt | `rollout/epm-backup.sh`, `rollout/04-projekt.sh`, neu: `audit/backup.py`, systemd-Dienst | U9 für F64 | `age`-Schlüssel, Auftragsverzeichnis, Status-Datei, Endpunkte |
+| O-23 | Backup 02:00 verschlüsselt, Steuerung aus der Oberfläche, Übertragung per rsync in den WebDAV-Ordner (F61–F64) | nicht umgesetzt | `rollout/epm-backup.sh`, `rollout/04-projekt.sh`, neu: `audit/backup.py`, systemd-Dienste | für F64: WebDAV-Adresse, Zugang, Zeitfenster | `age`-Schlüssel, Auftragsverzeichnis, Status-Datei, Endpunkte, rsync-Dienst |
 | O-24 | Serverskripte angleichen | Festlegungen aus „EPM-Server Aufbau“ fehlen | `rollout/01-basis.sh`, `rollout/02-docker.sh` | – | Adressbereiche, `epm.service`, needrestart, Swap |
 | O-25 | Import Altdaten (F65) | Rollout-Schritt 7 | neu: `patienten/management/commands/epm_import_alt.py` | frischer Dump | Import mit Protokoll, setzt `typ_geprueft`/`datum_quelle` |
-| O-26 | Tests für F05 (Ersetzen im Konto), F06, F41, F56 | noch nicht geschrieben | `accounts/tests.py`, `patienten/tests.py` | – | Tests ergänzen |
 
 ## Unklarheiten (nicht eigenmächtig entschieden)
 
 | Nr. | Frage | Betrifft | Zwischenlösung |
 |---|---|---|---|
-| U1 | Bedeutung und Einheit von Pantozol 0–3 / Tage | F38 | Werte wie im Altsystem |
-| U2 | Gesamtvolumen und Laufzeit eingeben oder berechnen? | F39 | – (blockiert) |
+| U1 | ~~Bedeutung und Einheit von Pantozol 0–3 / Tage~~ **Geklärt 01.10.2026:** Pantozol® 40 mg, Pantozol® 20 mg, Nexium®; Zeiten morgens, mittags, abends. Codes wie in `EPM_infuplan.php` (1 = 40 mg, 3 = 20 mg, 2 = Nexium®, 0 = kein; Zeiten 4/2/1 addiert) | F38 | – |
+| U2 | ~~Gesamtvolumen und Laufzeit eingeben oder berechnen?~~ **Geklärt 01.10.2026:** Gesamtvolumen = Gewicht × 35 ml (wie im Altsystem), Laufzeit manuell; Rate = Gesamtvolumen ÷ Laufzeit | F39, F48 | – |
 | U3 | „geändert“-Hinweis an einem Kontakt im Entwurf widerspricht „unveränderlich“ | F26 | Beschluss gilt |
 | U4 | Plan-Hinweis „6 Monate“ in der Liste vs. 12 Monate in den Grenzwerten | F14 | Grenzwert gilt (Text nennt die eingestellten Monate) |
 | U5 | Felder Krankenkasse, Telefon 2, Bemerkung (nicht im Entwurf) | F16 | bleiben gespeichert, nicht angezeigt |
 | U6 | Kontaktart (nicht im Entwurf) | F26 | bleibt gespeichert, nicht angezeigt |
 | U7 | Rolle des Testbenutzers: Mitarbeiter (Entwurf) oder Mediziner (Code) | F57 | Mediziner |
-| U8 | Gerätename im Audit-Log oder nur IP/Browser | F58 | IP und Browser |
-| U9 | Übertragung zur Nextcloud: Server schiebt oder Gegenseite holt ab | F64 | blockiert |
-| U10 | Wer pflegt Versorger und Ansprechpartner? Rollenmatrix: nur Admin pflegt Vorlagen; Entwurf 12 hat „Neu anlegen“ beim Versorger im Formular „Neuer Patient“ (Mitarbeiter) | F45, F46 | Mitarbeiter, Mediziner und Admin |
-| U11 | Ab welcher Änderung zeigt der Trend-Pfeil „gleich“? | F14 | weniger als ±1 % = gleich |
+| U8 | ~~Gerätename im Audit-Log oder nur IP/Browser~~ **Geklärt 01.10.2026:** IP und Browser reichen | F11, F58 | – |
+| U9 | ~~Übertragung zur Nextcloud: Server schiebt oder Gegenseite holt ab~~ **Geklärt 01.10.2026:** Server schiebt per rsync in einen WebDAV-Ordner (wie heute) | F64 | – |
+| U10 | ~~Wer pflegt Versorger und Ansprechpartner?~~ **Erledigt 01.10.2026:** Rechte sind je Gruppe einstellbar (F66); Standard Mitarbeiter, Mediziner und Admin | F45, F46 | – |
+| U11 | ~~Ab welcher Änderung zeigt der Trend-Pfeil „gleich“?~~ **Bestätigt 01.10.2026:** weniger als ±1 % = gleich | F14 | – |
+| U12 | ~~Darf der Admin auch Patientendaten schreiben?~~ **Geklärt 01.10.2026:** Admins dürfen alles, Patientendaten schreiben sie nur bei Testpatienten; echte Akten nur lesen, Wiederöffnen, Benutzer und Sicherungen bleiben | F66 | – |
+| U13 | ~~Energie im Infusionsplan: Lipide 9 oder 9,15 kcal/g, Albumin mit oder ohne Energie?~~ **Geklärt 01.10.2026:** wie in `EPM_infuplan.php`: Lipide 9,15 kcal/g, Humanalbumin in ml ohne Energie | F33, F39 | – |
+| U14 | ~~Stabilitätsprüfung Calcium + Magnesium und Vorbelegung des ersten Plans je kg übernehmen?~~ **Geklärt 01.10.2026:** ja, beides wie im Altsystem (Stabilität als Hinweis, Speichern bleibt möglich) | F32, F33 | – ||
+
+## Änderungsprotokoll
+
+| Datum | Stand | Änderung |
+|---|---|---|
+| 01.10.2026 | Runde 1 (`c387b7b`–`0e25377`) | Backend für F01–F22, F25–F36, F40–F48, F52–F54, F56–F58, F60 mit Backend-Tests; Nachweis angelegt |
+| 01.10.2026 | Runde 2 (`9eae348`) | Rechte je Gruppe (F66) nach Festlegung: Mediziner wie Admin außer Benutzerverwaltung, Wiederöffnen, Sicherungen, Testdaten; U10 erledigt, U11 bestätigt, U12 neu; Briefkopf und Logo (F49) |
+| 01.10.2026 | Runde 2 (`2b76a0a`–`39b86b9`) | Frontend: Anmeldung, Start, Patientenliste, Neuer Patient, Versorger, Akte (Übersicht, Diagnose & Therapie, Kontakte, Pläne, Dokumente, Verlauf); Browsertests im echten Stack in GitHub Actions |
+| 01.10.2026 | Runde 2 (`d1eae4e`–`0ea3e18`) | Mein Konto und Administration (Benutzer, Rechte, Vorlagen, Audit-Log) im Frontend; Bildschirmgrößen; abgelaufene Sitzung führt zur Anmeldung |
+| 01.10.2026 | Runde 2 (`04c9f4f`–`43d4fe1`) | Termine in der Akte ändern; Backend meldet zu schnelle 2FA-Bestätigung mit 429; Fehlersuche in CI (Seitenzustand, Audit-Log als Kommentar). Ursache beendeter Admin-Sitzungen in den Browsertests behoben (Testhilfe, kein Produktfehler) |
+| 01.10.2026 | Runde 2 (`ceaa105`) | Patientenliste: ein kurz nach „Filter zurücksetzen“ gewählter Filter ging verloren – behoben |
+| 01.10.2026 | Runde 2 (`06b4167`) | Neustart-Nachweis aller Browsertest-Ergebnisse über die Oberfläche; Plan-Editor füllt direkt nach einer Freigabe mit dem neuen Plan vor (vorher leer); Häkchen in den Auswahllisten schalten sofort um; Farbeingabe in „Mein Konto“ geht beim Verlassen nicht verloren; Status von 50 Funktionen auf ABGESCHLOSSEN UND GETESTET |
+| 01.10.2026 | Runde 2 (`15dae20`) | Rechte nach Festlegung: Mitarbeiter schließen Akten ab und pflegen Vorlagen; Admins alles, Patientendaten nur bei Testpatienten (U12 geklärt) |
+| 01.10.2026 | Runde 2 (`d7b3411`) | Plan-Editor: „Energie manuell“ ergänzt (war im Backend vorhanden, fehlte in der Oberfläche); Browsertests für Kopfzeilensuche, Testzugang, Vorlage und Leer beginnen, alle Elektrolyte, Praxistermin mit Ort, Diagramm |
+| 01.10.2026 | Runde 2 (`eae8bc3`–`a985fa5`) | Klärung U1, U2, U8, U9 umgesetzt: Protonenpumpenhemmer mit Zeiten (F38) und berechnetes Gesamtvolumen mit Rate und Grenze (F39, F48) auf ABGESCHLOSSEN UND GETESTET; F11/F58 ohne Gerätename-Lücke; F64 nicht mehr blockiert. U13/U14 gestellt |
+| 01.10.2026 | Runde 2 (`f865cde`–`a985fa5`) | Klärung U13/U14 umgesetzt: Energie mit Lipiden 9,15 kcal/g, Humanalbumin in ml ohne Energie (Feld `albumin_ml`), Hinweis zur Ca/Mg-Stabilität, erster Plan je kg Körpergewicht vorbelegt (`GET /api/infusionsplaene/vorbelegung/?patient=`) |
