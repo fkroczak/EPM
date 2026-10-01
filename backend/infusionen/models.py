@@ -251,8 +251,8 @@ class Infusionsplan(AktenEintrag):
     def freigeben(self, benutzer):
         if self.status != self.Status.ENTWURF:
             raise ValidationError("Nur Entwürfe können freigegeben werden.")
-        if not getattr(benutzer, "darf_plaene_bearbeiten", False):
-            raise PermissionError("Nur Mediziner geben Infusionspläne frei.")
+        if not getattr(benutzer, "darf_plaene_freigeben", False):
+            raise PermissionError("Infusionspläne freigeben darf nur, wer das Recht dazu hat.")
         self.patient.pruefe_bearbeitbar()
         self.full_clean()
         alt = Infusionsplan.objects.select_for_update().filter(

@@ -4,7 +4,7 @@ from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from accounts.permissions import PlanRecht
+from accounts.permissions import FreigabeRecht, PlanRecht
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import ModelClean, RichText, benutzername, patienten_fuer
 from stammdaten.models import Praeparat
@@ -164,7 +164,7 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
     def vergleich(self, request, pk=None):
         return Response(self.get_object().vergleich())
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], permission_classes=[FreigabeRecht])
     def freigeben(self, request, pk=None):
         plan = self.get_object()
         plan.freigeben(request.user)

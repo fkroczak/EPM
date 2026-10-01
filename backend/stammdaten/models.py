@@ -191,3 +191,74 @@ class Einstellungen(models.Model):
 
     def __str__(self):
         return "Einstellungen"
+
+
+class Absenderangaben(models.Model):
+    """Briefkopf je Absender (Entwurf 18 · Briefkopf und Logo). Welcher gilt, steht in Einstellungen.absender."""
+
+    art = models.CharField(max_length=10, choices=Einstellungen.Absender.choices, unique=True)
+    name = models.CharField("Name", max_length=200, blank=True)
+    strasse = models.CharField("Straße", max_length=150, blank=True)
+    plz = models.CharField("PLZ", max_length=10, blank=True)
+    ort = models.CharField("Ort", max_length=100, blank=True)
+    telefon = models.CharField("Telefon", max_length=50, blank=True)
+    fax = models.CharField("Fax", max_length=50, blank=True)
+    email = models.CharField("E-Mail", max_length=150, blank=True)
+    internet = models.CharField("Internet", max_length=150, blank=True)
+    fusszeile = models.CharField("Fußzeile", max_length=300, blank=True)
+
+    history = HistoricalRecords()
+
+    # Vorbelegung wie im Entwurf; die Administration pflegt die Angaben danach selbst
+    VORBELEGUNG = {
+        Einstellungen.Absender.STIFTUNG: {
+            "name": "Deutsche Stiftung Krankheitsbedingte Mangelernährung", "strasse": "Waltrup 16",
+            "plz": "48341", "ort": "Altenberge", "telefon": "0251 98 11 400", "fax": "0251 98 11 4019",
+            "email": "kontakt@dsgme.org", "internet": "www.dsgme.org",
+            "fusszeile": "rechtsfähige gemeinnützige und mildtätige Stiftung",
+        },
+        Einstellungen.Absender.GUG: {},
+    }
+
+    class Meta:
+        verbose_name = "Absenderangaben"
+        verbose_name_plural = "Absenderangaben"
+        ordering = ["art"]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Absenderangaben werden nicht gelöscht.")
+
+    def __str__(self):
+        return f"{self.get_art_display()}: {self.name}"
+
+    @classmethod
+    def alle(cls) -> dict:
+        ergebnis = {}
+        for art in Einstellungen.Absender.values:
+            obj, _ = cls.objects.get_or_create(art=art, defaults=cls.VORBELEGUNG.get(art, {}))
+            ergebnis[art] = obj
+        return ergebnis
+
+
+class Logo(models.Model):
+    """Hochgeladenes Logo für Briefkopf und Seitenleiste. Das neueste gilt; ältere bleiben erhalten."""
+
+    datei = models.CharField(max_length=255, unique=True, editable=False)
+    mime = models.CharField(max_length=40, editable=False)
+    sha256 = models.CharField(max_length=64, editable=False)
+    breite = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    hoehe = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    hochgeladen_am = models.DateTimeField(auto_now_add=True)
+    hochgeladen_von = models.ForeignKey("accounts.User", on_delete=models.PROTECT, null=True, related_name="+")
+
+    class Meta:
+        verbose_name = "Logo"
+        verbose_name_plural = "Logos"
+        ordering = ["-hochgeladen_am", "-id"]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Logos werden nicht gelöscht.")
+
+    @classmethod
+    def aktuell(cls):
+        return cls.objects.first()

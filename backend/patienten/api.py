@@ -17,7 +17,7 @@ from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
-from accounts.permissions import AbschlussRecht, NurAdmin, PatientendatenRecht
+from accounts.permissions import AbschlussRecht, AktenRecht, EintragRecht, WiederOeffnenRecht, recht
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import ModelClean, RichText, benutzername, patienten_fuer
 from stammdaten.models import Auswahlwert
@@ -239,7 +239,7 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
     ``ordering=letzter_kontakt|-letzter_kontakt|nachname|nummer|geburtsdatum`` (Standard: letzter Kontakt, neueste zuerst).
     """
 
-    permission_classes = [PatientendatenRecht]
+    permission_classes = [AktenRecht]
     filterset_class = PatientFilter
     ordering_fields = ["nachname", "nummer", "geburtsdatum", "geaendert_am", "letzter_kontakt"]
 
@@ -345,7 +345,7 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
         patient.refresh_from_db()
         return Response(PatientSerializer(patient, context=self.get_serializer_context()).data)
 
-    @action(detail=True, methods=["post"], url_path="wieder-oeffnen", permission_classes=[NurAdmin])
+    @action(detail=True, methods=["post"], url_path="wieder-oeffnen", permission_classes=[WiederOeffnenRecht])
     def wieder_oeffnen(self, request, pk=None):
         patient = self.get_object()
         if not patient.ist_abgeschlossen:
@@ -460,7 +460,7 @@ def _kurz(wert, laenge=300):
 class AktenEintragViewSet(viewsets.GenericViewSet):
     """Gemeinsame Regeln: nur Patienten im eigenen Bereich, Filter ?patient=ID."""
 
-    permission_classes = [PatientendatenRecht]
+    permission_classes = [EintragRecht]
     filterset_fields = ["patient"]
 
     def get_queryset(self):
@@ -918,5 +918,7 @@ def startseite_daten(user):
 
 
 class StartseiteViewSet(viewsets.ViewSet):
+    permission_classes = [recht("akten_lesen")]
+
     def list(self, request):
         return Response(startseite_daten(request.user))

@@ -9,7 +9,7 @@ from django_otp.oath import totp
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from rest_framework.test import APIClient
 
-from accounts.models import Rolle, Sitzung, User
+from accounts.models import Gruppenrecht, Rolle, Sitzung, User
 from audit.models import SystemEreignis
 from epm.pruefhilfen import (
     KENNWORT,
@@ -226,3 +226,91 @@ class MeinKonto(TestCase):
         self.assertFalse(karten[0]["sichtbar"])
         doppelt = {"karten": [{"id": "termine"}, {"id": "termine"}]}
         self.assertEqual(self.c.patch("/api/auth/ich/", {"startseite": doppelt}, format="json").status_code, 400)
+
+
+class RechteJeGruppe(TestCase):
+    """Rechte je Gruppe: Standard, Änderung durch die Administration, feste Rechte, Testbenutzer."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from patienten.models import Patient
+
+        cls.admin = benutzer("admin", Rolle.ADMIN)
+        cls.mediziner = benutzer("mediziner", Rolle.MEDIZINER)
+        cls.mitarbeiter = benutzer("mitarbeiter", Rolle.MITARBEITER)
+        cls.betrachter = benutzer("betrachter", Rolle.BETRACHTER)
+        cls.patient = Patient.objects.create(nachname="Recht", vorname="R", geburtsdatum="1970-01-01")
+
+    def test_standard(self):
+        r = client_fuer(self.admin).get("/api/rechte/").json()
+        m = r["matrix"]
+        self.assertTrue(m["mediziner"]["vorlagen_pflegen"])
+        self.assertTrue(m["mediziner"]["audit_lesen"])
+        for code in ("benutzer_verwalten", "akten_wieder_oeffnen", "backup_verwalten", "testdaten_zuruecksetzen"):
+            self.assertFalse(m["mediziner"][code], code)
+            self.assertTrue(m["admin"][code], code)
+        self.assertFalse(m["admin"]["akten_bearbeiten"])
+        self.assertEqual(m["betrachter"], {c["code"]: c["code"] == "akten_lesen" for c in r["rechte"]})
+        self.assertIn(["admin", "benutzer_verwalten"], r["fest"])
+        ich = client_fuer(self.mediziner).get("/api/auth/ich/").json()
+        self.assertIn("vorlagen_pflegen", ich["rechte"])
+        self.assertNotIn("benutzer_verwalten", ich["rechte"])
+        self.assertEqual(client_fuer(self.mediziner).get("/api/rechte/").status_code, 403)
+        self.assertEqual(client_fuer(self.mediziner).get("/api/protokoll/").status_code, 200)
+        self.assertEqual(client_fuer(self.mitarbeiter).get("/api/protokoll/").status_code, 403)
+
+    def test_admin_aendert_rechte(self):
+        a = client_fuer(self.admin)
+        b = client_fuer(self.betrachter)
+        kontakt = {"patient": self.patient.id, "text": "<p>Anruf</p>"}
+        self.assertEqual(b.post("/api/kontakte/", kontakt, format="json").status_code, 403)
+        r = a.put("/api/rechte/", {"matrix": {"betrachter": {"eintraege_erfassen": True}}}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.json()["matrix"]["betrachter"]["eintraege_erfassen"])
+        self.assertEqual(b.post("/api/kontakte/", kontakt, format="json").status_code, 201)
+        # Lesen entziehen: Liste und Akte gesperrt
+        a.put("/api/rechte/", {"matrix": {"betrachter": {"akten_lesen": False}}}, format="json")
+        self.assertEqual(b.get("/api/patienten/").status_code, 403)
+        self.assertEqual(b.get("/api/startseite/").status_code, 403)
+        eintrag = a.get("/api/protokoll/?gruppe=benutzer").json()["results"][0]
+        self.assertEqual(eintrag["beschreibung"], "Rechte geändert: Betrachter darf nicht mehr „Akten lesen“")
+        self.assertEqual(Gruppenrecht.history.count(), 2)
+        # zurück auf den Standard
+        a.put("/api/rechte/", {"matrix": {"betrachter": {"akten_lesen": True, "eintraege_erfassen": False}}},
+              format="json")
+        self.assertEqual(b.get("/api/patienten/").status_code, 200)
+
+    def test_feste_rechte_und_eingaben(self):
+        a = client_fuer(self.admin)
+        for matrix in ({"admin": {"benutzer_verwalten": False}}, {"chef": {"akten_lesen": True}},
+                       {"mediziner": {"fliegen": True}}, {"mediziner": {"akten_lesen": "ja"}}):
+            with self.subTest(matrix=matrix):
+                self.assertEqual(a.put("/api/rechte/", {"matrix": matrix}, format="json").status_code, 400)
+        self.assertEqual(a.put("/api/rechte/", {}, format="json").status_code, 400)
+        # eigene Rolle nicht so ändern, dass die Benutzerverwaltung verloren geht
+        r = a.patch(f"/api/benutzer/{self.admin.id}/", {"rolle": "mediziner"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        # Mediziner darf mit dem Recht Benutzer verwalten
+        a.put("/api/rechte/", {"matrix": {"mediziner": {"benutzer_verwalten": True}}}, format="json")
+        self.assertEqual(client_fuer(self.mediziner).get("/api/benutzer/").status_code, 200)
+
+    def test_testbenutzer_ohne_globale_rechte(self):
+        tester = benutzer("tester", Rolle.MEDIZINER, ist_test=True)
+        t = client_fuer(tester)
+        ich = t.get("/api/auth/ich/").json()
+        for code in ("vorlagen_pflegen", "versorger_pflegen", "audit_lesen"):
+            self.assertNotIn(code, ich["rechte"])
+        self.assertIn("plaene_freigeben", ich["rechte"])
+        self.assertEqual(t.patch("/api/einstellungen/", {"kcal_max_tag": 4000}, format="json").status_code, 403)
+        self.assertEqual(t.post("/api/versorger/", {"name": "Test-Versorger"}, format="json").status_code, 403)
+        self.assertEqual(t.get("/api/protokoll/").status_code, 403)
+
+    def test_freigabe_eigenes_recht(self):
+        from infusionen.models import Infusionsplan
+
+        a = client_fuer(self.admin)
+        a.put("/api/rechte/", {"matrix": {"mediziner": {"plaene_freigeben": False}}}, format="json")
+        m = client_fuer(self.mediziner)
+        e = m.post("/api/infusionsplaene/entwurf/", {"patient": self.patient.id}, format="json").json()
+        self.assertEqual(m.post(f"/api/infusionsplaene/{e['id']}/freigeben/").status_code, 403)
+        self.assertEqual(Infusionsplan.objects.get(pk=e["id"]).status, "entwurf")

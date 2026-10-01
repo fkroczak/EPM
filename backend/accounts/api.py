@@ -35,7 +35,7 @@ from audit.models import SystemEreignis, protokolliere
 
 from .models import Rolle, Sitzung, User
 from .sitzungen import aktive_sitzungen, alle_sitzungen_beenden, schluessel_erneuert, sitzung_beenden
-from .permissions import Angemeldet, NurAdmin, ist_verifiziert
+from .permissions import Angemeldet, BenutzerRecht, ist_verifiziert
 
 ANZAHL_NOTFALLCODES = 10
 
@@ -100,11 +100,7 @@ def ich_daten(user):
         "ist_test": user.ist_test,
         "darstellung": user.darstellung,
         "startseite": user.startseite,
-        "rechte": {
-            "patienten_bearbeiten": user.darf_patienten_bearbeiten,
-            "plaene_bearbeiten": user.darf_plaene_bearbeiten,
-            "administration": user.ist_admin,
-        },
+        "rechte": user.rechte,
     }
 
 
@@ -463,7 +459,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
 
     queryset = User.objects.all()
     serializer_class = BenutzerSerializer
-    permission_classes = [NurAdmin]
+    permission_classes = [BenutzerRecht]
     search_fields = ["username", "first_name", "last_name", "kuerzel"]
     filterset_fields = ["rolle", "is_active", "ist_test"]
 
@@ -488,9 +484,13 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
                          for u in gesperrt])
 
     def perform_update(self, serializer):
+        from .rechte import matrix
+
         user = serializer.instance
-        if user == self.request.user and serializer.validated_data.get("rolle", user.rolle) != Rolle.ADMIN:
-            raise serializers.ValidationError({"rolle": "Die eigene Admin-Rolle kann nicht entzogen werden."})
+        neue_rolle = serializer.validated_data.get("rolle", user.rolle)
+        if user == self.request.user and not matrix()[neue_rolle]["benutzer_verwalten"]:
+            raise serializers.ValidationError({"rolle": "Mit dieser Rolle könntest du Benutzer nicht mehr verwalten. "
+                                                        "Die eigene Rolle bitte von einer anderen Person ändern lassen."})
         vorher = {f: getattr(user, f) for f in serializer.validated_data}
         user = serializer.save()
         geaendert = {f: [str(vorher[f]), str(getattr(user, f))] for f in vorher if vorher[f] != getattr(user, f)}
@@ -548,3 +548,65 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         alle_sitzungen_beenden(user)
         protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_ZURUECKGESETZT, request, objekt=user.username)
         return Response({"einmal_kennwort": kennwort, "gueltig_bis": user.einmal_kennwort_gueltig_bis})
+
+
+class RechteView(APIView):
+    """Rechte je Gruppe (Entwurf 17 · „Was die Rollen dürfen“), einstellbar durch die Administration.
+
+    GET  /api/rechte/   → {"rechte": [{code, name, beschreibung}], "rollen": [{code, name}],
+                           "matrix": {rolle: {recht: bool}}, "fest": [[rolle, recht]], "standard": {...}}
+    PUT  /api/rechte/   {"matrix": {rolle: {recht: bool}}} → wie GET
+    """
+
+    permission_classes = [BenutzerRecht]
+
+    def get(self, request):
+        return Response(self._daten())
+
+    def put(self, request):
+        from .models import Gruppenrecht
+        from .rechte import CODES, FEST, NAMEN, matrix
+
+        eingabe = request.data.get("matrix")
+        if not isinstance(eingabe, dict):
+            return fehler("Bitte die Matrix übergeben.")
+        fehlerliste = {}
+        for rolle, werte in eingabe.items():
+            if rolle not in Rolle.values or not isinstance(werte, dict):
+                fehlerliste[rolle] = "Unbekannte Rolle."
+                continue
+            for code, wert in werte.items():
+                if code not in NAMEN or not isinstance(wert, bool):
+                    fehlerliste[f"{rolle}.{code}"] = "Unbekanntes Recht oder kein Ja/Nein."
+                elif (rolle, code) in FEST and not wert:
+                    fehlerliste[f"{rolle}.{code}"] = "Dieses Recht ist fest und kann nicht entzogen werden."
+        if fehlerliste:
+            return Response(fehlerliste, status=status.HTTP_400_BAD_REQUEST)
+        vorher = matrix()
+        aenderungen = []
+        rollennamen = dict(Rolle.choices)
+        for rolle, werte in eingabe.items():
+            for code in CODES:
+                if code not in werte or werte[code] == vorher[rolle][code]:
+                    continue
+                eintrag = Gruppenrecht.objects.filter(rolle=rolle, recht=code).first() or Gruppenrecht(
+                    rolle=rolle, recht=code)
+                eintrag.erlaubt = werte[code]
+                eintrag._history_user = request.user
+                eintrag.save()
+                aenderungen.append({"rolle": rollennamen[rolle], "recht": NAMEN[code], "erlaubt": werte[code]})
+        if aenderungen:
+            protokolliere(SystemEreignis.Art.RECHTE_GEAENDERT, request, objekt="Rechte der Gruppen",
+                          aenderungen=aenderungen)
+        return Response(self._daten())
+
+    def _daten(self):
+        from .rechte import FEST, RECHTE, STANDARD, matrix
+
+        return {
+            "rechte": [{"code": c, "name": n, "beschreibung": b} for c, n, b in RECHTE],
+            "rollen": [{"code": c, "name": n} for c, n in Rolle.choices],
+            "matrix": matrix(),
+            "fest": sorted([r, c] for r, c in FEST),
+            "standard": {str(r): sorted(v) for r, v in STANDARD.items()},
+        }

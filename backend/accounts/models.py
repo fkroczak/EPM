@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
 
 class Rolle(models.TextChoices):
@@ -85,18 +86,34 @@ class User(AbstractUser):
     def __str__(self):
         return self.anzeigename
 
-    # Rollen-Abkürzungen
+    # Rechte je Gruppe (accounts/rechte.py, in der Oberfläche unter Benutzer › Rechte)
+    def hat_recht(self, code: str) -> bool:
+        from .rechte import hat_recht
+
+        return hat_recht(self, code)
+
+    @property
+    def rechte(self) -> list[str]:
+        from .rechte import CODES, rechte_fuer
+
+        vorhanden = rechte_fuer(self)
+        return [c for c in CODES if c in vorhanden]
+
     @property
     def ist_admin(self):
         return self.rolle == Rolle.ADMIN
 
     @property
     def darf_patienten_bearbeiten(self):
-        return self.rolle in (Rolle.MITARBEITER, Rolle.MEDIZINER)
+        return self.hat_recht("akten_bearbeiten")
 
     @property
     def darf_plaene_bearbeiten(self):
-        return self.rolle == Rolle.MEDIZINER
+        return self.hat_recht("plaene_anlegen")
+
+    @property
+    def darf_plaene_freigeben(self):
+        return self.hat_recht("plaene_freigeben")
 
     EINMAL_FELDER = ["password", "muss_kennwort_aendern", "einmal_kennwort_gueltig_bis"]
 
@@ -151,3 +168,22 @@ class Sitzung(models.Model):
 
     def __str__(self):
         return f"{self.benutzer} · {self.browser[:40]}"
+
+
+class Gruppenrecht(models.Model):
+    """Abweichung vom Standard der Rechte-Matrix (accounts/rechte.py) für eine Rolle."""
+
+    rolle = models.CharField(max_length=20, choices=Rolle.choices)
+    recht = models.CharField(max_length=40)
+    erlaubt = models.BooleanField()
+    geaendert_am = models.DateTimeField(auto_now=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Gruppenrecht"
+        verbose_name_plural = "Gruppenrechte"
+        constraints = [models.UniqueConstraint(fields=["rolle", "recht"], name="ein_eintrag_je_rolle_und_recht")]
+
+    def __str__(self):
+        return f"{self.get_rolle_display()}: {self.recht} = {'ja' if self.erlaubt else 'nein'}"

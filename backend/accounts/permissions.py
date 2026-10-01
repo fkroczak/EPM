@@ -1,22 +1,10 @@
 """
-Rollenrechte für die API.
+Rechte für die API – je Gruppe einstellbar (accounts/rechte.py, Oberfläche: Benutzer › Rechte).
 
-| Rolle        | Lesen | Patientendaten | Infusionspläne | Stammdaten/Benutzer |
-|--------------|-------|----------------|----------------|---------------------|
-| Betrachter   | ja    | –              | –              | –                   |
-| Mitarbeiter  | ja    | ja             | –              | –                   |
-| Mediziner    | ja    | ja             | ja (Freigabe)  | –                   |
-| Admin        | ja    | –              | –              | ja                  |
-
-Akten abschließen dürfen nur Mediziner, wieder öffnen nur der Admin (Rollenmatrix Entwurf 17).
-Versorger und Ansprechpartner pflegen Mitarbeiter, Mediziner und Admin (siehe Unklarheit U10).
-
-Jeder Zugriff setzt eine vollständige Anmeldung voraus: Kennwort + zweiter Faktor
-und kein offenes Einmal-Kennwort.
+Lesen setzt „Akten lesen“ voraus, Schreiben das jeweilige Recht. Jeder Zugriff setzt eine
+vollständige Anmeldung voraus: Kennwort + zweiter Faktor und kein offenes Einmal-Kennwort.
 """
 from rest_framework.permissions import SAFE_METHODS, BasePermission
-
-from .models import Rolle
 
 
 def ist_verifiziert(user) -> bool:
@@ -44,46 +32,47 @@ class Angemeldet(BasePermission):
         return voll_angemeldet(request.user)
 
 
-class _Schreibrecht(Angemeldet):
-    rollen: tuple = ()
+class _Recht(Angemeldet):
+    """Lesen mit `lesen` (None = jeder Angemeldete), Schreiben mit `schreiben`."""
+
+    lesen: str | None = "akten_lesen"
+    schreiben: str = ""
+    message = "Dafür fehlt das Recht."
 
     def has_permission(self, request, view):
         if not super().has_permission(request, view):
             return False
         if request.method in SAFE_METHODS:
-            return True
-        return request.user.rolle in self.rollen
+            return self.lesen is None or request.user.hat_recht(self.lesen)
+        return request.user.hat_recht(self.schreiben)
 
 
-class PatientendatenRecht(_Schreibrecht):
-    message = "Patientendaten dürfen nur Mitarbeiter und Mediziner ändern."
-    rollen = (Rolle.MITARBEITER, Rolle.MEDIZINER)
+def recht(schreiben: str, lesen: str | None = "akten_lesen", meldung: str = ""):
+    """Permission-Klasse für ein bestimmtes Recht, z. B. ``recht("plaene_freigeben")``."""
+    from .rechte import NAMEN
+
+    return type(
+        f"Recht_{schreiben}",
+        (_Recht,),
+        {"schreiben": schreiben, "lesen": lesen,
+         "message": meldung or f"Dafür fehlt das Recht „{NAMEN.get(schreiben, schreiben)}“."},
+    )
 
 
-class PlanRecht(_Schreibrecht):
-    message = "Infusionspläne dürfen nur Mediziner bearbeiten."
-    rollen = (Rolle.MEDIZINER,)
+def nur_recht(code: str):
+    """Jede Methode (auch Lesen) nur mit diesem Recht, z. B. Audit-Log oder Benutzerverwaltung."""
+    return recht(code, lesen=code)
 
 
-class StammdatenRecht(_Schreibrecht):
-    message = "Stammdaten pflegt nur der Admin."
-    rollen = (Rolle.ADMIN,)
-
-
-class NurAdmin(Angemeldet):
-    message = "Nur für Admins."
-
-    def has_permission(self, request, view):
-        return super().has_permission(request, view) and request.user.rolle == Rolle.ADMIN
-
-
-class AbschlussRecht(Angemeldet):
-    message = "Akten abschließen dürfen nur Mediziner."
-
-    def has_permission(self, request, view):
-        return super().has_permission(request, view) and request.user.rolle == Rolle.MEDIZINER
-
-
-class VersorgerRecht(_Schreibrecht):
-    message = "Versorger pflegen Mitarbeiter, Mediziner und Admin."
-    rollen = (Rolle.MITARBEITER, Rolle.MEDIZINER, Rolle.ADMIN)
+# Rechte der Endpunkte (früher feste Rollen)
+AktenRecht = recht("akten_bearbeiten")          # Patienten anlegen, Stammdaten, Diagnose, Therapie
+EintragRecht = recht("eintraege_erfassen")      # Kontakte, Gewichte, Termine, Dokumente
+PlanRecht = recht("plaene_anlegen")
+FreigabeRecht = recht("plaene_freigeben")
+AbschlussRecht = recht("akten_abschliessen")
+WiederOeffnenRecht = recht("akten_wieder_oeffnen")
+StammdatenRecht = recht("vorlagen_pflegen", lesen=None)
+VersorgerRecht = recht("versorger_pflegen", lesen=None)
+BenutzerRecht = nur_recht("benutzer_verwalten")
+AuditRecht = nur_recht("audit_lesen")
+TestdatenRecht = nur_recht("testdaten_zuruecksetzen")

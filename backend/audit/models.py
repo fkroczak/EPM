@@ -16,6 +16,7 @@ class SystemEreignis(models.Model):
         BENUTZER_ANGELEGT = "benutzer_angelegt", "Benutzer angelegt"
         BENUTZER_GEAENDERT = "benutzer_geaendert", "Benutzer geändert"
         BENUTZER_GESPERRT = "benutzer_gesperrt", "Benutzer gesperrt"
+        RECHTE_GEAENDERT = "rechte_geaendert", "Rechte geändert"
         EINMAL_KENNWORT = "einmal_kennwort", "Einmal-Kennwort erzeugt"
         ZWEITER_FAKTOR_ZURUECKGESETZT = "2fa_zurueckgesetzt", "2FA zurückgesetzt"
         AKTE_ABGESCHLOSSEN = "akte_abgeschlossen", "Akte abgeschlossen"

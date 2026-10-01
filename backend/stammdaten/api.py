@@ -1,4 +1,5 @@
 """Stammdaten: lesen dürfen alle, ändern nur der Admin. Gelöscht wird nichts, nur deaktiviert."""
+from django.utils import timezone
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -7,7 +8,7 @@ from rest_framework.views import APIView
 from accounts.permissions import StammdatenRecht, VersorgerRecht
 from audit.models import SystemEreignis, protokolliere
 
-from .models import Ansprechpartner, Auswahlwert, Einstellungen, Praeparat, Versorger
+from .models import Absenderangaben, Ansprechpartner, Auswahlwert, Einstellungen, Logo, Praeparat, Versorger
 
 
 def _text(wert):
@@ -58,6 +59,27 @@ class OhneLoeschen(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Crea
                       bezeichnungen=namen)
 
 
+def neue_reihenfolge(request, queryset, gruppenfeld: str):
+    """Reihenfolge per Ziehen speichern: {"ids": [...]} – alle aus derselben Liste/Kategorie."""
+    ids = request.data.get("ids")
+    if not isinstance(ids, list) or not ids or not all(isinstance(i, int) for i in ids) or len(set(ids)) != len(ids):
+        return Response({"ids": "Bitte die IDs in der neuen Reihenfolge übergeben."}, status=status.HTTP_400_BAD_REQUEST)
+    objekte = {o.id: o for o in queryset.filter(id__in=ids)}
+    gruppen = {getattr(o, gruppenfeld) for o in objekte.values()}
+    if len(objekte) != len(ids) or len(gruppen) != 1:
+        return Response({"ids": "Unbekannte IDs oder gemischte Listen."}, status=status.HTTP_400_BAD_REQUEST)
+    for i, pk in enumerate(ids):
+        o = objekte[pk]
+        if o.reihenfolge != (i + 1) * 10:
+            o.reihenfolge = (i + 1) * 10
+            o._history_user = request.user
+            o.save(update_fields=["reihenfolge"])
+    gruppe = gruppen.pop()
+    protokolliere(SystemEreignis.Art.STAMMDATEN, request, objekt=f"{queryset.model._meta.verbose_name_plural}: {gruppe}",
+                  aktion="Reihenfolge geändert")
+    return Response({"reihenfolge": ids})
+
+
 class AuswahlwertSerializer(serializers.ModelSerializer):
     class Meta:
         model = Auswahlwert
@@ -69,6 +91,10 @@ class AuswahlwertViewSet(OhneLoeschen):
     serializer_class = AuswahlwertSerializer
     filterset_fields = ["liste", "aktiv"]
     pagination_class = None
+
+    @action(detail=False, methods=["post"])
+    def reihenfolge(self, request):
+        return neue_reihenfolge(request, Auswahlwert.objects.all(), "liste")
 
 
 class AnsprechpartnerSerializer(serializers.ModelSerializer):
@@ -178,6 +204,10 @@ class PraeparatViewSet(OhneLoeschen):
     def get_queryset(self):
         return _praeparate_mit_nutzung()
 
+    @action(detail=False, methods=["post"])
+    def reihenfolge(self, request):
+        return neue_reihenfolge(request, Praeparat.objects.all(), "kategorie")
+
 
 class EinstellungenSerializer(serializers.ModelSerializer):
     class Meta:
@@ -209,3 +239,182 @@ class EinstellungenView(APIView):
         protokolliere(SystemEreignis.Art.STAMMDATEN, request, objekt="Einstellungen", felder=sorted(s.validated_data),
                       aenderungen=aenderungen, bezeichnungen=namen)
         return Response(s.data)
+
+
+# ================================================================= Briefkopf und Logo (Entwurf 18)
+ABSENDER_FELDER = ["name", "strasse", "plz", "ort", "telefon", "fax", "email", "internet", "fusszeile"]
+
+
+class AbsenderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Absenderangaben
+        fields = ABSENDER_FELDER
+
+
+def briefkopf_daten():
+    e = Einstellungen.aktuell()
+    logo = Logo.aktuell()
+    return {
+        "aktiv": e.absender,
+        "absender": {art: AbsenderSerializer(obj).data for art, obj in Absenderangaben.alle().items()},
+        "arten": [{"code": c, "name": n} for c, n in Einstellungen.Absender.choices],
+        "logo": {"vorhanden": logo is not None, "mime": logo.mime, "sha256": logo.sha256, "breite": logo.breite,
+                 "hoehe": logo.hoehe, "hochgeladen_am": logo.hochgeladen_am} if logo else {"vorhanden": False},
+    }
+
+
+class BriefkopfView(APIView):
+    """GET (alle Angemeldeten) und PATCH (Recht „Vorlagen pflegen“):
+    {"aktiv"?: "stiftung"|"gug", "absender"?: {"stiftung"?: {...}, "gug"?: {...}}}"""
+
+    permission_classes = [StammdatenRecht]
+
+    def get(self, request):
+        return Response(briefkopf_daten())
+
+    def patch(self, request):
+        from django.db import transaction
+
+        aktiv = request.data.get("aktiv")
+        absender = request.data.get("absender") or {}
+        if aktiv is not None and aktiv not in Einstellungen.Absender.values:
+            return Response({"aktiv": "Unbekannter Absender."}, status=status.HTTP_400_BAD_REQUEST)
+        if not isinstance(absender, dict) or set(absender) - set(Einstellungen.Absender.values):
+            return Response({"absender": "Unbekannter Absender."}, status=status.HTTP_400_BAD_REQUEST)
+        vorhanden = Absenderangaben.alle()
+        serializers_ = {}
+        for art, werte in absender.items():
+            s = AbsenderSerializer(vorhanden[art], data=werte, partial=True)
+            if not s.is_valid():
+                return Response({"absender": {art: s.errors}}, status=status.HTTP_400_BAD_REQUEST)
+            serializers_[art] = s
+        geaendert = []
+        with transaction.atomic():
+            for art, s in serializers_.items():
+                vorher = {f: getattr(s.instance, f) for f in s.validated_data}
+                s.instance._history_user = request.user
+                s.save()
+                aenderungen, namen = aenderungen_von(s.instance, vorher)
+                if aenderungen:
+                    geaendert.append((art, aenderungen, namen))
+            if aktiv is not None:
+                e = Einstellungen.aktuell()
+                if e.absender != aktiv:
+                    vorher = {"absender": e.absender}
+                    e.absender = aktiv
+                    e.save()
+                    aenderungen, namen = aenderungen_von(e, vorher)
+                    geaendert.append(("auswahl", aenderungen, namen))
+        for art, aenderungen, namen in geaendert:
+            protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Briefkopf ({art})", aenderungen=aenderungen,
+                          bezeichnungen=namen)
+        return Response(briefkopf_daten())
+
+
+def _png_groesse(kopf: bytes):
+    if kopf[:8] != b"\x89PNG\r\n\x1a\n" or kopf[12:16] != b"IHDR":
+        return None
+    return int.from_bytes(kopf[16:20], "big"), int.from_bytes(kopf[20:24], "big")
+
+
+def _svg_pruefen(inhalt: bytes) -> str | None:
+    """Fehlermeldung oder None. Kein Skript, keine Ereignisse, keine externen Verweise."""
+    import xml.etree.ElementTree as ET
+
+    if b"<!DOCTYPE" in inhalt or b"<!ENTITY" in inhalt:
+        return "SVG mit DOCTYPE oder Entitäten wird nicht angenommen."
+    try:
+        wurzel = ET.fromstring(inhalt)
+    except ET.ParseError:
+        return "Die Datei ist kein gültiges SVG."
+    if not wurzel.tag.endswith("svg"):
+        return "Die Datei ist kein SVG."
+    for el in wurzel.iter():
+        name = el.tag.rsplit("}", 1)[-1].lower()
+        if name in ("script", "foreignobject", "iframe", "embed", "object"):
+            return "SVG mit Skripten oder eingebetteten Inhalten wird nicht angenommen."
+        for attr, wert in el.attrib.items():
+            a = attr.rsplit("}", 1)[-1].lower()
+            if a.startswith("on"):
+                return "SVG mit Ereignis-Attributen wird nicht angenommen."
+            if a == "href" and not (wert.startswith("#") or wert.startswith("data:image/")):
+                return "SVG mit externen Verweisen wird nicht angenommen."
+    return None
+
+
+class LogoView(APIView):
+    """GET: das aktuelle Logo (öffentlich, auch für die Anmeldeseite). POST: neues Logo (PNG oder SVG)."""
+
+    permission_classes = [StammdatenRecht]
+    MAX_BYTES = 2 * 1024 * 1024
+
+    def get_permissions(self):
+        from rest_framework.permissions import AllowAny
+
+        return [AllowAny()] if self.request.method == "GET" else super().get_permissions()
+
+    def get(self, request):
+        from django.conf import settings
+        from django.http import FileResponse, Http404
+
+        logo = Logo.aktuell()
+        if logo is None:
+            raise Http404("Kein Logo hochgeladen.")
+        pfad = settings.EPM_DOKUMENTE / logo.datei
+        if not pfad.exists():
+            raise Http404("Logo-Datei fehlt.")
+        antwort = FileResponse(open(pfad, "rb"), content_type=logo.mime)
+        antwort["Cache-Control"] = "private, max-age=300"
+        antwort["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
+        antwort["ETag"] = f'"{logo.sha256}"'
+        return antwort
+
+    def post(self, request):
+        import hashlib
+        import os
+        import tempfile
+
+        from django.conf import settings
+
+        datei = request.FILES.get("datei")
+        if datei is None:
+            return Response({"datei": "Bitte eine Datei auswählen."}, status=status.HTTP_400_BAD_REQUEST)
+        if datei.size > self.MAX_BYTES:
+            return Response({"datei": "Das Logo darf höchstens 2 MB groß sein."}, status=status.HTTP_400_BAD_REQUEST)
+        inhalt = datei.read()
+        breite = hoehe = None
+        groesse = _png_groesse(inhalt[:32])
+        if groesse:
+            mime, endung = "image/png", "png"
+            breite, hoehe = groesse
+            if breite < 600:
+                return Response({"datei": f"Das Logo ist {breite} px breit, nötig sind mindestens 600 px."},
+                                status=status.HTTP_400_BAD_REQUEST)
+            if breite <= hoehe:
+                return Response({"datei": "Bitte ein Logo im Querformat hochladen."}, status=status.HTTP_400_BAD_REQUEST)
+        elif b"<svg" in inhalt[:4096]:
+            meldung = _svg_pruefen(inhalt)
+            if meldung:
+                return Response({"datei": meldung}, status=status.HTTP_400_BAD_REQUEST)
+            mime, endung = "image/svg+xml", "svg"
+        else:
+            return Response({"datei": "Erlaubt sind PNG und SVG."}, status=status.HTTP_400_BAD_REQUEST)
+        sha = hashlib.sha256(inhalt).hexdigest()
+        relativ = f"_system/logo-{sha[:16]}.{endung}"
+        ziel = settings.EPM_DOKUMENTE / relativ
+        ziel.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
+        if not ziel.exists():
+            fd, tmp = tempfile.mkstemp(dir=ziel.parent, prefix=".logo-")
+            with os.fdopen(fd, "wb") as f:
+                f.write(inhalt)
+            os.chmod(tmp, 0o640)
+            os.replace(tmp, ziel)
+        logo = Logo.objects.filter(datei=relativ).first()
+        if logo is None:
+            logo = Logo.objects.create(datei=relativ, mime=mime, sha256=sha, breite=breite, hoehe=hoehe,
+                                       hochgeladen_von=request.user)
+        else:  # dasselbe Logo erneut: wieder als aktuelles markieren
+            Logo.objects.filter(pk=logo.pk).update(hochgeladen_am=timezone.now(), hochgeladen_von=request.user)
+        protokolliere(SystemEreignis.Art.VORLAGE, request, objekt="Logo", aktion="Logo hochgeladen", sha256=sha,
+                      mime=mime)
+        return Response(briefkopf_daten(), status=status.HTTP_201_CREATED)

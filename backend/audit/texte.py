@@ -13,7 +13,7 @@ GRUPPEN = {
     "anmeldung": ("Anmeldung", [A.ANMELDUNG, A.ABMELDUNG, A.KENNWORT_GEAENDERT, A.ZWEITER_FAKTOR_EINGERICHTET]),
     "fehlversuch": ("Fehlversuch", [A.ANMELDUNG_FEHLGESCHLAGEN, A.ZWEITER_FAKTOR_FEHLGESCHLAGEN, A.ANMELDUNG_GESPERRT]),
     "benutzer": ("Benutzer", [A.BENUTZER_ANGELEGT, A.BENUTZER_GEAENDERT, A.BENUTZER_GESPERRT, A.EINMAL_KENNWORT,
-                              A.ZWEITER_FAKTOR_ZURUECKGESETZT, A.TESTDATEN]),
+                              A.ZWEITER_FAKTOR_ZURUECKGESETZT, A.TESTDATEN, A.RECHTE_GEAENDERT]),
     "vorlage": ("Vorlage", [A.VORLAGE, A.STAMMDATEN]),
     "backup": ("Backup", [A.BACKUP]),
     "export": ("Export", [A.EXPORT]),
@@ -102,6 +102,10 @@ def beschreibung(e) -> str:
             return f"Benutzer {e.objekt} entsperrt"
         felder = ", ".join(d.get("aenderungen") or {})
         return f"Benutzer {e.objekt} geändert" + (f": {felder}" if felder else "")
+    if art == A.RECHTE_GEAENDERT:
+        teile = [f"{t['rolle']} {'darf jetzt' if t['erlaubt'] else 'darf nicht mehr'} „{t['recht']}“"
+                 for t in d.get("aenderungen", [])]
+        return "Rechte geändert: " + "; ".join(teile) if teile else "Rechte geändert"
     if art == A.BENUTZER_GESPERRT:
         return f"Benutzer {e.objekt} gesperrt"
     if art == A.EINMAL_KENNWORT:
@@ -125,6 +129,10 @@ def beschreibung(e) -> str:
         if d.get("aktion") == "Patienten neu zugeordnet":
             return f"{e.objekt}: {d.get('anzahl', 0)} Patienten an {d.get('ziel', '')} übergeben"
         return f"{e.objekt} {d.get('aktion', 'geändert')}"
+    if art == A.VORLAGE:
+        if d.get("aenderungen"):
+            return f"{e.objekt}: {_aenderungen(d)}"
+        return f"{e.objekt}: {d.get('aktion', 'geändert')}"
     if art == A.TESTDATEN:
         return f"Testdaten zurückgesetzt: {d.get('geloescht', 0)} Testpatienten gelöscht, {d.get('angelegt', 0)} neu angelegt"
     return e.get_art_display() + (f" {e.objekt}" if e.objekt else "")

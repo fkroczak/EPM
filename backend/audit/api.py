@@ -3,7 +3,7 @@ from rest_framework import mixins, serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from accounts.permissions import NurAdmin
+from accounts.permissions import AuditRecht, TestdatenRecht
 
 from .models import SystemEreignis, protokolliere
 from .texte import GRUPPEN, beschreibung, gruppe, gruppe_name
@@ -61,7 +61,7 @@ class SystemEreignisViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vi
 
     queryset = SystemEreignis.objects.select_related("benutzer")
     serializer_class = SystemEreignisSerializer
-    permission_classes = [NurAdmin]
+    permission_classes = [AuditRecht]
     filterset_class = SystemEreignisFilter
     search_fields = ["benutzername", "objekt"]
 
@@ -69,7 +69,7 @@ class SystemEreignisViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vi
 class TestdatenViewSet(viewsets.ViewSet):
     """Admin: alle Testpatienten löschen und die Musterdaten neu anlegen."""
 
-    permission_classes = [NurAdmin]
+    permission_classes = [TestdatenRecht]
 
     @action(detail=False, methods=["post"])
     def zuruecksetzen(self, request):

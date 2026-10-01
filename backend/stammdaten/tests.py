@@ -27,9 +27,11 @@ class Praeparate(Grundlage):
         einzeln = c.get(f"/api/praeparate/{glamin.id}/").json()
         self.assertEqual(einzeln["in_plaenen"], 2)
 
-    def test_nur_admin_pflegt_kein_loeschen(self):
+    def test_vorlagen_pflegen_admin_und_mediziner_kein_loeschen(self):
         neu = {"kategorie": "lipide", "name": "Omegaven", "konzentration": "10 %", "einheit": "ml", "reihenfolge": 5}
-        self.assertEqual(client_fuer(self.mediziner).post("/api/praeparate/", neu, format="json").status_code, 403)
+        self.assertEqual(client_fuer(self.mitarbeiter).post("/api/praeparate/", neu, format="json").status_code, 403)
+        r = client_fuer(self.mediziner).post("/api/praeparate/", {**neu, "konzentration": "20 %"}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)  # Mediziner wie Admin (Festlegung 01.10.2026)
         a = client_fuer(self.admin)
         r = a.post("/api/praeparate/", neu, format="json")
         self.assertEqual(r.status_code, 201, r.content)
@@ -94,8 +96,10 @@ class EinstellungenPruefen(Grundlage):
     def test_grenzen_und_rechte(self):
         a = client_fuer(self.admin)
         self.assertEqual(client_fuer(self.mediziner).get("/api/einstellungen/").status_code, 200)
-        self.assertEqual(client_fuer(self.mediziner).patch("/api/einstellungen/", {"kcal_max_tag": 3000},
-                                                           format="json").status_code, 403)
+        self.assertEqual(client_fuer(self.mitarbeiter).patch("/api/einstellungen/", {"kcal_max_tag": 3000},
+                                                             format="json").status_code, 403)
+        self.assertEqual(client_fuer(self.mediziner).patch("/api/einstellungen/", {"kcal_max_tag": 4800},
+                                                           format="json").status_code, 200)
         r = a.patch("/api/einstellungen/", {"glucose_min_g": 1200}, format="json")
         self.assertEqual(r.status_code, 400)
         self.assertIn("glucose_min_g", r.json())
@@ -109,3 +113,96 @@ class EinstellungenPruefen(Grundlage):
         self.assertEqual(eintrag["gruppe_name"], "Vorlage")
         self.assertIn("„Kontakt überfällig“ von 12 auf 6 Monate geändert", eintrag["beschreibung"])
         self.assertIn("„Kalium maximal“ von 300 auf 250 mmol geändert", eintrag["beschreibung"])
+
+
+def png_kopf(breite, hoehe):
+    """Kopf einer PNG-Datei (für die Prüfung reichen Signatur und IHDR)."""
+    return (b"\x89PNG\r\n\x1a\n" + (13).to_bytes(4, "big") + b"IHDR" + breite.to_bytes(4, "big")
+            + hoehe.to_bytes(4, "big") + b"\x08\x06\x00\x00\x00" + b"\x00" * 64)
+
+
+class BriefkopfUndLogo(Grundlage):
+    def test_briefkopf_lesen_und_aendern(self):
+        r = client_fuer(self.betrachter).get("/api/briefkopf/").json()
+        self.assertEqual(r["aktiv"], "stiftung")
+        self.assertEqual(r["absender"]["stiftung"]["strasse"], "Waltrup 16")
+        self.assertEqual(r["absender"]["gug"]["name"], "")
+        self.assertFalse(r["logo"]["vorhanden"])
+        aenderung = {"aktiv": "gug", "absender": {"stiftung": {"telefon": "0251 98 11 401"},
+                                                  "gug": {"name": "DSKM gUG", "ort": "Altenberge"}}}
+        self.assertEqual(client_fuer(self.mitarbeiter).patch("/api/briefkopf/", aenderung, format="json").status_code,
+                         403)
+        r = client_fuer(self.mediziner).patch("/api/briefkopf/", aenderung, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual((r.json()["aktiv"], r.json()["absender"]["gug"]["name"]), ("gug", "DSKM gUG"))
+        texte = [e["beschreibung"] for e in client_fuer(self.admin).get("/api/protokoll/?gruppe=vorlage").json()["results"]]
+        self.assertIn("Briefkopf (stiftung): „Telefon“ von 0251 98 11 400 auf 0251 98 11 401 geändert", texte)
+        for falsch in ({"aktiv": "firma"}, {"absender": {"firma": {"name": "x"}}},
+                       {"absender": {"stiftung": {"plz": "1" * 20}}}):
+            with self.subTest(falsch=falsch):
+                self.assertEqual(client_fuer(self.admin).patch("/api/briefkopf/", falsch, format="json").status_code,
+                                 400)
+
+    def test_logo(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from rest_framework.test import APIClient
+
+        anonym = APIClient()
+        self.assertEqual(anonym.get("/api/briefkopf/logo/").status_code, 404)
+        a = client_fuer(self.admin)
+
+        def hochladen(name, inhalt, client=a):
+            return client.post("/api/briefkopf/logo/", {"datei": SimpleUploadedFile(name, inhalt)}, format="multipart")
+
+        faelle = [
+            ("schmal.png", png_kopf(500, 120), "600 px"),
+            ("hoch.png", png_kopf(800, 900), "Querformat"),
+            ("text.png", b"kein Bild", "PNG und SVG"),
+            ("skript.svg", b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', "Skripten"),
+            ("ereignis.svg", b'<svg xmlns="http://www.w3.org/2000/svg" onload="x()"></svg>', "Ereignis"),
+            ("extern.svg", b'<svg xmlns="http://www.w3.org/2000/svg"><image href="https://x.example/a.png"/></svg>',
+             "externen"),
+        ]
+        for name, inhalt, meldung in faelle:
+            with self.subTest(name=name):
+                r = hochladen(name, inhalt)
+                self.assertEqual(r.status_code, 400, r.content)
+                self.assertIn(meldung, r.json()["datei"])
+        self.assertEqual(hochladen("logo.png", png_kopf(800, 280), client_fuer(self.mitarbeiter)).status_code, 403)
+        r = hochladen("logo.png", png_kopf(800, 280))
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual((r.json()["logo"]["breite"], r.json()["logo"]["mime"]), (800, "image/png"))
+        d = anonym.get("/api/briefkopf/logo/")
+        self.assertEqual(d.status_code, 200)
+        self.assertEqual(d["Content-Type"], "image/png")
+        self.assertIn("default-src 'none'", d["Content-Security-Policy"])
+        self.assertEqual(b"".join(d.streaming_content)[:8], b"\x89PNG\r\n\x1a\n")
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100"><rect width="300" height="100"/></svg>'
+        self.assertEqual(hochladen("logo.svg", svg).json()["logo"]["mime"], "image/svg+xml")
+        self.assertEqual(anonym.get("/api/briefkopf/logo/")["Content-Type"], "image/svg+xml")
+
+
+class Reihenfolge(Grundlage):
+    def test_praeparate_und_auswahlwerte_sortieren(self):
+        m = client_fuer(self.mediziner)
+        ids = [p["id"] for p in m.get("/api/praeparate/?kategorie=aminosaeuren").json()]
+        neu = list(reversed(ids))
+        self.assertEqual(client_fuer(self.mitarbeiter).post("/api/praeparate/reihenfolge/", {"ids": neu},
+                                                            format="json").status_code, 403)
+        r = m.post("/api/praeparate/reihenfolge/", {"ids": neu}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual([p["id"] for p in m.get("/api/praeparate/?kategorie=aminosaeuren").json()], neu)
+        gemischt = [ids[0], Praeparat.objects.get(name="Clinoleic").id]
+        self.assertEqual(m.post("/api/praeparate/reihenfolge/", {"ids": gemischt}, format="json").status_code, 400)
+        self.assertEqual(m.post("/api/praeparate/reihenfolge/", {"ids": "1,2"}, format="json").status_code, 400)
+        orte = [a["id"] for a in m.get("/api/auswahlwerte/?liste=katheter").json()]
+        r = m.post("/api/auswahlwerte/reihenfolge/", {"ids": orte[::-1]}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual([a["id"] for a in m.get("/api/auswahlwerte/?liste=katheter").json()], orte[::-1])
+
+    def test_seitengroesse(self):
+        for i in range(3):
+            Patient.objects.create(nachname=f"Seite{i}", vorname="S", geburtsdatum="1970-01-01")
+        r = client_fuer(self.betrachter).get("/api/patienten/?seitengroesse=2").json()
+        self.assertEqual(len(r["results"]), 2)
+        self.assertIn("seitengroesse=2", r["next"])

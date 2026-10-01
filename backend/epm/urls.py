@@ -9,7 +9,8 @@ from patienten.api import (
     DokumentViewSet, GewichtViewSet, KontaktViewSet, PatientViewSet, StartseiteViewSet, TerminViewSet,
 )
 from stammdaten.api import (
-    AnsprechpartnerViewSet, AuswahlwertViewSet, EinstellungenView, PraeparatViewSet, VersorgerViewSet,
+    AnsprechpartnerViewSet, AuswahlwertViewSet, BriefkopfView, EinstellungenView, LogoView, PraeparatViewSet,
+    VersorgerViewSet,
 )
 
 router = DefaultRouter()
@@ -45,6 +46,9 @@ auth = [
 urlpatterns = [
     path("api/auth/", include(auth)),
     path("api/einstellungen/", EinstellungenView.as_view()),
+    path("api/rechte/", konto.RechteView.as_view()),
+    path("api/briefkopf/", BriefkopfView.as_view()),
+    path("api/briefkopf/logo/", LogoView.as_view()),
     path("api/", include(router.urls)),
 ]
 
