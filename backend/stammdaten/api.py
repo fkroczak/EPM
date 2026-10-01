@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from accounts.permissions import StammdatenRecht, VersorgerRecht
 from audit.models import SystemEreignis, protokolliere
 
-from .models import Absenderangaben, Ansprechpartner, Auswahlwert, Einstellungen, Logo, Praeparat, Versorger
+from .models import Absenderangaben, Ansprechpartner, Arzt, Auswahlwert, Einstellungen, Logo, Praeparat, Versorger
 
 
 def _text(wert):
@@ -168,6 +168,48 @@ class VersorgerViewSet(OhneLoeschen):
     filterset_fields = ["aktiv"]
     search_fields = ["name", "ort"]
     pagination_class = None
+
+
+class ArztSerializer(serializers.ModelSerializer):
+    patienten_anzahl = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Arzt
+        fields = ["id", "name", "praxis", "fachrichtung", "strasse", "plz", "ort", "telefon", "fax", "email", "notiz",
+                  "aktiv", "patienten_anzahl"]
+
+    def validate_name(self, wert):
+        if not wert.strip():
+            raise serializers.ValidationError("Bitte einen Namen eingeben.")
+        return wert.strip()
+
+    def get_patienten_anzahl(self, obj):
+        """Zugeordnete Patienten in Betreuung (ohne Testpatienten), wie bei den Versorgern."""
+        return (obj.zuordnungen.filter(aktiv=True, patient__abgeschlossen_am__isnull=True, patient__ist_test=False)
+                .values("patient_id").distinct().count())
+
+
+class ArztViewSet(OhneLoeschen):
+    """Gemeinsame Ärzteliste (Festlegung 01.10.2026). Pflegen mit dem Recht „Versorger, Ansprechpartner und
+    Ärzte pflegen“; lesen alle Angemeldeten. Nie löschen, nur deaktivieren."""
+
+    permission_classes = [VersorgerRecht]
+    queryset = Arzt.objects.all()
+    serializer_class = ArztSerializer
+    filterset_fields = ["aktiv"]
+    search_fields = ["name", "praxis", "fachrichtung", "ort"]
+    pagination_class = None
+
+    @action(detail=True, methods=["get"])
+    def patienten(self, request, pk=None):
+        """Patienten in Betreuung, denen dieser Arzt zugeordnet ist (mit Rolle)."""
+        from patienten.api import PatientListSerializer
+        from epm.api_basis import patienten_fuer
+
+        arzt = self.get_object()
+        qs = patienten_fuer(request.user).filter(aerzte__arzt=arzt, aerzte__aktiv=True,
+                                                 abgeschlossen_am__isnull=True).distinct()
+        return Response(PatientListSerializer(qs, many=True).data)
 
 
 class PraeparatSerializer(serializers.ModelSerializer):

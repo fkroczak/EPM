@@ -136,12 +136,17 @@ body {
 :root[data-schema="kontrast"] body { font-weight: 500; }
 .wurzel { isolation: isolate; }
 
-a { color: var(--akzent-text); }
-a:hover { color: var(--akzent-hover); }
-:root[data-schema="kontrast"] a { text-decoration: underline; }
+/* Grundregeln für Links und Fokus in der Ebene „base“: Ohne Ebene würden sie jede Regel aus
+   „components“ schlagen (ungeschichtete Regeln gewinnen unabhängig von der Spezifität). Dann bekam
+   z. B. ein Link mit .btn.pri blaue Schrift auf blauem Grund. */
+@layer base {
+  a { color: var(--akzent-text); }
+  a:hover { color: var(--akzent-hover); }
+  :root[data-schema="kontrast"] a { text-decoration: underline; }
 
-:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--akzent-weich), 0 0 0 1px var(--akzent); }
-:root[data-schema="kontrast"] :focus-visible { outline: 3px solid var(--akzent) !important; outline-offset: 2px; }
+  :focus-visible { outline: none; box-shadow: 0 0 0 3px var(--akzent-weich), 0 0 0 1px var(--akzent); }
+  :root[data-schema="kontrast"] :focus-visible { outline: 3px solid var(--akzent) !important; outline-offset: 2px; }
+}
 
 @layer components {
   .nav {

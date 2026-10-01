@@ -47,13 +47,18 @@ function Kennzahl({ titel, children, erste }: { titel: string; children: ReactNo
   );
 }
 
+/** Wert der Auswahl „kein“ (bewusst keiner) bei Versorger und Katheter */
+const KEIN = "kein";
+
 /** Stammdaten bearbeiten (Felder wie „Neuer Patient“) */
 function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen: boolean; onOffen: (o: boolean) => void }) {
   const start = () => ({
     nachname: patient.nachname, vorname: patient.vorname, geschlecht: patient.geschlecht, geburtsdatum: datum(patient.geburtsdatum),
     groesse: patient.groesse_cm != null ? zahl(patient.groesse_cm) : "", strasse: patient.strasse, plz: patient.plz, ort: patient.ort,
-    telefon: patient.telefon, email: patient.email, versorger: patient.versorger ? String(patient.versorger) : "",
-    ansprechpartner: patient.ansprechpartner ? String(patient.ansprechpartner) : "", katheter: patient.katheter ? String(patient.katheter) : "",
+    telefon: patient.telefon, email: patient.email,
+    versorger: patient.versorger ? String(patient.versorger) : patient.kein_versorger ? KEIN : "",
+    ansprechpartner: patient.ansprechpartner ? String(patient.ansprechpartner) : "",
+    katheter: patient.katheter ? String(patient.katheter) : patient.kein_katheter ? KEIN : "",
     nickelallergie: patient.nickelallergie, hausarzt: patient.hausarzt, ueberweisung_durch: patient.ueberweisung_durch,
   });
   const [f, setF] = useState(start);
@@ -88,8 +93,11 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
     speichern.mutate({
       nachname: f.nachname.trim(), vorname: f.vorname.trim(), geschlecht: f.geschlecht, geburtsdatum: geb, groesse_cm: groesse,
       strasse: f.strasse.trim(), plz: f.plz.trim(), ort: f.ort.trim(), telefon: f.telefon.trim(), email: f.email.trim(),
-      versorger: f.versorger ? Number(f.versorger) : null, ansprechpartner: f.ansprechpartner ? Number(f.ansprechpartner) : null,
-      katheter: f.katheter ? Number(f.katheter) : null, nickelallergie: f.nickelallergie, hausarzt: f.hausarzt.trim(),
+      // „kein“ = bewusst keiner, leer = noch nicht erfasst (Festlegung 01.10.2026)
+      versorger: f.versorger && f.versorger !== KEIN ? Number(f.versorger) : null, kein_versorger: f.versorger === KEIN,
+      ansprechpartner: f.ansprechpartner && f.versorger !== KEIN ? Number(f.ansprechpartner) : null,
+      katheter: f.katheter && f.katheter !== KEIN ? Number(f.katheter) : null, kein_katheter: f.katheter === KEIN,
+      nickelallergie: f.nickelallergie, hausarzt: f.hausarzt.trim(),
       ueberweisung_durch: f.ueberweisung_durch.trim(),
     });
   };
@@ -110,14 +118,15 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
         </Feld>
         <Feld label="Geburtsdatum" pflicht fehler={e.geburtsdatum}>{(p) => <Eingabe {...p} className="num" value={f.geburtsdatum} onChange={set("geburtsdatum")} />}</Feld>
         <Feld label="Größe (cm)" fehler={e.groesse_cm}>{(p) => <Eingabe {...p} className="num" value={f.groesse} onChange={set("groesse")} inputMode="decimal" />}</Feld>
-        <fieldset className="border-0 p-0 m-0">
-          <legend className="text-sm font-medium mb-2">Nickelallergie</legend>
-          <div className="flex gap-3 h-9 items-center">
-            {["ja", "nein", "unbekannt"].map((w) => (
-              <label key={w} className="flex items-center gap-1.5 text-sm"><input type="radio" name="nickel" value={w} checked={f.nickelallergie === w} onChange={set("nickelallergie")} />{w}</label>
-            ))}
-          </div>
-        </fieldset>
+        <Feld label="Nickelallergie" fehler={e.nickelallergie}>
+          {(p) => (
+            <Auswahl {...p} value={f.nickelallergie} onChange={set("nickelallergie")}>
+              <option value="unbekannt">nicht erfasst</option>
+              <option value="ja">ja</option>
+              <option value="nein">nein</option>
+            </Auswahl>
+          )}
+        </Feld>
         <Feld label="Straße und Hausnummer" className="col-span-2" fehler={e.strasse}>{(p) => <Eingabe {...p} value={f.strasse} onChange={set("strasse")} />}</Feld>
         <Feld label="PLZ" fehler={e.plz}>{(p) => <Eingabe {...p} className="num" value={f.plz} onChange={set("plz")} />}</Feld>
         <Feld label="Ort" fehler={e.ort}>{(p) => <Eingabe {...p} value={f.ort} onChange={set("ort")} />}</Feld>
@@ -126,7 +135,8 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
         <Feld label="Versorger" className="col-span-2" fehler={e.versorger}>
           {(p) => (
             <Auswahl {...p} value={f.versorger} onChange={(ev) => setF((a) => ({ ...a, versorger: ev.target.value, ansprechpartner: "" }))}>
-              <option value="">— noch keiner —</option>
+              <option value="">— nicht erfasst —</option>
+              <option value={KEIN}>kein Versorger</option>
               {(versorger.data ?? []).filter((v) => v.aktiv || String(v.id) === f.versorger).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
             </Auswahl>
           )}
@@ -142,12 +152,19 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
         <Feld label="Katheter" className="col-span-2" fehler={e.katheter}>
           {(p) => (
             <Auswahl {...p} value={f.katheter} onChange={set("katheter")}>
-              <option value="">— noch keiner —</option>
+              <option value="">— nicht erfasst —</option>
+              <option value={KEIN}>kein Katheter</option>
               {(katheter.data ?? []).filter((k) => k.aktiv || String(k.id) === f.katheter).map((k) => <option key={k.id} value={k.id}>{k.wert}</option>)}
             </Auswahl>
           )}
         </Feld>
-        <Feld label="Hausarzt" className="col-span-2" fehler={e.hausarzt}>{(p) => <Eingabe {...p} value={f.hausarzt} onChange={set("hausarzt")} />}</Feld>
+        {patient.hausarzt ? (
+          // Freitext aus dem Altsystem bzw. von vor der Ärzteliste: bleibt erhalten, neue Ärzte über „Ärzte“ zuordnen
+          <Feld label="Hausarzt (bisheriger Freitext)" className="col-span-2" fehler={e.hausarzt}
+            hinweis="Ärzte mit Kontaktdaten in der Übersicht unter „Ärzte“ zuordnen">
+            {(p) => <Eingabe {...p} value={f.hausarzt} onChange={set("hausarzt")} />}
+          </Feld>
+        ) : null}
         <Feld label="Überweisung / Kontaktaufnahme durch" className="col-span-4" fehler={e.ueberweisung_durch}>{(p) => <Eingabe {...p} value={f.ueberweisung_durch} onChange={set("ueberweisung_durch")} />}</Feld>
         {speichern.error && !(speichern.error instanceof ApiFehler && Object.keys(speichern.error.felder).length) ? <Meldung art="fehler" className="col-span-4">{speichern.error.message}</Meldung> : null}
         <button type="submit" hidden />
@@ -300,12 +317,21 @@ export function Akte() {
               ) : null}</> : "—"}
             </Kennzahl>
             <Kennzahl titel="BMI"><span className="num">{k.bmi != null ? zahl(k.bmi, 1) : "—"}</span></Kennzahl>
-            <Kennzahl titel="Katheter">{k.katheter ?? "—"}</Kennzahl>
-            <Kennzahl titel="Versorger">{k.versorger ?? "—"}</Kennzahl>
+            <Kennzahl titel="Katheter">{k.katheter ?? <span className="gedaempft">nicht erfasst</span>}</Kennzahl>
+            <Kennzahl titel="Versorger">{k.versorger ?? <span className="gedaempft">nicht erfasst</span>}</Kennzahl>
             <Kennzahl titel="Ansprechpartner">{k.ansprechpartner ? <>{k.ansprechpartner}{k.ansprechpartner_telefon ? <> · <span className="num">{k.ansprechpartner_telefon}</span></> : null}</> : "—"}</Kennzahl>
             <Kennzahl titel="Aktueller Plan">{k.aktueller_plan ? `${zahl(k.aktueller_plan.kcal)} kcal${k.aktueller_plan.laufzeit_h ? ` · ${zahl(k.aktueller_plan.laufzeit_h)} h` : ""}` : "—"}</Kennzahl>
             <Kennzahl titel="Nächster Termin">
               {k.naechster_termin ? `${terminZeit(k.naechster_termin.faellig_am, k.naechster_termin.uhrzeit)} · ${k.naechster_termin.ort ?? TERMINARTEN[k.naechster_termin.art]}` : "—"}
+            </Kennzahl>
+            <Kennzahl titel="Hausarzt">
+              {k.hausarzt ? <>{k.hausarzt.name}{k.hausarzt.telefon ? <> · <span className="num">{k.hausarzt.telefon}</span></> : null}</> : "—"}
+            </Kennzahl>
+            <Kennzahl titel="Auskunft an">
+              {/* Bezugspersonen mit Schweigepflichtentbindung – am Telefon sofort sichtbar */}
+              <span data-testid="auskunft">{k.auskunft.length ? k.auskunft.map((a, i) => (
+                <span key={a.id}>{i ? " · " : ""}{a.name}{a.beziehung ? ` (${a.beziehung})` : ""}{a.telefon ? <> <span className="num">{a.telefon}</span></> : null}</span>
+              )) : <span className="gedaempft">niemand eingetragen</span>}</span>
             </Kennzahl>
             <Kennzahl titel="Nickelallergie">
               {p.nickelallergie === "ja" ? <Chip art="fehler">ja</Chip>

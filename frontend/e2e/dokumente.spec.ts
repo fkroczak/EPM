@@ -1,6 +1,6 @@
 /** Entwurf 9 · Dokumente und Entwurf 10 · Verlauf – Upload über Nginx bis in den Dateispeicher und zurück. */
 import { expect, test } from "@playwright/test";
-import { apiAls, eindeutig, merken, zustand } from "./hilfen";
+import { apiAls, eindeutig, einfachePdf, kontrast, merken, zustand } from "./hilfen";
 
 test.use({ storageState: zustand("mitarbeiter") });
 
@@ -91,4 +91,44 @@ test("Altdokument prüfen: Typ und Datum bestätigen", async ({ page }) => {
   await expect(alt).not.toContainText("Typ prüfen");
   await expect(alt).toContainText("Labor");
   merken("altdokument", { patient: Number(new URL(page.url()).pathname.split("/")[2]) });
+});
+
+test("PDF-Vorschau und Ansicht in EPM (ohne PDF-Programm des Browsers), Schaltflächen lesbar", async ({ page }) => {
+  const api = await apiAls("mitarbeiter");
+  const p = await api.post("patienten/", { nachname: eindeutig("Pdf"), vorname: "Paula", geburtsdatum: "1979-09-09" });
+  await api.ende();
+  await page.goto(`/patienten/${p.id}/dokumente`);
+  await page.getByLabel("Dateien hochladen").setInputFiles([
+    { name: "Befund.pdf", mimeType: "application/pdf", buffer: einfachePdf(["Seite eins (E2E)", "Seite zwei (E2E)"]) },
+  ]);
+  const liste = page.getByTestId("dokumentliste");
+  await liste.getByRole("button", { name: "Befund" }).click();
+  const details = page.getByTestId("dokument-details");
+  // Vorschau wird von EPM selbst gezeichnet (Canvas), kein eingebettetes PDF-Programm
+  const vorschau = details.getByTestId("pdf-vorschau");
+  await expect(vorschau.locator('canvas[data-fertig="1"]')).toHaveCount(1);
+  await expect(details.locator("iframe")).toHaveCount(0);
+  await expect(vorschau).toContainText("Seite 1 von 2");
+  await vorschau.getByRole("button", { name: "Nächste Seite" }).click();
+  await expect(vorschau).toContainText("Seite 2 von 2");
+  // die gezeichnete Seite ist nicht leer (Text schwarz auf weiß)
+  const pixel = await vorschau.locator("canvas").evaluate((c: HTMLCanvasElement) => {
+    const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+    let dunkel = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] < 128 && d[i + 3] > 0) dunkel++;
+    return dunkel;
+  });
+  expect(pixel).toBeGreaterThan(50);
+
+  // „Öffnen“: Primärknopf mit lesbarer Schrift (nicht Akzent auf Akzent), große Ansicht mit allen Seiten
+  const oeffnen = details.getByRole("button", { name: "Öffnen" });
+  expect(await kontrast(oeffnen)).toBeGreaterThan(4.5);
+  await oeffnen.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByTestId("pdf-leser").locator('canvas[data-fertig="1"]')).toHaveCount(2);
+  await dialog.getByRole("button", { name: "Vergrößern" }).click();
+  await expect(dialog).toContainText("125 %");
+  await dialog.getByRole("button", { name: "Schließen" }).click();
+  // Herunterladen bleibt als Link mit lesbarer Schrift
+  await expect(details.getByRole("link", { name: "Herunterladen" })).toBeVisible();
 });

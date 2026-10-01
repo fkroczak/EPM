@@ -1,7 +1,7 @@
 /** Gemeinsame Abfragen (Stammdaten werden selten geändert und dürfen länger im Zwischenspeicher bleiben). */
 import { useQuery } from "@tanstack/react-query";
 import { abfrage, api } from "./api";
-import type { Auswahlwert, Einstellungen, Praeparat, Versorger } from "./typen";
+import type { Arzt, Auswahlwert, Einstellungen, Praeparat, Versorger } from "./typen";
 
 export function useAuswahl(liste: string, nurAktiv = true) {
   return useQuery({
@@ -23,6 +23,15 @@ export function useVersorgerListe() {
   return useQuery({
     queryKey: ["versorger"],
     queryFn: () => api<Versorger[]>("versorger/"),
+    staleTime: 60_000,
+  });
+}
+
+/** Gemeinsame Ärzteliste */
+export function useAerzteListe() {
+  return useQuery({
+    queryKey: ["aerzte"],
+    queryFn: () => api<Arzt[]>("aerzte/"),
     staleTime: 60_000,
   });
 }

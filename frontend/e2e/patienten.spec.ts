@@ -1,6 +1,6 @@
 /** Entwurf 3 · Patientenliste und Entwurf 12 · Neuer Patient – gegen echtes Backend und PostgreSQL. */
 import { expect, test } from "@playwright/test";
-import { apiAls, eindeutig, merken, zustand } from "./hilfen";
+import { apiAls, eindeutig, kontrast, merken, zustand } from "./hilfen";
 
 test.use({ storageState: zustand("mitarbeiter") });
 
@@ -10,6 +10,8 @@ test("Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten", 
   await page.goto("/");
   await page.getByRole("navigation", { name: "Hauptnavigation" }).getByRole("link", { name: "Patienten" }).click();
   await expect(page.getByRole("heading", { name: "Patienten", level: 1 })).toBeVisible();
+  // „Neuer Patient“ ist ein Link mit Knopf-Stil: Schrift muss sich vom Akzent abheben (vorher blau auf blau)
+  expect(await kontrast(page.getByRole("link", { name: "Neuer Patient" }))).toBeGreaterThan(4.5);
   const liste = page.getByTestId("patientenliste");
   const zeile = (name: string) => liste.getByRole("row").filter({ has: page.getByRole("link", { name }) });
 
@@ -23,7 +25,10 @@ test("Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten", 
   const zaehlung = await apiAls("mitarbeiter");
   const echte = (await zaehlung.get("patienten/?status=in_betreuung&test=ohne&seitengroesse=1")).count;
   await zaehlung.ende();
-  await expect(page.getByText(`${echte} Patienten in Betreuung`)).toBeVisible();
+  await expect(page.getByTestId("zahl-in-betreuung")).toContainText(`${echte} Patienten in Betreuung`);
+  // Testpatienten stehen getrennt daneben, damit „0“ neben einer vollen Liste nicht wie ein Fehler wirkt
+  await expect(page.getByTestId("zahl-in-betreuung")).toContainText(/zusätzlich \d+ Testpatienten/);
+  await expect(page.getByRole("group", { name: "Ansicht" }).getByRole("button", { name: /In Betreuung/ })).toContainText(/\+\d+ Test/);
   await expect(liste.getByRole("link", { name: "Demo, Karl" })).toHaveCount(0);
 
   // Freitext
@@ -118,6 +123,7 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   await page.getByLabel("Ansprechpartner beim Versorger").selectOption({ label: "Frau Beispiel" });
   await page.getByLabel("Katheter").selectOption({ label: "Port" });
   await page.getByRole("radio", { name: "ja" }).check();
+  await page.getByLabel("Hausarzt").selectOption({ label: "Dr. med. Anna Hausmann (fiktiv) (Altenberge)" });
   await page.getByLabel("Diagnose").fill("Kurzdarmsyndrom (E2E)");
   await page.getByLabel("Überweisung / Kontaktaufnahme durch").fill("Praxis Dr. Holtmeier");
   await page.getByRole("button", { name: "Anlegen und Akte öffnen" }).click();
@@ -134,6 +140,9 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   expect(p.kopf.versorger).toBe("Testversorger Nord (fiktiv)");
   expect(p.kopf.ansprechpartner).toBe("Frau Beispiel");
   expect(p.kopf.katheter).toBe("Port");
+  // Hausarzt aus der Ärzteliste als Zuordnung gespeichert, mit Kontaktdaten im Kopf
+  expect(p.kopf.hausarzt.name).toBe("Dr. med. Anna Hausmann (fiktiv)");
+  expect(p.kopf.hausarzt.telefon).toBe("0000 111111");
   expect(p.diagnose).toContain("Kurzdarmsyndrom (E2E)");
   expect(p.ueberweisung_durch).toBe("Praxis Dr. Holtmeier");
   const gewichte = await api.get(`gewichte/?patient=${id}`);

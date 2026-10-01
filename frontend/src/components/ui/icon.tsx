@@ -35,6 +35,8 @@ const PFADE: Record<string, ReactNode> = {
   auge: (<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>),
   griff: (<><circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="9" cy="18" r="1" /><circle cx="15" cy="18" r="1" /></>),
   info: (<><circle cx="12" cy="12" r="9" /><path d="M12 16v-4" /><path d="M12 8h.01" /></>),
+  arzt: (<><path d="M5 3v5a5 5 0 0 0 10 0V3" /><path d="M10 13v2a5 5 0 0 0 10 0v-2" /><circle cx="20" cy="11" r="2" /><path d="M4 3h2" /><path d="M14 3h2" /></>),
+  minus: (<><path d="M5 12h14" /></>),
   sanduhr: (<><path d="M6 2h12" /><path d="M6 22h12" /><path d="M6 2c0 6 6 6 6 10s-6 4-6 10" /><path d="M18 2c0 6-6 6-6 10s6 4 6 10" /></>),
 };
 

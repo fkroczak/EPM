@@ -24,7 +24,9 @@ from epm.api_basis import (ModelClean, RichText, benutzername, legt_testpatiente
 from stammdaten.models import Auswahlwert
 
 from .kennzahlen import kennzahlen, pruefliste, schnellfilter, zaehler
-from .models import Dokument, Gewichtsmessung, Kontakt, Patient, Termin, dokument_pfad
+from stammdaten.models import Arzt
+
+from .models import Bezugsperson, Dokument, Gewichtsmessung, Kontakt, Patient, PatientArzt, Termin, dokument_pfad
 
 
 # ================================================================= Patient
@@ -41,6 +43,7 @@ class PatientListSerializer(serializers.ModelSerializer):
         fields = [
             "id", "nummer", "nachname", "vorname", "geburtsdatum", "alter", "ort", "katheter", "katheter_name",
             "versorger", "versorger_name", "ansprechpartner", "ansprechpartner_name", "nickelallergie",
+            "kein_katheter", "kein_versorger",
             "ist_abgeschlossen", "abgeschlossen_am", "abschluss_anlass", "ist_test", "kennzahlen",
         ]
 
@@ -67,6 +70,9 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                                                    allow_null=True, write_only=True)
     aufnahme_gemessen_am = serializers.DateField(required=False, write_only=True)
     aufnahme_quelle = serializers.ChoiceField(Gewichtsmessung.Quelle.choices, required=False, write_only=True)
+    # Nur beim Anlegen: Hausarzt aus der Ärzteliste (wird als Zuordnung „Hausarzt“ gespeichert)
+    aufnahme_hausarzt = serializers.PrimaryKeyRelatedField(queryset=Arzt.objects.all(), required=False,
+                                                           allow_null=True, write_only=True)
 
     class Meta:
         model = Patient
@@ -74,10 +80,11 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
             "id", "nummer", "nachname", "vorname", "geburtsdatum", "geschlecht",
             "strasse", "plz", "ort", "telefon", "telefon2", "email", "krankenkasse", "hausarzt",
             "ueberweisung_durch", "groesse_cm", "katheter", "versorger", "ansprechpartner", "nickelallergie",
+            "kein_katheter", "kein_versorger",
             "diagnose", "therapie", "empfehlung", "bemerkung",
             "abgeschlossen_am", "abschluss_anlass", "abschluss_notiz", "ist_abgeschlossen", "ist_test",
             "angelegt_am", "angelegt_von_name", "geaendert_am", "kopf",
-            "aufnahme_gewicht_kg", "aufnahme_gemessen_am", "aufnahme_quelle",
+            "aufnahme_gewicht_kg", "aufnahme_gemessen_am", "aufnahme_quelle", "aufnahme_hausarzt",
         ]
         read_only_fields = ["abgeschlossen_am", "abschluss_anlass", "abschluss_notiz", "angelegt_am", "geaendert_am"]
 
@@ -97,8 +104,20 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
             "gewicht": {"kg": letzte.gewicht_kg, "am": letzte.gemessen_am} if letzte else None,
             "gewichtstrend": obj.gewichtstrend(),
             "bmi": obj.bmi,
-            "katheter": obj.katheter.wert if obj.katheter_id else None,
-            "versorger": obj.versorger.name if obj.versorger_id else None,
+            "katheter": obj.katheter.wert if obj.katheter_id else ("kein" if obj.kein_katheter else None),
+            "versorger": obj.versorger.name if obj.versorger_id else ("kein" if obj.kein_versorger else None),
+            "kein_katheter": obj.kein_katheter,
+            "kein_versorger": obj.kein_versorger,
+            # Wem darf Auskunft gegeben werden (Schweigepflichtentbindung), für Telefonate sofort sichtbar
+            "auskunft": [
+                {"id": b.id, "name": b.name, "beziehung": b.beziehung.wert if b.beziehung_id else None,
+                 "telefon": b.telefon or b.mobil}
+                for b in obj.bezugspersonen.filter(aktiv=True, auskunft_erlaubt=True).select_related("beziehung")
+            ],
+            "hausarzt": next((
+                {"id": z.arzt_id, "name": z.arzt.name, "praxis": z.arzt.praxis, "telefon": z.arzt.telefon}
+                for z in obj.aerzte.filter(aktiv=True, rolle=PatientArzt.Rolle.HAUSARZT).select_related("arzt")
+            ), None),
             "ansprechpartner": obj.ansprechpartner.name if obj.ansprechpartner_id else None,
             "ansprechpartner_telefon": (obj.ansprechpartner.telefon or obj.ansprechpartner.mobil)
             if obj.ansprechpartner_id else None,
@@ -117,6 +136,8 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                 "dokumente": obj.dokumente.filter(ausgeblendet=False).count(),
                 "termine_offen": obj.termine.filter(erledigt_am__isnull=True).count(),
                 "infusionsplaene": obj.infusionsplaene.count(),
+                "bezugspersonen": obj.bezugspersonen.filter(aktiv=True).count(),
+                "aerzte": obj.aerzte.filter(aktiv=True).count(),
             },
         }
 
@@ -125,6 +146,18 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                     if k in attrs}
         if aufnahme and self.instance is not None:
             raise serializers.ValidationError({"aufnahme_gewicht_kg": "Nur beim Anlegen möglich."})
+        hausarzt = attrs.pop("aufnahme_hausarzt", None)
+        if hausarzt is not None:
+            if self.instance is not None:
+                raise serializers.ValidationError({"aufnahme_hausarzt": "Nur beim Anlegen möglich; danach unter „Ärzte“."})
+            if not hausarzt.aktiv:
+                raise serializers.ValidationError({"aufnahme_hausarzt": "Dieser Arzt ist deaktiviert."})
+            self.aufnahme_hausarzt = hausarzt
+        # Wer einen Katheter bzw. Versorger wählt, hebt „kein“ auf (und umgekehrt leert „kein“ die Auswahl nicht stillschweigend)
+        if attrs.get("katheter") is not None and "kein_katheter" not in attrs:
+            attrs["kein_katheter"] = False
+        if attrs.get("versorger") is not None and "kein_versorger" not in attrs:
+            attrs["kein_versorger"] = False
         if aufnahme.get("aufnahme_gewicht_kg") is not None:
             messung = Gewichtsmessung(
                 gewicht_kg=aufnahme["aufnahme_gewicht_kg"],
@@ -189,7 +222,7 @@ class PatientFilter(filters.FilterSet):
     suche = filters.CharFilter(method="filter_suche", label="Name, Vorname, Ort, Patientennummer oder Geburtsdatum")
     pruefen = filters.ChoiceFilter(
         choices=[("altdokumente", "Altdokumente prüfen"), ("nickelallergie", "Nickelallergie nicht erfasst"),
-                 ("kein_versorger", "Kein Versorger"), ("kein_kontakt", "Kein Kontakt seit X Monaten")],
+                 ("kein_versorger", "Versorger nicht erfasst"), ("kein_kontakt", "Kein Kontakt seit X Monaten")],
         method="filter_pruefen",
     )
 
@@ -205,7 +238,8 @@ class PatientFilter(filters.FilterSet):
         if wert == "nickelallergie":
             return qs.filter(nickelallergie=Patient.Nickelallergie.UNBEKANNT)
         if wert == "kein_versorger":
-            return qs.filter(versorger__isnull=True)
+            # „kein Versorger“ (bewusst keiner) ist kein offener Punkt
+            return qs.filter(versorger__isnull=True, kein_versorger=False)
         if wert == "kein_kontakt":
             from stammdaten.models import Einstellungen
 
@@ -279,9 +313,17 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
     def zaehler(self, request):
         """Zahlen für „In Betreuung“, „Abgeschlossen“ und die Schnellfilter (Testpatienten zählen nicht)."""
         qs = patienten_fuer(request.user)
-        if not request.user.ist_test:
-            qs = qs.filter(ist_test=False)
-        return Response(zaehler(qs))
+        if request.user.ist_test:
+            return Response(zaehler(qs))
+        daten = zaehler(qs.filter(ist_test=False))
+        # Testpatienten zählen nicht mit, stehen aber in der Liste. Ihre Anzahl wird getrennt geliefert,
+        # damit „0 in Betreuung“ neben sechs Testpatienten nicht wie ein Fehler aussieht.
+        test = qs.filter(ist_test=True)
+        daten["testpatienten"] = {
+            "in_betreuung": test.filter(abgeschlossen_am__isnull=True).count(),
+            "abgeschlossen": test.filter(abgeschlossen_am__isnull=False).count(),
+        }
+        return Response(daten)
 
     @action(detail=False, methods=["get"], url_path="naechste-nummer")
     def naechste_nummer(self, request):
@@ -298,6 +340,10 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
             messung.patient = patient
             messung.erfasst_von = self.request.user
             messung.save()
+        hausarzt = getattr(serializer, "aufnahme_hausarzt", None)
+        if hausarzt is not None:
+            PatientArzt.objects.create(patient=patient, arzt=hausarzt, rolle=PatientArzt.Rolle.HAUSARZT,
+                                       angelegt_von=self.request.user)
 
     @action(detail=True, methods=["get"])
     def versionen(self, request, pk=None):
@@ -401,6 +447,10 @@ def _aktion(name, h, aenderungen):
         return "erledigt"
     if name == "infusionsplaene" and "status" in felder:
         return {"aktuell": "freigegeben", "abgeloest": "abgelöst"}.get(h.status, "geändert")
+    if name == "bezugspersonen" and "aktiv" in felder:
+        return "wieder aktuell" if h.aktiv else "nicht mehr aktuell"
+    if name == "aerzte" and "aktiv" in felder:
+        return "wieder zuständig" if h.aktiv else "nicht mehr zuständig"
     if name == "stammdaten" and "abgeschlossen_am" in felder:
         return "abgeschlossen" if h.abgeschlossen_am else "wieder geöffnet"
     return "geändert"
@@ -451,6 +501,15 @@ def _beschreibung(name, h, aktion) -> str:
                 teile.append(f"{_deutsch(h.laufzeit_h)} h")
             teile.append(f"gültig ab {h.gueltig_ab:%d.%m.%Y}")
             return " · ".join(teile)
+        if name == "bezugspersonen":
+            beziehung = Auswahlwert.objects.filter(pk=h.beziehung_id).values_list("wert", flat=True).first()
+            teile = [t for t in (beziehung, h.name, h.telefon or h.mobil) if t]
+            if h.auskunft_erlaubt:
+                teile.append("Auskunft erlaubt")
+            return " · ".join(teile)
+        if name == "aerzte":
+            arzt = Arzt.objects.filter(pk=h.arzt_id).first()
+            return " · ".join(t for t in (dict(PatientArzt.Rolle.choices).get(h.rolle, h.rolle), str(arzt or ""), h.notiz) if t)
         if name == "akte":
             if aktion == "abgeschlossen":
                 return f"Anlass: {dict(Patient.Abschlussanlass.choices).get(h.abschluss_anlass, h.abschluss_anlass)}"
@@ -471,6 +530,8 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         "termine": Termin.history.filter(patient_id=patient.id),
         "dokumente": Dokument.history.filter(patient_id=patient.id),
         "infusionsplaene": Infusionsplan.history.filter(patient_id=patient.id),
+        "bezugspersonen": Bezugsperson.history.filter(patient_id=patient.id),
+        "aerzte": PatientArzt.history.filter(patient_id=patient.id),
     }
     if bereich and bereich not in ("stammdaten", *TEXTFELDER):
         quellen = {k: v for k, v in quellen.items() if k == bereich}
@@ -897,6 +958,120 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
 
 
 # ================================================================= Startseite
+# ================================================================= Bezugspersonen und Ärzte der Akte
+class _StammEintragViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                           mixins.CreateModelMixin, mixins.UpdateModelMixin):
+    """Teil der Stammdaten der Akte: schreiben mit „Patienten anlegen, Diagnose, Therapie, Stammdaten ändern“.
+    Kein Löschen (405): nicht mehr Aktuelles wird mit ``aktiv: false`` markiert und bleibt im Verlauf."""
+
+    permission_classes = [AktenRecht]
+    filterset_fields = ["patient", "aktiv"]
+    pagination_class = None
+
+    def perform_create(self, serializer):
+        self.pruefe_patient(serializer.validated_data["patient"])
+        serializer.save(angelegt_von=self.request.user)
+
+    def perform_update(self, serializer):
+        self.pruefe_patient(serializer.instance.patient)
+        serializer.save()
+
+
+class _PatientFest:
+    def validate_patient(self, patient):
+        if self.instance and patient != self.instance.patient:
+            raise serializers.ValidationError("Der Patient kann nicht geändert werden.")
+        return patient
+
+
+class BezugspersonSerializer(_PatientFest, serializers.ModelSerializer):
+    beziehung_name = serializers.CharField(source="beziehung.wert", read_only=True, default=None)
+    angelegt_von_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Bezugsperson
+        fields = ["id", "patient", "beziehung", "beziehung_name", "name", "telefon", "mobil", "email", "strasse",
+                  "plz", "ort", "notiz", "auskunft_erlaubt", "aktiv", "angelegt_am", "angelegt_von_name"]
+        read_only_fields = ["angelegt_am"]
+
+    def get_angelegt_von_name(self, obj):
+        return benutzername(obj.angelegt_von)
+
+    def validate_name(self, wert):
+        if not wert.strip():
+            raise serializers.ValidationError("Bitte einen Namen eingeben.")
+        return wert.strip()
+
+    def validate_beziehung(self, wert):
+        if wert is not None and wert.liste != Auswahlwert.Liste.BEZIEHUNG:
+            raise serializers.ValidationError("Ungültiger Wert für die Liste „Beziehung“.")
+        if wert is not None and not wert.aktiv and (self.instance is None or self.instance.beziehung_id != wert.id):
+            raise serializers.ValidationError("Dieser Wert ist ausgeblendet.")
+        return wert
+
+
+class BezugspersonViewSet(_StammEintragViewSet):
+    """Bezugspersonen (Mutter, Vater, Betreuer/in …) je Patient: ``?patient=ID&aktiv=true``."""
+
+    model = Bezugsperson
+    serializer_class = BezugspersonSerializer
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("beziehung", "angelegt_von")
+
+
+class ArztKurzSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Arzt
+        fields = ["id", "name", "praxis", "fachrichtung", "strasse", "plz", "ort", "telefon", "fax", "email", "aktiv"]
+
+
+class PatientArztSerializer(_PatientFest, serializers.ModelSerializer):
+    arzt_daten = ArztKurzSerializer(source="arzt", read_only=True)
+    rolle_name = serializers.CharField(source="get_rolle_display", read_only=True)
+    angelegt_von_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PatientArzt
+        fields = ["id", "patient", "arzt", "arzt_daten", "rolle", "rolle_name", "notiz", "aktiv", "angelegt_am",
+                  "angelegt_von_name"]
+        read_only_fields = ["angelegt_am"]
+
+    def get_angelegt_von_name(self, obj):
+        return benutzername(obj.angelegt_von)
+
+    def validate_arzt(self, arzt):
+        if self.instance is not None and arzt != self.instance.arzt:
+            raise serializers.ValidationError("Der Arzt kann nicht getauscht werden; bitte neu zuordnen.")
+        if self.instance is None and not arzt.aktiv:
+            raise serializers.ValidationError("Dieser Arzt ist deaktiviert.")
+        return arzt
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        patient = attrs.get("patient") or self.instance.patient
+        arzt = attrs.get("arzt") or self.instance.arzt
+        rolle = attrs.get("rolle") or (self.instance.rolle if self.instance else PatientArzt.Rolle.HAUSARZT)
+        aktiv = attrs.get("aktiv", self.instance.aktiv if self.instance else True)
+        if aktiv:
+            doppelt = PatientArzt.objects.filter(patient=patient, arzt=arzt, rolle=rolle, aktiv=True)
+            if self.instance is not None:
+                doppelt = doppelt.exclude(pk=self.instance.pk)
+            if doppelt.exists():
+                raise serializers.ValidationError({"arzt": "Dieser Arzt ist mit dieser Rolle bereits zugeordnet."})
+        return attrs
+
+
+class PatientArztViewSet(_StammEintragViewSet):
+    """Ärzte eines Patienten aus der gemeinsamen Ärzteliste: ``?patient=ID&aktiv=true``."""
+
+    model = PatientArzt
+    serializer_class = PatientArztSerializer
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("arzt", "angelegt_von")
+
+
 def _zuletzt_eingetragen(patienten, anzahl=10):
     """Neueste Einträge aus allen Bereichen (Entwurf 2 · „Zuletzt eingetragen“)."""
     from infusionen.models import Infusionsplan

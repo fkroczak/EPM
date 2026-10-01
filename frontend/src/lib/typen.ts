@@ -91,6 +91,8 @@ export type PatientZeile = {
   ansprechpartner: number | null;
   ansprechpartner_name: string | null;
   nickelallergie: "ja" | "nein" | "unbekannt";
+  kein_katheter: boolean;
+  kein_versorger: boolean;
   ist_abgeschlossen: boolean;
   abgeschlossen_am: string | null;
   abschluss_anlass: string;
@@ -121,6 +123,9 @@ export type Patient = {
   versorger: number | null;
   ansprechpartner: number | null;
   nickelallergie: "ja" | "nein" | "unbekannt";
+  /** bewusst kein Katheter / kein Versorger (leer = noch nicht erfasst) */
+  kein_katheter: boolean;
+  kein_versorger: boolean;
   diagnose: string;
   therapie: string;
   empfehlung: string;
@@ -144,12 +149,18 @@ export type Patient = {
     ansprechpartner: string | null;
     ansprechpartner_telefon: string | null;
     nickelallergie: string;
+    kein_katheter: boolean;
+    kein_versorger: boolean;
+    /** Bezugspersonen mit Schweigepflichtentbindung */
+    auskunft: { id: number; name: string; beziehung: string | null; telefon: string }[];
+    hausarzt: { id: number; name: string; praxis: string; telefon: string } | null;
     aktueller_plan: { id: number; gueltig_ab: string; kcal: number; laufzeit_h: number | null } | null;
     naechster_termin: {
       id: number; art: string; titel: string; faellig_am: string; uhrzeit: string | null; ort: string | null; bei: string;
     } | null;
     versionen: Record<"diagnose" | "therapie" | "empfehlung", Versionskopf>;
-    zaehler: { kontakte: number; gewichte: number; dokumente: number; termine_offen: number; infusionsplaene: number };
+    zaehler: { kontakte: number; gewichte: number; dokumente: number; termine_offen: number; infusionsplaene: number;
+      bezugspersonen: number; aerzte: number };
   } | null;
 };
 
@@ -255,6 +266,61 @@ export type Versorger = {
   aktiv: boolean;
   ansprechpartner: Ansprechpartner[];
   patienten_anzahl: number;
+};
+
+/** Gemeinsame Ärzteliste (Festlegung 01.10.2026) */
+export type Arzt = {
+  id: number;
+  name: string;
+  praxis: string;
+  fachrichtung: string;
+  strasse: string;
+  plz: string;
+  ort: string;
+  telefon: string;
+  fax: string;
+  email: string;
+  notiz: string;
+  aktiv: boolean;
+  patienten_anzahl: number;
+};
+
+export const ARZTROLLEN: Record<string, string> = {
+  hausarzt: "Hausarzt", facharzt: "Facharzt", ueberweisend: "Überweisend", klinik: "Klinik", sonstige: "Sonstige",
+};
+
+/** Arzt eines Patienten (Zuordnung mit Rolle) */
+export type PatientArzt = {
+  id: number;
+  patient: number;
+  arzt: number;
+  arzt_daten: Omit<Arzt, "notiz" | "patienten_anzahl">;
+  rolle: keyof typeof ARZTROLLEN;
+  rolle_name: string;
+  notiz: string;
+  aktiv: boolean;
+  angelegt_am: string;
+  angelegt_von_name: string | null;
+};
+
+/** Bezugsperson (Mutter, Vater, Betreuer/in …) */
+export type Bezugsperson = {
+  id: number;
+  patient: number;
+  beziehung: number | null;
+  beziehung_name: string | null;
+  name: string;
+  telefon: string;
+  mobil: string;
+  email: string;
+  strasse: string;
+  plz: string;
+  ort: string;
+  notiz: string;
+  auskunft_erlaubt: boolean;
+  aktiv: boolean;
+  angelegt_am: string;
+  angelegt_von_name: string | null;
 };
 
 export type Dokument = {

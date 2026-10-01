@@ -6,10 +6,11 @@ from accounts import api as konto
 from audit.api import SystemEreignisViewSet, TestdatenViewSet
 from infusionen.api import InfusionsplanViewSet
 from patienten.api import (
-    DokumentViewSet, GewichtViewSet, KontaktViewSet, PatientViewSet, StartseiteViewSet, TerminViewSet,
+    BezugspersonViewSet, DokumentViewSet, GewichtViewSet, KontaktViewSet, PatientArztViewSet, PatientViewSet,
+    StartseiteViewSet, TerminViewSet,
 )
 from stammdaten.api import (
-    AnsprechpartnerViewSet, AuswahlwertViewSet, BriefkopfView, EinstellungenView, LogoView, PraeparatViewSet,
+    AnsprechpartnerViewSet, ArztViewSet, AuswahlwertViewSet, BriefkopfView, EinstellungenView, LogoView, PraeparatViewSet,
     VersorgerViewSet,
 )
 
@@ -20,9 +21,12 @@ router.register("gewichte", GewichtViewSet, basename="gewicht")
 router.register("kontakte", KontaktViewSet, basename="kontakt")
 router.register("termine", TerminViewSet, basename="termin")
 router.register("dokumente", DokumentViewSet, basename="dokument")
+router.register("bezugspersonen", BezugspersonViewSet, basename="bezugsperson")
+router.register("patient-aerzte", PatientArztViewSet, basename="patientarzt")
 router.register("infusionsplaene", InfusionsplanViewSet, basename="infusionsplan")
 router.register("versorger", VersorgerViewSet, basename="versorger")
 router.register("ansprechpartner", AnsprechpartnerViewSet, basename="ansprechpartner")
+router.register("aerzte", ArztViewSet, basename="arzt")
 router.register("praeparate", PraeparatViewSet, basename="praeparat")
 router.register("auswahlwerte", AuswahlwertViewSet, basename="auswahlwert")
 router.register("benutzer", konto.BenutzerViewSet, basename="benutzer")

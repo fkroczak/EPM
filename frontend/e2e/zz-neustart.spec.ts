@@ -31,7 +31,7 @@ test("Vor dem Neustart: Grenzwert, Rechte, Darstellung und Startseite in der Obe
 
   await page.goto("/admin/benutzer");
   const rechte = page.getByTestId("rechte");
-  await rechte.getByRole("checkbox", { name: "Betrachter: Versorger und Ansprechpartner pflegen" }).check();
+  await rechte.getByRole("checkbox", { name: "Betrachter: Versorger, Ansprechpartner und Ärzte pflegen" }).check();
   await rechte.getByRole("button", { name: "Speichern (1)" }).click();
   await expect(page.getByText("Rechte gespeichert. Sie gelten ab sofort.")).toBeVisible();
   await ctx.close();
@@ -83,6 +83,17 @@ test("Nach dem Neustart: Akten mit Gewicht, Diagnose und Versionen, Kontakten, T
   const verlauf = page.getByTestId("verlauf");
   await expect(verlauf).toContainText("abgeschlossen");
   await expect(verlauf).toContainText("wieder geöffnet");
+  await page.goto(`/patienten/${abschluss}`);
+  await expect(page.getByTestId("kennzahlen")).toContainText("kein");  // Katheter und Versorger bewusst „kein“
+
+  // Ärzte und Bezugspersonen
+  const kd = gemerkt("kontaktdaten");
+  await page.goto(`/patienten/${kd.patient}`);
+  await expect(page.getByTestId("aerzte")).toContainText(kd.arzt);
+  await expect(page.getByTestId("aerzte")).toContainText("0251 99999");
+  await expect(page.getByTestId("bezugspersonen").getByTestId("bezugsperson")).toHaveCount(1);
+  await expect(page.getByTestId("bezugspersonen")).toContainText("Bernd Betreuer");
+  await expect(page.getByTestId("auskunft")).toContainText("niemand eingetragen");
   await ctx.close();
 });
 
@@ -140,7 +151,7 @@ test("Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Re
 
   // Rechte: Änderung von vor dem Neustart gilt, auch für den Betrachter
   const rechte = page.getByTestId("rechte");
-  await expect(rechte.getByRole("checkbox", { name: "Betrachter: Versorger und Ansprechpartner pflegen" })).toBeChecked();
+  await expect(rechte.getByRole("checkbox", { name: "Betrachter: Versorger, Ansprechpartner und Ärzte pflegen" })).toBeChecked();
   const b = await seiteAls(browser, "betrachter");
   await b.page.goto("/versorger");
   await expect(b.page.getByRole("button", { name: "Neuer Versorger" })).toBeVisible();

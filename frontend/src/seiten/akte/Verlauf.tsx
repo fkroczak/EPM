@@ -2,9 +2,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { abfrage, api } from "@/lib/api";
-import { usePraeparate, useVersorgerListe } from "@/lib/daten";
+import { useAerzteListe, usePraeparate, useVersorgerListe } from "@/lib/daten";
 import { datum, uhrzeit } from "@/lib/format";
-import { ABSCHLUSSANLAESSE, GESCHLECHTER, GEWICHTSQUELLEN, TERMINARTEN, ppiName, ppiZeiten } from "@/lib/typen";
+import { ABSCHLUSSANLAESSE, ARZTROLLEN, GESCHLECHTER, GEWICHTSQUELLEN, TERMINARTEN, ppiName, ppiZeiten } from "@/lib/typen";
 import type { Auswahlwert, Verlaufseintrag } from "@/lib/typen";
 import { Auswahl, Chip, Fehleranzeige, Karte, Knopf, Laden, Leer, Segmente } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
@@ -15,18 +15,21 @@ const BEREICHE: { wert: string; text: string }[] = [
   { wert: "", text: "Alle" }, { wert: "stammdaten", text: "Stammdaten" }, { wert: "diagnose", text: "Diagnose" },
   { wert: "therapie", text: "Therapie" }, { wert: "empfehlung", text: "Empfehlung" }, { wert: "kontakte", text: "Kontakte" },
   { wert: "gewichte", text: "Gewicht" }, { wert: "termine", text: "Termine" }, { wert: "infusionsplaene", text: "Infusionspläne" },
-  { wert: "dokumente", text: "Dokumente" },
+  { wert: "dokumente", text: "Dokumente" }, { wert: "aerzte", text: "Ärzte" }, { wert: "bezugspersonen", text: "Bezugspersonen" },
 ];
 const BEREICH_EINZELN: Record<string, string> = {
   stammdaten: "Stammdaten", diagnose: "Diagnose", therapie: "Therapie", empfehlung: "Empfehlung", kontakte: "Kontakt",
   gewichte: "Gewicht", termine: "Termin", infusionsplaene: "Infusionsplan", dokumente: "Dokument",
+  aerzte: "Arzt", bezugspersonen: "Bezugsperson",
 };
 
 const FELDER: Record<string, string> = {
   nachname: "Nachname", vorname: "Vorname", geburtsdatum: "Geburtsdatum", geschlecht: "Geschlecht", strasse: "Straße", plz: "PLZ",
   ort: "Ort", telefon: "Telefon", telefon2: "Telefon 2", email: "E-Mail", krankenkasse: "Krankenkasse", hausarzt: "Hausarzt",
   ueberweisung_durch: "Überweisung durch", groesse_cm: "Größe (cm)", katheter: "Katheter", versorger: "Versorger",
-  ansprechpartner: "Ansprechpartner", nickelallergie: "Nickelallergie", diagnose: "Diagnose", therapie: "Therapie",
+  ansprechpartner: "Ansprechpartner", nickelallergie: "Nickelallergie", kein_katheter: "Kein Katheter",
+  kein_versorger: "Kein Versorger", beziehung: "Beziehung", name: "Name", mobil: "Mobil",
+  auskunft_erlaubt: "Auskunft erlaubt", aktiv: "aktuell", arzt: "Arzt", rolle: "Rolle", diagnose: "Diagnose", therapie: "Therapie",
   empfehlung: "Empfehlung", bemerkung: "Bemerkung", abgeschlossen_am: "Abgeschlossen am", abschluss_anlass: "Anlass",
   abschluss_notiz: "Notiz zum Abschluss", gewicht_kg: "Gewicht (kg)", gemessen_am: "gemessen am", datum_ungenau: "Datum ungefähr",
   quelle: "Quelle", notiz: "Notiz", text: "Text", zeitpunkt: "Zeitpunkt", storniert_am: "Storniert am", storno_grund: "Grund",
@@ -48,13 +51,16 @@ const TEXTFELDER = new Set(["diagnose", "therapie", "empfehlung", "bemerkung", "
 function useWertAnzeige() {
   const versorger = useVersorgerListe();
   const praeparate = usePraeparate();
+  const aerzte = useAerzteListe();
   const auswahl = useQuery({ queryKey: ["auswahlwerte", "alle"], queryFn: () => api<Auswahlwert[]>("auswahlwerte/"), staleTime: 5 * 60_000 });
   return (feld: string, wert: string) => {
     if (wert === "" || wert === "None") return "—";
     if (TEXTFELDER.has(feld)) return klartext(wert) || "—";
     if (feld === "versorger") return versorger.data?.find((v) => String(v.id) === wert)?.name ?? wert;
     if (feld === "ansprechpartner") return versorger.data?.flatMap((v) => v.ansprechpartner).find((a) => String(a.id) === wert)?.name ?? wert;
-    if (["katheter", "ort", "typ"].includes(feld) || (feld === "art" && /^\d+$/.test(wert))) return auswahl.data?.find((a) => String(a.id) === wert)?.wert ?? wert;
+    if (["katheter", "ort", "typ", "beziehung"].includes(feld) || (feld === "art" && /^\d+$/.test(wert))) return auswahl.data?.find((a) => String(a.id) === wert)?.wert ?? wert;
+    if (feld === "arzt") return aerzte.data?.find((a) => String(a.id) === wert)?.name ?? wert;
+    if (feld === "rolle") return ARZTROLLEN[wert] ?? wert;
     if (feld.endsWith("_praeparat") || feld === "spurenelemente" || feld === "katheterschutz") return praeparate.data?.find((p) => String(p.id) === wert)?.anzeige ?? wert;
     if (feld === "geschlecht") return GESCHLECHTER[wert] ?? wert;
     if (feld === "quelle") return GEWICHTSQUELLEN[wert] ?? wert;

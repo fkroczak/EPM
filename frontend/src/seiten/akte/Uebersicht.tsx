@@ -18,6 +18,7 @@ import type { Zeitraum } from "@/components/GewichtsDiagramm";
 import { Richtext, klartext } from "@/components/Editor";
 import { TerminDialog } from "@/components/TerminDialog";
 import { useAkte } from "./Akte";
+import { AerzteKarte, BezugspersonenKarte } from "./Kontaktpersonen";
 
 const QUELLEN_NEU = ["telefonisch", "ambulanz", "versorger", "arztbrief"];
 const ZEITRAEUME: { wert: Zeitraum; text: string }[] = [
@@ -332,7 +333,7 @@ function StammKarte() {
       <span className="gedaempft">Adresse</span><span>{adresse || "—"}</span>
       <span className="gedaempft">Telefon</span><span className="num">{p.telefon || "—"}</span>
       <span className="gedaempft">E-Mail</span><span className="truncate">{p.email || "—"}</span>
-      <span className="gedaempft">Hausarzt</span><span>{p.hausarzt || "—"}</span>
+      {p.hausarzt ? <><span className="gedaempft">Hausarzt</span><span title="bisheriger Freitext; Ärzte mit Kontaktdaten unter „Ärzte“">{p.hausarzt}</span></> : null}
       <span className="gedaempft">Überweisung</span><span>{p.ueberweisung_durch || "—"}</span>
       <span className="gedaempft">Größe</span><span className="num">{p.groesse_cm != null ? `${zahl(p.groesse_cm)} cm` : "—"}</span>
     </Karte>
@@ -351,6 +352,8 @@ export function Uebersicht() {
         <PlanKarte />
         <KontakteKarte />
         <StammKarte />
+        <AerzteKarte />
+        <BezugspersonenKarte />
       </div>
     </div>
   );

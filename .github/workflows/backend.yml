@@ -146,7 +146,7 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Abhängigkeiten (Lockfile beim ersten Lauf erzeugen)
+      - name: Abhängigkeiten (Lockfile erzeugen bzw. bei neuen Paketen ergänzen)
         id: npm
         working-directory: frontend
         run: |
@@ -154,6 +154,10 @@ jobs:
           if [ ! -f package-lock.json ]; then
             npm install --no-audit --no-fund 2>&1 | tee -a ../frontend-bau.txt
             echo "lock=1" >> "$GITHUB_OUTPUT"
+          else
+            # neue Abhängigkeit in package.json: Lockfile ergänzen, bestehende Versionen bleiben fest
+            npm install --package-lock-only --no-audit --no-fund 2>&1 | tail -3 | tee -a ../frontend-bau.txt
+            if ! git diff --quiet -- package-lock.json; then echo "lock=1" >> "$GITHUB_OUTPUT"; fi
           fi
           npm ci --no-audit --no-fund 2>&1 | tail -5 | tee -a ../frontend-bau.txt
 
@@ -163,7 +167,7 @@ jobs:
           git config user.name "epm-ci"
           git config user.email "epm-ci@users.noreply.github.com"
           git add frontend/package-lock.json
-          git commit -m "Frontend: package-lock.json erzeugt (CI)"
+          git commit -m "Frontend: package-lock.json erzeugt/aktualisiert (CI)"
           git pull --rebase
           git push
 

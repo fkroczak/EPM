@@ -117,6 +117,7 @@ const LISTEN: Liste[] = [
   { schluessel: "elektrolyte", titel: "Elektrolytzusätze", art: "praeparat" }, { schluessel: "medikament", titel: "Medikamente", art: "praeparat" },
   { schluessel: "katheter", titel: "Katheter", art: "auswahl" }, { schluessel: "terminort", titel: "Terminorte", art: "auswahl" },
   { schluessel: "dokumenttyp", titel: "Dokumenttypen", art: "auswahl" },
+  { schluessel: "beziehung", titel: "Beziehungen (Bezugspersonen)", art: "auswahl" },
 ];
 
 function EintragDialog({ liste, eintrag, onZu }: { liste: Liste; eintrag: Praeparat | Auswahlwert | null | "neu"; onZu: () => void }) {

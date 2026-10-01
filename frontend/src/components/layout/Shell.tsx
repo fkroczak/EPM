@@ -54,6 +54,7 @@ function Seitenleiste() {
         <NavEintrag zu="/" icon="start" text="Start" ende />
         <NavEintrag zu="/patienten" icon="patienten" text="Patienten" />
         <NavEintrag zu="/versorger" icon="versorger" text="Versorger" />
+        <NavEintrag zu="/aerzte" icon="arzt" text="Ärzte" />
       </nav>
       {admin.length ? (
         <nav aria-label="Administration" className="flex flex-col gap-0.5">

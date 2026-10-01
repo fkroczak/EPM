@@ -9,6 +9,8 @@ import type { Dokument } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Leer, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
+import { Dialog } from "@/components/ui/dialog";
+import { PdfLeser, PdfVorschau } from "@/components/PdfAnsicht";
 import { useAkte } from "./Akte";
 
 const DATUMSQUELLE: Record<string, string> = {
@@ -25,11 +27,19 @@ function dateiUrl(d: Dokument, anzeigen: boolean) {
   return `/api/dokumente/${d.id}/datei/${anzeigen ? "?anzeigen=1" : ""}`;
 }
 
+function istPdf(dok: Dokument) {
+  return dok.mime === "application/pdf";
+}
+
 function Vorschau({ dok }: { dok: Dokument }) {
   if (dok.mime.startsWith("image/")) {
     return <img src={dateiUrl(dok, true)} alt={dok.titel} className="w-full max-h-[320px] object-contain rounded-lg border border-rand bg-fein" />;
   }
-  if (dok.mime === "application/pdf" || dok.mime.startsWith("text/")) {
+  if (istPdf(dok)) {
+    // eigene Anzeige statt PDF-Programm des Browsers (Adobe Reader blendet dort eine schwarze Leiste ein)
+    return <PdfVorschau url={dateiUrl(dok, true)} titel={dok.titel} />;
+  }
+  if (dok.mime.startsWith("text/")) {
     return <iframe title={`Vorschau ${dok.titel}`} src={dateiUrl(dok, true)} className="w-full h-[320px] rounded-lg border border-rand bg-white" />;
   }
   return <div className="h-[120px] flex items-center justify-center text-sm gedaempft border border-dashed border-rand rounded-lg">Keine Vorschau</div>;
@@ -42,6 +52,7 @@ function Details({ dok }: { dok: Dokument }) {
   const [typ, setTyp] = useState(dok.typ ? String(dok.typ) : "");
   const [am, setAm] = useState(dok.datum ? datum(dok.datum) : "");
   const [notiz, setNotiz] = useState(dok.notiz);
+  const [lesen, setLesen] = useState(false);
   const qc = useQueryClient();
   const melden = useHinweis();
   useEffect(() => {
@@ -98,9 +109,17 @@ function Details({ dok }: { dok: Dokument }) {
       </dl>
       {speichern.error && !Object.keys(f).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
       <div className="flex gap-2 flex-wrap">
-        <a className="btn pri" href={dateiUrl(dok, true)} target="_blank" rel="noopener"><Icon name="auge" />Öffnen</a>
+        {istPdf(dok)
+          ? <Knopf variante="pri" icon="auge" onClick={() => setLesen(true)}>Öffnen</Knopf>
+          : <a className="btn pri" href={dateiUrl(dok, true)} target="_blank" rel="noopener"><Icon name="auge" />Öffnen</a>}
         <a className="btn sec" href={dateiUrl(dok, false)} download><Icon name="herunterladen" />Herunterladen</a>
       </div>
+      {istPdf(dok) ? (
+        <Dialog offen={lesen} onOffen={setLesen} titel={dok.titel} breite={1100}
+          beschreibung={<>{dok.originalname} · <a href={dateiUrl(dok, false)} download>Herunterladen</a></>}>
+          {lesen ? <PdfLeser url={dateiUrl(dok, true)} className="h-[68vh]" /> : null}
+        </Dialog>
+      ) : null}
       {erfassen ? (
         <div className="flex gap-2 flex-wrap">
           {!dok.typ_geprueft ? <Knopf variante="pri" laedt={speichern.isPending && speichern.variables === "pruefen"} onClick={() => speichern.mutate("pruefen")}>Typ und Datum bestätigen</Knopf> : null}

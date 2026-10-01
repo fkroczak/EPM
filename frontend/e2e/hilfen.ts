@@ -195,3 +195,43 @@ export async function apiAnmelden(benutzername: string, kennwort: string, code: 
   const b = await ctx.post("/api/auth/2fa/", { data: { code }, headers: await kopf() });
   return { ctx, schritt: (await b.json()).schritt as string, status: b.status() };
 }
+
+/** Kleine, gültige PDF mit einer Textzeile je Seite (für die PDF-Anzeige in EPM). */
+export function einfachePdf(seiten: string[]): Buffer {
+  const objekte: string[] = [];
+  const kids = seiten.map((_, i) => `${3 + i * 2} 0 R`).join(" ");
+  const schrift = 3 + seiten.length * 2;
+  objekte.push("<< /Type /Catalog /Pages 2 0 R >>");
+  objekte.push(`<< /Type /Pages /Kids [${kids}] /Count ${seiten.length} >>`);
+  for (let i = 0; i < seiten.length; i++) {
+    const inhalt = `BT /F1 24 Tf 72 760 Td (${seiten[i].replace(/[()\\]/g, "")}) Tj ET`;
+    objekte.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents ${4 + i * 2} 0 R /Resources << /Font << /F1 ${schrift} 0 R >> >> >>`);
+    objekte.push(`<< /Length ${inhalt.length} >>\nstream\n${inhalt}\nendstream`);
+  }
+  objekte.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  let pdf = "%PDF-1.4\n";
+  const versatz: number[] = [];
+  objekte.forEach((o, i) => {
+    versatz.push(pdf.length);
+    pdf += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objekte.length + 1}\n0000000000 65535 f \n`;
+  for (const v of versatz) pdf += `${String(v).padStart(10, "0")} 00000 n \n`;
+  pdf += `trailer\n<< /Size ${objekte.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(pdf, "latin1");
+}
+
+/** Kontrast zwischen Schrift und Hintergrund eines Knopfs (Regression „blaue Schrift auf blauem Knopf“). */
+export async function kontrast(el: import("@playwright/test").Locator): Promise<number> {
+  return el.evaluate((e) => {
+    const s = getComputedStyle(e);
+    const lum = (farbe: string) => {
+      const [r, g, b] = (farbe.match(/\d+(\.\d+)?/g) ?? ["0", "0", "0"]).slice(0, 3).map((x) => Number(x) / 255)
+        .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const [a, b] = [lum(s.color), lum(s.backgroundColor)].sort((x, y) => y - x);
+    return (a + 0.05) / (b + 0.05);
+  });
+}

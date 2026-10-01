@@ -15,8 +15,15 @@ import { Auswahl, Chip, Fehleranzeige, Karte, KnopfLink, Knopf, Laden, Leer, Sei
 import { Icon } from "@/components/ui/icon";
 
 type Zaehler = { in_betreuung: number; abgeschlossen: number; mit_hinweisen: number; gewichtsverlust: number; termin_woche: number };
+/** Testpatienten zählen nicht mit; ihre Anzahl kommt getrennt (nicht für Testbenutzer). */
+type ZaehlerAntwort = Zaehler & { testpatienten?: { in_betreuung: number; abgeschlossen: number } };
 
 const SEITENGROESSE = 50;
+
+/** „+6 Test“ neben dem Zähler, wenn Testpatienten sichtbar sind. */
+function testZahl(n: number | undefined) {
+  return n ? <span className="num opacity-70 text-[0.75rem] ml-1" title={`${n} Testpatienten, nicht mitgezählt`}>+{n} Test</span> : null;
+}
 
 const SCHNELLFILTER: { wert: string; text: string; zahl: keyof Zaehler }[] = [
   { wert: "hinweise", text: "Nur mit Hinweisen", zahl: "mit_hinweisen" },
@@ -27,7 +34,7 @@ const SCHNELLFILTER: { wert: string; text: string; zahl: keyof Zaehler }[] = [
 const PRUEFEN: Record<string, string> = {
   altdokumente: "Altdokumente ohne geprüften Typ",
   nickelallergie: "Nickelallergie nicht erfasst",
-  kein_versorger: "Kein Versorger eingetragen",
+  kein_versorger: "Versorger nicht erfasst",
   kein_kontakt: "Lange kein Kontakt",
 };
 
@@ -120,7 +127,7 @@ export function Patienten() {
 
   const versorger = useVersorgerListe();
   const katheter = useAuswahl("katheter", false);
-  const zaehler = useQuery({ queryKey: ["patienten", "zaehler"], queryFn: () => api<Zaehler>("patienten/zaehler/") });
+  const zaehler = useQuery({ queryKey: ["patienten", "zaehler"], queryFn: () => api<ZaehlerAntwort>("patienten/zaehler/") });
   const abfrageWerte = {
     status: archiv ? "abgeschlossen" : "in_betreuung",
     suche: params.get("suche") ?? undefined,
@@ -157,8 +164,8 @@ export function Patienten() {
         setParams(neu);
       }}
       werte={[
-        { wert: "in_betreuung", text: <>In Betreuung <span className="num opacity-70">{z ? zahl(z.in_betreuung) : ""}</span></> },
-        { wert: "abgeschlossen", text: <>Abgeschlossen <span className="num opacity-70">{z ? zahl(z.abgeschlossen) : ""}</span></> },
+        { wert: "in_betreuung", text: <>In Betreuung <span className="num opacity-70">{z ? zahl(z.in_betreuung) : ""}</span>{testZahl(z?.testpatienten?.in_betreuung)}</> },
+        { wert: "abgeschlossen", text: <>Abgeschlossen <span className="num opacity-70">{z ? zahl(z.abgeschlossen) : ""}</span>{testZahl(z?.testpatienten?.abgeschlossen)}</> },
       ]} />
   );
 
@@ -171,7 +178,8 @@ export function Patienten() {
           rechts={umschalter} />
       ) : (
         <Seitenkopf titel="Patienten"
-          unter={<><span className="num">{z ? zahl(z.in_betreuung) : "…"}</span> Patienten in Betreuung</>}
+          unter={<span data-testid="zahl-in-betreuung"><span className="num">{z ? zahl(z.in_betreuung) : "…"}</span> Patienten in Betreuung
+            {z?.testpatienten?.in_betreuung ? <> · zusätzlich <span className="num">{zahl(z.testpatienten.in_betreuung)}</span> {z.testpatienten.in_betreuung === 1 ? "Testpatient" : "Testpatienten"} (zählen in keiner Statistik)</> : null}</span>}
           rechts={<>
             {umschalter}
             {darf("akten_bearbeiten") ? <KnopfLink to="/patienten/neu" variante="pri" icon="plus">Neuer Patient</KnopfLink> : null}
@@ -259,8 +267,8 @@ export function Patienten() {
                   <td className="td num gedaempft">{nummer(p.nummer)}</td>
                   <td className="td"><Link to={`/patienten/${p.id}`} className="font-medium no-underline text-text2">{p.nachname}, {p.vorname}</Link></td>
                   <td className="td num text-text2">{datum(p.geburtsdatum)}</td>
-                  <td className="td text-text2">{p.katheter_name ?? "—"}</td>
-                  <td className="td text-text2">{p.versorger_name ?? "—"}</td>
+                  <td className="td text-text2">{p.katheter_name ?? (p.kein_katheter ? "kein" : "—")}</td>
+                  <td className="td text-text2">{p.versorger_name ?? (p.kein_versorger ? "kein" : "—")}</td>
                   <td className="td num text-text2">{datum(p.abgeschlossen_am)}</td>
                   <td className="td gedaempft">{ABSCHLUSSANLAESSE[p.abschluss_anlass] ?? p.abschluss_anlass}</td>
                 </tr>
@@ -274,9 +282,9 @@ export function Patienten() {
                     </span>
                   </td>
                   <td className="td"><span className="num">{datum(p.geburtsdatum)}</span> <span className="gedaempft">({p.alter})</span></td>
-                  <td className="td">{p.katheter_name ?? "—"}</td>
+                  <td className="td">{p.katheter_name ?? (p.kein_katheter ? "kein" : "—")}</td>
                   <td className="td text-text2">
-                    {p.versorger_name ?? "—"}
+                    {p.versorger_name ?? (p.kein_versorger ? "kein" : "—")}
                     {p.ansprechpartner_name ? <><br /><span className="text-[0.78rem] gedaempft">{p.ansprechpartner_name}</span></> : null}
                   </td>
                   <td className="td num text-right whitespace-nowrap">

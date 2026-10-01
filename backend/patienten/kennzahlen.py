@@ -73,8 +73,8 @@ def kennzahlen(patienten) -> dict:
                              "text": f"Gewicht {_deutsch(trend['prozent'])} % in {e.gewicht_warnung_monate} Mon."})
         if p.id in plaene and plaene[p.id] < plan_grenze:
             hinweise.append({"art": "plan", "text": f"Plan älter als {e.plan_alter_warnung_monate} Mon."})
-        if not p.versorger_id:
-            hinweise.append({"art": "versorger", "text": "Kein Versorger"})
+        if not p.versorger_id and not p.kein_versorger:  # „kein Versorger“ ist bewusst so erfasst
+            hinweise.append({"art": "versorger", "text": "Versorger nicht erfasst"})
         letzter = kontakte.get(p.id)
         if letzter is None or letzter < kontakt_grenze:
             hinweise.append({"art": "kontakt",
@@ -91,7 +91,7 @@ def kennzahlen(patienten) -> dict:
 
 def _nur_ids(patienten_qs):
     """Nur die Spalten, die ``kennzahlen`` braucht (ohne select_related der Listenansicht)."""
-    return patienten_qs.select_related(None).only("id", "versorger")
+    return patienten_qs.select_related(None).only("id", "versorger", "kein_versorger")
 
 
 def schnellfilter(patienten_qs, art: str):
@@ -131,7 +131,7 @@ def pruefliste(patienten_qs) -> dict:
     return {
         "altdokumente": Dokument.objects.filter(patient__in=offen, typ_geprueft=False, ausgeblendet=False).count(),
         "nickelallergie_unbekannt": offen.filter(nickelallergie=Patient.Nickelallergie.UNBEKANNT).count(),
-        "kein_versorger": offen.filter(versorger__isnull=True).count(),
+        "kein_versorger": offen.filter(versorger__isnull=True, kein_versorger=False).count(),
         "kein_kontakt": offen.exclude(id__in=mit_kontakt).count(),
         "kontakt_monate": e.kontakt_ueberfaellig_monate,
     }

@@ -10,7 +10,7 @@ from django.db.models import Max
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
-from stammdaten.models import Ansprechpartner, Auswahlwert, Einstellungen, Versorger
+from stammdaten.models import Ansprechpartner, Arzt, Auswahlwert, Einstellungen, Versorger
 
 TESTNUMMER_AB = 9001
 
@@ -62,6 +62,9 @@ class Patient(models.Model):
         Ansprechpartner, on_delete=models.PROTECT, null=True, blank=True, related_name="patienten"
     )
     nickelallergie = models.CharField(max_length=10, choices=Nickelallergie.choices, default=Nickelallergie.UNBEKANNT)
+    # „kein“ = bewusst keiner (Festlegung 01.10.2026), leer = noch nicht erfasst (mit Hinweis wie Nickelallergie „unbekannt“)
+    kein_katheter = models.BooleanField("Kein Katheter", default=False)
+    kein_versorger = models.BooleanField("Kein Versorger", default=False)
 
     # Lange formatierte Texte (bereinigtes HTML), versioniert über die Historie
     diagnose = models.TextField(blank=True)
@@ -87,6 +90,11 @@ class Patient(models.Model):
         ordering = ["nachname", "vorname"]
         indexes = [models.Index(fields=["nachname", "vorname"]), models.Index(fields=["geburtsdatum"])]
         constraints = [
+            models.CheckConstraint(name="kein_katheter_ohne_katheter",
+                                   condition=models.Q(kein_katheter=False) | models.Q(katheter__isnull=True)),
+            models.CheckConstraint(name="kein_versorger_ohne_versorger",
+                                   condition=models.Q(kein_versorger=False)
+                                   | models.Q(versorger__isnull=True, ansprechpartner__isnull=True)),
             models.CheckConstraint(
                 name="abschluss_vollstaendig",
                 condition=(
@@ -136,6 +144,10 @@ class Patient(models.Model):
             raise ValidationError({"ansprechpartner": "Ansprechpartner gehört nicht zum gewählten Versorger."})
         if self.geburtsdatum and self.geburtsdatum > timezone.localdate():
             raise ValidationError({"geburtsdatum": "Geburtsdatum liegt in der Zukunft."})
+        if self.kein_katheter and self.katheter_id:
+            raise ValidationError({"katheter": "Entweder einen Katheter wählen oder „kein Katheter“."})
+        if self.kein_versorger and (self.versorger_id or self.ansprechpartner_id):
+            raise ValidationError({"versorger": "Entweder einen Versorger wählen oder „kein Versorger“."})
 
     # --- abgeleitete Werte für den Patientenkopf ---
     def letzte_messung(self):
@@ -311,6 +323,81 @@ class Termin(AktenEintrag):
         self.erledigt_am = timezone.now()
         self.erledigt_von = benutzer
         self.save()
+
+
+class Bezugsperson(AktenEintrag):
+    """Weitere Ansprechperson des Patienten (Mutter, Vater, Betreuer/in …), 1:n.
+
+    Nicht mehr aktuelle Personen werden auf „aktiv = False“ gesetzt statt gelöscht; jede Fassung steht im
+    Verlauf der Akte. „Auskunft erlaubt“ = Schweigepflichtentbindung liegt vor (im Patientenkopf sichtbar)."""
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="bezugspersonen")
+    beziehung = models.ForeignKey(
+        Auswahlwert, on_delete=models.PROTECT, null=True, blank=True, related_name="+",
+        limit_choices_to={"liste": Auswahlwert.Liste.BEZIEHUNG},
+    )
+    name = models.CharField(max_length=150)
+    telefon = models.CharField(max_length=50, blank=True)
+    mobil = models.CharField(max_length=50, blank=True)
+    email = models.EmailField("E-Mail", blank=True)
+    strasse = models.CharField("Straße", max_length=150, blank=True)
+    plz = models.CharField("PLZ", max_length=10, blank=True)
+    ort = models.CharField(max_length=100, blank=True)
+    notiz = models.TextField(blank=True)
+    auskunft_erlaubt = models.BooleanField("Auskunft erlaubt (Schweigepflichtentbindung liegt vor)", default=False)
+    aktiv = models.BooleanField(default=True)
+    angelegt_am = models.DateTimeField(auto_now_add=True)
+    angelegt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Bezugsperson"
+        verbose_name_plural = "Bezugspersonen"
+        ordering = ["-aktiv", "-auskunft_erlaubt", "name", "id"]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Bezugspersonen werden nicht gelöscht, sondern als „nicht mehr aktuell“ markiert.")
+
+    def __str__(self):
+        return self.name
+
+
+class PatientArzt(AktenEintrag):
+    """Zuordnung eines Arztes aus der gemeinsamen Ärzteliste zum Patienten, mit Rolle (1:n).
+    Endet eine Zuständigkeit, wird sie auf „aktiv = False“ gesetzt; der Verlauf behält alle Fassungen."""
+
+    class Rolle(models.TextChoices):
+        HAUSARZT = "hausarzt", "Hausarzt"
+        FACHARZT = "facharzt", "Facharzt"
+        UEBERWEISEND = "ueberweisend", "Überweisend"
+        KLINIK = "klinik", "Klinik"
+        SONSTIGE = "sonstige", "Sonstige"
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="aerzte")
+    arzt = models.ForeignKey(Arzt, on_delete=models.PROTECT, related_name="zuordnungen")
+    rolle = models.CharField(max_length=20, choices=Rolle.choices, default=Rolle.HAUSARZT)
+    notiz = models.CharField(max_length=300, blank=True)
+    aktiv = models.BooleanField(default=True)
+    angelegt_am = models.DateTimeField(auto_now_add=True)
+    angelegt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Arzt des Patienten"
+        verbose_name_plural = "Ärzte des Patienten"
+        ordering = ["-aktiv", "rolle", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["patient", "arzt", "rolle"], condition=models.Q(aktiv=True),
+                                    name="arzt_je_rolle_einmal"),
+        ]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Zuordnungen werden nicht gelöscht, sondern als „nicht mehr zuständig“ markiert.")
+
+    def __str__(self):
+        return f"{self.get_rolle_display()}: {self.arzt}"
 
 
 def dokument_pfad(patient: Patient, originalname: str) -> str:

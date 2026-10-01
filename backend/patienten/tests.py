@@ -18,10 +18,10 @@ from accounts.models import Rolle, User
 from audit.models import SystemEreignis, protokolliere
 from epm.pruefhilfen import TMP, Grundlage, benutzer, client_fuer
 from infusionen.models import Infusionsplan
-from stammdaten.models import Ansprechpartner, Auswahlwert, Versorger
+from stammdaten.models import Ansprechpartner, Arzt, Auswahlwert, Versorger
 
 from .kennzahlen import woche
-from .models import Dokument, Gewichtsmessung, Kontakt, Patient, Termin
+from .models import Bezugsperson, Dokument, Gewichtsmessung, Kontakt, Patient, PatientArzt, Termin
 from .testdaten import testdaten_zuruecksetzen, testpatienten_anlegen
 
 
@@ -359,8 +359,11 @@ class Patientenliste(Grundlage):
         self.assertIn(self.testpat.id, alle)  # ohne Filter „test=ohne“ sichtbar, aber nicht gezählt
         self.assertEqual(ids("hinweise"), {self.verlust.id, self.patient.id})
         z = c.get("/api/patienten/zaehler/").json()
+        test_offen = Patient.objects.filter(ist_test=True, abgeschlossen_am__isnull=True).count()
+        self.assertGreaterEqual(test_offen, 1)
+        # Testpatienten zählen nicht mit; ihre Anzahl steht getrennt daneben
         self.assertEqual(z, {"in_betreuung": 3, "abgeschlossen": 0, "mit_hinweisen": 2, "gewichtsverlust": 1,
-                             "termin_woche": 1})
+                             "termin_woche": 1, "testpatienten": {"in_betreuung": test_offen, "abgeschlossen": 0}})
 
     def test_sortierung_ohne_kontakt_immer_am_ende(self):
         c = client_fuer(self.mitarbeiter)
@@ -499,6 +502,130 @@ class Rollen(Grundlage):
         self.assertEqual(r.status_code, 400)
 
 
+class Kontaktdaten(Grundlage):
+    """Festlegung 01.10.2026: Bezugspersonen (1:n) mit Beziehung aus pflegbarer Liste und „Auskunft erlaubt“,
+    gemeinsame Ärzteliste mit Zuordnung je Rolle, „kein“ Katheter/Versorger getrennt von „nicht erfasst“."""
+
+    def test_beziehungsliste_wie_festgelegt(self):
+        werte = list(Auswahlwert.objects.filter(liste=Auswahlwert.Liste.BEZIEHUNG).order_by("reihenfolge")
+                     .values_list("wert", flat=True))
+        self.assertEqual(werte, ["Mutter", "Vater", "Ehepartner/in", "Kind", "Betreuer/in (gesetzlich)",
+                                 "Pflegedienst", "Sonstige"])
+
+    def test_bezugspersonen_anlegen_aendern_nicht_loeschen(self):
+        c = client_fuer(self.mitarbeiter)
+        mutter = wert(Auswahlwert.Liste.BEZIEHUNG, "Mutter")
+        r = c.post("/api/bezugspersonen/", {"patient": self.patient.id, "beziehung": mutter.id, "name": "Maria Echt",
+                                            "telefon": "0251 1", "auskunft_erlaubt": True}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        bp = r.json()
+        self.assertEqual((bp["beziehung_name"], bp["angelegt_von_name"] is not None), ("Mutter", True))
+        # zweite Person (1:n), Beziehung aus falscher Liste wird abgewiesen
+        katheter = wert(Auswahlwert.Liste.KATHETER, "Port")
+        r = c.post("/api/bezugspersonen/", {"patient": self.patient.id, "beziehung": katheter.id, "name": "X"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("beziehung", r.json())
+        r = c.post("/api/bezugspersonen/", {"patient": self.patient.id, "name": "  "}, format="json")
+        self.assertEqual(r.status_code, 400)
+        vater = wert(Auswahlwert.Liste.BEZIEHUNG, "Vater")
+        r = c.post("/api/bezugspersonen/", {"patient": self.patient.id, "beziehung": vater.id, "name": "Paul Echt"},
+                   format="json")
+        self.assertEqual(r.status_code, 201)
+        liste = c.get(f"/api/bezugspersonen/?patient={self.patient.id}").json()
+        self.assertEqual(len(liste), 2)
+        # Kopf zeigt, wem Auskunft gegeben werden darf
+        kopf = c.get(f"/api/patienten/{self.patient.id}/").json()["kopf"]
+        self.assertEqual([a["name"] for a in kopf["auskunft"]], ["Maria Echt"])
+        self.assertEqual(kopf["zaehler"]["bezugspersonen"], 2)
+        # nicht löschen, sondern „nicht mehr aktuell“; steht im Verlauf
+        self.assertEqual(c.delete(f"/api/bezugspersonen/{bp['id']}/").status_code, 405)
+        r = c.patch(f"/api/bezugspersonen/{bp['id']}/", {"aktiv": False}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(c.get(f"/api/patienten/{self.patient.id}/").json()["kopf"]["auskunft"], [])
+        verlauf = c.get(f"/api/patienten/{self.patient.id}/verlauf/?bereich=bezugspersonen").json()
+        self.assertEqual([v["aktion"] for v in verlauf], ["nicht mehr aktuell", "angelegt", "angelegt"])
+        self.assertIn("Mutter · Maria Echt", verlauf[0]["beschreibung"])
+        # Patient nicht umhängbar
+        anderer = Patient.objects.create(nachname="Zwei", vorname="Z", geburtsdatum="1980-01-01")
+        r = c.patch(f"/api/bezugspersonen/{bp['id']}/", {"patient": anderer.id}, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_bezugspersonen_rechte(self):
+        daten = {"patient": self.patient.id, "name": "Jemand"}
+        self.assertEqual(client_fuer(self.betrachter).post("/api/bezugspersonen/", daten, format="json").status_code, 403)
+        self.assertEqual(client_fuer(self.betrachter).get(f"/api/bezugspersonen/?patient={self.patient.id}").status_code, 200)
+        # Admin schreibt nur bei Testpatienten
+        self.assertEqual(client_fuer(self.admin).post("/api/bezugspersonen/", daten, format="json").status_code, 403)
+        # abgeschlossene Akte → 409
+        Patient.objects.filter(pk=self.patient.pk).update(abgeschlossen_am=timezone.localdate(), abschluss_anlass="verstorben")
+        r = client_fuer(self.mitarbeiter).post("/api/bezugspersonen/", daten, format="json")
+        self.assertEqual(r.status_code, 409)
+
+    def test_aerzteliste_und_zuordnung(self):
+        c = client_fuer(self.mitarbeiter)
+        r = c.post("/api/aerzte/", {"name": "Dr. med. Haus", "praxis": "Praxis Haus", "fachrichtung": "Allgemeinmedizin",
+                                    "ort": "Altenberge", "telefon": "02505 1"}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        arzt = r.json()
+        self.assertEqual(client_fuer(self.betrachter).post("/api/aerzte/", {"name": "X"}, format="json").status_code, 403)
+        self.assertEqual(client_fuer(self.betrachter).get("/api/aerzte/").status_code, 200)
+        self.assertEqual(c.delete(f"/api/aerzte/{arzt['id']}/").status_code, 405)
+        # neuer Patient mit Hausarzt aus der Liste (eine Transaktion)
+        r = c.post("/api/patienten/", {"nachname": "Neu", "vorname": "Nora", "geburtsdatum": "1990-05-05",
+                                       "aufnahme_hausarzt": arzt["id"]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        pid = r.json()["id"]
+        self.assertEqual(r.json()["kopf"]["hausarzt"]["name"], "Dr. med. Haus")
+        zuordnungen = c.get(f"/api/patient-aerzte/?patient={pid}").json()
+        self.assertEqual([(z["rolle"], z["arzt_daten"]["telefon"]) for z in zuordnungen], [("hausarzt", "02505 1")])
+        # gleiche Rolle doppelt → 400, andere Rolle möglich
+        r = c.post("/api/patient-aerzte/", {"patient": pid, "arzt": arzt["id"], "rolle": "hausarzt"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        r = c.post("/api/patient-aerzte/", {"patient": pid, "arzt": arzt["id"], "rolle": "ueberweisend"}, format="json")
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(c.get(f"/api/aerzte/{arzt['id']}/").json()["patienten_anzahl"], 1)
+        # Telefonnummer einmal ändern → gilt in jeder Akte
+        c.patch(f"/api/aerzte/{arzt['id']}/", {"telefon": "02505 99"}, format="json")
+        self.assertEqual(c.get(f"/api/patienten/{pid}/").json()["kopf"]["hausarzt"]["telefon"], "02505 99")
+        # nicht mehr zuständig statt löschen; deaktivierter Arzt nicht neu zuordenbar
+        z = zuordnungen[0]
+        self.assertEqual(c.delete(f"/api/patient-aerzte/{z['id']}/").status_code, 405)
+        self.assertEqual(c.patch(f"/api/patient-aerzte/{z['id']}/", {"aktiv": False}, format="json").status_code, 200)
+        self.assertIsNone(c.get(f"/api/patienten/{pid}/").json()["kopf"]["hausarzt"])
+        verlauf = c.get(f"/api/patienten/{pid}/verlauf/?bereich=aerzte").json()
+        self.assertEqual(verlauf[0]["aktion"], "nicht mehr zuständig")
+        c.patch(f"/api/aerzte/{arzt['id']}/", {"aktiv": False}, format="json")
+        r = c.post("/api/patient-aerzte/", {"patient": pid, "arzt": arzt["id"], "rolle": "facharzt"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        r = c.post("/api/patienten/", {"nachname": "N", "vorname": "N", "geburtsdatum": "1990-05-05",
+                                       "aufnahme_hausarzt": arzt["id"]}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(Patient.objects.filter(nachname="N").exists())
+
+    def test_kein_katheter_und_kein_versorger(self):
+        c = client_fuer(self.mitarbeiter)
+        url = f"/api/patienten/{self.patient.id}/"
+        # nicht erfasst → Hinweis und Prüfliste
+        zeile = lambda: next(p for p in c.get("/api/patienten/?test=ohne").json()["results"] if p["id"] == self.patient.id)  # noqa: E731
+        self.assertIn("versorger", {h["art"] for h in zeile()["kennzahlen"]["hinweise"]})
+        # bewusst „kein“ → kein Hinweis, nicht in der Prüfliste
+        r = c.patch(url, {"kein_versorger": True, "kein_katheter": True}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual((r.json()["kopf"]["versorger"], r.json()["kopf"]["katheter"]), ("kein", "kein"))
+        self.assertNotIn("versorger", {h["art"] for h in zeile()["kennzahlen"]["hinweise"]})
+        self.assertEqual(c.get("/api/patienten/?pruefen=kein_versorger&test=ohne").json()["count"], 0)
+        # „kein“ zusammen mit einer Auswahl ist widersprüchlich
+        port = wert(Auswahlwert.Liste.KATHETER, "Port")
+        r = c.patch(url, {"katheter": port.id, "kein_katheter": True}, format="json")
+        self.assertEqual(r.status_code, 400)
+        # Auswahl ohne Angabe hebt „kein“ auf
+        r = c.patch(url, {"katheter": port.id}, format="json")
+        self.assertEqual((r.status_code, r.json()["kein_katheter"], r.json()["kopf"]["katheter"]), (200, False, "Port"))
+        # und die Datenbank lässt den Widerspruch auch direkt nicht zu
+        with self.assertRaises(DatabaseError), transaction.atomic():
+            Patient.objects.filter(pk=self.patient.pk).update(kein_katheter=True)
+
+
 @override_settings(EPM_DOKUMENTE=Path(TMP))
 class Musterdaten(TestCase):
     def test_anlegen_und_zuruecksetzen(self):
@@ -522,3 +649,7 @@ class Musterdaten(TestCase):
         self.assertTrue(start["infusionsplaene"]["aelter_als_grenze"])
         self.assertTrue(start["infusionsplaene"]["entwuerfe"])
         self.assertEqual(start["pruefen"]["altdokumente"], 1)
+        # Bezugspersonen und Ärzte gehören zu den Musterdaten und werden mit zurückgesetzt
+        self.assertTrue(Bezugsperson.objects.filter(patient__ist_test=True, auskunft_erlaubt=True).exists())
+        self.assertTrue(PatientArzt.objects.filter(patient__ist_test=True, rolle="hausarzt").exists())
+        self.assertTrue(Arzt.objects.filter(name__endswith="(fiktiv)").exists())

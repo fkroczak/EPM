@@ -17,9 +17,9 @@ from django.utils import timezone
 from accounts.models import Rolle, User
 from audit.schutz import wartungsmodus
 from infusionen.models import Infusionsplan, InfusionsplanPosition
-from stammdaten.models import Ansprechpartner, Auswahlwert, Einstellungen, Praeparat, Versorger
+from stammdaten.models import Ansprechpartner, Arzt, Auswahlwert, Einstellungen, Praeparat, Versorger
 
-from .models import Dokument, Gewichtsmessung, Kontakt, Patient, Termin
+from .models import Bezugsperson, Dokument, Gewichtsmessung, Kontakt, Patient, PatientArzt, Termin
 
 TESTBENUTZER = "test"
 
@@ -29,6 +29,9 @@ AUSWAHLWERTE = {
     Auswahlwert.Liste.KATHETER: ["Port", "Hickman", "Broviac", "PICC", "Port 1-Kammer", "Port 2-Kammer"],
     Auswahlwert.Liste.DOKUMENTTYP: ["Arztbrief", "Labor", "Infusionsplan", "Bild", "Patientendatenblatt", "Sonstiges"],
     Auswahlwert.Liste.TERMINORT: ["Praxis Dr. Holtmeier"],
+    # Festlegung 01.10.2026: Beziehung der Bezugsperson, unter Vorlagen › Auswahllisten erweiterbar
+    Auswahlwert.Liste.BEZIEHUNG: ["Mutter", "Vater", "Ehepartner/in", "Kind", "Betreuer/in (gesetzlich)",
+                                  "Pflegedienst", "Sonstige"],
     # Kontaktarten bleiben wie bisher angelegt – die Liste im Entwurf ist noch offen (U6).
     Auswahlwert.Liste.KONTAKTART: ["Telefon (Anruf erhalten)", "Telefon (angerufen)", "Persönlich", "E-Mail",
                                   "Brief/Fax", "Versorger", "Sonstiges"],
@@ -104,6 +107,29 @@ def _testversorger():
         a[name], _ = Ansprechpartner.objects.get_or_create(versorger=v, name=name, defaults={"telefon": "0000 0000"})
     return v1, v2, a
 
+
+def _testaerzte():
+    """Fiktive Ärzte für die Musterdaten (gemeinsame Ärzteliste)."""
+    hausarzt, _ = Arzt.objects.get_or_create(
+        name="Dr. med. Anna Hausmann (fiktiv)",
+        defaults={"praxis": "Hausarztpraxis Test", "fachrichtung": "Allgemeinmedizin", "strasse": "Testweg 3",
+                  "plz": "48341", "ort": "Altenberge", "telefon": "0000 111111", "fax": "0000 111112"},
+    )
+    facharzt, _ = Arzt.objects.get_or_create(
+        name="Dr. med. Bernd Beispiel (fiktiv)",
+        defaults={"praxis": "Gastroenterologie Test", "fachrichtung": "Gastroenterologie", "plz": "48143",
+                  "ort": "Münster", "telefon": "0000 222222", "email": "praxis@example.org"},
+    )
+    return hausarzt, facharzt
+
+
+# Bezugspersonen je Testpatient: (Beziehung, Name, Telefon, Auskunft erlaubt)
+TEST_BEZUGSPERSONEN = {
+    0: [("Ehepartner/in", "Hans Musterfrau (fiktiv)", "0000 333333", True)],
+    1: [("Betreuer/in (gesetzlich)", "Betreuungsbüro Test (fiktiv)", "0000 444444", True),
+        ("Kind", "Lena Mustermann (fiktiv)", "0000 555555", False)],
+    2: [("Mutter", "Maria Beispiel (fiktiv)", "0000 666666", True)],
+}
 
 TESTPATIENTEN = [
     # nachname, vorname, geburtsdatum, geschlecht, groesse, versorger-idx, ansprechpartner, katheter, nickel, profil
@@ -195,6 +221,8 @@ def testpatienten_anlegen() -> int:
     heute = timezone.localdate()
     user, _ = testbenutzer_anlegen()
     v1, v2, ansprech = _testversorger()
+    hausarzt, facharzt = _testaerzte()
+    beziehungen = {a.wert: a for a in Auswahlwert.objects.filter(liste=Auswahlwert.Liste.BEZIEHUNG)}
     katheter = {a.wert: a for a in Auswahlwert.objects.filter(liste=Auswahlwert.Liste.KATHETER)}
     art = Auswahlwert.objects.filter(liste=Auswahlwert.Liste.KONTAKTART).first()
     doktyp = Auswahlwert.objects.filter(liste=Auswahlwert.Liste.DOKUMENTTYP, wert="Arztbrief").first()
@@ -221,6 +249,13 @@ def testpatienten_anlegen() -> int:
         ))
         pat.save()
         _gewichte(pat, user, profil, heute, rnd)
+        _nutzer(user, PatientArzt(patient=pat, arzt=hausarzt, rolle=PatientArzt.Rolle.HAUSARZT, angelegt_von=user)).save()
+        if i in (0, 1):
+            _nutzer(user, PatientArzt(patient=pat, arzt=facharzt, rolle=PatientArzt.Rolle.FACHARZT,
+                                      notiz="Kontrolle halbjährlich (Testdaten)", angelegt_von=user)).save()
+        for beziehung, bname, tel, auskunft in TEST_BEZUGSPERSONEN.get(i, []):
+            _nutzer(user, Bezugsperson(patient=pat, beziehung=beziehungen.get(beziehung), name=bname, telefon=tel,
+                                       auskunft_erlaubt=auskunft, angelegt_von=user)).save()
         kontakte = _kontakte(pat, user, heute, rnd, art)
 
         if profil != "neu":
@@ -297,7 +332,7 @@ def testdaten_zuruecksetzen() -> dict:
         Patient.objects.filter(id__in=ids).delete()
         # Historie der Testakten entfernen
         Patient.history.filter(id__in=ids).delete()
-        for modell in (Gewichtsmessung, Kontakt, Termin, Dokument, Infusionsplan):
+        for modell in (Gewichtsmessung, Kontakt, Termin, Dokument, Infusionsplan, Bezugsperson, PatientArzt):
             modell.history.filter(patient_id__in=ids).delete()
         InfusionsplanPosition.history.filter(plan_id__in=plan_ids).delete()
     for _, nummer in testpatienten:

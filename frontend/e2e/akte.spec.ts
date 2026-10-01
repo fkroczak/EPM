@@ -231,11 +231,17 @@ test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen 
   await page.getByTestId("kennzahlen").getByRole("button", { name: /nicht erfasst/ }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Telefon").fill("0251 98765");
-  await dialog.getByRole("radio", { name: "nein" }).check();
+  // Nickelallergie als Auswahlliste; Katheter und Versorger bewusst „kein“ (Festlegung 01.10.2026)
+  await dialog.getByLabel("Nickelallergie").selectOption("nein");
+  await dialog.getByLabel("Katheter").selectOption({ label: "kein Katheter" });
+  await dialog.getByLabel("Versorger", { exact: true }).selectOption({ label: "kein Versorger" });
   await dialog.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Stammdaten gespeichert.")).toBeVisible();
   await expect(page.getByTestId("stammdaten")).toContainText("0251 98765");
-  await expect(page.getByTestId("kennzahlen")).not.toContainText("nicht erfasst");
+  const kennzahlen = page.getByTestId("kennzahlen");
+  await expect(kennzahlen).not.toContainText("nicht erfasst");
+  await expect(kennzahlen.locator("div").filter({ hasText: /^Katheter/ })).toContainText("kein");
+  await expect(kennzahlen.locator("div").filter({ hasText: /^Versorger/ })).toContainText("kein");
 
   // Betrachter darf nicht abschließen
   const bet = await browser.newContext({ storageState: zustand("betrachter"), ignoreHTTPSErrors: true });
@@ -278,6 +284,91 @@ test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen 
   const api = await apiAls("mitarbeiter");
   const akte = await api.get(`patienten/${p.id}/`);
   expect([akte.ist_abgeschlossen, akte.telefon, akte.nickelallergie]).toEqual([false, "0251 98765", "nein"]);
+  expect([akte.kein_katheter, akte.kein_versorger, akte.katheter, akte.versorger]).toEqual([true, true, null, null]);
   await api.ende();
   merken("abschluss", { id: p.id });
+});
+
+test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pflegen", async ({ page }) => {
+  const p = await neuerPatient();
+  // Arzt einmal in der Ärzteliste anlegen
+  const arztName = eindeutig("Dr. med. Erik Eintrag");
+  await page.goto("/aerzte");
+  await page.getByRole("button", { name: "Neuer Arzt" }).click();
+  const detail = page.getByTestId("arzt-detail");
+  await detail.getByLabel("Name").fill(arztName);
+  await detail.getByLabel("Praxis / Klinik").fill("Praxis Eintrag");
+  await detail.getByLabel("Fachrichtung").fill("Allgemeinmedizin");
+  await detail.getByLabel("Ort").fill("Münster");
+  await detail.getByLabel("Telefon").fill("0251 12345");
+  await detail.getByRole("button", { name: "Arzt anlegen" }).click();
+  await expect(page.getByText("Arzt angelegt.")).toBeVisible();
+
+  // in der Akte als Hausarzt zuordnen → Kopf zeigt Name und Telefon
+  await oeffnen(page, p.id);
+  const aerzte = page.getByTestId("aerzte");
+  await aerzte.getByRole("button", { name: "Arzt", exact: true }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Arzt").selectOption({ label: `${arztName} · Allgemeinmedizin (Münster)` });
+  await dialog.getByLabel("Rolle").selectOption("hausarzt");
+  await dialog.getByRole("button", { name: "Zuordnen" }).click();
+  await expect(page.getByText("Arzt zugeordnet.")).toBeVisible();
+  await expect(aerzte.getByTestId("arzt-zuordnung")).toContainText(arztName);
+  await expect(aerzte.getByTestId("arzt-zuordnung")).toContainText("0251 12345");
+  const kopf = page.getByTestId("kennzahlen");
+  await expect(kopf.locator("div").filter({ hasText: /^Hausarzt/ })).toContainText(arztName);
+
+  // Telefonnummer in der Ärzteliste ändern → gilt in der Akte
+  await page.goto("/aerzte");
+  await page.getByLabel("Ärzte filtern").fill(arztName);
+  await page.getByTestId("aerzteliste").getByRole("button", { name: arztName }).click();
+  await page.getByTestId("arzt-detail").getByLabel("Telefon").fill("0251 99999");
+  await page.getByTestId("arzt-detail").getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Arzt gespeichert.")).toBeVisible();
+  await expect(page.getByTestId("arzt-patienten")).toContainText(p.name);
+  await oeffnen(page, p.id);
+  await expect(page.getByTestId("aerzte")).toContainText("0251 99999");
+
+  // Bezugspersonen: zwei Personen, eine mit Schweigepflichtentbindung → „Auskunft an“ im Kopf
+  const personen = page.getByTestId("bezugspersonen");
+  await personen.getByRole("button", { name: "Person", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Beziehung").selectOption({ label: "Mutter" });
+  await dialog.getByLabel("Name").fill("Margit Akte");
+  await dialog.getByLabel("Telefon").fill("0251 55555");
+  await dialog.getByRole("checkbox", { name: /Auskunft erlaubt/ }).check();
+  await dialog.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Bezugsperson angelegt.")).toBeVisible();
+  await personen.getByRole("button", { name: "Person", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Beziehung").selectOption({ label: "Betreuer/in (gesetzlich)" });
+  await dialog.getByLabel("Name").fill("Bernd Betreuer");
+  await dialog.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Bezugsperson angelegt.")).toBeVisible();
+  await expect(personen.getByTestId("bezugsperson")).toHaveCount(2);
+  await expect(page.getByTestId("auskunft")).toContainText("Margit Akte (Mutter)");
+  await expect(page.getByTestId("auskunft")).not.toContainText("Bernd Betreuer");
+
+  // nicht löschen, sondern „nicht mehr aktuell“ – bleibt unter „Frühere anzeigen“ und im Verlauf
+  await personen.getByRole("button", { name: "Margit Akte" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Nicht mehr aktuell" }).click();
+  await expect(page.getByText("Als nicht mehr aktuell markiert.")).toBeVisible();
+  await expect(page.getByTestId("auskunft")).toContainText("niemand eingetragen");
+  await expect(personen.getByTestId("bezugsperson")).toHaveCount(1);
+  await personen.getByRole("button", { name: /Frühere anzeigen/ }).click();
+  await expect(personen.getByTestId("bezugsperson")).toHaveCount(2);
+  await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Verlauf" }).click();
+  await page.getByRole("button", { name: "Bezugspersonen" }).click();
+  const verlauf = page.getByTestId("verlauf");
+  await expect(verlauf.getByRole("row").filter({ hasText: "nicht mehr aktuell" })).toContainText("Margit Akte");
+  await page.getByRole("button", { name: "Ärzte" }).click();
+  await expect(verlauf.getByRole("row").filter({ hasText: "angelegt" })).toContainText(arztName);
+
+  // in der Datenbank
+  const api = await apiAls("mitarbeiter");
+  const bps = await api.get(`bezugspersonen/?patient=${p.id}`);
+  expect(bps.map((b: { name: string; aktiv: boolean; auskunft_erlaubt: boolean }) => [b.name, b.aktiv, b.auskunft_erlaubt]).sort())
+    .toEqual([["Bernd Betreuer", true, false], ["Margit Akte", false, true]]);
+  await api.ende();
+  merken("kontaktdaten", { patient: p.id, arzt: arztName });
 });

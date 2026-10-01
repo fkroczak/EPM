@@ -2,7 +2,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import Dokument, Gewichtsmessung, Kontakt, Patient, Termin
+from .models import Bezugsperson, Dokument, Gewichtsmessung, Kontakt, Patient, PatientArzt, Termin
 
 
 class NurLesen(SimpleHistoryAdmin):
@@ -57,3 +57,15 @@ class DokumentAdmin(NurLesen):
 @admin.register(Gewichtsmessung)
 class GewichtAdmin(NurLesen):
     list_display = ["patient", "gemessen_am", "gewicht_kg", "quelle"]
+
+
+@admin.register(Bezugsperson)
+class BezugspersonAdmin(NurLesen):
+    list_display = ["patient", "beziehung", "name", "telefon", "auskunft_erlaubt", "aktiv"]
+    list_filter = ["aktiv", "auskunft_erlaubt", "patient__ist_test"]
+
+
+@admin.register(PatientArzt)
+class PatientArztAdmin(NurLesen):
+    list_display = ["patient", "rolle", "arzt", "aktiv"]
+    list_filter = ["rolle", "aktiv", "patient__ist_test"]

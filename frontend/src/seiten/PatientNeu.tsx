@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useAuswahl, useVersorgerListe } from "@/lib/daten";
+import { useAerzteListe, useAuswahl, useVersorgerListe } from "@/lib/daten";
 import { datum, eingabeDatum, eingabeZahl, heuteIso, nummer } from "@/lib/format";
 import { GESCHLECHTER } from "@/lib/typen";
 import type { Patient, PatientZeile } from "@/lib/typen";
@@ -26,6 +26,9 @@ const LEER: Formular = {
   strasse: "", plz: "", ort: "", telefon: "", email: "", versorger: "", ansprechpartner: "", katheter: "",
   nickelallergie: "unbekannt", hausarzt: "", ueberweisung_durch: "", diagnose: "",
 };
+
+/** Wert der Auswahl „kein“ (bewusst keiner) bei Versorger und Katheter */
+const KEIN = "kein";
 
 /** Klartext der Diagnose als einfaches HTML für das Rich-Text-Feld der Akte */
 function alsHtml(text: string): string {
@@ -63,6 +66,7 @@ export function PatientNeu() {
   const naechste = useQuery({ queryKey: ["patienten", "naechste-nummer"], queryFn: () => api<{ nummer: number; testpatient: boolean }>("patienten/naechste-nummer/") });
   const versorger = useVersorgerListe();
   const katheter = useAuswahl("katheter");
+  const aerzte = useAerzteListe();
   const gewaehlt = (versorger.data ?? []).find((v) => String(v.id) === f.versorger);
 
   // Doppelungsprüfung: gleiches Geburtsdatum und ähnlicher Name
@@ -112,11 +116,15 @@ export function PatientNeu() {
       ort: f.ort.trim(),
       telefon: f.telefon.trim(),
       email: f.email.trim(),
-      versorger: f.versorger ? Number(f.versorger) : null,
-      ansprechpartner: f.ansprechpartner ? Number(f.ansprechpartner) : null,
-      katheter: f.katheter ? Number(f.katheter) : null,
+      // „kein“ = bewusst keiner, leer = noch nicht erfasst (Festlegung 01.10.2026)
+      versorger: f.versorger && f.versorger !== KEIN ? Number(f.versorger) : null,
+      kein_versorger: f.versorger === KEIN,
+      ansprechpartner: f.ansprechpartner && f.versorger !== KEIN ? Number(f.ansprechpartner) : null,
+      katheter: f.katheter && f.katheter !== KEIN ? Number(f.katheter) : null,
+      kein_katheter: f.katheter === KEIN,
       nickelallergie: f.nickelallergie,
-      hausarzt: f.hausarzt.trim(),
+      // Hausarzt aus der gemeinsamen Ärzteliste (wird als Zuordnung „Hausarzt“ gespeichert)
+      ...(f.hausarzt ? { aufnahme_hausarzt: Number(f.hausarzt) } : {}),
       ueberweisung_durch: f.ueberweisung_durch.trim(),
       diagnose: alsHtml(f.diagnose),
       ...(gewicht ? { aufnahme_gewicht_kg: gewicht, aufnahme_gemessen_am: gemessen ?? heuteIso() } : {}),
@@ -210,7 +218,8 @@ export function PatientNeu() {
                 <Feld label="Versorger" fehler={e.versorger}>
                   {(p) => (
                     <Auswahl {...p} value={f.versorger} onChange={(ev) => setF((alt) => ({ ...alt, versorger: ev.target.value, ansprechpartner: "" }))}>
-                      <option value="">— noch keiner —</option>
+                      <option value="">— nicht erfasst —</option>
+                      <option value={KEIN}>kein Versorger</option>
                       {(versorger.data ?? []).filter((v) => v.aktiv).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
                     </Auswahl>
                   )}
@@ -229,7 +238,8 @@ export function PatientNeu() {
               <Feld label="Katheter" className="col-span-2" fehler={e.katheter}>
                 {(p) => (
                   <Auswahl {...p} value={f.katheter} onChange={setze("katheter")}>
-                    <option value="">— noch keiner —</option>
+                    <option value="">— nicht erfasst —</option>
+                    <option value={KEIN}>kein Katheter</option>
                     {(katheter.data ?? []).map((k) => <option key={k.id} value={k.id}>{k.wert}</option>)}
                   </Auswahl>
                 )}
@@ -244,9 +254,22 @@ export function PatientNeu() {
                   ))}
                 </div>
               </fieldset>
-              <Feld label="Hausarzt" className="col-span-2" fehler={e.hausarzt}>
-                {(p) => <Eingabe {...p} placeholder="Name, Ort" value={f.hausarzt} onChange={setze("hausarzt")} />}
-              </Feld>
+              <div className="col-span-2 relative">
+                {darf("versorger_pflegen") ? (
+                  <Link to="/aerzte?neu=1" className="absolute right-0 top-0 text-[0.8125rem]">Neu anlegen</Link>
+                ) : null}
+                <Feld label="Hausarzt" fehler={e.aufnahme_hausarzt ?? e.hausarzt}
+                  hinweis="aus der Ärzteliste; weitere Ärzte und Bezugspersonen danach in der Akte">
+                  {(p) => (
+                    <Auswahl {...p} value={f.hausarzt} onChange={setze("hausarzt")}>
+                      <option value="">— nicht erfasst —</option>
+                      {(aerzte.data ?? []).filter((a) => a.aktiv).map((a) => (
+                        <option key={a.id} value={a.id}>{a.name}{a.ort ? ` (${a.ort})` : ""}</option>
+                      ))}
+                    </Auswahl>
+                  )}
+                </Feld>
+              </div>
               <Feld label="Überweisung / Kontaktaufnahme durch" className="col-span-2" fehler={e.ueberweisung_durch}>
                 {(p) => <Eingabe {...p} placeholder="z. B. Klinik, Praxis Dr. Holtmeier" value={f.ueberweisung_durch} onChange={setze("ueberweisung_durch")} />}
               </Feld>

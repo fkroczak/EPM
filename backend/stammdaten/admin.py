@@ -1,7 +1,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import Ansprechpartner, Auswahlwert, Einstellungen, Praeparat, Versorger
+from .models import Ansprechpartner, Arzt, Auswahlwert, Einstellungen, Praeparat, Versorger
 
 
 class OhneLoeschen(SimpleHistoryAdmin):
@@ -21,6 +21,13 @@ class VersorgerAdmin(OhneLoeschen):
     list_filter = ["aktiv"]
     search_fields = ["name", "ort"]
     inlines = [AnsprechpartnerInline]
+
+
+@admin.register(Arzt)
+class ArztAdmin(OhneLoeschen):
+    list_display = ["name", "praxis", "fachrichtung", "ort", "telefon", "aktiv"]
+    list_filter = ["aktiv"]
+    search_fields = ["name", "praxis", "ort"]
 
 
 @admin.register(Auswahlwert)

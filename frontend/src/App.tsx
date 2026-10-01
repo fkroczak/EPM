@@ -21,6 +21,7 @@ import { PatientNeu } from "./seiten/PatientNeu";
 import { Patienten } from "./seiten/Patienten";
 import { Start } from "./seiten/Start";
 import { Versorger } from "./seiten/Versorger";
+import { Aerzte } from "./seiten/Aerzte";
 
 function NichtGefunden() {
   return (
@@ -64,6 +65,7 @@ const router = createBrowserRouter([
         ],
       },
       { path: "versorger", element: <Versorger /> },
+      { path: "aerzte", element: <Aerzte /> },
       { path: "konto", element: <Konto /> },
       { path: "admin/benutzer", element: <MitRecht recht="benutzer_verwalten" titel="Benutzer"><Benutzer /></MitRecht> },
       { path: "admin/vorlagen", element: <MitRecht recht="vorlagen_pflegen" titel="Vorlagen"><Vorlagen /></MitRecht> },

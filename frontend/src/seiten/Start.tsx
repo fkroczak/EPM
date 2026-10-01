@@ -180,7 +180,7 @@ function PruefenKarte({ daten }: { daten: Startdaten }) {
   const eintraege: [string, number, string][] = [
     ["Altdokumente: Typ und Datum prüfen", p.altdokumente, "altdokumente"],
     ["Nickelallergie nicht erfasst", p.nickelallergie_unbekannt, "nickelallergie"],
-    ["Kein Versorger eingetragen", p.kein_versorger, "kein_versorger"],
+    ["Versorger nicht erfasst", p.kein_versorger, "kein_versorger"],
     [`Kein Kontakt seit über ${p.kontakt_monate} Monaten`, p.kein_kontakt, "kein_kontakt"],
   ];
   return (

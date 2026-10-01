@@ -12,6 +12,7 @@ class Auswahlwert(models.Model):
         DOKUMENTTYP = "dokumenttyp", "Dokumenttyp"
         KONTAKTART = "kontaktart", "Kontaktart"
         TERMINORT = "terminort", "Terminort"
+        BEZIEHUNG = "beziehung", "Beziehung (Bezugsperson)"
 
     liste = models.CharField(max_length=30, choices=Liste.choices)
     wert = models.CharField(max_length=100)
@@ -85,6 +86,37 @@ class Ansprechpartner(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.versorger})"
+
+
+class Arzt(models.Model):
+    """Arzt bzw. Praxis (gemeinsame Liste, Festlegung 01.10.2026). Wird einmal gepflegt und beim Patienten
+    mit Rolle zugeordnet (Hausarzt, Facharzt …); eine geänderte Telefonnummer gilt so für alle Patienten.
+    Wird nie gelöscht, nur deaktiviert."""
+
+    name = models.CharField("Name", max_length=150, help_text="z. B. „Dr. med. Anna Hausmann“")
+    praxis = models.CharField("Praxis / Klinik", max_length=150, blank=True)
+    fachrichtung = models.CharField(max_length=100, blank=True, help_text="z. B. Allgemeinmedizin, Gastroenterologie")
+    strasse = models.CharField("Straße", max_length=150, blank=True)
+    plz = models.CharField("PLZ", max_length=10, blank=True)
+    ort = models.CharField(max_length=100, blank=True)
+    telefon = models.CharField(max_length=50, blank=True)
+    fax = models.CharField(max_length=50, blank=True)
+    email = models.EmailField("E-Mail", blank=True)
+    notiz = models.TextField(blank=True)
+    aktiv = models.BooleanField(default=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Arzt"
+        verbose_name_plural = "Ärzte"
+        ordering = ["name", "ort"]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Ärzte werden nicht gelöscht, nur deaktiviert.")
+
+    def __str__(self):
+        return f"{self.name} ({self.ort})" if self.ort else self.name
 
 
 class Praeparat(models.Model):
