@@ -48,9 +48,8 @@ services:
     security_opt: [no-new-privileges:true]
 
   web:
-    # Bis zum Frontend (Schritt 5) das Standard-Nginx-Image mit Platzhalterseite;
-    # danach: image: epm-web:${EPM_VERSION}
-    image: nginxinc/nginx-unprivileged:stable-alpine
+    # Nginx mit dem gebauten Frontend (frontend/Dockerfile); Konfiguration und Zertifikat vom Server
+    image: epm-web:${EPM_VERSION}
     restart: unless-stopped
     depends_on: [backend]
     ports:
@@ -58,7 +57,6 @@ services:
     volumes:
       - ./nginx/epm.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro
-      - ./web:/srv/web:ro
       - ./data/dokumente:/data/dokumente:ro
       - static:/srv/static:ro
     networks: [intern, extern]

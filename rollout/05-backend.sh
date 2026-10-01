@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# EPM – Schritt 4: Backend-Image laden, auf den Betriebs-Stack umstellen, Musterdaten anlegen
-# Aufruf: sudo ./05-backend.sh ~/epm-backend-0.1.0.tar
+# EPM – Schritt 4/5: Images (Backend und Frontend) laden, auf den Betriebs-Stack umstellen, Musterdaten anlegen
+# Aufruf: sudo ./05-backend.sh ~/epm-0.2.0.tar        (gebaut mit werkzeuge/bauen.sh bzw. bauen.ps1)
 set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo "Bitte mit sudo ausführen."; exit 1; }
 cd "$(dirname "$0")"
@@ -9,10 +9,10 @@ KONF=/etc/epm/epm.conf; [[ -f "$KONF" ]] || KONF=./epm.conf
 source "$KONF"
 B="$EPM_BASE"
 
-TAR="${1:?Bitte die Image-Datei angeben, z. B. ~/epm-backend-0.1.0.tar}"
+TAR="${1:?Bitte die Image-Datei angeben, z. B. ~/epm-0.2.0.tar}"
 [[ -f "$TAR" ]] || { echo "Datei $TAR nicht gefunden."; exit 1; }
-VERSION="$(basename "$TAR" .tar)"; VERSION="${VERSION#epm-backend-}"
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version nicht erkannt (erwartet epm-backend-X.Y.Z.tar)."; exit 1; }
+VERSION="$(basename "$TAR" .tar)"; VERSION="${VERSION#epm-backend-}"; VERSION="${VERSION#epm-}"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version nicht erkannt (erwartet epm-X.Y.Z.tar)."; exit 1; }
 
 echo "==> Projektdateien aktualisieren"
 ./04-projekt.sh >/dev/null
@@ -20,6 +20,8 @@ echo "==> Projektdateien aktualisieren"
 echo "==> Image laden (Version $VERSION)"
 install -m 0600 "$TAR" "$B/images/"
 docker load -i "$B/images/$(basename "$TAR")"
+docker image inspect "epm-web:$VERSION" >/dev/null 2>&1 || {
+  echo "Im Paket fehlt das Frontend-Image epm-web:$VERSION – bitte mit dem aktuellen bauen.sh/bauen.ps1 neu bauen."; exit 1; }
 
 echo "==> Auf den Betriebs-Stack umstellen"
 sed -i -e 's/^COMPOSE_FILE=.*/COMPOSE_FILE=compose.yaml/' -e "s/^EPM_VERSION=.*/EPM_VERSION=$VERSION/" "$B/.env"

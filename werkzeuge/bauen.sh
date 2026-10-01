@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# EPM – Backend-Image auf Linux bauen (z. B. in der Test-VM) und als Datei speichern
+# EPM – Images (Backend und Frontend) auf Linux bauen (z. B. in der Test-VM) und als Datei speichern
 # Aufruf im Ordner mit diesem Skript:   ./bauen.sh            (Version 0.1.0)
 #                                       ./bauen.sh 0.1.1      (andere Version)
 set -euo pipefail
@@ -23,9 +23,12 @@ echo "==> Prüfe Projekt und Migrationen"
 $DOCKER run --rm -e DJANGO_DEBUG=1 "$IMAGE" python manage.py check
 $DOCKER run --rm -e DJANGO_DEBUG=1 "$IMAGE" python manage.py makemigrations --check --dry-run
 
-echo "==> Speichere $IMAGE"
-$DOCKER save "$IMAGE" -o "epm-backend-$VERSION.tar"
-[[ $EUID -eq 0 ]] || sudo chown "$(id -u):$(id -g)" "epm-backend-$VERSION.tar"
+echo "==> Baue epm-web:$VERSION (Frontend)"
+$DOCKER build -t "epm-web:$VERSION" frontend
+
+echo "==> Speichere beide Images"
+$DOCKER save "$IMAGE" "epm-web:$VERSION" -o "epm-$VERSION.tar"
+[[ $EUID -eq 0 ]] || sudo chown "$(id -u):$(id -g)" "epm-$VERSION.tar"
 echo
-echo "Fertig: $PWD/epm-backend-$VERSION.tar"
-echo "Weiter mit:  cd ~/epm-rollout && sudo ./05-backend.sh $PWD/epm-backend-$VERSION.tar"
+echo "Fertig: $PWD/epm-$VERSION.tar"
+echo "Weiter mit:  cd ~/epm-rollout && sudo ./05-backend.sh $PWD/epm-$VERSION.tar"

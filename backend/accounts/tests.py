@@ -33,6 +33,10 @@ class Anmeldung(TestCase):
                                        format="json")
 
     def test_erstanmeldung(self):
+        status = self.c.get("/api/auth/status/").json()
+        self.assertEqual(status["schritt"], "anmelden")
+        self.assertEqual(status["organisation"]["anschrift"], "Waltrup 16 · 48341 Altenberge")
+        self.assertNotIn("benutzer", status)
         r = self.anmelden(self.kennwort)
         self.assertEqual(r.json()["schritt"], "kennwort_aendern")
         self.assertEqual(self.c.get("/api/patienten/").status_code, 403)

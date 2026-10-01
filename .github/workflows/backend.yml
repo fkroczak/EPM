@@ -1,6 +1,6 @@
 # EPM – Backend prüfen: bei jedem Push Tests gegen echtes PostgreSQL 18.
 # Fehlen Migrationen für geänderte Modelle, werden sie hier erzeugt und ins Repo übernommen.
-name: Backend
+name: EPM
 
 on:
   push:
@@ -128,12 +128,93 @@ jobs:
           name: test-ausgabe
           path: backend/test-ausgabe.txt
 
-  image:
-    name: Docker-Image bauen
+  frontend:
+    name: Frontend bauen und im Browser testen (echter Stack)
     runs-on: ubuntu-24.04
+    needs: tests
+    if: ${{ !cancelled() }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v7
-      - name: Image bauen
-        run: docker build -t epm-backend:ci backend
-      - name: Image startet und findet seine Module
-        run: docker run --rm -e DJANGO_DEBUG=1 epm-backend:ci python manage.py check
+        with:
+          # nach einem Push den neuesten Stand von main (inkl. Migrationen, die der Test-Job gerade erzeugt hat)
+          ref: ${{ github.event_name == 'push' && github.ref || github.sha }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Abhängigkeiten (Lockfile beim ersten Lauf erzeugen)
+        id: npm
+        working-directory: frontend
+        run: |
+          set -o pipefail
+          if [ ! -f package-lock.json ]; then
+            npm install --no-audit --no-fund 2>&1 | tee -a ../frontend-bau.txt
+            echo "lock=1" >> "$GITHUB_OUTPUT"
+          fi
+          npm ci --no-audit --no-fund 2>&1 | tail -5 | tee -a ../frontend-bau.txt
+
+      - name: Lockfile ins Repo übernehmen
+        if: steps.npm.outputs.lock == '1' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "epm-ci"
+          git config user.email "epm-ci@users.noreply.github.com"
+          git add frontend/package-lock.json
+          git commit -m "Frontend: package-lock.json erzeugt (CI)"
+          git pull --rebase
+          git push
+
+      - name: Typen prüfen und bauen
+        working-directory: frontend
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee -a ../frontend-bau.txt
+
+      - name: Stack starten (Images bauen, Musterdaten, Testkonten)
+        run: |
+          set -o pipefail
+          werkzeuge/ci-stack.sh start 2>&1 | tee stack.txt
+
+      - name: Browser installieren
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium > /dev/null
+
+      - name: Browsertests
+        working-directory: frontend
+        env:
+          EPM_CI_BASIS: /tmp/epm-ci
+        run: |
+          set -o pipefail
+          npx playwright test 2>&1 | tee ../e2e-ausgabe.txt
+
+      - name: Protokolle des Stacks
+        if: failure()
+        run: werkzeuge/ci-stack.sh logs > stack-logs.txt 2>&1 || true
+
+      - name: Ergebnis als Kommentar am Commit
+        if: always() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "**Frontend und Browsertests: ${{ job.status }}** (Lauf ${{ github.run_id }})"
+            echo
+            if [ -s e2e-ausgabe.txt ]; then
+              echo '```'; tail -c 40000 e2e-ausgabe.txt; echo '```'
+            fi
+            if [ "${{ job.status }}" != "success" ]; then
+              echo "<details><summary>Bau</summary>"; echo; echo '```'; tail -c 12000 frontend-bau.txt 2>/dev/null; echo '```'; echo "</details>"
+              echo "<details><summary>Stack</summary>"; echo; echo '```'; tail -c 4000 stack.txt 2>/dev/null; echo; tail -c 8000 stack-logs.txt 2>/dev/null; echo '```'; echo "</details>"
+            fi
+          } > kommentar.md
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@kommentar.md > /dev/null
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-ergebnisse
+          path: frontend/test-results/
+          if-no-files-found: ignore

@@ -41,6 +41,7 @@ case "${1:-}" in
   --zurueck)
     TAG="${2:?Version angeben, siehe: sudo epm-update --versionen}"
     docker image inspect "epm-backend:$TAG" >/dev/null || { echo "Version $TAG nicht vorhanden."; exit 1; }
+    docker image inspect "epm-web:$TAG" >/dev/null || { echo "Frontend-Image epm-web:$TAG fehlt."; exit 1; }
     starte_version "$TAG"
     echo "Zurückgeschaltet auf $TAG. Achtung: Datenbank-Migrationen werden dabei nicht zurückgedreht."
     exit 0 ;;
@@ -65,8 +66,8 @@ schritt "Projektdateien aktualisieren (Compose, Nginx, Skripte)"
 (cd "$CODE/rollout" && ./04-projekt.sh >/dev/null)
 install -m 0750 "$CODE/werkzeuge/epm-update.sh" /usr/local/sbin/epm-update
 
-if docker image inspect "epm-backend:$TAG" >/dev/null 2>&1; then
-  schritt "Image epm-backend:$TAG ist schon gebaut"
+if docker image inspect "epm-backend:$TAG" >/dev/null 2>&1 && docker image inspect "epm-web:$TAG" >/dev/null 2>&1; then
+  schritt "Images epm-backend:$TAG und epm-web:$TAG sind schon gebaut"
 else
   schritt "Image epm-backend:$TAG bauen"
   docker build --quiet -t "epm-backend:$TAG" "$CODE/backend" >/dev/null
@@ -75,10 +76,12 @@ else
     echo "ABBRUCH: Im Code fehlen Datenbank-Migrationen. Nichts wurde umgestellt."
     exit 1
   fi
-  docker save "epm-backend:$TAG" -o "$B/images/epm-backend-$TAG.tar"
-  chmod 0600 "$B/images/epm-backend-$TAG.tar"
+  schritt "Image epm-web:$TAG bauen (Frontend, braucht Zugang zu registry.npmjs.org)"
+  docker build --quiet -t "epm-web:$TAG" "$CODE/frontend" >/dev/null
+  docker save "epm-backend:$TAG" "epm-web:$TAG" -o "$B/images/epm-$TAG.tar"
+  chmod 0600 "$B/images/epm-$TAG.tar"
   # nur die letzten 5 Image-Dateien behalten
-  ls -1t "$B"/images/epm-backend-*.tar 2>/dev/null | tail -n +6 | xargs -r rm -f
+  ls -1t "$B"/images/epm-*.tar 2>/dev/null | tail -n +6 | xargs -r rm -f
 fi
 
 schritt "Backup vor dem Umstellen"

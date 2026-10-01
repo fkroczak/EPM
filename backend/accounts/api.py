@@ -104,8 +104,16 @@ def ich_daten(user):
     }
 
 
+def organisation():
+    """Name und Anschrift des aktiven Absenders – für die Anmeldeseite (öffentlich, keine Patientendaten)."""
+    from stammdaten.models import Absenderangaben, Einstellungen
+
+    a = Absenderangaben.alle()[Einstellungen.aktuell().absender]
+    return {"name": a.name, "anschrift": " · ".join(t for t in (a.strasse, f"{a.plz} {a.ort}".strip()) if t)}
+
+
 def status_antwort(request, **extra):
-    daten = {"schritt": naechster_schritt(request), **extra}
+    daten = {"schritt": naechster_schritt(request), "organisation": organisation(), **extra}
     if daten["schritt"] == "fertig":
         daten["benutzer"] = ich_daten(request.user)
     return Response(daten)

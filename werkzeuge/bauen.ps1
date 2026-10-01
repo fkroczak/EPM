@@ -29,8 +29,11 @@ Write-Host "==> Prüfe Projekt und Migrationen"
 Docker-Befehl run --rm -e DJANGO_DEBUG=1 $Image python manage.py check
 Docker-Befehl run --rm -e DJANGO_DEBUG=1 $Image python manage.py makemigrations --check --dry-run
 
-Write-Host "==> Speichere $Image"
-Docker-Befehl save $Image -o "epm-backend-$Version.tar"
+Write-Host "==> Baue epm-web:$Version (Frontend)"
+Docker-Befehl build -t "epm-web:$Version" .\frontend
+
+Write-Host "==> Speichere beide Images"
+Docker-Befehl save $Image "epm-web:$Version" -o "epm-$Version.tar"
 Write-Host ""
 Write-Host "Fertig. Weiter mit:"
-Write-Host "   scp epm-backend-$Version.tar epm-test:~"
+Write-Host "   scp epm-$Version.tar epm-test:~"
