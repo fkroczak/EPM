@@ -28,7 +28,8 @@ type Eintrag = { label: string; wert: string };
 export type Block = {
   id: string; typ: string; bezeichnung?: string; optionen?: Optionen;
   text?: string; zusatz_label?: string; zusatz?: string; spalten?: number; felder?: Eintrag[]; quelle?: string;
-  linie?: string; hoehe_mm?: number;
+  linie?: string; hoehe_mm?: number; links?: string; rechts?: string; rechts_klein?: boolean;
+  absender?: boolean; linienfarbe?: string; falzmarken?: boolean;
 };
 type Version = {
   id: number; version: number | null; status: "entwurf" | "aktiv" | "abgeloest"; notiz: string; erstellt_am: string;
@@ -43,23 +44,24 @@ type Aufbau = Uebersicht & {
 type Entwurf = Version & { ist_entwurf: boolean; grundlage?: number; bloecke: Block[] };
 
 const TYPNAME: Record<string, string> = {
-  briefkopf: "Briefkopf", titel: "Titel", text: "Text", datenfelder: "Datenfelder", tabelle: "Tabelle", trennlinie: "Trennlinie",
+  briefkopf: "Briefkopf", titel: "Titel", text: "Text", zweispaltig: "Zwei Spalten", datenfelder: "Datenfelder", tabelle: "Tabelle", trennlinie: "Trennlinie",
   leerraum: "Leerraum", unterschrift: "Unterschrift", seitenumbruch: "Seitenumbruch", fusszeile: "Fußzeile",
 };
 const HINWEIS: Record<string, string> = {
-  briefkopf: "Logo und Absender aus „Briefkopf und Logo“. Änderungen dort gelten für neue PDFs.",
+  briefkopf: "Logo (und auf Wunsch Absender) aus „Briefkopf und Logo“, darunter eine farbige Linie; Falzmarken am linken Rand.",
   titel: "Überschrift des Dokuments, rechts daneben ein Zusatz wie „gültig ab“.",
-  text: "Freier Text. Datenfelder werden beim Erzeugen eingesetzt.",
+  text: "Freier Text. Datenfelder werden beim Erzeugen eingesetzt; Zeilen ohne Wert entfallen.",
+  zweispaltig: "Zwei Textspalten nebeneinander, z. B. Anschrift links und „Unsere Zeichen“ rechts. Zeilen ohne Wert entfallen.",
   datenfelder: "Bezeichnung links, Wert rechts. Mehrere Spalten setzen Paare nebeneinander.",
   tabelle: "Feste Spalten; die Zeilen kommen aus der Akte bzw. dem Plan.",
   trennlinie: "Waagerechte Linie.",
   leerraum: "Abstand in Millimetern.",
   unterschrift: "Angaben zur Freigabe und eine Linie für die Unterschrift.",
   seitenumbruch: "Alles danach beginnt auf einer neuen Seite.",
-  fusszeile: "Steht auf jeder Seite unten. {Seite} und {Seiten} werden zur Seitenzahl.",
+  fusszeile: "Steht auf jeder Seite unten (bis 8 Zeilen links, rechts z. B. die Seitenzahl). {Seite} und {Seiten} werden zur Seitenzahl.",
 };
 /** Bausteine aus dem Entwurf; Briefkopf, Titel und Fußzeile gibt es je Vorlage einmal */
-const BAUSTEINE = ["text", "datenfelder", "tabelle", "trennlinie", "leerraum", "unterschrift", "seitenumbruch", "titel", "briefkopf", "fusszeile"];
+const BAUSTEINE = ["text", "zweispaltig", "datenfelder", "tabelle", "trennlinie", "leerraum", "unterschrift", "seitenumbruch", "titel", "briefkopf", "fusszeile"];
 const PLATZHALTER = /\{\{\s*([^{}]+?)\s*\}\}/g;
 
 function neueId(typ: string, bloecke: Block[]): string {
@@ -72,7 +74,9 @@ function neuerBlock(typ: string, bloecke: Block[], tabellen: Aufbau["tabellen"])
   const b: Block = { id: neueId(typ, bloecke), typ, bezeichnung: TYPNAME[typ] };
   if (typ === "titel") Object.assign(b, { text: "Titel", zusatz_label: "", zusatz: "" });
   if (typ === "text") b.text = "Text";
-  if (typ === "fusszeile") b.text = "{{Absender.Name}} · Seite {Seite}/{Seiten}";
+  if (typ === "fusszeile") Object.assign(b, { text: "{{Absender.Name}}", rechts: "{Seite}/{Seiten}" });
+  if (typ === "zweispaltig") Object.assign(b, { links: "{{Patient.Name}}", rechts: "Patienten-Nr.: {{Patient.Nummer}}", rechts_klein: true });
+  if (typ === "briefkopf") Object.assign(b, { absender: false, linienfarbe: "#EE8D4D", falzmarken: true });
   if (typ === "datenfelder") Object.assign(b, { spalten: 1, felder: [{ label: "Bezeichnung", wert: "{{Heute}}" }] });
   if (typ === "tabelle") b.quelle = tabellen[0]?.quelle;
   if (typ === "unterschrift") Object.assign(b, { felder: [], linie: "Unterschrift" });
@@ -105,11 +109,11 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
   switch (b.typ) {
     case "briefkopf":
       return (
-        <div className="flex justify-between items-center pb-2 border-b-2 border-[#251F53]">
+        <div className="flex justify-between items-end pb-2 border-b-2" style={{ borderColor: /^#[0-9a-f]{6}$/i.test(b.linienfarbe ?? "") ? b.linienfarbe : "#251F53" }}>
           <Logo className="w-[150px] h-[53px]" version={briefkopf.data?.logo.sha256} />
-          <div className="flex flex-col items-end text-[9px] text-[#555]">
+          {b.absender !== false ? <div className="flex flex-col items-end text-[9px] text-[#555]">
             {a ? <><span>{a.strasse} · {a.plz} {a.ort}</span><span>Tel. {a.telefon}</span><span>{a.email}</span></> : null}
-          </div>
+          </div> : null}
         </div>
       );
     case "titel":
@@ -122,7 +126,14 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
     case "text":
       return <div className={cx("text-[10px] leading-relaxed", stil(b.optionen))}>{kopf}<MitFeldern text={b.text} /></div>;
     case "fusszeile":
-      return <div className="text-[8.5px] text-[#777] text-center"><MitFeldern text={b.text} /></div>;
+      return <div className="flex justify-between gap-3 text-[8px] text-[#00325a] leading-snug"><span><MitFeldern text={b.text} /></span><span><MitFeldern text={b.rechts} /></span></div>;
+    case "zweispaltig":
+      return (
+        <div className={cx("flex justify-between gap-4 text-[10px]", stil(b.optionen))}>
+          <div><MitFeldern text={b.links} /></div>
+          <div className={cx("text-right text-[#00325a]", b.rechts_klein && "text-[8.5px]")}><MitFeldern text={b.rechts} /></div>
+        </div>
+      );
     case "datenfelder":
     case "unterschrift": {
       const n = b.typ === "unterschrift" ? Math.min(Math.max(b.felder?.length ?? 1, 1), 4) : b.spalten ?? 1;
@@ -425,6 +436,18 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
         </div>
       </> : null}
       {b.typ === "text" || b.typ === "fusszeile" ? <FeldText label="Text" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} mehrzeilig /> : null}
+      {b.typ === "fusszeile" ? <FeldText label="Rechts" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} /> : null}
+      {b.typ === "zweispaltig" ? <>
+        <FeldText label="Links" wert={b.links ?? ""} onWert={(w) => aendere({ links: w })} fokus={fokus} mehrzeilig />
+        <FeldText label="Rechts" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} mehrzeilig />
+        <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!b.rechts_klein} onChange={(e) => aendere({ rechts_klein: e.target.checked })} />Rechte Spalte kleiner</label>
+      </> : null}
+      {b.typ === "briefkopf" ? <>
+        <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={b.absender !== false} onChange={(e) => aendere({ absender: e.target.checked })} />Absender neben dem Logo</label>
+        <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!b.falzmarken} onChange={(e) => aendere({ falzmarken: e.target.checked })} />Falzmarken am linken Rand</label>
+        <label className="flex items-center gap-2 text-[13.5px]">Linienfarbe
+          <input type="color" aria-label="Linienfarbe" value={(b.linienfarbe ?? "#251F53").toLowerCase()} onChange={(e) => aendere({ linienfarbe: e.target.value.toUpperCase() })} /></label>
+      </> : null}
       {b.typ === "datenfelder" ? (
         <Feld label="Spalten">{(p) => <Auswahl {...p} value={b.spalten ?? 1} onChange={(e) => aendere({ spalten: Number(e.target.value) })}>
           {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}</Auswahl>}</Feld>

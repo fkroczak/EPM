@@ -35,21 +35,31 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await editor.getByLabel("Kalium").fill("40");
   await editor.getByLabel("Phosphat").fill("12");
   await editor.getByLabel("Calcium").fill("9");
-  // Stabilität wie im Altsystem: Ca + Mg ≤ Gesamtvolumen ÷ 100 (2.100 ml → 21 mmol)
+  // Stabilität wie im Altsystem: Ca + Mg ≤ Mischbeutel ÷ 100 (2.100 ml → 21 mmol)
   await editor.getByLabel("Magnesium").fill("13");
-  await expect(editor.getByTestId("ca-mg-stabilitaet")).toContainText("Calcium + Magnesium 22 mmol, Grenze 21 mmol (Gesamtvolumen ÷ 100): instabil");
+  await expect(editor.getByTestId("ca-mg-stabilitaet")).toContainText("Calcium + Magnesium 22 mmol, Grenze 21 mmol (Mischbeutel ÷ 100): instabil");
   await expect(editor.getByTestId("plan-summe")).toContainText("Instabil: Calcium + Magnesium 22 mmol über 21 mmol");
   await editor.getByLabel("Magnesium").fill("6");
-  await expect(editor.getByTestId("ca-mg-stabilitaet")).toContainText("Calcium + Magnesium 15 mmol, Grenze 21 mmol (Gesamtvolumen ÷ 100): stabil");
+  await expect(editor.getByTestId("ca-mg-stabilitaet")).toContainText("Calcium + Magnesium 15 mmol, Grenze 21 mmol (Mischbeutel ÷ 100): stabil");
   await editor.getByLabel("Spurenelemente").selectOption({ label: "Addel N" });
   await editor.getByLabel("Katheterblock / Medikament").selectOption({ label: "Taurolin 2 %" });
+  // Erweiterung: weiterer Bestandteil aus den Auswahllisten
+  const weitere = editor.getByTestId("weitere-bestandteile");
+  await weitere.getByRole("button", { name: "Bestandteil hinzufügen" }).click();
+  await weitere.getByLabel("Bestandteil 1").selectOption({ label: "Dipeptamin 20 %" });
+  await weitere.getByLabel("Menge 1").fill("100");
+  await weitere.getByLabel("Einheit 1").fill("ml");
+  await weitere.getByLabel("Häufigkeit 1").fill("täglich");
   await editor.getByRole("button", { name: "+ Soluvit N" }).click();
   await editor.getByRole("button", { name: "+ Vitalipid adult" }).click();
   await editor.getByLabel("Laufzeit").fill("12");
   await editor.getByLabel("Tage pro Woche").fill("5");
-  // Gesamtvolumen wie im Altsystem: letztes Gewicht × 35 ml; Laufzeit manuell, Rate = Gesamtvolumen ÷ Laufzeit
-  await expect(editor.getByTestId("plan-gesamtvolumen")).toHaveText("2.100 ml");
-  await expect(editor.getByTestId("plan-rate")).toHaveText("175 ml/h");
+  // wie auf der alten PDF: Mischbeutel = letztes Gewicht × 35 ml, Zusatzvolumen = Basislösung, Gesamtvolumen = Summe;
+  // Laufzeit manuell, Rate = Gesamtvolumen ÷ Laufzeit (2.600 ÷ 12)
+  await expect(editor.getByTestId("plan-mischbeutel")).toHaveText("2.100 ml");
+  await expect(editor.getByTestId("plan-zusatzvolumen")).toHaveText("500 ml");
+  await expect(editor.getByTestId("plan-gesamtvolumen")).toHaveText("2.600 ml");
+  await expect(editor.getByTestId("plan-rate")).toHaveText("216,7 ml/h");
   await expect(editor.getByTestId("plan-volumen-hinweis")).toContainText("35 ml/kg × 60,0 kg");
   // Protonenpumpenhemmer mit den Codes des Altsystems; Zeiten morgens/mittags/abends
   await expect(editor.getByRole("checkbox", { name: "Morgens" })).toBeDisabled();
@@ -73,8 +83,10 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(blatt).toContainText("1.509 kcal");
   await expect(blatt).toContainText("Soluvit N | Vitalipid adult");
   await expect(blatt).toContainText("Taurolin 2 %");
-  await expect(blatt.getByRole("row").filter({ hasText: "Gesamtvolumen" })).toContainText("2.100 ml (35 ml/kg × 60 kg)");
-  await expect(blatt.getByRole("row").filter({ hasText: /^Rate/ })).toContainText("175 ml/h");
+  await expect(blatt.getByRole("row").filter({ hasText: "Weitere Bestandteile" })).toContainText("Dipeptamin 20 % 100 ml (täglich)");
+  await expect(blatt.getByRole("row").filter({ hasText: "Volumen im Mischbeutel" })).toContainText("2.100 ml (35 ml/kg × 60 kg)");
+  await expect(blatt.getByRole("row").filter({ hasText: /^Gesamtvolumen/ })).toContainText("2.600 ml");
+  await expect(blatt.getByRole("row").filter({ hasText: /^Rate/ })).toContainText("216,7 ml/h");
   await expect(blatt.getByRole("row").filter({ hasText: "Protonenpumpenhemmer" })).toContainText("Pantozol® 40 mg · morgens, abends");
   await expect(detail.getByTestId("planvergleich")).toHaveCount(0);
 
@@ -106,7 +118,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(editor.getByLabel("Präparat (Kurzinfusion)")).toHaveValue("1");
   await expect(editor.getByRole("checkbox", { name: "Morgens" })).toBeChecked();
   await expect(editor.getByRole("checkbox", { name: "Mittags" })).not.toBeChecked();
-  await expect(editor.getByTestId("plan-rate")).toHaveText("175 ml/h");
+  await expect(editor.getByTestId("plan-rate")).toHaveText("216,7 ml/h");
   await editor.getByLabel("Menge Glucose in g").fill("2000");
   await expect(summe).toContainText("Glucose 2.000 g außerhalb");
   await editor.getByRole("button", { name: "Als Entwurf speichern" }).click();
@@ -173,13 +185,15 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
     .toEqual([["aktuell", 80, 1509]]);
   expect([plaene.results[0].phosphat_mmol, plaene.results[0].calcium_mmol, plaene.results[0].magnesium_mmol]).toEqual([12, 9, 6]);
   expect(plaene.results[0].vitamine_namen).toEqual(["Soluvit N", "Vitalipid adult"]);
-  expect([plaene.results[0].gesamtvolumen_ml, plaene.results[0].volumen_gewicht_kg, plaene.results[0].laufzeit_h, plaene.results[0].rate_ml_h])
-    .toEqual([2100, 60, 12, 175]);
+  expect(plaene.results[0].positionen.map((x: { praeparat_name: string; menge: number; einheit: string; haeufigkeit: string }) =>
+    [x.praeparat_name, x.menge, x.einheit, x.haeufigkeit])).toEqual([["Dipeptamin 20 %", 100, "ml", "täglich"]]);
+  expect([plaene.results[0].gesamtvolumen_ml, plaene.results[0].volumen_gewicht_kg, plaene.results[0].volumen_summe_ml,
+    plaene.results[0].laufzeit_h, plaene.results[0].rate_ml_h]).toEqual([2100, 60, 2600, 12, 216.7]);
   expect([plaene.results[0].pantozol_stufe, plaene.results[0].pantozol_tage]).toEqual([1, 5]);
   expect([plaene.results[0].ca_mg_mmol, plaene.results[0].ca_mg_grenze_mmol, plaene.results[0].ca_mg_stabil]).toEqual([15, 21, true]);
   // Übersicht der Akte zeigt Gesamtvolumen und Rate des aktuellen Plans
   await page.goto(`/patienten/${patient.id}`);
-  await expect(page.getByTestId("plan-volumen")).toContainText("Gesamtvolumen 2.100 ml · Rate 175 ml/h");
+  await expect(page.getByTestId("plan-volumen")).toContainText("Gesamtvolumen 2.600 ml · Rate 216,7 ml/h");
   await api.ende();
   merken("plan", { patient: patient.id });
 });

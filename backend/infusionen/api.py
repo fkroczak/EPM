@@ -50,6 +50,7 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
     kcal = serializers.IntegerField(read_only=True)
     gesamtvolumen_ml = serializers.DecimalField(max_digits=7, decimal_places=2, read_only=True)
     volumen_gewicht_kg = serializers.DecimalField(max_digits=5, decimal_places=1, read_only=True)
+    volumen_summe_ml = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
     rate_ml_h = serializers.DecimalField(max_digits=7, decimal_places=1, read_only=True)
     ca_mg_mmol = serializers.DecimalField(max_digits=7, decimal_places=1, read_only=True)
     ca_mg_grenze_mmol = serializers.DecimalField(max_digits=7, decimal_places=2, read_only=True)
@@ -67,7 +68,7 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
             "aminosaeuren_g", "lipide_praeparat", "lipide_g", "albumin_praeparat", "albumin_ml",
             "natrium_mmol", "kalium_mmol", "phosphat_mmol", "calcium_mmol", "magnesium_mmol",
             "ca_mg_mmol", "ca_mg_grenze_mmol", "ca_mg_stabil", "spurenelemente", "vitamine", "vitamine_namen",
-            "kcal_manuell", "kcal_berechnet", "kcal", "gesamtvolumen_ml", "volumen_gewicht_kg", "laufzeit_h", "rate_ml_h",
+            "kcal_manuell", "kcal_berechnet", "kcal", "gesamtvolumen_ml", "volumen_gewicht_kg", "volumen_summe_ml", "laufzeit_h", "rate_ml_h",
             "tage_pro_woche", "katheterschutz",
             "pantozol_stufe", "pantozol_tage", "bemerkung", "positionen", "geaenderte_felder",
             "erstellt_am", "erstellt_von_name", "freigegeben_am", "freigegeben_von_name",

@@ -68,9 +68,10 @@ VERGLEICHSZEILEN = [
     ("albumin", "Humanalbumin"), ("natrium_mmol", "Natrium"), ("kalium_mmol", "Kalium"),
     ("phosphat_mmol", "Phosphat"), ("calcium_mmol", "Calcium"), ("magnesium_mmol", "Magnesium"),
     ("spurenelemente", "Spurenelemente"), ("vitamine", "Vitamine"), ("katheterschutz", "Katheterblock"),
-    ("gesamtvolumen", "Gesamtvolumen"), ("laufzeit_h", "Laufzeit"), ("rate", "Rate"),
+    ("mischbeutel", "Volumen im Mischbeutel"), ("gesamtvolumen", "Gesamtvolumen"), ("laufzeit_h", "Laufzeit"),
+    ("rate", "Rate"),
     ("tage_pro_woche", "Tage pro Woche"), ("kcal", "Energie"),
-    ("pantozol", "Protonenpumpenhemmer"), ("bemerkung", "Bemerkung"),
+    ("pantozol", "Protonenpumpenhemmer"), ("positionen", "Weitere Bestandteile"), ("bemerkung", "Bemerkung"),
 ]
 
 
@@ -230,11 +231,18 @@ class Infusionsplan(AktenEintrag):
         self.gesamtvolumen_ml = (letztes * ML_JE_KG).quantize(Decimal("0.01")) if letztes is not None else None
 
     @property
-    def rate_ml_h(self):
-        """Rate = Gesamtvolumen ÷ Laufzeit (ml/h)."""
-        if self.gesamtvolumen_ml is None or not self.laufzeit_h:
+    def volumen_summe_ml(self):
+        """Gesamtvolumen wie auf der alten PDF: Volumen im Mischbeutel (Gewicht × 35 ml) + Zusatzvolumen (Basislösung)."""
+        if self.gesamtvolumen_ml is None:
             return None
-        return (self.gesamtvolumen_ml / self.laufzeit_h).quantize(Decimal("0.1"))
+        return self.gesamtvolumen_ml + Decimal(self.basis_ml or 0)
+
+    @property
+    def rate_ml_h(self):
+        """Rate = Gesamtvolumen (Mischbeutel + Zusatzvolumen) ÷ Laufzeit (ml/h); Festlegung 01.10.2026."""
+        if self.volumen_summe_ml is None or not self.laufzeit_h:
+            return None
+        return (self.volumen_summe_ml / self.laufzeit_h).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
 
     def clean(self):
         fehler = {}
@@ -242,7 +250,7 @@ class Infusionsplan(AktenEintrag):
         if self.status == self.Status.ENTWURF and self.patient_id:
             self.berechne_volumen()
         if self.gesamtvolumen_ml is not None and not (e.volumen_min_ml <= self.gesamtvolumen_ml <= e.volumen_max_ml):
-            fehler["gesamtvolumen_ml"] = (f"Gesamtvolumen {_zahl(self.gesamtvolumen_ml, 'ml')} liegt außerhalb der "
+            fehler["gesamtvolumen_ml"] = (f"Volumen im Mischbeutel {_zahl(self.gesamtvolumen_ml, 'ml')} liegt außerhalb der "
                                           f"Plausibilitätsgrenzen ({_zahl(e.volumen_min_ml)}–{_zahl(e.volumen_max_ml)} ml).")
         if not (e.kcal_min_tag <= self.kcal <= e.kcal_max_tag):
             fehler["kcal_manuell"] = (f"{self.kcal} kcal liegen außerhalb der Plausibilitätsgrenzen "
@@ -458,6 +466,8 @@ def _anzeige(plan, schluessel):
     if schluessel == "laufzeit_h":
         return _zahl(plan.laufzeit_h, "h")
     if schluessel == "gesamtvolumen":
+        return _zahl(plan.volumen_summe_ml, "ml")
+    if schluessel == "mischbeutel":
         if plan.gesamtvolumen_ml is None:
             return None
         return f"{_zahl(plan.gesamtvolumen_ml, 'ml')} (35 ml/kg × {_zahl(plan.volumen_gewicht_kg, 'kg')})"
@@ -472,6 +482,16 @@ def _anzeige(plan, schluessel):
             return None
         zeiten = ppi_zeiten_text(plan.pantozol_tage)
         return f"{Protonenpumpenhemmer(plan.pantozol_stufe).label} · {zeiten}" if zeiten else Protonenpumpenhemmer(plan.pantozol_stufe).label
+    if schluessel == "positionen":
+        if not plan.pk:
+            return None
+        teile = []
+        for x in plan.positionen.select_related("praeparat"):
+            t = " ".join(filter(None, [str(x.praeparat), _zahl(x.menge, x.einheit) if x.menge is not None else x.einheit]))
+            zusatz = ", ".join(filter(None, [x.haeufigkeit, x.bemerkung]))
+            teiles = f"{t} ({zusatz})" if zusatz else t
+            teile.append(teiles)
+        return " | ".join(teile) or None
     if schluessel == "bemerkung":
         return plan.bemerkung or None
     return None

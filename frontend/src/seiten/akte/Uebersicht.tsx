@@ -283,7 +283,7 @@ function PlanKarte() {
             <div className="flex flex-col"><span className="num text-lg font-semibold">{plan.data?.tage_pro_woche != null ? `${plan.data.tage_pro_woche}×` : "—"}</span><span className="text-xs gedaempft">pro Woche</span></div>
           </div>
           <span className="text-[0.8125rem]" data-testid="plan-volumen">
-            Gesamtvolumen <span className="num">{plan.data?.gesamtvolumen_ml != null ? `${zahl(plan.data.gesamtvolumen_ml)} ml` : "—"}</span>
+            Gesamtvolumen <span className="num">{plan.data?.volumen_summe_ml != null ? `${zahl(plan.data.volumen_summe_ml)} ml` : "—"}</span>
             {" · "}Rate <span className="num">{plan.data?.rate_ml_h != null ? `${zahl(plan.data.rate_ml_h)} ml/h` : "—"}</span>
           </span>
           <span className="text-[0.8125rem] gedaempft">

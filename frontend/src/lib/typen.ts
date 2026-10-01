@@ -378,6 +378,8 @@ export type Plan = {
   /** berechnet wie im Altsystem: Körpergewicht × 35 ml, bei Freigabe eingefroren */
   gesamtvolumen_ml: number | null;
   volumen_gewicht_kg: number | null;
+  /** Gesamtvolumen wie auf der alten PDF: Mischbeutel + Zusatzvolumen (Basislösung) */
+  volumen_summe_ml: number | null;
   laufzeit_h: number | null;
   /** Gesamtvolumen ÷ Laufzeit */
   rate_ml_h: number | null;

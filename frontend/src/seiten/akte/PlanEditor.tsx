@@ -22,7 +22,12 @@ const AUSWAHL = ["basis_praeparat", "glucose_praeparat", "aminosaeuren_praeparat
   "spurenelemente", "katheterschutz"] as const;
 type ZahlFeld = (typeof ZAHLEN)[number];
 type AuswahlFeld = (typeof AUSWAHL)[number];
-type Formular = Record<ZahlFeld | AuswahlFeld, string> & { vitamine: number[]; bemerkung: string; pantozol_stufe: string; gueltig_ab: string };
+/** Weitere Bestandteile (Erweiterungen): beliebiges Präparat aus den Auswahllisten mit Menge, Einheit, Häufigkeit */
+type Position = { praeparat: string; menge: string; einheit: string; haeufigkeit: string; bemerkung: string };
+type Formular = Record<ZahlFeld | AuswahlFeld, string> & {
+  vitamine: number[]; bemerkung: string; pantozol_stufe: string; gueltig_ab: string; positionen: Position[];
+};
+const EINHEITEN = ["ml", "g", "mg", "µg", "mmol", "IE", "Amp.", "Stück"];
 
 // Energie wie im Altsystem (EPM_infuplan.php): Glucose und Aminosäuren 4 kcal/g, Lipide 9,15 kcal/g;
 // Humanalbumin wird dort in ml erfasst und zählt nicht zur Energie (Festlegung 01.10.2026)
@@ -45,7 +50,7 @@ const ELEKTROLYTE: { feld: ZahlFeld; text: string }[] = [
 
 function leer(): Formular {
   const f = Object.fromEntries([...ZAHLEN, ...AUSWAHL].map((k) => [k, ""])) as Record<ZahlFeld | AuswahlFeld, string>;
-  return { ...f, vitamine: [], bemerkung: "", pantozol_stufe: "0", gueltig_ab: datum(heuteIso()) };
+  return { ...f, vitamine: [], bemerkung: "", pantozol_stufe: "0", gueltig_ab: datum(heuteIso()), positionen: [] };
 }
 
 function ausPlan(p: Plan, gueltig?: string): Formular {
@@ -53,7 +58,9 @@ function ausPlan(p: Plan, gueltig?: string): Formular {
   for (const k of ZAHLEN) f[k] = p[k] != null ? zahl(p[k] as number) : "";
   for (const k of AUSWAHL) f[k] = p[k] != null ? String(p[k]) : "";
   return { ...f, vitamine: [...p.vitamine], bemerkung: p.bemerkung, pantozol_stufe: String(p.pantozol_stufe ?? 0),
-    gueltig_ab: gueltig ?? datum(p.gueltig_ab) };
+    gueltig_ab: gueltig ?? datum(p.gueltig_ab),
+    positionen: (p.positionen ?? []).map((x) => ({ praeparat: String(x.praeparat), menge: x.menge != null ? zahl(x.menge) : "",
+      einheit: x.einheit ?? "", haeufigkeit: x.haeufigkeit ?? "", bemerkung: x.bemerkung ?? "" })) };
 }
 
 function zahlWert(t: string): number | null {
@@ -63,8 +70,9 @@ function zahlWert(t: string): number | null {
 
 /** Vergleichbare Form eines Werts (Komma/Punkt, leer, Zahlformat) */
 function norm(f: Formular, k: keyof Formular): string {
+  if (k === "positionen") return JSON.stringify(f.positionen.map((x) => ({ ...x, menge: zahlWert(x.menge) })));
   const v = f[k];
-  if (Array.isArray(v)) return [...v].sort((a, b) => a - b).join(",");
+  if (Array.isArray(v)) return [...(v as number[])].sort((a, b) => a - b).join(",");
   if ((ZAHLEN as readonly string[]).includes(k)) { const z = zahlWert(v); return z == null ? "" : String(z); }
   return String(v ?? "");
 }
@@ -88,6 +96,59 @@ function PraeparatAuswahl({ id, wert, onWahl, kategorie, praeparate, markiert, l
       <option value="">—</option>
       {liste.map((p) => <option key={p.id} value={p.id}>{p.anzeige}{p.aktiv ? "" : " (ausgeblendet)"}</option>)}
     </Auswahl>
+  );
+}
+
+const KATEGORIE_TEXT: Record<string, string> = {
+  medikament: "Medikamente", elektrolyte: "Elektrolytzusätze", sonstiges: "Sonstiges", vitamine: "Vitamine",
+  spurenelemente: "Spurenelemente", katheterschutz: "Katheterblock", aminosaeuren: "Aminosäuren", lipide: "Lipide",
+  glucose: "Glucose", basisloesung: "Basislösungen", albumin: "Albumin",
+};
+
+/** Erweiterungen des Plans ohne eigenes Feld: jedes Präparat aus „Vorlagen › Auswahllisten“ */
+function WeitereBestandteile({ positionen, praeparate, fehler, markiert, onAendern }: {
+  positionen: Position[]; praeparate: Praeparat[]; fehler: Feldfehler; markiert: boolean; onAendern: (p: Position[]) => void;
+}) {
+  const setze = (i: number, neu: Partial<Position>) => onAendern(positionen.map((x, j) => (j === i ? { ...x, ...neu } : x)));
+  const gruppen = Object.entries(KATEGORIE_TEXT).map(([k, t]) => [t, praeparate.filter((x) => x.kategorie === k)] as const);
+  return (
+    <div className={cx("flex flex-col gap-2 rounded-lg", markiert && "bg-warn-bg p-2 border border-warn")} role="group" aria-label="Weitere Bestandteile"
+      data-testid="weitere-bestandteile">
+      <span className="text-sm font-medium">Weitere Bestandteile</span>
+      {positionen.length ? (
+        <table className="tabelle">
+          <thead><tr><th className="th">Präparat</th><th className="th w-[96px]">Menge</th><th className="th w-[96px]">Einheit</th><th className="th">Häufigkeit</th><th className="th">Bemerkung</th><th className="th w-[40px]" /></tr></thead>
+          <tbody>
+            {positionen.map((x, i) => (
+              <tr key={i}>
+                <td className="td">
+                  <Auswahl aria-label={`Bestandteil ${i + 1}`} value={x.praeparat} aria-invalid={fehler[`positionen.${i}.praeparat`] ? true : undefined}
+                    onChange={(ev) => {
+                      const pr = praeparate.find((y) => String(y.id) === ev.target.value);
+                      setze(i, { praeparat: ev.target.value, einheit: x.einheit || pr?.einheit || "" });
+                    }}>
+                    <option value="">—</option>
+                    {gruppen.map(([t, liste]) => liste.some((y) => y.aktiv || String(y.id) === x.praeparat) ? (
+                      <optgroup key={t} label={t}>{liste.filter((y) => y.aktiv || String(y.id) === x.praeparat).map((y) => <option key={y.id} value={y.id}>{y.anzeige}{y.aktiv ? "" : " (ausgeblendet)"}</option>)}</optgroup>
+                    ) : null)}
+                  </Auswahl>
+                  {fehler[`positionen.${i}.praeparat`] ? <span className="fehlertext" role="alert">{fehler[`positionen.${i}.praeparat`]}</span> : null}
+                </td>
+                <td className="td"><Eingabe aria-label={`Menge ${i + 1}`} className="num" inputMode="decimal" value={x.menge} onChange={(ev) => setze(i, { menge: ev.target.value })}
+                  aria-invalid={fehler[`positionen.${i}.menge`] ? true : undefined} /></td>
+                <td className="td"><Eingabe aria-label={`Einheit ${i + 1}`} list="epm-einheiten" maxLength={10} value={x.einheit} onChange={(ev) => setze(i, { einheit: ev.target.value })} /></td>
+                <td className="td"><Eingabe aria-label={`Häufigkeit ${i + 1}`} maxLength={60} placeholder="z. B. täglich" value={x.haeufigkeit} onChange={(ev) => setze(i, { haeufigkeit: ev.target.value })} /></td>
+                <td className="td"><Eingabe aria-label={`Bemerkung ${i + 1}`} maxLength={200} value={x.bemerkung} onChange={(ev) => setze(i, { bemerkung: ev.target.value })} /></td>
+                <td className="td"><Knopf klein variante="geist" icon="x" aria-label={`Bestandteil ${i + 1} entfernen`} onClick={() => onAendern(positionen.filter((_, j) => j !== i))} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : <span className="text-[0.8125rem] gedaempft">Keine. Für Zusätze ohne eigenes Feld, z. B. Medikamente oder neue Präparate aus „Vorlagen › Auswahllisten“.</span>}
+      <datalist id="epm-einheiten">{EINHEITEN.map((u) => <option key={u} value={u} />)}</datalist>
+      <Knopf klein icon="plus" className="self-start" onClick={() => onAendern([...positionen, { praeparat: "", menge: "", einheit: "", haeufigkeit: "", bemerkung: "" }])}>Bestandteil hinzufügen</Knopf>
+      {fehler.positionen ? <span className="fehlertext" role="alert">{fehler.positionen}</span> : null}
+    </div>
   );
 }
 
@@ -168,9 +229,17 @@ export function PlanEditor() {
       const gueltig = eingabeDatum(f!.gueltig_ab);
       if (!gueltig) fehler.gueltig_ab = "Bitte als TT.MM.JJJJ eingeben.";
       if (f!.pantozol_stufe !== "0" && !zahlWert(f!.pantozol_tage)) fehler.pantozol_tage = "Bitte die Zeiten angeben (morgens, mittags, abends).";
+      const positionen = f!.positionen.map((x, i) => {
+        const menge = eingabeZahl(x.menge);
+        if (!x.praeparat) fehler[`positionen.${i}.praeparat`] = "Bitte ein Präparat wählen.";
+        if (menge === "ungueltig") fehler[`positionen.${i}.menge`] = "Bitte eine Zahl eingeben.";
+        return { praeparat: Number(x.praeparat), menge: menge === "ungueltig" ? null : menge, einheit: x.einheit.trim(),
+          haeufigkeit: x.haeufigkeit.trim(), bemerkung: x.bemerkung.trim(), reihenfolge: i };
+      });
       setLokal(fehler);
       if (Object.keys(fehler).length) throw new ApiFehler(400, "Bitte die markierten Felder prüfen.", null, fehler);
-      Object.assign(daten, { gueltig_ab: gueltig, vitamine: f!.vitamine, bemerkung: f!.bemerkung, pantozol_stufe: Number(f!.pantozol_stufe) });
+      Object.assign(daten, { gueltig_ab: gueltig, vitamine: f!.vitamine, bemerkung: f!.bemerkung, pantozol_stufe: Number(f!.pantozol_stufe),
+        positionen });
       let id = planId ? Number(planId) : neueId;
       if (!id) {
         const neu = await api<Plan>("infusionsplaene/entwurf/", {
@@ -218,8 +287,11 @@ export function PlanEditor() {
   // Gesamtvolumen aus dem letzten Gewicht (der Server rechnet beim Speichern genauso und friert es bei Freigabe ein); Laufzeit manuell
   const volumen = gewicht != null ? Math.round(gewicht * ML_JE_KG * 100) / 100 : null;
   const laufzeit = zahlWert(f.laufzeit_h);
-  const rate = volumen != null && laufzeit ? Math.round((volumen / laufzeit) * 10) / 10 : null;
-  const volumenVorher = vorgaenger.data?.gesamtvolumen_ml ?? null;
+  // Gesamtvolumen wie auf der alten PDF: Mischbeutel + Zusatzvolumen (Basislösung); die Rate wird aus der Summe berechnet
+  const zusatz = zahlWert(f.basis_ml) ?? 0;
+  const summe = volumen != null ? Math.round((volumen + zusatz) * 100) / 100 : null;
+  const rate = summe != null && laufzeit ? Math.round((summe / laufzeit) * 10) / 10 : null;
+  const volumenVorher = vorgaenger.data?.volumen_summe_ml ?? null;
   const rateVorher = vorgaenger.data?.rate_ml_h ?? null;
   const ppiMaske = zahlWert(f.pantozol_tage) ?? 0;
   const ca = zahlWert(f.calcium_mmol);
@@ -227,7 +299,7 @@ export function PlanEditor() {
   const caMg = ca == null && mg == null ? null : Math.round(((ca ?? 0) + (mg ?? 0)) * 10) / 10;
   const caMgGrenze = volumen != null ? Math.round((volumen / CA_MG_ML_JE_MMOL) * 100) / 100 : null;
   const caMgStabil = caMg != null && caMgGrenze != null ? caMg <= caMgGrenze : null;
-  const anzahlGeaendert = vorher ? ([...ZAHLEN, ...AUSWAHL, "vitamine", "bemerkung", "pantozol_stufe"] as (keyof Formular)[]).filter(geaendert).length : 0;
+  const anzahlGeaendert = vorher ? ([...ZAHLEN, ...AUSWAHL, "vitamine", "bemerkung", "pantozol_stufe", "positionen"] as (keyof Formular)[]).filter(geaendert).length : 0;
   const es = einstellungen.data;
   const warnungen: string[] = [];
   if (es) {
@@ -235,14 +307,14 @@ export function PlanEditor() {
       if (wert != null && (wert < Number(unten) || wert > Number(oben))) warnungen.push(`${text} ${zahl(wert)} ${einheit} außerhalb ${zahl(Number(unten))}–${zahl(Number(oben))} ${einheit}`);
     };
     pruefe(kcal, es.kcal_min_tag, es.kcal_max_tag, "Energie", "kcal");
-    pruefe(volumen, es.volumen_min_ml, es.volumen_max_ml, "Gesamtvolumen", "ml");
+    pruefe(volumen, es.volumen_min_ml, es.volumen_max_ml, "Volumen im Mischbeutel", "ml");
     pruefe(zahlWert(f.glucose_g), es.glucose_min_g, es.glucose_max_g, "Glucose", "g");
     pruefe(zahlWert(f.aminosaeuren_g), es.aminosaeuren_min_g, es.aminosaeuren_max_g, "Aminosäuren", "g");
     pruefe(zahlWert(f.lipide_g), es.lipide_min_g, es.lipide_max_g, "Lipide", "g");
     pruefe(zahlWert(f.natrium_mmol), es.natrium_min_mmol, es.natrium_max_mmol, "Natrium", "mmol");
     pruefe(zahlWert(f.kalium_mmol), es.kalium_min_mmol, es.kalium_max_mmol, "Kalium", "mmol");
   }
-  if (caMgStabil === false) warnungen.push(`Instabil: Calcium + Magnesium ${zahl(caMg)} mmol über ${zahl(caMgGrenze)} mmol (Gesamtvolumen ÷ 100)`);
+  if (caMgStabil === false) warnungen.push(`Instabil: Calcium + Magnesium ${zahl(caMg)} mmol über ${zahl(caMgGrenze)} mmol (Mischbeutel ÷ 100)`);
   const vitamineListe = p.filter((x) => x.kategorie === "vitamine");
   const zahlFeld = (k: ZahlFeld, label: string, einheit: string, extra?: ReactNode) => (
     <Feld label={label} fehler={e[k]} hinweis={extra}>
@@ -322,8 +394,8 @@ export function PlanEditor() {
             <h3 className="lbl m-0">Elektrolyte</h3>
             <div className="grid grid-cols-5 gap-3">{ELEKTROLYTE.map((x) => <div key={x.feld}>{zahlFeld(x.feld, x.text, "mmol")}</div>)}</div>
             <span className={cx("text-[0.8125rem]", caMgStabil === false ? "text-warn font-medium" : "gedaempft")} data-testid="ca-mg-stabilitaet">
-              {caMgStabil == null ? "Stabilität Calcium + Magnesium: wird geprüft, sobald Gesamtvolumen und Werte vorliegen."
-                : `Calcium + Magnesium ${zahl(caMg)} mmol, Grenze ${zahl(caMgGrenze)} mmol (Gesamtvolumen ÷ 100): ${caMgStabil ? "stabil" : "instabil"}`}
+              {caMgStabil == null ? "Stabilität Calcium + Magnesium: wird geprüft, sobald Mischbeutel-Volumen und Werte vorliegen."
+                : `Calcium + Magnesium ${zahl(caMg)} mmol, Grenze ${zahl(caMgGrenze)} mmol (Mischbeutel ÷ 100): ${caMgStabil ? "stabil" : "instabil"}`}
             </span>
           </Karte>
 
@@ -356,6 +428,8 @@ export function PlanEditor() {
               </div>
               {e.vitamine ? <span className="fehlertext" role="alert">{e.vitamine}</span> : null}
             </div>
+            <WeitereBestandteile positionen={f.positionen} praeparate={p} fehler={e} markiert={geaendert("positionen")}
+              onAendern={(positionen) => setF((a) => ({ ...a!, positionen }))} />
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium" id="plan-kommentar">Kommentar</span>
               <Editor wert={f.bemerkung} onAenderung={setze("bemerkung")} label="Kommentar" werkzeuge={false} hoehe={56} />
@@ -372,10 +446,14 @@ export function PlanEditor() {
               {zahlFeld("tage_pro_woche", "Tage pro Woche", "×")}
             </div>
             <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-sm" data-testid="plan-volumen">
-              <span className="gedaempft">Gesamtvolumen</span>
-              <span className="num text-right" data-testid="plan-gesamtvolumen">
-                {volumen != null ? `${zahl(volumen)} ml` : "—"}
-                {volumenVorher != null && volumen != null && Math.abs(volumenVorher - volumen) >= 0.01 ? <span className="text-warn"> vorher {zahl(volumenVorher)} ml</span> : null}
+              <span className="gedaempft">Volumen im Mischbeutel</span>
+              <span className="num text-right" data-testid="plan-mischbeutel">{volumen != null ? `${zahl(volumen)} ml` : "—"}</span>
+              <span className="gedaempft">Zusatzvolumen (Basislösung)</span>
+              <span className="num text-right" data-testid="plan-zusatzvolumen">{`${zahl(zusatz)} ml`}</span>
+              <span className="gedaempft font-medium">Gesamtvolumen</span>
+              <span className="num text-right font-medium" data-testid="plan-gesamtvolumen">
+                {summe != null ? `${zahl(summe)} ml` : "—"}
+                {volumenVorher != null && summe != null && Math.abs(volumenVorher - summe) >= 0.01 ? <span className="text-warn"> vorher {zahl(volumenVorher)} ml</span> : null}
               </span>
               <span className="gedaempft">Rate</span>
               <span className="num text-right" data-testid="plan-rate">
@@ -386,8 +464,8 @@ export function PlanEditor() {
             <span className={cx("text-xs", e.gesamtvolumen_ml ? "fehlertext" : "gedaempft")} role={e.gesamtvolumen_ml ? "alert" : undefined}
               data-testid="plan-volumen-hinweis">
               {e.gesamtvolumen_ml ?? (gewicht != null
-                ? `Berechnet: ${ML_JE_KG} ml/kg × ${kg(gewicht)} (letztes Gewicht). Rate = Gesamtvolumen ÷ Laufzeit. Bei Freigabe festgeschrieben.`
-                : "Kein Gewicht erfasst: Gesamtvolumen und Rate werden berechnet, sobald ein Gewicht eingetragen ist.")}
+                ? `Mischbeutel: ${ML_JE_KG} ml/kg × ${kg(gewicht)} (letztes Gewicht). Rate = Gesamtvolumen ÷ Laufzeit. Bei Freigabe festgeschrieben.`
+                : "Kein Gewicht erfasst: Volumen und Rate werden berechnet, sobald ein Gewicht eingetragen ist.")}
             </span>
           </Karte>
           <Karte className="px-5 py-[18px] flex flex-col gap-3.5">

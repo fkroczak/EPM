@@ -136,7 +136,7 @@ class Vorlagen(Grundlage):
         self.assertEqual(r.status_code, 200, r.content)
         if PDFTOTEXT:
             text = pdf_text(r.content)
-            for erwartet in ["Patientendatenblatt", "Probe, Paula", "60 kg am", "Seite 1/1"]:
+            for erwartet in ["Patientendatenblatt", "Probe, Paula", "60 kg am", "1/1", "Spendenkonto"]:
                 self.assertIn(erwartet, text)
             self.assertIn("ENTWURF", kompakt(text))
 
@@ -146,10 +146,12 @@ class Vorlagen(Grundlage):
         pdf, version = erzeuge_aus_vorlage("infusionsplan", Kontext(patient=p, plan=plan), wasserzeichen="TESTDATEN")
         self.assertEqual(version, 1)
         text = pdf_text(pdf)
-        for erwartet in ["Infusionsplan", "Probe, Paula", "Sterofundin", "Glamin 13,4 %", "80 g", "1.509 kcal",
-                         "2.100 ml", "175 ml/h", "Pantozol® 40 mg · morgens, abends", "78 mmol", "heimparenteralen",
-                         "Deutsche Stiftung Krankheitsbedingte Mangelernährung", "Tel. 0251 98 11 400",
-                         "Seite 1/1", "Unterschrift"]:
+        for erwartet in ["Empfehlung eines Infusionsplans", "Probe, Paula", "Sterofundin", "Glamin 13,4 %", "80 g",
+                         "1.509 kcal", "2.100 ml", "500 ml", "2.600 ml", "216,7 ml/h", "78 mmol", "heimparenteralen",
+                         "Pantozol® Kurzinfusion 1 Amp. 40 mg in 50 ml Trägerlösung · 1-0-1",
+                         "Patienten-Nr.: 9", "Infusionsplan-Nr.:", "Volumen im Mischbeutel", "Laufmenge je Stunde",
+                         "Deutsche Stiftung Krankheitsbedingte Mangelernährung", "Telefon 0251 98 11 400",
+                         "Spendenkonto", "1/1", "Maschinell erstellt, geprüft und freigegeben von"]:
             self.assertIn(erwartet, text)
         self.assertIn("TESTDATEN", kompakt(text))
         self.assertNotIn("{{", text)

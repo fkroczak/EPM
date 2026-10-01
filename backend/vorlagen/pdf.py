@@ -19,17 +19,24 @@ STANDARD_LOGO = Path(__file__).resolve().parent / "statisch" / "logo-stiftung.pn
 LEER = "—"
 
 CSS = """
-@page { size: A4; margin: 16mm 17mm 20mm 17mm;
-  @bottom-center { content: %(fusszeile)s; font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif;
-                   font-size: 7.5pt; color: #5d5b72; } }
+@page { size: A4; margin: 15mm 17mm %(unten)smm 17mm;
+  @bottom-left { content: %(fusszeile)s; white-space: pre; vertical-align: top; padding-top: 4mm;
+                 font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif; font-size: 7pt; line-height: 1.45; color: #00325a;
+                 width: 150mm; }
+  @bottom-right { content: %(rechts)s; vertical-align: top; padding-top: 4mm;
+                  font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif; font-size: 7pt; color: #00325a; } }
 html { font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif; font-size: 9.5pt; color: #1b1932; line-height: 1.4; }
 body { margin: 0; }
 .block { margin: 0 0 4.5mm 0; }
-.briefkopf { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; }
-.briefkopf img { height: 17mm; max-width: 75mm; object-fit: contain; object-position: left top; }
+.briefkopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 8mm; padding-bottom: 3mm;
+             border-bottom: 0.5mm solid; }
+.briefkopf img { height: 19mm; max-width: 62mm; object-fit: contain; object-position: left bottom; }
+.falzmarke { position: fixed; left: -12mm; width: 2mm; height: 0; border-top: 0.2mm solid #828282; }
+.spalten { display: flex; justify-content: space-between; gap: 10mm; }
+.spalten .rechts { text-align: right; color: #00325a; }
+.spalten .rechts.klein { font-size: 8pt; line-height: 1.5; }
 .absender { text-align: right; font-size: 7.5pt; color: #3b3953; line-height: 1.45; }
-.titel { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 0.8pt solid #1b1932;
-         padding-bottom: 1.5mm; }
+.titel { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 1mm; }
 .titel h1 { font-size: 15pt; font-weight: 600; margin: 0; }
 .titel .zusatz { font-size: 9.5pt; }
 .titel .zusatz span { color: #5d5b72; }
@@ -84,24 +91,28 @@ def _absender():
     return Absenderangaben.alle()[Einstellungen.aktuell().absender]
 
 
-def briefkopf_html() -> str:
+def briefkopf_html(absender_zeigen=True, linienfarbe="#251F53", falzmarken=False) -> str:
     a = _absender()
     zeilen = [a.name, f"{a.strasse} · {a.plz} {a.ort}".strip(" ·"),
               " · ".join(t for t in (a.telefon and f"Tel. {a.telefon}", a.fax and f"Fax {a.fax}") if t),
               " · ".join(t for t in (a.email, a.internet) if t)]
-    absender = "<br>".join(html.escape(z) for z in zeilen if z)
-    return (f'<div class="briefkopf"><img src="{logo_data_uri()}" alt="Logo">'
+    absender = "<br>".join(html.escape(z) for z in zeilen if z) if absender_zeigen else ""
+    farbe = linienfarbe if re.fullmatch(r"#[0-9A-Fa-f]{6}", linienfarbe or "") else "#251F53"
+    # Falzmarken (DIN 5008, wie im Altsystem bei 99 / 148,5 / 198 mm); bezogen auf den Seitenbereich ab 15 mm Rand
+    marken = "".join(f'<div class="falzmarke" style="top:{y - 15}mm"></div>' for y in (99, 148.5, 198)) if falzmarken else ""
+    return (f'{marken}<div class="briefkopf" style="border-color:{farbe}"><img src="{logo_data_uri()}" alt="Logo">'
             f'<div class="absender">{absender}</div></div>')
 
 
 def _css_string(text: str) -> str:
-    return '"' + text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ") + '"'
+    """CSS-Zeichenkette; Zeilenumbrüche als \\A (mit white-space: pre in der Fußzeile)."""
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\A ") + '"'
 
 
 def fusszeile_css(text: str | None) -> str:
     """Fußzeilentext → CSS-``content`` mit Seitenzählern ({Seite}, {Seiten})."""
     if not text:
-        return '"Seite " counter(page) "/" counter(pages)'
+        return '""'
     teile = []
     for stueck in re.split(r"(\{Seite\}|\{Seiten\})", text):
         if stueck == "{Seite}":
@@ -151,6 +162,21 @@ class Ersetzer:
             return leer_zeichen, True  # z. B. „— · —“ wird zu „—“
         return "".join(stuecke), alle_leer
 
+    def zeilen(self, text: str) -> tuple[str, bool]:
+        """Mehrzeiliger Text: Zeilen, deren Datenfelder alle leer sind und die sonst nichts Wesentliches enthalten
+        (z. B. „* {{Patient.Geburtsdatum}}“ ohne Datum), entfallen ganz."""
+        ausgabe, alle_leer, gesehen = [], True, False
+        for zeile in (text or "").split("\n"):
+            inhalt, leer = self(zeile, leer_zeichen="")
+            if PLATZHALTER.search(zeile):
+                gesehen = True
+                rest = PLATZHALTER.sub("", zeile).strip(" *·,:;-–/")
+                if leer and not rest:
+                    continue
+                alle_leer = alle_leer and leer
+            ausgabe.append(inhalt)
+        return "<br>".join(ausgabe), gesehen and alle_leer
+
     def text(self, text: str) -> str:
         """Nur Text (Fußzeile): Platzhalter ohne HTML einsetzen."""
         return PLATZHALTER.sub(lambda m: str(self.wert(m.group(1).strip())[0] or ""), text or "")
@@ -189,17 +215,23 @@ def _feldtabelle(ersetze, eintraege, spalten) -> tuple[str, bool]:
     return f'<table class="felder">{"".join(zeilen)}</table>', alle_leer
 
 
-def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str]:
-    """→ (Inhalt als HTML, Fußzeilentext)."""
+def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | None, str | None]:
+    """→ (Inhalt als HTML, Fußzeilentext links, Fußzeile rechts)."""
     ersetze = Ersetzer(art, kontext)
-    teile, fuss = [], None
+    teile, fuss, rechts = [], None, None
     for b in bloecke:
         typ = b.get("typ")
         o = b.get("optionen") or {}
         ausblenden = o.get("ausblenden_wenn_leer", False)
         kopf = f"<h2>{html.escape(b['bezeichnung'])}</h2>" if o.get("ueberschrift") and b.get("bezeichnung") else ""
         if typ == "briefkopf":
-            teile.append(f'<div class="{_klassen(b)}">{briefkopf_html()}</div>')
+            teile.append(f'<div class="{_klassen(b)}">{briefkopf_html(b.get("absender", True), b.get("linienfarbe"), b.get("falzmarken", False))}</div>')
+        elif typ == "zweispaltig":
+            links, _ = ersetze.zeilen(b.get("links", ""))
+            rechts, _ = ersetze.zeilen(b.get("rechts", ""))
+            klein = " klein" if b.get("rechts_klein") else ""
+            teile.append(f'<div class="{_klassen(b)} spalten"><div class="links">{links}</div>'
+                         f'<div class="rechts{klein}">{rechts}</div></div>')
         elif typ == "titel":
             titel, _ = ersetze(b.get("text", ""), html_erlaubt=False)
             zusatz = ""
@@ -208,7 +240,7 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str]:
                 zusatz = (f'<div class="zusatz"><span>{html.escape(b.get("zusatz_label") or "")}</span> {wert}</div>')
             teile.append(f'<div class="{_klassen(b)} titel"><h1>{titel}</h1>{zusatz}</div>')
         elif typ == "text":
-            inhalt, leer = ersetze(b.get("text", ""), leer_zeichen="")
+            inhalt, leer = ersetze.zeilen(b.get("text", ""))
             if leer and ausblenden:
                 continue
             teile.append(f'<div class="{_klassen(b)}">{kopf}{inhalt}</div>')
@@ -242,13 +274,18 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str]:
             teile.append('<div class="umbruch"></div>')
         elif typ == "fusszeile":
             fuss = ersetze.text(b.get("text", ""))
-    return "".join(teile), fuss
+            rechts = ersetze.text(b.get("rechts", ""))
+    return "".join(teile), fuss, rechts
 
 
-def seite(titel: str, inhalt: str, fusszeile: str | None = None, wasserzeichen: str | None = None) -> str:
+def seite(titel: str, inhalt: str, fusszeile: str | None = None, wasserzeichen: str | None = None,
+          rechts: str | None = "{Seite}/{Seiten}") -> str:
     zeichen = f'<div class="wasserzeichen">{html.escape(wasserzeichen)}</div>' if wasserzeichen else ""
+    zeilen = (fusszeile or "").count("\n") + 1 if fusszeile else 1
+    css = CSS % {"fusszeile": fusszeile_css(fusszeile), "rechts": fusszeile_css(rechts),
+                 "unten": f"{max(18, 10 + 3.6 * zeilen):.0f}"}
     return (f'<!doctype html><html lang="de"><head><meta charset="utf-8"><title>{html.escape(titel)}</title>'
-            f'<meta name="author" content="EPM"><style>{CSS % {"fusszeile": fusszeile_css(fusszeile)}}</style></head>'
+            f'<meta name="author" content="EPM"><style>{css}</style></head>'
             f"<body>{zeichen}{inhalt}</body></html>")
 
 
@@ -274,8 +311,8 @@ def erzeuge_aus_vorlage(art: str, kontext: Kontext, vorlage=None, bloecke=None, 
     if bloecke is None:
         vorlage = vorlage or Dokumentvorlage.aktive(art)
         bloecke = vorlage.bloecke
-    inhalt, fuss = bloecke_html(art, bloecke, kontext)
-    pdf = html_zu_pdf(seite(titel or Dokumentvorlage.Art(art).label, inhalt, fuss, wasserzeichen))
+    inhalt, fuss, rechts = bloecke_html(art, bloecke, kontext)
+    pdf = html_zu_pdf(seite(titel or Dokumentvorlage.Art(art).label, inhalt, fuss, wasserzeichen, rechts))
     return pdf, (vorlage.version if vorlage is not None else None)
 
 

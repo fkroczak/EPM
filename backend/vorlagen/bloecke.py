@@ -10,11 +10,13 @@ from .felder import FELDER, TABELLEN
 
 PLATZHALTER = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
 ID_MUSTER = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
+FARBE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 TYPEN = {
     "briefkopf": "Briefkopf",
     "titel": "Titel",
     "text": "Text",
+    "zweispaltig": "Zwei Spalten",
     "datenfelder": "Datenfelder",
     "tabelle": "Tabelle",
     "trennlinie": "Trennlinie",
@@ -106,7 +108,23 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
         erlaubt = {"id", "typ", "bezeichnung", "optionen"}
         if typ in zaehler:
             zaehler[typ] += 1
-        if typ == "titel":
+        if typ == "briefkopf":
+            erlaubt |= {"absender", "linienfarbe", "falzmarken"}
+            for k in ("absender", "falzmarken"):
+                if k in b and not isinstance(b[k], bool):
+                    fehler.append(f"{name}: „{k}“ ja oder nein.")
+            if "linienfarbe" in b and not (isinstance(b["linienfarbe"], str) and FARBE.match(b["linienfarbe"])):
+                fehler.append(f"{name}: Linienfarbe als #RRGGBB angeben.")
+        elif typ == "zweispaltig":
+            erlaubt |= {"links", "rechts", "rechts_klein"}
+            for k in ("links", "rechts"):
+                _text(b.get(k), f"{name} ({k})", fehler)
+                _felder_pruefen(art, b.get(k), name, fehler)
+            if not (b.get("links") or b.get("rechts")):
+                fehler.append(f"{name}: mindestens eine Spalte ausfüllen.")
+            if "rechts_klein" in b and not isinstance(b["rechts_klein"], bool):
+                fehler.append(f"{name}: „rechts_klein“ ja oder nein.")
+        elif typ == "titel":
             erlaubt |= {"text", "zusatz_label", "zusatz"}
             _text(b.get("text"), f"{name} (Text)", fehler, pflicht=True, laenge=200)
             _text(b.get("zusatz_label"), f"{name} (Zusatz)", fehler, laenge=80)
@@ -114,9 +132,14 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
             for feld in ("text", "zusatz"):
                 _felder_pruefen(art, b.get(feld), name, fehler)
         elif typ in ("text", "fusszeile"):
-            erlaubt |= {"text"}
-            _text(b.get("text"), f"{name} (Text)", fehler, pflicht=True)
+            erlaubt |= {"text"} | ({"rechts"} if typ == "fusszeile" else set())
+            _text(b.get("text"), f"{name} (Text)", fehler, pflicht=typ == "text")
             _felder_pruefen(art, b.get("text"), name, fehler)
+            if typ == "fusszeile":
+                _text(b.get("rechts"), f"{name} (rechts)", fehler, laenge=100)
+                _felder_pruefen(art, b.get("rechts"), name, fehler)
+                if (b.get("text") or "").count("\n") > 7:
+                    fehler.append(f"{name}: höchstens 8 Zeilen.")
         elif typ == "datenfelder":
             erlaubt |= {"spalten", "felder"}
             if b.get("spalten", 2) not in (1, 2, 3, 4, 5, 6):
@@ -145,44 +168,65 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
     return fehler
 
 
-FUSSZEILE = "{{Absender.Name}} · {{Absender.Fußzeile}} · Seite {Seite}/{Seiten}"
+# Kopf und Fuß wie fpdf_layout.php des Altsystems: Logo mit orangefarbener Linie, Falzmarken; unten Stiftung,
+# Anschrift, Kontakt, Vorstand, Spendenkonto, rechts die Seitenzahl
+KOPF = {"absender": False, "linienfarbe": "#EE8D4D", "falzmarken": True}
+FUSS = {
+    "text": "{{Absender.Name}}\n{{Absender.Straße}} · {{Absender.PLZ_Ort}} · {{Absender.Internet}}\n"
+            "Telefon {{Absender.Telefon}} · Fax {{Absender.Fax}} · {{Absender.E-Mail}}\n"
+            "Vorstand: Prof. Dr. Markus Masin; Prof. Dr. Till Zech, LL.M.\n"
+            "Spendenkonto: DKM Darlehnskasse Münster eG · DE71 4006 0265 0017 8247 00 · BIC GENODEM1DKM",
+    "rechts": "{Seite}/{Seiten}",
+}
 
-# Startvorlagen: Aufbau wie im Entwurf „EPM Oberfläche“ (Dokumentvorlagen). Ergänzt um Werte, die nach dem Entwurf
-# festgelegt wurden (Protonenpumpenhemmer, Tage pro Woche, Bemerkung, weitere Bestandteile).
+# Startvorlagen. Patientendatenblatt: Aufbau wie im Entwurf „EPM Oberfläche“ (Dokumentvorlagen).
 STARTVORLAGEN = {
+    # Aufbau wie die bisherige PDF des Altsystems (EPM_infuPDF.php mit fpdf_layout.php), moderner gesetzt
+    # (Festlegung 01.10.2026); Freigabevermerk statt eingescannter Unterschrift
     "infusionsplan": [
-        {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf"},
-        {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Infusionsplan",
+        {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF},
+        {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Empfehlung eines Infusionsplans",
          "zusatz_label": "gültig ab", "zusatz": "{{Plan.gültig_ab}}"},
-        {"id": "patient", "typ": "datenfelder", "bezeichnung": "Patientendaten", "spalten": 1, "felder": [
-            {"label": "Patient", "wert": "{{Patient.Name}}"}, {"label": "Geboren", "wert": "{{Patient.Geburtsdatum}}"},
-            {"label": "Gewicht", "wert": "{{Patient.Gewicht}}"}, {"label": "Versorger", "wert": "{{Versorger.Firma}}"}]},
-        {"id": "zusammensetzung", "typ": "tabelle", "bezeichnung": "Zusammensetzung", "quelle": "zusammensetzung"},
-        {"id": "elektrolyte", "typ": "datenfelder", "bezeichnung": "Elektrolyte", "spalten": 5, "felder": [
-            {"label": "Na", "wert": "{{Na}}"}, {"label": "K", "wert": "{{K}}"}, {"label": "Phosphat", "wert": "{{PO4}}"},
-            {"label": "Ca", "wert": "{{Ca}}"}, {"label": "Mg", "wert": "{{Mg}}"}]},
-        {"id": "zusaetze", "typ": "datenfelder", "bezeichnung": "Zusätze und Laufzeit", "spalten": 1, "felder": [
+        {"id": "anschrift", "typ": "zweispaltig", "bezeichnung": "Patient und Zeichen", "rechts_klein": True,
+         "links": "{{Patient.Anrede}}\n{{Patient.Name}}\n{{Patient.Straße}}\n{{Patient.PLZ_Ort}}\n* {{Patient.Geburtsdatum}}",
+         "rechts": "Prof. Dr. Markus Masin\nDeutsche Stiftung Krankheitsbedingte Mangelernährung · Vorstand\n"
+                   "Medical Institut for Nutrition Science & Technology · Director\n\n"
+                   "Patienten-Nr.: {{Patient.Nummer}}\nInfusionsplan-Nr.: {{Plan.Nummer}}\n"
+                   "erstellt von: {{Plan.erstellt_von}}\nerstellt am: {{Plan.erstellt_am}}"},
+        {"id": "koerper", "typ": "datenfelder", "bezeichnung": "Größe und Gewicht", "spalten": 2, "felder": [
+            {"label": "Größe", "wert": "{{Patient.Größe}}"}, {"label": "Gewicht", "wert": "{{Patient.Gewicht}}"}]},
+        {"id": "zusammensetzung", "typ": "tabelle", "bezeichnung": "Zusammensetzung der Infusionslösung",
+         "quelle": "zusammensetzung", "optionen": {"ueberschrift": True}},
+        {"id": "mineralstoffe", "typ": "datenfelder", "bezeichnung": "Mineralstoffe", "spalten": 2,
+         "optionen": {"ueberschrift": True}, "felder": [
+            {"label": "Natrium", "wert": "{{Na}}"}, {"label": "Phosphat", "wert": "{{PO4}}"},
+            {"label": "Kalium", "wert": "{{K}}"}, {"label": "Calcium", "wert": "{{Ca}}"},
+            {"label": "Magnesium", "wert": "{{Mg}}"}]},
+        {"id": "inhaltsstoffe", "typ": "datenfelder", "bezeichnung": "Weitere Inhaltsstoffe", "spalten": 1,
+         "optionen": {"ueberschrift": True}, "felder": [
             {"label": "Spurenelemente", "wert": "{{Spurenelemente}}"}, {"label": "Vitamine", "wert": "{{Vitamine}}"},
-            {"label": "Katheterblock", "wert": "{{Katheterblock}}"},
-            {"label": "Protonenpumpenhemmer", "wert": "{{Plan.Protonenpumpenhemmer}}"},
-            {"label": "Gesamt", "wert": "{{Plan.ml}} · {{Plan.kcal}}"},
-            {"label": "Laufzeit", "wert": "{{Plan.Stunden}} · {{Plan.Rate}}"},
-            {"label": "Tage pro Woche", "wert": "{{Plan.Tage_pro_Woche}}"}]},
+            {"label": "Medikament zur Blockung", "wert": "{{Katheterblock}}"},
+            {"label": "Protonenpumpenhemmer", "wert": "{{Plan.Protonenpumpenhemmer_Anordnung}}"}]},
         {"id": "positionen", "typ": "tabelle", "bezeichnung": "Weitere Bestandteile", "quelle": "positionen",
-         "optionen": {"ausblenden_wenn_leer": True}},
-        {"id": "bemerkung", "typ": "text", "bezeichnung": "Bemerkung", "text": "{{Plan.Bemerkung}}",
-         "optionen": {"ausblenden_wenn_leer": True}},
-        {"id": "hinweis", "typ": "text", "bezeichnung": "Hinweis an Versorger",
-         "text": "Bei Rückfragen erreichen Sie uns werktags von 8 bis 16 Uhr unter {{Absender.Telefon}}. "
-                 "Änderungen der Zusammensetzung nur nach Rücksprache.", "optionen": {"schrift": "klein"}},
-        {"id": "freigabe", "typ": "unterschrift", "bezeichnung": "Freigabe und Unterschrift", "felder": [
-            {"label": "Freigegeben am", "wert": "{{Plan.freigegeben_am}}"},
-            {"label": "von", "wert": "{{Plan.freigegeben_von}}"}], "linie": "Unterschrift",
+         "optionen": {"ueberschrift": True, "ausblenden_wenn_leer": True}},
+        {"id": "laufzeit", "typ": "datenfelder", "bezeichnung": "Laufzeit und Volumen", "spalten": 2,
+         "optionen": {"ueberschrift": True, "nicht_teilen": True}, "felder": [
+            {"label": "Laufzeit", "wert": "{{Plan.Stunden}}"}, {"label": "Laufmenge je Stunde", "wert": "{{Plan.Rate}}"},
+            {"label": "Kalorien im Mischbeutel", "wert": "{{Plan.kcal}}"},
+            {"label": "Volumen im Mischbeutel", "wert": "{{Plan.Mischbeutel}}"},
+            {"label": "Zusatzlösung", "wert": "{{Basis.Präparat}}"}, {"label": "Zusatzvolumen", "wert": "{{Plan.Zusatzvolumen}}"},
+            {"label": "Gesamtkalorien", "wert": "{{Plan.kcal}}"}, {"label": "Gesamtvolumen", "wert": "{{Plan.ml}}"}]},
+        {"id": "bemerkung", "typ": "text", "bezeichnung": "Weitere Anordnungen/Bemerkungen", "text": "{{Plan.Bemerkung}}",
+         "optionen": {"ueberschrift": True, "ausblenden_wenn_leer": True}},
+        {"id": "diagnose", "typ": "text", "bezeichnung": "Diagnose", "text": "{{Patient.Diagnose}}",
+         "optionen": {"ueberschrift": True, "ausblenden_wenn_leer": True}},
+        {"id": "freigabe", "typ": "text", "bezeichnung": "Freigabevermerk",
+         "text": "Maschinell erstellt, geprüft und freigegeben von {{Plan.freigegeben_von}} am {{Plan.freigegeben_datum}}.",
          "optionen": {"nicht_teilen": True}},
-        {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", "text": FUSSZEILE},
+        {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
     ],
     "patientendatenblatt": [
-        {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf"},
+        {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF},
         {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Patientendatenblatt",
          "zusatz_label": "Stand", "zusatz": "{{Heute}}"},
         {"id": "person", "typ": "datenfelder", "bezeichnung": "Person", "spalten": 1, "felder": [
@@ -203,6 +247,6 @@ STARTVORLAGEN = {
             {"label": "Aktuelle Therapie", "wert": "{{Patient.Therapie}}"},
             {"label": "Plan", "wert": "{{Plan.kcal}} · {{Plan.ml}} · {{Plan.Stunden}}"}]},
         {"id": "termine", "typ": "tabelle", "bezeichnung": "Nächste Termine", "quelle": "termine"},
-        {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", "text": FUSSZEILE},
+        {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
     ],
 }

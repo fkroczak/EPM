@@ -14,13 +14,17 @@ test("Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau, Ver
   const editor = page.getByTestId("dokumentvorlagen");
   await expect(editor.getByTestId("vorlage-stand")).toHaveText(`Version ${vorher.aktiv.version} ist aktiv`);
   const aufbau = editor.getByTestId("aufbau");
-  await expect(aufbau).toContainText("Zusammensetzung");
+  // Startvorlage: Aufbau wie die PDF des Altsystems
+  await expect(aufbau).toContainText("Zusammensetzung der Infusionslösung");
+  await expect(aufbau).toContainText("Laufzeit und Volumen");
+  await expect(editor.getByTestId("vorlage-seite")).toContainText("Empfehlung eines Infusionsplans");
   await expect(editor.getByTestId("vorlage-seite")).toContainText("Plan.gültig_ab");
 
-  // Block „Hinweis an Versorger“ ändern, Datenfeld an der Schreibmarke einsetzen
-  await aufbau.getByRole("button", { name: /Hinweis an Versorger/ }).click();
+  // Block „Freigabevermerk“ ändern, Datenfeld an der Schreibmarke einsetzen
+  await aufbau.getByRole("button", { name: /Freigabevermerk/ }).click();
   const eigenschaften = editor.getByTestId("block-eigenschaften");
   const text = eigenschaften.getByLabel("Text");
+  await expect(text).toHaveValue("Maschinell erstellt, geprüft und freigegeben von {{Plan.freigegeben_von}} am {{Plan.freigegeben_datum}}.");
   await text.fill("Rückfragen an die Stiftung, Stand ");
   await text.press("End");
   await editor.getByTestId("datenfelder").getByRole("button", { name: "Heute", exact: true }).click();
@@ -42,9 +46,9 @@ test("Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau, Ver
   await expect(editor.getByTestId("vorlage-stand")).toContainText("Entwurf · gespeichert");
   const entwurf = await api.get("vorlagen/infusionsplan/entwurf/");
   expect(entwurf.ist_entwurf).toBe(true);
-  const hinweis = entwurf.bloecke.find((b: { id: string }) => b.id === "hinweis");
+  const hinweis = entwurf.bloecke.find((b: { id: string }) => b.id === "freigabe");
   expect([hinweis.text, hinweis.optionen.fett]).toEqual(["Rückfragen an die Stiftung, Stand {{Heute}}", true]);
-  const ihr = entwurf.bloecke.findIndex((b: { id: string }) => b.id === "hinweis");
+  const ihr = entwurf.bloecke.findIndex((b: { id: string }) => b.id === "freigabe");
   expect(entwurf.bloecke[ihr + 1].typ).toBe("trennlinie");
 
   // Vorschau mit Testpatient (PDF mit pdf.js gezeichnet)

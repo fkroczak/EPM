@@ -185,10 +185,10 @@ test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", asyn
   await expect(grenzen.getByText("Untere Grenze muss kleiner als obere Grenze sein.")).toBeVisible();
   await grenzen.getByLabel("Gewicht minimal").fill("20");
   await grenzen.getByLabel("Kontakt überfällig nach").fill("13");
-  // Grenze für das berechnete Gesamtvolumen (Gewicht × 35 ml)
-  await expect(grenzen.getByLabel("Gesamtvolumen minimal")).toHaveValue("0");
-  await expect(grenzen.getByLabel("Gesamtvolumen maximal")).toHaveValue("9000");
-  await grenzen.getByLabel("Gesamtvolumen maximal").fill("8000");
+  // Grenze für das berechnete Volumen im Mischbeutel (Gewicht × 35 ml)
+  await expect(grenzen.getByLabel("Volumen im Mischbeutel minimal")).toHaveValue("0");
+  await expect(grenzen.getByLabel("Volumen im Mischbeutel maximal")).toHaveValue("9000");
+  await grenzen.getByLabel("Volumen im Mischbeutel maximal").fill("8000");
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Grenzwerte gespeichert.")).toBeVisible();
   const einstellungen = await admin.get("einstellungen/");

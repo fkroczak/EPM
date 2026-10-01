@@ -79,6 +79,22 @@ def _trend(k):
     return f"{vz}{_zahl(t['prozent'], '%')} seit {datum(t['von'])}".replace("-", "−")
 
 
+PPI_ANORDNUNG = {
+    1: "Pantozol® Kurzinfusion 1 Amp. 40 mg in 50 ml Trägerlösung",
+    2: "Nexium® Kurzinfusion 1 Amp. 40 mg in 50 ml Trägerlösung",
+    3: "Pantozol® Kurzinfusion 1 Amp. 20 mg in 50 ml Trägerlösung",
+}
+
+
+def _ppi_anordnung(p):
+    """Wie auf der alten PDF: Präparat und Schema morgens-mittags-abends, z. B. 1-0-1."""
+    text = PPI_ANORDNUNG.get(p.pantozol_stufe)
+    if not text:
+        return None
+    m = p.pantozol_tage or 0
+    return f"{text} · {'-'.join('1' if m & bit else '0' for bit in (4, 2, 1))}"
+
+
 def _absender(k):
     from stammdaten.models import Absenderangaben, Einstellungen
 
@@ -118,7 +134,19 @@ GEMEINSAM = {
                                     lambda k: (k.patient.ansprechpartner.telefon or None)
                                     if k.patient.ansprechpartner_id else None),
     "Heute": Feld("Datum der Erstellung", lambda k: datum(k.heute)),
+    "Patient.Anrede": Feld("Frau / Herr (aus dem Geschlecht)",
+                           lambda k: {"w": "Frau", "m": "Herr"}.get(k.patient.geschlecht)),
+    "Patient.Straße": Feld("Straße", lambda k: k.patient.strasse or None),
+    "Patient.PLZ_Ort": Feld("PLZ und Ort", lambda k: f"{k.patient.plz} {k.patient.ort}".strip() or None),
+    "Patient.Anschrift": Feld("Anschrift in einer Zeile", lambda k: _anschrift(k.patient)),
+    "Patient.Größe": Feld("Größe", lambda k: _zahl(k.patient.groesse_cm, "cm")),
+    "Patient.Diagnose": Feld("Diagnose (formatiert)", lambda k: k.patient.diagnose or None, html=True),
     "Absender.Name": Feld("Name des Absenders (Vorlagen › Briefkopf)", lambda k: _absender(k).name or None),
+    "Absender.Straße": Feld("Straße des Absenders", lambda k: _absender(k).strasse or None),
+    "Absender.PLZ_Ort": Feld("PLZ und Ort des Absenders",
+                             lambda k: f"{_absender(k).plz} {_absender(k).ort}".strip() or None),
+    "Absender.Fax": Feld("Fax des Absenders", lambda k: _absender(k).fax or None),
+    "Absender.Internet": Feld("Internetadresse des Absenders", lambda k: _absender(k).internet or None),
     "Absender.Telefon": Feld("Telefon des Absenders", lambda k: _absender(k).telefon or None),
     "Absender.E-Mail": Feld("E-Mail des Absenders", lambda k: _absender(k).email or None),
     "Absender.Fußzeile": Feld("Fußzeile des Absenders", lambda k: _absender(k).fusszeile or None),
@@ -132,11 +160,21 @@ INFUSIONSPLAN = {
                             else (_zahl(_letztes_gewicht(k).gewicht_kg, "kg") if _letztes_gewicht(k) else None)),
     "Plan.gültig_ab": Feld("gültig ab", _plan(lambda p: datum(p.gueltig_ab))),
     "Plan.kcal": Feld("Energie (kcal)", lambda k: _anzeige(k, "kcal")),
-    "Plan.ml": Feld("Gesamtvolumen (Gewicht × 35 ml)", _plan(lambda p: _zahl(p.gesamtvolumen_ml, "ml"))),
+    "Plan.ml": Feld("Gesamtvolumen (Mischbeutel + Zusatzvolumen)", _plan(lambda p: _zahl(p.volumen_summe_ml, "ml"))),
+    "Plan.Mischbeutel": Feld("Volumen im Mischbeutel (Gewicht × 35 ml)", _plan(lambda p: _zahl(p.gesamtvolumen_ml, "ml"))),
+    "Plan.Zusatzvolumen": Feld("Zusatzvolumen (Basislösung)", _plan(lambda p: _zahl(p.basis_ml, "ml"))),
+    "Plan.Nummer": Feld("Nummer des Infusionsplans", _plan(lambda p: str(p.pk) if p.pk else None)),
+    "Plan.erstellt_von": Feld("Erstellt von", _plan(lambda p: _person(p.erstellt_von))),
+    "Plan.erstellt_am": Feld("Erstellt am (Datum)",
+                             _plan(lambda p: datum(timezone.localtime(p.erstellt_am).date()) if p.erstellt_am else None)),
+    "Plan.freigegeben_datum": Feld("Freigabe (nur Datum)",
+                                   _plan(lambda p: datum(timezone.localtime(p.freigegeben_am).date()) if p.freigegeben_am else None)),
     "Plan.Stunden": Feld("Laufzeit (h)", _plan(lambda p: _zahl(p.laufzeit_h, "h"))),
     "Plan.Rate": Feld("Rate (ml/h)", _plan(lambda p: _zahl(p.rate_ml_h, "ml/h"))),
     "Plan.Tage_pro_Woche": Feld("Tage pro Woche", _plan(lambda p: _zahl(p.tage_pro_woche, "× pro Woche"))),
     "Plan.Protonenpumpenhemmer": Feld("Protonenpumpenhemmer mit Zeiten", lambda k: _anzeige(k, "pantozol")),
+    "Plan.Protonenpumpenhemmer_Anordnung": Feld("Protonenpumpenhemmer wie auf der alten PDF (… in 50 ml Trägerlösung · 1-0-1)",
+                                                _plan(lambda p: _ppi_anordnung(p))),
     "Plan.CaMg": Feld("Calcium + Magnesium und Stabilität",
                       _plan(lambda p: None if p.ca_mg_stabil is None else
                             f"{_zahl(p.ca_mg_mmol, 'mmol')} (Grenze {_zahl(p.ca_mg_grenze_mmol, 'mmol')}): "
@@ -166,7 +204,6 @@ INFUSIONSPLAN = {
 
 PATIENTENDATENBLATT = {
     **GEMEINSAM,
-    "Patient.Anschrift": Feld("Anschrift", lambda k: _anschrift(k.patient)),
     "Patient.Telefon": Feld("Telefon", lambda k: k.patient.telefon or None),
     "Patient.E-Mail": Feld("E-Mail", lambda k: k.patient.email or None),
     "Patient.Hausarzt": Feld("Hausarzt", _hausarzt),
@@ -174,8 +211,6 @@ PATIENTENDATENBLATT = {
                              lambda k: "kein Katheter" if k.patient.kein_katheter
                              else (str(k.patient.katheter) if k.patient.katheter_id else None)),
     "Patient.Nickelallergie": Feld("Nickelallergie", lambda k: k.patient.get_nickelallergie_display()),
-    "Patient.Größe": Feld("Größe", lambda k: _zahl(k.patient.groesse_cm, "cm")),
-    "Patient.Diagnose": Feld("Diagnose (formatiert)", lambda k: k.patient.diagnose or None, html=True),
     "Patient.Therapie": Feld("Therapie (formatiert)", lambda k: k.patient.therapie or None, html=True),
     "Patient.Empfehlung": Feld("Empfehlung (formatiert)", lambda k: k.patient.empfehlung or None, html=True),
     "Gewicht.aktuell": Feld("letztes Gewicht mit Datum",

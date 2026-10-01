@@ -167,10 +167,14 @@ class Infusionsplaene(Grundlage):
         r = c.patch(url, {**self.plan_daten(), "pantozol_stufe": 1, "pantozol_tage": 5}, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         p = r.json()
-        self.assertEqual([p["gesamtvolumen_ml"], p["volumen_gewicht_kg"], p["laufzeit_h"], p["rate_ml_h"]], [2100, 60, 12, 175])
+        # Mischbeutel 60 kg × 35 = 2.100 ml, Zusatzvolumen (Basislösung) 500 ml, Rate aus der Summe: 2.600 ÷ 12 = 216,7
+        self.assertEqual([p["gesamtvolumen_ml"], p["volumen_gewicht_kg"], p["volumen_summe_ml"], p["laufzeit_h"], p["rate_ml_h"]],
+                         [2100, 60, 2600, 12, 216.7])
         zeilen = {z["schluessel"]: z for z in c.get(url + "vergleich/").json()["zeilen"]}
-        self.assertEqual(zeilen["gesamtvolumen"]["jetzt"], "2.100 ml (35 ml/kg × 60 kg)")
-        self.assertEqual(zeilen["rate"]["jetzt"], "175 ml/h")
+        self.assertEqual(zeilen["mischbeutel"]["jetzt"], "2.100 ml (35 ml/kg × 60 kg)")
+        self.assertEqual(zeilen["mischbeutel"]["wert"], "Volumen im Mischbeutel")
+        self.assertEqual(zeilen["gesamtvolumen"]["jetzt"], "2.600 ml")
+        self.assertEqual(zeilen["rate"]["jetzt"], "216,7 ml/h")
         self.assertEqual(zeilen["pantozol"]["jetzt"], "Pantozol® 40 mg · morgens, abends")
         self.assertEqual(zeilen["pantozol"]["wert"], "Protonenpumpenhemmer")
         # Freigabe friert das Volumen ein; ein neuer Entwurf rechnet mit dem neuen Gewicht

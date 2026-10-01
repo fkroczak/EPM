@@ -115,6 +115,7 @@ const LISTEN: Liste[] = [
   { schluessel: "albumin", titel: "Albumin", art: "praeparat" }, { schluessel: "spurenelemente", titel: "Spurenelemente", art: "praeparat" },
   { schluessel: "vitamine", titel: "Vitamine", art: "praeparat" }, { schluessel: "katheterschutz", titel: "Katheterblock", art: "praeparat" },
   { schluessel: "elektrolyte", titel: "Elektrolytzusätze", art: "praeparat" }, { schluessel: "medikament", titel: "Medikamente", art: "praeparat" },
+  { schluessel: "sonstiges", titel: "Sonstige Bestandteile", art: "praeparat" },
   { schluessel: "katheter", titel: "Katheter", art: "auswahl" }, { schluessel: "terminort", titel: "Terminorte", art: "auswahl" },
   { schluessel: "dokumenttyp", titel: "Dokumenttypen", art: "auswahl" },
   { schluessel: "beziehung", titel: "Beziehungen (Bezugspersonen)", art: "auswahl" },
@@ -258,7 +259,7 @@ const HINWEISE: { k: string; label: string; einheit: string }[] = [
 ];
 const GRENZEN: { text: string; min: string; max: string; einheit: string }[] = [
   { text: "Energie", min: "kcal_min_tag", max: "kcal_max_tag", einheit: "kcal" },
-  { text: "Gesamtvolumen", min: "volumen_min_ml", max: "volumen_max_ml", einheit: "ml" },
+  { text: "Volumen im Mischbeutel", min: "volumen_min_ml", max: "volumen_max_ml", einheit: "ml" },
   { text: "Glucose", min: "glucose_min_g", max: "glucose_max_g", einheit: "g" },
   { text: "Aminosäuren", min: "aminosaeuren_min_g", max: "aminosaeuren_max_g", einheit: "g" },
   { text: "Lipide", min: "lipide_min_g", max: "lipide_max_g", einheit: "g" },
@@ -335,7 +336,7 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
             ))}
           </tbody>
         </table>
-        <span className="text-xs gedaempft">Das Gesamtvolumen wird wie im Altsystem berechnet (Körpergewicht × 35 ml) und gegen diese Grenzen geprüft.</span>
+        <span className="text-xs gedaempft">Das Volumen im Mischbeutel wird wie im Altsystem berechnet (Körpergewicht × 35 ml) und gegen diese Grenzen geprüft.</span>
         <div className="text-[0.8125rem] gedaempft">Werte außerhalb werden nicht gespeichert. Im Altsystem standen z. B. 433.564 kcal und 9.999 kg.</div>
         {speichern.error && !Object.keys(f).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
       </Karte>
