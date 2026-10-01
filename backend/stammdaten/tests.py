@@ -27,9 +27,12 @@ class Praeparate(Grundlage):
         einzeln = c.get(f"/api/praeparate/{glamin.id}/").json()
         self.assertEqual(einzeln["in_plaenen"], 2)
 
-    def test_vorlagen_pflegen_admin_und_mediziner_kein_loeschen(self):
+    def test_vorlagen_pflegen_mit_recht_kein_loeschen(self):
         neu = {"kategorie": "lipide", "name": "Omegaven", "konzentration": "10 %", "einheit": "ml", "reihenfolge": 5}
-        self.assertEqual(client_fuer(self.mitarbeiter).post("/api/praeparate/", neu, format="json").status_code, 403)
+        self.assertEqual(client_fuer(self.betrachter).post("/api/praeparate/", neu, format="json").status_code, 403)
+        # Vorlagen pflegen auch Mitarbeiter (Festlegung 01.10.2026)
+        r = client_fuer(self.mitarbeiter).post("/api/praeparate/", {**neu, "konzentration": "15 %"}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
         r = client_fuer(self.mediziner).post("/api/praeparate/", {**neu, "konzentration": "20 %"}, format="json")
         self.assertEqual(r.status_code, 201, r.content)  # Mediziner wie Admin (Festlegung 01.10.2026)
         a = client_fuer(self.admin)
@@ -134,7 +137,7 @@ class BriefkopfUndLogo(Grundlage):
         self.assertFalse(r["logo"]["vorhanden"])
         aenderung = {"aktiv": "gug", "absender": {"stiftung": {"telefon": "0251 98 11 401"},
                                                   "gug": {"name": "DSKM gUG", "ort": "Altenberge"}}}
-        self.assertEqual(client_fuer(self.mitarbeiter).patch("/api/briefkopf/", aenderung, format="json").status_code,
+        self.assertEqual(client_fuer(self.betrachter).patch("/api/briefkopf/", aenderung, format="json").status_code,
                          403)
         r = client_fuer(self.mediziner).patch("/api/briefkopf/", aenderung, format="json")
         self.assertEqual(r.status_code, 200, r.content)
@@ -172,7 +175,7 @@ class BriefkopfUndLogo(Grundlage):
                 r = hochladen(name, inhalt)
                 self.assertEqual(r.status_code, 400, r.content)
                 self.assertIn(meldung, r.json()["datei"])
-        self.assertEqual(hochladen("logo.png", png_kopf(800, 280), client_fuer(self.mitarbeiter)).status_code, 403)
+        self.assertEqual(hochladen("logo.png", png_kopf(800, 280), client_fuer(self.betrachter)).status_code, 403)
         r = hochladen("logo.png", png_kopf(800, 280))
         self.assertEqual(r.status_code, 201, r.content)
         self.assertEqual((r.json()["logo"]["breite"], r.json()["logo"]["mime"]), (800, "image/png"))
@@ -191,8 +194,8 @@ class Reihenfolge(Grundlage):
         m = client_fuer(self.mediziner)
         ids = [p["id"] for p in m.get("/api/praeparate/?kategorie=aminosaeuren").json()]
         neu = list(reversed(ids))
-        self.assertEqual(client_fuer(self.mitarbeiter).post("/api/praeparate/reihenfolge/", {"ids": neu},
-                                                            format="json").status_code, 403)
+        self.assertEqual(client_fuer(self.betrachter).post("/api/praeparate/reihenfolge/", {"ids": neu},
+                                                           format="json").status_code, 403)
         r = m.post("/api/praeparate/reihenfolge/", {"ids": neu}, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual([p["id"] for p in m.get("/api/praeparate/?kategorie=aminosaeuren").json()], neu)
