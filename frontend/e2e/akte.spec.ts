@@ -360,11 +360,14 @@ test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pfl
   await personen.getByRole("button", { name: /Frühere anzeigen/ }).click();
   await expect(personen.getByTestId("bezugsperson")).toHaveCount(2);
   await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Verlauf" }).click();
-  await page.getByRole("button", { name: "Bezugspersonen" }).click();
+  const bereich = page.getByRole("group", { name: "Bereich" });
   const verlauf = page.getByTestId("verlauf");
+  await bereich.getByRole("button", { name: "Ärzte", exact: true }).click();
+  await expect(bereich.getByRole("button", { name: "Ärzte", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(verlauf.getByRole("row").filter({ hasText: arztName })).toContainText("angelegt");
+  await expect(verlauf.getByRole("row").filter({ hasText: "Bezugsperson" })).toHaveCount(0);
+  await bereich.getByRole("button", { name: "Bezugspersonen", exact: true }).click();
   await expect(verlauf.getByRole("row").filter({ hasText: "nicht mehr aktuell" })).toContainText("Margit Akte");
-  await page.getByRole("button", { name: "Ärzte" }).click();
-  await expect(verlauf.getByRole("row").filter({ hasText: "angelegt" })).toContainText(arztName);
 
   // in der Datenbank
   const api = await apiAls("mitarbeiter");

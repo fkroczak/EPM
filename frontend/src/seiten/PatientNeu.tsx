@@ -256,7 +256,7 @@ export function PatientNeu() {
               </fieldset>
               <div className="col-span-2 relative">
                 {darf("versorger_pflegen") ? (
-                  <Link to="/aerzte?neu=1" className="absolute right-0 top-0 text-[0.8125rem]">Neu anlegen</Link>
+                  <Link to="/aerzte?neu=1" aria-label="Neuen Arzt anlegen" className="absolute right-0 top-0 text-[0.8125rem]">Neu anlegen</Link>
                 ) : null}
                 <Feld label="Hausarzt" fehler={e.aufnahme_hausarzt ?? e.hausarzt}
                   hinweis="aus der Ärzteliste; weitere Ärzte und Bezugspersonen danach in der Akte">

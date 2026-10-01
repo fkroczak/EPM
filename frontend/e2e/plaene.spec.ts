@@ -46,7 +46,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   // Erweiterung: weiterer Bestandteil aus den Auswahllisten
   const weitere = editor.getByTestId("weitere-bestandteile");
   await weitere.getByRole("button", { name: "Bestandteil hinzufügen" }).click();
-  await weitere.getByLabel("Bestandteil 1").selectOption({ label: "Dipeptamin 20 %" });
+  await weitere.getByLabel("Bestandteil 1", { exact: true }).selectOption({ label: "Dipeptamin 20 %" });
   await weitere.getByLabel("Menge 1").fill("100");
   await weitere.getByLabel("Einheit 1").fill("ml");
   await weitere.getByLabel("Häufigkeit 1").fill("täglich");
