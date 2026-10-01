@@ -27,7 +27,7 @@ CSS = """
                   font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif; font-size: 7pt; color: #00325a; } }
 html { font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif; font-size: 9.5pt; color: #1b1932; line-height: 1.4; }
 body { margin: 0; }
-.block { margin: 0 0 4.5mm 0; }
+.block { margin: 0 0 3.5mm 0; }
 .briefkopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 8mm; padding-bottom: 3mm;
              border-bottom: 0.5mm solid; }
 .briefkopf img { height: 19mm; max-width: 62mm; object-fit: contain; object-position: left bottom; }
@@ -42,7 +42,7 @@ body { margin: 0; }
 .titel .zusatz span { color: #5d5b72; }
 h2 { font-size: 8pt; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #5d5b72; margin: 0 0 1.5mm 0; }
 table { width: 100%%; border-collapse: collapse; }
-.felder td { vertical-align: top; padding: 0.9mm 2.5mm 0.9mm 0; border-bottom: 0.4pt solid #ececf2; }
+.felder td { vertical-align: top; padding: 0.7mm 2.5mm 0.7mm 0; border-bottom: 0.4pt solid #ececf2; }
 .felder td.label { color: #5d5b72; }
 /* mehrere Paare nebeneinander: Bezeichnung einzeilig („Volumen im Mischbeutel“ brach sonst mitten im Feld um) */
 .felder.mehrspaltig td.label { white-space: nowrap; padding-right: 3mm; }
@@ -51,7 +51,7 @@ table { width: 100%%; border-collapse: collapse; }
               padding: 1mm 2mm 1mm 0; }
 .tabelle td { border-bottom: 0.4pt solid #e6e5ee; padding: 1.2mm 2mm 1.2mm 0; vertical-align: top; }
 .leer { color: #5d5b72; font-style: italic; }
-hr { border: 0; border-top: 0.6pt solid #c9c8d4; margin: 0 0 4.5mm 0; }
+hr { border: 0; border-top: 0.6pt solid #c9c8d4; margin: 0 0 3.5mm 0; }
 .unterschrift .linie { margin-top: 12mm; width: 75mm; border-top: 0.6pt solid #1b1932; padding-top: 1mm;
                        font-size: 7.5pt; color: #5d5b72; }
 .s-klein { font-size: 8pt; } .s-gross { font-size: 11.5pt; }

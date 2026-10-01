@@ -250,7 +250,7 @@ function EditorFuerArt({ art, setArt }: { art: Art; setArt: (a: Art) => void }) 
   const a = aufbau.data;
   const gewaehlt = bloecke.find((b) => b.id === auswahl) ?? null;
   const index = gewaehlt ? bloecke.indexOf(gewaehlt) : -1;
-  const aendere = (neu: Partial<Block>) => setBloecke(bloecke.map((b) => (b.id === auswahl ? { ...b, ...neu } : b)));
+  const aendere = (neu: Partial<Block>) => setBloecke((alt) => (alt ?? []).map((b) => (b.id === auswahl ? { ...b, ...neu } : b)));
   const aendereOptionen = (neu: Partial<Optionen>) => aendere({ optionen: { ...gewaehlt?.optionen, ...neu } });
   const verschiebe = (i: number, nach: number) => {
     if (nach < 0 || nach >= bloecke.length) return;
@@ -393,14 +393,18 @@ function FeldText({ label, wert, onWert, fokus, mehrzeilig }: {
   label: string; wert: string; onWert: (w: string) => void; fokus: { current: { setze: (f: string) => void } | null }; mehrzeilig?: boolean;
 }) {
   const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+  const aktuellerWert = useRef(onWert);
+  aktuellerWert.current = onWert;
   const merken = () => {
     fokus.current = {
       setze: (feld) => {
+        // aktuellen Inhalt aus dem Feld lesen, nicht den Stand beim Fokussieren
         const el = ref.current;
-        const pos = el?.selectionStart ?? wert.length;
+        const aktuell = el?.value ?? wert;
+        const pos = el?.selectionStart ?? aktuell.length;
         const ende = el?.selectionEnd ?? pos;
         const einfuegen = `{{${feld}}}`;
-        onWert(wert.slice(0, pos) + einfuegen + wert.slice(ende));
+        aktuellerWert.current(aktuell.slice(0, pos) + einfuegen + aktuell.slice(ende));
         requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(pos + einfuegen.length, pos + einfuegen.length); });
       },
     };
@@ -498,14 +502,17 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
 
 function FeldWert({ wert, onWert, fokus, nummer }: { wert: string; onWert: (w: string) => void; fokus: { current: { setze: (f: string) => void } | null }; nummer: number }) {
   const ref = useRef<HTMLInputElement>(null);
+  const aktuellerWert = useRef(onWert);
+  aktuellerWert.current = onWert;
   return (
     <Eingabe ref={ref} aria-label={`Wert ${nummer}`} value={wert} className="font-mono text-[12.5px]" onChange={(e) => onWert(e.target.value)}
       onFocus={() => {
         fokus.current = {
           setze: (feld) => {
-            const pos = ref.current?.selectionStart ?? wert.length;
+            const aktuell = ref.current?.value ?? wert;
+            const pos = ref.current?.selectionStart ?? aktuell.length;
             const ende = ref.current?.selectionEnd ?? pos;
-            onWert(`${wert.slice(0, pos)}{{${feld}}}${wert.slice(ende)}`);
+            aktuellerWert.current(`${aktuell.slice(0, pos)}{{${feld}}}${aktuell.slice(ende)}`);
           },
         };
       }} />
