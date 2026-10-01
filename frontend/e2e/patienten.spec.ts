@@ -34,8 +34,13 @@ test("Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten", 
   await expect(liste.getByRole("link", { name: "Musterfrau, Erika" })).toHaveCount(0);
   await page.getByLabel("Versorger").selectOption({ label: "Alle Versorger" });
   await expect(page).not.toHaveURL(/versorger=/);
+  const gefiltert = page.waitForResponse((a) => /\/api\/patienten\/\?.*ansprechpartner=\d+/.test(a.url()));
   await page.getByLabel("Ansprechpartner").selectOption({ label: "Herr Muster (Testversorger Nord (fiktiv))" });
   await expect(page).toHaveURL(/ansprechpartner=\d+/);
+  // Antwort, die die Oberfläche erhält (trennt Backend- von Anzeigefehlern)
+  const antwort = await gefiltert;
+  expect(antwort.status()).toBe(200);
+  expect((await antwort.json()).results.map((p: { nachname: string }) => p.nachname), antwort.url()).toEqual(["Mustermann"]);
   // gleiche Abfrage direkt an die API: nur Patienten dieses Ansprechpartners
   const apId = new URL(page.url()).searchParams.get("ansprechpartner");
   const api = await apiAls("mitarbeiter");

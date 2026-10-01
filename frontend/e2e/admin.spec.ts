@@ -1,6 +1,6 @@
 /** Entwürfe 17, 18, 20 · Administration: Benutzer, Rechte je Gruppe, Vorlagen, Audit-Log; Zugriff nur mit Recht. */
 import { expect, test } from "@playwright/test";
-import { BASIS, apiAls, eindeutig, neuesKonto, zustand } from "./hilfen";
+import { BASIS, apiAls, eindeutig, neuesKonto, sitzungGilt, zustand } from "./hilfen";
 import { request } from "@playwright/test";
 
 test.use({ storageState: zustand("admin") });
@@ -32,6 +32,7 @@ test("Benutzer anlegen, Einmal-Kennwort, sperren und entsperren", async ({ page 
   expect(einmal.length).toBeGreaterThan(8);
   await expect(page.getByTestId("benutzerliste")).toContainText("Dr. med. H. Heilmann");
   await expect(detail).toContainText("Einrichtung offen");
+  await sitzungGilt(page, "Benutzer anlegen");
 
   // mit dem Einmal-Kennwort beginnt die erste Anmeldung
   const ctx = await request.newContext({ baseURL: BASIS, ignoreHTTPSErrors: true });
@@ -40,11 +41,16 @@ test("Benutzer anlegen, Einmal-Kennwort, sperren und entsperren", async ({ page 
   const r = await ctx.post("/api/auth/anmelden/", { data: { benutzername: name, kennwort: einmal }, headers: { "X-CSRFToken": csrf, Referer: `${BASIS}/` } });
   expect((await r.json()).schritt).toBe("kennwort_aendern");
   await ctx.dispose();
+  await sitzungGilt(page, "erste Anmeldung der neuen Person");
 
   // sperren und entsperren
   await detail.getByRole("button", { name: "Sperren" }).click();
+  const gesperrt = page.waitForResponse((a) => a.url().endsWith("/sperren/"));
   await page.getByRole("dialog").getByRole("button", { name: "Benutzer sperren" }).click();
+  const antwort = await gesperrt;
+  expect(antwort.status(), await antwort.text()).toBe(200);
   await expect(page.getByText("Benutzer gesperrt.")).toBeVisible();
+  await sitzungGilt(page, "Sperren");
   await expect(detail).toContainText("gesperrt");
   await detail.getByRole("button", { name: "Entsperren" }).click();
   await expect(page.getByText("Benutzer entsperrt.")).toBeVisible();
@@ -98,11 +104,15 @@ test("Rechte je Gruppe: Admin erlaubt Mitarbeitern Pläne, wirkt sofort, Standar
     await expect(page.getByText("Rechte gespeichert. Sie gelten ab sofort.")).toBeVisible();
     expect((await mitarbeiter.get("auth/ich/")).rechte).not.toContain("plaene_anlegen");
   } finally {
-    // Ausgangsstand für die übrigen Tests, auch wenn oben etwas fehlschlägt
-    const r = await admin.get("rechte/");
-    const standard = Object.fromEntries(r.rollen.map((ro: { code: string }) => [ro.code,
-      Object.fromEntries(r.rechte.map((x: { code: string }) => [x.code, r.standard[ro.code].includes(x.code) || r.fest.some((f: string[]) => f[0] === ro.code && f[1] === x.code)]))]));
-    await admin.put("rechte/", { matrix: standard });
+    // Ausgangsstand für die übrigen Tests, auch wenn oben etwas fehlschlägt (ohne den ursprünglichen Fehler zu verdecken)
+    try {
+      const r = await admin.get("rechte/");
+      const standard = Object.fromEntries(r.rollen.map((ro: { code: string }) => [ro.code,
+        Object.fromEntries(r.rechte.map((x: { code: string }) => [x.code, r.standard[ro.code].includes(x.code) || r.fest.some((f: string[]) => f[0] === ro.code && f[1] === x.code)]))]));
+      await admin.put("rechte/", { matrix: standard });
+    } catch (fehler) {
+      console.error("Rechte nicht auf Standard zurückgesetzt:", fehler);
+    }
     await mitarbeiter.ende();
     await admin.ende();
   }

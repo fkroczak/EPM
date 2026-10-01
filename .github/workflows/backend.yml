@@ -214,11 +214,30 @@ jobs:
             fi
             if [ "${{ job.status }}" != "success" ]; then
               echo "<details><summary>Bau</summary>"; echo; echo '```'; ende 12000 frontend-bau.txt; echo '```'; echo "</details>"
-              echo "<details><summary>Audit-Log und abgewiesene Anfragen</summary>"; echo; echo '```'; ende 14000 audit.txt; echo '```'; echo "</details>"
               echo "<details><summary>Stack</summary>"; echo; echo '```'; ende 2000 stack.txt; echo; ende 4000 stack-logs.txt; echo '```'; echo "</details>"
             fi
           } > kommentar.md
-          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@kommentar.md > /dev/null
+          senden() { head -c 64000 "$1" | iconv -f utf-8 -t utf-8 -c > "$1.kurz" || true
+                     gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -F body=@"$1.kurz" > /dev/null; }
+          senden kommentar.md
+          if [ "${{ job.status }}" != "success" ]; then
+            # Seitenzustand beim Fehler (error-context.md je Test) – zeigt ohne Artefakt-Download, was die Oberfläche anzeigte
+            if ls frontend/test-results/*/error-context.md > /dev/null 2>&1; then
+              {
+                echo "**Seitenzustand der fehlgeschlagenen Browsertests** (Lauf ${{ github.run_id }})"
+                for f in frontend/test-results/*/error-context.md; do
+                  echo; echo "<details><summary>$(basename "$(dirname "$f")")</summary>"; echo; echo '```'
+                  head -c 3800 "$f" | iconv -f utf-8 -t utf-8 -c || true; echo; echo '```'; echo "</details>"
+                done
+              } > kontext.md
+              senden kontext.md
+            fi
+            if [ -s audit.txt ]; then
+              { echo "**Audit-Log, abgewiesene Anfragen, Fehler im Backend** (Lauf ${{ github.run_id }})"; echo; echo '```'
+                head -c 62000 audit.txt | iconv -f utf-8 -t utf-8 -c || true; echo '```'; } > audit.md
+              senden audit.md
+            fi
+          fi
 
       - uses: actions/upload-artifact@v7
         if: failure()

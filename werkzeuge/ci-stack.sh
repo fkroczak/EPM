@@ -23,13 +23,22 @@ case "${1:-start}" in
     compose logs --tail 200 backend web
     exit 0 ;;
   protokoll)
-    # Audit-Log (letzte Einträge) und abgewiesene Anfragen – zur Fehlersuche nach fehlgeschlagenen Browsertests
+    # Zur Fehlersuche nach fehlgeschlagenen Browsertests: Anmeldungen und Benutzerverwaltung aus dem Audit-Log,
+    # abgewiesene Anfragen (kompakt, ohne das erwartete 404 für ein fehlendes Logo) und Fehler im Backend
+    echo "--- Audit-Log: Anmeldung, Sitzungen, Benutzer, Rechte ---"
     compose exec -T backend python manage.py shell -c "
 from audit.models import SystemEreignis as E
-for e in E.objects.order_by('-id')[:60][::-1]:
-    print(e.zeitpunkt.strftime('%H:%M:%S'), e.art, e.benutzername or (e.benutzer.username if e.benutzer else '-'), e.objekt, e.details)
+arten = [a for a in E.Art.values if a.startswith(('anmeldung', 'abmeldung', 'kennwort', '2fa', 'benutzer', 'rechte', 'einmal', 'testdaten'))]
+for e in E.objects.filter(art__in=arten).order_by('id')[:200]:
+    name = e.benutzername or (e.benutzer.username if e.benutzer else '-')
+    print(e.zeitpunkt.strftime('%H:%M:%S'), e.art, name, e.objekt or '', str(e.details)[:120])
 "
-    compose logs --no-log-prefix web 2>/dev/null | grep -E '\" (40[0-9]|5[0-9][0-9]) ' | tail -60
+    echo "--- abgewiesene Anfragen ---"
+    compose logs --no-log-prefix web 2>/dev/null | grep -E '" (40[0-9]|5[0-9][0-9]) ' \
+      | grep -v -E 'briefkopf/logo/ HTTP/[0-9.]+" 404|"curl/' \
+      | sed -E 's/^[^[]*\[[^:]*:([0-9:]+)[^]]*\] "([A-Z]+) ([^ ]+) ([^"]*)" ([0-9]+) [0-9]+ "([^"]*)".*/\1 \5 \2 \3 \4 (\6)/' | head -150
+    echo "--- Fehler im Backend ---"
+    compose logs --no-log-prefix backend 2>/dev/null | grep -E -A4 'Traceback|ERROR|Internal Server Error' | tail -80
     exit 0 ;;
   start) ;;
   *) sed -n 2,8p "$0"; exit 1 ;;

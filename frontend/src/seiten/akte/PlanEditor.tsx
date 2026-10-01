@@ -333,9 +333,9 @@ export function PlanEditor() {
             </Feld>
             {zahlFeld("pantozol_tage", "Pantozol-Zeit", "", "Einheit noch offen (U1) · im Altsystem Werte 1–7, meist 5")}
           </Karte>
-          <Karte className="px-5 py-[18px] flex flex-col gap-3">
+          <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="plan-summe">
             <h3 className="lbl m-0">Summe</h3>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-sm" data-testid="plan-summe">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-sm">
               <span className="gedaempft">Energie</span>
               <span className="num">{zahl(kcal)} kcal{kcalVorher != null && Math.round(kcalVorher) !== kcal ? <span className="text-warn"> {kcal - Math.round(kcalVorher) > 0 ? "+" : "−"}{zahl(Math.abs(kcal - Math.round(kcalVorher)))}</span> : null}</span>
               <span className="gedaempft">je kg Körpergewicht</span><span className="num">{gewicht ? `${zahl(kcal / gewicht, 1)} kcal/kg` : "—"}</span>

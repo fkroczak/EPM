@@ -68,7 +68,9 @@ test("Abgelaufene Sitzung führt zurück zur Anmeldung", async ({ browser }) => 
   await expect(page.getByTestId("angemeldet-als")).toBeVisible();
   // Sitzung ist weg (wie nach 30 Minuten ohne Aktivität): der nächste Aufruf meldet ab
   await ctx.clearCookies();
+  const abgewiesen = page.waitForResponse((a) => a.url().includes("/api/patienten/"));
   await page.getByRole("navigation", { name: "Hauptnavigation" }).getByRole("link", { name: "Patienten" }).click();
+  expect((await abgewiesen).status()).toBe(403);
   await expect(page.getByRole("heading", { name: "Anmelden" })).toBeVisible();
   await ctx.close();
 });

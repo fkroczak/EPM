@@ -201,6 +201,29 @@ class Sitzungen(TestCase):
         self.assertEqual(b.get("/api/patienten/").status_code, 403)
         self.assertEqual(Sitzung.objects.filter(benutzer=self.user).count(), 1)
 
+    def test_admin_sitzung_bleibt_bei_benutzerverwaltung(self):
+        """Ablauf wie in der Oberfläche: anlegen, erste Anmeldung der neuen Person, sperren, entsperren,
+        Einmal-Kennwort, 2FA zurücksetzen – die Sitzung des Admins bleibt gültig, die der Person endet."""
+        chef = benutzer("chef", Rolle.ADMIN)
+        a = echte_anmeldung(chef, mit_zweitem_faktor(chef)[0])
+        r = a.post("/api/benutzer/", {"username": "neu.heilmann", "titel": "Dr. med.", "first_name": "Henrike",
+                                      "last_name": "Heilmann", "kuerzel": "HH", "funktion": "Ärztin",
+                                      "rolle": "mediziner"}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        neu_id, einmal = r.json()["id"], r.json()["einmal_kennwort"]
+        p = APIClient(HTTP_USER_AGENT="Mozilla/5.0 (Windows NT 10.0) Chrome/140.0")
+        r = p.post("/api/auth/anmelden/", {"benutzername": "neu.heilmann", "kennwort": einmal}, format="json")
+        self.assertEqual(r.json()["schritt"], "kennwort_aendern", r.content)
+        self.assertEqual(a.get("/api/auth/status/").json()["schritt"], "fertig")
+        for schritt in ("sperren", "entsperren", "einmal-kennwort", "2fa-zuruecksetzen"):
+            with self.subTest(schritt=schritt):
+                r = a.post(f"/api/benutzer/{neu_id}/{schritt}/")
+                self.assertEqual(r.status_code, 200, r.content)
+                self.assertEqual(a.get("/api/auth/status/").json()["schritt"], "fertig")
+                self.assertEqual(a.get("/api/rechte/").status_code, 200)
+        self.assertEqual(p.get("/api/auth/status/").json()["schritt"], "anmelden")
+        self.assertEqual(Sitzung.objects.filter(benutzer=chef).count(), 1)
+
     def test_abgelaufene_sitzung_verschwindet(self):
         c = echte_anmeldung(self.user, self.codes[0])
         echte_anmeldung(self.user, self.codes[1])

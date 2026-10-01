@@ -89,7 +89,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
 
   const plaene = await api.get(`infusionsplaene/?patient=${patient.id}`);
   expect(plaene.results.map((p: { status: string; aminosaeuren_g: string; kcal: number }) => [p.status, p.aminosaeuren_g, p.kcal]))
-    .toEqual([["aktuell", "80.0", 1500]]);
+    .toEqual([["aktuell", 80, 1500]]);
   expect(plaene.results[0].vitamine_namen).toEqual(["Soluvit N", "Vitalipid adult"]);
   await api.ende();
 });

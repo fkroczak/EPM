@@ -104,6 +104,12 @@ export function stackNeuStarten() {
   throw new Error("Stack nach Neustart nicht erreichbar");
 }
 
+/** Gilt die Sitzung der Seite noch? Bei einem Fehlschlag steht im Bericht, nach welchem Schritt sie endete. */
+export async function sitzungGilt(page: Page, nachSchritt: string) {
+  const s = await (await page.request.get("/api/auth/status/")).json();
+  expect(s.schritt, `Sitzung nach „${nachSchritt}“`).toBe("fertig");
+}
+
 export function eindeutig(prefix: string) {
   return `${prefix}${Date.now().toString(36).slice(-5)}`;
 }
