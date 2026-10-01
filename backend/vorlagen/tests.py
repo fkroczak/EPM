@@ -212,7 +212,7 @@ class Vorlagen(Grundlage):
         self.assertIn('briefkopf ohne-linie', inhalt)
         # Titel rechts neben dem Logo statt in einer eigenen Zeile; Bereiche mit Überschrift als Karte
         self.assertIn('<div class="kopftitel"><h1>Empfehlung eines Infusionsplans</h1>', inhalt)
-        self.assertNotIn('titel"><h1>', inhalt)
+        self.assertNotIn('block titel"', inhalt)
         self.assertEqual(inhalt.count(" karte"), 5)  # ohne Diagnose und weitere Bestandteile (leer → ausgeblendet)
         self.assertIn('<td class="zahl fett">2.600</td>', inhalt)
         self.assertNotIn("·  ·", inhalt)

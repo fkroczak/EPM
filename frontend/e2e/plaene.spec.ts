@@ -158,7 +158,10 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(summe).toContainText("berechnet wären 1.509 kcal");
   await editor.getByRole("button", { name: "Als Entwurf speichern" }).click();
   await expect(page.getByText("Entwurf gespeichert.").last()).toBeVisible();
-  const ausVorlage = (await api.get(`infusionsplaene/?patient=${patient.id}&status=entwurf`)).results[0];
+  // auf den gespeicherten Entwurf warten (ein früherer Hinweis „Entwurf gespeichert.“ kann noch sichtbar sein)
+  const entwurfVon = async () => (await api.get(`infusionsplaene/?patient=${patient.id}&status=entwurf`)).results[0];
+  await expect.poll(async () => (await entwurfVon())?.kcal_manuell).toBe(1600);
+  const ausVorlage = await entwurfVon();
   expect([ausVorlage.aminosaeuren_g, ausVorlage.phosphat_mmol, ausVorlage.magnesium_mmol]).toEqual([80, 12, 6]);
   expect([ausVorlage.kcal_manuell, ausVorlage.kcal, ausVorlage.kcal_berechnet]).toEqual([1600, 1600, 1509]);
   await detail.getByRole("button", { name: "Verwerfen" }).click();
@@ -174,7 +177,8 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(editor.getByLabel("Phosphat")).toHaveValue("");
   await editor.getByRole("button", { name: "Als Entwurf speichern" }).click();
   await expect(page.getByText("Entwurf gespeichert.").last()).toBeVisible();
-  const leer = (await api.get(`infusionsplaene/?patient=${patient.id}&status=entwurf`)).results[0];
+  await expect.poll(async () => (await entwurfVon())?.id ?? null).not.toBeNull();
+  const leer = await entwurfVon();
   expect([leer.aminosaeuren_g, leer.phosphat_mmol, leer.basis_praeparat]).toEqual([null, null, null]);
   await detail.getByRole("button", { name: "Verwerfen" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Verwerfen" }).click();
