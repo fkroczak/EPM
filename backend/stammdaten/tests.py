@@ -38,8 +38,9 @@ class Praeparate(Grundlage):
         self.assertEqual(a.delete(f"/api/praeparate/{r.json()['id']}/").status_code, 405)
         r = a.patch(f"/api/praeparate/{r.json()['id']}/", {"aktiv": False}, format="json")
         self.assertFalse(r.json()["aktiv"])
-        lipide = [p["name"] for p in a.get("/api/praeparate/?kategorie=lipide&aktiv=true").json()]
-        self.assertNotIn("Omegaven", lipide)
+        aktive = [p["anzeige"] for p in a.get("/api/praeparate/?kategorie=lipide&aktiv=true").json()]
+        self.assertNotIn("Omegaven 10 %", aktive)
+        self.assertIn("Omegaven 20 %", aktive)
 
     def test_auswahllisten_wie_im_entwurf(self):
         orte = list(Auswahlwert.objects.filter(liste="terminort").values_list("wert", flat=True))
