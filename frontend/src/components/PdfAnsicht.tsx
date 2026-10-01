@@ -39,7 +39,6 @@ function useDokument(url: string) {
       const basis = new URL("/pdfjs/", window.location.origin).href;
       geladen = await bib.getDocument({
         data: daten,
-        isEvalSupported: false,
         useWasm: false,
         wasmUrl: `${basis}wasm/`,
         standardFontDataUrl: `${basis}standard_fonts/`,
