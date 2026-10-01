@@ -1,6 +1,6 @@
 /** Entwürfe 17, 18, 20 · Administration: Benutzer, Rechte je Gruppe, Vorlagen, Audit-Log; Zugriff nur mit Recht. */
 import { expect, test } from "@playwright/test";
-import { BASIS, apiAls, eindeutig, zustand } from "./hilfen";
+import { BASIS, apiAls, eindeutig, neuesKonto, zustand } from "./hilfen";
 import { request } from "@playwright/test";
 
 test.use({ storageState: zustand("admin") });
@@ -48,6 +48,13 @@ test("Benutzer anlegen, Einmal-Kennwort, sperren und entsperren", async ({ page 
   await expect(detail).toContainText("gesperrt");
   await detail.getByRole("button", { name: "Entsperren" }).click();
   await expect(page.getByText("Benutzer entsperrt.")).toBeVisible();
+
+  // ändern: Funktion und Rolle
+  await detail.getByLabel("Funktion").fill("Oberärztin");
+  await detail.getByLabel("Rolle").selectOption("mitarbeiter");
+  await detail.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Benutzer gespeichert.")).toBeVisible();
+  await expect(page.getByTestId("benutzerliste").getByRole("row").filter({ hasText: name })).toContainText("Mitarbeiter");
 
   // neues Einmal-Kennwort
   await detail.getByRole("button", { name: "Einmal-Kennwort erzeugen" }).click();
@@ -144,6 +151,18 @@ test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", asyn
   await expect(liste.getByRole("row").filter({ hasText: ort })).toContainText("ausgeblendet");
   expect((await admin.get("auswahlwerte/?liste=terminort")).find((o: { wert: string }) => o.wert === ort).aktiv).toBe(false);
 
+  // Präparate: neues Vitamin anlegen und ausblenden (bleibt in alten Plänen, nicht mehr wählbar)
+  await page.getByRole("navigation", { name: "Listen" }).getByRole("button", { name: /^Vitamine/ }).click();
+  const vitamin = eindeutig("E2E-Vitamin ");
+  await liste.getByRole("button", { name: "Präparat" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill(vitamin);
+  await page.getByRole("dialog").getByRole("button", { name: "Speichern" }).click();
+  await expect(liste.getByRole("button", { name: vitamin })).toBeVisible();
+  await liste.getByRole("checkbox", { name: `${vitamin} in der Auswahl` }).uncheck();
+  await expect(liste.getByRole("row").filter({ hasText: vitamin })).toContainText("ausgeblendet");
+  const vit = (await admin.get("praeparate/?kategorie=vitamine")).find((x: { name: string }) => x.name === vitamin);
+  expect([vit.aktiv, vit.kategorie]).toEqual([false, "vitamine"]);
+
   // Grenzwerte: untere Grenze größer als obere wird abgewiesen, gültiger Wert gespeichert
   await page.getByRole("button", { name: "Grenzwerte" }).click();
   const grenzen = page.getByTestId("grenzwerte");
@@ -175,4 +194,53 @@ test("Ohne Recht keine Administration: Mitarbeiter sieht nichts, Mediziner Vorla
   await expect(nav.getByRole("link", { name: "Audit-Log" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Benutzer" })).toHaveCount(0);
   await d.close();
+});
+
+test("Fünf falsche Passwörter sperren das Konto; Admin sieht den Hinweis, setzt 2FA zurück und entsperrt", async ({ page, browser }) => {
+  const konto = await neuesKonto("mitarbeiter", "Lotte", "Gesperrt");
+  const fremd = await browser.newContext({ ignoreHTTPSErrors: true });
+  const fp = await fremd.newPage();
+  await fp.goto("/");
+  for (let i = 0; i < 5; i++) {
+    await fp.getByLabel("Benutzername").fill(konto.benutzername);
+    await fp.getByLabel("Passwort").fill(`falsch-${i}-falsch-falsch`);
+    await fp.getByRole("button", { name: "Weiter" }).click();
+    await expect(fp.getByRole("alert")).toBeVisible();
+  }
+  await expect(fp.getByRole("alert")).toContainText("Das Konto ist gesperrt.");
+  await fremd.close();
+
+  await page.goto("/admin/audit-log");
+  await expect(page.getByTestId("sperrhinweis").filter({ hasText: konto.benutzername })).toBeVisible();
+  await page.getByRole("button", { name: "Fehlversuch" }).click();
+  await expect(page.getByTestId("auditlog")).toContainText("L. Gesperrt");
+  await page.getByTestId("sperrhinweis").filter({ hasText: konto.benutzername }).getByRole("link", { name: "Zum Benutzer" }).click();
+  const detail = page.getByTestId("benutzer-detail");
+  await expect(detail).toContainText("L. Gesperrt");
+  await expect(detail).toContainText("Fehlversuche bei der Anmeldung");
+
+  // 2FA zurücksetzen (Telefon verloren): neues Einmal-Kennwort, Authenticator weg
+  await detail.getByRole("button", { name: "2FA zurücksetzen" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "2FA zurücksetzen" }).click();
+  await expect(page.getByText("2FA zurückgesetzt, neues Einmal-Kennwort erzeugt.")).toBeVisible();
+  await expect(detail.getByTestId("einmal-kennwort")).toBeVisible();
+  await detail.getByRole("button", { name: "Entsperren" }).click();
+  await expect(page.getByText("Benutzer entsperrt.")).toBeVisible();
+  await expect(page.getByTestId("benutzerliste").getByRole("row").filter({ hasText: konto.benutzername })).toContainText("2FA: nicht eingerichtet");
+});
+
+test("Testdaten auf Ausgangsstand zurücksetzen (nur Testpatienten)", async ({ page }) => {
+  const admin = await apiAls("admin");
+  const echte = (await admin.get("patienten/?test=ohne&seitengroesse=1")).count;
+  await page.goto("/admin/benutzer");
+  await page.getByTestId("benutzerliste").getByRole("button", { name: "T. Test", exact: true }).click();
+  const detail = page.getByTestId("benutzer-detail");
+  await expect(detail).toContainText("Testbenutzer:");
+  await detail.getByRole("button", { name: "Testdaten auf Ausgangsstand zurücksetzen" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Testdaten zurücksetzen" }).click();
+  await expect(page.getByText(/Testdaten zurückgesetzt \(\d+ gelöscht, 6 angelegt\)/)).toBeVisible();
+  expect((await admin.get("patienten/?test=ohne&seitengroesse=1")).count).toBe(echte);
+  expect((await admin.get("patienten/?test=nur&seitengroesse=50")).results.map((p: { nachname: string }) => p.nachname).sort())
+    .toEqual(["Beispiel", "Demo", "Musterfrau", "Mustermann", "Probe", "Test"]);
+  await admin.ende();
 });

@@ -1,5 +1,5 @@
-/** Termin anlegen: Rückruf, Wiedervorlage, Praxistermin (mit Terminort), Sonstiges. */
-import { useState } from "react";
+/** Termin anlegen oder ändern: Rückruf, Wiedervorlage, Praxistermin (mit Terminort), Sonstiges. */
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
@@ -12,8 +12,10 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { PatientWahl } from "./PatientWahl";
 
-export function TerminDialog({ offen, onOffen, patientId, patientName }: {
+export function TerminDialog({ offen, onOffen, patientId, patientName, termin }: {
   offen: boolean; onOffen: (o: boolean) => void; patientId?: number; patientName?: string;
+  /** vorhandener, offener Termin zum Ändern */
+  termin?: Termin | null;
 }) {
   const [patient, setPatient] = useState<PatientZeile | null>(null);
   const [art, setArt] = useState("rueckruf");
@@ -25,23 +27,31 @@ export function TerminDialog({ offen, onOffen, patientId, patientName }: {
   const orte = useAuswahl("terminort");
   const qc = useQueryClient();
   const melden = useHinweis();
+  useEffect(() => {
+    if (offen && termin) {
+      setArt(termin.art); setOrt(termin.ort ? String(termin.ort) : ""); setFaellig(termin.faellig_am);
+      setUhr(termin.uhrzeit ? termin.uhrzeit.slice(0, 5) : ""); setTitel(termin.titel); setNotiz(termin.notiz);
+    }
+  }, [offen, termin]);
   const speichern = useMutation({
-    mutationFn: () => api<Termin>("termine/", {
-      body: {
-        patient: patientId ?? patient?.id,
+    mutationFn: () => {
+      const daten = {
         art,
         ort: art === "praxistermin" && ort ? Number(ort) : null,
         faellig_am: faellig,
         uhrzeit: uhr || null,
         titel: titel.trim() || TERMINARTEN[art],
         notiz,
-      },
-    }),
+      };
+      return termin
+        ? api<Termin>(`termine/${termin.id}/`, { method: "PATCH", body: daten })
+        : api<Termin>("termine/", { body: { ...daten, patient: patientId ?? patient?.id } });
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["startseite"] });
       void qc.invalidateQueries({ queryKey: ["termine"] });
       void qc.invalidateQueries({ queryKey: ["patient"] });
-      melden("Termin angelegt.");
+      melden(termin ? "Termin geändert." : "Termin angelegt.");
       onOffen(false);
       setPatient(null);
       setTitel("");
@@ -51,15 +61,15 @@ export function TerminDialog({ offen, onOffen, patientId, patientName }: {
   });
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
-    <Dialog offen={offen} onOffen={onOffen} titel="Termin anlegen"
+    <Dialog offen={offen} onOffen={onOffen} titel={termin ? "Termin ändern" : "Termin anlegen"}
       beschreibung={patientName ? `für ${patientName}` : "Erscheint auf der Startseite unter „Termine und Wiedervorlagen“."}
       fuss={<>
         <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
-        <Knopf variante="pri" laedt={speichern.isPending} disabled={!patientId && !patient}
+        <Knopf variante="pri" laedt={speichern.isPending} disabled={!termin && !patientId && !patient}
           onClick={() => speichern.mutate()}>Termin speichern</Knopf>
       </>}>
       <form className="grid grid-cols-2 gap-4" onSubmit={(e) => { e.preventDefault(); speichern.mutate(); }}>
-        {!patientId ? (
+        {!patientId && !termin ? (
           <Feld label="Patient" className="col-span-2" fehler={f.patient} pflicht>
             {(p) => <PatientWahl id={p.id} wert={patient} onWahl={setPatient} fehler={!!f.patient} />}
           </Feld>

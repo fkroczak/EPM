@@ -185,6 +185,18 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   const termine = await api.get(`termine/?patient=${p.id}&offen=true`);
   expect(termine.results[0].art).toBe("rueckruf");
   expect(termine.results[0].uhrzeit).toBe("10:00:00");
+
+  // Termin ändern (F29): Titel und Uhrzeit
+  await page.getByTestId("aktentermine").getByRole("button", { name: "Rückruf" }).click();
+  const td = page.getByRole("dialog");
+  await expect(td.getByRole("heading", { name: "Termin ändern" })).toBeVisible();
+  await td.getByLabel("Titel").fill("Rückruf Trinkmenge");
+  await td.getByLabel("Uhrzeit").fill("11:15");
+  await td.getByRole("button", { name: "Termin speichern" }).click();
+  await expect(page.getByText("Termin geändert.")).toBeVisible();
+  await expect(page.getByTestId("aktentermine")).toContainText("Rückruf Trinkmenge");
+  const geaendert = await api.get(`termine/${termine.results[0].id}/`);
+  expect([geaendert.titel, geaendert.uhrzeit]).toEqual(["Rückruf Trinkmenge", "11:15:00"]);
   await api.ende();
 });
 

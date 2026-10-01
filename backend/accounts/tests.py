@@ -160,6 +160,25 @@ class Sitzungen(TestCase):
         andere = benutzer("andere", Rolle.MITARBEITER)
         self.assertEqual(client_fuer(andere).get("/api/sitzungen/").json(), [])
 
+    def test_sitzung_laeuft_nach_30_minuten_ab(self):
+        """F12: 30 Minuten ohne Anfrage → Sitzung ungültig; jede Anfrage verlängert sie."""
+        from datetime import timedelta
+
+        from django.conf import settings
+        from django.contrib.sessions.models import Session
+        from django.utils import timezone
+
+        self.assertEqual((settings.SESSION_COOKIE_AGE, settings.SESSION_SAVE_EVERY_REQUEST), (30 * 60, True))
+        c = echte_anmeldung(self.user, self.codes[0])
+        self.assertEqual(c.get("/api/patienten/").status_code, 200)
+        schluessel = c.session.session_key
+        ablauf = Session.objects.get(session_key=schluessel).expire_date
+        self.assertGreater(ablauf, timezone.now() + timedelta(minutes=29))
+        Session.objects.filter(session_key=schluessel).update(expire_date=timezone.now() - timedelta(seconds=1))
+        r = c.get("/api/patienten/")
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(c.get("/api/auth/status/").json()["schritt"], "anmelden")
+
     def test_abmelden_entfernt_sitzung(self):
         c = echte_anmeldung(self.user, self.codes[0])
         self.assertEqual(Sitzung.objects.filter(benutzer=self.user).count(), 1)

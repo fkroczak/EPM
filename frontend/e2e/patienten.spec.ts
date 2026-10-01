@@ -36,6 +36,12 @@ test("Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten", 
   await expect(page).not.toHaveURL(/versorger=/);
   await page.getByLabel("Ansprechpartner").selectOption({ label: "Herr Muster (Testversorger Nord (fiktiv))" });
   await expect(page).toHaveURL(/ansprechpartner=\d+/);
+  // gleiche Abfrage direkt an die API: nur Patienten dieses Ansprechpartners
+  const apId = new URL(page.url()).searchParams.get("ansprechpartner");
+  const api = await apiAls("mitarbeiter");
+  const direkt = await api.get(`patienten/?status=in_betreuung&ansprechpartner=${apId}`);
+  expect(direkt.results.map((p: { nachname: string; ansprechpartner_name: string }) => `${p.nachname}/${p.ansprechpartner_name}`)).toEqual(["Mustermann/Herr Muster"]);
+  await api.ende();
   await expect(liste.getByRole("link", { name: "Mustermann, Max" })).toBeVisible();
   await expect(liste.getByRole("link", { name: "Musterfrau, Erika" })).toHaveCount(0);
   await page.getByRole("button", { name: "Filter zurücksetzen" }).click();

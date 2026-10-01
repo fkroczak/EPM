@@ -120,9 +120,10 @@ export function PlanEditor() {
     enabled: !planId,
   });
   useEffect(() => {
-    const vorhanden = offeneEntwuerfe.data?.results[0];
+    // nur frisch geladene Daten zählen (im Zwischenspeicher kann noch ein inzwischen freigegebener Entwurf stehen)
+    const vorhanden = offeneEntwuerfe.isFetchedAfterMount && !offeneEntwuerfe.isFetching ? offeneEntwuerfe.data?.results[0] : undefined;
     if (!planId && !neueId && vorhanden && !speichern.isPending) navigate(`/patienten/${patient.id}/plaene/${vorhanden.id}/bearbeiten`, { replace: true });
-  }, [offeneEntwuerfe.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [offeneEntwuerfe.data, offeneEntwuerfe.isFetching]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const vorher = useMemo(() => (vorgaenger.data ? ausPlan(vorgaenger.data) : null), [vorgaenger.data]);
   const geaendert = (k: keyof Formular) => !!(vorher && f && k !== "gueltig_ab" && norm(f, k) !== norm(vorher, k));

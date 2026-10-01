@@ -5,6 +5,7 @@
 #   werkzeuge/ci-stack.sh start     Images bauen, Stack starten, Musterdaten und Testkonten anlegen
 #   werkzeuge/ci-stack.sh stop      Stack beenden und Daten löschen
 #   werkzeuge/ci-stack.sh logs      Protokolle von Backend und Nginx
+#   werkzeuge/ci-stack.sh protokoll Audit-Log und abgewiesene Anfragen (Fehlersuche)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"
@@ -20,6 +21,15 @@ case "${1:-start}" in
     exit 0 ;;
   logs)
     compose logs --tail 200 backend web
+    exit 0 ;;
+  protokoll)
+    # Audit-Log (letzte Einträge) und abgewiesene Anfragen – zur Fehlersuche nach fehlgeschlagenen Browsertests
+    compose exec -T backend python manage.py shell -c "
+from audit.models import SystemEreignis as E
+for e in E.objects.order_by('-id')[:60][::-1]:
+    print(e.zeitpunkt.strftime('%H:%M:%S'), e.art, e.benutzername or (e.benutzer.username if e.benutzer else '-'), e.objekt, e.details)
+"
+    compose logs --no-log-prefix web 2>/dev/null | grep -E '\" (40[0-9]|5[0-9][0-9]) ' | tail -60
     exit 0 ;;
   start) ;;
   *) sed -n 2,8p "$0"; exit 1 ;;

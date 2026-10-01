@@ -16,6 +16,7 @@ import { Icon } from "@/components/ui/icon";
 import { GewichtsDiagramm, imZeitraum } from "@/components/GewichtsDiagramm";
 import type { Zeitraum } from "@/components/GewichtsDiagramm";
 import { Richtext, klartext } from "@/components/Editor";
+import { TerminDialog } from "@/components/TerminDialog";
 import { useAkte } from "./Akte";
 
 const QUELLEN_NEU = ["telefonisch", "ambulanz", "versorger", "arztbrief"];
@@ -222,6 +223,7 @@ function TherapieKarte() {
 
 function TermineKarte() {
   const { patient, erfassen, terminAnlegen } = useAkte();
+  const [bearbeiten, setBearbeiten] = useState<Termin | null>(null);
   const neuLaden = useAkteNeuLaden();
   const melden = useHinweis();
   const termine = useQuery({
@@ -245,12 +247,17 @@ function TermineKarte() {
               ) : null}
               <span className={cx("num w-[104px] shrink-0 text-[0.84rem]", t.faellig_am < heuteIso() && "text-fehler")}>{terminZeit(t.faellig_am, t.uhrzeit)}</span>
               <Chip>{t.ort_name ?? TERMINARTEN[t.art]}</Chip>
-              <span className="truncate">{t.titel}</span>
+              {erfassen ? (
+                <button type="button" className="bg-transparent border-0 p-0 text-left truncate cursor-pointer text-akzent-text"
+                  title="Termin ändern" onClick={() => setBearbeiten(t)}>{t.titel}</button>
+              ) : <span className="truncate">{t.titel}</span>}
             </li>
           ))}
         </ul>
       ) : <span className="text-sm gedaempft">Keine offenen Termine.</span>}
       <Fehleranzeige fehler={abhaken.error} />
+      <TerminDialog offen={!!bearbeiten} onOffen={(o) => { if (!o) setBearbeiten(null); }} termin={bearbeiten}
+        patientId={patient.id} patientName={`${patient.nachname}, ${patient.vorname}`} />
     </Karte>
   );
 }

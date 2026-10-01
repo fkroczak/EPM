@@ -375,6 +375,18 @@ class Patientenliste(Grundlage):
         v = c.get(f"/api/versorger/{self.versorger.id}/").json()
         self.assertEqual((v["patienten_anzahl"], v["ansprechpartner"][0]["patienten_anzahl"]), (1, 1))
 
+    def test_filter_versorger_und_ansprechpartner(self):
+        c = client_fuer(self.mitarbeiter)
+        ap2 = Ansprechpartner.objects.create(versorger=self.versorger, name="Herr Zwei")
+        Patient.objects.filter(pk=self.stabil.pk).update(ansprechpartner=ap2)
+
+        def ids(**filter_):
+            return {p["id"] for p in c.get("/api/patienten/", {"test": "ohne", **filter_}).json()["results"]}
+
+        self.assertEqual(ids(versorger=self.versorger.id), {self.verlust.id, self.stabil.id})
+        self.assertEqual(ids(ansprechpartner=self.ap1.id), {self.verlust.id})
+        self.assertEqual(ids(ansprechpartner=ap2.id, ordering="-letzter_kontakt"), {self.stabil.id})
+
     def test_suche(self):
         c = client_fuer(self.mitarbeiter)
 
