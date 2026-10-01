@@ -115,8 +115,9 @@ export function sitzungAblaufenLassen(schluessel: string) {
   const befehl = "from datetime import timedelta; from django.utils import timezone; " +
     "from django.contrib.sessions.models import Session; " +
     `print(Session.objects.filter(session_key='${schluessel}').update(expire_date=timezone.now() - timedelta(seconds=1)))`;
-  const anzahl = execSync(`sudo docker compose -p epm-ci exec -T backend python manage.py shell -c "${befehl}"`,
+  const ausgabe = execSync(`sudo docker compose -p epm-ci exec -T backend python manage.py shell -v 0 -c "${befehl}"`,
     { cwd: process.env.EPM_CI_BASIS ?? "/tmp/epm-ci" }).toString().trim();
+  const anzahl = ausgabe.split("\n").pop()?.trim();
   if (anzahl !== "1") throw new Error(`Sitzung nicht gefunden (${anzahl})`);
 }
 

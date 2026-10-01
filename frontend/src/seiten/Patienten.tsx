@@ -97,8 +97,10 @@ export function Patienten() {
   const seite = Math.max(1, Number(params.get("seite") ?? "1") || 1);
   const [suche, setSuche] = useState(params.get("suche") ?? "");
 
+  // Grundlage ist immer die aktuelle Adresse, nicht der Stand beim letzten Rendern: Der Router übernimmt eine neue
+  // Adresse verzögert (Transition). Sonst überschreibt die verzögerte Suche einen kurz danach gewählten Filter.
   const setze = (aenderung: Record<string, string | null>, seiteBehalten = false) => {
-    const neu = new URLSearchParams(params);
+    const neu = new URLSearchParams(window.location.search);
     for (const [k, v] of Object.entries(aenderung)) {
       if (v) neu.set(k, v); else neu.delete(k);
     }
@@ -109,7 +111,8 @@ export function Patienten() {
   // Freitext mit kurzer Verzögerung in die Adresse übernehmen (Liste bleibt teilbar und „Zurück“ funktioniert)
   useEffect(() => {
     const t = window.setTimeout(() => {
-      if ((params.get("suche") ?? "") !== suche.trim()) setze({ suche: suche.trim() || null });
+      const inAdresse = new URLSearchParams(window.location.search).get("suche") ?? "";
+      if (inAdresse !== suche.trim()) setze({ suche: suche.trim() || null });
     }, 300);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps

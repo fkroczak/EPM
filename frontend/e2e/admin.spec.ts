@@ -152,7 +152,7 @@ test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", asyn
   await liste.getByRole("button", { name: "Wert" }).click();
   await page.getByRole("dialog").getByLabel("Wert").fill(ort);
   await page.getByRole("dialog").getByRole("button", { name: "Speichern" }).click();
-  await expect(liste.getByRole("button", { name: ort })).toBeVisible();
+  await expect(liste.getByRole("button", { name: ort, exact: true })).toBeVisible();
   await liste.getByRole("button", { name: `${ort} verschieben (Pfeiltasten)` }).press("ArrowUp");
   await expect(page.getByText("Reihenfolge gespeichert.")).toBeVisible();
   const orte = await admin.get("auswahlwerte/?liste=terminort");
@@ -167,7 +167,7 @@ test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", asyn
   await liste.getByRole("button", { name: "Präparat" }).click();
   await page.getByRole("dialog").getByLabel("Name").fill(vitamin);
   await page.getByRole("dialog").getByRole("button", { name: "Speichern" }).click();
-  await expect(liste.getByRole("button", { name: vitamin })).toBeVisible();
+  await expect(liste.getByRole("button", { name: vitamin, exact: true })).toBeVisible();
   await liste.getByRole("checkbox", { name: `${vitamin} in der Auswahl` }).uncheck();
   await expect(liste.getByRole("row").filter({ hasText: vitamin })).toContainText("ausgeblendet");
   const vit = (await admin.get("praeparate/?kategorie=vitamine")).find((x: { name: string }) => x.name === vitamin);
