@@ -133,6 +133,8 @@ def beschreibung(e) -> str:
         if d.get("aenderungen"):
             return f"{e.objekt}: {_aenderungen(d)}"
         return f"{e.objekt}: {d.get('aktion', 'geändert')}"
+    if art == A.EXPORT:
+        return f"{d.get('was', 'Export')} als PDF: {e.objekt}" if e.objekt else f"{d.get('was', 'Export')} als PDF"
     if art == A.TESTDATEN:
         return f"Testdaten zurückgesetzt: {d.get('geloescht', 0)} Testpatienten gelöscht, {d.get('angelegt', 0)} neu angelegt"
     return e.get_art_display() + (f" {e.objekt}" if e.objekt else "")

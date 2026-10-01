@@ -1,5 +1,6 @@
 /** Entwurf 17 · Benutzer: anlegen, ändern, sperren, Einmal-Kennwort, 2FA zurücksetzen; Rechte je Gruppe einstellbar. */
 import { useEffect, useState } from "react";
+import { PdfDialog } from "@/components/PdfDialog";
 import { useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, alle, api } from "@/lib/api";
@@ -39,7 +40,8 @@ function zustand(b: BenutzerTyp): { text: string; art: "ok" | "fehler" | "warn" 
   return { text: "aktiv", art: "ok" };
 }
 
-function Kennwortanzeige({ kennwort, gueltig, name }: { kennwort: string; gueltig: string | null; name: string }) {
+function Kennwortanzeige({ id, kennwort, gueltig, name, benutzername }: { id: number; kennwort: string; gueltig: string | null; name: string; benutzername: string }) {
+  const [blatt, setBlatt] = useState(false);
   return (
     <div className="meldung info flex flex-col gap-2" data-testid="einmal-kennwort">
       <span className="text-[0.8125rem] font-medium">Einmal-Kennwort</span>
@@ -48,7 +50,9 @@ function Kennwortanzeige({ kennwort, gueltig, name }: { kennwort: string; guelti
         {gueltig ? `Gültig bis ${zeitpunkt(gueltig)}. ` : ""}Persönlich übergeben. Beim ersten Login legt {name} ein eigenes Passwort fest und
         richtet die Authenticator-App ein. Das Kennwort wird nur jetzt angezeigt.
       </span>
-      <div><Knopf klein icon="dokument" disabled title="folgt mit der PDF-Erzeugung (F55)">Zugangsblatt drucken</Knopf></div>
+      <div><Knopf klein icon="dokument" onClick={() => setBlatt(true)}>Zugangsblatt drucken</Knopf></div>
+      <PdfDialog offen={blatt} onOffen={setBlatt} titel={`Zugangsblatt für ${name}`} pfad={`benutzer/${id}/zugangsblatt/`}
+        body={{ kennwort }} dateiname={`Zugang-${benutzername}.pdf`} />
     </div>
   );
 }
@@ -178,7 +182,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
       </div>
       {benutzer?.gesperrt_am ? <Meldung art="fehler">Gesperrt am {zeitpunkt(benutzer.gesperrt_am)}{benutzer.sperrgrund ? ` · ${benutzer.sperrgrund}` : ""}.</Meldung> : null}
       {benutzer?.nur_historisch ? <Meldung>Aus dem Altsystem übernommen, damit alte Einträge einer Person zugeordnet bleiben. Kann sich nicht anmelden.</Meldung> : null}
-      {kennwort ? <Kennwortanzeige kennwort={kennwort.kennwort} gueltig={kennwort.gueltig} name={name} /> : null}
+      {kennwort ? <Kennwortanzeige id={kennwort.id} kennwort={kennwort.kennwort} gueltig={kennwort.gueltig} name={name} benutzername={benutzer?.username ?? ""} /> : null}
       {benutzer?.ist_test ? (
         <div className="meldung warn flex flex-col gap-2 text-[0.8125rem]">
           <span><strong>Testbenutzer:</strong> sieht und bearbeitet ausschließlich Testpatienten, nie echte Patientendaten. Oben erscheint dauerhaft ein

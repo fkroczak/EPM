@@ -421,6 +421,36 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
         return Response(PatientSerializer(patient, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=["get"])
+    def pdf(self, request, pk=None):
+        """Akte als PDF (F23): Patientendatenblatt mit der aktiven Vorlage, auch für abgeschlossene Akten."""
+        from vorlagen.api import pdf_antwort
+        from vorlagen.listen import akte_pdf
+
+        patient = self.get_object()
+        pdf = akte_pdf(patient)
+        protokolliere(SystemEreignis.Art.EXPORT, request, objekt=f"Akte {patient.nachname}, {patient.vorname} (Nr. {patient.nummer})",
+                      was="Akte")
+        return pdf_antwort(pdf, f"Patientendatenblatt-{patient.nummer}-{timezone.localdate():%Y-%m-%d}.pdf")
+
+    @action(detail=True, methods=["get"], url_path="verlauf/pdf")
+    def verlauf_pdf(self, request, pk=None):
+        """Verlauf als PDF (F24), mit denselben Filtern wie die Ansicht."""
+        from vorlagen.api import pdf_antwort
+        from vorlagen.listen import BEREICHE, verlauf_pdf
+
+        patient = self.get_object()
+        bereich = request.query_params.get("bereich") or None
+        person = request.query_params.get("person") or None
+        eintraege = verlauf_eintraege(patient, bereich, person)
+        filter_text = " · ".join(t for t in (
+            f"Bereich {BEREICHE.get(bereich, bereich)}" if bereich else "",
+            f"Person {eintraege[0]['person']}" if person and eintraege else "") if t)
+        pdf = verlauf_pdf(patient, eintraege, filter_text)
+        protokolliere(SystemEreignis.Art.EXPORT, request, objekt=f"Akte {patient.nachname}, {patient.vorname} (Nr. {patient.nummer})",
+                      was="Verlauf", bereich=bereich or "", person=person or "")
+        return pdf_antwort(pdf, f"Verlauf-{patient.nummer}-{timezone.localdate():%Y-%m-%d}.pdf")
+
+    @action(detail=True, methods=["get"])
     def verlauf(self, request, pk=None):
         """Alle Fassungen aller Einträge dieser Akte, neueste zuerst (Entwurf 10).
 

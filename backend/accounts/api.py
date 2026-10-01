@@ -490,6 +490,24 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         daten["einmal_kennwort"] = kennwort
         return Response(daten, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=["post"])
+    def zugangsblatt(self, request, pk=None):
+        """Zugangsblatt als PDF (F55). Das Einmal-Kennwort ist nur als Prüfsumme gespeichert; die Oberfläche schickt es
+        mit, solange sie es anzeigt. Es wird geprüft und muss noch gültig sein."""
+        from vorlagen.api import pdf_antwort
+        from vorlagen.listen import zugangsblatt_pdf
+
+        user = self.get_object()
+        kennwort = str(request.data.get("kennwort", ""))
+        if not user.muss_kennwort_aendern or user.einmal_kennwort_abgelaufen:
+            return fehler("Für diesen Benutzer gibt es kein gültiges Einmal-Kennwort. Bitte ein neues erzeugen.")
+        if not kennwort or not user.check_password(kennwort):
+            return fehler("Das Einmal-Kennwort passt nicht zu diesem Benutzer.")
+        adresse = f"https://{request.get_host()}/"
+        pdf = zugangsblatt_pdf(user, kennwort, adresse)
+        protokolliere(SystemEreignis.Art.EXPORT, request, objekt=user.username, was="Zugangsblatt")
+        return pdf_antwort(pdf, f"Zugang-{user.username}.pdf")
+
     @action(detail=False, methods=["get"])
     def hinweise(self, request):
         """Gesperrte Konten für den Hinweis im Audit-Log."""

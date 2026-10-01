@@ -1,3 +1,4 @@
+from django.utils import timezone
 from django_filters import rest_framework as filters
 from rest_framework import mixins, serializers, viewsets
 from rest_framework.decorators import action
@@ -64,6 +65,25 @@ class SystemEreignisViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vi
     permission_classes = [AuditRecht]
     filterset_class = SystemEreignisFilter
     search_fields = ["benutzername", "objekt"]
+
+    @action(detail=False, methods=["get"])
+    def pdf(self, request):
+        """Audit-Log für einen Zeitraum als PDF (F59), mit denselben Filtern wie die Liste; höchstens 5.000 Einträge."""
+        from vorlagen.api import pdf_antwort
+        from vorlagen.listen import protokoll_pdf
+
+        qs = self.filter_queryset(self.get_queryset())[:5000]
+        p = request.query_params
+        teile = []
+        if p.get("von") or p.get("bis"):
+            teile.append(f"Zeitraum {p.get('von') or '…'} bis {p.get('bis') or '…'}")
+        if p.get("gruppe"):
+            teile.append(f"Art {p.get('gruppe')}")
+        if p.get("search"):
+            teile.append(f"Suche „{p.get('search')}“")
+        pdf = protokoll_pdf(list(qs), " · ".join(teile))
+        protokolliere(SystemEreignis.Art.EXPORT, request, objekt=" · ".join(teile) or "alle Einträge", was="Audit-Log")
+        return pdf_antwort(pdf, f"Audit-Log-{timezone.localdate():%Y-%m-%d}.pdf")
 
 
 class TestdatenViewSet(viewsets.ViewSet):

@@ -198,3 +198,62 @@ class Vorlagen(Grundlage):
         with self.assertRaises(DatabaseError), transaction.atomic():
             with connection.cursor() as cur:
                 cur.execute("UPDATE infusionen_infusionsplan SET pdf_sha256 = 'x' WHERE id = %s", [plan.id])
+
+
+class WeiterePdfs(Grundlage):
+    testpatient_mit_plan = Vorlagen.testpatient_mit_plan
+    def test_akte_und_verlauf_als_pdf(self):
+        from audit.models import SystemEreignis
+
+        p, _ = self.testpatient_mit_plan(freigeben=True)
+        c = client_fuer(self.betrachter)  # lesen genügt
+        r = c.get(f"/api/patienten/{p.id}/pdf/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.content.startswith(b"%PDF-"))
+        self.assertTrue(SystemEreignis.objects.filter(art="export", details__was="Akte").exists())
+        r = c.get(f"/api/patienten/{p.id}/verlauf/pdf/?bereich=gewichte")
+        self.assertEqual(r.status_code, 200, r.content)
+        if PDFTOTEXT:
+            text = pdf_text(r.content)
+            for erwartet in ["Verlauf der Akte", "Probe, Paula", "Bereich Gewicht", "Gewicht", "angelegt"]:
+                self.assertIn(erwartet, text)
+            self.assertIn("TESTDATEN", wasserzeichen(r.content))
+            self.assertIn("Infusionsplan", pdf_text(c.get(f"/api/patienten/{p.id}/pdf/").content))
+        # auch abgeschlossene Akten lassen sich ausgeben
+        Patient.objects.filter(pk=p.pk).update(abgeschlossen_am=timezone.localdate(), abschluss_anlass="therapie_beendet")
+        self.assertEqual(c.get(f"/api/patienten/{p.id}/pdf/").status_code, 200)
+        self.assertTrue(SystemEreignis.objects.filter(art="export", details__was="Verlauf").exists())
+
+    def test_audit_log_als_pdf(self):
+        a = client_fuer(self.admin)
+        a.post("/api/benutzer/", {"username": "neu.pdf", "first_name": "Neu", "last_name": "Pdf", "rolle": "mitarbeiter"},
+               format="json")
+        r = a.get("/api/protokoll/pdf/?gruppe=benutzer")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.content.startswith(b"%PDF-"))
+        if PDFTOTEXT:
+            text = pdf_text(r.content)
+            self.assertIn("Audit-Log", text)
+            self.assertIn("neu.pdf", text)
+        self.assertEqual(client_fuer(self.mitarbeiter).get("/api/protokoll/pdf/").status_code, 403)
+        self.assertEqual(a.get("/api/protokoll/pdf/?gruppe=unbekannt").status_code, 400)
+
+    def test_zugangsblatt(self):
+        a = client_fuer(self.admin)
+        r = a.post("/api/benutzer/", {"username": "zugang.test", "first_name": "Zora", "last_name": "Zugang",
+                                      "rolle": "mitarbeiter"}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        uid, kennwort = r.json()["id"], r.json()["einmal_kennwort"]
+        url = f"/api/benutzer/{uid}/zugangsblatt/"
+        self.assertEqual(a.post(url, {"kennwort": "falsch"}, format="json").status_code, 400)
+        self.assertEqual(client_fuer(self.mitarbeiter).post(url, {"kennwort": kennwort}, format="json").status_code, 403)
+        r = a.post(url, {"kennwort": kennwort}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        if PDFTOTEXT:
+            text = pdf_text(r.content)
+            for erwartet in ["Zugang zu EPM", "zugang.test", kennwort, "Authenticator", "Notfall-Codes"]:
+                self.assertIn(erwartet, text)
+        from accounts.models import User
+
+        User.objects.filter(pk=uid).update(muss_kennwort_aendern=False)
+        self.assertEqual(a.post(url, {"kennwort": kennwort}, format="json").status_code, 400)

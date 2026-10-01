@@ -1,5 +1,6 @@
 /** Entwurf 4 · Patientenakte: Kopf mit Kerndaten und Schnellaktionen, Reiter mit Zählern. */
 import { useEffect, useState } from "react";
+import { PdfDialog } from "@/components/PdfDialog";
 import type { ReactNode } from "react";
 import { NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -255,7 +256,7 @@ export function Akte() {
   const pid = Number(id);
   const { darf, darfBei, ich } = useAuth();
   const navigate = useNavigate();
-  const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin">("");
+  const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "pdf">("");
   const akte = useQuery({ queryKey: ["patient", pid], queryFn: () => api<Patient>(`patienten/${pid}/`), enabled: !!pid });
   const p = akte.data;
   if (akte.isLoading) return <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: "…" }]}><Laden /></Seite>;
@@ -301,7 +302,7 @@ export function Akte() {
             {offen && darfBei("plaene_anlegen", p) ? <Knopf icon="tropfen" onClick={() => navigate(`${basis}/plaene/neu`)}>Neuer Plan</Knopf> : null}
             <Menue label="Weitere Aktionen" eintraege={[
               ...(kontext.bearbeiten ? [{ text: "Stammdaten bearbeiten", onClick: () => setDialog("stammdaten") }] : []),
-              { text: "Akte als PDF", onClick: () => undefined, aus: true, hinweis: "folgt mit der PDF-Erzeugung (F23)" },
+              { text: "Akte als PDF", onClick: () => setDialog("pdf") },
               ...(offen && darfBei("akten_abschliessen", p) ? [{ text: "Akte abschließen", onClick: () => setDialog("abschluss"), gefaehrlich: true }] : []),
               ...(!offen && darf("akten_wieder_oeffnen") ? [{ text: "Akte wieder öffnen", onClick: () => setDialog("oeffnen") }] : []),
             ]} />
@@ -366,6 +367,8 @@ export function Akte() {
       {kontext.bearbeiten ? <StammdatenDialog patient={p} offen={dialog === "stammdaten"} onOffen={(o) => setDialog(o ? "stammdaten" : "")} /> : null}
       <AbschlussDialog patient={p} offen={dialog === "abschluss"} onOffen={(o) => setDialog(o ? "abschluss" : "")} />
       <WiederOeffnenDialog patient={p} offen={dialog === "oeffnen"} onOffen={(o) => setDialog(o ? "oeffnen" : "")} />
+      <PdfDialog offen={dialog === "pdf"} onOffen={(o) => setDialog(o ? "pdf" : "")} titel={`Akte ${name(p)} als PDF`}
+        pfad={`patienten/${p.id}/pdf/`} dateiname={`Patientendatenblatt-${p.nummer}.pdf`} />
       <TerminDialog offen={dialog === "termin"} onOffen={(o) => setDialog(o ? "termin" : "")} patientId={p.id} patientName={name(p)} />
     </Seite>
   );

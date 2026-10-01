@@ -1,5 +1,6 @@
 /** Entwurf 10 · Verlauf: jede Fassung aller Einträge der Akte, unveränderlich, gefiltert nach Bereich und Person. */
 import { useState } from "react";
+import { PdfDialog } from "@/components/PdfDialog";
 import { useQuery } from "@tanstack/react-query";
 import { abfrage, api } from "@/lib/api";
 import { useAerzteListe, usePraeparate, useVersorgerListe } from "@/lib/daten";
@@ -81,6 +82,7 @@ export function Verlauf() {
   const { patient } = useAkte();
   const [bereich, setBereich] = useState("");
   const [person, setPerson] = useState("");
+  const [pdf, setPdf] = useState(false);
   const anzeige = useWertAnzeige();
   const eintraege = useQuery({
     queryKey: ["patient", patient.id, "verlauf", bereich, person],
@@ -103,7 +105,9 @@ export function Verlauf() {
             <option value="">Alle Personen</option>
             {[...personen.entries()].map(([id, n]) => <option key={id} value={id}>{n}</option>)}
           </Auswahl>
-          <Knopf icon="dokument" disabled title="folgt mit der PDF-Erzeugung (F24)">Verlauf als PDF</Knopf>
+          <Knopf icon="dokument" onClick={() => setPdf(true)}>Verlauf als PDF</Knopf>
+          <PdfDialog offen={pdf} onOffen={setPdf} titel="Verlauf als PDF" dateiname={`Verlauf-${patient.nummer}.pdf`}
+            pfad={`patienten/${patient.id}/verlauf/pdf/${abfrage({ bereich, person })}`} />
         </div>
       </div>
       <Karte className="overflow-hidden">

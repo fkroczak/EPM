@@ -249,7 +249,9 @@ test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen 
   await oeffnen(bp, p.id);
   await bp.getByRole("button", { name: "Weitere Aktionen" }).click();
   await expect(bp.getByRole("menuitem", { name: "Akte abschließen" })).toHaveCount(0);
-  await expect(bp.getByRole("menuitem", { name: /Akte als PDF/ })).toHaveAttribute("aria-disabled", "true");
+  // Akte als PDF (F23): Lesen genügt
+  await bp.getByRole("menuitem", { name: "Akte als PDF" }).click();
+  await expect(bp.getByTestId("pdf-dialog").getByTestId("pdf-leser").locator("canvas").first()).toBeVisible();
   await bet.close();
 
   // Mitarbeiter schließt ab (Festlegung 01.10.2026: Mitarbeiter, Mediziner und Admin)

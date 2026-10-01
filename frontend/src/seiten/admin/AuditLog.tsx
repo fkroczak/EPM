@@ -1,5 +1,6 @@
 /** Entwurf 20 · Audit-Log: Anmeldungen, Benutzer, Vorlagen, Exporte, Abschlüsse – nur lesen, nicht änderbar. */
 import { useState } from "react";
+import { PdfDialog } from "@/components/PdfDialog";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { abfrage, alle, api } from "@/lib/api";
@@ -45,10 +46,13 @@ export function AuditLog() {
   const benutzer = useQuery({ queryKey: ["benutzer"], queryFn: () => alle<Benutzer>("benutzer/?ordering=last_name"), enabled: darf("benutzer_verwalten") });
   const gesperrt = useQuery({ queryKey: ["benutzer", "hinweise"], queryFn: () => api<Gesperrt[]>("benutzer/hinweise/"), enabled: darf("benutzer_verwalten") });
   const daten = liste.data;
+  const [pdf, setPdf] = useState(false);
   return (
     <Seite pfad={[{ text: "Administration" }, { text: "Audit-Log" }]}>
       <Seitenkopf titel="Audit-Log" unter="Alles, was nicht zu einer einzelnen Akte gehört: Anmeldungen, Benutzer, Vorlagen, Backups, Exporte."
-        rechts={<Knopf icon="dokument" disabled title="folgt mit der PDF-Erzeugung (F59)">Zeitraum als PDF</Knopf>} />
+        rechts={<Knopf icon="dokument" onClick={() => setPdf(true)}>Zeitraum als PDF</Knopf>} />
+      <PdfDialog offen={pdf} onOffen={setPdf} titel="Audit-Log als PDF" dateiname="Audit-Log.pdf"
+        pfad={`protokoll/pdf/${abfrage({ ...werte, seitengroesse: undefined })}`} />
       <div className="flex items-center gap-2.5 flex-wrap">
         <Auswahl aria-label="Zeitraum" className="w-[180px]" value={zeitraum} onChange={(e) => setZeitraum(e.target.value)}>
           {Object.entries(ZEITRAEUME).map(([k, v]) => <option key={k} value={k}>{v.text}</option>)}

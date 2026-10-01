@@ -30,6 +30,10 @@ test("Benutzer anlegen, Einmal-Kennwort, sperren und entsperren", async ({ page 
   await expect(kennwortBox).toBeVisible();
   const einmal = (await kennwortBox.locator(".num").first().textContent())?.trim() ?? "";
   expect(einmal.length).toBeGreaterThan(8);
+  // Zugangsblatt (F55) mit dem angezeigten Einmal-Kennwort
+  await kennwortBox.getByRole("button", { name: "Zugangsblatt drucken" }).click();
+  await expect(page.getByTestId("pdf-dialog").getByTestId("pdf-leser").locator("canvas").first()).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(page.getByTestId("benutzerliste")).toContainText("Dr. med. H. Heilmann");
   await expect(detail).toContainText("Einrichtung offen");
   await sitzungGilt(page, "Benutzer anlegen");
