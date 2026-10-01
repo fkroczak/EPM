@@ -8,7 +8,7 @@ from django.utils import timezone
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_create_with_history
 
-from patienten.models import AktenEintrag, Patient
+from patienten.models import AktenEintrag, Gewichtsmessung, Patient
 from stammdaten.models import Einstellungen, Praeparat
 
 # Energiegehalt je Gramm (wie im Altsystem)
@@ -18,6 +18,25 @@ KCAL_JE_G = {
     "albumin_g": Decimal(4),
     "lipide_g": Decimal(9),
 }
+
+# Gesamtvolumen = Körpergewicht × 35 ml (wie im Altsystem: $volum = round($gewicht * 35, 2); Festlegung 01.10.2026)
+ML_JE_KG = Decimal(35)
+
+# Protonenpumpenhemmer als Kurzinfusion – Codes wie im Altsystem (EPM_infuplan.php), damit der Import passt
+class Protonenpumpenhemmer(models.IntegerChoices):
+    KEIN = 0, "kein"
+    PANTOZOL_40 = 1, "Pantozol® 40 mg"
+    NEXIUM = 2, "Nexium®"
+    PANTOZOL_20 = 3, "Pantozol® 20 mg"
+
+
+# Zeiten als Bitmaske wie im Altsystem (panzeit = 4 morgens + 2 mittags + 1 abends; meist 5 = morgens und abends)
+PPI_ZEITEN = [(4, "morgens"), (2, "mittags"), (1, "abends")]
+
+
+def ppi_zeiten_text(maske) -> str:
+    return ", ".join(name for bit, name in PPI_ZEITEN if maske and maske & bit)
+
 
 # Felder, die beim neuen Entwurf vom aktuellen Plan übernommen und auf Änderung verglichen werden
 PLANFELDER = [
@@ -34,8 +53,9 @@ VERGLEICHSZEILEN = [
     ("albumin", "Humanalbumin"), ("natrium_mmol", "Natrium"), ("kalium_mmol", "Kalium"),
     ("phosphat_mmol", "Phosphat"), ("calcium_mmol", "Calcium"), ("magnesium_mmol", "Magnesium"),
     ("spurenelemente", "Spurenelemente"), ("vitamine", "Vitamine"), ("katheterschutz", "Katheterblock"),
-    ("laufzeit_h", "Laufzeit"), ("tage_pro_woche", "Tage pro Woche"), ("kcal", "Energie"),
-    ("pantozol", "Pantozol"), ("bemerkung", "Bemerkung"),
+    ("gesamtvolumen", "Gesamtvolumen"), ("laufzeit_h", "Laufzeit"), ("rate", "Rate"),
+    ("tage_pro_woche", "Tage pro Woche"), ("kcal", "Energie"),
+    ("pantozol", "Protonenpumpenhemmer"), ("bemerkung", "Bemerkung"),
 ]
 
 
@@ -92,9 +112,17 @@ class Infusionsplan(AktenEintrag):
         limit_choices_to={"kategorie": Praeparat.Kategorie.KATHETERSCHUTZ}, verbose_name="Katheterschutz (Lock)",
     )
     pantozol_stufe = models.PositiveSmallIntegerField(
-        "Pantozol", default=0, help_text="0–3 wie im Altsystem (Bedeutung wird noch festgelegt)"
+        "Protonenpumpenhemmer", default=0, choices=Protonenpumpenhemmer.choices,
+        help_text="als Kurzinfusion; Codes wie im Altsystem (Feld pantozol)",
     )
-    pantozol_tage = models.PositiveSmallIntegerField("Pantozol Tage", null=True, blank=True)
+    pantozol_tage = models.PositiveSmallIntegerField(
+        "Zeiten", null=True, blank=True, help_text="Bitmaske wie im Altsystem (panzeit): 4 morgens, 2 mittags, 1 abends"
+    )
+    # berechnet aus dem letzten Gewicht (nicht eingebbar); bleibt mit dem Plan nach der Freigabe unverändert
+    gesamtvolumen_ml = models.DecimalField("Gesamtvolumen (ml)", max_digits=7, decimal_places=2, null=True, blank=True,
+                                           editable=False)
+    volumen_gewicht_kg = models.DecimalField("Gewicht für das Gesamtvolumen (kg)", max_digits=5, decimal_places=1,
+                                             null=True, blank=True, editable=False)
     bemerkung = models.TextField(blank=True)
 
     erstellt_am = models.DateTimeField(auto_now_add=True)
@@ -138,10 +166,14 @@ class Infusionsplan(AktenEintrag):
     # --- Regeln ---
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")
-        if self.pk and not (update_fields and set(update_fields) <= {"status"}):
-            alt_status = Infusionsplan.objects.filter(pk=self.pk).values_list("status", flat=True).first()
-            if alt_status != self.Status.ENTWURF:
-                raise PermissionError("Freigegebene Pläne sind unveränderlich. Bitte einen neuen Plan anlegen.")
+        nur_status = bool(update_fields and set(update_fields) <= {"status"})
+        if not nur_status:
+            if self.pk:
+                alt_status = Infusionsplan.objects.filter(pk=self.pk).values_list("status", flat=True).first()
+                if alt_status != self.Status.ENTWURF:
+                    raise PermissionError("Freigegebene Pläne sind unveränderlich. Bitte einen neuen Plan anlegen.")
+            if self.patient_id:
+                self.berechne_volumen()  # Entwurf: immer mit dem aktuellen Gewicht; mit der Freigabe eingefroren
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
@@ -158,9 +190,28 @@ class Infusionsplan(AktenEintrag):
     def kcal(self) -> int:
         return self.kcal_manuell if self.kcal_manuell is not None else self.kcal_berechnet
 
+    def berechne_volumen(self):
+        """Gesamtvolumen aus dem letzten erfassten Gewicht (35 ml/kg); ohne Gewicht leer."""
+        letztes = (Gewichtsmessung.objects.filter(patient_id=self.patient_id)
+                   .order_by("-gemessen_am", "-id").values_list("gewicht_kg", flat=True).first())
+        self.volumen_gewicht_kg = letztes
+        self.gesamtvolumen_ml = (letztes * ML_JE_KG).quantize(Decimal("0.01")) if letztes is not None else None
+
+    @property
+    def rate_ml_h(self):
+        """Rate = Gesamtvolumen ÷ Laufzeit (ml/h)."""
+        if self.gesamtvolumen_ml is None or not self.laufzeit_h:
+            return None
+        return (self.gesamtvolumen_ml / self.laufzeit_h).quantize(Decimal("0.1"))
+
     def clean(self):
         fehler = {}
         e = Einstellungen.aktuell()
+        if self.status == self.Status.ENTWURF and self.patient_id:
+            self.berechne_volumen()
+        if self.gesamtvolumen_ml is not None and not (e.volumen_min_ml <= self.gesamtvolumen_ml <= e.volumen_max_ml):
+            fehler["gesamtvolumen_ml"] = (f"Gesamtvolumen {_zahl(self.gesamtvolumen_ml, 'ml')} liegt außerhalb der "
+                                          f"Plausibilitätsgrenzen ({_zahl(e.volumen_min_ml)}–{_zahl(e.volumen_max_ml)} ml).")
         if not (e.kcal_min_tag <= self.kcal <= e.kcal_max_tag):
             fehler["kcal_manuell"] = (f"{self.kcal} kcal liegen außerhalb der Plausibilitätsgrenzen "
                                       f"({e.kcal_min_tag}–{e.kcal_max_tag} kcal).")
@@ -174,10 +225,14 @@ class Infusionsplan(AktenEintrag):
             wert = getattr(self, feld)
             if wert is not None and not (unten <= wert <= oben):
                 fehler[feld] = f"Wert außerhalb der Plausibilitätsgrenzen ({unten}–{oben} {einheit})."
+        if self.pantozol_stufe not in Protonenpumpenhemmer.values:
+            fehler["pantozol_stufe"] = "Unbekannter Protonenpumpenhemmer."
+        if self.pantozol_tage is not None and not 0 < self.pantozol_tage <= 7:
+            fehler["pantozol_tage"] = "Zeiten: morgens, mittags und/oder abends."
         if self.pantozol_stufe and not self.pantozol_tage:
-            fehler["pantozol_tage"] = "Bitte Tage angeben, wenn Pantozol gesetzt ist."
+            fehler["pantozol_tage"] = "Bitte die Zeiten angeben (morgens, mittags, abends)."
         if not self.pantozol_stufe and self.pantozol_tage:
-            fehler["pantozol_tage"] = "Tage nur angeben, wenn Pantozol gesetzt ist."
+            fehler["pantozol_tage"] = "Zeiten nur angeben, wenn ein Protonenpumpenhemmer gewählt ist."
         for feld, praep in [("glucose_g", "glucose_praeparat"), ("aminosaeuren_g", "aminosaeuren_praeparat"),
                             ("lipide_g", "lipide_praeparat"), ("albumin_g", "albumin_praeparat")]:
             if getattr(self, feld) and not getattr(self, f"{praep}_id"):
@@ -348,12 +403,21 @@ def _anzeige(plan, schluessel):
         return " | ".join(namen) or None
     if schluessel == "laufzeit_h":
         return _zahl(plan.laufzeit_h, "h")
+    if schluessel == "gesamtvolumen":
+        if plan.gesamtvolumen_ml is None:
+            return None
+        return f"{_zahl(plan.gesamtvolumen_ml, 'ml')} (35 ml/kg × {_zahl(plan.volumen_gewicht_kg, 'kg')})"
+    if schluessel == "rate":
+        return _zahl(plan.rate_ml_h, "ml/h")
     if schluessel == "tage_pro_woche":
         return _zahl(plan.tage_pro_woche, "× pro Woche")
     if schluessel == "kcal":
         return _zahl(plan.kcal, "kcal") + (" (manuell)" if plan.kcal_manuell is not None else "")
     if schluessel == "pantozol":
-        return f"{plan.pantozol_stufe} · {plan.pantozol_tage}" if plan.pantozol_stufe else None
+        if not plan.pantozol_stufe:
+            return None
+        zeiten = ppi_zeiten_text(plan.pantozol_tage)
+        return f"{Protonenpumpenhemmer(plan.pantozol_stufe).label} · {zeiten}" if zeiten else Protonenpumpenhemmer(plan.pantozol_stufe).label
     if schluessel == "bemerkung":
         return plan.bemerkung or None
     return None

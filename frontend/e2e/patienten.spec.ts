@@ -180,6 +180,7 @@ test("Suche in der Kopfzeile (Strg K) nach Name, Nummer und Geburtsdatum", async
   await api.ende();
   const [jahr, monat, tag] = max.geburtsdatum.split("-");
   await page.goto("/");
+  await expect(page.getByTestId("angemeldet-als")).toBeVisible(); // Kopfzeile geladen, Tastenkürzel aktiv
   await page.keyboard.press("Control+k");
   const suche = page.getByRole("combobox", { name: "Suchen" });
   await expect(suche).toBeFocused();

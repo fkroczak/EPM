@@ -23,7 +23,7 @@ def _text(wert):
 
 
 EINHEITEN = {"_monate": "Monate", "_prozent": "%", "_kg": "kg", "_cm": "cm", "_mmol": "mmol", "_g": "g",
-             "_tag": "kcal"}
+             "_tag": "kcal", "_ml": "ml"}
 
 
 def aenderungen_von(obj, vorher: dict):

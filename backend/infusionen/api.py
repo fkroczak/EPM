@@ -43,6 +43,9 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
     bemerkung = RichText()
     kcal_berechnet = serializers.IntegerField(read_only=True)
     kcal = serializers.IntegerField(read_only=True)
+    gesamtvolumen_ml = serializers.DecimalField(max_digits=7, decimal_places=2, read_only=True)
+    volumen_gewicht_kg = serializers.DecimalField(max_digits=5, decimal_places=1, read_only=True)
+    rate_ml_h = serializers.DecimalField(max_digits=7, decimal_places=1, read_only=True)
     geaenderte_felder = serializers.SerializerMethodField()
     erstellt_von_name = serializers.SerializerMethodField()
     freigegeben_von_name = serializers.SerializerMethodField()
@@ -56,7 +59,8 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
             "aminosaeuren_g", "lipide_praeparat", "lipide_g", "albumin_praeparat", "albumin_g",
             "natrium_mmol", "kalium_mmol", "phosphat_mmol", "calcium_mmol", "magnesium_mmol",
             "spurenelemente", "vitamine", "vitamine_namen",
-            "kcal_manuell", "kcal_berechnet", "kcal", "laufzeit_h", "tage_pro_woche", "katheterschutz",
+            "kcal_manuell", "kcal_berechnet", "kcal", "gesamtvolumen_ml", "volumen_gewicht_kg", "laufzeit_h", "rate_ml_h",
+            "tage_pro_woche", "katheterschutz",
             "pantozol_stufe", "pantozol_tage", "bemerkung", "positionen", "geaenderte_felder",
             "erstellt_am", "erstellt_von_name", "freigegeben_am", "freigegeben_von_name",
             "pdf_datei", "pdf_sha256", "vorlage_version",

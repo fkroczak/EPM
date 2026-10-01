@@ -34,6 +34,17 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await editor.getByRole("button", { name: "+ Vitalipid adult" }).click();
   await editor.getByLabel("Laufzeit").fill("12");
   await editor.getByLabel("Tage pro Woche").fill("5");
+  // Gesamtvolumen wie im Altsystem: letztes Gewicht × 35 ml; Laufzeit manuell, Rate = Gesamtvolumen ÷ Laufzeit
+  await expect(editor.getByTestId("plan-gesamtvolumen")).toHaveText("2.100 ml");
+  await expect(editor.getByTestId("plan-rate")).toHaveText("175 ml/h");
+  await expect(editor.getByTestId("plan-volumen-hinweis")).toContainText("35 ml/kg × 60,0 kg");
+  // Protonenpumpenhemmer mit den Codes des Altsystems; Zeiten morgens/mittags/abends
+  await expect(editor.getByRole("checkbox", { name: "Morgens" })).toBeDisabled();
+  await editor.getByLabel("Präparat (Kurzinfusion)").selectOption({ label: "Pantozol® 40 mg" });
+  await editor.getByRole("button", { name: "Als Entwurf speichern" }).click();
+  await expect(editor.getByText("Bitte die Zeiten angeben (morgens, mittags, abends).")).toBeVisible();
+  await editor.getByRole("checkbox", { name: "Morgens" }).check();
+  await editor.getByRole("checkbox", { name: "Abends" }).check();
   await editor.getByRole("textbox", { name: "Kommentar" }).fill("Start der heimparenteralen Ernährung");
   const summe = editor.getByTestId("plan-summe");
   await expect(summe).toContainText("1.500 kcal");
@@ -49,6 +60,9 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(blatt).toContainText("1.500 kcal");
   await expect(blatt).toContainText("Soluvit N | Vitalipid adult");
   await expect(blatt).toContainText("Taurolin 2 %");
+  await expect(blatt.getByRole("row").filter({ hasText: "Gesamtvolumen" })).toContainText("2.100 ml (35 ml/kg × 60 kg)");
+  await expect(blatt.getByRole("row").filter({ hasText: /^Rate/ })).toContainText("175 ml/h");
+  await expect(blatt.getByRole("row").filter({ hasText: "Protonenpumpenhemmer" })).toContainText("Pantozol® 40 mg · morgens, abends");
   await expect(detail.getByTestId("planvergleich")).toHaveCount(0);
 
   // Freigeben (Recht „Pläne freigeben“)
@@ -63,6 +77,10 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await page.getByTestId("aktenkopf").getByRole("button", { name: "Neuer Plan" }).click();
   await expect(editor).toContainText("Vorbelegt mit dem aktuellen Plan vom");
   await expect(editor.getByLabel("Menge Aminosäuren in g")).toHaveValue("80");
+  await expect(editor.getByLabel("Präparat (Kurzinfusion)")).toHaveValue("1");
+  await expect(editor.getByRole("checkbox", { name: "Morgens" })).toBeChecked();
+  await expect(editor.getByRole("checkbox", { name: "Mittags" })).not.toBeChecked();
+  await expect(editor.getByTestId("plan-rate")).toHaveText("175 ml/h");
   await editor.getByLabel("Menge Glucose in g").fill("2000");
   await expect(summe).toContainText("Glucose 2.000 g außerhalb");
   await editor.getByRole("button", { name: "Als Entwurf speichern" }).click();
@@ -129,6 +147,12 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
     .toEqual([["aktuell", 80, 1500]]);
   expect([plaene.results[0].phosphat_mmol, plaene.results[0].calcium_mmol, plaene.results[0].magnesium_mmol]).toEqual([12, 9, 6]);
   expect(plaene.results[0].vitamine_namen).toEqual(["Soluvit N", "Vitalipid adult"]);
+  expect([plaene.results[0].gesamtvolumen_ml, plaene.results[0].volumen_gewicht_kg, plaene.results[0].laufzeit_h, plaene.results[0].rate_ml_h])
+    .toEqual([2100, 60, 12, 175]);
+  expect([plaene.results[0].pantozol_stufe, plaene.results[0].pantozol_tage]).toEqual([1, 5]);
+  // Übersicht der Akte zeigt Gesamtvolumen und Rate des aktuellen Plans
+  await page.goto(`/patienten/${patient.id}`);
+  await expect(page.getByTestId("plan-volumen")).toContainText("Gesamtvolumen 2.100 ml · Rate 175 ml/h");
   await api.ende();
   merken("plan", { patient: patient.id });
 });

@@ -52,6 +52,20 @@ export const GESCHLECHTER: Record<string, string> = { w: "weiblich", m: "männli
 
 export const NICKEL: Record<string, string> = { ja: "ja", nein: "nein", unbekannt: "unbekannt" };
 
+/** Protonenpumpenhemmer als Kurzinfusion; Codes wie im Altsystem (Feld pantozol) */
+export const PROTONENPUMPENHEMMER: [number, string][] = [[0, "kein"], [1, "Pantozol® 40 mg"], [3, "Pantozol® 20 mg"], [2, "Nexium®"]];
+/** Gabezeiten als Bitmaske wie im Altsystem (Feld panzeit): morgens 4, mittags 2, abends 1 */
+export const PPI_ZEITEN: [number, string][] = [[4, "morgens"], [2, "mittags"], [1, "abends"]];
+
+export function ppiName(code: number | string): string {
+  return PROTONENPUMPENHEMMER.find(([c]) => String(c) === String(code))?.[1] ?? String(code);
+}
+
+export function ppiZeiten(maske: number | string | null | undefined): string {
+  const m = Number(maske);
+  return m ? PPI_ZEITEN.filter(([bit]) => m & bit).map(([, n]) => n).join(", ") : "";
+}
+
 export type Trend = { richtung: "down" | "up" | "flat" | null; prozent: number; warnung: boolean };
 
 export type Kennzahlen = {
@@ -291,7 +305,12 @@ export type Plan = {
   kcal_manuell: number | null;
   kcal_berechnet: number;
   kcal: number;
+  /** berechnet wie im Altsystem: Körpergewicht × 35 ml, bei Freigabe eingefroren */
+  gesamtvolumen_ml: number | null;
+  volumen_gewicht_kg: number | null;
   laufzeit_h: number | null;
+  /** Gesamtvolumen ÷ Laufzeit */
+  rate_ml_h: number | null;
   tage_pro_woche: number | null;
   katheterschutz: number | null;
   pantozol_stufe: number;

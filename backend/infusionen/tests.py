@@ -153,6 +153,55 @@ class Infusionsplaene(Grundlage):
         r = c.post("/api/infusionsplaene/entwurf/", {"patient": anderer.id, "vorlage": a.id}, format="json")
         self.assertEqual(r.status_code, 400)
 
+    def test_gesamtvolumen_rate_und_protonenpumpenhemmer(self):
+        """Festlegung 01.10.2026: Gesamtvolumen = letztes Gewicht × 35 ml (wie im Altsystem), Laufzeit wird eingegeben,
+        Rate = Gesamtvolumen ÷ Laufzeit; Protonenpumpenhemmer mit den Codes des Altsystems, Zeiten als Bitmaske."""
+        c = client_fuer(self.mediziner)
+        m = client_fuer(self.mitarbeiter)
+        e = self.entwurf(c)
+        url = f"/api/infusionsplaene/{e['id']}/"
+        self.assertIsNone(c.get(url).json()["gesamtvolumen_ml"])  # ohne Gewicht kein Volumen
+        vorher = str(timezone.localdate() - timedelta(days=30))
+        m.post("/api/gewichte/", {"patient": self.patient.id, "gewicht_kg": "58.0", "gemessen_am": vorher}, format="json")
+        m.post("/api/gewichte/", {"patient": self.patient.id, "gewicht_kg": "60.0"}, format="json")
+        r = c.patch(url, {**self.plan_daten(), "pantozol_stufe": 1, "pantozol_tage": 5}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        p = r.json()
+        self.assertEqual([p["gesamtvolumen_ml"], p["volumen_gewicht_kg"], p["laufzeit_h"], p["rate_ml_h"]], [2100, 60, 12, 175])
+        zeilen = {z["schluessel"]: z for z in c.get(url + "vergleich/").json()["zeilen"]}
+        self.assertEqual(zeilen["gesamtvolumen"]["jetzt"], "2.100 ml (35 ml/kg × 60 kg)")
+        self.assertEqual(zeilen["rate"]["jetzt"], "175 ml/h")
+        self.assertEqual(zeilen["pantozol"]["jetzt"], "Pantozol® 40 mg · morgens, abends")
+        self.assertEqual(zeilen["pantozol"]["wert"], "Protonenpumpenhemmer")
+        # Freigabe friert das Volumen ein; ein neuer Entwurf rechnet mit dem neuen Gewicht
+        self.assertEqual(c.post(url + "freigeben/").status_code, 200)
+        m.post("/api/gewichte/", {"patient": self.patient.id, "gewicht_kg": "70.0"}, format="json")
+        self.assertEqual(c.get(url).json()["gesamtvolumen_ml"], 2100)
+        e2 = self.entwurf(c)
+        url2 = f"/api/infusionsplaene/{e2['id']}/"
+        self.assertEqual(c.get(url2).json()["gesamtvolumen_ml"], 2450)
+        # Plausibilitätsgrenze für das Gesamtvolumen
+        a = client_fuer(self.admin)
+        self.assertEqual(a.patch("/api/einstellungen/", {"volumen_max_ml": 2000}, format="json").status_code, 200)
+        r = c.patch(url2, {"bemerkung": "<p>x</p>"}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertIn("gesamtvolumen_ml", r.json())
+        a.patch("/api/einstellungen/", {"volumen_max_ml": 9000}, format="json")
+        # Protonenpumpenhemmer: Codes 0–3 wie im Altsystem, Zeiten Pflicht, wenn gewählt
+        for daten, feld in [({"pantozol_stufe": 2, "pantozol_tage": None}, "pantozol_tage"),
+                            ({"pantozol_stufe": 0, "pantozol_tage": 4}, "pantozol_tage"),
+                            ({"pantozol_stufe": 3, "pantozol_tage": 8}, "pantozol_tage"),
+                            ({"pantozol_stufe": 9}, "pantozol_stufe")]:
+            with self.subTest(daten=daten):
+                r = c.patch(url2, daten, format="json")
+                self.assertEqual(r.status_code, 400, r.content)
+                self.assertIn(feld, r.json())
+        r = c.patch(url2, {"pantozol_stufe": 3, "pantozol_tage": 7}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        zeilen = {z["schluessel"]: z for z in c.get(url2 + "vergleich/").json()["zeilen"]}
+        self.assertEqual(zeilen["pantozol"]["jetzt"], "Pantozol® 20 mg · morgens, mittags, abends")
+        self.assertEqual(zeilen["pantozol"]["vorher"], "Pantozol® 40 mg · morgens, abends")
+
     def test_praeparate_werden_geprueft(self):
         c = client_fuer(self.mediziner)
         e = self.entwurf(c)

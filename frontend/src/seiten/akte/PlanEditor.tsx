@@ -8,6 +8,7 @@ import type { Feldfehler } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useEinstellungen, usePraeparate } from "@/lib/daten";
 import { datum, eingabeDatum, eingabeZahl, heuteIso, kg, nummer, zahl } from "@/lib/format";
+import { PPI_ZEITEN, PROTONENPUMPENHEMMER, ppiZeiten } from "@/lib/typen";
 import type { Plan, Praeparat } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Feld, Karte, Knopf, KnopfLink, Laden, Meldung, cx } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
@@ -29,6 +30,8 @@ const MAKRO: { feld: "glucose" | "aminosaeuren" | "lipide" | "albumin"; text: st
   { feld: "lipide", text: "Lipide", kategorie: "lipide", kcal: 9 },
   { feld: "albumin", text: "Humanalbumin", kategorie: "albumin", kcal: 4 },
 ];
+/** Gesamtvolumen wie im Altsystem: Körpergewicht × 35 ml, auf 2 Stellen gerundet */
+const ML_JE_KG = 35;
 const ELEKTROLYTE: { feld: ZahlFeld; text: string }[] = [
   { feld: "natrium_mmol", text: "Natrium" }, { feld: "kalium_mmol", text: "Kalium" }, { feld: "phosphat_mmol", text: "Phosphat" },
   { feld: "calcium_mmol", text: "Calcium" }, { feld: "magnesium_mmol", text: "Magnesium" },
@@ -149,6 +152,7 @@ export function PlanEditor() {
       for (const k of AUSWAHL) daten[k] = f![k] ? Number(f![k]) : null;
       const gueltig = eingabeDatum(f!.gueltig_ab);
       if (!gueltig) fehler.gueltig_ab = "Bitte als TT.MM.JJJJ eingeben.";
+      if (f!.pantozol_stufe !== "0" && !zahlWert(f!.pantozol_tage)) fehler.pantozol_tage = "Bitte die Zeiten angeben (morgens, mittags, abends).";
       setLokal(fehler);
       if (Object.keys(fehler).length) throw new ApiFehler(400, "Bitte die markierten Felder prüfen.", null, fehler);
       Object.assign(daten, { gueltig_ab: gueltig, vitamine: f!.vitamine, bemerkung: f!.bemerkung, pantozol_stufe: Number(f!.pantozol_stufe) });
@@ -197,6 +201,13 @@ export function PlanEditor() {
   const kcalVorher = vorher ? zahlWert(vorher.kcal_manuell)
     ?? MAKRO.reduce((s, m) => s + (zahlWert(vorher[`${m.feld}_g` as ZahlFeld]) ?? 0) * m.kcal, 0) : null;
   const gewicht = patient.kopf?.gewicht ? Number(patient.kopf.gewicht.kg) : null;
+  // Gesamtvolumen aus dem letzten Gewicht (der Server rechnet beim Speichern genauso und friert es bei Freigabe ein); Laufzeit manuell
+  const volumen = gewicht != null ? Math.round(gewicht * ML_JE_KG * 100) / 100 : null;
+  const laufzeit = zahlWert(f.laufzeit_h);
+  const rate = volumen != null && laufzeit ? Math.round((volumen / laufzeit) * 10) / 10 : null;
+  const volumenVorher = vorgaenger.data?.gesamtvolumen_ml ?? null;
+  const rateVorher = vorgaenger.data?.rate_ml_h ?? null;
+  const ppiMaske = zahlWert(f.pantozol_tage) ?? 0;
   const anzahlGeaendert = vorher ? ([...ZAHLEN, ...AUSWAHL, "vitamine", "bemerkung", "pantozol_stufe"] as (keyof Formular)[]).filter(geaendert).length : 0;
   const es = einstellungen.data;
   const warnungen: string[] = [];
@@ -205,6 +216,7 @@ export function PlanEditor() {
       if (wert != null && (wert < Number(unten) || wert > Number(oben))) warnungen.push(`${text} ${zahl(wert)} ${einheit} außerhalb ${zahl(Number(unten))}–${zahl(Number(oben))} ${einheit}`);
     };
     pruefe(kcal, es.kcal_min_tag, es.kcal_max_tag, "Energie", "kcal");
+    pruefe(volumen, es.volumen_min_ml, es.volumen_max_ml, "Gesamtvolumen", "ml");
     pruefe(zahlWert(f.glucose_g), es.glucose_min_g, es.glucose_max_g, "Glucose", "g");
     pruefe(zahlWert(f.aminosaeuren_g), es.aminosaeuren_min_g, es.aminosaeuren_max_g, "Aminosäuren", "g");
     pruefe(zahlWert(f.lipide_g), es.lipide_min_g, es.lipide_max_g, "Lipide", "g");
@@ -333,19 +345,50 @@ export function PlanEditor() {
               {zahlFeld("laufzeit_h", "Laufzeit", "h", vorher ? (norm(f, "laufzeit_h") === norm(vorher, "laufzeit_h") ? "unverändert" : `vorher ${vorher.laufzeit_h || "—"} h`) : undefined)}
               {zahlFeld("tage_pro_woche", "Tage pro Woche", "×")}
             </div>
-            <span className="text-xs gedaempft" title="Unklarheit U2">Gesamtvolumen und Laufrate (ml/h): Eingabe oder Berechnung ist noch nicht geklärt (U2).</span>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-sm" data-testid="plan-volumen">
+              <span className="gedaempft">Gesamtvolumen</span>
+              <span className="num text-right" data-testid="plan-gesamtvolumen">
+                {volumen != null ? `${zahl(volumen)} ml` : "—"}
+                {volumenVorher != null && volumen != null && Math.abs(volumenVorher - volumen) >= 0.01 ? <span className="text-warn"> vorher {zahl(volumenVorher)} ml</span> : null}
+              </span>
+              <span className="gedaempft">Rate</span>
+              <span className="num text-right" data-testid="plan-rate">
+                {rate != null ? `${zahl(rate)} ml/h` : "—"}
+                {rateVorher != null && rate != null && Math.abs(rateVorher - rate) >= 0.05 ? <span className="text-warn"> vorher {zahl(rateVorher)} ml/h</span> : null}
+              </span>
+            </div>
+            <span className={cx("text-xs", e.gesamtvolumen_ml ? "fehlertext" : "gedaempft")} role={e.gesamtvolumen_ml ? "alert" : undefined}
+              data-testid="plan-volumen-hinweis">
+              {e.gesamtvolumen_ml ?? (gewicht != null
+                ? `Berechnet: ${ML_JE_KG} ml/kg × ${kg(gewicht)} (letztes Gewicht). Rate = Gesamtvolumen ÷ Laufzeit. Bei Freigabe festgeschrieben.`
+                : "Kein Gewicht erfasst: Gesamtvolumen und Rate werden berechnet, sobald ein Gewicht eingetragen ist.")}
+            </span>
           </Karte>
           <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
-            <h3 className="lbl m-0">Pantozol</h3>
-            <Feld label="Pantozol" hinweis="Bedeutung der Stufen noch offen (U1)" fehler={e.pantozol_stufe}>
+            <h3 className="lbl m-0">Protonenpumpenhemmer</h3>
+            <Feld label="Präparat (Kurzinfusion)" fehler={e.pantozol_stufe}>
               {(pp) => (
                 <Auswahl {...pp} value={f.pantozol_stufe} onChange={(ev) => setF((a) => ({ ...a!, pantozol_stufe: ev.target.value, pantozol_tage: ev.target.value === "0" ? "" : a!.pantozol_tage }))}
                   className={cx(geaendert("pantozol_stufe") && "border-warn bg-warn-bg")}>
-                  <option value="0">kein</option><option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                  {PROTONENPUMPENHEMMER.map(([code, text]) => <option key={code} value={code}>{text}</option>)}
                 </Auswahl>
               )}
             </Feld>
-            {zahlFeld("pantozol_tage", "Pantozol-Zeit", "", "Einheit noch offen (U1) · im Altsystem Werte 1–7, meist 5")}
+            <fieldset className={cx("m-0 flex flex-col gap-1.5 rounded-lg", geaendert("pantozol_tage") ? "bg-warn-bg border border-warn p-2" : "border-0 p-0")}
+              disabled={f.pantozol_stufe === "0"} aria-describedby={e.pantozol_tage ? "ppi-zeiten-fehler" : undefined}>
+              <legend className="text-sm font-medium p-0 mb-1">Zeiten</legend>
+              <div className="flex gap-4 flex-wrap">
+                {PPI_ZEITEN.map(([bit, text]) => (
+                  <label key={bit} className="flex items-center gap-1.5 text-sm">
+                    <input type="checkbox" checked={(ppiMaske & bit) !== 0}
+                      onChange={(ev) => setze("pantozol_tage")(String((ev.target.checked ? ppiMaske | bit : ppiMaske & ~bit) || ""))} />
+                    {text.charAt(0).toUpperCase() + text.slice(1)}
+                  </label>
+                ))}
+              </div>
+              {e.pantozol_tage ? <span id="ppi-zeiten-fehler" className="fehlertext" role="alert">{e.pantozol_tage}</span>
+                : vorher && geaendert("pantozol_tage") ? <span className="hinweis">vorher {ppiZeiten(zahlWert(vorher.pantozol_tage)) || "—"}</span> : null}
+            </fieldset>
           </Karte>
           <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="plan-summe">
             <h3 className="lbl m-0">Summe</h3>

@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { abfrage, api } from "@/lib/api";
 import { usePraeparate, useVersorgerListe } from "@/lib/daten";
 import { datum, uhrzeit } from "@/lib/format";
-import { ABSCHLUSSANLAESSE, GESCHLECHTER, GEWICHTSQUELLEN, TERMINARTEN } from "@/lib/typen";
+import { ABSCHLUSSANLAESSE, GESCHLECHTER, GEWICHTSQUELLEN, TERMINARTEN, ppiName, ppiZeiten } from "@/lib/typen";
 import type { Auswahlwert, Verlaufseintrag } from "@/lib/typen";
 import { Auswahl, Chip, Fehleranzeige, Karte, Knopf, Laden, Leer, Segmente } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
@@ -37,7 +37,8 @@ const FELDER: Record<string, string> = {
   aminosaeuren_g: "Aminosäuren (g)", lipide_praeparat: "Lipid-Präparat", lipide_g: "Lipide (g)", albumin_praeparat: "Albumin-Präparat",
   albumin_g: "Albumin (g)", natrium_mmol: "Natrium", kalium_mmol: "Kalium", phosphat_mmol: "Phosphat", calcium_mmol: "Calcium",
   magnesium_mmol: "Magnesium", spurenelemente: "Spurenelemente", katheterschutz: "Katheterblock", laufzeit_h: "Laufzeit (h)",
-  tage_pro_woche: "Tage pro Woche", pantozol_stufe: "Pantozol", pantozol_tage: "Pantozol-Zeit", kcal_manuell: "Energie (manuell)",
+  tage_pro_woche: "Tage pro Woche", pantozol_stufe: "Protonenpumpenhemmer", pantozol_tage: "PPI-Zeiten", kcal_manuell: "Energie (manuell)",
+  gesamtvolumen_ml: "Gesamtvolumen (ml)", volumen_gewicht_kg: "Gewicht für das Gesamtvolumen (kg)",
 };
 /** technische Felder, die sich bei jeder Aktion mitändern */
 const VERBORGEN = new Set(["geaendert_am", "erfasst_am", "angelegt_am", "hochgeladen_am", "freigegeben_am", "freigegeben_von",
@@ -59,6 +60,8 @@ function useWertAnzeige() {
     if (feld === "quelle") return GEWICHTSQUELLEN[wert] ?? wert;
     if (feld === "abschluss_anlass") return ABSCHLUSSANLAESSE[wert] ?? wert;
     if (feld === "art") return TERMINARTEN[wert] ?? wert;
+    if (feld === "pantozol_stufe") return ppiName(wert);
+    if (feld === "pantozol_tage") return ppiZeiten(wert) || wert;
     if (wert === "True") return "ja";
     if (wert === "False") return "nein";
     if (/^\d{4}-\d{2}-\d{2}$/.test(wert)) return datum(wert);

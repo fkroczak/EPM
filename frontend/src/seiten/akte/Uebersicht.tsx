@@ -281,7 +281,10 @@ function PlanKarte() {
             <div className="flex flex-col"><span className="num text-lg font-semibold">{aktuell.laufzeit_h != null ? `${zahl(aktuell.laufzeit_h)} h` : "—"}</span><span className="text-xs gedaempft">Laufzeit</span></div>
             <div className="flex flex-col"><span className="num text-lg font-semibold">{plan.data?.tage_pro_woche != null ? `${plan.data.tage_pro_woche}×` : "—"}</span><span className="text-xs gedaempft">pro Woche</span></div>
           </div>
-          <span className="text-xs gedaempft" title="Unklarheit U2: Gesamtvolumen und Laufzeit eingeben oder berechnen?">Gesamtvolumen und Rate (ml/h): Klärung offen (U2)</span>
+          <span className="text-[0.8125rem]" data-testid="plan-volumen">
+            Gesamtvolumen <span className="num">{plan.data?.gesamtvolumen_ml != null ? `${zahl(plan.data.gesamtvolumen_ml)} ml` : "—"}</span>
+            {" · "}Rate <span className="num">{plan.data?.rate_ml_h != null ? `${zahl(plan.data.rate_ml_h)} ml/h` : "—"}</span>
+          </span>
           <span className="text-[0.8125rem] gedaempft">
             gültig ab {datum(aktuell.gueltig_ab)}
             {plan.data?.freigegeben_am ? ` · Freigegeben ${zeitpunkt(plan.data.freigegeben_am)}${plan.data.freigegeben_von_name ? ` · ${plan.data.freigegeben_von_name}` : ""}` : ""}

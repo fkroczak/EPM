@@ -160,6 +160,9 @@ class Einstellungen(models.Model):
     natrium_max_mmol = models.DecimalField("Natrium maximal", max_digits=6, decimal_places=1, default=Decimal("500"))
     kalium_min_mmol = models.DecimalField("Kalium minimal", max_digits=6, decimal_places=1, default=Decimal("0"))
     kalium_max_mmol = models.DecimalField("Kalium maximal", max_digits=6, decimal_places=1, default=Decimal("300"))
+    # Gesamtvolumen = Gewicht × 35 ml (Festlegung 01.10.2026); Standard deckt 20–250 kg ab
+    volumen_min_ml = models.DecimalField("Gesamtvolumen minimal", max_digits=7, decimal_places=0, default=Decimal("0"))
+    volumen_max_ml = models.DecimalField("Gesamtvolumen maximal", max_digits=7, decimal_places=0, default=Decimal("9000"))
 
     history = HistoricalRecords()
 
@@ -171,7 +174,7 @@ class Einstellungen(models.Model):
         ("gewicht_min_kg", "gewicht_max_kg"), ("groesse_min_cm", "groesse_max_cm"), ("kcal_min_tag", "kcal_max_tag"),
         ("glucose_min_g", "glucose_max_g"), ("aminosaeuren_min_g", "aminosaeuren_max_g"),
         ("lipide_min_g", "lipide_max_g"), ("natrium_min_mmol", "natrium_max_mmol"),
-        ("kalium_min_mmol", "kalium_max_mmol"),
+        ("kalium_min_mmol", "kalium_max_mmol"), ("volumen_min_ml", "volumen_max_ml"),
     ]
 
     def save(self, *args, **kwargs):
