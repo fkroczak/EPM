@@ -27,6 +27,7 @@ OPTIONEN = {
     "schrift": {"klein", "normal", "gross"},
     "ausrichtung": {"links", "mitte", "rechts"},
     "fett": bool, "kursiv": bool, "ausblenden_wenn_leer": bool, "nicht_teilen": bool,
+    "ueberschrift": bool,  # Bezeichnung als Überschrift über dem Block drucken
 }
 MAX_BLOECKE = 60
 MAX_FELDER = 30
@@ -153,14 +154,14 @@ STARTVORLAGEN = {
         {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf"},
         {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Infusionsplan",
          "zusatz_label": "gültig ab", "zusatz": "{{Plan.gültig_ab}}"},
-        {"id": "patient", "typ": "datenfelder", "bezeichnung": "Patientendaten", "spalten": 4, "felder": [
+        {"id": "patient", "typ": "datenfelder", "bezeichnung": "Patientendaten", "spalten": 1, "felder": [
             {"label": "Patient", "wert": "{{Patient.Name}}"}, {"label": "Geboren", "wert": "{{Patient.Geburtsdatum}}"},
             {"label": "Gewicht", "wert": "{{Patient.Gewicht}}"}, {"label": "Versorger", "wert": "{{Versorger.Firma}}"}]},
         {"id": "zusammensetzung", "typ": "tabelle", "bezeichnung": "Zusammensetzung", "quelle": "zusammensetzung"},
         {"id": "elektrolyte", "typ": "datenfelder", "bezeichnung": "Elektrolyte", "spalten": 5, "felder": [
             {"label": "Na", "wert": "{{Na}}"}, {"label": "K", "wert": "{{K}}"}, {"label": "Phosphat", "wert": "{{PO4}}"},
             {"label": "Ca", "wert": "{{Ca}}"}, {"label": "Mg", "wert": "{{Mg}}"}]},
-        {"id": "zusaetze", "typ": "datenfelder", "bezeichnung": "Zusätze und Laufzeit", "spalten": 2, "felder": [
+        {"id": "zusaetze", "typ": "datenfelder", "bezeichnung": "Zusätze und Laufzeit", "spalten": 1, "felder": [
             {"label": "Spurenelemente", "wert": "{{Spurenelemente}}"}, {"label": "Vitamine", "wert": "{{Vitamine}}"},
             {"label": "Katheterblock", "wert": "{{Katheterblock}}"},
             {"label": "Protonenpumpenhemmer", "wert": "{{Plan.Protonenpumpenhemmer}}"},
@@ -184,11 +185,11 @@ STARTVORLAGEN = {
         {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf"},
         {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Patientendatenblatt",
          "zusatz_label": "Stand", "zusatz": "{{Heute}}"},
-        {"id": "person", "typ": "datenfelder", "bezeichnung": "Person", "spalten": 2, "felder": [
+        {"id": "person", "typ": "datenfelder", "bezeichnung": "Person", "spalten": 1, "felder": [
             {"label": "Name", "wert": "{{Patient.Name}}"}, {"label": "Nr.", "wert": "{{Patient.Nummer}}"},
             {"label": "Geboren", "wert": "{{Patient.Geburtsdatum}}"}, {"label": "Anschrift", "wert": "{{Patient.Anschrift}}"},
             {"label": "Telefon", "wert": "{{Patient.Telefon}}"}]},
-        {"id": "betreuung", "typ": "datenfelder", "bezeichnung": "Betreuung", "spalten": 2, "felder": [
+        {"id": "betreuung", "typ": "datenfelder", "bezeichnung": "Betreuung", "spalten": 1, "felder": [
             {"label": "Hausarzt", "wert": "{{Patient.Hausarzt}}"},
             {"label": "Versorger", "wert": "{{Versorger.Firma}} · {{Versorger.Telefon}}"},
             {"label": "Katheter", "wert": "{{Patient.Katheter}}"},

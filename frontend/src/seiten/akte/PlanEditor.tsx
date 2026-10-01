@@ -440,7 +440,7 @@ export function PlanEditor() {
             <Knopf type="submit" laedt={speichern.isPending && speichern.variables === false} disabled={speichern.isPending}>Als Entwurf speichern</Knopf>
             <span className="text-xs gedaempft leading-normal">
               Freigeben darf, wer das Recht „Pläne freigeben“ hat (Mediziner). Der vorherige Plan bleibt im Verlauf erhalten.
-              Die PDF bei Freigabe folgt mit der PDF-Erzeugung (F51).
+              Bei der Freigabe wird die PDF mit der aktiven Dokumentvorlage erzeugt und mit Prüfsumme gespeichert.
             </span>
           </div>
         </aside>

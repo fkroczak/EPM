@@ -1,0 +1,530 @@
+/**
+ * Entwurf 18 · Dokumentvorlagen: Infusionsplan und Patientendatenblatt aus Blöcken (WYSIWYG).
+ * Aufbau links, Seite in der Mitte, Eigenschaften des markierten Blocks rechts. Platzhalter nur aus der festen Liste
+ * des Servers. Entwurf → Veröffentlichen; jede Version bleibt erhalten, freigegebene Pläne behalten ihr PDF.
+ */
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiFehler, abfrage, api, apiDatei } from "@/lib/api";
+import type { Seite as Seitenliste } from "@/lib/api";
+import { useBriefkopf } from "@/lib/daten";
+import { datum, zeitpunkt } from "@/lib/format";
+import { Seite } from "@/components/layout/Shell";
+import { Logo } from "@/components/layout/logo";
+import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Seitenkopf, Segmente, Textfeld, cx } from "@/components/ui/basis";
+import { Dialog } from "@/components/ui/dialog";
+import { useHinweis } from "@/components/ui/hinweise";
+import { Icon } from "@/components/ui/icon";
+import { useSortierbar } from "@/components/ui/sortierbar";
+import { PdfLeser } from "@/components/PdfAnsicht";
+
+type Art = "infusionsplan" | "patientendatenblatt";
+type Optionen = {
+  schrift?: "klein" | "normal" | "gross"; ausrichtung?: "links" | "mitte" | "rechts"; fett?: boolean; kursiv?: boolean;
+  ausblenden_wenn_leer?: boolean; nicht_teilen?: boolean; ueberschrift?: boolean;
+};
+type Eintrag = { label: string; wert: string };
+export type Block = {
+  id: string; typ: string; bezeichnung?: string; optionen?: Optionen;
+  text?: string; zusatz_label?: string; zusatz?: string; spalten?: number; felder?: Eintrag[]; quelle?: string;
+  linie?: string; hoehe_mm?: number;
+};
+type Version = {
+  id: number; version: number | null; status: "entwurf" | "aktiv" | "abgeloest"; notiz: string; erstellt_am: string;
+  geaendert_am: string; geaendert_von: string | null; veroeffentlicht_am: string | null; veroeffentlicht_von: string | null;
+};
+type Uebersicht = { art: Art; name: string; aktiv: Version; entwurf: Version | null; versionen: Version[] };
+type Aufbau = Uebersicht & {
+  bausteine: { typ: string; name: string }[];
+  felder: { name: string; beschreibung: string; html: boolean }[];
+  tabellen: { quelle: string; name: string; spalten: string[] }[];
+};
+type Entwurf = Version & { ist_entwurf: boolean; grundlage?: number; bloecke: Block[] };
+
+const TYPNAME: Record<string, string> = {
+  briefkopf: "Briefkopf", titel: "Titel", text: "Text", datenfelder: "Datenfelder", tabelle: "Tabelle", trennlinie: "Trennlinie",
+  leerraum: "Leerraum", unterschrift: "Unterschrift", seitenumbruch: "Seitenumbruch", fusszeile: "Fußzeile",
+};
+const HINWEIS: Record<string, string> = {
+  briefkopf: "Logo und Absender aus „Briefkopf und Logo“. Änderungen dort gelten für neue PDFs.",
+  titel: "Überschrift des Dokuments, rechts daneben ein Zusatz wie „gültig ab“.",
+  text: "Freier Text. Datenfelder werden beim Erzeugen eingesetzt.",
+  datenfelder: "Bezeichnung links, Wert rechts. Mehrere Spalten setzen Paare nebeneinander.",
+  tabelle: "Feste Spalten; die Zeilen kommen aus der Akte bzw. dem Plan.",
+  trennlinie: "Waagerechte Linie.",
+  leerraum: "Abstand in Millimetern.",
+  unterschrift: "Angaben zur Freigabe und eine Linie für die Unterschrift.",
+  seitenumbruch: "Alles danach beginnt auf einer neuen Seite.",
+  fusszeile: "Steht auf jeder Seite unten. {Seite} und {Seiten} werden zur Seitenzahl.",
+};
+/** Bausteine aus dem Entwurf; Briefkopf, Titel und Fußzeile gibt es je Vorlage einmal */
+const BAUSTEINE = ["text", "datenfelder", "tabelle", "trennlinie", "leerraum", "unterschrift", "seitenumbruch", "titel", "briefkopf", "fusszeile"];
+const PLATZHALTER = /\{\{\s*([^{}]+?)\s*\}\}/g;
+
+function neueId(typ: string, bloecke: Block[]): string {
+  let i = 1;
+  while (bloecke.some((b) => b.id === `${typ}-${i}`)) i += 1;
+  return `${typ}-${i}`;
+}
+
+function neuerBlock(typ: string, bloecke: Block[], tabellen: Aufbau["tabellen"]): Block {
+  const b: Block = { id: neueId(typ, bloecke), typ, bezeichnung: TYPNAME[typ] };
+  if (typ === "titel") Object.assign(b, { text: "Titel", zusatz_label: "", zusatz: "" });
+  if (typ === "text") b.text = "Text";
+  if (typ === "fusszeile") b.text = "{{Absender.Name}} · Seite {Seite}/{Seiten}";
+  if (typ === "datenfelder") Object.assign(b, { spalten: 1, felder: [{ label: "Bezeichnung", wert: "{{Heute}}" }] });
+  if (typ === "tabelle") b.quelle = tabellen[0]?.quelle;
+  if (typ === "unterschrift") Object.assign(b, { felder: [], linie: "Unterschrift" });
+  if (typ === "leerraum") b.hoehe_mm = 6;
+  return b;
+}
+
+/** Text mit Platzhaltern als Chips (wie im Entwurf) */
+function MitFeldern({ text }: { text?: string }) {
+  const teile: ReactNode[] = [];
+  let pos = 0;
+  for (const m of (text ?? "").matchAll(PLATZHALTER)) {
+    teile.push(text!.slice(pos, m.index));
+    teile.push(<span key={m.index} className="feldchip">{m[1]}</span>);
+    pos = (m.index ?? 0) + m[0].length;
+  }
+  teile.push((text ?? "").slice(pos));
+  return <>{teile.map((t, i) => typeof t === "string" ? <Fragment key={`t${i}`}>{t.split("\n").map((z, j) => <Fragment key={j}>{j ? <br /> : null}{z}</Fragment>)}</Fragment> : t)}</>;
+}
+
+function stil(o?: Optionen): string {
+  return cx(o?.schrift === "klein" && "text-[9px]", o?.schrift === "gross" && "text-[13px]", o?.fett && "font-semibold",
+    o?.kursiv && "italic", o?.ausrichtung === "mitte" && "text-center", o?.ausrichtung === "rechts" && "text-right");
+}
+
+function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] }) {
+  const briefkopf = useBriefkopf();
+  const a = briefkopf.data ? briefkopf.data.absender[briefkopf.data.aktiv] : null;
+  const kopf = b.optionen?.ueberschrift && b.bezeichnung ? <div className="text-[8.5px] font-semibold uppercase tracking-wider text-[#5d5b72] mb-1">{b.bezeichnung}</div> : null;
+  switch (b.typ) {
+    case "briefkopf":
+      return (
+        <div className="flex justify-between items-center pb-2 border-b-2 border-[#251F53]">
+          <Logo className="w-[150px] h-[53px]" version={briefkopf.data?.logo.sha256} />
+          <div className="flex flex-col items-end text-[9px] text-[#555]">
+            {a ? <><span>{a.strasse} · {a.plz} {a.ort}</span><span>Tel. {a.telefon}</span><span>{a.email}</span></> : null}
+          </div>
+        </div>
+      );
+    case "titel":
+      return (
+        <div className={cx("flex justify-between items-baseline", stil(b.optionen))}>
+          <span className="text-[16px] font-semibold"><MitFeldern text={b.text} /></span>
+          <span className="text-[10px] text-[#555]">{b.zusatz_label} <MitFeldern text={b.zusatz} /></span>
+        </div>
+      );
+    case "text":
+      return <div className={cx("text-[10px] leading-relaxed", stil(b.optionen))}>{kopf}<MitFeldern text={b.text} /></div>;
+    case "fusszeile":
+      return <div className="text-[8.5px] text-[#777] text-center"><MitFeldern text={b.text} /></div>;
+    case "datenfelder":
+    case "unterschrift": {
+      const n = b.typ === "unterschrift" ? Math.min(Math.max(b.felder?.length ?? 1, 1), 4) : b.spalten ?? 1;
+      const felder = b.felder ?? [];
+      const zeilen = Array.from({ length: Math.ceil(felder.length / n) }, (_, i) => felder.slice(i * n, i * n + n));
+      return (
+        <div className={stil(b.optionen)}>
+          {kopf}
+          <table className="w-full border-collapse text-[10px]"><tbody>
+            {zeilen.map((z, i) => (
+              <tr key={i}>{z.map((e, j) => <Fragment key={j}>
+                <td className="py-[3px] pr-2 text-[#666] border-b border-[#eee] align-top" style={{ width: `${36 / n}%` }}>{e.label}</td>
+                <td className="py-[3px] pr-2 border-b border-[#eee] align-top"><MitFeldern text={e.wert} /></td>
+              </Fragment>)}</tr>
+            ))}
+          </tbody></table>
+          {b.typ === "unterschrift" ? <div className="mt-6 w-[200px] border-t border-[#1b1932] pt-0.5 text-[8.5px] text-[#5d5b72]">{b.linie || "Unterschrift"}</div> : null}
+        </div>
+      );
+    }
+    case "tabelle": {
+      const t = tabellen.find((x) => x.quelle === b.quelle);
+      return (
+        <div className={stil(b.optionen)}>
+          {kopf}
+          <table className="w-full border-collapse text-[10px]">
+            <thead><tr>{(t?.spalten ?? []).map((s) => <th key={s} className="text-left font-semibold text-[#666] border-b border-[#ccc] py-[3px] pr-2">{s}</th>)}</tr></thead>
+            <tbody><tr><td colSpan={t?.spalten.length ?? 1} className="py-[3px] text-[#888] italic">{t?.name ?? "unbekannte Tabelle"}</td></tr></tbody>
+          </table>
+        </div>
+      );
+    }
+    case "trennlinie":
+      return <hr className="border-0 border-t border-[#ccc] m-0" />;
+    case "leerraum":
+      return <div style={{ height: (b.hoehe_mm ?? 6) * 2.1 }} className="bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,#f2f1f6_4px,#f2f1f6_8px)]" />;
+    case "seitenumbruch":
+      return <div className="text-center text-[9px] text-[#888] border-t border-dashed border-[#bbb] pt-0.5">Seitenumbruch</div>;
+    default:
+      return null;
+  }
+}
+
+export function Dokumentvorlagen() {
+  const [art, setArt] = useState<Art>("infusionsplan");
+  return (
+    <Seite pfad={[{ text: "Administration" }, { text: "Vorlagen", zu: "/admin/vorlagen" }, { text: "Dokumentvorlagen" }]}>
+      <EditorFuerArt key={art} art={art} setArt={setArt} />
+    </Seite>
+  );
+}
+
+function EditorFuerArt({ art, setArt }: { art: Art; setArt: (a: Art) => void }) {
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const aufbau = useQuery({ queryKey: ["vorlagen", art], queryFn: () => api<Aufbau>(`vorlagen/${art}/`) });
+  const entwurf = useQuery({ queryKey: ["vorlagen", art, "entwurf"], queryFn: () => api<Entwurf>(`vorlagen/${art}/entwurf/`) });
+  const [bloecke, setBloecke] = useState<Block[] | null>(null);
+  const [geladen, setGeladen] = useState("");
+  const [auswahl, setAuswahl] = useState<string | null>(null);
+  const [vorschau, setVorschau] = useState(false);
+  const [veroeffentlichen, setVeroeffentlichen] = useState(false);
+  const [verwerfen, setVerwerfen] = useState(false);
+  const fokus = useRef<{ setze: (feld: string) => void } | null>(null);
+
+  useEffect(() => {
+    if (entwurf.data && bloecke === null) {
+      setBloecke(structuredClone(entwurf.data.bloecke));
+      setGeladen(JSON.stringify(entwurf.data.bloecke));
+      setAuswahl(entwurf.data.bloecke[0]?.id ?? null);
+    }
+  }, [entwurf.data, bloecke]);
+
+  const neuLaden = (b: Block[]) => { setBloecke(structuredClone(b)); setGeladen(JSON.stringify(b)); };
+  const geaendert = bloecke !== null && JSON.stringify(bloecke) !== geladen;
+
+  const speichern = useMutation({
+    mutationFn: () => api<Entwurf>(`vorlagen/${art}/entwurf/`, { method: "PUT", body: { bloecke } }),
+    onSuccess: (e) => {
+      neuLaden(e.bloecke);
+      qc.setQueryData(["vorlagen", art, "entwurf"], e);
+      void qc.invalidateQueries({ queryKey: ["vorlagen", art], exact: true });
+      melden("Entwurf gespeichert.");
+    },
+  });
+  const freigeben = useMutation({
+    mutationFn: async () => {
+      if (geaendert || !entwurf.data?.ist_entwurf) await api(`vorlagen/${art}/entwurf/`, { method: "PUT", body: { bloecke } });
+      return api<Uebersicht>(`vorlagen/${art}/veroeffentlichen/`, { method: "POST" });
+    },
+    onSuccess: (u) => {
+      setVeroeffentlichen(false);
+      setBloecke(null);
+      void qc.invalidateQueries({ queryKey: ["vorlagen"] });
+      melden(`Version ${u.aktiv.version} veröffentlicht. Sie gilt ab sofort für neue PDFs.`);
+    },
+  });
+  const verwerfenM = useMutation({
+    mutationFn: () => api(`vorlagen/${art}/entwurf/`, { method: "DELETE" }),
+    onSuccess: () => {
+      setVerwerfen(false);
+      setBloecke(null);
+      void qc.invalidateQueries({ queryKey: ["vorlagen"] });
+      melden("Entwurf verworfen.");
+    },
+  });
+  const uebernehmen = useMutation({
+    mutationFn: (v: number) => api<Entwurf>(`vorlagen/${art}/versionen/${v}/`),
+    onSuccess: (v) => { setBloecke(structuredClone(v.bloecke)); setAuswahl(v.bloecke[0]?.id ?? null); melden(`Version ${v.version} als Grundlage geladen – noch nicht gespeichert.`); },
+  });
+
+  const sort = useSortierbar(bloecke ?? [], (neu) => setBloecke(neu));
+  if (!aufbau.data || !entwurf.data || !bloecke) return <><Fehleranzeige fehler={aufbau.error ?? entwurf.error} /><Laden /></>;
+  const a = aufbau.data;
+  const gewaehlt = bloecke.find((b) => b.id === auswahl) ?? null;
+  const index = gewaehlt ? bloecke.indexOf(gewaehlt) : -1;
+  const aendere = (neu: Partial<Block>) => setBloecke(bloecke.map((b) => (b.id === auswahl ? { ...b, ...neu } : b)));
+  const aendereOptionen = (neu: Partial<Optionen>) => aendere({ optionen: { ...gewaehlt?.optionen, ...neu } });
+  const verschiebe = (i: number, nach: number) => {
+    if (nach < 0 || nach >= bloecke.length) return;
+    const neu = [...bloecke];
+    const [x] = neu.splice(i, 1);
+    neu.splice(nach, 0, x);
+    setBloecke(neu);
+  };
+  const entferne = (id: string) => { const neu = bloecke.filter((b) => b.id !== id); setBloecke(neu); setAuswahl(neu[0]?.id ?? null); };
+  const hinzufuegen = (typ: string) => {
+    const b = neuerBlock(typ, bloecke, a.tabellen);
+    const nach = typ === "briefkopf" ? 0 : typ === "fusszeile" ? bloecke.length : index >= 0 ? index + 1 : bloecke.length;
+    const neu = [...bloecke];
+    neu.splice(nach, 0, b);
+    setBloecke(neu);
+    setAuswahl(b.id);
+  };
+  const einmal = (typ: string) => ["briefkopf", "fusszeile"].includes(typ) && bloecke.some((b) => b.typ === typ);
+  const serverFehler = [speichern.error, freigeben.error].find((e) => e instanceof ApiFehler) as ApiFehler | undefined;
+  const fehlerListe = serverFehler ? (Array.isArray((serverFehler.daten as { bloecke?: string[] })?.bloecke)
+    ? (serverFehler.daten as { bloecke: string[] }).bloecke : [serverFehler.message]) : [];
+  const verInfo = geaendert ? "Ungespeicherte Änderungen"
+    : entwurf.data.ist_entwurf ? `Entwurf · gespeichert ${zeitpunkt(entwurf.data.geaendert_am)}`
+    : `Version ${a.aktiv.version} ist aktiv`;
+
+  return (
+    <div className="flex flex-col gap-5" data-testid="dokumentvorlagen">
+      <Seitenkopf titel="Dokumentvorlagen bearbeiten" unter={<span>Vorlagen / Dokumentvorlagen</span>}
+        rechts={<div className="flex items-center gap-2.5 flex-wrap">
+          <span className="text-[0.8125rem] gedaempft" data-testid="vorlage-stand">{verInfo}</span>
+          <Knopf icon="dokument" onClick={() => setVorschau(true)}>Vorschau mit Testpatient</Knopf>
+          <Knopf laedt={speichern.isPending} disabled={!geaendert} onClick={() => speichern.mutate()}>Entwurf speichern</Knopf>
+          <Knopf variante="pri" icon="haken" onClick={() => setVeroeffentlichen(true)} disabled={!geaendert && !entwurf.data.ist_entwurf}>Veröffentlichen</Knopf>
+        </div>} />
+      <Segmente label="Vorlage" wert={art} onWahl={(w) => { if (!geaendert || window.confirm("Ungespeicherte Änderungen verwerfen?")) setArt(w); }}
+        werte={[{ wert: "infusionsplan", text: "Infusionsplan" }, { wert: "patientendatenblatt", text: "Patientendatenblatt" }]} className="self-start" />
+      {fehlerListe.length ? <Meldung art="fehler"><ul className="m-0 pl-4" data-testid="vorlage-fehler">{fehlerListe.map((f) => <li key={f}>{f}</li>)}</ul></Meldung> : null}
+
+      <div className="grid grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)_300px] gap-5 items-start">
+        <aside className="flex flex-col gap-3.5 min-w-0">
+          <Karte className="p-2.5 flex flex-col gap-0.5" data-testid="aufbau">
+            <span className="lbl px-1.5 pb-1.5 pt-1">Aufbau</span>
+            {bloecke.map((b, i) => (
+              <div key={b.id} {...sort.zeile(i)} className={cx("flex items-center rounded-md", sort.ueber === i && "outline outline-2 outline-akzent")}>
+                <button type="button" aria-current={b.id === auswahl ? "true" : undefined} onClick={() => setAuswahl(b.id)}
+                  className={cx("flex-1 flex justify-between items-center gap-2 px-2.5 py-[7px] border-0 rounded-md text-[13.5px] text-left cursor-pointer",
+                    b.id === auswahl ? "bg-akzent-weich text-akzent-text font-medium" : "bg-transparent hover:bg-fein")}>
+                  <span className="truncate">{b.bezeichnung || TYPNAME[b.typ]}</span>
+                  <span className="text-[11.5px] gedaempft shrink-0">{TYPNAME[b.typ]}</span>
+                </button>
+                <span tabIndex={0} {...sort.griff(i, b.bezeichnung || TYPNAME[b.typ], `vorlage-${art}`)} className="px-1 cursor-grab gedaempft"><Icon name="griff" /></span>
+              </div>
+            ))}
+          </Karte>
+          <Karte className="p-3 flex flex-col gap-2" data-testid="bausteine">
+            <span className="lbl">Bausteine</span>
+            <div className="flex flex-wrap gap-1.5">
+              {BAUSTEINE.filter((t) => a.bausteine.some((x) => x.typ === t)).map((t) => (
+                <button key={t} type="button" disabled={einmal(t)} onClick={() => hinzufuegen(t)}
+                  className="px-2.5 py-1.5 border border-dashed border-rand rounded-lg bg-flaeche text-[13px] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                  + {TYPNAME[t]}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs gedaempft leading-normal">Neuer Block kommt hinter den markierten. Reihenfolge per Ziehen im Aufbau, mit den Pfeiltasten am Griff oder mit ↑ ↓ am markierten Block.</span>
+          </Karte>
+          <Karte className="p-3.5 flex flex-col gap-1.5" data-testid="versionen">
+            <span className="lbl">Versionen</span>
+            <ul className="m-0 p-0 list-none flex flex-col gap-1 text-[13px]">
+              {a.entwurf ? <li><strong>Entwurf</strong> · {datum(a.entwurf.geaendert_am)}{a.entwurf.geaendert_von ? ` · ${a.entwurf.geaendert_von}` : ""}</li> : null}
+              {a.versionen.map((v) => (
+                <li key={v.id} className="flex items-center justify-between gap-2">
+                  <span>v{v.version} · {v.status === "aktiv" ? `aktiv seit ${datum(v.veroeffentlicht_am)}` : datum(v.veroeffentlicht_am)}{v.notiz ? ` · ${v.notiz}` : ""}</span>
+                  <button type="button" className="text-xs underline bg-transparent border-0 cursor-pointer text-akzent-text p-0"
+                    onClick={() => uebernehmen.mutate(v.version!)} title="Blöcke dieser Version in den Editor laden">laden</button>
+                </li>
+              ))}
+            </ul>
+          </Karte>
+        </aside>
+
+        <div className="py-6 bg-[#E6E5EE] rounded-xl overflow-auto min-w-0" data-testid="vorlage-seite">
+          <div className="w-[560px] min-h-[792px] mx-auto px-[38px] py-[34px] bg-white text-[#1a1a1a] shadow-md flex flex-col gap-2.5">
+            {bloecke.map((b, i) => (
+              <div key={b.id} role="button" tabIndex={0} aria-label={`Block ${b.bezeichnung || TYPNAME[b.typ]}`}
+                onClick={() => setAuswahl(b.id)} onKeyDown={(e) => { if (e.key === "Enter") setAuswahl(b.id); }}
+                className={cx("relative px-2 py-1.5 rounded cursor-pointer", b.id === auswahl ? "outline outline-2 outline-[#251F53]" : "hover:outline hover:outline-1 hover:outline-[#c9c8d4]")}>
+                {b.id === auswahl ? <>
+                  <span className="absolute -top-2.5 left-1.5 text-[10px] bg-[#251F53] text-white px-1.5 rounded-sm">{b.bezeichnung || TYPNAME[b.typ]}</span>
+                  <span className="absolute -top-3 right-1 flex gap-0.5">
+                    <button type="button" aria-label="nach oben" disabled={i === 0} onClick={(e) => { e.stopPropagation(); verschiebe(i, i - 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[11px] p-0 cursor-pointer">↑</button>
+                    <button type="button" aria-label="nach unten" disabled={i === bloecke.length - 1} onClick={(e) => { e.stopPropagation(); verschiebe(i, i + 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[11px] p-0 cursor-pointer">↓</button>
+                    <button type="button" aria-label="entfernen" onClick={(e) => { e.stopPropagation(); entferne(b.id); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[11px] p-0 cursor-pointer">×</button>
+                  </span>
+                </> : null}
+                <BlockAnsicht b={b} tabellen={a.tabellen} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <aside className="flex flex-col gap-3.5 min-w-0">
+          {gewaehlt ? <BlockEigenschaften b={gewaehlt} aufbau={a} aendere={aendere} aendereOptionen={aendereOptionen} fokus={fokus} /> : <Karte className="p-4 text-sm gedaempft">Block im Aufbau oder auf der Seite markieren.</Karte>}
+          <Karte className="p-4 flex flex-col gap-2" data-testid="datenfelder">
+            <span className="lbl">Datenfeld einfügen</span>
+            <div className="flex flex-wrap gap-1">
+              {a.felder.map((f) => (
+                <button key={f.name} type="button" title={f.beschreibung} onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => fokus.current?.setze(f.name)}
+                  className="px-1.5 py-0.5 rounded bg-fein border-0 text-[12px] font-mono text-text2 cursor-pointer hover:bg-akzent-weich">{f.name}</button>
+              ))}
+            </div>
+            <span className="text-xs gedaempft">Nur diese Felder sind erlaubt. Tippfehler in Platzhaltern sind damit ausgeschlossen. Zuerst in ein Textfeld des Blocks klicken.</span>
+          </Karte>
+          <div className="flex gap-2 p-3 rounded-lg bg-fein text-[12.5px] leading-normal text-text2">
+            <Icon name="info" /><span>Neue Version gilt ab Veröffentlichung. Bereits freigegebene Pläne behalten ihr PDF unverändert.</span>
+          </div>
+          {entwurf.data.ist_entwurf ? <Knopf variante="geist" onClick={() => setVerwerfen(true)}>Entwurf verwerfen</Knopf> : null}
+        </aside>
+      </div>
+
+      <VorschauDialog art={art} bloecke={bloecke} offen={vorschau} onOffen={setVorschau} />
+      <Dialog offen={veroeffentlichen} onOffen={setVeroeffentlichen} titel={`${a.name}: neue Version veröffentlichen`} breite={520}
+        beschreibung={`Wird Version ${Math.max(0, ...a.versionen.map((v) => v.version ?? 0)) + 1}. Sie gilt ab sofort für neue PDFs; Version ${a.aktiv.version} bleibt erhalten.`}
+        fuss={<><Knopf onClick={() => setVeroeffentlichen(false)}>Abbrechen</Knopf><Knopf variante="pri" laedt={freigeben.isPending} onClick={() => freigeben.mutate()}>Veröffentlichen</Knopf></>}>
+        <span className="text-sm">Bereits freigegebene Pläne behalten ihr PDF unverändert.</span>
+        <Fehleranzeige fehler={freigeben.error} />
+      </Dialog>
+      <Dialog offen={verwerfen} onOffen={setVerwerfen} titel="Entwurf verwerfen" breite={480}
+        beschreibung={`Die aktive Version ${a.aktiv.version} bleibt unverändert.`}
+        fuss={<><Knopf onClick={() => setVerwerfen(false)}>Abbrechen</Knopf><Knopf variante="dng" laedt={verwerfenM.isPending} onClick={() => verwerfenM.mutate()}>Verwerfen</Knopf></>}>
+        <Fehleranzeige fehler={verwerfenM.error} />
+      </Dialog>
+    </div>
+  );
+}
+
+/** Textfeld, in das „Datenfeld einfügen“ an der Schreibmarke einsetzt */
+function FeldText({ label, wert, onWert, fokus, mehrzeilig }: {
+  label: string; wert: string; onWert: (w: string) => void; fokus: { current: { setze: (f: string) => void } | null }; mehrzeilig?: boolean;
+}) {
+  const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+  const merken = () => {
+    fokus.current = {
+      setze: (feld) => {
+        const el = ref.current;
+        const pos = el?.selectionStart ?? wert.length;
+        const ende = el?.selectionEnd ?? pos;
+        const einfuegen = `{{${feld}}}`;
+        onWert(wert.slice(0, pos) + einfuegen + wert.slice(ende));
+        requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(pos + einfuegen.length, pos + einfuegen.length); });
+      },
+    };
+  };
+  return (
+    <Feld label={label}>
+      {(p) => mehrzeilig
+        ? <Textfeld {...p} ref={ref} rows={4} value={wert} onFocus={merken} onChange={(e) => onWert(e.target.value)} className="font-mono text-[13px]" />
+        : <Eingabe {...p} ref={ref} value={wert} onFocus={merken} onChange={(e) => onWert(e.target.value)} className="font-mono text-[13px]" />}
+    </Feld>
+  );
+}
+
+function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
+  b: Block; aufbau: Aufbau; aendere: (n: Partial<Block>) => void; aendereOptionen: (n: Partial<Optionen>) => void;
+  fokus: { current: { setze: (f: string) => void } | null };
+}) {
+  const o = b.optionen ?? {};
+  const eintraege = b.felder ?? [];
+  const setzeEintrag = (i: number, neu: Partial<Eintrag>) => aendere({ felder: eintraege.map((e, j) => (j === i ? { ...e, ...neu } : e)) });
+  const textartig = !["briefkopf", "trennlinie", "leerraum", "seitenumbruch"].includes(b.typ);
+  return (
+    <Karte className="p-4 flex flex-col gap-3" data-testid="block-eigenschaften">
+      <div className="flex justify-between items-center"><span className="lbl">Block</span><Chip art="akzent">{TYPNAME[b.typ]}</Chip></div>
+      <Feld label="Bezeichnung">{(p) => <Eingabe {...p} value={b.bezeichnung ?? ""} onChange={(e) => aendere({ bezeichnung: e.target.value })} />}</Feld>
+      <span className="text-[12.5px] gedaempft leading-normal">{HINWEIS[b.typ]}</span>
+
+      {b.typ === "titel" ? <>
+        <FeldText label="Text" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} />
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-2">
+          <Feld label="Zusatz">{(p) => <Eingabe {...p} value={b.zusatz_label ?? ""} onChange={(e) => aendere({ zusatz_label: e.target.value })} />}</Feld>
+          <FeldText label="Wert" wert={b.zusatz ?? ""} onWert={(w) => aendere({ zusatz: w })} fokus={fokus} />
+        </div>
+      </> : null}
+      {b.typ === "text" || b.typ === "fusszeile" ? <FeldText label="Text" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} mehrzeilig /> : null}
+      {b.typ === "datenfelder" ? (
+        <Feld label="Spalten">{(p) => <Auswahl {...p} value={b.spalten ?? 1} onChange={(e) => aendere({ spalten: Number(e.target.value) })}>
+          {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}</Auswahl>}</Feld>
+      ) : null}
+      {b.typ === "datenfelder" || b.typ === "unterschrift" ? (
+        <div className="flex flex-col gap-2" role="group" aria-label="Felder">
+          <span className="text-sm font-medium">Felder</span>
+          {eintraege.map((e, i) => (
+            <div key={i} className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto] gap-1.5 items-start">
+              <Eingabe aria-label={`Bezeichnung ${i + 1}`} value={e.label} onChange={(ev) => setzeEintrag(i, { label: ev.target.value })} />
+              <FeldWert wert={e.wert} onWert={(w) => setzeEintrag(i, { wert: w })} fokus={fokus} nummer={i + 1} />
+              <Knopf klein variante="geist" icon="x" aria-label={`Feld ${i + 1} entfernen`} onClick={() => aendere({ felder: eintraege.filter((_, j) => j !== i) })} />
+            </div>
+          ))}
+          <Knopf klein icon="plus" onClick={() => aendere({ felder: [...eintraege, { label: "", wert: "" }] })}>Feld hinzufügen</Knopf>
+        </div>
+      ) : null}
+      {b.typ === "unterschrift" ? <Feld label="Text unter der Linie">{(p) => <Eingabe {...p} value={b.linie ?? ""} onChange={(e) => aendere({ linie: e.target.value })} />}</Feld> : null}
+      {b.typ === "tabelle" ? (
+        <Feld label="Tabelle">{(p) => <Auswahl {...p} value={b.quelle ?? ""} onChange={(e) => aendere({ quelle: e.target.value })}>
+          {aufbau.tabellen.map((t) => <option key={t.quelle} value={t.quelle}>{t.name}</option>)}</Auswahl>}</Feld>
+      ) : null}
+      {b.typ === "leerraum" ? (
+        <Feld label="Höhe (mm)">{(p) => <Eingabe {...p} inputMode="numeric" value={b.hoehe_mm ?? 6} onChange={(e) => aendere({ hoehe_mm: Number(e.target.value) || 1 })} />}</Feld>
+      ) : null}
+
+      {textartig ? <>
+        <div className="flex flex-col gap-2"><span className="text-sm font-medium">Schrift</span>
+          <div className="flex gap-1.5">
+            <Auswahl aria-label="Schriftgröße" value={o.schrift ?? "normal"} onChange={(e) => aendereOptionen({ schrift: e.target.value as Optionen["schrift"] })}>
+              <option value="klein">Klein</option><option value="normal">Normal</option><option value="gross">Groß</option>
+            </Auswahl>
+            <Knopf aria-label="Fett" aria-pressed={!!o.fett} className={cx("w-[34px] px-0 justify-center font-bold", o.fett && "bg-akzent-weich")} onClick={() => aendereOptionen({ fett: !o.fett })}>B</Knopf>
+            <Knopf aria-label="Kursiv" aria-pressed={!!o.kursiv} className={cx("w-[34px] px-0 justify-center italic", o.kursiv && "bg-akzent-weich")} onClick={() => aendereOptionen({ kursiv: !o.kursiv })}>I</Knopf>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2"><span className="text-sm font-medium">Ausrichtung</span>
+          <Segmente label="Ausrichtung" wert={o.ausrichtung ?? "links"} onWahl={(w) => aendereOptionen({ ausrichtung: w })}
+            werte={[{ wert: "links", text: "Links" }, { wert: "mitte", text: "Mitte" }, { wert: "rechts", text: "Rechts" }]} />
+        </div>
+      </> : null}
+      {textartig && b.typ !== "fusszeile" && b.typ !== "titel" ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.ueberschrift} onChange={(e) => aendereOptionen({ ueberschrift: e.target.checked })} />Bezeichnung als Überschrift drucken</label> : null}
+      {["text", "datenfelder", "tabelle"].includes(b.typ) ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.ausblenden_wenn_leer} onChange={(e) => aendereOptionen({ ausblenden_wenn_leer: e.target.checked })} />Ausblenden, wenn leer</label> : null}
+      {b.typ !== "fusszeile" && b.typ !== "seitenumbruch" ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.nicht_teilen} onChange={(e) => aendereOptionen({ nicht_teilen: e.target.checked })} />Nicht über Seitenumbruch teilen</label> : null}
+    </Karte>
+  );
+}
+
+function FeldWert({ wert, onWert, fokus, nummer }: { wert: string; onWert: (w: string) => void; fokus: { current: { setze: (f: string) => void } | null }; nummer: number }) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <Eingabe ref={ref} aria-label={`Wert ${nummer}`} value={wert} className="font-mono text-[12.5px]" onChange={(e) => onWert(e.target.value)}
+      onFocus={() => {
+        fokus.current = {
+          setze: (feld) => {
+            const pos = ref.current?.selectionStart ?? wert.length;
+            const ende = ref.current?.selectionEnd ?? pos;
+            onWert(`${wert.slice(0, pos)}{{${feld}}}${wert.slice(ende)}`);
+          },
+        };
+      }} />
+  );
+}
+
+type Testpatient = { id: number; nachname: string; vorname: string; nummer: number };
+
+function VorschauDialog({ art, bloecke, offen, onOffen }: { art: Art; bloecke: Block[]; offen: boolean; onOffen: (o: boolean) => void }) {
+  const patienten = useQuery({
+    queryKey: ["patienten", "testpatienten"],
+    queryFn: () => api<Seitenliste<Testpatient>>(`patienten/${abfrage({ test: "nur", seitengroesse: 50 })}`),
+    enabled: offen,
+  });
+  const [patient, setPatient] = useState("");
+  const [schluessel, setSchluessel] = useState("");
+  const stand = useMemo(() => JSON.stringify(bloecke), [bloecke]);
+  const pdf = useQuery({
+    queryKey: ["vorlagen", art, "vorschau", patient, schluessel],
+    queryFn: () => apiDatei(`vorlagen/${art}/vorschau/`, { method: "POST", body: { patient: Number(patient), bloecke: JSON.parse(schluessel) } }),
+    enabled: offen && !!patient && !!schluessel,
+    gcTime: 0,
+  });
+  useEffect(() => { if (offen) setSchluessel(stand); }, [offen, stand]);
+  useEffect(() => {
+    if (!patient && patienten.data?.results[0]) setPatient(String(patienten.data.results[0].id));
+  }, [patienten.data, patient]);
+  return (
+    <Dialog offen={offen} onOffen={onOffen} titel="Vorschau mit Testpatient" breite={1000}
+      beschreibung="Aus dem aktuellen Stand im Editor, auch ungespeichert. Wasserzeichen „ENTWURF“.">
+      <div className="flex flex-col gap-3" data-testid="vorlage-vorschau">
+        <Feld label="Testpatient">{(p) => (
+          <Auswahl {...p} value={patient} onChange={(e) => setPatient(e.target.value)}>
+            {(patienten.data?.results ?? []).map((t) => <option key={t.id} value={t.id}>{t.nachname}, {t.vorname} · Nr. {t.nummer}</option>)}
+          </Auswahl>
+        )}</Feld>
+        {patienten.data && !patienten.data.results.length ? <Meldung art="warn">Es gibt keine Testpatienten.</Meldung> : null}
+        <Fehleranzeige fehler={pdf.error} />
+        {pdf.isFetching ? <Laden text="PDF wird erzeugt …" /> : pdf.data ? (
+          <PdfLeser url={`vorschau-${art}-${patient}-${pdf.dataUpdatedAt}`} laden={() => Promise.resolve(pdf.data.daten)} className="h-[64vh]" />
+        ) : null}
+      </div>
+    </Dialog>
+  );
+}

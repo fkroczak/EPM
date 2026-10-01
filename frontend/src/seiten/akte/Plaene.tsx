@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { abfrage, alle, api } from "@/lib/api";
+import { abfrage, alle, api, apiDatei } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useBriefkopf } from "@/lib/daten";
 import { datum, kg, zahl, zeitpunkt } from "@/lib/format";
@@ -13,6 +13,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/layout/logo";
 import { Richtext, klartext } from "@/components/Editor";
+import { PdfLeser } from "@/components/PdfAnsicht";
 import { name, useAkte } from "./Akte";
 
 export const STATUS_TEXT: Record<Plan["status"], string> = { entwurf: "Entwurf", aktuell: "aktuell gültig", abgeloest: "abgelöst" };
@@ -28,7 +29,7 @@ function kopfText(plan: Plan) {
   return `${s} · ${datum(plan.gueltig_ab)}`;
 }
 
-/** „Ansicht wie PDF“: Aufbau wie der gedruckte Plan (die gespeicherte PDF selbst folgt mit F37/F51) */
+/** „Ansicht wie PDF“: Werte im Aufbau des Plans (die gespeicherte PDF öffnet „PDF öffnen“) */
 function PdfAnsicht({ plan, vergleich }: { plan: Plan; vergleich: Vergleich }) {
   const { patient } = useAkte();
   const briefkopf = useBriefkopf();
@@ -134,9 +135,39 @@ function FreigabeDialog({ plan, offen, onOffen }: { plan: Plan; offen: boolean; 
       <ul className="m-0 pl-5 text-sm flex flex-col gap-1.5">
         <li>Der Plan wird zum aktuell gültigen Plan und ist danach unveränderlich.</li>
         <li>Der bisherige Plan wird „abgelöst“ und bleibt im Verlauf erhalten.</li>
+        <li>Die PDF wird mit der aktiven Dokumentvorlage erzeugt, mit Prüfsumme gespeichert und erscheint unter „Dokumente“. Sie wird nie neu erzeugt.</li>
       </ul>
-      <Meldung art="warn">Die PDF wird bei der Freigabe noch nicht erzeugt: die PDF-Erzeugung (F51) ist noch nicht umgesetzt.</Meldung>
       <Fehleranzeige fehler={freigeben.error} />
+    </Dialog>
+  );
+}
+
+/** Gespeicherte PDF (F37): vor der Anzeige prüft der Server die Prüfsumme. */
+function PlanPdfDialog({ plan, offen, onOffen }: { plan: Plan; offen: boolean; onOffen: (o: boolean) => void }) {
+  const datei = useQuery({
+    queryKey: ["plan", plan.id, "pdf"],
+    queryFn: () => apiDatei(`infusionsplaene/${plan.id}/pdf/`),
+    enabled: offen,
+    staleTime: 0,
+    gcTime: 0,
+  });
+  const pruefung = datei.data?.kopf.get("X-EPM-Pruefung");
+  const version = datei.data?.kopf.get("X-EPM-Vorlage-Version");
+  return (
+    <Dialog offen={offen} onOffen={onOffen} titel={`Infusionsplan gültig ab ${datum(plan.gueltig_ab)}`} breite={1100}
+      beschreibung={<>Gespeicherte PDF · <a href={`/api/infusionsplaene/${plan.id}/pdf/`} download>Herunterladen</a></>}>
+      <div data-testid="plan-pdf" className="flex flex-col gap-3">
+        {datei.isLoading ? <Laden /> : null}
+        <Fehleranzeige fehler={datei.error} />
+        {pruefung === "ok" ? (
+          <div className="meldung ok flex items-center gap-2 text-sm" data-testid="pdf-pruefung">
+            <Icon name="haken" />Prüfsumme stimmt: unverändert seit der Freigabe{version ? ` · Dokumentvorlage Version ${version}` : ""}.
+          </div>
+        ) : pruefung ? (
+          <Meldung art="fehler"><span data-testid="pdf-pruefung">Die gespeicherte PDF weicht von der Prüfsumme ab und wurde nach der Freigabe verändert. Bitte die Administration informieren.</span></Meldung>
+        ) : null}
+        {datei.data ? <PdfLeser url={`plan-${plan.id}-${plan.pdf_sha256}`} laden={() => Promise.resolve(datei.data.daten)} className="h-[64vh]" /> : null}
+      </div>
     </Dialog>
   );
 }
@@ -149,6 +180,7 @@ export function Plaene() {
   const [modus, setModus] = useState<"ansicht" | "vergleich">("ansicht");
   const [freigabe, setFreigabe] = useState(false);
   const [verwerfen, setVerwerfen] = useState(false);
+  const [pdf, setPdf] = useState(false);
   const qc = useQueryClient();
   const melden = useHinweis();
   const plaene = useQuery({
@@ -213,7 +245,7 @@ export function Plaene() {
               <span className="text-[0.8125rem] gedaempft max-w-[70ch]">
                 {gewaehlt.status === "entwurf"
                   ? "Entwurf: nur für das Team sichtbar, noch nicht beim Versorger. Freigeben darf, wer das Recht „Pläne freigeben“ hat (Mediziner)."
-                  : `Freigegeben am ${zeitpunkt(gewaehlt.freigegeben_am)}${gewaehlt.freigegeben_von_name ? ` von ${gewaehlt.freigegeben_von_name}` : ""}. Die gespeicherte PDF mit SHA-256-Prüfung folgt mit der PDF-Erzeugung (F37).`}
+                  : `Freigegeben am ${zeitpunkt(gewaehlt.freigegeben_am)}${gewaehlt.freigegeben_von_name ? ` von ${gewaehlt.freigegeben_von_name}` : ""}. ${gewaehlt.pdf_sha256 ? " Die PDF ist mit Prüfsumme gespeichert und wird nie neu erzeugt." : " Für diesen Plan ist keine PDF gespeichert."}`}
               </span>
             </div>
             <div className="flex gap-2 flex-wrap">
@@ -223,7 +255,8 @@ export function Plaene() {
                 {darfBei("plaene_freigeben", patient) ? <Knopf variante="pri" icon="haken" onClick={() => setFreigabe(true)}>Freigeben</Knopf> : null}
               </> : null}
               {gewaehlt.status !== "entwurf" ? <>
-                <Knopf icon="dokument" disabled title="folgt mit der PDF-Erzeugung (F37)">PDF öffnen</Knopf>
+                <Knopf icon="dokument" disabled={!gewaehlt.pdf_sha256} onClick={() => setPdf(true)}
+                  title={gewaehlt.pdf_sha256 ? undefined : "Für diesen Plan ist keine PDF gespeichert (vor Einführung der PDF-Erzeugung freigegeben)."}>PDF öffnen</Knopf>
                 {anlegen && !entwurfDa ? <Knopf icon="plus" onClick={() => navigate(`/patienten/${patient.id}/plaene/neu?vorlage=${gewaehlt.id}`)}>Als Vorlage für neuen Plan</Knopf> : null}
               </> : null}
             </div>
@@ -232,6 +265,7 @@ export function Plaene() {
             modus === "ansicht" ? <PdfAnsicht plan={gewaehlt} vergleich={vergleich.data} /> : <VergleichTabelle plan={gewaehlt} vergleich={vergleich.data} />
           ) : <Fehleranzeige fehler={vergleich.error} />}
           <FreigabeDialog plan={gewaehlt} offen={freigabe} onOffen={setFreigabe} />
+          {gewaehlt.pdf_sha256 ? <PlanPdfDialog plan={gewaehlt} offen={pdf} onOffen={setPdf} /> : null}
           <Dialog offen={verwerfen} onOffen={setVerwerfen} titel="Entwurf verwerfen" breite={480}
             beschreibung="Der Entwurf wird gelöscht. Im Verlauf der Akte bleibt sichtbar, dass es ihn gab."
             fuss={<><Knopf onClick={() => setVerwerfen(false)}>Abbrechen</Knopf><Knopf variante="dng" laedt={verwerfenM.isPending} onClick={() => verwerfenM.mutate()}>Verwerfen</Knopf></>}>

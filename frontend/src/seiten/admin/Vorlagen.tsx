@@ -9,7 +9,7 @@ import type { Absender, Briefkopf } from "@/lib/daten";
 import { eingabeZahl, zahl } from "@/lib/format";
 import type { Auswahlwert, Einstellungen, Praeparat } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
-import { Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Seitenkopf, Segmente, cx } from "@/components/ui/basis";
+import { Eingabe, Fehleranzeige, Feld, Karte, Knopf, KnopfLink, Laden, Meldung, Seitenkopf, Segmente, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { useSortierbar } from "@/components/ui/sortierbar";
@@ -353,9 +353,7 @@ export function Vorlagen() {
       <div className="flex items-center gap-3 flex-wrap">
         <Segmente label="Bereich" wert={bereich} onWahl={setBereich}
           werte={[{ wert: "briefkopf", text: "Briefkopf und Logo" }, { wert: "listen", text: "Auswahllisten" }, { wert: "grenzwerte", text: "Grenzwerte" }]} />
-        <span className="btn sec opacity-60 cursor-not-allowed" aria-disabled="true" title="Dokumentvorlagen (WYSIWYG) folgen mit F50">
-          Dokumentvorlagen <span className="chip">folgt</span>
-        </span>
+        <KnopfLink to="/admin/vorlagen/dokumente" icon="dokument">Dokumentvorlagen</KnopfLink>
       </div>
       {bereich === "briefkopf" ? <BriefkopfBereich speichernRef={speichern} /> : bereich === "listen" ? <ListenBereich /> : <GrenzwerteBereich speichernRef={speichern} />}
     </Seite>

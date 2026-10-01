@@ -23,7 +23,8 @@ function pdfjs(): Promise<PdfJs> {
   return pdfjsLaden;
 }
 
-function useDokument(url: string) {
+/** Lädt die PDF über ``url`` oder – z. B. für eine Vorschau per POST – über ``laden`` (``url`` ist dann nur der Schlüssel). */
+function useDokument(url: string, laden?: () => Promise<Uint8Array>) {
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
   useEffect(() => {
@@ -32,9 +33,14 @@ function useDokument(url: string) {
     setDoc(null);
     setFehler(null);
     (async () => {
-      const antwort = await fetch(url, { credentials: "same-origin" });
-      if (!antwort.ok) throw new Error(`Datei nicht verfügbar (${antwort.status}).`);
-      const daten = new Uint8Array(await antwort.arrayBuffer());
+      let daten: Uint8Array;
+      if (laden) {
+        daten = await laden();
+      } else {
+        const antwort = await fetch(url, { credentials: "same-origin" });
+        if (!antwort.ok) throw new Error(`Datei nicht verfügbar (${antwort.status}).`);
+        daten = new Uint8Array(await antwort.arrayBuffer());
+      }
       const bib = await pdfjs();
       const basis = new URL("/pdfjs/", window.location.origin).href;
       geladen = await bib.getDocument({
@@ -109,8 +115,8 @@ function useBreite() {
 }
 
 /** Kleine Vorschau: eine Seite, blättern. */
-export function PdfVorschau({ url, titel, hoehe = 320 }: { url: string; titel: string; hoehe?: number }) {
-  const { doc, fehler } = useDokument(url);
+export function PdfVorschau({ url, titel, hoehe = 320, laden }: { url: string; titel: string; hoehe?: number; laden?: () => Promise<Uint8Array> }) {
+  const { doc, fehler } = useDokument(url, laden);
   const [seite, setSeite] = useState(1);
   const { ref, breite } = useBreite();
   useEffect(() => setSeite(1), [url]);
@@ -136,8 +142,8 @@ export function PdfVorschau({ url, titel, hoehe = 320 }: { url: string; titel: s
 const ZOOM = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 /** Große Ansicht: alle Seiten untereinander, Zoom. */
-export function PdfLeser({ url, className }: { url: string; className?: string }) {
-  const { doc, fehler } = useDokument(url);
+export function PdfLeser({ url, className, laden }: { url: string; className?: string; laden?: () => Promise<Uint8Array> }) {
+  const { doc, fehler } = useDokument(url, laden);
   const [stufe, setStufe] = useState(2);
   const { ref, breite } = useBreite();
   const zoom = ZOOM[stufe];

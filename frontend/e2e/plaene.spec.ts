@@ -85,6 +85,19 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(page.getByTestId("planliste")).toContainText("aktuell gültig");
   await expect(detail).toContainText(/Freigegeben am .* von Dr\. med\. M\. Medizin/);
   await expect(detail.getByRole("button", { name: "Bearbeiten" })).toHaveCount(0);
+  // gespeicherte PDF (F37): Prüfsumme wird vor der Anzeige geprüft, Seiten werden gezeichnet
+  await detail.getByRole("button", { name: "PDF öffnen" }).click();
+  const pdfDialog = page.getByRole("dialog");
+  await expect(pdfDialog.getByTestId("pdf-pruefung")).toContainText("Prüfsumme stimmt: unverändert seit der Freigabe");
+  await expect(pdfDialog.getByTestId("pdf-leser").locator("canvas").first()).toBeVisible();
+  await expect(pdfDialog.getByTestId("pdf-leser")).toContainText("1 Seite");
+  await page.keyboard.press("Escape");
+  const freigegeben = (await api.get(`infusionsplaene/?patient=${patient.id}&status=aktuell`)).results[0];
+  expect(freigegeben.pdf_sha256).toMatch(/^[0-9a-f]{64}$/);
+  expect(freigegeben.vorlage_version).toBeGreaterThanOrEqual(1);
+  const dokumente = (await api.get(`dokumente/?patient=${patient.id}`)).results;
+  expect(dokumente.map((d: { herkunft: string; mime: string; sha256: string }) => [d.herkunft, d.mime, d.sha256]))
+    .toEqual([["system", "application/pdf", freigegeben.pdf_sha256]]);
 
   // Folgeplan: vorbelegt, Grenzwert wird im Backend geprüft, Änderungen markiert
   await page.getByTestId("aktenkopf").getByRole("button", { name: "Neuer Plan" }).click();

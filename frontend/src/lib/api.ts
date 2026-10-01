@@ -101,6 +101,33 @@ export async function api<T = unknown>(pfad: string, opt: Optionen = {}): Promis
   return daten as T;
 }
 
+/** Datei (z. B. PDF) holen – mit Antwortköpfen und denselben Fehlermeldungen wie ``api``. */
+export async function apiDatei(pfad: string, opt: Optionen = {}): Promise<{ daten: Uint8Array; kopf: Headers }> {
+  const method = opt.method ?? (opt.body !== undefined ? "POST" : "GET");
+  const headers: Record<string, string> = { Accept: "application/pdf, application/json" };
+  let body: BodyInit | undefined;
+  if (opt.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(opt.body);
+  }
+  if (method !== "GET") headers["X-CSRFToken"] = csrfToken();
+  const url = pfad.startsWith("/api/") ? pfad : `/api/${pfad.replace(/^\//, "")}`;
+  const antwort = await fetch(url, { method, headers, body, credentials: "same-origin", signal: opt.signal });
+  if (!antwort.ok) {
+    const daten: unknown = await antwort.json().catch(() => null);
+    const objekt = (daten && typeof daten === "object" ? daten : {}) as Record<string, unknown>;
+    const felder = flach(objekt);
+    delete felder.fehler;
+    delete felder.detail;
+    const meldung = text(objekt.fehler) || text(objekt.detail) || Object.values(felder)[0] || MELDUNGEN[antwort.status] || `Fehler ${antwort.status}`;
+    if ((antwort.status === 401 || antwort.status === 403) && !opt.ohneAbmeldeSignal) {
+      window.dispatchEvent(new Event(/Anmeldung mit zweitem Faktor/.test(meldung) ? ABGEMELDET : STATUS_PRUEFEN));
+    }
+    throw new ApiFehler(antwort.status, meldung, daten, felder);
+  }
+  return { daten: new Uint8Array(await antwort.arrayBuffer()), kopf: antwort.headers };
+}
+
 export type Seite<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 /** Alle Seiten einer Liste holen (für kleine Mengen wie Gewichte einer Akte). */

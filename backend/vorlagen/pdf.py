@@ -35,8 +35,8 @@ body { margin: 0; }
 .titel .zusatz span { color: #5d5b72; }
 h2 { font-size: 8pt; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #5d5b72; margin: 0 0 1.5mm 0; }
 table { width: 100%%; border-collapse: collapse; }
-.felder td { vertical-align: top; padding: 0 3mm 1.6mm 0; }
-.felder .label { display: block; font-size: 7.5pt; color: #5d5b72; }
+.felder td { vertical-align: top; padding: 0.9mm 2.5mm 0.9mm 0; border-bottom: 0.4pt solid #ececf2; }
+.felder td.label { color: #5d5b72; }
 .felder .wert p { margin: 0 0 1mm 0; }
 .tabelle th { text-align: left; font-size: 7.5pt; font-weight: 600; color: #5d5b72; border-bottom: 0.6pt solid #c9c8d4;
               padding: 1mm 2mm 1mm 0; }
@@ -177,12 +177,14 @@ def _klassen(b) -> str:
 
 
 def _feldtabelle(ersetze, eintraege, spalten) -> tuple[str, bool]:
+    """Bezeichnung links, Wert rechts (wie im Entwurf); ``spalten`` Paare nebeneinander."""
     zellen, alle_leer = [], True
+    breite = 100 / spalten
     for e in eintraege:
         wert, leer = ersetze(e.get("wert", ""))
         alle_leer = alle_leer and leer
-        label = f'<span class="label">{html.escape(e.get("label") or "")}</span>' if e.get("label") else ""
-        zellen.append(f'<td style="width:{100 / spalten:.2f}%">{label}<div class="wert">{wert}</div></td>')
+        zellen.append(f'<td class="label" style="width:{breite * 0.36:.2f}%">{html.escape(e.get("label") or "")}</td>'
+                      f'<td class="wert" style="width:{breite * 0.64:.2f}%">{wert}</td>')
     zeilen = ["<tr>" + "".join(zellen[i:i + spalten]) + "</tr>" for i in range(0, len(zellen), spalten)]
     return f'<table class="felder">{"".join(zeilen)}</table>', alle_leer
 
@@ -195,10 +197,7 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str]:
         typ = b.get("typ")
         o = b.get("optionen") or {}
         ausblenden = o.get("ausblenden_wenn_leer", False)
-        kopf = ""
-        if typ in ("datenfelder", "tabelle", "unterschrift") and b.get("bezeichnung") and not (
-                typ == "datenfelder" and b.get("spalten") == 1):
-            kopf = f"<h2>{html.escape(b['bezeichnung'])}</h2>"
+        kopf = f"<h2>{html.escape(b['bezeichnung'])}</h2>" if o.get("ueberschrift") and b.get("bezeichnung") else ""
         if typ == "briefkopf":
             teile.append(f'<div class="{_klassen(b)}">{briefkopf_html()}</div>')
         elif typ == "titel":
@@ -212,7 +211,7 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str]:
             inhalt, leer = ersetze(b.get("text", ""), leer_zeichen="")
             if leer and ausblenden:
                 continue
-            teile.append(f'<div class="{_klassen(b)}">{inhalt}</div>')
+            teile.append(f'<div class="{_klassen(b)}">{kopf}{inhalt}</div>')
         elif typ == "datenfelder":
             tabelle, leer = _feldtabelle(ersetze, b.get("felder") or [], b.get("spalten", 2))
             if leer and ausblenden:

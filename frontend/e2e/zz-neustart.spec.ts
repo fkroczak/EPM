@@ -114,6 +114,16 @@ test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", 
   await expect(blatt.getByRole("row").filter({ hasText: "Gesamtvolumen" })).toContainText("2.100 ml (35 ml/kg × 60 kg)");
   await expect(blatt.getByRole("row").filter({ hasText: /^Rate/ })).toContainText("175 ml/h");
   await expect(blatt.getByRole("row").filter({ hasText: "Protonenpumpenhemmer" })).toContainText("Pantozol® 40 mg · morgens, abends");
+  // gespeicherte PDF: nach dem Neustart unverändert (Prüfsumme)
+  await page.getByTestId("plan-detail").getByRole("button", { name: "PDF öffnen" }).click();
+  await expect(page.getByRole("dialog").getByTestId("pdf-pruefung")).toContainText("Prüfsumme stimmt");
+  await expect(page.getByRole("dialog").getByTestId("pdf-leser").locator("canvas").first()).toBeVisible();
+  await page.keyboard.press("Escape");
+  // veröffentlichte Dokumentvorlage
+  await page.goto("/admin/vorlagen/dokumente");
+  await expect(page.getByTestId("vorlage-stand")).toHaveText(`Version ${gemerkt("vorlage").version} ist aktiv`);
+  await page.getByTestId("aufbau").getByRole("button", { name: /Hinweis an Versorger/ }).click();
+  await expect(page.getByTestId("block-eigenschaften").getByLabel("Text")).toHaveValue("Rückfragen an die Stiftung, Stand {{Heute}}");
 
   const dok = gemerkt("dokumente").id;
   await page.goto(`/patienten/${dok}/dokumente`);
