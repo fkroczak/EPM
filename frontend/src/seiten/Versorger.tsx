@@ -173,7 +173,8 @@ export function Versorger() {
   const melden = useHinweis();
 
   // Formular nur beim Wechsel des Versorgers neu füllen (ein Neuladen im Hintergrund verwirft keine Eingaben)
-  useEffect(() => setF(formularVon(cur)), [cur?.id, neu, !!liste.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  // (nicht beim ersten Laden der Liste: sonst ging eine schon begonnene Eingabe bei „Neu“ verloren)
+  useEffect(() => setF(formularVon(cur)), [cur?.id, neu]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const waehlen = (id: number) => setParams(new URLSearchParams({ id: String(id) }), { replace: true });
   const speichern = useMutation({

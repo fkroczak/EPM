@@ -704,7 +704,9 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   Grund mindestens 5 Zeichen; Zielpatient sichtbar, nicht derselbe, Testpatient nur zu Testpatient; beide Akten offen;
   von EPM erzeugte Dokumente (Plan-PDFs) nicht.
 - **Tabellen:** `patienten_dokument` (+ Historie), `patienten_dokumentvorgang`, `audit_systemereignis`; Migrationen
-  `patienten/0004_dokumentvorgang`, `audit/0004_dokumente_umhaengen_loeschen`
+  `patienten/0004_dokumentvorgang`, `audit/0004_dokumente_umhaengen_loeschen`; für F73 zusätzlich
+  `patienten/0005_dokumentvorgang_nachweis`, `patienten/0006_geloeschte_dokumente_schwaerzen`,
+  `audit/0005_dokument_loeschung_nachgeholt`
 - **Fehlerfälle:** 400 Grund/Patient · 403 ohne Recht bzw. Admin bei echten Akten · 409 Datei fehlt
 - **Teststatus:** Backend-Tests grün (`FalschZugeordneteDokumente.test_umhaengen`, `test_systemdokumente_bleiben`). Browsertest
   grün: `dokumente-falsch.spec.ts` „Dokument beim falschen Patienten dem richtigen zuordnen; Verlauf neutral bzw. mit Grund“
@@ -719,17 +721,41 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   markierbar)
 - **Endpunkte:** `POST /api/dokumente/{id}/loeschen-vorbereiten/` → `{code, gueltig_bis}` (5 Minuten, in der Sitzung);
   `POST /api/dokumente/{id}/loeschen/` `{"grund", "kennwort", "code", "bestaetigung"}` → 204
-- **Logik:** Datensatz und Datei werden entfernt (Datei nach dem Commit). Bleibt: Historie (unveränderlich), `DokumentVorgang`,
-  Audit-Log mit Titel, Akte, Grund, Prüfsumme, Größe. Verlauf: „endgültig gelöscht“ mit Grund, frühere Einträge ohne Titel.
-  Jede Ablehnung (Code abgelaufen/falsch, Kennwort, 2FA) steht im Audit-Log (Gruppe „Fehlversuch“); dreimal falscher
-  Bestätigungscode macht ihn ungültig. Der Titel bleibt nur im unveränderlichen Protokoll.
+- **Logik (Art. 17 DSGVO, Klärung U15 vom 02.10.2026):** Datensatz und Datei werden entfernt (Datei nach dem Commit), dazu
+  in derselben Transaktion Titel, Original-Dateiname, Notiz und Dokumentdatum in **allen** Historien-Zeilen des Dokuments und
+  in seinen Audit-Log-Einträgen (auch den Ablehnungen) → „[entfernt]“ (`patienten/loeschung.py::schwaerze_dokument`).
+  Die Schutz-Trigger (`audit/schutz.py`) erlauben genau diese eine Änderung – nur mit `SET LOCAL epm.schwaerzen =
+  'dokument:<Nummer>:<SHA-256>'`, nur für dieses Dokument, nur diese Spalten, nur der Platzhalter; jede andere Änderung,
+  jedes andere Dokument und jedes Löschen von Protokollzeilen bleibt verboten. Es bleibt der Nachweis ohne Inhalt
+  (Art. 5 Abs. 2, Art. 33 Abs. 5 DSGVO; § 630f BGB): `DokumentVorgang` (Nummer, Akte, Person, Zeitpunkt, Grund, SHA-256,
+  Pfad), Audit-Log „Dokument Nr. N (Typ, SHA-256 …) aus Akte X endgültig gelöscht – Datei, Titel und Inhalt entfernt
+  (Art. 17 DSGVO), Grund: …“ mit Größe und Hochladezeitpunkt, Verlauf „endgültig gelöscht“ mit Grund, frühere Einträge
+  ohne Titel. Jede Ablehnung (Code abgelaufen/falsch, Kennwort, 2FA) steht im Audit-Log (Gruppe „Fehlversuch“); dreimal
+  falscher Bestätigungscode macht ihn ungültig. Der Grund bleibt im Protokoll – die Oberfläche bittet, keine Namen oder
+  Gesundheitsangaben der fremden Person hineinzuschreiben.
+- **Sicherungen und Wiederherstellung:** Ältere Sicherungen enthalten das Dokument bis zu ihrem Ablauf (14 Tage, F61).
+  Jede Löschung steht zusätzlich in der Löschliste `data/loeschliste/loeschliste.jsonl` (eigener Ordner, nur Backend,
+  weder in der Datenbank noch im Dokumentordner; Inhalt: Nummer, SHA-256, Pfad, Patienten-ID, Benutzer-ID, Zeitpunkt –
+  kein Titel); `epm-backup` sichert sie getrennt mit. Bei jedem Start läuft `manage.py epm_loeschungen_nachholen`
+  (`entrypoint.sh`): Ist ein gelöschtes Dokument nach einer Wiederherstellung wieder da (gleiche Nummer **und** gleiche
+  Prüfsumme), wird es erneut gelöscht und geschwärzt, mit Vorgang und Audit-Eintrag „Löschung eines Dokuments nachgeholt“;
+  eine zurückgekommene Datei wird entfernt; fehlt eine Löschung in der Liste, wird sie aus der Datenbank ergänzt. Ein neues
+  Dokument, das dieselbe Nummer bekommen hat, bleibt unberührt (andere Prüfsumme). Bei einer Wiederherstellung immer die
+  neueste Löschliste behalten (F63).
+- **Bestand:** Migration `patienten/0006_geloeschte_dokumente_schwaerzen` schwärzt Dokumente, die vor dieser Version
+  gelöscht wurden, und trägt Prüfsumme und Pfad im Vorgang nach.
 - **Validierung:** Rolle Mediziner und Recht „Dokumente endgültig löschen“ (nur Mediziner, keiner anderen Rolle zuweisbar);
   Grund mindestens 10 Zeichen; Akte offen; keine von EPM erzeugten Dokumente.
 - **Fehlerfälle:** 400 je Feld · 403 nicht Mediziner/ohne Recht · 404 schon gelöscht
-- **Teststatus:** Backend-Tests grün (`FalschZugeordneteDokumente.test_endgueltig_loeschen`, `RechteJeGruppe.test_standard`).
-  Browsertest grün: `dokumente-falsch.spec.ts` „Endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code und
-  Bestätigungscode“ (falsches Kennwort abgelehnt und protokolliert, dann gelöscht; Verlauf und Audit-Log)
-  (Lauf 36938008996, Commit `e709bee`).
+- **Teststatus:** Backend-Tests grün (`FalschZugeordneteDokumente.test_endgueltig_loeschen` – auch: Titel, Dateiname, Notiz,
+  Datum in keiner Historien-Zeile und keinem Audit-Eintrag mehr, Löschliste ohne Titel, Trigger lehnen jede andere Änderung
+  ab; `test_loeschung_nach_wiederherstellung_nachholen` – Datensatz, Datei und Historie zurückgespielt → erneut gelöscht und
+  geschwärzt, nur Datei zurück → entfernt, gleiche Nummer mit anderem Inhalt bleibt, verlorene Löschliste wird ergänzt;
+  `test_migration_schwaerzt_bestehende_loeschungen`; `RechteJeGruppe.test_standard`). Browsertest grün:
+  `dokumente-falsch.spec.ts` „Endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code und Bestätigungscode“
+  (falsches Kennwort abgelehnt und protokolliert, dann gelöscht; Verlauf; Audit-Log in der Oberfläche, Filter „Dokument“ und
+  „Fehlversuch“: Nummer und Prüfsumme statt Titel, Titel nirgends); Neustart geprüft in `zz-neustart.spec.ts` (Dokument
+  bleibt weg, Verlauf und Audit-Log ohne Titel; beim Neustart läuft das Nachholen) (LAUF_U15).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F41 Dokumente lesen, Metadaten ändern, ausblenden
@@ -1005,7 +1031,8 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 ### F60 Unveränderlichkeit
 - **Umsetzung:** PostgreSQL-Trigger (`audit/schutz.py`) auf allen Historientabellen und `audit_systemereignis` (kein UPDATE,
   DELETE, TRUNCATE), auf `patienten_kontakt` (nur einmaliges Storno), auf `infusionen_infusionsplan` (nach Freigabe nur
-  „aktuell → abgelöst“), auf `infusionen_infusionsplan_vitamine` (Zuordnung nur im Entwurf). Ausnahme nur im Wartungsmodus.
+  „aktuell → abgelöst“), auf `infusionen_infusionsplan_vitamine` (Zuordnung nur im Entwurf). Ausnahme nur im Wartungsmodus – und das Schwärzen eines endgültig gelöschten
+  Dokuments (F73, Art. 17 DSGVO): nur Titel, Dateiname, Notiz und Datum genau dieses Dokuments, nur durch „[entfernt]“.
 - **Teststatus:** Backend-Tests grün (`test_historie_ist_unveraenderlich`, `test_trigger_verhindert_aenderung_in_der_datenbank`,
   `test_vitamine_freigegebener_plaene_in_der_datenbank_geschuetzt`). Browsertests grün: `akte.spec.ts` „Kontakt mit Wiedervorlage erfassen, suchen, stornieren“ (Kontakt nur stornieren),
   `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“ (freigegebener Plan ohne „Bearbeiten“), `dokumente.spec.ts` „Dokumente hochladen, Typ am Inhalt prüfen, Metadaten ändern, ausblenden, herunterladen; Verlauf“ (Verlauf nur lesend).
@@ -1016,7 +1043,8 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 ## J · Backup und Wiederherstellung
 
 ### F61 Tägliche verschlüsselte Sicherung
-- **Ist:** `/usr/local/sbin/epm-backup` + systemd-Timer 02:30: `pg_dump` und Dokumente als `.tar.gz`, SHA-256, 14 Tage.
+- **Ist:** `/usr/local/sbin/epm-backup` + systemd-Timer 02:30: `pg_dump` und Dokumente als `.tar.gz`, Löschliste (F73) als
+  eigene Datei, SHA-256, 14 Tage.
 - **Fehlt:** Uhrzeit 02:00, Verschlüsselung mit `age`, Status-Datei für das Backend.
 - **Status:** TEILWEISE ABGESCHLOSSEN
 
@@ -1028,7 +1056,9 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 
 ### F63 Wiederherstellen
 - **Geplant:** `POST /api/backup/{id}/wiederherstellen/` `{"kennwort", "code"}`; vorher automatische Sicherung des aktuellen Stands;
-  Protokoll im Audit-Log.
+  Protokoll im Audit-Log. Die aktuelle Löschliste (`data/loeschliste/`) bleibt dabei unangetastet (auf einem neuen Server: die
+  neueste aus den Sicherungen); der anschließende Start des Backends löscht und schwärzt endgültig gelöschte Dokumente erneut
+  (F73, Art. 17 DSGVO).
 - **Status:** NICHT ABGESCHLOSSEN
 
 ### F64 Übertragung zur Nextcloud/NAS
@@ -1160,7 +1190,7 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 | U12 | ~~Darf der Admin auch Patientendaten schreiben?~~ **Geklärt 01.10.2026:** Admins dürfen alles, Patientendaten schreiben sie nur bei Testpatienten; echte Akten nur lesen, Wiederöffnen, Benutzer und Sicherungen bleiben | F66 | – |
 | U13 | ~~Energie im Infusionsplan: Lipide 9 oder 9,15 kcal/g, Albumin mit oder ohne Energie?~~ **Geklärt 01.10.2026:** wie in `EPM_infuplan.php`: Lipide 9,15 kcal/g, Humanalbumin in ml ohne Energie | F33, F39 | – |
 | U14 | ~~Stabilitätsprüfung Calcium + Magnesium und Vorbelegung des ersten Plans je kg übernehmen?~~ **Geklärt 01.10.2026:** ja, beides wie im Altsystem (Stabilität als Hinweis, Speichern bleibt möglich); Präparate werden beim ersten Plan **nicht** vorausgewählt | F32, F33 | – |
-| U15 | Endgültig gelöschtes Dokument (F73): Der Titel bleibt im unveränderlichen Audit-Log und in der Historie des Datensatzes (nur Mediziner/Admin mit Audit-Recht sehen ihn; im Verlauf der Akte nicht). Muss auch er verschwinden? | F73 | Titel bleibt im Protokoll (Nachweis, was gelöscht wurde); Inhalt und Datei sind weg |
+| U15 | ~~Muss beim endgültigen Löschen auch der Titel aus Historie und Audit-Log verschwinden?~~ **Geklärt 02.10.2026: nach geltender DSGVO.** Titel, Dateiname, Notiz und Datum werden überall entfernt (Art. 17 Abs. 1 d, Art. 5 Abs. 1 c/e); es bleibt der Nachweis ohne Inhalt (Art. 5 Abs. 2, Art. 33 Abs. 5; § 630f BGB); Sicherungen laufen nach 14 Tagen ab, nach einer Wiederherstellung wird erneut gelöscht | F73 | – |
 
 ## Änderungsprotokoll
 
@@ -1178,6 +1208,7 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 | 01.10.2026 | Runde 2 (`eae8bc3`–`a985fa5`) | Klärung U1, U2, U8, U9 umgesetzt: Protonenpumpenhemmer mit Zeiten (F38) und berechnetes Gesamtvolumen mit Rate und Grenze (F39, F48) auf ABGESCHLOSSEN UND GETESTET; F11/F58 ohne Gerätename-Lücke; F64 nicht mehr blockiert. U13/U14 gestellt |
 | 01.10.2026 | Runde 2 (`f865cde`–`a985fa5`) | Klärung U13/U14 umgesetzt: Energie mit Lipiden 9,15 kcal/g, Humanalbumin in ml ohne Energie (Feld `albumin_ml`), Hinweis zur Ca/Mg-Stabilität, erster Plan je kg Körpergewicht vorbelegt (`GET /api/infusionsplaene/vorbelegung/?patient=`) |
 | 01.10.2026 | Runde 3 (`c3aacfa`–`1718dc3`) | Rückmeldungen aus dem Testsystem: Blau auf Blau behoben, Testpatienten-Zahl nur für Admin, PDF-Anzeige mit pdf.js, Ärzteliste (F67/F68), Bezugspersonen (F69), „kein“ Katheter/Versorger und Nickelallergie als Auswahl (F70); Backend-Image mit IBM Plex aus dem Repo (Debian 13 hat kein `fonts-ibm-plex`) |
+| 02.10.2026 | Runde 3 (`6c6a97a`) | U15 nach DSGVO geklärt und umgesetzt (F73): Titel, Dateiname, Notiz und Datum endgültig gelöschter Dokumente auch aus Historie und Audit-Log entfernt (kontrollierte Trigger-Ausnahme), Nachweis ohne Inhalt, Löschliste mit Nachholen nach einer Wiederherstellung, Bestand per Migration; Audit-Log mit Filter „Dokument“. Browsertest Rechte stabilisiert (`b306c79`) |
 | 02.10.2026 | Runde 3 (`df02dda`–`e709bee`) | Rückmeldungen zur PDF-Funktion: Dokumentvorlagen als Bereich der Vorlagen, Felder verschiebbar, Schriftgröße und Titel-Ausrichtung wirksam, Planansicht in der Akte = echte PDF (F31), Aktenkopf mit festem Raster und anklickbarem „Auskunft an“ (F17). Neu: Dokument dem richtigen Patienten zuordnen (F72) und endgültig löschen nur durch Mediziner mit Kennwort, 2FA und Bestätigungscode (F73). Fehler behoben: Datenmigration „Kontakt überfällig“ brach auf bestehender Datenbank ab (Grund > 100 Zeichen); Grund beim Wiederöffnen begrenzt |
 | 01.10.2026 | Runde 3 (`0624527`–`ca9f858`) | PDF-Erzeugung mit WeasyPrint (F51), Dokumentvorlagen mit Editor (F50), Freigabe-PDF mit SHA-256 und Prüfung beim Öffnen (F35, F37; Nginx reicht `X-EPM-Pruefung` weiter), Akte, Verlauf, Audit-Log und Zugangsblatt als PDF (F23, F24, F59, F55). Infusionsplan-PDF nach dem Altsystem, auf Wunsch neu gestaltet wie ein Laborbefund und wie die Oberfläche (Kopfkarte, Karten, Menge/Einheit in eigenen Spalten, Titel neben dem Logo, ohne Linie, fax-tauglich, einseitig); Laufzeit 0 als „—“; neue Bausteine und Optionen im Editor; Datenfeld-Einfügen nimmt den aktuellen Feldinhalt (Fehler behoben) |
 | 01.10.2026 | Runde 3 (`a30b26d`) | „Kein Kontakt seit …“ nach 4 statt 12 Monaten (Patienten kommen meist quartalsweise): Standard in den Einstellungen, Datenmigration stellt einen unveränderten Wert 12 um (mit Grund in der Historie); wirkt auf Hinweis in der Patientenliste und „Nach und nach prüfen“ auf der Startseite; Backend-Test `test_kontakt_ueberfaellig_nach_4_monaten` |

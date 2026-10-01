@@ -939,21 +939,25 @@ class FalschZugeordneteDokumente(Grundlage):
 
         migration = importlib.import_module("patienten.migrations.0006_geloeschte_dokumente_schwaerzen")
         dok = self.hochladen(self.sabine)
-        sha, datei = dok.sha256, dok.datei
+        nummer, sha, datei = dok.id, dok.sha256, dok.datei  # nach delete() ist dok.id leer
         # so hat die Version vor U15 gelöscht: Vorgang ohne Prüfsumme, Titel im Audit-Log
         DokumentVorgang.objects.create(art=DokumentVorgang.Art.GELOESCHT, dokument_id=dok.id, von_patient=self.sabine,
                                        grund="fremdes Dokument", person=self.mediziner)
-        protokolliere(SystemEreignis.Art.DOKUMENT_LOESCHEN_ABGELEHNT, objekt=f"Dokument {dok.id}", titel=dok.titel,
+        protokolliere(SystemEreignis.Art.DOKUMENT_LOESCHEN_ABGELEHNT, objekt=f"Dokument {nummer}", titel=dok.titel,
                       fehler="Kennwort falsch.")
-        protokolliere(SystemEreignis.Art.DOKUMENT_GELOESCHT, objekt=f"Dokument {dok.id}", titel=dok.titel,
+        protokolliere(SystemEreignis.Art.DOKUMENT_GELOESCHT, objekt=f"Dokument {nummer}", titel=dok.titel,
                       akte="Falsch, Sabine", grund="fremdes Dokument", sha256=sha, groesse=dok.groesse)
         dok.delete()
+        self.assertTrue(Dokument.history.filter(id=nummer, titel="Arztbrief Bernd Richtig").exists())
         migration.vorwaerts(django_apps, types.SimpleNamespace(connection=connection))
-        self.assertFalse(Dokument.history.filter(id=dok.id).exclude(titel="[entfernt]").exists())
-        self.assertEqual(set(Dokument.history.filter(id=dok.id).values_list("originalname", flat=True)), {"[entfernt]"})
-        for e in SystemEreignis.objects.filter(objekt=f"Dokument {dok.id}"):
+        self.assertEqual(Dokument.history.filter(id=nummer).count(), 2)
+        self.assertFalse(Dokument.history.filter(id=nummer).exclude(titel="[entfernt]").exists())
+        self.assertEqual(set(Dokument.history.filter(id=nummer).values_list("originalname", flat=True)), {"[entfernt]"})
+        ereignisse = SystemEreignis.objects.filter(objekt=f"Dokument {nummer}")
+        self.assertEqual(ereignisse.count(), 2)
+        for e in ereignisse:
             self.assertEqual((e.details["titel"], e.details["sha256"]), ("[entfernt]", sha))
-        v = DokumentVorgang.objects.get(dokument_id=dok.id)
+        v = DokumentVorgang.objects.get(dokument_id=nummer)
         self.assertEqual((v.sha256, v.datei), (sha, datei))
         self.assertEqual(nachholen()["liste_ergaenzt"], 1)
         # danach greift wieder der volle Schutz
