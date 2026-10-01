@@ -897,8 +897,9 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - **Geplant:** nach der nächtlichen Sicherung (F61) überträgt ein systemd-Dienst auf dem Host die verschlüsselten Dateien per
   rsync in den WebDAV-Ordner; Ergebnis („übertragen am …“ bzw. Fehler) in der Status-Datei, angezeigt in F62 und auf der
   Startseite (F13). Zugangsdaten nur auf dem Host (`/etc/epm`), nicht im Container.
-- **Für die Umsetzung nötig:** WebDAV-Adresse des Zielordners, Zugang (z. B. Nextcloud-App-Passwort) und das Zeitfenster, in dem
-  die Verbindung offen ist; ob der WebDAV-Ordner wie heute per davfs2 eingebunden wird.
+- **Festlegung 01.10.2026:** Ziel (WebDAV-Adresse, Benutzer, Kennwort, Zeitfenster) pflegt die Administration selbst in der
+  Oberfläche und kann es jederzeit ändern; Zugangsdaten nicht im Code oder in Dateien von Hand.
+- **Offen:** Übertragungswerkzeug (rsync auf einen per davfs2 eingebundenen Ordner wie heute, oder rclone mit WebDAV direkt).
 - **Status:** NICHT ABGESCHLOSSEN
 
 ---
@@ -951,7 +952,7 @@ Browser reichen). Funktionen, die noch fehlen, zeigt die Oberfläche als „folg
 | U11 | ~~Ab welcher Änderung zeigt der Trend-Pfeil „gleich“?~~ **Bestätigt 01.10.2026:** weniger als ±1 % = gleich | F14 | – |
 | U12 | ~~Darf der Admin auch Patientendaten schreiben?~~ **Geklärt 01.10.2026:** Admins dürfen alles, Patientendaten schreiben sie nur bei Testpatienten; echte Akten nur lesen, Wiederöffnen, Benutzer und Sicherungen bleiben | F66 | – |
 | U13 | ~~Energie im Infusionsplan: Lipide 9 oder 9,15 kcal/g, Albumin mit oder ohne Energie?~~ **Geklärt 01.10.2026:** wie in `EPM_infuplan.php`: Lipide 9,15 kcal/g, Humanalbumin in ml ohne Energie | F33, F39 | – |
-| U14 | ~~Stabilitätsprüfung Calcium + Magnesium und Vorbelegung des ersten Plans je kg übernehmen?~~ **Geklärt 01.10.2026:** ja, beides wie im Altsystem (Stabilität als Hinweis, Speichern bleibt möglich) | F32, F33 | – ||
+| U14 | ~~Stabilitätsprüfung Calcium + Magnesium und Vorbelegung des ersten Plans je kg übernehmen?~~ **Geklärt 01.10.2026:** ja, beides wie im Altsystem (Stabilität als Hinweis, Speichern bleibt möglich); Präparate werden beim ersten Plan **nicht** vorausgewählt | F32, F33 | – ||
 
 ## Änderungsprotokoll
 
