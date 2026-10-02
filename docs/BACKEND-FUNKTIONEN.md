@@ -31,6 +31,7 @@ Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests. Beide laufe
 
 Stand 02.10.2026 (Datenschutz F74–F83 und Systemseite/Kalender/Infusionspläne F84–F89 zusammen): **141 von 141 Backend-Tests** und **66 von 66 Browsertests grün** (Lauf 36976550763, Commit `97e5a5b`; dazu 1 Bildschirmfoto-Test, nur beim manuellen Start).
 Stand 02.10.2026 (Rechte: Löschen auch Admins, Systemverwaltung als Vertretung): **142 von 142 Backend-Tests** und **66 von 66 Browsertests grün** (Lauf 36989064354, Commit `0cca47d`).
+Stand 02.10.2026 (Altdaten-Import F65, Branch `altdaten-import` mit eingemischtem `main`): **212 von 212 Backend-Tests** und **74 von 74 Browsertests grün** (Lauf 37004133307, Commit `853b5ff`; dazu 2 Bildschirmfoto-Tests, nur beim manuellen Start).
 Stand 02.10.2026 (Datensicherung F61–F64 mit O-07, O-23, O-24, in `main` zusammen mit der Rechte-Änderung): **156 von 156 Backend-Tests** und **70 von 70 Browsertests grün** (Lauf 36991958136 auf `main`, Commit `7ba9f35`; vorher im Pull Request #3 Lauf 36990805767; dazu 1 Bildschirmfoto-Test, nur beim manuellen Start).
 
 Sporadische Fehlschläge der Browsertests (kein Produktfehler belegt, Ursache im Test bzw. offen): „Ärzte aus der
@@ -1269,7 +1270,15 @@ Recht „Sicherungen verwalten“ (Standard: nur Admin; Testzugänge nie).
 - **Unabhängige Prüfung (zweite Instanz, nur lesend, 02.10.2026):** 13 Befunde, alle behoben (u. a. untaugliche
   Korrektur entsperrte einen offenen Punkt; TIMESTAMP in UTC; Dokumentenordner bei korrigierter Nummer; unlesbare
   Ordner; Fehlertexte mit Zeileninhalt).
-- **Teststatus:** TESTSTATUS_F65
+- **Teststatus:** Backend-Tests `altimport/test_rein.py` (Dump-Leser, Werte, Umsetzung nach den Regeln, Befunde der
+  Prüfung – reines Python) und `altimport/tests.py` gegen PostgreSQL (Rechte, Dump laden, Zuordnungen, Probelauf schreibt
+  nichts, Import mit Historie und Schutz-Triggern, übernommene Akten im Alltag, Dokumente in Etappen, Zurücknehmen und
+  erneut übernehmen, Abschließen). Browsertest `aa-import.spec.ts` (läuft als erste Datei, solange es keine echten
+  Akten gibt): nur Admin; Dump laden und alle Bereiche der Zuordnungen in der Oberfläche korrigieren; Probelauf, Import
+  mit Passwort und Notfall-Code, übernommene Akte als Mediziner (Gewichte, Kontakte, Pläne, Dokumente), Dokumente aus
+  dem Ordner des CI-Stacks, Zurücknehmen, Protokolle, Audit-Log. Neustart: `zz-neustart.spec.ts` (Dump, Zuordnungen
+  und Läufe sind nach dem Neustart da; mit echten Akten ist der Import gesperrt). Bildschirmfotos der Seite beim
+  manuellen Start des Workflows (Branch `bildschirmfotos`).
 - **Grenze des Nachweises:** Getestet ist mit einem erfundenen Dump, der die 17 Regeln und die bekannten Auffälligkeiten
   nachstellt. Der echte Dump ist hier nie gelaufen – der erste Probelauf mit dem frischen Dump zeigt, ob Spaltennamen
   und Inhalte so sind wie in der Datenanalyse angenommen (dafür sind die Zuordnungen korrigierbar).

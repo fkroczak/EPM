@@ -122,7 +122,7 @@ export const BEREICHE: Record<string, string> = {
   kontakte: "Kontakte", infusionen: "Infusionspläne",
 };
 export const NICHT: Record<string, string> = {
-  geloescht: "im Altsystem gelöscht", ausgelassen: "auf Entscheidung ausgelassen", fehler: "offene Auffälligkeit",
+  geloescht: "im Altsystem gelöscht", ausgelassen: "ausgelassen (siehe Auffälligkeiten)", fehler: "offene Auffälligkeit",
   patient_nicht_uebernommen: "Patient wird nicht übernommen", ohne_patient: "ohne Patient",
   platzhalter: "Platzhalter (leer, 0, 9999)", leer: "ohne Text",
 };

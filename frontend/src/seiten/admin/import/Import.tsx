@@ -27,7 +27,7 @@ const SCHRITTE: { wert: Schritt; text: string }[] = [
 ];
 const STUFE: Record<Protokollzeile["stufe"], { text: string; art: "fehler" | "warn" | "neutral" | "ok" }> = {
   fehler: { text: "Fehler", art: "fehler" }, warnung: { text: "Warnung", art: "warn" }, hinweis: { text: "Hinweis", art: "neutral" },
-  info: { text: "Regel", art: "ok" },
+  info: { text: "Info", art: "ok" },
 };
 
 function neuLaden(qc: ReturnType<typeof useQueryClient>) {

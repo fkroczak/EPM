@@ -559,7 +559,7 @@ function AuffaelligkeitenTeil({ stand, speichern }: { stand: Zuordnungsstand; sp
       <KartenKopf titel={`Auffälligkeiten (${liste.length})`}
         unter="Einzelne Werte, die fehlen, nicht lesbar oder unplausibel sind. Ohne Entscheidung gilt der Standard; was als „offen“ markiert ist, muss entschieden werden. Eine Korrektur gilt nur, solange im Dump derselbe Wert steht." />
       <table className="tabelle">
-        <thead><tr><th className="th w-[130px]">Zeile</th><th className="th w-[170px]">Angabe</th><th className="th">Befund</th><th className="th w-[260px]">Entscheidung</th><th className="th w-[110px]" /></tr></thead>
+        <thead><tr><th className="th w-[130px]">Zeile</th><th className="th w-[170px]">Angabe</th><th className="th">Befund</th><th className="th w-[320px]">Entscheidung</th><th className="th w-[110px]" /></tr></thead>
         <tbody>{liste.slice(0, anzahl).map((a) => <AuffaelligZeile key={a.schluessel} a={a} speichern={speichern} />)}</tbody>
       </table>
       {liste.length > anzahl ? <div><Knopf klein onClick={() => setAnzahl(anzahl + 200)}>Weitere anzeigen ({liste.length - anzahl})</Knopf></div> : null}
