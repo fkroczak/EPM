@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import type { Feldfehler } from "@/lib/api";
 import { useBriefkopf } from "@/lib/daten";
 import type { Absender, Briefkopf } from "@/lib/daten";
@@ -264,7 +265,7 @@ const HINWEISE: { k: string; label: string; einheit: string }[] = [
 const DATENSCHUTZ: { k: string; label: string; einheit: string; hinweis?: string }[] = [
   { k: "aufbewahrung_jahre", label: "Aufbewahrung nach Abschluss der Akte", einheit: "Jahre", hinweis: "danach kann die Akte gelöscht werden" },
   { k: "abschluss_pruefen_monate", label: "„Abschluss prüfen“, wenn kein Kontakt seit", einheit: "Monaten" },
-  { k: "protokoll_aufbewahrung_jahre", label: "Audit-Log aufbewahren", einheit: "Jahre", hinweis: "0 = unbegrenzt; sonst werden ältere Einträge täglich entfernt" },
+  { k: "protokoll_aufbewahrung_jahre", label: "Audit-Log aufbewahren", einheit: "Jahre", hinweis: "0 = unbegrenzt; sonst werden ältere Einträge täglich endgültig entfernt" },
 ];
 const GRENZEN: { text: string; min: string; max: string; einheit: string }[] = [
   { text: "Energie", min: "kcal_min_tag", max: "kcal_max_tag", einheit: "kcal" },
@@ -288,6 +289,8 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
   const daten = useQuery({ queryKey: ["einstellungen"], queryFn: () => api<Einstellungen>("einstellungen/") });
   const [w, setW] = useState<Record<string, string> | null>(null);
   const [pflicht, setPflicht] = useState<string[]>([]);
+  // Fristen des Datenschutzes ändert nur, wer auch über Datenschutz-Anfragen entscheidet
+  const datenschutz = useAuth().darf("datenschutz_entscheiden");
   useEffect(() => {
     if (daten.data && !w) {
       setW(Object.fromEntries(Object.entries(daten.data).map(([k, v]) => [k, typeof v === "number" ? zahl(v).replace(/\./g, "") : String(v)])));
@@ -296,9 +299,9 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
   }, [daten.data, w]);
   const speichern = useMutation({
     mutationFn: () => {
-      const felder = [...HINWEISE.map((h) => h.k), ...DATENSCHUTZ.map((h) => h.k), ...GRENZEN.flatMap((g) => [g.min, g.max])];
+      const felder = [...HINWEISE.map((h) => h.k), ...(datenschutz ? DATENSCHUTZ.map((h) => h.k) : []), ...GRENZEN.flatMap((g) => [g.min, g.max])];
       const fehler: Feldfehler = {};
-      const body: Record<string, string | string[] | null> = { pflicht_erklaerungen: pflicht };
+      const body: Record<string, string | string[] | null> = datenschutz ? { pflicht_erklaerungen: pflicht } : {};
       for (const k of felder) {
         const z = eingabeZahl(w![k] ?? "");
         if (!z || z === "ungueltig") fehler[k] = "Bitte eine Zahl eingeben.";
@@ -340,15 +343,16 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
         <div className="grid grid-cols-2 gap-3">
           {DATENSCHUTZ.map((h) => (
             <Feld key={h.k} label={h.label} fehler={f[h.k]} hinweis={h.hinweis}>
-              {(p) => <Einheit einheit={h.einheit}><Eingabe {...p} className="num pr-20" value={w[h.k] ?? ""} onChange={(e) => setW({ ...w, [h.k]: e.target.value })} /></Einheit>}
+              {(p) => <Einheit einheit={h.einheit}><Eingabe {...p} className="num pr-20" disabled={!datenschutz} value={w[h.k] ?? ""} onChange={(e) => setW({ ...w, [h.k]: e.target.value })} /></Einheit>}
             </Feld>
           ))}
         </div>
+        {datenschutz ? null : <span className="text-[0.8125rem] gedaempft" data-testid="datenschutz-nur-lesen">Diese Werte ändert, wer über Datenschutz-Anfragen entscheidet (Benutzer › Rechte).</span>}
         <fieldset className="border-0 p-0 m-0 flex flex-col gap-1.5">
           <legend className="text-sm font-medium mb-1.5">Erklärungen, die in jeder Akte vorliegen sollen</legend>
           {(Object.keys(ERKLAERUNGEN) as ErklaerungsArt[]).map((art) => (
             <label key={art} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={pflicht.includes(art)}
+              <input type="checkbox" checked={pflicht.includes(art)} disabled={!datenschutz}
                 onChange={(e) => setPflicht(e.target.checked ? [...pflicht, art] : pflicht.filter((x) => x !== art))} />
               {ERKLAERUNGEN[art]}
             </label>

@@ -35,13 +35,42 @@ def patienten_fuer(user, eingeschraenkte: bool = False):
 
     Akten, deren Verarbeitung eingeschränkt ist (Art. 18 DSGVO), erscheinen nirgends – nicht in Listen, nicht in
     der Suche, nicht mit ihren Einträgen –, außer für die Person, die gerade eine begründete Einsicht hat.
-    ``eingeschraenkte=True`` nur für die Datenschutz-Vorgänge selbst (Einsicht nehmen, aufheben, löschen, Anfragen)."""
+    ``eingeschraenkte=True`` liefert auch sie – nur für Stellen, die keine Inhalte zeigen (Hinweis „eingeschränkt“
+    mit Nummer, Zählen). Für die Datenschutz-Vorgänge selbst: ``patienten_mit_eingeschraenkten``."""
     qs = Patient.objects.all()
     if getattr(user, "ist_test", False):
         qs = qs.filter(ist_test=True)
     if not eingeschraenkte:
         einsicht = Akteneinsicht.objects.filter(benutzer_id=getattr(user, "pk", None), bis__gt=timezone.now())
         qs = qs.filter(Q(eingeschraenkt_am__isnull=True) | Q(id__in=einsicht.values("patient_id")))
+    return qs
+
+
+def darf_einsicht(user, patient) -> bool:
+    """Darf diese Person in die eingeschränkte Akte Einsicht nehmen? Recht „Datenschutz: Anfragen entscheiden …“;
+    Admins nur bei Testpatienten."""
+    from accounts.rechte import schreibt_nur_testpatienten
+
+    if not user.hat_recht("datenschutz_entscheiden"):
+        return False
+    if getattr(user, "ist_test", False) and not patient.ist_test:
+        return False
+    return patient.ist_test or not schreibt_nur_testpatienten(user)
+
+
+def patienten_mit_eingeschraenkten(user):
+    """Wie ``patienten_fuer``, zusätzlich die eingeschränkten Akten, in die diese Person Einsicht nehmen dürfte.
+
+    Für die Datenschutz-Vorgänge selbst (Übersicht, Anfragen, einschränken, aufheben, löschen): Wer über eine
+    eingeschränkte Akte entscheidet, muss sie finden können. Alle anderen sehen von ihr höchstens die Nummer."""
+    from accounts.rechte import schreibt_nur_testpatienten
+
+    if not user.hat_recht("datenschutz_entscheiden"):
+        return patienten_fuer(user)
+    qs = patienten_fuer(user, eingeschraenkte=True)
+    if schreibt_nur_testpatienten(user):
+        einsicht = Akteneinsicht.objects.filter(benutzer_id=user.pk, bis__gt=timezone.now())
+        qs = qs.filter(Q(eingeschraenkt_am__isnull=True) | Q(ist_test=True) | Q(id__in=einsicht.values("patient_id")))
     return qs
 
 

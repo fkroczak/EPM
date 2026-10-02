@@ -437,8 +437,8 @@ function AkteLoeschenDialog({ patient, offen, onOffen }: { patient: Patient; off
           disabled={!vorbereiten.data || grund.trim().length < 10 || !kennwort || code.trim().length < 6 || bestaetigung.trim().length < 6}>Akte endgültig löschen</Knopf></>}>
       <div className="flex flex-col gap-3" data-testid="akte-loeschen">
         <Meldung art="fehler">Die Akte wird mit allen Einträgen, Infusionsplänen, Dokumenten und ihrem gesamten Verlauf
-          unwiederbringlich gelöscht. Es bleiben das Löschprotokoll (Patientennummer, Rechtsgrund, Umfang – kein Name) und die
-          Einträge im Audit-Log ohne Namen und Inhalte. Ältere Sicherungen enthalten die Akte noch bis zu ihrem Ablauf; nach
+          unwiederbringlich gelöscht. Es bleiben das Löschprotokoll (Patientennummer, Daten zu Abschluss und Frist, Rechtsgrund,
+          Ihr Grund, Umfang in Zahlen – kein Name) und die Einträge im Audit-Log ohne Namen und Inhalte. Ältere Sicherungen enthalten die Akte noch bis zu ihrem Ablauf; nach
           einer Wiederherstellung wird sie automatisch erneut gelöscht.</Meldung>
         {vorbereiten.data ? <Meldung art={vorbereiten.data.loeschen.rechtsgrund === "frist" ? "info" : "warn"}>{vorbereiten.data.loeschen.hinweis}</Meldung> : null}
         {u ? (
@@ -509,6 +509,7 @@ function AufbewahrungKarte({ daten, patient, darf, entscheiden, loeschenErlaubt 
           <span className="text-sm" data-testid="aufbewahrung-stand">
             Abgeschlossen am {datum(patient.abgeschlossen_am)} · Aufbewahrung {a.jahre} Jahre, bis <strong className="num">{datum(a.bis)}</strong>
             {a.abgelaufen ? <> <Chip art="warn">Frist abgelaufen</Chip></> : null}
+            {a.beginn && a.beginn !== patient.abgeschlossen_am ? <span className="gedaempft"> · gerechnet ab dem letzten Kontakt am {datum(a.beginn)} (er liegt nach dem Abschlussdatum)</span> : null}
             {a.verlaengert_bis && a.bis === a.verlaengert_bis ? <span className="gedaempft"> · im Einzelfall verlängert (regulär bis {datum(a.regulaer_bis)}): {a.grund}</span> : null}
           </span>
         ) : (
@@ -564,7 +565,7 @@ function AufbewahrungKarte({ daten, patient, darf, entscheiden, loeschenErlaubt 
         </Feld>
       </GrundDialog>
       <GrundDialog titel="Verarbeitung einschränken" knopf="Einschränken" gefaehrlich testid="einschraenken"
-        beschreibung={`${name(patient)} · Die Akte erscheint danach in keiner Liste und keiner Suche mehr – auch nicht für Sie. Lesbar ist sie nur mit begründeter Einsicht (60 Minuten, im Audit-Log).`}
+        beschreibung={`${name(patient)} · Die Akte erscheint danach in keiner Liste und keiner Suche mehr – auch nicht für Sie. Lesbar ist sie nur mit begründeter Einsicht (60 Minuten, im Audit-Log). In der Übersicht „Datenschutz“ bleibt sie mit Nummer aufgeführt; den Namen sieht dort nur, wer Einsicht nehmen darf.`}
         offen={dialog === "einschraenken"} onOffen={(o) => setDialog(o ? "einschraenken" : "")} laedt={einschraenken.isPending}
         fehler={einschraenken.error} onAbsenden={(g) => einschraenken.mutate(g)} />
       <GrundDialog titel="Einschränkung aufheben" knopf="Aufheben" testid="einschraenkung-aufheben"

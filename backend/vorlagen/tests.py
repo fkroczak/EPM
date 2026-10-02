@@ -161,7 +161,12 @@ class Vorlagen(Grundlage):
                 b.update(text=m.ALT, optionen={"nicht_teilen": True, "linie_oben": True})
         Dokumentvorlage.objects.create(art="infusionsplan", version=1, status="aktiv", bloecke=bloecke,
                                        veroeffentlicht_am=timezone.now())
+        entwurf = Dokumentvorlage.objects.create(art="infusionsplan", status="entwurf", bloecke=bloecke)
         m.freigabevermerk(apps, None)
+        # ein Entwurf in Arbeit wird an Ort und Stelle umgestellt (sonst käme der alte Satz beim Veröffentlichen zurück)
+        entwurf.refresh_from_db()
+        self.assertEqual(next(b for b in entwurf.bloecke if b["id"] == "freigabe")["text"], "{{Plan.Freigabevermerk}}")
+        entwurf.delete()
         aktiv = Dokumentvorlage.aktive("infusionsplan")
         vermerk = next(b for b in aktiv.bloecke if b["id"] == "freigabe")
         self.assertEqual((aktiv.version, vermerk["text"], vermerk["optionen"]["ausblenden_wenn_leer"]),

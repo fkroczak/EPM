@@ -56,7 +56,9 @@ def loeschliste() -> Path:
 
 def trage_ein(eintrag: dict) -> None:
     """Hängt eine Löschung an die Löschliste an (eine JSON-Zeile, sofort auf die Platte geschrieben).
-    Enthält nur Nummer, Prüfsumme, Pfad, Akte (Patienten-ID), Person (Benutzer-ID) und Zeitpunkt – keinen Titel."""
+    Dokument: nur Nummer, Prüfsumme, Pfad, Akte (Patienten-ID), Person (Benutzer-ID) und Zeitpunkt – kein Titel.
+    Akte (``patienten.datenschutz``): Kennung, Patientennummer, Daten zu Anlage, Abschluss und Frist, Rechtsgrund,
+    der eingetragene Grund (Freitext), Umfang in Zahlen, Person, Zeitpunkt – kein Name."""
     pfad = loeschliste()
     pfad.parent.mkdir(parents=True, exist_ok=True)
     zeile = json.dumps(eintrag, ensure_ascii=False, sort_keys=True) + "\n"

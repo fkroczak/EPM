@@ -105,8 +105,9 @@ export type PatientZeile = {
 };
 
 /** Aufbewahrungsfrist einer abgeschlossenen Akte */
-export type Aufbewahrung = { jahre: number; regulaer_bis: string | null; verlaengert_bis: string | null; grund: string;
-  bis: string | null; abgelaufen: boolean };
+/** beginn: Abschlussdatum – oder der Tag des letzten Kontakts, wenn der später liegt */
+export type Aufbewahrung = { jahre: number; beginn: string | null; regulaer_bis: string | null; verlaengert_bis: string | null;
+  grund: string; bis: string | null; abgelaufen: boolean };
 
 export type ErklaerungsArt = "datenschutzinformation" | "einwilligung" | "schweigepflichtentbindung";
 export const ERKLAERUNGEN: Record<ErklaerungsArt, string> = {
@@ -159,13 +160,16 @@ export type AktenDatenschutz = {
   loeschen: Loeschpruefung;
 };
 
-type AktenZeile = { id: number; nummer: number; name: string; ist_test: boolean };
+/** name: null bei einer eingeschränkten Akte, wenn die angemeldete Person keine Einsicht nehmen dürfte */
+type AktenZeile = { id: number; nummer: number; name: string | null; ist_test: boolean };
 export type DatenschutzUebersicht = {
   anfragen_offen: Datenschutzanfrage[];
   anfragen_ueberfaellig: number;
+  /** offene Anfragen zu eingeschränkten Akten, die diese Person nicht sieht */
+  anfragen_verborgen: number;
   aufbewahrung_abgelaufen: (AktenZeile & { abgeschlossen_am: string; aufbewahrung_bis: string; verlaengert: boolean; eingeschraenkt: boolean })[];
   aufbewahrung_laeuft_ab: (AktenZeile & { abgeschlossen_am: string; aufbewahrung_bis: string; verlaengert: boolean; eingeschraenkt: boolean })[];
-  eingeschraenkt: (AktenZeile & { am: string; von: string | null; grund: string })[];
+  eingeschraenkt: (AktenZeile & { am: string; von: string | null; grund: string | null })[];
   erklaerungen_fehlen: number;
   abschluss_pruefen: number;
   loeschprotokoll: { id: number; nummer: number; ist_test: boolean; geloescht_am: string; geloescht_von: string | null;

@@ -1,11 +1,30 @@
 """Patientendaten im Django-Admin nur lesen (Bearbeitung über die Anwendung)."""
 from django.contrib import admin
+from django.core.exceptions import ObjectDoesNotExist
 from simple_history.admin import SimpleHistoryAdmin
 
 from .models import Bezugsperson, Dokument, Gewichtsmessung, Kontakt, Patient, PatientArzt, Termin
 
 
 class NurLesen(SimpleHistoryAdmin):
+    #: Weg vom Modell zur Akte ("" = die Akte selbst)
+    akte = "patient__"
+
+    def get_queryset(self, request):
+        # Akten mit eingeschränkter Verarbeitung (Art. 18 DSGVO) erscheinen hier nicht, auch nicht mit ihren
+        # Einträgen: Einsicht gibt es nur in EPM, mit Grund und Eintrag im Audit-Log.
+        return super().get_queryset(request).filter(**{f"{self.akte}eingeschraenkt_am__isnull": True})
+
+    def has_view_permission(self, request, obj=None):
+        # gilt auch für die Historien-Ansicht, die ein Objekt notfalls aus der Historie holt
+        try:
+            akte = obj if isinstance(obj, Patient) else getattr(obj, "patient", None)
+        except ObjectDoesNotExist:
+            akte = None
+        if akte is not None and akte.eingeschraenkt_am:
+            return False
+        return super().has_view_permission(request, obj)
+
     def has_add_permission(self, request, obj=None):
         return False
 
@@ -31,6 +50,7 @@ class GewichtInline(admin.TabularInline):
 
 @admin.register(Patient)
 class PatientAdmin(NurLesen):
+    akte = ""
     list_display = ["nummer", "nachname", "vorname", "geburtsdatum", "versorger", "abgeschlossen_am", "ist_test"]
     list_filter = ["ist_test", "versorger", ("abgeschlossen_am", admin.EmptyFieldListFilter)]
     search_fields = ["nachname", "vorname"]

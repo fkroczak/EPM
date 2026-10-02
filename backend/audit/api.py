@@ -6,6 +6,7 @@ from rest_framework.response import Response
 
 from accounts.permissions import AuditRecht, TestdatenRecht
 
+from .bereinigung import akte_bedingung, verbergen
 from .models import SystemEreignis, protokolliere
 from .texte import GRUPPEN, beschreibung, gruppe, gruppe_name
 
@@ -66,6 +67,40 @@ class SystemEreignisViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vi
     filterset_class = SystemEreignisFilter
     search_fields = ["benutzername", "objekt"]
 
+    # Akten mit eingeschränkter Verarbeitung (Art. 18 DSGVO): Wer keine Einsicht nehmen dürfte (z. B. die
+    # Administration bei echten Akten), sieht die Einträge ohne Namen, Titel und Freitext – und findet sie nicht
+    # über die Suche nach dem Namen.
+    def _verborgen(self) -> dict:
+        if not hasattr(self, "_verborgen_cache"):
+            from epm.api_basis import patienten_mit_eingeschraenkten
+            from patienten.models import Patient
+
+            sichtbar = patienten_mit_eingeschraenkten(self.request.user).values("id")
+            self._verborgen_cache = dict(Patient.objects.filter(eingeschraenkt_am__isnull=False)
+                                         .exclude(id__in=sichtbar).values_list("id", "nummer"))
+        return self._verborgen_cache
+
+    def filter_queryset(self, queryset):
+        qs = super().filter_queryset(queryset)
+        if self.request.query_params.get("search"):
+            # über positive Treffer ausschließen: ein verneinter Vergleich auf ``details`` ließe auch alle Einträge
+            # ohne diesen Schlüssel fallen (NULL)
+            for pid, nummer in self._verborgen().items():
+                qs = qs.exclude(id__in=SystemEreignis.objects.filter(akte_bedingung(pid, nummer)).values("id"))
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        qs = self.filter_queryset(self.get_queryset())
+        seite = self.paginate_queryset(qs)
+        eintraege = verbergen(list(seite if seite is not None else qs), self._verborgen())
+        daten = self.get_serializer(eintraege, many=True).data
+        return self.get_paginated_response(daten) if seite is not None else Response(daten)
+
+    def retrieve(self, request, *args, **kwargs):
+        e = self.get_object()
+        verbergen([e], self._verborgen())
+        return Response(self.get_serializer(e).data)
+
     @action(detail=False, methods=["get"])
     def pdf(self, request):
         """Audit-Log für einen Zeitraum als PDF (F59), mit denselben Filtern wie die Liste; höchstens 5.000 Einträge."""
@@ -81,7 +116,7 @@ class SystemEreignisViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vi
             teile.append(f"Art {p.get('gruppe')}")
         if p.get("search"):
             teile.append(f"Suche „{p.get('search')}“")
-        pdf = protokoll_pdf(list(qs), " · ".join(teile))
+        pdf = protokoll_pdf(verbergen(list(qs), self._verborgen()), " · ".join(teile))
         protokolliere(SystemEreignis.Art.EXPORT, request, objekt=" · ".join(teile) or "alle Einträge", was="Audit-Log")
         return pdf_antwort(pdf, f"Audit-Log-{timezone.localdate():%Y-%m-%d}.pdf")
 

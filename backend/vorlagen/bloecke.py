@@ -261,8 +261,9 @@ DATENSCHUTZINFORMATION = [
                "[eintragen: entweder, dass keine Übermittlung stattfindet, oder die Angaben nach Art. 13 Abs. 1 "
                "Buchst. f DSGVO]"),
     _abschnitt("dauer", "5. Wie lange speichern wir Ihre Daten?",
-               "Wir bewahren Ihre Akte {{Aufbewahrung.Jahre}} Jahre nach dem Abschluss der Betreuung auf; danach "
-               "wird sie gelöscht. [Grundlage dieser Frist eintragen]"),
+               "Wir bewahren Ihre Akte {{Aufbewahrung.Jahre}} Jahre nach dem Abschluss der Betreuung auf. "
+               "[Grundlage dieser Frist eintragen; eintragen, was nach Ablauf geschieht – EPM zeigt abgelaufene "
+               "Akten in der Übersicht „Datenschutz“ an, gelöscht wird dort von Hand]"),
     _abschnitt("rechte", "6. Welche Rechte haben Sie?",
                "Sie haben das Recht auf Auskunft über Ihre Daten (Art. 15 DSGVO), auf Berichtigung (Art. 16 DSGVO), "
                "auf Löschung (Art. 17 DSGVO) und auf Einschränkung der Verarbeitung (Art. 18 DSGVO) sowie – soweit "

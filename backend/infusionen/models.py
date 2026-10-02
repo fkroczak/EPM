@@ -401,6 +401,17 @@ class Infusionsplan(AktenEintrag):
             fehler["nachweis"] = "Der Nachweis gehört zu einer anderen Akte."
         if fehler:
             raise ValidationError(fehler)
+        # Der Vermerk auf der PDF muss beide Personen nennen – das leistet nur das Datenfeld „Freigabevermerk“.
+        import json
+        import re
+
+        from vorlagen.models import Dokumentvorlage
+
+        vorlage = json.dumps(Dokumentvorlage.aktive("infusionsplan").bloecke, ensure_ascii=False)
+        if not re.search(r"\{\{\s*Plan\.Freigabevermerk\s*\}\}", vorlage):
+            raise ValidationError({"fehler": "Die Dokumentvorlage „Infusionsplan“ enthält das Datenfeld „Freigabevermerk“ "
+                                             "nicht. Ohne es nennt die PDF nicht, wer den Plan abgeschlossen hat. Bitte "
+                                             "unter Vorlagen › Dokumentvorlagen ergänzen und veröffentlichen."})
         self._freigabe(mediziner=mediziner, abschliessend=benutzer, weg=weg, datum=datum, nachweis=nachweis)
 
     def _freigabe(self, mediziner, abschliessend, weg, datum, nachweis):
