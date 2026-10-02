@@ -54,7 +54,41 @@ AKTIONEN = {
         "name": "Paketreste entfernen", "bestaetigung": "einfach",
         "beschreibung": "Nicht mehr benötigte Pakete (z. B. alte Kernel) und den Paketcache entfernen.",
     },
+    # Administration › Backup (intern: nicht unter System › Tätigkeiten, nur über /api/backup/…)
+    "sicherung_passwort": {
+        "name": "Sicherungs-Passwort festlegen", "bestaetigung": "2fa", "recht": "backup_verwalten", "intern": True,
+        "beschreibung": "Neues Passwort für die Verschlüsselung der Sicherungen; ältere bleiben mit ihrem Passwort lesbar.",
+    },
+    "sicherung_ziel": {
+        "name": "Übertragungsziel festlegen", "bestaetigung": "2fa", "recht": "backup_verwalten", "intern": True,
+        "beschreibung": "WebDAV-Ordner (Nextcloud) und Zeitfenster für die Übertragung der Sicherungen.",
+    },
+    "sicherung_ziel_entfernen": {
+        "name": "Übertragungsziel entfernen", "bestaetigung": "2fa", "recht": "backup_verwalten", "intern": True,
+        "beschreibung": "Sicherungen bleiben danach nur auf dem Server.",
+    },
+    "sicherung_ziel_testen": {
+        "name": "Verbindung zum Übertragungsziel testen", "bestaetigung": "keine", "recht": "backup_verwalten",
+        "intern": True, "beschreibung": "Anmeldung am WebDAV-Ordner prüfen und den Ordner anlegen, falls er fehlt.",
+    },
+    "sicherung_uebertragen": {
+        "name": "Sicherungen jetzt übertragen", "bestaetigung": "einfach", "recht": "backup_verwalten", "intern": True,
+        "beschreibung": "Noch nicht übertragene, verschlüsselte Sicherungen jetzt zum Ziel kopieren (auch außerhalb des "
+                        "Zeitfensters).",
+    },
+    "wiederherstellen": {
+        "name": "Sicherung wiederherstellen", "bestaetigung": "2fa", "recht": "backup_verwalten", "intern": True,
+        "sichern": True, "warnen": True,
+        "beschreibung": "Ersetzt Datenbank und Dokumente durch den Stand der Sicherung. Vorher automatische Sicherung des "
+                        "jetzigen Stands; die Löschliste bleibt.",
+        "hinweis": "EPM wird auf eine Sicherung zurückgesetzt und ist einige Minuten nicht erreichbar. Eingaben nach dem "
+                   "Zeitpunkt der Sicherung gehen verloren; danach bitte neu anmelden.",
+    },
 }
+
+# Aktionen der Seite Administration › Backup (für deren Liste der Tätigkeiten)
+SICHERUNG_AKTIONEN = ("sicherung", "sicherung_passwort", "sicherung_ziel", "sicherung_ziel_entfernen",
+                      "sicherung_ziel_testen", "sicherung_uebertragen", "wiederherstellen")
 
 STATUS_VERALTET_S = 180   # der Agent misst jede Minute; älter heißt: Agent läuft nicht
 
@@ -145,8 +179,10 @@ class AuftragNichtMoeglich(Exception):
     pass
 
 
-def auftrag_ablegen(auftrag):
-    """Auftragsdatei für den Agenten schreiben (atomar: erst .tmp, dann umbenennen – der Agent liest nur *.json)."""
+def auftrag_ablegen(auftrag, geheim=None):
+    """Auftragsdatei für den Agenten schreiben (atomar: erst .tmp, dann umbenennen – der Agent liest nur *.json).
+    ``geheim`` (Passwörter) steht nur in dieser Datei (0600, der Agent löscht sie sofort nach dem Lesen), nie in der
+    Datenbank."""
     ordner = ordner_auftraege()
     if not ordner.is_dir():
         raise AuftragNichtMoeglich(
@@ -159,9 +195,12 @@ def auftrag_ablegen(auftrag):
         "angefordert_von": auftrag.angefordert_von.get_username(),
         "angefordert_am": auftrag.angefordert_am.isoformat(),
     }
+    if geheim:
+        daten["geheim"] = geheim
     tmp = ordner / f".{auftrag.kennung.hex}.tmp"
     try:
-        with open(tmp, "w", encoding="utf-8") as f:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(daten, f, ensure_ascii=False)
         os.replace(tmp, ordner / f"{auftrag.kennung.hex}.json")
     except OSError as e:

@@ -1475,7 +1475,15 @@ def startseite_daten(user):
             "in_betreuung": statistik.count(),
             "mit_offenem_termin": statistik.filter(termine__erledigt_am__isnull=True).distinct().count(),
         },
+        # Kopfzeile (O-07): Zustand der Sicherungen vom Systemagenten – für alle sichtbar, ohne Zugangsdaten
+        "sicherung": sicherung_kurz(),
     }
+
+
+def sicherung_kurz():
+    from system.sicherung import kurzstatus
+
+    return kurzstatus()
 
 
 class StartseiteViewSet(viewsets.ViewSet):
