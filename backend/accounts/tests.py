@@ -275,8 +275,9 @@ class MeinKonto(TestCase):
         self.assertEqual(r.status_code, 200, r.content)
         karten = r.json()["startseite"]["karten"]
         self.assertEqual([k["id"] for k in karten][:2], ["gewicht", "termine"])
-        self.assertEqual(len(karten), 5)  # fehlende Karten werden angehängt
+        self.assertEqual(len(karten), 15)  # fehlende Kacheln werden mit ihrem Standard angehängt (S11)
         self.assertFalse(karten[0]["sichtbar"])
+        self.assertEqual((karten[1]["breite"], karten[1]["hoehe"]), (2, 2))  # Standardgröße der Termine
         doppelt = {"karten": [{"id": "termine"}, {"id": "termine"}]}
         self.assertEqual(self.c.patch("/api/auth/ich/", {"startseite": doppelt}, format="json").status_code, 400)
 

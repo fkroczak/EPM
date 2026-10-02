@@ -7,9 +7,12 @@ import { abfrage, api } from "@/lib/api";
 import type { Seite as ApiSeite } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useAuswahl, useVersorgerListe } from "@/lib/daten";
-import { datum, kg, nummer, prozent, relativ, zahl } from "@/lib/format";
-import { ABSCHLUSSANLAESSE } from "@/lib/typen";
-import type { PatientZeile, Trend } from "@/lib/typen";
+import { datum, heuteIso, kg, nummer, prozent, relativ, terminZeit, zahl } from "@/lib/format";
+import { ab, useStufe } from "@/lib/stufen";
+import { ABSCHLUSSANLAESSE, ERKLAERUNGEN_KURZ, TERMINARTEN } from "@/lib/typen";
+import type { Kontakt, Patient, PatientZeile, Trend } from "@/lib/typen";
+import { Spalten } from "@/components/ui/spalten";
+import { Richtext, klartext } from "@/components/Editor";
 import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Fehleranzeige, Karte, KnopfLink, Knopf, Laden, Leer, Seitenkopf, Segmente, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
@@ -35,7 +38,10 @@ const PRUEFEN: Record<string, string> = {
   altdokumente: "Altdokumente ohne geprüften Typ",
   nickelallergie: "Nickelallergie nicht erfasst",
   kein_versorger: "Versorger nicht erfasst",
-  kein_kontakt: "Lange kein Kontakt",
+  kein_kontakt: "Kontakt fällig (bald fällig und überfällig)",
+  kontakt_bald: "Kontakt bald fällig",
+  kontakt_ueberfaellig: "Kontakt überfällig",
+  wiedereinbestellung: "Wiedereinbestellung fällig (kein Termin geplant)",
   erklaerungen: "Erklärungen zum Datenschutz fehlen",
   abschluss_pruefen: "Abschluss prüfen (lange kein Kontakt)",
 };
@@ -88,8 +94,83 @@ function Hinweise({ p }: { p: PatientZeile }) {
     <span className="inline-flex gap-1.5 flex-wrap">
       {p.nickelallergie === "ja" ? <Chip art="fehler">Nickelallergie</Chip> : null}
       {p.nickelallergie === "unbekannt" ? <Chip title="Nickelallergie nicht erfasst">Nickel ?</Chip> : null}
-      {(p.kennzahlen?.hinweise ?? []).map((h) => <Chip key={h.art} art="warn">{h.text}</Chip>)}
+      {/* Kontakt fällig in zwei Stufen (S04): überfällig rot, bald fällig gelb */}
+      {(p.kennzahlen?.hinweise ?? []).map((h) => <Chip key={h.art} art={h.stufe === "ueberfaellig" ? "fehler" : "warn"}>{h.text}</Chip>)}
     </span>
+  );
+}
+
+function NaechsterTermin({ p }: { p: PatientZeile }) {
+  const t = p.kennzahlen?.naechster_termin;
+  if (!t) return <span className="gedaempft">—</span>;
+  return (
+    <span className={cx("text-[0.8125rem]", t.faellig_am < heuteIso() && "text-fehler")} title={t.titel}>
+      {terminZeit(t.faellig_am, t.uhrzeit)}<br /><span className="gedaempft">{TERMINARTEN[t.art] ?? t.art}</span>
+    </span>
+  );
+}
+
+function PlanZelle({ p }: { p: PatientZeile }) {
+  const plan = p.kennzahlen?.plan;
+  if (!plan) return <span className="gedaempft">—</span>;
+  return (
+    <span className="text-[0.8125rem] inline-flex flex-col gap-0.5 items-start">
+      {plan.gueltig_ab ? <span className={cx("num", plan.alt && "text-warn")} title={plan.alt ? "älter als eingestellt" : undefined}>seit {datum(plan.gueltig_ab)}</span> : null}
+      {plan.entwurf ? <Chip>Entwurf</Chip> : null}
+    </span>
+  );
+}
+
+function Erklaerungen({ p }: { p: PatientZeile }) {
+  const fehlt = p.kennzahlen?.erklaerungen_fehlen ?? [];
+  return fehlt.length ? <span className="inline-flex gap-1 flex-wrap">{fehlt.map((a) => <Chip key={a} art="warn">{ERKLAERUNGEN_KURZ[a]}</Chip>)}</span>
+    : <Chip art="ok"><Icon name="haken" groesse={12} />vollständig</Chip>;
+}
+
+/** Vorschau der gewählten Akte (ab 2560 px rechts neben der Liste, S16) */
+function AktenVorschau({ id }: { id: number | null }) {
+  const akte = useQuery({ queryKey: ["patient", id], queryFn: () => api<Patient>(`patienten/${id}/`), enabled: !!id });
+  const kontakte = useQuery({
+    queryKey: ["patient", id, "kontakte", "letzte"],
+    queryFn: () => api<ApiSeite<Kontakt>>(`kontakte/${abfrage({ patient: id ?? undefined, seitengroesse: 3 })}`),
+    enabled: !!id,
+  });
+  if (!id) return <Karte className="px-5 py-6 text-sm gedaempft">Zeile anklicken: Vorschau der Akte.</Karte>;
+  const p = akte.data;
+  if (!p) return <Karte className="p-5">{akte.error ? <Fehleranzeige fehler={akte.error} /> : <Laden />}</Karte>;
+  const k = p.kopf;
+  return (
+    <Karte className="px-5 py-[18px] flex flex-col gap-3.5" data-testid="akten-vorschau">
+      <div className="flex justify-between items-start gap-3 flex-wrap">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="m-0 text-lg font-semibold">{p.nachname}, {p.vorname}</h2>
+          <span className="num text-[0.8125rem] gedaempft">Nr. {nummer(p.nummer)} · {datum(p.geburtsdatum)}</span>
+        </div>
+        <KnopfLink to={`/patienten/${p.id}`} klein variante="pri">Akte öffnen</KnopfLink>
+      </div>
+      {k ? (
+        <dl className="m-0 grid grid-cols-[120px_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
+          <dt className="gedaempft">Gewicht</dt><dd className="m-0">{k.gewicht ? <>{kg(k.gewicht.kg)} · {datum(k.gewicht.am)}</> : "—"}</dd>
+          <dt className="gedaempft">Katheter</dt><dd className="m-0">{k.katheter ?? "—"}</dd>
+          <dt className="gedaempft">Versorger</dt><dd className="m-0">{k.versorger ?? "—"}</dd>
+          <dt className="gedaempft">Aktueller Plan</dt><dd className="m-0">{k.aktueller_plan ? `${zahl(k.aktueller_plan.kcal)} kcal · seit ${datum(k.aktueller_plan.gueltig_ab)}` : "—"}</dd>
+          <dt className="gedaempft">Nächster Termin</dt><dd className="m-0">{k.naechster_termin ? terminZeit(k.naechster_termin.faellig_am, k.naechster_termin.uhrzeit) : "—"}</dd>
+          <dt className="gedaempft">Auskunft an</dt><dd className="m-0">{k.auskunft.length ? k.auskunft.map((a) => a.name).join(", ") : "niemand eingetragen"}</dd>
+        </dl>
+      ) : null}
+      <div className="flex flex-col gap-1"><span className="text-[0.8125rem] font-medium gedaempft">Diagnose</span>
+        <Richtext html={p.diagnose} leer="Noch keine Diagnose eingetragen." className="text-sm" /></div>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[0.8125rem] font-medium gedaempft">Letzte Kontakte</span>
+        {(kontakte.data?.results ?? []).length === 0 ? <span className="text-sm gedaempft">Noch keine Kontakte.</span>
+          : kontakte.data!.results.map((x) => (
+            <span key={x.id} className={cx("text-sm flex flex-col", x.storniert_am && "opacity-60 line-through")}>
+              <span className="text-[0.78125rem] gedaempft num">{datum(x.zeitpunkt)} · {x.erfasst_von_name}</span>
+              <span className="line-clamp-2">{klartext(x.text)}</span>
+            </span>
+          ))}
+      </div>
+    </Karte>
   );
 }
 
@@ -105,6 +186,8 @@ export function Patienten() {
   const sortierung = params.get("ordering") ?? (archiv ? "-abgeschlossen_am" : "-letzter_kontakt");
   const seite = Math.max(1, Number(params.get("seite") ?? "1") || 1);
   const [suche, setSuche] = useState(params.get("suche") ?? "");
+  const stufe = useStufe();
+  const [vorschau, setVorschau] = useState<number | null>(null);
 
   // Grundlage ist immer die aktuelle Adresse, nicht der Stand beim letzten Rendern: Der Router übernimmt eine neue
   // Adresse verzögert (Transition). Sonst überschreibt die verzögerte Suche einen kurz danach gewählten Filter.
@@ -156,6 +239,98 @@ export function Patienten() {
   const von = daten && daten.count ? (seite - 1) * SEITENGROESSE + 1 : 0;
   const bis = daten ? Math.min(seite * SEITENGROESSE, daten.count) : 0;
   const gefiltert = !!(params.get("suche") || versorgerId || apId || katheterId || schnell || pruefen);
+
+  // Spalten je Fensterstufe (S16, Entwurf 2): unter 1440 px Nr., Name, Kontakt, Termin, Hinweise; ab 1440 px dazu Geboren,
+  // Katheter, Versorger, Gewicht mit Trend; ab 1920 px dazu Plan und Erklärungen; ab 2560 px rechts die Vorschau der Akte
+  const breit = ab(stufe, "hd");
+  const sehrBreit = ab(stufe, "fhd");
+  const vorschauSpalte = stufe === "qhd" && !archiv;
+  const sortieren = (o: string) => setze({ ordering: o });
+  const tabelle = (
+    <Karte key="tabelle" className="overflow-x-auto">
+      {liste.isLoading ? <Laden /> : (
+        <table className="tabelle" aria-busy={liste.isFetching || undefined} data-testid="patientenliste">
+          <thead>
+            {archiv ? (
+              <tr>
+                <Spalte feld="nummer" breite="64px" sortierung={sortierung} onSortieren={sortieren}>Nr.</Spalte>
+                <Spalte feld="nachname" sortierung={sortierung} onSortieren={sortieren}>Name</Spalte>
+                <Spalte feld="geburtsdatum" sortierung={sortierung} onSortieren={sortieren}>Geboren</Spalte>
+                <Spalte sortierung={sortierung} onSortieren={() => undefined}>Katheter</Spalte>
+                <Spalte sortierung={sortierung} onSortieren={() => undefined}>Versorger</Spalte>
+                <Spalte feld="abgeschlossen_am" sortierung={sortierung} onSortieren={sortieren}>Abgeschlossen</Spalte>
+                <Spalte sortierung={sortierung} onSortieren={() => undefined}>Anlass</Spalte>
+              </tr>
+            ) : (
+              <tr>
+                <Spalte feld="nummer" breite="64px" sortierung={sortierung} onSortieren={sortieren}>Nr.</Spalte>
+                <Spalte feld="nachname" sortierung={sortierung} onSortieren={sortieren}>Name</Spalte>
+                {breit ? <Spalte feld="geburtsdatum" sortierung={sortierung} onSortieren={sortieren}>Geboren</Spalte> : null}
+                {breit ? <Spalte sortierung={sortierung} onSortieren={() => undefined}>Katheter</Spalte> : null}
+                {breit ? <Spalte sortierung={sortierung} onSortieren={() => undefined}>Versorger</Spalte> : null}
+                {breit ? <Spalte rechts sortierung={sortierung} onSortieren={() => undefined}>Gewicht</Spalte> : null}
+                {sehrBreit ? <Spalte sortierung={sortierung} onSortieren={() => undefined}>Plan</Spalte> : null}
+                <Spalte feld="letzter_kontakt" sortierung={sortierung} onSortieren={sortieren}>Letzter Kontakt</Spalte>
+                <Spalte sortierung={sortierung} onSortieren={() => undefined}>Nächster Termin</Spalte>
+                {sehrBreit ? <Spalte sortierung={sortierung} onSortieren={() => undefined}>Erklärungen</Spalte> : null}
+                <Spalte sortierung={sortierung} onSortieren={() => undefined}>Hinweise</Spalte>
+              </tr>
+            )}
+          </thead>
+          <tbody>
+            {(daten?.results ?? []).map((p) => archiv ? (
+              <tr key={p.id}>
+                <td className="td num gedaempft">{nummer(p.nummer)}</td>
+                <td className="td"><Link to={`/patienten/${p.id}`} className="font-medium no-underline text-text2">{p.nachname}, {p.vorname}</Link></td>
+                <td className="td num text-text2">{datum(p.geburtsdatum)}</td>
+                <td className="td text-text2">{p.katheter_name ?? (p.kein_katheter ? "kein" : "—")}</td>
+                <td className="td text-text2">{p.versorger_name ?? (p.kein_versorger ? "kein" : "—")}</td>
+                <td className="td num text-text2">{datum(p.abgeschlossen_am)}</td>
+                <td className="td gedaempft">{ABSCHLUSSANLAESSE[p.abschluss_anlass] ?? p.abschluss_anlass}</td>
+              </tr>
+            ) : (
+              <tr key={p.id} className={cx(vorschauSpalte && "cursor-pointer", vorschauSpalte && vorschau === p.id && "gewaehlt")}
+                onClick={vorschauSpalte ? () => setVorschau(p.id) : undefined}>
+                <td className="td num gedaempft">{nummer(p.nummer)}</td>
+                <td className="td">
+                  <span className="inline-flex items-center gap-2 flex-wrap">
+                    <Link to={`/patienten/${p.id}`} className="font-medium no-underline">{p.nachname}, {p.vorname}</Link>
+                    {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
+                    {vorschauSpalte ? (
+                      <button type="button" className="btn icon klein geist" aria-label={`Vorschau: ${p.nachname}, ${p.vorname}`}
+                        aria-pressed={vorschau === p.id} onClick={(e) => { e.stopPropagation(); setVorschau(p.id); }}><Icon name="auge" groesse={15} /></button>
+                    ) : null}
+                  </span>
+                  {!breit ? <><br /><span className="text-[0.78rem] gedaempft"><span className="num">{datum(p.geburtsdatum)}</span> ({p.alter})</span></> : null}
+                </td>
+                {breit ? <td className="td"><span className="num">{datum(p.geburtsdatum)}</span> <span className="gedaempft">({p.alter})</span></td> : null}
+                {breit ? <td className="td">{p.katheter_name ?? (p.kein_katheter ? "kein" : "—")}</td> : null}
+                {breit ? (
+                  <td className="td text-text2">
+                    {p.versorger_name ?? (p.kein_versorger ? "kein" : "—")}
+                    {p.ansprechpartner_name ? <><br /><span className="text-[0.78rem] gedaempft">{p.ansprechpartner_name}</span></> : null}
+                  </td>
+                ) : null}
+                {breit ? (
+                  <td className="td num text-right whitespace-nowrap">
+                    {kg(p.kennzahlen?.gewicht?.kg)}<TrendPfeil trend={p.kennzahlen?.trend ?? null} />
+                  </td>
+                ) : null}
+                {sehrBreit ? <td className="td"><PlanZelle p={p} /></td> : null}
+                <td className="td text-text2">{relativ(p.kennzahlen?.letzter_kontakt)}</td>
+                <td className="td"><NaechsterTermin p={p} /></td>
+                {sehrBreit ? <td className="td"><Erklaerungen p={p} /></td> : null}
+                <td className="td"><Hinweise p={p} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {daten && daten.count === 0 ? (
+        <Leer>{gefiltert ? "Keine Patienten passen zu diesen Filtern." : archiv ? "Noch keine abgeschlossenen Akten." : "Noch keine Patienten angelegt."}</Leer>
+      ) : null}
+    </Karte>
+  );
 
   const umschalter = (
     <Segmente label="Ansicht" wert={archiv ? "abgeschlossen" : "in_betreuung"}
@@ -236,73 +411,10 @@ export function Patienten() {
       </div>
 
       <Fehleranzeige fehler={liste.error} />
-      <Karte className="overflow-hidden">
-        {liste.isLoading ? <Laden /> : (
-          <table className="tabelle" aria-busy={liste.isFetching || undefined} data-testid="patientenliste">
-            <thead>
-              {archiv ? (
-                <tr>
-                  <Spalte feld="nummer" breite="64px" sortierung={sortierung} onSortieren={(o) => setze({ ordering: o })}>Nr.</Spalte>
-                  <Spalte feld="nachname" sortierung={sortierung} onSortieren={(o) => setze({ ordering: o })}>Name</Spalte>
-                  <Spalte feld="geburtsdatum" sortierung={sortierung} onSortieren={(o) => setze({ ordering: o })}>Geboren</Spalte>
-                  <Spalte sortierung={sortierung} onSortieren={() => undefined}>Katheter</Spalte>
-                  <Spalte sortierung={sortierung} onSortieren={() => undefined}>Versorger</Spalte>
-                  <Spalte feld="abgeschlossen_am" sortierung={sortierung} onSortieren={(o) => setze({ ordering: o })}>Abgeschlossen</Spalte>
-                  <Spalte sortierung={sortierung} onSortieren={() => undefined}>Anlass</Spalte>
-                </tr>
-              ) : (
-                <tr>
-                  <Spalte feld="nummer" breite="64px" sortierung={sortierung} onSortieren={(o) => setze({ ordering: o })}>Nr.</Spalte>
-                  <Spalte feld="nachname" sortierung={sortierung} onSortieren={(o) => setze({ ordering: o })}>Name</Spalte>
-                  <Spalte feld="geburtsdatum" sortierung={sortierung} onSortieren={(o) => setze({ ordering: o })}>Geboren</Spalte>
-                  <Spalte sortierung={sortierung} onSortieren={() => undefined}>Katheter</Spalte>
-                  <Spalte sortierung={sortierung} onSortieren={() => undefined}>Versorger</Spalte>
-                  <Spalte rechts sortierung={sortierung} onSortieren={() => undefined}>Gewicht</Spalte>
-                  <Spalte feld="letzter_kontakt" sortierung={sortierung} onSortieren={(o) => setze({ ordering: o })}>Letzter Kontakt</Spalte>
-                  <Spalte sortierung={sortierung} onSortieren={() => undefined}>Hinweise</Spalte>
-                </tr>
-              )}
-            </thead>
-            <tbody>
-              {(daten?.results ?? []).map((p) => archiv ? (
-                <tr key={p.id}>
-                  <td className="td num gedaempft">{nummer(p.nummer)}</td>
-                  <td className="td"><Link to={`/patienten/${p.id}`} className="font-medium no-underline text-text2">{p.nachname}, {p.vorname}</Link></td>
-                  <td className="td num text-text2">{datum(p.geburtsdatum)}</td>
-                  <td className="td text-text2">{p.katheter_name ?? (p.kein_katheter ? "kein" : "—")}</td>
-                  <td className="td text-text2">{p.versorger_name ?? (p.kein_versorger ? "kein" : "—")}</td>
-                  <td className="td num text-text2">{datum(p.abgeschlossen_am)}</td>
-                  <td className="td gedaempft">{ABSCHLUSSANLAESSE[p.abschluss_anlass] ?? p.abschluss_anlass}</td>
-                </tr>
-              ) : (
-                <tr key={p.id}>
-                  <td className="td num gedaempft">{nummer(p.nummer)}</td>
-                  <td className="td">
-                    <span className="inline-flex items-center gap-2">
-                      <Link to={`/patienten/${p.id}`} className="font-medium no-underline">{p.nachname}, {p.vorname}</Link>
-                      {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
-                    </span>
-                  </td>
-                  <td className="td"><span className="num">{datum(p.geburtsdatum)}</span> <span className="gedaempft">({p.alter})</span></td>
-                  <td className="td">{p.katheter_name ?? (p.kein_katheter ? "kein" : "—")}</td>
-                  <td className="td text-text2">
-                    {p.versorger_name ?? (p.kein_versorger ? "kein" : "—")}
-                    {p.ansprechpartner_name ? <><br /><span className="text-[0.78rem] gedaempft">{p.ansprechpartner_name}</span></> : null}
-                  </td>
-                  <td className="td num text-right whitespace-nowrap">
-                    {kg(p.kennzahlen?.gewicht?.kg)}<TrendPfeil trend={p.kennzahlen?.trend ?? null} />
-                  </td>
-                  <td className="td text-text2">{relativ(p.kennzahlen?.letzter_kontakt)}</td>
-                  <td className="td"><Hinweise p={p} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {daten && daten.count === 0 ? (
-          <Leer>{gefiltert ? "Keine Patienten passen zu diesen Filtern." : archiv ? "Noch keine abgeschlossenen Akten." : "Noch keine Patienten angelegt."}</Leer>
-        ) : null}
-      </Karte>
+      {vorschauSpalte ? (
+        <Spalten seite="patientenliste" stufe="qhd" standard={[2 / 3]} namen={["Patientenliste", "Vorschau der Akte"]} testid="patienten-stufe"
+          spalten={[tabelle, <AktenVorschau key="vorschau" id={vorschau} />]} />
+      ) : tabelle}
 
       <div className="flex justify-between items-center gap-4 text-[0.8125rem] gedaempft flex-wrap">
         <span>

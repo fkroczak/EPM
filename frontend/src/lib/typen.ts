@@ -8,7 +8,12 @@ export type Recht =
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
   | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "system_verwalten" | "altdaten_importieren";
 
-export type Karte = { id: "termine" | "gewicht" | "plaene" | "pruefen" | "aktiv"; sichtbar: boolean };
+/** Kacheln der Startseite (S11): klinische und – mit dem jeweiligen Recht – die der Administration (S12–S14) */
+export type KartenId =
+  | "termine" | "wieder" | "meine" | "gewicht" | "plaene" | "pruefen" | "aktiv"
+  | "sicherung" | "server" | "updates" | "konten" | "angemeldet" | "hinweis" | "zugriffe" | "testumgebung";
+/** Größe im Raster: Spalten × Zeilen, je 1 oder 2 */
+export type Karte = { id: KartenId; sichtbar: boolean; breite: 1 | 2; hoehe: 1 | 2 };
 
 export type Ich = {
   id: number;
@@ -22,7 +27,11 @@ export type Ich = {
   rolle: "betrachter" | "mitarbeiter" | "mediziner" | "admin";
   ist_test: boolean;
   darstellung: Partial<Darstellung>;
-  startseite: { karten?: Karte[] };
+  /** karten: vollständig, in Anzeigereihenfolge (fehlende ergänzt der Server mit dem Standard der Rolle);
+   *  notfallhinweis_bei: Hinweis zu den Notfall-Codes bei dieser Anzahl ausgeblendet (S08) */
+  startseite: { karten: Karte[]; notfallhinweis_bei?: number | null };
+  /** Spaltenteiler je Seite und Fensterstufe (S17): {"akte_uebersicht@fhd": [0.6667]} */
+  aufteilung: Record<string, number[]>;
   rechte: Recht[];
   /** Admins: Patientendaten nur bei Testpatienten schreiben (echte Akten nur lesen) */
   schreibt_nur_testpatienten: boolean;
@@ -70,12 +79,20 @@ export function ppiZeiten(maske: number | string | null | undefined): string {
 
 export type Trend = { richtung: "down" | "up" | "flat" | null; prozent: number; warnung: boolean };
 
+/** Kontakt fällig in zwei Stufen (S04) */
+export type Kontaktstufe = "bald" | "ueberfaellig";
+
 export type Kennzahlen = {
   gewicht: { kg: number; am: string } | null;
   trend: Trend | null;
   letzter_kontakt: string | null;
+  kontakt_stufe: Kontaktstufe | null;
   termin_woche: boolean;
-  hinweise: { art: "gewicht" | "plan" | "versorger" | "kontakt"; text: string }[];
+  hinweise: { art: "gewicht" | "plan" | "versorger" | "kontakt"; text: string; stufe?: Kontaktstufe }[];
+  /** nur in der Patientenliste (breite Spalten, S16) */
+  naechster_termin?: { id: number; art: string; faellig_am: string; uhrzeit: string | null; titel: string } | null;
+  plan?: { gueltig_ab: string | null; alt: boolean; entwurf: boolean } | null;
+  erklaerungen_fehlen?: ErklaerungsArt[];
 };
 
 export type PatientZeile = {
@@ -246,6 +263,10 @@ export type Patient = {
       id: number; art: string; titel: string; faellig_am: string; uhrzeit: string | null; ort: string | null; bei: string;
     } | null;
     versionen: Record<"diagnose" | "therapie" | "empfehlung", Versionskopf>;
+    /** Schnellerfassung (S02): Zeitpunkt des letzten gültigen Kontakts */
+    letzter_kontakt: string | null;
+    /** Merkliste der angemeldeten Person (S05) */
+    gemerkt: boolean;
     zaehler: { kontakte: number; gewichte: number; dokumente: number; termine_offen: number; infusionsplaene: number;
       bezugspersonen: number; aerzte: number; erklaerungen: number };
   } | null;

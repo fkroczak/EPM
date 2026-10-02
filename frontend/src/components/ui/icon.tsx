@@ -41,6 +41,11 @@ const PFADE: Record<string, ReactNode> = {
   neustart: (<><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></>),
   aktivitaet: (<><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></>),
   sanduhr: (<><path d="M6 2h12" /><path d="M6 22h12" /><path d="M6 2c0 6 6 6 6 10s-6 4-6 10" /><path d="M18 2c0 6-6 6-6 10s6 4 6 10" /></>),
+  hilfe: (<><circle cx="12" cy="12" r="9" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></>),
+  stern: (<><path d="M12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.3l-5.8 3.1 1.1-6.5L2.6 9.3l6.5-.9z" /></>),
+  auge_zu: (<><path d="M17.9 17.9A10 10 0 0 1 12 20c-6.5 0-10-8-10-8a18 18 0 0 1 5.1-5.9" /><path d="M9.9 4.2A9 9 0 0 1 12 4c6.5 0 10 8 10 8a18 18 0 0 1-2.2 3.2" /><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2" /><path d="M2 2l20 20" /></>),
+  ecke: (<><path d="M21 11v10H11" /><path d="M21 16v5h-5" /></>),
+  buch: (<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></>),
 };
 
 export type IconName = keyof typeof PFADE;

@@ -243,7 +243,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
 export function Benutzer() {
   const [params] = useSearchParams();
   const [gewaehlt, setGewaehlt] = useState<number | null>(Number(params.get("id")) || null);
-  const [neu, setNeu] = useState(false);
+  const [neu, setNeu] = useState(params.get("neu") === "1"); // „Benutzer anlegen“ auf der Startseite der Administration
   const [kennwort, setKennwort] = useState<Kennwort | null>(null);
   const liste = useQuery({ queryKey: ["benutzer"], queryFn: () => alle<BenutzerTyp>("benutzer/?ordering=last_name") });
   const benutzer = liste.data ?? [];

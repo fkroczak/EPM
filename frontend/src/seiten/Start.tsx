@@ -1,38 +1,49 @@
-/** Entwurf 2 · Start (Varianten 16 über die Darstellung). */
-import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
+/**
+ * Entwurf 2 · Startseite (S01–S14, S17): Kennzahlen, Kacheln im festen Raster (1×1, 2×1, 1×2, 2×2; 1/2/3/4/5 Spalten
+ * je Fensterbreite), „Startseite anpassen“ mit Ziehen und Einrasten, Schnellerfassung, Kacheln der Administration.
+ * Größe, Reihenfolge und Sichtbarkeit je Person (PATCH /api/auth/ich/ {startseite}).
+ */
+import { useEffect, useRef, useState } from "react";
+import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 import { Link, useLocation } from "react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { useAuth, useIch, useOhneRechtSchliessen } from "@/lib/auth";
-import { datum, kg, langesDatum, prozent, relativ, terminZeit, uhrzeit } from "@/lib/format";
-import { TERMINARTEN } from "@/lib/typen";
-import type { Ich, Karte, Termin } from "@/lib/typen";
+import { useAuth, useIch } from "@/lib/auth";
+import { langesDatum, relativ, zahl } from "@/lib/format";
+import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
+import type { Ich, Karte, KartenId, Recht } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
-import { Chip, Fehleranzeige, Karte as KarteBox, Knopf, Laden, Leer, Segmente, cx } from "@/components/ui/basis";
+import { Chip, Fehleranzeige, Karte as KarteBox, Knopf, KnopfLink, Laden, cx } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
-import { useSortierbar } from "@/components/ui/sortierbar";
+import { verschiebe } from "@/components/ui/sortierbar";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
+import { GewichtDialog, KontaktDialog } from "@/components/Schnellerfassung";
+import type { Vorgabe } from "@/components/Schnellerfassung";
+import type { Startdaten } from "./start/daten";
+import { AktivKachel, GewichtKachel, MeineKachel, PlaeneKachel, PruefenKachel, TermineKachel, WiederKachel } from "./start/kacheln";
+import { AngemeldetKachel, HinweisKachel, KontenKachel, ServerKachel, SicherungKachel, TestKachel, UpdatesKachel, ZugriffeKachel,
+  useKonten } from "./start/admin";
 
-type PlanEintrag = { id: number; patient: number; name: string; gueltig_ab: string; status: string; erstellt_am: string;
-  erstellt_von: string | null; freigegeben_am: string | null };
-
-type Startdaten = {
-  termine: { ueberfaellig: Termin[]; heute: Termin[]; naechste_7_tage: Termin[] };
-  gewichtswarnungen: { patient: number; name: string; nummer: number; gewicht: { kg: number; am: string } | null; prozent: number }[];
-  gewicht_schwelle: { prozent: number; monate: number };
-  infusionsplaene: { entwuerfe: PlanEintrag[]; aelter_als_grenze: PlanEintrag[]; grenze_monate: number };
-  pruefen: { altdokumente: number; nickelallergie_unbekannt: number; kein_versorger: number; kein_kontakt: number; kontakt_monate: number;
-    erklaerungen_fehlen: number; abschluss_pruefen: number; abschluss_monate: number; datenschutz_anfragen: number;
-    datenschutz_ueberfaellig: number };
-  zuletzt_eingetragen: { bereich: string; bezeichnung: string; objekt_id: number; patient: number; name: string | null;
-    zeitpunkt: string; person: string | null }[];
-  zahlen: { in_betreuung: number; mit_offenem_termin: number };
-  /** O-07: Zustand der Sicherungen (vom Systemagenten), für alle sichtbar */
-  sicherung: { zustand: "ok" | "warnung" | "fehler" | "unbekannt"; letzte_am: string | null; verschluesselt: boolean | null;
-    titel: string; hinweise: string[] };
+/** Titel und nötiges Recht je Kachel (ohne Recht erscheint sie weder auf der Seite noch unter „Ausgeblendet“) */
+const KACHELN: Record<KartenId, { titel: string; recht: Recht }> = {
+  termine: { titel: "Termine und Wiedervorlagen", recht: "akten_lesen" },
+  wieder: { titel: "Wiedereinbestellung fällig", recht: "akten_lesen" },
+  meine: { titel: "Meine Akten", recht: "akten_lesen" },
+  gewicht: { titel: "Auffällige Gewichte", recht: "akten_lesen" },
+  plaene: { titel: "Infusionspläne", recht: "akten_lesen" },
+  pruefen: { titel: "Nach und nach prüfen", recht: "akten_lesen" },
+  aktiv: { titel: "Zuletzt eingetragen", recht: "akten_lesen" },
+  sicherung: { titel: "Datensicherung", recht: "backup_verwalten" },
+  server: { titel: "Server", recht: "system_verwalten" },
+  updates: { titel: "Ubuntu-Updates", recht: "system_verwalten" },
+  konten: { titel: "Konten", recht: "benutzer_verwalten" },
+  angemeldet: { titel: "Angemeldet", recht: "system_verwalten" },
+  hinweis: { titel: "Hinweis an alle", recht: "system_verwalten" },
+  zugriffe: { titel: "Zugriffe · 7 Tage", recht: "audit_lesen" },
+  testumgebung: { titel: "Testumgebung", recht: "testdaten_zuruecksetzen" },
 };
+const GROESSEN: [1 | 2, 1 | 2][] = [[1, 1], [2, 1], [1, 2], [2, 2]];
 
 /** Kopfzeile wie im Entwurf: „Backup heute 02:00 erfolgreich“; sonst der wichtigste Hinweis. Mit dem Recht
  *  „Sicherungen verwalten“ führt der Chip zur Seite Backup. */
@@ -49,294 +60,346 @@ function BackupStatus({ s, verweis }: { s: Startdaten["sicherung"]; verweis: boo
   );
 }
 
-const KARTEN: { id: Karte["id"]; titel: string }[] = [
-  { id: "termine", titel: "Termine und Wiedervorlagen" },
-  { id: "gewicht", titel: "Auffällige Gewichte" },
-  { id: "plaene", titel: "Infusionspläne" },
-  { id: "pruefen", titel: "Nach und nach prüfen" },
-  { id: "aktiv", titel: "Zuletzt eingetragen" },
-];
-
-function kartenVon(ich: Ich): Karte[] {
-  const gespeichert = ich.startseite?.karten ?? [];
-  const ids = new Set(gespeichert.map((k) => k.id));
-  return [...gespeichert.filter((k) => KARTEN.some((x) => x.id === k.id)),
-    ...KARTEN.filter((k) => !ids.has(k.id)).map((k) => ({ id: k.id, sichtbar: true }))];
-}
-
-function terminChip(t: Termin) {
-  if (t.art === "wiedervorlage") return <Chip art="warn">{TERMINARTEN[t.art]}</Chip>;
-  if (t.art === "praxistermin") return <Chip art="akzent">{t.ort_name || t.bei || TERMINARTEN[t.art]}</Chip>;
-  return <Chip>{TERMINARTEN[t.art]}</Chip>;
-}
-
-function Liste({ children }: { children: ReactNode }) {
-  return <div className="flex flex-col">{children}</div>;
-}
-
-function Zeile({ links, rechts, unter, zu }: { links: ReactNode; rechts?: ReactNode; unter?: ReactNode; zu: string }) {
+// ---------------------------------------------------------------- Kennzahlenleiste (S01, SU8)
+function Kennzahl({ titel, wert, unter, zu, testid }: { titel: string; wert: ReactNode; unter: ReactNode; zu: string; testid: string }) {
   return (
-    <div className="flex justify-between items-center gap-3 py-[9px] border-b border-rand last:border-b-0">
-      <span className="flex flex-col gap-px min-w-0">
-        <Link to={zu} className="font-medium no-underline">{links}</Link>
-        {unter ? <span className="text-[0.78125rem] gedaempft">{unter}</span> : null}
-      </span>
-      {rechts}
+    <Link to={zu} className="flex flex-col gap-1 px-5 py-1 no-underline text-tinte min-w-0 border-rand schmal:border-l schmal:first:border-l-0"
+      data-testid={testid}>
+      <span className="text-[0.8125rem] gedaempft">{titel}</span>
+      <span className="num text-2xl font-semibold leading-tight">{wert}</span>
+      <span className="text-[0.78125rem] gedaempft">{unter}</span>
+    </Link>
+  );
+}
+
+function Kennzahlen({ d }: { d: Startdaten }) {
+  const z = d.zahlen;
+  const anteil = z.in_betreuung ? Math.round((100 * z.mit_offenem_termin) / z.in_betreuung) : 0;
+  return (
+    <section aria-label="Kennzahlen" className="card grid grid-cols-2 schmal:grid-cols-5 gap-y-3 py-4" data-testid="kennzahlenleiste">
+      <Kennzahl titel="In Betreuung" wert={zahl(z.in_betreuung)} unter="ohne Testpatienten" zu="/patienten" testid="kz-in-betreuung" />
+      <Kennzahl titel="Mit offenem Termin" wert={zahl(z.mit_offenem_termin)} unter={`${anteil} % der Betreuten`} zu="/kalender?ansicht=liste"
+        testid="kz-offener-termin" />
+      <Kennzahl titel="Termine in 7 Tagen" wert={zahl(z.termine_7_tage)} unter={`davon ${z.praxistermine_7_tage} Praxistermine`}
+        zu="/kalender?ansicht=woche" testid="kz-termine-7" />
+      <Kennzahl titel="Kontakt fällig" testid="kz-kontakt" zu="/patienten?pruefen=wiedereinbestellung"
+        wert={<>{z.kontakt_ueberfaellig} <span className="text-[0.9375rem] font-medium gedaempft">+ {z.kontakt_bald} bald</span></>}
+        unter={<span className="flex gap-1 flex-wrap"><Chip art="fehler">über {d.wiedereinbestellung.ueberfaellig_monate} Mon.</Chip>
+          <Chip art="warn">{d.wiedereinbestellung.bald_monate}–{d.wiedereinbestellung.ueberfaellig_monate} Mon.</Chip></span>} />
+      <Kennzahl titel="Termine überfällig" wert={zahl(z.termine_ueberfaellig)} unter={z.termine_ueberfaellig ? "offen, Datum vorbei" : "keine"}
+        zu="/kalender" testid="kz-ueberfaellig" />
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- Startseite anpassen (S11, S17)
+type Zug = { art: "verschieben"; id: KartenId; ziel: KartenId | null }
+  | { art: "groesse"; id: KartenId; breite: 1 | 2; hoehe: 1 | 2; links: number; oben: number; zelleB: number; zelleH: number; abstand: number };
+
+function useKartenSpeichern() {
+  const ich = useIch();
+  const { setIch } = useAuth();
+  const melden = useHinweis();
+  /** ``karten: []`` setzt auf den Standard der Rolle zurück; ohne ``karten`` bleiben die Kacheln unverändert */
+  return (startseite: { karten?: Karte[]; notfallhinweis_bei?: number }) => {
+    const vorher: Ich = ich;
+    if (startseite.karten?.length || startseite.notfallhinweis_bei !== undefined) {
+      setIch({ ...ich, startseite: { ...ich.startseite, ...(startseite.karten?.length ? { karten: startseite.karten } : {}),
+        ...(startseite.notfallhinweis_bei !== undefined ? { notfallhinweis_bei: startseite.notfallhinweis_bei } : {}) } });
+    }
+    api<Ich>("auth/ich/", { method: "PATCH", body: { startseite } })
+      .then((antwort) => setIch(antwort))
+      .catch((e: Error) => { setIch(vorher); melden(`Startseite nicht gespeichert: ${e.message}`, "fehler"); });
+  };
+}
+
+function Bearbeitungsleiste({ karte, titel, spalten, onGroesse, onAusblenden, griff }: {
+  karte: Karte; titel: string; spalten: number; onGroesse: (b: 1 | 2, h: 1 | 2) => void; onAusblenden: () => void;
+  griff: { onPointerDown: (e: PointerEvent<HTMLButtonElement>) => void; onPointerMove: (e: PointerEvent<HTMLButtonElement>) => void;
+    onPointerUp: (e: PointerEvent<HTMLButtonElement>) => void; onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => void };
+}) {
+  return (
+    <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 p-1 rounded-[10px] bg-flaeche border border-rand shadow-md"
+      data-testid={`leiste-${karte.id}`}>
+      <button type="button" className="btn icon klein geist cursor-grab touch-none" data-griff={karte.id}
+        aria-label={`${titel} verschieben (Pfeiltasten; Umschalt + Pfeiltasten: Größe)`} title="Ziehen oder mit Pfeiltasten verschieben"
+        {...griff}><Icon name="griff" groesse={16} /></button>
+      <div role="group" aria-label={`Größe ${titel}`} className="segmente">
+        {GROESSEN.map(([b, h]) => (
+          <button key={`${b}${h}`} type="button" className="segment !px-2" aria-pressed={karte.breite === b && karte.hoehe === h}
+            disabled={b > spalten} onClick={() => onGroesse(b, h)}>{b}×{h}</button>
+        ))}
+      </div>
+      <button type="button" className="btn icon klein geist" aria-label={`${titel} ausblenden`} title="Ausblenden" onClick={onAusblenden}>
+        <Icon name="auge_zu" groesse={16} /></button>
     </div>
   );
 }
 
-function TermineKarte({ daten }: { daten: Startdaten }) {
-  const { darf, darfBei } = useAuth();
-  const [tab, setTab] = useState<"heute" | "woche" | "ueber">("heute");
-  const [dialog, setDialog] = useState(false);
-  const [erledigt, setErledigt] = useState<Record<number, Termin>>({});
-  const [laeuft, setLaeuft] = useState<number[]>([]);
-  const qc = useQueryClient();
-  const melden = useHinweis();
-  const abhaken = useMutation({
-    mutationFn: (t: Termin) => api<Termin>(`termine/${t.id}/erledigt/`, { method: "POST" }),
-    onMutate: (t) => setLaeuft((l) => [...l, t.id]), // Haken sofort zeigen, bei Fehler zurücknehmen
-    onSettled: (_d, _e, t) => setLaeuft((l) => l.filter((x) => x !== t.id)),
-    onSuccess: (t) => {
-      setErledigt((e) => ({ ...e, [t.id]: t }));
-      void qc.invalidateQueries({ queryKey: ["patient", t.patient] });
-      melden(`Erledigt: ${t.patient_name}`);
-    },
-    onError: (e) => melden(e.message, "fehler"),
-  });
-  const offen = (l: Termin[]) => l.filter((t) => !erledigt[t.id]).length;
-  const heute = daten.termine.heute, woche = daten.termine.naechste_7_tage, ueber = daten.termine.ueberfaellig;
-  const zeilen = tab === "heute" ? heute : tab === "woche" ? woche : ueber;
-  const schreiben = darf("eintraege_erfassen");
-  useOhneRechtSchliessen(schreiben, () => setDialog(false));
+function AnpassenBanner({ ausgeblendet, onEinblenden, onStandard, onFertig, spalten }: {
+  ausgeblendet: Karte[]; onEinblenden: (id: KartenId) => void; onStandard: () => void; onFertig: () => void; spalten: number;
+}) {
   return (
-    <KarteBox className="col-span-3 lg:col-span-2 px-5 py-[18px] flex flex-col gap-3 min-w-0" aria-labelledby="k-termine">
-      <div className="flex justify-between items-center gap-3 flex-wrap">
-        <h2 id="k-termine" className="lbl m-0">Termine und Wiedervorlagen</h2>
-        <div className="flex items-center gap-2.5">
-          <Segmente label="Zeitraum" wert={tab} onWahl={setTab} werte={[
-            { wert: "heute", text: <>Heute <span className="num opacity-70">{offen(heute)}</span></> },
-            { wert: "woche", text: <>Nächste 7 Tage <span className="num opacity-70">{offen(woche)}</span></> },
-            { wert: "ueber", text: <>Überfällig <span className="num opacity-70">{offen(ueber)}</span></> },
-          ]} />
-          {schreiben ? <Knopf klein icon="plus" onClick={() => setDialog(true)}>Termin</Knopf> : null}
-        </div>
+    <div className="flex items-start justify-between gap-4 flex-wrap px-[18px] py-3.5 rounded-[14px] bg-akzent-weich text-akzent-text border border-akzent/30"
+      data-testid="anpassen">
+      <div className="flex flex-col gap-1 max-w-[110ch]">
+        <h2 className="m-0 text-[0.9375rem] font-semibold">Startseite anpassen</h2>
+        <span className="text-[0.84375rem] leading-normal text-text2">Kachel am Griff ziehen = verschieben · an der Ecke unten rechts ziehen =
+          vergrößern, rastet in 1×1, 2×1, 1×2 und 2×2 ein · Tastatur: Griff wählen, Pfeiltasten verschieben, Umschalt + Pfeiltasten Größe.
+          Gilt nur für dich. Fenster jetzt: {spalten} {spalten === 1 ? "Spalte" : "Spalten"} (unter 900 px 1, bis 1439 px 2, bis 1919 px 3,
+          bis 2559 px 4, ab 2560 px 5).</span>
       </div>
-      <div className="flex flex-col" data-testid="terminliste">
-        {zeilen.length === 0 ? <Leer>Keine offenen Termine.</Leer> : zeilen.map((t) => {
-          const fertig = erledigt[t.id];
-          return (
-            <div key={t.id} className="grid grid-cols-[36px_150px_190px_minmax(0,1fr)] items-center gap-3 py-[11px] border-b border-rand last:border-b-0">
-              {/* Abhaken nur mit Recht; ohne Recht kein (ausgegrautes) Kästchen */}
-              {darfBei("eintraege_erfassen", { ist_test: t.patient_ist_test }) ? (
-                <input type="checkbox" aria-label={`Erledigt: ${t.patient_name}, ${t.titel}`} className="!w-5 !h-5"
-                  checked={!!fertig || laeuft.includes(t.id)}
-                  disabled={!!fertig || laeuft.includes(t.id)}
-                  onChange={() => abhaken.mutate(t)} />
-              ) : <span aria-hidden="true" />}
-              <span className="num text-[0.84375rem] text-text2">{terminZeit(t.faellig_am, t.uhrzeit)}</span>
-              <span>{terminChip(t)}</span>
-              <span className="flex flex-col gap-px min-w-0">
-                {fertig ? (
-                  <span className="gedaempft line-through">{t.patient_name} · {t.titel}</span>
-                ) : (
-                  <span><Link to={`/patienten/${t.patient}`} className="font-medium no-underline">{t.patient_name}</Link>{" "}
-                    <span className="text-text2">· {t.titel}{t.notiz ? ` – ${t.notiz}` : ""}</span></span>
-                )}
-                <span className="text-[0.78125rem] gedaempft">
-                  {fertig ? `erledigt ${uhrzeit(fertig.erledigt_am)} von ${fertig.erledigt_von_name ?? "—"}`
-                    : `angelegt von ${t.angelegt_von_name ?? "—"}`}
-                </span>
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      <span className="text-[0.78125rem] gedaempft">
-        Abhaken markiert als erledigt, mit Person und Uhrzeit. Termine lassen sich in der Akte, bei einem Kontakt oder hier anlegen.
-      </span>
-      {schreiben ? <TerminDialog offen={dialog} onOffen={setDialog} /> : null}
-    </KarteBox>
-  );
-}
-
-function GewichtKarte({ daten }: { daten: Startdaten }) {
-  const s = daten.gewicht_schwelle;
-  return (
-    <KarteBox className="col-span-3 lg:col-span-1 px-5 py-[18px] flex flex-col gap-1.5 min-w-0" aria-labelledby="k-gewicht">
-      <h2 id="k-gewicht" className="lbl m-0">Auffällige Gewichte</h2>
-      <span className="text-[0.78125rem] gedaempft">Mehr als {String(s.prozent).replace(".", ",")} % Verlust in {s.monate} Monaten</span>
-      <Liste>
-        {daten.gewichtswarnungen.length === 0 ? <Leer>Keine auffälligen Gewichte.</Leer> : daten.gewichtswarnungen.map((w) => (
-          <Zeile key={w.patient} zu={`/patienten/${w.patient}`} links={w.name}
-            unter={w.gewicht ? `${kg(w.gewicht.kg)} · zuletzt ${datum(w.gewicht.am)}` : undefined}
-            rechts={<Chip art="warn">{prozent(w.prozent)}</Chip>} />
+      <div className="flex items-center gap-2 flex-wrap">
+        {ausgeblendet.length ? <span className="text-[0.8125rem] text-text2">Ausgeblendet:</span> : null}
+        {ausgeblendet.map((k) => (
+          <Knopf key={k.id} klein icon="plus" onClick={() => onEinblenden(k.id)} aria-label={`${KACHELN[k.id].titel} einblenden`}>
+            {KACHELN[k.id].titel}</Knopf>
         ))}
-      </Liste>
-    </KarteBox>
-  );
-}
-
-function PlaeneKarte({ daten }: { daten: Startdaten }) {
-  const p = daten.infusionsplaene;
-  const leer = p.entwuerfe.length === 0 && p.aelter_als_grenze.length === 0;
-  return (
-    <KarteBox className="col-span-3 md:col-span-1 px-5 py-[18px] flex flex-col gap-1.5 min-w-0" aria-labelledby="k-plaene">
-      <h2 id="k-plaene" className="lbl m-0">Infusionspläne</h2>
-      <Liste>
-        {leer ? <Leer>Keine offenen Entwürfe, keine alten Pläne.</Leer> : null}
-        {p.entwuerfe.map((e) => (
-          <Zeile key={e.id} zu={`/patienten/${e.patient}/plaene?plan=${e.id}`} links={e.name}
-            unter={`seit ${relativ(e.erstellt_am, true)} · ${e.erstellt_von ?? "—"}`} rechts={<Chip>Entwurf</Chip>} />
-        ))}
-        {p.aelter_als_grenze.map((e) => (
-          <Zeile key={e.id} zu={`/patienten/${e.patient}/plaene?plan=${e.id}`} links={e.name}
-            unter={`freigegeben ${datum(e.freigegeben_am ?? e.gueltig_ab)}`}
-            rechts={<Chip art="warn">älter als {p.grenze_monate} Monate</Chip>} />
-        ))}
-      </Liste>
-    </KarteBox>
-  );
-}
-
-function PruefenKarte({ daten }: { daten: Startdaten }) {
-  const p = daten.pruefen;
-  const eintraege: [string, number, string][] = [
-    ["Altdokumente: Typ und Datum prüfen", p.altdokumente, "altdokumente"],
-    ["Nickelallergie nicht erfasst", p.nickelallergie_unbekannt, "nickelallergie"],
-    ["Versorger nicht erfasst", p.kein_versorger, "kein_versorger"],
-    [`Kein Kontakt seit über ${p.kontakt_monate} Monaten`, p.kein_kontakt, "kein_kontakt"],
-    // Datenschutz: Erklärungen nachhalten wie die Nickelallergie; lange ruhende Akten abschließen (erst dann läuft die Frist)
-    ["Erklärungen zum Datenschutz fehlen", p.erklaerungen_fehlen, "erklaerungen"],
-    [`Abschluss prüfen: kein Kontakt seit über ${p.abschluss_monate} Monaten`, p.abschluss_pruefen, "abschluss_pruefen"],
-  ];
-  const { darf } = useAuth();
-  const datenschutz = (darf("datenschutz_bearbeiten") || darf("datenschutz_entscheiden")) && p.datenschutz_anfragen > 0;
-  return (
-    <KarteBox className="col-span-3 md:col-span-1 px-5 py-[18px] flex flex-col gap-2.5 min-w-0" aria-labelledby="k-pruefen">
-      <h2 id="k-pruefen" className="lbl m-0">Nach und nach prüfen</h2>
-      <div className="flex flex-col gap-2.5 text-sm">
-        {eintraege.map(([text, n, filter]) => (
-          <Link key={filter} to={`/patienten?pruefen=${filter}`} className="flex justify-between no-underline text-tinte hover:text-akzent-text">
-            <span>{text}</span><span className="num text-akzent-text" data-testid={`pruefen-${filter}`}>{n}</span>
-          </Link>
-        ))}
-        {datenschutz ? (
-          <Link to="/datenschutz" className="flex justify-between no-underline text-tinte hover:text-akzent-text">
-            <span>Offene Datenschutz-Anfragen{p.datenschutz_ueberfaellig ? <span className="text-fehler" data-testid="pruefen-datenschutz-ueberfaellig"> · {p.datenschutz_ueberfaellig} überfällig</span> : null}</span>
-            <span className="num text-akzent-text" data-testid="pruefen-datenschutz">{p.datenschutz_anfragen}</span>
-          </Link>
-        ) : null}
-      </div>
-    </KarteBox>
-  );
-}
-
-function AktivKarte({ daten }: { daten: Startdaten }) {
-  const wann = (z: string) => {
-    const r = relativ(z);
-    return r === "heute" ? uhrzeit(z) : r === "gestern" ? "gestern" : datum(z).slice(0, 6);
-  };
-  return (
-    <KarteBox className="col-span-3 md:col-span-1 px-5 py-[18px] flex flex-col gap-1.5 min-w-0" aria-labelledby="k-aktiv">
-      <h2 id="k-aktiv" className="lbl m-0">Zuletzt eingetragen</h2>
-      <div className="flex flex-col text-[0.84375rem]">
-        {daten.zuletzt_eingetragen.length === 0 ? <Leer>Noch nichts eingetragen.</Leer> : daten.zuletzt_eingetragen.map((z, i) => (
-          <div key={`${z.bereich}-${z.objekt_id}-${i}`} className="py-[7px] border-b border-rand last:border-b-0">
-            <span className="num gedaempft">{wann(z.zeitpunkt)}</span> {z.person ?? "—"} · {z.bezeichnung}{" "}
-            <Link to={`/patienten/${z.patient}`}>{z.name?.split(",")[0] ?? "Akte"}</Link>
-          </div>
-        ))}
-      </div>
-    </KarteBox>
-  );
-}
-
-function Anpassen({ karten, onAendern, onFertig }: { karten: Karte[]; onAendern: (k: Karte[]) => void; onFertig: () => void }) {
-  const sort = useSortierbar(karten, onAendern);
-  return (
-    <KarteBox className="px-5 py-4 flex flex-col gap-3 !border-akzent" aria-labelledby="k-anpassen">
-      <div className="flex justify-between items-center">
-        <h2 id="k-anpassen" className="lbl m-0 text-akzent-text">Meine Startseite</h2>
+        <Knopf klein variante="geist" onClick={onStandard}>Standard</Knopf>
         <Knopf klein variante="pri" onClick={onFertig}>Fertig</Knopf>
       </div>
-      <ul className="grid grid-cols-2 md:grid-cols-5 gap-2.5 m-0 p-0 list-none">
-        {karten.map((k, i) => {
-          const titel = KARTEN.find((x) => x.id === k.id)?.titel ?? k.id;
-          return (
-            <li key={k.id} {...sort.zeile(i)}
-              className={cx("flex items-center gap-2.5 px-3 py-2.5 border border-rand rounded-lg text-sm bg-flaeche",
-                sort.ueber === i && "outline-2 outline-akzent", sort.zieht === i && "opacity-50")}>
-              <button type="button" className="border-0 bg-transparent cursor-grab gedaempft p-0 tracking-[-2px]" {...sort.griff(i, titel, "startkarten")}>⋮⋮</button>
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <input type="checkbox" className="!w-[18px] !h-[18px]" checked={k.sichtbar}
-                  onChange={() => onAendern(karten.map((x) => (x.id === k.id ? { ...x, sichtbar: !x.sichtbar } : x)))} />
-                {titel}
-              </label>
-            </li>
-          );
-        })}
-      </ul>
-      <span className="text-[0.78125rem] gedaempft">
-        Ein- und ausblenden per Haken, Reihenfolge per Ziehen. Gilt nur für dich; jede Person hat ihre eigene Startseite.
-      </span>
-    </KarteBox>
+    </div>
   );
 }
 
+// ---------------------------------------------------------------- Seite
 export function Start() {
   const ich = useIch();
-  const { setIch, darf } = useAuth();
-  const melden = useHinweis();
+  const { darf } = useAuth();
+  const stufe = useStufe();
+  const spalten = RASTER_SPALTEN[stufe];
   const [bearbeiten, setBearbeiten] = useState(false);
+  const [zug, setZug] = useState<Zug | null>(null);
+  const [ansage, setAnsage] = useState("");
+  const [dialog, setDialog] = useState<null | "kontakt" | "gewicht" | "termin">(null);
+  const [vorgabe, setVorgabe] = useState<Vorgabe | null>(null);
+  const raster = useRef<HTMLDivElement>(null);
   const location = useLocation();
+  const speichern = useKartenSpeichern();
   useEffect(() => {
     if ((location.state as { anpassen?: number } | null)?.anpassen) setBearbeiten(true); // „Startseite anpassen“ aus Mein Konto
   }, [location.state]);
-  const daten = useQuery({ queryKey: ["startseite"], queryFn: () => api<Startdaten>("startseite/") });
-  const karten = kartenVon(ich);
-  const speichern = useMutation({
-    mutationFn: (neu: Karte[]) => api<Ich>("auth/ich/", { method: "PATCH", body: { startseite: { karten: neu } } }),
-    onMutate: (neu) => setIch({ ...ich, startseite: { karten: neu } }),
-    onSuccess: (antwort) => setIch(antwort),
-    onError: (e) => {
-      melden(`Startseite nicht gespeichert: ${e.message}`, "fehler");
-      setIch(ich);
+  const lesen = darf("akten_lesen");
+  const daten = useQuery({ queryKey: ["startseite"], queryFn: () => api<Startdaten>("startseite/"), enabled: lesen });
+  const konten = useKonten(darf("benutzer_verwalten"));
+  const d = daten.data;
+  const erfassen = darf("eintraege_erfassen");
+
+  const karten = ich.startseite.karten;
+  const erlaubt = (k: Karte) => darf(KACHELN[k.id].recht);
+  const sichtbar = karten.filter((k) => k.sichtbar && erlaubt(k));
+  const ausgeblendet = karten.filter((k) => !k.sichtbar && erlaubt(k));
+
+  const aendern = (id: KartenId, aenderung: Partial<Karte>) => speichern({ karten: karten.map((k) => (k.id === id ? { ...k, ...aenderung } : k)) });
+  const fokus = (id: KartenId) => window.requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-griff="${id}"]`)?.focus());
+  const verschieben = (id: KartenId, ziel: KartenId) => {
+    const von = karten.findIndex((k) => k.id === id), nach = karten.findIndex((k) => k.id === ziel);
+    if (von < 0 || nach < 0 || von === nach) return;
+    speichern({ karten: verschiebe(karten, von, nach) });
+  };
+
+  const griff = (k: Karte) => ({
+    onPointerDown: (e: PointerEvent<HTMLButtonElement>) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setZug({ art: "verschieben", id: k.id, ziel: null });
+    },
+    onPointerMove: (e: PointerEvent<HTMLButtonElement>) => {
+      if (zug?.art !== "verschieben" || zug.id !== k.id) return;
+      const unter = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-kachel]");
+      const ziel = (unter?.dataset.kachel as KartenId | undefined) ?? null;
+      if (ziel !== zug.ziel) setZug({ ...zug, ziel: ziel === k.id ? null : ziel });
+    },
+    onPointerUp: () => {
+      if (zug?.art === "verschieben" && zug.id === k.id && zug.ziel) {
+        verschieben(k.id, zug.ziel);
+        setAnsage(`${KACHELN[k.id].titel} verschoben.`);
+      }
+      setZug(null);
+    },
+    onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => {
+      const titel = KACHELN[k.id].titel;
+      if (e.shiftKey && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+        e.preventDefault();
+        const breite = e.key === "ArrowRight" ? 2 : e.key === "ArrowLeft" ? 1 : k.breite;
+        const hoehe = e.key === "ArrowDown" ? 2 : e.key === "ArrowUp" ? 1 : k.hoehe;
+        if (breite !== k.breite || hoehe !== k.hoehe) {
+          aendern(k.id, { breite, hoehe });
+          setAnsage(`${titel}: ${breite} × ${hoehe}`);
+        }
+        fokus(k.id);
+        return;
+      }
+      const zurueck = e.key === "ArrowLeft" || e.key === "ArrowUp";
+      const vor = e.key === "ArrowRight" || e.key === "ArrowDown";
+      if (!zurueck && !vor) return;
+      e.preventDefault();
+      const i = sichtbar.findIndex((x) => x.id === k.id);
+      const nachbar = sichtbar[zurueck ? i - 1 : i + 1];
+      if (!nachbar) return;
+      verschieben(k.id, nachbar.id);
+      setAnsage(`${titel}: Position ${zurueck ? i : i + 2} von ${sichtbar.length}`);
+      fokus(k.id);
     },
   });
-  const d = daten.data;
-  const inhalt: Record<Karte["id"], (d: Startdaten) => ReactNode> = {
-    termine: (x) => <TermineKarte key="termine" daten={x} />,
-    gewicht: (x) => <GewichtKarte key="gewicht" daten={x} />,
-    plaene: (x) => <PlaeneKarte key="plaene" daten={x} />,
-    pruefen: (x) => <PruefenKarte key="pruefen" daten={x} />,
-    aktiv: (x) => <AktivKarte key="aktiv" daten={x} />,
+
+  /** Ecke unten rechts: Größe ziehen, rastet in ganzen Rasterzellen ein (höchstens 2 × 2) */
+  const ecke = (k: Karte) => ({
+    onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0 || !raster.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      const stil = getComputedStyle(raster.current);
+      const abstand = parseFloat(stil.columnGap) || 20;
+      const zelleB = (raster.current.clientWidth - (spalten - 1) * abstand) / spalten;
+      const zelleH = parseFloat(stil.gridAutoRows) || 300;
+      const kachel = e.currentTarget.closest<HTMLElement>("[data-kachel]")!.getBoundingClientRect();
+      const r = raster.current.getBoundingClientRect();
+      setZug({ art: "groesse", id: k.id, breite: Math.min(k.breite, spalten) as 1 | 2, hoehe: k.hoehe, links: kachel.left - r.left,
+        oben: kachel.top - r.top, zelleB, zelleH, abstand });
+    },
+    onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
+      if (zug?.art !== "groesse" || zug.id !== k.id || !raster.current) return;
+      const r = raster.current.getBoundingClientRect();
+      const b = Math.round((e.clientX - r.left - zug.links + zug.abstand) / (zug.zelleB + zug.abstand));
+      const h = Math.round((e.clientY - r.top - zug.oben + zug.abstand) / (zug.zelleH + zug.abstand));
+      const breite = Math.min(Math.max(b, 1), Math.min(2, spalten)) as 1 | 2;
+      const hoehe = Math.min(Math.max(h, 1), 2) as 1 | 2;
+      if (breite !== zug.breite || hoehe !== zug.hoehe) setZug({ ...zug, breite, hoehe });
+    },
+    onPointerUp: () => {
+      if (zug?.art === "groesse" && zug.id === k.id && (zug.breite !== Math.min(k.breite, spalten) || zug.hoehe !== k.hoehe)) {
+        aendern(k.id, { breite: zug.breite, hoehe: zug.hoehe });
+        setAnsage(`${KACHELN[k.id].titel}: ${zug.breite} × ${zug.hoehe}`);
+      }
+      setZug(null);
+    },
+  });
+
+  const oeffne = (art: "kontakt" | "gewicht" | "termin", v: Vorgabe | null = null) => { setVorgabe(v); setDialog(art); };
+  const inhalt = (k: Karte): ReactNode => {
+    const breit = Math.min(k.breite, spalten) === 2;
+    if (["sicherung", "server", "updates", "konten", "angemeldet", "hinweis", "zugriffe", "testumgebung"].includes(k.id)) {
+      return k.id === "sicherung" ? <SicherungKachel /> : k.id === "server" ? <ServerKachel /> : k.id === "updates" ? <UpdatesKachel />
+        : k.id === "konten" ? <KontenKachel /> : k.id === "angemeldet" ? <AngemeldetKachel /> : k.id === "hinweis" ? <HinweisKachel />
+        : k.id === "zugriffe" ? <ZugriffeKachel /> : <TestKachel />;
+    }
+    if (k.id === "meine") return <MeineKachel />;
+    if (!d) return daten.error ? <div className="p-5"><Fehleranzeige fehler={daten.error} /></div> : <Laden />;
+    switch (k.id) {
+      case "termine": return <TermineKachel daten={d} breit={breit} />;
+      case "wieder": return <WiederKachel daten={d} onKontakt={(v) => oeffne("kontakt", v)} onTermin={(v) => oeffne("termin", v)} />;
+      case "gewicht": return <GewichtKachel daten={d} />;
+      case "plaene": return <PlaeneKachel daten={d} />;
+      case "pruefen": return <PruefenKachel daten={d} />;
+      default: return <AktivKachel daten={d} breit={breit} />;
+    }
   };
+
+  // S08: Hinweis „Nur noch n Notfall-Codes übrig“ (ausgeblendet bis weniger übrig sind)
+  const codes = d?.notfallcodes;
+  const codesHinweis = codes && codes.eingerichtet && codes.uebrig <= codes.warnen_ab
+    && !(ich.startseite.notfallhinweis_bei != null && codes.uebrig >= ich.startseite.notfallhinweis_bei);
+  const gesperrt = (konten.data ?? []).filter((k) => k.probleme.includes("gesperrt") && /Fehlversuche/.test(k.sperrgrund));
+  const verwaltung = ich.rolle === "admin";
+
   return (
     <Seite pfad={[{ text: "Start" }]}>
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div className="flex flex-col gap-1">
           <h1 className="m-0 text-[1.625rem] font-semibold">{langesDatum()}</h1>
-          {d ? (
+          {verwaltung && ich.schreibt_nur_testpatienten ? (
+            <span className="text-sm gedaempft">Administration · echte Akten sind für dich nur lesbar</span>
+          ) : d ? (
             <span className="text-sm gedaempft" data-testid="start-zahlen">
               <span className="num">{d.termine.heute.length}</span> offene Termine heute · <span className="num">{d.termine.ueberfaellig.length}</span> überfällig
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5 flex-wrap">
           {d?.sicherung ? <BackupStatus s={d.sicherung} verweis={darf("backup_verwalten")} /> : null}
-          <Knopf icon="stift" onClick={() => setBearbeiten((b) => !b)} aria-expanded={bearbeiten}>Startseite anpassen</Knopf>
+          {erfassen && lesen ? <>
+            <Knopf variante="pri" icon="telefon" onClick={() => oeffne("kontakt")}>Kontakt erfassen</Knopf>
+            <Knopf icon="waage" onClick={() => oeffne("gewicht")}>Gewicht</Knopf>
+            <Knopf icon="kalender" onClick={() => oeffne("termin")}>Termin</Knopf>
+          </> : null}
+          {darf("benutzer_verwalten") && verwaltung ? <KnopfLink to="/admin/benutzer?neu=1" icon="benutzer">Benutzer anlegen</KnopfLink> : null}
+          <Knopf variante="geist" icon="stift" onClick={() => setBearbeiten((b) => !b)} aria-expanded={bearbeiten}>Startseite anpassen</Knopf>
         </div>
       </div>
-      {bearbeiten ? <Anpassen karten={karten} onAendern={(k) => speichern.mutate(k)} onFertig={() => setBearbeiten(false)} /> : null}
-      {daten.isLoading ? <Laden /> : null}
-      <Fehleranzeige fehler={daten.error} />
-      {d ? (
-        <div className="grid grid-cols-3 gap-5 items-start">
-          {karten.filter((k) => k.sichtbar).map((k) => inhalt[k.id](d))}
+
+      {gesperrt.map((k) => (
+        <div key={k.id} role="alert" className="meldung fehler flex items-center gap-2.5" data-testid="konto-gesperrt">
+          <Icon name="warnung" groesse={18} />
+          <span className="grow">Konto <strong>{k.benutzername}</strong> gesperrt: {k.sperrgrund}{k.gesperrt_am ? `, ${relativ(k.gesperrt_am, true)}` : ""}.</span>
+          <Link to={`/admin/benutzer?id=${k.id}`} className="font-medium whitespace-nowrap text-fehler">Zum Benutzer</Link>
+        </div>
+      ))}
+      {codesHinweis && codes ? (
+        <div role="status" className="meldung warn flex items-center gap-2.5" data-testid="notfallcodes-hinweis">
+          <Icon name="warnung" groesse={18} />
+          <span className="grow">{codes.uebrig ? <>Nur noch <strong>{codes.uebrig} von {codes.gesamt}</strong> Notfall-Codes übrig.</>
+            : <>Keine Notfall-Codes mehr übrig.</>} Ohne Codes ist bei Verlust des Telefons keine Anmeldung möglich.</span>
+          <Link to="/konto" state={{ sicherheit: Date.now() }} className="font-medium whitespace-nowrap text-warn">Neue Codes erzeugen</Link>
+          <button type="button" className="btn icon geist klein text-warn" aria-label="Hinweis zu den Notfall-Codes ausblenden"
+            onClick={() => speichern({ notfallhinweis_bei: codes.uebrig })}><Icon name="x" /></button>
         </div>
       ) : null}
+
+      {bearbeiten ? (
+        <AnpassenBanner ausgeblendet={ausgeblendet} spalten={spalten} onFertig={() => setBearbeiten(false)}
+          onEinblenden={(id) => { aendern(id, { sichtbar: true }); setAnsage(`${KACHELN[id].titel} eingeblendet.`); }}
+          onStandard={() => { speichern({ karten: [] }); setAnsage("Standard wiederhergestellt."); }} />
+      ) : null}
+      <span className="sr-only" aria-live="polite">{ansage}</span>
+
+      {lesen && d ? <Kennzahlen d={d} /> : null}
+      {lesen && daten.isLoading ? <Laden /> : null}
+
+      <div ref={raster} className="raster" data-testid="raster" data-spalten={spalten}>
+        {sichtbar.map((k) => {
+          const b = Math.min(k.breite, spalten);
+          const zieht = zug?.art === "verschieben" && zug.id === k.id;
+          return (
+            <KarteBox key={k.id} className={cx("kachel", bearbeiten && "bearbeiten", zieht && "zieht",
+              zug?.art === "verschieben" && zug.ziel === k.id && "ziel")}
+              style={{ gridColumn: `span ${b}`, gridRow: `span ${k.hoehe}` }} aria-labelledby={`k-${k.id}`}
+              data-kachel={k.id} data-groesse={`${b}x${k.hoehe}`}>
+              <div className="contents" inert={bearbeiten || undefined}>{inhalt(k)}</div>
+              {bearbeiten ? (
+                <>
+                  <div aria-hidden="true" className="absolute inset-0 rounded-[inherit] bg-grund/50 z-10" />
+                  <Bearbeitungsleiste karte={k} titel={KACHELN[k.id].titel} spalten={spalten} griff={griff(k)}
+                    onGroesse={(breite, hoehe) => { aendern(k.id, { breite, hoehe }); setAnsage(`${KACHELN[k.id].titel}: ${breite} × ${hoehe}`); }}
+                    onAusblenden={() => { aendern(k.id, { sichtbar: false }); setAnsage(`${KACHELN[k.id].titel} ausgeblendet.`); }} />
+                  <div aria-hidden="true" title="Größe ziehen" data-testid={`ecke-${k.id}`}
+                    className="absolute right-1 bottom-1 z-20 w-5 h-5 flex items-center justify-center text-akzent-text cursor-nwse-resize touch-none"
+                    {...ecke(k)}><Icon name="ecke" groesse={14} strokeWidth={2.2} /></div>
+                </>
+              ) : null}
+            </KarteBox>
+          );
+        })}
+        {zug?.art === "groesse" ? (
+          <div aria-hidden="true" className="absolute z-30 rounded-[14px] border-2 border-akzent bg-akzent/5 pointer-events-none flex items-end justify-end p-3"
+            style={{ left: zug.links, top: zug.oben, width: zug.breite * zug.zelleB + (zug.breite - 1) * zug.abstand,
+              height: zug.hoehe * zug.zelleH + (zug.hoehe - 1) * zug.abstand }}>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-akzent text-auf-akzent text-[0.8125rem] font-medium">
+              <Icon name="ecke" groesse={14} />{zug.breite} × {zug.hoehe} · loslassen zum Einrasten</span>
+          </div>
+        ) : null}
+      </div>
+      {sichtbar.length === 0 ? (
+        <KarteBox className="px-5 py-6 text-sm gedaempft text-center">Alle Kacheln sind ausgeblendet. Unter „Startseite anpassen“ lassen sie sich wieder einblenden.</KarteBox>
+      ) : null}
+
+      {erfassen ? <>
+        <KontaktDialog offen={dialog === "kontakt"} onOffen={(o) => setDialog(o ? "kontakt" : null)} vorgabe={vorgabe} />
+        <GewichtDialog offen={dialog === "gewicht"} onOffen={(o) => setDialog(o ? "gewicht" : null)} vorgabe={vorgabe} />
+        <TerminDialog offen={dialog === "termin"} onOffen={(o) => setDialog(o ? "termin" : null)} patientId={vorgabe?.id} patientName={vorgabe?.name} />
+      </> : null}
     </Seite>
   );
 }

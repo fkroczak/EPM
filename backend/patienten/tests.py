@@ -489,7 +489,7 @@ class Patientenliste(Grundlage):
         self.assertEqual((float(start["gewicht_schwelle"]["prozent"]), start["gewicht_schwelle"]["monate"]), (5.0, 3))
         zuletzt = start["zuletzt_eingetragen"]
         self.assertTrue(zuletzt)
-        self.assertEqual({z["bereich"] for z in zuletzt}, {"kontakt", "gewicht"})
+        self.assertEqual({z["bereich"] for z in zuletzt}, {"kontakt", "gewicht", "termin"})  # Termine seit S10
         self.assertEqual(start["zahlen"]["in_betreuung"], 3)  # ohne Testpatient
 
 

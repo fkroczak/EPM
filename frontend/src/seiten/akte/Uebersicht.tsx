@@ -19,6 +19,8 @@ import { Richtext, klartext } from "@/components/Editor";
 import { TerminDialog } from "@/components/TerminDialog";
 import { useAkte } from "./Akte";
 import { AerzteKarte, BezugspersonenKarte } from "./Kontaktpersonen";
+import { useStufe } from "@/lib/stufen";
+import { Spalten } from "@/components/ui/spalten";
 
 const QUELLEN_NEU = ["telefonisch", "ambulanz", "versorger", "arztbrief"];
 const ZEITRAEUME: { wert: Zeitraum; text: string }[] = [
@@ -78,11 +80,11 @@ function KorrekturDialog({ messung, onZu }: { messung: Gewicht | null; onZu: () 
   );
 }
 
-function GewichtKarte() {
+function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
   const { patient, erfassen } = useAkte();
   const location = useLocation();
   const feld = useRef<HTMLInputElement>(null);
-  const [zeitraum, setZeitraum] = useState<Zeitraum>("y1");
+  const [zeitraum, setZeitraum] = useState<Zeitraum>(startZeitraum);
   const [geglaettet, setGeglaettet] = useState(true);
   const [wert, setWert] = useState("");
   const [am, setAm] = useState(datum(heuteIso()));
@@ -225,7 +227,7 @@ function TherapieKarte() {
   );
 }
 
-function TermineKarte() {
+export function TermineKarte() {
   const { patient, erfassen, terminAnlegen } = useAkte();
   const [bearbeiten, setBearbeiten] = useState<Termin | null>(null);
   useOhneRechtSchliessen(erfassen, () => setBearbeiten(null));
@@ -346,21 +348,41 @@ function StammKarte() {
   );
 }
 
+/** Aufteilung je Fensterstufe (S16, Vorschlag Entwurf 2 bestätigt 02.10.2026): unter 1440 px eine Spalte, 1440–1919 px
+ *  ½ | ½ mit Teiler, ab 1920 px ⅔ (selbst zweispaltig) | ⅓ mit Teiler, ab 2560 px dazu mehr Verlauf im Diagramm (3 Jahre). */
 export function Uebersicht() {
+  const stufe = useStufe();
+  const gewicht = <GewichtKarte key="gewicht" startZeitraum={stufe === "qhd" ? "y3" : "y1"} />;
+  const therapie = <TherapieKarte key="therapie" />;
+  const termine = <TermineKarte key="termine" />;
+  const plan = <PlanKarte key="plan" />;
+  const kontakte = <KontakteKarte key="kontakte" />;
+  const stamm = <StammKarte key="stamm" />;
+  const aerzte = <AerzteKarte key="aerzte" />;
+  const bezug = <BezugspersonenKarte key="bezug" />;
+  if (stufe === "eng" || stufe === "schmal") {
+    return <div className="flex flex-col gap-5 min-w-0" data-testid="uebersicht-stufe">{gewicht}{termine}{plan}{therapie}{kontakte}{stamm}{aerzte}{bezug}</div>;
+  }
+  if (stufe === "hd") {
+    return (
+      <Spalten seite="akte_uebersicht" stufe="hd" standard={[1 / 2]} testid="uebersicht-stufe" namen={["Gewicht und Diagnose", "Termine und Plan"]}
+        spalten={[<>{gewicht}{therapie}{kontakte}{stamm}</>, <>{termine}{plan}{aerzte}{bezug}</>]} />
+    );
+  }
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
-      <div className="flex flex-col gap-5 min-w-0">
-        <GewichtKarte />
-        <TherapieKarte />
-      </div>
-      <div className="flex flex-col gap-5 min-w-0">
-        <TermineKarte />
-        <PlanKarte />
-        <KontakteKarte />
-        <StammKarte />
-        <AerzteKarte />
-        <BezugspersonenKarte />
-      </div>
-    </div>
+    <Spalten seite="akte_uebersicht" stufe={stufe} standard={[2 / 3]} testid="uebersicht-stufe"
+      namen={["Gewicht, Diagnose und Kontakte", "Termine und Plan"]}
+      spalten={[
+        <>
+          {gewicht}
+          <div className="@container">
+            <div className="grid grid-cols-1 @min-[44rem]:grid-cols-2 gap-5 items-start">
+              <div className="flex flex-col gap-5 min-w-0">{therapie}{stamm}</div>
+              <div className="flex flex-col gap-5 min-w-0">{kontakte}{aerzte}</div>
+            </div>
+          </div>
+        </>,
+        <>{termine}{plan}{bezug}</>,
+      ]} />
   );
 }

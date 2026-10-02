@@ -19,10 +19,10 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 
-type Platte = { pfad: string; bezeichnung: string; gesamt: number; frei: number };
-type Speicher = { gesamt: number | null; verfuegbar: number | null; swap_gesamt: number | null; swap_frei: number | null } | null;
+export type Platte = { pfad: string; bezeichnung: string; gesamt: number; frei: number };
+export type Speicher = { gesamt: number | null; verfuegbar: number | null; swap_gesamt: number | null; swap_frei: number | null } | null;
 type Paket = { name: string; von: string; nach: string; sicherheit: boolean };
-type HostStatus = {
+export type HostStatus = {
   zeit: string; alter_s: number | null; aktuell: boolean; trocken?: boolean;
   rechner?: string; system?: string; kernel?: string; laufzeit_s?: number | null;
   cpu?: { kerne: number | null; last: number[]; prozent: number | null };
@@ -36,14 +36,14 @@ type HostStatus = {
   sicherung?: { verfuegbar: boolean; anzahl?: number; gesamt?: number; letzte_am?: string | null; letzte_groesse?: number };
   dienste?: Record<string, string>;
 };
-type Aktion = { code: string; name: string; bestaetigung: "keine" | "einfach" | "2fa"; beschreibung: string; sichern: boolean;
+export type Aktion = { code: string; name: string; bestaetigung: "keine" | "einfach" | "2fa"; beschreibung: string; sichern: boolean;
   warnen: boolean; erlaubt: boolean };
 type Aufgabe = { code: string; name: string; bestaetigung: "keine" | "einfach"; beschreibung: string };
-type Sitzung = { id: number; benutzer: number; name: string; benutzername: string; rolle: string; browser: string; ip: string | null;
+export type Sitzung = { id: number; benutzer: number; name: string; benutzername: string; rolle: string; browser: string; ip: string | null;
   angemeldet_am: string; zuletzt_am: string; eigene: boolean };
-type Hinweis = { id: number; text: string; art: "info" | "warnung"; gueltig_bis: string | null; angelegt_am: string;
+export type Hinweis = { id: number; text: string; art: "info" | "warnung"; gueltig_bis: string | null; angelegt_am: string;
   angelegt_von_name: string | null; auftrag: number | null };
-type Uebersicht = {
+export type Uebersicht = {
   host: HostStatus | null;
   container: { kerne: number | null; last: number[] | null; speicher: Speicher; laufzeit_s: number | null; platten: Platte[] };
   agent: { verzeichnis: boolean; erreichbar: boolean };
@@ -63,22 +63,22 @@ type Uebersicht = {
   aufgaben: Aufgabe[];
   minuten: number[];
 };
-type Auftrag = { id: number; kennung: string; ziel: "server" | "epm"; aktion: string; name: string;
+export type Auftrag = { id: number; kennung: string; ziel: "server" | "epm"; aktion: string; name: string;
   status: "wartet" | "laeuft" | "erledigt" | "fehler" | "abgebrochen"; status_name: string; offen: boolean;
   parameter: { minuten?: number; pruefsummen?: boolean }; angefordert_von_name: string | null; angefordert_am: string;
   begonnen_am: string | null; beendet_am: string | null; ergebnis: string; ausgabe: string; rueckgabe: number | null; probelauf: boolean };
 type Verlauf = { felder: string[]; punkte: [number, number | null, number | null, number | null, number | null][] };
 
 // ---------------------------------------------------------------- Hilfen
-function dauer(s: number | null | undefined) {
+export function dauer(s: number | null | undefined) {
   if (s == null) return "—";
   const t = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
   return t ? `${t} T ${h} h` : h ? `${h} h ${m} min` : `${m} min`;
 }
-function anteil(belegt: number | null | undefined, gesamt: number | null | undefined) {
+export function anteil(belegt: number | null | undefined, gesamt: number | null | undefined) {
   return belegt != null && gesamt ? Math.round((100 * belegt) / gesamt) : null;
 }
-function stufe(p: number | null): "ok" | "warn" | "fehler" {
+export function stufe(p: number | null): "ok" | "warn" | "fehler" {
   return p == null || p < 75 ? "ok" : p < 90 ? "warn" : "fehler";
 }
 const STUFE_TEXT = { ok: "in Ordnung", warn: "hoch", fehler: "kritisch" };
@@ -205,9 +205,9 @@ function VerlaufDiagramm({ verlauf }: { verlauf: Verlauf }) {
 }
 
 // ---------------------------------------------------------------- Bestätigen und ausführen
-type Wahl = { art: "server"; aktion: Aktion } | { art: "epm"; aufgabe: Aufgabe };
+export type Wahl = { art: "server"; aktion: Aktion } | { art: "epm"; aufgabe: Aufgabe };
 
-function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; daten: Uebersicht; onZu: () => void }) {
+export function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; daten: Uebersicht; onZu: () => void }) {
   const qc = useQueryClient();
   const melden = useHinweis();
   const [kennwort, setKennwort] = useState("");
@@ -567,7 +567,8 @@ export function System() {
       <Taetigkeiten daten={d} offen={offen} onWahl={setWahl} />
       <Auftraege liste={auftraege.data ?? []} />
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+      {/* Karten in Stufen (S16, Entwurf 2): untereinander, ab 1440 px 2, ab 1920 px 3, ab 2560 px 4 Kartenspalten */}
+      <div className="grid grid-cols-1 hd:grid-cols-2 fhd:grid-cols-3 qhd:grid-cols-4 gap-5 items-start" data-testid="system-karten">
         <Karte className="px-5 py-4 flex flex-col gap-2" data-testid="server-karte">
           <KartenKopf titel="Server" unter={h ? `gemessen ${relativ(h.zeit, true)}` : "ohne Systemagent nur Werte aus dem Container"} />
           <dl className="m-0">
@@ -645,9 +646,6 @@ export function System() {
                 <td className="td num text-right text-[0.75rem] gedaempft">{zahl(t.zeilen)} Zeilen</td></tr>))}</tbody>
           </table>
         </Karte>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
         <HinweisKarte hinweis={d.hinweis} />
         <Angemeldet liste={d.angemeldet} />
       </div>

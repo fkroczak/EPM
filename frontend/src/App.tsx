@@ -23,6 +23,7 @@ import { Kalender } from "./seiten/Kalender";
 import { Benutzer } from "./seiten/admin/Benutzer";
 import { Datenschutz } from "./seiten/Datenschutz";
 import { Vorlagen } from "./seiten/admin/Vorlagen";
+import { Hilfe } from "./seiten/Hilfe";
 import { Konto } from "./seiten/Konto";
 import { PatientNeu } from "./seiten/PatientNeu";
 import { Patienten } from "./seiten/Patienten";
@@ -75,6 +76,7 @@ const router = createBrowserRouter([
       { path: "aerzte", element: <Aerzte /> },
       { path: "datenschutz", element: <MitRecht recht={["datenschutz_bearbeiten", "datenschutz_entscheiden"]}><Datenschutz /></MitRecht> },
       { path: "konto", element: <Konto /> },
+      { path: "hilfe", element: <Hilfe /> },
       { path: "admin/backup", element: <MitRecht recht="backup_verwalten" titel="Backup"><Backup /></MitRecht> },
       { path: "admin/benutzer", element: <MitRecht recht="benutzer_verwalten" titel="Benutzer"><Benutzer /></MitRecht> },
       { path: "admin/vorlagen", element: <MitRecht recht="vorlagen_pflegen" titel="Vorlagen"><Vorlagen /></MitRecht> },

@@ -189,6 +189,11 @@ test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", asyn
   await expect(grenzen.getByText("Untere Grenze muss kleiner als obere Grenze sein.")).toBeVisible();
   await grenzen.getByLabel("Gewicht minimal").fill("20");
   await grenzen.getByLabel("Kontakt überfällig nach").fill("13");
+  // Kontakt fällig in zwei Stufen (S04): „bald fällig“ muss vor „überfällig“ liegen
+  await grenzen.getByLabel("Kontakt bald fällig nach").fill("13");
+  await page.getByRole("button", { name: "Speichern" }).click();
+  await expect(grenzen.getByText("„Überfällig“ muss später liegen als „bald fällig“.")).toBeVisible();
+  await grenzen.getByLabel("Kontakt bald fällig nach").fill("5");
   // Grenze für das berechnete Volumen im Mischbeutel (Gewicht × 35 ml)
   await expect(grenzen.getByLabel("Volumen im Mischbeutel minimal")).toHaveValue("0");
   await expect(grenzen.getByLabel("Volumen im Mischbeutel maximal")).toHaveValue("9000");
@@ -196,8 +201,8 @@ test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", asyn
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Grenzwerte gespeichert.")).toBeVisible();
   const einstellungen = await admin.get("einstellungen/");
-  expect([einstellungen.kontakt_ueberfaellig_monate, einstellungen.volumen_max_ml]).toEqual([13, 8000]);
-  await admin.patch("einstellungen/", { kontakt_ueberfaellig_monate: 6, volumen_max_ml: 9000 });
+  expect([einstellungen.kontakt_bald_monate, einstellungen.kontakt_ueberfaellig_monate, einstellungen.volumen_max_ml]).toEqual([5, 13, 8000]);
+  await admin.patch("einstellungen/", { kontakt_bald_monate: 4, kontakt_ueberfaellig_monate: 6, volumen_max_ml: 9000 });
   await admin.ende();
   merken("vorlagen", { ort, vitamin });
 });
