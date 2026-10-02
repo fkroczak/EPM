@@ -59,7 +59,7 @@ done
 
 echo "==> Projektverzeichnis $B"
 sudo rm -rf "$B"
-mkdir -p "$B/secrets" "$B/nginx/certs" "$B/data/dokumente" "$B/data/loeschliste" "$B/system/auftraege" "$B/system/status/auftraege" \
+mkdir -p "$B/secrets" "$B/nginx/certs" "$B/data/dokumente" "$B/data/loeschliste" "$B/data/import" "$B/system/auftraege" "$B/system/status/auftraege" \
   "$B/backup" "$B/konf-sicherung"
 chmod 0700 "$B/backup" "$B/konf-sicherung"
 cp rollout/projekt/compose.yaml "$B/"

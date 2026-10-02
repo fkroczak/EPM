@@ -133,6 +133,12 @@ Name); nach einer Wiederherstellung löscht das Backend beim Start alles erneut,
 5. Sicherungs-Passwort unter Administration › Backup festlegen, Passwortblatt drucken und im Tresor verwahren; Aufbewahrung auf NAS/Nextcloud festlegen (O7).
 6. Nach dem Import der Altdaten (F65): Altsystem abschalten und seine Daten löschen – Datenbank, Dumps, Kopien auf
    Arbeitsrechnern und die Test-VM. Solange dort Daten liegen, gelten Löschungen in EPM dort nicht.
+   Im EPM selbst liegt der Dump (mit den Daten aller Patienten des Altsystems, auch der nicht übernommenen und der dort
+   gelöschten) bis zum „Abschließen“ in der Datenbank; mit dem Abschließen werden Dump, Zuordnungen und die Nummern in
+   den Importprotokollen gelöscht. Getrennt zu löschen bleiben: der Dokumentenordner `data/import/PatData` auf dem
+   Server und Sicherungen aus der Zeit vor dem Abschließen (auf dem Server laufen sie nach 30 Tagen ab; Kopien auf NAS
+   und Nextcloud löscht EPM nicht, siehe O7). Kennwörter des Altsystems
+   werden nie gespeichert.
 7. Freigabe-E-Mails für Infusionspläne: nur Patienten- und Plannummer nennen, keine Namen oder Diagnosen.
 8. Bestehende Patienten: vorhandene Einwilligungen und Schweigepflichtentbindungen nach und nach in der Akte erfassen
    (Startseite „Erklärungen fehlen“).

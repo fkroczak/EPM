@@ -314,7 +314,8 @@ class RechteJeGruppe(TestCase):
         self.assertFalse(m["mitarbeiter"]["dokumente_loeschen"])
         # Festlegung 02.10.2026: Systemverwaltung Standard nur Admin, aber für eine Vertretung jeder Gruppe erteilbar
         self.assertEqual(r["nur_rollen"], {"dokumente_loeschen": ["admin", "mediziner"],
-                                           "akten_loeschen": ["admin", "mediziner"]})
+                                           "akten_loeschen": ["admin", "mediziner"],
+                                           "altdaten_importieren": ["admin"]})
         self.assertFalse(m["mediziner"]["system_verwalten"])
         # Datenschutz: Mitarbeiter erfassen und schließen freigegebene Pläne ab, entscheiden und löschen nicht
         for code in ("datenschutz_bearbeiten", "plaene_abschliessen"):

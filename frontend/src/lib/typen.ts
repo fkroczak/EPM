@@ -6,7 +6,7 @@ export type Recht =
   | "plaene_anlegen" | "plaene_freigeben" | "plaene_abschliessen"
   | "datenschutz_bearbeiten" | "datenschutz_entscheiden" | "akten_loeschen"
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
-  | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "system_verwalten";
+  | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "system_verwalten" | "altdaten_importieren";
 
 export type Karte = { id: "termine" | "gewicht" | "plaene" | "pruefen" | "aktiv"; sichtbar: boolean };
 
@@ -491,6 +491,8 @@ export type Plan = {
   abgeschlossen_von_name: string | null;
   freigabe_nachweis: number | null;
   freigabevermerk: string | null;
+  /** aus dem Altsystem übernommene Pläne: ohne Freigabe im Sinne des EPM und ohne gespeicherte PDF */
+  herkunft: "epm" | "altsystem";
   pdf_datei: string;
   pdf_sha256: string;
   vorlage_version: number | null;

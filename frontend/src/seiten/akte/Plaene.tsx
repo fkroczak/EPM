@@ -47,6 +47,7 @@ function PlanAnsicht({ plan }: { plan: Plan }) {
       <span className="text-[0.8125rem] gedaempft" data-testid="ansicht-herkunft">
         {original ? <>Gespeicherte PDF der Freigabe{pruefung === "ok" ? " · Prüfsumme stimmt" : ""}.</>
           : plan.status === "entwurf" ? "Vorschau mit der aktiven Dokumentvorlage. Die PDF entsteht bei der Freigabe."
+          : plan.herkunft === "altsystem" ? "Aus dem Altsystem übernommen – dort gab es keine gespeicherte PDF. Ansicht mit der aktiven Dokumentvorlage."
           : "Für diesen Plan ist keine PDF gespeichert (vor Einführung der PDF-Erzeugung freigegeben). Ansicht mit der aktiven Dokumentvorlage."}
       </span>
       {pruefung === "abweichend" ? <Meldung art="fehler">Die gespeicherte PDF weicht von der Prüfsumme ab und wurde nach der Freigabe verändert. Bitte die Administration informieren.</Meldung> : null}
@@ -295,6 +296,7 @@ export function Plaene() {
                 <span className="num text-[0.8125rem]">{zahl(p.kcal)} kcal{p.laufzeit_h != null ? ` · ${zahl(p.laufzeit_h)} h` : ""}{p.tage_pro_woche ? ` · ${p.tage_pro_woche}×/Woche` : ""}</span>
                 <span className="text-xs gedaempft">
                   {p.status === "entwurf" ? `angelegt ${zeitpunkt(p.erstellt_am)}${p.erstellt_von_name ? ` · ${p.erstellt_von_name}` : ""}`
+                    : p.herkunft === "altsystem" ? `aus dem Altsystem · angelegt ${datum(p.erstellt_am)}${p.erstellt_von_name ? ` · ${p.erstellt_von_name}` : ""}`
                     : p.abgeschlossen_von_name && p.freigabe_datum
                       // außerhalb von EPM freigegeben: der Tag der Freigabe, nicht der Zeitpunkt des Abschließens
                       ? `freigegeben ${datum(p.freigabe_datum)} · ${p.freigegeben_von_name ?? "—"} · abgeschlossen von ${p.abgeschlossen_von_name}`
@@ -318,6 +320,8 @@ export function Plaene() {
               <span className="text-[0.8125rem] gedaempft max-w-[70ch]">
                 {gewaehlt.status === "entwurf"
                   ? "Entwurf: nur für das Team sichtbar, noch nicht beim Versorger."
+                  : gewaehlt.herkunft === "altsystem"
+                    ? `${gewaehlt.freigabevermerk ?? "Aus dem Altsystem übernommen."} Eine Freigabe im EPM und eine gespeicherte PDF gibt es für diesen Plan nicht.`
                   : gewaehlt.abgeschlossen_von_name
                     ? `Freigegeben am ${datum(gewaehlt.freigabe_datum)} von ${gewaehlt.freigegeben_von_name ?? "—"} (${gewaehlt.freigabe_weg_name}); im System abgeschlossen am ${zeitpunkt(gewaehlt.freigegeben_am)} von ${gewaehlt.abgeschlossen_von_name}.${gewaehlt.pdf_sha256 ? " Die PDF ist mit Prüfsumme gespeichert und wird nie neu erzeugt." : ""}`
                   : `Freigegeben am ${zeitpunkt(gewaehlt.freigegeben_am)}${gewaehlt.freigegeben_von_name ? ` von ${gewaehlt.freigegeben_von_name}` : ""}. ${gewaehlt.pdf_sha256 ? " Die PDF ist mit Prüfsumme gespeichert und wird nie neu erzeugt." : " Für diesen Plan ist keine PDF gespeichert."}`}
@@ -332,7 +336,8 @@ export function Plaene() {
               {gewaehlt.status === "entwurf" && abschliessen ? <Knopf variante="pri" icon="haken" onClick={() => setAbschluss(true)}>Nach Freigabe abschließen</Knopf> : null}
               {gewaehlt.status !== "entwurf" ? <>
                 <Knopf icon="dokument" disabled={!gewaehlt.pdf_sha256} onClick={() => setPdf(true)}
-                  title={gewaehlt.pdf_sha256 ? undefined : "Für diesen Plan ist keine PDF gespeichert (vor Einführung der PDF-Erzeugung freigegeben)."}>PDF öffnen</Knopf>
+                  title={gewaehlt.pdf_sha256 ? undefined : gewaehlt.herkunft === "altsystem" ? "Aus dem Altsystem übernommen: keine gespeicherte PDF."
+                    : "Für diesen Plan ist keine PDF gespeichert (vor Einführung der PDF-Erzeugung freigegeben)."}>PDF öffnen</Knopf>
                 {anlegen && !entwurfDa ? <Knopf icon="plus" onClick={() => navigate(`/patienten/${patient.id}/plaene/neu?vorlage=${gewaehlt.id}`)}>Als Vorlage für neuen Plan</Knopf> : null}
               </> : null}
             </div>

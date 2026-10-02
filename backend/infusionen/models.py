@@ -168,6 +168,13 @@ class Infusionsplan(AktenEintrag):
         "patienten.Dokument", on_delete=models.PROTECT, null=True, blank=True, related_name="+",
         verbose_name="Nachweis der Freigabe (z. B. die E-Mail)",
     )
+    # Aus dem Altsystem übernommene Pläne (F65) haben keinen Freigabevermerk und keine gespeicherte PDF – beides gab es
+    # dort nicht. Der jüngste Plan je Patient wird als „aktuell“ übernommen, die früheren als „abgelöst“.
+    class Herkunft(models.TextChoices):
+        EPM = "epm", "In EPM angelegt"
+        ALTSYSTEM = "altsystem", "Aus dem Altsystem übernommen"
+
+    herkunft = models.CharField(max_length=20, choices=Herkunft.choices, default=Herkunft.EPM, editable=False)
     # Bei Freigabe erzeugte PDF (kommt mit den Dokumentvorlagen); wird nie neu erzeugt
     pdf_datei = models.CharField(max_length=255, blank=True)
     pdf_sha256 = models.CharField(max_length=64, blank=True)
@@ -451,10 +458,16 @@ class Infusionsplan(AktenEintrag):
     @property
     def freigabevermerk(self) -> str | None:
         """Vermerk statt Unterschrift – nennt, wer freigegeben hat, und bei Freigabe auf Anordnung auch den Weg und
-        wer den Plan im System abgeschlossen hat (der Vermerk muss stimmen)."""
+        wer den Plan im System abgeschlossen hat (der Vermerk muss stimmen). Aus dem Altsystem übernommene Pläne
+        tragen statt einer Freigabe ihre Herkunft – eine Freigabe im Sinne des EPM gab es dort nicht."""
+        from epm.api_basis import benutzername
+
+        if self.herkunft == self.Herkunft.ALTSYSTEM:
+            wer = f" von {benutzername(self.erstellt_von)}" if self.erstellt_von_id else ""
+            wann = f"{timezone.localtime(self.erstellt_am):%d.%m.%Y}" if self.erstellt_am else f"{self.gueltig_ab:%d.%m.%Y}"
+            return f"Aus dem Altsystem übernommen; dort angelegt am {wann}{wer}."
         if not self.freigegeben_von_id or not self.freigabe_tag:
             return None
-        from epm.api_basis import benutzername
 
         mediziner, tag = benutzername(self.freigegeben_von), f"{self.freigabe_tag:%d.%m.%Y}"
         if not self.abgeschlossen_von_id:

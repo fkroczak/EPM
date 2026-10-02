@@ -5,6 +5,7 @@ from rest_framework.routers import DefaultRouter
 from accounts import api as konto
 from audit.api import SystemEreignisViewSet, TestdatenViewSet
 from system import api as system
+from altimport import api as altimport
 from system import sicherung_api as backup
 from infusionen.api import InfusionsplanViewSet
 from vorlagen import api as vorlagen
@@ -76,6 +77,17 @@ urlpatterns = [
     path("api/system/epm/", system.EpmAufgabeView.as_view()),
     path("api/system/hinweis/", system.HinweisView.as_view()),
     path("api/system/sitzungen/<int:pk>/", system.SitzungBeendenView.as_view()),
+    # Administration › Import: Übernahme der Altdaten (nur Admin)
+    path("api/altimport/", altimport.StandView.as_view()),
+    path("api/altimport/dump/", altimport.DumpView.as_view()),
+    path("api/altimport/zuordnung/", altimport.ZuordnungView.as_view()),
+    path("api/altimport/probelauf/", altimport.ProbelaufView.as_view()),
+    path("api/altimport/import/", altimport.ImportView.as_view()),
+    path("api/altimport/dokumente/", altimport.DokumenteView.as_view()),
+    path("api/altimport/zuruecknehmen/", altimport.ZuruecknehmenView.as_view()),
+    path("api/altimport/abschliessen/", altimport.AbschliessenView.as_view()),
+    path("api/altimport/laeufe/<int:pk>/", altimport.LaufView.as_view()),
+    path("api/altimport/laeufe/<int:pk>/text/", altimport.LaufView.as_view(), {"text": True}),
     # Administration › Backup (Recht „Sicherungen verwalten“)
     path("api/backup/", backup.UebersichtView.as_view()),
     path("api/backup/jetzt/", backup.JetztView.as_view()),

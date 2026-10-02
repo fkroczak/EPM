@@ -9,6 +9,8 @@ Festlegungen vom 01.10.2026:
   sie nur lesbar (Wieder öffnen, Benutzer, Sicherungen bleiben).
 - Systemverwaltung (Server und EPM, Festlegung 02.10.2026): Standard nur Admin; für eine Vertretung je Gruppe
   freischaltbar. Endgültig löschen (Dokumente, Akten): Mediziner und Admin, Admins auch bei echten Akten.
+- Altdaten übernehmen (Import, F65): nur Admin; anderen Rollen nicht erteilbar. Der Import ist eine bewusste
+  Ausnahme von „Admins schreiben Patientendaten nur bei Testpatienten“ – er legt die übernommenen Akten an.
 Für Betrachter gilt die Rollenmatrix aus dem Entwurf 17.
 
 Was nicht ausdrücklich in der Datenbank steht, kommt aus STANDARD. Testbenutzer erhalten nie
@@ -51,13 +53,15 @@ RECHTE = [
     ("system_verwalten", "Systemverwaltung (Server und EPM)",
      "Auslastung, Ubuntu-Updates, Neustart, Wartung von Datenbank und Dateien, Hinweise an alle Benutzer; Standard nur "
      "Admin, für eine Vertretung (z. B. Urlaub) je Gruppe freischaltbar"),
+    ("altdaten_importieren", "Altdaten übernehmen (Import)",
+     "Dump des Altsystems laden, Zuordnungen pflegen, Probelauf, Import, zurücknehmen, abschließen – nur Admin"),
 ]
 CODES = [code for code, _, _ in RECHTE]
 NAMEN = {code: name for code, name, _ in RECHTE}
 
 _ALLE = set(CODES)
 _ADMIN_SPEZIAL = {"benutzer_verwalten", "akten_wieder_oeffnen", "backup_verwalten", "testdaten_zuruecksetzen",
-                  "system_verwalten"}
+                  "system_verwalten", "altdaten_importieren"}
 
 # Rechte, die Patientendaten verändern (Einträge, Stammdaten, Pläne, Abschluss)
 PATIENTENDATEN_SCHREIBEN = {"eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
@@ -71,8 +75,9 @@ LOESCHEN = {"dokumente_loeschen", "akten_loeschen"}
 # Rechte, die nur bestimmte Rollen haben können; anderen Rollen nicht erteilbar (Festlegungen 02.10.2026:
 # endgültig löschen nur Mediziner und Admin – Admins auch bei echten Akten, Ausnahme von „Admins schreiben
 # Patientendaten nur bei Testpatienten“). Die Systemverwaltung ist Standard nur für Admin, für eine Urlaubsvertretung
-# aber jeder Gruppe erteilbar (Benutzer › Rechte).
-NUR_ROLLEN = {"dokumente_loeschen": {Rolle.MEDIZINER, Rolle.ADMIN}, "akten_loeschen": {Rolle.MEDIZINER, Rolle.ADMIN}}
+# aber jeder Gruppe erteilbar (Benutzer › Rechte). Altdaten übernehmen (F65): nur Admin.
+NUR_ROLLEN = {"dokumente_loeschen": {Rolle.MEDIZINER, Rolle.ADMIN}, "akten_loeschen": {Rolle.MEDIZINER, Rolle.ADMIN},
+              "altdaten_importieren": {Rolle.ADMIN}}
 
 STANDARD = {
     Rolle.BETRACHTER: {"akten_lesen"},
@@ -92,7 +97,8 @@ FEST = {(Rolle.ADMIN, "benutzer_verwalten"), (Rolle.ADMIN, "akten_lesen")}
 
 # Testbenutzer arbeiten nur mit Testpatienten; alles, was darüber hinaus wirkt, bleibt verwehrt
 NUR_ECHTE_BENUTZER = {"versorger_pflegen", "vorlagen_pflegen", "audit_lesen", "benutzer_verwalten",
-                      "backup_verwalten", "testdaten_zuruecksetzen", "akten_wieder_oeffnen", "system_verwalten"}
+                      "backup_verwalten", "testdaten_zuruecksetzen", "akten_wieder_oeffnen", "system_verwalten",
+                      "altdaten_importieren"}
 
 
 def matrix() -> dict:

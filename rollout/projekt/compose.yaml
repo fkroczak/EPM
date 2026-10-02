@@ -38,12 +38,15 @@ services:
       EPM_DOKUMENTE: /data/dokumente
       EPM_LOESCHLISTE: /data/loeschliste/loeschliste.jsonl
       EPM_SYSTEM: /data/system
+      EPM_IMPORT: /data/import
       EPM_VERSION: ${EPM_VERSION}
       TZ: Europe/Berlin
     secrets: [db_password, django_secret_key]
     volumes:
       - ./data/dokumente:/data/dokumente
       - ./data/loeschliste:/data/loeschliste   # Art. 17 DSGVO: übersteht eine Wiederherstellung
+      # Übernahme der Altdaten (Administration › Import): Dokumente des Altsystems unter data/import/PatData/, nur lesen
+      - ./data/import:/data/import:ro
       # Administration › System: Aufträge an den Systemagenten (schreiben), dessen Status (nur lesen)
       - ./system/auftraege:/data/system/auftraege
       - ./system/status:/data/system/status:ro
