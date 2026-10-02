@@ -297,6 +297,10 @@ test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pfl
   await page.goto("/aerzte");
   await page.getByRole("button", { name: "Neuer Arzt" }).click();
   const detail = page.getByTestId("arzt-detail");
+  // erst wenn das leere Formular „Neuer Arzt“ steht: vorher zeigt die Seite noch den ersten Arzt der Liste, und eine
+  // sofort getippte Eingabe ginge beim Umschalten verloren (sporadischer Fehlschlag in CI, Lauf 36945132489)
+  await expect(detail.getByRole("heading", { name: "Neuer Arzt" })).toBeVisible();
+  await expect(detail.getByLabel("Name")).toHaveValue("");
   await detail.getByLabel("Name").fill(arztName);
   await detail.getByLabel("Praxis / Klinik").fill("Praxis Eintrag");
   await detail.getByLabel("Fachrichtung").fill("Allgemeinmedizin");
