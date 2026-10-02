@@ -22,7 +22,7 @@ Es ist keine Rechtsberatung. Wo eine Frage nicht aus dem Gesetz selbst beantwort
 
 | Vorschrift | Inhalt (kurz) | Umsetzung in EPM | Funktion |
 |---|---|---|---|
-| Art. 5 Abs. 1 e DSGVO (Speicherbegrenzung) | Daten nur so lange speichern, wie es der Zweck erfordert | Aufbewahrungsfrist je Akte ab Abschluss (einstellbar, Standard 10 Jahre); Übersicht „Aufbewahrung abgelaufen“ und „läuft in 12 Monaten ab“; Hinweis „Abschluss prüfen“ für lange ruhende Akten, damit die Frist überhaupt beginnt | F74, F81 |
+| Art. 5 Abs. 1 e DSGVO (Speicherbegrenzung) | Daten nur so lange speichern, wie es der Zweck erfordert | Aufbewahrungsfrist je Akte ab Abschluss – bzw. ab dem letzten Kontakt, wenn der später liegt (einstellbar, Standard 10 Jahre); Übersicht „Aufbewahrung abgelaufen“ und „läuft in 12 Monaten ab“; Hinweis „Abschluss prüfen“ für lange ruhende Akten, damit die Frist überhaupt beginnt | F74, F81 |
 | Art. 5 Abs. 2 DSGVO (Rechenschaftspflicht) | Einhaltung nachweisen können | Audit-Log, Verlauf, Löschprotokoll (ohne Namen), Erklärungen mit Datum und Scan | F58, F75, F80 |
 | Art. 7 Abs. 1 und 3 DSGVO | Einwilligung nachweisen; Widerruf jederzeit, wirkt für die Zukunft | Erklärungen je Akte mit Datum, Fassung der Vorlage und Scan; Widerruf mit Datum; Hinweis im Aktenkopf und in „Nach und nach prüfen“, wenn eine Erklärung fehlt | F75 |
 | Art. 9 Abs. 2 a bzw. h, Abs. 3 DSGVO | Gesundheitsdaten nur mit ausdrücklicher Einwilligung oder auf einer der anderen Grundlagen | Vordruck „Einwilligung“ als Dokumentvorlage; welche Grundlage die Stiftung nutzt, ist offen (O1) | F76 |
@@ -33,7 +33,7 @@ Es ist keine Rechtsberatung. Wo eine Frage nicht aus dem Gesetz selbst beantwort
 | Art. 17 Abs. 1 DSGVO | Löschung auf Antrag bzw. wenn der Zweck entfallen ist | Akte endgültig löschen (nur Mediziner, Kennwort + Authenticator-Code + Bestätigungscode): Einträge, Historie, Dateien weg; Audit-Log ohne Namen und Inhalte; Löschprotokoll ohne Namen. Einzelne Dokumente: F73 | F80, F73 |
 | Art. 17 Abs. 3 b und e DSGVO | keine Löschung, soweit eine rechtliche Pflicht zur Aufbewahrung besteht oder die Daten für Rechtsansprüche gebraucht werden | Vor Ablauf der Frist wird nur auf Antrag gelöscht; der Mediziner entscheidet, ob eine Aufbewahrungspflicht entgegensteht – dann Einschränkung statt Löschung | F79, F80 |
 | § 35 Abs. 3 BDSG | Einschränkung statt Löschung, wenn satzungsmäßige oder vertragliche Aufbewahrungsfristen entgegenstehen | Ergebnis „Verarbeitung eingeschränkt statt gelöscht“ einer Anfrage schränkt die Akte ein | F77, F79 |
-| Art. 18 DSGVO | Eingeschränkte Daten werden – von der Speicherung abgesehen – nur noch in engen Fällen verarbeitet; vor dem Aufheben ist die Person zu unterrichten (Abs. 3) | Eingeschränkte Akte erscheint in keiner Liste, Suche oder Auswertung; lesbar nur mit begründeter Einsicht (60 Minuten, im Audit-Log); Aufheben nur mit Datum der Unterrichtung oder Begründung, warum sie entfällt | F79 |
+| Art. 18 DSGVO | Eingeschränkte Daten werden – von der Speicherung abgesehen – nur noch in engen Fällen verarbeitet; vor dem Aufheben ist die Person zu unterrichten (Abs. 3) | Eingeschränkte Akte erscheint in keiner Patientenliste, Suche oder Auswertung; lesbar nur mit begründeter Einsicht (60 Minuten, im Audit-Log). Damit Fristen und Anfragen nicht untergehen, führt die Übersicht „Datenschutz“ sie weiter auf: mit Namen nur für Personen, die Einsicht nehmen dürften, sonst nur mit Nummer; ebenso das Audit-Log. Aufheben nur mit Datum der Unterrichtung oder Begründung, warum sie entfällt | F79, F81 |
 | Art. 32 DSGVO | Sicherheit der Verarbeitung | bestehend: Rollen und Rechte, 2FA, Sperre, Sitzungsende, Audit-Log, Trigger. Neu: Sicherungen 30 Tage, Verschlüsselung der Sicherungen mit `age` vorbereitet (O5) | F61, F66 |
 | § 630f BGB | Dokumentation: Änderungen müssen erkennbar bleiben; Aufbewahrung 10 Jahre nach Abschluss der Behandlung | Verlauf und Versionen unveränderlich (bestehend, F19, F22, F60). Ob § 630f für die Stiftung unmittelbar gilt, ist offen (O1) | F60, F74 |
 | § 203 StGB | Berufsgeheimnis; mitwirkende Dienstleister sind zur Geheimhaltung zu verpflichten | organisatorisch (O6) – nichts im Programm | – |
@@ -54,12 +54,14 @@ den Weg der Freigabe sowie, wer den Plan im System abgeschlossen hat; die E-Mail
 **Menüpunkt „Datenschutz“** (wer Erklärungen/Anfragen erfassen oder entscheiden darf): offene Anfragen nach Frist,
 Akten mit abgelaufener bzw. bald ablaufender Aufbewahrung, eingeschränkte Akten, Löschprotokoll, eingestellte Fristen.
 
-**Startseite „Nach und nach prüfen“:** Erklärungen fehlen · Abschluss prüfen · offene Datenschutz-Anfragen.
+**Startseite „Nach und nach prüfen“:** Erklärungen fehlen · Abschluss prüfen · offene Datenschutz-Anfragen (auch zu
+abgeschlossenen Akten, mit der Zahl der überfälligen).
 
 **Vorlagen › Dokumentvorlagen:** drei neue Vorlagen (Datenschutzinformation, Einwilligung, Schweigepflichtentbindung).
 
 **Vorlagen › Grenzwerte › Datenschutz:** Aufbewahrung nach Abschluss (Jahre), „Abschluss prüfen“ (Monate),
-Aufbewahrung des Audit-Logs (Jahre, 0 = unbegrenzt), Erklärungen, die vorliegen sollen.
+Aufbewahrung des Audit-Logs (Jahre, 0 = unbegrenzt), Erklärungen, die vorliegen sollen. Ändern kann diese Werte nur, wer
+über Datenschutz-Anfragen entscheidet – „Vorlagen pflegen“ allein reicht nicht.
 
 **Rechte** (Benutzer › Rechte, je Gruppe einstellbar):
 
@@ -70,15 +72,23 @@ Aufbewahrung des Audit-Logs (Jahre, 0 = unbegrenzt), Erklärungen, die vorliegen
 | Akten endgültig löschen | – | – | ✓ | – (nur Mediziner) |
 | Infusionspläne nach Freigabe abschließen | – | ✓ | ✓ | ✓ T |
 
-T = nur bei Testpatienten. Admins können eingeschränkte echte Akten nicht einsehen.
+T = nur bei Testpatienten. Admins können eingeschränkte echte Akten nicht einsehen; sie sehen von ihnen – in der
+Übersicht, im Audit-Log – nur die Nummer, im Django-Admin gar nichts. Mitarbeiter (ohne das Recht „entscheiden“) ebenso.
+Wer das Recht „entscheiden“ hat, sieht in der Übersicht „Datenschutz“ und im Audit-Log auch Namen und Grund – sonst
+ließe sich eine Anfrage zu einer eingeschränkten Akte nicht bearbeiten; die Akte selbst öffnet auch diese Person nur
+mit begründeter Einsicht.
 
-**Was beim Löschen einer Akte bleibt:** das Löschprotokoll (Patientennummer, Zeitpunkt, Person, Rechtsgrund, Grund,
-Anzahl der gelöschten Einträge – kein Name) und die Einträge im Audit-Log als „Akte Nr. N (gelöscht)“ ohne Namen,
-Titel und Freitexte. Die Patientennummer wird nicht neu vergeben.
+**Was beim Löschen einer Akte bleibt:** das Löschprotokoll (Patientennummer und interne Kennung, angelegt am,
+abgeschlossen am, Aufbewahrung bis, Rechtsgrund, der eingetragene Grund, Anzahl der gelöschten Einträge, bei einem
+Antrag sein Eingangsdatum, Zeitpunkt, Person – kein Name, nicht der Anlass des Abschlusses) und die Einträge im
+Audit-Log als „Akte Nr. N (gelöscht)“ ohne Namen, Titel und Freitexte. Die Patientennummer wird nicht neu vergeben.
+Ein Dokument, das einer anderen Akte zugeordnet wurde, gehört zu jener Akte und bleibt dort.
 
 **Sicherungen:** Eine ältere Sicherung enthält gelöschte Akten und Dokumente noch bis zu ihrem Ablauf (30 Tage). Jede
-Löschung steht in der Löschliste (`data/loeschliste/loeschliste.jsonl`, ohne Namen); nach einer Wiederherstellung
-löscht das Backend beim Start alles erneut, was die Sicherung zurückgebracht hat (`manage.py epm_loeschungen_nachholen`).
+Löschung steht in der Löschliste (`data/loeschliste/loeschliste.jsonl`: dieselben Angaben wie im Löschprotokoll, kein
+Name); nach einer Wiederherstellung löscht das Backend beim Start alles erneut, was die Sicherung zurückgebracht hat
+(`manage.py epm_loeschungen_nachholen`). Die Löschliste gehört zu genau einem System – nie die eines anderen Systems
+(z. B. einer Testkopie) einspielen.
 
 ## 4. Grenzen der Umsetzung (bewusst so)
 
@@ -86,7 +96,12 @@ löscht das Backend beim Start alles erneut, was die Sicherung zurückgebracht h
   Verarbeitung nicht mehr will, beendet die Betreuung (Akte abschließen), danach wird eingeschränkt oder gelöscht.
 - **Gelöscht wird die ganze Akte**, nicht einzelne Einträge (Ausnahme: ein Dokument, das nicht zur Akte gehört – F73).
   Falsche Angaben werden berichtigt; die frühere Fassung bleibt im Verlauf (§ 630f BGB: Änderungen erkennbar).
-- **Der Grund einer Löschung bleibt** im Löschprotokoll. Die Oberfläche bittet, keine Namen hineinzuschreiben.
+- **Der Grund einer Löschung bleibt** im Löschprotokoll und in der Löschliste. Die Oberfläche bittet, keine Namen
+  hineinzuschreiben; verhindern kann das Programm es nicht.
+- **Die Frist beginnt nicht vor dem letzten Kontakt.** Das Abschlussdatum lässt sich rückwirkend eintragen; liegt ein
+  Kontakt danach, zählt dessen Tag. So macht ein Tippfehler im Jahr eine Akte nicht sofort löschbar.
+- **Gelöscht wird von Hand**, nie automatisch: Die Übersicht zeigt Akten mit abgelaufener Frist, ein Mediziner löscht.
+- **Geänderte Jahre gelten für alle Akten**, auch für bereits abgeschlossene.
 - **Die drei Vordrucke sind Entwürfe.** Sie folgen dem Aufbau von Art. 13 DSGVO bzw. nennen Freiwilligkeit und Widerruf,
   enthalten aber Lücken in [eckigen Klammern] und einen Hinweis zur Prüfung. Bis die Stiftung sie bearbeitet und
   veröffentlicht hat, tragen die PDFs das Wasserzeichen „ENTWURF“.
@@ -104,7 +119,7 @@ löscht das Backend beim Start alles erneut, was die Sicherung zurückgebracht h
 | O6 | Verpflichtung von Netcup und Hetzner zur Geheimhaltung (§ 203 StGB) zusätzlich zum Auftragsverarbeitungsvertrag | liegt nicht vor bzw. nicht bekannt | – (organisatorisch) |
 | O7 | Aufbewahrung der Sicherungen auf der NAS und in der Nextcloud | 30 Tage gelten bisher nur für den Server; liegen Kopien länger auf der NAS, bleiben gelöschte Akten dort länger erhalten | – (organisatorisch; F64 ist noch nicht umgesetzt) |
 | O8 | Sollen Mitarbeiter Pläne auch anlegen dürfen? | Abschließen nach Freigabe dürfen sie jetzt; das Anlegen ist nach der Festlegung vom 01.10.2026 Medizinern vorbehalten und unter Benutzer › Rechte umstellbar | unverändert |
-| O9 | Nachweis bei Freigabe per Telefon oder persönlich | bei E-Mail und schriftlich ist der Nachweis Pflicht; bei Telefon/persönlich gibt es kein Schriftstück | ohne Nachweis möglich, Weg und Datum stehen im Vermerk |
+| O9 | Nachweis bei Freigabe per Telefon oder persönlich | bei E-Mail und schriftlich ist der Nachweis Pflicht; bei Telefon/persönlich gibt es kein Schriftstück. Der genannte Mediziner wird von EPM nicht benachrichtigt – er sieht den Plan mit Vermerk in der Akte, im Verlauf und im Audit-Log | ohne Nachweis möglich, Weg und Datum stehen im Vermerk |
 
 ## 6. Vor der Inbetriebnahme (organisatorisch, nicht im Programm)
 
