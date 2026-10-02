@@ -148,6 +148,9 @@ class _Lauf:
             self.genutzt[art].add(ref["neu"])
         return ref
 
+    # Auffälligkeiten, bei denen ein eingetragener Wert auch dann gilt, wenn er wieder auffällt
+    WERT_GILT = {"unplausibel", "plz"}
+
     def sperre(self, bereich, text):
         if not any(o["bereich"] == bereich and o["text"] == text for o in self.e.offen):
             self.e.offen.append({"bereich": bereich, "text": text})
@@ -163,13 +166,20 @@ class _Lauf:
             titel = JE_NAME[tab].feld(feld).titel
         except (KeyError, StopIteration):
             pass
-        offen = blockiert and entschieden is None
+        # Ein eingetragener Wert, der dieselbe Auffälligkeit wieder auslöst, ist keine Entscheidung: Der Punkt bleibt
+        # offen, bis ein brauchbarer Wert oder eine andere Entscheidung eingetragen ist. Ausnahme: „unplausibel“ und
+        # die vierstellige PLZ – dort ist ein bewusst eingetragener Wert die Entscheidung.
+        untauglich = (entschieden == "wert" and schluessel in self.angewandt and art not in self.WERT_GILT)
+        if untauglich:
+            text = f"{text} Der eingetragene Wert „{k.get('wert', '')}“ behebt das nicht."
+            entschieden = None
+        offen = (blockiert and entschieden is None) or untauglich
         self.e.auffaelligkeiten.append({
             "schluessel": schluessel, "tabelle": tab, "tabelle_titel": JE_NAME[tab].titel, "id": str(kennung),
             "patient": patient, "feld": feld, "feld_titel": titel, "art": art, "text": text,
             "wert": None if roh is None else str(roh)[:200], "roh": None if roh is None else str(roh),
             "standard": standard, "moeglich": moeglich,
-            "eingabe": eingabe, "blockiert": offen, "entscheidung": k if entschieden else None,
+            "eingabe": eingabe, "blockiert": offen, "entscheidung": k if entschieden or untauglich else None,
         })
         if offen:
             self.sperre("auffaelligkeiten", "Es gibt Auffälligkeiten, über die noch entschieden werden muss.")
@@ -305,7 +315,8 @@ class _Lauf:
         if self.reparatur is None:
             return zeilen
         spalten = sorted({i for i in idx.values() if i is not None})
-        aus, anzahl = [], 0
+        aus, anzahl, beispiele = [], 0, []
+        ki = idx.get("nummer" if tab == "patienten" else "benutzername" if tab == "benutzerdaten" else "id")
         for z in zeilen:
             neu = None
             for i in spalten:
@@ -317,9 +328,11 @@ class _Lauf:
                             neu = list(z)
                         neu[i] = r
                         anzahl += 1
+            if neu is not None and ki is not None and z[ki] not in (None, "") and len(beispiele) < BEISPIELE:
+                beispiele.append(str(z[ki]).strip())
             aus.append(neu if neu is not None else z)
         if anzahl:
-            self.repariert[tab] = anzahl
+            self.repariert[tab] = (anzahl, beispiele)
         return aus
 
     # ------------------------------------------------ Benutzer
@@ -350,6 +363,7 @@ class _Lauf:
         vorhanden = [b for b in self.bestand.get("benutzer", []) if not b.get("ist_test")]
         je_id = {b["id"]: b for b in vorhanden}
         je_name = {b["username"].casefold(): b for b in vorhanden}
+        vergeben = {b["username"].casefold() for b in self.bestand.get("benutzer", [])}
         entscheidungen = self.z.get("benutzer") if isinstance(self.z.get("benutzer"), dict) else {}
         self.benutzer_ref = {}
         neu = {}
@@ -389,6 +403,8 @@ class _Lauf:
                     fehler = "Benutzername fehlt oder enthält unzulässige Zeichen (erlaubt: Buchstaben, Ziffern, . _ @ + -)."
                 elif name.casefold() in je_name:
                     fehler = f"Den Benutzernamen „{name}“ gibt es im EPM schon – bitte „vorhandener Benutzer“ wählen."
+                elif name.casefold() in vergeben:
+                    fehler = f"Den Benutzernamen „{name}“ trägt im EPM ein Testbenutzer – bitte einen anderen Benutzernamen eintragen."
                 elif wirksam["art"] == "konto" and wirksam.get("rolle") not in ROLLEN:
                     fehler = "Bitte die Rolle des neuen Kontos wählen."
                 elif any(len(str(wirksam.get(k) or "")) > g for k, g in (("vorname", 150), ("nachname", 150), ("titel", 40))):
@@ -447,8 +463,9 @@ class _Lauf:
             if not firma and not name:
                 vorschlag = {"art": "leer"}
             else:
-                vname = (firma or name)[:LAENGEN["versorger_name"]]
-                aname = (name if firma else "")[:LAENGEN["ansprechpartner_name"]]
+                # nicht kürzen: Ein zu langer Name wird unten als offener Punkt gemeldet und von Hand gekürzt
+                vname = firma or name
+                aname = name if firma else ""
                 treffer = je_name.get(W.schluessel(vname))
                 vorschlag = ({"art": "vorhanden", "id": treffer["id"], "ansprechpartner": aname} if treffer
                              else {"art": "neu", "versorger": vname, "ansprechpartner": aname})
@@ -565,7 +582,7 @@ class _Lauf:
             elif s in je_wert:
                 vorschlag = {"art": "wert", "id": je_wert[s]["id"]}
             else:
-                vorschlag = {"art": "neu", "wert": g["text"][:LAENGEN["auswahlwert"]]}
+                vorschlag = {"art": "neu", "wert": g["text"]}
             wahl = wahl_k.get(s)
             wirksam, fehler = vorschlag, ""
             if isinstance(wahl, dict) and wahl.get("art") in ("wert", "neu", "kein", "leer"):
@@ -706,6 +723,22 @@ class _Lauf:
         teile = re.split(r"\s*\|\s*", text) if mehrere else [text]
         return [t.strip() for t in teile if not W.ist_leer(t)]
 
+    # ------------------------------------------------ Formatierte Texte (Regel 11)
+    def html(self, tab, kennung, text, was) -> str:
+        """Text des Altsystems als formatierter Text – mit Protokoll, wenn er HTML enthält. Nichts geht still verloren:
+        Linkziele und Bilder bleiben als Text stehen; HTML ohne lesbaren Inhalt wird als Quelltext übernommen."""
+        inhalt, war_html = W.als_html(text)
+        if not war_html:
+            return inhalt
+        if W.ohne_lesbaren_text(inhalt):
+            self.p(11, tab, "hinweis", f"{was} enthält nur HTML ohne lesbaren Text → der Quelltext steht als Text im Feld.", kennung)
+            return W.als_html(text, als_text=True)[0]
+        self.p(11, tab, "info", f"{was} enthält HTML → als formatierter Text übernommen und bereinigt.", kennung)
+        if W.BILD.search(text) or W.LINK.search(text):
+            self.p(11, tab, "hinweis", f"{was} enthält Links oder Bilder: Linkziele stehen als Text hinter dem Linktext, "
+                                       f"Bilder werden nicht übernommen (Vermerk im Text).", kennung)
+        return inhalt
+
     # ------------------------------------------------ Texte mit begrenzter Länge
     def begrenzt(self, text, laenge, titel, extras, tab, kennung):
         """Passt der Text nicht ins Zielfeld, steht er vollständig in der Bemerkung; im Feld der gekürzte Anfang."""
@@ -771,10 +804,9 @@ class _Lauf:
         saetze, nummern = [], {}
         nicht = {"geloescht": 0, "ausgelassen": 0, "fehler": 0}
         self.patient_ref = {}     # Nummer im Altsystem (Text) → Patientennummer, soweit übernommen
-        self.patient_bekannt = set()
+        self.patient_bekannt = {self.kennung(tab, z, nr) for nr, z in enumerate(zeilen, 1)}
         for nr, z in enumerate(zeilen, 1):
             kennung = self.kennung(tab, z, nr)
-            self.patient_bekannt.add(kennung)
             # --- im Altsystem gelöscht? Entscheidung je Patient: nicht übernehmen (Standard) oder als abgeschlossene Akte
             abschluss = None
             try:
@@ -838,10 +870,15 @@ class _Lauf:
                 problem = f"Patientennummer {nummer} liegt im Bereich der Testpatienten (ab {self.test_ab})."
             elif nummer in nummern:
                 problem = f"Patientennummer {nummer} kommt mehrfach vor."
+            elif str(nummer) != kennung and str(nummer) in self.patient_bekannt:
+                # eine korrigierte Nummer darf nicht die eines anderen Patienten des Altsystems sein – auch nicht eines
+                # gelöschten: Gewichte, Pläne und der Dokumentenordner dieser Nummer gehören zu jenem Patienten
+                problem = f"Patientennummer {nummer} gehört im Altsystem einem anderen Patienten."
             if problem:
                 self.auffaellig(tab, kennung, "nummer", "nummer", problem, roh, "offen", ["wert", "auslassen"], "zahl",
                                 blockiert=True)
                 nicht["fehler"] += 1
+                self.p(15, tab, "fehler", "Patientennummer nicht verwendbar → Patient wird so nicht übernommen.", kennung)
                 continue
             # --- Geburtsdatum (Pflicht im EPM)
             wert, roh = self.lies(tab, kennung, "geburtsdatum", z)
@@ -854,6 +891,7 @@ class _Lauf:
                                 "Geburtsdatum fehlt oder ist nicht lesbar – im EPM ist es Pflicht.", roh, "offen",
                                 ["wert", "auslassen"], "datum", blockiert=True, patient=nummer)
                 nicht["fehler"] += 1
+                self.p(0, tab, "fehler", "Geburtsdatum fehlt → Patient wird so nicht übernommen.", kennung)
                 continue
             if geburt > self.heute or geburt.year < 1900:
                 self.auffaellig(tab, kennung, "geburtsdatum", "unplausibel", f"Geburtsdatum {_tag(geburt)} ist unplausibel.",
@@ -905,6 +943,7 @@ class _Lauf:
                 elif g < 0:
                     self.auffaellig(tab, kennung, "groesse", "negativ", f"Größe {wert} ist negativ.", roh, "leer",
                                     ["wert", "leer"], "zahl", patient=nummer)
+                    extras.append(W.absatz("Größe (laut Altsystem)", str(roh)))
                 else:
                     if g < 3:
                         self.p(6, tab, "info", "Größe in Metern (unter 3) → in Zentimeter umgerechnet (× 100).", kennung)
@@ -943,9 +982,7 @@ class _Lauf:
             texte = {}
             for feld in ("diagnose", "therapie", "empfehlung"):
                 roh_text = self.text(tab, z, feld)
-                texte[feld], war_html = W.als_html("" if W.ist_leer(roh_text) else roh_text)
-                if war_html:
-                    self.p(11, tab, "info", f"„{JE_NAME[tab].feld(feld).titel}“ enthält HTML → als formatierter Text übernommen und bereinigt.", kennung)
+                texte[feld] = self.html(tab, kennung, "" if W.ist_leer(roh_text) else roh_text, f"„{JE_NAME[tab].feld(feld).titel}“")
             try:
                 geaendert = W.zeitpunkt(self.roh(tab, z, "geaendert"))
             except W.Unlesbar:
@@ -1077,9 +1114,7 @@ class _Lauf:
                 zaehler["leer"] += 1
                 self.p(0, tab, "hinweis", "Kontakt ohne Text → nicht übernommen.", kennung)
                 continue
-            inhalt, war_html = W.als_html(roh_text)
-            if war_html:
-                self.p(11, tab, "info", "Kontakt enthält HTML → als formatierter Text übernommen und bereinigt.", kennung)
+            inhalt = self.html(tab, kennung, roh_text, "Kontakt")
             wert, roh = self.lies(tab, kennung, "zeit", z)
             try:
                 zeit = W.zeitpunkt(wert)
@@ -1252,8 +1287,8 @@ class _Lauf:
                     pass
                 extras.append(W.absatz(f"{titel} (laut Altsystem)", f"{t} {einheit}".strip()))
                 self.p(13, tab, "hinweis", f"„{titel}“ ist gefüllt: Das EPM hat dafür kein eigenes Feld, der Wert steht in der Bemerkung.", kennung)
-            kommentar, war_html = W.als_html("" if W.ist_leer(self.text(tab, z, "kommentar")) else self.text(tab, z, "kommentar"))
-            satz["bemerkung"] = kommentar
+            kommentar = self.text(tab, z, "kommentar")
+            satz["bemerkung"] = self.html(tab, kennung, "" if W.ist_leer(kommentar) else kommentar, "„Kommentar“")
             satz["bemerkung_extras"] = extras
             saetze.append(satz)
         # Status und Vorgänger: je Patient nach Datum; der jüngste Plan ist der aktuelle (Regel 16)
@@ -1296,8 +1331,10 @@ class _Lauf:
                 "entscheidung": k,
             })
             self.p(0, tab, "hinweis", f"„{JE_NAME[tab].feld(feld).titel}“ von der Administration korrigiert.", kennung)
-        for tab, n in sorted(self.repariert.items()):
+        for tab, (n, beispiele) in sorted(self.repariert.items()):
             self.p(3, tab, "info", "Doppelt kodierte Umlaute repariert (Felder).", anzahl=n)
+            for kennung in beispiele:
+                self.p(3, tab, "info", "Doppelt kodierte Umlaute repariert (Felder).", kennung, anzahl=0)
         for tab in ("gewichte", "kontakte", "infusionen"):
             n = self.e.zahlen.get(tab, {}).get("nicht", {}).get("patient_nicht_uebernommen")
             if n:

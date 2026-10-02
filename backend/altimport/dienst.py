@@ -24,7 +24,7 @@ from pathlib import Path
 
 from django.apps import apps
 from django.conf import settings
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.db.models import ProtectedError, RestrictedError
 from django.utils import timezone
 
@@ -138,6 +138,7 @@ def dump_laden(daten: bytes, name: str, benutzer, request=None) -> Importstand:
                         if stand.status == S.IMPORTIERT else "Die Übernahme ist abgeschlossen.")
     ergebnis = dump.lies(daten)
     entfernt = dump.ohne_kennwoerter(ergebnis["tabellen"])
+    zeit_hinweise = dump.zeitstempel_in_ortszeit(ergebnis["tabellen"], ergebnis.get("zeitzone"), settings.TIME_ZONE)
     Alttabelle.objects.all().delete()
     Alttabelle.objects.bulk_create([
         Alttabelle(name=n[:100], spalten=t["spalten"], typen=t.get("typen", {}), entfernt=t.get("entfernt", []),
@@ -146,6 +147,7 @@ def dump_laden(daten: bytes, name: str, benutzer, request=None) -> Importstand:
     if entfernt:
         hinweise.append("Kennwörter werden nicht übernommen (Regel 1) – geleert und nicht gespeichert: "
                         + ", ".join(f"{t}.{s}" for t, s in entfernt) + ".")
+    hinweise.extend(zeit_hinweise)
     stand.status = S.GELADEN
     stand.dump_name = (name or "dump.sql")[:255]
     stand.dump_sha256 = hashlib.sha256(daten).hexdigest()
@@ -453,6 +455,16 @@ def _pruefe_geschrieben(e: umsetzung.Ergebnis, geschrieben: dict):
         raise RuntimeError(f"Historie unvollständig: {historie} Fassungen für {soll['patienten']} Akten.")
 
 
+def _fehlertext(f: Exception) -> str:
+    """Fehler für das Protokoll des Laufs. Bei Datenbankfehlern nur die erste Zeile: PostgreSQL nennt darunter die
+    ganze betroffene Zeile („Failing row contains …“) – Patientendaten gehören nicht ins Protokoll."""
+    text = str(f).strip()
+    if isinstance(f, DatabaseError):
+        erste = text.splitlines()[0] if text else ""
+        return f"{type(f).__name__}: {erste[:500]} (Einzelheiten im Protokoll des Servers)"
+    return f"{type(f).__name__}: {text[:2000]}"
+
+
 def _lauf(art, benutzer, stand) -> Importlauf:
     return Importlauf(art=art, benutzer=benutzer, dump_name=stand.dump_name, dump_sha256=stand.dump_sha256)
 
@@ -478,7 +490,7 @@ def probelauf(benutzer) -> Importlauf:
             lauf.erfolgreich = True
         except Exception as f:  # noqa: BLE001 – der Probelauf soll jeden Fehler zeigen, nicht abbrechen
             log.exception("Probelauf der Altdaten-Übernahme fehlgeschlagen")
-            lauf.fehler = f"{type(f).__name__}: {f}"
+            lauf.fehler = _fehlertext(f)
     lauf.beendet_am = timezone.now()
     lauf.save()
     return lauf
@@ -509,7 +521,7 @@ def importiere(benutzer, request=None) -> Importlauf:
         lauf.erfolgreich = True
     except Exception as f:  # noqa: BLE001 – Fehler festhalten statt einer Seite „Serverfehler“
         log.exception("Import der Altdaten fehlgeschlagen")
-        lauf.fehler = f"{type(f).__name__}: {f}"
+        lauf.fehler = _fehlertext(f)
     lauf.beendet_am = timezone.now()
     lauf.save()
     return lauf
@@ -578,6 +590,9 @@ def zuruecknehmen(benutzer, request=None) -> Importlauf:
                 if not _entferne_wenn_unbenutzt(modell, pk):
                     behalten[art] = behalten.get(art, 0) + 1
         Importobjekt.objects.all().delete()
+    # eine begonnene Dokumentenübernahme gehört zu diesem Import – sie wird nicht mit dem nächsten fortgesetzt
+    Importlauf.objects.filter(art=Importlauf.Art.DOKUMENTE, beendet_am__isnull=True).update(
+        beendet_am=timezone.now(), fehler="Nicht abgeschlossen: Der Import wurde zurückgenommen.")
     for _, nummer, _, _ in akten:
         transaction.on_commit(lambda n=nummer: dateien_entfernen(n), robust=True)
     stand.status = S.GELADEN if Alttabelle.objects.exists() else S.LEER
@@ -602,16 +617,22 @@ def abschliessen(benutzer, request=None, ohne_dokumente: bool = False) -> Import
         raise Hindernis("Abschließen ist erst möglich, wenn die Altdaten übernommen sind."
                         if stand.status != S.ABGESCHLOSSEN else "Die Übernahme ist bereits abgeschlossen.")
     offen = dokumente_stand(stand)
-    if offen["vorhanden"] and offen["offen"] and not ohne_dokumente:
-        raise Hindernis(f"Es sind noch {offen['offen']} Dokumente nicht übernommen. Bitte zuerst die Dokumente "
-                        f"übernehmen – oder ausdrücklich ohne sie abschließen.")
+    if offen["vorhanden"] and (offen["offen"] or offen["unlesbar"]) and not ohne_dokumente:
+        raise Hindernis(f"Es sind noch {offen['offen']} Dokumente nicht übernommen und {offen['unlesbar']} Ordner oder "
+                        f"Dateien nicht lesbar. Bitte zuerst die Dokumente übernehmen – oder ausdrücklich ohne sie abschließen.")
     lauf = _lauf(Importlauf.Art.ABGESCHLOSSEN, benutzer, stand)
-    lauf.zahlen = {"bestand": bestand_der_uebernahme(), "dokumente_offen": offen["offen"] if offen["vorhanden"] else 0}
+    lauf.zahlen = {"bestand": bestand_der_uebernahme(), "dokumente_offen": offen["offen"] if offen["vorhanden"] else 0,
+                   "dokumente_unlesbar": offen["unlesbar"] if offen["vorhanden"] else 0}
     Alttabelle.objects.all().delete()
     Importobjekt.objects.all().delete()
-    for alt in Importlauf.objects.exclude(protokoll=[]):
-        alt.protokoll = [{**p, "beispiele": []} for p in alt.protokoll if isinstance(p, dict)]
-        alt.save(update_fields=["protokoll"])
+    # Protokolle: Zählungen bleiben; einzelne Nummern (Beispiele) und Fehlertexte mit Nummern verschwinden
+    for alt in Importlauf.objects.all():
+        alt.protokoll = [{**p, "beispiele": []} for p in (alt.protokoll or []) if isinstance(p, dict)]
+        if alt.fehler:
+            alt.fehler = "Nicht erfolgreich (Einzelheiten mit dem Abschließen entfernt)."
+        alt.save(update_fields=["protokoll", "fehler"])
+    Importlauf.objects.filter(art=Importlauf.Art.DOKUMENTE, beendet_am__isnull=True).update(
+        beendet_am=timezone.now(), fehler="Nicht abgeschlossen: Die Übernahme wurde ohne die offenen Dokumente abgeschlossen.")
     stand.status, stand.zuordnung, stand.dump_hinweise = S.ABGESCHLOSSEN, {}, []
     stand.abgeschlossen_am, stand.abgeschlossen_von = timezone.now(), benutzer
     stand.save()
@@ -690,65 +711,114 @@ def dokumentdatum(pfad: Path, mime: str) -> tuple[date, str]:
     return date.fromtimestamp(pfad.stat().st_mtime), Q.DATEIDATUM
 
 
+def _lesbar(name: str) -> str:
+    """Datei- oder Ordnername für Anzeige, Titel und Schlüssel. Namen, die auf dem Server nicht als UTF-8 vorliegen
+    (alte Kodierung des Altsystems), werden als Windows-1252 gelesen – sonst ließen sie sich nicht speichern."""
+    def teil(t):
+        try:
+            t.encode("utf-8")
+            return t
+        except UnicodeEncodeError:
+            return os.fsencode(t).decode("cp1252", "replace")
+
+    return "/".join(teil(t) for t in name.split("/"))
+
+
+def _ordnerschluessel(name: str) -> str:
+    """Ordnername → Patientennummer des Altsystems („007“ = „7“); anderes bleibt, wie es ist."""
+    if name.isdecimal():
+        try:
+            return str(int(name))
+        except ValueError:
+            pass
+    return _lesbar(name)
+
+
 def dokumente_stand(stand: Importstand | None = None, mit_dateien: bool = False) -> dict:
-    """Überblick über den Dokumentenordner: was da ist, was schon übernommen ist, was nicht übernommen wird."""
+    """Überblick über den Dokumentenordner: was da ist, was schon übernommen ist, was nicht übernommen wird.
+    Die Ordner tragen die Patientennummer des ALTsystems – zugeordnet wird über das, was der Import zu jedem
+    übernommenen Patienten festgehalten hat (auch wenn die Nummer bei der Übernahme korrigiert wurde)."""
     stand = stand or Importstand.aktuell()
     wurzel = dokumentenordner()
     aus = {"vorhanden": wurzel.is_dir(), "pfad": str(wurzel), "ordner": 0, "dateien": 0, "bytes": 0, "erledigt": 0,
            "offen": 0, "offen_bytes": 0, "ohne_patient": [], "nicht_uebernommen": [], "nicht_uebernommen_anzahl": 0,
-           "ohne_patient_anzahl": 0, "frei_bytes": None}
+           "ohne_patient_anzahl": 0, "unlesbar": 0, "frei_bytes": None}
     if not aus["vorhanden"]:
+        return aus
+    try:
+        eintraege = sorted(os.scandir(wurzel), key=lambda x: x.name)
+    except OSError:
+        aus["vorhanden"] = False   # vorhanden, aber für das Backend nicht lesbar: wie „fehlt“ (Hinweis in der Oberfläche)
         return aus
     try:
         aus["frei_bytes"] = shutil.disk_usage(settings.EPM_DOKUMENTE).free
     except OSError:
         pass
-    akten = dict(uebernommene_akten().values_list("nummer", "id")) if stand.status == S.IMPORTIERT else None
+    akten = None
+    if stand.status == S.IMPORTIERT:
+        nummern = dict(uebernommene_akten().values_list("id", "nummer"))
+        akten = {schluessel: (pk, nummern[pk]) for schluessel, pk in
+                 Importobjekt.objects.filter(art=O.PATIENT).values_list("schluessel", "objekt_id") if pk in nummern}
     erledigt = set(Importobjekt.objects.filter(art=O.DATEI).values_list("schluessel", flat=True))
     offen = []
 
-    def nicht(pfad, grund):
+    def nicht(pfad, grund, unlesbar=False):
         aus["nicht_uebernommen_anzahl"] += 1
+        aus["unlesbar"] += 1 if unlesbar else 0
         if len(aus["nicht_uebernommen"]) < 100:
-            aus["nicht_uebernommen"].append({"pfad": pfad, "grund": grund})
+            aus["nicht_uebernommen"].append({"pfad": _lesbar(pfad), "grund": grund})
 
-    for eintrag in sorted(os.scandir(wurzel), key=lambda x: x.name):
+    def relativ(pfad) -> str:
+        return Path(pfad).relative_to(wurzel).as_posix()
+
+    for eintrag in eintraege:
+        if eintrag.is_symlink():
+            nicht(eintrag.name, "Verknüpfung – wird nicht verfolgt")
+            continue
         if not eintrag.is_dir(follow_symlinks=False):
             nicht(eintrag.name, "liegt nicht in einem Patientenordner")
             continue
         aus["ordner"] += 1
-        nummer = int(eintrag.name) if eintrag.name.isdigit() else None
-        dateien = []
-        for ordner, unterordner, namen in os.walk(eintrag.path, followlinks=False):
+        schluessel = _ordnerschluessel(eintrag.name)
+        dateien, fehler = [], []
+        for ordner, unterordner, namen in os.walk(eintrag.path, followlinks=False, onerror=fehler.append):
             unterordner.sort()
+            for name in unterordner:
+                if os.path.islink(os.path.join(ordner, name)):
+                    nicht(relativ(os.path.join(ordner, name)), "Verknüpfung auf einen Ordner – wird nicht verfolgt")
             for name in sorted(namen):
                 voll = Path(ordner) / name
-                dateien.append((voll, voll.relative_to(wurzel).as_posix()))
+                dateien.append((voll, _lesbar(relativ(voll))))
+        for f in fehler:
+            nicht(relativ(f.filename) if f.filename else eintrag.name, "Ordner nicht lesbar (Zugriffsrechte)", unlesbar=True)
         aus["dateien"] += len(dateien)
-        if akten is not None and (nummer is None or nummer not in akten):
+        if akten is not None and schluessel not in akten:
             aus["ohne_patient_anzahl"] += 1
             if len(aus["ohne_patient"]) < 100:
-                aus["ohne_patient"].append({"ordner": eintrag.name, "dateien": len(dateien)})
+                aus["ohne_patient"].append({"ordner": _lesbar(eintrag.name), "dateien": len(dateien)})
             continue
-        for voll, relativ in dateien:
-            if voll.is_symlink() or not voll.is_file():
-                nicht(relativ, "Verknüpfung, keine Datei")
-                continue
-            groesse = voll.stat().st_size
-            aus["bytes"] += groesse
-            if relativ in erledigt:
-                aus["erledigt"] += 1
-            elif groesse == 0:
-                nicht(relativ, "leere Datei")
-            elif voll.suffix.lower() in NICHT_ERLAUBT:
-                nicht(relativ, "Dateityp war schon im Altsystem nicht zugelassen")
-            elif dateityp(voll) is None:
-                nicht(relativ, "Dateityp wird vom EPM nicht angenommen (PDF, Bilder und Text)")
-            else:
-                aus["offen"] += 1
-                aus["offen_bytes"] += groesse
-                if mit_dateien:
-                    offen.append((voll, relativ, nummer, groesse))
+        for voll, rel in dateien:
+            try:
+                if voll.is_symlink() or not voll.is_file():
+                    nicht(rel, "Verknüpfung, keine Datei")
+                    continue
+                groesse = voll.stat().st_size
+                aus["bytes"] += groesse
+                if rel in erledigt:
+                    aus["erledigt"] += 1
+                elif groesse == 0:
+                    nicht(rel, "leere Datei")
+                elif voll.suffix.lower() in NICHT_ERLAUBT:
+                    nicht(rel, "Dateityp war schon im Altsystem nicht zugelassen")
+                elif dateityp(voll) is None:
+                    nicht(rel, "Dateityp wird vom EPM nicht angenommen (PDF, Bilder und Text)")
+                else:
+                    aus["offen"] += 1
+                    aus["offen_bytes"] += groesse
+                    if mit_dateien:
+                        offen.append((voll, rel, schluessel, groesse))
+            except OSError:
+                nicht(rel, "Datei nicht lesbar (Zugriffsrechte)", unlesbar=True)
     if mit_dateien:
         aus["_offen"] = offen
         aus["_akten"] = akten or {}
@@ -791,24 +861,38 @@ def dokumente_uebernehmen(benutzer, request=None, max_dateien=200, max_bytes=256
     typ, _ = Auswahlwert.objects.get_or_create(liste=Auswahlwert.Liste.DOKUMENTTYP, wert="Sonstiges",
                                                defaults={"reihenfolge": 990})
     beginn = time.monotonic()
-    neu, kopiert, summe, schluessel = [], [], 0, []
+    neu, kopiert, summe, schluessel, probleme = [], [], 0, [], []
     frei = uebersicht["frei_bytes"]
+    reparatur = W.ftfy_reparatur()
     try:
-        for voll, relativ, nummer, groesse in offen:
+        for voll, relativ, alt, groesse in offen:
             if len(neu) >= max_dateien or (neu and summe + groesse > max_bytes) or time.monotonic() - beginn > max_sekunden:
                 break
             if frei is not None and frei - summe - groesse < 200 * MB:
                 raise Hindernis("Der Speicherplatz für Dokumente reicht nicht mehr (weniger als 200 MB frei).")
-            mime = dateityp(voll)
-            datum, quelle = dokumentdatum(voll, mime)
-            endung = "".join(c for c in voll.suffix[1:] if c.isalnum())[:10].lower()
+            patient_id, nummer = akten[alt]
+            endung = "".join(c for c in voll.suffix[1:] if c.isascii() and c.isalnum())[:10].lower()
             datei = f"{nummer}/{uuid.uuid4().hex}{'.' + endung if endung else ''}"
             ziel = settings.EPM_DOKUMENTE / datei
-            sha = _kopiere(voll, ziel)
+            try:
+                mime = dateityp(voll)
+                if mime is None:
+                    raise OSError("Dateityp nicht mehr erkennbar")
+                datum, quelle = dokumentdatum(voll, mime)
+                sha = _kopiere(voll, ziel)
+            except OSError as f:
+                # eine einzelne Datei hält die Übernahme nicht auf; sie bleibt offen und wird genannt
+                log.warning("Altdaten: Datei nicht übernommen (%s): %s", type(f).__name__, relativ)
+                probleme.append({"pfad": relativ, "grund": "beim Kopieren nicht lesbar"})
+                continue
             kopiert.append(ziel)
+            name = Path(relativ).name
             unterpfad = Path(relativ).relative_to(Path(relativ).parts[0])
-            d = Dokument(patient_id=akten[nummer], typ=typ, titel=unterpfad.with_suffix("").as_posix()[:200] or voll.name[:200],
-                         datum=datum, datei=datei, originalname=voll.name[:255], mime=mime, groesse=groesse, sha256=sha,
+            titel = unterpfad.with_suffix("").as_posix() or name
+            if reparatur is not None and W.VERDACHT.search(titel):
+                titel = reparatur(titel)   # Regel 3 gilt auch für Dateinamen (der Originalname bleibt, wie er war)
+            d = Dokument(patient_id=patient_id, typ=typ, titel=titel[:200],
+                         datum=datum, datei=datei, originalname=name[:255], mime=mime, groesse=groesse, sha256=sha,
                          herkunft=Dokument.Herkunft.ALTSYSTEM, datum_quelle=quelle, typ_geprueft=False)
             d._history_user, d._change_reason = None, GRUND
             neu.append(d)
@@ -825,7 +909,7 @@ def dokumente_uebernehmen(benutzer, request=None, max_dateien=200, max_bytes=256
     rest = uebersicht["offen"] - len(neu)
     ergebnis = {"uebernommen": len(neu), "bytes": summe, "offen": max(rest, 0),
                 "offen_bytes": uebersicht["offen_bytes"] - summe, "erledigt": uebersicht["erledigt"] + len(neu),
-                "fertig": rest <= 0}
+                "fertig": rest <= 0, "probleme": probleme[:50]}
     lauf = Importlauf.objects.filter(art=Importlauf.Art.DOKUMENTE, beendet_am__isnull=True).order_by("-id").first()
     if lauf is None:
         if not neu:

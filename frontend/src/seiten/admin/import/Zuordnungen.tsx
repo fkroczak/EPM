@@ -42,7 +42,7 @@ function Fehlertext({ text }: { text: string }) {
 }
 
 // ---------------------------------------------------------------- Tabellen und Spalten
-function Spalten({ stand, speichern }: { stand: Zuordnungsstand; speichern: Speichern }) {
+function Spalten({ stand, speichern, laeuft }: { stand: Zuordnungsstand; speichern: Speichern; laeuft: boolean }) {
   const q = stand.quelle;
   const ignorierteTabellen = q.uebrig.filter((u) => u.art === "ignoriert").map((u) => u.tabelle);
   return (
@@ -97,9 +97,9 @@ function Spalten({ stand, speichern }: { stand: Zuordnungsstand; speichern: Spei
                     <span className="num">{r.spalte}</span>
                     {r.art === "offen" ? <Chip art="warn"><Icon name="warnung" />nicht zugeordnet</Chip> : <Chip>wird nicht übernommen</Chip>}
                     <span className="text-[0.8125rem] gedaempft">{r.grund}</span>
-                    {r.art === "offen" ? <Knopf klein onClick={() => speichern({ bereich: "spalten_ignoriert", aenderungen: { [t.name]: [...ignoriert, r.spalte] } })}
+                    {r.art === "offen" ? <Knopf klein disabled={laeuft} onClick={() => speichern({ bereich: "spalten_ignoriert", aenderungen: { [t.name]: [...ignoriert, r.spalte] } })}
                       aria-label={`Spalte ${r.spalte} nicht übernehmen`}>Nicht übernehmen</Knopf> : null}
-                    {r.art === "ignoriert" ? <Knopf klein variante="geist" onClick={() => speichern({ bereich: "spalten_ignoriert",
+                    {r.art === "ignoriert" ? <Knopf klein variante="geist" disabled={laeuft} onClick={() => speichern({ bereich: "spalten_ignoriert",
                       aenderungen: { [t.name]: ignoriert.filter((s) => s !== r.spalte) } })}>Zurücknehmen</Knopf> : null}
                   </div>
                 ))}
@@ -116,8 +116,8 @@ function Spalten({ stand, speichern }: { stand: Zuordnungsstand; speichern: Spei
               <span className="num">{u.tabelle}</span><span className="gedaempft">{zahl(u.zeilen)} Zeilen</span>
               {u.art === "offen" ? <Chip art="warn"><Icon name="warnung" />nicht zugeordnet</Chip> : <Chip>wird nicht übernommen</Chip>}
               {u.art === "offen"
-                ? <Knopf klein onClick={() => speichern({ bereich: "tabellen_ignoriert", aenderungen: [...ignorierteTabellen, u.tabelle] })}>Nicht übernehmen</Knopf>
-                : <Knopf klein variante="geist" onClick={() => speichern({ bereich: "tabellen_ignoriert",
+                ? <Knopf klein disabled={laeuft} onClick={() => speichern({ bereich: "tabellen_ignoriert", aenderungen: [...ignorierteTabellen, u.tabelle] })}>Nicht übernehmen</Knopf>
+                : <Knopf klein variante="geist" disabled={laeuft} onClick={() => speichern({ bereich: "tabellen_ignoriert",
                   aenderungen: ignorierteTabellen.filter((n) => n !== u.tabelle) })}>Zurücknehmen</Knopf>}
             </div>
           ))}
@@ -596,7 +596,7 @@ export function Zuordnungen({ daten, speichern, laeuft, fehler }: { daten: Zuord
       {fehler}
       <Segmente label="Bereich der Zuordnungen" wert={teil} onWahl={setTeil}
         werte={TEILE.map((t) => ({ wert: t.wert, text: offen(t.wert) ? `${t.text} (${offen(t.wert)})` : t.text }))} className="self-start flex-wrap" />
-      {teil === "spalten" ? <Spalten stand={stand} speichern={speichern} /> : null}
+      {teil === "spalten" ? <Spalten stand={stand} speichern={speichern} laeuft={laeuft} /> : null}
       {teil === "benutzer" ? <BenutzerTeil stand={stand} bestand={bestand} rollen={auswahl.rollen} speichern={speichern} /> : null}
       {teil === "versorger" ? <VersorgerTeil stand={stand} bestand={bestand} speichern={speichern} /> : null}
       {teil === "werte" ? <WerteTeil stand={stand} bestand={bestand} speichern={speichern} /> : null}

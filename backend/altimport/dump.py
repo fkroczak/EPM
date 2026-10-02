@@ -64,7 +64,7 @@ _NAME = r"(?:`(?:[^`]|``)+`|\"[^\"]+\"|[A-Za-z_][\w$]*)"
 _KOPF_CREATE = re.compile(rf"\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?((?:{_NAME}\s*\.\s*)?{_NAME})\s*\(", re.I)
 _KOPF_INSERT = re.compile(
     rf"\s*(?:INSERT|REPLACE)\s+(?:LOW_PRIORITY\s+|DELAYED\s+|HIGH_PRIORITY\s+)?(?:IGNORE\s+)?(?:INTO\s+)?"
-    rf"((?:{_NAME}\s*\.\s*)?{_NAME})\s*(\((?:\s*{_NAME}\s*,?)+\))?\s*VALUES?\s*",
+    rf"((?:{_NAME}\s*\.\s*)?{_NAME})\s*(\(\s*{_NAME}(?:\s*,\s*{_NAME})*\s*\))?\s*VALUES?\s*",
     re.I,
 )
 _SPALTE = re.compile(rf"\s*({_NAME})\s+([A-Za-z]+(?:\s*\([^)]*\))?(?:\s+unsigned)?)", re.I)
@@ -269,7 +269,51 @@ def lies(daten: bytes) -> dict:
                          "Erwartet wird ein MySQL-Dump als .sql oder .sql.gz.")
     if nul:
         hinweise.append(f"{nul} Werte enthielten Nullzeichen; sie wurden entfernt.")
-    return {"tabellen": tabellen, "kodierung": kodierung, "hinweise": hinweise}
+    z = _ZEITZONE.search(text, 0, 1 << 20)
+    return {"tabellen": tabellen, "kodierung": kodierung, "hinweise": hinweise, "zeitzone": z.group(1) if z else None}
+
+
+# ---------------------------------------------------------------- TIMESTAMP-Spalten: Zeitzone des Dumps (Regel 2)
+# mysqldump (Vorgabe --tz-utc) und phpMyAdmin setzen die Sitzung auf UTC: Dann stehen TIMESTAMP-Spalten in UTC im
+# Dump, DATETIME-Spalten unverändert in der Zeit, in der sie gespeichert wurden.
+_ZEITZONE = re.compile(r"SET\s+(?:@@session\.)?TIME_ZONE\s*=\s*['\"]([+-]\d\d:\d\d)['\"]", re.I)
+_ZEITWERT = re.compile(r"(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d):(\d\d)(\.\d+)?")
+
+
+def zeitstempel_in_ortszeit(tabellen: dict, zeitzone: str | None, ortszeit: str = "Europe/Berlin") -> list[str]:
+    """Werte der TIMESTAMP-Spalten aus der Zeitzone des Dumps in Ortszeit umrechnen (an Ort und Stelle).
+    Liefert Hinweise für die Anzeige. DATETIME-, DATE- und Textspalten bleiben unberührt."""
+    from datetime import datetime, timedelta, timezone
+    from zoneinfo import ZoneInfo
+
+    spalten = [(name, s) for name, t in tabellen.items() for s in t["spalten"]
+               if str(t.get("typen", {}).get(s, "")).startswith("timestamp")]
+    if not spalten:
+        return []
+    genannt = ", ".join(f"{n}.{s}" for n, s in spalten)
+    if zeitzone is None:
+        return [f"TIMESTAMP-Spalten ({genannt}): Der Dump nennt keine Zeitzone (SET TIME_ZONE fehlt) – die Zeitpunkte "
+                f"werden als Ortszeit gelesen."]
+    vz = -1 if zeitzone[0] == "-" else 1
+    quelle = timezone(vz * timedelta(hours=int(zeitzone[1:3]), minutes=int(zeitzone[4:6])))
+    ziel = ZoneInfo(ortszeit)
+    anzahl = 0
+    for name, spalte in spalten:
+        t = tabellen[name]
+        i = t["spalten"].index(spalte)
+        for z in t["zeilen"]:
+            w = z[i]
+            m = _ZEITWERT.fullmatch(w.strip()) if isinstance(w, str) else None
+            if m is None or m.group(1) == "0000":
+                continue
+            try:
+                alt = datetime(*(int(x) for x in m.groups()[:6]), tzinfo=quelle)
+            except ValueError:
+                continue
+            z[i] = alt.astimezone(ziel).strftime("%Y-%m-%d %H:%M:%S") + (m.group(7) or "")
+            anzahl += 1
+    return [f"TIMESTAMP-Spalten ({genannt}) stehen im Dump in der Zeitzone {zeitzone} (SET TIME_ZONE): "
+            f"{anzahl} Zeitpunkte wurden in Ortszeit ({ortszeit}) umgerechnet."]
 
 
 # ---------------------------------------------------------------- Kennwörter nie speichern (Regel 1)

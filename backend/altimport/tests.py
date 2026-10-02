@@ -138,6 +138,23 @@ class DumpLaden(Basis):
         self.assertEqual(Importstand.aktuell().zuordnung, {"werte": {"nickel": {"vielleicht": "unbekannt"}}})
         self.assertEqual(self.a.delete("/api/altimport/dump/").status_code, 409)
 
+    def test_timestamp_spalten_werden_in_ortszeit_umgerechnet(self):
+        """mysqldump schreibt TIMESTAMP-Spalten in UTC (SET TIME_ZONE='+00:00'); DATETIME-Spalten bleiben, wie sie sind."""
+        daten = BEISPIEL.read_bytes().replace(
+            b"CREATE TABLE `kontakte` (", b"CREATE TABLE `kontakte_x` (").replace(b"INSERT INTO `kontakte`", b"INSERT INTO `kontakte_x`")
+        daten += ("CREATE TABLE `kontakte` (`ID` int, `PatID` int, `kontakt` text, `lastchange` timestamp NOT NULL, `edit` varchar(50));\n"
+                  "INSERT INTO `kontakte` VALUES (1,1,'Anruf kurz nach Mitternacht (erfunden)','2023-06-30 22:30:00','e.beispiel');\n").encode()
+        d = self.lade(daten).json()
+        self.assertIn("kontakte.lastchange", d["dump"]["hinweise"][-1])
+        self.assertIn("1 Zeitpunkte wurden in Ortszeit (Europe/Berlin) umgerechnet", d["dump"]["hinweise"][-1])
+        self.assertEqual(Alttabelle.objects.get(name="kontakte").zeilen[0][3], "2023-07-01 00:30:00")
+        self.assertEqual(Alttabelle.objects.get(name="gewichte").zeilen[0][3], "2023-01-10 09:00:00")   # DATETIME bleibt
+        self.speichere("tabellen_ignoriert", ["kontakte_x"])
+        self.assertEqual(self.entscheide()["stand"]["offen"], [])
+        r = self.a.post("/api/altimport/import/", {"kennwort": KENNWORT, "code": self.codes.pop()}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(Kontakt.objects.get().zeitpunkt, ortszeit(2023, 7, 1, 0, 30))
+
     def test_unlesbare_dateien(self):
         for daten, erwartet in ((b"kein dump", "keine Tabellen"), (b"\x1f\x8bkaputt", "beschädigt"),
                                 (b"CREATE TABLE `t` (`a` int);\nINSERT INTO `t` VALUES ('abc", "nicht geschlossen")):
@@ -509,6 +526,68 @@ class Dokumente(Basis):
         self.assertEqual(self.a.post("/api/altimport/dokumente/").json()["uebernommen"], 1)
 
 
+    def test_ordner_traegt_die_nummer_des_altsystems(self):
+        """Eine bei der Übernahme korrigierte Patientennummer ändert nichts am Dokumentenordner: Er heißt wie im Altsystem."""
+        self.assertEqual(self.lade(BEISPIEL.read_bytes().replace(b"(1,'Musterfrau'", b"(9500,'Musterfrau'")).status_code, 201)
+        self.entscheide()
+        # die Nummer eines anderen Patienten des Altsystems (auch eines gelöschten) ist nicht wählbar
+        stand = self.speichere("korrekturen", {"patienten:9500:nummer": {"art": "wert", "wert": "6"}})["stand"]
+        self.assertTrue(any(o["bereich"] == "auffaelligkeiten" for o in stand["offen"]))
+        r = self.a.post("/api/altimport/import/", {"kennwort": KENNWORT, "code": self.codes.pop()}, format="json")
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(self.speichere("korrekturen", {"patienten:9500:nummer": {"art": "wert", "wert": "8"}})["stand"]["offen"], [])
+        r = self.a.post("/api/altimport/import/", {"kennwort": KENNWORT, "code": self.codes.pop()}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(self.akte(8).nachname, "Musterfrau")
+        self.lege("9500/brief.txt", b"gehoert zu Musterfrau")
+        self.lege("8/fremd.txt", b"im Altsystem gab es keinen Patienten 8")
+        self.lege("0002/alt.txt", b"Ordner mit fuehrenden Nullen")
+        d = self.a.get("/api/altimport/dokumente/").json()
+        self.assertEqual((d["offen"], [x["ordner"] for x in d["ohne_patient"]]), (2, ["8"]))
+        self.assertEqual(self.a.post("/api/altimport/dokumente/").json()["uebernommen"], 2)
+        brief = self.akte(8).dokumente.get()
+        self.assertEqual(brief.originalname, "brief.txt")
+        self.assertTrue(brief.datei.startswith("8/") and brief.pfad.exists())
+        self.assertEqual(self.akte(2).dokumente.get().originalname, "alt.txt")
+
+    def test_unlesbares_verknuepfungen_und_dateinamen(self):
+        import os
+
+        self.importiere()
+        wurzel = TMP / "import" / "PatData"
+        self.lege("1/MÃ¼ller Brief.txt", b"doppelt kodierter Dateiname")
+        with open(os.path.join(os.fsencode(wurzel / "1"), b"Gr\xf6\xdfe.txt"), "wb") as f:   # Name in Latin-1, kein UTF-8
+            f.write(b"alte Kodierung")
+        self.lege("2/geheim/befund.txt", b"nicht lesbar")
+        self.lege("2/lesbar.txt", b"lesbar")
+        os.symlink(wurzel / "1", wurzel / "2" / "verweis")
+        os.symlink(wurzel / "1", wurzel / "77")
+        (wurzel / "²").mkdir()                                  # „Ziffer“, aber keine Zahl
+        root = os.geteuid() == 0                                 # root liest alles – dann entfällt die Rechteprüfung
+        os.chmod(wurzel / "2" / "geheim", 0)
+        try:
+            d = self.a.get("/api/altimport/dokumente/").json()
+            nicht = {(x["pfad"], x["grund"]) for x in d["nicht_uebernommen"]}
+            self.assertIn(("2/verweis", "Verknüpfung auf einen Ordner – wird nicht verfolgt"), nicht)
+            self.assertIn(("77", "Verknüpfung – wird nicht verfolgt"), nicht)
+            self.assertIn("²", [x["ordner"] for x in d["ohne_patient"]])
+            if not root:
+                self.assertIn(("2/geheim", "Ordner nicht lesbar (Zugriffsrechte)"), nicht)
+                self.assertEqual((d["unlesbar"], d["offen"]), (1, 3))
+            r = self.a.post("/api/altimport/dokumente/").json()
+            self.assertEqual((r["uebernommen"], r["fertig"], r["probleme"]), (3 if not root else 4, True, []))
+            namen = {x.originalname: x.titel for x in self.akte(1).dokumente.all()}
+            self.assertEqual(namen, {"MÃ¼ller Brief.txt": "Müller Brief", "Größe.txt": "Größe"})
+            if not root:
+                # unlesbare Ordner zählen wie offene Dokumente: Abschließen nur ausdrücklich ohne sie
+                koerper = {"kennwort": KENNWORT, "code": self.codes.pop(), "bestaetigung": "ABSCHLIESSEN"}
+                r = self.a.post("/api/altimport/abschliessen/", koerper, format="json")
+                self.assertEqual(r.status_code, 409)
+                self.assertIn("1 Ordner oder Dateien nicht lesbar", r.json()["fehler"])
+        finally:
+            os.chmod(wurzel / "2" / "geheim", 0o750)
+
+
 class ZuruecknehmenUndAbschliessen(Basis):
     def bestaetigung(self, wort):
         return {"kennwort": KENNWORT, "code": self.codes.pop(), "bestaetigung": wort}
@@ -575,6 +654,37 @@ class ZuruecknehmenUndAbschliessen(Basis):
         self.assertEqual(self.akte(7).versorger, apotheke)   # der behaltene Versorger wird wiederverwendet
         self.assertEqual([x.art for x in Importlauf.objects.order_by("id")], ["import", "dokumente", "zurueckgenommen", "import"])
 
+    def test_begonnene_dokumentenuebernahme_endet_mit_dem_zuruecknehmen(self):
+        (TMP / "import" / "PatData" / "1").mkdir(parents=True, exist_ok=True)
+        for name in ("a.txt", "b.txt"):
+            (TMP / "import" / "PatData" / "1" / name).write_bytes(name.encode())
+        self.importiere()
+        self.assertFalse(dienst.dokumente_uebernehmen(self.admin, max_dateien=1)["fertig"])
+        self.assertIsNone(Importlauf.objects.get(art="dokumente").beendet_am)
+        with self.captureOnCommitCallbacks(execute=True):
+            r = self.a.post("/api/altimport/zuruecknehmen/", self.bestaetigung("ZURÜCKNEHMEN"), format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        alt = Importlauf.objects.get(art="dokumente")
+        self.assertEqual((alt.erfolgreich, alt.fehler), (False, "Nicht abgeschlossen: Der Import wurde zurückgenommen."))
+        self.assertIsNotNone(alt.beendet_am)
+        # der nächste Import zählt seine Dokumente in einem eigenen Lauf
+        r = self.a.post("/api/altimport/import/", {"kennwort": KENNWORT, "code": self.codes.pop()}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertTrue(dienst.dokumente_uebernehmen(self.admin)["fertig"])
+        neu = Importlauf.objects.filter(art="dokumente").order_by("-id").first()
+        self.assertEqual((neu.erfolgreich, neu.zahlen["dateien"]), (True, 2))
+        self.assertNotEqual(neu.id, alt.id)
+
+    def test_fehlertext_ohne_inhalte_der_zeile(self):
+        from django.db import IntegrityError
+
+        f = IntegrityError('null value in column "nachname" violates not-null constraint\n'
+                           'DETAIL:  Failing row contains (17, Musterfrau, Erika, 1961-03-14).')
+        text = dienst._fehlertext(f)
+        self.assertEqual(text, 'IntegrityError: null value in column "nachname" violates not-null constraint '
+                               '(Einzelheiten im Protokoll des Servers)')
+        self.assertEqual(dienst._fehlertext(RuntimeError("Zählung stimmt nicht")), "RuntimeError: Zählung stimmt nicht")
+
     def test_abschliessen(self):
         r = self.a.post("/api/altimport/abschliessen/", self.bestaetigung("ABSCHLIESSEN"), format="json")
         self.assertEqual(r.status_code, 409)   # nichts übernommen
@@ -588,12 +698,15 @@ class ZuruecknehmenUndAbschliessen(Basis):
         self.assertEqual((r.status_code, list(r.json())), (400, ["bestaetigung"]))
         dienst.dokumente_uebernehmen(self.admin)
         self.assertTrue(any(p["beispiele"] for p in Importlauf.objects.get(art="import").protokoll))
+        gescheitert = Importlauf.objects.create(art="probelauf", fehler="Gelöschter Patient 4: Bitte den Anlass des Abschlusses wählen.",
+                                                beendet_am=timezone.now())
         r = self.a.post("/api/altimport/abschliessen/", self.bestaetigung("abschliessen"), format="json")
         self.assertEqual(r.status_code, 200, r.content)
         stand = Importstand.aktuell()
         self.assertEqual((stand.status, stand.zuordnung, stand.abgeschlossen_von), ("abgeschlossen", {}, self.admin))
         self.assertEqual((Alttabelle.objects.count(), Importobjekt.objects.count()), (0, 0))
-        # die Protokolle behalten die Zählung, verlieren die Nummern
+        # die Protokolle behalten die Zählung, verlieren die Nummern – auch in den Fehlertexten früherer Läufe
+        self.assertEqual(Importlauf.objects.get(id=gescheitert.id).fehler, "Nicht erfolgreich (Einzelheiten mit dem Abschließen entfernt).")
         protokoll = Importlauf.objects.get(art="import").protokoll
         self.assertTrue(protokoll and all(p["beispiele"] == [] and p["anzahl"] > 0 for p in protokoll))
         self.assertEqual(Patient.objects.filter(ist_test=False).count(), 6)

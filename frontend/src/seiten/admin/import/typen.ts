@@ -109,9 +109,10 @@ export type Zuordnung = {
 export type Dokumentenstand = {
   vorhanden: boolean; pfad: string; ordner: number; dateien: number; bytes: number; erledigt: number; offen: number;
   offen_bytes: number; ohne_patient: { ordner: string; dateien: number }[]; ohne_patient_anzahl: number;
-  nicht_uebernommen: { pfad: string; grund: string }[]; nicht_uebernommen_anzahl: number; frei_bytes: number | null;
+  nicht_uebernommen: { pfad: string; grund: string }[]; nicht_uebernommen_anzahl: number; unlesbar: number; frei_bytes: number | null;
 };
-export type Etappe = { uebernommen: number; bytes: number; offen: number; offen_bytes: number; erledigt: number; fertig: boolean };
+export type Etappe = { uebernommen: number; bytes: number; offen: number; offen_bytes: number; erledigt: number; fertig: boolean;
+  probleme: { pfad: string; grund: string }[] };
 
 /** Änderung an den Zuordnungen: Bereich und Entscheidungen (null = Entscheidung zurücknehmen, es gilt der Vorschlag) */
 export type Aenderung = { bereich: string; aenderungen: unknown };

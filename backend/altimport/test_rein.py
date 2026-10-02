@@ -587,3 +587,161 @@ class Umsetzung(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Pruefbefunde(unittest.TestCase):
+    """Fälle aus der unabhängigen Prüfung (02.10.2026): Nichts darf still verloren gehen oder falsch zugeordnet werden."""
+
+    def test_untaugliche_korrektur_bleibt_offen(self):
+        t = beispiel()
+        t["patienten"]["zeilen"][0][0] = "9500"          # Nummer im Bereich der Testpatienten
+        z = entscheidungen()
+        z["korrekturen"]["patienten:9500:nummer"] = {"art": "wert", "wert": "2", "alt": "9500"}   # 2 ist vergeben
+        e = lauf(tabellen=t, zuordnung=z)
+        a = next(x for x in e.auffaelligkeiten if x["schluessel"] == "patienten:9500:nummer")
+        self.assertTrue(a["blockiert"])
+        self.assertIn("Der eingetragene Wert „2“ behebt das nicht.", a["text"])
+        self.assertEqual(a["entscheidung"]["wert"], "2")      # bleibt sichtbar und änderbar
+        self.assertIn({"bereich": "auffaelligkeiten", "text": "Es gibt Auffälligkeiten, über die noch entschieden werden muss."}, e.offen)
+        self.assertTrue(any(p["stufe"] == "fehler" and p["beispiele"] == ["9500"] for p in e.protokoll))
+        # brauchbare Nummer: übernommen, Gewichte und Pläne hängen weiter an der Nummer des Altsystems
+        z["korrekturen"]["patienten:9500:nummer"]["wert"] = "8"
+        e = lauf(tabellen=t, zuordnung=z)
+        self.assertEqual(e.offen, [])
+        self.assertIn(8, [p["nummer"] for p in e.saetze["patienten"]])
+        # unlesbares Geburtsdatum als Korrektur
+        z = entscheidungen()
+        z["korrekturen"]["patienten:3:geburtsdatum"] = {"art": "wert", "wert": "irgendwann", "alt": "0000-00-00"}
+        e = lauf(zuordnung=z)
+        self.assertTrue(next(x for x in e.auffaelligkeiten if x["schluessel"] == "patienten:3:geburtsdatum")["blockiert"])
+        self.assertNotEqual(e.offen, [])
+
+    def test_korrigierte_nummer_darf_keinem_anderen_alt_patienten_gehoeren(self):
+        t = beispiel()
+        t["patienten"]["zeilen"][0][0] = "9500"
+        z = entscheidungen()
+        del z["geloeschte"]["4"]                           # Patient 4 und 6 sind gelöscht und werden nicht übernommen
+        z["korrekturen"]["patienten:9500:nummer"] = {"art": "wert", "wert": "6", "alt": "9500"}
+        e = lauf(tabellen=t, zuordnung=z)
+        a = next(x for x in e.auffaelligkeiten if x["schluessel"] == "patienten:9500:nummer")
+        self.assertTrue(a["blockiert"])
+        self.assertIn("gehört im Altsystem einem anderen Patienten", a["text"])
+
+    def test_unlesbare_zahl_als_korrektur_bleibt_offen(self):
+        t = beispiel()
+        spalten = t["infusionen"]["spalten"]
+        e0 = lauf(tabellen=t, zuordnung=entscheidungen())
+        feld = next(f for f in next(q for q in e0.quelle["tabellen"] if q["name"] == "infusionen")["felder"] if f["name"] == "natrium")
+        i = spalten.index(feld["spalte"])
+        t["infusionen"]["zeilen"][0][i] = "ca. 78"
+        z = entscheidungen()
+        e = lauf(tabellen=t, zuordnung=z)
+        a = next(x for x in e.auffaelligkeiten if x["schluessel"] == "infusionen:1:natrium")
+        self.assertEqual((a["art"], a["blockiert"], a["standard"]), ("unlesbar", False, "leer"))
+        plan = next(p for p in e.saetze["plaene"] if p["alt"] == "1")
+        self.assertIn("ca. 78", " ".join(plan["bemerkung_extras"]))     # Standard „leer“: der Altwert steht in der Bemerkung
+        z["korrekturen"]["infusionen:1:natrium"] = {"art": "wert", "wert": "78 mmol", "alt": "ca. 78"}
+        e = lauf(tabellen=t, zuordnung=z)
+        a = next(x for x in e.auffaelligkeiten if x["schluessel"] == "infusionen:1:natrium")
+        self.assertTrue(a["blockiert"])
+        self.assertNotEqual(e.offen, [])
+        z["korrekturen"]["infusionen:1:natrium"]["wert"] = "78"
+        e = lauf(tabellen=t, zuordnung=z)
+        self.assertEqual(e.offen, [])
+        self.assertEqual(next(p for p in e.saetze["plaene"] if p["alt"] == "1")["natrium_mmol"], Decimal("78.0"))
+        # bewusst eingetragener, weiter unplausibler Wert gilt (Plausibilität ist ein Hinweis, kein Verbot)
+        z["korrekturen"]["gewichte:7:gewicht"] = {"art": "wert", "wert": "300", "alt": "640.0"}
+        e = lauf(tabellen=t, zuordnung=z)
+        self.assertEqual(e.offen, [])
+        self.assertEqual({g["alt"]: g for g in e.saetze["gewichte"]}["7"]["gewicht_kg"], Decimal("300.0"))
+
+    def test_sehr_grosse_zahl_ist_unlesbar_statt_absturz(self):
+        for wert in ("1e30", "9" * 40, "1e-40"):
+            with self.subTest(wert=wert), self.assertRaises(W.Unlesbar):
+                W.zahl(wert)
+        t = beispiel()
+        t["gewichte"]["zeilen"][0][2] = "1e30"
+        e = lauf(tabellen=t, zuordnung=entscheidungen())
+        self.assertTrue(any(a["schluessel"] == "gewichte:1:gewicht" and a["art"] == "unlesbar" for a in e.auffaelligkeiten))
+
+    def test_insert_select_haengt_nicht(self):
+        beginn = time.monotonic()
+        with self.assertRaises(dump.DumpFehler) as f:
+            dump.lies(b"CREATE TABLE t (a int, b int, c int, d int, e int);\n"
+                      b"INSERT INTO t (a, b, c, d, e) SELECT 1, 2, 3, 4, 5;\n")
+        self.assertLess(time.monotonic() - beginn, 2)
+        self.assertIn("INSERT nicht lesbar", str(f.exception))
+        d = dump.lies(b"CREATE TABLE t (a int, b int);\nINSERT INTO t ( `b` ,a ) VALUES (2,1);\n")
+        self.assertEqual(d["tabellen"]["t"]["zeilen"], [["1", "2"]])
+
+    def test_timestamp_spalten_stehen_im_dump_in_utc(self):
+        sql = ("/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;\n/*!40103 SET TIME_ZONE='+00:00' */;\n"
+               "CREATE TABLE `kontakte` (`ID` int, `text` varchar(50), `lastchange` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,"
+               " `angelegt` datetime DEFAULT NULL);\n"
+               "INSERT INTO `kontakte` VALUES (1,'Sommer','2023-06-30 22:30:00','2023-06-30 22:30:00'),"
+               "(2,'Winter','2023-12-31 23:30:00.250',NULL),(3,'leer','0000-00-00 00:00:00',NULL),(4,'nichts',NULL,NULL);\n"
+               "/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;\n").encode()
+        d = dump.lies(sql)
+        self.assertEqual(d["zeitzone"], "+00:00")
+        hinweise = dump.zeitstempel_in_ortszeit(d["tabellen"], d["zeitzone"], "Europe/Berlin")
+        z = d["tabellen"]["kontakte"]["zeilen"]
+        self.assertEqual(z[0][2], "2023-07-01 00:30:00")           # Sommerzeit: +2 Stunden, anderer Tag
+        self.assertEqual(z[0][3], "2023-06-30 22:30:00")           # DATETIME bleibt
+        self.assertEqual(z[1][2], "2024-01-01 00:30:00.250")       # Winterzeit: +1 Stunde, anderes Jahr
+        self.assertEqual((z[2][2], z[3][2]), ("0000-00-00 00:00:00", None))
+        self.assertEqual(len(hinweise), 1)
+        self.assertIn("kontakte.lastchange", hinweise[0])
+        self.assertIn("2 Zeitpunkte wurden in Ortszeit", hinweise[0])
+        # ohne SET TIME_ZONE: nichts umrechnen, aber darauf hinweisen
+        d = dump.lies(sql.replace(b"/*!40103 SET TIME_ZONE='+00:00' */;\n", b""))
+        self.assertIsNone(d["zeitzone"])
+        hinweise = dump.zeitstempel_in_ortszeit(d["tabellen"], d["zeitzone"])
+        self.assertEqual(d["tabellen"]["kontakte"]["zeilen"][0][2], "2023-06-30 22:30:00")
+        self.assertIn("keine Zeitzone", hinweise[0])
+        # phpMyAdmin schreibt die Anweisung ohne Kommentar; der Beispiel-Dump hat keine TIMESTAMP-Spalten
+        self.assertEqual(dump.lies(b'SET time_zone = "+00:00";\nCREATE TABLE t (a int);\nINSERT INTO t VALUES (1);')["zeitzone"], "+00:00")
+        b = dump.lies(BEISPIEL.read_bytes())
+        self.assertEqual(dump.zeitstempel_in_ortszeit(b["tabellen"], b["zeitzone"]), [])
+
+    def test_benutzername_eines_testbenutzers_ist_vergeben(self):
+        z = entscheidungen()
+        z["benutzer"] = {"a.muster": {"art": "konto", "benutzername": "test", "vorname": "A", "nachname": "Muster",
+                                      "titel": "", "rolle": "mitarbeiter"}}
+        e = lauf(zuordnung=z)
+        zeile = next(b for b in e.benutzer if b["schluessel"] == "a.muster")
+        self.assertIn("Testbenutzer", zeile["fehler"])
+        self.assertTrue(any(o["bereich"] == "benutzer" for o in e.offen))
+
+    def test_html_links_bilder_und_text_ohne_inhalt(self):
+        html, war = W.als_html('<p>Siehe <a href="https://example.org/brief.pdf" target="_blank">Arztbrief</a> und '
+                               '<a href="https://example.org">https://example.org</a></p><img src="bilder/port.jpg" alt="Port">')
+        self.assertTrue(war)
+        self.assertIn("Arztbrief (https://example.org/brief.pdf)", html)
+        self.assertEqual(html.count("https://example.org<"), 1)                 # Ziel = Text: nicht doppelt
+        self.assertIn("[Bild im Text des Altsystems – nicht übernommen: bilder/port.jpg]", html)
+        self.assertNotIn("<img", html)
+        self.assertIn("nicht übernommen]", W.als_html('<p><img src="data:image/png;base64,AAAA"></p>')[0])
+        self.assertTrue(W.ohne_lesbaren_text("<p>&nbsp;</p><script>alert(1)</script><br>"))
+        self.assertFalse(W.ohne_lesbaren_text("<p>Text</p>"))
+        t = beispiel()
+        t["kontakte"]["zeilen"][0][2] = "<div><script>alert(1)</script></div>"
+        e = lauf(tabellen=t, zuordnung=entscheidungen())
+        kontakt = next(k for k in e.saetze["kontakte"] if k["alt"] == "1")
+        self.assertEqual(kontakt["text"], "<p>&lt;div&gt;&lt;script&gt;alert(1)&lt;/script&gt;&lt;/div&gt;</p>")
+        self.assertTrue(any("nur HTML ohne lesbaren Text" in p["text"] and p["beispiele"] == ["1"] for p in e.protokoll))
+
+    def test_zu_lange_namen_werden_nicht_still_gekuerzt(self):
+        t = beispiel()
+        t["versorger"]["zeilen"][1][1] = "V" * 151
+        t["patienten"]["zeilen"][0][19] = "K" * 101
+        e = lauf(tabellen=t, zuordnung=entscheidungen())
+        self.assertEqual(t["patienten"]["spalten"][19], "katheter")
+        texte = " ".join(o["text"] for o in e.offen)
+        self.assertIn("höchstens 150 Zeichen", texte)
+        self.assertIn("höchstens 100 Zeichen", texte)
+
+    def test_protokoll_nennt_reparierte_zeilen(self):
+        e = lauf(zuordnung=entscheidungen())
+        p = next(p for p in e.protokoll if p["regel"] == 3 and p["bereich"] == "patienten")
+        self.assertEqual(p["beispiele"], ["2"])
+        self.assertGreaterEqual(p["anzahl"], 2)

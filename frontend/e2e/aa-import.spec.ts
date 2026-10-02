@@ -45,6 +45,19 @@ function dokumentenordnerAnlegen() {
     { stdio: "inherit" });
 }
 
+// Sicherheitsnetz: Scheitert ein Test, während die Altdaten übernommen sind, fänden alle folgenden Tests fremde
+// Akten vor. Dann hier über die API zurücknehmen (in der Oberfläche prüft es der dritte Test).
+test.afterAll(async () => {
+  const admin = await apiAls("admin");
+  try {
+    if ((await admin.get("altimport/")).status === "importiert") {
+      await admin.post("altimport/zuruecknehmen/", { kennwort: KENNWORT, code: naechsterNotfallcode("e2e.admin"), bestaetigung: "ZURÜCKNEHMEN" });
+    }
+  } finally {
+    await admin.ende();
+  }
+});
+
 test("Import: nur für Admin – Menü, Seite und Recht nur für die Rolle Admin", async ({ page, browser }) => {
   await page.goto("/");
   await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Import" }).click();
@@ -215,6 +228,7 @@ test("Import: Probelauf, Übernahme mit Passwort und 2FA, Akte, Dokumente, Zurü
   const akte = await ctx.newPage();
   await akte.goto(`/patienten/${erika!.id}`);
   await expect(akte.getByTestId("aktenkopf")).toContainText("Musterfrau");
+  await akte.getByRole("button", { name: /Messwerte anzeigen/ }).click();
   await expect(akte.getByTestId("messwerte")).toContainText("64,5");
   await akte.goto(`/patienten/${erika!.id}/kontakte`);
   await expect(akte.getByTestId("kontaktliste")).toContainText("Befinden stabil");

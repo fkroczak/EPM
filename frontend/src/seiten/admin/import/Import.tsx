@@ -363,6 +363,13 @@ function Dokumente({ stand }: { stand: Stand }) {
                 <span className="text-[0.8125rem] gedaempft">Titel = Dateiname, Typ „Sonstiges“, Datum aus der Datei (PDF, EXIF) oder das Dateidatum; die Dokumente erscheinen unter „Nach und nach prüfen“.</span>
               </div>
             )}
+            {s.unlesbar > 0 ? (
+              <Meldung art="warn"><span data-testid="dokumente-unlesbar">{zahl(s.unlesbar)} Ordner oder Dateien kann das Backend nicht lesen (Zugriffsrechte) – sie stehen unten
+                unter „Wird nicht übernommen“. Auf dem Server für die Gruppe 101 lesbar machen (<code>chgrp -R 101</code>, <code>chmod -R g+rX</code>) und „Neu einlesen“.</span></Meldung>
+            ) : null}
+            {fortschritt && fortschritt.probleme.length > 0 ? (
+              <Meldung art="warn">Beim Kopieren nicht lesbar, weiter offen: <span className="num text-[0.8125rem]">{fortschritt.probleme.map((p) => p.pfad).join(", ")}</span></Meldung>
+            ) : null}
             <Fehleranzeige fehler={fehler} />
           </>
         )}
@@ -394,6 +401,7 @@ function Abschluss({ stand }: { stand: Stand }) {
   const [ohne, setOhne] = useState(false);
   const d = useQuery({ queryKey: ["altimport", "dokumente"], queryFn: () => api<Dokumentenstand>("altimport/dokumente/"), enabled: stand.status === "importiert" });
   const offen = d.data?.vorhanden ? d.data.offen : 0;
+  const unlesbar = d.data?.vorhanden ? d.data.unlesbar : 0;
   return (
     <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="abschluss-karte">
       <KartenKopf titel="Übernahme abschließen (Go-live)" unter="Der letzte Schritt, wenn die übernommenen Akten geprüft sind und das EPM das Altsystem ablöst." />
@@ -408,12 +416,12 @@ function Abschluss({ stand }: { stand: Stand }) {
             <li>Der Dokumentenordner auf dem Server und ältere Sicherungen aus der Testphase enthalten weiterhin Altdaten – bitte getrennt löschen.</li>
           </ul>
           {stand.status !== "importiert" ? <Meldung art="info">Abschließen ist erst möglich, wenn die Altdaten übernommen sind (Schritt 3).</Meldung> : null}
-          {stand.status === "importiert" && offen > 0 ? (
-            <Meldung art="warn">Es sind noch {zahl(offen)} Dokumente nicht übernommen (Schritt 4).
+          {stand.status === "importiert" && offen + unlesbar > 0 ? (
+            <Meldung art="warn">Es sind noch {zahl(offen)} Dokumente nicht übernommen{unlesbar > 0 ? ` und ${zahl(unlesbar)} Ordner oder Dateien nicht lesbar` : ""} (Schritt 4).
               <label className="flex items-center gap-2 mt-1.5"><input type="checkbox" checked={ohne} onChange={(e) => setOhne(e.target.checked)} />
                 Trotzdem abschließen – die offenen Dokumente werden nicht mehr übernommen</label></Meldung>
           ) : null}
-          <div><Knopf variante="dng" disabled={stand.status !== "importiert" || (offen > 0 && !ohne)} onClick={() => setDialog(true)}>Übernahme abschließen …</Knopf></div>
+          <div><Knopf variante="dng" disabled={stand.status !== "importiert" || (offen + unlesbar > 0 && !ohne)} onClick={() => setDialog(true)}>Übernahme abschließen …</Knopf></div>
         </>
       )}
       <Bestaetigung offen={dialog} onZu={() => setDialog(false)} titel="Übernahme abschließen" wort="ABSCHLIESSEN" knopf="Bestätigen und abschließen"

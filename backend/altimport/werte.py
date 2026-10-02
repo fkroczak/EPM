@@ -47,6 +47,9 @@ def ist_leer(t: str) -> bool:
     return not t or t.strip() in PLATZHALTER
 
 
+GROESSTE_ZAHL = Decimal(10) ** 15
+
+
 def zahl(wert) -> Decimal | None:
     """Zahl in deutscher oder englischer Schreibweise; leer → ``None``; sonst ``Unlesbar``."""
     if wert is None:
@@ -65,7 +68,8 @@ def zahl(wert) -> Decimal | None:
         z = Decimal(t)
     except InvalidOperation as e:
         raise Unlesbar(str(wert)) from e
-    if not z.is_finite():
+    if not z.is_finite() or abs(z) >= GROESSTE_ZAHL or (z != 0 and z.adjusted() < -12):
+        # weit jenseits dessen, was ein Feld des EPM speichert (und was sich noch runden lässt)
         raise Unlesbar(str(wert))
     return z
 
@@ -118,20 +122,55 @@ _BLOCK = [(re.compile(r"<(/?)(?:div|center|pre)\b[^<>]*>", re.I), r"<\1p>"),
           (re.compile(r"<(/?)h[56]\b[^<>]*>", re.I), r"<\1h4>")]
 
 
+# Was die Bereinigung des EPM ersatzlos entfernt: Linkziele und Bilder. Linkziele bleiben als Text hinter dem
+# Linktext stehen; Bilder werden mit ihrer Quelle genannt (eingebettete Bilddaten nur als Vermerk).
+LINK = re.compile(r"<a\b[^<>]*?\bhref\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s<>]+))[^<>]*>(.*?)</a\s*>", re.I | re.S)
+BILD = re.compile(r"<img\b[^<>]*?>", re.I)
+_BILD_QUELLE = re.compile(r"\bsrc\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s<>]+))", re.I)
+_UNSICHTBAR = re.compile(r"<(script|style)\b.*?</\1\s*>|<!--.*?-->", re.I | re.S)
+_TAG = re.compile(r"<[^<>]*>")
+
+
+def _link(m) -> str:
+    ziel = html.unescape(next((g for g in m.groups()[:3] if g is not None), "")).strip()
+    text = m.group(4)
+    sichtbar = html.unescape(_TAG.sub("", text)).strip()
+    if not ziel or ziel.casefold() == sichtbar.casefold() or ziel.casefold().startswith("javascript:"):
+        return text
+    return f"{text} ({html.escape(ziel[:500], quote=False)})"
+
+
+def _bild(m) -> str:
+    q = _BILD_QUELLE.search(m.group(0))
+    quelle = html.unescape(next((g for g in q.groups() if g is not None), "")).strip() if q else ""
+    if not quelle or quelle.casefold().startswith("data:"):
+        return "[Bild im Text des Altsystems – nicht übernommen]"
+    return f"[Bild im Text des Altsystems – nicht übernommen: {html.escape(quelle[:300], quote=False)}]"
+
+
+def ohne_lesbaren_text(t: str) -> bool:
+    """Bleibt von einem HTML-Text nach dem Entfernen aller Tags nichts Lesbares übrig?"""
+    rest = html.unescape(_TAG.sub("", _UNSICHTBAR.sub("", t or "")))
+    return not rest.replace("\xa0", " ").strip()
+
+
 def ist_html(t: str) -> bool:
     return bool(_HTML.search(t))
 
 
-def als_html(t: str) -> tuple[str, bool]:
+def als_html(t: str, als_text: bool = False) -> tuple[str, bool]:
     """Text des Altsystems als formatierter Text. Liefert (HTML vor dem Bereinigen, war schon HTML?).
 
     Reiner Text: Zeichen maskieren, Leerzeile = neuer Absatz, Zeilenumbruch = ``<br>``. Vorhandenes HTML bleibt,
     nur unbekannte Blöcke werden auf Absätze bzw. erlaubte Überschriften abgebildet; das eigentliche Bereinigen
-    (erlaubte Tags, keine Skripte) übernimmt ``epm.sanitize`` beim Schreiben."""
+    (erlaubte Tags, keine Skripte) übernimmt ``epm.sanitize`` beim Schreiben. Linkziele und Bilder, die das
+    Bereinigen ersatzlos entfernen würde, bleiben als Text stehen. ``als_text``: den Quelltext selbst als Text
+    übernehmen (für HTML ohne lesbaren Inhalt)."""
     t = (t or "").replace("\r\n", "\n").replace("\r", "\n").strip()
     if not t:
         return "", False
-    if ist_html(t):
+    if ist_html(t) and not als_text:
+        t = BILD.sub(_bild, LINK.sub(_link, t))
         for muster, ersatz in _BLOCK:
             t = muster.sub(ersatz, t)
         return t, True
