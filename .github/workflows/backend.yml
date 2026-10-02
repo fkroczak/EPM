@@ -254,7 +254,14 @@ jobs:
                 echo "**Seitenzustand der fehlgeschlagenen Browsertests** (Lauf ${{ github.run_id }})"
                 for f in frontend/test-results/*/error-context.md; do
                   echo; echo "<details><summary>$(basename "$(dirname "$f")")</summary>"; echo; echo '```'
-                  head -c 3800 "$f" | iconv -f utf-8 -t utf-8 -c || true; echo; echo '```'; echo "</details>"
+                  # ohne die Seitenleiste (immer gleich) – sonst reicht der Platz nicht bis zum Inhalt der Seite
+                  if grep -q -- '- main' "$f"; then
+                    { sed -n '1,/^# Page snapshot/p' "$f"; sed -n '/^# Page snapshot/,$p' "$f" | sed -n '/- main/,$p'; } \
+                      | head -c 14000 | iconv -f utf-8 -t utf-8 -c || true
+                  else
+                    head -c 14000 "$f" | iconv -f utf-8 -t utf-8 -c || true
+                  fi
+                  echo; echo '```'; echo "</details>"
                 done
               } > kontext.md
               senden kontext.md

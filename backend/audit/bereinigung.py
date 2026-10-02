@@ -11,6 +11,7 @@ Beides läuft im Wartungsmodus der Datenbank (sonst verhindern die Trigger jede 
 """
 import logging
 import re
+from datetime import timedelta
 
 from django.db import transaction
 from django.db.models import Q
@@ -145,7 +146,10 @@ def bereinigen() -> dict:
         if ergebnis["protokoll"]:
             protokolliere(A.PROTOKOLL_BEREINIGT, objekt="Audit-Log", anzahl=ergebnis["protokoll"], jahre=jahre)
     ergebnis["sitzungen"], _ = Session.objects.filter(expire_date__lt=timezone.now()).delete()
-    Sitzung.objects.exclude(sitzungsschluessel__in=Session.objects.values("session_key")).delete()
+    # Erfasste Sitzungen (Gerät, IP) ohne gültige Anmeldung – nur ältere: Beim Wechsel des Sitzungsschlüssels (z. B.
+    # Kennwortwechsel) gibt es für einen Augenblick einen Eintrag ohne Sitzung, der nicht verschwinden darf.
+    gestern = timezone.now() - timedelta(days=1)
+    Sitzung.objects.filter(zuletzt_am__lt=gestern).exclude(sitzungsschluessel__in=Session.objects.values("session_key")).delete()
     return ergebnis
 
 
