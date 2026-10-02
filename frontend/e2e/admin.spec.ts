@@ -288,14 +288,22 @@ test("Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten", async
   await expect(kopf.getByRole("button", { name: "Neuer Plan" })).toHaveCount(0);
   await expect(page.getByTestId("gewichtskarte").getByLabel("Neues Gewicht")).toHaveCount(0);
   await page.getByRole("button", { name: "Weitere Aktionen" }).click();
-  await expect(page.getByRole("menuitem", { name: "Akte abschließen" })).toHaveCount(0);
   await expect(page.getByRole("menuitem", { name: "Stammdaten bearbeiten" })).toHaveCount(0);
+  // Ausnahme (Fehlerliste 02.10.2026, 6.3): Akten abschließen dürfen Admins auch bei echten Patienten
+  await expect(page.getByRole("menuitem", { name: "Akte abschließen" })).toBeVisible();
   await page.keyboard.press("Escape");
   // auch die API weist ab
   const admin = await apiAls("admin");
   const abgewiesen = await admin.roh.post("/api/kontakte/", { data: { patient: echt.id, text: "<p>x</p>" }, headers: await admin.kopf() });
   expect(abgewiesen.status()).toBe(403);
   expect((await abgewiesen.json()).fehler).toContain("nur bei Testpatienten");
+  await page.getByRole("button", { name: "Weitere Aktionen" }).click();
+  await page.getByRole("menuitem", { name: "Akte abschließen" }).click();
+  const abschluss = page.getByRole("dialog");
+  await abschluss.getByRole("radio").first().check();
+  await abschluss.getByRole("button", { name: "Akte abschließen" }).click();
+  await expect(page.getByText("Akte abgeschlossen.")).toBeVisible();
+  expect((await admin.get(`patienten/${echt.id}/`)).ist_abgeschlossen).toBe(true);
 
   // Neuer Patient wird Testpatient, dort darf der Admin alles
   await page.goto("/patienten/neu");
@@ -316,6 +324,71 @@ test("Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten", async
   const p = await admin.get(`patienten/${id}/`);
   expect([p.ist_test, p.nummer >= 9001]).toEqual([true, true]);
   expect((await admin.get(`kontakte/?patient=${id}`)).results).toHaveLength(1);
+  await admin.ende();
+});
+
+test("Benutzer ohne Login: anlegen, setzen, wieder einbinden; Rolle „Keine Berechtigung“; Testbenutzer-Schalter", async ({ page }) => {
+  await page.goto("/admin/benutzer");
+  // Rolle „Keine Berechtigung“ hat nie Rechte – keine Spalte in der Rechtetabelle
+  const rechte = page.getByTestId("rechte");
+  await expect(rechte.getByRole("columnheader", { name: "Keine Berechtigung" })).toHaveCount(0);
+  await expect(rechte.getByRole("columnheader", { name: "Mitarbeiter" })).toBeVisible();
+  // ohne Login anlegen: kein Kennwort, keine Rechte
+  const name = eindeutig("e2e.ohne");
+  await page.getByRole("button", { name: "Benutzer anlegen" }).click();
+  const detail = page.getByTestId("benutzer-detail");
+  await detail.getByLabel("Vorname").fill("Olga");
+  await detail.getByLabel("Nachname").fill("Ohnelogin");
+  await detail.getByLabel("Benutzername").fill(name);
+  await detail.getByRole("checkbox", { name: /Ohne Login anlegen/ }).check();
+  await expect(detail.getByLabel("Rolle")).toHaveValue("keine");
+  await expect(detail.getByLabel("Rolle")).toBeDisabled();
+  await detail.getByRole("button", { name: "Ohne Login anlegen" }).click();
+  await expect(page.getByText("Benutzer ohne Login angelegt.")).toBeVisible();
+  await expect(detail.getByTestId("einmal-kennwort")).toHaveCount(0);
+  await expect(detail.getByTestId("ohne-login-hinweis")).toBeVisible();
+  const zeile = page.getByTestId("benutzerliste").getByRole("row").filter({ hasText: name });
+  await expect(zeile).toContainText("ohne Login");
+  await expect(zeile).toContainText("Keine Berechtigung");
+  // Login geben: als Mitarbeiter wieder einbinden, mit Einmal-Kennwort
+  await detail.getByRole("button", { name: "Login geben" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Rolle").selectOption("mitarbeiter");
+  await dialog.getByRole("button", { name: "Login geben" }).click();
+  await expect(page.getByText("O. Ohnelogin hat wieder einen Login.")).toBeVisible();
+  await expect(detail.getByTestId("einmal-kennwort")).toBeVisible();
+  await expect(zeile).toContainText("Mitarbeiter");
+  await expect(zeile).toContainText("Einrichtung offen");
+  // Testbenutzer-Schalter (für Betrachter, Mitarbeiter, Mediziner)
+  await detail.getByRole("checkbox", { name: /Testbenutzer/ }).check();
+  await detail.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Benutzer gespeichert.")).toBeVisible();
+  await expect(zeile).toContainText("Testbenutzer");
+  const admin = await apiAls("admin");
+  const konto = (await admin.get(`benutzer/?search=${name}`)).results[0];
+  expect([konto.rolle, konto.ist_test, konto.nur_historisch]).toEqual(["mitarbeiter", true, false]);
+  // Admins können keine Testbenutzer sein
+  await detail.getByLabel("Rolle").selectOption("admin");
+  await expect(detail.getByRole("checkbox", { name: /Testbenutzer/ })).not.toBeChecked();
+  await expect(detail.getByRole("checkbox", { name: /Testbenutzer/ })).toBeDisabled();
+  await detail.getByLabel("Rolle").selectOption("mitarbeiter");
+  await detail.getByRole("checkbox", { name: /Testbenutzer/ }).uncheck();
+  await detail.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Benutzer gespeichert.")).toBeVisible();
+  // wieder auf „ohne Login“: keine Rechte, Rolle „Keine Berechtigung“
+  await detail.getByRole("button", { name: "Auf „ohne Login“ setzen" }).click();
+  await dialog.getByRole("button", { name: "Auf „ohne Login“ setzen" }).click();
+  await expect(page.getByText("Konto ist jetzt ohne Login und ohne Rechte.")).toBeVisible();
+  await expect(zeile).toContainText("ohne Login");
+  const danach = await admin.get(`benutzer/${konto.id}/`);
+  expect([danach.rolle, danach.nur_historisch, danach.is_active, danach.ist_test]).toEqual(["keine", true, false, false]);
+  // Anmeldung: Zwei-Faktor-Anmeldung freiwillig (Standard), umstellbar
+  const anmeldung = page.getByTestId("anmeldung");
+  await expect(anmeldung.getByRole("radio", { name: /^freiwillig/ })).toBeChecked();
+  await anmeldung.getByRole("radio", { name: /^Pflicht für alle/ }).check();
+  await expect(anmeldung.getByRole("button", { name: "Speichern" })).toBeEnabled();
+  await anmeldung.getByRole("radio", { name: /^freiwillig/ }).check();
+  await expect(anmeldung.getByRole("button", { name: "Speichern" })).toBeDisabled();
   await admin.ende();
 });
 

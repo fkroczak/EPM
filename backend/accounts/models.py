@@ -13,6 +13,8 @@ class Rolle(models.TextChoices):
     MITARBEITER = "mitarbeiter", "Mitarbeiter"
     MEDIZINER = "mediziner", "Mediziner"
     ADMIN = "admin", "Admin"
+    # Festlegung 02.10.2026: Konten ohne Login haben keinerlei Rechte; auch für Konten mit Login wählbar
+    KEINE = "keine", "Keine Berechtigung"
 
 
 # Zeichen für Einmal-Kennwörter: ohne leicht verwechselbare (0/O, 1/l/I)
@@ -44,7 +46,8 @@ class User(AbstractUser):
     )
     nur_historisch = models.BooleanField(
         "Nur historisch", default=False,
-        help_text="Aus dem Altsystem übernommener Name ohne Login (Bearbeiter alter Einträge).",
+        help_text="Ohne Login: Name, dem Einträge zugeordnet bleiben (aus dem Altsystem übernommen oder von der "
+                  "Administration so gesetzt). Kann sich nicht anmelden und hat keine Rechte.",
     )
     muss_kennwort_aendern = models.BooleanField("Muss Kennwort ändern", default=True)
     einmal_kennwort_gueltig_bis = models.DateTimeField("Einmal-Kennwort gültig bis", null=True, blank=True)
@@ -56,6 +59,8 @@ class User(AbstractUser):
     startseite = models.JSONField("Startseite (Karten)", default=dict, blank=True)
     # Spaltenteiler je Seite und Fensterstufe (S17): {"akte_uebersicht@fhd": [0.6667], …}
     aufteilung = models.JSONField("Aufteilung der Seiten", default=dict, blank=True)
+    # Größe der Karten je Seite (Akte, System): {"akte_uebersicht": {"gewicht": {"breite": 2, "hoehe": 0}}, …}
+    bereiche = models.JSONField("Größe der Karten", default=dict, blank=True)
 
     objects = EpmUserManager()
 
@@ -70,8 +75,17 @@ class User(AbstractUser):
         if self.rolle != Rolle.ADMIN:
             self.is_superuser = False
         if self.nur_historisch:
+            # ohne Login: keine Anmeldung, keine Rechte, kein Testzugang
             self.is_active = False
             self.set_unusable_password()
+            self.rolle = Rolle.KEINE
+            self.ist_test = False
+            self.is_staff = False
+            self.is_superuser = False
+            felder = kwargs.get("update_fields")
+            if felder is not None:
+                kwargs["update_fields"] = list({*felder, "is_active", "password", "rolle", "ist_test", "is_staff",
+                                                "is_superuser"})
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
@@ -189,3 +203,37 @@ class Gruppenrecht(models.Model):
 
     def __str__(self):
         return f"{self.get_rolle_display()}: {self.recht} = {'ja' if self.erlaubt else 'nein'}"
+
+
+class Anmelderegeln(models.Model):
+    """Genau ein Datensatz (pk=1): ob der zweite Faktor (Authenticator-App) Pflicht ist.
+
+    Festlegung 02.10.2026: Der zweite Faktor ist freiwillig – zu viele Umstellungen auf einmal; EPM ist ohnehin nur
+    über das VPN mit eigenem zweitem Faktor erreichbar. Wer ihn eingerichtet hat, meldet sich weiter damit an. Die
+    Administration kann ihn hier wieder zur Pflicht machen (für Admins oder für alle)."""
+
+    class ZweiterFaktor(models.TextChoices):
+        FREIWILLIG = "freiwillig", "freiwillig"
+        ADMINS = "admins", "Pflicht für Admins"
+        ALLE = "alle", "Pflicht für alle"
+
+    zweiter_faktor = models.CharField("Zweiter Faktor", max_length=12, choices=ZweiterFaktor.choices,
+                                      default=ZweiterFaktor.FREIWILLIG)
+    geaendert_am = models.DateTimeField(auto_now=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Anmelderegeln"
+        verbose_name_plural = "Anmelderegeln"
+
+    def __str__(self):
+        return f"Zweiter Faktor: {self.get_zweiter_faktor_display()}"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def aktuell(cls):
+        return cls.objects.get_or_create(pk=1)[0]

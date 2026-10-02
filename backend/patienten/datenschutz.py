@@ -465,7 +465,7 @@ class DatenschutzAktionen:
         das Löschprotokoll (ohne Namen) und die Einträge im Audit-Log ohne Namen und Inhalte."""
         from datetime import datetime
 
-        from django_otp.plugins.otp_totp.models import TOTPDevice
+        from accounts.zweifaktor import code_bestaetigt
 
         patient = self._akte(pk, loeschen=True)
         pruefung = loeschbar(patient)
@@ -497,8 +497,8 @@ class DatenschutzAktionen:
         if not request.user.check_password(str(request.data.get("kennwort", ""))):
             antwort = abgelehnt("kennwort", "Kennwort falsch.")
             return bestaetigung_fehlgeschlagen(request, "loeschen_kennwort") or antwort
-        code = str(request.data.get("code", "")).replace(" ", "")
-        if not any(g.verify_token(code) for g in TOTPDevice.objects.filter(user=request.user, confirmed=True)):
+        # zweiter Faktor freiwillig (Festlegung 02.10.2026): ohne eingerichteten zweiten Faktor genügt das Kennwort
+        if not code_bestaetigt(request.user, request.data.get("code", ""), notfallcodes=False):
             antwort = abgelehnt("code", "Code aus der Authenticator-App falsch oder schon verwendet.")
             return bestaetigung_fehlgeschlagen(request, "loeschen_2fa") or antwort
         bestaetigung_gelungen(request)

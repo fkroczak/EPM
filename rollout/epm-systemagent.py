@@ -35,16 +35,27 @@ import socket
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
-VERSION = 2
+VERSION = 3
 KONF = "/etc/epm/epm.conf"
 BACKUP_SKRIPT = "/usr/local/sbin/epm-backup"
 KONF_SICHERUNG = "/etc/epm/sicherung"
 VERLAUF_PUNKTE = 1440            # 24 Stunden bei einer Messung je Minute
+# Verlauf über längere Zeiträume (Administration › System: 7 Tage bis 6 Monate): Mittelwerte in gröberen Stufen,
+# dazu die Spitzen von CPU und Arbeitsspeicher. (Name, Sekunden je Punkt, Anzahl Punkte)
+VERLAUF_STUFEN = (("viertelstunde", 900, 1344),   # 14 Tage
+                  ("stunde", 3600, 744),           # 31 Tage
+                  ("vierteltag", 21600, 736))      # 184 Tage
+VERLAUF_FELDER = ["zeit", "cpu", "ram", "last", "platte"]
+AUFBEWAHRUNG_TAGE = (7, 14, 30)  # wählbar unter Administration › Backup (Festlegung 02.10.2026)
+BUENDEL_MUSTER = re.compile(r"^epm-sicherung_(\d{4}-\d{2}-\d{2}_\d{4}(?:\d{2})?)\.tar$")
+BUENDEL_STUNDEN = 2              # so lange liegt eine zum Herunterladen bereitgestellte Sicherung bereit
+UPLOAD_ALT_STUNDEN = 24          # abgebrochene Uploads werden danach entfernt
 AUSGABE_MAX = 20000              # Zeichen Ausgabe je Auftrag
 ERGEBNISSE_BEHALTEN = 200
 ID_MUSTER = re.compile(r"^[0-9a-f]{32}$")
@@ -56,7 +67,7 @@ DATEI_MUSTER = re.compile(
 NEBEN_MUSTER = re.compile(r"^epm_(\d{4}-\d{2}-\d{2}_\d{4}(?:\d{2})?)\.(sha256|json)$")
 PASSWORT_MIN, PASSWORT_MAX = 16, 200
 UEBERTRAGUNG_WIEDERHOLEN_S = 15 * 60
-ARTEN = ("nachts", "von_hand", "vor_update", "vor_aenderung", "vor_wiederherstellung")
+ARTEN = ("nachts", "von_hand", "vor_update", "vor_aenderung", "vor_wiederherstellung", "hochgeladen")
 APP_UID, APP_GID = 10001, 101
 
 # Aktion -> (Bezeichnung, vorher sichern). Dieselbe Liste steht in backend/system/host.py.
@@ -75,11 +86,15 @@ AKTIONEN = {
     "sicherung_ziel_entfernen": ("Übertragungsziel entfernen", False),
     "sicherung_ziel_testen": ("Verbindung zum Übertragungsziel testen", False),
     "sicherung_uebertragen": ("Sicherungen jetzt übertragen", False),
+    "sicherung_aufbewahrung": ("Aufbewahrung der Sicherungen festlegen", False),
+    "sicherung_bereitstellen": ("Sicherung zum Herunterladen bereitstellen", False),
+    "sicherung_einlesen": ("Hochgeladene Sicherung einlesen", False),
     "wiederherstellen": ("Sicherung wiederherstellen", True),
 }
 # Aktionen, die Sicherungen schreiben, übertragen oder zurückspielen: mit --sicherung-echt auch im Probelauf echt
 SICHERUNG_AKTIONEN = {"sicherung", "sicherung_passwort", "sicherung_ziel", "sicherung_ziel_entfernen",
-                      "sicherung_ziel_testen", "sicherung_uebertragen", "wiederherstellen"}
+                      "sicherung_ziel_testen", "sicherung_uebertragen", "sicherung_aufbewahrung",
+                      "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen"}
 # Art der Sicherung, die eine Aktion vorher erstellt
 VORHER_ART = {"updates_installieren": "vor_update", "server_neustart": "vor_aenderung",
               "wiederherstellen": "vor_wiederherstellung"}
@@ -157,6 +172,9 @@ class Agent:
         self.status = os.path.join(basis, "system", "status")
         self.ergebnisse = os.path.join(self.status, "auftraege")
         self.backup = os.path.join(basis, "backup")
+        # Austausch mit dem Backend: bereitgestellte Sicherungen (liest Nginx aus) und hochgeladene (schreibt das Backend)
+        self.download = os.path.join(basis, "system", "download")
+        self.upload = os.path.join(basis, "system", "upload")
         einstellungen = lese_konf()
         self.proxy = einstellungen.get("EPM_APT_PROXY", "")
         try:
@@ -170,12 +188,15 @@ class Agent:
         return self.trocken and not (self.sicherung_echt and aktion in SICHERUNG_AKTIONEN)
 
     # ------------------------------------------------------------ Hilfen
-    def schreibe(self, pfad, daten, modus=0o644):
+    def schreibe(self, pfad, daten, modus=0o644, kompakt=False):
         """Atomar schreiben (für den Container lesbar: 0644; Geheimes 0600)."""
         tmp = f"{pfad}.tmp{os.getpid()}"
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, modus)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(daten, f, ensure_ascii=False, indent=1, default=str)
+            if kompakt:
+                json.dump(daten, f, ensure_ascii=False, separators=(",", ":"), default=str)
+            else:
+                json.dump(daten, f, ensure_ascii=False, indent=1, default=str)
         os.chmod(tmp, modus)
         os.replace(tmp, pfad)
 
@@ -405,6 +426,7 @@ class Agent:
         self.schreibe(os.path.join(self.status, "system.json"), status)
         self.verlauf_ergaenzen(status)
         try:
+            self.austausch_aufraeumen()
             self.sicherung_status_schreiben()
             self.passwoerter_aufraeumen()
             self.uebertragung_anstossen()
@@ -424,7 +446,46 @@ class Agent:
             status["platten"][0] if status["platten"] else None)
         platte = round(100.0 * (1 - daten["frei"] / daten["gesamt"]), 1) if daten and daten["gesamt"] else None
         punkte.append([int(time.time()), status["cpu"]["prozent"], ram, status["cpu"]["last"][0], platte])
-        self.schreibe(pfad, {"felder": ["zeit", "cpu", "ram", "last", "platte"], "punkte": punkte[-VERLAUF_PUNKTE:]})
+        punkte = punkte[-VERLAUF_PUNKTE:]
+        stufen = self.verlauf_stufen(verlauf.get("stufen"), punkte)  # 7 Tage bis 6 Monate
+        self.schreibe(pfad, {"felder": VERLAUF_FELDER, "punkte": punkte, "stufen": stufen}, kompakt=True)
+
+    @staticmethod
+    def verlauf_stufen(stufen, punkte):
+        """Gröbere Stufen fortschreiben: Je Stufe wird der laufende Abschnitt (z. B. die Viertelstunde, in die die
+        letzte Messung fällt) aus den Minutenwerten neu gemittelt – Mittelwert je Feld, dazu die Spitzen von CPU und
+        Arbeitsspeicher. Fehlende Werte (None) zählen nicht mit."""
+        stufen = stufen if isinstance(stufen, dict) else {}
+        ergebnis = {}
+        for name, sekunden, anzahl in VERLAUF_STUFEN:
+            alt = stufen.get(name) if isinstance(stufen.get(name), dict) else {}
+            liste = [p for p in (alt.get("punkte") or []) if isinstance(p, list) and len(p) == 7]
+            # ab dem letzten gespeicherten Abschnitt neu rechnen (beim ersten Mal: alles aus den Minutenwerten)
+            ab = liste[-1][0] if liste else 0
+            abschnitte = {}
+            for p in punkte:
+                beginn = p[0] - p[0] % sekunden
+                if beginn >= ab:
+                    abschnitte.setdefault(beginn, []).append(p)
+            for beginn in sorted(abschnitte):
+                teil = abschnitte[beginn]
+
+                def mittel(i, teil=teil):
+                    werte = [p[i] for p in teil if p[i] is not None]
+                    return round(sum(werte) / len(werte), 2) if werte else None
+
+                def spitze(i, teil=teil):
+                    werte = [p[i] for p in teil if p[i] is not None]
+                    return max(werte) if werte else None
+
+                punkt = [beginn, mittel(1), mittel(2), mittel(3), mittel(4), spitze(1), spitze(2)]
+                if liste and liste[-1][0] == beginn:
+                    liste[-1] = punkt
+                else:
+                    liste.append(punkt)
+            ergebnis[name] = {"sekunden": sekunden, "felder": VERLAUF_FELDER + ["cpu_max", "ram_max"],
+                              "punkte": liste[-anzahl:]}
+        return ergebnis
 
     # ------------------------------------------------------------ Sicherungen: Bestand
     def sicherungen(self):
@@ -798,6 +859,303 @@ class Agent:
             self.sicherung_status_schreiben()
             return (0 if rc == 0 else 1), ergebnis
 
+    # ------------------------------------------------------------ Sicherungen: Aufbewahrung
+    def aufbewahrung_tage(self):
+        """Tage, die Sicherungen auf dem Server bleiben: Auswahl aus der Oberfläche (``<konf>/aufbewahrung``), sonst
+        EPM_BACKUP_TAGE aus /etc/epm/epm.conf, sonst 30."""
+        try:
+            with open(os.path.join(self.konf, "aufbewahrung"), encoding="utf-8") as f:
+                wert = int(f.read().strip())
+            if wert >= 1:
+                return wert
+        except (OSError, ValueError):
+            pass
+        try:
+            return max(1, int(lese_konf().get("EPM_BACKUP_TAGE") or 30))
+        except ValueError:
+            return 30
+
+    def aufbewahrung_setzen(self, tage, zeile):
+        if isinstance(tage, bool) or tage not in AUFBEWAHRUNG_TAGE:
+            return 2, "Bitte 7, 14 oder 30 Tage wählen."
+        self.konf_ordner()
+        vorher = self.aufbewahrung_tage()
+        tmp = os.path.join(self.konf, f".aufbewahrung.{os.getpid()}")
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(f"{tage}\n")
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, os.path.join(self.konf, "aufbewahrung"))
+        zeile(f"Aufbewahrung: {tage} Tage (bisher {vorher}). Ältere Sicherungen entfernt die nächste Sicherung.\n")
+        self.sicherung_status_schreiben()
+        return 0, f"Sicherungen bleiben {tage} Tage auf dem Server (bisher {vorher})."
+
+    # ------------------------------------------------------------ Sicherungen: herunterladen und hochladen
+    def austausch_ordner(self):
+        """Ordner für den Austausch mit dem Backend (falls rollout/04-projekt.sh sie noch nicht angelegt hat)."""
+        os.makedirs(self.download, mode=0o750, exist_ok=True)
+        os.makedirs(self.upload, mode=0o770, exist_ok=True)
+        if os.geteuid() == 0:
+            os.chown(self.download, 0, APP_GID)
+            os.chmod(self.download, 0o750)
+            os.chown(self.upload, self.app_uid, APP_GID)
+            os.chmod(self.upload, 0o770)
+
+    def bereitgestellt(self):
+        """Zum Herunterladen bereitgestellte Sicherungen: [{stempel, datei, groesse, bis}]"""
+        liste = []
+        try:
+            namen = os.listdir(self.download)
+        except OSError:
+            return liste
+        for n in sorted(namen):
+            m = BUENDEL_MUSTER.match(n)
+            if not m:
+                continue
+            try:
+                info = os.lstat(os.path.join(self.download, n))
+            except OSError:
+                continue
+            bis = datetime.fromtimestamp(info.st_mtime + BUENDEL_STUNDEN * 3600, timezone.utc).astimezone()
+            liste.append({"stempel": m.group(1), "datei": n, "groesse": info.st_size,
+                          "bis": bis.isoformat(timespec="seconds")})
+        return liste
+
+    def austausch_aufraeumen(self):
+        """Bereitgestellte Sicherungen nach 2 Stunden und liegengebliebene Uploads nach 24 Stunden entfernen."""
+        jetzt = time.time()
+        for ordner, stunden in ((self.download, BUENDEL_STUNDEN), (self.upload, UPLOAD_ALT_STUNDEN)):
+            try:
+                namen = os.listdir(ordner)
+            except OSError:
+                continue
+            for n in namen:
+                pfad = os.path.join(ordner, n)
+                try:
+                    info = os.lstat(pfad)
+                    if stat.S_ISREG(info.st_mode) and jetzt - info.st_mtime > stunden * 3600:
+                        os.unlink(pfad)
+                except OSError:
+                    pass
+
+    def bereitstellen(self, stempel, zeile):
+        """Eine Sicherung als eine Datei (epm-sicherung_<Stempel>.tar: Datenbank, Dokumente, Löschliste, Prüfsummen,
+        Angaben) zum Herunterladen bereitlegen – für 2 Stunden, lesbar nur für Backend und Webserver (Gruppe 101).
+        Die Dateien bleiben, wie sie sind: verschlüsselte Sicherungen bleiben verschlüsselt."""
+        if not isinstance(stempel, str) or not STEMPEL_MUSTER.match(stempel):
+            return 2, "Unbekannte Sicherung."
+        s = next((x for x in self.sicherungen() if x["stempel"] == stempel), None)
+        if s is None:
+            return 2, f"Die Sicherung {stempel} gibt es auf dem Server nicht (mehr)."
+        self.austausch_ordner()
+        namen = list(s["dateien"])
+        for endung in ("sha256", "json"):
+            if os.path.exists(os.path.join(self.backup, f"epm_{stempel}.{endung}")):
+                namen.append(f"epm_{stempel}.{endung}")
+        try:
+            frei = os.statvfs(self.download)
+            if frei.f_bavail * frei.f_frsize < s["groesse"] + 64 * 1024 * 1024:
+                return 1, "Zu wenig freier Speicher auf dem Server, um die Sicherung bereitzustellen."
+        except OSError:
+            pass
+        ziel = os.path.join(self.download, f"epm-sicherung_{stempel}.tar")
+        tmp = f"{ziel}.teil"
+        zeile(f"Sicherung vom {s['zeitpunkt']} ({stempel}): {len(namen)} Dateien, "
+              f"{'verschlüsselt' if s['verschluesselt'] else 'UNVERSCHLÜSSELT'}.\n")
+        try:
+            with tarfile.open(tmp, "w") as tar:
+                for n in namen:
+                    tar.add(os.path.join(self.backup, n), arcname=n, recursive=False)
+            if os.geteuid() == 0:
+                os.chown(tmp, 0, APP_GID)
+            os.chmod(tmp, 0o640)
+            os.replace(tmp, ziel)
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+        groesse = os.stat(ziel).st_size
+        zeile(f"Bereitgestellt: {os.path.basename(ziel)} ({groesse} Bytes), {BUENDEL_STUNDEN} Stunden lang.\n")
+        self.sicherung_status_schreiben()
+        return 0, f"Sicherung zum Herunterladen bereit ({BUENDEL_STUNDEN} Stunden)."
+
+    def passwort_passt(self, datei, passwort_datei):
+        """Lässt sich die verschlüsselte Datei mit diesem Passwort lesen? (entschlüsselt nach /dev/null)"""
+        heim = tempfile.mkdtemp(prefix="epm-gpg-")
+        try:
+            rc, _aus = self.befehl(["gpg", "--homedir", heim, "--batch", "--yes", "--quiet", "--no-symkey-cache",
+                                    "--pinentry-mode", "loopback", "--passphrase-file", passwort_datei, "--decrypt",
+                                    "-o", "/dev/null", datei], zeitlimit=3 * 3600)
+        finally:
+            self.befehl(["gpgconf", "--homedir", heim, "--kill", "all"], zeitlimit=30)
+            shutil.rmtree(heim, ignore_errors=True)
+        return rc == 0
+
+    def einlesen(self, kennung, passwort, von, zeile):
+        """Hochgeladene Sicherung (epm-sicherung_<Stempel>.tar, wie sie „Herunterladen“ liefert) prüfen und in den
+        Backup-Ordner übernehmen: nur die bekannten Dateinamen einer Sicherung, Prüfsummen müssen stimmen, eine
+        vorhandene Sicherung wird nie überschrieben. Ist sie mit einem Passwort verschlüsselt, das dieser Server
+        nicht kennt (Sicherung eines anderen EPM-Servers), wird das mitgegebene Passwort geprüft und für diese
+        Sicherung hinterlegt. Danach steht sie in der Liste und lässt sich wie jede andere wiederherstellen."""
+        if not isinstance(kennung, str) or not ID_MUSTER.match(kennung):
+            return 2, "Unbekannter Upload."
+        quelle = os.path.join(self.upload, f"{kennung}.teil")
+        neben = os.path.join(self.upload, f"{kennung}.json")
+
+        def weg():
+            for pfad in (quelle, neben):
+                try:
+                    os.unlink(pfad)
+                except OSError:
+                    pass
+
+        try:
+            fd = os.open(quelle, os.O_RDONLY | os.O_NOFOLLOW)
+        except OSError:
+            return 2, "Die hochgeladene Datei liegt nicht (mehr) auf dem Server."
+        arbeit = os.path.join(self.backup, f".einlesen-{kennung[:12]}")
+        try:
+            with os.fdopen(fd, "rb") as f:
+                if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+                    return 2, "Die hochgeladene Datei ist keine gewöhnliche Datei."
+                try:
+                    tar = tarfile.open(fileobj=f, mode="r:")
+                except (tarfile.TarError, OSError):
+                    weg()
+                    return 1, "Die Datei ist keine Sicherung von EPM (kein tar-Archiv, wie es „Herunterladen“ liefert)."
+                with tar:
+                    try:
+                        glieder = tar.getmembers()
+                    except (tarfile.TarError, OSError):
+                        weg()
+                        return 1, "Die Datei ist beschädigt (tar-Archiv nicht lesbar)."
+                    stempel, namen = None, []
+                    for g in glieder:
+                        m = DATEI_MUSTER.match(g.name) or NEBEN_MUSTER.match(g.name)
+                        st = (m.group(2) if DATEI_MUSTER.match(g.name) else m.group(1)) if m else None
+                        if not g.isreg() or not m or (stempel and st != stempel) or g.name in namen:
+                            weg()
+                            return 1, ("Die Datei ist keine Sicherung von EPM: Sie enthält etwas anderes als die Dateien "
+                                       "genau einer Sicherung.")
+                        stempel = st
+                        namen.append(g.name)
+                    daten = [n for n in namen if DATEI_MUSTER.match(n)]
+                    if not any(n.startswith("epm-db_") for n in daten) or \
+                            not any(n.startswith("epm-dokumente_") for n in daten):
+                        weg()
+                        return 1, "Die Sicherung ist unvollständig: Datenbank oder Dokumente fehlen."
+                    if any(n.endswith(".age") for n in daten):
+                        weg()
+                        return 1, ("Diese Sicherung ist mit einem öffentlichen Schlüssel (age) verschlüsselt und lässt "
+                                   "sich hier nicht zurückspielen.")
+                    if any(x["stempel"] == stempel for x in self.sicherungen()) or \
+                            any(os.path.exists(os.path.join(self.backup, n)) for n in namen):
+                        weg()
+                        return 1, f"Die Sicherung {stempel} gibt es auf diesem Server schon – nichts verändert."
+                    bedarf = sum(g.size for g in glieder)
+                    try:
+                        frei = os.statvfs(self.backup)
+                        if frei.f_bavail * frei.f_frsize < bedarf + 64 * 1024 * 1024:
+                            return 1, "Zu wenig freier Speicher im Backup-Ordner. Die hochgeladene Datei bleibt liegen."
+                    except OSError:
+                        pass
+                    shutil.rmtree(arbeit, ignore_errors=True)
+                    os.makedirs(arbeit, mode=0o700)
+                    zeile(f"Sicherung {stempel}: {len(namen)} Dateien auspacken …\n")
+                    for g in glieder:
+                        quelle_f = tar.extractfile(g)
+                        ziel_fd = os.open(os.path.join(arbeit, g.name), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                        with os.fdopen(ziel_fd, "wb") as ziel_f:
+                            shutil.copyfileobj(quelle_f, ziel_f, 1 << 20)
+            # Prüfsummen (im Arbeitsordner)
+            if f"epm_{stempel}.sha256" in namen:
+                with open(os.path.join(arbeit, f"epm_{stempel}.sha256"), encoding="utf-8", errors="replace") as f:
+                    soll = {}
+                    for z in f.read().splitlines():
+                        teile = z.split(None, 1)
+                        if len(teile) == 2:
+                            soll[os.path.basename(teile[1].strip().lstrip("*"))] = teile[0]
+                for n in daten:
+                    h = hashlib.sha256()
+                    with open(os.path.join(arbeit, n), "rb") as f:
+                        for block in iter(lambda: f.read(1 << 20), b""):
+                            h.update(block)
+                    if soll.get(n) != h.hexdigest():
+                        weg()
+                        return 1, f"Die Sicherung ist beschädigt: Prüfsumme von {n} stimmt nicht. Nichts übernommen."
+                zeile("Prüfsummen stimmen.\n")
+            else:
+                zeile("Die Sicherung enthält keine Prüfsummen – ohne Prüfung übernommen.\n")
+            # Verschlüsselung: Welches hinterlegte Passwort passt? Sonst das mitgegebene prüfen und hinterlegen.
+            verschluesselt = any(n.endswith(".gpg") for n in daten)
+            nr = None
+            if verschluesselt:
+                if not all(n.endswith(".gpg") for n in daten):
+                    weg()
+                    return 1, "Die Sicherung ist nur teilweise verschlüsselt – nichts übernommen."
+                if not shutil.which("gpg"):
+                    return 1, "GnuPG fehlt auf dem Server (sudo apt install gnupg). Die hochgeladene Datei bleibt liegen."
+                probe = min((os.path.join(arbeit, n) for n in daten), key=os.path.getsize)
+                stand = self.passwort_stand()
+                for v in sorted(stand["versionen"], key=lambda v: -(v.get("nr") or 0)):
+                    datei = self.passwort_datei(v.get("nr"))
+                    if datei and self.passwort_passt(probe, datei):
+                        nr = v["nr"]
+                        zeile(f"Verschlüsselt mit dem hinterlegten Sicherungs-Passwort Nr. {nr}.\n")
+                        break
+                if nr is None:
+                    if not isinstance(passwort, str) or not passwort:
+                        return 3, ("Die Sicherung ist mit einem Passwort verschlüsselt, das dieser Server nicht kennt. "
+                                   "Bitte beim Einlesen das Passwort dieser Sicherung angeben (vom Passwortblatt des "
+                                   "anderen Servers). Die hochgeladene Datei bleibt bis dahin liegen.")
+                    if not (1 <= len(passwort) <= PASSWORT_MAX) or any(z in passwort for z in "\r\n\0"):
+                        return 3, "Das angegebene Passwort ist ungültig. Die hochgeladene Datei bleibt liegen."
+                    self.konf_ordner()
+                    probe_pw = os.path.join(self.konf, f".probe-{kennung[:12]}")
+                    fd = os.open(probe_pw, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                    with os.fdopen(fd, "w", encoding="utf-8") as f:
+                        f.write(passwort)
+                    passt = False
+                    try:
+                        passt = self.passwort_passt(probe, probe_pw)
+                    finally:
+                        if not passt:
+                            os.unlink(probe_pw)
+                    if not passt:
+                        return 3, ("Das angegebene Passwort passt nicht zu dieser Sicherung. Die hochgeladene Datei "
+                                   "bleibt liegen – bitte erneut mit dem richtigen Passwort einlesen.")
+                    nr = max([v.get("nr", 0) for v in stand["versionen"]] + [0]) + 1
+                    os.replace(probe_pw, os.path.join(self.konf, f"passwort-{nr}"))
+                    salz = os.urandom(16)
+                    wert = hashlib.scrypt(passwort.encode(), salt=salz, n=2 ** 14, r=8, p=1, dklen=32)
+                    stand["versionen"].append({"nr": nr, "gesetzt_am": jetzt_iso(), "gesetzt_von": von or "",
+                                               "fremd": True,
+                                               "pruefwert": {"verfahren": "scrypt", "n": 2 ** 14, "r": 8, "p": 1,
+                                                             "salz": salz.hex(), "wert": wert.hex()}})
+                    self.schreibe(os.path.join(self.konf, "passwort.json"), stand, modus=0o600)
+                    zeile(f"Passwort der Sicherung geprüft und als Nr. {nr} hinterlegt (nur für diese Sicherung; das "
+                          "aktuelle Sicherungs-Passwort dieses Servers bleibt).\n")
+            # Angaben zur Sicherung: Herkunft und – für das Wiederherstellen – die hiesige Nummer des Passworts
+            meta_pfad = os.path.join(arbeit, f"epm_{stempel}.json")
+            meta = self.lies(meta_pfad) if f"epm_{stempel}.json" in namen else None
+            meta = meta if isinstance(meta, dict) else {"version": 1, "stempel": stempel}
+            if meta.get("art") in ARTEN and meta.get("art") != "hochgeladen":
+                meta["art_urspruenglich"] = meta["art"]
+            meta.update({"art": "hochgeladen", "ausgeloest_von": von or "", "hochgeladen_am": jetzt_iso(),
+                         "verschluesselt": verschluesselt, "passwort_nr": nr})
+            self.schreibe(meta_pfad, meta, modus=0o600)
+            if f"epm_{stempel}.json" not in namen:
+                namen.append(f"epm_{stempel}.json")
+            for n in namen:
+                os.chmod(os.path.join(arbeit, n), 0o600)
+                os.replace(os.path.join(arbeit, n), os.path.join(self.backup, n))
+            weg()
+            self.sicherung_status_schreiben()
+            return 0, (f"Sicherung {stempel} übernommen ({'verschlüsselt' if verschluesselt else 'unverschlüsselt'}). "
+                       "Sie steht in der Liste und lässt sich wiederherstellen.")
+        finally:
+            shutil.rmtree(arbeit, ignore_errors=True)
+
     # ------------------------------------------------------------ Sicherungen: Status für das Backend
     def sicherung_status_schreiben(self):
         stand = self.passwort_stand()
@@ -807,7 +1165,7 @@ class Agent:
         for v in stand["versionen"]:
             nr = v.get("nr")
             versionen.append({"nr": nr, "gesetzt_am": v.get("gesetzt_am"), "gesetzt_von": v.get("gesetzt_von", ""),
-                              "entfernt_am": v.get("entfernt_am"),
+                              "entfernt_am": v.get("entfernt_am"), "fremd": bool(v.get("fremd")),
                               "sicherungen": sum(1 for s in liste if s["passwort_nr"] == nr)})
             if v.get("pruefwert") and not v.get("entfernt_am"):
                 pruefwerte.append({"nr": nr, **v["pruefwert"]})
@@ -854,7 +1212,10 @@ class Agent:
             },
             "sicherungen": liste,
             "speicher": {"platz": platz, "sicherungen": sum(x["groesse"] for x in liste)},
-            "aufbewahrung_tage": int(lese_konf().get("EPM_BACKUP_TAGE") or 30),
+            "aufbewahrung_tage": self.aufbewahrung_tage(),
+            "aufbewahrung_auswahl": list(AUFBEWAHRUNG_TAGE),
+            "bereitgestellt": self.bereitgestellt(),
+            "austausch": os.path.isdir(self.download) and os.path.isdir(self.upload),
             "naechste_sicherung": naechste_sicherung,
             "nachts_fehlgeschlagen": nachts_fehlgeschlagen,
             "gpg": bool(shutil.which("gpg")),
@@ -1217,7 +1578,7 @@ class Agent:
         if not os.path.exists(self.backup_skript):
             zeile(f"\n{self.backup_skript} fehlt – Sicherung nicht möglich.\n")
             return 1
-        env = {"EPM_BASIS": self.basis, "EPM_SICHERUNG_KONF": self.konf}
+        env = {"EPM_BASIS": self.basis, "EPM_SICHERUNG_KONF": self.konf, "EPM_BACKUP_TAGE": str(self.aufbewahrung_tage())}
         if self.projekt:
             env["EPM_COMPOSE_PROJEKT"] = self.projekt
         args = [self.backup_skript, "--art", art] + (["--von", von] if von else [])
@@ -1318,6 +1679,17 @@ class Agent:
 
         if aktion == "sicherung_uebertragen":
             return (0, "Probelauf: nichts übertragen.") if t else self.uebertragen(zeile, manuell=True)
+
+        if aktion == "sicherung_aufbewahrung":
+            return (0, "Probelauf: Aufbewahrung nicht geändert.") if t else \
+                self.aufbewahrung_setzen(parameter.get("tage"), zeile)
+
+        if aktion == "sicherung_bereitstellen":
+            return (0, "Probelauf: nichts bereitgestellt.") if t else self.bereitstellen(parameter.get("stempel"), zeile)
+
+        if aktion == "sicherung_einlesen":
+            return (0, "Probelauf: nichts eingelesen.") if t else \
+                self.einlesen(parameter.get("upload"), geheim.get("passwort"), von, zeile)
 
         if aktion == "wiederherstellen":
             if t:

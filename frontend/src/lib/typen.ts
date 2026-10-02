@@ -24,18 +24,26 @@ export type Ich = {
   nachname: string;
   kuerzel: string | null;
   funktion: string;
-  rolle: "betrachter" | "mitarbeiter" | "mediziner" | "admin";
+  rolle: "betrachter" | "mitarbeiter" | "mediziner" | "admin" | "keine";
   ist_test: boolean;
   darstellung: Partial<Darstellung>;
   /** karten: vollständig, in Anzeigereihenfolge (fehlende ergänzt der Server mit dem Standard der Rolle);
    *  notfallhinweis_bei: Hinweis zu den Notfall-Codes bei dieser Anzahl ausgeblendet (S08) */
-  startseite: { karten: Karte[]; notfallhinweis_bei?: number | null };
+  startseite: { karten: Karte[]; notfallhinweis_bei?: number | null; zweifaktorhinweis_aus?: boolean };
   /** Spaltenteiler je Seite und Fensterstufe (S17): {"akte_uebersicht@fhd": [0.6667]} */
   aufteilung: Record<string, number[]>;
+  /** Größe der Karten je Seite (Akte, System): {"akte_uebersicht": {"gewicht": {breite: 2, hoehe: 0}}} */
+  bereiche: Record<string, Record<string, Bereichsgroesse>>;
+  /** Authenticator-App eingerichtet / für dieses Konto Pflicht (sonst freiwillig, Festlegung 02.10.2026) */
+  zweiter_faktor: boolean;
+  zweiter_faktor_pflicht: boolean;
   rechte: Recht[];
   /** Admins: Patientendaten nur bei Testpatienten schreiben (echte Akten nur lesen) */
   schreibt_nur_testpatienten: boolean;
 };
+
+/** Breite in Spalten des Rasters (1–5), Höhe in Rasterzeilen (0 = automatisch nach Inhalt, sonst 1–4) */
+export type Bereichsgroesse = { breite: number; hoehe: number };
 
 export type Schritt = "anmelden" | "kennwort_aendern" | "2fa_einrichten" | "2fa" | "fertig";
 
@@ -51,6 +59,7 @@ export const ROLLEN: Record<string, string> = {
   mitarbeiter: "Mitarbeiter",
   mediziner: "Mediziner",
   admin: "Admin",
+  keine: "Keine Berechtigung",
 };
 
 export const ABSCHLUSSANLAESSE: Record<string, string> = {
@@ -92,6 +101,7 @@ export type Kennzahlen = {
   /** nur in der Patientenliste (breite Spalten, S16) */
   naechster_termin?: { id: number; art: string; faellig_am: string; uhrzeit: string | null; titel: string } | null;
   plan?: { gueltig_ab: string | null; alt: boolean; entwurf: boolean } | null;
+  kein_plan?: boolean;
   erklaerungen_fehlen?: ErklaerungsArt[];
 };
 
@@ -259,6 +269,8 @@ export type Patient = {
     auskunft: { id: number; name: string; beziehung: string | null; telefon: string }[];
     hausarzt: { id: number; name: string; praxis: string; telefon: string } | null;
     aktueller_plan: { id: number; gueltig_ab: string; kcal: number; laufzeit_h: number | null } | null;
+    /** „Kein Infusionsplan nötig“ bestätigt (Ergänzung zur Fehlerliste 02.10.2026) */
+    kein_plan?: { grund: string; am: string | null; von: string | null } | null;
     naechster_termin: {
       id: number; art: string; titel: string; faellig_am: string; uhrzeit: string | null; ort: string | null; bei: string;
     } | null;
@@ -557,6 +569,7 @@ export type Benutzer = {
   nur_historisch: boolean;
   anzeigename: string;
   zweiter_faktor: boolean;
+  zweiter_faktor_pflicht: boolean;
   muss_kennwort_aendern: boolean;
   einmal_kennwort_gueltig_bis: string | null;
   gesperrt_am: string | null;

@@ -11,6 +11,9 @@ Festlegungen vom 01.10.2026:
   freischaltbar. Endgültig löschen (Dokumente, Akten): Mediziner und Admin, Admins auch bei echten Akten.
 - Altdaten übernehmen (Import, F65): nur Admin; anderen Rollen nicht erteilbar. Der Import ist eine bewusste
   Ausnahme von „Admins schreiben Patientendaten nur bei Testpatienten“ – er legt die übernommenen Akten an.
+- Festlegungen 02.10.2026 (Fehlerliste): Admins dürfen auch bei echten Akten Dokumente einem anderen Patienten zuordnen
+  und Akten abschließen (wie schon endgültig löschen). Neue Rolle „Keine Berechtigung“: keinerlei Rechte, nicht
+  einstellbar; Konten ohne Login haben immer diese Rolle.
 Für Betrachter gilt die Rollenmatrix aus dem Entwurf 17.
 
 Was nicht ausdrücklich in der Datenbank steht, kommt aus STANDARD. Testbenutzer erhalten nie
@@ -71,6 +74,9 @@ PATIENTENDATEN_SCHREIBEN = {"eintraege_erfassen", "akten_bearbeiten", "plaene_an
 # Endgültiges Löschen (F73, F80) dürfen Admins auch bei echten Akten (Festlegung 02.10.2026); die übrigen Prüfungen
 # (Frist bzw. Antrag, Kennwort + 2FA + Bestätigungscode, Audit-Log, Löschprotokoll) gelten unverändert
 LOESCHEN = {"dokumente_loeschen", "akten_loeschen"}
+# Was Admins auch bei echten Akten dürfen (Ausnahmen von „Admins schreiben Patientendaten nur bei Testpatienten“):
+# endgültig löschen, Dokumente einem anderen Patienten zuordnen, Akten abschließen (Festlegungen 02.10.2026)
+AUCH_BEI_ECHTEN_AKTEN = LOESCHEN | {"dokumente_umhaengen", "akten_abschliessen"}
 
 # Rechte, die nur bestimmte Rollen haben können; anderen Rollen nicht erteilbar (Festlegungen 02.10.2026:
 # endgültig löschen nur Mediziner und Admin – Admins auch bei echten Akten, Ausnahme von „Admins schreiben
@@ -79,7 +85,11 @@ LOESCHEN = {"dokumente_loeschen", "akten_loeschen"}
 NUR_ROLLEN = {"dokumente_loeschen": {Rolle.MEDIZINER, Rolle.ADMIN}, "akten_loeschen": {Rolle.MEDIZINER, Rolle.ADMIN},
               "altdaten_importieren": {Rolle.ADMIN}}
 
+# Rollen ohne jedes Recht – in der Matrix nicht einstellbar
+OHNE_RECHTE = {Rolle.KEINE}
+
 STANDARD = {
+    Rolle.KEINE: set(),
     Rolle.BETRACHTER: {"akten_lesen"},
     # Datenschutz: Mitarbeiter erfassen Erklärungen und Anfragen und schließen freigegebene Pläne ab;
     # entscheiden, einschränken und löschen bleibt beim Mediziner
@@ -111,6 +121,8 @@ def matrix() -> dict:
             ergebnis[rolle][recht] = erlaubt
     for rolle, recht in FEST:
         ergebnis[rolle][recht] = True
+    for rolle in OHNE_RECHTE:
+        ergebnis[rolle] = {code: False for code in CODES}
     for recht, rollen in NUR_ROLLEN.items():
         for rolle in ergebnis:
             if rolle not in rollen:
@@ -122,6 +134,8 @@ def rechte_fuer(user) -> frozenset:
     """Rechte eines Benutzers (eine kleine Abfrage; bewusst ohne Zwischenspeicher, damit
     Änderungen der Administration sofort gelten)."""
     if user is None or not getattr(user, "is_authenticated", False):
+        return frozenset()
+    if user.rolle in OHNE_RECHTE or getattr(user, "nur_historisch", False):
         return frozenset()
     werte = matrix().get(user.rolle, {})
     rechte = {code for code, erlaubt in werte.items() if erlaubt}

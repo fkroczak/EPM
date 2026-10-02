@@ -18,7 +18,7 @@ import { Icon } from "@/components/ui/icon";
 import { AuthenticatorEinrichten, NotfallcodesAnzeige } from "./Anmeldung";
 
 type Sicherheit = { kennwort_geaendert_am: string | null; authenticator_aktiv: boolean; authenticator_eingerichtet_am: string | null;
-  notfallcodes_uebrig: number; notfallcodes_gesamt: number };
+  notfallcodes_uebrig: number; notfallcodes_gesamt: number; zweiter_faktor_pflicht?: boolean };
 type Sitzung = { id: number; browser: string; ip: string | null; angemeldet_am: string; zuletzt_am: string; diese: boolean };
 
 const SCHEMATA: { wert: Darstellung["schema"]; titel: string; text: string; farben: [string, string, string] }[] = [
@@ -223,8 +223,46 @@ function KennwortDialog({ offen, onOffen }: { offen: boolean; onOffen: (o: boole
   );
 }
 
+/** Zwei-Faktor-Anmeldung ausschalten (nur solange sie freiwillig ist): mit Passwort und einem gültigen Code */
+function AusschaltenDialog({ offen, onOffen }: { offen: boolean; onOffen: (o: boolean) => void }) {
+  const [kennwort, setKennwort] = useState("");
+  const [code, setCode] = useState("");
+  const { setIch } = useAuth();
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const aus = useMutation({
+    mutationFn: () => api<Ich>("auth/2fa/ausschalten/", { body: { kennwort, code } }),
+    onSuccess: (ich) => {
+      setIch(ich);
+      void qc.invalidateQueries({ queryKey: ["konto"] });
+      void qc.invalidateQueries({ queryKey: ["startseite"] });
+      melden("Zwei-Faktor-Anmeldung ausgeschaltet.");
+      onOffen(false);
+    },
+  });
+  useEffect(() => { if (offen) { setKennwort(""); setCode(""); aus.reset(); } }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const f = aus.error instanceof ApiFehler ? aus.error.felder : {};
+  return (
+    <Dialog offen={offen} onOffen={onOffen} titel="Zwei-Faktor-Anmeldung ausschalten" breite={520}
+      beschreibung="Authenticator und Notfall-Codes werden gelöscht. Zum Anmelden genügen danach Benutzername und Passwort."
+      fuss={<><Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
+        <Knopf variante="dng" laedt={aus.isPending} disabled={!kennwort || !code} onClick={() => aus.mutate()}>Ausschalten</Knopf></>}>
+      <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); if (kennwort && code) aus.mutate(); }}>
+        <Meldung art="warn">Ohne zweiten Faktor schützt nur noch das Passwort dein Konto – und damit die Patientendaten, die du sehen darfst.</Meldung>
+        <div className="grid grid-cols-2 gap-3">
+          <Feld label="Dein Passwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
+          <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={f.code}>
+            {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />}</Feld>
+        </div>
+        {aus.error && !Object.keys(f).length ? <Meldung art="fehler">{aus.error.message}</Meldung> : null}
+        <button type="submit" hidden />
+      </form>
+    </Dialog>
+  );
+}
+
 function SicherheitKarte() {
-  const [dialog, setDialog] = useState<"" | "kennwort" | "geraet" | "codes">("");
+  const [dialog, setDialog] = useState<"" | "kennwort" | "geraet" | "codes" | "aus">("");
   const [codes, setCodes] = useState<string[] | null>(null);
   const { setStatus } = useAuth();
   const qc = useQueryClient();
@@ -241,26 +279,36 @@ function SicherheitKarte() {
   // „Neue Codes erzeugen“ im Hinweis der Startseite führt hierher
   const location = useLocation();
   useEffect(() => {
-    if ((location.state as { sicherheit?: number } | null)?.sicherheit) {
+    // … ebenso „2FA einrichten“ (Startseite, Administration › System: /konto#zwei-faktor)
+    if ((location.state as { sicherheit?: number } | null)?.sicherheit || location.hash === "#zwei-faktor") {
       document.querySelector('[data-testid="sicherheit"]')?.scrollIntoView({ block: "start" });
     }
-  }, [location.state]);
+  }, [location.state, location.hash, s.data]);
   const d = s.data;
   return (
-    <Karte className="px-5 py-[18px] flex flex-col gap-1" data-testid="sicherheit">
+    <Karte className="px-5 py-[18px] flex flex-col gap-1" data-testid="sicherheit" id="zwei-faktor">
       <h2 className="lbl m-0 mb-1">Anmeldung und Sicherheit</h2>
       {s.isLoading || !d ? <Laden /> : <>
         <Zeile titel="Passwort" unter={d.kennwort_geaendert_am ? `zuletzt geändert ${datum(d.kennwort_geaendert_am)}` : "noch nie geändert"}
           rechts={<Knopf klein onClick={() => setDialog("kennwort")}>Ändern</Knopf>} />
-        <Zeile titel={<>Authenticator-App {d.authenticator_aktiv ? <Chip art="ok"><Icon name="haken" />aktiv</Chip> : <Chip art="warn">nicht eingerichtet</Chip>}</>}
-          unter={d.authenticator_eingerichtet_am ? `eingerichtet ${datum(d.authenticator_eingerichtet_am)}` : undefined}
-          rechts={<Knopf klein onClick={() => setDialog("geraet")}>Neues Gerät</Knopf>} />
-        <Zeile titel="Notfall-Codes" unter={`${d.notfallcodes_uebrig} von ${d.notfallcodes_gesamt} übrig, für verlorenes Handy`}
-          rechts={<Knopf klein onClick={() => setDialog("codes")}>Neu erzeugen</Knopf>} />
+        <Zeile titel={<>Zwei-Faktor-Anmeldung (Authenticator-App) {d.authenticator_aktiv ? <Chip art="ok"><Icon name="haken" />aktiv</Chip>
+            : <Chip art={d.zweiter_faktor_pflicht ? "warn" : undefined}>nicht eingerichtet</Chip>}</>}
+          unter={d.authenticator_aktiv ? (d.authenticator_eingerichtet_am ? `eingerichtet ${datum(d.authenticator_eingerichtet_am)}` : undefined)
+            : d.zweiter_faktor_pflicht ? "für dein Konto Pflicht" : "freiwillig – schützt dein Konto zusätzlich mit einem Code vom Telefon"}
+          rechts={<span className="flex gap-1.5">
+            {d.authenticator_aktiv && !d.zweiter_faktor_pflicht ? <Knopf klein variante="geist" onClick={() => setDialog("aus")}>Ausschalten</Knopf> : null}
+            <Knopf klein variante={d.authenticator_aktiv ? "sec" : "pri"} onClick={() => setDialog("geraet")}>{d.authenticator_aktiv ? "Neues Gerät" : "Einrichten"}</Knopf>
+          </span>} />
+        {d.authenticator_aktiv ? (
+          <Zeile titel="Notfall-Codes" unter={`${d.notfallcodes_uebrig} von ${d.notfallcodes_gesamt} übrig, für verlorenes Handy`}
+            rechts={<Knopf klein onClick={() => setDialog("codes")}>Neu erzeugen</Knopf>} />
+        ) : null}
       </>}
+      <AusschaltenDialog offen={dialog === "aus"} onOffen={(o) => setDialog(o ? "aus" : "")} />
       <KennwortDialog offen={dialog === "kennwort"} onOffen={(o) => setDialog(o ? "kennwort" : "")} />
-      <Dialog offen={dialog === "geraet"} onOffen={(o) => { setDialog(o ? "geraet" : ""); if (!o) setCodes(null); }} titel="Neues Gerät einrichten" breite={560}
-        beschreibung="Das bisherige Gerät gilt nicht mehr, sobald das neue bestätigt ist. Danach gibt es neue Notfall-Codes.">
+      <Dialog offen={dialog === "geraet"} onOffen={(o) => { setDialog(o ? "geraet" : ""); if (!o) setCodes(null); }} titel={d?.authenticator_aktiv || codes ? "Neues Gerät einrichten" : "Zwei-Faktor-Anmeldung einrichten"} breite={560}
+        beschreibung={d?.authenticator_aktiv ? "Das bisherige Gerät gilt nicht mehr, sobald das neue bestätigt ist. Danach gibt es neue Notfall-Codes."
+          : "Ab dann fragt EPM beim Anmelden zusätzlich nach dem Code aus der Authenticator-App. Danach gibt es Notfall-Codes für ein verlorenes Telefon."}>
         {codes ? (
           <NotfallcodesAnzeige codes={codes} weiterText="Fertig" onWeiter={() => { setCodes(null); setDialog(""); }} />
         ) : dialog === "geraet" ? (
@@ -269,7 +317,8 @@ function SicherheitKarte() {
             const { notfallcodes: _n, ...rest } = st;
             setStatus(rest);
             void qc.invalidateQueries({ queryKey: ["konto"] });
-            melden("Neues Gerät eingerichtet.");
+            void qc.invalidateQueries({ queryKey: ["startseite"] });
+            melden(d?.authenticator_aktiv ? "Neues Gerät eingerichtet." : "Zwei-Faktor-Anmeldung eingerichtet.");
           }} />
         ) : null}
       </Dialog>
@@ -320,7 +369,7 @@ export function Konto() {
               <span className="gedaempft">Funktion</span><span>{ich.funktion || "—"}</span>
               <span className="gedaempft">Kürzel</span><span className="num">{ich.kuerzel || "—"}</span>
               <span className="gedaempft">Benutzer</span><span className="num">{ich.benutzername}</span>
-              <span className="gedaempft">Rolle</span><span><Chip art="akzent">{ROLLEN[ich.rolle]}</Chip>{ich.ist_test ? <Chip art="warn" className="ml-2">Testzugang</Chip> : null}</span>
+              <span className="gedaempft">Rolle</span><span><Chip art={ich.rolle === "keine" ? undefined : "akzent"}>{ROLLEN[ich.rolle]}</Chip>{ich.ist_test ? <Chip art="warn" className="ml-2">Testzugang</Chip> : null}</span>
             </div>
             <span className="text-[0.8125rem] gedaempft">Name, Titel, Kürzel und Rolle ändert die Administration unter „Benutzer“.</span>
           </Karte>

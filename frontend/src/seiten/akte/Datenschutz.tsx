@@ -401,6 +401,7 @@ function AkteLoeschenDialog({ patient, offen, onOffen }: { patient: Patient; off
   const [grund, setGrund] = useState("");
   const [kennwort, setKennwort] = useState("");
   const [code, setCode] = useState("");
+  const zweiterFaktor = !!useAuth().ich?.zweiter_faktor;
   const [bestaetigung, setBestaetigung] = useState("");
   type Vorbereitung = { code: string; gueltig_bis: string; loeschen: AktenDatenschutz["loeschen"]; umfang: Record<string, number> };
   const vorbereiten = useMutation({
@@ -434,7 +435,7 @@ function AkteLoeschenDialog({ patient, offen, onOffen }: { patient: Patient; off
       beschreibung={`${name(patient)} · Nr. ${nummer(patient.nummer)}`}
       fuss={<><Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
         <Knopf variante="dng" laedt={loeschen.isPending} onClick={() => loeschen.mutate()}
-          disabled={!vorbereiten.data || grund.trim().length < 10 || !kennwort || code.trim().length < 6 || bestaetigung.trim().length < 6}>Akte endgültig löschen</Knopf></>}>
+          disabled={!vorbereiten.data || grund.trim().length < 10 || !kennwort || (zweiterFaktor && code.trim().length < 6) || bestaetigung.trim().length < 6}>Akte endgültig löschen</Knopf></>}>
       <div className="flex flex-col gap-3" data-testid="akte-loeschen">
         <Meldung art="fehler">Die Akte wird mit allen Einträgen, Infusionsplänen, Dokumenten und ihrem gesamten Verlauf
           unwiederbringlich gelöscht. Es bleiben das Löschprotokoll (Patientennummer, Daten zu Abschluss und Frist, Rechtsgrund,
@@ -452,7 +453,8 @@ function AkteLoeschenDialog({ patient, offen, onOffen }: { patient: Patient; off
         </Feld>
         <div className="grid grid-cols-2 gap-3">
           <Feld label="Kennwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
-          <Feld label="Code aus der Authenticator-App" fehler={f.code}>{(p) => <Eingabe {...p} inputMode="numeric" autoComplete="one-time-code" className="num" value={code} onChange={(e) => setCode(e.target.value)} />}</Feld>
+          {/* ohne eingerichtete Zwei-Faktor-Anmeldung genügt das Passwort (Fehlerliste 02.10.2026, 6.5) */}
+          {zweiterFaktor ? <Feld label="Code aus der Authenticator-App" fehler={f.code}>{(p) => <Eingabe {...p} inputMode="numeric" autoComplete="one-time-code" className="num" value={code} onChange={(e) => setCode(e.target.value)} />}</Feld> : null}
         </div>
         <div className="flex items-end gap-3 flex-wrap">
           <div className="flex flex-col gap-1">

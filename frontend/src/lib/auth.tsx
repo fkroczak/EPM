@@ -20,9 +20,10 @@ type AuthWert = {
 };
 
 /** Rechte, die Patientendaten verändern (siehe backend/accounts/rechte.py) */
-const PATIENTENDATEN: Recht[] = ["eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben", "akten_abschliessen",
+const PATIENTENDATEN: Recht[] = ["eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
   "plaene_abschliessen", "datenschutz_bearbeiten", "datenschutz_entscheiden"];
-// Endgültig löschen (dokumente_loeschen, akten_loeschen) dürfen Admins auch bei echten Akten (Festlegung 02.10.2026)
+// Auch bei echten Akten dürfen Admins (Festlegungen 02.10.2026): endgültig löschen (dokumente_loeschen, akten_loeschen),
+// Dokumente einem anderen Patienten zuordnen (dokumente_umhaengen) und Akten abschließen (akten_abschliessen)
 
 const AuthKontext = createContext<AuthWert | null>(null);
 
@@ -74,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const vorher = JSON.stringify(rechteRef.current);
         const s = await pruefen();
         const b = s?.schritt === "fertig" ? s.benutzer : null;
-        if (b && JSON.stringify([b.rechte, b.schreibt_nur_testpatienten, b.ist_test]) !== vorher) void queryClient.invalidateQueries();
+        if (b && JSON.stringify([b.rechte, b.schreibt_nur_testpatienten, b.ist_test, b.rolle]) !== vorher) void queryClient.invalidateQueries();
       } finally {
         laeuft = false;
       }
@@ -100,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [neuLaden, queryClient]);
 
   const ich = status?.schritt === "fertig" ? status.benutzer ?? null : null;
-  rechteRef.current = ich ? [ich.rechte, ich.schreibt_nur_testpatienten, ich.ist_test] : null;
+  rechteRef.current = ich ? [ich.rechte, ich.schreibt_nur_testpatienten, ich.ist_test, ich.rolle] : null;
   const setIch = useCallback((neu: Ich) => {
     setStatusRoh((s) => (s ? { ...s, benutzer: neu } : s));
     darstellungAnwenden(neu.darstellung);

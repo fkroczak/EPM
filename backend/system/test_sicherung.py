@@ -108,7 +108,10 @@ class Uebersicht(Backupverzeichnis):
         self.assertFalse(d["ziel"]["eingerichtet"])
         self.assertEqual(set(d["aktionen"]), {"sicherung", "sicherung_passwort", "sicherung_ziel",
                                               "sicherung_ziel_entfernen", "sicherung_ziel_testen",
-                                              "sicherung_uebertragen", "wiederherstellen"})
+                                              "sicherung_uebertragen", "sicherung_aufbewahrung",
+                                              "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen"})
+        self.assertEqual((d["aufbewahrung_auswahl"], d["austausch"], d["bereitgestellt"], d["uploads"]),
+                         ([7, 14, 30], True, [], []))
         self.assertEqual(d["aktionen"]["wiederherstellen"]["bestaetigung"], "2fa")
 
     def test_status_vom_server(self):
@@ -378,6 +381,158 @@ class Wiederherstellen(Backupverzeichnis):
         self.assertIn("Sicherung wiederherstellen erledigt: Sicherung wiederhergestellt.", texte)
 
 
+class Aufbewahrung(Backupverzeichnis):
+    """Fehlerliste 02.10.2026 (5.2): 7, 14 oder 30 Tage."""
+
+    def test_nur_die_drei_werte_mit_bestaetigung(self):
+        self.status_schreiben()
+        url = "/api/backup/aufbewahrung/"
+        for tage in (0, 10, "14", True, None):
+            with self.subTest(tage=tage):
+                r = self.a.post(url, {"tage": tage, "kennwort": KENNWORT, "code": self.admin_codes[0]}, format="json")
+                self.assertEqual((r.status_code, list(r.json())), (400, ["tage"]))
+        r = self.a.post(url, {"tage": 14}, format="json")
+        self.assertEqual((r.status_code, list(r.json())), (400, ["kennwort"]))
+        self.assertEqual(self.auftragsdateien(), [])
+        r = self.a.post(url, {"tage": 14, "kennwort": KENNWORT, "code": self.admin_codes[0]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        auftrag = self.auftragsdatei()
+        self.assertEqual((auftrag["aktion"], auftrag["parameter"]), ("sicherung_aufbewahrung", {"tage": 14}))
+        texte = [e["beschreibung"] for e in self.a.get("/api/protokoll/?gruppe=backup").json()["results"]]
+        self.assertIn("Aufbewahrung der Sicherungen: 14 Tage, mit Passwort und 2FA bestätigt", texte)
+        self.assertEqual(client_fuer(self.mediziner).post(url, {"tage": 7}, format="json").status_code, 403)
+
+
+class Herunterladen(Backupverzeichnis):
+    """Fehlerliste 02.10.2026 (5.1): Sicherung bereitstellen (Auftrag) und ausliefern."""
+
+    STEMPEL = "2026-10-01_020000"
+
+    def test_bereitstellen_und_ausliefern(self):
+        self.status_schreiben()
+        url = f"/api/backup/{self.STEMPEL}/bereitstellen/"
+        self.assertEqual(self.a.post("/api/backup/2020-01-01_000000/bereitstellen/",
+                                     {"kennwort": KENNWORT, "code": self.admin_codes[0]}, format="json").status_code, 404)
+        r = self.a.post(url, {"kennwort": "falsch", "code": self.admin_codes[0]}, format="json")
+        self.assertEqual((r.status_code, list(r.json())), (400, ["kennwort"]))
+        r = self.a.post(url, {"kennwort": KENNWORT, "code": self.admin_codes[0]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(self.auftragsdatei()["parameter"], {"stempel": self.STEMPEL})
+        # noch nicht bereit
+        datei = f"/api/backup/{self.STEMPEL}/datei/"
+        self.assertEqual(self.a.get(datei).status_code, 404)
+        self.assertEqual(self.a.get("/api/backup/..%2F..%2Fetc/datei/").status_code, 404)
+        # der Agent hat sie bereitgelegt und meldet es im Status
+        name = f"epm-sicherung_{self.STEMPEL}.tar"
+        (self.ordner / "download" / name).write_bytes(b"tar-inhalt")
+        self.status_schreiben(bereitgestellt=[{"stempel": self.STEMPEL, "datei": name, "groesse": 10, "bis": iso(-2)},
+                                              {"stempel": "2026-09-30_020000", "datei": "fehlt.tar", "groesse": 1,
+                                               "bis": iso(-2)}])
+        d = self.a.get("/api/backup/").json()
+        self.assertEqual([b["stempel"] for b in d["bereitgestellt"]], [self.STEMPEL])   # nur was wirklich da liegt
+        r = self.a.get(datei)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["X-Accel-Redirect"], f"/_geschuetzt/sicherung/{name}")
+        self.assertIn(f"filename*=UTF-8''{name}", r["Content-Disposition"])
+        self.assertEqual(r["Cache-Control"], "private, no-store")
+        texte = [e["beschreibung"] for e in self.a.get("/api/protokoll/?gruppe=backup").json()["results"]]
+        self.assertRegex(texte[0], r"^Sicherung vom \d{2}\.\d{2}\.\d{4} \d{2}:\d{2} heruntergeladen$")
+        self.assertTrue(any(t.startswith("Sicherung vom ") and "zum Herunterladen angefordert, mit Passwort und 2FA bestätigt" in t
+                            for t in texte))
+        # nur mit dem Recht „Sicherungen verwalten“
+        for user in (self.mediziner, self.mitarbeiter):
+            c = client_fuer(user)
+            self.assertEqual(c.get(datei).status_code, 403)
+            self.assertEqual(c.post(url, {"kennwort": KENNWORT}, format="json").status_code, 403)
+
+    def test_ohne_austausch_ordner(self):
+        self.status_schreiben()
+        shutil.rmtree(self.ordner / "download")
+        r = self.a.post(f"/api/backup/{self.STEMPEL}/bereitstellen/", {"kennwort": KENNWORT, "code": self.admin_codes[0]},
+                        format="json")
+        self.assertEqual(r.status_code, 503)
+        self.assertIn("epm-update", r.json()["fehler"])
+        self.assertFalse(self.a.get("/api/backup/").json()["austausch"])
+
+
+class Hochladen(Backupverzeichnis):
+    """Fehlerliste 02.10.2026 (5.3): Sicherung in Stücken hochladen, dann einlesen lassen."""
+
+    def beginne(self, groesse=10, name="epm-sicherung_2026-10-01_020000.tar", client=None):
+        return (client or self.a).post("/api/backup/hochladen/", {"name": name, "groesse": groesse}, format="json")
+
+    def stueck(self, kennung, daten, versatz, client=None):
+        return (client or self.a).put(f"/api/backup/hochladen/{kennung}/?versatz={versatz}", daten,
+                                      content_type="application/octet-stream")
+
+    def test_in_stuecken_hochladen_und_einlesen(self):
+        self.status_schreiben()
+        r = self.beginne()
+        self.assertEqual(r.status_code, 201, r.content)
+        kennung, teil = r.json()["upload"], r.json()["teil"]
+        self.assertEqual(teil, 4 * 1024 * 1024)
+        self.assertEqual(self.stueck(kennung, b"01234", 0).json(), {"erhalten": 5, "groesse": 10})
+        # falsche Stelle (z. B. nach einem Abbruch): der Server nennt, was er hat – dort geht es weiter
+        r = self.stueck(kennung, b"56789", 0)
+        self.assertEqual((r.status_code, r.json()["erhalten"]), (409, 5))
+        # noch unvollständig: kein Einlesen
+        r = self.a.post(f"/api/backup/hochladen/{kennung}/einlesen/", {}, format="json")
+        self.assertEqual((r.status_code, r.json()["erhalten"]), (409, 5))
+        # mehr als angekündigt wird abgewiesen
+        self.assertEqual(self.stueck(kennung, b"567890", 5).status_code, 400)
+        self.assertEqual(self.stueck(kennung, b"56789", 5).json()["erhalten"], 10)
+        self.assertEqual((self.ordner / "upload" / f"{kennung}.teil").read_bytes(), b"0123456789")
+        d = self.a.get("/api/backup/").json()
+        self.assertEqual([(u["upload"], u["name"], u["vollstaendig"], u["von"]) for u in d["uploads"]],
+                         [(kennung, "epm-sicherung_2026-10-01_020000.tar", True, "admin")])
+        # einlesen: Auftrag an den Agenten; das Passwort der Sicherung steht nur in der Auftragsdatei
+        fremd = "Passwort-des-anderen-Servers-1"
+        r = self.a.post(f"/api/backup/hochladen/{kennung}/einlesen/", {"passwort": fremd}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        auftrag = self.auftragsdatei()
+        self.assertEqual(auftrag["aktion"], "sicherung_einlesen")
+        self.assertEqual(auftrag["parameter"], {"upload": kennung, "datei": "epm-sicherung_2026-10-01_020000.tar"})
+        self.assertEqual(auftrag["geheim"], {"passwort": fremd})
+        self.nirgends_in_der_datenbank(fremd)
+        texte = [e["beschreibung"] for e in self.a.get("/api/protokoll/?gruppe=backup").json()["results"]]
+        self.assertIn("Hochgeladene Sicherung einlesen: epm-sicherung_2026-10-01_020000.tar, mit dem Passwort der Sicherung", texte)
+        self.assertIn("Hochladen einer Sicherung begonnen: epm-sicherung_2026-10-01_020000.tar", texte)
+        # während der Server einliest, lässt sich die Datei nicht verwerfen
+        self.assertEqual(self.a.delete(f"/api/backup/hochladen/{kennung}/").status_code, 409)
+
+    def test_pruefungen_und_verwerfen(self):
+        self.status_schreiben()
+        for name, groesse in (("sicherung.zip", 10), ("", 10), ("x.tar", 0), ("x.tar", -5), ("x.tar", "10"),
+                              ("x.tar", True), ("x.tar", 10 ** 15)):
+            with self.subTest(name=name, groesse=groesse):
+                self.assertEqual(self.beginne(groesse, name).status_code, 400)
+        self.assertEqual(list((self.ordner / "upload").iterdir()), [])
+        # Pfade im Namen werden entfernt
+        r = self.beginne(3, "../../etc/epm-sicherung_x.tar")
+        kennung = r.json()["upload"]
+        self.assertEqual(self.a.get("/api/backup/").json()["uploads"][0]["name"], "epm-sicherung_x.tar")
+        # unbekannte Kennungen, zu große Stücke, falscher Inhaltstyp
+        self.assertEqual(self.stueck("0" * 32, b"abc", 0).status_code, 404)
+        self.assertEqual(self.stueck("../" + kennung, b"abc", 0).status_code, 404)
+        self.assertEqual(self.a.put(f"/api/backup/hochladen/{kennung}/?versatz=0", {"a": 1}, format="json").status_code, 400)
+        self.assertEqual(self.a.post(f"/api/backup/hochladen/{kennung}/einlesen/", {"passwort": "x\ny"}, format="json").status_code, 409)
+        self.assertEqual(self.stueck(kennung, b"abc", 0).status_code, 200)
+        r = self.a.post(f"/api/backup/hochladen/{kennung}/einlesen/", {"passwort": "x\ny"}, format="json")
+        self.assertEqual((r.status_code, list(r.json())), (400, ["passwort"]))
+        # verwerfen
+        self.assertEqual(self.a.delete(f"/api/backup/hochladen/{kennung}/").status_code, 204)
+        self.assertEqual(list((self.ordner / "upload").iterdir()), [])
+        self.assertEqual(self.a.get("/api/backup/").json()["uploads"], [])
+        self.assertEqual(self.auftragsdateien(), [])
+        # Rechte
+        m = client_fuer(self.mediziner)
+        self.assertEqual(self.beginne(client=m).status_code, 403)
+        self.assertEqual(self.stueck(kennung, b"abc", 0, client=m).status_code, 403)
+        # ohne den Ordner (Server noch nicht aktualisiert)
+        shutil.rmtree(self.ordner / "upload")
+        self.assertEqual(self.beginne().status_code, 503)
+
+
 @unittest.skipUnless(AGENT.exists() and SKRIPT.exists() and shutil.which("gpg") and shutil.which("jq"),
                      "Systemagent und Backup-Skript nur im Repo, GnuPG und jq nötig")
 class EchterAgent(Backupverzeichnis):
@@ -488,3 +643,174 @@ class EchterAgent(Backupverzeichnis):
         for pfad in (self.ordner / "status").rglob("*.json"):
             self.assertNotIn(PASSWORT, pfad.read_text(), pfad)
         self.assertEqual((self.konf / "passwort-1").read_text(), PASSWORT)
+
+    def hochladen(self, inhalt: bytes, name: str) -> str:
+        """Datei wie die Oberfläche in Stücken hochladen; liefert die Kennung des Uploads."""
+        r = self.a.post("/api/backup/hochladen/", {"name": name, "groesse": len(inhalt)}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        kennung, teil = r.json()["upload"], 1000   # kleine Stücke, damit es mehrere sind
+        for versatz in range(0, len(inhalt), teil):
+            r = self.a.put(f"/api/backup/hochladen/{kennung}/?versatz={versatz}", inhalt[versatz:versatz + teil],
+                           content_type="application/octet-stream")
+            self.assertEqual(r.status_code, 200, r.content)
+        return kennung
+
+    def letzter_auftrag(self):
+        return self.a.get("/api/backup/").json()["auftraege"][0]
+
+    def test_aufbewahrung_herunterladen_hochladen(self):
+        """Fehlerliste 02.10.2026 (5.1–5.3) mit dem echten Agenten: Aufbewahrung 7 Tage; Sicherung herunterladen; auf
+        einem „anderen Server“ (ohne die Sicherung, ohne das Passwort) hochladen und einlesen."""
+        import tarfile
+
+        # Aufbewahrung: 7 Tage – der Agent merkt es sich, das Backup-Skript hält sich daran
+        r = self.a.post("/api/backup/aufbewahrung/", {"tage": 7, "kennwort": KENNWORT, "code": self.admin_codes[0]},
+                        format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.agent()
+        self.assertEqual(self.letzter_auftrag()["ergebnis"], "Sicherungen bleiben 7 Tage auf dem Server (bisher 30).")
+        self.assertEqual((self.konf / "aufbewahrung").read_text().strip(), "7")
+        self.assertEqual(self.a.get("/api/backup/").json()["aufbewahrung_tage"], 7)
+        # verschlüsselte Sicherung erstellen
+        r = self.a.post("/api/backup/passwort/", {"passwort": PASSWORT, "passwort2": PASSWORT, "kennwort": KENNWORT,
+                                                  "code": self.admin_codes[1]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.agent()
+        self.assertEqual(self.a.post("/api/backup/jetzt/").status_code, 201)
+        self.agent()
+        d = self.a.get("/api/backup/").json()
+        self.assertIn("Aufbewahrung 7 Tage", d["auftraege"][0]["ausgabe"])
+        s = d["sicherungen"][0]
+        stempel = s["stempel"]
+        self.assertTrue(s["verschluesselt"])
+        # eine acht Tage alte Sicherung räumt die nächste Sicherung weg (7 Tage), eine sechs Tage alte bleibt
+        import time
+        for alter, st in ((8, "2026-01-01_020000"), (6, "2026-01-03_020000")):
+            for n in (f"epm-db_{st}.dump", f"epm-dokumente_{st}.tar.gz"):
+                (self.basis / "backup" / n).write_bytes(b"alt")
+                os.utime(self.basis / "backup" / n, (time.time() - alter * 86400 - 60,) * 2)
+        time.sleep(1.1)
+        self.assertEqual(self.a.post("/api/backup/jetzt/").status_code, 201)
+        self.agent()
+        stempel_liste = [x["stempel"] for x in self.a.get("/api/backup/").json()["sicherungen"]]
+        self.assertNotIn("2026-01-01_020000", stempel_liste)
+        self.assertIn("2026-01-03_020000", stempel_liste)
+
+        # herunterladen: bereitstellen → eine tar-Datei mit allen Dateien der Sicherung, lesbar für Gruppe und Besitzer
+        r = self.a.post(f"/api/backup/{stempel}/bereitstellen/", {"kennwort": KENNWORT, "code": self.admin_codes[2]},
+                        format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.agent()
+        self.assertEqual(self.letzter_auftrag()["status"], "erledigt", self.letzter_auftrag()["ausgabe"])
+        d = self.a.get("/api/backup/").json()
+        self.assertEqual([b["stempel"] for b in d["bereitgestellt"]], [stempel])
+        buendel = self.ordner / "download" / f"epm-sicherung_{stempel}.tar"
+        self.assertEqual(stat.S_IMODE(buendel.stat().st_mode), 0o640)
+        self.assertEqual(d["bereitgestellt"][0]["groesse"], buendel.stat().st_size)
+        with tarfile.open(buendel) as tar:
+            namen = sorted(tar.getnames())
+        self.assertEqual(namen, sorted(s["dateien"] + [f"epm_{stempel}.json", f"epm_{stempel}.sha256"]))
+        self.assertEqual(self.a.get(f"/api/backup/{stempel}/datei/")["X-Accel-Redirect"],
+                         f"/_geschuetzt/sicherung/epm-sicherung_{stempel}.tar")
+        inhalt = buendel.read_bytes()
+
+        # dieselbe Sicherung hochladen, solange es sie gibt: abgewiesen, nichts verändert
+        kennung = self.hochladen(inhalt, buendel.name)
+        self.assertEqual(self.a.post(f"/api/backup/hochladen/{kennung}/einlesen/", {}, format="json").status_code, 201)
+        self.agent()
+        self.assertEqual(self.letzter_auftrag()["status"], "fehler")
+        self.assertIn("gibt es auf diesem Server schon", self.letzter_auftrag()["ergebnis"])
+        self.assertEqual(list((self.ordner / "upload").iterdir()), [])
+
+        # „anderer Server“: Sicherung und Passwort gibt es dort nicht
+        for pfad in (self.basis / "backup").glob(f"epm*{stempel}*"):
+            pfad.unlink()
+        for pfad in self.konf.glob("passwort*"):
+            pfad.unlink()
+        (self.konf / "aktuell").unlink()
+        kennung = self.hochladen(inhalt, buendel.name)
+        # ohne Passwort: nicht lesbar, die Datei bleibt für den nächsten Versuch liegen
+        self.assertEqual(self.a.post(f"/api/backup/hochladen/{kennung}/einlesen/", {}, format="json").status_code, 201)
+        self.agent()
+        self.assertEqual(self.letzter_auftrag()["status"], "fehler")
+        self.assertIn("Passwort dieser Sicherung angeben", self.letzter_auftrag()["ergebnis"])
+        self.assertTrue((self.ordner / "upload" / f"{kennung}.teil").exists())
+        # falsches Passwort
+        r = self.a.post(f"/api/backup/hochladen/{kennung}/einlesen/", {"passwort": "ganz-falsches-Passwort-1"}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.agent()
+        self.assertIn("passt nicht zu dieser Sicherung", self.letzter_auftrag()["ergebnis"])
+        self.assertEqual(list(self.konf.glob("passwort-*")), [])
+        self.assertEqual(list(self.konf.glob(".probe-*")), [])
+        # richtiges Passwort: übernommen, als „Hochgeladen“ in der Liste, Passwort nur für diese Sicherung hinterlegt
+        r = self.a.post(f"/api/backup/hochladen/{kennung}/einlesen/", {"passwort": PASSWORT}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.agent()
+        auftrag = self.letzter_auftrag()
+        self.assertEqual(auftrag["status"], "erledigt", auftrag["ausgabe"])
+        self.assertIn("Prüfsummen stimmen", auftrag["ausgabe"])
+        d = self.a.get("/api/backup/").json()
+        neu = next(x for x in d["sicherungen"] if x["stempel"] == stempel)
+        self.assertEqual((neu["art"], neu["art_name"], neu["ausgeloest_von"], neu["verschluesselt"], neu["wiederherstellbar"]),
+                         ("hochgeladen", "Hochgeladen", "admin", True, True))
+        self.assertEqual(sorted(neu["dateien"]), sorted(s["dateien"]))
+        nr = neu["passwort_nr"]
+        self.assertEqual((self.konf / f"passwort-{nr}").read_text(), PASSWORT)
+        self.assertEqual(stat.S_IMODE((self.konf / f"passwort-{nr}").stat().st_mode), 0o600)
+        version = next(v for v in d["verschluesselung"]["versionen"] if v["nr"] == nr)
+        self.assertTrue(version["fremd"])
+        self.assertFalse(d["verschluesselung"]["eingerichtet"])     # das aktuelle Passwort dieses Servers bleibt, wie es war
+        self.assertEqual(d["uploads"], [])
+        for n in neu["dateien"]:
+            self.assertEqual(stat.S_IMODE((self.basis / "backup" / n).stat().st_mode), 0o600)
+        self.nirgends_in_der_datenbank(PASSWORT)
+        # die Dateien sind unverändert angekommen (Prüfsummen der Sicherung)
+        summen = (self.basis / "backup" / f"epm_{stempel}.sha256").read_text().split()
+        for n in neu["dateien"]:
+            self.assertEqual(hashlib.sha256((self.basis / "backup" / n).read_bytes()).hexdigest(), summen[summen.index(n) - 1])
+
+    def test_einlesen_weist_fremde_und_beschaedigte_dateien_ab(self):
+        import io
+        import tarfile
+
+        def tar_mit(dateien: dict) -> bytes:
+            puffer = io.BytesIO()
+            with tarfile.open(fileobj=puffer, mode="w") as tar:
+                for n, inhalt in dateien.items():
+                    info = tarfile.TarInfo(n)
+                    info.size = len(inhalt)
+                    tar.addfile(info, io.BytesIO(inhalt))
+            return puffer.getvalue()
+
+        st = "2026-05-05_020000"
+        db, dok = b"PGDMP-anderswo", b"dokumente"
+        summen = (f"{hashlib.sha256(db).hexdigest()}  epm-db_{st}.dump\n"
+                  f"{hashlib.sha256(dok).hexdigest()}  epm-dokumente_{st}.tar.gz\n").encode()
+        gut = {f"epm-db_{st}.dump": db, f"epm-dokumente_{st}.tar.gz": dok, f"epm_{st}.sha256": summen}
+        faelle = [
+            (b"das ist kein tar-Archiv" * 100, "keine Sicherung von EPM"),
+            (tar_mit({**gut, "../../etc/cron.d/boese": b"x"}), "etwas anderes als die Dateien"),
+            (tar_mit({**gut, "epm-db_2026-06-06_020000.dump": b"x"}), "etwas anderes als die Dateien"),
+            (tar_mit({f"epm-db_{st}.dump": db}), "unvollständig"),
+            (tar_mit({**gut, f"epm-db_{st}.dump": b"veraendert"}), "Prüfsumme"),
+        ]
+        for inhalt, meldung in faelle:
+            with self.subTest(meldung=meldung):
+                kennung = self.hochladen(inhalt, "epm-sicherung_x.tar")
+                self.assertEqual(self.a.post(f"/api/backup/hochladen/{kennung}/einlesen/", {}, format="json").status_code, 201)
+                self.agent()
+                auftrag = self.letzter_auftrag()
+                self.assertEqual(auftrag["status"], "fehler")
+                self.assertIn(meldung, auftrag["ergebnis"])
+                self.assertFalse((self.basis / "backup").exists() and any(
+                    p.name.startswith("epm") for p in (self.basis / "backup").iterdir()))
+                self.assertEqual(list((self.ordner / "upload").iterdir()), [])
+        self.assertFalse(Path("/etc/cron.d/boese").exists())
+        # unverschlüsselte Sicherung von Hand zusammengestellt (ohne Angaben-Datei): wird übernommen
+        kennung = self.hochladen(tar_mit(gut), "epm-sicherung_von-hand.tar")
+        self.assertEqual(self.a.post(f"/api/backup/hochladen/{kennung}/einlesen/", {}, format="json").status_code, 201)
+        self.agent()
+        self.assertEqual(self.letzter_auftrag()["status"], "erledigt", self.letzter_auftrag()["ausgabe"])
+        eintrag = self.a.get("/api/backup/").json()["sicherungen"][0]
+        self.assertEqual((eintrag["stempel"], eintrag["art"], eintrag["verschluesselt"], eintrag["passwort_nr"]),
+                         (st, "hochgeladen", False, None))

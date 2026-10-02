@@ -19,8 +19,9 @@ import { Richtext, klartext } from "@/components/Editor";
 import { TerminDialog } from "@/components/TerminDialog";
 import { useAkte } from "./Akte";
 import { AerzteKarte, BezugspersonenKarte } from "./Kontaktpersonen";
-import { useStufe } from "@/lib/stufen";
-import { Spalten } from "@/components/ui/spalten";
+import { KeinPlanHinweis } from "./Plaene";
+import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
+import { Bereich, Bereiche } from "@/components/ui/bereiche";
 
 const QUELLEN_NEU = ["telefonisch", "ambulanz", "versorger", "arztbrief"];
 const ZEITRAEUME: { wert: Zeitraum; text: string }[] = [
@@ -299,7 +300,8 @@ function PlanKarte() {
               : ""}
           </span>
         </>
-      ) : <span className="text-sm gedaempft">Noch kein freigegebener Plan.</span>}
+      ) : null}
+      <KeinPlanHinweis />
       <div className="flex gap-2 flex-wrap">
         {!patient.ist_abgeschlossen && darfBei("plaene_anlegen", patient) ? <KnopfLink to={`/patienten/${patient.id}/plaene/neu`} variante="pri" klein>Neuer Plan</KnopfLink> : null}
         <KnopfLink to={`/patienten/${patient.id}/plaene`} klein>Alle Pläne</KnopfLink>
@@ -338,6 +340,7 @@ function StammKarte() {
   const adresse = [p.strasse, [p.plz, p.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
   return (
     <Karte className="px-[22px] py-[18px] grid grid-cols-[100px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm" data-testid="stammdaten">
+      <h2 className="lbl m-0 col-span-2 pb-1">Anschrift und Kontakt</h2>
       <span className="gedaempft">Adresse</span><span>{adresse || "—"}</span>
       <span className="gedaempft">Telefon</span><span className="num">{p.telefon || "—"}</span>
       <span className="gedaempft">E-Mail</span><span className="truncate">{p.email || "—"}</span>
@@ -348,41 +351,21 @@ function StammKarte() {
   );
 }
 
-/** Aufteilung je Fensterstufe (S16, Vorschlag Entwurf 2 bestätigt 02.10.2026): unter 1440 px eine Spalte, 1440–1919 px
- *  ½ | ½ mit Teiler, ab 1920 px ⅔ (selbst zweispaltig) | ⅓ mit Teiler, ab 2560 px dazu mehr Verlauf im Diagramm (3 Jahre). */
+/** Übersicht im Raster (Fehlerliste 02.10.2026, Punkt 2): Spalten wie auf der Startseite (1/2/3/4/5 je Fensterbreite),
+ *  jede Karte mit dem Menü „⋯“ für Breite und Höhe – je Person gespeichert. Der senkrechte Teiler entfällt hier. Ab
+ *  2560 px beginnt das Gewichtsdiagramm mit 3 Jahren (S16). */
 export function Uebersicht() {
   const stufe = useStufe();
-  const gewicht = <GewichtKarte key="gewicht" startZeitraum={stufe === "qhd" ? "y3" : "y1"} />;
-  const therapie = <TherapieKarte key="therapie" />;
-  const termine = <TermineKarte key="termine" />;
-  const plan = <PlanKarte key="plan" />;
-  const kontakte = <KontakteKarte key="kontakte" />;
-  const stamm = <StammKarte key="stamm" />;
-  const aerzte = <AerzteKarte key="aerzte" />;
-  const bezug = <BezugspersonenKarte key="bezug" />;
-  if (stufe === "eng" || stufe === "schmal") {
-    return <div className="flex flex-col gap-5 min-w-0" data-testid="uebersicht-stufe">{gewicht}{termine}{plan}{therapie}{kontakte}{stamm}{aerzte}{bezug}</div>;
-  }
-  if (stufe === "hd") {
-    return (
-      <Spalten seite="akte_uebersicht" stufe="hd" standard={[1 / 2]} testid="uebersicht-stufe" namen={["Gewicht und Diagnose", "Termine und Plan"]}
-        spalten={[<>{gewicht}{therapie}{kontakte}{stamm}</>, <>{termine}{plan}{aerzte}{bezug}</>]} />
-    );
-  }
   return (
-    <Spalten seite="akte_uebersicht" stufe={stufe} standard={[2 / 3]} testid="uebersicht-stufe"
-      namen={["Gewicht, Diagnose und Kontakte", "Termine und Plan"]}
-      spalten={[
-        <>
-          {gewicht}
-          <div className="@container">
-            <div className="grid grid-cols-1 @min-[44rem]:grid-cols-2 gap-5 items-start">
-              <div className="flex flex-col gap-5 min-w-0">{therapie}{stamm}</div>
-              <div className="flex flex-col gap-5 min-w-0">{kontakte}{aerzte}</div>
-            </div>
-          </div>
-        </>,
-        <>{termine}{plan}{bezug}</>,
-      ]} />
+    <Bereiche seite="akte_uebersicht" spalten={RASTER_SPALTEN[stufe]} testid="uebersicht-stufe">
+      <Bereich id="gewicht" titel="Gewichtsverlauf" standard={{ breite: 2 }}><GewichtKarte startZeitraum={stufe === "qhd" ? "y3" : "y1"} /></Bereich>
+      <Bereich id="termine" titel="Termine"><TermineKarte /></Bereich>
+      <Bereich id="plan" titel="Aktueller Infusionsplan"><PlanKarte /></Bereich>
+      <Bereich id="therapie" titel="Diagnose und Therapie" standard={{ breite: 2 }}><TherapieKarte /></Bereich>
+      <Bereich id="kontakte" titel="Letzte Kontakte"><KontakteKarte /></Bereich>
+      <Bereich id="stamm" titel="Anschrift und Kontakt"><StammKarte /></Bereich>
+      <Bereich id="aerzte" titel="Ärzte"><AerzteKarte /></Bereich>
+      <Bereich id="bezug" titel="Bezugspersonen"><BezugspersonenKarte /></Bereich>
+    </Bereiche>
   );
 }

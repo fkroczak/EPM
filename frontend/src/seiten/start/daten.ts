@@ -23,7 +23,7 @@ export type Startdaten = {
   pruefen: { altdokumente: number; altdokumente_gesamt: number; nickelallergie_unbekannt: number; kein_versorger: number;
     kein_kontakt: number; kontakt_bald: number; kontakt_ueberfaellig: number; kontakt_monate: number; kontakt_bald_monate: number;
     kontakt_ueberfaellig_monate: number; erklaerungen_fehlen: number; abschluss_pruefen: number; abschluss_monate: number;
-    datenschutz_anfragen: number; datenschutz_ueberfaellig: number };
+    datenschutz_anfragen: number; datenschutz_ueberfaellig: number; ohne_plan?: number };
   /** S04: Kontakt fällig ohne geplanten Termin, in zwei Stufen */
   wiedereinbestellung: { ueberfaellig: Wiedereintrag[]; bald: Wiedereintrag[]; anzahl_ueberfaellig: number; anzahl_bald: number;
     bald_monate: number; ueberfaellig_monate: number };

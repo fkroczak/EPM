@@ -12,15 +12,30 @@ POST /api/backup/ziel/testen/                      Verbindung zum Ziel testen
 POST /api/backup/uebertragen/                      noch nicht übertragene Sicherungen jetzt übertragen
 POST /api/backup/<stempel>/wiederherstellen/       {kennwort, code, minuten, hinweis?}
 POST /api/backup/auftraege/<kennung>/abbrechen/    wartenden Auftrag zurückziehen
+POST /api/backup/aufbewahrung/                     {tage: 7 | 14 | 30, kennwort, code}
+POST /api/backup/<stempel>/bereitstellen/          {kennwort, code} → Sicherung für 2 Stunden zum Herunterladen bereitlegen
+GET  /api/backup/<stempel>/datei/                  die bereitgestellte Sicherung (epm-sicherung_<Stempel>.tar)
+POST /api/backup/hochladen/                        {name, groesse} → {upload, teil}: Hochladen einer Sicherung beginnen
+PUT  /api/backup/hochladen/<upload>/?versatz=N     nächstes Stück (application/octet-stream, höchstens „teil“ Bytes)
+DELETE /api/backup/hochladen/<upload>/             hochgeladene Datei verwerfen
+POST /api/backup/hochladen/<upload>/einlesen/      {passwort?} → der Server prüft die Sicherung und nimmt sie in die Liste
+
+Der zweite Faktor ist freiwillig (Festlegung 02.10.2026): „code“ wird nur geprüft, wenn die Person einen eingerichtet hat.
 
 Passwörter (Sicherungs-Passwort, Zugang zum Ziel) gehen nur in die Auftragsdatei an den Server (0600, der Agent löscht
 sie sofort nach dem Lesen) – nie in die Datenbank, das Audit-Log oder eine Antwort. Ausnahme ist das Passwortblatt:
 Es druckt das Passwort, das die Oberfläche gerade mitschickt, nachdem es gegen den Prüfwert des Servers geprüft ist.
 """
-from urllib.parse import urlsplit
+import json
+import os
+import uuid
+from urllib.parse import quote, urlsplit
 
+from django.conf import settings
+from django.http import FileResponse, HttpResponse
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.parsers import BaseParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -88,6 +103,12 @@ class UebersichtView(APIView):
                          "belegt": platz["gesamt"] - platz["frei"] if platz.get("gesamt") is not None
                          and platz.get("frei") is not None else None},
             "aufbewahrung_tage": d.get("aufbewahrung_tage"),
+            "aufbewahrung_auswahl": list(sicherung.AUFBEWAHRUNG_TAGE),
+            # Herunterladen und Hochladen (Fehlerliste 02.10.2026, 5.1 und 5.3)
+            "austausch": host.ordner_download().is_dir() and host.ordner_upload().is_dir(),
+            "bereitgestellt": sicherung.bereitgestellt(daten),
+            "uploads": sicherung.uploads(),
+            "upload": {"teil": sicherung.UPLOAD_TEIL, "max": sicherung.UPLOAD_MAX},
             "naechste_sicherung": d.get("naechste_sicherung"),
             "nachts_fehlgeschlagen": bool(d.get("nachts_fehlgeschlagen")),
             "gpg": d.get("gpg"),
@@ -293,3 +314,206 @@ class AuftragAbbrechenView(APIView):
         auftrag = Systemauftrag.objects.filter(kennung=kennung, ziel=Systemauftrag.Ziel.SERVER,
                                                aktion__in=host.SICHERUNG_AKTIONEN).first()
         return auftrag_zurueckziehen(request, auftrag)
+
+
+class AufbewahrungView(APIView):
+    """Wie lange Sicherungen auf dem Server bleiben (Fehlerliste 02.10.2026, 5.2): 7, 14 oder 30 Tage. Ältere
+    entfernt die nächste Sicherung; im Übertragungsziel wird nie gelöscht."""
+
+    permission_classes = [BackupRecht]
+
+    def post(self, request):
+        tage = request.data.get("tage")
+        if isinstance(tage, bool) or tage not in sicherung.AUFBEWAHRUNG_TAGE:
+            return _fehler("tage", "Bitte 7, 14 oder 30 Tage wählen.")
+        return auftrag_anlegen(request, "sicherung_aufbewahrung", parameter={"tage": tage},
+                               objekt="Aufbewahrung der Sicherungen", protokoll_details={"tage": tage})
+
+
+AUSTAUSCH_FEHLT = ("Die Ordner für das Herunter- und Hochladen von Sicherungen fehlen. Bitte auf dem Server einmal "
+                   "„sudo epm-update“ (bzw. rollout/04-projekt.sh) ausführen.")
+
+
+class BereitstellenView(APIView):
+    """5.1: Sicherung herunterladen. Der Server legt sie als eine Datei für 2 Stunden bereit (Auftrag an den
+    Systemagenten, mit Passwort und – wenn eingerichtet – zweitem Faktor bestätigt); danach GET …/datei/."""
+
+    permission_classes = [BackupRecht]
+
+    def post(self, request, stempel):
+        if not host.ordner_download().is_dir():
+            return Response({"fehler": AUSTAUSCH_FEHLT}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        s = sicherung.finde(stempel)
+        if s is None:
+            return Response({"fehler": "Diese Sicherung gibt es auf dem Server nicht (mehr)."},
+                            status=status.HTTP_404_NOT_FOUND)
+        return auftrag_anlegen(request, "sicherung_bereitstellen", parameter={"stempel": s["stempel"]},
+                               objekt=f"Sicherung vom {_zeitpunkt_text(s.get('zeitpunkt'))}",
+                               protokoll_details={"stempel": s["stempel"], "sicherung_zeitpunkt": s.get("zeitpunkt"),
+                                                  "verschluesselt": bool(s.get("verschluesselt"))})
+
+
+class DateiView(APIView):
+    """Die bereitgestellte Sicherung ausliefern (Nginx per X-Accel-Redirect); jeder Abruf steht im Audit-Log."""
+
+    permission_classes = [BackupRecht]
+
+    def get(self, request, stempel):
+        if not sicherung.STEMPEL_MUSTER.match(stempel):
+            return Response({"fehler": "Unbekannte Sicherung."}, status=status.HTTP_404_NOT_FOUND)
+        name = sicherung.buendel_name(stempel)
+        pfad = host.ordner_download() / name
+        if not pfad.is_file():
+            return Response({"fehler": "Diese Sicherung liegt nicht (mehr) zum Herunterladen bereit. Bitte erneut "
+                                       "„Herunterladen“ wählen."}, status=status.HTTP_404_NOT_FOUND)
+        s = sicherung.finde(stempel) or {}
+        protokolliere(SystemEreignis.Art.BACKUP, request, objekt=f"Sicherung {stempel}", ereignis="heruntergeladen",
+                      stempel=stempel, sicherung_zeitpunkt=s.get("zeitpunkt"), groesse=pfad.stat().st_size,
+                      verschluesselt=bool(s.get("verschluesselt")))
+        if settings.EPM_X_ACCEL:
+            antwort = HttpResponse(content_type="application/x-tar")
+            antwort["X-Accel-Redirect"] = "/_geschuetzt/sicherung/" + name
+        else:
+            antwort = FileResponse(open(pfad, "rb"), content_type="application/x-tar")
+        antwort["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(name)}"
+        antwort["Cache-Control"] = "private, no-store"
+        antwort["X-Content-Type-Options"] = "nosniff"
+        return antwort
+
+
+class RohParser(BaseParser):
+    """Ein Stück der hochgeladenen Datei, unverändert (höchstens ``UPLOAD_TEIL`` Bytes je Anfrage)."""
+
+    media_type = "application/octet-stream"
+
+    def parse(self, stream, media_type=None, parser_context=None):
+        return stream.read(sicherung.UPLOAD_TEIL + 1)
+
+
+def _upload(kennung):
+    """(Pfad der Datei, Angaben) eines begonnenen Uploads oder (None, None)."""
+    if not sicherung.ID_MUSTER.match(kennung or ""):
+        return None, None
+    ordner = host.ordner_upload()
+    meta = host._lies(ordner / f"{kennung}.json")
+    pfad = ordner / f"{kennung}.teil"
+    if not isinstance(meta, dict) or not pfad.is_file() or pfad.is_symlink():
+        return None, None
+    return pfad, meta
+
+
+class HochladenView(APIView):
+    """5.3: Sicherung hochladen – in Stücken, damit auch große Dateien (Dokumente!) sicher ankommen und der Fortschritt
+    sichtbar ist. Die Datei landet in einem eigenen Ordner; erst „einlesen“ prüft sie auf dem Server und nimmt sie
+    in die Liste der Sicherungen auf. Zurückgespielt wird nur mit „Wiederherstellen“ (eigene Bestätigung)."""
+
+    permission_classes = [BackupRecht]
+
+    def post(self, request):
+        ordner = host.ordner_upload()
+        if not ordner.is_dir():
+            return Response({"fehler": AUSTAUSCH_FEHLT}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        name = os.path.basename(str(request.data.get("name") or "").replace("\\", "/"))[:200]
+        groesse = request.data.get("groesse")
+        if not name.lower().endswith(".tar") or any(z in STEUERZEICHEN for z in name):
+            return _fehler("name", "Bitte die Datei wählen, die „Herunterladen“ geliefert hat "
+                                   "(epm-sicherung_<Zeitpunkt>.tar).")
+        if isinstance(groesse, bool) or not isinstance(groesse, int) or not (0 < groesse <= sicherung.UPLOAD_MAX):
+            return _fehler("groesse", "Die Datei ist leer oder zu groß.")
+        try:
+            frei = os.statvfs(ordner)
+            # Platz für die hochgeladene Datei und für das Auspacken in den Backup-Ordner
+            if frei.f_bavail * frei.f_frsize < 2 * groesse + 64 * 1024 * 1024:
+                return _fehler("groesse", "Auf dem Server ist dafür zu wenig Speicher frei.")
+        except OSError:
+            pass
+        kennung = uuid.uuid4().hex
+        try:
+            fd = os.open(ordner / f"{kennung}.teil", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
+            os.close(fd)
+            with open(ordner / f"{kennung}.json", "w", encoding="utf-8") as f:
+                json.dump({"name": name, "groesse": groesse, "von": request.user.get_username(),
+                           "begonnen_am": timezone.now().isoformat(timespec="seconds")}, f, ensure_ascii=False)
+        except OSError as e:
+            return Response({"fehler": f"Die Datei konnte nicht angelegt werden ({e.strerror}). Rechte des Ordners für "
+                                       "hochgeladene Sicherungen prüfen."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        protokolliere(SystemEreignis.Art.BACKUP, request, objekt="Sicherung hochladen", ereignis="upload_begonnen",
+                      datei=name, groesse=groesse, upload=kennung)
+        return Response({"upload": kennung, "teil": sicherung.UPLOAD_TEIL, "erhalten": 0, "groesse": groesse},
+                        status=status.HTTP_201_CREATED)
+
+
+class HochladenTeilView(APIView):
+    permission_classes = [BackupRecht]
+    parser_classes = [RohParser, JSONParser]
+
+    def put(self, request, kennung):
+        pfad, meta = _upload(kennung)
+        if pfad is None:
+            return Response({"fehler": "Dieser Upload ist nicht (mehr) bekannt. Bitte neu beginnen."},
+                            status=status.HTTP_404_NOT_FOUND)
+        daten = request.data
+        if not isinstance(daten, (bytes, bytearray)) or not daten:
+            return _fehler("fehler", "Erwartet wird ein Stück der Datei (application/octet-stream).")
+        if len(daten) > sicherung.UPLOAD_TEIL:
+            return _fehler("fehler", "Das Stück ist zu groß.", status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+        erhalten = pfad.stat().st_size
+        try:
+            versatz = int(request.query_params.get("versatz", ""))
+        except ValueError:
+            versatz = -1
+        if versatz != erhalten:
+            # z. B. nach einer unterbrochenen Verbindung: Die Oberfläche setzt an der gemeldeten Stelle fort
+            return Response({"fehler": "Das Stück passt nicht an das bisher Empfangene.", "erhalten": erhalten},
+                            status=status.HTTP_409_CONFLICT)
+        if erhalten + len(daten) > meta.get("groesse", 0):
+            return _fehler("fehler", "Es kommt mehr an, als angekündigt wurde.")
+        with open(pfad, "ab") as f:
+            f.write(daten)
+        return Response({"erhalten": erhalten + len(daten), "groesse": meta.get("groesse")})
+
+    def delete(self, request, kennung):
+        pfad, meta = _upload(kennung)
+        if pfad is None:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        if Systemauftrag.objects.filter(ziel=Systemauftrag.Ziel.SERVER, aktion="sicherung_einlesen",
+                                        parameter__upload=kennung,
+                                        status__in=[Systemauftrag.Status.WARTET, Systemauftrag.Status.LAEUFT]).exists():
+            return Response({"fehler": "Der Server liest diese Datei gerade ein."}, status=status.HTTP_409_CONFLICT)
+        for datei in (pfad, pfad.with_suffix(".json")):
+            try:
+                os.unlink(datei)
+            except OSError:
+                pass
+        protokolliere(SystemEreignis.Art.BACKUP, request, objekt="Sicherung hochladen", ereignis="upload_abgebrochen",
+                      datei=str(meta.get("name") or ""), upload=kennung)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class EinlesenView(APIView):
+    """Vollständig hochgeladene Sicherung einlesen (Auftrag an den Systemagenten). ``passwort``: das Passwort der
+    Sicherung, falls sie mit einem verschlüsselt ist, das dieser Server nicht kennt (Sicherung eines anderen
+    EPM-Servers) – es geht nur in die Auftragsdatei, nie in die Datenbank oder das Audit-Log."""
+
+    permission_classes = [BackupRecht]
+
+    def post(self, request, kennung):
+        pfad, meta = _upload(kennung)
+        if pfad is None:
+            return Response({"fehler": "Dieser Upload ist nicht (mehr) bekannt. Bitte neu beginnen."},
+                            status=status.HTTP_404_NOT_FOUND)
+        erhalten = pfad.stat().st_size
+        if erhalten != meta.get("groesse"):
+            return Response({"fehler": "Die Datei ist noch nicht vollständig hochgeladen.", "erhalten": erhalten},
+                            status=status.HTTP_409_CONFLICT)
+        passwort = request.data.get("passwort")
+        if passwort in ("", None):
+            passwort = None
+        elif not isinstance(passwort, str) or len(passwort) > sicherung.PASSWORT_MAX \
+                or any(z in STEUERZEICHEN for z in passwort):
+            return _fehler("passwort", "Das Passwort der Sicherung ist ungültig.")
+        name = str(meta.get("name") or "")
+        return auftrag_anlegen(request, "sicherung_einlesen", parameter={"upload": kennung, "datei": name},
+                               geheim={"passwort": passwort} if passwort else None,
+                               objekt=f"Sicherung {name}"[:200],
+                               protokoll_details={"datei": name, "groesse": erhalten, "mit_passwort": passwort is not None})

@@ -105,6 +105,13 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
         .values_list("patient_id", flat=True)
     )
     plan_grenze = heute - timedelta(days=30 * e.plan_alter_warnung_monate)
+    # „Kein Infusionsplan nötig“ bestätigt bzw. Akte in Betreuung (nur dort fehlt ein Plan)
+    kein_plan, in_betreuung = set(), set()
+    for pid, ohne, abgeschlossen in Patient.objects.filter(id__in=ids).values_list("id", "kein_plan", "abgeschlossen_am"):
+        if ohne:
+            kein_plan.add(pid)
+        if abgeschlossen is None:
+            in_betreuung.add(pid)
     grenzen = kontakt_grenzen(e)
     naechste, entwuerfe, erklaerungen = {}, set(), {}
     if liste:
@@ -133,8 +140,11 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
         if trend and trend["warnung"]:
             hinweise.append({"art": "gewicht",
                              "text": f"Gewicht {_deutsch(trend['prozent'])} % in {e.gewicht_warnung_monate} Mon."})
-        if p.id in plaene and plaene[p.id] < plan_grenze:
-            hinweise.append({"art": "plan", "text": f"Plan älter als {e.plan_alter_warnung_monate} Mon."})
+        if p.id not in kein_plan:
+            if p.id in plaene and plaene[p.id] < plan_grenze:
+                hinweise.append({"art": "plan", "text": f"Plan älter als {e.plan_alter_warnung_monate} Mon."})
+            elif p.id not in plaene and p.id in in_betreuung:
+                hinweise.append({"art": "ohne_plan", "text": "Kein Infusionsplan"})
         if not p.versorger_id and not p.kein_versorger:  # „kein Versorger“ ist bewusst so erfasst
             hinweise.append({"art": "versorger", "text": "Versorger nicht erfasst"})
         letzter = kontakte.get(p.id)
@@ -153,8 +163,10 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
             gueltig_ab = plaene.get(p.id)
             ergebnis[p.id].update({
                 "naechster_termin": naechste.get(p.id),
-                "plan": {"gueltig_ab": gueltig_ab, "alt": gueltig_ab is not None and gueltig_ab < plan_grenze,
+                "plan": {"gueltig_ab": gueltig_ab, "alt": gueltig_ab is not None and gueltig_ab < plan_grenze
+                         and p.id not in kein_plan,
                          "entwurf": p.id in entwuerfe} if gueltig_ab or p.id in entwuerfe else None,
+                "kein_plan": p.id in kein_plan,
                 "erklaerungen_fehlen": erklaerungen.get(p.id, []),
             })
     return ergebnis
@@ -215,6 +227,14 @@ def abschluss_pruefen(patienten_qs):
             .exclude(id__in=mit_kontakt).exclude(id__in=mit_termin))
 
 
+def ohne_plan(patienten_qs):
+    """Akten in Betreuung ohne aktuell gültigen Infusionsplan, bei denen niemand „kein Plan nötig“ bestätigt hat."""
+    from infusionen.models import Infusionsplan
+
+    mit_plan = Infusionsplan.objects.filter(status=Infusionsplan.Status.AKTUELL).values("patient_id")
+    return patienten_qs.filter(abgeschlossen_am__isnull=True, kein_plan=False).exclude(id__in=mit_plan)
+
+
 def pruefliste(patienten_qs) -> dict:
     """„Nach und nach prüfen“ auf der Startseite (Entwurf 2)."""
     from .models import Datenschutzanfrage, Dokument
@@ -229,6 +249,8 @@ def pruefliste(patienten_qs) -> dict:
         "altdokumente_gesamt": altdokumente.filter(Q(typ_geprueft=False) | Q(herkunft=Dokument.Herkunft.ALTSYSTEM)).count(),
         "nickelallergie_unbekannt": offen.filter(nickelallergie=Patient.Nickelallergie.UNBEKANNT).count(),
         "kein_versorger": offen.filter(versorger__isnull=True, kein_versorger=False).count(),
+        # Akten in Betreuung ohne freigegebenen Infusionsplan, ohne Bestätigung „kein Plan nötig“
+        "ohne_plan": ohne_plan(offen).count(),
         # Kontakt fällig in zwei Stufen (S04); „kein_kontakt“ = beide Stufen zusammen
         "kein_kontakt": kontakt_filter(offen, "kein_kontakt").count(),
         "kontakt_bald": kontakt_filter(offen, "kontakt_bald").count(),

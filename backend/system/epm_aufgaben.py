@@ -77,12 +77,15 @@ def migrationen_offen() -> int:
 
 
 def epm_info():
+    from accounts import zweifaktor
     from accounts.models import Rolle, User
     from patienten.models import Dokument, Patient
     from django_otp.plugins.otp_totp.models import TOTPDevice
 
     konten = User.objects.filter(nur_historisch=False)
     mit_2fa = set(TOTPDevice.objects.filter(confirmed=True).values_list("user_id", flat=True))
+    ohne_2fa = list(konten.filter(is_active=True).exclude(id__in=mit_2fa).order_by("last_name", "first_name"))
+    einmal = list(konten.filter(is_active=True, muss_kennwort_aendern=True).order_by("last_name", "first_name"))
     dokumente = Dokument.objects.all()
     try:
         s = os.statvfs(settings.EPM_DOKUMENTE)
@@ -111,8 +114,15 @@ def epm_info():
         "konten": {
             "aktiv": konten.filter(is_active=True).count(),
             "gesperrt": konten.filter(gesperrt_am__isnull=False).count(),
-            "ohne_2fa": konten.filter(is_active=True).exclude(id__in=mit_2fa).count(),
-            "einmal_kennwort_offen": konten.filter(is_active=True, muss_kennwort_aendern=True).count(),
+            "ohne_2fa": len(ohne_2fa),
+            # wer das ist – für den direkten Weg zur Einrichtung (Fehlerliste 02.10.2026, Punkt 4.2)
+            "ohne_2fa_konten": [{"id": u.id, "anzeigename": u.anzeigename, "benutzername": u.username} for u in ohne_2fa],
+            "zweiter_faktor": zweifaktor.regel(),
+            "einmal_kennwort_offen": len(einmal),
+            "einmal_kennwort_konten": [{"id": u.id, "anzeigename": u.anzeigename, "benutzername": u.username}
+                                       for u in einmal],
+            "gesperrt_konten": [{"id": u.id, "anzeigename": u.anzeigename, "benutzername": u.username}
+                                for u in konten.filter(gesperrt_am__isnull=False).order_by("last_name", "first_name")],
             "admins": konten.filter(is_active=True, rolle=Rolle.ADMIN).count(),
         },
     }

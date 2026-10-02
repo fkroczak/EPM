@@ -85,17 +85,22 @@ type Optionen = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
   form?: FormData;
+  /** Rohdaten (application/octet-stream), z. B. ein Stück einer großen Datei */
+  roh?: Blob;
   signal?: AbortSignal;
   /** 403 „Anmeldung erforderlich“ nicht als Abmeldung behandeln (z. B. bei der Anmeldung selbst) */
   ohneAbmeldeSignal?: boolean;
 };
 
 export async function api<T = unknown>(pfad: string, opt: Optionen = {}): Promise<T> {
-  const method = opt.method ?? (opt.body !== undefined || opt.form ? "POST" : "GET");
+  const method = opt.method ?? (opt.body !== undefined || opt.form || opt.roh ? "POST" : "GET");
   const headers: Record<string, string> = { Accept: "application/json" };
   let body: BodyInit | undefined;
   if (opt.form) {
     body = opt.form;
+  } else if (opt.roh) {
+    headers["Content-Type"] = "application/octet-stream";
+    body = opt.roh;
   } else if (opt.body !== undefined) {
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(opt.body);

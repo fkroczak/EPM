@@ -13,7 +13,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { klartext } from "@/components/Editor";
-import { PdfLeser } from "@/components/PdfAnsicht";
+import { PdfLeser, PdfVorschau } from "@/components/PdfAnsicht";
 import { name, useAkte } from "./Akte";
 
 export const STATUS_TEXT: Record<Plan["status"], string> = { entwurf: "Entwurf", aktuell: "aktuell gültig", abgeloest: "abgelöst" };
@@ -31,10 +31,12 @@ function kopfText(plan: Plan) {
 
 /** „Ansicht wie PDF“: die echte PDF. Freigegebene Pläne zeigen das gespeicherte Original (Prüfsumme geprüft),
  *  Entwürfe und Pläne ohne gespeicherte PDF werden mit der aktiven Dokumentvorlage gezeichnet – so sieht die Akte
- *  immer genauso aus wie die PDF. */
+ *  immer genauso aus wie die PDF. Klein als Vorschau wie unter „Dokumente“; ein Klick öffnet die große Ansicht
+ *  (Fehlerliste 02.10.2026, 1.3). */
 function PlanAnsicht({ plan }: { plan: Plan }) {
   const original = !!plan.pdf_sha256;
   const pfad = original ? `infusionsplaene/${plan.id}/pdf/` : `infusionsplaene/${plan.id}/ansicht/`;
+  const [gross, setGross] = useState(false);
   const datei = useQuery({
     queryKey: ["plan", plan.id, original ? "pdf" : "ansicht", plan.status],
     queryFn: () => apiDatei(pfad),
@@ -42,20 +44,89 @@ function PlanAnsicht({ plan }: { plan: Plan }) {
     gcTime: 0,
   });
   const pruefung = datei.data?.kopf.get("X-EPM-Pruefung");
+  const daten = datei.data?.daten;
+  const kennung = `plan-ansicht-${plan.id}-${datei.dataUpdatedAt}`;
   return (
-    <div className="flex flex-col gap-2" data-testid="plan-ansicht">
-      <span className="text-[0.8125rem] gedaempft" data-testid="ansicht-herkunft">
+    <div className="flex flex-col gap-2 w-full max-w-[340px]" data-testid="plan-ansicht">
+      {pruefung === "abweichend" ? <Meldung art="fehler">Die gespeicherte PDF weicht von der Prüfsumme ab und wurde nach der Freigabe verändert. Bitte die Administration informieren.</Meldung> : null}
+      <Fehleranzeige fehler={datei.error} />
+      {datei.isLoading ? <Laden text="PDF wird geladen …" /> : daten ? (
+        <>
+          {/* Klick auf das Blatt öffnet die große Ansicht; die Knöpfe zum Blättern bleiben bedienbar */}
+          <div className="cursor-zoom-in" title="Zum Vergrößern anklicken" data-testid="plan-vorschau"
+            onClick={(e) => { if ((e.target as HTMLElement).tagName === "CANVAS") setGross(true); }}>
+            <PdfVorschau url={kennung} titel={`Infusionsplan gültig ab ${datum(plan.gueltig_ab)}`} hoehe={430} laden={() => Promise.resolve(daten.slice())} />
+          </div>
+          <Knopf klein icon="dokument" className="self-start" onClick={() => setGross(true)}>Groß ansehen</Knopf>
+          <Dialog offen={gross} onOffen={setGross} titel={`Infusionsplan gültig ab ${datum(plan.gueltig_ab)}`} breite={1100}
+            beschreibung={original ? "Gespeicherte PDF der Freigabe" : "Ansicht mit der aktiven Dokumentvorlage"}>
+            <div data-testid="plan-gross">
+              {gross ? <PdfLeser url={`${kennung}-gross`} laden={() => Promise.resolve(daten.slice())} className="h-[72vh]" /> : null}
+            </div>
+          </Dialog>
+        </>
+      ) : null}
+      <span className="text-[0.8125rem] gedaempft leading-normal" data-testid="ansicht-herkunft">
         {original ? <>Gespeicherte PDF der Freigabe{pruefung === "ok" ? " · Prüfsumme stimmt" : ""}.</>
           : plan.status === "entwurf" ? "Vorschau mit der aktiven Dokumentvorlage. Die PDF entsteht bei der Freigabe."
           : plan.herkunft === "altsystem" ? "Aus dem Altsystem übernommen – dort gab es keine gespeicherte PDF. Ansicht mit der aktiven Dokumentvorlage."
           : "Für diesen Plan ist keine PDF gespeichert (vor Einführung der PDF-Erzeugung freigegeben). Ansicht mit der aktiven Dokumentvorlage."}
       </span>
-      {pruefung === "abweichend" ? <Meldung art="fehler">Die gespeicherte PDF weicht von der Prüfsumme ab und wurde nach der Freigabe verändert. Bitte die Administration informieren.</Meldung> : null}
-      <Fehleranzeige fehler={datei.error} />
-      {datei.isLoading ? <Laden text="PDF wird geladen …" /> : datei.data ? (
-        <PdfLeser url={`plan-ansicht-${plan.id}-${datei.dataUpdatedAt}`} laden={() => Promise.resolve(datei.data.daten)} className="h-[78vh]" />
-      ) : null}
     </div>
+  );
+}
+
+/**
+ * Kein Infusionsplan nötig (Ergänzung zur Fehlerliste 02.10.2026): Jede Akte in Betreuung braucht einen freigegebenen
+ * Plan – sonst Hinweis in Patientenliste und Startseite. Braucht ein Patient keinen, bestätigt man das hier; der Hinweis
+ * und die Warnung „Plan älter als …“ entfallen. Mit der nächsten Freigabe eines Plans endet die Bestätigung.
+ */
+export function KeinPlanHinweis() {
+  const { patient } = useAkte();
+  const { darfBei } = useAuth();
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const [offen, setOffen] = useState(false);
+  const [grund, setGrund] = useState("");
+  const kp = patient.kopf?.kein_plan ?? null;
+  const aktuell = patient.kopf?.aktueller_plan ?? null;
+  const darf = !patient.ist_abgeschlossen && darfBei("akten_bearbeiten", patient);
+  useOhneRechtSchliessen(darf, () => setOffen(false));
+  const setzen = useMutation({
+    mutationFn: (wert: boolean) => api(`patienten/${patient.id}/kein-plan/`, { body: wert ? { kein_plan: true, grund: grund.trim() } : { kein_plan: false } }),
+    onSuccess: (_d, wert) => {
+      for (const k of [["patient", patient.id], ["patienten"], ["startseite"], ["infusionsplaene"], ["kalender"]]) void qc.invalidateQueries({ queryKey: k });
+      melden(wert ? "Bestätigt: kein Infusionsplan nötig." : "Bestätigung aufgehoben – der Patient braucht einen Infusionsplan.");
+      setOffen(false);
+    },
+  });
+  if (patient.ist_abgeschlossen || (aktuell && !kp)) return null;
+  return (
+    <>
+      {kp ? (
+        <div className="meldung info flex items-start justify-between gap-3 text-[0.8125rem]" data-testid="kein-plan">
+          <span><strong>Kein Infusionsplan nötig</strong> – bestätigt{kp.von ? ` von ${kp.von}` : ""}{kp.am ? ` am ${datum(kp.am)}` : ""}
+            {kp.grund ? <>: {kp.grund}</> : null}. Hinweise zu fehlenden oder alten Plänen erscheinen für diesen Patienten nicht.</span>
+          {darf ? <Knopf klein laedt={setzen.isPending} onClick={() => setzen.mutate(false)}>Aufheben</Knopf> : null}
+        </div>
+      ) : (
+        <div className="meldung warn flex items-start justify-between gap-3 text-[0.8125rem]" data-testid="ohne-plan">
+          <span>Noch kein freigegebener Infusionsplan. Braucht der Patient keinen, bitte bestätigen – dann entfällt der Hinweis.</span>
+          {darf ? <Knopf klein onClick={() => { setGrund(""); setzen.reset(); setOffen(true); }}>Kein Plan nötig</Knopf> : null}
+        </div>
+      )}
+      <Dialog offen={offen && darf} onOffen={setOffen} titel="Kein Infusionsplan nötig" breite={480}
+        beschreibung="Der Hinweis „Kein Infusionsplan“ und die Warnung „Plan älter als …“ entfallen für diesen Patienten. Wird später ein Plan freigegeben, endet die Bestätigung von selbst."
+        fuss={<><Knopf onClick={() => setOffen(false)}>Abbrechen</Knopf>
+          <Knopf variante="pri" laedt={setzen.isPending} onClick={() => setzen.mutate(true)}>Bestätigen</Knopf></>}>
+        <div className="flex flex-col gap-3">
+          <Feld label="Grund" hinweis="optional, z. B. „nur orale Ernährung“ – steht im Verlauf der Akte">
+            {(p) => <Eingabe {...p} maxLength={300} value={grund} onChange={(e) => setGrund(e.target.value)} />}
+          </Feld>
+          <Fehleranzeige fehler={setzen.error} />
+        </div>
+      </Dialog>
+    </>
   );
 }
 
@@ -286,6 +357,7 @@ export function Plaene() {
           <h2 className="lbl m-0">{liste.length} {liste.length === 1 ? "Plan" : "Pläne"} · neueste oben</h2>
         </div>
         {anlegen && !entwurfDa ? <Knopf variante="pri" icon="plus" onClick={() => navigate(`/patienten/${patient.id}/plaene/neu`)}>Neuer Plan</Knopf> : null}
+        <KeinPlanHinweis />
         {plaene.isLoading ? <Laden /> : (
           <div className="flex flex-col gap-2" role="list" aria-label="Infusionspläne" data-testid="planliste">
             {liste.map((p) => (

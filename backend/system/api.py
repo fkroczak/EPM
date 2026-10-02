@@ -2,7 +2,7 @@
 Administration › System (nur mit Recht „Systemverwaltung“, Standard: nur Admin).
 
 GET    /api/system/uebersicht/                 Auslastung (Server bzw. Container), EPM, Anmeldungen, Aktionen
-GET    /api/system/verlauf/                    Auslastung der letzten 24 Stunden (vom Systemagenten)
+GET    /api/system/verlauf/?zeitraum=24h       Auslastung (vom Systemagenten): 1h, 3h, 24h, 7t, 14t, 1m, 6m
 GET    /api/system/auftraege/                  letzte Aufträge (Ergebnisse des Servers werden vorher übernommen)
 POST   /api/system/auftraege/                  {aktion, kennwort?, code?, minuten?, hinweis?} → Auftrag an den Server
 POST   /api/system/auftraege/<kennung>/abbrechen/   wartenden Auftrag zurückziehen
@@ -16,12 +16,11 @@ from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
-from django_otp.plugins.otp_static.models import StaticDevice
-from django_otp.plugins.otp_totp.models import TOTPDevice
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts import zweifaktor
 from accounts.permissions import SystemRecht, recht
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import benutzername
@@ -93,7 +92,8 @@ def auftraege_abgleichen():
 
 
 def bestaetigung_pruefen(request, was: str):
-    """Admin-Kennwort und zweiter Faktor (Authenticator oder Notfall-Code) – wie beim Wiederherstellen (F63).
+    """Admin-Kennwort und – wenn eingerichtet – zweiter Faktor (Authenticator oder Notfall-Code), wie beim
+    Wiederherstellen (F63).
     Fehlversuche stehen im Audit-Log, sperren das Konto aber nicht (die Anmeldung selbst ist schon bestätigt)."""
     user = request.user
     kennwort = str(request.data.get("kennwort", ""))
@@ -101,11 +101,9 @@ def bestaetigung_pruefen(request, was: str):
     if not kennwort or not user.check_password(kennwort):
         protokolliere(SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request, grund="bestaetigung", was=was)
         return {"kennwort": "Das Passwort stimmt nicht."}
-    if code:
-        for geraet in [*TOTPDevice.objects.filter(user=user, confirmed=True),
-                       *StaticDevice.objects.filter(user=user, confirmed=True)]:
-            if geraet.verify_token(code):
-                return None
+    # zweiter Faktor freiwillig (Festlegung 02.10.2026): ohne eingerichteten zweiten Faktor genügt das Kennwort
+    if zweifaktor.code_bestaetigt(user, code):
+        return None
     protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request, schritt="bestaetigung", was=was)
     return {"code": "Der Code ist ungültig oder wurde schon verwendet."}
 
@@ -148,7 +146,10 @@ class VerlaufView(APIView):
     permission_classes = [SystemRecht]
 
     def get(self, request):
-        return Response(host.verlauf())
+        zeitraum = request.query_params.get("zeitraum") or "24h"
+        if zeitraum not in host.ZEITRAEUME:
+            return Response({"zeitraum": f"Erlaubt: {', '.join(host.ZEITRAEUME)}."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(host.verlauf(zeitraum))
 
 
 class AuftraegeView(APIView):
@@ -214,8 +215,10 @@ def auftrag_anlegen(request, code, parameter=None, geheim=None, objekt=None, pro
         Systemhinweis.objects.create(
             text=f"{text} {zeit}"[:500], art=Systemhinweis.Art.WARNUNG, auftrag=auftrag, angelegt_von=request.user,
             gueltig_bis=beginn + timedelta(minutes=WARNUNG_NACHLAUF.get(code, 15)))
+    bestaetigt = aktion["bestaetigung"] == "2fa"
     protokolliere(protokoll_art(code), request, objekt=objekt or aktion["name"], ereignis="angefordert",
-                  aktion=code, name=aktion["name"], minuten=minuten, bestaetigt=aktion["bestaetigung"] == "2fa",
+                  aktion=code, name=aktion["name"], minuten=minuten, bestaetigt=bestaetigt,
+                  **({"zweiter_faktor": zweifaktor.hat_zweiten_faktor(request.user)} if bestaetigt else {}),
                   **(protokoll_details or {}))
     return Response(AuftragSerializer(auftrag).data, status=status.HTTP_201_CREATED)
 

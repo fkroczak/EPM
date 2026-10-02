@@ -1,9 +1,12 @@
-/** Entwurf 17 · Benutzer: anlegen, ändern, sperren, Einmal-Kennwort, 2FA zurücksetzen; Rechte je Gruppe einstellbar. */
+/** Entwurf 17 · Benutzer: anlegen, ändern, sperren, Einmal-Kennwort, 2FA zurücksetzen; Rechte je Gruppe einstellbar.
+ *  Fehlerliste 02.10.2026, Punkt 6: Konten „ohne Login“ setzen und wieder einbinden (Login geben), Rolle „Keine
+ *  Berechtigung“, Testbenutzer-Schalter für Betrachter, Mitarbeiter und Mediziner, Zwei-Faktor-Anmeldung freiwillig
+ *  oder Pflicht (Karte „Anmeldung“). */
 import { useEffect, useState } from "react";
 import { PdfDialog } from "@/components/PdfDialog";
-import { useSearchParams } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ApiFehler, alle, api } from "@/lib/api";
+import { ApiFehler, STATUS_PRUEFEN, alle, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
 import { relativ, zeitpunkt } from "@/lib/format";
@@ -25,10 +28,17 @@ type Rechte = {
   nur_testpatienten: { rollen: string[]; rechte: string[] };
   /** Rechte, die nur bestimmte Rollen haben können (endgültig löschen: Mediziner und Admin) */
   nur_rollen: Record<string, string[]>;
+  /** Rollen ohne jedes Recht (Konten ohne Login) – stehen nicht in der Tabelle */
+  ohne_rechte?: string[];
 };
-type Formular = { titel: string; first_name: string; last_name: string; kuerzel: string; funktion: string; username: string; rolle: string };
+type Formular = { titel: string; first_name: string; last_name: string; kuerzel: string; funktion: string; username: string; rolle: string;
+  ist_test: boolean; ohne_login: boolean };
+type Anmeldung = { zweiter_faktor: "freiwillig" | "admins" | "alle"; auswahl: { wert: string; name: string }[]; geaendert_am: string | null;
+  ohne_zweiten_faktor: { id: number; anzeigename: string; rolle: string }[] };
+const TESTBENUTZER_ROLLEN = ["betrachter", "mitarbeiter", "mediziner"];
 const TITEL = ["", "Dr.", "Dr. med.", "Prof. Dr.", "Prof. Dr. med.", "Dipl.-Oec. troph."];
-const LEER: Formular = { titel: "", first_name: "", last_name: "", kuerzel: "", funktion: "", username: "", rolle: "mitarbeiter" };
+const LEER: Formular = { titel: "", first_name: "", last_name: "", kuerzel: "", funktion: "", username: "", rolle: "mitarbeiter", ist_test: false,
+  ohne_login: false };
 
 function anzeige(f: Formular) {
   const name = [f.titel, f.first_name ? `${f.first_name.trim()[0]}.` : "", f.last_name].filter(Boolean).join(" ");
@@ -38,7 +48,8 @@ function anzeige(f: Formular) {
 function zustand(b: BenutzerTyp): { text: string; art: "ok" | "fehler" | "warn" | "neutral" } {
   if (b.nur_historisch) return { text: "ohne Login", art: "neutral" };
   if (b.gesperrt_am || !b.is_active) return { text: "gesperrt", art: "fehler" };
-  if (b.muss_kennwort_aendern || !b.zweiter_faktor) return { text: "Einrichtung offen", art: "warn" };
+  // die Zwei-Faktor-Anmeldung zählt nur zur Einrichtung, wenn sie für diese Person Pflicht ist
+  if (b.muss_kennwort_aendern || (b.zweiter_faktor_pflicht && !b.zweiter_faktor)) return { text: "Einrichtung offen", art: "warn" };
   return { text: "aktiv", art: "ok" };
 }
 
@@ -49,8 +60,8 @@ function Kennwortanzeige({ id, kennwort, gueltig, name, benutzername }: { id: nu
       <span className="text-[0.8125rem] font-medium">Einmal-Kennwort</span>
       <span className="num text-xl font-semibold tracking-[.08em]">{kennwort}</span>
       <span className="text-[0.8125rem] leading-normal">
-        {gueltig ? `Gültig bis ${zeitpunkt(gueltig)}. ` : ""}Persönlich übergeben. Beim ersten Login legt {name} ein eigenes Passwort fest und
-        richtet die Authenticator-App ein. Das Kennwort wird nur jetzt angezeigt.
+        {gueltig ? `Gültig bis ${zeitpunkt(gueltig)}. ` : ""}Persönlich übergeben. Beim ersten Login legt {name} ein eigenes Passwort fest
+        (und richtet die Authenticator-App ein, wenn die Zwei-Faktor-Anmeldung Pflicht ist). Das Kennwort wird nur jetzt angezeigt.
       </span>
       <div><Knopf klein icon="dokument" onClick={() => setBlatt(true)}>Zugangsblatt drucken</Knopf></div>
       <PdfDialog offen={blatt} onOffen={setBlatt} titel={`Zugangsblatt für ${name}`} pfad={`benutzer/${id}/zugangsblatt/`}
@@ -72,16 +83,19 @@ function RechteMatrix() {
   if (!daten.data || !m) return <Karte className="px-5 py-4"><Laden /></Karte>;
   const d = daten.data;
   const fest = new Set(d.fest.map(([r, c]) => `${r}.${c}`));
-  const geaendert = d.rollen.reduce((n, r) => n + d.rechte.filter((x) => m[r.code][x.code] !== d.matrix[r.code][x.code]).length, 0);
-  const standard = () => setM(Object.fromEntries(d.rollen.map((r) => [r.code, Object.fromEntries(d.rechte.map((x) => [x.code, d.standard[r.code].includes(x.code) || fest.has(`${r.code}.${x.code}`)]))])));
+  // „Keine Berechtigung“ hat nie Rechte und ist nicht einstellbar – keine Spalte
+  const rollen = d.rollen.filter((r) => !(d.ohne_rechte ?? []).includes(r.code) && m[r.code] && d.matrix[r.code]);
+  const geaendert = rollen.reduce((n, r) => n + d.rechte.filter((x) => m[r.code][x.code] !== d.matrix[r.code][x.code]).length, 0);
+  const standard = () => setM({ ...m, ...Object.fromEntries(rollen.map((r) => [r.code, Object.fromEntries(d.rechte.map((x) => [x.code, (d.standard[r.code] ?? []).includes(x.code) || fest.has(`${r.code}.${x.code}`)]))])) });
   return (
-    <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="rechte">
+    <Karte className="px-5 py-[18px] flex flex-col gap-3 overflow-x-auto" data-testid="rechte">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex flex-col gap-1">
           <h2 className="lbl m-0">Was die Rollen dürfen</h2>
           <span className="text-[0.8125rem] gedaempft leading-normal max-w-[70ch]">Je Gruppe einstellbar. Mediziner sind dem Admin gleichgestellt, außer bei Benutzern,
             dem Wiederöffnen abgeschlossener Akten, Sicherungen, Testdaten und der Systemverwaltung. Admins dürfen alles, Patientendaten schreiben sie aber nur
-            bei Testpatienten. Die Systemverwaltung (Server und EPM) hat standardmäßig nur der Admin; für eine Urlaubsvertretung kann sie hier einer Gruppe freigeschaltet werden. Testbenutzer erhalten nie Rechte über
+            bei Testpatienten – ausgenommen: Akten abschließen, Dokumente einem anderen Patienten zuordnen und endgültig löschen, das geht auch bei echten Akten.
+            Die Rolle „Keine Berechtigung“ (Konten ohne Login) hat nie Rechte und steht deshalb nicht in der Tabelle. Die Systemverwaltung (Server und EPM) hat standardmäßig nur der Admin; für eine Urlaubsvertretung kann sie hier einer Gruppe freigeschaltet werden. Testbenutzer erhalten nie Rechte über
             Testpatienten hinaus.</span>
         </div>
         <div className="flex gap-2">
@@ -92,12 +106,12 @@ function RechteMatrix() {
         </div>
       </div>
       <table className="tabelle">
-        <thead><tr><th className="th" />{d.rollen.map((r) => <th key={r.code} className="th text-center">{r.name}</th>)}</tr></thead>
+        <thead><tr><th className="th" />{rollen.map((r) => <th key={r.code} className="th text-center">{r.name}</th>)}</tr></thead>
         <tbody>
           {d.rechte.map((x) => (
             <tr key={x.code}>
               <td className="td"><span className="text-sm">{x.name}</span>{x.beschreibung ? <><br /><span className="text-xs gedaempft">{x.beschreibung}</span></> : null}</td>
-              {d.rollen.map((r) => {
+              {rollen.map((r) => {
                 const istFest = fest.has(`${r.code}.${x.code}`);
                 const vorbehalten = !!d.nur_rollen[x.code] && !d.nur_rollen[x.code].includes(r.code);
                 const nurTest = d.nur_testpatienten.rollen.includes(r.code) && d.nur_testpatienten.rechte.includes(x.code);
@@ -122,6 +136,68 @@ function RechteMatrix() {
   );
 }
 
+/** Anmeldung: Zwei-Faktor-Anmeldung freiwillig, Pflicht für Admins oder Pflicht für alle (Fehlerliste 02.10.2026, 6.5) */
+function AnmeldungKarte({ onBenutzer }: { onBenutzer: (id: number) => void }) {
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const daten = useQuery({ queryKey: ["benutzer", "anmeldung"], queryFn: () => api<Anmeldung>("benutzer/anmeldung/") });
+  const [wert, setWert] = useState<string | null>(null);
+  useEffect(() => { if (daten.data) setWert(daten.data.zweiter_faktor); }, [daten.data]);
+  const speichern = useMutation({
+    mutationFn: () => api<Anmeldung>("benutzer/anmeldung/", { method: "PUT", body: { zweiter_faktor: wert } }),
+    onSuccess: (r) => {
+      qc.setQueryData(["benutzer", "anmeldung"], r);
+      void qc.invalidateQueries({ queryKey: ["benutzer"] });
+      void qc.invalidateQueries({ queryKey: ["startseite"] });
+      window.dispatchEvent(new Event(STATUS_PRUEFEN));
+      melden("Anmeldung gespeichert. Die Regel gilt ab sofort.");
+    },
+  });
+  const d = daten.data;
+  if (!d || wert == null) return <Karte className="px-5 py-4" id="anmeldung">{daten.error ? <Fehleranzeige fehler={daten.error} /> : <Laden />}</Karte>;
+  const TEXT: Record<string, string> = {
+    freiwillig: "Jede Person entscheidet selbst unter „Mein Konto“. Anmelden geht mit Benutzername und Passwort.",
+    admins: "Admins müssen die Authenticator-App einrichten, alle anderen entscheiden selbst.",
+    alle: "Alle müssen die Authenticator-App einrichten, bevor sie mit EPM arbeiten können.",
+  };
+  const betroffen = d.ohne_zweiten_faktor.filter((u) => wert === "alle" || (wert === "admins" && u.rolle === "admin"));
+  return (
+    <Karte className="px-5 py-[18px] flex flex-col gap-3" id="anmeldung" data-testid="anmeldung">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex flex-col gap-1">
+          <h2 className="lbl m-0">Anmeldung: Zwei-Faktor-Anmeldung (2FA)</h2>
+          <span className="text-[0.8125rem] gedaempft leading-normal max-w-[70ch]">Zweiter Faktor ist der Code aus einer Authenticator-App.
+            Wer ihn eingerichtet hat, wird beim Anmelden immer danach gefragt – auch wenn er freiwillig ist.</span>
+        </div>
+        <Knopf klein variante="pri" disabled={wert === d.zweiter_faktor} laedt={speichern.isPending} onClick={() => speichern.mutate()}>Speichern</Knopf>
+      </div>
+      <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Zwei-Faktor-Anmeldung">
+        {d.auswahl.map((a) => (
+          <label key={a.wert} className="flex items-start gap-2.5 text-sm cursor-pointer">
+            <input type="radio" name="zweiter-faktor" className="mt-1" checked={wert === a.wert} onChange={() => setWert(a.wert)} />
+            <span><span className="font-medium">{a.name}</span><br /><span className="text-[0.8125rem] gedaempft">{TEXT[a.wert] ?? ""}</span></span>
+          </label>
+        ))}
+      </div>
+      {wert !== d.zweiter_faktor && betroffen.length ? (
+        <Meldung art="warn">{betroffen.length === 1 ? "1 Person muss" : `${betroffen.length} Personen müssen`} dann zuerst die Authenticator-App einrichten
+          (mit der nächsten Seite, die sie öffnen): {betroffen.map((u) => u.anzeigename).join(", ")}.</Meldung>
+      ) : null}
+      {d.ohne_zweiten_faktor.length ? (
+        <span className="text-[0.8125rem]" data-testid="ohne-2fa">Ohne 2FA ({d.ohne_zweiten_faktor.length}):{" "}
+          {d.ohne_zweiten_faktor.map((u, i) => (
+            <span key={u.id}>{i ? ", " : ""}<button type="button" className="bg-transparent border-0 p-0 text-akzent-text cursor-pointer underline"
+              onClick={() => onBenutzer(u.id)}>{u.anzeigename}</button></span>
+          ))}
+          <span className="gedaempft"> · Einrichten kann jede Person nur selbst unter „Mein Konto“.</span></span>
+      ) : <span className="text-[0.8125rem] gedaempft">Alle aktiven Konten haben die Zwei-Faktor-Anmeldung eingerichtet.</span>}
+      <Fehleranzeige fehler={speichern.error} />
+      <span className="text-xs gedaempft">Bestätigungen (endgültig löschen, Wiederherstellen, Updates) verlangen das Passwort – und den Code, wenn die
+        Person die Zwei-Faktor-Anmeldung eingerichtet hat. Jede Änderung steht im Audit-Log.</span>
+    </Karte>
+  );
+}
+
 type Kennwort = { id: number; kennwort: string; gueltig: string | null };
 
 function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige }: {
@@ -134,30 +210,48 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
   const melden = useHinweis();
   const start = (): Formular => benutzer ? {
     titel: benutzer.titel, first_name: benutzer.first_name, last_name: benutzer.last_name, kuerzel: benutzer.kuerzel ?? "",
-    funktion: benutzer.funktion, username: benutzer.username, rolle: benutzer.rolle,
+    funktion: benutzer.funktion, username: benutzer.username, rolle: benutzer.rolle, ist_test: benutzer.ist_test, ohne_login: false,
   } : { ...LEER };
   const [f, setF] = useState<Formular>(start);
   const kennwort = kennwortAnzeige && benutzer && kennwortAnzeige.id === benutzer.id ? kennwortAnzeige : null;
-  const [frage, setFrage] = useState<"" | "kennwort" | "2fa" | "sperren" | "testdaten">("");
+  const [frage, setFrage] = useState<"" | "kennwort" | "2fa" | "sperren" | "testdaten" | "ohnelogin">("");
+  const [loginRolle, setLoginRolle] = useState<string | null>(null);
   useEffect(() => { setF(start()); }, [benutzer?.id, neu]); // eslint-disable-line react-hooks/exhaustive-deps
   const neuLaden = () => void qc.invalidateQueries({ queryKey: ["benutzer"] });
   const speichern = useMutation({
-    mutationFn: () => neu
-      ? api<BenutzerTyp & { einmal_kennwort?: string }>("benutzer/", { body: f })
-      : api<BenutzerTyp & { einmal_kennwort?: string }>(`benutzer/${benutzer!.id}/`, { method: "PATCH", body: f }),
+    mutationFn: () => {
+      // „ohne Login“ gibt es nur beim Anlegen; ein Konto ohne Login hat keine Rolle und keinen Testzugang
+      const { ohne_login, ...felder } = f;
+      const body = neu ? (ohne_login ? { ...felder, rolle: "keine", ist_test: false, ohne_login: true } : felder)
+        : benutzer!.nur_historisch ? { ...felder, rolle: undefined, ist_test: undefined } : felder;
+      return neu
+        ? api<BenutzerTyp & { einmal_kennwort?: string }>("benutzer/", { body })
+        : api<BenutzerTyp & { einmal_kennwort?: string }>(`benutzer/${benutzer!.id}/`, { method: "PATCH", body });
+    },
     onSuccess: (b) => {
       neuLaden();
       if (neu) {
-        setKennwortAnzeige({ id: b.id, kennwort: b.einmal_kennwort ?? "", gueltig: b.einmal_kennwort_gueltig_bis });
+        if (b.einmal_kennwort) setKennwortAnzeige({ id: b.id, kennwort: b.einmal_kennwort, gueltig: b.einmal_kennwort_gueltig_bis });
         onGewaehlt(b.id);
-        melden("Benutzer angelegt.");
+        melden(b.nur_historisch ? "Benutzer ohne Login angelegt." : "Benutzer angelegt.");
       } else melden("Benutzer gespeichert.");
     },
   });
+  // Konto ohne Login wieder einbinden: Rolle wählen, Einmal-Kennwort für das Zugangsblatt
+  const loginGeben = useMutation({
+    mutationFn: () => api<BenutzerTyp & { einmal_kennwort: string }>(`benutzer/${benutzer!.id}/login-geben/`, { body: { rolle: loginRolle } }),
+    onSuccess: (b) => {
+      neuLaden();
+      setLoginRolle(null);
+      setKennwortAnzeige({ id: b.id, kennwort: b.einmal_kennwort, gueltig: b.einmal_kennwort_gueltig_bis });
+      setF((v) => ({ ...v, rolle: b.rolle }));
+      melden(`${b.anzeigename} hat wieder einen Login.`);
+    },
+  });
   const aktion = useMutation({
-    mutationFn: (art: "kennwort" | "2fa" | "sperren" | "entsperren" | "testdaten") => {
+    mutationFn: (art: "kennwort" | "2fa" | "sperren" | "entsperren" | "testdaten" | "ohnelogin") => {
       if (art === "testdaten") return api<Record<string, number>>("testdaten/zuruecksetzen/", { method: "POST" });
-      const pfad = { kennwort: "einmal-kennwort", "2fa": "2fa-zuruecksetzen", sperren: "sperren", entsperren: "entsperren" }[art];
+      const pfad = { kennwort: "einmal-kennwort", "2fa": "2fa-zuruecksetzen", sperren: "sperren", entsperren: "entsperren", ohnelogin: "ohne-login" }[art];
       return api<Record<string, unknown>>(`benutzer/${benutzer!.id}/${pfad}/`, { method: "POST" });
     },
     onSuccess: (r, art) => {
@@ -165,7 +259,9 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
       setFrage("");
       if (art === "kennwort" || art === "2fa") setKennwortAnzeige({ id: benutzer!.id, kennwort: String(r.einmal_kennwort), gueltig: String(r.gueltig_bis ?? "") || null });
       if (art === "testdaten") void qc.invalidateQueries({});
+      if (art === "ohnelogin") { setKennwortAnzeige(null); setF((v) => ({ ...v, rolle: "keine", ist_test: false })); }
       melden({ kennwort: "Neues Einmal-Kennwort erzeugt.", "2fa": "2FA zurückgesetzt, neues Einmal-Kennwort erzeugt.", sperren: "Benutzer gesperrt.",
+        ohnelogin: "Konto ist jetzt ohne Login und ohne Rechte.",
         entsperren: "Benutzer entsperrt.", testdaten: `Testdaten zurückgesetzt (${r.geloescht ?? 0} gelöscht, ${r.angelegt ?? 0} angelegt).` }[art]);
     },
   });
@@ -178,7 +274,11 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
     "2fa": ["2FA zurücksetzen", "Authenticator und Notfall-Codes werden gelöscht. Mit dem neuen Einmal-Kennwort richtet die Person die App neu ein."],
     sperren: ["Benutzer sperren", "Die Person kann sich nicht mehr anmelden, alle Sitzungen werden beendet. Einträge bleiben zugeordnet."],
     testdaten: ["Testdaten zurücksetzen", "Alle Testpatienten (Nr. ab 9001) werden gelöscht und die Musterdaten neu angelegt. Echte Patienten bleiben unberührt."],
+    ohnelogin: ["Auf „ohne Login“ setzen", "Die Person kann sich nicht mehr anmelden und hat keine Rechte mehr (Rolle „Keine Berechtigung“). Passwort, Authenticator und Notfall-Codes werden gelöscht, alle Sitzungen beendet. Ihre Einträge bleiben ihr zugeordnet. Mit „Login geben“ lässt sie sich später wieder einbinden."],
   } as const;
+  const historisch = !!benutzer?.nur_historisch;
+  const ohneLogin = neu ? f.ohne_login : historisch;
+  const testMoeglich = !ohneLogin && TESTBENUTZER_ROLLEN.includes(f.rolle) && benutzer?.id !== ich.id;
   return (
     <Karte className="px-5 py-[18px] flex flex-col gap-4 min-w-0" data-testid="benutzer-detail">
       <div className="flex items-center gap-2.5 flex-wrap">
@@ -186,7 +286,10 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
         {z ? <Chip art={z.art}>{z.art === "ok" ? <Icon name="haken" /> : z.art === "fehler" ? <Icon name="schloss" /> : null}{z.text}</Chip> : null}
       </div>
       {benutzer?.gesperrt_am ? <Meldung art="fehler">Gesperrt am {zeitpunkt(benutzer.gesperrt_am)}{benutzer.sperrgrund ? ` · ${benutzer.sperrgrund}` : ""}.</Meldung> : null}
-      {benutzer?.nur_historisch ? <Meldung>Aus dem Altsystem übernommen, damit alte Einträge einer Person zugeordnet bleiben. Kann sich nicht anmelden.</Meldung> : null}
+      {historisch ? (
+        <Meldung><span data-testid="ohne-login-hinweis">Ohne Login: nur als Name, damit Einträge dieser Person zugeordnet bleiben (z. B. aus dem Altsystem
+          übernommen oder frühere Mitarbeiter). Kann sich nicht anmelden und hat keine Rechte. Mit „Login geben“ wird daraus wieder ein Konto zum Arbeiten.</span></Meldung>
+      ) : null}
       {kennwort ? <Kennwortanzeige id={kennwort.id} kennwort={kennwort.kennwort} gueltig={kennwort.gueltig} name={name} benutzername={benutzer?.username ?? ""} /> : null}
       {benutzer?.ist_test ? (
         <div className="meldung warn flex flex-col gap-2 text-[0.8125rem]">
@@ -204,14 +307,34 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
         <Feld label="Kürzel" hinweis="erscheint an Einträgen" fehler={fehler.kuerzel}>{(p) => <Eingabe {...p} className="num" maxLength={4} value={f.kuerzel} onChange={set("kuerzel")} />}</Feld>
         <Feld label="Funktion" className="col-span-2" fehler={fehler.funktion}>{(p) => <Eingabe {...p} placeholder="z. B. Ärztin, Ernährungsberaterin" value={f.funktion} onChange={set("funktion")} />}</Feld>
         <Feld label="Benutzername" hinweis="zum Anmelden" fehler={fehler.username}>{(p) => <Eingabe {...p} className="num" autoComplete="off" value={f.username} onChange={set("username")} />}</Feld>
-        <Feld label="Rolle" fehler={fehler.rolle}>
-          {(p) => <Auswahl {...p} value={f.rolle} onChange={set("rolle")}>{Object.entries(ROLLEN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Auswahl>}
+        <Feld label="Rolle" fehler={fehler.rolle} hinweis={ohneLogin ? "ohne Login: keine Rechte" : undefined}>
+          {(p) => <Auswahl {...p} value={ohneLogin ? "keine" : f.rolle} disabled={ohneLogin}
+            onChange={(e) => setF({ ...f, rolle: e.target.value, ist_test: TESTBENUTZER_ROLLEN.includes(e.target.value) ? f.ist_test : false })}>
+            {Object.entries(ROLLEN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Auswahl>}
         </Feld>
+        <div className="col-span-4 flex flex-col gap-1.5">
+          {neu ? (
+            <label className="flex items-start gap-2 text-sm cursor-pointer">
+              <input type="checkbox" className="mt-1" checked={f.ohne_login} onChange={(e) => setF({ ...f, ohne_login: e.target.checked })} />
+              <span>Ohne Login anlegen<br /><span className="text-[0.8125rem] gedaempft">Nur als Name für Einträge (z. B. frühere Mitarbeiter): kein Passwort,
+                keine Rechte. Ein Login lässt sich später geben.</span></span>
+            </label>
+          ) : null}
+          <label className={cx("flex items-start gap-2 text-sm", testMoeglich ? "cursor-pointer" : "opacity-60")}>
+            <input type="checkbox" className="mt-1" checked={f.ist_test && !ohneLogin} disabled={!testMoeglich && !f.ist_test}
+              onChange={(e) => setF({ ...f, ist_test: e.target.checked })} />
+            <span>Testbenutzer<br /><span className="text-[0.8125rem] gedaempft">Sieht und bearbeitet ausschließlich Testpatienten – für Schulungen und zum
+              Ausprobieren. Möglich für Betrachter, Mitarbeiter und Mediziner{benutzer?.id === ich.id ? "; nicht für das eigene Konto" : ""}.</span>
+              {fehler.ist_test ? <><br /><span className="fehlertext" role="alert">{fehler.ist_test}</span></> : null}</span>
+          </label>
+        </div>
         <span className="col-span-4 text-[0.8125rem] gedaempft">Anzeige in der Akte: <span className="text-tinte font-medium">{anzeige(f)}</span></span>
         {speichern.error && !Object.keys(fehler).length ? <Meldung art="fehler" className="col-span-4">{speichern.error.message}</Meldung> : null}
         {neu ? (
-          <Meldung className="col-span-4">Nach dem Anlegen erzeugt EPM ein Einmal-Kennwort. Du gibst es der Person persönlich oder als ausgedrucktes Zugangsblatt.
-            Beim ersten Login legt sie ein eigenes Passwort fest und richtet die Authenticator-App ein.</Meldung>
+          f.ohne_login ? <Meldung className="col-span-4">Das Konto bekommt kein Kennwort und keine Rechte. Es dient nur dazu, Einträge einer Person zuzuordnen.</Meldung>
+            : <Meldung className="col-span-4">Nach dem Anlegen erzeugt EPM ein Einmal-Kennwort. Du gibst es der Person persönlich oder als ausgedrucktes Zugangsblatt.
+              Beim ersten Login legt sie ein eigenes Passwort fest; die Authenticator-App richtet sie ein, wenn die Zwei-Faktor-Anmeldung Pflicht ist –
+              sonst freiwillig unter „Mein Konto“.</Meldung>
         ) : null}
         <div className="col-span-4 flex gap-2 flex-wrap items-center">
           {!neu && benutzer && !benutzer.nur_historisch ? <>
@@ -221,9 +344,12 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
               ? <Knopf icon="schloss" laedt={aktion.isPending && aktion.variables === "entsperren"} onClick={() => aktion.mutate("entsperren")}>Entsperren</Knopf>
               : <Knopf icon="schloss" disabled={benutzer.id === ich.id} title={benutzer.id === ich.id ? "Das eigene Konto kann nicht gesperrt werden." : undefined}
                   onClick={() => setFrage("sperren")}>Sperren</Knopf>}
+            <Knopf disabled={benutzer.id === ich.id} title={benutzer.id === ich.id ? "Das eigene Konto kann nicht auf „ohne Login“ gesetzt werden." : undefined}
+              onClick={() => setFrage("ohnelogin")}>Auf „ohne Login“ setzen</Knopf>
           </> : null}
+          {!neu && historisch ? <Knopf icon="schloss" onClick={() => setLoginRolle("mitarbeiter")}>Login geben</Knopf> : null}
           {neu ? <Knopf className="ml-auto" onClick={() => onGewaehlt(null)}>Abbrechen</Knopf> : null}
-          <Knopf type="submit" variante="pri" className={neu ? "" : "ml-auto"} laedt={speichern.isPending}>{neu ? "Anlegen und Einmal-Kennwort erzeugen" : "Speichern"}</Knopf>
+          <Knopf type="submit" variante="pri" className={neu ? "" : "ml-auto"} laedt={speichern.isPending}>{neu ? (f.ohne_login ? "Ohne Login anlegen" : "Anlegen und Einmal-Kennwort erzeugen") : "Speichern"}</Knopf>
         </div>
       </form>
       <div className="meldung info flex gap-2.5 items-start text-[0.8125rem] leading-normal">
@@ -233,8 +359,22 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
       <Dialog offen={!!frage} onOffen={(o) => { if (!o) setFrage(""); }} titel={frage ? fragen[frage][0] : ""} breite={480}
         beschreibung={frage ? fragen[frage][1] : undefined}
         fuss={<><Knopf onClick={() => setFrage("")}>Abbrechen</Knopf>
-          <Knopf variante={frage === "sperren" || frage === "testdaten" ? "dng" : "pri"} laedt={aktion.isPending} onClick={() => frage && aktion.mutate(frage)}>{frage ? fragen[frage][0] : ""}</Knopf></>}>
+          <Knopf variante={frage === "sperren" || frage === "testdaten" || frage === "ohnelogin" ? "dng" : "pri"} laedt={aktion.isPending} onClick={() => frage && aktion.mutate(frage)}>{frage ? fragen[frage][0] : ""}</Knopf></>}>
         <Fehleranzeige fehler={aktion.error} />
+      </Dialog>
+      <Dialog offen={loginRolle != null} onOffen={(o) => { if (!o) { setLoginRolle(null); loginGeben.reset(); } }} titel="Login geben" breite={480}
+        beschreibung={`${name} wird wieder ein Konto zum Arbeiten: Rolle wählen, EPM erzeugt ein Einmal-Kennwort für das Zugangsblatt.`}
+        fuss={<><Knopf onClick={() => setLoginRolle(null)}>Abbrechen</Knopf>
+          <Knopf variante="pri" laedt={loginGeben.isPending} onClick={() => loginGeben.mutate()}>Login geben</Knopf></>}>
+        <div className="flex flex-col gap-3">
+          <Feld label="Rolle">
+            {(p) => <Auswahl {...p} value={loginRolle ?? "mitarbeiter"} onChange={(e) => setLoginRolle(e.target.value)}>
+              {Object.entries(ROLLEN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Auswahl>}
+          </Feld>
+          <span className="text-[0.8125rem] gedaempft">Alle bisherigen Einträge der Person bleiben ihr zugeordnet. Mit „Keine Berechtigung“ kann sie sich
+            anmelden, sieht aber keine Patientendaten.</span>
+          <Fehleranzeige fehler={loginGeben.error} />
+        </div>
       </Dialog>
     </Karte>
   );
@@ -247,6 +387,10 @@ export function Benutzer() {
   const [kennwort, setKennwort] = useState<Kennwort | null>(null);
   const liste = useQuery({ queryKey: ["benutzer"], queryFn: () => alle<BenutzerTyp>("benutzer/?ordering=last_name") });
   const benutzer = liste.data ?? [];
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash === "#anmeldung" && liste.data) document.getElementById("anmeldung")?.scrollIntoView({ block: "start" });
+  }, [hash, liste.data]);
   const aktiv = neu ? null : benutzer.find((b) => b.id === gewaehlt) ?? benutzer[0] ?? null;
   return (
     <Seite pfad={[{ text: "Administration" }, { text: "Benutzer" }]}>
@@ -254,7 +398,7 @@ export function Benutzer() {
         rechts={<Knopf variante="pri" icon="plus" onClick={() => setNeu(true)}>Benutzer anlegen</Knopf>} />
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 items-start">
         <div className="flex flex-col gap-5 min-w-0">
-          <Karte className="overflow-hidden">
+          <Karte className="overflow-x-auto">
             {liste.isLoading ? <Laden /> : (
               <table className="tabelle" data-testid="benutzerliste">
                 <thead><tr><th className="th w-12" /><th className="th">Name</th><th className="th">Rolle</th><th className="th">Anmeldung</th><th className="th">Status</th></tr></thead>
@@ -269,8 +413,8 @@ export function Benutzer() {
                             onClick={(e) => { e.stopPropagation(); setNeu(false); setGewaehlt(b.id); }}>{b.anzeigename}</button>
                           <br /><span className="text-[0.8125rem] gedaempft">{b.funktion ? `${b.funktion} · ` : ""}<span className="num">{b.username}</span></span>
                         </td>
-                        <td className="td"><Chip art="akzent">{ROLLEN[b.rolle] ?? b.rolle}</Chip>{b.ist_test ? <><br /><Chip art="warn" className="mt-1">Testbenutzer</Chip></> : null}</td>
-                        <td className="td text-[0.8125rem]">{b.last_login ? relativ(b.last_login, true) : "noch nie"}<br /><span className="gedaempft">2FA: {b.nur_historisch ? "—" : b.zweiter_faktor ? "aktiv" : "nicht eingerichtet"}</span></td>
+                        <td className="td"><Chip art={b.rolle === "keine" ? undefined : "akzent"}>{ROLLEN[b.rolle] ?? b.rolle}</Chip>{b.ist_test ? <><br /><Chip art="warn" className="mt-1">Testbenutzer</Chip></> : null}</td>
+                        <td className="td text-[0.8125rem]">{b.last_login ? relativ(b.last_login, true) : "noch nie"}<br /><span className="gedaempft">2FA: {b.nur_historisch ? "—" : b.zweiter_faktor ? "aktiv" : b.zweiter_faktor_pflicht ? "nicht eingerichtet (Pflicht)" : "nicht eingerichtet"}</span></td>
                         <td className="td"><Chip art={z.art}>{z.text}</Chip></td>
                       </tr>
                     );
@@ -280,6 +424,7 @@ export function Benutzer() {
             )}
             <Fehleranzeige fehler={liste.error} />
           </Karte>
+          <AnmeldungKarte onBenutzer={(id) => { setNeu(false); setGewaehlt(id); }} />
           <RechteMatrix />
         </div>
         {aktiv || neu ? <Detail benutzer={aktiv} neu={neu} onGewaehlt={(id) => { setNeu(false); setGewaehlt(id); }}

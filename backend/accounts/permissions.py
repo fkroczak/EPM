@@ -2,7 +2,8 @@
 Rechte für die API – je Gruppe einstellbar (accounts/rechte.py, Oberfläche: Benutzer › Rechte).
 
 Lesen setzt „Akten lesen“ voraus, Schreiben das jeweilige Recht. Jeder Zugriff setzt eine
-vollständige Anmeldung voraus: Kennwort + zweiter Faktor und kein offenes Einmal-Kennwort.
+vollständige Anmeldung voraus: Kennwort, kein offenes Einmal-Kennwort und – wenn eingerichtet oder
+Pflicht (accounts/zweifaktor.py) – der zweite Faktor.
 """
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
@@ -15,17 +16,28 @@ def ist_verifiziert(user) -> bool:
     return getattr(user, "otp_device", None) is not None
 
 
+def zweiter_faktor_erfuellt(user) -> bool:
+    """Zweiter Faktor bestätigt – oder für diese Person nicht nötig: Er ist freiwillig (Festlegung 02.10.2026,
+    ``Anmelderegeln``) und sie hat keinen eingerichtet. Wer einen eingerichtet hat, braucht ihn bei jeder Anmeldung."""
+    if ist_verifiziert(user):
+        return True
+    from .zweifaktor import hat_zweiten_faktor, pflicht
+
+    return not hat_zweiten_faktor(user) and not pflicht(user)
+
+
 def voll_angemeldet(user) -> bool:
     return bool(
         user
         and user.is_authenticated
         and user.is_active
-        and ist_verifiziert(user)
         and not user.muss_kennwort_aendern
+        and zweiter_faktor_erfuellt(user)
     )
 
 
 class Angemeldet(BasePermission):
+    # Der Wortlaut ist Teil des Vertrags mit der Oberfläche (lib/api.ts erkennt daran die abgelaufene Anmeldung)
     message = "Anmeldung mit zweitem Faktor erforderlich."
 
     def has_permission(self, request, view):
@@ -44,7 +56,12 @@ class _Recht(Angemeldet):
             self.message = Angemeldet.message  # abgelaufene Sitzung, nicht fehlendes Recht
             return False
         if request.method in SAFE_METHODS:
-            return self.lesen is None or request.user.hat_recht(self.lesen)
+            if self.lesen is None:
+                # gemeinsame Listen (Versorger, Ärzte, Auswahllisten): jeder Angemeldete – außer „Keine Berechtigung“
+                from .rechte import OHNE_RECHTE
+
+                return request.user.rolle not in OHNE_RECHTE
+            return request.user.hat_recht(self.lesen)
         return request.user.hat_recht(self.schreiben)
 
 

@@ -359,6 +359,8 @@ export function PruefenKachel({ daten }: { daten: Startdaten }) {
     ["Altdokumente: Typ und Datum prüfen", p.altdokumente, "altdokumente"],
     ["Nickelallergie nicht erfasst", p.nickelallergie_unbekannt, "nickelallergie"],
     ["Versorger nicht erfasst", p.kein_versorger, "kein_versorger"],
+    // Ergänzung zur Fehlerliste 02.10.2026: Akten ohne Plan, bei denen niemand „kein Plan nötig“ bestätigt hat
+    ["Kein Infusionsplan", p.ohne_plan ?? 0, "ohne_plan"],
     [`Kontakt überfällig (über ${p.kontakt_ueberfaellig_monate} Monate)`, p.kontakt_ueberfaellig, "kontakt_ueberfaellig"],
     [`Kontakt bald fällig (${p.kontakt_bald_monate}–${p.kontakt_ueberfaellig_monate} Monate)`, p.kontakt_bald, "kontakt_bald"],
     // Datenschutz: Erklärungen nachhalten wie die Nickelallergie; lange ruhende Akten abschließen (erst dann läuft die Frist)

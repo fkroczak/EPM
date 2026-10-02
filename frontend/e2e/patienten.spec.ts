@@ -155,6 +155,28 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   merken("neuer_patient", { id, nachname, name: `${nachname}, Nele` });
 });
 
+test("Neuer Patient als Testpatient (z. B. für Plantests): eigene Nummer ab 9001", async ({ page }) => {
+  await page.goto("/patienten/neu");
+  const nr = page.getByTestId("naechste-nummer");
+  await expect(nr).toHaveText(/^\d{4}$/);
+  const echt = Number(await nr.textContent());
+  await page.getByRole("checkbox", { name: "als Testpatient anlegen" }).check();
+  await expect(page.getByText("wird Testpatient")).toBeVisible();
+  await expect.poll(async () => Number(await nr.textContent())).toBeGreaterThanOrEqual(9001);
+  expect(echt).toBeLessThan(9001);
+  const nachname = eindeutig("Plantest");
+  await page.getByLabel("Nachname").fill(nachname);
+  await page.getByLabel("Vorname").fill("Paul");
+  await page.getByLabel("Geburtsdatum").fill("04.04.1974");
+  await page.getByRole("button", { name: "Anlegen und Akte öffnen" }).click();
+  await expect(page).toHaveURL(/\/patienten\/\d+$/);
+  await expect(page.getByTestId("aktenkopf").getByText("Testpatient")).toBeVisible();
+  const api = await apiAls("mitarbeiter");
+  const p = await api.get(`patienten/${page.url().split("/").pop()}/`);
+  expect([p.ist_test, p.nummer >= 9001]).toEqual([true, true]);
+  await api.ende();
+});
+
 test("Betrachter sieht die Liste, aber keinen Knopf „Neuer Patient“", async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: zustand("betrachter"), ignoreHTTPSErrors: true });
   const page = await ctx.newPage();

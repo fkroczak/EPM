@@ -45,11 +45,12 @@ function Seitenleiste() {
       <span className="hd:hidden self-center font-mono text-xs font-semibold tracking-[.07em] text-akzent-text" title="EPM · Patientenmanagement">EPM</span>
       <nav aria-label="Hauptnavigation" className="flex flex-col gap-0.5">
         <NavEintrag zu="/" icon="start" text="Start" ende />
-        <NavEintrag zu="/patienten" icon="patienten" text="Patienten" />
+        {darf("akten_lesen") ? <NavEintrag zu="/patienten" icon="patienten" text="Patienten" /> : null}
         {darf("akten_lesen") ? <NavEintrag zu="/kalender" icon="kalender" text="Kalender" /> : null}
         {darf("akten_lesen") ? <NavEintrag zu="/infusionsplaene" icon="tropfen" text="Infusionspläne" /> : null}
-        <NavEintrag zu="/versorger" icon="versorger" text="Versorger" />
-        <NavEintrag zu="/aerzte" icon="arzt" text="Ärzte" />
+        {/* Rolle „Keine Berechtigung“: keine gemeinsamen Listen */}
+        {ich.rolle !== "keine" ? <NavEintrag zu="/versorger" icon="versorger" text="Versorger" /> : null}
+        {ich.rolle !== "keine" ? <NavEintrag zu="/aerzte" icon="arzt" text="Ärzte" /> : null}
         {darf("datenschutz_bearbeiten") || darf("datenschutz_entscheiden") ? <NavEintrag zu="/datenschutz" icon="schloss" text="Datenschutz" /> : null}
       </nav>
       {admin.length ? (
@@ -180,16 +181,18 @@ function Systemhinweis() {
   });
   const h = daten.data?.hinweis;
   if (!h || weg === h.id) return null;
+  const warnung = h.art === "warnung";
+  // Warnungen (Wartung, Update, Neustart, Wiederherstellen) groß und unübersehbar (Fehlerliste 02.10.2026, 4.3)
   return (
-    <div role="region" aria-label="Hinweis der Administration" data-testid="systemhinweis"
-      className={cx("nicht-drucken flex items-start gap-3 px-8 py-2.5 text-sm border-b",
-        h.art === "warnung" ? "bg-warn-bg text-warn border-warn/30" : "bg-akzent-weich text-akzent-text border-rand")}>
-      <Icon name={h.art === "warnung" ? "warnung" : "info"} groesse={18} className="shrink-0 mt-0.5" />
+    <div role="region" aria-label="Hinweis der Administration" data-testid="systemhinweis" data-art={h.art}
+      className={cx("nicht-drucken systemhinweis", warnung && "warnung")}>
+      <Icon name={warnung ? "warnung" : "info"} groesse={warnung ? 34 : 18} strokeWidth={warnung ? 2 : 1.8} className={cx("shrink-0", !warnung && "mt-0.5")} />
       <span className="grow leading-normal">
-        <strong className="font-semibold">Hinweis der Administration: </strong>{h.text}
+        <strong className={cx("font-semibold", warnung && "systemhinweis-titel")}>{warnung ? "Wartung – Hinweis der Administration" : "Hinweis der Administration: "}</strong>
+        {h.text}
         {h.angelegt_von_name ? <span className="opacity-80"> – {h.angelegt_von_name}, {zeitpunkt(h.angelegt_am)}</span> : null}
       </span>
-      <button type="button" className="btn geist klein shrink-0" onClick={() => { ausgeblendeterHinweis = h.id; setWeg(h.id); }}
+      <button type="button" className={cx("btn shrink-0", warnung ? "sec" : "geist klein")} onClick={() => { ausgeblendeterHinweis = h.id; setWeg(h.id); }}
         aria-label="Hinweis ausblenden">Ausblenden</button>
     </div>
   );

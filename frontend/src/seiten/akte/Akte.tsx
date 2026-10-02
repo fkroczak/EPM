@@ -415,7 +415,8 @@ export function Akte() {
             <Kennzahl titel="Versorger" hinweis={k.versorger ?? undefined}>{k.versorger ?? <span className="gedaempft">nicht erfasst</span>}</Kennzahl>
             <Kennzahl titel="Ansprechpartner" hinweis={k.ansprechpartner ? [k.ansprechpartner, k.ansprechpartner_telefon].filter(Boolean).join(" · ") : undefined}>
               {k.ansprechpartner ? <>{k.ansprechpartner}{k.ansprechpartner_telefon ? <> · <span className="num">{k.ansprechpartner_telefon}</span></> : null}</> : "—"}</Kennzahl>
-            <Kennzahl titel="Aktueller Plan">{k.aktueller_plan ? `${zahl(k.aktueller_plan.kcal)} kcal${k.aktueller_plan.laufzeit_h ? ` · ${zahl(k.aktueller_plan.laufzeit_h)} h` : ""}` : "—"}</Kennzahl>
+            <Kennzahl titel="Aktueller Plan">{k.aktueller_plan ? `${zahl(k.aktueller_plan.kcal)} kcal${k.aktueller_plan.laufzeit_h ? ` · ${zahl(k.aktueller_plan.laufzeit_h)} h` : ""}`
+              : k.kein_plan ? <span className="gedaempft">nicht nötig</span> : "—"}</Kennzahl>
             <Kennzahl titel="Nächster Termin" hinweis={k.naechster_termin ? `${terminZeit(k.naechster_termin.faellig_am, k.naechster_termin.uhrzeit)} · ${k.naechster_termin.ort ?? TERMINARTEN[k.naechster_termin.art]}` : undefined}>
               {k.naechster_termin ? `${terminZeit(k.naechster_termin.faellig_am, k.naechster_termin.uhrzeit)} · ${k.naechster_termin.ort ?? TERMINARTEN[k.naechster_termin.art]}` : "—"}
             </Kennzahl>

@@ -31,6 +31,9 @@ class Systemverzeichnis(Grundlage):
         self.ordner = Path(tempfile.mkdtemp(prefix="epm-system-"))
         (self.ordner / "auftraege").mkdir()
         (self.ordner / "status" / "auftraege").mkdir(parents=True)
+        # Austausch von Sicherungen (legt rollout/04-projekt.sh an): bereitgestellte und hochgeladene
+        (self.ordner / "download").mkdir()
+        (self.ordner / "upload").mkdir()
         self.einstellung = override_settings(EPM_SYSTEM=self.ordner)
         self.einstellung.enable()
         self.admin_codes = mit_zweitem_faktor(self.admin, anzahl_codes=6)
@@ -134,8 +137,79 @@ class Uebersicht(Systemverzeichnis):
         d = self.a.get("/api/system/uebersicht/").json()
         self.assertFalse(d["host"]["aktuell"])
         self.assertFalse(d["agent"]["erreichbar"])
-        (self.ordner / "status" / "verlauf.json").write_text(json.dumps({"punkte": [[1, 5, 40, 0.1, 30]]}))
-        self.assertEqual(self.a.get("/api/system/verlauf/").json()["punkte"], [[1, 5, 40, 0.1, 30]])
+        jetzt = int(timezone.now().timestamp())
+        (self.ordner / "status" / "verlauf.json").write_text(json.dumps({"punkte": [[jetzt - 60, 5, 40, 0.1, 30]]}))
+        self.assertEqual(self.a.get("/api/system/verlauf/").json()["punkte"], [[jetzt - 60, 5, 40, 0.1, 30]])
+
+    def test_verlauf_in_zeitraeumen(self):
+        """Fehlerliste 02.10.2026 (4.1): Auslastung für 1 Stunde bis 6 Monate – kurze Zeiträume aus den Messungen je
+        Minute, lange aus den gemittelten Stufen des Agenten (mit Spitzen)."""
+        jetzt = int(timezone.now().timestamp())
+        minuten = [[jetzt - 60 * i, 10 + i % 7, 40, 0.2, 30] for i in range(1439, -1, -1)]   # 24 Stunden
+        felder = ["zeit", "cpu", "ram", "last", "platte", "cpu_max", "ram_max"]
+        stufen = {
+            "viertelstunde": {"sekunden": 900, "felder": felder,
+                              "punkte": [[jetzt - 900 * i, 12, 41, 0.2, 30, 55, 44] for i in range(1343, -1, -1)]},
+            "stunde": {"sekunden": 3600, "felder": felder,
+                       "punkte": [[jetzt - 3600 * i, 13, 42, 0.2, 30, 60, 45] for i in range(743, -1, -1)]},
+            "vierteltag": {"sekunden": 21600, "felder": felder,
+                           "punkte": [[jetzt - 21600 * i, 14, 43, 0.2, 31, 70, 50] for i in range(99, -1, -1)]},
+        }
+        (self.ordner / "status" / "verlauf.json").write_text(json.dumps(
+            {"felder": felder[:5], "punkte": minuten, "stufen": stufen}))
+        erwartet = {"1h": (60, 60, 62), "3h": (60, 180, 182), "24h": (60, 1438, 1440), "7t": (900, 671, 673),
+                    "14t": (900, 1343, 1344), "1m": (3600, 743, 744), "6m": (21600, 100, 100)}
+        for zeitraum, (schritt, von, bis) in erwartet.items():
+            with self.subTest(zeitraum=zeitraum):
+                d = self.a.get(f"/api/system/verlauf/?zeitraum={zeitraum}").json()
+                self.assertEqual((d["zeitraum"], d["schritt_s"]), (zeitraum, schritt))
+                self.assertTrue(von <= len(d["punkte"]) <= bis, len(d["punkte"]))
+                self.assertEqual(len(d["felder"]), 5 if schritt == 60 else 7)
+                self.assertGreaterEqual(d["punkte"][0][0], d["von"])
+        d = self.a.get("/api/system/verlauf/").json()
+        self.assertEqual(d["zeitraum"], "24h")  # Standard wie bisher
+        self.assertEqual([z["code"] for z in d["zeitraeume"]], ["1h", "3h", "24h", "7t", "14t", "1m", "6m"])
+        self.assertEqual(d["zeitraeume"][3]["name"], "7 Tage")
+        self.assertEqual(self.a.get("/api/system/verlauf/?zeitraum=1j").status_code, 400)
+        # ohne die Stufen (Agent noch in der alten Fassung): lange Zeiträume leer statt Fehler
+        (self.ordner / "status" / "verlauf.json").write_text(json.dumps({"punkte": minuten}))
+        self.assertEqual(self.a.get("/api/system/verlauf/?zeitraum=7t").json()["punkte"], [])
+        self.assertEqual(self.a.get("/api/system/verlauf/?zeitraum=6m").status_code, 200)
+        self.assertEqual(client_fuer(self.mediziner).get("/api/system/verlauf/?zeitraum=1h").status_code, 403)
+
+    @unittest.skipUnless(AGENT.exists(), "rollout/epm-systemagent.py nur im Repo (nicht im Image)")
+    def test_agent_mittelt_den_verlauf_in_stufen(self):
+        """Der Agent schreibt zu den Messungen je Minute gröbere Stufen fort: Mittelwert je Abschnitt, Spitzen von CPU
+        und Arbeitsspeicher; beim ersten Lauf aus allen vorhandenen Minutenwerten."""
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("epm_systemagent", AGENT)
+        agent = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(agent)
+        basis = 1_800_000_000 - 1_800_000_000 % 21600          # Beginn eines 6-Stunden-Abschnitts
+        punkte = [[basis + 60 * i, float(i % 10), 50.0, 0.5, 20.0] for i in range(45)]   # 45 Minuten
+        punkte[3][1] = None                                    # fehlende Messung zählt nicht mit
+        punkte[20][1] = 90.0                                   # Spitze in der zweiten Viertelstunde
+        stufen = agent.Agent.verlauf_stufen(None, punkte)
+        self.assertEqual(sorted(stufen), ["stunde", "viertelstunde", "vierteltag"])
+        viertel = stufen["viertelstunde"]["punkte"]
+        self.assertEqual([p[0] for p in viertel], [basis, basis + 900, basis + 1800])
+        erste = [i % 10 for i in range(15) if i != 3]
+        self.assertEqual(viertel[0][1], round(sum(erste) / len(erste), 2))
+        self.assertEqual((viertel[0][5], viertel[1][5], viertel[1][6]), (9.0, 90.0, 50.0))
+        self.assertEqual(len(stufen["stunde"]["punkte"]), 1)
+        self.assertEqual(stufen["stunde"]["punkte"][0][5], 90.0)
+        self.assertEqual(stufen["viertelstunde"]["felder"][-2:], ["cpu_max", "ram_max"])
+        # nächste Minute: der laufende Abschnitt wird ersetzt, kein zweiter Punkt für dieselbe Viertelstunde
+        punkte.append([basis + 60 * 45, 100.0, 80.0, 0.5, 20.0])
+        weiter = agent.Agent.verlauf_stufen(stufen, punkte)
+        self.assertEqual([p[0] for p in weiter["viertelstunde"]["punkte"]], [basis, basis + 900, basis + 1800, basis + 2700])
+        self.assertEqual(weiter["viertelstunde"]["punkte"][0], viertel[0])       # abgeschlossene Abschnitte bleiben
+        self.assertEqual(weiter["stunde"]["punkte"][0][5], 100.0)
+        self.assertEqual(len(weiter["stunde"]["punkte"]), 1)
+        # alte Abschnitte fallen hinten heraus (hier: 14 Tage bei Viertelstunden)
+        viele = {"viertelstunde": {"punkte": [[basis - 900 * i, 1, 1, 1, 1, 1, 1] for i in range(1400, 0, -1)]}}
+        self.assertEqual(len(agent.Agent.verlauf_stufen(viele, punkte)["viertelstunde"]["punkte"]), 1344)
 
     def test_angemeldete_sitzungen(self):
         from epm.pruefhilfen import echte_anmeldung
@@ -217,6 +291,22 @@ class Auftraege(Systemverzeichnis):
         r = self.a.post(url, {"aktion": "epm_neustart", "kennwort": KENNWORT, "code": self.admin_codes[1]},
                         format="json")
         self.assertEqual(r.status_code, 400)
+
+    def test_ohne_zweiten_faktor_genuegt_das_kennwort(self):
+        """Zweiter Faktor freiwillig (Festlegung 02.10.2026): Wer keinen eingerichtet hat, bestätigt Update, Neustart
+        und Wiederherstellen mit dem Kennwort; ein falsches Kennwort wird weiter abgewiesen."""
+        ohne = benutzer("ohne2fa", Rolle.ADMIN)
+        c = client_fuer(ohne)
+        url = "/api/system/auftraege/"
+        r = c.post(url, {"aktion": "epm_neustart", "minuten": 0, "kennwort": "falsch"}, format="json")
+        self.assertEqual((r.status_code, list(r.json())), (400, ["kennwort"]))
+        r = c.post(url, {"aktion": "epm_neustart", "minuten": 0, "kennwort": KENNWORT}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        e = c.get("/api/protokoll/?gruppe=system").json()["results"][0]
+        self.assertEqual(e["beschreibung"], "EPM neu starten angefordert, mit Passwort bestätigt")
+        # mit eingerichtetem zweitem Faktor bleibt der Code Pflicht
+        r = self.a.post(url, {"aktion": "server_neustart", "minuten": 0, "kennwort": KENNWORT}, format="json")
+        self.assertEqual((r.status_code, list(r.json())), (400, ["code"]))
 
     def test_sicherung_braucht_recht_sicherungen(self):
         Gruppenrecht.objects.create(rolle=Rolle.ADMIN, recht="backup_verwalten", erlaubt=False)

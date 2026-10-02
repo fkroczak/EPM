@@ -18,7 +18,9 @@ def praeparat(name, konzentration=None):
     return qs.get()
 
 
-class Infusionsplaene(Grundlage):
+class PlanHilfen:
+    """Entwurf anlegen und freigeben (gemeinsam für die Testklassen der Pläne)."""
+
     def plan_daten(self):
         """Werte wie im Entwurf 7 · Neuer Infusionsplan."""
         return {
@@ -50,6 +52,8 @@ class Infusionsplaene(Grundlage):
         self.assertEqual(c.post(f"/api/infusionsplaene/{e['id']}/freigeben/").status_code, 200)
         return Infusionsplan.objects.get(pk=e["id"])
 
+
+class Infusionsplaene(PlanHilfen, Grundlage):
     def test_ablauf(self):
         c = client_fuer(self.mediziner)
         self.assertEqual(client_fuer(self.mitarbeiter).post("/api/infusionsplaene/entwurf/",
@@ -293,3 +297,70 @@ class Infusionsplaene(Grundlage):
         r = client_fuer(self.mediziner).post("/api/infusionsplaene/entwurf/", {"patient": self.patient.id},
                                              format="json")
         self.assertEqual(r.status_code, 409)
+
+
+class KeinPlanNoetig(PlanHilfen, Grundlage):
+    """Ergänzung zur Fehlerliste 02.10.2026: Akten in Betreuung ohne Infusionsplan bekommen einen Hinweis; wer bestätigt,
+    dass ein Patient keinen braucht, unterdrückt ihn und die Warnung „Plan älter als …“. Die nächste Freigabe eines
+    Plans hebt die Bestätigung wieder auf."""
+
+    def liste(self, **filter):
+        r = client_fuer(self.mitarbeiter).get("/api/patienten/", {"status": "in_betreuung", **filter})
+        self.assertEqual(r.status_code, 200, r.content)
+        return {p["id"]: p for p in r.json()["results"]}
+
+    def test_hinweis_bestaetigen_aufheben(self):
+        p = self.liste()[self.patient.id]
+        self.assertIn("ohne_plan", [h["art"] for h in p["kennzahlen"]["hinweise"]])
+        self.assertIn(self.patient.id, self.liste(pruefen="ohne_plan"))
+        start = client_fuer(self.mitarbeiter).get("/api/startseite/").json()
+        self.assertGreaterEqual(start["pruefen"]["ohne_plan"], 1)
+        # Betrachter darf nicht, Admin nur bei Testpatienten
+        url = f"/api/patienten/{self.patient.id}/kein-plan/"
+        self.assertEqual(client_fuer(self.betrachter).post(url, {"kein_plan": True}, format="json").status_code, 403)
+        self.assertEqual(client_fuer(self.admin).post(url, {"kein_plan": True}, format="json").status_code, 403)
+        self.assertEqual(client_fuer(self.mitarbeiter).post(url, {"kein_plan": "ja"}, format="json").status_code, 400)
+        r = client_fuer(self.mitarbeiter).post(url, {"kein_plan": True, "grund": "nur orale Ernährung"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        kopf = r.json()["kopf"]["kein_plan"]
+        self.assertEqual(kopf["grund"], "nur orale Ernährung")
+        self.assertTrue(kopf["von"])
+        p = self.liste()[self.patient.id]
+        self.assertNotIn("ohne_plan", [h["art"] for h in p["kennzahlen"]["hinweise"]])
+        self.assertNotIn(self.patient.id, self.liste(pruefen="ohne_plan"))
+        # steht in der Historie (Verlauf der Akte)
+        self.assertTrue(self.patient.history.filter(kein_plan=True).exists())
+        r = client_fuer(self.mitarbeiter).post(url, {"kein_plan": False}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertIsNone(r.json()["kopf"]["kein_plan"])
+        self.assertIn(self.patient.id, self.liste(pruefen="ohne_plan"))
+
+    def test_alter_plan_ohne_warnung_und_freigabe_hebt_auf(self):
+        from stammdaten.models import Einstellungen
+
+        alt = timezone.localdate() - timedelta(days=30 * Einstellungen.aktuell().plan_alter_warnung_monate + 10)
+        # aktueller Plan von vor der Grenze (wie aus dem Altsystem übernommen; freigegebene Pläne sind unveränderlich)
+        Infusionsplan.objects.bulk_create([Infusionsplan(patient=self.patient, status=Infusionsplan.Status.AKTUELL,
+                                                         gueltig_ab=alt, herkunft=Infusionsplan.Herkunft.ALTSYSTEM,
+                                                         erstellt_von=self.mediziner)])
+        c = client_fuer(self.mediziner)
+        self.assertIn("plan", [h["art"] for h in self.liste()[self.patient.id]["kennzahlen"]["hinweise"]])
+        self.assertEqual(len(c.get("/api/startseite/").json()["infusionsplaene"]["aelter_als_grenze"]), 1)
+        self.assertEqual(c.get("/api/infusionsplaene/uebersicht/?gruppe=alt").json()["zaehler"]["alt"], 1)
+        self.assertEqual(c.post(f"/api/patienten/{self.patient.id}/kein-plan/", {"kein_plan": True},
+                                format="json").status_code, 200)
+        arten = [h["art"] for h in self.liste()[self.patient.id]["kennzahlen"]["hinweise"]]
+        self.assertNotIn("plan", arten)
+        self.assertNotIn("ohne_plan", arten)
+        self.assertEqual(c.get("/api/startseite/").json()["infusionsplaene"]["aelter_als_grenze"], [])
+        uebersicht = c.get("/api/infusionsplaene/uebersicht/?gruppe=aktuell").json()
+        self.assertEqual(uebersicht["zaehler"]["alt"], 0)
+        self.assertEqual([(z["aelter_als_grenze"], z["kein_plan"]) for z in uebersicht["ergebnisse"]], [(False, True)])
+        from patienten.kalender import faelligkeiten
+
+        eintraege, _ = faelligkeiten(Patient.objects.all(), timezone.localdate() + timedelta(days=400))
+        self.assertFalse([x for x in eintraege if x["art"] == "plan"])
+        # neuer Plan freigegeben → Patient braucht wieder einen Plan
+        self.freigegebener_plan()
+        self.patient.refresh_from_db()
+        self.assertFalse(self.patient.kein_plan)

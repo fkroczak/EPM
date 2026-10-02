@@ -101,11 +101,12 @@ function useKartenSpeichern() {
   const { setIch } = useAuth();
   const melden = useHinweis();
   /** ``karten: []`` setzt auf den Standard der Rolle zurück; ohne ``karten`` bleiben die Kacheln unverändert */
-  return (startseite: { karten?: Karte[]; notfallhinweis_bei?: number }) => {
+  return (startseite: { karten?: Karte[]; notfallhinweis_bei?: number; zweifaktorhinweis_aus?: boolean }) => {
     const vorher: Ich = ich;
-    if (startseite.karten?.length || startseite.notfallhinweis_bei !== undefined) {
+    if (startseite.karten?.length || startseite.notfallhinweis_bei !== undefined || startseite.zweifaktorhinweis_aus !== undefined) {
       setIch({ ...ich, startseite: { ...ich.startseite, ...(startseite.karten?.length ? { karten: startseite.karten } : {}),
-        ...(startseite.notfallhinweis_bei !== undefined ? { notfallhinweis_bei: startseite.notfallhinweis_bei } : {}) } });
+        ...(startseite.notfallhinweis_bei !== undefined ? { notfallhinweis_bei: startseite.notfallhinweis_bei } : {}),
+        ...(startseite.zweifaktorhinweis_aus !== undefined ? { zweifaktorhinweis_aus: startseite.zweifaktorhinweis_aus } : {}) } });
     }
     api<Ich>("auth/ich/", { method: "PATCH", body: { startseite } })
       .then((antwort) => setIch(antwort))
@@ -337,6 +338,23 @@ export function Start() {
           <Link to={`/admin/benutzer?id=${k.id}`} className="font-medium whitespace-nowrap text-fehler">Zum Benutzer</Link>
         </div>
       ))}
+      {ich.rolle === "keine" ? (
+        <div role="status" className="meldung info flex items-center gap-2.5" data-testid="keine-berechtigung">
+          <Icon name="info" groesse={18} />
+          <span>Dein Konto hat die Rolle „Keine Berechtigung“: Du bist angemeldet, siehst aber keine Patientendaten. Rolle und Rechte vergibt die Administration.</span>
+        </div>
+      ) : null}
+      {/* Zwei-Faktor-Anmeldung ist freiwillig (Fehlerliste 02.10.2026, 6.5): einmal darauf hinweisen, ausblendbar */}
+      {!ich.zweiter_faktor && !ich.startseite.zweifaktorhinweis_aus ? (
+        <div role="status" className="meldung info flex items-center gap-2.5" data-testid="zweifaktor-hinweis">
+          <Icon name="schloss" groesse={18} />
+          <span className="grow">Dein Konto ist nur mit dem Passwort geschützt. Die Zwei-Faktor-Anmeldung (Code aus einer Authenticator-App) ist freiwillig
+            und in zwei Minuten eingerichtet.</span>
+          <Link to="/konto#zwei-faktor" className="font-medium whitespace-nowrap">Jetzt einrichten</Link>
+          <button type="button" className="btn icon geist klein" aria-label="Hinweis zur Zwei-Faktor-Anmeldung ausblenden"
+            onClick={() => speichern({ zweifaktorhinweis_aus: true })}><Icon name="x" /></button>
+        </div>
+      ) : null}
       {codesHinweis && codes ? (
         <div role="status" className="meldung warn flex items-center gap-2.5" data-testid="notfallcodes-hinweis">
           <Icon name="warnung" groesse={18} />

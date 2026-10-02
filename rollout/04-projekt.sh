@@ -28,6 +28,13 @@ install -d -m 0750 -o 101 -g 101 "$B/nginx/certs"
 install -d -m 0755 "$B/system" "$B/system/status" "$B/system/status/auftraege"
 install -d -m 0770 -o "$EPM_APP_UID" -g 101 "$B/system/auftraege"
 chown "$EPM_APP_UID:101" "$B/system/auftraege"; chmod 0770 "$B/system/auftraege"
+# Administration › Backup: Sicherungen herunterladen und hochladen. download/: der Systemagent (root) legt eine
+# Sicherung für 2 Stunden bereit, Backend und Nginx lesen über Gruppe 101. upload/: das Backend schreibt die
+# hochgeladene Datei, der Systemagent prüft sie und übernimmt sie in $B/backup.
+install -d -m 0750 -o root -g 101 "$B/system/download"
+chown root:101 "$B/system/download"; chmod 0750 "$B/system/download"
+install -d -m 0770 -o "$EPM_APP_UID" -g 101 "$B/system/upload"
+chown "$EPM_APP_UID:101" "$B/system/upload"; chmod 0770 "$B/system/upload"
 
 echo "==> Projektdateien kopieren"
 install -m 0644 projekt/compose.yaml projekt/compose.smoke.yaml "$B/"

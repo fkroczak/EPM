@@ -231,6 +231,94 @@ test("Backup: Übertragungsziel festlegen, Verbindung testen, von Hand und im Ze
   await expect(page.getByRole("heading", { name: "Backup und Wiederherstellung", level: 1 })).toBeVisible();
 });
 
+test("Backup: Aufbewahrung wählen, Sicherung herunterladen und als neue Sicherung wieder hochladen", async ({ page }) => {
+  test.setTimeout(300_000);
+  await page.goto("/admin/backup");
+  // Aufbewahrung 7/14/30 Tage (Fehlerliste 02.10.2026, 5.2) – mit Passwort und (eingerichtetem) zweiten Faktor
+  const vorher = ((await (await page.request.get("/api/backup/")).json()) as { aufbewahrung_tage: number | null }).aufbewahrung_tage;
+  await page.getByTestId("aufbewahrung").getByRole("button", { name: "Ändern" }).click();
+  let dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Aufbewahren für").locator("option")).toHaveText([/^7 Tage/, /^14 Tage/, /^30 Tage/]);
+  await dialog.getByLabel("Aufbewahren für").selectOption("7");
+  await dialog.getByLabel("Ihr Passwort").fill(KENNWORT);
+  await dialog.getByLabel("Code aus der Authenticator-App").fill(naechsterNotfallcode("e2e.admin"));
+  const auf = await auftragDurch(page, "aufbewahrung/", () => dialog.getByRole("button", { name: "Bestätigen und speichern" }).click());
+  await abwarten(page, auf.kennung);
+  expect(execSync(`sudo cat ${B}/konf-sicherung/aufbewahrung`).toString().trim()).toBe("7");
+  await expect(page.getByTestId("aufbewahrung")).toContainText("7 Tage");
+
+  // Herunterladen (5.1): der Server legt die Sicherung als eine Datei bereit, dann lädt der Browser sie
+  const s = (await stand(page)).sicherungen.find((x) => x.verschluesselt)!;
+  expect(s).toBeTruthy();
+  await page.getByTestId(`sicherung-${s.stempel}`).getByRole("button", { name: /herunterladen/i }).click();
+  dialog = page.getByRole("dialog");
+  await expect(dialog.getByTestId("herunterladen")).toContainText("Die Datei bleibt verschlüsselt");
+  await dialog.getByLabel("Ihr Passwort").fill(KENNWORT);
+  await dialog.getByLabel("Code aus der Authenticator-App").fill(naechsterNotfallcode("e2e.admin"));
+  const bereit = await auftragDurch(page, `${s.stempel}/bereitstellen/`, () => dialog.getByRole("button", { name: "Bestätigen und bereitstellen" }).click());
+  await abwarten(page, bereit.kennung);
+  await expect(dialog.getByTestId("sicherung-bereit")).toBeVisible({ timeout: 30_000 });
+  const laden = page.waitForEvent("download");
+  await dialog.getByTestId("sicherung-datei").click();
+  const download = await laden;
+  expect(download.suggestedFilename()).toBe(`epm-sicherung_${s.stempel}.tar`);
+  const ordner = mkdtempSync(join(tmpdir(), "epm-buendel-"));
+  try {
+    const datei = join(ordner, download.suggestedFilename());
+    await download.saveAs(datei);
+    const inhalt = execSync(`tar -tf ${datei}`).toString().split("\n").filter(Boolean).sort();
+    expect(inhalt).toEqual(expect.arrayContaining([`epm-db_${s.stempel}.dump.gpg`, `epm_${s.stempel}.sha256`]));
+    await dialog.getByRole("button", { name: "Fertig" }).click();
+
+    // Hochladen (5.3): dieselbe Sicherung unter neuem Zeitstempel – so, als käme sie von der Migrationsmaschine
+    const neu = `${s.stempel.slice(0, 10)}_000001`;
+    const arbeit = join(ordner, "a");
+    execSync(`mkdir ${arbeit} && tar -xf ${datei} -C ${arbeit}`);
+    execSync(`python3 - ${arbeit} ${s.stempel} ${neu}`, { input: [
+      "import os, sys",
+      "d, alt, neu = sys.argv[1:]",
+      "for n in os.listdir(d):",
+      "    p = os.path.join(d, n)",
+      "    if n.endswith(('.sha256', '.json')):",
+      "        t = open(p, encoding='utf-8').read().replace(alt, neu)",
+      "        open(p, 'w', encoding='utf-8').write(t)",
+      "    os.rename(p, os.path.join(d, n.replace(alt, neu)))",
+    ].join("\n") });
+    const hoch = join(ordner, `epm-sicherung_${neu}.tar`);
+    execSync(`tar -cf ${hoch} -C ${arbeit} ${readdirSync(arbeit).join(" ")}`);
+    await page.getByRole("button", { name: "Sicherung hochladen" }).click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Datei der Sicherung").setInputFiles(hoch);
+    await expect(dialog.getByTestId("hochladen")).toContainText(`epm-sicherung_${neu}.tar`);
+    await dialog.getByRole("button", { name: "Hochladen" }).click();
+    await expect(dialog.getByTestId("hochladen-ergebnis")).toContainText(`Sicherung ${neu} übernommen (verschlüsselt)`, { timeout: 120_000 });
+    await dialog.getByRole("button", { name: "Fertig" }).click();
+    const zeile = page.getByTestId(`sicherung-${neu}`);
+    await expect(zeile).toContainText("Hochgeladen");
+    await expect(zeile).toContainText("verschlüsselt");
+    await expect(zeile.getByRole("button", { name: /wiederherstellen/ })).toBeEnabled();
+    expect((await stand(page)).sicherungen.find((x) => x.stempel === neu)?.passwort_nr).toBe(s.passwort_nr);
+    // dieselbe Datei noch einmal: wird abgelehnt, nichts überschrieben
+    await page.getByRole("button", { name: "Sicherung hochladen" }).click();
+    await dialog.getByLabel("Datei der Sicherung").setInputFiles(hoch);
+    await dialog.getByRole("button", { name: "Hochladen" }).click();
+    await expect(dialog.getByTestId("hochladen-ergebnis")).toContainText("gibt es auf diesem Server schon", { timeout: 120_000 });
+    await dialog.getByRole("button", { name: /Fertig|Ausblenden/ }).click();
+  } finally {
+    rmSync(ordner, { recursive: true, force: true });
+  }
+  // Audit-Log: Herunterladen und Hochladen stehen darin
+  await page.goto("/admin/audit-log");
+  await expect(page.getByText(/heruntergeladen/).first()).toBeVisible();
+  // Aufbewahrung zurück
+  if (vorher && vorher !== 7) {
+    const a = await page.request.post("/api/backup/aufbewahrung/", { data: { tage: vorher, kennwort: KENNWORT, code: naechsterNotfallcode("e2e.admin") },
+      headers: { "X-CSRFToken": (await page.context().cookies()).find((c) => c.name === "epm_csrf")?.value ?? "", Referer: `${BASIS}/` } });
+    expect(a.status(), await a.text()).toBe(201);
+    await abwarten(page, ((await a.json()) as Auftrag).kennung);
+  }
+});
+
 test("Backup: Wiederherstellen mit Passwort und 2FA – Stand der Sicherung zurück, alle neu anmelden, Audit-Log", async ({ page }) => {
   test.setTimeout(480_000);
   await page.goto("/admin/backup");

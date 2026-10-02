@@ -77,21 +77,30 @@ def patienten_mit_eingeschraenkten(user):
 NUR_TESTPATIENTEN_TEXT = "Als Admin nur bei Testpatienten möglich. Echte Akten sind für die Administration nur lesbar."
 
 
-def pruefe_schreibbereich(user, patient, loeschen: bool = False):
+def pruefe_schreibbereich(user, patient, loeschen: bool = False, recht: str | None = None):
     """Admins schreiben Patientendaten nur bei Testpatienten (Festlegung 01.10.2026) → sonst 403.
-    Ausnahme ``loeschen``: endgültig löschen (Dokumente F73, Akten F80) dürfen Admins auch bei echten Akten
-    (Festlegung 02.10.2026)."""
-    from accounts.rechte import schreibt_nur_testpatienten
+    Ausnahmen (Festlegungen 02.10.2026, ``accounts.rechte.AUCH_BEI_ECHTEN_AKTEN``): endgültig löschen (``loeschen``;
+    Dokumente F73, Akten F80), Dokumente einem anderen Patienten zuordnen und Akten abschließen (``recht``) dürfen
+    Admins auch bei echten Akten."""
+    from accounts.rechte import AUCH_BEI_ECHTEN_AKTEN, schreibt_nur_testpatienten
 
-    if schreibt_nur_testpatienten(user) and not patient.ist_test and not loeschen:
+    if loeschen or recht in AUCH_BEI_ECHTEN_AKTEN:
+        return
+    if schreibt_nur_testpatienten(user) and not patient.ist_test:
         raise PermissionError(NUR_TESTPATIENTEN_TEXT)
 
 
-def legt_testpatienten_an(user) -> bool:
-    """Testbenutzer und Admins legen nur Testpatienten an."""
+def legt_testpatienten_an(user, gewuenscht: bool = False) -> bool:
+    """Testbenutzer und Admins legen nur Testpatienten an. Alle anderen können beim Anlegen einen Testpatienten
+    wählen (``gewuenscht``, Fehlerliste 02.10.2026) – z. B. um Infusionspläne auszuprobieren."""
     from accounts.rechte import schreibt_nur_testpatienten
 
-    return bool(getattr(user, "ist_test", False) or schreibt_nur_testpatienten(user))
+    return bool(gewuenscht or getattr(user, "ist_test", False) or schreibt_nur_testpatienten(user))
+
+
+def wahr(wert) -> bool:
+    """„1“, „true“, „ja“, True → True (Schalter in Anfragen)"""
+    return wert is True or str(wert).strip().lower() in ("1", "true", "ja", "on")
 
 
 class RichText(serializers.CharField):

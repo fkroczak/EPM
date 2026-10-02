@@ -104,6 +104,7 @@ function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean
   const [grund, setGrund] = useState("");
   const [kennwort, setKennwort] = useState("");
   const [code, setCode] = useState("");
+  const zweiterFaktor = !!useAuth().ich?.zweiter_faktor;
   const [bestaetigung, setBestaetigung] = useState("");
   const vorbereiten = useMutation({
     mutationFn: () => api<{ code: string; gueltig_bis: string }>(`dokumente/${dok.id}/loeschen-vorbereiten/`, { method: "POST" }),
@@ -132,7 +133,7 @@ function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean
       beschreibung={`„${dok.titel}“ bei ${name(patient)}`}
       fuss={<><Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
         <Knopf variante="dng" laedt={loeschen.isPending} onClick={() => loeschen.mutate()}
-          disabled={!vorbereiten.data || grund.trim().length < 10 || !kennwort || code.trim().length < 6 || bestaetigung.trim().length < 6}>Endgültig löschen</Knopf></>}>
+          disabled={!vorbereiten.data || grund.trim().length < 10 || !kennwort || (zweiterFaktor && code.trim().length < 6) || bestaetigung.trim().length < 6}>Endgültig löschen</Knopf></>}>
       <div className="flex flex-col gap-3" data-testid="loeschen">
         <Meldung art="fehler">Datei, Inhalt, Titel, Dateiname, Notiz und Datum werden unwiederbringlich gelöscht – auch aus Historie und Audit-Log (Art. 17 DSGVO). Es bleibt nur der Nachweis ohne Inhalt: im Verlauf „endgültig gelöscht“ mit Grund, im Audit-Log Dokumentnummer, Typ, Prüfsumme, Person und Zeitpunkt. Ältere Sicherungen enthalten das Dokument noch bis zu ihrem Ablauf; nach einer Wiederherstellung wird es automatisch erneut gelöscht. Gehört das Dokument einem anderen Patienten der Stiftung, bitte stattdessen „Anderem Patienten zuordnen“.</Meldung>
         <Feld label="Grund" fehler={f.grund} hinweis="mindestens 10 Zeichen · ohne Namen oder Gesundheitsangaben der fremden Person – der Grund bleibt im Protokoll">
@@ -140,7 +141,8 @@ function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean
         </Feld>
         <div className="grid grid-cols-2 gap-3">
           <Feld label="Kennwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
-          <Feld label="Code aus der Authenticator-App" fehler={f.code}>{(p) => <Eingabe {...p} inputMode="numeric" autoComplete="one-time-code" className="num" value={code} onChange={(e) => setCode(e.target.value)} />}</Feld>
+          {/* ohne eingerichtete Zwei-Faktor-Anmeldung genügt das Passwort (Fehlerliste 02.10.2026, 6.5) */}
+          {zweiterFaktor ? <Feld label="Code aus der Authenticator-App" fehler={f.code}>{(p) => <Eingabe {...p} inputMode="numeric" autoComplete="one-time-code" className="num" value={code} onChange={(e) => setCode(e.target.value)} />}</Feld> : null}
         </div>
         <div className="flex items-end gap-3 flex-wrap">
           <div className="flex flex-col gap-1">

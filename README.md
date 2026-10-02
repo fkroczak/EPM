@@ -36,10 +36,12 @@ Die Konfiguration des Servers liegt in `/etc/epm/epm.conf` (nicht im Repo). Die 
 `https://<EPM_WEB_NAME>/` erreichbar, die Django-Verwaltung unter `/verwaltung/` (nur Rolle Admin).
 
 ## Datensicherung
-Täglich um 02:00 (`epm-backup.timer`), 30 Tage auf dem Server unter `/srv/epm/backup`. Gesteuert wird alles unter
+Täglich um 02:00 (`epm-backup.timer`), 30 Tage auf dem Server unter `/srv/epm/backup` (unter Administration › Backup
+auf 7, 14 oder 30 Tage einstellbar). Gesteuert wird alles unter
 Administration › Backup: Passwort für die Verschlüsselung festlegen und das Passwortblatt im Tresor verwahren,
-Übertragungsziel (WebDAV, z. B. Nextcloud mit App-Passwort) mit Zeitfenster, „Jetzt sichern“, Wiederherstellen (Admin-
-Passwort und 2FA). Passwort und Zugang liegen nur auf dem Server in `/etc/epm/sicherung` (root, 0600). Die Adresse des
+Übertragungsziel (WebDAV, z. B. Nextcloud mit App-Passwort) mit Zeitfenster, „Jetzt sichern“, Wiederherstellen (eigenes
+Passwort, dazu der Code, wenn die Zwei-Faktor-Anmeldung eingerichtet ist), Sicherung als eine Datei herunterladen und
+wieder hochladen (z. B. von der Migrationsmaschine; Austausch über `/srv/epm/system/download` und `…/upload`). Passwort und Zugang liegen nur auf dem Server in `/etc/epm/sicherung` (root, 0600). Die Adresse des
 Ziels muss im Proxy der OPNsense freigegeben sein. Ohne EPM entschlüsseln: `gpg -d -o epm-db_….dump epm-db_….dump.gpg`.
 
 ## Tests

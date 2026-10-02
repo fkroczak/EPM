@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { abfrage, api } from "@/lib/api";
 import type { Seite as ApiSeite } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
-import { datum, nummer, relativ, zahl } from "@/lib/format";
+import { datum, nummer, zahl } from "@/lib/format";
 import type { PatientZeile, Plan } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Chip, Eingabe, Fehleranzeige, Karte, Knopf, KnopfLink, Laden, Leer, Meldung, Segmente, Seitenkopf } from "@/components/ui/basis";
@@ -22,14 +22,20 @@ type Zeile = {
   status: "entwurf" | "aktuell" | "abgeloest"; gueltig_ab: string; kcal: number | null; laufzeit_h: number | null;
   rate_ml_h: number | null; tage_pro_woche: number | null; erstellt_am: string; erstellt_von: string | null;
   freigegeben_am: string | null; freigegeben_von: string | null; pdf: boolean; pdf_sha256: string | null; herkunft: "epm" | "altsystem";
-  aelter_als_grenze: boolean;
+  aelter_als_grenze: boolean; alt_ab: string | null;
 };
 type Antwort = { zaehler: Record<Gruppe, number>; grenze_monate: number; ergebnisse: Zeile[] };
 
-function StatusChip({ z }: { z: Zeile }) {
-  if (z.status === "entwurf") return <Chip art="warn">Entwurf</Chip>;
-  if (z.status === "abgeloest") return <Chip>abgelöst</Chip>;
-  return z.aelter_als_grenze ? <Chip art="fehler">aktuell, alt</Chip> : <Chip art="ok">aktuell</Chip>;
+/** Status; beim Überfahren mit der Maus (und für Bildschirmleser) steht die Frist dabei (Fehlerliste 02.10.2026, 1.2). */
+function StatusChip({ z, grenze }: { z: Zeile; grenze: number }) {
+  if (z.status === "entwurf") return <Chip art="warn" title="Entwurf: noch nicht freigegeben" className="cursor-help">Entwurf</Chip>;
+  if (z.status === "abgeloest") return <Chip title="Durch einen neueren Plan abgelöst" className="cursor-help">abgelöst</Chip>;
+  const frist = z.alt_ab ? datum(z.alt_ab) : "—";
+  return z.aelter_als_grenze
+    ? <Chip art="fehler" className="cursor-help" data-testid="plan-frist"
+      title={`Frist abgelaufen am ${frist}: gültig seit ${datum(z.gueltig_ab)}, älter als ${grenze} Monate – bitte prüfen und neu freigeben.`}>aktuell, alt</Chip>
+    : <Chip art="ok" className="cursor-help" data-testid="plan-frist"
+      title={`Frist: ${frist} – ab dann gilt der Plan als alt (älter als ${grenze} Monate).`}>aktuell</Chip>;
 }
 
 /** Neuer Plan: Patient wählen; gibt es schon einen Entwurf, diesen öffnen statt einen zweiten anzulegen. */
@@ -113,26 +119,28 @@ export function Infusionsplaene() {
             <thead>
               <tr>
                 <th className="th">Nr.</th><th className="th">Patient</th><th className="th">Status</th><th className="th">gültig ab</th>
-                <th className="th text-right">Energie</th><th className="th text-right">Laufzeit · Rate</th><th className="th">Tage/Woche</th>
+                <th className="th text-right">Energie</th><th className="th">Infusion</th>
                 <th className="th">Erstellt</th><th className="th">Freigegeben</th><th className="th" />
               </tr>
             </thead>
             <tbody>
               {zeilen.map((p) => (
                 <tr key={p.id}>
-                  <td className="td num gedaempft">{nummer(p.nummer)}</td>
+                  <td className="td num gedaempft whitespace-nowrap">{nummer(p.nummer)}</td>
                   <td className="td">
                     <Link to={`/patienten/${p.patient}`} className="font-medium no-underline">{p.name}</Link>
                     {p.ist_test ? <Chip art="warn" className="ml-2">Test</Chip> : null}
                     {p.patient_abgeschlossen ? <Chip className="ml-2">abgeschlossen</Chip> : null}
                   </td>
-                  <td className="td"><StatusChip z={p} /></td>
-                  <td className="td num">{datum(p.gueltig_ab)}</td>
-                  <td className="td num text-right">{p.kcal != null ? `${zahl(p.kcal)} kcal` : "—"}</td>
-                  <td className="td num text-right">{p.laufzeit_h ? `${zahl(p.laufzeit_h)} h` : "—"}{p.rate_ml_h ? ` · ${zahl(p.rate_ml_h)} ml/h` : ""}</td>
-                  <td className="td num">{p.tage_pro_woche ? `${p.tage_pro_woche}×` : "—"}</td>
-                  <td className="td text-[0.8125rem]">{relativ(p.erstellt_am)}<br /><span className="gedaempft">{p.erstellt_von ?? "—"}</span></td>
-                  <td className="td text-[0.8125rem]">{p.freigegeben_am ? <>{relativ(p.freigegeben_am)}<br /><span className="gedaempft">{p.freigegeben_von ?? "—"}</span></>
+                  <td className="td whitespace-nowrap"><StatusChip z={p} grenze={grenze} /></td>
+                  <td className="td num whitespace-nowrap">{datum(p.gueltig_ab)}</td>
+                  <td className="td num text-right whitespace-nowrap">{p.kcal != null ? `${zahl(p.kcal)} kcal` : "—"}</td>
+                  <td className="td num whitespace-nowrap">{[p.laufzeit_h ? `${zahl(p.laufzeit_h)} h` : null, p.rate_ml_h ? `${zahl(p.rate_ml_h)} ml/h` : null,
+                    p.tage_pro_woche ? `${p.tage_pro_woche}×/Woche` : null].filter(Boolean).join(" · ") || "—"}</td>
+                  <td className="td text-[0.8125rem] whitespace-nowrap"><span className="num">{datum(p.erstellt_am)}</span>
+                    {p.erstellt_von ? <span className="gedaempft"> · {p.erstellt_von}</span> : null}</td>
+                  <td className="td text-[0.8125rem] whitespace-nowrap">{p.freigegeben_am
+                    ? <><span className="num">{datum(p.freigegeben_am)}</span>{p.freigegeben_von ? <span className="gedaempft"> · {p.freigegeben_von}</span> : null}</>
                     : p.herkunft === "altsystem" ? <span className="gedaempft">aus dem Altsystem</span> : "—"}</td>
                   <td className="td">
                     <div className="flex gap-1.5 justify-end">
