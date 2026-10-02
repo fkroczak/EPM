@@ -187,7 +187,8 @@ def dokumente_pruefen(request, pruefsummen=False, **_):
     basis = settings.EPM_DOKUMENTE
     probleme, bekannt = [], set()
     gepruft = 0
-    eintraege = [(d.datei, d.groesse, d.sha256, f"Dokument „{d.titel}“ (Patient {d.patient.nummer})")
+    # ohne Titel: die Ausgabe sieht die Administration, die eingeschränkte Akten nur mit Nummer sehen darf (Art. 18 DSGVO)
+    eintraege = [(d.datei, d.groesse, d.sha256, f"Dokument {d.id} (Patient {d.patient.nummer})")
                  for d in Dokument.objects.select_related("patient")]
     eintraege += [(p.pdf_datei, None, p.pdf_sha256, f"Infusionsplan {p.id} (Patient {p.patient.nummer})")
                   for p in Infusionsplan.objects.exclude(pdf_datei="").exclude(pdf_datei__isnull=True)
