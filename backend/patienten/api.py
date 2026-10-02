@@ -521,6 +521,9 @@ def _aktion(name, h, aenderungen):
     if name == "termine" and "erledigt_am" in felder:
         return "erledigt"
     if name == "infusionsplaene" and "status" in felder:
+        if h.status == "aktuell" and h.abgeschlossen_von_id:
+            # der Mediziner hat außerhalb von EPM freigegeben; die eintragende Person hat nur abgeschlossen
+            return "nach Freigabe abgeschlossen"
         return {"aktuell": "freigegeben", "abgeloest": "abgelöst"}.get(h.status, "geändert")
     if name == "bezugspersonen" and "aktiv" in felder:
         return "wieder aktuell" if h.aktiv else "nicht mehr aktuell"
@@ -586,6 +589,12 @@ def _beschreibung(name, h, aktion) -> str:
             if h.laufzeit_h is not None:
                 teile.append(f"{_deutsch(h.laufzeit_h)} h")
             teile.append(f"gültig ab {h.gueltig_ab:%d.%m.%Y}")
+            if h.abgeschlossen_von_id and h.freigegeben_von_id and h.freigabe_datum:
+                from accounts.models import User
+
+                weg = dict(type(plan).Freigabeweg.choices).get(h.freigabe_weg, "")
+                teile.append(f"freigegeben von {benutzername(User.objects.filter(pk=h.freigegeben_von_id).first())} "
+                             f"am {h.freigabe_datum:%d.%m.%Y}{f' ({weg})' if weg else ''}")
             return " · ".join(teile)
         if name == "bezugspersonen":
             beziehung = Auswahlwert.objects.filter(pk=h.beziehung_id).values_list("wert", flat=True).first()
@@ -1394,6 +1403,8 @@ def _zuletzt_eingetragen(patienten, anzahl=10):
         if schluessel in gesehen:
             continue
         gesehen.add(schluessel)
+        if bezeichnung == "Infusionsplan freigegeben" and h.abgeschlossen_von_id:
+            bezeichnung = "Infusionsplan nach Freigabe abgeschlossen"  # freigegeben hat der Mediziner, außerhalb von EPM
         ergebnis.append({"bereich": bereich, "bezeichnung": bezeichnung, "objekt_id": h.id,
                          "patient": h.patient_id, "name": namen.get(h.patient_id), "zeitpunkt": zeit,
                          "person": benutzername(h.history_user)})

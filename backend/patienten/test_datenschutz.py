@@ -709,6 +709,13 @@ class FreigabeAufAnordnung(DatenschutzGrundlage):
         e = SystemEreignis.objects.get(art=A.PLAN_FREIGEGEBEN)
         self.assertEqual((e.benutzer, e.details["auf_anordnung"], e.details["patient_id"]), (self.mitarbeiter, True, pid))
         self.assertIn("per E-Mail", beschreibung(e))
+        # Verlauf der Akte: nicht „freigegeben“ durch den Mitarbeiter, sondern abgeschlossen nach Freigabe des Mediziners
+        verlauf = [x for x in c.get(f"/api/patienten/{pid}/verlauf/?bereich=infusionsplaene").json()
+                   if x["aktion"] == "nach Freigabe abgeschlossen"]
+        self.assertEqual(len(verlauf), 1, verlauf)
+        self.assertIn(f"freigegeben von {self.mediziner.anzeigename} am {heute:%d.%m.%Y} (per E-Mail)", verlauf[0]["beschreibung"])
+        self.assertEqual(verlauf[0]["person_id"], self.mitarbeiter.id)
+        self.assertNotIn("freigegeben", [x["aktion"] for x in c.get(f"/api/patienten/{pid}/verlauf/?bereich=infusionsplaene").json()])
         # der Nachweis bleibt bei seinem Plan
         anderer = Patient.objects.create(nachname="Zwei", vorname="Zoe", geburtsdatum="1980-01-01")
         r = m.post(f"/api/dokumente/{nachweis.id}/umhaengen/", {"patient": anderer.id, "grund": "falscher Patient"}, format="json")
