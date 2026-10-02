@@ -902,25 +902,22 @@ class FalschZugeordneteDokumente(Grundlage):
         self.assertEqual(r.status_code, 403)
 
     def test_endgueltig_loeschen_ohne_zweiten_faktor(self):
-        """Zweiter Faktor freiwillig (Festlegung 02.10.2026): Ohne eingerichteten Authenticator bestätigt der Mediziner
-        mit Kennwort und abgetipptem Code; ein falsches Kennwort wird weiter abgewiesen."""
+        """Festlegung 03.10.2026: Endgültig löschen nur mit eingerichtetem zweitem Faktor; ohne ihn wird abgewiesen
+        (mit Hinweis, ihn unter Mein Konto einzurichten), das Dokument bleibt."""
         from django_otp.plugins.otp_totp.models import TOTPDevice
 
+        from accounts.zweifaktor import OHNE_ZWEITEN_FAKTOR
         from epm.pruefhilfen import KENNWORT
 
         self.assertFalse(TOTPDevice.objects.filter(user=self.mediziner).exists())
         dok = self.hochladen(self.sabine)
         c = client_fuer(self.mediziner)
-        grund = "Dokument eines fremden Patienten, nicht aus der Stiftung"
         bestaetigung = c.post(f"/api/dokumente/{dok.id}/loeschen-vorbereiten/").json()["code"]
-        r = c.post(f"/api/dokumente/{dok.id}/loeschen/", {"grund": grund, "kennwort": "falsch", "bestaetigung": bestaetigung},
-                   format="json")
-        self.assertEqual((r.status_code, list(r.json())), (400, ["kennwort"]))
-        with self.captureOnCommitCallbacks(execute=True):
-            r = c.post(f"/api/dokumente/{dok.id}/loeschen/", {"grund": grund, "kennwort": KENNWORT,
-                                                              "bestaetigung": bestaetigung}, format="json")
-        self.assertEqual(r.status_code, 204, r.content)
-        self.assertFalse(Dokument.objects.filter(pk=dok.id).exists())
+        r = c.post(f"/api/dokumente/{dok.id}/loeschen/", {"grund": "Dokument eines fremden Patienten", "kennwort": KENNWORT,
+                                                          "bestaetigung": bestaetigung}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertEqual(r.json(), {"code": OHNE_ZWEITEN_FAKTOR})
+        self.assertTrue(Dokument.objects.filter(pk=dok.id).exists())
 
     def test_endgueltig_loeschen(self):
         from epm.pruefhilfen import KENNWORT

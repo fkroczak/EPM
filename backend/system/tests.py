@@ -292,21 +292,17 @@ class Auftraege(Systemverzeichnis):
                         format="json")
         self.assertEqual(r.status_code, 400)
 
-    def test_ohne_zweiten_faktor_genuegt_das_kennwort(self):
-        """Zweiter Faktor freiwillig (Festlegung 02.10.2026): Wer keinen eingerichtet hat, bestätigt Update, Neustart
-        und Wiederherstellen mit dem Kennwort; ein falsches Kennwort wird weiter abgewiesen."""
+    def test_ohne_zweiten_faktor_geht_es_nicht(self):
+        """Festlegung 03.10.2026: Update, Neustart, Wiederherstellen nur mit eingerichtetem zweitem Faktor – auch wenn
+        die Anmeldung ohne ihn erlaubt ist. Das Kennwort allein genügt nicht."""
+        from accounts.zweifaktor import OHNE_ZWEITEN_FAKTOR
+
         ohne = benutzer("ohne2fa", Rolle.ADMIN)
         c = client_fuer(ohne)
-        url = "/api/system/auftraege/"
-        r = c.post(url, {"aktion": "epm_neustart", "minuten": 0, "kennwort": "falsch"}, format="json")
-        self.assertEqual((r.status_code, list(r.json())), (400, ["kennwort"]))
-        r = c.post(url, {"aktion": "epm_neustart", "minuten": 0, "kennwort": KENNWORT}, format="json")
-        self.assertEqual(r.status_code, 201, r.content)
-        e = c.get("/api/protokoll/?gruppe=system").json()["results"][0]
-        self.assertEqual(e["beschreibung"], "EPM neu starten angefordert, mit Passwort bestätigt")
-        # mit eingerichtetem zweitem Faktor bleibt der Code Pflicht
-        r = self.a.post(url, {"aktion": "server_neustart", "minuten": 0, "kennwort": KENNWORT}, format="json")
-        self.assertEqual((r.status_code, list(r.json())), (400, ["code"]))
+        r = c.post("/api/system/auftraege/", {"aktion": "epm_neustart", "minuten": 0, "kennwort": KENNWORT}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertEqual(r.json(), {"code": OHNE_ZWEITEN_FAKTOR})
+        self.assertFalse(Systemauftrag.objects.filter(angefordert_von=ohne).exists())
 
     def test_sicherung_braucht_recht_sicherungen(self):
         Gruppenrecht.objects.create(rolle=Rolle.ADMIN, recht="backup_verwalten", erlaubt=False)

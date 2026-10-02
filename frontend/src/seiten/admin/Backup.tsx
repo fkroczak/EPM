@@ -25,6 +25,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { PdfDialog } from "@/components/PdfDialog";
+import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
 
 // ---------------------------------------------------------------- Typen (GET /api/backup/)
 type Sicherung = {
@@ -113,28 +114,28 @@ function Wert({ label, children }: { label: ReactNode; children: ReactNode }) {
 }
 
 /** Admin-Passwort und Code (Authenticator oder Notfall-Code) – für Aktionen mit Bestätigung „2fa“. Wer keine
- *  Zwei-Faktor-Anmeldung eingerichtet hat, bestätigt nur mit dem Passwort (Fehlerliste 02.10.2026, 6.5). */
+ *  Zwei-Faktor-Anmeldung eingerichtet hat, kann nicht bestätigen und richtet sie zuerst ein (Festlegung 03.10.2026). */
 function Bestaetigung({ kennwort, code, onKennwort, onCode, fehler }: { kennwort: string; code: string;
   onKennwort: (s: string) => void; onCode: (s: string) => void; fehler: Feldfehler }) {
-  const ich = useIch();
   return (
-    <div className={cx("grid gap-3", ich.zweiter_faktor ? "grid-cols-2" : "grid-cols-1")}>
-      <Feld label="Ihr Passwort" fehler={fehler.kennwort} pflicht>
-        {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => onKennwort(e.target.value)} />}
-      </Feld>
-      {ich.zweiter_faktor ? (
+    <>
+      <ZweiFaktorFehlt />
+      <div className="grid grid-cols-2 gap-3">
+        <Feld label="Ihr Passwort" fehler={fehler.kennwort} pflicht>
+          {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => onKennwort(e.target.value)} />}
+        </Feld>
         <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={fehler.code} pflicht>
           {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(e) => onCode(e.target.value)} />}
         </Feld>
-      ) : null}
-    </div>
+      </div>
+    </>
   );
 }
 
 /** Ist die Bestätigung vollständig ausgefüllt? */
 function useBestaetigt(kennwort: string, code: string) {
   const ich = useIch();
-  return !!kennwort && (!ich.zweiter_faktor || !!code);
+  return ich.zweiter_faktor && !!kennwort && !!code;
 }
 
 function useAuftrag(pfad: string, onFertig?: (a: Auftrag) => void) {
@@ -904,7 +905,6 @@ export function Backup() {
   const [offen, setOffen] = useState<Offen>(null);
   const [wahl, setWahl] = useState<Sicherung | null>(null);
   const [laden, setLaden] = useState<string | null>(null);
-  const ich = useIch();
   const d = daten.data;
   const laufend = useMemo(() => new Set((d?.auftraege ?? []).filter((a) => a.offen).map((a) => a.aktion)), [d]);
   // Ist ein Auftrag fertig geworden, auch den Hinweis an alle Benutzer neu laden (Wiederherstellen setzt ihn)
@@ -1000,7 +1000,7 @@ export function Backup() {
       <div className="flex gap-2.5 px-4 py-3 rounded-lg bg-fehler-bg text-fehler text-sm leading-normal items-start" data-testid="warnung-wiederherstellen">
         <Icon name="warnung" groesse={18} />
         <span><strong>Wiederherstellen ersetzt den aktuellen Datenbestand.</strong> Vorher wird automatisch eine Sicherung des jetzigen Stands
-          angelegt. Zum Bestätigen {ich.zweiter_faktor ? "müssen das eigene Passwort und der 2FA-Code" : "muss das eigene Passwort"} eingegeben werden.</span>
+          angelegt. Zum Bestätigen müssen das eigene Passwort und der 2FA-Code eingegeben werden.</span>
       </div>
 
       <div className="grid grid-cols-1 hd:grid-cols-2 gap-5 items-start">

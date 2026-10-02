@@ -40,7 +40,7 @@ Täglich um 02:00 (`epm-backup.timer`), 30 Tage auf dem Server unter `/srv/epm/b
 auf 7, 14 oder 30 Tage einstellbar). Gesteuert wird alles unter
 Administration › Backup: Passwort für die Verschlüsselung festlegen und das Passwortblatt im Tresor verwahren,
 Übertragungsziel (WebDAV, z. B. Nextcloud mit App-Passwort) mit Zeitfenster, „Jetzt sichern“, Wiederherstellen (eigenes
-Passwort, dazu der Code, wenn die Zwei-Faktor-Anmeldung eingerichtet ist), Sicherung als eine Datei herunterladen und
+Passwort und Code aus der Authenticator-App – die Zwei-Faktor-Anmeldung ist dafür nötig), Sicherung als eine Datei herunterladen und
 wieder hochladen (z. B. von der Migrationsmaschine; Austausch über `/srv/epm/system/download` und `…/upload`). Passwort und Zugang liegen nur auf dem Server in `/etc/epm/sicherung` (root, 0600). Die Adresse des
 Ziels muss im Proxy der OPNsense freigegeben sein. Ohne EPM entschlüsseln: `gpg -d -o epm-db_….dump epm-db_….dump.gpg`.
 

@@ -39,8 +39,9 @@ jederzeit unter <strong>Mein Konto › Anmeldung und Sicherheit › Einrichten</
 Notfall-Codes.</li>
 </ol>
 <p>Solange sie freiwillig ist, lässt sich die Zwei-Faktor-Anmeldung unter Mein Konto mit Kennwort und Code auch wieder
-ausschalten. Bestätigungen (endgültig löschen, Wiederherstellen, Updates) verlangen das Kennwort und – wenn eingerichtet –
-den Code.</p>
+ausschalten. Bestätigungen (endgültig löschen, Wiederherstellen, Updates, Sicherung, Import) verlangen immer Kennwort
+<strong>und</strong> Code – wer sie ausführen soll (z. B. Mediziner, Administration), muss die Zwei-Faktor-Anmeldung
+eingerichtet haben.</p>
 <p>Nach mehreren falschen Kennwörtern wird das Konto gesperrt; entsperren kann die Administration. Nach längerer
 Pause meldet EPM von selbst ab.</p>""",
     },
@@ -501,8 +502,8 @@ die gefilterten Einträge aus.</p>""",
 Ubuntu-Updates und den Verlauf der Auslastung – wählbar 1 Stunde, 3 Stunden, 24 Stunden, 7 und 14 Tage, 1 und 6 Monate
 (längere Zeiträume als Mittelwerte mit gestrichelten Spitzen). Die Karten lassen sich über <strong>⋯</strong> in Breite und
 Höhe einstellen. Von hier aus lassen sich <strong>Updates installieren</strong>,
-der <strong>Server neu starten</strong> und EPM neu starten – mit Passwort (und Code, wenn die Zwei-Faktor-Anmeldung
-eingerichtet ist), vorher läuft automatisch eine
+der <strong>Server neu starten</strong> und EPM neu starten – mit Passwort und Code aus der Authenticator-App
+(Zwei-Faktor-Anmeldung nötig), vorher läuft automatisch eine
 Sicherung (schlägt sie fehl, wird nichts verändert), angemeldete Benutzer werden gewarnt. Beginn sofort oder in 5 bis 60
 Minuten; ein wartender Auftrag lässt sich zurückziehen.</p>
 <p>Außerdem: <strong>Hinweis an alle Benutzer</strong> setzen und angemeldete Benutzer abmelden. Bei den Konten führen die
@@ -516,7 +517,7 @@ Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Kennwort) direkt zur Person
 wird (das <strong>Passwortblatt</strong> gehört in den Tresor). Die Sicherungen werden im Zeitfenster in einen
 WebDAV-Ordner (z. B. Nextcloud) übertragen.</p>
 <p><strong>Jetzt sichern</strong> startet eine Sicherung sofort. <strong>Wiederherstellen</strong> braucht das eigene
-Passwort (und den Code, wenn die Zwei-Faktor-Anmeldung eingerichtet ist); danach müssen sich alle neu anmelden.</p>
+Passwort und den Code aus der Authenticator-App (Zwei-Faktor-Anmeldung nötig); danach müssen sich alle neu anmelden.</p>
 <p><strong>Aufbewahrung</strong>: 7, 14 oder 30 Tage auf dem Server; ältere entfernt die nächste Sicherung (im
 Übertragungsziel wird nie gelöscht).</p>
 <p><strong>Herunterladen</strong>: Der Server legt die Sicherung für 2 Stunden als eine Datei

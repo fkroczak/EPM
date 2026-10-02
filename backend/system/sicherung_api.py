@@ -336,7 +336,7 @@ AUSTAUSCH_FEHLT = ("Die Ordner für das Herunter- und Hochladen von Sicherungen 
 
 class BereitstellenView(APIView):
     """5.1: Sicherung herunterladen. Der Server legt sie als eine Datei für 2 Stunden bereit (Auftrag an den
-    Systemagenten, mit Passwort und – wenn eingerichtet – zweitem Faktor bestätigt); danach GET …/datei/."""
+    Systemagenten, mit Passwort und zweitem Faktor bestätigt); danach GET …/datei/."""
 
     permission_classes = [BackupRecht]
 

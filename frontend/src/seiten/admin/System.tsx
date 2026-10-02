@@ -19,6 +19,7 @@ import type { Stufe } from "@/lib/stufen";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, Laden, Leer, Meldung, Segmente, Seitenkopf,
   Textfeld, cx } from "@/components/ui/basis";
 import { Bereich, Bereiche } from "@/components/ui/bereiche";
+import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
@@ -319,7 +320,7 @@ export function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; dat
       const a = wahl.aktion;
       return api<Auftrag>("system/auftraege/", { body: {
         aktion: a.code, ...(a.warnen ? { minuten: Number(minuten), hinweis: text.trim() || undefined } : {}),
-        ...(a.bestaetigung === "2fa" ? { kennwort, ...(ich.zweiter_faktor ? { code } : {}) } : {}),
+        ...(a.bestaetigung === "2fa" ? { kennwort, code } : {}),
       } });
     },
     onSuccess: (a) => {
@@ -342,7 +343,7 @@ export function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; dat
       beschreibung={wahl.art === "server" ? wahl.aktion.beschreibung : wahl.aufgabe.beschreibung}
       fuss={<>
         <Knopf onClick={onZu}>Abbrechen</Knopf>
-        <Knopf variante={zfa ? "dng" : "pri"} laedt={los.isPending} disabled={zfa && (!kennwort || (ich.zweiter_faktor && !code))} onClick={() => los.mutate()}>
+        <Knopf variante={zfa ? "dng" : "pri"} laedt={los.isPending} disabled={zfa && (!ich.zweiter_faktor || !kennwort || !code)} onClick={() => los.mutate()}>
           {zfa ? "Bestätigen und ausführen" : "Ausführen"}</Knopf>
       </>}>
       <form className="flex flex-col gap-3.5" onSubmit={(e) => { e.preventDefault(); los.mutate(); }}>
@@ -375,17 +376,17 @@ export function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; dat
           <Meldung art="warn">{andere.length} andere Anmeldungen werden beendet. Ungespeicherte Eingaben dieser Benutzer gehen verloren.</Meldung>
         ) : null}
         {zfa ? (
-          <div className={cx("grid gap-3", ich.zweiter_faktor ? "grid-cols-2" : "grid-cols-1")}>
-            <Feld label="Ihr Passwort" fehler={f.kennwort} pflicht>
-              {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}
-            </Feld>
-            {/* ohne eingerichtete Zwei-Faktor-Anmeldung genügt das Passwort (Fehlerliste 02.10.2026, 6.5) */}
-            {ich.zweiter_faktor ? (
+          <>
+            <ZweiFaktorFehlt />
+            <div className="grid grid-cols-2 gap-3">
+              <Feld label="Ihr Passwort" fehler={f.kennwort} pflicht>
+                {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}
+              </Feld>
               <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={f.code} pflicht>
                 {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />}
               </Feld>
-            ) : null}
-          </div>
+            </div>
+          </>
         ) : null}
         {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
         {f.minuten ? <Meldung art="fehler">{f.minuten}</Meldung> : null}
@@ -397,7 +398,6 @@ export function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; dat
 
 // ---------------------------------------------------------------- Teile der Seite
 function Taetigkeiten({ daten, offen, onWahl }: { daten: Uebersicht; offen: Set<string>; onWahl: (w: Wahl) => void }) {
-  const ich = useIch();
   const knopf = (wahl: Wahl, name: string, gesperrt: boolean, laeuft: boolean) => (
     <Knopf klein variante={wahl.art === "server" && wahl.aktion.bestaetigung === "2fa" ? "dng" : "sec"} disabled={gesperrt || laeuft}
       laedt={laeuft} onClick={() => onWahl(wahl)} aria-label={name}>{laeuft ? "läuft" : "Ausführen"}</Knopf>
@@ -415,7 +415,7 @@ function Taetigkeiten({ daten, offen, onWahl }: { daten: Uebersicht; offen: Set<
                 <span className="text-sm font-medium">{a.name}</span>
                 <span className="text-xs gedaempft">{a.beschreibung}</span>
                 <span className="flex gap-1.5 flex-wrap">
-                  {a.bestaetigung === "2fa" ? <Chip art="warn"><Icon name="schloss" groesse={11} />{ich.zweiter_faktor ? "Passwort + 2FA" : "Passwort"}</Chip> : null}
+                  {a.bestaetigung === "2fa" ? <Chip art="warn"><Icon name="schloss" groesse={11} />Passwort + 2FA</Chip> : null}
                   {a.sichern ? <Chip><Icon name="backup" groesse={11} />vorher Sicherung</Chip> : null}
                   {a.warnen ? <Chip><Icon name="info" groesse={11} />warnt Benutzer</Chip> : null}
                   {!a.erlaubt ? <Chip>Recht „Sicherungen verwalten“ fehlt</Chip> : null}

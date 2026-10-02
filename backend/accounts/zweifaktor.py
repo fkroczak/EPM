@@ -2,9 +2,10 @@
 Zweiter Faktor (Authenticator-App, Notfall-Codes): eingerichtet? Pflicht? Code gültig?
 
 Festlegung 02.10.2026: Der zweite Faktor ist freiwillig (``Anmelderegeln``); die Administration kann ihn für Admins oder
-für alle zur Pflicht machen. Wer ihn eingerichtet hat, meldet sich immer damit an. Bestätigungen mit Kennwort und Code
-(endgültig löschen, Wiederherstellen, Updates, Neustart …) verlangen den Code von allen, die einen zweiten Faktor
-haben; ohne zweiten Faktor genügt dort das Kennwort.
+für alle zur Pflicht machen. Wer ihn eingerichtet hat, meldet sich immer damit an.
+Festlegung 03.10.2026: Bestätigungen mit Kennwort und Code (endgültig löschen, Wiederherstellen, Updates, Neustart,
+Sicherungs-Passwort, Übertragungsziel, Import …) verlangen **immer** den zweiten Faktor. Wer keinen eingerichtet hat,
+muss ihn zuerst unter Mein Konto einrichten – ohne geht es nicht.
 """
 from django_otp.plugins.otp_static.models import StaticDevice
 from django_otp.plugins.otp_totp.models import TOTPDevice
@@ -39,8 +40,12 @@ def code_gueltig(user, code: str, notfallcodes: bool = True) -> bool:
     return any(g.verify_token(code) for g in geraete)
 
 
+OHNE_ZWEITEN_FAKTOR = ("Dafür ist die Zwei-Faktor-Anmeldung nötig. Bitte zuerst unter Mein Konto › Anmeldung und "
+                       "Sicherheit die Authenticator-App einrichten.")
+
+
 def code_bestaetigt(user, code: str, notfallcodes: bool = True) -> bool:
-    """Für Bestätigungen in der Sitzung: ohne eingerichteten zweiten Faktor genügt das Kennwort."""
-    if not hat_zweiten_faktor(user):
-        return True
-    return code_gueltig(user, code, notfallcodes=notfallcodes)
+    """Für Bestätigungen in der Sitzung: nur mit eingerichtetem zweitem Faktor und gültigem Code
+    (Festlegung 03.10.2026). Ohne zweiten Faktor vorher mit ``hat_zweiten_faktor`` prüfen und
+    ``OHNE_ZWEITEN_FAKTOR`` melden."""
+    return hat_zweiten_faktor(user) and code_gueltig(user, code, notfallcodes=notfallcodes)

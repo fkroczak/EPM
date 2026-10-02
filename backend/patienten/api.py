@@ -1228,7 +1228,7 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
         bleiben. Jede Ablehnung steht im Audit-Log."""
         from datetime import datetime
 
-        from accounts.zweifaktor import code_bestaetigt
+        from accounts.zweifaktor import OHNE_ZWEITEN_FAKTOR, code_bestaetigt, hat_zweiten_faktor
 
         dok = self.get_object()
         self._nicht_systemdokument(dok)
@@ -1256,10 +1256,12 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
             return abgelehnt("bestaetigung", "Der Bestätigungscode stimmt nicht.")
         from accounts.api import bestaetigung_fehlgeschlagen, bestaetigung_gelungen
 
+        if not hat_zweiten_faktor(request.user):
+            # Festlegung 03.10.2026: endgültig löschen nur mit eingerichtetem zweitem Faktor
+            return abgelehnt("code", OHNE_ZWEITEN_FAKTOR)
         if not request.user.check_password(str(request.data.get("kennwort", ""))):
             antwort = abgelehnt("kennwort", "Kennwort falsch.")
             return bestaetigung_fehlgeschlagen(request, "loeschen_kennwort") or antwort
-        # zweiter Faktor freiwillig (Festlegung 02.10.2026): ohne eingerichteten zweiten Faktor genügt das Kennwort
         if not code_bestaetigt(request.user, request.data.get("code", ""), notfallcodes=False):
             antwort = abgelehnt("code", "Code aus der Authenticator-App falsch oder schon verwendet.")
             return bestaetigung_fehlgeschlagen(request, "loeschen_2fa") or antwort

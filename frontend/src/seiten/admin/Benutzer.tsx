@@ -193,8 +193,8 @@ function AnmeldungKarte({ onBenutzer }: { onBenutzer: (id: number) => void }) {
           <span className="gedaempft"> · Einrichten kann jede Person nur selbst unter „Mein Konto“.</span></span>
       ) : <span className="text-[0.8125rem] gedaempft">Alle aktiven Konten haben die Zwei-Faktor-Anmeldung eingerichtet.</span>}
       <Fehleranzeige fehler={speichern.error} />
-      <span className="text-xs gedaempft">Bestätigungen (endgültig löschen, Wiederherstellen, Updates) verlangen das Passwort – und den Code, wenn die
-        Person die Zwei-Faktor-Anmeldung eingerichtet hat. Jede Änderung steht im Audit-Log.</span>
+      <span className="text-xs gedaempft">Bestätigungen (endgültig löschen, Wiederherstellen, Updates, Sicherung, Import) verlangen immer Passwort und
+        Code – dafür muss die Person die Zwei-Faktor-Anmeldung eingerichtet haben, auch wenn sie freiwillig ist. Jede Änderung steht im Audit-Log.</span>
     </Karte>
   );
 }

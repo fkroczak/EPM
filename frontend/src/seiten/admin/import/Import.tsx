@@ -10,6 +10,7 @@ import { useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import { useIch } from "@/lib/auth";
+import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
 import type { Feldfehler } from "@/lib/api";
 import { dateigroesse, zahl, zeitpunkt } from "@/lib/format";
 import { Seite } from "@/components/layout/Shell";
@@ -123,7 +124,7 @@ function Bestaetigung({ offen, onZu, titel, beschreibung, wort, knopf, pfad, zus
     <Dialog offen={offen} onOffen={(o) => { if (!o) onZu(); }} titel={titel} beschreibung={beschreibung} breite={560}
       fuss={<>
         <Knopf onClick={onZu}>Abbrechen</Knopf>
-        <Knopf variante="dng" laedt={los.isPending} disabled={!kennwort || (zweiterFaktor && !code) || (!!wort && !eingabe)} onClick={() => los.mutate()}>{knopf}</Knopf>
+        <Knopf variante="dng" laedt={los.isPending} disabled={!zweiterFaktor || !kennwort || !code || (!!wort && !eingabe)} onClick={() => los.mutate()}>{knopf}</Knopf>
       </>}>
       <form className="flex flex-col gap-3.5" onSubmit={(e) => { e.preventDefault(); los.mutate(); }}>
         {children}
@@ -132,15 +133,14 @@ function Bestaetigung({ offen, onZu, titel, beschreibung, wort, knopf, pfad, zus
             {(p) => <Eingabe {...p} autoComplete="off" value={eingabe} onChange={(e) => setEingabe(e.target.value)} />}
           </Feld>
         ) : null}
+        <ZweiFaktorFehlt />
         <div className="grid grid-cols-2 gap-3">
           <Feld label="Ihr Passwort" fehler={f.kennwort} pflicht>
             {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}
           </Feld>
-          {zweiterFaktor ? (
           <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={f.code} pflicht>
             {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />}
           </Feld>
-          ) : null}
         </div>
         {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
         <button type="submit" hidden />
