@@ -29,9 +29,14 @@ Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests. Beide laufe
   `werkzeuge/ci-stack.sh`: dieselbe Compose-Datei, Nginx-Konfiguration und dieselben Images wie auf dem Server, mit
   Musterdaten und eigenen Testkonten je Rolle.
 
-Stand 02.10.2026: **100 von 100 Backend-Tests** und **49 von 49 Browsertests grün** (Lauf 36943685896, Commit `e74f4ff`).
-Stand 02.10.2026 (Runde 4, Systemseite/Kalender/Infusionspläne, auf `a9724b2`): **123 von 123 Backend-Tests** und **60 von 60 Browsertests grün** (Lauf 36970663378, Commit `473cef0`; dazu 1 Bildschirmfoto-Test, nur beim manuellen Start).
-Stand 02.10.2026: **118 von 118 Backend-Tests** und **55 von 55 Browsertests grün** (LAUF_DS).
+Stand 02.10.2026 (Datenschutz F74–F83 und Systemseite/Kalender/Infusionspläne F84–F89 zusammen): STAND_GESAMT
+
+Sporadische Fehlschläge der Browsertests (kein Produktfehler belegt, Ursache im Test bzw. offen): „Ärzte aus der
+gemeinsamen Liste zuordnen …“ tippte gelegentlich, bevor das leere Formular stand (schon auf `main`, Lauf 36942510984;
+seit `3935b3a` wartet der Test darauf). „Endgültig löschen: nur Mediziner …“ (F73) fand in Lauf 36950601660 einmal das
+gerade hochgeladene Dokument nicht in der Liste; in den Läufen davor und danach nicht aufgetreten, Ursache nicht
+geklärt (die Aufzeichnung des Laufs ist von hier aus nicht abrufbar). Der Seitenzustand fehlgeschlagener Tests wird
+seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneutes Auftreten auswertbar ist.
 
 ## Übersicht
 
@@ -1236,7 +1241,7 @@ erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migratione
   ändern die vier Datenschutz-Werte nicht; `test_abschluss_pruefen`, `Einschraenkung.test_aufbewahrung_im_einzelfall_verlaengern`).
   Browsertests grün: `datenschutz.spec.ts` „Anfrage mit Frist, Kopie der Akte, Löschwunsch → eingeschränkt, Einsicht mit
   Grund, Aufheben“ (Stand der Aufbewahrung in der Akte), „Grenzwerte: Fristen des Datenschutzes einstellen“ (Mediziner
-  ändert, Mitarbeiter sieht die Werte nur) (LAUF_DS).
+  ändert, Mitarbeiter sieht die Werte nur) (Lauf 36969989383, Commit `34c627d`).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F75 Erklärungen nachhalten
@@ -1263,7 +1268,7 @@ erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migratione
 - **Teststatus:** Backend-Tests grün (`Erklaerungen.test_erfassen_nachhalten_widerrufen`,
   `test_auch_bei_abgeschlossener_akte`, `Testdaten.test_zuruecksetzen_mit_umgehaengtem_dokument_und_erklaerungen`).
   Browsertest grün: `datenschutz.spec.ts` „Erklärungen nachhalten: Hinweis im Aktenkopf, Vordruck als PDF, erfassen mit
-  Scan, Widerruf“; Neustart geprüft in `zz-neustart.spec.ts` „Nach dem Neustart: Datenschutz – …“ (LAUF_DS).
+  Scan, Widerruf“; Neustart geprüft in `zz-neustart.spec.ts` „Nach dem Neustart: Datenschutz – …“ (Lauf 36969989383, Commit `34c627d`).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F76 Vordrucke der Erklärungen als PDF aus Dokumentvorlagen
@@ -1281,7 +1286,7 @@ erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migratione
 - **Tabellen:** `vorlagen_dokumentvorlage`
 - **Teststatus:** Backend-Tests grün (`Erklaerungen.test_pdf_aus_der_dokumentvorlage`,
   `vorlagen.Vorlagen.test_startvorlagen_sind_gueltig_und_rechte`). Browsertest grün: `datenschutz.spec.ts` „Erklärungen
-  nachhalten: …“ (PDF mit Namen des Patienten, Entwurfshinweis) (LAUF_DS).
+  nachhalten: …“ (PDF mit Namen des Patienten, Entwurfshinweis) (Lauf 36969989383, Commit `34c627d`).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F77 Datenschutz-Anfragen mit Frist
@@ -1306,7 +1311,7 @@ erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migratione
 - **Teststatus:** Backend-Tests grün (`Anfragen.test_ablauf_mit_frist`,
   `test_loeschung_wird_eingeschraenkt_statt_geloescht`, `Fristen.test_aufbewahrung_und_frist_der_anfragen`). Browsertest
   grün: `datenschutz.spec.ts` „Anfrage mit Frist, Kopie der Akte, Löschwunsch → eingeschränkt, Einsicht mit Grund,
-  Aufheben“ (LAUF_DS).
+  Aufheben“ (Lauf 36969989383, Commit `34c627d`).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F78 Kopie der Akte als ZIP
@@ -1320,7 +1325,7 @@ erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migratione
 - **Validierung:** Recht „Datenschutz: Erklärungen und Anfragen erfassen“; Akte lesbar (eingeschränkt: nur mit Einsicht);
   Admins nur bei Testpatienten (403 bei echten Akten).
 - **Teststatus:** Backend-Test grün (`Aktenkopie.test_kopie_als_zip`). Browsertest grün: `datenschutz.spec.ts` „Anfrage mit
-  Frist, Kopie der Akte, …“ (Download; ZIP enthält Akte, Verlauf und LIESMICH; Eintrag unter „Kopien“) (LAUF_DS).
+  Frist, Kopie der Akte, …“ (Download; ZIP enthält Akte, Verlauf und LIESMICH; Eintrag unter „Kopien“) (Lauf 36969989383, Commit `34c627d`).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F79 Verarbeitung einschränken, begründete Einsicht, Aufheben
@@ -1360,7 +1365,7 @@ erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migratione
   Frist, Kopie der Akte, Löschwunsch → eingeschränkt, Einsicht mit Grund, Aufheben“ (Akte danach verschlossen – auch für
   die Person, die eingeschränkt hat –, nicht mehr in der Patientenliste, Einsicht erst mit Grund, Aufheben erst mit Datum
   der Unterrichtung, alles im Audit-Log; ein Mitarbeiter sieht in der Übersicht nur die Nummer, weder Namen noch Grund);
-  Neustart geprüft in `zz-neustart.spec.ts` (LAUF_DS). Dass Mitarbeiter keine Einsicht nehmen können, prüft der
+  Neustart geprüft in `zz-neustart.spec.ts` (Lauf 36969989383, Commit `34c627d`). Dass Mitarbeiter keine Einsicht nehmen können, prüft der
   Backend-Test.
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
@@ -1411,7 +1416,7 @@ erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migratione
   `test_loeschen_nach_ablauf_der_frist`; `test_loeschungen_nach_wiederherstellung_nachholen` – auch: unlesbare Zeile,
   liegen gebliebener Ordner). Browsertest grün:
   `datenschutz.spec.ts` „Akte endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code und Bestätigungscode“;
-  Neustart geprüft in `zz-neustart.spec.ts` (Akte bleibt weg, Löschprotokoll ohne Namen) (LAUF_DS).
+  Neustart geprüft in `zz-neustart.spec.ts` (Akte bleibt weg, Löschprotokoll ohne Namen) (Lauf 36969989383, Commit `34c627d`).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F81 Übersicht „Datenschutz“
@@ -1425,7 +1430,7 @@ erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migratione
 - **Validierung:** Recht „… erfassen“ oder „… entscheiden“; Testbenutzer sehen nur Testpatienten und Test-Löschungen.
 - **Teststatus:** Backend-Tests grün (`Einschraenkung.*`, `AkteLoeschen.*`, `Anfragen.*` prüfen die Übersicht mit).
   Browsertests grün: `datenschutz.spec.ts` (eingeschränkte Akten, Löschprotokoll ohne Namen, eingestellte Fristen);
-  Neustart geprüft in `zz-neustart.spec.ts` (LAUF_DS).
+  Neustart geprüft in `zz-neustart.spec.ts` (Lauf 36969989383, Commit `34c627d`).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F82 Plan nach Freigabe abschließen (Freigabe auf Anordnung)
@@ -1458,7 +1463,7 @@ erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migratione
   Datenfeld,
   `vorlagen.Vorlagen.test_inhalt_des_plan_pdfs`, `test_migration_stellt_bisherigen_freigabevermerk_um`). Browsertest grün:
   `datenschutz.spec.ts` „Plan nach Freigabe per E-Mail abschließen: Mitarbeiter hält Mediziner, Datum, Weg und Nachweis
-  fest“; Neustart geprüft in `zz-neustart.spec.ts` (LAUF_DS).
+  fest“; Neustart geprüft in `zz-neustart.spec.ts` (Lauf 36969989383, Commit `34c627d`).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F83 Aufbewahrung des Audit-Logs, tägliche Bereinigung
@@ -1676,8 +1681,8 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 | 01.10.2026 | Runde 2 (`f865cde`–`a985fa5`) | Klärung U13/U14 umgesetzt: Energie mit Lipiden 9,15 kcal/g, Humanalbumin in ml ohne Energie (Feld `albumin_ml`), Hinweis zur Ca/Mg-Stabilität, erster Plan je kg Körpergewicht vorbelegt (`GET /api/infusionsplaene/vorbelegung/?patient=`) |
 | 01.10.2026 | Runde 3 (`c3aacfa`–`1718dc3`) | Rückmeldungen aus dem Testsystem: Blau auf Blau behoben, Testpatienten-Zahl nur für Admin, PDF-Anzeige mit pdf.js, Ärzteliste (F67/F68), Bezugspersonen (F69), „kein“ Katheter/Versorger und Nickelallergie als Auswahl (F70); Backend-Image mit IBM Plex aus dem Repo (Debian 13 hat kein `fonts-ibm-plex`) |
 | 02.10.2026 | Runde 3 (`6c6a97a`–`e74f4ff`) | U15 nach DSGVO geklärt und umgesetzt (F73): Titel, Dateiname, Notiz und Datum endgültig gelöschter Dokumente auch aus Historie und Audit-Log entfernt (kontrollierte Trigger-Ausnahme), Nachweis ohne Inhalt, Löschliste mit Nachholen nach einer Wiederherstellung, Bestand per Migration; Audit-Log mit Filter „Dokument“. Fehler behoben: bei „Neuer Arzt“/„Neuer Versorger“ ging eine schon begonnene Eingabe verloren, wenn die Liste erst danach fertig geladen war. Browsertest Rechte stabilisiert (`b306c79`). Lauf 36943685896: 100/100 Backend-Tests, 49/49 Browsertests |
-| 02.10.2026 | Runde 4 (`COMMITS_DS`) | Datenschutz nach DSGVO (`docs/DATENSCHUTZ.md`): Aufbewahrungsfrist je Akte mit Verlängerung und „Abschluss prüfen“ (F74); Erklärungen nachhalten mit Vordrucken aus Dokumentvorlagen (F75, F76); Anfragen mit Frist (F77); Kopie der Akte (F78); Verarbeitung einschränken mit begründeter Einsicht (F79); Akte endgültig löschen mit Löschprotokoll, Löschliste und Nachholen nach einer Wiederherstellung (F80); Übersicht „Datenschutz“ (F81); Plan nach Freigabe per E-Mail abschließen, Freigabevermerk nennt beide Personen (F82); Aufbewahrung des Audit-Logs einstellbar (F83). Vier neue Rechte. Testdaten-Zurücksetzen nutzt dieselbe Löschlogik (behebt einen Abbruch bei umgehängten Dokumenten). Wartungsmodus der Trigger gilt nur noch für den Vorgang statt bis zum Ende der Transaktion. Sicherungen 30 statt 14 Tage, Verschlüsselung mit `age` vorbereitet (F61). Unklarheiten U16–U24 |
-| 02.10.2026 | Runde 4 (`e292ae7`) | Unabhängige Prüfung der Datenschutz-Änderung (zweite Instanz, nur lesend) und Behebung ihrer Befunde: Reste nach dem Löschen einer Akte (Fassungen eines Dokuments aus der Zeit in einer anderen Akte, Titel bei hin- und zurückgewechseltem Dokument, Vitamin-Historie, Suchbegriff im Audit-Log); Nachweis einer Dokument-Löschung in der anderen Akte wurde beim Löschen fälschlich umgeschrieben; eingeschränkte Akten waren mit Namen sichtbar (Übersicht und Anfragen für Mitarbeiter und Administration, Audit-Log, Django-Admin); Fristen des Datenschutzes waren mit „Vorlagen pflegen“ änderbar; Kopie echter Akten durch Admins; Startseite zählte Anfragen zu abgeschlossenen Akten nicht; Aufbewahrungsfrist beginnt nicht vor dem letzten Kontakt; Abschließen nach Freigabe nur mit dem Datenfeld „Freigabevermerk“ in der Vorlage; Verlauf und Listen nennen bei Freigabe außerhalb von EPM den Mediziner und den Tag der Freigabe; Fehlversuche beim endgültigen Löschen zählen (F73, F80); Nachholen von Löschungen robuster; Sicherung hinterlässt bei Fehlern keine halbe Datei, Löschliste mitverschlüsselt; Löschprotokoll ohne Anlass des Abschlusses |
+| 02.10.2026 | Runde 4 (`e9b953d`–`08b15db`) | Datenschutz nach DSGVO (`docs/DATENSCHUTZ.md`): Aufbewahrungsfrist je Akte mit Verlängerung und „Abschluss prüfen“ (F74); Erklärungen nachhalten mit Vordrucken aus Dokumentvorlagen (F75, F76); Anfragen mit Frist (F77); Kopie der Akte (F78); Verarbeitung einschränken mit begründeter Einsicht (F79); Akte endgültig löschen mit Löschprotokoll, Löschliste und Nachholen nach einer Wiederherstellung (F80); Übersicht „Datenschutz“ (F81); Plan nach Freigabe per E-Mail abschließen, Freigabevermerk nennt beide Personen (F82); Aufbewahrung des Audit-Logs einstellbar (F83). Vier neue Rechte. Testdaten-Zurücksetzen nutzt dieselbe Löschlogik (behebt einen Abbruch bei umgehängten Dokumenten). Wartungsmodus der Trigger gilt nur noch für den Vorgang statt bis zum Ende der Transaktion. Sicherungen 30 statt 14 Tage, Verschlüsselung mit `age` vorbereitet (F61). Unklarheiten U16–U24 |
+| 02.10.2026 | Runde 4 (`e292ae7`–`34c627d`) | Unabhängige Prüfung der Datenschutz-Änderung (zweite Instanz, nur lesend) und Behebung ihrer Befunde: Reste nach dem Löschen einer Akte (Fassungen eines Dokuments aus der Zeit in einer anderen Akte, Titel bei hin- und zurückgewechseltem Dokument, Vitamin-Historie, Suchbegriff im Audit-Log); Nachweis einer Dokument-Löschung in der anderen Akte wurde beim Löschen fälschlich umgeschrieben; eingeschränkte Akten waren mit Namen sichtbar (Übersicht und Anfragen für Mitarbeiter und Administration, Audit-Log, Django-Admin); Fristen des Datenschutzes waren mit „Vorlagen pflegen“ änderbar; Kopie echter Akten durch Admins; Startseite zählte Anfragen zu abgeschlossenen Akten nicht; Aufbewahrungsfrist beginnt nicht vor dem letzten Kontakt; Abschließen nach Freigabe nur mit dem Datenfeld „Freigabevermerk“ in der Vorlage; Verlauf und Listen nennen bei Freigabe außerhalb von EPM den Mediziner und den Tag der Freigabe; Fehlversuche beim endgültigen Löschen zählen (F73, F80); Nachholen von Löschungen robuster; Sicherung hinterlässt bei Fehlern keine halbe Datei, Löschliste mitverschlüsselt; Löschprotokoll ohne Anlass des Abschlusses |
 | 02.10.2026 | Runde 3 (`df02dda`–`e709bee`) | Rückmeldungen zur PDF-Funktion: Dokumentvorlagen als Bereich der Vorlagen, Felder verschiebbar, Schriftgröße und Titel-Ausrichtung wirksam, Planansicht in der Akte = echte PDF (F31), Aktenkopf mit festem Raster und anklickbarem „Auskunft an“ (F17). Neu: Dokument dem richtigen Patienten zuordnen (F72) und endgültig löschen nur durch Mediziner mit Kennwort, 2FA und Bestätigungscode (F73). Fehler behoben: Datenmigration „Kontakt überfällig“ brach auf bestehender Datenbank ab (Grund > 100 Zeichen); Grund beim Wiederöffnen begrenzt |
 | 01.10.2026 | Runde 3 (`0624527`–`ca9f858`) | PDF-Erzeugung mit WeasyPrint (F51), Dokumentvorlagen mit Editor (F50), Freigabe-PDF mit SHA-256 und Prüfung beim Öffnen (F35, F37; Nginx reicht `X-EPM-Pruefung` weiter), Akte, Verlauf, Audit-Log und Zugangsblatt als PDF (F23, F24, F59, F55). Infusionsplan-PDF nach dem Altsystem, auf Wunsch neu gestaltet wie ein Laborbefund und wie die Oberfläche (Kopfkarte, Karten, Menge/Einheit in eigenen Spalten, Titel neben dem Logo, ohne Linie, fax-tauglich, einseitig); Laufzeit 0 als „—“; neue Bausteine und Optionen im Editor; Datenfeld-Einfügen nimmt den aktuellen Feldinhalt (Fehler behoben) |
 | 01.10.2026 | Runde 3 (`a30b26d`) | „Kein Kontakt seit …“ nach 4 statt 12 Monaten (Patienten kommen meist quartalsweise): Standard in den Einstellungen, Datenmigration stellt einen unveränderten Wert 12 um (mit Grund in der Historie); wirkt auf Hinweis in der Patientenliste und „Nach und nach prüfen“ auf der Startseite; Backend-Test `test_kontakt_ueberfaellig_nach_4_monaten` |
