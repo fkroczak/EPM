@@ -141,3 +141,31 @@ export function initialen(name: string): string {
   const teile = name.replace(/(Prof\.|Dr\.|med\.|Dipl\.-[^ ]+)/g, "").trim().split(/\s+/).filter(Boolean);
   return ((teile[0]?.[0] ?? "") + (teile.length > 1 ? teile[teile.length - 1][0] : "")).toUpperCase();
 }
+
+/** „vor 4 Monaten“, „vor 12 Tagen“, „heute“ – für den letzten Kontakt (Wiedereinbestellung, Schnellerfassung) */
+export function vorZeit(wert: string | Date | null | undefined): string {
+  const d = alsDatum(wert);
+  if (!d) return "—";
+  const tage = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (tage < 1) return "heute";
+  if (tage < 2) return "gestern";
+  if (tage < 45) return `vor ${tage} Tagen`;
+  const monate = Math.round((tage / 30.44) * 2) / 2;
+  if (monate < 12) return `vor ${String(monate).replace(".5", "½")} Monaten`;
+  const jahre = Math.floor(tage / 365.25);
+  return jahre === 1 ? "vor über einem Jahr" : `vor über ${jahre} Jahren`;
+}
+
+/** Datum in ``tage`` Tagen als „TT.MM.JJJJ“ (Vorschläge für Wiedervorlagen) */
+export function inTagen(tage: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + tage);
+  return datum(d);
+}
+
+/** Datum in ``monate`` Monaten als „TT.MM.JJJJ“ */
+export function inMonaten(monate: number): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() + monate);
+  return datum(d);
+}

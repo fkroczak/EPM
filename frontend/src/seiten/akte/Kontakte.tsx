@@ -1,6 +1,6 @@
 /** Entwurf 6 · Kontakte: Protokoll der Kommunikation. Nach dem Speichern unveränderlich, Korrektur nur per Storno. */
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api } from "@/lib/api";
 import type { Feldfehler, Seite as ApiSeite } from "@/lib/api";
@@ -8,13 +8,16 @@ import { useIch, useOhneRechtSchliessen } from "@/lib/auth";
 import { useAuswahl, useVersorgerListe } from "@/lib/daten";
 import { datum, eingabeDatum, heuteIso, terminZeit, uhrzeit, zahl, zeitpunkt } from "@/lib/format";
 import { TERMINARTEN } from "@/lib/typen";
-import type { Kontakt } from "@/lib/typen";
+import type { Kontakt, Verlaufseintrag } from "@/lib/typen";
+import { useStufe } from "@/lib/stufen";
+import { Spalten } from "@/components/ui/spalten";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Leer, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { Editor, Richtext } from "@/components/Editor";
 import { useAkte } from "./Akte";
+import { TermineKarte } from "./Uebersicht";
 
 function inTagen(tage: number) {
   const d = new Date();
@@ -158,9 +161,9 @@ export function Kontakte() {
     placeholderData: (vorher: ApiSeite<Kontakt> | undefined) => vorher,
   });
   const daten = liste.data;
-  return (
-    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-5 items-start">
-      <Karte className="flex flex-col min-w-0 overflow-hidden">
+  const stufe = useStufe();
+  const kontakte = (
+      <Karte key="kontakte" className="flex flex-col min-w-0 overflow-hidden">
         {erfassen ? <NeuerKontakt /> : null}
         <div className="flex items-center justify-between gap-3 px-[22px] pt-4 pb-2 flex-wrap">
           <h2 className="lbl m-0">Kontakte · <span className="num">{daten ? zahl(daten.count) : "…"}</span> · neueste oben</h2>
@@ -203,15 +206,62 @@ export function Kontakte() {
         {daten?.next ? <div className="px-[22px] py-3 border-t border-rand"><Knopf klein onClick={() => setAnzahl(anzahl + 50)}>Weitere laden</Knopf></div> : null}
         <Fehleranzeige fehler={liste.error} />
       </Karte>
-      <div className="flex flex-col gap-4 min-w-0">
-        <div className="meldung info flex gap-2.5 items-start text-[0.8125rem] leading-normal">
-          <Icon name="info" />
-          <span>Kontakte sind das Protokoll der Kommunikation mit dem Patienten. Ein gespeicherter Kontakt wird nicht mehr geändert.
-            Wurde etwas falsch erfasst, wird der Kontakt mit Grund storniert und neu geschrieben. Beides bleibt sichtbar.</span>
-        </div>
-        <Erreichbarkeit />
-      </div>
-      {erfassen ? <StornoDialog kontakt={storno} onZu={() => setStorno(null)} /> : null}
+  );
+  const info = (
+    <div key="info" className="meldung info flex gap-2.5 items-start text-[0.8125rem] leading-normal">
+      <Icon name="info" />
+      <span>Kontakte sind das Protokoll der Kommunikation mit dem Patienten. Ein gespeicherter Kontakt wird nicht mehr geändert.
+        Wurde etwas falsch erfasst, wird der Kontakt mit Grund storniert und neu geschrieben. Beides bleibt sichtbar.</span>
     </div>
+  );
+  const storniert = erfassen ? <StornoDialog kontakt={storno} onZu={() => setStorno(null)} /> : null;
+  // Aufteilung je Fensterstufe (S16, Entwurf 2): untereinander · ⅗ | ⅖ mit Teiler · ⅔ | ⅓ mit Teiler und Terminen ·
+  // ab 2560 px ½ | ¼ | ¼ mit dem Verlauf der Akte
+  if (stufe === "eng" || stufe === "schmal") {
+    return <div className="flex flex-col gap-5 min-w-0" data-testid="kontakte-stufe">{kontakte}{info}<Erreichbarkeit />{storniert}</div>;
+  }
+  if (stufe === "qhd") {
+    return (
+      <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-5 items-start" data-testid="kontakte-stufe">
+        {kontakte}
+        <div className="flex flex-col gap-4 min-w-0">{info}<Erreichbarkeit /><TermineKarte /></div>
+        <VerlaufKurz />
+        {storniert}
+      </div>
+    );
+  }
+  return (
+    <>
+      <Spalten seite="akte_kontakte" stufe={stufe} standard={[stufe === "hd" ? 3 / 5 : 2 / 3]} testid="kontakte-stufe"
+        namen={["Kontakte", "Erreichbarkeit"]}
+        spalten={[kontakte, <>{info}<Erreichbarkeit />{stufe === "fhd" ? <TermineKarte /> : null}</>]} />
+      {storniert}
+    </>
+  );
+}
+
+/** Die letzten Änderungen an der Akte (Reiter „Verlauf“ in kurz) – ab 2560 px neben den Kontakten */
+function VerlaufKurz() {
+  const { patient } = useAkte();
+  const verlauf = useQuery({
+    queryKey: ["patient", patient.id, "verlauf", "kurz"],
+    queryFn: () => api<(Verlaufseintrag & { beschreibung?: string })[]>(`patienten/${patient.id}/verlauf/`),
+  });
+  const liste = (verlauf.data ?? []).slice(0, 15);
+  return (
+    <Karte className="px-5 py-4 flex flex-col gap-3 min-w-0" data-testid="verlauf-kurz">
+      <h2 className="lbl m-0">Verlauf</h2>
+      {verlauf.isLoading ? <Laden /> : liste.length === 0 ? <Leer>Noch keine Einträge.</Leer> : (
+        <ol className="m-0 p-0 list-none flex flex-col">
+          {liste.map((v, i) => (
+            <li key={`${v.art}-${v.objekt_id}-${i}`} className="py-2 border-b border-rand last:border-b-0 flex flex-col gap-0.5 text-sm">
+              <span className="text-[0.78125rem] gedaempft"><span className="num">{zeitpunkt(v.zeitpunkt)}</span> · {v.person ?? "—"}</span>
+              <span className="text-text2">{v.beschreibung ?? `${v.bereich} ${v.aktion}`}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      <Link to={`/patienten/${patient.id}/verlauf`} className="text-[0.8125rem]">Ganzer Verlauf</Link>
+    </Karte>
   );
 }

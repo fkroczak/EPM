@@ -41,7 +41,7 @@ type Auftrag = { id: number; kennung: string; ziel: "server" | "epm"; aktion: st
   parameter: { minuten?: number; stempel?: string; url?: string }; angefordert_von_name: string | null; angefordert_am: string;
   begonnen_am: string | null; beendet_am: string | null; ergebnis: string; ausgabe: string; rueckgabe: number | null;
   probelauf: boolean };
-type Daten = {
+export type Daten = {
   agent: { verzeichnis: boolean; erreichbar: boolean };
   status: { vorhanden: boolean; aktuell: boolean; zeit: string | null; alter_s: number | null };
   probelauf: boolean;
@@ -65,7 +65,7 @@ type Daten = {
 
 // ---------------------------------------------------------------- Hilfen
 /** „Fri 2026-10-02 02:00:00 CEST“ (systemd) → „02.10.2026 02:00“ */
-function systemdZeit(text: string | null) {
+export function systemdZeit(text: string | null) {
   const m = text?.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
   return m ? `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]}` : null;
 }
@@ -126,7 +126,7 @@ function useAuftrag(pfad: string, onFertig?: (a: Auftrag) => void) {
 }
 
 // ---------------------------------------------------------------- Einfache Rückfrage (Jetzt sichern, Jetzt übertragen)
-function Rueckfrage({ offen, titel, text, knopf, pfad, onZu }: { offen: boolean; titel: string; text: ReactNode; knopf: string;
+export function Rueckfrage({ offen, titel, text, knopf, pfad, onZu }: { offen: boolean; titel: string; text: ReactNode; knopf: string;
   pfad: string; onZu: () => void }) {
   const melden = useHinweis();
   const los = useAuftrag(pfad, (a) => { melden(`${a.name}: Auftrag an den Server übergeben.`); onZu(); });
@@ -656,7 +656,7 @@ export function Backup() {
           angelegt. Zum Bestätigen muss das Admin-Passwort und der 2FA-Code eingegeben werden.</span>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+      <div className="grid grid-cols-1 hd:grid-cols-2 gap-5 items-start">
         <Verschluesselung daten={d} onPasswort={() => setOffen("passwort")} onPruefen={() => setOffen("pruefen")} />
         <UebertragungKarte daten={d} offen={laufend} onZiel={() => setOffen("ziel")} onEntfernen={() => setOffen("ziel_entfernen")}
           onUebertragen={() => setOffen("uebertragen")} />

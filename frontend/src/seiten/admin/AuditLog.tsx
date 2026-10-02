@@ -1,7 +1,7 @@
 /** Entwurf 20 · Audit-Log: Anmeldungen, Benutzer, Vorlagen, Exporte, Abschlüsse – nur lesen, nicht änderbar. */
 import { useState } from "react";
 import { PdfDialog } from "@/components/PdfDialog";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { abfrage, alle, api } from "@/lib/api";
 import type { Seite as ApiSeite } from "@/lib/api";
@@ -34,9 +34,11 @@ type Gesperrt = { id: number; benutzername: string; anzeigename: string; gesperr
 
 export function AuditLog() {
   const { darf } = useAuth();
-  const [zeitraum, setZeitraum] = useState("7");
+  // Verweise von der Startseite (Kachel „Zugriffe · 7 Tage“): ?gruppe=anmeldung&tage=7
+  const [params] = useSearchParams();
+  const [zeitraum, setZeitraum] = useState(params.get("tage") === "30" ? "30" : "7");
   const [person, setPerson] = useState("");
-  const [gruppen, setGruppen] = useState<string[]>([]);
+  const [gruppen, setGruppen] = useState<string[]>((params.get("gruppe") ?? "").split(",").filter(Boolean));
   const [anzahl, setAnzahl] = useState(100);
   const werte = { von: vonDatum(zeitraum), benutzer: person || undefined, gruppe: gruppen.join(",") || undefined, seitengroesse: anzahl };
   const liste = useQuery({

@@ -69,6 +69,9 @@ function Seitenleiste() {
             <span className="text-xs gedaempft">{ROLLEN[ich.rolle]}{ich.ist_test ? " · Testzugang" : ""}</span>
           </div>
         </div>
+        <NavLink to="/hilfe" title="Hilfe" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
+          <Icon name="hilfe" /> <span className="sr-only hd:not-sr-only">Hilfe</span>
+        </NavLink>
         <NavLink to="/konto" title="Mein Konto" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
           <Icon name="konto" /> <span className="sr-only hd:not-sr-only">Mein Konto</span>
         </NavLink>
@@ -194,10 +197,11 @@ function Systemhinweis() {
 
 export type Pfadteil = { text: string; zu?: string };
 
-/** Kopfzeile + Inhalt einer Seite */
-export function Seite({ pfad, children, breit, className }: { pfad: Pfadteil[]; children: ReactNode; breit?: boolean;
-  className?: string }) {
+/** Kopfzeile + Inhalt einer Seite. Der Inhalt nutzt die volle Fensterbreite (S16, Festlegung 01.10.2026); die Seiten
+ *  teilen sich in Stufen auf (lib/stufen.ts). Das „?“ führt zum passenden Abschnitt der Hilfe (S15). */
+export function Seite({ pfad, children, className }: { pfad: Pfadteil[]; children: ReactNode; className?: string }) {
   const ich = useIch();
+  const { pathname } = useLocation();
   useEffect(() => {
     document.title = `${pfad[pfad.length - 1]?.text ?? "Start"} · EPM`;
   }, [pfad]);
@@ -213,13 +217,17 @@ export function Seite({ pfad, children, breit, className }: { pfad: Pfadteil[]; 
             </span>
           ))}
         </nav>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2.5">
           <Suche />
+          {pathname !== "/hilfe" ? (
+            <Link to={`/hilfe?seite=${encodeURIComponent(pathname)}`} className="btn icon geist" aria-label="Hilfe zu dieser Seite"
+              title="Hilfe zu dieser Seite" data-testid="hilfe-zur-seite"><Icon name="hilfe" groesse={20} /></Link>
+          ) : null}
           {ich.ist_test ? <Chip art="warn" data-testid="testzugang">Testzugang</Chip> : null}
         </div>
       </header>
       <Systemhinweis />
-      <main className={cx("grow min-h-0 px-8 py-7 flex flex-col gap-5", !breit && "max-w-[1440px]", className)}>{children}</main>
+      <main className={cx("grow min-h-0 min-w-0 w-full px-4 schmal:px-8 py-7 flex flex-col gap-5", className)}>{children}</main>
     </div>
   );
 }

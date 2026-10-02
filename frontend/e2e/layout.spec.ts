@@ -1,4 +1,4 @@
-/** Bildschirmgrößen: unter 1440 px Seitenleiste mit Symbolen, unter 1280 px rutschen rechte Spalten nach unten. */
+/** Bildschirmgrößen: unter 1440 px Seitenleiste mit Symbolen und die Akte einspaltig (S16, Stufen je Seite). */
 import { expect, test } from "@playwright/test";
 import { zustand } from "./hilfen";
 
@@ -17,7 +17,7 @@ test("15-Zoll-Laptop: Seitenleiste als Symbolleiste, Navigation bleibt bedienbar
   expect((await leiste.boundingBox())?.width ?? 0).toBeGreaterThan(200);
 });
 
-test("Unter 1280 px stehen die Karten der Akte untereinander", async ({ page }) => {
+test("Unter 1440 px stehen die Karten der Akte untereinander, ab 1440 px nebeneinander (½ | ½)", async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 900 });
   await page.goto("/patienten");
   await page.getByTestId("patientenliste").getByRole("link", { name: "Probe, Jonas" }).click();

@@ -1,5 +1,5 @@
 /** Entwurf 4 · Patientenakte: Kopf mit Kerndaten und Schnellaktionen, Reiter mit Zählern. */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PdfDialog } from "@/components/PdfDialog";
 import type { ReactNode } from "react";
 import { NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
@@ -301,6 +301,27 @@ export function Akte() {
   const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "pdf">("");
   const akte = useQuery({ queryKey: ["patient", pid], queryFn: () => api<Patient>(`patienten/${pid}/`), enabled: !!pid });
   const p = akte.data;
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  // „Meine Akten“ (S05): Stern im Aktenkopf, und die Akte meldet sich einmal je Aufruf als „zuletzt geöffnet“
+  const merken = useMutation({
+    mutationFn: (an: boolean) => an ? api("meine-akten/merken/", { body: { patient: pid } })
+      : api(`meine-akten/merken/${pid}/`, { method: "DELETE" }),
+    onSuccess: (_d, an) => {
+      void qc.invalidateQueries({ queryKey: ["patient", pid] });
+      void qc.invalidateQueries({ queryKey: ["meine-akten"] });
+      melden(an ? "Auf die Merkliste gesetzt." : "Von der Merkliste genommen.");
+    },
+    onError: (e) => melden(e.message, "fehler"),
+  });
+  const gemeldet = useRef<number | null>(null);
+  useEffect(() => {
+    if (!p || gemeldet.current === p.id) return;
+    gemeldet.current = p.id;
+    api("meine-akten/geoeffnet/", { body: { patient: p.id } })
+      .then(() => qc.invalidateQueries({ queryKey: ["meine-akten"] }))
+      .catch(() => undefined); // nur ein Lesezeichen: scheitert es, bleibt die Akte trotzdem offen
+  }, [p, qc]);
   // Fenster, deren Recht wegfällt, verschwinden und bleiben zu – auch wenn das Recht später zurückkommt
   const offenBei = (recht: Recht) => !!p && !p.ist_abgeschlossen && darfBei(recht, p);
   const erlaubt: Record<typeof dialog, boolean> = {
@@ -341,6 +362,11 @@ export function Akte() {
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="m-0 text-[1.625rem] font-semibold">{name(p)}</h1>
+              <button type="button" className={cx("btn icon klein geist", k?.gemerkt ? "!text-akzent-text" : "")} data-testid="merken"
+                aria-pressed={!!k?.gemerkt} aria-label={k?.gemerkt ? "Von der Merkliste nehmen" : "Auf die Merkliste"}
+                title={k?.gemerkt ? "Von der Merkliste nehmen" : "Auf die Merkliste (erscheint auf der Startseite unter „Meine Akten“)"}
+                disabled={merken.isPending} onClick={() => merken.mutate(!k?.gemerkt)}>
+                <Icon name="stern" groesse={18} fill={k?.gemerkt ? "currentColor" : "none"} /></button>
               {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
               {p.ist_abgeschlossen ? <Chip>abgeschlossen</Chip> : null}
               {p.ist_eingeschraenkt ? <Chip art="warn"><Icon name="schloss" />Verarbeitung eingeschränkt</Chip> : null}

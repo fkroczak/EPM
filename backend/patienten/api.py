@@ -1555,7 +1555,10 @@ def startseite_daten(user):
         "zahlen": {
             # Statistik ohne Testpatienten (für Testzugänge: nur Testpatienten)
             "in_betreuung": statistik.count(),
-            "mit_offenem_termin": statistik.filter(termine__erledigt_am__isnull=True).distinct().count(),
+            # nur Akten mit mindestens einem offenen Termin (vorher zählten auch Akten ganz ohne Termin mit: der Filter
+            # über die Verknüpfung traf bei fehlendem Termin auf NULL)
+            "mit_offenem_termin": statistik.filter(
+                id__in=Termin.objects.filter(erledigt_am__isnull=True).values("patient_id")).count(),
             # wie die Kacheln „Termine und Wiedervorlagen“ und „Wiedereinbestellung fällig“
             "termine_7_tage": sieben_tage.count(),
             "praxistermine_7_tage": sieben_tage.filter(art=Termin.Art.PRAXISTERMIN).count(),

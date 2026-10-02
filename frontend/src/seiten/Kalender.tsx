@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { abfrage, api } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { datum, heuteIso, nummer, uhrzeit, zeitpunkt } from "@/lib/format";
+import { ab, useStufe } from "@/lib/stufen";
 import { TERMINARTEN } from "@/lib/typen";
 import type { Termin } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
@@ -19,12 +20,13 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
 
-type Faelligkeit = { art: "kontakt" | "plan"; patient: number; name: string; nummer: number; ist_test: boolean;
-  faellig_am: string; seit: string; ueberfaellig: boolean; text: string };
+/** stufe (nur Kontakt, S04): am Tag „bald fällig“ bzw. „überfällig“ – je Akte ein Eintrag je Stufe */
+type Faelligkeit = { art: "kontakt" | "plan"; stufe?: "bald" | "ueberfaellig"; patient: number; name: string; nummer: number;
+  ist_test: boolean; faellig_am: string; seit: string; ueberfaellig: boolean; text: string };
 type KalenderDaten = {
   von: string; bis: string; heute: string;
   termine: Termin[]; termine_ueberfaellig: Termin[]; faelligkeiten: Faelligkeit[];
-  grenzen: { kontakt_monate?: number; plan_monate?: number };
+  grenzen: { kontakt_monate?: number; kontakt_bald_monate?: number; plan_monate?: number };
   feiertage: { datum: string; name: string }[];
 };
 type Ansicht = "monat" | "woche" | "liste";
@@ -106,9 +108,16 @@ function farbe(e: Eintrag, heute: string) {
     return "bg-fein text-tinte";
   }
   const f = e.faellig!;
+  if (f.art === "kontakt") {
+    return f.stufe === "bald" && !f.ueberfaellig ? "border border-dashed border-warn text-warn bg-flaeche"
+      : "border border-dashed border-fehler text-fehler bg-flaeche";
+  }
   if (f.ueberfaellig) return "border border-dashed border-fehler text-fehler bg-flaeche";
-  return f.art === "plan" ? "border border-dashed border-akzent text-akzent-text bg-flaeche"
-    : "border border-dashed border-warn text-warn bg-flaeche";
+  return "border border-dashed border-akzent text-akzent-text bg-flaeche";
+}
+
+function faelligName(f: Faelligkeit) {
+  return f.art === "plan" ? "Plan prüfen" : f.stufe === "ueberfaellig" ? "Kontakt überfällig" : "Kontakt bald fällig";
 }
 
 function beschriftung(e: Eintrag) {
@@ -118,7 +127,7 @@ function beschriftung(e: Eintrag) {
     return `${zeit}${TERMINARTEN[t.art]}: ${t.patient_name} – ${t.titel}${t.erledigt_am ? " (erledigt)" : ""}`;
   }
   const f = e.faellig!;
-  return `${f.art === "plan" ? "Plan prüfen" : "Kontakt fällig"}: ${f.name}${f.ueberfaellig ? " (überfällig)" : ""}`;
+  return `${faelligName(f)}: ${f.name}${f.ueberfaellig && f.art === "plan" ? " (überfällig)" : ""}`;
 }
 
 function EintragKnopf({ e, heute, onWahl, voll }: { e: Eintrag; heute: string; onWahl: (e: Eintrag) => void; voll?: boolean }) {
@@ -171,7 +180,7 @@ function EintragDialog({ e, heute, onZu, onTermin, onAendern }: {
   const patient = t ? t.patient : f!.patient;
   const name = t ? t.patient_name : f!.name;
   return (
-    <Dialog offen onOffen={(o) => { if (!o) onZu(); }} titel={t ? t.titel : f!.art === "plan" ? "Infusionsplan prüfen" : "Kontakt fällig"}
+    <Dialog offen onOffen={(o) => { if (!o) onZu(); }} titel={t ? t.titel : f!.art === "plan" ? "Infusionsplan prüfen" : faelligName(f!)}
       beschreibung={<Link to={`/patienten/${patient}`} className="font-medium">{name}</Link>}
       fuss={<>
         {f?.art === "plan" ? <Link className="btn sec" to={`/patienten/${patient}/plaene`}>Pläne öffnen</Link>
@@ -357,6 +366,7 @@ export function Kalender() {
   const [neu, setNeu] = useState<{ datum: string; patient?: number; name?: string } | null>(null);
   const [aendern, setAendern] = useState<Termin | null>(null);
   const schreiben = darf("eintraege_erfassen");
+  const stufe = useStufe();
   useOhneRechtSchliessen(schreiben, () => { setNeu(null); setAendern(null); });
 
   const z = zeitraum(ansicht, bezug);
@@ -369,7 +379,7 @@ export function Kalender() {
 
   const { tage, ueberfaellig, feiertage } = useMemo(() => {
     const karte = new Map<string, Eintrag[]>();
-    const ueber: { termine: Eintrag[]; kontakt: Eintrag[]; plan: Eintrag[] } = { termine: [], kontakt: [], plan: [] };
+    const ueber: { termine: Eintrag[]; kontakt: Eintrag[]; bald: Eintrag[]; plan: Eintrag[] } = { termine: [], kontakt: [], bald: [], plan: [] };
     const fei = new Map<string, string>();
     const d = daten.data;
     if (!d) return { tage: karte, ueberfaellig: ueber, feiertage: fei };
@@ -380,7 +390,9 @@ export function Kalender() {
       karte.set(e.datum, liste);
     };
     for (const t of d.termine) if (filter.includes(t.art)) neuEintrag({ schluessel: `t${t.id}`, datum: t.faellig_am, termin: t });
-    for (const f of d.faelligkeiten) if (filter.includes(f.art)) neuEintrag({ schluessel: `${f.art}${f.patient}`, datum: f.faellig_am, faellig: f });
+    for (const f of d.faelligkeiten) {
+      if (filter.includes(f.art)) neuEintrag({ schluessel: `${f.art}${f.stufe ?? ""}${f.patient}`, datum: f.faellig_am, faellig: f });
+    }
     for (const liste of karte.values()) {
       liste.sort((a, b) => {
         const rang = (e: Eintrag) => (e.termin ? (e.termin.uhrzeit ? 1 : 0) : 2);
@@ -389,9 +401,15 @@ export function Kalender() {
       });
     }
     for (const t of d.termine_ueberfaellig) if (filter.includes(t.art)) ueber.termine.push({ schluessel: `t${t.id}`, datum: t.faellig_am, termin: t });
+    // Kontakt: je Akte nur die höchste erreichte Stufe (überfällig vor bald fällig)
+    const ueberfaelligeAkten = new Set(d.faelligkeiten.filter((f) => f.art === "kontakt" && f.stufe === "ueberfaellig" && f.ueberfaellig)
+      .map((f) => f.patient));
     for (const f of d.faelligkeiten) {
       if (!f.ueberfaellig || !filter.includes(f.art)) continue;
-      ueber[f.art].push({ schluessel: `${f.art}${f.patient}`, datum: f.faellig_am, faellig: f });
+      const e = { schluessel: `${f.art}${f.stufe ?? ""}${f.patient}`, datum: f.faellig_am, faellig: f };
+      if (f.art === "plan") ueber.plan.push(e);
+      else if (f.stufe === "ueberfaellig") ueber.kontakt.push(e);
+      else if (!ueberfaelligeAkten.has(f.patient)) ueber.bald.push(e);
     }
     for (const f of d.feiertage) fei.set(f.datum, f.name);
     return { tage: karte, ueberfaellig: ueber, feiertage: fei };
@@ -429,7 +447,9 @@ export function Kalender() {
         </div>
       </div>
       <Fehleranzeige fehler={daten.error} />
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] hd:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
+      {/* Stufen (S16, Entwurf 2): bis 1919 px Kalender mit Seitenspalte wie bisher, ab 1920 px Monat ¾ | Tagesliste ¼ */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] hd:grid-cols-[minmax(0,1fr)_360px] fhd:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-5 items-start"
+        data-testid="kalender-stufe">
         <Karte className="p-3 min-w-0">
           {!daten.data ? <Laden /> : ansicht === "monat" ? (
             <Monat von={z.von} bezug={bezug} heute={heute} tage={tage} feiertage={feiertage} gewaehlt={gewaehlt}
@@ -441,7 +461,7 @@ export function Kalender() {
           )}
         </Karte>
         <div className="flex flex-col gap-4">
-          {ansicht === "monat" ? (
+          {ansicht === "monat" || ab(stufe, "fhd") ? (
             <Karte className="px-4 py-3.5 flex flex-col gap-2" data-testid="tagesliste">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="lbl m-0">{langerTag(gewaehlt)}</h2>
@@ -457,9 +477,13 @@ export function Kalender() {
             <Seitenliste titel="Offene Termine" anzahl={ueberfaellig.termine.length} testid="ueberfaellig-termine">
               <Gekuerzt eintraege={ueberfaellig.termine} heute={heute} onWahl={setEintrag} />
             </Seitenliste>
-            <Seitenliste titel={`Kontakt fällig (über ${daten.data?.grenzen.kontakt_monate ?? "…"} Mon.)`} anzahl={ueberfaellig.kontakt.length}
+            <Seitenliste titel={`Kontakt überfällig (über ${daten.data?.grenzen.kontakt_monate ?? "…"} Mon.)`} anzahl={ueberfaellig.kontakt.length}
               testid="ueberfaellig-kontakt">
               <Gekuerzt eintraege={ueberfaellig.kontakt} heute={heute} onWahl={setEintrag} />
+            </Seitenliste>
+            <Seitenliste titel={`Kontakt bald fällig (über ${daten.data?.grenzen.kontakt_bald_monate ?? "…"} Mon.)`} anzahl={ueberfaellig.bald.length}
+              testid="bald-kontakt">
+              <Gekuerzt eintraege={ueberfaellig.bald} heute={heute} onWahl={setEintrag} />
             </Seitenliste>
             <Seitenliste titel={`Plan prüfen (älter als ${daten.data?.grenzen.plan_monate ?? "…"} Mon.)`} anzahl={ueberfaellig.plan.length}
               testid="ueberfaellig-plan">
@@ -469,7 +493,8 @@ export function Kalender() {
           <div className="flex flex-col gap-1.5 text-xs gedaempft px-1">
             <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm bg-akzent-weich" />Praxistermin
               <span className="w-3 h-3 rounded-sm bg-warn-bg ml-2" />Wiedervorlage<span className="w-3 h-3 rounded-sm bg-fehler-bg ml-2" />überfällig</span>
-            <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm border border-dashed border-warn" />berechnet: Kontakt fällig
+            <span className="flex items-center gap-2 flex-wrap"><span className="w-3 h-3 rounded-sm border border-dashed border-warn" />berechnet: Kontakt bald fällig
+              <span className="w-3 h-3 rounded-sm border border-dashed border-fehler ml-2" />Kontakt überfällig
               <span className="w-3 h-3 rounded-sm border border-dashed border-akzent ml-2" />Plan prüfen</span>
           </div>
         </div>

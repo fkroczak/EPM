@@ -49,7 +49,8 @@ function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) 
   return (
     <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
       <h2 className="lbl m-0">{titel}</h2>
-      <div className="grid grid-cols-4 gap-x-4 gap-y-3.5 items-start">{children}</div>
+      {/* Formulare in Stufen (S16): 2 breite Felder je Zeile, ab 1920 px 3, ab 2560 px 4 */}
+      <div className="grid grid-cols-4 fhd:grid-cols-6 qhd:grid-cols-8 gap-x-4 gap-y-3.5 items-start">{children}</div>
     </Karte>
   );
 }

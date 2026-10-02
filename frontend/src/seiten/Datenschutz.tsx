@@ -69,7 +69,7 @@ export function Datenschutz() {
           ) : null}
         </Karte>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+        <div className="grid grid-cols-1 hd:grid-cols-2 fhd:grid-cols-3 gap-5 items-start">
           <Karte className="overflow-hidden">
             <div className="px-5 pt-[18px] pb-2 flex flex-col gap-1">
               <h2 className="lbl m-0 text-[0.9375rem]">Aufbewahrung abgelaufen</h2>

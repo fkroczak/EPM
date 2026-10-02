@@ -3,14 +3,18 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ApiFehler, api } from "@/lib/api";
+import { ApiFehler, api, apiDatei } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useEinstellungen, usePraeparate } from "@/lib/daten";
-import { datum, eingabeDatum, eingabeZahl, heuteIso, kg, nummer, zahl } from "@/lib/format";
+import { datum, eingabeDatum, eingabeZahl, heuteIso, kg, nummer, uhrzeit, zahl } from "@/lib/format";
+import { useStufe } from "@/lib/stufen";
+import type { Stufe } from "@/lib/stufen";
 import { PPI_ZEITEN, PROTONENPUMPENHEMMER, ppiZeiten } from "@/lib/typen";
 import type { Plan, Praeparat } from "@/lib/typen";
-import { Auswahl, Chip, Eingabe, Feld, Karte, Knopf, KnopfLink, Laden, Meldung, cx } from "@/components/ui/basis";
+import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, KnopfLink, Laden, Meldung, cx } from "@/components/ui/basis";
+import { Spalten } from "@/components/ui/spalten";
+import { PdfLeser } from "@/components/PdfAnsicht";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { Editor } from "@/components/Editor";
@@ -167,6 +171,7 @@ export function PlanEditor() {
   const [leerBegonnen, setLeerBegonnen] = useState(false);
   const [lokal, setLokal] = useState<Feldfehler>({});
   const [neueId, setNeueId] = useState<number | null>(null); // Entwurf, der beim ersten Speichern angelegt wurde
+  const stufe = useStufe();
 
   const entwurf = useQuery({ queryKey: ["plan", planId], queryFn: () => api<Plan>(`infusionsplaene/${planId}/`), enabled: !!planId });
   // aktueller Plan frisch vom Server: Der Aktenkopf kann direkt nach einer Freigabe noch den alten Stand zeigen,
@@ -344,7 +349,7 @@ export function PlanEditor() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
+      <PlanSpalten stufe={stufe} vorschau={<PlanVorschau id={planId ? Number(planId) : neueId} />} eingabe={
         <div className="flex flex-col gap-4 min-w-0">
           <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
             <h3 className="lbl m-0">Basislösung</h3>
@@ -435,7 +440,7 @@ export function PlanEditor() {
               <Editor wert={f.bemerkung} onAenderung={setze("bemerkung")} label="Kommentar" werkzeuge={false} hoehe={56} />
             </div>
           </Karte>
-        </div>
+        </div>} summen={
 
         <aside className="flex flex-col gap-4">
           <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
@@ -523,7 +528,53 @@ export function PlanEditor() {
             </span>
           </div>
         </aside>
-      </div>
+      } />
     </form>
+  );
+}
+
+/** Aufteilung je Fensterstufe (S16, Entwurf 2): untereinander · Eingabe | Summen wie bisher · ab 1920 px ½ | ¼ | ¼ mit
+ *  PDF-Vorschau · ab 2560 px ⅓ | ⅓ | ⅓ mit Teilern */
+function PlanSpalten({ stufe, eingabe, summen, vorschau }: { stufe: Stufe; eingabe: ReactNode; summen: ReactNode; vorschau: ReactNode }) {
+  if (stufe === "qhd") {
+    return <Spalten seite="plan_editor" stufe="qhd" standard={[1 / 3, 2 / 3]} namen={["Eingabe", "Summen", "PDF-Vorschau"]}
+      testid="plan-stufe" spalten={[eingabe, summen, vorschau]} />;
+  }
+  if (stufe === "fhd") {
+    return (
+      <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-5 items-start" data-testid="plan-stufe">
+        {eingabe}{summen}<div className="flex flex-col gap-4 min-w-0">{vorschau}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start" data-testid="plan-stufe">{eingabe}{summen}</div>
+  );
+}
+
+/** PDF-Vorschau des Entwurfs mit der aktiven Dokumentvorlage (Wasserzeichen „ENTWURF“): zeigt den zuletzt gespeicherten
+ *  Stand; ungespeicherte Eingaben erscheinen nach „Als Entwurf speichern“ und erneutem Öffnen des Entwurfs. */
+function PlanVorschau({ id }: { id: number | null }) {
+  const datei = useQuery({
+    queryKey: ["plan", id, "ansicht"],
+    queryFn: () => apiDatei(`infusionsplaene/${id}/ansicht/`),
+    enabled: !!id,
+    staleTime: 0,
+    gcTime: 0,
+  });
+  return (
+    <Karte className="px-4 py-3.5 flex flex-col gap-2 hd:sticky hd:top-4" data-testid="plan-pdf-vorschau">
+      <h3 className="lbl m-0">PDF-Vorschau</h3>
+      {!id ? <span className="text-sm gedaempft">Die Vorschau erscheint, sobald der Entwurf gespeichert ist.</span> : (
+        <>
+          <span className="text-[0.8125rem] gedaempft">Stand der letzten Speicherung{datei.dataUpdatedAt ? ` (geladen ${uhrzeit(new Date(datei.dataUpdatedAt))})` : ""} ·
+            mit der aktiven Dokumentvorlage, Wasserzeichen „ENTWURF“. Ungespeicherte Änderungen sind noch nicht enthalten.</span>
+          <Fehleranzeige fehler={datei.error} />
+          {datei.isLoading ? <Laden text="PDF wird geladen …" /> : datei.data ? (
+            <PdfLeser url={`plan-entwurf-${id}-${datei.dataUpdatedAt}`} laden={() => Promise.resolve(datei.data!.daten)} className="h-[70vh]" />
+          ) : null}
+        </>
+      )}
+    </Karte>
   );
 }

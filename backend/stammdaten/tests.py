@@ -112,13 +112,13 @@ class EinstellungenPruefen(Grundlage):
         self.assertIn("glucose_min_g", r.json())
         r = a.patch("/api/einstellungen/", {"natrium_min_mmol": 10, "natrium_max_mmol": 5}, format="json")
         self.assertEqual(r.status_code, 400)
-        r = a.patch("/api/einstellungen/", {"kontakt_ueberfaellig_monate": 6, "kalium_max_mmol": 250}, format="json")
+        r = a.patch("/api/einstellungen/", {"kontakt_ueberfaellig_monate": 8, "kalium_max_mmol": 250}, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         e = Einstellungen.aktuell()
-        self.assertEqual((e.kontakt_ueberfaellig_monate, e.kalium_max_mmol), (6, 250))
+        self.assertEqual((e.kontakt_ueberfaellig_monate, e.kalium_max_mmol), (8, 250))
         eintrag = a.get("/api/protokoll/?gruppe=vorlage").json()["results"][0]
         self.assertEqual(eintrag["gruppe_name"], "Vorlage")
-        self.assertIn("„Kontakt überfällig“ von 4 auf 6 Monate geändert", eintrag["beschreibung"])
+        self.assertIn("„Kontakt überfällig“ von 6 auf 8 Monate geändert", eintrag["beschreibung"])
         self.assertIn("„Kalium maximal“ von 300 auf 250 mmol geändert", eintrag["beschreibung"])
 
 

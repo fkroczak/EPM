@@ -259,6 +259,8 @@ const HINWEISE: { k: string; label: string; einheit: string }[] = [
   { k: "gewicht_warnung_prozent", label: "Warnung Gewichtsverlust", einheit: "%" },
   { k: "gewicht_warnung_monate", label: "Zeitraum dafür", einheit: "Monaten" },
   { k: "plan_alter_warnung_monate", label: "Infusionsplan gilt als alt nach", einheit: "Monaten" },
+  // Kontakt fällig in zwei Stufen (S04): erst „bald fällig“, dann „überfällig“
+  { k: "kontakt_bald_monate", label: "Kontakt bald fällig nach", einheit: "Monaten" },
   { k: "kontakt_ueberfaellig_monate", label: "Kontakt überfällig nach", einheit: "Monaten" },
 ];
 // Datenschutz (docs/DATENSCHUTZ.md): Fristen und die Erklärungen, die in jeder Akte vorliegen sollen
@@ -336,7 +338,9 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
             </Feld>
           ))}
         </div>
-        <span className="text-[0.8125rem] gedaempft">Beispiel: Warnung, wenn ein Patient mehr als {w.gewicht_warnung_prozent} % in {w.gewicht_warnung_monate} Monaten abnimmt.</span>
+        <span className="text-[0.8125rem] gedaempft">Beispiel: Warnung, wenn ein Patient mehr als {w.gewicht_warnung_prozent} % in {w.gewicht_warnung_monate} Monaten abnimmt.
+          Kontakt: „bald fällig“ nach {w.kontakt_bald_monate}, „überfällig“ nach {w.kontakt_ueberfaellig_monate} Monaten ohne Kontakt
+          (Wiedereinbestellung auf der Startseite, Hinweis in der Liste, Kalender).</span>
       </Karte>
       <Karte className="px-5 py-[18px] flex flex-col gap-3.5" data-testid="grenzwerte-datenschutz">
         <h2 className="lbl m-0">Datenschutz</h2>

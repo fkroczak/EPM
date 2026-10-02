@@ -26,6 +26,7 @@ test("Vor dem Neustart: Grenzwert, Rechte, Darstellung und Startseite in der Obe
   await page.goto("/admin/vorlagen");
   await page.getByRole("button", { name: "Grenzwerte" }).click();
   await page.getByTestId("grenzwerte").getByLabel("Kontakt überfällig nach").fill("14");
+  await page.getByTestId("grenzwerte").getByLabel("Kontakt bald fällig nach").fill("9");
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Grenzwerte gespeichert.")).toBeVisible();
 
@@ -44,10 +45,20 @@ test("Vor dem Neustart: Grenzwert, Rechte, Darstellung und Startseite in der Obe
   await d.page.goto("/");
   await d.page.getByRole("button", { name: "Startseite anpassen" }).click();
   antwort = gespeichert(d.page, "auth/ich/");
-  await d.page.getByRole("checkbox", { name: "Zuletzt eingetragen" }).uncheck();
+  await d.page.getByRole("button", { name: "Zuletzt eingetragen ausblenden" }).click();
+  await antwort;
+  antwort = gespeichert(d.page, "auth/ich/");
+  await d.page.getByRole("group", { name: "Größe Auffällige Gewichte" }).getByRole("button", { name: "2×2" }).click();
   await antwort;
   await d.page.getByRole("button", { name: "Fertig" }).click();
   await expect(d.page.getByRole("heading", { name: "Zuletzt eingetragen" })).toHaveCount(0);
+  // Spaltenteiler der Akte (S17, bei 1440 px Stufe „hd“): per Tastatur auf ⅓
+  await d.page.goto("/patienten");
+  await d.page.getByTestId("patientenliste").getByRole("link", { name: "Probe, Jonas" }).click();
+  antwort = gespeichert(d.page, "auth/ich/");
+  await d.page.getByTestId("teiler-akte_uebersicht-0").press("ArrowLeft");
+  await antwort;
+  await expect(d.page.getByTestId("uebersicht-stufe")).toHaveAttribute("data-aufteilung", "0.3333");
   await d.ctx.close();
 });
 
@@ -230,7 +241,9 @@ test("Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Re
   await page.getByRole("button", { name: "Grenzwerte" }).click();
   const grenzen = page.getByTestId("grenzwerte");
   await expect(grenzen.getByLabel("Kontakt überfällig nach")).toHaveValue("14");
-  await grenzen.getByLabel("Kontakt überfällig nach").fill("4");
+  await expect(grenzen.getByLabel("Kontakt bald fällig nach")).toHaveValue("9");
+  await grenzen.getByLabel("Kontakt bald fällig nach").fill("4");
+  await grenzen.getByLabel("Kontakt überfällig nach").fill("6");
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Grenzwerte gespeichert.")).toBeVisible();
   await ctx.close();
@@ -252,6 +265,10 @@ test("Nach dem Neustart: Konto mit neuem Passwort und Gerät, Notfall-Codes, Dar
   await expect(d.page.locator("html")).toHaveAttribute("data-schema", "dunkel");
   await expect(d.page.getByRole("heading", { name: "Auffällige Gewichte" })).toBeVisible();
   await expect(d.page.getByRole("heading", { name: "Zuletzt eingetragen" })).toHaveCount(0);
+  await expect(d.page.locator('[data-kachel="gewicht"]')).toHaveAttribute("data-groesse", "2x2");
+  await d.page.goto("/patienten");
+  await d.page.getByTestId("patientenliste").getByRole("link", { name: "Probe, Jonas" }).click();
+  await expect(d.page.getByTestId("uebersicht-stufe")).toHaveAttribute("data-aufteilung", "0.3333");
   await d.ctx.close();
 });
 

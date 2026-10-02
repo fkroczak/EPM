@@ -1,7 +1,7 @@
 /** Entwurf 14 · Mein Konto (Varianten 22/23): Darstellung, Profil, Anmeldung und Sicherheit, Sitzungen. */
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
@@ -232,8 +232,19 @@ function SicherheitKarte() {
   const s = useQuery({ queryKey: ["konto", "sicherheit"], queryFn: () => api<Sicherheit>("auth/sicherheit/") });
   const neueCodes = useMutation({
     mutationFn: () => api<{ notfallcodes: string[] }>("auth/notfallcodes/", { method: "POST" }),
-    onSuccess: (r) => { setCodes(r.notfallcodes); void qc.invalidateQueries({ queryKey: ["konto"] }); },
+    onSuccess: (r) => {
+      setCodes(r.notfallcodes);
+      void qc.invalidateQueries({ queryKey: ["konto"] });
+      void qc.invalidateQueries({ queryKey: ["startseite"] }); // Hinweis „Nur noch n Notfall-Codes“ (S08) verschwindet
+    },
   });
+  // „Neue Codes erzeugen“ im Hinweis der Startseite führt hierher
+  const location = useLocation();
+  useEffect(() => {
+    if ((location.state as { sicherheit?: number } | null)?.sicherheit) {
+      document.querySelector('[data-testid="sicherheit"]')?.scrollIntoView({ block: "start" });
+    }
+  }, [location.state]);
   const d = s.data;
   return (
     <Karte className="px-5 py-[18px] flex flex-col gap-1" data-testid="sicherheit">
