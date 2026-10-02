@@ -83,6 +83,21 @@ def fehlversuch(user, request, art):
 GESPERRT_TEXT = "Das Konto ist gesperrt. Bitte an die Administration wenden."
 
 
+def bestaetigung_fehlgeschlagen(request, art: str):
+    """Falsches Kennwort oder falscher Authenticator-Code bei einer Bestätigung in der Sitzung (endgültiges Löschen):
+    zählt wie ein Fehlversuch bei der Anmeldung – sonst ließe sich das Kennwort dort beliebig oft probieren.
+    Liefert die Antwort „gesperrt“, wenn das Konto damit gesperrt wurde, sonst None."""
+    if fehlversuch(request.user, request, art):
+        return Response({"fehler": GESPERRT_TEXT}, status=status.HTTP_403_FORBIDDEN)
+    return None
+
+
+def bestaetigung_gelungen(request):
+    if request.user.fehlversuche:
+        request.user.fehlversuche = 0
+        request.user.save(update_fields=["fehlversuche"])
+
+
 def fehler(text, code=status.HTTP_400_BAD_REQUEST, **extra):
     return Response({"fehler": text, **extra}, status=code)
 

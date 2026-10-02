@@ -23,7 +23,8 @@ type Startdaten = {
   gewicht_schwelle: { prozent: number; monate: number };
   infusionsplaene: { entwuerfe: PlanEintrag[]; aelter_als_grenze: PlanEintrag[]; grenze_monate: number };
   pruefen: { altdokumente: number; nickelallergie_unbekannt: number; kein_versorger: number; kein_kontakt: number; kontakt_monate: number;
-    erklaerungen_fehlen: number; abschluss_pruefen: number; abschluss_monate: number; datenschutz_anfragen: number };
+    erklaerungen_fehlen: number; abschluss_pruefen: number; abschluss_monate: number; datenschutz_anfragen: number;
+    datenschutz_ueberfaellig: number };
   zuletzt_eingetragen: { bereich: string; bezeichnung: string; objekt_id: number; patient: number; name: string | null;
     zeitpunkt: string; person: string | null }[];
   zahlen: { in_betreuung: number; mit_offenem_termin: number };
@@ -204,7 +205,8 @@ function PruefenKarte({ daten }: { daten: Startdaten }) {
         ))}
         {datenschutz ? (
           <Link to="/datenschutz" className="flex justify-between no-underline text-tinte hover:text-akzent-text">
-            <span>Offene Datenschutz-Anfragen</span><span className="num text-akzent-text" data-testid="pruefen-datenschutz">{p.datenschutz_anfragen}</span>
+            <span>Offene Datenschutz-Anfragen{p.datenschutz_ueberfaellig ? <span className="text-fehler" data-testid="pruefen-datenschutz-ueberfaellig"> · {p.datenschutz_ueberfaellig} überfällig</span> : null}</span>
+            <span className="num text-akzent-text" data-testid="pruefen-datenschutz">{p.datenschutz_anfragen}</span>
           </Link>
         ) : null}
       </div>

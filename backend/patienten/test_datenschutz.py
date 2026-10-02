@@ -6,6 +6,7 @@ import zipfile
 from datetime import date, timedelta
 from pathlib import Path
 
+from django.apps import apps
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
@@ -76,6 +77,19 @@ class Fristen(DatenschutzGrundlage):
         p = self.abschliessen(datum=heute - timedelta(days=30))
         a = p.aufbewahrung()
         self.assertEqual((a["jahre"], a["bis"], a["abgelaufen"]), (10, plus_jahre(p.abgeschlossen_am, 10), False))
+        # ein zu früh eingetragenes Abschlussdatum macht die Akte nicht vorzeitig löschbar: Die Frist beginnt nicht
+        # vor dem letzten Kontakt (stornierte zählen nicht)
+        frueh = Patient.objects.create(nachname="Frueh", vorname="Frida", geburtsdatum="1970-01-01")
+        k = self.neuer_kontakt(patient=frueh)
+        frueh = self.abschliessen(frueh, datum=plus_jahre(heute, -11))
+        a2 = frueh.aufbewahrung()
+        self.assertEqual((a2["beginn"], a2["regulaer_bis"], a2["abgelaufen"]), (heute, plus_jahre(heute, 10), False))
+        m = client_fuer(self.mediziner)
+        self.assertEqual(m.post(f"/api/patienten/{frueh.id}/loeschen-vorbereiten/").status_code, 409)
+        self.assertEqual(m.get("/api/datenschutz/").json()["aufbewahrung_abgelaufen"], [])
+        Kontakt.objects.filter(pk=k["id"]).update(storniert_am=timezone.now())
+        self.assertEqual((frueh.aufbewahrung()["beginn"], frueh.aufbewahrung()["abgelaufen"]), (plus_jahre(heute, -11), True))
+        self.assertEqual([x["nummer"] for x in m.get("/api/datenschutz/").json()["aufbewahrung_abgelaufen"]], [frueh.nummer])
         # im Einzelfall länger (nur wenn später als die reguläre Frist)
         p.aufbewahrung_bis = plus_jahre(heute, 15)
         self.assertEqual(p.aufbewahrung()["bis"], plus_jahre(heute, 15))
@@ -114,6 +128,18 @@ class Fristen(DatenschutzGrundlage):
         self.assertEqual(r.json()["pflicht_erklaerungen"], ["datenschutzinformation", "einwilligung"])
         text = beschreibung(SystemEreignis.objects.filter(art=A.STAMMDATEN).first())
         self.assertIn("von 10 auf 30 Jahre geändert", text)
+        # Fristen entscheiden über Löschen von Akten und Audit-Log: „Vorlagen pflegen“ allein reicht dafür nicht
+        c = client_fuer(self.mitarbeiter)
+        for feld, wert in (("aufbewahrung_jahre", 1), ("protokoll_aufbewahrung_jahre", 1), ("abschluss_pruefen_monate", 6),
+                           ("pflicht_erklaerungen", [])):
+            with self.subTest(feld=feld):
+                r = c.patch("/api/einstellungen/", {feld: wert}, format="json")
+                self.assertEqual(r.status_code, 403, r.content)
+        e = Einstellungen.aktuell()
+        self.assertEqual((e.aufbewahrung_jahre, e.protokoll_aufbewahrung_jahre), (30, 0))
+        # die übrigen Grenzwerte ändern Mitarbeiter weiter – auch wenn das Formular die Datenschutz-Werte unverändert mitschickt
+        r = c.patch("/api/einstellungen/", {"kontakt_ueberfaellig_monate": 5, "aufbewahrung_jahre": 30}, format="json")
+        self.assertEqual((r.status_code, r.json()["kontakt_ueberfaellig_monate"]), (200, 5))
 
     def test_abschluss_pruefen(self):
         """Akten ohne Kontakt seit der eingestellten Zeit: abschließen? Sonst beginnt die Aufbewahrungsfrist nie."""
@@ -298,6 +324,11 @@ class Anfragen(DatenschutzGrundlage):
         self.assertIn("abgeschlossene Akten", str(r.json()))
         self.assertTrue(Datenschutzanfrage.objects.get(pk=a["id"]).ist_offen)
         self.abschliessen()
+        # die Anfrage zu einer abgeschlossenen Akte steht weiter auf der Startseite – mit dem Hinweis „überfällig“
+        self.assertEqual((self.pruefen()["datenschutz_anfragen"], self.pruefen()["datenschutz_ueberfaellig"]), (1, 0))
+        Datenschutzanfrage.objects.filter(pk=a["id"]).update(eingegangen_am=timezone.localdate() - timedelta(days=40))
+        self.assertEqual((self.pruefen()["datenschutz_anfragen"], self.pruefen()["datenschutz_ueberfaellig"]), (1, 1))
+        self.assertEqual(self.pruefen(client_fuer(self.betrachter))["datenschutz_anfragen"], 0)
         r = m.post(url, daten, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         self.patient.refresh_from_db()
@@ -307,15 +338,29 @@ class Anfragen(DatenschutzGrundlage):
         u = m.get("/api/datenschutz/").json()
         self.assertEqual([x["nummer"] for x in u["eingeschraenkt"]], [self.patient.nummer])
         self.assertEqual((u["anfragen_offen"], u["darf_entscheiden"]), ([], True))
-        self.assertEqual(c.get("/api/datenschutz/").json()["darf_entscheiden"], False)
+        self.assertEqual((u["eingeschraenkt"][0]["name"], u["eingeschraenkt"][0]["grund"]), ("Echt, Anna", daten["begruendung"]))
         self.assertEqual(client_fuer(self.betrachter).get("/api/datenschutz/").status_code, 403)
-        # Anfragen zu eingeschränkten Akten sehen nur Datenschutz-Berechtigte
-        self.assertEqual(len(c.get(f"/api/datenschutzanfragen/?patient={pid}").json()), 1)
-        self.assertEqual(client_fuer(self.betrachter).get(f"/api/datenschutzanfragen/?patient={pid}").json(), [])
-        # eine weitere Anfrage (z. B. Auskunft) lässt sich auch jetzt erfassen
+        # Wer keine Einsicht nehmen dürfte, sieht von der eingeschränkten Akte nur die Nummer – Mitarbeiter (kein Recht
+        # „entscheiden“) und die Administration (echte Akte)
+        for client in (c, client_fuer(self.admin)):
+            u = client.get("/api/datenschutz/").json()
+            self.assertEqual([(x["nummer"], x["name"], x["grund"], x["von"]) for x in u["eingeschraenkt"]],
+                             [(self.patient.nummer, None, None, None)])
+            self.assertNotIn("Echt", json.dumps(u, ensure_ascii=False))
+        self.assertEqual(c.get("/api/datenschutz/").json()["darf_entscheiden"], False)
+        # Anfragen zu eingeschränkten Akten sieht und erfasst nur, wer Einsicht nehmen dürfte
+        self.assertEqual(len(m.get(f"/api/datenschutzanfragen/?patient={pid}").json()), 1)
+        for client in (c, client_fuer(self.admin), client_fuer(self.betrachter)):
+            self.assertEqual(client.get(f"/api/datenschutzanfragen/?patient={pid}").json(), [])
         r = c.post("/api/datenschutzanfragen/", {"patient": pid, "art": "auskunft"}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        r = m.post("/api/datenschutzanfragen/", {"patient": pid, "art": "auskunft"}, format="json")
         self.assertEqual(r.status_code, 201, r.content)
         self.assertEqual(len(m.get("/api/datenschutz/").json()["anfragen_offen"]), 1)
+        u = c.get("/api/datenschutz/").json()
+        self.assertEqual((u["anfragen_offen"], u["anfragen_verborgen"]), ([], 1))
+        self.assertEqual(self.pruefen()["datenschutz_anfragen"], 0)
+        self.assertEqual(self.pruefen(m)["datenschutz_anfragen"], 1)
 
 
 class Einschraenkung(DatenschutzGrundlage):
@@ -346,16 +391,36 @@ class Einschraenkung(DatenschutzGrundlage):
             self.assertEqual(client.get(url + "pdf/").status_code, 404)
         self.assertEqual((m.get(url).json()["darf_einsicht"], c.get(url).json()["darf_einsicht"]), (True, False))
         self.assertEqual(c.get("/api/patienten/zaehler/").json()["abgeschlossen"], 0)
-        # der Stand zum Datenschutz bleibt für Berechtigte lesbar (z. B. um eine Anfrage zu bearbeiten)
-        self.assertEqual(c.get(url + "datenschutz/").json()["einschraenkung"]["grund"], self.GRUND)
-        self.assertEqual(client_fuer(self.betrachter).get(url + "datenschutz/").status_code, 403)
+        # auch Erklärungen, Anfragen und der Grund sind Inhalt der Akte: ohne Einsicht für niemanden lesbar
+        r = m.get(url + "datenschutz/")
+        self.assertEqual((r.status_code, r.json()["eingeschraenkt"], r.json()["darf_einsicht"]), (403, True, True))
+        self.assertNotIn("einschraenkung", r.json())
+        for client in (c, client_fuer(self.betrachter), client_fuer(self.admin)):
+            self.assertEqual(client.get(url + "datenschutz/").status_code, 404)
+        self.assertEqual(client_fuer(self.admin).get(url).json()["darf_einsicht"], False)
+        # Audit-Log: Die Administration dürfte keine Einsicht nehmen – sie sieht die Einträge zur Akte ohne Namen und
+        # findet sie nicht über die Suche nach dem Namen; der Mediziner sieht sie unverändert
+        admin = client_fuer(self.admin)
+        zeilen = eintraege(admin.get("/api/protokoll/"))
+        self.assertGreaterEqual(len(zeilen), 2)  # mindestens: abgeschlossen, eingeschränkt
+        self.assertNotIn("Echt", json.dumps(zeilen, ensure_ascii=False))
+        verborgen = [z for z in zeilen if z["details"].get("verborgen")]
+        self.assertEqual({z["objekt"] for z in verborgen}, {f"Akte Nr. {p.nummer} (Verarbeitung eingeschränkt)"})
+        self.assertIn(A.AKTE_EINGESCHRAENKT, [z["art"] for z in verborgen])
+        self.assertTrue(all("grund" not in z["details"] for z in verborgen))
+        self.assertEqual(eintraege(admin.get("/api/protokoll/?search=Echt")), [])
+        self.assertEqual(len(eintraege(admin.get("/api/protokoll/"))), len(eintraege(m.get("/api/protokoll/"))))
+        self.assertIn("Echt, Anna", json.dumps(eintraege(m.get("/api/protokoll/?search=Echt")), ensure_ascii=False))
+        # die Suche nach etwas anderem verliert keine Einträge (auch nicht die ohne Bezug zu einer Akte)
+        protokolliere(A.EXPORT, objekt="Suchwort Zebra", was="Audit-Log")
+        self.assertEqual(len(eintraege(admin.get("/api/protokoll/?search=Zebra"))), 1)
 
         # Einsicht: nur mit „entscheiden“, mit Grund, nur für diese Person, steht im Audit-Log
         einsicht = {"grund": "Rückfrage des Hausarztes zur früheren Therapie"}
         self.assertEqual(c.post(url + "einsicht/", einsicht, format="json").status_code, 403)
         self.assertEqual(m.post(url + "einsicht/", {"grund": "x"}, format="json").status_code, 400)
-        # Admins schreiben nur bei Testpatienten – und sehen eingeschränkte echte Akten auch nicht ein
-        self.assertEqual(client_fuer(self.admin).post(url + "einsicht/", einsicht, format="json").status_code, 403)
+        # Admins schreiben nur bei Testpatienten – eingeschränkte echte Akten gibt es für sie nicht
+        self.assertEqual(client_fuer(self.admin).post(url + "einsicht/", einsicht, format="json").status_code, 404)
         r = m.post(url + "einsicht/", einsicht, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual((m.get(url).status_code, m.get(url).json()["ist_eingeschraenkt"]), (200, True))
@@ -423,6 +488,7 @@ class Aktenkopie(DatenschutzGrundlage):
                format="json")
         url = f"/api/patienten/{pid}/kopie/"
         self.assertEqual(client_fuer(self.betrachter).get(url).status_code, 403)
+        self.assertEqual(client_fuer(self.admin).get(url).status_code, 403)  # echte Akte: lesen ja, Kopie nein
         r = c.get(url)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r["Content-Type"], "application/zip")
@@ -471,7 +537,10 @@ class AkteLoeschen(DatenschutzGrundlage):
         self.assertEqual(c.post("/api/erklaerungen/", {"patient": p.id, "art": "einwilligung", "erteilt_am": str(heute),
                                                        "datei": scan}, format="multipart").status_code, 201)
         # erster Plan: der Mediziner gibt selbst frei; zweiter: Freigabe per E-Mail, abgeschlossen vom Mitarbeiter
-        self.assertEqual(m.post(f"/api/infusionsplaene/{self.plan_entwurf(p)}/freigeben/").status_code, 200)
+        erster = self.plan_entwurf(p)
+        r = m.patch(f"/api/infusionsplaene/{erster}/", {"vitamine": [praeparat("Soluvit N").id]}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(m.post(f"/api/infusionsplaene/{erster}/freigeben/").status_code, 200)
         mail = SimpleUploadedFile("freigabe.txt", b"Plan ist freigegeben. Masin", content_type="text/plain")
         r = c.post(f"/api/infusionsplaene/{self.plan_entwurf(p)}/abschliessen/",
                    {"freigegeben_von": self.mediziner.id, "freigegeben_am": str(heute), "weg": "email", "nachweis": mail},
@@ -485,7 +554,10 @@ class AkteLoeschen(DatenschutzGrundlage):
             return Dokument.objects.get(pk=r.json()["id"])
 
         weg, her = hochladen(p, "Arztbrief Anna Echt"), hochladen(self.patient, "Befund für Lena")
-        for dok, ziel in ((weg, self.patient), (her, p)):
+        # „pendel“ wird versehentlich der anderen Akte zugeordnet und kommt zurück – es endet in dieser Akte;
+        # „fremd“ lag einmal hier, gehört der anderen Akte und wird dort später endgültig gelöscht
+        self.pendel, self.fremd = hochladen(p, "Pendelbrief Lena"), hochladen(p, "Brief einer Fremden")
+        for dok, ziel in ((weg, self.patient), (her, p), (self.pendel, self.patient), (self.pendel, p), (self.fremd, self.patient)):
             r = m.post(f"/api/dokumente/{dok.id}/umhaengen/", {"patient": ziel.id, "grund": "Verwechslung mit Lena Loeschbar"},
                        format="json")
             self.assertEqual(r.status_code, 200, r.content)
@@ -505,6 +577,18 @@ class AkteLoeschen(DatenschutzGrundlage):
         p, weg, her = self.gefuellte_akte()
         pid, nummer = p.id, p.nummer
         url = f"/api/patienten/{pid}/"
+        # „fremd“ wird in der anderen Akte endgültig gelöscht (F73) – dieser Nachweis gehört zur anderen Akte
+        fremd_id, fremd_sha = self.fremd.id, self.fremd.sha256
+        bestaetigung = m.post(f"/api/dokumente/{fremd_id}/loeschen-vorbereiten/").json()["code"]
+        with self.captureOnCommitCallbacks(execute=True):
+            r = m.post(f"/api/dokumente/{fremd_id}/loeschen/", {"grund": "Gehört zu keiner Patientin der Stiftung",
+                                                               "kennwort": KENNWORT, "code": code(), "bestaetigung": bestaetigung},
+                       format="json")
+        self.assertEqual(r.status_code, 204, r.content)
+        TOTPDevice.objects.filter(pk=geraet.pk).update(last_t=-1)  # derselbe Code gilt in diesem Test noch einmal
+        VitaminHistorie = apps.get_model("infusionen", "HistoricalInfusionsplan_vitamine")
+        plan_ids = list(Infusionsplan.objects.filter(patient_id=pid).values_list("id", flat=True))
+        self.assertTrue(VitaminHistorie.objects.filter(infusionsplan_id__in=plan_ids).exists())
         # nicht abgeschlossen → nicht löschbar
         r = m.post(url + "loeschen-vorbereiten/")
         self.assertEqual(r.status_code, 409, r.content)
@@ -524,12 +608,14 @@ class AkteLoeschen(DatenschutzGrundlage):
         v = r.json()
         self.assertEqual(v["loeschen"]["rechtsgrund"], "antrag")
         self.assertIn("Art. 17 Abs. 3 DSGVO", v["loeschen"]["hinweis"])
-        self.assertEqual((v["umfang"]["kontakte"], v["umfang"]["infusionsplaene"], v["umfang"]["dokumente"]), (1, 2, 5))
+        self.assertEqual((v["umfang"]["kontakte"], v["umfang"]["infusionsplaene"], v["umfang"]["dokumente"]), (1, 2, 6))
         grund = "Antrag der Patientin; es besteht keine Aufbewahrungspflicht"
         r = m.post(url + "loeschen/", {"grund": grund, "kennwort": "falsch", "code": code(), "bestaetigung": v["code"]},
                    format="json")
         self.assertEqual((r.status_code, list(r.json())), (400, ["kennwort"]))
         self.assertEqual(SystemEreignis.objects.filter(art=A.AKTE_LOESCHEN_ABGELEHNT).count(), 1)
+        # ein falsches Kennwort zählt wie ein Fehlversuch bei der Anmeldung (sonst ließe es sich hier beliebig probieren)
+        self.assertEqual(User.objects.get(pk=self.mediziner.pk).fehlversuche, 1)
         ordner = settings.EPM_DOKUMENTE / str(nummer)
         self.assertTrue(ordner.is_dir())
         with self.captureOnCommitCallbacks(execute=True):
@@ -537,6 +623,7 @@ class AkteLoeschen(DatenschutzGrundlage):
                                            "bestaetigung": v["code"].lower()}, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual((r.json()["geloescht"], r.json()["nummer"]), (True, nummer))
+        self.assertEqual(User.objects.get(pk=self.mediziner.pk).fehlversuche, 0)
 
         # alles weg: Akte, Einträge, Historie, Dateien
         self.assertFalse(Patient.objects.filter(pk=pid).exists())
@@ -548,20 +635,28 @@ class AkteLoeschen(DatenschutzGrundlage):
         self.assertEqual(m.get(url).status_code, 404)
         liste = LISTE.read_text(encoding="utf-8")
         self.assertIn(f'"akte": {pid}', liste)
-        self.assertNotIn("Loeschbar", liste)
+        for nicht in ("Loeschbar", "Lena", "abschluss_anlass", "therapie_beendet"):
+            self.assertNotIn(nicht, liste)
+        # auch die Historie der Vitamin-Zuordnung der Pläne ist weg
+        self.assertFalse(VitaminHistorie.objects.filter(infusionsplan_id__in=plan_ids).exists())
         # das Dokument, das vorher der anderen Akte zugeordnet wurde, bleibt dort – mit seinen früheren Fassungen;
         # das Dokument, das aus der anderen Akte kam, ist mit gelöscht
         self.assertTrue(Dokument.objects.filter(pk=weg.id, patient=self.patient).exists())
         self.assertGreaterEqual(Dokument.history.filter(id=weg.id).count(), 2)
         self.assertFalse(Dokument.objects.filter(pk=her.id).exists())
         self.assertFalse(Dokument.history.filter(patient_id=pid).exclude(id=weg.id).exists())
+        # Dokumente, die mit der Akte enden, verlieren ALLE Fassungen – auch die aus der Zeit in der anderen Akte
+        # (dort lagen sie nur versehentlich; Titel und Dateiname gehören zur gelöschten Person)
+        self.assertFalse(Dokument.history.filter(id__in=[her.id, self.pendel.id]).exists())
         v1, v2 = DokumentVorgang.objects.get(dokument_id=weg.id), DokumentVorgang.objects.get(dokument_id=her.id)
         self.assertEqual((v1.von_patient_id, v1.nach_patient_id, v1.grund), (None, self.patient.id, OHNE_GRUND))
         self.assertEqual((v2.von_patient_id, v2.nach_patient_id, v2.grund), (self.patient.id, None, OHNE_GRUND))
         r = c.get(f"/api/patienten/{self.patient.id}/verlauf/?bereich=dokumente")
         self.assertEqual(r.status_code, 200)
         self.assertIn("von einer anderen Akte übernommen", [x["aktion"] for x in r.json()])
-        self.assertNotIn("Loeschbar", json.dumps(r.json(), ensure_ascii=False))
+        self.assertIn("einer anderen Akte zugeordnet", [x["aktion"] for x in r.json()])  # neutral, ohne Titel
+        for nicht in ("Loeschbar", "Befund für Lena", "Pendelbrief"):
+            self.assertNotIn(nicht, json.dumps(r.json(), ensure_ascii=False))
 
         # Löschprotokoll: Nummer, Rechtsgrund, Umfang – kein Name; unveränderlich
         eintrag = Loeschprotokoll.objects.get()
@@ -575,7 +670,14 @@ class AkteLoeschen(DatenschutzGrundlage):
             Loeschprotokoll.objects.all().delete()
         # Audit-Log: die Einträge bleiben, Namen und Inhalte sind entfernt
         alles = json.dumps(list(SystemEreignis.objects.values("objekt", "details")), ensure_ascii=False, default=str)
-        self.assertNotIn("Loeschbar", alles)
+        # … auch nicht bei dem Dokument, das hin- und zurückgewechselt hat (es endete in der gelöschten Akte)
+        for nicht in ("Loeschbar", "Befund für Lena", "Pendelbrief"):
+            self.assertNotIn(nicht, alles)
+        self.assertEqual(SystemEreignis.objects.filter(art=A.DOKUMENT_UMGEHAENGT, objekt=f"Dokument {self.pendel.id}").count(), 0)
+        # der Nachweis der Löschung in der ANDEREN Akte bleibt unangetastet: ihr Eintrag, mit Prüfsumme und Grund
+        f = SystemEreignis.objects.get(art=A.DOKUMENT_GELOESCHT, objekt=f"Dokument {fremd_id}")
+        self.assertEqual((f.details["sha256"], f.details["patient_id"], f.details.get("entfernt")), (fremd_sha, self.patient.id, None))
+        self.assertIn("Gehört zu keiner Patientin", f.details["grund"])
         e = SystemEreignis.objects.get(art=A.AKTE_ABGESCHLOSSEN)
         self.assertEqual((e.objekt, e.details.get("entfernt"), e.details.get("anlass")),
                          (f"Akte Nr. {nummer} (gelöscht)", True, "therapie_beendet"))
@@ -630,8 +732,16 @@ class AkteLoeschen(DatenschutzGrundlage):
             akte_loeschen(p, self.mediziner, "frist", "Aufbewahrungsfrist abgelaufen")
         self.assertEqual([(z["akte"], z["nummer"], z["rechtsgrund"]) for z in lies_akten()], [(pid, nummer, "frist")])
         self.assertNotIn("Wieder", LISTE.read_text(encoding="utf-8"))
-        nichts = {"akten": 0, "protokoll_ergaenzt": 0, "akten_liste_ergaenzt": 0}
+        nichts = {"akten": 0, "protokoll_ergaenzt": 0, "akten_liste_ergaenzt": 0, "ordner_entfernt": 0, "akten_fehler": 0}
         self.assertEqual(akten_nachholen(), nichts)
+        # war das Löschen der Dateien fehlgeschlagen (oder bringt eine Wiederherstellung nur sie zurück), räumt der
+        # nächste Start den Ordner der gelöschten Akte ab; fremde Ordner bleiben
+        ordner, anderer = settings.EPM_DOKUMENTE / str(nummer), settings.EPM_DOKUMENTE / str(self.patient.nummer)
+        for o in (ordner, anderer):
+            o.mkdir(parents=True, exist_ok=True)
+            (o / "rest.pdf").write_bytes(b"%PDF-1.4 Rest")
+        self.assertEqual(akten_nachholen(), {**nichts, "ordner_entfernt": 1})
+        self.assertEqual((ordner.exists(), (anderer / "rest.pdf").is_file()), (False, True))
 
         def wiederherstellen(**werte):
             """Stand einer älteren Sicherung: Die Akte ist wieder da, der Protokolleintrag fehlt."""
@@ -662,6 +772,14 @@ class AkteLoeschen(DatenschutzGrundlage):
         LISTE.unlink()
         self.assertEqual(akten_nachholen(), {**nichts, "akten_liste_ergaenzt": 1})
         self.assertEqual([z["nummer"] for z in lies_akten()], [nummer])
+        # eine unlesbare Zeile hält die übrigen nicht auf – und trifft keine vorhandene Akte
+        with open(LISTE, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"akte": self.patient.id, "nummer": self.patient.nummer, "angelegt_am": "kaputt",
+                                "geloescht_am": timezone.now().isoformat(), "rechtsgrund": "frist"}) + "\n")
+        wiederherstellen(angelegt_am=angelegt)
+        self.assertEqual(akten_nachholen(), {**nichts, "akten": 1, "protokoll_ergaenzt": 1, "akten_fehler": 1})
+        self.assertFalse(Patient.objects.filter(pk=pid).exists())
+        self.assertTrue(Patient.objects.filter(pk=self.patient.pk).exists())
 
 
 class FreigabeAufAnordnung(DatenschutzGrundlage):
@@ -737,6 +855,22 @@ class FreigabeAufAnordnung(DatenschutzGrundlage):
         r = c.post(f"/api/infusionsplaene/{dritter}/abschliessen/", {**basis, "weg": "telefon"}, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         self.assertIn("(telefonisch)", r.json()["freigabevermerk"])
+        # Nennt die aktive Dokumentvorlage den Freigabevermerk nicht als Datenfeld, stünde auf der PDF nicht, wer
+        # abgeschlossen hat → kein Abschließen nach Freigabe (die Freigabe durch den Mediziner selbst bleibt möglich)
+        from vorlagen.models import Dokumentvorlage
+
+        aktiv = Dokumentvorlage.aktive("infusionsplan")
+        ohne = [b for b in aktiv.bloecke if "Plan.Freigabevermerk" not in json.dumps(b)]
+        self.assertEqual(len(ohne), len(aktiv.bloecke) - 1)
+        Dokumentvorlage.objects.filter(pk=aktiv.pk).update(status="abgeloest")
+        Dokumentvorlage.objects.create(art="infusionsplan", version=aktiv.version + 1, status="aktiv", bloecke=ohne,
+                                       veroeffentlicht_am=timezone.now())
+        vierter = self.plan_entwurf()
+        r = c.post(f"/api/infusionsplaene/{vierter}/abschliessen/", {**basis, "weg": "telefon"}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertIn("Freigabevermerk", str(r.json()["fehler"]))
+        self.assertEqual(Infusionsplan.objects.get(pk=vierter).status, "entwurf")
+        self.assertEqual(m.post(f"/api/infusionsplaene/{vierter}/freigeben/").status_code, 200)
 
 
 class AuditBereinigung(DatenschutzGrundlage):

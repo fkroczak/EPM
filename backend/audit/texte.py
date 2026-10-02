@@ -97,6 +97,9 @@ def _aenderungen(d) -> str:
 def beschreibung(e) -> str:
     d = e.details or {}
     art = e.art
+    if d.get("verborgen"):
+        # Verarbeitung der Akte eingeschränkt, die lesende Person darf keine Einsicht nehmen (nur für die Anzeige)
+        return f"{e.get_art_display()}: {e.objekt}"
     if d.get("entfernt"):
         # Die Akte ist endgültig gelöscht: Der Eintrag bleibt (wer, wann, was), Namen und Inhalte sind entfernt
         return f"{e.get_art_display()}: {e.objekt} – Angaben mit der Akte gelöscht"

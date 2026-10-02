@@ -134,6 +134,17 @@ test("Anfrage mit Frist, Kopie der Akte, Löschwunsch → eingeschränkt, Einsic
   await page.goto(`/patienten?status=abgeschlossen&suche=${encodeURIComponent(p.nachname)}`);
   await expect(page.getByTestId("patientenliste")).not.toContainText(p.nachname);
 
+  // Wer keine Einsicht nehmen dürfte (Mitarbeiter), sieht in der Übersicht nur die Nummer – keinen Namen, keinen Grund
+  {
+    const zweit = await seiteAls(browser, "mitarbeiter");
+    await zweit.page.goto("/datenschutz");
+    const zeile = zweit.page.getByTestId("eingeschraenkte").getByRole("row").filter({ hasText: `Nr. ${String(p.nummer).padStart(4, "0")}` });
+    await expect(zeile).toContainText("Akte");
+    await expect(zweit.page.getByRole("main")).not.toContainText(p.nachname);
+    await expect(zweit.page.getByRole("main")).not.toContainText("Die Akte ist noch aufzubewahren (E2E)");
+    await zweit.ctx.close();
+  }
+
   // Übersicht Datenschutz: dort steht die Akte; Einsicht nur mit Grund
   await page.getByRole("navigation", { name: "Hauptnavigation" }).getByRole("link", { name: "Datenschutz" }).click();
   await page.getByTestId("eingeschraenkte").getByRole("row").filter({ hasText: p.nachname }).getByRole("link").click();
@@ -283,4 +294,14 @@ test("Grenzwerte: Fristen des Datenschutzes einstellen", async ({ browser }) => 
   await page.goto("/datenschutz");
   await expect(page.getByTestId("datenschutz-einstellungen")).toContainText("Aufbewahrung 10 Jahre nach Abschluss der Akte · Audit-Log 30 Jahre");
   await ctx.close();
+
+  // Mitarbeiter pflegen Grenzwerte, die Fristen des Datenschutzes aber nicht (sie entscheiden über das Löschen)
+  const zweit = await seiteAls(browser, "mitarbeiter");
+  await zweit.page.goto("/admin/vorlagen");
+  await zweit.page.getByRole("button", { name: "Grenzwerte" }).click();
+  const nurLesen = zweit.page.getByTestId("grenzwerte-datenschutz");
+  await expect(nurLesen.getByLabel("Aufbewahrung nach Abschluss der Akte")).toBeDisabled();
+  await expect(nurLesen.getByLabel("Audit-Log aufbewahren")).toHaveValue("30");
+  await expect(nurLesen.getByTestId("datenschutz-nur-lesen")).toBeVisible();
+  await zweit.ctx.close();
 });

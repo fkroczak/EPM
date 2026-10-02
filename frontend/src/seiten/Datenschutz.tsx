@@ -62,6 +62,11 @@ export function Datenschutz() {
               </tbody>
             </table>
           ) : <Leer>Keine offenen Anfragen.</Leer>}
+          {d.anfragen_verborgen ? (
+            <div className="px-5 py-3 border-t border-rand text-[0.8125rem] gedaempft" data-testid="anfragen-verborgen">
+              Dazu {d.anfragen_verborgen === 1 ? "kommt 1 offene Anfrage" : `kommen ${d.anfragen_verborgen} offene Anfragen`} zu Akten mit eingeschränkter Verarbeitung – sichtbar für Personen, die über Anfragen entscheiden.
+            </div>
+          ) : null}
         </Karte>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
@@ -77,7 +82,7 @@ export function Datenschutz() {
                 <tbody>
                   {d.aufbewahrung_abgelaufen.map((p) => (
                     <tr key={p.id}>
-                      <td className="td"><Link to={`/patienten/${p.id}/datenschutz`} className="font-medium no-underline">{p.name}</Link>{" "}
+                      <td className="td"><Link to={`/patienten/${p.id}/datenschutz`} className="font-medium no-underline">{p.name ?? "Akte"}</Link>{" "}
                         <span className="num gedaempft">Nr. {nummer(p.nummer)}</span> <Test ja={p.ist_test} />
                         {p.eingeschraenkt ? <> <Chip art="warn">eingeschränkt</Chip></> : null}</td>
                       <td className="td num">{datum(p.abgeschlossen_am)}</td>
@@ -91,7 +96,7 @@ export function Datenschutz() {
               <div className="px-5 py-3 border-t border-rand text-[0.8125rem]" data-testid="laeuft-ab">
                 <span className="gedaempft">Frist läuft in den nächsten 12 Monaten ab: </span>
                 {d.aufbewahrung_laeuft_ab.map((p, i) => (
-                  <span key={p.id}>{i ? " · " : ""}<Link to={`/patienten/${p.id}/datenschutz`}>{p.name}</Link> ({datum(p.aufbewahrung_bis)})</span>
+                  <span key={p.id}>{i ? " · " : ""}<Link to={`/patienten/${p.id}/datenschutz`}>{p.name ?? `Akte Nr. ${nummer(p.nummer)}`}</Link> ({datum(p.aufbewahrung_bis)})</span>
                 ))}
               </div>
             ) : null}
@@ -100,7 +105,7 @@ export function Datenschutz() {
           <Karte className="overflow-hidden">
             <div className="px-5 pt-[18px] pb-2 flex flex-col gap-1">
               <h2 className="lbl m-0 text-[0.9375rem]">Verarbeitung eingeschränkt</h2>
-              <span className="text-[0.8125rem] gedaempft">Diese Akten erscheinen in keiner Liste und keiner Suche. Lesbar sind sie nur mit begründeter Einsicht{d.darf_entscheiden ? "" : " (wer über Anfragen entscheidet)"}.</span>
+              <span className="text-[0.8125rem] gedaempft">Diese Akten erscheinen in keiner Liste und keiner Suche. Lesbar sind sie nur mit begründeter Einsicht. Name und Grund sieht hier nur, wer Einsicht nehmen darf (wer über Anfragen entscheidet; die Administration nur bei Testpatienten) – alle anderen sehen die Nummer.</span>
             </div>
             {d.eingeschraenkt.length ? (
               <table className="tabelle" data-testid="eingeschraenkte">
@@ -108,10 +113,10 @@ export function Datenschutz() {
                 <tbody>
                   {d.eingeschraenkt.map((p) => (
                     <tr key={p.id}>
-                      <td className="td"><Link to={`/patienten/${p.id}`} className="font-medium no-underline">{p.name}</Link>{" "}
+                      <td className="td"><Link to={`/patienten/${p.id}`} className="font-medium no-underline">{p.name ?? "Akte"}</Link>{" "}
                         <span className="num gedaempft">Nr. {nummer(p.nummer)}</span> <Test ja={p.ist_test} /></td>
                       <td className="td num">{datum(p.am)}</td>
-                      <td className="td text-sm">{p.grund}{p.von ? <span className="gedaempft"> · {p.von}</span> : null}</td>
+                      <td className="td text-sm">{p.grund ?? <span className="gedaempft">—</span>}{p.von ? <span className="gedaempft"> · {p.von}</span> : null}</td>
                     </tr>
                   ))}
                 </tbody>

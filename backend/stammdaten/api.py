@@ -284,6 +284,12 @@ class EinstellungenSerializer(serializers.ModelSerializer):
         return attrs
 
 
+# Diese Einstellungen entscheiden, wann Akten gelöscht werden dürfen und wann Einträge des Audit-Logs entfernt
+# werden – sie ändert nur, wer auch über Datenschutz-Anfragen entscheidet (nicht jede Person mit „Vorlagen pflegen“).
+DATENSCHUTZ_FELDER = ["aufbewahrung_jahre", "abschluss_pruefen_monate", "protokoll_aufbewahrung_jahre",
+                      "pflicht_erklaerungen"]
+
+
 class EinstellungenView(APIView):
     permission_classes = [StammdatenRecht]
 
@@ -294,6 +300,9 @@ class EinstellungenView(APIView):
         e = Einstellungen.aktuell()
         s = EinstellungenSerializer(e, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
+        geaendert = [f for f in DATENSCHUTZ_FELDER if f in s.validated_data and s.validated_data[f] != getattr(e, f)]
+        if geaendert and not request.user.hat_recht("datenschutz_entscheiden"):
+            raise PermissionError("Dafür fehlt das Recht „Datenschutz: Anfragen entscheiden, Verarbeitung einschränken“.")
         vorher = {f: getattr(e, f) for f in s.validated_data}
         s.save()
         aenderungen, namen = aenderungen_von(s.instance, vorher)

@@ -12,6 +12,7 @@ GET       /api/datenschutz/                     Übersicht: offene Anfragen, ein
 """
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Max, Q
 from django.utils import timezone
 from django_filters import rest_framework as filters
 from rest_framework import mixins, serializers, status, viewsets
@@ -22,11 +23,12 @@ from rest_framework.response import Response
 from accounts.permissions import DatenschutzEntscheidenRecht, DatenschutzLesen, DatenschutzRecht
 from audit.bereinigung import akte_text
 from audit.models import SystemEreignis, protokolliere
-from epm.api_basis import ModelClean, benutzername, patienten_fuer, pruefe_schreibbereich
+from epm.api_basis import (ModelClean, benutzername, patienten_fuer, patienten_mit_eingeschraenkten,
+                           pruefe_schreibbereich)
 from stammdaten.models import Auswahlwert, Einstellungen
 
 from .api import AktenEintragViewSet, erkenne_dateityp, speichere_datei
-from .datenschutz import einschraenken, einschraenkung_daten, hat_datenschutzrecht
+from .datenschutz import einschraenken, einschraenkung_daten
 from .kennzahlen import pruefliste
 from .models import Datenschutzanfrage, Dokument, Erklaerung, Loeschprotokoll, plus_jahre
 
@@ -206,7 +208,8 @@ class DatenschutzanfrageViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin
                                 mixins.UpdateModelMixin, viewsets.GenericViewSet):
     """Anfragen (Auskunft, Berichtigung, Löschung, Einschränkung, Widerruf) als Vorgang mit Frist. Erfassen mit
     „Datenschutz: Erklärungen und Anfragen erfassen“, erledigen mit „Datenschutz: Anfragen entscheiden“.
-    Anfragen gibt es auch zu Akten, deren Verarbeitung eingeschränkt ist."""
+    Anfragen gibt es auch zu Akten, deren Verarbeitung eingeschränkt ist – diese sieht und bearbeitet nur, wer
+    Einsicht nehmen dürfte (Recht „entscheiden“; Admins nur bei Testpatienten)."""
 
     serializer_class = DatenschutzanfrageSerializer
     permission_classes = [DatenschutzRecht]
@@ -214,7 +217,7 @@ class DatenschutzanfrageViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin
     pagination_class = None
 
     def _patienten(self):
-        return patienten_fuer(self.request.user, eingeschraenkte=hat_datenschutzrecht(self.request.user))
+        return patienten_mit_eingeschraenkten(self.request.user)
 
     def get_queryset(self):
         return (Datenschutzanfrage.objects.filter(patient__in=self._patienten())
@@ -300,14 +303,23 @@ class DatenschutzViewSet(viewsets.ViewSet):
         user = request.user
         e = Einstellungen.aktuell()
         heute = timezone.localdate()
+        # Alle Akten im Bereich der Person – auch eingeschränkte, damit Fristen nicht untergehen. Von einer
+        # eingeschränkten Akte sieht aber nur, wer Einsicht nehmen dürfte, mehr als die Nummer.
         alle = patienten_fuer(user, eingeschraenkte=True)
+        mit_namen = set(patienten_mit_eingeschraenkten(user).values_list("id", flat=True))
+
+        def name(p):
+            return f"{p.nachname}, {p.vorname}" if p.id in mit_namen else None
+
         anfragen = (Datenschutzanfrage.objects.filter(patient__in=alle, erledigt_am__isnull=True)
                     .select_related("patient", "erfasst_von", "erledigt_von"))
-        offene = sorted(anfragen, key=lambda a: a.frist_bis)
+        offene = sorted((a for a in anfragen if a.patient_id in mit_namen), key=lambda a: a.frist_bis)
         abgelaufen, bald = [], []
-        for p in alle.filter(abgeschlossen_am__isnull=False).order_by("abgeschlossen_am", "nummer"):
-            a = p.aufbewahrung(e.aufbewahrung_jahre)
-            zeile = {"id": p.id, "nummer": p.nummer, "name": f"{p.nachname}, {p.vorname}", "ist_test": p.ist_test,
+        geschlossen = alle.filter(abgeschlossen_am__isnull=False).annotate(
+            kontakt_zuletzt=Max("kontakte__zeitpunkt", filter=Q(kontakte__storniert_am__isnull=True)))
+        for p in geschlossen.order_by("abgeschlossen_am", "nummer"):
+            a = p.aufbewahrung(e.aufbewahrung_jahre, letzter_kontakt=p.kontakt_zuletzt)
+            zeile = {"id": p.id, "nummer": p.nummer, "name": name(p), "ist_test": p.ist_test,
                      "abgeschlossen_am": p.abgeschlossen_am, "aufbewahrung_bis": a["bis"],
                      "verlaengert": bool(a["verlaengert_bis"] and a["bis"] == a["verlaengert_bis"]),
                      "eingeschraenkt": p.ist_eingeschraenkt}
@@ -316,8 +328,8 @@ class DatenschutzViewSet(viewsets.ViewSet):
             elif a["bis"] <= plus_jahre(heute, 1):
                 bald.append(zeile)
         eingeschraenkt = [
-            {"id": p.id, "nummer": p.nummer, "name": f"{p.nachname}, {p.vorname}", "ist_test": p.ist_test,
-             **einschraenkung_daten(p)}
+            {"id": p.id, "nummer": p.nummer, "name": name(p), "ist_test": p.ist_test,
+             **(einschraenkung_daten(p) if p.id in mit_namen else {"am": p.eingeschraenkt_am, "von": None, "grund": None})}
             for p in alle.filter(eingeschraenkt_am__isnull=False).select_related("eingeschraenkt_von").order_by("-eingeschraenkt_am")
         ]
         protokoll = Loeschprotokoll.objects.select_related("geloescht_von")
@@ -328,6 +340,8 @@ class DatenschutzViewSet(viewsets.ViewSet):
         return Response({
             "anfragen_offen": DatenschutzanfrageSerializer(offene, many=True).data,
             "anfragen_ueberfaellig": sum(1 for a in offene if a.ueberfaellig),
+            # offene Anfragen zu eingeschränkten Akten, die diese Person nicht sieht (nur die Anzahl)
+            "anfragen_verborgen": sum(1 for a in anfragen if a.patient_id not in mit_namen),
             "aufbewahrung_abgelaufen": abgelaufen,
             "aufbewahrung_laeuft_ab": bald,
             "eingeschraenkt": eingeschraenkt,

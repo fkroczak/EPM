@@ -295,7 +295,10 @@ export function Plaene() {
                 <span className="num text-[0.8125rem]">{zahl(p.kcal)} kcal{p.laufzeit_h != null ? ` · ${zahl(p.laufzeit_h)} h` : ""}{p.tage_pro_woche ? ` · ${p.tage_pro_woche}×/Woche` : ""}</span>
                 <span className="text-xs gedaempft">
                   {p.status === "entwurf" ? `angelegt ${zeitpunkt(p.erstellt_am)}${p.erstellt_von_name ? ` · ${p.erstellt_von_name}` : ""}`
-                    : `freigegeben ${zeitpunkt(p.freigegeben_am)}${p.freigegeben_von_name ? ` · ${p.freigegeben_von_name}` : ""}`}
+                    : p.abgeschlossen_von_name && p.freigabe_datum
+                      // außerhalb von EPM freigegeben: der Tag der Freigabe, nicht der Zeitpunkt des Abschließens
+                      ? `freigegeben ${datum(p.freigabe_datum)} · ${p.freigegeben_von_name ?? "—"} · abgeschlossen von ${p.abgeschlossen_von_name}`
+                      : `freigegeben ${zeitpunkt(p.freigegeben_am)}${p.freigegeben_von_name ? ` · ${p.freigegeben_von_name}` : ""}`}
                 </span>
               </button>
             ))}

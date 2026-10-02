@@ -292,7 +292,9 @@ function PlanKarte() {
           </span>
           <span className="text-[0.8125rem] gedaempft">
             gültig ab {datum(aktuell.gueltig_ab)}
-            {plan.data?.freigegeben_am ? ` · Freigegeben ${zeitpunkt(plan.data.freigegeben_am)}${plan.data.freigegeben_von_name ? ` · ${plan.data.freigegeben_von_name}` : ""}` : ""}
+            {plan.data?.freigegeben_am
+              ? ` · Freigegeben ${plan.data.abgeschlossen_von_name && plan.data.freigabe_datum ? datum(plan.data.freigabe_datum) : zeitpunkt(plan.data.freigegeben_am)}${plan.data.freigegeben_von_name ? ` · ${plan.data.freigegeben_von_name}` : ""}`
+              : ""}
           </span>
         </>
       ) : <span className="text-sm gedaempft">Noch kein freigegebener Plan.</span>}

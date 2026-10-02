@@ -31,15 +31,16 @@ class Command(BaseCommand):
     help = "Holt endgültige Löschungen von Dokumenten nach (z. B. nach einer Wiederherstellung) und schwärzt erneut."
 
     def handle(self, *args, **opts):
-        try:
-            ergebnis = nachholen()
-            # endgültig gelöschte Akten (Datenschutz): ebenfalls aus der Löschliste erneut löschen
-            from patienten.datenschutz import akten_nachholen
+        # endgültig gelöschte Akten (Datenschutz) ebenfalls aus der Löschliste erneut löschen – unabhängig von den
+        # Dokumenten: scheitert das eine, läuft das andere trotzdem
+        from patienten.datenschutz import akten_nachholen
 
-            ergebnis.update(akten_nachholen())
-        except Exception as fehler:  # noqa: BLE001 – der Start des Backends darf daran nicht scheitern
-            self.stderr.write(f"WARNUNG: Löschungen konnten nicht geprüft werden: {fehler}")
-            return
+        ergebnis = {}
+        for was, schritt in (("Dokumente", nachholen), ("Akten", akten_nachholen)):
+            try:
+                ergebnis.update(schritt())
+            except Exception as fehler:  # noqa: BLE001 – der Start des Backends darf daran nicht scheitern
+                self.stderr.write(f"WARNUNG: Löschungen ({was}) konnten nicht geprüft werden: {fehler}")
         if any(ergebnis.values()):
             self.stdout.write("Löschungen nachgeholt: " + ", ".join(f"{k} {v}" for k, v in ergebnis.items()))
 

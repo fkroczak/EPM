@@ -147,19 +147,28 @@ class Patient(models.Model):
     def ist_eingeschraenkt(self) -> bool:
         return self.eingeschraenkt_am is not None
 
-    def aufbewahrung(self, jahre: int | None = None) -> dict:
+    def aufbewahrung(self, jahre: int | None = None, letzter_kontakt=False) -> dict:
         """Aufbewahrungsfrist der Akte: läuft ab dem Abschluss (ohne Abschluss keine Frist).
 
-        ``regulaer_bis`` = Abschluss + eingestellte Jahre, ``bis`` = spätestes Datum aus regulärer Frist und
-        einer Verlängerung im Einzelfall, ``abgelaufen`` = die Akte darf gelöscht werden."""
+        ``beginn`` = Abschlussdatum – oder der Tag des letzten Kontakts, wenn der später liegt (ein versehentlich zu
+        früh eingetragenes Abschlussdatum macht die Akte so nicht vorzeitig löschbar). ``regulaer_bis`` = Beginn +
+        eingestellte Jahre, ``bis`` = spätestes Datum aus regulärer Frist und einer Verlängerung im Einzelfall,
+        ``abgelaufen`` = die Akte darf gelöscht werden. ``letzter_kontakt``: Zeitpunkt, falls schon bekannt
+        (Listen), sonst wird er gelesen."""
         if jahre is None:
             jahre = Einstellungen.aktuell().aufbewahrung_jahre
-        regulaer = plus_jahre(self.abgeschlossen_am, jahre) if self.abgeschlossen_am else None
+        beginn = self.abgeschlossen_am
+        if beginn:
+            if letzter_kontakt is False:
+                letzter_kontakt = self.kontakte.filter(storniert_am__isnull=True).aggregate(m=Max("zeitpunkt"))["m"]
+            if letzter_kontakt and timezone.localtime(letzter_kontakt).date() > beginn:
+                beginn = timezone.localtime(letzter_kontakt).date()
+        regulaer = plus_jahre(beginn, jahre) if beginn else None
         bis = regulaer
         if regulaer and self.aufbewahrung_bis and self.aufbewahrung_bis > regulaer:
             bis = self.aufbewahrung_bis
         return {
-            "jahre": jahre, "regulaer_bis": regulaer, "verlaengert_bis": self.aufbewahrung_bis,
+            "jahre": jahre, "beginn": beginn, "regulaer_bis": regulaer, "verlaengert_bis": self.aufbewahrung_bis,
             "grund": self.aufbewahrung_grund, "bis": bis,
             "abgelaufen": bool(bis and bis < timezone.localdate()),
         }
@@ -683,10 +692,11 @@ class Akteneinsicht(models.Model):
 
 
 class Loeschprotokoll(models.Model):
-    """Nachweis einer endgültig gelöschten Akte – ohne Namen und ohne Inhalte: nur die Patientennummer, Daten zur
-    Frist, Rechtsgrund, Umfang (Anzahl der Datensätze und Dateien), wer wann gelöscht hat. Unveränderlich (Trigger).
-    Nach dem Wiederherstellen einer älteren Sicherung werden die hier vermerkten Akten erneut gelöscht
-    (``manage.py epm_loeschprotokoll --nachziehen``)."""
+    """Nachweis einer endgültig gelöschten Akte – ohne Namen und ohne Inhalte: Patientennummer und interne Kennung,
+    angelegt am, abgeschlossen am, Aufbewahrung bis, Rechtsgrund, Grund (Freitext der löschenden Person), Umfang
+    (Anzahl der Datensätze und Dateien), wer wann gelöscht hat. Der Anlass des Abschlusses (z. B. „verstorben“) wird
+    bewusst nicht übernommen. Unveränderlich (Trigger). Nach dem Wiederherstellen einer älteren Sicherung werden die
+    hier vermerkten Akten erneut gelöscht (``manage.py epm_loeschungen_nachholen``, bei jedem Start)."""
 
     class Rechtsgrund(models.TextChoices):
         FRIST = "frist", "Aufbewahrungsfrist abgelaufen"
@@ -697,7 +707,6 @@ class Loeschprotokoll(models.Model):
     ist_test = models.BooleanField(default=False)
     angelegt_am = models.DateTimeField("Akte angelegt am")
     abgeschlossen_am = models.DateField(null=True, blank=True)
-    abschluss_anlass = models.CharField(max_length=30, blank=True)
     aufbewahrung_bis = models.DateField(null=True, blank=True)
     rechtsgrund = models.CharField(max_length=20, choices=Rechtsgrund.choices)
     grund = models.TextField()

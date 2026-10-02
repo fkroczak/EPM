@@ -11,6 +11,7 @@ Grundlagen (im Einzelnen: docs/DATENSCHUTZ.md):
 Dieses Modul enthält die Regeln und die Aktionen an der Akte (``/api/patienten/{id}/…``). Die Listen für
 Erklärungen und Anfragen stehen in ``datenschutz_api.py``.
 """
+import logging
 import shutil
 import tempfile
 import zipfile
@@ -31,19 +32,17 @@ from accounts.permissions import AkteLoeschenRecht, DatenschutzEntscheidenRecht,
 from audit.bereinigung import OHNE_GRUND, akte_entfernen as protokoll_entfernen, akte_text
 from audit.models import SystemEreignis, protokolliere
 from audit.schutz import wartungsmodus
-from epm.api_basis import benutzername, patienten_fuer, pruefe_schreibbereich
+from epm.api_basis import (benutzername, darf_einsicht, patienten_fuer, patienten_mit_eingeschraenkten,
+                           pruefe_schreibbereich)
 from stammdaten.models import Einstellungen
 
 from .loeschung import trage_ein
 from .models import (Akteneinsicht, Bezugsperson, Datenschutzanfrage, Dokument, DokumentVorgang, Erklaerung,
                      Gewichtsmessung, Kontakt, Loeschprotokoll, Patient, PatientArzt, Termin, erklaerungen_stand)
 
+log = logging.getLogger(__name__)
 EINSICHT_MINUTEN = 60
 KopieRecht = recht("datenschutz_bearbeiten", lesen="datenschutz_bearbeiten")
-
-
-def hat_datenschutzrecht(user) -> bool:
-    return user.hat_recht("datenschutz_bearbeiten") or user.hat_recht("datenschutz_entscheiden")
 
 
 # ================================================================= Regeln
@@ -88,14 +87,26 @@ def umfang(patient) -> dict:
     }
 
 
+def eigene_dokumente(ids) -> set[int]:
+    """Nummern der Dokumente, die mit diesen Akten enden: die jetzt darin liegen und die, die darin endgültig
+    gelöscht wurden. Dokumente, die einer anderen Akte zugeordnet wurden, gehören nicht dazu – sie leben dort weiter."""
+    eigene = set(Dokument.objects.filter(patient_id__in=ids).values_list("id", flat=True))
+    eigene |= set(DokumentVorgang.objects.filter(von_patient_id__in=ids, art=DokumentVorgang.Art.GELOESCHT)
+                  .values_list("dokument_id", flat=True))
+    return eigene
+
+
 def akten_entfernen(ids: list[int]) -> None:
     """Akten mit allen Einträgen und der gesamten Historie aus der Datenbank entfernen.
 
     Nur im Wartungsmodus aufrufen (die Trigger verhindern sonst jedes Löschen). Gemeinsame Grundlage für das
     endgültige Löschen einer Akte und das Zurücksetzen der Testdaten. Die Dateien entfernt der Aufrufer."""
+    from django.apps import apps
+
     from infusionen.models import Infusionsplan, InfusionsplanPosition
 
     ids = list(ids)
+    eigene = eigene_dokumente(ids)
     plan_ids = set(Infusionsplan.objects.filter(patient_id__in=ids).values_list("id", flat=True))
     plan_ids |= set(Infusionsplan.history.filter(patient_id__in=ids).values_list("id", flat=True))
     # Dokument-Vorgänge: gelöschte Dokumente der Akte entfallen; bei Dokumenten, die zwischen dieser und einer
@@ -109,9 +120,12 @@ def akten_entfernen(ids: list[int]) -> None:
     Infusionsplan.objects.filter(id__in=plan_ids).update(vorgaenger=None, freigabe_nachweis=None)
     Infusionsplan.objects.filter(id__in=plan_ids).delete()
     Patient.objects.filter(id__in=ids).delete()
-    # Historie. Dokumente, die inzwischen in einer anderen Akte liegen, behalten ihre früheren Fassungen
-    # (sie gehören zu jenem Dokument; die andere Akte zeigt sie als „von einer anderen Akte übernommen“).
+    # Historie. Dokumente dieser Akten verlieren ALLE früheren Fassungen – auch die aus der Zeit, in der sie
+    # (falsch zugeordnet) in einer anderen Akte lagen; dort bleibt nur der neutrale Vorgang. Dokumente, die
+    # inzwischen in einer anderen Akte liegen, behalten ihre früheren Fassungen (sie gehören zu jenem Dokument;
+    # die andere Akte zeigt sie als „von einer anderen Akte übernommen“).
     Patient.history.filter(id__in=ids).delete()
+    Dokument.history.filter(id__in=eigene).delete()
     frueher = Dokument.history.filter(patient_id__in=ids)
     bleibt = set(Dokument.objects.filter(id__in=frueher.values("id")).values_list("id", flat=True))
     frueher.exclude(id__in=bleibt).delete()
@@ -119,6 +133,8 @@ def akten_entfernen(ids: list[int]) -> None:
                    Datenschutzanfrage):
         modell.history.filter(patient_id__in=ids).delete()
     InfusionsplanPosition.history.filter(plan_id__in=plan_ids).delete()
+    # Historie der Vitamin-Zuordnung (eigene Tabelle von django-simple-history, ohne Fremdschlüssel in der Datenbank)
+    apps.get_model("infusionen", "HistoricalInfusionsplan_vitamine").objects.filter(infusionsplan_id__in=plan_ids).delete()
 
 
 def dateien_entfernen(nummer: int) -> None:
@@ -133,8 +149,7 @@ def akte_loeschen(patient, benutzer, rechtsgrund: str, grund: str, request=None,
     nicht zurückbringt. ``eintrag``/``nachgezogen``: beim erneuten Löschen nach einer Wiederherstellung."""
     pid, nummer = patient.id, patient.nummer
     a = patient.aufbewahrung()
-    frueher = set(Dokument.history.filter(patient_id=pid).values_list("id", flat=True))
-    woanders = set(Dokument.objects.filter(id__in=frueher).exclude(patient_id=pid).values_list("id", flat=True))
+    eigene = eigene_dokumente([pid])
     antrag = patient.datenschutzanfragen.filter(art=Datenschutzanfrage.Art.LOESCHUNG, erledigt_am__isnull=True) \
         .order_by("eingegangen_am", "id").first()
     with wartungsmodus():
@@ -144,10 +159,10 @@ def akte_loeschen(patient, benutzer, rechtsgrund: str, grund: str, request=None,
         if eintrag is None:
             eintrag = Loeschprotokoll.objects.create(
                 akte_id=pid, nummer=nummer, ist_test=patient.ist_test, angelegt_am=patient.angelegt_am,
-                abgeschlossen_am=patient.abgeschlossen_am, abschluss_anlass=patient.abschluss_anlass,
+                abgeschlossen_am=patient.abgeschlossen_am,
                 aufbewahrung_bis=a["bis"], rechtsgrund=rechtsgrund, grund=grund, umfang=zahlen, geloescht_von=benutzer)
         akten_entfernen([pid])
-        bereinigt = protokoll_entfernen(pid, nummer, sorted(frueher - woanders))
+        bereinigt = protokoll_entfernen(pid, nummer, sorted(eigene), namen=(patient.nachname, patient.vorname))
         protokolliere(SystemEreignis.Art.AKTE_GELOESCHT, request, benutzer=benutzer, objekt=f"Akte Nr. {nummer}",
                       akte_id=pid, rechtsgrund=rechtsgrund, grund=grund, umfang=zahlen, protokolleintraege=bereinigt,
                       **({"nachgezogen": True} if nachgezogen else {}))
@@ -228,10 +243,20 @@ class DatenschutzAktionen:
     LOESCH_MINUTEN = 5
 
     def _akte(self, pk, schreiben=True):
-        patient = get_object_or_404(patienten_fuer(self.request.user, eingeschraenkte=True), pk=pk)
+        """Akte für einen Datenschutz-Vorgang – auch eine eingeschränkte, wenn die Person Einsicht nehmen dürfte."""
+        patient = get_object_or_404(patienten_mit_eingeschraenkten(self.request.user), pk=pk)
         if schreiben:
             pruefe_schreibbereich(self.request.user, patient)
         return patient
+
+    def _verschlossen(self, patient):
+        """Antwort für eine eingeschränkte Akte ohne laufende Einsicht: nur Nummer und Zeitpunkt, kein Name."""
+        return Response({
+            "fehler": "Die Verarbeitung dieser Akte ist eingeschränkt (Art. 18 DSGVO). Sie ist nur mit einer "
+                      "begründeten Einsicht lesbar.",
+            "eingeschraenkt": True, "id": patient.id, "nummer": patient.nummer,
+            "eingeschraenkt_am": patient.eingeschraenkt_am, "darf_einsicht": darf_einsicht(self.request.user, patient),
+        }, status=status.HTTP_403_FORBIDDEN)
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -241,16 +266,7 @@ class DatenschutzAktionen:
             p = patienten_fuer(request.user, eingeschraenkte=True).filter(pk=pk).first() if pk.isdigit() else None
             if p is None or not p.ist_eingeschraenkt:
                 raise
-            from accounts.rechte import schreibt_nur_testpatienten
-
-            darf = request.user.hat_recht("datenschutz_entscheiden") and (
-                p.ist_test or not schreibt_nur_testpatienten(request.user))
-            return Response({
-                "fehler": "Die Verarbeitung dieser Akte ist eingeschränkt (Art. 18 DSGVO). Sie ist nur mit einer "
-                          "begründeten Einsicht lesbar.",
-                "eingeschraenkt": True, "id": p.id, "nummer": p.nummer, "eingeschraenkt_am": p.eingeschraenkt_am,
-                "darf_einsicht": darf,
-            }, status=status.HTTP_403_FORBIDDEN)
+            return self._verschlossen(p)
 
     @action(detail=True, methods=["get"])
     def datenschutz(self, request, pk=None):
@@ -262,8 +278,8 @@ class DatenschutzAktionen:
         patient = self._akte(pk, schreiben=False)
         einsicht = Akteneinsicht.objects.filter(patient=patient, benutzer=request.user, bis__gt=timezone.now()) \
             .order_by("-bis").first()
-        if patient.ist_eingeschraenkt and einsicht is None and not hat_datenschutzrecht(request.user):
-            raise PermissionDenied("Die Verarbeitung dieser Akte ist eingeschränkt.")
+        if patient.ist_eingeschraenkt and einsicht is None:
+            return self._verschlossen(patient)  # auch Erklärungen und Anfragen sind Inhalt der Akte
         vorlagen = {}
         for art in Erklaerung.Art.values:
             v = Dokumentvorlage.aktive(art)
@@ -388,6 +404,7 @@ class DatenschutzAktionen:
     def kopie(self, request, pk=None):
         """Vollständige Kopie der Akte als ZIP: Akte und Verlauf als PDF, alle Dokumente im Original."""
         patient = self.get_object()
+        pruefe_schreibbereich(request.user, patient)  # Admins: Kopien nur von Testpatienten
         datei = tempfile.TemporaryFile()
         inhalt = aktenkopie(patient, datei)
         datei.seek(0)
@@ -481,11 +498,16 @@ class DatenschutzAktionen:
                 return abgelehnt("bestaetigung", "Bestätigungscode dreimal falsch. Bitte einen neuen anfordern.")
             request.session[self.LOESCHCODE] = sitzung
             return abgelehnt("bestaetigung", "Der Bestätigungscode stimmt nicht.")
+        from accounts.api import bestaetigung_fehlgeschlagen, bestaetigung_gelungen
+
         if not request.user.check_password(str(request.data.get("kennwort", ""))):
-            return abgelehnt("kennwort", "Kennwort falsch.")
+            antwort = abgelehnt("kennwort", "Kennwort falsch.")
+            return bestaetigung_fehlgeschlagen(request, "loeschen_kennwort") or antwort
         code = str(request.data.get("code", "")).replace(" ", "")
         if not any(g.verify_token(code) for g in TOTPDevice.objects.filter(user=request.user, confirmed=True)):
-            return abgelehnt("code", "Code aus der Authenticator-App falsch oder schon verwendet.")
+            antwort = abgelehnt("code", "Code aus der Authenticator-App falsch oder schon verwendet.")
+            return bestaetigung_fehlgeschlagen(request, "loeschen_2fa") or antwort
+        bestaetigung_gelungen(request)
         request.session.pop(self.LOESCHCODE, None)
         eintrag = akte_loeschen(patient, request.user, pruefung["rechtsgrund"], grund, request)
         return Response({"geloescht": True, "nummer": eintrag.nummer, "protokoll": eintrag.id})
@@ -520,7 +542,6 @@ def _listen_eintrag(x: Loeschprotokoll) -> dict:
     return {
         "akte": x.akte_id, "nummer": x.nummer, "ist_test": x.ist_test, "angelegt_am": x.angelegt_am.isoformat(),
         "abgeschlossen_am": x.abgeschlossen_am.isoformat() if x.abgeschlossen_am else None,
-        "abschluss_anlass": x.abschluss_anlass,
         "aufbewahrung_bis": x.aufbewahrung_bis.isoformat() if x.aufbewahrung_bis else None,
         "rechtsgrund": x.rechtsgrund, "grund": x.grund, "umfang": x.umfang,
         "geloescht_am": x.geloescht_am.isoformat(), "person": x.geloescht_von_id,
@@ -556,7 +577,7 @@ def akten_nachholen() -> dict:
 
     from accounts.models import User
 
-    ergebnis = {"akten": 0, "protokoll_ergaenzt": 0, "akten_liste_ergaenzt": 0}
+    ergebnis = {"akten": 0, "protokoll_ergaenzt": 0, "akten_liste_ergaenzt": 0, "ordner_entfernt": 0, "akten_fehler": 0}
 
     def schluessel(akte, nummer, geloescht_am):
         return int(akte), int(nummer), geloescht_am
@@ -575,22 +596,39 @@ def akten_nachholen() -> dict:
             aus_liste[k] = eintrag
             ergebnis["akten_liste_ergaenzt"] += 1
     for k, e in aus_liste.items():
-        angelegt_am = datetime.fromisoformat(e["angelegt_am"])
-        eintrag = aus_db.get(k)
-        if eintrag is None:
-            eintrag = Loeschprotokoll.objects.create(
-                akte_id=k[0], nummer=k[1], ist_test=bool(e.get("ist_test")), angelegt_am=angelegt_am,
-                abgeschlossen_am=date.fromisoformat(e["abgeschlossen_am"]) if e.get("abgeschlossen_am") else None,
-                abschluss_anlass=e.get("abschluss_anlass") or "",
-                aufbewahrung_bis=date.fromisoformat(e["aufbewahrung_bis"]) if e.get("aufbewahrung_bis") else None,
-                rechtsgrund=e.get("rechtsgrund") or Loeschprotokoll.Rechtsgrund.FRIST, grund=e.get("grund") or "",
-                umfang=e.get("umfang") or {}, geloescht_am=k[2],
-                geloescht_von=User.objects.filter(id=e.get("person")).first() if e.get("person") else None)
-            ergebnis["protokoll_ergaenzt"] += 1
-        if e.get("ist_test"):
-            continue
-        patient = Patient.objects.filter(id=k[0], nummer=k[1], ist_test=False).first()
-        if patient is not None and patient.angelegt_am == angelegt_am:
-            akte_loeschen(patient, None, eintrag.rechtsgrund, eintrag.grund, nachgezogen=True, eintrag=eintrag)
-            ergebnis["akten"] += 1
+        # jede Zeile für sich: eine unlesbare oder widersprüchliche Zeile hält die übrigen nicht auf
+        getan = []
+        try:
+            with transaction.atomic():
+                angelegt_am = datetime.fromisoformat(e["angelegt_am"])
+                eintrag = aus_db.get(k)
+                if eintrag is None:
+                    eintrag = Loeschprotokoll.objects.create(
+                        akte_id=k[0], nummer=k[1], ist_test=bool(e.get("ist_test")), angelegt_am=angelegt_am,
+                        abgeschlossen_am=date.fromisoformat(e["abgeschlossen_am"]) if e.get("abgeschlossen_am") else None,
+                        aufbewahrung_bis=date.fromisoformat(e["aufbewahrung_bis"]) if e.get("aufbewahrung_bis") else None,
+                        rechtsgrund=e.get("rechtsgrund") or Loeschprotokoll.Rechtsgrund.FRIST, grund=e.get("grund") or "",
+                        umfang=e.get("umfang") or {}, geloescht_am=k[2],
+                        geloescht_von=User.objects.filter(id=e.get("person")).first() if e.get("person") else None)
+                    getan.append("protokoll_ergaenzt")
+                # Testakten nie: ihre Nummern werden beim Zurücksetzen neu vergeben
+                patient = None if e.get("ist_test") else Patient.objects.filter(id=k[0], nummer=k[1], ist_test=False).first()
+                if patient is not None and patient.angelegt_am == angelegt_am:
+                    akte_loeschen(patient, None, eintrag.rechtsgrund, eintrag.grund, nachgezogen=True, eintrag=eintrag)
+                    getan.append("akten")
+                elif not e.get("ist_test") and patient is None and not Patient.objects.filter(nummer=k[1]).exists():
+                    # Die Akte ist weg, ihr Dokumentenordner aber noch da (das Löschen der Dateien war fehlgeschlagen
+                    # oder eine Wiederherstellung hat nur die Dateien zurückgebracht): Nummern echter Akten werden
+                    # nicht neu vergeben, der Ordner gehört also zur gelöschten Akte.
+                    ordner = settings.EPM_DOKUMENTE / str(k[1])
+                    if ordner.is_dir():
+                        dateien_entfernen(k[1])
+                        if not ordner.exists():
+                            getan.append("ordner_entfernt")
+        except Exception:  # noqa: BLE001 – der Start des Backends darf daran nicht scheitern
+            log.exception("Löschung der Akte Nr. %s konnte nicht nachgeholt werden", k[1])
+            ergebnis["akten_fehler"] += 1
+        else:
+            for was in getan:
+                ergebnis[was] += 1
     return ergebnis

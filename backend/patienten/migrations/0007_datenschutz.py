@@ -195,7 +195,6 @@ class Migration(migrations.Migration):
                 ('ist_test', models.BooleanField(default=False)),
                 ('angelegt_am', models.DateTimeField(verbose_name='Akte angelegt am')),
                 ('abgeschlossen_am', models.DateField(blank=True, null=True)),
-                ('abschluss_anlass', models.CharField(blank=True, max_length=30)),
                 ('aufbewahrung_bis', models.DateField(blank=True, null=True)),
                 ('rechtsgrund', models.CharField(choices=[('frist', 'Aufbewahrungsfrist abgelaufen'), ('antrag', 'Antrag der betroffenen Person')], max_length=20)),
                 ('grund', models.TextField()),

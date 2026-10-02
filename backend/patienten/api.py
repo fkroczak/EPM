@@ -23,7 +23,7 @@ from accounts.permissions import (AbschlussRecht, AktenRecht, EintragRecht, Loes
                                   WiederOeffnenRecht, recht)
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import (ModelClean, RichText, benutzername, legt_testpatienten_an, patienten_fuer,
-                            pruefe_schreibbereich)
+                            patienten_mit_eingeschraenkten, pruefe_schreibbereich)
 from stammdaten.models import Auswahlwert
 
 from audit.bereinigung import akte_text
@@ -1214,11 +1214,16 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
                 return abgelehnt("bestaetigung", "Bestätigungscode dreimal falsch. Bitte einen neuen anfordern.")
             request.session[self.LOESCHCODE] = sitzung
             return abgelehnt("bestaetigung", "Der Bestätigungscode stimmt nicht.")
+        from accounts.api import bestaetigung_fehlgeschlagen, bestaetigung_gelungen
+
         if not request.user.check_password(str(request.data.get("kennwort", ""))):
-            return abgelehnt("kennwort", "Kennwort falsch.")
+            antwort = abgelehnt("kennwort", "Kennwort falsch.")
+            return bestaetigung_fehlgeschlagen(request, "loeschen_kennwort") or antwort
         code = str(request.data.get("code", "")).replace(" ", "")
         if not any(g.verify_token(code) for g in TOTPDevice.objects.filter(user=request.user, confirmed=True)):
-            return abgelehnt("code", "Code aus der Authenticator-App falsch oder schon verwendet.")
+            antwort = abgelehnt("code", "Code aus der Authenticator-App falsch oder schon verwendet.")
+            return bestaetigung_fehlgeschlagen(request, "loeschen_2fa") or antwort
+        bestaetigung_gelungen(request)
         request.session.pop(self.LOESCHCODE, None)
         pfad = dok.pfad
         dok_id, sha, datei = dok.id, dok.sha256, dok.datei
@@ -1446,6 +1451,16 @@ def startseite_daten(user):
                 for x in qs[:50]]
 
     statistik = patienten if user.ist_test else patienten.filter(ist_test=False)
+    pruefen = pruefliste(statistik)
+    # Datenschutz-Anfragen betreffen oft abgeschlossene Akten (Löschung, Auskunft) – hier zählen alle Akten im
+    # Bereich der Person, für die sie Anfragen sieht; ohne Datenschutz-Recht erscheint nichts.
+    pruefen["datenschutz_anfragen"] = pruefen["datenschutz_ueberfaellig"] = 0
+    if user.hat_recht("datenschutz_bearbeiten") or user.hat_recht("datenschutz_entscheiden"):
+        bereich = patienten_mit_eingeschraenkten(user)
+        offen = list(Datenschutzanfrage.objects.filter(
+            patient__in=bereich if user.ist_test else bereich.filter(ist_test=False), erledigt_am__isnull=True))
+        pruefen["datenschutz_anfragen"] = len(offen)
+        pruefen["datenschutz_ueberfaellig"] = sum(1 for a in offen if a.ueberfaellig)
     return {
         "termine": {
             "ueberfaellig": t(termine.filter(faellig_am__lt=heute)),
@@ -1460,7 +1475,7 @@ def startseite_daten(user):
                                     .order_by("gueltig_ab")),
             "grenze_monate": e.plan_alter_warnung_monate,
         },
-        "pruefen": pruefliste(statistik),
+        "pruefen": pruefen,
         "zuletzt_eingetragen": _zuletzt_eingetragen(patienten),
         "zahlen": {
             "in_betreuung": statistik.count(),
