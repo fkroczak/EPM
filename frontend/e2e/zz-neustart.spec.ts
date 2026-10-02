@@ -271,3 +271,32 @@ test("Nach dem Neustart: Termin im Kalender (erledigt) und Tätigkeiten der Syst
   await expect(zeilen.getByRole("row", { name: /Unveränderlichkeit prüfen/ }).first()).toContainText("erledigt");
   await a.ctx.close();
 });
+
+test("Nach dem Neustart: Import – Dump, Zuordnungen und Läufe der Altdaten-Übernahme", async ({ browser }) => {
+  const { dump } = gemerkt("import");
+  const a = await seiteAls(browser, "admin");
+  await a.page.goto("/admin/import");
+  await expect(a.page.getByTestId("import-status")).toHaveText("Dump geladen");
+  await expect(a.page.getByTestId("dump-name")).toContainText(dump);
+  await expect(a.page.getByTestId("dump-tabellen")).toContainText("patienten (7)");
+  // inzwischen haben die anderen Tests echte Akten angelegt: Zuordnungen lassen sich weiter pflegen, übernommen wird nicht
+  await expect(a.page.getByTestId("echte-akten")).toContainText("Übernommen wird nur in ein System ohne echte Akten");
+  await a.page.goto("/admin/import?schritt=zuordnungen");
+  await expect(a.page.getByTestId("offene-punkte")).toContainText("Alle Zuordnungen sind vollständig");
+  const bereiche = a.page.getByRole("group", { name: "Bereich der Zuordnungen" });
+  await bereiche.getByRole("button", { name: "Katheter und Werte" }).click();
+  await expect(a.page.getByTestId("nickel-vielleicht").getByLabel("Nickelallergie im EPM für vielleicht")).toHaveValue("unbekannt");
+  await bereiche.getByRole("button", { name: "Benutzer" }).click();
+  await expect(a.page.getByTestId("benutzer-a.muster").getByLabel("Vorname für a.muster")).toHaveValue("Anton");
+  await bereiche.getByRole("button", { name: "Gelöschte Patienten" }).click();
+  await expect(a.page.getByTestId("geloescht-4").getByLabel("Anlass für Patient 4")).toHaveValue("therapie_beendet");
+  await a.page.goto("/admin/import?schritt=import");
+  await expect(a.page.getByTestId("hindernisse")).toContainText("echte Akten");
+  await expect(a.page.getByRole("button", { name: "Altdaten übernehmen …" })).toBeDisabled();
+  await a.page.goto("/admin/import?schritt=protokolle");
+  const laeufe = a.page.getByTestId("laeufe");
+  for (const art of ["Probelauf", "Dokumente übernommen", "Import zurückgenommen"]) {
+    await expect(laeufe.getByTestId("lauf").filter({ hasText: art }).first()).toContainText("erfolgreich");
+  }
+  await a.ctx.close();
+});

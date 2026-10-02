@@ -556,7 +556,7 @@ class ZuruecknehmenUndAbschliessen(Basis):
         self.assertFalse(User.objects.filter(username__in=["a.muster", "hans.alt", "verwaltung", "b.betrachter"]).exists())
         self.assertTrue(User.objects.filter(username="e.beispiel").exists())
         self.assertEqual(list(Versorger.objects.filter(name__contains="(erfunden)").values_list("name", flat=True)), ["Apotheke Süd (erfunden)"])
-        self.assertFalse(Ansprechpartner.objects.filter(name__in=["Frau Probe", "Herr Muster"]).exists())
+        self.assertFalse(Ansprechpartner.objects.filter(versorger__name__contains="(erfunden)").exists())
         self.assertFalse(Auswahlwert.objects.filter(wert__in=["Portkatheter", "Power PICC", "Broviac 2-lumig", "ZVK"]).exists())
         self.assertFalse(Praeparat.objects.filter(name="Heparin").exists())
         self.assertFalse(Versorger.history.filter(name="Homecare Nord (erfunden)").exists())

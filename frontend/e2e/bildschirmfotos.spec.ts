@@ -28,3 +28,32 @@ test("Bildschirmfotos: System, Kalender, Infusionspläne", async ({ page }) => {
   await expect(page.getByTestId("plan-uebersicht")).toBeVisible();
   await page.screenshot({ path: `${ORDNER}/infusionsplaene.png`, fullPage: true });
 });
+
+test("Bildschirmfotos: Import der Altdaten (Dump, Zuordnungen, Probelauf)", async ({ page }) => {
+  mkdirSync(ORDNER, { recursive: true });
+  await page.goto("/admin/import");
+  await expect(page.getByTestId("dump-name")).toBeVisible();
+  await page.screenshot({ path: `${ORDNER}/import-dump.png`, fullPage: true });
+  await page.goto("/admin/import?schritt=zuordnungen");
+  await expect(page.getByTestId("offene-punkte")).toBeVisible();
+  await page.screenshot({ path: `${ORDNER}/import-zuordnungen-spalten.png`, fullPage: true });
+  const bereiche = page.getByRole("group", { name: "Bereich der Zuordnungen" });
+  for (const [name, datei, testid] of [["Benutzer", "benutzer", "zuordnung-benutzer"], ["Versorger", "versorger", "zuordnung-versorger"],
+    ["Katheter und Werte", "werte", "zuordnung-katheter"], ["Präparate", "praeparate", "zuordnung-praeparate-lipide"],
+    ["Gelöschte Patienten", "geloeschte", "zuordnung-geloeschte"], ["Auffälligkeiten", "auffaelligkeiten", "zuordnung-auffaelligkeiten"]]) {
+    await bereiche.getByRole("button", { name }).click();
+    await expect(page.getByTestId(testid)).toBeVisible();
+    await page.screenshot({ path: `${ORDNER}/import-zuordnungen-${datei}.png`, fullPage: true });
+  }
+  await page.goto("/admin/import?schritt=import");
+  await expect(page.getByTestId("zaehlung")).toBeVisible();
+  await page.screenshot({ path: `${ORDNER}/import-probelauf.png`, fullPage: true });
+  await page.goto("/admin/import?schritt=dokumente");
+  await expect(page.getByTestId("dokumente-karte")).toBeVisible();
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `${ORDNER}/import-dokumente.png`, fullPage: true });
+  await page.goto("/admin/import?schritt=protokolle");
+  await page.getByTestId("lauf").filter({ has: page.getByRole("cell", { name: "Import", exact: true }) }).getByRole("button", { name: "Ansehen" }).click();
+  await expect(page.getByTestId("lauf-ergebnis")).toBeVisible();
+  await page.screenshot({ path: `${ORDNER}/import-protokoll.png`, fullPage: true });
+});

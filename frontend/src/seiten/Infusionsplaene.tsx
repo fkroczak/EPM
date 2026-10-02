@@ -21,7 +21,7 @@ type Zeile = {
   id: number; patient: number; name: string; nummer: number; ist_test: boolean; patient_abgeschlossen: boolean;
   status: "entwurf" | "aktuell" | "abgeloest"; gueltig_ab: string; kcal: number | null; laufzeit_h: number | null;
   rate_ml_h: number | null; tage_pro_woche: number | null; erstellt_am: string; erstellt_von: string | null;
-  freigegeben_am: string | null; freigegeben_von: string | null; pdf: boolean; pdf_sha256: string | null;
+  freigegeben_am: string | null; freigegeben_von: string | null; pdf: boolean; pdf_sha256: string | null; herkunft: "epm" | "altsystem";
   aelter_als_grenze: boolean;
 };
 type Antwort = { zaehler: Record<Gruppe, number>; grenze_monate: number; ergebnisse: Zeile[] };
@@ -132,7 +132,8 @@ export function Infusionsplaene() {
                   <td className="td num text-right">{p.laufzeit_h ? `${zahl(p.laufzeit_h)} h` : "—"}{p.rate_ml_h ? ` · ${zahl(p.rate_ml_h)} ml/h` : ""}</td>
                   <td className="td num">{p.tage_pro_woche ? `${p.tage_pro_woche}×` : "—"}</td>
                   <td className="td text-[0.8125rem]">{relativ(p.erstellt_am)}<br /><span className="gedaempft">{p.erstellt_von ?? "—"}</span></td>
-                  <td className="td text-[0.8125rem]">{p.freigegeben_am ? <>{relativ(p.freigegeben_am)}<br /><span className="gedaempft">{p.freigegeben_von ?? "—"}</span></> : "—"}</td>
+                  <td className="td text-[0.8125rem]">{p.freigegeben_am ? <>{relativ(p.freigegeben_am)}<br /><span className="gedaempft">{p.freigegeben_von ?? "—"}</span></>
+                    : p.herkunft === "altsystem" ? <span className="gedaempft">aus dem Altsystem</span> : "—"}</td>
                   <td className="td">
                     <div className="flex gap-1.5 justify-end">
                       {p.pdf ? <Knopf klein icon="dokument" onClick={() => setPdf(p)} aria-label={`PDF des Plans von ${p.name}`}>PDF</Knopf> : null}

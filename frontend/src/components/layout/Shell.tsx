@@ -40,6 +40,7 @@ function Seitenleiste() {
     darf("vorlagen_pflegen") ? <NavEintrag key="v" zu="/admin/vorlagen" icon="vorlagen" text="Vorlagen" /> : null,
     darf("audit_lesen") ? <NavEintrag key="a" zu="/admin/audit-log" icon="uhr" text="Audit-Log" /> : null,
     darf("system_verwalten") ? <NavEintrag key="s" zu="/admin/system" icon="server" text="System" /> : null,
+    darf("altdaten_importieren") ? <NavEintrag key="i" zu="/admin/import" icon="hochladen" text="Import" /> : null,
   ].filter(Boolean);
   return (
     <aside className="w-16 hd:w-64 shrink-0 bg-flaeche border-r border-rand flex flex-col px-2 hd:px-3 py-4 gap-5 nicht-drucken sticky top-0 h-screen overflow-y-auto"
