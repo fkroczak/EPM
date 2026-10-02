@@ -80,6 +80,9 @@ test("Termin von der Startseite anlegen und als erledigt abhaken", async ({ page
 });
 
 test("Startseite anpassen: ausblenden, verschieben und Größe per Tastatur, Maus und Knopf – je Person gespeichert", async ({ page }) => {
+  // 1440 px breit (3 Spalten), aber hoch genug, dass alle Kacheln ohne Scrollen sichtbar sind – die Maus zieht
+  // nur an sichtbaren Stellen (unter 960 px Höhe lag „Nach und nach prüfen“ in der vierten Rasterzeile außerhalb)
+  await page.setViewportSize({ width: 1440, height: 1700 });
   await page.goto("/");
   await page.getByRole("button", { name: "Startseite anpassen" }).click();
   await expect(page.getByTestId("anpassen")).toContainText("3 Spalten");
@@ -111,6 +114,7 @@ test("Startseite anpassen: ausblenden, verschieben und Größe per Tastatur, Mau
   await expect(page.locator('[data-kachel="gewicht"]')).toHaveAttribute("data-groesse", "1x2");
   // Maus: Ecke unten rechts ziehen – rastet in ganzen Rasterzellen ein
   const pruefen = page.locator('[data-kachel="pruefen"]');
+  await pruefen.scrollIntoViewIfNeeded();
   const kasten = (await pruefen.boundingBox())!;
   const ecke = (await page.getByTestId("ecke-pruefen").boundingBox())!;
   antwort = gespeichert(page);
