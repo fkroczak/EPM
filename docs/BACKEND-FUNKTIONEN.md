@@ -29,7 +29,7 @@ Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests. Beide laufe
   Musterdaten und eigenen Testkonten je Rolle.
 
 Stand 02.10.2026: **100 von 100 Backend-Tests** und **49 von 49 Browsertests grün** (Lauf 36943685896, Commit `e74f4ff`).
-Stand 02.10.2026 (Runde 4, Systemseite/Kalender/Infusionspläne): **121 von 121 Backend-Tests** und **60 von 60 Browsertests grün** (Lauf 36939957368, Commit `1534dee`).
+Stand 02.10.2026 (Runde 4, Systemseite/Kalender/Infusionspläne, auf `a9724b2`): **123 von 123 Backend-Tests** und **60 von 60 Browsertests grün** (Lauf 36970663378, Commit `473cef0`; dazu 1 Bildschirmfoto-Test, nur beim manuellen Start).
 
 ## Übersicht
 
