@@ -269,6 +269,10 @@ function EinsichtAnsicht({ info }: { info: Eingeschraenkt }) {
           Sie bleibt gespeichert, erscheint aber in keiner Liste und ist nur mit einer begründeten Einsicht lesbar.</span>
         {info.darf_einsicht ? (
           <form className="flex flex-col gap-3" noValidate onSubmit={(e) => { e.preventDefault(); einsicht.mutate(); }}>
+            <span className="text-[0.8125rem] gedaempft" data-testid="einsicht-zulaessig">Eingeschränkte Daten dürfen – von der Speicherung abgesehen – nur mit
+              Einwilligung der betroffenen Person verarbeitet werden, zur Geltendmachung, Ausübung oder Verteidigung von
+              Rechtsansprüchen, zum Schutz der Rechte einer anderen Person oder aus Gründen eines wichtigen öffentlichen
+              Interesses (Art. 18 Abs. 2 DSGVO). Bitte den Grund entsprechend angeben.</span>
             <Feld label="Grund der Einsicht" pflicht fehler={f.grund} hinweis="mindestens 10 Zeichen · die Einsicht gilt 60 Minuten und steht mit Grund im Audit-Log">
               {(p) => <Textfeld {...p} rows={2} value={grund} onChange={(e) => setGrund(e.target.value)} />}
             </Feld>
