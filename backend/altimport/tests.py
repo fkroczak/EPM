@@ -642,6 +642,9 @@ class ZuruecknehmenUndAbschliessen(Basis):
         # Audit-Log: der Vorgang steht drin, die Namen der entfernten Akten nicht mehr
         e = SystemEreignis.objects.filter(art=SystemEreignis.Art.SYSTEM).first()
         self.assertIn("zurückgenommen: 6 Akten mit 6 Gewichten, 5 Kontakten, 5 Infusionsplänen und 1 Dokumenten entfernt", e.details["name"])
+        # im Audit-Log erscheint genau dieser Text (der Schlüssel „entfernt“ stünde dort für „Akte gelöscht“)
+        from audit.texte import beschreibung
+        self.assertIn("zurückgenommen: 6 Akten", beschreibung(e))
         abschluss = SystemEreignis.objects.filter(art=SystemEreignis.Art.AKTE_ABGESCHLOSSEN).get()
         self.assertEqual((abschluss.objekt, abschluss.details.get("entfernt")), ("Akte Nr. 5 (gelöscht)", True))
         # Dump und Zuordnungen sind noch da: gleich wieder übernehmen (dieselben Nummern)

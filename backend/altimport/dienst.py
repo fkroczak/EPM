@@ -604,7 +604,7 @@ def zuruecknehmen(benutzer, request=None) -> Importlauf:
     melde(request, benutzer,
           f"Übernahme der Altdaten zurückgenommen: {vorher['patienten']} Akten mit {vorher['gewichte']} Gewichten, "
           f"{vorher['kontakte']} Kontakten, {vorher['plaene']} Infusionsplänen und {vorher['dokumente']} Dokumenten entfernt",
-          entfernt=vorher, behalten=behalten)
+          zurueckgenommen=vorher, behalten=behalten)   # nicht „entfernt“: das bedeutet im Audit-Log „Akte gelöscht“
     return lauf
 
 
