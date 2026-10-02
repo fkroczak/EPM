@@ -77,11 +77,13 @@ def patienten_mit_eingeschraenkten(user):
 NUR_TESTPATIENTEN_TEXT = "Als Admin nur bei Testpatienten möglich. Echte Akten sind für die Administration nur lesbar."
 
 
-def pruefe_schreibbereich(user, patient):
-    """Admins schreiben Patientendaten nur bei Testpatienten (Festlegung 01.10.2026) → sonst 403."""
+def pruefe_schreibbereich(user, patient, loeschen: bool = False):
+    """Admins schreiben Patientendaten nur bei Testpatienten (Festlegung 01.10.2026) → sonst 403.
+    Ausnahme ``loeschen``: endgültig löschen (Dokumente F73, Akten F80) dürfen Admins auch bei echten Akten
+    (Festlegung 02.10.2026)."""
     from accounts.rechte import schreibt_nur_testpatienten
 
-    if schreibt_nur_testpatienten(user) and not patient.ist_test:
+    if schreibt_nur_testpatienten(user) and not patient.ist_test and not loeschen:
         raise PermissionError(NUR_TESTPATIENTEN_TEXT)
 
 

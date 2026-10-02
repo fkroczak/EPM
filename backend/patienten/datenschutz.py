@@ -242,11 +242,11 @@ class DatenschutzAktionen:
     LOESCHCODE = "epm_akte_loeschcode"
     LOESCH_MINUTEN = 5
 
-    def _akte(self, pk, schreiben=True):
+    def _akte(self, pk, schreiben=True, loeschen=False):
         """Akte für einen Datenschutz-Vorgang – auch eine eingeschränkte, wenn die Person Einsicht nehmen dürfte."""
         patient = get_object_or_404(patienten_mit_eingeschraenkten(self.request.user), pk=pk)
         if schreiben:
-            pruefe_schreibbereich(self.request.user, patient)
+            pruefe_schreibbereich(self.request.user, patient, loeschen=loeschen)
         return patient
 
     def _verschlossen(self, patient):
@@ -444,17 +444,12 @@ class DatenschutzAktionen:
         return antwort
 
     # ------------------------------------------------ Akte endgültig löschen (Art. 17 DSGVO)
-    def _nur_mediziner_akte(self, request):
-        if request.user.rolle != Rolle.MEDIZINER:
-            raise PermissionDenied("Endgültig löschen dürfen nur Mediziner.")
-
     @action(detail=True, methods=["post"], url_path="loeschen-vorbereiten", permission_classes=[AkteLoeschenRecht])
     def loeschen_vorbereiten(self, request, pk=None):
         """Schritt 1: prüfen, ob die Akte gelöscht werden darf, und Bestätigungscode ausgeben (5 Minuten gültig)."""
         import secrets
 
-        self._nur_mediziner_akte(request)
-        patient = self._akte(pk)
+        patient = self._akte(pk, loeschen=True)
         pruefung = loeschbar(patient)
         if not pruefung["moeglich"]:
             return Response({"fehler": pruefung["hinweis"], "loeschen": pruefung}, status=status.HTTP_409_CONFLICT)
@@ -465,15 +460,14 @@ class DatenschutzAktionen:
 
     @action(detail=True, methods=["post"], permission_classes=[AkteLoeschenRecht])
     def loeschen(self, request, pk=None):
-        """Schritt 2: Akte endgültig löschen (nur Mediziner) – mit Grund, Kennwort, Code aus der Authenticator-App
+        """Schritt 2: Akte endgültig löschen (Mediziner und Admin, Recht „Akten endgültig löschen“) – mit Grund, Kennwort, Code aus der Authenticator-App
         und dem abgetippten Bestätigungscode. Danach sind alle Einträge, die Historie und die Dateien weg; es bleiben
         das Löschprotokoll (ohne Namen) und die Einträge im Audit-Log ohne Namen und Inhalte."""
         from datetime import datetime
 
         from django_otp.plugins.otp_totp.models import TOTPDevice
 
-        self._nur_mediziner_akte(request)
-        patient = self._akte(pk)
+        patient = self._akte(pk, loeschen=True)
         pruefung = loeschbar(patient)
         if not pruefung["moeglich"]:
             return Response({"fehler": pruefung["hinweis"], "loeschen": pruefung}, status=status.HTTP_409_CONFLICT)

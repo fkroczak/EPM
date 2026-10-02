@@ -114,14 +114,14 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F70 | „kein“ Katheter/Versorger, Nickelallergie als Auswahl | 4 Akte, 12 Neuer Patient, 3 Liste | ABGESCHLOSSEN UND GETESTET |
 | F71 | Nicht Erlaubtes ausblenden, Rechteänderung sofort in der Oberfläche | alle Ansichten | ABGESCHLOSSEN UND GETESTET |
 | F72 | Dokument dem richtigen Patienten zuordnen | 9 Dokumente, 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
-| F73 | Dokument endgültig löschen (nur Mediziner, Kennwort + 2FA + Bestätigungscode) | 9 Dokumente, 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
+| F73 | Dokument endgültig löschen (Mediziner und Admin, Kennwort + 2FA + Bestätigungscode) | 9 Dokumente, 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
 | F74 | Aufbewahrungsfrist der Akte, Verlängerung im Einzelfall, „Abschluss prüfen“ | 4 Akte (Datenschutz), 2 Start, 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
 | F75 | Erklärungen nachhalten (Datenschutzinformation, Einwilligung, Schweigepflichtentbindung), Widerruf | 4 Akte (Kopf, Datenschutz), 2 Start, 3 Liste | ABGESCHLOSSEN UND GETESTET |
 | F76 | Vordrucke der Erklärungen als PDF aus Dokumentvorlagen | 4 Akte (Datenschutz), 19 Dokumentvorlagen | ABGESCHLOSSEN UND GETESTET |
 | F77 | Datenschutz-Anfragen mit Frist (Art. 12 Abs. 3 DSGVO) | 4 Akte (Datenschutz), Datenschutz (neu), 2 Start | ABGESCHLOSSEN UND GETESTET |
 | F78 | Kopie der Akte als ZIP (Art. 15 Abs. 3 DSGVO) | 4 Akte (Datenschutz) | ABGESCHLOSSEN UND GETESTET |
 | F79 | Verarbeitung einschränken, begründete Einsicht, Aufheben (Art. 18 DSGVO) | 4 Akte, Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
-| F80 | Akte endgültig löschen mit Löschprotokoll (Art. 17 DSGVO; nur Mediziner, Kennwort + 2FA + Bestätigungscode) | 4 Akte (Datenschutz), Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
+| F80 | Akte endgültig löschen mit Löschprotokoll (Art. 17 DSGVO; Mediziner und Admin, Kennwort + 2FA + Bestätigungscode) | 4 Akte (Datenschutz), Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
 | F81 | Übersicht „Datenschutz“ | Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
 | F82 | Plan nach Freigabe abschließen (Freigabe per E-Mail o. Ä.), Freigabevermerk mit beiden Personen | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
 | F83 | Aufbewahrung des Audit-Logs, tägliche Bereinigung | 18 Vorlagen (Grenzwerte), 20 Audit-Log | TEILWEISE ABGESCHLOSSEN |
@@ -159,7 +159,7 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24.
   Akten abschließen dürfen Mitarbeiter, Mediziner und Admin; Vorlagen pflegen auch Mitarbeiter und Mediziner.
   Admins dürfen alles, Patientendaten schreiben sie aber nur bei Testpatienten – echte Akten sind für sie nur
   lesbar, ein neuer Patient eines Admins wird Testpatient. Standard (✓ = erlaubt, ● = fest, nicht entziehbar,
-  T = nur bei Testpatienten, fest; „nur Mediziner“ = keiner anderen Rolle zuweisbar):
+  T = nur bei Testpatienten, fest; „nur Mediziner und Admin“ = keiner anderen Rolle zuweisbar):
 
 | Recht | Betrachter | Mitarbeiter | Mediziner | Admin |
 |---|---|---|---|---|
@@ -170,11 +170,11 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24.
 | Infusionspläne freigeben | – | – | ✓ | ✓ T |
 | Akten abschließen | – | ✓ | ✓ | ✓ T |
 | Dokumente einem anderen Patienten zuordnen (F72) | – | – | ✓ | ✓ T |
-| Dokumente endgültig löschen (F73) | – | – | ✓ | – (nur Mediziner) |
+| Dokumente endgültig löschen (F73) | – | – | ✓ | ✓ (auch echte Akten; nur Mediziner und Admin) |
 | Infusionspläne nach Freigabe abschließen (F82) | – | ✓ | ✓ | ✓ T |
 | Datenschutz: Erklärungen und Anfragen erfassen, Kopie der Akte (F75, F77, F78) | – | ✓ | ✓ | ✓ T |
 | Datenschutz: Anfragen entscheiden, Verarbeitung einschränken, Einsicht, Aufbewahrung verlängern (F74, F77, F79) | – | – | ✓ | ✓ T |
-| Akten endgültig löschen (F80) | – | – | ✓ | – (nur Mediziner) |
+| Akten endgültig löschen (F80) | – | – | ✓ | ✓ (auch echte Akten; nur Mediziner und Admin) |
 | Abgeschlossene Akten wieder öffnen | – | – | – | ✓ |
 | Versorger und Ansprechpartner pflegen | – | ✓ | ✓ | ✓ |
 | Vorlagen pflegen (Briefkopf, Auswahllisten, Präparate, Grenzwerte) | – | ✓ | ✓ | ✓ |
@@ -182,7 +182,7 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24.
 | Benutzer und Rechte verwalten | – | – | – | ● |
 | Sicherungen verwalten | – | – | – | ✓ |
 | Testdaten zurücksetzen | – | – | – | ✓ |
-| Systemverwaltung (Server und EPM) | – | – | – | ✓ (nur Admin, anderen Rollen nicht erteilbar) |
+| Systemverwaltung (Server und EPM) | – | – | – | ✓ (für eine Urlaubsvertretung jeder Gruppe freischaltbar) |
 
   Testbenutzer bekommen nie Rechte, die über Testpatienten hinaus wirken (Versorger, Vorlagen, Audit-Log, Benutzer,
   Sicherungen, Testdaten, Wiederöffnen). Fehlendes Recht → 403 „Dafür fehlt das Recht „…“.“; abgelaufene Sitzung → 403
@@ -782,9 +782,10 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24.
   neueste Löschliste behalten (F63).
 - **Bestand:** Migration `patienten/0006_geloeschte_dokumente_schwaerzen` schwärzt Dokumente, die vor dieser Version
   gelöscht wurden, und trägt Prüfsumme und Pfad im Vorgang nach.
-- **Validierung:** Rolle Mediziner und Recht „Dokumente endgültig löschen“ (nur Mediziner, keiner anderen Rolle zuweisbar);
+- **Validierung:** Recht „Dokumente endgültig löschen“ (Mediziner und Admin, keiner anderen Rolle zuweisbar; Admins auch bei
+  echten Akten, Festlegung 02.10.2026);
   Grund mindestens 10 Zeichen; Akte offen; keine von EPM erzeugten Dokumente.
-- **Fehlerfälle:** 400 je Feld · 403 nicht Mediziner/ohne Recht · 404 schon gelöscht
+- **Fehlerfälle:** 400 je Feld · 403 ohne Recht · 404 schon gelöscht
 - **Teststatus:** Backend-Tests grün (`FalschZugeordneteDokumente.test_endgueltig_loeschen` – auch: Titel, Dateiname, Notiz,
   Datum in keiner Historien-Zeile und keinem Audit-Eintrag mehr, Löschliste ohne Titel, Trigger lehnen jede andere Änderung
   ab; `test_loeschung_nach_wiederherstellung_nachholen` – Datensatz, Datei und Historie zurückgespielt → erneut gelöscht und
@@ -1005,8 +1006,8 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24.
   Patient eines Admins wird Testpatient. GET liefert dazu `nur_testpatienten: {rollen, rechte}`.
 - **Validierung:** nur mit Recht „Benutzer und Rechte verwalten“; unbekannte Rolle oder Recht → 400; feste Rechte (Admin: Akten lesen,
   Benutzer und Rechte verwalten) nicht entziehbar → 400; Rechte, die einer Rolle vorbehalten sind (`nur_rollen` in GET;
-  02.10.2026: „Dokumente endgültig löschen“ nur Mediziner), anderen Rollen nicht zuweisbar → 400 „Dieses Recht ist Mediziner
-  vorbehalten.“, in der Matrix ausgegraut; Testbenutzer ohne Rechte über Testpatienten hinaus.
+  02.10.2026: „Dokumente/Akten endgültig löschen“ nur Mediziner und Admin), anderen Rollen nicht zuweisbar → 400 „Dieses Recht
+  ist Admin und Mediziner vorbehalten.“, in der Matrix ausgegraut; Testbenutzer ohne Rechte über Testpatienten hinaus.
 - **Tabellen:** `accounts_gruppenrecht`, `accounts_historicalgruppenrecht`, `audit_systemereignis` („Rechte geändert“)
 - **Fehlerfälle:** 400 · 403 ohne Recht
 - **Teststatus:** Backend-Tests grün (`RechteJeGruppe.*`, `Rollen.test_admin_schreibt_nur_bei_testpatienten`,
@@ -1490,10 +1491,10 @@ Festlegungen S12–S14 vom 01.10.2026 (`claude/startseite-erweiterungen.md`): nu
 Admin-Kennwort + 2FA, vorher automatische Sicherung, angemeldete Benutzer vorher warnen; der Container bekommt keinen
 Zugriff auf den Server (Auftrag und Status über ein gemeinsames Verzeichnis, ausgeführt von systemd-Diensten).
 
-**Recht „Systemverwaltung (Server und EPM)“** (`system_verwalten`): nur Admin. Anderen Rollen kann es nicht erteilt
-werden (`NUR_ROLLEN` in `accounts/rechte.py`, gemeinsam mit „Dokumente endgültig löschen“ – nur Mediziner); die
-Rechte-Matrix zeigt es für andere Rollen ausgegraut, `PUT /api/rechte/` lehnt es mit 400 ab, auch ein Eintrag direkt in
-der Datenbank wirkt nicht. Testzugänge erhalten es nie. Der Admin kann es sich selbst entziehen und wieder geben.
+**Recht „Systemverwaltung (Server und EPM)“** (`system_verwalten`): Standard nur Admin. Festlegung 02.10.2026
+(Urlaubsregelung): unter Benutzer › Rechte jeder Gruppe freischaltbar und wieder zurücknehmbar – wirkt sofort, steht im
+Audit-Log („Rechte geändert“). Die Vertretung bestätigt Update und Neustart mit dem eigenen Passwort und 2FA.
+Testzugänge erhalten es nie. Der Admin kann es sich selbst entziehen und wieder geben.
 Kalender und Infusionspläne brauchen kein neues Recht: Lesen mit „Akten lesen“, Termine mit „Kontakte, Gewichte,
 Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie in der Akte.
 
@@ -1668,6 +1669,7 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 |---|---|---|
 | 02.10.2026 | Runde 4 (Systemseite, Kalender, Infusionspläne) | Neues Recht „Systemverwaltung“ (nur Admin); Administration › System mit Systemagent auf dem Server (F86–F89, Festlegungen S12–S14); globaler Kalender mit Fälligkeiten und Feiertagen (F84); Übersicht aller Infusionspläne (F85); Audit-Gruppe „System“; Feiertage NRW (U25). Nummern ab F84, damit parallele Arbeiten (F72 ff.) nicht kollidieren |
 | 02.10.2026 | Runde 4 (Updates VPS) | Festlegung: VPS ohne Verbindung zu GitHub und ohne Build (`EPM_UPDATE_QUELLE="paket"`); `sudo epm-update --paket-erstellen` auf der Test-VM packt die dort laufende, getestete Version (Images, Rollout-Dateien, Systemagent, `epm-update`, SHA-256), `sudo epm-update --paket DATEI` spielt sie auf dem VPS ein (Prüfsummen, Backup, Umstellen, Tests) |
+| 02.10.2026 | Rechte (Festlegung) | Endgültig löschen (F73 Dokumente, F80 Akten) auch Admins – auch bei echten Akten, als Ausnahme von „Admins schreiben Patientendaten nur bei Testpatienten“; alle Bestätigungen und Prüfungen unverändert. Systemverwaltung für eine Urlaubsvertretung je Gruppe freischaltbar (Standard weiter nur Admin) |
 | 01.10.2026 | Runde 1 (`c387b7b`–`0e25377`) | Backend für F01–F22, F25–F36, F40–F48, F52–F54, F56–F58, F60 mit Backend-Tests; Nachweis angelegt |
 | 01.10.2026 | Runde 2 (`9eae348`) | Rechte je Gruppe (F66) nach Festlegung: Mediziner wie Admin außer Benutzerverwaltung, Wiederöffnen, Sicherungen, Testdaten; U10 erledigt, U11 bestätigt, U12 neu; Briefkopf und Logo (F49) |
 | 01.10.2026 | Runde 2 (`2b76a0a`–`39b86b9`) | Frontend: Anmeldung, Start, Patientenliste, Neuer Patient, Versorger, Akte (Übersicht, Diagnose & Therapie, Kontakte, Pläne, Dokumente, Verlauf); Browsertests im echten Stack in GitHub Actions |

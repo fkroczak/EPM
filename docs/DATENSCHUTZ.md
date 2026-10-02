@@ -30,7 +30,7 @@ Es ist keine Rechtsberatung. Wo eine Frage nicht aus dem Gesetz selbst beantwort
 | Art. 12 Abs. 4 DSGVO | Wird ein Antrag nicht erfüllt, sind der Person innerhalb eines Monats die Gründe mitzuteilen – mit dem Hinweis auf die Beschwerde bei einer Aufsichtsbehörde und den gerichtlichen Rechtsbehelf | „abgelehnt“ und „eingeschränkt statt gelöscht“ nur mit Begründung; Datum der Mitteilung. Das Schreiben selbst (mit den Hinweisen) verfasst die Stiftung; EPM hält Begründung und Datum fest | F77 |
 | Art. 13 DSGVO | Information bei der Erhebung | Vordruck „Datenschutzinformation“ als Dokumentvorlage (Entwurf mit Lücken, siehe O2); Aushändigung wird in der Akte nachgehalten | F75, F76 |
 | Art. 15 Abs. 3 DSGVO | Kopie der Daten | „Kopie der Akte“ als ZIP: Akte und Verlauf als PDF, alle Dokumente im Original; jede Kopie steht im Audit-Log | F78 |
-| Art. 17 Abs. 1 DSGVO | Löschung auf Antrag bzw. wenn der Zweck entfallen ist | Akte endgültig löschen (nur Mediziner, Kennwort + Authenticator-Code + Bestätigungscode): Einträge, Historie, Dateien weg; Audit-Log ohne Namen und Inhalte; Löschprotokoll ohne Namen. Einzelne Dokumente: F73 | F80, F73 |
+| Art. 17 Abs. 1 DSGVO | Löschung auf Antrag bzw. wenn der Zweck entfallen ist | Akte endgültig löschen (Mediziner und Admin, Kennwort + Authenticator-Code + Bestätigungscode): Einträge, Historie, Dateien weg; Audit-Log ohne Namen und Inhalte; Löschprotokoll ohne Namen. Einzelne Dokumente: F73 | F80, F73 |
 | Art. 17 Abs. 3 b und e DSGVO | keine Löschung, soweit eine rechtliche Pflicht zur Aufbewahrung besteht oder die Daten für Rechtsansprüche gebraucht werden | Vor Ablauf der Frist wird nur auf Antrag gelöscht; der Mediziner entscheidet, ob eine Aufbewahrungspflicht entgegensteht – dann Einschränkung statt Löschung | F79, F80 |
 | § 35 Abs. 3 BDSG | Einschränkung statt Löschung, wenn satzungsgemäße oder vertragliche Aufbewahrungsfristen entgegenstehen | Ergebnis „Verarbeitung eingeschränkt statt gelöscht“ einer Anfrage schränkt die Akte ein | F77, F79 |
 | Art. 18 DSGVO | Eingeschränkte Daten werden – von der Speicherung abgesehen – nur noch mit Einwilligung der Person, für Rechtsansprüche, zum Schutz der Rechte einer anderen Person oder aus wichtigem öffentlichem Interesse verarbeitet (Abs. 2); vor dem Aufheben ist die Person zu unterrichten (Abs. 3) | Eingeschränkte Akte erscheint in keiner Patientenliste, Suche oder Auswertung; lesbar nur mit begründeter Einsicht (60 Minuten, im Audit-Log; die Ansicht nennt die zulässigen Zwecke nach Abs. 2 – ob der eingetragene Grund darunter fällt, entscheidet die Person, nicht das Programm). Damit Fristen und Anfragen nicht untergehen, führt die Übersicht „Datenschutz“ sie weiter auf: mit Namen nur für Personen, die Einsicht nehmen dürften, sonst nur mit Nummer; ebenso das Audit-Log. Aufheben nur mit Datum der Unterrichtung oder Begründung, warum sie entfällt | F79, F81 |
@@ -69,10 +69,12 @@ Aufbewahrung des Audit-Logs (Jahre, 0 = unbegrenzt), Erklärungen, die vorliegen
 |---|---|---|---|---|
 | Datenschutz: Erklärungen und Anfragen erfassen, Kopie der Akte | – | ✓ | ✓ | ✓ T |
 | Datenschutz: Anfragen entscheiden, Verarbeitung einschränken, Einsicht, Aufbewahrung verlängern | – | – | ✓ | ✓ T |
-| Akten endgültig löschen | – | – | ✓ | – (nur Mediziner) |
+| Akten endgültig löschen | – | – | ✓ | ✓ (auch echte Akten) |
 | Infusionspläne nach Freigabe abschließen | – | ✓ | ✓ | ✓ T |
 
-T = nur bei Testpatienten. Admins können eingeschränkte echte Akten nicht einsehen; sie sehen von ihnen – in der
+T = nur bei Testpatienten. Endgültig löschen dürfen Admins seit 02.10.2026 auch echte Akten und Dokumente (Festlegung;
+sonst schreiben Admins Patientendaten nur bei Testpatienten) – eine eingeschränkte Akte aber nicht, weil sie sie nicht
+sehen; die löscht wer Einsicht nehmen darf. Admins können eingeschränkte echte Akten nicht einsehen; sie sehen von ihnen – in der
 Übersicht, im Audit-Log – nur die Nummer, im Django-Admin gar nichts. Mitarbeiter (ohne das Recht „entscheiden“) ebenso.
 Wer das Recht „entscheiden“ hat, sieht in der Übersicht „Datenschutz“ und im Audit-Log auch Namen und Grund – sonst
 ließe sich eine Anfrage zu einer eingeschränkten Akte nicht bearbeiten; die Akte selbst öffnet auch diese Person nur

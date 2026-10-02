@@ -629,7 +629,7 @@ class RechteView(APIView):
                 elif (rolle, code) in FEST and not wert:
                     fehlerliste[f"{rolle}.{code}"] = "Dieses Recht ist fest und kann nicht entzogen werden."
                 elif wert and code in NUR_ROLLEN and rolle not in NUR_ROLLEN[code]:
-                    namen = ", ".join(dict(Rolle.choices)[r] for r in sorted(NUR_ROLLEN[code]))
+                    namen = " und ".join(dict(Rolle.choices)[r] for r in sorted(NUR_ROLLEN[code]))
                     fehlerliste[f"{rolle}.{code}"] = f"Dieses Recht ist {namen} vorbehalten."
         if fehlerliste:
             return Response(fehlerliste, status=status.HTTP_400_BAD_REQUEST)

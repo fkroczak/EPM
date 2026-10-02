@@ -748,10 +748,10 @@ class AktenEintragViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return self.model.objects.filter(patient__in=patienten_fuer(self.request.user)).select_related("patient")
 
-    def pruefe_patient(self, patient):
+    def pruefe_patient(self, patient, loeschen: bool = False):
         if not patienten_fuer(self.request.user).filter(pk=patient.pk).exists():
             raise serializers.ValidationError({"patient": "Patient nicht gefunden."})
-        pruefe_schreibbereich(self.request.user, patient)
+        pruefe_schreibbereich(self.request.user, patient, loeschen=loeschen)
         patient.pruefe_bearbeitbar()
 
 
@@ -1162,19 +1162,14 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
     LOESCHCODE = "epm_loeschcode"
     LOESCH_MINUTEN = 5
 
-    def _nur_mediziner(self, request):
-        if request.user.rolle != Rolle.MEDIZINER:
-            raise PermissionDenied("Endgültig löschen dürfen nur Mediziner.")
-
     @action(detail=True, methods=["post"], url_path="loeschen-vorbereiten", permission_classes=[LoeschenRecht])
     def loeschen_vorbereiten(self, request, pk=None):
         """Schritt 1 des endgültigen Löschens: Bestätigungscode für dieses Dokument (5 Minuten, in der Sitzung)."""
         import secrets
 
-        self._nur_mediziner(request)
         dok = self.get_object()
         self._nicht_systemdokument(dok)
-        self.pruefe_patient(dok.patient)
+        self.pruefe_patient(dok.patient, loeschen=True)
         code = "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(6))
         bis = timezone.now() + timedelta(minutes=self.LOESCH_MINUTEN)
         request.session[self.LOESCHCODE] = {"dokument": dok.id, "code": code, "bis": bis.isoformat(), "versuche": 0}
@@ -1182,17 +1177,16 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
 
     @action(detail=True, methods=["post"], permission_classes=[LoeschenRecht])
     def loeschen(self, request, pk=None):
-        """Schritt 2: endgültig löschen (nur Mediziner) mit Grund, Kennwort, Code aus der Authenticator-App und dem
+        """Schritt 2: endgültig löschen (Mediziner und Admin, Recht „Dokumente endgültig löschen“) mit Grund, Kennwort, Code aus der Authenticator-App und dem
         abgetippten Bestätigungscode. Datei und Inhalt sind danach weg; Audit-Log und Verlauf („endgültig gelöscht“)
         bleiben. Jede Ablehnung steht im Audit-Log."""
         from datetime import datetime
 
         from django_otp.plugins.otp_totp.models import TOTPDevice
 
-        self._nur_mediziner(request)
         dok = self.get_object()
         self._nicht_systemdokument(dok)
-        self.pruefe_patient(dok.patient)
+        self.pruefe_patient(dok.patient, loeschen=True)
         grund = str(request.data.get("grund", "")).strip()
         if len(grund) < 10:
             return Response({"grund": "Bitte den Grund angeben (mindestens 10 Zeichen)."}, status=status.HTTP_400_BAD_REQUEST)
