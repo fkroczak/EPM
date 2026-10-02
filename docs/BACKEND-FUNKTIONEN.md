@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 02.10.2026 · Code-Stand: Fehlerliste vom 02.10.2026 (F98–F105, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
+Stand: 02.10.2026 · Code-Stand: Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
 Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026, Prüfung nach DSGVO vom 02.10.2026 (`docs/DATENSCHUTZ.md`).
@@ -151,13 +151,14 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F102 | Auslastung mit wählbarem Zeitraum 1 h bis 6 Monate (Mittelwerte und Spitzen), Konten mit direktem Weg | System | ABGESCHLOSSEN UND GETESTET |
 | F103 | Sicherung herunterladen, Aufbewahrung 7/14/30 Tage, heruntergeladene Sicherung hochladen und einlesen | 11 Backup | ABGESCHLOSSEN UND GETESTET |
 | F104 | Admins auch bei echten Akten: Akte abschließen, Dokument anderem Patienten zuordnen | 4 Akte, 9 Dokumente | ABGESCHLOSSEN UND GETESTET |
+| F106 | Recht „Testdaten sehen“ je Gruppe (Testpatienten und Testbenutzer ausblenden); Testbenutzer ausblenden/einblenden | 17 Benutzer, alle Listen | ABGESCHLOSSEN UND GETESTET |
 | F105 | Hinweis „Kein Infusionsplan“; „Kein Infusionsplan nötig“ je Patient bestätigen unterdrückt ihn und die Warnung „Plan älter als …“ | 3 Patientenliste, 2 Start, 4 Akte, 8 Infusionspläne, Kalender | ABGESCHLOSSEN UND GETESTET |
 
-Summe (105 Funktionen, gezählt aus der Tabelle): 104 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 1 teilweise abgeschlossen (F83) · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
+Summe (106 Funktionen, gezählt aus der Tabelle): 105 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 1 teilweise abgeschlossen (F83) · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 Neu in Runde 4 sind F74–F83 (Datenschutz nach DSGVO und Abschließen eines Plans nach Freigabe); offene Fragen dazu stehen
-in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18). Runde 7 setzt die Startseiten- und Oberflächen-Erweiterungen S01–S17 aus `claude/startseite-erweiterungen.md` um (F90–F97, dazu erweitert F09, F13, F14, F17, F48, F84). Die Fehlerliste vom 02.10.2026 bringt F98–F105 und ändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97 (Abschnitt P).
+in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18). Runde 7 setzt die Startseiten- und Oberflächen-Erweiterungen S01–S17 aus `claude/startseite-erweiterungen.md` um (F90–F97, dazu erweitert F09, F13, F14, F17, F48, F84). Die Fehlerliste vom 02.10.2026 bringt F98–F106 und ändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97 (Abschnitt P).
 
 ---
 
@@ -2111,6 +2112,23 @@ Punkt 6.4 „Testbenutzer-Schalter“ und zusätzlich „Testpatient definieren 
   „Kein Infusionsplan nötig: bestätigen unterdrückt den Hinweis, aufheben bringt ihn zurück“.
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
+### F106 Testdaten ausblenden (Ergänzung vom 03.10.2026)
+- **Anlass:** „Ausblenden / Entfernen der Testuser für alle durch Berechtigung möglich.“ Rückfragen geklärt:
+  Testbenutzer **und** Testpatienten; Entfernen heißt **immer nur ausblenden** (nichts wird gelöscht).
+- **Recht „Testdaten sehen (Testpatienten und Testbenutzer)“** (`testdaten_sehen`), unter Benutzer › Rechte je Gruppe:
+  ohne das Recht gibt es Testpatienten nicht (`patienten_fuer` – Liste, Suche, Akte, Kalender, Startseite, Pläne,
+  Auswahlfelder) und Testbenutzer erscheinen in keiner Liste (`sichtbare_benutzer`); einen Testpatienten kann man dann
+  nicht anlegen. Standard: alle Rollen (wie bisher). Admin fest (legt nur Testpatienten an). Testbenutzer sehen ihre
+  Testpatienten immer.
+- **Testbenutzer ausblenden:** `POST /api/benutzer/<id>/ausblenden/` (nur Testbenutzer, nicht das eigene Konto),
+  `POST /api/benutzer/testbenutzer-ausblenden/` (alle), `POST /api/benutzer/<id>/einblenden/`. Ausblenden sperrt,
+  beendet alle Anmeldungen und setzt `ausgeblendet_am` (Migration `accounts/0006`); das Konto fehlt in der
+  Benutzerliste (außer `?ausgeblendete=1`, „Ausgeblendete zeigen“), in Konten, Anmeldung/2FA und Systemzahlen.
+  Einträge bleiben zugeordnet; Entsperren geht nur über „Einblenden“. Audit-Log.
+- **Teststatus:** Backend-Tests `accounts.tests.TestdatenAusblenden`. Browsertest `admin.spec.ts` „Testbenutzer
+  ausblenden und wieder einblenden; Recht „Testdaten sehen“ je Gruppe“.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2175,13 +2193,14 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U35 | Hochgeladene Sicherung eines anderen Servers mit fremdem Passwort: Das Passwort wird auf diesem Server (root, 0600) als eigene Nummer hinterlegt, damit sich die Sicherung wiederherstellen lässt | F103 | so umgesetzt; das aktuelle Sicherungs-Passwort dieses Servers bleibt unverändert |
 | U36 | Geänderte Aufbewahrung wirkt erst mit der nächsten Sicherung (dann werden ältere entfernt), nicht sofort | F103 | so umgesetzt; der Dialog sagt es |
 | U37 | „Kein Infusionsplan nötig“: Wer darf bestätigen? Gilt auch eine offene Entwurfsfassung als „kein Plan“? | F105 | Recht „Akten bearbeiten“ (wie „kein Versorger“; unter Benutzer › Rechte umstellbar); ein Entwurf allein zählt nicht als Plan – der Hinweis bleibt bis zur Freigabe |
+| U38 | „Testdaten sehen“ für den Admin abschaltbar? | F106 | nein, fest – Admins legen nur Testpatienten an und schreiben nur dort; ohne das Recht verschwände alles, was sie bearbeiten dürfen |
 | U33 | Vor dem Abschließen: Ein nach Art. 17 endgültig gelöschtes **Dokument** käme nach „Zurücknehmen“ und erneutem Import wieder (neue Nummer, die Löschliste erkennt es nicht). Eine endgültig gelöschte **Akte** kommt nicht wieder: Ihre Nummer steht im Löschprotokoll; der Patient erscheint unter „Auffälligkeiten“ und lässt sich nur „nicht übernehmen“ – eine andere Nummer ist nicht wählbar (O-29, behoben 02.10.2026) | F65, F73, F80 | Dokumente: betrifft nur die Zeit vor dem Abschließen (Testphase); nach dem Abschließen ist der Dump gelöscht |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
-| 02.10.2026 | Fehlerliste (Branch `fehlerliste-2026-10-02`) | Infusionspläne: Datum statt „heute/gestern“, Frist beim Überfahren des Status, kompakte Tabelle, Planansicht als kleine Vorschau mit großer Ansicht per Klick (F85, F31). Akte und System: Karten im Raster mit „⋯“ statt Teiler, je Person (F98); Kurz-Verlauf unter Kontakte entfernt. System: Zeitraum der Auslastung 1 h–6 Monate, Konten mit Links, größere Warnungen (F102). Backup: Herunterladen, Aufbewahrung 7/14/30 Tage, Hochladen und Einlesen (F103). Benutzer: ohne Login setzen/Login geben, Rolle „Keine Berechtigung“, Testbenutzer-Schalter (F100); Testpatient beim Anlegen (F101); Admins schließen Akten ab und ordnen Dokumente zu, auch bei echten Akten (F104); Zwei-Faktor-Anmeldung freiwillig (F99). Migration `accounts/0005`; Systemagent Version 3; neue Ordner `system/download`, `system/upload` (über `sudo epm-update`). U34–U36. Ergänzung: Hinweis „Kein Infusionsplan“ und Bestätigung „Kein Infusionsplan nötig“ je Patient (F105, Migration `patienten/0009`, U37) |
+| 02.10.2026 | Fehlerliste (Branch `fehlerliste-2026-10-02`) | Infusionspläne: Datum statt „heute/gestern“, Frist beim Überfahren des Status, kompakte Tabelle, Planansicht als kleine Vorschau mit großer Ansicht per Klick (F85, F31). Akte und System: Karten im Raster mit „⋯“ statt Teiler, je Person (F98); Kurz-Verlauf unter Kontakte entfernt. System: Zeitraum der Auslastung 1 h–6 Monate, Konten mit Links, größere Warnungen (F102). Backup: Herunterladen, Aufbewahrung 7/14/30 Tage, Hochladen und Einlesen (F103). Benutzer: ohne Login setzen/Login geben, Rolle „Keine Berechtigung“, Testbenutzer-Schalter (F100); Testpatient beim Anlegen (F101); Admins schließen Akten ab und ordnen Dokumente zu, auch bei echten Akten (F104); Zwei-Faktor-Anmeldung freiwillig (F99). Migration `accounts/0005`; Systemagent Version 3; neue Ordner `system/download`, `system/upload` (über `sudo epm-update`). U34–U36. Ergänzung: Hinweis „Kein Infusionsplan“ und Bestätigung „Kein Infusionsplan nötig“ je Patient (F105, Migration `patienten/0009`, U37). 03.10.2026: Recht „Testdaten sehen“ und Testbenutzer ausblenden (F106, Migration `accounts/0006`, U38) |
 | 02.10.2026 | Runde 7 (Startseite und Oberfläche, Pull Request #7: `f24bbb7`, `a6d1903`, `33612fa`) | S01–S17 aus `claude/startseite-erweiterungen.md` nach Entwurf 2, SU8–SU10 geklärt: Kennzahlenleiste, Kacheln im festen Raster mit Größe/Reihenfolge je Person und Ziehen mit Einrasten (F93), Schnellerfassung mit zwei Anfragen (F91), Meine Akten (F92), Kontakt fällig in zwei Stufen 4/6 Monate mit Datenmigration (F90), Admin-Startseite (F94), Hilfe je Rolle mit Ergänzungen (F95), volle Breite in Stufen (F96), Spaltenteiler ⅓/½/⅔ (F97); F09, F13, F14, F17, F48, F84 erweitert. Korrektur „Mit offenem Termin“ (zählte Akten ohne Termin). Kennzahlen ohne Testpatienten. Migrationen `stammdaten/0009`, `patienten/0008`, `accounts/0004`, `hilfe/0001`. Abgeleitete Punkte A1–A19 im Projekt-Dokument markiert. Lauf 37036210226: 236 von 236 Backend-Tests, 82 von 82 Browsertests (vorher Lauf 37033921101: ein Browsertest zog an einer Kachel außerhalb des Fensters – Testfehler, behoben) |
 | 02.10.2026 | Behebung der Gegenprüfung (O-27 bis O-29) | `epm-backup.sh` entfernt bei einem Abbruch alle Dateien des Laufs (vorher blieb nach gescheitertem `tar` der Datenbank-Dump als unvollständige Sicherung liegen und wäre mit übertragen worden). `epm_loeschungen_nachholen` hält sein Ergebnis fest (Stand neben der Löschliste, Audit-Log, Hinweis auf Backup- und Startseite), zählt unlesbare Zeilen der Löschliste und endet mit `--streng` als Fehler; der Systemagent knüpft die Meldung des Wiederherstellens daran. Import: Patient, dessen Nummer im Löschprotokoll steht, erscheint als Auffälligkeit und lässt sich nur ausnehmen |
 | 02.10.2026 | Gegenprüfung Datensicherung/Löschliste | `docs/DATENSCHUTZ.md` gegen `epm-backup.sh`, Systemagent und Start des Backends geprüft (Skript in einer Simulation gelaufen: verschlüsselt, Prüfsummen, Löschliste in der Sicherung, gescheiterter Dump hinterlässt nichts). Im Dokument ergänzt: unverschlüsselt ohne Passwort, Löschliste auf einem neuen Server, Nachholen nicht überwacht, Sicherung von vor dem Abschließen der Altdaten-Übernahme. Offen: O-27 bis O-29; U33 berichtigt |

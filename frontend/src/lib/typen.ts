@@ -6,7 +6,7 @@ export type Recht =
   | "plaene_anlegen" | "plaene_freigeben" | "plaene_abschliessen"
   | "datenschutz_bearbeiten" | "datenschutz_entscheiden" | "akten_loeschen"
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
-  | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "system_verwalten" | "altdaten_importieren";
+  | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "testdaten_sehen" | "system_verwalten" | "altdaten_importieren";
 
 /** Kacheln der Startseite (S11): klinische und – mit dem jeweiligen Recht – die der Administration (S12–S14) */
 export type KartenId =
@@ -37,6 +37,8 @@ export type Ich = {
   /** Authenticator-App eingerichtet / für dieses Konto Pflicht (sonst freiwillig, Festlegung 02.10.2026) */
   zweiter_faktor: boolean;
   zweiter_faktor_pflicht: boolean;
+  /** Testbenutzer ausgeblendet (gesperrt, aus allen Listen) – Festlegung 03.10.2026 */
+  ausgeblendet_am?: string | null;
   rechte: Recht[];
   /** Admins: Patientendaten nur bei Testpatienten schreiben (echte Akten nur lesen) */
   schreibt_nur_testpatienten: boolean;
@@ -570,6 +572,8 @@ export type Benutzer = {
   anzeigename: string;
   zweiter_faktor: boolean;
   zweiter_faktor_pflicht: boolean;
+  /** Testbenutzer ausgeblendet (gesperrt, aus allen Listen) – Festlegung 03.10.2026 */
+  ausgeblendet_am?: string | null;
   muss_kennwort_aendern: boolean;
   einmal_kennwort_gueltig_bis: string | null;
   gesperrt_am: string | null;

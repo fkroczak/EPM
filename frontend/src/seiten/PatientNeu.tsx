@@ -158,7 +158,8 @@ export function PatientNeu() {
             <span className="text-[0.84rem] gedaempft">
               Nr. <span className="num text-tinte font-semibold" data-testid="naechste-nummer">{naechste.data ? nummer(naechste.data.nummer) : "…"}</span> wird automatisch vergeben
             </span>
-            {naechste.data?.testpatient_fest ? <Chip art="warn" title="Testbenutzer und Admins legen nur Testpatienten an">wird Testpatient</Chip> : (
+            {naechste.data?.testpatient_fest ? <Chip art="warn" title="Testbenutzer und Admins legen nur Testpatienten an">wird Testpatient</Chip>
+              : !darf("testdaten_sehen") ? null : (
               <label className="flex items-center gap-1.5 text-sm cursor-pointer" title="Zum Ausprobieren, z. B. für Infusionspläne: eigene Nummern ab 9001, erscheint nicht in Auswertungen echter Patienten">
                 <input type="checkbox" checked={test} onChange={(ev) => setTest(ev.target.checked)} />
                 als Testpatient anlegen

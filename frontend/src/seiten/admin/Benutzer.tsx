@@ -47,6 +47,7 @@ function anzeige(f: Formular) {
 
 function zustand(b: BenutzerTyp): { text: string; art: "ok" | "fehler" | "warn" | "neutral" } {
   if (b.nur_historisch) return { text: "ohne Login", art: "neutral" };
+  if (b.ausgeblendet_am) return { text: "ausgeblendet", art: "neutral" };
   if (b.gesperrt_am || !b.is_active) return { text: "gesperrt", art: "fehler" };
   // die Zwei-Faktor-Anmeldung zählt nur zur Einrichtung, wenn sie für diese Person Pflicht ist
   if (b.muss_kennwort_aendern || (b.zweiter_faktor_pflicht && !b.zweiter_faktor)) return { text: "Einrichtung offen", art: "warn" };
@@ -214,7 +215,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
   } : { ...LEER };
   const [f, setF] = useState<Formular>(start);
   const kennwort = kennwortAnzeige && benutzer && kennwortAnzeige.id === benutzer.id ? kennwortAnzeige : null;
-  const [frage, setFrage] = useState<"" | "kennwort" | "2fa" | "sperren" | "testdaten" | "ohnelogin">("");
+  const [frage, setFrage] = useState<"" | "kennwort" | "2fa" | "sperren" | "testdaten" | "ohnelogin" | "ausblenden">("");
   const [loginRolle, setLoginRolle] = useState<string | null>(null);
   useEffect(() => { setF(start()); }, [benutzer?.id, neu]); // eslint-disable-line react-hooks/exhaustive-deps
   const neuLaden = () => void qc.invalidateQueries({ queryKey: ["benutzer"] });
@@ -249,9 +250,10 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
     },
   });
   const aktion = useMutation({
-    mutationFn: (art: "kennwort" | "2fa" | "sperren" | "entsperren" | "testdaten" | "ohnelogin") => {
+    mutationFn: (art: "kennwort" | "2fa" | "sperren" | "entsperren" | "testdaten" | "ohnelogin" | "ausblenden" | "einblenden") => {
       if (art === "testdaten") return api<Record<string, number>>("testdaten/zuruecksetzen/", { method: "POST" });
-      const pfad = { kennwort: "einmal-kennwort", "2fa": "2fa-zuruecksetzen", sperren: "sperren", entsperren: "entsperren", ohnelogin: "ohne-login" }[art];
+      const pfad = { kennwort: "einmal-kennwort", "2fa": "2fa-zuruecksetzen", sperren: "sperren", entsperren: "entsperren", ohnelogin: "ohne-login",
+        ausblenden: "ausblenden", einblenden: "einblenden" }[art];
       return api<Record<string, unknown>>(`benutzer/${benutzer!.id}/${pfad}/`, { method: "POST" });
     },
     onSuccess: (r, art) => {
@@ -262,6 +264,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
       if (art === "ohnelogin") { setKennwortAnzeige(null); setF((v) => ({ ...v, rolle: "keine", ist_test: false })); }
       melden({ kennwort: "Neues Einmal-Kennwort erzeugt.", "2fa": "2FA zurückgesetzt, neues Einmal-Kennwort erzeugt.", sperren: "Benutzer gesperrt.",
         ohnelogin: "Konto ist jetzt ohne Login und ohne Rechte.",
+        ausblenden: "Testbenutzer ausgeblendet.", einblenden: "Testbenutzer wieder eingeblendet.",
         entsperren: "Benutzer entsperrt.", testdaten: `Testdaten zurückgesetzt (${r.geloescht ?? 0} gelöscht, ${r.angelegt ?? 0} angelegt).` }[art]);
     },
   });
@@ -274,6 +277,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
     "2fa": ["2FA zurücksetzen", "Authenticator und Notfall-Codes werden gelöscht. Mit dem neuen Einmal-Kennwort richtet die Person die App neu ein."],
     sperren: ["Benutzer sperren", "Die Person kann sich nicht mehr anmelden, alle Sitzungen werden beendet. Einträge bleiben zugeordnet."],
     testdaten: ["Testdaten zurücksetzen", "Alle Testpatienten (Nr. ab 9001) werden gelöscht und die Musterdaten neu angelegt. Echte Patienten bleiben unberührt."],
+    ausblenden: ["Testbenutzer ausblenden", "Das Konto wird gesperrt, alle Anmeldungen werden beendet, und es erscheint in keiner Liste mehr (in der Benutzerverwaltung nur mit „Ausgeblendete zeigen“). Es wird nicht gelöscht; Einträge bleiben zugeordnet. Mit „Einblenden“ ist es wieder da."],
     ohnelogin: ["Auf „ohne Login“ setzen", "Die Person kann sich nicht mehr anmelden und hat keine Rechte mehr (Rolle „Keine Berechtigung“). Passwort, Authenticator und Notfall-Codes werden gelöscht, alle Sitzungen beendet. Ihre Einträge bleiben ihr zugeordnet. Mit „Login geben“ lässt sie sich später wieder einbinden."],
   } as const;
   const historisch = !!benutzer?.nur_historisch;
@@ -291,11 +295,19 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
           übernommen oder frühere Mitarbeiter). Kann sich nicht anmelden und hat keine Rechte. Mit „Login geben“ wird daraus wieder ein Konto zum Arbeiten.</span></Meldung>
       ) : null}
       {kennwort ? <Kennwortanzeige id={kennwort.id} kennwort={kennwort.kennwort} gueltig={kennwort.gueltig} name={name} benutzername={benutzer?.username ?? ""} /> : null}
-      {benutzer?.ist_test ? (
+      {benutzer?.ausgeblendet_am ? (
+        <Meldung><span className="flex items-center justify-between gap-3 flex-wrap" data-testid="ausgeblendet-hinweis">
+          <span>Ausgeblendet am {zeitpunkt(benutzer.ausgeblendet_am)}: gesperrt und in keiner Liste sichtbar.</span>
+          <Knopf klein laedt={aktion.isPending && aktion.variables === "einblenden"} onClick={() => aktion.mutate("einblenden")}>Einblenden</Knopf></span></Meldung>
+      ) : null}
+      {benutzer?.ist_test && !benutzer.ausgeblendet_am ? (
         <div className="meldung warn flex flex-col gap-2 text-[0.8125rem]">
           <span><strong>Testbenutzer:</strong> sieht und bearbeitet ausschließlich Testpatienten, nie echte Patientendaten. Oben erscheint dauerhaft ein
             Hinweis „Testzugang“. Für Schulungen und zum Durchklicken nach jedem Update.</span>
-          {darf("testdaten_zuruecksetzen") ? <div><Knopf klein onClick={() => setFrage("testdaten")}>Testdaten auf Ausgangsstand zurücksetzen</Knopf></div> : null}
+          <div className="flex gap-2 flex-wrap">
+            {darf("testdaten_zuruecksetzen") ? <Knopf klein onClick={() => setFrage("testdaten")}>Testdaten auf Ausgangsstand zurücksetzen</Knopf> : null}
+            {benutzer.id !== ich.id ? <Knopf klein onClick={() => setFrage("ausblenden")}>Testbenutzer ausblenden</Knopf> : null}
+          </div>
         </div>
       ) : null}
       <form className="grid grid-cols-4 gap-3" onSubmit={(e) => { e.preventDefault(); speichern.mutate(); }}>
@@ -337,7 +349,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
               sonst freiwillig unter „Mein Konto“.</Meldung>
         ) : null}
         <div className="col-span-4 flex gap-2 flex-wrap items-center">
-          {!neu && benutzer && !benutzer.nur_historisch ? <>
+          {!neu && benutzer && !benutzer.nur_historisch && !benutzer.ausgeblendet_am ? <>
             <Knopf onClick={() => setFrage("kennwort")}>Einmal-Kennwort erzeugen</Knopf>
             <Knopf onClick={() => setFrage("2fa")} disabled={!benutzer.zweiter_faktor}>2FA zurücksetzen</Knopf>
             {benutzer.gesperrt_am || !benutzer.is_active
@@ -359,7 +371,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
       <Dialog offen={!!frage} onOffen={(o) => { if (!o) setFrage(""); }} titel={frage ? fragen[frage][0] : ""} breite={480}
         beschreibung={frage ? fragen[frage][1] : undefined}
         fuss={<><Knopf onClick={() => setFrage("")}>Abbrechen</Knopf>
-          <Knopf variante={frage === "sperren" || frage === "testdaten" || frage === "ohnelogin" ? "dng" : "pri"} laedt={aktion.isPending} onClick={() => frage && aktion.mutate(frage)}>{frage ? fragen[frage][0] : ""}</Knopf></>}>
+          <Knopf variante={frage === "sperren" || frage === "testdaten" || frage === "ohnelogin" || frage === "ausblenden" ? "dng" : "pri"} laedt={aktion.isPending} onClick={() => frage && aktion.mutate(frage)}>{frage ? fragen[frage][0] : ""}</Knopf></>}>
         <Fehleranzeige fehler={aktion.error} />
       </Dialog>
       <Dialog offen={loginRolle != null} onOffen={(o) => { if (!o) { setLoginRolle(null); loginGeben.reset(); } }} titel="Login geben" breite={480}
@@ -385,8 +397,26 @@ export function Benutzer() {
   const [gewaehlt, setGewaehlt] = useState<number | null>(Number(params.get("id")) || null);
   const [neu, setNeu] = useState(params.get("neu") === "1"); // „Benutzer anlegen“ auf der Startseite der Administration
   const [kennwort, setKennwort] = useState<Kennwort | null>(null);
-  const liste = useQuery({ queryKey: ["benutzer"], queryFn: () => alle<BenutzerTyp>("benutzer/?ordering=last_name") });
+  // ausgeblendete Testbenutzer nur auf Wunsch (Festlegung 03.10.2026)
+  const [mitAusgeblendeten, setMitAusgeblendeten] = useState(false);
+  const liste = useQuery({
+    queryKey: ["benutzer", { ausgeblendete: mitAusgeblendeten }],
+    queryFn: () => alle<BenutzerTyp>(`benutzer/?ordering=last_name${mitAusgeblendeten ? "&ausgeblendete=1" : ""}`),
+  });
   const benutzer = liste.data ?? [];
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const [alleAusblenden, setAlleAusblenden] = useState(false);
+  const ich = useIch();
+  const sichtbareTester = benutzer.filter((b) => b.ist_test && !b.ausgeblendet_am && b.id !== ich.id);
+  const ausblenden = useMutation({
+    mutationFn: () => api<{ ausgeblendet: number }>("benutzer/testbenutzer-ausblenden/", { method: "POST" }),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: ["benutzer"] });
+      setAlleAusblenden(false);
+      melden(`${r.ausgeblendet} Testbenutzer ausgeblendet.`);
+    },
+  });
   const { hash } = useLocation();
   useEffect(() => {
     if (hash === "#anmeldung" && liste.data) document.getElementById("anmeldung")?.scrollIntoView({ block: "start" });
@@ -395,7 +425,21 @@ export function Benutzer() {
   return (
     <Seite pfad={[{ text: "Administration" }, { text: "Benutzer" }]}>
       <Seitenkopf titel="Benutzer" unter="Wer darf was im EPM. Benutzer werden nie gelöscht, nur gesperrt, damit ihre Einträge zuordenbar bleiben."
-        rechts={<Knopf variante="pri" icon="plus" onClick={() => setNeu(true)}>Benutzer anlegen</Knopf>} />
+        rechts={<>
+          <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input type="checkbox" checked={mitAusgeblendeten} onChange={(e) => setMitAusgeblendeten(e.target.checked)} />Ausgeblendete zeigen
+          </label>
+          {sichtbareTester.length ? <Knopf onClick={() => { ausblenden.reset(); setAlleAusblenden(true); }}>Alle Testbenutzer ausblenden</Knopf> : null}
+          <Knopf variante="pri" icon="plus" onClick={() => setNeu(true)}>Benutzer anlegen</Knopf></>} />
+      <Dialog offen={alleAusblenden} onOffen={setAlleAusblenden} titel="Alle Testbenutzer ausblenden" breite={520}
+        beschreibung="Alle Konten mit Testzugang werden gesperrt, ihre Anmeldungen beendet, und sie erscheinen in keiner Liste mehr. Nichts wird gelöscht; einzeln wieder einblendbar."
+        fuss={<><Knopf onClick={() => setAlleAusblenden(false)}>Abbrechen</Knopf>
+          <Knopf variante="dng" laedt={ausblenden.isPending} onClick={() => ausblenden.mutate()}>{sichtbareTester.length} ausblenden</Knopf></>}>
+        <div className="flex flex-col gap-2 text-sm">
+          <span>{sichtbareTester.map((b) => b.anzeigename).join(", ")}</span>
+          <Fehleranzeige fehler={ausblenden.error} />
+        </div>
+      </Dialog>
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 items-start">
         <div className="flex flex-col gap-5 min-w-0">
           <Karte className="overflow-x-auto">

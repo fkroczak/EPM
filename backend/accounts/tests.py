@@ -347,7 +347,7 @@ class RechteJeGruppe(TestCase):
             self.assertTrue(m["mitarbeiter"][code], code)
         for code in ("plaene_anlegen", "plaene_freigeben", "audit_lesen", "akten_wieder_oeffnen"):
             self.assertFalse(m["mitarbeiter"][code], code)
-        self.assertEqual(m["betrachter"], {c["code"]: c["code"] == "akten_lesen" for c in r["rechte"]})
+        self.assertEqual(m["betrachter"], {c["code"]: c["code"] in ("akten_lesen", "testdaten_sehen") for c in r["rechte"]})
         self.assertIn(["admin", "benutzer_verwalten"], r["fest"])
         ich = client_fuer(self.mediziner).get("/api/auth/ich/").json()
         self.assertIn("vorlagen_pflegen", ich["rechte"])
@@ -686,3 +686,68 @@ class KartenGroessen(TestCase):
                 self.assertIn("bereiche", r.json())
         self.user.refresh_from_db()
         self.assertEqual(self.user.bereiche, {})
+
+
+class TestdatenAusblenden(TestCase):
+    """Festlegung 03.10.2026: „Testdaten sehen“ je Gruppe einstellbar – ohne das Recht gibt es Testpatienten und
+    Testbenutzer nicht; Testbenutzer lassen sich ausblenden (gesperrt, aus allen Listen, nicht gelöscht)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from patienten.models import Patient
+
+        cls.admin = benutzer("admin", Rolle.ADMIN)
+        cls.mitarbeiter = benutzer("mitarbeiter", Rolle.MITARBEITER)
+        cls.tester = benutzer("tester", Rolle.MITARBEITER, ist_test=True)
+        cls.echt = Patient.objects.create(nachname="Echt", vorname="E", geburtsdatum="1970-01-01")
+        cls.test = Patient.objects.create(nachname="Probe", vorname="P", geburtsdatum="1970-01-01", ist_test=True)
+
+    def ids(self, user, pfad="/api/patienten/"):
+        return {x["id"] for x in client_fuer(user).get(pfad).json()["results"]}
+
+    def test_recht_testdaten_sehen(self):
+        self.assertEqual(self.ids(self.mitarbeiter), {self.echt.id, self.test.id})  # Standard wie bisher
+        Gruppenrecht.objects.create(rolle=Rolle.MITARBEITER, recht="testdaten_sehen", erlaubt=False)
+        self.assertEqual(self.ids(self.mitarbeiter), {self.echt.id})
+        c = client_fuer(self.mitarbeiter)
+        self.assertEqual(c.get(f"/api/patienten/{self.test.id}/").status_code, 404)
+        # kein Testpatient anlegbar (verschwände sofort)
+        r = c.post("/api/patienten/", {"nachname": "Neu", "vorname": "N", "geburtsdatum": "1980-01-01",
+                                       "testpatient": True}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertFalse(r.json()["ist_test"])
+        # Testbenutzer sehen ihre Testpatienten immer
+        self.assertEqual(self.ids(self.tester), {self.test.id})
+        # Admin: fest (legt nur Testpatienten an)
+        client_fuer(self.admin).put("/api/rechte/", {"matrix": {"admin": {"testdaten_sehen": False}}}, format="json")
+        self.assertIn(self.test.id, self.ids(self.admin))
+        # Testbenutzer erscheinen ohne das Recht auch nicht in Listen (z. B. Benutzerverwaltung mit Vertretungsrecht)
+        Gruppenrecht.objects.create(rolle=Rolle.MITARBEITER, recht="benutzer_verwalten", erlaubt=True)
+        namen = {b["username"] for b in client_fuer(self.mitarbeiter).get("/api/benutzer/").json()["results"]}
+        self.assertNotIn("tester", namen)
+        self.assertIn("admin", namen)
+
+    def test_testbenutzer_ausblenden_und_einblenden(self):
+        c = client_fuer(self.admin)
+        self.assertEqual(c.post(f"/api/benutzer/{self.mitarbeiter.id}/ausblenden/").status_code, 400)
+        r = c.post(f"/api/benutzer/{self.tester.id}/ausblenden/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.tester.refresh_from_db()
+        self.assertFalse(self.tester.is_active)
+        self.assertIsNotNone(self.tester.ausgeblendet_am)
+        namen = {b["username"] for b in c.get("/api/benutzer/").json()["results"]}
+        self.assertNotIn("tester", namen)
+        namen = {b["username"] for b in c.get("/api/benutzer/?ausgeblendete=1").json()["results"]}
+        self.assertIn("tester", namen)
+        self.assertNotIn("tester", {k["benutzername"] for k in c.get("/api/benutzer/konten/").json()})
+        self.assertEqual(c.post(f"/api/benutzer/{self.tester.id}/entsperren/").status_code, 400)
+        self.assertTrue(SystemEreignis.objects.filter(art=SystemEreignis.Art.BENUTZER_GESPERRT).exists())
+        r = c.post(f"/api/benutzer/{self.tester.id}/einblenden/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.tester.refresh_from_db()
+        self.assertTrue(self.tester.is_active)
+        self.assertIsNone(self.tester.ausgeblendet_am)
+        # alle auf einmal
+        benutzer("tester2", Rolle.BETRACHTER, ist_test=True)
+        self.assertEqual(c.post("/api/benutzer/testbenutzer-ausblenden/").json(), {"ausgeblendet": 2})
+        self.assertFalse(User.objects.filter(ist_test=True, ausgeblendet_am__isnull=True).exists())

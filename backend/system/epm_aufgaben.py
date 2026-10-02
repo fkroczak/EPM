@@ -82,7 +82,7 @@ def epm_info():
     from patienten.models import Dokument, Patient
     from django_otp.plugins.otp_totp.models import TOTPDevice
 
-    konten = User.objects.filter(nur_historisch=False)
+    konten = User.objects.filter(nur_historisch=False, ausgeblendet_am__isnull=True)  # ausgeblendete Testbenutzer nicht
     mit_2fa = set(TOTPDevice.objects.filter(confirmed=True).values_list("user_id", flat=True))
     ohne_2fa = list(konten.filter(is_active=True).exclude(id__in=mit_2fa).order_by("last_name", "first_name"))
     einmal = list(konten.filter(is_active=True, muss_kennwort_aendern=True).order_by("last_name", "first_name"))

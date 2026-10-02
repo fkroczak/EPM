@@ -475,7 +475,10 @@ Rechte. Ein Konto lässt sich auf „ohne Login“ setzen (Kennwort und zweiter 
 zugeordnet) und mit <strong>Login geben</strong> wieder einbinden, z. B. als Mitarbeiter; dabei entsteht ein neues
 Einmal-Kennwort.</p>
 <p><strong>Testbenutzer</strong> (Schalter im Konto, für Betrachter, Mitarbeiter und Mediziner) sehen und bearbeiten
-ausschließlich Testpatienten.</p>
+ausschließlich Testpatienten. Nicht mehr gebrauchte Testbenutzer lassen sich <strong>ausblenden</strong> (einzeln oder
+„Alle Testbenutzer ausblenden“): gesperrt und in keiner Liste mehr, aber nicht gelöscht; „Ausgeblendete zeigen“ und
+„Einblenden“ holen sie zurück. Mit dem Recht <strong>Testdaten sehen</strong> legt man je Gruppe fest, wer
+Testpatienten und Testbenutzer überhaupt sieht.</p>
 <p>Unter <strong>Anmeldung</strong> legt die Administration fest, ob die Zwei-Faktor-Anmeldung freiwillig, Pflicht für
 Admins oder Pflicht für alle ist.</p>
 <p>Unter <strong>Rechte</strong> legt man je Gruppe (Betrachter, Mitarbeiter, Mediziner, Admin) fest, was erlaubt ist.

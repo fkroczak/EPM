@@ -37,6 +37,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from audit.models import SystemEreignis, protokolliere
+from epm.api_basis import sichtbare_benutzer, wahr
 
 from .models import Anmelderegeln, Rolle, Sitzung, User
 from .sitzungen import aktive_sitzungen, alle_sitzungen_beenden, schluessel_erneuert, sitzung_beenden
@@ -674,10 +675,10 @@ class BenutzerSerializer(serializers.ModelSerializer):
             "id", "username", "titel", "first_name", "last_name", "kuerzel", "funktion", "email",
             "rolle", "ist_test", "is_active", "nur_historisch", "anzeigename", "zweiter_faktor",
             "zweiter_faktor_pflicht", "muss_kennwort_aendern", "einmal_kennwort_gueltig_bis", "gesperrt_am", "sperrgrund",
-            "fehlversuche", "last_login", "date_joined",
+            "fehlversuche", "last_login", "date_joined", "ausgeblendet_am",
         ]
         read_only_fields = ["is_active", "nur_historisch", "muss_kennwort_aendern", "einmal_kennwort_gueltig_bis",
-                            "gesperrt_am", "sperrgrund", "fehlversuche", "last_login", "date_joined"]
+                            "gesperrt_am", "sperrgrund", "fehlversuche", "last_login", "date_joined", "ausgeblendet_am"]
 
     def get_zweiter_faktor(self, obj):
         return hat_zweiten_faktor(obj)
@@ -713,6 +714,54 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
     permission_classes = [BenutzerRecht]
     search_fields = ["username", "first_name", "last_name", "kuerzel"]
     filterset_fields = ["rolle", "is_active", "ist_test"]
+
+    def get_queryset(self):
+        """Ausgeblendete Testbenutzer nur mit ``?ausgeblendete=1`` in der Liste (einzeln immer erreichbar, damit man sie
+        wieder einblenden kann); Testbenutzer nur mit Recht „Testdaten sehen“ (Festlegung 03.10.2026)."""
+        ausgeblendete = self.action != "list" or wahr(self.request.query_params.get("ausgeblendete"))
+        return sichtbare_benutzer(self.request.user, User.objects.all(), ausgeblendete=ausgeblendete)
+
+    def _ausblenden(self, request, user):
+        user.sperren("Testbenutzer ausgeblendet")
+        user.ausgeblendet_am = timezone.now()
+        user.save(update_fields=User.SPERR_FELDER + ["ausgeblendet_am"])
+        alle_sitzungen_beenden(user)
+        protokolliere(SystemEreignis.Art.BENUTZER_GESPERRT, request, objekt=user.username, ausgeblendet=True)
+
+    @action(detail=True, methods=["post"])
+    def ausblenden(self, request, pk=None):
+        """Testbenutzer ausblenden (Festlegung 03.10.2026): gesperrt, alle Anmeldungen beendet, aus allen Listen
+        genommen – nicht gelöscht; Einträge bleiben zugeordnet. Zurück mit „einblenden“."""
+        user = self.get_object()
+        if not user.ist_test:
+            return fehler("Ausblenden gibt es nur für Testbenutzer. Echte Konten werden gesperrt oder ohne Login gesetzt.")
+        if user == request.user:
+            return fehler("Das eigene Konto kann nicht ausgeblendet werden.")
+        if user.ausgeblendet_am:
+            return fehler("Der Testbenutzer ist bereits ausgeblendet.")
+        self._ausblenden(request, user)
+        return Response(self.get_serializer(user).data)
+
+    @action(detail=False, methods=["post"], url_path="testbenutzer-ausblenden")
+    def testbenutzer_ausblenden(self, request):
+        """Alle Testbenutzer auf einmal ausblenden (außer dem eigenen Konto)."""
+        konten = list(User.objects.filter(ist_test=True, ausgeblendet_am__isnull=True, nur_historisch=False)
+                      .exclude(pk=request.user.pk))
+        for user in konten:
+            self._ausblenden(request, user)
+        return Response({"ausgeblendet": len(konten)})
+
+    @action(detail=True, methods=["post"])
+    def einblenden(self, request, pk=None):
+        """Ausgeblendeten Testbenutzer wieder einblenden und entsperren."""
+        user = self.get_object()
+        if not user.ausgeblendet_am:
+            return fehler("Der Benutzer ist nicht ausgeblendet.")
+        user.ausgeblendet_am = None
+        user.entsperren()
+        user.save(update_fields=User.SPERR_FELDER + ["ausgeblendet_am"])
+        protokolliere(SystemEreignis.Art.BENUTZER_GEAENDERT, request, objekt=user.username, eingeblendet=True)
+        return Response(self.get_serializer(user).data)
 
     def create(self, request, *args, **kwargs):
         s = self.get_serializer(data=request.data)
@@ -751,7 +800,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
                 namen = dict(Anmelderegeln.ZweiterFaktor.choices)
                 protokolliere(SystemEreignis.Art.RECHTE_GEAENDERT, request, objekt="Anmeldung",
                               zweiter_faktor=[namen[vorher], namen[wert]])
-        konten = User.objects.filter(nur_historisch=False, is_active=True)
+        konten = User.objects.filter(nur_historisch=False, is_active=True, ausgeblendet_am__isnull=True)
         ohne = [u for u in konten if not hat_zweiten_faktor(u)]
         return Response({
             "zweiter_faktor": regeln.zweiter_faktor,
@@ -782,7 +831,8 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
     @action(detail=False, methods=["get"])
     def hinweise(self, request):
         """Gesperrte Konten für den Hinweis im Audit-Log."""
-        gesperrt = User.objects.filter(gesperrt_am__isnull=False, nur_historisch=False).order_by("-gesperrt_am")
+        gesperrt = sichtbare_benutzer(request.user, User.objects.filter(gesperrt_am__isnull=False, nur_historisch=False)
+                                      ).order_by("-gesperrt_am")
         return Response([{"id": u.id, "benutzername": u.username, "anzeigename": u.anzeigename,
                           "gesperrt_am": u.gesperrt_am, "sperrgrund": u.sperrgrund, "fehlversuche": u.fehlversuche}
                          for u in gesperrt])
@@ -793,7 +843,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         Einmal-Kennwort offen oder abgelaufen, ohne zweiten Faktor, Notfall-Codes knapp. Ohne Kennwörter oder Codes,
         nur Zustände und Anzahlen."""
         zeilen = []
-        for u in User.objects.filter(nur_historisch=False).order_by("last_name", "first_name"):
+        for u in sichtbare_benutzer(request.user, User.objects.filter(nur_historisch=False)).order_by("last_name", "first_name"):
             codes = StaticToken.objects.filter(device__user=u).count()
             probleme = []
             if u.gesperrt_am:
@@ -846,6 +896,8 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user = self.get_object()
         if user.nur_historisch:
             return fehler("Historische Benutzer haben keinen Zugang.")
+        if user.ausgeblendet_am:
+            return fehler("Der Testbenutzer ist ausgeblendet. Bitte „Einblenden“ wählen.")
         vorher = user.sperrgrund
         user.entsperren()
         user.save(update_fields=User.SPERR_FELDER)

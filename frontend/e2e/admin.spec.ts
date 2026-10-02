@@ -392,6 +392,44 @@ test("Benutzer ohne Login: anlegen, setzen, wieder einbinden; Rolle „Keine Ber
   await admin.ende();
 });
 
+test("Testbenutzer ausblenden und wieder einblenden; Recht „Testdaten sehen“ je Gruppe", async ({ page }) => {
+  const admin = await apiAls("admin");
+  const name = eindeutig("e2e.tester");
+  const konto = await admin.post("benutzer/", { username: name, first_name: "Tilo", last_name: "Tester", rolle: "mitarbeiter", ist_test: true });
+  await page.goto(`/admin/benutzer?id=${konto.id}`);
+  const detail = page.getByTestId("benutzer-detail");
+  await expect(detail).toContainText("Testbenutzer:");
+  await expect(page.getByRole("button", { name: "Alle Testbenutzer ausblenden" })).toBeVisible();
+  await detail.getByRole("button", { name: "Testbenutzer ausblenden" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Testbenutzer ausblenden" }).click();
+  await expect(page.getByText("Testbenutzer ausgeblendet.")).toBeVisible();
+  const liste = page.getByTestId("benutzerliste");
+  await expect(liste.getByRole("row").filter({ hasText: name })).toHaveCount(0);
+  const gesperrt = await admin.get(`benutzer/${konto.id}/`);
+  expect([gesperrt.is_active, !!gesperrt.ausgeblendet_am]).toEqual([false, true]);
+  // nur mit „Ausgeblendete zeigen“ – dort wieder einblenden
+  await page.getByRole("checkbox", { name: "Ausgeblendete zeigen" }).check();
+  const zeile = liste.getByRole("row").filter({ hasText: name });
+  await expect(zeile).toContainText("ausgeblendet");
+  await zeile.getByRole("button", { name: "T. Tester" }).click();
+  await detail.getByTestId("ausgeblendet-hinweis").getByRole("button", { name: "Einblenden" }).click();
+  await expect(page.getByText("Testbenutzer wieder eingeblendet.")).toBeVisible();
+  expect((await admin.get(`benutzer/${konto.id}/`)).is_active).toBe(true);
+  // Recht „Testdaten sehen“: je Gruppe einstellbar, für Admin fest
+  const rechte = page.getByTestId("rechte");
+  await expect(rechte.getByRole("checkbox", { name: "Admin: Testdaten sehen (Testpatienten und Testbenutzer)" })).toBeDisabled();
+  await expect(rechte.getByRole("checkbox", { name: "Betrachter: Testdaten sehen (Testpatienten und Testbenutzer)" })).toBeChecked();
+  // ohne das Recht sieht der Betrachter keine Testpatienten
+  const betrachter = await apiAls("betrachter");
+  expect((await betrachter.get("patienten/?test=nur")).count).toBeGreaterThan(0);
+  await admin.put("rechte/", { matrix: { betrachter: { testdaten_sehen: false } } });
+  expect((await betrachter.get("patienten/?test=nur")).count).toBe(0);
+  await admin.put("rechte/", { matrix: { betrachter: { testdaten_sehen: true } } });
+  expect((await betrachter.get("patienten/?test=nur")).count).toBeGreaterThan(0);
+  await betrachter.ende();
+  await admin.ende();
+});
+
 test("Testdaten auf Ausgangsstand zurücksetzen (nur Testpatienten)", async ({ page }) => {
   const admin = await apiAls("admin");
   const echte = (await admin.get("patienten/?test=ohne&seitengroesse=1")).count;

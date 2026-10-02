@@ -54,6 +54,8 @@ class User(AbstractUser):
     kennwort_geaendert_am = models.DateTimeField("Kennwort geändert am", null=True, blank=True)
     fehlversuche = models.PositiveSmallIntegerField("Fehlversuche seit letzter Anmeldung", default=0)
     gesperrt_am = models.DateTimeField("Gesperrt am", null=True, blank=True)
+    # Testbenutzer ausblenden (Festlegung 03.10.2026): gesperrt und aus allen Listen genommen, nicht gelöscht
+    ausgeblendet_am = models.DateTimeField("Ausgeblendet am", null=True, blank=True)
     sperrgrund = models.CharField("Sperrgrund", max_length=200, blank=True)
     darstellung = models.JSONField("Darstellung", default=dict, blank=True)
     startseite = models.JSONField("Startseite (Karten)", default=dict, blank=True)

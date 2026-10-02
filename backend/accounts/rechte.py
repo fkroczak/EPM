@@ -14,6 +14,9 @@ Festlegungen vom 01.10.2026:
 - Festlegungen 02.10.2026 (Fehlerliste): Admins dürfen auch bei echten Akten Dokumente einem anderen Patienten zuordnen
   und Akten abschließen (wie schon endgültig löschen). Neue Rolle „Keine Berechtigung“: keinerlei Rechte, nicht
   einstellbar; Konten ohne Login haben immer diese Rolle.
+- Festlegung 03.10.2026: „Testdaten sehen“ (Testpatienten und Testbenutzer) je Gruppe einstellbar – ohne das Recht
+  erscheinen sie nirgends. Standard: alle Rollen wie bisher; Admin fest (legt nur Testpatienten an und verlöre sonst
+  alles, was er schreiben darf). Testbenutzer sehen ihre Testpatienten immer.
 Für Betrachter gilt die Rollenmatrix aus dem Entwurf 17.
 
 Was nicht ausdrücklich in der Datenbank steht, kommt aus STANDARD. Testbenutzer erhalten nie
@@ -52,6 +55,9 @@ RECHTE = [
     ("benutzer_verwalten", "Benutzer und Rechte verwalten",
      "Benutzer anlegen, sperren, Einmal-Kennwort, 2FA zurücksetzen, Rechte der Gruppen"),
     ("backup_verwalten", "Sicherungen verwalten", "Sicherung starten, wiederherstellen"),
+    ("testdaten_sehen", "Testdaten sehen (Testpatienten und Testbenutzer)",
+     "ohne dieses Recht erscheinen Testpatienten (Nr. ab 9001) und Testbenutzer nirgends – nicht in Listen, Suche, "
+     "Kalender, Startseite oder Auswahlfeldern; Testbenutzer selbst sehen ihre Testpatienten immer"),
     ("testdaten_zuruecksetzen", "Testdaten zurücksetzen", ""),
     ("system_verwalten", "Systemverwaltung (Server und EPM)",
      "Auslastung, Ubuntu-Updates, Neustart, Wartung von Datenbank und Dateien, Hinweise an alle Benutzer; Standard nur "
@@ -90,11 +96,12 @@ OHNE_RECHTE = {Rolle.KEINE}
 
 STANDARD = {
     Rolle.KEINE: set(),
-    Rolle.BETRACHTER: {"akten_lesen"},
+    Rolle.BETRACHTER: {"akten_lesen", "testdaten_sehen"},
     # Datenschutz: Mitarbeiter erfassen Erklärungen und Anfragen und schließen freigegebene Pläne ab;
     # entscheiden, einschränken und löschen bleibt beim Mediziner
     Rolle.MITARBEITER: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
-                        "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten", "plaene_abschliessen"},
+                        "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten", "plaene_abschliessen",
+                        "testdaten_sehen"},
     Rolle.MEDIZINER: _ALLE - _ADMIN_SPEZIAL,
     Rolle.ADMIN: _ALLE - {c for c, rollen in NUR_ROLLEN.items() if Rolle.ADMIN not in rollen},
 }
@@ -103,7 +110,7 @@ STANDARD = {
 NUR_TESTPATIENTEN_SCHREIBEN = {Rolle.ADMIN}
 
 # Diese Rechte kann niemand entziehen (sonst sperrt sich die Administration aus)
-FEST = {(Rolle.ADMIN, "benutzer_verwalten"), (Rolle.ADMIN, "akten_lesen")}
+FEST = {(Rolle.ADMIN, "benutzer_verwalten"), (Rolle.ADMIN, "akten_lesen"), (Rolle.ADMIN, "testdaten_sehen")}
 
 # Testbenutzer arbeiten nur mit Testpatienten; alles, was darüber hinaus wirkt, bleibt verwehrt
 NUR_ECHTE_BENUTZER = {"versorger_pflegen", "vorlagen_pflegen", "audit_lesen", "benutzer_verwalten",
@@ -146,6 +153,11 @@ def rechte_fuer(user) -> frozenset:
 
 def hat_recht(user, code: str) -> bool:
     return code in rechte_fuer(user)
+
+
+def sieht_testdaten(user) -> bool:
+    """Testpatienten und Testbenutzer sichtbar? Recht „Testdaten sehen“; Testbenutzer sehen ihre Testpatienten immer."""
+    return bool(getattr(user, "ist_test", False)) or hat_recht(user, "testdaten_sehen")
 
 
 def schreibt_nur_testpatienten(user) -> bool:
