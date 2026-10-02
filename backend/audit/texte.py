@@ -139,6 +139,8 @@ def beschreibung(e) -> str:
         from accounts.models import Rolle
 
         rolle = dict(Rolle.choices).get(d.get("rolle"), d.get("rolle", ""))
+        if d.get("quelle") == "altdaten":
+            return f"Benutzer {e.objekt} bei der Übernahme der Altdaten angelegt ({rolle}), noch ohne Kennwort"
         return f"Benutzer {e.objekt} angelegt ({rolle}), Einmal-Kennwort erzeugt"
     if art == A.BENUTZER_GEAENDERT:
         if d.get("entsperrt"):

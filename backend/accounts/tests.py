@@ -313,7 +313,7 @@ class RechteJeGruppe(TestCase):
         self.assertFalse(m["mitarbeiter"]["dokumente_loeschen"])
         # Festlegung 02.10.2026: Systemverwaltung (Server und EPM) nur Admin
         self.assertEqual(r["nur_rollen"], {"dokumente_loeschen": ["mediziner"], "akten_loeschen": ["mediziner"],
-                                           "system_verwalten": ["admin"]})
+                                           "system_verwalten": ["admin"], "altdaten_importieren": ["admin"]})
         # Datenschutz: Mitarbeiter erfassen und schließen freigegebene Pläne ab, entscheiden und löschen nicht
         for code in ("datenschutz_bearbeiten", "plaene_abschliessen"):
             self.assertTrue(m["mitarbeiter"][code], code)

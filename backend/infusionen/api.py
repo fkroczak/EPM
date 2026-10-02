@@ -77,11 +77,11 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
             "pantozol_stufe", "pantozol_tage", "bemerkung", "positionen", "geaenderte_felder",
             "erstellt_am", "erstellt_von_name", "freigegeben_am", "freigegeben_von_name",
             "freigabe_weg", "freigabe_weg_name", "freigabe_datum", "abgeschlossen_von_name", "freigabe_nachweis",
-            "freigabevermerk",
+            "freigabevermerk", "herkunft",
             "pdf_datei", "pdf_sha256", "vorlage_version",
         ]
         read_only_fields = ["patient", "status", "vorgaenger", "erstellt_am", "freigegeben_am",
-                            "freigabe_weg", "freigabe_datum", "freigabe_nachweis",
+                            "freigabe_weg", "freigabe_datum", "freigabe_nachweis", "herkunft",
                             "pdf_datei", "pdf_sha256", "vorlage_version"]
 
     def get_vitamine_namen(self, obj):
@@ -239,7 +239,7 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
             "rate_ml_h": x.rate_ml_h, "tage_pro_woche": x.tage_pro_woche,
             "erstellt_am": x.erstellt_am, "erstellt_von": benutzername(x.erstellt_von),
             "freigegeben_am": x.freigegeben_am, "freigegeben_von": benutzername(x.freigegeben_von),
-            "pdf": bool(x.pdf_sha256), "pdf_sha256": x.pdf_sha256 or None,
+            "pdf": bool(x.pdf_sha256), "pdf_sha256": x.pdf_sha256 or None, "herkunft": x.herkunft,
             "aelter_als_grenze": x.status == Infusionsplan.Status.AKTUELL and x.gueltig_ab < grenze,
         } for x in gruppen[gruppe].order_by(*reihenfolge, "id")[:1000]]
         return Response({"zaehler": {k: v.count() for k, v in gruppen.items()},
@@ -262,8 +262,9 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
         Ergebnis im Kopf ``X-EPM-Pruefung: ok|abweichend``. Die PDF wird nie neu erzeugt."""
         plan = self.get_object()
         if not plan.pdf_datei:
-            return Response({"fehler": "Für diesen Plan ist keine PDF gespeichert (vor Einführung der PDF-Erzeugung "
-                                       "freigegeben oder noch Entwurf)."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"fehler": "Für diesen Plan ist keine PDF gespeichert (aus dem Altsystem übernommen, vor "
+                                       "Einführung der PDF-Erzeugung freigegeben oder noch Entwurf)."},
+                            status=status.HTTP_404_NOT_FOUND)
         pfad = settings.EPM_DOKUMENTE / plan.pdf_datei
         if not pfad.is_file():
             return Response({"fehler": "Die gespeicherte PDF fehlt im Dokumentenverzeichnis."},

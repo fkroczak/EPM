@@ -6,6 +6,7 @@ django-otp>=1.7,<1.8
 django-simple-history>=3.13,<4
 psycopg[binary]>=3.3,<3.4
 nh3>=0.3,<0.4
+ftfy>=6.3,<7                 # Altdaten-Import: doppelt kodierte Umlaute reparieren (Regel 3 der Datenanalyse)
 qrcode>=8.2,<9
 gunicorn>=26,<27
 weasyprint>=66,<70           # PDF-Erzeugung (offline, braucht Pango aus dem Image)

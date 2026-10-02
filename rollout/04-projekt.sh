@@ -19,6 +19,10 @@ chown "$EPM_APP_UID:101" "$B/data" "$B/data/dokumente"; chmod 0750 "$B/data"; ch
 # Löschliste (Art. 17 DSGVO): nur das Backend; bewusst nicht im Dokumentordner, damit eine Wiederherstellung sie nicht ersetzt
 install -d -m 0700 -o "$EPM_APP_UID" -g 101 "$B/data/loeschliste"
 chown "$EPM_APP_UID:101" "$B/data/loeschliste"; chmod 0700 "$B/data/loeschliste"
+# Übernahme der Altdaten (Administration › Import): Hierhin kommen die Dokumente des Altsystems (PatData/<PatientenID>/…).
+# Das Backend liest nur (Gruppe 101); setgid vererbt die Gruppe an alles, was hineinkopiert wird.
+install -d -m 2750 -o root -g 101 "$B/data/import"
+chown root:101 "$B/data/import"; chmod 2750 "$B/data/import"
 install -d -m 0750 -o 101 -g 101 "$B/nginx/certs"
 # Systemverwaltung (Administration › System): das Backend legt Aufträge ab, der Systemagent (root) schreibt den Status
 install -d -m 0755 "$B/system" "$B/system/status" "$B/system/status/auftraege"
