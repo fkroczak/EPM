@@ -6,6 +6,7 @@ import { Laden } from "./components/ui/basis";
 import { Seite, Shell } from "./components/layout/Shell";
 import { Anmeldung } from "./seiten/Anmeldung";
 import { Akte } from "./seiten/akte/Akte";
+import { AkteDatenschutz } from "./seiten/akte/Datenschutz";
 import { Dokumente } from "./seiten/akte/Dokumente";
 import { Kontakte } from "./seiten/akte/Kontakte";
 import { PlanEditor } from "./seiten/akte/PlanEditor";
@@ -18,6 +19,7 @@ import { System } from "./seiten/admin/System";
 import { Infusionsplaene } from "./seiten/Infusionsplaene";
 import { Kalender } from "./seiten/Kalender";
 import { Benutzer } from "./seiten/admin/Benutzer";
+import { Datenschutz } from "./seiten/Datenschutz";
 import { Vorlagen } from "./seiten/admin/Vorlagen";
 import { Konto } from "./seiten/Konto";
 import { PatientNeu } from "./seiten/PatientNeu";
@@ -37,9 +39,9 @@ function NichtGefunden() {
 
 /** Seite nur mit dem passenden Recht (die API prüft zusätzlich jede Anfrage). Ohne Recht gibt es die Seite für
  *  diese Person nicht: weiter zur Startseite, ohne Hinweis auf Rechte (Festlegung 01.10.2026). */
-function MitRecht({ recht, children }: { recht: Recht; titel?: string; children: ReactNode }) {
+function MitRecht({ recht, children }: { recht: Recht | Recht[]; titel?: string; children: ReactNode }) {
   const { darf } = useAuth();
-  if (darf(recht)) return <>{children}</>;
+  if ((Array.isArray(recht) ? recht : [recht]).some(darf)) return <>{children}</>;
   return <Navigate to="/" replace />;
 }
 
@@ -61,6 +63,7 @@ const router = createBrowserRouter([
           { path: "plaene/neu", element: <PlanEditor /> },
           { path: "plaene/:planId/bearbeiten", element: <PlanEditor key="bearbeiten" /> },
           { path: "dokumente", element: <Dokumente /> },
+          { path: "datenschutz", element: <AkteDatenschutz /> },
           { path: "verlauf", element: <Verlauf /> },
         ],
       },
@@ -68,6 +71,7 @@ const router = createBrowserRouter([
       { path: "infusionsplaene", element: <MitRecht recht="akten_lesen" titel="Infusionspläne"><Infusionsplaene /></MitRecht> },
       { path: "versorger", element: <Versorger /> },
       { path: "aerzte", element: <Aerzte /> },
+      { path: "datenschutz", element: <MitRecht recht={["datenschutz_bearbeiten", "datenschutz_entscheiden"]}><Datenschutz /></MitRecht> },
       { path: "konto", element: <Konto /> },
       { path: "admin/benutzer", element: <MitRecht recht="benutzer_verwalten" titel="Benutzer"><Benutzer /></MitRecht> },
       { path: "admin/vorlagen", element: <MitRecht recht="vorlagen_pflegen" titel="Vorlagen"><Vorlagen /></MitRecht> },

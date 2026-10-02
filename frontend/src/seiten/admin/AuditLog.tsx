@@ -16,6 +16,7 @@ const GRUPPEN: { wert: string; text: string }[] = [
   { wert: "anmeldung", text: "Anmeldung" }, { wert: "fehlversuch", text: "Fehlversuch" }, { wert: "benutzer", text: "Benutzer" },
   { wert: "vorlage", text: "Vorlage" }, { wert: "backup", text: "Backup" }, { wert: "export", text: "Export" },
   { wert: "abschluss", text: "Abschluss" }, { wert: "infusionsplan", text: "Infusionsplan" }, { wert: "dokument", text: "Dokument" }, { wert: "system", text: "System" },
+  { wert: "datenschutz", text: "Datenschutz" },
 ];
 const ZEITRAEUME: Record<string, { text: string; tage: number | null }> = {
   "7": { text: "Letzte 7 Tage", tage: 7 }, "30": { text: "Letzte 30 Tage", tage: 30 }, jahr: { text: "Dieses Jahr", tage: null }, alles: { text: "Alles", tage: null },
@@ -101,7 +102,9 @@ export function AuditLog() {
       <div className="meldung info flex gap-2.5 items-start text-[0.8125rem] leading-normal">
         <Icon name="schloss" />
         <span>Das Audit-Log wird automatisch geschrieben und kann von niemandem geändert oder gelöscht werden, auch nicht vom Admin.
-          Änderungen an Patientendaten stehen im Reiter „Verlauf“ der jeweiligen Akte.</span>
+          Änderungen an Patientendaten stehen im Reiter „Verlauf“ der jeweiligen Akte. Zwei Ausnahmen aus dem Datenschutz, beide
+          selbst protokolliert: Wird eine Akte endgültig gelöscht, bleiben ihre Einträge hier ohne Namen und Inhalte. Ist unter
+          Vorlagen › Grenzwerte eine Aufbewahrung für das Audit-Log eingestellt, werden ältere Einträge entfernt.</span>
       </div>
     </Seite>
   );

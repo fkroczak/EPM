@@ -5,7 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { abfrage, api } from "@/lib/api";
 import { useAerzteListe, usePraeparate, useVersorgerListe } from "@/lib/daten";
 import { datum, uhrzeit } from "@/lib/format";
-import { ABSCHLUSSANLAESSE, ARZTROLLEN, GESCHLECHTER, GEWICHTSQUELLEN, TERMINARTEN, ppiName, ppiZeiten } from "@/lib/typen";
+import { ABSCHLUSSANLAESSE, ANFRAGEARTEN, ANFRAGE_ERGEBNISSE, ARZTROLLEN, ERKLAERUNGEN, FREIGABEWEGE, GESCHLECHTER, GEWICHTSQUELLEN,
+  TERMINARTEN, ppiName, ppiZeiten } from "@/lib/typen";
 import type { Auswahlwert, Verlaufseintrag } from "@/lib/typen";
 import { Auswahl, Chip, Fehleranzeige, Karte, Knopf, Laden, Leer, Segmente } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
@@ -17,11 +18,12 @@ const BEREICHE: { wert: string; text: string }[] = [
   { wert: "therapie", text: "Therapie" }, { wert: "empfehlung", text: "Empfehlung" }, { wert: "kontakte", text: "Kontakte" },
   { wert: "gewichte", text: "Gewicht" }, { wert: "termine", text: "Termine" }, { wert: "infusionsplaene", text: "Infusionspläne" },
   { wert: "dokumente", text: "Dokumente" }, { wert: "aerzte", text: "Ärzte" }, { wert: "bezugspersonen", text: "Bezugspersonen" },
+  { wert: "erklaerungen", text: "Erklärungen" }, { wert: "datenschutz", text: "Datenschutz" },
 ];
 const BEREICH_EINZELN: Record<string, string> = {
   stammdaten: "Stammdaten", diagnose: "Diagnose", therapie: "Therapie", empfehlung: "Empfehlung", kontakte: "Kontakt",
   gewichte: "Gewicht", termine: "Termin", infusionsplaene: "Infusionsplan", dokumente: "Dokument",
-  aerzte: "Arzt", bezugspersonen: "Bezugsperson",
+  aerzte: "Arzt", bezugspersonen: "Bezugsperson", erklaerungen: "Erklärung", datenschutz: "Datenschutz-Anfrage",
 };
 
 const FELDER: Record<string, string> = {
@@ -43,10 +45,19 @@ const FELDER: Record<string, string> = {
   magnesium_mmol: "Magnesium", spurenelemente: "Spurenelemente", katheterschutz: "Katheterblock", laufzeit_h: "Laufzeit (h)",
   tage_pro_woche: "Tage pro Woche", pantozol_stufe: "Protonenpumpenhemmer", pantozol_tage: "PPI-Zeiten", kcal_manuell: "Energie (manuell)",
   gesamtvolumen_ml: "Gesamtvolumen (ml)", volumen_gewicht_kg: "Gewicht für das Gesamtvolumen (kg)",
+  // Datenschutz
+  aufbewahrung_bis: "Aufbewahrung verlängert bis", aufbewahrung_grund: "Grund der längeren Aufbewahrung",
+  eingeschraenkt_am: "Verarbeitung eingeschränkt am", einschraenkung_grund: "Grund der Einschränkung",
+  erteilt_am: "erteilt am", widerrufen_am: "widerrufen am", widerruf_notiz: "Notiz zum Widerruf", dokument: "Dokument (Scan)",
+  vorlage_version: "Stand der Vorlage", eingegangen_am: "eingegangen am", gestellt_von: "gestellt von", inhalt: "Inhalt",
+  frist_verlaengert: "Frist verlängert", verlaengerung_grund: "Grund der Verlängerung", ergebnis: "Ergebnis",
+  begruendung: "Begründung", mitgeteilt_am: "mitgeteilt am",
+  freigabe_weg: "Weg der Freigabe", freigabe_datum: "Freigabe durch den Mediziner am",
 };
 /** technische Felder, die sich bei jeder Aktion mitändern */
 const VERBORGEN = new Set(["geaendert_am", "erfasst_am", "angelegt_am", "hochgeladen_am", "freigegeben_am", "freigegeben_von",
-  "erledigt_von", "storniert_von", "angelegt_von", "erfasst_von", "hochgeladen_von", "erstellt_von", "erstellt_am", "id"]);
+  "erledigt_von", "storniert_von", "angelegt_von", "erfasst_von", "hochgeladen_von", "erstellt_von", "erstellt_am", "id",
+  "eingeschraenkt_von", "abgeschlossen_von", "freigabe_nachweis", "pdf_datei", "pdf_sha256"]);
 const TEXTFELDER = new Set(["diagnose", "therapie", "empfehlung", "bemerkung", "text"]);
 
 function useWertAnzeige() {
@@ -66,7 +77,9 @@ function useWertAnzeige() {
     if (feld === "geschlecht") return GESCHLECHTER[wert] ?? wert;
     if (feld === "quelle") return GEWICHTSQUELLEN[wert] ?? wert;
     if (feld === "abschluss_anlass") return ABSCHLUSSANLAESSE[wert] ?? wert;
-    if (feld === "art") return TERMINARTEN[wert] ?? wert;
+    if (feld === "art") return TERMINARTEN[wert] ?? (ERKLAERUNGEN as Record<string, string>)[wert] ?? ANFRAGEARTEN[wert] ?? wert;
+    if (feld === "ergebnis") return ANFRAGE_ERGEBNISSE[wert] ?? wert;
+    if (feld === "freigabe_weg") return FREIGABEWEGE[wert] ?? wert;
     if (feld === "pantozol_stufe") return ppiName(wert);
     if (feld === "pantozol_tage") return ppiZeiten(wert) || wert;
     if (wert === "True") return "ja";
@@ -153,7 +166,8 @@ export function Verlauf() {
       <div className="meldung info flex gap-2.5 items-start text-[0.8125rem] leading-normal">
         <Icon name="schloss" />
         <span>Der Verlauf wird automatisch geschrieben und kann von niemandem geändert oder gelöscht werden, auch nicht von der
-          Administration. Stornierte Einträge bleiben hier sichtbar.</span>
+          Administration. Stornierte Einträge bleiben hier sichtbar. Erst wenn die Akte nach Ablauf der Aufbewahrungsfrist oder
+          auf Antrag endgültig gelöscht wird, wird auch ihr Verlauf gelöscht.</span>
       </div>
     </div>
   );

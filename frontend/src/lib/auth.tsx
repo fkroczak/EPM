@@ -20,7 +20,8 @@ type AuthWert = {
 };
 
 /** Rechte, die Patientendaten verändern (siehe backend/accounts/rechte.py) */
-const PATIENTENDATEN: Recht[] = ["eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben", "akten_abschliessen"];
+const PATIENTENDATEN: Recht[] = ["eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben", "akten_abschliessen",
+  "plaene_abschliessen", "datenschutz_bearbeiten", "datenschutz_entscheiden", "akten_loeschen"];
 
 const AuthKontext = createContext<AuthWert | null>(null);
 

@@ -36,6 +36,8 @@ const PRUEFEN: Record<string, string> = {
   nickelallergie: "Nickelallergie nicht erfasst",
   kein_versorger: "Versorger nicht erfasst",
   kein_kontakt: "Lange kein Kontakt",
+  erklaerungen: "Erklärungen zum Datenschutz fehlen",
+  abschluss_pruefen: "Abschluss prüfen (lange kein Kontakt)",
 };
 
 const SORTIERUNG_TEXT: Record<string, string> = {

@@ -1,12 +1,14 @@
 /** Entwurf 8 · Infusionspläne: Liste, Ansicht wie PDF, Vergleich mit Vorgänger, Freigabe, Verwerfen. */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { abfrage, alle, api, apiDatei } from "@/lib/api";
+import { ApiFehler, abfrage, alle, api, apiDatei } from "@/lib/api";
+import type { Feldfehler } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
-import { datum, zahl, zeitpunkt } from "@/lib/format";
+import { datum, eingabeDatum, heuteIso, zahl, zeitpunkt } from "@/lib/format";
+import { FREIGABEWEGE } from "@/lib/typen";
 import type { Plan, Vergleich } from "@/lib/typen";
-import { Chip, Fehleranzeige, Karte, Knopf, Laden, Leer, Meldung, Segmente, cx } from "@/components/ui/basis";
+import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Leer, Meldung, Segmente, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
@@ -114,6 +116,94 @@ function FreigabeDialog({ plan, offen, onOffen }: { plan: Plan; offen: boolean; 
   );
 }
 
+/** Freigabe auf Anordnung: Der Mediziner hat den Entwurf außerhalb von EPM freigegeben (z. B. per E-Mail); wer den Plan
+ *  hier abschließt, hält fest, wer freigegeben hat, wann, auf welchem Weg – und hängt den Nachweis an. */
+function AbschliessenDialog({ plan, offen, onOffen }: { plan: Plan; offen: boolean; onOffen: (o: boolean) => void }) {
+  const { patient } = useAkte();
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const [von, setVon] = useState("");
+  const [am, setAm] = useState(datum(heuteIso()));
+  const [weg, setWeg] = useState("email");
+  const [datei, setDatei] = useState<File | null>(null);
+  const eingabe = useRef<HTMLInputElement>(null);
+  const mediziner = useQuery({
+    queryKey: ["freigebende", patient.id],
+    queryFn: () => api<{ id: number; name: string }[]>(`infusionsplaene/freigebende/${abfrage({ patient: patient.id })}`),
+    enabled: offen,
+  });
+  useEffect(() => { if (offen) { setAm(datum(heuteIso())); setWeg("email"); setDatei(null); } }, [offen]);
+  useEffect(() => {
+    if (!von && mediziner.data?.length === 1) setVon(String(mediziner.data[0].id));
+  }, [mediziner.data, von]);
+  const pflicht = weg === "email" || weg === "schriftlich";
+  const abschliessen = useMutation({
+    mutationFn: () => {
+      const iso = eingabeDatum(am);
+      if (!iso) throw new ApiFehler(400, "", null, { freigegeben_am: "Bitte als TT.MM.JJJJ eingeben." });
+      const form = new FormData();
+      form.append("freigegeben_von", von);
+      form.append("freigegeben_am", iso);
+      form.append("weg", weg);
+      if (datei) form.append("nachweis", datei);
+      return api<Plan>(`infusionsplaene/${plan.id}/abschliessen/`, { form });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["patient", patient.id] });
+      void qc.invalidateQueries({ queryKey: ["startseite"] });
+      melden("Plan abgeschlossen.");
+      onOffen(false);
+    },
+  });
+  const f: Feldfehler = abschliessen.error instanceof ApiFehler ? abschliessen.error.felder : {};
+  return (
+    <Dialog offen={offen} onOffen={onOffen} titel="Plan nach Freigabe abschließen" breite={600}
+      beschreibung={`Plan gültig ab ${datum(plan.gueltig_ab)} für ${name(patient)}`}
+      fuss={<><Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
+        <Knopf variante="pri" icon="haken" laedt={abschliessen.isPending} disabled={!von || (pflicht && !datei)} onClick={() => abschliessen.mutate()}>Abschließen</Knopf></>}>
+      <div className="flex flex-col gap-3" data-testid="plan-abschliessen">
+        <span className="text-sm">Der Mediziner hat diesen Entwurf geprüft und außerhalb von EPM freigegeben. Der Plan wird damit zum
+          aktuell gültigen Plan und ist danach unveränderlich. Der Freigabevermerk auf der PDF nennt, wer freigegeben und wer
+          abgeschlossen hat.</span>
+        <div className="grid grid-cols-2 gap-3">
+          <Feld label="Freigegeben von" pflicht fehler={f.freigegeben_von} className="col-span-2">
+            {(p) => (
+              <Auswahl {...p} value={von} onChange={(e) => setVon(e.target.value)}>
+                <option value="">— bitte wählen —</option>
+                {(mediziner.data ?? []).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </Auswahl>
+            )}
+          </Feld>
+          <Feld label="Freigegeben am" pflicht fehler={f.freigegeben_am}>
+            {(p) => <Eingabe {...p} className="num" value={am} onChange={(e) => setAm(e.target.value)} placeholder="TT.MM.JJJJ" />}
+          </Feld>
+          <Feld label="Weg der Freigabe" pflicht fehler={f.weg}>
+            {(p) => (
+              <Auswahl {...p} value={weg} onChange={(e) => setWeg(e.target.value)}>
+                {["email", "telefon", "persoenlich", "schriftlich"].map((k) => <option key={k} value={k}>{FREIGABEWEGE[k]}</option>)}
+              </Auswahl>
+            )}
+          </Feld>
+        </div>
+        <div className="feld">
+          <span>Nachweis der Freigabe{pflicht ? " *" : " (optional)"}</span>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <Knopf icon="hochladen" onClick={() => eingabe.current?.click()}>Datei auswählen</Knopf>
+            <span className="text-sm">{datei ? datei.name : <span className="gedaempft">keine Datei gewählt</span>}</span>
+            <input ref={eingabe} type="file" hidden aria-label="Nachweis der Freigabe" accept=".pdf,.jpg,.jpeg,.png,.txt,application/pdf,image/jpeg,image/png,text/plain"
+              onChange={(e) => setDatei(e.target.files?.[0] ?? null)} />
+          </div>
+          {f.nachweis ? <span className="fehlertext" role="alert">{f.nachweis}</span>
+            : <span className="hinweis">{pflicht ? "z. B. die E-Mail als PDF oder Bildschirmfoto." : "Bei telefonischer oder persönlicher Freigabe ohne Nachweis möglich."}{" "}
+              Liegt danach unter „Dokumente“ (Typ „Freigabe“) und bleibt bei diesem Plan.</span>}
+        </div>
+        <Fehleranzeige fehler={mediziner.error} />
+        {abschliessen.error && !Object.keys(f).length ? <Fehleranzeige fehler={abschliessen.error} /> : null}
+      </div>
+    </Dialog>
+  );
+}
+
 /** Gespeicherte PDF (F37): vor der Anzeige prüft der Server die Prüfsumme. */
 export function PlanPdfDialog({ plan, offen, onOffen }: { plan: Pick<Plan, "id" | "gueltig_ab" | "pdf_sha256">; offen: boolean;
   onOffen: (o: boolean) => void }) {
@@ -152,6 +242,7 @@ export function Plaene() {
   const navigate = useNavigate();
   const [modus, setModus] = useState<"ansicht" | "vergleich">("ansicht");
   const [freigabe, setFreigabe] = useState(false);
+  const [abschluss, setAbschluss] = useState(false);
   const [verwerfen, setVerwerfen] = useState(false);
   const [pdf, setPdf] = useState(false);
   const qc = useQueryClient();
@@ -180,8 +271,11 @@ export function Plaene() {
   const offen = !patient.ist_abgeschlossen;
   const anlegen = offen && darfBei("plaene_anlegen", patient);
   const freigeben = darfBei("plaene_freigeben", patient);
+  // Abschließen nach Freigabe außerhalb von EPM: für alle, die nicht selbst freigeben (z. B. Mitarbeiter)
+  const abschliessen = offen && !freigeben && darfBei("plaene_abschliessen", patient);
   useOhneRechtSchliessen(anlegen, () => setVerwerfen(false));
   useOhneRechtSchliessen(freigeben, () => setFreigabe(false));
+  useOhneRechtSchliessen(abschliessen, () => setAbschluss(false));
   const entwurfDa = liste.some((p) => p.status === "entwurf");
 
   return (
@@ -221,6 +315,8 @@ export function Plaene() {
               <span className="text-[0.8125rem] gedaempft max-w-[70ch]">
                 {gewaehlt.status === "entwurf"
                   ? "Entwurf: nur für das Team sichtbar, noch nicht beim Versorger."
+                  : gewaehlt.abgeschlossen_von_name
+                    ? `Freigegeben am ${datum(gewaehlt.freigabe_datum)} von ${gewaehlt.freigegeben_von_name ?? "—"} (${gewaehlt.freigabe_weg_name}); im System abgeschlossen am ${zeitpunkt(gewaehlt.freigegeben_am)} von ${gewaehlt.abgeschlossen_von_name}.${gewaehlt.pdf_sha256 ? " Die PDF ist mit Prüfsumme gespeichert und wird nie neu erzeugt." : ""}`
                   : `Freigegeben am ${zeitpunkt(gewaehlt.freigegeben_am)}${gewaehlt.freigegeben_von_name ? ` von ${gewaehlt.freigegeben_von_name}` : ""}. ${gewaehlt.pdf_sha256 ? " Die PDF ist mit Prüfsumme gespeichert und wird nie neu erzeugt." : " Für diesen Plan ist keine PDF gespeichert."}`}
               </span>
             </div>
@@ -230,6 +326,7 @@ export function Plaene() {
                 <Knopf onClick={() => setVerwerfen(true)}>Verwerfen</Knopf>
                 {darfBei("plaene_freigeben", patient) ? <Knopf variante="pri" icon="haken" onClick={() => setFreigabe(true)}>Freigeben</Knopf> : null}
               </> : null}
+              {gewaehlt.status === "entwurf" && abschliessen ? <Knopf variante="pri" icon="haken" onClick={() => setAbschluss(true)}>Nach Freigabe abschließen</Knopf> : null}
               {gewaehlt.status !== "entwurf" ? <>
                 <Knopf icon="dokument" disabled={!gewaehlt.pdf_sha256} onClick={() => setPdf(true)}
                   title={gewaehlt.pdf_sha256 ? undefined : "Für diesen Plan ist keine PDF gespeichert (vor Einführung der PDF-Erzeugung freigegeben)."}>PDF öffnen</Knopf>
@@ -241,6 +338,7 @@ export function Plaene() {
             : vergleich.isLoading ? <Laden /> : vergleich.data ? <VergleichTabelle plan={gewaehlt} vergleich={vergleich.data} />
             : <Fehleranzeige fehler={vergleich.error} />}
           {freigeben ? <FreigabeDialog plan={gewaehlt} offen={freigabe} onOffen={setFreigabe} /> : null}
+          {abschliessen ? <AbschliessenDialog plan={gewaehlt} offen={abschluss} onOffen={setAbschluss} /> : null}
           {gewaehlt.pdf_sha256 ? <PlanPdfDialog plan={gewaehlt} offen={pdf} onOffen={setPdf} /> : null}
           <Dialog offen={verwerfen && anlegen} onOffen={setVerwerfen} titel="Entwurf verwerfen" breite={480}
             beschreibung="Der Entwurf wird gelöscht. Im Verlauf der Akte bleibt sichtbar, dass es ihn gab."

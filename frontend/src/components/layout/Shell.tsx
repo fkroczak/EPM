@@ -58,6 +58,7 @@ function Seitenleiste() {
         {darf("akten_lesen") ? <NavEintrag zu="/infusionsplaene" icon="tropfen" text="Infusionspläne" /> : null}
         <NavEintrag zu="/versorger" icon="versorger" text="Versorger" />
         <NavEintrag zu="/aerzte" icon="arzt" text="Ärzte" />
+        {darf("datenschutz_bearbeiten") || darf("datenschutz_entscheiden") ? <NavEintrag zu="/datenschutz" icon="schloss" text="Datenschutz" /> : null}
       </nav>
       {admin.length ? (
         <nav aria-label="Administration" className="flex flex-col gap-0.5">

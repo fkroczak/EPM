@@ -22,7 +22,8 @@ type Startdaten = {
   gewichtswarnungen: { patient: number; name: string; nummer: number; gewicht: { kg: number; am: string } | null; prozent: number }[];
   gewicht_schwelle: { prozent: number; monate: number };
   infusionsplaene: { entwuerfe: PlanEintrag[]; aelter_als_grenze: PlanEintrag[]; grenze_monate: number };
-  pruefen: { altdokumente: number; nickelallergie_unbekannt: number; kein_versorger: number; kein_kontakt: number; kontakt_monate: number };
+  pruefen: { altdokumente: number; nickelallergie_unbekannt: number; kein_versorger: number; kein_kontakt: number; kontakt_monate: number;
+    erklaerungen_fehlen: number; abschluss_pruefen: number; abschluss_monate: number; datenschutz_anfragen: number };
   zuletzt_eingetragen: { bereich: string; bezeichnung: string; objekt_id: number; patient: number; name: string | null;
     zeitpunkt: string; person: string | null }[];
   zahlen: { in_betreuung: number; mit_offenem_termin: number };
@@ -186,7 +187,12 @@ function PruefenKarte({ daten }: { daten: Startdaten }) {
     ["Nickelallergie nicht erfasst", p.nickelallergie_unbekannt, "nickelallergie"],
     ["Versorger nicht erfasst", p.kein_versorger, "kein_versorger"],
     [`Kein Kontakt seit über ${p.kontakt_monate} Monaten`, p.kein_kontakt, "kein_kontakt"],
+    // Datenschutz: Erklärungen nachhalten wie die Nickelallergie; lange ruhende Akten abschließen (erst dann läuft die Frist)
+    ["Erklärungen zum Datenschutz fehlen", p.erklaerungen_fehlen, "erklaerungen"],
+    [`Abschluss prüfen: kein Kontakt seit über ${p.abschluss_monate} Monaten`, p.abschluss_pruefen, "abschluss_pruefen"],
   ];
+  const { darf } = useAuth();
+  const datenschutz = (darf("datenschutz_bearbeiten") || darf("datenschutz_entscheiden")) && p.datenschutz_anfragen > 0;
   return (
     <KarteBox className="col-span-3 md:col-span-1 px-5 py-[18px] flex flex-col gap-2.5 min-w-0" aria-labelledby="k-pruefen">
       <h2 id="k-pruefen" className="lbl m-0">Nach und nach prüfen</h2>
@@ -196,6 +202,11 @@ function PruefenKarte({ daten }: { daten: Startdaten }) {
             <span>{text}</span><span className="num text-akzent-text" data-testid={`pruefen-${filter}`}>{n}</span>
           </Link>
         ))}
+        {datenschutz ? (
+          <Link to="/datenschutz" className="flex justify-between no-underline text-tinte hover:text-akzent-text">
+            <span>Offene Datenschutz-Anfragen</span><span className="num text-akzent-text" data-testid="pruefen-datenschutz">{p.datenschutz_anfragen}</span>
+          </Link>
+        ) : null}
       </div>
     </KarteBox>
   );

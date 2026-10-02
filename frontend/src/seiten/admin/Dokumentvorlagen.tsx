@@ -19,7 +19,7 @@ import { Icon } from "@/components/ui/icon";
 import { useSortierbar, verschiebe } from "@/components/ui/sortierbar";
 import { PdfLeser } from "@/components/PdfAnsicht";
 
-type Art = "infusionsplan" | "patientendatenblatt";
+type Art = "infusionsplan" | "patientendatenblatt" | "datenschutzinformation" | "einwilligung" | "schweigepflichtentbindung";
 type Optionen = {
   schrift?: "klein" | "normal" | "gross"; ausrichtung?: "links" | "mitte" | "rechts"; fett?: boolean; kursiv?: boolean;
   ausblenden_wenn_leer?: boolean; nicht_teilen?: boolean; ueberschrift?: boolean; linie_oben?: boolean;
@@ -369,7 +369,14 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
         <Knopf variante="pri" icon="haken" onClick={() => setVeroeffentlichen(true)} disabled={!geaendert && !entwurf.data.ist_entwurf}>Veröffentlichen</Knopf>
       </>, aktionenZiel) : null}
       <Segmente label="Vorlage" wert={art} onWahl={(w) => { if (!geaendert || window.confirm("Ungespeicherte Änderungen verwerfen?")) setArt(w); }}
-        werte={[{ wert: "infusionsplan", text: "Infusionsplan" }, { wert: "patientendatenblatt", text: "Patientendatenblatt" }]} className="self-start" />
+        werte={[{ wert: "infusionsplan", text: "Infusionsplan" }, { wert: "patientendatenblatt", text: "Patientendatenblatt" },
+          { wert: "datenschutzinformation", text: "Datenschutzinformation" }, { wert: "einwilligung", text: "Einwilligung" },
+          { wert: "schweigepflichtentbindung", text: "Schweigepflichtentbindung" }]} className="self-start" />
+      {art !== "infusionsplan" && art !== "patientendatenblatt" && !a.aktiv.veroeffentlicht_von ? (
+        <Meldung art="warn"><span data-testid="vorlage-ungeprueft">Diese Vorlage ist der mitgelieferte Entwurf: Stellen in [eckigen Klammern]
+          sind von der Stiftung auszufüllen, der Text ist rechtlich zu prüfen. Bis sie hier bearbeitet und veröffentlicht ist,
+          tragen die PDFs in den Akten das Wasserzeichen „ENTWURF“.</span></Meldung>
+      ) : null}
       {fehlerListe.length ? <Meldung art="fehler"><ul className="m-0 pl-4" data-testid="vorlage-fehler">{fehlerListe.map((f) => <li key={f}>{f}</li>)}</ul></Meldung> : null}
 
       <div className="grid grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)_300px] gap-5 items-start">

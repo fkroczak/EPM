@@ -155,6 +155,35 @@ test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", 
   await ctx.close();
 });
 
+test("Nach dem Neustart: Datenschutz – Erklärungen, eingeschränkte und gelöschte Akte, Plan nach Freigabe", async ({ browser }) => {
+  const { ctx, page } = await seiteAls(browser, "mediziner");
+  await page.goto(`/patienten/${gemerkt("erklaerung").patient}/datenschutz`);
+  await expect(page.getByTestId("erklaerung-einwilligung")).toContainText("widerrufen am");
+  await expect(page.getByTestId("erklaerung-datenschutzinformation")).toContainText("liegt vor seit");
+  await expect(page.getByTestId("erklaerungen-fehlen")).toHaveText("Einwilligung fehlt");
+
+  // eingeschränkte Akte: weiter verschlossen, ohne Namen
+  const zu = gemerkt("eingeschraenkt");
+  await page.goto(`/patienten/${zu.patient}`);
+  await expect(page.getByTestId("akte-eingeschraenkt")).toContainText("Verarbeitung eingeschränkt");
+  await expect(page.getByTestId("akte-eingeschraenkt")).not.toContainText(zu.nachname);
+
+  // endgültig gelöschte Akte: bleibt weg (beim Start prüft das Backend die Löschliste), das Löschprotokoll bleibt
+  const weg = gemerkt("akte_geloescht");
+  expect((await page.request.get(`/api/patienten/${weg.id}/`)).status()).toBe(404);
+  await page.goto("/datenschutz");
+  await expect(page.getByTestId("loeschprotokoll")).toContainText(`Nr. ${String(weg.nummer).padStart(4, "0")}`);
+  await expect(page.getByTestId("eingeschraenkte")).toContainText(zu.nachname);
+  await expect(page.getByRole("main")).not.toContainText(weg.nachname);
+  await expect(page.getByTestId("datenschutz-einstellungen")).toContainText("Audit-Log 30 Jahre");
+
+  // Plan, den ein Mitarbeiter nach der Freigabe per E-Mail abgeschlossen hat
+  await page.goto(`/patienten/${gemerkt("plan_abgeschlossen").patient}/plaene`);
+  await expect(page.getByTestId("plan-detail")).toContainText("(per E-Mail); im System abgeschlossen am");
+  await expect(page.getByTestId("ansicht-herkunft")).toContainText("Prüfsumme stimmt");
+  await ctx.close();
+});
+
 test("Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Rechte", async ({ browser }) => {
   const { ctx, page } = await seiteAls(browser, "admin");
 
