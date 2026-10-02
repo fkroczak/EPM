@@ -208,8 +208,131 @@ FUSS = {
     "rechts": "{Seite}/{Seiten}",
 }
 
+# Bisheriger Text des Freigabevermerks in der Startvorlage (bis 02.10.2026); eine aktive Vorlage, die ihn noch
+# unverändert enthält, stellt die Migration 0002 auf {{Plan.Freigabevermerk}} um.
+FREIGABEVERMERK_ALT = ("Maschinell erstellt, geprüft und freigegeben von {{Plan.freigegeben_von}} am "
+                       "{{Plan.freigegeben_datum}}.")
+FREIGABEVERMERK_NEU = "{{Plan.Freigabevermerk}}"
+
+# ------------------------------------------------------------------------------------------------ Datenschutz
+# Die drei Startvorlagen folgen im Aufbau dem Gesetz (Datenschutzinformation: die Pflichtangaben nach Art. 13 DSGVO
+# in dessen Reihenfolge; Einwilligung: Art. 7 und Art. 9 Abs. 2 Buchst. a DSGVO). Inhalte, die nur die Stiftung
+# festlegen kann (Zwecke, Rechtsgrundlage, Empfänger, Aufsichtsbehörde …), stehen als Lücke in [eckigen Klammern].
+# Nichts davon ist rechtlich geprüft: Bis ein Mensch die Vorlage bearbeitet und veröffentlicht hat, tragen die
+# erzeugten PDFs das Wasserzeichen „ENTWURF“.
+HINWEIS_VORLAGE = {
+    "id": "hinweis", "typ": "text", "bezeichnung": "Hinweis zur Vorlage – vor dem Veröffentlichen entfernen",
+    "text": "Diese Vorlage ist ein Entwurf. Alle Stellen in [eckigen Klammern] sind von der Stiftung auszufüllen; der "
+            "gesamte Text ist vor der Verwendung rechtlich zu prüfen (z. B. durch die oder den "
+            "Datenschutzbeauftragten). Solange die Vorlage nicht bearbeitet und veröffentlicht ist, tragen die PDFs "
+            "das Wasserzeichen „ENTWURF“.",
+    "optionen": {"ueberschrift": True, "kursiv": True, "schrift": "klein"},
+}
+PATIENT_BLOCK = {
+    "id": "patient", "typ": "datenfelder", "bezeichnung": "Patientin / Patient", "spalten": 2,
+    "optionen": {"ueberschrift": True}, "felder": [
+        {"label": "Name", "wert": "{{Patient.Name}}"}, {"label": "Geboren", "wert": "{{Patient.Geburtsdatum}}"},
+        {"label": "Anschrift", "wert": "{{Patient.Anschrift}}"}, {"label": "Patienten-Nr.", "wert": "{{Patient.Nummer}}"}],
+}
+
+
+def _abschnitt(kennung, ueberschrift, text):
+    return {"id": kennung, "typ": "text", "bezeichnung": ueberschrift, "text": text, "optionen": {"ueberschrift": True}}
+
+
+DATENSCHUTZINFORMATION = [
+    {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF},
+    {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Information zur Verarbeitung Ihrer Daten",
+     "zusatz_label": "Stand", "zusatz": "{{Heute}}"},
+    HINWEIS_VORLAGE,
+    {"id": "einleitung", "typ": "text", "bezeichnung": "Einleitung",
+     "text": "Mit diesem Blatt informieren wir Sie nach Art. 13 der Datenschutz-Grundverordnung (DSGVO) darüber, wie "
+             "wir Ihre personenbezogenen Daten verarbeiten."},
+    _abschnitt("verantwortlich", "1. Wer ist für die Verarbeitung verantwortlich?",
+               "{{Absender.Name}}\n{{Absender.Straße}}, {{Absender.PLZ_Ort}}\n"
+               "Telefon {{Absender.Telefon}} · {{Absender.E-Mail}}\n\n"
+               "Datenschutzbeauftragte/r: [Name und Kontaktdaten eintragen – oder diesen Satz streichen, wenn keine "
+               "Benennung erforderlich ist]"),
+    _abschnitt("zwecke", "2. Wozu verarbeiten wir Ihre Daten, und auf welcher Rechtsgrundlage?",
+               "Zwecke: [eintragen]\n\nRechtsgrundlage: [eintragen]"),
+    _abschnitt("empfaenger", "3. Wer erhält Ihre Daten?",
+               "[Empfänger oder Kategorien von Empfängern eintragen]"),
+    _abschnitt("drittland", "4. Werden Daten in ein Land außerhalb der Europäischen Union übermittelt?",
+               "[eintragen: entweder, dass keine Übermittlung stattfindet, oder die Angaben nach Art. 13 Abs. 1 "
+               "Buchst. f DSGVO]"),
+    _abschnitt("dauer", "5. Wie lange speichern wir Ihre Daten?",
+               "Wir bewahren Ihre Akte {{Aufbewahrung.Jahre}} Jahre nach dem Abschluss der Betreuung auf; danach "
+               "wird sie gelöscht. [Grundlage dieser Frist eintragen]"),
+    _abschnitt("rechte", "6. Welche Rechte haben Sie?",
+               "Sie haben das Recht auf Auskunft über Ihre Daten (Art. 15 DSGVO), auf Berichtigung (Art. 16 DSGVO), "
+               "auf Löschung (Art. 17 DSGVO) und auf Einschränkung der Verarbeitung (Art. 18 DSGVO) sowie – soweit "
+               "die gesetzlichen Voraussetzungen vorliegen – das Recht auf Datenübertragbarkeit (Art. 20 DSGVO) und "
+               "ein Widerspruchsrecht (Art. 21 DSGVO).\n\n"
+               "Beruht die Verarbeitung auf Ihrer Einwilligung, können Sie die Einwilligung jederzeit widerrufen. Die "
+               "Rechtmäßigkeit der Verarbeitung bis zum Widerruf bleibt davon unberührt (Art. 7 Abs. 3 DSGVO).\n\n"
+               "Sie haben das Recht, sich bei einer Datenschutz-Aufsichtsbehörde zu beschweren (Art. 77 DSGVO). "
+               "[Zuständige Aufsichtsbehörde mit Anschrift eintragen]"),
+    _abschnitt("bereitstellung", "7. Müssen Sie Ihre Daten bereitstellen?",
+               "[eintragen: ob die Bereitstellung gesetzlich oder vertraglich vorgeschrieben oder für die Betreuung "
+               "erforderlich ist und welche Folgen es hat, wenn Daten nicht bereitgestellt werden – Art. 13 Abs. 2 "
+               "Buchst. e DSGVO]"),
+    _abschnitt("automatisiert", "8. Automatisierte Entscheidungen",
+               "[eintragen: ob eine automatisierte Entscheidungsfindung einschließlich Profiling stattfindet – "
+               "Art. 13 Abs. 2 Buchst. f DSGVO]"),
+    PATIENT_BLOCK,
+    {"id": "erhalten", "typ": "unterschrift", "bezeichnung": "Empfangsbestätigung",
+     "linie": "Ort, Datum, Unterschrift – ich habe diese Information erhalten", "optionen": {"nicht_teilen": True}},
+    {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
+]
+
+EINWILLIGUNG = [
+    {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF},
+    {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Einwilligung in die Verarbeitung meiner Daten"},
+    HINWEIS_VORLAGE,
+    PATIENT_BLOCK,
+    _abschnitt("einwilligung", "Einwilligung",
+               "Ich willige ein, dass die {{Absender.Name}} meine personenbezogenen Daten einschließlich meiner "
+               "Gesundheitsdaten zu folgenden Zwecken verarbeitet:\n[Zwecke eintragen]\n\n"
+               "Die Einwilligung umfasst die Weitergabe der dafür erforderlichen Daten an:\n[Empfänger eintragen]"),
+    _abschnitt("widerruf", "Freiwilligkeit und Widerruf",
+               "Diese Einwilligung ist freiwillig. Ich kann sie jederzeit mit Wirkung für die Zukunft widerrufen. "
+               "Die Rechtmäßigkeit der bis zum Widerruf erfolgten Verarbeitung bleibt davon unberührt "
+               "(Art. 7 Abs. 3 DSGVO).\n[eintragen: an wen der Widerruf zu richten ist und was er für die Betreuung "
+               "bedeutet]"),
+    {"id": "information", "typ": "text", "bezeichnung": "Datenschutzinformation",
+     "text": "Die „Information zur Verarbeitung Ihrer Daten“ habe ich erhalten."},
+    {"id": "unterschrift", "typ": "unterschrift", "bezeichnung": "Unterschrift",
+     "linie": "Ort, Datum, Unterschrift Patient/in oder gesetzliche Vertretung", "optionen": {"nicht_teilen": True}},
+    {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
+]
+
+SCHWEIGEPFLICHTENTBINDUNG = [
+    {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF},
+    {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Entbindung von der Schweigepflicht"},
+    HINWEIS_VORLAGE,
+    PATIENT_BLOCK,
+    _abschnitt("erklaerung", "Erklärung",
+               "Ich entbinde [Personen bzw. Funktionen bei der {{Absender.Name}} eintragen] von der Schweigepflicht "
+               "gegenüber den unten genannten Personen und Stellen, soweit es für [Zweck eintragen] erforderlich ist."),
+    {"id": "stellen", "typ": "datenfelder", "bezeichnung": "Personen und Stellen", "spalten": 1,
+     "optionen": {"ueberschrift": True}, "felder": [
+        {"label": "Versorger", "wert": "{{Versorger.Firma}}"},
+        {"label": "Hausarzt", "wert": "{{Patient.Hausarzt}}"},
+        {"label": "Bezugspersonen", "wert": "{{Bezugspersonen.Auskunft}}"},
+        {"label": "Weitere", "wert": "______________________________________________"}]},
+    _abschnitt("widerruf", "Freiwilligkeit und Widerruf",
+               "Diese Erklärung ist freiwillig. Ich kann sie jederzeit mit Wirkung für die Zukunft widerrufen.\n"
+               "[eintragen: an wen der Widerruf zu richten ist]"),
+    {"id": "unterschrift", "typ": "unterschrift", "bezeichnung": "Unterschrift",
+     "linie": "Ort, Datum, Unterschrift Patient/in oder gesetzliche Vertretung", "optionen": {"nicht_teilen": True}},
+    {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
+]
+
 # Startvorlagen. Patientendatenblatt: Aufbau wie im Entwurf „EPM Oberfläche“ (Dokumentvorlagen).
 STARTVORLAGEN = {
+    "datenschutzinformation": DATENSCHUTZINFORMATION,
+    "einwilligung": EINWILLIGUNG,
+    "schweigepflichtentbindung": SCHWEIGEPFLICHTENTBINDUNG,
     # Aufbau wie die bisherige PDF des Altsystems (EPM_infuPDF.php mit fpdf_layout.php), moderner gesetzt
     # (Festlegung 01.10.2026); Freigabevermerk statt eingescannter Unterschrift
     "infusionsplan": [
@@ -251,9 +374,10 @@ STARTVORLAGEN = {
          "optionen": {"ueberschrift": True, "ausblenden_wenn_leer": True}},
         {"id": "diagnose", "typ": "text", "bezeichnung": "Diagnose", "text": "{{Patient.Diagnose}}",
          "optionen": {"ueberschrift": True, "ausblenden_wenn_leer": True}},
-        {"id": "freigabe", "typ": "text", "bezeichnung": "Freigabevermerk",
-         "text": "Maschinell erstellt, geprüft und freigegeben von {{Plan.freigegeben_von}} am {{Plan.freigegeben_datum}}.",
-         "optionen": {"nicht_teilen": True, "linie_oben": True}},
+        # Der Vermerk nennt, wer freigegeben hat – und bei einer Freigabe außerhalb von EPM (z. B. per E-Mail) auch den
+        # Weg und wer den Plan im System abgeschlossen hat. Beim Entwurf entfällt er.
+        {"id": "freigabe", "typ": "text", "bezeichnung": "Freigabevermerk", "text": "{{Plan.Freigabevermerk}}",
+         "optionen": {"nicht_teilen": True, "linie_oben": True, "ausblenden_wenn_leer": True}},
         {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
     ],
     "patientendatenblatt": [

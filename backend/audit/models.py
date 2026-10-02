@@ -3,7 +3,11 @@ from django.db import models
 
 
 class SystemEreignis(models.Model):
-    """Systemweites, unveränderliches Protokoll (DB-Trigger verhindert UPDATE/DELETE)."""
+    """Systemweites, unveränderliches Protokoll (DB-Trigger verhindert UPDATE/DELETE).
+
+    Zwei Ausnahmen, beide nur im Wartungsmodus und selbst protokolliert (Datenschutz): Wird eine Akte endgültig
+    gelöscht, verlieren ihre Einträge Namen und Inhalte (``audit.bereinigung.akte_entfernen``); ist eine
+    Aufbewahrungsdauer für das Audit-Log eingestellt, werden ältere Einträge entfernt."""
 
     class Art(models.TextChoices):
         ANMELDUNG = "anmeldung", "Anmeldung"
@@ -32,6 +36,14 @@ class SystemEreignis(models.Model):
         DOKUMENT_LOESCHEN_ABGELEHNT = "dokument_loeschen_abgelehnt", "Löschen eines Dokuments abgelehnt"
         DOKUMENT_LOESCHUNG_NACHGEHOLT = "dokument_loeschung_nachgeholt", "Löschung eines Dokuments nachgeholt"
         SYSTEM = "system", "Systemverwaltung"
+        # Datenschutz (Festlegung 02.10.2026)
+        DATENSCHUTZ = "datenschutz", "Datenschutz"
+        AKTE_EINGESCHRAENKT = "akte_eingeschraenkt", "Verarbeitung einer Akte eingeschränkt"
+        AKTE_EINSCHRAENKUNG_AUFGEHOBEN = "akte_einschraenkung_aufgehoben", "Einschränkung einer Akte aufgehoben"
+        AKTE_EINSICHT = "akte_einsicht", "Einsicht in eine eingeschränkte Akte"
+        AKTE_GELOESCHT = "akte_geloescht", "Akte endgültig gelöscht"
+        AKTE_LOESCHEN_ABGELEHNT = "akte_loeschen_abgelehnt", "Löschen einer Akte abgelehnt"
+        PROTOKOLL_BEREINIGT = "protokoll_bereinigt", "Audit-Log bereinigt"
 
     zeitpunkt = models.DateTimeField(auto_now_add=True, db_index=True)
     art = models.CharField(max_length=40, choices=Art.choices, db_index=True)

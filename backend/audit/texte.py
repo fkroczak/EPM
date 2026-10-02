@@ -12,7 +12,7 @@ A = SystemEreignis.Art
 GRUPPEN = {
     "anmeldung": ("Anmeldung", [A.ANMELDUNG, A.ABMELDUNG, A.KENNWORT_GEAENDERT, A.ZWEITER_FAKTOR_EINGERICHTET]),
     "fehlversuch": ("Fehlversuch", [A.ANMELDUNG_FEHLGESCHLAGEN, A.ZWEITER_FAKTOR_FEHLGESCHLAGEN, A.ANMELDUNG_GESPERRT,
-                                    A.DOKUMENT_LOESCHEN_ABGELEHNT]),
+                                    A.DOKUMENT_LOESCHEN_ABGELEHNT, A.AKTE_LOESCHEN_ABGELEHNT]),
     "benutzer": ("Benutzer", [A.BENUTZER_ANGELEGT, A.BENUTZER_GEAENDERT, A.BENUTZER_GESPERRT, A.EINMAL_KENNWORT,
                               A.ZWEITER_FAKTOR_ZURUECKGESETZT, A.TESTDATEN, A.RECHTE_GEAENDERT]),
     "vorlage": ("Vorlage", [A.VORLAGE, A.STAMMDATEN]),
@@ -24,6 +24,8 @@ GRUPPEN = {
     "dokument": ("Dokument", [A.DOKUMENT_UMGEHAENGT, A.DOKUMENT_GELOESCHT, A.DOKUMENT_LOESCHUNG_NACHGEHOLT]),
     # Administration › System: Aufträge an den Server, Wartung des EPM, Hinweise an alle Benutzer
     "system": ("System", [A.SYSTEM]),
+    "datenschutz": ("Datenschutz", [A.DATENSCHUTZ, A.AKTE_EINGESCHRAENKT, A.AKTE_EINSCHRAENKUNG_AUFGEHOBEN,
+                                    A.AKTE_EINSICHT, A.AKTE_GELOESCHT, A.PROTOKOLL_BEREINIGT]),
 }
 GRUPPE_JE_ART = {art: schluessel for schluessel, (_, arten) in GRUPPEN.items() for art in arten}
 
@@ -95,6 +97,9 @@ def _aenderungen(d) -> str:
 def beschreibung(e) -> str:
     d = e.details or {}
     art = e.art
+    if d.get("entfernt"):
+        # Die Akte ist endgültig gelöscht: Der Eintrag bleibt (wer, wann, was), Namen und Inhalte sind entfernt
+        return f"{e.get_art_display()}: {e.objekt} – Angaben mit der Akte gelöscht"
     if art == A.ANMELDUNG:
         return {
             "2fa": "Anmeldung mit 2FA",
@@ -155,6 +160,9 @@ def beschreibung(e) -> str:
     if art == A.AKTE_GEOEFFNET:
         return f"{_akte(e)} wieder geöffnet, Grund: {d.get('grund', '')}"
     if art == A.PLAN_FREIGEGEBEN:
+        if d.get("auf_anordnung"):
+            return (f"Infusionsplan nach Freigabe durch {d.get('freigegeben_von', '')} am {d.get('freigegeben_am', '')} "
+                    f"({d.get('weg', '')}) abgeschlossen ({e.objekt})")
         return f"Infusionsplan freigegeben ({e.objekt})"
     if art == A.STAMMDATEN:
         if d.get("aenderungen"):
@@ -169,7 +177,8 @@ def beschreibung(e) -> str:
             return f"{e.objekt}: {_aenderungen(d)}"
         return f"{e.objekt}: {d.get('aktion', 'geändert')}"
     if art == A.EXPORT:
-        return f"{d.get('was', 'Export')} als PDF: {e.objekt}" if e.objekt else f"{d.get('was', 'Export')} als PDF"
+        als = d.get("format", "PDF")
+        return f"{d.get('was', 'Export')} als {als}: {e.objekt}" if e.objekt else f"{d.get('was', 'Export')} als {als}"
     if art == A.TESTDATEN:
         return f"Testdaten zurückgesetzt: {d.get('geloescht', 0)} Testpatienten gelöscht, {d.get('angelegt', 0)} neu angelegt"
     if art == A.DOKUMENT_UMGEHAENGT:
@@ -185,6 +194,23 @@ def beschreibung(e) -> str:
                 f"(Löschung vom {_datum(d.get('geloescht_am', ''))})")
     if art == A.SYSTEM:
         return _system(e, d)
+    if art == A.DATENSCHUTZ:
+        return f"{e.objekt}: {d.get('aktion', '')}" + (f" – {d['hinweis']}" if d.get("hinweis") else "")
+    if art == A.AKTE_EINGESCHRAENKT:
+        return f"Verarbeitung eingeschränkt: {e.objekt}, Grund: {d.get('grund', '')}"
+    if art == A.AKTE_EINSCHRAENKUNG_AUFGEHOBEN:
+        return f"Einschränkung aufgehoben: {e.objekt}, Grund: {d.get('grund', '')}"
+    if art == A.AKTE_EINSICHT:
+        return f"Einsicht in eingeschränkte Akte: {e.objekt}, Grund: {d.get('grund', '')}"
+    if art == A.AKTE_GELOESCHT:
+        rechtsgrund = {"frist": "Aufbewahrungsfrist abgelaufen", "antrag": "Antrag der betroffenen Person"}.get(
+            d.get("rechtsgrund"), d.get("rechtsgrund", ""))
+        return f"{e.objekt} endgültig gelöscht ({rechtsgrund}), Grund: {d.get('grund', '')}"
+    if art == A.AKTE_LOESCHEN_ABGELEHNT:
+        return f"Löschen abgelehnt: {e.objekt} – {d.get('fehler', '')}"
+    if art == A.PROTOKOLL_BEREINIGT:
+        return (f"{d.get('anzahl', 0)} Einträge älter als {d.get('jahre', '?')} Jahre entfernt "
+                f"(eingestellte Aufbewahrung des Audit-Logs)")
     return e.get_art_display() + (f" {e.objekt}" if e.objekt else "")
 
 

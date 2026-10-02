@@ -13,6 +13,10 @@ Datenbank. Für jede Löschung gilt:
 - Titel, Dateiname, Notiz und Datum werden in Historie und Audit-Log erneut geschwärzt.
 - Fehlt eine Löschung aus der Datenbank in der Löschliste, wird sie dort ergänzt.
 Ohne Befund passiert nichts. Fehler werden gemeldet, halten den Start aber nicht auf.
+
+Ebenso endgültig gelöschte Akten (``patienten.datenschutz.akten_nachholen``): Bringt eine Wiederherstellung eine
+gelöschte Akte zurück (gleiche Kennung, Nummer und Anlagezeitpunkt), wird sie erneut vollständig gelöscht; das
+Löschprotokoll in der Datenbank und die Löschliste werden gegenseitig ergänzt.
 """
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -29,6 +33,10 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         try:
             ergebnis = nachholen()
+            # endgültig gelöschte Akten (Datenschutz): ebenfalls aus der Löschliste erneut löschen
+            from patienten.datenschutz import akten_nachholen
+
+            ergebnis.update(akten_nachholen())
         except Exception as fehler:  # noqa: BLE001 – der Start des Backends darf daran nicht scheitern
             self.stderr.write(f"WARNUNG: Löschungen konnten nicht geprüft werden: {fehler}")
             return

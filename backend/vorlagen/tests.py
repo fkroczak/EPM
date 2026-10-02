@@ -69,7 +69,9 @@ class Vorlagen(Grundlage):
         r = client_fuer(self.admin).get("/api/vorlagen/")
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual([(v["art"], v["aktiv"]["version"], v["entwurf"]) for v in r.json()],
-                         [("infusionsplan", 1, None), ("patientendatenblatt", 1, None)])
+                         [("infusionsplan", 1, None), ("patientendatenblatt", 1, None),
+                          ("datenschutzinformation", 1, None), ("einwilligung", 1, None),
+                          ("schweigepflichtentbindung", 1, None)])
         self.assertEqual(client_fuer(self.betrachter).get("/api/vorlagen/").status_code, 403)
         self.assertEqual(client_fuer(self.mitarbeiter).get("/api/vorlagen/infusionsplan/").status_code, 200)
         d = client_fuer(self.mediziner).get("/api/vorlagen/infusionsplan/").json()

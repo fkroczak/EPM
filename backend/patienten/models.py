@@ -78,6 +78,15 @@ class Patient(models.Model):
 
     ist_test = models.BooleanField("Testpatient", default=False, editable=False)
 
+    # Datenschutz (Festlegung 02.10.2026): Aufbewahrung = Abschluss + eingestellte Jahre; im Einzelfall länger
+    # (mit Grund). Verarbeitung einschränken (Art. 18 DSGVO): Akte nur noch mit begründeter Einsicht lesbar.
+    aufbewahrung_bis = models.DateField("Aufbewahrung verlängert bis", null=True, blank=True)
+    aufbewahrung_grund = models.CharField("Grund der längeren Aufbewahrung", max_length=300, blank=True)
+    eingeschraenkt_am = models.DateTimeField("Verarbeitung eingeschränkt am", null=True, blank=True)
+    eingeschraenkt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                           related_name="+")
+    einschraenkung_grund = models.CharField("Grund der Einschränkung", max_length=300, blank=True)
+
     angelegt_am = models.DateTimeField(auto_now_add=True)
     angelegt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
     geaendert_am = models.DateTimeField(auto_now=True)
@@ -123,7 +132,9 @@ class Patient(models.Model):
             hoechste = Patient.objects.filter(nummer__gte=TESTNUMMER_AB).aggregate(m=Max("nummer"))["m"]
             return max(hoechste or 0, TESTNUMMER_AB - 1) + 1
         hoechste = Patient.objects.filter(ist_test=False).aggregate(m=Max("nummer"))["m"] or 0
-        nummer = hoechste + 1
+        # die Nummer einer gelöschten Akte wird nicht neu vergeben (sie steht im Löschprotokoll)
+        geloescht = Loeschprotokoll.objects.filter(ist_test=False).aggregate(m=Max("nummer"))["m"] or 0
+        nummer = max(hoechste, geloescht) + 1
         if nummer >= TESTNUMMER_AB and Patient.objects.filter(nummer=nummer).exists():
             nummer = Patient.objects.aggregate(m=Max("nummer"))["m"] + 1
         return nummer
@@ -131,6 +142,27 @@ class Patient(models.Model):
     @property
     def ist_abgeschlossen(self) -> bool:
         return self.abgeschlossen_am is not None
+
+    @property
+    def ist_eingeschraenkt(self) -> bool:
+        return self.eingeschraenkt_am is not None
+
+    def aufbewahrung(self, jahre: int | None = None) -> dict:
+        """Aufbewahrungsfrist der Akte: läuft ab dem Abschluss (ohne Abschluss keine Frist).
+
+        ``regulaer_bis`` = Abschluss + eingestellte Jahre, ``bis`` = spätestes Datum aus regulärer Frist und
+        einer Verlängerung im Einzelfall, ``abgelaufen`` = die Akte darf gelöscht werden."""
+        if jahre is None:
+            jahre = Einstellungen.aktuell().aufbewahrung_jahre
+        regulaer = plus_jahre(self.abgeschlossen_am, jahre) if self.abgeschlossen_am else None
+        bis = regulaer
+        if regulaer and self.aufbewahrung_bis and self.aufbewahrung_bis > regulaer:
+            bis = self.aufbewahrung_bis
+        return {
+            "jahre": jahre, "regulaer_bis": regulaer, "verlaengert_bis": self.aufbewahrung_bis,
+            "grund": self.aufbewahrung_grund, "bis": bis,
+            "abgelaufen": bool(bis and bis < timezone.localdate()),
+        }
 
     def pruefe_bearbeitbar(self):
         if self.ist_abgeschlossen:
@@ -165,6 +197,24 @@ class Patient(models.Model):
         """Veränderung des Gewichts im eingestellten Zeitraum, siehe ``berechne_trend``."""
         messungen = list(self.gewichte.order_by("gemessen_am", "id").values_list("gemessen_am", "gewicht_kg"))
         return berechne_trend(messungen, Einstellungen.aktuell())
+
+
+def plus_jahre(tag, jahre: int):
+    """Datum + Jahre; der 29. Februar wird in Jahren ohne Schalttag zum 28. Februar."""
+    try:
+        return tag.replace(year=tag.year + jahre)
+    except ValueError:
+        return tag.replace(year=tag.year + jahre, day=28)
+
+
+def plus_monate(tag, monate: int):
+    """Datum + Monate; gibt es den Tag im Zielmonat nicht (31. → Februar), gilt der letzte Tag des Monats."""
+    import calendar
+
+    monat = tag.month - 1 + monate
+    jahr = tag.year + monat // 12
+    monat = monat % 12 + 1
+    return tag.replace(year=jahr, month=monat, day=min(tag.day, calendar.monthrange(jahr, monat)[1]))
 
 
 def berechne_trend(messungen, e):
@@ -463,7 +513,8 @@ class DokumentVorgang(models.Model):
 
     art = models.CharField(max_length=20, choices=Art.choices)
     dokument_id = models.PositiveIntegerField(db_index=True)
-    von_patient = models.ForeignKey(Patient, on_delete=models.PROTECT, related_name="+")
+    # leer, wenn die bisherige Akte inzwischen endgültig gelöscht ist (das Dokument liegt bei ``nach_patient``)
+    von_patient = models.ForeignKey(Patient, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
     nach_patient = models.ForeignKey(Patient, on_delete=models.PROTECT, null=True, blank=True, related_name="+")
     grund = models.TextField()
     zeitpunkt = models.DateTimeField(auto_now_add=True)
@@ -479,3 +530,186 @@ class DokumentVorgang(models.Model):
         verbose_name_plural = "Dokument-Vorgänge"
         ordering = ["-zeitpunkt"]
 
+
+
+# ================================================================= Datenschutz (Festlegung 02.10.2026)
+class Erklaerung(models.Model):
+    """Erklärung des Patienten: Datenschutzinformation erhalten, Einwilligung, Schweigepflichtentbindung.
+
+    Nachgehalten wie die Nickelallergie, aber mit Datum: je Art „nicht erfasst“, „liegt vor seit …“ oder
+    „widerrufen am …“. Das unterschriebene Blatt liegt als Dokument (Scan) in der Akte und ist hier verknüpft.
+    Gelöscht wird nichts: Ein Widerruf wird eingetragen, eine neue Erklärung ist ein neuer Eintrag.
+    Auch bei abgeschlossenen Akten möglich (ein Widerruf kann nach dem Abschluss eingehen)."""
+
+    class Art(models.TextChoices):
+        DATENSCHUTZINFORMATION = "datenschutzinformation", "Datenschutzinformation"
+        EINWILLIGUNG = "einwilligung", "Einwilligung in die Datenverarbeitung"
+        SCHWEIGEPFLICHTENTBINDUNG = "schweigepflichtentbindung", "Schweigepflichtentbindung"
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="erklaerungen")
+    art = models.CharField(max_length=30, choices=Art.choices)
+    erteilt_am = models.DateField("erteilt bzw. ausgehändigt am")
+    dokument = models.ForeignKey(Dokument, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+                                 verbose_name="Unterschriebenes Blatt (Scan)")
+    vorlage_version = models.PositiveIntegerField("Stand der Dokumentvorlage bei der Erfassung", null=True, blank=True)
+    notiz = models.CharField(max_length=300, blank=True)
+    widerrufen_am = models.DateField(null=True, blank=True)
+    widerruf_notiz = models.CharField(max_length=300, blank=True)
+    erfasst_am = models.DateTimeField(auto_now_add=True)
+    erfasst_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Erklärung"
+        verbose_name_plural = "Erklärungen"
+        ordering = ["art", "-erteilt_am", "-id"]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Erklärungen werden nicht gelöscht; ein Widerruf wird eingetragen.")
+
+    def clean(self):
+        heute = timezone.localdate()
+        if self.erteilt_am and self.erteilt_am > heute:
+            raise ValidationError({"erteilt_am": "Das Datum liegt in der Zukunft."})
+        if self.widerrufen_am and self.widerrufen_am > heute:
+            raise ValidationError({"widerrufen_am": "Das Datum liegt in der Zukunft."})
+        if self.widerrufen_am and self.erteilt_am and self.widerrufen_am < self.erteilt_am:
+            raise ValidationError({"widerrufen_am": "Der Widerruf liegt vor der Erklärung."})
+
+    def __str__(self):
+        return f"{self.get_art_display()} vom {self.erteilt_am:%d.%m.%Y}"
+
+
+def erklaerungen_stand(patient_ids) -> dict:
+    """{patient_id: {art: {"status": "liegt_vor" | "widerrufen", "am": Datum, "id": ID}}} – je Art zählt die
+    jüngste Erklärung; fehlt die Art ganz, fehlt auch der Schlüssel („nicht erfasst“)."""
+    stand: dict = {}
+    for e in Erklaerung.objects.filter(patient_id__in=list(patient_ids)).order_by("erteilt_am", "id"):
+        stand.setdefault(e.patient_id, {})[e.art] = {
+            "status": "widerrufen" if e.widerrufen_am else "liegt_vor",
+            "am": e.widerrufen_am or e.erteilt_am, "id": e.id,
+        }
+    return stand
+
+
+class Datenschutzanfrage(models.Model):
+    """Anfrage einer betroffenen Person (Auskunft, Berichtigung, Löschung, Einschränkung, Widerruf) als Vorgang
+    mit Frist: zu beantworten unverzüglich, spätestens einen Monat nach Eingang; bei Bedarf um zwei Monate
+    verlängerbar (Art. 12 Abs. 3 DSGVO). Erledigt wird mit Ergebnis und Begründung; nichts wird gelöscht."""
+
+    class Art(models.TextChoices):
+        AUSKUNFT = "auskunft", "Auskunft / Kopie der Akte"
+        BERICHTIGUNG = "berichtigung", "Berichtigung"
+        LOESCHUNG = "loeschung", "Löschung"
+        EINSCHRAENKUNG = "einschraenkung", "Einschränkung der Verarbeitung"
+        WIDERRUF = "widerruf", "Widerruf einer Einwilligung"
+        SONSTIGES = "sonstiges", "Sonstiges"
+
+    class Ergebnis(models.TextChoices):
+        ERFUELLT = "erfuellt", "erfüllt"
+        EINGESCHRAENKT = "eingeschraenkt", "Verarbeitung eingeschränkt statt gelöscht"
+        ABGELEHNT = "abgelehnt", "abgelehnt"
+        ZURUECKGEZOGEN = "zurueckgezogen", "zurückgezogen"
+
+    FRIST_MONATE = 1
+    VERLAENGERUNG_MONATE = 2
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="datenschutzanfragen")
+    art = models.CharField(max_length=20, choices=Art.choices)
+    eingegangen_am = models.DateField(default=timezone.localdate)
+    gestellt_von = models.CharField("Gestellt von", max_length=150, blank=True,
+                                    help_text="z. B. „Patient selbst“, Betreuerin, Erbe")
+    inhalt = models.TextField("Inhalt der Anfrage", blank=True)
+    frist_verlaengert = models.BooleanField(default=False)
+    verlaengerung_grund = models.CharField(max_length=300, blank=True)
+    ergebnis = models.CharField(max_length=20, choices=Ergebnis.choices, blank=True)
+    begruendung = models.TextField("Begründung / Vermerk", blank=True)
+    mitgeteilt_am = models.DateField("Der Person mitgeteilt am", null=True, blank=True)
+    erledigt_am = models.DateTimeField(null=True, blank=True)
+    erledigt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                     related_name="+")
+    erfasst_am = models.DateTimeField(auto_now_add=True)
+    erfasst_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Datenschutz-Anfrage"
+        verbose_name_plural = "Datenschutz-Anfragen"
+        ordering = ["-eingegangen_am", "-id"]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Datenschutz-Anfragen werden nicht gelöscht, sondern mit Ergebnis erledigt.")
+
+    @property
+    def ist_offen(self) -> bool:
+        return self.erledigt_am is None
+
+    @property
+    def frist_bis(self):
+        monate = self.FRIST_MONATE + (self.VERLAENGERUNG_MONATE if self.frist_verlaengert else 0)
+        return plus_monate(self.eingegangen_am, monate)
+
+    @property
+    def ueberfaellig(self) -> bool:
+        return self.ist_offen and self.frist_bis < timezone.localdate()
+
+    def clean(self):
+        if self.eingegangen_am and self.eingegangen_am > timezone.localdate():
+            raise ValidationError({"eingegangen_am": "Das Datum liegt in der Zukunft."})
+        if self.frist_verlaengert and not self.verlaengerung_grund.strip():
+            raise ValidationError({"verlaengerung_grund": "Bitte den Grund der Verlängerung angeben."})
+
+    def __str__(self):
+        return f"{self.get_art_display()} vom {self.eingegangen_am:%d.%m.%Y}"
+
+
+class Akteneinsicht(models.Model):
+    """Begründete Einsicht in eine Akte, deren Verarbeitung eingeschränkt ist: gilt für eine Person und eine
+    begrenzte Zeit; jede Einsicht steht mit Grund im Audit-Log."""
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="einsichten")
+    benutzer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    grund = models.TextField()
+    von = models.DateTimeField(auto_now_add=True)
+    bis = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "Akteneinsicht"
+        verbose_name_plural = "Akteneinsichten"
+        ordering = ["-von"]
+        indexes = [models.Index(fields=["benutzer", "bis"], name="akteneinsicht_benutzer_bis")]
+
+
+class Loeschprotokoll(models.Model):
+    """Nachweis einer endgültig gelöschten Akte – ohne Namen und ohne Inhalte: nur die Patientennummer, Daten zur
+    Frist, Rechtsgrund, Umfang (Anzahl der Datensätze und Dateien), wer wann gelöscht hat. Unveränderlich (Trigger).
+    Nach dem Wiederherstellen einer älteren Sicherung werden die hier vermerkten Akten erneut gelöscht
+    (``manage.py epm_loeschprotokoll --nachziehen``)."""
+
+    class Rechtsgrund(models.TextChoices):
+        FRIST = "frist", "Aufbewahrungsfrist abgelaufen"
+        ANTRAG = "antrag", "Antrag der betroffenen Person"
+
+    akte_id = models.PositiveBigIntegerField("Interne Kennung der Akte", db_index=True)
+    nummer = models.PositiveIntegerField("Patientennummer", db_index=True)
+    ist_test = models.BooleanField(default=False)
+    angelegt_am = models.DateTimeField("Akte angelegt am")
+    abgeschlossen_am = models.DateField(null=True, blank=True)
+    abschluss_anlass = models.CharField(max_length=30, blank=True)
+    aufbewahrung_bis = models.DateField(null=True, blank=True)
+    rechtsgrund = models.CharField(max_length=20, choices=Rechtsgrund.choices)
+    grund = models.TextField()
+    umfang = models.JSONField(default=dict, blank=True)
+    geloescht_am = models.DateTimeField(default=timezone.now)
+    geloescht_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                      related_name="+")
+
+    class Meta:
+        verbose_name = "Löschprotokoll"
+        verbose_name_plural = "Löschprotokoll"
+        ordering = ["-geloescht_am", "-id"]
+
+    def __str__(self):
+        return f"Akte Nr. {self.nummer} gelöscht am {self.geloescht_am:%d.%m.%Y}"

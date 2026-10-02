@@ -6,7 +6,6 @@ Nummern ab 9001, zählen in keiner Statistik und sind für den Testbenutzer die 
 sichtbaren Akten. Alle Namen sind frei erfunden.
 """
 import random
-import shutil
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
@@ -16,10 +15,10 @@ from django.utils import timezone
 
 from accounts.models import Rolle, User
 from audit.schutz import wartungsmodus
-from infusionen.models import Infusionsplan, InfusionsplanPosition
+from infusionen.models import Infusionsplan
 from stammdaten.models import Ansprechpartner, Arzt, Auswahlwert, Einstellungen, Praeparat, Versorger
 
-from .models import Bezugsperson, Dokument, Gewichtsmessung, Kontakt, Patient, PatientArzt, Termin
+from .models import Bezugsperson, Dokument, Erklaerung, Gewichtsmessung, Kontakt, Patient, PatientArzt, Termin
 
 TESTBENUTZER = "test"
 
@@ -27,7 +26,9 @@ TESTBENUTZER = "test"
 # Die Administration pflegt sie danach selbst; gelöscht wird nichts.
 AUSWAHLWERTE = {
     Auswahlwert.Liste.KATHETER: ["Port", "Hickman", "Broviac", "PICC", "Port 1-Kammer", "Port 2-Kammer"],
-    Auswahlwert.Liste.DOKUMENTTYP: ["Arztbrief", "Labor", "Infusionsplan", "Bild", "Patientendatenblatt", "Sonstiges"],
+    # „Einwilligung/Datenschutz“: unterschriebene Erklärungen; „Freigabe“: Nachweis der Freigabe eines Plans (E-Mail)
+    Auswahlwert.Liste.DOKUMENTTYP: ["Arztbrief", "Labor", "Infusionsplan", "Bild", "Patientendatenblatt", "Sonstiges",
+                                    "Einwilligung/Datenschutz", "Freigabe"],
     Auswahlwert.Liste.TERMINORT: ["Praxis Dr. Holtmeier"],
     # Festlegung 01.10.2026: Beziehung der Bezugsperson, unter Vorlagen › Auswahllisten erweiterbar
     Auswahlwert.Liste.BEZIEHUNG: ["Mutter", "Vater", "Ehepartner/in", "Kind", "Betreuer/in (gesetzlich)",
@@ -122,6 +123,13 @@ def _testaerzte():
     )
     return hausarzt, facharzt
 
+
+# Erklärungen zum Datenschutz je Testpatient: (Art, Tage seit Erteilung, Tage seit Widerruf oder None).
+# Die übrigen Testpatienten haben keine – so zeigt die Startseite „Erklärungen fehlen“.
+TEST_ERKLAERUNGEN = {
+    0: [("datenschutzinformation", 400, None), ("einwilligung", 400, None), ("schweigepflichtentbindung", 400, None)],
+    1: [("datenschutzinformation", 300, None), ("einwilligung", 300, None), ("schweigepflichtentbindung", 300, 20)],
+}
 
 # Bezugspersonen je Testpatient: (Beziehung, Name, Telefon, Auskunft erlaubt)
 TEST_BEZUGSPERSONEN = {
@@ -256,6 +264,11 @@ def testpatienten_anlegen() -> int:
         for beziehung, bname, tel, auskunft in TEST_BEZUGSPERSONEN.get(i, []):
             _nutzer(user, Bezugsperson(patient=pat, beziehung=beziehungen.get(beziehung), name=bname, telefon=tel,
                                        auskunft_erlaubt=auskunft, angelegt_von=user)).save()
+        for e_art, seit, widerruf in TEST_ERKLAERUNGEN.get(i, []):
+            _nutzer(user, Erklaerung(
+                patient=pat, art=e_art, erteilt_am=heute - timedelta(days=seit), erfasst_von=user,
+                notiz="Testdaten", widerrufen_am=heute - timedelta(days=widerruf) if widerruf else None,
+                widerruf_notiz="Widerruf telefonisch (Testdaten)" if widerruf else "")).save()
         kontakte = _kontakte(pat, user, heute, rnd, art)
 
         if profil != "neu":
@@ -321,21 +334,14 @@ def _beispieldokument(patient, user, typ, altsystem=False):
 
 def testdaten_zuruecksetzen() -> dict:
     """Löscht alle Testpatienten samt Historie und Dateien und legt die Musterdaten neu an."""
+    from .datenschutz import akten_entfernen, dateien_entfernen
+
     with wartungsmodus():
         testpatienten = list(Patient.objects.filter(ist_test=True).values_list("id", "nummer"))
         ids = [i for i, _ in testpatienten]
-        plan_ids = list(Infusionsplan.objects.filter(patient_id__in=ids).values_list("id", flat=True))
-        # Positionen und Pläne zuerst (Vorgänger-Verweise), dann die Akten
-        InfusionsplanPosition.objects.filter(plan_id__in=plan_ids).delete()
-        Infusionsplan.objects.filter(id__in=plan_ids).update(vorgaenger=None)
-        Infusionsplan.objects.filter(id__in=plan_ids).delete()
-        Patient.objects.filter(id__in=ids).delete()
-        # Historie der Testakten entfernen
-        Patient.history.filter(id__in=ids).delete()
-        for modell in (Gewichtsmessung, Kontakt, Termin, Dokument, Infusionsplan, Bezugsperson, PatientArzt):
-            modell.history.filter(patient_id__in=ids).delete()
-        InfusionsplanPosition.history.filter(plan_id__in=plan_ids).delete()
+        # dieselbe Routine wie beim endgültigen Löschen einer Akte (Einträge, Pläne, Dokument-Vorgänge, Historie)
+        akten_entfernen(ids)
     for _, nummer in testpatienten:
-        shutil.rmtree(settings.EPM_DOKUMENTE / str(nummer), ignore_errors=True)
+        dateien_entfernen(nummer)
     angelegt = testpatienten_anlegen()
     return {"geloescht": len(ids), "angelegt": angelegt}

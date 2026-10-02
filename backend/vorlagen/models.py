@@ -1,4 +1,5 @@
-"""Dokumentvorlagen (Entwurf 18 · Dokumentvorlagen): Infusionsplan und Patientendatenblatt aus Blöcken.
+"""Dokumentvorlagen (Entwurf 18 · Dokumentvorlagen): Infusionsplan, Patientendatenblatt und die Erklärungen zum
+Datenschutz (Datenschutzinformation, Einwilligung, Schweigepflichtentbindung) aus Blöcken.
 
 Je Art gibt es höchstens einen Entwurf und genau eine aktive Version. Veröffentlichen macht aus dem Entwurf die
 nächste Version; die bisherige wird „abgelöst“ und bleibt erhalten. Veröffentlichte Versionen sind unveränderlich
@@ -15,6 +16,12 @@ class Dokumentvorlage(models.Model):
     class Art(models.TextChoices):
         INFUSIONSPLAN = "infusionsplan", "Infusionsplan"
         PATIENTENDATENBLATT = "patientendatenblatt", "Patientendatenblatt"
+        # Datenschutz (Festlegung 02.10.2026): zum Ausdrucken und Unterschreiben je Patient. Die mitgelieferten
+        # Startvorlagen sind Entwürfe mit Lücken in [eckigen Klammern]; bis die Stiftung sie geprüft und
+        # veröffentlicht hat, tragen die PDFs das Wasserzeichen „ENTWURF“.
+        DATENSCHUTZINFORMATION = "datenschutzinformation", "Datenschutzinformation"
+        EINWILLIGUNG = "einwilligung", "Einwilligung in die Datenverarbeitung"
+        SCHWEIGEPFLICHTENTBINDUNG = "schweigepflichtentbindung", "Schweigepflichtentbindung"
 
     class Status(models.TextChoices):
         ENTWURF = "entwurf", "Entwurf"

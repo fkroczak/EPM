@@ -16,13 +16,15 @@ def _text(wert):
 
     if wert is None or isinstance(wert, (bool, int, str)):
         return wert
+    if isinstance(wert, (list, tuple)):
+        return ", ".join(str(w) for w in wert) or "–"
     if isinstance(wert, Decimal):
         text = f"{wert:f}"
         return text.rstrip("0").rstrip(".").replace(".", ",") if "." in text else text
     return str(wert)
 
 
-EINHEITEN = {"_monate": "Monate", "_prozent": "%", "_kg": "kg", "_cm": "cm", "_mmol": "mmol", "_g": "g",
+EINHEITEN = {"_monate": "Monate", "_jahre": "Jahre", "_prozent": "%", "_kg": "kg", "_cm": "cm", "_mmol": "mmol", "_g": "g",
              "_tag": "kcal", "_ml": "ml"}
 
 
@@ -261,11 +263,24 @@ class EinstellungenSerializer(serializers.ModelSerializer):
         exclude = ["id"]
 
     def validate(self, attrs):
+        from .models import ERKLAERUNGSARTEN
+
         attrs = super().validate(attrs)
         e = self.instance
         for unten, oben in Einstellungen.GRENZPAARE:
             if attrs.get(unten, getattr(e, unten)) >= attrs.get(oben, getattr(e, oben)):
                 raise serializers.ValidationError({unten: "Untere Grenze muss kleiner als obere Grenze sein."})
+        # Datenschutz: Fristen und die Erklärungen, die vorliegen sollen
+        if "aufbewahrung_jahre" in attrs and not 1 <= attrs["aufbewahrung_jahre"] <= 100:
+            raise serializers.ValidationError({"aufbewahrung_jahre": "Bitte 1 bis 100 Jahre angeben."})
+        if "abschluss_pruefen_monate" in attrs and attrs["abschluss_pruefen_monate"] < 1:
+            raise serializers.ValidationError({"abschluss_pruefen_monate": "Bitte mindestens 1 Monat angeben."})
+        if "pflicht_erklaerungen" in attrs:
+            liste = attrs["pflicht_erklaerungen"]
+            if (not isinstance(liste, list) or any(a not in ERKLAERUNGSARTEN for a in liste)
+                    or len(set(liste)) != len(liste)):
+                raise serializers.ValidationError({"pflicht_erklaerungen": "Unbekannte Erklärung."})
+            attrs["pflicht_erklaerungen"] = [a for a in ERKLAERUNGSARTEN if a in liste]  # feste Reihenfolge
         return attrs
 
 
