@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 02.10.2026 · Code-Stand: Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
+Stand: 02.10.2026 · Code-Stand: Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
 Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026, Prüfung nach DSGVO vom 02.10.2026 (`docs/DATENSCHUTZ.md`).
@@ -54,12 +54,12 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F06 | Notfall-Codes neu erzeugen | 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
 | F07 | Abmelden | alle Ansichten (Seitenleiste) | ABGESCHLOSSEN UND GETESTET |
 | F08 | Konto sperren nach 5 Fehlversuchen | 1 Anmeldung, 17 Benutzer, 20 Audit-Log | ABGESCHLOSSEN UND GETESTET |
-| F09 | Eigenes Profil, Darstellung und Startseite speichern | 14 Mein Konto, 2 Start | ABGESCHLOSSEN UND GETESTET |
+| F09 | Eigenes Profil, Darstellung, Startseite (Kacheln mit Größe) und Spaltenaufteilung speichern | 14 Mein Konto, 2 Start, alle Seiten mit Spaltenteiler | ABGESCHLOSSEN UND GETESTET |
 | F10 | Sicherheitsstatus im Konto | 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
 | F11 | Angemeldete Sitzungen anzeigen und abmelden | 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
 | F12 | Automatische Abmeldung nach 30 Minuten | alle | ABGESCHLOSSEN UND GETESTET |
-| F13 | Startseite | 2 Start | ABGESCHLOSSEN UND GETESTET |
-| F14 | Patientenliste mit Filtern und Suche | 3 Patientenliste | ABGESCHLOSSEN UND GETESTET |
+| F13 | Startseite mit Kennzahlenleiste und Kacheln (S01, S03, S06–S10) | 2 Start | ABGESCHLOSSEN UND GETESTET |
+| F14 | Patientenliste mit Filtern und Suche (Spalten je Bildschirmbreite, Vorschau ab 2560 px) | 3 Patientenliste | ABGESCHLOSSEN UND GETESTET |
 | F15 | Doppelprüfung beim Anlegen | 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
 | F16 | Patient anlegen | 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
 | F17 | Akte lesen mit Patientenkopf | 4 Patientenakte | ABGESCHLOSSEN UND GETESTET |
@@ -93,7 +93,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F45 | Versorger pflegen | 13 Versorger | ABGESCHLOSSEN UND GETESTET |
 | F46 | Ansprechpartner pflegen | 13 Versorger | ABGESCHLOSSEN UND GETESTET |
 | F47 | Präparate pflegen | 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
-| F48 | Grenzwerte und Einstellungen | 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
+| F48 | Grenzwerte und Einstellungen (Kontakt bald fällig / überfällig) | 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
 | F49 | Briefkopf, Absender und Logo | 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
 | F50 | Dokumentvorlagen (WYSIWYG) | 19 Dokumentvorlagen | ABGESCHLOSSEN UND GETESTET |
 | F51 | PDF-Erzeugung | Grundlage für F23, F24, F35, F37, F50, F55, F59 | ABGESCHLOSSEN UND GETESTET |
@@ -129,18 +129,26 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F81 | Übersicht „Datenschutz“ | Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
 | F82 | Plan nach Freigabe abschließen (Freigabe per E-Mail o. Ä.), Freigabevermerk mit beiden Personen | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
 | F83 | Aufbewahrung des Audit-Logs, tägliche Bereinigung | 18 Vorlagen (Grenzwerte), 20 Audit-Log | TEILWEISE ABGESCHLOSSEN |
-| F84 | Globaler Kalender mit Fälligkeiten und Feiertagen | Kalender (neu) | ABGESCHLOSSEN UND GETESTET |
+| F84 | Globaler Kalender mit Fälligkeiten (Kontakt in zwei Stufen) und Feiertagen | Kalender (neu) | ABGESCHLOSSEN UND GETESTET |
 | F85 | Übersicht aller Infusionspläne | Infusionspläne (neu) | ABGESCHLOSSEN UND GETESTET |
 | F86 | Systemverwaltung: Auslastung, Updates, Container, EPM-Zustand | System (neu) | ABGESCHLOSSEN UND GETESTET |
 | F87 | Tätigkeiten für den Server über den Systemagenten (Update, Neustart, Sicherung, Aufräumen) | System | ABGESCHLOSSEN UND GETESTET |
 | F88 | Wartung des EPM (Sitzungen, Datenbank, Dokumente, Unveränderlichkeit, Konfiguration, alle abmelden) | System | ABGESCHLOSSEN UND GETESTET |
 | F89 | Hinweis an alle Benutzer, angemeldete Benutzer abmelden | System, alle Ansichten | ABGESCHLOSSEN UND GETESTET |
+| F90 | Kontakt fällig in zwei Stufen „bald fällig“ und „überfällig“ (S04), Kachel „Wiedereinbestellung fällig“ | 2 Start, 3 Patientenliste, Kalender, 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
+| F91 | Schnellerfassung von der Startseite: Kontakt (mit Wiedervorlage), Gewicht, Termin; Kontakt und Gewicht als zwei Anfragen (S02) | 2 Start | ABGESCHLOSSEN UND GETESTET |
+| F92 | Meine Akten: Merkliste (Stern im Aktenkopf) und zuletzt geöffnet, je Person (S05) | 2 Start, 4 Akte | ABGESCHLOSSEN UND GETESTET |
+| F93 | Startseite anpassen: Kacheln im festen Raster 1×1/2×1/1×2/2×2, verschieben, Größe ziehen mit Einrasten, je Person (S11, S17) | 2 Start | ABGESCHLOSSEN UND GETESTET |
+| F94 | Startseite der Administration: Sicherung, Server, Updates, Konten, Angemeldet, Hinweis, Zugriffe, Testumgebung (S12–S14) | 2 Start | ABGESCHLOSSEN UND GETESTET |
+| F95 | Hilfe je Rolle nach tatsächlichen Rechten, mitgeliefert + eigene Ergänzungen mit Historie (S15) | Hilfe (neu), „?“ auf jeder Seite | ABGESCHLOSSEN UND GETESTET |
+| F96 | Volle Fensterbreite, Aufteilung der Seiten in Stufen 1440/1920/2560 px (S16) | alle Ansichten | ABGESCHLOSSEN UND GETESTET |
+| F97 | Spaltenteiler ziehen mit Einrastpunkten ⅓, ½, ⅔, je Seite, Stufe und Person (S17) | Patientenliste, Akte (Übersicht, Kontakte), Plan-Editor | ABGESCHLOSSEN UND GETESTET |
 
-Summe (89 Funktionen, gezählt aus der Tabelle): 87 abgeschlossen und getestet · 1 teilweise abgeschlossen · 1 nicht abgeschlossen · 0 blockiert.
+Summe (97 Funktionen, gezählt aus der Tabelle): 96 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 1 teilweise abgeschlossen (F83) · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 Neu in Runde 4 sind F74–F83 (Datenschutz nach DSGVO und Abschließen eines Plans nach Freigabe); offene Fragen dazu stehen
-in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18).
+in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18). Runde 7 setzt die Startseiten- und Oberflächen-Erweiterungen S01–S17 aus `claude/startseite-erweiterungen.md` um (F90–F97, dazu erweitert F09, F13, F14, F17, F48, F84).
 
 ---
 
@@ -317,19 +325,31 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 
 ### F09 Eigenes Profil, Darstellung und Startseite speichern
 - **Ansicht:** 14 Mein Konto, 2 Start („Startseite anpassen“)
-- **Endpunkt:** `GET /api/auth/ich/` → `Ich`; `PATCH /api/auth/ich/` `{"darstellung"?: Darstellung, "startseite"?: {"karten": [...]}}`
+- **Endpunkt:** `GET /api/auth/ich/` → `Ich` (mit `startseite: {karten, notfallhinweis_bei}` und `aufteilung`);
+  `PATCH /api/auth/ich/` `{"darstellung"?: Darstellung, "startseite"?: {"karten"?: [...], "notfallhinweis_bei"?: n|null},
+  "aufteilung"?: {"<seite>@<stufe>": [Anteile] | null}}`
 - **Darstellung:** `schema` standard|individuell|kontrast|dunkel · `auto_dunkel` bool · `akzent`
   nachtblau|petrol|blau|gruen|orange|aubergine|schiefer|eigen + `akzent_eigen` #RRGGBB · `hintergrund`
   weissgrau|hellgrau|grau|kraeftig|blaugrau|sand|eigen + `hintergrund_eigen` · `dichte` grosszuegig|normal|kompakt|sehrkompakt ·
   `schriftgroesse` klein|normal|gross|sehrgross · `schriftstaerke` normal|kraeftig
-- **Startseite:** `karten: [{"id": termine|gewicht|plaene|pruefen|aktiv, "sichtbar": bool}]` in Anzeigereihenfolge; fehlende Karten
-  werden sichtbar angehängt.
+- **Startseite (Runde 7, S11):** `karten: [{"id", "sichtbar": bool, "breite": 1|2, "hoehe": 1|2}]` in Anzeigereihenfolge;
+  15 Kacheln: klinisch `termine` (2×2), `wieder` (1×2), `meine`, `gewicht`, `plaene`, `pruefen` (je 1×1), `aktiv` (2×1);
+  Administration `sicherung` (2×1), `server`, `updates`, `konten`, `angemeldet`, `hinweis`, `zugriffe`, `testumgebung`
+  (je 1×1). Fehlende Kacheln werden mit ihrer Standardgröße angehängt – sichtbar die klinischen für alle Rollen außer
+  Admin, die der Administration nur für die Rolle Admin; unbekannte gespeicherte fallen weg. Eine leere Liste setzt auf
+  den Standard zurück. Ob eine Kachel erscheint, entscheidet zusätzlich das Recht (F94). `notfallhinweis_bei`: der Hinweis
+  „Nur noch n Notfall-Codes“ (S08) ist bei dieser Anzahl ausgeblendet und kommt wieder, sobald weniger übrig sind.
+- **Spaltenaufteilung (Runde 7, S17, F97):** `aufteilung` je Seite und Fensterstufe – Seiten `patientenliste`,
+  `akte_uebersicht`, `akte_kontakte`, `plan_editor`; Stufen `hd` (ab 1440 px), `fhd` (ab 1920 px), `qhd` (ab 2560 px);
+  Werte = Positionen der Teiler von links (0–1, ein oder zwei); `null` entfernt den Eintrag (Standard). Andere Einträge
+  bleiben beim PATCH erhalten.
 - **Validierung:** unbekannte Schlüssel → 400; eigene Akzentfarbe braucht Kontrast ≥ 4,5:1 zu Weiß oder zur Schrift #1B1932;
-  eigene Hintergrundfarbe muss hell genug sein (Leuchtdichte ≥ 0,6); Karten nur einmal.
-- **Tabellen:** `accounts_user` (`darstellung`, `startseite`)
+  eigene Hintergrundfarbe muss hell genug sein (Leuchtdichte ≥ 0,6); Karten nur einmal; Größe nur 1 oder 2; Aufteilung:
+  nur bekannte Seiten und Stufen, Teiler aufsteigend, jede Spalte mindestens 15 % breit.
+- **Tabellen:** `accounts_user` (`darstellung`, `startseite`, `aufteilung` – neu, Migration `accounts/0004_user_aufteilung`)
 - **Fehlerfälle:** 400 `{"<schlüssel>": [...]}`
-- **Teststatus:** Backend-Tests grün (`MeinKonto.*`). Browsertests grün: `konto.spec.ts` „Darstellung wählen, eigene Farben prüfen, nach Neuladen erhalten, zurücksetzen“, `start.spec.ts` „Startseite anpassen: Karte ausblenden bleibt gespeichert“; Neustart geprüft in `zz-neustart.spec.ts` (Darstellung „Dunkel“ und ausgeblendete Karte,
-  beide vor dem Neustart in der Oberfläche gewählt).
+- **Teststatus:** Backend-Tests grün (`MeinKonto.*`, `test_startseite.KachelnUndTeiler.*`). Browsertests grün: `konto.spec.ts` „Darstellung wählen, eigene Farben prüfen, nach Neuladen erhalten, zurücksetzen“, `start.spec.ts` „Startseite anpassen: ausblenden, verschieben und Größe per Tastatur, Maus und Knopf – je Person gespeichert“, `oberflaeche.spec.ts` „Volle Breite in Stufen: 1920 px mit Spaltenteiler …“; Neustart geprüft in `zz-neustart.spec.ts` (Darstellung „Dunkel“, ausgeblendete Kachel, Kachel „Auffällige Gewichte“ 2×2, Spaltenteiler der Akte auf ⅓ –
+  alles vor dem Neustart in der Oberfläche gewählt).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F10 Sicherheitsstatus im Konto
@@ -372,22 +392,37 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 ## B · Startseite
 
 ### F13 Startseite
-- **Ansicht:** 2 Start
+- **Ansicht:** 2 Start (Runde 7: Kennzahlenleiste und Kacheln im festen Raster, Entwurf 2 „Startseite – Erweiterungen“)
 - **Endpunkt:** `GET /api/startseite/`
-- **Response 200:** `{"termine": {"ueberfaellig", "heute", "naechste_7_tage": [Termin]}, "gewichtswarnungen": [{patient, name,
-  nummer, gewicht, prozent}] (stärkster Verlust zuerst), "gewicht_schwelle": {prozent, monate}, "infusionsplaene":
-  {"entwuerfe", "aelter_als_grenze": [{id, patient, name, gueltig_ab, status, erstellt_am, erstellt_von, freigegeben_am}],
-  "grenze_monate"}, "pruefen": {altdokumente, nickelallergie_unbekannt, kein_versorger, kein_kontakt, kontakt_monate,
-  erklaerungen_fehlen, abschluss_pruefen, abschluss_monate, datenschutz_anfragen, datenschutz_ueberfaellig (F74, F75, F77 –
-  Anfragen zählen auch für abgeschlossene Akten; ohne Datenschutz-Recht 0)},
-  "zuletzt_eingetragen": [{bereich (kontakt|gewicht|dokument|plan), bezeichnung, objekt_id, patient, name, zeitpunkt, person}],
-  "zahlen": {in_betreuung, mit_offenem_termin}, "sicherung": {zustand (ok|warnung|fehler|unbekannt), letzte_am,
-  verschluesselt, titel, hinweise} (O-07, für alle; ohne Zugangsdaten)}`
-- **Validierung:** Testbenutzer sieht nur Testpatienten; Testpatienten fehlen in Zahlen und Prüfliste.
+- **Response 200:** `{"termine": {"ueberfaellig", "heute", "naechste_7_tage": [Termin] (heute bis heute + 6)}, "woche": [{datum,
+  anzahl, praxistermine, feiertag}] (S03, 7 Tage ab heute, Feiertage aus F84), "gewichtswarnungen": [{patient, name, nummer, gewicht,
+  prozent, verlauf: [{am, kg}]}] (stärkster Verlust zuerst; Verlauf = Messungen der letzten 6 Monate mit echten Zeitabständen,
+  S06), "gewicht_schwelle": {prozent, monate}, "infusionsplaene": {"entwuerfe", "aelter_als_grenze": [{id, patient, name,
+  gueltig_ab, status, erstellt_am, erstellt_von, freigegeben_am}], "grenze_monate", "anzahl_entwuerfe", "anzahl_aelter"} (S07),
+  "pruefen": {altdokumente, altdokumente_gesamt (S09 Fortschritt), nickelallergie_unbekannt, kein_versorger, kein_kontakt
+  (beide Stufen), kontakt_bald, kontakt_ueberfaellig, kontakt_bald_monate, kontakt_ueberfaellig_monate, kontakt_monate
+  (= bald, für ältere Oberflächen), erklaerungen_fehlen, abschluss_pruefen, abschluss_monate, datenschutz_anfragen,
+  datenschutz_ueberfaellig (F74, F75, F77 – Anfragen zählen auch für abgeschlossene Akten; ohne Datenschutz-Recht 0)},
+  "wiedereinbestellung": siehe F90, "zuletzt_eingetragen": [{bereich (kontakt|gewicht|dokument|plan|termin), bezeichnung,
+  objekt_id, patient, name, zeitpunkt, person, person_id}], "zuletzt_von_mir": [… nur eigene Einträge] (S10),
+  "zahlen": {in_betreuung, mit_offenem_termin, termine_7_tage, praxistermine_7_tage, termine_ueberfaellig,
+  kontakt_ueberfaellig, kontakt_bald} (S01), "notfallcodes": {uebrig, gesamt, eingerichtet, warnen_ab} (S08, F10), "sicherung":
+  {zustand (ok|warnung|fehler|unbekannt), letzte_am, verschluesselt, titel, hinweise} (O-07, für alle; ohne Zugangsdaten)}`
+- **Oberfläche (Runde 7):** Kennzahlenleiste „In Betreuung“, „Mit offenem Termin“, „Termine in 7 Tagen“, „Kontakt fällig“
+  (überfällig + bald), „Termine überfällig“ (SU8: Datensicherung nicht in der Leiste, sie steht als Chip in der Kopfzeile).
+  Kacheln: „Termine und Wiedervorlagen“ mit Wochenstreifen (Tag anklicken filtert), „Wiedereinbestellung fällig“ (F90),
+  „Meine Akten“ (F92), „Auffällige Gewichte“ mit Mini-Verlauf, „Infusionspläne“ gruppiert „Zur Freigabe“/„Älter als n Mon.“
+  mit Link zur Übersicht (F85), „Nach und nach prüfen“ mit Fortschritt der Altdokumente, „Zuletzt eingetragen“ mit „Alle“/
+  „Von mir“. Passt ein Inhalt nicht in die Kachel, scrollt sie in sich bzw. zeigt „Alle anzeigen“. Hinweis „Nur noch n
+  Notfall-Codes übrig“ (ab 3 oder weniger, ausblendbar), Kopfknöpfe „Kontakt erfassen“, „Gewicht“, „Termin“ (F91).
+- **Korrektur (Runde 7):** `mit_offenem_termin` zählte auch Akten ganz ohne Termin (LEFT JOIN); jetzt nur Akten mit
+  mindestens einem offenen Termin.
+- **Validierung:** Testbenutzer sieht nur Testpatienten; Testpatienten fehlen in Zahlen (auch in allen Kennzahlen der
+  Leiste, Runde 7) und Prüfliste; die Kacheln zeigen sie mit dem Hinweis „Test“.
 - **Tabellen:** `patienten_*` (+ Historie), `infusionen_infusionsplan`, `stammdaten_einstellungen`
 - **Kopfzeile:** Chip „Backup heute 02:00 erfolgreich“ bzw. der wichtigste Hinweis (z. B. „Backup unverschlüsselt“); mit dem Recht „Sicherungen verwalten“ ein Link zu Administration › Backup (F62).
-- **Teststatus:** Backend-Tests grün (`Patientenliste.test_startseite`, `test_pruefen_filter`, `Musterdaten.*`). Browsertests grün: `start.spec.ts` „Startseite zeigt Termine, Gewichte, Pläne, Prüfliste und Zuletzt eingetragen“,
-  `start.spec.ts` „Termin von der Startseite anlegen und als erledigt abhaken“ (mit Neustart), `start.spec.ts` „Startseite anpassen: Karte ausblenden bleibt gespeichert“; Backup-Status: Backend-Test `system.test_sicherung.Uebersicht.test_zustand_fuer_die_startseite`, Browsertest `zzz-sicherung.spec.ts` (Mitarbeiter sieht „Backup heute … erfolgreich“ ohne Link, Admin mit Link zur Seite).
+- **Teststatus:** Backend-Tests grün (`Patientenliste.test_startseite`, `test_pruefen_filter`, `Musterdaten.*`, `test_startseite.Startseite.*`). Browsertests grün: `start.spec.ts` „Startseite zeigt Kennzahlen und alle Kacheln im Raster“,
+  `start.spec.ts` „Termin von der Startseite anlegen und als erledigt abhaken“ (mit Neustart), `start.spec.ts` „Startseite anpassen: ausblenden, verschieben und Größe …“; Backup-Status: Backend-Test `system.test_sicherung.Uebersicht.test_zustand_fuer_die_startseite`, Browsertest `zzz-sicherung.spec.ts` (Mitarbeiter sieht „Backup heute … erfolgreich“ ohne Link, Admin mit Link zur Seite).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ---
@@ -400,18 +435,26 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
   gewichtsverlust, termin_woche}` (ohne Testpatienten)
 - **Query:** `status=in_betreuung|abgeschlossen`, `schnellfilter=hinweise|gewichtsverlust|termin_woche`, `suche` (Wörter;
   Datum TT.MM.JJJJ oder JJJJ-MM-TT = Geburtsdatum, Ziffern = Nummer, sonst Name/Vorname/Ort), `pruefen=altdokumente|
-  nickelallergie|kein_versorger|kein_kontakt|erklaerungen|abschluss_pruefen` (F74, F75), `versorger`, `ansprechpartner`, `katheter`, `nickelallergie`, `test=nur|ohne`,
+  nickelallergie|kein_versorger|kein_kontakt|kontakt_bald|kontakt_ueberfaellig|wiedereinbestellung|erklaerungen|abschluss_pruefen`
+  (F74, F75, F90), `versorger`, `ansprechpartner`, `katheter`, `nickelallergie`, `test=nur|ohne`,
   `ordering=letzter_kontakt|nachname|nummer|geburtsdatum|geaendert_am` (Standard: letzter Kontakt, neueste zuerst, ohne Kontakt am Ende)
 - **Response 200:** Seite mit `[{id, nummer, nachname, vorname, geburtsdatum, alter, ort, katheter, katheter_name, versorger,
   versorger_name, ansprechpartner, ansprechpartner_name, nickelallergie, ist_abgeschlossen, abgeschlossen_am,
   abschluss_anlass, ist_test, kennzahlen: {gewicht {kg, am}, trend {richtung down|up|flat, prozent, warnung},
-  letzter_kontakt, termin_woche, hinweise: [{art: gewicht|plan|versorger|kontakt, text}]}}]`
+  letzter_kontakt, termin_woche, kontakt_stufe (bald|ueberfaellig|null), naechster_termin {id, art, faellig_am, uhrzeit, titel},
+  plan {gueltig_ab, alt, entwurf}, erklaerungen_fehlen [Art], hinweise: [{art: gewicht|plan|versorger|kontakt, text, stufe?}]}}]`
 - **Logik:** Trend gegen die Messung, die den eingestellten Zeitraum zurückliegt; Pfeil „gleich“ bei weniger als ±1 %
   (Zwischenlösung, siehe U11); Hinweise „Gewicht −8,6 % in 3 Mon.“, „Plan älter als 12 Mon.“, „Kein Versorger“,
-  „Kein Kontakt seit über 12 Mon.“ (Monate aus den Einstellungen, U4).
+  „Kontakt bald fällig (über 4 Mon.)“ / „Kontakt überfällig (über 6 Mon.)“ / „Noch kein Kontakt erfasst“ (Monate aus den
+  Einstellungen, U4, F90).
+- **Oberfläche (Runde 7, S16/F96):** Spalten je Fensterstufe – unter 1440 px Nr., Name mit Geburtsdatum, Letzter Kontakt,
+  Nächster Termin, Hinweise; ab 1440 px zusätzlich Geboren (sortierbar), Katheter, Versorger, Gewicht mit Trend; ab 1920 px
+  Plan und Erklärungen; ab 2560 px rechts eine Vorschau der gewählten Akte (Kopfdaten, Hinweise, letzte Kontakte; Zeile
+  anklicken oder „Vorschau: Name“), getrennt durch einen Spaltenteiler (F97, Standard ⅔ | ⅓). Hinweis-Chips „Kontakt“ in
+  Gelb (bald fällig) bzw. Rot (überfällig).
 - **Tabellen:** `patienten_patient`, `patienten_gewichtsmessung`, `patienten_kontakt`, `patienten_termin`,
   `infusionen_infusionsplan`, `stammdaten_einstellungen`
-- **Teststatus:** Backend-Tests grün (`Patientenliste.*`, `test_testbenutzer_sieht_nur_testpatienten`). Browsertests grün: `patienten.spec.ts` „Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten“ (Freitext,
+- **Teststatus:** Backend-Tests grün (`Patientenliste.*`, `test_testbenutzer_sieht_nur_testpatienten`, `Patientenliste.test_kontakt_faellig_in_zwei_stufen`). Browsertests grün: `oberflaeche.spec.ts` „Volle Breite in Stufen: 1280 px“ und „… 2560 px mit Vorschau in der Patientenliste …“, `patienten.spec.ts` „Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten“ (Freitext,
   Versorger, Ansprechpartner, Schnellfilter, Sortierung, abgeschlossene Akten, Zahl ohne Testpatienten), `patienten.spec.ts` „Betrachter sieht die Liste, aber keinen Knopf „Neuer Patient““, `patienten.spec.ts` „Testzugang: Hinweis dauerhaft sichtbar, nur Testpatienten, neue Patienten werden Testpatienten“, `patienten.spec.ts` „Suche in der Kopfzeile (Strg K) nach Name, Nummer und Geburtsdatum“;
   Neustart geprüft in `zz-neustart.spec.ts` (Suche nach dem neuen Patienten).
 - **Status:** ABGESCHLOSSEN UND GETESTET
@@ -449,12 +492,16 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
   tage, warnung, vergleich_kg, aktuell_kg}, bmi, katheter, versorger, ansprechpartner, ansprechpartner_telefon,
   nickelallergie, aktueller_plan {id, gueltig_ab, kcal, laufzeit_h}, naechster_termin {id, art, titel, faellig_am, uhrzeit,
   ort, bei}, versionen {diagnose|therapie|empfehlung: {version, zeitpunkt, person}}, zaehler {kontakte, gewichte, dokumente,
-  termine_offen, infusionsplaene}}`
+  termine_offen, infusionsplaene}, letzter_kontakt (Runde 7, für den Kontextkasten der Schnellerfassung F91), gemerkt (bool,
+  Stern „Merken“ im Aktenkopf, F92)}`
 - **Fehlerfälle:** 404 unbekannt oder außerhalb des Bereichs
 - **Teststatus:** Backend-Tests grün (`test_versionen_der_textfelder`, `test_termin_mit_ort`, `Infusionsplaene.test_ablauf`). Browsertests grün:
   `akte.spec.ts` „Akte aus der Liste öffnen: Kopf mit Kerndaten und Gewichtswarnung“, `layout.spec.ts` „Unter 1280 px stehen die Karten der Akte untereinander“,
   `akte.spec.ts` „Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pflegen“ (Kopfhöhe bleibt mit Personen gleich;
   „Auskunft an“ führt zur Person).
+- **Oberfläche (Runde 7, S16/F96):** Übersicht unter 1440 px untereinander, ab 1440 px zwei Spalten ½ | ½ mit Teiler, ab
+  1920 px ⅔ | ⅓ mit zweispaltigem Inhalt links, ab 2560 px Gewichtsdiagramm standardmäßig über 3 Jahre. Kontakte ab 1440 px
+  ⅗ | ⅖ mit Teiler, ab 1920 px ⅔ | ⅓ mit Terminen, ab 2560 px fest ½ | ¼ | ¼ (Kontakte, Erreichbarkeit mit Terminen, Verlauf kurz).
 - **Oberfläche (02.10.2026):** Kennzahlen im festen Raster (2 Zeilen à 5, schmaler 3 bzw. 2 Spalten), je eine Zeile, Langes
   gekürzt mit vollem Text im Tooltip – mehr Ärzte oder Personen verändern die Höhe nicht. „Auskunft an“: Klick springt zur
   Bezugsperson mit Anschrift und Kontaktdaten und hebt sie kurz hervor.
@@ -874,13 +921,17 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 ### F48 Grenzwerte und Einstellungen
 - **Ansicht:** 18 Vorlagen › Grenzwerte
 - **Endpunkt:** `GET/PATCH /api/einstellungen/` (lesen alle, ändern mit Recht „Vorlagen pflegen“)
-- **Felder:** Absender; Warnung Gewichtsverlust %, Zeitraum, Plan alt nach Monaten, Kontakt überfällig nach Monaten;
+- **Felder:** Absender; Warnung Gewichtsverlust %, Zeitraum, Plan alt nach Monaten, Kontakt bald fällig nach Monaten
+  (`kontakt_bald_monate`, Standard 4, neu in Runde 7) und Kontakt überfällig nach Monaten (`kontakt_ueberfaellig_monate`,
+  Standard 6; F90);
   Min/Max für Energie, Gesamtvolumen, Glucose, Aminosäuren, Lipide, Natrium, Kalium, Gewicht, Größe.
   Datenschutz (Karte „Datenschutz“): `aufbewahrung_jahre` (Standard 10, 1–100), `abschluss_pruefen_monate` (Standard 24),
   `protokoll_aufbewahrung_jahre` (Standard 0 = unbegrenzt), `pflicht_erklaerungen` (Liste; Standard alle drei) – F74, F75, F83.
   Diese vier Werte ändert nur, wer zusätzlich das Recht „Datenschutz: Anfragen entscheiden …“ hat (sie bestimmen, wann
   Akten gelöscht werden dürfen und wann Einträge des Audit-Logs entfernt werden); sonst 403, in der Oberfläche nur lesbar.
-- **Validierung:** Minimum < Maximum je Paar; Audit-Log „Grenzwert „Kontakt überfällig“ von 6 auf 12 Monate geändert“.
+- **Validierung:** Minimum < Maximum je Paar; „bald fällig“ mindestens 1 Monat und kleiner als „überfällig“ (sonst 400
+  `{"kontakt_ueberfaellig_monate": "„Überfällig“ muss später liegen als „bald fällig“."}`); Audit-Log „Grenzwert „Kontakt
+  überfällig“ von 6 auf 8 Monate geändert“.
 - **Teststatus:** Backend-Tests grün (`EinstellungenPruefen.test_grenzen_und_rechte`, `test_gesamtvolumen_rate_und_protonenpumpenhemmer`).
   Browsertests grün: `admin.spec.ts` „Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte“ (untere > obere Grenze abgewiesen, Grenze für das Gesamtvolumen geändert), Grenzen wirken in
   `akte.spec.ts` „Gewicht erfassen, Plausibilität, korrigieren, Zeitraum“, `patienten.spec.ts` „Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme“, `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“; Neustart geprüft in `zz-neustart.spec.ts` (Grenzwert vor dem Neustart in der Oberfläche geändert).
@@ -1663,8 +1714,9 @@ Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie
   `{von, bis, heute, termine: [Termin], termine_ueberfaellig: [Termin], faelligkeiten: [{art: kontakt|plan, patient, name,
   nummer, ist_test, faellig_am, seit, ueberfaellig, text}], grenzen: {kontakt_monate, plan_monate}, feiertage: [{datum, name}]}`.
   Termine anlegen, ändern, erledigen weiter über F29/F30.
-- **Logik:** Fälligkeiten nur für Akten in Betreuung: Kontakt fällig = letzter Kontakt (sonst Anlage der Akte) +
-  Grenzwert „Kontakt überfällig“; Plan prüfen = gültig ab des aktuellen Plans + Grenzwert „Infusionsplan gilt als alt
+- **Logik:** Fälligkeiten nur für Akten in Betreuung: Kontakt fällig in zwei Stufen (Runde 7, F90) – je Akte ein Eintrag
+  „bald fällig“ (letzter Kontakt, sonst Anlage der Akte, + Grenzwert „Kontakt bald fällig“) und einer „überfällig“ (+ Grenzwert
+  „Kontakt überfällig“), jeweils mit `stufe`; `grenzen` enthält zusätzlich `kontakt_bald_monate`; Plan prüfen = gültig ab des aktuellen Plans + Grenzwert „Infusionsplan gilt als alt
   nach“ (je 30 Tage pro Monat wie in der Patientenliste). Feiertage bundesweit plus NRW (Fronleichnam, Allerheiligen),
   siehe U25. Überfällige Termine nur offener Akten. Testzugang: nur Testpatienten.
 - **Validierung:** von/bis Pflicht, bis ≥ von, höchstens 400 Tage → sonst 400.
@@ -1672,6 +1724,8 @@ Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie
 - **Teststatus:** Backend-Tests `patienten/test_kalender.py` (`Feiertage.test_ostern_und_nrw`, `Kalender.*`). Browsertests
   `kalender.spec.ts` (Menüpunkt, Überfälliges, Fälligkeit „Plan prüfen“ öffnen, Woche/Liste, Feiertage; Termin an einem Tag
   anlegen, öffnen, abhaken, Erledigte ausblenden; Betrachter ohne Anlegen); Neustart in `zz-neustart.spec.ts`.
+- **Oberfläche (Runde 7):** Seitenlisten „Kontakt überfällig“ und „Kontakt bald fällig“ getrennt, Farben je Stufe; ab
+  1920 px Kalender ¾ | ¼ mit der Tagesliste in allen Ansichten (Monat, Woche, Liste).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F85 Übersicht aller Infusionspläne
@@ -1761,9 +1815,169 @@ Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie
 
 Hinweise zur Abgrenzung: Die Systemseite zeigt die letzte Sicherung und kann eine Sicherung anstoßen; Verschlüsselung,
 Übertragung und Wiederherstellen stehen unter Administration › Backup (F61–F64) und nutzen denselben Systemagenten. Die Kacheln der Admin-Startseite
-(S12–S14 in `claude/startseite-erweiterungen.md`) folgen mit den Startseiten-Erweiterungen; sie lesen dieselben Endpunkte.
+(S12–S14 in `claude/startseite-erweiterungen.md`) sind F94; sie lesen dieselben Endpunkte.
 Ein Auftrag mit Wartezeit (Beginn in n Minuten) ist ab der Übernahme durch den Server nicht mehr zurückziehbar; die Warnung
 lässt sich jederzeit beenden.
+
+## O · Startseite und Oberfläche (Runde 7, Festlegungen 01./02.10.2026)
+
+Grundlage: `claude/startseite-erweiterungen.md` (S01–S17, SU1–SU10) und Entwurf 2 „EPM Startseite – Erweiterungen“ auf der
+Design-Fläche. SU8–SU10 am 02.10.2026 nach den Vorschlägen des Entwurfs geklärt: in der Kennzahlenleiste „Termine
+überfällig“ statt Datensicherung (die steht als Chip in der Kopfzeile); unter 1440 px 2 Spalten, unter 900 px 1;
+Aufteilung der übrigen Seiten wie im Entwurf vorgeschlagen. Erweitert sind außerdem F09, F13, F14, F17, F48 und F84.
+
+**Fensterstufen** (in der ganzen Oberfläche gleich): „eng“ unter 900 px, „schmal“ 900–1439 px, „hd“ ab 1440 px, „fhd“ ab
+1920 px, „qhd“ ab 2560 px. Raster der Startseite: 1 / 2 / 3 / 4 / 5 Spalten.
+
+### F90 Kontakt fällig in zwei Stufen, Wiedereinbestellung
+- **Zweck:** „bald fällig“ (Standard 4 Monate) und „überfällig“ (Standard 6 Monate) ohne Kontakt, beide unter Vorlagen ›
+  Grenzwerte einstellbar (F48). Gilt in Patientenliste (Hinweis und Filter), Prüfliste, Kennzahlenleiste, Kalender (F84) und
+  der Kachel „Wiedereinbestellung fällig“.
+- **Datenmigration** `stammdaten/0009_kontakt_zwei_stufen`: der bisherige Wert „Kontakt überfällig“ wird „bald fällig“,
+  „überfällig“ = größerer Wert aus 6 und bisher + 2 Monate (bisher 4 → 4/6). Eintrag in der Historie der Einstellungen mit
+  Grund „Kontakt fällig in 2 Stufen: bald fällig = bisheriger Wert, überfällig neu (Festlegung 01.10.2026)“.
+- **Logik:** Stufe aus dem letzten nicht stornierten Kontakt: älter als „überfällig“ → `ueberfaellig`, älter als „bald“ →
+  `bald`; Akten ohne jeden Kontakt gelten als „überfällig“ (wie bisher „Kein Kontakt“; Text „Noch kein Kontakt erfasst“).
+  Nur Akten in Betreuung. Monate zu 30 Tagen wie in der Patientenliste.
+- **Endpunkte:** `GET /api/patienten/?pruefen=kontakt_bald|kontakt_ueberfaellig|kein_kontakt (beide)|wiedereinbestellung`;
+  in `GET /api/startseite/`: `"wiedereinbestellung": {ueberfaellig: [{patient, name, nummer, ist_test, letzter_kontakt,
+  stufe}], bald: [...], anzahl_ueberfaellig, anzahl_bald, bald_monate, ueberfaellig_monate}` – Akten mit fälligem Kontakt
+  **ohne** offenen Termin, längste Zeit ohne Kontakt zuerst, je Stufe höchstens 50.
+- **Kachel:** Anzahl je Stufe, Namen mit „seit …“, Knöpfe „Kontakt erfassen“ (F91 mit dem Patienten vorbelegt) und
+  „Termin anlegen“; Link „Alle anzeigen“ zur gefilterten Patientenliste.
+- **Validierung:** beide ≥ 1 Monat, „bald“ < „überfällig“ – im Modell (`kontaktstufen_fehler`) und in der API.
+- **Tabellen:** `stammdaten_einstellungen` (+ Historie), `patienten_kontakt`, `patienten_termin`
+- **Teststatus:** Backend-Tests `patienten/test_startseite.py` (`Kontaktstufen.*`: Migration, Validierung;
+  `Startseite.test_wiedereinbestellung_ohne_geplanten_termin`), `Patientenliste.test_kontakt_faellig_in_zwei_stufen`,
+  `test_kalender.py` (beide Stufen), `stammdaten/tests.py` (Audit „von 6 auf 8 Monate“). Browsertests `start.spec.ts`
+  „Wiedereinbestellung (S04): Stufen und Kontakt direkt aus der Kachel“, `admin.spec.ts` „Vorlagen: … Grenzwerte“ („bald“ ≥
+  „überfällig“ abgewiesen), `kalender.spec.ts`; Neustart in `zz-neustart.spec.ts` (bald 9 / überfällig 14 vor dem Neustart
+  in der Oberfläche gesetzt, danach geprüft und auf 4 / 6 zurückgestellt).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F91 Schnellerfassung von der Startseite
+- **Ansicht:** 2 Start, Kopfknöpfe „Kontakt erfassen“, „Gewicht“, „Termin“; „Kontakt erfassen“ auch in den Kacheln
+  „Wiedereinbestellung“ und „Meine Akten“ (dann mit dem Patienten vorbelegt).
+- **Dialog „Kontakt erfassen“:** Patient wählen (Suche wie F14), Kontextkasten „Aus der Akte“ (letzter Kontakt, Gewicht mit
+  Trend, aktueller Plan, nächster Termin, „Auskunft an“ – aus F17), Datum und Uhrzeit vorbelegt mit jetzt, Notiz
+  (formatiert), „Gewicht mit erfassen“ (Gewicht, gemessen am, Quelle; Veränderung zur letzten Messung wird angezeigt),
+  „Wiedervorlage anlegen“ (Rückruf/Wiedervorlage/Praxistermin, fällig am mit Schnellwahl, Uhrzeit, Ort bzw. Titel).
+- **Speichern (Festlegung SU1):** zwei getrennte Anfragen – zuerst `POST /api/kontakte/` (mit Wiedervorlage, F26/F28), dann
+  `POST /api/gewichte/` (F25). Scheitert das Gewicht (z. B. außerhalb der Grenzen), bleibt der Kontakt gespeichert; der
+  Dialog meldet „Kontakt gespeichert – Gewicht nicht gespeichert: …“, die Kontaktfelder sind gesperrt und „Gewicht
+  speichern“ holt nur das Gewicht nach. „Gewicht“ allein und „Termin“ nutzen F25 bzw. F29.
+- **Validierung / Fehlerfälle:** wie F25, F26, F28, F29 (Grenzen der Einstellungen, abgeschlossene Akte 409, Rechte).
+- **Teststatus:** Browsertest `oberflaeche.spec.ts` „Schnellerfassung (S02): Kontakt mit Wiedervorlage; das Gewicht
+  scheitert getrennt und wird nachgeholt“ (590 kg abgewiesen, Kontakt bleibt, 59,4 kg nachgeholt; danach in der Akte und
+  über die API geprüft, Gewicht allein).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F92 Meine Akten: Merkliste und zuletzt geöffnet
+- **Ansicht:** Stern „Merken“ im Aktenkopf (F17, `aria-pressed`); Kachel „Meine Akten“ mit „Merkliste“ und „Zuletzt
+  geöffnet“ (Gewicht/Trend, nächster Termin, Planentwurf; Knopf „Kontakt erfassen“). Die Akte meldet das Öffnen einmal je
+  Aufruf.
+- **Endpunkte:** `GET /api/meine-akten/` → `{merkliste: [Zeile], zuletzt: [Zeile]}` mit Zeile `{patient, name, nummer,
+  ist_test, ist_abgeschlossen, am, gewicht, trend, naechster_termin, plan_entwurf}`; `POST /api/meine-akten/merken/`
+  `{patient}` → 201; `DELETE /api/meine-akten/merken/<patient>/`; `POST /api/meine-akten/geoeffnet/` `{patient}` → 204.
+- **Logik:** je Person gespeichert; „zuletzt geöffnet“ behält die 20 jüngsten, die Merkliste höchstens 200. Nur Akten im
+  eigenen Bereich (Testzugang: nur Testpatienten; eingeschränkte Akten erscheinen nicht). Wird die Akte endgültig gelöscht
+  (F80) oder das Konto entfernt, fallen die Einträge mit weg (CASCADE). Keine Historie (reine Arbeitshilfe der Person, siehe
+  `docs/DATENSCHUTZ.md`).
+- **Validierung / Fehlerfälle:** 400 unbekannte oder fremde Akte; 400 Merkliste voll; 403 ohne „Akten lesen“.
+- **Tabellen:** `patienten_merkeintrag` (neu, Migration `patienten/0008_merkeintrag`; eindeutig je Person, Akte und Art)
+- **Teststatus:** Backend-Tests `test_startseite.MeineAkten.*` (merken, zuletzt, Bereich, Wegfall mit der Akte).
+  Browsertest `oberflaeche.spec.ts` „Meine Akten (S05): Stern im Aktenkopf, Merkliste und zuletzt geöffnet auf der
+  Startseite“.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F93 Startseite anpassen: Kacheln im festen Raster
+- **Ansicht:** 2 Start › „Startseite anpassen“: Leiste mit Spaltenzahl der aktuellen Fensterstufe, „Standard“, „Fertig“;
+  je Kachel Griff (verschieben), Größenwahl 1×1/2×1/1×2/2×2, „ausblenden“; ausgeblendete Kacheln unten mit „einblenden“.
+  Größe per Ziehen an der Ecke unten rechts – ein Rahmen zeigt die Zielgröße („2 × 1 · loslassen zum Einrasten“), die
+  Kachel rastet in ganzen Rasterzellen ein. Verschieben per Ziehen am Griff auf eine andere Kachel. Tastatur am Griff:
+  Pfeile verschieben, Umschalt + Pfeile ändern die Größe.
+- **Raster:** feste Zeilenhöhe; Spalten je Fensterstufe 1/2/3/4/5 (SU9); eine Kachel ist höchstens so breit wie das
+  Raster. Passt der Inhalt nicht, scrollt die Kachel in sich oder zeigt „Alle anzeigen“.
+- **Speichern:** jede Änderung sofort über F09 (`startseite.karten` mit Größe und Reihenfolge).
+- **Teststatus:** Backend-Tests `test_startseite.KachelnUndTeiler.test_standard_je_rolle`,
+  `test_groesse_und_reihenfolge_gespeichert`, `accounts/tests.py`. Browsertest `start.spec.ts` „Startseite anpassen:
+  ausblenden, verschieben und Größe per Tastatur, Maus und Knopf – je Person gespeichert“; Neustart in `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F94 Startseite der Administration
+- **Ansicht:** 2 Start für die Rolle Admin (Standard; jede Person kann Kacheln ein- und ausblenden, angezeigt nur mit dem
+  passenden Recht): „Datensicherung“ (letzte Sicherung, Verschlüsselung, Übertragung, Speicher; „Jetzt sichern“ mit
+  Rückfrage – Recht „Sicherungen verwalten“, F62), „Server“ (CPU, Arbeitsspeicher, Platte, Laufzeit seit Neustart – F86),
+  „Ubuntu-Updates“ (offene Pakete, davon Sicherheit, Hinweis „Neustart nötig“; „Updates installieren“, „Server neu starten“
+  mit demselben Dialog wie System: Passwort + 2FA, Beginn, Warnung an alle – F87), „Angemeldet“ (abmelden – F89), „Hinweis an
+  alle“ (setzen/beenden – F89), „Konten“ (gesperrt, Einmal-Kennwort offen/abgelaufen, ohne 2FA, Notfall-Codes knapp;
+  „Entsperren“, Link zu Benutzer – Recht „Benutzer verwalten“), „Zugriffe · 7 Tage“ (Anmeldungen, Fehlversuche, PDF-Exporte,
+  Vorlagen geändert, Wiederherstellungen; jede Zeile öffnet das Audit-Log mit Gruppe und Zeitraum – Recht „Audit-Log
+  lesen“), „Testumgebung“ (Testpatienten in Betreuung/abgeschlossen, zuletzt zurückgesetzt; „Testdaten zurücksetzen“ – F57).
+  Kopfknopf „Benutzer anlegen“ (öffnet Benutzer mit dem Formular).
+- **Neue Endpunkte:** `GET /api/benutzer/konten/` → `[{id, benutzername, anzeigename, rolle, probleme:
+  [gesperrt|einmal_kennwort|einmal_kennwort_abgelaufen|ohne_2fa|notfallcodes], gesperrt_am, sperrgrund, fehlversuche,
+  einmal_kennwort_gueltig_bis, notfallcodes_uebrig, notfallcodes_gesamt}]` – nur Zustände und Anzahlen, keine Kennwörter,
+  Codes oder Prüfsummen; `GET /api/protokoll/zusammenfassung/?tage=7` (1–90) → `{tage, von, zeilen: [{schluessel, text,
+  gruppe, anzahl}]}`; `GET /api/testdaten/` → `{in_betreuung, abgeschlossen, zuletzt_am, zuletzt_von}`. Alle übrigen Kacheln
+  lesen vorhandene Endpunkte (`/api/backup/`, `/api/system/uebersicht/`, `/api/system/auftraege/`, `/api/system/hinweis/`).
+- **Abweichung (markiert):** Die Kachel „Konten“ druckt kein Zugangsblatt – das Einmal-Kennwort wird nur beim Erzeugen
+  angezeigt (F54/F55) und ist danach nur als Prüfsumme gespeichert; die Kachel verweist dafür auf Administration › Benutzer.
+- **Fehlerfälle:** 403 ohne das jeweilige Recht (Kachel ausgeblendet, F71).
+- **Teststatus:** Backend-Tests `test_startseite.AdminKacheln.*` (Konten ohne Geheimnisse, Zugriffe 7 Tage, Testumgebung).
+  Browsertest `oberflaeche.spec.ts` „Startseite der Administration (S12–S14): Kacheln nach Rechten, Update nur mit Passwort
+  und 2FA“ (Mitarbeiter sieht keine Admin-Kachel; falscher Code abgelehnt, Auftrag mit Notfall-Code, Zugriffe → Audit-Log).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F95 Hilfe je Rolle
+- **Ansicht:** Menüpunkt „Hilfe“ (für alle Angemeldeten) und „?“ in der Kopfzeile jeder Seite (`/hilfe?seite=<Pfad>` öffnet
+  den passenden Abschnitt, Unterseiten ohne eigenen Abschnitt den der übergeordneten Seite). Inhaltsverzeichnis nach Gruppen,
+  Suche über Titel, Text und Ergänzungen; Chip „mitgeliefert · EPM <Version>“; darunter „Ergänzung der Stiftung“ mit
+  Historie (alle Fassungen) und – mit dem Recht „Vorlagen pflegen“ – „Ergänzen“/„Bearbeiten“ (Editor wie Dokumentvorlagen).
+- **Inhalt:** 45 mitgelieferte Abschnitte in 10 Gruppen (`backend/hilfe/inhalt.py`, mit dem Code versioniert – passt immer
+  zur installierten Version), darunter Kalender, Infusionspläne, System, Datenschutz, Backup und Import. Angezeigt werden die
+  Abschnitte, für die die Person mindestens eines der genannten Rechte hat (Rechte je Gruppe, F66) – nicht der Rollenname.
+- **Endpunkte:** `GET /api/hilfe/` → `{version, darf_ergaenzen, gruppen: [{id, titel, abschnitte: [{id, titel, seiten, html,
+  ergaenzung: {text, geaendert_am, geaendert_von, versionen} | null}]}]}`; `PUT /api/hilfe/<abschnitt>/ergaenzung/` `{text}`
+  (Recht „Vorlagen pflegen“; leer = entfernen); `GET /api/hilfe/<abschnitt>/ergaenzung/versionen/` → `[{version, zeitpunkt,
+  person, text}]`.
+- **Logik:** Text wird wie andere formatierte Texte bereinigt (`epm/sanitize.py`); jede Änderung als neue Fassung in der
+  Historie (unveränderlich, Löschen nicht vorgesehen) und im Audit-Log (Gruppe „Vorlagen“, Objekt „Hilfe › <Titel>“,
+  angelegt/geändert/entfernt). Abschnitte ohne Recht → 404.
+- **Tabellen:** `hilfe_hilfeergaenzung`, `hilfe_historicalhilfeergaenzung` (neue App `hilfe`, Migration `0001_initial`)
+- **Teststatus:** Backend-Tests `test_startseite.Hilfe.*` (Abschnitte nach Rechten, Ergänzung mit Historie und Audit, jeder
+  Abschnitt vollständig). Browsertest `oberflaeche.spec.ts` „Hilfe (S15): „?“ führt zum passenden Abschnitt, Suche,
+  Ergänzung mit Historie“ (auch: Betrachter sieht keine Administration und kein „Ergänzen“).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F96 Volle Fensterbreite, Aufteilung in Stufen
+- **Umsetzung:** Begrenzung `max-w-[1440px]` in `Seite` entfernt – alle Seiten nutzen die volle Breite (Rand 16 px, ab
+  900 px 32 px). Aufteilung je Stufe nach Entwurf 2: Startseite (F93), Patientenliste (F14), Akte Übersicht und Kontakte
+  (F17), Plan-Editor (ab 1920 px Eingabe | Summen | PDF-Vorschau im Verhältnis 2 : 1 : 1, ab 2560 px drei Spalten mit zwei
+  Teilern, Standard ⅓ | ⅓ | ⅓), Kalender (F84), Neuer
+  Patient (ab 1920 px 6, ab 2560 px 8 Felder je Zeile), Dokumente (ab 1920 px Liste | Vorschau 2 : 1), Pläne (ab 1920 px
+  breitere Liste), Administration (System 2/3/4 Karten je Zeile, Backup und Datenschutz zwei- bzw. dreispaltig), Hilfe
+  (Inhalt | Text).
+- **PDF-Vorschau im Plan-Editor:** zeigt den Stand der letzten Speicherung (`/api/infusionsplaene/<id>/ansicht/`); vor der
+  ersten Speicherung „sobald der Entwurf gespeichert ist“. Keine Vorschau ungespeicherter Eingaben (abgeleitet, markiert in
+  `claude/startseite-erweiterungen.md`).
+- **Teststatus:** Browsertests `oberflaeche.spec.ts` „Volle Breite in Stufen: 1280 px“, „… 1920 px …“, „… 2560 px …“
+  (Startseite 2/4/5 Spalten, Inhalt über die volle Breite, Spalten der Patientenliste, Aufteilung der Akte, Tagesliste im
+  Kalender, Vorschau in der Patientenliste, Plan-Editor mit PDF-Vorschau), `layout.spec.ts`; 3 Spalten bei 1440 px in
+  `start.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F97 Spaltenteiler mit Einrastpunkten
+- **Ansicht:** senkrechter Teiler zwischen Spalten (Patientenliste ab 2560 px, Akte Übersicht und Kontakte ab 1440 px bis
+  1919 px und ab 1920 px – Kontakte ab 2560 px feste Aufteilung ohne Teiler –, Plan-Editor ab 2560 px mit zwei Teilern). Ziehen mit der Maus – rastet bei ⅓, ½, ⅔ und beim Standard der Seite ein, Tooltip zeigt den
+  Punkt („⅔ · rastet ein · Doppelklick: Standard“); Doppelklick setzt auf den Standard zurück. Tastatur (Rolle
+  `separator`): ←/→ zum nächsten Einrastpunkt, Pos1/Ende erster/letzter, Eingabe = Standard.
+- **Speichern:** je Seite, Fensterstufe und Person über F09 (`aufteilung`, `"<seite>@<stufe>"`); Standard = Eintrag
+  entfernt.
+- **Teststatus:** Backend-Test `test_startseite.KachelnUndTeiler.test_spaltenteiler` (Validierung, Zusammenführen, Zurücksetzen).
+  Browsertest `oberflaeche.spec.ts` „Volle Breite in Stufen: 1920 px mit Spaltenteiler (Einrastpunkte ⅓, ½, ⅔, je Person
+  gespeichert)“ (Tastatur, Maus, Doppelklick, gespeicherter Wert); Neustart in `zz-neustart.spec.ts` (Teiler der Akte auf ⅓).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ## Offene Backend-Funktionen
 

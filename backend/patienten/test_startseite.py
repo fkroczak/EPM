@@ -73,18 +73,28 @@ class Startseite(Grundlage):
             Gewichtsmessung.objects.create(patient=cls.bald, gewicht_kg=Decimal(kg),
                                            gemessen_am=heute - timedelta(days=tage))
         cls.test = Patient.objects.create(nachname="Probe", vorname="Tom", geburtsdatum="1970-01-01", ist_test=True)
+        # Testpatient mit überfälligem und anstehendem Termin: in den Kacheln sichtbar, in den Kennzahlen nicht
+        Termin.objects.create(patient=cls.test, art=Termin.Art.RUECKRUF, faellig_am=heute - timedelta(days=1), titel="Test alt")
+        Termin.objects.create(patient=cls.test, art=Termin.Art.PRAXISTERMIN, faellig_am=heute + timedelta(days=1),
+                              titel="Test neu")
 
     def test_kennzahlen_und_wochenstreifen(self):
         d = client_fuer(self.mitarbeiter).get("/api/startseite/").json()
         z = d["zahlen"]
         self.assertEqual(z["in_betreuung"], 4)  # ohne Testpatient
         self.assertEqual(z["mit_offenem_termin"], 2)
+        # ohne Testpatient (F13), die Kacheln zeigen ihn
         self.assertEqual((z["termine_7_tage"], z["praxistermine_7_tage"], z["termine_ueberfaellig"]), (2, 1, 1))
+        self.assertEqual(len(d["termine"]["ueberfaellig"]), 2)
         # heute und die 6 folgenden Tage – der Termin am achten Tag zählt nicht mit
-        self.assertEqual({t["titel"] for t in d["termine"]["naechste_7_tage"]}, {"Rückruf", "Kontrolle"})
+        self.assertEqual({t["titel"] for t in d["termine"]["naechste_7_tage"]}, {"Rückruf", "Kontrolle", "Test neu"})
         woche = d["woche"]
         self.assertEqual([w["datum"] for w in woche], [(self.heute + timedelta(days=i)).isoformat() for i in range(7)])
-        self.assertEqual((woche[0]["anzahl"], woche[2]["anzahl"], woche[2]["praxistermine"]), (1, 1, 1))
+        self.assertEqual((woche[0]["anzahl"], woche[1]["anzahl"], woche[2]["anzahl"], woche[2]["praxistermine"]), (1, 1, 1, 1))
+        # Testzugang: nur Testpatienten, die zählen dort auch in den Kennzahlen
+        z = client_fuer(benutzer("tester", Rolle.MITARBEITER, ist_test=True)).get("/api/startseite/").json()["zahlen"]
+        self.assertEqual((z["in_betreuung"], z["termine_7_tage"], z["termine_ueberfaellig"], z["kontakt_ueberfaellig"]),
+                         (1, 1, 1, 0))
         self.assertTrue(all("feiertag" in w for w in woche))
 
     def test_feiertage_im_wochenstreifen(self):
@@ -98,12 +108,16 @@ class Startseite(Grundlage):
     def test_wiedereinbestellung_ohne_geplanten_termin(self):
         d = client_fuer(self.mitarbeiter).get("/api/startseite/").json()
         w = d["wiedereinbestellung"]
-        self.assertEqual([x["patient"] for x in w["ueberfaellig"]][:1], [self.test.id])  # noch nie Kontakt: zuerst
-        self.assertIn(self.alt.id, [x["patient"] for x in w["ueberfaellig"]])
+        self.assertEqual([x["patient"] for x in w["ueberfaellig"]], [self.alt.id])  # Testpatient hat einen Termin
         self.assertEqual([x["patient"] for x in w["bald"]], [self.bald.id])  # „Geplant“ hat einen Termin
         self.assertEqual((w["bald_monate"], w["ueberfaellig_monate"]), (4, 6))
-        self.assertEqual((d["zahlen"]["kontakt_bald"], d["zahlen"]["kontakt_ueberfaellig"]),
-                         (w["anzahl_bald"], w["anzahl_ueberfaellig"]))
+        self.assertEqual((d["zahlen"]["kontakt_bald"], d["zahlen"]["kontakt_ueberfaellig"]), (1, 1))
+        # ohne Kontakt und ohne Termin: Testpatient steht in der Kachel zuerst, zählt aber nicht in den Kennzahlen
+        Termin.objects.filter(patient=self.test).update(erledigt_am=timezone.now())
+        d = client_fuer(self.mitarbeiter).get("/api/startseite/").json()
+        w = d["wiedereinbestellung"]
+        self.assertEqual([x["patient"] for x in w["ueberfaellig"]], [self.test.id, self.alt.id])  # noch nie Kontakt: zuerst
+        self.assertEqual((w["anzahl_ueberfaellig"], d["zahlen"]["kontakt_ueberfaellig"]), (2, 1))
         ids = {p["id"] for p in client_fuer(self.mitarbeiter).get(
             "/api/patienten/?pruefen=wiedereinbestellung&test=ohne").json()["results"]}
         self.assertEqual(ids, {self.alt.id, self.bald.id})

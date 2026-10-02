@@ -1531,6 +1531,12 @@ def startseite_daten(user):
         pruefen["datenschutz_anfragen"] = len(offen)
         pruefen["datenschutz_ueberfaellig"] = sum(1 for a in offen if a.ueberfaellig)
     wieder = _wiedereinbestellung(patienten, e)
+    # Kennzahlenleiste (S01) ohne Testpatienten wie „In Betreuung“ (F13: Testpatienten fehlen in Zahlen und Prüfliste) –
+    # sonst zählten die Musterdaten der Testumgebung dauerhaft bei „Termine überfällig“ und „Kontakt fällig“ mit.
+    # Die Kacheln selbst zeigen Testpatienten wie bisher mit dem Hinweis „Test“.
+    stat_termine = termine if user.ist_test else termine.filter(patient__ist_test=False)
+    stat_sieben = stat_termine.filter(faellig_am__gte=heute, faellig_am__lte=heute + timedelta(days=6))
+    stat_wieder = wieder if user.ist_test else _wiedereinbestellung(statistik, e)
     return {
         "termine": {
             "ueberfaellig": t(termine.filter(faellig_am__lt=heute)),
@@ -1559,12 +1565,12 @@ def startseite_daten(user):
             # über die Verknüpfung traf bei fehlendem Termin auf NULL)
             "mit_offenem_termin": statistik.filter(
                 id__in=Termin.objects.filter(erledigt_am__isnull=True).values("patient_id")).count(),
-            # wie die Kacheln „Termine und Wiedervorlagen“ und „Wiedereinbestellung fällig“
-            "termine_7_tage": sieben_tage.count(),
-            "praxistermine_7_tage": sieben_tage.filter(art=Termin.Art.PRAXISTERMIN).count(),
-            "termine_ueberfaellig": termine.filter(faellig_am__lt=heute).count(),
-            "kontakt_ueberfaellig": wieder["anzahl_ueberfaellig"],
-            "kontakt_bald": wieder["anzahl_bald"],
+            # gezählt wie die Kacheln „Termine und Wiedervorlagen“ und „Wiedereinbestellung fällig“, ohne Testpatienten
+            "termine_7_tage": stat_sieben.count(),
+            "praxistermine_7_tage": stat_sieben.filter(art=Termin.Art.PRAXISTERMIN).count(),
+            "termine_ueberfaellig": stat_termine.filter(faellig_am__lt=heute).count(),
+            "kontakt_ueberfaellig": stat_wieder["anzahl_ueberfaellig"],
+            "kontakt_bald": stat_wieder["anzahl_bald"],
         },
         # S08: Hinweis „Nur noch n Notfall-Codes übrig“ für die angemeldete Person
         "notfallcodes": notfallcodes_stand(user),

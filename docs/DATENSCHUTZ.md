@@ -57,6 +57,18 @@ Akten mit abgelaufener bzw. bald ablaufender Aufbewahrung, eingeschränkte Akten
 **Startseite „Nach und nach prüfen“:** Erklärungen fehlen · Abschluss prüfen · offene Datenschutz-Anfragen (auch zu
 abgeschlossenen Akten, mit der Zahl der überfälligen).
 
+**Persönliche Arbeitshilfen (Startseite, Runde 7):** „Meine Akten“ speichert je Person, welche Akten sie mit dem Stern
+gemerkt und welche sie zuletzt geöffnet hat (höchstens 20, ältere fallen weg) – nur Verweis auf die Akte und Zeitpunkt,
+ohne Historie. Die Einträge sieht nur die Person selbst; eingeschränkte Akten (Art. 18) erscheinen dort nicht, und mit
+dem endgültigen Löschen der Akte (F80) oder des Kontos fallen sie mit weg. Kacheln, Spaltenbreiten und der ausgeblendete
+Hinweis zu den Notfall-Codes sind Einstellungen der Person ohne Patientenbezug. Die Kachel „Konten“ der Administration
+zeigt nur Zustände (gesperrt, Einmal-Kennwort offen, ohne 2FA, Anzahl der Notfall-Codes) – keine Kennwörter, Codes oder
+Prüfsummen.
+
+**Hilfe:** Ergänzungen der Stiftung zur Hilfe (Recht „Vorlagen pflegen“) sind für alle Angemeldeten mit dem passenden
+Abschnitt sichtbar und bleiben mit allen Fassungen in der Historie und im Audit-Log – deshalb gehören dort keine
+Patientendaten hinein (Telefonnummern von Versorgern und interne Abläufe ja).
+
 **Vorlagen › Dokumentvorlagen:** drei neue Vorlagen (Datenschutzinformation, Einwilligung, Schweigepflichtentbindung).
 
 **Vorlagen › Grenzwerte › Datenschutz:** Aufbewahrung nach Abschluss (Jahre), „Abschluss prüfen“ (Monate),
