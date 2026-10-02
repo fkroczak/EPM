@@ -420,7 +420,9 @@ class Patientenliste(Grundlage):
 
         migration = importlib.import_module("stammdaten.migrations.0007_kontakt_ueberfaellig_4_monate")
         self.assertLessEqual(len(migration.GRUND), 100)
-        Einstellungen.objects.filter(pk=Einstellungen.aktuell().pk).update(kontakt_ueberfaellig_monate=12)
+        # „bald fällig“ (seit 0009) unter 4, damit der damalige Zielwert 4 auch nach heutiger Prüfung gültig ist
+        Einstellungen.objects.filter(pk=Einstellungen.aktuell().pk).update(kontakt_ueberfaellig_monate=12,
+                                                                            kontakt_bald_monate=2)
         migration.umstellen(django_apps, None)
         e = Einstellungen.objects.get(pk=1)
         self.assertEqual(e.kontakt_ueberfaellig_monate, 4)
@@ -430,24 +432,47 @@ class Patientenliste(Grundlage):
         migration.umstellen(django_apps, None)
         self.assertEqual(Einstellungen.objects.get(pk=1).kontakt_ueberfaellig_monate, 6)
 
-    def test_kontakt_ueberfaellig_nach_4_monaten(self):
-        """Festlegung 01.10.2026: Patienten kommen meist quartalsweise → Hinweis nach 4 Monaten ohne Kontakt."""
+    def test_kontakt_faellig_in_zwei_stufen(self):
+        """S04 (Festlegung 01.10.2026): „bald fällig“ nach 4, „überfällig“ nach 6 Monaten ohne Kontakt – in
+        Patientenliste (Hinweis und Prüffilter) und „Nach und nach prüfen“."""
         from stammdaten.models import Einstellungen
 
-        self.assertEqual(Einstellungen.aktuell().kontakt_ueberfaellig_monate, 4)
+        e = Einstellungen.aktuell()
+        self.assertEqual((e.kontakt_bald_monate, e.kontakt_ueberfaellig_monate), (4, 6))
         jetzt = timezone.now()
         drei = Patient.objects.create(nachname="Quartal", vorname="Q", geburtsdatum="1970-02-02")
         Kontakt.objects.create(patient=drei, text="<p>vor 3 Monaten</p>", zeitpunkt=jetzt - timedelta(days=90))
         fuenf = Patient.objects.create(nachname="Lange", vorname="L", geburtsdatum="1970-03-03")
         Kontakt.objects.create(patient=fuenf, text="<p>vor 5 Monaten</p>", zeitpunkt=jetzt - timedelta(days=150))
+        sieben = Patient.objects.create(nachname="Sieben", vorname="S", geburtsdatum="1970-04-04")
+        Kontakt.objects.create(patient=sieben, text="<p>vor 7 Monaten</p>", zeitpunkt=jetzt - timedelta(days=210))
         c = client_fuer(self.mitarbeiter)
-        ids = {p["id"] for p in c.get("/api/patienten/?pruefen=kein_kontakt&test=ohne").json()["results"]}
-        self.assertIn(fuenf.id, ids)
-        self.assertNotIn(drei.id, ids)
+
+        def ids(pruefen):
+            return {p["id"] for p in c.get(f"/api/patienten/?pruefen={pruefen}&test=ohne").json()["results"]}
+
+        self.assertTrue({fuenf.id, sieben.id, self.patient.id} <= ids("kein_kontakt"))
+        self.assertNotIn(drei.id, ids("kein_kontakt"))
+        self.assertEqual(ids("kontakt_bald"), {fuenf.id})
+        self.assertEqual(ids("kontakt_ueberfaellig"), {sieben.id, self.patient.id})  # self.patient: noch kein Kontakt
         zeilen = {p["id"]: p for p in c.get("/api/patienten/?test=ohne&seitengroesse=200").json()["results"]}
-        self.assertIn("Kein Kontakt seit über 4 Mon.", [h["text"] for h in zeilen[fuenf.id]["kennzahlen"]["hinweise"]])
+
+        def hinweis(pid):
+            return next(h for h in zeilen[pid]["kennzahlen"]["hinweise"] if h["art"] == "kontakt")
+
+        self.assertEqual((hinweis(fuenf.id)["stufe"], hinweis(fuenf.id)["text"]), ("bald", "Kontakt bald fällig (über 4 Mon.)"))
+        self.assertEqual((hinweis(sieben.id)["stufe"], hinweis(sieben.id)["text"]),
+                         ("ueberfaellig", "Kontakt überfällig (über 6 Mon.)"))
+        self.assertEqual(hinweis(self.patient.id)["text"], "Noch kein Kontakt erfasst")
         self.assertNotIn("kontakt", {h["art"] for h in zeilen[drei.id]["kennzahlen"]["hinweise"]})
-        self.assertEqual(c.get("/api/startseite/").json()["pruefen"]["kontakt_monate"], 4)
+        self.assertEqual(zeilen[fuenf.id]["kennzahlen"]["kontakt_stufe"], "bald")
+        pruefen = c.get("/api/startseite/").json()["pruefen"]
+        self.assertEqual((pruefen["kontakt_monate"], pruefen["kontakt_bald_monate"], pruefen["kontakt_ueberfaellig_monate"]),
+                         (4, 4, 6))
+        self.assertEqual((pruefen["kontakt_bald"], pruefen["kontakt_ueberfaellig"], pruefen["kein_kontakt"]), (1, 2, 3))
+        # Grenzwerte verschieben: mit 6/8 Monaten ist „Sieben“ nur noch bald fällig
+        Einstellungen.objects.filter(pk=1).update(kontakt_bald_monate=6, kontakt_ueberfaellig_monate=8)
+        self.assertEqual(ids("kontakt_bald"), {sieben.id})
 
     def test_pruefen_filter(self):
         c = client_fuer(self.mitarbeiter)

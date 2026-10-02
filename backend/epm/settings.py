@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "audit",
     "system",
     "altimport",
+    "hilfe",
 ]
 if EPM_DJANGO_ADMIN:
     INSTALLED_APPS.insert(0, "django.contrib.admin")

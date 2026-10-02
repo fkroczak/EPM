@@ -54,6 +54,8 @@ class User(AbstractUser):
     sperrgrund = models.CharField("Sperrgrund", max_length=200, blank=True)
     darstellung = models.JSONField("Darstellung", default=dict, blank=True)
     startseite = models.JSONField("Startseite (Karten)", default=dict, blank=True)
+    # Spaltenteiler je Seite und Fensterstufe (S17): {"akte_uebersicht@fhd": [0.6667], …}
+    aufteilung = models.JSONField("Aufteilung der Seiten", default=dict, blank=True)
 
     objects = EpmUserManager()
 

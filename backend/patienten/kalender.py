@@ -1,7 +1,8 @@
 """
 Globaler Kalender (Menüpunkt „Kalender“, Wunsch 02.10.2026): alle Termine und Wiedervorlagen aller Patienten,
-dazu berechnete Fälligkeiten – Kontakt fällig (Grenzwert „Kontakt überfällig“) und Infusionsplan prüfen (Grenzwert
-„Infusionsplan gilt als alt nach“) – und die gesetzlichen Feiertage.
+dazu berechnete Fälligkeiten – Kontakt fällig in zwei Stufen (Grenzwerte „Kontakt bald fällig“ und „Kontakt
+überfällig“, S04) und Infusionsplan prüfen (Grenzwert „Infusionsplan gilt als alt nach“) – und die gesetzlichen
+Feiertage.
 
 Feiertage: bundesweit plus Nordrhein-Westfalen (Fronleichnam, Allerheiligen), weil der Sitz der Stiftung in
 Altenberge (NRW) liegt. Abgeleitet aus der Anschrift; ein anderes Bundesland wäre eine eigene Festlegung.
@@ -74,19 +75,22 @@ def faelligkeiten(patienten, bis: date):
                   .values("patient_id").annotate(z=Max("zeitpunkt")).values_list("patient_id", "z"))
     plaene = dict(Infusionsplan.objects.filter(patient_id__in=ids, status=Infusionsplan.Status.AKTUELL)
                   .values_list("patient_id", "gueltig_ab"))
-    kontakt_tage = 30 * e.kontakt_ueberfaellig_monate
+    # Kontakt fällig in zwei Stufen (S04): je Akte ein Eintrag am Tag „bald fällig“ und einer am Tag „überfällig“
+    stufen = (("bald", 30 * e.kontakt_bald_monate, "bald fällig"),
+              ("ueberfaellig", 30 * e.kontakt_ueberfaellig_monate, "überfällig"))
     plan_tage = 30 * e.plan_alter_warnung_monate
     ergebnis = []
     for p in offen:
         basis = {"patient": p.id, "name": f"{p.nachname}, {p.vorname}", "nummer": p.nummer, "ist_test": p.ist_test}
         letzter = letzte.get(p.id)
         seit = timezone.localdate(letzter) if letzter else timezone.localdate(p.angelegt_am)
-        faellig = seit + timedelta(days=kontakt_tage)
-        if faellig <= bis:
-            ergebnis.append({**basis, "art": "kontakt", "faellig_am": faellig, "seit": seit,
-                             "ueberfaellig": faellig < heute,
-                             "text": f"Kontakt fällig – letzter Kontakt {seit:%d.%m.%Y}" if letzter
-                             else "Kontakt fällig – noch kein Kontakt erfasst"})
+        for stufe, tage, wort in stufen:
+            faellig = seit + timedelta(days=tage)
+            if faellig <= bis:
+                ergebnis.append({**basis, "art": "kontakt", "stufe": stufe, "faellig_am": faellig, "seit": seit,
+                                 "ueberfaellig": faellig < heute,
+                                 "text": f"Kontakt {wort} – letzter Kontakt {seit:%d.%m.%Y}" if letzter
+                                 else f"Kontakt {wort} – noch kein Kontakt erfasst"})
         gueltig_ab = plaene.get(p.id)
         if gueltig_ab:
             faellig = gueltig_ab + timedelta(days=plan_tage)
@@ -95,4 +99,5 @@ def faelligkeiten(patienten, bis: date):
                                  "ueberfaellig": faellig < heute,
                                  "text": f"Infusionsplan prüfen – gültig seit {gueltig_ab:%d.%m.%Y}"})
     ergebnis.sort(key=lambda x: (x["faellig_am"], x["name"]))
-    return ergebnis, {"kontakt_monate": e.kontakt_ueberfaellig_monate, "plan_monate": e.plan_alter_warnung_monate}
+    return ergebnis, {"kontakt_monate": e.kontakt_ueberfaellig_monate, "kontakt_bald_monate": e.kontakt_bald_monate,
+                      "plan_monate": e.plan_alter_warnung_monate}

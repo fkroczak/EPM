@@ -166,6 +166,15 @@ def pflicht_erklaerungen_standard():
     return list(ERKLAERUNGSARTEN)
 
 
+def kontaktstufen_fehler(bald, ueberfaellig) -> dict | None:
+    """Kontakt fällig in zwei Stufen (S04): beide mindestens 1 Monat, „bald fällig“ vor „überfällig“."""
+    if bald is None or bald < 1:
+        return {"kontakt_bald_monate": "Bitte mindestens 1 Monat angeben."}
+    if ueberfaellig is None or ueberfaellig <= bald:
+        return {"kontakt_ueberfaellig_monate": "„Überfällig“ muss später liegen als „bald fällig“."}
+    return None
+
+
 class Einstellungen(models.Model):
     """Genau ein Datensatz (pk=1): Absender, Warnschwellen, Plausibilitätsgrenzen, Fristen des Datenschutzes."""
 
@@ -180,7 +189,10 @@ class Einstellungen(models.Model):
                                                   default=Decimal("5.0"))
     gewicht_warnung_monate = models.PositiveSmallIntegerField("Zeitraum Gewichtsverlust", default=3)
     plan_alter_warnung_monate = models.PositiveSmallIntegerField("Infusionsplan gilt als alt nach", default=12)
-    kontakt_ueberfaellig_monate = models.PositiveSmallIntegerField("Kontakt überfällig", default=4)  # quartalsweise Kontakte + 1 Monat (Festlegung 01.10.2026)
+    # Wiedereinbestellung in zwei Stufen (Festlegung 01.10.2026, S04): „bald fällig“ ab 4 Monaten (quartalsweise
+    # Kontakte + 1 Monat), „überfällig“ ab 6 Monaten – beide einstellbar, „bald“ muss früher liegen als „überfällig“
+    kontakt_bald_monate = models.PositiveSmallIntegerField("Kontakt bald fällig", default=4)
+    kontakt_ueberfaellig_monate = models.PositiveSmallIntegerField("Kontakt überfällig", default=6)
 
     # Plausibilitätsgrenzen (Eingaben außerhalb werden abgelehnt)
     gewicht_min_kg = models.DecimalField("Gewicht minimal", max_digits=5, decimal_places=1, default=Decimal("20.0"))
@@ -235,6 +247,9 @@ class Einstellungen(models.Model):
             raise ValidationError({"aufbewahrung_jahre": "Bitte 1 bis 100 Jahre angeben."})
         if self.abschluss_pruefen_monate < 1:
             raise ValidationError({"abschluss_pruefen_monate": "Bitte mindestens 1 Monat angeben."})
+        fehler = kontaktstufen_fehler(self.kontakt_bald_monate, self.kontakt_ueberfaellig_monate)
+        if fehler:
+            raise ValidationError(fehler)
         if (not isinstance(self.pflicht_erklaerungen, list)
                 or any(a not in ERKLAERUNGSARTEN for a in self.pflicht_erklaerungen)
                 or len(set(self.pflicht_erklaerungen)) != len(self.pflicht_erklaerungen)):

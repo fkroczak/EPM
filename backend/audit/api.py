@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.utils import timezone
 from django_filters import rest_framework as filters
 from rest_framework import mixins, serializers, viewsets
@@ -102,6 +104,29 @@ class SystemEreignisViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vi
         return Response(self.get_serializer(e).data)
 
     @action(detail=False, methods=["get"])
+    def zusammenfassung(self, request):
+        """Admin-Startseite, Kachel „Zugriffe · 7 Tage“ (S12): Anzahl je Art im Zeitraum (``?tage=7``, 1–90).
+        Jede Zeile verweist auf das Audit-Log mit derselben Gruppe (``gruppe``) und demselben Zeitraum."""
+        try:
+            tage = min(max(int(request.query_params.get("tage", 7)), 1), 90)
+        except ValueError:
+            tage = 7
+        seit = timezone.now() - timedelta(days=tage)
+        qs = SystemEreignis.objects.filter(zeitpunkt__gte=seit)
+        A = SystemEreignis.Art
+        zeilen = [
+            ("anmeldungen", "Anmeldungen", "anmeldung", qs.filter(art=A.ANMELDUNG)),
+            ("fehlversuche", "Fehlversuche", "fehlversuch", qs.filter(art__in=GRUPPEN["fehlversuch"][1])),
+            ("exporte", "PDF-Exporte", "export", qs.filter(art=A.EXPORT)),
+            ("vorlagen", "Vorlagen geändert", "vorlage", qs.filter(art__in=[A.VORLAGE, A.STAMMDATEN])),
+            ("wiederherstellungen", "Sicherungen wiederhergestellt", "backup",
+             qs.filter(art=A.BACKUP, details__ereignis="wiederhergestellt")),
+        ]
+        return Response({"tage": tage, "von": timezone.localdate(seit),
+                         "zeilen": [{"schluessel": k, "text": t, "gruppe": g, "anzahl": q.count()}
+                                    for k, t, g, q in zeilen]})
+
+    @action(detail=False, methods=["get"])
     def pdf(self, request):
         """Audit-Log für einen Zeitraum als PDF (F59), mit denselben Filtern wie die Liste; höchstens 5.000 Einträge."""
         from vorlagen.api import pdf_antwort
@@ -125,6 +150,19 @@ class TestdatenViewSet(viewsets.ViewSet):
     """Admin: alle Testpatienten löschen und die Musterdaten neu anlegen."""
 
     permission_classes = [TestdatenRecht]
+
+    def list(self, request):
+        """Admin-Startseite, Kachel „Testumgebung“ (S12): Anzahl der Testpatienten, letztes Zurücksetzen."""
+        from patienten.models import Patient
+
+        zuletzt = SystemEreignis.objects.filter(art=SystemEreignis.Art.TESTDATEN).select_related("benutzer").first()
+        test = Patient.objects.filter(ist_test=True)
+        return Response({
+            "in_betreuung": test.filter(abgeschlossen_am__isnull=True).count(),
+            "abgeschlossen": test.filter(abgeschlossen_am__isnull=False).count(),
+            "zuletzt_am": zuletzt.zeitpunkt if zuletzt else None,
+            "zuletzt_von": (zuletzt.benutzer.anzeigename if zuletzt.benutzer else zuletzt.benutzername) if zuletzt else None,
+        })
 
     @action(detail=False, methods=["post"])
     def zuruecksetzen(self, request):

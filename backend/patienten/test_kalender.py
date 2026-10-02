@@ -62,12 +62,19 @@ class Kalender(Grundlage):
         self.assertIn(self.t_alt.id, {t["id"] for t in d["termine_ueberfaellig"]})
         self.assertNotIn(self.t_erledigt.id, {t["id"] for t in self.monat(client_fuer(self.betrachter),
                                                                           erledigte=0)["termine"]})
-        kontakt = {f["patient"]: f for f in d["faelligkeiten"] if f["art"] == "kontakt"}
-        self.assertTrue(kontakt[self.lange.id]["ueberfaellig"])
-        self.assertEqual(kontakt[self.lange.id]["faellig_am"],
-                         (timezone.localdate(timezone.now() - timedelta(days=150)) + timedelta(days=120)).isoformat())
-        self.assertNotIn(self.patient.id, kontakt)  # Kontakt heute: erst in 4 Monaten fällig
-        self.assertEqual(d["grenzen"]["kontakt_monate"], 4)
+        # Kontakt fällig in zwei Stufen (S04): je Akte ein Eintrag „bald fällig“ (4 Monate) und „überfällig“ (6 Monate)
+        r = client_fuer(self.betrachter).get("/api/kalender/", {"von": (self.heute - timedelta(days=200)).isoformat(),
+                                                                "bis": (self.heute + timedelta(days=60)).isoformat()})
+        weit = r.json()
+        kontakt = {(f["patient"], f["stufe"]): f for f in weit["faelligkeiten"] if f["art"] == "kontakt"}
+        seit = timezone.localdate(timezone.now() - timedelta(days=150))
+        self.assertTrue(kontakt[(self.lange.id, "bald")]["ueberfaellig"])
+        self.assertEqual(kontakt[(self.lange.id, "bald")]["faellig_am"], (seit + timedelta(days=120)).isoformat())
+        self.assertIn("bald fällig", kontakt[(self.lange.id, "bald")]["text"])
+        self.assertEqual(kontakt[(self.lange.id, "ueberfaellig")]["faellig_am"], (seit + timedelta(days=180)).isoformat())
+        self.assertFalse(kontakt[(self.lange.id, "ueberfaellig")]["ueberfaellig"])  # erst in etwa einem Monat
+        self.assertNotIn((self.patient.id, "bald"), kontakt)  # Kontakt heute: erst in 4 Monaten fällig
+        self.assertEqual((weit["grenzen"]["kontakt_bald_monate"], weit["grenzen"]["kontakt_monate"]), (4, 6))
         self.assertTrue(d["feiertage"] is not None)
         self.assertEqual(self.monat(client_fuer(self.betrachter), faelligkeiten=0)["faelligkeiten"], [])
 

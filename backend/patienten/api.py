@@ -30,8 +30,8 @@ from audit.bereinigung import akte_text
 from stammdaten.models import Arzt
 
 from .datenschutz import DatenschutzAktionen
-from .kennzahlen import (abschluss_pruefen, kennzahlen, ohne_pflicht_erklaerungen, pruefliste, schnellfilter,
-                         zaehler)
+from .kennzahlen import (abschluss_pruefen, kennzahlen, kontakt_filter, ohne_pflicht_erklaerungen, pruefliste,
+                         schnellfilter, zaehler)
 from .loeschung import PLATZHALTER, schwaerze_dokument, trage_ein
 from .models import (Bezugsperson, Datenschutzanfrage, Dokument, DokumentVorgang, Erklaerung, Gewichtsmessung,
                      Kontakt, Patient, PatientArzt, Termin, dokument_pfad)
@@ -153,6 +153,9 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                  "bei": termin.bei} if termin else None
             ),
             "versionen": {feld: _versionskopf(obj, feld) for feld in TEXTFELDER},
+            # Schnellerfassung (S02): letzter Kontakt im Kontextkasten; Merkliste (S05): Stern im Aktenkopf
+            "letzter_kontakt": obj.kontakte.filter(storniert_am__isnull=True).aggregate(z=Max("zeitpunkt"))["z"],
+            "gemerkt": _gemerkt(self.context.get("request"), obj),
             "zaehler": {
                 "kontakte": obj.kontakte.count(),
                 "gewichte": obj.gewichte.count(),
@@ -199,6 +202,15 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
             if wert is not None and wert.liste != liste:
                 raise serializers.ValidationError({feld: "Ungültiger Wert für diese Liste."})
         return attrs
+
+
+def _gemerkt(request, patient) -> bool:
+    from .models import Merkeintrag
+
+    user = getattr(request, "user", None)
+    if user is None or not user.is_authenticated:
+        return False
+    return Merkeintrag.objects.filter(benutzer=user, patient=patient, art=Merkeintrag.Art.MERKLISTE).exists()
 
 
 def _erklaerungen_kopf(patient) -> dict:
@@ -258,7 +270,10 @@ class PatientFilter(filters.FilterSet):
     suche = filters.CharFilter(method="filter_suche", label="Name, Vorname, Ort, Patientennummer oder Geburtsdatum")
     pruefen = filters.ChoiceFilter(
         choices=[("altdokumente", "Altdokumente prüfen"), ("nickelallergie", "Nickelallergie nicht erfasst"),
-                 ("kein_versorger", "Versorger nicht erfasst"), ("kein_kontakt", "Kein Kontakt seit X Monaten"),
+                 ("kein_versorger", "Versorger nicht erfasst"),
+                 ("kein_kontakt", "Kontakt fällig (bald fällig und überfällig)"),
+                 ("kontakt_bald", "Kontakt bald fällig"), ("kontakt_ueberfaellig", "Kontakt überfällig"),
+                 ("wiedereinbestellung", "Wiedereinbestellung fällig (Kontakt fällig, kein Termin geplant)"),
                  ("erklaerungen", "Erklärungen zum Datenschutz fehlen"),
                  ("abschluss_pruefen", "Abschluss prüfen (lange kein Kontakt)")],
         method="filter_pruefen",
@@ -278,12 +293,8 @@ class PatientFilter(filters.FilterSet):
         if wert == "kein_versorger":
             # „kein Versorger“ (bewusst keiner) ist kein offener Punkt
             return qs.filter(versorger__isnull=True, kein_versorger=False)
-        if wert == "kein_kontakt":
-            from stammdaten.models import Einstellungen
-
-            grenze = timezone.now() - timedelta(days=30 * Einstellungen.aktuell().kontakt_ueberfaellig_monate)
-            aktuell = Kontakt.objects.filter(storniert_am__isnull=True, zeitpunkt__gte=grenze).values("patient_id")
-            return qs.exclude(id__in=aktuell)
+        if wert in ("kein_kontakt", "kontakt_bald", "kontakt_ueberfaellig", "wiedereinbestellung"):
+            return kontakt_filter(qs, wert)  # S04: zwei Stufen „bald fällig“ und „überfällig“
         if wert == "erklaerungen":
             return qs.filter(id__in=ohne_pflicht_erklaerungen(qs.order_by()))
         if wert == "abschluss_pruefen":
@@ -347,7 +358,7 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
         seite = self.paginate_queryset(qs)
         eintraege = seite if seite is not None else list(qs)
         context = self.get_serializer_context()
-        context["kennzahlen"] = kennzahlen(eintraege)
+        context["kennzahlen"] = kennzahlen(eintraege, liste=True)
         daten = PatientListSerializer(eintraege, many=True, context=context).data
         return self.get_paginated_response(daten) if seite is not None else Response(daten)
 
@@ -1376,8 +1387,8 @@ class PatientArztViewSet(_StammEintragViewSet):
         return super().get_queryset().select_related("arzt", "angelegt_von")
 
 
-def _zuletzt_eingetragen(patienten, anzahl=10):
-    """Neueste Einträge aus allen Bereichen (Entwurf 2 · „Zuletzt eingetragen“)."""
+def _zuletzt_eingetragen(patienten, anzahl=10, person=None):
+    """Neueste Einträge aus allen Bereichen (Entwurf 2 · „Zuletzt eingetragen“); ``person``: nur eigene (S10)."""
     from infusionen.models import Infusionsplan
 
     ids = list(patienten.values_list("id", flat=True))
@@ -1385,12 +1396,20 @@ def _zuletzt_eingetragen(patienten, anzahl=10):
         ("kontakt", "Kontakt", Kontakt.history.filter(patient_id__in=ids, history_type="+")),
         ("gewicht", "Gewicht", Gewichtsmessung.history.filter(patient_id__in=ids, history_type="+")),
         ("dokument", "Dokument", Dokument.history.filter(patient_id__in=ids, history_type="+")),
+        ("termin", "Termin angelegt", Termin.history.filter(patient_id__in=ids, history_type="+")),
+        ("termin", "Termin erledigt",
+         Termin.history.filter(patient_id__in=ids, history_type="~", erledigt_am__isnull=False)),
         ("plan", "Infusionsplan-Entwurf", Infusionsplan.history.filter(patient_id__in=ids, history_type="+")),
         ("plan", "Infusionsplan freigegeben",
          Infusionsplan.history.filter(patient_id__in=ids, history_type="~", status="aktuell", freigegeben_am__isnull=False)),
     ]
     eintraege = []
     for bereich, bezeichnung, qs in quellen:
+        if person is not None:
+            qs = qs.filter(history_user=person)
+        if bezeichnung == "Termin erledigt":
+            # nur die Fassung, in der „erledigt“ gesetzt wurde (spätere Änderungen eines erledigten Termins nicht)
+            qs = qs.filter(history_date__lte=F("erledigt_am") + timedelta(seconds=5))
         for h in qs.select_related("history_user").order_by("-history_date")[:anzahl]:
             eintraege.append((h.history_date, bereich, bezeichnung, h))
     eintraege.sort(key=lambda e: e[0], reverse=True)
@@ -1406,13 +1425,63 @@ def _zuletzt_eingetragen(patienten, anzahl=10):
             bezeichnung = "Infusionsplan nach Freigabe abgeschlossen"  # freigegeben hat der Mediziner, außerhalb von EPM
         ergebnis.append({"bereich": bereich, "bezeichnung": bezeichnung, "objekt_id": h.id,
                          "patient": h.patient_id, "name": namen.get(h.patient_id), "zeitpunkt": zeit,
-                         "person": benutzername(h.history_user)})
+                         "person": benutzername(h.history_user), "person_id": h.history_user_id})
         if len(ergebnis) == anzahl:
             break
     return ergebnis
 
 
+def _wiedereinbestellung(patienten, e, grenze=50):
+    """S04 „Wiedereinbestellung fällig“: Akten in Betreuung, deren letzter Kontakt über „bald fällig“ bzw. „überfällig“
+    zurückliegt und für die kein offener Termin geplant ist. Längste Zeit ohne Kontakt zuerst."""
+    from .kennzahlen import kontakt_grenzen, kontaktstufe
+
+    offen = kontakt_filter(patienten.filter(abgeschlossen_am__isnull=True), "wiedereinbestellung")
+    zeilen = list(offen.annotate(letzter=Max("kontakte__zeitpunkt", filter=Q(kontakte__storniert_am__isnull=True)))
+                  .order_by(F("letzter").asc(nulls_first=True), "nachname", "vorname")
+                  .values("id", "nachname", "vorname", "nummer", "ist_test", "letzter"))
+    grenzen = kontakt_grenzen(e)
+    stufen = {"ueberfaellig": [], "bald": []}
+    for z in zeilen:
+        stufe = kontaktstufe(z["letzter"], grenzen)
+        if stufe:
+            stufen[stufe].append({"patient": z["id"], "name": f"{z['nachname']}, {z['vorname']}", "nummer": z["nummer"],
+                                  "ist_test": z["ist_test"], "letzter_kontakt": z["letzter"], "stufe": stufe})
+    return {
+        "ueberfaellig": stufen["ueberfaellig"][:grenze], "bald": stufen["bald"][:grenze],
+        "anzahl_ueberfaellig": len(stufen["ueberfaellig"]), "anzahl_bald": len(stufen["bald"]),
+        "bald_monate": e.kontakt_bald_monate, "ueberfaellig_monate": e.kontakt_ueberfaellig_monate,
+    }
+
+
+def _gewichtsverlauf(patient_ids, tage=180):
+    """Mini-Verlauf je Patient (S06): Messungen der letzten 6 Monate mit echten Zeitabständen."""
+    seit = timezone.localdate() - timedelta(days=tage)
+    verlauf = {}
+    for pid, am, kg_ in (Gewichtsmessung.objects.filter(patient_id__in=list(patient_ids), gemessen_am__gte=seit)
+                         .order_by("patient_id", "gemessen_am", "id").values_list("patient_id", "gemessen_am", "gewicht_kg")):
+        verlauf.setdefault(pid, []).append({"am": am, "kg": kg_})
+    return verlauf
+
+
+def _woche(termine_qs, heute):
+    """Wochenstreifen (S03): die 7 Tage ab heute mit Anzahl offener Termine, davon Praxistermine, und Feiertagen."""
+    from .kalender import feiertage_zwischen
+
+    bis = heute + timedelta(days=6)
+    feiertage = {f["datum"]: f["name"] for f in feiertage_zwischen(heute, bis)}
+    zaehlung = {}
+    for datum_, art in termine_qs.filter(faellig_am__range=(heute, bis)).values_list("faellig_am", "art"):
+        z = zaehlung.setdefault(datum_, [0, 0])
+        z[0] += 1
+        z[1] += art == Termin.Art.PRAXISTERMIN
+    return [{"datum": heute + timedelta(days=i), "anzahl": zaehlung.get(heute + timedelta(days=i), [0, 0])[0],
+             "praxistermine": zaehlung.get(heute + timedelta(days=i), [0, 0])[1],
+             "feiertag": feiertage.get(heute + timedelta(days=i))} for i in range(7)]
+
+
 def startseite_daten(user):
+    from accounts.api import notfallcodes_stand
     from infusionen.models import Infusionsplan
     from stammdaten.models import Einstellungen
 
@@ -1421,6 +1490,7 @@ def startseite_daten(user):
     patienten = patienten_fuer(user).filter(abgeschlossen_am__isnull=True)
     termine = Termin.objects.filter(patient__in=patienten, erledigt_am__isnull=True).select_related(
         "patient", "ort", "angelegt_von")
+    sieben_tage = termine.filter(faellig_am__gte=heute, faellig_am__lte=heute + timedelta(days=6))
 
     def t(qs):
         return TerminSerializer(qs.order_by("faellig_am", "uhrzeit")[:100], many=True).data
@@ -1433,10 +1503,15 @@ def startseite_daten(user):
          for pid, k in werte.items() if k["trend"] and k["trend"]["warnung"]),
         key=lambda w: w["prozent"],
     )
+    verlauf = _gewichtsverlauf(w["patient"] for w in warnungen)
+    for w in warnungen:
+        w["verlauf"] = verlauf.get(w["patient"], [])
 
     grenze = heute - timedelta(days=30 * e.plan_alter_warnung_monate)
     plaene = Infusionsplan.objects.filter(patient__in=patienten).select_related("patient", "erstellt_von",
                                                                                "freigegeben_von")
+    entwuerfe = plaene.filter(status=Infusionsplan.Status.ENTWURF).order_by("-erstellt_am")
+    alte = plaene.filter(status=Infusionsplan.Status.AKTUELL, gueltig_ab__lt=grenze).order_by("gueltig_ab")
 
     def pl(qs):
         return [{"id": x.id, "patient": x.patient_id, "name": f"{x.patient.nachname}, {x.patient.vorname}",
@@ -1455,26 +1530,41 @@ def startseite_daten(user):
             patient__in=bereich if user.ist_test else bereich.filter(ist_test=False), erledigt_am__isnull=True))
         pruefen["datenschutz_anfragen"] = len(offen)
         pruefen["datenschutz_ueberfaellig"] = sum(1 for a in offen if a.ueberfaellig)
+    wieder = _wiedereinbestellung(patienten, e)
     return {
         "termine": {
             "ueberfaellig": t(termine.filter(faellig_am__lt=heute)),
             "heute": t(termine.filter(faellig_am=heute)),
-            "naechste_7_tage": t(termine.filter(faellig_am__gte=heute, faellig_am__lte=heute + timedelta(days=7))),
+            # heute und die 6 folgenden Tage – wie der Wochenstreifen und die Kennzahl „Termine in 7 Tagen“
+            "naechste_7_tage": t(sieben_tage),
         },
+        "woche": _woche(termine, heute),
         "gewichtswarnungen": warnungen,
         "gewicht_schwelle": {"prozent": e.gewicht_warnung_prozent, "monate": e.gewicht_warnung_monate},
         "infusionsplaene": {
-            "entwuerfe": pl(plaene.filter(status=Infusionsplan.Status.ENTWURF).order_by("-erstellt_am")),
-            "aelter_als_grenze": pl(plaene.filter(status=Infusionsplan.Status.AKTUELL, gueltig_ab__lt=grenze)
-                                    .order_by("gueltig_ab")),
+            "entwuerfe": pl(entwuerfe),
+            "aelter_als_grenze": pl(alte),
+            "anzahl_entwuerfe": entwuerfe.count(),
+            "anzahl_aelter": alte.count(),
             "grenze_monate": e.plan_alter_warnung_monate,
         },
         "pruefen": pruefen,
+        "wiedereinbestellung": wieder,
         "zuletzt_eingetragen": _zuletzt_eingetragen(patienten),
+        "zuletzt_von_mir": _zuletzt_eingetragen(patienten, person=user),
         "zahlen": {
+            # Statistik ohne Testpatienten (für Testzugänge: nur Testpatienten)
             "in_betreuung": statistik.count(),
             "mit_offenem_termin": statistik.filter(termine__erledigt_am__isnull=True).distinct().count(),
+            # wie die Kacheln „Termine und Wiedervorlagen“ und „Wiedereinbestellung fällig“
+            "termine_7_tage": sieben_tage.count(),
+            "praxistermine_7_tage": sieben_tage.filter(art=Termin.Art.PRAXISTERMIN).count(),
+            "termine_ueberfaellig": termine.filter(faellig_am__lt=heute).count(),
+            "kontakt_ueberfaellig": wieder["anzahl_ueberfaellig"],
+            "kontakt_bald": wieder["anzahl_bald"],
         },
+        # S08: Hinweis „Nur noch n Notfall-Codes übrig“ für die angemeldete Person
+        "notfallcodes": notfallcodes_stand(user),
         # Kopfzeile (O-07): Zustand der Sicherungen vom Systemagenten – für alle sichtbar, ohne Zugangsdaten
         "sicherung": sicherung_kurz(),
     }

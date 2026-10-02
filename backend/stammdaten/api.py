@@ -263,13 +263,19 @@ class EinstellungenSerializer(serializers.ModelSerializer):
         exclude = ["id"]
 
     def validate(self, attrs):
-        from .models import ERKLAERUNGSARTEN
+        from .models import ERKLAERUNGSARTEN, kontaktstufen_fehler
 
         attrs = super().validate(attrs)
         e = self.instance
         for unten, oben in Einstellungen.GRENZPAARE:
             if attrs.get(unten, getattr(e, unten)) >= attrs.get(oben, getattr(e, oben)):
                 raise serializers.ValidationError({unten: "Untere Grenze muss kleiner als obere Grenze sein."})
+        # Kontakt fällig in zwei Stufen (S04): „bald fällig“ vor „überfällig“
+        fehler = kontaktstufen_fehler(attrs.get("kontakt_bald_monate", getattr(e, "kontakt_bald_monate", None)),
+                                      attrs.get("kontakt_ueberfaellig_monate",
+                                                getattr(e, "kontakt_ueberfaellig_monate", None)))
+        if fehler:
+            raise serializers.ValidationError(fehler)
         # Datenschutz: Fristen und die Erklärungen, die vorliegen sollen
         if "aufbewahrung_jahre" in attrs and not 1 <= attrs["aufbewahrung_jahre"] <= 100:
             raise serializers.ValidationError({"aufbewahrung_jahre": "Bitte 1 bis 100 Jahre angeben."})
