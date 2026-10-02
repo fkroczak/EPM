@@ -745,3 +745,27 @@ class Pruefbefunde(unittest.TestCase):
         p = next(p for p in e.protokoll if p["regel"] == 3 and p["bereich"] == "patienten")
         self.assertEqual(p["beispiele"], ["2"])
         self.assertGreaterEqual(p["anzahl"], 2)
+
+    def test_nummer_einer_im_epm_geloeschten_akte(self):
+        """Steht eine Patientennummer im Löschprotokoll des EPM, lässt sich der Patient nur ausnehmen (O-29)."""
+        b = bestand()
+        b["geloeschte_nummern"] = [5]
+        e = lauf(zuordnung=entscheidungen(), vorhandenes=b)
+        a = next(x for x in e.auffaelligkeiten if x["schluessel"] == "patienten:5:nummer")
+        self.assertEqual((a["art"], a["blockiert"], a["moeglich"]), ("geloescht_epm", True, ["auslassen"]))
+        self.assertNotIn(5, [p["nummer"] for p in e.saetze["patienten"]])
+        self.assertNotEqual(e.offen, [])
+        # eine andere Nummer ist kein Ausweg (auch nicht über die Schnittstelle)
+        z = entscheidungen()
+        z["korrekturen"]["patienten:5:nummer"] = {"art": "wert", "wert": "8", "alt": "5"}
+        e = lauf(zuordnung=z, vorhandenes=b)
+        self.assertTrue(next(x for x in e.auffaelligkeiten if x["schluessel"] == "patienten:5:nummer")["blockiert"])
+        self.assertNotIn(8, [p["nummer"] for p in e.saetze["patienten"]])
+        # ausnehmen: die übrigen Patienten werden übernommen, die Entscheidung bleibt sichtbar
+        z["korrekturen"]["patienten:5:nummer"] = {"art": "auslassen", "alt": "5"}
+        e = lauf(zuordnung=z, vorhandenes=b)
+        self.assertEqual(e.offen, [])
+        self.assertEqual(sorted(p["nummer"] for p in e.saetze["patienten"]), [1, 2, 3, 4, 7])
+        a = next(x for x in e.auffaelligkeiten if x["schluessel"] == "patienten:5:nummer")
+        self.assertEqual((a["entscheidung"]["art"], a["blockiert"]), ("auslassen", False))
+        self.assertEqual(e.zahlen["patienten"]["nicht"]["ausgelassen"], 1)

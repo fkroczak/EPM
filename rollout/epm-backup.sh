@@ -69,16 +69,25 @@ fi
 # GnuPG ohne Schlüsselbund und ohne zwischengespeichertes Passwort, in einem eigenen Ordner, der danach gelöscht wird
 GNUPGHOME="$(mktemp -d)"
 export GNUPGHOME
+FERTIG=0
 aufraeumen() {
   gpgconf --homedir "$GNUPGHOME" --kill all >/dev/null 2>&1 || true
   rm -rf "$GNUPGHOME"
   rm -f "$ZIEL"/epm-*_"$STAMP".*.teil
+  if [[ "$FERTIG" != 1 ]]; then
+    # Abbruch mitten im Lauf (z. B. tar gescheitert, nachdem der Datenbank-Dump schon fertig war): Auch die fertigen
+    # Dateien dieses Laufs entfernen. Sonst läge ein Dump ohne Dokumente, Prüfsummen und Angaben als „Sicherung“ im
+    # Ordner – er stünde in der Liste und würde, wenn verschlüsselt, mit übertragen (im Ziel wird nie gelöscht).
+    rm -f "$ZIEL"/epm-*_"$STAMP".* "$ZIEL"/epm_"$STAMP".*
+    echo "Sicherung $STAMP abgebrochen – es bleibt keine unvollständige Sicherung liegen." >&2
+  fi
 }
 trap aufraeumen EXIT
 
 # sichern <Zieldatei> <Befehl …>: schreibt die Ausgabe des Befehls nach <Zieldatei> (verschlüsselt nach
 # <Zieldatei>.gpg, wenn ein Passwort festgelegt ist). Die Datei bekommt ihren Namen erst, wenn der Befehl UND das
-# Schreiben gelungen sind – scheitert pg_dump oder tar, bricht das Skript ab und es bleibt keine halbe Sicherung liegen.
+# Schreiben gelungen sind. Scheitert pg_dump, tar oder ein späterer Schritt, bricht das Skript ab; „aufraeumen“
+# entfernt dann alle Dateien dieses Laufs – es bleibt keine halbe Sicherung liegen.
 DATEIEN=()
 sichern() {
   local ziel="$1"; shift
@@ -118,6 +127,7 @@ jq -n --arg stempel "$STAMP" --arg zeitpunkt "$(date --iso-8601=seconds)" --arg 
     verfahren: (if $verschluesselt then "gpg-symmetrisch" else "" end), passwort_nr: (if $nr == "" then null else ($nr | tonumber) end),
     epm_version: $version, dauer_s: $dauer, dateien: $dateien}' > "$ZIEL/epm_$STAMP.json.teil"
 mv "$ZIEL/epm_$STAMP.json.teil" "$ZIEL/epm_$STAMP.json"
+FERTIG=1   # ab hier ist die Sicherung vollständig (Dateien, Prüfsummen, Angaben)
 chmod 0600 "$ZIEL/"epm*"_$STAMP."*
 
 # Ablauf: nur die eigenen Dateien, und alles ab dem Alter von $TAGE Tagen (find rundet das Alter auf ganze Tage ab,

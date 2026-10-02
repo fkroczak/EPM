@@ -1098,8 +1098,19 @@ class Agent:
         # Erfolg: den beiseitegelegten Stand entfernen (er steckt in der Sicherung, die vorher erstellt wurde)
         self.psql(f"DROP DATABASE IF EXISTS {alt_db}", zeile)
         shutil.rmtree(alt_dok, ignore_errors=True)
+        # Löschungen nach Art. 17 DSGVO: Das Backend holt sie beim Start nach, meldet einen Fehler dort aber nur als
+        # Warnung (der Start darf daran nicht scheitern). Deshalb hier noch einmal mit „--streng“ – der Befehl ist
+        # beliebig oft ausführbar – und die Meldung an dessen Ergebnis knüpfen.
+        zeile("\nLöschungen nach Art. 17 DSGVO prüfen …\n")
+        rc = self.schritt("Löschungen", self.compose("exec", "-T", "backend", "python", "manage.py",
+                                                    "epm_loeschungen_nachholen", "--streng"),
+                          zeile, cwd=self.basis, zeitlimit=1800)
+        if rc != 0:
+            return 0, ("Sicherung wiederhergestellt. Alle Benutzer müssen sich neu anmelden. ACHTUNG: Löschungen nach "
+                       "Art. 17 DSGVO konnten nicht vollständig nachgeholt werden – siehe Audit-Log (System) und "
+                       "Backup-Seite.")
         return 0, ("Sicherung wiederhergestellt. Alle Benutzer müssen sich neu anmelden; Löschungen nach Art. 17 DSGVO "
-                   "wurden beim Start erneut angewendet.")
+                   "wurden erneut angewendet.")
 
     # ------------------------------------------------------------ Aufträge
     def ergebnis(self, auftrag_id, **werte):

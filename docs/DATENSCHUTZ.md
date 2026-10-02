@@ -34,7 +34,7 @@ Es ist keine Rechtsberatung. Wo eine Frage nicht aus dem Gesetz selbst beantwort
 | Art. 17 Abs. 3 b und e DSGVO | keine Löschung, soweit eine rechtliche Pflicht zur Aufbewahrung besteht oder die Daten für Rechtsansprüche gebraucht werden | Vor Ablauf der Frist wird nur auf Antrag gelöscht; der Mediziner entscheidet, ob eine Aufbewahrungspflicht entgegensteht – dann Einschränkung statt Löschung | F79, F80 |
 | § 35 Abs. 3 BDSG | Einschränkung statt Löschung, wenn satzungsgemäße oder vertragliche Aufbewahrungsfristen entgegenstehen | Ergebnis „Verarbeitung eingeschränkt statt gelöscht“ einer Anfrage schränkt die Akte ein | F77, F79 |
 | Art. 18 DSGVO | Eingeschränkte Daten werden – von der Speicherung abgesehen – nur noch mit Einwilligung der Person, für Rechtsansprüche, zum Schutz der Rechte einer anderen Person oder aus wichtigem öffentlichem Interesse verarbeitet (Abs. 2); vor dem Aufheben ist die Person zu unterrichten (Abs. 3) | Eingeschränkte Akte erscheint in keiner Patientenliste, Suche oder Auswertung; lesbar nur mit begründeter Einsicht (60 Minuten, im Audit-Log; die Ansicht nennt die zulässigen Zwecke nach Abs. 2 – ob der eingetragene Grund darunter fällt, entscheidet die Person, nicht das Programm). Damit Fristen und Anfragen nicht untergehen, führt die Übersicht „Datenschutz“ sie weiter auf: mit Namen nur für Personen, die Einsicht nehmen dürften, sonst nur mit Nummer; ebenso das Audit-Log. Aufheben nur mit Datum der Unterrichtung oder Begründung, warum sie entfällt | F79, F81 |
-| Art. 32 DSGVO | Sicherheit der Verarbeitung | bestehend: Rollen und Rechte, 2FA, Sperre, Sitzungsende, Audit-Log, Trigger. Sicherungen 30 Tage, verschlüsselt (GnuPG, AES-256) mit einem Passwort, das die Administration in der Oberfläche festlegt (O5 geklärt), Übertragung nur verschlüsselt; Wiederherstellen nur mit Passwort und 2FA | F61–F64, F66 |
+| Art. 32 DSGVO | Sicherheit der Verarbeitung | bestehend: Rollen und Rechte, 2FA, Sperre, Sitzungsende, Audit-Log, Trigger. Sicherungen 30 Tage, verschlüsselt (GnuPG, AES-256) mit einem Passwort, das die Administration in der Oberfläche festlegt (O5 geklärt) – solange keines festgelegt ist, sind die Sicherungen auf dem Server unverschlüsselt und werden nicht übertragen; Übertragung nur verschlüsselt; Wiederherstellen nur mit Passwort und 2FA | F61–F64, F66 |
 | § 630f BGB | Dokumentation: Änderungen müssen erkennbar bleiben; Aufbewahrung 10 Jahre nach Abschluss der Behandlung | Verlauf und Versionen unveränderlich (bestehend, F19, F22, F60). Ob § 630f für die Stiftung unmittelbar gilt, ist offen (O1) | F60, F74 |
 | § 203 StGB | Berufsgeheimnis; mitwirkende Dienstleister sind zur Geheimhaltung zu verpflichten | organisatorisch (O6) – nichts im Programm | – |
 
@@ -90,7 +90,11 @@ Ein Dokument, das einer anderen Akte zugeordnet wurde, gehört zu jener Akte und
 Löschung steht in der Löschliste (`data/loeschliste/loeschliste.jsonl`: dieselben Angaben wie im Löschprotokoll, kein
 Name); nach einer Wiederherstellung löscht das Backend beim Start alles erneut, was die Sicherung zurückgebracht hat
 (`manage.py epm_loeschungen_nachholen`). Die Löschliste gehört zu genau einem System – nie die eines anderen Systems
-(z. B. einer Testkopie) einspielen.
+(z. B. einer Testkopie) einspielen. Jede Sicherung enthält eine Kopie der Löschliste (`epm-loeschliste_….jsonl`,
+verschlüsselt wie die übrigen Dateien). Das Wiederherstellen fasst die Löschliste auf dem Server nicht an und spielt
+auch keine aus der Sicherung ein: Auf einem **neuen** Server muss die neueste Löschliste aus den Sicherungen von Hand
+nach `data/loeschliste/loeschliste.jsonl` gelegt werden, bevor eine ältere Sicherung zurückgespielt wird – sonst kommen
+Löschungen zurück, die nach dieser Sicherung lagen.
 
 ## 4. Grenzen der Umsetzung (bewusst so)
 
@@ -100,6 +104,13 @@ Name); nach einer Wiederherstellung löscht das Backend beim Start alles erneut,
   Falsche Angaben werden berichtigt; die frühere Fassung bleibt im Verlauf (§ 630f BGB: Änderungen erkennbar).
 - **Der Grund einer Löschung bleibt** im Löschprotokoll und in der Löschliste. Die Oberfläche bittet, keine Namen
   hineinzuschreiben; verhindern kann das Programm es nicht.
+- **Das Nachholen der Löschungen nach einer Wiederherstellung kann scheitern – dann wird es gemeldet, nicht still
+  übergangen.** Es läuft bei jedem Start des Backends und noch einmal am Ende jeder Wiederherstellung. Was es erneut
+  löscht und was nicht ging (Fehler, nicht nachgeholte Akten, unlesbare Zeilen der Löschliste), steht im Audit-Log
+  (Gruppe „System“); ein Fehler erscheint auf der Backup-Seite und in der Kopfzeile der Startseite, bis ein Lauf ohne
+  Fehler durchgeht, und die Meldung des Wiederherstellens nennt ihn („ACHTUNG: Löschungen … konnten nicht vollständig
+  nachgeholt werden“). Das Backend startet in diesem Fall trotzdem – bis zur Behebung sind die betroffenen Akten oder
+  Dokumente wieder sichtbar.
 - **Die Frist beginnt nicht vor dem letzten Kontakt.** Das Abschlussdatum lässt sich rückwirkend eintragen; liegt ein
   Kontakt danach, zählt dessen Tag. So macht ein Tippfehler im Jahr eine Akte nicht sofort löschbar.
 - **Gelöscht wird von Hand**, nie automatisch: Die Übersicht zeigt Akten mit abgelaufener Frist, ein Mediziner löscht.
@@ -137,8 +148,9 @@ Name); nach einer Wiederherstellung löscht das Backend beim Start alles erneut,
    gelöschten) bis zum „Abschließen“ in der Datenbank; mit dem Abschließen werden Dump, Zuordnungen und die Nummern in
    den Importprotokollen gelöscht. Getrennt zu löschen bleiben: der Dokumentenordner `data/import/PatData` auf dem
    Server und Sicherungen aus der Zeit vor dem Abschließen (auf dem Server laufen sie nach 30 Tagen ab; Kopien auf NAS
-   und Nextcloud löscht EPM nicht, siehe O7). Kennwörter des Altsystems
-   werden nie gespeichert.
+   und Nextcloud löscht EPM nicht, siehe O7). Wird später eine Sicherung aus der Zeit vor dem Abschließen
+   zurückgespielt, sind Dump und Zuordnungen wieder da und die Übernahme gilt wieder als vorläufig – dann erneut
+   „Abschließen“. Kennwörter des Altsystems werden nie gespeichert.
 7. Freigabe-E-Mails für Infusionspläne: nur Patienten- und Plannummer nennen, keine Namen oder Diagnosen.
 8. Bestehende Patienten: vorhandene Einwilligungen und Schweigepflichtentbindungen nach und nach in der Akte erfassen
    (Startseite „Erklärungen fehlen“).

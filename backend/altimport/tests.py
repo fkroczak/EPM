@@ -261,10 +261,26 @@ class Probelauf(Basis):
         self.assertIn("ohne echte Akten", r.json()["fehler"])
 
     def test_nummer_aus_dem_loeschprotokoll(self):
+        """Eine im EPM endgültig gelöschte Akte kommt mit der Übernahme nicht zurück: Der Patient lässt sich nur
+        ausnehmen – die übrigen werden übernommen (O-29)."""
         Loeschprotokoll.objects.create(akte_id=77, nummer=5, angelegt_am=timezone.now(), rechtsgrund="frist", grund="Test")
         self.lade()
-        self.entscheide()
-        self.assertIn("Löschprotokoll", self.a.get("/api/altimport/zuordnung/").json()["hindernisse"][0])
+        stand = self.entscheide()["stand"]
+        a = next(x for x in stand["auffaelligkeiten"] if x["schluessel"] == "patienten:5:nummer")
+        self.assertEqual((a["art"], a["blockiert"], a["moeglich"]), ("geloescht_epm", True, ["auslassen"]))
+        self.assertIn("1 Punkte offen", self.a.get("/api/altimport/zuordnung/").json()["hindernisse"][0])
+        r = self.a.post("/api/altimport/import/", {"kennwort": KENNWORT, "code": self.codes.pop()}, format="json")
+        self.assertEqual(r.status_code, 409)
+        # eine andere Nummer ist kein Ausweg
+        stand = self.speichere("korrekturen", {"patienten:5:nummer": {"art": "wert", "wert": "8"}})["stand"]
+        self.assertNotEqual(stand["offen"], [])
+        stand = self.speichere("korrekturen", {"patienten:5:nummer": {"art": "auslassen"}})["stand"]
+        self.assertEqual(stand["offen"], [])
+        self.assertEqual(self.a.get("/api/altimport/zuordnung/").json()["hindernisse"], [])
+        r = self.a.post("/api/altimport/import/", {"kennwort": KENNWORT, "code": self.codes.pop()}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertTrue(r.json()["erfolgreich"], r.json()["fehler"])
+        self.assertEqual(sorted(Patient.objects.filter(ist_test=False).values_list("nummer", flat=True)), [1, 2, 3, 4, 7])
 
 
 class Import(Basis):

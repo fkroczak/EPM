@@ -30,7 +30,7 @@ def bestand() -> dict:
         "katheter": [{"id": 10, "wert": "Port"}, {"id": 11, "wert": "ZVK"}],
         "praeparate": [{"id": i, "kategorie": k, "name": n, "konzentration": c}
                        for i, (k, n, c) in enumerate(praeparate, 1)],
-        "grenzen": dict(GRENZEN), "testnummer_ab": 9001,
+        "grenzen": dict(GRENZEN), "testnummer_ab": 9001, "geloeschte_nummern": [],
     }
 
 

@@ -84,6 +84,9 @@ def bestand() -> dict:
                            .values("id", "kategorie", "name", "konzentration", "aktiv")),
         "grenzen": {f: str(getattr(e, f)) for f in GRENZFELDER},
         "testnummer_ab": TESTNUMMER_AB,
+        # Nummern endgültig gelöschter Akten (Art. 17 DSGVO): Sie werden nicht neu vergeben – ein Patient des
+        # Altsystems mit einer solchen Nummer lässt sich nur ausnehmen (O-29)
+        "geloeschte_nummern": sorted(set(Loeschprotokoll.objects.filter(ist_test=False).values_list("nummer", flat=True))),
     }
 
 

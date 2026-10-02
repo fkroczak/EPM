@@ -521,6 +521,45 @@ class Aktenkopie(DatenschutzGrundlage):
 class AkteLoeschen(DatenschutzGrundlage):
     def setUp(self):
         LISTE.unlink(missing_ok=True)
+        LISTE.with_name("nachholen.json").unlink(missing_ok=True)
+
+    def test_nachholen_meldet_was_nicht_ging(self):
+        """Das Nachholen der Löschungen läuft bei jedem Start; ein Fehler darf nicht nur im Protokoll des Containers
+        stehen (O-28): Stand neben der Löschliste, Eintrag im Audit-Log, mit „--streng“ ein Fehler für den Aufrufer."""
+        from django.core.management.base import CommandError
+
+        from .loeschung import nachholen_stand, unlesbare_zeilen
+
+        ereignisse = SystemEreignis.objects.filter(art=A.SYSTEM, details__ereignis="loeschungen_nachholen")
+        # ohne Befund: kein Eintrag, Stand „ok“
+        call_command("epm_loeschungen_nachholen", stdout=io.StringIO(), stderr=io.StringIO())
+        self.assertEqual((nachholen_stand()["status"], ereignisse.count()), ("ok", 0))
+        # abgeschnittene Zeile (z. B. Abbruch beim Schreiben) und eine Zeile, die kein Objekt ist
+        LISTE.parent.mkdir(parents=True, exist_ok=True)
+        LISTE.write_text('{"akte": 1, "nummer": 2, "angelegt_am": "2026-01-01T10:00:00+01:00", "geloescht_am": "2026-0\n\n[1, 2]\n',
+                         encoding="utf-8")
+        self.assertEqual(unlesbare_zeilen(), 2)
+        fehler = io.StringIO()
+        call_command("epm_loeschungen_nachholen", stdout=io.StringIO(), stderr=fehler)
+        self.assertIn("2 Zeilen der Löschliste nicht lesbar", fehler.getvalue())
+        stand = nachholen_stand()
+        self.assertEqual(stand["status"], "fehler")
+        e = ereignisse.get()
+        self.assertEqual((e.details["status"], e.benutzername), ("fehler", "System"))
+        self.assertIn("konnten nicht vollständig nachgeholt werden: 2 Zeilen der Löschliste nicht lesbar", beschreibung(e))
+        # derselbe Fehler beim nächsten Start: kein zweiter Eintrag; mit --streng ein Fehler für den Aufrufer (Agent)
+        call_command("epm_loeschungen_nachholen", stdout=io.StringIO(), stderr=io.StringIO())
+        self.assertEqual(ereignisse.count(), 1)
+        with self.assertRaises(CommandError):
+            call_command("epm_loeschungen_nachholen", streng=True, stdout=io.StringIO(), stderr=io.StringIO())
+        # behoben: Stand „ok“, ein Eintrag hält es fest; danach wieder still
+        LISTE.write_text("", encoding="utf-8")
+        call_command("epm_loeschungen_nachholen", streng=True, stdout=io.StringIO(), stderr=io.StringIO())
+        self.assertEqual(nachholen_stand()["status"], "ok")
+        self.assertEqual(ereignisse.count(), 2)
+        self.assertIn("jetzt vollständig", beschreibung(ereignisse.order_by("-id").first()))
+        call_command("epm_loeschungen_nachholen", stdout=io.StringIO(), stderr=io.StringIO())
+        self.assertEqual(ereignisse.count(), 2)
 
     def gefuellte_akte(self):
         """Akte mit Einträgen aller Art, zwei Plänen (einer auf Anordnung mit Nachweis) und Dokumenten, die zwischen
@@ -762,7 +801,7 @@ class AkteLoeschen(DatenschutzGrundlage):
         wiederherstellen(angelegt_am=angelegt)
         ausgabe = io.StringIO()
         call_command("epm_loeschungen_nachholen", stdout=ausgabe)
-        self.assertIn("akten 1", ausgabe.getvalue())
+        self.assertIn("1 Akten erneut gelöscht", ausgabe.getvalue())
         self.assertFalse(Patient.objects.filter(pk=pid).exists())
         self.assertFalse(Patient.history.filter(id=pid).exists())
         self.assertEqual(Loeschprotokoll.objects.count(), 1)
