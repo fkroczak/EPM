@@ -232,7 +232,8 @@ class ZielView(APIView):
         return auftrag_anlegen(request, "sicherung_ziel", parameter=z,
                                geheim={"kennwort": kennwort} if kennwort else None,
                                objekt=f"Übertragungsziel {urlsplit(z['url']).hostname}",
-                               protokoll_details={"url": z["url"], "benutzer": z["benutzer"], "ordner": z["ordner"],
+                               # „benutzer“ hieße in protokolliere() die handelnde Person – daher ziel_benutzer
+                               protokoll_details={"url": z["url"], "ziel_benutzer": z["benutzer"], "ordner": z["ordner"],
                                                   "zeitfenster": f"{z['von']}–{z['bis']}",
                                                   "zugang_neu": kennwort is not None})
 
