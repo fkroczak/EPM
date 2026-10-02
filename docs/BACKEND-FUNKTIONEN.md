@@ -31,6 +31,7 @@ Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests. Beide laufe
 
 Stand 02.10.2026 (Datenschutz F74–F83 und Systemseite/Kalender/Infusionspläne F84–F89 zusammen): **141 von 141 Backend-Tests** und **66 von 66 Browsertests grün** (Lauf 36976550763, Commit `97e5a5b`; dazu 1 Bildschirmfoto-Test, nur beim manuellen Start).
 Stand 02.10.2026 (Rechte: Löschen auch Admins, Systemverwaltung als Vertretung): **142 von 142 Backend-Tests** und **66 von 66 Browsertests grün** (Lauf 36989064354, Commit `0cca47d`).
+Stand 02.10.2026 (Behebung der Gegenprüfung, O-27 bis O-29, Pull Request #6): **216 von 216 Backend-Tests** und **74 von 74 Browsertests grün** (Lauf 37031797322, Commit `641936b`; dazu 2 Bildschirmfoto-Tests, nur beim manuellen Start).
 Stand 02.10.2026 (Altdaten-Import F65, in `main` als `26084ba`, Pull Request #5): **212 von 212 Backend-Tests** und **74 von 74 Browsertests grün** (Lauf 37018759253 auf `main`; vorher im Pull Request Lauf 37006765744 und auf dem Branch Lauf 37004133307; dazu 2 Bildschirmfoto-Tests, nur beim manuellen Start).
 Stand 02.10.2026 (Datensicherung F61–F64 mit O-07, O-23, O-24, in `main` zusammen mit der Rechte-Änderung): **156 von 156 Backend-Tests** und **70 von 70 Browsertests grün** (Lauf 36991958136 auf `main`, Commit `7ba9f35`; vorher im Pull Request #3 Lauf 36990805767; dazu 1 Bildschirmfoto-Test, nur beim manuellen Start).
 
