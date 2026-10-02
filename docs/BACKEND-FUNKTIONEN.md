@@ -29,7 +29,7 @@ Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests. Beide laufe
   `werkzeuge/ci-stack.sh`: dieselbe Compose-Datei, Nginx-Konfiguration und dieselben Images wie auf dem Server, mit
   Musterdaten und eigenen Testkonten je Rolle.
 
-Stand 02.10.2026 (Datenschutz F74–F83 und Systemseite/Kalender/Infusionspläne F84–F89 zusammen): STAND_GESAMT
+Stand 02.10.2026 (Datenschutz F74–F83 und Systemseite/Kalender/Infusionspläne F84–F89 zusammen): **141 von 141 Backend-Tests** und **66 von 66 Browsertests grün** (Lauf 36976550763, Commit `97e5a5b`; dazu 1 Bildschirmfoto-Test, nur beim manuellen Start).
 
 Sporadische Fehlschläge der Browsertests (kein Produktfehler belegt, Ursache im Test bzw. offen): „Ärzte aus der
 gemeinsamen Liste zuordnen …“ tippte gelegentlich, bevor das leere Formular stand (schon auf `main`, Lauf 36942510984;
