@@ -1,8 +1,9 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 02.10.2026 · Code-Stand: Runde 3 (bis `e74f4ff`: PDF-Erzeugung, Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
+Stand: 02.10.2026 · Code-Stand: Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
+Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
-Festlegung zu den Rechten vom 01.10.2026.
+Festlegung zu den Rechten vom 01.10.2026, Prüfung nach DSGVO vom 02.10.2026 (`docs/DATENSCHUTZ.md`).
 
 ## Statuswerte
 
@@ -30,6 +31,7 @@ Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests. Beide laufe
 
 Stand 02.10.2026: **100 von 100 Backend-Tests** und **49 von 49 Browsertests grün** (Lauf 36943685896, Commit `e74f4ff`).
 Stand 02.10.2026 (Runde 4, Systemseite/Kalender/Infusionspläne, auf `a9724b2`): **123 von 123 Backend-Tests** und **60 von 60 Browsertests grün** (Lauf 36970663378, Commit `473cef0`; dazu 1 Bildschirmfoto-Test, nur beim manuellen Start).
+Stand 02.10.2026: **118 von 118 Backend-Tests** und **55 von 55 Browsertests grün** (LAUF_DS).
 
 ## Übersicht
 
@@ -108,16 +110,28 @@ Stand 02.10.2026 (Runde 4, Systemseite/Kalender/Infusionspläne, auf `a9724b2`):
 | F71 | Nicht Erlaubtes ausblenden, Rechteänderung sofort in der Oberfläche | alle Ansichten | ABGESCHLOSSEN UND GETESTET |
 | F72 | Dokument dem richtigen Patienten zuordnen | 9 Dokumente, 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
 | F73 | Dokument endgültig löschen (nur Mediziner, Kennwort + 2FA + Bestätigungscode) | 9 Dokumente, 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
-| F80 | Globaler Kalender mit Fälligkeiten und Feiertagen | Kalender (neu) | ABGESCHLOSSEN UND GETESTET |
-| F81 | Übersicht aller Infusionspläne | Infusionspläne (neu) | ABGESCHLOSSEN UND GETESTET |
-| F82 | Systemverwaltung: Auslastung, Updates, Container, EPM-Zustand | System (neu) | ABGESCHLOSSEN UND GETESTET |
-| F83 | Tätigkeiten für den Server über den Systemagenten (Update, Neustart, Sicherung, Aufräumen) | System | ABGESCHLOSSEN UND GETESTET |
-| F84 | Wartung des EPM (Sitzungen, Datenbank, Dokumente, Unveränderlichkeit, Konfiguration, alle abmelden) | System | ABGESCHLOSSEN UND GETESTET |
-| F85 | Hinweis an alle Benutzer, angemeldete Benutzer abmelden | System, alle Ansichten | ABGESCHLOSSEN UND GETESTET |
+| F74 | Aufbewahrungsfrist der Akte, Verlängerung im Einzelfall, „Abschluss prüfen“ | 4 Akte (Datenschutz), 2 Start, 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
+| F75 | Erklärungen nachhalten (Datenschutzinformation, Einwilligung, Schweigepflichtentbindung), Widerruf | 4 Akte (Kopf, Datenschutz), 2 Start, 3 Liste | ABGESCHLOSSEN UND GETESTET |
+| F76 | Vordrucke der Erklärungen als PDF aus Dokumentvorlagen | 4 Akte (Datenschutz), 19 Dokumentvorlagen | ABGESCHLOSSEN UND GETESTET |
+| F77 | Datenschutz-Anfragen mit Frist (Art. 12 Abs. 3 DSGVO) | 4 Akte (Datenschutz), Datenschutz (neu), 2 Start | ABGESCHLOSSEN UND GETESTET |
+| F78 | Kopie der Akte als ZIP (Art. 15 Abs. 3 DSGVO) | 4 Akte (Datenschutz) | ABGESCHLOSSEN UND GETESTET |
+| F79 | Verarbeitung einschränken, begründete Einsicht, Aufheben (Art. 18 DSGVO) | 4 Akte, Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
+| F80 | Akte endgültig löschen mit Löschprotokoll (Art. 17 DSGVO; nur Mediziner, Kennwort + 2FA + Bestätigungscode) | 4 Akte (Datenschutz), Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
+| F81 | Übersicht „Datenschutz“ | Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
+| F82 | Plan nach Freigabe abschließen (Freigabe per E-Mail o. Ä.), Freigabevermerk mit beiden Personen | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
+| F83 | Aufbewahrung des Audit-Logs, tägliche Bereinigung | 18 Vorlagen (Grenzwerte), 20 Audit-Log | TEILWEISE ABGESCHLOSSEN |
+| F84 | Globaler Kalender mit Fälligkeiten und Feiertagen | Kalender (neu) | ABGESCHLOSSEN UND GETESTET |
+| F85 | Übersicht aller Infusionspläne | Infusionspläne (neu) | ABGESCHLOSSEN UND GETESTET |
+| F86 | Systemverwaltung: Auslastung, Updates, Container, EPM-Zustand | System (neu) | ABGESCHLOSSEN UND GETESTET |
+| F87 | Tätigkeiten für den Server über den Systemagenten (Update, Neustart, Sicherung, Aufräumen) | System | ABGESCHLOSSEN UND GETESTET |
+| F88 | Wartung des EPM (Sitzungen, Datenbank, Dokumente, Unveränderlichkeit, Konfiguration, alle abmelden) | System | ABGESCHLOSSEN UND GETESTET |
+| F89 | Hinweis an alle Benutzer, angemeldete Benutzer abmelden | System, alle Ansichten | ABGESCHLOSSEN UND GETESTET |
 
-Summe (79 Funktionen, gezählt aus der Tabelle): 73 abgeschlossen und getestet · 2 teilweise abgeschlossen · 4 nicht abgeschlossen · 0 blockiert.
+Summe (89 Funktionen, gezählt aus der Tabelle): 82 abgeschlossen und getestet · 3 teilweise abgeschlossen · 4 nicht abgeschlossen · 0 blockiert.
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
+Neu in Runde 4 sind F74–F83 (Datenschutz nach DSGVO und Abschließen eines Plans nach Freigabe); offene Fragen dazu stehen
+in `docs/DATENSCHUTZ.md` und unten als U16–U24.
 
 ---
 
@@ -130,7 +144,8 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - Fehlerformat: Feldfehler `{"<feld>": ["Meldung"]}`, allgemeine Fehler `{"fehler": "Meldung"}`.
 - Fehlercodes: 400 Validierung · 401 falsche Anmeldedaten · 403 fehlendes Recht, unveränderlicher Datensatz oder
   Datenbank-Trigger · 404 nicht vorhanden oder außerhalb des eigenen Bereichs (Testbenutzer) · 405 Aktion nicht
-  vorgesehen (z. B. Kontakt ändern) · 409 Akte abgeschlossen · 429 zu viele Versuche.
+  vorgesehen (z. B. Kontakt ändern) · 409 Akte abgeschlossen · 429 zu viele Versuche. Akte mit eingeschränkter
+  Verarbeitung (F79): in Listen nicht enthalten, Einträge 404, `GET /api/patienten/{id}/` → 403 mit `eingeschraenkt: true`.
 - Testbenutzer (`ist_test`) sehen und bearbeiten nur Testpatienten.
 - Rechte je Gruppe (F66): Die Administration stellt sie in der Oberfläche ein (Benutzer › Rechte), Änderungen gelten ab
   der nächsten Anfrage. Festlegungen vom 01.10.2026: Mediziner sind dem Admin gleichgestellt, ausgenommen
@@ -150,6 +165,10 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 | Akten abschließen | – | ✓ | ✓ | ✓ T |
 | Dokumente einem anderen Patienten zuordnen (F72) | – | – | ✓ | ✓ T |
 | Dokumente endgültig löschen (F73) | – | – | ✓ | – (nur Mediziner) |
+| Infusionspläne nach Freigabe abschließen (F82) | – | ✓ | ✓ | ✓ T |
+| Datenschutz: Erklärungen und Anfragen erfassen, Kopie der Akte (F75, F77, F78) | – | ✓ | ✓ | ✓ T |
+| Datenschutz: Anfragen entscheiden, Verarbeitung einschränken, Einsicht, Aufbewahrung verlängern (F74, F77, F79) | – | – | ✓ | ✓ T |
+| Akten endgültig löschen (F80) | – | – | ✓ | – (nur Mediziner) |
 | Abgeschlossene Akten wieder öffnen | – | – | – | ✓ |
 | Versorger und Ansprechpartner pflegen | – | ✓ | ✓ | ✓ |
 | Vorlagen pflegen (Briefkopf, Auswahllisten, Präparate, Grenzwerte) | – | ✓ | ✓ | ✓ |
@@ -168,7 +187,8 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - Migrationen liegen im Repo (`backend/*/migrations/`). Ändert sich ein Modell, erzeugt GitHub Actions die Migration,
   legt sie als Commit „Migrationen automatisch erzeugt (CI)“ ab und prüft danach `makemigrations --check`.
   Schutz-Trigger werden nach jedem `migrate` gesetzt (`audit/schutz.py`).
-- Tests: `accounts/tests.py`, `patienten/tests.py`, `infusionen/tests.py`, `stammdaten/tests.py`; gemeinsame Hilfen in
+- Tests: `accounts/tests.py`, `patienten/tests.py`, `patienten/test_datenschutz.py`, `infusionen/tests.py`,
+  `stammdaten/tests.py`, `vorlagen/tests.py`; gemeinsame Hilfen in
   `epm/pruefhilfen.py`.
 
 ---
@@ -347,7 +367,8 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - **Response 200:** `{"termine": {"ueberfaellig", "heute", "naechste_7_tage": [Termin]}, "gewichtswarnungen": [{patient, name,
   nummer, gewicht, prozent}] (stärkster Verlust zuerst), "gewicht_schwelle": {prozent, monate}, "infusionsplaene":
   {"entwuerfe", "aelter_als_grenze": [{id, patient, name, gueltig_ab, status, erstellt_am, erstellt_von, freigegeben_am}],
-  "grenze_monate"}, "pruefen": {altdokumente, nickelallergie_unbekannt, kein_versorger, kein_kontakt, kontakt_monate},
+  "grenze_monate"}, "pruefen": {altdokumente, nickelallergie_unbekannt, kein_versorger, kein_kontakt, kontakt_monate,
+  erklaerungen_fehlen, abschluss_pruefen, abschluss_monate, datenschutz_anfragen (F74, F75, F77)},
   "zuletzt_eingetragen": [{bereich (kontakt|gewicht|dokument|plan), bezeichnung, objekt_id, patient, name, zeitpunkt, person}],
   "zahlen": {in_betreuung, mit_offenem_termin}}`
 - **Validierung:** Testbenutzer sieht nur Testpatienten; Testpatienten fehlen in Zahlen und Prüfliste.
@@ -367,7 +388,7 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   gewichtsverlust, termin_woche}` (ohne Testpatienten)
 - **Query:** `status=in_betreuung|abgeschlossen`, `schnellfilter=hinweise|gewichtsverlust|termin_woche`, `suche` (Wörter;
   Datum TT.MM.JJJJ oder JJJJ-MM-TT = Geburtsdatum, Ziffern = Nummer, sonst Name/Vorname/Ort), `pruefen=altdokumente|
-  nickelallergie|kein_versorger|kein_kontakt`, `versorger`, `ansprechpartner`, `katheter`, `nickelallergie`, `test=nur|ohne`,
+  nickelallergie|kein_versorger|kein_kontakt|erklaerungen|abschluss_pruefen` (F74, F75), `versorger`, `ansprechpartner`, `katheter`, `nickelallergie`, `test=nur|ohne`,
   `ordering=letzter_kontakt|nachname|nummer|geburtsdatum|geaendert_am` (Standard: letzter Kontakt, neueste zuerst, ohne Kontakt am Ende)
 - **Response 200:** Seite mit `[{id, nummer, nachname, vorname, geburtsdatum, alter, ort, katheter, katheter_name, versorger,
   versorger_name, ansprechpartner, ansprechpartner_name, nickelallergie, ist_abgeschlossen, abgeschlossen_am,
@@ -621,7 +642,8 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - **Logik:** danach unveränderlich, auch die Vitamin-Zuordnung (Trigger auf `infusionen_infusionsplan_vitamine`). Bei der
   Freigabe entsteht die PDF mit der aktiven Vorlage „Infusionsplan“ (F50/F51) und wird als Dokument „Von EPM erzeugt“ (Typ
   „Infusionsplan“) in der Akte abgelegt; am Plan stehen `pdf_datei`, `pdf_sha256` und `vorlage_version`. Freigabevermerk statt
-  Unterschrift: „Maschinell erstellt, geprüft und freigegeben von <Mediziner> am <Datum>.“
+  Unterschrift: „Maschinell erstellt, geprüft und freigegeben von <Mediziner> am <Datum>.“ Hat der Mediziner außerhalb von
+  EPM freigegeben und ein Mitarbeiter schließt ab: F82 (der Vermerk nennt dann beide).
 - **Validierung:** Recht „Infusionspläne freigeben“ (Standard: Mediziner; Admin nur bei Testpatienten); vollständige Prüfung aller Werte; Akte offen.
 - **Teststatus:** Backend-Tests grün (`test_ablauf`, `test_vitamine_freigegebener_plaene_in_der_datenbank_geschuetzt`,
   `vorlagen.Vorlagen.test_freigabe_speichert_pdf_mit_pruefsumme`). Browsertest grün: `plaene.spec.ts` „Erster Plan, Freigabe,
@@ -741,7 +763,7 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   ohne Titel. Jede Ablehnung (Code abgelaufen/falsch, Kennwort, 2FA) steht im Audit-Log (Gruppe „Fehlversuch“); dreimal
   falscher Bestätigungscode macht ihn ungültig. Der Grund bleibt im Protokoll – die Oberfläche bittet, keine Namen oder
   Gesundheitsangaben der fremden Person hineinzuschreiben.
-- **Sicherungen und Wiederherstellung:** Ältere Sicherungen enthalten das Dokument bis zu ihrem Ablauf (14 Tage, F61).
+- **Sicherungen und Wiederherstellung:** Ältere Sicherungen enthalten das Dokument bis zu ihrem Ablauf (30 Tage, F61).
   Jede Löschung steht zusätzlich in der Löschliste `data/loeschliste/loeschliste.jsonl` (eigener Ordner, nur Backend,
   weder in der Datenbank noch im Dokumentordner; Inhalt: Nummer, SHA-256, Pfad, Patienten-ID, Benutzer-ID, Zeitpunkt –
   kein Titel); `epm-backup` sichert sie getrennt mit. Bei jedem Start läuft `manage.py epm_loeschungen_nachholen`
@@ -840,6 +862,8 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - **Endpunkt:** `GET/PATCH /api/einstellungen/` (lesen alle, ändern mit Recht „Vorlagen pflegen“)
 - **Felder:** Absender; Warnung Gewichtsverlust %, Zeitraum, Plan alt nach Monaten, Kontakt überfällig nach Monaten;
   Min/Max für Energie, Gesamtvolumen, Glucose, Aminosäuren, Lipide, Natrium, Kalium, Gewicht, Größe.
+  Datenschutz (Karte „Datenschutz“): `aufbewahrung_jahre` (Standard 10, 1–100), `abschluss_pruefen_monate` (Standard 24),
+  `protokoll_aufbewahrung_jahre` (Standard 0 = unbegrenzt), `pflicht_erklaerungen` (Liste; Standard alle drei) – F74, F75, F83.
 - **Validierung:** Minimum < Maximum je Paar; Audit-Log „Grenzwert „Kontakt überfällig“ von 6 auf 12 Monate geändert“.
 - **Teststatus:** Backend-Tests grün (`EinstellungenPruefen.test_grenzen_und_rechte`, `test_gesamtvolumen_rate_und_protonenpumpenhemmer`).
   Browsertests grün: `admin.spec.ts` „Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte“ (untere > obere Grenze abgewiesen, Grenze für das Gesamtvolumen geändert), Grenzen wirken in
@@ -1016,7 +1040,7 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 
 ### F58 Audit-Log lesen und filtern
 - **Ansicht:** 20 Audit-Log
-- **Endpunkt:** `GET /api/protokoll/?gruppe=anmeldung,fehlversuch,benutzer,vorlage,backup,export,abschluss&benutzer&von&bis&search`
+- **Endpunkt:** `GET /api/protokoll/?gruppe=anmeldung,fehlversuch,benutzer,vorlage,backup,export,abschluss,dokument,datenschutz&benutzer&von&bis&search`
   → `[{id, zeitpunkt, art, art_name, gruppe, gruppe_name, beschreibung, benutzer, person, benutzername, objekt, details, ip, geraet}]`
 - **Logik:** `beschreibung` wie im Entwurf („Anmeldung mit 2FA“, „Falsches Passwort (3. Versuch)“, „5 falsche Passwörter in
   4 Minuten, Konto gesperrt“, „Benutzer k.oezdemir angelegt (Mitarbeiter), Einmal-Kennwort erzeugt“, „Akte Weber, Anna
@@ -1041,6 +1065,9 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
   DELETE, TRUNCATE), auf `patienten_kontakt` (nur einmaliges Storno), auf `infusionen_infusionsplan` (nach Freigabe nur
   „aktuell → abgelöst“), auf `infusionen_infusionsplan_vitamine` (Zuordnung nur im Entwurf). Ausnahme nur im Wartungsmodus – und das Schwärzen eines endgültig gelöschten
   Dokuments (F73, Art. 17 DSGVO): nur Titel, Dateiname, Notiz und Datum genau dieses Dokuments, nur durch „[entfernt]“.
+  Im Wartungsmodus (nur für die Dauer des Vorgangs, in derselben Transaktion) laufen außerdem das endgültige Löschen einer
+  Akte (F80) und die Bereinigung des Audit-Logs nach der eingestellten Aufbewahrung (F83). Das Löschprotokoll
+  (`patienten_loeschprotokoll`) kann nur ergänzt werden (Trigger „nur anfügen“).
 - **Teststatus:** Backend-Tests grün (`test_historie_ist_unveraenderlich`, `test_trigger_verhindert_aenderung_in_der_datenbank`,
   `test_vitamine_freigegebener_plaene_in_der_datenbank_geschuetzt`). Browsertests grün: `akte.spec.ts` „Kontakt mit Wiedervorlage erfassen, suchen, stornieren“ (Kontakt nur stornieren),
   `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“ (freigegebener Plan ohne „Bearbeiten“), `dokumente.spec.ts` „Dokumente hochladen, Typ am Inhalt prüfen, Metadaten ändern, ausblenden, herunterladen; Verlauf“ (Verlauf nur lesend).
@@ -1051,9 +1078,15 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 ## J · Backup und Wiederherstellung
 
 ### F61 Tägliche verschlüsselte Sicherung
-- **Ist:** `/usr/local/sbin/epm-backup` + systemd-Timer 02:30: `pg_dump` und Dokumente als `.tar.gz`, Löschliste (F73) als
-  eigene Datei, SHA-256, 14 Tage.
-- **Fehlt:** Uhrzeit 02:00, Verschlüsselung mit `age`, Status-Datei für das Backend.
+- **Ist:** `/usr/local/sbin/epm-backup` + systemd-Timer 02:30: `pg_dump` und Dokumente als `.tar.gz`, Löschliste (F73, F80) als
+  eigene Datei, SHA-256, **30 Tage** (Festlegung 02.10.2026: Sicherungen werden 30 Tage vorgehalten; `EPM_BACKUP_TAGE`).
+  Verschlüsselung mit `age` (Art. 32 DSGVO) ist vorbereitet: Liegt der öffentliche Schlüssel in
+  `/srv/epm/secrets/backup-empfaenger.txt` und ist `age` installiert, werden Datenbank und Dokumente verschlüsselt geschrieben
+  (`.age`); sonst wie bisher unverschlüsselt, mit Hinweis in der Ausgabe. Die Löschliste bleibt lesbar (keine Namen).
+  Unvollständige Dateien bleiben nicht liegen (`.teil`).
+- **Geprüft:** von Hand in einer Testumgebung (unverschlüsselt und verschlüsselt, Entschlüsseln, Prüfsummen, Ablauf nach 30
+  Tagen) – kein automatischer Test, nicht auf dem Server gelaufen.
+- **Fehlt:** Uhrzeit 02:00, Schlüssel erzeugen und hinterlegen (Entscheidung, wer ihn verwahrt: U20), Status-Datei für das Backend.
 - **Status:** TEILWEISE ABGESCHLOSSEN
 
 ### F62 Sicherungen anzeigen, „Jetzt sichern“
@@ -1066,7 +1099,7 @@ Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blocki
 - **Geplant:** `POST /api/backup/{id}/wiederherstellen/` `{"kennwort", "code"}`; vorher automatische Sicherung des aktuellen Stands;
   Protokoll im Audit-Log. Die aktuelle Löschliste (`data/loeschliste/`) bleibt dabei unangetastet (auf einem neuen Server: die
   neueste aus den Sicherungen); der anschließende Start des Backends löscht und schwärzt endgültig gelöschte Dokumente erneut
-  (F73, Art. 17 DSGVO).
+  (F73, Art. 17 DSGVO) und löscht endgültig gelöschte Akten erneut (F80).
 - **Status:** NICHT ABGESCHLOSSEN
 
 ### F64 Übertragung zur Nextcloud/NAS
@@ -1157,7 +1190,242 @@ gemeinsame Ärzteliste; „kein“ und „nicht erfasst“ getrennt; Bezugsperso
   eine schwarze Leiste ein); große Ansicht mit Zoom. Offline, ohne eval/WebAssembly (CSP unverändert). Browsertest `dokumente.spec.ts`
   „PDF-Vorschau und Ansicht in EPM …“.
 
-## M · Kalender, Infusionspläne, Systemverwaltung (Runde 4, Wunsch 02.10.2026)
+## M · Datenschutz nach DSGVO (Runde 4, Prüfung und Festlegungen vom 02.10.2026)
+
+Anlass: Prüfung des Projekts auf Anpassungen nach DSGVO (Recht auf Löschung u. a.) im Abgleich mit den Pflichten bei
+Patientendaten. Vorschriften, Abwägungen und offene Punkte stehen in `docs/DATENSCHUTZ.md`; hier steht, was EPM tut.
+Angaben der Stiftung: Verantwortlich ist allein die Stiftung; Pläne gibt nur Prof. Masin frei, per E-Mail, Mitarbeiter
+schließen im System ab; Sicherungen 30 Tage; Aufbewahrung 10 Jahre „soweit bekannt“ (U16).
+
+Gemeinsam für F74–F81: Reiter „Datenschutz“ in der Akte (`/patienten/{id}/datenschutz`), Menüpunkt „Datenschutz“
+(`/datenschutz`). Stand der Akte: `GET /api/patienten/{id}/datenschutz/` → `{aufbewahrung, einschraenkung, einsicht_bis,
+erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migrationen: `patienten/0007_datenschutz`,
+`stammdaten/0008_datenschutz`, `audit/0006_datenschutz`, `infusionen/0005_freigabe_auf_anordnung`,
+`vorlagen/0002_datenschutz_freigabevermerk`. Audit-Log: neue Gruppe „Datenschutz“; Einträge zu Akten tragen seitdem
+`details.patient_id`. Verlauf der Akte: neue Bereiche `erklaerungen` und `datenschutz`.
+
+### F74 Aufbewahrungsfrist der Akte, Verlängerung im Einzelfall, „Abschluss prüfen“
+- **Zweck:** Speicherbegrenzung (Art. 5 Abs. 1 e DSGVO): Die Frist beginnt mit dem Abschluss der Akte; danach darf (F80)
+  gelöscht werden. Eine nie abgeschlossene Akte bliebe für immer – deshalb der Hinweis „Abschluss prüfen“.
+- **Ansicht:** Akte › Datenschutz › Aufbewahrung; Banner der abgeschlossenen Akte („Aufbewahrung bis …“); Start und
+  Patientenliste „Abschluss prüfen“; Vorlagen › Grenzwerte › Datenschutz
+- **Endpunkte:** `aufbewahrung` in `GET /api/patienten/{id}/` und `…/datenschutz/` → `{jahre, regulaer_bis, verlaengert_bis,
+  grund, bis, abgelaufen}`; `POST /api/patienten/{id}/aufbewahrung/` `{"bis": "JJJJ-MM-TT", "grund"}` bzw. `{"bis": null}`
+  (Verlängerung zurücknehmen); `GET /api/patienten/?pruefen=abschluss_pruefen`
+- **Logik:** regulär = Abschlussdatum + `aufbewahrung_jahre` (Einstellung, Standard 10); `bis` = das spätere Datum aus
+  regulärer Frist und Verlängerung; `abgelaufen`, wenn `bis` vor heute liegt. „Abschluss prüfen“: Akte in Betreuung, älter
+  als `abschluss_pruefen_monate` (Standard 24), seitdem kein Kontakt und kein offener Termin in der Zukunft.
+- **Validierung:** Verlängern mit Recht „Datenschutz: Anfragen entscheiden …“ (Standard: Mediziner; Admin nur
+  Testpatienten); Datum in der Zukunft und nach der regulären Frist; Grund mindestens 10 Zeichen.
+- **Tabellen:** `patienten_patient` (`aufbewahrung_bis`, `aufbewahrung_grund`) + Historie, `stammdaten_einstellungen`
+- **Teststatus:** Backend-Tests grün (`test_datenschutz.Fristen.test_aufbewahrung_und_frist_der_anfragen`,
+  `test_einstellungen`, `test_abschluss_pruefen`, `Einschraenkung.test_aufbewahrung_im_einzelfall_verlaengern`).
+  Browsertests grün: `datenschutz.spec.ts` „Anfrage mit Frist, Kopie der Akte, Löschwunsch → eingeschränkt, Einsicht mit
+  Grund, Aufheben“ (Stand der Aufbewahrung in der Akte), „Grenzwerte: Fristen des Datenschutzes einstellen“ (LAUF_DS).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F75 Erklärungen nachhalten
+- **Zweck:** Nachweis, dass informiert wurde und eine Einwilligung bzw. Schweigepflichtentbindung vorliegt (Art. 7 Abs. 1,
+  Art. 13 DSGVO) – nachgehalten wie die Nickelallergie: „liegt vor“, „widerrufen“, „nicht erfasst“.
+- **Ansicht:** Akte › Datenschutz › Erklärungen; Hinweis im Aktenkopf („Erklärungen fehlen“); Start „Nach und nach prüfen“;
+  Patientenliste (Filter aus der Prüfliste)
+- **Endpunkte:** `GET/POST /api/erklaerungen/?patient&art` (POST auch `multipart` mit `datei` = Scan → Dokument vom Typ
+  „Einwilligung/Datenschutz“ in der Akte), `PATCH /api/erklaerungen/{id}/` (Datum, Notiz, verknüpftes Dokument),
+  `POST /api/erklaerungen/{id}/widerrufen/` `{"widerrufen_am"?, "notiz"?}`; kein Löschen.
+  Kopf der Akte: `kopf.erklaerungen {stand: {art: {status, am, id}}, pflicht, fehlt}`, `zaehler.erklaerungen`;
+  `GET /api/patienten/?pruefen=erklaerungen`; Startseite `pruefen.erklaerungen_fehlen`
+- **Felder:** `art` (datenschutzinformation | einwilligung | schweigepflichtentbindung), `erteilt_am`, `dokument`,
+  `vorlage_version` (Fassung der Dokumentvorlage beim Erfassen), `notiz`, `widerrufen_am`, `widerruf_notiz`
+- **Logik:** Stand je Art = jüngste Erklärung; ein Widerruf wirkt für die Zukunft (Art. 7 Abs. 3 DSGVO), die Erklärung
+  bleibt mit Widerrufsdatum stehen. Welche Arten vorliegen sollen, steht in den Einstellungen (`pflicht_erklaerungen`,
+  Standard alle drei). Widerruf der Schweigepflichtentbindung: Hinweis, wenn bei Bezugspersonen noch „Auskunft erlaubt“
+  steht; Widerruf der Einwilligung: Hinweis, die Folge als Anfrage zu erfassen. Auch bei abgeschlossener Akte möglich
+  (ohne neuen Scan). Wird das verknüpfte Dokument einer anderen Akte zugeordnet (F72), löst sich die Verknüpfung.
+- **Validierung:** Recht „Datenschutz: Erklärungen und Anfragen erfassen“ (Standard: Mitarbeiter, Mediziner; Admin nur
+  Testpatienten); Datum nicht in der Zukunft; Widerruf nicht vor der Erteilung; Dokument aus derselben Akte; Datei wie F40.
+- **Tabellen:** `patienten_erklaerung` (+ Historie), `patienten_dokument`, `audit_systemereignis`
+- **Fehlerfälle:** 400 je Feld / schon widerrufen · 403 ohne Recht · 404 fremde oder eingeschränkte Akte
+- **Teststatus:** Backend-Tests grün (`Erklaerungen.test_erfassen_nachhalten_widerrufen`,
+  `test_auch_bei_abgeschlossener_akte`, `Testdaten.test_zuruecksetzen_mit_umgehaengtem_dokument_und_erklaerungen`).
+  Browsertest grün: `datenschutz.spec.ts` „Erklärungen nachhalten: Hinweis im Aktenkopf, Vordruck als PDF, erfassen mit
+  Scan, Widerruf“; Neustart geprüft in `zz-neustart.spec.ts` „Nach dem Neustart: Datenschutz – …“ (LAUF_DS).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F76 Vordrucke der Erklärungen als PDF aus Dokumentvorlagen
+- **Zweck:** Datenschutzinformation, Einwilligung und Schweigepflichtentbindung mit den Daten des Patienten ausdrucken –
+  wie ein Infusionsplan aus einer pflegbaren Dokumentvorlage (F50/F51).
+- **Ansicht:** Akte › Datenschutz › Erklärungen („Vordruck als PDF“); Vorlagen › Dokumentvorlagen (jetzt 5 Arten)
+- **Endpunkt:** `GET /api/patienten/{id}/erklaerung-pdf/?art=…` → PDF; Kopfzeilen `X-EPM-Vorlage-Version`,
+  `X-EPM-Vorlage-Entwurf`; der Export steht im Audit-Log
+- **Logik:** Neue Arten der Dokumentvorlage: `datenschutzinformation`, `einwilligung`, `schweigepflichtentbindung`, mit
+  Datenfeldern (Patient, Absender, Versorger, Hausarzt, Bezugspersonen mit Auskunft, Aufbewahrung in Jahren). Die
+  mitgelieferten Startvorlagen sind **Entwürfe**: Aufbau nach Art. 13 DSGVO bzw. mit Freiwilligkeit und Widerruf, Lücken
+  in [eckigen Klammern], Hinweis zur rechtlichen Prüfung. Solange keine von der Stiftung veröffentlichte Version aktiv
+  ist, trägt die PDF das Wasserzeichen „ENTWURF“ und die Oberfläche zeigt „Vorlage noch nicht geprüft“ (U17).
+- **Validierung:** Akte lesbar; `art` aus der Liste, sonst 400.
+- **Tabellen:** `vorlagen_dokumentvorlage`
+- **Teststatus:** Backend-Tests grün (`Erklaerungen.test_pdf_aus_der_dokumentvorlage`,
+  `vorlagen.Vorlagen.test_startvorlagen_sind_gueltig_und_rechte`). Browsertest grün: `datenschutz.spec.ts` „Erklärungen
+  nachhalten: …“ (PDF mit Namen des Patienten, Entwurfshinweis) (LAUF_DS).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F77 Datenschutz-Anfragen mit Frist
+- **Zweck:** Anträge betroffener Personen (Auskunft, Berichtigung, Löschung, Einschränkung, Widerruf, Sonstiges) als
+  Vorgang: Eingang, Frist, Ergebnis, Mitteilung (Art. 12 Abs. 3 und 4 DSGVO).
+- **Ansicht:** Akte › Datenschutz › Anfragen; Datenschutz › Offene Anfragen; Start „Nach und nach prüfen“
+- **Endpunkte:** `GET/POST /api/datenschutzanfragen/?patient&art&offen`, `PATCH /api/datenschutzanfragen/{id}/` (solange
+  offen; auch `frist_verlaengert` + `verlaengerung_grund`), `POST /api/datenschutzanfragen/{id}/erledigen/` `{"ergebnis":
+  "erfuellt|eingeschraenkt|abgelehnt|zurueckgezogen", "begruendung"?, "mitgeteilt_am"?}`; kein Löschen.
+  Kopf der Akte: `kopf.datenschutz_anfragen`; Startseite `pruefen.datenschutz_anfragen`
+- **Logik:** `frist_bis` = Eingang + 1 Monat, einmal um 2 Monate verlängerbar (nur mit Grund); `ueberfaellig`, wenn offen
+  und Frist vorbei. Ergebnis „eingeschraenkt“ („Verarbeitung eingeschränkt statt gelöscht“, § 35 Abs. 3 BDSG) schränkt
+  zugleich die Akte ein (F79). Eine Löschung wird nicht hier, sondern mit F80 erfüllt; die offene Anfrage „Löschung“ ist
+  dort die Grundlage, wenn die Frist noch läuft. Anfragen gibt es auch zu eingeschränkten Akten.
+- **Validierung:** erfassen/ändern mit Recht „… erfassen“, erledigen mit Recht „… entscheiden“ (Standard: Mediziner);
+  „abgelehnt“ und „eingeschraenkt“ nur mit Begründung (mindestens 10 Zeichen, Art. 12 Abs. 4 DSGVO); `mitgeteilt_am`
+  nicht vor dem Eingang, nicht in der Zukunft; erledigte Anfragen unveränderlich.
+- **Tabellen:** `patienten_datenschutzanfrage` (+ Historie), `audit_systemereignis`
+- **Fehlerfälle:** 400 je Feld / schon erledigt · 403 ohne Recht · 404 fremde Akte
+- **Teststatus:** Backend-Tests grün (`Anfragen.test_ablauf_mit_frist`,
+  `test_loeschung_wird_eingeschraenkt_statt_geloescht`, `Fristen.test_aufbewahrung_und_frist_der_anfragen`). Browsertest
+  grün: `datenschutz.spec.ts` „Anfrage mit Frist, Kopie der Akte, Löschwunsch → eingeschränkt, Einsicht mit Grund,
+  Aufheben“ (LAUF_DS).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F78 Kopie der Akte als ZIP
+- **Zweck:** Auskunft mit Kopie der Daten (Art. 15 Abs. 3 DSGVO) in einem Schritt.
+- **Ansicht:** Akte › Datenschutz › Aufbewahrung („Kopie der Akte“; darunter die bisher erstellten Kopien)
+- **Endpunkt:** `GET /api/patienten/{id}/kopie/` → `Aktenkopie-<Nr>-<Datum>.zip` mit `Akte-<Nr>.pdf` (alle Angaben und
+  Einträge: Stammdaten, Diagnose, Therapie, Empfehlung, Bezugspersonen, Ärzte, Gewichte, Kontakte, Termine, Pläne,
+  Erklärungen, Anfragen), `Verlauf-<Nr>.pdf`, `Dokumente/` (alle Dateien im Original, auch die Plan-PDFs), `LIESMICH.txt`
+  (Inhalt; fehlende Dateien werden genannt)
+- **Logik:** Jede Kopie steht im Audit-Log (Export „Kopie der Akte“, ZIP, Anzahl Dokumente) und in der Akte unter „Kopien“.
+- **Validierung:** Recht „Datenschutz: Erklärungen und Anfragen erfassen“; Akte lesbar (eingeschränkt: nur mit Einsicht).
+- **Teststatus:** Backend-Test grün (`Aktenkopie.test_kopie_als_zip`). Browsertest grün: `datenschutz.spec.ts` „Anfrage mit
+  Frist, Kopie der Akte, …“ (Download; ZIP enthält Akte, Verlauf und LIESMICH; Eintrag unter „Kopien“) (LAUF_DS).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F79 Verarbeitung einschränken, begründete Einsicht, Aufheben
+- **Zweck:** Art. 18 DSGVO, § 35 Abs. 3 BDSG: Darf (noch) nicht gelöscht werden, bleibt die Akte gespeichert, wird aber
+  nicht mehr verwendet.
+- **Ansicht:** Akte › Datenschutz; eingeschränkte Akte: statt der Akte die Ansicht „Verarbeitung eingeschränkt“ mit
+  „Einsicht nehmen“ (Grund); Datenschutz › Eingeschränkte Akten
+- **Endpunkte:** `POST /api/patienten/{id}/einschraenken/` `{"grund"}` · `POST …/einsicht/` `{"grund"}` → `{bis}` (60
+  Minuten, nur für diese Person) · `POST …/einschraenkung-aufheben/` `{"grund", "unterrichtet_am"}` oder `{"grund",
+  "unterrichtung_entfaellt": "Begründung"}` · `GET /api/patienten/{id}/` bei eingeschränkter Akte ohne Einsicht → 403
+  `{eingeschraenkt: true, id, nummer, eingeschraenkt_am, darf_einsicht, fehler}`
+- **Logik:** Eingeschränkte Akten fehlen in Patientenliste, Suche, Startseite, Zählern und allen Eintragslisten
+  (`epm/api_basis.py::patienten_fuer`), außer für Personen mit laufender Einsicht. Einschränken, jede Einsicht (mit Grund)
+  und das Aufheben stehen im Audit-Log (Gruppe „Datenschutz“) und im Verlauf. Vor dem Aufheben ist die betroffene Person
+  zu unterrichten (Art. 18 Abs. 3 DSGVO): Datum der Unterrichtung oder Begründung, warum sie entfällt. Aufheben beendet
+  laufende Einsichten. Wieder öffnen (F21) erst nach dem Aufheben (409).
+- **Validierung:** Recht „Datenschutz: Anfragen entscheiden, Verarbeitung einschränken“ (Standard: Mediziner; Admin nur
+  Testpatienten – eingeschränkte echte Akten kann ein Admin nicht einsehen); nur abgeschlossene Akten; Gründe mindestens
+  10 Zeichen.
+- **Tabellen:** `patienten_patient` (`eingeschraenkt_am`, `eingeschraenkt_von`, `einschraenkung_grund`) + Historie,
+  `patienten_akteneinsicht`, `audit_systemereignis`
+- **Fehlerfälle:** 400 Grund / Unterrichtung fehlt / nicht abgeschlossen / schon eingeschränkt · 403 ohne Recht · 404
+- **Teststatus:** Backend-Tests grün (`Einschraenkung.test_eingeschraenkte_akte_verschwindet_und_einsicht`,
+  `Anfragen.test_loeschung_wird_eingeschraenkt_statt_geloescht`). Browsertest grün: `datenschutz.spec.ts` „Anfrage mit
+  Frist, Kopie der Akte, Löschwunsch → eingeschränkt, Einsicht mit Grund, Aufheben“ (Akte danach verschlossen – auch für
+  die Person, die eingeschränkt hat –, nicht mehr in der Patientenliste, Einsicht erst mit Grund, Aufheben erst mit Datum
+  der Unterrichtung, alles im Audit-Log); Neustart geprüft in `zz-neustart.spec.ts` (LAUF_DS). Dass Mitarbeiter keine
+  Einsicht nehmen können, prüft der Backend-Test.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F80 Akte endgültig löschen mit Löschprotokoll
+- **Zweck:** Recht auf Löschung (Art. 17 DSGVO) und Löschen nach Ablauf der Aufbewahrung (Art. 5 Abs. 1 e DSGVO).
+- **Ansicht:** Akte › Datenschutz › „Akte endgültig löschen“ (Umfang, Grund, Kennwort, Code aus der Authenticator-App,
+  6-stelliger Bestätigungscode zum Abtippen); Datenschutz › Löschprotokoll
+- **Endpunkte:** `POST /api/patienten/{id}/loeschen-vorbereiten/` → `{code, gueltig_bis, loeschen, umfang}` (5 Minuten, in
+  der Sitzung); `POST /api/patienten/{id}/loeschen/` `{"grund", "kennwort", "code", "bestaetigung"}` → `{geloescht, nummer,
+  protokoll}`
+- **Wann möglich:** nur abgeschlossene Akten, und entweder ist die Aufbewahrungsfrist abgelaufen (Rechtsgrund `frist`)
+  oder es liegt eine offene Anfrage „Löschung“ vor (Rechtsgrund `antrag`; läuft die Frist noch, weist der Dialog darauf
+  hin, dass nur gelöscht werden darf, wenn keine Aufbewahrungspflicht entgegensteht – Art. 17 Abs. 3 DSGVO –, sonst F79).
+  Sonst 409 mit Hinweis.
+- **Logik:** In einer Transaktion, im Wartungsmodus der Trigger: Löschprotokoll schreiben; Akte mit allen Einträgen
+  (Kontakte, Gewichte, Termine, Dokumente, Pläne mit Positionen, Bezugspersonen, Ärzte-Zuordnungen, Erklärungen, Anfragen,
+  Einsichten) **und der gesamten Historie** entfernen; Dokument-Vorgänge der Akte entfernen bzw. bei Dokumenten, die in
+  einer anderen Akte weiterleben, den Verweis und den Freitext; im Audit-Log bleiben die Einträge zur Akte als Nachweis
+  (wer, wann, welche Art), verlieren aber Namen, Titel und Freitexte → „Akte Nr. N (gelöscht)“
+  (`audit/bereinigung.py::akte_entfernen`). Nach dem Commit: Dokumentenordner der Akte löschen, Eintrag in die Löschliste.
+  Die Patientennummer wird nicht neu vergeben. Jede Ablehnung (Code, Kennwort, 2FA) steht im Audit-Log; dreimal falscher
+  Bestätigungscode macht ihn ungültig.
+- **Löschprotokoll** (`patienten_loeschprotokoll`, nur anfügen): Nummer, interne Kennung, Test ja/nein, angelegt am,
+  abgeschlossen am, Anlass, Aufbewahrung bis, Rechtsgrund, Grund, Umfang (Anzahlen), Zeitpunkt, Person – kein Name. Der
+  Grund ist Freitext; die Oberfläche bittet, keine Namen hineinzuschreiben.
+- **Sicherungen und Wiederherstellung:** wie F73 – ältere Sicherungen enthalten die Akte bis zu ihrem Ablauf (30 Tage);
+  die Löschung steht in der Löschliste (`data/loeschliste/loeschliste.jsonl`, Zeilen mit `akte`), `manage.py
+  epm_loeschungen_nachholen` (bei jedem Start) löscht eine zurückgekommene Akte erneut, wenn interne Kennung, Nummer und
+  Anlagezeitpunkt übereinstimmen, und gleicht Löschliste und Löschprotokoll gegenseitig ab. Testakten werden nie
+  nachgelöscht (ihre Nummern vergibt das Zurücksetzen neu).
+- **Validierung:** Rolle Mediziner und Recht „Akten endgültig löschen“ (keiner anderen Rolle zuweisbar); Grund mindestens
+  10 Zeichen.
+- **Tabellen:** alle Tabellen der Akte und ihre Historien, `patienten_loeschprotokoll`, `audit_systemereignis`
+- **Fehlerfälle:** 400 je Feld · 403 nicht Mediziner/ohne Recht · 404 · 409 nicht löschbar
+- **Teststatus:** Backend-Tests grün (`AkteLoeschen.test_endgueltig_loeschen_auf_antrag` – auch: kein Name mehr in
+  Datenbank, Historie und Audit-Log, Dateien weg, umgehängtes Dokument lebt in der anderen Akte weiter, Nummer nicht neu
+  vergeben; `test_loeschen_nach_ablauf_der_frist`; `test_loeschungen_nach_wiederherstellung_nachholen`). Browsertest grün:
+  `datenschutz.spec.ts` „Akte endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code und Bestätigungscode“;
+  Neustart geprüft in `zz-neustart.spec.ts` (Akte bleibt weg, Löschprotokoll ohne Namen) (LAUF_DS).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F81 Übersicht „Datenschutz“
+- **Ansicht:** Datenschutz (Seitenleiste, neu; sichtbar mit einem der beiden Datenschutz-Rechte)
+- **Endpunkt:** `GET /api/datenschutz/` → `{anfragen_offen: [Anfrage] (nach Frist), anfragen_ueberfaellig,
+  aufbewahrung_abgelaufen: [{id, nummer, name, abgeschlossen_am, aufbewahrung_bis, verlaengert, eingeschraenkt}],
+  aufbewahrung_laeuft_ab (nächste 12 Monate), eingeschraenkt: [{id, nummer, name, am, von, grund}], erklaerungen_fehlen,
+  abschluss_pruefen, loeschprotokoll: [… letzte 100], einstellungen, darf_entscheiden}`
+- **Validierung:** Recht „… erfassen“ oder „… entscheiden“; Testbenutzer sehen nur Testpatienten und Test-Löschungen.
+- **Teststatus:** Backend-Tests grün (`Einschraenkung.*`, `AkteLoeschen.*`, `Anfragen.*` prüfen die Übersicht mit).
+  Browsertests grün: `datenschutz.spec.ts` (eingeschränkte Akten, Löschprotokoll ohne Namen, eingestellte Fristen);
+  Neustart geprüft in `zz-neustart.spec.ts` (LAUF_DS).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F82 Plan nach Freigabe abschließen (Freigabe auf Anordnung)
+- **Zweck:** Festlegung 02.10.2026: Prof. Masin gibt Pläne per E-Mail frei, Mitarbeiter dokumentieren und schließen den
+  Plan ab. Bisher musste das mit seinem Konto geschehen; der Vermerk „geprüft und freigegeben von …“ muss aber stimmen.
+- **Ansicht:** 8 Infusionspläne › Entwurf › „Nach Freigabe abschließen“ (für alle mit dem Recht, die nicht selbst
+  freigeben dürfen): Mediziner, Datum, Weg, Nachweis
+- **Endpunkte:** `GET /api/infusionsplaene/freigebende/?patient=` → `[{id, name}]`;
+  `POST /api/infusionsplaene/{id}/abschliessen/` (multipart) `freigegeben_von`, `freigegeben_am`, `weg`
+  (email | telefon | persoenlich | schriftlich), `nachweis`? (Datei) → Plan mit `status: "aktuell"`, `freigabe_weg`,
+  `freigabe_datum`, `abgeschlossen_von_name`, `freigabe_nachweis`, `freigabevermerk`
+- **Logik:** wie F35 (PDF mit Prüfsumme, Vorgänger abgelöst, unveränderlich), zusätzlich: Nachweis wird als Dokument vom
+  Typ „Freigabe“ in der Akte abgelegt und kann weder umgehängt noch gelöscht werden. Freigabevermerk der PDF (Datenfeld
+  `{{Plan.Freigabevermerk}}`): „Maschinell erstellt. Geprüft und freigegeben von <Mediziner> am <Datum> (<Weg>); im System
+  abgeschlossen von <Person> am <Datum>.“ – bei Freigabe im System unverändert wie F35. Entwürfe zeigen keinen Vermerk.
+  Die Migration stellt eine aktive Vorlage mit dem bisherigen festen Satz als neue Version auf das Datenfeld um.
+  Audit-Log („Infusionsplan nach Freigabe durch <Mediziner> am <Datum> (<Weg>) abgeschlossen“), Verlauf der Akte („nach
+  Freigabe abgeschlossen“ mit „freigegeben von … am … (Weg)“) und Startseite nennen den Vorgang so – nicht als Freigabe
+  durch die abschließende Person.
+- **Validierung:** Recht „Infusionspläne nach Freigabe abschließen“ (Standard: Mitarbeiter, Mediziner; Admin nur
+  Testpatienten); `freigegeben_von` = aktiver Mediziner mit Recht „Infusionspläne freigeben“; Datum nicht in der Zukunft
+  und nicht vor dem Anlegen des Plans; Nachweis Pflicht bei E-Mail und schriftlich (U24); sonst wie F35.
+- **Tabellen:** `infusionen_infusionsplan` (`freigabe_weg`, `freigabe_datum`, `abgeschlossen_von`, `freigabe_nachweis`)
+  + Historie, `patienten_dokument`
+- **Fehlerfälle:** 400 je Feld · 403 ohne Recht · 409 Akte abgeschlossen
+- **Teststatus:** Backend-Tests grün (`FreigabeAufAnordnung.test_abschliessen_nach_freigabe`,
+  `vorlagen.Vorlagen.test_inhalt_des_plan_pdfs`, `test_migration_stellt_bisherigen_freigabevermerk_um`). Browsertest grün:
+  `datenschutz.spec.ts` „Plan nach Freigabe per E-Mail abschließen: Mitarbeiter hält Mediziner, Datum, Weg und Nachweis
+  fest“; Neustart geprüft in `zz-neustart.spec.ts` (LAUF_DS).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F83 Aufbewahrung des Audit-Logs, tägliche Bereinigung
+- **Zweck:** Auch das Protokoll enthält personenbezogene Daten (Benutzer, IP-Adresse, Aktenbezug). Die Dauer ist
+  einstellbar; der Standard ändert nichts (0 = unbegrenzt, U18).
+- **Ansicht:** Vorlagen › Grenzwerte › Datenschutz („Audit-Log aufbewahren“); Audit-Log (Hinweistext)
+- **Logik:** `audit/bereinigung.py::taeglich` – einmal am Tag (angestoßen beim Öffnen der Startseite): Einträge älter
+  als `protokoll_aufbewahrung_jahre` werden entfernt (Wartungsmodus), die Bereinigung steht selbst im Audit-Log
+  („Protokoll bereinigt“, Anzahl); außerdem werden abgelaufene Sitzungen entfernt.
+- **Teststatus:** Backend-Test grün (`AuditBereinigung.test_aufbewahrung_des_audit_logs`). Browsertest grün für die
+  Einstellung (`datenschutz.spec.ts` „Grenzwerte: Fristen des Datenschutzes einstellen“). Das Entfernen alter Einträge
+  ist nur im Backend-Test geprüft (über die Oberfläche lassen sich keine alten Einträge erzeugen), daher nicht
+  ABGESCHLOSSEN UND GETESTET.
+- **Status:** TEILWEISE ABGESCHLOSSEN
+
+## N · Kalender, Infusionspläne, Systemverwaltung (Runde 4, Wunsch 02.10.2026)
 
 Wünsche: „Sysadmin-Seite unter Administration für typische Tätigkeiten an der VM und am EPM, mit Übersicht über die
 aktuelle Auslastung, natürlich nur für Admin; Rollen und Rechte anpassen und erweitern“, „durch Termine und Fälligkeiten
@@ -1173,7 +1441,7 @@ der Datenbank wirkt nicht. Testzugänge erhalten es nie. Der Admin kann es sich 
 Kalender und Infusionspläne brauchen kein neues Recht: Lesen mit „Akten lesen“, Termine mit „Kontakte, Gewichte,
 Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie in der Akte.
 
-### F80 Globaler Kalender
+### F84 Globaler Kalender
 - **Ansicht:** Menüpunkt „Kalender“ (Seitenleiste, für alle mit „Akten lesen“): Monat (6 Wochen, Klick auf einen Tag zeigt
   ihn rechts), Woche, Liste; „Überfällig“ (offene Termine, Kontakt fällig, Plan prüfen); Filter nach Art; „Erledigte zeigen“.
   Eintrag anklicken → Einzelheiten, „Akte öffnen“/„Pläne öffnen“, „Ändern“, „Erledigt“, bei Fälligkeiten „Termin anlegen“.
@@ -1185,7 +1453,7 @@ Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie
 - **Logik:** Fälligkeiten nur für Akten in Betreuung: Kontakt fällig = letzter Kontakt (sonst Anlage der Akte) +
   Grenzwert „Kontakt überfällig“; Plan prüfen = gültig ab des aktuellen Plans + Grenzwert „Infusionsplan gilt als alt
   nach“ (je 30 Tage pro Monat wie in der Patientenliste). Feiertage bundesweit plus NRW (Fronleichnam, Allerheiligen),
-  siehe U16. Überfällige Termine nur offener Akten. Testzugang: nur Testpatienten.
+  siehe U25. Überfällige Termine nur offener Akten. Testzugang: nur Testpatienten.
 - **Validierung:** von/bis Pflicht, bis ≥ von, höchstens 400 Tage → sonst 400.
 - **Tabellen:** `patienten_termin`, `patienten_kontakt`, `infusionen_infusionsplan`, `stammdaten_einstellungen`
 - **Teststatus:** Backend-Tests `patienten/test_kalender.py` (`Feiertage.test_ostern_und_nrw`, `Kalender.*`). Browsertests
@@ -1193,7 +1461,7 @@ Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie
   anlegen, öffnen, abhaken, Erledigte ausblenden; Betrachter ohne Anlegen); Neustart in `zz-neustart.spec.ts`.
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
-### F81 Übersicht aller Infusionspläne
+### F85 Übersicht aller Infusionspläne
 - **Ansicht:** Menüpunkt „Infusionspläne“: Gruppen „Zur Freigabe“ (Entwürfe), „Aktuell“, „Älter als n Mon.“ (Grenzwert),
   „Abgelöst“, „Alle“ mit Anzahl; Suche nach Name/Nummer; „auch abgeschlossene Akten“; Spalten Patient, Status, gültig ab,
   Energie, Laufzeit/Rate, Tage/Woche, erstellt, freigegeben; „PDF“ (gespeicherte PDF mit Prüfsumme wie F37), „Öffnen“ (Akte ›
@@ -1208,7 +1476,7 @@ Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie
   mit Prüfsumme, Öffnen in der Akte; vorhandener Entwurf statt Doppelanlage; Betrachter ohne „Neuer Plan“).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
-### F82 Systemverwaltung: Übersicht
+### F86 Systemverwaltung: Übersicht
 - **Ansicht:** Administration › System (nur mit Recht „Systemverwaltung“): Kennzahlen CPU, Arbeitsspeicher, Platte,
   Laufzeit, Ubuntu-Updates (davon Sicherheit), letzte Sicherung – mit Balken und Text „hoch“/„kritisch“ ab 75/90 %;
   Auslastung der letzten 24 Stunden (CPU und RAM, Fadenkreuz mit Werten); Server (Betriebssystem, Kernel, Swap, Platten,
@@ -1227,7 +1495,7 @@ Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie
   (Menü, Seite, Matrix) und „Auslastung und Status vom Systemagenten“ (CI startet den Agenten im Probelauf).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
-### F83 Tätigkeiten für den Server (Systemagent)
+### F87 Tätigkeiten für den Server (Systemagent)
 - **Ansicht:** System › Tätigkeiten › Server: Status neu einlesen, Nach Updates suchen, **Ubuntu-Updates installieren**,
   **Server neu starten**, **EPM neu starten** (alle drei mit Passwort + Code aus der Authenticator-App oder Notfall-Code; Beginn
   sofort oder in 5–60 Minuten; Hinweistext an die Benutzer), Sicherung erstellen (zusätzlich Recht „Sicherungen verwalten“),
@@ -1241,7 +1509,7 @@ Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie
   Befehl benutzt, Dateien ohne Folgen symbolischer Links gelesen), schreibt Zwischenstand und Ergebnis nach
   `status/auftraege/<kennung>.json`. Update und Neustart: vorher `epm-backup` – schlägt die Sicherung fehl, wird nichts
   verändert. Updates: `apt-get update` und `apt-get -y upgrade --with-new-pkgs` (nicht interaktiv, Konfiguration bleibt).
-  Mit „warnen“ setzt das Backend einen Hinweis an alle Benutzer mit Uhrzeit des Beginns (F85); er endet mit dem Auftrag
+  Mit „warnen“ setzt das Backend einen Hinweis an alle Benutzer mit Uhrzeit des Beginns (F89); er endet mit dem Auftrag
   (beim Neustart nach Ablauf). Derselbe Auftrag nicht doppelt (409). Abschluss steht im Audit-Log (Gruppe „System“).
   Fehlversuche bei Passwort/Code stehen im Audit-Log, sperren das Konto aber nicht.
 - **Validierung / Fehlerfälle:** unbekannte Aktion 400; Passwort falsch 400 `{kennwort}`; Code falsch 400 `{code}`; Minuten
@@ -1257,7 +1525,7 @@ Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie
   Beginn in 15 Minuten, Warnung beim Mitarbeiter); Neustart in `zz-neustart.spec.ts`. In CI läuft der Agent mit `--trocken`.
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
-### F84 Wartung des EPM
+### F88 Wartung des EPM
 - **Ansicht:** System › Tätigkeiten › EPM: Abgelaufene Sitzungen bereinigen, Datenbank optimieren (VACUUM ANALYZE),
   Dokumente prüfen (vorhanden, Größe; wahlweise Prüfsummen; Dateien ohne Eintrag werden nur gemeldet), Unveränderlichkeit
   prüfen (fehlende Schutz-Trigger werden wieder gesetzt), Konfiguration prüfen (Django-Sicherheitsprüfung; HSTS und
@@ -1268,7 +1536,7 @@ Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie
   Trigger wird wieder gesetzt, andere Sitzung beendet). Browsertest `system.spec.ts` „Unveränderlichkeit prüfen“.
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
-### F85 Hinweis an alle Benutzer, Anmeldungen beenden
+### F89 Hinweis an alle Benutzer, Anmeldungen beenden
 - **Ansicht:** Banner oben auf jeder Seite für alle Angemeldeten (Information/Warnung, „Ausblenden“ für die Sitzung), alle
   60 Sekunden abgefragt. System › Hinweis an alle Benutzer: setzen (Dauer 1 h … 1 Woche oder bis zum Beenden), beenden.
   System › Angemeldet: alle gültigen Anmeldungen mit Browser, Adresse, zuletzt aktiv; „Abmelden“ (nicht die eigene).
@@ -1304,7 +1572,7 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 | Nr. | Was fehlt | Warum | Betroffene Dateien | Abhängigkeiten | Nächster Schritt |
 |---|---|---|---|---|---|
 | O-07 | Backup-Status auf der Startseite (F13) | hängt an der Backup-Steuerung | `patienten/api.py` | O-23 | Status-Datei lesen |
-| O-23 | Backup 02:00 verschlüsselt, Steuerung aus der Oberfläche, Übertragung mit rclone in den WebDAV-Ordner (F61–F64; U9) | nicht umgesetzt | `rollout/epm-backup.sh`, `rollout/04-projekt.sh`, neu: `audit/backup.py`, systemd-Dienste | WebDAV-Adresse und Zugang trägt die Administration selbst in der Oberfläche ein (Wunsch 01.10.2026; verschlüsselt gespeichert), Test gegen einen WebDAV-Testserver in CI | `age`-Schlüssel, Auftragsverzeichnis, Status-Datei, Endpunkte, rclone-Dienst |
+| O-23 | Backup 02:00, Schlüssel für die Verschlüsselung hinterlegen (Skript ist vorbereitet, U20), Steuerung aus der Oberfläche, Übertragung mit rclone in den WebDAV-Ordner (F61–F64; U9) | nicht umgesetzt | `rollout/epm-backup.sh`, `rollout/04-projekt.sh`, neu: `audit/backup.py`, systemd-Dienste | WebDAV-Adresse und Zugang trägt die Administration selbst in der Oberfläche ein (Wunsch 01.10.2026; verschlüsselt gespeichert), Test gegen einen WebDAV-Testserver in CI | `age`-Schlüssel, Auftragsverzeichnis, Status-Datei, Endpunkte, rclone-Dienst |
 | O-24 | Serverskripte angleichen | Festlegungen aus „EPM-Server Aufbau“ fehlen | `rollout/01-basis.sh`, `rollout/02-docker.sh` | – | Adressbereiche, `epm.service`, needrestart, Swap |
 | O-25 | Import Altdaten (F65) | Rollout-Schritt 7 | neu: `patienten/management/commands/epm_import_alt.py` | frischer Dump | Import mit Protokoll, setzt `typ_geprueft`/`datum_quelle` |
 
@@ -1326,14 +1594,23 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 | U12 | ~~Darf der Admin auch Patientendaten schreiben?~~ **Geklärt 01.10.2026:** Admins dürfen alles, Patientendaten schreiben sie nur bei Testpatienten; echte Akten nur lesen, Wiederöffnen, Benutzer und Sicherungen bleiben | F66 | – |
 | U13 | ~~Energie im Infusionsplan: Lipide 9 oder 9,15 kcal/g, Albumin mit oder ohne Energie?~~ **Geklärt 01.10.2026:** wie in `EPM_infuplan.php`: Lipide 9,15 kcal/g, Humanalbumin in ml ohne Energie | F33, F39 | – |
 | U14 | ~~Stabilitätsprüfung Calcium + Magnesium und Vorbelegung des ersten Plans je kg übernehmen?~~ **Geklärt 01.10.2026:** ja, beides wie im Altsystem (Stabilität als Hinweis, Speichern bleibt möglich); Präparate werden beim ersten Plan **nicht** vorausgewählt | F32, F33 | – |
-| U15 | ~~Muss beim endgültigen Löschen auch der Titel aus Historie und Audit-Log verschwinden?~~ **Geklärt 02.10.2026: nach geltender DSGVO.** Titel, Dateiname, Notiz und Datum werden überall entfernt (Art. 17 Abs. 1 d, Art. 5 Abs. 1 c/e); es bleibt der Nachweis ohne Inhalt (Art. 5 Abs. 2, Art. 33 Abs. 5; § 630f BGB); Sicherungen laufen nach 14 Tagen ab, nach einer Wiederherstellung wird erneut gelöscht | F73 | – |
-| U16 | ~~Feiertage im Kalender: welches Bundesland?~~ **Geklärt 02.10.2026:** NRW (Sitz der Stiftung in Altenberge) | F80 | – |
+| U15 | ~~Muss beim endgültigen Löschen auch der Titel aus Historie und Audit-Log verschwinden?~~ **Geklärt 02.10.2026: nach geltender DSGVO.** Titel, Dateiname, Notiz und Datum werden überall entfernt (Art. 17 Abs. 1 d, Art. 5 Abs. 1 c/e); es bleibt der Nachweis ohne Inhalt (Art. 5 Abs. 2, Art. 33 Abs. 5; § 630f BGB); Sicherungen laufen nach 30 Tagen ab (Festlegung 02.10.2026, vorher 14), nach einer Wiederherstellung wird erneut gelöscht | F73 | – |
+| U16 | Rechtsgrundlage der Verarbeitung (Einwilligung nach Art. 9 Abs. 2 a oder Art. 9 Abs. 2 h DSGVO) und Herkunft der 10 Jahre Aufbewahrung – § 630f BGB verpflichtet Behandelnde; die Stiftung „vermittelt“, die Praxis führt eigene Akten. Anfrage an die Stiftung ist formuliert, Antwort offen | F74, F80 | 10 Jahre als einstellbarer Standard; vor Ablauf Löschung nur auf Antrag und nach Entscheidung des Mediziners |
+| U17 | Texte der drei Vordrucke (Zwecke, Empfänger, Rechtsgrundlage, Speicherdauer, Datenschutzbeauftragte/r, Aufsichtsbehörde) | F76 | Entwürfe mit Lücken, Wasserzeichen „ENTWURF“ bis zur Veröffentlichung durch die Stiftung |
+| U18 | Wie lange wird das Audit-Log aufbewahrt? | F83 | 0 = unbegrenzt (wie bisher), einstellbar |
+| U19 | „Abschluss prüfen“ nach wie vielen Monaten ohne Kontakt? Welche Erklärungen sollen vorliegen? | F74, F75 | 24 Monate; alle drei – einstellbar |
+| U20 | Verschlüsselung der Sicherungen: Wer erzeugt und verwahrt den privaten Schlüssel (nicht auf dem Server)? | F61 | Skript verschlüsselt, sobald der öffentliche Schlüssel hinterlegt ist; bis dahin unverschlüsselt |
+| U21 | Aufbewahrung der Sicherungen auf NAS und Nextcloud (30 Tage gelten bisher nur auf dem Server); Geheimhaltungsverpflichtung der Dienstleister (§ 203 StGB) | F61, F64 | organisatorisch, siehe `docs/DATENSCHUTZ.md` |
+| U22 | Sollen Mitarbeiter Pläne auch anlegen dürfen (bisher nur Mediziner, Festlegung 01.10.2026)? Abschließen nach Freigabe dürfen sie jetzt | F32, F82 | unverändert; unter Benutzer › Rechte umstellbar |
+| U23 | Einschränkung nur bei abgeschlossenen Akten – reicht das? | F79 | ja (in laufender Betreuung wird die Akte gebraucht; erst abschließen) |
+| U24 | Nachweis bei Freigabe per Telefon oder persönlich | F82 | ohne Nachweis möglich (Pflicht nur bei E-Mail und schriftlich) |
+| U25 | ~~Feiertage im Kalender: welches Bundesland?~~ **Geklärt 02.10.2026:** NRW (Sitz der Stiftung in Altenberge) | F84 | – |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
-| 02.10.2026 | Runde 4 (Systemseite, Kalender, Infusionspläne) | Neues Recht „Systemverwaltung“ (nur Admin); Administration › System mit Systemagent auf dem Server (F82–F85, Festlegungen S12–S14); globaler Kalender mit Fälligkeiten und Feiertagen (F80); Übersicht aller Infusionspläne (F81); Audit-Gruppe „System“; Feiertage NRW (U16). Nummern ab F80, damit parallele Arbeiten (F72 ff.) nicht kollidieren |
+| 02.10.2026 | Runde 4 (Systemseite, Kalender, Infusionspläne) | Neues Recht „Systemverwaltung“ (nur Admin); Administration › System mit Systemagent auf dem Server (F86–F89, Festlegungen S12–S14); globaler Kalender mit Fälligkeiten und Feiertagen (F84); Übersicht aller Infusionspläne (F85); Audit-Gruppe „System“; Feiertage NRW (U25). Nummern ab F84, damit parallele Arbeiten (F72 ff.) nicht kollidieren |
 | 02.10.2026 | Runde 4 (Updates VPS) | Festlegung: VPS ohne Verbindung zu GitHub und ohne Build (`EPM_UPDATE_QUELLE="paket"`); `sudo epm-update --paket-erstellen` auf der Test-VM packt die dort laufende, getestete Version (Images, Rollout-Dateien, Systemagent, `epm-update`, SHA-256), `sudo epm-update --paket DATEI` spielt sie auf dem VPS ein (Prüfsummen, Backup, Umstellen, Tests) |
 | 01.10.2026 | Runde 1 (`c387b7b`–`0e25377`) | Backend für F01–F22, F25–F36, F40–F48, F52–F54, F56–F58, F60 mit Backend-Tests; Nachweis angelegt |
 | 01.10.2026 | Runde 2 (`9eae348`) | Rechte je Gruppe (F66) nach Festlegung: Mediziner wie Admin außer Benutzerverwaltung, Wiederöffnen, Sicherungen, Testdaten; U10 erledigt, U11 bestätigt, U12 neu; Briefkopf und Logo (F49) |
@@ -1348,6 +1625,7 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 | 01.10.2026 | Runde 2 (`f865cde`–`a985fa5`) | Klärung U13/U14 umgesetzt: Energie mit Lipiden 9,15 kcal/g, Humanalbumin in ml ohne Energie (Feld `albumin_ml`), Hinweis zur Ca/Mg-Stabilität, erster Plan je kg Körpergewicht vorbelegt (`GET /api/infusionsplaene/vorbelegung/?patient=`) |
 | 01.10.2026 | Runde 3 (`c3aacfa`–`1718dc3`) | Rückmeldungen aus dem Testsystem: Blau auf Blau behoben, Testpatienten-Zahl nur für Admin, PDF-Anzeige mit pdf.js, Ärzteliste (F67/F68), Bezugspersonen (F69), „kein“ Katheter/Versorger und Nickelallergie als Auswahl (F70); Backend-Image mit IBM Plex aus dem Repo (Debian 13 hat kein `fonts-ibm-plex`) |
 | 02.10.2026 | Runde 3 (`6c6a97a`–`e74f4ff`) | U15 nach DSGVO geklärt und umgesetzt (F73): Titel, Dateiname, Notiz und Datum endgültig gelöschter Dokumente auch aus Historie und Audit-Log entfernt (kontrollierte Trigger-Ausnahme), Nachweis ohne Inhalt, Löschliste mit Nachholen nach einer Wiederherstellung, Bestand per Migration; Audit-Log mit Filter „Dokument“. Fehler behoben: bei „Neuer Arzt“/„Neuer Versorger“ ging eine schon begonnene Eingabe verloren, wenn die Liste erst danach fertig geladen war. Browsertest Rechte stabilisiert (`b306c79`). Lauf 36943685896: 100/100 Backend-Tests, 49/49 Browsertests |
+| 02.10.2026 | Runde 4 (`COMMITS_DS`) | Datenschutz nach DSGVO (`docs/DATENSCHUTZ.md`): Aufbewahrungsfrist je Akte mit Verlängerung und „Abschluss prüfen“ (F74); Erklärungen nachhalten mit Vordrucken aus Dokumentvorlagen (F75, F76); Anfragen mit Frist (F77); Kopie der Akte (F78); Verarbeitung einschränken mit begründeter Einsicht (F79); Akte endgültig löschen mit Löschprotokoll, Löschliste und Nachholen nach einer Wiederherstellung (F80); Übersicht „Datenschutz“ (F81); Plan nach Freigabe per E-Mail abschließen, Freigabevermerk nennt beide Personen (F82); Aufbewahrung des Audit-Logs einstellbar (F83). Vier neue Rechte. Testdaten-Zurücksetzen nutzt dieselbe Löschlogik (behebt einen Abbruch bei umgehängten Dokumenten). Wartungsmodus der Trigger gilt nur noch für den Vorgang statt bis zum Ende der Transaktion. Sicherungen 30 statt 14 Tage, Verschlüsselung mit `age` vorbereitet (F61). Unklarheiten U16–U24 |
 | 02.10.2026 | Runde 3 (`df02dda`–`e709bee`) | Rückmeldungen zur PDF-Funktion: Dokumentvorlagen als Bereich der Vorlagen, Felder verschiebbar, Schriftgröße und Titel-Ausrichtung wirksam, Planansicht in der Akte = echte PDF (F31), Aktenkopf mit festem Raster und anklickbarem „Auskunft an“ (F17). Neu: Dokument dem richtigen Patienten zuordnen (F72) und endgültig löschen nur durch Mediziner mit Kennwort, 2FA und Bestätigungscode (F73). Fehler behoben: Datenmigration „Kontakt überfällig“ brach auf bestehender Datenbank ab (Grund > 100 Zeichen); Grund beim Wiederöffnen begrenzt |
 | 01.10.2026 | Runde 3 (`0624527`–`ca9f858`) | PDF-Erzeugung mit WeasyPrint (F51), Dokumentvorlagen mit Editor (F50), Freigabe-PDF mit SHA-256 und Prüfung beim Öffnen (F35, F37; Nginx reicht `X-EPM-Pruefung` weiter), Akte, Verlauf, Audit-Log und Zugangsblatt als PDF (F23, F24, F59, F55). Infusionsplan-PDF nach dem Altsystem, auf Wunsch neu gestaltet wie ein Laborbefund und wie die Oberfläche (Kopfkarte, Karten, Menge/Einheit in eigenen Spalten, Titel neben dem Logo, ohne Linie, fax-tauglich, einseitig); Laufzeit 0 als „—“; neue Bausteine und Optionen im Editor; Datenfeld-Einfügen nimmt den aktuellen Feldinhalt (Fehler behoben) |
 | 01.10.2026 | Runde 3 (`a30b26d`) | „Kein Kontakt seit …“ nach 4 statt 12 Monaten (Patienten kommen meist quartalsweise): Standard in den Einstellungen, Datenmigration stellt einen unveränderten Wert 12 um (mit Grund in der Historie); wirkt auf Hinweis in der Patientenliste und „Nach und nach prüfen“ auf der Startseite; Backend-Test `test_kontakt_ueberfaellig_nach_4_monaten` |

@@ -136,7 +136,7 @@ export function Verlauf() {
                     <td className="td num align-top">{datum(e.zeitpunkt)}<br /><span className="text-[0.8125rem] gedaempft">{uhrzeit(e.zeitpunkt)}</span></td>
                     <td className="td align-top">{e.person ?? <span className="gedaempft">System</span>}</td>
                     <td className="td align-top">{BEREICH_EINZELN[e.bereich] ?? e.bereich}</td>
-                    <td className="td align-top"><Chip art={e.aktion === "storniert" || e.aktion === "gelöscht" || e.aktion === "endgültig gelöscht" ? "fehler" : e.aktion === "freigegeben" ? "ok" : undefined}>{e.aktion}</Chip></td>
+                    <td className="td align-top"><Chip art={e.aktion === "storniert" || e.aktion === "gelöscht" || e.aktion === "endgültig gelöscht" ? "fehler" : e.aktion === "freigegeben" || e.aktion === "nach Freigabe abgeschlossen" ? "ok" : undefined}>{e.aktion}</Chip></td>
                     <td className="td align-top text-sm">
                       <div className="flex flex-col gap-1">
                         {e.beschreibung ? <span>{e.beschreibung}</span> : null}
