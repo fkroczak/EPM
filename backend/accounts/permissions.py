@@ -80,3 +80,19 @@ TestdatenRecht = nur_recht("testdaten_zuruecksetzen")
 UmhaengenRecht = recht("dokumente_umhaengen")
 LoeschenRecht = recht("dokumente_loeschen")
 SystemRecht = nur_recht("system_verwalten")          # Administration › System (nur Admin)
+PlanAbschlussRecht = recht("plaene_abschliessen")
+DatenschutzRecht = recht("datenschutz_bearbeiten")
+DatenschutzEntscheidenRecht = recht("datenschutz_entscheiden")
+AkteLoeschenRecht = recht("akten_loeschen")
+
+
+class DatenschutzLesen(Angemeldet):
+    """Übersicht „Datenschutz“: wer Anfragen erfasst oder entscheidet."""
+
+    message = "Dafür fehlt das Recht „Datenschutz“."
+
+    def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            self.message = Angemeldet.message
+            return False
+        return request.user.hat_recht("datenschutz_bearbeiten") or request.user.hat_recht("datenschutz_entscheiden")

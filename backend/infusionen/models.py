@@ -147,6 +147,27 @@ class Infusionsplan(AktenEintrag):
     freigegeben_von = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
     )
+
+    # Freigabe auf Anordnung (Festlegung 02.10.2026): Der Mediziner gibt z. B. per E-Mail frei, ein Mitarbeiter
+    # schließt den Plan danach im System ab. ``freigegeben_von`` ist immer der Mediziner, ``abgeschlossen_von`` die
+    # Person, die den Plan im System abgeschlossen hat (leer = der Mediziner selbst).
+    class Freigabeweg(models.TextChoices):
+        SYSTEM = "system", "im System"
+        EMAIL = "email", "per E-Mail"
+        TELEFON = "telefon", "telefonisch"
+        PERSOENLICH = "persoenlich", "persönlich"
+        SCHRIFTLICH = "schriftlich", "schriftlich"
+
+    freigabe_weg = models.CharField("Weg der Freigabe", max_length=20, choices=Freigabeweg.choices, blank=True)
+    freigabe_datum = models.DateField("Datum der Freigabe durch den Mediziner", null=True, blank=True)
+    abgeschlossen_von = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+",
+        verbose_name="Im System abgeschlossen von",
+    )
+    freigabe_nachweis = models.ForeignKey(
+        "patienten.Dokument", on_delete=models.PROTECT, null=True, blank=True, related_name="+",
+        verbose_name="Nachweis der Freigabe (z. B. die E-Mail)",
+    )
     # Bei Freigabe erzeugte PDF (kommt mit den Dokumentvorlagen); wird nie neu erzeugt
     pdf_datei = models.CharField(max_length=255, blank=True)
     pdf_sha256 = models.CharField(max_length=64, blank=True)
@@ -342,12 +363,49 @@ class Infusionsplan(AktenEintrag):
             "anzahl_geaendert": sum(z["geaendert"] for z in zeilen),
         }
 
+    # Wege, bei denen es ein Schriftstück gibt: Der Nachweis (z. B. die E-Mail) gehört an den Plan
+    NACHWEIS_PFLICHT = {Freigabeweg.EMAIL, Freigabeweg.SCHRIFTLICH}
+
     @transaction.atomic
     def freigeben(self, benutzer):
-        if self.status != self.Status.ENTWURF:
-            raise ValidationError("Nur Entwürfe können freigegeben werden.")
+        """Freigabe durch den Mediziner selbst, direkt im System."""
         if not getattr(benutzer, "darf_plaene_freigeben", False):
             raise PermissionError("Infusionspläne freigeben darf nur, wer das Recht dazu hat.")
+        self._freigabe(mediziner=benutzer, abschliessend=None, weg=self.Freigabeweg.SYSTEM,
+                       datum=timezone.localdate(), nachweis=None)
+
+    @transaction.atomic
+    def abschliessen_auf_anordnung(self, benutzer, mediziner, datum, weg, nachweis=None):
+        """Der Mediziner hat außerhalb des Systems freigegeben (z. B. per E-Mail); ``benutzer`` schließt den Plan ab.
+        Festgehalten werden: wer freigegeben hat, wann, auf welchem Weg, der Nachweis und wer abgeschlossen hat."""
+        from accounts.models import Rolle
+
+        if not benutzer.hat_recht("plaene_abschliessen"):
+            raise PermissionError("Dafür fehlt das Recht „Infusionspläne nach Freigabe abschließen“.")
+        fehler = {}
+        if (mediziner is None or mediziner.rolle != Rolle.MEDIZINER or not mediziner.is_active
+                or not mediziner.hat_recht("plaene_freigeben")
+                or (mediziner.ist_test and not self.patient.ist_test)):
+            fehler["freigegeben_von"] = "Bitte den Mediziner wählen, der den Plan freigegeben hat."
+        if weg not in self.Freigabeweg.values or weg == self.Freigabeweg.SYSTEM:
+            fehler["weg"] = "Bitte angeben, auf welchem Weg freigegeben wurde."
+        if datum is None:
+            fehler["freigegeben_am"] = "Bitte das Datum der Freigabe angeben."
+        elif datum > timezone.localdate():
+            fehler["freigegeben_am"] = "Das Datum liegt in der Zukunft."
+        elif self.erstellt_am and datum < timezone.localtime(self.erstellt_am).date():
+            fehler["freigegeben_am"] = "Die Freigabe liegt vor dem Anlegen des Plans."
+        if weg in self.NACHWEIS_PFLICHT and nachweis is None:
+            fehler["nachweis"] = "Bitte den Nachweis der Freigabe anhängen (z. B. die E-Mail als PDF)."
+        if nachweis is not None and nachweis.patient_id != self.patient_id:
+            fehler["nachweis"] = "Der Nachweis gehört zu einer anderen Akte."
+        if fehler:
+            raise ValidationError(fehler)
+        self._freigabe(mediziner=mediziner, abschliessend=benutzer, weg=weg, datum=datum, nachweis=nachweis)
+
+    def _freigabe(self, mediziner, abschliessend, weg, datum, nachweis):
+        if self.status != self.Status.ENTWURF:
+            raise ValidationError("Nur Entwürfe können freigegeben werden.")
         self.patient.pruefe_bearbeitbar()
         self.full_clean()
         alt = Infusionsplan.objects.select_for_update().filter(
@@ -358,15 +416,43 @@ class Infusionsplan(AktenEintrag):
             alt.save(update_fields=["status"])
         self.status = self.Status.AKTUELL
         self.freigegeben_am = timezone.now()
-        self.freigegeben_von = benutzer
+        self.freigegeben_von = mediziner
+        self.freigabe_weg = weg
+        self.freigabe_datum = datum
+        self.abgeschlossen_von = abschliessend
+        self.freigabe_nachweis = nachweis
         # PDF mit der aktiven Vorlage erzeugen, als Dokument „Von EPM erzeugt“ ablegen, Prüfsumme und Vorlagenversion
         # am Plan festhalten (F35/F51). Scheitert die PDF, wird nicht freigegeben.
-        dok = self._pdf_ablegen(benutzer)
+        dok = self._pdf_ablegen(abschliessend or mediziner)
         try:
             super().save()  # letzter Schreibvorgang am Entwurf, danach gesperrt
         except BaseException:
             dok.pfad.unlink(missing_ok=True)
             raise
+
+    @property
+    def freigabe_tag(self):
+        """Tag der Freigabe durch den Mediziner (bei Freigabe auf Anordnung das angegebene Datum)."""
+        if self.freigabe_datum:
+            return self.freigabe_datum
+        return timezone.localtime(self.freigegeben_am).date() if self.freigegeben_am else None
+
+    @property
+    def freigabevermerk(self) -> str | None:
+        """Vermerk statt Unterschrift – nennt, wer freigegeben hat, und bei Freigabe auf Anordnung auch den Weg und
+        wer den Plan im System abgeschlossen hat (der Vermerk muss stimmen)."""
+        if not self.freigegeben_von_id or not self.freigabe_tag:
+            return None
+        from epm.api_basis import benutzername
+
+        mediziner, tag = benutzername(self.freigegeben_von), f"{self.freigabe_tag:%d.%m.%Y}"
+        if not self.abgeschlossen_von_id:
+            return f"Maschinell erstellt, geprüft und freigegeben von {mediziner} am {tag}."
+        weg = self.get_freigabe_weg_display() if self.freigabe_weg else ""
+        abschluss = f"{timezone.localtime(self.freigegeben_am):%d.%m.%Y}" if self.freigegeben_am else tag
+        return (f"Maschinell erstellt. Geprüft und freigegeben von {mediziner} am {tag}"
+                f"{f' ({weg})' if weg else ''}; im System abgeschlossen von {benutzername(self.abgeschlossen_von)} "
+                f"am {abschluss}.")
 
     def _pdf_ablegen(self, benutzer):
         from vorlagen.felder import Kontext

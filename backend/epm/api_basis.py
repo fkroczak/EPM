@@ -1,13 +1,15 @@
 """Gemeinsame API-Bausteine: Fehlerbehandlung, Bereich des Benutzers (Testdaten), Rich-Text."""
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import DatabaseError
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_handler, set_rollback
 
 from epm.sanitize import bereinige_html
-from patienten.models import AkteGesperrt, Patient
+from patienten.models import AkteGesperrt, Akteneinsicht, Patient
 
 
 def exception_handler(exc, context):
@@ -28,11 +30,18 @@ def exception_handler(exc, context):
     return drf_handler(exc, context)
 
 
-def patienten_fuer(user):
-    """Testbenutzer sehen ausschließlich Testpatienten."""
+def patienten_fuer(user, eingeschraenkte: bool = False):
+    """Akten im Bereich des Benutzers: Testbenutzer sehen ausschließlich Testpatienten.
+
+    Akten, deren Verarbeitung eingeschränkt ist (Art. 18 DSGVO), erscheinen nirgends – nicht in Listen, nicht in
+    der Suche, nicht mit ihren Einträgen –, außer für die Person, die gerade eine begründete Einsicht hat.
+    ``eingeschraenkte=True`` nur für die Datenschutz-Vorgänge selbst (Einsicht nehmen, aufheben, löschen, Anfragen)."""
     qs = Patient.objects.all()
     if getattr(user, "ist_test", False):
         qs = qs.filter(ist_test=True)
+    if not eingeschraenkte:
+        einsicht = Akteneinsicht.objects.filter(benutzer_id=getattr(user, "pk", None), bis__gt=timezone.now())
+        qs = qs.filter(Q(eingeschraenkt_am__isnull=True) | Q(id__in=einsicht.values("patient_id")))
     return qs
 
 

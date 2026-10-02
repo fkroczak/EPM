@@ -11,6 +11,7 @@ from patienten.api import (
     BezugspersonViewSet, DokumentViewSet, GewichtViewSet, KalenderViewSet, KontaktViewSet, PatientArztViewSet,
     PatientViewSet, StartseiteViewSet, TerminViewSet,
 )
+from patienten.datenschutz_api import DatenschutzanfrageViewSet, DatenschutzViewSet, ErklaerungViewSet
 from stammdaten.api import (
     AnsprechpartnerViewSet, ArztViewSet, AuswahlwertViewSet, BriefkopfView, EinstellungenView, LogoView, PraeparatViewSet,
     VersorgerViewSet,
@@ -26,6 +27,9 @@ router.register("kalender", KalenderViewSet, basename="kalender")
 router.register("dokumente", DokumentViewSet, basename="dokument")
 router.register("bezugspersonen", BezugspersonViewSet, basename="bezugsperson")
 router.register("patient-aerzte", PatientArztViewSet, basename="patientarzt")
+router.register("erklaerungen", ErklaerungViewSet, basename="erklaerung")
+router.register("datenschutzanfragen", DatenschutzanfrageViewSet, basename="datenschutzanfrage")
+router.register("datenschutz", DatenschutzViewSet, basename="datenschutz")
 router.register("infusionsplaene", InfusionsplanViewSet, basename="infusionsplan")
 router.register("versorger", VersorgerViewSet, basename="versorger")
 router.register("ansprechpartner", AnsprechpartnerViewSet, basename="ansprechpartner")

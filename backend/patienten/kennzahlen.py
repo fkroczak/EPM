@@ -119,9 +119,34 @@ def zaehler(patienten_qs) -> dict:
     }
 
 
+def ohne_pflicht_erklaerungen(patienten_qs) -> list:
+    """IDs der Akten, in denen eine der Erklärungen fehlt (oder widerrufen ist), die laut Einstellung vorliegen
+    sollen (Vorlagen › Grenzwerte: Datenschutzinformation, Einwilligung, Schweigepflichtentbindung)."""
+    from .models import erklaerungen_stand
+
+    pflicht = Einstellungen.aktuell().pflicht_erklaerungen
+    ids = list(patienten_qs.values_list("id", flat=True))
+    if not pflicht or not ids:
+        return []
+    stand = erklaerungen_stand(ids)
+    return [pid for pid in ids
+            if any(stand.get(pid, {}).get(art, {}).get("status") != "liegt_vor" for art in pflicht)]
+
+
+def abschluss_pruefen(patienten_qs):
+    """Akten in Betreuung ohne Kontakt seit der eingestellten Zeit und ohne offenen Termin: Ist die Betreuung
+    beendet? Erst mit dem Abschluss beginnt die Aufbewahrungsfrist – eine nie abgeschlossene Akte bliebe für immer."""
+    monate = Einstellungen.aktuell().abschluss_pruefen_monate
+    grenze = timezone.now() - timedelta(days=30 * monate)
+    mit_kontakt = Kontakt.objects.filter(storniert_am__isnull=True, zeitpunkt__gte=grenze).values("patient_id")
+    mit_termin = Termin.objects.filter(erledigt_am__isnull=True, faellig_am__gte=timezone.localdate()).values("patient_id")
+    return (patienten_qs.filter(abgeschlossen_am__isnull=True, angelegt_am__lt=grenze)
+            .exclude(id__in=mit_kontakt).exclude(id__in=mit_termin))
+
+
 def pruefliste(patienten_qs) -> dict:
     """„Nach und nach prüfen“ auf der Startseite (Entwurf 2)."""
-    from .models import Dokument
+    from .models import Datenschutzanfrage, Dokument
 
     e = Einstellungen.aktuell()
     offen = patienten_qs.filter(abgeschlossen_am__isnull=True)
@@ -134,4 +159,9 @@ def pruefliste(patienten_qs) -> dict:
         "kein_versorger": offen.filter(versorger__isnull=True, kein_versorger=False).count(),
         "kein_kontakt": offen.exclude(id__in=mit_kontakt).count(),
         "kontakt_monate": e.kontakt_ueberfaellig_monate,
+        # Datenschutz: Erklärungen nachhalten wie die Nickelallergie; lange ruhende Akten abschließen
+        "erklaerungen_fehlen": len(ohne_pflicht_erklaerungen(offen)),
+        "abschluss_pruefen": abschluss_pruefen(offen).count(),
+        "abschluss_monate": e.abschluss_pruefen_monate,
+        "datenschutz_anfragen": Datenschutzanfrage.objects.filter(patient__in=patienten_qs, erledigt_am__isnull=True).count(),
     }

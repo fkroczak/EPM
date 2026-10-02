@@ -143,7 +143,7 @@ SONDERREGELN = {
 }
 # Zuordnungstabellen von Plänen: auch INSERT prüfen
 ZUORDNUNG = {"infusionen_infusionsplan_vitamine": "epm_plan_zuordnung_schutz"}
-NUR_ANFUEGEN_FEST = ["audit_systemereignis", "patienten_dokumentvorgang"]
+NUR_ANFUEGEN_FEST = ["audit_systemereignis", "patienten_dokumentvorgang", "patienten_loeschprotokoll"]
 
 
 def _historientabellen(cursor):
@@ -196,8 +196,15 @@ def _zuordnung(c, vorhandene):
 
 @contextmanager
 def wartungsmodus():
-    """Erlaubt innerhalb der Transaktion Änderungen an geschützten Tabellen. Sparsam verwenden!"""
+    """Erlaubt innerhalb des Blocks Änderungen an geschützten Tabellen. Sparsam verwenden!
+
+    Am Ende des Blocks gilt wieder der Zustand von vorher – auch wenn der Block Teil einer größeren Transaktion
+    ist (``SET LOCAL`` allein gälte bis zu deren Ende). Bei einem Fehler nimmt der Rücksprung die Einstellung zurück."""
     with transaction.atomic():
         with connection.cursor() as c:
-            c.execute("SET LOCAL epm.wartung = 'on'")
+            c.execute("SELECT coalesce(current_setting('epm.wartung', true), '')")
+            vorher = c.fetchone()[0] or "off"
+            c.execute("SELECT set_config('epm.wartung', 'on', true)")
         yield
+        with connection.cursor() as c:
+            c.execute("SELECT set_config('epm.wartung', %s, true)", [vorher])

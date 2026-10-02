@@ -305,13 +305,22 @@ class RechteJeGruppe(TestCase):
         # Festlegung 01.10.2026: Admin alles (Patientendaten nur bei Testpatienten), Mitarbeiter schließen Akten ab
         # und pflegen Vorlagen
         # Festlegung 02.10.2026: endgültig löschen nur Mediziner – sonst hat der Admin alles
-        self.assertEqual([c for c, v in m["admin"].items() if not v], ["dokumente_loeschen"])
+        # Datenschutz: auch Akten endgültig löschen nur Mediziner
+        self.assertEqual([c for c, v in m["admin"].items() if not v], ["dokumente_loeschen", "akten_loeschen"])
         self.assertTrue(m["mediziner"]["dokumente_loeschen"])
         self.assertTrue(m["mediziner"]["dokumente_umhaengen"])
         self.assertTrue(m["admin"]["dokumente_umhaengen"])
         self.assertFalse(m["mitarbeiter"]["dokumente_loeschen"])
         # Festlegung 02.10.2026: Systemverwaltung (Server und EPM) nur Admin
-        self.assertEqual(r["nur_rollen"], {"dokumente_loeschen": ["mediziner"], "system_verwalten": ["admin"]})
+        self.assertEqual(r["nur_rollen"], {"dokumente_loeschen": ["mediziner"], "akten_loeschen": ["mediziner"],
+                                           "system_verwalten": ["admin"]})
+        # Datenschutz: Mitarbeiter erfassen und schließen freigegebene Pläne ab, entscheiden und löschen nicht
+        for code in ("datenschutz_bearbeiten", "plaene_abschliessen"):
+            self.assertTrue(m["mitarbeiter"][code], code)
+        for code in ("datenschutz_entscheiden", "akten_loeschen"):
+            self.assertFalse(m["mitarbeiter"][code], code)
+            self.assertTrue(m["mediziner"][code], code)
+        self.assertIn("datenschutz_entscheiden", r["nur_testpatienten"]["rechte"])
         abgelehnt = client_fuer(self.admin).put("/api/rechte/", {"matrix": {"mitarbeiter": {"dokumente_loeschen": True}}},
                                                format="json")
         self.assertEqual(abgelehnt.status_code, 400)

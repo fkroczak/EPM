@@ -27,8 +27,18 @@ RECHTE = [
      "nur Mediziner; mit Kennwort, Code aus der Authenticator-App und Bestätigungscode; im Audit-Log"),
     ("plaene_anlegen", "Infusionspläne anlegen", "Entwürfe anlegen, bearbeiten und verwerfen"),
     ("plaene_freigeben", "Infusionspläne freigeben", ""),
+    ("plaene_abschliessen", "Infusionspläne nach Freigabe abschließen",
+     "wenn der Mediziner außerhalb von EPM freigegeben hat (z. B. per E-Mail): mit Datum, Weg und Nachweis"),
     ("akten_abschliessen", "Akten abschließen", ""),
     ("akten_wieder_oeffnen", "Abgeschlossene Akten wieder öffnen", ""),
+    ("datenschutz_bearbeiten", "Datenschutz: Erklärungen und Anfragen erfassen",
+     "Datenschutzinformation, Einwilligung und Schweigepflichtentbindung nachhalten; Anfragen erfassen; "
+     "Kopie der Akte erstellen"),
+    ("datenschutz_entscheiden", "Datenschutz: Anfragen entscheiden, Verarbeitung einschränken",
+     "Anfragen mit Ergebnis erledigen; Akten einschränken, Einsicht nehmen; Aufbewahrung verlängern"),
+    ("akten_loeschen", "Akten endgültig löschen",
+     "nur Mediziner; nach Ablauf der Aufbewahrungsfrist oder auf Antrag; mit Kennwort, Code aus der "
+     "Authenticator-App und Bestätigungscode; im Löschprotokoll und im Audit-Log"),
     ("versorger_pflegen", "Versorger, Ansprechpartner und Ärzte pflegen",
      "gemeinsame Listen: Versorger mit Ansprechpartnern, Ärzte mit Kontaktdaten"),
     ("vorlagen_pflegen", "Vorlagen pflegen", "Briefkopf und Logo, Auswahllisten, Präparate, Grenzwerte"),
@@ -49,16 +59,20 @@ _ADMIN_SPEZIAL = {"benutzer_verwalten", "akten_wieder_oeffnen", "backup_verwalte
 
 # Rechte, die Patientendaten verändern (Einträge, Stammdaten, Pläne, Abschluss)
 PATIENTENDATEN_SCHREIBEN = {"eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
-                            "akten_abschliessen", "dokumente_umhaengen", "dokumente_loeschen"}
+                            "plaene_abschliessen", "akten_abschliessen", "dokumente_umhaengen", "dokumente_loeschen",
+                            "datenschutz_bearbeiten", "datenschutz_entscheiden", "akten_loeschen"}
 
 # Rechte, die nur bestimmte Rollen haben können; anderen Rollen nicht erteilbar (Festlegungen 02.10.2026:
 # endgültig löschen nur Mediziner; Systemverwaltung – Server und EPM – natürlich nur Admin)
-NUR_ROLLEN = {"dokumente_loeschen": {Rolle.MEDIZINER}, "system_verwalten": {Rolle.ADMIN}}
+NUR_ROLLEN = {"dokumente_loeschen": {Rolle.MEDIZINER}, "akten_loeschen": {Rolle.MEDIZINER},
+              "system_verwalten": {Rolle.ADMIN}}
 
 STANDARD = {
     Rolle.BETRACHTER: {"akten_lesen"},
+    # Datenschutz: Mitarbeiter erfassen Erklärungen und Anfragen und schließen freigegebene Pläne ab;
+    # entscheiden, einschränken und löschen bleibt beim Mediziner
     Rolle.MITARBEITER: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
-                        "versorger_pflegen", "vorlagen_pflegen"},
+                        "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten", "plaene_abschliessen"},
     Rolle.MEDIZINER: _ALLE - _ADMIN_SPEZIAL,
     Rolle.ADMIN: _ALLE - {c for c, rollen in NUR_ROLLEN.items() if Rolle.ADMIN not in rollen},
 }

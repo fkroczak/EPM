@@ -178,8 +178,14 @@ INFUSIONSPLAN = {
     "Plan.erstellt_von": Feld("Erstellt von", _plan(lambda p: _person(p.erstellt_von))),
     "Plan.erstellt_am": Feld("Erstellt am (Datum)",
                              _plan(lambda p: datum(timezone.localtime(p.erstellt_am).date()) if p.erstellt_am else None)),
-    "Plan.freigegeben_datum": Feld("Freigabe (nur Datum)",
-                                   _plan(lambda p: datum(timezone.localtime(p.freigegeben_am).date()) if p.freigegeben_am else None)),
+    # Tag, an dem der Mediziner freigegeben hat (bei Freigabe außerhalb von EPM das dabei angegebene Datum)
+    "Plan.freigegeben_datum": Feld("Freigabe durch den Mediziner (nur Datum)", _plan(lambda p: datum(p.freigabe_tag))),
+    "Plan.Freigabevermerk": Feld("Freigabevermerk: wer freigegeben hat, wann und auf welchem Weg; wer abgeschlossen hat",
+                                 _plan(lambda p: p.freigabevermerk)),
+    "Plan.Freigabeweg": Feld("Weg der Freigabe (im System, per E-Mail, telefonisch …)",
+                             _plan(lambda p: p.get_freigabe_weg_display() if p.freigabe_weg else None)),
+    "Plan.abgeschlossen_von": Feld("Im System abgeschlossen von (leer, wenn der Mediziner selbst freigegeben hat)",
+                                   _plan(lambda p: _person(p.abgeschlossen_von) if p.abgeschlossen_von_id else None)),
     "Plan.Stunden": Feld("Laufzeit (h)", _plan(lambda p: _zahl(p.laufzeit_h, "h"))),
     "Plan.Rate": Feld("Rate (ml/h)", _plan(lambda p: _zahl(p.rate_ml_h, "ml/h"))),
     "Plan.Tage_pro_Woche": Feld("Tage pro Woche", _plan(lambda p: _zahl(p.tage_pro_woche, "× pro Woche"))),
@@ -190,7 +196,8 @@ INFUSIONSPLAN = {
                       _plan(lambda p: None if p.ca_mg_stabil is None else
                             f"{_zahl(p.ca_mg_mmol, 'mmol')} (Grenze {_zahl(p.ca_mg_grenze_mmol, 'mmol')}): "
                             f"{'stabil' if p.ca_mg_stabil else 'instabil'}")),
-    "Plan.freigegeben_am": Feld("Freigabe (Datum, Uhrzeit)", _plan(lambda p: datum(p.freigegeben_am))),
+    "Plan.freigegeben_am": Feld("Freigabe (Datum, Uhrzeit; bei Freigabe außerhalb von EPM nur das Datum)",
+                                _plan(lambda p: datum(p.freigabe_datum) if p.abgeschlossen_von_id else datum(p.freigegeben_am))),
     "Plan.freigegeben_von": Feld("Freigegeben von", _plan(lambda p: _person(p.freigegeben_von))),
     "Plan.Bemerkung": Feld("Bemerkung zum Plan", _plan(lambda p: p.bemerkung or None), html=True),
     "Basis.Präparat": Feld("Basislösung", _praeparat("basis_praeparat")),
@@ -236,7 +243,34 @@ PATIENTENDATENBLATT = {
     "Plan.gültig_ab": INFUSIONSPLAN["Plan.gültig_ab"],
 }
 
-FELDER = {"infusionsplan": INFUSIONSPLAN, "patientendatenblatt": PATIENTENDATENBLATT}
+def _auskunft_personen(k):
+    p = k.patient
+    if not p.pk:
+        return None
+    personen = p.bezugspersonen.filter(aktiv=True, auskunft_erlaubt=True).select_related("beziehung")
+    return ", ".join(f"{b.name} ({b.beziehung.wert})" if b.beziehung_id else b.name for b in personen) or None
+
+
+def _aufbewahrung_jahre(k):
+    from stammdaten.models import Einstellungen
+
+    return str(Einstellungen.aktuell().aufbewahrung_jahre)
+
+
+# Erklärungen zum Datenschutz: Angaben zur Person und zu den Stellen, an die Daten gehen
+ERKLAERUNG = {
+    **{name: feld for name, feld in GEMEINSAM.items() if name != "Patient.Diagnose"},
+    "Patient.Telefon": PATIENTENDATENBLATT["Patient.Telefon"],
+    "Patient.E-Mail": PATIENTENDATENBLATT["Patient.E-Mail"],
+    "Patient.Hausarzt": PATIENTENDATENBLATT["Patient.Hausarzt"],
+    "Patient.Krankenkasse": Feld("Krankenkasse", lambda k: k.patient.krankenkasse or None),
+    "Bezugspersonen.Auskunft": Feld("Bezugspersonen, denen Auskunft gegeben werden darf", _auskunft_personen),
+    "Aufbewahrung.Jahre": Feld("Aufbewahrung nach Abschluss der Akte in Jahren (Vorlagen › Grenzwerte)",
+                               _aufbewahrung_jahre),
+}
+
+FELDER = {"infusionsplan": INFUSIONSPLAN, "patientendatenblatt": PATIENTENDATENBLATT,
+          "datenschutzinformation": ERKLAERUNG, "einwilligung": ERKLAERUNG, "schweigepflichtentbindung": ERKLAERUNG}
 
 # Tabellen mit festem Aufbau je Art (Spalten stehen fest, damit nichts Falsches gedruckt werden kann).
 # (Name, Spalten, Ausrichtung je Spalte): "zahl" rechtsbündig, "einheit" schmal und grau – wie im Laborbefund.
@@ -252,6 +286,7 @@ TABELLEN = {
     "patientendatenblatt": {
         "termine": ("Nächste offene Termine (bis zu 3)", ["Datum", "Art", "Titel", "Ort"], ["", "", "", ""]),
     },
+    "datenschutzinformation": {}, "einwilligung": {}, "schweigepflichtentbindung": {},
 }
 
 

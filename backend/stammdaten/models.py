@@ -157,8 +157,17 @@ class Praeparat(models.Model):
         return f"{self.name} {self.konzentration}".strip()
 
 
+# Erklärungen, die bei jeder Akte in Betreuung vorliegen sollen (Schlüssel wie ``patienten.Erklaerung.Art``).
+# Fehlt eine davon, steht die Akte unter „Nach und nach prüfen“ (Festlegung 02.10.2026).
+ERKLAERUNGSARTEN = ["datenschutzinformation", "einwilligung", "schweigepflichtentbindung"]
+
+
+def pflicht_erklaerungen_standard():
+    return list(ERKLAERUNGSARTEN)
+
+
 class Einstellungen(models.Model):
-    """Genau ein Datensatz (pk=1): Absender, Warnschwellen, Plausibilitätsgrenzen."""
+    """Genau ein Datensatz (pk=1): Absender, Warnschwellen, Plausibilitätsgrenzen, Fristen des Datenschutzes."""
 
     class Absender(models.TextChoices):
         STIFTUNG = "stiftung", "Stiftung"
@@ -196,6 +205,14 @@ class Einstellungen(models.Model):
     volumen_min_ml = models.DecimalField("Gesamtvolumen minimal", max_digits=7, decimal_places=0, default=Decimal("0"))
     volumen_max_ml = models.DecimalField("Gesamtvolumen maximal", max_digits=7, decimal_places=0, default=Decimal("9000"))
 
+    # Datenschutz (Festlegung 02.10.2026)
+    aufbewahrung_jahre = models.PositiveSmallIntegerField("Aufbewahrung nach Abschluss der Akte", default=10)
+    abschluss_pruefen_monate = models.PositiveSmallIntegerField("Abschluss prüfen, wenn kein Kontakt seit", default=24)
+    protokoll_aufbewahrung_jahre = models.PositiveSmallIntegerField(
+        "Audit-Log aufbewahren", default=0, help_text="0 = unbegrenzt; sonst werden ältere Einträge täglich entfernt")
+    pflicht_erklaerungen = models.JSONField("Erklärungen, die vorliegen sollen", default=pflicht_erklaerungen_standard,
+                                            blank=True)
+
     history = HistoricalRecords()
 
     class Meta:
@@ -214,6 +231,14 @@ class Einstellungen(models.Model):
         for unten, oben in self.GRENZPAARE:
             if getattr(self, unten) >= getattr(self, oben):
                 raise ValidationError({unten: "Untere Grenze muss kleiner als obere Grenze sein."})
+        if not 1 <= self.aufbewahrung_jahre <= 100:
+            raise ValidationError({"aufbewahrung_jahre": "Bitte 1 bis 100 Jahre angeben."})
+        if self.abschluss_pruefen_monate < 1:
+            raise ValidationError({"abschluss_pruefen_monate": "Bitte mindestens 1 Monat angeben."})
+        if (not isinstance(self.pflicht_erklaerungen, list)
+                or any(a not in ERKLAERUNGSARTEN for a in self.pflicht_erklaerungen)
+                or len(set(self.pflicht_erklaerungen)) != len(self.pflicht_erklaerungen)):
+            raise ValidationError({"pflicht_erklaerungen": "Unbekannte Erklärung."})
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):

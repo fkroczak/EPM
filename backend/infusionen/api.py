@@ -7,9 +7,10 @@ from django.db import transaction
 from django.http import FileResponse, HttpResponse
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
-from accounts.permissions import FreigabeRecht, PlanRecht
+from accounts.permissions import FreigabeRecht, PlanAbschlussRecht, PlanRecht, recht
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import ModelClean, RichText, benutzername, patienten_fuer, pruefe_schreibbereich
 from stammdaten.models import Praeparat
@@ -58,6 +59,9 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
     geaenderte_felder = serializers.SerializerMethodField()
     erstellt_von_name = serializers.SerializerMethodField()
     freigegeben_von_name = serializers.SerializerMethodField()
+    abgeschlossen_von_name = serializers.SerializerMethodField()
+    freigabe_weg_name = serializers.CharField(source="get_freigabe_weg_display", read_only=True)
+    freigabevermerk = serializers.CharField(read_only=True)
     patient_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -72,9 +76,12 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
             "tage_pro_woche", "katheterschutz",
             "pantozol_stufe", "pantozol_tage", "bemerkung", "positionen", "geaenderte_felder",
             "erstellt_am", "erstellt_von_name", "freigegeben_am", "freigegeben_von_name",
+            "freigabe_weg", "freigabe_weg_name", "freigabe_datum", "abgeschlossen_von_name", "freigabe_nachweis",
+            "freigabevermerk",
             "pdf_datei", "pdf_sha256", "vorlage_version",
         ]
         read_only_fields = ["patient", "status", "vorgaenger", "erstellt_am", "freigegeben_am",
+                            "freigabe_weg", "freigabe_datum", "freigabe_nachweis",
                             "pdf_datei", "pdf_sha256", "vorlage_version"]
 
     def get_vitamine_namen(self, obj):
@@ -88,6 +95,9 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
 
     def get_freigegeben_von_name(self, obj):
         return benutzername(obj.freigegeben_von)
+
+    def get_abgeschlossen_von_name(self, obj):
+        return benutzername(obj.abgeschlossen_von)
 
     def get_patient_name(self, obj):
         return f"{obj.patient.nachname}, {obj.patient.vorname}"
@@ -133,7 +143,11 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
     GET    /api/infusionsplaene/vorbelegung/?patient=ID  Werte für den ersten Plan je kg Körpergewicht (wie im Altsystem)
     GET    /api/infusionsplaene/ID/vergleich/     alle Werte neben denen des Vorgängers
     PATCH  /api/infusionsplaene/ID/               Entwurf bearbeiten
-    POST   /api/infusionsplaene/ID/freigeben/     Entwurf wird aktueller Plan
+    POST   /api/infusionsplaene/ID/freigeben/     Entwurf wird aktueller Plan (der Mediziner gibt selbst frei)
+    POST   /api/infusionsplaene/ID/abschliessen/  Entwurf wird aktueller Plan, nachdem der Mediziner außerhalb von EPM
+                                                  freigegeben hat: {"freigegeben_von": Benutzer-ID, "freigegeben_am",
+                                                  "weg": email|telefon|persoenlich|schriftlich, "nachweis": Datei}
+    GET    /api/infusionsplaene/freigebende/?patient=ID  Mediziner, die freigeben dürfen (für die Auswahl)
     DELETE /api/infusionsplaene/ID/               Entwurf verwerfen
     """
 
@@ -144,7 +158,7 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
     def get_queryset(self):
         return (
             Infusionsplan.objects.filter(patient__in=patienten_fuer(self.request.user))
-            .select_related("patient", "erstellt_von", "freigegeben_von", "vorgaenger")
+            .select_related("patient", "erstellt_von", "freigegeben_von", "abgeschlossen_von", "vorgaenger")
             .prefetch_related("positionen__praeparat", "vitamine")
         )
 
@@ -295,7 +309,77 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
         plan = self.get_object()
         pruefe_schreibbereich(request.user, plan.patient)
         plan.freigeben(request.user)
-        protokolliere(SystemEreignis.Art.PLAN_FREIGEGEBEN, request, objekt=f"Plan {plan.id} / Patient {plan.patient.nummer}")
+        protokolliere(SystemEreignis.Art.PLAN_FREIGEGEBEN, request, objekt=f"Plan {plan.id} / Patient {plan.patient.nummer}",
+                      patient_id=plan.patient_id)
+        plan.refresh_from_db()
+        return Response(self.get_serializer(plan).data)
+
+    @action(detail=False, methods=["get"], permission_classes=[recht("plaene_abschliessen", lesen="plaene_abschliessen")])
+    def freigebende(self, request):
+        """Mediziner, die Infusionspläne freigeben dürfen – zur Auswahl beim Abschließen nach Freigabe."""
+        from accounts.models import Rolle, User
+
+        patient = patienten_fuer(request.user).filter(pk=request.query_params.get("patient") or 0).first()
+        qs = User.objects.filter(rolle=Rolle.MEDIZINER, is_active=True, nur_historisch=False)
+        if patient is None or not patient.ist_test:
+            qs = qs.filter(ist_test=False)
+        return Response([{"id": u.id, "name": benutzername(u)} for u in qs if u.hat_recht("plaene_freigeben")])
+
+    @action(detail=True, methods=["post"], permission_classes=[PlanAbschlussRecht],
+            parser_classes=[JSONParser, MultiPartParser, FormParser])
+    def abschliessen(self, request, pk=None):
+        """Freigabe auf Anordnung (Festlegung 02.10.2026): Der Mediziner hat den Entwurf außerhalb von EPM geprüft und
+        freigegeben (z. B. per E-Mail); die Person, die ihn hier abschließt, hält fest, wer freigegeben hat, wann, auf
+        welchem Weg, und hängt den Nachweis an. Bei E-Mail und schriftlicher Freigabe ist der Nachweis Pflicht.
+        Der Freigabevermerk auf der PDF nennt beide Personen."""
+        from accounts.models import User
+        from patienten.api import erkenne_dateityp, speichere_datei
+        from patienten.models import Dokument
+        from stammdaten.models import Auswahlwert
+
+        plan = self.get_object()
+        pruefe_schreibbereich(request.user, plan.patient)
+        fehler, datum = {}, None
+        mediziner_id = str(request.data.get("freigegeben_von", ""))
+        mediziner = User.objects.filter(pk=mediziner_id).first() if mediziner_id.isdigit() else None
+        weg = str(request.data.get("weg", ""))
+        try:
+            datum = serializers.DateField().to_internal_value(request.data.get("freigegeben_am") or "")
+        except serializers.ValidationError:
+            fehler["freigegeben_am"] = "Bitte das Datum der Freigabe angeben."
+        upload = request.FILES.get("nachweis")
+        typ = None
+        if upload is not None:
+            if upload.size > settings.EPM_UPLOAD_MAX_MB * 1024 * 1024:
+                fehler["nachweis"] = f"Datei größer als {settings.EPM_UPLOAD_MAX_MB} MB."
+            else:
+                typ = erkenne_dateityp(upload)
+                if typ is None:
+                    fehler["nachweis"] = "Erlaubt sind PDF, JPG, PNG und TXT."
+        if fehler:
+            return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
+        nachweis = None
+        try:
+            with transaction.atomic():
+                if upload is not None:
+                    plan.patient.pruefe_bearbeitbar()
+                    meta = speichere_datei(plan.patient, upload, typ)
+                    nachweis = Dokument(
+                        patient=plan.patient, datum=datum, hochgeladen_von=request.user,
+                        typ=Auswahlwert.objects.filter(liste=Auswahlwert.Liste.DOKUMENTTYP, wert="Freigabe").first(),
+                        titel=f"Freigabe Infusionsplan gültig ab {plan.gueltig_ab:%d.%m.%Y}"[:200], **meta)
+                    nachweis._history_user = request.user
+                    nachweis.save()
+                plan._history_user = request.user
+                plan.abschliessen_auf_anordnung(request.user, mediziner, datum, weg, nachweis)
+                protokolliere(SystemEreignis.Art.PLAN_FREIGEGEBEN, request,
+                              objekt=f"Plan {plan.id} / Patient {plan.patient.nummer}", patient_id=plan.patient_id,
+                              auf_anordnung=True, weg=plan.get_freigabe_weg_display(),
+                              freigegeben_von=benutzername(mediziner), freigegeben_am=f"{datum:%d.%m.%Y}")
+        except BaseException:
+            if nachweis is not None:
+                nachweis.pfad.unlink(missing_ok=True)
+            raise
         plan.refresh_from_db()
         return Response(self.get_serializer(plan).data)
 

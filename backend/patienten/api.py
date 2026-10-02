@@ -26,12 +26,15 @@ from epm.api_basis import (ModelClean, RichText, benutzername, legt_testpatiente
                             pruefe_schreibbereich)
 from stammdaten.models import Auswahlwert
 
-from .kennzahlen import kennzahlen, pruefliste, schnellfilter, zaehler
+from audit.bereinigung import akte_text
 from stammdaten.models import Arzt
 
+from .datenschutz import DatenschutzAktionen
+from .kennzahlen import (abschluss_pruefen, kennzahlen, ohne_pflicht_erklaerungen, pruefliste, schnellfilter,
+                         zaehler)
 from .loeschung import PLATZHALTER, schwaerze_dokument, trage_ein
-from .models import (Bezugsperson, Dokument, DokumentVorgang, Gewichtsmessung, Kontakt, Patient, PatientArzt, Termin,
-                     dokument_pfad)
+from .models import (Bezugsperson, Datenschutzanfrage, Dokument, DokumentVorgang, Erklaerung, Gewichtsmessung,
+                     Kontakt, Patient, PatientArzt, Termin, dokument_pfad)
 
 
 # ================================================================= Patient
@@ -40,6 +43,7 @@ class PatientListSerializer(serializers.ModelSerializer):
     ansprechpartner_name = serializers.CharField(source="ansprechpartner.name", read_only=True, default=None)
     katheter_name = serializers.CharField(source="katheter.wert", read_only=True, default=None)
     ist_abgeschlossen = serializers.BooleanField(read_only=True)
+    ist_eingeschraenkt = serializers.BooleanField(read_only=True)
     alter = serializers.SerializerMethodField()
     kennzahlen = serializers.SerializerMethodField()
 
@@ -49,7 +53,8 @@ class PatientListSerializer(serializers.ModelSerializer):
             "id", "nummer", "nachname", "vorname", "geburtsdatum", "alter", "ort", "katheter", "katheter_name",
             "versorger", "versorger_name", "ansprechpartner", "ansprechpartner_name", "nickelallergie",
             "kein_katheter", "kein_versorger",
-            "ist_abgeschlossen", "abgeschlossen_am", "abschluss_anlass", "ist_test", "kennzahlen",
+            "ist_abgeschlossen", "abgeschlossen_am", "abschluss_anlass", "ist_test", "ist_eingeschraenkt",
+            "kennzahlen",
         ]
 
     def get_alter(self, obj):
@@ -68,6 +73,8 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
     empfehlung = RichText()
     bemerkung = RichText()
     ist_abgeschlossen = serializers.BooleanField(read_only=True)
+    ist_eingeschraenkt = serializers.BooleanField(read_only=True)
+    aufbewahrung = serializers.SerializerMethodField()
     kopf = serializers.SerializerMethodField()
     angelegt_von_name = serializers.SerializerMethodField()
     # Nur beim Anlegen: „Gewicht bei Aufnahme“ (Entwurf 12) wird als erste Messung gespeichert
@@ -88,13 +95,21 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
             "kein_katheter", "kein_versorger",
             "diagnose", "therapie", "empfehlung", "bemerkung",
             "abgeschlossen_am", "abschluss_anlass", "abschluss_notiz", "ist_abgeschlossen", "ist_test",
+            "ist_eingeschraenkt", "eingeschraenkt_am", "aufbewahrung",
             "angelegt_am", "angelegt_von_name", "geaendert_am", "kopf",
             "aufnahme_gewicht_kg", "aufnahme_gemessen_am", "aufnahme_quelle", "aufnahme_hausarzt",
         ]
-        read_only_fields = ["abgeschlossen_am", "abschluss_anlass", "abschluss_notiz", "angelegt_am", "geaendert_am"]
+        read_only_fields = ["abgeschlossen_am", "abschluss_anlass", "abschluss_notiz", "angelegt_am", "geaendert_am",
+                            "eingeschraenkt_am"]
 
     def get_angelegt_von_name(self, obj):
         return benutzername(obj.angelegt_von)
+
+    def get_aufbewahrung(self, obj):
+        """Aufbewahrungsfrist (nur bei abgeschlossenen Akten): bis wann, verlängert, abgelaufen."""
+        if not obj.pk or not obj.ist_abgeschlossen or (self.context.get("view") and self.context["view"].action == "list"):
+            return None
+        return obj.aufbewahrung()
 
     def get_kopf(self, obj):
         """Kerndaten für den Patientenkopf (nur in der Einzelansicht)."""
@@ -127,6 +142,9 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
             "ansprechpartner_telefon": (obj.ansprechpartner.telefon or obj.ansprechpartner.mobil)
             if obj.ansprechpartner_id else None,
             "nickelallergie": obj.nickelallergie,
+            # Erklärungen zum Datenschutz, nachgehalten wie die Nickelallergie (nicht erfasst / liegt vor / widerrufen)
+            "erklaerungen": _erklaerungen_kopf(obj),
+            "datenschutz_anfragen": obj.datenschutzanfragen.filter(erledigt_am__isnull=True).count(),
             "aktueller_plan": {"id": plan.id, "gueltig_ab": plan.gueltig_ab, "kcal": plan.kcal,
                                "laufzeit_h": plan.laufzeit_h} if plan else None,
             "naechster_termin": (
@@ -143,6 +161,7 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                 "infusionsplaene": obj.infusionsplaene.count(),
                 "bezugspersonen": obj.bezugspersonen.filter(aktiv=True).count(),
                 "aerzte": obj.aerzte.filter(aktiv=True).count(),
+                "erklaerungen": obj.erklaerungen.count(),
             },
         }
 
@@ -180,6 +199,18 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
             if wert is not None and wert.liste != liste:
                 raise serializers.ValidationError({feld: "Ungültiger Wert für diese Liste."})
         return attrs
+
+
+def _erklaerungen_kopf(patient) -> dict:
+    """{"stand": {art: {status, am, id}}, "pflicht": [...], "fehlt": [...]} für den Patientenkopf."""
+    from stammdaten.models import Einstellungen
+
+    from .datenschutz import stand_daten
+
+    stand = stand_daten(patient)
+    pflicht = Einstellungen.aktuell().pflicht_erklaerungen
+    return {"stand": stand, "pflicht": pflicht,
+            "fehlt": [art for art in pflicht if stand[art]["status"] != "liegt_vor"]}
 
 
 def _datum(text: str):
@@ -227,7 +258,9 @@ class PatientFilter(filters.FilterSet):
     suche = filters.CharFilter(method="filter_suche", label="Name, Vorname, Ort, Patientennummer oder Geburtsdatum")
     pruefen = filters.ChoiceFilter(
         choices=[("altdokumente", "Altdokumente prüfen"), ("nickelallergie", "Nickelallergie nicht erfasst"),
-                 ("kein_versorger", "Versorger nicht erfasst"), ("kein_kontakt", "Kein Kontakt seit X Monaten")],
+                 ("kein_versorger", "Versorger nicht erfasst"), ("kein_kontakt", "Kein Kontakt seit X Monaten"),
+                 ("erklaerungen", "Erklärungen zum Datenschutz fehlen"),
+                 ("abschluss_pruefen", "Abschluss prüfen (lange kein Kontakt)")],
         method="filter_pruefen",
     )
 
@@ -251,6 +284,10 @@ class PatientFilter(filters.FilterSet):
             grenze = timezone.now() - timedelta(days=30 * Einstellungen.aktuell().kontakt_ueberfaellig_monate)
             aktuell = Kontakt.objects.filter(storniert_am__isnull=True, zeitpunkt__gte=grenze).values("patient_id")
             return qs.exclude(id__in=aktuell)
+        if wert == "erklaerungen":
+            return qs.filter(id__in=ohne_pflicht_erklaerungen(qs.order_by()))
+        if wert == "abschluss_pruefen":
+            return qs.filter(id__in=abschluss_pruefen(Patient.objects.all()).values("id"))
         return qs
 
     def filter_status(self, qs, name, wert):
@@ -271,7 +308,7 @@ class PatientFilter(filters.FilterSet):
         return qs.filter(ist_test=(wert == "nur"))
 
 
-class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.CreateModelMixin,
+class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.CreateModelMixin,
                      mixins.UpdateModelMixin, viewsets.GenericViewSet):
     """
     Liste: ``?status=in_betreuung|abgeschlossen``, ``schnellfilter=hinweise|gewichtsverlust|termin_woche``,
@@ -404,7 +441,7 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
         patient.abschluss_notiz = str(request.data.get("notiz", ""))[:2000]
         patient.save()
         protokolliere(SystemEreignis.Art.AKTE_ABGESCHLOSSEN, request, objekt=patient.nummer, anlass=anlass,
-                      name=f"{patient.nachname}, {patient.vorname}")
+                      name=f"{patient.nachname}, {patient.vorname}", patient_id=patient.id)
         patient.refresh_from_db()
         return Response(PatientSerializer(patient, context=self.get_serializer_context()).data)
 
@@ -413,6 +450,9 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
         patient = self.get_object()
         if not patient.ist_abgeschlossen:
             return Response({"fehler": "Akte ist nicht abgeschlossen."}, status=status.HTTP_400_BAD_REQUEST)
+        if patient.ist_eingeschraenkt:
+            return Response({"fehler": "Die Verarbeitung dieser Akte ist eingeschränkt. Bitte zuerst die Einschränkung "
+                                       "aufheben (Reiter „Datenschutz“)."}, status=status.HTTP_409_CONFLICT)
         grund = str(request.data.get("grund", "")).strip()
         if not grund:
             return Response({"grund": "Bitte einen Grund angeben."}, status=status.HTTP_400_BAD_REQUEST)
@@ -423,7 +463,7 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
         patient._change_reason = f"Wieder geöffnet: {grund}"[:100]  # Feld der Historie fasst 100 Zeichen
         patient.save()
         protokolliere(SystemEreignis.Art.AKTE_GEOEFFNET, request, objekt=patient.nummer, grund=grund,
-                      vorheriger_anlass=vorher, name=f"{patient.nachname}, {patient.vorname}")
+                      vorheriger_anlass=vorher, name=f"{patient.nachname}, {patient.vorname}", patient_id=patient.id)
         return Response(PatientSerializer(patient, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=["get"])
@@ -434,8 +474,7 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
 
         patient = self.get_object()
         pdf = akte_pdf(patient)
-        protokolliere(SystemEreignis.Art.EXPORT, request, objekt=f"Akte {patient.nachname}, {patient.vorname} (Nr. {patient.nummer})",
-                      was="Akte")
+        protokolliere(SystemEreignis.Art.EXPORT, request, objekt=akte_text(patient), was="Akte", patient_id=patient.id)
         return pdf_antwort(pdf, f"Patientendatenblatt-{patient.nummer}-{timezone.localdate():%Y-%m-%d}.pdf")
 
     @action(detail=True, methods=["get"], url_path="verlauf/pdf")
@@ -452,8 +491,8 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
             f"Bereich {BEREICHE.get(bereich, bereich)}" if bereich else "",
             f"Person {eintraege[0]['person']}" if person and eintraege else "") if t)
         pdf = verlauf_pdf(patient, eintraege, filter_text)
-        protokolliere(SystemEreignis.Art.EXPORT, request, objekt=f"Akte {patient.nachname}, {patient.vorname} (Nr. {patient.nummer})",
-                      was="Verlauf", bereich=bereich or "", person=person or "")
+        protokolliere(SystemEreignis.Art.EXPORT, request, objekt=akte_text(patient), was="Verlauf",
+                      bereich=bereich or "", person=person or "", patient_id=patient.id)
         return pdf_antwort(pdf, f"Verlauf-{patient.nummer}-{timezone.localdate():%Y-%m-%d}.pdf")
 
     @action(detail=True, methods=["get"])
@@ -461,7 +500,7 @@ class PatientViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
         """Alle Fassungen aller Einträge dieser Akte, neueste zuerst (Entwurf 10).
 
         Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, gewichte, kontakte, termine,
-        dokumente, infusionsplaene; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
+        dokumente, infusionsplaene, bezugspersonen, aerzte, erklaerungen, datenschutz; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
         die Bereiche Stammdaten, Diagnose, Therapie und Empfehlung verteilt.
         """
         patient = self.get_object()
@@ -489,6 +528,16 @@ def _aktion(name, h, aenderungen):
         return "wieder zuständig" if h.aktiv else "nicht mehr zuständig"
     if name == "stammdaten" and "abgeschlossen_am" in felder:
         return "abgeschlossen" if h.abgeschlossen_am else "wieder geöffnet"
+    if name == "stammdaten" and "eingeschraenkt_am" in felder:
+        return "Verarbeitung eingeschränkt" if h.eingeschraenkt_am else "Einschränkung aufgehoben"
+    if name == "stammdaten" and "aufbewahrung_bis" in felder:
+        return "Aufbewahrung verlängert" if h.aufbewahrung_bis else "Verlängerung zurückgenommen"
+    if name == "erklaerungen" and "widerrufen_am" in felder:
+        return "widerrufen"
+    if name == "datenschutz" and "erledigt_am" in felder:
+        return "erledigt"
+    if name == "datenschutz" and "frist_verlaengert" in felder:
+        return "Frist verlängert"
     return "geändert"
 
 
@@ -547,7 +596,22 @@ def _beschreibung(name, h, aktion) -> str:
         if name == "aerzte":
             arzt = Arzt.objects.filter(pk=h.arzt_id).first()
             return " · ".join(t for t in (dict(PatientArzt.Rolle.choices).get(h.rolle, h.rolle), str(arzt or ""), h.notiz) if t)
+        if name == "erklaerungen":
+            teile = [dict(Erklaerung.Art.choices).get(h.art, h.art), f"vom {h.erteilt_am:%d.%m.%Y}"]
+            if h.widerrufen_am:
+                teile.append(f"widerrufen am {h.widerrufen_am:%d.%m.%Y}")
+            return " · ".join(teile)
+        if name == "datenschutz":
+            teile = [f"Anfrage: {dict(Datenschutzanfrage.Art.choices).get(h.art, h.art)}",
+                     f"eingegangen am {h.eingegangen_am:%d.%m.%Y}"]
+            if h.ergebnis:
+                teile.append(f"Ergebnis: {dict(Datenschutzanfrage.Ergebnis.choices).get(h.ergebnis, h.ergebnis)}")
+            return " · ".join(teile)
         if name == "akte":
+            if aktion == "Verarbeitung eingeschränkt":
+                return f"Grund: {h.einschraenkung_grund}"
+            if aktion == "Aufbewahrung verlängert":
+                return f"bis {h.aufbewahrung_bis:%d.%m.%Y} · Grund: {h.aufbewahrung_grund}"
             if aktion == "abgeschlossen":
                 return f"Anlass: {dict(Patient.Abschlussanlass.choices).get(h.abschluss_anlass, h.abschluss_anlass)}"
             if h.history_type == "+":
@@ -569,6 +633,8 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         "infusionsplaene": Infusionsplan.history.filter(patient_id=patient.id),
         "bezugspersonen": Bezugsperson.history.filter(patient_id=patient.id),
         "aerzte": PatientArzt.history.filter(patient_id=patient.id),
+        "erklaerungen": Erklaerung.history.filter(patient_id=patient.id),
+        "datenschutz": Datenschutzanfrage.history.filter(patient_id=patient.id),
     }
     if bereich and bereich not in ("stammdaten", *TEXTFELDER):
         quellen = {k: v for k, v in quellen.items() if k == bereich}
@@ -1017,9 +1083,14 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
 
     # ------------------------------------------------ falsch zugeordnet: umhängen oder endgültig löschen
     def _nicht_systemdokument(self, dok):
+        from infusionen.models import Infusionsplan
+
         if dok.herkunft == Dokument.Herkunft.SYSTEM:
             raise serializers.ValidationError({"fehler": "Von EPM erzeugte Dokumente (z. B. die PDF eines freigegebenen "
                                                          "Infusionsplans) gehören zu ihrem Plan und bleiben unverändert."})
+        if Infusionsplan.objects.filter(freigabe_nachweis=dok).exists():
+            raise serializers.ValidationError({"fehler": "Dieses Dokument ist der Nachweis der Freigabe eines "
+                                                         "Infusionsplans und bleibt bei seinem Plan."})
 
     @action(detail=True, methods=["post"], permission_classes=[UmhaengenRecht])
     def umhaengen(self, request, pk=None):
@@ -1060,13 +1131,20 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
                 dok._history_user = request.user
                 dok._change_reason = "Von einer anderen Akte übernommen"
                 dok.save()
+                # war das Dokument als unterschriebenes Blatt an einer Erklärung der bisherigen Akte verknüpft,
+                # endet die Verknüpfung (die Erklärung selbst bleibt)
+                for erklaerung in Erklaerung.objects.filter(dokument=dok):
+                    erklaerung.dokument = None
+                    erklaerung._history_user = request.user
+                    erklaerung._change_reason = "Verknüpftes Dokument einer anderen Akte zugeordnet"
+                    erklaerung.save()
                 DokumentVorgang.objects.create(art=DokumentVorgang.Art.UMGEHAENGT, dokument_id=dok.id, von_patient=alt,
                                                nach_patient=ziel, grund=grund, person=request.user, sha256=dok.sha256,
                                                datei=neu_relativ)
                 protokolliere(SystemEreignis.Art.DOKUMENT_UMGEHAENGT, request, objekt=f"Dokument {dok.id}",
                               titel=dok.titel, von=f"{alt.nachname}, {alt.vorname} (Nr. {alt.nummer})",
                               nach=f"{ziel.nachname}, {ziel.vorname} (Nr. {ziel.nummer})", grund=grund,
-                              sha256=dok.sha256)
+                              sha256=dok.sha256, patient_id=alt.id, nach_id=ziel.id)
         except BaseException:
             os.replace(ziel_pfad, quelle)  # Datenbank unverändert → Datei zurück
             raise
@@ -1112,7 +1190,7 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
 
         def abgelehnt(feld, meldung):
             protokolliere(SystemEreignis.Art.DOKUMENT_LOESCHEN_ABGELEHNT, request, objekt=f"Dokument {dok.id}",
-                          titel=dok.titel, fehler=meldung, sha256=dok.sha256)
+                          titel=dok.titel, fehler=meldung, sha256=dok.sha256, patient_id=dok.patient_id)
             return Response({feld: meldung}, status=status.HTTP_400_BAD_REQUEST)
 
         sitzung = request.session.get(self.LOESCHCODE) or {}
@@ -1143,7 +1221,8 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
             # Art. 17 DSGVO (U15): kein Titel, kein Dateiname im Nachweis – nur Typ, Größe, Prüfsumme, Zeitpunkte
             protokolliere(SystemEreignis.Art.DOKUMENT_GELOESCHT, request, objekt=f"Dokument {dok_id}", akte=akte,
                           grund=grund, sha256=sha, groesse=dok.groesse, typ=dok.typ.wert if dok.typ else "",
-                          hochgeladen_am=dok.hochgeladen_am.isoformat() if dok.hochgeladen_am else "")
+                          hochgeladen_am=dok.hochgeladen_am.isoformat() if dok.hochgeladen_am else "",
+                          patient_id=dok.patient_id)
             dok._history_user = request.user
             dok._change_reason = "Endgültig gelöscht"
             dok.delete()
@@ -1383,6 +1462,9 @@ class StartseiteViewSet(viewsets.ViewSet):
     permission_classes = [recht("akten_lesen")]
 
     def list(self, request):
+        from audit.bereinigung import taeglich
+
+        taeglich()  # abgelaufene Sitzungen, Audit-Log nach der eingestellten Aufbewahrung (höchstens einmal am Tag)
         return Response(startseite_daten(request.user))
 
 
