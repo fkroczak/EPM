@@ -148,9 +148,34 @@ class Vorlagen(Grundlage):
                 self.assertIn(kompakt(erwartet), kompakt(text))
             self.assertIn("ENTWURF", wasserzeichen(r.content))
 
+    def test_migration_stellt_bisherigen_freigabevermerk_um(self):
+        """Bestand: Enthält die aktive Vorlage noch den bisherigen Text, entsteht eine neue Version mit dem Datenfeld."""
+        import importlib
+
+        from django.apps import apps
+
+        m = importlib.import_module("vorlagen.migrations.0002_datenschutz_freigabevermerk")
+        bloecke = [dict(b) for b in STARTVORLAGEN["infusionsplan"]]
+        for b in bloecke:
+            if b["id"] == "freigabe":
+                b.update(text=m.ALT, optionen={"nicht_teilen": True, "linie_oben": True})
+        Dokumentvorlage.objects.create(art="infusionsplan", version=1, status="aktiv", bloecke=bloecke,
+                                       veroeffentlicht_am=timezone.now())
+        m.freigabevermerk(apps, None)
+        aktiv = Dokumentvorlage.aktive("infusionsplan")
+        vermerk = next(b for b in aktiv.bloecke if b["id"] == "freigabe")
+        self.assertEqual((aktiv.version, vermerk["text"], vermerk["optionen"]["ausblenden_wenn_leer"]),
+                         (2, "{{Plan.Freigabevermerk}}", True))
+        self.assertEqual(pruefe_bloecke("infusionsplan", aktiv.bloecke), [])
+        self.assertEqual(Dokumentvorlage.objects.get(art="infusionsplan", version=1).status, "abgeloest")
+        # wiederholbar; eine selbst geänderte Vorlage bleibt, wie sie ist
+        m.freigabevermerk(apps, None)
+        self.assertEqual(Dokumentvorlage.objects.filter(art="infusionsplan").count(), 2)
+
     @unittest.skipUnless(PDFTOTEXT, "pdftotext fehlt")
     def test_inhalt_des_plan_pdfs(self):
-        p, plan = self.testpatient_mit_plan()
+        # freigegeben: Der Freigabevermerk steht nur auf freigegebenen Plänen (beim Entwurf entfällt er)
+        p, plan = self.testpatient_mit_plan(freigeben=True)
         pdf, version = erzeuge_aus_vorlage("infusionsplan", Kontext(patient=p, plan=plan), wasserzeichen="TESTDATEN")
         self.assertEqual(version, 1)
         text = pdf_text(pdf)

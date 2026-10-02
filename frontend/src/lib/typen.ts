@@ -3,7 +3,8 @@ import type { Darstellung } from "./darstellung";
 
 export type Recht =
   | "akten_lesen" | "eintraege_erfassen" | "akten_bearbeiten" | "dokumente_umhaengen" | "dokumente_loeschen"
-  | "plaene_anlegen" | "plaene_freigeben"
+  | "plaene_anlegen" | "plaene_freigeben" | "plaene_abschliessen"
+  | "datenschutz_bearbeiten" | "datenschutz_entscheiden" | "akten_loeschen"
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
   | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "system_verwalten";
 
@@ -98,7 +99,81 @@ export type PatientZeile = {
   abgeschlossen_am: string | null;
   abschluss_anlass: string;
   ist_test: boolean;
+  /** Verarbeitung eingeschränkt (Art. 18 DSGVO): nur sichtbar, solange die eigene Einsicht läuft */
+  ist_eingeschraenkt: boolean;
   kennzahlen: Kennzahlen | null;
+};
+
+/** Aufbewahrungsfrist einer abgeschlossenen Akte */
+export type Aufbewahrung = { jahre: number; regulaer_bis: string | null; verlaengert_bis: string | null; grund: string;
+  bis: string | null; abgelaufen: boolean };
+
+export type ErklaerungsArt = "datenschutzinformation" | "einwilligung" | "schweigepflichtentbindung";
+export const ERKLAERUNGEN: Record<ErklaerungsArt, string> = {
+  datenschutzinformation: "Datenschutzinformation",
+  einwilligung: "Einwilligung in die Datenverarbeitung",
+  schweigepflichtentbindung: "Schweigepflichtentbindung",
+};
+export const ERKLAERUNGEN_KURZ: Record<ErklaerungsArt, string> = {
+  datenschutzinformation: "Datenschutzinformation", einwilligung: "Einwilligung", schweigepflichtentbindung: "Schweigepflichtentbindung",
+};
+export type ErklaerungsStand = { status: "nicht_erfasst" | "liegt_vor" | "widerrufen"; am: string | null; id: number | null };
+
+export type Erklaerung = {
+  id: number; patient: number; art: ErklaerungsArt; art_name: string; status: "liegt_vor" | "widerrufen"; erteilt_am: string;
+  dokument: number | null; dokument_titel: string | null; vorlage_version: number | null; notiz: string;
+  widerrufen_am: string | null; widerruf_notiz: string; erfasst_am: string; erfasst_von_name: string | null; hinweis?: string;
+};
+
+export const ANFRAGEARTEN: Record<string, string> = {
+  auskunft: "Auskunft / Kopie der Akte", berichtigung: "Berichtigung", loeschung: "Löschung",
+  einschraenkung: "Einschränkung der Verarbeitung", widerruf: "Widerruf einer Einwilligung", sonstiges: "Sonstiges",
+};
+export const ANFRAGE_ERGEBNISSE: Record<string, string> = {
+  erfuellt: "erfüllt", eingeschraenkt: "Verarbeitung eingeschränkt statt gelöscht", abgelehnt: "abgelehnt",
+  zurueckgezogen: "zurückgezogen",
+};
+
+export type Datenschutzanfrage = {
+  id: number; patient: number; patient_name: string; patient_nummer: number; patient_ist_test: boolean;
+  patient_eingeschraenkt: boolean; art: string; art_name: string; eingegangen_am: string; gestellt_von: string; inhalt: string;
+  frist_verlaengert: boolean; verlaengerung_grund: string; frist_bis: string; ueberfaellig: boolean; ist_offen: boolean;
+  ergebnis: string; ergebnis_name: string; begruendung: string; mitgeteilt_am: string | null; erledigt_am: string | null;
+  erledigt_von_name: string | null; erfasst_am: string; erfasst_von_name: string | null;
+};
+
+export type Loeschpruefung = { moeglich: boolean; rechtsgrund: "frist" | "antrag" | null; hinweis: string;
+  frist_laeuft_bis: string | null; antrag: number | null; antrag_vom: string | null };
+
+/** Reiter „Datenschutz“ einer Akte */
+export type AktenDatenschutz = {
+  aufbewahrung: Aufbewahrung;
+  einschraenkung: { am: string; von: string | null; grund: string } | null;
+  einsicht_bis: string | null;
+  erklaerungen: Erklaerung[];
+  stand: Record<ErklaerungsArt, ErklaerungsStand>;
+  pflicht: ErklaerungsArt[];
+  vorlagen: Record<ErklaerungsArt, { version: number; entwurf: boolean }>;
+  anfragen: Datenschutzanfrage[];
+  kopien: { zeitpunkt: string; person: string | null }[];
+  loeschen: Loeschpruefung;
+};
+
+type AktenZeile = { id: number; nummer: number; name: string; ist_test: boolean };
+export type DatenschutzUebersicht = {
+  anfragen_offen: Datenschutzanfrage[];
+  anfragen_ueberfaellig: number;
+  aufbewahrung_abgelaufen: (AktenZeile & { abgeschlossen_am: string; aufbewahrung_bis: string; verlaengert: boolean; eingeschraenkt: boolean })[];
+  aufbewahrung_laeuft_ab: (AktenZeile & { abgeschlossen_am: string; aufbewahrung_bis: string; verlaengert: boolean; eingeschraenkt: boolean })[];
+  eingeschraenkt: (AktenZeile & { am: string; von: string | null; grund: string })[];
+  erklaerungen_fehlen: number;
+  abschluss_pruefen: number;
+  loeschprotokoll: { id: number; nummer: number; ist_test: boolean; geloescht_am: string; geloescht_von: string | null;
+    rechtsgrund: string; rechtsgrund_name: string; grund: string; abgeschlossen_am: string | null;
+    aufbewahrung_bis: string | null; umfang: Record<string, number | string> }[];
+  einstellungen: { aufbewahrung_jahre: number; abschluss_pruefen_monate: number; protokoll_aufbewahrung_jahre: number;
+    pflicht_erklaerungen: ErklaerungsArt[] };
+  darf_entscheiden: boolean;
 };
 
 export type Versionskopf = { version: number; zeitpunkt: string; person: string } | null;
@@ -136,6 +211,10 @@ export type Patient = {
   abschluss_notiz: string;
   ist_abgeschlossen: boolean;
   ist_test: boolean;
+  ist_eingeschraenkt: boolean;
+  eingeschraenkt_am: string | null;
+  /** nur bei abgeschlossenen Akten */
+  aufbewahrung: Aufbewahrung | null;
   angelegt_am: string;
   angelegt_von_name: string | null;
   geaendert_am: string;
@@ -150,6 +229,9 @@ export type Patient = {
     ansprechpartner: string | null;
     ansprechpartner_telefon: string | null;
     nickelallergie: string;
+    /** Erklärungen zum Datenschutz, nachgehalten wie die Nickelallergie */
+    erklaerungen: { stand: Record<ErklaerungsArt, ErklaerungsStand>; pflicht: ErklaerungsArt[]; fehlt: ErklaerungsArt[] };
+    datenschutz_anfragen: number;
     kein_katheter: boolean;
     kein_versorger: boolean;
     /** Bezugspersonen mit Schweigepflichtentbindung */
@@ -161,7 +243,7 @@ export type Patient = {
     } | null;
     versionen: Record<"diagnose" | "therapie" | "empfehlung", Versionskopf>;
     zaehler: { kontakte: number; gewichte: number; dokumente: number; termine_offen: number; infusionsplaene: number;
-      bezugspersonen: number; aerzte: number };
+      bezugspersonen: number; aerzte: number; erklaerungen: number };
   } | null;
 };
 
@@ -398,9 +480,21 @@ export type Plan = {
   erstellt_von_name: string | null;
   freigegeben_am: string | null;
   freigegeben_von_name: string | null;
+  /** Freigabe außerhalb von EPM (z. B. per E-Mail): Weg, Datum, wer den Plan im System abgeschlossen hat, Nachweis */
+  freigabe_weg: "" | "system" | "email" | "telefon" | "persoenlich" | "schriftlich";
+  freigabe_weg_name: string;
+  freigabe_datum: string | null;
+  abgeschlossen_von_name: string | null;
+  freigabe_nachweis: number | null;
+  freigabevermerk: string | null;
   pdf_datei: string;
   pdf_sha256: string;
   vorlage_version: number | null;
+};
+
+/** Weg der Freigabe eines Plans (im System durch den Mediziner selbst oder außerhalb von EPM) */
+export const FREIGABEWEGE: Record<string, string> = {
+  system: "im System", email: "per E-Mail", telefon: "telefonisch", persoenlich: "persönlich", schriftlich: "schriftlich",
 };
 
 export type Vergleich = {
@@ -462,4 +556,5 @@ export type Systemereignis = {
   geraet: string;
 };
 
+/** Zahlen und Texte; ``pflicht_erklaerungen`` ist die einzige Liste (siehe Vorlagen › Grenzwerte) */
 export type Einstellungen = Record<string, number | string>;

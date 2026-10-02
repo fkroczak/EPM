@@ -9,7 +9,7 @@ import type { Feldfehler } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useAuswahl, useVersorgerListe } from "@/lib/daten";
 import { alter, datum, eingabeDatum, eingabeZahl, heuteIso, kg, nummer, prozent, terminZeit, zahl } from "@/lib/format";
-import { ABSCHLUSSANLAESSE, GESCHLECHTER, TERMINARTEN } from "@/lib/typen";
+import { ABSCHLUSSANLAESSE, ERKLAERUNGEN_KURZ, GESCHLECHTER, TERMINARTEN } from "@/lib/typen";
 import type { Patient, Recht } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Textfeld, cx } from "@/components/ui/basis";
@@ -244,6 +244,43 @@ function WiederOeffnenDialog({ patient, offen, onOffen }: { patient: Patient; of
   );
 }
 
+/** Akte, deren Verarbeitung eingeschränkt ist (Art. 18 DSGVO): Sie ist nur mit begründeter Einsicht lesbar. */
+type Eingeschraenkt = { eingeschraenkt: true; id: number; nummer: number; eingeschraenkt_am: string; darf_einsicht: boolean; fehler: string };
+
+function EinsichtAnsicht({ info }: { info: Eingeschraenkt }) {
+  const [grund, setGrund] = useState("");
+  const qc = useQueryClient();
+  const einsicht = useMutation({
+    mutationFn: () => api<{ bis: string }>(`patienten/${info.id}/einsicht/`, { body: { grund: grund.trim() } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["patient", info.id] });
+      void qc.invalidateQueries({ queryKey: ["patienten"] });
+    },
+  });
+  const f: Feldfehler = einsicht.error instanceof ApiFehler ? einsicht.error.felder : {};
+  return (
+    <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: `Akte Nr. ${nummer(info.nummer)}` }]}>
+      <Karte className="px-[22px] py-[18px] flex flex-col gap-3 max-w-[720px]" data-testid="akte-eingeschraenkt">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <h1 className="m-0 text-[1.625rem] font-semibold">Akte Nr. {nummer(info.nummer)}</h1>
+          <Chip art="warn"><Icon name="schloss" />Verarbeitung eingeschränkt</Chip>
+        </div>
+        <span className="text-sm">Die Verarbeitung dieser Akte ist seit {datum(info.eingeschraenkt_am)} eingeschränkt (Art. 18 DSGVO).
+          Sie bleibt gespeichert, erscheint aber in keiner Liste und ist nur mit einer begründeten Einsicht lesbar.</span>
+        {info.darf_einsicht ? (
+          <form className="flex flex-col gap-3" noValidate onSubmit={(e) => { e.preventDefault(); einsicht.mutate(); }}>
+            <Feld label="Grund der Einsicht" pflicht fehler={f.grund} hinweis="mindestens 10 Zeichen · die Einsicht gilt 60 Minuten und steht mit Grund im Audit-Log">
+              {(p) => <Textfeld {...p} rows={2} value={grund} onChange={(e) => setGrund(e.target.value)} />}
+            </Feld>
+            {einsicht.error && !Object.keys(f).length ? <Meldung art="fehler">{einsicht.error.message}</Meldung> : null}
+            <Knopf variante="pri" type="submit" className="self-start" laedt={einsicht.isPending} disabled={grund.trim().length < 10}>Einsicht nehmen</Knopf>
+          </form>
+        ) : <Meldung art="info">Einsicht nehmen kann, wer über Datenschutz-Anfragen entscheidet.</Meldung>}
+      </Karte>
+    </Seite>
+  );
+}
+
 function Reiter({ zu, text, zahl: anzahl, ende }: { zu: string; text: string; zahl?: number; ende?: boolean }) {
   return (
     <NavLink to={zu} end={ende} className={({ isActive }) => cx("segment no-underline", isActive && "aktiv")}>
@@ -271,6 +308,10 @@ export function Akte() {
     termin: offenBei("eintraege_erfassen"),
   };
   useOhneRechtSchliessen(erlaubt[dialog], () => setDialog(""));
+  // Verarbeitung eingeschränkt (auch wenn es während der Arbeit geschieht oder die Einsicht abläuft): Was vorher
+  // geladen war, wird nicht weiter gezeigt
+  const gesperrt = akte.error instanceof ApiFehler && akte.error.status === 403 ? akte.error.daten as Eingeschraenkt | null : null;
+  if (gesperrt?.eingeschraenkt) return <EinsichtAnsicht info={gesperrt} />;
   if (akte.isLoading) return <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: "…" }]}><Laden /></Seite>;
   if (!p) {
     return (
@@ -298,6 +339,16 @@ export function Akte() {
               <h1 className="m-0 text-[1.625rem] font-semibold">{name(p)}</h1>
               {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
               {p.ist_abgeschlossen ? <Chip>abgeschlossen</Chip> : null}
+              {p.ist_eingeschraenkt ? <Chip art="warn"><Icon name="schloss" />Verarbeitung eingeschränkt</Chip> : null}
+              {/* Erklärungen zum Datenschutz: nachgehalten wie die Nickelallergie – fehlt eine, steht es hier */}
+              {offen && k?.erklaerungen.fehlt.length ? (
+                <button type="button" className="chip warn border-0 cursor-pointer" data-testid="erklaerungen-fehlen"
+                  title={k.erklaerungen.fehlt.map((a) => `${ERKLAERUNGEN_KURZ[a]}: ${k.erklaerungen.stand[a].status === "widerrufen" ? "widerrufen" : "nicht erfasst"}`).join("\n")}
+                  onClick={() => navigate(`${basis}/datenschutz`)}>
+                  <Icon name="warnung" />
+                  {k.erklaerungen.fehlt.length === 1 ? `${ERKLAERUNGEN_KURZ[k.erklaerungen.fehlt[0]]} fehlt` : `${k.erklaerungen.fehlt.length} Erklärungen fehlen`}
+                </button>
+              ) : null}
             </div>
             <span className="num text-sm gedaempft">
               Nr. {nummer(p.nummer)}{p.geschlecht ? ` · ${GESCHLECHTER[p.geschlecht]}` : ""} · {datum(p.geburtsdatum)} ({alter(p.geburtsdatum)} J.)
@@ -365,10 +416,17 @@ export function Akte() {
         ) : null}
       </Karte>
 
+      {p.ist_eingeschraenkt ? (
+        <Meldung art="warn">
+          Die Verarbeitung dieser Akte ist eingeschränkt (Art. 18 DSGVO). Sie sehen sie mit begründeter Einsicht; die Einsicht
+          gilt 60 Minuten und steht im Audit-Log.
+        </Meldung>
+      ) : null}
       {p.ist_abgeschlossen ? (
         <Meldung art="info">
           Akte abgeschlossen am {datum(p.abgeschlossen_am)} · Anlass: {ABSCHLUSSANLAESSE[p.abschluss_anlass] ?? p.abschluss_anlass}
           {p.abschluss_notiz ? ` · ${p.abschluss_notiz}` : ""}. Die Akte ist nur noch lesbar.
+          {p.aufbewahrung?.bis ? ` Aufbewahrung bis ${datum(p.aufbewahrung.bis)}${p.aufbewahrung.abgelaufen ? " (Frist abgelaufen)" : ""}.` : ""}
         </Meldung>
       ) : null}
 
@@ -378,6 +436,7 @@ export function Akte() {
         <Reiter zu={`${basis}/kontakte`} text="Kontakte" zahl={k?.zaehler.kontakte} />
         <Reiter zu={`${basis}/plaene`} text="Infusionspläne" zahl={k?.zaehler.infusionsplaene} />
         <Reiter zu={`${basis}/dokumente`} text="Dokumente" zahl={k?.zaehler.dokumente} />
+        <Reiter zu={`${basis}/datenschutz`} text="Datenschutz" zahl={k?.datenschutz_anfragen || undefined} />
         <Reiter zu={`${basis}/verlauf`} text="Verlauf" />
       </nav>
 

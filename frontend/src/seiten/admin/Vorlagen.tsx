@@ -8,7 +8,8 @@ import type { Feldfehler } from "@/lib/api";
 import { useBriefkopf } from "@/lib/daten";
 import type { Absender, Briefkopf } from "@/lib/daten";
 import { eingabeZahl, zahl } from "@/lib/format";
-import type { Auswahlwert, Einstellungen, Praeparat } from "@/lib/typen";
+import { ERKLAERUNGEN } from "@/lib/typen";
+import type { Auswahlwert, Einstellungen, ErklaerungsArt, Praeparat } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Seitenkopf, Segmente, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
@@ -259,6 +260,12 @@ const HINWEISE: { k: string; label: string; einheit: string }[] = [
   { k: "plan_alter_warnung_monate", label: "Infusionsplan gilt als alt nach", einheit: "Monaten" },
   { k: "kontakt_ueberfaellig_monate", label: "Kontakt überfällig nach", einheit: "Monaten" },
 ];
+// Datenschutz (docs/DATENSCHUTZ.md): Fristen und die Erklärungen, die in jeder Akte vorliegen sollen
+const DATENSCHUTZ: { k: string; label: string; einheit: string; hinweis?: string }[] = [
+  { k: "aufbewahrung_jahre", label: "Aufbewahrung nach Abschluss der Akte", einheit: "Jahre", hinweis: "danach kann die Akte gelöscht werden" },
+  { k: "abschluss_pruefen_monate", label: "„Abschluss prüfen“, wenn kein Kontakt seit", einheit: "Monaten" },
+  { k: "protokoll_aufbewahrung_jahre", label: "Audit-Log aufbewahren", einheit: "Jahre", hinweis: "0 = unbegrenzt; sonst werden ältere Einträge täglich entfernt" },
+];
 const GRENZEN: { text: string; min: string; max: string; einheit: string }[] = [
   { text: "Energie", min: "kcal_min_tag", max: "kcal_max_tag", einheit: "kcal" },
   { text: "Volumen im Mischbeutel", min: "volumen_min_ml", max: "volumen_max_ml", einheit: "ml" },
@@ -280,14 +287,18 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
   const melden = useHinweis();
   const daten = useQuery({ queryKey: ["einstellungen"], queryFn: () => api<Einstellungen>("einstellungen/") });
   const [w, setW] = useState<Record<string, string> | null>(null);
+  const [pflicht, setPflicht] = useState<string[]>([]);
   useEffect(() => {
-    if (daten.data && !w) setW(Object.fromEntries(Object.entries(daten.data).map(([k, v]) => [k, typeof v === "number" ? zahl(v).replace(/\./g, "") : String(v)])));
+    if (daten.data && !w) {
+      setW(Object.fromEntries(Object.entries(daten.data).map(([k, v]) => [k, typeof v === "number" ? zahl(v).replace(/\./g, "") : String(v)])));
+      setPflicht((daten.data as unknown as { pflicht_erklaerungen?: string[] }).pflicht_erklaerungen ?? []);
+    }
   }, [daten.data, w]);
   const speichern = useMutation({
     mutationFn: () => {
-      const felder = [...HINWEISE.map((h) => h.k), ...GRENZEN.flatMap((g) => [g.min, g.max])];
+      const felder = [...HINWEISE.map((h) => h.k), ...DATENSCHUTZ.map((h) => h.k), ...GRENZEN.flatMap((g) => [g.min, g.max])];
       const fehler: Feldfehler = {};
-      const body: Record<string, string | null> = {};
+      const body: Record<string, string | string[] | null> = { pflicht_erklaerungen: pflicht };
       for (const k of felder) {
         const z = eingabeZahl(w![k] ?? "");
         if (!z || z === "ungueltig") fehler[k] = "Bitte eine Zahl eingeben.";
@@ -312,6 +323,7 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
   );
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-5 items-start" data-testid="grenzwerte">
+      <div className="flex flex-col gap-5 min-w-0">
       <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
         <h2 className="lbl m-0">Hinweise auf Startseite und in der Liste</h2>
         <div className="grid grid-cols-2 gap-3">
@@ -323,6 +335,29 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
         </div>
         <span className="text-[0.8125rem] gedaempft">Beispiel: Warnung, wenn ein Patient mehr als {w.gewicht_warnung_prozent} % in {w.gewicht_warnung_monate} Monaten abnimmt.</span>
       </Karte>
+      <Karte className="px-5 py-[18px] flex flex-col gap-3.5" data-testid="grenzwerte-datenschutz">
+        <h2 className="lbl m-0">Datenschutz</h2>
+        <div className="grid grid-cols-2 gap-3">
+          {DATENSCHUTZ.map((h) => (
+            <Feld key={h.k} label={h.label} fehler={f[h.k]} hinweis={h.hinweis}>
+              {(p) => <Einheit einheit={h.einheit}><Eingabe {...p} className="num pr-20" value={w[h.k] ?? ""} onChange={(e) => setW({ ...w, [h.k]: e.target.value })} /></Einheit>}
+            </Feld>
+          ))}
+        </div>
+        <fieldset className="border-0 p-0 m-0 flex flex-col gap-1.5">
+          <legend className="text-sm font-medium mb-1.5">Erklärungen, die in jeder Akte vorliegen sollen</legend>
+          {(Object.keys(ERKLAERUNGEN) as ErklaerungsArt[]).map((art) => (
+            <label key={art} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={pflicht.includes(art)}
+                onChange={(e) => setPflicht(e.target.checked ? [...pflicht, art] : pflicht.filter((x) => x !== art))} />
+              {ERKLAERUNGEN[art]}
+            </label>
+          ))}
+          {f.pflicht_erklaerungen ? <span className="fehlertext" role="alert">{f.pflicht_erklaerungen}</span> : null}
+          <span className="text-[0.8125rem] gedaempft">Fehlt eine davon oder ist sie widerrufen, steht es im Kopf der Akte und auf der Startseite unter „Nach und nach prüfen“.</span>
+        </fieldset>
+      </Karte>
+      </div>
       <Karte className="px-5 py-[18px] flex flex-col gap-3">
         <h2 className="lbl m-0">Plausibilitätsgrenzen bei der Eingabe</h2>
         <table className="tabelle">

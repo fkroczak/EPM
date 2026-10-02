@@ -47,7 +47,8 @@ test("Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau, Ver
   await aufbau.getByRole("button", { name: /Freigabevermerk/ }).click();
   const eigenschaften = editor.getByTestId("block-eigenschaften");
   const text = eigenschaften.getByLabel("Text");
-  await expect(text).toHaveValue("Maschinell erstellt, geprüft und freigegeben von {{Plan.freigegeben_von}} am {{Plan.freigegeben_datum}}.");
+  // der Vermerk kommt aus einem Datenfeld: er nennt, wer freigegeben hat – und bei Freigabe außerhalb von EPM auch den Weg
+  await expect(text).toHaveValue("{{Plan.Freigabevermerk}}");
   await text.fill("Rückfragen an die Stiftung, Stand ");
   await text.press("End");
   await editor.getByTestId("datenfelder").getByRole("button", { name: "Heute", exact: true }).click();
