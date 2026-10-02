@@ -26,15 +26,20 @@ else
   rm -f /etc/apt/apt.conf.d/95epm-proxy
 fi
 
-echo "==> needrestart: Dienste nur auflisten, nicht selbst neu starten"
+echo "==> needrestart: Dienste nach Updates selbst neu starten – außer Docker und containerd („EPM-Server Aufbau“ A4)"
+# Deren Neustart würde alle Container und damit EPM stoppen; das passiert nur im Wartungsfenster.
 mkdir -p /etc/needrestart/conf.d
-echo "\$nrconf{restart} = 'l';" > /etc/needrestart/conf.d/90-epm.conf
+rm -f /etc/needrestart/conf.d/90-epm.conf
+cat > /etc/needrestart/conf.d/50-epm.conf <<'NEEDRESTART'
+$nrconf{restart} = 'a';
+$nrconf{override_rc}{qr(^(docker|containerd)\.service$)} = 0;
+NEEDRESTART
 
 echo "==> System aktualisieren"
 apt-get update
 apt-get -y full-upgrade
 apt-get -y install ca-certificates curl gnupg vim htop rsync unzip jq tree \
-  unattended-upgrades apt-listchanges age openssl
+  unattended-upgrades apt-listchanges needrestart openssl rclone
 
 echo "==> Automatische Sicherheitsupdates, ohne Neustart"
 cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
@@ -54,11 +59,13 @@ Unattended-Upgrade::Package-Blacklist {
         "docker-buildx-plugin"; "docker-compose-plugin";
 };
 Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
 Unattended-Upgrade::Remove-Unused-Dependencies "true";
 EOF
 systemctl enable --now unattended-upgrades
 
 echo "==> Zeit (VPS: von der OPNsense)"
+timedatectl set-ntp true 2>/dev/null || true
 if [[ -n "$EPM_NTP_SERVER" ]]; then
   if [[ -d /etc/chrony/sources.d ]]; then
     for f in /etc/chrony/sources.d/*.sources; do
@@ -74,13 +81,24 @@ if [[ -n "$EPM_NTP_SERVER" ]]; then
   fi
 fi
 
-echo "==> Journal begrenzen"
+echo "==> Journal dauerhaft speichern, höchstens 1 GB und 6 Monate"
 mkdir -p /etc/systemd/journald.conf.d
-printf "[Journal]\nSystemMaxUse=1G\n" > /etc/systemd/journald.conf.d/90-epm.conf
+printf "[Journal]\nStorage=persistent\nSystemMaxUse=1G\nMaxRetentionSec=6month\n" > /etc/systemd/journald.conf.d/90-epm.conf
 systemctl restart systemd-journald
 
 echo "==> Projektverzeichnis"
 install -d -m 0755 "$EPM_BASE"
+# Eigenes Volume für /srv („EPM-Server Aufbau“ A2): laufen Daten oder Sicherungen voll, bleibt das System lauffähig
+if ! mountpoint -q /srv && ! mountpoint -q "$EPM_BASE" && [[ "$(df --output=target "$EPM_BASE" | tail -1)" == "/" ]]; then
+  echo "WARNUNG: $EPM_BASE liegt auf der Root-Partition. Empfohlen: eigenes LVM-Volume für /srv."
+fi
+
+echo "==> Swap (2 GB, falls keiner da ist)"
+if ! swapon --show | grep -q .; then
+  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+swapon --show
 
 echo
 echo "Fertig. Neustart empfohlen, falls ein neuer Kernel installiert wurde:"

@@ -167,7 +167,7 @@ fi
 
 schritt "Backup vor dem Umstellen"
 if (cd "$B" && docker compose ps --status running -q db | grep -q .); then
-  /usr/local/sbin/epm-backup
+  /usr/local/sbin/epm-backup --art vor_update
 fi
 
 schritt "Version $TAG starten (Migrationen laufen automatisch)"

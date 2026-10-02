@@ -5,6 +5,7 @@ from rest_framework.routers import DefaultRouter
 from accounts import api as konto
 from audit.api import SystemEreignisViewSet, TestdatenViewSet
 from system import api as system
+from system import sicherung_api as backup
 from infusionen.api import InfusionsplanViewSet
 from vorlagen import api as vorlagen
 from patienten.api import (
@@ -75,6 +76,18 @@ urlpatterns = [
     path("api/system/epm/", system.EpmAufgabeView.as_view()),
     path("api/system/hinweis/", system.HinweisView.as_view()),
     path("api/system/sitzungen/<int:pk>/", system.SitzungBeendenView.as_view()),
+    # Administration › Backup (Recht „Sicherungen verwalten“)
+    path("api/backup/", backup.UebersichtView.as_view()),
+    path("api/backup/jetzt/", backup.JetztView.as_view()),
+    path("api/backup/passwort/", backup.PasswortView.as_view()),
+    path("api/backup/passwort/pruefen/", backup.PasswortPruefenView.as_view()),
+    path("api/backup/passwortblatt/", backup.PasswortblattView.as_view()),
+    path("api/backup/ziel/", backup.ZielView.as_view()),
+    path("api/backup/ziel/entfernen/", backup.ZielEntfernenView.as_view()),
+    path("api/backup/ziel/testen/", backup.ZielTestenView.as_view()),
+    path("api/backup/uebertragen/", backup.UebertragenView.as_view()),
+    path("api/backup/auftraege/<uuid:kennung>/abbrechen/", backup.AuftragAbbrechenView.as_view()),
+    path("api/backup/<str:stempel>/wiederherstellen/", backup.WiederherstellenView.as_view()),
     path("api/", include(router.urls)),
 ]
 

@@ -12,13 +12,17 @@ REPO="$PWD"
 B="${EPM_CI_BASIS:-/tmp/epm-ci}"
 TAG="${EPM_CI_TAG:-ci}"
 DOCKER="docker"; [[ $EUID -eq 0 ]] || DOCKER="sudo docker"
+# WebDAV-Ziel für die Übertragung der Sicherungen (Browsertest sicherung.spec.ts): rclone serve webdav, nur lokal
+WEBDAV="${EPM_CI_WEBDAV:-/tmp/epm-ci-webdav}"
+WEBDAV_ADRESSE="127.0.0.1:8099"
 compose() { (cd "$B" && $DOCKER compose -p epm-ci "$@"); }
 
 case "${1:-start}" in
   stop)
     sudo pkill -f "epm-systemagent.py schleife" 2>/dev/null || true
+    pkill -f "rclone serve webdav" 2>/dev/null || true
     compose down -v --remove-orphans 2>/dev/null || true
-    sudo rm -rf "$B"
+    sudo rm -rf "$B" "$WEBDAV"
     exit 0 ;;
   logs)
     compose logs --tail 200 backend web
@@ -55,7 +59,9 @@ done
 
 echo "==> Projektverzeichnis $B"
 sudo rm -rf "$B"
-mkdir -p "$B/secrets" "$B/nginx/certs" "$B/data/dokumente" "$B/data/loeschliste" "$B/system/auftraege" "$B/system/status/auftraege"
+mkdir -p "$B/secrets" "$B/nginx/certs" "$B/data/dokumente" "$B/data/loeschliste" "$B/system/auftraege" "$B/system/status/auftraege" \
+  "$B/backup" "$B/konf-sicherung"
+chmod 0700 "$B/backup" "$B/konf-sicherung"
 cp rollout/projekt/compose.yaml "$B/"
 cp rollout/projekt/nginx/epm.conf "$B/nginx/"
 openssl rand -hex 24 > "$B/secrets/db_password"
@@ -90,10 +96,21 @@ if [[ "$status" != "healthy" ]]; then
   echo "Backend startet nicht:"; compose logs --tail 80 backend; exit 1
 fi
 
-echo "==> Systemagent im Probelauf (wie auf dem Server, aber Updates, Neustart und Sicherung nur simuliert)"
+echo "==> Systemagent im Probelauf (wie auf dem Server; Updates, Neustart und Aufräumen nur simuliert,"
+echo "    Sicherung, Übertragung und Wiederherstellen echt – mit epm-backup aus dem Repo)"
 sudo pkill -f "epm-systemagent.py schleife" 2>/dev/null || true
-sudo nohup python3 "$REPO/rollout/epm-systemagent.py" schleife --basis "$B" --projekt epm-ci --trocken \
-  > /tmp/epm-systemagent.log 2>&1 &
+sudo nohup python3 "$REPO/rollout/epm-systemagent.py" schleife --basis "$B" --projekt epm-ci --trocken --sicherung-echt \
+  --konf "$B/konf-sicherung" --backup-skript "$REPO/rollout/epm-backup.sh" > /tmp/epm-systemagent.log 2>&1 &
+
+if command -v rclone >/dev/null 2>&1; then
+  echo "==> WebDAV-Testziel für die Übertragung ($WEBDAV_ADRESSE, Benutzer epm-ci)"
+  pkill -f "rclone serve webdav" 2>/dev/null || true
+  rm -rf "$WEBDAV"; mkdir -p "$WEBDAV"
+  nohup rclone serve webdav "$WEBDAV" --addr "$WEBDAV_ADRESSE" --user epm-ci --pass "WebDAV-Test-2026" \
+    > /tmp/epm-webdav.log 2>&1 &
+else
+  echo "WARNUNG: rclone fehlt – kein WebDAV-Testziel (sudo apt-get install rclone)"
+fi
 for _ in $(seq 1 30); do [[ -s "$B/system/status/system.json" ]] && break; sleep 1; done
 [[ -s "$B/system/status/system.json" ]] && echo "Systemagent misst" || { echo "Systemagent liefert keinen Status:"; cat /tmp/epm-systemagent.log; }
 

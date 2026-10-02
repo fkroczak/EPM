@@ -184,6 +184,9 @@ jobs:
           grep -v "dist/assets/" ../bau-roh.txt | tee -a ../frontend-bau.txt
           exit $rc
 
+      - name: Programme für Sicherung und Übertragung (GnuPG, rclone, jq)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gnupg rclone jq > /dev/null && rclone version | head -1
+
       - name: Stack starten (Images bauen, Musterdaten, Testkonten)
         run: |
           set -o pipefail
