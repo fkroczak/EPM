@@ -783,6 +783,33 @@ class FalschZugeordneteDokumente(Grundlage):
                                                               "bestaetigung": bestaetigung}, format="json")
         self.assertEqual(r.status_code, 204, r.content)
 
+    def test_admin_loescht_auch_bei_echter_akte(self):
+        """Festlegung 02.10.2026: endgültig löschen auch Admins – auch bei echten Akten (Ausnahme von „nur
+        Testpatienten“); mit denselben Bestätigungen wie beim Mediziner. Andere Patientendaten weiter nur lesen."""
+        from django_otp.oath import totp
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        from epm.pruefhilfen import KENNWORT, mit_zweitem_faktor
+
+        mit_zweitem_faktor(self.admin)
+        geraet = TOTPDevice.objects.get(user=self.admin)
+        dok = self.hochladen(self.sabine)
+        self.assertFalse(dok.patient.ist_test)
+        pfad = dok.pfad
+        a = client_fuer(self.admin)
+        bestaetigung = a.post(f"/api/dokumente/{dok.id}/loeschen-vorbereiten/").json()["code"]
+        with self.captureOnCommitCallbacks(execute=True):
+            r = a.post(f"/api/dokumente/{dok.id}/loeschen/", {
+                "grund": "Falsch zugeordnet, gehört nicht zur Stiftung", "kennwort": KENNWORT,
+                "code": f"{totp(geraet.bin_key, geraet.step, geraet.t0, geraet.digits):06d}", "bestaetigung": bestaetigung},
+                format="json")
+        self.assertEqual(r.status_code, 204, r.content)
+        self.assertFalse(Dokument.objects.filter(pk=dok.id).exists())
+        self.assertFalse(pfad.exists())
+        # sonst schreibt der Admin bei echten Akten weiterhin nichts
+        r = a.patch(f"/api/patienten/{self.sabine.id}/", {"diagnose": "<p>x</p>"}, format="json")
+        self.assertEqual(r.status_code, 403)
+
     def test_endgueltig_loeschen(self):
         from epm.pruefhilfen import KENNWORT
 
@@ -797,8 +824,9 @@ class FalschZugeordneteDokumente(Grundlage):
         dok.refresh_from_db()
         pfad = dok.pfad
         basis = f"/api/dokumente/{dok.id}/"
-        # nur Mediziner: Admin und Mitarbeiter nicht
-        self.assertEqual(client_fuer(self.admin).post(basis + "loeschen-vorbereiten/").status_code, 403)
+        # Mediziner und Admin (auch bei echten Akten, Festlegung 02.10.2026), Mitarbeiter nicht
+        self.assertFalse(dok.patient.ist_test)
+        self.assertEqual(client_fuer(self.admin).post(basis + "loeschen-vorbereiten/").status_code, 200)
         self.assertEqual(client_fuer(self.mitarbeiter).post(basis + "loeschen-vorbereiten/").status_code, 403)
         c = client_fuer(self.mediziner)
         grund = "Dokument eines fremden Patienten, nicht aus der Stiftung"

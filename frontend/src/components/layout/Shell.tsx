@@ -13,16 +13,7 @@ import { Chip, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "./logo";
 
-function NavEintrag({ zu, icon, text, ende, folgt }: { zu: string; icon: string; text: string; ende?: boolean; folgt?: boolean }) {
-  if (folgt) {
-    return (
-      <span className="nav opacity-60 cursor-not-allowed" aria-disabled="true" title={`${text}: kommt mit der Backup-Steuerung`}>
-        <Icon name={icon} groesse={18} />
-        <span className="sr-only hd:not-sr-only">{text}</span>
-        <span className="chip ml-auto hidden hd:inline-flex">folgt</span>
-      </span>
-    );
-  }
+function NavEintrag({ zu, icon, text, ende }: { zu: string; icon: string; text: string; ende?: boolean }) {
   return (
     <NavLink to={zu} end={ende} title={text} className={({ isActive }) => cx("nav", isActive && "aktiv")}>
       <Icon name={icon} groesse={18} />
@@ -35,7 +26,7 @@ function Seitenleiste() {
   const ich = useIch();
   const { abmelden, darf } = useAuth();
   const admin = [
-    darf("backup_verwalten") ? <NavEintrag key="b" zu="/admin/backup" icon="backup" text="Backup" folgt /> : null,
+    darf("backup_verwalten") ? <NavEintrag key="b" zu="/admin/backup" icon="backup" text="Backup" /> : null,
     darf("benutzer_verwalten") ? <NavEintrag key="u" zu="/admin/benutzer" icon="benutzer" text="Benutzer" /> : null,
     darf("vorlagen_pflegen") ? <NavEintrag key="v" zu="/admin/vorlagen" icon="vorlagen" text="Vorlagen" /> : null,
     darf("audit_lesen") ? <NavEintrag key="a" zu="/admin/audit-log" icon="uhr" text="Audit-Log" /> : null,

@@ -31,7 +31,12 @@ from .models import Systemauftrag, Systemhinweis
 
 MINUTEN_ERLAUBT = (0, 5, 10, 15, 30, 60)
 # so lange bleibt die Warnung nach dem Beginn stehen (falls der Auftrag sie nicht vorher beendet)
-WARNUNG_NACHLAUF = {"updates_installieren": 60, "server_neustart": 15, "epm_neustart": 5}
+WARNUNG_NACHLAUF = {"updates_installieren": 60, "server_neustart": 15, "epm_neustart": 5, "wiederherstellen": 30}
+
+
+def protokoll_art(aktion: str):
+    """Aufträge rund um die Sicherungen stehen im Audit-Log unter „Backup“, alle anderen unter „System“."""
+    return SystemEreignis.Art.BACKUP if aktion in host.SICHERUNG_AKTIONEN else SystemEreignis.Art.SYSTEM
 
 
 def _name(a: Systemauftrag) -> str:
@@ -80,7 +85,7 @@ def auftraege_abgleichen():
                                                status__in=[Systemauftrag.Status.WARTET, Systemauftrag.Status.LAEUFT])
                   .select_related("angefordert_von"))
     for a in host.abgleichen(offene):
-        protokolliere(SystemEreignis.Art.SYSTEM, benutzer=a.angefordert_von, objekt=_name(a), ereignis="abgeschlossen",
+        protokolliere(protokoll_art(a.aktion), benutzer=a.angefordert_von, objekt=_name(a), ereignis="abgeschlossen",
                       aktion=a.aktion, name=_name(a), status=a.status, ergebnis=a.ergebnis, probelauf=a.probelauf)
         if a.aktion != "server_neustart" or a.status == Systemauftrag.Status.FEHLER:
             for h in Systemhinweis.objects.filter(auftrag=a, beendet_am__isnull=True):
@@ -133,7 +138,7 @@ class UebersichtView(APIView):
             "aktionen": [{"code": code, **{k: v for k, v in a.items() if k != "hinweis"},
                           "sichern": a.get("sichern", False), "warnen": a.get("warnen", False),
                           "erlaubt": not a.get("recht") or request.user.hat_recht(a["recht"])}
-                         for code, a in host.AKTIONEN.items()],
+                         for code, a in host.AKTIONEN.items() if not a.get("intern")],
             "aufgaben": [{"code": code, **a} for code, a in epm_aufgaben.AUFGABEN.items()],
             "minuten": MINUTEN_ERLAUBT,
         })
@@ -157,72 +162,88 @@ class AuftraegeView(APIView):
     def post(self, request):
         code = request.data.get("aktion")
         aktion = host.AKTIONEN.get(code) if isinstance(code, str) else None
-        if aktion is None:
+        if aktion is None or aktion.get("intern"):
             return Response({"aktion": "Unbekannte Aktion."}, status=status.HTTP_400_BAD_REQUEST)
-        if aktion.get("recht") and not request.user.hat_recht(aktion["recht"]):
-            from accounts.rechte import NAMEN
+        return auftrag_anlegen(request, code)
 
-            return Response({"fehler": f"Dafür fehlt das Recht „{NAMEN[aktion['recht']]}“."},
-                            status=status.HTTP_403_FORBIDDEN)
-        minuten = 0
-        if aktion.get("warnen"):
-            try:
-                minuten = int(request.data.get("minuten") or 0)
-            except (TypeError, ValueError):
-                minuten = -1
-            if minuten not in MINUTEN_ERLAUBT:
-                return Response({"minuten": "Bitte 0, 5, 10, 15, 30 oder 60 Minuten wählen."},
-                                status=status.HTTP_400_BAD_REQUEST)
-        if aktion["bestaetigung"] == "2fa":
-            fehler = bestaetigung_pruefen(request, aktion["name"])
-            if fehler:
-                return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
-        if Systemauftrag.objects.filter(ziel=Systemauftrag.Ziel.SERVER, aktion=code,
-                                        status__in=[Systemauftrag.Status.WARTET, Systemauftrag.Status.LAEUFT]).exists():
-            return Response({"fehler": f"„{aktion['name']}“ ist schon beauftragt und noch nicht abgeschlossen."},
-                            status=status.HTTP_409_CONFLICT)
-        auftrag = Systemauftrag.objects.create(ziel=Systemauftrag.Ziel.SERVER, aktion=code,
-                                               parameter={"minuten": minuten} if aktion.get("warnen") else {},
-                                               angefordert_von=request.user)
+
+def auftrag_anlegen(request, code, parameter=None, geheim=None, objekt=None, protokoll_details=None):
+    """Auftrag an den Systemagenten: Recht, Wartezeit und Warnung (warnen), Passwort + 2FA (bestaetigung „2fa“), nicht
+    doppelt, ablegen, Hinweis an alle Benutzer, Audit-Log. ``parameter`` stehen auch in der Datenbank, ``geheim`` nur
+    in der Auftragsdatei. Antwort: 201 mit dem Auftrag oder 400/403/409/503."""
+    aktion = host.AKTIONEN[code]
+    if aktion.get("recht") and not request.user.hat_recht(aktion["recht"]):
+        from accounts.rechte import NAMEN
+
+        return Response({"fehler": f"Dafür fehlt das Recht „{NAMEN[aktion['recht']]}“."},
+                        status=status.HTTP_403_FORBIDDEN)
+    minuten = 0
+    if aktion.get("warnen"):
         try:
-            host.auftrag_ablegen(auftrag)
-        except host.AuftragNichtMoeglich as e:
-            transaction.set_rollback(True)
-            return Response({"fehler": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        if aktion.get("warnen"):
-            beginn = timezone.now() + timedelta(minutes=minuten)
-            text = str(request.data.get("hinweis") or "").strip()[:400] or aktion["hinweis"]
-            zeit = f"Beginn: {timezone.localtime(beginn):%H:%M} Uhr." if minuten else "Beginn: jetzt."
-            vorher = Systemhinweis.aktiv()
-            if vorher is not None:
-                hinweis_beenden(vorher, request.user)
-            Systemhinweis.objects.create(
-                text=f"{text} {zeit}"[:500], art=Systemhinweis.Art.WARNUNG, auftrag=auftrag, angelegt_von=request.user,
-                gueltig_bis=beginn + timedelta(minutes=WARNUNG_NACHLAUF.get(code, 15)))
-        protokolliere(SystemEreignis.Art.SYSTEM, request, objekt=aktion["name"], ereignis="angefordert", aktion=code,
-                      name=aktion["name"], minuten=minuten, bestaetigt=aktion["bestaetigung"] == "2fa")
-        return Response(AuftragSerializer(auftrag).data, status=status.HTTP_201_CREATED)
+            minuten = int(request.data.get("minuten") or 0)
+        except (TypeError, ValueError):
+            minuten = -1
+        if minuten not in MINUTEN_ERLAUBT:
+            return Response({"minuten": "Bitte 0, 5, 10, 15, 30 oder 60 Minuten wählen."},
+                            status=status.HTTP_400_BAD_REQUEST)
+    if aktion["bestaetigung"] == "2fa":
+        fehler = bestaetigung_pruefen(request, aktion["name"])
+        if fehler:
+            return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
+    if Systemauftrag.objects.filter(ziel=Systemauftrag.Ziel.SERVER, aktion=code,
+                                    status__in=[Systemauftrag.Status.WARTET, Systemauftrag.Status.LAEUFT]).exists():
+        return Response({"fehler": f"„{aktion['name']}“ ist schon beauftragt und noch nicht abgeschlossen."},
+                        status=status.HTTP_409_CONFLICT)
+    werte = dict(parameter or {})
+    if aktion.get("warnen"):
+        werte["minuten"] = minuten
+    auftrag = Systemauftrag.objects.create(ziel=Systemauftrag.Ziel.SERVER, aktion=code, parameter=werte,
+                                           angefordert_von=request.user)
+    try:
+        host.auftrag_ablegen(auftrag, geheim=geheim)
+    except host.AuftragNichtMoeglich as e:
+        transaction.set_rollback(True)
+        return Response({"fehler": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    if aktion.get("warnen"):
+        beginn = timezone.now() + timedelta(minutes=minuten)
+        text = str(request.data.get("hinweis") or "").strip()[:400] or aktion["hinweis"]
+        zeit = f"Beginn: {timezone.localtime(beginn):%H:%M} Uhr." if minuten else "Beginn: jetzt."
+        vorher = Systemhinweis.aktiv()
+        if vorher is not None:
+            hinweis_beenden(vorher, request.user)
+        Systemhinweis.objects.create(
+            text=f"{text} {zeit}"[:500], art=Systemhinweis.Art.WARNUNG, auftrag=auftrag, angelegt_von=request.user,
+            gueltig_bis=beginn + timedelta(minutes=WARNUNG_NACHLAUF.get(code, 15)))
+    protokolliere(protokoll_art(code), request, objekt=objekt or aktion["name"], ereignis="angefordert",
+                  aktion=code, name=aktion["name"], minuten=minuten, bestaetigt=aktion["bestaetigung"] == "2fa",
+                  **(protokoll_details or {}))
+    return Response(AuftragSerializer(auftrag).data, status=status.HTTP_201_CREATED)
 
 
 class AuftragAbbrechenView(APIView):
     permission_classes = [SystemRecht]
 
     def post(self, request, kennung):
-        auftrag = Systemauftrag.objects.filter(kennung=kennung).first()
-        if auftrag is None:
-            return Response({"fehler": "Auftrag nicht gefunden."}, status=status.HTTP_404_NOT_FOUND)
-        if auftrag.status != Systemauftrag.Status.WARTET or not host.auftrag_zurueckziehen(auftrag):
-            return Response({"fehler": "Der Server hat den Auftrag schon übernommen; er kann nicht mehr zurückgezogen "
-                                       "werden."}, status=status.HTTP_409_CONFLICT)
-        auftrag.status = Systemauftrag.Status.ABGEBROCHEN
-        auftrag.beendet_am = timezone.now()
-        auftrag.ergebnis = f"Zurückgezogen von {request.user.anzeigename}."
-        auftrag.save(update_fields=["status", "beendet_am", "ergebnis"])
-        for h in Systemhinweis.objects.filter(auftrag=auftrag, beendet_am__isnull=True):
-            hinweis_beenden(h, request.user)
-        protokolliere(SystemEreignis.Art.SYSTEM, request, objekt=_name(auftrag), ereignis="abgebrochen",
-                      aktion=auftrag.aktion, name=_name(auftrag))
-        return Response(AuftragSerializer(auftrag).data)
+        auftrag = Systemauftrag.objects.filter(kennung=kennung, ziel=Systemauftrag.Ziel.SERVER).first()
+        return auftrag_zurueckziehen(request, auftrag)
+
+
+def auftrag_zurueckziehen(request, auftrag: Systemauftrag | None):
+    """Wartenden Auftrag zurückziehen, solange der Agent die Datei noch nicht übernommen hat."""
+    if auftrag is None:
+        return Response({"fehler": "Auftrag nicht gefunden."}, status=status.HTTP_404_NOT_FOUND)
+    if auftrag.status != Systemauftrag.Status.WARTET or not host.auftrag_zurueckziehen(auftrag):
+        return Response({"fehler": "Der Server hat den Auftrag schon übernommen; er kann nicht mehr zurückgezogen "
+                                   "werden."}, status=status.HTTP_409_CONFLICT)
+    auftrag.status = Systemauftrag.Status.ABGEBROCHEN
+    auftrag.beendet_am = timezone.now()
+    auftrag.ergebnis = f"Zurückgezogen von {request.user.anzeigename}."
+    auftrag.save(update_fields=["status", "beendet_am", "ergebnis"])
+    for h in Systemhinweis.objects.filter(auftrag=auftrag, beendet_am__isnull=True):
+        hinweis_beenden(h, request.user)
+    protokolliere(protokoll_art(auftrag.aktion), request, objekt=_name(auftrag), ereignis="abgebrochen",
+                  aktion=auftrag.aktion, name=_name(auftrag))
+    return Response(AuftragSerializer(auftrag).data)
 
 
 class EpmAufgabeView(APIView):

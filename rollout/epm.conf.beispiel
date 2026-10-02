@@ -25,5 +25,12 @@ EPM_NTP_SERVER=""                  # z. B. 10.0.0.1 (OPNsense)
 # (Paket auf der Test-VM mit  sudo epm-update --paket-erstellen  erzeugen und per scp übertragen)
 EPM_UPDATE_QUELLE="git"            # VPS: paket
 
+# Interne Docker-Netze: dürfen sich NICHT mit LAN-, VPN- oder Kundennetzen überschneiden (02-docker.sh)
+EPM_DOCKER_BIP="10.231.0.1/24"
+EPM_DOCKER_POOL="10.231.16.0/20"
+
+# Sicherungen: Aufbewahrung auf dem Server in Tagen (Festlegung 02.10.2026: 30)
+EPM_BACKUP_TAGE="30"
+
 # UID, unter der das Backend im Container läuft (muss zum Dockerfile passen)
 EPM_APP_UID="10001"

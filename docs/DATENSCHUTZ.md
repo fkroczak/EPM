@@ -30,11 +30,11 @@ Es ist keine Rechtsberatung. Wo eine Frage nicht aus dem Gesetz selbst beantwort
 | Art. 12 Abs. 4 DSGVO | Wird ein Antrag nicht erfüllt, sind der Person innerhalb eines Monats die Gründe mitzuteilen – mit dem Hinweis auf die Beschwerde bei einer Aufsichtsbehörde und den gerichtlichen Rechtsbehelf | „abgelehnt“ und „eingeschränkt statt gelöscht“ nur mit Begründung; Datum der Mitteilung. Das Schreiben selbst (mit den Hinweisen) verfasst die Stiftung; EPM hält Begründung und Datum fest | F77 |
 | Art. 13 DSGVO | Information bei der Erhebung | Vordruck „Datenschutzinformation“ als Dokumentvorlage (Entwurf mit Lücken, siehe O2); Aushändigung wird in der Akte nachgehalten | F75, F76 |
 | Art. 15 Abs. 3 DSGVO | Kopie der Daten | „Kopie der Akte“ als ZIP: Akte und Verlauf als PDF, alle Dokumente im Original; jede Kopie steht im Audit-Log | F78 |
-| Art. 17 Abs. 1 DSGVO | Löschung auf Antrag bzw. wenn der Zweck entfallen ist | Akte endgültig löschen (nur Mediziner, Kennwort + Authenticator-Code + Bestätigungscode): Einträge, Historie, Dateien weg; Audit-Log ohne Namen und Inhalte; Löschprotokoll ohne Namen. Einzelne Dokumente: F73 | F80, F73 |
+| Art. 17 Abs. 1 DSGVO | Löschung auf Antrag bzw. wenn der Zweck entfallen ist | Akte endgültig löschen (Mediziner und Admin, Kennwort + Authenticator-Code + Bestätigungscode): Einträge, Historie, Dateien weg; Audit-Log ohne Namen und Inhalte; Löschprotokoll ohne Namen. Einzelne Dokumente: F73 | F80, F73 |
 | Art. 17 Abs. 3 b und e DSGVO | keine Löschung, soweit eine rechtliche Pflicht zur Aufbewahrung besteht oder die Daten für Rechtsansprüche gebraucht werden | Vor Ablauf der Frist wird nur auf Antrag gelöscht; der Mediziner entscheidet, ob eine Aufbewahrungspflicht entgegensteht – dann Einschränkung statt Löschung | F79, F80 |
 | § 35 Abs. 3 BDSG | Einschränkung statt Löschung, wenn satzungsgemäße oder vertragliche Aufbewahrungsfristen entgegenstehen | Ergebnis „Verarbeitung eingeschränkt statt gelöscht“ einer Anfrage schränkt die Akte ein | F77, F79 |
 | Art. 18 DSGVO | Eingeschränkte Daten werden – von der Speicherung abgesehen – nur noch mit Einwilligung der Person, für Rechtsansprüche, zum Schutz der Rechte einer anderen Person oder aus wichtigem öffentlichem Interesse verarbeitet (Abs. 2); vor dem Aufheben ist die Person zu unterrichten (Abs. 3) | Eingeschränkte Akte erscheint in keiner Patientenliste, Suche oder Auswertung; lesbar nur mit begründeter Einsicht (60 Minuten, im Audit-Log; die Ansicht nennt die zulässigen Zwecke nach Abs. 2 – ob der eingetragene Grund darunter fällt, entscheidet die Person, nicht das Programm). Damit Fristen und Anfragen nicht untergehen, führt die Übersicht „Datenschutz“ sie weiter auf: mit Namen nur für Personen, die Einsicht nehmen dürften, sonst nur mit Nummer; ebenso das Audit-Log. Aufheben nur mit Datum der Unterrichtung oder Begründung, warum sie entfällt | F79, F81 |
-| Art. 32 DSGVO | Sicherheit der Verarbeitung | bestehend: Rollen und Rechte, 2FA, Sperre, Sitzungsende, Audit-Log, Trigger. Neu: Sicherungen 30 Tage, Verschlüsselung der Sicherungen mit `age` vorbereitet (O5) | F61, F66 |
+| Art. 32 DSGVO | Sicherheit der Verarbeitung | bestehend: Rollen und Rechte, 2FA, Sperre, Sitzungsende, Audit-Log, Trigger. Sicherungen 30 Tage, verschlüsselt (GnuPG, AES-256) mit einem Passwort, das die Administration in der Oberfläche festlegt (O5 geklärt), Übertragung nur verschlüsselt; Wiederherstellen nur mit Passwort und 2FA | F61–F64, F66 |
 | § 630f BGB | Dokumentation: Änderungen müssen erkennbar bleiben; Aufbewahrung 10 Jahre nach Abschluss der Behandlung | Verlauf und Versionen unveränderlich (bestehend, F19, F22, F60). Ob § 630f für die Stiftung unmittelbar gilt, ist offen (O1) | F60, F74 |
 | § 203 StGB | Berufsgeheimnis; mitwirkende Dienstleister sind zur Geheimhaltung zu verpflichten | organisatorisch (O6) – nichts im Programm | – |
 
@@ -69,10 +69,12 @@ Aufbewahrung des Audit-Logs (Jahre, 0 = unbegrenzt), Erklärungen, die vorliegen
 |---|---|---|---|---|
 | Datenschutz: Erklärungen und Anfragen erfassen, Kopie der Akte | – | ✓ | ✓ | ✓ T |
 | Datenschutz: Anfragen entscheiden, Verarbeitung einschränken, Einsicht, Aufbewahrung verlängern | – | – | ✓ | ✓ T |
-| Akten endgültig löschen | – | – | ✓ | – (nur Mediziner) |
+| Akten endgültig löschen | – | – | ✓ | ✓ (auch echte Akten) |
 | Infusionspläne nach Freigabe abschließen | – | ✓ | ✓ | ✓ T |
 
-T = nur bei Testpatienten. Admins können eingeschränkte echte Akten nicht einsehen; sie sehen von ihnen – in der
+T = nur bei Testpatienten. Endgültig löschen dürfen Admins seit 02.10.2026 auch echte Akten und Dokumente (Festlegung;
+sonst schreiben Admins Patientendaten nur bei Testpatienten) – eine eingeschränkte Akte aber nicht, weil sie sie nicht
+sehen; die löscht wer Einsicht nehmen darf. Admins können eingeschränkte echte Akten nicht einsehen; sie sehen von ihnen – in der
 Übersicht, im Audit-Log – nur die Nummer, im Django-Admin gar nichts. Mitarbeiter (ohne das Recht „entscheiden“) ebenso.
 Wer das Recht „entscheiden“ hat, sieht in der Übersicht „Datenschutz“ und im Audit-Log auch Namen und Grund – sonst
 ließe sich eine Anfrage zu einer eingeschränkten Akte nicht bearbeiten; die Akte selbst öffnet auch diese Person nur
@@ -115,9 +117,9 @@ Name); nach einer Wiederherstellung löscht das Backend beim Start alles erneut,
 | O2 | Texte der drei Vordrucke | Rechtstexte dürfen nicht erfunden werden: Zwecke, Empfänger, Rechtsgrundlage, Speicherdauer, Datenschutzbeauftragte/r, Aufsichtsbehörde trägt die Stiftung ein | Entwürfe mit Lücken, Wasserzeichen „ENTWURF“ bis zur Veröffentlichung |
 | O3 | Wie lange wird das Audit-Log aufbewahrt? | keine gesetzliche Zahl gefunden; Abwägung zwischen Nachweis (Art. 5 Abs. 2) und Speicherbegrenzung | 0 = unbegrenzt, einstellbar |
 | O4 | Nach wie vielen Monaten ohne Kontakt soll „Abschluss prüfen“ erscheinen? Welche Erklärungen sollen vorliegen? | fachliche Festlegung | 24 Monate; alle drei Erklärungen – beides einstellbar |
-| O5 | Verschlüsselung der Sicherungen: Wer verwahrt den privaten Schlüssel? | ohne Schlüssel keine Wiederherstellung; der Schlüssel darf nicht auf dem Server liegen | `epm-backup` verschlüsselt, sobald `secrets/backup-empfaenger.txt` hinterlegt und `age` installiert ist; sonst wie bisher unverschlüsselt mit Hinweis |
+| O5 | ~~Verschlüsselung der Sicherungen: Wer verwahrt den Schlüssel?~~ **Geklärt 02.10.2026:** symmetrisch mit einem Passwort aus der Oberfläche (Administration › Backup); es liegt nur auf dem Server (root, 0600), damit die nächtliche Sicherung ohne Eingabe läuft, und ausgedruckt im Tresor (Passwortblatt). Ein neues Passwort gilt ab der nächsten Sicherung; ältere bleiben, bis keine Sicherung sie mehr braucht | – | umgesetzt (F61) |
 | O6 | Verpflichtung von Netcup und Hetzner zur Geheimhaltung (§ 203 StGB) zusätzlich zum Auftragsverarbeitungsvertrag | liegt nicht vor bzw. nicht bekannt | – (organisatorisch) |
-| O7 | Aufbewahrung der Sicherungen auf der NAS und in der Nextcloud | 30 Tage gelten bisher nur für den Server; liegen Kopien länger auf der NAS, bleiben gelöschte Akten dort länger erhalten | – (organisatorisch; F64 ist noch nicht umgesetzt) |
+| O7 | Aufbewahrung der Sicherungen auf der NAS und in der Nextcloud | 30 Tage gelten nur für den Server. EPM überträgt nur verschlüsselte Sicherungen und löscht im Ziel nie (Schutz gegen versehentliches oder böswilliges Löschen) – wie lange Kopien dort liegen, legt die Stiftung fest; so lange bleiben gelöschte Akten darin (verschlüsselt) erhalten | – (organisatorisch; Löschen im Ziel z. B. per Aufbewahrungsregel der Nextcloud/NAS) |
 | O8 | Sollen Mitarbeiter Pläne auch anlegen dürfen? | Abschließen nach Freigabe dürfen sie jetzt; das Anlegen ist nach der Festlegung vom 01.10.2026 Medizinern vorbehalten und unter Benutzer › Rechte umstellbar | unverändert |
 | O9 | Nachweis bei Freigabe per Telefon oder persönlich | bei E-Mail und schriftlich ist der Nachweis Pflicht; bei Telefon/persönlich gibt es kein Schriftstück. Der genannte Mediziner wird von EPM nicht benachrichtigt – er sieht den Plan mit Vermerk in der Akte, im Verlauf und im Audit-Log | ohne Nachweis möglich, Weg und Datum stehen im Vermerk |
 
@@ -128,7 +130,7 @@ Name); nach einer Wiederherstellung löscht das Backend beim Start alles erneut,
 3. Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO) um EPM ergänzen: Zwecke, Kategorien, Empfänger (Versorger,
    Praxis), Auftragsverarbeiter (Netcup, Hetzner), Löschfristen.
 4. Geheimhaltungsverpflichtung der Dienstleister (O6) klären.
-5. Schlüssel für die Sicherungen erzeugen und verwahren (O5); Aufbewahrung auf NAS/Nextcloud festlegen (O7).
+5. Sicherungs-Passwort unter Administration › Backup festlegen, Passwortblatt drucken und im Tresor verwahren; Aufbewahrung auf NAS/Nextcloud festlegen (O7).
 6. Nach dem Import der Altdaten (F65): Altsystem abschalten und seine Daten löschen – Datenbank, Dumps, Kopien auf
    Arbeitsrechnern und die Test-VM. Solange dort Daten liegen, gelten Löschungen in EPM dort nicht.
 7. Freigabe-E-Mails für Infusionspläne: nur Patienten- und Plannummer nennen, keine Namen oder Diagnosen.

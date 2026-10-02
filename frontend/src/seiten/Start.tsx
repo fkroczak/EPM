@@ -12,6 +12,7 @@ import { Seite } from "@/components/layout/Shell";
 import { Chip, Fehleranzeige, Karte as KarteBox, Knopf, Laden, Leer, Segmente, cx } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
 import { useSortierbar } from "@/components/ui/sortierbar";
+import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
 
 type PlanEintrag = { id: number; patient: number; name: string; gueltig_ab: string; status: string; erstellt_am: string;
@@ -28,7 +29,25 @@ type Startdaten = {
   zuletzt_eingetragen: { bereich: string; bezeichnung: string; objekt_id: number; patient: number; name: string | null;
     zeitpunkt: string; person: string | null }[];
   zahlen: { in_betreuung: number; mit_offenem_termin: number };
+  /** O-07: Zustand der Sicherungen (vom Systemagenten), für alle sichtbar */
+  sicherung: { zustand: "ok" | "warnung" | "fehler" | "unbekannt"; letzte_am: string | null; verschluesselt: boolean | null;
+    titel: string; hinweise: string[] };
 };
+
+/** Kopfzeile wie im Entwurf: „Backup heute 02:00 erfolgreich“; sonst der wichtigste Hinweis. Mit dem Recht
+ *  „Sicherungen verwalten“ führt der Chip zur Seite Backup. */
+function BackupStatus({ s, verweis }: { s: Startdaten["sicherung"]; verweis: boolean }) {
+  const ok = s.zustand === "ok";
+  const text = ok ? `Backup ${relativ(s.letzte_am, true).replace(", ", " ")} erfolgreich` : s.titel || "Backup-Status fehlt";
+  const art = ok ? "ok" : s.zustand === "warnung" ? "warn" : s.zustand === "unbekannt" ? undefined : "fehler";
+  const inhalt = <><Icon name={ok ? "haken" : "warnung"} groesse={14} />{text}</>;
+  const titel = ok ? undefined : s.hinweise.join(" ");
+  return verweis ? (
+    <Link to="/admin/backup" className={cx("chip h-7 no-underline", art)} title={titel} data-testid="backup-status">{inhalt}</Link>
+  ) : (
+    <Chip art={art} className="h-7" title={titel} data-testid="backup-status">{inhalt}</Chip>
+  );
+}
 
 const KARTEN: { id: Karte["id"]; titel: string }[] = [
   { id: "termine", titel: "Termine und Wiedervorlagen" },
@@ -268,7 +287,7 @@ function Anpassen({ karten, onAendern, onFertig }: { karten: Karte[]; onAendern:
 
 export function Start() {
   const ich = useIch();
-  const { setIch } = useAuth();
+  const { setIch, darf } = useAuth();
   const melden = useHinweis();
   const [bearbeiten, setBearbeiten] = useState(false);
   const location = useLocation();
@@ -305,7 +324,10 @@ export function Start() {
             </span>
           ) : null}
         </div>
-        <Knopf icon="stift" onClick={() => setBearbeiten((b) => !b)} aria-expanded={bearbeiten}>Startseite anpassen</Knopf>
+        <div className="flex items-center gap-3 flex-wrap">
+          {d?.sicherung ? <BackupStatus s={d.sicherung} verweis={darf("backup_verwalten")} /> : null}
+          <Knopf icon="stift" onClick={() => setBearbeiten((b) => !b)} aria-expanded={bearbeiten}>Startseite anpassen</Knopf>
+        </div>
       </div>
       {bearbeiten ? <Anpassen karten={karten} onAendern={(k) => speichern.mutate(k)} onFertig={() => setBearbeiten(false)} /> : null}
       {daten.isLoading ? <Laden /> : null}

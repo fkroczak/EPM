@@ -199,6 +199,8 @@ def beschreibung(e) -> str:
                 f"(Löschung vom {_datum(d.get('geloescht_am', ''))})")
     if art == A.SYSTEM:
         return _system(e, d)
+    if art == A.BACKUP:
+        return _backup(e, d)
     if art == A.DATENSCHUTZ:
         return f"{e.objekt}: {d.get('aktion', '')}" + (f" – {d['hinweis']}" if d.get("hinweis") else "")
     if art == A.AKTE_EINGESCHRAENKT:
@@ -217,6 +219,37 @@ def beschreibung(e) -> str:
         return (f"{d.get('anzahl', 0)} Einträge älter als {d.get('jahre', '?')} Jahre entfernt "
                 f"(eingestellte Aufbewahrung des Audit-Logs)")
     return e.get_art_display() + (f" {e.objekt}" if e.objekt else "")
+
+
+def _backup(e, d) -> str:
+    """Administration › Backup: Aufträge wie unter System, dazu Passwort und Wiederherstellung (nie ein Passwort)."""
+    ereignis = d.get("ereignis")
+    if ereignis == "angefordert" and d.get("aktion") == "sicherung_ziel":
+        teile = [f"Übertragungsziel festgelegt: {d.get('url', '')}"]
+        if d.get("ordner"):
+            teile.append(f"Ordner „{d['ordner']}“")
+        if d.get("zeitfenster"):
+            teile.append(f"Zeitfenster {d['zeitfenster']}")
+        teile.append("neues Passwort für das Ziel" if d.get("zugang_neu") else "Passwort für das Ziel unverändert")
+        return ", ".join(teile) + (", mit Passwort und 2FA bestätigt" if d.get("bestaetigt") else "")
+    if ereignis == "angefordert" and d.get("aktion") == "wiederherstellen":
+        zeit = _datum(d.get("sicherung_zeitpunkt", "")) or d.get("stempel", "")
+        return (f"Wiederherstellen der Sicherung vom {zeit} angefordert"
+                + (f", Beginn in {d['minuten']} Min." if d.get("minuten") else "")
+                + (", mit Passwort und 2FA bestätigt" if d.get("bestaetigt") else ""))
+    if ereignis == "wiederhergestellt":
+        zeit = _datum(d.get("sicherung_zeitpunkt", "")) or d.get("stempel", "")
+        text = f"Sicherung vom {zeit} wiederhergestellt, alle Anmeldungen beendet"
+        if d.get("vorher_stempel"):
+            text += f" – der Stand davor (auch dieses Audit-Log) ist in der Sicherung {d['vorher_stempel']}"
+        return text
+    if ereignis == "passwortblatt":
+        return f"Passwortblatt für Sicherungs-Passwort Nr. {d.get('nr', '?')} gedruckt"
+    if ereignis == "passwort_geprueft":
+        return f"Sicherungs-Passwort geprüft: passt zu Nr. {d.get('nr', '?')}"
+    if ereignis == "passwort_falsch":
+        return "Sicherungs-Passwort geprüft: passt zu keinem hinterlegten Passwort"
+    return _system(e, d)
 
 
 def _system(e, d) -> str:

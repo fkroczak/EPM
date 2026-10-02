@@ -35,6 +35,13 @@ sudo epm-update --paket ~/epm-paket-<TAG>.tar                 # auf dem VPS: pr�
 Die Konfiguration des Servers liegt in `/etc/epm/epm.conf` (nicht im Repo). Die Oberfläche ist danach unter
 `https://<EPM_WEB_NAME>/` erreichbar, die Django-Verwaltung unter `/verwaltung/` (nur Rolle Admin).
 
+## Datensicherung
+Täglich um 02:00 (`epm-backup.timer`), 30 Tage auf dem Server unter `/srv/epm/backup`. Gesteuert wird alles unter
+Administration › Backup: Passwort für die Verschlüsselung festlegen und das Passwortblatt im Tresor verwahren,
+Übertragungsziel (WebDAV, z. B. Nextcloud mit App-Passwort) mit Zeitfenster, „Jetzt sichern“, Wiederherstellen (Admin-
+Passwort und 2FA). Passwort und Zugang liegen nur auf dem Server in `/etc/epm/sicherung` (root, 0600). Die Adresse des
+Ziels muss im Proxy der OPNsense freigegeben sein. Ohne EPM entschlüsseln: `gpg -d -o epm-db_….dump epm-db_….dump.gpg`.
+
 ## Tests
 Bei jedem Push laufen in GitHub Actions (`.github/workflows/backend.yml`):
 1. Backend-Tests gegen PostgreSQL 18 (`backend/*/tests.py`), fehlende Migrationen werden erzeugt und eingecheckt.

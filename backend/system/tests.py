@@ -69,17 +69,31 @@ class Rechte(Systemverzeichnis):
         self.assertNotIn("system_verwalten", test_admin.rechte)
         self.assertEqual(client_fuer(test_admin).get("/api/system/uebersicht/").status_code, 403)
 
-    def test_anderen_rollen_nicht_erteilbar(self):
-        r = self.a.put("/api/rechte/", {"matrix": {"mediziner": {"system_verwalten": True}}}, format="json")
-        self.assertEqual(r.status_code, 400)
-        self.assertIn("Admin vorbehalten", str(r.json()))
-        self.assertFalse(Gruppenrecht.objects.filter(recht="system_verwalten").exists())
+    def test_vertretung_je_gruppe_freischaltbar(self):
+        """Festlegung 02.10.2026: Standard nur Admin, für eine Urlaubsvertretung jeder Gruppe erteilbar."""
         daten = self.a.get("/api/rechte/").json()
-        self.assertEqual(daten["nur_rollen"]["system_verwalten"], ["admin"])
+        self.assertNotIn("system_verwalten", daten["nur_rollen"])
         self.assertFalse(daten["matrix"]["mediziner"]["system_verwalten"])
-        # auch ein Eintrag direkt in der Datenbank wirkt nicht
-        Gruppenrecht.objects.create(rolle=Rolle.MEDIZINER, recht="system_verwalten", erlaubt=True)
-        self.assertNotIn("system_verwalten", self.mediziner.rechte)
+        m = client_fuer(self.mediziner)
+        self.assertEqual(m.get("/api/system/uebersicht/").status_code, 403)
+        r = self.a.put("/api/rechte/", {"matrix": {"mediziner": {"system_verwalten": True}}}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.json()["matrix"]["mediziner"]["system_verwalten"])
+        self.mediziner.refresh_from_db()
+        self.assertIn("system_verwalten", self.mediziner.rechte)
+        self.assertEqual(m.get("/api/system/uebersicht/").status_code, 200)
+        # Vertretung führt Tätigkeiten mit dem eigenen Passwort und 2FA aus
+        codes = mit_zweitem_faktor(self.mediziner, anzahl_codes=2)
+        r = m.post("/api/system/auftraege/", {"aktion": "server_neustart", "minuten": 0, "kennwort": KENNWORT,
+                                              "code": codes[0]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        # Testzugänge erhalten es auch dann nicht
+        tester = benutzer("tester", Rolle.MEDIZINER, ist_test=True)
+        self.assertNotIn("system_verwalten", tester.rechte)
+        # Urlaub vorbei: zurücknehmen wirkt sofort
+        self.a.put("/api/rechte/", {"matrix": {"mediziner": {"system_verwalten": False}}}, format="json")
+        self.assertEqual(m.get("/api/system/uebersicht/").status_code, 403)
+        self.assertTrue(SystemEreignis.objects.filter(art="rechte_geaendert").exists())
         # Admin selbst darf es abgeben und wieder bekommen
         r = self.a.put("/api/rechte/", {"matrix": {"admin": {"system_verwalten": False}}}, format="json")
         self.assertEqual(r.status_code, 200)

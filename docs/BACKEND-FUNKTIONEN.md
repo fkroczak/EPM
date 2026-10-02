@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 02.10.2026 · Code-Stand: Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
+Stand: 02.10.2026 · Code-Stand: Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
 Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026, Prüfung nach DSGVO vom 02.10.2026 (`docs/DATENSCHUTZ.md`).
@@ -30,13 +30,15 @@ Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests. Beide laufe
   Musterdaten und eigenen Testkonten je Rolle.
 
 Stand 02.10.2026 (Datenschutz F74–F83 und Systemseite/Kalender/Infusionspläne F84–F89 zusammen): **141 von 141 Backend-Tests** und **66 von 66 Browsertests grün** (Lauf 36976550763, Commit `97e5a5b`; dazu 1 Bildschirmfoto-Test, nur beim manuellen Start).
+Stand 02.10.2026 (Rechte: Löschen auch Admins, Systemverwaltung als Vertretung): **142 von 142 Backend-Tests** und **66 von 66 Browsertests grün** (Lauf 36989064354, Commit `0cca47d`).
+Stand 02.10.2026 (Datensicherung F61–F64 mit O-07, O-23, O-24, in `main` zusammen mit der Rechte-Änderung): **156 von 156 Backend-Tests** und **70 von 70 Browsertests grün** (Lauf 36991958136 auf `main`, Commit `7ba9f35`; vorher im Pull Request #3 Lauf 36990805767; dazu 1 Bildschirmfoto-Test, nur beim manuellen Start).
 
 Sporadische Fehlschläge der Browsertests (kein Produktfehler belegt, Ursache im Test bzw. offen): „Ärzte aus der
 gemeinsamen Liste zuordnen …“ tippte gelegentlich, bevor das leere Formular stand (schon auf `main`, Lauf 36942510984;
 seit `3935b3a` wartet der Test darauf). „Endgültig löschen: nur Mediziner …“ (F73) fand in Lauf 36950601660 einmal das
 gerade hochgeladene Dokument nicht in der Liste; in den Läufen davor und danach nicht aufgetreten, Ursache nicht
 geklärt (die Aufzeichnung des Laufs ist von hier aus nicht abrufbar). Der Seitenzustand fehlgeschlagener Tests wird
-seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneutes Auftreten auswertbar ist.
+seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneutes Auftreten auswertbar ist. Neu in Lauf 36986911046 (erster Versuch): „Kontakt mit Wiedervorlage erfassen, suchen, stornieren“ – Kontakt und Wiedervorlage waren gespeichert (Reiter „Kontakte 1“, nächster Termin im Aktenkopf), die Liste zeigte aber noch „0“; im zweiten Versuch desselben Laufs und in Lauf 36985771116 grün, Ursache nicht geklärt (Seite unverändert seit Runde 2).
 
 ## Übersicht
 
@@ -54,7 +56,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F10 | Sicherheitsstatus im Konto | 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
 | F11 | Angemeldete Sitzungen anzeigen und abmelden | 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
 | F12 | Automatische Abmeldung nach 30 Minuten | alle | ABGESCHLOSSEN UND GETESTET |
-| F13 | Startseite | 2 Start | TEILWEISE ABGESCHLOSSEN |
+| F13 | Startseite | 2 Start | ABGESCHLOSSEN UND GETESTET |
 | F14 | Patientenliste mit Filtern und Suche | 3 Patientenliste | ABGESCHLOSSEN UND GETESTET |
 | F15 | Doppelprüfung beim Anlegen | 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
 | F16 | Patient anlegen | 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
@@ -102,10 +104,10 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F58 | Audit-Log lesen und filtern | 20 Audit-Log | ABGESCHLOSSEN UND GETESTET |
 | F59 | Audit-Log als PDF | 20 Audit-Log | ABGESCHLOSSEN UND GETESTET |
 | F60 | Unveränderlichkeit von Verlauf, Protokoll, Kontakten, Plänen | 10 Verlauf, 20 Audit-Log | ABGESCHLOSSEN UND GETESTET |
-| F61 | Tägliche verschlüsselte Sicherung | 11 Backup | TEILWEISE ABGESCHLOSSEN |
-| F62 | Sicherungen anzeigen, „Jetzt sichern“ | 11 Backup, 2 Start | NICHT ABGESCHLOSSEN |
-| F63 | Wiederherstellen mit Admin-Kennwort und 2FA | 11 Backup | NICHT ABGESCHLOSSEN |
-| F64 | Übertragung zur Nextcloud/NAS mit Status | 11 Backup | NICHT ABGESCHLOSSEN |
+| F61 | Tägliche verschlüsselte Sicherung | 11 Backup | ABGESCHLOSSEN UND GETESTET |
+| F62 | Sicherungen anzeigen, „Jetzt sichern“ | 11 Backup, 2 Start | ABGESCHLOSSEN UND GETESTET |
+| F63 | Wiederherstellen mit Admin-Kennwort und 2FA | 11 Backup | ABGESCHLOSSEN UND GETESTET |
+| F64 | Übertragung zur Nextcloud/NAS mit Status | 11 Backup | ABGESCHLOSSEN UND GETESTET |
 | F65 | Import der Altdaten | – (Rollout-Schritt 7) | NICHT ABGESCHLOSSEN |
 | F66 | Rechte je Gruppe einstellen | 17 Benutzer (Rechte) | ABGESCHLOSSEN UND GETESTET |
 | F67 | Gemeinsame Ärzteliste pflegen | Ärzte (neu) | ABGESCHLOSSEN UND GETESTET |
@@ -114,14 +116,14 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F70 | „kein“ Katheter/Versorger, Nickelallergie als Auswahl | 4 Akte, 12 Neuer Patient, 3 Liste | ABGESCHLOSSEN UND GETESTET |
 | F71 | Nicht Erlaubtes ausblenden, Rechteänderung sofort in der Oberfläche | alle Ansichten | ABGESCHLOSSEN UND GETESTET |
 | F72 | Dokument dem richtigen Patienten zuordnen | 9 Dokumente, 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
-| F73 | Dokument endgültig löschen (nur Mediziner, Kennwort + 2FA + Bestätigungscode) | 9 Dokumente, 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
+| F73 | Dokument endgültig löschen (Mediziner und Admin, Kennwort + 2FA + Bestätigungscode) | 9 Dokumente, 10 Verlauf | ABGESCHLOSSEN UND GETESTET |
 | F74 | Aufbewahrungsfrist der Akte, Verlängerung im Einzelfall, „Abschluss prüfen“ | 4 Akte (Datenschutz), 2 Start, 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
 | F75 | Erklärungen nachhalten (Datenschutzinformation, Einwilligung, Schweigepflichtentbindung), Widerruf | 4 Akte (Kopf, Datenschutz), 2 Start, 3 Liste | ABGESCHLOSSEN UND GETESTET |
 | F76 | Vordrucke der Erklärungen als PDF aus Dokumentvorlagen | 4 Akte (Datenschutz), 19 Dokumentvorlagen | ABGESCHLOSSEN UND GETESTET |
 | F77 | Datenschutz-Anfragen mit Frist (Art. 12 Abs. 3 DSGVO) | 4 Akte (Datenschutz), Datenschutz (neu), 2 Start | ABGESCHLOSSEN UND GETESTET |
 | F78 | Kopie der Akte als ZIP (Art. 15 Abs. 3 DSGVO) | 4 Akte (Datenschutz) | ABGESCHLOSSEN UND GETESTET |
 | F79 | Verarbeitung einschränken, begründete Einsicht, Aufheben (Art. 18 DSGVO) | 4 Akte, Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
-| F80 | Akte endgültig löschen mit Löschprotokoll (Art. 17 DSGVO; nur Mediziner, Kennwort + 2FA + Bestätigungscode) | 4 Akte (Datenschutz), Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
+| F80 | Akte endgültig löschen mit Löschprotokoll (Art. 17 DSGVO; Mediziner und Admin, Kennwort + 2FA + Bestätigungscode) | 4 Akte (Datenschutz), Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
 | F81 | Übersicht „Datenschutz“ | Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
 | F82 | Plan nach Freigabe abschließen (Freigabe per E-Mail o. Ä.), Freigabevermerk mit beiden Personen | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
 | F83 | Aufbewahrung des Audit-Logs, tägliche Bereinigung | 18 Vorlagen (Grenzwerte), 20 Audit-Log | TEILWEISE ABGESCHLOSSEN |
@@ -132,11 +134,11 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F88 | Wartung des EPM (Sitzungen, Datenbank, Dokumente, Unveränderlichkeit, Konfiguration, alle abmelden) | System | ABGESCHLOSSEN UND GETESTET |
 | F89 | Hinweis an alle Benutzer, angemeldete Benutzer abmelden | System, alle Ansichten | ABGESCHLOSSEN UND GETESTET |
 
-Summe (89 Funktionen, gezählt aus der Tabelle): 82 abgeschlossen und getestet · 3 teilweise abgeschlossen · 4 nicht abgeschlossen · 0 blockiert.
+Summe (89 Funktionen, gezählt aus der Tabelle): 87 abgeschlossen und getestet · 1 teilweise abgeschlossen · 1 nicht abgeschlossen · 0 blockiert.
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 Neu in Runde 4 sind F74–F83 (Datenschutz nach DSGVO und Abschließen eines Plans nach Freigabe); offene Fragen dazu stehen
-in `docs/DATENSCHUTZ.md` und unten als U16–U24.
+in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18).
 
 ---
 
@@ -159,7 +161,7 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24.
   Akten abschließen dürfen Mitarbeiter, Mediziner und Admin; Vorlagen pflegen auch Mitarbeiter und Mediziner.
   Admins dürfen alles, Patientendaten schreiben sie aber nur bei Testpatienten – echte Akten sind für sie nur
   lesbar, ein neuer Patient eines Admins wird Testpatient. Standard (✓ = erlaubt, ● = fest, nicht entziehbar,
-  T = nur bei Testpatienten, fest; „nur Mediziner“ = keiner anderen Rolle zuweisbar):
+  T = nur bei Testpatienten, fest; „nur Mediziner und Admin“ = keiner anderen Rolle zuweisbar):
 
 | Recht | Betrachter | Mitarbeiter | Mediziner | Admin |
 |---|---|---|---|---|
@@ -170,11 +172,11 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24.
 | Infusionspläne freigeben | – | – | ✓ | ✓ T |
 | Akten abschließen | – | ✓ | ✓ | ✓ T |
 | Dokumente einem anderen Patienten zuordnen (F72) | – | – | ✓ | ✓ T |
-| Dokumente endgültig löschen (F73) | – | – | ✓ | – (nur Mediziner) |
+| Dokumente endgültig löschen (F73) | – | – | ✓ | ✓ (auch echte Akten; nur Mediziner und Admin) |
 | Infusionspläne nach Freigabe abschließen (F82) | – | ✓ | ✓ | ✓ T |
 | Datenschutz: Erklärungen und Anfragen erfassen, Kopie der Akte (F75, F77, F78) | – | ✓ | ✓ | ✓ T |
 | Datenschutz: Anfragen entscheiden, Verarbeitung einschränken, Einsicht, Aufbewahrung verlängern (F74, F77, F79) | – | – | ✓ | ✓ T |
-| Akten endgültig löschen (F80) | – | – | ✓ | – (nur Mediziner) |
+| Akten endgültig löschen (F80) | – | – | ✓ | ✓ (auch echte Akten; nur Mediziner und Admin) |
 | Abgeschlossene Akten wieder öffnen | – | – | – | ✓ |
 | Versorger und Ansprechpartner pflegen | – | ✓ | ✓ | ✓ |
 | Vorlagen pflegen (Briefkopf, Auswahllisten, Präparate, Grenzwerte) | – | ✓ | ✓ | ✓ |
@@ -182,7 +184,7 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24.
 | Benutzer und Rechte verwalten | – | – | – | ● |
 | Sicherungen verwalten | – | – | – | ✓ |
 | Testdaten zurücksetzen | – | – | – | ✓ |
-| Systemverwaltung (Server und EPM) | – | – | – | ✓ (nur Admin, anderen Rollen nicht erteilbar) |
+| Systemverwaltung (Server und EPM) | – | – | – | ✓ (für eine Urlaubsvertretung jeder Gruppe freischaltbar) |
 
   Testbenutzer bekommen nie Rechte, die über Testpatienten hinaus wirken (Versorger, Vorlagen, Audit-Log, Benutzer,
   Sicherungen, Testdaten, Wiederöffnen). Fehlendes Recht → 403 „Dafür fehlt das Recht „…“.“; abgelaufene Sitzung → 403
@@ -377,13 +379,14 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24.
   erklaerungen_fehlen, abschluss_pruefen, abschluss_monate, datenschutz_anfragen, datenschutz_ueberfaellig (F74, F75, F77 –
   Anfragen zählen auch für abgeschlossene Akten; ohne Datenschutz-Recht 0)},
   "zuletzt_eingetragen": [{bereich (kontakt|gewicht|dokument|plan), bezeichnung, objekt_id, patient, name, zeitpunkt, person}],
-  "zahlen": {in_betreuung, mit_offenem_termin}}`
+  "zahlen": {in_betreuung, mit_offenem_termin}, "sicherung": {zustand (ok|warnung|fehler|unbekannt), letzte_am,
+  verschluesselt, titel, hinweise} (O-07, für alle; ohne Zugangsdaten)}`
 - **Validierung:** Testbenutzer sieht nur Testpatienten; Testpatienten fehlen in Zahlen und Prüfliste.
 - **Tabellen:** `patienten_*` (+ Historie), `infusionen_infusionsplan`, `stammdaten_einstellungen`
-- **Fehlt:** Backup-Status für die Kopfzeile (hängt an F62).
+- **Kopfzeile:** Chip „Backup heute 02:00 erfolgreich“ bzw. der wichtigste Hinweis (z. B. „Backup unverschlüsselt“); mit dem Recht „Sicherungen verwalten“ ein Link zu Administration › Backup (F62).
 - **Teststatus:** Backend-Tests grün (`Patientenliste.test_startseite`, `test_pruefen_filter`, `Musterdaten.*`). Browsertests grün: `start.spec.ts` „Startseite zeigt Termine, Gewichte, Pläne, Prüfliste und Zuletzt eingetragen“,
-  `start.spec.ts` „Termin von der Startseite anlegen und als erledigt abhaken“ (mit Neustart), `start.spec.ts` „Startseite anpassen: Karte ausblenden bleibt gespeichert“. Es fehlt der Backup-Status (F62), daher nicht ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+  `start.spec.ts` „Termin von der Startseite anlegen und als erledigt abhaken“ (mit Neustart), `start.spec.ts` „Startseite anpassen: Karte ausblenden bleibt gespeichert“; Backup-Status: Backend-Test `system.test_sicherung.Uebersicht.test_zustand_fuer_die_startseite`, Browsertest `zzz-sicherung.spec.ts` (Mitarbeiter sieht „Backup heute … erfolgreich“ ohne Link, Admin mit Link zur Seite).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ---
 
@@ -782,9 +785,10 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24.
   neueste Löschliste behalten (F63).
 - **Bestand:** Migration `patienten/0006_geloeschte_dokumente_schwaerzen` schwärzt Dokumente, die vor dieser Version
   gelöscht wurden, und trägt Prüfsumme und Pfad im Vorgang nach.
-- **Validierung:** Rolle Mediziner und Recht „Dokumente endgültig löschen“ (nur Mediziner, keiner anderen Rolle zuweisbar);
+- **Validierung:** Recht „Dokumente endgültig löschen“ (Mediziner und Admin, keiner anderen Rolle zuweisbar; Admins auch bei
+  echten Akten, Festlegung 02.10.2026);
   Grund mindestens 10 Zeichen; Akte offen; keine von EPM erzeugten Dokumente.
-- **Fehlerfälle:** 400 je Feld · 403 nicht Mediziner/ohne Recht · 404 schon gelöscht
+- **Fehlerfälle:** 400 je Feld · 403 ohne Recht · 404 schon gelöscht
 - **Teststatus:** Backend-Tests grün (`FalschZugeordneteDokumente.test_endgueltig_loeschen` – auch: Titel, Dateiname, Notiz,
   Datum in keiner Historien-Zeile und keinem Audit-Eintrag mehr, Löschliste ohne Titel, Trigger lehnen jede andere Änderung
   ab; `test_loeschung_nach_wiederherstellung_nachholen` – Datensatz, Datei und Historie zurückgespielt → erneut gelöscht und
@@ -1005,8 +1009,8 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24.
   Patient eines Admins wird Testpatient. GET liefert dazu `nur_testpatienten: {rollen, rechte}`.
 - **Validierung:** nur mit Recht „Benutzer und Rechte verwalten“; unbekannte Rolle oder Recht → 400; feste Rechte (Admin: Akten lesen,
   Benutzer und Rechte verwalten) nicht entziehbar → 400; Rechte, die einer Rolle vorbehalten sind (`nur_rollen` in GET;
-  02.10.2026: „Dokumente endgültig löschen“ nur Mediziner), anderen Rollen nicht zuweisbar → 400 „Dieses Recht ist Mediziner
-  vorbehalten.“, in der Matrix ausgegraut; Testbenutzer ohne Rechte über Testpatienten hinaus.
+  02.10.2026: „Dokumente/Akten endgültig löschen“ nur Mediziner und Admin), anderen Rollen nicht zuweisbar → 400 „Dieses Recht
+  ist Admin und Mediziner vorbehalten.“, in der Matrix ausgegraut; Testbenutzer ohne Rechte über Testpatienten hinaus.
 - **Tabellen:** `accounts_gruppenrecht`, `accounts_historicalgruppenrecht`, `audit_systemereignis` („Rechte geändert“)
 - **Fehlerfälle:** 400 · 403 ohne Recht
 - **Teststatus:** Backend-Tests grün (`RechteJeGruppe.*`, `Rollen.test_admin_schreibt_nur_bei_testpatienten`,
@@ -1090,44 +1094,105 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24.
 
 ## J · Backup und Wiederherstellung
 
+Festlegungen 02.10.2026: Verschlüsselung **symmetrisch mit einem Passwort**, das die Administration in der Oberfläche
+festlegt (U20); das Passwort liegt nur auf dem Server, damit die nächtliche Sicherung ohne Eingabe läuft, und wird
+ausgedruckt im Tresor verwahrt. Sicherungen 30 Tage auf dem Server, täglich um 02:00. Übertragung in einen WebDAV-Ordner
+(Nextcloud) mit rclone, Ziel und Zeitfenster pflegt die Administration selbst (U9, Wunsch 01.10.2026). Alles, was den
+Server betrifft, läuft über den Systemagenten (F87): Das Backend legt Aufträge ab, der Agent (root) führt sie aus und
+schreibt `status/sicherung.json` (Bestand, Verschlüsselung, Ziel ohne Zugangsdaten, Übertragung, Speicher).
+Recht „Sicherungen verwalten“ (Standard: nur Admin; Testzugänge nie).
+
 ### F61 Tägliche verschlüsselte Sicherung
-- **Ist:** `/usr/local/sbin/epm-backup` + systemd-Timer 02:30: `pg_dump` und Dokumente als `.tar.gz`, Löschliste (F73, F80) als
-  eigene Datei, SHA-256, **30 Tage** (Festlegung 02.10.2026: Sicherungen werden 30 Tage vorgehalten; `EPM_BACKUP_TAGE`).
-  Verschlüsselung mit `age` (Art. 32 DSGVO) ist vorbereitet: Liegt der öffentliche Schlüssel in
-  `/srv/epm/secrets/backup-empfaenger.txt` und ist `age` installiert, werden Datenbank und Dokumente verschlüsselt geschrieben
-  (`.age`), ebenso die Löschliste (sie nennt Patientennummern und den eingetragenen Grund); sonst wie bisher
-  unverschlüsselt, mit Hinweis in der Ausgabe. Eine Datei bekommt ihren Namen erst, wenn `pg_dump` bzw. `tar` **und** das
-  Schreiben gelungen sind – scheitert ein Schritt, bricht das Skript ab und es bleibt keine halbe Sicherung liegen.
-  Sperre gegen zwei gleichzeitige Läufe; der Ablauf löscht nur die eigenen Dateien (`epm-*`, `epm_*.sha256`).
-- **Geprüft:** von Hand in einer Testumgebung mit nachgestelltem `docker` (unverschlüsselt und verschlüsselt, Entschlüsseln,
-  Prüfsummen, gescheiterter Dump und gescheitertes `tar` hinterlassen nichts, Ablauf: 29 Tage alt bleibt, 30 Tage alt
-  geht, fremde Dateien bleiben, zweiter Lauf wird abgewiesen) – kein automatischer Test, nicht auf dem Server gelaufen.
-- **Fehlt:** Uhrzeit 02:00, Schlüssel erzeugen und hinterlegen (Entscheidung, wer ihn verwahrt: U20), Status-Datei für das Backend.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+- **Ansicht:** 11 Backup › Verschlüsselung: Stand (Passwort Nr., festgelegt am, von), Liste der Passwörter, mit denen noch
+  Sicherungen verschlüsselt sind; „Passwort festlegen“ (Vorschlag mit 20 Zeichen ohne verwechselbare Zeichen, Wiederholung,
+  Admin-Passwort + Code), danach „Passwortblatt drucken“; „Passwort prüfen“ (z. B. das Blatt aus dem Tresor).
+- **Endpunkte:** `POST /api/backup/passwort/` `{passwort, passwort2, kennwort, code}` → 201 Auftrag;
+  `POST /api/backup/passwort/pruefen/` `{passwort}` → `{stimmt, nr, aktuell}`;
+  `POST /api/backup/passwortblatt/` `{passwort}` → PDF (nur mit einem hinterlegten Passwort).
+- **Logik:** `/usr/local/sbin/epm-backup --art nachts` per systemd-Timer um **02:00** (`--art von_hand|vor_update|
+  vor_aenderung|vor_wiederherstellung`, `--von BENUTZER` bei Aufträgen): `pg_dump`, Dokumente als `.tar.gz`, Löschliste,
+  je mit GnuPG verschlüsselt (OpenPGP, AES-256, S2K SHA-512, ohne Schlüsselbund und Zwischenspeicher), dazu
+  `epm_<Stempel>.sha256` und `epm_<Stempel>.json` (Zeitpunkt, Art, ausgelöst von, Passwort-Nr., EPM-Version, Dateien –
+  keine Patientendaten). Ohne Passwort unverschlüsselt mit Hinweis (Oberfläche und Startseite warnen). Das Passwort
+  schreibt der Agent nach `/etc/epm/sicherung/passwort-<Nr.>` (0600, root), die aktuelle Nummer nach `aktuell`; ein neues
+  Passwort gilt ab der nächsten Sicherung, ältere bleiben, bis keine Sicherung sie mehr braucht (dann gelöscht). Für das
+  Backend schreibt der Agent nur einen scrypt-Prüfwert (`status/sicherung-pruefwerte.json`). Das Passwort steht nie in
+  der Datenbank, im Audit-Log, in einer Antwort oder im Status; die Auftragsdatei (0600) löscht der Agent sofort nach dem
+  Lesen. Das Passwortblatt druckt das Passwort, das die Oberfläche gerade mitschickt, nach Prüfung gegen den Prüfwert –
+  mit Anleitung zum Entschlüsseln ohne EPM (`gpg -d`) und der Liste der noch gebrauchten Passwörter.
+- **Validierung / Fehlerfälle:** 16–200 Zeichen, keine Steuerzeichen, kein Leerzeichen am Anfang/Ende, Wiederholung gleich,
+  nicht das eigene Anmelde-Passwort, nicht schon hinterlegt (400 je Feld); Admin-Passwort/Code falsch 400; Prüfen und
+  Passwortblatt: jeder Versuch im Audit-Log, nach 5 falschen Passwörtern in 15 Minuten 429.
+- **Teststatus:** Backend-Tests `system/test_sicherung.py` (`Passwort.*`, `EchterAgent.test_passwort_sicherung_pruefen_und_blatt`:
+  Backend → echter Agent → echtes `epm-backup.sh` mit GnuPG → Entschlüsseln mit dem Passwort, mit einem anderen nicht;
+  Passwort nirgends außer in `/etc/epm/sicherung`). Browsertest `zzz-sicherung.spec.ts` „Sicherungs-Passwort festlegen und
+  Passwortblatt drucken“ (Passwort nicht in der Datenbank – geprüft an einem `pg_dump` –, nicht im Status) und
+  „„Jetzt sichern“ verschlüsselt mit dem Passwort aus der Oberfläche“ (Datei auf dem Server mit `gpg` entschlüsselt,
+  Prüfsummen).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F62 Sicherungen anzeigen, „Jetzt sichern“
-- **Geplant:** `GET /api/backup/` → `{"letzte": {...}, "uebertragung": {...}, "speicher": {"belegt", "gesamt"}, "sicherungen": [{zeitpunkt, art, groesse, verschluesselt, uebertragen}]}`;
-  `POST /api/backup/jetzt/`. Der Container bekommt keinen Zugriff auf den Host: Auftrag und Status laufen über ein gemeinsames
-  Verzeichnis, ausgeführt von einem systemd-Dienst auf dem Server.
-- **Status:** NICHT ABGESCHLOSSEN
+- **Ansicht:** 11 Backup (Entwurf): Kopf mit „Jetzt sichern“, drei Karten (Letzte Sicherung, Übertragung, Speicher), Tabelle
+  der Sicherungen (Zeitpunkt, Art, Größe, Schutz, Übertragung, „Wiederherstellen“), Warnung zum Wiederherstellen,
+  Verschlüsselung, Übertragung, Tätigkeiten mit Ausgabe und „Zurückziehen“. 2 Start: Chip in der Kopfzeile
+  („Backup heute 02:00 erfolgreich“ bzw. der wichtigste Hinweis), für alle sichtbar, mit dem Recht ein Link zur Seite.
+- **Endpunkte:** `GET /api/backup/` → `{agent, status, probelauf, kurz: {zustand, letzte_am, verschluesselt, titel,
+  hinweise}, letzte, sicherungen: [{stempel, zeitpunkt, art, art_name, ausgeloest_von, verschluesselt, passwort_nr, groesse,
+  dateien, uebertragen, uebertragen_am, wiederherstellbar, …}], verschluesselung, ziel, uebertragung, speicher: {belegt,
+  gesamt, frei, sicherungen}, aufbewahrung_tage, naechste_sicherung, auftraege, aktionen, minuten, angemeldet}`;
+  `POST /api/backup/jetzt/` → 201 Auftrag; `POST /api/backup/auftraege/<kennung>/abbrechen/`.
+  `GET /api/startseite/` enthält `sicherung` (siehe F13).
+- **Logik:** Zustand: Fehler, wenn der Agent seit 3 Minuten nichts meldet, es keine Sicherung gibt, die letzte älter als 36 h
+  ist oder der nächtliche Lauf gescheitert ist; Warnung bei unverschlüsselter letzter Sicherung, ohne Übertragungsziel,
+  bei fehlgeschlagener Übertragung oder einer verschlüsselten Sicherung, die seit über einem Tag nicht übertragen ist.
+  Aufträge der Seite stehen im Audit-Log unter „Backup“.
+- **Teststatus:** Backend-Tests `system/test_sicherung.py` (`Rechte.*`, `Uebersicht.*` inkl. Zustand der Startseite).
+  Browsertests `zzz-sicherung.spec.ts` (Recht, „Jetzt sichern“, Tabelle, Startseite).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F63 Wiederherstellen
-- **Geplant:** `POST /api/backup/{id}/wiederherstellen/` `{"kennwort", "code"}`; vorher automatische Sicherung des aktuellen Stands;
-  Protokoll im Audit-Log. Die aktuelle Löschliste (`data/loeschliste/`) bleibt dabei unangetastet (auf einem neuen Server: die
-  neueste aus den Sicherungen); der anschließende Start des Backends löscht und schwärzt endgültig gelöschte Dokumente erneut
-  (F73, Art. 17 DSGVO) und löscht endgültig gelöschte Akten erneut (F80).
-- **Status:** NICHT ABGESCHLOSSEN
+- **Ansicht:** 11 Backup › „Wiederherstellen“ je Sicherung: Angaben der Sicherung, Warnung, Beginn (sofort oder in 5–60
+  Minuten) mit Hinweis an alle Angemeldeten, Admin-Passwort und Code. Während es läuft, ein Hinweis auf der Seite; danach
+  müssen sich alle neu anmelden.
+- **Endpunkt:** `POST /api/backup/<stempel>/wiederherstellen/` `{kennwort, code, minuten, hinweis?}` → 201 Auftrag.
+- **Logik (Agent):** zuerst eine Sicherung des jetzigen Stands (`vor_wiederherstellung`) – schlägt sie fehl, passiert
+  nichts. Dann, während EPM noch läuft: Prüfsummen, entschlüsseln (Passwort Nr. der Sicherung), Dump mit
+  `pg_restore --list` prüfen, Dokumente in einen Zwischenordner auspacken. Erst dann Backend und Webserver anhalten, Dump in
+  eine neue Datenbank einspielen, Datenbanken und Dokumentordner tauschen (Rechte bleiben), starten, auf „gesund“ warten.
+  Schlägt ein Schritt fehl, wird der vorige Stand zurückgetauscht und läuft weiter. Die Löschliste bleibt unangetastet; das
+  Backend löscht beim Start erneut, was die Sicherung zurückgebracht hat (F73, F80). Vor dem Start vermerkt der Agent die
+  Wiederherstellung in `status/wiederherstellungen.json`; das Backend trägt sie beim Start ins Audit-Log der
+  zurückgespielten Datenbank ein (wer, wann, welche Sicherung, in welcher Sicherung der Stand davor liegt), legt den
+  Auftrag wieder an und beendet **alle Anmeldungen** (`manage.py epm_wiederherstellungen_nachtragen`).
+- **Validierung / Fehlerfälle:** Admin-Passwort/Code 400; unbekannte Sicherung 404; ohne Dokumente oder mit `age`
+  verschlüsselt 409; Agent meldet sich nicht 409 (ein wartender Auftrag würde zu einem unerwarteten Zeitpunkt zurückspielen);
+  schon beauftragt 409.
+- **Teststatus:** Backend-Tests `system/test_sicherung.py` (`Wiederherstellen.*` inkl. Nachtragen und Ende aller Sitzungen).
+  Browsertest `zzz-sicherung.spec.ts` „Wiederherstellen mit Passwort und 2FA“: echter Ablauf im Stack – danach ist ein
+  später angelegter Benutzer weg, alle Anmeldungen sind beendet, Auftrag erledigt, Stand davor als eigene Sicherung,
+  Eintrag im Audit-Log. Vorher von Hand geprüft: Rücktausch, wenn das Backend nicht startet.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F64 Übertragung zur Nextcloud/NAS
-- **Festlegung 01.10.2026 (U9):** Der Server schiebt – wie heute: ein rsync-Dienst überträgt die Sicherungen in einen
-  WebDAV-Ordner (Nextcloud, von dort auf die NAS gespiegelt).
-- **Geplant:** nach der nächtlichen Sicherung (F61) überträgt ein systemd-Dienst auf dem Host die verschlüsselten Dateien per
-  rsync in den WebDAV-Ordner; Ergebnis („übertragen am …“ bzw. Fehler) in der Status-Datei, angezeigt in F62 und auf der
-  Startseite (F13). Zugangsdaten nur auf dem Host (`/etc/epm`), nicht im Container.
-- **Festlegung 01.10.2026:** Ziel (WebDAV-Adresse, Benutzer, Kennwort, Zeitfenster) pflegt die Administration selbst in der
-  Oberfläche und kann es jederzeit ändern; Zugangsdaten nicht im Code oder in Dateien von Hand.
-- **Festlegung 01.10.2026:** Übertragung mit rclone (WebDAV direkt, ohne Einbinden per davfs2; nur geänderte Dateien, mit Prüfsumme).
-- **Status:** NICHT ABGESCHLOSSEN
+- **Ansicht:** 11 Backup › Übertragung: Ziel (WebDAV-Adresse, Benutzer, Ordner, Zeitfenster), zuletzt übertragen, offene
+  Sicherungen, letzter Fehler; „Ziel festlegen/ändern“ (Admin-Passwort + Code), „Verbindung testen“, „Jetzt übertragen“,
+  „Ziel entfernen“ (Admin-Passwort + Code). Tabelle: „übertragen …“ bzw. „wartet auf Zeitfenster“.
+- **Endpunkte:** `POST /api/backup/ziel/` `{url, benutzer, ziel_kennwort?, ordner, von, bis, kennwort, code}`;
+  `POST /api/backup/ziel/entfernen/` `{kennwort, code}`; `POST /api/backup/ziel/testen/`; `POST /api/backup/uebertragen/`.
+- **Logik:** Zugang nur auf dem Server: `/etc/epm/sicherung/rclone.conf` (0600, Passwort mit `rclone obscure`), Angaben
+  ohne Passwort in `ziel.json`; leeres Passwort beim Ändern = bisheriges bleibt. Der Status-Lauf (jede Minute) startet im
+  Zeitfenster die Übertragung im Hintergrund (`epm-uebertragung.service`), nach einem Fehler frühestens 15 Minuten später
+  erneut, höchstens bis zum Ende des Fensters. Übertragen werden nur verschlüsselte Sicherungen mit Prüfsummen und Angaben,
+  `rclone copy` (nie löschen) und danach `rclone check`; „Jetzt übertragen“ auch außerhalb des Fensters. Ein neues Ziel
+  bekommt alle vorhandenen verschlüsselten Sicherungen. Der Server erreicht das Ziel über den Proxy der OPNsense
+  (`EPM_APT_PROXY`); die Adresse muss dort freigegeben sein.
+- **Validierung / Fehlerfälle:** nur `https://` (`http://` nur für localhost – Test), keine Zugangsdaten in der Adresse,
+  Ordner ohne `\ : ..`, Zeiten HH:MM (von = bis: ganztägig), Passwort beim ersten Festlegen Pflicht (400 je Feld).
+- **Teststatus:** Backend-Tests `system/test_sicherung.py` (`Ziel.*`: Prüfungen, Zugang nur in der Auftragsdatei).
+  Browsertest `zzz-sicherung.spec.ts` „Übertragungsziel festlegen, Verbindung testen, von Hand und im Zeitfenster
+  übertragen“ gegen einen WebDAV-Server (`rclone serve webdav` in `ci-stack.sh`): Dateien im Ziel, nur verschlüsselt,
+  automatische Übertragung im Fenster.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ---
 
@@ -1490,10 +1555,10 @@ Festlegungen S12–S14 vom 01.10.2026 (`claude/startseite-erweiterungen.md`): nu
 Admin-Kennwort + 2FA, vorher automatische Sicherung, angemeldete Benutzer vorher warnen; der Container bekommt keinen
 Zugriff auf den Server (Auftrag und Status über ein gemeinsames Verzeichnis, ausgeführt von systemd-Diensten).
 
-**Recht „Systemverwaltung (Server und EPM)“** (`system_verwalten`): nur Admin. Anderen Rollen kann es nicht erteilt
-werden (`NUR_ROLLEN` in `accounts/rechte.py`, gemeinsam mit „Dokumente endgültig löschen“ – nur Mediziner); die
-Rechte-Matrix zeigt es für andere Rollen ausgegraut, `PUT /api/rechte/` lehnt es mit 400 ab, auch ein Eintrag direkt in
-der Datenbank wirkt nicht. Testzugänge erhalten es nie. Der Admin kann es sich selbst entziehen und wieder geben.
+**Recht „Systemverwaltung (Server und EPM)“** (`system_verwalten`): Standard nur Admin. Festlegung 02.10.2026
+(Urlaubsregelung): unter Benutzer › Rechte jeder Gruppe freischaltbar und wieder zurücknehmbar – wirkt sofort, steht im
+Audit-Log („Rechte geändert“). Die Vertretung bestätigt Update und Neustart mit dem eigenen Passwort und 2FA.
+Testzugänge erhalten es nie. Der Admin kann es sich selbst entziehen und wieder geben.
 Kalender und Infusionspläne brauchen kein neues Recht: Lesen mit „Akten lesen“, Termine mit „Kontakte, Gewichte,
 Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie in der Akte.
 
@@ -1602,9 +1667,8 @@ Termine, Dokumente erfassen“, Pläne mit „Infusionspläne anlegen“ – wie
   Browsertest `system.spec.ts` „eigener Hinweis an alle Benutzer und Eintrag im Audit-Log“.
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
-Hinweise zur Abgrenzung: Die Systemseite zeigt die letzte Sicherung (aus dem Backup-Ordner, gemessen vom Systemagenten) und
-kann eine Sicherung mit dem bestehenden `epm-backup` anstoßen; die Backup-Seite mit Verschlüsselung, Wiederherstellen und
-Übertragung (F61–F64, O-23) bleibt offen und nutzt künftig denselben Systemagenten. Die Kacheln der Admin-Startseite
+Hinweise zur Abgrenzung: Die Systemseite zeigt die letzte Sicherung und kann eine Sicherung anstoßen; Verschlüsselung,
+Übertragung und Wiederherstellen stehen unter Administration › Backup (F61–F64) und nutzen denselben Systemagenten. Die Kacheln der Admin-Startseite
 (S12–S14 in `claude/startseite-erweiterungen.md`) folgen mit den Startseiten-Erweiterungen; sie lesen dieselben Endpunkte.
 Ein Auftrag mit Wartezeit (Beginn in n Minuten) ist ab der Übernahme durch den Server nicht mehr zurückziehbar; die Warnung
 lässt sich jederzeit beenden.
@@ -1625,11 +1689,10 @@ Browser reichen). Funktionen, die noch fehlen, zeigt die Oberfläche als „folg
 
 Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, F24, F35, F37, F50, F51, F55, F59).
 
+Erledigt in Runde 5 (02.10.2026): O-07 Backup-Status auf der Startseite (F13), O-23 Datensicherung aus der Oberfläche (F61–F64: Sicherung um 02:00, Passwort für die Verschlüsselung in der Oberfläche, Übertragung mit rclone, Wiederherstellen; geprüft gegen einen WebDAV-Testserver in CI), O-24 Serverskripte nach „EPM-Server Aufbau“ (needrestart startet Dienste außer Docker/containerd selbst neu, eigene Docker-Adressbereiche, `epm.service`, Journal dauerhaft mit 1 GB/6 Monaten, Swap, wöchentliches Docker-Aufräumen, Warnung ohne eigenes Volume für `/srv`). Abweichung: `epm.service` legt `04-projekt.sh` an (nicht `02-docker.sh`), damit `sudo epm-update` es auch auf bestehenden Servern einrichtet.
+
 | Nr. | Was fehlt | Warum | Betroffene Dateien | Abhängigkeiten | Nächster Schritt |
 |---|---|---|---|---|---|
-| O-07 | Backup-Status auf der Startseite (F13) | hängt an der Backup-Steuerung | `patienten/api.py` | O-23 | Status-Datei lesen |
-| O-23 | Backup 02:00, Schlüssel für die Verschlüsselung hinterlegen (Skript ist vorbereitet, U20), Steuerung aus der Oberfläche, Übertragung mit rclone in den WebDAV-Ordner (F61–F64; U9) | nicht umgesetzt | `rollout/epm-backup.sh`, `rollout/04-projekt.sh`, neu: `audit/backup.py`, systemd-Dienste | WebDAV-Adresse und Zugang trägt die Administration selbst in der Oberfläche ein (Wunsch 01.10.2026; verschlüsselt gespeichert), Test gegen einen WebDAV-Testserver in CI | `age`-Schlüssel, Auftragsverzeichnis, Status-Datei, Endpunkte, rclone-Dienst |
-| O-24 | Serverskripte angleichen | Festlegungen aus „EPM-Server Aufbau“ fehlen | `rollout/01-basis.sh`, `rollout/02-docker.sh` | – | Adressbereiche, `epm.service`, needrestart, Swap |
 | O-25 | Import Altdaten (F65) | Rollout-Schritt 7 | neu: `patienten/management/commands/epm_import_alt.py` | frischer Dump | Import mit Protokoll, setzt `typ_geprueft`/`datum_quelle` |
 
 ## Unklarheiten (nicht eigenmächtig entschieden)
@@ -1655,8 +1718,8 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 | U17 | Texte der drei Vordrucke (Zwecke, Empfänger, Rechtsgrundlage, Speicherdauer, Datenschutzbeauftragte/r, Aufsichtsbehörde) | F76 | Entwürfe mit Lücken, Wasserzeichen „ENTWURF“ bis zur Veröffentlichung durch die Stiftung |
 | U18 | Wie lange wird das Audit-Log aufbewahrt? | F83 | 0 = unbegrenzt (wie bisher), einstellbar |
 | U19 | „Abschluss prüfen“ nach wie vielen Monaten ohne Kontakt? Welche Erklärungen sollen vorliegen? | F74, F75 | 24 Monate; alle drei – einstellbar |
-| U20 | Verschlüsselung der Sicherungen: Wer erzeugt und verwahrt den privaten Schlüssel (nicht auf dem Server)? | F61 | Skript verschlüsselt, sobald der öffentliche Schlüssel hinterlegt ist; bis dahin unverschlüsselt |
-| U21 | Aufbewahrung der Sicherungen auf NAS und Nextcloud (30 Tage gelten bisher nur auf dem Server); Geheimhaltungsverpflichtung der Dienstleister (§ 203 StGB) | F61, F64 | organisatorisch, siehe `docs/DATENSCHUTZ.md` |
+| U20 | ~~Verschlüsselung der Sicherungen: Wer erzeugt und verwahrt den privaten Schlüssel?~~ **Geklärt 02.10.2026:** symmetrisch mit einem Passwort, das die Administration in der Oberfläche festlegt; es liegt nur auf dem Server (root) und ausgedruckt im Tresor (Passwortblatt) | F61 | – |
+| U21 | Aufbewahrung der Sicherungen in der Nextcloud und auf der NAS: EPM kopiert nur und löscht im Ziel nie – wie lange liegen sie dort, wer löscht? (30 Tage gelten nur auf dem Server); Geheimhaltungsverpflichtung der Dienstleister (§ 203 StGB) | F61, F64 | organisatorisch, siehe `docs/DATENSCHUTZ.md` (O7) |
 | U22 | Sollen Mitarbeiter Pläne auch anlegen dürfen (bisher nur Mediziner, Festlegung 01.10.2026)? Abschließen nach Freigabe dürfen sie jetzt | F32, F82 | unverändert; unter Benutzer › Rechte umstellbar |
 | U23 | Einschränkung nur bei abgeschlossenen Akten – reicht das? | F79 | ja (in laufender Betreuung wird die Akte gebraucht; erst abschließen) |
 | U24 | Nachweis bei Freigabe per Telefon oder persönlich | F82 | ohne Nachweis möglich (Pflicht nur bei E-Mail und schriftlich) |
@@ -1666,8 +1729,10 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 02.10.2026 | Runde 5 (Pull Request #3, in `main` als `b1949ca`–`7ba9f35`) | Datensicherung aus der Oberfläche (O-23): Administration › Backup nach Entwurf 11 (F61–F64) – Passwort für die Verschlüsselung in der Oberfläche festlegen (U20 geklärt: symmetrisch, GnuPG/AES-256; Passwortblatt für den Tresor, Prüfen), Sicherung täglich 02:00 und „Jetzt sichern“, Übertragung in einen WebDAV-Ordner mit rclone im Zeitfenster, Wiederherstellen mit Admin-Passwort und 2FA (vorher Sicherung, Rücktausch bei Fehlern, Löschliste bleibt, danach Audit-Log und alle neu anmelden). Backup-Status in der Kopfzeile der Startseite (O-07, F13). Serverskripte nach „EPM-Server Aufbau“ (O-24). Audit-Gruppe „Backup“ für alle Tätigkeiten rund um Sicherungen. CI meldet Ergebnisse auch bei Pull Requests am Commit. Lauf 36986911046: 155 von 155 Backend-Tests, 70 von 70 Browsertests; nach dem Zusammenführen mit der Rechte-Änderung Lauf 36990805767 und auf `main` Lauf 36991958136: je 156 von 156 und 70 von 70 |
 | 02.10.2026 | Runde 4 (Systemseite, Kalender, Infusionspläne) | Neues Recht „Systemverwaltung“ (nur Admin); Administration › System mit Systemagent auf dem Server (F86–F89, Festlegungen S12–S14); globaler Kalender mit Fälligkeiten und Feiertagen (F84); Übersicht aller Infusionspläne (F85); Audit-Gruppe „System“; Feiertage NRW (U25). Nummern ab F84, damit parallele Arbeiten (F72 ff.) nicht kollidieren |
 | 02.10.2026 | Runde 4 (Updates VPS) | Festlegung: VPS ohne Verbindung zu GitHub und ohne Build (`EPM_UPDATE_QUELLE="paket"`); `sudo epm-update --paket-erstellen` auf der Test-VM packt die dort laufende, getestete Version (Images, Rollout-Dateien, Systemagent, `epm-update`, SHA-256), `sudo epm-update --paket DATEI` spielt sie auf dem VPS ein (Prüfsummen, Backup, Umstellen, Tests) |
+| 02.10.2026 | Rechte (Festlegung) | Endgültig löschen (F73 Dokumente, F80 Akten) auch Admins – auch bei echten Akten, als Ausnahme von „Admins schreiben Patientendaten nur bei Testpatienten“; alle Bestätigungen und Prüfungen unverändert. Systemverwaltung für eine Urlaubsvertretung je Gruppe freischaltbar (Standard weiter nur Admin) |
 | 01.10.2026 | Runde 1 (`c387b7b`–`0e25377`) | Backend für F01–F22, F25–F36, F40–F48, F52–F54, F56–F58, F60 mit Backend-Tests; Nachweis angelegt |
 | 01.10.2026 | Runde 2 (`9eae348`) | Rechte je Gruppe (F66) nach Festlegung: Mediziner wie Admin außer Benutzerverwaltung, Wiederöffnen, Sicherungen, Testdaten; U10 erledigt, U11 bestätigt, U12 neu; Briefkopf und Logo (F49) |
 | 01.10.2026 | Runde 2 (`2b76a0a`–`39b86b9`) | Frontend: Anmeldung, Start, Patientenliste, Neuer Patient, Versorger, Akte (Übersicht, Diagnose & Therapie, Kontakte, Pläne, Dokumente, Verlauf); Browsertests im echten Stack in GitHub Actions |

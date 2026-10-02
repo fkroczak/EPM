@@ -7,8 +7,9 @@ Festlegungen vom 01.10.2026:
 - Akten abschließen: Mitarbeiter, Mediziner und Admin. Vorlagen pflegen: auch Mitarbeiter und Mediziner.
 - Admins dürfen alles, Patientendaten schreiben sie aber nur bei Testpatienten; echte Akten sind für
   sie nur lesbar (Wieder öffnen, Benutzer, Sicherungen bleiben).
-- Systemverwaltung (Server und EPM, Festlegung 02.10.2026): nur Admin; anderen Rollen nicht erteilbar.
-- Altdaten übernehmen (Import, F65): nur Admin; anderen Rollen nicht erteilbar. Der Import ist die eine bewusste
+- Systemverwaltung (Server und EPM, Festlegung 02.10.2026): Standard nur Admin; für eine Vertretung je Gruppe
+  freischaltbar. Endgültig löschen (Dokumente, Akten): Mediziner und Admin, Admins auch bei echten Akten.
+- Altdaten übernehmen (Import, F65): nur Admin; anderen Rollen nicht erteilbar. Der Import ist eine bewusste
   Ausnahme von „Admins schreiben Patientendaten nur bei Testpatienten“ – er legt die übernommenen Akten an.
 Für Betrachter gilt die Rollenmatrix aus dem Entwurf 17.
 
@@ -26,7 +27,7 @@ RECHTE = [
     ("dokumente_umhaengen", "Dokumente einem anderen Patienten zuordnen",
      "bei falsch zugeordneten Dokumenten; mit Grund, im Verlauf beider Akten und im Audit-Log"),
     ("dokumente_loeschen", "Dokumente endgültig löschen",
-     "nur Mediziner; mit Kennwort, Code aus der Authenticator-App und Bestätigungscode; im Audit-Log"),
+     "nur Mediziner und Admin; mit Kennwort, Code aus der Authenticator-App und Bestätigungscode; im Audit-Log"),
     ("plaene_anlegen", "Infusionspläne anlegen", "Entwürfe anlegen, bearbeiten und verwerfen"),
     ("plaene_freigeben", "Infusionspläne freigeben", ""),
     ("plaene_abschliessen", "Infusionspläne nach Freigabe abschließen",
@@ -39,7 +40,7 @@ RECHTE = [
     ("datenschutz_entscheiden", "Datenschutz: Anfragen entscheiden, Verarbeitung einschränken",
      "Anfragen mit Ergebnis erledigen; Akten einschränken, Einsicht nehmen; Aufbewahrung verlängern"),
     ("akten_loeschen", "Akten endgültig löschen",
-     "nur Mediziner; nach Ablauf der Aufbewahrungsfrist oder auf Antrag; mit Kennwort, Code aus der "
+     "nur Mediziner und Admin; nach Ablauf der Aufbewahrungsfrist oder auf Antrag; mit Kennwort, Code aus der "
      "Authenticator-App und Bestätigungscode; im Löschprotokoll und im Audit-Log"),
     ("versorger_pflegen", "Versorger, Ansprechpartner und Ärzte pflegen",
      "gemeinsame Listen: Versorger mit Ansprechpartnern, Ärzte mit Kontaktdaten"),
@@ -50,7 +51,8 @@ RECHTE = [
     ("backup_verwalten", "Sicherungen verwalten", "Sicherung starten, wiederherstellen"),
     ("testdaten_zuruecksetzen", "Testdaten zurücksetzen", ""),
     ("system_verwalten", "Systemverwaltung (Server und EPM)",
-     "Auslastung, Ubuntu-Updates, Neustart, Wartung von Datenbank und Dateien, Hinweise an alle Benutzer – nur Admin"),
+     "Auslastung, Ubuntu-Updates, Neustart, Wartung von Datenbank und Dateien, Hinweise an alle Benutzer; Standard nur "
+     "Admin, für eine Vertretung (z. B. Urlaub) je Gruppe freischaltbar"),
     ("altdaten_importieren", "Altdaten übernehmen (Import)",
      "Dump des Altsystems laden, Zuordnungen pflegen, Probelauf, Import, zurücknehmen, abschließen – nur Admin"),
 ]
@@ -63,13 +65,19 @@ _ADMIN_SPEZIAL = {"benutzer_verwalten", "akten_wieder_oeffnen", "backup_verwalte
 
 # Rechte, die Patientendaten verändern (Einträge, Stammdaten, Pläne, Abschluss)
 PATIENTENDATEN_SCHREIBEN = {"eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
-                            "plaene_abschliessen", "akten_abschliessen", "dokumente_umhaengen", "dokumente_loeschen",
-                            "datenschutz_bearbeiten", "datenschutz_entscheiden", "akten_loeschen"}
+                            "plaene_abschliessen", "akten_abschliessen", "dokumente_umhaengen",
+                            "datenschutz_bearbeiten", "datenschutz_entscheiden"}
+
+# Endgültiges Löschen (F73, F80) dürfen Admins auch bei echten Akten (Festlegung 02.10.2026); die übrigen Prüfungen
+# (Frist bzw. Antrag, Kennwort + 2FA + Bestätigungscode, Audit-Log, Löschprotokoll) gelten unverändert
+LOESCHEN = {"dokumente_loeschen", "akten_loeschen"}
 
 # Rechte, die nur bestimmte Rollen haben können; anderen Rollen nicht erteilbar (Festlegungen 02.10.2026:
-# endgültig löschen nur Mediziner; Systemverwaltung – Server und EPM – natürlich nur Admin)
-NUR_ROLLEN = {"dokumente_loeschen": {Rolle.MEDIZINER}, "akten_loeschen": {Rolle.MEDIZINER},
-              "system_verwalten": {Rolle.ADMIN}, "altdaten_importieren": {Rolle.ADMIN}}
+# endgültig löschen nur Mediziner und Admin – Admins auch bei echten Akten, Ausnahme von „Admins schreiben
+# Patientendaten nur bei Testpatienten“). Die Systemverwaltung ist Standard nur für Admin, für eine Urlaubsvertretung
+# aber jeder Gruppe erteilbar (Benutzer › Rechte). Altdaten übernehmen (F65): nur Admin.
+NUR_ROLLEN = {"dokumente_loeschen": {Rolle.MEDIZINER, Rolle.ADMIN}, "akten_loeschen": {Rolle.MEDIZINER, Rolle.ADMIN},
+              "altdaten_importieren": {Rolle.ADMIN}}
 
 STANDARD = {
     Rolle.BETRACHTER: {"akten_lesen"},

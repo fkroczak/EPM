@@ -269,3 +269,63 @@ def zugangsblatt_pdf(user, kennwort: str, adresse: str) -> bytes:
               + "<style>.mono { font-family: 'IBM Plex Mono', 'DejaVu Sans Mono', monospace; font-size: 12pt; }"
                 " .schritte li { margin-bottom: 2mm; }</style>")
     return html_zu_pdf(seite("Zugang zu EPM", inhalt, fuss, None, rechts))
+
+
+# --------------------------------------------------------------------------------------------- F61 Passwortblatt
+def sicherungs_passwortblatt_pdf(passwort: str, nr: int, aktuell: bool, gesetzt_am: str, gesetzt_von: str,
+                                 verfahren: str, adresse: str, aufbewahrung_tage: int, versionen: list) -> bytes:
+    """Blatt für den Tresor (Festlegung 02.10.2026): das Sicherungs-Passwort und wie man ohne EPM an die Daten kommt.
+    Das Passwort kommt aus der Oberfläche und ist vorher gegen den Prüfwert des Servers geprüft."""
+    kopf, fuss, rechts = _kopf_fuss()
+    angaben = [("Passwort Nr.", f"{nr}" + ("" if aktuell else " (nicht mehr das aktuelle)")),
+               ("festgelegt", f"{gesetzt_am} von {gesetzt_von}" if gesetzt_von else gesetzt_am),
+               ("EPM", adresse), ("Verfahren", verfahren or "GnuPG (OpenPGP), AES-256, symmetrisch")]
+    felder = "".join(f'<tr><td class="label" style="width:30%">{html.escape(a)}</td><td class="wert">{_e(b)}</td></tr>'
+                     for a, b in angaben)
+    gruppen = ""
+    if " " not in passwort:
+        teile = [passwort[i:i + 4] for i in range(0, len(passwort), 4)]
+        gruppen = ('<div class="gruppen">' + "".join(f"<span>{html.escape(t)}</span>" for t in teile)
+                   + '</div><div class="s-klein">dasselbe in Vierergruppen zum Abschreiben – die Lücken gehören nicht '
+                     'zum Passwort</div>')
+    zeilen = [[html.escape(str(v.get("nr", ""))), html.escape(v.get("gesetzt_am") or ""),
+               html.escape(v.get("gesetzt_von") or ""), html.escape(str(v.get("sicherungen", 0)))] for v in versionen]
+    befehle = "\n".join([
+        "sha256sum -c epm_<Stempel>.sha256",
+        "gpg -d -o epm-db_<Stempel>.dump epm-db_<Stempel>.dump.gpg",
+        "gpg -d -o epm-dokumente_<Stempel>.tar.gz epm-dokumente_<Stempel>.tar.gz.gpg",
+        "gpg -d -o epm-loeschliste_<Stempel>.jsonl epm-loeschliste_<Stempel>.jsonl.gpg",
+    ])
+    inhalt = (
+        kopf + _titel("Sicherungs-Passwort", f"Nr. {nr} · gedruckt {datum(timezone.localdate())}")
+        + f'<div class="block"><div class="passwort">{html.escape(passwort)}</div>{gruppen}</div>'
+        + f'<div class="block"><table class="felder">{felder}</table></div>'
+        + _abschnitt("Wofür", "<p>Mit diesem Passwort sind die Sicherungen von EPM verschlüsselt – Datenbank, Dokumente "
+                              "und Löschliste, auf dem Server und in der Nextcloud bzw. auf der NAS. Ohne das Passwort "
+                              "lassen sich diese Sicherungen nicht mehr lesen; niemand kann es wiederherstellen.</p>")
+        + _abschnitt("Aufbewahren", "<p>Im Tresor aufbewahren, nie zusammen mit den Sicherungen. Nicht fotografieren, "
+                                    "nicht per E-Mail oder Chat weitergeben. Ein neues Passwort gilt ab der nächsten "
+                                    f"Sicherung; ältere Sicherungen bleiben mit ihrem Passwort verschlüsselt. Dieses Blatt "
+                                    f"daher aufheben, bis es keine Sicherung mit Nr. {nr} mehr gibt – auf dem Server "
+                                    f"{aufbewahrung_tage} Tage, in der Nextcloud und auf der NAS so lange, wie die "
+                                    "Dateien dort liegen.</p>")
+        + _abschnitt("Zurückspielen", "<p>In EPM: Administration › Backup › „Wiederherstellen“ (das Passwort liegt auf "
+                                      "dem Server, hier wird es nicht gebraucht). Ohne EPM, z. B. auf einem neuen Server, "
+                                      "eine Sicherung erst prüfen, dann jede Datei mit diesem Passwort entschlüsseln:</p>"
+                                      f'<pre class="befehle">{html.escape(befehle)}</pre>'
+                                      "<p>Danach die Datenbank mit <i>pg_restore</i> einspielen, die Dokumente nach "
+                                      "/srv/epm/data/dokumente auspacken und die neueste Löschliste nach "
+                                      "/srv/epm/data/loeschliste/loeschliste.jsonl legen (nie die Löschliste eines anderen "
+                                      "Systems).</p>")
+        + (_abschnitt("Passwörter, mit denen noch Sicherungen verschlüsselt sind",
+                      _tabelle(["Nr.", "festgelegt", "von", "Sicherungen"], zeilen, ["14mm", "40mm", None, "28mm"]))
+           if zeilen else "")
+        + '<div class="block s-klein">Dieses Blatt enthält ein Passwort: nicht kopieren, nicht weitergeben. Bei Verlust '
+          'sofort unter Administration › Backup ein neues Sicherungs-Passwort festlegen.</div>'
+        + "<style>.passwort { font-family: 'IBM Plex Mono', 'DejaVu Sans Mono', monospace; font-size: 15pt;"
+          " word-break: break-all; padding: 3mm 4mm; border: 0.4mm solid #251F53; border-radius: 2mm; }"
+          " .gruppen { margin-top: 2mm; font-family: 'IBM Plex Mono', 'DejaVu Sans Mono', monospace; font-size: 12pt; }"
+          " .gruppen span { margin-right: 4mm; }"
+          " .befehle { font-family: 'IBM Plex Mono', 'DejaVu Sans Mono', monospace; font-size: 8.5pt;"
+          " white-space: pre-wrap; margin: 1mm 0; }</style>")
+    return html_zu_pdf(seite("Sicherungs-Passwort", inhalt, fuss, None, rechts))

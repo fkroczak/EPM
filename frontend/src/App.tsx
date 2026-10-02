@@ -15,6 +15,7 @@ import { Therapie } from "./seiten/akte/Therapie";
 import { Uebersicht } from "./seiten/akte/Uebersicht";
 import { Verlauf } from "./seiten/akte/Verlauf";
 import { AuditLog } from "./seiten/admin/AuditLog";
+import { Backup } from "./seiten/admin/Backup";
 import { System } from "./seiten/admin/System";
 import { Import } from "./seiten/admin/import/Import";
 import { Infusionsplaene } from "./seiten/Infusionsplaene";
@@ -74,6 +75,7 @@ const router = createBrowserRouter([
       { path: "aerzte", element: <Aerzte /> },
       { path: "datenschutz", element: <MitRecht recht={["datenschutz_bearbeiten", "datenschutz_entscheiden"]}><Datenschutz /></MitRecht> },
       { path: "konto", element: <Konto /> },
+      { path: "admin/backup", element: <MitRecht recht="backup_verwalten" titel="Backup"><Backup /></MitRecht> },
       { path: "admin/benutzer", element: <MitRecht recht="benutzer_verwalten" titel="Benutzer"><Benutzer /></MitRecht> },
       { path: "admin/vorlagen", element: <MitRecht recht="vorlagen_pflegen" titel="Vorlagen"><Vorlagen /></MitRecht> },
       { path: "admin/vorlagen/dokumente", element: <MitRecht recht="vorlagen_pflegen" titel="Dokumentvorlagen"><Vorlagen /></MitRecht> },

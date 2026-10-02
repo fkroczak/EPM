@@ -72,21 +72,35 @@ EOF
   chmod 0600 "$B/.env"
 fi
 
-echo "==> Backup-Skript und täglicher Timer (02:30)"
+echo "==> Programme für Sicherung und Übertragung (GnuPG, rclone, jq)"
+fehlend=()
+for paar in gpg:gnupg rclone:rclone jq:jq; do
+  command -v "${paar%%:*}" >/dev/null 2>&1 || fehlend+=("${paar##*:}")
+done
+if [[ ${#fehlend[@]} -gt 0 ]]; then
+  # der VPS erreicht die Paketquellen über den Proxy der OPNsense (apt.conf.d/95epm-proxy aus 01-basis.sh)
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -q "${fehlend[@]}" >/dev/null \
+    || echo "WARNUNG: ${fehlend[*]} nicht installiert – ohne gpg keine Verschlüsselung, ohne rclone keine Übertragung."
+fi
+# Passwort und Übertragungsziel der Sicherungen (schreibt der Systemagent; nur root)
+install -d -m 0700 /etc/epm/sicherung
+
+echo "==> Backup-Skript und täglicher Timer (02:00)"
 install -m 0750 epm-backup.sh /usr/local/sbin/epm-backup
 cat > /etc/systemd/system/epm-backup.service <<EOF
 [Unit]
-Description=EPM Backup (Datenbank + Dokumente)
+Description=EPM Sicherung (Datenbank, Dokumente, Löschliste)
 After=docker.service
 [Service]
 Type=oneshot
-ExecStart=/usr/local/sbin/epm-backup
+ExecStart=/usr/local/sbin/epm-backup --art nachts
+TimeoutStartSec=3h
 EOF
 cat > /etc/systemd/system/epm-backup.timer <<'EOF'
 [Unit]
-Description=EPM Backup täglich
+Description=EPM Sicherung täglich um 02:00
 [Timer]
-OnCalendar=*-*-* 02:30
+OnCalendar=*-*-* 02:00
 Persistent=true
 [Install]
 WantedBy=timers.target
@@ -94,7 +108,33 @@ EOF
 systemctl daemon-reload
 systemctl enable --now epm-backup.timer
 
-echo "==> Systemagent (Administration › System: Auslastung, Updates, Neustart aus der Oberfläche)"
+echo "==> Autostart des EPM-Stacks (epm.service, „EPM-Server Aufbau“ B4)"
+# Startet „docker compose up“ beim Booten und fährt EPM beim Herunterfahren geordnet herunter. Welche Compose-Datei
+# und Version gilt, steht in $B/.env (epm-update schreibt sie).
+cat > /etc/systemd/system/epm.service <<EOF
+[Unit]
+Description=EPM Anwendung (Docker Compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+ConditionPathExists=$B/.env
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=$B
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down
+ExecReload=/usr/bin/docker compose up -d --remove-orphans
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable epm.service >/dev/null
+
+echo "==> Systemagent (Administration › System und › Backup: Auslastung, Updates, Neustart, Sicherungen)"
 install -m 0750 epm-systemagent.py /usr/local/sbin/epm-systemagent
 cat > /etc/systemd/system/epm-systemstatus.service <<'EOF'
 [Unit]
@@ -123,6 +163,16 @@ After=docker.service
 Type=oneshot
 ExecStart=/usr/local/sbin/epm-systemagent auftraege
 TimeoutStartSec=6h
+EOF
+cat > /etc/systemd/system/epm-uebertragung.service <<'EOF'
+[Unit]
+Description=EPM Sicherungen zum Übertragungsziel (WebDAV) übertragen – im Zeitfenster, vom Systemagenten angestoßen
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/epm-systemagent uebertragen
+TimeoutStartSec=6h
+Nice=10
 EOF
 cat > /etc/systemd/system/epm-systemagent.path <<EOF
 [Unit]

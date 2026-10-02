@@ -294,7 +294,7 @@ function ErledigenDialog({ anfrage, patient, offen, onOffen }: { anfrage: Datens
         <Knopf variante="pri" laedt={erledigen.isPending} onClick={() => erledigen.mutate()}>Erledigen</Knopf></>}>
       <div className="flex flex-col gap-3" data-testid="anfrage-erledigen">
         {loeschung ? (
-          <Meldung art="info">Eine Löschung wird mit „Akte endgültig löschen“ erfüllt (unten auf dieser Seite, nur Mediziner). Steht
+          <Meldung art="info">Eine Löschung wird mit „Akte endgültig löschen“ erfüllt (unten auf dieser Seite, Mediziner oder Admin). Steht
             eine Aufbewahrungspflicht entgegen, wird stattdessen die Verarbeitung eingeschränkt (Art. 17 Abs. 3 DSGVO, § 35 Abs. 3 BDSG).</Meldung>
         ) : null}
         <Feld label="Ergebnis" fehler={f.ergebnis}>
@@ -586,7 +586,7 @@ function AufbewahrungKarte({ daten, patient, darf, entscheiden, loeschenErlaubt 
 
 export function AkteDatenschutz() {
   const { patient } = useAkte();
-  const { darfBei, ich } = useAuth();
+  const { darfBei } = useAuth();
   const daten = useQuery({
     queryKey: ["patient", patient.id, "datenschutz"],
     queryFn: () => api<AktenDatenschutz>(`patienten/${patient.id}/datenschutz/`),
@@ -595,7 +595,8 @@ export function AkteDatenschutz() {
   if (!daten.data) return <Fehleranzeige fehler={daten.error ?? "Nicht geladen."} />;
   const darf = darfBei("datenschutz_bearbeiten", patient);
   const entscheiden = darfBei("datenschutz_entscheiden", patient);
-  const loeschenErlaubt = darfBei("akten_loeschen", patient) && ich?.rolle === "mediziner";
+  // Recht „Akten endgültig löschen“: Mediziner und Admin, Admins auch bei echten Akten (Festlegung 02.10.2026)
+  const loeschenErlaubt = darfBei("akten_loeschen", patient);
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start" data-testid="akte-datenschutz">
       <div className="flex flex-col gap-5 min-w-0">

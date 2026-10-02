@@ -23,7 +23,7 @@ type Rechte = {
   standard: Record<string, string[]>;
   /** Rollen, die diese Rechte nur bei Testpatienten ausüben (Admin) */
   nur_testpatienten: { rollen: string[]; rechte: string[] };
-  /** Rechte, die nur bestimmte Rollen haben können (endgültig löschen: nur Mediziner) */
+  /** Rechte, die nur bestimmte Rollen haben können (endgültig löschen: Mediziner und Admin) */
   nur_rollen: Record<string, string[]>;
 };
 type Formular = { titel: string; first_name: string; last_name: string; kuerzel: string; funktion: string; username: string; rolle: string };
@@ -81,7 +81,7 @@ function RechteMatrix() {
           <h2 className="lbl m-0">Was die Rollen dürfen</h2>
           <span className="text-[0.8125rem] gedaempft leading-normal max-w-[70ch]">Je Gruppe einstellbar. Mediziner sind dem Admin gleichgestellt, außer bei Benutzern,
             dem Wiederöffnen abgeschlossener Akten, Sicherungen, Testdaten und der Systemverwaltung. Admins dürfen alles, Patientendaten schreiben sie aber nur
-            bei Testpatienten. Die Systemverwaltung (Server und EPM) gibt es nur für Admins. Testbenutzer erhalten nie Rechte über
+            bei Testpatienten. Die Systemverwaltung (Server und EPM) hat standardmäßig nur der Admin; für eine Urlaubsvertretung kann sie hier einer Gruppe freigeschaltet werden. Testbenutzer erhalten nie Rechte über
             Testpatienten hinaus.</span>
         </div>
         <div className="flex gap-2">

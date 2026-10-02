@@ -521,7 +521,7 @@ export function System() {
 
   return (
     <Seite pfad={[{ text: "Administration" }, { text: "System" }]}>
-      <Seitenkopf titel="System" unter="Server und EPM: Auslastung, Updates, Wartung. Nur für die Administration."
+      <Seitenkopf titel="System" unter="Server und EPM: Auslastung, Updates, Wartung. Standardmäßig nur für die Administration (Vertretung unter Benutzer › Rechte)."
         rechts={<Knopf icon="neustart" laedt={daten.isFetching} onClick={() => { void daten.refetch(); void auftraege.refetch(); void verlauf.refetch(); }}>
           Neu laden</Knopf>} />
 
