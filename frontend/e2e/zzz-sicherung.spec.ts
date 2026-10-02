@@ -117,7 +117,8 @@ test("Backup: nur mit Recht „Sicherungen verwalten“; Sicherungs-Passwort fes
   // Das Passwort steht nur auf dem Server – nicht in der Datenbank, nicht im Status für den Container
   expect(execSync(`sudo cat ${B}/konf-sicherung/passwort-1`).toString()).toBe(passwort);
   expect(execSync(`sudo stat -c %a ${B}/konf-sicherung/passwort-1`).toString().trim()).toBe("600");
-  const dump = execSync(`sudo docker compose -p epm-ci exec -T db pg_dump -U epm -d epm --data-only`, { cwd: B, maxBuffer: 1 << 28 });
+  const dump = execSync(`sudo docker compose -p epm-ci exec -T db pg_dump -U epm -d epm --data-only`,
+    { cwd: B, maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "ignore"] });
   expect(dump.includes(Buffer.from(passwort))).toBe(false);
   for (const name of readdirSync(`${B}/system/status`).filter((n) => n.endsWith(".json"))) {
     expect(readFileSync(`${B}/system/status/${name}`, "utf8")).not.toContain(passwort);
@@ -150,7 +151,8 @@ test("Backup: „Jetzt sichern“ verschlüsselt mit dem Passwort aus der Oberfl
   await dialog.getByLabel("Sicherungs-Passwort").fill(passwort);
   await dialog.getByRole("button", { name: "Prüfen" }).click();
   await expect(dialog).toContainText("Stimmt: Passwort Nr. 1 (aktuell)");
-  await dialog.getByRole("button", { name: "Schließen" }).click();
+  await dialog.getByRole("button", { name: "Fertig" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
 test("Backup: Übertragungsziel festlegen, Verbindung testen, von Hand und im Zeitfenster übertragen; Startseite", async ({ page, browser }) => {
