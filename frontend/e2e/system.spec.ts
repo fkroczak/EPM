@@ -7,16 +7,16 @@ import { KENNWORT, merken, naechsterNotfallcode, zustand } from "./hilfen";
 
 test.use({ storageState: zustand("admin") });
 
-test("System: nur für Admin – Menü, Seite und Recht nur für die Rolle Admin", async ({ page, browser }) => {
+test("System: Standard nur Admin, Vertretung je Gruppe freischaltbar und wieder zurücknehmbar", async ({ page, browser }) => {
   await page.goto("/");
   await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "System" }).click();
   await expect(page.getByRole("heading", { name: "System", level: 1 })).toBeVisible();
-  // Recht „Systemverwaltung“ gibt es in der Matrix nur für Admin
+  // Standard: nur Admin; für eine Urlaubsvertretung je Gruppe freischaltbar (Festlegung 02.10.2026)
   await page.goto("/admin/benutzer");
   const rechte = page.getByTestId("rechte");
   await expect(rechte.getByRole("checkbox", { name: "Admin: Systemverwaltung (Server und EPM)" })).toBeChecked();
   const mediziner = rechte.getByRole("checkbox", { name: "Mediziner: Systemverwaltung (Server und EPM)" });
-  await expect(mediziner).toBeDisabled();
+  await expect(mediziner).toBeEnabled();
   await expect(mediziner).not.toBeChecked();
   for (const rolle of ["mediziner", "mitarbeiter", "betrachter"] as const) {
     const ctx = await browser.newContext({ storageState: zustand(rolle), ignoreHTTPSErrors: true });
@@ -28,6 +28,22 @@ test("System: nur für Admin – Menü, Seite und Recht nur für die Rolle Admin
     await expect(p).toHaveURL(/\/$/);
     await ctx.close();
   }
+  // Vertretung: Mediziner bekommen die Systemverwaltung, sehen Menü und Seite; danach zurück auf Standard
+  await mediziner.check();
+  await rechte.getByRole("button", { name: "Speichern (1)" }).click();
+  await expect(page.getByText("Rechte gespeichert. Sie gelten ab sofort.")).toBeVisible();
+  const ctx = await browser.newContext({ storageState: zustand("mediziner"), ignoreHTTPSErrors: true });
+  const p = await ctx.newPage();
+  await p.goto("/");
+  await p.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "System" }).click();
+  await expect(p.getByRole("heading", { name: "System", level: 1 })).toBeVisible();
+  await expect(p.getByTestId("taetigkeiten")).toBeVisible();
+  await mediziner.uncheck();
+  await rechte.getByRole("button", { name: "Speichern (1)" }).click();
+  await expect(rechte.getByRole("button", { name: "Speichern", exact: true })).toBeDisabled();
+  await p.goto("/");
+  await expect(p.getByRole("link", { name: "System", exact: true })).toHaveCount(0);
+  await ctx.close();
 });
 
 test("System: Auslastung und Status vom Systemagenten, Wartung des EPM", async ({ page }) => {

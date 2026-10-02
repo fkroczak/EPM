@@ -96,7 +96,7 @@ function UmhaengenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolea
   );
 }
 
-/** Endgültig löschen: nur Mediziner, mit Kennwort, Code aus der Authenticator-App und abgetipptem Bestätigungscode. */
+/** Endgültig löschen: Mediziner und Admin (auch bei echten Akten), mit Kennwort, Code aus der Authenticator-App und abgetipptem Bestätigungscode. */
 function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean; onOffen: (o: boolean) => void }) {
   const { patient } = useAkte();
   const qc = useQueryClient();

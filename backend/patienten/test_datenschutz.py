@@ -600,8 +600,8 @@ class AkteLoeschen(DatenschutzGrundlage):
         self.assertIn("Aufbewahrungsfrist läuft bis", r.json()["fehler"])
         r = c.post("/api/datenschutzanfragen/", {"patient": pid, "art": "loeschung", "gestellt_von": "Patientin"}, format="json")
         self.assertEqual(r.status_code, 201, r.content)
-        # nur Mediziner
-        self.assertEqual(client_fuer(self.admin).post(url + "loeschen-vorbereiten/").status_code, 403)
+        # Mediziner und Admin (Admins auch bei echten Akten, Festlegung 02.10.2026), Mitarbeiter nicht
+        self.assertEqual(client_fuer(self.admin).post(url + "loeschen-vorbereiten/").status_code, 200)
         self.assertEqual(c.post(url + "loeschen-vorbereiten/").status_code, 403)
         r = m.post(url + "loeschen-vorbereiten/")
         self.assertEqual(r.status_code, 200, r.content)

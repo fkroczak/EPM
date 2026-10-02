@@ -264,7 +264,7 @@ class DatenschutzanfrageViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin
         if ergebnis not in E.values:
             fehler["ergebnis"] = "Bitte das Ergebnis wählen."
         elif ergebnis == E.ERFUELLT and a.art == Datenschutzanfrage.Art.LOESCHUNG:
-            fehler["ergebnis"] = ("Eine Löschung wird mit „Akte endgültig löschen“ erfüllt (nur Mediziner). Steht eine "
+            fehler["ergebnis"] = ("Eine Löschung wird mit „Akte endgültig löschen“ erfüllt (Mediziner oder Admin). Steht eine "
                                   "Aufbewahrungspflicht entgegen: „Verarbeitung eingeschränkt statt gelöscht“.")
         elif ergebnis in (E.ABGELEHNT, E.EINGESCHRAENKT) and len(begruendung) < 10:
             # Art. 12 Abs. 4 DSGVO: Wird der Antrag nicht (voll) erfüllt, sind der Person die Gründe mitzuteilen
