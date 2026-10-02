@@ -39,6 +39,15 @@ from .permissions import Angemeldet, BenutzerRecht, ist_verifiziert
 from .rechte import schreibt_nur_testpatienten
 
 ANZAHL_NOTFALLCODES = 10
+# S08: Hinweis auf der Startseite, sobald nur noch so viele Notfall-Codes übrig sind (abgeleitet: bei 3 von 10 bleibt
+# Zeit, neue zu erzeugen; ohne Codes ist bei Verlust des Telefons keine Anmeldung möglich)
+NOTFALLCODES_WARNEN_AB = 3
+
+
+def notfallcodes_stand(user) -> dict:
+    return {"uebrig": StaticToken.objects.filter(device__user=user).count(), "gesamt": ANZAHL_NOTFALLCODES,
+            "eingerichtet": StaticDevice.objects.filter(user=user, confirmed=True).exists(),
+            "warnen_ab": NOTFALLCODES_WARNEN_AB}
 
 
 # ---------------------------------------------------------------- Hilfen
@@ -115,7 +124,8 @@ def ich_daten(user):
         "rolle": user.rolle,
         "ist_test": user.ist_test,
         "darstellung": user.darstellung,
-        "startseite": user.startseite,
+        "startseite": {**(user.startseite or {}), "karten": startseite_karten(user)},
+        "aufteilung": user.aufteilung or {},
         "rechte": user.rechte,
         # Admins: Patientendaten nur bei Testpatienten schreiben (Oberfläche blendet Knöpfe bei echten Akten aus)
         "schreibt_nur_testpatienten": schreibt_nur_testpatienten(user),
@@ -306,7 +316,45 @@ class AbmeldenView(OffenerView):
 
 AKZENTE = ["nachtblau", "petrol", "blau", "gruen", "orange", "aubergine", "schiefer", "eigen"]
 HINTERGRUENDE = ["weissgrau", "hellgrau", "grau", "kraeftig", "blaugrau", "sand", "eigen"]
-KARTEN = ["termine", "gewicht", "plaene", "pruefen", "aktiv"]
+# Kacheln der Startseite (S11) in Standardreihenfolge: Standardgröße (Spalten × Zeilen im Raster) und Gruppe.
+# Klinische Kacheln sind standardmäßig für alle sichtbar außer der Rolle Admin, die Kacheln der Administration
+# (S12–S14) nur für die Rolle Admin. Jede Person kann jede Kachel ein- oder ausblenden; ob sie erscheint, entscheidet
+# zusätzlich das Recht (Sicherung: „Sicherungen verwalten“, Server/Updates/Angemeldet/Hinweis: „Systemverwaltung“,
+# Konten: „Benutzer verwalten“, Zugriffe: „Audit-Log lesen“, Testumgebung: „Testdaten zurücksetzen“).
+KARTEN = {
+    "termine": (2, 2, "klinik"), "wieder": (1, 2, "klinik"), "meine": (1, 1, "klinik"), "gewicht": (1, 1, "klinik"),
+    "plaene": (1, 1, "klinik"), "pruefen": (1, 1, "klinik"), "aktiv": (2, 1, "klinik"),
+    "sicherung": (2, 1, "admin"), "server": (1, 1, "admin"), "updates": (1, 1, "admin"), "konten": (1, 1, "admin"),
+    "angemeldet": (1, 1, "admin"), "hinweis": (1, 1, "admin"), "zugriffe": (1, 1, "admin"),
+    "testumgebung": (1, 1, "admin"),
+}
+GROESSEN = (1, 2)
+
+# Spaltenteiler (S17): Seiten mit Teiler und Fensterstufen (hd ab 1440 px, fhd ab 1920 px, qhd ab 2560 px)
+TEILER_SEITEN = ("patientenliste", "akte_uebersicht", "akte_kontakte", "plan_editor")
+TEILER_STUFEN = ("hd", "fhd", "qhd")
+TEILER_MIN_SPALTE = 0.15  # keine Spalte schmaler als 15 % (sonst wäre sie nicht mehr bedienbar)
+
+
+def startseite_karten(user, gespeichert=None) -> list[dict]:
+    """Alle Kacheln in Anzeigereihenfolge: gespeicherte zuerst (unbekannte fallen weg), fehlende mit ihrem Standard
+    hinten angehängt – so geht nichts verloren, und neue Kacheln einer späteren Version erscheinen von selbst."""
+    if gespeichert is None:
+        gespeichert = (user.startseite or {}).get("karten", [])
+    admin = getattr(user, "rolle", None) == Rolle.ADMIN
+    ergebnis, ids = [], set()
+    for k in gespeichert if isinstance(gespeichert, list) else []:
+        if not isinstance(k, dict) or k.get("id") not in KARTEN or k["id"] in ids:
+            continue
+        breite, hoehe, _ = KARTEN[k["id"]]
+        ergebnis.append({"id": k["id"], "sichtbar": bool(k.get("sichtbar", True)),
+                         "breite": k["breite"] if k.get("breite") in GROESSEN else breite,
+                         "hoehe": k["hoehe"] if k.get("hoehe") in GROESSEN else hoehe})
+        ids.add(k["id"])
+    for kid, (breite, hoehe, gruppe) in KARTEN.items():
+        if kid not in ids:
+            ergebnis.append({"id": kid, "sichtbar": (gruppe == "admin") == admin, "breite": breite, "hoehe": hoehe})
+    return ergebnis
 TINTE = "#1B1932"
 
 
@@ -360,21 +408,49 @@ class DarstellungSerializer(serializers.Serializer):
 
 
 class KarteSerializer(serializers.Serializer):
-    id = serializers.ChoiceField(KARTEN)
+    id = serializers.ChoiceField(list(KARTEN))
     sichtbar = serializers.BooleanField(default=True)
+    # Größe im Raster (S11): Spalten × Zeilen, je 1 oder 2
+    breite = serializers.ChoiceField(GROESSEN, required=False)
+    hoehe = serializers.ChoiceField(GROESSEN, required=False)
 
 
 class StartseiteSerializer(serializers.Serializer):
-    """Karten der Startseite in Anzeigereihenfolge (Entwurf 2 · „Startseite anpassen“)."""
+    """Kacheln der Startseite in Anzeigereihenfolge mit Größe (Entwurf 2 · „Startseite anpassen“, S11). Eine leere
+    Liste setzt auf den Standard zurück. ``notfallhinweis_bei``: Hinweis zu den Notfall-Codes bei dieser Anzahl
+    ausgeblendet (S08) – er erscheint wieder, sobald weniger Codes übrig sind."""
 
-    karten = KarteSerializer(many=True)
+    karten = KarteSerializer(many=True, required=False)
+    notfallhinweis_bei = serializers.IntegerField(min_value=0, allow_null=True, required=False)
 
     def validate_karten(self, karten):
         ids = [k["id"] for k in karten]
         if len(ids) != len(set(ids)):
             raise serializers.ValidationError("Jede Karte darf nur einmal vorkommen.")
-        # fehlende Karten hinten sichtbar anhängen, damit nichts verloren geht
-        return karten + [{"id": k, "sichtbar": True} for k in KARTEN if k not in ids]
+        return karten
+
+
+def pruefe_aufteilung(daten) -> dict:
+    """{"<seite>@<stufe>": [Anteile] | null} prüfen (S17). Anteile sind die Positionen der Teiler von links (0–1),
+    aufsteigend, jede Spalte mindestens 15 % breit; null setzt die Seite auf den Standard zurück."""
+    if not isinstance(daten, dict):
+        raise serializers.ValidationError({"aufteilung": "Erwartet wird ein Objekt."})
+    ergebnis = {}
+    for schluessel, werte in daten.items():
+        seite, _, stufe = str(schluessel).partition("@")
+        if seite not in TEILER_SEITEN or stufe not in TEILER_STUFEN:
+            raise serializers.ValidationError({"aufteilung": f"Unbekannte Seite oder Stufe „{schluessel}“."})
+        if werte is None:
+            ergebnis[schluessel] = None
+            continue
+        if (not isinstance(werte, list) or not 1 <= len(werte) <= 2
+                or not all(isinstance(w, (int, float)) and not isinstance(w, bool) for w in werte)):
+            raise serializers.ValidationError({"aufteilung": "Ein oder zwei Teiler als Zahlen zwischen 0 und 1."})
+        grenzen = [0.0, *werte, 1.0]
+        if any(b - a < TEILER_MIN_SPALTE - 1e-9 for a, b in zip(grenzen, grenzen[1:])):
+            raise serializers.ValidationError({"aufteilung": "Jede Spalte muss mindestens 15 % breit sein."})
+        ergebnis[schluessel] = [round(float(w), 4) for w in werte]
+    return ergebnis
 
 
 class IchView(APIView):
@@ -396,8 +472,22 @@ class IchView(APIView):
         if "startseite" in request.data:
             s = StartseiteSerializer(data=request.data["startseite"])
             s.is_valid(raise_exception=True)
-            user.startseite = {"karten": [dict(k) for k in s.validated_data["karten"]]}
+            neu = dict(user.startseite or {})
+            if "karten" in s.validated_data:
+                neu["karten"] = startseite_karten(user, [dict(k) for k in s.validated_data["karten"]])
+            if "notfallhinweis_bei" in s.validated_data:
+                neu["notfallhinweis_bei"] = s.validated_data["notfallhinweis_bei"]
+            user.startseite = neu
             felder.append("startseite")
+        if "aufteilung" in request.data:
+            neu = dict(user.aufteilung or {})
+            for schluessel, werte in pruefe_aufteilung(request.data["aufteilung"]).items():
+                if werte is None:
+                    neu.pop(schluessel, None)
+                else:
+                    neu[schluessel] = werte
+            user.aufteilung = neu
+            felder.append("aufteilung")
         if felder:
             user.save(update_fields=felder)
         return Response(ich_daten(user))
@@ -530,6 +620,31 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         return Response([{"id": u.id, "benutzername": u.username, "anzeigename": u.anzeigename,
                           "gesperrt_am": u.gesperrt_am, "sperrgrund": u.sperrgrund, "fehlversuche": u.fehlversuche}
                          for u in gesperrt])
+
+    @action(detail=False, methods=["get"])
+    def konten(self, request):
+        """Admin-Startseite, Kachel „Konten“ (S12): Konten, um die sich die Administration kümmern sollte – gesperrt,
+        Einmal-Kennwort offen oder abgelaufen, ohne zweiten Faktor, Notfall-Codes knapp. Ohne Kennwörter oder Codes,
+        nur Zustände und Anzahlen."""
+        zeilen = []
+        for u in User.objects.filter(nur_historisch=False).order_by("last_name", "first_name"):
+            codes = StaticToken.objects.filter(device__user=u).count()
+            probleme = []
+            if u.gesperrt_am:
+                probleme.append("gesperrt")
+            if u.muss_kennwort_aendern and u.einmal_kennwort_gueltig_bis:
+                probleme.append("einmal_kennwort_abgelaufen" if u.einmal_kennwort_abgelaufen else "einmal_kennwort")
+            elif not u.gesperrt_am and not hat_zweiten_faktor(u):
+                probleme.append("ohne_2fa")
+            elif not u.gesperrt_am and codes <= NOTFALLCODES_WARNEN_AB:
+                probleme.append("notfallcodes")
+            if probleme:
+                zeilen.append({"id": u.id, "benutzername": u.username, "anzeigename": u.anzeigename,
+                               "rolle": u.rolle, "probleme": probleme, "gesperrt_am": u.gesperrt_am,
+                               "sperrgrund": u.sperrgrund, "fehlversuche": u.fehlversuche,
+                               "einmal_kennwort_gueltig_bis": u.einmal_kennwort_gueltig_bis,
+                               "notfallcodes_uebrig": codes, "notfallcodes_gesamt": ANZAHL_NOTFALLCODES})
+        return Response(zeilen)
 
     def perform_update(self, serializer):
         from .rechte import matrix

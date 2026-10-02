@@ -722,3 +722,24 @@ class Loeschprotokoll(models.Model):
 
     def __str__(self):
         return f"Akte Nr. {self.nummer} gelöscht am {self.geloescht_am:%d.%m.%Y}"
+
+
+class Merkeintrag(models.Model):
+    """„Meine Akten“ (S05) je Person: Merkliste (Stern im Aktenkopf) und zuletzt geöffnete Akten. Nur der Verweis auf
+    die Akte, keine Inhalte; sichtbar nur für die Person selbst. Fällt mit der Akte weg (endgültiges Löschen,
+    Zurücksetzen der Testdaten)."""
+
+    class Art(models.TextChoices):
+        MERKLISTE = "merkliste", "Merkliste"
+        GEOEFFNET = "geoeffnet", "zuletzt geöffnet"
+
+    benutzer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="+")
+    art = models.CharField(max_length=10, choices=Art.choices)
+    zeitpunkt = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Eintrag in „Meine Akten“"
+        verbose_name_plural = "Einträge in „Meine Akten“"
+        ordering = ["-zeitpunkt", "-id"]
+        constraints = [models.UniqueConstraint(fields=["benutzer", "patient", "art"], name="merkeintrag_eindeutig")]

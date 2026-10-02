@@ -13,6 +13,8 @@ from patienten.api import (
     BezugspersonViewSet, DokumentViewSet, GewichtViewSet, KalenderViewSet, KontaktViewSet, PatientArztViewSet,
     PatientViewSet, StartseiteViewSet, TerminViewSet,
 )
+from hilfe import api as hilfe
+from patienten import meine_akten
 from patienten.datenschutz_api import DatenschutzanfrageViewSet, DatenschutzViewSet, ErklaerungViewSet
 from stammdaten.api import (
     AnsprechpartnerViewSet, ArztViewSet, AuswahlwertViewSet, BriefkopfView, EinstellungenView, LogoView, PraeparatViewSet,
@@ -100,6 +102,13 @@ urlpatterns = [
     path("api/backup/uebertragen/", backup.UebertragenView.as_view()),
     path("api/backup/auftraege/<uuid:kennung>/abbrechen/", backup.AuftragAbbrechenView.as_view()),
     path("api/backup/<str:stempel>/wiederherstellen/", backup.WiederherstellenView.as_view()),
+    path("api/meine-akten/", meine_akten.MeineAktenView.as_view()),
+    path("api/meine-akten/merken/", meine_akten.MerkenView.as_view()),
+    path("api/meine-akten/merken/<int:patient>/", meine_akten.MerkenView.as_view()),
+    path("api/meine-akten/geoeffnet/", meine_akten.GeoeffnetView.as_view()),
+    path("api/hilfe/", hilfe.HilfeView.as_view()),
+    path("api/hilfe/<slug:abschnitt>/ergaenzung/", hilfe.ErgaenzungView.as_view()),
+    path("api/hilfe/<slug:abschnitt>/ergaenzung/versionen/", hilfe.VersionenView.as_view()),
     path("api/", include(router.urls)),
 ]
 
