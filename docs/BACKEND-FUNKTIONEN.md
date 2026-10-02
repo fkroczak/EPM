@@ -1341,7 +1341,9 @@ erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migratione
   zu einer eingeschränkten Akte für Personen ohne Einsichtsrecht ohne Namen, Titel und Freitext („Akte Nr. N
   (Verarbeitung eingeschränkt)“) und sind über die Suche nach dem Namen nicht zu finden; im Django-Admin (`/verwaltung/`)
   erscheinen eingeschränkte Akten, ihre Einträge und ihre Audit-Einträge nicht. Einschränken, jede Einsicht (mit Grund)
-  und das Aufheben stehen im Audit-Log (Gruppe „Datenschutz“) und im Verlauf. Vor dem Aufheben ist die betroffene Person
+  und das Aufheben stehen im Audit-Log (Gruppe „Datenschutz“) und im Verlauf. Die Ansicht nennt vor der Einsicht, wofür
+  eingeschränkte Daten verarbeitet werden dürfen (Art. 18 Abs. 2 DSGVO); ob der eingetragene Grund darunter fällt, prüft
+  das Programm nicht. Vor dem Aufheben ist die betroffene Person
   zu unterrichten (Art. 18 Abs. 3 DSGVO): Datum der Unterrichtung oder Begründung, warum sie entfällt. Aufheben beendet
   laufende Einsichten. Wieder öffnen (F21) erst nach dem Aufheben (409).
 - **Validierung:** Recht „Datenschutz: Anfragen entscheiden, Verarbeitung einschränken“ (Standard: Mediziner; Admin nur
