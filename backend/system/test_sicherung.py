@@ -130,6 +130,36 @@ class Uebersicht(Backupverzeichnis):
         self.assertNotIn("kennwort", json.dumps(d["ziel"]))
         self.assertEqual(d["aufbewahrung_tage"], 30)
 
+    def test_nicht_nachgeholte_loeschungen_sind_ein_fehler(self):
+        """Konnten Löschungen nach Art. 17 DSGVO nicht vollständig nachgeholt werden, zeigen es Backup-Seite und
+        Startseite – auch wenn die Sicherung selbst in Ordnung ist (O-28)."""
+        from django.test import override_settings
+
+        from patienten.loeschung import nachholen_stand_schreiben
+
+        ordner = Path(tempfile.mkdtemp(prefix="epm-loeschliste-"))
+        try:
+            with override_settings(EPM_LOESCHLISTE=ordner / "loeschliste.jsonl"):
+                self.status_schreiben()
+                self.assertEqual(self.a.get("/api/backup/").json()["kurz"]["zustand"], "ok")
+                nachholen_stand_schreiben("fehler", "Löschungen … nicht vollständig nachgeholt: 1 Zeilen der Löschliste "
+                                          "nicht lesbar", timezone.now().isoformat())
+                kurz = self.a.get("/api/backup/").json()["kurz"]
+                self.assertEqual((kurz["zustand"], kurz["titel"]), ("fehler", "Löschungen nicht nachgeholt"))
+                self.assertIn("Endgültige Löschungen (Art. 17 DSGVO) konnten nicht vollständig nachgeholt werden", kurz["hinweise"][0])
+                start = client_fuer(self.mitarbeiter).get("/api/startseite/").json()["sicherung"]
+                self.assertEqual(start["zustand"], "fehler")
+                # auch ohne Status vom Server sichtbar
+                (self.ordner / "status" / "sicherung.json").unlink()
+                kurz = self.a.get("/api/backup/").json()["kurz"]
+                self.assertEqual((kurz["zustand"], kurz["titel"]), ("fehler", "Löschungen nicht nachgeholt"))
+                # behoben: der Hinweis verschwindet
+                nachholen_stand_schreiben("ok", "", timezone.now().isoformat())
+                self.status_schreiben()
+                self.assertEqual(self.a.get("/api/backup/").json()["kurz"]["zustand"], "ok")
+        finally:
+            shutil.rmtree(ordner, ignore_errors=True)
+
     def test_zustand_fuer_die_startseite(self):
         start = lambda: client_fuer(self.mitarbeiter).get("/api/startseite/").json()["sicherung"]  # noqa: E731
         self.assertEqual(start()["zustand"], "unbekannt")
@@ -381,6 +411,24 @@ class EchterAgent(Backupverzeichnis):
                            env=self.umgebung)
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertEqual(self.auftragsdateien(), [])
+
+    def test_gescheiterte_sicherung_hinterlaesst_nichts(self):
+        """Scheitert das Packen der Dokumente, nachdem der Datenbank-Dump schon fertig ist, bleibt kein Dump als halbe
+        Sicherung liegen (O-27) – er stünde sonst in der Liste und würde mit übertragen."""
+        self.assertEqual(self.a.post("/api/backup/jetzt/").status_code, 201)
+        self.agent()
+        self.assertEqual(len(self.a.get("/api/backup/").json()["sicherungen"]), 1)
+        vorher = sorted(p.name for p in (self.basis / "backup").iterdir() if p.name.startswith("epm"))
+        shutil.rmtree(self.basis / "data" / "dokumente")
+        import time
+        time.sleep(1.1)   # eigener Zeitstempel für den zweiten Lauf
+        self.assertEqual(self.a.post("/api/backup/jetzt/").status_code, 201)
+        self.agent()
+        d = self.a.get("/api/backup/").json()
+        self.assertEqual(d["auftraege"][0]["status"], "fehler", d["auftraege"][0]["ausgabe"])
+        self.assertIn("es bleibt keine unvollständige Sicherung liegen", d["auftraege"][0]["ausgabe"])
+        self.assertEqual(len(d["sicherungen"]), 1)
+        self.assertEqual(sorted(p.name for p in (self.basis / "backup").iterdir() if p.name.startswith("epm")), vorher)
 
     def test_passwort_sicherung_pruefen_und_blatt(self):
         # 1. unverschlüsselte Sicherung (noch kein Passwort)

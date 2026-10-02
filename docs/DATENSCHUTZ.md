@@ -104,12 +104,13 @@ Löschungen zurück, die nach dieser Sicherung lagen.
   Falsche Angaben werden berichtigt; die frühere Fassung bleibt im Verlauf (§ 630f BGB: Änderungen erkennbar).
 - **Der Grund einer Löschung bleibt** im Löschprotokoll und in der Löschliste. Die Oberfläche bittet, keine Namen
   hineinzuschreiben; verhindern kann das Programm es nicht.
-- **Das Nachholen der Löschungen nach einer Wiederherstellung wird nicht überwacht.** Es läuft bei jedem Start des
-  Backends; was es erneut löscht, steht im Audit-Log. Scheitert es (z. B. Löschliste nicht lesbar), startet das Backend
-  trotzdem, und der Fehler steht nur als Warnung im Protokoll des Containers – die Meldung „Löschungen … erneut
-  angewendet“ nach dem Wiederherstellen erscheint unabhängig davon. Unlesbare Zeilen der Löschliste werden übersprungen.
-  Nach einer Wiederherstellung daher prüfen: `docker compose logs backend | grep -i lösch` (Befund der Gegenprüfung
-  vom 02.10.2026, noch nicht behoben).
+- **Das Nachholen der Löschungen nach einer Wiederherstellung kann scheitern – dann wird es gemeldet, nicht still
+  übergangen.** Es läuft bei jedem Start des Backends und noch einmal am Ende jeder Wiederherstellung. Was es erneut
+  löscht und was nicht ging (Fehler, nicht nachgeholte Akten, unlesbare Zeilen der Löschliste), steht im Audit-Log
+  (Gruppe „System“); ein Fehler erscheint auf der Backup-Seite und in der Kopfzeile der Startseite, bis ein Lauf ohne
+  Fehler durchgeht, und die Meldung des Wiederherstellens nennt ihn („ACHTUNG: Löschungen … konnten nicht vollständig
+  nachgeholt werden“). Das Backend startet in diesem Fall trotzdem – bis zur Behebung sind die betroffenen Akten oder
+  Dokumente wieder sichtbar.
 - **Die Frist beginnt nicht vor dem letzten Kontakt.** Das Abschlussdatum lässt sich rückwirkend eintragen; liegt ein
   Kontakt danach, zählt dessen Tag. So macht ein Tippfehler im Jahr eine Akte nicht sofort löschbar.
 - **Gelöscht wird von Hand**, nie automatisch: Die Übersicht zeigt Akten mit abgelaufener Frist, ein Mediziner löscht.

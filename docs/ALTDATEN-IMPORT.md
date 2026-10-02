@@ -67,7 +67,7 @@ möglich. Jede Änderung wird sofort gespeichert, „Vorschlag“ nimmt sie zur�
 | Katheter und Werte | Katheter → Einträge der Auswahlliste; unbekannte Werte bei Nickelallergie/Geschlecht zuordnen. |
 | Präparate | Schreibvarianten dem richtigen Präparat zuordnen, sonst entstehen doppelte Einträge. Unbekanntes: neu anlegen, als Text in die Bemerkung oder nicht übernehmen. |
 | Gelöschte Patienten | Standard: nicht übernehmen. Sonst als abgeschlossene Akte mit Anlass und Abschlussdatum (ab dann läuft die Aufbewahrungsfrist). |
-| Auffälligkeiten | Einzelne Werte: fehlendes Geburtsdatum (muss entschieden werden), unlesbare oder unplausible Zahlen, vierstellige PLZ, Gewichte ohne Zeitpunkt … |
+| Auffälligkeiten | Einzelne Werte: fehlendes Geburtsdatum (muss entschieden werden), unlesbare oder unplausible Zahlen, vierstellige PLZ, Gewichte ohne Zeitpunkt … Steht eine Patientennummer im Löschprotokoll des EPM (endgültig gelöschte Akte), lässt sich dieser Patient nur „nicht übernehmen“. |
 
 **3 · Probelauf und Import.** Der Probelauf zeigt die Zählung „im Altsystem / wird übernommen / nicht übernommen
 (warum)“ und das Protokoll nach Regeln. Bitte die Zählung gegen das Altsystem halten, bevor importiert wird. „Altdaten

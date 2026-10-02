@@ -133,6 +133,7 @@ class _Lauf:
         self.korrekturen = self.z.get("korrekturen") if isinstance(self.z.get("korrekturen"), dict) else {}
         self.grenzen = {k: Decimal(str(v)) for k, v in (bestand.get("grenzen") or {}).items()}
         self.test_ab = int(bestand.get("testnummer_ab") or 9001)
+        self.geloescht_epm = {int(n) for n in bestand.get("geloeschte_nummern") or []}
 
     # ------------------------------------------------ Protokoll, offene Punkte, Auffälligkeiten
     def p(self, regel, bereich, stufe, text, kennung=None, anzahl=1):
@@ -863,6 +864,21 @@ class _Lauf:
                 nummer = W.ganzzahl(wert)
             except W.Unlesbar:
                 nummer = None
+            # im EPM endgültig gelöscht (Löschprotokoll, Art. 17 DSGVO)? Die Nummer wird nicht neu vergeben, und eine
+            # andere Nummer wäre ein Weg um die Löschung herum – der Patient lässt sich nur ausnehmen. Geprüft wird
+            # die Nummer des Dumps ebenso wie eine eingetragene Korrektur.
+            try:
+                nummer_im_dump = W.ganzzahl(roh)
+            except W.Unlesbar:
+                nummer_im_dump = None
+            if any(n is not None and n in self.geloescht_epm for n in (nummer, nummer_im_dump)):
+                self.auffaellig(tab, kennung, "nummer", "geloescht_epm",
+                                "Die Patientennummer gehört zu einer im EPM endgültig gelöschten Akte (Löschprotokoll, "
+                                "Art. 17 DSGVO) und wird nicht neu vergeben – dieser Patient kann nur ausgenommen werden.",
+                                roh, "offen", ["auslassen"], "zahl", blockiert=True)
+                nicht["fehler"] += 1
+                self.p(15, tab, "fehler", "Patientennummer steht im Löschprotokoll des EPM → Patient wird so nicht übernommen.", kennung)
+                continue
             problem = None
             if nummer is None or nummer <= 0:
                 problem = f"Patientennummer „{wert}“ ist keine positive ganze Zahl."

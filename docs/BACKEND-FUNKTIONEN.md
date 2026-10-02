@@ -1114,7 +1114,9 @@ Recht „Sicherungen verwalten“ (Standard: nur Admin; Testzugänge nie).
   vor_aenderung|vor_wiederherstellung`, `--von BENUTZER` bei Aufträgen): `pg_dump`, Dokumente als `.tar.gz`, Löschliste,
   je mit GnuPG verschlüsselt (OpenPGP, AES-256, S2K SHA-512, ohne Schlüsselbund und Zwischenspeicher), dazu
   `epm_<Stempel>.sha256` und `epm_<Stempel>.json` (Zeitpunkt, Art, ausgelöst von, Passwort-Nr., EPM-Version, Dateien –
-  keine Patientendaten). Ohne Passwort unverschlüsselt mit Hinweis (Oberfläche und Startseite warnen). Das Passwort
+  keine Patientendaten). Ohne Passwort unverschlüsselt mit Hinweis (Oberfläche und Startseite warnen). Bricht der
+  Lauf ab (z. B. `tar` scheitert nach gelungenem Dump), entfernt das Skript alle Dateien dieses Laufs – es bleibt keine
+  unvollständige Sicherung liegen (O-27; Test `EchterAgent.test_gescheiterte_sicherung_hinterlaesst_nichts`). Das Passwort
   schreibt der Agent nach `/etc/epm/sicherung/passwort-<Nr.>` (0600, root), die aktuelle Nummer nach `aktuell`; ein neues
   Passwort gilt ab der nächsten Sicherung, ältere bleiben, bis keine Sicherung sie mehr braucht (dann gelöscht). Für das
   Backend schreibt der Agent nur einen scrypt-Prüfwert (`status/sicherung-pruefwerte.json`). Das Passwort steht nie in
@@ -1161,7 +1163,15 @@ Recht „Sicherungen verwalten“ (Standard: nur Admin; Testzugänge nie).
   `pg_restore --list` prüfen, Dokumente in einen Zwischenordner auspacken. Erst dann Backend und Webserver anhalten, Dump in
   eine neue Datenbank einspielen, Datenbanken und Dokumentordner tauschen (Rechte bleiben), starten, auf „gesund“ warten.
   Schlägt ein Schritt fehl, wird der vorige Stand zurückgetauscht und läuft weiter. Die Löschliste bleibt unangetastet; das
-  Backend löscht beim Start erneut, was die Sicherung zurückgebracht hat (F73, F80). Vor dem Start vermerkt der Agent die
+  Backend löscht beim Start erneut, was die Sicherung zurückgebracht hat (F73, F80). Der Agent ruft das Nachholen danach
+  noch einmal mit `--streng` auf und knüpft seine Meldung an das Ergebnis: „… wurden erneut angewendet“ oder „ACHTUNG:
+  Löschungen … konnten nicht vollständig nachgeholt werden“. Das Nachholen hält seinen Stand neben der Löschliste fest
+  (`data/loeschliste/nachholen.json`, übersteht eine Wiederherstellung) und schreibt ins Audit-Log (Gruppe „System“),
+  wenn es etwas nachgeholt hat oder etwas nicht ging (Fehler eines Schritts, nicht nachgeholte Akten, unlesbare Zeilen
+  der Löschliste) – derselbe Fehler nicht bei jedem Start erneut. Ein Fehler erscheint auf der Backup-Seite und in der
+  Kopfzeile der Startseite („Löschungen nicht nachgeholt“), bis ein Lauf ohne Fehler durchgeht (Gegenprüfung 02.10.2026,
+  O-28; Tests `patienten/test_datenschutz.py` `test_nachholen_meldet_was_nicht_ging`, `system/test_sicherung.py`
+  `test_nicht_nachgeholte_loeschungen_sind_ein_fehler`). Vor dem Start vermerkt der Agent die
   Wiederherstellung in `status/wiederherstellungen.json`; das Backend trägt sie beim Start ins Audit-Log der
   zurückgespielten Datenbank ein (wer, wann, welche Sicherung, in welcher Sicherung der Stand davor liegt), legt den
   Auftrag wieder an und beendet **alle Anmeldungen** (`manage.py epm_wiederherstellungen_nachtragen`).
@@ -1772,12 +1782,11 @@ Erledigt in Runde 3 (01.10.2026): O-17 PDF-Erzeugung und Dokumentvorlagen (F23, 
 
 Erledigt in Runde 5 (02.10.2026): O-07 Backup-Status auf der Startseite (F13), O-23 Datensicherung aus der Oberfläche (F61–F64: Sicherung um 02:00, Passwort für die Verschlüsselung in der Oberfläche, Übertragung mit rclone, Wiederherstellen; geprüft gegen einen WebDAV-Testserver in CI), O-24 Serverskripte nach „EPM-Server Aufbau“ (needrestart startet Dienste außer Docker/containerd selbst neu, eigene Docker-Adressbereiche, `epm.service`, Journal dauerhaft mit 1 GB/6 Monaten, Swap, wöchentliches Docker-Aufräumen, Warnung ohne eigenes Volume für `/srv`). Abweichung: `epm.service` legt `04-projekt.sh` an (nicht `02-docker.sh`), damit `sudo epm-update` es auch auf bestehenden Servern einrichtet.
 
+Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hinterlässt keine Dateien (F61), O-28 Nachholen der Löschungen wird überwacht – Stand, Audit-Log, Backup- und Startseite, Meldung des Wiederherstellens (F63, F73, F80), O-29 Import: Patient mit im EPM gelöschter Nummer lässt sich ausnehmen (F65).
+
 | Nr. | Was fehlt | Warum | Betroffene Dateien | Abhängigkeiten | Nächster Schritt |
 |---|---|---|---|---|---|
 | O-25 | Altdaten übernehmen (Rollout-Schritt 7) | Werkzeug ist fertig (F65); die Übernahme selbst steht aus | – | frischer Dump des Altsystems, Dokumentenordner `PatData` auf dem Server | nach `docs/ALTDATEN-IMPORT.md`: Dump laden, Zuordnungen prüfen, Probelauf, Import, Dokumente, Akten prüfen, Abschließen |
-| O-27 | Sicherung: Scheitert das Packen der Dokumente (`tar`) nach gelungenem Datenbank-Dump, bleibt der Dump als unvollständige Sicherung liegen – ohne Dokumente, Prüfsummen und Angaben; er erscheint in der Liste (nicht wiederherstellbar) und wird, wenn verschlüsselt, mit übertragen (im Ziel löscht EPM nie) | Gegenprüfung 02.10.2026, in einer Simulation nachgestellt; ein gescheiterter `pg_dump` hinterlässt dagegen nichts | `rollout/epm-backup.sh` | – | beim Abbruch die fertigen Dateien dieses Laufs entfernen; Test dazu |
-| O-28 | Nachholen der Löschungen nach einer Wiederherstellung überwachen: Ein Fehler steht nur als Warnung im Protokoll des Containers; die Erfolgsmeldung des Wiederherstellens erscheint unabhängig davon; unlesbare Zeilen der Löschliste werden still übersprungen | Gegenprüfung 02.10.2026 (`backend/entrypoint.sh`, `epm_loeschungen_nachholen`, `rollout/epm-systemagent.py`) | dieselben | – | Ergebnis bzw. Fehler ins Audit-Log (Gruppe „System“) und auf die Backup-Seite; Meldung des Wiederherstellens daran knüpfen |
-| O-29 | Import: Patient, dessen Nummer im Löschprotokoll steht, einzeln „nicht übernehmen“ können (bisher sperrt die Nummer den ganzen Import, siehe U33) | Gegenprüfung 02.10.2026 | `altimport/umsetzung.py`, `altimport/dienst.py` | – | als Auffälligkeit mit der Entscheidung „nicht übernehmen“ anbieten |
 
 ## Unklarheiten (nicht eigenmächtig entschieden)
 
@@ -1815,12 +1824,13 @@ Erledigt in Runde 5 (02.10.2026): O-07 Backup-Status auf der Startseite (F13), O
 | U30 | Infusionspläne aus dem Altsystem: ohne Freigabe und ohne gespeicherte PDF (im Altsystem gab es beides nicht); Mengen 0 → leer; Energie nur dann als „manuell“, wenn sie von der Berechnung abweicht; jüngster Plan je Patient „aktuell“ | F65 | so umgesetzt (Regeln 13 und 16 der Datenanalyse); in der Akte als „aus dem Altsystem“ gekennzeichnet |
 | U31 | Rolle der Konten aus dem Altsystem: Vorschlag aus dessen Rechtestufe (100 Betrachter, 1000 Mitarbeiter, 10000 Mediziner, 100000 Admin) | F65 | Vorschlag, je Konto im Werkzeug änderbar; Konten entstehen ohne Kennwort |
 | U32 | Nach dem Abschließen enthalten ältere Sicherungen aus der Testphase und der Ordner `data/import` auf dem Server weiterhin Altdaten (auch der nicht übernommenen Patienten) | F65, F61 | organisatorisch löschen (`docs/DATENSCHUTZ.md`); das Werkzeug weist beim Abschließen darauf hin |
-| U33 | Vor dem Abschließen: Ein nach Art. 17 endgültig gelöschtes **Dokument** käme nach „Zurücknehmen“ und erneutem Import wieder (neue Nummer, die Löschliste erkennt es nicht). Eine endgültig gelöschte **Akte** kommt nicht wieder – ihre Nummer steht im Löschprotokoll und sperrt den erneuten Import insgesamt; einen Patienten ohne Auffälligkeit kann die Oberfläche bisher nicht einzeln ausnehmen (Gegenprüfung 02.10.2026) | F65, F73, F80 | betrifft nur die Zeit vor dem Abschließen (Testphase); nach dem Abschließen ist der Dump gelöscht. In der Testphase übernommene Akten nicht endgültig löschen, wenn danach erneut übernommen werden soll |
+| U33 | Vor dem Abschließen: Ein nach Art. 17 endgültig gelöschtes **Dokument** käme nach „Zurücknehmen“ und erneutem Import wieder (neue Nummer, die Löschliste erkennt es nicht). Eine endgültig gelöschte **Akte** kommt nicht wieder: Ihre Nummer steht im Löschprotokoll; der Patient erscheint unter „Auffälligkeiten“ und lässt sich nur „nicht übernehmen“ – eine andere Nummer ist nicht wählbar (O-29, behoben 02.10.2026) | F65, F73, F80 | Dokumente: betrifft nur die Zeit vor dem Abschließen (Testphase); nach dem Abschließen ist der Dump gelöscht |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 02.10.2026 | Behebung der Gegenprüfung (O-27 bis O-29) | `epm-backup.sh` entfernt bei einem Abbruch alle Dateien des Laufs (vorher blieb nach gescheitertem `tar` der Datenbank-Dump als unvollständige Sicherung liegen und wäre mit übertragen worden). `epm_loeschungen_nachholen` hält sein Ergebnis fest (Stand neben der Löschliste, Audit-Log, Hinweis auf Backup- und Startseite), zählt unlesbare Zeilen der Löschliste und endet mit `--streng` als Fehler; der Systemagent knüpft die Meldung des Wiederherstellens daran. Import: Patient, dessen Nummer im Löschprotokoll steht, erscheint als Auffälligkeit und lässt sich nur ausnehmen |
 | 02.10.2026 | Gegenprüfung Datensicherung/Löschliste | `docs/DATENSCHUTZ.md` gegen `epm-backup.sh`, Systemagent und Start des Backends geprüft (Skript in einer Simulation gelaufen: verschlüsselt, Prüfsummen, Löschliste in der Sicherung, gescheiterter Dump hinterlässt nichts). Im Dokument ergänzt: unverschlüsselt ohne Passwort, Löschliste auf einem neuen Server, Nachholen nicht überwacht, Sicherung von vor dem Abschließen der Altdaten-Übernahme. Offen: O-27 bis O-29; U33 berichtigt |
 | 02.10.2026 | Runde 6 (Altdaten-Import, Pull Request #5, in `main` als `26084ba`) | Werkzeug Administration › Import (F65) statt des geplanten Befehls `epm_import_alt` (Wunsch 02.10.2026): Dump im Browser laden, Zuordnungen prüfen und korrigieren, Probelauf, Import mit Kennwort + 2FA, Dokumente aus dem Ordner auf dem Server, Zurücknehmen, Abschließen; neues Recht „Altdaten übernehmen“ (nur Admin); Infusionspläne mit Herkunft „Altsystem“; unabhängige Prüfung mit 13 behobenen Befunden; U26–U33 gestellt; Anleitung `docs/ALTDATEN-IMPORT.md` |
 | 02.10.2026 | Runde 5 (Pull Request #3, in `main` als `b1949ca`–`7ba9f35`) | Datensicherung aus der Oberfläche (O-23): Administration › Backup nach Entwurf 11 (F61–F64) – Passwort für die Verschlüsselung in der Oberfläche festlegen (U20 geklärt: symmetrisch, GnuPG/AES-256; Passwortblatt für den Tresor, Prüfen), Sicherung täglich 02:00 und „Jetzt sichern“, Übertragung in einen WebDAV-Ordner mit rclone im Zeitfenster, Wiederherstellen mit Admin-Passwort und 2FA (vorher Sicherung, Rücktausch bei Fehlern, Löschliste bleibt, danach Audit-Log und alle neu anmelden). Backup-Status in der Kopfzeile der Startseite (O-07, F13). Serverskripte nach „EPM-Server Aufbau“ (O-24). Audit-Gruppe „Backup“ für alle Tätigkeiten rund um Sicherungen. CI meldet Ergebnisse auch bei Pull Requests am Commit. Lauf 36986911046: 155 von 155 Backend-Tests, 70 von 70 Browsertests; nach dem Zusammenführen mit der Rechte-Änderung Lauf 36990805767 und auf `main` Lauf 36991958136: je 156 von 156 und 70 von 70 |

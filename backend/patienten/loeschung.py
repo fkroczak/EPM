@@ -90,6 +90,52 @@ def lies_liste() -> list[dict]:
     return eintraege
 
 
+def unlesbare_zeilen() -> int:
+    """Zeilen der Löschliste, die sich nicht lesen lassen (kein JSON-Objekt) – etwa nach einem abgebrochenen
+    Schreibvorgang oder einer Bearbeitung von Hand. ``lies_liste`` und ``lies_akten`` überspringen sie; eine Löschung,
+    die nur in einer solchen Zeile steht, würde nach einer Wiederherstellung nicht nachgeholt."""
+    pfad = loeschliste()
+    if not pfad.exists():
+        return 0
+    anzahl = 0
+    for zeile in pfad.read_bytes().splitlines():
+        if not zeile.strip():
+            continue
+        try:
+            if not isinstance(json.loads(zeile.decode("utf-8")), dict):
+                anzahl += 1
+        except ValueError:   # auch UnicodeDecodeError
+            anzahl += 1
+    return anzahl
+
+
+def _stand_pfad() -> Path:
+    return loeschliste().with_name("nachholen.json")
+
+
+def nachholen_stand() -> dict | None:
+    """Ergebnis des letzten Laufs von ``epm_loeschungen_nachholen`` (``status`` ok | fehler, ``zeitpunkt``, ``text``).
+    Liegt neben der Löschliste – außerhalb der Datenbank, damit es eine Wiederherstellung übersteht."""
+    try:
+        daten = json.loads(_stand_pfad().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return daten if isinstance(daten, dict) and daten.get("status") in ("ok", "fehler") else None
+
+
+def nachholen_stand_schreiben(status: str, text: str, zeitpunkt: str) -> None:
+    pfad = _stand_pfad()
+    pfad.parent.mkdir(parents=True, exist_ok=True)
+    tmp = pfad.with_name(f".{pfad.name}.{os.getpid()}")
+    tmp.write_text(json.dumps({"status": status, "text": text, "zeitpunkt": zeitpunkt}, ensure_ascii=False),
+                   encoding="utf-8")
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError:
+        pass
+    os.replace(tmp, pfad)
+
+
 def datei_pruefsumme(pfad: Path) -> str:
     h = hashlib.sha256()
     with open(pfad, "rb") as f:

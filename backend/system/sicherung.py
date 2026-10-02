@@ -96,6 +96,19 @@ def _alter_h(text):
     return (timezone.now() - zeit).total_seconds() / 3600 if zeit else None
 
 
+def _loeschungen_hinweis():
+    """Konnten endgültige Löschungen (Art. 17 DSGVO) beim letzten Lauf nicht vollständig nachgeholt werden – etwa nach
+    einer Wiederherstellung –, ist das ein Fehler, den jemand sehen muss (O-28). Der Stand liegt neben der Löschliste."""
+    from patienten.loeschung import nachholen_stand
+
+    stand = nachholen_stand()
+    if not stand or stand["status"] != "fehler":
+        return None
+    return (2, "Löschungen nicht nachgeholt",
+            "Endgültige Löschungen (Art. 17 DSGVO) konnten nicht vollständig nachgeholt werden – siehe Audit-Log "
+            "(System). Nach der Behebung: Backend neu starten.")
+
+
 def kurzstatus(daten=None, mit_daten=False):
     """Zustand der Sicherung für die Kopfzeile der Startseite (O-07): ``zustand`` ok | warnung | fehler | unbekannt,
     letzte Sicherung, Hinweise (schlimmste zuerst). Enthält keine Zugangsdaten und nichts aus den Akten."""
@@ -103,10 +116,16 @@ def kurzstatus(daten=None, mit_daten=False):
     hinweise = []   # (stufe, kurz, text): 2 = fehler, 1 = warnung; „kurz“ für die Kopfzeile der Startseite
     liste = sicherungen(daten)
     letzte = liste[0] if liste else None
+    loeschungen = _loeschungen_hinweis()
     if daten is None:
         ergebnis = {"zustand": "unbekannt", "letzte_am": None, "verschluesselt": None, "titel": "Backup-Status fehlt",
                     "hinweise": ["Kein Status vom Server – der Systemagent ist nicht eingerichtet."]}
+        if loeschungen:
+            ergebnis.update(zustand="fehler", titel=loeschungen[1])
+            ergebnis["hinweise"].insert(0, loeschungen[2])
         return (ergebnis, daten) if mit_daten else ergebnis
+    if loeschungen:
+        hinweise.append(loeschungen)
     if not daten.get("aktuell"):
         hinweise.append((2, "Backup-Status veraltet",
                          "Der Server meldet seit mehr als 3 Minuten keinen Stand der Sicherungen."))

@@ -19,30 +19,90 @@ gelöschte Akte zurück (gleiche Kennung, Nummer und Anlagezeitpunkt), wird sie 
 Löschprotokoll in der Datenbank und die Löschliste werden gegenseitig ergänzt.
 """
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.utils import timezone
 
 from audit.models import SystemEreignis, protokolliere
-from patienten.loeschung import datei_pruefsumme, lies_liste, schwaerze_dokument, trage_ein
+from patienten.loeschung import (
+    datei_pruefsumme, lies_liste, nachholen_stand, nachholen_stand_schreiben, schwaerze_dokument, trage_ein,
+    unlesbare_zeilen,
+)
 from patienten.models import Dokument, DokumentVorgang
+
+# Was im Ergebnis „etwas getan“ bedeutet – mit dem Wortlaut für Audit-Log und Ausgabe
+GETAN = (("akten", "Akten erneut gelöscht"), ("dokumente", "Dokumente erneut gelöscht"),
+         ("dateien", "Dateien entfernt"), ("ordner_entfernt", "Dokumentenordner entfernt"),
+         ("geschwaerzt", "Einträge erneut geschwärzt"), ("liste_ergaenzt", "Dokument-Löschungen in der Löschliste ergänzt"),
+         ("akten_liste_ergaenzt", "Akten-Löschungen in der Löschliste ergänzt"),
+         ("protokoll_ergaenzt", "Einträge im Löschprotokoll ergänzt"))
 
 
 class Command(BaseCommand):
     help = "Holt endgültige Löschungen von Dokumenten nach (z. B. nach einer Wiederherstellung) und schwärzt erneut."
+
+    def add_arguments(self, parser):
+        parser.add_argument("--streng", action="store_true",
+                            help="Mit Fehler enden, wenn nicht alles nachgeholt werden konnte (so ruft der Systemagent "
+                                 "den Befehl nach einer Wiederherstellung auf; beim Start des Backends ohne)")
 
     def handle(self, *args, **opts):
         # endgültig gelöschte Akten (Datenschutz) ebenfalls aus der Löschliste erneut löschen – unabhängig von den
         # Dokumenten: scheitert das eine, läuft das andere trotzdem
         from patienten.datenschutz import akten_nachholen
 
-        ergebnis = {}
+        ergebnis, probleme = {}, []
         for was, schritt in (("Dokumente", nachholen), ("Akten", akten_nachholen)):
             try:
                 ergebnis.update(schritt())
             except Exception as fehler:  # noqa: BLE001 – der Start des Backends darf daran nicht scheitern
                 self.stderr.write(f"WARNUNG: Löschungen ({was}) konnten nicht geprüft werden: {fehler}")
-        if any(ergebnis.values()):
-            self.stdout.write("Löschungen nachgeholt: " + ", ".join(f"{k} {v}" for k, v in ergebnis.items()))
+                probleme.append(f"{was} nicht geprüft ({type(fehler).__name__})")
+        if ergebnis.get("akten_fehler"):
+            probleme.append(f"{ergebnis['akten_fehler']} Akten nicht nachgeholt")
+        try:
+            unlesbar = unlesbare_zeilen()
+        except OSError as fehler:
+            unlesbar = 0
+            probleme.append(f"Löschliste nicht lesbar ({type(fehler).__name__})")
+        if unlesbar:
+            probleme.append(f"{unlesbar} Zeilen der Löschliste nicht lesbar")
+        getan = [f"{ergebnis[k]} {name}" for k, name in GETAN if ergebnis.get(k)]
+        if getan:
+            self.stdout.write("Löschungen nachgeholt: " + ", ".join(getan))
+        self._festhalten(getan, probleme)
+        if probleme:
+            self.stderr.write("WARNUNG: Löschungen nach Art. 17 DSGVO nicht vollständig nachgeholt: " + "; ".join(probleme))
+            if opts.get("streng"):
+                raise CommandError("Löschungen nicht vollständig nachgeholt: " + "; ".join(probleme))
+
+    def _festhalten(self, getan, probleme):
+        """Ergebnis sichtbar machen (Gegenprüfung 02.10.2026, O-28): Stand neben der Löschliste für die Backup-Seite
+        und die Startseite, Eintrag im Audit-Log (Gruppe „System“). Ohne Befund und ohne vorherigen Fehler entsteht
+        kein Eintrag – der Befehl läuft bei jedem Start. Die Texte nennen Zahlen, keine Namen und keine Nummern."""
+        vorher = nachholen_stand()
+        if probleme:
+            status = "fehler"
+            text = ("Löschungen nach Art. 17 DSGVO konnten nicht vollständig nachgeholt werden: " + "; ".join(probleme)
+                    + (" – nachgeholt: " + ", ".join(getan) if getan else ""))
+        elif getan:
+            status, text = "ok", "Löschungen nach Art. 17 DSGVO nachgeholt: " + ", ".join(getan)
+        elif vorher and vorher["status"] == "fehler":
+            status, text = "ok", "Löschungen nach Art. 17 DSGVO geprüft: jetzt vollständig, nichts nachzuholen"
+        else:
+            status, text = "ok", ""
+        if vorher is None or vorher["status"] != status or (text and vorher.get("text") != text):
+            try:
+                nachholen_stand_schreiben(status, text or (vorher or {}).get("text", ""), timezone.now().isoformat(timespec="seconds"))
+            except OSError as fehler:
+                self.stderr.write(f"WARNUNG: Stand des Nachholens nicht gespeichert: {fehler}")
+        if not text or (vorher and vorher["status"] == status == "fehler" and vorher.get("text") == text):
+            return   # nichts zu melden bzw. derselbe Fehler wie beim letzten Start: nicht bei jedem Start erneut
+        try:
+            protokolliere(SystemEreignis.Art.SYSTEM, benutzername="System", objekt="Löschliste",
+                          ereignis="loeschungen_nachholen", status=status, name=text)
+        except Exception as fehler:  # noqa: BLE001 – auch ohne Eintrag soll das Backend starten
+            self.stderr.write(f"WARNUNG: Eintrag im Audit-Log nicht möglich: {fehler}")
 
 
 def nachholen() -> dict:
