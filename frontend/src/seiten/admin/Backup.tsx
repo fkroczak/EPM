@@ -167,7 +167,7 @@ function PasswortDialog({ offen, daten, onZu }: { offen: boolean; daten: Daten; 
         beschreibung="Damit werden ab der nächsten Sicherung Datenbank, Dokumente und Löschliste verschlüsselt (GnuPG, AES-256)."
         fuss={kennung ? (
           <>
-            <Knopf onClick={onZu}>{fertig ? "Fertig" : "Schließen"}</Knopf>
+            <Knopf onClick={onZu}>{auftrag && !auftrag.offen ? "Fertig" : "Ausblenden"}</Knopf>
             <Knopf variante="pri" icon="herunterladen" disabled={!fertig} onClick={() => setBlatt(true)}>Passwortblatt drucken</Knopf>
           </>
         ) : (
@@ -235,7 +235,7 @@ function PruefenDialog({ offen, onZu }: { offen: boolean; onZu: () => void }) {
       <Dialog offen={offen && !blatt} onOffen={(o) => { if (!o) onZu(); }} titel="Sicherungs-Passwort prüfen"
         beschreibung="Passt ein Passwort (z. B. vom Blatt im Tresor) zu einem auf dem Server hinterlegten?"
         fuss={<>
-          <Knopf onClick={onZu}>Schließen</Knopf>
+          <Knopf onClick={onZu}>Fertig</Knopf>
           {r?.stimmt ? <Knopf icon="herunterladen" onClick={() => setBlatt(true)}>Passwortblatt drucken</Knopf> : null}
           <Knopf variante="pri" laedt={pruefen.isPending} disabled={!passwort} onClick={() => pruefen.mutate()}>Prüfen</Knopf>
         </>}>
