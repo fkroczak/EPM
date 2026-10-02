@@ -108,7 +108,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F62 | Sicherungen anzeigen, „Jetzt sichern“ | 11 Backup, 2 Start | ABGESCHLOSSEN UND GETESTET |
 | F63 | Wiederherstellen mit Admin-Kennwort und 2FA | 11 Backup | ABGESCHLOSSEN UND GETESTET |
 | F64 | Übertragung zur Nextcloud/NAS mit Status | 11 Backup | ABGESCHLOSSEN UND GETESTET |
-| F65 | Import der Altdaten | – (Rollout-Schritt 7) | NICHT ABGESCHLOSSEN |
+| F65 | Import der Altdaten (Werkzeug mit Oberfläche) | Administration › Import (neu) | ABGESCHLOSSEN UND GETESTET – mit erfundenem Beispiel-Dump; der echte Dump steht aus |
 | F66 | Rechte je Gruppe einstellen | 17 Benutzer (Rechte) | ABGESCHLOSSEN UND GETESTET |
 | F67 | Gemeinsame Ärzteliste pflegen | Ärzte (neu) | ABGESCHLOSSEN UND GETESTET |
 | F68 | Ärzte eines Patienten (Rolle, Hausarzt im Kopf) | 4 Akte, 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
@@ -1199,9 +1199,81 @@ Recht „Sicherungen verwalten“ (Standard: nur Admin; Testzugänge nie).
 ## K · Migration
 
 ### F65 Import der Altdaten
-- **Geplant:** Befehl `manage.py epm_import_alt` nach den 17 Regeln der Datenanalyse, Importprotokoll, Zählungen alt gegen neu.
-- **Abhängigkeit:** frischer `mysqldump` (die Tabellen `gewichte`/`kontakte` im alten Dump haben kein `lastchange`).
-- **Status:** NICHT ABGESCHLOSSEN
+- **Wunsch 02.10.2026:** statt eines Befehls auf dem Server ein Werkzeug mit Oberfläche, in dem sich die Zuordnungen
+  prüfen und korrigieren lassen. Festlegungen dazu: Ort = Administration › Import (nur Admin, Kennwort + 2FA); Import nur
+  in ein System ohne echte Akten, beliebig oft als Probelauf, bis zum Abschließen vollständig zurücknehmbar und mit
+  frischem Dump wiederholbar; im Altsystem gelöschte Patienten werden je Patient im Werkzeug entschieden (Standard:
+  nicht übernehmen; sonst als abgeschlossene Akte mit Anlass). Anleitung: `docs/ALTDATEN-IMPORT.md`.
+- **Ansicht:** Administration › Import mit den Schritten 1 · Dump, 2 · Zuordnungen (Tabellen und Spalten, Benutzer,
+  Versorger, Katheter und Werte, Präparate, Gelöschte Patienten, Auffälligkeiten), 3 · Probelauf und Import,
+  4 · Dokumente, 5 · Abschließen, Protokolle. Jede Entscheidung wird sofort gespeichert; „Vorschlag“ nimmt sie zurück.
+  Offene Punkte stehen oben und sperren Probelauf und Import.
+- **Recht:** `altdaten_importieren` („Altdaten übernehmen (Import)“) – fest bei der Rolle Admin, anderen Rollen nicht
+  erteilbar, nicht für Testbenutzer. Das ist die eine Ausnahme von „Admins schreiben Patientendaten nur bei
+  Testpatienten“ (U12): Die Übernahme legt echte Akten an (U26).
+- **Endpunkte** (alle nur mit dem Recht; `409 {"fehler"}` bei einem Hindernis):
+  `GET /api/altimport/` (Status, Dump, Tabellen, echte Akten, Bestand der Übernahme, letzte 30 Läufe);
+  `POST /api/altimport/dump/` (multipart `datei`, .sql oder .sql.gz, höchstens 50 MB, entpackt 300 MB; `400 {"datei"}`),
+  `DELETE /api/altimport/dump/`; `GET /api/altimport/zuordnung/` (Stand der Auswertung, Hindernisse, Bestand des EPM),
+  `PATCH /api/altimport/zuordnung/` `{bereich, aenderungen}` (Bereiche `tabellen`, `tabellen_ignoriert`, `spalten`,
+  `spalten_ignoriert`, `benutzer`, `versorger`, `werte`, `praeparate`, `geloeschte`, `korrekturen`; `null` = Vorschlag);
+  `POST /api/altimport/probelauf/`; `POST /api/altimport/import/` `{kennwort, code}`;
+  `GET`/`POST /api/altimport/dokumente/` (Überblick bzw. nächste Etappe); `POST /api/altimport/zuruecknehmen/`
+  `{kennwort, code, bestaetigung: "ZURÜCKNEHMEN"}`; `POST /api/altimport/abschliessen/` `{kennwort, code, bestaetigung:
+  "ABSCHLIESSEN", ohne_dokumente?}`; `GET /api/altimport/laeufe/<id>/` und `…/text/` (Protokoll als Textdatei).
+- **Logik – Dump:** eigener Leser für MySQL-Dumps (mysqldump und phpMyAdmin, mit und ohne Spaltenliste, gepackt, UTF-8
+  oder Windows-1252); nicht Lesbares wird mit Stelle gemeldet, nichts übersprungen. Kennwort-Spalten werden beim
+  Einlesen geleert und nie gespeichert (Regel 1; erkannt am Namen oder am Inhalt). `TIMESTAMP`-Spalten stehen im Dump
+  in UTC (`SET TIME_ZONE='+00:00'`) und werden beim Laden in Ortszeit umgerechnet, `DATETIME` bleibt (Hinweis am Dump).
+  Der Dump liegt bis zum Abschließen in der Datenbank (`altimport_alttabelle`), nicht als Datei.
+- **Logik – Zuordnungen:** Das Werkzeug schlägt vor, die Administration korrigiert. Tabellen und Spalten werden am Namen
+  erkannt (die Spaltennamen des Altsystems sind nicht gesichert – daher zuordenbar); nicht zugeordnete Spalten und
+  Tabellen müssen ausdrücklich „nicht übernommen“ werden. Benutzer: Konto im Altsystem → neues Konto mit Rolle nach
+  den Rechten des Altsystems (ohne Kennwort; danach Einmal-Kennwort unter Benutzer), nur als Bearbeiter genannte Namen →
+  historischer Benutzer ohne Login (Regel 8), oder vorhandener Benutzer. Versorger: gleiche Firma = ein Versorger mit
+  Ansprechpartnern (Regel 4). Katheter → Auswahlliste (Regel 9), Nickelallergie und Geschlecht → feste Werte
+  (Regel 10). Präparate: vorgeschlagen wird nur bei genauer Übereinstimmung (Groß-/Kleinschreibung, Leerzeichen,
+  „20%“/„20 %“ egal); alles andere wird einem Präparat zugeordnet, neu angelegt, in die Bemerkung geschrieben oder
+  nicht übernommen (Regel 16). Auffälligkeiten (fehlendes Geburtsdatum, unlesbare oder unplausible Werte, vierstellige
+  PLZ …): je Wert „Wert eintragen“, „leer lassen“, „unverändert übernehmen“ oder „nicht übernehmen“; eine Korrektur gilt
+  nur, solange im Dump derselbe Wert steht, und nur, wenn sie die Auffälligkeit behebt. Die Zuordnungen bleiben
+  unabhängig vom Dump erhalten und gelten für den frischen Dump zum Go-live weiter.
+- **Logik – Umsetzung nach den Regeln der Datenanalyse:** Patientennummer = PatientenID (Regel 15; Nummern ab 9001,
+  doppelte und im Löschprotokoll stehende Nummern sperren). Gewichte 0/leer/9999 nicht (Regel 5), Messdatum aus
+  `lastchange`, als ungenau und „Altsystem“ gekennzeichnet (Regel 2). Größe 0 → leer, unter 3 → ×100 (Regel 6).
+  „-“ → leer (Regel 7). Doppelt kodierte Umlaute repariert (ftfy, Regel 3). HTML bereinigt (Regel 11); Linkziele und
+  Bilder bleiben als Text bzw. Vermerk stehen. Infusionspläne (Regeln 13, 14, 16): jüngster Plan je Patient „aktuell“,
+  ältere „abgelöst“ mit Vorgängerkette, Herkunft „Altsystem“ (ohne Freigabe und ohne gespeicherte PDF), Gesamtvolumen
+  = `ml` des Altsystems, Mengen 0 → leer, Energie nur dann „manuell“, wenn sie von der Berechnung abweicht,
+  Protonenpumpenhemmer-Codes und Zeiten, Vitamine „A | B“. Einträge tragen in der Historie Bearbeiter und Zeitpunkt
+  des Altsystems (Grund „Aus dem Altsystem übernommen“). Nichts geht still verloren: Was in kein Feld passt (zu lang,
+  ungültige E-Mail, unbekannte Werte), steht in der Bemerkung; jede Regel zählt im Protokoll, mit Nummern, ohne Namen.
+- **Logik – Schreiben:** Probelauf = derselbe Schreibvorgang in einer Transaktion, die zurückgerollt wird; danach
+  Zählung „im Altsystem / wird übernommen / nicht übernommen (warum)“. Import nur ohne echte Akten und ohne offene
+  Punkte, mit Kennwort und 2FA; danach Prüfung der geschriebenen Mengen gegen die Berechnung – bei Abweichung wird
+  nichts gespeichert. Angelegt werden nur die Stammdaten, die übernommene Datensätze brauchen. Zurücknehmen entfernt
+  die übernommenen Akten mit allen Einträgen, Historie und Dateien (auch seither Erfasstes) sowie die vom Import
+  angelegten Stammdaten und Benutzer, soweit nichts anderes sie verwendet; Dump und Zuordnungen bleiben. Abschließen
+  löscht Dump, Zuordnungen und die Nummern in den Protokollen; danach ist alles gesperrt.
+- **Logik – Dokumente:** aus `data/import/PatData/<PatientenID des Altsystems>/` auf dem Server (nur lesend
+  eingebunden), in Etappen und fortsetzbar; PDF, Bilder (auch GIF, BMP, TIFF, WebP) und Text nach Inhalt; Titel =
+  Dateiname, Typ „Sonstiges“, Datum aus PDF/EXIF, sonst Dateidatum; erscheinen unter „Nach und nach prüfen“ (F28).
+  Nicht übernommen und aufgelistet: `.php`, `.html`, `.js`, `.svg`, andere Dateitypen, leere Dateien, Verknüpfungen,
+  Ordner ohne übernommenen Patienten, nicht lesbare Ordner und Dateien (zählen beim Abschließen wie offene Dokumente).
+- **Audit-Log (Gruppe „System“):** Dump geladen/entfernt, Import, Dokumente, Zurücknehmen, Abschließen; neue Konten als
+  „bei der Übernahme der Altdaten angelegt“.
+- **Tabellen:** `altimport_importstand`, `altimport_alttabelle`, `altimport_importlauf`, `altimport_importobjekt`;
+  `infusionen_infusionsplan.herkunft` (neu: `epm` | `altsystem`).
+- **Server:** `compose.yaml` bindet `./data/import` nur lesend nach `/data/import` (`EPM_IMPORT`); `rollout/04-projekt.sh`
+  legt den Ordner an. Neue Abhängigkeit `ftfy`.
+- **Unabhängige Prüfung (zweite Instanz, nur lesend, 02.10.2026):** 13 Befunde, alle behoben (u. a. untaugliche
+  Korrektur entsperrte einen offenen Punkt; TIMESTAMP in UTC; Dokumentenordner bei korrigierter Nummer; unlesbare
+  Ordner; Fehlertexte mit Zeileninhalt).
+- **Teststatus:** TESTSTATUS_F65
+- **Grenze des Nachweises:** Getestet ist mit einem erfundenen Dump, der die 17 Regeln und die bekannten Auffälligkeiten
+  nachstellt. Der echte Dump ist hier nie gelaufen – der erste Probelauf mit dem frischen Dump zeigt, ob Spaltennamen
+  und Inhalte so sind wie in der Datenanalyse angenommen (dafür sind die Zuordnungen korrigierbar).
+- **Status:** ABGESCHLOSSEN UND GETESTET (Werkzeug); die Übernahme der echten Daten selbst ist Rollout-Schritt 7
 
 ---
 
@@ -1693,7 +1765,7 @@ Erledigt in Runde 5 (02.10.2026): O-07 Backup-Status auf der Startseite (F13), O
 
 | Nr. | Was fehlt | Warum | Betroffene Dateien | Abhängigkeiten | Nächster Schritt |
 |---|---|---|---|---|---|
-| O-25 | Import Altdaten (F65) | Rollout-Schritt 7 | neu: `patienten/management/commands/epm_import_alt.py` | frischer Dump | Import mit Protokoll, setzt `typ_geprueft`/`datum_quelle` |
+| O-25 | Altdaten übernehmen (Rollout-Schritt 7) | Werkzeug ist fertig (F65); die Übernahme selbst steht aus | – | frischer Dump des Altsystems, Dokumentenordner `PatData` auf dem Server | nach `docs/ALTDATEN-IMPORT.md`: Dump laden, Zuordnungen prüfen, Probelauf, Import, Dokumente, Akten prüfen, Abschließen |
 
 ## Unklarheiten (nicht eigenmächtig entschieden)
 
@@ -1724,11 +1796,20 @@ Erledigt in Runde 5 (02.10.2026): O-07 Backup-Status auf der Startseite (F13), O
 | U23 | Einschränkung nur bei abgeschlossenen Akten – reicht das? | F79 | ja (in laufender Betreuung wird die Akte gebraucht; erst abschließen) |
 | U24 | Nachweis bei Freigabe per Telefon oder persönlich | F82 | ohne Nachweis möglich (Pflicht nur bei E-Mail und schriftlich) |
 | U25 | ~~Feiertage im Kalender: welches Bundesland?~~ **Geklärt 02.10.2026:** NRW (Sitz der Stiftung in Altenberge) | F84 | – |
+| U26 | Den Import führt die Administration durch und legt dabei echte Akten an – Ausnahme von U12 („Admins schreiben Patientendaten nur bei Testpatienten“). So gewollt? | F65 | ja, nur über Administration › Import (eigenes Recht, Kennwort + 2FA, Audit-Log) |
+| U27 | Echte (nicht Test-)Akten aus der Testphase sperren den Import; ihre Nummern bleiben nach dem endgültigen Löschen (F80) im Löschprotokoll und sind für die Übernahme gesperrt. Soll das Werkzeug solche Akten entfernen dürfen? | F65 | nein – übernommen wird nur in ein System ohne echte Akten (Festlegung 02.10.2026); auf einem Server, auf dem schon echte Akten angelegt wurden, braucht der Go-live eine frische Datenbank |
+| U28 | Dokumente anderer Dateitypen im Ordner des Altsystems (Word, Excel …) | F65 | werden nicht übernommen, aber einzeln aufgelistet; der Ordner bleibt unverändert |
+| U29 | Zeitangaben: Welchen Typ haben `lastchange`, `created`, `deleted_at` im echten Altsystem? `TIMESTAMP` steht im Dump in UTC und wird umgerechnet, `DATETIME` gilt als Ortszeit | F65 | am echten Dump prüfen – das Werkzeug zeigt nach dem Laden einen Hinweis, wenn es umgerechnet hat |
+| U30 | Infusionspläne aus dem Altsystem: ohne Freigabe und ohne gespeicherte PDF (im Altsystem gab es beides nicht); Mengen 0 → leer; Energie nur dann als „manuell“, wenn sie von der Berechnung abweicht; jüngster Plan je Patient „aktuell“ | F65 | so umgesetzt (Regeln 13 und 16 der Datenanalyse); in der Akte als „aus dem Altsystem“ gekennzeichnet |
+| U31 | Rolle der Konten aus dem Altsystem: Vorschlag aus dessen Rechtestufe (100 Betrachter, 1000 Mitarbeiter, 10000 Mediziner, 100000 Admin) | F65 | Vorschlag, je Konto im Werkzeug änderbar; Konten entstehen ohne Kennwort |
+| U32 | Nach dem Abschließen enthalten ältere Sicherungen aus der Testphase und der Ordner `data/import` auf dem Server weiterhin Altdaten (auch der nicht übernommenen Patienten) | F65, F61 | organisatorisch löschen (`docs/DATENSCHUTZ.md`); das Werkzeug weist beim Abschließen darauf hin |
+| U33 | Ein nach Art. 17 endgültig gelöschtes Dokument oder eine gelöschte Akte käme nach „Zurücknehmen“ und erneutem Import wieder | F65, F73, F80 | betrifft nur die Zeit vor dem Abschließen (Testphase); nach dem Abschließen ist der Dump gelöscht |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 02.10.2026 | Runde 6 (Altdaten-Import, Branch `altdaten-import`) | Werkzeug Administration › Import (F65) statt des geplanten Befehls `epm_import_alt` (Wunsch 02.10.2026): Dump im Browser laden, Zuordnungen prüfen und korrigieren, Probelauf, Import mit Kennwort + 2FA, Dokumente aus dem Ordner auf dem Server, Zurücknehmen, Abschließen; neues Recht „Altdaten übernehmen“ (nur Admin); Infusionspläne mit Herkunft „Altsystem“; unabhängige Prüfung mit 13 behobenen Befunden; U26–U33 gestellt; Anleitung `docs/ALTDATEN-IMPORT.md` |
 | 02.10.2026 | Runde 5 (Pull Request #3, in `main` als `b1949ca`–`7ba9f35`) | Datensicherung aus der Oberfläche (O-23): Administration › Backup nach Entwurf 11 (F61–F64) – Passwort für die Verschlüsselung in der Oberfläche festlegen (U20 geklärt: symmetrisch, GnuPG/AES-256; Passwortblatt für den Tresor, Prüfen), Sicherung täglich 02:00 und „Jetzt sichern“, Übertragung in einen WebDAV-Ordner mit rclone im Zeitfenster, Wiederherstellen mit Admin-Passwort und 2FA (vorher Sicherung, Rücktausch bei Fehlern, Löschliste bleibt, danach Audit-Log und alle neu anmelden). Backup-Status in der Kopfzeile der Startseite (O-07, F13). Serverskripte nach „EPM-Server Aufbau“ (O-24). Audit-Gruppe „Backup“ für alle Tätigkeiten rund um Sicherungen. CI meldet Ergebnisse auch bei Pull Requests am Commit. Lauf 36986911046: 155 von 155 Backend-Tests, 70 von 70 Browsertests; nach dem Zusammenführen mit der Rechte-Änderung Lauf 36990805767 und auf `main` Lauf 36991958136: je 156 von 156 und 70 von 70 |
 | 02.10.2026 | Runde 4 (Systemseite, Kalender, Infusionspläne) | Neues Recht „Systemverwaltung“ (nur Admin); Administration › System mit Systemagent auf dem Server (F86–F89, Festlegungen S12–S14); globaler Kalender mit Fälligkeiten und Feiertagen (F84); Übersicht aller Infusionspläne (F85); Audit-Gruppe „System“; Feiertage NRW (U25). Nummern ab F84, damit parallele Arbeiten (F72 ff.) nicht kollidieren |
 | 02.10.2026 | Runde 4 (Updates VPS) | Festlegung: VPS ohne Verbindung zu GitHub und ohne Build (`EPM_UPDATE_QUELLE="paket"`); `sudo epm-update --paket-erstellen` auf der Test-VM packt die dort laufende, getestete Version (Images, Rollout-Dateien, Systemagent, `epm-update`, SHA-256), `sudo epm-update --paket DATEI` spielt sie auf dem VPS ein (Prüfsummen, Backup, Umstellen, Tests) |
