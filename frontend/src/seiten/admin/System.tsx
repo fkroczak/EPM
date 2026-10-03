@@ -10,7 +10,7 @@ import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
-import { useIch } from "@/lib/auth";
+import { useAuth, useIch } from "@/lib/auth";
 import { dateigroesse, datum, relativ, uhrzeit, zahl, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
@@ -69,7 +69,17 @@ export type Uebersicht = {
   aktionen: Aktion[];
   aufgaben: Aufgabe[];
   minuten: number[];
+  /** Schalter der Testphase (Festlegung 03.10.2026, U27/U32) */
+  einstellungen?: Einstellungen;
+  /** „Datenbank leeren“ nur für die Rolle Admin */
+  leeren_erlaubt?: boolean;
 };
+type Einstellungen = { musterdaten_automatisch: boolean; import_ausgeblendet: boolean };
+type LeerenKonto = { id: number; anzeigename: string; benutzername: string; rolle: string; ist_test: boolean; nur_historisch: boolean;
+  eigene: boolean };
+type LeerenVorbereitung = { code: string; gueltig_bis: string; benutzer: LeerenKonto[];
+  umfang: { patienten: number; testpatienten: number; kontakte: number; dokumente: number; loeschprotokoll: number; versorger: number;
+    aerzte: number; importlaeufe: number } };
 export type Auftrag = { id: number; kennung: string; ziel: "server" | "epm"; aktion: string; name: string;
   status: "wartet" | "laeuft" | "erledigt" | "fehler" | "abgebrochen"; status_name: string; offen: boolean;
   parameter: { minuten?: number; pruefsummen?: boolean }; angefordert_von_name: string | null; angefordert_am: string;
@@ -443,6 +453,180 @@ function Taetigkeiten({ daten, offen, onWahl }: { daten: Uebersicht; offen: Set<
   );
 }
 
+// ---------------------------------------------------------------- Testphase und Go-live (Festlegung 03.10.2026, U27/U32)
+function GoLiveKarte({ daten, laeuft, onLeeren }: { daten: Uebersicht; laeuft: boolean; onLeeren: () => void }) {
+  const qc = useQueryClient();
+  const { neuLaden } = useAuth();
+  const melden = useHinweis();
+  const e = daten.einstellungen;
+  const setzen = useMutation({
+    mutationFn: (wert: Partial<Einstellungen>) => api<Einstellungen>("system/einstellungen/", { body: wert }),
+    onSuccess: (neu, wert) => {
+      qc.setQueryData(["system", "uebersicht"], (alt: Uebersicht | undefined) => (alt ? { ...alt, einstellungen: neu } : alt));
+      void neuLaden();   // Menü (Import) sofort anpassen
+      melden("import_ausgeblendet" in wert ? (neu.import_ausgeblendet ? "Menüpunkt „Import“ ausgeblendet." : "Menüpunkt „Import“ wieder eingeblendet.")
+        : neu.musterdaten_automatisch ? "Musterdaten werden beim Start wieder angelegt." : "Musterdaten werden nicht mehr automatisch angelegt.");
+    },
+  });
+  if (!e) return null;
+  return (
+    <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="golive-karte">
+      <KartenKopf titel="Testphase und Go-live" unter="Vor der Übernahme der Altdaten: Testdaten entfernen, danach den Import ausblenden." />
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" className="mt-0.5" checked={e.musterdaten_automatisch} disabled={setzen.isPending}
+          onChange={(ev) => setzen.mutate({ musterdaten_automatisch: ev.target.checked })} />
+        <span><span className="font-medium">Musterdaten automatisch anlegen</span>
+          <span className="block text-xs gedaempft">Testpatienten und Testkonten beim Start von EPM anlegen bzw. ergänzen. Aus: nur Auswahllisten und
+            Präparate. „Datenbank leeren“ schaltet das aus.</span></span>
+      </label>
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" className="mt-0.5" checked={e.import_ausgeblendet} disabled={setzen.isPending}
+          onChange={(ev) => setzen.mutate({ import_ausgeblendet: ev.target.checked })} />
+        <span><span className="font-medium">Menüpunkt „Import“ ausblenden</span>
+          <span className="block text-xs gedaempft">Nach der Übernahme der Altdaten. Die Seite bleibt erreichbar:{" "}
+            <Link to="/admin/import">Import öffnen</Link>.</span></span>
+      </label>
+      {setzen.error ? <Meldung art="fehler">{setzen.error.message}</Meldung> : null}
+      {daten.leeren_erlaubt ? (
+        <div className="flex items-start justify-between gap-3 pt-3 border-t border-rand" data-testid="leeren-zeile">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-sm font-medium">Datenbank leeren</span>
+            <span className="text-xs gedaempft">Entfernt alle Akten (auch echte), Dokumente, Versorger, Ärzte, nicht ausgewählte Benutzer und
+              das Audit-Log. Präparate, Auswahllisten, Vorlagen und Einstellungen bleiben. Vorher wird automatisch gesichert.</span>
+            <span className="flex gap-1.5 flex-wrap">
+              <Chip art="warn"><Icon name="schloss" groesse={11} />Passwort + 2FA + Bestätigungscode</Chip>
+              <Chip><Icon name="backup" groesse={11} />vorher Sicherung</Chip>
+              <Chip>nur Rolle Admin</Chip>
+            </span>
+          </div>
+          <Knopf klein variante="dng" disabled={laeuft || !daten.agent.verzeichnis} laedt={laeuft} onClick={onLeeren}>
+            {laeuft ? "läuft" : "Datenbank leeren …"}</Knopf>
+        </div>
+      ) : null}
+    </Karte>
+  );
+}
+
+function LeerenDialog({ offen, daten, onZu }: { offen: boolean; daten: Uebersicht; onZu: () => void }) {
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const ich = useIch();
+  const [behalten, setBehalten] = useState<Set<number>>(new Set());
+  const [bestaetigung, setBestaetigung] = useState("");
+  const [kennwort, setKennwort] = useState("");
+  const [code, setCode] = useState("");
+  const [minuten, setMinuten] = useState("5");
+  const [frage, setFrage] = useState(false);
+  const vorbereiten = useMutation({
+    mutationFn: () => api<LeerenVorbereitung>("system/leeren/vorbereiten/", { method: "POST" }),
+    // Vorschlag: echte, aktive Konten bleiben; Testkonten und nur historische Einträge gehen
+    onSuccess: (v) => setBehalten(new Set(v.benutzer.filter((b) => b.eigene || (!b.ist_test && !b.nur_historisch)).map((b) => b.id))),
+  });
+  const { mutate: holen, reset: zuruecksetzen } = vorbereiten;
+  useEffect(() => {
+    setBestaetigung(""); setKennwort(""); setCode(""); setMinuten("5"); setFrage(false);
+    if (offen) holen(); else zuruecksetzen();
+  }, [offen, holen, zuruecksetzen]);
+  const los = useMutation({
+    mutationFn: () => api<Auftrag>("system/leeren/", { body: {
+      bestaetigung, wirklich: true, behalten: [...behalten], minuten: Number(minuten), kennwort, code } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["system"] });
+      void qc.invalidateQueries({ queryKey: ["systemhinweis"] });
+      melden("Datenbank leeren: Auftrag an den Server übergeben. Vorher wird gesichert.");
+      onZu();
+    },
+    onError: () => setFrage(false),
+  });
+  if (!offen) return null;
+  const v = vorbereiten.data;
+  const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
+  const codeOk = !!v && bestaetigung.replace(/\s/g, "").toUpperCase() === v.code;
+  const bereit = codeOk && !!ich.zweiter_faktor && !!kennwort && !!code;
+  const u = v?.umfang;
+  const weg = v ? v.benutzer.filter((b) => !behalten.has(b.id)).length : 0;
+  return (
+    <Dialog offen onOffen={(o) => { if (!o) onZu(); }} titel={frage ? "Wollen Sie wirklich die Datenbank löschen?" : "Datenbank leeren"} breite={640}
+      beschreibung={frage ? "Alle Akten, Dokumente, Versorger, Ärzte, die nicht ausgewählten Benutzer und das Audit-Log werden entfernt. "
+        + "Zurück geht es nur über die Sicherung, die vorher erstellt wird."
+        : "Ende der Testphase: EPM wird für die Übernahme der Altdaten geleert."}
+      fuss={frage ? <>
+        <Knopf onClick={() => setFrage(false)}>Nein, zurück</Knopf>
+        <Knopf variante="dng" laedt={los.isPending} onClick={() => los.mutate()}>Ja, Datenbank leeren</Knopf>
+      </> : <>
+        <Knopf onClick={onZu}>Abbrechen</Knopf>
+        <Knopf variante="dng" disabled={!bereit} onClick={() => setFrage(true)}>Weiter …</Knopf>
+      </>}>
+      {frage ? (
+        <div className="flex flex-col gap-2" data-testid="leeren-frage">
+          <Meldung art="fehler">Entfernt werden {u ? `${zahl(u.patienten)} echte Akten, ${zahl(u.testpatienten)} Testpatienten, ${zahl(u.dokumente)} Dokumente, `
+            + `${zahl(u.versorger)} Versorger, ${zahl(u.aerzte)} Ärzte und ${weg} Benutzer` : ""}. Das Audit-Log beginnt neu.</Meldung>
+          <span className="text-sm">Es bleiben {behalten.size} Benutzer, Präparate, Auswahllisten, Vorlagen, Einstellungen und die Sicherungen.</span>
+        </div>
+      ) : (
+      <form className="flex flex-col gap-3.5" onSubmit={(ev) => { ev.preventDefault(); if (bereit) setFrage(true); }}>
+        {vorbereiten.error ? <Meldung art="fehler">{vorbereiten.error.message}</Meldung> : !v ? <Laden /> : (
+          <>
+            <Meldung art="warn"><span data-testid="leeren-umfang">Entfernt werden: {zahl(v.umfang.patienten)} echte Akten, {zahl(v.umfang.testpatienten)} Testpatienten
+              ({zahl(v.umfang.kontakte)} Kontakte), {zahl(v.umfang.dokumente)} Dokumente, {zahl(v.umfang.versorger)} Versorger, {zahl(v.umfang.aerzte)} Ärzte,
+              {" "}{zahl(v.umfang.loeschprotokoll)} Einträge im Löschprotokoll, {zahl(v.umfang.importlaeufe)} Importläufe und das Audit-Log.
+              Präparate, Auswahllisten, Vorlagen und Einstellungen bleiben.</span></Meldung>
+            <Meldung art="info">Vorher erstellt der Server automatisch eine Sicherung. Schlägt sie fehl, wird nichts verändert. Musterdaten werden danach
+              nicht mehr automatisch angelegt; alle anderen Anmeldungen werden beendet.</Meldung>
+            <fieldset className="m-0 p-0 border-0 flex flex-col gap-1">
+              <legend className="text-sm font-semibold mb-1">Diese Konten bleiben</legend>
+              <div className="max-h-56 overflow-y-auto border border-rand rounded-md px-3 py-1.5 flex flex-col" data-testid="leeren-konten">
+                {v.benutzer.map((b) => (
+                  <label key={b.id} className="flex items-center gap-2 text-sm py-1">
+                    <input type="checkbox" checked={b.eigene || behalten.has(b.id)} disabled={b.eigene}
+                      aria-label={`${b.anzeigename} behalten`}
+                      onChange={(ev) => setBehalten((alt) => { const n = new Set(alt); if (ev.target.checked) n.add(b.id); else n.delete(b.id); return n; })} />
+                    <span className="min-w-0 truncate">{b.anzeigename} <span className="gedaempft">({b.benutzername})</span></span>
+                    <span className="ml-auto flex gap-1">
+                      <Chip>{ROLLEN[b.rolle as keyof typeof ROLLEN] ?? b.rolle}</Chip>
+                      {b.ist_test ? <Chip art="warn">Test</Chip> : null}
+                      {b.nur_historisch ? <Chip>ohne Login</Chip> : null}
+                      {b.eigene ? <Chip art="ok">eigenes Konto</Chip> : null}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <span className="text-xs gedaempft">{behalten.size} bleiben, {weg} werden entfernt. Das eigene Konto bleibt immer.</span>
+            </fieldset>
+            <Feld label="Beginn" hinweis="Angemeldete Benutzer sehen den Hinweis oben auf jeder Seite.">
+              {(p) => (
+                <Auswahl {...p} value={minuten} onChange={(ev) => setMinuten(ev.target.value)}>
+                  {daten.minuten.map((m) => <option key={m} value={m}>{m === 0 ? "sofort" : `in ${m} Minuten`}</option>)}
+                </Auswahl>
+              )}
+            </Feld>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm">Bestätigungscode zum Abtippen (10 Minuten gültig):</span>
+              <span className="num text-2xl font-semibold tracking-[.3em] select-none" data-testid="leeren-code" aria-label={`Bestätigungscode ${v.code.split("").join(" ")}`}>{v.code}</span>
+            </div>
+            <Feld label="Bestätigungscode eingeben" fehler={f.bestaetigung} pflicht>
+              {(p) => <Eingabe {...p} autoComplete="off" value={bestaetigung} onChange={(ev) => setBestaetigung(ev.target.value)} />}
+            </Feld>
+            <ZweiFaktorFehlt />
+            <div className="grid grid-cols-2 gap-3">
+              <Feld label="Ihr Passwort" fehler={f.kennwort} pflicht>
+                {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(ev) => setKennwort(ev.target.value)} />}
+              </Feld>
+              <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={f.code} pflicht>
+                {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(ev) => setCode(ev.target.value)} />}
+              </Feld>
+            </div>
+          </>
+        )}
+        {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
+        {f.minuten || f.behalten || f.wirklich ? <Meldung art="fehler">{f.minuten || f.behalten || f.wirklich}</Meldung> : null}
+        <button type="submit" hidden />
+      </form>
+      )}
+    </Dialog>
+  );
+}
+
 function HinweisKarte({ hinweis }: { hinweis: Hinweis | null }) {
   const qc = useQueryClient();
   const melden = useHinweis();
@@ -597,6 +781,7 @@ export function System() {
   });
   const fenster = useStufe();
   const [wahl, setWahl] = useState<Wahl | null>(null);
+  const [leeren, setLeeren] = useState(false);
   const [pakete, setPakete] = useState(false);
   const qc = useQueryClient();
   // Ist ein Auftrag fertig geworden, die Übersicht neu laden (Updates, Sicherung, Status)
@@ -769,9 +954,15 @@ export function System() {
         </Bereich>
         <Bereich id="hinweis" titel="Hinweis an alle Benutzer"><HinweisKarte hinweis={d.hinweis} /></Bereich>
         <Bereich id="angemeldet" titel="Angemeldet"><Angemeldet liste={d.angemeldet} /></Bereich>
+        {d.einstellungen ? (
+          <Bereich id="golive" titel="Testphase und Go-live">
+            <GoLiveKarte daten={d} laeuft={offen.has("server:datenbank_leeren")} onLeeren={() => setLeeren(true)} />
+          </Bereich>
+        ) : null}
       </Bereiche>
       <span className="text-xs gedaempft">Angemeldet als {ich.anzeigename}. Werte vom Server werden jede Minute aktualisiert.</span>
       <AusfuehrenDialog wahl={wahl} daten={d} onZu={() => setWahl(null)} />
+      <LeerenDialog offen={leeren} daten={d} onZu={() => setLeeren(false)} />
     </Seite>
   );
 }

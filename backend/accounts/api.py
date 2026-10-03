@@ -131,13 +131,21 @@ def ich_daten(user):
         "startseite": {**(user.startseite or {}), "karten": startseite_karten(user)},
         "aufteilung": user.aufteilung or {},
         "bereiche": user.bereiche or {},
-        # zweiter Faktor: eingerichtet? Pflicht? (Bestätigungen fragen den Code nur, wenn einer eingerichtet ist)
+        # zweiter Faktor: eingerichtet? Pflicht? (Bestätigungen verlangen ihn immer – ohne ihn keine Bestätigung)
         "zweiter_faktor": hat_zweiten_faktor(user),
         "zweiter_faktor_pflicht": zweiter_faktor_pflicht(user),
         "rechte": user.rechte,
         # Admins: Patientendaten nur bei Testpatienten schreiben (Oberfläche blendet Knöpfe bei echten Akten aus)
         "schreibt_nur_testpatienten": schreibt_nur_testpatienten(user),
+        # Menüpunkt „Import“ nach der Übernahme ausgeblendet (Administration › System, Festlegung 03.10.2026)
+        "import_ausgeblendet": _import_ausgeblendet(),
     }
+
+
+def _import_ausgeblendet() -> bool:
+    from stammdaten.models import Einstellungen
+
+    return Einstellungen.aktuell().import_ausgeblendet
 
 
 def organisation():

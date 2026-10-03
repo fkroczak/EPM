@@ -160,10 +160,14 @@ Löschungen zurück, die nach dieser Sicherung lagen.
    Im EPM selbst liegt der Dump (mit den Daten aller Patienten des Altsystems, auch der nicht übernommenen und der dort
    gelöschten) bis zum „Abschließen“ in der Datenbank; mit dem Abschließen werden Dump, Zuordnungen und die Nummern in
    den Importprotokollen gelöscht. Getrennt zu löschen bleiben: der Dokumentenordner `data/import/PatData` auf dem
-   Server und Sicherungen aus der Zeit vor dem Abschließen (auf dem Server laufen sie nach 30 Tagen ab; Kopien auf NAS
-   und Nextcloud löscht EPM nicht, siehe O7). Wird später eine Sicherung aus der Zeit vor dem Abschließen
+   Server und Sicherungen aus der Zeit vor dem Abschließen (auf dem Server laufen sie nach 30 Tagen ab, im
+   Übertragungsziel entfernt der Server sie nach dessen Aufbewahrung – Standard 30 Tage, Festlegung 03.10.2026; was die
+   NAS aus der Nextcloud spiegelt, folgt deren Einstellung). Wird später eine Sicherung aus der Zeit vor dem Abschließen
    zurückgespielt, sind Dump und Zuordnungen wieder da und die Übernahme gilt wieder als vorläufig – dann erneut
    „Abschließen“. Kennwörter des Altsystems werden nie gespeichert.
-7. Freigabe-E-Mails für Infusionspläne: nur Patienten- und Plannummer nennen, keine Namen oder Diagnosen.
-8. Bestehende Patienten: vorhandene Einwilligungen und Schweigepflichtentbindungen nach und nach in der Akte erfassen
+7. Ende der Testphase: Administration › System › „Datenbank leeren“ entfernt alle Akten, Dokumente, Versorger, Ärzte,
+   nicht ausgewählte Benutzer und das Audit-Log (Festlegung 03.10.2026, F107). Die Sicherung, die der Server davor
+   anlegt, enthält den Stand der Testphase und läuft wie jede andere nach der Aufbewahrung ab.
+8. Freigabe-E-Mails für Infusionspläne: nur Patienten- und Plannummer nennen, keine Namen oder Diagnosen.
+9. Bestehende Patienten: vorhandene Einwilligungen und Schweigepflichtentbindungen nach und nach in der Akte erfassen
    (Startseite „Erklärungen fehlen“).

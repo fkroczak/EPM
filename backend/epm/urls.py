@@ -80,6 +80,9 @@ urlpatterns = [
     path("api/system/auftraege/<uuid:kennung>/abbrechen/", system.AuftragAbbrechenView.as_view()),
     path("api/system/epm/", system.EpmAufgabeView.as_view()),
     path("api/system/hinweis/", system.HinweisView.as_view()),
+    path("api/system/einstellungen/", system.EinstellungenView.as_view()),
+    path("api/system/leeren/vorbereiten/", system.LeerenVorbereitenView.as_view()),
+    path("api/system/leeren/", system.LeerenView.as_view()),
     path("api/system/sitzungen/<int:pk>/", system.SitzungBeendenView.as_view()),
     # Administration › Import: Übernahme der Altdaten (nur Admin)
     path("api/altimport/", altimport.StandView.as_view()),

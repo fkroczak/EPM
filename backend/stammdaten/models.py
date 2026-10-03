@@ -227,6 +227,11 @@ class Einstellungen(models.Model):
     # Vordrucke ohne Wasserzeichen „ENTWURF“, obwohl die mitgelieferte Startvorlage noch aktiv ist (Festlegung 03.10.2026:
     # Entwurfsmodus manuell abschaltbar, Vorlagen › Dokumentvorlagen). Liste der Arten; nur über eigenen Endpunkt.
     vordrucke_ohne_entwurf = models.JSONField("Vordrucke ohne Wasserzeichen „ENTWURF“", default=list, blank=True)
+    # Musterdaten (Testbenutzer, Testpatienten ab Nr. 9001) bei jedem Update/Start anlegen? Nach „Datenbank leeren“
+    # aus (Festlegung 03.10.2026); unter Administration › System umschaltbar.
+    musterdaten_automatisch = models.BooleanField("Musterdaten automatisch anlegen", default=True)
+    # Menüpunkt „Import“ nach der Übernahme ausblenden, wieder einblendbar (Festlegung 03.10.2026, U32)
+    import_ausgeblendet = models.BooleanField("Import ausgeblendet", default=False)
 
     history = HistoricalRecords()
 
