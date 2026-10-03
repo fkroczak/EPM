@@ -114,13 +114,18 @@ test("PDF-Vorschau und Ansicht in EPM (ohne PDF-Programm des Browsers), Schaltfl
   await vorschau.getByRole("button", { name: "Nächste Seite" }).click();
   await expect(vorschau).toContainText("Seite 2 von 2");
   // die gezeichnete Seite ist nicht leer (Text schwarz auf weiß)
-  const pixel = await vorschau.locator("canvas").evaluate((c: HTMLCanvasElement) => {
-    const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
-    let dunkel = 0;
-    for (let i = 0; i < d.length; i += 4) if (d[i] < 128 && d[i + 3] > 0) dunkel++;
-    return dunkel;
-  });
-  expect(pixel).toBeGreaterThan(50);
+  // nach dem Blättern wird die Seite neu gezeichnet – warten, bis sie fertig ist
+  await expect(vorschau.locator('canvas[data-fertig="1"]')).toHaveCount(1);
+  await expect
+    .poll(() =>
+      vorschau.locator("canvas").evaluate((c: HTMLCanvasElement) => {
+        const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+        let dunkel = 0;
+        for (let i = 0; i < d.length; i += 4) if (d[i] < 128 && d[i + 3] > 0) dunkel++;
+        return dunkel;
+      }),
+    )
+    .toBeGreaterThan(50);
 
   // „Öffnen“: Primärknopf mit lesbarer Schrift (nicht Akzent auf Akzent), große Ansicht mit allen Seiten
   const oeffnen = details.getByRole("button", { name: "Öffnen" });
