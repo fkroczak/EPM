@@ -28,7 +28,8 @@ SICHERUNG_ALT_H = 36                             # letzte Sicherung älter: Warn
 UEBERTRAGUNG_ALT_H = 26                          # verschlüsselte Sicherung so lange nicht übertragen: Warnung
 PRUEF_FEHLVERSUCHE, PRUEF_MINUTEN = 5, 15        # falsche Sicherungs-Passwörter je Person, danach kurz gesperrt
 ARTEN = {"nachts": "Automatisch", "von_hand": "Von Hand", "vor_update": "Vor Update", "vor_aenderung": "Vor Neustart",
-         "vor_wiederherstellung": "Vor Wiederherstellung", "hochgeladen": "Hochgeladen", "unbekannt": "Unbekannt"}
+         "vor_wiederherstellung": "Vor Wiederherstellung", "vor_leeren": "Vor Datenbank leeren", "hochgeladen": "Hochgeladen",
+         "unbekannt": "Unbekannt"}
 AUFBEWAHRUNG_TAGE = (7, 14, 30)                   # wie im Systemagenten (Festlegung 02.10.2026)
 # Aufbewahrung im Übertragungsziel, 0 = nie löschen (Festlegung 03.10.2026: Standard 30 Tage, wie im Systemagenten)
 ZIEL_AUFBEWAHRUNG = (0, 14, 30, 60, 90, 180, 365)
@@ -232,12 +233,21 @@ def wiederherstellungen_nachtragen() -> int:
     liste = host._lies(host.ordner_status() / "wiederherstellungen.json")
     if not isinstance(liste, list):
         return 0
+    # „Datenbank leeren“ (F107) beginnt das Audit-Log neu – Wiederherstellungen davor sind schon nachgetragen und dürfen
+    # nicht noch einmal alle Anmeldungen beenden
+    geleert = (SystemEreignis.objects.filter(art=SystemEreignis.Art.SYSTEM, details__ereignis="datenbank_geleert")
+               .order_by("-zeitpunkt").values_list("zeitpunkt", flat=True).first())
     anzahl = 0
     for e in liste:
         if not isinstance(e, dict) or e.get("status") not in ("umgestellt", "erledigt"):
             continue
         kennung = str(e.get("id") or "")
         if not ID_MUSTER.match(kennung):
+            continue
+        beginn = host._zeit(e.get("begonnen_am"))
+        if beginn and timezone.is_naive(beginn):
+            beginn = timezone.make_aware(beginn)
+        if geleert and beginn and beginn < geleert:
             continue
         if SystemEreignis.objects.filter(art=SystemEreignis.Art.BACKUP, details__ereignis="wiederhergestellt",
                                          details__auftrag=kennung).exists():

@@ -2150,13 +2150,14 @@ Punkt 6.4 „Testbenutzer-Schalter“ und zusätzlich „Testpatient definieren 
   (abgetippter Code), `wirklich: true` (Rückfrage „Wollen Sie wirklich die Datenbank löschen?“ – „Nein, zurück“ /
   „Ja, Datenbank leeren“), `behalten` (Konten-IDs; das eigene Konto bleibt immer), `kennwort`, `code` (2FA, Pflicht),
   `minuten`, `hinweis` → Auftrag `datenbank_leeren` an den Systemagenten. Der Agent sichert vorher (Art
-  „vor_aenderung“; ohne Sicherung wird nicht geleert) und ruft `manage.py epm_datenbank_leeren` auf
+  „vor_leeren“, auf der Backup-Seite „Vor Datenbank leeren“; ohne Sicherung wird nicht geleert) und ruft `manage.py epm_datenbank_leeren` auf
   (`system/leeren.py`). Entfernt: alle Akten (echte und Testpatienten) mit Einträgen, Plänen, Dokumenten, Historie und
   Dateien, Löschprotokoll und Löschliste, Merklisten, Stand und Läufe des Altdaten-Imports, Versorger mit
   Ansprechpartnern, Ärzte, die nicht ausgewählten Benutzer (Verweise darauf gehen auf das ausführende Konto bzw. werden
   geleert) und das Audit-Log; alle anderen Anmeldungen werden beendet. Es bleiben Präparate, Auswahllisten, Grenzwerte,
   Briefkopf, Dokumentvorlagen, Rechte, Hilfe-Ergänzungen und die Sicherungen. Das Audit-Log beginnt mit „Datenbank
-  geleert“ (Anzahlen, Sicherung vorher). Der Dialog schlägt vor: echte Konten bleiben, Testkonten und Konten ohne Login
+  geleert“ (Anzahlen, Sicherung vorher); Wiederherstellungen aus der Zeit davor werden danach nicht noch einmal
+  nachgetragen (sonst endeten erneut alle Anmeldungen). Der Dialog schlägt vor: echte Konten bleiben, Testkonten und Konten ohne Login
   gehen.
 - **F108 Musterdaten automatisch anlegen** (`Einstellungen.musterdaten_automatisch`, Standard an): aus → `epm_musterdaten`
   legt beim Start nur noch Auswahllisten und Präparate an, keine Testkonten und Testpatienten. „Datenbank leeren“

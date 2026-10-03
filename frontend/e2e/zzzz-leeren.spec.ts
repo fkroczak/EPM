@@ -119,7 +119,7 @@ test("Datenbank leeren: Kontenauswahl, Code abtippen, Passwort + 2FA, Rückfrage
 
   // Sicherung vorher, Musterdaten aus, Audit-Log neu begonnen
   const backup = await (await page.request.get("/api/backup/")).json();
-  expect(backup.sicherungen[0].art).toBe("vor_aenderung");
+  expect(backup.sicherungen[0].art).toBe("vor_leeren");
   await page.goto("/admin/system");
   await expect(page.getByTestId("golive-karte").getByRole("checkbox", { name: /Musterdaten automatisch anlegen/ })).not.toBeChecked();
   await page.goto("/admin/audit-log");

@@ -70,7 +70,7 @@ DATEI_MUSTER = re.compile(
 NEBEN_MUSTER = re.compile(r"^epm_(\d{4}-\d{2}-\d{2}_\d{4}(?:\d{2})?)\.(sha256|json)$")
 PASSWORT_MIN, PASSWORT_MAX = 16, 200
 UEBERTRAGUNG_WIEDERHOLEN_S = 15 * 60
-ARTEN = ("nachts", "von_hand", "vor_update", "vor_aenderung", "vor_wiederherstellung", "hochgeladen")
+ARTEN = ("nachts", "von_hand", "vor_update", "vor_aenderung", "vor_wiederherstellung", "vor_leeren", "hochgeladen")
 APP_UID, APP_GID = 10001, 101
 
 # Aktion -> (Bezeichnung, vorher sichern). Dieselbe Liste steht in backend/system/host.py.
@@ -103,7 +103,7 @@ SICHERUNG_AKTIONEN = {"sicherung", "sicherung_passwort", "sicherung_ziel", "sich
                       "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen", "datenbank_leeren"}
 # Art der Sicherung, die eine Aktion vorher erstellt
 VORHER_ART = {"updates_installieren": "vor_update", "server_neustart": "vor_aenderung",
-              "wiederherstellen": "vor_wiederherstellung"}
+              "wiederherstellen": "vor_wiederherstellung", "datenbank_leeren": "vor_leeren"}
 
 APT_ENV = {"DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE": "a", "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"}
 

@@ -71,6 +71,24 @@ class DatenbankLeeren(Systemverzeichnis):
         self.assertEqual(set(User.objects.values_list("username", flat=True)), {"admin", "mediziner"})
         # auch die bleibenden Konten müssen sich neu anmelden (nur das ausführende nicht)
         self.assertEqual(list(Sitzung.objects.values_list("sitzungsschluessel", flat=True)), ["admin-sitzung"])
+        # eine Wiederherstellung vor dem Leeren wird nicht noch einmal nachgetragen (sonst endeten alle Anmeldungen)
+        import json
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from .sicherung import wiederherstellungen_nachtragen
+
+        vorher = (timezone.now() - timedelta(hours=1)).isoformat()
+        (self.ordner / "status" / "wiederherstellungen.json").write_text(json.dumps([
+            {"id": "a" * 32, "stempel": "2026-10-01_020000", "angefordert_von": "admin", "begonnen_am": vorher,
+             "status": "erledigt", "ergebnis": "ok"}]))
+        self.assertEqual(wiederherstellungen_nachtragen(), 0)
+        self.assertTrue(Sitzung.objects.filter(sitzungsschluessel="admin-sitzung").exists())
+        # die Seiten der Administration funktionieren mit der leeren Datenbank
+        for pfad in ("/api/backup/", "/api/system/uebersicht/", "/api/startseite/", "/api/benutzer/", "/api/protokoll/",
+                     "/api/altimport/", "/api/patienten/", "/api/auth/ich/"):
+            self.assertEqual(self.a.get(pfad).status_code, 200, pfad)
         self.assertFalse(Einstellungen.aktuell().musterdaten_automatisch)
         self.assertEqual(list(Path(settings.EPM_DOKUMENTE).iterdir()), [])
         self.assertEqual(Path(settings.EPM_LOESCHLISTE).read_text(), "")
@@ -120,6 +138,8 @@ class DatenbankLeeren(Systemverzeichnis):
         self.assertEqual(agent.AKTIONEN["datenbank_leeren"], ("Datenbank leeren", True))
         self.assertTrue(BACKEND["datenbank_leeren"]["sichern"])
         self.assertIn("datenbank_leeren", agent.SICHERUNG_AKTIONEN)
+        self.assertEqual(agent.VORHER_ART["datenbank_leeren"], "vor_leeren")
+        self.assertIn("vor_leeren", agent.ARTEN)
         zeilen = []
         a = SimpleNamespace()
         leeren = agent.Agent.leeren
