@@ -219,7 +219,7 @@ def _plan(patient, user, p, gueltig_ab, glucose, aa, lipide, freigeben=True):
     plan.vitamine.set([p("vitamine", "Soluvit N"), p("vitamine", "Vitalipid adult")])
     if freigeben:
         # Musterdaten: ohne Prüfung des Rechts „Pläne freigeben“ – der Testbenutzer ist seit 03.10.2026 (U7) standardmäßig
-        # Mitarbeiter; die Freigabe nennt ihn trotzdem (fiktive Testdaten, Wasserzeichen „TEST“)
+        # Mitarbeiter; die Freigabe nennt ihn trotzdem (fiktive Testdaten, Wasserzeichen „TESTDATEN“)
         plan._freigabe(mediziner=user, abschliessend=None, weg=Infusionsplan.Freigabeweg.SYSTEM,
                        datum=timezone.localdate(), nachweis=None)
     return plan
