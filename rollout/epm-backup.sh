@@ -2,7 +2,7 @@
 # EPM – Sicherung: Datenbank (pg_dump) + Patientendokumente + Löschliste, 7, 14 oder 30 Tage aufbewahrt
 # (endgültig gelöschte Akten und Dokumente stecken damit höchstens 30 Tage in älteren Sicherungen)
 #
-#   sudo epm-backup [--art nachts|von_hand|vor_update|vor_aenderung|vor_wiederherstellung] [--von BENUTZER]
+#   sudo epm-backup [--art nachts|von_hand|vor_update|vor_aenderung|vor_wiederherstellung|vor_leeren] [--von BENUTZER]
 #
 # Läuft täglich um 02:00 per systemd-Timer (--art nachts), „Jetzt sichern“ und die Sicherung vor Updates, Neustart und
 # Wiederherstellen stößt der Systemagent an (Administration › Backup bzw. › System).
@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
-[[ "$ART" =~ ^(nachts|von_hand|vor_update|vor_aenderung|vor_wiederherstellung)$ ]] || { echo "Unbekannte Art: $ART" >&2; exit 2; }
+[[ "$ART" =~ ^(nachts|von_hand|vor_update|vor_aenderung|vor_wiederherstellung|vor_leeren)$ ]] || { echo "Unbekannte Art: $ART" >&2; exit 2; }
 [[ -z "$VON" || "$VON" =~ ^[A-Za-z0-9_.@+-]{1,150}$ ]] || { echo "Ungültiger Benutzername." >&2; exit 2; }
 [[ "$TAGE" =~ ^[1-9][0-9]*$ ]] || { echo "EPM_BACKUP_TAGE muss eine Zahl ab 1 sein (ist: $TAGE)." >&2; exit 2; }
 STAMP="$(date +%F_%H%M%S)"

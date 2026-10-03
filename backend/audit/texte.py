@@ -315,4 +315,11 @@ def _system(e, d) -> str:
         return "Hinweis an alle Benutzer beendet"
     if ereignis == "sitzung_beendet":
         return f"Sitzung von {e.objekt} beendet ({d.get('browser') or 'Browser unbekannt'})"
+    if ereignis == "datenbank_geleert":
+        return (f"Datenbank geleert: {d.get('patienten', 0)} Akten, {d.get('testpatienten', 0)} Testpatienten, "
+                f"{d.get('dokumente', 0)} Dokumente, {d.get('versorger', 0)} Versorger, {d.get('aerzte', 0)} Ärzte, "
+                f"{d.get('konten', 0)} Benutzer entfernt; Audit-Log neu begonnen"
+                + (f"; vorher gesichert ({d['sicherung']})" if d.get("sicherung") else ""))
+    if ereignis == "einstellung":
+        return f"{d.get('was', 'Einstellung')}: {d.get('wert', '')}"
     return name

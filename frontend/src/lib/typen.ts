@@ -42,6 +42,8 @@ export type Ich = {
   rechte: Recht[];
   /** Admins: Patientendaten nur bei Testpatienten schreiben (echte Akten nur lesen) */
   schreibt_nur_testpatienten: boolean;
+  /** Menüpunkt „Import“ nach der Übernahme ausgeblendet (Administration › System, Festlegung 03.10.2026, U32) */
+  import_ausgeblendet?: boolean;
 };
 
 /** Breite in Spalten des Rasters (1–5), Höhe in Rasterzeilen (0 = automatisch nach Inhalt, sonst 1–4) */

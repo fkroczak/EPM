@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import { useIch } from "@/lib/auth";
@@ -468,6 +468,7 @@ function Protokolle({ stand }: { stand: Stand }) {
 // ---------------------------------------------------------------- Seite
 export function Import() {
   const qc = useQueryClient();
+  const ich = useIch();
   const [params, setParams] = useSearchParams();
   const schritt = (SCHRITTE.some((s) => s.wert === params.get("schritt")) ? params.get("schritt") : "quelle") as Schritt;
   const stand = useQuery({ queryKey: ["altimport", "stand"], queryFn: () => api<Stand>("altimport/") });
@@ -488,6 +489,10 @@ export function Import() {
     <Seite pfad={pfad}>
       <Seitenkopf titel="Import" unter="Übernahme der Altdaten aus dem bisherigen System. Nur für die Administration."
         rechts={<Chip art={art} data-testid="import-status">{s.status_name}</Chip>} />
+      {ich.import_ausgeblendet ? (
+        <Meldung art="info"><span data-testid="import-ausgeblendet">Der Menüpunkt „Import“ ist ausgeblendet. Wieder einblenden unter{" "}
+          <Link to="/admin/system">Administration › System</Link> (Karte „Testphase und Go-live“).</span></Meldung>
+      ) : null}
       {s.echte_akten.anzahl > 0 && (s.status === "leer" || s.status === "geladen") ? (
         <Meldung art="warn"><span data-testid="echte-akten">Im EPM gibt es {zahl(s.echte_akten.anzahl)} echte Akten (Nr. {s.echte_akten.nummern.join(", ")}{s.echte_akten.anzahl > s.echte_akten.nummern.length ? " …" : ""}).
           Übernommen wird nur in ein System ohne echte Akten, weil die Patientennummern des Altsystems frei sein müssen. Zuordnungen lassen sich trotzdem vorbereiten.</span></Meldung>

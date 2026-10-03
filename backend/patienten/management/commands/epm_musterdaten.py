@@ -19,6 +19,12 @@ class Command(BaseCommand):
         self.stdout.write(f"Stammdaten: {neu['auswahlwerte']} Auswahlwerte, {neu['praeparate']} Präparate neu.")
         if opt["nur_stammdaten"]:
             return
+        from stammdaten.models import Einstellungen
+
+        if not opt["zuruecksetzen"] and not Einstellungen.aktuell().musterdaten_automatisch:
+            # nach „Datenbank leeren“ bzw. unter Administration › System abgeschaltet (Festlegung 03.10.2026)
+            self.stdout.write("Musterdaten: automatisches Anlegen ist abgeschaltet (Administration › System).")
+            return
         user, kennwort = testbenutzer_anlegen()
         if kennwort:
             self.stdout.write(self.style.WARNING(

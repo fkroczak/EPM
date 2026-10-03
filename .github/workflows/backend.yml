@@ -209,6 +209,8 @@ jobs:
         working-directory: frontend
         env:
           EPM_CI_BASIS: /tmp/epm-ci
+          # beim manuellen Start folgen Bildschirmfotos mit Musterdaten – dann die Datenbank nicht leeren
+          EPM_OHNE_LEEREN: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
         run: |
           set -o pipefail
           npx playwright test 2>&1 | tee ../e2e-ausgabe.txt

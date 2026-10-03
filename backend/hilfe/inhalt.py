@@ -511,7 +511,15 @@ der <strong>Server neu starten</strong> und EPM neu starten – mit Passwort und
 Sicherung (schlägt sie fehl, wird nichts verändert), angemeldete Benutzer werden gewarnt. Beginn sofort oder in 5 bis 60
 Minuten; ein wartender Auftrag lässt sich zurückziehen.</p>
 <p>Außerdem: <strong>Hinweis an alle Benutzer</strong> setzen und angemeldete Benutzer abmelden. Bei den Konten führen die
-Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Kennwort) direkt zur Person in der Benutzerverwaltung.</p>""",
+Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Kennwort) direkt zur Person in der Benutzerverwaltung.</p>
+<p><strong>Testphase und Go-live</strong>: <strong>Musterdaten automatisch anlegen</strong> abschalten, damit beim Start
+keine Testpatienten und Testkonten mehr entstehen. <strong>Menüpunkt „Import“ ausblenden</strong>, wenn die Altdaten
+übernommen sind – die Seite bleibt über die Karte erreichbar, der Menüpunkt lässt sich wieder einblenden.
+<strong>Datenbank leeren</strong> (nur Rolle Admin) entfernt alles aus der Testphase: alle Akten (auch echte),
+Dokumente, Versorger, Ärzte, die nicht ausgewählten Benutzer und das Audit-Log; Präparate, Auswahllisten, Vorlagen und
+Einstellungen bleiben. Welche Konten bleiben, wird im Dialog angehakt (das eigene bleibt immer). Bestätigt wird mit dem
+angezeigten Code zum Abtippen, Passwort, Code aus der Authenticator-App und der Rückfrage „Wollen Sie wirklich die
+Datenbank löschen?“. Vorher sichert der Server automatisch – zurück geht es nur über diese Sicherung.</p>""",
     },
     {
         "id": "backup", "gruppe": "administration", "titel": "Datensicherung", "rechte": ["backup_verwalten"],

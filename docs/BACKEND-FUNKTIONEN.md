@@ -153,12 +153,15 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F104 | Admins auch bei echten Akten: Akte abschließen, Dokument anderem Patienten zuordnen | 4 Akte, 9 Dokumente | ABGESCHLOSSEN UND GETESTET |
 | F106 | Recht „Testdaten sehen“ je Gruppe (Testpatienten und Testbenutzer ausblenden); Testbenutzer ausblenden/einblenden | 17 Benutzer, alle Listen | ABGESCHLOSSEN UND GETESTET |
 | F105 | Hinweis „Kein Infusionsplan“; „Kein Infusionsplan nötig“ je Patient bestätigen unterdrückt ihn und die Warnung „Plan älter als …“ | 3 Patientenliste, 2 Start, 4 Akte, 8 Infusionspläne, Kalender | ABGESCHLOSSEN UND GETESTET |
+| F107 | Datenbank leeren (Ende der Testphase): Akten, Dokumente, Versorger, Ärzte, nicht ausgewählte Benutzer und Audit-Log entfernen; Kontenauswahl, Bestätigungscode, Passwort + 2FA, Rückfrage, vorher Sicherung | System | ABGESCHLOSSEN UND GETESTET |
+| F108 | Schalter „Musterdaten automatisch anlegen“ | System | ABGESCHLOSSEN UND GETESTET |
+| F109 | Menüpunkt „Import“ nach der Übernahme aus- und wieder einblenden | System, Seitenleiste, Import | ABGESCHLOSSEN UND GETESTET |
 
-Summe (106 Funktionen, gezählt aus der Tabelle): 105 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 1 teilweise abgeschlossen (F83) · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
+Summe (109 Funktionen, gezählt aus der Tabelle): 108 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 1 teilweise abgeschlossen (F83) · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 Neu in Runde 4 sind F74–F83 (Datenschutz nach DSGVO und Abschließen eines Plans nach Freigabe); offene Fragen dazu stehen
-in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18). Runde 7 setzt die Startseiten- und Oberflächen-Erweiterungen S01–S17 aus `claude/startseite-erweiterungen.md` um (F90–F97, dazu erweitert F09, F13, F14, F17, F48, F84). Die Fehlerliste vom 02.10.2026 bringt F98–F106 und ändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97 (Abschnitt P).
+in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18). Runde 7 setzt die Startseiten- und Oberflächen-Erweiterungen S01–S17 aus `claude/startseite-erweiterungen.md` um (F90–F97, dazu erweitert F09, F13, F14, F17, F48, F84). Die Klärungen vom 03.10.2026 bringen F107–F109 (Testphase und Go-live). Die Fehlerliste vom 02.10.2026 bringt F98–F106 und ändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97 (Abschnitt P).
 
 ---
 
@@ -2135,6 +2138,39 @@ Punkt 6.4 „Testbenutzer-Schalter“ und zusätzlich „Testpatient definieren 
   ausblenden und wieder einblenden; Recht „Testdaten sehen“ je Gruppe“.
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
+### F107–F109 Testphase und Go-live (Klärung U27/U32 vom 03.10.2026)
+- **Anlass:** „Menüpunkt in System ‚Datenbank löschen‘ mit 2FA, ablesbarem Code und Passwort und einer ‚Wollen Sie wirklich
+  die Datenbank löschen‘-Abfrage, um eine leere Datenbank zu bekommen. Des Weiteren der Punkt, um nicht automatisch
+  Testpatienten anzulegen.“ – „Import nach dem Import ausblenden, wieder einblendbar.“ Rückfragen geklärt: alles aus der
+  Testphase muss weg (Einträge, Dokumente, Benutzer, Patienten, Versorger, Ärzte), Präparate und Vorlagen bleiben;
+  vorher immer sichern; welche Konten bleiben, wird im Dialog ausgewählt; das Audit-Log wird ebenfalls geleert.
+- **Karte „Testphase und Go-live“** unter Administration › System (Recht „Systemverwaltung“).
+- **F107 Datenbank leeren** (nur Rolle Admin): `POST /api/system/leeren/vorbereiten/` liefert Umfang, alle Konten und
+  einen Bestätigungscode (6 Zeichen, 10 Minuten, in der Sitzung). `POST /api/system/leeren/` mit `bestaetigung`
+  (abgetippter Code), `wirklich: true` (Rückfrage „Wollen Sie wirklich die Datenbank löschen?“ – „Nein, zurück“ /
+  „Ja, Datenbank leeren“), `behalten` (Konten-IDs; das eigene Konto bleibt immer), `kennwort`, `code` (2FA, Pflicht),
+  `minuten`, `hinweis` → Auftrag `datenbank_leeren` an den Systemagenten. Der Agent sichert vorher (Art
+  „vor_leeren“, auf der Backup-Seite „Vor Datenbank leeren“; ohne Sicherung wird nicht geleert) und ruft `manage.py epm_datenbank_leeren` auf
+  (`system/leeren.py`). Entfernt: alle Akten (echte und Testpatienten) mit Einträgen, Plänen, Dokumenten, Historie und
+  Dateien, Löschprotokoll und Löschliste, Merklisten, Stand und Läufe des Altdaten-Imports, Versorger mit
+  Ansprechpartnern, Ärzte, die nicht ausgewählten Benutzer (Verweise darauf gehen auf das ausführende Konto bzw. werden
+  geleert) und das Audit-Log; alle anderen Anmeldungen werden beendet. Es bleiben Präparate, Auswahllisten, Grenzwerte,
+  Briefkopf, Dokumentvorlagen, Rechte, Hilfe-Ergänzungen und die Sicherungen. Das Audit-Log beginnt mit „Datenbank
+  geleert“ (Anzahlen, Sicherung vorher); Wiederherstellungen aus der Zeit davor werden danach nicht noch einmal
+  nachgetragen (sonst endeten erneut alle Anmeldungen). Der Dialog schlägt vor: echte Konten bleiben, Testkonten und Konten ohne Login
+  gehen.
+- **F108 Musterdaten automatisch anlegen** (`Einstellungen.musterdaten_automatisch`, Standard an): aus → `epm_musterdaten`
+  legt beim Start nur noch Auswahllisten und Präparate an, keine Testkonten und Testpatienten. „Datenbank leeren“
+  schaltet ihn aus. „Testdaten zurücksetzen“ (F57) bleibt davon unberührt.
+- **F109 Import ausblenden** (`Einstellungen.import_ausgeblendet`): der Menüpunkt „Import“ verschwindet für alle; die
+  Seite bleibt über die Karte erreichbar und weist auf das Wiedereinblenden hin. `GET /api/auth/ich/` liefert
+  `import_ausgeblendet`.
+- Beide Schalter: `POST /api/system/einstellungen/` (`musterdaten_automatisch`, `import_ausgeblendet`, je Wahrheitswert),
+  Historie der Einstellungen und Audit-Log. Migration `stammdaten/0011`.
+- **Teststatus:** Backend-Tests `system.test_leeren` (Ablauf und Prüfungen, Leeren, Schalter, Systemagent). Browsertest
+  `zzzz-leeren.spec.ts` (läuft als letzte Datei; beim manuellen Start mit Bildschirmfotos übersprungen).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2188,24 +2224,25 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U23 | ~~Einschränkung nur bei abgeschlossenen Akten – reicht das?~~ **Bestätigt 03.10.2026:** ja | F79 | – |
 | U24 | ~~Nachweis bei Freigabe per Telefon oder persönlich~~ **Bestätigt 03.10.2026:** ohne Nachweis möglich (Pflicht nur bei E-Mail und schriftlich) | F82 | – |
 | U25 | ~~Feiertage im Kalender: welches Bundesland?~~ **Geklärt 02.10.2026:** NRW (Sitz der Stiftung in Altenberge) | F84 | – |
-| U26 | Den Import führt die Administration durch und legt dabei echte Akten an – Ausnahme von U12 („Admins schreiben Patientendaten nur bei Testpatienten“). So gewollt? | F65 | ja, nur über Administration › Import (eigenes Recht, Kennwort + 2FA, Audit-Log) |
-| U27 | Echte (nicht Test-)Akten aus der Testphase sperren den Import; ihre Nummern bleiben nach dem endgültigen Löschen (F80) im Löschprotokoll und sind für die Übernahme gesperrt. Soll das Werkzeug solche Akten entfernen dürfen? | F65 | nein – übernommen wird nur in ein System ohne echte Akten (Festlegung 02.10.2026); auf einem Server, auf dem schon echte Akten angelegt wurden, braucht der Go-live eine frische Datenbank |
-| U28 | Dokumente anderer Dateitypen im Ordner des Altsystems (Word, Excel …) | F65 | werden nicht übernommen, aber einzeln aufgelistet; der Ordner bleibt unverändert |
+| U26 | ~~Import durch die Administration legt echte Akten an – Ausnahme von U12?~~ **Bestätigt 03.10.2026:** ja, Admins dürfen den Import mit echten Daten durchführen (nur über Administration › Import, eigenes Recht, Kennwort + 2FA, Audit-Log) | F65 | – |
+| U27 | ~~Echte Akten aus der Testphase sperren den Import – wie kommt man zu einem leeren System?~~ **Geklärt 03.10.2026:** Administration › System › „Datenbank leeren“ (F107: alles aus der Testphase inkl. Löschprotokoll, Versorger, Ärzte, Benutzer nach Auswahl und Audit-Log; Präparate und Vorlagen bleiben; vorher Sicherung; Bestätigungscode, Passwort, 2FA, Rückfrage) und Schalter „Musterdaten automatisch anlegen“ (F108) | F65, F107, F108 | – |
+| U28 | ~~Dokumente anderer Dateitypen im Ordner des Altsystems (Word, Excel …)~~ **Bestätigt 03.10.2026:** nicht übernehmen (veränderbar); sie werden einzeln aufgelistet, der Ordner bleibt unverändert | F65 | – |
 | U29 | Zeitangaben: Welchen Typ haben `lastchange`, `created`, `deleted_at` im echten Altsystem? `TIMESTAMP` steht im Dump in UTC und wird umgerechnet, `DATETIME` gilt als Ortszeit | F65 | am echten Dump prüfen – das Werkzeug zeigt nach dem Laden einen Hinweis, wenn es umgerechnet hat |
-| U30 | Infusionspläne aus dem Altsystem: ohne Freigabe und ohne gespeicherte PDF (im Altsystem gab es beides nicht); Mengen 0 → leer; Energie nur dann als „manuell“, wenn sie von der Berechnung abweicht; jüngster Plan je Patient „aktuell“ | F65 | so umgesetzt (Regeln 13 und 16 der Datenanalyse); in der Akte als „aus dem Altsystem“ gekennzeichnet |
+| U30 | Infusionspläne aus dem Altsystem: ohne Freigabe und ohne gespeicherte PDF (im Altsystem gab es beides nicht); Mengen 0 → leer; Energie nur dann als „manuell“, wenn sie von der Berechnung abweicht; jüngster Plan je Patient „aktuell“ | F65 | so umgesetzt (Regeln 13 und 16 der Datenanalyse); in der Akte als „aus dem Altsystem“ gekennzeichnet – **bestätigt 03.10.2026** |
 | U31 | Rolle der Konten aus dem Altsystem: Vorschlag aus dessen Rechtestufe (100 Betrachter, 1000 Mitarbeiter, 10000 Mediziner, 100000 Admin) | F65 | Vorschlag, je Konto im Werkzeug änderbar; Konten entstehen ohne Kennwort |
-| U32 | Nach dem Abschließen enthalten ältere Sicherungen aus der Testphase und der Ordner `data/import` auf dem Server weiterhin Altdaten (auch der nicht übernommenen Patienten) | F65, F61 | organisatorisch löschen (`docs/DATENSCHUTZ.md`); das Werkzeug weist beim Abschließen darauf hin |
+| U32 | Nach dem Abschließen enthalten ältere Sicherungen aus der Testphase und der Ordner `data/import` auf dem Server weiterhin Altdaten (auch der nicht übernommenen Patienten) | F65, F61 | organisatorisch löschen (`docs/DATENSCHUTZ.md`); das Werkzeug weist beim Abschließen darauf hin – **bestätigt 03.10.2026**; dazu Menüpunkt „Import“ unter System aus- und wieder einblendbar (F109) |
 | U34 | ~~Bestätigungen ohne zweiten Faktor nur mit Kennwort?~~ **Geklärt 03.10.2026: nein.** Endgültig löschen, Wiederherstellen, Updates, Neustart, Sicherung und Import verlangen immer den zweiten Faktor; wer sie ausführt (Mediziner, Administration …), muss ihn einrichten – ohne geht es nicht | F99 | – |
 | U35 | Hochgeladene Sicherung eines anderen Servers mit fremdem Passwort: Das Passwort wird auf diesem Server (root, 0600) als eigene Nummer hinterlegt, damit sich die Sicherung wiederherstellen lässt | F103 | so umgesetzt; das aktuelle Sicherungs-Passwort dieses Servers bleibt unverändert – **bestätigt 03.10.2026** |
 | U36 | Geänderte Aufbewahrung wirkt erst mit der nächsten Sicherung (dann werden ältere entfernt), nicht sofort | F103 | so umgesetzt; der Dialog sagt es – **bestätigt 03.10.2026** |
 | U37 | „Kein Infusionsplan nötig“: Wer darf bestätigen? Gilt auch eine offene Entwurfsfassung als „kein Plan“? | F105 | Recht „Akten bearbeiten“ (wie „kein Versorger“; unter Benutzer › Rechte umstellbar); ein Entwurf allein zählt nicht als Plan – der Hinweis bleibt bis zur Freigabe – **bestätigt 03.10.2026** |
 | U38 | ~~„Testdaten sehen“ für den Admin abschaltbar?~~ **Bestätigt 03.10.2026:** nein, für den Admin fest | F106 | – |
-| U33 | Vor dem Abschließen: Ein nach Art. 17 endgültig gelöschtes **Dokument** käme nach „Zurücknehmen“ und erneutem Import wieder (neue Nummer, die Löschliste erkennt es nicht). Eine endgültig gelöschte **Akte** kommt nicht wieder: Ihre Nummer steht im Löschprotokoll; der Patient erscheint unter „Auffälligkeiten“ und lässt sich nur „nicht übernehmen“ – eine andere Nummer ist nicht wählbar (O-29, behoben 02.10.2026) | F65, F73, F80 | Dokumente: betrifft nur die Zeit vor dem Abschließen (Testphase); nach dem Abschließen ist der Dump gelöscht |
+| U33 | Vor dem Abschließen: Ein nach Art. 17 endgültig gelöschtes **Dokument** käme nach „Zurücknehmen“ und erneutem Import wieder (neue Nummer, die Löschliste erkennt es nicht). Eine endgültig gelöschte **Akte** kommt nicht wieder: Ihre Nummer steht im Löschprotokoll; der Patient erscheint unter „Auffälligkeiten“ und lässt sich nur „nicht übernehmen“ – eine andere Nummer ist nicht wählbar (O-29, behoben 02.10.2026) | F65, F73, F80 | Dokumente: betrifft nur die Zeit vor dem Abschließen (Testphase); nach dem Abschließen ist der Dump gelöscht – **bestätigt 03.10.2026** |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 03.10.2026 | Klärungen U26–U33 (Branch `bereinigen-2026-10-03`) | Administration › System, Karte „Testphase und Go-live“: Datenbank leeren (F107, Systemagent-Aktion `datenbank_leeren`, Befehl `epm_datenbank_leeren`), Schalter „Musterdaten automatisch anlegen“ (F108) und „Import ausblenden“ (F109); Migration `stammdaten/0011`; U26, U28, U30, U32, U33 bestätigt, U27 geklärt. Systemagent über `sudo epm-update` aktualisieren |
 | 03.10.2026 | Klärungen U7, U16–U24, U38 | Entwurfsmodus der Vordrucke manuell abschaltbar (F76, Migration `stammdaten/0010`); Aufbewahrung im Übertragungsziel, Standard 30 Tage, Systemagent räumt nach jeder Übertragung auf (F64, U21); Rolle „Mitarbeiter (erweitert)“ (Migration `accounts/0007`, U22); Testbenutzer der Musterdaten als Mitarbeiter (U7); U18, U19, U23, U24, U38 bestätigt |
 | 02.10.2026 | Fehlerliste (Branch `fehlerliste-2026-10-02`) | Infusionspläne: Datum statt „heute/gestern“, Frist beim Überfahren des Status, kompakte Tabelle, Planansicht als kleine Vorschau mit großer Ansicht per Klick (F85, F31). Akte und System: Karten im Raster mit „⋯“ statt Teiler, je Person (F98); Kurz-Verlauf unter Kontakte entfernt. System: Zeitraum der Auslastung 1 h–6 Monate, Konten mit Links, größere Warnungen (F102). Backup: Herunterladen, Aufbewahrung 7/14/30 Tage, Hochladen und Einlesen (F103). Benutzer: ohne Login setzen/Login geben, Rolle „Keine Berechtigung“, Testbenutzer-Schalter (F100); Testpatient beim Anlegen (F101); Admins schließen Akten ab und ordnen Dokumente zu, auch bei echten Akten (F104); Zwei-Faktor-Anmeldung freiwillig (F99). Migration `accounts/0005`; Systemagent Version 3; neue Ordner `system/download`, `system/upload` (über `sudo epm-update`). U34–U36. Ergänzung: Hinweis „Kein Infusionsplan“ und Bestätigung „Kein Infusionsplan nötig“ je Patient (F105, Migration `patienten/0009`, U37). 03.10.2026: Recht „Testdaten sehen“ und Testbenutzer ausblenden (F106, Migration `accounts/0006`, U38). 03.10.2026: U34 geklärt – Bestätigungen immer mit zweitem Faktor, ohne eingerichteten Faktor abgewiesen; U35–U37 bestätigt |
 | 02.10.2026 | Runde 7 (Startseite und Oberfläche, Pull Request #7: `f24bbb7`, `a6d1903`, `33612fa`) | S01–S17 aus `claude/startseite-erweiterungen.md` nach Entwurf 2, SU8–SU10 geklärt: Kennzahlenleiste, Kacheln im festen Raster mit Größe/Reihenfolge je Person und Ziehen mit Einrasten (F93), Schnellerfassung mit zwei Anfragen (F91), Meine Akten (F92), Kontakt fällig in zwei Stufen 4/6 Monate mit Datenmigration (F90), Admin-Startseite (F94), Hilfe je Rolle mit Ergänzungen (F95), volle Breite in Stufen (F96), Spaltenteiler ⅓/½/⅔ (F97); F09, F13, F14, F17, F48, F84 erweitert. Korrektur „Mit offenem Termin“ (zählte Akten ohne Termin). Kennzahlen ohne Testpatienten. Migrationen `stammdaten/0009`, `patienten/0008`, `accounts/0004`, `hilfe/0001`. Abgeleitete Punkte A1–A19 im Projekt-Dokument markiert. Lauf 37036210226: 236 von 236 Backend-Tests, 82 von 82 Browsertests (vorher Lauf 37033921101: ein Browsertest zog an einer Kachel außerhalb des Fensters – Testfehler, behoben) |

@@ -94,6 +94,9 @@ unter „Protokolle“ als Textdatei herunter.
 
 ## 5 · Ablauf zum Go-live
 
+0. Testphase beenden: Administration › System › „Testphase und Go-live“ › **Datenbank leeren** (vorher automatische
+   Sicherung; Akten, Dokumente, Versorger, Ärzte, nicht ausgewählte Benutzer und Audit-Log werden entfernt, Präparate und
+   Vorlagen bleiben; Musterdaten werden danach nicht mehr angelegt). Echte Akten aus der Testphase sperren sonst den Import.
 1. Altsystem für Eingaben sperren.
 2. Frischen Dump ziehen; Dokumentenordner nachziehen (`rsync -a` überträgt nur Neues).
 3. Im EPM: frischen Dump laden (ein vorher zum Üben importierter Stand wird davor zurückgenommen). Die Zuordnungen
@@ -102,6 +105,7 @@ unter „Protokolle“ als Textdatei herunter.
 5. Akten prüfen, Einmal-Kennwörter ausgeben.
 6. Abschließen. Danach: Dump und Kopien löschen, Ordner `data/import/PatData` auf dem Server löschen, Altsystem
    abschalten (siehe `docs/DATENSCHUTZ.md`, Punkt 6).
+7. Optional: Menüpunkt „Import“ unter Administration › System ausblenden (wieder einblendbar).
 
 ## Was das Werkzeug nach den Regeln der Datenanalyse tut
 
@@ -122,5 +126,6 @@ unter „Protokolle“ als Textdatei herunter.
 
 ## Offene Fragen
 
-Siehe „Unklarheiten“ U26–U33 in `docs/BACKEND-FUNKTIONEN.md` – unter anderem: echte Akten aus der Testphase sperren den
-Import (U27), andere Dateitypen im Dokumentenordner (U28), Spaltentyp der Zeitangaben (U29), Rollen der Konten (U31).
+Siehe „Unklarheiten“ U26–U33 in `docs/BACKEND-FUNKTIONEN.md`. Geklärt bzw. bestätigt am 03.10.2026: U26, U27 (leeres
+System über „Datenbank leeren“), U28 (Word, Excel … nicht übernehmen), U30, U32, U33. Offen: Spaltentyp der
+Zeitangaben (U29, am echten Dump prüfen), Rollen der Konten (U31).

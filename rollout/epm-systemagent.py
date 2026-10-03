@@ -41,7 +41,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
-VERSION = 3
+VERSION = 4  # 4: Datenbank leeren (03.10.2026)
 KONF = "/etc/epm/epm.conf"
 BACKUP_SKRIPT = "/usr/local/sbin/epm-backup"
 KONF_SICHERUNG = "/etc/epm/sicherung"
@@ -70,7 +70,7 @@ DATEI_MUSTER = re.compile(
 NEBEN_MUSTER = re.compile(r"^epm_(\d{4}-\d{2}-\d{2}_\d{4}(?:\d{2})?)\.(sha256|json)$")
 PASSWORT_MIN, PASSWORT_MAX = 16, 200
 UEBERTRAGUNG_WIEDERHOLEN_S = 15 * 60
-ARTEN = ("nachts", "von_hand", "vor_update", "vor_aenderung", "vor_wiederherstellung", "hochgeladen")
+ARTEN = ("nachts", "von_hand", "vor_update", "vor_aenderung", "vor_wiederherstellung", "vor_leeren", "hochgeladen")
 APP_UID, APP_GID = 10001, 101
 
 # Aktion -> (Bezeichnung, vorher sichern). Dieselbe Liste steht in backend/system/host.py.
@@ -93,14 +93,17 @@ AKTIONEN = {
     "sicherung_bereitstellen": ("Sicherung zum Herunterladen bereitstellen", False),
     "sicherung_einlesen": ("Hochgeladene Sicherung einlesen", False),
     "wiederherstellen": ("Sicherung wiederherstellen", True),
+    # Administration › System: Ende der Testphase (U27)
+    "datenbank_leeren": ("Datenbank leeren", True),
 }
-# Aktionen, die Sicherungen schreiben, übertragen oder zurückspielen: mit --sicherung-echt auch im Probelauf echt
+# Aktionen, die Sicherungen schreiben, übertragen oder zurückspielen – und das Leeren der Datenbank, das nur den
+# EPM-Stack betrifft: mit --sicherung-echt auch im Probelauf echt (Browsertests gegen den echten Stack)
 SICHERUNG_AKTIONEN = {"sicherung", "sicherung_passwort", "sicherung_ziel", "sicherung_ziel_entfernen",
                       "sicherung_ziel_testen", "sicherung_uebertragen", "sicherung_aufbewahrung",
-                      "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen"}
+                      "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen", "datenbank_leeren"}
 # Art der Sicherung, die eine Aktion vorher erstellt
 VORHER_ART = {"updates_installieren": "vor_update", "server_neustart": "vor_aenderung",
-              "wiederherstellen": "vor_wiederherstellung"}
+              "wiederherstellen": "vor_wiederherstellung", "datenbank_leeren": "vor_leeren"}
 
 APT_ENV = {"DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE": "a", "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"}
 
@@ -1792,6 +1795,9 @@ class Agent:
                 return 0, "Probelauf: nichts zurückgespielt."
             return self.wiederherstellen(parameter.get("stempel"), von, auftrag_id, zeile, vorher=vorher)
 
+        if aktion == "datenbank_leeren":
+            return self.leeren(parameter.get("behalten"), von, zeile, vorher=vorher, simuliert=t)
+
         if aktion == "docker_aufraeumen":
             if t:
                 rc = self.schritt("Images", ["docker", "image", "ls", "--filter", "dangling=true"], zeile, zeitlimit=60)
@@ -1810,6 +1816,28 @@ class Agent:
                 else "Aufräumen fehlgeschlagen."
 
         return 2, f"{name}: nicht umgesetzt."
+
+    def leeren(self, behalten, von, zeile, vorher=None, simuliert=False):
+        """Datenbank leeren (U27): alle Akten, Dokumente, Versorger, Ärzte, nicht ausgewählte Benutzer und das Audit-Log
+        entfernen – im Backend (``manage.py epm_datenbank_leeren``), nach der Sicherung oben."""
+        if not isinstance(behalten, list) or not all(isinstance(x, int) and not isinstance(x, bool) and x > 0
+                                                     for x in behalten):
+            return 2, "Ungültige Auswahl der Konten – nichts verändert."
+        if not von:
+            return 2, "Unbekannter Auftraggeber – nichts verändert."
+        if not vorher and not simuliert:
+            return 1, "Ohne Sicherung vorher wird nicht geleert – nichts verändert."
+        args = ["epm_datenbank_leeren", "--von", von, "--behalten", ",".join(str(x) for x in behalten),
+                "--sicherung", vorher or "", "--ja"]
+        if simuliert:
+            zeile(f"\n(Probelauf) würde ausführen: manage.py {' '.join(args)}\n")
+            return 0, "Probelauf: nichts geleert."
+        rc = self.schritt("Leeren", self.compose("exec", "-T", "backend", "python", "manage.py", *args), zeile,
+                          cwd=self.basis, zeitlimit=3600)
+        if rc != 0:
+            return 1, f"Leeren fehlgeschlagen – die Sicherung {vorher} enthält den Stand davor."
+        return 0, (f"Datenbank geleert (Sicherung vorher: {vorher}). Alle anderen Anmeldungen sind beendet; Musterdaten "
+                   "werden nicht mehr automatisch angelegt.")
 
     def ergebnisse_aufraeumen(self):
         try:

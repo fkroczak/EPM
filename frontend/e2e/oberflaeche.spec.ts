@@ -219,14 +219,16 @@ test("Volle Breite in Stufen: 1920 px – Karten der Akte im Raster, Größe je 
   await page.reload();
   await expect(page.getByTestId("uebersicht-stufe").locator('[data-bereich="gewicht"]')).toHaveAttribute("data-breite", "3");
   await expect(page.getByTestId("uebersicht-stufe").locator('[data-bereich="gewicht"]')).toHaveAttribute("data-hoehe", "1");
-  // Karten überdecken sich nicht
-  const karten = await page.getByTestId("uebersicht-stufe").locator("[data-bereich]").evaluateAll((els) => els.map((e) => {
-    const r = e.getBoundingClientRect();
-    return { id: e.getAttribute("data-bereich"), l: r.left, r: r.right, o: r.top, u: r.bottom };
-  }));
-  for (const a of karten) for (const b of karten) {
-    if (a.id! < b.id!) expect(a.r <= b.l + 1 || b.r <= a.l + 1 || a.u <= b.o + 1 || b.u <= a.o + 1, `${a.id} überdeckt ${b.id}`).toBe(true);
-  }
+  // Karten überdecken sich nicht (nach dem Neuladen erst, wenn alle Karten ihre Daten haben und das Raster steht)
+  await expect(async () => {
+    const karten = await page.getByTestId("uebersicht-stufe").locator("[data-bereich]").evaluateAll((els) => els.map((e) => {
+      const r = e.getBoundingClientRect();
+      return { id: e.getAttribute("data-bereich"), l: r.left, r: r.right, o: r.top, u: r.bottom };
+    }));
+    for (const a of karten) for (const b of karten) {
+      if (a.id! < b.id!) expect(a.r <= b.l + 1 || b.r <= a.l + 1 || a.u <= b.o + 1 || b.u <= a.o + 1, `${a.id} überdeckt ${b.id}`).toBe(true);
+    }
+  }).toPass({ timeout: 10_000 });
   // Standardgröße
   antwort = gespeichert(page);
   await page.getByTestId("groesse-gewicht").click();

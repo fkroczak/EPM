@@ -140,7 +140,109 @@ class UebersichtView(APIView):
                          for code, a in host.AKTIONEN.items() if not a.get("intern")],
             "aufgaben": [{"code": code, **a} for code, a in epm_aufgaben.AUFGABEN.items()],
             "minuten": MINUTEN_ERLAUBT,
+            "einstellungen": _einstellungen(),
+            # „Datenbank leeren“ nur für die Rolle Admin (Festlegung 03.10.2026, U27)
+            "leeren_erlaubt": request.user.rolle == "admin",
         })
+
+
+def _einstellungen():
+    from stammdaten.models import Einstellungen
+
+    e = Einstellungen.aktuell()
+    return {"musterdaten_automatisch": e.musterdaten_automatisch, "import_ausgeblendet": e.import_ausgeblendet}
+
+
+class EinstellungenView(APIView):
+    """Schalter unter Administration › System (Festlegung 03.10.2026): ``musterdaten_automatisch`` – Testbenutzer und
+    Testpatienten bei Start/Update anlegen; ``import_ausgeblendet`` – Menüpunkt „Import“ nach der Übernahme aus-
+    bzw. wieder einblenden. Historie der Einstellungen und Audit-Log."""
+
+    permission_classes = [SystemRecht]
+    NAMEN = {"musterdaten_automatisch": "Musterdaten automatisch anlegen", "import_ausgeblendet": "Import ausgeblendet"}
+
+    def post(self, request):
+        from stammdaten.models import Einstellungen
+
+        werte = {k: request.data[k] for k in self.NAMEN if k in request.data}
+        if not werte or any(not isinstance(v, bool) for v in werte.values()):
+            return Response({"fehler": "Erwartet: musterdaten_automatisch und/oder import_ausgeblendet (true/false)."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        e = Einstellungen.aktuell()
+        for k, v in werte.items():
+            if getattr(e, k) != v:
+                setattr(e, k, v)
+                e._history_user = request.user
+                e.save()
+                protokolliere(SystemEreignis.Art.SYSTEM, request, objekt="Einstellung", ereignis="einstellung",
+                              was=self.NAMEN[k], wert="ja" if v else "nein")
+        return Response(_einstellungen())
+
+
+LEEREN_SCHLUESSEL = "epm_leeren"
+LEEREN_MINUTEN = 10
+
+
+class LeerenVorbereitenView(APIView):
+    """„Datenbank leeren“ Schritt 1: Umfang, Konten zur Auswahl und ein Bestätigungscode zum Abtippen (10 Minuten, in
+    der Sitzung). Nur Rolle Admin mit Recht „Systemverwaltung“."""
+
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        import secrets
+
+        from accounts.models import User
+
+        from .leeren import umfang
+
+        if request.user.rolle != "admin":
+            return Response({"fehler": "Die Datenbank leeren darf nur die Rolle Admin."}, status=status.HTTP_403_FORBIDDEN)
+        code = "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(6))
+        bis = timezone.now() + timedelta(minutes=LEEREN_MINUTEN)
+        request.session[LEEREN_SCHLUESSEL] = {"code": code, "bis": bis.isoformat()}
+        konten = User.objects.order_by("last_name", "first_name", "username")
+        return Response({
+            "code": code, "gueltig_bis": bis, "umfang": umfang(),
+            "benutzer": [{"id": u.id, "anzeigename": u.anzeigename, "benutzername": u.username, "rolle": u.rolle,
+                          "ist_test": u.ist_test, "nur_historisch": u.nur_historisch, "eigene": u.pk == request.user.pk}
+                         for u in konten],
+        })
+
+
+class LeerenView(APIView):
+    """Schritt 2: Auftrag an den Systemagenten (vorher Sicherung). Verlangt den abgetippten Bestätigungscode,
+    ``wirklich: true`` (Rückfrage „Wollen Sie wirklich …“), die Auswahl der bleibenden Konten, Passwort und Code der
+    Zwei-Faktor-Anmeldung."""
+
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        from datetime import datetime
+
+        from accounts.models import User
+
+        if request.user.rolle != "admin":
+            return Response({"fehler": "Die Datenbank leeren darf nur die Rolle Admin."}, status=status.HTTP_403_FORBIDDEN)
+        sitzung = request.session.get(LEEREN_SCHLUESSEL) or {}
+        if not sitzung or datetime.fromisoformat(sitzung["bis"]) < timezone.now():
+            return Response({"bestaetigung": "Der Bestätigungscode ist abgelaufen. Bitte neu anfordern."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if "".join(str(request.data.get("bestaetigung", "")).upper().split()) != sitzung["code"]:
+            return Response({"bestaetigung": "Der Bestätigungscode stimmt nicht."}, status=status.HTTP_400_BAD_REQUEST)
+        if request.data.get("wirklich") is not True:
+            return Response({"wirklich": "Bitte bestätigen: Wollen Sie die Datenbank wirklich leeren?"},
+                            status=status.HTTP_400_BAD_REQUEST)
+        behalten = request.data.get("behalten") or []
+        if not isinstance(behalten, list) or any(isinstance(x, bool) or not isinstance(x, int) for x in behalten):
+            return Response({"behalten": "Liste der Konten-IDs erwartet."}, status=status.HTTP_400_BAD_REQUEST)
+        ids = set(User.objects.filter(pk__in=behalten).values_list("pk", flat=True)) | {request.user.pk}
+        with transaction.atomic():
+            antwort = auftrag_anlegen(request, "datenbank_leeren", parameter={"behalten": sorted(ids)},
+                                      objekt="Datenbank", protokoll_details={"konten_bleiben": len(ids)})
+        if antwort.status_code == status.HTTP_201_CREATED:
+            request.session.pop(LEEREN_SCHLUESSEL, None)
+        return antwort
 
 
 class VerlaufView(APIView):

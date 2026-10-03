@@ -51,6 +51,14 @@ AKTIONEN = {
         "beschreibung": "Nicht mehr benutzte Images und Build-Zwischenstände löschen; markierte Versionen für "
                         "„Zurückschalten“ bleiben.",
     },
+    # Festlegung 03.10.2026 (U27): vor dem Go-live alles aus der Testphase entfernen (system/leeren.py). Nur über
+    # /api/system/leeren/ (Bestätigungscode abtippen, Rückfrage, Auswahl der Konten), vorher immer eine Sicherung.
+    "datenbank_leeren": {
+        "name": "Datenbank leeren", "bestaetigung": "2fa", "sichern": True, "warnen": True, "intern": True,
+        "beschreibung": "Entfernt alle Akten, Dokumente, Versorger, Ärzte, Benutzer (außer den ausgewählten) und das "
+                        "Audit-Log. Präparate, Vorlagen und Einstellungen bleiben. Vorher automatische Sicherung.",
+        "hinweis": "EPM wird geleert (Ende der Testphase). Alle Anmeldungen werden beendet – bitte nichts mehr eingeben.",
+    },
     "pakete_aufraeumen": {
         "name": "Paketreste entfernen", "bestaetigung": "einfach",
         "beschreibung": "Nicht mehr benötigte Pakete (z. B. alte Kernel) und den Paketcache entfernen.",

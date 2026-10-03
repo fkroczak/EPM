@@ -261,7 +261,8 @@ class EinstellungenSerializer(serializers.ModelSerializer):
     class Meta:
         model = Einstellungen
         exclude = ["id"]
-        read_only_fields = ["vordrucke_ohne_entwurf"]  # Vorlagen › Dokumentvorlagen › Entwurfsmodus
+        # Vorlagen › Dokumentvorlagen › Entwurfsmodus; Administration › System
+        read_only_fields = ["vordrucke_ohne_entwurf", "musterdaten_automatisch", "import_ausgeblendet"]
 
     def validate(self, attrs):
         from .models import ERKLAERUNGSARTEN, kontaktstufen_fehler
