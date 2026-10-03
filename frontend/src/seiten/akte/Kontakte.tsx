@@ -30,12 +30,14 @@ function NeuerKontakt() {
   const ich = useIch();
   const location = useLocation();
   const [text, setText] = useState("");
+  const [kontaktart, setKontaktart] = useState("");
   const [mitTermin, setMitTermin] = useState(false);
   const [art, setArt] = useState("rueckruf");
   const [faellig, setFaellig] = useState(inTagen(7));
   const [uhr, setUhr] = useState("");
   const [fokus, setFokus] = useState(0);
   const orte = useAuswahl("terminort");
+  const kontaktarten = useAuswahl("kontaktart");
   const qc = useQueryClient();
   const melden = useHinweis();
   useEffect(() => {
@@ -51,7 +53,7 @@ function NeuerKontakt() {
         const [a, ort] = art.startsWith("ort:") ? ["praxistermin", Number(art.slice(4))] : [art, null];
         wiedervorlage = { art: a, ort, faellig_am: iso, uhrzeit: uhr || null };
       }
-      return api<Kontakt>("kontakte/", { body: { patient: patient.id, text, wiedervorlage } });
+      return api<Kontakt>("kontakte/", { body: { patient: patient.id, text, art: kontaktart ? Number(kontaktart) : null, wiedervorlage } });
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["patient", patient.id] });
@@ -59,6 +61,7 @@ function NeuerKontakt() {
       void qc.invalidateQueries({ queryKey: ["patienten"] });
       melden(mitTermin ? "Kontakt und Wiedervorlage gespeichert." : "Kontakt gespeichert.");
       setText("");
+      setKontaktart("");
       setMitTermin(false);
       setUhr("");
       setFaellig(inTagen(7));
@@ -74,6 +77,14 @@ function NeuerKontakt() {
       <Editor key={fokus} wert={text} onAenderung={setText} label="Neuer Kontakt" werkzeuge={false} hoehe={84} autofokus={fokus > 0}
         platzhalter="Telefonat, Ambulanz, Absprache mit Versorger …" />
       {f.text ? <span className="fehlertext" role="alert">{f.text}</span> : null}
+      {/* Kontaktart seit 03.10.2026 sichtbar (Klärung U6); Liste unter Vorlagen › Auswahllisten */}
+      <div className="flex items-center gap-2.5 flex-wrap">
+        <Auswahl aria-label="Kontaktart" className="w-[260px]" value={kontaktart} onChange={(e) => setKontaktart(e.target.value)}>
+          <option value="">Kontaktart: — ohne Angabe —</option>
+          {(kontaktarten.data ?? []).map((o) => <option key={o.id} value={o.id}>{o.wert}</option>)}
+        </Auswahl>
+        {f.art ? <span className="fehlertext" role="alert">{f.art}</span> : null}
+      </div>
       <div className="flex items-center gap-2.5 flex-wrap">
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input type="checkbox" checked={mitTermin} onChange={(e) => setMitTermin(e.target.checked)} /> Wiedervorlage
@@ -180,6 +191,7 @@ export function Kontakte() {
                 <div className="flex items-center justify-between gap-3">
                   <span className="flex items-center gap-2.5 text-[0.8125rem] gedaempft">
                     <span className="num">{datum(k.zeitpunkt)}, {uhrzeit(k.zeitpunkt)}</span><span>{k.erfasst_von_name}</span>
+                    {k.art_name ? <Chip data-testid="kontaktart">{k.art_name}</Chip> : null}
                     {k.storniert_am ? <Chip art="fehler">storniert</Chip> : null}
                   </span>
                   {erfassen && !k.storniert_am ? (

@@ -14,10 +14,10 @@ import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
 import { Bereich, Bereiche } from "@/components/ui/bereiche";
 import { useAkte } from "./Akte";
 
-type Feld = "diagnose" | "therapie" | "empfehlung";
+type Feld = "diagnose" | "therapie" | "empfehlung" | "bemerkung";
 type Fassungen = { feld: Feld; version: number; fassungen: { version: number; zeitpunkt: string; person: string | null; text: string }[] };
 
-const TITEL: Record<Feld, string> = { diagnose: "Diagnose", therapie: "Therapie", empfehlung: "Empfehlung" };
+const TITEL: Record<Feld, string> = { diagnose: "Diagnose", therapie: "Therapie", empfehlung: "Empfehlung", bemerkung: "Bemerkung" };
 
 function VersionenDialog({ feld, offen, onOffen }: { feld: Feld; offen: boolean; onOffen: (o: boolean) => void }) {
   const { patient } = useAkte();
@@ -133,10 +133,12 @@ export function Therapie() {
       <Bereich id="diagnose" titel="Diagnose"><TextKarte feld="diagnose" /></Bereich>
       <Bereich id="therapie" titel="Therapie" standard={{ breite: 2 }}><TextKarte feld="therapie" immerOffen /></Bereich>
       <Bereich id="empfehlung" titel="Empfehlung"><TextKarte feld="empfehlung" /></Bereich>
+      {/* seit 03.10.2026 sichtbar (Klärung U5) – u. a. Bemerkungen aus dem Altsystem */}
+      <Bereich id="bemerkung" titel="Bemerkung"><TextKarte feld="bemerkung" /></Bereich>
       <Bereich id="hinweis" titel="Hinweis" menue={false}>
         <div className="meldung info flex gap-2.5 items-start text-[0.8125rem] leading-normal">
           <Icon name="info" />
-          <span>Diagnose, Empfehlung und Therapie sind änderbar. Jede Fassung bleibt mit Person, Datum und Uhrzeit im{" "}
+          <span>Diagnose, Therapie, Empfehlung und Bemerkung sind änderbar. Jede Fassung bleibt mit Person, Datum und Uhrzeit im{" "}
             <Link to={`/patienten/${patient.id}/verlauf`}>Verlauf</Link> erhalten. Die Kommunikation mit dem Patienten steht unter{" "}
             <Link to={`/patienten/${patient.id}/kontakte`}>Kontakte</Link>.</span>
         </div>

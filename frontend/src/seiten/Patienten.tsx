@@ -166,7 +166,7 @@ function AktenVorschau({ id }: { id: number | null }) {
         {(kontakte.data?.results ?? []).length === 0 ? <span className="text-sm gedaempft">Noch keine Kontakte.</span>
           : kontakte.data!.results.map((x) => (
             <span key={x.id} className={cx("text-sm flex flex-col", x.storniert_am && "opacity-60 line-through")}>
-              <span className="text-[0.78125rem] gedaempft num">{datum(x.zeitpunkt)} · {x.erfasst_von_name}</span>
+              <span className="text-[0.78125rem] gedaempft num">{datum(x.zeitpunkt)} · {x.erfasst_von_name}{x.art_name ? ` · ${x.art_name}` : ""}</span>
               <span className="line-clamp-2">{klartext(x.text)}</span>
             </span>
           ))}

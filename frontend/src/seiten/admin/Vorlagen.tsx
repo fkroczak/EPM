@@ -122,6 +122,7 @@ const LISTEN: Liste[] = [
   { schluessel: "sonstiges", titel: "Sonstige Bestandteile", art: "praeparat" },
   { schluessel: "katheter", titel: "Katheter", art: "auswahl" }, { schluessel: "terminort", titel: "Terminorte", art: "auswahl" },
   { schluessel: "dokumenttyp", titel: "Dokumenttypen", art: "auswahl" },
+  { schluessel: "kontaktart", titel: "Kontaktarten", art: "auswahl" },
   { schluessel: "beziehung", titel: "Beziehungen (Bezugspersonen)", art: "auswahl" },
 ];
 

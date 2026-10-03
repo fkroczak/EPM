@@ -15,13 +15,14 @@ import { useAkte } from "./Akte";
 
 const BEREICHE: { wert: string; text: string }[] = [
   { wert: "", text: "Alle" }, { wert: "stammdaten", text: "Stammdaten" }, { wert: "diagnose", text: "Diagnose" },
-  { wert: "therapie", text: "Therapie" }, { wert: "empfehlung", text: "Empfehlung" }, { wert: "kontakte", text: "Kontakte" },
+  { wert: "therapie", text: "Therapie" }, { wert: "empfehlung", text: "Empfehlung" }, { wert: "bemerkung", text: "Bemerkung" },
+  { wert: "kontakte", text: "Kontakte" },
   { wert: "gewichte", text: "Gewicht" }, { wert: "termine", text: "Termine" }, { wert: "infusionsplaene", text: "Infusionspläne" },
   { wert: "dokumente", text: "Dokumente" }, { wert: "aerzte", text: "Ärzte" }, { wert: "bezugspersonen", text: "Bezugspersonen" },
   { wert: "erklaerungen", text: "Erklärungen" }, { wert: "datenschutz", text: "Datenschutz" },
 ];
 const BEREICH_EINZELN: Record<string, string> = {
-  stammdaten: "Stammdaten", diagnose: "Diagnose", therapie: "Therapie", empfehlung: "Empfehlung", kontakte: "Kontakt",
+  stammdaten: "Stammdaten", diagnose: "Diagnose", therapie: "Therapie", empfehlung: "Empfehlung", bemerkung: "Bemerkung", kontakte: "Kontakt",
   gewichte: "Gewicht", termine: "Termin", infusionsplaene: "Infusionsplan", dokumente: "Dokument",
   aerzte: "Arzt", bezugspersonen: "Bezugsperson", erklaerungen: "Erklärung", datenschutz: "Datenschutz-Anfrage",
 };

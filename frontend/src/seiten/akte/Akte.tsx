@@ -57,7 +57,7 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
   const start = () => ({
     nachname: patient.nachname, vorname: patient.vorname, geschlecht: patient.geschlecht, geburtsdatum: datum(patient.geburtsdatum),
     groesse: patient.groesse_cm != null ? zahl(patient.groesse_cm) : "", strasse: patient.strasse, plz: patient.plz, ort: patient.ort,
-    telefon: patient.telefon, email: patient.email,
+    telefon: patient.telefon, telefon2: patient.telefon2, email: patient.email, krankenkasse: patient.krankenkasse,
     versorger: patient.versorger ? String(patient.versorger) : patient.kein_versorger ? KEIN : "",
     ansprechpartner: patient.ansprechpartner ? String(patient.ansprechpartner) : "",
     katheter: patient.katheter ? String(patient.katheter) : patient.kein_katheter ? KEIN : "",
@@ -95,6 +95,7 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
     speichern.mutate({
       nachname: f.nachname.trim(), vorname: f.vorname.trim(), geschlecht: f.geschlecht, geburtsdatum: geb, groesse_cm: groesse,
       strasse: f.strasse.trim(), plz: f.plz.trim(), ort: f.ort.trim(), telefon: f.telefon.trim(), email: f.email.trim(),
+      telefon2: f.telefon2.trim(), krankenkasse: f.krankenkasse.trim(),
       // „kein“ = bewusst keiner, leer = noch nicht erfasst (Festlegung 01.10.2026)
       versorger: f.versorger && f.versorger !== KEIN ? Number(f.versorger) : null, kein_versorger: f.versorger === KEIN,
       ansprechpartner: f.ansprechpartner && f.versorger !== KEIN ? Number(f.ansprechpartner) : null,
@@ -133,7 +134,9 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
         <Feld label="PLZ" fehler={e.plz}>{(p) => <Eingabe {...p} className="num" value={f.plz} onChange={set("plz")} />}</Feld>
         <Feld label="Ort" fehler={e.ort}>{(p) => <Eingabe {...p} value={f.ort} onChange={set("ort")} />}</Feld>
         <Feld label="Telefon" className="col-span-2" fehler={e.telefon}>{(p) => <Eingabe {...p} className="num" value={f.telefon} onChange={set("telefon")} />}</Feld>
+        <Feld label="Telefon 2" className="col-span-2" fehler={e.telefon2}>{(p) => <Eingabe {...p} className="num" value={f.telefon2} onChange={set("telefon2")} />}</Feld>
         <Feld label="E-Mail" className="col-span-2" fehler={e.email}>{(p) => <Eingabe {...p} type="email" value={f.email} onChange={set("email")} />}</Feld>
+        <Feld label="Krankenkasse" className="col-span-2" fehler={e.krankenkasse}>{(p) => <Eingabe {...p} maxLength={100} value={f.krankenkasse} onChange={set("krankenkasse")} />}</Feld>
         <Feld label="Versorger" className="col-span-2" fehler={e.versorger}>
           {(p) => (
             <Auswahl {...p} value={f.versorger} onChange={(ev) => setF((a) => ({ ...a, versorger: ev.target.value, ansprechpartner: "" }))}>

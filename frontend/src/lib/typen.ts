@@ -279,7 +279,7 @@ export type Patient = {
     naechster_termin: {
       id: number; art: string; titel: string; faellig_am: string; uhrzeit: string | null; ort: string | null; bei: string;
     } | null;
-    versionen: Record<"diagnose" | "therapie" | "empfehlung", Versionskopf>;
+    versionen: Record<"diagnose" | "therapie" | "empfehlung" | "bemerkung", Versionskopf>;
     /** Schnellerfassung (S02): Zeitpunkt des letzten gültigen Kontakts */
     letzter_kontakt: string | null;
     /** Merkliste der angemeldeten Person (S05) */

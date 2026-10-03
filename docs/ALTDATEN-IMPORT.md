@@ -127,5 +127,5 @@ unter „Protokolle“ als Textdatei herunter.
 ## Offene Fragen
 
 Siehe „Unklarheiten“ U26–U33 in `docs/BACKEND-FUNKTIONEN.md`. Geklärt bzw. bestätigt am 03.10.2026: U26, U27 (leeres
-System über „Datenbank leeren“), U28 (Word, Excel … nicht übernehmen), U30, U32, U33. Offen: Spaltentyp der
-Zeitangaben (U29, am echten Dump prüfen), Rollen der Konten (U31).
+System über „Datenbank leeren“), U28 (Word, Excel … nicht übernehmen), U30, U31 (Rollen aus der Rechtestufe, beim Import je Konto
+gesetzt), U32, U33. Offen: Spaltentyp der Zeitangaben (U29, am echten Dump prüfen).

@@ -156,10 +156,12 @@ export function KontaktDialog({ offen, onOffen, vorgabe }: { offen: boolean; onO
   const melden = useHinweis();
   const neuLaden = useNeuLaden();
   const orte = useAuswahl("terminort");
+  const kontaktarten = useAuswahl("kontaktart");
   const [patient, setPatient] = useState<PatientZeile | null>(null);
   const [tag, setTag] = useState(datum(heuteIso()));
   const [uhr, setUhr] = useState(jetztUhr());
   const [text, setText] = useState("");
+  const [kontaktart, setKontaktart] = useState("");
   const [mitGewicht, setMitGewicht] = useState(false);
   const [wert, setWert] = useState("");
   const [quelle, setQuelle] = useState("telefonisch");
@@ -177,7 +179,7 @@ export function KontaktDialog({ offen, onOffen, vorgabe }: { offen: boolean; onO
 
   useEffect(() => {
     if (!offen) return;
-    setPatient(null); setTag(datum(heuteIso())); setUhr(jetztUhr()); setText(""); setMitGewicht(false); setWert("");
+    setPatient(null); setTag(datum(heuteIso())); setUhr(jetztUhr()); setText(""); setKontaktart(""); setMitGewicht(false); setWert("");
     setQuelle("telefonisch"); setGemessen(datum(heuteIso())); setMitTermin(false); setArt("wiedervorlage"); setOrt("");
     setFaellig(inTagen(14)); setTerminUhr(""); setTitel(""); setLokal({}); setGespeichert(null); setEditorSchluessel((n) => n + 1);
   }, [offen]);
@@ -218,7 +220,8 @@ export function KontaktDialog({ offen, onOffen, vorgabe }: { offen: boolean; onO
         if (Object.keys(fehler).length) throw new ApiFehler(400, "", null, fehler);
         const [h, m] = uhr.trim().split(":").map(Number);
         const zeitpunkt = new Date(`${isoTag}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`).toISOString();
-        kontakt = await api<Kontakt>("kontakte/", { body: { patient: pid, text, zeitpunkt, wiedervorlage } });
+        kontakt = await api<Kontakt>("kontakte/", { body: { patient: pid, text, zeitpunkt, art: kontaktart ? Number(kontaktart) : null,
+          wiedervorlage } });
         setGespeichert(kontakt);
       }
       if (mitGewicht) {
@@ -273,8 +276,16 @@ export function KontaktDialog({ offen, onOffen, vorgabe }: { offen: boolean; onO
           <>
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] gap-3 items-end">
               <Feld label="Datum" fehler={f.zeitpunkt}>{(p) => <Eingabe {...p} className="num" value={tag} onChange={(e) => setTag(e.target.value)} />}</Feld>
-              <Feld label="Uhrzeit">{(p) => <Eingabe {...p} className="num" value={uhr} onChange={(e) => setUhr(e.target.value)} />}</Feld>
-              <span className="text-[0.8125rem] gedaempft pb-2.5">Vorbelegt mit jetzt</span>
+              <Feld label="Uhrzeit" hinweis="vorbelegt mit jetzt">{(p) => <Eingabe {...p} className="num" value={uhr} onChange={(e) => setUhr(e.target.value)} />}</Feld>
+              {/* Kontaktart seit 03.10.2026 sichtbar (Klärung U6) */}
+              <Feld label="Kontaktart" fehler={f.art}>
+                {(p) => (
+                  <Auswahl {...p} value={kontaktart} onChange={(e) => setKontaktart(e.target.value)}>
+                    <option value="">— ohne Angabe —</option>
+                    {(kontaktarten.data ?? []).map((o) => <option key={o.id} value={o.id}>{o.wert}</option>)}
+                  </Auswahl>
+                )}
+              </Feld>
             </div>
             <div className="feld">
               <span>Notiz</span>

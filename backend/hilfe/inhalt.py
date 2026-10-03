@@ -141,7 +141,8 @@ lässt sich ein Telefonat festhalten, ohne die Akte zu öffnen.</p>
 <ol>
 <li>Patient suchen (Name, Nummer oder Geburtsdatum) und auswählen. Der Kasten „Aus der Akte“ zeigt letzten Kontakt,
 Gewicht, aktuellen Plan, nächsten Termin und <strong>wem Auskunft gegeben werden darf</strong>.</li>
-<li>Notiz eintragen. Auf Wunsch <strong>Gewicht mit erfassen</strong> und eine <strong>Wiedervorlage</strong> anlegen.</li>
+<li>Notiz eintragen und, wenn bekannt, die <strong>Kontaktart</strong> wählen (Telefon, persönlich, E-Mail …). Auf Wunsch
+<strong>Gewicht mit erfassen</strong> und eine <strong>Wiedervorlage</strong> anlegen.</li>
 <li><strong>Speichern</strong>.</li>
 </ol>
 <p>Kontakt und Gewicht werden nacheinander gespeichert. Scheitert das Gewicht (z. B. unplausibler Wert), bleibt der
@@ -209,8 +210,9 @@ ziehen wie bei einem Fenster.</p>
         "id": "stammdaten", "gruppe": "patienten", "titel": "Stammdaten, Diagnose und Therapie ändern",
         "rechte": ["akten_bearbeiten"], "seiten": ["/patienten/:id/therapie"],
         "html": """
-<p>Stammdaten (Name, Anschrift, Versorger, Katheter, Nickelallergie …) ändert man über <strong>Weitere Aktionen ›
-Stammdaten bearbeiten</strong> im Aktenkopf. Diagnose, Therapie und Empfehlung stehen im Reiter
+<p>Stammdaten (Name, Anschrift, Telefon und Telefon 2, Krankenkasse, Versorger, Katheter, Nickelallergie …) ändert man
+über <strong>Weitere Aktionen › Stammdaten bearbeiten</strong> im Aktenkopf. Diagnose, Therapie, Empfehlung und
+Bemerkung stehen im Reiter
 <strong>Diagnose &amp; Therapie</strong>; jede gespeicherte Fassung bekommt eine Versionsnummer, frühere Fassungen bleiben
 lesbar.</p>
 <p>Jede Änderung steht mit Person und Zeitpunkt im Verlauf der Akte.</p>""",
@@ -242,7 +244,7 @@ ausgeben.</p>""",
 festgehalten. Ein gespeicherter Kontakt wird nicht mehr geändert.</p>
 <ol>
 <li>Akte öffnen und <strong>Kontakt</strong> wählen – oder auf der Startseite <strong>Kontakt erfassen</strong>.</li>
-<li>Text eintragen. Für einen Rückruf, eine Wiedervorlage oder einen Praxistermin den Haken
+<li>Text eintragen und die <strong>Kontaktart</strong> wählen (Liste unter Vorlagen › Auswahllisten). Für einen Rückruf, eine Wiedervorlage oder einen Praxistermin den Haken
 <strong>Wiedervorlage</strong> setzen, Art und Datum wählen; sie erscheint auf der Startseite und im Kalender.</li>
 <li><strong>Kontakt speichern</strong>. Zeitpunkt und Person trägt EPM selbst ein.</li>
 </ol>
