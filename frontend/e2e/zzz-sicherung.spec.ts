@@ -203,7 +203,12 @@ test("Backup: Übertragungsziel festlegen, Verbindung testen, von Hand und im Ze
   // der nächsten Übertragung, fremde Dateien im Ordner bleiben
   await expect(karte.getByTestId("ziel-aufbewahrung")).toHaveText("30 Tage");
   const alt = ["epm-db_2020-01-01_0200.dump.gpg", "epm_2020-01-01_0200.sha256"];
-  for (const name of [...alt, "notizen.txt"]) execSync(`echo alt | sudo tee ${join(WEBDAV, ORDNER, name)} >/dev/null`);
+  // über WebDAV ablegen (rclone serve hält die Verzeichnisliste einige Minuten im Speicher – direkt auf die Platte
+  // geschriebene Dateien sähe der Server erst später)
+  for (const name of [...alt, "notizen.txt"]) {
+    execSync(`curl -sf -u epm-ci:WebDAV-Test-2026 -T - http://127.0.0.1:8099/${ORDNER}/${name}`, { input: "alt" });
+  }
+  expect(readdirSync(join(WEBDAV, ORDNER))).toEqual(expect.arrayContaining([...alt, "notizen.txt"]));
 
   // im Zeitfenster von selbst: neue Sicherung, Zeitfenster ganztägig (Passwort für das Ziel bleibt)
   const neu = await jetztSichern(page);
