@@ -211,7 +211,8 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
             return Response({"gruppe": "Erlaubt: entwuerfe, aktuell, alt, abgeloest, alle."},
                             status=status.HTTP_400_BAD_REQUEST)
         e = Einstellungen.aktuell()
-        grenze = timezone.localdate() - timedelta(days=30 * e.plan_alter_warnung_monate)
+        frist = timedelta(days=30 * e.plan_alter_warnung_monate)
+        grenze = timezone.localdate() - frist
         qs = (Infusionsplan.objects.filter(patient__in=patienten_fuer(request.user))
               .select_related("patient", "erstellt_von", "freigegeben_von"))
         if str(p.get("abgeschlossene", "")).lower() not in ("1", "true", "ja"):
@@ -225,7 +226,8 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
         gruppen = {
             "entwuerfe": qs.filter(status=Infusionsplan.Status.ENTWURF),
             "aktuell": qs.filter(status=Infusionsplan.Status.AKTUELL),
-            "alt": qs.filter(status=Infusionsplan.Status.AKTUELL, gueltig_ab__lt=grenze),
+            # ohne die Akten mit „kein Infusionsplan nötig“ (dort keine Warnung)
+            "alt": qs.filter(status=Infusionsplan.Status.AKTUELL, gueltig_ab__lt=grenze, patient__kein_plan=False),
             "abgeloest": qs.filter(status=Infusionsplan.Status.ABGELOEST),
             "alle": qs,
         }
@@ -240,7 +242,11 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
             "erstellt_am": x.erstellt_am, "erstellt_von": benutzername(x.erstellt_von),
             "freigegeben_am": x.freigegeben_am, "freigegeben_von": benutzername(x.freigegeben_von),
             "pdf": bool(x.pdf_sha256), "pdf_sha256": x.pdf_sha256 or None, "herkunft": x.herkunft,
-            "aelter_als_grenze": x.status == Infusionsplan.Status.AKTUELL and x.gueltig_ab < grenze,
+            "aelter_als_grenze": x.status == Infusionsplan.Status.AKTUELL and x.gueltig_ab < grenze
+            and not x.patient.kein_plan,
+            "kein_plan": x.patient.kein_plan,
+            # Frist (Fehlerliste 02.10.2026, 1.2): ab diesem Tag gilt ein aktueller Plan als alt
+            "alt_ab": x.gueltig_ab + frist if x.status == Infusionsplan.Status.AKTUELL else None,
         } for x in gruppen[gruppe].order_by(*reihenfolge, "id")[:1000]]
         return Response({"zaehler": {k: v.count() for k, v in gruppen.items()},
                          "grenze_monate": e.plan_alter_warnung_monate, "ergebnisse": zeilen})

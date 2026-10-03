@@ -60,7 +60,7 @@ done
 echo "==> Projektverzeichnis $B"
 sudo rm -rf "$B"
 mkdir -p "$B/secrets" "$B/nginx/certs" "$B/data/dokumente" "$B/data/loeschliste" "$B/data/import" "$B/system/auftraege" "$B/system/status/auftraege" \
-  "$B/backup" "$B/konf-sicherung"
+  "$B/system/download" "$B/system/upload" "$B/backup" "$B/konf-sicherung"
 chmod 0700 "$B/backup" "$B/konf-sicherung"
 cp rollout/projekt/compose.yaml "$B/"
 cp rollout/projekt/nginx/epm.conf "$B/nginx/"
@@ -81,6 +81,8 @@ chmod 0644 "$B/secrets/"*
 sudo chown -R 10001:101 "$B/data"
 sudo chmod 0750 "$B/data"; sudo chmod 2770 "$B/data/dokumente"; sudo chmod 0700 "$B/data/loeschliste"
 sudo chown 10001:101 "$B/system/auftraege"; sudo chmod 0770 "$B/system/auftraege"
+sudo chown root:101 "$B/system/download"; sudo chmod 0750 "$B/system/download"
+sudo chown 10001:101 "$B/system/upload"; sudo chmod 0770 "$B/system/upload"
 sudo chown -R root:root "$B/system/status"; sudo chmod -R 0755 "$B/system/status"
 sudo chown 101:101 "$B/nginx/certs/"*
 sudo chmod 0400 "$B/nginx/certs/epm.key"

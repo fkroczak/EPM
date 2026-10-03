@@ -13,7 +13,8 @@ from django.conf import settings
 from django.utils import timezone
 
 # Code -> Angaben. Dieselben Aktionen stehen im Agenten (AKTIONEN); andere führt er nicht aus.
-# bestaetigung: "keine" | "einfach" (Rückfrage) | "2fa" (Admin-Kennwort und Code, Festlegung 01.10.2026)
+# bestaetigung: "keine" | "einfach" (Rückfrage) | "2fa" (Admin-Kennwort und – wenn ein zweiter Faktor eingerichtet
+# ist – der Code; Festlegungen 01. und 02.10.2026)
 # sichern: der Agent erstellt vorher eine Sicherung; warnen: angemeldete Benutzer bekommen vorher einen Hinweis
 AKTIONEN = {
     "status_aktualisieren": {
@@ -76,6 +77,24 @@ AKTIONEN = {
         "beschreibung": "Noch nicht übertragene, verschlüsselte Sicherungen jetzt zum Ziel kopieren (auch außerhalb des "
                         "Zeitfensters).",
     },
+    "sicherung_aufbewahrung": {
+        "name": "Aufbewahrung der Sicherungen festlegen", "bestaetigung": "2fa", "recht": "backup_verwalten",
+        "intern": True,
+        "beschreibung": "Wie lange Sicherungen auf dem Server bleiben: 7, 14 oder 30 Tage. Ältere entfernt die nächste "
+                        "Sicherung.",
+    },
+    "sicherung_bereitstellen": {
+        "name": "Sicherung zum Herunterladen bereitstellen", "bestaetigung": "2fa", "recht": "backup_verwalten",
+        "intern": True,
+        "beschreibung": "Legt die Sicherung als eine Datei für 2 Stunden zum Herunterladen bereit (verschlüsselte "
+                        "bleiben verschlüsselt).",
+    },
+    "sicherung_einlesen": {
+        "name": "Hochgeladene Sicherung einlesen", "bestaetigung": "einfach", "recht": "backup_verwalten",
+        "intern": True,
+        "beschreibung": "Prüft eine hochgeladene Sicherung (Inhalt, Prüfsummen, Passwort) und nimmt sie in die Liste auf. "
+                        "Zurückgespielt wird erst mit „Wiederherstellen“.",
+    },
     "wiederherstellen": {
         "name": "Sicherung wiederherstellen", "bestaetigung": "2fa", "recht": "backup_verwalten", "intern": True,
         "sichern": True, "warnen": True,
@@ -88,7 +107,8 @@ AKTIONEN = {
 
 # Aktionen der Seite Administration › Backup (für deren Liste der Tätigkeiten)
 SICHERUNG_AKTIONEN = ("sicherung", "sicherung_passwort", "sicherung_ziel", "sicherung_ziel_entfernen",
-                      "sicherung_ziel_testen", "sicherung_uebertragen", "wiederherstellen")
+                      "sicherung_ziel_testen", "sicherung_uebertragen", "sicherung_aufbewahrung",
+                      "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen")
 
 STATUS_VERALTET_S = 180   # der Agent misst jede Minute; älter heißt: Agent läuft nicht
 
@@ -99,6 +119,16 @@ def ordner_auftraege():
 
 def ordner_status():
     return settings.EPM_SYSTEM / "status"
+
+
+def ordner_download():
+    """Zum Herunterladen bereitgestellte Sicherungen (schreibt der Agent; Backend und Webserver lesen nur)."""
+    return settings.EPM_SYSTEM / "download"
+
+
+def ordner_upload():
+    """Hochgeladene Sicherungen (schreibt das Backend, der Agent liest sie ein und entfernt sie)."""
+    return settings.EPM_SYSTEM / "upload"
 
 
 def _lies(pfad):
@@ -130,11 +160,42 @@ def host_status():
     return daten
 
 
-def verlauf():
+# Zeiträume der Auslastung (Fehlerliste 02.10.2026, 4.1): Code -> (Bezeichnung, Sekunden, Stufe des Agenten).
+# „minute“ sind die Messungen je Minute (24 Stunden), die gröberen Stufen Mittelwerte mit Spitzen.
+ZEITRAEUME = {
+    "1h": ("1 Stunde", 3600, "minute"),
+    "3h": ("3 Stunden", 3 * 3600, "minute"),
+    "24h": ("24 Stunden", 24 * 3600, "minute"),
+    "7t": ("7 Tage", 7 * 86400, "viertelstunde"),
+    "14t": ("14 Tage", 14 * 86400, "viertelstunde"),
+    "1m": ("1 Monat", 31 * 86400, "stunde"),
+    "6m": ("6 Monate", 184 * 86400, "vierteltag"),
+}
+VERLAUF_FELDER = ["zeit", "cpu", "ram", "last", "platte"]
+
+
+def verlauf(zeitraum: str = "24h"):
+    """Auslastung im gewählten Zeitraum: {"felder", "punkte", "zeitraum", "schritt_s", "von", "bis", "zeitraeume"}.
+    Reicht der Verlauf noch nicht so weit zurück (der Agent sammelt erst seit seiner Einrichtung), beginnt er später."""
+    name, sekunden, stufe = ZEITRAEUME.get(zeitraum) or ZEITRAEUME["24h"]
+    zeitraum = zeitraum if zeitraum in ZEITRAEUME else "24h"
     daten = _lies(ordner_status() / "verlauf.json")
-    if not isinstance(daten, dict):
-        return {"felder": ["zeit", "cpu", "ram", "last", "platte"], "punkte": []}
-    return daten
+    daten = daten if isinstance(daten, dict) else {}
+    if stufe == "minute":
+        punkte, felder, schritt = daten.get("punkte"), daten.get("felder"), 60
+    else:
+        teil = (daten.get("stufen") or {}).get(stufe) if isinstance(daten.get("stufen"), dict) else None
+        teil = teil if isinstance(teil, dict) else {}
+        punkte, felder, schritt = teil.get("punkte"), teil.get("felder"), teil.get("sekunden") or 0
+    punkte = [p for p in punkte or [] if isinstance(p, list) and p and isinstance(p[0], (int, float))]
+    bis = int(timezone.now().timestamp())
+    von = bis - sekunden
+    return {
+        "felder": felder if isinstance(felder, list) else VERLAUF_FELDER,
+        "punkte": [p for p in punkte if p[0] >= von],
+        "zeitraum": zeitraum, "name": name, "schritt_s": schritt, "von": von, "bis": bis,
+        "zeitraeume": [{"code": c, "name": n} for c, (n, _s, _st) in ZEITRAEUME.items()],
+    }
 
 
 def agent_erreichbar() -> bool:

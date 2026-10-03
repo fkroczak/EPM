@@ -64,7 +64,13 @@ export function PatientNeu() {
   const { darf } = useAuth();
   const setze = (feld: keyof Formular) => (e: { target: { value: string } }) => setF((alt) => ({ ...alt, [feld]: e.target.value }));
 
-  const naechste = useQuery({ queryKey: ["patienten", "naechste-nummer"], queryFn: () => api<{ nummer: number; testpatient: boolean }>("patienten/naechste-nummer/") });
+  // Testpatient (Fehlerliste 02.10.2026, 6.4): Mitarbeiter und Mediziner können beim Anlegen einen Testpatienten wählen –
+  // z. B. um Infusionspläne auszuprobieren. Testbenutzer und Admins legen immer Testpatienten an (testpatient_fest).
+  const [test, setTest] = useState(false);
+  const naechste = useQuery({
+    queryKey: ["patienten", "naechste-nummer", test],
+    queryFn: () => api<{ nummer: number; testpatient: boolean; testpatient_fest?: boolean }>(`patienten/naechste-nummer/${test ? "?testpatient=1" : ""}`),
+  });
   const versorger = useVersorgerListe();
   const katheter = useAuswahl("katheter");
   const aerzte = useAerzteListe();
@@ -129,6 +135,7 @@ export function PatientNeu() {
       ueberweisung_durch: f.ueberweisung_durch.trim(),
       diagnose: alsHtml(f.diagnose),
       ...(gewicht ? { aufnahme_gewicht_kg: gewicht, aufnahme_gemessen_am: gemessen ?? heuteIso() } : {}),
+      ...(test ? { testpatient: true } : {}),
     });
   };
 
@@ -151,7 +158,14 @@ export function PatientNeu() {
             <span className="text-[0.84rem] gedaempft">
               Nr. <span className="num text-tinte font-semibold" data-testid="naechste-nummer">{naechste.data ? nummer(naechste.data.nummer) : "…"}</span> wird automatisch vergeben
             </span>
-            {naechste.data?.testpatient ? <Chip art="warn" title="Testbenutzer und Admins legen nur Testpatienten an">wird Testpatient</Chip> : null}
+            {naechste.data?.testpatient_fest ? <Chip art="warn" title="Testbenutzer und Admins legen nur Testpatienten an">wird Testpatient</Chip>
+              : !darf("testdaten_sehen") ? null : (
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer" title="Zum Ausprobieren, z. B. für Infusionspläne: eigene Nummern ab 9001, erscheint nicht in Auswertungen echter Patienten">
+                <input type="checkbox" checked={test} onChange={(ev) => setTest(ev.target.checked)} />
+                als Testpatient anlegen
+              </label>
+            )}
+            {test && !naechste.data?.testpatient_fest ? <Chip art="warn">wird Testpatient</Chip> : null}
             <KnopfLink to="/patienten">Abbrechen</KnopfLink>
             <Knopf type="submit" variante="pri" laedt={anlegen.isPending}>Anlegen und Akte öffnen</Knopf>
           </div>

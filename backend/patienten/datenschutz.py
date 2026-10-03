@@ -283,7 +283,7 @@ class DatenschutzAktionen:
         vorlagen = {}
         for art in Erklaerung.Art.values:
             v = Dokumentvorlage.aktive(art)
-            vorlagen[art] = {"version": v.version, "entwurf": v.veroeffentlicht_von_id is None}
+            vorlagen[art] = {"version": v.version, "entwurf": v.im_entwurfsmodus}
         kontext = self.get_serializer_context()
         return Response({
             "aufbewahrung": patient.aufbewahrung(),
@@ -431,9 +431,14 @@ class DatenschutzAktionen:
             return Response({"art": f"Erlaubt: {', '.join(Erklaerung.Art.values)}."}, status=status.HTTP_400_BAD_REQUEST)
         patient = self.get_object()
         vorlage = Dokumentvorlage.aktive(art)
-        entwurf = vorlage.veroeffentlicht_von_id is None
+        entwurf = vorlage.im_entwurfsmodus
         name = Erklaerung.Art(art).label
-        pdf, version = erzeuge_aus_vorlage(art, Kontext(patient=patient), vorlage=vorlage,
+        # Entwurfsmodus manuell aus (U17): ohne Wasserzeichen und ohne den Hinweisblock der Startvorlage („Diese Vorlage
+        # ist ein Entwurf …“), der sich an die Bearbeiter richtet und auf dem Blatt des Patienten nichts zu suchen hat
+        bloecke = None
+        if not entwurf and vorlage.veroeffentlicht_von_id is None:
+            bloecke = [b for b in vorlage.bloecke if b.get("id") != "hinweis"]
+        pdf, version = erzeuge_aus_vorlage(art, Kontext(patient=patient), vorlage=vorlage, bloecke=bloecke,
                                            wasserzeichen="ENTWURF" if entwurf else wasserzeichen_fuer(patient),
                                            titel=f"{name} – {patient.nachname}, {patient.vorname}")
         protokolliere(SystemEreignis.Art.EXPORT, request, objekt=akte_text(patient), was=name, patient_id=patient.id)
@@ -465,7 +470,7 @@ class DatenschutzAktionen:
         das Löschprotokoll (ohne Namen) und die Einträge im Audit-Log ohne Namen und Inhalte."""
         from datetime import datetime
 
-        from django_otp.plugins.otp_totp.models import TOTPDevice
+        from accounts.zweifaktor import OHNE_ZWEITEN_FAKTOR, code_bestaetigt, hat_zweiten_faktor
 
         patient = self._akte(pk, loeschen=True)
         pruefung = loeschbar(patient)
@@ -494,11 +499,13 @@ class DatenschutzAktionen:
             return abgelehnt("bestaetigung", "Der Bestätigungscode stimmt nicht.")
         from accounts.api import bestaetigung_fehlgeschlagen, bestaetigung_gelungen
 
+        if not hat_zweiten_faktor(request.user):
+            # Festlegung 03.10.2026: endgültig löschen nur mit eingerichtetem zweitem Faktor
+            return abgelehnt("code", OHNE_ZWEITEN_FAKTOR)
         if not request.user.check_password(str(request.data.get("kennwort", ""))):
             antwort = abgelehnt("kennwort", "Kennwort falsch.")
             return bestaetigung_fehlgeschlagen(request, "loeschen_kennwort") or antwort
-        code = str(request.data.get("code", "")).replace(" ", "")
-        if not any(g.verify_token(code) for g in TOTPDevice.objects.filter(user=request.user, confirmed=True)):
+        if not code_bestaetigt(request.user, request.data.get("code", ""), notfallcodes=False):
             antwort = abgelehnt("code", "Code aus der Authenticator-App falsch oder schon verwendet.")
             return bestaetigung_fehlgeschlagen(request, "loeschen_2fa") or antwort
         bestaetigung_gelungen(request)

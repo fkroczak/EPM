@@ -38,6 +38,7 @@ const PRUEFEN: Record<string, string> = {
   altdokumente: "Altdokumente ohne geprüften Typ",
   nickelallergie: "Nickelallergie nicht erfasst",
   kein_versorger: "Versorger nicht erfasst",
+  ohne_plan: "Kein Infusionsplan (nicht als „kein Plan nötig“ bestätigt)",
   kein_kontakt: "Kontakt fällig (bald fällig und überfällig)",
   kontakt_bald: "Kontakt bald fällig",
   kontakt_ueberfaellig: "Kontakt überfällig",
@@ -112,7 +113,7 @@ function NaechsterTermin({ p }: { p: PatientZeile }) {
 
 function PlanZelle({ p }: { p: PatientZeile }) {
   const plan = p.kennzahlen?.plan;
-  if (!plan) return <span className="gedaempft">—</span>;
+  if (!plan) return <span className="gedaempft">{p.kennzahlen?.kein_plan ? "nicht nötig" : "—"}</span>;
   return (
     <span className="text-[0.8125rem] inline-flex flex-col gap-0.5 items-start">
       {plan.gueltig_ab ? <span className={cx("num", plan.alt && "text-warn")} title={plan.alt ? "älter als eingestellt" : undefined}>seit {datum(plan.gueltig_ab)}</span> : null}

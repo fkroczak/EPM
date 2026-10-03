@@ -7,7 +7,11 @@ from .models import SystemEreignis, protokolliere
 
 @receiver(user_logged_in, dispatch_uid="epm_login")
 def _login(sender, request, user, **kwargs):
-    protokolliere(SystemEreignis.Art.ANMELDUNG, request, benutzer=user, schritt="kennwort")
+    from accounts.zweifaktor import hat_zweiten_faktor, pflicht
+
+    # zweiter Faktor freiwillig (Festlegung 02.10.2026): ohne ihn ist die Anmeldung mit dem Kennwort abgeschlossen
+    offen = hat_zweiten_faktor(user) or pflicht(user)
+    protokolliere(SystemEreignis.Art.ANMELDUNG, request, benutzer=user, schritt="kennwort" if offen else "ohne_2fa")
 
 
 @receiver(user_logged_out, dispatch_uid="epm_logout")

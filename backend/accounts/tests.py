@@ -9,7 +9,7 @@ from django_otp.oath import totp
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from rest_framework.test import APIClient
 
-from accounts.models import Gruppenrecht, Rolle, Sitzung, User
+from accounts.models import Anmelderegeln, Gruppenrecht, Rolle, Sitzung, User
 from audit.models import SystemEreignis
 from epm.pruefhilfen import (
     KENNWORT,
@@ -33,6 +33,8 @@ class Anmeldung(TestCase):
                                        format="json")
 
     def test_erstanmeldung(self):
+        """Ablauf mit Pflicht zum zweiten Faktor (die Administration kann sie setzen; Standard ist freiwillig)."""
+        Anmelderegeln.objects.update_or_create(pk=1, defaults={"zweiter_faktor": "alle"})
         status = self.c.get("/api/auth/status/").json()
         self.assertEqual(status["schritt"], "anmelden")
         self.assertEqual(status["organisation"]["anschrift"], "Waltrup 16 · 48341 Altenberge")
@@ -330,12 +332,22 @@ class RechteJeGruppe(TestCase):
         self.assertEqual(abgelehnt.status_code, 400)
         self.assertIn("Admin und Mediziner vorbehalten", abgelehnt.json()["mitarbeiter.dokumente_loeschen"])
         self.assertEqual(r["nur_testpatienten"]["rollen"], ["admin"])
-        self.assertIn("akten_abschliessen", r["nur_testpatienten"]["rechte"])
+        # Festlegung 02.10.2026 (Fehlerliste 6.3): Akten abschließen und Dokumente zuordnen auch bei echten Akten
+        for code in ("akten_abschliessen", "dokumente_umhaengen", "dokumente_loeschen", "akten_loeschen"):
+            self.assertNotIn(code, r["nur_testpatienten"]["rechte"])
+        self.assertIn("eintraege_erfassen", r["nur_testpatienten"]["rechte"])
+        # Rolle „Keine Berechtigung“ (6.2): kein Recht, nicht einstellbar
+        self.assertEqual(r["ohne_rechte"], ["keine"])
+        self.assertEqual(set(m["keine"].values()), {False})
+        self.assertIn({"code": "keine", "name": "Keine Berechtigung"}, r["rollen"])
+        nein = client_fuer(self.admin).put("/api/rechte/", {"matrix": {"keine": {"akten_lesen": True}}}, format="json")
+        self.assertEqual(nein.status_code, 400)
+        self.assertIn("keine Rechte", nein.json()["keine.akten_lesen"])
         for code in ("akten_abschliessen", "vorlagen_pflegen", "eintraege_erfassen", "akten_bearbeiten"):
             self.assertTrue(m["mitarbeiter"][code], code)
         for code in ("plaene_anlegen", "plaene_freigeben", "audit_lesen", "akten_wieder_oeffnen"):
             self.assertFalse(m["mitarbeiter"][code], code)
-        self.assertEqual(m["betrachter"], {c["code"]: c["code"] == "akten_lesen" for c in r["rechte"]})
+        self.assertEqual(m["betrachter"], {c["code"]: c["code"] in ("akten_lesen", "testdaten_sehen") for c in r["rechte"]})
         self.assertIn(["admin", "benutzer_verwalten"], r["fest"])
         ich = client_fuer(self.mediziner).get("/api/auth/ich/").json()
         self.assertIn("vorlagen_pflegen", ich["rechte"])
@@ -414,3 +426,352 @@ class RechteJeGruppe(TestCase):
         self.assertNotIn("akten_abschliessen", c.get("/api/auth/ich/").json()["rechte"])
         # ohne Anmeldung kein Kopf
         self.assertNotIn("X-EPM-Rechte", APIClient().get("/api/auth/status/"))
+
+
+class ZweiterFaktorFreiwillig(TestCase):
+    """Fehlerliste 02.10.2026, 6.5: Der zweite Faktor ist freiwillig; die Administration kann ihn zur Pflicht machen."""
+
+    def setUp(self):
+        cache.clear()
+        self.admin = benutzer("admin", Rolle.ADMIN)
+        self.user = User(username="frei", first_name="Frieda", last_name="Frei", rolle=Rolle.MITARBEITER)
+        self.einmal = self.user.neues_einmal_kennwort()
+        self.user.save()
+        self.c = APIClient()
+
+    def anmelden(self, kennwort, client=None):
+        return (client or self.c).post("/api/auth/anmelden/", {"benutzername": "frei", "kennwort": kennwort},
+                                       format="json")
+
+    def test_erstanmeldung_ohne_zweiten_faktor(self):
+        self.assertEqual(Anmelderegeln.aktuell().zweiter_faktor, "freiwillig")  # Standard
+        self.assertEqual(self.anmelden(self.einmal).json()["schritt"], "kennwort_aendern")
+        r = self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Kennwort-42"}, format="json")
+        self.assertEqual(r.json()["schritt"], "fertig", r.content)
+        ich = r.json()["benutzer"]
+        self.assertEqual((ich["zweiter_faktor"], ich["zweiter_faktor_pflicht"]), (False, False))
+        self.assertEqual(self.c.get("/api/patienten/").status_code, 200)
+        # nächste Anmeldung: das Kennwort genügt; im Audit-Log steht, dass ohne zweiten Faktor angemeldet wurde
+        self.c.post("/api/auth/abmelden/")
+        self.assertEqual(self.anmelden("falsch").status_code, 401)
+        r = self.anmelden("Ein-langes-neues-Kennwort-42")
+        self.assertEqual(r.json()["schritt"], "fertig")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.fehlversuche, 0)  # der Fehlversuch davor ist mit der Anmeldung erledigt
+        eintrag = SystemEreignis.objects.filter(art="anmeldung", benutzer=self.user).order_by("-id").first()
+        self.assertEqual(eintrag.details["schritt"], "ohne_2fa")
+        log = client_fuer(self.admin).get("/api/protokoll/?gruppe=anmeldung").json()["results"]
+        self.assertIn("Anmeldung mit Kennwort (ohne zweiten Faktor)", [e["beschreibung"] for e in log])
+        # „Mein Konto“ zeigt den Stand
+        s = self.c.get("/api/auth/sicherheit/").json()
+        self.assertEqual((s["authenticator_aktiv"], s["zweiter_faktor_pflicht"]), (False, False))
+
+    def test_freiwillig_einrichten_und_wieder_ausschalten(self):
+        self.anmelden(self.einmal)
+        self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Kennwort-42"}, format="json")
+        # freiwillig einrichten (Mein Konto)
+        self.assertEqual(self.c.post("/api/auth/2fa/einrichten/").status_code, 200)
+        geraet = TOTPDevice.objects.get(user=self.user)
+        code = f"{totp(geraet.bin_key, geraet.step, geraet.t0, geraet.digits):06d}"
+        r = self.c.post("/api/auth/2fa/bestaetigen/", {"code": code}, format="json")
+        self.assertEqual(r.json()["schritt"], "fertig", r.content)
+        notfall = r.json()["notfallcodes"]
+        self.assertTrue(self.c.get("/api/auth/ich/").json()["zweiter_faktor"])
+        # wer ihn eingerichtet hat, braucht ihn bei jeder Anmeldung
+        neu = APIClient()
+        self.assertEqual(self.anmelden("Ein-langes-neues-Kennwort-42", neu).json()["schritt"], "2fa")
+        self.assertEqual(neu.get("/api/patienten/").status_code, 403)
+        self.assertEqual(neu.post("/api/auth/2fa/", {"code": notfall[0]}, format="json").json()["schritt"], "fertig")
+        # ausschalten: Kennwort und Code; falsche Eingaben werden abgewiesen
+        r = neu.post("/api/auth/2fa/ausschalten/", {"kennwort": "falsch", "code": notfall[1]}, format="json")
+        self.assertEqual((r.status_code, list(r.json())), (400, ["kennwort"]))
+        r = neu.post("/api/auth/2fa/ausschalten/", {"kennwort": "Ein-langes-neues-Kennwort-42", "code": "000000x"},
+                     format="json")
+        self.assertEqual((r.status_code, list(r.json())), (400, ["code"]))
+        # django-otp bremst nach einem falschen Code kurz (1 s, 2 s, 4 s …) – hier nicht abwarten
+        from django_otp.plugins.otp_static.models import StaticDevice
+        for modell in (TOTPDevice, StaticDevice):
+            modell.objects.filter(user=self.user).update(throttling_failure_timestamp=None, throttling_failure_count=0)
+        r = neu.post("/api/auth/2fa/ausschalten/", {"kennwort": "Ein-langes-neues-Kennwort-42", "code": notfall[1]},
+                     format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertFalse(r.json()["zweiter_faktor"])
+        self.assertFalse(TOTPDevice.objects.filter(user=self.user).exists())
+        self.assertEqual(neu.get("/api/patienten/").status_code, 200)  # die Sitzung gilt weiter
+        self.assertEqual(self.anmelden("Ein-langes-neues-Kennwort-42", APIClient()).json()["schritt"], "fertig")
+        texte = [e["beschreibung"] for e in client_fuer(self.admin).get("/api/protokoll/?gruppe=benutzer").json()["results"]]
+        self.assertIn("Zweiten Faktor (Authenticator-App) selbst ausgeschaltet", texte)
+        # ohne zweiten Faktor gibt es nichts auszuschalten
+        self.assertEqual(neu.post("/api/auth/2fa/ausschalten/", {"kennwort": "x", "code": "1"}, format="json").status_code, 400)
+
+    def test_pflicht_durch_die_administration(self):
+        self.anmelden(self.einmal)
+        self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Kennwort-42"}, format="json")
+        self.assertEqual(self.c.get("/api/patienten/").status_code, 200)
+        a = client_fuer(self.admin)
+        stand = a.get("/api/benutzer/anmeldung/").json()
+        self.assertEqual(stand["zweiter_faktor"], "freiwillig")
+        self.assertEqual([x["wert"] for x in stand["auswahl"]], ["freiwillig", "admins", "alle"])
+        self.assertIn(self.user.id, [k["id"] for k in stand["ohne_zweiten_faktor"]])
+        self.assertEqual(a.put("/api/benutzer/anmeldung/", {"zweiter_faktor": "immer"}, format="json").status_code, 400)
+        # Pflicht nur für Admins: die Mitarbeiterin arbeitet weiter
+        self.assertEqual(a.put("/api/benutzer/anmeldung/", {"zweiter_faktor": "admins"}, format="json").status_code, 200)
+        self.assertEqual(self.c.get("/api/patienten/").status_code, 200)
+        self.assertFalse(self.c.get("/api/auth/ich/").json()["zweiter_faktor_pflicht"])
+        # Pflicht für alle: Mit der nächsten Anfrage muss sie den Authenticator einrichten
+        r = a.put("/api/benutzer/anmeldung/", {"zweiter_faktor": "alle"}, format="json")
+        self.assertEqual(r.json()["zweiter_faktor"], "alle")
+        self.assertEqual(self.c.get("/api/patienten/").status_code, 403)
+        self.assertEqual(self.c.get("/api/auth/status/").json()["schritt"], "2fa_einrichten")
+        self.assertEqual(self.c.post("/api/auth/2fa/einrichten/").status_code, 200)
+        geraet = TOTPDevice.objects.get(user=self.user)
+        code = f"{totp(geraet.bin_key, geraet.step, geraet.t0, geraet.digits):06d}"
+        r = self.c.post("/api/auth/2fa/bestaetigen/", {"code": code}, format="json")
+        self.assertEqual(r.json()["schritt"], "fertig", r.content)
+        self.assertEqual(self.c.get("/api/patienten/").status_code, 200)
+        # bei Pflicht lässt er sich nicht ausschalten
+        r = self.c.post("/api/auth/2fa/ausschalten/", {"kennwort": "Ein-langes-neues-Kennwort-42",
+                                                       "code": r.json()["notfallcodes"][0]}, format="json")
+        self.assertEqual(r.status_code, 403)
+        texte = [e["beschreibung"] for e in a.get("/api/protokoll/?gruppe=benutzer").json()["results"]]
+        self.assertIn("Zweiter Faktor bei der Anmeldung: Pflicht für alle (vorher Pflicht für Admins)", texte)
+        self.assertEqual(Anmelderegeln.history.count(), 3)  # angelegt, admins, alle
+        # nur mit dem Recht „Benutzer verwalten“
+        self.assertEqual(self.c.get("/api/benutzer/anmeldung/").status_code, 403)
+
+    def test_konten_kachel_meldet_fehlenden_faktor_nur_bei_pflicht(self):
+        self.anmelden(self.einmal)
+        self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Kennwort-42"}, format="json")
+        a = client_fuer(self.admin)
+        self.assertNotIn(self.user.id, [k["id"] for k in a.get("/api/benutzer/konten/").json()])
+        Anmelderegeln.objects.update_or_create(pk=1, defaults={"zweiter_faktor": "alle"})
+        zeile = next(k for k in a.get("/api/benutzer/konten/").json() if k["id"] == self.user.id)
+        self.assertEqual(zeile["probleme"], ["ohne_2fa"])
+
+
+class OhneLoginUndTestbenutzer(TestCase):
+    """Fehlerliste 02.10.2026, 6.1, 6.2, 6.4: „ohne Login“ setzen und zurück, Rolle „Keine Berechtigung“,
+    Testbenutzer an- und abschalten."""
+
+    def setUp(self):
+        cache.clear()
+        self.admin = benutzer("admin", Rolle.ADMIN)
+        self.a = client_fuer(self.admin)
+        self.user = benutzer("ehemalig", Rolle.MITARBEITER)
+
+    def test_ohne_login_setzen_und_wieder_einbinden(self):
+        codes = mit_zweitem_faktor(self.user)
+        c = echte_anmeldung(self.user, codes[0])
+        self.assertEqual(c.get("/api/patienten/").status_code, 200)
+        r = self.a.post(f"/api/benutzer/{self.user.id}/ohne-login/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual((r.json()["nur_historisch"], r.json()["rolle"], r.json()["is_active"], r.json()["zweiter_faktor"]),
+                         (True, "keine", False, False))
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.has_usable_password())
+        # Anmeldung beendet, keine neue möglich
+        self.assertEqual(c.get("/api/patienten/").status_code, 403)
+        r = APIClient().post("/api/auth/anmelden/", {"benutzername": "ehemalig", "kennwort": KENNWORT}, format="json")
+        self.assertEqual(r.status_code, 401)
+        # ohne Login: keine Rolle außer „Keine Berechtigung“, kein Einmal-Kennwort, nicht doppelt, nicht das eigene Konto
+        self.assertEqual(self.a.patch(f"/api/benutzer/{self.user.id}/", {"rolle": "mediziner"}, format="json").status_code, 400)
+        self.assertEqual(self.a.patch(f"/api/benutzer/{self.user.id}/", {"funktion": "früher Pflege"}, format="json").status_code, 200)
+        self.assertEqual(self.a.post(f"/api/benutzer/{self.user.id}/einmal-kennwort/").status_code, 400)
+        self.assertEqual(self.a.post(f"/api/benutzer/{self.user.id}/ohne-login/").status_code, 400)
+        self.assertEqual(self.a.post(f"/api/benutzer/{self.admin.id}/ohne-login/").status_code, 400)
+        # wieder einbinden: Rolle und Einmal-Kennwort wie beim Anlegen
+        self.assertEqual(self.a.post(f"/api/benutzer/{self.user.id}/login-geben/", {"rolle": "chef"}, format="json").status_code, 400)
+        r = self.a.post(f"/api/benutzer/{self.user.id}/login-geben/", {"rolle": "mitarbeiter"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual((r.json()["nur_historisch"], r.json()["rolle"], r.json()["is_active"]), (False, "mitarbeiter", True))
+        neu = APIClient()
+        r2 = neu.post("/api/auth/anmelden/", {"benutzername": "ehemalig", "kennwort": r.json()["einmal_kennwort"]}, format="json")
+        self.assertEqual(r2.json()["schritt"], "kennwort_aendern", r2.content)
+        self.assertEqual(self.a.post(f"/api/benutzer/{self.user.id}/login-geben/", {"rolle": "mitarbeiter"}, format="json").status_code, 400)
+        texte = [e["beschreibung"] for e in self.a.get("/api/protokoll/?gruppe=benutzer").json()["results"]]
+        self.assertIn("Benutzer ehemalig auf „ohne Login“ gesetzt (keine Anmeldung, keine Rechte)", texte)
+        self.assertIn("Benutzer ehemalig erhält wieder einen Login (Mitarbeiter), Einmal-Kennwort erzeugt", texte)
+
+    def test_ohne_login_anlegen(self):
+        r = self.a.post("/api/benutzer/", {"username": "frueher", "first_name": "Frida", "last_name": "Früher",
+                                           "rolle": "mediziner", "ohne_login": True}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertNotIn("einmal_kennwort", r.json())
+        self.assertEqual((r.json()["nur_historisch"], r.json()["rolle"], r.json()["is_active"]), (True, "keine", False))
+
+    def test_rolle_keine_berechtigung(self):
+        """Auch ein Konto mit Login kann „Keine Berechtigung“ haben: anmelden ja, sonst nichts."""
+        r = self.a.patch(f"/api/benutzer/{self.user.id}/", {"rolle": "keine"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.user.refresh_from_db()
+        c = client_fuer(self.user)
+        ich = c.get("/api/auth/ich/").json()
+        self.assertEqual((ich["rolle"], ich["rechte"]), ("keine", []))
+        for pfad in ("patienten/", "startseite/", "versorger/", "aerzte/", "auswahlwerte/", "einstellungen/",
+                     "kalender/", "infusionsplaene/", "benutzer/", "protokoll/", "backup/", "system/uebersicht/"):
+            with self.subTest(pfad=pfad):
+                self.assertEqual(c.get(f"/api/{pfad}").status_code, 403)
+        self.assertEqual(c.get("/api/hilfe/").status_code, 200)
+        # Betrachter lesen die gemeinsamen Listen weiterhin
+        self.assertEqual(client_fuer(benutzer("b", Rolle.BETRACHTER)).get("/api/versorger/").status_code, 200)
+
+    def test_testbenutzer_schalter(self):
+        from patienten.models import Patient
+
+        echt = Patient.objects.create(nachname="Echt", vorname="E", geburtsdatum="1970-01-01")
+        test = Patient.objects.create(nachname="Test", vorname="T", geburtsdatum="1970-01-01", ist_test=True)
+        c = client_fuer(self.user)
+        self.assertEqual({p["id"] for p in c.get("/api/patienten/").json()["results"]}, {echt.id, test.id})
+        r = self.a.patch(f"/api/benutzer/{self.user.id}/", {"ist_test": True}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.user.refresh_from_db()
+        c = client_fuer(self.user)
+        self.assertEqual({p["id"] for p in c.get("/api/patienten/").json()["results"]}, {test.id})
+        self.assertTrue(c.get("/api/auth/ich/").json()["ist_test"])
+        eintrag = self.a.get("/api/protokoll/?gruppe=benutzer").json()["results"][0]
+        self.assertEqual(eintrag["beschreibung"], "Benutzer ehemalig geändert: ist_test")
+        # wieder ausschalten
+        self.assertEqual(self.a.patch(f"/api/benutzer/{self.user.id}/", {"ist_test": False}, format="json").status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(len(client_fuer(self.user).get("/api/patienten/").json()["results"]), 2)
+        # nicht für Admins (auch nicht das eigene Konto) und nicht zusammen mit der Rolle Admin
+        zweiter = benutzer("zweiter", Rolle.ADMIN)
+        self.assertEqual(self.a.patch(f"/api/benutzer/{zweiter.id}/", {"ist_test": True}, format="json").status_code, 400)
+        self.assertEqual(self.a.patch(f"/api/benutzer/{self.admin.id}/", {"ist_test": True}, format="json").status_code, 400)
+        self.a.patch(f"/api/benutzer/{self.user.id}/", {"ist_test": True}, format="json")
+        r = self.a.patch(f"/api/benutzer/{self.user.id}/", {"rolle": "admin"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("ist_test", r.json())
+
+
+class KartenGroessen(TestCase):
+    """Fehlerliste 02.10.2026, Punkt 2 und 4.1: Größe der Karten je Seite und Person (PATCH /api/auth/ich/)."""
+
+    def setUp(self):
+        self.user = benutzer("karten", Rolle.MITARBEITER)
+        self.c = client_fuer(self.user)
+
+    def setze(self, bereiche):
+        return self.c.patch("/api/auth/ich/", {"bereiche": bereiche}, format="json")
+
+    def test_speichern_und_zuruecksetzen(self):
+        self.assertEqual(self.c.get("/api/auth/ich/").json()["bereiche"], {})
+        r = self.setze({"akte_uebersicht": {"gewicht": {"breite": 3, "hoehe": 2}, "termine": {"breite": 1, "hoehe": 0}}})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()["bereiche"]["akte_uebersicht"]["gewicht"], {"breite": 3, "hoehe": 2})
+        # eine weitere Seite und eine weitere Karte kommen dazu, Bestehendes bleibt
+        r = self.setze({"system": {"verlauf": {"breite": 2, "hoehe": 1}}, "akte_uebersicht": {"plan": {"breite": 2, "hoehe": 0}}})
+        stand = r.json()["bereiche"]
+        self.assertEqual(sorted(stand), ["akte_uebersicht", "system"])
+        self.assertEqual(sorted(stand["akte_uebersicht"]), ["gewicht", "plan", "termine"])
+        # gilt je Person
+        andere = benutzer("andere", Rolle.MITARBEITER)
+        self.assertEqual(client_fuer(andere).get("/api/auth/ich/").json()["bereiche"], {})
+        # null setzt eine Karte bzw. die ganze Seite auf den Standard zurück
+        stand = self.setze({"akte_uebersicht": {"gewicht": None}}).json()["bereiche"]
+        self.assertEqual(sorted(stand["akte_uebersicht"]), ["plan", "termine"])
+        stand = self.setze({"akte_uebersicht": None}).json()["bereiche"]
+        self.assertEqual(sorted(stand), ["system"])
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.bereiche, {"system": {"verlauf": {"breite": 2, "hoehe": 1}}})
+
+    def test_wird_geprueft(self):
+        for bereiche in ({"startseite": {"x": {"breite": 1, "hoehe": 1}}}, {"akte_uebersicht": {"unbekannt": {"breite": 1, "hoehe": 1}}},
+                         {"akte_uebersicht": {"gewicht": {"breite": 6, "hoehe": 1}}}, {"akte_uebersicht": {"gewicht": {"breite": 1, "hoehe": 5}}},
+                         {"akte_uebersicht": {"gewicht": {"breite": True, "hoehe": 1}}}, {"akte_uebersicht": {"gewicht": {"breite": 1}}},
+                         {"akte_uebersicht": {"gewicht": "gross"}}, {"akte_uebersicht": []}, []):
+            with self.subTest(bereiche=bereiche):
+                r = self.setze(bereiche)
+                self.assertEqual(r.status_code, 400, r.content)
+                self.assertIn("bereiche", r.json())
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.bereiche, {})
+
+
+class TestdatenAusblenden(TestCase):
+    """Festlegung 03.10.2026: „Testdaten sehen“ je Gruppe einstellbar – ohne das Recht gibt es Testpatienten und
+    Testbenutzer nicht; Testbenutzer lassen sich ausblenden (gesperrt, aus allen Listen, nicht gelöscht)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from patienten.models import Patient
+
+        cls.admin = benutzer("admin", Rolle.ADMIN)
+        cls.mitarbeiter = benutzer("mitarbeiter", Rolle.MITARBEITER)
+        cls.tester = benutzer("tester", Rolle.MITARBEITER, ist_test=True)
+        cls.echt = Patient.objects.create(nachname="Echt", vorname="E", geburtsdatum="1970-01-01")
+        cls.test = Patient.objects.create(nachname="Probe", vorname="P", geburtsdatum="1970-01-01", ist_test=True)
+
+    def ids(self, user, pfad="/api/patienten/"):
+        return {x["id"] for x in client_fuer(user).get(pfad).json()["results"]}
+
+    def test_recht_testdaten_sehen(self):
+        self.assertEqual(self.ids(self.mitarbeiter), {self.echt.id, self.test.id})  # Standard wie bisher
+        Gruppenrecht.objects.create(rolle=Rolle.MITARBEITER, recht="testdaten_sehen", erlaubt=False)
+        self.assertEqual(self.ids(self.mitarbeiter), {self.echt.id})
+        c = client_fuer(self.mitarbeiter)
+        self.assertEqual(c.get(f"/api/patienten/{self.test.id}/").status_code, 404)
+        # kein Testpatient anlegbar (verschwände sofort)
+        r = c.post("/api/patienten/", {"nachname": "Neu", "vorname": "N", "geburtsdatum": "1980-01-01",
+                                       "testpatient": True}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertFalse(r.json()["ist_test"])
+        # Testbenutzer sehen ihre Testpatienten immer
+        self.assertEqual(self.ids(self.tester), {self.test.id})
+        # Admin: fest (legt nur Testpatienten an)
+        client_fuer(self.admin).put("/api/rechte/", {"matrix": {"admin": {"testdaten_sehen": False}}}, format="json")
+        self.assertIn(self.test.id, self.ids(self.admin))
+        # Testbenutzer erscheinen ohne das Recht auch nicht in Listen (z. B. Benutzerverwaltung mit Vertretungsrecht)
+        Gruppenrecht.objects.create(rolle=Rolle.MITARBEITER, recht="benutzer_verwalten", erlaubt=True)
+        namen = {b["username"] for b in client_fuer(self.mitarbeiter).get("/api/benutzer/").json()["results"]}
+        self.assertNotIn("tester", namen)
+        self.assertIn("admin", namen)
+
+    def test_testbenutzer_ausblenden_und_einblenden(self):
+        c = client_fuer(self.admin)
+        self.assertEqual(c.post(f"/api/benutzer/{self.mitarbeiter.id}/ausblenden/").status_code, 400)
+        r = c.post(f"/api/benutzer/{self.tester.id}/ausblenden/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.tester.refresh_from_db()
+        self.assertFalse(self.tester.is_active)
+        self.assertIsNotNone(self.tester.ausgeblendet_am)
+        namen = {b["username"] for b in c.get("/api/benutzer/").json()["results"]}
+        self.assertNotIn("tester", namen)
+        namen = {b["username"] for b in c.get("/api/benutzer/?ausgeblendete=1").json()["results"]}
+        self.assertIn("tester", namen)
+        self.assertNotIn("tester", {k["benutzername"] for k in c.get("/api/benutzer/konten/").json()})
+        self.assertEqual(c.post(f"/api/benutzer/{self.tester.id}/entsperren/").status_code, 400)
+        self.assertTrue(SystemEreignis.objects.filter(art=SystemEreignis.Art.BENUTZER_GESPERRT).exists())
+        r = c.post(f"/api/benutzer/{self.tester.id}/einblenden/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.tester.refresh_from_db()
+        self.assertTrue(self.tester.is_active)
+        self.assertIsNone(self.tester.ausgeblendet_am)
+        # alle auf einmal
+        benutzer("tester2", Rolle.BETRACHTER, ist_test=True)
+        self.assertEqual(c.post("/api/benutzer/testbenutzer-ausblenden/").json(), {"ausgeblendet": 2})
+        self.assertFalse(User.objects.filter(ist_test=True, ausgeblendet_am__isnull=True).exists())
+
+
+class MitarbeiterErweitert(TestCase):
+    """Festlegung 03.10.2026 (U22): Rolle „Mitarbeiter (erweitert)“ – Standard wie Mitarbeiter und zusätzlich
+    Infusionspläne anlegen; eigene Spalte in der Rechtetabelle, je Recht umstellbar, auch als Testbenutzer."""
+
+    def test_standard_und_umstellbar(self):
+        from accounts.rechte import STANDARD, matrix
+
+        admin = benutzer("admin", Rolle.ADMIN)
+        plus = benutzer("plus", Rolle.MITARBEITER_PLUS)
+        self.assertEqual(STANDARD[Rolle.MITARBEITER_PLUS] - STANDARD[Rolle.MITARBEITER], {"plaene_anlegen"})
+        self.assertTrue(plus.hat_recht("plaene_anlegen"))
+        self.assertFalse(plus.hat_recht("plaene_freigeben"))
+        c = client_fuer(admin)
+        d = c.get("/api/rechte/").json()
+        self.assertIn({"code": "mitarbeiter_plus", "name": "Mitarbeiter (erweitert)"}, d["rollen"])
+        r = c.put("/api/rechte/", {"matrix": {"mitarbeiter_plus": {"plaene_freigeben": True}}}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(matrix()["mitarbeiter_plus"]["plaene_freigeben"])
+        self.assertFalse(matrix()["mitarbeiter"]["plaene_freigeben"])
+        # als Testbenutzer möglich
+        r = c.patch(f"/api/benutzer/{plus.id}/", {"ist_test": True}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)

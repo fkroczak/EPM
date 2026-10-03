@@ -224,6 +224,9 @@ class Einstellungen(models.Model):
         "Audit-Log aufbewahren", default=0, help_text="0 = unbegrenzt; sonst werden ältere Einträge täglich entfernt")
     pflicht_erklaerungen = models.JSONField("Erklärungen, die vorliegen sollen", default=pflicht_erklaerungen_standard,
                                             blank=True)
+    # Vordrucke ohne Wasserzeichen „ENTWURF“, obwohl die mitgelieferte Startvorlage noch aktiv ist (Festlegung 03.10.2026:
+    # Entwurfsmodus manuell abschaltbar, Vorlagen › Dokumentvorlagen). Liste der Arten; nur über eigenen Endpunkt.
+    vordrucke_ohne_entwurf = models.JSONField("Vordrucke ohne Wasserzeichen „ENTWURF“", default=list, blank=True)
 
     history = HistoricalRecords()
 
@@ -254,6 +257,9 @@ class Einstellungen(models.Model):
                 or any(a not in ERKLAERUNGSARTEN for a in self.pflicht_erklaerungen)
                 or len(set(self.pflicht_erklaerungen)) != len(self.pflicht_erklaerungen)):
             raise ValidationError({"pflicht_erklaerungen": "Unbekannte Erklärung."})
+        if not isinstance(self.vordrucke_ohne_entwurf, list) or any(a not in ERKLAERUNGSARTEN
+                                                                    for a in self.vordrucke_ohne_entwurf):
+            raise ValidationError({"vordrucke_ohne_entwurf": "Unbekannter Vordruck."})
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):

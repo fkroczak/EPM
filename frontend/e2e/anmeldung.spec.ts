@@ -24,10 +24,12 @@ test("Falsches Passwort wird abgewiesen", async ({ page }) => {
   await expect(page.getByLabel("Passwort")).toHaveValue("");
 });
 
-test("Erste Anmeldung: eigenes Passwort, Authenticator einrichten, Notfall-Codes", async ({ page }) => {
+test("Erste Anmeldung: eigenes Passwort; Zwei-Faktor-Anmeldung freiwillig einrichten und wieder ausschalten", async ({ page }) => {
   const admin = await apiAls("admin");
   const name = eindeutig("e2e.neu");
   const neu = await admin.post("benutzer/", { username: name, first_name: "Nora", last_name: "Neuling", rolle: "mitarbeiter" });
+  // Festlegung 02.10.2026: Die Zwei-Faktor-Anmeldung ist freiwillig (Standard)
+  expect((await admin.get("benutzer/anmeldung/")).zweiter_faktor).toBe("freiwillig");
   await admin.ende();
   await page.goto("/");
   await page.getByLabel("Benutzername").fill(name);
@@ -41,24 +43,51 @@ test("Erste Anmeldung: eigenes Passwort, Authenticator einrichten, Notfall-Codes
   await page.getByLabel("Neues Passwort").fill(KENNWORT + "-neu");
   await page.getByLabel("Passwort wiederholen").fill(KENNWORT + "-neu");
   await page.getByRole("button", { name: "Passwort speichern" }).click();
-  await expect(page.getByRole("heading", { name: "Authenticator-App einrichten" })).toBeVisible();
-  await expect(page.getByRole("img", { name: "QR-Code für die Authenticator-App" })).toBeVisible();
-  const geheim = (await page.getByTestId("otp-schluessel").textContent()) ?? "";
+  // ohne zweiten Faktor direkt angemeldet; die Startseite weist einmal auf die freiwillige Einrichtung hin
+  await expect(page.getByTestId("angemeldet-als")).toHaveText("N. Neuling");
+  const hinweis = page.getByTestId("zweifaktor-hinweis");
+  await expect(hinweis).toContainText("freiwillig");
+  await hinweis.getByRole("link", { name: "Jetzt einrichten" }).click();
+  await expect(page).toHaveURL(/\/konto#zwei-faktor$/);
+  const sicherheit = page.getByTestId("sicherheit");
+  await expect(sicherheit).toContainText("nicht eingerichtet");
+  await expect(sicherheit).not.toContainText("Notfall-Codes");
+  await sicherheit.getByRole("button", { name: "Einrichten" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("img", { name: "QR-Code für die Authenticator-App" })).toBeVisible();
+  const geheim = (await dialog.getByTestId("otp-schluessel").textContent()) ?? "";
   expect(geheim.length).toBeGreaterThan(15);
-  await page.getByLabel("Code aus der App").fill("000000");
-  await page.getByRole("button", { name: "Bestätigen" }).click();
-  await expect(page.getByRole("alert")).toContainText("Code ungültig");
+  await dialog.getByLabel("Code aus der App").fill("000000");
+  await dialog.getByRole("button", { name: "Bestätigen" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Code ungültig");
   // nach einem Fehlversuch sperrt django-otp das Gerät kurz (Schutz gegen Durchprobieren)
   await page.waitForTimeout(2100);
-  await page.getByLabel("Code aus der App").fill(totpBase32(geheim));
-  await page.getByRole("button", { name: "Bestätigen" }).click();
-  await expect(page.getByRole("heading", { name: "Notfall-Codes" })).toBeVisible();
-  await expect(page.getByTestId("notfallcodes").locator("li")).toHaveCount(10);
-  await page.getByRole("button", { name: "Codes notiert – weiter" }).click();
+  await dialog.getByLabel("Code aus der App").fill(totpBase32(geheim));
+  await dialog.getByRole("button", { name: "Bestätigen" }).click();
+  await expect(dialog.getByTestId("notfallcodes").locator("li")).toHaveCount(10);
+  await dialog.getByRole("button", { name: "Fertig" }).click();
+  await expect(sicherheit).toContainText("aktiv");
+  await expect(sicherheit).toContainText("Notfall-Codes");
+  // Sitzung bleibt nach dem Neuladen bestehen; der Hinweis auf der Startseite ist weg
+  await page.goto("/");
   await expect(page.getByTestId("angemeldet-als")).toHaveText("N. Neuling");
-  // Sitzung bleibt nach dem Neuladen bestehen
-  await page.reload();
-  await expect(page.getByTestId("angemeldet-als")).toHaveText("N. Neuling");
+  await expect(page.getByTestId("zweifaktor-hinweis")).toHaveCount(0);
+  // wer den zweiten Faktor eingerichtet hat, wird beim Anmelden danach gefragt
+  const mit = await apiAnmelden(name, KENNWORT + "-neu", totpBase32(geheim, Date.now() + 30_000));
+  expect(mit.schritt).toBe("fertig");
+  await mit.ctx.dispose();
+  // freiwillig heißt auch: wieder ausschalten – mit Passwort und Code
+  await page.goto("/konto");
+  await sicherheit.getByRole("button", { name: "Ausschalten" }).click();
+  await dialog.getByLabel("Dein Passwort").fill(KENNWORT + "-neu");
+  await dialog.getByLabel("Code aus der Authenticator-App").fill("000000");
+  await dialog.getByRole("button", { name: "Ausschalten" }).click();
+  await expect(dialog).toContainText("Der Code ist ungültig");
+  await page.waitForTimeout(2100);
+  await dialog.getByLabel("Code aus der Authenticator-App").fill(totpBase32(geheim, Date.now() + 60_000));
+  await dialog.getByRole("button", { name: "Ausschalten" }).click();
+  await expect(page.getByText("Zwei-Faktor-Anmeldung ausgeschaltet.")).toBeVisible();
+  await expect(sicherheit).toContainText("nicht eingerichtet");
 });
 
 test("Abgelaufene Sitzung führt zurück zur Anmeldung", async ({ browser }) => {

@@ -188,7 +188,7 @@ class Zuordnungen(Basis):
         amino = {z["text"]: z["wirksam"] for z in stand["praeparate"]["amino"]["zeilen"]}
         self.assertEqual(amino["Glamin 13,4%"], {"art": "praeparat", "id": self.praeparat("aminosaeuren", "Glamin").id})
         self.assertIn("Port", [k["wert"] for k in d["bestand"]["katheter"]])
-        self.assertEqual(d["auswahl"]["rollen"], ["betrachter", "mitarbeiter", "mediziner", "admin"])
+        self.assertEqual(d["auswahl"]["rollen"], ["betrachter", "mitarbeiter", "mitarbeiter_plus", "mediziner", "admin"])
         # Entscheidungen speichern; die Korrektur merkt sich den Wert des Dumps (setzt der Server)
         d = self.entscheide()
         self.assertEqual((d["stand"]["offen"], d["hindernisse"]), ([], []))

@@ -50,6 +50,10 @@ services:
       # Administration › System: Aufträge an den Systemagenten (schreiben), dessen Status (nur lesen)
       - ./system/auftraege:/data/system/auftraege
       - ./system/status:/data/system/status:ro
+      # Administration › Backup: zum Herunterladen bereitgestellte Sicherungen (nur lesen; legt der Systemagent hin)
+      # und hochgeladene (schreiben; der Systemagent liest sie ein)
+      - ./system/download:/data/system/download:ro
+      - ./system/upload:/data/system/upload
       - static:/app/staticfiles
     networks: [intern]
     read_only: true
@@ -68,6 +72,8 @@ services:
       - ./nginx/epm.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro
       - ./data/dokumente:/data/dokumente:ro
+      # bereitgestellte Sicherungen: Nginx liefert sie aus, nachdem Django Recht und Sitzung geprüft hat
+      - ./system/download:/data/sicherung-download:ro
       - static:/srv/static:ro
     networks: [intern, extern]
     read_only: true

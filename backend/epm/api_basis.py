@@ -37,9 +37,14 @@ def patienten_fuer(user, eingeschraenkte: bool = False):
     der Suche, nicht mit ihren Einträgen –, außer für die Person, die gerade eine begründete Einsicht hat.
     ``eingeschraenkte=True`` liefert auch sie – nur für Stellen, die keine Inhalte zeigen (Hinweis „eingeschränkt“
     mit Nummer, Zählen). Für die Datenschutz-Vorgänge selbst: ``patienten_mit_eingeschraenkten``."""
+    from accounts.rechte import sieht_testdaten
+
     qs = Patient.objects.all()
     if getattr(user, "ist_test", False):
         qs = qs.filter(ist_test=True)
+    elif not sieht_testdaten(user):
+        # ohne Recht „Testdaten sehen“ gibt es Testpatienten nicht (Festlegung 03.10.2026)
+        qs = qs.filter(ist_test=False)
     if not eingeschraenkte:
         einsicht = Akteneinsicht.objects.filter(benutzer_id=getattr(user, "pk", None), bis__gt=timezone.now())
         qs = qs.filter(Q(eingeschraenkt_am__isnull=True) | Q(id__in=einsicht.values("patient_id")))
@@ -77,21 +82,45 @@ def patienten_mit_eingeschraenkten(user):
 NUR_TESTPATIENTEN_TEXT = "Als Admin nur bei Testpatienten möglich. Echte Akten sind für die Administration nur lesbar."
 
 
-def pruefe_schreibbereich(user, patient, loeschen: bool = False):
+def pruefe_schreibbereich(user, patient, loeschen: bool = False, recht: str | None = None):
     """Admins schreiben Patientendaten nur bei Testpatienten (Festlegung 01.10.2026) → sonst 403.
-    Ausnahme ``loeschen``: endgültig löschen (Dokumente F73, Akten F80) dürfen Admins auch bei echten Akten
-    (Festlegung 02.10.2026)."""
-    from accounts.rechte import schreibt_nur_testpatienten
+    Ausnahmen (Festlegungen 02.10.2026, ``accounts.rechte.AUCH_BEI_ECHTEN_AKTEN``): endgültig löschen (``loeschen``;
+    Dokumente F73, Akten F80), Dokumente einem anderen Patienten zuordnen und Akten abschließen (``recht``) dürfen
+    Admins auch bei echten Akten."""
+    from accounts.rechte import AUCH_BEI_ECHTEN_AKTEN, schreibt_nur_testpatienten
 
-    if schreibt_nur_testpatienten(user) and not patient.ist_test and not loeschen:
+    if loeschen or recht in AUCH_BEI_ECHTEN_AKTEN:
+        return
+    if schreibt_nur_testpatienten(user) and not patient.ist_test:
         raise PermissionError(NUR_TESTPATIENTEN_TEXT)
 
 
-def legt_testpatienten_an(user) -> bool:
-    """Testbenutzer und Admins legen nur Testpatienten an."""
-    from accounts.rechte import schreibt_nur_testpatienten
+def legt_testpatienten_an(user, gewuenscht: bool = False) -> bool:
+    """Testbenutzer und Admins legen nur Testpatienten an. Alle anderen können beim Anlegen einen Testpatienten
+    wählen (``gewuenscht``, Fehlerliste 02.10.2026) – z. B. um Infusionspläne auszuprobieren –, sofern sie
+    Testdaten sehen (sonst verschwände der neue Patient sofort)."""
+    from accounts.rechte import schreibt_nur_testpatienten, sieht_testdaten
 
-    return bool(getattr(user, "ist_test", False) or schreibt_nur_testpatienten(user))
+    if getattr(user, "ist_test", False) or schreibt_nur_testpatienten(user):
+        return True
+    return bool(gewuenscht and sieht_testdaten(user))
+
+
+def sichtbare_benutzer(user, qs, ausgeblendete: bool = False):
+    """Konten, die diese Person in Listen sieht: ausgeblendete Testbenutzer nur auf Wunsch (Benutzerverwaltung),
+    Testbenutzer nur mit Recht „Testdaten sehen“ (Festlegung 03.10.2026)."""
+    from accounts.rechte import sieht_testdaten
+
+    if not ausgeblendete:
+        qs = qs.filter(ausgeblendet_am__isnull=True)
+    if not sieht_testdaten(user):
+        qs = qs.filter(ist_test=False)
+    return qs
+
+
+def wahr(wert) -> bool:
+    """„1“, „true“, „ja“, True → True (Schalter in Anfragen)"""
+    return wert is True or str(wert).strip().lower() in ("1", "true", "ja", "on")
 
 
 class RichText(serializers.CharField):

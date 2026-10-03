@@ -29,7 +29,8 @@ EPM_UPDATE_QUELLE="git"            # VPS: paket
 EPM_DOCKER_BIP="10.231.0.1/24"
 EPM_DOCKER_POOL="10.231.16.0/20"
 
-# Sicherungen: Aufbewahrung auf dem Server in Tagen (Festlegung 02.10.2026: 30)
+# Sicherungen: Aufbewahrung auf dem Server in Tagen (Festlegung 02.10.2026: 30). Eine Auswahl unter Administration ›
+# Backup (7, 14 oder 30 Tage, Datei /etc/epm/sicherung/aufbewahrung) geht vor.
 EPM_BACKUP_TAGE="30"
 
 # UID, unter der das Backend im Container läuft (muss zum Dockerfile passen)

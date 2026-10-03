@@ -10,6 +10,7 @@ wiederherstellen) gehen wie unter Administration › System als Auftragsdatei an
 """
 import hashlib
 import hmac
+import os
 import re
 import uuid
 from datetime import timedelta
@@ -27,7 +28,53 @@ SICHERUNG_ALT_H = 36                             # letzte Sicherung älter: Warn
 UEBERTRAGUNG_ALT_H = 26                          # verschlüsselte Sicherung so lange nicht übertragen: Warnung
 PRUEF_FEHLVERSUCHE, PRUEF_MINUTEN = 5, 15        # falsche Sicherungs-Passwörter je Person, danach kurz gesperrt
 ARTEN = {"nachts": "Automatisch", "von_hand": "Von Hand", "vor_update": "Vor Update", "vor_aenderung": "Vor Neustart",
-         "vor_wiederherstellung": "Vor Wiederherstellung", "unbekannt": "Unbekannt"}
+         "vor_wiederherstellung": "Vor Wiederherstellung", "hochgeladen": "Hochgeladen", "unbekannt": "Unbekannt"}
+AUFBEWAHRUNG_TAGE = (7, 14, 30)                   # wie im Systemagenten (Festlegung 02.10.2026)
+# Aufbewahrung im Übertragungsziel, 0 = nie löschen (Festlegung 03.10.2026: Standard 30 Tage, wie im Systemagenten)
+ZIEL_AUFBEWAHRUNG = (0, 14, 30, 60, 90, 180, 365)
+ZIEL_AUFBEWAHRUNG_STANDARD = 30
+BUENDEL_MUSTER = re.compile(r"^epm-sicherung_(\d{4}-\d{2}-\d{2}_\d{4}(?:\d{2})?)\.tar$")
+UPLOAD_TEIL = 4 * 1024 * 1024                    # Bytes je Anfrage beim Hochladen (unter DATA_UPLOAD_MAX_MEMORY_SIZE)
+UPLOAD_MAX = 200 * 1024 ** 3                     # größte Sicherung, die sich hochladen lässt
+
+
+def buendel_name(stempel: str) -> str:
+    return f"epm-sicherung_{stempel}.tar"
+
+
+def bereitgestellt(daten=None) -> list:
+    """Zum Herunterladen bereitgestellte Sicherungen, die das Backend auch wirklich sieht."""
+    daten = daten if daten is not None else status()
+    liste = []
+    for b in (daten or {}).get("bereitgestellt") or []:
+        if isinstance(b, dict) and STEMPEL_MUSTER.match(str(b.get("stempel") or "")) \
+                and (host.ordner_download() / buendel_name(b["stempel"])).is_file():
+            liste.append({"stempel": b["stempel"], "groesse": b.get("groesse"), "bis": b.get("bis")})
+    return liste
+
+
+def uploads() -> list:
+    """Hochgeladene, noch nicht eingelesene Sicherungen: [{upload, name, groesse, erhalten, vollstaendig, von, …}]"""
+    ordner = host.ordner_upload()
+    liste = []
+    try:
+        namen = sorted(n for n in os.listdir(ordner) if n.endswith(".json"))
+    except OSError:
+        return liste
+    for n in namen:
+        kennung = n[:-5]
+        meta = host._lies(ordner / n)
+        if not ID_MUSTER.match(kennung) or not isinstance(meta, dict):
+            continue
+        try:
+            erhalten = os.stat(ordner / f"{kennung}.teil").st_size
+        except OSError:
+            continue
+        liste.append({"upload": kennung, "name": str(meta.get("name") or ""), "groesse": meta.get("groesse"),
+                      "erhalten": erhalten, "vollstaendig": erhalten == meta.get("groesse"),
+                      "von": str(meta.get("von") or ""), "begonnen_am": meta.get("begonnen_am")})
+    return liste
+
 
 
 def status():

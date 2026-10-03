@@ -65,6 +65,14 @@ class Patient(models.Model):
     # „kein“ = bewusst keiner (Festlegung 01.10.2026), leer = noch nicht erfasst (mit Hinweis wie Nickelallergie „unbekannt“)
     kein_katheter = models.BooleanField("Kein Katheter", default=False)
     kein_versorger = models.BooleanField("Kein Versorger", default=False)
+    # Kein Infusionsplan nötig (Ergänzung zur Fehlerliste 02.10.2026): Jede Akte in Betreuung braucht einen
+    # freigegebenen Plan – sonst erscheint ein Hinweis. Wer bestätigt, dass dieser Patient keinen braucht, unterdrückt
+    # den Hinweis und die Warnung „Plan älter als …“. Mit der nächsten Freigabe eines Plans gilt wieder „Plan nötig“.
+    kein_plan = models.BooleanField("Kein Infusionsplan nötig", default=False)
+    kein_plan_grund = models.CharField("Grund (kein Infusionsplan)", max_length=300, blank=True)
+    kein_plan_am = models.DateTimeField(null=True, blank=True)
+    kein_plan_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                      related_name="+")
 
     # Lange formatierte Texte (bereinigtes HTML), versioniert über die Historie
     diagnose = models.TextField(blank=True)

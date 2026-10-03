@@ -52,13 +52,14 @@ test("Vor dem Neustart: Grenzwert, Rechte, Darstellung und Startseite in der Obe
   await antwort;
   await d.page.getByRole("button", { name: "Fertig" }).click();
   await expect(d.page.getByRole("heading", { name: "Zuletzt eingetragen" })).toHaveCount(0);
-  // Spaltenteiler der Akte (S17, bei 1440 px Stufe „hd“): per Tastatur auf ⅓
+  // Karten der Akte im Raster (Fehlerliste 02.10.2026, 2; bei 1440 px 3 Spalten): Gewichtsverlauf über „⋯“ auf ganze Breite
   await d.page.goto("/patienten");
   await d.page.getByTestId("patientenliste").getByRole("link", { name: "Probe, Jonas" }).click();
   antwort = gespeichert(d.page, "auth/ich/");
-  await d.page.getByTestId("teiler-akte_uebersicht-0").press("ArrowLeft");
+  await d.page.getByTestId("groesse-gewicht").click();
+  await d.page.getByRole("menuitem", { name: /^Breite: 3 Spalten/ }).click();
   await antwort;
-  await expect(d.page.getByTestId("uebersicht-stufe")).toHaveAttribute("data-aufteilung", "0.3333");
+  await expect(d.page.getByTestId("uebersicht-stufe").locator('[data-bereich="gewicht"]')).toHaveAttribute("data-breite", "3");
   await d.ctx.close();
 });
 
@@ -268,7 +269,7 @@ test("Nach dem Neustart: Konto mit neuem Passwort und Gerät, Notfall-Codes, Dar
   await expect(d.page.locator('[data-kachel="gewicht"]')).toHaveAttribute("data-groesse", "2x2");
   await d.page.goto("/patienten");
   await d.page.getByTestId("patientenliste").getByRole("link", { name: "Probe, Jonas" }).click();
-  await expect(d.page.getByTestId("uebersicht-stufe")).toHaveAttribute("data-aufteilung", "0.3333");
+  await expect(d.page.getByTestId("uebersicht-stufe").locator('[data-bereich="gewicht"]')).toHaveAttribute("data-breite", "3");
   await d.ctx.close();
 });
 

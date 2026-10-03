@@ -10,6 +10,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { Editor, Richtext } from "@/components/Editor";
+import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
+import { Bereich, Bereiche } from "@/components/ui/bereiche";
 import { useAkte } from "./Akte";
 
 type Feld = "diagnose" | "therapie" | "empfehlung";
@@ -121,21 +123,24 @@ function TextKarte({ feld, immerOffen, className }: { feld: Feld; immerOffen?: b
   );
 }
 
+/** Im Raster mit einstellbarer Größe je Karte (Fehlerliste 02.10.2026, Punkt 2); Diagnose und Therapie brauchen
+ *  Platz für lange Texte – Standard: Therapie doppelt so breit. */
 export function Therapie() {
   const { patient } = useAkte();
+  const stufe = useStufe();
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-5 items-start">
-      <div className="flex flex-col gap-5 min-w-0">
-        <TextKarte feld="diagnose" />
-        <TextKarte feld="empfehlung" />
+    <Bereiche seite="akte_therapie" spalten={RASTER_SPALTEN[stufe]} testid="therapie-stufe">
+      <Bereich id="diagnose" titel="Diagnose"><TextKarte feld="diagnose" /></Bereich>
+      <Bereich id="therapie" titel="Therapie" standard={{ breite: 2 }}><TextKarte feld="therapie" immerOffen /></Bereich>
+      <Bereich id="empfehlung" titel="Empfehlung"><TextKarte feld="empfehlung" /></Bereich>
+      <Bereich id="hinweis" titel="Hinweis" menue={false}>
         <div className="meldung info flex gap-2.5 items-start text-[0.8125rem] leading-normal">
           <Icon name="info" />
           <span>Diagnose, Empfehlung und Therapie sind änderbar. Jede Fassung bleibt mit Person, Datum und Uhrzeit im{" "}
             <Link to={`/patienten/${patient.id}/verlauf`}>Verlauf</Link> erhalten. Die Kommunikation mit dem Patienten steht unter{" "}
             <Link to={`/patienten/${patient.id}/kontakte`}>Kontakte</Link>.</span>
         </div>
-      </div>
-      <TextKarte feld="therapie" immerOffen />
-    </div>
+      </Bereich>
+    </Bereiche>
   );
 }

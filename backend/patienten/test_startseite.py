@@ -261,6 +261,12 @@ class AdminKacheln(Grundlage):
         self.assertEqual(zeilen["neu"]["probleme"], ["einmal_kennwort"])
         self.assertEqual((zeilen["knapp"]["probleme"], zeilen["knapp"]["notfallcodes_uebrig"]), (["notfallcodes"], 2))
         self.assertNotIn("gut", zeilen)
+        # zweiter Faktor freiwillig (Festlegung 02.10.2026): ohne ihn ist ein Konto nur bei Pflicht auffällig
+        self.assertNotIn("mediziner", zeilen)
+        from accounts.models import Anmelderegeln
+
+        Anmelderegeln.objects.update_or_create(pk=1, defaults={"zweiter_faktor": "alle"})
+        zeilen = {z["benutzername"]: z for z in client_fuer(self.admin).get("/api/benutzer/konten/").json()}
         self.assertEqual(zeilen["mediziner"]["probleme"], ["ohne_2fa"])
         self.assertNotIn("password", r.content.decode())
 

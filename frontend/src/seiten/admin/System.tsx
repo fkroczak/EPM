@@ -6,6 +6,7 @@
  */
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ZeigerEreignis, ReactNode } from "react";
+import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
@@ -13,8 +14,12 @@ import { useIch } from "@/lib/auth";
 import { dateigroesse, datum, relativ, uhrzeit, zahl, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
-import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, Laden, Leer, Meldung, Seitenkopf,
+import { useStufe } from "@/lib/stufen";
+import type { Stufe } from "@/lib/stufen";
+import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, Laden, Leer, Meldung, Segmente, Seitenkopf,
   Textfeld, cx } from "@/components/ui/basis";
+import { Bereich, Bereiche } from "@/components/ui/bereiche";
+import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
@@ -36,6 +41,7 @@ export type HostStatus = {
   sicherung?: { verfuegbar: boolean; anzahl?: number; gesamt?: number; letzte_am?: string | null; letzte_groesse?: number };
   dienste?: Record<string, string>;
 };
+type Konto = { id: number; anzeigename: string; benutzername: string };
 export type Aktion = { code: string; name: string; bestaetigung: "keine" | "einfach" | "2fa"; beschreibung: string; sichern: boolean;
   warnen: boolean; erlaubt: boolean };
 type Aufgabe = { code: string; name: string; bestaetigung: "keine" | "einfach"; beschreibung: string };
@@ -55,7 +61,8 @@ export type Uebersicht = {
     schutz: { erwartet: number; vorhanden: number; fehlend: string[] };
     patienten: { in_betreuung: number; abgeschlossen: number; testpatienten: number };
     dokumente: { anzahl: number; groesse: number; ungeprueft: number; platz: { gesamt: number; frei: number } | null };
-    konten: { aktiv: number; gesperrt: number; ohne_2fa: number; einmal_kennwort_offen: number; admins: number };
+    konten: { aktiv: number; gesperrt: number; ohne_2fa: number; einmal_kennwort_offen: number; admins: number;
+      zweiter_faktor?: "freiwillig" | "admins" | "alle"; ohne_2fa_konten?: Konto[]; einmal_kennwort_konten?: Konto[]; gesperrt_konten?: Konto[] };
   };
   angemeldet: Sitzung[];
   hinweis: Hinweis | null;
@@ -67,7 +74,13 @@ export type Auftrag = { id: number; kennung: string; ziel: "server" | "epm"; akt
   status: "wartet" | "laeuft" | "erledigt" | "fehler" | "abgebrochen"; status_name: string; offen: boolean;
   parameter: { minuten?: number; pruefsummen?: boolean }; angefordert_von_name: string | null; angefordert_am: string;
   begonnen_am: string | null; beendet_am: string | null; ergebnis: string; ausgabe: string; rueckgabe: number | null; probelauf: boolean };
-type Verlauf = { felder: string[]; punkte: [number, number | null, number | null, number | null, number | null][] };
+type Zeitraum = "1h" | "3h" | "24h" | "7t" | "14t" | "1m" | "6m";
+type Verlauf = { felder: string[]; punkte: (number | null)[][]; zeitraum: Zeitraum; name: string; schritt_s: number; von: number; bis: number;
+  zeitraeume: { code: Zeitraum; name: string }[] };
+const ZEITRAUM_KURZ: Record<Zeitraum, string> = { "1h": "1 h", "3h": "3 h", "24h": "24 h", "7t": "7 Tage", "14t": "14 Tage", "1m": "1 Monat", "6m": "6 Monate" };
+const ZEITRAUM_MERKER = "epm-system-zeitraum";
+/** Spalten des Rasters der Systemseite je Fensterstufe (S16, Entwurf 2: ab 1440 px 2, ab 1920 px 3, ab 2560 px 4) */
+const SYSTEM_SPALTEN: Record<Stufe, number> = { eng: 1, schmal: 1, hd: 2, fhd: 3, qhd: 4 };
 
 // ---------------------------------------------------------------- Hilfen
 export function dauer(s: number | null | undefined) {
@@ -122,85 +135,168 @@ function AuftragStatus({ a }: { a: Auftrag }) {
     {a.probelauf ? " (Probelauf)" : ""}</Chip>;
 }
 
-// ---------------------------------------------------------------- Verlauf der Auslastung (24 h)
-/** CPU und Arbeitsspeicher in % auf einer gemeinsamen Achse (0–100 %), mit Fadenkreuz und Werten beim Überfahren. */
+// ---------------------------------------------------------------- Verlauf der Auslastung
+const WOCHENTAG = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+const zwei = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * CPU und Arbeitsspeicher in % auf einer gemeinsamen Achse (0–100 %), mit Fadenkreuz und Werten beim Überfahren.
+ * Zeitraum wählbar (1 h bis 6 Monate, Fehlerliste 02.10.2026, 4.1): Die Zeitachse reicht immer über den ganzen Zeitraum,
+ * auch wenn der Verlauf noch nicht so weit zurückreicht. Bei längeren Zeiträumen sind die Punkte Mittelwerte
+ * (15 Minuten, 1 Stunde, 6 Stunden); die Spitzen in dieser Zeit stehen als dünne gestrichelte Linie dabei.
+ * Das Diagramm füllt die Karte: Breite und Höhe folgen der eingestellten Größe der Karte.
+ */
 function VerlaufDiagramm({ verlauf }: { verlauf: Verlauf }) {
   const [zeiger, setZeiger] = useState<number | null>(null);
   const flaeche = useRef<SVGSVGElement>(null);
+  const rahmen = useRef<HTMLDivElement>(null);
+  const [mass, setMass] = useState({ b: 720, h: 200 });
+  useEffect(() => {
+    if (!rahmen.current || typeof ResizeObserver === "undefined") return;
+    const beobachter = new ResizeObserver(([e]) => {
+      const b = Math.max(280, Math.floor(e.contentRect.width)), h = Math.max(160, Math.floor(e.contentRect.height));
+      setMass((m) => (m.b === b && m.h === h ? m : { b, h }));
+    });
+    beobachter.observe(rahmen.current);
+    return () => beobachter.disconnect();
+  }, []);
   const punkte = verlauf.punkte;
-  const B = 720, H = 180, L = 36, R = 64, O = 10, U = 24;
-  if (punkte.length < 2) return <Leer>Noch kein Verlauf – der Systemagent misst jede Minute.</Leer>;
-  const t0 = punkte[0][0], t1 = punkte[punkte.length - 1][0];
-  const x = (t: number) => L + ((t - t0) / Math.max(1, t1 - t0)) * (B - L - R);
-  const y = (p: number) => O + (1 - p / 100) * (H - O - U);
-  const linie = (i: 1 | 2) => {
+  const B = mass.b, H = mass.h, L = 36, R = 64, O = 10, U = 24;
+  const spalte = (name: string) => verlauf.felder.indexOf(name);
+  const iCpu = spalte("cpu"), iRam = spalte("ram"), iLast = spalte("last"), iPlatte = spalte("platte");
+  const iCpuMax = spalte("cpu_max"), iRamMax = spalte("ram_max");
+  const t0 = verlauf.von, t1 = Math.max(verlauf.bis, t0 + 1);
+  const x = (t: number) => L + ((t - t0) / (t1 - t0)) * (B - L - R);
+  const y = (p: number) => O + (1 - Math.min(100, Math.max(0, p)) / 100) * (H - O - U);
+  // Lücken (Server aus, Agent pausiert) nicht überbrücken: ab dem Dreifachen des Messabstands neu ansetzen
+  const luecke = Math.max(180, 3 * (verlauf.schritt_s || 60));
+  const linie = (i: number) => {
+    if (i < 0) return "";
     let d = "";
-    let offen = false;
+    let vorher: number | null = null;
     for (const p of punkte) {
       const v = p[i];
-      if (v == null) { offen = false; continue; }
-      d += `${offen ? "L" : "M"}${x(p[0]).toFixed(1)},${y(v).toFixed(1)}`;
-      offen = true;
+      if (v == null) { vorher = null; continue; }
+      d += `${vorher != null && p[0]! - vorher <= luecke ? "L" : "M"}${x(p[0]!).toFixed(1)},${y(v).toFixed(1)}`;
+      vorher = p[0]!;
     }
     return d;
   };
-  const letzte = punkte[punkte.length - 1];
-  const zeit = (t: number) => uhrzeit(new Date(t * 1000));
-  const p = zeiger != null ? punkte[zeiger] : null;
+  const lang = t1 - t0 > 36 * 3600, sehrLang = t1 - t0 > 20 * 86400;
+  const achse = (t: number) => {
+    const d = new Date(t * 1000);
+    return sehrLang ? `${zwei(d.getDate())}.${zwei(d.getMonth() + 1)}.` : lang ? `${WOCHENTAG[d.getDay()]} ${zwei(d.getDate())}.${zwei(d.getMonth() + 1)}.` : uhrzeit(d);
+  };
+  const marken = Math.max(2, Math.min(7, Math.floor((B - L - R) / 110)));
+  const letzte = punkte.length ? punkte[punkte.length - 1] : null;
+  const p = zeiger != null ? punkte[zeiger] ?? null : null;
   const bewegen = (e: ZeigerEreignis<SVGSVGElement>) => {
     const r = flaeche.current?.getBoundingClientRect();
-    if (!r) return;
+    if (!r || !punkte.length) return;
     const t = t0 + ((((e.clientX - r.left) / r.width) * B - L) / (B - L - R)) * (t1 - t0);
     let best = 0;
-    for (let i = 1; i < punkte.length; i++) if (Math.abs(punkte[i][0] - t) < Math.abs(punkte[best][0] - t)) best = i;
+    for (let i = 1; i < punkte.length; i++) if (Math.abs(punkte[i][0]! - t) < Math.abs(punkte[best][0]! - t)) best = i;
     setZeiger(best);
   };
-  const reihen: { i: 1 | 2; name: string; farbe: string }[] = [
-    { i: 1, name: "CPU", farbe: "var(--reihe-1)" }, { i: 2, name: "Arbeitsspeicher", farbe: "var(--reihe-2)" }];
+  const reihen = [
+    { i: iCpu, max: iCpuMax, name: "CPU", kurz: "CPU", farbe: "var(--reihe-1)" },
+    { i: iRam, max: iRamMax, name: "Arbeitsspeicher", kurz: "RAM", farbe: "var(--reihe-2)" }].filter((r) => r.i >= 0);
+  const mitSpitzen = iCpuMax >= 0 || iRamMax >= 0;
+  const wert = (z: (number | null)[], i: number, einheit = " %") => (i >= 0 && z[i] != null ? `${zahl(z[i])}${einheit}` : "—");
+  const mittel = verlauf.schritt_s >= 86400 / 4 ? "6 Stunden" : verlauf.schritt_s >= 3600 ? "1 Stunde" : verlauf.schritt_s >= 900 ? "15 Minuten" : "";
   return (
-    <div className="flex flex-col gap-2" data-testid="verlauf">
-      <div className="flex items-center gap-4 text-xs text-text2" aria-hidden="true">
+    <div className="flex flex-col gap-2 grow min-h-0" data-testid="verlauf" data-zeitraum={verlauf.zeitraum} data-punkte={punkte.length}>
+      <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-text2" aria-hidden="true">
         {reihen.map((r) => <span key={r.i} className="flex items-center gap-1.5"><span className="w-4 h-0.5 rounded" style={{ background: r.farbe }} />{r.name}</span>)}
-        <span className="gedaempft">letzte {Math.round((t1 - t0) / 3600)} h · Werte in %</span>
+        {mitSpitzen ? <span className="flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-current" />Spitze</span> : null}
+        <span className="gedaempft">Werte in %{mittel ? ` · Mittel über ${mittel}` : ""}</span>
       </div>
-      <div className="relative">
-        <svg ref={flaeche} viewBox={`0 0 ${B} ${H}`} className="w-full h-auto touch-none" role="img"
-          aria-label={`Auslastung: CPU zuletzt ${zahl(letzte[1])} %, Arbeitsspeicher ${zahl(letzte[2])} %`}
+      <div ref={rahmen} className="relative grow" style={{ minHeight: Math.round(Math.min(300, Math.max(180, B * 0.2))) }}>
+        <svg ref={flaeche} viewBox={`0 0 ${B} ${H}`} className="absolute inset-0 w-full h-full touch-none" role="img"
+          aria-label={letzte ? `Auslastung, ${verlauf.name}: CPU zuletzt ${wert(letzte, iCpu)}, Arbeitsspeicher ${wert(letzte, iRam)}`
+            : `Auslastung, ${verlauf.name}: noch keine Messwerte`}
           onPointerMove={bewegen} onPointerLeave={() => setZeiger(null)}>
-          {[0, 50, 100].map((g) => (
+          {[0, 25, 50, 75, 100].map((g) => (
             <g key={g}>
-              <line x1={L} x2={B - R} y1={y(g)} y2={y(g)} stroke="var(--rand)" strokeWidth={1} />
-              <text x={L - 6} y={y(g) + 4} textAnchor="end" fontSize={11} fill="var(--gedaempft)">{g}</text>
+              <line x1={L} x2={B - R} y1={y(g)} y2={y(g)} stroke="var(--rand)" strokeWidth={1} strokeDasharray={g % 50 ? "2 4" : undefined} />
+              {g % 50 === 0 || H > 220 ? <text x={L - 6} y={y(g) + 4} textAnchor="end" fontSize={11} fill="var(--gedaempft)">{g}</text> : null}
             </g>
           ))}
-          <text x={L} y={H - 6} fontSize={11} fill="var(--gedaempft)">{zeit(t0)}</text>
-          <text x={B - R} y={H - 6} fontSize={11} fill="var(--gedaempft)" textAnchor="end">{zeit(t1)}</text>
+          {Array.from({ length: marken + 1 }, (_, k) => {
+            const t = t0 + ((t1 - t0) * k) / marken;
+            return (
+              <g key={k}>
+                {k > 0 && k < marken ? <line x1={x(t)} x2={x(t)} y1={O} y2={H - U} stroke="var(--rand)" strokeWidth={1} strokeDasharray="2 4" /> : null}
+                <text x={x(t)} y={H - 6} fontSize={11} fill="var(--gedaempft)" textAnchor={k === 0 ? "start" : k === marken ? "end" : "middle"}>{achse(t)}</text>
+              </g>
+            );
+          })}
           {reihen.map((r) => (
             <g key={r.i}>
+              {r.max >= 0 ? <path d={linie(r.max)} fill="none" stroke={r.farbe} strokeWidth={1} strokeDasharray="3 3" opacity={0.7} /> : null}
               <path d={linie(r.i)} fill="none" stroke={r.farbe} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-              {letzte[r.i] != null ? (
-                <text x={x(t1) + 6} y={y(letzte[r.i]!) + 4} fontSize={11} fill="var(--text2)">{r.name === "CPU" ? "CPU" : "RAM"} {zahl(letzte[r.i], 0)}</text>
+              {letzte && letzte[r.i] != null ? (
+                <text x={x(letzte[0]!) + 6} y={y(letzte[r.i]!) + 4} fontSize={11} fill="var(--text2)">{r.kurz} {zahl(letzte[r.i], 0)}</text>
               ) : null}
             </g>
           ))}
           {p ? (
             <g>
-              <line x1={x(p[0])} x2={x(p[0])} y1={O} y2={H - U} stroke="var(--gedaempft)" strokeWidth={1} strokeDasharray="3 3" />
-              {reihen.map((r) => p[r.i] != null ? <circle key={r.i} cx={x(p[0])} cy={y(p[r.i]!)} r={4} fill={r.farbe}
+              <line x1={x(p[0]!)} x2={x(p[0]!)} y1={O} y2={H - U} stroke="var(--gedaempft)" strokeWidth={1} strokeDasharray="3 3" />
+              {reihen.map((r) => p[r.i] != null ? <circle key={r.i} cx={x(p[0]!)} cy={y(p[r.i]!)} r={4} fill={r.farbe}
                 stroke="var(--flaeche)" strokeWidth={2} /> : null)}
             </g>
           ) : null}
         </svg>
+        {punkte.length < 2 ? (
+          <div className="absolute inset-0 flex items-center justify-center text-sm gedaempft text-center px-10 pointer-events-none" data-testid="verlauf-leer">
+            {verlauf.schritt_s > 60 ? "Für diesen Zeitraum gibt es noch keine Werte – der Systemagent sammelt sie ab jetzt." : "Noch kein Verlauf – der Systemagent misst jede Minute."}
+          </div>
+        ) : null}
         {p ? (
           <div className="card absolute top-1 px-2.5 py-1.5 text-xs pointer-events-none flex flex-col gap-0.5"
-            style={{ left: `min(calc(${((x(p[0]) / B) * 100).toFixed(1)}% + 10px), calc(100% - 170px))` }}>
-            <span className="font-medium">{zeitpunkt(new Date(p[0] * 1000))}</span>
-            <span>CPU {p[1] != null ? `${zahl(p[1])} %` : "—"} · RAM {p[2] != null ? `${zahl(p[2])} %` : "—"}</span>
-            <span className="gedaempft">Last {p[3] != null ? zahl(p[3]) : "—"} · Platte {p[4] != null ? `${zahl(p[4])} %` : "—"}</span>
+            style={{ left: `min(calc(${((x(p[0]!) / B) * 100).toFixed(1)}% + 10px), calc(100% - 190px))` }}>
+            <span className="font-medium">{zeitpunkt(new Date(p[0]! * 1000))}</span>
+            <span>CPU {wert(p, iCpu)} · RAM {wert(p, iRam)}</span>
+            {mitSpitzen ? <span>Spitze: CPU {wert(p, iCpuMax)} · RAM {wert(p, iRamMax)}</span> : null}
+            <span className="gedaempft">Last {wert(p, iLast, "")} · Platte {wert(p, iPlatte)}</span>
           </div>
         ) : null}
       </div>
     </div>
+  );
+}
+
+function gemerkterZeitraum(): Zeitraum {
+  try {
+    const w = window.localStorage.getItem(ZEITRAUM_MERKER);
+    if (w && w in ZEITRAUM_KURZ) return w as Zeitraum;
+  } catch { /* ohne Speicher: Standard */ }
+  return "24h";
+}
+
+/** Karte „Auslastung“ mit wählbarem Zeitraum; die Wahl bleibt in diesem Browser gemerkt. */
+function AuslastungKarte() {
+  const [zeitraum, setZeitraumRoh] = useState<Zeitraum>(gemerkterZeitraum);
+  const setZeitraum = (z: Zeitraum) => {
+    setZeitraumRoh(z);
+    try { window.localStorage.setItem(ZEITRAUM_MERKER, z); } catch { /* nur bequem, nicht nötig */ }
+  };
+  const verlauf = useQuery({
+    queryKey: ["system", "verlauf", zeitraum],
+    queryFn: () => api<Verlauf>(`system/verlauf/?zeitraum=${zeitraum}`),
+    refetchInterval: 60_000,
+    placeholderData: (vorher: Verlauf | undefined) => vorher,
+  });
+  return (
+    <Karte className="px-5 py-4 flex flex-col gap-2.5 min-h-0" data-testid="auslastung">
+      <KartenKopf titel={`Auslastung · ${verlauf.data?.name ?? ZEITRAUM_KURZ[zeitraum]}`}
+        unter="CPU und Arbeitsspeicher in Prozent, gemessen jede Minute vom Systemagenten" />
+      <Segmente label="Zeitraum" wert={zeitraum} onWahl={setZeitraum} className="self-start flex-wrap"
+        werte={(Object.keys(ZEITRAUM_KURZ) as Zeitraum[]).map((z) => ({ wert: z, text: ZEITRAUM_KURZ[z] }))} />
+      <Fehleranzeige fehler={verlauf.error} />
+      {verlauf.data ? <VerlaufDiagramm verlauf={verlauf.data} /> : verlauf.error ? null : <Laden />}
+    </Karte>
   );
 }
 
@@ -210,6 +306,7 @@ export type Wahl = { art: "server"; aktion: Aktion } | { art: "epm"; aufgabe: Au
 export function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; daten: Uebersicht; onZu: () => void }) {
   const qc = useQueryClient();
   const melden = useHinweis();
+  const ich = useIch();
   const [kennwort, setKennwort] = useState("");
   const [code, setCode] = useState("");
   const [minuten, setMinuten] = useState("0");
@@ -246,7 +343,7 @@ export function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; dat
       beschreibung={wahl.art === "server" ? wahl.aktion.beschreibung : wahl.aufgabe.beschreibung}
       fuss={<>
         <Knopf onClick={onZu}>Abbrechen</Knopf>
-        <Knopf variante={zfa ? "dng" : "pri"} laedt={los.isPending} disabled={zfa && (!kennwort || !code)} onClick={() => los.mutate()}>
+        <Knopf variante={zfa ? "dng" : "pri"} laedt={los.isPending} disabled={zfa && (!ich.zweiter_faktor || !kennwort || !code)} onClick={() => los.mutate()}>
           {zfa ? "Bestätigen und ausführen" : "Ausführen"}</Knopf>
       </>}>
       <form className="flex flex-col gap-3.5" onSubmit={(e) => { e.preventDefault(); los.mutate(); }}>
@@ -279,14 +376,17 @@ export function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; dat
           <Meldung art="warn">{andere.length} andere Anmeldungen werden beendet. Ungespeicherte Eingaben dieser Benutzer gehen verloren.</Meldung>
         ) : null}
         {zfa ? (
-          <div className="grid grid-cols-2 gap-3">
-            <Feld label="Ihr Passwort" fehler={f.kennwort} pflicht>
-              {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}
-            </Feld>
-            <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={f.code} pflicht>
-              {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />}
-            </Feld>
-          </div>
+          <>
+            <ZweiFaktorFehlt />
+            <div className="grid grid-cols-2 gap-3">
+              <Feld label="Ihr Passwort" fehler={f.kennwort} pflicht>
+                {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}
+              </Feld>
+              <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={f.code} pflicht>
+                {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />}
+              </Feld>
+            </div>
+          </>
         ) : null}
         {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
         {f.minuten ? <Meldung art="fehler">{f.minuten}</Meldung> : null}
@@ -305,7 +405,7 @@ function Taetigkeiten({ daten, offen, onWahl }: { daten: Uebersicht; offen: Set<
   return (
     <Karte className="px-5 py-4 flex flex-col gap-4" data-testid="taetigkeiten">
       <KartenKopf titel="Tätigkeiten" unter="Jede Tätigkeit steht mit Person und Zeitpunkt im Audit-Log." />
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-6">
         <div className="flex flex-col gap-1">
           <h3 className="m-0 text-sm font-semibold flex items-center gap-2"><Icon name="server" />Server (Ubuntu-VM)</h3>
           <span className="text-xs gedaempft mb-1">ausgeführt vom Systemagenten auf dem Server – nur diese festen Tätigkeiten</span>
@@ -369,7 +469,7 @@ function HinweisKarte({ hinweis }: { hinweis: Hinweis | null }) {
           <Knopf klein laedt={beenden.isPending} onClick={() => beenden.mutate()}>Beenden</Knopf>
         </div>
       ) : <span className="text-sm gedaempft">Gerade ist kein Hinweis aktiv.</span>}
-      <form className="grid grid-cols-[minmax(0,1fr)_150px_170px_auto] gap-2.5 items-end" onSubmit={(e) => { e.preventDefault(); setzen.mutate(); }}>
+      <form className="flex flex-wrap gap-2.5 items-end [&>.feld]:grow [&>.feld:first-child]:basis-[260px]" onSubmit={(e) => { e.preventDefault(); setzen.mutate(); }}>
         <Feld label="Neuer Hinweis" fehler={f.text}>
           {(p) => <Eingabe {...p} maxLength={500} value={text} onChange={(e) => setText(e.target.value)} placeholder="z. B. Heute ab 18 Uhr Wartung" />}
         </Feld>
@@ -398,7 +498,7 @@ function Angemeldet({ liste }: { liste: Sitzung[] }) {
     onError: (e) => melden(e.message, "fehler"),
   });
   return (
-    <Karte className="px-5 py-4 flex flex-col gap-2" data-testid="angemeldet">
+    <Karte className="px-5 py-4 flex flex-col gap-2 overflow-x-auto" data-testid="angemeldet">
       <KartenKopf titel={`Angemeldet (${liste.length})`} unter="Alle gültigen Anmeldungen; nach 30 Minuten ohne Aktivität laufen sie ab." />
       {liste.length === 0 ? <Leer>Niemand angemeldet.</Leer> : (
         <table className="tabelle">
@@ -433,7 +533,7 @@ function Auftraege({ liste }: { liste: Auftrag[] }) {
     onError: (e) => melden(e.message, "fehler"),
   });
   return (
-    <Karte className="px-5 py-4 flex flex-col gap-2" data-testid="auftraege">
+    <Karte className="px-5 py-4 flex flex-col gap-2 overflow-x-auto" data-testid="auftraege">
       <KartenKopf titel="Verlauf der Tätigkeiten" unter="Die letzten 30 – vollständig im Audit-Log (Gruppe „System“)." />
       {liste.length === 0 ? <Leer>Noch keine Tätigkeiten.</Leer> : (
         <table className="tabelle">
@@ -470,6 +570,22 @@ function Auftraege({ liste }: { liste: Auftrag[] }) {
   );
 }
 
+/** Direkter Weg zu den betroffenen Konten (Fehlerliste 02.10.2026, 4.2): das eigene Konto führt zu „Mein Konto“
+ *  (dort wird die Zwei-Faktor-Anmeldung eingerichtet), alle anderen in die Benutzerverwaltung zu dieser Person. */
+function KontenLinks({ konten, ich, zweifaktor }: { konten?: Konto[]; ich: number; zweifaktor?: boolean }) {
+  if (!konten?.length) return null;
+  return (
+    <span className="text-[0.8125rem]">{" "}
+      {konten.map((k, i) => (
+        <Fragment key={k.id}>{i ? ", " : ""}
+          {k.id === ich && zweifaktor ? <Link to="/konto#zwei-faktor" title="Zwei-Faktor-Anmeldung für mein Konto einrichten">{k.anzeigename} (jetzt einrichten)</Link>
+            : <Link to={`/admin/benutzer?id=${k.id}`} title={`${k.anzeigename} in der Benutzerverwaltung öffnen`}>{k.anzeigename}</Link>}
+        </Fragment>
+      ))}
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------- Seite
 export function System() {
   const ich = useIch();
@@ -479,7 +595,7 @@ export function System() {
     queryFn: () => api<Auftrag[]>("system/auftraege/"),
     refetchInterval: (q) => ((q.state.data ?? []).some((a) => a.offen) ? 3000 : 30_000),
   });
-  const verlauf = useQuery({ queryKey: ["system", "verlauf"], queryFn: () => api<Verlauf>("system/verlauf/"), refetchInterval: 60_000 });
+  const fenster = useStufe();
   const [wahl, setWahl] = useState<Wahl | null>(null);
   const [pakete, setPakete] = useState(false);
   const qc = useQueryClient();
@@ -522,7 +638,7 @@ export function System() {
   return (
     <Seite pfad={[{ text: "Administration" }, { text: "System" }]}>
       <Seitenkopf titel="System" unter="Server und EPM: Auslastung, Updates, Wartung. Standardmäßig nur für die Administration (Vertretung unter Benutzer › Rechte)."
-        rechts={<Knopf icon="neustart" laedt={daten.isFetching} onClick={() => { void daten.refetch(); void auftraege.refetch(); void verlauf.refetch(); }}>
+        rechts={<Knopf icon="neustart" laedt={daten.isFetching} onClick={() => { void daten.refetch(); void auftraege.refetch(); void qc.invalidateQueries({ queryKey: ["system", "verlauf"] }); }}>
           Neu laden</Knopf>} />
 
       {!d.agent.verzeichnis ? (
@@ -559,17 +675,14 @@ export function System() {
             {letzteSicherungAlt ? <span className="text-warn"> · älter als 36 h</span> : null}</> : h ? "keine Sicherung gefunden" : "kommt vom Systemagenten"} />
       </div>
 
-      <Karte className="px-5 py-4 flex flex-col gap-2">
-        <KartenKopf titel="Auslastung der letzten 24 Stunden" unter="CPU und Arbeitsspeicher in Prozent, gemessen jede Minute vom Systemagenten" />
-        {verlauf.data ? <VerlaufDiagramm verlauf={verlauf.data} /> : <Laden />}
-      </Karte>
-
-      <Taetigkeiten daten={d} offen={offen} onWahl={setWahl} />
-      <Auftraege liste={auftraege.data ?? []} />
-
-      {/* Karten in Stufen (S16, Entwurf 2): untereinander, ab 1440 px 2, ab 1920 px 3, ab 2560 px 4 Kartenspalten */}
-      <div className="grid grid-cols-1 hd:grid-cols-2 fhd:grid-cols-3 qhd:grid-cols-4 gap-5 items-start" data-testid="system-karten">
-        <Karte className="px-5 py-4 flex flex-col gap-2" data-testid="server-karte">
+      {/* Karten im Raster (S16, Entwurf 2: ab 1440 px 2, ab 1920 px 3, ab 2560 px 4 Spalten); Breite und Höhe jeder
+          Karte über das Menü „⋯“ einstellbar, je Person gespeichert (Fehlerliste 02.10.2026, 4.1) */}
+      <Bereiche seite="system" spalten={SYSTEM_SPALTEN[fenster]} testid="system-karten">
+        <Bereich id="verlauf" titel="Auslastung" standard={{ breite: 5 }}><AuslastungKarte /></Bereich>
+        <Bereich id="taetigkeiten" titel="Tätigkeiten" standard={{ breite: 5 }}><Taetigkeiten daten={d} offen={offen} onWahl={setWahl} /></Bereich>
+        <Bereich id="auftraege" titel="Verlauf der Tätigkeiten" standard={{ breite: 5 }}><Auftraege liste={auftraege.data ?? []} /></Bereich>
+        <Bereich id="server" titel="Server">
+        <Karte className="px-5 py-4 flex flex-col gap-2 overflow-x-auto" data-testid="server-karte">
           <KartenKopf titel="Server" unter={h ? `gemessen ${relativ(h.zeit, true)}` : "ohne Systemagent nur Werte aus dem Container"} />
           <dl className="m-0">
             <Zeile label="Rechner">{h?.rechner ?? "—"}</Zeile>
@@ -618,8 +731,10 @@ export function System() {
             </>
           ) : null}
         </Karte>
+        </Bereich>
 
-        <Karte className="px-5 py-4 flex flex-col gap-2" data-testid="epm-karte">
+        <Bereich id="epm" titel="EPM">
+        <Karte className="px-5 py-4 flex flex-col gap-2 overflow-x-auto" data-testid="epm-karte">
           <KartenKopf titel="EPM" unter={`Version ${d.epm.version}`} />
           <dl className="m-0">
             <Zeile label="Software">Django {d.epm.django} · Python {d.epm.python} · PostgreSQL {d.epm.datenbank.version}</Zeile>
@@ -633,10 +748,15 @@ export function System() {
             <Zeile label="Dokumente">{zahl(d.epm.dokumente.anzahl)} Dateien · {dateigroesse(d.epm.dokumente.groesse)}
               {d.epm.dokumente.ungeprueft ? <span className="gedaempft"> · {d.epm.dokumente.ungeprueft} Altdokumente ungeprüft</span> : null}
               {d.epm.dokumente.platz ? <span className="gedaempft"> · {dateigroesse(d.epm.dokumente.platz.frei)} frei</span> : null}</Zeile>
-            <Zeile label="Konten">{d.epm.konten.aktiv} aktiv · {d.epm.konten.admins} Admins
-              {d.epm.konten.gesperrt ? <> · <Chip art="fehler">{d.epm.konten.gesperrt} gesperrt</Chip></> : null}
-              {d.epm.konten.ohne_2fa ? <> · <Chip art="warn">{d.epm.konten.ohne_2fa} ohne 2FA</Chip></> : null}
-              {d.epm.konten.einmal_kennwort_offen ? <> · {d.epm.konten.einmal_kennwort_offen} mit offenem Einmal-Kennwort</> : null}</Zeile>
+            <Zeile label="Konten"><span data-testid="konten-zeile">{d.epm.konten.aktiv} aktiv · {d.epm.konten.admins} Admins
+              {d.epm.konten.gesperrt ? <> · <Chip art="fehler">{d.epm.konten.gesperrt} gesperrt</Chip>
+                <KontenLinks konten={d.epm.konten.gesperrt_konten} ich={ich.id} /></> : null}
+              {d.epm.konten.ohne_2fa ? <> · <Chip art={d.epm.konten.zweiter_faktor === "freiwillig" ? undefined : "warn"}>{d.epm.konten.ohne_2fa} ohne 2FA</Chip>
+                <KontenLinks konten={d.epm.konten.ohne_2fa_konten} ich={ich.id} zweifaktor /></> : null}
+              {d.epm.konten.einmal_kennwort_offen ? <> · {d.epm.konten.einmal_kennwort_offen} mit offenem Einmal-Kennwort
+                <KontenLinks konten={d.epm.konten.einmal_kennwort_konten} ich={ich.id} /></> : null}</span></Zeile>
+            <Zeile label="Zwei-Faktor-Anmeldung">{d.epm.konten.zweiter_faktor === "alle" ? "Pflicht für alle" : d.epm.konten.zweiter_faktor === "admins"
+              ? "Pflicht für Admins, sonst freiwillig" : "freiwillig"} · <Link to="/admin/benutzer#anmeldung">ändern</Link></Zeile>
             <Zeile label="Zeitzone">{d.epm.zeitzone} · Serverzeit {h ? zeitpunkt(h.zeit) : "—"} · heute {datum(new Date())}</Zeile>
           </dl>
           <h3 className="m-0 mt-2 text-sm font-semibold">Größte Tabellen</h3>
@@ -646,9 +766,10 @@ export function System() {
                 <td className="td num text-right text-[0.75rem] gedaempft">{zahl(t.zeilen)} Zeilen</td></tr>))}</tbody>
           </table>
         </Karte>
-        <HinweisKarte hinweis={d.hinweis} />
-        <Angemeldet liste={d.angemeldet} />
-      </div>
+        </Bereich>
+        <Bereich id="hinweis" titel="Hinweis an alle Benutzer"><HinweisKarte hinweis={d.hinweis} /></Bereich>
+        <Bereich id="angemeldet" titel="Angemeldet"><Angemeldet liste={d.angemeldet} /></Bereich>
+      </Bereiche>
       <span className="text-xs gedaempft">Angemeldet als {ich.anzeigename}. Werte vom Server werden jede Minute aktualisiert.</span>
       <AusfuehrenDialog wahl={wahl} daten={d} onZu={() => setWahl(null)} />
     </Seite>

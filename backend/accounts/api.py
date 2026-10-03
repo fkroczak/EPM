@@ -8,6 +8,11 @@ Ablauf beim ersten Login:
   4. POST /api/auth/2fa/bestaetigen   ersten Code eingeben → Notfall-Codes (einmalig angezeigt)
 Danach bei jeder Anmeldung: 1. und POST /api/auth/2fa mit dem aktuellen Code.
 
+Der zweite Faktor ist freiwillig (Festlegung 02.10.2026, ``Anmelderegeln``): Ohne Pflicht entfallen 3. und 4.; wer
+die Authenticator-App trotzdem einrichtet (Mein Konto), meldet sich danach immer mit Code an und kann sie dort mit
+POST /api/auth/2fa/ausschalten wieder ausschalten. Die Administration kann die Pflicht für Admins oder für alle setzen
+(GET/PUT /api/benutzer/anmeldung/).
+
 Fehler werden als Antwort zurückgegeben (nicht als Exception), damit das
 Protokoll der Fehlversuche nicht mit der Transaktion zurückgerollt wird.
 """
@@ -32,11 +37,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from audit.models import SystemEreignis, protokolliere
+from epm.api_basis import sichtbare_benutzer, wahr
 
-from .models import Rolle, Sitzung, User
+from .models import Anmelderegeln, Rolle, Sitzung, User
 from .sitzungen import aktive_sitzungen, alle_sitzungen_beenden, schluessel_erneuert, sitzung_beenden
-from .permissions import Angemeldet, BenutzerRecht, ist_verifiziert
+from .permissions import Angemeldet, BenutzerRecht, ist_verifiziert, zweiter_faktor_erfuellt
 from .rechte import schreibt_nur_testpatienten
+from .zweifaktor import code_gueltig, hat_zweiten_faktor, pflicht as zweiter_faktor_pflicht
 
 ANZAHL_NOTFALLCODES = 10
 # S08: Hinweis auf der Startseite, sobald nur noch so viele Notfall-Codes übrig sind (abgeleitet: bei 3 von 10 bleibt
@@ -51,10 +58,6 @@ def notfallcodes_stand(user) -> dict:
 
 
 # ---------------------------------------------------------------- Hilfen
-def hat_zweiten_faktor(user) -> bool:
-    return TOTPDevice.objects.filter(user=user, confirmed=True).exists()
-
-
 def naechster_schritt(request) -> str:
     user = request.user
     if not user.is_authenticated:
@@ -62,7 +65,8 @@ def naechster_schritt(request) -> str:
     if user.muss_kennwort_aendern:
         return "kennwort_aendern"
     if not hat_zweiten_faktor(user):
-        return "2fa_einrichten"
+        # freiwillig (Festlegung 02.10.2026): ohne Pflicht ist die Anmeldung mit dem Kennwort fertig
+        return "2fa_einrichten" if zweiter_faktor_pflicht(user) else "fertig"
     if not ist_verifiziert(user):
         return "2fa"
     return "fertig"
@@ -126,6 +130,10 @@ def ich_daten(user):
         "darstellung": user.darstellung,
         "startseite": {**(user.startseite or {}), "karten": startseite_karten(user)},
         "aufteilung": user.aufteilung or {},
+        "bereiche": user.bereiche or {},
+        # zweiter Faktor: eingerichtet? Pflicht? (Bestätigungen fragen den Code nur, wenn einer eingerichtet ist)
+        "zweiter_faktor": hat_zweiten_faktor(user),
+        "zweiter_faktor_pflicht": zweiter_faktor_pflicht(user),
         "rechte": user.rechte,
         # Admins: Patientendaten nur bei Testpatienten schreiben (Oberfläche blendet Knöpfe bei echten Akten aus)
         "schreibt_nur_testpatienten": schreibt_nur_testpatienten(user),
@@ -188,6 +196,10 @@ class AnmeldenView(OffenerView):
             return fehler("Das Einmal-Kennwort ist abgelaufen. Bitte bei der Administration ein neues anfordern.",
                           status.HTTP_401_UNAUTHORIZED, abgelaufen=True)
         login(request, user)  # Sitzungs-ID wird erneuert
+        if naechster_schritt(request) == "fertig" and user.fehlversuche:
+            # ohne zweiten Faktor ist die Anmeldung hier abgeschlossen (sonst setzt der Code die Fehlversuche zurück)
+            user.fehlversuche = 0
+            user.save(update_fields=["fehlversuche"])
         return status_antwort(request)
 
 
@@ -226,7 +238,7 @@ class KennwortView(OffenerView):
             return fehler("Nicht angemeldet.", status.HTTP_401_UNAUTHORIZED)
         erstanmeldung = user.muss_kennwort_aendern
         if not erstanmeldung:
-            if not ist_verifiziert(user):
+            if not zweiter_faktor_erfuellt(user):
                 return fehler("Anmeldung mit zweitem Faktor erforderlich.", status.HTTP_403_FORBIDDEN)
             if not user.check_password(str(request.data.get("alt", ""))):
                 return fehler("Bisheriges Kennwort ist falsch.")
@@ -308,6 +320,36 @@ def neue_notfallcodes(user) -> list[str]:
     return codes
 
 
+class ZweiterFaktorAusschaltenView(APIView):
+    """Eigenen zweiten Faktor ausschalten (nur solange er freiwillig ist): mit Kennwort und einem gültigen Code.
+    Authenticator und Notfall-Codes werden gelöscht; die Anmeldung braucht danach nur noch das Kennwort."""
+
+    permission_classes = [Angemeldet]
+
+    def post(self, request):
+        user = request.user
+        if not hat_zweiten_faktor(user):
+            return fehler("Es ist kein zweiter Faktor eingerichtet.")
+        if zweiter_faktor_pflicht(user):
+            return fehler("Der zweite Faktor ist für dieses Konto Pflicht und kann nicht ausgeschaltet werden.",
+                          status.HTTP_403_FORBIDDEN)
+        if not user.check_password(str(request.data.get("kennwort", ""))):
+            protokolliere(SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request, grund="bestaetigung",
+                          was="Zweiten Faktor ausschalten")
+            return bestaetigung_fehlgeschlagen(request, "2fa_aus_kennwort") or Response(
+                {"kennwort": "Das Passwort stimmt nicht."}, status=status.HTTP_400_BAD_REQUEST)
+        if not code_gueltig(user, request.data.get("code", "")):
+            protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request, schritt="bestaetigung",
+                          was="Zweiten Faktor ausschalten")
+            return bestaetigung_fehlgeschlagen(request, "2fa_aus_code") or Response(
+                {"code": "Der Code ist ungültig oder wurde schon verwendet."}, status=status.HTTP_400_BAD_REQUEST)
+        bestaetigung_gelungen(request)
+        TOTPDevice.objects.filter(user=user).delete()
+        StaticDevice.objects.filter(user=user).delete()
+        protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_ZURUECKGESETZT, request, objekt=user.username, selbst=True)
+        return Response(ich_daten(user))
+
+
 class AbmeldenView(OffenerView):
     def post(self, request):
         logout(request)
@@ -334,6 +376,50 @@ GROESSEN = (1, 2)
 TEILER_SEITEN = ("patientenliste", "akte_uebersicht", "akte_kontakte", "plan_editor")
 TEILER_STUFEN = ("hd", "fhd", "qhd")
 TEILER_MIN_SPALTE = 0.15  # keine Spalte schmaler als 15 % (sonst wäre sie nicht mehr bedienbar)
+
+
+# Größe der Karten je Seite (Fehlerliste 02.10.2026, Punkt 2 und 4.1): wie die Kacheln der Startseite im Raster, je
+# Person. Breite in Spalten des Rasters (1–5, begrenzt auf die Spalten des Fensters), Höhe in Rasterzeilen
+# (0 = automatisch nach Inhalt, sonst 1–4 feste Zeilen, der Inhalt scrollt dann in der Karte).
+BEREICH_SEITEN = {
+    "akte_uebersicht": ("gewicht", "therapie", "termine", "plan", "kontakte", "stamm", "aerzte", "bezug"),
+    "akte_therapie": ("diagnose", "empfehlung", "therapie", "hinweis"),
+    "akte_kontakte": ("kontakte", "hinweis", "erreichbarkeit", "termine"),
+    "system": ("verlauf", "taetigkeiten", "auftraege", "server", "epm", "hinweis", "angemeldet"),
+}
+BEREICH_BREITEN = (1, 2, 3, 4, 5)
+BEREICH_HOEHEN = (0, 1, 2, 3, 4)
+
+
+def pruefe_bereiche(daten) -> dict:
+    """{"<seite>": {"<karte>": {"breite": 1–5, "hoehe": 0–4} | null} | null} prüfen; null setzt die Karte bzw. die
+    ganze Seite auf den Standard zurück."""
+    if not isinstance(daten, dict):
+        raise serializers.ValidationError({"bereiche": "Erwartet wird ein Objekt."})
+    ergebnis = {}
+    for seite, karten in daten.items():
+        if seite not in BEREICH_SEITEN:
+            raise serializers.ValidationError({"bereiche": f"Unbekannte Seite „{seite}“."})
+        if karten is None:
+            ergebnis[seite] = None
+            continue
+        if not isinstance(karten, dict):
+            raise serializers.ValidationError({"bereiche": "Je Seite wird ein Objekt mit den Karten erwartet."})
+        ergebnis[seite] = {}
+        for karte, groesse in karten.items():
+            if karte not in BEREICH_SEITEN[seite]:
+                raise serializers.ValidationError({"bereiche": f"Unbekannte Karte „{karte}“ auf „{seite}“."})
+            if groesse is None:
+                ergebnis[seite][karte] = None
+                continue
+            breite = groesse.get("breite") if isinstance(groesse, dict) else None
+            hoehe = groesse.get("hoehe") if isinstance(groesse, dict) else None
+            if (isinstance(breite, bool) or breite not in BEREICH_BREITEN
+                    or isinstance(hoehe, bool) or hoehe not in BEREICH_HOEHEN):
+                raise serializers.ValidationError(
+                    {"bereiche": "Breite 1 bis 5 Spalten, Höhe 0 (automatisch) bis 4 Zeilen."})
+            ergebnis[seite][karte] = {"breite": breite, "hoehe": hoehe}
+    return ergebnis
 
 
 def startseite_karten(user, gespeichert=None) -> list[dict]:
@@ -422,6 +508,8 @@ class StartseiteSerializer(serializers.Serializer):
 
     karten = KarteSerializer(many=True, required=False)
     notfallhinweis_bei = serializers.IntegerField(min_value=0, allow_null=True, required=False)
+    # Hinweis „Zweiter Faktor nicht eingerichtet“ ausgeblendet (solange er freiwillig ist)
+    zweifaktorhinweis_aus = serializers.BooleanField(required=False)
 
     def validate_karten(self, karten):
         ids = [k["id"] for k in karten]
@@ -454,7 +542,7 @@ def pruefe_aufteilung(daten) -> dict:
 
 
 class IchView(APIView):
-    """Eigenes Konto: Daten lesen, Darstellung und Startseite speichern."""
+    """Eigenes Konto: Daten lesen; Darstellung, Startseite, Spaltenteiler und Größe der Karten speichern."""
 
     permission_classes = [Angemeldet]
 
@@ -477,6 +565,8 @@ class IchView(APIView):
                 neu["karten"] = startseite_karten(user, [dict(k) for k in s.validated_data["karten"]])
             if "notfallhinweis_bei" in s.validated_data:
                 neu["notfallhinweis_bei"] = s.validated_data["notfallhinweis_bei"]
+            if "zweifaktorhinweis_aus" in s.validated_data:
+                neu["zweifaktorhinweis_aus"] = s.validated_data["zweifaktorhinweis_aus"]
             user.startseite = neu
             felder.append("startseite")
         if "aufteilung" in request.data:
@@ -488,6 +578,22 @@ class IchView(APIView):
                     neu[schluessel] = werte
             user.aufteilung = neu
             felder.append("aufteilung")
+        if "bereiche" in request.data:
+            neu = {k: dict(v) for k, v in (user.bereiche or {}).items() if isinstance(v, dict)}
+            for seite, karten in pruefe_bereiche(request.data["bereiche"]).items():
+                if karten is None:
+                    neu.pop(seite, None)
+                    continue
+                stand = neu.setdefault(seite, {})
+                for karte, groesse in karten.items():
+                    if groesse is None:
+                        stand.pop(karte, None)
+                    else:
+                        stand[karte] = groesse
+                if not stand:
+                    neu.pop(seite, None)
+            user.bereiche = neu
+            felder.append("bereiche")
         if felder:
             user.save(update_fields=felder)
         return Response(ich_daten(user))
@@ -511,6 +617,8 @@ class SicherheitView(APIView):
             "authenticator_eingerichtet_am": eingerichtet,
             "notfallcodes_uebrig": StaticToken.objects.filter(device__user=user).count(),
             "notfallcodes_gesamt": ANZAHL_NOTFALLCODES,
+            # freiwillig (Festlegung 02.10.2026): ohne Pflicht lässt sich der zweite Faktor ausschalten
+            "zweiter_faktor_pflicht": zweiter_faktor_pflicht(user),
         })
 
 
@@ -551,26 +659,50 @@ class NotfallcodesView(APIView):
 
 
 # ---------------------------------------------------------------- Benutzerverwaltung (Admin)
+# Testbenutzer (sehen und bearbeiten nur Testpatienten) gibt es für diese Rollen; Admins schreiben ohnehin nur bei
+# Testpatienten und verlören als Testbenutzer die Verwaltung
+TESTBENUTZER_ROLLEN = (Rolle.BETRACHTER, Rolle.MITARBEITER, Rolle.MITARBEITER_PLUS, Rolle.MEDIZINER)
+
+
 class BenutzerSerializer(serializers.ModelSerializer):
     anzeigename = serializers.CharField(read_only=True)
     zweiter_faktor = serializers.SerializerMethodField()
+    zweiter_faktor_pflicht = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             "id", "username", "titel", "first_name", "last_name", "kuerzel", "funktion", "email",
             "rolle", "ist_test", "is_active", "nur_historisch", "anzeigename", "zweiter_faktor",
-            "muss_kennwort_aendern", "einmal_kennwort_gueltig_bis", "gesperrt_am", "sperrgrund",
-            "fehlversuche", "last_login", "date_joined",
+            "zweiter_faktor_pflicht", "muss_kennwort_aendern", "einmal_kennwort_gueltig_bis", "gesperrt_am", "sperrgrund",
+            "fehlversuche", "last_login", "date_joined", "ausgeblendet_am",
         ]
         read_only_fields = ["is_active", "nur_historisch", "muss_kennwort_aendern", "einmal_kennwort_gueltig_bis",
-                            "gesperrt_am", "sperrgrund", "fehlversuche", "last_login", "date_joined"]
+                            "gesperrt_am", "sperrgrund", "fehlversuche", "last_login", "date_joined", "ausgeblendet_am"]
 
     def get_zweiter_faktor(self, obj):
         return hat_zweiten_faktor(obj)
 
+    def get_zweiter_faktor_pflicht(self, obj):
+        return zweiter_faktor_pflicht(obj)
+
     def validate_kuerzel(self, wert):
         return wert or None
+
+    def validate(self, attrs):
+        konto = self.instance
+        rolle = attrs.get("rolle", konto.rolle if konto else Rolle.BETRACHTER)
+        test = attrs.get("ist_test", konto.ist_test if konto else False)
+        if konto is not None and konto.nur_historisch:
+            if "rolle" in attrs and attrs["rolle"] != Rolle.KEINE:
+                raise serializers.ValidationError({"rolle": "Ohne Login hat das Konto keine Rechte. Bitte zuerst "
+                                                            "„Login geben“."})
+            if attrs.get("ist_test"):
+                raise serializers.ValidationError({"ist_test": "Ohne Login gibt es keinen Testzugang."})
+        elif test and rolle not in TESTBENUTZER_ROLLEN:
+            raise serializers.ValidationError({"ist_test": "Testbenutzer gibt es für Betrachter, Mitarbeiter, Mitarbeiter (erweitert) und "
+                                                           "Mediziner."})
+        return attrs
 
 
 class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.CreateModelMixin,
@@ -583,9 +715,64 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
     search_fields = ["username", "first_name", "last_name", "kuerzel"]
     filterset_fields = ["rolle", "is_active", "ist_test"]
 
+    def get_queryset(self):
+        """Ausgeblendete Testbenutzer nur mit ``?ausgeblendete=1`` in der Liste (einzeln immer erreichbar, damit man sie
+        wieder einblenden kann); Testbenutzer nur mit Recht „Testdaten sehen“ (Festlegung 03.10.2026)."""
+        ausgeblendete = self.action != "list" or wahr(self.request.query_params.get("ausgeblendete"))
+        return sichtbare_benutzer(self.request.user, User.objects.all(), ausgeblendete=ausgeblendete)
+
+    def _ausblenden(self, request, user):
+        user.sperren("Testbenutzer ausgeblendet")
+        user.ausgeblendet_am = timezone.now()
+        user.save(update_fields=User.SPERR_FELDER + ["ausgeblendet_am"])
+        alle_sitzungen_beenden(user)
+        protokolliere(SystemEreignis.Art.BENUTZER_GESPERRT, request, objekt=user.username, ausgeblendet=True)
+
+    @action(detail=True, methods=["post"])
+    def ausblenden(self, request, pk=None):
+        """Testbenutzer ausblenden (Festlegung 03.10.2026): gesperrt, alle Anmeldungen beendet, aus allen Listen
+        genommen – nicht gelöscht; Einträge bleiben zugeordnet. Zurück mit „einblenden“."""
+        user = self.get_object()
+        if not user.ist_test:
+            return fehler("Ausblenden gibt es nur für Testbenutzer. Echte Konten werden gesperrt oder ohne Login gesetzt.")
+        if user == request.user:
+            return fehler("Das eigene Konto kann nicht ausgeblendet werden.")
+        if user.ausgeblendet_am:
+            return fehler("Der Testbenutzer ist bereits ausgeblendet.")
+        self._ausblenden(request, user)
+        return Response(self.get_serializer(user).data)
+
+    @action(detail=False, methods=["post"], url_path="testbenutzer-ausblenden")
+    def testbenutzer_ausblenden(self, request):
+        """Alle Testbenutzer auf einmal ausblenden (außer dem eigenen Konto)."""
+        konten = list(User.objects.filter(ist_test=True, ausgeblendet_am__isnull=True, nur_historisch=False)
+                      .exclude(pk=request.user.pk))
+        for user in konten:
+            self._ausblenden(request, user)
+        return Response({"ausgeblendet": len(konten)})
+
+    @action(detail=True, methods=["post"])
+    def einblenden(self, request, pk=None):
+        """Ausgeblendeten Testbenutzer wieder einblenden und entsperren."""
+        user = self.get_object()
+        if not user.ausgeblendet_am:
+            return fehler("Der Benutzer ist nicht ausgeblendet.")
+        user.ausgeblendet_am = None
+        user.entsperren()
+        user.save(update_fields=User.SPERR_FELDER + ["ausgeblendet_am"])
+        protokolliere(SystemEreignis.Art.BENUTZER_GEAENDERT, request, objekt=user.username, eingeblendet=True)
+        return Response(self.get_serializer(user).data)
+
     def create(self, request, *args, **kwargs):
         s = self.get_serializer(data=request.data)
         s.is_valid(raise_exception=True)
+        if request.data.get("ohne_login") in (True, "true", "1", 1):
+            # nur als Name für Einträge (z. B. frühere Mitarbeiter): ohne Kennwort, ohne Rechte
+            user = User(**{**s.validated_data, "nur_historisch": True})
+            user.save()
+            protokolliere(SystemEreignis.Art.BENUTZER_ANGELEGT, request, objekt=user.username, rolle=user.rolle,
+                          ohne_login=True)
+            return Response(self.get_serializer(user).data, status=status.HTTP_201_CREATED)
         user = User(**s.validated_data)
         kennwort = user.neues_einmal_kennwort()
         user.save()
@@ -594,6 +781,34 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         daten = self.get_serializer(user).data
         daten["einmal_kennwort"] = kennwort
         return Response(daten, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get", "put"], url_path="anmeldung")
+    def anmeldung(self, request):
+        """Anmelderegeln: ob der zweite Faktor freiwillig ist, Pflicht für Admins oder Pflicht für alle
+        (Festlegung 02.10.2026: freiwillig). ``PUT {"zweiter_faktor": "freiwillig" | "admins" | "alle"}``."""
+        regeln = Anmelderegeln.aktuell()
+        if request.method == "PUT":
+            wert = request.data.get("zweiter_faktor")
+            if wert not in Anmelderegeln.ZweiterFaktor.values:
+                return Response({"zweiter_faktor": "Erlaubt: freiwillig, admins, alle."},
+                                status=status.HTTP_400_BAD_REQUEST)
+            if wert != regeln.zweiter_faktor:
+                vorher = regeln.zweiter_faktor
+                regeln.zweiter_faktor = wert
+                regeln._history_user = request.user
+                regeln.save()
+                namen = dict(Anmelderegeln.ZweiterFaktor.choices)
+                protokolliere(SystemEreignis.Art.RECHTE_GEAENDERT, request, objekt="Anmeldung",
+                              zweiter_faktor=[namen[vorher], namen[wert]])
+        konten = User.objects.filter(nur_historisch=False, is_active=True, ausgeblendet_am__isnull=True)
+        ohne = [u for u in konten if not hat_zweiten_faktor(u)]
+        return Response({
+            "zweiter_faktor": regeln.zweiter_faktor,
+            "auswahl": [{"wert": w, "name": n} for w, n in Anmelderegeln.ZweiterFaktor.choices],
+            "geaendert_am": regeln.geaendert_am,
+            # aktive Konten ohne zweiten Faktor – sie müssten ihn bei „Pflicht“ mit der nächsten Anfrage einrichten
+            "ohne_zweiten_faktor": [{"id": u.id, "anzeigename": u.anzeigename, "rolle": u.rolle} for u in ohne],
+        })
 
     @action(detail=True, methods=["post"])
     def zugangsblatt(self, request, pk=None):
@@ -616,7 +831,8 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
     @action(detail=False, methods=["get"])
     def hinweise(self, request):
         """Gesperrte Konten für den Hinweis im Audit-Log."""
-        gesperrt = User.objects.filter(gesperrt_am__isnull=False, nur_historisch=False).order_by("-gesperrt_am")
+        gesperrt = sichtbare_benutzer(request.user, User.objects.filter(gesperrt_am__isnull=False, nur_historisch=False)
+                                      ).order_by("-gesperrt_am")
         return Response([{"id": u.id, "benutzername": u.username, "anzeigename": u.anzeigename,
                           "gesperrt_am": u.gesperrt_am, "sperrgrund": u.sperrgrund, "fehlversuche": u.fehlversuche}
                          for u in gesperrt])
@@ -627,17 +843,20 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         Einmal-Kennwort offen oder abgelaufen, ohne zweiten Faktor, Notfall-Codes knapp. Ohne Kennwörter oder Codes,
         nur Zustände und Anzahlen."""
         zeilen = []
-        for u in User.objects.filter(nur_historisch=False).order_by("last_name", "first_name"):
+        for u in sichtbare_benutzer(request.user, User.objects.filter(nur_historisch=False)).order_by("last_name", "first_name"):
             codes = StaticToken.objects.filter(device__user=u).count()
             probleme = []
             if u.gesperrt_am:
                 probleme.append("gesperrt")
             if u.muss_kennwort_aendern and u.einmal_kennwort_gueltig_bis:
                 probleme.append("einmal_kennwort_abgelaufen" if u.einmal_kennwort_abgelaufen else "einmal_kennwort")
-            elif not u.gesperrt_am and not hat_zweiten_faktor(u):
-                probleme.append("ohne_2fa")
-            elif not u.gesperrt_am and codes <= NOTFALLCODES_WARNEN_AB:
-                probleme.append("notfallcodes")
+            elif not u.gesperrt_am and u.is_active:
+                # zweiter Faktor freiwillig: Er fehlt nur, wo er Pflicht ist; Notfall-Codes zählen nur mit Authenticator
+                hat = hat_zweiten_faktor(u)
+                if not hat and zweiter_faktor_pflicht(u):
+                    probleme.append("ohne_2fa")
+                elif hat and codes <= NOTFALLCODES_WARNEN_AB:
+                    probleme.append("notfallcodes")
             if probleme:
                 zeilen.append({"id": u.id, "benutzername": u.username, "anzeigename": u.anzeigename,
                                "rolle": u.rolle, "probleme": probleme, "gesperrt_am": u.gesperrt_am,
@@ -654,6 +873,8 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         if user == self.request.user and not matrix()[neue_rolle]["benutzer_verwalten"]:
             raise serializers.ValidationError({"rolle": "Mit dieser Rolle könntest du Benutzer nicht mehr verwalten. "
                                                         "Die eigene Rolle bitte von einer anderen Person ändern lassen."})
+        if user == self.request.user and serializer.validated_data.get("ist_test") and not user.ist_test:
+            raise serializers.ValidationError({"ist_test": "Das eigene Konto kann nicht zum Testbenutzer werden."})
         vorher = {f: getattr(user, f) for f in serializer.validated_data}
         user = serializer.save()
         geaendert = {f: [str(vorher[f]), str(getattr(user, f))] for f in vorher if vorher[f] != getattr(user, f)}
@@ -675,12 +896,60 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user = self.get_object()
         if user.nur_historisch:
             return fehler("Historische Benutzer haben keinen Zugang.")
+        if user.ausgeblendet_am:
+            return fehler("Der Testbenutzer ist ausgeblendet. Bitte „Einblenden“ wählen.")
         vorher = user.sperrgrund
         user.entsperren()
         user.save(update_fields=User.SPERR_FELDER)
         protokolliere(SystemEreignis.Art.BENUTZER_GEAENDERT, request, objekt=user.username, entsperrt=True,
                       sperrgrund=vorher)
         return Response(self.get_serializer(user).data)
+
+    @action(detail=True, methods=["post"], url_path="ohne-login")
+    def ohne_login(self, request, pk=None):
+        """Konto auf „ohne Login“ setzen (Fehlerliste 02.10.2026): Die Person kann sich nicht mehr anmelden und hat
+        keine Rechte mehr (Rolle „Keine Berechtigung“); ihre Einträge bleiben ihr zugeordnet. Kennwort, Authenticator
+        und Notfall-Codes werden gelöscht, alle Anmeldungen beendet. Zurück geht es mit „Login geben“."""
+        user = self.get_object()
+        if user == request.user:
+            return fehler("Das eigene Konto kann nicht auf „ohne Login“ gesetzt werden.")
+        if user.nur_historisch:
+            return fehler("Das Konto ist bereits ohne Login.")
+        vorher = user.rolle
+        user.nur_historisch = True
+        user.gesperrt_am = None
+        user.sperrgrund = ""
+        user.fehlversuche = 0
+        user.muss_kennwort_aendern = True
+        user.einmal_kennwort_gueltig_bis = None
+        user.save()
+        TOTPDevice.objects.filter(user=user).delete()
+        StaticDevice.objects.filter(user=user).delete()
+        alle_sitzungen_beenden(user)
+        protokolliere(SystemEreignis.Art.BENUTZER_GEAENDERT, request, objekt=user.username, ohne_login=True,
+                      rolle_vorher=vorher)
+        return Response(self.get_serializer(user).data)
+
+    @action(detail=True, methods=["post"], url_path="login-geben")
+    def login_geben(self, request, pk=None):
+        """Konto ohne Login wieder einbinden: ``{"rolle": "mitarbeiter"}`` → Rolle setzen und ein Einmal-Kennwort
+        für das Zugangsblatt erzeugen (wie beim Anlegen)."""
+        user = self.get_object()
+        if not user.nur_historisch:
+            return fehler("Dieses Konto hat bereits einen Login.")
+        rolle = request.data.get("rolle") or Rolle.MITARBEITER
+        if rolle not in Rolle.values:
+            return Response({"rolle": "Unbekannte Rolle."}, status=status.HTTP_400_BAD_REQUEST)
+        user.nur_historisch = False
+        user.rolle = rolle
+        user.entsperren()
+        kennwort = user.neues_einmal_kennwort()
+        user.save()
+        protokolliere(SystemEreignis.Art.BENUTZER_GEAENDERT, request, objekt=user.username, login_gegeben=True,
+                      rolle=rolle, einmal_kennwort_gueltig_bis=user.einmal_kennwort_gueltig_bis.isoformat())
+        daten = self.get_serializer(user).data
+        daten["einmal_kennwort"] = kennwort
+        return Response(daten)
 
     @action(detail=True, methods=["post"], url_path="einmal-kennwort")
     def einmal_kennwort(self, request, pk=None):
@@ -728,7 +997,7 @@ class RechteView(APIView):
 
     def put(self, request):
         from .models import Gruppenrecht
-        from .rechte import CODES, FEST, NAMEN, NUR_ROLLEN, matrix
+        from .rechte import CODES, FEST, NAMEN, NUR_ROLLEN, OHNE_RECHTE, matrix
 
         eingabe = request.data.get("matrix")
         if not isinstance(eingabe, dict):
@@ -741,6 +1010,8 @@ class RechteView(APIView):
             for code, wert in werte.items():
                 if code not in NAMEN or not isinstance(wert, bool):
                     fehlerliste[f"{rolle}.{code}"] = "Unbekanntes Recht oder kein Ja/Nein."
+                elif rolle in OHNE_RECHTE and wert:
+                    fehlerliste[f"{rolle}.{code}"] = "Diese Rolle hat keine Rechte."
                 elif (rolle, code) in FEST and not wert:
                     fehlerliste[f"{rolle}.{code}"] = "Dieses Recht ist fest und kann nicht entzogen werden."
                 elif wert and code in NUR_ROLLEN and rolle not in NUR_ROLLEN[code]:
@@ -767,11 +1038,16 @@ class RechteView(APIView):
         return Response(self._daten())
 
     def _daten(self):
-        from .rechte import FEST, NUR_ROLLEN, NUR_TESTPATIENTEN_SCHREIBEN, PATIENTENDATEN_SCHREIBEN, RECHTE, STANDARD, matrix
+        from .rechte import (AUCH_BEI_ECHTEN_AKTEN, FEST, NUR_ROLLEN, NUR_TESTPATIENTEN_SCHREIBEN, OHNE_RECHTE,
+                             PATIENTENDATEN_SCHREIBEN, RECHTE, STANDARD, matrix)
 
         return {
             # Rollen, die Patientendaten nur bei Testpatienten schreiben, und welche Rechte das betrifft
-            "nur_testpatienten": {"rollen": sorted(NUR_TESTPATIENTEN_SCHREIBEN), "rechte": sorted(PATIENTENDATEN_SCHREIBEN)},
+            # (nicht: endgültig löschen, Dokumente zuordnen, Akten abschließen – die gelten auch bei echten Akten)
+            "nur_testpatienten": {"rollen": sorted(NUR_TESTPATIENTEN_SCHREIBEN),
+                                  "rechte": sorted(PATIENTENDATEN_SCHREIBEN - AUCH_BEI_ECHTEN_AKTEN)},
+            # Rollen ohne jedes Recht (nicht einstellbar; Konten ohne Login)
+            "ohne_rechte": sorted(OHNE_RECHTE),
             "rechte": [{"code": c, "name": n, "beschreibung": b} for c, n, b in RECHTE],
             "rollen": [{"code": c, "name": n} for c, n in Rolle.choices],
             "matrix": matrix(),

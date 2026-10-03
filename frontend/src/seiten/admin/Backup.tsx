@@ -5,12 +5,18 @@
  * (Festlegung 02.10.2026: symmetrisch, GnuPG/AES-256; das Passwort liegt nur auf dem Server und gehört ausgedruckt in
  * den Tresor), Übertragung in einen WebDAV-Ordner (Nextcloud) im Zeitfenster, Wiederherstellen mit Admin-Passwort und
  * 2FA. Alles läuft als Auftrag über den Systemagenten auf dem Server; Passwörter stehen nie in der Datenbank.
+ *
+ * Fehlerliste 02.10.2026, Punkt 5: Sicherung herunterladen (der Server legt sie für 2 Stunden als eine Datei bereit),
+ * Aufbewahrung 7/14/30 Tage wählbar, heruntergeladene Sicherung wieder hochladen (in Stücken, mit Fortschritt) – z. B.
+ * Altdaten auf der Migrationsmaschine importieren, dort sichern, hier hochladen und wiederherstellen.
+ * Bestätigungen: Passwort, dazu der Code nur, wenn die Person eine Zwei-Faktor-Anmeldung eingerichtet hat (6.5).
  */
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
+import { useIch } from "@/lib/auth";
 import { dateigroesse, relativ, uhrzeit, zeitpunkt } from "@/lib/format";
 import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, Laden, Leer, Meldung, Seitenkopf,
@@ -19,6 +25,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { PdfDialog } from "@/components/PdfDialog";
+import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
 
 // ---------------------------------------------------------------- Typen (GET /api/backup/)
 type Sicherung = {
@@ -31,16 +38,24 @@ type Version = { nr: number; gesetzt_am: string | null; gesetzt_von: string; ent
 type Kurz = { zustand: "ok" | "warnung" | "fehler" | "unbekannt"; letzte_am: string | null; verschluesselt: boolean | null;
   titel: string; hinweise: string[] };
 type Ziel = { eingerichtet: boolean; url?: string; benutzer?: string; ordner?: string; von?: string; bis?: string;
-  hersteller?: string; gesetzt_am?: string | null; gesetzt_von?: string };
+  hersteller?: string; gesetzt_am?: string | null; gesetzt_von?: string;
+  /** Tage, die Sicherungen im Ziel bleiben; 0 = nie löschen (Festlegung 03.10.2026, Standard 30) */
+  aufbewahrung_tage?: number };
+/** Aufbewahrung im Übertragungsziel (wie im Systemagenten) */
+const ZIEL_AUFBEWAHRUNG = [0, 14, 30, 60, 90, 180, 365];
+const zielAufbewahrung = (t: number | undefined) => (t === 0 ? "nie löschen" : `${t ?? 30} Tage`);
 type Uebertragung = { letzter_versuch?: string | null; letzter_erfolg?: string | null; letzter_fehler?: string; laeuft?: boolean;
-  offen?: number; im_zeitfenster?: boolean; naechstes_fenster?: string | null; rclone?: boolean };
+  offen?: number; im_zeitfenster?: boolean; naechstes_fenster?: string | null; rclone?: boolean;
+  im_ziel_entfernt?: { am: string; anzahl: number } | null };
 type Aktion = { name: string; bestaetigung: "keine" | "einfach" | "2fa"; beschreibung: string; sichern?: boolean;
   warnen?: boolean; hinweis?: string };
 type Auftrag = { id: number; kennung: string; ziel: "server" | "epm"; aktion: string; name: string;
   status: "wartet" | "laeuft" | "erledigt" | "fehler" | "abgebrochen"; status_name: string; offen: boolean;
-  parameter: { minuten?: number; stempel?: string; url?: string }; angefordert_von_name: string | null; angefordert_am: string;
+  parameter: { minuten?: number; stempel?: string; url?: string; tage?: number; datei?: string; upload?: string }; angefordert_von_name: string | null; angefordert_am: string;
   begonnen_am: string | null; beendet_am: string | null; ergebnis: string; ausgabe: string; rueckgabe: number | null;
   probelauf: boolean };
+type Bereit = { stempel: string; groesse: number | null; bis: string | null };
+type Upload = { upload: string; name: string; groesse: number; erhalten: number; vollstaendig: boolean; von: string; begonnen_am: string | null };
 export type Daten = {
   agent: { verzeichnis: boolean; erreichbar: boolean };
   status: { vorhanden: boolean; aktuell: boolean; zeit: string | null; alter_s: number | null };
@@ -53,6 +68,12 @@ export type Daten = {
   uebertragung: Uebertragung;
   speicher: { sicherungen: number | null; gesamt: number | null; frei: number | null; belegt: number | null };
   aufbewahrung_tage: number | null;
+  aufbewahrung_auswahl?: number[];
+  /** Ordner zum Herunter- und Hochladen auf dem Server vorhanden */
+  austausch?: boolean;
+  bereitgestellt?: Bereit[];
+  uploads?: Upload[];
+  upload?: { teil: number; max: number };
   naechste_sicherung: string | null;
   nachts_fehlgeschlagen: boolean;
   gpg: boolean | null;
@@ -98,19 +119,29 @@ function Wert({ label, children }: { label: ReactNode; children: ReactNode }) {
   );
 }
 
-/** Admin-Passwort und Code (Authenticator oder Notfall-Code) – für Aktionen mit Bestätigung „2fa“ */
+/** Admin-Passwort und Code (Authenticator oder Notfall-Code) – für Aktionen mit Bestätigung „2fa“. Wer keine
+ *  Zwei-Faktor-Anmeldung eingerichtet hat, kann nicht bestätigen und richtet sie zuerst ein (Festlegung 03.10.2026). */
 function Bestaetigung({ kennwort, code, onKennwort, onCode, fehler }: { kennwort: string; code: string;
   onKennwort: (s: string) => void; onCode: (s: string) => void; fehler: Feldfehler }) {
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <Feld label="Ihr Passwort" fehler={fehler.kennwort} pflicht>
-        {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => onKennwort(e.target.value)} />}
-      </Feld>
-      <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={fehler.code} pflicht>
-        {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(e) => onCode(e.target.value)} />}
-      </Feld>
-    </div>
+    <>
+      <ZweiFaktorFehlt />
+      <div className="grid grid-cols-2 gap-3">
+        <Feld label="Ihr Passwort" fehler={fehler.kennwort} pflicht>
+          {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => onKennwort(e.target.value)} />}
+        </Feld>
+        <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={fehler.code} pflicht>
+          {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(e) => onCode(e.target.value)} />}
+        </Feld>
+      </div>
+    </>
   );
+}
+
+/** Ist die Bestätigung vollständig ausgefüllt? */
+function useBestaetigt(kennwort: string, code: string) {
+  const ich = useIch();
+  return ich.zweiter_faktor && !!kennwort && !!code;
 }
 
 function useAuftrag(pfad: string, onFertig?: (a: Auftrag) => void) {
@@ -158,6 +189,7 @@ function PasswortDialog({ offen, daten, onZu }: { offen: boolean; daten: Daten; 
   const auftrag = kennung ? daten.auftraege.find((a) => a.kennung === kennung) : undefined;
   const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
   const { min, max } = daten.passwort;
+  const bestaetigt = useBestaetigt(kennwort, code);
   const vorschlag = () => { const p = passwortVorschlag(); setPasswort(p); setPasswort2(p); setZeigen(true); };
   const fertig = auftrag?.status === "erledigt";
   return (
@@ -173,7 +205,7 @@ function PasswortDialog({ offen, daten, onZu }: { offen: boolean; daten: Daten; 
         ) : (
           <>
             <Knopf onClick={onZu}>Abbrechen</Knopf>
-            <Knopf variante="dng" laedt={los.isPending} disabled={!passwort || !passwort2 || !kennwort || !code}
+            <Knopf variante="dng" laedt={los.isPending} disabled={!passwort || !passwort2 || !bestaetigt}
               onClick={() => los.mutate({ passwort, passwort2, kennwort, code })}>Bestätigen und festlegen</Knopf>
           </>
         )}>
@@ -260,13 +292,14 @@ function PruefenDialog({ offen, onZu }: { offen: boolean; onZu: () => void }) {
 // ---------------------------------------------------------------- Übertragungsziel
 function ZielDialog({ offen, ziel, onZu }: { offen: boolean; ziel: Ziel; onZu: () => void }) {
   const melden = useHinweis();
-  const [w, setW] = useState({ url: "", benutzer: "", ziel_kennwort: "", ordner: "EPM-Sicherungen", von: "02:00", bis: "05:00" });
+  const [w, setW] = useState({ url: "", benutzer: "", ziel_kennwort: "", ordner: "EPM-Sicherungen", von: "02:00", bis: "05:00",
+    aufbewahrung_tage: "30" });
   const [kennwort, setKennwort] = useState("");
   const [code, setCode] = useState("");
   useEffect(() => {
     if (offen) {
       setW({ url: ziel.url ?? "", benutzer: ziel.benutzer ?? "", ziel_kennwort: "", ordner: ziel.eingerichtet ? ziel.ordner ?? "" : "EPM-Sicherungen",
-        von: ziel.von ?? "02:00", bis: ziel.bis ?? "05:00" });
+        von: ziel.von ?? "02:00", bis: ziel.bis ?? "05:00", aufbewahrung_tage: String(ziel.eingerichtet ? ziel.aufbewahrung_tage ?? 30 : 30) });
       setKennwort(""); setCode("");
     }
   }, [offen, ziel]);
@@ -274,13 +307,14 @@ function ZielDialog({ offen, ziel, onZu }: { offen: boolean; ziel: Ziel; onZu: (
   useEffect(() => { if (offen) los.reset(); }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
   const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
   const setze = (k: keyof typeof w) => (e: { target: { value: string } }) => setW({ ...w, [k]: e.target.value });
-  const absenden = () => los.mutate({ ...w, kennwort, code });
+  const absenden = () => los.mutate({ ...w, aufbewahrung_tage: Number(w.aufbewahrung_tage), kennwort, code });
+  const bestaetigt = useBestaetigt(kennwort, code);
   return (
     <Dialog offen={offen} onOffen={(o) => { if (!o) onZu(); }} breite={640}
       titel={ziel.eingerichtet ? "Übertragungsziel ändern" : "Übertragungsziel festlegen"}
       beschreibung="WebDAV-Ordner, in den der Server die verschlüsselten Sicherungen kopiert (z. B. Nextcloud; von dort auf die NAS gespiegelt)."
       fuss={<><Knopf onClick={onZu}>Abbrechen</Knopf>
-        <Knopf variante="dng" laedt={los.isPending} disabled={!w.url || !w.benutzer || !kennwort || !code} onClick={absenden}>Bestätigen und speichern</Knopf></>}>
+        <Knopf variante="dng" laedt={los.isPending} disabled={!w.url || !w.benutzer || !bestaetigt} onClick={absenden}>Bestätigen und speichern</Knopf></>}>
       <form className="flex flex-col gap-3.5" onSubmit={(e) => { e.preventDefault(); absenden(); }}>
         <Feld label="WebDAV-Adresse" fehler={f.url} pflicht hinweis="Nextcloud: https://cloud.beispiel.de/remote.php/dav/files/BENUTZER">
           {(p) => <Eingabe {...p} type="url" inputMode="url" spellCheck={false} value={w.url} onChange={setze("url")} placeholder="https://" />}
@@ -305,8 +339,13 @@ function ZielDialog({ offen, ziel, onZu }: { offen: boolean; ziel: Ziel; onZu: (
             {(p) => <Eingabe {...p} type="time" value={w.bis} onChange={setze("bis")} />}
           </Feld>
         </div>
-        <Meldung art="info">Übertragen werden nur verschlüsselte Sicherungen, und nur im Zeitfenster (von = bis: ganztägig). Im Ziel wird nie
-          etwas gelöscht. Der Server erreicht das Internet nur über den Proxy der OPNsense – die Adresse muss dort freigegeben sein.</Meldung>
+        <Feld label="Aufbewahrung im Ziel" fehler={f.aufbewahrung_tage}
+          hinweis="Nach jeder Übertragung entfernt der Server im Ordner ältere EPM-Sicherungen; die jüngste bleibt immer, andere Dateien werden nie angefasst.">
+          {(p) => <Auswahl {...p} value={w.aufbewahrung_tage} onChange={setze("aufbewahrung_tage")}>
+            {ZIEL_AUFBEWAHRUNG.map((t) => <option key={t} value={t}>{t === 0 ? "nie löschen" : `${t} Tage${t === 30 ? " (Standard)" : ""}`}</option>)}
+          </Auswahl>}
+        </Feld>
+        <Meldung art="info">Übertragen werden nur verschlüsselte Sicherungen, und nur im Zeitfenster (von = bis: ganztägig). Der Server erreicht das Internet nur über den Proxy der OPNsense – die Adresse muss dort freigegeben sein.</Meldung>
         <Bestaetigung kennwort={kennwort} code={code} onKennwort={setKennwort} onCode={setCode} fehler={f} />
         {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
         <button type="submit" hidden />
@@ -320,13 +359,14 @@ function ZielEntfernenDialog({ offen, onZu }: { offen: boolean; onZu: () => void
   const [kennwort, setKennwort] = useState("");
   const [code, setCode] = useState("");
   const los = useAuftrag("backup/ziel/entfernen/", (a) => { melden(`${a.name}: Auftrag an den Server übergeben.`); onZu(); });
+  const bestaetigt = useBestaetigt(kennwort, code);
   useEffect(() => { if (offen) { setKennwort(""); setCode(""); los.reset(); } }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
   const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
   return (
     <Dialog offen={offen} onOffen={(o) => { if (!o) onZu(); }} titel="Übertragungsziel entfernen" breite={560}
       beschreibung="Adresse und Zugangsdaten werden vom Server gelöscht. Sicherungen liegen danach nur noch auf dem Server."
       fuss={<><Knopf onClick={onZu}>Abbrechen</Knopf>
-        <Knopf variante="dng" laedt={los.isPending} disabled={!kennwort || !code} onClick={() => los.mutate({ kennwort, code })}>Bestätigen und entfernen</Knopf></>}>
+        <Knopf variante="dng" laedt={los.isPending} disabled={!bestaetigt} onClick={() => los.mutate({ kennwort, code })}>Bestätigen und entfernen</Knopf></>}>
       <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); los.mutate({ kennwort, code }); }}>
         <Meldung art="warn">Bereits übertragene Sicherungen bleiben im Ziel.</Meldung>
         <Bestaetigung kennwort={kennwort} code={code} onKennwort={setKennwort} onCode={setCode} fehler={f} />
@@ -349,6 +389,7 @@ function WiederherstellenDialog({ s, daten, onZu }: { s: Sicherung | null; daten
     onZu();
   });
   useEffect(() => { setMinuten(daten.angemeldet.length ? "5" : "0"); setText(""); setKennwort(""); setCode(""); los.reset(); }, [s]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bestaetigt = useBestaetigt(kennwort, code);
   if (!s) return null;
   const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
   const absenden = () => los.mutate({ minuten: Number(minuten), hinweis: text.trim() || undefined, kennwort, code });
@@ -357,7 +398,7 @@ function WiederherstellenDialog({ s, daten, onZu }: { s: Sicherung | null; daten
       beschreibung={<>Stand vom <strong>{zeitpunkt(s.zeitpunkt)}</strong> · {s.art_name}{s.ausgeloest_von ? ` · ${s.ausgeloest_von}` : ""} ·
         {" "}{dateigroesse(s.groesse)} · {s.verschluesselt ? `verschlüsselt (Passwort Nr. ${s.passwort_nr ?? "?"})` : "unverschlüsselt"}</>}
       fuss={<><Knopf onClick={onZu}>Abbrechen</Knopf>
-        <Knopf variante="dng" laedt={los.isPending} disabled={!kennwort || !code} onClick={absenden}>Bestätigen und wiederherstellen</Knopf></>}>
+        <Knopf variante="dng" laedt={los.isPending} disabled={!bestaetigt} onClick={absenden}>Bestätigen und wiederherstellen</Knopf></>}>
       <form className="flex flex-col gap-3.5" onSubmit={(e) => { e.preventDefault(); absenden(); }}>
         <Meldung art="fehler"><strong>Datenbank und Dokumente werden durch diesen Stand ersetzt.</strong> Alles, was danach eingetragen
           wurde, ist danach nicht mehr in EPM – es steckt in der Sicherung, die der Server vorher automatisch anlegt. EPM ist dabei einige
@@ -384,6 +425,311 @@ function WiederherstellenDialog({ s, daten, onZu }: { s: Sicherung | null; daten
   );
 }
 
+// ---------------------------------------------------------------- Herunterladen (5.1)
+/** Die Sicherung als eine Datei: Der Server legt sie nach der Bestätigung für 2 Stunden bereit, dann lädt der Browser sie. */
+function HerunterladenDialog({ s, daten, onZu }: { s: Sicherung | null; daten: Daten; onZu: () => void }) {
+  const [kennwort, setKennwort] = useState("");
+  const [code, setCode] = useState("");
+  const [kennung, setKennung] = useState<string | null>(null);
+  const los = useAuftrag(s ? `backup/${s.stempel}/bereitstellen/` : "backup/", (a) => setKennung(a.kennung));
+  useEffect(() => { setKennwort(""); setCode(""); setKennung(null); los.reset(); }, [s?.stempel]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bestaetigt = useBestaetigt(kennwort, code);
+  if (!s) return null;
+  const bereit = (daten.bereitgestellt ?? []).find((b) => b.stempel === s.stempel);
+  const auftrag = kennung ? daten.auftraege.find((a) => a.kennung === kennung) : undefined;
+  const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
+  const laeuft = !!kennung && !bereit && (!auftrag || auftrag.offen || auftrag.status === "erledigt");
+  const fehlgeschlagen = !!auftrag && !auftrag.offen && auftrag.status !== "erledigt";
+  return (
+    <Dialog offen onOffen={(o) => { if (!o) onZu(); }} titel="Sicherung herunterladen" breite={600}
+      beschreibung={<>Stand vom <strong>{zeitpunkt(s.zeitpunkt)}</strong> · {s.art_name} · {dateigroesse(s.groesse)} ·
+        {" "}{s.verschluesselt ? `verschlüsselt (Passwort Nr. ${s.passwort_nr ?? "?"})` : "unverschlüsselt"}</>}
+      fuss={bereit ? (
+        <><Knopf onClick={onZu}>Fertig</Knopf>
+          <a className="btn pri" href={`/api/backup/${s.stempel}/datei/`} download data-testid="sicherung-datei"><Icon name="herunterladen" />Datei herunterladen</a></>
+      ) : (
+        <><Knopf onClick={onZu}>{kennung ? "Ausblenden" : "Abbrechen"}</Knopf>
+          {!kennung || fehlgeschlagen ? <Knopf variante="pri" laedt={los.isPending} disabled={!bestaetigt || daten.austausch === false}
+            onClick={() => { setKennung(null); los.mutate({ kennwort, code }); }}>Bestätigen und bereitstellen</Knopf> : null}</>
+      )}>
+      <div className="flex flex-col gap-3.5" data-testid="herunterladen">
+        {daten.austausch === false ? <Meldung art="fehler">Die Ordner für das Herunter- und Hochladen fehlen auf dem Server. Bitte dort einmal
+          <code> sudo epm-update</code> ausführen.</Meldung> : null}
+        {!s.verschluesselt ? (
+          <Meldung art="fehler"><strong>Diese Sicherung ist nicht verschlüsselt.</strong> Die Datei enthält alle Patientendaten lesbar –
+            nur auf einen verschlüsselten Datenträger laden und danach sicher löschen. Besser: erst ein Sicherungs-Passwort festlegen und neu sichern.</Meldung>
+        ) : (
+          <Meldung art="info">Die Datei bleibt verschlüsselt. Zum Lesen und Wiederherstellen braucht es das Sicherungs-Passwort
+            Nr. {s.passwort_nr ?? "?"} (Passwortblatt im Tresor).</Meldung>
+        )}
+        {bereit ? (
+          <Meldung art="ok"><span data-testid="sicherung-bereit">Die Datei liegt bereit{bereit.groesse ? ` (${dateigroesse(bereit.groesse)})` : ""}
+            {bereit.bis ? ` – bis ${uhrzeit(bereit.bis)} Uhr` : ""}. Danach entfernt der Server sie wieder; jeder Abruf steht im Audit-Log.</span></Meldung>
+        ) : laeuft ? (
+          <Meldung art="info"><span className="flex items-center gap-2"><Icon name="sanduhr" groesse={14} />Der Server legt die Datei bereit …
+            Bei großen Sicherungen dauert das einige Minuten.</span></Meldung>
+        ) : (
+          <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); if (bestaetigt) los.mutate({ kennwort, code }); }}>
+            {fehlgeschlagen ? <Meldung art="fehler">{auftrag?.ergebnis || "Die Datei konnte nicht bereitgestellt werden."}</Meldung> : null}
+            <span className="text-sm">Der Server packt Datenbank, Dokumente und Löschliste dieser Sicherung in <strong>eine Datei</strong> und hält
+              sie 2 Stunden zum Herunterladen bereit. Genau diese Datei lässt sich später wieder hochladen.</span>
+            <Bestaetigung kennwort={kennwort} code={code} onKennwort={setKennwort} onCode={setCode} fehler={f} />
+            {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
+            <button type="submit" hidden />
+          </form>
+        )}
+      </div>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------- Aufbewahrung (5.2)
+function AufbewahrungDialog({ offen, daten, onZu }: { offen: boolean; daten: Daten; onZu: () => void }) {
+  const melden = useHinweis();
+  const auswahl = daten.aufbewahrung_auswahl ?? [7, 14, 30];
+  const [tage, setTage] = useState(String(daten.aufbewahrung_tage ?? 14));
+  const [kennwort, setKennwort] = useState("");
+  const [code, setCode] = useState("");
+  const los = useAuftrag("backup/aufbewahrung/", (a) => { melden(`${a.name}: Auftrag an den Server übergeben.`); onZu(); });
+  useEffect(() => { if (offen) { setTage(String(daten.aufbewahrung_tage ?? 14)); setKennwort(""); setCode(""); los.reset(); } }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bestaetigt = useBestaetigt(kennwort, code);
+  const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
+  const absenden = () => los.mutate({ tage: Number(tage), kennwort, code });
+  const kuerzer = daten.aufbewahrung_tage != null && Number(tage) < daten.aufbewahrung_tage;
+  return (
+    <Dialog offen={offen} onOffen={(o) => { if (!o) onZu(); }} titel="Aufbewahrung der Sicherungen" breite={560}
+      beschreibung="Wie lange Sicherungen auf dem Server bleiben. Ältere entfernt die nächste Sicherung."
+      fuss={<><Knopf onClick={onZu}>Abbrechen</Knopf>
+        <Knopf variante="pri" laedt={los.isPending} disabled={!bestaetigt || Number(tage) === daten.aufbewahrung_tage} onClick={absenden}>Bestätigen und speichern</Knopf></>}>
+      <form className="flex flex-col gap-3.5" onSubmit={(e) => { e.preventDefault(); if (bestaetigt) absenden(); }}>
+        <Feld label="Aufbewahren für" fehler={f.tage}>
+          {(p) => (
+            <Auswahl {...p} value={tage} onChange={(e) => setTage(e.target.value)}>
+              {auswahl.map((t) => <option key={t} value={t}>{t} Tage{t === daten.aufbewahrung_tage ? " (aktuell)" : ""}</option>)}
+            </Auswahl>
+          )}
+        </Feld>
+        {kuerzer ? <Meldung art="warn">Mit der nächsten Sicherung entfernt der Server alle Sicherungen, die älter als {tage} Tage sind.
+          Im Übertragungsziel gilt die dort eingestellte Aufbewahrung ({zielAufbewahrung(daten.ziel.aufbewahrung_tage)}).</Meldung>
+          : <Meldung art="info">Mehr Tage brauchen mehr Speicher auf dem Server (aktuell {dateigroesse(daten.speicher.sicherungen ?? 0)} für
+            {" "}{daten.sicherungen.length} Sicherungen, {daten.speicher.frei != null ? `${dateigroesse(daten.speicher.frei)} frei` : "freier Platz unbekannt"}).</Meldung>}
+        <Bestaetigung kennwort={kennwort} code={code} onKennwort={setKennwort} onCode={setCode} fehler={f} />
+        {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
+        <button type="submit" hidden />
+      </form>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------- Hochladen (5.3)
+const warten = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Sicherung hochladen: die Datei, die „Herunterladen“ geliefert hat (auch von einem anderen EPM-Server, z. B. der
+ * Migrationsmaschine). Übertragen wird in Stücken – eine unterbrochene Verbindung setzt an der Stelle fort, an der der
+ * Server steht. Danach liest der Server die Datei ein (prüft Inhalt, Prüfsummen, Passwort); zurückgespielt wird erst mit
+ * „Wiederherstellen“.
+ */
+function HochladenDialog({ offen, daten, onZu }: { offen: boolean; daten: Daten; onZu: () => void }) {
+  const qc = useQueryClient();
+  const eingabe = useRef<HTMLInputElement>(null);
+  const abbruch = useRef(false);
+  const [datei, setDatei] = useState<File | null>(null);
+  const [passwort, setPasswort] = useState("");
+  const [stand, setStand] = useState<{ phase: "wahl" | "laden" | "einlesen"; erhalten: number; upload?: string; kennung?: string }>({ phase: "wahl", erhalten: 0 });
+  const [fehler, setFehler] = useState<string | null>(null);
+  useEffect(() => {
+    if (offen) { setDatei(null); setPasswort(""); setStand({ phase: "wahl", erhalten: 0 }); setFehler(null); abbruch.current = false; }
+  }, [offen]);
+  const teil = daten.upload?.teil ?? 4 * 1024 * 1024;
+  const max = daten.upload?.max ?? 0;
+  const auftrag = stand.kennung ? daten.auftraege.find((a) => a.kennung === stand.kennung) : undefined;
+  const zuGross = !!datei && !!max && datei.size > max;
+  const falsch = !!datei && !datei.name.toLowerCase().endsWith(".tar");
+
+  const einlesen = async (upload: string) => {
+    const a = await api<Auftrag>(`backup/hochladen/${upload}/einlesen/`, { body: passwort ? { passwort } : {} });
+    setStand((s) => ({ ...s, phase: "einlesen", kennung: a.kennung }));
+    void qc.invalidateQueries({ queryKey: ["backup"] });
+  };
+  const hochladen = async () => {
+    if (!datei) return;
+    setFehler(null);
+    abbruch.current = false;
+    let upload = stand.upload;
+    let versatz = stand.erhalten;
+    try {
+      if (!upload) {
+        const start = await api<{ upload: string; erhalten: number }>("backup/hochladen/", { body: { name: datei.name, groesse: datei.size } });
+        upload = start.upload;
+        versatz = start.erhalten;
+      }
+      setStand({ phase: "laden", erhalten: versatz, upload });
+      let versuche = 0;
+      while (versatz < datei.size) {
+        if (abbruch.current) return;
+        try {
+          const r = await api<{ erhalten: number }>(`backup/hochladen/${upload}/?versatz=${versatz}`,
+            { method: "PUT", roh: datei.slice(versatz, versatz + teil) });
+          versatz = r.erhalten;
+          versuche = 0;
+        } catch (e) {
+          // Der Server steht woanders (Stück kam an, Antwort ging verloren): dort fortsetzen
+          const erhalten = e instanceof ApiFehler && e.status === 409 ? (e.daten as { erhalten?: number } | null)?.erhalten : undefined;
+          if (typeof erhalten === "number") { versatz = erhalten; continue; }
+          // Netz kurz weg: einige Male mit Pause wiederholen, dann aufgeben (Fortsetzen bleibt möglich)
+          if (e instanceof ApiFehler || ++versuche > 5) throw e;
+          await warten(1500 * versuche);
+        }
+        setStand({ phase: "laden", erhalten: versatz, upload });
+      }
+      await einlesen(upload);
+    } catch (e) {
+      setStand((s) => ({ ...s, erhalten: versatz, upload }));
+      setFehler(e instanceof Error && e.message ? e.message : "Die Verbindung wurde unterbrochen.");
+    }
+  };
+  const verwerfen = async () => {
+    abbruch.current = true;
+    if (stand.upload && stand.phase !== "einlesen") {
+      try { await api(`backup/hochladen/${stand.upload}/`, { method: "DELETE" }); } catch { /* räumt der Server nach einem Tag selbst auf */ }
+      void qc.invalidateQueries({ queryKey: ["backup"] });
+    }
+    onZu();
+  };
+  const verwerfenEingelesen = async () => {
+    if (stand.upload) {
+      try { await api(`backup/hochladen/${stand.upload}/`, { method: "DELETE" }); } catch { /* räumt der Server selbst auf */ }
+      void qc.invalidateQueries({ queryKey: ["backup"] });
+    }
+    onZu();
+  };
+  const laeuft = stand.phase === "laden" && !fehler;
+  const prozent = datei?.size ? Math.min(100, Math.round((100 * stand.erhalten) / datei.size)) : 0;
+  const eingelesen = stand.phase === "einlesen" && auftrag && !auftrag.offen;
+  // Rückgabe 3: Passwort fehlt oder passt nicht – die Datei bleibt auf dem Server, mit Passwort erneut einlesen
+  const passwortFehlt = !!eingelesen && auftrag?.status !== "erledigt" && auftrag?.rueckgabe === 3;
+  const nochmal = async () => {
+    if (!stand.upload) return;
+    setFehler(null);
+    try { await einlesen(stand.upload); } catch (e) { setFehler(e instanceof Error ? e.message : String(e)); }
+  };
+  return (
+    <Dialog offen={offen} onOffen={(o) => { if (!o && !laeuft) onZu(); }} titel="Sicherung hochladen" breite={620}
+      beschreibung="Eine zuvor heruntergeladene Sicherung (epm-sicherung_….tar) auf diesen Server bringen – auch von einem anderen EPM-Server."
+      fuss={stand.phase === "einlesen" ? (passwortFehlt ? (
+        <><Knopf onClick={() => void verwerfenEingelesen()}>Datei verwerfen</Knopf>
+          <Knopf variante="pri" disabled={!passwort} onClick={() => void nochmal()}>Mit Passwort einlesen</Knopf></>
+      ) : (
+        <Knopf variante={eingelesen ? "pri" : "sec"} onClick={onZu}>{eingelesen ? "Fertig" : "Ausblenden"}</Knopf>
+      )) : (
+        <><Knopf onClick={() => void verwerfen()}>{stand.upload ? "Abbrechen und verwerfen" : "Abbrechen"}</Knopf>
+          <Knopf variante="pri" icon="hochladen" laedt={laeuft} disabled={!datei || zuGross || falsch || laeuft || daten.austausch === false}
+            onClick={() => void hochladen()}>{stand.upload ? "Fortsetzen" : "Hochladen"}</Knopf></>
+      )}>
+      <div className="flex flex-col gap-3.5" data-testid="hochladen">
+        {daten.austausch === false ? <Meldung art="fehler">Die Ordner für das Herunter- und Hochladen fehlen auf dem Server. Bitte dort einmal
+          <code> sudo epm-update</code> ausführen.</Meldung> : null}
+        {stand.phase === "wahl" || (stand.phase === "laden" && fehler) ? (
+          <>
+            <div className="feld">
+              <span>Datei der Sicherung *</span>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <Knopf icon="hochladen" disabled={!!stand.upload} onClick={() => eingabe.current?.click()}>Datei auswählen</Knopf>
+                <span className="text-sm">{datei ? <>{datei.name} <span className="gedaempft num">· {dateigroesse(datei.size)}</span></> : <span className="gedaempft">keine Datei gewählt</span>}</span>
+                <input ref={eingabe} type="file" hidden aria-label="Datei der Sicherung" accept=".tar,application/x-tar"
+                  onChange={(e) => { setDatei(e.target.files?.[0] ?? null); setFehler(null); }} />
+              </div>
+              {falsch ? <span className="fehlertext" role="alert">Bitte die Datei wählen, die „Herunterladen“ geliefert hat (epm-sicherung_….tar).</span>
+                : zuGross ? <span className="fehlertext" role="alert">Die Datei ist größer als erlaubt ({dateigroesse(max)}).</span>
+                : <span className="hinweis">Die Datei wird unverändert übertragen; eine verschlüsselte Sicherung bleibt verschlüsselt.</span>}
+            </div>
+            <Feld label="Passwort dieser Sicherung" hinweis="Nur nötig, wenn die Sicherung von einem anderen EPM-Server stammt oder mit einem Passwort verschlüsselt ist, das dieser Server nicht kennt. Der Server merkt es sich nur für diese Sicherung.">
+              {(p) => <Eingabe {...p} type="password" autoComplete="off" spellCheck={false} className="num" value={passwort} onChange={(e) => setPasswort(e.target.value)} />}
+            </Feld>
+          </>
+        ) : null}
+        {stand.phase === "laden" ? (
+          <div className="flex flex-col gap-1.5" data-testid="hochladen-fortschritt">
+            <div className="flex justify-between text-sm"><span>{datei?.name}</span>
+              <span className="num">{dateigroesse(stand.erhalten)} von {dateigroesse(datei?.size ?? 0)} · {prozent} %</span></div>
+            <div className="h-2 rounded-full bg-fein overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={prozent}
+              aria-label="Fortschritt des Hochladens">
+              <div className="h-full rounded-full bg-akzent transition-[width]" style={{ width: `${prozent}%` }} />
+            </div>
+            {laeuft ? <span className="text-xs gedaempft">Bitte dieses Fenster geöffnet lassen, bis die Datei übertragen ist.</span> : null}
+          </div>
+        ) : null}
+        {stand.phase === "einlesen" ? (
+          <div data-testid="hochladen-ergebnis">
+            {!auftrag || auftrag.offen ? (
+              <Meldung art="info"><span className="flex items-center gap-2"><Icon name="sanduhr" groesse={14} />Übertragen. Der Server prüft die
+                Sicherung und nimmt sie in die Liste auf …</span></Meldung>
+            ) : auftrag.status === "erledigt" ? (
+              <Meldung art="ok">{auftrag.ergebnis || "Die Sicherung steht jetzt in der Liste."} Zurückgespielt wird sie erst mit „Wiederherstellen“.</Meldung>
+            ) : <Meldung art="fehler">{auftrag.ergebnis || "Die Sicherung konnte nicht eingelesen werden."}</Meldung>}
+            {passwortFehlt ? (
+              <Feld label="Passwort dieser Sicherung" className="mt-3" hinweis="vom Passwortblatt des Servers, auf dem die Sicherung entstanden ist">
+                {(p) => <Eingabe {...p} type="password" autoComplete="off" spellCheck={false} className="num" value={passwort} onChange={(e) => setPasswort(e.target.value)} />}
+              </Feld>
+            ) : null}
+          </div>
+        ) : null}
+        {fehler ? <Meldung art="fehler"><span data-testid="hochladen-fehler">{fehler}{stand.upload ? " Mit „Fortsetzen“ geht es an derselben Stelle weiter." : ""}</span></Meldung> : null}
+      </div>
+    </Dialog>
+  );
+}
+
+/** Hochgeladene Dateien, die noch nicht eingelesen sind (z. B. Fenster geschlossen, bevor der Server fertig war) */
+function OffeneUploads({ daten, laufend }: { daten: Daten; laufend: Set<string> }) {
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const fertig = () => void qc.invalidateQueries({ queryKey: ["backup"] });
+  const [wahl, setWahl] = useState<Upload | null>(null);
+  const [passwort, setPasswort] = useState("");
+  const einlesen = useMutation({
+    mutationFn: (u: Upload) => api<Auftrag>(`backup/hochladen/${u.upload}/einlesen/`, { body: passwort ? { passwort } : {} }),
+    onSuccess: (a) => { fertig(); setWahl(null); setPasswort(""); melden(`${a.name}: Auftrag an den Server übergeben.`); },
+  });
+  const verwerfen = useMutation({
+    mutationFn: (u: Upload) => api(`backup/hochladen/${u.upload}/`, { method: "DELETE" }),
+    onSuccess: () => { fertig(); melden("Hochgeladene Datei verworfen."); },
+    onError: (e) => melden(e.message, "fehler"),
+  });
+  const liste = daten.uploads ?? [];
+  if (!liste.length) return null;
+  const liest = laufend.has("sicherung_einlesen");
+  return (
+    <Karte className="px-5 py-4 flex flex-col gap-2" data-testid="uploads">
+      <KartenKopf titel="Hochgeladen, noch nicht eingelesen" unter="Der Server räumt liegen gebliebene Dateien nach einem Tag selbst auf." />
+      {liste.map((u) => (
+        <div key={u.upload} className="flex items-center justify-between gap-3 py-1.5 border-b border-rand last:border-b-0 text-sm flex-wrap">
+          <span className="min-w-0 break-all">{u.name} <span className="gedaempft num">· {dateigroesse(u.erhalten)}{u.vollstaendig ? "" : ` von ${dateigroesse(u.groesse)}`}
+            {u.von ? ` · ${u.von}` : ""}{u.begonnen_am ? ` · ${relativ(u.begonnen_am, true)}` : ""}</span>
+            {u.vollstaendig ? null : <Chip art="warn" className="ml-2">unvollständig</Chip>}</span>
+          <span className="flex gap-1.5">
+            {u.vollstaendig ? <Knopf klein laedt={liest || (einlesen.isPending && einlesen.variables?.upload === u.upload)} disabled={liest}
+              onClick={() => { einlesen.reset(); setPasswort(""); setWahl(u); }}>Einlesen</Knopf> : null}
+            <Knopf klein variante="geist" disabled={liest} onClick={() => verwerfen.mutate(u)}>Verwerfen</Knopf>
+          </span>
+        </div>
+      ))}
+      <Dialog offen={!!wahl} onOffen={(o) => { if (!o) setWahl(null); }} titel="Hochgeladene Sicherung einlesen" breite={520}
+        beschreibung={wahl ? `${wahl.name} · ${dateigroesse(wahl.erhalten)}` : undefined}
+        fuss={<><Knopf onClick={() => setWahl(null)}>Abbrechen</Knopf>
+          <Knopf variante="pri" laedt={einlesen.isPending} onClick={() => wahl && einlesen.mutate(wahl)}>Einlesen</Knopf></>}>
+        <div className="flex flex-col gap-3">
+          <Feld label="Passwort dieser Sicherung" hinweis="Nur nötig, wenn sie mit einem Passwort verschlüsselt ist, das dieser Server nicht kennt.">
+            {(p) => <Eingabe {...p} type="password" autoComplete="off" spellCheck={false} className="num" value={passwort} onChange={(e) => setPasswort(e.target.value)} />}
+          </Feld>
+          <Fehleranzeige fehler={einlesen.error} />
+        </div>
+      </Dialog>
+    </Karte>
+  );
+}
+
 // ---------------------------------------------------------------- Teile der Seite
 function Kennzahl({ titel, wert, children, testid }: { titel: string; wert: ReactNode; children?: ReactNode; testid?: string }) {
   return (
@@ -395,14 +741,16 @@ function Kennzahl({ titel, wert, children, testid }: { titel: string; wert: Reac
   );
 }
 
-function SicherungenTabelle({ daten, onWiederherstellen }: { daten: Daten; onWiederherstellen: (s: Sicherung) => void }) {
+function SicherungenTabelle({ daten, onWiederherstellen, onHerunterladen }: { daten: Daten; onWiederherstellen: (s: Sicherung) => void;
+  onHerunterladen: (s: Sicherung) => void }) {
+  const bereit = new Set((daten.bereitgestellt ?? []).map((b) => b.stempel));
   const ziel = daten.ziel.eingerichtet;
   const ue = daten.uebertragung;
   if (!daten.sicherungen.length) {
     return <Karte className="px-5 py-4"><Leer>{daten.status.vorhanden ? "Noch keine Sicherung auf dem Server." : "Der Server hat noch keinen Stand der Sicherungen gemeldet."}</Leer></Karte>;
   }
   return (
-    <Karte className="overflow-hidden" data-testid="sicherungen">
+    <Karte className="overflow-x-auto" data-testid="sicherungen">
       <table className="tabelle">
         <thead><tr><th className="th">Zeitpunkt</th><th className="th">Art</th><th className="th text-right">Größe</th><th className="th">Schutz</th>
           <th className="th">{daten.ziel.hersteller === "nextcloud" ? "Nextcloud" : "Übertragung"}</th><th className="th" /></tr></thead>
@@ -420,7 +768,9 @@ function SicherungenTabelle({ daten, onWiederherstellen }: { daten: Daten; onWie
                   : !s.verschluesselt || s.verfahren !== "gpg" ? <span className="text-xs gedaempft">wird nicht übertragen</span>
                     : ue.laeuft ? <Chip art="warn"><Icon name="sanduhr" groesse={12} />wird übertragen</Chip>
                       : <Chip art="warn"><Icon name="uhr" groesse={12} />wartet auf Zeitfenster</Chip>}</td>
-              <td className="td text-right">
+              <td className="td text-right whitespace-nowrap">
+                <Knopf klein icon="herunterladen" className="mr-1.5" onClick={() => onHerunterladen(s)}
+                  aria-label={`Sicherung vom ${zeitpunkt(s.zeitpunkt)} herunterladen`}>{bereit.has(s.stempel) ? "Liegt bereit" : "Herunterladen"}</Knopf>
                 <Knopf klein disabled={!s.wiederherstellbar} title={s.wiederherstellbar ? undefined : `nicht möglich: ${s.nicht_wiederherstellbar_weil}`}
                   onClick={() => onWiederherstellen(s)} aria-label={`Sicherung vom ${zeitpunkt(s.zeitpunkt)} wiederherstellen`}>Wiederherstellen</Knopf>
               </td>
@@ -471,7 +821,7 @@ function UebertragungKarte({ daten, offen, onZiel, onEntfernen, onUebertragen }:
   const testen = useAuftrag("backup/ziel/testen/");
   return (
     <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="uebertragung">
-      <KartenKopf titel="Übertragung" unter="Kopie der verschlüsselten Sicherungen in einen WebDAV-Ordner (rclone, nur kopieren, nie löschen)"
+      <KartenKopf titel="Übertragung" unter="Kopie der verschlüsselten Sicherungen in einen WebDAV-Ordner (rclone); ältere entfernt der Server dort nach der Aufbewahrung"
         rechts={z.eingerichtet ? (u.letzter_fehler ? <Chip art="fehler">Fehler</Chip> : u.laeuft ? <Chip art="warn">läuft</Chip> : <Chip art="ok">eingerichtet</Chip>)
           : <Chip art="warn">kein Ziel</Chip>} />
       {z.eingerichtet ? (
@@ -480,6 +830,8 @@ function UebertragungKarte({ daten, offen, onZiel, onEntfernen, onUebertragen }:
           <Wert label="Benutzer · Ordner">{z.benutzer} · {z.ordner ? `/${z.ordner}` : "/"}</Wert>
           <Wert label="Zeitfenster">{z.von === z.bis ? "ganztägig" : `${z.von}–${z.bis} Uhr`}{u.im_zeitfenster ? <span className="gedaempft"> · gerade offen</span>
             : u.naechstes_fenster ? <span className="gedaempft"> · nächstes {relativ(u.naechstes_fenster, true)}</span> : null}</Wert>
+          <Wert label="Aufbewahrung im Ziel"><span data-testid="ziel-aufbewahrung">{zielAufbewahrung(z.aufbewahrung_tage)}</span>
+            {u.im_ziel_entfernt ? <span className="gedaempft"> · zuletzt {u.im_ziel_entfernt.anzahl} ältere entfernt, {relativ(u.im_ziel_entfernt.am, true)}</span> : null}</Wert>
           <Wert label="Zuletzt übertragen">{u.letzter_erfolg ? relativ(u.letzter_erfolg, true) : "noch nie"}
             {u.offen ? <span className="gedaempft"> · {u.offen} Sicherung{u.offen === 1 ? "" : "en"} ausstehend</span> : null}</Wert>
           {u.letzter_fehler ? <Wert label="Letzter Fehler"><span className="text-fehler">{u.letzter_fehler}</span>
@@ -554,7 +906,7 @@ function Taetigkeiten({ liste }: { liste: Auftrag[] }) {
 }
 
 // ---------------------------------------------------------------- Seite
-type Offen = null | "jetzt" | "passwort" | "pruefen" | "ziel" | "ziel_entfernen" | "uebertragen";
+type Offen = null | "jetzt" | "passwort" | "pruefen" | "ziel" | "ziel_entfernen" | "uebertragen" | "aufbewahrung" | "hochladen";
 
 export function Backup() {
   const qc = useQueryClient();
@@ -566,6 +918,7 @@ export function Backup() {
   });
   const [offen, setOffen] = useState<Offen>(null);
   const [wahl, setWahl] = useState<Sicherung | null>(null);
+  const [laden, setLaden] = useState<string | null>(null);
   const d = daten.data;
   const laufend = useMemo(() => new Set((d?.auftraege ?? []).filter((a) => a.offen).map((a) => a.aktion)), [d]);
   // Ist ein Auftrag fertig geworden, auch den Hinweis an alle Benutzer neu laden (Wiederherstellen setzt ihn)
@@ -597,8 +950,10 @@ export function Backup() {
       <Seitenkopf titel="Backup und Wiederherstellung"
         unter={`Datenbank, Dokumente und Löschliste täglich um 02:00${d.aufbewahrung_tage ? `, ${d.aufbewahrung_tage} Tage auf dem Server` : ""}${
           d.verschluesselung.eingerichtet ? ", verschlüsselt" : ""}${z.eingerichtet ? ", Kopie im Übertragungsziel" : ""}.`}
-        rechts={<Knopf variante="pri" icon="backup" laedt={laufend.has("sicherung")} disabled={laufend.has("sicherung") || !d.agent.verzeichnis}
-          onClick={() => setOffen("jetzt")}>Jetzt sichern</Knopf>} />
+        rechts={<>
+          <Knopf icon="hochladen" disabled={!d.agent.verzeichnis} onClick={() => setOffen("hochladen")}>Sicherung hochladen</Knopf>
+          <Knopf variante="pri" icon="backup" laedt={laufend.has("sicherung")} disabled={laufend.has("sicherung") || !d.agent.verzeichnis}
+            onClick={() => setOffen("jetzt")}>Jetzt sichern</Knopf></>} />
 
       {wiederherstellen ? (
         <Meldung art="warn"><span data-testid="wiederherstellen-laeuft"><strong>Wiederherstellen läuft</strong> ({wiederherstellen.parameter.stempel}):
@@ -645,15 +1000,21 @@ export function Backup() {
             </div>
           ) : null}
           <span className="text-[0.8125rem] gedaempft">Sicherungen: {dateigroesse(sp.sicherungen ?? 0)} · {d.sicherungen.length} vorhanden</span>
+          <span className="text-[0.8125rem] flex items-center gap-2 flex-wrap" data-testid="aufbewahrung">
+            <span>Aufbewahrung: <strong className="num">{d.aufbewahrung_tage ?? "—"} Tage</strong></span>
+            <Knopf klein disabled={!d.agent.verzeichnis || laufend.has("sicherung_aufbewahrung")} laedt={laufend.has("sicherung_aufbewahrung")}
+              onClick={() => setOffen("aufbewahrung")}>Ändern</Knopf>
+          </span>
         </Kennzahl>
       </div>
 
-      <SicherungenTabelle daten={d} onWiederherstellen={setWahl} />
+      <SicherungenTabelle daten={d} onWiederherstellen={setWahl} onHerunterladen={(s) => setLaden(s.stempel)} />
+      <OffeneUploads daten={d} laufend={laufend} />
 
       <div className="flex gap-2.5 px-4 py-3 rounded-lg bg-fehler-bg text-fehler text-sm leading-normal items-start" data-testid="warnung-wiederherstellen">
         <Icon name="warnung" groesse={18} />
         <span><strong>Wiederherstellen ersetzt den aktuellen Datenbestand.</strong> Vorher wird automatisch eine Sicherung des jetzigen Stands
-          angelegt. Zum Bestätigen muss das Admin-Passwort und der 2FA-Code eingegeben werden.</span>
+          angelegt. Zum Bestätigen müssen das eigene Passwort und der 2FA-Code eingegeben werden.</span>
       </div>
 
       <div className="grid grid-cols-1 hd:grid-cols-2 gap-5 items-start">
@@ -679,6 +1040,9 @@ export function Backup() {
       <ZielDialog offen={offen === "ziel"} ziel={z} onZu={() => setOffen(null)} />
       <ZielEntfernenDialog offen={offen === "ziel_entfernen"} onZu={() => setOffen(null)} />
       <WiederherstellenDialog s={wahl} daten={d} onZu={() => setWahl(null)} />
+      <HerunterladenDialog s={d.sicherungen.find((x) => x.stempel === laden) ?? null} daten={d} onZu={() => setLaden(null)} />
+      <AufbewahrungDialog offen={offen === "aufbewahrung"} daten={d} onZu={() => setOffen(null)} />
+      <HochladenDialog offen={offen === "hochladen"} daten={d} onZu={() => setOffen(null)} />
     </Seite>
   );
 }

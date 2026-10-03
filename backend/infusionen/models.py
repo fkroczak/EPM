@@ -433,6 +433,14 @@ class Infusionsplan(AktenEintrag):
             alt.status = self.Status.ABGELOEST
             alt.save(update_fields=["status"])
         self.status = self.Status.AKTUELL
+        if self.patient.kein_plan:
+            # Ein freigegebener Plan heißt: Der Patient braucht wieder einen – die Bestätigung „kein Plan nötig“ endet
+            self.patient.kein_plan = False
+            self.patient.kein_plan_grund = ""
+            self.patient.kein_plan_am = None
+            self.patient.kein_plan_von = None
+            self.patient.save(update_fields=["kein_plan", "kein_plan_grund", "kein_plan_am", "kein_plan_von",
+                                             "geaendert_am"])
         self.freigegeben_am = timezone.now()
         self.freigegeben_von = mediziner
         self.freigabe_weg = weg

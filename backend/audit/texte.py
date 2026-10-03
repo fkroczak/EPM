@@ -108,6 +108,7 @@ def beschreibung(e) -> str:
             "2fa": "Anmeldung mit 2FA",
             "notfallcode": f"Anmeldung mit Notfall-Code (noch {d.get('verbleibend', '?')} übrig)",
             "kennwort": "Kennwort richtig, zweiter Faktor ausstehend",
+            "ohne_2fa": "Anmeldung mit Kennwort (ohne zweiten Faktor)",
         }.get(d.get("schritt"), "Anmeldung")
     if art == A.ABMELDUNG:
         return "Abmeldung"
@@ -141,12 +142,24 @@ def beschreibung(e) -> str:
         rolle = dict(Rolle.choices).get(d.get("rolle"), d.get("rolle", ""))
         if d.get("quelle") == "altdaten":
             return f"Benutzer {e.objekt} bei der Übernahme der Altdaten angelegt ({rolle}), noch ohne Kennwort"
+        if d.get("ohne_login"):
+            return f"Benutzer {e.objekt} ohne Login angelegt (keine Rechte)"
         return f"Benutzer {e.objekt} angelegt ({rolle}), Einmal-Kennwort erzeugt"
     if art == A.BENUTZER_GEAENDERT:
         if d.get("entsperrt"):
             return f"Benutzer {e.objekt} entsperrt"
+        if d.get("ohne_login"):
+            return f"Benutzer {e.objekt} auf „ohne Login“ gesetzt (keine Anmeldung, keine Rechte)"
+        if d.get("login_gegeben"):
+            from accounts.models import Rolle
+
+            rolle = dict(Rolle.choices).get(d.get("rolle"), d.get("rolle", ""))
+            return f"Benutzer {e.objekt} erhält wieder einen Login ({rolle}), Einmal-Kennwort erzeugt"
         felder = ", ".join(d.get("aenderungen") or {})
         return f"Benutzer {e.objekt} geändert" + (f": {felder}" if felder else "")
+    if art == A.RECHTE_GEAENDERT and d.get("zweiter_faktor"):
+        vorher, jetzt = d["zweiter_faktor"]
+        return f"Zweiter Faktor bei der Anmeldung: {jetzt} (vorher {vorher})"
     if art == A.RECHTE_GEAENDERT:
         teile = [f"{t['rolle']} {'darf jetzt' if t['erlaubt'] else 'darf nicht mehr'} „{t['recht']}“"
                  for t in d.get("aenderungen", [])]
@@ -156,6 +169,8 @@ def beschreibung(e) -> str:
     if art == A.EINMAL_KENNWORT:
         return f"Neues Einmal-Kennwort für {e.objekt} erzeugt"
     if art == A.ZWEITER_FAKTOR_ZURUECKGESETZT:
+        if d.get("selbst"):
+            return "Zweiten Faktor (Authenticator-App) selbst ausgeschaltet"
         return f"2FA für {e.objekt} zurückgesetzt, Einmal-Kennwort erzeugt"
     if art == A.AKTE_ABGESCHLOSSEN:
         from patienten.models import Patient
@@ -221,6 +236,14 @@ def beschreibung(e) -> str:
     return e.get_art_display() + (f" {e.objekt}" if e.objekt else "")
 
 
+def _bestaetigt(d) -> str:
+    """„mit Passwort und 2FA bestätigt“ – ohne eingerichteten zweiten Faktor (freiwillig, Festlegung 02.10.2026) nur
+    mit Passwort. Ältere Einträge ohne die Angabe wurden immer mit beidem bestätigt."""
+    if not d.get("bestaetigt"):
+        return ""
+    return ", mit Passwort und 2FA bestätigt" if d.get("zweiter_faktor", True) else ", mit Passwort bestätigt"
+
+
 def _backup(e, d) -> str:
     """Administration › Backup: Aufträge wie unter System, dazu Passwort und Wiederherstellung (nie ein Passwort)."""
     ereignis = d.get("ereignis")
@@ -230,13 +253,32 @@ def _backup(e, d) -> str:
             teile.append(f"Ordner „{d['ordner']}“")
         if d.get("zeitfenster"):
             teile.append(f"Zeitfenster {d['zeitfenster']}")
+        if "aufbewahrung_im_ziel" in d:
+            tage = d["aufbewahrung_im_ziel"]
+            teile.append("im Ziel nie löschen" if not tage else f"im Ziel {tage} Tage aufbewahren")
         teile.append("neues Passwort für das Ziel" if d.get("zugang_neu") else "Passwort für das Ziel unverändert")
-        return ", ".join(teile) + (", mit Passwort und 2FA bestätigt" if d.get("bestaetigt") else "")
+        return ", ".join(teile) + _bestaetigt(d)
+    if ereignis == "angefordert" and d.get("aktion") == "sicherung_aufbewahrung":
+        return f"Aufbewahrung der Sicherungen: {d.get('tage', '?')} Tage" + _bestaetigt(d)
+    if ereignis == "angefordert" and d.get("aktion") == "sicherung_bereitstellen":
+        zeit = _datum(d.get("sicherung_zeitpunkt", "")) or d.get("stempel", "")
+        return (f"Sicherung vom {zeit} zum Herunterladen angefordert"
+                + ("" if d.get("verschluesselt") else " (unverschlüsselt)") + _bestaetigt(d))
+    if ereignis == "heruntergeladen":
+        zeit = _datum(d.get("sicherung_zeitpunkt", "")) or d.get("stempel", "")
+        return f"Sicherung vom {zeit} heruntergeladen" + ("" if d.get("verschluesselt") else " (unverschlüsselt)")
+    if ereignis == "upload_begonnen":
+        return f"Hochladen einer Sicherung begonnen: {d.get('datei', '')}"
+    if ereignis == "upload_abgebrochen":
+        return f"Hochgeladene Sicherung verworfen: {d.get('datei', '')}"
+    if ereignis == "angefordert" and d.get("aktion") == "sicherung_einlesen":
+        return (f"Hochgeladene Sicherung einlesen: {d.get('datei', '')}"
+                + (", mit dem Passwort der Sicherung" if d.get("mit_passwort") else ""))
     if ereignis == "angefordert" and d.get("aktion") == "wiederherstellen":
         zeit = _datum(d.get("sicherung_zeitpunkt", "")) or d.get("stempel", "")
         return (f"Wiederherstellen der Sicherung vom {zeit} angefordert"
                 + (f", Beginn in {d['minuten']} Min." if d.get("minuten") else "")
-                + (", mit Passwort und 2FA bestätigt" if d.get("bestaetigt") else ""))
+                + _bestaetigt(d))
     if ereignis == "wiederhergestellt":
         zeit = _datum(d.get("sicherung_zeitpunkt", "")) or d.get("stempel", "")
         text = f"Sicherung vom {zeit} wiederhergestellt, alle Anmeldungen beendet"
@@ -259,9 +301,7 @@ def _system(e, d) -> str:
         teile = [f"{name} angefordert"]
         if d.get("minuten"):
             teile.append(f"Beginn in {d['minuten']} Min.")
-        if d.get("bestaetigt"):
-            teile.append("mit Passwort und 2FA bestätigt")
-        return ", ".join(teile)
+        return ", ".join(teile) + _bestaetigt(d)
     if ereignis == "abgeschlossen":
         zustand = {"erledigt": "erledigt", "fehler": "fehlgeschlagen"}.get(d.get("status"), d.get("status", ""))
         return f"{name} {zustand}" + (f": {d['ergebnis']}" if d.get("ergebnis") else "")

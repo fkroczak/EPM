@@ -159,12 +159,22 @@ class Akte(Grundlage):
         self.assertEqual(a.post(f"/api/patienten/{self.patient.id}/wieder-oeffnen/", {"grund": "Irrtum"}, format="json").status_code, 200)
 
     def test_abschliessen_mit_recht(self):
-        """Akten abschließen: Mitarbeiter, Mediziner, Admin (Admin nur bei Testpatienten); Betrachter nicht."""
-        for wer in (self.betrachter, self.admin):
-            with self.subTest(rolle=wer.rolle):
-                r = client_fuer(wer).post(f"/api/patienten/{self.patient.id}/abschliessen/",
-                                          {"anlass": "therapie_beendet"}, format="json")
-                self.assertEqual(r.status_code, 403)
+        """Akten abschließen: Mitarbeiter, Mediziner, Admin (seit 02.10.2026 auch bei echten Akten); Betrachter nicht."""
+        r = client_fuer(self.betrachter).post(f"/api/patienten/{self.patient.id}/abschliessen/",
+                                              {"anlass": "therapie_beendet"}, format="json")
+        self.assertEqual(r.status_code, 403)
+        # Admin: echte Akte abschließen (Fehlerliste 02.10.2026, 6.3) – steht mit Person im Audit-Log
+        echt = Patient.objects.create(nachname="Admin", vorname="Abschluss", geburtsdatum="1960-06-06")
+        r = client_fuer(self.admin).post(f"/api/patienten/{echt.id}/abschliessen/", {"anlass": "betreuung_gewechselt"},
+                                         format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.json()["ist_abgeschlossen"])
+        log = client_fuer(self.admin).get("/api/protokoll/?gruppe=abschluss").json()["results"]
+        self.assertEqual(log[0]["person"], self.admin.anzeigename)
+        # … mehr als abschließen darf die Administration an der echten Akte weiterhin nicht
+        offen = Patient.objects.create(nachname="Admin", vorname="Offen", geburtsdatum="1960-06-06")
+        self.assertEqual(client_fuer(self.admin).patch(f"/api/patienten/{offen.id}/", {"ort": "Münster"},
+                                                       format="json").status_code, 403)
         c = client_fuer(self.mitarbeiter)
         url = f"/api/patienten/{self.patient.id}/abschliessen/"
         self.assertEqual(c.post(url, {"anlass": "x"}, format="json").status_code, 400)
@@ -212,6 +222,30 @@ class Akte(Grundlage):
         self.assertEqual(t.nummer, 9001)
         r = client_fuer(self.mitarbeiter).get("/api/patienten/naechste-nummer/").json()
         self.assertEqual(r["nummer"], p.nummer + 1)
+        self.assertEqual((r["testpatient"], r["testpatient_fest"]), (False, False))
+
+    def test_testpatient_anlegen(self):
+        """Fehlerliste 02.10.2026 (6.4): Mitarbeiter und Mediziner können beim Anlegen einen Testpatienten wählen –
+        z. B. um Infusionspläne auszuprobieren. Er bekommt eine Nummer ab 9001 und zählt in keiner Statistik."""
+        c = client_fuer(self.mitarbeiter)
+        r = c.get("/api/patienten/naechste-nummer/?testpatient=1").json()
+        self.assertEqual((r["nummer"], r["testpatient"], r["testpatient_fest"]), (9001, True, False))
+        daten = {"nachname": "Plantest", "vorname": "Paula", "geburtsdatum": "1975-05-05"}
+        r = c.post("/api/patienten/", {**daten, "testpatient": True}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual((r.json()["ist_test"], r.json()["nummer"]), (True, 9001))
+        vorher = c.get("/api/patienten/zaehler/").json()["in_betreuung"]
+        r2 = c.post("/api/patienten/", {**daten, "nachname": "Echt"}, format="json")
+        self.assertEqual((r2.json()["ist_test"], r2.json()["nummer"] < 9001), (False, True))
+        self.assertEqual(c.get("/api/patienten/zaehler/").json()["in_betreuung"], vorher + 1)
+        # der Mediziner probiert an der Testakte einen Plan aus und gibt ihn frei
+        m = client_fuer(self.mediziner)
+        e = m.post("/api/infusionsplaene/entwurf/", {"patient": r.json()["id"]}, format="json")
+        self.assertEqual(e.status_code, 201, e.content)
+        # eine echte Akte wird nicht nachträglich zur Testakte (und umgekehrt)
+        r3 = c.patch(f"/api/patienten/{r2.json()['id']}/", {"ist_test": True, "testpatient": True}, format="json")
+        self.assertEqual(r3.status_code, 200)
+        self.assertFalse(Patient.objects.get(pk=r2.json()["id"]).ist_test)
 
     def test_anlegen_mit_aufnahmegewicht(self):
         c = client_fuer(self.mitarbeiter)
@@ -327,6 +361,8 @@ class Patientenliste(Grundlage):
         Kontakt.objects.create(patient=cls.stabil, text="<p>Besuch</p>")
         montag, sonntag = woche(heute)
         Termin.objects.create(patient=cls.stabil, art=Termin.Art.RUECKRUF, faellig_am=sonntag, titel="Rückruf")
+        # braucht keinen Infusionsplan (bestätigt) – sonst Hinweis „Kein Infusionsplan“
+        Patient.objects.filter(pk=cls.stabil.pk).update(kein_plan=True)
         # Testpatient: in der Liste mit Filter „test=ohne“ ausblendbar, zählt in keiner Statistik
         cls.testpat = Patient.objects.create(nachname="Test", vorname="T", geburtsdatum="1970-01-01", ist_test=True)
 
@@ -337,13 +373,13 @@ class Patientenliste(Grundlage):
         v = zeilen[self.verlust.id]["kennzahlen"]
         self.assertEqual(Decimal(str(v["gewicht"]["kg"])), Decimal("64.0"))
         self.assertEqual((v["trend"]["richtung"], v["trend"]["warnung"]), ("down", True))
-        self.assertEqual([h["art"] for h in v["hinweise"]], ["gewicht"])
+        self.assertEqual([h["art"] for h in v["hinweise"]], ["gewicht", "ohne_plan"])
         s = zeilen[self.stabil.id]["kennzahlen"]
         self.assertEqual(s["trend"]["richtung"], "flat")
         self.assertTrue(s["termin_woche"])
         self.assertEqual(s["hinweise"], [])
         ohne = zeilen[self.patient.id]["kennzahlen"]
-        self.assertEqual({h["art"] for h in ohne["hinweise"]}, {"versorger", "kontakt"})
+        self.assertEqual({h["art"] for h in ohne["hinweise"]}, {"versorger", "kontakt", "ohne_plan"})
         self.assertIsNone(ohne["gewicht"])
         # Standard-Reihenfolge: letzter Kontakt, neueste zuerst; ohne Kontakt ans Ende
         self.assertEqual(r["results"][-1]["id"], self.patient.id)
@@ -518,10 +554,23 @@ class Rollen(Grundlage):
 
         c = APIClient()
         c.force_authenticate(self.mitarbeiter)  # kein is_verified
+        # zweiter Faktor freiwillig (Festlegung 02.10.2026): ohne eingerichteten Authenticator genügt das Kennwort
+        self.assertEqual(c.get("/api/patienten/").status_code, 200)
+        # wer einen eingerichtet hat, kommt ohne Code nicht hinein
+        from epm.pruefhilfen import mit_zweitem_faktor
+
+        mit_zweitem_faktor(self.mitarbeiter)
         r = c.get("/api/patienten/")
         self.assertEqual(r.status_code, 403)
         # Meldung „Anmeldung …“ statt „Recht fehlt“: daran erkennt die Oberfläche, dass neu angemeldet werden muss
         self.assertIn("Anmeldung mit zweitem Faktor", r.json()["detail"])
+        # … ebenso alle, sobald die Administration den zweiten Faktor zur Pflicht macht
+        from accounts.models import Anmelderegeln
+
+        Anmelderegeln.objects.update_or_create(pk=1, defaults={"zweiter_faktor": "alle"})
+        d = APIClient()
+        d.force_authenticate(self.betrachter)
+        self.assertEqual(d.get("/api/patienten/").status_code, 403)
 
     def test_admin_schreibt_nur_bei_testpatienten(self):
         """Festlegung 01.10.2026: Admins dürfen alles, Patientendaten schreiben aber nur bei Testpatienten."""
@@ -539,7 +588,6 @@ class Rollen(Grundlage):
                                        "titel": "Rückruf"}),
             ("patch", f"/api/patienten/{echt.id}/", {"ort": "Münster"}),
             ("post", "/api/infusionsplaene/entwurf/", {"patient": echt.id}),
-            ("post", f"/api/patienten/{echt.id}/abschliessen/", {"anlass": "verstorben"}),
         ]
         for methode, url, daten in versuche:
             with self.subTest(url=url):
@@ -749,11 +797,11 @@ class FalschZugeordneteDokumente(Grundlage):
         dok = self.hochladen(self.sabine)
         alter_pfad, sha = dok.pfad, dok.sha256
         url = f"/api/dokumente/{dok.id}/umhaengen/"
-        # Recht: Standard Mediziner (und Admin nur bei Testpatienten), nicht Mitarbeiter
+        # Recht: Standard Mediziner und Admin (seit 02.10.2026 auch bei echten Akten), nicht Mitarbeiter
         self.assertEqual(client_fuer(self.mitarbeiter).post(url, {"patient": self.bernd.id, "grund": "falscher Patient"},
                                                             format="json").status_code, 403)
-        self.assertEqual(client_fuer(self.admin).post(url, {"patient": self.bernd.id, "grund": "falscher Patient"},
-                                                      format="json").status_code, 403)
+        r = client_fuer(self.admin).post(url, {"patient": self.bernd.id, "grund": ""}, format="json")
+        self.assertEqual((r.status_code, list(r.json())), (400, ["grund"]))  # erlaubt, nur der Grund fehlt
         c = client_fuer(self.mediziner)
         self.assertIn("grund", c.post(url, {"patient": self.bernd.id, "grund": ""}, format="json").json())
         self.assertIn("patient", c.post(url, {"patient": self.sabine.id, "grund": "falscher Patient"}, format="json").json())
@@ -834,6 +882,42 @@ class FalschZugeordneteDokumente(Grundlage):
         # sonst schreibt der Admin bei echten Akten weiterhin nichts
         r = a.patch(f"/api/patienten/{self.sabine.id}/", {"diagnose": "<p>x</p>"}, format="json")
         self.assertEqual(r.status_code, 403)
+
+    def test_admin_ordnet_dokument_bei_echten_akten_zu(self):
+        """Fehlerliste 02.10.2026 (6.3): Admins dürfen ein Dokument auch bei echten Akten dem richtigen Patienten
+        zuordnen; vollständig im Audit-Log."""
+        dok = self.hochladen(self.sabine)
+        self.assertFalse(self.sabine.ist_test or self.bernd.ist_test)
+        r = client_fuer(self.admin).post(f"/api/dokumente/{dok.id}/umhaengen/",
+                                         {"patient": self.bernd.id, "grund": "beim falschen Patienten hochgeladen"},
+                                         format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        dok.refresh_from_db()
+        self.assertEqual(dok.patient_id, self.bernd.id)
+        self.assertTrue(dok.pfad.is_file())
+        e = SystemEreignis.objects.filter(art=SystemEreignis.Art.DOKUMENT_UMGEHAENGT).get()
+        self.assertEqual(e.benutzer, self.admin)
+        # hochladen oder ändern darf die Administration an echten Akten weiterhin nicht
+        r = client_fuer(self.admin).patch(f"/api/dokumente/{dok.id}/", {"notiz": "x"}, format="json")
+        self.assertEqual(r.status_code, 403)
+
+    def test_endgueltig_loeschen_ohne_zweiten_faktor(self):
+        """Festlegung 03.10.2026: Endgültig löschen nur mit eingerichtetem zweitem Faktor; ohne ihn wird abgewiesen
+        (mit Hinweis, ihn unter Mein Konto einzurichten), das Dokument bleibt."""
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+
+        from accounts.zweifaktor import OHNE_ZWEITEN_FAKTOR
+        from epm.pruefhilfen import KENNWORT
+
+        self.assertFalse(TOTPDevice.objects.filter(user=self.mediziner).exists())
+        dok = self.hochladen(self.sabine)
+        c = client_fuer(self.mediziner)
+        bestaetigung = c.post(f"/api/dokumente/{dok.id}/loeschen-vorbereiten/").json()["code"]
+        r = c.post(f"/api/dokumente/{dok.id}/loeschen/", {"grund": "Dokument eines fremden Patienten", "kennwort": KENNWORT,
+                                                          "bestaetigung": bestaetigung}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertEqual(r.json(), {"code": OHNE_ZWEITEN_FAKTOR})
+        self.assertTrue(Dokument.objects.filter(pk=dok.id).exists())
 
     def test_endgueltig_loeschen(self):
         from epm.pruefhilfen import KENNWORT

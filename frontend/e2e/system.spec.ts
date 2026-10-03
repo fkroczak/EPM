@@ -58,6 +58,44 @@ test("System: Auslastung und Status vom Systemagenten, Wartung des EPM", async (
   await expect(page.getByTestId("kennzahl-updates")).toContainText("Paketlisten");
   await expect(page.getByTestId("epm-karte")).toContainText("vollständig");
   await expect(page.getByTestId("epm-karte")).toContainText("Tabellen geschützt");
+  // Auslastung: Zeitraum wählbar (Fehlerliste 02.10.2026, 4.1), Standard 24 h; die Wahl bleibt gemerkt
+  const auslastung = page.getByTestId("auslastung");
+  await expect(auslastung.getByRole("group", { name: "Zeitraum" }).getByRole("button")).toHaveText(["1 h", "3 h", "24 h", "7 Tage", "14 Tage", "1 Monat", "6 Monate"]);
+  await expect(auslastung.getByTestId("verlauf")).toHaveAttribute("data-zeitraum", "24h");
+  for (const [knopf, code, titel] of [["1 h", "1h", "1 Stunde"], ["6 Monate", "6m", "6 Monate"], ["7 Tage", "7t", "7 Tage"]]) {
+    const antwort = page.waitForResponse((r) => r.url().includes(`/api/system/verlauf/?zeitraum=${code}`) && r.ok());
+    await auslastung.getByRole("button", { name: knopf, exact: true }).click();
+    await antwort;
+    await expect(auslastung.getByTestId("verlauf")).toHaveAttribute("data-zeitraum", code);
+    await expect(auslastung.getByRole("heading", { name: `Auslastung · ${titel}` })).toBeVisible();
+  }
+  await page.reload();
+  await expect(page.getByTestId("auslastung").getByTestId("verlauf")).toHaveAttribute("data-zeitraum", "7t");
+  await page.getByTestId("auslastung").getByRole("button", { name: "24 h", exact: true }).click();
+  // Größe der Karten über „⋯“ (wie auf der Startseite), je Person gespeichert
+  const karten = page.getByTestId("system-karten");
+  const verlaufKarte = karten.locator('[data-bereich="verlauf"]');
+  await expect(verlaufKarte).toHaveAttribute("data-breite", "2"); // 1440 px: 2 Spalten, Standard ganze Breite
+  let gespeichert = page.waitForResponse((r) => r.url().endsWith("/api/auth/ich/") && r.request().method() === "PATCH" && r.ok());
+  await page.getByTestId("groesse-verlauf").click();
+  await page.getByRole("menuitem", { name: "Breite: 1 Spalte" }).click();
+  await gespeichert;
+  await expect(verlaufKarte).toHaveAttribute("data-breite", "1");
+  gespeichert = page.waitForResponse((r) => r.url().endsWith("/api/auth/ich/") && r.request().method() === "PATCH" && r.ok());
+  await page.getByTestId("groesse-verlauf").click();
+  await page.getByRole("menuitem", { name: "Höhe: 2 Zeilen" }).click();
+  await gespeichert;
+  await expect(verlaufKarte).toHaveAttribute("data-hoehe", "2");
+  await page.reload();
+  await expect(page.getByTestId("system-karten").locator('[data-bereich="verlauf"]')).toHaveAttribute("data-hoehe", "2");
+  gespeichert = page.waitForResponse((r) => r.url().endsWith("/api/auth/ich/") && r.request().method() === "PATCH" && r.ok());
+  await page.getByTestId("groesse-verlauf").click();
+  await page.getByRole("menuitem", { name: "Standardgröße" }).click();
+  await gespeichert;
+  await expect(page.getByTestId("system-karten").locator('[data-bereich="verlauf"]')).toHaveAttribute("data-breite", "2");
+  // Konten: Zwei-Faktor-Anmeldung freiwillig, direkter Weg zur Einstellung (4.2)
+  await expect(page.getByTestId("epm-karte")).toContainText("Zwei-Faktor-Anmeldung");
+  await expect(page.getByTestId("epm-karte").getByRole("link", { name: "ändern" })).toHaveAttribute("href", "/admin/benutzer#anmeldung");
   // Wartung des EPM: sofort mit Ergebnis
   await page.getByTestId("aufgabe-schutz_pruefen").getByRole("button", { name: "Unveränderlichkeit prüfen" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Ausführen" }).click();

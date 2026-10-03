@@ -97,6 +97,19 @@ class Dokumentvorlage(models.Model):
                                            veroeffentlicht_am=timezone.now())
         return v
 
+    # Vordrucke zum Datenschutz: mitgelieferte Startvorlagen sind ungeprüfte Entwürfe (U17)
+    VORDRUCKE = ("datenschutzinformation", "einwilligung", "schweigepflichtentbindung")
+
+    @property
+    def im_entwurfsmodus(self) -> bool:
+        """Trägt die PDF das Wasserzeichen „ENTWURF“? Bei den Vordrucken, solange die mitgelieferte Startvorlage aktiv
+        ist (nie von einem Menschen veröffentlicht) – außer jemand hat den Entwurfsmodus für diese Art ausgeschaltet."""
+        from stammdaten.models import Einstellungen
+
+        if self.art not in self.VORDRUCKE or self.veroeffentlicht_von_id is not None:
+            return False
+        return self.art not in (Einstellungen.aktuell().vordrucke_ohne_entwurf or [])
+
     @classmethod
     def entwurf_von(cls, art: str):
         return cls.objects.filter(art=art, status=cls.Status.ENTWURF).first()

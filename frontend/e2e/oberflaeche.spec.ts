@@ -182,7 +182,7 @@ test("Volle Breite in Stufen: 1280 px", async ({ page }) => {
   await expect(page.locator(".teiler")).toHaveCount(0); // unter 1440 px untereinander, ohne Teiler
 });
 
-test("Volle Breite in Stufen: 1920 px mit Spaltenteiler (Einrastpunkte ⅓, ½, ⅔, je Person gespeichert)", async ({ page }) => {
+test("Volle Breite in Stufen: 1920 px – Karten der Akte im Raster, Größe je Karte über „⋯“, je Person gespeichert", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto("/");
   await expect(page.getByTestId("raster")).toHaveAttribute("data-spalten", "4");
@@ -192,42 +192,60 @@ test("Volle Breite in Stufen: 1920 px mit Spaltenteiler (Einrastpunkte ⅓, ½, 
   await expect(page.getByRole("columnheader", { name: /Erklärungen/ })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: /Plan/ })).toBeVisible();
   await page.getByTestId("patientenliste").getByRole("link", { name: "Probe, Jonas" }).click();
+  // Übersicht: Raster wie auf der Startseite (4 Spalten bei 1920 px), kein senkrechter Teiler mehr
   const stufe = page.getByTestId("uebersicht-stufe");
-  await expect(stufe).toHaveAttribute("data-aufteilung", "0.6667"); // ⅔ | ⅓ (Standard ab 1920 px)
-  const teiler = page.getByTestId("teiler-akte_uebersicht-0");
-  await expect(teiler).toHaveAttribute("aria-valuenow", "67");
-  // Tastatur: ← springt zum nächsten Einrastpunkt (½)
+  await expect(stufe).toHaveAttribute("data-spalten", "4");
+  await expect(page.locator(".teiler")).toHaveCount(0);
+  const gewicht = stufe.locator('[data-bereich="gewicht"]');
+  await expect(gewicht).toHaveAttribute("data-breite", "2"); // Standard: Gewichtsverlauf doppelt breit
+  await expect(stufe.locator("[data-bereich]")).toHaveCount(8);
+  const b0 = (await gewicht.boundingBox())!;
+  // „⋯“: Breite 3 Spalten
   let antwort = gespeichert(page);
-  await teiler.focus();
-  await teiler.press("ArrowLeft");
+  await page.getByTestId("groesse-gewicht").click();
+  await page.getByRole("menuitem", { name: /^Breite: 3 Spalten/ }).click();
   await antwort;
-  await expect(stufe).toHaveAttribute("data-aufteilung", "0.5000");
-  // Maus: Richtung ⅓ ziehen, loslassen rastet ein
-  const box = (await stufe.boundingBox())!;
-  const t = (await teiler.boundingBox())!;
-  antwort = gespeichert(page);
-  await page.mouse.move(t.x + t.width / 2, t.y + 200);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width * 0.36, t.y + 200, { steps: 10 });
-  await expect(page.getByText(/⅓ · rastet ein/)).toBeVisible();
-  await page.mouse.up();
-  await antwort;
-  await expect(stufe).toHaveAttribute("data-aufteilung", "0.3333");
+  await expect(gewicht).toHaveAttribute("data-breite", "3");
+  await expect.poll(async () => (await gewicht.boundingBox())!.width).toBeGreaterThan(b0.width * 1.3);
   const api = await apiAls("mitarbeiter");
-  expect((await api.get("auth/ich/")).aufteilung["akte_uebersicht@fhd"]).toEqual([0.3333]);
+  expect((await api.get("auth/ich/")).bereiche.akte_uebersicht.gewicht).toEqual({ breite: 3, hoehe: 0 });
+  // feste Höhe: 1 Zeile – der Inhalt scrollt in der Karte
+  antwort = gespeichert(page);
+  await page.getByTestId("groesse-gewicht").click();
+  await page.getByRole("menuitem", { name: "Höhe: 1 Zeile" }).click();
+  await antwort;
+  await expect(gewicht).toHaveAttribute("data-hoehe", "1");
   // gespeichert je Person: nach dem Neuladen gleich
   await page.reload();
-  await expect(page.getByTestId("uebersicht-stufe")).toHaveAttribute("data-aufteilung", "0.3333");
-  // Doppelklick: Standard
+  await expect(page.getByTestId("uebersicht-stufe").locator('[data-bereich="gewicht"]')).toHaveAttribute("data-breite", "3");
+  await expect(page.getByTestId("uebersicht-stufe").locator('[data-bereich="gewicht"]')).toHaveAttribute("data-hoehe", "1");
+  // Karten überdecken sich nicht
+  const karten = await page.getByTestId("uebersicht-stufe").locator("[data-bereich]").evaluateAll((els) => els.map((e) => {
+    const r = e.getBoundingClientRect();
+    return { id: e.getAttribute("data-bereich"), l: r.left, r: r.right, o: r.top, u: r.bottom };
+  }));
+  for (const a of karten) for (const b of karten) {
+    if (a.id! < b.id!) expect(a.r <= b.l + 1 || b.r <= a.l + 1 || a.u <= b.o + 1 || b.u <= a.o + 1, `${a.id} überdeckt ${b.id}`).toBe(true);
+  }
+  // Standardgröße
   antwort = gespeichert(page);
-  await page.getByTestId("teiler-akte_uebersicht-0").dblclick();
+  await page.getByTestId("groesse-gewicht").click();
+  await page.getByRole("menuitem", { name: "Standardgröße" }).click();
   await antwort;
-  await expect(page.getByTestId("uebersicht-stufe")).toHaveAttribute("data-aufteilung", "0.6667");
-  expect((await api.get("auth/ich/")).aufteilung["akte_uebersicht@fhd"]).toBeUndefined();
+  await expect(page.getByTestId("uebersicht-stufe").locator('[data-bereich="gewicht"]')).toHaveAttribute("data-breite", "2");
+  expect((await api.get("auth/ich/")).bereiche.akte_uebersicht?.gewicht).toBeUndefined();
   await api.ende();
-  // Kontakte: ⅔ | ⅓ mit Teiler und Terminen
+  // Diagnose & Therapie: gleiches Raster mit „⋯“
+  await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: /Diagnose/ }).click();
+  await expect(page.getByTestId("therapie-stufe").locator('[data-bereich="therapie"]')).toHaveAttribute("data-breite", "2");
+  await expect(page.getByTestId("groesse-diagnose")).toBeVisible();
+  // Kontakte: Raster ohne Teiler; der Verlauf der Akte steht nur im eigenen Reiter „Verlauf“ (Fehlerliste 02.10.2026, 3)
   await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: /^Kontakte/ }).click();
-  await expect(page.getByTestId("teiler-akte_kontakte-0")).toBeVisible();
+  const kontakte = page.getByTestId("kontakte-stufe");
+  await expect(kontakte.locator('[data-bereich="kontakte"]')).toHaveAttribute("data-breite", "2");
+  await expect(kontakte.locator("[data-bereich]")).toHaveCount(4);
+  await expect(kontakte.getByRole("heading", { name: /Verlauf/ })).toHaveCount(0);
+  await expect(page.locator(".teiler")).toHaveCount(0);
   // Kalender: Monat ¾ | Tagesliste ¼, auch in der Woche
   await page.goto("/kalender?ansicht=woche");
   await expect(page.getByTestId("tagesliste")).toBeVisible();

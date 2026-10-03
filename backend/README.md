@@ -5,13 +5,13 @@ Django 5.2 LTS · Django REST Framework · PostgreSQL 18 · django-otp (TOTP + N
 ## Apps
 | App | Inhalt |
 |---|---|
-| `accounts` | Benutzer (Titel, Kürzel, Rolle, Testbenutzer), Anmeldung mit Einmal-Kennwort und 2FA |
+| `accounts` | Benutzer (Titel, Kürzel, Rolle, Testbenutzer), Anmeldung mit Einmal-Kennwort, 2FA freiwillig oder Pflicht (`Anmelderegeln`), Konten ohne Login (Rolle „Keine Berechtigung“) |
 | `stammdaten` | Auswahllisten (Katheter, Dokumenttyp, Kontaktart), Versorger + Ansprechpartner, Präparate, Einstellungen |
 | `patienten` | Patient, Gewichtsmessung, Kontakt (unveränderlich, Storno), Termin, Dokument (Dateisystem + SHA-256) |
 | `infusionen` | Infusionsplan (Entwurf → aktuell → abgelöst, Vorgänger, kcal), Positionen |
 | `audit` | Systemprotokoll, DB-Trigger (Historie/Protokoll unveränderlich), Wartungsmodus |
 
-## API (alle unter `/api/`, Sitzung + CSRF, voll angemeldet = Kennwort + 2FA)
+## API (alle unter `/api/`, Sitzung + CSRF, voll angemeldet = Kennwort + 2FA, sofern eingerichtet oder Pflicht)
 - `auth/status` · `auth/anmelden` · `auth/2fa` · `auth/kennwort` · `auth/2fa/einrichten` · `auth/2fa/bestaetigen` · `auth/abmelden` · `auth/ich` · `auth/notfallcodes`
 - `startseite/` – Termine (überfällig/heute/7 Tage), Gewichtswarnungen, Planhinweise, zuletzt eingetragen
 - `patienten/` (+ `doppelte/`, `{id}/abschliessen/`, `{id}/wieder-oeffnen/`, `{id}/verlauf/`), Filter `suche`, `status`, `versorger` …

@@ -11,6 +11,14 @@ Festlegungen vom 01.10.2026:
   freischaltbar. Endgültig löschen (Dokumente, Akten): Mediziner und Admin, Admins auch bei echten Akten.
 - Altdaten übernehmen (Import, F65): nur Admin; anderen Rollen nicht erteilbar. Der Import ist eine bewusste
   Ausnahme von „Admins schreiben Patientendaten nur bei Testpatienten“ – er legt die übernommenen Akten an.
+- Festlegungen 02.10.2026 (Fehlerliste): Admins dürfen auch bei echten Akten Dokumente einem anderen Patienten zuordnen
+  und Akten abschließen (wie schon endgültig löschen). Neue Rolle „Keine Berechtigung“: keinerlei Rechte, nicht
+  einstellbar; Konten ohne Login haben immer diese Rolle.
+- Festlegung 03.10.2026 (U22): Rolle „Mitarbeiter (erweitert)“ zwischen Mitarbeiter und Mediziner – Standard wie
+  Mitarbeiter und zusätzlich Infusionspläne anlegen; alles je Gruppe umstellbar.
+- Festlegung 03.10.2026: „Testdaten sehen“ (Testpatienten und Testbenutzer) je Gruppe einstellbar – ohne das Recht
+  erscheinen sie nirgends. Standard: alle Rollen wie bisher; Admin fest (legt nur Testpatienten an und verlöre sonst
+  alles, was er schreiben darf). Testbenutzer sehen ihre Testpatienten immer.
 Für Betrachter gilt die Rollenmatrix aus dem Entwurf 17.
 
 Was nicht ausdrücklich in der Datenbank steht, kommt aus STANDARD. Testbenutzer erhalten nie
@@ -49,6 +57,9 @@ RECHTE = [
     ("benutzer_verwalten", "Benutzer und Rechte verwalten",
      "Benutzer anlegen, sperren, Einmal-Kennwort, 2FA zurücksetzen, Rechte der Gruppen"),
     ("backup_verwalten", "Sicherungen verwalten", "Sicherung starten, wiederherstellen"),
+    ("testdaten_sehen", "Testdaten sehen (Testpatienten und Testbenutzer)",
+     "ohne dieses Recht erscheinen Testpatienten (Nr. ab 9001) und Testbenutzer nirgends – nicht in Listen, Suche, "
+     "Kalender, Startseite oder Auswahlfeldern; Testbenutzer selbst sehen ihre Testpatienten immer"),
     ("testdaten_zuruecksetzen", "Testdaten zurücksetzen", ""),
     ("system_verwalten", "Systemverwaltung (Server und EPM)",
      "Auslastung, Ubuntu-Updates, Neustart, Wartung von Datenbank und Dateien, Hinweise an alle Benutzer; Standard nur "
@@ -71,6 +82,9 @@ PATIENTENDATEN_SCHREIBEN = {"eintraege_erfassen", "akten_bearbeiten", "plaene_an
 # Endgültiges Löschen (F73, F80) dürfen Admins auch bei echten Akten (Festlegung 02.10.2026); die übrigen Prüfungen
 # (Frist bzw. Antrag, Kennwort + 2FA + Bestätigungscode, Audit-Log, Löschprotokoll) gelten unverändert
 LOESCHEN = {"dokumente_loeschen", "akten_loeschen"}
+# Was Admins auch bei echten Akten dürfen (Ausnahmen von „Admins schreiben Patientendaten nur bei Testpatienten“):
+# endgültig löschen, Dokumente einem anderen Patienten zuordnen, Akten abschließen (Festlegungen 02.10.2026)
+AUCH_BEI_ECHTEN_AKTEN = LOESCHEN | {"dokumente_umhaengen", "akten_abschliessen"}
 
 # Rechte, die nur bestimmte Rollen haben können; anderen Rollen nicht erteilbar (Festlegungen 02.10.2026:
 # endgültig löschen nur Mediziner und Admin – Admins auch bei echten Akten, Ausnahme von „Admins schreiben
@@ -79,12 +93,20 @@ LOESCHEN = {"dokumente_loeschen", "akten_loeschen"}
 NUR_ROLLEN = {"dokumente_loeschen": {Rolle.MEDIZINER, Rolle.ADMIN}, "akten_loeschen": {Rolle.MEDIZINER, Rolle.ADMIN},
               "altdaten_importieren": {Rolle.ADMIN}}
 
+# Rollen ohne jedes Recht – in der Matrix nicht einstellbar
+OHNE_RECHTE = {Rolle.KEINE}
+
 STANDARD = {
-    Rolle.BETRACHTER: {"akten_lesen"},
+    Rolle.KEINE: set(),
+    Rolle.BETRACHTER: {"akten_lesen", "testdaten_sehen"},
     # Datenschutz: Mitarbeiter erfassen Erklärungen und Anfragen und schließen freigegebene Pläne ab;
     # entscheiden, einschränken und löschen bleibt beim Mediziner
     Rolle.MITARBEITER: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
-                        "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten", "plaene_abschliessen"},
+                        "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten", "plaene_abschliessen",
+                        "testdaten_sehen"},
+    Rolle.MITARBEITER_PLUS: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
+                                  "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten",
+                                  "plaene_abschliessen", "plaene_anlegen", "testdaten_sehen"},
     Rolle.MEDIZINER: _ALLE - _ADMIN_SPEZIAL,
     Rolle.ADMIN: _ALLE - {c for c, rollen in NUR_ROLLEN.items() if Rolle.ADMIN not in rollen},
 }
@@ -93,7 +115,7 @@ STANDARD = {
 NUR_TESTPATIENTEN_SCHREIBEN = {Rolle.ADMIN}
 
 # Diese Rechte kann niemand entziehen (sonst sperrt sich die Administration aus)
-FEST = {(Rolle.ADMIN, "benutzer_verwalten"), (Rolle.ADMIN, "akten_lesen")}
+FEST = {(Rolle.ADMIN, "benutzer_verwalten"), (Rolle.ADMIN, "akten_lesen"), (Rolle.ADMIN, "testdaten_sehen")}
 
 # Testbenutzer arbeiten nur mit Testpatienten; alles, was darüber hinaus wirkt, bleibt verwehrt
 NUR_ECHTE_BENUTZER = {"versorger_pflegen", "vorlagen_pflegen", "audit_lesen", "benutzer_verwalten",
@@ -111,6 +133,8 @@ def matrix() -> dict:
             ergebnis[rolle][recht] = erlaubt
     for rolle, recht in FEST:
         ergebnis[rolle][recht] = True
+    for rolle in OHNE_RECHTE:
+        ergebnis[rolle] = {code: False for code in CODES}
     for recht, rollen in NUR_ROLLEN.items():
         for rolle in ergebnis:
             if rolle not in rollen:
@@ -123,6 +147,8 @@ def rechte_fuer(user) -> frozenset:
     Änderungen der Administration sofort gelten)."""
     if user is None or not getattr(user, "is_authenticated", False):
         return frozenset()
+    if user.rolle in OHNE_RECHTE or getattr(user, "nur_historisch", False):
+        return frozenset()
     werte = matrix().get(user.rolle, {})
     rechte = {code for code, erlaubt in werte.items() if erlaubt}
     if getattr(user, "ist_test", False):
@@ -132,6 +158,11 @@ def rechte_fuer(user) -> frozenset:
 
 def hat_recht(user, code: str) -> bool:
     return code in rechte_fuer(user)
+
+
+def sieht_testdaten(user) -> bool:
+    """Testpatienten und Testbenutzer sichtbar? Recht „Testdaten sehen“; Testbenutzer sehen ihre Testpatienten immer."""
+    return bool(getattr(user, "ist_test", False)) or hat_recht(user, "testdaten_sehen")
 
 
 def schreibt_nur_testpatienten(user) -> bool:

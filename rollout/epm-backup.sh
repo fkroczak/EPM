@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# EPM – Sicherung: Datenbank (pg_dump) + Patientendokumente + Löschliste, 30 Tage aufbewahrt
+# EPM – Sicherung: Datenbank (pg_dump) + Patientendokumente + Löschliste, 7, 14 oder 30 Tage aufbewahrt
 # (endgültig gelöschte Akten und Dokumente stecken damit höchstens 30 Tage in älteren Sicherungen)
 #
 #   sudo epm-backup [--art nachts|von_hand|vor_update|vor_aenderung|vor_wiederherstellung] [--von BENUTZER]
@@ -7,7 +7,8 @@
 # Läuft täglich um 02:00 per systemd-Timer (--art nachts), „Jetzt sichern“ und die Sicherung vor Updates, Neustart und
 # Wiederherstellen stößt der Systemagent an (Administration › Backup bzw. › System).
 #
-# Aufbewahrung: EPM_BACKUP_TAGE (Standard 30; Festlegung 02.10.2026: Sicherungen werden 30 Tage vorgehalten).
+# Aufbewahrung: 7, 14 oder 30 Tage, wählbar unter Administration › Backup (der Systemagent schreibt die Auswahl nach
+# /etc/epm/sicherung/aufbewahrung); ohne Auswahl EPM_BACKUP_TAGE aus /etc/epm/epm.conf, sonst 30 Tage.
 #
 # Verschlüsselung (Festlegung 02.10.2026: symmetrisch mit einem Passwort, das die Administration in der Oberfläche
 # festlegt; Art. 32 DSGVO): Das Passwort liegt nur für root lesbar in /etc/epm/sicherung/passwort-<Nr.>, die aktuelle
@@ -22,8 +23,14 @@
 set -euo pipefail
 B="${EPM_BASIS:-/srv/epm}"
 ZIEL="$B/backup"
-TAGE="${EPM_BACKUP_TAGE:-30}"
 KONF="${EPM_SICHERUNG_KONF:-/etc/epm/sicherung}"
+TAGE="${EPM_BACKUP_TAGE:-}"
+if [[ -s "$KONF/aufbewahrung" ]]; then
+  TAGE="$(tr -dc '0-9' < "$KONF/aufbewahrung")"
+elif [[ -z "$TAGE" && -r /etc/epm/epm.conf ]]; then
+  TAGE="$(sed -n 's/^EPM_BACKUP_TAGE=["'"'"']\{0,1\}\([0-9]*\).*/\1/p' /etc/epm/epm.conf | head -1)"
+fi
+TAGE="${TAGE:-30}"
 PROJEKT="${EPM_COMPOSE_PROJEKT:-}"
 ART="nachts"
 VON=""

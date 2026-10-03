@@ -73,7 +73,9 @@ def faelligkeiten(patienten, bis: date):
     ids = [p.id for p in offen]
     letzte = dict(Kontakt.objects.filter(patient_id__in=ids, storniert_am__isnull=True)
                   .values("patient_id").annotate(z=Max("zeitpunkt")).values_list("patient_id", "z"))
-    plaene = dict(Infusionsplan.objects.filter(patient_id__in=ids, status=Infusionsplan.Status.AKTUELL)
+    # „Kein Infusionsplan nötig“ bestätigt: keine Erinnerung „Infusionsplan prüfen“
+    plaene = dict(Infusionsplan.objects.filter(patient_id__in=ids, status=Infusionsplan.Status.AKTUELL,
+                                               patient__kein_plan=False)
                   .values_list("patient_id", "gueltig_ab"))
     # Kontakt fällig in zwei Stufen (S04): je Akte ein Eintrag am Tag „bald fällig“ und einer am Tag „überfällig“
     stufen = (("bald", 30 * e.kontakt_bald_monate, "bald fällig"),

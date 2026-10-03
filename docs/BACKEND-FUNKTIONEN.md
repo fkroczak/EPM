@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 02.10.2026 · Code-Stand: Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
+Stand: 02.10.2026 · Code-Stand: Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
 Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026, Prüfung nach DSGVO vom 02.10.2026 (`docs/DATENSCHUTZ.md`).
@@ -143,13 +143,22 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F94 | Startseite der Administration: Sicherung, Server, Updates, Konten, Angemeldet, Hinweis, Zugriffe, Testumgebung (S12–S14) | 2 Start | ABGESCHLOSSEN UND GETESTET |
 | F95 | Hilfe je Rolle nach tatsächlichen Rechten, mitgeliefert + eigene Ergänzungen mit Historie (S15) | Hilfe (neu), „?“ auf jeder Seite | ABGESCHLOSSEN UND GETESTET |
 | F96 | Volle Fensterbreite, Aufteilung der Seiten in Stufen 1440/1920/2560 px (S16) | alle Ansichten | ABGESCHLOSSEN UND GETESTET |
-| F97 | Spaltenteiler ziehen mit Einrastpunkten ⅓, ½, ⅔, je Seite, Stufe und Person (S17) | Patientenliste, Akte (Übersicht, Kontakte), Plan-Editor | ABGESCHLOSSEN UND GETESTET |
+| F97 | Spaltenteiler ziehen mit Einrastpunkten ⅓, ½, ⅔, je Seite, Stufe und Person (S17); in der Akte ersetzt durch F98 | Patientenliste, Plan-Editor | ABGESCHLOSSEN UND GETESTET |
+| F98 | Karten im Raster mit Menü „⋯“ (Breite, Höhe, Standardgröße) je Person – Akte Übersicht, Diagnose & Therapie, Kontakte, System | 4–6 Akte, System | ABGESCHLOSSEN UND GETESTET |
+| F99 | Zwei-Faktor-Anmeldung freiwillig (Standard), Pflicht für Admins oder alle einstellbar; selbst einrichten und ausschalten; Bestätigungen immer mit Passwort und 2FA (ohne eingerichteten Faktor nicht möglich) | 1 Anmeldung, 14 Mein Konto, 17 Benutzer, alle Bestätigungen | ABGESCHLOSSEN UND GETESTET |
+| F100 | Konten „ohne Login“ setzen und mit „Login geben“ wieder einbinden; Rolle „Keine Berechtigung“ ohne Rechte; Testbenutzer-Schalter | 17 Benutzer | ABGESCHLOSSEN UND GETESTET |
+| F101 | Testpatient beim Anlegen wählbar (z. B. für Plantests) | 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
+| F102 | Auslastung mit wählbarem Zeitraum 1 h bis 6 Monate (Mittelwerte und Spitzen), Konten mit direktem Weg | System | ABGESCHLOSSEN UND GETESTET |
+| F103 | Sicherung herunterladen, Aufbewahrung 7/14/30 Tage, heruntergeladene Sicherung hochladen und einlesen | 11 Backup | ABGESCHLOSSEN UND GETESTET |
+| F104 | Admins auch bei echten Akten: Akte abschließen, Dokument anderem Patienten zuordnen | 4 Akte, 9 Dokumente | ABGESCHLOSSEN UND GETESTET |
+| F106 | Recht „Testdaten sehen“ je Gruppe (Testpatienten und Testbenutzer ausblenden); Testbenutzer ausblenden/einblenden | 17 Benutzer, alle Listen | ABGESCHLOSSEN UND GETESTET |
+| F105 | Hinweis „Kein Infusionsplan“; „Kein Infusionsplan nötig“ je Patient bestätigen unterdrückt ihn und die Warnung „Plan älter als …“ | 3 Patientenliste, 2 Start, 4 Akte, 8 Infusionspläne, Kalender | ABGESCHLOSSEN UND GETESTET |
 
-Summe (97 Funktionen, gezählt aus der Tabelle): 96 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 1 teilweise abgeschlossen (F83) · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
+Summe (106 Funktionen, gezählt aus der Tabelle): 105 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 1 teilweise abgeschlossen (F83) · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 Neu in Runde 4 sind F74–F83 (Datenschutz nach DSGVO und Abschließen eines Plans nach Freigabe); offene Fragen dazu stehen
-in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18). Runde 7 setzt die Startseiten- und Oberflächen-Erweiterungen S01–S17 aus `claude/startseite-erweiterungen.md` um (F90–F97, dazu erweitert F09, F13, F14, F17, F48, F84).
+in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18). Runde 7 setzt die Startseiten- und Oberflächen-Erweiterungen S01–S17 aus `claude/startseite-erweiterungen.md` um (F90–F97, dazu erweitert F09, F13, F14, F17, F48, F84). Die Fehlerliste vom 02.10.2026 bringt F98–F106 und ändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97 (Abschnitt P).
 
 ---
 
@@ -1247,7 +1256,7 @@ Recht „Sicherungen verwalten“ (Standard: nur Admin; Testzugänge nie).
   ohne Passwort in `ziel.json`; leeres Passwort beim Ändern = bisheriges bleibt. Der Status-Lauf (jede Minute) startet im
   Zeitfenster die Übertragung im Hintergrund (`epm-uebertragung.service`), nach einem Fehler frühestens 15 Minuten später
   erneut, höchstens bis zum Ende des Fensters. Übertragen werden nur verschlüsselte Sicherungen mit Prüfsummen und Angaben,
-  `rclone copy` (nie löschen) und danach `rclone check`; „Jetzt übertragen“ auch außerhalb des Fensters. Ein neues Ziel
+  `rclone copy` und danach `rclone check`; danach entfernt der Agent im Ziel EPM-Sicherungen, die älter als die Aufbewahrung im Ziel sind (Festlegung 03.10.2026: Standard 30 Tage, einstellbar nie/14–365 Tage, die jüngste bleibt immer, andere Dateien nie; `im_ziel_veraltet`, Backend-Test `test_agent_aufbewahrung_im_ziel`, Browsertest `zzz-sicherung.spec.ts`); „Jetzt übertragen“ auch außerhalb des Fensters. Ein neues Ziel
   bekommt alle vorhandenen verschlüsselten Sicherungen. Der Server erreicht das Ziel über den Proxy der OPNsense
   (`EPM_APT_PROXY`); die Adresse muss dort freigegeben sein.
 - **Validierung / Fehlerfälle:** nur `https://` (`http://` nur für localhost – Test), keine Zugangsdaten in der Adresse,
@@ -1491,6 +1500,11 @@ erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migratione
   mitgelieferten Startvorlagen sind **Entwürfe**: Aufbau nach Art. 13 DSGVO bzw. mit Freiwilligkeit und Widerruf, Lücken
   in [eckigen Klammern], Hinweis zur rechtlichen Prüfung. Solange keine von der Stiftung veröffentlichte Version aktiv
   ist, trägt die PDF das Wasserzeichen „ENTWURF“ und die Oberfläche zeigt „Vorlage noch nicht geprüft“ (U17).
+  **Entwurfsmodus manuell abschaltbar (Festlegung 03.10.2026):** Vorlagen › Dokumentvorlagen › „Entwurfsmodus
+  ausschalten“ (`POST /api/vorlagen/<art>/entwurfsmodus/ {"aus": true|false}`, Recht „Vorlagen pflegen“, Audit-Log,
+  Historie der Einstellungen `vordrucke_ohne_entwurf`, Migration `stammdaten/0010`): Die PDFs der mitgelieferten
+  Vorlage tragen dann kein Wasserzeichen und keinen Hinweisblock für die Bearbeiter; Lücken in [eckigen Klammern]
+  bleiben stehen. Jederzeit wieder einschaltbar; nach dem Veröffentlichen einer eigenen Version ohnehin ohne Wasserzeichen.
 - **Validierung:** Akte lesbar; `art` aus der Liste, sonst 400.
 - **Tabellen:** `vorlagen_dokumentvorlage`
 - **Teststatus:** Backend-Tests grün (`Erklaerungen.test_pdf_aus_der_dokumentvorlage`,
@@ -1980,6 +1994,147 @@ Aufteilung der übrigen Seiten wie im Entwurf vorgeschlagen. Erweitert sind auß
   gespeichert)“ (Tastatur, Maus, Doppelklick, gespeicherter Wert); Neustart in `zz-neustart.spec.ts` (Teiler der Akte auf ⅓).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
+## P · Fehlerliste vom 02.10.2026
+
+Punkte der Fehlerliste: 1 Infusionspläne-Übersicht und Planansicht, 2 Karten mit „⋯“ statt Teiler in der Akte,
+3 Verlauf unter Kontakte, 4 System, 5 Backup, 6 Benutzer und Rechte. Rückfragen geklärt: Punkt 2 „Raster mit ⋯-Menü“,
+Punkt 6.4 „Testbenutzer-Schalter“ und zusätzlich „Testpatient definieren für mögliche Plantests“.
+
+**Geänderte Funktionen**
+- **F85 Übersicht aller Infusionspläne (1.1, 1.2, 1.4):** „Erstellt“ und „Freigegeben“ immer als Datum (nie „heute“/
+  „gestern“), mit Person in derselben Zeile; Laufzeit, Rate und Tage/Woche in einer Spalte „Infusion“, Zeilen ohne
+  Umbruch. Der Status zeigt beim Überfahren die Frist: „Frist: TT.MM.JJJJ – ab dann gilt der Plan als alt“ bzw.
+  „Frist abgelaufen am …“ (neues Feld `alt_ab` = gültig ab + Grenzwert „Plan-Alter-Warnung“).
+- **F31 Infusionspläne eines Patienten (1.3):** „Ansicht wie PDF“ als kleine Vorschau (höchstens 340 px breit, blätterbar)
+  wie unter „Dokumente“; Klick auf das Blatt oder „Groß ansehen“ öffnet die große Ansicht mit Zoom in einem Fenster.
+- **F97 / F98 (2, 3):** In der Akte gibt es keinen senkrechten Teiler mehr (Patientenliste und Plan-Editor behalten ihn).
+  Der Kurz-Verlauf neben den Kontakten (ab 2560 px) entfällt – der Verlauf steht nur im eigenen Reiter.
+- **F03, F05, F09, F52** siehe F99 und F100; **F20, F72** siehe F104; **F86** siehe F102.
+
+### F98 Karten im Raster mit Menü „⋯“
+- **Ansicht:** Akte › Übersicht (Gewichtsverlauf, Termine, aktueller Plan, Diagnose und Therapie, letzte Kontakte,
+  Anschrift, Ärzte, Bezugspersonen), › Diagnose & Therapie (Diagnose, Therapie, Empfehlung, Hinweis), › Kontakte
+  (Kontakte, Hinweis, Erreichbarkeit, Termine), Administration › System (Auslastung, Tätigkeiten, Verlauf der
+  Tätigkeiten, Server, EPM, Hinweis an alle, Angemeldet). Spalten wie auf der Startseite (1/2/3/4/5 je Fensterstufe;
+  System 1/1/2/3/4). Jede Karte hat oben rechts „⋯“: Breite 1 Spalte bis ganze Breite, Höhe automatisch oder 1–4 Zeilen
+  (Inhalt scrollt in der Karte), Standardgröße. Karten rücken lückenlos auf (Raster mit 8-px-Zeilen, Höhe gemessen).
+- **Speichern:** `PATCH /api/auth/ich/ {"bereiche": {"<seite>": {"<karte>": {"breite": 1–5, "hoehe": 0–4} | null}}}`
+  (Feld `User.bereiche`, Migration `accounts/0005`); nur bekannte Seiten und Karten, `null` = Standard.
+- **Teststatus:** Backend-Tests `accounts.tests` (Bereiche prüfen, zusammenführen, zurücksetzen). Browsertests
+  `oberflaeche.spec.ts` „1920 px – Karten der Akte im Raster …“ (Breite, Höhe, gespeichert, keine Überdeckung,
+  Standardgröße, Therapie und Kontakte ohne Verlauf), `system.spec.ts` (Größe der Auslastung), Neustart in
+  `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F99 Zwei-Faktor-Anmeldung freiwillig (6.5)
+- **Regel:** Modell `Anmelderegeln` (eine Zeile, mit Historie): `freiwillig` (Standard), `admins`, `alle`;
+  `GET/PUT /api/benutzer/anmeldung/` (Recht „Benutzer verwalten“, Audit-Log). Wer einen zweiten Faktor eingerichtet hat,
+  wird bei der Anmeldung immer danach gefragt. Ist er Pflicht und fehlt, führt die Anmeldung wie bisher zur Einrichtung.
+- **Selbst:** Mein Konto › Einrichten (QR-Code, Notfall-Codes); Ausschalten nur solange freiwillig, mit Kennwort und Code
+  (`POST /api/auth/2fa/ausschalten/`). Startseite: einmaliger, ausblendbarer Hinweis (`startseite.zweifaktorhinweis_aus`).
+- **Bestätigungen** (endgültig löschen F73/F80, Wiederherstellen, Updates/Neustart, Sicherungs-Passwort, Ziel, Import):
+  immer Kennwort **und** Code (Festlegung 03.10.2026, U34). Ohne eingerichteten zweiten Faktor wird abgewiesen
+  (`accounts.zweifaktor.OHNE_ZWEITEN_FAKTOR`: „Bitte zuerst unter Mein Konto … einrichten“); die Oberfläche zeigt den
+  Hinweis mit Verweis auf Mein Konto und lässt den Knopf aus. Der Django-Admin verlangt ebenfalls einen zweiten Faktor.
+- **Konten-Kachel und System:** „ohne 2FA“ nur, wo er Pflicht ist; „Notfall-Codes knapp“ nur mit eingerichtetem Faktor.
+- **Teststatus:** Backend-Tests `accounts.tests` (Regel, Anmeldung mit und ohne Faktor, Pflicht, Ausschalten, Bestätigung
+  ohne Code), `patienten.tests`, `system.tests`. Browsertest `anmeldung.spec.ts` „Erste Anmeldung: eigenes Passwort;
+  Zwei-Faktor-Anmeldung freiwillig einrichten und wieder ausschalten“; Bestätigungen mit Code in `system.spec.ts`,
+  `zzz-sicherung.spec.ts`, `datenschutz.spec.ts`, `dokumente-falsch.spec.ts` (Testkonten haben einen Faktor).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F100 Ohne Login, Rolle „Keine Berechtigung“, Testbenutzer-Schalter (6.1, 6.2, 6.4)
+- **Ohne Login:** `POST /api/benutzer/<id>/ohne-login/` – Konto inaktiv, Kennwort unbrauchbar, Authenticator und
+  Notfall-Codes gelöscht, Sitzungen beendet, Rolle `keine`, kein Testzugang; Einträge bleiben zugeordnet. Beim Anlegen
+  `{"ohne_login": true}`. Nicht für das eigene Konto.
+- **Login geben:** `POST /api/benutzer/<id>/login-geben/ {"rolle": "mitarbeiter"}` – Rolle setzen, Einmal-Kennwort für das
+  Zugangsblatt (wie beim Anlegen).
+- **Rolle „Keine Berechtigung“ (`keine`):** hat nie Rechte (nicht einstellbar, nicht in der Rechtetabelle); angemeldet sieht
+  man nur Startseite, Hilfe und Mein Konto. Bestehende Konten ohne Login bekommen sie per Migration.
+- **Testbenutzer:** Schalter im Konto, für Betrachter, Mitarbeiter und Mediziner (nicht Admin, nicht das eigene Konto).
+- **Teststatus:** Backend-Tests `accounts.tests`. Browsertest `admin.spec.ts` „Benutzer ohne Login: anlegen, setzen,
+  wieder einbinden; Rolle „Keine Berechtigung“; Testbenutzer-Schalter“.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F101 Testpatient beim Anlegen (6.4, Nachtrag)
+- **Ansicht:** Neuer Patient › „als Testpatient anlegen“; Nummer ab 9001 (`GET /api/patienten/naechste-nummer/?testpatient=1`),
+  `POST /api/patienten/ {"testpatient": true}`. Testbenutzer und Admins legen weiterhin immer Testpatienten an
+  (`testpatient_fest`).
+- **Teststatus:** Backend-Test `patienten.tests`; Browsertest `patienten.spec.ts` „Neuer Patient als Testpatient …“.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F102 Auslastung mit Zeitraum, Konten mit direktem Weg (4.1–4.3)
+- **Zeitraum:** `GET /api/system/verlauf/?zeitraum=1h|3h|24h|7t|14t|1m|6m`. Der Systemagent (Version 3) hält neben den
+  Minutenwerten (24 h) Mittelwerte je 15 Minuten (14 Tage), je Stunde (31 Tage) und je 6 Stunden (184 Tage) mit Spitzen
+  (`cpu_max`, `ram_max`). Das Diagramm reicht immer über den ganzen Zeitraum, beschriftet Uhrzeit bzw. Datum, zeigt
+  Spitzen gestrichelt und folgt der Kartengröße (F98). Die Wahl bleibt im Browser gemerkt.
+- **Konten:** Namen (gesperrt, ohne 2FA, offenes Einmal-Kennwort) führen zur Person in der Benutzerverwaltung, das eigene
+  Konto ohne 2FA zu Mein Konto › Einrichten; Regel der Zwei-Faktor-Anmeldung mit Verweis zur Einstellung.
+- **Hinweis an alle Benutzer (4.3):** Warnungen deutlich größer (Titel, größere Schrift, kräftiger Rand).
+- **Teststatus:** Backend-Tests `system.tests` (Zeiträume, Stufen). Browsertest `system.spec.ts` „System: Auslastung …“.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F103 Sicherung herunterladen, Aufbewahrung, hochladen (5.1–5.3)
+- **Aufbewahrung:** `POST /api/backup/aufbewahrung/ {"tage": 7|14|30}` (Passwort und Code) → Auftrag an den
+  Systemagenten, Datei `/etc/epm/sicherung/aufbewahrung`; `epm-backup.sh` liest sie (sonst `EPM_BACKUP_TAGE`, sonst 30).
+  Wirkt mit der nächsten Sicherung; im Übertragungsziel gilt dessen eigene Aufbewahrung (F64, Standard 30 Tage).
+- **Herunterladen:** `POST /api/backup/<stempel>/bereitstellen/` (Passwort und Code) → der Agent legt
+  `epm-sicherung_<stempel>.tar` (alle Dateien der Sicherung unverändert, verschlüsselte bleiben verschlüsselt) für 2 Stunden
+  in `<EPM_BASE>/system/download` (root:101, 0750); `GET /api/backup/<stempel>/datei/` liefert sie über Nginx
+  (`X-Accel-Redirect`, Ort `/_geschuetzt/sicherung/`), jeder Abruf im Audit-Log.
+- **Hochladen:** `POST /api/backup/hochladen/ {name, groesse}` → Stücke zu 4 MiB mit `PUT …/hochladen/<id>/?versatz=n`
+  (unterbrochene Verbindung setzt an der Stelle des Servers fort), `DELETE` verwirft. `POST …/<id>/einlesen/
+  {passwort?}` → der Agent prüft (nur Dateien genau einer Sicherung, Datenbank und Dokumente vorhanden, Prüfsummen,
+  bestehende Sicherung wird nie überschrieben, Platz) und übernimmt sie mit Art „Hochgeladen“. Ist sie mit einem
+  unbekannten Passwort verschlüsselt (anderer EPM-Server), wird das mitgegebene geprüft und als eigene Passwort-Nummer
+  („fremd“) hinterlegt; ohne bzw. mit falschem Passwort bleibt die Datei liegen und lässt sich mit Passwort erneut
+  einlesen. Zurückgespielt wird nur mit „Wiederherstellen“ (F63).
+- **Teststatus:** Backend-Tests `system.test_sicherung` (Aufbewahrung, Bereitstellen, Datei, Stücke, Versatz, Einlesen).
+  Browsertest `zzz-sicherung.spec.ts` „Backup: Aufbewahrung wählen, Sicherung herunterladen und als neue Sicherung wieder
+  hochladen“ (echter Systemagent und echtes GnuPG in CI; Ablehnung einer schon vorhandenen Sicherung).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F104 Admins auch bei echten Akten (6.3)
+- **Regel:** `accounts.rechte.AUCH_BEI_ECHTEN_AKTEN` = Akten abschließen, Dokumente einem anderen Patienten zuordnen,
+  endgültig löschen (F73, F80). Alle anderen Patientendaten schreiben Admins weiterhin nur bei Testpatienten (U12).
+- **Teststatus:** Backend-Tests `patienten.tests`; Browsertest `admin.spec.ts` „Admin: echte Akten nur lesen …“ (schließt
+  eine echte Akte ab).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F105 Kein Infusionsplan nötig (Ergänzung zur Fehlerliste, 02.10.2026)
+- **Anlass:** „Infusionspläne müssen erstellt werden, einige Patienten benötigen keinen – Option, dies zu bestätigen und
+  damit die Warnung auf der Startseite usw. zu unterdrücken.“
+- **Hinweis (neu, abgeleitet):** Akte in Betreuung ohne aktuell gültigen (freigegebenen) Plan → Hinweis „Kein
+  Infusionsplan“ in der Patientenliste (zählt bei „Nur mit Hinweisen“), Filter `?pruefen=ohne_plan`, Eintrag in „Nach
+  und nach prüfen“ auf der Startseite (`pruefen.ohne_plan`), Hinweis in der Akte (Übersicht, Infusionspläne).
+- **Bestätigen:** `POST /api/patienten/<id>/kein-plan/ {"kein_plan": true, "grund": "…"}` (Recht „Akten bearbeiten“,
+  Admins nur bei Testpatienten, nicht bei abgeschlossenen Akten); `{"kein_plan": false}` hebt auf. Felder `kein_plan`,
+  `kein_plan_grund`, `kein_plan_am`, `kein_plan_von` (Migration `patienten/0009`), im Verlauf der Akte. Unterdrückt
+  für diesen Patienten: „Kein Infusionsplan“, „Plan älter als …“ (Patientenliste, Startseite, Gruppe „Älter als …“ der
+  Übersicht, Status „aktuell, alt“), „Infusionsplan prüfen“ im Kalender. Aktenkopf: „Aktueller Plan: nicht nötig“.
+- **Ende:** Mit der nächsten Freigabe (oder dem Abschließen nach Freigabe) eines Plans endet die Bestätigung von selbst.
+- **Teststatus:** Backend-Tests `infusionen.tests.KeinPlanNoetig` (Hinweis, Filter, Startseite, Rechte, Aufheben, alter
+  Plan ohne Warnung in Liste/Startseite/Übersicht/Kalender, Freigabe hebt auf). Browsertest `infusionsplaene.spec.ts`
+  „Kein Infusionsplan nötig: bestätigen unterdrückt den Hinweis, aufheben bringt ihn zurück“.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F106 Testdaten ausblenden (Ergänzung vom 03.10.2026)
+- **Anlass:** „Ausblenden / Entfernen der Testuser für alle durch Berechtigung möglich.“ Rückfragen geklärt:
+  Testbenutzer **und** Testpatienten; Entfernen heißt **immer nur ausblenden** (nichts wird gelöscht).
+- **Recht „Testdaten sehen (Testpatienten und Testbenutzer)“** (`testdaten_sehen`), unter Benutzer › Rechte je Gruppe:
+  ohne das Recht gibt es Testpatienten nicht (`patienten_fuer` – Liste, Suche, Akte, Kalender, Startseite, Pläne,
+  Auswahlfelder) und Testbenutzer erscheinen in keiner Liste (`sichtbare_benutzer`); einen Testpatienten kann man dann
+  nicht anlegen. Standard: alle Rollen (wie bisher). Admin fest (legt nur Testpatienten an). Testbenutzer sehen ihre
+  Testpatienten immer.
+- **Testbenutzer ausblenden:** `POST /api/benutzer/<id>/ausblenden/` (nur Testbenutzer, nicht das eigene Konto),
+  `POST /api/benutzer/testbenutzer-ausblenden/` (alle), `POST /api/benutzer/<id>/einblenden/`. Ausblenden sperrt,
+  beendet alle Anmeldungen und setzt `ausgeblendet_am` (Migration `accounts/0006`); das Konto fehlt in der
+  Benutzerliste (außer `?ausgeblendete=1`, „Ausgeblendete zeigen“), in Konten, Anmeldung/2FA und Systemzahlen.
+  Einträge bleiben zugeordnet; Entsperren geht nur über „Einblenden“. Audit-Log.
+- **Teststatus:** Backend-Tests `accounts.tests.TestdatenAusblenden`. Browsertest `admin.spec.ts` „Testbenutzer
+  ausblenden und wieder einblenden; Recht „Testdaten sehen“ je Gruppe“.
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2014,7 +2169,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U4 | Plan-Hinweis „6 Monate“ in der Liste vs. 12 Monate in den Grenzwerten | F14 | Grenzwert gilt (Text nennt die eingestellten Monate) |
 | U5 | Felder Krankenkasse, Telefon 2, Bemerkung (nicht im Entwurf) | F16 | bleiben gespeichert, nicht angezeigt |
 | U6 | Kontaktart (nicht im Entwurf) | F26 | bleibt gespeichert, nicht angezeigt |
-| U7 | Rolle des Testbenutzers: Mitarbeiter (Entwurf) oder Mediziner (Code) | F57 | Mediziner |
+| U7 | ~~Rolle des Testbenutzers: Mitarbeiter (Entwurf) oder Mediziner (Code)~~ **Geklärt 03.10.2026:** Mitarbeiter; je Konto auf Betrachter, Mitarbeiter (erweitert) oder Mediziner umstellbar (Testbenutzer-Schalter, F100) | F57 | – |
 | U8 | ~~Gerätename im Audit-Log oder nur IP/Browser~~ **Geklärt 01.10.2026:** IP und Browser reichen | F11, F58 | – |
 | U9 | ~~Übertragung zur Nextcloud: Server schiebt oder Gegenseite holt ab~~ **Geklärt 01.10.2026:** Server schiebt in einen WebDAV-Ordner, Werkzeug rclone (Festlegung 01.10.2026) | F64 | – |
 | U10 | ~~Wer pflegt Versorger und Ansprechpartner?~~ **Erledigt 01.10.2026:** Rechte sind je Gruppe einstellbar (F66); Standard Mitarbeiter, Mediziner und Admin | F45, F46 | – |
@@ -2024,14 +2179,14 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U14 | ~~Stabilitätsprüfung Calcium + Magnesium und Vorbelegung des ersten Plans je kg übernehmen?~~ **Geklärt 01.10.2026:** ja, beides wie im Altsystem (Stabilität als Hinweis, Speichern bleibt möglich); Präparate werden beim ersten Plan **nicht** vorausgewählt | F32, F33 | – |
 | U15 | ~~Muss beim endgültigen Löschen auch der Titel aus Historie und Audit-Log verschwinden?~~ **Geklärt 02.10.2026: nach geltender DSGVO.** Titel, Dateiname, Notiz und Datum werden überall entfernt (Art. 17 Abs. 1 d, Art. 5 Abs. 1 c/e); es bleibt der Nachweis ohne Inhalt (Art. 5 Abs. 2, Art. 33 Abs. 5; § 630f BGB); Sicherungen laufen nach 30 Tagen ab (Festlegung 02.10.2026, vorher 14), nach einer Wiederherstellung wird erneut gelöscht | F73 | – |
 | U16 | Rechtsgrundlage der Verarbeitung (Einwilligung nach Art. 9 Abs. 2 a oder Art. 9 Abs. 2 h DSGVO) und Herkunft der 10 Jahre Aufbewahrung – § 630f BGB verpflichtet Behandelnde; die Stiftung „vermittelt“, die Praxis führt eigene Akten. Anfrage an die Stiftung ist formuliert, Antwort offen | F74, F80 | 10 Jahre als einstellbarer Standard; vor Ablauf Löschung nur auf Antrag und nach Entscheidung des Mediziners |
-| U17 | Texte der drei Vordrucke (Zwecke, Empfänger, Rechtsgrundlage, Speicherdauer, Datenschutzbeauftragte/r, Aufsichtsbehörde) | F76 | Entwürfe mit Lücken, Wasserzeichen „ENTWURF“ bis zur Veröffentlichung durch die Stiftung |
-| U18 | Wie lange wird das Audit-Log aufbewahrt? | F83 | 0 = unbegrenzt (wie bisher), einstellbar |
-| U19 | „Abschluss prüfen“ nach wie vielen Monaten ohne Kontakt? Welche Erklärungen sollen vorliegen? | F74, F75 | 24 Monate; alle drei – einstellbar |
+| U17 | Texte der drei Vordrucke (Zwecke, Empfänger, Rechtsgrundlage, Speicherdauer, Datenschutzbeauftragte/r, Aufsichtsbehörde) | F76 | Entwürfe mit Lücken, Wasserzeichen „ENTWURF“ bis zur Veröffentlichung durch die Stiftung – **seit 03.10.2026 je Vordruck manuell abschaltbar** (Vorlagen › Dokumentvorlagen › „Entwurfsmodus ausschalten“, F76) |
+| U18 | ~~Wie lange wird das Audit-Log aufbewahrt?~~ **Geklärt 03.10.2026:** unbegrenzt (Standard 0); in EPM einstellbar (Vorlagen › Grenzwerte › Datenschutz) | F83 | – |
+| U19 | ~~„Abschluss prüfen“ nach wie vielen Monaten ohne Kontakt? Welche Erklärungen sollen vorliegen?~~ **Bestätigt 03.10.2026:** 24 Monate; alle drei – einstellbar | F74, F75 | – |
 | U20 | ~~Verschlüsselung der Sicherungen: Wer erzeugt und verwahrt den privaten Schlüssel?~~ **Geklärt 02.10.2026:** symmetrisch mit einem Passwort, das die Administration in der Oberfläche festlegt; es liegt nur auf dem Server (root) und ausgedruckt im Tresor (Passwortblatt) | F61 | – |
-| U21 | Aufbewahrung der Sicherungen in der Nextcloud und auf der NAS: EPM kopiert nur und löscht im Ziel nie – wie lange liegen sie dort, wer löscht? (30 Tage gelten nur auf dem Server); Geheimhaltungsverpflichtung der Dienstleister (§ 203 StGB) | F61, F64 | organisatorisch, siehe `docs/DATENSCHUTZ.md` (O7) |
-| U22 | Sollen Mitarbeiter Pläne auch anlegen dürfen (bisher nur Mediziner, Festlegung 01.10.2026)? Abschließen nach Freigabe dürfen sie jetzt | F32, F82 | unverändert; unter Benutzer › Rechte umstellbar |
-| U23 | Einschränkung nur bei abgeschlossenen Akten – reicht das? | F79 | ja (in laufender Betreuung wird die Akte gebraucht; erst abschließen) |
-| U24 | Nachweis bei Freigabe per Telefon oder persönlich | F82 | ohne Nachweis möglich (Pflicht nur bei E-Mail und schriftlich) |
+| U21 | ~~Aufbewahrung der Sicherungen in der Nextcloud und auf der NAS~~ **Geklärt 03.10.2026:** auch dort 30 Tage; der Systemagent entfernt nach jeder Übertragung ältere EPM-Sicherungen im Ziel (einstellbar: nie, 14–365 Tage; die jüngste bleibt immer, fremde Dateien werden nie angefasst). Was die NAS aus der Nextcloud spiegelt, folgt deren Einstellung. Geheimhaltungsverpflichtung der Dienstleister (§ 203 StGB) bleibt organisatorisch | F64 | – |
+| U22 | ~~Sollen Mitarbeiter Pläne auch anlegen dürfen?~~ **Geklärt 03.10.2026:** Recht bleibt je Gruppe umstellbar; neue Rolle „Mitarbeiter (erweitert)“ (Standard wie Mitarbeiter + Infusionspläne anlegen) für feinere Verteilung | F32, F66 | – |
+| U23 | ~~Einschränkung nur bei abgeschlossenen Akten – reicht das?~~ **Bestätigt 03.10.2026:** ja | F79 | – |
+| U24 | ~~Nachweis bei Freigabe per Telefon oder persönlich~~ **Bestätigt 03.10.2026:** ohne Nachweis möglich (Pflicht nur bei E-Mail und schriftlich) | F82 | – |
 | U25 | ~~Feiertage im Kalender: welches Bundesland?~~ **Geklärt 02.10.2026:** NRW (Sitz der Stiftung in Altenberge) | F84 | – |
 | U26 | Den Import führt die Administration durch und legt dabei echte Akten an – Ausnahme von U12 („Admins schreiben Patientendaten nur bei Testpatienten“). So gewollt? | F65 | ja, nur über Administration › Import (eigenes Recht, Kennwort + 2FA, Audit-Log) |
 | U27 | Echte (nicht Test-)Akten aus der Testphase sperren den Import; ihre Nummern bleiben nach dem endgültigen Löschen (F80) im Löschprotokoll und sind für die Übernahme gesperrt. Soll das Werkzeug solche Akten entfernen dürfen? | F65 | nein – übernommen wird nur in ein System ohne echte Akten (Festlegung 02.10.2026); auf einem Server, auf dem schon echte Akten angelegt wurden, braucht der Go-live eine frische Datenbank |
@@ -2040,12 +2195,19 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U30 | Infusionspläne aus dem Altsystem: ohne Freigabe und ohne gespeicherte PDF (im Altsystem gab es beides nicht); Mengen 0 → leer; Energie nur dann als „manuell“, wenn sie von der Berechnung abweicht; jüngster Plan je Patient „aktuell“ | F65 | so umgesetzt (Regeln 13 und 16 der Datenanalyse); in der Akte als „aus dem Altsystem“ gekennzeichnet |
 | U31 | Rolle der Konten aus dem Altsystem: Vorschlag aus dessen Rechtestufe (100 Betrachter, 1000 Mitarbeiter, 10000 Mediziner, 100000 Admin) | F65 | Vorschlag, je Konto im Werkzeug änderbar; Konten entstehen ohne Kennwort |
 | U32 | Nach dem Abschließen enthalten ältere Sicherungen aus der Testphase und der Ordner `data/import` auf dem Server weiterhin Altdaten (auch der nicht übernommenen Patienten) | F65, F61 | organisatorisch löschen (`docs/DATENSCHUTZ.md`); das Werkzeug weist beim Abschließen darauf hin |
+| U34 | ~~Bestätigungen ohne zweiten Faktor nur mit Kennwort?~~ **Geklärt 03.10.2026: nein.** Endgültig löschen, Wiederherstellen, Updates, Neustart, Sicherung und Import verlangen immer den zweiten Faktor; wer sie ausführt (Mediziner, Administration …), muss ihn einrichten – ohne geht es nicht | F99 | – |
+| U35 | Hochgeladene Sicherung eines anderen Servers mit fremdem Passwort: Das Passwort wird auf diesem Server (root, 0600) als eigene Nummer hinterlegt, damit sich die Sicherung wiederherstellen lässt | F103 | so umgesetzt; das aktuelle Sicherungs-Passwort dieses Servers bleibt unverändert – **bestätigt 03.10.2026** |
+| U36 | Geänderte Aufbewahrung wirkt erst mit der nächsten Sicherung (dann werden ältere entfernt), nicht sofort | F103 | so umgesetzt; der Dialog sagt es – **bestätigt 03.10.2026** |
+| U37 | „Kein Infusionsplan nötig“: Wer darf bestätigen? Gilt auch eine offene Entwurfsfassung als „kein Plan“? | F105 | Recht „Akten bearbeiten“ (wie „kein Versorger“; unter Benutzer › Rechte umstellbar); ein Entwurf allein zählt nicht als Plan – der Hinweis bleibt bis zur Freigabe – **bestätigt 03.10.2026** |
+| U38 | ~~„Testdaten sehen“ für den Admin abschaltbar?~~ **Bestätigt 03.10.2026:** nein, für den Admin fest | F106 | – |
 | U33 | Vor dem Abschließen: Ein nach Art. 17 endgültig gelöschtes **Dokument** käme nach „Zurücknehmen“ und erneutem Import wieder (neue Nummer, die Löschliste erkennt es nicht). Eine endgültig gelöschte **Akte** kommt nicht wieder: Ihre Nummer steht im Löschprotokoll; der Patient erscheint unter „Auffälligkeiten“ und lässt sich nur „nicht übernehmen“ – eine andere Nummer ist nicht wählbar (O-29, behoben 02.10.2026) | F65, F73, F80 | Dokumente: betrifft nur die Zeit vor dem Abschließen (Testphase); nach dem Abschließen ist der Dump gelöscht |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 03.10.2026 | Klärungen U7, U16–U24, U38 | Entwurfsmodus der Vordrucke manuell abschaltbar (F76, Migration `stammdaten/0010`); Aufbewahrung im Übertragungsziel, Standard 30 Tage, Systemagent räumt nach jeder Übertragung auf (F64, U21); Rolle „Mitarbeiter (erweitert)“ (Migration `accounts/0007`, U22); Testbenutzer der Musterdaten als Mitarbeiter (U7); U18, U19, U23, U24, U38 bestätigt |
+| 02.10.2026 | Fehlerliste (Branch `fehlerliste-2026-10-02`) | Infusionspläne: Datum statt „heute/gestern“, Frist beim Überfahren des Status, kompakte Tabelle, Planansicht als kleine Vorschau mit großer Ansicht per Klick (F85, F31). Akte und System: Karten im Raster mit „⋯“ statt Teiler, je Person (F98); Kurz-Verlauf unter Kontakte entfernt. System: Zeitraum der Auslastung 1 h–6 Monate, Konten mit Links, größere Warnungen (F102). Backup: Herunterladen, Aufbewahrung 7/14/30 Tage, Hochladen und Einlesen (F103). Benutzer: ohne Login setzen/Login geben, Rolle „Keine Berechtigung“, Testbenutzer-Schalter (F100); Testpatient beim Anlegen (F101); Admins schließen Akten ab und ordnen Dokumente zu, auch bei echten Akten (F104); Zwei-Faktor-Anmeldung freiwillig (F99). Migration `accounts/0005`; Systemagent Version 3; neue Ordner `system/download`, `system/upload` (über `sudo epm-update`). U34–U36. Ergänzung: Hinweis „Kein Infusionsplan“ und Bestätigung „Kein Infusionsplan nötig“ je Patient (F105, Migration `patienten/0009`, U37). 03.10.2026: Recht „Testdaten sehen“ und Testbenutzer ausblenden (F106, Migration `accounts/0006`, U38). 03.10.2026: U34 geklärt – Bestätigungen immer mit zweitem Faktor, ohne eingerichteten Faktor abgewiesen; U35–U37 bestätigt |
 | 02.10.2026 | Runde 7 (Startseite und Oberfläche, Pull Request #7: `f24bbb7`, `a6d1903`, `33612fa`) | S01–S17 aus `claude/startseite-erweiterungen.md` nach Entwurf 2, SU8–SU10 geklärt: Kennzahlenleiste, Kacheln im festen Raster mit Größe/Reihenfolge je Person und Ziehen mit Einrasten (F93), Schnellerfassung mit zwei Anfragen (F91), Meine Akten (F92), Kontakt fällig in zwei Stufen 4/6 Monate mit Datenmigration (F90), Admin-Startseite (F94), Hilfe je Rolle mit Ergänzungen (F95), volle Breite in Stufen (F96), Spaltenteiler ⅓/½/⅔ (F97); F09, F13, F14, F17, F48, F84 erweitert. Korrektur „Mit offenem Termin“ (zählte Akten ohne Termin). Kennzahlen ohne Testpatienten. Migrationen `stammdaten/0009`, `patienten/0008`, `accounts/0004`, `hilfe/0001`. Abgeleitete Punkte A1–A19 im Projekt-Dokument markiert. Lauf 37036210226: 236 von 236 Backend-Tests, 82 von 82 Browsertests (vorher Lauf 37033921101: ein Browsertest zog an einer Kachel außerhalb des Fensters – Testfehler, behoben) |
 | 02.10.2026 | Behebung der Gegenprüfung (O-27 bis O-29) | `epm-backup.sh` entfernt bei einem Abbruch alle Dateien des Laufs (vorher blieb nach gescheitertem `tar` der Datenbank-Dump als unvollständige Sicherung liegen und wäre mit übertragen worden). `epm_loeschungen_nachholen` hält sein Ergebnis fest (Stand neben der Löschliste, Audit-Log, Hinweis auf Backup- und Startseite), zählt unlesbare Zeilen der Löschliste und endet mit `--streng` als Fehler; der Systemagent knüpft die Meldung des Wiederherstellens daran. Import: Patient, dessen Nummer im Löschprotokoll steht, erscheint als Auffälligkeit und lässt sich nur ausnehmen |
 | 02.10.2026 | Gegenprüfung Datensicherung/Löschliste | `docs/DATENSCHUTZ.md` gegen `epm-backup.sh`, Systemagent und Start des Backends geprüft (Skript in einer Simulation gelaufen: verschlüsselt, Prüfsummen, Löschliste in der Sicherung, gescheiterter Dump hinterlässt nichts). Im Dokument ergänzt: unverschlüsselt ohne Passwort, Löschliste auf einem neuen Server, Nachholen nicht überwacht, Sicherung von vor dem Abschließen der Altdaten-Übernahme. Offen: O-27 bis O-29; U33 berichtigt |

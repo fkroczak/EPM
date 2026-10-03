@@ -23,14 +23,14 @@ from accounts.permissions import (AbschlussRecht, AktenRecht, EintragRecht, Loes
                                   WiederOeffnenRecht, recht)
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import (ModelClean, RichText, benutzername, legt_testpatienten_an, patienten_fuer,
-                            patienten_mit_eingeschraenkten, pruefe_schreibbereich)
+                            patienten_mit_eingeschraenkten, pruefe_schreibbereich, wahr)
 from stammdaten.models import Auswahlwert
 
 from audit.bereinigung import akte_text
 from stammdaten.models import Arzt
 
 from .datenschutz import DatenschutzAktionen
-from .kennzahlen import (abschluss_pruefen, kennzahlen, kontakt_filter, ohne_pflicht_erklaerungen, pruefliste,
+from .kennzahlen import (abschluss_pruefen, kennzahlen, kontakt_filter, ohne_pflicht_erklaerungen, ohne_plan, pruefliste,
                          schnellfilter, zaehler)
 from .loeschung import PLATZHALTER, schwaerze_dokument, trage_ein
 from .models import (Bezugsperson, Datenschutzanfrage, Dokument, DokumentVorgang, Erklaerung, Gewichtsmessung,
@@ -147,6 +147,9 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
             "datenschutz_anfragen": obj.datenschutzanfragen.filter(erledigt_am__isnull=True).count(),
             "aktueller_plan": {"id": plan.id, "gueltig_ab": plan.gueltig_ab, "kcal": plan.kcal,
                                "laufzeit_h": plan.laufzeit_h} if plan else None,
+            # „Kein Infusionsplan nötig“ bestätigt (Ergänzung zur Fehlerliste 02.10.2026)
+            "kein_plan": {"grund": obj.kein_plan_grund, "am": obj.kein_plan_am,
+                          "von": benutzername(obj.kein_plan_von)} if obj.kein_plan else None,
             "naechster_termin": (
                 {"id": termin.id, "art": termin.art, "titel": termin.titel, "faellig_am": termin.faellig_am,
                  "uhrzeit": termin.uhrzeit, "ort": termin.ort.wert if termin.ort_id else None,
@@ -271,6 +274,7 @@ class PatientFilter(filters.FilterSet):
     pruefen = filters.ChoiceFilter(
         choices=[("altdokumente", "Altdokumente prüfen"), ("nickelallergie", "Nickelallergie nicht erfasst"),
                  ("kein_versorger", "Versorger nicht erfasst"),
+                 ("ohne_plan", "Kein Infusionsplan (und nicht als „kein Plan nötig“ bestätigt)"),
                  ("kein_kontakt", "Kontakt fällig (bald fällig und überfällig)"),
                  ("kontakt_bald", "Kontakt bald fällig"), ("kontakt_ueberfaellig", "Kontakt überfällig"),
                  ("wiedereinbestellung", "Wiedereinbestellung fällig (Kontakt fällig, kein Termin geplant)"),
@@ -293,6 +297,8 @@ class PatientFilter(filters.FilterSet):
         if wert == "kein_versorger":
             # „kein Versorger“ (bewusst keiner) ist kein offener Punkt
             return qs.filter(versorger__isnull=True, kein_versorger=False)
+        if wert == "ohne_plan":
+            return ohne_plan(qs)
         if wert in ("kein_kontakt", "kontakt_bald", "kontakt_ueberfaellig", "wiedereinbestellung"):
             return kontakt_filter(qs, wert)  # S04: zwei Stufen „bald fällig“ und „überfällig“
         if wert == "erklaerungen":
@@ -381,14 +387,17 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
 
     @action(detail=False, methods=["get"], url_path="naechste-nummer")
     def naechste_nummer(self, request):
-        """„Nr. 0300 wird automatisch vergeben“ (Entwurf 12)."""
-        return Response({"nummer": Patient.naechste_nummer(legt_testpatienten_an(request.user)),
-                         "testpatient": legt_testpatienten_an(request.user)})
+        """„Nr. 0300 wird automatisch vergeben“ (Entwurf 12). ``?testpatient=1``: Nummer für einen Testpatienten.
+        ``testpatient_fest``: Diese Person legt immer Testpatienten an (Testbenutzer, Admin)."""
+        test = legt_testpatienten_an(request.user, wahr(request.query_params.get("testpatient")))
+        return Response({"nummer": Patient.naechste_nummer(test), "testpatient": test,
+                         "testpatient_fest": legt_testpatienten_an(request.user)})
 
     @transaction.atomic
     def perform_create(self, serializer):
-        # Testbenutzer und Admins legen nur Testpatienten an
-        patient = serializer.save(angelegt_von=self.request.user, ist_test=legt_testpatienten_an(self.request.user))
+        # Testbenutzer und Admins legen nur Testpatienten an; alle anderen können es wählen ({"testpatient": true})
+        test = legt_testpatienten_an(self.request.user, wahr(self.request.data.get("testpatient")))
+        patient = serializer.save(angelegt_von=self.request.user, ist_test=test)
         messung = getattr(serializer, "aufnahme_messung", None)
         if messung is not None:
             messung.patient = patient
@@ -434,7 +443,8 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
     @action(detail=True, methods=["post"], permission_classes=[AbschlussRecht])
     def abschliessen(self, request, pk=None):
         patient = self.get_object()
-        pruefe_schreibbereich(request.user, patient)
+        # Akten abschließen dürfen Admins auch bei echten Akten (Festlegung 02.10.2026)
+        pruefe_schreibbereich(request.user, patient, recht="akten_abschliessen")
         patient.pruefe_bearbeitbar()
         anlass = request.data.get("anlass")
         if anlass not in Patient.Abschlussanlass.values:
@@ -453,6 +463,30 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
         patient.save()
         protokolliere(SystemEreignis.Art.AKTE_ABGESCHLOSSEN, request, objekt=patient.nummer, anlass=anlass,
                       name=f"{patient.nachname}, {patient.vorname}", patient_id=patient.id)
+        patient.refresh_from_db()
+        return Response(PatientSerializer(patient, context=self.get_serializer_context()).data)
+
+    @action(detail=True, methods=["post"], url_path="kein-plan")
+    def kein_plan(self, request, pk=None):
+        """„Kein Infusionsplan nötig“ bestätigen oder aufheben (Ergänzung zur Fehlerliste 02.10.2026):
+        ``{"kein_plan": true, "grund": "…"}`` unterdrückt den Hinweis „Kein Infusionsplan“ und die Warnung „Plan älter
+        als …“ (Patientenliste, Startseite, Kalender, Übersicht der Pläne); ``{"kein_plan": false}`` hebt es auf.
+        Recht „Akten bearbeiten“; Admins nur bei Testpatienten. Steht im Verlauf der Akte."""
+        patient = self.get_object()
+        pruefe_schreibbereich(request.user, patient)
+        patient.pruefe_bearbeitbar()
+        wert = request.data.get("kein_plan")
+        if not isinstance(wert, bool):
+            return Response({"kein_plan": "Bitte true oder false."}, status=status.HTTP_400_BAD_REQUEST)
+        grund = str(request.data.get("grund") or "").strip()
+        if len(grund) > 300:
+            return Response({"grund": "Höchstens 300 Zeichen."}, status=status.HTTP_400_BAD_REQUEST)
+        patient.kein_plan = wert
+        patient.kein_plan_grund = grund if wert else ""
+        patient.kein_plan_am = timezone.now() if wert else None
+        patient.kein_plan_von = request.user if wert else None
+        patient._history_user = request.user
+        patient.save(update_fields=["kein_plan", "kein_plan_grund", "kein_plan_am", "kein_plan_von", "geaendert_am"])
         patient.refresh_from_db()
         return Response(PatientSerializer(patient, context=self.get_serializer_context()).data)
 
@@ -759,10 +793,10 @@ class AktenEintragViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return self.model.objects.filter(patient__in=patienten_fuer(self.request.user)).select_related("patient")
 
-    def pruefe_patient(self, patient, loeschen: bool = False):
+    def pruefe_patient(self, patient, loeschen: bool = False, recht: str | None = None):
         if not patienten_fuer(self.request.user).filter(pk=patient.pk).exists():
             raise serializers.ValidationError({"patient": "Patient nicht gefunden."})
-        pruefe_schreibbereich(self.request.user, patient, loeschen=loeschen)
+        pruefe_schreibbereich(self.request.user, patient, loeschen=loeschen, recht=recht)
         patient.pruefe_bearbeitbar()
 
 
@@ -1134,8 +1168,9 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
         if fehler:
             return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
         alt = dok.patient
-        self.pruefe_patient(alt)
-        self.pruefe_patient(ziel)
+        # Zuordnen dürfen Admins auch bei echten Akten (Festlegung 02.10.2026)
+        self.pruefe_patient(alt, recht="dokumente_umhaengen")
+        self.pruefe_patient(ziel, recht="dokumente_umhaengen")
         quelle = dok.pfad
         if not quelle.is_file():
             return Response({"fehler": "Die Datei fehlt im Dokumentenverzeichnis. Bitte die Administration informieren."},
@@ -1193,7 +1228,7 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
         bleiben. Jede Ablehnung steht im Audit-Log."""
         from datetime import datetime
 
-        from django_otp.plugins.otp_totp.models import TOTPDevice
+        from accounts.zweifaktor import OHNE_ZWEITEN_FAKTOR, code_bestaetigt, hat_zweiten_faktor
 
         dok = self.get_object()
         self._nicht_systemdokument(dok)
@@ -1221,11 +1256,13 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
             return abgelehnt("bestaetigung", "Der Bestätigungscode stimmt nicht.")
         from accounts.api import bestaetigung_fehlgeschlagen, bestaetigung_gelungen
 
+        if not hat_zweiten_faktor(request.user):
+            # Festlegung 03.10.2026: endgültig löschen nur mit eingerichtetem zweitem Faktor
+            return abgelehnt("code", OHNE_ZWEITEN_FAKTOR)
         if not request.user.check_password(str(request.data.get("kennwort", ""))):
             antwort = abgelehnt("kennwort", "Kennwort falsch.")
             return bestaetigung_fehlgeschlagen(request, "loeschen_kennwort") or antwort
-        code = str(request.data.get("code", "")).replace(" ", "")
-        if not any(g.verify_token(code) for g in TOTPDevice.objects.filter(user=request.user, confirmed=True)):
+        if not code_bestaetigt(request.user, request.data.get("code", ""), notfallcodes=False):
             antwort = abgelehnt("code", "Code aus der Authenticator-App falsch oder schon verwendet.")
             return bestaetigung_fehlgeschlagen(request, "loeschen_2fa") or antwort
         bestaetigung_gelungen(request)
@@ -1511,7 +1548,8 @@ def startseite_daten(user):
     plaene = Infusionsplan.objects.filter(patient__in=patienten).select_related("patient", "erstellt_von",
                                                                                "freigegeben_von")
     entwuerfe = plaene.filter(status=Infusionsplan.Status.ENTWURF).order_by("-erstellt_am")
-    alte = plaene.filter(status=Infusionsplan.Status.AKTUELL, gueltig_ab__lt=grenze).order_by("gueltig_ab")
+    alte = plaene.filter(status=Infusionsplan.Status.AKTUELL, gueltig_ab__lt=grenze,
+                         patient__kein_plan=False).order_by("gueltig_ab")
 
     def pl(qs):
         return [{"id": x.id, "patient": x.patient_id, "name": f"{x.patient.nachname}, {x.patient.vorname}",

@@ -15,11 +15,12 @@ export function PatientWahl({ id, wert, onWahl, fehler, test, ohne }: {
 }) {
   const [text, setText] = useState("");
   const begriff = text.trim();
-  // Admins schreiben nur bei Testpatienten – also nur diese zur Auswahl anbieten
-  const nurTest = !!useAuth().ich?.schreibt_nur_testpatienten;
+  // Admins schreiben nur bei Testpatienten – also nur diese zur Auswahl anbieten; gibt die Seite selbst vor, welche
+  // Akten in Frage kommen (``test``, z. B. beim Zuordnen eines Dokuments auch echte), gilt das
+  const nurTest = test ? test === "nur" : !!useAuth().ich?.schreibt_nur_testpatienten;
   const treffer = useQuery({
     queryKey: ["patientwahl", begriff, nurTest, test],
-    queryFn: () => api<Seite<PatientZeile>>(`patienten/${abfrage({ suche: begriff, status: "in_betreuung", seitengroesse: 6, ordering: "nachname", test: nurTest ? "nur" : test })}`),
+    queryFn: () => api<Seite<PatientZeile>>(`patienten/${abfrage({ suche: begriff, status: "in_betreuung", seitengroesse: 6, ordering: "nachname", test: test ?? (nurTest ? "nur" : undefined) })}`),
     enabled: begriff.length >= 2 && !wert,
   });
   if (wert) {

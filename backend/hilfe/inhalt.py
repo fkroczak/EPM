@@ -27,14 +27,21 @@ ABSCHNITTE = [
         "id": "anmelden", "gruppe": "erste_schritte", "titel": "Anmelden mit Kennwort und Authenticator", "rechte": [],
         "seiten": [],
         "html": """
-<p>EPM fragt bei jeder Anmeldung zwei Dinge ab: das <strong>Kennwort</strong> und einen <strong>Code aus der
-Authenticator-App</strong> auf dem Telefon (zweiter Faktor). Ohne beides ist keine Anmeldung möglich.</p>
+<p>Angemeldet wird mit Benutzername und <strong>Kennwort</strong>. Die <strong>Zwei-Faktor-Anmeldung</strong> (Code aus
+einer Authenticator-App auf dem Telefon) ist freiwillig – die Administration kann sie für Admins oder für alle zur
+Pflicht machen. Wer sie eingerichtet hat, wird bei jeder Anmeldung nach dem Code gefragt.</p>
 <ol>
 <li>Benutzername und Kennwort eingeben, <strong>Anmelden</strong> wählen.</li>
-<li>Den sechsstelligen Code aus der Authenticator-App eingeben. Er wechselt alle 30 Sekunden.</li>
-<li>Bei der ersten Anmeldung mit dem Einmal-Kennwort vom Zugangsblatt wird zuerst ein eigenes Kennwort festgelegt und
-dann die Authenticator-App eingerichtet (QR-Code scannen). Danach zeigt EPM einmalig die Notfall-Codes.</li>
+<li>Mit Zwei-Faktor-Anmeldung: den sechsstelligen Code aus der Authenticator-App eingeben. Er wechselt alle 30 Sekunden.</li>
+<li>Bei der ersten Anmeldung mit dem Einmal-Kennwort vom Zugangsblatt wird zuerst ein eigenes Kennwort festgelegt. Ist
+die Zwei-Faktor-Anmeldung Pflicht, wird danach die Authenticator-App eingerichtet (QR-Code scannen); sonst geht das
+jederzeit unter <strong>Mein Konto › Anmeldung und Sicherheit › Einrichten</strong>. Danach zeigt EPM einmalig die
+Notfall-Codes.</li>
 </ol>
+<p>Solange sie freiwillig ist, lässt sich die Zwei-Faktor-Anmeldung unter Mein Konto mit Kennwort und Code auch wieder
+ausschalten. Bestätigungen (endgültig löschen, Wiederherstellen, Updates, Sicherung, Import) verlangen immer Kennwort
+<strong>und</strong> Code – wer sie ausführen soll (z. B. Mediziner, Administration), muss die Zwei-Faktor-Anmeldung
+eingerichtet haben.</p>
 <p>Nach mehreren falschen Kennwörtern wird das Konto gesperrt; entsperren kann die Administration. Nach längerer
 Pause meldet EPM von selbst ab.</p>""",
     },
@@ -57,6 +64,7 @@ und dunkel), Akzentfarbe, Hintergrund, Dichte, Schriftgröße und Schriftstärke
 an dem man sich anmeldet.</p>
 <ul>
 <li><strong>Kennwort ändern</strong>: altes Kennwort, dann zweimal das neue.</li>
+<li><strong>Zwei-Faktor-Anmeldung</strong>: einrichten, neues Gerät, Notfall-Codes; solange freiwillig auch ausschalten.</li>
 <li><strong>Anmeldungen</strong>: zeigt, wo man gerade angemeldet ist; fremde Anmeldungen lassen sich einzeln beenden.</li>
 <li><strong>Startseite anpassen</strong> führt zur Startseite im Bearbeitungsmodus.</li>
 </ul>""",
@@ -162,6 +170,8 @@ Erklärungen. Ab 2560 px steht rechts eine <strong>Vorschau</strong> der gewähl
 <p><strong>Neuer Patient</strong> in der Patientenliste öffnet das Formular. Pflicht sind Nachname, Vorname und
 Geburtsdatum; EPM vergibt die Patientennummer selbst und warnt, wenn es eine Akte mit gleichem Namen und Geburtsdatum
 schon gibt.</p>
+<p><strong>Als Testpatient anlegen</strong> (Häkchen oben) legt eine Übungsakte an, z. B. um Infusionspläne
+auszuprobieren: Nummer ab 9001, zählt in keiner Statistik. Testzugänge und Admins legen immer Testpatienten an.</p>
 <p>Gewicht bei Aufnahme, Hausarzt, Versorger, Katheter und Nickelallergie lassen sich gleich mit erfassen.
 „Kein Versorger“ bzw. „kein Katheter“ heißt bewusst keiner; leer heißt noch nicht erfasst.</p>""",
     },
@@ -178,11 +188,16 @@ unter „Meine Akten“. Dort stehen auch die zuletzt geöffneten Akten. Merklis
 Verlauf.</p>""",
     },
     {
-        "id": "spalten", "gruppe": "patienten", "titel": "Spalten verbreitern (Teiler ziehen)", "rechte": [], "seiten": [],
+        "id": "spalten", "gruppe": "patienten", "titel": "Karten vergrößern und Spalten verbreitern", "rechte": [], "seiten": [],
         "html": """
 <p>Auf breiten Bildschirmen nutzen alle Seiten die volle Breite und teilen sich in Stufen auf (ab 1440, 1920 und
-2560 px). Wo zwei oder drei Spalten nebeneinander stehen (Akte, Kontakte, Plan-Editor, Patientenliste mit Vorschau),
-lässt sich der <strong>Teiler</strong> zwischen den Spalten ziehen wie bei einem Fenster.</p>
+2560 px).</p>
+<p>In der Akte (Übersicht, Diagnose &amp; Therapie, Kontakte) und unter Administration › System stehen die Karten in einem
+Raster wie auf der Startseite. Das Menü <strong>⋯</strong> oben rechts an jeder Karte stellt ihre
+<strong>Breite</strong> (1 Spalte bis ganze Breite) und <strong>Höhe</strong> (automatisch oder 1–4 Zeilen; der Inhalt
+scrollt dann in der Karte) ein; <strong>Standardgröße</strong> setzt zurück. Gespeichert wird je Person.</p>
+<p>In der Patientenliste mit Vorschau und im Plan-Editor lässt sich der <strong>Teiler</strong> zwischen den Spalten
+ziehen wie bei einem Fenster.</p>
 <ul>
 <li>Er rastet bei <strong>⅓</strong>, <strong>½</strong> und <strong>⅔</strong> ein.</li>
 <li><strong>Doppelklick</strong> auf den Teiler setzt auf den Standard zurück.</li>
@@ -205,7 +220,7 @@ lesbar.</p>
         "rechte": ["akten_abschliessen", "akten_wieder_oeffnen"], "seiten": [],
         "html": """
 <p>Endet die Betreuung, wird die Akte über <strong>Weitere Aktionen › Akte abschließen</strong> mit Anlass (verstorben,
-Therapie beendet, Betreuung gewechselt) und Datum abgeschlossen. Sie bleibt vollständig lesbar, wird aber nicht mehr
+Therapie beendet, Betreuung gewechselt) und Datum abgeschlossen. Admins dürfen das auch bei echten Akten. Sie bleibt vollständig lesbar, wird aber nicht mehr
 verändert; erst mit dem Abschluss beginnt die Aufbewahrungsfrist.</p>
 <p>Nach einem Versehen kann die Administration die Akte mit Grund <strong>wieder öffnen</strong>; der Grund steht im
 Verlauf und im Audit-Log.</p>""",
@@ -292,8 +307,13 @@ kleinen Verlauf der letzten 6 Monate in echten Zeitabständen.</p>""",
 <p>Der Reiter <strong>Infusionspläne</strong> der Akte zeigt den aktuellen Plan, Entwürfe und frühere Pläne mit den
 Änderungen gegenüber dem Vorgänger. Ein freigegebener Plan hat eine gespeicherte PDF mit Prüfsumme; EPM prüft beim Öffnen,
 ob sie unverändert ist.</p>
+<p>Die Ansicht wie PDF erscheint klein als Vorschau; ein Klick darauf (oder „Groß ansehen“) öffnet sie groß.</p>
 <p>Der Menüpunkt <strong>Infusionspläne</strong> zeigt die Pläne aller Patienten: zur Freigabe, aktuell und älter als
-eingestellt.</p>""",
+eingestellt. Beim Überfahren des Status steht die Frist, ab der ein Plan als alt gilt.</p>
+<p>Jede Akte in Betreuung braucht einen freigegebenen Plan, sonst erscheint der Hinweis <strong>Kein
+Infusionsplan</strong>. Braucht ein Patient keinen, unter Infusionspläne <strong>Kein Plan nötig</strong> wählen (mit
+Grund): Der Hinweis und die Warnung „Plan älter als …“ entfallen; mit der nächsten Freigabe eines Plans endet die
+Bestätigung.</p>""",
     },
     {
         "id": "plan_anlegen", "gruppe": "plaene", "titel": "Neuen Plan anlegen", "rechte": ["plaene_anlegen"],
@@ -441,7 +461,11 @@ entscheidet.</p>""",
 <p>Dokumentvorlagen bestimmen das Aussehen der PDFs (Infusionsplan, Patientendatenblatt, Vordrucke). Änderungen
 entstehen als <strong>Entwurf</strong>, lassen sich mit einem Testpatienten in der <strong>Vorschau</strong> prüfen und
 gelten erst nach <strong>Veröffentlichen</strong>. Frühere Versionen bleiben erhalten; jede PDF vermerkt, mit welcher
-Version sie erzeugt wurde.</p>""",
+Version sie erzeugt wurde.</p>
+<p>Die Vordrucke zum Datenschutz (Datenschutzinformation, Einwilligung, Schweigepflichtentbindung) kommen als ungeprüfte
+Entwürfe mit Lücken in [eckigen Klammern]; ihre PDFs tragen das Wasserzeichen „ENTWURF“, bis eine eigene Version
+veröffentlicht ist. Mit <strong>Entwurfsmodus ausschalten</strong> lässt sich das Wasserzeichen (und der Hinweisblock für
+die Bearbeiter) auch ohne Bearbeiten abschalten – die Lücken bleiben dann stehen; jederzeit wieder einschaltbar.</p>""",
     },
     {
         "id": "benutzer", "gruppe": "administration", "titel": "Benutzer und Rechte", "rechte": ["benutzer_verwalten"],
@@ -450,8 +474,21 @@ Version sie erzeugt wurde.</p>""",
 <p><strong>Benutzer anlegen</strong> erzeugt ein Einmal-Kennwort; das <strong>Zugangsblatt</strong> lässt sich nur
 drucken, solange das Kennwort angezeigt wird. Benutzer werden nie gelöscht, nur gesperrt. Weitere Aktionen: entsperren,
 neues Einmal-Kennwort (Kennwort vergessen), zweiten Faktor zurücksetzen (Telefon verloren).</p>
+<p><strong>Ohne Login</strong>: Konten, die nur als Name für Einträge dienen (z. B. frühere Mitarbeiter oder aus dem
+Altsystem übernommen), können sich nicht anmelden und haben die Rolle <strong>Keine Berechtigung</strong> – also keine
+Rechte. Ein Konto lässt sich auf „ohne Login“ setzen (Kennwort und zweiter Faktor werden gelöscht, Einträge bleiben
+zugeordnet) und mit <strong>Login geben</strong> wieder einbinden, z. B. als Mitarbeiter; dabei entsteht ein neues
+Einmal-Kennwort.</p>
+<p><strong>Testbenutzer</strong> (Schalter im Konto, für Betrachter, Mitarbeiter, Mitarbeiter (erweitert) und Mediziner) sehen und bearbeiten
+ausschließlich Testpatienten. Nicht mehr gebrauchte Testbenutzer lassen sich <strong>ausblenden</strong> (einzeln oder
+„Alle Testbenutzer ausblenden“): gesperrt und in keiner Liste mehr, aber nicht gelöscht; „Ausgeblendete zeigen“ und
+„Einblenden“ holen sie zurück. Mit dem Recht <strong>Testdaten sehen</strong> legt man je Gruppe fest, wer
+Testpatienten und Testbenutzer überhaupt sieht.</p>
+<p>Unter <strong>Anmeldung</strong> legt die Administration fest, ob die Zwei-Faktor-Anmeldung freiwillig, Pflicht für
+Admins oder Pflicht für alle ist.</p>
 <p>Unter <strong>Rechte</strong> legt man je Gruppe (Betrachter, Mitarbeiter, Mediziner, Admin) fest, was erlaubt ist.
-Änderungen gelten sofort; nicht Erlaubtes wird in der Oberfläche ausgeblendet.</p>""",
+Änderungen gelten sofort; nicht Erlaubtes wird in der Oberfläche ausgeblendet. Admins schreiben Patientendaten nur bei
+Testpatienten – ausgenommen Akten abschließen, Dokumente einem anderen Patienten zuordnen und endgültig löschen.</p>""",
     },
     {
         "id": "audit", "gruppe": "administration", "titel": "Audit-Log", "rechte": ["audit_lesen"],
@@ -466,11 +503,15 @@ die gefilterten Einträge aus.</p>""",
         "rechte": ["system_verwalten"], "seiten": ["/admin/system"],
         "html": """
 <p><strong>Administration › System</strong> zeigt Auslastung (CPU, Arbeitsspeicher, Platte, Laufzeit), offene
-Ubuntu-Updates und den Verlauf der letzten 24 Stunden. Von hier aus lassen sich <strong>Updates installieren</strong>,
-der <strong>Server neu starten</strong> und EPM neu starten – mit Passwort und 2FA, vorher läuft automatisch eine
+Ubuntu-Updates und den Verlauf der Auslastung – wählbar 1 Stunde, 3 Stunden, 24 Stunden, 7 und 14 Tage, 1 und 6 Monate
+(längere Zeiträume als Mittelwerte mit gestrichelten Spitzen). Die Karten lassen sich über <strong>⋯</strong> in Breite und
+Höhe einstellen. Von hier aus lassen sich <strong>Updates installieren</strong>,
+der <strong>Server neu starten</strong> und EPM neu starten – mit Passwort und Code aus der Authenticator-App
+(Zwei-Faktor-Anmeldung nötig), vorher läuft automatisch eine
 Sicherung (schlägt sie fehl, wird nichts verändert), angemeldete Benutzer werden gewarnt. Beginn sofort oder in 5 bis 60
 Minuten; ein wartender Auftrag lässt sich zurückziehen.</p>
-<p>Außerdem: <strong>Hinweis an alle Benutzer</strong> setzen und angemeldete Benutzer abmelden.</p>""",
+<p>Außerdem: <strong>Hinweis an alle Benutzer</strong> setzen und angemeldete Benutzer abmelden. Bei den Konten führen die
+Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Kennwort) direkt zur Person in der Benutzerverwaltung.</p>""",
     },
     {
         "id": "backup", "gruppe": "administration", "titel": "Datensicherung", "rechte": ["backup_verwalten"],
@@ -479,8 +520,18 @@ Minuten; ein wartender Auftrag lässt sich zurückziehen.</p>
 <p>EPM sichert jede Nacht Datenbank und Dokumente, verschlüsselt mit einem Passwort, das in der Oberfläche festgelegt
 wird (das <strong>Passwortblatt</strong> gehört in den Tresor). Die Sicherungen werden im Zeitfenster in einen
 WebDAV-Ordner (z. B. Nextcloud) übertragen.</p>
-<p><strong>Jetzt sichern</strong> startet eine Sicherung sofort. <strong>Wiederherstellen</strong> braucht Admin-Passwort
-und 2FA; danach müssen sich alle neu anmelden.</p>""",
+<p><strong>Jetzt sichern</strong> startet eine Sicherung sofort. <strong>Wiederherstellen</strong> braucht das eigene
+Passwort und den Code aus der Authenticator-App (Zwei-Faktor-Anmeldung nötig); danach müssen sich alle neu anmelden.</p>
+<p><strong>Aufbewahrung</strong>: 7, 14 oder 30 Tage auf dem Server; ältere entfernt die nächste Sicherung. Im
+Übertragungsziel gilt eine eigene Aufbewahrung (unter „Ziel ändern“, Standard 30 Tage, auch „nie löschen“): Nach jeder
+Übertragung entfernt der Server dort ältere EPM-Sicherungen; die jüngste bleibt immer, andere Dateien im Ordner werden
+nie angefasst.</p>
+<p><strong>Herunterladen</strong>: Der Server legt die Sicherung für 2 Stunden als eine Datei
+(<code>epm-sicherung_….tar</code>) bereit; verschlüsselte bleiben verschlüsselt. <strong>Sicherung hochladen</strong>
+bringt genau so eine Datei zurück – auch von einem anderen EPM-Server, z. B. nach dem Altdaten-Import auf einer
+Migrationsmaschine. Der Server prüft sie (Inhalt, Prüfsummen, Passwort) und nimmt sie als „Hochgeladen“ in die Liste
+auf; stammt sie von einem anderen Server, wird ihr Passwort einmal abgefragt. Zurückgespielt wird erst mit
+<strong>Wiederherstellen</strong>.</p>""",
     },
     {
         "id": "testdaten", "gruppe": "administration", "titel": "Testumgebung und Testpatienten",

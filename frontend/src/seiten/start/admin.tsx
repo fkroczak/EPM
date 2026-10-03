@@ -9,9 +9,10 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useIch } from "@/lib/auth";
 import { dateigroesse, relativ, zahl, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
-import { Auswahl, Chip, Eingabe, Fehleranzeige, Knopf, Laden, Leer, Meldung, cx } from "@/components/ui/basis";
+import { Auswahl, Chip, Eingabe, Fehleranzeige, Knopf, KnopfLink, Laden, Leer, Meldung, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
@@ -185,6 +186,7 @@ const KONTO_TEXT: Record<Konto["probleme"][number], [string, "fehler" | "warn" |
 
 export function KontenKachel() {
   const konten = useKonten(true);
+  const ich = useIch();
   const qc = useQueryClient();
   const melden = useHinweis();
   const entsperren = useMutation({
@@ -209,6 +211,8 @@ export function KontenKachel() {
             {k.probleme.includes("gesperrt") ? (
               <Knopf klein laedt={entsperren.isPending && entsperren.variables?.id === k.id} onClick={() => entsperren.mutate(k)}
                 aria-label={`${k.anzeigename} entsperren`}>Entsperren</Knopf>
+            ) : k.probleme.includes("ohne_2fa") && k.id === ich.id ? (
+              <KnopfLink klein to="/konto#zwei-faktor">Einrichten</KnopfLink>
             ) : k.probleme.includes("notfallcodes") ? (
               <span className="num gedaempft text-[0.8125rem]">{k.notfallcodes_uebrig} von {k.notfallcodes_gesamt}</span>
             ) : null}
