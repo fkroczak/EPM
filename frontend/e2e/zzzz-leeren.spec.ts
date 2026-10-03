@@ -28,7 +28,7 @@ test("Testphase: Menüpunkt „Import“ ausblenden und wieder einblenden; Muste
   await anmelden(page);
   await page.goto("/admin/system");
   const karte = page.getByTestId("golive-karte");
-  const nav = page.getByRole("navigation", { name: "Hauptnavigation" });
+  const nav = page.getByRole("navigation", { name: "Administration" });
   await expect(nav.getByRole("link", { name: "Import" })).toBeVisible();
   const import_aus = karte.getByRole("checkbox", { name: /Menüpunkt „Import“ ausblenden/ });
   await expect(import_aus).not.toBeChecked();
@@ -65,7 +65,7 @@ test("Datenbank leeren: Kontenauswahl, Code abtippen, Passwort + 2FA, Rückfrage
   await expect(dialog.getByTestId("leeren-umfang")).toContainText("Testpatienten");
   const konten = dialog.getByTestId("leeren-konten");
   // eigenes Konto fest, Testkonten vorgeschlagen zum Entfernen, echte Konten zum Behalten
-  await expect(konten.getByRole("checkbox", { name: /Admin.* behalten/ }).first()).toBeDisabled();
+  await expect(konten.getByRole("checkbox", { name: "A. Admin behalten", exact: true })).toBeDisabled();
   await expect(konten.getByRole("checkbox", { name: /Testzugang behalten/ })).not.toBeChecked();
   await expect(konten.getByRole("checkbox", { name: /Betrachtung behalten/ })).toBeChecked();
   await konten.getByRole("checkbox", { name: /Betrachtung behalten/ }).uncheck();
