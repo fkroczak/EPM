@@ -1,9 +1,10 @@
 /** Datenschutz (DSGVO) in der Oberfläche: Erklärungen nachhalten, Anfragen mit Frist, Kopie der Akte, Verarbeitung
  *  einschränken und Einsicht, Akte endgültig löschen, Plan nach Freigabe außerhalb von EPM abschließen. */
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import type { Browser } from "@playwright/test";
-import { apiAls, eindeutig, einfachePdf, merken, neuesKonto, totpBase32, zustand } from "./hilfen";
+import { apiAls, eindeutig, einfachePdf, merken, neuesKonto, stackNeuStarten, totpBase32, zustand } from "./hilfen";
 import type { Rolle } from "./hilfen";
 
 async function seiteAls(browser: Browser, wer: Rolle | { zustand: string }) {
@@ -304,4 +305,50 @@ test("Grenzwerte: Fristen des Datenschutzes einstellen", async ({ browser }) => 
   await expect(nurLesen.getByLabel("Audit-Log aufbewahren")).toHaveValue("30");
   await expect(nurLesen.getByTestId("datenschutz-nur-lesen")).toBeVisible();
   await zweit.ctx.close();
+});
+
+test("Audit-Log aufbewahren: ältere Einträge entfernt die tägliche Bereinigung, sie steht selbst im Audit-Log (F83)", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const { ctx, page } = await seiteAls(browser, "mediziner");
+  const marke = eindeutig("E2E-Altbestand");
+  // Ein alter Eintrag lässt sich über die Oberfläche nicht erzeugen: direkt im Backend anlegen und zurückdatieren
+  // (nur im Wartungsmodus möglich – sonst verhindern die Trigger jede Änderung am Protokoll)
+  const skript = [
+    "from datetime import timedelta", "from django.utils import timezone",
+    "from audit.models import SystemEreignis, protokolliere", "from audit.schutz import wartungsmodus",
+    `e = protokolliere(SystemEreignis.Art.EXPORT, objekt="${marke}")`,
+    "with wartungsmodus():",
+    "    SystemEreignis.objects.filter(pk=e.pk).update(zeitpunkt=timezone.now() - timedelta(days=800))",
+  ].join("\n");
+  execSync("sudo docker compose -p epm-ci exec -T backend python manage.py shell",
+    { cwd: process.env.EPM_CI_BASIS ?? "/tmp/epm-ci", input: skript, stdio: ["pipe", "inherit", "inherit"] });
+  const api = await apiAls("mediziner");
+  expect((await api.get(`protokoll/?search=${encodeURIComponent(marke)}`)).count).toBe(1);
+
+  // Aufbewahrung über die Oberfläche auf 1 Jahr
+  await page.goto("/admin/vorlagen");
+  await page.getByRole("button", { name: "Grenzwerte" }).click();
+  const ds = page.getByTestId("grenzwerte-datenschutz");
+  const vorher = await ds.getByLabel("Audit-Log aufbewahren").inputValue();
+  await ds.getByLabel("Audit-Log aufbewahren").fill("1");
+  await page.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Grenzwerte gespeichert.")).toBeVisible();
+
+  // Die Bereinigung läuft einmal am Tag je Prozess des Backends, angestoßen von der Startseite – nach einem Neustart
+  // also beim nächsten Öffnen
+  stackNeuStarten();
+  await page.goto("/");
+  await expect(page.getByRole("navigation", { name: "Hauptnavigation" })).toBeVisible();
+  await expect.poll(async () => (await api.get(`protokoll/?search=${encodeURIComponent(marke)}`)).count, { timeout: 30_000 }).toBe(0);
+  await page.goto("/admin/audit-log");
+  await expect(page.getByText(/\d+ Einträge älter als 1 Jahre entfernt/).first()).toBeVisible();
+
+  // zurück auf den vorherigen Wert
+  await page.goto("/admin/vorlagen");
+  await page.getByRole("button", { name: "Grenzwerte" }).click();
+  await page.getByTestId("grenzwerte-datenschutz").getByLabel("Audit-Log aufbewahren").fill(vorher);
+  await page.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Grenzwerte gespeichert.")).toBeVisible();
+  await api.ende();
+  await ctx.close();
 });

@@ -42,7 +42,7 @@ test("Kalender: Termin an einem Tag anlegen, öffnen, abhaken; Erledigte ausblen
   await expect(dialog.getByLabel("Datum")).toHaveValue(ziel);
   await dialog.getByLabel("Patient").fill("Beispiel");
   await dialog.getByRole("option", { name: /Beispiel, Paula/ }).click();
-  await dialog.getByLabel("Art").selectOption("wiedervorlage");
+  await dialog.getByLabel("Art", { exact: true }).selectOption("wiedervorlage");
   await dialog.getByLabel("Uhrzeit").fill("09:15");
   await dialog.getByLabel("Titel").fill("E2E Kalender Kontrolle");
   await dialog.getByRole("button", { name: "Termin speichern" }).click();

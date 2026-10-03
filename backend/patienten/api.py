@@ -240,7 +240,8 @@ def _datum(text: str):
     return None
 
 
-TEXTFELDER = ("diagnose", "therapie", "empfehlung")
+# Bemerkung seit 03.10.2026 sichtbar (Klärung U5) – mit Versionen wie Diagnose, Therapie und Empfehlung
+TEXTFELDER = ("diagnose", "therapie", "empfehlung", "bemerkung")
 
 
 def feldversionen(patient, feld: str) -> list:
@@ -544,9 +545,9 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
     def verlauf(self, request, pk=None):
         """Alle Fassungen aller Einträge dieser Akte, neueste zuerst (Entwurf 10).
 
-        Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, gewichte, kontakte, termine,
+        Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, bemerkung, gewichte, kontakte, termine,
         dokumente, infusionsplaene, bezugspersonen, aerzte, erklaerungen, datenschutz; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
-        die Bereiche Stammdaten, Diagnose, Therapie und Empfehlung verteilt.
+        die Bereiche Stammdaten, Diagnose, Therapie, Empfehlung und Bemerkung verteilt.
         """
         patient = self.get_object()
         bereich = request.query_params.get("bereich") or None

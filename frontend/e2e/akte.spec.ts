@@ -136,6 +136,18 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   await therapie.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Therapie gespeichert.")).toBeVisible();
 
+  // Bemerkung (Klärung U5 vom 03.10.2026): eigene Karte mit Versionen
+  const bemerkung = page.getByTestId("karte-bemerkung");
+  await expect(bemerkung).toContainText("Noch keine Bemerkung eingetragen.");
+  await bemerkung.getByRole("button", { name: "Bearbeiten" }).click();
+  await bemerkung.getByRole("textbox", { name: "Bemerkung" }).fill("Port seit 2019, Allergie auf Pflaster");
+  await bemerkung.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Bemerkung gespeichert.")).toBeVisible();
+  await expect(bemerkung.getByTestId("version-bemerkung")).toContainText("Version 1");
+  await page.goto(`/patienten/${p.id}/verlauf`);
+  await page.getByRole("group", { name: "Bereich" }).getByRole("button", { name: "Bemerkung", exact: true }).click();
+  await expect(page.getByTestId("verlauf").getByRole("row").filter({ hasText: "Port seit 2019" })).toContainText("Bemerkung");
+
   // nach Neuladen aus der Datenbank, Übersicht zeigt beides
   await oeffnen(page, p.id);
   await expect(page.locator(".richtext li").filter({ hasText: "HPE 5×/Woche über Port" })).toBeVisible();
@@ -143,6 +155,7 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   const akte = await api.get(`patienten/${p.id}/`);
   expect(akte.diagnose).toBe("<p>Kurzdarmsyndrom nach Resektion</p><p><strong>Typ II</strong></p>");
   expect(akte.therapie).toBe("<ul><li><p>HPE 5×/Woche über Port</p></li></ul>");
+  expect(akte.bemerkung).toBe("<p>Port seit 2019, Allergie auf Pflaster</p>");
   await api.ende();
   merken("diagnose", { id: p.id });
 });
@@ -156,8 +169,10 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   const editor = neu.getByRole("textbox", { name: "Neuer Kontakt" });
   await expect(editor).toBeFocused();
   await editor.fill("Telefonat: Appetit schlechter, Trinkmenge dokumentieren.");
+  // Kontaktart (Klärung U6 vom 03.10.2026)
+  await neu.getByLabel("Kontaktart").selectOption({ label: "Telefon (angerufen)" });
   await neu.getByLabel("Wiedervorlage").check();
-  await neu.getByLabel("Art").selectOption({ label: "Rückruf" });
+  await neu.getByLabel("Art", { exact: true }).selectOption({ label: "Rückruf" });
   await neu.getByLabel("Uhrzeit").fill("10:00");
   await neu.getByRole("button", { name: "Kontakt speichern" }).click();
   await expect(page.getByText("Kontakt und Wiedervorlage gespeichert.")).toBeVisible();
@@ -166,6 +181,7 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   await expect(erster).toContainText("Appetit schlechter");
   await expect(erster).toContainText("Rückruf");
   await expect(erster).toContainText("S. Mitarbeit");
+  await expect(erster.getByTestId("kontaktart")).toHaveText("Telefon (angerufen)");
 
   // zweiter Kontakt und Suche
   await editor.fill("Versorger: Lieferung bestätigt.");
@@ -213,7 +229,7 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   // Praxistermin mit Terminort aus der pflegbaren Liste
   await page.getByTestId("aktenkopf").getByRole("button", { name: "Termin" }).click();
   const pt = page.getByRole("dialog");
-  await pt.getByLabel("Art").selectOption("praxistermin");
+  await pt.getByLabel("Art", { exact: true }).selectOption("praxistermin");
   await pt.getByLabel("Ort").selectOption({ label: "Praxis Dr. Holtmeier" });
   await pt.getByLabel("Titel").fill("Kontrolle in der Praxis");
   await pt.getByRole("button", { name: "Termin speichern" }).click();
@@ -230,7 +246,10 @@ test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen 
   await oeffnen(page, p.id);
   await page.getByTestId("kennzahlen").getByRole("button", { name: /nicht erfasst/ }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Telefon").fill("0251 98765");
+  await dialog.getByLabel("Telefon", { exact: true }).fill("0251 98765");
+  // Telefon 2 und Krankenkasse seit 03.10.2026 sichtbar (Klärung U5)
+  await dialog.getByLabel("Telefon 2").fill("0171 2223334");
+  await dialog.getByLabel("Krankenkasse").fill("AOK NordWest");
   // Nickelallergie als Auswahlliste; Katheter und Versorger bewusst „kein“ (Festlegung 01.10.2026)
   await dialog.getByLabel("Nickelallergie").selectOption("nein");
   await dialog.getByLabel("Katheter").selectOption({ label: "kein Katheter" });
@@ -238,6 +257,8 @@ test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen 
   await dialog.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Stammdaten gespeichert.")).toBeVisible();
   await expect(page.getByTestId("stammdaten")).toContainText("0251 98765");
+  await expect(page.getByTestId("stammdaten").getByTestId("telefon2")).toHaveText("0171 2223334");
+  await expect(page.getByTestId("stammdaten").getByTestId("krankenkasse")).toHaveText("AOK NordWest");
   const kennzahlen = page.getByTestId("kennzahlen");
   await expect(kennzahlen).not.toContainText("nicht erfasst");
   await expect(kennzahlen.locator("div").filter({ hasText: /^Katheter/ })).toContainText("kein");

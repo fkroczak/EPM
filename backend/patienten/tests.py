@@ -46,6 +46,19 @@ class KontaktRegeln(Grundlage):
         with self.assertRaises(PermissionError):
             obj.save()
 
+    def test_kontaktart(self):
+        """Kontaktart wird erfasst und angezeigt (Klärung U6 vom 03.10.2026); nur Werte der Liste „Kontaktart“."""
+        from stammdaten.models import Auswahlwert
+
+        art, _ = Auswahlwert.objects.get_or_create(liste=Auswahlwert.Liste.KONTAKTART, wert="Telefon (angerufen)")
+        k = self.neuer_kontakt(art=art.id)
+        self.assertEqual((k["art"], k["art_name"]), (art.id, "Telefon (angerufen)"))
+        self.assertIsNone(self.neuer_kontakt()["art_name"])
+        fremd, _ = Auswahlwert.objects.get_or_create(liste=Auswahlwert.Liste.KATHETER, wert="Port")
+        r = client_fuer(self.mitarbeiter).post("/api/kontakte/", {"patient": self.patient.id, "text": "x", "art": fremd.id},
+                                               format="json")
+        self.assertEqual(r.status_code, 400)
+
     def test_trigger_verhindert_aenderung_in_der_datenbank(self):
         k = self.neuer_kontakt()
         with self.assertRaises(DatabaseError), transaction.atomic():
@@ -142,6 +155,17 @@ class Revisionssicherheit(Grundlage):
         self.assertEqual(kopf["versionen"]["diagnose"]["version"], 2)
         self.assertIsNone(kopf["versionen"]["empfehlung"])
         self.assertEqual(c.get(f"/api/patienten/{self.patient.id}/versionen/?feld=nachname").status_code, 400)
+        # Bemerkung mit Versionen (Klärung U5 vom 03.10.2026); Krankenkasse und Telefon 2 in den Stammdaten
+        self.assertEqual(c.patch(f"/api/patienten/{self.patient.id}/", {"bemerkung": "<p>aus dem Altsystem</p>",
+                                                                        "krankenkasse": "AOK", "telefon2": "0251 1"},
+                                 format="json").status_code, 200)
+        r = c.get(f"/api/patienten/{self.patient.id}/versionen/?feld=bemerkung").json()
+        self.assertEqual((r["version"], r["fassungen"][0]["text"]), (1, "<p>aus dem Altsystem</p>"))
+        d = c.get(f"/api/patienten/{self.patient.id}/").json()
+        self.assertEqual(d["kopf"]["versionen"]["bemerkung"]["version"], 1)
+        self.assertEqual((d["krankenkasse"], d["telefon2"]), ("AOK", "0251 1"))
+        verlauf = c.get(f"/api/patienten/{self.patient.id}/verlauf/?bereich=bemerkung").json()
+        self.assertTrue(verlauf, verlauf)
 
 
 class Akte(Grundlage):

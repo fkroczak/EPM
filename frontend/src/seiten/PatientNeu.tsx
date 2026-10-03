@@ -16,14 +16,14 @@ import { Icon } from "@/components/ui/icon";
 
 type Formular = {
   nachname: string; vorname: string; geschlecht: string; geburtsdatum: string; groesse: string; gewicht: string;
-  gemessen_am: string; strasse: string; plz: string; ort: string; telefon: string; email: string;
-  versorger: string; ansprechpartner: string; katheter: string; nickelallergie: string; hausarzt: string;
+  gemessen_am: string; strasse: string; plz: string; ort: string; telefon: string; telefon2: string; email: string;
+  krankenkasse: string; versorger: string; ansprechpartner: string; katheter: string; nickelallergie: string; hausarzt: string;
   ueberweisung_durch: string; diagnose: string;
 };
 
 const LEER: Formular = {
   nachname: "", vorname: "", geschlecht: "", geburtsdatum: "", groesse: "", gewicht: "", gemessen_am: "",
-  strasse: "", plz: "", ort: "", telefon: "", email: "", versorger: "", ansprechpartner: "", katheter: "",
+  strasse: "", plz: "", ort: "", telefon: "", telefon2: "", email: "", krankenkasse: "", versorger: "", ansprechpartner: "", katheter: "",
   nickelallergie: "unbekannt", hausarzt: "", ueberweisung_durch: "", diagnose: "",
 };
 
@@ -122,7 +122,9 @@ export function PatientNeu() {
       plz: f.plz.trim(),
       ort: f.ort.trim(),
       telefon: f.telefon.trim(),
+      telefon2: f.telefon2.trim(),
       email: f.email.trim(),
+      krankenkasse: f.krankenkasse.trim(),
       // „kein“ = bewusst keiner, leer = noch nicht erfasst (Festlegung 01.10.2026)
       versorger: f.versorger && f.versorger !== KEIN ? Number(f.versorger) : null,
       kein_versorger: f.versorger === KEIN,
@@ -215,8 +217,14 @@ export function PatientNeu() {
               <Feld label="Telefon" className="col-span-2" fehler={e.telefon}>
                 {(p) => <Eingabe {...p} className="num" type="tel" value={f.telefon} onChange={setze("telefon")} autoComplete="off" />}
               </Feld>
+              <Feld label="Telefon 2" className="col-span-2" fehler={e.telefon2}>
+                {(p) => <Eingabe {...p} className="num" type="tel" value={f.telefon2} onChange={setze("telefon2")} autoComplete="off" />}
+              </Feld>
               <Feld label="E-Mail" className="col-span-2" fehler={e.email}>
                 {(p) => <Eingabe {...p} type="email" value={f.email} onChange={setze("email")} autoComplete="off" />}
+              </Feld>
+              <Feld label="Krankenkasse" className="col-span-2" fehler={e.krankenkasse}>
+                {(p) => <Eingabe {...p} value={f.krankenkasse} onChange={setze("krankenkasse")} autoComplete="off" maxLength={100} />}
               </Feld>
             </Abschnitt>
 

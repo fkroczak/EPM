@@ -324,7 +324,7 @@ function KontakteKarte() {
         <ul className="m-0 p-0 list-none flex flex-col gap-3">
           {liste.map((k) => (
             <li key={k.id} className={cx("flex flex-col gap-1 text-sm", k.storniert_am && "opacity-60")}>
-              <span className="flex gap-2 text-[0.8125rem] gedaempft"><span className="num">{datum(k.zeitpunkt)}, {uhrzeit(k.zeitpunkt)}</span><span>{k.erfasst_von_name}</span>{k.storniert_am ? <Chip>storniert</Chip> : null}</span>
+              <span className="flex gap-2 text-[0.8125rem] gedaempft"><span className="num">{datum(k.zeitpunkt)}, {uhrzeit(k.zeitpunkt)}</span><span>{k.erfasst_von_name}</span>{k.art_name ? <span>· {k.art_name}</span> : null}{k.storniert_am ? <Chip>storniert</Chip> : null}</span>
               <span className={cx("line-clamp-2", k.storniert_am && "line-through")}>{klartext(k.text)}</span>
             </li>
           ))}
@@ -343,7 +343,10 @@ function StammKarte() {
       <h2 className="lbl m-0 col-span-2 pb-1">Anschrift und Kontakt</h2>
       <span className="gedaempft">Adresse</span><span>{adresse || "—"}</span>
       <span className="gedaempft">Telefon</span><span className="num">{p.telefon || "—"}</span>
+      {/* Telefon 2 und Krankenkasse seit 03.10.2026 sichtbar (Klärung U5) */}
+      <span className="gedaempft">Telefon 2</span><span className="num" data-testid="telefon2">{p.telefon2 || "—"}</span>
       <span className="gedaempft">E-Mail</span><span className="truncate">{p.email || "—"}</span>
+      <span className="gedaempft">Krankenkasse</span><span data-testid="krankenkasse">{p.krankenkasse || "—"}</span>
       {p.hausarzt ? <><span className="gedaempft">Hausarzt</span><span title="bisheriger Freitext; Ärzte mit Kontaktdaten unter „Ärzte“">{p.hausarzt}</span></> : null}
       <span className="gedaempft">Überweisung</span><span>{p.ueberweisung_durch || "—"}</span>
       <span className="gedaempft">Größe</span><span className="num">{p.groesse_cm != null ? `${zahl(p.groesse_cm)} cm` : "—"}</span>

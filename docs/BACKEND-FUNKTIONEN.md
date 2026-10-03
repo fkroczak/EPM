@@ -129,7 +129,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F80 | Akte endgültig löschen mit Löschprotokoll (Art. 17 DSGVO; Mediziner und Admin, Kennwort + 2FA + Bestätigungscode) | 4 Akte (Datenschutz), Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
 | F81 | Übersicht „Datenschutz“ | Datenschutz (neu) | ABGESCHLOSSEN UND GETESTET |
 | F82 | Plan nach Freigabe abschließen (Freigabe per E-Mail o. Ä.), Freigabevermerk mit beiden Personen | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
-| F83 | Aufbewahrung des Audit-Logs, tägliche Bereinigung | 18 Vorlagen (Grenzwerte), 20 Audit-Log | TEILWEISE ABGESCHLOSSEN |
+| F83 | Aufbewahrung des Audit-Logs, tägliche Bereinigung | 18 Vorlagen (Grenzwerte), 20 Audit-Log | ABGESCHLOSSEN UND GETESTET |
 | F84 | Globaler Kalender mit Fälligkeiten (Kontakt in zwei Stufen) und Feiertagen | Kalender (neu) | ABGESCHLOSSEN UND GETESTET |
 | F85 | Übersicht aller Infusionspläne | Infusionspläne (neu) | ABGESCHLOSSEN UND GETESTET |
 | F86 | Systemverwaltung: Auslastung, Updates, Container, EPM-Zustand | System (neu) | ABGESCHLOSSEN UND GETESTET |
@@ -157,7 +157,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F108 | Schalter „Musterdaten automatisch anlegen“ | System | ABGESCHLOSSEN UND GETESTET |
 | F109 | Menüpunkt „Import“ nach der Übernahme aus- und wieder einblenden | System, Seitenleiste, Import | ABGESCHLOSSEN UND GETESTET |
 
-Summe (109 Funktionen, gezählt aus der Tabelle): 108 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 1 teilweise abgeschlossen (F83) · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
+Summe (109 Funktionen, gezählt aus der Tabelle): 109 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen (F83 seit 03.10.2026 mit Browsertest) · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 Neu in Runde 4 sind F74–F83 (Datenschutz nach DSGVO und Abschließen eines Plans nach Freigabe); offene Fragen dazu stehen
@@ -484,7 +484,9 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 - **Request:** Pflicht `nachname`, `vorname`, `geburtsdatum`; optional `geschlecht (w|m|d|"")`, `strasse`, `plz`, `ort`, `telefon`,
   `email`, `hausarzt`, `ueberweisung_durch`, `groesse_cm`, `katheter`, `versorger`, `ansprechpartner`,
   `nickelallergie (ja|nein|unbekannt)`, `diagnose` (formatiert), `aufnahme_gewicht_kg`, `aufnahme_gemessen_am`,
-  `aufnahme_quelle` (nur beim Anlegen). Im Code zusätzlich `telefon2`, `krankenkasse`, `bemerkung` (Unklarheit U5).
+  `aufnahme_quelle` (nur beim Anlegen), `telefon2`, `krankenkasse` (seit 03.10.2026 in Neuer Patient, Stammdaten bearbeiten und
+  der Karte „Anschrift und Kontakt“, U5); `bemerkung` (formatiert) als eigene Karte unter Diagnose & Therapie mit Versionen
+  (`GET /api/patienten/{id}/versionen/?feld=bemerkung`, Verlauf-Bereich „Bemerkung“).
 - **Response 201:** Akte wie F17; `nummer` automatisch fortlaufend, Testpatienten ab 9001.
 - **Logik:** Patient und Aufnahmegewicht (als erste Gewichtsmessung, erfasst von der anlegenden Person) in einer Transaktion.
 - **Validierung:** Geburtsdatum nicht in der Zukunft; Größe und Aufnahmegewicht in den Grenzen der Einstellungen;
@@ -492,7 +494,7 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 - **Tabellen:** `patienten_patient`, `patienten_gewichtsmessung` (+ Historie)
 - **Fehlerfälle:** 400 Pflichtfeld/Plausibilität (dann wird nichts gespeichert) · 403 ohne Recht „Patienten anlegen, Diagnose, Therapie, Stammdaten ändern“; ein
   Admin legt automatisch einen Testpatienten an (`naechste-nummer` meldet `testpatient: true`)
-- **Teststatus:** Backend-Tests grün (`test_schreibrechte`, `test_nummern`, `test_anlegen_mit_aufnahmegewicht`). Browsertests grün: `patienten.spec.ts` „Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme“
+- **Teststatus:** Backend-Tests grün (`test_schreibrechte`, `test_nummern`, `test_anlegen_mit_aufnahmegewicht`, `test_versionen_der_textfelder` mit Bemerkung, Krankenkasse, Telefon 2). Browsertests grün: `patienten.spec.ts` „Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme“; `akte.spec.ts` „Stammdaten bearbeiten …“ (Telefon 2, Krankenkasse) und „Diagnose und Therapie bearbeiten …“ (Bemerkung mit Version und Verlauf)
   (Pflichtfelder in der Oberfläche, Größe vom Backend abgewiesen, Anlegen mit Aufnahmegewicht und Überweisung, Versorger
   aus dem Formular neu anlegen), `admin.spec.ts` „Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten“ (Admin legt Testpatienten an), `patienten.spec.ts` „Testzugang: Hinweis dauerhaft sichtbar, nur Testpatienten, neue Patienten werden Testpatienten“ (Testzugang: Nummer ab 9001); Neustart geprüft in `zz-neustart.spec.ts`.
 - **Status:** ABGESCHLOSSEN UND GETESTET
@@ -606,12 +608,12 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 ### F26 Kontakte anlegen, lesen, durchsuchen
 - **Ansicht:** 6 Kontakte
 - **Endpunkte:** `GET /api/kontakte/?patient=<id>&search=<text>`, `POST /api/kontakte/`; `PATCH`/`DELETE` → 405
-- **Request:** `{"patient", "text" (formatiert, Pflicht), "zeitpunkt"?, "wiedervorlage"?}` (im Code zusätzlich `art`, Unklarheit U6)
+- **Request:** `{"patient", "text" (formatiert, Pflicht), "zeitpunkt"?, "art"? (Kontaktart aus der Liste „Kontaktart“), "wiedervorlage"?}` – Kontaktart seit 03.10.2026 in Kontakte, Schnellerfassung, Kontaktliste, Übersicht und Vorschau der Patientenliste (U6); Liste unter Vorlagen › Auswahllisten › „Kontaktarten“
 - **Response:** `{id, patient, zeitpunkt, art, art_name, text, erfasst_am, erfasst_von_name, storniert_am, storniert_von_name,
   storno_grund, termine: [{id, art, faellig_am, uhrzeit, ort, erledigt}]}`
 - **Validierung:** Text bereinigt; Zeitpunkt nicht in der Zukunft; Akte offen. Unveränderlich: Modell + Datenbank-Trigger.
 - **Tabellen:** `patienten_kontakt`, `patienten_historicalkontakt`
-- **Teststatus:** Backend-Tests grün (`KontaktRegeln.*`). Browsertest grün: `akte.spec.ts` „Kontakt mit Wiedervorlage erfassen, suchen, stornieren“ (mit Neustart); Neustart geprüft in `zz-neustart.spec.ts`.
+- **Teststatus:** Backend-Tests grün (`KontaktRegeln.*`, `test_kontaktart`). Browsertest grün: `akte.spec.ts` „Kontakt mit Wiedervorlage erfassen, suchen, stornieren“ (mit Kontaktart, mit Neustart); Neustart geprüft in `zz-neustart.spec.ts`.
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F27 Kontakt stornieren
@@ -1702,10 +1704,11 @@ erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migratione
   als `protokoll_aufbewahrung_jahre` werden entfernt (Wartungsmodus), die Bereinigung steht selbst im Audit-Log
   („Protokoll bereinigt“, Anzahl); außerdem werden abgelaufene Sitzungen entfernt.
 - **Teststatus:** Backend-Test grün (`AuditBereinigung.test_aufbewahrung_des_audit_logs`). Browsertest grün für die
-  Einstellung (`datenschutz.spec.ts` „Grenzwerte: Fristen des Datenschutzes einstellen“). Das Entfernen alter Einträge
-  ist nur im Backend-Test geprüft (über die Oberfläche lassen sich keine alten Einträge erzeugen), daher nicht
-  ABGESCHLOSSEN UND GETESTET.
-- **Status:** TEILWEISE ABGESCHLOSSEN
+  Einstellung (`datenschutz.spec.ts` „Grenzwerte: Fristen des Datenschutzes einstellen“) und seit 03.10.2026 für das
+  Entfernen: `datenschutz.spec.ts` „Audit-Log aufbewahren: ältere Einträge entfernt die tägliche Bereinigung …“ (alter
+  Eintrag im Backend angelegt und zurückdatiert, Aufbewahrung über die Oberfläche auf 1 Jahr, Neustart, Startseite →
+  Eintrag weg, „Audit-Log bereinigt“ im Audit-Log, Einstellung zurück).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ## N · Kalender, Infusionspläne, Systemverwaltung (Runde 4, Wunsch 02.10.2026)
 
@@ -2201,10 +2204,10 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 |---|---|---|---|
 | U1 | ~~Bedeutung und Einheit von Pantozol 0–3 / Tage~~ **Geklärt 01.10.2026:** Pantozol® 40 mg, Pantozol® 20 mg, Nexium®; Zeiten morgens, mittags, abends. Codes wie in `EPM_infuplan.php` (1 = 40 mg, 3 = 20 mg, 2 = Nexium®, 0 = kein; Zeiten 4/2/1 addiert) | F38 | – |
 | U2 | ~~Gesamtvolumen und Laufzeit eingeben oder berechnen?~~ **Geklärt 01.10.2026:** Gesamtvolumen = Gewicht × 35 ml (wie im Altsystem), Laufzeit manuell; Rate = Gesamtvolumen ÷ Laufzeit | F39, F48 | – |
-| U3 | „geändert“-Hinweis an einem Kontakt im Entwurf widerspricht „unveränderlich“ | F26 | Beschluss gilt |
-| U4 | Plan-Hinweis „6 Monate“ in der Liste vs. 12 Monate in den Grenzwerten | F14 | Grenzwert gilt (Text nennt die eingestellten Monate) |
-| U5 | Felder Krankenkasse, Telefon 2, Bemerkung (nicht im Entwurf) | F16 | bleiben gespeichert, nicht angezeigt |
-| U6 | Kontaktart (nicht im Entwurf) | F26 | bleibt gespeichert, nicht angezeigt |
+| U3 | „geändert“-Hinweis an einem Kontakt im Entwurf widerspricht „unveränderlich“ | F26 | Beschluss gilt – **bestätigt 03.10.2026: bleibt so** |
+| U4 | ~~Plan-Hinweis „6 Monate“ in der Liste vs. 12 Monate in den Grenzwerten~~ **Bestätigt 03.10.2026:** es gilt der eingestellte Grenzwert (Text nennt die eingestellten Monate) | F14 | – |
+| U5 | ~~Felder Krankenkasse, Telefon 2, Bemerkung (nicht im Entwurf)~~ **Geklärt 03.10.2026:** anzeigen – Telefon 2 und Krankenkasse in Neuer Patient, Stammdaten und „Anschrift und Kontakt“; Bemerkung als Karte unter Diagnose & Therapie mit Versionen und Verlauf | F16, F17, F19 | – |
+| U6 | ~~Kontaktart (nicht im Entwurf)~~ **Geklärt 03.10.2026:** anzeigen – Auswahl beim Erfassen (Kontakte, Schnellerfassung), Anzeige in Kontaktliste, Übersicht und Vorschau; Liste „Kontaktarten“ unter Vorlagen › Auswahllisten | F26, F91 | – |
 | U7 | ~~Rolle des Testbenutzers: Mitarbeiter (Entwurf) oder Mediziner (Code)~~ **Geklärt 03.10.2026:** Mitarbeiter; je Konto auf Betrachter, Mitarbeiter (erweitert) oder Mediziner umstellbar (Testbenutzer-Schalter, F100) | F57 | – |
 | U8 | ~~Gerätename im Audit-Log oder nur IP/Browser~~ **Geklärt 01.10.2026:** IP und Browser reichen | F11, F58 | – |
 | U9 | ~~Übertragung zur Nextcloud: Server schiebt oder Gegenseite holt ab~~ **Geklärt 01.10.2026:** Server schiebt in einen WebDAV-Ordner, Werkzeug rclone (Festlegung 01.10.2026) | F64 | – |
@@ -2229,7 +2232,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U28 | ~~Dokumente anderer Dateitypen im Ordner des Altsystems (Word, Excel …)~~ **Bestätigt 03.10.2026:** nicht übernehmen (veränderbar); sie werden einzeln aufgelistet, der Ordner bleibt unverändert | F65 | – |
 | U29 | Zeitangaben: Welchen Typ haben `lastchange`, `created`, `deleted_at` im echten Altsystem? `TIMESTAMP` steht im Dump in UTC und wird umgerechnet, `DATETIME` gilt als Ortszeit | F65 | am echten Dump prüfen – das Werkzeug zeigt nach dem Laden einen Hinweis, wenn es umgerechnet hat |
 | U30 | Infusionspläne aus dem Altsystem: ohne Freigabe und ohne gespeicherte PDF (im Altsystem gab es beides nicht); Mengen 0 → leer; Energie nur dann als „manuell“, wenn sie von der Berechnung abweicht; jüngster Plan je Patient „aktuell“ | F65 | so umgesetzt (Regeln 13 und 16 der Datenanalyse); in der Akte als „aus dem Altsystem“ gekennzeichnet – **bestätigt 03.10.2026** |
-| U31 | Rolle der Konten aus dem Altsystem: Vorschlag aus dessen Rechtestufe (100 Betrachter, 1000 Mitarbeiter, 10000 Mediziner, 100000 Admin) | F65 | Vorschlag, je Konto im Werkzeug änderbar; Konten entstehen ohne Kennwort |
+| U31 | ~~Rolle der Konten aus dem Altsystem~~ **Bestätigt 03.10.2026:** Vorschlag aus dessen Rechtestufe (100 Betrachter, 1000 Mitarbeiter, 10000 Mediziner, 100000 Admin), je Konto im Werkzeug änderbar – die Berechtigung wird beim Import gesetzt; Konten entstehen ohne Kennwort | F65 | – |
 | U32 | Nach dem Abschließen enthalten ältere Sicherungen aus der Testphase und der Ordner `data/import` auf dem Server weiterhin Altdaten (auch der nicht übernommenen Patienten) | F65, F61 | organisatorisch löschen (`docs/DATENSCHUTZ.md`); das Werkzeug weist beim Abschließen darauf hin – **bestätigt 03.10.2026**; dazu Menüpunkt „Import“ unter System aus- und wieder einblendbar (F109) |
 | U34 | ~~Bestätigungen ohne zweiten Faktor nur mit Kennwort?~~ **Geklärt 03.10.2026: nein.** Endgültig löschen, Wiederherstellen, Updates, Neustart, Sicherung und Import verlangen immer den zweiten Faktor; wer sie ausführt (Mediziner, Administration …), muss ihn einrichten – ohne geht es nicht | F99 | – |
 | U35 | Hochgeladene Sicherung eines anderen Servers mit fremdem Passwort: Das Passwort wird auf diesem Server (root, 0600) als eigene Nummer hinterlegt, damit sich die Sicherung wiederherstellen lässt | F103 | so umgesetzt; das aktuelle Sicherungs-Passwort dieses Servers bleibt unverändert – **bestätigt 03.10.2026** |
@@ -2242,6 +2245,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 03.10.2026 | Klärungen U3–U6, U31 (Branch `klaerungen-u3-u6-2026-10-03`) | Telefon 2, Krankenkasse und Bemerkung sichtbar und bearbeitbar, Bemerkung mit Versionen und eigenem Bereich im Verlauf (U5); Kontaktart beim Erfassen und in den Listen, Auswahlliste „Kontaktarten“ (U6); U3, U4, U31 bestätigt; F83 mit Browsertest abgeschlossen |
 | 03.10.2026 | Klärungen U26–U33 (Branch `bereinigen-2026-10-03`) | Administration › System, Karte „Testphase und Go-live“: Datenbank leeren (F107, Systemagent-Aktion `datenbank_leeren`, Befehl `epm_datenbank_leeren`), Schalter „Musterdaten automatisch anlegen“ (F108) und „Import ausblenden“ (F109); Migration `stammdaten/0011`; U26, U28, U30, U32, U33 bestätigt, U27 geklärt. Systemagent über `sudo epm-update` aktualisieren |
 | 03.10.2026 | Klärungen U7, U16–U24, U38 | Entwurfsmodus der Vordrucke manuell abschaltbar (F76, Migration `stammdaten/0010`); Aufbewahrung im Übertragungsziel, Standard 30 Tage, Systemagent räumt nach jeder Übertragung auf (F64, U21); Rolle „Mitarbeiter (erweitert)“ (Migration `accounts/0007`, U22); Testbenutzer der Musterdaten als Mitarbeiter (U7); U18, U19, U23, U24, U38 bestätigt |
 | 02.10.2026 | Fehlerliste (Branch `fehlerliste-2026-10-02`) | Infusionspläne: Datum statt „heute/gestern“, Frist beim Überfahren des Status, kompakte Tabelle, Planansicht als kleine Vorschau mit großer Ansicht per Klick (F85, F31). Akte und System: Karten im Raster mit „⋯“ statt Teiler, je Person (F98); Kurz-Verlauf unter Kontakte entfernt. System: Zeitraum der Auslastung 1 h–6 Monate, Konten mit Links, größere Warnungen (F102). Backup: Herunterladen, Aufbewahrung 7/14/30 Tage, Hochladen und Einlesen (F103). Benutzer: ohne Login setzen/Login geben, Rolle „Keine Berechtigung“, Testbenutzer-Schalter (F100); Testpatient beim Anlegen (F101); Admins schließen Akten ab und ordnen Dokumente zu, auch bei echten Akten (F104); Zwei-Faktor-Anmeldung freiwillig (F99). Migration `accounts/0005`; Systemagent Version 3; neue Ordner `system/download`, `system/upload` (über `sudo epm-update`). U34–U36. Ergänzung: Hinweis „Kein Infusionsplan“ und Bestätigung „Kein Infusionsplan nötig“ je Patient (F105, Migration `patienten/0009`, U37). 03.10.2026: Recht „Testdaten sehen“ und Testbenutzer ausblenden (F106, Migration `accounts/0006`, U38). 03.10.2026: U34 geklärt – Bestätigungen immer mit zweitem Faktor, ohne eingerichteten Faktor abgewiesen; U35–U37 bestätigt |
