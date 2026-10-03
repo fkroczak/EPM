@@ -32,21 +32,26 @@ test("Testphase: Menüpunkt „Import“ ausblenden und wieder einblenden; Muste
   await expect(nav.getByRole("link", { name: "Import" })).toBeVisible();
   const import_aus = karte.getByRole("checkbox", { name: /Menüpunkt „Import“ ausblenden/ });
   await expect(import_aus).not.toBeChecked();
-  await import_aus.check();
+  // Schalter folgen der Antwort des Servers – klicken, dann auf den neuen Zustand warten
+  await import_aus.click();
+  await expect(import_aus).toBeChecked();
   await expect(page.getByText("Menüpunkt „Import“ ausgeblendet.")).toBeVisible();
   await expect(nav.getByRole("link", { name: "Import" })).toHaveCount(0);
   // die Seite bleibt erreichbar und sagt, wo man wieder einblendet
   await karte.getByRole("link", { name: "Import öffnen" }).click();
   await expect(page.getByTestId("import-ausgeblendet")).toBeVisible();
   await page.getByTestId("import-ausgeblendet").getByRole("link", { name: "Administration › System" }).click();
-  await karte.getByRole("checkbox", { name: /Menüpunkt „Import“ ausblenden/ }).uncheck();
+  await karte.getByRole("checkbox", { name: /Menüpunkt „Import“ ausblenden/ }).click();
+  await expect(karte.getByRole("checkbox", { name: /Menüpunkt „Import“ ausblenden/ })).not.toBeChecked();
   await expect(nav.getByRole("link", { name: "Import" })).toBeVisible();
 
   const muster = karte.getByRole("checkbox", { name: /Musterdaten automatisch anlegen/ });
   await expect(muster).toBeChecked();
-  await muster.uncheck();
+  await muster.click();
+  await expect(muster).not.toBeChecked();
   await expect(page.getByText("Musterdaten werden nicht mehr automatisch angelegt.")).toBeVisible();
-  await muster.check();
+  await muster.click();
+  await expect(muster).toBeChecked();
   await expect(page.getByText("Musterdaten werden beim Start wieder angelegt.")).toBeVisible();
 });
 
