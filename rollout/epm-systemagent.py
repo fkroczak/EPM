@@ -53,6 +53,9 @@ VERLAUF_STUFEN = (("viertelstunde", 900, 1344),   # 14 Tage
                   ("vierteltag", 21600, 736))      # 184 Tage
 VERLAUF_FELDER = ["zeit", "cpu", "ram", "last", "platte"]
 AUFBEWAHRUNG_TAGE = (7, 14, 30)  # wählbar unter Administration › Backup (Festlegung 02.10.2026)
+# Aufbewahrung im Übertragungsziel (Festlegung 03.10.2026): Standard 30 Tage, 0 = nie löschen
+ZIEL_AUFBEWAHRUNG = (0, 14, 30, 60, 90, 180, 365)
+ZIEL_AUFBEWAHRUNG_STANDARD = 30
 BUENDEL_MUSTER = re.compile(r"^epm-sicherung_(\d{4}-\d{2}-\d{2}_\d{4}(?:\d{2})?)\.tar$")
 BUENDEL_STUNDEN = 2              # so lange liegt eine zum Herunterladen bereitgestellte Sicherung bereit
 UPLOAD_ALT_STUNDEN = 24          # abgebrochene Uploads werden danach entfernt
@@ -100,6 +103,38 @@ VORHER_ART = {"updates_installieren": "vor_update", "server_neustart": "vor_aend
               "wiederherstellen": "vor_wiederherstellung"}
 
 APT_ENV = {"DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE": "a", "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"}
+
+
+def stempel_zeit(stempel):
+    """„2026-10-03_0200“ bzw. „…_020000“ → datetime (UTC, wie der Server die Sicherung benannt hat: Ortszeit wird
+    hier nicht gebraucht – es geht um Tage) oder None."""
+    for form in ("%Y-%m-%d_%H%M%S", "%Y-%m-%d_%H%M"):
+        try:
+            return datetime.strptime(stempel, form).replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            pass
+    return None
+
+
+def im_ziel_veraltet(namen, tage, jetzt=None):
+    """Welche Dateien im Übertragungsziel älter als ``tage`` sind und entfernt werden: nur Dateien von EPM-Sicherungen
+    (Namen wie im Backup-Ordner), nach dem Zeitstempel im Namen; die jüngste Sicherung im Ziel bleibt immer, alles
+    andere im Ordner wird nie angefasst. ``tage`` 0 = nie löschen."""
+    if not tage:
+        return []
+    jetzt = jetzt or datetime.now(timezone.utc)
+    je_stempel = {}
+    for name in namen:
+        name = name.strip()
+        m = DATEI_MUSTER.match(name)
+        stempel = m.group(2) if m else (NEBEN_MUSTER.match(name).group(1) if NEBEN_MUSTER.match(name) else None)
+        if stempel and stempel_zeit(stempel):
+            je_stempel.setdefault(stempel, []).append(name)
+    if not je_stempel:
+        return []
+    juengste = max(je_stempel, key=stempel_zeit)
+    grenze = jetzt - timedelta(days=tage)
+    return sorted(n for st, liste in je_stempel.items() if st != juengste and stempel_zeit(st) < grenze for n in liste)
 
 
 def jetzt_iso():
@@ -643,8 +678,11 @@ class Agent:
         if kennwort is not None and (not isinstance(kennwort, str) or len(kennwort) > 500
                                      or any(z in kennwort for z in "\r\n\0")):
             return "Das Passwort für das Ziel ist ungültig.", None
+        tage = p.get("aufbewahrung_tage", ZIEL_AUFBEWAHRUNG_STANDARD)
+        if isinstance(tage, bool) or tage not in ZIEL_AUFBEWAHRUNG:
+            return "Aufbewahrung im Ziel: bitte nie, 14, 30, 60, 90, 180 oder 365 Tage wählen.", None
         return None, {"url": url.rstrip("/"), "benutzer": benutzer, "ordner": ordner, "von": von, "bis": bis,
-                      "kennwort": kennwort or None}
+                      "kennwort": kennwort or None, "aufbewahrung_tage": tage}
 
     def rclone_konf(self):
         return os.path.join(self.konf, "rclone.conf")
@@ -682,13 +720,58 @@ class Agent:
             f.write(inhalt)
         os.replace(tmp, self.rclone_konf())
         ziel = {"url": z["url"], "benutzer": z["benutzer"], "ordner": z["ordner"], "von": z["von"], "bis": z["bis"],
+                "aufbewahrung_tage": z["aufbewahrung_tage"],
                 "hersteller": hersteller, "gesetzt_am": jetzt_iso(), "gesetzt_von": von or ""}
         self.schreibe(os.path.join(self.konf, "ziel.json"), ziel, modus=0o600)
-        zeile(f"Ziel gespeichert: {z['url']} · Ordner „{z['ordner'] or '/'}“ · Zeitfenster {z['von']}–{z['bis']}\n")
+        zeile(f"Ziel gespeichert: {z['url']} · Ordner „{z['ordner'] or '/'}“ · Zeitfenster {z['von']}–{z['bis']} · "
+              f"Aufbewahrung im Ziel: {self.aufbewahrung_text(z['aufbewahrung_tage'])}\n")
         if alt and self.ziel_kennung(alt) != self.ziel_kennung(ziel):
             zeile("Neues Ziel: Die vorhandenen verschlüsselten Sicherungen werden im nächsten Zeitfenster dorthin übertragen.\n")
         self.sicherung_status_schreiben()
         return 0, f"Übertragungsziel festgelegt ({teile_host(z['url'])}, Zeitfenster {z['von']}–{z['bis']})."
+
+    @staticmethod
+    def ziel_aufbewahrung(ziel):
+        """Tage, die Sicherungen im Ziel bleiben (0 = nie löschen); ältere Ziele ohne Angabe: Standard 30."""
+        tage = (ziel or {}).get("aufbewahrung_tage", ZIEL_AUFBEWAHRUNG_STANDARD)
+        return tage if not isinstance(tage, bool) and tage in ZIEL_AUFBEWAHRUNG else ZIEL_AUFBEWAHRUNG_STANDARD
+
+    @staticmethod
+    def aufbewahrung_text(tage):
+        return "nie löschen" if not tage else f"{tage} Tage"
+
+    def ziel_aufraeumen(self, ziel, zeile):
+        """Sicherungen im Ziel, die älter als die Aufbewahrung sind, entfernen (Festlegung 03.10.2026). Nur nach einer
+        erfolgreichen Übertragung, nur Dateien von EPM-Sicherungen im eingestellten Ordner, die jüngste bleibt immer.
+        Ein Fehler hier lässt die Übertragung gelingen und steht in der Ausgabe."""
+        tage = self.ziel_aufbewahrung(ziel)
+        if not tage:
+            return 0
+        rc, aus = self.rclone(["lsf", self.ziel_pfad(ziel), "--files-only", "--max-depth", "1"], zeile, zeitlimit=600)
+        if rc != 0:
+            zeile("Aufräumen im Ziel: Inhalt nicht lesbar – nichts entfernt.\n")
+            return 0
+        weg = im_ziel_veraltet(aus.splitlines(), tage)
+        if not weg:
+            zeile(f"Aufräumen im Ziel: nichts älter als {tage} Tage.\n")
+            return 0
+        liste_pfad = os.path.join(self.backup, ".ziel-aufraeumen.liste")
+        with open(liste_pfad, "w", encoding="utf-8") as f:
+            f.write("\n".join(weg) + "\n")
+        try:
+            rc, _ = self.rclone(["delete", self.ziel_pfad(ziel), "--files-from-raw", liste_pfad, "--max-depth", "1",
+                                 "-v"], zeile, zeitlimit=3600)
+        finally:
+            try:
+                os.unlink(liste_pfad)
+            except OSError:
+                pass
+        stempel = sorted({n.split("_", 1)[1].split(".", 1)[0] for n in weg})
+        if rc != 0:
+            zeile("Aufräumen im Ziel fehlgeschlagen – Ausgabe prüfen. Die Sicherungen bleiben dort vorerst liegen.\n")
+            return 0
+        zeile(f"Aufräumen im Ziel: {len(stempel)} Sicherung(en) älter als {tage} Tage entfernt ({', '.join(stempel)}).\n")
+        return len(stempel)
 
     def ziel_entfernen(self, zeile):
         for name in ("ziel.json", "rclone.conf"):
@@ -789,8 +872,9 @@ class Agent:
                              start_new_session=True)
 
     def uebertragen(self, zeile, manuell=False):
-        """Verschlüsselte Sicherungen (und ihre Prüfsummen und Angaben) zum Ziel kopieren – nie löschen, nie
-        Unverschlüsseltes. Automatisch nur im Zeitfenster und höchstens bis zu seinem Ende."""
+        """Verschlüsselte Sicherungen (und ihre Prüfsummen und Angaben) zum Ziel kopieren – nie Unverschlüsseltes.
+        Automatisch nur im Zeitfenster und höchstens bis zu seinem Ende. Danach entfernt ``ziel_aufraeumen`` im Ziel die
+        Sicherungen, die älter als die dort eingestellte Aufbewahrung sind (Standard 30 Tage, „nie“ wählbar)."""
         ziel = self.ziel_lesen()
         if not ziel:
             return 2, "Es ist noch kein Übertragungsziel festgelegt."
@@ -812,10 +896,14 @@ class Agent:
             self.schreibe(self.uebertragung_pfad(), stand, modus=0o600)
             self.sicherung_status_schreiben()
             if not offen:
+                entfernt = self.ziel_aufraeumen(ziel, zeile)
                 stand.update({"laeuft_seit": None, "letzter_fehler": "", "letzter_erfolg": jetzt_iso()})
+                if entfernt:
+                    stand["im_ziel_entfernt"] = {"am": jetzt_iso(), "anzahl": entfernt}
                 self.schreibe(self.uebertragung_pfad(), stand, modus=0o600)
                 self.sicherung_status_schreiben()
-                return 0, "Alle verschlüsselten Sicherungen sind schon übertragen."
+                return 0, "Alle verschlüsselten Sicherungen sind schon übertragen." + (
+                    f" Im Ziel {entfernt} ältere Sicherung(en) entfernt." if entfernt else "")
             liste = []
             for s in offen:
                 liste.extend(s["dateien"])
@@ -849,8 +937,12 @@ class Agent:
                 vorhanden = {s["stempel"] for s in self.sicherungen()}
                 for k in list(stand["uebertragen"]):
                     stand["uebertragen"][k] = {st: z for st, z in stand["uebertragen"][k].items() if st in vorhanden}
+                entfernt = self.ziel_aufraeumen(ziel, zeile)
+                if entfernt:
+                    stand["im_ziel_entfernt"] = {"am": jetzt_iso(), "anzahl": entfernt}
                 stand.update({"letzter_erfolg": jetzt_iso(), "letzter_fehler": ""})
-                ergebnis = f"{len(offen)} Sicherung(en) übertragen und geprüft."
+                ergebnis = f"{len(offen)} Sicherung(en) übertragen und geprüft." + (
+                    f" Im Ziel {entfernt} ältere Sicherung(en) entfernt." if entfernt else "")
             else:
                 stand["letzter_fehler"] = ("Übertragung fehlgeschlagen oder Zeitfenster vorbei – Ausgabe prüfen "
                                            "(Adresse, Zugang, Proxy-Freigabe).")
@@ -1199,7 +1291,9 @@ class Agent:
                 "versionen": versionen,
             },
             "ziel": ({k: ziel.get(k) for k in ("url", "benutzer", "ordner", "von", "bis", "hersteller", "gesetzt_am",
-                                                "gesetzt_von")} | {"eingerichtet": True}) if ziel else {"eingerichtet": False},
+                                                "gesetzt_von")}
+                     | {"eingerichtet": True, "aufbewahrung_tage": self.ziel_aufbewahrung(ziel)}) if ziel
+            else {"eingerichtet": False},
             "uebertragung": {
                 "letzter_versuch": ue.get("letzter_versuch"),
                 "letzter_erfolg": ue.get("letzter_erfolg"),
@@ -1209,6 +1303,7 @@ class Agent:
                 "im_zeitfenster": im_zeitfenster(ziel["von"], ziel["bis"]) if ziel else False,
                 "naechstes_fenster": naechstes,
                 "rclone": bool(shutil.which("rclone")),
+                "im_ziel_entfernt": ue.get("im_ziel_entfernt"),
             },
             "sicherungen": liste,
             "speicher": {"platz": platz, "sicherungen": sum(x["groesse"] for x in liste)},

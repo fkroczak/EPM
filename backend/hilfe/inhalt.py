@@ -461,7 +461,11 @@ entscheidet.</p>""",
 <p>Dokumentvorlagen bestimmen das Aussehen der PDFs (Infusionsplan, Patientendatenblatt, Vordrucke). Änderungen
 entstehen als <strong>Entwurf</strong>, lassen sich mit einem Testpatienten in der <strong>Vorschau</strong> prüfen und
 gelten erst nach <strong>Veröffentlichen</strong>. Frühere Versionen bleiben erhalten; jede PDF vermerkt, mit welcher
-Version sie erzeugt wurde.</p>""",
+Version sie erzeugt wurde.</p>
+<p>Die Vordrucke zum Datenschutz (Datenschutzinformation, Einwilligung, Schweigepflichtentbindung) kommen als ungeprüfte
+Entwürfe mit Lücken in [eckigen Klammern]; ihre PDFs tragen das Wasserzeichen „ENTWURF“, bis eine eigene Version
+veröffentlicht ist. Mit <strong>Entwurfsmodus ausschalten</strong> lässt sich das Wasserzeichen (und der Hinweisblock für
+die Bearbeiter) auch ohne Bearbeiten abschalten – die Lücken bleiben dann stehen; jederzeit wieder einschaltbar.</p>""",
     },
     {
         "id": "benutzer", "gruppe": "administration", "titel": "Benutzer und Rechte", "rechte": ["benutzer_verwalten"],
@@ -475,7 +479,7 @@ Altsystem übernommen), können sich nicht anmelden und haben die Rolle <strong>
 Rechte. Ein Konto lässt sich auf „ohne Login“ setzen (Kennwort und zweiter Faktor werden gelöscht, Einträge bleiben
 zugeordnet) und mit <strong>Login geben</strong> wieder einbinden, z. B. als Mitarbeiter; dabei entsteht ein neues
 Einmal-Kennwort.</p>
-<p><strong>Testbenutzer</strong> (Schalter im Konto, für Betrachter, Mitarbeiter und Mediziner) sehen und bearbeiten
+<p><strong>Testbenutzer</strong> (Schalter im Konto, für Betrachter, Mitarbeiter, Mitarbeiter (erweitert) und Mediziner) sehen und bearbeiten
 ausschließlich Testpatienten. Nicht mehr gebrauchte Testbenutzer lassen sich <strong>ausblenden</strong> (einzeln oder
 „Alle Testbenutzer ausblenden“): gesperrt und in keiner Liste mehr, aber nicht gelöscht; „Ausgeblendete zeigen“ und
 „Einblenden“ holen sie zurück. Mit dem Recht <strong>Testdaten sehen</strong> legt man je Gruppe fest, wer
@@ -518,8 +522,10 @@ wird (das <strong>Passwortblatt</strong> gehört in den Tresor). Die Sicherungen
 WebDAV-Ordner (z. B. Nextcloud) übertragen.</p>
 <p><strong>Jetzt sichern</strong> startet eine Sicherung sofort. <strong>Wiederherstellen</strong> braucht das eigene
 Passwort und den Code aus der Authenticator-App (Zwei-Faktor-Anmeldung nötig); danach müssen sich alle neu anmelden.</p>
-<p><strong>Aufbewahrung</strong>: 7, 14 oder 30 Tage auf dem Server; ältere entfernt die nächste Sicherung (im
-Übertragungsziel wird nie gelöscht).</p>
+<p><strong>Aufbewahrung</strong>: 7, 14 oder 30 Tage auf dem Server; ältere entfernt die nächste Sicherung. Im
+Übertragungsziel gilt eine eigene Aufbewahrung (unter „Ziel ändern“, Standard 30 Tage, auch „nie löschen“): Nach jeder
+Übertragung entfernt der Server dort ältere EPM-Sicherungen; die jüngste bleibt immer, andere Dateien im Ordner werden
+nie angefasst.</p>
 <p><strong>Herunterladen</strong>: Der Server legt die Sicherung für 2 Stunden als eine Datei
 (<code>epm-sicherung_….tar</code>) bereit; verschlüsselte bleiben verschlüsselt. <strong>Sicherung hochladen</strong>
 bringt genau so eine Datei zurück – auch von einem anderen EPM-Server, z. B. nach dem Altdaten-Import auf einer

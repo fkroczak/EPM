@@ -288,19 +288,25 @@ class Ziel(Backupverzeichnis):
         self.assertEqual(datei["geheim"], {"kennwort": "App-Passwort-1234"})
         self.assertEqual(datei["parameter"], {"url": "https://cloud.example.org/remote.php/dav/files/epm",
                                               "benutzer": "epm-sicherung", "ordner": "EPM/Sicherungen",
-                                              "von": "02:00", "bis": "05:00"})
+                                              "von": "02:00", "bis": "05:00", "aufbewahrung_tage": 30})
         self.nirgends_in_der_datenbank("App-Passwort-1234")
         e = self.a.get("/api/protokoll/?gruppe=backup").json()["results"]
         self.assertIn("Übertragungsziel festgelegt: https://cloud.example.org/remote.php/dav/files/epm, Ordner "
-                      "„EPM/Sicherungen“, Zeitfenster 02:00–05:00, neues Passwort für das Ziel", e[0]["beschreibung"])
+                      "„EPM/Sicherungen“, Zeitfenster 02:00–05:00, im Ziel 30 Tage aufbewahren, neues Passwort für das "
+                      "Ziel", e[0]["beschreibung"])
         # lokaler WebDAV-Server (Test) mit http erlaubt; bei bestehendem Ziel darf das Passwort fehlen (bleibt)
         self.status_schreiben()
         Path(self.ordner / "auftraege").joinpath(f"{datei['id']}.json").unlink()
         Systemauftrag.objects.update(status=Systemauftrag.Status.ERLEDIGT)
+        r = self.a.post(self.url, {**self.gueltig, "aufbewahrung_tage": 31, "kennwort": KENNWORT,
+                                   "code": self.admin_codes[1]}, format="json")
+        self.assertEqual((r.status_code, list(r.json())), (400, ["aufbewahrung_tage"]))
         r = self.a.post(self.url, {**self.gueltig, "url": "http://127.0.0.1:8099", "ziel_kennwort": "",
-                                   "kennwort": KENNWORT, "code": self.admin_codes[1]}, format="json")
+                                   "aufbewahrung_tage": 0, "kennwort": KENNWORT, "code": self.admin_codes[1]},
+                        format="json")
         self.assertEqual(r.status_code, 201, r.content)
         self.assertNotIn("geheim", self.auftragsdatei())
+        self.assertEqual(self.auftragsdatei()["parameter"]["aufbewahrung_tage"], 0)
 
     def test_testen_uebertragen_entfernen(self):
         self.assertEqual(self.a.post("/api/backup/ziel/testen/").status_code, 201)

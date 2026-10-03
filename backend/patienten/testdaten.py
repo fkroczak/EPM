@@ -80,12 +80,13 @@ def stammdaten_anlegen() -> dict:
 
 
 def testbenutzer_anlegen():
-    """Legt den Testbenutzer an (Rolle Mediziner). Gibt das Einmal-Kennwort zurück, falls neu."""
+    """Legt den Testbenutzer an (Rolle Mitarbeiter – Festlegung 03.10.2026, U7; unter Benutzer auf Betrachter,
+    Mitarbeiter (erweitert) oder Mediziner umstellbar). Gibt das Einmal-Kennwort zurück, falls neu."""
     user, angelegt = User.objects.get_or_create(
         username=TESTBENUTZER,
         defaults={"first_name": "Tessa", "last_name": "Test", "titel": "", "kuerzel": "TT",
                   "funktion": "Testzugang für Schulung und Prüfung nach Updates",
-                  "rolle": Rolle.MEDIZINER, "ist_test": True},
+                  "rolle": Rolle.MITARBEITER, "ist_test": True},
     )
     if not angelegt:
         return user, None
@@ -217,7 +218,10 @@ def _plan(patient, user, p, gueltig_ab, glucose, aa, lipide, freigeben=True):
     _nutzer(user, plan).save()
     plan.vitamine.set([p("vitamine", "Soluvit N"), p("vitamine", "Vitalipid adult")])
     if freigeben:
-        plan.freigeben(user)
+        # Musterdaten: ohne Prüfung des Rechts „Pläne freigeben“ – der Testbenutzer ist seit 03.10.2026 (U7) standardmäßig
+        # Mitarbeiter; die Freigabe nennt ihn trotzdem (fiktive Testdaten, Wasserzeichen „TEST“)
+        plan._freigabe(mediziner=user, abschliessend=None, weg=Infusionsplan.Freigabeweg.SYSTEM,
+                       datum=timezone.localdate(), nachweis=None)
     return plan
 
 

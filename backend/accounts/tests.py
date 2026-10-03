@@ -751,3 +751,27 @@ class TestdatenAusblenden(TestCase):
         benutzer("tester2", Rolle.BETRACHTER, ist_test=True)
         self.assertEqual(c.post("/api/benutzer/testbenutzer-ausblenden/").json(), {"ausgeblendet": 2})
         self.assertFalse(User.objects.filter(ist_test=True, ausgeblendet_am__isnull=True).exists())
+
+
+class MitarbeiterErweitert(TestCase):
+    """Festlegung 03.10.2026 (U22): Rolle „Mitarbeiter (erweitert)“ – Standard wie Mitarbeiter und zusätzlich
+    Infusionspläne anlegen; eigene Spalte in der Rechtetabelle, je Recht umstellbar, auch als Testbenutzer."""
+
+    def test_standard_und_umstellbar(self):
+        from accounts.rechte import STANDARD, matrix
+
+        admin = benutzer("admin", Rolle.ADMIN)
+        plus = benutzer("plus", Rolle.MITARBEITER_PLUS)
+        self.assertEqual(STANDARD[Rolle.MITARBEITER_PLUS] - STANDARD[Rolle.MITARBEITER], {"plaene_anlegen"})
+        self.assertTrue(plus.hat_recht("plaene_anlegen"))
+        self.assertFalse(plus.hat_recht("plaene_freigeben"))
+        c = client_fuer(admin)
+        d = c.get("/api/rechte/").json()
+        self.assertIn({"code": "mitarbeiter_plus", "name": "Mitarbeiter (erweitert)"}, d["rollen"])
+        r = c.put("/api/rechte/", {"matrix": {"mitarbeiter_plus": {"plaene_freigeben": True}}}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(matrix()["mitarbeiter_plus"]["plaene_freigeben"])
+        self.assertFalse(matrix()["mitarbeiter"]["plaene_freigeben"])
+        # als Testbenutzer möglich
+        r = c.patch(f"/api/benutzer/{plus.id}/", {"ist_test": True}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)

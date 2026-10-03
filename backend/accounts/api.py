@@ -661,7 +661,7 @@ class NotfallcodesView(APIView):
 # ---------------------------------------------------------------- Benutzerverwaltung (Admin)
 # Testbenutzer (sehen und bearbeiten nur Testpatienten) gibt es für diese Rollen; Admins schreiben ohnehin nur bei
 # Testpatienten und verlören als Testbenutzer die Verwaltung
-TESTBENUTZER_ROLLEN = (Rolle.BETRACHTER, Rolle.MITARBEITER, Rolle.MEDIZINER)
+TESTBENUTZER_ROLLEN = (Rolle.BETRACHTER, Rolle.MITARBEITER, Rolle.MITARBEITER_PLUS, Rolle.MEDIZINER)
 
 
 class BenutzerSerializer(serializers.ModelSerializer):
@@ -700,7 +700,7 @@ class BenutzerSerializer(serializers.ModelSerializer):
             if attrs.get("ist_test"):
                 raise serializers.ValidationError({"ist_test": "Ohne Login gibt es keinen Testzugang."})
         elif test and rolle not in TESTBENUTZER_ROLLEN:
-            raise serializers.ValidationError({"ist_test": "Testbenutzer gibt es für Betrachter, Mitarbeiter und "
+            raise serializers.ValidationError({"ist_test": "Testbenutzer gibt es für Betrachter, Mitarbeiter, Mitarbeiter (erweitert) und "
                                                            "Mediziner."})
         return attrs
 

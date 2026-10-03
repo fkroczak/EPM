@@ -332,7 +332,11 @@ test("Benutzer ohne Login: anlegen, setzen, wieder einbinden; Rolle „Keine Ber
   // Rolle „Keine Berechtigung“ hat nie Rechte – keine Spalte in der Rechtetabelle
   const rechte = page.getByTestId("rechte");
   await expect(rechte.getByRole("columnheader", { name: "Keine Berechtigung" })).toHaveCount(0);
-  await expect(rechte.getByRole("columnheader", { name: "Mitarbeiter" })).toBeVisible();
+  await expect(rechte.getByRole("columnheader", { name: "Mitarbeiter", exact: true })).toBeVisible();
+  // Rolle „Mitarbeiter (erweitert)“ (Festlegung 03.10.2026): eigene Spalte, Standard mit „Infusionspläne anlegen“
+  await expect(rechte.getByRole("columnheader", { name: "Mitarbeiter (erweitert)" })).toBeVisible();
+  await expect(rechte.getByRole("checkbox", { name: "Mitarbeiter (erweitert): Infusionspläne anlegen" })).toBeChecked();
+  await expect(rechte.getByRole("checkbox", { name: "Mitarbeiter: Infusionspläne anlegen", exact: true })).not.toBeChecked();
   // ohne Login anlegen: kein Kennwort, keine Rechte
   const name = eindeutig("e2e.ohne");
   await page.getByRole("button", { name: "Benutzer anlegen" }).click();

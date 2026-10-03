@@ -114,3 +114,24 @@ test("Betrachter hat keinen Zugang zu den Dokumentvorlagen", async ({ browser })
   await api.ende();
   await ctx.close();
 });
+
+test("Vordruck Schweigepflichtentbindung: Entwurfsmodus (Wasserzeichen „ENTWURF“) aus- und wieder einschalten", async ({ page }) => {
+  const api = await apiAls("mitarbeiter");
+  const art = "schweigepflichtentbindung";
+  const stand = (await api.get(`vorlagen/${art}/`)).entwurfsmodus;
+  test.skip(!stand?.moeglich, "Vorlage wurde bereits veröffentlicht – ohne Entwurfsmodus");
+  await page.goto("/admin/vorlagen/dokumente");
+  await page.getByRole("group", { name: "Vorlage" }).getByRole("button", { name: "Schweigepflichtentbindung" }).click();
+  const editor = page.getByTestId("dokumentvorlagen");
+  await expect(editor.getByTestId("vorlage-ungeprueft")).toBeVisible();
+  await editor.getByRole("button", { name: "Entwurfsmodus ausschalten" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Ausschalten" }).click();
+  await expect(page.getByText("Entwurfsmodus ausgeschaltet: Die PDFs tragen kein Wasserzeichen „ENTWURF“ mehr.")).toBeVisible();
+  await expect(editor.getByTestId("entwurfsmodus-aus")).toBeVisible();
+  expect((await api.get(`vorlagen/${art}/`)).entwurfsmodus).toEqual({ moeglich: true, aktiv: false, aus: true });
+  // wieder einschalten (andere Tests erwarten den Entwurfshinweis)
+  await editor.getByTestId("entwurfsmodus-aus").getByRole("button", { name: "Entwurfsmodus wieder einschalten" }).click();
+  await expect(editor.getByTestId("vorlage-ungeprueft")).toBeVisible();
+  expect((await api.get(`vorlagen/${art}/`)).entwurfsmodus.aus).toBe(false);
+  await api.ende();
+});

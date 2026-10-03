@@ -11,6 +11,8 @@ from simple_history.models import HistoricalRecords
 class Rolle(models.TextChoices):
     BETRACHTER = "betrachter", "Betrachter"
     MITARBEITER = "mitarbeiter", "Mitarbeiter"
+    # Festlegung 03.10.2026 (U22): zwischen Mitarbeiter und Mediziner, um Rechte feiner zu verteilen
+    MITARBEITER_PLUS = "mitarbeiter_plus", "Mitarbeiter (erweitert)"
     MEDIZINER = "mediziner", "Mediziner"
     ADMIN = "admin", "Admin"
     # Festlegung 02.10.2026: Konten ohne Login haben keinerlei Rechte; auch für Konten mit Login wählbar

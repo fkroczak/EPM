@@ -24,7 +24,7 @@ export type Ich = {
   nachname: string;
   kuerzel: string | null;
   funktion: string;
-  rolle: "betrachter" | "mitarbeiter" | "mediziner" | "admin" | "keine";
+  rolle: "betrachter" | "mitarbeiter" | "mitarbeiter_plus" | "mediziner" | "admin" | "keine";
   ist_test: boolean;
   darstellung: Partial<Darstellung>;
   /** karten: vollständig, in Anzeigereihenfolge (fehlende ergänzt der Server mit dem Standard der Rolle);
@@ -59,6 +59,7 @@ export type Status = {
 export const ROLLEN: Record<string, string> = {
   betrachter: "Betrachter",
   mitarbeiter: "Mitarbeiter",
+  mitarbeiter_plus: "Mitarbeiter (erweitert)",
   mediziner: "Mediziner",
   admin: "Admin",
   keine: "Keine Berechtigung",

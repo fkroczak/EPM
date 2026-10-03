@@ -253,6 +253,9 @@ def _backup(e, d) -> str:
             teile.append(f"Ordner „{d['ordner']}“")
         if d.get("zeitfenster"):
             teile.append(f"Zeitfenster {d['zeitfenster']}")
+        if "aufbewahrung_im_ziel" in d:
+            tage = d["aufbewahrung_im_ziel"]
+            teile.append("im Ziel nie löschen" if not tage else f"im Ziel {tage} Tage aufbewahren")
         teile.append("neues Passwort für das Ziel" if d.get("zugang_neu") else "Passwort für das Ziel unverändert")
         return ", ".join(teile) + _bestaetigt(d)
     if ereignis == "angefordert" and d.get("aktion") == "sicherung_aufbewahrung":

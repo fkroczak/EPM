@@ -47,8 +47,14 @@ def _uebersicht(art):
     aktiv = Dokumentvorlage.aktive(art)
     versionen = Dokumentvorlage.objects.filter(art=art).exclude(status=Dokumentvorlage.Status.ENTWURF) \
         .select_related("veroeffentlicht_von").order_by("-version")
+    from stammdaten.models import Einstellungen
+
     return {"art": art, "name": Dokumentvorlage.Art(art).label, "aktiv": _version(aktiv),
-            "entwurf": _version(Dokumentvorlage.entwurf_von(art)), "versionen": [_version(v) for v in versionen]}
+            "entwurf": _version(Dokumentvorlage.entwurf_von(art)), "versionen": [_version(v) for v in versionen],
+            # Vordrucke: Wasserzeichen „ENTWURF“ (Startvorlage ungeprüft) und ob es manuell abgeschaltet ist (U17)
+            "entwurfsmodus": {"moeglich": art in Dokumentvorlage.VORDRUCKE and aktiv.veroeffentlicht_von_id is None,
+                              "aktiv": aktiv.im_entwurfsmodus,
+                              "aus": art in (Einstellungen.aktuell().vordrucke_ohne_entwurf or [])}}
 
 
 class VorlagenView(APIView):
@@ -112,6 +118,34 @@ class EntwurfView(APIView):
         protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {Dokumentvorlage.Art(art).label}",
                       aktion="Entwurf verworfen")
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class EntwurfsmodusView(APIView):
+    """Wasserzeichen „ENTWURF“ auf einem Vordruck manuell ab- oder wieder einschalten (Festlegung 03.10.2026, U17):
+    ``POST {"aus": true}``. Gilt, solange die mitgelieferte Startvorlage aktiv ist; nach dem Veröffentlichen einer
+    eigenen Version entfällt das Wasserzeichen ohnehin. Steht im Audit-Log und in der Historie der Einstellungen."""
+
+    permission_classes = [VorlagenRecht]
+
+    def post(self, request, art):
+        from stammdaten.models import Einstellungen
+
+        art = _art(art)
+        if art not in Dokumentvorlage.VORDRUCKE:
+            return Response({"fehler": "Den Entwurfsmodus gibt es nur bei den Vordrucken zum Datenschutz."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        aus = request.data.get("aus")
+        if not isinstance(aus, bool):
+            return Response({"aus": "Bitte true oder false."}, status=status.HTTP_400_BAD_REQUEST)
+        e = Einstellungen.aktuell()
+        liste = [a for a in (e.vordrucke_ohne_entwurf or []) if a != art] + ([art] if aus else [])
+        if sorted(liste) != sorted(e.vordrucke_ohne_entwurf or []):
+            e.vordrucke_ohne_entwurf = sorted(liste)
+            e._history_user = request.user
+            e.save()
+            protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {Dokumentvorlage.Art(art).label}",
+                          aktion="Wasserzeichen „ENTWURF“ ausgeschaltet" if aus else "Wasserzeichen „ENTWURF“ eingeschaltet")
+        return Response(_uebersicht(art))
 
 
 class VeroeffentlichenView(APIView):

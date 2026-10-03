@@ -30,6 +30,9 @@ PRUEF_FEHLVERSUCHE, PRUEF_MINUTEN = 5, 15        # falsche Sicherungs-Passwörte
 ARTEN = {"nachts": "Automatisch", "von_hand": "Von Hand", "vor_update": "Vor Update", "vor_aenderung": "Vor Neustart",
          "vor_wiederherstellung": "Vor Wiederherstellung", "hochgeladen": "Hochgeladen", "unbekannt": "Unbekannt"}
 AUFBEWAHRUNG_TAGE = (7, 14, 30)                   # wie im Systemagenten (Festlegung 02.10.2026)
+# Aufbewahrung im Übertragungsziel, 0 = nie löschen (Festlegung 03.10.2026: Standard 30 Tage, wie im Systemagenten)
+ZIEL_AUFBEWAHRUNG = (0, 14, 30, 60, 90, 180, 365)
+ZIEL_AUFBEWAHRUNG_STANDARD = 30
 BUENDEL_MUSTER = re.compile(r"^epm-sicherung_(\d{4}-\d{2}-\d{2}_\d{4}(?:\d{2})?)\.tar$")
 UPLOAD_TEIL = 4 * 1024 * 1024                    # Bytes je Anfrage beim Hochladen (unter DATA_UPLOAD_MAX_MEMORY_SIZE)
 UPLOAD_MAX = 200 * 1024 ** 3                     # größte Sicherung, die sich hochladen lässt

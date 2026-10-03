@@ -14,6 +14,8 @@ Festlegungen vom 01.10.2026:
 - Festlegungen 02.10.2026 (Fehlerliste): Admins dürfen auch bei echten Akten Dokumente einem anderen Patienten zuordnen
   und Akten abschließen (wie schon endgültig löschen). Neue Rolle „Keine Berechtigung“: keinerlei Rechte, nicht
   einstellbar; Konten ohne Login haben immer diese Rolle.
+- Festlegung 03.10.2026 (U22): Rolle „Mitarbeiter (erweitert)“ zwischen Mitarbeiter und Mediziner – Standard wie
+  Mitarbeiter und zusätzlich Infusionspläne anlegen; alles je Gruppe umstellbar.
 - Festlegung 03.10.2026: „Testdaten sehen“ (Testpatienten und Testbenutzer) je Gruppe einstellbar – ohne das Recht
   erscheinen sie nirgends. Standard: alle Rollen wie bisher; Admin fest (legt nur Testpatienten an und verlöre sonst
   alles, was er schreiben darf). Testbenutzer sehen ihre Testpatienten immer.
@@ -102,6 +104,9 @@ STANDARD = {
     Rolle.MITARBEITER: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
                         "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten", "plaene_abschliessen",
                         "testdaten_sehen"},
+    Rolle.MITARBEITER_PLUS: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
+                                  "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten",
+                                  "plaene_abschliessen", "plaene_anlegen", "testdaten_sehen"},
     Rolle.MEDIZINER: _ALLE - _ADMIN_SPEZIAL,
     Rolle.ADMIN: _ALLE - {c for c, rollen in NUR_ROLLEN.items() if Rolle.ADMIN not in rollen},
 }

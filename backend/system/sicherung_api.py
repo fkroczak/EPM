@@ -104,6 +104,7 @@ class UebersichtView(APIView):
                          and platz.get("frei") is not None else None},
             "aufbewahrung_tage": d.get("aufbewahrung_tage"),
             "aufbewahrung_auswahl": list(sicherung.AUFBEWAHRUNG_TAGE),
+            "ziel_aufbewahrung_auswahl": list(sicherung.ZIEL_AUFBEWAHRUNG),
             # Herunterladen und Hochladen (Fehlerliste 02.10.2026, 5.1 und 5.3)
             "austausch": host.ordner_download().is_dir() and host.ordner_upload().is_dir(),
             "bereitgestellt": sicherung.bereitgestellt(daten),
@@ -238,7 +239,11 @@ def ziel_pruefen(daten, neu: bool):
             return {"ziel_kennwort": "Bitte das Passwort für das Ziel angeben (z. B. ein App-Passwort der Nextcloud)."}, None
     elif not isinstance(kennwort, str) or len(kennwort) > 500 or any(z in "\r\n\0" for z in kennwort):
         return {"ziel_kennwort": "Das Passwort für das Ziel ist ungültig."}, None
-    return None, {"url": url.rstrip("/"), "benutzer": benutzer, "ordner": ordner, **werte, "kennwort": kennwort}
+    tage = daten.get("aufbewahrung_tage", sicherung.ZIEL_AUFBEWAHRUNG_STANDARD)
+    if isinstance(tage, bool) or tage not in sicherung.ZIEL_AUFBEWAHRUNG:
+        return {"aufbewahrung_tage": "Bitte nie, 14, 30, 60, 90, 180 oder 365 Tage wählen."}, None
+    return None, {"url": url.rstrip("/"), "benutzer": benutzer, "ordner": ordner, **werte, "kennwort": kennwort,
+                  "aufbewahrung_tage": tage}
 
 
 class ZielView(APIView):
@@ -256,6 +261,7 @@ class ZielView(APIView):
                                # „benutzer“ hieße in protokolliere() die handelnde Person – daher ziel_benutzer
                                protokoll_details={"url": z["url"], "ziel_benutzer": z["benutzer"], "ordner": z["ordner"],
                                                   "zeitfenster": f"{z['von']}–{z['bis']}",
+                                                  "aufbewahrung_im_ziel": z["aufbewahrung_tage"],
                                                   "zugang_neu": kennwort is not None})
 
 

@@ -38,7 +38,9 @@ type Version = {
   id: number; version: number | null; status: "entwurf" | "aktiv" | "abgeloest"; notiz: string; erstellt_am: string;
   geaendert_am: string; geaendert_von: string | null; veroeffentlicht_am: string | null; veroeffentlicht_von: string | null;
 };
-type Uebersicht = { art: Art; name: string; aktiv: Version; entwurf: Version | null; versionen: Version[] };
+type Uebersicht = { art: Art; name: string; aktiv: Version; entwurf: Version | null; versionen: Version[];
+  /** Vordrucke: Wasserzeichen „ENTWURF“ der Startvorlage, manuell abschaltbar (U17) */
+  entwurfsmodus?: { moeglich: boolean; aktiv: boolean; aus: boolean } };
 type Aufbau = Uebersicht & {
   bausteine: { typ: string; name: string }[];
   felder: { name: string; beschreibung: string; html: boolean }[];
@@ -255,6 +257,17 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
   const [vorschau, setVorschau] = useState(false);
   const [veroeffentlichen, setVeroeffentlichen] = useState(false);
   const [verwerfen, setVerwerfen] = useState(false);
+  const [modusFrage, setModusFrage] = useState(false);
+  // Entwurfsmodus der Vordrucke manuell aus- bzw. wieder einschalten (Festlegung 03.10.2026, U17)
+  const modus = useMutation({
+    mutationFn: (aus: boolean) => api<Uebersicht>(`vorlagen/${art}/entwurfsmodus/`, { body: { aus } }),
+    onSuccess: (u) => {
+      void qc.invalidateQueries({ queryKey: ["vorlagen", art], exact: true });
+      void qc.invalidateQueries({ queryKey: ["vorlagen"] });
+      setModusFrage(false);
+      melden(u.entwurfsmodus?.aus ? "Entwurfsmodus ausgeschaltet: Die PDFs tragen kein Wasserzeichen „ENTWURF“ mehr." : "Entwurfsmodus wieder eingeschaltet.");
+    },
+  });
   const fokus = useRef<{ setze: (feld: string) => void } | null>(null);
 
   useEffect(() => {
@@ -373,10 +386,29 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
           { wert: "datenschutzinformation", text: "Datenschutzinformation" }, { wert: "einwilligung", text: "Einwilligung" },
           { wert: "schweigepflichtentbindung", text: "Schweigepflichtentbindung" }]} className="self-start" />
       {art !== "infusionsplan" && art !== "patientendatenblatt" && !a.aktiv.veroeffentlicht_von ? (
-        <Meldung art="warn"><span data-testid="vorlage-ungeprueft">Diese Vorlage ist der mitgelieferte Entwurf: Stellen in [eckigen Klammern]
-          sind von der Stiftung auszufüllen, der Text ist rechtlich zu prüfen. Bis sie hier bearbeitet und veröffentlicht ist,
-          tragen die PDFs in den Akten das Wasserzeichen „ENTWURF“.</span></Meldung>
+        a.entwurfsmodus?.aus ? (
+          <Meldung><span className="flex items-start justify-between gap-3 flex-wrap" data-testid="entwurfsmodus-aus">
+            <span>Entwurfsmodus ausgeschaltet: Die PDFs dieser mitgelieferten Vorlage tragen kein Wasserzeichen „ENTWURF“ und keinen
+              Hinweisblock mehr. Stellen in [eckigen Klammern] bleiben stehen, bis die Vorlage bearbeitet und veröffentlicht ist.</span>
+            <Knopf klein laedt={modus.isPending} onClick={() => modus.mutate(false)}>Entwurfsmodus wieder einschalten</Knopf></span></Meldung>
+        ) : (
+          <Meldung art="warn"><span className="flex items-start justify-between gap-3 flex-wrap">
+            <span data-testid="vorlage-ungeprueft">Diese Vorlage ist der mitgelieferte Entwurf: Stellen in [eckigen Klammern]
+              sind von der Stiftung auszufüllen, der Text ist rechtlich zu prüfen. Bis sie hier bearbeitet und veröffentlicht ist,
+              tragen die PDFs in den Akten das Wasserzeichen „ENTWURF“.</span>
+            <Knopf klein onClick={() => { modus.reset(); setModusFrage(true); }}>Entwurfsmodus ausschalten</Knopf></span></Meldung>
+        )
       ) : null}
+      <Dialog offen={modusFrage} onOffen={setModusFrage} titel="Entwurfsmodus ausschalten" breite={540}
+        beschreibung="Die PDFs dieses Vordrucks werden ohne Wasserzeichen „ENTWURF“ und ohne den Hinweisblock für die Bearbeiter erzeugt – mit dem Text der mitgelieferten Vorlage."
+        fuss={<><Knopf onClick={() => setModusFrage(false)}>Abbrechen</Knopf>
+          <Knopf variante="dng" laedt={modus.isPending} onClick={() => modus.mutate(true)}>Ausschalten</Knopf></>}>
+        <div className="flex flex-col gap-3">
+          <Meldung art="warn">Der Text ist nicht rechtlich geprüft, und Stellen in [eckigen Klammern] bleiben stehen. Bitte nur ausschalten,
+            wenn die Stiftung den Vordruck so verwenden will. Die Änderung steht im Audit-Log; jederzeit wieder einschaltbar.</Meldung>
+          <Fehleranzeige fehler={modus.error} />
+        </div>
+      </Dialog>
       {fehlerListe.length ? <Meldung art="fehler"><ul className="m-0 pl-4" data-testid="vorlage-fehler">{fehlerListe.map((f) => <li key={f}>{f}</li>)}</ul></Meldung> : null}
 
       <div className="grid grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)_300px] gap-5 items-start">

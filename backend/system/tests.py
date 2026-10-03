@@ -178,6 +178,34 @@ class Uebersicht(Systemverzeichnis):
         self.assertEqual(client_fuer(self.mediziner).get("/api/system/verlauf/?zeitraum=1h").status_code, 403)
 
     @unittest.skipUnless(AGENT.exists(), "rollout/epm-systemagent.py nur im Repo (nicht im Image)")
+    def test_agent_aufbewahrung_im_ziel(self):
+        """Festlegung 03.10.2026: Im Übertragungsziel entfernt der Agent Sicherungen, die älter als die Aufbewahrung
+        sind (Standard 30 Tage) – nur Dateien von EPM-Sicherungen, nach dem Zeitstempel im Namen; die jüngste bleibt
+        immer, alles andere im Ordner wird nicht angefasst; 0 = nie löschen."""
+        import importlib.util
+        from datetime import datetime, timezone as tz
+
+        spec = importlib.util.spec_from_file_location("epm_systemagent", AGENT)
+        agent = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(agent)
+        jetzt = datetime(2026, 10, 3, 12, 0, tzinfo=tz.utc)
+        namen = ["epm-db_2026-08-01_0200.dump.gpg", "epm-dokumente_2026-08-01_0200.tar.gz.gpg", "epm_2026-08-01_0200.sha256",
+                 "epm_2026-08-01_0200.json", "epm-db_2026-09-20_0200.dump.gpg", "epm-db_2026-10-02_020000.dump.gpg",
+                 "notizen.txt", "epm-db_kaputt.dump.gpg", "unterordner/epm-db_2020-01-01_0200.dump.gpg"]
+        self.assertEqual(agent.im_ziel_veraltet(namen, 30, jetzt),
+                         ["epm-db_2026-08-01_0200.dump.gpg", "epm-dokumente_2026-08-01_0200.tar.gz.gpg",
+                          "epm_2026-08-01_0200.json", "epm_2026-08-01_0200.sha256"])
+        self.assertEqual(agent.im_ziel_veraltet(namen, 0, jetzt), [])
+        # die jüngste Sicherung bleibt, auch wenn sie älter als die Aufbewahrung ist
+        self.assertEqual(agent.im_ziel_veraltet(["epm-db_2020-01-01_0200.dump.gpg"], 14, jetzt), [])
+        self.assertEqual(agent.Agent.ziel_aufbewahrung({}), 30)
+        self.assertEqual(agent.Agent.ziel_aufbewahrung({"aufbewahrung_tage": 0}), 0)
+        self.assertEqual(agent.Agent.ziel_aufbewahrung({"aufbewahrung_tage": 31}), 30)
+        fehler, z = agent.Agent.ziel_pruefen({"url": "https://cloud.example.org/dav", "benutzer": "b", "von": "02:00",
+                                               "bis": "05:00", "aufbewahrung_tage": 31})
+        self.assertIn("Aufbewahrung im Ziel", fehler)
+
+    @unittest.skipUnless(AGENT.exists(), "rollout/epm-systemagent.py nur im Repo (nicht im Image)")
     def test_agent_mittelt_den_verlauf_in_stufen(self):
         """Der Agent schreibt zu den Messungen je Minute gröbere Stufen fort: Mittelwert je Abschnitt, Spitzen von CPU
         und Arbeitsspeicher; beim ersten Lauf aus allen vorhandenen Minutenwerten."""

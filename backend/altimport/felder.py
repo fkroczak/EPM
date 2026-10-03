@@ -134,7 +134,7 @@ JE_NAME = {t.name: t for t in TABELLEN}
 
 # Rechte des Altsystems → Rolle (Datenanalyse: benutzerdaten.Rechte)
 RECHTE = {"100": "betrachter", "1000": "mitarbeiter", "10000": "mediziner", "100000": "admin"}
-ROLLEN = ("betrachter", "mitarbeiter", "mediziner", "admin")
+ROLLEN = ("betrachter", "mitarbeiter", "mitarbeiter_plus", "mediziner", "admin")
 
 # Präparat-Freitexte der Infusionen: Feld des Katalogs → (Bezeichnung, Kategorie der Präparate, mehrere mit „|“?)
 PRAEPARATFELDER = {

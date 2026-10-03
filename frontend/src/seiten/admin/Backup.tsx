@@ -38,9 +38,15 @@ type Version = { nr: number; gesetzt_am: string | null; gesetzt_von: string; ent
 type Kurz = { zustand: "ok" | "warnung" | "fehler" | "unbekannt"; letzte_am: string | null; verschluesselt: boolean | null;
   titel: string; hinweise: string[] };
 type Ziel = { eingerichtet: boolean; url?: string; benutzer?: string; ordner?: string; von?: string; bis?: string;
-  hersteller?: string; gesetzt_am?: string | null; gesetzt_von?: string };
+  hersteller?: string; gesetzt_am?: string | null; gesetzt_von?: string;
+  /** Tage, die Sicherungen im Ziel bleiben; 0 = nie löschen (Festlegung 03.10.2026, Standard 30) */
+  aufbewahrung_tage?: number };
+/** Aufbewahrung im Übertragungsziel (wie im Systemagenten) */
+const ZIEL_AUFBEWAHRUNG = [0, 14, 30, 60, 90, 180, 365];
+const zielAufbewahrung = (t: number | undefined) => (t === 0 ? "nie löschen" : `${t ?? 30} Tage`);
 type Uebertragung = { letzter_versuch?: string | null; letzter_erfolg?: string | null; letzter_fehler?: string; laeuft?: boolean;
-  offen?: number; im_zeitfenster?: boolean; naechstes_fenster?: string | null; rclone?: boolean };
+  offen?: number; im_zeitfenster?: boolean; naechstes_fenster?: string | null; rclone?: boolean;
+  im_ziel_entfernt?: { am: string; anzahl: number } | null };
 type Aktion = { name: string; bestaetigung: "keine" | "einfach" | "2fa"; beschreibung: string; sichern?: boolean;
   warnen?: boolean; hinweis?: string };
 type Auftrag = { id: number; kennung: string; ziel: "server" | "epm"; aktion: string; name: string;
@@ -286,13 +292,14 @@ function PruefenDialog({ offen, onZu }: { offen: boolean; onZu: () => void }) {
 // ---------------------------------------------------------------- Übertragungsziel
 function ZielDialog({ offen, ziel, onZu }: { offen: boolean; ziel: Ziel; onZu: () => void }) {
   const melden = useHinweis();
-  const [w, setW] = useState({ url: "", benutzer: "", ziel_kennwort: "", ordner: "EPM-Sicherungen", von: "02:00", bis: "05:00" });
+  const [w, setW] = useState({ url: "", benutzer: "", ziel_kennwort: "", ordner: "EPM-Sicherungen", von: "02:00", bis: "05:00",
+    aufbewahrung_tage: "30" });
   const [kennwort, setKennwort] = useState("");
   const [code, setCode] = useState("");
   useEffect(() => {
     if (offen) {
       setW({ url: ziel.url ?? "", benutzer: ziel.benutzer ?? "", ziel_kennwort: "", ordner: ziel.eingerichtet ? ziel.ordner ?? "" : "EPM-Sicherungen",
-        von: ziel.von ?? "02:00", bis: ziel.bis ?? "05:00" });
+        von: ziel.von ?? "02:00", bis: ziel.bis ?? "05:00", aufbewahrung_tage: String(ziel.eingerichtet ? ziel.aufbewahrung_tage ?? 30 : 30) });
       setKennwort(""); setCode("");
     }
   }, [offen, ziel]);
@@ -300,7 +307,7 @@ function ZielDialog({ offen, ziel, onZu }: { offen: boolean; ziel: Ziel; onZu: (
   useEffect(() => { if (offen) los.reset(); }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
   const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
   const setze = (k: keyof typeof w) => (e: { target: { value: string } }) => setW({ ...w, [k]: e.target.value });
-  const absenden = () => los.mutate({ ...w, kennwort, code });
+  const absenden = () => los.mutate({ ...w, aufbewahrung_tage: Number(w.aufbewahrung_tage), kennwort, code });
   const bestaetigt = useBestaetigt(kennwort, code);
   return (
     <Dialog offen={offen} onOffen={(o) => { if (!o) onZu(); }} breite={640}
@@ -332,8 +339,13 @@ function ZielDialog({ offen, ziel, onZu }: { offen: boolean; ziel: Ziel; onZu: (
             {(p) => <Eingabe {...p} type="time" value={w.bis} onChange={setze("bis")} />}
           </Feld>
         </div>
-        <Meldung art="info">Übertragen werden nur verschlüsselte Sicherungen, und nur im Zeitfenster (von = bis: ganztägig). Im Ziel wird nie
-          etwas gelöscht. Der Server erreicht das Internet nur über den Proxy der OPNsense – die Adresse muss dort freigegeben sein.</Meldung>
+        <Feld label="Aufbewahrung im Ziel" fehler={f.aufbewahrung_tage}
+          hinweis="Nach jeder Übertragung entfernt der Server im Ordner ältere EPM-Sicherungen; die jüngste bleibt immer, andere Dateien werden nie angefasst.">
+          {(p) => <Auswahl {...p} value={w.aufbewahrung_tage} onChange={setze("aufbewahrung_tage")}>
+            {ZIEL_AUFBEWAHRUNG.map((t) => <option key={t} value={t}>{t === 0 ? "nie löschen" : `${t} Tage${t === 30 ? " (Standard)" : ""}`}</option>)}
+          </Auswahl>}
+        </Feld>
+        <Meldung art="info">Übertragen werden nur verschlüsselte Sicherungen, und nur im Zeitfenster (von = bis: ganztägig). Der Server erreicht das Internet nur über den Proxy der OPNsense – die Adresse muss dort freigegeben sein.</Meldung>
         <Bestaetigung kennwort={kennwort} code={code} onKennwort={setKennwort} onCode={setCode} fehler={f} />
         {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
         <button type="submit" hidden />
@@ -498,7 +510,7 @@ function AufbewahrungDialog({ offen, daten, onZu }: { offen: boolean; daten: Dat
           )}
         </Feld>
         {kuerzer ? <Meldung art="warn">Mit der nächsten Sicherung entfernt der Server alle Sicherungen, die älter als {tage} Tage sind.
-          Kopien im Übertragungsziel bleiben – dort wird nie gelöscht.</Meldung>
+          Im Übertragungsziel gilt die dort eingestellte Aufbewahrung ({zielAufbewahrung(daten.ziel.aufbewahrung_tage)}).</Meldung>
           : <Meldung art="info">Mehr Tage brauchen mehr Speicher auf dem Server (aktuell {dateigroesse(daten.speicher.sicherungen ?? 0)} für
             {" "}{daten.sicherungen.length} Sicherungen, {daten.speicher.frei != null ? `${dateigroesse(daten.speicher.frei)} frei` : "freier Platz unbekannt"}).</Meldung>}
         <Bestaetigung kennwort={kennwort} code={code} onKennwort={setKennwort} onCode={setCode} fehler={f} />
@@ -809,7 +821,7 @@ function UebertragungKarte({ daten, offen, onZiel, onEntfernen, onUebertragen }:
   const testen = useAuftrag("backup/ziel/testen/");
   return (
     <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="uebertragung">
-      <KartenKopf titel="Übertragung" unter="Kopie der verschlüsselten Sicherungen in einen WebDAV-Ordner (rclone, nur kopieren, nie löschen)"
+      <KartenKopf titel="Übertragung" unter="Kopie der verschlüsselten Sicherungen in einen WebDAV-Ordner (rclone); ältere entfernt der Server dort nach der Aufbewahrung"
         rechts={z.eingerichtet ? (u.letzter_fehler ? <Chip art="fehler">Fehler</Chip> : u.laeuft ? <Chip art="warn">läuft</Chip> : <Chip art="ok">eingerichtet</Chip>)
           : <Chip art="warn">kein Ziel</Chip>} />
       {z.eingerichtet ? (
@@ -818,6 +830,8 @@ function UebertragungKarte({ daten, offen, onZiel, onEntfernen, onUebertragen }:
           <Wert label="Benutzer · Ordner">{z.benutzer} · {z.ordner ? `/${z.ordner}` : "/"}</Wert>
           <Wert label="Zeitfenster">{z.von === z.bis ? "ganztägig" : `${z.von}–${z.bis} Uhr`}{u.im_zeitfenster ? <span className="gedaempft"> · gerade offen</span>
             : u.naechstes_fenster ? <span className="gedaempft"> · nächstes {relativ(u.naechstes_fenster, true)}</span> : null}</Wert>
+          <Wert label="Aufbewahrung im Ziel"><span data-testid="ziel-aufbewahrung">{zielAufbewahrung(z.aufbewahrung_tage)}</span>
+            {u.im_ziel_entfernt ? <span className="gedaempft"> · zuletzt {u.im_ziel_entfernt.anzahl} ältere entfernt, {relativ(u.im_ziel_entfernt.am, true)}</span> : null}</Wert>
           <Wert label="Zuletzt übertragen">{u.letzter_erfolg ? relativ(u.letzter_erfolg, true) : "noch nie"}
             {u.offen ? <span className="gedaempft"> · {u.offen} Sicherung{u.offen === 1 ? "" : "en"} ausstehend</span> : null}</Wert>
           {u.letzter_fehler ? <Wert label="Letzter Fehler"><span className="text-fehler">{u.letzter_fehler}</span>

@@ -266,6 +266,24 @@ class Erklaerungen(DatenschutzGrundlage):
         stand = c.get(f"/api/patienten/{self.patient.id}/datenschutz/").json()["vorlagen"]
         self.assertEqual(stand["einwilligung"], {"version": 2, "entwurf": False})
         self.assertTrue(stand["datenschutzinformation"]["entwurf"])
+        # Entwurfsmodus manuell ausschalten (Festlegung 03.10.2026, U17): ohne Wasserzeichen, obwohl die Startvorlage
+        # aktiv ist; nur bei den Vordrucken, nur mit „Vorlagen pflegen“, im Audit-Log; wieder einschaltbar
+        modus = "/api/vorlagen/datenschutzinformation/entwurfsmodus/"
+        self.assertEqual(client_fuer(self.betrachter).post(modus, {"aus": True}, format="json").status_code, 403)
+        self.assertEqual(c.post("/api/vorlagen/infusionsplan/entwurfsmodus/", {"aus": True}, format="json").status_code, 400)
+        r = c.post(modus, {"aus": True}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()["entwurfsmodus"], {"moeglich": True, "aktiv": False, "aus": True})
+        r = c.get(url + "?art=datenschutzinformation")
+        self.assertEqual(r["X-EPM-Vorlage-Entwurf"], "0")
+        if PDFTOTEXT:
+            # weder Wasserzeichen noch der Hinweisblock für die Bearbeiter; die Lücken bleiben sichtbar
+            self.assertNotIn("ENTWURF", wasserzeichen(r.content))
+            self.assertIn(kompakt("[eintragen]"), kompakt(pdf_text(r.content)))
+        self.assertFalse(c.get(f"/api/patienten/{self.patient.id}/datenschutz/").json()["vorlagen"]["datenschutzinformation"]["entwurf"])
+        self.assertTrue(SystemEreignis.objects.filter(art=A.VORLAGE, details__aktion="Wasserzeichen „ENTWURF“ ausgeschaltet").exists())
+        self.assertEqual(c.post(modus, {"aus": False}, format="json").json()["entwurfsmodus"]["aktiv"], True)
+        self.assertEqual(c.get(url + "?art=datenschutzinformation")["X-EPM-Vorlage-Entwurf"], "1")
         # eine neu erfasste Erklärung hält den Stand der Vorlage fest
         r = c.post("/api/erklaerungen/", {"patient": self.patient.id, "art": "einwilligung",
                                           "erteilt_am": str(timezone.localdate())}, format="json")

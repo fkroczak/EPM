@@ -1256,7 +1256,7 @@ Recht „Sicherungen verwalten“ (Standard: nur Admin; Testzugänge nie).
   ohne Passwort in `ziel.json`; leeres Passwort beim Ändern = bisheriges bleibt. Der Status-Lauf (jede Minute) startet im
   Zeitfenster die Übertragung im Hintergrund (`epm-uebertragung.service`), nach einem Fehler frühestens 15 Minuten später
   erneut, höchstens bis zum Ende des Fensters. Übertragen werden nur verschlüsselte Sicherungen mit Prüfsummen und Angaben,
-  `rclone copy` (nie löschen) und danach `rclone check`; „Jetzt übertragen“ auch außerhalb des Fensters. Ein neues Ziel
+  `rclone copy` und danach `rclone check`; danach entfernt der Agent im Ziel EPM-Sicherungen, die älter als die Aufbewahrung im Ziel sind (Festlegung 03.10.2026: Standard 30 Tage, einstellbar nie/14–365 Tage, die jüngste bleibt immer, andere Dateien nie; `im_ziel_veraltet`, Backend-Test `test_agent_aufbewahrung_im_ziel`, Browsertest `zzz-sicherung.spec.ts`); „Jetzt übertragen“ auch außerhalb des Fensters. Ein neues Ziel
   bekommt alle vorhandenen verschlüsselten Sicherungen. Der Server erreicht das Ziel über den Proxy der OPNsense
   (`EPM_APT_PROXY`); die Adresse muss dort freigegeben sein.
 - **Validierung / Fehlerfälle:** nur `https://` (`http://` nur für localhost – Test), keine Zugangsdaten in der Adresse,
@@ -1500,6 +1500,11 @@ erklaerungen, stand, pflicht, vorlagen, anfragen, kopien, loeschen}`. Migratione
   mitgelieferten Startvorlagen sind **Entwürfe**: Aufbau nach Art. 13 DSGVO bzw. mit Freiwilligkeit und Widerruf, Lücken
   in [eckigen Klammern], Hinweis zur rechtlichen Prüfung. Solange keine von der Stiftung veröffentlichte Version aktiv
   ist, trägt die PDF das Wasserzeichen „ENTWURF“ und die Oberfläche zeigt „Vorlage noch nicht geprüft“ (U17).
+  **Entwurfsmodus manuell abschaltbar (Festlegung 03.10.2026):** Vorlagen › Dokumentvorlagen › „Entwurfsmodus
+  ausschalten“ (`POST /api/vorlagen/<art>/entwurfsmodus/ {"aus": true|false}`, Recht „Vorlagen pflegen“, Audit-Log,
+  Historie der Einstellungen `vordrucke_ohne_entwurf`, Migration `stammdaten/0010`): Die PDFs der mitgelieferten
+  Vorlage tragen dann kein Wasserzeichen und keinen Hinweisblock für die Bearbeiter; Lücken in [eckigen Klammern]
+  bleiben stehen. Jederzeit wieder einschaltbar; nach dem Veröffentlichen einer eigenen Version ohnehin ohne Wasserzeichen.
 - **Validierung:** Akte lesbar; `art` aus der Liste, sonst 400.
 - **Tabellen:** `vorlagen_dokumentvorlage`
 - **Teststatus:** Backend-Tests grün (`Erklaerungen.test_pdf_aus_der_dokumentvorlage`,
@@ -2072,7 +2077,7 @@ Punkt 6.4 „Testbenutzer-Schalter“ und zusätzlich „Testpatient definieren 
 ### F103 Sicherung herunterladen, Aufbewahrung, hochladen (5.1–5.3)
 - **Aufbewahrung:** `POST /api/backup/aufbewahrung/ {"tage": 7|14|30}` (Passwort und Code) → Auftrag an den
   Systemagenten, Datei `/etc/epm/sicherung/aufbewahrung`; `epm-backup.sh` liest sie (sonst `EPM_BACKUP_TAGE`, sonst 30).
-  Wirkt mit der nächsten Sicherung; im Übertragungsziel wird nie gelöscht.
+  Wirkt mit der nächsten Sicherung; im Übertragungsziel gilt dessen eigene Aufbewahrung (F64, Standard 30 Tage).
 - **Herunterladen:** `POST /api/backup/<stempel>/bereitstellen/` (Passwort und Code) → der Agent legt
   `epm-sicherung_<stempel>.tar` (alle Dateien der Sicherung unverändert, verschlüsselte bleiben verschlüsselt) für 2 Stunden
   in `<EPM_BASE>/system/download` (root:101, 0750); `GET /api/backup/<stempel>/datei/` liefert sie über Nginx
@@ -2164,7 +2169,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U4 | Plan-Hinweis „6 Monate“ in der Liste vs. 12 Monate in den Grenzwerten | F14 | Grenzwert gilt (Text nennt die eingestellten Monate) |
 | U5 | Felder Krankenkasse, Telefon 2, Bemerkung (nicht im Entwurf) | F16 | bleiben gespeichert, nicht angezeigt |
 | U6 | Kontaktart (nicht im Entwurf) | F26 | bleibt gespeichert, nicht angezeigt |
-| U7 | Rolle des Testbenutzers: Mitarbeiter (Entwurf) oder Mediziner (Code) | F57 | Mediziner |
+| U7 | ~~Rolle des Testbenutzers: Mitarbeiter (Entwurf) oder Mediziner (Code)~~ **Geklärt 03.10.2026:** Mitarbeiter; je Konto auf Betrachter, Mitarbeiter (erweitert) oder Mediziner umstellbar (Testbenutzer-Schalter, F100) | F57 | – |
 | U8 | ~~Gerätename im Audit-Log oder nur IP/Browser~~ **Geklärt 01.10.2026:** IP und Browser reichen | F11, F58 | – |
 | U9 | ~~Übertragung zur Nextcloud: Server schiebt oder Gegenseite holt ab~~ **Geklärt 01.10.2026:** Server schiebt in einen WebDAV-Ordner, Werkzeug rclone (Festlegung 01.10.2026) | F64 | – |
 | U10 | ~~Wer pflegt Versorger und Ansprechpartner?~~ **Erledigt 01.10.2026:** Rechte sind je Gruppe einstellbar (F66); Standard Mitarbeiter, Mediziner und Admin | F45, F46 | – |
@@ -2174,14 +2179,14 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U14 | ~~Stabilitätsprüfung Calcium + Magnesium und Vorbelegung des ersten Plans je kg übernehmen?~~ **Geklärt 01.10.2026:** ja, beides wie im Altsystem (Stabilität als Hinweis, Speichern bleibt möglich); Präparate werden beim ersten Plan **nicht** vorausgewählt | F32, F33 | – |
 | U15 | ~~Muss beim endgültigen Löschen auch der Titel aus Historie und Audit-Log verschwinden?~~ **Geklärt 02.10.2026: nach geltender DSGVO.** Titel, Dateiname, Notiz und Datum werden überall entfernt (Art. 17 Abs. 1 d, Art. 5 Abs. 1 c/e); es bleibt der Nachweis ohne Inhalt (Art. 5 Abs. 2, Art. 33 Abs. 5; § 630f BGB); Sicherungen laufen nach 30 Tagen ab (Festlegung 02.10.2026, vorher 14), nach einer Wiederherstellung wird erneut gelöscht | F73 | – |
 | U16 | Rechtsgrundlage der Verarbeitung (Einwilligung nach Art. 9 Abs. 2 a oder Art. 9 Abs. 2 h DSGVO) und Herkunft der 10 Jahre Aufbewahrung – § 630f BGB verpflichtet Behandelnde; die Stiftung „vermittelt“, die Praxis führt eigene Akten. Anfrage an die Stiftung ist formuliert, Antwort offen | F74, F80 | 10 Jahre als einstellbarer Standard; vor Ablauf Löschung nur auf Antrag und nach Entscheidung des Mediziners |
-| U17 | Texte der drei Vordrucke (Zwecke, Empfänger, Rechtsgrundlage, Speicherdauer, Datenschutzbeauftragte/r, Aufsichtsbehörde) | F76 | Entwürfe mit Lücken, Wasserzeichen „ENTWURF“ bis zur Veröffentlichung durch die Stiftung |
-| U18 | Wie lange wird das Audit-Log aufbewahrt? | F83 | 0 = unbegrenzt (wie bisher), einstellbar |
-| U19 | „Abschluss prüfen“ nach wie vielen Monaten ohne Kontakt? Welche Erklärungen sollen vorliegen? | F74, F75 | 24 Monate; alle drei – einstellbar |
+| U17 | Texte der drei Vordrucke (Zwecke, Empfänger, Rechtsgrundlage, Speicherdauer, Datenschutzbeauftragte/r, Aufsichtsbehörde) | F76 | Entwürfe mit Lücken, Wasserzeichen „ENTWURF“ bis zur Veröffentlichung durch die Stiftung – **seit 03.10.2026 je Vordruck manuell abschaltbar** (Vorlagen › Dokumentvorlagen › „Entwurfsmodus ausschalten“, F76) |
+| U18 | ~~Wie lange wird das Audit-Log aufbewahrt?~~ **Geklärt 03.10.2026:** unbegrenzt (Standard 0); in EPM einstellbar (Vorlagen › Grenzwerte › Datenschutz) | F83 | – |
+| U19 | ~~„Abschluss prüfen“ nach wie vielen Monaten ohne Kontakt? Welche Erklärungen sollen vorliegen?~~ **Bestätigt 03.10.2026:** 24 Monate; alle drei – einstellbar | F74, F75 | – |
 | U20 | ~~Verschlüsselung der Sicherungen: Wer erzeugt und verwahrt den privaten Schlüssel?~~ **Geklärt 02.10.2026:** symmetrisch mit einem Passwort, das die Administration in der Oberfläche festlegt; es liegt nur auf dem Server (root) und ausgedruckt im Tresor (Passwortblatt) | F61 | – |
-| U21 | Aufbewahrung der Sicherungen in der Nextcloud und auf der NAS: EPM kopiert nur und löscht im Ziel nie – wie lange liegen sie dort, wer löscht? (30 Tage gelten nur auf dem Server); Geheimhaltungsverpflichtung der Dienstleister (§ 203 StGB) | F61, F64 | organisatorisch, siehe `docs/DATENSCHUTZ.md` (O7) |
-| U22 | Sollen Mitarbeiter Pläne auch anlegen dürfen (bisher nur Mediziner, Festlegung 01.10.2026)? Abschließen nach Freigabe dürfen sie jetzt | F32, F82 | unverändert; unter Benutzer › Rechte umstellbar |
-| U23 | Einschränkung nur bei abgeschlossenen Akten – reicht das? | F79 | ja (in laufender Betreuung wird die Akte gebraucht; erst abschließen) |
-| U24 | Nachweis bei Freigabe per Telefon oder persönlich | F82 | ohne Nachweis möglich (Pflicht nur bei E-Mail und schriftlich) |
+| U21 | ~~Aufbewahrung der Sicherungen in der Nextcloud und auf der NAS~~ **Geklärt 03.10.2026:** auch dort 30 Tage; der Systemagent entfernt nach jeder Übertragung ältere EPM-Sicherungen im Ziel (einstellbar: nie, 14–365 Tage; die jüngste bleibt immer, fremde Dateien werden nie angefasst). Was die NAS aus der Nextcloud spiegelt, folgt deren Einstellung. Geheimhaltungsverpflichtung der Dienstleister (§ 203 StGB) bleibt organisatorisch | F64 | – |
+| U22 | ~~Sollen Mitarbeiter Pläne auch anlegen dürfen?~~ **Geklärt 03.10.2026:** Recht bleibt je Gruppe umstellbar; neue Rolle „Mitarbeiter (erweitert)“ (Standard wie Mitarbeiter + Infusionspläne anlegen) für feinere Verteilung | F32, F66 | – |
+| U23 | ~~Einschränkung nur bei abgeschlossenen Akten – reicht das?~~ **Bestätigt 03.10.2026:** ja | F79 | – |
+| U24 | ~~Nachweis bei Freigabe per Telefon oder persönlich~~ **Bestätigt 03.10.2026:** ohne Nachweis möglich (Pflicht nur bei E-Mail und schriftlich) | F82 | – |
 | U25 | ~~Feiertage im Kalender: welches Bundesland?~~ **Geklärt 02.10.2026:** NRW (Sitz der Stiftung in Altenberge) | F84 | – |
 | U26 | Den Import führt die Administration durch und legt dabei echte Akten an – Ausnahme von U12 („Admins schreiben Patientendaten nur bei Testpatienten“). So gewollt? | F65 | ja, nur über Administration › Import (eigenes Recht, Kennwort + 2FA, Audit-Log) |
 | U27 | Echte (nicht Test-)Akten aus der Testphase sperren den Import; ihre Nummern bleiben nach dem endgültigen Löschen (F80) im Löschprotokoll und sind für die Übernahme gesperrt. Soll das Werkzeug solche Akten entfernen dürfen? | F65 | nein – übernommen wird nur in ein System ohne echte Akten (Festlegung 02.10.2026); auf einem Server, auf dem schon echte Akten angelegt wurden, braucht der Go-live eine frische Datenbank |
@@ -2194,13 +2199,14 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U35 | Hochgeladene Sicherung eines anderen Servers mit fremdem Passwort: Das Passwort wird auf diesem Server (root, 0600) als eigene Nummer hinterlegt, damit sich die Sicherung wiederherstellen lässt | F103 | so umgesetzt; das aktuelle Sicherungs-Passwort dieses Servers bleibt unverändert – **bestätigt 03.10.2026** |
 | U36 | Geänderte Aufbewahrung wirkt erst mit der nächsten Sicherung (dann werden ältere entfernt), nicht sofort | F103 | so umgesetzt; der Dialog sagt es – **bestätigt 03.10.2026** |
 | U37 | „Kein Infusionsplan nötig“: Wer darf bestätigen? Gilt auch eine offene Entwurfsfassung als „kein Plan“? | F105 | Recht „Akten bearbeiten“ (wie „kein Versorger“; unter Benutzer › Rechte umstellbar); ein Entwurf allein zählt nicht als Plan – der Hinweis bleibt bis zur Freigabe – **bestätigt 03.10.2026** |
-| U38 | „Testdaten sehen“ für den Admin abschaltbar? | F106 | nein, fest – Admins legen nur Testpatienten an und schreiben nur dort; ohne das Recht verschwände alles, was sie bearbeiten dürfen |
+| U38 | ~~„Testdaten sehen“ für den Admin abschaltbar?~~ **Bestätigt 03.10.2026:** nein, für den Admin fest | F106 | – |
 | U33 | Vor dem Abschließen: Ein nach Art. 17 endgültig gelöschtes **Dokument** käme nach „Zurücknehmen“ und erneutem Import wieder (neue Nummer, die Löschliste erkennt es nicht). Eine endgültig gelöschte **Akte** kommt nicht wieder: Ihre Nummer steht im Löschprotokoll; der Patient erscheint unter „Auffälligkeiten“ und lässt sich nur „nicht übernehmen“ – eine andere Nummer ist nicht wählbar (O-29, behoben 02.10.2026) | F65, F73, F80 | Dokumente: betrifft nur die Zeit vor dem Abschließen (Testphase); nach dem Abschließen ist der Dump gelöscht |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 03.10.2026 | Klärungen U7, U16–U24, U38 | Entwurfsmodus der Vordrucke manuell abschaltbar (F76, Migration `stammdaten/0010`); Aufbewahrung im Übertragungsziel, Standard 30 Tage, Systemagent räumt nach jeder Übertragung auf (F64, U21); Rolle „Mitarbeiter (erweitert)“ (Migration `accounts/0007`, U22); Testbenutzer der Musterdaten als Mitarbeiter (U7); U18, U19, U23, U24, U38 bestätigt |
 | 02.10.2026 | Fehlerliste (Branch `fehlerliste-2026-10-02`) | Infusionspläne: Datum statt „heute/gestern“, Frist beim Überfahren des Status, kompakte Tabelle, Planansicht als kleine Vorschau mit großer Ansicht per Klick (F85, F31). Akte und System: Karten im Raster mit „⋯“ statt Teiler, je Person (F98); Kurz-Verlauf unter Kontakte entfernt. System: Zeitraum der Auslastung 1 h–6 Monate, Konten mit Links, größere Warnungen (F102). Backup: Herunterladen, Aufbewahrung 7/14/30 Tage, Hochladen und Einlesen (F103). Benutzer: ohne Login setzen/Login geben, Rolle „Keine Berechtigung“, Testbenutzer-Schalter (F100); Testpatient beim Anlegen (F101); Admins schließen Akten ab und ordnen Dokumente zu, auch bei echten Akten (F104); Zwei-Faktor-Anmeldung freiwillig (F99). Migration `accounts/0005`; Systemagent Version 3; neue Ordner `system/download`, `system/upload` (über `sudo epm-update`). U34–U36. Ergänzung: Hinweis „Kein Infusionsplan“ und Bestätigung „Kein Infusionsplan nötig“ je Patient (F105, Migration `patienten/0009`, U37). 03.10.2026: Recht „Testdaten sehen“ und Testbenutzer ausblenden (F106, Migration `accounts/0006`, U38). 03.10.2026: U34 geklärt – Bestätigungen immer mit zweitem Faktor, ohne eingerichteten Faktor abgewiesen; U35–U37 bestätigt |
 | 02.10.2026 | Runde 7 (Startseite und Oberfläche, Pull Request #7: `f24bbb7`, `a6d1903`, `33612fa`) | S01–S17 aus `claude/startseite-erweiterungen.md` nach Entwurf 2, SU8–SU10 geklärt: Kennzahlenleiste, Kacheln im festen Raster mit Größe/Reihenfolge je Person und Ziehen mit Einrasten (F93), Schnellerfassung mit zwei Anfragen (F91), Meine Akten (F92), Kontakt fällig in zwei Stufen 4/6 Monate mit Datenmigration (F90), Admin-Startseite (F94), Hilfe je Rolle mit Ergänzungen (F95), volle Breite in Stufen (F96), Spaltenteiler ⅓/½/⅔ (F97); F09, F13, F14, F17, F48, F84 erweitert. Korrektur „Mit offenem Termin“ (zählte Akten ohne Termin). Kennzahlen ohne Testpatienten. Migrationen `stammdaten/0009`, `patienten/0008`, `accounts/0004`, `hilfe/0001`. Abgeleitete Punkte A1–A19 im Projekt-Dokument markiert. Lauf 37036210226: 236 von 236 Backend-Tests, 82 von 82 Browsertests (vorher Lauf 37033921101: ein Browsertest zog an einer Kachel außerhalb des Fensters – Testfehler, behoben) |
 | 02.10.2026 | Behebung der Gegenprüfung (O-27 bis O-29) | `epm-backup.sh` entfernt bei einem Abbruch alle Dateien des Laufs (vorher blieb nach gescheitertem `tar` der Datenbank-Dump als unvollständige Sicherung liegen und wäre mit übertragen worden). `epm_loeschungen_nachholen` hält sein Ergebnis fest (Stand neben der Löschliste, Audit-Log, Hinweis auf Backup- und Startseite), zählt unlesbare Zeilen der Löschliste und endet mit `--streng` als Fehler; der Systemagent knüpft die Meldung des Wiederherstellens daran. Import: Patient, dessen Nummer im Löschprotokoll steht, erscheint als Auffälligkeit und lässt sich nur ausnehmen |

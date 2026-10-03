@@ -1,6 +1,6 @@
 /** Entwurf 17 · Benutzer: anlegen, ändern, sperren, Einmal-Kennwort, 2FA zurücksetzen; Rechte je Gruppe einstellbar.
  *  Fehlerliste 02.10.2026, Punkt 6: Konten „ohne Login“ setzen und wieder einbinden (Login geben), Rolle „Keine
- *  Berechtigung“, Testbenutzer-Schalter für Betrachter, Mitarbeiter und Mediziner, Zwei-Faktor-Anmeldung freiwillig
+ *  Berechtigung“, Testbenutzer-Schalter für Betrachter, Mitarbeiter (auch erweitert) und Mediziner, Zwei-Faktor-Anmeldung freiwillig
  *  oder Pflicht (Karte „Anmeldung“). */
 import { useEffect, useState } from "react";
 import { PdfDialog } from "@/components/PdfDialog";
@@ -35,7 +35,7 @@ type Formular = { titel: string; first_name: string; last_name: string; kuerzel:
   ist_test: boolean; ohne_login: boolean };
 type Anmeldung = { zweiter_faktor: "freiwillig" | "admins" | "alle"; auswahl: { wert: string; name: string }[]; geaendert_am: string | null;
   ohne_zweiten_faktor: { id: number; anzeigename: string; rolle: string }[] };
-const TESTBENUTZER_ROLLEN = ["betrachter", "mitarbeiter", "mediziner"];
+const TESTBENUTZER_ROLLEN = ["betrachter", "mitarbeiter", "mitarbeiter_plus", "mediziner"];
 const TITEL = ["", "Dr.", "Dr. med.", "Prof. Dr.", "Prof. Dr. med.", "Dipl.-Oec. troph."];
 const LEER: Formular = { titel: "", first_name: "", last_name: "", kuerzel: "", funktion: "", username: "", rolle: "mitarbeiter", ist_test: false,
   ohne_login: false };
@@ -336,7 +336,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
             <input type="checkbox" className="mt-1" checked={f.ist_test && !ohneLogin} disabled={!testMoeglich && !f.ist_test}
               onChange={(e) => setF({ ...f, ist_test: e.target.checked })} />
             <span>Testbenutzer<br /><span className="text-[0.8125rem] gedaempft">Sieht und bearbeitet ausschließlich Testpatienten – für Schulungen und zum
-              Ausprobieren. Möglich für Betrachter, Mitarbeiter und Mediziner{benutzer?.id === ich.id ? "; nicht für das eigene Konto" : ""}.</span>
+              Ausprobieren. Möglich für Betrachter, Mitarbeiter, Mitarbeiter (erweitert) und Mediziner{benutzer?.id === ich.id ? "; nicht für das eigene Konto" : ""}.</span>
               {fehler.ist_test ? <><br /><span className="fehlertext" role="alert">{fehler.ist_test}</span></> : null}</span>
           </label>
         </div>

@@ -199,6 +199,11 @@ test("Backup: Übertragungsziel festlegen, Verbindung testen, von Hand und im Ze
   for (const datei of imZiel) expect(datei).toMatch(/\.gpg$|^epm_.*\.(sha256|json)$/);
   const db = verschluesselt.dateien.find((d) => d.startsWith("epm-db_"))!;
   expect(readFileSync(join(WEBDAV, ORDNER, db)).subarray(0, 5).toString()).not.toBe("PGDMP");
+  // Aufbewahrung im Ziel (Festlegung 03.10.2026): Standard 30 Tage; ältere EPM-Sicherungen entfernt der Server dort nach
+  // der nächsten Übertragung, fremde Dateien im Ordner bleiben
+  await expect(karte.getByTestId("ziel-aufbewahrung")).toHaveText("30 Tage");
+  const alt = ["epm-db_2020-01-01_0200.dump.gpg", "epm_2020-01-01_0200.sha256"];
+  for (const name of [...alt, "notizen.txt"]) execSync(`echo alt | sudo tee ${join(WEBDAV, ORDNER, name)} >/dev/null`);
 
   // im Zeitfenster von selbst: neue Sicherung, Zeitfenster ganztägig (Passwort für das Ziel bleibt)
   const neu = await jetztSichern(page);
@@ -206,6 +211,7 @@ test("Backup: Übertragungsziel festlegen, Verbindung testen, von Hand und im Ze
   await karte.getByRole("button", { name: "Ziel ändern" }).click();
   dialog = page.getByRole("dialog");
   await expect(dialog.getByLabel("WebDAV-Adresse")).toHaveValue("http://127.0.0.1:8099");
+  await expect(dialog.getByLabel("Aufbewahrung im Ziel")).toHaveValue("30");
   await dialog.getByLabel("Zeitfenster von").fill("00:00");
   await dialog.getByLabel("bis", { exact: true }).fill("00:00");
   await dialog.getByLabel("Ihr Passwort").fill(KENNWORT);
@@ -216,6 +222,9 @@ test("Backup: Übertragungsziel festlegen, Verbindung testen, von Hand und im Ze
   await expect.poll(async () => (await stand(page)).sicherungen.find((x) => x.stempel === neu.stempel)?.uebertragen,
     { timeout: 240_000, intervals: [5000] }).toBe(true);
   expect(readdirSync(join(WEBDAV, ORDNER))).toContain(neu.dateien.find((d) => d.startsWith("epm-db_")));
+  await expect.poll(() => readdirSync(join(WEBDAV, ORDNER)).filter((n) => alt.includes(n)), { timeout: 60_000 }).toEqual([]);
+  expect(readdirSync(join(WEBDAV, ORDNER))).toContain("notizen.txt");
+  expect(readdirSync(join(WEBDAV, ORDNER))).toContain(db);
   await page.reload();
   await expect(page.getByTestId(`sicherung-${neu.stempel}`)).toContainText("übertragen");
 
