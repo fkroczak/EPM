@@ -17,7 +17,12 @@ import { Auswahl, Chip, Eingabe, Feld, Fehleranzeige, Karte, KartenKopf, Knopf, 
   from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
+import { Icon } from "@/components/ui/icon";
+import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
+import { Bereich, Bereiche } from "@/components/ui/bereiche";
+import { Link } from "react-router";
 import { useAkte } from "./Akte";
+import { TextKarte } from "./TextKarte";
 
 const KATALOG_ID = "diagnoseliste";
 
@@ -182,5 +187,26 @@ export function DiagnosenKarte() {
       {bearbeiten ? <DiagnoseDialog diagnose={dialog.diagnose} offen={dialog.offen}
         onOffen={(o) => setDialog((d) => ({ ...d, offen: o }))} /> : null}
     </Karte>
+  );
+}
+
+/** Reiter „Diagnosen“ (Aufteilung 07.10.2026, F121): die Liste mit ICD-Code und daneben der lange Freitext (U51). */
+export function Diagnosen() {
+  const { patient } = useAkte();
+  const stufe = useStufe();
+  return (
+    <Bereiche seite="akte_diagnosen" spalten={RASTER_SPALTEN[stufe]} testid="diagnosen-stufe">
+      <Bereich id="diagnosen" titel="Diagnosen (ICD)" standard={{ breite: 2 }}><DiagnosenKarte /></Bereich>
+      <Bereich id="diagnose" titel="Diagnose (Freitext)"><TextKarte feld="diagnose" /></Bereich>
+      <Bereich id="hinweis" titel="Hinweis" menue={false}>
+        <div className="meldung info flex gap-2.5 items-start text-[0.8125rem] leading-normal">
+          <Icon name="info" />
+          <span>Die Liste mit ICD-Code und das Freitextfeld bestehen nebeneinander: In der Liste steht, was abgerechnet
+            und ausgewertet wird, im Freitext die ausführliche Beschreibung. Jede Fassung bleibt im{" "}
+            <Link to={`/patienten/${patient.id}/verlauf`}>Verlauf</Link> erhalten; Therapie und Empfehlung stehen unter{" "}
+            <Link to={`/patienten/${patient.id}/therapie`}>Therapie</Link>.</span>
+        </div>
+      </Bereich>
+    </Bereiche>
   );
 }

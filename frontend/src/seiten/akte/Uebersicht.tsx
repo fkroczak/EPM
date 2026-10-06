@@ -18,6 +18,8 @@ import type { Zeitraum } from "@/components/GewichtsDiagramm";
 import { Richtext, klartext } from "@/components/Editor";
 import { TerminDialog } from "@/components/TerminDialog";
 import { useAkte } from "./Akte";
+import { BefundeKurz } from "./Befunde";
+import { StummKarte } from "@/components/HinweisChips";
 import { AerzteKarte, BezugspersonenKarte } from "./Kontaktpersonen";
 import { KeinPlanHinweis } from "./Plaene";
 import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
@@ -217,9 +219,11 @@ function TherapieKarte() {
   const { patient, bearbeiten } = useAkte();
   return (
     <Karte className="px-[22px] py-[18px] flex flex-col gap-4">
-      <KartenKopf titel="Diagnose und Therapie" rechts={bearbeiten
-        ? <KnopfLink to={`/patienten/${patient.id}/therapie`} klein icon="stift">Öffnen und bearbeiten</KnopfLink>
-        : <KnopfLink to={`/patienten/${patient.id}/therapie`} klein>Öffnen</KnopfLink>} />
+      {/* seit 07.10.2026 (F121) zwei Reiter: Diagnosen und Therapie */}
+      <KartenKopf titel="Diagnose und Therapie" rechts={<>
+        <KnopfLink to={`/patienten/${patient.id}/diagnosen`} klein icon={bearbeiten ? "stift" : undefined}>Diagnosen</KnopfLink>
+        <KnopfLink to={`/patienten/${patient.id}/therapie`} klein icon={bearbeiten ? "stift" : undefined}>Therapie</KnopfLink>
+      </>} />
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-5">
         <div className="flex flex-col gap-1.5 min-w-0"><span className="text-[0.8125rem] font-medium gedaempft">Diagnose</span><Richtext html={patient.diagnose} leer="Noch keine Diagnose eingetragen." /></div>
         <div className="flex flex-col gap-1.5 min-w-0"><span className="text-[0.8125rem] font-medium gedaempft">Therapie</span><Richtext html={patient.therapie} leer="Noch keine Therapie eingetragen." /></div>
@@ -357,12 +361,30 @@ function StammKarte() {
   );
 }
 
+/** Letzter Laborbefund und letzte BIA-Messung mit Weg in die Reiter (Wünsche 06./07.10.2026, F112–F114, F121). */
+function BefundeKarte() {
+  const { patient } = useAkte();
+  return (
+    <Karte className="px-[22px] py-[18px] flex flex-col gap-4" data-testid="karte-befunde">
+      <KartenKopf titel="Labor und BIA" rechts={<>
+        <KnopfLink to={`/patienten/${patient.id}/labor`} klein>Labor</KnopfLink>
+        <KnopfLink to={`/patienten/${patient.id}/bia`} klein>BIA</KnopfLink>
+      </>} />
+      <BefundeKurz patientId={patient.id} />
+    </Karte>
+  );
+}
+
 /** Übersicht im Raster (Fehlerliste 02.10.2026, Punkt 2): Spalten wie auf der Startseite (1/2/3/4/5 je Fensterbreite),
  *  jede Karte mit dem Menü „⋯“ für Breite und Höhe – je Person gespeichert. Der senkrechte Teiler entfällt hier. Ab
  *  2560 px beginnt das Gewichtsdiagramm mit 3 Jahren (S16). */
 export function Uebersicht() {
   const stufe = useStufe();
+  const { patient, bearbeiten } = useAkte();
   return (
+    <div className="flex flex-col gap-4">
+      {/* Weggeklickte Hinweise stehen hier und lassen sich zurückholen (Wunsch 07.10.2026, F119) */}
+      <StummKarte patientId={patient.id} aenderbar={bearbeiten} />
     <Bereiche seite="akte_uebersicht" spalten={RASTER_SPALTEN[stufe]} testid="uebersicht-stufe">
       <Bereich id="gewicht" titel="Gewichtsverlauf" standard={{ breite: 2 }}><GewichtKarte startZeitraum={stufe === "qhd" ? "y3" : "y1"} /></Bereich>
       <Bereich id="termine" titel="Termine"><TermineKarte /></Bereich>
@@ -372,6 +394,8 @@ export function Uebersicht() {
       <Bereich id="stamm" titel="Anschrift und Kontakt"><StammKarte /></Bereich>
       <Bereich id="aerzte" titel="Ärzte"><AerzteKarte /></Bereich>
       <Bereich id="bezug" titel="Bezugspersonen"><BezugspersonenKarte /></Bereich>
+      <Bereich id="befunde" titel="Labor und BIA"><BefundeKarte /></Bereich>
     </Bereiche>
+    </div>
   );
 }

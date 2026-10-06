@@ -364,6 +364,9 @@ export function PruefenKachel({ daten }: { daten: Startdaten }) {
     [`Kontakt überfällig (über ${p.kontakt_ueberfaellig_monate} Monate)`, p.kontakt_ueberfaellig, "kontakt_ueberfaellig"],
     [`Kontakt bald fällig (${p.kontakt_bald_monate}–${p.kontakt_ueberfaellig_monate} Monate)`, p.kontakt_bald, "kontakt_bald"],
     // Datenschutz: Erklärungen nachhalten wie die Nickelallergie; lange ruhende Akten abschließen (erst dann läuft die Frist)
+    // Befunde (F120): fehlt ganz oder ist älter als die eingestellte Grenze
+    [`Laborbefund fehlt oder ist älter als ${p.labor_monate ?? 12} Monate`, p.labor_faellig ?? 0, "labor_faellig"],
+    [`BIA-Messung fehlt oder ist älter als ${p.bia_monate ?? 12} Monate`, p.bia_faellig ?? 0, "bia_faellig"],
     ["Erklärungen zum Datenschutz fehlen", p.erklaerungen_fehlen, "erklaerungen"],
     [`Abschluss prüfen: kein Kontakt seit über ${p.abschluss_monate} Monaten`, p.abschluss_pruefen, "abschluss_pruefen"],
   ];

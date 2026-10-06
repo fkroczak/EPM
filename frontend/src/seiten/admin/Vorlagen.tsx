@@ -268,6 +268,9 @@ const HINWEISE: { k: string; label: string; einheit: string }[] = [
   { k: "gewicht_warnung_prozent", label: "Warnung Gewichtsverlust", einheit: "%" },
   { k: "gewicht_warnung_monate", label: "Zeitraum dafür", einheit: "Monaten" },
   { k: "plan_alter_warnung_monate", label: "Infusionsplan gilt als alt nach", einheit: "Monaten" },
+  // Befunde (Festlegung 07.10.2026, F120)
+  { k: "labor_alter_warnung_monate", label: "Laborbefund gilt als alt nach", einheit: "Monaten" },
+  { k: "bia_alter_warnung_monate", label: "BIA-Messung gilt als alt nach", einheit: "Monaten" },
   // Kontakt fällig in zwei Stufen (S04): erst „bald fällig“, dann „überfällig“
   { k: "kontakt_bald_monate", label: "Kontakt bald fällig nach", einheit: "Monaten" },
   { k: "kontakt_ueberfaellig_monate", label: "Kontakt überfällig nach", einheit: "Monaten" },

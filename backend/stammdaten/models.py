@@ -299,6 +299,9 @@ class Einstellungen(models.Model):
                                                   default=Decimal("5.0"))
     gewicht_warnung_monate = models.PositiveSmallIntegerField("Zeitraum Gewichtsverlust", default=3)
     plan_alter_warnung_monate = models.PositiveSmallIntegerField("Infusionsplan gilt als alt nach", default=12)
+    # Befunde gelten nach einem Jahr als alt (Festlegung 07.10.2026, F120); je Art einstellbar
+    labor_alter_warnung_monate = models.PositiveSmallIntegerField("Laborbefund gilt als alt nach", default=12)
+    bia_alter_warnung_monate = models.PositiveSmallIntegerField("BIA-Messung gilt als alt nach", default=12)
     # Wiedereinbestellung in zwei Stufen (Festlegung 01.10.2026, S04): „bald fällig“ ab 4 Monaten (quartalsweise
     # Kontakte + 1 Monat), „überfällig“ ab 6 Monaten – beide einstellbar, „bald“ muss früher liegen als „überfällig“
     kontakt_bald_monate = models.PositiveSmallIntegerField("Kontakt bald fällig", default=4)
@@ -365,6 +368,9 @@ class Einstellungen(models.Model):
             raise ValidationError({"aufbewahrung_jahre": "Bitte 1 bis 100 Jahre angeben."})
         if self.abschluss_pruefen_monate < 1:
             raise ValidationError({"abschluss_pruefen_monate": "Bitte mindestens 1 Monat angeben."})
+        for feld in ("plan_alter_warnung_monate", "labor_alter_warnung_monate", "bia_alter_warnung_monate"):
+            if getattr(self, feld) < 1:
+                raise ValidationError({feld: "Bitte mindestens 1 Monat angeben."})
         fehler = kontaktstufen_fehler(self.kontakt_bald_monate, self.kontakt_ueberfaellig_monate)
         if fehler:
             raise ValidationError(fehler)

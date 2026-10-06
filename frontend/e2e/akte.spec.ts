@@ -1,4 +1,4 @@
-/** Entwürfe 4, 5, 6 · Patientenakte: Kopf, Übersicht mit Gewicht, Diagnose & Therapie, Kontakte, Abschluss. */
+/** Entwürfe 4, 5, 6 · Patientenakte: Kopf, Übersicht mit Gewicht, Diagnosen, Therapie, Kontakte, Abschluss. */
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { apiAls, eindeutig, merken, stackNeuStarten, zustand } from "./hilfen";
@@ -38,7 +38,9 @@ test("Akte aus der Liste öffnen: Kopf mit Kerndaten und Gewichtswarnung", async
   await expect(zahlen).toContainText(/↓ \d+,\d %/);
   await expect(page.getByTestId("gewichtstrend")).toContainText("Hinweis ab mehr als 5 % in 3 Monaten");
   await expect(page.getByTestId("gewichtsdiagramm")).toBeVisible();
-  for (const r of ["Übersicht", "Diagnose & Therapie", "Kontakte", "Infusionspläne", "Dokumente", "Verlauf"]) {
+  // jeder Bereich ein eigener Reiter (F121)
+  for (const r of ["Übersicht", "Diagnosen", "Therapie", "Kontakte", "Infusionspläne", "Labor", "BIA", "Berichte",
+    "Dokumente", "Verlauf"]) {
     await expect(page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: new RegExp(`^${r}`) })).toBeVisible();
   }
   await expect(page.getByTestId("aktueller-plan")).toContainText("kcal");
@@ -102,7 +104,8 @@ test("Gewicht erfassen, Plausibilität, korrigieren, Zeitraum", async ({ page })
 
 test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => {
   const p = await neuerPatient();
-  await oeffnen(page, p.id, "/therapie");
+  // eigene Reiter seit F121: der Freitext „Diagnose“ unter „Diagnosen“, die Therapie unter „Therapie“
+  await oeffnen(page, p.id, "/diagnosen");
   const diagnose = page.getByTestId("karte-diagnose");
   await diagnose.getByRole("button", { name: "Bearbeiten" }).click();
   const editor = diagnose.getByRole("textbox", { name: "Diagnose" });
@@ -129,6 +132,8 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   await page.keyboard.press("Escape");
 
   // Therapie: Editor ist direkt offen, Formatierung über die Werkzeugleiste
+  await oeffnen(page, p.id, "/therapie");
+  await expect(page.getByTestId("zuletzt-therapie")).toContainText("noch nicht bearbeitet");
   const therapie = page.getByTestId("karte-therapie");
   await therapie.getByRole("textbox", { name: "Therapie" }).click();
   await therapie.getByRole("button", { name: "Aufzählung" }).click();

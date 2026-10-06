@@ -30,14 +30,36 @@ from audit.bereinigung import akte_text
 from stammdaten.models import Arzt
 
 from .datenschutz import DatenschutzAktionen
-from .kennzahlen import (abschluss_pruefen, kennzahlen, kontakt_filter, ohne_pflicht_erklaerungen, ohne_plan, pruefliste,
+from .kennzahlen import (abschluss_pruefen, befund_filter, kennzahlen, kontakt_filter, ohne_pflicht_erklaerungen,
+                         ohne_plan, pruefliste,
                          schnellfilter, zaehler)
 from .loeschung import PLATZHALTER, schwaerze_dokument, trage_ein
 from .models import (Bezugsperson, Datenschutzanfrage, Diagnose, Dokument, DokumentVorgang, Erklaerung,
-                     Gewichtsmessung, Kontakt, Patient, PatientArzt, Termin, dokument_pfad)
+                     Gewichtsmessung, Hinweisruhe, Kontakt, Patient, PatientArzt, Termin, dokument_pfad,
+                     plus_monate)
 
 
 # ================================================================= Patient
+class HinweisruheSerializer(serializers.ModelSerializer):
+    """Ein weggeklickter Hinweis (F119)."""
+
+    art_name = serializers.CharField(source="get_art_display", read_only=True)
+    laeuft = serializers.BooleanField(read_only=True)
+    gesetzt_von_name = serializers.SerializerMethodField()
+    aufgehoben_von_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Hinweisruhe
+        fields = ["id", "art", "art_name", "bis", "grund", "laeuft", "gesetzt_am", "gesetzt_von_name",
+                  "aufgehoben_am", "aufgehoben_von_name"]
+
+    def get_gesetzt_von_name(self, obj):
+        return benutzername(obj.gesetzt_von)
+
+    def get_aufgehoben_von_name(self, obj):
+        return benutzername(obj.aufgehoben_von)
+
+
 class PatientListSerializer(serializers.ModelSerializer):
     versorger_name = serializers.CharField(source="versorger.name", read_only=True, default=None)
     ansprechpartner_name = serializers.CharField(source="ansprechpartner.name", read_only=True, default=None)
@@ -169,6 +191,11 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                 "bezugspersonen": obj.bezugspersonen.filter(aktiv=True).count(),
                 "aerzte": obj.aerzte.filter(aktiv=True).count(),
                 "erklaerungen": obj.erklaerungen.count(),
+                # eigene Reiter seit 07.10.2026 (F121): Zähler für Diagnosen, Labor, BIA und Berichte
+                "diagnosen": obj.diagnosen.filter(aktiv=True).count(),
+                "laborbefunde": obj.laborbefunde.count(),
+                "bia_messungen": obj.bia_messungen.count(),
+                "berichte": obj.berichte.count(),
             },
         }
 
@@ -281,7 +308,9 @@ class PatientFilter(filters.FilterSet):
                  ("kontakt_bald", "Kontakt bald fällig"), ("kontakt_ueberfaellig", "Kontakt überfällig"),
                  ("wiedereinbestellung", "Wiedereinbestellung fällig (Kontakt fällig, kein Termin geplant)"),
                  ("erklaerungen", "Erklärungen zum Datenschutz fehlen"),
-                 ("abschluss_pruefen", "Abschluss prüfen (lange kein Kontakt)")],
+                 ("abschluss_pruefen", "Abschluss prüfen (lange kein Kontakt)"),
+                 ("labor_faellig", "Laborbefund fehlt oder ist zu alt"),
+                 ("bia_faellig", "BIA-Messung fehlt oder ist zu alt")],
         method="filter_pruefen",
     )
 
@@ -307,6 +336,8 @@ class PatientFilter(filters.FilterSet):
             return qs.filter(id__in=ohne_pflicht_erklaerungen(qs.order_by()))
         if wert == "abschluss_pruefen":
             return qs.filter(id__in=abschluss_pruefen(Patient.objects.all()).values("id"))
+        if wert in ("labor_faellig", "bia_faellig"):
+            return befund_filter(qs, wert)  # F120: Befund fehlt oder ist älter als die eingestellte Grenze
         return qs
 
     def filter_status(self, qs, name, wert):
@@ -492,6 +523,58 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
         patient.refresh_from_db()
         return Response(PatientSerializer(patient, context=self.get_serializer_context()).data)
 
+    @action(detail=True, methods=["get", "post"], url_path="hinweis-ruhe")
+    def hinweis_ruhe(self, request, pk=None):
+        """Einen Hinweis der Akte wegklicken oder wieder einschalten (Wunsch 07.10.2026, F119).
+
+        ``GET`` liefert die laufenden und die früheren Stummschaltungen.
+        ``POST {"art": "labor", "monate": 3, "grund": "…"}`` schaltet den Hinweis für 3 Monate stumm;
+        ``{"art": "labor", "dauerhaft": true, "grund": "…"}`` heißt „nicht mehr nötig“ – der Hinweis bleibt weg,
+        bis jemand ihn zurückholt. ``{"art": "labor", "aufheben": true}`` holt ihn zurück.
+
+        Recht „Akten bearbeiten“; Admins nur bei Testpatienten. Steht im Verlauf der Akte."""
+        patient = self.get_object()
+        if request.method == "GET":
+            return Response(HinweisruheSerializer(
+                patient.hinweisruhe.select_related("gesetzt_von", "aufgehoben_von"), many=True).data)
+        pruefe_schreibbereich(request.user, patient)
+        patient.pruefe_bearbeitbar()
+        art = str(request.data.get("art") or "")
+        if art not in Hinweisruhe.Art.values:
+            return Response({"art": "Unbekannter Hinweis."}, status=status.HTTP_400_BAD_REQUEST)
+        laufend = patient.hinweisruhe.filter(art=art, aufgehoben_am__isnull=True).first()
+        if wahr(request.data.get("aufheben")):
+            if laufend is None:
+                return Response({"fehler": "Dieser Hinweis ist nicht stummgeschaltet."},
+                                status=status.HTTP_400_BAD_REQUEST)
+            laufend._history_user = request.user
+            laufend.aufheben(request.user)
+            return Response(HinweisruheSerializer(laufend).data)
+        grund = str(request.data.get("grund") or "").strip()
+        if len(grund) > 300:
+            return Response({"grund": "Höchstens 300 Zeichen."}, status=status.HTTP_400_BAD_REQUEST)
+        dauerhaft = wahr(request.data.get("dauerhaft"))
+        bis = None
+        if not dauerhaft:
+            try:
+                monate = int(request.data.get("monate"))
+            except (TypeError, ValueError):
+                monate = 0
+            if monate not in Hinweisruhe.FRISTEN:
+                return Response({"monate": f"Bitte eine Frist wählen: "
+                                           f"{', '.join(str(m) for m in Hinweisruhe.FRISTEN)} Monate – "
+                                           f"oder „nicht mehr nötig“."}, status=status.HTTP_400_BAD_REQUEST)
+            bis = plus_monate(timezone.localdate(), monate)
+        if laufend is not None:
+            # schon stumm: die bisherige Stummschaltung endet, die neue tritt an ihre Stelle (beides im Verlauf)
+            laufend._history_user = request.user
+            laufend.aufheben(request.user)
+        ruhe = Hinweisruhe(patient=patient, art=art, bis=bis, grund=grund, gesetzt_von=request.user)
+        ruhe.full_clean(exclude=["gesetzt_von"])
+        ruhe._history_user = request.user
+        ruhe.save()
+        return Response(HinweisruheSerializer(ruhe).data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=["post"], url_path="wieder-oeffnen", permission_classes=[WiederOeffnenRecht])
     def wieder_oeffnen(self, request, pk=None):
         patient = self.get_object()
@@ -606,6 +689,8 @@ def _aktion(name, h, aenderungen):
         return "wieder aktuell" if h.aktiv else "nicht mehr aktuell"
     if name == "aerzte" and "aktiv" in felder:
         return "wieder zuständig" if h.aktiv else "nicht mehr zuständig"
+    if name == "hinweisruhe" and "aufgehoben_am" in felder:
+        return "wieder eingeschaltet"
     if name == "diagnosen" and "aktiv" in felder:
         return "wieder zutreffend" if h.aktiv else "nicht mehr zutreffend"
     if name == "berichte" and "status" in felder:
@@ -698,6 +783,9 @@ def _beschreibung(name, h, aktion) -> str:
             if h.notiz:
                 teile.append(h.notiz)
             return " · ".join(teile)
+        if name == "hinweisruhe":
+            wann = f"bis {h.bis:%d.%m.%Y}" if h.bis else "bis auf Weiteres (nicht mehr nötig)"
+            return " · ".join(filter(None, [dict(Hinweisruhe.Art.choices).get(h.art, h.art), wann, h.grund]))
         if name == "laborbefunde":
             teile = [f"Abnahme {h.abgenommen_am:%d.%m.%Y}"]
             if h.labor:
@@ -756,6 +844,7 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         "datenschutz": Datenschutzanfrage.history.filter(patient_id=patient.id),
         # Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
         "diagnosen": Diagnose.history.filter(patient_id=patient.id),
+        "hinweisruhe": Hinweisruhe.history.filter(patient_id=patient.id),
         "laborbefunde": Laborbefund.history.filter(patient_id=patient.id),
         "bia_messungen": BiaMessung.history.filter(patient_id=patient.id),
         "berichte": Bericht.history.filter(patient_id=patient.id),

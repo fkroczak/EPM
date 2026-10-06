@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from stammdaten.models import Einstellungen
 
-from .models import Gewichtsmessung, Kontakt, Patient, Termin, berechne_trend
+from .models import Gewichtsmessung, Kontakt, Patient, Termin, berechne_trend, ruhende_hinweise
 
 TREND_SPANNE = Decimal("1.0")  # unter ±1 % gilt das Gewicht als gleichbleibend (Pfeil →)
 
@@ -104,7 +104,18 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
         Termin.objects.filter(patient_id__in=ids, erledigt_am__isnull=True, faellig_am__range=(montag, sonntag))
         .values_list("patient_id", flat=True)
     )
+    # Befunde (F120): jüngster Laborbefund und jüngste BIA-Messung je Akte
+    from befunde.models import BiaMessung, Laborbefund
+
+    labore = dict(Laborbefund.objects.filter(patient_id__in=ids).values("patient_id")
+                  .annotate(z=Max("abgenommen_am")).values_list("patient_id", "z"))
+    bias = dict(BiaMessung.objects.filter(patient_id__in=ids).values("patient_id")
+                .annotate(z=Max("gemessen_am")).values_list("patient_id", "z"))
     plan_grenze = heute - timedelta(days=30 * e.plan_alter_warnung_monate)
+    labor_grenze = heute - timedelta(days=30 * e.labor_alter_warnung_monate)
+    bia_grenze = heute - timedelta(days=30 * e.bia_alter_warnung_monate)
+    # stummgeschaltete Hinweise (F119): „×“ an der Meldung, mit Frist oder dauerhaft
+    stumm = ruhende_hinweise(ids)
     # „Kein Infusionsplan nötig“ bestätigt bzw. Akte in Betreuung (nur dort fehlt ein Plan)
     kein_plan, in_betreuung = set(), set()
     for pid, ohne, abgeschlossen in Patient.objects.filter(id__in=ids).values_list("id", "kein_plan", "abgeschlossen_am"):
@@ -151,6 +162,20 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
         stufe = kontaktstufe(letzter, grenzen)
         if stufe:
             hinweise.append({"art": "kontakt", "stufe": stufe, "text": kontakt_text(stufe, letzter, e)})
+        # Befunde zu alt bzw. nie erfasst – nur bei Akten in Betreuung (F120)
+        if p.id in in_betreuung:
+            if p.id not in labore:
+                hinweise.append({"art": "labor", "text": "Kein Laborbefund"})
+            elif labore[p.id] < labor_grenze:
+                hinweise.append({"art": "labor", "text": f"Labor älter als {e.labor_alter_warnung_monate} Mon."})
+            if p.id not in bias:
+                hinweise.append({"art": "bia", "text": "Keine BIA-Messung"})
+            elif bias[p.id] < bia_grenze:
+                hinweise.append({"art": "bia", "text": f"BIA älter als {e.bia_alter_warnung_monate} Mon."})
+        # weggeklickte Hinweise erscheinen nicht; sie stehen in der Akte unter „Stummgeschaltet“ (F119)
+        ruht = stumm.get(p.id, set())
+        unterdrueckt = [h["art"] for h in hinweise if h["art"] in ruht]
+        hinweise = [h for h in hinweise if h["art"] not in ruht]
         ergebnis[p.id] = {
             "gewicht": {"kg": reihe[-1][1], "am": reihe[-1][0]} if reihe else None,
             "trend": {"richtung": richtung, "prozent": trend["prozent"], "warnung": trend["warnung"]} if trend else None,
@@ -158,6 +183,9 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
             "kontakt_stufe": stufe,
             "termin_woche": p.id in mit_termin,
             "hinweise": hinweise,
+            "hinweise_stumm": unterdrueckt,
+            "labor": {"am": labore.get(p.id), "alt": p.id in labore and labore[p.id] < labor_grenze},
+            "bia": {"am": bias.get(p.id), "alt": p.id in bias and bias[p.id] < bia_grenze},
         }
         if liste:
             gueltig_ab = plaene.get(p.id)
@@ -235,6 +263,33 @@ def ohne_plan(patienten_qs):
     return patienten_qs.filter(abgeschlossen_am__isnull=True, kein_plan=False).exclude(id__in=mit_plan)
 
 
+def befund_filter(patienten_qs, art: str):
+    """Patientenliste ``?pruefen=labor_faellig`` bzw. ``bia_faellig`` (F120): Akten in Betreuung, deren jüngster
+    Befund älter ist als die eingestellte Grenze – oder die noch keinen haben. Weggeklickte Hinweise (F119) bleiben
+    außen vor, damit Liste und Kachel dasselbe zeigen."""
+    from befunde.models import BiaMessung, Laborbefund
+
+    e = Einstellungen.aktuell()
+    heute = timezone.localdate()
+    if art == "labor_faellig":
+        grenze = heute - timedelta(days=30 * e.labor_alter_warnung_monate)
+        jung = Laborbefund.objects.filter(abgenommen_am__gte=grenze).values("patient_id")
+        ruhe = "labor"
+    else:
+        grenze = heute - timedelta(days=30 * e.bia_alter_warnung_monate)
+        jung = BiaMessung.objects.filter(gemessen_am__gte=grenze).values("patient_id")
+        ruhe = "bia"
+    qs = patienten_qs.filter(abgeschlossen_am__isnull=True).exclude(id__in=jung)
+    stumm = [pid for pid, arten in ruhende_hinweise(_nur_ids(qs)).items() if ruhe in arten]
+    return qs.exclude(id__in=stumm)
+
+
+def _mit_hinweis(patienten_qs, art: str) -> int:
+    """Wie viele Akten diesen Hinweis gerade zeigen (stummgeschaltete sind schon heraus)."""
+    return sum(1 for k in kennzahlen(_nur_ids(patienten_qs)).values()
+               if any(h["art"] == art for h in k["hinweise"]))
+
+
 def pruefliste(patienten_qs) -> dict:
     """„Nach und nach prüfen“ auf der Startseite (Entwurf 2)."""
     from .models import Datenschutzanfrage, Dokument
@@ -259,6 +314,11 @@ def pruefliste(patienten_qs) -> dict:
         "kontakt_bald_monate": e.kontakt_bald_monate,
         "kontakt_ueberfaellig_monate": e.kontakt_ueberfaellig_monate,
         # Datenschutz: Erklärungen nachhalten wie die Nickelallergie; lange ruhende Akten abschließen
+        # Befunde zu alt oder nie erfasst (F120); stummgeschaltete zählen nicht mit (F119)
+        "labor_faellig": _mit_hinweis(offen, "labor"),
+        "bia_faellig": _mit_hinweis(offen, "bia"),
+        "labor_monate": e.labor_alter_warnung_monate,
+        "bia_monate": e.bia_alter_warnung_monate,
         "erklaerungen_fehlen": len(ohne_pflicht_erklaerungen(offen)),
         "abschluss_pruefen": abschluss_pruefen(offen).count(),
         "abschluss_monate": e.abschluss_pruefen_monate,

@@ -1,6 +1,9 @@
 /**
  * Wünsche aus der Praxis vom 06.10.2026 über die Oberfläche: Diagnosen mit ICD (F117), Versichertendaten (F118),
  * Laborbefund und BIA (F112–F114), Bericht mit Freigabe (F115), Sprechstundenblatt (F116).
+ *
+ * Dazu die Wünsche vom 07.10.2026: Hinweise mit „×“ wegklicken (F119), Grenzen „gilt als alt“ (F120) und ein eigener
+ * Reiter je Bereich (F121).
  */
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
@@ -25,7 +28,7 @@ async function oeffnen(page: Page, id: number, reiter = "") {
 
 test("Diagnose mit ICD-Code eintragen; die Liste im Hintergrund wächst mit", async ({ page }) => {
   const p = await neuerPatient();
-  await oeffnen(page, p.id, "/therapie");
+  await oeffnen(page, p.id, "/diagnosen");
   const karte = page.getByTestId("karte-diagnosen");
   await karte.getByRole("button", { name: "Diagnose" }).click();
   const dialog = page.getByRole("dialog");
@@ -61,7 +64,7 @@ test("Versichertendaten in den Stammdaten", async ({ page }) => {
 
 test("Laborbefund über die Maske erfassen – nur Werte eintragen", async ({ page }) => {
   const p = await neuerPatient();
-  await oeffnen(page, p.id, "/befunde");
+  await oeffnen(page, p.id, "/labor");
   await page.getByRole("button", { name: "Neuer Laborbefund" }).click();
   await page.getByRole("dialog").getByLabel("Labor").fill("Labor Dr. Wagner");
   const maske = page.getByTestId("labor-maske");
@@ -84,7 +87,7 @@ test("Laborbefund über die Maske erfassen – nur Werte eintragen", async ({ pa
 
 test("BIA-Messung mit Beurteilung; das Gewicht wandert in den Verlauf", async ({ page }) => {
   const p = await neuerPatient();
-  await oeffnen(page, p.id, "/befunde");
+  await oeffnen(page, p.id, "/bia");
   await page.getByRole("button", { name: "Neue Messung" }).click();
   await page.getByLabel("Gewicht (kg)").fill("61,2");
   await page.getByLabel("BCM (kg)").fill("24,1");
@@ -155,4 +158,79 @@ test("Unterlagen für die Sprechstunde als PDF", async ({ page }) => {
   await expect(page.getByRole("dialog")).toContainText("Unterlagen für die Sprechstunde");
   await expect(page.getByTestId("pdf-dialog")).toBeVisible();
   await expect(page.getByTestId("pdf-text").first()).toContainText("Kurzdarmsyndrom");
+});
+
+test("Hinweise mit „×“ wegklicken und wieder einschalten", async ({ page }) => {
+  const p = await neuerPatient();
+  // Ohne Laborbefund und ohne BIA-Messung steht beides als Hinweis an der Akte (F120)
+  await page.goto(`/patienten?suche=${encodeURIComponent(p.name.split(",")[0])}`);
+  const zeile = page.getByTestId("patientenliste").getByRole("row").filter({ hasText: p.name });
+  await expect(zeile).toContainText("Kein Laborbefund");
+
+  await zeile.getByRole("button", { name: /Hinweis „Kein Laborbefund“ ausblenden/ }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("group", { name: "Ruhe" }).getByRole("button", { name: "6 Monate" }).click();
+  await dialog.getByLabel("Grund").fill("Labor ist beim Hausarzt angefordert");
+  await dialog.getByRole("button", { name: "Ausblenden" }).click();
+  await expect(page.getByText("Hinweis für 6 Monate ausgeblendet.")).toBeVisible();
+  await expect(zeile).not.toContainText("Kein Laborbefund");
+  await expect(zeile).toContainText("Keine BIA-Messung"); // andere Hinweise bleiben
+
+  // In der Akte steht, was ausgeblendet ist – und lässt sich zurückholen
+  await oeffnen(page, p.id);
+  const karte = page.getByTestId("stumme-hinweise");
+  await expect(karte).toContainText("Laborbefund älter als");
+  await expect(karte).toContainText("Labor ist beim Hausarzt angefordert");
+  await karte.getByRole("button", { name: "Wieder einschalten" }).click();
+  await expect(page.getByText("Hinweis wieder eingeschaltet.")).toBeVisible();
+  await expect(page.getByTestId("stumme-hinweise")).toHaveCount(0);
+
+  // und steht im Verlauf der Akte
+  await oeffnen(page, p.id, "/verlauf");
+  await page.getByRole("group", { name: "Bereich" }).getByRole("button", { name: "Hinweise ausgeblendet" }).click();
+  await expect(page.getByTestId("verlauf")).toContainText("Labor ist beim Hausarzt angefordert");
+});
+
+test("Jeder Bereich ein eigener Reiter; die alte Adresse leitet weiter", async ({ page }) => {
+  const p = await neuerPatient();
+  const reiter = page.getByRole("navigation", { name: "Aktenbereiche" });
+  await oeffnen(page, p.id);
+  // Diagnosen und Therapie getrennt (F121)
+  await reiter.getByRole("link", { name: /^Diagnosen/ }).click();
+  await expect(page.getByTestId("karte-diagnosen")).toBeVisible();
+  await expect(page.getByTestId("karte-diagnose")).toBeVisible();
+  await expect(page.getByTestId("karte-therapie")).toHaveCount(0);
+  await reiter.getByRole("link", { name: /^Therapie/ }).click();
+  await expect(page.getByTestId("karte-therapie")).toBeVisible();
+  await expect(page.getByTestId("zuletzt-therapie")).toBeVisible();
+  await expect(page.getByTestId("karte-diagnosen")).toHaveCount(0);
+  // Labor und BIA getrennt
+  await reiter.getByRole("link", { name: /^Labor/ }).click();
+  await expect(page.getByRole("button", { name: "Neuer Laborbefund" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Neue Messung" })).toHaveCount(0);
+  await reiter.getByRole("link", { name: /^BIA/ }).click();
+  await expect(page.getByRole("button", { name: "Neue Messung" })).toBeVisible();
+  // der alte Weg „Labor & BIA“ landet beim Labor
+  await page.goto(`/patienten/${p.id}/befunde`);
+  await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}/labor$`));
+});
+
+test("Grenze „gilt als alt“ unter Vorlagen › Grenzwerte", async ({ browser, page }) => {
+  const api = await apiAls("admin");
+  await api.patch("einstellungen/", { labor_alter_warnung_monate: 6, bia_alter_warnung_monate: 9 });
+  await api.ende();
+  const ctx = await browser.newContext({ storageState: zustand("admin"), ignoreHTTPSErrors: true });
+  const adm = await ctx.newPage();
+  await adm.goto("/admin/vorlagen");
+  await adm.getByRole("group", { name: "Bereich" }).getByRole("button", { name: "Grenzwerte" }).click();
+  await expect(adm.getByLabel("Laborbefund gilt als alt nach")).toHaveValue("6");
+  await expect(adm.getByLabel("BIA-Messung gilt als alt nach")).toHaveValue("9");
+  await ctx.close();
+  // die Startseite nennt die eingestellte Grenze und zählt die Akten
+  await page.goto("/");
+  await expect(page.getByText(/Laborbefund fehlt oder ist älter als 6 Monate/)).toBeVisible();
+  await expect(page.getByTestId("pruefen-labor_faellig")).toBeVisible();
+  const zurueck = await apiAls("admin");
+  await zurueck.patch("einstellungen/", { labor_alter_warnung_monate: 12, bia_alter_warnung_monate: 12 });
+  await zurueck.ende();
 });

@@ -390,8 +390,10 @@ TEILER_MIN_SPALTE = 0.15  # keine Spalte schmaler als 15 % (sonst wäre sie nich
 # Person. Breite in Spalten des Rasters (1–5, begrenzt auf die Spalten des Fensters), Höhe in Rasterzeilen
 # (0 = automatisch nach Inhalt, sonst 1–4 feste Zeilen, der Inhalt scrollt dann in der Karte).
 BEREICH_SEITEN = {
-    "akte_uebersicht": ("gewicht", "therapie", "termine", "plan", "kontakte", "stamm", "aerzte", "bezug"),
-    "akte_therapie": ("diagnose", "empfehlung", "therapie", "hinweis"),
+    "akte_uebersicht": ("gewicht", "therapie", "termine", "plan", "kontakte", "stamm", "aerzte", "bezug", "befunde"),
+    # eigene Reiter seit 07.10.2026 (F121): Diagnosen und Therapie getrennt
+    "akte_diagnosen": ("diagnosen", "diagnose", "hinweis"),
+    "akte_therapie": ("therapie", "empfehlung", "bemerkung", "hinweis"),
     "akte_kontakte": ("kontakte", "hinweis", "erreichbarkeit", "termine"),
     "system": ("verlauf", "taetigkeiten", "auftraege", "server", "epm", "hinweis", "angemeldet"),
 }

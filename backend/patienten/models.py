@@ -823,6 +823,87 @@ class Loeschprotokoll(models.Model):
         return f"Akte Nr. {self.nummer} gelöscht am {self.geloescht_am:%d.%m.%Y}"
 
 
+class Hinweisruhe(models.Model):
+    """Ein Hinweis einer Akte ist stummgeschaltet (Wunsch 07.10.2026, F119).
+
+    Jeder Hinweis der Patientenliste und des Aktenkopfs lässt sich mit „×“ wegklicken. Dabei wird entschieden,
+    wie lange Ruhe sein soll: eine Frist in Monaten – danach erscheint der Hinweis von allein wieder – oder
+    „nicht mehr nötig“ (``bis`` leer), dann bleibt er weg, bis jemand das zurücknimmt.
+
+    Gelöscht wird nichts: Das Aufheben trägt ``aufgehoben_am`` ein, jede Fassung steht im Verlauf der Akte.
+    Die Bestätigung „Kein Infusionsplan nötig“ (F105) bleibt davon unberührt – sie wirkt weiter wie bisher."""
+
+    class Art(models.TextChoices):
+        GEWICHT = "gewicht", "Gewichtsverlust"
+        PLAN = "plan", "Infusionsplan älter als …"
+        OHNE_PLAN = "ohne_plan", "Kein Infusionsplan"
+        VERSORGER = "versorger", "Versorger nicht erfasst"
+        KONTAKT = "kontakt", "Kontakt fällig"
+        LABOR = "labor", "Laborbefund älter als …"
+        BIA = "bia", "BIA-Messung älter als …"
+
+    FRISTEN = (3, 6, 12)
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="hinweisruhe")
+    art = models.CharField(max_length=20, choices=Art.choices)
+    bis = models.DateField("Ruhe bis", null=True, blank=True, help_text="leer = nicht mehr nötig, bis aufgehoben")
+    grund = models.CharField(max_length=300, blank=True)
+    gesetzt_am = models.DateTimeField(auto_now_add=True)
+    gesetzt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+    aufgehoben_am = models.DateTimeField(null=True, blank=True)
+    aufgehoben_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                       related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Stummgeschalteter Hinweis"
+        verbose_name_plural = "Stummgeschaltete Hinweise"
+        ordering = ["-gesetzt_am", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["patient", "art"], condition=models.Q(aufgehoben_am__isnull=True),
+                                    name="hinweisruhe_je_art_einmal"),
+        ]
+        indexes = [models.Index(fields=["patient", "art"], name="hinweisruhe_patient_art")]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Stummgeschaltete Hinweise werden nicht gelöscht, sondern aufgehoben.")
+
+    @property
+    def laeuft(self) -> bool:
+        """Wirkt die Stummschaltung heute noch?"""
+        if self.aufgehoben_am is not None:
+            return False
+        return self.bis is None or self.bis >= timezone.localdate()
+
+    def aufheben(self, benutzer):
+        if self.aufgehoben_am is not None:
+            raise ValidationError("Der Hinweis ist bereits wieder eingeschaltet.")
+        self.aufgehoben_am = timezone.now()
+        self.aufgehoben_von = benutzer
+        self.save(update_fields=["aufgehoben_am", "aufgehoben_von"])
+
+    def clean(self):
+        if self.bis is not None and self.bis < timezone.localdate():
+            raise ValidationError({"bis": "Das Datum liegt in der Vergangenheit."})
+
+    def __str__(self):
+        wann = f"bis {self.bis:%d.%m.%Y}" if self.bis else "bis auf Weiteres"
+        return f"{self.get_art_display()} stumm {wann}"
+
+
+def ruhende_hinweise(patient_ids) -> dict:
+    """{patient_id: {art}} – welche Hinweise heute stummgeschaltet sind (F119)."""
+    heute = timezone.localdate()
+    ergebnis: dict = {}
+    for pid, art in (Hinweisruhe.objects
+                     .filter(patient_id__in=list(patient_ids), aufgehoben_am__isnull=True)
+                     .filter(models.Q(bis__isnull=True) | models.Q(bis__gte=heute))
+                     .values_list("patient_id", "art")):
+        ergebnis.setdefault(pid, set()).add(art)
+    return ergebnis
+
+
 class Merkeintrag(models.Model):
     """„Meine Akten“ (S05) je Person: Merkliste (Stern im Aktenkopf) und zuletzt geöffnete Akten. Nur der Verweis auf
     die Akte, keine Inhalte; sichtbar nur für die Person selbst. Fällt mit der Akte weg (endgültiges Löschen,

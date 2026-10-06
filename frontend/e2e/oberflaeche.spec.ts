@@ -237,9 +237,13 @@ test("Volle Breite in Stufen: 1920 px – Karten der Akte im Raster, Größe je 
   await expect(page.getByTestId("uebersicht-stufe").locator('[data-bereich="gewicht"]')).toHaveAttribute("data-breite", "2");
   expect((await api.get("auth/ich/")).bereiche.akte_uebersicht?.gewicht).toBeUndefined();
   await api.ende();
-  // Diagnose & Therapie: gleiches Raster mit „⋯“
-  await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: /Diagnose/ }).click();
+  // Therapie und Diagnosen (eigene Reiter seit F121): gleiches Raster mit „⋯“
+  const reiter = page.getByRole("navigation", { name: "Aktenbereiche" });
+  await reiter.getByRole("link", { name: /^Therapie/ }).click();
   await expect(page.getByTestId("therapie-stufe").locator('[data-bereich="therapie"]')).toHaveAttribute("data-breite", "2");
+  await expect(page.getByTestId("groesse-bemerkung")).toBeVisible();
+  await reiter.getByRole("link", { name: /^Diagnosen/ }).click();
+  await expect(page.getByTestId("diagnosen-stufe").locator('[data-bereich="diagnosen"]')).toHaveAttribute("data-breite", "2");
   await expect(page.getByTestId("groesse-diagnose")).toBeVisible();
   // Kontakte: Raster ohne Teiler; der Verlauf der Akte steht nur im eigenen Reiter „Verlauf“ (Fehlerliste 02.10.2026, 3)
   await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: /^Kontakte/ }).click();

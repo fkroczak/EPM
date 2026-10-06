@@ -73,11 +73,13 @@ test("Nach dem Neustart: Akten mit Gewicht, Diagnose und Versionen, Kontakten, T
   await page.goto(`/patienten/${gemerkt("gewicht").id}`);
   await expect(page.getByTestId("gewichtskarte").getByTestId("aktuelles-gewicht")).toHaveText("60,6 kg");
 
-  await page.goto(`/patienten/${gemerkt("diagnose").id}/therapie`);
+  await page.goto(`/patienten/${gemerkt("diagnose").id}/diagnosen`);
   const diagnose = page.getByTestId("karte-diagnose");
   await expect(diagnose.locator(".richtext strong")).toHaveText("Typ II");
   await expect(diagnose.getByTestId("version-diagnose")).toContainText("Version 2");
+  await page.goto(`/patienten/${gemerkt("diagnose").id}/therapie`);
   await expect(page.getByTestId("karte-therapie")).toContainText("HPE 5×/Woche über Port");
+  await expect(page.getByTestId("zuletzt-therapie")).toContainText("zuletzt geändert");
 
   const kontakte = gemerkt("kontakte").id;
   await page.goto(`/patienten/${kontakte}/kontakte`);

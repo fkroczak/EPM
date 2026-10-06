@@ -103,7 +103,12 @@ export type Kennzahlen = {
   letzter_kontakt: string | null;
   kontakt_stufe: Kontaktstufe | null;
   termin_woche: boolean;
-  hinweise: { art: "gewicht" | "plan" | "versorger" | "kontakt"; text: string; stufe?: Kontaktstufe }[];
+  hinweise: { art: HinweisArt; text: string; stufe?: Kontaktstufe }[];
+  /** weggeklickte Hinweise dieser Akte (F119) – sie erscheinen nicht in „hinweise“ */
+  hinweise_stumm?: HinweisArt[];
+  /** letzter Laborbefund bzw. letzte BIA-Messung mit Fälligkeit (F120) */
+  labor?: { am: string | null; alt: boolean };
+  bia?: { am: string | null; alt: boolean };
   /** nur in der Patientenliste (breite Spalten, S16) */
   naechster_termin?: { id: number; art: string; faellig_am: string; uhrzeit: string | null; titel: string } | null;
   plan?: { gueltig_ab: string | null; alt: boolean; entwurf: boolean } | null;
@@ -289,7 +294,9 @@ export type Patient = {
     /** Merkliste der angemeldeten Person (S05) */
     gemerkt: boolean;
     zaehler: { kontakte: number; gewichte: number; dokumente: number; termine_offen: number; infusionsplaene: number;
-      bezugspersonen: number; aerzte: number; erklaerungen: number };
+      bezugspersonen: number; aerzte: number; erklaerungen: number;
+      /** eigene Reiter seit 07.10.2026 (F121) */
+      diagnosen: number; laborbefunde: number; bia_messungen: number; berichte: number };
   } | null;
 };
 
@@ -755,4 +762,25 @@ export type Bericht = {
   dokument: number | null;
   pdf_sha256: string;
   vorlage_version: number | null;
+};
+
+
+// ================================================================= Hinweise stummschalten (07.10.2026, F119)
+export type HinweisArt = "gewicht" | "plan" | "ohne_plan" | "versorger" | "kontakt" | "labor" | "bia";
+
+/** Fristen, die beim Wegklicken zur Wahl stehen; „nicht mehr nötig“ ist die vierte Möglichkeit */
+export const RUHE_FRISTEN = [3, 6, 12] as const;
+
+export type Hinweisruhe = {
+  id: number;
+  art: HinweisArt;
+  art_name: string;
+  /** leer = nicht mehr nötig, bis jemand es zurücknimmt */
+  bis: string | null;
+  grund: string;
+  laeuft: boolean;
+  gesetzt_am: string;
+  gesetzt_von_name: string | null;
+  aufgehoben_am: string | null;
+  aufgehoben_von_name: string | null;
 };

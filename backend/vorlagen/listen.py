@@ -258,7 +258,9 @@ BEREICHE = {"stammdaten": "Stammdaten", "diagnose": "Diagnose (Text)", "therapie
             "aerzte": "Arzt", "erklaerungen": "Erklärung", "datenschutz": "Datenschutz",
             # Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
             "diagnosen": "Diagnose (ICD)", "laborbefunde": "Laborbefund", "bia_messungen": "BIA-Messung",
-            "berichte": "Bericht"}
+            "berichte": "Bericht",
+            # Hinweise stummschalten (Wunsch 07.10.2026, F119)
+            "hinweisruhe": "Hinweis stummgeschaltet"}
 
 
 def verlauf_pdf(patient, eintraege, filter_text="") -> bytes:

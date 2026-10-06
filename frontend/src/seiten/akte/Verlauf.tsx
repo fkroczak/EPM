@@ -23,11 +23,14 @@ const BEREICHE: { wert: string; text: string }[] = [
   // Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
   { wert: "diagnosen", text: "Diagnosen (ICD)" }, { wert: "laborbefunde", text: "Laborbefunde" },
   { wert: "bia_messungen", text: "BIA-Messungen" }, { wert: "berichte", text: "Berichte" },
+  // weggeklickte Hinweise (F119)
+  { wert: "hinweisruhe", text: "Hinweise ausgeblendet" },
 ];
 const BEREICH_EINZELN: Record<string, string> = {
   stammdaten: "Stammdaten", diagnose: "Diagnose", therapie: "Therapie", empfehlung: "Empfehlung", bemerkung: "Bemerkung", kontakte: "Kontakt",
   gewichte: "Gewicht", termine: "Termin", infusionsplaene: "Infusionsplan", dokumente: "Dokument",
   aerzte: "Arzt", bezugspersonen: "Bezugsperson", erklaerungen: "Erklärung", datenschutz: "Datenschutz-Anfrage",
+  hinweisruhe: "Hinweis ausgeblendet",
   // Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
   diagnosen: "Diagnose (ICD)", laborbefunde: "Laborbefund", bia_messungen: "BIA-Messung", berichte: "Bericht",
 };

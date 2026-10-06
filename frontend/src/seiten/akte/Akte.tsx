@@ -480,14 +480,17 @@ export function Akte() {
         </Meldung>
       ) : null}
 
-      <nav aria-label="Aktenbereiche" className="segmente self-start">
+      {/* Jeder Bereich ein eigener Reiter (Wunsch 07.10.2026, F121); bei schmalem Fenster umbrechen die Reiter */}
+      <nav aria-label="Aktenbereiche" className="segmente self-start flex-wrap h-auto">
         <Reiter zu={basis} text="Übersicht" ende />
-        <Reiter zu={`${basis}/therapie`} text="Diagnose & Therapie" />
+        <Reiter zu={`${basis}/diagnosen`} text="Diagnosen" zahl={k?.zaehler.diagnosen} />
+        <Reiter zu={`${basis}/therapie`} text="Therapie" />
         <Reiter zu={`${basis}/kontakte`} text="Kontakte" zahl={k?.zaehler.kontakte} />
         <Reiter zu={`${basis}/plaene`} text="Infusionspläne" zahl={k?.zaehler.infusionsplaene} />
         {/* Wünsche aus der Praxis vom 06.10.2026 (F112–F115) */}
-        <Reiter zu={`${basis}/befunde`} text="Labor & BIA" />
-        <Reiter zu={`${basis}/berichte`} text="Berichte" />
+        <Reiter zu={`${basis}/labor`} text="Labor" zahl={k?.zaehler.laborbefunde} />
+        <Reiter zu={`${basis}/bia`} text="BIA" zahl={k?.zaehler.bia_messungen} />
+        <Reiter zu={`${basis}/berichte`} text="Berichte" zahl={k?.zaehler.berichte} />
         <Reiter zu={`${basis}/dokumente`} text="Dokumente" zahl={k?.zaehler.dokumente} />
         <Reiter zu={`${basis}/datenschutz`} text="Datenschutz" zahl={k?.datenschutz_anfragen || undefined} />
         <Reiter zu={`${basis}/verlauf`} text="Verlauf" />

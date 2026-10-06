@@ -7,10 +7,12 @@ import { Seite, Shell } from "./components/layout/Shell";
 import { Anmeldung } from "./seiten/Anmeldung";
 import { Akte } from "./seiten/akte/Akte";
 import { AkteDatenschutz } from "./seiten/akte/Datenschutz";
-import { Befunde } from "./seiten/akte/Befunde";
+import { Bia } from "./seiten/akte/Bia";
 import { Berichte } from "./seiten/akte/Berichte";
+import { Diagnosen } from "./seiten/akte/Diagnosen";
 import { Dokumente } from "./seiten/akte/Dokumente";
 import { Kontakte } from "./seiten/akte/Kontakte";
+import { Labor } from "./seiten/akte/Labor";
 import { PlanEditor } from "./seiten/akte/PlanEditor";
 import { Plaene } from "./seiten/akte/Plaene";
 import { Therapie } from "./seiten/akte/Therapie";
@@ -62,12 +64,16 @@ const router = createBrowserRouter([
         element: <Akte />,
         children: [
           { index: true, element: <Uebersicht /> },
+          // eigene Reiter seit 07.10.2026 (F121); die alten Adressen leiten weiter
+          { path: "diagnosen", element: <Diagnosen /> },
           { path: "therapie", element: <Therapie /> },
           { path: "kontakte", element: <Kontakte /> },
           { path: "plaene", element: <Plaene /> },
           { path: "plaene/neu", element: <PlanEditor /> },
           { path: "plaene/:planId/bearbeiten", element: <PlanEditor key="bearbeiten" /> },
-          { path: "befunde", element: <Befunde /> },
+          { path: "labor", element: <Labor /> },
+          { path: "bia", element: <Bia /> },
+          { path: "befunde", element: <Navigate to="../labor" replace /> },
           { path: "berichte", element: <Berichte /> },
           { path: "dokumente", element: <Dokumente /> },
           { path: "datenschutz", element: <AkteDatenschutz /> },
