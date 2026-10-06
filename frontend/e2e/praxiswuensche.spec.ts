@@ -122,7 +122,7 @@ test("Bericht: Entwurf, Freigabe durch den Mediziner, danach unveränderlich", a
   // Bearbeiten ist weg, die PDF liegt in den Dokumenten
   await expect(medizinerSeite.getByRole("button", { name: "Bearbeiten" })).toHaveCount(0);
   await medizinerSeite.goto(`/patienten/${p.id}/dokumente`);
-  await expect(medizinerSeite.getByText("Verlaufsbericht 2026")).toBeVisible();
+  await expect(medizinerSeite.getByTestId("dokument-details").getByText("Verlaufsbericht 2026")).toBeVisible();
   await medizinerSeite.close();
 });
 

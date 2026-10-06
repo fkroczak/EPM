@@ -53,7 +53,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await editor.getByRole("button", { name: "+ Soluvit N" }).click();
   await editor.getByRole("button", { name: "+ Vitalipid adult" }).click();
   await editor.getByLabel("Laufzeit").fill("12");
-  await editor.getByLabel("Tage pro Woche").fill("5");
+  await editor.getByTestId("infusionstage").getByLabel("PE (Mischbeutel)").fill("5");
   // wie auf der alten PDF: Mischbeutel = letztes Gewicht × 35 ml, Zusatzvolumen = Basislösung, Gesamtvolumen = Summe;
   // Laufzeit manuell, Rate = Gesamtvolumen ÷ Laufzeit (2.600 ÷ 12)
   await expect(editor.getByTestId("plan-mischbeutel")).toHaveText("2.100 ml");

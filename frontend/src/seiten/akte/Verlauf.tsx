@@ -56,7 +56,7 @@ const FELDER: Record<string, string> = {
   aminosaeuren_g: "Aminosäuren (g)", lipide_praeparat: "Lipid-Präparat", lipide_g: "Lipide (g)", albumin_praeparat: "Albumin-Präparat",
   albumin_ml: "Humanalbumin (ml)", albumin_g: "Albumin (g)", natrium_mmol: "Natrium", kalium_mmol: "Kalium", phosphat_mmol: "Phosphat", calcium_mmol: "Calcium",
   magnesium_mmol: "Magnesium", spurenelemente: "Spurenelemente", katheterschutz: "Katheterblock", laufzeit_h: "Laufzeit (h)",
-  tage_pro_woche: "Tage pro Woche", pantozol_stufe: "Protonenpumpenhemmer", pantozol_tage: "PPI-Zeiten", kcal_manuell: "Energie (manuell)",
+  tage_pro_woche: "PE (Mischbeutel) pro Woche", pantozol_stufe: "Protonenpumpenhemmer", pantozol_tage: "PPI-Zeiten", kcal_manuell: "Energie (manuell)",
   gesamtvolumen_ml: "Gesamtvolumen (ml)", volumen_gewicht_kg: "Gewicht für das Gesamtvolumen (kg)",
   // Datenschutz
   aufbewahrung_bis: "Aufbewahrung verlängert bis", aufbewahrung_grund: "Grund der längeren Aufbewahrung",
