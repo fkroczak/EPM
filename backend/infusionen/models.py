@@ -59,7 +59,8 @@ PLANFELDER = [
     "lipide_praeparat", "lipide_g", "albumin_praeparat", "albumin_ml",
     "natrium_mmol", "kalium_mmol", "phosphat_mmol", "calcium_mmol", "magnesium_mmol",
     "spurenelemente", "katheterschutz", "kcal_manuell",
-    "laufzeit_h", "tage_pro_woche", "pantozol_stufe", "pantozol_tage", "bemerkung",
+    "laufzeit_h", "tage_pro_woche", "zusatz_tage_pro_woche", "freie_tage_pro_woche",
+    "pantozol_stufe", "pantozol_tage", "bemerkung",
 ]
 
 # Bezeichnungen und Einheiten für Vergleich und PDF (Reihenfolge wie im Entwurf 8)
@@ -70,7 +71,8 @@ VERGLEICHSZEILEN = [
     ("spurenelemente", "Spurenelemente"), ("vitamine", "Vitamine"), ("katheterschutz", "Katheterblock"),
     ("mischbeutel", "Volumen im Mischbeutel"), ("gesamtvolumen", "Gesamtvolumen"), ("laufzeit_h", "Laufzeit"),
     ("rate", "Rate"),
-    ("tage_pro_woche", "Tage pro Woche"), ("kcal", "Energie"),
+    ("tage_pro_woche", "PE (Mischbeutel) pro Woche"), ("zusatz_tage_pro_woche", "Zusatzvolumen pro Woche"),
+    ("freie_tage_pro_woche", "Infusionsfreie Tage"), ("kcal", "Energie"),
     ("pantozol", "Protonenpumpenhemmer"), ("positionen", "Weitere Bestandteile"), ("bemerkung", "Bemerkung"),
 ]
 
@@ -122,7 +124,17 @@ class Infusionsplan(AktenEintrag):
         "kcal (manuell)", null=True, blank=True, help_text="Überschreibt die berechneten kcal"
     )
     laufzeit_h = models.DecimalField("Laufzeit (h)", max_digits=4, decimal_places=1, null=True, blank=True)
-    tage_pro_woche = models.PositiveSmallIntegerField("Tage pro Woche", null=True, blank=True)
+    # Infusionstage je Beutelart (Wunsch 06.10.2026, F110): unabhängig von der Zusammensetzung des Plans.
+    # Beispiel aus der Praxis: PE 5× / Woche, Elektrolytbeutel (= Zusatzvolumen) 2× / Woche, keine freien Tage.
+    tage_pro_woche = models.PositiveSmallIntegerField("PE (Mischbeutel) pro Woche", null=True, blank=True)
+    zusatz_tage_pro_woche = models.PositiveSmallIntegerField(
+        "Zusatzvolumen pro Woche", null=True, blank=True,
+        help_text="Tage pro Woche mit Zusatzvolumen („Elektrolytbeutel“)",
+    )
+    freie_tage_pro_woche = models.PositiveSmallIntegerField(
+        "Infusionsfreie Tage pro Woche", null=True, blank=True,
+        help_text="Tage ganz ohne Infusion; „keine“ = 0",
+    )
     katheterschutz = models.ForeignKey(
         Praeparat, on_delete=models.PROTECT, null=True, blank=True, related_name="+",
         limit_choices_to={"kategorie": Praeparat.Kategorie.KATHETERSCHUTZ}, verbose_name="Katheterschutz (Lock)",
@@ -201,6 +213,16 @@ class Infusionsplan(AktenEintrag):
             models.CheckConstraint(
                 name="tage_pro_woche_bereich",
                 condition=models.Q(tage_pro_woche__isnull=True) | models.Q(tage_pro_woche__range=(1, 7)),
+            ),
+            models.CheckConstraint(
+                name="zusatz_tage_pro_woche_bereich",
+                condition=models.Q(zusatz_tage_pro_woche__isnull=True)
+                | models.Q(zusatz_tage_pro_woche__range=(1, 7)),
+            ),
+            models.CheckConstraint(
+                name="freie_tage_pro_woche_bereich",
+                condition=models.Q(freie_tage_pro_woche__isnull=True)
+                | models.Q(freie_tage_pro_woche__range=(0, 6)),
             ),
         ]
 
@@ -293,6 +315,16 @@ class Infusionsplan(AktenEintrag):
             wert = getattr(self, feld)
             if wert is not None and not (unten <= wert <= oben):
                 fehler[feld] = f"Wert außerhalb der Plausibilitätsgrenzen ({unten}–{oben} {einheit})."
+        # Infusionstage (F110): An wie vielen Tagen überhaupt infundiert wird, hängt davon ab, ob PE und
+        # Zusatzvolumen auf dieselben Tage fallen. Höchstens möglich sind deshalb 7 − max(PE, Zusatz) freie Tage.
+        infusionstage = max(self.tage_pro_woche or 0, self.zusatz_tage_pro_woche or 0)
+        if self.freie_tage_pro_woche is not None and infusionstage:
+            hoechstens = 7 - infusionstage
+            if self.freie_tage_pro_woche > hoechstens:
+                fehler["freie_tage_pro_woche"] = (
+                    f"Bei {infusionstage} Infusionstagen pro Woche sind höchstens {hoechstens} infusionsfreie "
+                    f"Tage möglich."
+                )
         if self.pantozol_stufe not in Protonenpumpenhemmer.values:
             fehler["pantozol_stufe"] = "Unbekannter Protonenpumpenhemmer."
         if self.pantozol_tage is not None and not 0 < self.pantozol_tage <= 7:
@@ -591,8 +623,12 @@ def _anzeige(plan, schluessel):
         return f"{_zahl(plan.gesamtvolumen_ml, 'ml')} (35 ml/kg × {_zahl(plan.volumen_gewicht_kg, 'kg')})"
     if schluessel == "rate":
         return _zahl(plan.rate_ml_h, "ml/h")
-    if schluessel == "tage_pro_woche":
-        return _zahl(plan.tage_pro_woche, "× pro Woche")
+    if schluessel in ("tage_pro_woche", "zusatz_tage_pro_woche"):
+        return _zahl(getattr(plan, schluessel), "× pro Woche")
+    if schluessel == "freie_tage_pro_woche":
+        if plan.freie_tage_pro_woche is None:
+            return None
+        return "keine" if plan.freie_tage_pro_woche == 0 else _zahl(plan.freie_tage_pro_woche, "pro Woche")
     if schluessel == "kcal":
         return _zahl(plan.kcal, "kcal") + (" (manuell)" if plan.kcal_manuell is not None else "")
     if schluessel == "pantozol":

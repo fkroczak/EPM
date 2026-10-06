@@ -10,16 +10,18 @@ from system import sicherung_api as backup
 from infusionen.api import InfusionsplanViewSet
 from vorlagen import api as vorlagen
 from patienten.api import (
-    BezugspersonViewSet, DokumentViewSet, GewichtViewSet, KalenderViewSet, KontaktViewSet, PatientArztViewSet,
-    PatientViewSet, StartseiteViewSet, TerminViewSet,
+    BezugspersonViewSet, DiagnoseViewSet, DokumentViewSet, GewichtViewSet, KalenderViewSet, KontaktViewSet,
+    PatientArztViewSet, PatientViewSet, StartseiteViewSet, TerminViewSet,
 )
 from hilfe import api as hilfe
 from patienten import meine_akten
 from patienten.datenschutz_api import DatenschutzanfrageViewSet, DatenschutzViewSet, ErklaerungViewSet
 from stammdaten.api import (
-    AnsprechpartnerViewSet, ArztViewSet, AuswahlwertViewSet, BriefkopfView, EinstellungenView, LogoView, PraeparatViewSet,
-    VersorgerViewSet,
+    AnsprechpartnerViewSet, ArztViewSet, AuswahlwertViewSet, BriefkopfView, DiagnosevorlageViewSet, EinstellungenView,
+    LaborparameterViewSet, LogoView, PraeparatViewSet, VersorgerViewSet,
 )
+from befunde.api import BiaMessungViewSet, LaborbefundViewSet
+from berichte.api import BerichtViewSet
 
 router = DefaultRouter()
 router.register("startseite", StartseiteViewSet, basename="startseite")
@@ -31,6 +33,10 @@ router.register("kalender", KalenderViewSet, basename="kalender")
 router.register("dokumente", DokumentViewSet, basename="dokument")
 router.register("bezugspersonen", BezugspersonViewSet, basename="bezugsperson")
 router.register("patient-aerzte", PatientArztViewSet, basename="patientarzt")
+router.register("diagnosen", DiagnoseViewSet, basename="diagnose")
+router.register("laborbefunde", LaborbefundViewSet, basename="laborbefund")
+router.register("bia-messungen", BiaMessungViewSet, basename="biamessung")
+router.register("berichte", BerichtViewSet, basename="bericht")
 router.register("erklaerungen", ErklaerungViewSet, basename="erklaerung")
 router.register("datenschutzanfragen", DatenschutzanfrageViewSet, basename="datenschutzanfrage")
 router.register("datenschutz", DatenschutzViewSet, basename="datenschutz")
@@ -39,6 +45,8 @@ router.register("versorger", VersorgerViewSet, basename="versorger")
 router.register("ansprechpartner", AnsprechpartnerViewSet, basename="ansprechpartner")
 router.register("aerzte", ArztViewSet, basename="arzt")
 router.register("praeparate", PraeparatViewSet, basename="praeparat")
+router.register("laborparameter", LaborparameterViewSet, basename="laborparameter")
+router.register("diagnoseliste", DiagnosevorlageViewSet, basename="diagnosevorlage")
 router.register("auswahlwerte", AuswahlwertViewSet, basename="auswahlwert")
 router.register("benutzer", konto.BenutzerViewSet, basename="benutzer")
 router.register("protokoll", SystemEreignisViewSet, basename="protokoll")

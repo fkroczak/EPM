@@ -16,6 +16,9 @@ class Dokumentvorlage(models.Model):
     class Art(models.TextChoices):
         INFUSIONSPLAN = "infusionsplan", "Infusionsplan"
         PATIENTENDATENBLATT = "patientendatenblatt", "Patientendatenblatt"
+        # Wünsche aus der Praxis vom 06.10.2026: Berichte aus der Akte (F115) und das Sprechstundenblatt (F116)
+        BERICHT = "bericht", "Bericht"
+        SPRECHSTUNDE = "sprechstunde", "Unterlagen für die Sprechstunde"
         # Datenschutz (Festlegung 02.10.2026): zum Ausdrucken und Unterschreiben je Patient. Die mitgelieferten
         # Startvorlagen sind Entwürfe mit Lücken in [eckigen Klammern]; bis die Stiftung sie geprüft und
         # veröffentlicht hat, tragen die PDFs das Wasserzeichen „ENTWURF“.

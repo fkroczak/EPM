@@ -8,7 +8,7 @@ import type { Feldfehler } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useAerzteListe, useAuswahl, useVersorgerListe } from "@/lib/daten";
 import { datum, eingabeDatum, eingabeZahl, heuteIso, nummer } from "@/lib/format";
-import { GESCHLECHTER } from "@/lib/typen";
+import { GESCHLECHTER, VERSICHERUNGSARTEN } from "@/lib/typen";
 import type { Patient, PatientZeile } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Eingabe, Feld, Karte, Knopf, KnopfLink, Meldung, Textfeld, cx } from "@/components/ui/basis";
@@ -17,13 +17,15 @@ import { Icon } from "@/components/ui/icon";
 type Formular = {
   nachname: string; vorname: string; geschlecht: string; geburtsdatum: string; groesse: string; gewicht: string;
   gemessen_am: string; strasse: string; plz: string; ort: string; telefon: string; telefon2: string; email: string;
-  krankenkasse: string; versorger: string; ansprechpartner: string; katheter: string; nickelallergie: string; hausarzt: string;
+  versicherungsart: string; krankenkasse: string; versichertennummer: string;
+  versorger: string; ansprechpartner: string; katheter: string; nickelallergie: string; hausarzt: string;
   ueberweisung_durch: string; diagnose: string;
 };
 
 const LEER: Formular = {
   nachname: "", vorname: "", geschlecht: "", geburtsdatum: "", groesse: "", gewicht: "", gemessen_am: "",
-  strasse: "", plz: "", ort: "", telefon: "", telefon2: "", email: "", krankenkasse: "", versorger: "", ansprechpartner: "", katheter: "",
+  strasse: "", plz: "", ort: "", telefon: "", telefon2: "", email: "",
+  versicherungsart: "", krankenkasse: "", versichertennummer: "", versorger: "", ansprechpartner: "", katheter: "",
   nickelallergie: "unbekannt", hausarzt: "", ueberweisung_durch: "", diagnose: "",
 };
 
@@ -124,7 +126,9 @@ export function PatientNeu() {
       telefon: f.telefon.trim(),
       telefon2: f.telefon2.trim(),
       email: f.email.trim(),
+      versicherungsart: f.versicherungsart,
       krankenkasse: f.krankenkasse.trim(),
+      versichertennummer: f.versichertennummer.trim(),
       // „kein“ = bewusst keiner, leer = noch nicht erfasst (Festlegung 01.10.2026)
       versorger: f.versorger && f.versorger !== KEIN ? Number(f.versorger) : null,
       kein_versorger: f.versorger === KEIN,
@@ -223,8 +227,19 @@ export function PatientNeu() {
               <Feld label="E-Mail" className="col-span-2" fehler={e.email}>
                 {(p) => <Eingabe {...p} type="email" value={f.email} onChange={setze("email")} autoComplete="off" />}
               </Feld>
-              <Feld label="Krankenkasse" className="col-span-2" fehler={e.krankenkasse}>
+              {/* Versichertendaten (F118) */}
+              <Feld label="Versicherungsart" className="col-span-2" fehler={e.versicherungsart}>
+                {(p) => (
+                  <Auswahl {...p} value={f.versicherungsart} onChange={setze("versicherungsart")}>
+                    {Object.entries(VERSICHERUNGSARTEN).map(([k, text]) => <option key={k} value={k}>{text}</option>)}
+                  </Auswahl>
+                )}
+              </Feld>
+              <Feld label="Versicherung" className="col-span-2" fehler={e.krankenkasse}>
                 {(p) => <Eingabe {...p} value={f.krankenkasse} onChange={setze("krankenkasse")} autoComplete="off" maxLength={100} />}
+              </Feld>
+              <Feld label="Versichertennummer" className="col-span-2" fehler={e.versichertennummer}>
+                {(p) => <Eingabe {...p} className="num" value={f.versichertennummer} onChange={setze("versichertennummer")} autoComplete="off" maxLength={50} />}
               </Feld>
             </Abschnitt>
 

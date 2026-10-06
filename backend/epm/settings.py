@@ -58,6 +58,8 @@ INSTALLED_APPS = [
     "stammdaten",
     "patienten",
     "infusionen",
+    "befunde",
+    "berichte",
     "vorlagen",
     "audit",
     "system",

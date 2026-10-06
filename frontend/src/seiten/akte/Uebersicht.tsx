@@ -7,7 +7,7 @@ import type { Feldfehler, Seite as ApiSeite } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useEinstellungen } from "@/lib/daten";
 import { datum, eingabeDatum, eingabeZahl, heuteIso, kg, prozent, terminZeit, uhrzeit, zahl, zeitpunkt } from "@/lib/format";
-import { GEWICHTSQUELLEN, TERMINARTEN } from "@/lib/typen";
+import { GEWICHTSQUELLEN, TERMINARTEN, VERSICHERUNGSARTEN } from "@/lib/typen";
 import type { Gewicht, Kontakt, Plan, Termin } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, KnopfLink, Laden, Leer, Meldung, Segmente, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
@@ -18,6 +18,8 @@ import type { Zeitraum } from "@/components/GewichtsDiagramm";
 import { Richtext, klartext } from "@/components/Editor";
 import { TerminDialog } from "@/components/TerminDialog";
 import { useAkte } from "./Akte";
+import { BefundeKurz } from "./Befunde";
+import { StummKarte } from "@/components/HinweisChips";
 import { AerzteKarte, BezugspersonenKarte } from "./Kontaktpersonen";
 import { KeinPlanHinweis } from "./Plaene";
 import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
@@ -217,9 +219,11 @@ function TherapieKarte() {
   const { patient, bearbeiten } = useAkte();
   return (
     <Karte className="px-[22px] py-[18px] flex flex-col gap-4">
-      <KartenKopf titel="Diagnose und Therapie" rechts={bearbeiten
-        ? <KnopfLink to={`/patienten/${patient.id}/therapie`} klein icon="stift">Öffnen und bearbeiten</KnopfLink>
-        : <KnopfLink to={`/patienten/${patient.id}/therapie`} klein>Öffnen</KnopfLink>} />
+      {/* seit 07.10.2026 (F121) zwei Reiter: Diagnosen und Therapie */}
+      <KartenKopf titel="Diagnose und Therapie" rechts={<>
+        <KnopfLink to={`/patienten/${patient.id}/diagnosen`} klein icon={bearbeiten ? "stift" : undefined}>Diagnosen</KnopfLink>
+        <KnopfLink to={`/patienten/${patient.id}/therapie`} klein icon={bearbeiten ? "stift" : undefined}>Therapie</KnopfLink>
+      </>} />
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-5">
         <div className="flex flex-col gap-1.5 min-w-0"><span className="text-[0.8125rem] font-medium gedaempft">Diagnose</span><Richtext html={patient.diagnose} leer="Noch keine Diagnose eingetragen." /></div>
         <div className="flex flex-col gap-1.5 min-w-0"><span className="text-[0.8125rem] font-medium gedaempft">Therapie</span><Richtext html={patient.therapie} leer="Noch keine Therapie eingetragen." /></div>
@@ -346,10 +350,27 @@ function StammKarte() {
       {/* Telefon 2 und Krankenkasse seit 03.10.2026 sichtbar (Klärung U5) */}
       <span className="gedaempft">Telefon 2</span><span className="num" data-testid="telefon2">{p.telefon2 || "—"}</span>
       <span className="gedaempft">E-Mail</span><span className="truncate">{p.email || "—"}</span>
-      <span className="gedaempft">Krankenkasse</span><span data-testid="krankenkasse">{p.krankenkasse || "—"}</span>
+      <span className="gedaempft">Versicherung</span><span data-testid="krankenkasse">
+        {[VERSICHERUNGSARTEN[p.versicherungsart] !== "nicht erfasst" ? VERSICHERUNGSARTEN[p.versicherungsart] : "",
+          p.krankenkasse].filter(Boolean).join(" · ") || "—"}</span>
+      <span className="gedaempft">Versichertennummer</span><span className="num" data-testid="versichertennummer">{p.versichertennummer || "—"}</span>
       {p.hausarzt ? <><span className="gedaempft">Hausarzt</span><span title="bisheriger Freitext; Ärzte mit Kontaktdaten unter „Ärzte“">{p.hausarzt}</span></> : null}
       <span className="gedaempft">Überweisung</span><span>{p.ueberweisung_durch || "—"}</span>
       <span className="gedaempft">Größe</span><span className="num">{p.groesse_cm != null ? `${zahl(p.groesse_cm)} cm` : "—"}</span>
+    </Karte>
+  );
+}
+
+/** Letzter Laborbefund und letzte BIA-Messung mit Weg in die Reiter (Wünsche 06./07.10.2026, F112–F114, F121). */
+function BefundeKarte() {
+  const { patient } = useAkte();
+  return (
+    <Karte className="px-[22px] py-[18px] flex flex-col gap-4" data-testid="karte-befunde">
+      <KartenKopf titel="Labor und BIA" rechts={<>
+        <KnopfLink to={`/patienten/${patient.id}/labor`} klein>Labor</KnopfLink>
+        <KnopfLink to={`/patienten/${patient.id}/bia`} klein>BIA</KnopfLink>
+      </>} />
+      <BefundeKurz patientId={patient.id} />
     </Karte>
   );
 }
@@ -359,7 +380,11 @@ function StammKarte() {
  *  2560 px beginnt das Gewichtsdiagramm mit 3 Jahren (S16). */
 export function Uebersicht() {
   const stufe = useStufe();
+  const { patient, bearbeiten } = useAkte();
   return (
+    <div className="flex flex-col gap-4">
+      {/* Weggeklickte Hinweise stehen hier und lassen sich zurückholen (Wunsch 07.10.2026, F119) */}
+      <StummKarte patientId={patient.id} aenderbar={bearbeiten} />
     <Bereiche seite="akte_uebersicht" spalten={RASTER_SPALTEN[stufe]} testid="uebersicht-stufe">
       <Bereich id="gewicht" titel="Gewichtsverlauf" standard={{ breite: 2 }}><GewichtKarte startZeitraum={stufe === "qhd" ? "y3" : "y1"} /></Bereich>
       <Bereich id="termine" titel="Termine"><TermineKarte /></Bereich>
@@ -369,6 +394,8 @@ export function Uebersicht() {
       <Bereich id="stamm" titel="Anschrift und Kontakt"><StammKarte /></Bereich>
       <Bereich id="aerzte" titel="Ärzte"><AerzteKarte /></Bereich>
       <Bereich id="bezug" titel="Bezugspersonen"><BezugspersonenKarte /></Bereich>
+      <Bereich id="befunde" titel="Labor und BIA"><BefundeKarte /></Bereich>
     </Bereiche>
+    </div>
   );
 }

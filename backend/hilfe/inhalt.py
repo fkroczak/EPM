@@ -185,15 +185,19 @@ nächsten Termin, Hausarzt, <strong>Auskunft an</strong> (Personen mit Schweigep
 Fehlt eine Erklärung zum Datenschutz, steht ein Hinweis neben dem Namen.</p>
 <p>Der <strong>Stern</strong> neben dem Namen setzt die Akte auf deine Merkliste; sie erscheint dann auf der Startseite
 unter „Meine Akten“. Dort stehen auch die zuletzt geöffneten Akten. Merkliste und Verlauf sieht nur die Person selbst.</p>
-<p>Die Reiter führen zu Übersicht, Diagnose und Therapie, Kontakten, Infusionsplänen, Dokumenten, Datenschutz und
-Verlauf.</p>""",
+<p>Jeder Bereich hat seinen eigenen Reiter: Übersicht, Diagnosen, Therapie, Kontakte, Infusionspläne, Labor, BIA,
+Berichte, Dokumente, Datenschutz und Verlauf.</p>
+<p>Hinweise am Namen (Gewichtsverlust, Plan oder Befund zu alt, Kontakt fällig …) lassen sich mit dem <strong>×</strong>
+ausblenden. Dabei wird gewählt, wie lange Ruhe sein soll – 3, 6 oder 12 Monate, danach erscheint der Hinweis von allein
+wieder – oder <strong>nicht mehr nötig</strong>. Was gerade ausgeblendet ist, steht in der Übersicht der Akte unter
+„Ausgeblendete Hinweise“ und lässt sich dort wieder einschalten.</p>""",
     },
     {
         "id": "spalten", "gruppe": "patienten", "titel": "Karten vergrößern und Spalten verbreitern", "rechte": [], "seiten": [],
         "html": """
 <p>Auf breiten Bildschirmen nutzen alle Seiten die volle Breite und teilen sich in Stufen auf (ab 1440, 1920 und
 2560 px).</p>
-<p>In der Akte (Übersicht, Diagnose &amp; Therapie, Kontakte) und unter Administration › System stehen die Karten in einem
+<p>In der Akte (Übersicht, Diagnosen, Therapie, Kontakte) und unter Administration › System stehen die Karten in einem
 Raster wie auf der Startseite. Das Menü <strong>⋯</strong> oben rechts an jeder Karte stellt ihre
 <strong>Breite</strong> (1 Spalte bis ganze Breite) und <strong>Höhe</strong> (automatisch oder 1–4 Zeilen; der Inhalt
 scrollt dann in der Karte) ein; <strong>Standardgröße</strong> setzt zurück. Gespeichert wird je Person.</p>
@@ -208,13 +212,13 @@ ziehen wie bei einem Fenster.</p>
     },
     {
         "id": "stammdaten", "gruppe": "patienten", "titel": "Stammdaten, Diagnose und Therapie ändern",
-        "rechte": ["akten_bearbeiten"], "seiten": ["/patienten/:id/therapie"],
+        "rechte": ["akten_bearbeiten"], "seiten": ["/patienten/:id/therapie", "/patienten/:id/diagnosen"],
         "html": """
-<p>Stammdaten (Name, Anschrift, Telefon und Telefon 2, Krankenkasse, Versorger, Katheter, Nickelallergie …) ändert man
-über <strong>Weitere Aktionen › Stammdaten bearbeiten</strong> im Aktenkopf. Diagnose, Therapie, Empfehlung und
-Bemerkung stehen im Reiter
-<strong>Diagnose &amp; Therapie</strong>; jede gespeicherte Fassung bekommt eine Versionsnummer, frühere Fassungen bleiben
-lesbar.</p>
+<p>Stammdaten (Name, Anschrift, Telefon und Telefon 2, Versicherungsart, Versicherung und Versichertennummer, Versorger,
+Katheter, Nickelallergie …) ändert man über <strong>Weitere Aktionen › Stammdaten bearbeiten</strong> im Aktenkopf.
+Die Diagnoseliste mit ICD-Code und der Freitext „Diagnose“ stehen im Reiter <strong>Diagnosen</strong>, Therapie,
+Empfehlung und Bemerkung im Reiter <strong>Therapie</strong>; jede gespeicherte Fassung bekommt eine Versionsnummer,
+frühere Fassungen bleiben lesbar.</p>
 <p>Jede Änderung steht mit Person und Zeitpunkt im Verlauf der Akte.</p>""",
     },
     {

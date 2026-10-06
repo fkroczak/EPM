@@ -6,7 +6,8 @@ export type Recht =
   | "plaene_anlegen" | "plaene_freigeben" | "plaene_abschliessen"
   | "datenschutz_bearbeiten" | "datenschutz_entscheiden" | "akten_loeschen"
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
-  | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "testdaten_sehen" | "system_verwalten" | "altdaten_importieren";
+  | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "testdaten_sehen" | "system_verwalten"
+  | "altdaten_importieren" | "berichte_freigeben";
 
 /** Kacheln der Startseite (S11): klinische und – mit dem jeweiligen Recht – die der Administration (S12–S14) */
 export type KartenId =
@@ -102,7 +103,12 @@ export type Kennzahlen = {
   letzter_kontakt: string | null;
   kontakt_stufe: Kontaktstufe | null;
   termin_woche: boolean;
-  hinweise: { art: "gewicht" | "plan" | "versorger" | "kontakt"; text: string; stufe?: Kontaktstufe }[];
+  hinweise: { art: HinweisArt; text: string; stufe?: Kontaktstufe }[];
+  /** weggeklickte Hinweise dieser Akte (F119) – sie erscheinen nicht in „hinweise“ */
+  hinweise_stumm?: HinweisArt[];
+  /** letzter Laborbefund bzw. letzte BIA-Messung mit Fälligkeit (F120) */
+  labor?: { am: string | null; alt: boolean };
+  bia?: { am: string | null; alt: boolean };
   /** nur in der Patientenliste (breite Spalten, S16) */
   naechster_termin?: { id: number; art: string; faellig_am: string; uhrzeit: string | null; titel: string } | null;
   plan?: { gueltig_ab: string | null; alt: boolean; entwurf: boolean } | null;
@@ -227,7 +233,10 @@ export type Patient = {
   telefon: string;
   telefon2: string;
   email: string;
+  /** Versichertendaten (F118): Art, Name der Versicherung („krankenkasse“) und Versichertennummer */
+  versicherungsart: "" | "gkv" | "pkv" | "selbstzahler" | "sonstige";
   krankenkasse: string;
+  versichertennummer: string;
   hausarzt: string;
   ueberweisung_durch: string;
   groesse_cm: number | null;
@@ -285,7 +294,9 @@ export type Patient = {
     /** Merkliste der angemeldeten Person (S05) */
     gemerkt: boolean;
     zaehler: { kontakte: number; gewichte: number; dokumente: number; termine_offen: number; infusionsplaene: number;
-      bezugspersonen: number; aerzte: number; erklaerungen: number };
+      bezugspersonen: number; aerzte: number; erklaerungen: number;
+      /** eigene Reiter seit 07.10.2026 (F121) */
+      diagnosen: number; laborbefunde: number; bia_messungen: number; berichte: number };
   } | null;
 };
 
@@ -359,6 +370,8 @@ export type Praeparat = {
   name: string;
   konzentration: string;
   einheit: string;
+  /** kurzer Hinweis, z. B. „reines Taurolidin 2 %“ (F111) */
+  hinweis: string;
   reihenfolge: number;
   aktiv: boolean;
   anzeige: string;
@@ -508,7 +521,10 @@ export type Plan = {
   laufzeit_h: number | null;
   /** Gesamtvolumen ÷ Laufzeit */
   rate_ml_h: number | null;
+  /** Infusionstage je Beutelart (F110): PE (Mischbeutel), Zusatzvolumen, infusionsfreie Tage */
   tage_pro_woche: number | null;
+  zusatz_tage_pro_woche: number | null;
+  freie_tage_pro_woche: number | null;
   katheterschutz: number | null;
   pantozol_stufe: number;
   pantozol_tage: number | null;
@@ -605,3 +621,166 @@ export type Systemereignis = {
 
 /** Zahlen und Texte; ``pflicht_erklaerungen`` ist die einzige Liste (siehe Vorlagen › Grenzwerte) */
 export type Einstellungen = Record<string, number | string>;
+
+
+// ================================================================= Wünsche aus der Praxis (06.10.2026)
+export const VERSICHERUNGSARTEN: Record<string, string> = {
+  "": "nicht erfasst",
+  gkv: "GKV (gesetzlich)",
+  pkv: "PKV (privat)",
+  selbstzahler: "Selbstzahler",
+  sonstige: "Sonstige",
+};
+
+/** Zusatzkennzeichen der Diagnose: G gesichert, V Verdacht, Z Zustand nach, A Ausschluss (F117) */
+export const DIAGNOSE_KENNZEICHEN: Record<string, string> = {
+  G: "G – gesichert",
+  V: "V – Verdacht auf",
+  Z: "Z – Zustand nach",
+  A: "A – Ausschluss von",
+};
+
+export type Diagnose = {
+  id: number;
+  patient: number;
+  bezeichnung: string;
+  icd_code: string;
+  kennzeichen: "G" | "V" | "Z" | "A";
+  kennzeichen_name: string;
+  anzeige: string;
+  seit: string | null;
+  notiz: string;
+  reihenfolge: number;
+  aktiv: boolean;
+  beendet_am: string | null;
+  angelegt_am: string;
+  angelegt_von_name: string | null;
+};
+
+export type Diagnosevorlage = { id: number; icd_code: string; bezeichnung: string; aktiv: boolean; anzeige: string };
+
+export const LABORGRUPPEN: Record<string, string> = {
+  transaminasen: "Transaminasen",
+  niere: "Nierenwerte",
+  eisen: "Eisenhaushalt",
+  eiweiss_fett: "Eiweiß- und Fettstoffwechsel",
+  elektrolyte: "Elektrolyte",
+  spurenelemente: "Spurenelemente",
+  haematologie: "Hämatologie",
+  vitamine: "Vitamine",
+  knochen: "Knochenstoffwechsel",
+  pankreas: "Pankreasenzyme",
+  diabetes: "Blutzucker / Diabetes",
+  schilddruese: "Schilddrüse",
+  tumormarker: "Tumormarker",
+  genetik: "Genetische Parameter",
+  sonstiges: "Weitere Parameter",
+};
+
+export type Laborparameter = {
+  id: number;
+  gruppe: string;
+  gruppe_name: string;
+  name: string;
+  kurzname: string;
+  einheit: string;
+  referenz_von: number | null;
+  referenz_bis: number | null;
+  reihenfolge: number;
+  aktiv: boolean;
+  in_befunden: number;
+};
+
+export type Laborwert = {
+  id?: number;
+  parameter: number | null;
+  freitext_name: string;
+  bezeichnung?: string;
+  wert: number | string | null;
+  wert_text: string;
+  anzeige_wert?: string;
+  einheit: string;
+  referenz_von: number | null;
+  referenz_bis: number | null;
+  ausserhalb?: "hoch" | "niedrig" | null;
+  bemerkung: string;
+  reihenfolge?: number;
+  gruppe?: string | null;
+  gruppe_name?: string | null;
+};
+
+export type Laborbefund = {
+  id: number;
+  patient: number;
+  patient_name?: string;
+  abgenommen_am: string;
+  labor: string;
+  beurteilung: string;
+  dokument: number | null;
+  werte: Laborwert[];
+  anzahl_werte: number;
+  erfasst_am: string;
+  erfasst_von_name: string | null;
+};
+
+export type BiaMessung = {
+  id: number;
+  patient: number;
+  gemessen_am: string;
+  gewicht_kg: number | null;
+  bcm_kg: number | null;
+  fettmasse_kg: number | null;
+  ecw_prozent: number | null;
+  koerperwasser_l: number | null;
+  bmi: number | null;
+  bmi_berechnet: number | null;
+  magermasse_kg: number | null;
+  beurteilung: string;
+  dokument: number | null;
+  gewichtsmessung: number | null;
+  erfasst_am: string;
+  erfasst_von_name: string | null;
+};
+
+export type Bericht = {
+  id: number;
+  patient: number;
+  patient_name?: string;
+  status: "entwurf" | "freigegeben";
+  status_name: string;
+  art: number | null;
+  art_name: string | null;
+  titel: string;
+  datum: string;
+  empfaenger: string;
+  inhalt: string;
+  erstellt_am: string;
+  erstellt_von_name: string | null;
+  freigegeben_am: string | null;
+  freigegeben_von_name: string | null;
+  freigabevermerk: string | null;
+  dokument: number | null;
+  pdf_sha256: string;
+  vorlage_version: number | null;
+};
+
+
+// ================================================================= Hinweise stummschalten (07.10.2026, F119)
+export type HinweisArt = "gewicht" | "plan" | "ohne_plan" | "versorger" | "kontakt" | "labor" | "bia";
+
+/** Fristen, die beim Wegklicken zur Wahl stehen; „nicht mehr nötig“ ist die vierte Möglichkeit */
+export const RUHE_FRISTEN = [3, 6, 12] as const;
+
+export type Hinweisruhe = {
+  id: number;
+  art: HinweisArt;
+  art_name: string;
+  /** leer = nicht mehr nötig, bis jemand es zurücknimmt */
+  bis: string | null;
+  grund: string;
+  laeuft: boolean;
+  gesetzt_am: string;
+  gesetzt_von_name: string | null;
+  aufgehoben_am: string | null;
+  aufgehoben_von_name: string | null;
+};

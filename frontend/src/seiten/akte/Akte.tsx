@@ -9,7 +9,7 @@ import type { Feldfehler } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useAuswahl, useVersorgerListe } from "@/lib/daten";
 import { alter, datum, eingabeDatum, eingabeZahl, heuteIso, kg, nummer, prozent, terminZeit, zahl } from "@/lib/format";
-import { ABSCHLUSSANLAESSE, ERKLAERUNGEN_KURZ, GESCHLECHTER, TERMINARTEN } from "@/lib/typen";
+import { ABSCHLUSSANLAESSE, ERKLAERUNGEN_KURZ, GESCHLECHTER, TERMINARTEN, VERSICHERUNGSARTEN } from "@/lib/typen";
 import type { Patient, Recht } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Textfeld, cx } from "@/components/ui/basis";
@@ -57,7 +57,9 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
   const start = () => ({
     nachname: patient.nachname, vorname: patient.vorname, geschlecht: patient.geschlecht, geburtsdatum: datum(patient.geburtsdatum),
     groesse: patient.groesse_cm != null ? zahl(patient.groesse_cm) : "", strasse: patient.strasse, plz: patient.plz, ort: patient.ort,
-    telefon: patient.telefon, telefon2: patient.telefon2, email: patient.email, krankenkasse: patient.krankenkasse,
+    telefon: patient.telefon, telefon2: patient.telefon2, email: patient.email,
+    versicherungsart: patient.versicherungsart, krankenkasse: patient.krankenkasse,
+    versichertennummer: patient.versichertennummer,
     versorger: patient.versorger ? String(patient.versorger) : patient.kein_versorger ? KEIN : "",
     ansprechpartner: patient.ansprechpartner ? String(patient.ansprechpartner) : "",
     katheter: patient.katheter ? String(patient.katheter) : patient.kein_katheter ? KEIN : "",
@@ -95,7 +97,10 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
     speichern.mutate({
       nachname: f.nachname.trim(), vorname: f.vorname.trim(), geschlecht: f.geschlecht, geburtsdatum: geb, groesse_cm: groesse,
       strasse: f.strasse.trim(), plz: f.plz.trim(), ort: f.ort.trim(), telefon: f.telefon.trim(), email: f.email.trim(),
-      telefon2: f.telefon2.trim(), krankenkasse: f.krankenkasse.trim(),
+      telefon2: f.telefon2.trim(),
+      // Versichertendaten (F118): Art, Versicherung und Versichertennummer
+      versicherungsart: f.versicherungsart, krankenkasse: f.krankenkasse.trim(),
+      versichertennummer: f.versichertennummer.trim(),
       // „kein“ = bewusst keiner, leer = noch nicht erfasst (Festlegung 01.10.2026)
       versorger: f.versorger && f.versorger !== KEIN ? Number(f.versorger) : null, kein_versorger: f.versorger === KEIN,
       ansprechpartner: f.ansprechpartner && f.versorger !== KEIN ? Number(f.ansprechpartner) : null,
@@ -136,7 +141,15 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
         <Feld label="Telefon" className="col-span-2" fehler={e.telefon}>{(p) => <Eingabe {...p} className="num" value={f.telefon} onChange={set("telefon")} />}</Feld>
         <Feld label="Telefon 2" className="col-span-2" fehler={e.telefon2}>{(p) => <Eingabe {...p} className="num" value={f.telefon2} onChange={set("telefon2")} />}</Feld>
         <Feld label="E-Mail" className="col-span-2" fehler={e.email}>{(p) => <Eingabe {...p} type="email" value={f.email} onChange={set("email")} />}</Feld>
-        <Feld label="Krankenkasse" className="col-span-2" fehler={e.krankenkasse}>{(p) => <Eingabe {...p} maxLength={100} value={f.krankenkasse} onChange={set("krankenkasse")} />}</Feld>
+        <Feld label="Versicherungsart" className="col-span-2" fehler={e.versicherungsart}>
+          {(p) => (
+            <Auswahl {...p} value={f.versicherungsart} onChange={set("versicherungsart")}>
+              {Object.entries(VERSICHERUNGSARTEN).map(([k, text]) => <option key={k} value={k}>{text}</option>)}
+            </Auswahl>
+          )}
+        </Feld>
+        <Feld label="Versicherung" className="col-span-2" fehler={e.krankenkasse}>{(p) => <Eingabe {...p} maxLength={100} value={f.krankenkasse} onChange={set("krankenkasse")} />}</Feld>
+        <Feld label="Versichertennummer" className="col-span-2" fehler={e.versichertennummer}>{(p) => <Eingabe {...p} className="num" maxLength={50} value={f.versichertennummer} onChange={set("versichertennummer")} />}</Feld>
         <Feld label="Versorger" className="col-span-2" fehler={e.versorger}>
           {(p) => (
             <Auswahl {...p} value={f.versorger} onChange={(ev) => setF((a) => ({ ...a, versorger: ev.target.value, ansprechpartner: "" }))}>
@@ -301,7 +314,7 @@ export function Akte() {
   const pid = Number(id);
   const { darf, darfBei } = useAuth();
   const navigate = useNavigate();
-  const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "pdf">("");
+  const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "pdf" | "sprechstunde">("");
   const akte = useQuery({ queryKey: ["patient", pid], queryFn: () => api<Patient>(`patienten/${pid}/`), enabled: !!pid });
   const p = akte.data;
   const qc = useQueryClient();
@@ -330,6 +343,7 @@ export function Akte() {
   const erlaubt: Record<typeof dialog, boolean> = {
     "": true,
     pdf: true,
+    sprechstunde: true,
     stammdaten: offenBei("akten_bearbeiten"),
     abschluss: offenBei("akten_abschliessen"),
     oeffnen: !!p && p.ist_abgeschlossen && darf("akten_wieder_oeffnen"),
@@ -397,6 +411,8 @@ export function Akte() {
             <Menue label="Weitere Aktionen" eintraege={[
               ...(kontext.bearbeiten ? [{ text: "Stammdaten bearbeiten", onClick: () => setDialog("stammdaten") }] : []),
               { text: "Akte als PDF", onClick: () => setDialog("pdf") },
+              // Unterlagen für die Sprechstunde (F116): der aktuellste Stand aller Bereiche auf einem Blatt
+              { text: "Unterlagen für die Sprechstunde", onClick: () => setDialog("sprechstunde") },
               ...(erlaubt.abschluss ? [{ text: "Akte abschließen", onClick: () => setDialog("abschluss"), gefaehrlich: true }] : []),
               ...(erlaubt.oeffnen ? [{ text: "Akte wieder öffnen", onClick: () => setDialog("oeffnen") }] : []),
             ]} />
@@ -464,11 +480,17 @@ export function Akte() {
         </Meldung>
       ) : null}
 
-      <nav aria-label="Aktenbereiche" className="segmente self-start">
+      {/* Jeder Bereich ein eigener Reiter (Wunsch 07.10.2026, F121); bei schmalem Fenster umbrechen die Reiter */}
+      <nav aria-label="Aktenbereiche" className="segmente self-start flex-wrap h-auto">
         <Reiter zu={basis} text="Übersicht" ende />
-        <Reiter zu={`${basis}/therapie`} text="Diagnose & Therapie" />
+        <Reiter zu={`${basis}/diagnosen`} text="Diagnosen" zahl={k?.zaehler.diagnosen} />
+        <Reiter zu={`${basis}/therapie`} text="Therapie" />
         <Reiter zu={`${basis}/kontakte`} text="Kontakte" zahl={k?.zaehler.kontakte} />
         <Reiter zu={`${basis}/plaene`} text="Infusionspläne" zahl={k?.zaehler.infusionsplaene} />
+        {/* Wünsche aus der Praxis vom 06.10.2026 (F112–F115) */}
+        <Reiter zu={`${basis}/labor`} text="Labor" zahl={k?.zaehler.laborbefunde} />
+        <Reiter zu={`${basis}/bia`} text="BIA" zahl={k?.zaehler.bia_messungen} />
+        <Reiter zu={`${basis}/berichte`} text="Berichte" zahl={k?.zaehler.berichte} />
         <Reiter zu={`${basis}/dokumente`} text="Dokumente" zahl={k?.zaehler.dokumente} />
         <Reiter zu={`${basis}/datenschutz`} text="Datenschutz" zahl={k?.datenschutz_anfragen || undefined} />
         <Reiter zu={`${basis}/verlauf`} text="Verlauf" />
@@ -482,6 +504,9 @@ export function Akte() {
       {erlaubt.oeffnen ? <WiederOeffnenDialog patient={p} offen={dialog === "oeffnen"} onOffen={(o) => setDialog(o ? "oeffnen" : "")} /> : null}
       <PdfDialog offen={dialog === "pdf"} onOffen={(o) => setDialog(o ? "pdf" : "")} titel={`Akte ${name(p)} als PDF`}
         pfad={`patienten/${p.id}/pdf/`} dateiname={`Patientendatenblatt-${p.nummer}.pdf`} />
+      <PdfDialog offen={dialog === "sprechstunde"} onOffen={(o) => setDialog(o ? "sprechstunde" : "")}
+        titel={`Unterlagen für die Sprechstunde · ${name(p)}`}
+        pfad={`patienten/${p.id}/sprechstunde/`} dateiname={`Sprechstunde-${p.nummer}.pdf`} />
       {kontext.erfassen ? <TerminDialog offen={dialog === "termin"} onOffen={(o) => setDialog(o ? "termin" : "")} patientId={p.id} patientName={name(p)} /> : null}
     </Seite>
   );

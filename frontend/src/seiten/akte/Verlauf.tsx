@@ -20,16 +20,30 @@ const BEREICHE: { wert: string; text: string }[] = [
   { wert: "gewichte", text: "Gewicht" }, { wert: "termine", text: "Termine" }, { wert: "infusionsplaene", text: "Infusionspläne" },
   { wert: "dokumente", text: "Dokumente" }, { wert: "aerzte", text: "Ärzte" }, { wert: "bezugspersonen", text: "Bezugspersonen" },
   { wert: "erklaerungen", text: "Erklärungen" }, { wert: "datenschutz", text: "Datenschutz" },
+  // Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
+  { wert: "diagnosen", text: "Diagnosen (ICD)" }, { wert: "laborbefunde", text: "Laborbefunde" },
+  { wert: "bia_messungen", text: "BIA-Messungen" }, { wert: "berichte", text: "Berichte" },
+  // weggeklickte Hinweise (F119)
+  { wert: "hinweisruhe", text: "Hinweise ausgeblendet" },
 ];
 const BEREICH_EINZELN: Record<string, string> = {
   stammdaten: "Stammdaten", diagnose: "Diagnose", therapie: "Therapie", empfehlung: "Empfehlung", bemerkung: "Bemerkung", kontakte: "Kontakt",
   gewichte: "Gewicht", termine: "Termin", infusionsplaene: "Infusionsplan", dokumente: "Dokument",
   aerzte: "Arzt", bezugspersonen: "Bezugsperson", erklaerungen: "Erklärung", datenschutz: "Datenschutz-Anfrage",
+  hinweisruhe: "Hinweis ausgeblendet",
+  // Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
+  diagnosen: "Diagnose (ICD)", laborbefunde: "Laborbefund", bia_messungen: "BIA-Messung", berichte: "Bericht",
 };
 
 const FELDER: Record<string, string> = {
   nachname: "Nachname", vorname: "Vorname", geburtsdatum: "Geburtsdatum", geschlecht: "Geschlecht", strasse: "Straße", plz: "PLZ",
-  ort: "Ort", telefon: "Telefon", telefon2: "Telefon 2", email: "E-Mail", krankenkasse: "Krankenkasse", hausarzt: "Hausarzt",
+  ort: "Ort", telefon: "Telefon", telefon2: "Telefon 2", email: "E-Mail", krankenkasse: "Versicherung",
+  versicherungsart: "Versicherungsart", versichertennummer: "Versichertennummer", hausarzt: "Hausarzt",
+  icd_code: "ICD-Code", kennzeichen: "Zusatzkennzeichen", bezeichnung: "Bezeichnung", seit: "besteht seit",
+  beendet_am: "beendet am", abgenommen_am: "Abnahme am", labor: "Labor", beurteilung: "Beurteilung",
+  bcm_kg: "BCM (kg)", fettmasse_kg: "Fettmasse (kg)", ecw_prozent: "ECW (%)", koerperwasser_l: "Körperwasser (l)",
+  bmi: "BMI", empfaenger: "Empfänger", freigegeben_am: "Freigegeben am",
+  zusatz_tage_pro_woche: "Zusatzvolumen pro Woche", freie_tage_pro_woche: "Infusionsfreie Tage",
   ueberweisung_durch: "Überweisung durch", groesse_cm: "Größe (cm)", katheter: "Katheter", versorger: "Versorger",
   ansprechpartner: "Ansprechpartner", nickelallergie: "Nickelallergie", kein_katheter: "Kein Katheter",
   kein_versorger: "Kein Versorger", kein_plan: "Kein Infusionsplan nötig", kein_plan_grund: "Grund (kein Infusionsplan)",
@@ -45,7 +59,7 @@ const FELDER: Record<string, string> = {
   aminosaeuren_g: "Aminosäuren (g)", lipide_praeparat: "Lipid-Präparat", lipide_g: "Lipide (g)", albumin_praeparat: "Albumin-Präparat",
   albumin_ml: "Humanalbumin (ml)", albumin_g: "Albumin (g)", natrium_mmol: "Natrium", kalium_mmol: "Kalium", phosphat_mmol: "Phosphat", calcium_mmol: "Calcium",
   magnesium_mmol: "Magnesium", spurenelemente: "Spurenelemente", katheterschutz: "Katheterblock", laufzeit_h: "Laufzeit (h)",
-  tage_pro_woche: "Tage pro Woche", pantozol_stufe: "Protonenpumpenhemmer", pantozol_tage: "PPI-Zeiten", kcal_manuell: "Energie (manuell)",
+  tage_pro_woche: "PE (Mischbeutel) pro Woche", pantozol_stufe: "Protonenpumpenhemmer", pantozol_tage: "PPI-Zeiten", kcal_manuell: "Energie (manuell)",
   gesamtvolumen_ml: "Gesamtvolumen (ml)", volumen_gewicht_kg: "Gewicht für das Gesamtvolumen (kg)",
   // Datenschutz
   aufbewahrung_bis: "Aufbewahrung verlängert bis", aufbewahrung_grund: "Grund der längeren Aufbewahrung",

@@ -1,9 +1,14 @@
 # EPM – Images auf dem PC bauen und für die Übertragung speichern
-# Aufruf in PowerShell im Ordner mit diesem Skript:   .\bauen.ps1            (Version 0.1.0)
-#                                                      .\bauen.ps1 0.1.1      (andere Version)
-param([string]$Version = "0.1.0")
+# Aufruf in PowerShell im Ordner mit diesem Skript:   .\bauen.ps1            (Version aus der Datei VERSION)
+#                                                      .\bauen.ps1 0.2.1      (andere Version)
+param([string]$Version = "")
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
+
+# Ohne Angabe gilt die Version des Projekts - sonst entstuende ein Paket mit einer alten Nummer, das beim
+# Einspielen eine neuere Fassung ueberschreibt (Stolperstein 06.10.2026).
+if (-not $Version) { $Version = (Get-Content "VERSION" -Raw).Trim() }
+if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "Version nicht erkannt: '$Version' (erwartet X.Y.Z)." }
 
 function Docker-Befehl {
     & docker @args

@@ -30,14 +30,36 @@ from audit.bereinigung import akte_text
 from stammdaten.models import Arzt
 
 from .datenschutz import DatenschutzAktionen
-from .kennzahlen import (abschluss_pruefen, kennzahlen, kontakt_filter, ohne_pflicht_erklaerungen, ohne_plan, pruefliste,
+from .kennzahlen import (abschluss_pruefen, befund_filter, kennzahlen, kontakt_filter, ohne_pflicht_erklaerungen,
+                         ohne_plan, pruefliste,
                          schnellfilter, zaehler)
 from .loeschung import PLATZHALTER, schwaerze_dokument, trage_ein
-from .models import (Bezugsperson, Datenschutzanfrage, Dokument, DokumentVorgang, Erklaerung, Gewichtsmessung,
-                     Kontakt, Patient, PatientArzt, Termin, dokument_pfad)
+from .models import (Bezugsperson, Datenschutzanfrage, Diagnose, Dokument, DokumentVorgang, Erklaerung,
+                     Gewichtsmessung, Hinweisruhe, Kontakt, Patient, PatientArzt, Termin, dokument_pfad,
+                     plus_monate)
 
 
 # ================================================================= Patient
+class HinweisruheSerializer(serializers.ModelSerializer):
+    """Ein weggeklickter Hinweis (F119)."""
+
+    art_name = serializers.CharField(source="get_art_display", read_only=True)
+    laeuft = serializers.BooleanField(read_only=True)
+    gesetzt_von_name = serializers.SerializerMethodField()
+    aufgehoben_von_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Hinweisruhe
+        fields = ["id", "art", "art_name", "bis", "grund", "laeuft", "gesetzt_am", "gesetzt_von_name",
+                  "aufgehoben_am", "aufgehoben_von_name"]
+
+    def get_gesetzt_von_name(self, obj):
+        return benutzername(obj.gesetzt_von)
+
+    def get_aufgehoben_von_name(self, obj):
+        return benutzername(obj.aufgehoben_von)
+
+
 class PatientListSerializer(serializers.ModelSerializer):
     versorger_name = serializers.CharField(source="versorger.name", read_only=True, default=None)
     ansprechpartner_name = serializers.CharField(source="ansprechpartner.name", read_only=True, default=None)
@@ -90,7 +112,8 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
         model = Patient
         fields = [
             "id", "nummer", "nachname", "vorname", "geburtsdatum", "geschlecht",
-            "strasse", "plz", "ort", "telefon", "telefon2", "email", "krankenkasse", "hausarzt",
+            "strasse", "plz", "ort", "telefon", "telefon2", "email",
+            "versicherungsart", "krankenkasse", "versichertennummer", "hausarzt",
             "ueberweisung_durch", "groesse_cm", "katheter", "versorger", "ansprechpartner", "nickelallergie",
             "kein_katheter", "kein_versorger",
             "diagnose", "therapie", "empfehlung", "bemerkung",
@@ -168,6 +191,11 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                 "bezugspersonen": obj.bezugspersonen.filter(aktiv=True).count(),
                 "aerzte": obj.aerzte.filter(aktiv=True).count(),
                 "erklaerungen": obj.erklaerungen.count(),
+                # eigene Reiter seit 07.10.2026 (F121): Zähler für Diagnosen, Labor, BIA und Berichte
+                "diagnosen": obj.diagnosen.filter(aktiv=True).count(),
+                "laborbefunde": obj.laborbefunde.count(),
+                "bia_messungen": obj.bia_messungen.count(),
+                "berichte": obj.berichte.count(),
             },
         }
 
@@ -280,7 +308,9 @@ class PatientFilter(filters.FilterSet):
                  ("kontakt_bald", "Kontakt bald fällig"), ("kontakt_ueberfaellig", "Kontakt überfällig"),
                  ("wiedereinbestellung", "Wiedereinbestellung fällig (Kontakt fällig, kein Termin geplant)"),
                  ("erklaerungen", "Erklärungen zum Datenschutz fehlen"),
-                 ("abschluss_pruefen", "Abschluss prüfen (lange kein Kontakt)")],
+                 ("abschluss_pruefen", "Abschluss prüfen (lange kein Kontakt)"),
+                 ("labor_faellig", "Laborbefund fehlt oder ist zu alt"),
+                 ("bia_faellig", "BIA-Messung fehlt oder ist zu alt")],
         method="filter_pruefen",
     )
 
@@ -306,6 +336,8 @@ class PatientFilter(filters.FilterSet):
             return qs.filter(id__in=ohne_pflicht_erklaerungen(qs.order_by()))
         if wert == "abschluss_pruefen":
             return qs.filter(id__in=abschluss_pruefen(Patient.objects.all()).values("id"))
+        if wert in ("labor_faellig", "bia_faellig"):
+            return befund_filter(qs, wert)  # F120: Befund fehlt oder ist älter als die eingestellte Grenze
         return qs
 
     def filter_status(self, qs, name, wert):
@@ -491,6 +523,58 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
         patient.refresh_from_db()
         return Response(PatientSerializer(patient, context=self.get_serializer_context()).data)
 
+    @action(detail=True, methods=["get", "post"], url_path="hinweis-ruhe")
+    def hinweis_ruhe(self, request, pk=None):
+        """Einen Hinweis der Akte wegklicken oder wieder einschalten (Wunsch 07.10.2026, F119).
+
+        ``GET`` liefert die laufenden und die früheren Stummschaltungen.
+        ``POST {"art": "labor", "monate": 3, "grund": "…"}`` schaltet den Hinweis für 3 Monate stumm;
+        ``{"art": "labor", "dauerhaft": true, "grund": "…"}`` heißt „nicht mehr nötig“ – der Hinweis bleibt weg,
+        bis jemand ihn zurückholt. ``{"art": "labor", "aufheben": true}`` holt ihn zurück.
+
+        Recht „Akten bearbeiten“; Admins nur bei Testpatienten. Steht im Verlauf der Akte."""
+        patient = self.get_object()
+        if request.method == "GET":
+            return Response(HinweisruheSerializer(
+                patient.hinweisruhe.select_related("gesetzt_von", "aufgehoben_von"), many=True).data)
+        pruefe_schreibbereich(request.user, patient)
+        patient.pruefe_bearbeitbar()
+        art = str(request.data.get("art") or "")
+        if art not in Hinweisruhe.Art.values:
+            return Response({"art": "Unbekannter Hinweis."}, status=status.HTTP_400_BAD_REQUEST)
+        laufend = patient.hinweisruhe.filter(art=art, aufgehoben_am__isnull=True).first()
+        if wahr(request.data.get("aufheben")):
+            if laufend is None:
+                return Response({"fehler": "Dieser Hinweis ist nicht stummgeschaltet."},
+                                status=status.HTTP_400_BAD_REQUEST)
+            laufend._history_user = request.user
+            laufend.aufheben(request.user)
+            return Response(HinweisruheSerializer(laufend).data)
+        grund = str(request.data.get("grund") or "").strip()
+        if len(grund) > 300:
+            return Response({"grund": "Höchstens 300 Zeichen."}, status=status.HTTP_400_BAD_REQUEST)
+        dauerhaft = wahr(request.data.get("dauerhaft"))
+        bis = None
+        if not dauerhaft:
+            try:
+                monate = int(request.data.get("monate"))
+            except (TypeError, ValueError):
+                monate = 0
+            if monate not in Hinweisruhe.FRISTEN:
+                return Response({"monate": f"Bitte eine Frist wählen: "
+                                           f"{', '.join(str(m) for m in Hinweisruhe.FRISTEN)} Monate – "
+                                           f"oder „nicht mehr nötig“."}, status=status.HTTP_400_BAD_REQUEST)
+            bis = plus_monate(timezone.localdate(), monate)
+        if laufend is not None:
+            # schon stumm: die bisherige Stummschaltung endet, die neue tritt an ihre Stelle (beides im Verlauf)
+            laufend._history_user = request.user
+            laufend.aufheben(request.user)
+        ruhe = Hinweisruhe(patient=patient, art=art, bis=bis, grund=grund, gesetzt_von=request.user)
+        ruhe.full_clean(exclude=["gesetzt_von"])
+        ruhe._history_user = request.user
+        ruhe.save()
+        return Response(HinweisruheSerializer(ruhe).data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=["post"], url_path="wieder-oeffnen", permission_classes=[WiederOeffnenRecht])
     def wieder_oeffnen(self, request, pk=None):
         patient = self.get_object()
@@ -523,6 +607,36 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
         protokolliere(SystemEreignis.Art.EXPORT, request, objekt=akte_text(patient), was="Akte", patient_id=patient.id)
         return pdf_antwort(pdf, f"Patientendatenblatt-{patient.nummer}-{timezone.localdate():%Y-%m-%d}.pdf")
 
+    @action(detail=True, methods=["get"])
+    def sprechstunde(self, request, pk=None):
+        """Unterlagen für die Sprechstunde als PDF (F116): Diagnosen, aktueller Infusionsplan, letzte
+        BIA-Messung, letzter Laborbefund, letzte Empfehlung und der Gewichtsstand auf einem Blatt.
+
+        ``?ablegen=1`` legt das Blatt zusätzlich als Dokument in der Akte ab (nur bei offenen Akten und mit
+        dem Recht, Einträge zu erfassen)."""
+        from vorlagen.api import pdf_antwort
+        from vorlagen.listen import sprechstunde_pdf
+        from vorlagen.pdf import als_dokument
+
+        patient = self.get_object()
+        pdf = sprechstunde_pdf(patient)
+        heute = timezone.localdate()
+        dateiname = f"Sprechstunde-{patient.nummer}-{heute:%Y-%m-%d}.pdf"
+        abgelegt = None
+        if wahr(request.query_params.get("ablegen")):
+            if not request.user.hat_recht("eintraege_erfassen"):
+                raise PermissionDenied("Dafür fehlt das Recht „Kontakte, Gewichte, Termine, Dokumente erfassen“.")
+            pruefe_schreibbereich(request.user, patient)
+            patient.pruefe_bearbeitbar()
+            abgelegt = als_dokument(patient, pdf, f"Unterlagen für die Sprechstunde vom {heute:%d.%m.%Y}",
+                                    "Sprechstunde", heute, request.user, dateiname)
+        protokolliere(SystemEreignis.Art.SPRECHSTUNDE_ERZEUGT, request, objekt=akte_text(patient),
+                      patient_id=patient.id, abgelegt=bool(abgelegt))
+        antwort = pdf_antwort(pdf, dateiname)
+        if abgelegt is not None:
+            antwort["X-EPM-Dokument"] = str(abgelegt.pk)
+        return antwort
+
     @action(detail=True, methods=["get"], url_path="verlauf/pdf")
     def verlauf_pdf(self, request, pk=None):
         """Verlauf als PDF (F24), mit denselben Filtern wie die Ansicht."""
@@ -546,7 +660,8 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
         """Alle Fassungen aller Einträge dieser Akte, neueste zuerst (Entwurf 10).
 
         Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, bemerkung, gewichte, kontakte, termine,
-        dokumente, infusionsplaene, bezugspersonen, aerzte, erklaerungen, datenschutz; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
+        dokumente, infusionsplaene, bezugspersonen, aerzte, erklaerungen, datenschutz, diagnosen, laborbefunde,
+        bia_messungen, berichte, hinweisruhe; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
         die Bereiche Stammdaten, Diagnose, Therapie, Empfehlung und Bemerkung verteilt.
         """
         patient = self.get_object()
@@ -575,6 +690,12 @@ def _aktion(name, h, aenderungen):
         return "wieder aktuell" if h.aktiv else "nicht mehr aktuell"
     if name == "aerzte" and "aktiv" in felder:
         return "wieder zuständig" if h.aktiv else "nicht mehr zuständig"
+    if name == "hinweisruhe" and "aufgehoben_am" in felder:
+        return "wieder eingeschaltet"
+    if name == "diagnosen" and "aktiv" in felder:
+        return "wieder zutreffend" if h.aktiv else "nicht mehr zutreffend"
+    if name == "berichte" and "status" in felder:
+        return "freigegeben" if h.status == "freigegeben" else "geändert"
     if name == "stammdaten" and "abgeschlossen_am" in felder:
         return "abgeschlossen" if h.abgeschlossen_am else "wieder geöffnet"
     if name == "stammdaten" and "eingeschraenkt_am" in felder:
@@ -656,6 +777,36 @@ def _beschreibung(name, h, aktion) -> str:
             if h.widerrufen_am:
                 teile.append(f"widerrufen am {h.widerrufen_am:%d.%m.%Y}")
             return " · ".join(teile)
+        if name == "diagnosen":
+            teile = [f"{h.bezeichnung} [{h.icd_code}{h.kennzeichen}]"]
+            if h.seit:
+                teile.append(f"seit {h.seit:%d.%m.%Y}")
+            if h.notiz:
+                teile.append(h.notiz)
+            return " · ".join(teile)
+        if name == "hinweisruhe":
+            wann = f"bis {h.bis:%d.%m.%Y}" if h.bis else "bis auf Weiteres (nicht mehr nötig)"
+            return " · ".join(filter(None, [dict(Hinweisruhe.Art.choices).get(h.art, h.art), wann, h.grund]))
+        if name == "laborbefunde":
+            teile = [f"Abnahme {h.abgenommen_am:%d.%m.%Y}"]
+            if h.labor:
+                teile.append(h.labor)
+            from befunde.models import Laborwert
+
+            anzahl = Laborwert.objects.filter(befund_id=h.id).count()
+            teile.append(f"{anzahl} Werte" if anzahl != 1 else "1 Wert")
+            return " · ".join(teile)
+        if name == "bia_messungen":
+            werte = [(f"{_deutsch(h.gewicht_kg, 1)} kg" if h.gewicht_kg is not None else None),
+                     (f"BCM {_deutsch(h.bcm_kg, 1)} kg" if h.bcm_kg is not None else None),
+                     (f"Fett {_deutsch(h.fettmasse_kg, 1)} kg" if h.fettmasse_kg is not None else None),
+                     (f"ECW {_deutsch(h.ecw_prozent, 1)} %" if h.ecw_prozent is not None else None)]
+            return " · ".join([f"gemessen am {h.gemessen_am:%d.%m.%Y}", *[w for w in werte if w]])
+        if name == "berichte":
+            teile = [h.titel, f"vom {h.datum:%d.%m.%Y}"]
+            if h.empfaenger:
+                teile.append(f"an {h.empfaenger}")
+            return " · ".join(teile)
         if name == "datenschutz":
             teile = [f"Anfrage: {dict(Datenschutzanfrage.Art.choices).get(h.art, h.art)}",
                      f"eingegangen am {h.eingegangen_am:%d.%m.%Y}"]
@@ -677,6 +828,8 @@ def _beschreibung(name, h, aktion) -> str:
 
 
 def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
+    from befunde.models import BiaMessung, Laborbefund
+    from berichte.models import Bericht
     from infusionen.models import Infusionsplan
 
     quellen = {
@@ -690,6 +843,12 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         "aerzte": PatientArzt.history.filter(patient_id=patient.id),
         "erklaerungen": Erklaerung.history.filter(patient_id=patient.id),
         "datenschutz": Datenschutzanfrage.history.filter(patient_id=patient.id),
+        # Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
+        "diagnosen": Diagnose.history.filter(patient_id=patient.id),
+        "hinweisruhe": Hinweisruhe.history.filter(patient_id=patient.id),
+        "laborbefunde": Laborbefund.history.filter(patient_id=patient.id),
+        "bia_messungen": BiaMessung.history.filter(patient_id=patient.id),
+        "berichte": Bericht.history.filter(patient_id=patient.id),
     }
     if bereich and bereich not in ("stammdaten", *TEXTFELDER):
         quellen = {k: v for k, v in quellen.items() if k == bereich}
@@ -1423,6 +1582,58 @@ class PatientArztViewSet(_StammEintragViewSet):
 
     def get_queryset(self):
         return super().get_queryset().select_related("arzt", "angelegt_von")
+
+
+class DiagnoseSerializer(ModelClean, _PatientFest, serializers.ModelSerializer):
+    """Diagnose mit ICD-Code und Zusatzkennzeichen (F117)."""
+
+    kennzeichen_name = serializers.CharField(source="get_kennzeichen_display", read_only=True)
+    anzeige = serializers.CharField(read_only=True)
+    angelegt_von_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Diagnose
+        fields = ["id", "patient", "bezeichnung", "icd_code", "kennzeichen", "kennzeichen_name", "anzeige",
+                  "seit", "notiz", "reihenfolge", "aktiv", "beendet_am", "angelegt_am", "angelegt_von_name"]
+        read_only_fields = ["angelegt_am", "beendet_am"]
+
+    def get_angelegt_von_name(self, obj):
+        return benutzername(obj.angelegt_von)
+
+    def validate_bezeichnung(self, wert):
+        if not wert.strip():
+            raise serializers.ValidationError("Bitte die Bezeichnung angeben.")
+        return wert.strip()
+
+    def validate_icd_code(self, wert):
+        """Großschreibung hier vereinheitlichen: ``ModelClean`` prüft nur, gespeichert wird der Serializer-Wert."""
+        return (wert or "").strip().upper()
+
+
+class DiagnoseViewSet(_StammEintragViewSet):
+    """Diagnosen eines Patienten: ``?patient=ID&aktiv=true``.
+
+    Jede neue Kombination aus ICD-Code und Bezeichnung wandert in den Katalog unter Vorlagen › Diagnosen,
+    damit die Liste im Hintergrund von allein mitwächst (U53)."""
+
+    model = Diagnose
+    serializer_class = DiagnoseSerializer
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("angelegt_von")
+
+    def _in_katalog(self, diagnose):
+        from stammdaten.models import Diagnosevorlage
+
+        Diagnosevorlage.objects.get_or_create(icd_code=diagnose.icd_code, bezeichnung=diagnose.bezeichnung)
+
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        self._in_katalog(serializer.instance)
+
+    def perform_update(self, serializer):
+        super().perform_update(serializer)
+        self._in_katalog(serializer.instance)
 
 
 def _zuletzt_eingetragen(patienten, anzahl=10, person=None):

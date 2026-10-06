@@ -1,4 +1,4 @@
-/** Entwürfe 4, 5, 6 · Patientenakte: Kopf, Übersicht mit Gewicht, Diagnose & Therapie, Kontakte, Abschluss. */
+/** Entwürfe 4, 5, 6 · Patientenakte: Kopf, Übersicht mit Gewicht, Diagnosen, Therapie, Kontakte, Abschluss. */
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { apiAls, eindeutig, merken, stackNeuStarten, zustand } from "./hilfen";
@@ -38,7 +38,9 @@ test("Akte aus der Liste öffnen: Kopf mit Kerndaten und Gewichtswarnung", async
   await expect(zahlen).toContainText(/↓ \d+,\d %/);
   await expect(page.getByTestId("gewichtstrend")).toContainText("Hinweis ab mehr als 5 % in 3 Monaten");
   await expect(page.getByTestId("gewichtsdiagramm")).toBeVisible();
-  for (const r of ["Übersicht", "Diagnose & Therapie", "Kontakte", "Infusionspläne", "Dokumente", "Verlauf"]) {
+  // jeder Bereich ein eigener Reiter (F121)
+  for (const r of ["Übersicht", "Diagnosen", "Therapie", "Kontakte", "Infusionspläne", "Labor", "BIA", "Berichte",
+    "Dokumente", "Verlauf"]) {
     await expect(page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: new RegExp(`^${r}`) })).toBeVisible();
   }
   await expect(page.getByTestId("aktueller-plan")).toContainText("kcal");
@@ -102,7 +104,8 @@ test("Gewicht erfassen, Plausibilität, korrigieren, Zeitraum", async ({ page })
 
 test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => {
   const p = await neuerPatient();
-  await oeffnen(page, p.id, "/therapie");
+  // eigene Reiter seit F121: der Freitext „Diagnose“ unter „Diagnosen“, die Therapie unter „Therapie“
+  await oeffnen(page, p.id, "/diagnosen");
   const diagnose = page.getByTestId("karte-diagnose");
   await diagnose.getByRole("button", { name: "Bearbeiten" }).click();
   const editor = diagnose.getByRole("textbox", { name: "Diagnose" });
@@ -129,6 +132,8 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   await page.keyboard.press("Escape");
 
   // Therapie: Editor ist direkt offen, Formatierung über die Werkzeugleiste
+  await oeffnen(page, p.id, "/therapie");
+  await expect(page.getByTestId("zuletzt-therapie")).toContainText("noch nicht bearbeitet");
   const therapie = page.getByTestId("karte-therapie");
   await therapie.getByRole("textbox", { name: "Therapie" }).click();
   await therapie.getByRole("button", { name: "Aufzählung" }).click();
@@ -247,9 +252,9 @@ test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen 
   await page.getByTestId("kennzahlen").getByRole("button", { name: /nicht erfasst/ }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Telefon", { exact: true }).fill("0251 98765");
-  // Telefon 2 und Krankenkasse seit 03.10.2026 sichtbar (Klärung U5)
+  // Telefon 2 und Versicherung sichtbar (Klärung U5; seit 06.10.2026 heißt „Krankenkasse“ „Versicherung“, F118)
   await dialog.getByLabel("Telefon 2").fill("0171 2223334");
-  await dialog.getByLabel("Krankenkasse").fill("AOK NordWest");
+  await dialog.getByLabel("Versicherung", { exact: true }).fill("AOK NordWest");
   // Nickelallergie als Auswahlliste; Katheter und Versorger bewusst „kein“ (Festlegung 01.10.2026)
   await dialog.getByLabel("Nickelallergie").selectOption("nein");
   await dialog.getByLabel("Katheter").selectOption({ label: "kein Katheter" });

@@ -16,6 +16,7 @@ import { Richtext, klartext } from "@/components/Editor";
 import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Fehleranzeige, Karte, KnopfLink, Knopf, Laden, Leer, Seitenkopf, Segmente, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
+import { HinweisChips } from "@/components/HinweisChips";
 
 type Zaehler = { in_betreuung: number; abgeschlossen: number; mit_hinweisen: number; gewichtsverlust: number; termin_woche: number };
 /** Testpatienten zählen nicht mit; ihre Anzahl kommt getrennt (nicht für Testbenutzer). */
@@ -38,6 +39,8 @@ const PRUEFEN: Record<string, string> = {
   altdokumente: "Altdokumente ohne geprüften Typ",
   nickelallergie: "Nickelallergie nicht erfasst",
   kein_versorger: "Versorger nicht erfasst",
+  labor_faellig: "Laborbefund fehlt oder ist zu alt",
+  bia_faellig: "BIA-Messung fehlt oder ist zu alt",
   ohne_plan: "Kein Infusionsplan (nicht als „kein Plan nötig“ bestätigt)",
   kein_kontakt: "Kontakt fällig (bald fällig und überfällig)",
   kontakt_bald: "Kontakt bald fällig",
@@ -91,12 +94,15 @@ function Spalte({ feld, sortierung, onSortieren, children, rechts, breite }: {
 }
 
 function Hinweise({ p }: { p: PatientZeile }) {
+  const { darfBei } = useAuth();
   return (
     <span className="inline-flex gap-1.5 flex-wrap">
       {p.nickelallergie === "ja" ? <Chip art="fehler">Nickelallergie</Chip> : null}
       {p.nickelallergie === "unbekannt" ? <Chip title="Nickelallergie nicht erfasst">Nickel ?</Chip> : null}
-      {/* Kontakt fällig in zwei Stufen (S04): überfällig rot, bald fällig gelb */}
-      {(p.kennzahlen?.hinweise ?? []).map((h) => <Chip key={h.art} art={h.stufe === "ueberfaellig" ? "fehler" : "warn"}>{h.text}</Chip>)}
+      {/* Kontakt fällig in zwei Stufen (S04): überfällig rot, bald fällig gelb.
+          Jeder Hinweis lässt sich mit „×“ wegklicken (F119). */}
+      <HinweisChips hinweise={p.kennzahlen?.hinweise ?? []} patientId={p.id}
+        ausblendbar={!p.ist_abgeschlossen && darfBei("akten_bearbeiten", p)} />
     </span>
   );
 }

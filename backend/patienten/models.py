@@ -48,7 +48,20 @@ class Patient(models.Model):
     telefon = models.CharField(max_length=50, blank=True)
     telefon2 = models.CharField("Telefon 2", max_length=50, blank=True)
     email = models.EmailField("E-Mail", blank=True)
-    krankenkasse = models.CharField(max_length=100, blank=True)
+    # Versichertendaten (Wunsch 06.10.2026, F118): Für die Auseinandersetzungen mit den Kassen reicht der Name
+    # der Kasse nicht. „krankenkasse“ behält seinen Spaltennamen (keine Datenwanderung) und heißt in der
+    # Oberfläche „Versicherung“; Art und Versichertennummer kommen dazu.
+    class Versicherungsart(models.TextChoices):
+        GKV = "gkv", "GKV (gesetzlich)"
+        PKV = "pkv", "PKV (privat)"
+        SELBSTZAHLER = "selbstzahler", "Selbstzahler"
+        SONSTIGE = "sonstige", "Sonstige"
+        UNBEKANNT = "", "nicht erfasst"
+
+    versicherungsart = models.CharField("Versicherungsart", max_length=20, choices=Versicherungsart.choices,
+                                        blank=True, default="")
+    krankenkasse = models.CharField("Versicherung", max_length=100, blank=True)
+    versichertennummer = models.CharField("Versichertennummer", max_length=50, blank=True)
     hausarzt = models.CharField(max_length=150, blank=True)
     ueberweisung_durch = models.CharField("Überweisung / Kontaktaufnahme durch", max_length=200, blank=True)
 
@@ -467,6 +480,84 @@ class PatientArzt(AktenEintrag):
         return f"{self.get_rolle_display()}: {self.arzt}"
 
 
+class Diagnose(AktenEintrag):
+    """Einzelne Diagnose der Akte mit ICD-Code und Zusatzkennzeichen (Wunsch 06.10.2026, F117).
+
+    Anzeige wie gewünscht: „Kurzdarmsyndrom [K91.2 G]“. Das Zusatzkennzeichen ist Pflicht – ohne es sagt ein
+    ICD-Code nicht, ob die Diagnose gesichert ist oder nur ein Verdacht. Nicht mehr zutreffende Diagnosen
+    werden auf „aktiv = False“ gesetzt statt gelöscht; jede Fassung steht im Verlauf der Akte.
+
+    Das lange Freitextfeld ``Patient.diagnose`` bleibt daneben bestehen (U51)."""
+
+    class Kennzeichen(models.TextChoices):
+        GESICHERT = "G", "G – gesichert"
+        VERDACHT = "V", "V – Verdacht auf"
+        ZUSTAND = "Z", "Z – Zustand nach"
+        AUSSCHLUSS = "A", "A – Ausschluss von"
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="diagnosen")
+    bezeichnung = models.CharField(max_length=200)
+    icd_code = models.CharField("ICD-Code", max_length=10, help_text="z. B. K91.2")
+    kennzeichen = models.CharField("Zusatzkennzeichen", max_length=1, choices=Kennzeichen.choices,
+                                   default=Kennzeichen.GESICHERT)
+    seit = models.DateField("besteht seit", null=True, blank=True)
+    notiz = models.CharField(max_length=300, blank=True)
+    reihenfolge = models.PositiveSmallIntegerField(default=100)
+    aktiv = models.BooleanField(default=True)
+    beendet_am = models.DateField(null=True, blank=True)
+    angelegt_am = models.DateTimeField(auto_now_add=True)
+    angelegt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Diagnose"
+        verbose_name_plural = "Diagnosen"
+        ordering = ["-aktiv", "reihenfolge", "bezeichnung", "id"]
+        indexes = [models.Index(fields=["patient", "aktiv"], name="diagnose_patient_aktiv")]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Diagnosen werden nicht gelöscht, sondern als „nicht mehr zutreffend“ markiert.")
+
+    @property
+    def anzeige(self) -> str:
+        return f"{self.bezeichnung} [{self.icd_code}{self.kennzeichen}]"
+
+    def clean(self):
+        import re
+
+        from stammdaten.models import ICD_MUSTER
+
+        self.icd_code = (self.icd_code or "").strip().upper()
+        fehler = {}
+        if not (self.bezeichnung or "").strip():
+            fehler["bezeichnung"] = "Bitte die Bezeichnung angeben."
+        if not re.match(ICD_MUSTER, self.icd_code):
+            fehler["icd_code"] = ("ICD-Code wie „K91.2“ angeben (Buchstabe, zwei Ziffern, bei Bedarf Punkt und "
+                                  "ein bis zwei Stellen).")
+        if self.kennzeichen not in self.Kennzeichen.values:
+            fehler["kennzeichen"] = "Bitte G (gesichert), V (Verdacht), Z (Zustand nach) oder A (Ausschluss) wählen."
+        heute = timezone.localdate()
+        if self.seit and self.seit > heute:
+            fehler["seit"] = "Das Datum liegt in der Zukunft."
+        if self.beendet_am and self.beendet_am > heute:
+            fehler["beendet_am"] = "Das Datum liegt in der Zukunft."
+        if self.beendet_am and self.seit and self.beendet_am < self.seit:
+            fehler["beendet_am"] = "Das Ende liegt vor dem Beginn."
+        if fehler:
+            raise ValidationError(fehler)
+
+    def save(self, *args, **kwargs):
+        if not self.aktiv and self.beendet_am is None:
+            self.beendet_am = timezone.localdate()
+        if self.aktiv:
+            self.beendet_am = None
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.anzeige
+
+
 def dokument_pfad(patient: Patient, originalname: str) -> str:
     endung = "".join(c for c in (originalname.rsplit(".", 1)[-1] if "." in originalname else "") if c.isalnum())[:10]
     return f"{patient.nummer}/{uuid.uuid4().hex}{'.' + endung.lower() if endung else ''}"
@@ -730,6 +821,87 @@ class Loeschprotokoll(models.Model):
 
     def __str__(self):
         return f"Akte Nr. {self.nummer} gelöscht am {self.geloescht_am:%d.%m.%Y}"
+
+
+class Hinweisruhe(models.Model):
+    """Ein Hinweis einer Akte ist stummgeschaltet (Wunsch 07.10.2026, F119).
+
+    Jeder Hinweis der Patientenliste und des Aktenkopfs lässt sich mit „×“ wegklicken. Dabei wird entschieden,
+    wie lange Ruhe sein soll: eine Frist in Monaten – danach erscheint der Hinweis von allein wieder – oder
+    „nicht mehr nötig“ (``bis`` leer), dann bleibt er weg, bis jemand das zurücknimmt.
+
+    Gelöscht wird nichts: Das Aufheben trägt ``aufgehoben_am`` ein, jede Fassung steht im Verlauf der Akte.
+    Die Bestätigung „Kein Infusionsplan nötig“ (F105) bleibt davon unberührt – sie wirkt weiter wie bisher."""
+
+    class Art(models.TextChoices):
+        GEWICHT = "gewicht", "Gewichtsverlust"
+        PLAN = "plan", "Infusionsplan älter als …"
+        OHNE_PLAN = "ohne_plan", "Kein Infusionsplan"
+        VERSORGER = "versorger", "Versorger nicht erfasst"
+        KONTAKT = "kontakt", "Kontakt fällig"
+        LABOR = "labor", "Laborbefund älter als …"
+        BIA = "bia", "BIA-Messung älter als …"
+
+    FRISTEN = (3, 6, 12)
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="hinweisruhe")
+    art = models.CharField(max_length=20, choices=Art.choices)
+    bis = models.DateField("Ruhe bis", null=True, blank=True, help_text="leer = nicht mehr nötig, bis aufgehoben")
+    grund = models.CharField(max_length=300, blank=True)
+    gesetzt_am = models.DateTimeField(auto_now_add=True)
+    gesetzt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+    aufgehoben_am = models.DateTimeField(null=True, blank=True)
+    aufgehoben_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                       related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Stummgeschalteter Hinweis"
+        verbose_name_plural = "Stummgeschaltete Hinweise"
+        ordering = ["-gesetzt_am", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["patient", "art"], condition=models.Q(aufgehoben_am__isnull=True),
+                                    name="hinweisruhe_je_art_einmal"),
+        ]
+        indexes = [models.Index(fields=["patient", "art"], name="hinweisruhe_patient_art")]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Stummgeschaltete Hinweise werden nicht gelöscht, sondern aufgehoben.")
+
+    @property
+    def laeuft(self) -> bool:
+        """Wirkt die Stummschaltung heute noch?"""
+        if self.aufgehoben_am is not None:
+            return False
+        return self.bis is None or self.bis >= timezone.localdate()
+
+    def aufheben(self, benutzer):
+        if self.aufgehoben_am is not None:
+            raise ValidationError("Der Hinweis ist bereits wieder eingeschaltet.")
+        self.aufgehoben_am = timezone.now()
+        self.aufgehoben_von = benutzer
+        self.save(update_fields=["aufgehoben_am", "aufgehoben_von"])
+
+    def clean(self):
+        if self.bis is not None and self.bis < timezone.localdate():
+            raise ValidationError({"bis": "Das Datum liegt in der Vergangenheit."})
+
+    def __str__(self):
+        wann = f"bis {self.bis:%d.%m.%Y}" if self.bis else "bis auf Weiteres"
+        return f"{self.get_art_display()} stumm {wann}"
+
+
+def ruhende_hinweise(patient_ids) -> dict:
+    """{patient_id: {art}} – welche Hinweise heute stummgeschaltet sind (F119)."""
+    heute = timezone.localdate()
+    ergebnis: dict = {}
+    for pid, art in (Hinweisruhe.objects
+                     .filter(patient_id__in=list(patient_ids), aufgehoben_am__isnull=True)
+                     .filter(models.Q(bis__isnull=True) | models.Q(bis__gte=heute))
+                     .values_list("patient_id", "art")):
+        ergebnis.setdefault(pid, set()).add(art)
+    return ergebnis
 
 
 class Merkeintrag(models.Model):

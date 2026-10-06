@@ -98,7 +98,7 @@ test("Import: Dump laden und Zuordnungen in der Oberfläche korrigieren", async 
 
   await schritt(page, "2 · Zuordnungen").click();
   const offen = page.getByTestId("offene-punkte");
-  await expect(offen).toContainText("4 offene Punkte");
+  await expect(offen).toContainText("5 offene Punkte");
   await expect(offen).toContainText("Nickelallergie „vielleicht“: Bitte zuordnen.");
 
   // Tabellen und Spalten: erkannt; eine Spalte abwählen und den Vorschlag wiederherstellen
@@ -138,7 +138,7 @@ test("Import: Dump laden und Zuordnungen in der Oberfläche korrigieren", async 
   await nickel.getByLabel("Nickelallergie im EPM für vielleicht").selectOption("unbekannt");
   await expect(nickel).toContainText("zugeordnet");
   await expect(page.getByTestId("katheter-nein").getByLabel("Katheter im EPM für Nein")).toHaveValue("kein");
-  await expect(offen).toContainText("3 offene Punkte");
+  await expect(offen).toContainText("4 offene Punkte");
 
   // Präparate: Schreibvariante dem vorhandenen Präparat zuordnen, unbekanntes Medikament neu anlegen
   await bereich(page, /^Präparate/).click();
@@ -158,6 +158,12 @@ test("Import: Dump laden und Zuordnungen in der Oberfläche korrigieren", async 
   await name.press("Enter");
   await expect(heparin.getByLabel("Kategorie für Heparin 100 I.E. nach Bedarf")).toHaveValue("medikament");
   await expect(heparin).toContainText("zugeordnet");
+  await expect(offen).toContainText("2 offene Punkte");
+  // „Sterofundin“ des Altsystems heißt im EPM seit dem 06.10.2026 „Sterofundin ISO“ (F111): kein genauer Treffer,
+  // deshalb steht es unter „Ähnlich geschrieben“ und wird einmal von Hand zugeordnet (U43)
+  const basis = page.getByTestId("praeparat-basis-sterofundin");
+  await basis.getByLabel("Zuordnung für Basislösung: Sterofundin").selectOption({ label: "Sterofundin ISO" });
+  await expect(basis).toContainText("zugeordnet");
   await expect(offen).toContainText("1 offene Punkte");
 
   // Im Altsystem gelöschte Patienten: Standard „nicht übernehmen“; Patient 4 als abgeschlossene Akte

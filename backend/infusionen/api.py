@@ -73,7 +73,7 @@ class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
             "natrium_mmol", "kalium_mmol", "phosphat_mmol", "calcium_mmol", "magnesium_mmol",
             "ca_mg_mmol", "ca_mg_grenze_mmol", "ca_mg_stabil", "spurenelemente", "vitamine", "vitamine_namen",
             "kcal_manuell", "kcal_berechnet", "kcal", "gesamtvolumen_ml", "volumen_gewicht_kg", "volumen_summe_ml", "laufzeit_h", "rate_ml_h",
-            "tage_pro_woche", "katheterschutz",
+            "tage_pro_woche", "zusatz_tage_pro_woche", "freie_tage_pro_woche", "katheterschutz",
             "pantozol_stufe", "pantozol_tage", "bemerkung", "positionen", "geaenderte_felder",
             "erstellt_am", "erstellt_von_name", "freigegeben_am", "freigegeben_von_name",
             "freigabe_weg", "freigabe_weg_name", "freigabe_datum", "abgeschlossen_von_name", "freigabe_nachweis",

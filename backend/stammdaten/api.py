@@ -8,7 +8,8 @@ from rest_framework.views import APIView
 from accounts.permissions import StammdatenRecht, VersorgerRecht
 from audit.models import SystemEreignis, protokolliere
 
-from .models import Absenderangaben, Ansprechpartner, Arzt, Auswahlwert, Einstellungen, Logo, Praeparat, Versorger
+from .models import (Absenderangaben, Ansprechpartner, Arzt, Auswahlwert, Diagnosevorlage, Einstellungen,
+                     Laborparameter, Logo, Praeparat, Versorger)
 
 
 def _text(wert):
@@ -220,7 +221,8 @@ class PraeparatSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Praeparat
-        fields = ["id", "kategorie", "name", "konzentration", "einheit", "reihenfolge", "aktiv", "anzeige", "in_plaenen"]
+        fields = ["id", "kategorie", "name", "konzentration", "einheit", "hinweis", "reihenfolge", "aktiv",
+                  "anzeige", "in_plaenen"]
 
 
 def _praeparate_mit_nutzung():
@@ -496,3 +498,79 @@ class LogoView(APIView):
         protokolliere(SystemEreignis.Art.VORLAGE, request, objekt="Logo", aktion="Logo hochgeladen", sha256=sha,
                       mime=mime)
         return Response(briefkopf_daten(), status=status.HTTP_201_CREATED)
+
+
+# ================================================================= Laborparameter (F112) und Diagnosen (F117)
+class LaborparameterSerializer(serializers.ModelSerializer):
+    gruppe_name = serializers.CharField(source="get_gruppe_display", read_only=True)
+    in_befunden = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Laborparameter
+        fields = ["id", "gruppe", "gruppe_name", "name", "kurzname", "einheit", "referenz_von", "referenz_bis",
+                  "reihenfolge", "aktiv", "in_befunden"]
+
+    def validate_name(self, wert):
+        if not wert.strip():
+            raise serializers.ValidationError("Bitte einen Namen angeben.")
+        return wert.strip()
+
+    def validate(self, attrs):
+        von = attrs.get("referenz_von", getattr(self.instance, "referenz_von", None))
+        bis = attrs.get("referenz_bis", getattr(self.instance, "referenz_bis", None))
+        if von is not None and bis is not None and von > bis:
+            raise serializers.ValidationError({"referenz_bis": "„Referenz bis“ muss größer oder gleich „Referenz von“ sein."})
+        return attrs
+
+
+class LaborparameterViewSet(OhneLoeschen):
+    """Katalog der Laborwerte (Vorlagen › Laborparameter). Lesen darf jeder Angemeldete – die Erfassungsmaske
+    eines Befunds braucht ihn –, ändern nur mit „Vorlagen pflegen“."""
+
+    queryset = Laborparameter.objects.all()
+    serializer_class = LaborparameterSerializer
+    filterset_fields = ["gruppe", "aktiv"]
+    search_fields = ["name", "kurzname"]
+    pagination_class = None
+
+    def get_queryset(self):
+        from django.db.models import Count
+
+        return Laborparameter.objects.annotate(in_befunden=Count("werte", distinct=True))
+
+    @action(detail=False, methods=["post"])
+    def reihenfolge(self, request):
+        return neue_reihenfolge(request, Laborparameter.objects.all(), "gruppe")
+
+
+class DiagnosevorlageSerializer(serializers.ModelSerializer):
+    anzeige = serializers.CharField(source="__str__", read_only=True)
+
+    class Meta:
+        model = Diagnosevorlage
+        fields = ["id", "icd_code", "bezeichnung", "aktiv", "anzeige", "angelegt_am"]
+        read_only_fields = ["angelegt_am"]
+
+    def validate(self, attrs):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        eintrag = self.instance or Diagnosevorlage()
+        for feld, wert in attrs.items():
+            setattr(eintrag, feld, wert)
+        try:
+            eintrag.clean()
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.message_dict if hasattr(e, "error_dict") else {"fehler": e.messages})
+        attrs["icd_code"] = eintrag.icd_code
+        return attrs
+
+
+class DiagnosevorlageViewSet(OhneLoeschen):
+    """Die Liste der Diagnosen mit ICD-Code (Vorlagen › Diagnosen). Sie wächst beim Eintragen in einer Akte
+    von allein mit (F117); hier wird sie korrigiert und ausgeblendet."""
+
+    queryset = Diagnosevorlage.objects.all()
+    serializer_class = DiagnosevorlageSerializer
+    filterset_fields = ["aktiv"]
+    search_fields = ["bezeichnung", "icd_code"]
+    pagination_class = None

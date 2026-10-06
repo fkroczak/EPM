@@ -397,13 +397,15 @@ class Patientenliste(Grundlage):
         v = zeilen[self.verlust.id]["kennzahlen"]
         self.assertEqual(Decimal(str(v["gewicht"]["kg"])), Decimal("64.0"))
         self.assertEqual((v["trend"]["richtung"], v["trend"]["warnung"]), ("down", True))
-        self.assertEqual([h["art"] for h in v["hinweise"]], ["gewicht", "ohne_plan"])
+        # seit F120 hat jede Akte in Betreuung ohne Befunde zusätzlich „labor“ und „bia“
+        self.assertEqual([h["art"] for h in v["hinweise"]], ["gewicht", "ohne_plan", "labor", "bia"])
         s = zeilen[self.stabil.id]["kennzahlen"]
         self.assertEqual(s["trend"]["richtung"], "flat")
         self.assertTrue(s["termin_woche"])
-        self.assertEqual(s["hinweise"], [])
+        self.assertEqual([h["art"] for h in s["hinweise"]], ["labor", "bia"])
         ohne = zeilen[self.patient.id]["kennzahlen"]
-        self.assertEqual({h["art"] for h in ohne["hinweise"]}, {"versorger", "kontakt", "ohne_plan"})
+        self.assertEqual({h["art"] for h in ohne["hinweise"]},
+                         {"versorger", "kontakt", "ohne_plan", "labor", "bia"})
         self.assertIsNone(ohne["gewicht"])
         # Standard-Reihenfolge: letzter Kontakt, neueste zuerst; ohne Kontakt ans Ende
         self.assertEqual(r["results"][-1]["id"], self.patient.id)
@@ -419,10 +421,11 @@ class Patientenliste(Grundlage):
         self.assertEqual(ids("termin_woche"), {self.stabil.id})
         alle = {p["id"] for p in c.get("/api/patienten/?schnellfilter=hinweise").json()["results"]}
         self.assertIn(self.testpat.id, alle)  # ohne Filter „test=ohne“ sichtbar, aber nicht gezählt
-        self.assertEqual(ids("hinweise"), {self.verlust.id, self.patient.id})
+        # seit F120 hat jede Akte in Betreuung ohne Laborbefund und ohne BIA-Messung einen Hinweis – also alle drei
+        self.assertEqual(ids("hinweise"), {self.verlust.id, self.patient.id, self.stabil.id})
         z = c.get("/api/patienten/zaehler/").json()
         # Testpatienten zählen nicht mit
-        self.assertEqual(z, {"in_betreuung": 3, "abgeschlossen": 0, "mit_hinweisen": 2, "gewichtsverlust": 1,
+        self.assertEqual(z, {"in_betreuung": 3, "abgeschlossen": 0, "mit_hinweisen": 3, "gewichtsverlust": 1,
                              "termin_woche": 1})
         # nur die Administration sieht ihre Anzahl getrennt daneben
         test_offen = Patient.objects.filter(ist_test=True, abgeschlossen_am__isnull=True).count()
@@ -1132,3 +1135,184 @@ class FalschZugeordneteDokumente(Grundlage):
                                              {"patient": self.bernd.id, "grund": "falscher Patient"}, format="json")
         self.assertEqual(r.status_code, 400)
         self.assertIn("gehören zu ihrem Plan", r.json()["fehler"])
+
+
+class HinweiseStummschalten(Grundlage):
+    """Hinweise mit „×“ wegklicken (Wunsch 07.10.2026, F119) und Grenzen für Befunde (F120)."""
+
+    def setUp(self):
+        self.c = client_fuer(self.mitarbeiter)
+        self.p = Patient.objects.create(nachname="Ruhe", vorname="Rita",
+                                        geburtsdatum=timezone.localdate() - timedelta(days=15000))
+
+    def hinweise(self, patient=None):
+        from .kennzahlen import kennzahlen
+        akte = patient or self.p
+        return kennzahlen([akte])[akte.id]
+
+    def arten(self, patient=None):
+        return {h["art"] for h in self.hinweise(patient)["hinweise"]}
+
+    def test_akte_ohne_befunde_zeigt_labor_und_bia(self):
+        self.assertIn("labor", self.arten())
+        self.assertIn("bia", self.arten())
+
+    def test_wegklicken_fuer_sechs_monate(self):
+        r = self.c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/",
+                        {"art": "labor", "monate": 6, "grund": "beim Hausarzt angefordert"}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        from .models import plus_monate
+        self.assertEqual(r.json()["bis"], str(plus_monate(timezone.localdate(), 6)))
+        werte = self.hinweise()
+        self.assertNotIn("labor", {h["art"] for h in werte["hinweise"]})
+        self.assertIn("labor", werte["hinweise_stumm"])
+        self.assertIn("bia", {h["art"] for h in werte["hinweise"]})  # andere Hinweise bleiben
+
+    def test_nicht_mehr_noetig_bleibt_ohne_frist(self):
+        r = self.c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/",
+                        {"art": "bia", "dauerhaft": True}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertIsNone(r.json()["bis"])
+        self.assertNotIn("bia", self.arten())
+
+    def test_abgelaufene_ruhe_zeigt_den_hinweis_wieder(self):
+        from .models import Hinweisruhe
+        ruhe = Hinweisruhe.objects.create(patient=self.p, art="labor", bis=timezone.localdate() + timedelta(days=5),
+                                         gesetzt_von=self.mitarbeiter)
+        self.assertNotIn("labor", self.arten())
+        Hinweisruhe.objects.filter(pk=ruhe.pk).update(bis=timezone.localdate() - timedelta(days=1))
+        self.assertIn("labor", self.arten())
+
+    def test_wieder_einschalten(self):
+        self.c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/", {"art": "labor", "monate": 3}, format="json")
+        r = self.c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/", {"art": "labor", "aufheben": True}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIn("labor", self.arten())
+        # und danach wieder stummschaltbar (die eindeutige Regel gilt nur für laufende Einträge)
+        r = self.c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/", {"art": "labor", "monate": 3}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+
+    def test_liste_zeigt_person_grund_und_frist(self):
+        self.c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/",
+                    {"art": "kontakt", "monate": 12, "grund": "Patient ist im Ausland"}, format="json")
+        r = self.c.get(f"/api/patienten/{self.p.id}/hinweis-ruhe/")
+        self.assertEqual(r.status_code, 200, r.content)
+        eintrag = r.json()[0]
+        self.assertEqual(eintrag["art_name"], "Kontakt fällig")
+        self.assertEqual(eintrag["grund"], "Patient ist im Ausland")
+        self.assertEqual(eintrag["gesetzt_von_name"], self.mitarbeiter.anzeigename)
+        self.assertTrue(eintrag["laeuft"])
+
+    def test_frist_muss_erlaubt_sein(self):
+        r = self.c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/", {"art": "labor", "monate": 7}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+
+    def test_unbekannte_art_abgelehnt(self):
+        r = self.c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/", {"art": "erfunden", "monate": 3}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+
+    def test_ohne_recht_nicht_erlaubt(self):
+        c = client_fuer(self.betrachter)
+        r = c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/", {"art": "labor", "monate": 3}, format="json")
+        self.assertEqual(r.status_code, 403, r.content)
+
+    def test_nicht_loeschbar(self):
+        from .models import Hinweisruhe
+        ruhe = Hinweisruhe.objects.create(patient=self.p, art="labor", gesetzt_von=self.mitarbeiter)
+        with self.assertRaises(PermissionError):
+            ruhe.delete()
+
+    def test_neue_frist_ersetzt_die_alte(self):
+        """Nochmal wegklicken verlängert: die alte Stummschaltung endet, die neue tritt an ihre Stelle."""
+        self.c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/", {"art": "labor", "monate": 3}, format="json")
+        r = self.c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/", {"art": "labor", "monate": 12}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        liste = self.c.get(f"/api/patienten/{self.p.id}/hinweis-ruhe/").json()
+        self.assertEqual([e["laeuft"] for e in liste], [True, False])
+        self.assertNotIn("labor", self.arten())
+
+    def test_datenbank_laesst_nur_eine_laufende_je_art_zu(self):
+        from django.db import IntegrityError
+
+        from .models import Hinweisruhe
+        Hinweisruhe.objects.create(patient=self.p, art="labor", gesetzt_von=self.mitarbeiter)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Hinweisruhe.objects.create(patient=self.p, art="labor", gesetzt_von=self.mitarbeiter)
+
+    def test_steht_im_verlauf_der_akte(self):
+        self.c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/",
+                    {"art": "labor", "monate": 3, "grund": "Termin steht"}, format="json")
+        r = self.c.get(f"/api/patienten/{self.p.id}/verlauf/?bereich=hinweisruhe")
+        self.assertEqual(r.status_code, 200, r.content)
+        eintraege = r.json()
+        self.assertTrue(eintraege, r.content)
+        self.assertIn("Termin steht", eintraege[0]["beschreibung"])
+
+
+class BefundGrenzwerte(Grundlage):
+    """Ab wann ein Befund als zu alt gilt – einstellbar unter Vorlagen › Grenzwerte (Festlegung 07.10.2026, F120)."""
+
+    def setUp(self):
+        from befunde.models import BiaMessung, Laborbefund
+        self.Laborbefund, self.BiaMessung = Laborbefund, BiaMessung
+        self.p = Patient.objects.create(nachname="Alt", vorname="Albert",
+                                        geburtsdatum=timezone.localdate() - timedelta(days=16000))
+
+    def arten(self):
+        from .kennzahlen import kennzahlen
+        return {h["art"] for h in kennzahlen([self.p])[self.p.id]["hinweise"]}
+
+    def test_standard_sind_zwoelf_monate(self):
+        from stammdaten.models import Einstellungen
+        e = Einstellungen.aktuell()
+        self.assertEqual((e.labor_alter_warnung_monate, e.bia_alter_warnung_monate), (12, 12))
+
+    def test_junger_befund_ohne_hinweis(self):
+        self.Laborbefund.objects.create(patient=self.p, abgenommen_am=timezone.localdate() - timedelta(days=30))
+        self.BiaMessung.objects.create(patient=self.p, gemessen_am=timezone.localdate() - timedelta(days=30))
+        self.assertEqual(self.arten() & {"labor", "bia"}, set())
+
+    def test_alter_befund_mit_hinweis(self):
+        self.Laborbefund.objects.create(patient=self.p, abgenommen_am=timezone.localdate() - timedelta(days=500))
+        self.BiaMessung.objects.create(patient=self.p, gemessen_am=timezone.localdate() - timedelta(days=500))
+        self.assertEqual(self.arten() & {"labor", "bia"}, {"labor", "bia"})
+
+    def test_grenze_wirkt(self):
+        from stammdaten.models import Einstellungen
+        self.Laborbefund.objects.create(patient=self.p, abgenommen_am=timezone.localdate() - timedelta(days=200))
+        self.assertNotIn("labor", self.arten())
+        e = Einstellungen.aktuell()
+        e.labor_alter_warnung_monate = 6
+        e.save()
+        self.assertIn("labor", self.arten())
+
+    def test_grenze_mindestens_ein_monat(self):
+        c = client_fuer(self.admin)
+        r = c.patch("/api/einstellungen/", {"labor_alter_warnung_monate": 0}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+
+    def test_abgeschlossene_akte_ohne_hinweis(self):
+        # Akten abschließen dürfen Admins auch bei echten Akten (Festlegung 02.10.2026)
+        c = client_fuer(self.admin)
+        r = c.post(f"/api/patienten/{self.p.id}/abschliessen/", {"anlass": "therapie_beendet"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(self.arten() & {"labor", "bia"}, set())
+
+    def test_prueflisten_filter_und_zahlen(self):
+        c = client_fuer(self.mitarbeiter)
+        r = c.get("/api/patienten/?pruefen=labor_faellig")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIn(self.p.id, [x["id"] for x in r.json()["results"]])
+        # weggeklickt verschwindet die Akte auch aus der Liste
+        c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/", {"art": "labor", "dauerhaft": True}, format="json")
+        r = c.get("/api/patienten/?pruefen=labor_faellig")
+        self.assertNotIn(self.p.id, [x["id"] for x in r.json()["results"]])
+
+    def test_startseite_zaehlt_mit(self):
+        c = client_fuer(self.mitarbeiter)
+        r = c.get("/api/startseite/")
+        self.assertEqual(r.status_code, 200, r.content)
+        pruefen = r.json()["pruefen"]
+        self.assertGreaterEqual(pruefen["labor_faellig"], 1)
+        self.assertEqual(pruefen["labor_monate"], 12)
+        self.assertEqual(pruefen["bia_monate"], 12)

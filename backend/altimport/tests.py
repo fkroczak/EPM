@@ -70,6 +70,9 @@ class Basis(TestCase):
         """Alle offenen Punkte des Beispiel-Dumps entscheiden."""
         self.speichere("werte", {"nickel": {"vielleicht": "unbekannt"}})
         self.speichere("praeparate", {
+            # „Sterofundin“ des Altsystems heißt im EPM seit dem 06.10.2026 „Sterofundin ISO“ (F111) – ob das
+            # dasselbe Präparat ist, entscheidet ein Mensch in den Zuordnungen (U43).
+            "basis": {"sterofundin": {"art": "praeparat", "id": self.praeparat("basisloesung", "Sterofundin ISO").id}},
             "lipide": {"clinoleik 20%": {"art": "praeparat", "id": self.praeparat("lipide", "Clinoleic").id}},
             "medikamente": {"heparin 100 i.e. nach bedarf": {"art": "neu", "name": "Heparin", "konzentration": "",
                                                              "kategorie": "medikament"}}})
@@ -175,9 +178,10 @@ class Zuordnungen(Basis):
         stand = d["stand"]
         self.assertEqual({o["text"] for o in stand["offen"]}, {
             "Nickelallergie „vielleicht“: Bitte zuordnen.", "Lipide „Clinoleik 20%“: Bitte zuordnen.",
+            "Basislösung „Sterofundin“: Bitte zuordnen.",
             "Katheterblock / Medikamente „Heparin 100 I.E. nach Bedarf“: Bitte zuordnen.",
             "Es gibt Auffälligkeiten, über die noch entschieden werden muss."})
-        self.assertEqual(d["hindernisse"], ["In den Zuordnungen sind noch 4 Punkte offen."])
+        self.assertEqual(d["hindernisse"], ["In den Zuordnungen sind noch 5 Punkte offen."])
         # der vorhandene Benutzer wird erkannt, doppelt kodierte Umlaute sind repariert (ftfy)
         benutzer_ = {b["schluessel"]: b["wirksam"] for b in stand["benutzer"]}
         self.assertEqual(benutzer_["e.beispiel"], {"art": "benutzer", "id": self.eva.id})
@@ -217,7 +221,7 @@ class Probelauf(Basis):
         self.lade()
         r = self.a.post("/api/altimport/probelauf/").json()
         self.assertFalse(r["erfolgreich"])
-        self.assertIn("noch 4 Punkte offen", r["fehler"])
+        self.assertIn("noch 5 Punkte offen", r["fehler"])
         self.entscheide()
         vorher = (User.objects.count(), Versorger.objects.count(), Praeparat.objects.count(), Auswahlwert.objects.count(),
                   SystemEreignis.objects.count())
@@ -391,7 +395,7 @@ class Import(Basis):
         self.assertEqual((alt.status, aktuell.status, aktuell.vorgaenger, alt.vorgaenger), ("abgeloest", "aktuell", alt, None))
         self.assertEqual((alt.herkunft, alt.gueltig_ab, alt.erstellt_am, alt.erstellt_von),
                          ("altsystem", date(2021, 1, 2), ortszeit(2021, 1, 2, 10, 0), self.eva))
-        self.assertEqual((alt.basis_praeparat.name, alt.basis_ml, alt.glucose_g, alt.glucose_praeparat), ("Sterofundin", 500, Decimal("150.0"), None))
+        self.assertEqual((alt.basis_praeparat.name, alt.basis_ml, alt.glucose_g, alt.glucose_praeparat), ("Sterofundin ISO", 500, Decimal("150.0"), None))
         self.assertEqual((alt.aminosaeuren_praeparat.name, alt.lipide_praeparat.name, alt.spurenelemente.name, alt.katheterschutz.name),
                          ("Glamin", "Clinoleic", "Addel N", "Taurolin"))
         self.assertEqual(sorted(alt.vitamine.values_list("name", flat=True)), ["Soluvit N", "Vitalipid adult"])

@@ -64,6 +64,30 @@ def akte_pdf(patient) -> bytes:
     return pdf
 
 
+# --------------------------------------------------------------------------------------------- F116
+def sprechstunde_kontext(patient) -> Kontext:
+    """Der jeweils aktuellste Stand aller Bereiche in einem Kontext (F116): aktueller Infusionsplan, letzte
+    BIA-Messung, letzter Laborbefund. Diagnosen und Empfehlung kommen über die Felder des Patienten dazu."""
+    from befunde.models import BiaMessung, Laborbefund
+    from infusionen.models import Infusionsplan
+
+    plan = Infusionsplan.objects.filter(patient=patient, status=Infusionsplan.Status.AKTUELL).first()
+    labor = (Laborbefund.objects.filter(patient=patient).order_by("-abgenommen_am", "-id")
+             .prefetch_related("werte__parameter").first())
+    bia = BiaMessung.objects.filter(patient=patient).order_by("-gemessen_am", "-id").first()
+    return Kontext(patient=patient, plan=plan, labor=labor, bia=bia)
+
+
+def sprechstunde_pdf(patient) -> bytes:
+    """Unterlagen für die Sprechstunde als PDF (F116)."""
+    from .pdf import erzeuge_aus_vorlage, wasserzeichen_fuer
+
+    pdf, _ = erzeuge_aus_vorlage("sprechstunde", sprechstunde_kontext(patient),
+                                 wasserzeichen=wasserzeichen_fuer(patient),
+                                 titel=f"Unterlagen für die Sprechstunde – {patient.nachname}, {patient.vorname}")
+    return pdf
+
+
 # --------------------------------------------------------------------------------------------- Kopie der Akte
 def _e(wert) -> str:
     return html.escape(str(wert)) if wert not in (None, "") else "—"
@@ -104,7 +128,9 @@ def aktenkopie_pdf(patient) -> bytes:
         ("Geburtsdatum", _e(datum(p.geburtsdatum))), ("Geschlecht", _e(p.get_geschlecht_display() if p.geschlecht else "")),
         ("Anschrift", _e(", ".join(t for t in (p.strasse, f"{p.plz} {p.ort}".strip()) if t))),
         ("Telefon", _e(p.telefon)), ("Telefon 2", _e(p.telefon2)), ("E-Mail", _e(p.email)),
-        ("Krankenkasse", _e(p.krankenkasse)), ("Hausarzt", _e(hausarzt.arzt if hausarzt else p.hausarzt)),
+        ("Versicherungsart", _e(p.get_versicherungsart_display() if p.versicherungsart else "")),
+        ("Versicherung", _e(p.krankenkasse)), ("Versichertennummer", _e(p.versichertennummer)),
+        ("Hausarzt", _e(hausarzt.arzt if hausarzt else p.hausarzt)),
         ("Überweisung / Kontaktaufnahme durch", _e(p.ueberweisung_durch)),
         ("Größe", _e(f"{p.groesse_cm} cm".replace(".", ",") if p.groesse_cm is not None else "")),
         ("Katheter", _e("kein Katheter" if p.kein_katheter else (p.katheter.wert if p.katheter_id else ""))),
@@ -115,8 +141,15 @@ def aktenkopie_pdf(patient) -> bytes:
         ("Akte abgeschlossen", _e(f"{datum(p.abgeschlossen_am)} · {p.get_abschluss_anlass_display()}"
                                   + (f" · {p.abschluss_notiz}" if p.abschluss_notiz else "")) if p.abgeschlossen_am else ""),
     ])))
-    for titel, text in (("Diagnose", p.diagnose), ("Therapie", p.therapie), ("Empfehlung", p.empfehlung),
-                        ("Bemerkung", p.bemerkung)):
+    diagnosen = [[_e(d.bezeichnung), _e(f"{d.icd_code}{d.kennzeichen}"), _e(d.get_kennzeichen_display()),
+                  _e(datum(d.seit)), "zutreffend" if d.aktiv else f"beendet am {datum(d.beendet_am)}", _e(d.notiz)]
+                 for d in p.diagnosen.order_by("reihenfolge", "id")]
+    teile.append(_abschnitt("Diagnosen (ICD)", _tabelle(
+        ["Diagnose", "ICD", "Kennzeichen", "seit", "Stand", "Notiz"], diagnosen,
+        [None, "20mm", "34mm", "22mm", "30mm", None])))
+
+    for titel, text in (("Diagnose (Freitext)", p.diagnose), ("Therapie", p.therapie),
+                        ("Empfehlung", p.empfehlung), ("Bemerkung", p.bemerkung)):
         if text:
             teile.append(_abschnitt(titel, _text(text)))
 
@@ -171,6 +204,35 @@ def aktenkopie_pdf(patient) -> bytes:
     teile.append(_abschnitt("Dokumente (die Dateien liegen dieser Kopie im Original bei)", _tabelle(
         ["Datum", "Typ", "Titel", "Datei", "Herkunft"], dokumente, ["22mm", "30mm", None, "46mm", "26mm"])))
 
+    for befund in p.laborbefunde.prefetch_related("werte__parameter").order_by("abgenommen_am", "id"):
+        zeilen = [[_e(w.bezeichnung), _e(w.anzeige_wert), _e(w.einheit),
+                   _e(f"{w.referenz_von or ''} – {w.referenz_bis or ''}".strip(" –")), _e(w.bemerkung)]
+                  for w in befund.werte.all()]
+        inhalt = _tabelle(["Parameter", "Wert", "Einheit", "Referenz", "Bemerkung"], zeilen,
+                          [None, "22mm", "22mm", "30mm", None])
+        if befund.beurteilung:
+            inhalt += _text(befund.beurteilung)
+        teile.append(_abschnitt(f"Laborbefund vom {datum(befund.abgenommen_am)}"
+                                + (f" · {befund.labor}" if befund.labor else ""), inhalt))
+    if not p.laborbefunde.exists():
+        teile.append(_abschnitt("Laborbefunde", '<div class="leer">keine Einträge</div>'))
+
+    bia = [[_e(datum(b.gemessen_am)), _e(b.gewicht_kg), _e(b.bcm_kg), _e(b.fettmasse_kg), _e(b.ecw_prozent),
+            _e(b.koerperwasser_l), _e(b.bmi), _text(b.beurteilung) if b.beurteilung else "—"]
+           for b in p.bia_messungen.order_by("gemessen_am", "id")]
+    teile.append(_abschnitt("BIA-Messungen", _tabelle(
+        ["Datum", "Gewicht (kg)", "BCM (kg)", "Fettmasse (kg)", "ECW (%)", "Körperwasser (l)", "BMI", "Beurteilung"],
+        bia, ["22mm", "20mm", "18mm", "22mm", "16mm", "24mm", "14mm", None])))
+
+    for b in p.berichte.select_related("art", "erstellt_von", "freigegeben_von").order_by("datum", "id"):
+        kopfzeilen = [("Art", _e(b.art.wert if b.art_id else "")), ("Datum", _e(datum(b.datum))),
+                      ("Empfänger", _e(b.empfaenger)), ("Stand", _e(b.get_status_display())),
+                      ("Erstellt", _e(f"{_zeitpunkt(b.erstellt_am)} · {benutzername(b.erstellt_von) or '—'}")),
+                      ("Freigabe", _e(b.freigabevermerk or ""))]
+        teile.append(_abschnitt(f"Bericht: {b.titel}", _paare(kopfzeilen) + _text(b.inhalt or "")))
+    if not p.berichte.exists():
+        teile.append(_abschnitt("Berichte", '<div class="leer">keine Einträge</div>'))
+
     erklaerungen = [[_e(e.get_art_display()), _e(datum(e.erteilt_am)),
                      _e(f"widerrufen am {datum(e.widerrufen_am)}" if e.widerrufen_am else "liegt vor"),
                      _e(" · ".join(t for t in (e.notiz, e.widerruf_notiz) if t))]
@@ -190,10 +252,15 @@ def aktenkopie_pdf(patient) -> bytes:
 
 
 # --------------------------------------------------------------------------------------------- F24
-BEREICHE = {"stammdaten": "Stammdaten", "diagnose": "Diagnose", "therapie": "Therapie", "empfehlung": "Empfehlung",
-            "gewichte": "Gewicht", "kontakte": "Kontakt", "termine": "Termin", "dokumente": "Dokument",
-            "infusionsplaene": "Infusionsplan", "bezugspersonen": "Bezugsperson", "aerzte": "Arzt",
-            "erklaerungen": "Erklärung", "datenschutz": "Datenschutz"}
+BEREICHE = {"stammdaten": "Stammdaten", "diagnose": "Diagnose (Text)", "therapie": "Therapie",
+            "empfehlung": "Empfehlung", "gewichte": "Gewicht", "kontakte": "Kontakt", "termine": "Termin",
+            "dokumente": "Dokument", "infusionsplaene": "Infusionsplan", "bezugspersonen": "Bezugsperson",
+            "aerzte": "Arzt", "erklaerungen": "Erklärung", "datenschutz": "Datenschutz",
+            # Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
+            "diagnosen": "Diagnose (ICD)", "laborbefunde": "Laborbefund", "bia_messungen": "BIA-Messung",
+            "berichte": "Bericht",
+            # Hinweise stummschalten (Wunsch 07.10.2026, F119)
+            "hinweisruhe": "Hinweis stummgeschaltet"}
 
 
 def verlauf_pdf(patient, eintraege, filter_text="") -> bytes:

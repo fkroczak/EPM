@@ -23,8 +23,8 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   // Humanalbumin in ml ohne Energie, Lipide 9,15 kcal/g
   await expect(editor.getByLabel("Menge Humanalbumin in ml")).toHaveValue("");
 
-  await editor.getByLabel("Präparat", { exact: true }).selectOption({ label: "Sterofundin" });
-  await editor.getByLabel("Volumen").fill("500");
+  await editor.getByLabel("Präparat", { exact: true }).selectOption({ label: "Sterofundin ISO" });
+  await editor.getByLabel("Volumen", { exact: true }).fill("500");
   await editor.getByLabel("Präparat Glucose").selectOption({ label: "Glucose 70 %" });
   await editor.getByLabel("Menge Glucose in g").fill("160");
   await editor.getByLabel("Präparat Aminosäuren").selectOption({ label: "Glamin 13,4 %" });
@@ -46,14 +46,14 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   // Erweiterung: weiterer Bestandteil aus den Auswahllisten
   const weitere = editor.getByTestId("weitere-bestandteile");
   await weitere.getByRole("button", { name: "Bestandteil hinzufügen" }).click();
-  await weitere.getByLabel("Bestandteil 1", { exact: true }).selectOption({ label: "Dipeptamin 20 %" });
+  await weitere.getByLabel("Bestandteil 1", { exact: true }).selectOption({ label: "Pantozol i.v. 40 mg" });
   await weitere.getByLabel("Menge 1").fill("100");
   await weitere.getByLabel("Einheit 1").fill("ml");
   await weitere.getByLabel("Häufigkeit 1").fill("täglich");
   await editor.getByRole("button", { name: "+ Soluvit N" }).click();
   await editor.getByRole("button", { name: "+ Vitalipid adult" }).click();
   await editor.getByLabel("Laufzeit").fill("12");
-  await editor.getByLabel("Tage pro Woche").fill("5");
+  await editor.getByTestId("infusionstage").getByLabel("PE (Mischbeutel)").fill("5");
   // wie auf der alten PDF: Mischbeutel = letztes Gewicht × 35 ml, Zusatzvolumen = Basislösung, Gesamtvolumen = Summe;
   // Laufzeit manuell, Rate = Gesamtvolumen ÷ Laufzeit (2.600 ÷ 12)
   await expect(editor.getByTestId("plan-mischbeutel")).toHaveText("2.100 ml");
@@ -86,7 +86,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(blatt).toContainText(/Kalorien\s+1\.509/);
   await expect(blatt).toContainText("Soluvit N | Vitalipid adult");
   await expect(blatt).toContainText("Taurolin 2 %");
-  await expect(blatt).toContainText(/Dipeptamin 20 %\s+100\s+ml\s+täglich/);
+  await expect(blatt).toContainText(/Pantozol i.v. 40 mg\s+100\s+ml\s+täglich/);
   await expect(blatt).toContainText(/Volumen\s+2\.100\s+500\s+2\.600\s+ml/);
   await expect(blatt).toContainText(/Laufmenge je Stunde\s+216,7\s+ml\/h/);
   await expect(blatt).toContainText("Pantozol® Kurzinfusion 1 Amp. 40 mg in 50 ml Trägerlösung · 1-0-1");
@@ -207,7 +207,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   expect([plaene.results[0].phosphat_mmol, plaene.results[0].calcium_mmol, plaene.results[0].magnesium_mmol]).toEqual([12, 9, 6]);
   expect(plaene.results[0].vitamine_namen).toEqual(["Soluvit N", "Vitalipid adult"]);
   expect(plaene.results[0].positionen.map((x: { praeparat_name: string; menge: number; einheit: string; haeufigkeit: string }) =>
-    [x.praeparat_name, x.menge, x.einheit, x.haeufigkeit])).toEqual([["Dipeptamin 20 %", 100, "ml", "täglich"]]);
+    [x.praeparat_name, x.menge, x.einheit, x.haeufigkeit])).toEqual([["Pantozol i.v. 40 mg", 100, "ml", "täglich"]]);
   expect([plaene.results[0].gesamtvolumen_ml, plaene.results[0].volumen_gewicht_kg, plaene.results[0].volumen_summe_ml,
     plaene.results[0].laufzeit_h, plaene.results[0].rate_ml_h]).toEqual([2100, 60, 2600, 12, 216.7]);
   expect([plaene.results[0].pantozol_stufe, plaene.results[0].pantozol_tage]).toEqual([1, 5]);

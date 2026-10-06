@@ -22,6 +22,11 @@ class Kontext:
     patient: object
     plan: object = None
     heute: date = None
+    # Wünsche aus der Praxis vom 06.10.2026: Bericht (F115) und Sprechstundenblatt (F116). Beim
+    # Sprechstundenblatt werden ``plan``, ``labor`` und ``bia`` mit dem jeweils aktuellsten Stand gefüllt.
+    bericht: object = None
+    labor: object = None
+    bia: object = None
 
     def __post_init__(self):
         self.heute = self.heute or timezone.localdate()
@@ -103,6 +108,14 @@ def _ppi_anordnung(p):
     return f"{text} · {'-'.join('1' if m & bit else '0' for bit in (4, 2, 1))}"
 
 
+def _diagnosen(k):
+    """Aktive Diagnosen der Akte, eine je Zeile: „Kurzdarmsyndrom [K91.2G]“ (F117)."""
+    if not k.patient.pk:
+        return None
+    eintraege = k.merke("diagnosen", lambda: list(k.patient.diagnosen.filter(aktiv=True)))
+    return "\n".join(d.anzeige for d in eintraege) or None
+
+
 def _absender(k):
     from stammdaten.models import Absenderangaben, Einstellungen
 
@@ -152,6 +165,13 @@ GEMEINSAM = {
     "Patient.Anschrift": Feld("Anschrift in einer Zeile", lambda k: _anschrift(k.patient)),
     "Patient.Größe": Feld("Größe", lambda k: _zahl(k.patient.groesse_cm, "cm")),
     "Patient.Diagnose": Feld("Diagnose (formatiert)", lambda k: k.patient.diagnose or None, html=True),
+    "Patient.Diagnosen": Feld("Diagnoseliste mit ICD-Code, eine je Zeile (z. B. Kurzdarmsyndrom [K91.2G])",
+                              lambda k: _diagnosen(k)),
+    "Patient.Versicherungsart": Feld("GKV / PKV / Selbstzahler",
+                                     lambda k: k.patient.get_versicherungsart_display()
+                                     if k.patient.versicherungsart else None),
+    "Patient.Versicherung": Feld("Name der Versicherung", lambda k: k.patient.krankenkasse or None),
+    "Patient.Versichertennummer": Feld("Versichertennummer", lambda k: k.patient.versichertennummer or None),
     "Absender.Name": Feld("Name des Absenders (Vorlagen › Briefkopf)", lambda k: _absender(k).name or None),
     "Absender.Straße": Feld("Straße des Absenders", lambda k: _absender(k).strasse or None),
     "Absender.PLZ_Ort": Feld("PLZ und Ort des Absenders",
@@ -188,7 +208,12 @@ INFUSIONSPLAN = {
                                    _plan(lambda p: _person(p.abgeschlossen_von) if p.abgeschlossen_von_id else None)),
     "Plan.Stunden": Feld("Laufzeit (h)", _plan(lambda p: _zahl(p.laufzeit_h, "h"))),
     "Plan.Rate": Feld("Rate (ml/h)", _plan(lambda p: _zahl(p.rate_ml_h, "ml/h"))),
-    "Plan.Tage_pro_Woche": Feld("Tage pro Woche", _plan(lambda p: _zahl(p.tage_pro_woche, "× pro Woche"))),
+    "Plan.Tage_pro_Woche": Feld("PE (Mischbeutel): Tage pro Woche",
+                                _plan(lambda p: _zahl(p.tage_pro_woche, "× pro Woche"))),
+    "Plan.Zusatz_pro_Woche": Feld("Zusatzvolumen („Elektrolytbeutel“): Tage pro Woche",
+                                  _plan(lambda p: _zahl(p.zusatz_tage_pro_woche, "× pro Woche"))),
+    "Plan.Infusionsfreie_Tage": Feld("Infusionsfreie Tage pro Woche („keine“ bei 0)",
+                                     lambda k: _anzeige(k, "freie_tage_pro_woche")),
     "Plan.Protonenpumpenhemmer": Feld("Protonenpumpenhemmer mit Zeiten", lambda k: _anzeige(k, "pantozol")),
     "Plan.Protonenpumpenhemmer_Anordnung": Feld("Protonenpumpenhemmer wie auf der alten PDF (… in 50 ml Trägerlösung · 1-0-1)",
                                                 _plan(lambda p: _ppi_anordnung(p))),
@@ -269,8 +294,77 @@ ERKLAERUNG = {
                                _aufbewahrung_jahre),
 }
 
+def _bericht(funktion):
+    return lambda k: funktion(k.bericht) if k.bericht is not None else None
+
+
+# Bericht aus der Akte (F115)
+BERICHT = {
+    **GEMEINSAM,
+    "Patient.Telefon": PATIENTENDATENBLATT["Patient.Telefon"],
+    "Patient.Hausarzt": PATIENTENDATENBLATT["Patient.Hausarzt"],
+    "Bericht.Titel": Feld("Titel des Berichts", _bericht(lambda b: b.titel or None)),
+    "Bericht.Art": Feld("Berichtsart", _bericht(lambda b: str(b.art) if b.art_id else None)),
+    "Bericht.Datum": Feld("Datum des Berichts", _bericht(lambda b: datum(b.datum))),
+    "Bericht.Empfänger": Feld("Empfänger", _bericht(lambda b: b.empfaenger or None)),
+    "Bericht.Inhalt": Feld("Inhalt des Berichts (formatiert)", _bericht(lambda b: b.inhalt or None), html=True),
+    "Bericht.erstellt_von": Feld("Erstellt von", _bericht(lambda b: _person(b.erstellt_von))),
+    "Bericht.Freigabevermerk": Feld("Freigabevermerk: wer freigegeben hat und wann",
+                                    _bericht(lambda b: b.freigabevermerk)),
+}
+
+
+def _labor(funktion):
+    return lambda k: funktion(k.labor) if k.labor is not None else None
+
+
+def _bia(funktion):
+    return lambda k: funktion(k.bia) if k.bia is not None else None
+
+
+# Unterlagen für die Sprechstunde (F116): der jeweils aktuellste Stand aller Bereiche auf einem Blatt
+SPRECHSTUNDE = {
+    **GEMEINSAM,
+    "Patient.Telefon": PATIENTENDATENBLATT["Patient.Telefon"],
+    "Patient.Hausarzt": PATIENTENDATENBLATT["Patient.Hausarzt"],
+    "Patient.Katheter": PATIENTENDATENBLATT["Patient.Katheter"],
+    "Patient.Nickelallergie": PATIENTENDATENBLATT["Patient.Nickelallergie"],
+    "Patient.Therapie": PATIENTENDATENBLATT["Patient.Therapie"],
+    "Patient.Empfehlung": PATIENTENDATENBLATT["Patient.Empfehlung"],
+    "Gewicht.aktuell": PATIENTENDATENBLATT["Gewicht.aktuell"],
+    "Gewicht.BMI": PATIENTENDATENBLATT["Gewicht.BMI"],
+    "Gewicht.Trend": PATIENTENDATENBLATT["Gewicht.Trend"],
+    "Plan.gültig_ab": INFUSIONSPLAN["Plan.gültig_ab"],
+    "Plan.kcal": INFUSIONSPLAN["Plan.kcal"],
+    "Plan.ml": INFUSIONSPLAN["Plan.ml"],
+    "Plan.Stunden": INFUSIONSPLAN["Plan.Stunden"],
+    "Plan.Rate": INFUSIONSPLAN["Plan.Rate"],
+    "Plan.Tage_pro_Woche": INFUSIONSPLAN["Plan.Tage_pro_Woche"],
+    "Plan.Zusatz_pro_Woche": INFUSIONSPLAN["Plan.Zusatz_pro_Woche"],
+    "Plan.Infusionsfreie_Tage": INFUSIONSPLAN["Plan.Infusionsfreie_Tage"],
+    "Plan.Protonenpumpenhemmer_Anordnung": INFUSIONSPLAN["Plan.Protonenpumpenhemmer_Anordnung"],
+    "Plan.Bemerkung": INFUSIONSPLAN["Plan.Bemerkung"],
+    "Spurenelemente": INFUSIONSPLAN["Spurenelemente"],
+    "Vitamine": INFUSIONSPLAN["Vitamine"],
+    "Katheterblock": INFUSIONSPLAN["Katheterblock"],
+    "Labor.Datum": Feld("Abnahmedatum des letzten Laborbefunds", _labor(lambda b: datum(b.abgenommen_am))),
+    "Labor.Labor": Feld("Labor des letzten Befunds", _labor(lambda b: b.labor or None)),
+    "Labor.Beurteilung": Feld("Beurteilung des letzten Laborbefunds (formatiert)",
+                              _labor(lambda b: b.beurteilung or None), html=True),
+    "BIA.Datum": Feld("Datum der letzten BIA-Messung", _bia(lambda b: datum(b.gemessen_am))),
+    "BIA.Gewicht": Feld("BIA: Gewicht", _bia(lambda b: _zahl(b.gewicht_kg, "kg"))),
+    "BIA.BCM": Feld("BIA: BCM", _bia(lambda b: _zahl(b.bcm_kg, "kg"))),
+    "BIA.Fettmasse": Feld("BIA: Fettmasse", _bia(lambda b: _zahl(b.fettmasse_kg, "kg"))),
+    "BIA.ECW": Feld("BIA: extrazelluläres Wasser", _bia(lambda b: _zahl(b.ecw_prozent, "%"))),
+    "BIA.Körperwasser": Feld("BIA: Körperwasser", _bia(lambda b: _zahl(b.koerperwasser_l, "l"))),
+    "BIA.BMI": Feld("BIA: BMI", _bia(lambda b: _zahl(b.bmi))),
+    "BIA.Beurteilung": Feld("Beurteilung der letzten BIA-Messung (formatiert)",
+                            _bia(lambda b: b.beurteilung or None), html=True),
+}
+
 FELDER = {"infusionsplan": INFUSIONSPLAN, "patientendatenblatt": PATIENTENDATENBLATT,
-          "datenschutzinformation": ERKLAERUNG, "einwilligung": ERKLAERUNG, "schweigepflichtentbindung": ERKLAERUNG}
+          "datenschutzinformation": ERKLAERUNG, "einwilligung": ERKLAERUNG, "schweigepflichtentbindung": ERKLAERUNG,
+          "bericht": BERICHT, "sprechstunde": SPRECHSTUNDE}
 
 # Tabellen mit festem Aufbau je Art (Spalten stehen fest, damit nichts Falsches gedruckt werden kann).
 # (Name, Spalten, Ausrichtung je Spalte): "zahl" rechtsbündig, "einheit" schmal und grau – wie im Laborbefund.
@@ -287,6 +381,19 @@ TABELLEN = {
         "termine": ("Nächste offene Termine (bis zu 3)", ["Datum", "Art", "Titel", "Ort"], ["", "", "", ""]),
     },
     "datenschutzinformation": {}, "einwilligung": {}, "schweigepflichtentbindung": {},
+    "bericht": {
+        "diagnosen": ("Diagnosen mit ICD-Code", ["Diagnose", "ICD", "seit"], ["", "", ""]),
+    },
+    "sprechstunde": {
+        "diagnosen": ("Diagnosen mit ICD-Code", ["Diagnose", "ICD", "seit"], ["", "", ""]),
+        "labor": ("Letzter Laborbefund (Parameter, Wert, Einheit, Referenz)",
+                  ["Parameter", "Wert", "Einheit", "Referenz"], ["", "zahl", "einheit", ""]),
+        "bia": ("Letzte BIA-Messung", ["Merkmal", "Wert", "Einheit"], ["", "zahl", "einheit"]),
+        "zusammensetzung": ("Zusammensetzung des aktuellen Infusionsplans",
+                            ["Bestandteil", "Menge", "Einheit", "Präparat"], ["", "zahl", "einheit", ""]),
+        "bilanz": ("Laufzeit und Volumen (Mischbeutel, Zusatzlösung, Gesamt)",
+                   ["", "Mischbeutel", "Zusatzlösung", "Gesamt", ""], ["", "zahl", "zahl", "zahl", "einheit"]),
+    },
 }
 
 
@@ -338,6 +445,30 @@ def tabellenzeilen(art: str, quelle: str, k: Kontext) -> list[list[str]]:
             ["Laufzeit", "", "", laufzeit, "h" if laufzeit != "—" else ""],
             ["Laufmenge je Stunde", "", "", rate, "ml/h" if rate != "—" else ""],
         ]
+    if quelle == "diagnosen":
+        if not k.patient.pk:
+            return []
+        eintraege = k.merke("diagnosen", lambda: list(k.patient.diagnosen.filter(aktiv=True)))
+        return [[d.bezeichnung, f"{d.icd_code}{d.kennzeichen}", datum(d.seit) or "—"] for d in eintraege]
+    if quelle == "labor":
+        if k.labor is None:
+            return []
+        zeilen = []
+        for w in k.labor.werte.select_related("parameter"):
+            referenz = "—"
+            if w.referenz_von is not None or w.referenz_bis is not None:
+                referenz = f"{_zahl(w.referenz_von) or ''} – {_zahl(w.referenz_bis) or ''}".strip(" –")
+            wert = w.anzeige_wert
+            zeilen.append([w.bezeichnung, Fett(wert) if w.ausserhalb else wert, w.einheit or "", referenz])
+        return zeilen
+    if quelle == "bia":
+        if k.bia is None:
+            return []
+        b = k.bia
+        zeilen = [("Gewicht", b.gewicht_kg, "kg"), ("BCM", b.bcm_kg, "kg"), ("Fettmasse", b.fettmasse_kg, "kg"),
+                  ("Magermasse", b.magermasse_kg, "kg"), ("ECW (extrazelluläres Wasser)", b.ecw_prozent, "%"),
+                  ("Körperwasser", b.koerperwasser_l, "l"), ("BMI", b.bmi, "")]
+        return [[name, _zahl(wert), einheit] for name, wert, einheit in zeilen if wert is not None]
     if quelle == "termine":
         from patienten.models import Termin
 

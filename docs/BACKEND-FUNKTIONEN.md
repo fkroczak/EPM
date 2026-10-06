@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 02.10.2026 · Code-Stand: Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
+Stand: 07.10.2026 · Code-Stand: Wünsche aus der Praxis vom 06./07.10.2026 (F110–F121); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
 Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026, Prüfung nach DSGVO vom 02.10.2026 (`docs/DATENSCHUTZ.md`).
@@ -156,12 +156,24 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F107 | Datenbank leeren (Ende der Testphase): Akten, Dokumente, Versorger, Ärzte, nicht ausgewählte Benutzer und Audit-Log entfernen; Kontenauswahl, Bestätigungscode, Passwort + 2FA, Rückfrage, vorher Sicherung | System | ABGESCHLOSSEN UND GETESTET |
 | F108 | Schalter „Musterdaten automatisch anlegen“ | System | ABGESCHLOSSEN UND GETESTET |
 | F109 | Menüpunkt „Import“ nach der Übernahme aus- und wieder einblenden | System, Seitenleiste, Import | ABGESCHLOSSEN UND GETESTET |
+| F110 | Infusionstage je Beutelart: PE (Mischbeutel), Zusatzvolumen, infusionsfreie Tage – mit Übernahme in den Folgeplan, Vergleich und PDF | 7 Neuer Infusionsplan | ABGESCHLOSSEN UND GETESTET |
+| F111 | Präparate nach der Praxis: Zusatzvolumen (Sterofundin ISO, Ringer-Lösung, Ringer-Lactat, NaCl 0,9 %, Jonosteril), Natrovit, NutriLock/TauroLock, Hinweis am Präparat; Dipeptamin und Omegaven ausgeblendet | 18 Vorlagen › Auswahllisten | ABGESCHLOSSEN UND GETESTET |
+| F112 | Katalog der Laborparameter (Gruppen, Einheit, Referenzbereich) | 18 Vorlagen › Labor und Diagnosen | ABGESCHLOSSEN UND GETESTET |
+| F113 | Laborbefunde mit Maske statt Abschreiben; freie Zeilen für Tumormarker und genetische Parameter | 4 Akte › Labor & BIA | ABGESCHLOSSEN UND GETESTET |
+| F114 | BIA-Messungen (Gewicht, BCM, Fettmasse, ECW, Körperwasser, BMI) mit Beurteilung; Gewicht wandert in den Verlauf | 4 Akte › Labor & BIA | ABGESCHLOSSEN UND GETESTET |
+| F115 | Berichte aus der Akte: Entwurf → Freigabe, PDF als Dokument, danach unveränderlich | 4 Akte › Berichte | ABGESCHLOSSEN UND GETESTET |
+| F116 | Unterlagen für die Sprechstunde: Diagnosen, Plan, BIA, Labor und Empfehlung auf einem Blatt | 4 Akte | ABGESCHLOSSEN UND GETESTET |
+| F117 | Diagnosen mit ICD-Code und Zusatzkennzeichen G/V/Z/A, mitwachsende Liste im Hintergrund | 5 Diagnose & Therapie, 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
+| F118 | Versichertendaten: GKV/PKV, Versicherung, Versichertennummer | 4 Akte, 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
+| F119 | Hinweise mit „×“ ausblenden – 3, 6 oder 12 Monate Ruhe oder „nicht mehr nötig“, in der Akte zurückholbar | 3 Patientenliste, 4 Akte | ABGESCHLOSSEN UND GETESTET |
+| F120 | Ab wann Laborbefund und BIA-Messung als zu alt gelten (Standard 12 Monate, einstellbar) | 2 Startseite, 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
+| F121 | Ein eigener Reiter je Bereich: Diagnosen, Therapie, Labor, BIA | 4 Akte | ABGESCHLOSSEN UND GETESTET |
 
-Summe (109 Funktionen, gezählt aus der Tabelle): 109 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen (F83 seit 03.10.2026 mit Browsertest) · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
+Summe (121 Funktionen, gezählt aus der Tabelle): 121 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 Neu in Runde 4 sind F74–F83 (Datenschutz nach DSGVO und Abschließen eines Plans nach Freigabe); offene Fragen dazu stehen
-in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18). Runde 7 setzt die Startseiten- und Oberflächen-Erweiterungen S01–S17 aus `claude/startseite-erweiterungen.md` um (F90–F97, dazu erweitert F09, F13, F14, F17, F48, F84). Die Klärungen vom 03.10.2026 bringen F107–F109 (Testphase und Go-live). Die Fehlerliste vom 02.10.2026 bringt F98–F106 und ändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97 (Abschnitt P).
+in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18). Runde 7 setzt die Startseiten- und Oberflächen-Erweiterungen S01–S17 aus `claude/startseite-erweiterungen.md` um (F90–F97, dazu erweitert F09, F13, F14, F17, F48, F84). Die Klärungen vom 03.10.2026 bringen F107–F109 (Testphase und Go-live). Die Fehlerliste vom 02.10.2026 bringt F98–F106 und ändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97 (Abschnitt P). Die Wünsche aus der Praxis vom 06.10.2026 bringen F110–F118 (Abschnitt Q) und 22 offene Fragen U39–U60; die Wünsche vom 07.10.2026 bringen F119–F121 und eine weitere offene Frage (U61).
 
 ---
 
@@ -2174,6 +2186,188 @@ Punkt 6.4 „Testbenutzer-Schalter“ und zusätzlich „Testpatient definieren 
   `zzzz-leeren.spec.ts` (läuft als letzte Datei; beim manuellen Start mit Bildschirmfotos übersprungen).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
+
+## Q · Wünsche aus der Praxis (Alice, 06.10.2026)
+
+Grundlage: zwei E-Mails vom 06.10.2026 (sieben Punkte, dazu die Liste der Laborparameter). Fachliches Konzept und
+alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
+
+### F110 Infusionstage je Beutelart
+- **Anlass:** „Ist es möglich, dass man die Infusionstage pro Woche hinterlegen kann, gern auch unabhängig von der
+  Zusammensetzung des Infusionsplanes. Beispiel: PE 5x / Woche, Elektrolytbeutel: 2x / Woche, Infusionsfreie Tage: keine.“
+- **Felder am Plan:** `tage_pro_woche` (bisher „Tage pro Woche“, jetzt **PE / Mischbeutel**), `zusatz_tage_pro_woche`
+  (Zusatzvolumen, „Elektrolytbeutel“), `freie_tage_pro_woche` (infusionsfreie Tage, 0 = keine).
+  Migration `infusionen/0007`, Prüfregeln 1–7 bzw. 0–6 als Datenbank-Bedingung.
+- **Plausibilität:** Höchstens `7 − max(PE, Zusatz)` infusionsfreie Tage – mehr passen nicht zu den Infusionstagen.
+- **Übernahme in den Folgeplan:** Alle drei Felder stehen in `PLANFELDER` und werden beim neuen Entwurf vorbelegt
+  (Alices Vermutung stimmt, das war schon so). Sie erscheinen im Vergleich mit dem Vorgänger (`VERGLEICHSZEILEN`).
+- **PDF:** Datenfelder `{{Plan.Tage_pro_Woche}}`, `{{Plan.Zusatz_pro_Woche}}`, `{{Plan.Infusionsfreie_Tage}}`;
+  der Block „Infusionstage“ steht in der Startvorlage. **Bestehende Installationen** behalten ihre aktive
+  Vorlagenversion – der Block ist dort unter Vorlagen › Dokumentvorlagen einmal zu ergänzen.
+- **Teststatus:** Backend-Tests `patienten.test_praxiswuensche.InfusionstageTest`. Browsertest
+  `praxiswuensche.spec.ts` „Infusionstage je Beutelart im Plan-Editor“.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U39–U41.
+
+### F111 Präparate: Zusatzvolumen, Natrovit, Taurolidin, Hinweis am Präparat
+- **Anlass:** „Dipeptamen und Omegaven können eigentlich raus. Beim Zusatzvolumen bräuchte ich die folgenden
+  Präparate: Sterofundin ISO, Ringer-Lösung, Ringer-Lactat, NaCl 0,9%, Jonosteril. Bei den Vitaminen bitte noch
+  ergänzen: Natrovit … Nachbesserung beim Taurolidin: NutriLock (reines Taurolidin 2%) und TauroLock (Taurolidin mit Citrat).“
+- **Neues Feld `Praeparat.hinweis`** (Migration `stammdaten/0012`): kurzer Text, erscheint bei der Auswahl und auf der
+  Plan-PDF. Gepflegt unter Vorlagen › Auswahllisten.
+- **Datenmigration `stammdaten/0013`:** „Sterofundin“ → **Sterofundin ISO**, „Ringer-Infusionslösung“ → **Ringer-Lösung**,
+  „Junosteril“ → **Jonosteril** (Tippfehler); **Ringer-Lactat** neu; **Natrovit** (Hinweis „baugleich zu Cernevit,
+  günstiger (Regressgefahr)“), **NutriLock** (Hinweis „reines Taurolidin 2 %“), **TauroLock** (Hinweis „Taurolidin mit
+  Citrat“). **Dipeptamin** und **Omegaven** werden ausgeblendet – bestehende Pläne behalten sie, neu wählbar sind sie
+  nicht mehr (in EPM wird nichts gelöscht).
+- **Teststatus:** Backend-Tests `patienten.test_praxiswuensche.PraeparateTest`.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U42, U43.
+
+### F112 Katalog der Laborparameter
+- **Anlass:** „Ich muss jedes Labor händisch abschreiben … Ist es vielleicht möglich gewisse Standard-Parameter
+  vorzugeben, wo ich dann nur den gemessenen Wert und meinetwegen die Messeinheit eintragen kann.“
+- **Modell `stammdaten.Laborparameter`** (Migration `stammdaten/0012`): Gruppe (15 Gruppen), Name, Kurzname, Einheit,
+  Referenzbereich von/bis (freiwillig), Reihenfolge, aktiv. Nie gelöscht, nur deaktiviert.
+- **Vorbelegt** mit Alices Liste (`patienten.testdaten.LABORPARAMETER`, auch als Datenmigration `stammdaten/0013`):
+  Transaminasen, Nierenwerte, Eisenhaushalt, Eiweiß-/Fettstoffwechsel, Elektrolyte, Spurenelemente, Hämatologie,
+  Vitamine, Knochenstoffwechsel, Pankreasenzyme, Blutzucker/Diabetes, Schilddrüse. „Vitamin B1, B2, B6, B12,
+  Folsäure“ und „Vitamin D, D3, Calcidiol, Calcitriol“ je als eigener Parameter (U46).
+- **API:** `/api/laborparameter/` (lesen: jeder Angemeldete – die Erfassungsmaske braucht den Katalog; schreiben:
+  Recht „Vorlagen pflegen“), `POST /api/laborparameter/reihenfolge/`. Oberfläche: Vorlagen › Labor und Diagnosen.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U44–U46.
+
+### F113 Laborbefunde erfassen
+- **Modelle `befunde.Laborbefund` und `befunde.Laborwert`** (neue App, Migration `befunde/0001`): Befund mit
+  Abnahmedatum, Labor, Beurteilung (formatiert) und optional dem Originalbefund als Dokument der Akte; je Wert
+  Parameter aus dem Katalog **oder** Freitextname (Tumormarker, genetische Parameter), Zahl **oder** Werttext
+  („< 0,1“, „negativ“), Einheit und Referenzbereich (aus dem Katalog vorbelegt, überschreibbar).
+- **Regeln:** Teil der Akte (gesperrt, sobald die Akte abgeschlossen ist), Historie je Befund und je Wert; ein
+  Parameter nur einmal je Befund; eine Zeile braucht eine Bezeichnung und einen Wert (Datenbank-Bedingungen).
+  Beim Ändern werden die Zeilen vollständig ersetzt – für die Maske eindeutig.
+- **API:** `/api/laborbefunde/?patient=` (lesen, anlegen, ändern; Recht „Kontakte, Gewichte, Termine, Dokumente
+  erfassen“), `GET /api/laborbefunde/verlauf/?patient=&parameter=` für den Verlauf eines Parameters (U58).
+- **Oberfläche:** Reiter „Labor & BIA“ der Akte; die Maske zeigt die Parameter nach Gruppen, eingetragen wird nur der
+  Wert. Darunter freie Zeilen für weitere Parameter.
+- **Teststatus:** Backend-Tests `befunde.tests.LaborTest`. Browsertest `praxiswuensche.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U47, U48, U58.
+
+### F114 BIA-Messungen
+- **Anlass:** „Bei den BIA-Messungen wäre es das gleiche … Gewicht (kg), BCM (kg), Fettmasse (kg), ECW (%),
+  Körperwasser (L), BMI. Und gern noch ein Feld, wo man eine Zusammenfassung / Beurteilung eintragen kann.“
+- **Modell `befunde.BiaMessung`:** genau diese Werte, dazu Beurteilung (formatiert), optional das Geräteprotokoll als
+  Dokument, abgeleitet `bmi_berechnet` (aus Gewicht und hinterlegter Größe) und `magermasse_kg`.
+- **Gewicht in den Verlauf:** Häkchen beim Speichern (`gewicht_uebernehmen`, vorbelegt „ja“) legt eine
+  Gewichtsmessung an und verknüpft sie – doppelte Einträge sind so ausgeschlossen (U50).
+- **Plausibilität:** Gewichtsgrenzen wie beim Gewicht, ECW 0–100 %, Fettmasse und BCM nicht größer als das Gewicht,
+  Körperwasser nicht mehr Liter als das Gewicht Kilogramm, mindestens ein Messwert.
+- **Teststatus:** Backend-Tests `befunde.tests.BiaTest`. Browsertest `praxiswuensche.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U49, U50.
+
+### F115 Berichte aus der Akte
+- **Anlass:** „Kann man dann direkt Berichte für die Patienten innerhalb der Patientenakte verfassen? Gern auch mit
+  der Option ‚Entwurf‘ und ‚Freigabe‘.“
+- **Modell `berichte.Bericht`** (neue App, Migration `berichte/0001`): Titel, Berichtsart (neue Auswahlliste
+  „Berichtsarten“), Datum, Empfänger, Inhalt (formatiert), Status **Entwurf → freigegeben**.
+- **Freigabe:** neues Recht **„Berichte freigeben“** (Standard: Mediziner und Admin, je Gruppe umstellbar – U54).
+  `POST /api/berichte/<id>/freigeben/` erzeugt die PDF aus der neuen Dokumentvorlage **„Bericht“**, legt sie als
+  Dokument der Akte ab (Prüfsumme und Vorlagenversion wie beim Plan) und macht den Bericht unveränderlich –
+  im Modell **und** per Datenbank-Trigger (`epm_bericht_schutz`). Korrektur = neuer Bericht. Audit-Log
+  `bericht_freigegeben`.
+- **Teststatus:** Backend-Tests `berichte.tests.BerichtTest` (inkl. Trigger). Browsertest `praxiswuensche.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U54, U55, U59.
+
+### F116 Unterlagen für die Sprechstunde
+- **Anlass:** „Ist es vielleicht für die Vorarbeit zur Sprechstunde möglich, die aktuellsten Daten (BIA, Labor,
+  Infusionsplan, Diagnosen, letzte Empfehlungen) in einem Dokument zu bündeln?“
+- **`GET /api/patienten/<id>/sprechstunde/`** erzeugt die PDF aus der neuen Dokumentvorlage „Unterlagen für die
+  Sprechstunde“: Patientenkopf mit Gewicht, BMI und Trend, Diagnosen (ICD), Diagnose-Freitext, aktueller
+  Infusionsplan mit Zusammensetzung und Infusionstagen, letzte BIA-Messung mit Beurteilung, letzter Laborbefund mit
+  Beurteilung, letzte Empfehlung. `?ablegen=1` legt das Blatt zusätzlich als Dokument der Akte ab (Recht „Einträge
+  erfassen“, nur bei offenen Akten). Audit-Log `sprechstunde_erzeugt`.
+- **Teststatus:** Backend-Tests `patienten.test_praxiswuensche.SprechstundeTest`. Browsertest `praxiswuensche.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U56, U60.
+
+### F117 Diagnosen mit ICD-Code
+- **Anlass:** „Kann man im Hintergrund eine Liste mitführen (lassen), wo man Diagnosen mit dem jeweiligen ICD-Code
+  einfügt, und diese ICD dann auch in der Diagnose-Liste mit auftauchen. Bsp: Kurzdarmsyndrom [K91.2G] …“
+- **Modell `patienten.Diagnose`** (Migration `patienten/0010`): Bezeichnung, ICD-Code, Zusatzkennzeichen
+  **G/V/Z/A** (Pflicht), „besteht seit“, Notiz, Reihenfolge, aktiv/beendet. Anzeige `Kurzdarmsyndrom [K91.2G]`.
+  Nicht gelöscht, sondern auf „nicht mehr zutreffend“ gesetzt; jede Fassung im Verlauf.
+- **Katalog `stammdaten.Diagnosevorlage`:** ICD-Code und Bezeichnung. Jede neue Kombination aus einer Akte wandert
+  automatisch in den Katalog (U53) und wird beim nächsten Eintragen vorgeschlagen; gepflegt unter Vorlagen › Labor
+  und Diagnosen.
+- **Prüfung:** ICD-Format `^[A-Z]\d{2}(\.\d{1,2})?[+*!]?$`, Kleinschreibung wird vereinheitlicht.
+- **Das lange Freitextfeld „Diagnose“ bleibt daneben bestehen** (U51); die Akte zeigt beides.
+- **Teststatus:** Backend-Tests `patienten.test_praxiswuensche.DiagnosenTest`. Browsertest `praxiswuensche.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U51–U53.
+
+### F118 Versichertendaten
+- **Anlass:** „In Anbetracht der Debatten mit den Krankenkassen ist es nötig, dass wir auch die Versichertendaten der
+  Patienten in den Stammdaten dokumentieren. Da wäre der Oberpunkt GKV oder PKV, und dann die Versicherung und
+  Versichertennummer.“
+- **Felder am Patienten** (Migration `patienten/0010`): `versicherungsart` (GKV, PKV, Selbstzahler, Sonstige, nicht
+  erfasst), `versichertennummer`. Das bisherige Feld `krankenkasse` behält seinen Spaltennamen und heißt in der
+  Oberfläche **„Versicherung“** – es geht nichts verloren und nichts muss umgezogen werden.
+- **Sichtbar** in Stammdaten, „Neuer Patient“, der Übersicht der Akte, der Kopie der Akte (Art. 15 DSGVO) und als
+  Datenfelder `{{Patient.Versicherungsart}}`, `{{Patient.Versicherung}}`, `{{Patient.Versichertennummer}}`.
+- **Teststatus:** Backend-Tests `patienten.test_praxiswuensche.VersichertendatenTest`. Browsertest
+  `praxiswuensche.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U57.
+
+### F119 Hinweise mit „×“ ausblenden
+- **Anlass:** „Alle Meldungen können mit einem x entfernt werden (wenn akut keine Erneuerung benötigt wird).“
+  Rückfrage vom 07.10.2026 geklärt: **beim Wegklicken wird gewählt, wie lange Ruhe sein soll – oder dass es nicht
+  mehr nötig ist.**
+- **Modell `patienten.Hinweisruhe`** (Migration `patienten/0011`): Akte, Art des Hinweises (Gewichtsverlust, Plan zu
+  alt, kein Plan, Versorger nicht erfasst, Kontakt fällig, Labor zu alt, BIA zu alt), `bis` (Frist) oder leer für
+  „nicht mehr nötig“, Grund, Person und Zeitpunkt. Gelöscht wird nichts: Das Zurückholen trägt `aufgehoben_am` und
+  die Person ein, `delete()` ist gesperrt. Eine Datenbankregel lässt je Akte und Art nur **eine laufende**
+  Stummschaltung zu.
+- **Fristen:** 3, 6 oder 12 Monate – danach erscheint der Hinweis von allein wieder – oder „nicht mehr nötig“, dann
+  bleibt er weg, bis jemand ihn in der Akte wieder einschaltet. Nochmal wegklicken verlängert: die bisherige
+  Stummschaltung endet, die neue tritt an ihre Stelle (beides bleibt im Verlauf).
+- **`GET`/`POST /api/patienten/<id>/hinweis-ruhe/`:** `{"art": "labor", "monate": 6, "grund": "…"}` schaltet stumm,
+  `{"art": "labor", "dauerhaft": true}` heißt „nicht mehr nötig“, `{"art": "labor", "aufheben": true}` holt den
+  Hinweis zurück. Recht „Akten bearbeiten“, nur bei offenen Akten.
+- **Oberfläche:** Jeder Hinweis-Chip der Patientenliste hat ein **×**; der Dialog fragt die Frist und den Grund ab.
+  Was gerade ausgeblendet ist, steht in der Übersicht der Akte unter **„Ausgeblendete Hinweise“** mit Grund, Person
+  und Frist – dort auch „Wieder einschalten“. Alles steht im Verlauf der Akte (Bereich „Hinweise ausgeblendet“).
+  Startseite und Patientenliste zählen stummgeschaltete Akten nicht mehr mit, damit Kachel und Liste dasselbe zeigen.
+- **Löschen und Kopie:** `Hinweisruhe` samt Historie wird beim endgültigen Löschen entfernt und in `umfang()` gezählt.
+- **Teststatus:** Backend-Tests `patienten.tests.HinweiseStummschalten` (13 Tests, inkl. Datenbankregel und
+  Löschsperre). Browsertest `praxiswuensche.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U61.
+
+### F120 Ab wann ein Befund als zu alt gilt
+- **Anlass:** „12 Monate als zu alt für Befunde, jedoch einstellbar unter Vorlage.“
+- **Einstellungen** (Migration `stammdaten/0014`): `labor_alter_warnung_monate` und `bia_alter_warnung_monate`,
+  Standard **12 Monate**, mindestens 1 Monat, einstellbar unter **Vorlagen › Grenzwerte** neben der Grenze für den
+  Infusionsplan.
+- **Hinweise je Akte:** „Kein Laborbefund“ bzw. „Labor älter als N Mon.“ und dasselbe für die BIA-Messung – nur bei
+  Akten in Betreuung. Sie erscheinen als Chip in der Patientenliste (und lassen sich dort mit **×** ausblenden, F119).
+- **Startseite „Nach und nach prüfen“:** zwei neue Zeilen „Laborbefund fehlt oder ist älter als N Monate“ und
+  „BIA-Messung fehlt oder ist älter als N Monate“, mit Sprung in die Patientenliste
+  (`?pruefen=labor_faellig` bzw. `bia_faellig`).
+- **In der Akte** nennen die Reiter „Labor“ und „BIA“ oben das Datum der letzten Erfassung und warnen, wenn es über
+  der Grenze liegt.
+- **Teststatus:** Backend-Tests `patienten.tests.BefundGrenzwerte` (9 Tests). Browsertest `praxiswuensche.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET.
+
+### F121 Ein eigener Reiter je Bereich der Akte
+- **Anlass:** „Teile alles in einzelne Menüpunkte, auch Diagnose, Therapie und Befunde.“ Rückfrage vom 07.10.2026
+  geklärt: **nur Reiter in der Akte**, keine zusätzlichen Einträge in der Seitenleiste; der Reiter „Therapie“ zeigt,
+  **wann sie zuletzt geändert** wurde.
+- **Aufteilung:** „Diagnose & Therapie“ wird zu **„Diagnosen“** (Liste mit ICD-Code und Freitext „Diagnose“) und
+  **„Therapie“** (Therapie, Empfehlung, Bemerkung); „Labor & BIA“ wird zu **„Labor“** und **„BIA“**. Die Reiter
+  tragen jetzt Zähler für Diagnosen, Laborbefunde, BIA-Messungen und Berichte und brechen bei schmalem Fenster um.
+- **Alte Adressen:** `/patienten/<id>/befunde` leitet auf `/labor` weiter, damit gespeicherte Links weiter stimmen.
+- **Karten im Raster:** neue Seite `akte_diagnosen`; `akte_therapie` enthält jetzt Therapie, Empfehlung, Bemerkung und
+  den Hinweis. Dabei behoben: Die Karte **Bemerkung** war nie in der Liste der verstellbaren Karten – ihr Menü „⋯“
+  lief ins Leere (Fehler seit F97).
+- **Übersicht der Akte:** neue Karte **„Labor und BIA“** mit der letzten Erfassung und dem Weg in die beiden Reiter;
+  die Karte „Diagnose und Therapie“ führt jetzt in beide Reiter.
+- **Teststatus:** Browsertests `praxiswuensche.spec.ts`, `akte.spec.ts`, `oberflaeche.spec.ts`, `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET.
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2241,10 +2435,36 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U38 | ~~„Testdaten sehen“ für den Admin abschaltbar?~~ **Bestätigt 03.10.2026:** nein, für den Admin fest | F106 | – |
 | U33 | Vor dem Abschließen: Ein nach Art. 17 endgültig gelöschtes **Dokument** käme nach „Zurücknehmen“ und erneutem Import wieder (neue Nummer, die Löschliste erkennt es nicht). Eine endgültig gelöschte **Akte** kommt nicht wieder: Ihre Nummer steht im Löschprotokoll; der Patient erscheint unter „Auffälligkeiten“ und lässt sich nur „nicht übernehmen“ – eine andere Nummer ist nicht wählbar (O-29, behoben 02.10.2026) | F65, F73, F80 | Dokumente: betrifft nur die Zeit vor dem Abschließen (Testphase); nach dem Abschließen ist der Dump gelöscht – **bestätigt 03.10.2026** |
 
+| U39 | **Infusionstage:** Reichen Zahlen pro Woche, oder sollen konkrete Wochentage hinterlegt werden (Mo/Mi/Fr)? | F110 | Zahlen je Beutelart + Zahl der infusionsfreien Tage |
+| U40 | Ist mit „Elektrolytbeutel“ das **Zusatzvolumen** des Plans gemeint (Sterofundin ISO, Ringer …) oder ein weiterer, eigener Beutel? | F110 | Zusatzvolumen |
+| U41 | „Weitere Bestandteile“ haben ein Freitextfeld **Häufigkeit** („täglich“, „Mo/Mi/Fr“). Auch auf Tage pro Woche umstellen? | F110 | bleibt Freitext |
+| U42 | Dipeptamin und Omegaven **ausblenden** (bestehende Pläne behalten sie) statt löschen – richtig? | F111 | ausblenden |
+| U43 | Umbenennen von Sterofundin/Ringer/Junosteril wirkt auch auf **alte Pläne** (ein Katalogeintrag). So gewollt, oder neue Einträge daneben? Folge für die Übernahme: Das „Sterofundin“ des Altsystems trifft jetzt keinen Eintrag mehr automatisch und muss im Import einmal von Hand auf „Sterofundin ISO“ gelegt werden – das ist Absicht, denn ob beides dasselbe Präparat ist, entscheidet kein Programm | F111, F65 | umbenennen; eine Zuordnung mehr beim Import |
+| U44 | Labor: **Referenzbereiche** je Parameter hinterlegen und abweichende Werte markieren? In der Mail nicht gewünscht, aber jedes Labor liefert sie mit | F112 | Felder vorhanden, bleiben leer; keine Markierung, bis das geklärt ist |
+| U45 | Labor: Die **Einheiten** sind vorbelegt (GPT U/l, Kreatinin mg/dl, Natrium mmol/l …). Bitte einmal gegenlesen | F112 | Vorbelegung nach `docs/WUENSCHE-PRAXIS-2026-10-06.md`, je Wert überschreibbar |
+| U46 | „Vitamin B1, B2, B6, B12, Folsäure“ und „Vitamin D, D3, Calcidiol, Calcitriol“ als **je eigener Parameter** – richtig? | F112 | je eigener Parameter |
+| U47 | Labor: Werte wie **„< 0,1“ oder „negativ“** als Text erlauben (dann kein Verlauf für diesen Wert)? | F113 | Text erlaubt, Zahl bevorzugt |
+| U48 | Soll der **hochgeladene Originalbefund** am Laborbefund hängen (statt nur in den Dokumenten zu liegen)? | F113 | Verknüpfung vorhanden, freiwillig |
+| U49 | BIA: **BMI** aus Gewicht und Größe berechnen oder den Gerätewert eintragen? | F114 | Feld zum Eintragen, mit berechnetem Vorschlag daneben |
+| U50 | Soll das **BIA-Gewicht** in den Gewichtsverlauf übernommen werden? | F114 | Häkchen beim Speichern, vorbelegt „ja“ |
+| U51 | Bleibt das bisherige **Freitextfeld „Diagnose“** neben der strukturierten Liste bestehen? | F117 | beides nebeneinander |
+| U52 | Neben G/V/Z/A auch eine **Seitenangabe** (rechts/links/beidseits)? | F117 | nein |
+| U53 | Soll der Diagnose-Katalog bei **jeder neuen Eingabe** wachsen oder nur unter Vorlagen gepflegt werden? | F117 | wächst automatisch, unter Vorlagen korrigierbar |
+| U54 | Berichte: Wer darf **freigeben** – nur Mediziner oder auch Mitarbeiter? Braucht es eine Freigabe auf Anordnung wie bei den Plänen (F82)? | F115 | eigenes Recht „Berichte freigeben“, Standard Mediziner; keine Freigabe auf Anordnung |
+| U55 | Soll der freigegebene Bericht automatisch als **PDF in die Dokumente** wandern? | F115 | ja (wie die Plan-PDF) |
+| U56 | Sprechstundenblatt: Stimmt der **Umfang**, fehlt etwas (Therapie, Kontakte der letzten Monate, Termine)? | F116 | Umfang nach `docs/WUENSCHE-PRAXIS-2026-10-06.md` |
+| U57 | Versichertendaten: Reichen Art, Versicherung und Nummer, oder braucht es mehr (Versichertenstatus, Kostenträger-/IK-Nummer, Genehmigung bis, Befreiung)? | F118 | die drei Angaben |
+| U58 | Soll es einen **Verlauf je Laborparameter** geben (Diagramm wie beim Gewicht, z. B. Ferritin über 2 Jahre)? | F113 | Endpunkt vorhanden, in der Oberfläche noch nicht gezeichnet |
+| U59 | Welche **Berichtsarten** sollen in der Auswahlliste stehen? | F115 | Arztbrief, Verlaufsbericht, Stellungnahme, Sonstiges – unter Vorlagen änderbar |
+| U60 | Sprechstundenblatt: Nur **PDF** oder zusätzlich eine Ansicht am Bildschirm? | F116 | PDF |
+| U61 | Soll ein ausgeblendeter Hinweis auch dann **weg bleiben**, wenn sich die Lage ändert (z. B. „Kein Laborbefund“ ausgeblendet, danach wird einer erfasst)? Derzeit ja – die Stummschaltung läuft ab oder wird aufgehoben, der Hinweis entsteht ohnehin nur neu, wenn die Lage es hergibt | F119 | Stummschaltung bleibt bis zur Frist |
+
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 06.10.2026 | Wünsche aus der Praxis (Alice, 06.10.2026) | Infusionstage je Beutelart mit Übernahme in den Folgeplan, Vergleich und PDF (F110, Migration `infusionen/0007`); Präparate nach der Mail – Zusatzvolumen umbenannt und ergänzt, Natrovit, NutriLock/TauroLock, Hinweisfeld am Präparat, Dipeptamin und Omegaven ausgeblendet (F111, Migrationen `stammdaten/0012`, `0013`); Katalog der Laborparameter mit Alices Liste und Erfassungsmaske nach Gruppen (F112, F113, neue App `befunde`); BIA-Maske mit Beurteilung und Übernahme des Gewichts (F114); Berichte in der Akte mit Entwurf/Freigabe, PDF als Dokument und Trigger-Schutz (F115, neue App `berichte`, neues Recht „Berichte freigeben“); Sprechstundenblatt (F116); Diagnosen mit ICD-Code und mitwachsendem Katalog (F117, Migration `patienten/0010`); Versichertendaten GKV/PKV, Versicherung, Versichertennummer (F118). Neue Dokumentvorlagen „Bericht“ und „Unterlagen für die Sprechstunde“ (Migration `vorlagen/0003`), Audit-Arten `bericht_freigegeben` und `sprechstunde_erzeugt` (`audit/0008`). Endgültiges Löschen, Kopie der Akte und Verlauf um die neuen Bereiche erweitert. Konzept und 22 offene Fragen (U39–U60) in `docs/WUENSCHE-PRAXIS-2026-10-06.md`. Die Migrationen sind von Hand geschrieben (die Arbeitsumgebung hatte keinen Zugriff auf PyPI und npm); `makemigrations` in CI meldet dazu „No changes detected“. Die neuen Apps stehen jetzt auch in der `makemigrations`-Zeile des Workflows. Lauf 37525732042: 311 von 311 Backend-Tests, 98 von 98 Browsertests. Davor fand CI drei echte Fehler, die hier behoben sind: der Plan-Serializer gab die neuen Infusionstage-Felder weder aus noch nahm er sie entgegen (dadurch griff auch deren Prüfung nicht), der ICD-Code wurde nicht in Großschreibung vereinheitlicht, und das Frontend baute wegen eines doppelten Schlüssels in der Feldliste des Verlaufs nicht. Nebenwirkung der Umbenennung: Beim Altdaten-Import trifft „Sterofundin“ keinen Katalogeintrag mehr automatisch und wird einmal von Hand auf „Sterofundin ISO“ gelegt (U43) |
+| 07.10.2026 | Wünsche aus der Praxis (07.10.2026) | Hinweise mit „×“ ausblenden – beim Wegklicken 3, 6 oder 12 Monate Ruhe oder „nicht mehr nötig“, mit Grund, Person und Zeitpunkt, in der Akte unter „Ausgeblendete Hinweise“ zurückholbar, alles im Verlauf (F119, neues Modell `patienten.Hinweisruhe`, Migration `patienten/0011`); Grenzen „gilt als alt“ für Laborbefund und BIA-Messung, Standard 12 Monate, einstellbar unter Vorlagen › Grenzwerte, mit Hinweis je Akte, zwei neuen Zeilen in „Nach und nach prüfen“ und zwei neuen Filtern der Patientenliste (F120, Migration `stammdaten/0014`); ein eigener Reiter je Bereich – „Diagnose & Therapie“ wird zu „Diagnosen“ und „Therapie“ (mit „zuletzt geändert“), „Labor & BIA“ zu „Labor“ und „BIA“, mit Zählern, Weiterleitung der alten Adresse und neuer Karte „Labor und BIA“ in der Übersicht (F121). Dabei behoben: Die Karte „Bemerkung“ war nie in der Liste der verstellbaren Karten, ihr Menü „⋯“ lief ins Leere (seit F97). Eine weitere offene Frage: U61 |
 | 03.10.2026 | Klärungen U3–U6, U31 (Branch `klaerungen-u3-u6-2026-10-03`) | Telefon 2, Krankenkasse und Bemerkung sichtbar und bearbeitbar, Bemerkung mit Versionen und eigenem Bereich im Verlauf (U5); Kontaktart beim Erfassen und in den Listen, Auswahlliste „Kontaktarten“ (U6); U3, U4, U31 bestätigt; F83 mit Browsertest abgeschlossen |
 | 03.10.2026 | Klärungen U26–U33 (Branch `bereinigen-2026-10-03`) | Administration › System, Karte „Testphase und Go-live“: Datenbank leeren (F107, Systemagent-Aktion `datenbank_leeren`, Befehl `epm_datenbank_leeren`), Schalter „Musterdaten automatisch anlegen“ (F108) und „Import ausblenden“ (F109); Migration `stammdaten/0011`; U26, U28, U30, U32, U33 bestätigt, U27 geklärt. Systemagent über `sudo epm-update` aktualisieren |
 | 03.10.2026 | Klärungen U7, U16–U24, U38 | Entwurfsmodus der Vordrucke manuell abschaltbar (F76, Migration `stammdaten/0010`); Aufbewahrung im Übertragungsziel, Standard 30 Tage, Systemagent räumt nach jeder Übertragung auf (F64, U21); Rolle „Mitarbeiter (erweitert)“ (Migration `accounts/0007`, U22); Testbenutzer der Musterdaten als Mitarbeiter (U7); U18, U19, U23, U24, U38 bestätigt |
