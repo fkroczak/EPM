@@ -40,11 +40,12 @@ test("Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten", 
   await expect(liste.getByRole("link", { name: "Probe, Jonas" })).toBeVisible();
 
   // Versorger und Ansprechpartner
-  await page.getByLabel("Versorger").selectOption({ label: "Testversorger Süd (fiktiv)" });
+  // „exact“, weil das „×“ an den Hinweisen „Versorger nicht erfasst“ ebenfalls auf Versorger lautet (F119)
+  await page.getByLabel("Versorger", { exact: true }).selectOption({ label: "Testversorger Süd (fiktiv)" });
   await expect(page).toHaveURL(/versorger=\d+/);
   await expect(liste.getByRole("link", { name: "Probe, Jonas" })).toBeVisible();
   await expect(liste.getByRole("link", { name: "Musterfrau, Erika" })).toHaveCount(0);
-  await page.getByLabel("Versorger").selectOption({ label: "Alle Versorger" });
+  await page.getByLabel("Versorger", { exact: true }).selectOption({ label: "Alle Versorger" });
   await expect(page).not.toHaveURL(/versorger=/);
   const gefiltert = page.waitForResponse((a) => /\/api\/patienten\/\?.*ansprechpartner=\d+/.test(a.url()));
   await page.getByLabel("Ansprechpartner").selectOption({ label: "Herr Muster (Testversorger Nord (fiktiv))" });

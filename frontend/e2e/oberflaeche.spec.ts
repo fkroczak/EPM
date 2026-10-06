@@ -198,7 +198,7 @@ test("Volle Breite in Stufen: 1920 px – Karten der Akte im Raster, Größe je 
   await expect(page.locator(".teiler")).toHaveCount(0);
   const gewicht = stufe.locator('[data-bereich="gewicht"]');
   await expect(gewicht).toHaveAttribute("data-breite", "2"); // Standard: Gewichtsverlauf doppelt breit
-  await expect(stufe.locator("[data-bereich]")).toHaveCount(8);
+  await expect(stufe.locator("[data-bereich]")).toHaveCount(9); // seit F121 zusätzlich „Labor und BIA“
   const b0 = (await gewicht.boundingBox())!;
   // „⋯“: Breite 3 Spalten
   let antwort = gespeichert(page);
