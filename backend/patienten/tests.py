@@ -397,13 +397,15 @@ class Patientenliste(Grundlage):
         v = zeilen[self.verlust.id]["kennzahlen"]
         self.assertEqual(Decimal(str(v["gewicht"]["kg"])), Decimal("64.0"))
         self.assertEqual((v["trend"]["richtung"], v["trend"]["warnung"]), ("down", True))
-        self.assertEqual([h["art"] for h in v["hinweise"]], ["gewicht", "ohne_plan"])
+        # seit F120 hat jede Akte in Betreuung ohne Befunde zusätzlich „labor“ und „bia“
+        self.assertEqual([h["art"] for h in v["hinweise"]], ["gewicht", "ohne_plan", "labor", "bia"])
         s = zeilen[self.stabil.id]["kennzahlen"]
         self.assertEqual(s["trend"]["richtung"], "flat")
         self.assertTrue(s["termin_woche"])
-        self.assertEqual(s["hinweise"], [])
+        self.assertEqual([h["art"] for h in s["hinweise"]], ["labor", "bia"])
         ohne = zeilen[self.patient.id]["kennzahlen"]
-        self.assertEqual({h["art"] for h in ohne["hinweise"]}, {"versorger", "kontakt", "ohne_plan"})
+        self.assertEqual({h["art"] for h in ohne["hinweise"]},
+                         {"versorger", "kontakt", "ohne_plan", "labor", "bia"})
         self.assertIsNone(ohne["gewicht"])
         # Standard-Reihenfolge: letzter Kontakt, neueste zuerst; ohne Kontakt ans Ende
         self.assertEqual(r["results"][-1]["id"], self.patient.id)
@@ -419,10 +421,11 @@ class Patientenliste(Grundlage):
         self.assertEqual(ids("termin_woche"), {self.stabil.id})
         alle = {p["id"] for p in c.get("/api/patienten/?schnellfilter=hinweise").json()["results"]}
         self.assertIn(self.testpat.id, alle)  # ohne Filter „test=ohne“ sichtbar, aber nicht gezählt
-        self.assertEqual(ids("hinweise"), {self.verlust.id, self.patient.id})
+        # seit F120 hat jede Akte in Betreuung ohne Laborbefund und ohne BIA-Messung einen Hinweis – also alle drei
+        self.assertEqual(ids("hinweise"), {self.verlust.id, self.patient.id, self.stabil.id})
         z = c.get("/api/patienten/zaehler/").json()
         # Testpatienten zählen nicht mit
-        self.assertEqual(z, {"in_betreuung": 3, "abgeschlossen": 0, "mit_hinweisen": 2, "gewichtsverlust": 1,
+        self.assertEqual(z, {"in_betreuung": 3, "abgeschlossen": 0, "mit_hinweisen": 3, "gewichtsverlust": 1,
                              "termin_woche": 1})
         # nur die Administration sieht ihre Anzahl getrennt daneben
         test_offen = Patient.objects.filter(ist_test=True, abgeschlossen_am__isnull=True).count()
@@ -1144,7 +1147,8 @@ class HinweiseStummschalten(Grundlage):
 
     def hinweise(self, patient=None):
         from .kennzahlen import kennzahlen
-        return kennzahlen([(patient or self.p).id])[(patient or self.p).id]
+        akte = patient or self.p
+        return kennzahlen([akte])[akte.id]
 
     def arten(self, patient=None):
         return {h["art"] for h in self.hinweise(patient)["hinweise"]}
@@ -1256,7 +1260,7 @@ class BefundGrenzwerte(Grundlage):
 
     def arten(self):
         from .kennzahlen import kennzahlen
-        return {h["art"] for h in kennzahlen([self.p.id])[self.p.id]["hinweise"]}
+        return {h["art"] for h in kennzahlen([self.p])[self.p.id]["hinweise"]}
 
     def test_standard_sind_zwoelf_monate(self):
         from stammdaten.models import Einstellungen
@@ -1306,7 +1310,7 @@ class BefundGrenzwerte(Grundlage):
 
     def test_startseite_zaehlt_mit(self):
         c = client_fuer(self.mitarbeiter)
-        r = c.get("/api/patienten/startseite/")
+        r = c.get("/api/startseite/")
         self.assertEqual(r.status_code, 200, r.content)
         pruefen = r.json()["pruefen"]
         self.assertGreaterEqual(pruefen["labor_faellig"], 1)

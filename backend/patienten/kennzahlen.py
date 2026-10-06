@@ -280,7 +280,7 @@ def befund_filter(patienten_qs, art: str):
         jung = BiaMessung.objects.filter(gemessen_am__gte=grenze).values("patient_id")
         ruhe = "bia"
     qs = patienten_qs.filter(abgeschlossen_am__isnull=True).exclude(id__in=jung)
-    stumm = [pid for pid, arten in ruhende_hinweise(_nur_ids(qs)).items() if ruhe in arten]
+    stumm = [pid for pid, arten in ruhende_hinweise(qs.values_list("id", flat=True)).items() if ruhe in arten]
     return qs.exclude(id__in=stumm)
 
 
