@@ -13,6 +13,10 @@
 # Überall:
 #   sudo epm-update --zurueck TAG       auf eine frühere Version zurückschalten (z. B. 0.1.1-3fa2c1d)
 #   sudo epm-update --versionen         vorhandene Versionen anzeigen
+#
+# Die Ausgaben der Bauschritte stehen in /var/log/epm-update.log (je Lauf neu). Bricht ein Schritt ab, nennt das
+# Skript Schritt, Zeile und Exitcode und zeigt die letzten Zeilen des Protokolls. Wird der Lauf vom Kernel
+# beendet (Speichermangel), bleibt das Protokoll als einzige Spur – dann dort hineinsehen.
 set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo "Bitte mit sudo ausführen."; exit 1; }
 
@@ -25,7 +29,32 @@ QUELLE="${EPM_UPDATE_QUELLE:-git}"
 TESTS=1
 PAKET=""
 
-schritt() { echo; echo "==> $*"; }
+PROTOKOLL=/var/log/epm-update.log
+LETZTER_SCHRITT="Start"
+schritt() { LETZTER_SCHRITT="$*"; echo; echo "==> $*"; }
+
+# Ohne das hier endete ein fehlgeschlagener Schritt stumm (set -e, Ausgaben im Protokoll): Der Trap nennt
+# Schritt, Zeile und Exitcode und zeigt die letzten Zeilen des Protokolls (Stolperstein 07.10.2026).
+abbruch() {
+  local code=$1 zeile=$2 befehl=$3
+  echo
+  echo "ABBRUCH bei „$LETZTER_SCHRITT“ (Zeile $zeile, Exitcode $code)"
+  echo "   Befehl: $befehl"
+  if [[ $code -ge 128 ]]; then
+    echo "   Exitcode über 128 heißt: abgebrochen durch Signal $((code - 128))" \
+         "– 137 = vom Kernel wegen Speichermangel beendet (siehe: dmesg -T | tail -30), 130 = Strg-C."
+  fi
+  if [[ -s "$PROTOKOLL" ]]; then
+    echo "   Letzte Zeilen aus $PROTOKOLL:"
+    tail -n 25 "$PROTOKOLL" | sed 's/^/   /'
+  fi
+  echo "Nichts wurde umgestellt; die laufende Version bleibt unverändert."
+  exit "$code"
+}
+trap 'abbruch $? $LINENO "$BASH_COMMAND"' ERR
+# Protokoll je Lauf neu; Ausgaben der Bauschritte landen dort statt in /dev/null
+: > "$PROTOKOLL" 2>/dev/null || PROTOKOLL=/dev/null
+chmod 0600 "$PROTOKOLL" 2>/dev/null || true
 
 starte_version() {
   local tag="$1"
@@ -148,14 +177,14 @@ if docker image inspect "epm-backend:$TAG" >/dev/null 2>&1 && docker image inspe
   schritt "Images epm-backend:$TAG und epm-web:$TAG sind schon gebaut"
 else
   schritt "Image epm-backend:$TAG bauen"
-  docker build --quiet -t "epm-backend:$TAG" "$CODE/backend" >/dev/null
+  docker build -t "epm-backend:$TAG" "$CODE/backend" >>"$PROTOKOLL" 2>&1
   docker run --rm -e DJANGO_DEBUG=1 "epm-backend:$TAG" python manage.py check
   if ! docker run --rm -e DJANGO_DEBUG=1 "epm-backend:$TAG" python manage.py makemigrations --check --dry-run >/dev/null; then
     echo "ABBRUCH: Im Code fehlen Datenbank-Migrationen. Nichts wurde umgestellt."
     exit 1
   fi
   schritt "Image epm-web:$TAG bauen (Frontend, braucht Zugang zu registry.npmjs.org)"
-  docker build --quiet -t "epm-web:$TAG" "$CODE/frontend" >/dev/null
+  docker build -t "epm-web:$TAG" "$CODE/frontend" >>"$PROTOKOLL" 2>&1
   docker save "epm-backend:$TAG" "epm-web:$TAG" -o "$B/images/epm-$TAG.tar"
   chmod 0600 "$B/images/epm-$TAG.tar"
   # nur die letzten 5 Image-Dateien behalten (Update-Pakete für den VPS: die letzten 3)
