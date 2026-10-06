@@ -660,7 +660,8 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
         """Alle Fassungen aller Einträge dieser Akte, neueste zuerst (Entwurf 10).
 
         Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, bemerkung, gewichte, kontakte, termine,
-        dokumente, infusionsplaene, bezugspersonen, aerzte, erklaerungen, datenschutz; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
+        dokumente, infusionsplaene, bezugspersonen, aerzte, erklaerungen, datenschutz, diagnosen, laborbefunde,
+        bia_messungen, berichte, hinweisruhe; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
         die Bereiche Stammdaten, Diagnose, Therapie, Empfehlung und Bemerkung verteilt.
         """
         patient = self.get_object()
