@@ -156,17 +156,17 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F107 | Datenbank leeren (Ende der Testphase): Akten, Dokumente, Versorger, Ärzte, nicht ausgewählte Benutzer und Audit-Log entfernen; Kontenauswahl, Bestätigungscode, Passwort + 2FA, Rückfrage, vorher Sicherung | System | ABGESCHLOSSEN UND GETESTET |
 | F108 | Schalter „Musterdaten automatisch anlegen“ | System | ABGESCHLOSSEN UND GETESTET |
 | F109 | Menüpunkt „Import“ nach der Übernahme aus- und wieder einblenden | System, Seitenleiste, Import | ABGESCHLOSSEN UND GETESTET |
-| F110 | Infusionstage je Beutelart: PE (Mischbeutel), Zusatzvolumen, infusionsfreie Tage – mit Übernahme in den Folgeplan, Vergleich und PDF | 7 Neuer Infusionsplan | TEILWEISE ABGESCHLOSSEN |
-| F111 | Präparate nach der Praxis: Zusatzvolumen (Sterofundin ISO, Ringer-Lösung, Ringer-Lactat, NaCl 0,9 %, Jonosteril), Natrovit, NutriLock/TauroLock, Hinweis am Präparat; Dipeptamin und Omegaven ausgeblendet | 18 Vorlagen › Auswahllisten | TEILWEISE ABGESCHLOSSEN |
-| F112 | Katalog der Laborparameter (Gruppen, Einheit, Referenzbereich) | 18 Vorlagen › Labor und Diagnosen | TEILWEISE ABGESCHLOSSEN |
-| F113 | Laborbefunde mit Maske statt Abschreiben; freie Zeilen für Tumormarker und genetische Parameter | 4 Akte › Labor & BIA | TEILWEISE ABGESCHLOSSEN |
-| F114 | BIA-Messungen (Gewicht, BCM, Fettmasse, ECW, Körperwasser, BMI) mit Beurteilung; Gewicht wandert in den Verlauf | 4 Akte › Labor & BIA | TEILWEISE ABGESCHLOSSEN |
-| F115 | Berichte aus der Akte: Entwurf → Freigabe, PDF als Dokument, danach unveränderlich | 4 Akte › Berichte | TEILWEISE ABGESCHLOSSEN |
-| F116 | Unterlagen für die Sprechstunde: Diagnosen, Plan, BIA, Labor und Empfehlung auf einem Blatt | 4 Akte | TEILWEISE ABGESCHLOSSEN |
-| F117 | Diagnosen mit ICD-Code und Zusatzkennzeichen G/V/Z/A, mitwachsende Liste im Hintergrund | 5 Diagnose & Therapie, 18 Vorlagen | TEILWEISE ABGESCHLOSSEN |
-| F118 | Versichertendaten: GKV/PKV, Versicherung, Versichertennummer | 4 Akte, 12 Neuer Patient | TEILWEISE ABGESCHLOSSEN |
+| F110 | Infusionstage je Beutelart: PE (Mischbeutel), Zusatzvolumen, infusionsfreie Tage – mit Übernahme in den Folgeplan, Vergleich und PDF | 7 Neuer Infusionsplan | ABGESCHLOSSEN UND GETESTET |
+| F111 | Präparate nach der Praxis: Zusatzvolumen (Sterofundin ISO, Ringer-Lösung, Ringer-Lactat, NaCl 0,9 %, Jonosteril), Natrovit, NutriLock/TauroLock, Hinweis am Präparat; Dipeptamin und Omegaven ausgeblendet | 18 Vorlagen › Auswahllisten | ABGESCHLOSSEN UND GETESTET |
+| F112 | Katalog der Laborparameter (Gruppen, Einheit, Referenzbereich) | 18 Vorlagen › Labor und Diagnosen | ABGESCHLOSSEN UND GETESTET |
+| F113 | Laborbefunde mit Maske statt Abschreiben; freie Zeilen für Tumormarker und genetische Parameter | 4 Akte › Labor & BIA | ABGESCHLOSSEN UND GETESTET |
+| F114 | BIA-Messungen (Gewicht, BCM, Fettmasse, ECW, Körperwasser, BMI) mit Beurteilung; Gewicht wandert in den Verlauf | 4 Akte › Labor & BIA | ABGESCHLOSSEN UND GETESTET |
+| F115 | Berichte aus der Akte: Entwurf → Freigabe, PDF als Dokument, danach unveränderlich | 4 Akte › Berichte | ABGESCHLOSSEN UND GETESTET |
+| F116 | Unterlagen für die Sprechstunde: Diagnosen, Plan, BIA, Labor und Empfehlung auf einem Blatt | 4 Akte | ABGESCHLOSSEN UND GETESTET |
+| F117 | Diagnosen mit ICD-Code und Zusatzkennzeichen G/V/Z/A, mitwachsende Liste im Hintergrund | 5 Diagnose & Therapie, 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
+| F118 | Versichertendaten: GKV/PKV, Versicherung, Versichertennummer | 4 Akte, 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
 
-Summe (118 Funktionen, gezählt aus der Tabelle): 109 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 9 teilweise abgeschlossen (F110–F118, Wünsche aus der Praxis vom 06.10.2026: Code vollständig, Testläufe stehen aus) · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
+Summe (118 Funktionen, gezählt aus der Tabelle): 118 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 Neu in Runde 4 sind F74–F83 (Datenschutz nach DSGVO und Abschließen eines Plans nach Freigabe); offene Fragen dazu stehen
@@ -2203,8 +2203,7 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
   Vorlagenversion – der Block ist dort unter Vorlagen › Dokumentvorlagen einmal zu ergänzen.
 - **Teststatus:** Backend-Tests `patienten.test_praxiswuensche.InfusionstageTest`. Browsertest
   `praxiswuensche.spec.ts` „Infusionstage je Beutelart im Plan-Editor“.
-- **Status:** TEILWEISE ABGESCHLOSSEN (Umsetzung vollständig; die Läufe in CI stehen noch aus, siehe
-  Änderungsprotokoll). Offen: U39–U41.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U39–U41.
 
 ### F111 Präparate: Zusatzvolumen, Natrovit, Taurolidin, Hinweis am Präparat
 - **Anlass:** „Dipeptamen und Omegaven können eigentlich raus. Beim Zusatzvolumen bräuchte ich die folgenden
@@ -2218,7 +2217,7 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
   Citrat“). **Dipeptamin** und **Omegaven** werden ausgeblendet – bestehende Pläne behalten sie, neu wählbar sind sie
   nicht mehr (in EPM wird nichts gelöscht).
 - **Teststatus:** Backend-Tests `patienten.test_praxiswuensche.PraeparateTest`.
-- **Status:** TEILWEISE ABGESCHLOSSEN. Offen: U42, U43.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U42, U43.
 
 ### F112 Katalog der Laborparameter
 - **Anlass:** „Ich muss jedes Labor händisch abschreiben … Ist es vielleicht möglich gewisse Standard-Parameter
@@ -2231,7 +2230,7 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
   Folsäure“ und „Vitamin D, D3, Calcidiol, Calcitriol“ je als eigener Parameter (U46).
 - **API:** `/api/laborparameter/` (lesen: jeder Angemeldete – die Erfassungsmaske braucht den Katalog; schreiben:
   Recht „Vorlagen pflegen“), `POST /api/laborparameter/reihenfolge/`. Oberfläche: Vorlagen › Labor und Diagnosen.
-- **Status:** TEILWEISE ABGESCHLOSSEN. Offen: U44–U46.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U44–U46.
 
 ### F113 Laborbefunde erfassen
 - **Modelle `befunde.Laborbefund` und `befunde.Laborwert`** (neue App, Migration `befunde/0001`): Befund mit
@@ -2246,7 +2245,7 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
 - **Oberfläche:** Reiter „Labor & BIA“ der Akte; die Maske zeigt die Parameter nach Gruppen, eingetragen wird nur der
   Wert. Darunter freie Zeilen für weitere Parameter.
 - **Teststatus:** Backend-Tests `befunde.tests.LaborTest`. Browsertest `praxiswuensche.spec.ts`.
-- **Status:** TEILWEISE ABGESCHLOSSEN. Offen: U47, U48, U58.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U47, U48, U58.
 
 ### F114 BIA-Messungen
 - **Anlass:** „Bei den BIA-Messungen wäre es das gleiche … Gewicht (kg), BCM (kg), Fettmasse (kg), ECW (%),
@@ -2258,7 +2257,7 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
 - **Plausibilität:** Gewichtsgrenzen wie beim Gewicht, ECW 0–100 %, Fettmasse und BCM nicht größer als das Gewicht,
   Körperwasser nicht mehr Liter als das Gewicht Kilogramm, mindestens ein Messwert.
 - **Teststatus:** Backend-Tests `befunde.tests.BiaTest`. Browsertest `praxiswuensche.spec.ts`.
-- **Status:** TEILWEISE ABGESCHLOSSEN. Offen: U49, U50.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U49, U50.
 
 ### F115 Berichte aus der Akte
 - **Anlass:** „Kann man dann direkt Berichte für die Patienten innerhalb der Patientenakte verfassen? Gern auch mit
@@ -2271,7 +2270,7 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
   im Modell **und** per Datenbank-Trigger (`epm_bericht_schutz`). Korrektur = neuer Bericht. Audit-Log
   `bericht_freigegeben`.
 - **Teststatus:** Backend-Tests `berichte.tests.BerichtTest` (inkl. Trigger). Browsertest `praxiswuensche.spec.ts`.
-- **Status:** TEILWEISE ABGESCHLOSSEN. Offen: U54, U55, U59.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U54, U55, U59.
 
 ### F116 Unterlagen für die Sprechstunde
 - **Anlass:** „Ist es vielleicht für die Vorarbeit zur Sprechstunde möglich, die aktuellsten Daten (BIA, Labor,
@@ -2282,7 +2281,7 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
   Beurteilung, letzte Empfehlung. `?ablegen=1` legt das Blatt zusätzlich als Dokument der Akte ab (Recht „Einträge
   erfassen“, nur bei offenen Akten). Audit-Log `sprechstunde_erzeugt`.
 - **Teststatus:** Backend-Tests `patienten.test_praxiswuensche.SprechstundeTest`. Browsertest `praxiswuensche.spec.ts`.
-- **Status:** TEILWEISE ABGESCHLOSSEN. Offen: U56, U60.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U56, U60.
 
 ### F117 Diagnosen mit ICD-Code
 - **Anlass:** „Kann man im Hintergrund eine Liste mitführen (lassen), wo man Diagnosen mit dem jeweiligen ICD-Code
@@ -2296,7 +2295,7 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
 - **Prüfung:** ICD-Format `^[A-Z]\d{2}(\.\d{1,2})?[+*!]?$`, Kleinschreibung wird vereinheitlicht.
 - **Das lange Freitextfeld „Diagnose“ bleibt daneben bestehen** (U51); die Akte zeigt beides.
 - **Teststatus:** Backend-Tests `patienten.test_praxiswuensche.DiagnosenTest`. Browsertest `praxiswuensche.spec.ts`.
-- **Status:** TEILWEISE ABGESCHLOSSEN. Offen: U51–U53.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U51–U53.
 
 ### F118 Versichertendaten
 - **Anlass:** „In Anbetracht der Debatten mit den Krankenkassen ist es nötig, dass wir auch die Versichertendaten der
@@ -2309,7 +2308,7 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
   Datenfelder `{{Patient.Versicherungsart}}`, `{{Patient.Versicherung}}`, `{{Patient.Versichertennummer}}`.
 - **Teststatus:** Backend-Tests `patienten.test_praxiswuensche.VersichertendatenTest`. Browsertest
   `praxiswuensche.spec.ts`.
-- **Status:** TEILWEISE ABGESCHLOSSEN. Offen: U57.
+- **Status:** ABGESCHLOSSEN UND GETESTET. Offen: U57.
 
 ## Offene Backend-Funktionen
 
@@ -2405,7 +2404,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
-| 06.10.2026 | Wünsche aus der Praxis (Alice, 06.10.2026) | Infusionstage je Beutelart mit Übernahme in den Folgeplan, Vergleich und PDF (F110, Migration `infusionen/0007`); Präparate nach der Mail – Zusatzvolumen umbenannt und ergänzt, Natrovit, NutriLock/TauroLock, Hinweisfeld am Präparat, Dipeptamin und Omegaven ausgeblendet (F111, Migrationen `stammdaten/0012`, `0013`); Katalog der Laborparameter mit Alices Liste und Erfassungsmaske nach Gruppen (F112, F113, neue App `befunde`); BIA-Maske mit Beurteilung und Übernahme des Gewichts (F114); Berichte in der Akte mit Entwurf/Freigabe, PDF als Dokument und Trigger-Schutz (F115, neue App `berichte`, neues Recht „Berichte freigeben“); Sprechstundenblatt (F116); Diagnosen mit ICD-Code und mitwachsendem Katalog (F117, Migration `patienten/0010`); Versichertendaten GKV/PKV, Versicherung, Versichertennummer (F118). Neue Dokumentvorlagen „Bericht“ und „Unterlagen für die Sprechstunde“ (Migration `vorlagen/0003`), Audit-Arten `bericht_freigegeben` und `sprechstunde_erzeugt` (`audit/0008`). Endgültiges Löschen, Kopie der Akte und Verlauf um die neuen Bereiche erweitert. Konzept und 22 offene Fragen (U39–U60) in `docs/WUENSCHE-PRAXIS-2026-10-06.md`. **Noch nicht gelaufen:** Die Migrationen sind von Hand geschrieben, Backend- und Browsertests wurden nicht ausgeführt (die Arbeitsumgebung hatte keinen Zugriff auf PyPI und npm) – erster Nachweis ist der CI-Lauf. Die neuen Apps stehen jetzt auch in der `makemigrations`-Zeile des Workflows |
+| 06.10.2026 | Wünsche aus der Praxis (Alice, 06.10.2026) | Infusionstage je Beutelart mit Übernahme in den Folgeplan, Vergleich und PDF (F110, Migration `infusionen/0007`); Präparate nach der Mail – Zusatzvolumen umbenannt und ergänzt, Natrovit, NutriLock/TauroLock, Hinweisfeld am Präparat, Dipeptamin und Omegaven ausgeblendet (F111, Migrationen `stammdaten/0012`, `0013`); Katalog der Laborparameter mit Alices Liste und Erfassungsmaske nach Gruppen (F112, F113, neue App `befunde`); BIA-Maske mit Beurteilung und Übernahme des Gewichts (F114); Berichte in der Akte mit Entwurf/Freigabe, PDF als Dokument und Trigger-Schutz (F115, neue App `berichte`, neues Recht „Berichte freigeben“); Sprechstundenblatt (F116); Diagnosen mit ICD-Code und mitwachsendem Katalog (F117, Migration `patienten/0010`); Versichertendaten GKV/PKV, Versicherung, Versichertennummer (F118). Neue Dokumentvorlagen „Bericht“ und „Unterlagen für die Sprechstunde“ (Migration `vorlagen/0003`), Audit-Arten `bericht_freigegeben` und `sprechstunde_erzeugt` (`audit/0008`). Endgültiges Löschen, Kopie der Akte und Verlauf um die neuen Bereiche erweitert. Konzept und 22 offene Fragen (U39–U60) in `docs/WUENSCHE-PRAXIS-2026-10-06.md`. Die Migrationen sind von Hand geschrieben (die Arbeitsumgebung hatte keinen Zugriff auf PyPI und npm); `makemigrations` in CI meldet dazu „No changes detected“. Die neuen Apps stehen jetzt auch in der `makemigrations`-Zeile des Workflows. Lauf 37525732042: 311 von 311 Backend-Tests, 98 von 98 Browsertests. Davor fand CI drei echte Fehler, die hier behoben sind: der Plan-Serializer gab die neuen Infusionstage-Felder weder aus noch nahm er sie entgegen (dadurch griff auch deren Prüfung nicht), der ICD-Code wurde nicht in Großschreibung vereinheitlicht, und das Frontend baute wegen eines doppelten Schlüssels in der Feldliste des Verlaufs nicht. Nebenwirkung der Umbenennung: Beim Altdaten-Import trifft „Sterofundin“ keinen Katalogeintrag mehr automatisch und wird einmal von Hand auf „Sterofundin ISO“ gelegt (U43) |
 | 03.10.2026 | Klärungen U3–U6, U31 (Branch `klaerungen-u3-u6-2026-10-03`) | Telefon 2, Krankenkasse und Bemerkung sichtbar und bearbeitbar, Bemerkung mit Versionen und eigenem Bereich im Verlauf (U5); Kontaktart beim Erfassen und in den Listen, Auswahlliste „Kontaktarten“ (U6); U3, U4, U31 bestätigt; F83 mit Browsertest abgeschlossen |
 | 03.10.2026 | Klärungen U26–U33 (Branch `bereinigen-2026-10-03`) | Administration › System, Karte „Testphase und Go-live“: Datenbank leeren (F107, Systemagent-Aktion `datenbank_leeren`, Befehl `epm_datenbank_leeren`), Schalter „Musterdaten automatisch anlegen“ (F108) und „Import ausblenden“ (F109); Migration `stammdaten/0011`; U26, U28, U30, U32, U33 bestätigt, U27 geklärt. Systemagent über `sudo epm-update` aktualisieren |
 | 03.10.2026 | Klärungen U7, U16–U24, U38 | Entwurfsmodus der Vordrucke manuell abschaltbar (F76, Migration `stammdaten/0010`); Aufbewahrung im Übertragungsziel, Standard 30 Tage, Systemagent räumt nach jeder Übertragung auf (F64, U21); Rolle „Mitarbeiter (erweitert)“ (Migration `accounts/0007`, U22); Testbenutzer der Musterdaten als Mitarbeiter (U7); U18, U19, U23, U24, U38 bestätigt |
