@@ -96,7 +96,7 @@ class LaborTest(Grundlage):
         self.assertEqual(r.status_code, 200, r.content)
         d = r.json()
         self.assertEqual(d["parameter"]["einheit"], "µg/l")
-        self.assertEqual([p["wert"] for p in d["punkte"]], ["12.0000", "30.0000", "48.0000"])
+        self.assertEqual([p["wert"] for p in d["punkte"]], [12.0, 30.0, 48.0])
 
     def test_referenzbereich_markiert_abweichung(self):
         p = parameter("Ferritin")
@@ -126,7 +126,7 @@ class BiaTest(Grundlage):
         self.assertEqual(r.status_code, 201, r.content)
         d = r.json()
         self.assertIsNotNone(d["gewichtsmessung"])
-        self.assertEqual(d["magermasse_kg"], "43.8")
+        self.assertEqual(d["magermasse_kg"], 43.8)
         messung = self.patient.gewichte.get()
         self.assertEqual(messung.gewicht_kg, Decimal("62.4"))
         self.assertEqual(messung.notiz, "aus der BIA-Messung")
@@ -143,7 +143,7 @@ class BiaTest(Grundlage):
         self.patient.save()
         c = client_fuer(self.mitarbeiter)
         d = c.post("/api/bia-messungen/", self.werte(bmi=None), format="json").json()
-        self.assertEqual(d["bmi_berechnet"], "21.6")
+        self.assertEqual(d["bmi_berechnet"], 21.6)
         self.assertIsNone(d["bmi"])
 
     def test_unplausible_werte_abgelehnt(self):

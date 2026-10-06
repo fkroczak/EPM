@@ -1515,6 +1515,10 @@ class DiagnoseSerializer(ModelClean, _PatientFest, serializers.ModelSerializer):
             raise serializers.ValidationError("Bitte die Bezeichnung angeben.")
         return wert.strip()
 
+    def validate_icd_code(self, wert):
+        """Großschreibung hier vereinheitlichen: ``ModelClean`` prüft nur, gespeichert wird der Serializer-Wert."""
+        return (wert or "").strip().upper()
+
 
 class DiagnoseViewSet(_StammEintragViewSet):
     """Diagnosen eines Patienten: ``?patient=ID&aktiv=true``.

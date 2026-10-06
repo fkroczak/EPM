@@ -20,6 +20,9 @@ const BEREICHE: { wert: string; text: string }[] = [
   { wert: "gewichte", text: "Gewicht" }, { wert: "termine", text: "Termine" }, { wert: "infusionsplaene", text: "Infusionspläne" },
   { wert: "dokumente", text: "Dokumente" }, { wert: "aerzte", text: "Ärzte" }, { wert: "bezugspersonen", text: "Bezugspersonen" },
   { wert: "erklaerungen", text: "Erklärungen" }, { wert: "datenschutz", text: "Datenschutz" },
+  // Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
+  { wert: "diagnosen", text: "Diagnosen (ICD)" }, { wert: "laborbefunde", text: "Laborbefunde" },
+  { wert: "bia_messungen", text: "BIA-Messungen" }, { wert: "berichte", text: "Berichte" },
 ];
 const BEREICH_EINZELN: Record<string, string> = {
   stammdaten: "Stammdaten", diagnose: "Diagnose", therapie: "Therapie", empfehlung: "Empfehlung", bemerkung: "Bemerkung", kontakte: "Kontakt",
@@ -36,7 +39,7 @@ const FELDER: Record<string, string> = {
   icd_code: "ICD-Code", kennzeichen: "Zusatzkennzeichen", bezeichnung: "Bezeichnung", seit: "besteht seit",
   beendet_am: "beendet am", abgenommen_am: "Abnahme am", labor: "Labor", beurteilung: "Beurteilung",
   bcm_kg: "BCM (kg)", fettmasse_kg: "Fettmasse (kg)", ecw_prozent: "ECW (%)", koerperwasser_l: "Körperwasser (l)",
-  bmi: "BMI", empfaenger: "Empfänger", inhalt: "Inhalt", freigegeben_am: "Freigegeben am",
+  bmi: "BMI", empfaenger: "Empfänger", freigegeben_am: "Freigegeben am",
   zusatz_tage_pro_woche: "Zusatzvolumen pro Woche", freie_tage_pro_woche: "Infusionsfreie Tage",
   ueberweisung_durch: "Überweisung durch", groesse_cm: "Größe (cm)", katheter: "Katheter", versorger: "Versorger",
   ansprechpartner: "Ansprechpartner", nickelallergie: "Nickelallergie", kein_katheter: "Kein Katheter",

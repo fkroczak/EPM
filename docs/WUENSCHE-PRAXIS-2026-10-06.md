@@ -54,7 +54,7 @@ werden in EPM grundsätzlich nicht gelöscht.
 | U40 | Ist mit „Elektrolytbeutel“ das **Zusatzvolumen** des Plans gemeint (Sterofundin ISO, Ringer …) oder ein weiterer, eigener Beutel? | Zusatzvolumen |
 | U41 | „Weitere Bestandteile“ haben heute ein Freitextfeld **Häufigkeit** („täglich“, „Mo/Mi/Fr“). Soll das auch auf Tage pro Woche umgestellt werden? | bleibt Freitext |
 | U42 | Dipeptamin und Omegaven **ausblenden** (bestehende Pläne behalten sie) statt löschen – richtig? | ausblenden |
-| U43 | Umbenennen von Sterofundin/Ringer/Junosteril wirkt auch auf **alte Pläne**, weil es nur einen Katalogeintrag gibt. Soll das so sein, oder sollen neue Einträge daneben entstehen? | umbenennen (Tippfehler und Präzisierung, kein anderes Präparat) |
+| U43 | Umbenennen von Sterofundin/Ringer/Junosteril wirkt auch auf **alte Pläne**, weil es nur einen Katalogeintrag gibt. Soll das so sein, oder sollen neue Einträge daneben entstehen? Beim Altdaten-Import trifft „Sterofundin“ dadurch keinen Eintrag mehr automatisch und muss einmal von Hand auf „Sterofundin ISO“ gelegt werden (bewusst so – ob beides dasselbe Präparat ist, entscheidet kein Programm) | umbenennen; eine Zuordnung mehr beim Import |
 
 ---
 

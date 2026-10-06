@@ -29,6 +29,8 @@ die Zwischenlösung steht jeweils dahinter, damit läuft es auch so weiter.
 4. Ich habe **„Sterofundin“ in „Sterofundin ISO“** umbenannt, ebenso „Ringer-Infusionslösung“ → „Ringer-Lösung“
    und „Junosteril“ → „Jonosteril“ (Tippfehler). Das wirkt auch auf alte Pläne, weil es jeweils nur einen
    Katalogeintrag gibt. In Ordnung so, oder sollen die alten Namen stehen bleiben und die neuen daneben?
+   (Nebenwirkung: Beim Übernehmen der Altdaten muss „Sterofundin“ einmal von Hand auf „Sterofundin ISO“
+   gelegt werden. Das lasse ich bewusst so – ob das wirklich dasselbe Präparat ist, soll kein Programm raten.)
 
 ## 2 · Labor
 

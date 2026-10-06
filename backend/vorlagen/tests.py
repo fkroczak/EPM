@@ -70,6 +70,8 @@ class Vorlagen(Grundlage):
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual([(v["art"], v["aktiv"]["version"], v["entwurf"]) for v in r.json()],
                          [("infusionsplan", 1, None), ("patientendatenblatt", 1, None),
+                          # Wünsche aus der Praxis vom 06.10.2026 (F115, F116)
+                          ("bericht", 1, None), ("sprechstunde", 1, None),
                           ("datenschutzinformation", 1, None), ("einwilligung", 1, None),
                           ("schweigepflichtentbindung", 1, None)])
         self.assertEqual(client_fuer(self.betrachter).get("/api/vorlagen/").status_code, 403)
