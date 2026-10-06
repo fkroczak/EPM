@@ -247,9 +247,9 @@ test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen 
   await page.getByTestId("kennzahlen").getByRole("button", { name: /nicht erfasst/ }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Telefon", { exact: true }).fill("0251 98765");
-  // Telefon 2 und Krankenkasse seit 03.10.2026 sichtbar (Klärung U5)
+  // Telefon 2 und Versicherung sichtbar (Klärung U5; seit 06.10.2026 heißt „Krankenkasse“ „Versicherung“, F118)
   await dialog.getByLabel("Telefon 2").fill("0171 2223334");
-  await dialog.getByLabel("Krankenkasse").fill("AOK NordWest");
+  await dialog.getByLabel("Versicherung", { exact: true }).fill("AOK NordWest");
   // Nickelallergie als Auswahlliste; Katheter und Versorger bewusst „kein“ (Festlegung 01.10.2026)
   await dialog.getByLabel("Nickelallergie").selectOption("nein");
   await dialog.getByLabel("Katheter").selectOption({ label: "kein Katheter" });

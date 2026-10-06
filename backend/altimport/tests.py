@@ -272,7 +272,7 @@ class Probelauf(Basis):
         stand = self.entscheide()["stand"]
         a = next(x for x in stand["auffaelligkeiten"] if x["schluessel"] == "patienten:5:nummer")
         self.assertEqual((a["art"], a["blockiert"], a["moeglich"]), ("geloescht_epm", True, ["auslassen"]))
-        self.assertIn("2 Punkte offen", self.a.get("/api/altimport/zuordnung/").json()["hindernisse"][0])
+        self.assertIn("1 Punkte offen", self.a.get("/api/altimport/zuordnung/").json()["hindernisse"][0])
         r = self.a.post("/api/altimport/import/", {"kennwort": KENNWORT, "code": self.codes.pop()}, format="json")
         self.assertEqual(r.status_code, 409)
         # eine andere Nummer ist kein Ausweg

@@ -24,7 +24,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(editor.getByLabel("Menge Humanalbumin in ml")).toHaveValue("");
 
   await editor.getByLabel("Präparat", { exact: true }).selectOption({ label: "Sterofundin ISO" });
-  await editor.getByLabel("Volumen").fill("500");
+  await editor.getByLabel("Volumen", { exact: true }).fill("500");
   await editor.getByLabel("Präparat Glucose").selectOption({ label: "Glucose 70 %" });
   await editor.getByLabel("Menge Glucose in g").fill("160");
   await editor.getByLabel("Präparat Aminosäuren").selectOption({ label: "Glamin 13,4 %" });

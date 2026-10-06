@@ -163,7 +163,7 @@ export function Berichte() {
         <Karte key={b.id} className="p-[22px] flex flex-col gap-3" data-testid={`bericht-${b.id}`}>
           <KartenKopf
             titel={<span className="flex items-center gap-2">{b.titel}
-              <Chip art={b.status === "freigegeben" ? "ok" : "warn"}>{b.status_name}</Chip></span>}
+              <Chip art={b.status === "freigegeben" ? "ok" : "warn"} data-testid="bericht-status">{b.status_name}</Chip></span>}
             unter={[b.art_name, datum(b.datum), b.empfaenger ? `an ${b.empfaenger}` : "", b.erstellt_von_name]
               .filter(Boolean).join(" · ")}
             rechts={<>

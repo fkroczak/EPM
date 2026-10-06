@@ -28,11 +28,12 @@ test("Diagnose mit ICD-Code eintragen; die Liste im Hintergrund wächst mit", as
   await oeffnen(page, p.id, "/therapie");
   const karte = page.getByTestId("karte-diagnosen");
   await karte.getByRole("button", { name: "Diagnose" }).click();
-  await page.getByLabel("Diagnose", { exact: true }).fill("Kurzdarmsyndrom");
-  await page.getByLabel("ICD-Code").fill("K91.2");
-  await page.getByLabel("Zusatzkennzeichen").selectOption("G");
-  await expect(page.getByText("Kurzdarmsyndrom [K91.2G]")).toBeVisible();
-  await page.getByRole("button", { name: "Speichern" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Diagnose").fill("Kurzdarmsyndrom");
+  await dialog.getByLabel("ICD-Code").fill("K91.2");
+  await dialog.getByLabel("Zusatzkennzeichen").selectOption("G");
+  await expect(dialog.getByText("Kurzdarmsyndrom [K91.2G]")).toBeVisible();
+  await dialog.getByRole("button", { name: "Speichern" }).click();
   await expect(karte.getByTestId("diagnoseliste")).toContainText("Kurzdarmsyndrom");
   await expect(karte.getByTestId("diagnoseliste")).toContainText("[K91.2G]");
 
@@ -62,7 +63,7 @@ test("Laborbefund über die Maske erfassen – nur Werte eintragen", async ({ pa
   const p = await neuerPatient();
   await oeffnen(page, p.id, "/befunde");
   await page.getByRole("button", { name: "Neuer Laborbefund" }).click();
-  await page.getByLabel("Labor").fill("Labor Dr. Wagner");
+  await page.getByRole("dialog").getByLabel("Labor").fill("Labor Dr. Wagner");
   const maske = page.getByTestId("labor-maske");
   await maske.getByLabel("Ferritin").fill("18");
   await maske.getByLabel("Natrium").fill("138");
@@ -107,7 +108,7 @@ test("Bericht: Entwurf, Freigabe durch den Mediziner, danach unveränderlich", a
   await page.getByLabel("Empfänger").fill("Hausarzt Dr. Hausmann");
   await page.getByRole("textbox", { name: "Bericht" }).fill("Stabiler Verlauf unter heimparenteraler Ernährung.");
   await page.getByRole("button", { name: "Entwurf speichern" }).click();
-  await expect(page.getByText("Entwurf")).toBeVisible();
+  await expect(page.getByTestId("bericht-status")).toHaveText("Entwurf");
 
   // Mitarbeiter dürfen nicht freigeben – der Knopf erscheint erst gar nicht
   await expect(page.getByRole("button", { name: "Freigeben" })).toHaveCount(0);
@@ -116,7 +117,7 @@ test("Bericht: Entwurf, Freigabe durch den Mediziner, danach unveränderlich", a
   await medizinerSeite.goto(`/patienten/${p.id}/berichte`);
   await medizinerSeite.getByRole("button", { name: "Freigeben" }).click();
   await medizinerSeite.getByRole("button", { name: "Freigeben" }).last().click();
-  await expect(medizinerSeite.getByText("freigegeben", { exact: true })).toBeVisible();
+  await expect(medizinerSeite.getByTestId("bericht-status")).toHaveText("freigegeben");
   await expect(medizinerSeite.getByText(/Maschinell erstellt, geprüft und freigegeben von/)).toBeVisible();
   // Bearbeiten ist weg, die PDF liegt in den Dokumenten
   await expect(medizinerSeite.getByRole("button", { name: "Bearbeiten" })).toHaveCount(0);
