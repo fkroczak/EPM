@@ -18,8 +18,9 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { useSortierbar } from "@/components/ui/sortierbar";
 import { LOGO_URL, Logo } from "@/components/layout/logo";
 import { DokumentvorlagenBereich } from "@/seiten/admin/Dokumentvorlagen";
+import { KatalogeBereich } from "@/seiten/admin/Kataloge";
 
-type Bereich = "briefkopf" | "listen" | "grenzwerte" | "dokumente";
+type Bereich = "briefkopf" | "listen" | "kataloge" | "grenzwerte" | "dokumente";
 type SpeichernRef = { current: (() => void) | null };
 
 const ABSENDER_FELDER: { k: keyof Absender; label: string; span: number; num?: boolean }[] = [
@@ -124,6 +125,7 @@ const LISTEN: Liste[] = [
   { schluessel: "dokumenttyp", titel: "Dokumenttypen", art: "auswahl" },
   { schluessel: "kontaktart", titel: "Kontaktarten", art: "auswahl" },
   { schluessel: "beziehung", titel: "Beziehungen (Bezugspersonen)", art: "auswahl" },
+  { schluessel: "berichtart", titel: "Berichtsarten", art: "auswahl" },
 ];
 
 function EintragDialog({ liste, eintrag, onZu }: { liste: Liste; eintrag: Praeparat | Auswahlwert | null | "neu"; onZu: () => void }) {
@@ -132,17 +134,19 @@ function EintragDialog({ liste, eintrag, onZu }: { liste: Liste; eintrag: Praepa
   const [name, setName] = useState("");
   const [konz, setKonz] = useState("");
   const [einheit, setEinheit] = useState("ml");
+  const [hinweis, setHinweis] = useState("");
   useEffect(() => {
     if (eintrag && eintrag !== "neu") {
-      if ("kategorie" in eintrag) { setName(eintrag.name); setKonz(eintrag.konzentration); setEinheit(eintrag.einheit); }
-      else setName(eintrag.wert);
-    } else { setName(""); setKonz(""); setEinheit("ml"); }
+      if ("kategorie" in eintrag) {
+        setName(eintrag.name); setKonz(eintrag.konzentration); setEinheit(eintrag.einheit); setHinweis(eintrag.hinweis ?? "");
+      } else setName(eintrag.wert);
+    } else { setName(""); setKonz(""); setEinheit("ml"); setHinweis(""); }
   }, [eintrag]);
   const speichern = useMutation({
     mutationFn: () => {
       const neu = eintrag === "neu";
       if (liste.art === "praeparat") {
-        const daten = { name, konzentration: konz, einheit, ...(neu ? { kategorie: liste.schluessel } : {}) };
+        const daten = { name, konzentration: konz, einheit, hinweis, ...(neu ? { kategorie: liste.schluessel } : {}) };
         return neu ? api("praeparate/", { body: daten }) : api(`praeparate/${(eintrag as Praeparat).id}/`, { method: "PATCH", body: daten });
       }
       return neu ? api("auswahlwerte/", { body: { liste: liste.schluessel, wert: name } })
@@ -166,6 +170,10 @@ function EintragDialog({ liste, eintrag, onZu }: { liste: Liste; eintrag: Praepa
         {liste.art === "praeparat" ? <>
           <Feld label="Konzentration" hinweis="z. B. 13,4 %" className="col-span-2" fehler={f.konzentration}>{(p) => <Eingabe {...p} value={konz} onChange={(e) => setKonz(e.target.value)} />}</Feld>
           <Feld label="Einheit" fehler={f.einheit}>{(p) => <Eingabe {...p} value={einheit} onChange={(e) => setEinheit(e.target.value)} />}</Feld>
+          {/* Hinweis zum Praeparat (F111), z. B. reines Taurolidin 2 % oder baugleich zu Cernevit */}
+          <Feld label="Hinweis" className="col-span-3" hinweis="erscheint bei der Auswahl und auf der Plan-PDF" fehler={f.hinweis}>
+            {(p) => <Eingabe {...p} maxLength={200} value={hinweis} onChange={(e) => setHinweis(e.target.value)} />}
+          </Feld>
         </> : null}
         {speichern.error && !Object.keys(f).length ? <Meldung art="fehler" className="col-span-3">{speichern.error.message}</Meldung> : null}
         <button type="submit" hidden />
@@ -414,12 +422,14 @@ export function Vorlagen() {
     <Seite pfad={[{ text: "Administration" }, { text: "Vorlagen" }]}>
       <Seitenkopf titel="Vorlagen" unter="Alles, was sich ohne IT anpassen lassen soll. Jede Änderung steht im Audit-Log."
         rechts={bereich === "dokumente" ? <div ref={setAktionen} className="flex items-center gap-2.5 flex-wrap" />
-          : bereich !== "listen" ? <Knopf variante="pri" onClick={() => speichern.current?.()}>Speichern</Knopf> : null} />
+          : bereich !== "listen" && bereich !== "kataloge" ? <Knopf variante="pri" onClick={() => speichern.current?.()}>Speichern</Knopf> : null} />
       <Segmente label="Bereich" wert={bereich} onWahl={waehle} className="self-start"
-        werte={[{ wert: "briefkopf", text: "Briefkopf und Logo" }, { wert: "listen", text: "Auswahllisten" }, { wert: "grenzwerte", text: "Grenzwerte" },
+        werte={[{ wert: "briefkopf", text: "Briefkopf und Logo" }, { wert: "listen", text: "Auswahllisten" },
+          { wert: "kataloge", text: "Labor und Diagnosen" }, { wert: "grenzwerte", text: "Grenzwerte" },
           { wert: "dokumente", text: "Dokumentvorlagen" }]} />
       {bereich === "briefkopf" ? <BriefkopfBereich speichernRef={speichern} />
         : bereich === "listen" ? <ListenBereich />
+        : bereich === "kataloge" ? <KatalogeBereich />
         : bereich === "grenzwerte" ? <GrenzwerteBereich speichernRef={speichern} />
         : <DokumentvorlagenBereich aktionenZiel={aktionen} onGeaendert={merkeGeaendert} />}
     </Seite>

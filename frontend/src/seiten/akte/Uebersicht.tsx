@@ -7,7 +7,7 @@ import type { Feldfehler, Seite as ApiSeite } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useEinstellungen } from "@/lib/daten";
 import { datum, eingabeDatum, eingabeZahl, heuteIso, kg, prozent, terminZeit, uhrzeit, zahl, zeitpunkt } from "@/lib/format";
-import { GEWICHTSQUELLEN, TERMINARTEN } from "@/lib/typen";
+import { GEWICHTSQUELLEN, TERMINARTEN, VERSICHERUNGSARTEN } from "@/lib/typen";
 import type { Gewicht, Kontakt, Plan, Termin } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, KnopfLink, Laden, Leer, Meldung, Segmente, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
@@ -346,7 +346,10 @@ function StammKarte() {
       {/* Telefon 2 und Krankenkasse seit 03.10.2026 sichtbar (Klärung U5) */}
       <span className="gedaempft">Telefon 2</span><span className="num" data-testid="telefon2">{p.telefon2 || "—"}</span>
       <span className="gedaempft">E-Mail</span><span className="truncate">{p.email || "—"}</span>
-      <span className="gedaempft">Krankenkasse</span><span data-testid="krankenkasse">{p.krankenkasse || "—"}</span>
+      <span className="gedaempft">Versicherung</span><span data-testid="krankenkasse">
+        {[VERSICHERUNGSARTEN[p.versicherungsart] !== "nicht erfasst" ? VERSICHERUNGSARTEN[p.versicherungsart] : "",
+          p.krankenkasse].filter(Boolean).join(" · ") || "—"}</span>
+      <span className="gedaempft">Versichertennummer</span><span className="num" data-testid="versichertennummer">{p.versichertennummer || "—"}</span>
       {p.hausarzt ? <><span className="gedaempft">Hausarzt</span><span title="bisheriger Freitext; Ärzte mit Kontaktdaten unter „Ärzte“">{p.hausarzt}</span></> : null}
       <span className="gedaempft">Überweisung</span><span>{p.ueberweisung_durch || "—"}</span>
       <span className="gedaempft">Größe</span><span className="num">{p.groesse_cm != null ? `${zahl(p.groesse_cm)} cm` : "—"}</span>

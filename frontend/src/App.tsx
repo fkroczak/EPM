@@ -7,6 +7,8 @@ import { Seite, Shell } from "./components/layout/Shell";
 import { Anmeldung } from "./seiten/Anmeldung";
 import { Akte } from "./seiten/akte/Akte";
 import { AkteDatenschutz } from "./seiten/akte/Datenschutz";
+import { Befunde } from "./seiten/akte/Befunde";
+import { Berichte } from "./seiten/akte/Berichte";
 import { Dokumente } from "./seiten/akte/Dokumente";
 import { Kontakte } from "./seiten/akte/Kontakte";
 import { PlanEditor } from "./seiten/akte/PlanEditor";
@@ -65,6 +67,8 @@ const router = createBrowserRouter([
           { path: "plaene", element: <Plaene /> },
           { path: "plaene/neu", element: <PlanEditor /> },
           { path: "plaene/:planId/bearbeiten", element: <PlanEditor key="bearbeiten" /> },
+          { path: "befunde", element: <Befunde /> },
+          { path: "berichte", element: <Berichte /> },
           { path: "dokumente", element: <Dokumente /> },
           { path: "datenschutz", element: <AkteDatenschutz /> },
           { path: "verlauf", element: <Verlauf /> },

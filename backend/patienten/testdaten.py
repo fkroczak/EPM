@@ -16,7 +16,8 @@ from django.utils import timezone
 from accounts.models import Rolle, User
 from audit.schutz import wartungsmodus
 from infusionen.models import Infusionsplan
-from stammdaten.models import Ansprechpartner, Arzt, Auswahlwert, Einstellungen, Praeparat, Versorger
+from stammdaten.models import (Ansprechpartner, Arzt, Auswahlwert, Einstellungen, Laborparameter,
+                               Praeparat, Versorger)
 
 from .models import Bezugsperson, Dokument, Erklaerung, Gewichtsmessung, Kontakt, Patient, PatientArzt, Termin
 
@@ -27,8 +28,9 @@ TESTBENUTZER = "test"
 AUSWAHLWERTE = {
     Auswahlwert.Liste.KATHETER: ["Port", "Hickman", "Broviac", "PICC", "Port 1-Kammer", "Port 2-Kammer"],
     # „Einwilligung/Datenschutz“: unterschriebene Erklärungen; „Freigabe“: Nachweis der Freigabe eines Plans (E-Mail)
-    Auswahlwert.Liste.DOKUMENTTYP: ["Arztbrief", "Labor", "Infusionsplan", "Bild", "Patientendatenblatt", "Sonstiges",
-                                    "Einwilligung/Datenschutz", "Freigabe"],
+    # „Bericht“ und „Sprechstunde“: von EPM erzeugte PDFs (F115, F116); „BIA“: Geräteprotokoll der Messung
+    Auswahlwert.Liste.DOKUMENTTYP: ["Arztbrief", "Labor", "BIA", "Infusionsplan", "Bild", "Patientendatenblatt",
+                                    "Bericht", "Sprechstunde", "Sonstiges", "Einwilligung/Datenschutz", "Freigabe"],
     Auswahlwert.Liste.TERMINORT: ["Praxis Dr. Holtmeier"],
     # Festlegung 01.10.2026: Beziehung der Bezugsperson, unter Vorlagen › Auswahllisten erweiterbar
     Auswahlwert.Liste.BEZIEHUNG: ["Mutter", "Vater", "Ehepartner/in", "Kind", "Betreuer/in (gesetzlich)",
@@ -36,12 +38,16 @@ AUSWAHLWERTE = {
     # Kontaktarten bleiben wie bisher angelegt – die Liste im Entwurf ist noch offen (U6).
     Auswahlwert.Liste.KONTAKTART: ["Telefon (Anruf erhalten)", "Telefon (angerufen)", "Persönlich", "E-Mail",
                                   "Brief/Fax", "Versorger", "Sonstiges"],
+    # Berichte aus der Akte (Wunsch 06.10.2026, F115; Liste unter Vorlagen › Auswahllisten änderbar – U59)
+    Auswahlwert.Liste.BERICHTART: ["Arztbrief", "Verlaufsbericht", "Stellungnahme", "Sonstiges"],
 }
 
 K = Praeparat.Kategorie
 PRAEPARATE = [
-    (K.BASISLOESUNG, "Sterofundin", ""), (K.BASISLOESUNG, "NaCl", "0,9 %"),
-    (K.BASISLOESUNG, "Ringer-Infusionslösung", ""), (K.BASISLOESUNG, "Junosteril", ""),
+    # Zusatzvolumen nach der Mail vom 06.10.2026 (F111)
+    (K.BASISLOESUNG, "Sterofundin ISO", ""), (K.BASISLOESUNG, "NaCl", "0,9 %"),
+    (K.BASISLOESUNG, "Ringer-Lösung", ""), (K.BASISLOESUNG, "Ringer-Lactat", ""),
+    (K.BASISLOESUNG, "Jonosteril", ""),
     (K.GLUCOSE, "Glucose", "70 %"),
     (K.AMINOSAEUREN, "Glamin", "13,4 %"), (K.AMINOSAEUREN, "Nephrotect", "10,0 %"),
     (K.AMINOSAEUREN, "Aminoplasmal", "10 %"), (K.AMINOSAEUREN, "Aminosteril 8 % Hepa", "8,0 %"),
@@ -55,11 +61,59 @@ PRAEPARATE = [
     (K.SPURENELEMENTE, "Addel Trace", ""),
     (K.VITAMINE, "Soluvit N", ""), (K.VITAMINE, "Vitalipid adult", ""), (K.VITAMINE, "Frekavit fettlöslich", ""),
     (K.VITAMINE, "Frekavit wasserlöslich", ""), (K.VITAMINE, "Cernevit", ""),
+    (K.VITAMINE, "Natrovit", "", "baugleich zu Cernevit, günstiger (Regressgefahr)"),
     (K.KATHETERSCHUTZ, "Taurolin", "2 %"), (K.KATHETERSCHUTZ, "Taurolidin Nova", "2,0 %"),
+    (K.KATHETERSCHUTZ, "NutriLock", "2 %", "reines Taurolidin 2 %"),
+    (K.KATHETERSCHUTZ, "TauroLock", "", "Taurolidin mit Citrat"),
     # Bisherige Einträge ohne Gegenstück im Entwurf bleiben im Katalog (Elektrolytzusätze, Medikamente).
     (K.ELEKTROLYTE, "Kaliumchlorid", "7,45 %"), (K.ELEKTROLYTE, "Natriumhydrogencarbonat", "8,4 %"),
     (K.ELEKTROLYTE, "Magnesiumsulfat", "10 %"), (K.ELEKTROLYTE, "Calciumgluconat", "10 %"),
-    (K.MEDIKAMENT, "Pantozol i.v.", "40 mg"), (K.MEDIKAMENT, "Dipeptamin", "20 %"),
+    (K.MEDIKAMENT, "Pantozol i.v.", "40 mg"),
+    # Dipeptamin und Omegaven entfallen (Wunsch 06.10.2026, F111): Die Migration blendet vorhandene Einträge
+    # aus; neu angelegt werden sie nicht mehr.
+]
+
+
+# Laborparameter nach der Mail von Alice vom 06.10.2026 (F112). Reihenfolge und Gruppen wie dort; die Einheiten
+# sind ein Vorschlag und je Wert überschreibbar (U45). Referenzbereiche bleiben leer, bis sie geklärt sind (U44).
+G = Laborparameter.Gruppe
+LABORPARAMETER = [
+    (G.TRANSAMINASEN, "GPT (ALT)", "U/l", "GPT"), (G.TRANSAMINASEN, "GOT (AST)", "U/l", "GOT"),
+    (G.TRANSAMINASEN, "Gamma-GT", "U/l", "γ-GT"), (G.TRANSAMINASEN, "ALKP", "U/l", "AP"),
+    (G.TRANSAMINASEN, "Bilirubin gesamt", "mg/dl", "Bili ges."),
+    (G.TRANSAMINASEN, "Bilirubin indirekt", "mg/dl", "Bili ind."),
+    (G.TRANSAMINASEN, "Bilirubin direkt", "mg/dl", "Bili dir."),
+    (G.NIERE, "Kreatinin", "mg/dl", "Krea"), (G.NIERE, "GFR (CKD-EPI)", "ml/min/1,73 m²", "GFR CKD-EPI"),
+    (G.NIERE, "GFR", "ml/min", "GFR"), (G.NIERE, "Harnstoff", "mg/dl", ""),
+    (G.NIERE, "Harnsäure", "mg/dl", ""), (G.NIERE, "Cystatin-C", "mg/l", ""),
+    (G.EISEN, "Eisen", "µg/dl", ""), (G.EISEN, "Ferritin", "µg/l", ""),
+    (G.EISEN, "Transferrin", "mg/dl", ""), (G.EISEN, "Transferrinsättigung", "%", "TfS"),
+    (G.EIWEISS_FETT, "Triglyceride", "mg/dl", "TG"), (G.EIWEISS_FETT, "Albumin", "g/l", ""),
+    (G.EIWEISS_FETT, "Gesamteiweiß", "g/l", "GE"), (G.EIWEISS_FETT, "CRP", "mg/l", ""),
+    (G.ELEKTROLYTE, "Natrium", "mmol/l", "Na"), (G.ELEKTROLYTE, "Kalium", "mmol/l", "K"),
+    (G.ELEKTROLYTE, "Calcium", "mmol/l", "Ca"), (G.ELEKTROLYTE, "Magnesium", "mmol/l", "Mg"),
+    (G.ELEKTROLYTE, "Phosphat", "mmol/l", "PO4"), (G.ELEKTROLYTE, "Chlorid", "mmol/l", "Cl"),
+    (G.SPURENELEMENTE, "Kupfer", "µg/l", "Cu"), (G.SPURENELEMENTE, "Zink", "µg/l", "Zn"),
+    (G.SPURENELEMENTE, "Selen", "µg/l", "Se"), (G.SPURENELEMENTE, "Mangan", "µg/l", "Mn"),
+    (G.HAEMATOLOGIE, "Leukozyten", "/nl", "Leuko"), (G.HAEMATOLOGIE, "Erythrozyten", "/pl", "Ery"),
+    (G.HAEMATOLOGIE, "Hämoglobin", "g/dl", "Hb"), (G.HAEMATOLOGIE, "Hämatokrit", "%", "Hkt"),
+    (G.HAEMATOLOGIE, "MCV", "fl", ""), (G.HAEMATOLOGIE, "MCHC", "g/dl", ""), (G.HAEMATOLOGIE, "MCH", "pg", ""),
+    (G.HAEMATOLOGIE, "Thrombozyten", "/nl", "Thrombo"), (G.HAEMATOLOGIE, "Lymphozyten", "%", "Lympho"),
+    # „Vitamin B1, B2, B6, B12, Folsäure“ und „Vitamin D, D3, Calcidiol, Calcitriol“ je als eigener Parameter (U46)
+    (G.VITAMINE, "Vitamin A", "µg/l", ""), (G.VITAMINE, "Vitamin B1", "µg/l", ""),
+    (G.VITAMINE, "Vitamin B2", "µg/l", ""), (G.VITAMINE, "Vitamin B6", "µg/l", ""),
+    (G.VITAMINE, "Vitamin B12", "ng/l", ""), (G.VITAMINE, "Folsäure", "µg/l", ""),
+    (G.VITAMINE, "Vitamin K1", "µg/l", ""), (G.VITAMINE, "Vitamin K2", "µg/l", ""),
+    (G.VITAMINE, "Vitamin E", "mg/l", ""), (G.VITAMINE, "Vitamin D", "µg/l", ""),
+    (G.VITAMINE, "Vitamin D3", "µg/l", ""),
+    (G.VITAMINE, "Calcidiol (25-Hydroxy-Vitamin D)", "ng/ml", "25-OH-D"),
+    (G.VITAMINE, "Calcitriol (1,25-Dihydroxy-Vitamin D)", "pg/ml", "1,25-OH₂-D"),
+    (G.KNOCHEN, "Parathormon", "pg/ml", "PTH"),
+    (G.PANKREAS, "Amylase", "U/l", ""), (G.PANKREAS, "Lipase", "U/l", ""),
+    (G.DIABETES, "C-Peptid", "ng/ml", ""), (G.DIABETES, "HbA1c", "%", ""),
+    (G.DIABETES, "Glucose", "mg/dl", "Glu"), (G.DIABETES, "Insulin", "mU/l", ""),
+    (G.SCHILDDRUESE, "TSH (basal)", "mU/l", "TSH"), (G.SCHILDDRUESE, "fT3", "pg/ml", ""),
+    (G.SCHILDDRUESE, "fT4", "ng/dl", ""),
 ]
 
 
@@ -69,12 +123,21 @@ def stammdaten_anlegen() -> dict:
         for i, wert in enumerate(werte):
             _, angelegt = Auswahlwert.objects.get_or_create(liste=liste, wert=wert, defaults={"reihenfolge": (i + 1) * 10})
             neu["auswahlwerte"] += angelegt
-    for kategorie, name, konz in PRAEPARATE:
+    for eintrag in PRAEPARATE:
+        kategorie, name, konz = eintrag[0], eintrag[1], eintrag[2]
+        hinweis = eintrag[3] if len(eintrag) > 3 else ""
         _, angelegt = Praeparat.objects.get_or_create(
             kategorie=kategorie, name=name, konzentration=konz,
-            defaults={"einheit": "mg" if konz.endswith("mg") else "ml"},
+            defaults={"einheit": "mg" if konz.endswith("mg") else "ml", "hinweis": hinweis},
         )
         neu["praeparate"] += angelegt
+    neu["laborparameter"] = 0
+    for i, (gruppe, name, einheit, kurz) in enumerate(LABORPARAMETER):
+        _, angelegt = Laborparameter.objects.get_or_create(
+            gruppe=gruppe, name=name,
+            defaults={"einheit": einheit, "kurzname": kurz, "reihenfolge": (i + 1) * 10},
+        )
+        neu["laborparameter"] += angelegt
     Einstellungen.aktuell()
     return neu
 

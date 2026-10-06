@@ -26,6 +26,8 @@ class SystemEreignis(models.Model):
         AKTE_ABGESCHLOSSEN = "akte_abgeschlossen", "Akte abgeschlossen"
         AKTE_GEOEFFNET = "akte_geoeffnet", "Akte wieder geöffnet"
         PLAN_FREIGEGEBEN = "plan_freigegeben", "Infusionsplan freigegeben"
+        BERICHT_FREIGEGEBEN = "bericht_freigegeben", "Bericht freigegeben"
+        SPRECHSTUNDE_ERZEUGT = "sprechstunde_erzeugt", "Unterlagen für die Sprechstunde erzeugt"
         STAMMDATEN = "stammdaten", "Stammdaten geändert"
         VORLAGE = "vorlage", "Vorlage geändert"
         BACKUP = "backup", "Backup"

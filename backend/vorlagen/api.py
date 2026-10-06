@@ -219,6 +219,20 @@ class VorschauView(APIView):
         if art == Dokumentvorlage.Art.INFUSIONSPLAN and plan is None:
             return Response({"patient": "Dieser Testpatient hat noch keinen Infusionsplan."},
                             status=status.HTTP_400_BAD_REQUEST)
-        pdf, _ = erzeuge_aus_vorlage(art, Kontext(patient=patient, plan=plan), bloecke=bloecke, wasserzeichen="ENTWURF",
+        kontext = Kontext(patient=patient, plan=plan)
+        if art == Dokumentvorlage.Art.SPRECHSTUNDE:
+            # Vorschau mit dem aktuellsten Stand des Testpatienten (F116)
+            from .listen import sprechstunde_kontext
+
+            kontext = sprechstunde_kontext(patient)
+        elif art == Dokumentvorlage.Art.BERICHT:
+            from berichte.models import Bericht
+
+            bericht = Bericht.objects.filter(patient=patient).order_by("-datum", "-id").first()
+            if bericht is None:
+                return Response({"patient": "Dieser Testpatient hat noch keinen Bericht."},
+                                status=status.HTTP_400_BAD_REQUEST)
+            kontext = Kontext(patient=patient, plan=plan, bericht=bericht)
+        pdf, _ = erzeuge_aus_vorlage(art, kontext, bloecke=bloecke, wasserzeichen="ENTWURF",
                                      titel=f"Vorschau {Dokumentvorlage.Art(art).label}")
         return pdf_antwort(pdf, f"Vorschau-{art}.pdf")

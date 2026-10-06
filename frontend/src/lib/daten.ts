@@ -1,7 +1,7 @@
 /** Gemeinsame Abfragen (Stammdaten werden selten geändert und dürfen länger im Zwischenspeicher bleiben). */
 import { useQuery } from "@tanstack/react-query";
 import { abfrage, api } from "./api";
-import type { Arzt, Auswahlwert, Einstellungen, Praeparat, Versorger } from "./typen";
+import type { Arzt, Auswahlwert, Diagnosevorlage, Einstellungen, Laborparameter, Praeparat, Versorger } from "./typen";
 
 export function useAuswahl(liste: string, nurAktiv = true) {
   return useQuery({
@@ -16,6 +16,24 @@ export function usePraeparate() {
     queryKey: ["praeparate"],
     queryFn: () => api<Praeparat[]>("praeparate/"),
     staleTime: 5 * 60_000,
+  });
+}
+
+/** Katalog der Laborwerte (F112) – Grundlage der Erfassungsmaske eines Befunds */
+export function useLaborparameter(nurAktiv = true) {
+  return useQuery({
+    queryKey: ["laborparameter", nurAktiv],
+    queryFn: () => api<Laborparameter[]>(`laborparameter/${abfrage({ aktiv: nurAktiv ? "true" : undefined })}`),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Die mitwachsende Diagnoseliste mit ICD-Code (F117) */
+export function useDiagnoseliste(nurAktiv = true) {
+  return useQuery({
+    queryKey: ["diagnoseliste", nurAktiv],
+    queryFn: () => api<Diagnosevorlage[]>(`diagnoseliste/${abfrage({ aktiv: nurAktiv ? "true" : undefined })}`),
+    staleTime: 60_000,
   });
 }
 

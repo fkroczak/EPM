@@ -50,7 +50,7 @@ class Vorlagen(Grundlage):
         c = client_fuer(self.mediziner)
         e = c.post("/api/infusionsplaene/entwurf/", {"patient": p.id}, format="json").json()
         r = c.patch(f"/api/infusionsplaene/{e['id']}/", {
-            "basis_praeparat": praeparat("Sterofundin").id, "basis_ml": 500,
+            "basis_praeparat": praeparat("Sterofundin ISO").id, "basis_ml": 500,
             "glucose_praeparat": praeparat("Glucose", "70 %").id, "glucose_g": "160",
             "aminosaeuren_praeparat": praeparat("Glamin").id, "aminosaeuren_g": "80",
             "lipide_praeparat": praeparat("Clinoleic").id, "lipide_g": "60",
@@ -185,10 +185,10 @@ class Vorlagen(Grundlage):
         self.assertEqual(version, 1)
         text = pdf_text(pdf)
         # Aufbau wie ein Laborbefund (Überarbeitung 01.10.2026): Menge und Einheit in eigenen Spalten
-        for erwartet in ["Empfehlung eines Infusionsplans", "Probe, Paula", "Sterofundin", "Glamin 13,4 %", "80 g",
+        for erwartet in ["Empfehlung eines Infusionsplans", "Probe, Paula", "Sterofundin ISO", "Glamin 13,4 %", "80 g",
                          "1.509 kcal", "2.100", "500 ml", "2.600 ml", "216,7 ml/h", "78 mmol", "heimparenteralen",
                          "Pantozol® Kurzinfusion 1 Amp. 40 mg in 50 ml Trägerlösung · 1-0-1",
-                         "Patienten-Nr.", "Infusionsplan-Nr.", str(p.nummer), "Mischbeutel", "Zusatzlösung · Sterofundin",
+                         "Patienten-Nr.", "Infusionsplan-Nr.", str(p.nummer), "Mischbeutel", "Zusatzlösung · Sterofundin ISO",
                          "Laufmenge je Stunde", "Laufzeit 12 h", "Phosphat —",
                          "Deutsche Stiftung Krankheitsbedingte Mangelernährung", "Telefon 0251 98 11 400",
                          "Spendenkonto", "1/1", "Maschinell erstellt, geprüft und freigegeben von"]:

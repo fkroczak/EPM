@@ -13,6 +13,7 @@ import { Editor, Richtext } from "@/components/Editor";
 import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
 import { Bereich, Bereiche } from "@/components/ui/bereiche";
 import { useAkte } from "./Akte";
+import { DiagnosenKarte } from "./Diagnosen";
 
 type Feld = "diagnose" | "therapie" | "empfehlung" | "bemerkung";
 type Fassungen = { feld: Feld; version: number; fassungen: { version: number; zeitpunkt: string; person: string | null; text: string }[] };
@@ -130,7 +131,9 @@ export function Therapie() {
   const stufe = useStufe();
   return (
     <Bereiche seite="akte_therapie" spalten={RASTER_SPALTEN[stufe]} testid="therapie-stufe">
-      <Bereich id="diagnose" titel="Diagnose"><TextKarte feld="diagnose" /></Bereich>
+      {/* Diagnoseliste mit ICD-Code (F117); das lange Freitextfeld bleibt daneben bestehen (U51) */}
+      <Bereich id="diagnosen" titel="Diagnosen (ICD)"><DiagnosenKarte /></Bereich>
+      <Bereich id="diagnose" titel="Diagnose (Freitext)"><TextKarte feld="diagnose" /></Bereich>
       <Bereich id="therapie" titel="Therapie" standard={{ breite: 2 }}><TextKarte feld="therapie" immerOffen /></Bereich>
       <Bereich id="empfehlung" titel="Empfehlung"><TextKarte feld="empfehlung" /></Bereich>
       {/* seit 03.10.2026 sichtbar (Klärung U5) – u. a. Bemerkungen aus dem Altsystem */}

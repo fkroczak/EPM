@@ -24,7 +24,7 @@ class PlanHilfen:
     def plan_daten(self):
         """Werte wie im Entwurf 7 · Neuer Infusionsplan."""
         return {
-            "basis_praeparat": praeparat("Sterofundin").id, "basis_ml": 500,
+            "basis_praeparat": praeparat("Sterofundin ISO").id, "basis_ml": 500,
             "glucose_praeparat": praeparat("Glucose", "70 %").id, "glucose_g": "200",
             "aminosaeuren_praeparat": praeparat("Glamin").id, "aminosaeuren_g": "70",
             "lipide_praeparat": praeparat("Clinoleic").id, "lipide_g": "40",
@@ -34,7 +34,7 @@ class PlanHilfen:
             "vitamine": [praeparat("Soluvit N").id, praeparat("Vitalipid adult").id],
             "katheterschutz": praeparat("Taurolin").id,
             "laufzeit_h": "12", "tage_pro_woche": 5,
-            "positionen": [{"praeparat": praeparat("Dipeptamin").id, "menge": "100", "einheit": "ml"}],
+            "positionen": [{"praeparat": praeparat("Pantozol i.v.").id, "menge": "100", "einheit": "ml"}],
         }
 
     def entwurf(self, client=None, **extra):
@@ -131,7 +131,7 @@ class Infusionsplaene(PlanHilfen, Grundlage):
         self.assertEqual(zeilen["natrium_mmol"]["jetzt"], "80 mmol")
         self.assertEqual(zeilen["vitamine"]["jetzt"], "Soluvit N | Vitalipid adult")
         self.assertEqual(zeilen["laufzeit_h"]["jetzt"], "12 h")
-        self.assertEqual(zeilen["basis"]["jetzt"], "Sterofundin · 500 ml")
+        self.assertEqual(zeilen["basis"]["jetzt"], "Sterofundin ISO · 500 ml")
         self.assertEqual(zeilen["kcal"]["vorher"], "1.446 kcal")  # deutsche Schreibweise wie auf dem Plan
         self.assertEqual(zeilen["kcal"]["jetzt"], "1.246 kcal")
         # erster Plan ohne Vorgänger

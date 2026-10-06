@@ -48,7 +48,20 @@ class Patient(models.Model):
     telefon = models.CharField(max_length=50, blank=True)
     telefon2 = models.CharField("Telefon 2", max_length=50, blank=True)
     email = models.EmailField("E-Mail", blank=True)
-    krankenkasse = models.CharField(max_length=100, blank=True)
+    # Versichertendaten (Wunsch 06.10.2026, F118): Für die Auseinandersetzungen mit den Kassen reicht der Name
+    # der Kasse nicht. „krankenkasse“ behält seinen Spaltennamen (keine Datenwanderung) und heißt in der
+    # Oberfläche „Versicherung“; Art und Versichertennummer kommen dazu.
+    class Versicherungsart(models.TextChoices):
+        GKV = "gkv", "GKV (gesetzlich)"
+        PKV = "pkv", "PKV (privat)"
+        SELBSTZAHLER = "selbstzahler", "Selbstzahler"
+        SONSTIGE = "sonstige", "Sonstige"
+        UNBEKANNT = "", "nicht erfasst"
+
+    versicherungsart = models.CharField("Versicherungsart", max_length=20, choices=Versicherungsart.choices,
+                                        blank=True, default="")
+    krankenkasse = models.CharField("Versicherung", max_length=100, blank=True)
+    versichertennummer = models.CharField("Versichertennummer", max_length=50, blank=True)
     hausarzt = models.CharField(max_length=150, blank=True)
     ueberweisung_durch = models.CharField("Überweisung / Kontaktaufnahme durch", max_length=200, blank=True)
 
@@ -465,6 +478,84 @@ class PatientArzt(AktenEintrag):
 
     def __str__(self):
         return f"{self.get_rolle_display()}: {self.arzt}"
+
+
+class Diagnose(AktenEintrag):
+    """Einzelne Diagnose der Akte mit ICD-Code und Zusatzkennzeichen (Wunsch 06.10.2026, F117).
+
+    Anzeige wie gewünscht: „Kurzdarmsyndrom [K91.2 G]“. Das Zusatzkennzeichen ist Pflicht – ohne es sagt ein
+    ICD-Code nicht, ob die Diagnose gesichert ist oder nur ein Verdacht. Nicht mehr zutreffende Diagnosen
+    werden auf „aktiv = False“ gesetzt statt gelöscht; jede Fassung steht im Verlauf der Akte.
+
+    Das lange Freitextfeld ``Patient.diagnose`` bleibt daneben bestehen (U51)."""
+
+    class Kennzeichen(models.TextChoices):
+        GESICHERT = "G", "G – gesichert"
+        VERDACHT = "V", "V – Verdacht auf"
+        ZUSTAND = "Z", "Z – Zustand nach"
+        AUSSCHLUSS = "A", "A – Ausschluss von"
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="diagnosen")
+    bezeichnung = models.CharField(max_length=200)
+    icd_code = models.CharField("ICD-Code", max_length=10, help_text="z. B. K91.2")
+    kennzeichen = models.CharField("Zusatzkennzeichen", max_length=1, choices=Kennzeichen.choices,
+                                   default=Kennzeichen.GESICHERT)
+    seit = models.DateField("besteht seit", null=True, blank=True)
+    notiz = models.CharField(max_length=300, blank=True)
+    reihenfolge = models.PositiveSmallIntegerField(default=100)
+    aktiv = models.BooleanField(default=True)
+    beendet_am = models.DateField(null=True, blank=True)
+    angelegt_am = models.DateTimeField(auto_now_add=True)
+    angelegt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Diagnose"
+        verbose_name_plural = "Diagnosen"
+        ordering = ["-aktiv", "reihenfolge", "bezeichnung", "id"]
+        indexes = [models.Index(fields=["patient", "aktiv"], name="diagnose_patient_aktiv")]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Diagnosen werden nicht gelöscht, sondern als „nicht mehr zutreffend“ markiert.")
+
+    @property
+    def anzeige(self) -> str:
+        return f"{self.bezeichnung} [{self.icd_code}{self.kennzeichen}]"
+
+    def clean(self):
+        import re
+
+        from stammdaten.models import ICD_MUSTER
+
+        self.icd_code = (self.icd_code or "").strip().upper()
+        fehler = {}
+        if not (self.bezeichnung or "").strip():
+            fehler["bezeichnung"] = "Bitte die Bezeichnung angeben."
+        if not re.match(ICD_MUSTER, self.icd_code):
+            fehler["icd_code"] = ("ICD-Code wie „K91.2“ angeben (Buchstabe, zwei Ziffern, bei Bedarf Punkt und "
+                                  "ein bis zwei Stellen).")
+        if self.kennzeichen not in self.Kennzeichen.values:
+            fehler["kennzeichen"] = "Bitte G (gesichert), V (Verdacht), Z (Zustand nach) oder A (Ausschluss) wählen."
+        heute = timezone.localdate()
+        if self.seit and self.seit > heute:
+            fehler["seit"] = "Das Datum liegt in der Zukunft."
+        if self.beendet_am and self.beendet_am > heute:
+            fehler["beendet_am"] = "Das Datum liegt in der Zukunft."
+        if self.beendet_am and self.seit and self.beendet_am < self.seit:
+            fehler["beendet_am"] = "Das Ende liegt vor dem Beginn."
+        if fehler:
+            raise ValidationError(fehler)
+
+    def save(self, *args, **kwargs):
+        if not self.aktiv and self.beendet_am is None:
+            self.beendet_am = timezone.localdate()
+        if self.aktiv:
+            self.beendet_am = None
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.anzeige
 
 
 def dokument_pfad(patient: Patient, originalname: str) -> str:

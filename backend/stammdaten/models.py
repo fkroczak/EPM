@@ -13,6 +13,8 @@ class Auswahlwert(models.Model):
         KONTAKTART = "kontaktart", "Kontaktart"
         TERMINORT = "terminort", "Terminort"
         BEZIEHUNG = "beziehung", "Beziehung (Bezugsperson)"
+        # Wünsche aus der Praxis vom 06.10.2026: Berichte in der Akte (F115)
+        BERICHTART = "berichtart", "Berichtsart"
 
     liste = models.CharField(max_length=30, choices=Liste.choices)
     wert = models.CharField(max_length=100)
@@ -137,6 +139,9 @@ class Praeparat(models.Model):
     name = models.CharField(max_length=150)
     konzentration = models.CharField(max_length=60, blank=True, help_text="z. B. 50 %, 10 %, 20 %")
     einheit = models.CharField(max_length=10, default="ml", help_text="Standard-Einheit der Menge")
+    # Kurzer Hinweis zum Präparat (Wunsch 06.10.2026, F111): erscheint bei der Auswahl und auf der Plan-PDF,
+    # z. B. „baugleich zu Cernevit, günstiger (Regressgefahr)“ oder „reines Taurolidin 2 %“.
+    hinweis = models.CharField(max_length=200, blank=True, help_text="z. B. „reines Taurolidin 2 %“")
     reihenfolge = models.PositiveSmallIntegerField(default=100)
     aktiv = models.BooleanField(default=True, help_text="Ausgeblendete Präparate erscheinen nicht bei neuen Plänen")
 
@@ -155,6 +160,111 @@ class Praeparat(models.Model):
 
     def __str__(self):
         return f"{self.name} {self.konzentration}".strip()
+
+
+class Laborparameter(models.Model):
+    """Katalog der Laborwerte (Wunsch 06.10.2026, F112): Gruppe, Name, Einheit, Referenzbereich.
+
+    Die Erfassungsmaske eines Laborbefunds zeigt die aktiven Parameter nach Gruppen; eingetragen wird nur der
+    gemessene Wert, die Einheit steht schon da und bleibt je Wert überschreibbar. Gepflegt unter
+    Vorlagen › Laborparameter (Recht „Vorlagen pflegen“). Wird nie gelöscht, nur deaktiviert – sonst verlören
+    bereits erfasste Befunde ihren Bezug."""
+
+    class Gruppe(models.TextChoices):
+        TRANSAMINASEN = "transaminasen", "Transaminasen"
+        NIERE = "niere", "Nierenwerte"
+        EISEN = "eisen", "Eisenhaushalt"
+        EIWEISS_FETT = "eiweiss_fett", "Eiweiß- und Fettstoffwechsel"
+        ELEKTROLYTE = "elektrolyte", "Elektrolyte"
+        SPURENELEMENTE = "spurenelemente", "Spurenelemente"
+        HAEMATOLOGIE = "haematologie", "Hämatologie"
+        VITAMINE = "vitamine", "Vitamine"
+        KNOCHEN = "knochen", "Knochenstoffwechsel"
+        PANKREAS = "pankreas", "Pankreasenzyme"
+        DIABETES = "diabetes", "Blutzucker / Diabetes"
+        SCHILDDRUESE = "schilddruese", "Schilddrüse"
+        TUMORMARKER = "tumormarker", "Tumormarker"
+        GENETIK = "genetik", "Genetische Parameter"
+        SONSTIGES = "sonstiges", "Weitere Parameter"
+
+    gruppe = models.CharField(max_length=30, choices=Gruppe.choices)
+    name = models.CharField(max_length=150)
+    kurzname = models.CharField(max_length=60, blank=True, help_text="für enge Spalten, z. B. „GPT“")
+    einheit = models.CharField(max_length=30, blank=True, help_text="z. B. mg/dl, µg/l, U/l")
+    # Referenzbereich: in der Mail nicht gewünscht, aber jedes Labor liefert ihn mit (U44). Bleibt leer, bis
+    # Alice entschieden hat; erst dann markiert die Oberfläche abweichende Werte.
+    referenz_von = models.DecimalField("Referenz von", max_digits=12, decimal_places=4, null=True, blank=True)
+    referenz_bis = models.DecimalField("Referenz bis", max_digits=12, decimal_places=4, null=True, blank=True)
+    reihenfolge = models.PositiveSmallIntegerField(default=100)
+    aktiv = models.BooleanField(default=True, help_text="Ausgeblendete Parameter erscheinen nicht in neuen Befunden")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Laborparameter"
+        verbose_name_plural = "Laborparameter"
+        ordering = ["gruppe", "reihenfolge", "name"]
+        constraints = [
+            models.UniqueConstraint(fields=["gruppe", "name"], name="laborparameter_eindeutig"),
+            models.CheckConstraint(
+                name="laborparameter_referenz_reihenfolge",
+                condition=models.Q(referenz_von__isnull=True) | models.Q(referenz_bis__isnull=True)
+                | models.Q(referenz_von__lte=models.F("referenz_bis")),
+            ),
+        ]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Laborparameter werden nicht gelöscht, nur deaktiviert.")
+
+    def clean(self):
+        if (self.referenz_von is not None and self.referenz_bis is not None
+                and self.referenz_von > self.referenz_bis):
+            raise ValidationError({"referenz_bis": "„Referenz bis“ muss größer oder gleich „Referenz von“ sein."})
+
+    def __str__(self):
+        return f"{self.name} ({self.einheit})" if self.einheit else self.name
+
+
+ICD_MUSTER = r"^[A-Z]\d{2}(\.\d{1,2})?[+*!]?$"
+
+
+class Diagnosevorlage(models.Model):
+    """Die Liste, die im Hintergrund mitläuft (Wunsch 06.10.2026, F117): Diagnose mit ICD-Code.
+
+    Beim Eintragen einer Diagnose in der Akte wird daraus vorgeschlagen; eine neue Kombination aus Code und
+    Bezeichnung wandert in den Katalog, damit die Liste von allein mitwächst (U53). Korrigiert und
+    ausgeblendet wird sie unter Vorlagen › Diagnosen. Das Zusatzkennzeichen (G/V/Z/A) gehört zur einzelnen
+    Diagnose in der Akte, nicht hierher – dieselbe Diagnose kann bei einem Patienten gesichert und bei einem
+    anderen ein Verdacht sein."""
+
+    icd_code = models.CharField("ICD-Code", max_length=10, db_index=True, help_text="z. B. K91.2")
+    bezeichnung = models.CharField(max_length=200)
+    aktiv = models.BooleanField(default=True)
+    angelegt_am = models.DateTimeField(auto_now_add=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Diagnose (Liste)"
+        verbose_name_plural = "Diagnosen (Liste)"
+        ordering = ["bezeichnung", "icd_code"]
+        constraints = [models.UniqueConstraint(fields=["icd_code", "bezeichnung"], name="diagnosevorlage_eindeutig")]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Diagnosen der Liste werden nicht gelöscht, nur deaktiviert.")
+
+    def clean(self):
+        import re
+
+        self.icd_code = (self.icd_code or "").strip().upper()
+        if not re.match(ICD_MUSTER, self.icd_code):
+            raise ValidationError({"icd_code": "ICD-Code wie „K91.2“ angeben (Buchstabe, zwei Ziffern, "
+                                               "bei Bedarf Punkt und ein bis zwei Stellen)."})
+        if not (self.bezeichnung or "").strip():
+            raise ValidationError({"bezeichnung": "Bitte die Bezeichnung angeben."})
+
+    def __str__(self):
+        return f"{self.bezeichnung} [{self.icd_code}]"
 
 
 # Erklärungen, die bei jeder Akte in Betreuung vorliegen sollen (Schlüssel wie ``patienten.Erklaerung.Art``).

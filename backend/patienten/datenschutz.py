@@ -84,6 +84,9 @@ def umfang(patient) -> dict:
         "infusionsplaene": patient.infusionsplaene.count(), "bezugspersonen": patient.bezugspersonen.count(),
         "aerzte": patient.aerzte.count(), "erklaerungen": patient.erklaerungen.count(),
         "anfragen": patient.datenschutzanfragen.count(),
+        # Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
+        "diagnosen": patient.diagnosen.count(), "laborbefunde": patient.laborbefunde.count(),
+        "bia_messungen": patient.bia_messungen.count(), "berichte": patient.berichte.count(),
     }
 
 
@@ -103,10 +106,16 @@ def akten_entfernen(ids: list[int]) -> None:
     endgültige Löschen einer Akte und das Zurücksetzen der Testdaten. Die Dateien entfernt der Aufrufer."""
     from django.apps import apps
 
+    from befunde.models import BiaMessung, Laborbefund, Laborwert
+    from berichte.models import Bericht
     from infusionen.models import Infusionsplan, InfusionsplanPosition
+
+    from .models import Diagnose
 
     ids = list(ids)
     eigene = eigene_dokumente(ids)
+    befund_ids = set(Laborbefund.objects.filter(patient_id__in=ids).values_list("id", flat=True))
+    befund_ids |= set(Laborbefund.history.filter(patient_id__in=ids).values_list("id", flat=True))
     plan_ids = set(Infusionsplan.objects.filter(patient_id__in=ids).values_list("id", flat=True))
     plan_ids |= set(Infusionsplan.history.filter(patient_id__in=ids).values_list("id", flat=True))
     # Dokument-Vorgänge: gelöschte Dokumente der Akte entfallen; bei Dokumenten, die zwischen dieser und einer
@@ -119,6 +128,9 @@ def akten_entfernen(ids: list[int]) -> None:
     InfusionsplanPosition.objects.filter(plan_id__in=plan_ids).delete()
     Infusionsplan.objects.filter(id__in=plan_ids).update(vorgaenger=None, freigabe_nachweis=None)
     Infusionsplan.objects.filter(id__in=plan_ids).delete()
+    # Die freigegebene PDF eines Berichts ist ein Dokument der Akte (PROTECT): erst den Verweis lösen,
+    # sonst hält der Bericht das Dokument und damit die ganze Akte fest (F115).
+    Bericht.objects.filter(patient_id__in=ids).update(dokument=None)
     Patient.objects.filter(id__in=ids).delete()
     # Historie. Dokumente dieser Akten verlieren ALLE früheren Fassungen – auch die aus der Zeit, in der sie
     # (falsch zugeordnet) in einer anderen Akte lagen; dort bleibt nur der neutrale Vorgang. Dokumente, die
@@ -130,9 +142,10 @@ def akten_entfernen(ids: list[int]) -> None:
     bleibt = set(Dokument.objects.filter(id__in=frueher.values("id")).values_list("id", flat=True))
     frueher.exclude(id__in=bleibt).delete()
     for modell in (Gewichtsmessung, Kontakt, Termin, Infusionsplan, Bezugsperson, PatientArzt, Erklaerung,
-                   Datenschutzanfrage):
+                   Datenschutzanfrage, Diagnose, Laborbefund, BiaMessung, Bericht):
         modell.history.filter(patient_id__in=ids).delete()
     InfusionsplanPosition.history.filter(plan_id__in=plan_ids).delete()
+    Laborwert.history.filter(befund_id__in=befund_ids).delete()
     # Historie der Vitamin-Zuordnung (eigene Tabelle von django-simple-history, ohne Fremdschlüssel in der Datenbank)
     apps.get_model("infusionen", "HistoricalInfusionsplan_vitamine").objects.filter(infusionsplan_id__in=plan_ids).delete()
 

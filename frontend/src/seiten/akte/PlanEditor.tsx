@@ -21,7 +21,8 @@ import { Editor } from "@/components/Editor";
 import { name, useAkte } from "./Akte";
 
 const ZAHLEN = ["basis_ml", "glucose_g", "aminosaeuren_g", "lipide_g", "albumin_ml", "natrium_mmol", "kalium_mmol",
-  "phosphat_mmol", "calcium_mmol", "magnesium_mmol", "laufzeit_h", "tage_pro_woche", "pantozol_tage", "kcal_manuell"] as const;
+  "phosphat_mmol", "calcium_mmol", "magnesium_mmol", "laufzeit_h", "tage_pro_woche", "zusatz_tage_pro_woche",
+  "freie_tage_pro_woche", "pantozol_tage", "kcal_manuell"] as const;
 const AUSWAHL = ["basis_praeparat", "glucose_praeparat", "aminosaeuren_praeparat", "lipide_praeparat", "albumin_praeparat",
   "spurenelemente", "katheterschutz"] as const;
 type ZahlFeld = (typeof ZAHLEN)[number];
@@ -448,7 +449,13 @@ export function PlanEditor() {
             <div className="grid grid-cols-2 gap-3">
               <Feld label="gültig ab" fehler={e.gueltig_ab}>{(pp) => <Eingabe {...pp} className="num" value={f.gueltig_ab} onChange={(ev) => setze("gueltig_ab")(ev.target.value)} />}</Feld>
               {zahlFeld("laufzeit_h", "Laufzeit", "h", vorher ? (norm(f, "laufzeit_h") === norm(vorher, "laufzeit_h") ? "unverändert" : `vorher ${vorher.laufzeit_h || "—"} h`) : undefined)}
-              {zahlFeld("tage_pro_woche", "Tage pro Woche", "×")}
+            </div>
+            {/* Infusionstage je Beutelart (Wunsch 06.10.2026, F110): unabhängig von der Zusammensetzung */}
+            <h3 className="lbl m-0">Infusionstage pro Woche</h3>
+            <div className="grid grid-cols-3 gap-3" data-testid="infusionstage">
+              {zahlFeld("tage_pro_woche", "PE (Mischbeutel)", "×")}
+              {zahlFeld("zusatz_tage_pro_woche", "Zusatzvolumen", "×")}
+              {zahlFeld("freie_tage_pro_woche", "Infusionsfrei", "Tg")}
             </div>
             <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-sm" data-testid="plan-volumen">
               <span className="gedaempft">Volumen im Mischbeutel</span>
