@@ -10,6 +10,8 @@ dahin nicht geklärt ist, bleibt in der Zwischenlösung stehen und wird nicht ei
 
 Funktionsnummern schließen an `docs/BACKEND-FUNKTIONEN.md` an: **F110 ff.**, Unklarheiten **U39 ff.**
 
+Nachtrag vom 07.10.2026 am Ende des Dokuments: drei weitere Wünsche (F119–F121), per Rückfrage geklärt.
+
 ---
 
 ## 1 · Infusionsplan (F110, F111)
@@ -213,3 +215,64 @@ Reihenfolge und Gruppen wie in Alices Mail; Einheiten als Vorschlag (U45).
 | Pankreasenzyme | Amylase U/l · Lipase U/l |
 | Blutzucker / Diabetes | C-Peptid ng/ml · HbA1c % · Glucose mg/dl · Insulin mU/l |
 | Schilddrüse | TSH (basal) mU/l · fT3 pg/ml · fT4 ng/dl |
+
+---
+
+## Nachtrag: Wünsche vom 07.10.2026 (F119–F121)
+
+Drei weitere Punkte, geklärt per Rückfrage am 07.10.2026.
+
+### 8 · Hinweise mit „×“ ausblenden (F119)
+
+> „Alle Meldungen können mit einem x entfernt werden (wenn akut keine Erneuerung benötigt wird).“
+
+**Geklärt:** Beim Wegklicken wird gewählt, **wie lange Ruhe sein soll** – 3, 6 oder 12 Monate, danach erscheint
+der Hinweis von allein wieder – **oder „nicht mehr nötig“**, dann bleibt er weg, bis ihn jemand zurückholt.
+
+Neues Modell `patienten.Hinweisruhe`: Akte, Art des Hinweises, Frist (oder leer für „nicht mehr nötig“),
+Grund, Person, Zeitpunkt. Gelöscht wird nichts – das Zurückholen trägt Zeitpunkt und Person ein, und je Akte
+und Art kann nur **eine** Stummschaltung laufen (Datenbankregel). Betroffen sind alle Hinweise der
+Patientenliste: Gewichtsverlust, Plan zu alt, kein Plan, Versorger nicht erfasst, Kontakt fällig, Labor zu
+alt, BIA zu alt.
+
+In der Oberfläche trägt jeder Hinweis-Chip ein **×**; ein kleiner Dialog fragt Frist und Grund ab. Was gerade
+ausgeblendet ist, steht in der Übersicht der Akte unter **„Ausgeblendete Hinweise“** mit Grund, Person und
+Frist – dort auch „Wieder einschalten“. Alles steht im Verlauf der Akte. Startseite und Patientenliste zählen
+stummgeschaltete Akten nicht mehr mit, damit Kachel und Liste dasselbe zeigen.
+
+| Nr. | Frage | Zwischenlösung |
+|---|---|---|
+| U61 | Soll ein ausgeblendeter Hinweis auch weg bleiben, wenn sich die Lage ändert (z. B. „Kein Laborbefund“ ausgeblendet, danach wird einer erfasst)? | Stummschaltung bleibt bis zur Frist; der Hinweis entsteht ohnehin nur neu, wenn die Lage es hergibt |
+
+### 9 · Ab wann ein Befund als zu alt gilt (F120)
+
+> „12 Monate als zu alt für Befunde, jedoch einstellbar unter Vorlage.“
+
+Zwei neue Einstellungen unter **Vorlagen › Grenzwerte**, neben der schon bestehenden Grenze für den
+Infusionsplan: „Laborbefund gilt als alt nach“ und „BIA-Messung gilt als alt nach“, Standard **12 Monate**,
+mindestens einer.
+
+Daraus entstehen je Akte in Betreuung die Hinweise „Kein Laborbefund“ bzw. „Labor älter als N Mon.“ und
+dasselbe für die BIA-Messung. Auf der Startseite stehen sie unter „Nach und nach prüfen“ als zwei neue Zeilen
+mit Sprung in die Patientenliste. In den Reitern Labor und BIA steht oben das Datum der letzten Erfassung,
+mit Warnung, wenn es über der Grenze liegt.
+
+### 10 · Ein eigener Reiter je Bereich (F121)
+
+> „Teile alles in einzelne Menüpunkte, auch Diagnose, Therapie und Befunde.“
+
+**Geklärt:** nur **Reiter in der Akte**, keine zusätzlichen Einträge in der Seitenleiste; der Reiter
+„Therapie“ zeigt, **wann sie zuletzt geändert** wurde.
+
+| vorher | jetzt |
+|---|---|
+| Diagnose & Therapie | **Diagnosen** (Liste mit ICD-Code, Freitext „Diagnose“) und **Therapie** (Therapie, Empfehlung, Bemerkung, mit „zuletzt geändert“) |
+| Labor & BIA | **Labor** und **BIA** |
+
+Die Reiter tragen jetzt Zähler für Diagnosen, Laborbefunde, BIA-Messungen und Berichte und brechen bei
+schmalem Fenster um. Gespeicherte Links auf `…/befunde` landen weiterhin richtig (Weiterleitung auf
+`…/labor`). Die Übersicht der Akte bekommt eine Karte **„Labor und BIA“** mit der letzten Erfassung und dem
+Weg in beide Reiter.
+
+Dabei behoben: Die Karte **Bemerkung** war nie in der Liste der verstellbaren Karten – ihr Menü „⋯“ lief ins
+Leere.

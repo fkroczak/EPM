@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # EPM – Images (Backend und Frontend) auf Linux bauen (z. B. in der Test-VM) und als Datei speichern
-# Aufruf im Ordner mit diesem Skript:   ./bauen.sh            (Version 0.1.0)
-#                                       ./bauen.sh 0.1.1      (andere Version)
+# Aufruf im Ordner mit diesem Skript:   ./bauen.sh            (Version aus der Datei VERSION)
+#                                       ./bauen.sh 0.2.1      (andere Version)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VERSION="${1:-0.1.0}"
+# Ohne Angabe gilt die Version des Projekts – sonst entstünde ein Paket mit einer alten Nummer, das beim
+# Einspielen eine neuere Fassung überschreibt (Stolperstein 06.10.2026).
+VERSION="${1:-$(tr -d " \t\r\n" < VERSION)}"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version nicht erkannt: „$VERSION“ (erwartet X.Y.Z)."; exit 1; }
 IMAGE="epm-backend:$VERSION"
 DOCKER="docker"; [[ $EUID -eq 0 ]] || DOCKER="sudo docker"
 
