@@ -25,6 +25,7 @@ test("Falsches Passwort wird abgewiesen", async ({ page }) => {
 });
 
 test("Erste Anmeldung: eigenes Passwort; Zwei-Faktor-Anmeldung freiwillig einrichten und wieder ausschalten", async ({ page }) => {
+  test.setTimeout(120_000);   // wartet unten einmal auf das nächste 30-Sekunden-Fenster der Codes
   const admin = await apiAls("admin");
   const name = eindeutig("e2e.neu");
   const neu = await admin.post("benutzer/", { username: name, first_name: "Nora", last_name: "Neuling", rolle: "mitarbeiter" });
@@ -83,8 +84,11 @@ test("Erste Anmeldung: eigenes Passwort; Zwei-Faktor-Anmeldung freiwillig einric
   await dialog.getByLabel("Code aus der Authenticator-App").fill("000000");
   await dialog.getByRole("button", { name: "Ausschalten" }).click();
   await expect(dialog).toContainText("Der Code ist ungültig");
-  await page.waitForTimeout(2100);
-  await dialog.getByLabel("Code aus der Authenticator-App").fill(totpBase32(geheim, Date.now() + 60_000));
+  // Jeder Code darf nur einmal gelten, und der Server nimmt nur das aktuelle Fenster ±1 an. Die Fenster „jetzt“ und
+  // „+30 s“ sind oben schon verbraucht; „+60 s“ gilt erst, wenn das nächste Fenster begonnen hat – sonst wackelte
+  // der Test je nachdem, wo im Fenster er startete (Läufe 37546124091, 37556058753). Also bis dahin warten.
+  await page.waitForTimeout(Math.max(2100, 30_000 - (Date.now() % 30_000) + 500));
+  await dialog.getByLabel("Code aus der Authenticator-App").fill(totpBase32(geheim, Date.now() + 30_000));
   await dialog.getByRole("button", { name: "Ausschalten" }).click();
   await expect(page.getByText("Zwei-Faktor-Anmeldung ausgeschaltet.")).toBeVisible();
   await expect(sicherheit).toContainText("nicht eingerichtet");
