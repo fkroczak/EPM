@@ -69,7 +69,7 @@ test("Erklärungen nachhalten: Hinweis im Aktenkopf, Vordruck als PDF, erfassen 
   await expect(page.getByTestId("dokumentliste").getByRole("listitem").filter({ hasText: "Einwilligung in die Datenverarbeitung (unterschrieben)" }))
     .toContainText("Einwilligung/Datenschutz");
   await page.goto(`/patienten/${p.id}/verlauf`);
-  await page.getByRole("button", { name: "Erklärungen" }).click();
+  await page.getByTestId("verlauf-bereich").selectOption("erklaerungen");
   await expect(page.getByTestId("verlauf").getByRole("row").filter({ hasText: "widerrufen am" })).toHaveCount(1);
   await expect(page.getByTestId("verlauf").getByRole("row").filter({ hasText: "angelegt" })).toHaveCount(3);
 

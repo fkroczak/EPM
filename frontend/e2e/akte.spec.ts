@@ -141,7 +141,7 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   await api0.patch(`patienten/${p.id}/`, { bemerkung: "<p>Port seit 2019, Allergie auf Pflaster</p>" });
   await api0.ende();
   await page.goto(`/patienten/${p.id}/verlauf`);
-  await page.getByLabel("Bereich").selectOption("bemerkung");
+  await page.getByTestId("verlauf-bereich").selectOption("bemerkung");
   await expect(page.getByTestId("verlauf").getByRole("row").filter({ hasText: "Port seit 2019" })).toContainText("Bemerkung");
   // und erscheint in der Übersicht als Hinweis aus der Übernahme, nur lesbar
   await oeffnen(page, p.id);
@@ -399,7 +399,7 @@ test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pfl
   await personen.getByRole("button", { name: /Frühere anzeigen/ }).click();
   await expect(personen.getByTestId("bezugsperson")).toHaveCount(2);
   await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Verlauf" }).click();
-  const bereich = page.getByLabel("Bereich");
+  const bereich = page.getByTestId("verlauf-bereich");
   const verlauf = page.getByTestId("verlauf");
   await bereich.selectOption("aerzte");
   await expect(bereich).toHaveValue("aerzte");

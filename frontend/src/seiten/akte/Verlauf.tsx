@@ -130,7 +130,7 @@ export function Verlauf() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         {/* Mit den Reitern der Akte sind es zu viele Bereiche für eine Knopfreihe – darum eine Auswahlliste
             wie bei der Person daneben (Wunsch 07.10.2026) */}
-        <Auswahl aria-label="Bereich" className="w-[240px]" value={bereich} onChange={(e) => setBereich(e.target.value)}>
+        <Auswahl aria-label="Bereich" data-testid="verlauf-bereich" className="w-[240px]" value={bereich} onChange={(e) => setBereich(e.target.value)}>
           {BEREICHE.map((b) => <option key={b.wert} value={b.wert}>{b.wert ? b.text : "Alle Bereiche"}</option>)}
         </Auswahl>
         <div className="flex items-center gap-2.5">

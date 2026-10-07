@@ -64,7 +64,7 @@ test("Dokumente hochladen, Typ am Inhalt prüfen, Metadaten ändern, ausblenden,
 
   // Verlauf: Upload und Änderung mit Person, nicht änderbar
   await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Verlauf" }).click();
-  await page.getByRole("button", { name: "Dokumente" }).click();
+  await page.getByTestId("verlauf-bereich").selectOption("dokumente");
   const verlauf = page.getByTestId("verlauf");
   await expect(verlauf.getByRole("row").filter({ hasText: "hochgeladen" })).toHaveCount(2);
   const geaendert = verlauf.getByRole("row").filter({ hasText: "Arztbrief Klinikum Nord" }).filter({ hasText: "geändert" }).first();

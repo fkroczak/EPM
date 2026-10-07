@@ -111,7 +111,8 @@ test("Bericht: Entwurf, Freigabe durch den Mediziner, danach unveränderlich", a
   await page.getByLabel("Empfänger").fill("Hausarzt Dr. Hausmann");
   await page.getByRole("textbox", { name: "Bericht" }).fill("Stabiler Verlauf unter heimparenteraler Ernährung.");
   await page.getByRole("button", { name: "Entwurf speichern" }).click();
-  await expect(page.getByTestId("bericht-status")).toHaveText("Entwurf");
+  // der Status steht links am Eintrag und rechts im Detail – hier das Detail (F122)
+  await expect(page.getByTestId("bericht-detail").getByTestId("bericht-status")).toHaveText("Entwurf");
 
   // Mitarbeiter dürfen nicht freigeben – der Knopf erscheint erst gar nicht
   await expect(page.getByRole("button", { name: "Freigeben" })).toHaveCount(0);
@@ -120,7 +121,7 @@ test("Bericht: Entwurf, Freigabe durch den Mediziner, danach unveränderlich", a
   await medizinerSeite.goto(`/patienten/${p.id}/berichte`);
   await medizinerSeite.getByRole("button", { name: "Freigeben" }).click();
   await medizinerSeite.getByRole("button", { name: "Freigeben" }).last().click();
-  await expect(medizinerSeite.getByTestId("bericht-status")).toHaveText("freigegeben");
+  await expect(medizinerSeite.getByTestId("bericht-detail").getByTestId("bericht-status")).toHaveText("freigegeben");
   await expect(medizinerSeite.getByText(/Maschinell erstellt, geprüft und freigegeben von/)).toBeVisible();
   // Bearbeiten ist weg, die PDF liegt in den Dokumenten
   await expect(medizinerSeite.getByRole("button", { name: "Bearbeiten" })).toHaveCount(0);
@@ -187,7 +188,7 @@ test("Hinweise mit „×“ wegklicken und wieder einschalten", async ({ page })
 
   // und steht im Verlauf der Akte
   await oeffnen(page, p.id, "/verlauf");
-  await page.getByLabel("Bereich").selectOption("hinweisruhe");
+  await page.getByTestId("verlauf-bereich").selectOption("hinweisruhe");
   await expect(page.getByTestId("verlauf")).toContainText("Labor ist beim Hausarzt angefordert");
 });
 

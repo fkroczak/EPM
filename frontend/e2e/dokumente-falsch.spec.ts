@@ -29,14 +29,14 @@ test("Dokument beim falschen Patienten dem richtigen zuordnen; Verlauf neutral b
 
   // Verlauf bei Sabine: neutral, ohne Titel und ohne Bernd
   await page.goto(`/patienten/${sabine.id}/verlauf`);
-  await page.getByRole("button", { name: "Dokumente" }).click();
+  await page.getByTestId("verlauf-bereich").selectOption("dokumente");
   const verlauf = page.getByTestId("verlauf");
   await expect(verlauf.getByRole("row").filter({ hasText: "Dokument wurde einer anderen Akte zugeordnet." })).toHaveCount(1);
   await expect(verlauf).not.toContainText("Befund Bernd");
   await expect(verlauf).not.toContainText(bernd.nachname);
   // bei Bernd: übernommen mit Grund, Datei unverändert
   await page.goto(`/patienten/${bernd.id}/verlauf`);
-  await page.getByRole("button", { name: "Dokumente" }).click();
+  await page.getByTestId("verlauf-bereich").selectOption("dokumente");
   const zeile = page.getByTestId("verlauf").getByRole("row").filter({ hasText: "von einer anderen Akte übernommen" });
   await expect(zeile).toContainText("Befund Bernd");
   await expect(zeile).toContainText("Grund: beim falschen Patienten hochgeladen");
@@ -78,7 +78,7 @@ test("Endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code und B
   await expect(page.getByText("Dokument endgültig gelöscht.")).toBeVisible();
   await expect(page.getByText("Noch keine Dokumente.")).toBeVisible();
   await page.goto(`/patienten/${p.id}/verlauf`);
-  await page.getByRole("button", { name: "Dokumente" }).click();
+  await page.getByTestId("verlauf-bereich").selectOption("dokumente");
   const zeile = page.getByTestId("verlauf").getByRole("row").filter({ hasText: "Datei und Inhalt entfernt" });
   await expect(zeile).toContainText("Grund: Dokument eines fremden Patienten");
   await expect(page.getByTestId("verlauf")).not.toContainText("Fremdes Dokument");
