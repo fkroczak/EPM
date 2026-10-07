@@ -132,7 +132,7 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
   const e = einstellungen.data;
   const grenzen = e ? `${zahl(e.gewicht_min_kg)}–${zahl(e.gewicht_max_kg)} kg` : "";
   return (
-    <Karte className="px-[22px] py-[18px] flex flex-col gap-4" data-testid="gewichtskarte">
+    <Karte className="px-4 sm:px-[22px] py-4 sm:py-[18px] flex flex-col gap-4" data-testid="gewichtskarte">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex flex-col gap-1">
           <h2 className="lbl m-0">Gewichtsverlauf</h2>
@@ -219,7 +219,7 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
 function TherapieKarte() {
   const { patient, bearbeiten } = useAkte();
   return (
-    <Karte className="px-[22px] py-[18px] flex flex-col gap-4">
+    <Karte className="px-4 sm:px-[22px] py-4 sm:py-[18px] flex flex-col gap-4">
       {/* seit 07.10.2026 je ein eigener Reiter (F121, F122) */}
       <KartenKopf titel="Diagnosen und Therapie" rechts={<>
         <KnopfLink to={`/patienten/${patient.id}/diagnosen`} klein icon={bearbeiten ? "stift" : undefined}>Diagnosen</KnopfLink>
@@ -348,7 +348,7 @@ function StammKarte() {
   const { patient: p } = useAkte();
   const adresse = [p.strasse, [p.plz, p.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
   return (
-    <Karte className="px-[22px] py-[18px] grid grid-cols-[100px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm" data-testid="stammdaten">
+    <Karte className="px-4 sm:px-[22px] py-4 sm:py-[18px] grid grid-cols-[100px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm" data-testid="stammdaten">
       <h2 className="lbl m-0 col-span-2 pb-1">Anschrift und Kontakt</h2>
       <span className="gedaempft">Adresse</span><span>{adresse || "—"}</span>
       <span className="gedaempft">Telefon</span><span className="num">{p.telefon || "—"}</span>
@@ -387,7 +387,7 @@ function ImportHinweise() {
 function BefundeKarte() {
   const { patient } = useAkte();
   return (
-    <Karte className="px-[22px] py-[18px] flex flex-col gap-4" data-testid="karte-befunde">
+    <Karte className="px-4 sm:px-[22px] py-4 sm:py-[18px] flex flex-col gap-4" data-testid="karte-befunde">
       <KartenKopf titel="Labor und BIA" rechts={<>
         <KnopfLink to={`/patienten/${patient.id}/labor`} klein>Labor</KnopfLink>
         <KnopfLink to={`/patienten/${patient.id}/bia`} klein>BIA</KnopfLink>

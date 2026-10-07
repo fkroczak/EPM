@@ -7,10 +7,21 @@ import { apiAls, eindeutig, merken, zustand } from "./hilfen";
 const { defaultBrowserType: _browser, ...telefon } = devices["Pixel 7"];
 test.use({ ...telefon, storageState: zustand("mediziner") });
 
-/** Nichts darf seitlich über den Bildschirm hinausragen (sonst wackelt die Seite beim Wischen). */
+/** Nichts darf seitlich über den Bildschirm hinausragen (sonst wackelt die Seite beim Wischen). Im Fehlerfall nennt
+ *  die Meldung die Elemente, die zu breit sind. */
 async function passtInDieBreite(page: Page, wo: string) {
-  const { breite, inhalt } = await page.evaluate(() => ({ breite: window.innerWidth, inhalt: document.documentElement.scrollWidth }));
-  expect(inhalt, `${wo}: Seite ${inhalt}px breit bei ${breite}px Bildschirm`).toBeLessThanOrEqual(breite + 1);
+  const { breite, inhalt, zuBreit } = await page.evaluate(() => {
+    const b = window.innerWidth;
+    const liste: string[] = [];
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>("body *"))) {
+      const r = el.getBoundingClientRect();
+      if (r.width && r.right > b + 1 && liste.length < 8) {
+        liste.push(`${el.tagName.toLowerCase()}.${String(el.className).slice(0, 60)} (${Math.round(r.left)}–${Math.round(r.right)})`);
+      }
+    }
+    return { breite: b, inhalt: document.documentElement.scrollWidth, zuBreit: liste };
+  });
+  expect(inhalt, `${wo}: Seite ${inhalt}px breit bei ${breite}px Bildschirm – ${zuBreit.join("; ")}`).toBeLessThanOrEqual(breite + 1);
 }
 
 test("Telefon: Leiste unten, Menü, Suche, Seiten passen in die Breite", async ({ page }) => {
@@ -88,6 +99,8 @@ test("Telefon: Notiz zur offenen Akte über „Notiz“ in der Leiste", async ({
   await med.ende();
   await page.goto(`/patienten/${p.id}`);
   await expect(page.getByTestId("aktenkopf")).toContainText(p.nachname);
+  await expect(page.getByTestId("gewichtskarte")).toBeVisible();
+  await passtInDieBreite(page, "Akte ohne Einträge");
   // Reiter wischen seitlich statt umzubrechen
   const reiter = page.getByRole("navigation", { name: "Aktenbereiche" });
   const hoehe = await reiter.evaluate((e) => e.getBoundingClientRect().height);
