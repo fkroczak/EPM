@@ -320,6 +320,35 @@ class Auftraege(Systemverzeichnis):
                         format="json")
         self.assertEqual(r.status_code, 400)
 
+    def test_epm_aktualisieren(self):
+        """EPM aus der Oberfläche aktualisieren (Wunsch 07.10.2026, F123): Passwort und zweiter Faktor, Warnung an
+        die angemeldeten Benutzer, Auftrag für den Systemagenten."""
+        r = self.a.post("/api/system/auftraege/",
+                        {"aktion": "epm_update", "minuten": 5, "kennwort": KENNWORT, "code": self.admin_codes[0]},
+                        format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        auftrag = r.json()
+        self.assertEqual((auftrag["aktion"], auftrag["name"], auftrag["status"]),
+                         ("epm_update", "EPM aktualisieren", "wartet"))
+        dateien = self.auftragsdateien()
+        self.assertEqual(len(dateien), 1)
+        inhalt = json.loads((self.ordner / "auftraege" / dateien[0]).read_text())
+        self.assertEqual(inhalt["aktion"], "epm_update")
+        # Die angemeldeten Benutzer werden gewarnt, wie beim Neustart
+        self.assertTrue(Systemhinweis.objects.filter(text__icontains="neuen Stand").exists())
+        # und zweimal zugleich geht es nicht
+        self.assertEqual(self.a.post("/api/system/auftraege/",
+                                     {"aktion": "epm_update", "minuten": 0, "kennwort": KENNWORT,
+                                      "code": self.admin_codes[1]}, format="json").status_code, 409)
+
+    def test_epm_aktualisieren_nur_mit_recht_und_zweitem_faktor(self):
+        r = self.a.post("/api/system/auftraege/", {"aktion": "epm_update", "minuten": 0, "kennwort": KENNWORT},
+                        format="json")
+        self.assertEqual(r.status_code, 400, r.content)   # ohne zweiten Faktor nicht
+        c = client_fuer(benutzer("ohne_system", Rolle.MITARBEITER))
+        self.assertEqual(c.post("/api/system/auftraege/", {"aktion": "epm_update"}, format="json").status_code, 403)
+        self.assertFalse(Systemauftrag.objects.filter(aktion="epm_update").exists())
+
     def test_ohne_zweiten_faktor_geht_es_nicht(self):
         """Festlegung 03.10.2026: Update, Neustart, Wiederherstellen nur mit eingerichtetem zweitem Faktor – auch wenn
         die Anmeldung ohne ihn erlaubt ist. Das Kennwort allein genügt nicht."""
@@ -366,11 +395,32 @@ class Auftraege(Systemverzeichnis):
                             for x in e))
 
     @unittest.skipUnless(AGENT.exists(), "rollout/epm-systemagent.py nur im Repo (nicht im Image)")
+    def test_aktionen_im_backend_und_im_agenten_sind_dieselben(self):
+        """Beide Listen müssen übereinstimmen: Nimmt das Backend eine Aktion an, die der Agent nicht kennt, bliebe
+        der Auftrag ohne Ergebnis liegen – und umgekehrt wäre eine Aktion des Agenten nicht erreichbar."""
+        import importlib.util
+
+        from . import host
+
+        spec = importlib.util.spec_from_file_location("epm_systemagent", AGENT)
+        agent = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(agent)
+        self.assertEqual(sorted(host.AKTIONEN), sorted(agent.AKTIONEN))
+        for code, angaben in host.AKTIONEN.items():
+            self.assertEqual(angaben["name"], agent.AKTIONEN[code][0], f"Name von „{code}“ weicht ab")
+            self.assertEqual(bool(angaben.get("sichern")), agent.AKTIONEN[code][1],
+                             f"„Sicherung vorher“ bei „{code}“ weicht ab")
+
+    @unittest.skipUnless(AGENT.exists(), "rollout/epm-systemagent.py nur im Repo (nicht im Image)")
     def test_echter_agent_im_probelauf(self):
         """Backend legt ab → Agent (Probelauf) führt aus → Backend übernimmt das Ergebnis."""
         for aktion in ("status_aktualisieren", "docker_aufraeumen"):
             self.assertEqual(self.a.post("/api/system/auftraege/", {"aktion": aktion}, format="json").status_code, 201)
-        self.assertEqual(len(self.auftragsdateien()), 2)
+        # und das Update, das nur im Probelauf nichts tut (F123)
+        self.assertEqual(self.a.post("/api/system/auftraege/",
+                                     {"aktion": "epm_update", "minuten": 0, "kennwort": KENNWORT,
+                                      "code": self.admin_codes[0]}, format="json").status_code, 201)
+        self.assertEqual(len(self.auftragsdateien()), 3)
         basis = Path(tempfile.mkdtemp(prefix="epm-basis-"))
         try:
             os.symlink(self.ordner, basis / "system")

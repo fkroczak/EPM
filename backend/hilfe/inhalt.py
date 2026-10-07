@@ -516,6 +516,11 @@ der <strong>Server neu starten</strong> und EPM neu starten – mit Passwort und
 (Zwei-Faktor-Anmeldung nötig), vorher läuft automatisch eine
 Sicherung (schlägt sie fehl, wird nichts verändert), angemeldete Benutzer werden gewarnt. Beginn sofort oder in 5 bis 60
 Minuten; ein wartender Auftrag lässt sich zurückziehen.</p>
+<p><strong>EPM aktualisieren</strong> bringt EPM ohne Terminal auf einen neuen Stand: Der Server holt den Code, baut die
+Programmteile neu, sichert und stellt um. Das dauert je nach Server 10 bis 30 Minuten; beim Umstellen ist EPM kurz nicht
+erreichbar, deshalb vorher Eingaben speichern. Der Auftrag läuft auf dem Server weiter, auch wenn die Seite in der
+Zwischenzeit nicht antwortet – das Ergebnis erscheint danach unter <strong>Aufträge</strong> samt Ausgabe. Geht etwas
+schief, bleibt die bisherige Version in Betrieb; über <strong>Ausgabe</strong> ist zu sehen, woran es lag.</p>
 <p>Außerdem: <strong>Hinweis an alle Benutzer</strong> setzen und angemeldete Benutzer abmelden. Bei den Konten führen die
 Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Kennwort) direkt zur Person in der Benutzerverwaltung.</p>
 <p><strong>Testphase und Go-live</strong>: <strong>Musterdaten automatisch anlegen</strong> abschalten, damit beim Start

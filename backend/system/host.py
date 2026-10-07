@@ -37,6 +37,16 @@ AKTIONEN = {
         "hinweis": "Der Server wird neu gestartet. EPM ist danach einige Minuten nicht erreichbar – "
                    "bitte Eingaben vorher speichern.",
     },
+    # Wunsch 07.10.2026 (F123): Aktualisieren aus der Oberfläche, damit spätere Stände ohne Terminal eingespielt
+    # werden können. Das Skript sichert selbst, bevor es umstellt – deshalb hier kein zusätzliches „sichern“.
+    "epm_update": {
+        "name": "EPM aktualisieren", "bestaetigung": "2fa", "warnen": True,
+        "beschreibung": "Neuen Stand holen, Images bauen, sichern und umstellen (sudo epm-update), ohne Testlauf – "
+                        "getestet wird vor jedem Push. Dauert je nach Server 10 bis 30 Minuten; beim Umstellen ist "
+                        "EPM kurz nicht erreichbar. Geht etwas schief, läuft die bisherige Version weiter.",
+        "hinweis": "EPM wird auf einen neuen Stand gebracht. Beim Umstellen ist es kurz nicht erreichbar – "
+                   "bitte Eingaben vorher speichern.",
+    },
     "epm_neustart": {
         "name": "EPM neu starten", "bestaetigung": "2fa", "warnen": True,
         "beschreibung": "Datenbank, Backend und Webserver neu starten (z. B. nach Hängern). Etwa eine Minute.",

@@ -112,6 +112,25 @@ test("System: Auslastung und Status vom Systemagenten, Wartung des EPM", async (
   merken("system", { taetigkeit: "Status neu einlesen" });
 });
 
+test("System: EPM aus der Oberfläche aktualisieren", async ({ page }) => {
+  // Wunsch 07.10.2026 (F123): spätere Stände ohne Terminal einspielen
+  await page.goto("/admin/system");
+  const karte = page.getByTestId("aktion-epm_update");
+  await expect(karte).toContainText("sudo epm-update");
+  await expect(karte).toContainText("Passwort + 2FA");
+  await karte.getByRole("button", { name: "EPM aktualisieren" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("kurz nicht erreichbar");
+  await dialog.getByLabel("Ihr Passwort").fill(KENNWORT);
+  await dialog.getByLabel("Code aus der Authenticator-App").fill(naechsterNotfallcode("e2e.admin"));
+  await dialog.getByRole("button", { name: "Bestätigen und ausführen" }).click();
+  await expect(dialog).toHaveCount(0);
+  const auftrag = page.getByTestId("auftraege").getByRole("row", { name: /EPM aktualisieren/ }).first();
+  await expect(auftrag).toContainText("erledigt (Probelauf)", { timeout: 60_000 });
+  await auftrag.getByRole("button", { name: "Ausgabe" }).click();
+  await expect(page.getByTestId("auftrag-ausgabe")).toContainText("epm-update");
+});
+
 test("System: Neustart nur mit Passwort und 2FA, vorher Warnung an alle Benutzer", async ({ page, browser }) => {
   await page.goto("/admin/system");
   await page.getByTestId("aktion-server_neustart").getByRole("button", { name: "Server neu starten" }).click();

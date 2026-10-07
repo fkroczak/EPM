@@ -168,12 +168,13 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F119 | Hinweise mit „×“ ausblenden – 3, 6 oder 12 Monate Ruhe oder „nicht mehr nötig“, in der Akte zurückholbar | 3 Patientenliste, 4 Akte | ABGESCHLOSSEN UND GETESTET |
 | F120 | Ab wann Laborbefund und BIA-Messung als zu alt gelten (Standard 12 Monate, einstellbar) | 2 Startseite, 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
 | F121 | Ein eigener Reiter je Bereich: Diagnosen, Therapie, Labor, BIA | 4 Akte | ABGESCHLOSSEN UND GETESTET |
+| F123 | EPM aus der Oberfläche aktualisieren (Systemagent-Aktion `epm_update`) | 17 System | ABGESCHLOSSEN UND GETESTET |
 
-Summe (121 Funktionen, gezählt aus der Tabelle): 121 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
+Summe (122 Funktionen, gezählt aus der Tabelle): 122 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 Neu in Runde 4 sind F74–F83 (Datenschutz nach DSGVO und Abschließen eines Plans nach Freigabe); offene Fragen dazu stehen
-in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18). Runde 7 setzt die Startseiten- und Oberflächen-Erweiterungen S01–S17 aus `claude/startseite-erweiterungen.md` um (F90–F97, dazu erweitert F09, F13, F14, F17, F48, F84). Die Klärungen vom 03.10.2026 bringen F107–F109 (Testphase und Go-live). Die Fehlerliste vom 02.10.2026 bringt F98–F106 und ändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97 (Abschnitt P). Die Wünsche aus der Praxis vom 06.10.2026 bringen F110–F118 (Abschnitt Q) und 22 offene Fragen U39–U60; die Wünsche vom 07.10.2026 bringen F119–F121 und eine weitere offene Frage (U61).
+in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18). Runde 7 setzt die Startseiten- und Oberflächen-Erweiterungen S01–S17 aus `claude/startseite-erweiterungen.md` um (F90–F97, dazu erweitert F09, F13, F14, F17, F48, F84). Die Klärungen vom 03.10.2026 bringen F107–F109 (Testphase und Go-live). Die Fehlerliste vom 02.10.2026 bringt F98–F106 und ändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97 (Abschnitt P). Die Wünsche aus der Praxis vom 06.10.2026 bringen F110–F118 (Abschnitt Q) und 22 offene Fragen U39–U60; die Wünsche vom 07.10.2026 bringen F119–F121, F123 und eine weitere offene Frage (U61).
 
 ---
 
@@ -2366,6 +2367,26 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
 - **Übersicht der Akte:** neue Karte **„Labor und BIA“** mit der letzten Erfassung und dem Weg in die beiden Reiter;
   die Karte „Diagnose und Therapie“ führt jetzt in beide Reiter.
 - **Teststatus:** Browsertests `praxiswuensche.spec.ts`, `akte.spec.ts`, `oberflaeche.spec.ts`, `zz-neustart.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET.
+
+### F123 EPM aus der Oberfläche aktualisieren
+- **Anlass:** „Und eine `sudo epm-update` aus der UI unter System sollte möglich sein. Dann können nachfolgende
+  Pushes installiert werden.“
+- **Neue Aktion `epm_update`** im Katalog des Systemagenten (`system/host.py` und `rollout/epm-systemagent.py`):
+  Passwort und zweiter Faktor, Warnung an die angemeldeten Benutzer mit Beginn sofort bis 60 Minuten, wie beim
+  Neustart. Der Agent ruft `/usr/local/sbin/epm-update --ohne-tests` auf – getestet wird vor jedem Push in der CI.
+- **Keine zusätzliche Sicherung davor:** `epm-update` sichert selbst, bevor es umstellt; zwei Sicherungen
+  hintereinander wären nur Wartezeit.
+- **Während des Umstellens** ist die Oberfläche kurz nicht erreichbar. Der Auftrag läuft auf dem Server weiter (der
+  Agent ist ein Dienst auf dem Host, kein Container) und das Ergebnis erscheint danach unter Aufträge samt Ausgabe.
+  Schlägt das Update fehl, bleibt die bisherige Version in Betrieb.
+- **Die Oberfläche brauchte keine eigene Zeile:** Administration › System zeigt den Katalog der Aktionen seit F57
+  von sich aus, mit Name, Beschreibung und den Hinweisen „Passwort + 2FA“ und „warnt Benutzer“.
+- **Neuer Test `test_aktionen_im_backend_und_im_agenten_sind_dieselben`:** Backend und Agent führen zwei getrennte
+  Listen derselben Aktionen. Weicht eine ab, nähme das Backend einen Auftrag an, den der Agent nicht ausführt – der
+  Auftrag bliebe ohne Ergebnis liegen. Der Test vergleicht Codes, Namen und „Sicherung vorher“.
+- **Teststatus:** Backend-Tests `system.tests.Auftraege` (Aktion, Rechte, zweiter Faktor, Gleichstand der Kataloge,
+  echter Agent im Probelauf). Browsertest `system.spec.ts`.
 - **Status:** ABGESCHLOSSEN UND GETESTET.
 
 ## Offene Backend-Funktionen

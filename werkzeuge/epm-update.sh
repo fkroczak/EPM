@@ -226,7 +226,9 @@ schritt "Musterdaten prüfen"
 if [[ $TESTS -eq 1 ]]; then
   schritt "Tests (eigene Test-Datenbank, echte Daten bleiben unberührt)"
   LOG=/var/log/epm-tests.log
-  if (cd "$B" && docker compose run --rm -T backend python manage.py test) >"$LOG" 2>&1; then
+  # ``</dev/null``: Ohne das hängt die Standardeingabe am Terminal – in die Zwischenablage geratener Text landete
+  # dann im laufenden Testcontainer und ein darin enthaltenes Strg-C brach den Lauf ab (Stolperstein 06.10.2026).
+  if (cd "$B" && docker compose run --rm -T backend python manage.py test) </dev/null >"$LOG" 2>&1; then
     ERGEBNIS="Tests OK"
   else
     ERGEBNIS="TESTS FEHLGESCHLAGEN – Ausgabe oben, vollständig in $LOG"
