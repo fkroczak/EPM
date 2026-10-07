@@ -92,21 +92,21 @@ def auftraege_abgleichen():
 
 
 def bestaetigung_pruefen(request, was: str):
-    """Admin-Kennwort und zweiter Faktor (Authenticator oder Notfall-Code), wie beim Wiederherstellen (F63). Ohne
+    """Admin-Kennwort und zweiter Faktor (Authenticator, Notfall-Code oder Passkey), wie beim Wiederherstellen (F63). Ohne
     eingerichteten zweiten Faktor geht es nicht (Festlegung 03.10.2026).
     Fehlversuche stehen im Audit-Log, sperren das Konto aber nicht (die Anmeldung selbst ist schon bestätigt)."""
     user = request.user
     kennwort = str(request.data.get("kennwort", ""))
-    code = str(request.data.get("code", "")).replace(" ", "")
     if not zweifaktor.hat_zweiten_faktor(user):
         return {"code": zweifaktor.OHNE_ZWEITEN_FAKTOR}
     if not kennwort or not user.check_password(kennwort):
         protokolliere(SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request, grund="bestaetigung", was=was)
         return {"kennwort": "Das Passwort stimmt nicht."}
-    if zweifaktor.code_bestaetigt(user, code):
+    if zweifaktor.zweiter_faktor_bestaetigt(request):
         return None
-    protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request, schritt="bestaetigung", was=was)
-    return {"code": "Der Code ist ungültig oder wurde schon verwendet."}
+    protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request, schritt="bestaetigung", was=was,
+                  **({"passkey": True} if zweifaktor.passkey_gesendet(request) else {}))
+    return {"code": zweifaktor.fehlertext(request, "Der Code ist ungültig oder wurde schon verwendet.")}
 
 
 def _sitzungen(request):

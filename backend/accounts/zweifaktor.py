@@ -6,15 +6,39 @@ für alle zur Pflicht machen. Wer ihn eingerichtet hat, meldet sich immer damit 
 Festlegung 03.10.2026: Bestätigungen mit Kennwort und Code (endgültig löschen, Wiederherstellen, Updates, Neustart,
 Sicherungs-Passwort, Übertragungsziel, Import …) verlangen **immer** den zweiten Faktor. Wer keinen eingerichtet hat,
 muss ihn zuerst unter Mein Konto einrichten – ohne geht es nicht.
+Festlegung 08.10.2026: Ein Passkey (WebAuthn, accounts/passkey.py) ist ein gleichwertiger zweiter Faktor – bei der
+Anmeldung und bei jeder Bestätigung. Die Oberfläche schickt dann statt ``code`` die Antwort des Browsers als
+``passkey`` mit (``zweiter_faktor_bestaetigt``).
 """
 from django_otp.plugins.otp_static.models import StaticDevice
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
-from .models import Anmelderegeln, Rolle
+from .models import Anmelderegeln, Passkey, Rolle
+
+
+def hat_authenticator(user) -> bool:
+    return TOTPDevice.objects.filter(user=user, confirmed=True).exists()
+
+
+def hat_passkey(user) -> bool:
+    return Passkey.objects.filter(user=user, confirmed=True).exists()
 
 
 def hat_zweiten_faktor(user) -> bool:
-    return TOTPDevice.objects.filter(user=user, confirmed=True).exists()
+    return hat_authenticator(user) or hat_passkey(user)
+
+
+def nutzer_mit_zweitem_faktor() -> set:
+    """IDs aller Konten mit eingerichtetem zweitem Faktor (Authenticator oder Passkey)."""
+    return (set(TOTPDevice.objects.filter(confirmed=True).values_list("user_id", flat=True))
+            | set(Passkey.objects.filter(confirmed=True).values_list("user_id", flat=True)))
+
+
+def faktoren_loeschen(user):
+    """Authenticator, Passkeys und Notfall-Codes löschen (2FA zurücksetzen, ohne Login, ausschalten)."""
+    TOTPDevice.objects.filter(user=user).delete()
+    Passkey.objects.filter(user=user).delete()
+    StaticDevice.objects.filter(user=user).delete()
 
 
 def regel() -> str:
@@ -41,7 +65,8 @@ def code_gueltig(user, code: str, notfallcodes: bool = True) -> bool:
 
 
 OHNE_ZWEITEN_FAKTOR = ("Dafür ist die Zwei-Faktor-Anmeldung nötig. Bitte zuerst unter Mein Konto › Anmeldung und "
-                       "Sicherheit die Authenticator-App einrichten.")
+                       "Sicherheit die Authenticator-App oder einen Passkey einrichten.")
+PASSKEY_UNGUELTIG = "Der Passkey konnte nicht bestätigt werden. Bitte erneut versuchen."
 
 
 def code_bestaetigt(user, code: str, notfallcodes: bool = True) -> bool:
@@ -49,3 +74,29 @@ def code_bestaetigt(user, code: str, notfallcodes: bool = True) -> bool:
     (Festlegung 03.10.2026). Ohne zweiten Faktor vorher mit ``hat_zweiten_faktor`` prüfen und
     ``OHNE_ZWEITEN_FAKTOR`` melden."""
     return hat_zweiten_faktor(user) and code_gueltig(user, code, notfallcodes=notfallcodes)
+
+
+def passkey_gesendet(request) -> bool:
+    return bool(getattr(request, "data", None) and isinstance(request.data.get("passkey"), dict))
+
+
+def zweiter_faktor_bestaetigt(request, notfallcodes: bool = True) -> bool:
+    """Bestätigung in der Sitzung mit dem zweiten Faktor aus der Anfrage: ``passkey`` (Antwort des Browsers auf
+    ``POST /api/auth/passkey/optionen/`` mit Zweck „bestaetigen“) oder ``code`` (Authenticator, ggf. Notfall-Code).
+    Wie ``code_bestaetigt`` nur mit eingerichtetem zweitem Faktor."""
+    user = request.user
+    if not hat_zweiten_faktor(user):
+        return False
+    if passkey_gesendet(request):
+        from .passkey import PasskeyFehler, pruefen
+
+        try:
+            return pruefen(request, request.data["passkey"], "bestaetigen") is not None
+        except PasskeyFehler:
+            return False
+    return code_gueltig(user, request.data.get("code", ""), notfallcodes=notfallcodes)
+
+
+def fehlertext(request, standard: str) -> str:
+    """Meldung bei abgelehnter Bestätigung: beim Passkey eine eigene, sonst die bisherige zum Code."""
+    return PASSKEY_UNGUELTIG if passkey_gesendet(request) else standard

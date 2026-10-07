@@ -58,13 +58,20 @@ echo "==> Secrets (nur beim ersten Mal erzeugt)"
 [[ -s "$B/secrets/django_secret_key" ]] || openssl rand -base64 64 | tr -d '\n' > "$B/secrets/django_secret_key"
 chmod 0644 "$B/secrets/"*       # Ordner ist 0700: auf dem Host nur für root lesbar
 
-echo "==> TLS-Zertifikat für $EPM_WEB_NAME (selbst signiert, 5 Jahre)"
+echo "==> TLS-Zertifikat für $EPM_WEB_NAME"
+# Festlegung 08.10.2026: Zertifikat aus einer eigenen CA (rollout/epm-zertifikat.sh), damit Passkeys gehen. Ein schon
+# vorhandenes (z. B. selbst signiertes) bleibt, bis jemand „sudo epm-zertifikat einrichten“ aufruft.
+install -m 0750 epm-zertifikat.sh /usr/local/sbin/epm-zertifikat
 if [[ ! -s "$B/nginx/certs/epm.crt" ]]; then
-  openssl req -x509 -newkey rsa:3072 -sha256 -days 1825 -nodes \
-    -keyout "$B/nginx/certs/epm.key" -out "$B/nginx/certs/epm.crt" \
-    -subj "/CN=$EPM_WEB_NAME/O=EPM" \
-    -addext "subjectAltName=DNS:$EPM_WEB_NAME,IP:$EPM_MGMT_IP" \
-    -addext "extendedKeyUsage=serverAuth" 2>/dev/null
+  if [[ "$EPM_WEB_NAME" =~ ^[0-9.]+$ ]]; then
+    openssl req -x509 -newkey rsa:3072 -sha256 -days 1825 -nodes \
+      -keyout "$B/nginx/certs/epm.key" -out "$B/nginx/certs/epm.crt" \
+      -subj "/CN=$EPM_WEB_NAME/O=EPM" \
+      -addext "subjectAltName=IP:$EPM_WEB_NAME" \
+      -addext "extendedKeyUsage=serverAuth" 2>/dev/null
+  else
+    ./epm-zertifikat.sh einrichten
+  fi
 fi
 chown 101:101 "$B/nginx/certs/"*; chmod 0400 "$B/nginx/certs/epm.key"; chmod 0444 "$B/nginx/certs/epm.crt"
 

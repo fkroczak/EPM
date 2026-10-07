@@ -25,10 +25,8 @@ class Command(BaseCommand):
             user = User(username=name, first_name=opt["vorname"], last_name=opt["nachname"], titel=opt["titel"],
                         kuerzel=opt["kuerzel"] or None, rolle=Rolle.ADMIN, is_superuser=True)
         if opt["neues_kennwort"]:
-            from django_otp.plugins.otp_static.models import StaticDevice
-            from django_otp.plugins.otp_totp.models import TOTPDevice
-            TOTPDevice.objects.filter(user=user).delete()
-            StaticDevice.objects.filter(user=user).delete()
+            from accounts.zweifaktor import faktoren_loeschen
+            faktoren_loeschen(user)
             user.is_active = True
         kennwort = user.neues_einmal_kennwort()
         user.save()
