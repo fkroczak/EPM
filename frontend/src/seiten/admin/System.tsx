@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
+import { useHintergrundarbeit } from "@/lib/laden";
 import { dateigroesse, datum, relativ, uhrzeit, zahl, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
@@ -779,6 +780,8 @@ export function System() {
     queryFn: () => api<Auftrag[]>("system/auftraege/"),
     refetchInterval: (q) => ((q.state.data ?? []).some((a) => a.offen) ? 3000 : 30_000),
   });
+  // Solange ein Auftrag läuft, bleibt der Ladebalken oben in Bewegung (F124)
+  useHintergrundarbeit("system-auftraege", (auftraege.data ?? []).some((a) => a.offen));
   const fenster = useStufe();
   const [wahl, setWahl] = useState<Wahl | null>(null);
   const [leeren, setLeeren] = useState(false);

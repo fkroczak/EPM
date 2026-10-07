@@ -15,6 +15,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
+import { useHintergrundarbeit } from "@/lib/laden";
 import type { Feldfehler } from "@/lib/api";
 import { useIch } from "@/lib/auth";
 import { dateigroesse, relativ, uhrzeit, zeitpunkt } from "@/lib/format";
@@ -916,6 +917,8 @@ export function Backup() {
     refetchInterval: (q) => ((q.state.data?.auftraege ?? []).some((a) => a.offen) ? 3000 : 30_000),
     retry: false,
   });
+  // Solange ein Auftrag läuft (Sicherung, Übertragung, Wiederherstellung), bleibt der Ladebalken oben in Bewegung (F124)
+  useHintergrundarbeit("backup-auftraege", (daten.data?.auftraege ?? []).some((a) => a.offen));
   const [offen, setOffen] = useState<Offen>(null);
   const [wahl, setWahl] = useState<Sicherung | null>(null);
   const [laden, setLaden] = useState<string | null>(null);

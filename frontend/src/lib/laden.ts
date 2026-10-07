@@ -5,9 +5,11 @@
  * den Server wartet: Laden, Speichern, Hochladen, PDFs, die Abfragen der Aufträge. Ohne Abhängigkeit von der
  * Abfrage-Bibliothek, damit auch direkte Aufrufe (etwa das Hochladen von Dateien) sichtbar sind.
  */
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 let laufend = 0;
+/** Arbeit, die auf dem Server läuft und auf die jemand wartet (Aufträge des Systemagenten) – je Seite ein Schlüssel */
+const hintergrund = new Set<string>();
 const zuhoerer = new Set<() => void>();
 
 function melden() {
@@ -35,4 +37,26 @@ function abonnieren(z: () => void) {
 /** Wie viele Anfragen gerade laufen – aktualisiert sich von selbst. */
 export function useLaufendeAnfragen(): number {
   return useSyncExternalStore(abonnieren, () => laufend, () => 0);
+}
+
+/**
+ * Hintergrundarbeit anmelden, solange ``aktiv`` gilt – z. B. „ein Auftrag läuft auf dem Server“. Der Balken bleibt
+ * dann durchgehend in Bewegung, bis die Arbeit beendet ist, auch wenn die einzelnen Statusabfragen nur Millisekunden
+ * dauern (Wunsch 07.10.2026). Beim Verlassen der Seite endet die Anmeldung von selbst.
+ */
+export function useHintergrundarbeit(schluessel: string, aktiv: boolean) {
+  useEffect(() => {
+    if (!aktiv) return;
+    hintergrund.add(schluessel);
+    melden();
+    return () => {
+      hintergrund.delete(schluessel);
+      melden();
+    };
+  }, [schluessel, aktiv]);
+}
+
+/** Läuft gerade Hintergrundarbeit, auf die jemand wartet? */
+export function useHintergrundAktiv(): boolean {
+  return useSyncExternalStore(abonnieren, () => hintergrund.size > 0, () => false);
 }

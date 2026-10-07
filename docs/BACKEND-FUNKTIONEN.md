@@ -2434,6 +2434,10 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
   als 150 ms, füllt sich der Balken in Orange (`--ladebalken`, je Farbschema), ein Lichtstreifen wandert darüber;
   sind alle Anfragen beantwortet, läuft er einmal voll und blendet aus. Kürzere Anfragen zeigen nichts – sonst
   flackerte er bei jeder Statusabfrage. Bei „weniger Bewegung“ (Systemeinstellung) ohne Animation.
+- **Hintergrundarbeit** (Ergänzung 07.10.2026): Läuft ein Auftrag des Systemagenten – etwa „EPM aktualisieren“ –,
+  melden die Seiten System und Backup das über `useHintergrundarbeit()`. Der Balken bleibt dann durchgehend in
+  Bewegung (ein wandernder Abschnitt statt der Füllung), bis der Auftrag beendet ist; die kurzen Statusabfragen alle
+  drei Sekunden ändern daran nichts. „Wie der Verlauf der Tätigkeit: so lange aktiv, bis der Job gelaufen ist.“
 - **Status:** ABGESCHLOSSEN. Auf Wunsch ohne Testlauf eingespielt (`[skip ci]`); ein Browsertest steht noch aus.
 
 ## Offene Backend-Funktionen
