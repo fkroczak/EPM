@@ -168,13 +168,14 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F119 | Hinweise mit „×“ ausblenden – 3, 6 oder 12 Monate Ruhe oder „nicht mehr nötig“, in der Akte zurückholbar | 3 Patientenliste, 4 Akte | ABGESCHLOSSEN UND GETESTET |
 | F120 | Ab wann Laborbefund und BIA-Messung als zu alt gelten (Standard 12 Monate, einstellbar) | 2 Startseite, 18 Vorlagen | ABGESCHLOSSEN UND GETESTET |
 | F121 | Ein eigener Reiter je Bereich: Diagnosen, Therapie, Labor, BIA | 4 Akte | ABGESCHLOSSEN UND GETESTET |
+| F122 | Ein gemeinsames Muster für alle Reiter der Akte: links die Einträge mit Datum, rechts der gewählte; Knöpfe überall an derselben Stelle | 4–9 Akte | ABGESCHLOSSEN UND GETESTET |
 | F123 | EPM aus der Oberfläche aktualisieren (Systemagent-Aktion `epm_update`) | 17 System | ABGESCHLOSSEN UND GETESTET |
 
-Summe (122 Funktionen, gezählt aus der Tabelle): 122 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
+Summe (123 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 Neu in Runde 4 sind F74–F83 (Datenschutz nach DSGVO und Abschließen eines Plans nach Freigabe); offene Fragen dazu stehen
-in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18). Runde 7 setzt die Startseiten- und Oberflächen-Erweiterungen S01–S17 aus `claude/startseite-erweiterungen.md` um (F90–F97, dazu erweitert F09, F13, F14, F17, F48, F84). Die Klärungen vom 03.10.2026 bringen F107–F109 (Testphase und Go-live). Die Fehlerliste vom 02.10.2026 bringt F98–F106 und ändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97 (Abschnitt P). Die Wünsche aus der Praxis vom 06.10.2026 bringen F110–F118 (Abschnitt Q) und 22 offene Fragen U39–U60; die Wünsche vom 07.10.2026 bringen F119–F121, F123 und eine weitere offene Frage (U61).
+in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensicherung ab (F61–F64, dazu der Backup-Status der Startseite in F13); offen ist nur noch der Import der Altdaten (F65) und die Aufbewahrung des Audit-Logs (F83, U18). Runde 7 setzt die Startseiten- und Oberflächen-Erweiterungen S01–S17 aus `claude/startseite-erweiterungen.md` um (F90–F97, dazu erweitert F09, F13, F14, F17, F48, F84). Die Klärungen vom 03.10.2026 bringen F107–F109 (Testphase und Go-live). Die Fehlerliste vom 02.10.2026 bringt F98–F106 und ändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97 (Abschnitt P). Die Wünsche aus der Praxis vom 06.10.2026 bringen F110–F118 (Abschnitt Q) und 22 offene Fragen U39–U60; die Wünsche vom 07.10.2026 bringen F119–F123 und eine weitere offene Frage (U61).
 
 ---
 
@@ -2387,6 +2388,36 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
   Auftrag bliebe ohne Ergebnis liegen. Der Test vergleicht Codes, Namen und „Sicherung vorher“.
 - **Teststatus:** Backend-Tests `system.tests.Auftraege` (Aktion, Rechte, zweiter Faktor, Gleichstand der Kataloge,
   echter Agent im Probelauf). Browsertest `system.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET.
+
+### F122 Ein gemeinsames Muster für alle Reiter der Akte
+- **Anlass:** „Die UI bitte auf allen Reitern in der Patientenakte vereinheitlichen, damit es überall gleich
+  aussieht. Ich fände die Ansicht ähnlich der vom Infusionsplan relativ gut … Alle Knöpfe sollten auf jedem Reiter
+  an der möglichst gleichen Position sein. Wir wollen nicht suchen.“ Dazu: „ggf. auch ein wenig kompakter, da der
+  Bildschirm überfüllt wirkt.“
+- **`Aktenseite.tsx`** gibt die Form vor: links die Einträge mit Datum, rechts der gewählte. Feste Plätze –
+  Überschrift mit Anzahl links oben, darunter der Hauptknopf („Neue Diagnose“, „Neuer Laborbefund“, „Neuer
+  Kontakt“ …), darunter die Liste, darunter der erklärende Satz; rechts der Kopf mit Titel und Zusatz, die
+  Aktionen zum Eintrag immer oben rechts. Welcher Eintrag rechts steht, merkt sich die Adresse (`?befund=`,
+  `?kontakt=` …), damit ein Link darauf zeigt und ein Neuladen die Auswahl behält – wie beim Infusionsplan.
+  Die Abstände sind knapper als in den alten Karten.
+- **Umgestellt:** Diagnosen, Therapie, Empfehlung, Labor, BIA, Berichte, Kontakte, Dokumente. Der Infusionsplan
+  hatte die Form schon; Übersicht (Raster mit „⋯“), Verlauf (Tabelle) und Datenschutz (Vorgänge) behalten ihre.
+- **Diagnosen fasst beides zusammen** (Wunsch): die ICD-Liste und der frühere Freitext, der jetzt **Notizen**
+  heißt und obenan in der Liste steht – mit seinem Datum, wie jeder andere Eintrag.
+- **Therapie und Empfehlung** sind eigene Reiter; links stehen ihre Fassungen mit Datum, die aktuelle ist
+  bearbeitbar, ältere sind nur lesbar. Damit ist auch „wann zuletzt geändert“ auf einen Blick zu sehen, ohne
+  einen eigenen Dialog für die Versionen.
+- **Bemerkung ist aus der Oberfläche verschwunden** („haben wir noch nie verwendet“). Das Feld bleibt: Der
+  Altdaten-Import legt dort ab, was nicht ins vorgesehene Feld passte – im Wortlaut des Altsystems, damit nichts
+  verloren geht (`altimport/umsetzung.py`, „extras“). Damit das nicht unsichtbar wird, zeigt die Übersicht es als
+  **„Hinweise aus der Altdaten-Übernahme“**, nur lesbar und nur, wenn etwas drinsteht; im Verlauf steht es wie
+  bisher. Die Rasterseiten `akte_diagnosen`, `akte_therapie` und `akte_kontakte` entfallen damit; gespeicherte
+  Größen dieser Seiten bleiben unbeachtet liegen.
+- **Verlauf:** Der Bereichsfilter ist mit den neuen Bereichen zu lang für eine Knopfreihe geworden und jetzt eine
+  Auswahlliste, passend zur Person-Auswahl daneben.
+- **Teststatus:** Browsertests `akte.spec.ts`, `praxiswuensche.spec.ts`, `dokumente.spec.ts`, `oberflaeche.spec.ts`,
+  `zz-neustart.spec.ts`, `datenschutz.spec.ts`, `aa-import.spec.ts` – an das neue Muster angepasst.
 - **Status:** ABGESCHLOSSEN UND GETESTET.
 
 ## Offene Backend-Funktionen

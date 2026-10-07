@@ -68,9 +68,11 @@ export function Aktenseite({ titel, anzahl, aktion, kopfrechts, liste, fuss, det
 }
 
 /** Die Liste links; jeder Eintrag ein ``Eintrag``. */
-export function Eintragsliste({ name, children, leer }: { name: string; children: ReactNode; leer?: string }) {
+export function Eintragsliste({ name, children, leer, testid }: {
+  name: string; children: ReactNode; leer?: string; testid?: string;
+}) {
   return (
-    <div className="flex flex-col gap-1.5" role="list" aria-label={name} data-testid="eintragsliste">
+    <div className="flex flex-col gap-1.5" role="list" aria-label={name} data-testid={testid ?? "eintragsliste"}>
       {children}
       {leer ? <Leer>{leer}</Leer> : null}
     </div>

@@ -165,43 +165,50 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   await oeffnen(page, p.id);
   await page.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt" }).click();
   await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}/kontakte$`));
-  const neu = page.getByTestId("neuer-kontakt");
-  const editor = neu.getByRole("textbox", { name: "Neuer Kontakt" });
-  await expect(editor).toBeFocused();
-  await editor.fill("Telefonat: Appetit schlechter, Trinkmenge dokumentieren.");
-  // Kontaktart (Klärung U6 vom 03.10.2026)
-  await neu.getByLabel("Kontaktart").selectOption({ label: "Telefon (angerufen)" });
-  await neu.getByLabel("Wiedervorlage").check();
-  await neu.getByLabel("Art", { exact: true }).selectOption({ label: "Rückruf" });
-  await neu.getByLabel("Uhrzeit").fill("10:00");
-  await neu.getByRole("button", { name: "Kontakt speichern" }).click();
+  // Erfassen im Dialog, Liste links, gewählter Kontakt rechts (F122)
+  const erfassen = async (text: string, mitTermin = false) => {
+    await page.getByRole("button", { name: "Neuer Kontakt" }).click();
+    const neu = page.getByTestId("neuer-kontakt");
+    await neu.getByRole("textbox", { name: "Neuer Kontakt" }).fill(text);
+    if (mitTermin) {
+      // Kontaktart (Klärung U6 vom 03.10.2026)
+      await neu.getByLabel("Kontaktart").selectOption({ label: "Telefon (angerufen)" });
+      await neu.getByLabel("Wiedervorlage").check();
+      await neu.getByLabel("Art", { exact: true }).selectOption({ label: "Rückruf" });
+      await neu.getByLabel("Uhrzeit").fill("10:00");
+    }
+    await neu.getByRole("button", { name: "Kontakt speichern" }).click();
+  };
+  await erfassen("Telefonat: Appetit schlechter, Trinkmenge dokumentieren.", true);
   await expect(page.getByText("Kontakt und Wiedervorlage gespeichert.")).toBeVisible();
   const liste = page.getByTestId("kontaktliste");
-  const erster = liste.getByTestId("kontakt").first();
+  const erster = liste.getByRole("listitem").first();
   await expect(erster).toContainText("Appetit schlechter");
-  await expect(erster).toContainText("Rückruf");
   await expect(erster).toContainText("S. Mitarbeit");
   await expect(erster.getByTestId("kontaktart")).toHaveText("Telefon (angerufen)");
+  const detail = page.getByTestId("kontakt-detail");
+  await expect(detail).toContainText("Appetit schlechter");
+  await expect(detail).toContainText("Rückruf");
 
   // zweiter Kontakt und Suche
-  await editor.fill("Versorger: Lieferung bestätigt.");
-  await neu.getByRole("button", { name: "Kontakt speichern" }).click();
-  await expect(liste.getByTestId("kontakt")).toHaveCount(2);
+  await erfassen("Versorger: Lieferung bestätigt.");
+  await expect(page.getByText("Kontakt gespeichert.")).toBeVisible();
+  await expect(liste.getByRole("listitem")).toHaveCount(2);
   await page.getByLabel("In Kontakten suchen").fill("Appetit");
-  await expect(liste.getByTestId("kontakt")).toHaveCount(1);
+  await expect(liste.getByRole("listitem")).toHaveCount(1);
   await page.getByLabel("In Kontakten suchen").fill("");
 
   // stornieren mit Grund (Pflicht)
-  await liste.getByTestId("kontakt").filter({ hasText: "Lieferung" }).getByRole("button", { name: /stornieren/ }).click();
+  await liste.getByRole("listitem").filter({ hasText: "Lieferung" }).click();
+  await detail.getByRole("button", { name: "Stornieren" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Stornieren" }).click();
   await expect(dialog.getByRole("alert")).toBeVisible();
   await dialog.getByLabel("Grund").fill("falscher Patient");
   await dialog.getByRole("button", { name: "Stornieren" }).click();
   await expect(dialog).toHaveCount(0);
-  const storniert = liste.getByTestId("kontakt").filter({ hasText: "Lieferung" });
-  await expect(storniert).toContainText("Grund: falscher Patient");
-  await expect(storniert.getByRole("button", { name: /stornieren/ })).toHaveCount(0);
+  await expect(detail).toContainText("Grund: falscher Patient");
+  await expect(detail.getByRole("button", { name: "Stornieren" })).toHaveCount(0);
 
   // Wiedervorlage steht in der Akte und im Backend; Kontakte nach Neustart unverändert
   stackNeuStarten();

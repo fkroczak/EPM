@@ -18,7 +18,7 @@ import { useHinweis } from "./hinweise";
 import { cx } from "./basis";
 import { Icon } from "./icon";
 
-export type BereichSeite = "akte_uebersicht" | "akte_kontakte" | "system";
+export type BereichSeite = "akte_uebersicht" | "system";
 
 /** Höhe einer Zeile des Rasters in px (siehe .bereiche in index.css) */
 const EINHEIT = 8;

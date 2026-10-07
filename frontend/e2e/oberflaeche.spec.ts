@@ -246,11 +246,11 @@ test("Volle Breite in Stufen: 1920 px – Karten der Akte im Raster, Größe je 
   await expect(page.getByTestId("karte-diagnose")).toBeVisible();
   await reiter.getByRole("link", { name: /^Therapie/ }).click();
   await expect(page.getByTestId("karte-therapie")).toBeVisible();
-  // Kontakte: Raster ohne Teiler; der Verlauf der Akte steht nur im eigenen Reiter „Verlauf“ (Fehlerliste 02.10.2026, 3)
+  // Kontakte: seit F122 dasselbe Muster wie überall – links die Kontakte, rechts der gewählte, ohne Teiler.
+  // Der Verlauf der Akte steht nur im eigenen Reiter „Verlauf“ (Fehlerliste 02.10.2026, 3)
   await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: /^Kontakte/ }).click();
-  const kontakte = page.getByTestId("kontakte-stufe");
-  await expect(kontakte.locator('[data-bereich="kontakte"]')).toHaveAttribute("data-breite", "2");
-  await expect(kontakte.locator("[data-bereich]")).toHaveCount(4);
+  const kontakte = page.getByTestId("kontakte");
+  await expect(kontakte.getByTestId("kontaktliste")).toBeVisible();
   await expect(kontakte.getByRole("heading", { name: /Verlauf/ })).toHaveCount(0);
   await expect(page.locator(".teiler")).toHaveCount(0);
   // Kalender: Monat ¾ | Tagesliste ¼, auch in der Woche
