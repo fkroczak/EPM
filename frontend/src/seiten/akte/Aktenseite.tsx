@@ -93,18 +93,22 @@ export function Eintrag({ datum: datumText, merkmal, zeile, unten, aktiv, onWahl
   /** hebt den Eintrag hervor (z. B. Entwurf, storniert) */
   warnung?: boolean;
 }) {
+  // Listenpunkt und Knopf getrennt: ``role="listitem"`` direkt auf dem Knopf würde dessen Rolle ersetzen – er
+  // wäre dann für Hilfsmittel (und Tests) kein Knopf mehr.
   return (
-    <button type="button" role="listitem" aria-current={aktiv ? "true" : undefined}
-      className={cx("card text-left px-3 py-2 flex flex-col gap-0.5 cursor-pointer border",
-        aktiv ? "border-akzent bg-akzent-weich" : "hover:bg-fein", warnung && !aktiv && "border-warn")}
-      onClick={onWahl}>
-      <span className="flex items-center justify-between gap-2">
-        <span className="num font-medium text-sm">{datumText}</span>
-        {merkmal}
-      </span>
-      {zeile ? <span className="text-[0.8125rem] leading-snug">{zeile}</span> : null}
-      {unten ? <span className="text-xs gedaempft leading-snug">{unten}</span> : null}
-    </button>
+    <div role="listitem" className="flex">
+      <button type="button" aria-current={aktiv ? "true" : undefined}
+        className={cx("card w-full text-left px-3 py-2 flex flex-col gap-0.5 cursor-pointer border",
+          aktiv ? "border-akzent bg-akzent-weich" : "hover:bg-fein", warnung && !aktiv && "border-warn")}
+        onClick={onWahl}>
+        <span className="flex items-center justify-between gap-2 w-full">
+          <span className="num font-medium text-sm">{datumText}</span>
+          {merkmal}
+        </span>
+        {zeile ? <span className="text-[0.8125rem] leading-snug">{zeile}</span> : null}
+        {unten ? <span className="text-xs gedaempft leading-snug">{unten}</span> : null}
+      </button>
+    </div>
   );
 }
 
