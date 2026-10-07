@@ -56,6 +56,26 @@ trap 'abbruch $? $LINENO "$BASH_COMMAND"' ERR
 : > "$PROTOKOLL" 2>/dev/null || PROTOKOLL=/dev/null
 chmod 0600 "$PROTOKOLL" 2>/dev/null || true
 
+platz_pruefen() {
+  # Vor dem Schreiben der Image-Datei: passt sie überhaupt? Sonst bricht ``docker save`` mitten im Schreiben ab
+  # und hinterlässt eine halbe Datei (Stolperstein 07.10.2026).
+  local ziel="$1" brauchen=0 haben bild
+  for bild in "epm-backend:$TAG" "epm-web:$TAG"; do
+    brauchen=$(( brauchen + $(docker image inspect -f '{{.Size}}' "$bild") / 1024 ))
+  done
+  brauchen=$(( brauchen * 12 / 10 ))                     # in KiB, mit 20 % Reserve
+  haben="$(df --output=avail -k "$ziel" | tail -1)"
+  if (( haben < brauchen )); then
+    echo "ABBRUCH: Zu wenig Platz in $ziel – frei $(( haben / 1024 )) MB, gebraucht etwa $(( brauchen / 1024 )) MB."
+    echo "   Vorhandene Image-Dateien:"
+    ls -1sh "$ziel"/*.tar 2>/dev/null | sed 's/^/      /' || true
+    echo "   Aufräumen: ältere Versionen zeigt „sudo epm-update --versionen“, entfernen mit"
+    echo "   „sudo docker image rm epm-backend:TAG epm-web:TAG“; dazu „sudo docker image prune -f“."
+    echo "Nichts wurde umgestellt; die laufende Version bleibt unverändert."
+    exit 1
+  fi
+}
+
 starte_version() {
   local tag="$1"
   sed -i -e 's/^COMPOSE_FILE=.*/COMPOSE_FILE=compose.yaml/' -e "s/^EPM_VERSION=.*/EPM_VERSION=$tag/" "$B/.env"
@@ -147,8 +167,10 @@ if [[ -n "$PAKET" ]]; then
 
   schritt "Images laden (epm-backend:$TAG, epm-web:$TAG)"
   docker load -i "$TMP/images.tar" | sed 's/^/   /'
+  # auch hier erst aufräumen, dann ablegen (siehe Stolperstein 07.10.2026 weiter unten)
+  ls -1t "$B"/images/epm-*.tar 2>/dev/null | grep -v /epm-paket- | tail -n +5 | xargs -r rm -f
+  platz_pruefen "$B/images"
   install -m 0600 "$TMP/images.tar" "$B/images/epm-$TAG.tar"
-  ls -1t "$B"/images/epm-*.tar 2>/dev/null | grep -v /epm-paket- | tail -n +6 | xargs -r rm -f
 else
   # ------------------------------------------------------------ von GitHub holen und bauen (Test-VM)
   if [[ "$QUELLE" == "paket" ]]; then
@@ -185,11 +207,14 @@ else
   fi
   schritt "Image epm-web:$TAG bauen (Frontend, braucht Zugang zu registry.npmjs.org)"
   docker build -t "epm-web:$TAG" "$CODE/frontend" >>"$PROTOKOLL" 2>&1
+  # Erst aufräumen, dann schreiben: andersherum mussten kurzzeitig sechs Image-Dateien von je gut einem
+  # Gigabyte auf die Platte passen, und ein voller Datenträger beendete den Lauf mitten im Schreiben
+  # (Stolperstein 07.10.2026). Es bleiben die letzten 4, mit der neuen also 5 (Update-Pakete: die letzten 3).
+  ls -1t "$B"/images/epm-*.tar 2>/dev/null | grep -v /epm-paket- | tail -n +5 | xargs -r rm -f
+  ls -1t "$B"/images/epm-paket-*.tar 2>/dev/null | tail -n +4 | xargs -r rm -f
+  platz_pruefen "$B/images"
   docker save "epm-backend:$TAG" "epm-web:$TAG" -o "$B/images/epm-$TAG.tar"
   chmod 0600 "$B/images/epm-$TAG.tar"
-  # nur die letzten 5 Image-Dateien behalten (Update-Pakete für den VPS: die letzten 3)
-  ls -1t "$B"/images/epm-*.tar 2>/dev/null | grep -v /epm-paket- | tail -n +6 | xargs -r rm -f
-  ls -1t "$B"/images/epm-paket-*.tar 2>/dev/null | tail -n +4 | xargs -r rm -f
 fi
 
 fi
