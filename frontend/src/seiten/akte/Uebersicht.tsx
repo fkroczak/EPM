@@ -19,6 +19,7 @@ import { Richtext, klartext } from "@/components/Editor";
 import { TerminDialog } from "@/components/TerminDialog";
 import { useAkte } from "./Akte";
 import { BefundeKurz } from "./Befunde";
+import { DiagnosenKurz } from "./Diagnosen";
 import { StummKarte } from "@/components/HinweisChips";
 import { AerzteKarte, BezugspersonenKarte } from "./Kontaktpersonen";
 import { KeinPlanHinweis } from "./Plaene";
@@ -219,13 +220,17 @@ function TherapieKarte() {
   const { patient, bearbeiten } = useAkte();
   return (
     <Karte className="px-[22px] py-[18px] flex flex-col gap-4">
-      {/* seit 07.10.2026 (F121) zwei Reiter: Diagnosen und Therapie */}
-      <KartenKopf titel="Diagnose und Therapie" rechts={<>
+      {/* seit 07.10.2026 je ein eigener Reiter (F121, F122) */}
+      <KartenKopf titel="Diagnosen und Therapie" rechts={<>
         <KnopfLink to={`/patienten/${patient.id}/diagnosen`} klein icon={bearbeiten ? "stift" : undefined}>Diagnosen</KnopfLink>
         <KnopfLink to={`/patienten/${patient.id}/therapie`} klein icon={bearbeiten ? "stift" : undefined}>Therapie</KnopfLink>
+        <KnopfLink to={`/patienten/${patient.id}/empfehlung`} klein icon={bearbeiten ? "stift" : undefined}>Empfehlung</KnopfLink>
       </>} />
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-5">
-        <div className="flex flex-col gap-1.5 min-w-0"><span className="text-[0.8125rem] font-medium gedaempft">Diagnose</span><Richtext html={patient.diagnose} leer="Noch keine Diagnose eingetragen." /></div>
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <span className="text-[0.8125rem] font-medium gedaempft">Diagnosen</span>
+          <DiagnosenKurz patientId={patient.id} />
+        </div>
         <div className="flex flex-col gap-1.5 min-w-0"><span className="text-[0.8125rem] font-medium gedaempft">Therapie</span><Richtext html={patient.therapie} leer="Noch keine Therapie eingetragen." /></div>
       </div>
     </Karte>
@@ -361,6 +366,23 @@ function StammKarte() {
   );
 }
 
+/**
+ * Was beim Altdaten-Import nicht ins vorgesehene Feld passte, hat der Import im früheren Feld „Bemerkung“
+ * abgelegt – im Originalwortlaut, damit nichts verloren geht. Die Bemerkung als Arbeitsfeld gibt es seit dem
+ * 07.10.2026 nicht mehr (nie benutzt); diese Hinweise erscheinen nur hier, nur lesbar und nur, wenn es welche gibt.
+ */
+function ImportHinweise() {
+  const { patient } = useAkte();
+  if (!klartext(patient.bemerkung).trim()) return null;
+  return (
+    <Karte className="p-4 flex flex-col gap-2" data-testid="import-hinweise">
+      <KartenKopf titel="Hinweise aus der Altdaten-Übernahme"
+        unter="Werte, die beim Import nicht ins vorgesehene Feld passten – im Wortlaut des Altsystems." />
+      <Richtext html={patient.bemerkung} className="text-sm" />
+    </Karte>
+  );
+}
+
 /** Letzter Laborbefund und letzte BIA-Messung mit Weg in die Reiter (Wünsche 06./07.10.2026, F112–F114, F121). */
 function BefundeKarte() {
   const { patient } = useAkte();
@@ -385,6 +407,7 @@ export function Uebersicht() {
     <div className="flex flex-col gap-4">
       {/* Weggeklickte Hinweise stehen hier und lassen sich zurückholen (Wunsch 07.10.2026, F119) */}
       <StummKarte patientId={patient.id} aenderbar={bearbeiten} />
+      <ImportHinweise />
     <Bereiche seite="akte_uebersicht" spalten={RASTER_SPALTEN[stufe]} testid="uebersicht-stufe">
       <Bereich id="gewicht" titel="Gewichtsverlauf" standard={{ breite: 2 }}><GewichtKarte startZeitraum={stufe === "qhd" ? "y3" : "y1"} /></Bereich>
       <Bereich id="termine" titel="Termine"><TermineKarte /></Bereich>

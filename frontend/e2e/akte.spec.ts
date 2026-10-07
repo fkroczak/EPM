@@ -106,13 +106,14 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   const p = await neuerPatient();
   // eigene Reiter seit F121: der Freitext „Diagnose“ unter „Diagnosen“, die Therapie unter „Therapie“
   await oeffnen(page, p.id, "/diagnosen");
+  // der frühere Freitext „Diagnose“ heißt jetzt „Notizen“ und steht rechts (F122)
   const diagnose = page.getByTestId("karte-diagnose");
   await diagnose.getByRole("button", { name: "Bearbeiten" }).click();
-  const editor = diagnose.getByRole("textbox", { name: "Diagnose" });
+  const editor = diagnose.getByRole("textbox", { name: "Notizen" });
   await editor.fill("Kurzdarmsyndrom nach Resektion");
   await diagnose.getByRole("button", { name: "Speichern" }).click();
-  await expect(page.getByText("Diagnose gespeichert.")).toBeVisible();
-  await expect(diagnose.getByTestId("version-diagnose")).toContainText("Version 1");
+  await expect(page.getByText("Notizen gespeichert.")).toBeVisible();
+  await expect(diagnose).toContainText("Version 1");
 
   await diagnose.getByRole("button", { name: "Bearbeiten" }).click();
   await editor.click();
@@ -122,36 +123,30 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   await page.keyboard.type("Typ II");
   await diagnose.getByRole("button", { name: "Speichern" }).click();
   await expect(diagnose.locator(".richtext strong")).toHaveText("Typ II");
-  await expect(diagnose.getByTestId("version-diagnose")).toContainText("Version 2");
+  await expect(diagnose).toContainText("Version 2");
 
-  await diagnose.getByRole("button", { name: "Versionen" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("button", { name: /Version 2 · aktuell/ })).toBeVisible();
-  await dialog.getByRole("button", { name: /^Version 1/ }).click();
-  await expect(dialog.getByTestId("fassung")).toHaveText("Kurzdarmsyndrom nach Resektion");
-  await page.keyboard.press("Escape");
-
-  // Therapie: Editor ist direkt offen, Formatierung über die Werkzeugleiste
+  // Therapie: eigener Reiter, links die Fassungen, rechts der Text; der Editor ist direkt offen (F121/F122)
   await oeffnen(page, p.id, "/therapie");
-  await expect(page.getByTestId("zuletzt-therapie")).toContainText("noch nicht bearbeitet");
   const therapie = page.getByTestId("karte-therapie");
+  await expect(therapie).toContainText("Noch nicht bearbeitet");
   await therapie.getByRole("textbox", { name: "Therapie" }).click();
   await therapie.getByRole("button", { name: "Aufzählung" }).click();
   await page.keyboard.type("HPE 5×/Woche über Port");
   await therapie.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Therapie gespeichert.")).toBeVisible();
 
-  // Bemerkung (Klärung U5 vom 03.10.2026): eigene Karte mit Versionen
-  const bemerkung = page.getByTestId("karte-bemerkung");
-  await expect(bemerkung).toContainText("Noch keine Bemerkung eingetragen.");
-  await bemerkung.getByRole("button", { name: "Bearbeiten" }).click();
-  await bemerkung.getByRole("textbox", { name: "Bemerkung" }).fill("Port seit 2019, Allergie auf Pflaster");
-  await bemerkung.getByRole("button", { name: "Speichern" }).click();
-  await expect(page.getByText("Bemerkung gespeichert.")).toBeVisible();
-  await expect(bemerkung.getByTestId("version-bemerkung")).toContainText("Version 1");
+  // Bemerkung: seit dem 07.10.2026 kein Feld der Oberfläche mehr (nie benutzt, F122). Der Inhalt bleibt
+  // erhalten und im Verlauf sichtbar – dort landen auch die Hinweise des Altdaten-Imports.
+  const api0 = await apiAls("mitarbeiter");
+  await api0.patch(`patienten/${p.id}/`, { bemerkung: "<p>Port seit 2019, Allergie auf Pflaster</p>" });
+  await api0.ende();
   await page.goto(`/patienten/${p.id}/verlauf`);
-  await page.getByRole("group", { name: "Bereich" }).getByRole("button", { name: "Bemerkung", exact: true }).click();
+  await page.getByTestId("verlauf-bereich").selectOption("bemerkung");
   await expect(page.getByTestId("verlauf").getByRole("row").filter({ hasText: "Port seit 2019" })).toContainText("Bemerkung");
+  // und erscheint in der Übersicht als Hinweis aus der Übernahme, nur lesbar
+  await oeffnen(page, p.id);
+  await expect(page.getByTestId("import-hinweise")).toContainText("Port seit 2019");
+  await expect(page.getByTestId("karte-bemerkung")).toHaveCount(0);
 
   // nach Neuladen aus der Datenbank, Übersicht zeigt beides
   await oeffnen(page, p.id);
@@ -170,43 +165,50 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   await oeffnen(page, p.id);
   await page.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt" }).click();
   await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}/kontakte$`));
-  const neu = page.getByTestId("neuer-kontakt");
-  const editor = neu.getByRole("textbox", { name: "Neuer Kontakt" });
-  await expect(editor).toBeFocused();
-  await editor.fill("Telefonat: Appetit schlechter, Trinkmenge dokumentieren.");
-  // Kontaktart (Klärung U6 vom 03.10.2026)
-  await neu.getByLabel("Kontaktart").selectOption({ label: "Telefon (angerufen)" });
-  await neu.getByLabel("Wiedervorlage").check();
-  await neu.getByLabel("Art", { exact: true }).selectOption({ label: "Rückruf" });
-  await neu.getByLabel("Uhrzeit").fill("10:00");
-  await neu.getByRole("button", { name: "Kontakt speichern" }).click();
+  // Erfassen im Dialog, Liste links, gewählter Kontakt rechts (F122)
+  const erfassen = async (text: string, mitTermin = false) => {
+    await page.getByRole("button", { name: "Neuer Kontakt" }).click();
+    const neu = page.getByTestId("neuer-kontakt");
+    await neu.getByRole("textbox", { name: "Neuer Kontakt" }).fill(text);
+    if (mitTermin) {
+      // Kontaktart (Klärung U6 vom 03.10.2026)
+      await neu.getByLabel("Kontaktart").selectOption({ label: "Telefon (angerufen)" });
+      await neu.getByLabel("Wiedervorlage").check();
+      await neu.getByLabel("Art", { exact: true }).selectOption({ label: "Rückruf" });
+      await neu.getByLabel("Uhrzeit").fill("10:00");
+    }
+    await neu.getByRole("button", { name: "Kontakt speichern" }).click();
+  };
+  await erfassen("Telefonat: Appetit schlechter, Trinkmenge dokumentieren.", true);
   await expect(page.getByText("Kontakt und Wiedervorlage gespeichert.")).toBeVisible();
   const liste = page.getByTestId("kontaktliste");
-  const erster = liste.getByTestId("kontakt").first();
+  const erster = liste.getByRole("listitem").first();
   await expect(erster).toContainText("Appetit schlechter");
-  await expect(erster).toContainText("Rückruf");
   await expect(erster).toContainText("S. Mitarbeit");
   await expect(erster.getByTestId("kontaktart")).toHaveText("Telefon (angerufen)");
+  const detail = page.getByTestId("kontakt-detail");
+  await expect(detail).toContainText("Appetit schlechter");
+  await expect(detail).toContainText("Rückruf");
 
   // zweiter Kontakt und Suche
-  await editor.fill("Versorger: Lieferung bestätigt.");
-  await neu.getByRole("button", { name: "Kontakt speichern" }).click();
-  await expect(liste.getByTestId("kontakt")).toHaveCount(2);
+  await erfassen("Versorger: Lieferung bestätigt.");
+  await expect(page.getByText("Kontakt gespeichert.")).toBeVisible();
+  await expect(liste.getByRole("listitem")).toHaveCount(2);
   await page.getByLabel("In Kontakten suchen").fill("Appetit");
-  await expect(liste.getByTestId("kontakt")).toHaveCount(1);
+  await expect(liste.getByRole("listitem")).toHaveCount(1);
   await page.getByLabel("In Kontakten suchen").fill("");
 
   // stornieren mit Grund (Pflicht)
-  await liste.getByTestId("kontakt").filter({ hasText: "Lieferung" }).getByRole("button", { name: /stornieren/ }).click();
+  await liste.getByRole("listitem").filter({ hasText: "Lieferung" }).click();
+  await detail.getByRole("button", { name: "Stornieren" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Stornieren" }).click();
   await expect(dialog.getByRole("alert")).toBeVisible();
   await dialog.getByLabel("Grund").fill("falscher Patient");
   await dialog.getByRole("button", { name: "Stornieren" }).click();
   await expect(dialog).toHaveCount(0);
-  const storniert = liste.getByTestId("kontakt").filter({ hasText: "Lieferung" });
-  await expect(storniert).toContainText("Grund: falscher Patient");
-  await expect(storniert.getByRole("button", { name: /stornieren/ })).toHaveCount(0);
+  await expect(detail).toContainText("Grund: falscher Patient");
+  await expect(detail.getByRole("button", { name: "Stornieren" })).toHaveCount(0);
 
   // Wiedervorlage steht in der Akte und im Backend; Kontakte nach Neustart unverändert
   stackNeuStarten();
@@ -397,13 +399,13 @@ test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pfl
   await personen.getByRole("button", { name: /Frühere anzeigen/ }).click();
   await expect(personen.getByTestId("bezugsperson")).toHaveCount(2);
   await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Verlauf" }).click();
-  const bereich = page.getByRole("group", { name: "Bereich" });
+  const bereich = page.getByTestId("verlauf-bereich");
   const verlauf = page.getByTestId("verlauf");
-  await bereich.getByRole("button", { name: "Ärzte", exact: true }).click();
-  await expect(bereich.getByRole("button", { name: "Ärzte", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await bereich.selectOption("aerzte");
+  await expect(bereich).toHaveValue("aerzte");
   await expect(verlauf.getByRole("row").filter({ hasText: arztName })).toContainText("angelegt");
   await expect(verlauf.getByRole("row").filter({ hasText: "Bezugsperson" })).toHaveCount(0);
-  await bereich.getByRole("button", { name: "Bezugspersonen", exact: true }).click();
+  await bereich.selectOption("bezugspersonen");
   await expect(verlauf.getByRole("row").filter({ hasText: "nicht mehr aktuell" })).toContainText("Margit Akte");
 
   // in der Datenbank

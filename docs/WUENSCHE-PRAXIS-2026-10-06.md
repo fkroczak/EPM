@@ -276,3 +276,27 @@ Weg in beide Reiter.
 
 Dabei behoben: Die Karte **Bemerkung** war nie in der Liste der verstellbaren Karten – ihr Menü „⋯“ lief ins
 Leere.
+
+### 11 · Ein gemeinsames Muster für alle Reiter (F122)
+
+> „Die UI bitte auf allen Reitern in der Patientenakte vereinheitlichen, damit es überall gleich aussieht. Ich fände
+> die Ansicht ähnlich der vom Infusionsplan relativ gut … Alle Knöpfe sollten auf jedem Reiter an der möglichst
+> gleichen Position sein. Wir wollen nicht suchen.“
+
+**Geklärt:** alle Reiter, auch Kontakte und Dokumente; Diagnosen (ICD) und der Freitext zusammen, der Text als
+**Notizen**; Therapie und Empfehlung je ein eigener Reiter; **Bemerkung** nur aus der Oberfläche nehmen, Daten bleiben.
+
+Alle Reiter mit Einträgen haben jetzt dieselbe Form: links die Einträge mit Datum, rechts der gewählte – mit
+festen Plätzen für Überschrift, Hauptknopf, Liste, erklärenden Satz und die Aktionen zum Eintrag. Die Bemerkung
+bleibt als Ablageort des Imports erhalten und erscheint in der Übersicht als „Hinweise aus der Altdaten-Übernahme“,
+nur wenn etwas drinsteht. Der Bereichsfilter des Verlaufs ist eine Auswahlliste.
+
+### 12 · EPM aus der Oberfläche aktualisieren (F123)
+
+> „Und eine `sudo epm-update` aus der UI unter System sollte möglich sein. Dann können nachfolgende Pushes
+> installiert werden.“
+
+Administration › System › Tätigkeiten: **„EPM aktualisieren“** – Passwort und zweiter Faktor, Warnung an die
+Angemeldeten, Beginn sofort bis 60 Minuten. Der Server holt den Stand, baut, sichert und stellt um; beim Umstellen
+ist EPM kurz nicht erreichbar, das Ergebnis steht danach unter Aufträge. Ohne Testlauf – getestet wird vor jedem
+Push.

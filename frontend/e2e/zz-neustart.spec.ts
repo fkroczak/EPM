@@ -76,16 +76,18 @@ test("Nach dem Neustart: Akten mit Gewicht, Diagnose und Versionen, Kontakten, T
   await page.goto(`/patienten/${gemerkt("diagnose").id}/diagnosen`);
   const diagnose = page.getByTestId("karte-diagnose");
   await expect(diagnose.locator(".richtext strong")).toHaveText("Typ II");
-  await expect(diagnose.getByTestId("version-diagnose")).toContainText("Version 2");
+  await expect(diagnose).toContainText("Version 2");
   await page.goto(`/patienten/${gemerkt("diagnose").id}/therapie`);
   await expect(page.getByTestId("karte-therapie")).toContainText("HPE 5×/Woche über Port");
-  await expect(page.getByTestId("zuletzt-therapie")).toContainText("zuletzt geändert");
+  await expect(page.getByTestId("karte-therapie")).toContainText("geändert");
 
   const kontakte = gemerkt("kontakte").id;
   await page.goto(`/patienten/${kontakte}/kontakte`);
   const liste = page.getByTestId("kontaktliste");
-  await expect(liste.getByTestId("kontakt").filter({ hasText: "Lieferung" })).toContainText("Grund: falscher Patient");
-  await expect(liste.getByTestId("kontakt").filter({ hasText: "Appetit schlechter" })).toContainText("Rückruf");
+  await liste.getByRole("listitem").filter({ hasText: "Lieferung" }).click();
+  await expect(page.getByTestId("kontakt-detail")).toContainText("Grund: falscher Patient");
+  await liste.getByRole("listitem").filter({ hasText: "Appetit schlechter" }).click();
+  await expect(page.getByTestId("kontakt-detail")).toContainText("Rückruf");
   await page.goto(`/patienten/${kontakte}`);
   await expect(page.getByTestId("aktentermine")).toContainText("Rückruf Trinkmenge");
 
@@ -144,7 +146,7 @@ test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", 
   const dok = gemerkt("dokumente").id;
   await page.goto(`/patienten/${dok}/dokumente`);
   const doks = page.getByTestId("dokumentliste");
-  await expect(doks.getByRole("row").filter({ hasText: "Arztbrief Klinikum Nord" })).toContainText("15.09.2026");
+  await expect(doks.getByRole("listitem").filter({ hasText: "Arztbrief Klinikum Nord" })).toContainText("15.09.2026");
   await expect(doks.getByRole("button", { name: "Port-Foto" })).toHaveCount(0);
   await page.getByLabel("Ausgeblendete anzeigen").check();
   await expect(doks.getByRole("button", { name: "Port-Foto" })).toBeVisible();
@@ -163,7 +165,7 @@ test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", 
   await expect(page.getByTestId("verlauf")).not.toContainText(weg.titel);
 
   await page.goto(`/patienten/${gemerkt("altdokument").patient}/dokumente`);
-  const alt = page.getByTestId("dokumentliste").getByRole("row").filter({ hasText: "Altdokument aus dem bisherigen System" });
+  const alt = page.getByTestId("dokumentliste").getByRole("listitem").filter({ hasText: "Altdokument aus dem bisherigen System" });
   await expect(alt).toContainText("Labor");
   await expect(alt).not.toContainText("Typ prüfen");
   await ctx.close();

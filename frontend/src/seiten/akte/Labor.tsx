@@ -13,12 +13,12 @@ import { useLaborparameter } from "@/lib/daten";
 import { datum, eingabeDatum, heuteIso, zahl } from "@/lib/format";
 import { LABORGRUPPEN } from "@/lib/typen";
 import type { Laborbefund, Laborparameter, Laborwert } from "@/lib/typen";
-import { Eingabe, Feld, Fehleranzeige, Karte, KartenKopf, Knopf, Laden, Leer, Meldung, cx }
-  from "@/components/ui/basis";
+import { Eingabe, Feld, Fehleranzeige, Knopf, Laden, Meldung, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Editor, Richtext } from "@/components/Editor";
 import { useAkte } from "./Akte";
+import { Abschnitt, Aktenseite, Detail, Eintrag, Eintragsliste, useWahl } from "./Aktenseite";
 import { AlterHinweis } from "./Befunde";
 
 type Zeile = { parameter: number | null; freitext_name: string; wert: string; einheit: string; bemerkung: string };
@@ -181,80 +181,82 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
   );
 }
 
-function BefundKarte({ befund, onAendern, aenderbar }: { befund: Laborbefund; onAendern: () => void; aenderbar: boolean }) {
-  const [offen, setOffen] = useState(false);
+/** Der gewählte Befund rechts: die Werte nach Gruppen, darunter die Beurteilung. */
+function BefundDetail({ befund, onAendern, aenderbar }: { befund: Laborbefund; onAendern: () => void; aenderbar: boolean }) {
   const nachGruppe = useMemo(() => {
     const nach: Record<string, Laborwert[]> = {};
     for (const w of befund.werte) (nach[w.gruppe ?? "sonstiges"] ??= []).push(w);
     return Object.entries(nach);
   }, [befund.werte]);
   return (
-    <Karte className="p-[22px] flex flex-col gap-3">
-      <KartenKopf
-        titel={<>Laborbefund vom <span className="num">{datum(befund.abgenommen_am)}</span></>}
-        unter={[befund.labor, `${befund.anzahl_werte} Werte`, befund.erfasst_von_name].filter(Boolean).join(" · ")}
-        rechts={<>
-          <Knopf klein onClick={() => setOffen((o) => !o)}>{offen ? "Zuklappen" : "Werte zeigen"}</Knopf>
-          {aenderbar ? <Knopf klein onClick={onAendern}>Ändern</Knopf> : null}
-        </>}
-      />
-      {offen ? (
-        <div className="flex flex-col gap-3">
-          {nachGruppe.map(([gruppe, liste]) => (
-            <section key={gruppe} className="flex flex-col gap-1">
-              <h3 className="lbl m-0 text-[0.8125rem]">{LABORGRUPPEN[gruppe] ?? "Weitere Parameter"}</h3>
-              <div className="grid gap-x-4 sm:grid-cols-2 lg:grid-cols-3">
-                {liste.map((w, i) => (
-                  <div key={w.id ?? i} className="grid grid-cols-[1fr_auto_auto] items-baseline gap-2 text-sm py-0.5">
-                    <span className="truncate">{w.bezeichnung}</span>
-                    <span className={cx("num", w.ausserhalb && "font-semibold")}>{anzeigeWert(w)}</span>
-                    <span className="gedaempft text-[0.75rem] w-[64px]">{w.einheit}</span>
-                    {w.ausserhalb ? <span className="col-span-3 text-[0.75rem] gedaempft">
-                      {w.ausserhalb === "hoch" ? "über" : "unter"} Referenz {referenzText(w)}</span> : null}
-                  </div>
-                ))}
+    <Detail testid="labor-detail"
+      titel={<>Laborbefund vom <span className="num">{datum(befund.abgenommen_am)}</span></>}
+      unter={[befund.labor, `${befund.anzahl_werte} Werte`, befund.erfasst_von_name].filter(Boolean).join(" · ")}
+      aktionen={aenderbar ? <Knopf klein icon="stift" onClick={onAendern}>Ändern</Knopf> : undefined}>
+      {nachGruppe.map(([gruppe, liste]) => (
+        <Abschnitt key={gruppe} titel={LABORGRUPPEN[gruppe] ?? "Weitere Parameter"}>
+          <div className="grid gap-x-5 sm:grid-cols-2 lg:grid-cols-3">
+            {liste.map((w, i) => (
+              <div key={w.id ?? i} className="grid grid-cols-[1fr_auto_auto] items-baseline gap-2 text-sm border-b border-rand py-1">
+                <span className="truncate" title={w.bezeichnung}>{w.bezeichnung}</span>
+                <span className={cx("num", w.ausserhalb && "font-semibold text-warn")}>{anzeigeWert(w)}</span>
+                <span className="gedaempft text-[0.75rem] w-[58px]">{w.einheit}</span>
+                {w.ausserhalb ? <span className="col-span-3 text-[0.75rem] gedaempft">
+                  {w.ausserhalb === "hoch" ? "über" : "unter"} Referenz {referenzText(w)}</span> : null}
               </div>
-            </section>
-          ))}
-          {befund.beurteilung ? (
-            <div>
-              <h3 className="lbl m-0 text-[0.8125rem]">Beurteilung</h3>
-              <Richtext html={befund.beurteilung} />
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </Karte>
+            ))}
+          </div>
+        </Abschnitt>
+      ))}
+      {befund.beurteilung ? <Abschnitt titel="Beurteilung"><Richtext html={befund.beurteilung} className="text-sm" /></Abschnitt> : null}
+    </Detail>
   );
 }
 
 // ================================================================= Seite
 export function Labor() {
   const { patient, erfassen } = useAkte();
+  const [wahl, setWahl] = useWahl("befund");
   const [dialog, setDialog] = useState<{ offen: boolean; befund: Laborbefund | null }>({ offen: false, befund: null });
   const befunde = useQuery({
     queryKey: ["laborbefunde", patient.id],
     queryFn: () => api<Laborbefund[]>(`laborbefunde/?patient=${patient.id}`),
   });
+  const liste = befunde.data ?? [];
+  const gewaehlt = liste.find((b) => String(b.id) === wahl) ?? liste[0];
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="lbl m-0">Laborbefunde{befunde.data?.length ? <span className="num ml-1.5 opacity-70">{befunde.data.length}</span> : null}</h2>
-          <AlterHinweis art="labor" am={befunde.data?.[0]?.abgenommen_am} was="Laborbefund" />
-        </div>
-        {erfassen ? <Knopf variante="pri" klein onClick={() => setDialog({ offen: true, befund: null })}>
-          Neuer Laborbefund</Knopf> : null}
-      </div>
-      {befunde.isPending ? <Laden /> : <Fehleranzeige fehler={befunde.error} />}
-      {befunde.data?.length === 0 ? (
-        <Karte className="p-[22px]"><Leer>Noch kein Laborbefund erfasst.</Leer></Karte>
-      ) : null}
-      {(befunde.data ?? []).map((b) => (
-        <BefundKarte key={b.id} befund={b} aenderbar={erfassen} onAendern={() => setDialog({ offen: true, befund: b })} />
-      ))}
-      {erfassen ? <BefundDialog befund={dialog.befund} offen={dialog.offen}
-        onOffen={(o) => setDialog((d) => ({ ...d, offen: o }))} /> : null}
-    </div>
+    <>
+    <Aktenseite
+      testid="labor"
+      titel={liste.length === 1 ? "Laborbefund" : "Laborbefunde"}
+      anzahl={liste.length}
+      laedt={befunde.isPending}
+      aktion={erfassen
+        ? <Knopf variante="pri" icon="plus" onClick={() => setDialog({ offen: true, befund: null })}>Neuer Laborbefund</Knopf>
+        : undefined}
+      kopfrechts={<><Fehleranzeige fehler={befunde.error} />
+        <AlterHinweis art="labor" am={liste[0]?.abgenommen_am} was="Laborbefund" /></>}
+      liste={
+        <Eintragsliste name="Laborbefunde" leer={liste.length ? undefined : "Noch kein Laborbefund erfasst."}>
+          {liste.map((b) => (
+            <Eintrag key={b.id} aktiv={gewaehlt?.id === b.id} onWahl={() => setWahl(String(b.id))}
+              datum={datum(b.abgenommen_am)}
+              merkmal={<span className="num text-xs gedaempft">{b.anzahl_werte}</span>}
+              zeile={b.labor || "Labor nicht angegeben"}
+              unten={b.erfasst_von_name ?? ""} />
+          ))}
+        </Eintragsliste>
+      }
+      fuss={<>Eingetragen wird nur der gemessene Wert – die Einheit steht in der Maske schon da. Werte außerhalb des
+        Referenzbereichs sind hervorgehoben.</>}
+      detail={gewaehlt
+        ? <BefundDetail befund={gewaehlt} aenderbar={erfassen}
+            onAendern={() => setDialog({ offen: true, befund: gewaehlt })} />
+        : null}
+      leer="Links einen Befund wählen."
+    />
+    {erfassen ? <BefundDialog befund={dialog.befund} offen={dialog.offen}
+      onOffen={(o) => setDialog((d) => ({ ...d, offen: o }))} /> : null}
+    </>
   );
 }

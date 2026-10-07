@@ -8,7 +8,7 @@ test("Verlauf der Akte als PDF, mit Bereichsfilter", async ({ page }) => {
   await page.goto("/patienten");
   await page.getByTestId("patientenliste").getByRole("link", { name: "Musterfrau, Erika" }).click();
   await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Verlauf" }).click();
-  await page.getByRole("group", { name: "Bereich" }).getByRole("button", { name: "Gewicht", exact: true }).click();
+  await page.getByTestId("verlauf-bereich").selectOption("gewichte");
   const antwort = page.waitForResponse((a) => /\/verlauf\/pdf\/\?bereich=gewichte$/.test(a.url()) && a.ok());
   await page.getByRole("button", { name: "Verlauf als PDF" }).click();
   expect((await antwort).headers()["content-type"]).toBe("application/pdf");

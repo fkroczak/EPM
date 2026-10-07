@@ -237,19 +237,20 @@ test("Volle Breite in Stufen: 1920 px – Karten der Akte im Raster, Größe je 
   await expect(page.getByTestId("uebersicht-stufe").locator('[data-bereich="gewicht"]')).toHaveAttribute("data-breite", "2");
   expect((await api.get("auth/ich/")).bereiche.akte_uebersicht?.gewicht).toBeUndefined();
   await api.ende();
-  // Therapie und Diagnosen (eigene Reiter seit F121): gleiches Raster mit „⋯“
+  // Diagnosen, Therapie und Empfehlung haben seit F122 das feste Muster: links die Einträge, rechts der gewählte.
+  // Das Raster mit „⋯“ gibt es dort nicht mehr – die Knöpfe stehen dafür auf jedem Reiter an derselben Stelle.
   const reiter = page.getByRole("navigation", { name: "Aktenbereiche" });
-  await reiter.getByRole("link", { name: /^Therapie/ }).click();
-  await expect(page.getByTestId("therapie-stufe").locator('[data-bereich="therapie"]')).toHaveAttribute("data-breite", "2");
-  await expect(page.getByTestId("groesse-bemerkung")).toBeVisible();
   await reiter.getByRole("link", { name: /^Diagnosen/ }).click();
-  await expect(page.getByTestId("diagnosen-stufe").locator('[data-bereich="diagnosen"]')).toHaveAttribute("data-breite", "2");
-  await expect(page.getByTestId("groesse-diagnose")).toBeVisible();
-  // Kontakte: Raster ohne Teiler; der Verlauf der Akte steht nur im eigenen Reiter „Verlauf“ (Fehlerliste 02.10.2026, 3)
+  await expect(page.getByTestId("diagnosen")).toBeVisible();
+  await expect(page.getByTestId("eintragsliste")).toBeVisible();
+  await expect(page.getByTestId("karte-diagnose")).toBeVisible();
+  await reiter.getByRole("link", { name: /^Therapie/ }).click();
+  await expect(page.getByTestId("karte-therapie")).toBeVisible();
+  // Kontakte: seit F122 dasselbe Muster wie überall – links die Kontakte, rechts der gewählte, ohne Teiler.
+  // Der Verlauf der Akte steht nur im eigenen Reiter „Verlauf“ (Fehlerliste 02.10.2026, 3)
   await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: /^Kontakte/ }).click();
-  const kontakte = page.getByTestId("kontakte-stufe");
-  await expect(kontakte.locator('[data-bereich="kontakte"]')).toHaveAttribute("data-breite", "2");
-  await expect(kontakte.locator("[data-bereich]")).toHaveCount(4);
+  const kontakte = page.getByTestId("kontakte");
+  await expect(kontakte.getByTestId("kontaktliste")).toBeVisible();
   await expect(kontakte.getByRole("heading", { name: /Verlauf/ })).toHaveCount(0);
   await expect(page.locator(".teiler")).toHaveCount(0);
   // Kalender: Monat ¾ | Tagesliste ¼, auch in der Woche

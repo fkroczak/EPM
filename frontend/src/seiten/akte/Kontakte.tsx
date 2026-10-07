@@ -6,17 +6,16 @@ import { ApiFehler, abfrage, api } from "@/lib/api";
 import type { Feldfehler, Seite as ApiSeite } from "@/lib/api";
 import { useIch, useOhneRechtSchliessen } from "@/lib/auth";
 import { useAuswahl, useVersorgerListe } from "@/lib/daten";
-import { datum, eingabeDatum, heuteIso, terminZeit, uhrzeit, zahl, zeitpunkt } from "@/lib/format";
+import { datum, eingabeDatum, heuteIso, terminZeit, uhrzeit, zeitpunkt } from "@/lib/format";
 import { TERMINARTEN } from "@/lib/typen";
 import type { Kontakt } from "@/lib/typen";
-import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
-import { Bereich, Bereiche } from "@/components/ui/bereiche";
-import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Leer, Meldung, Textfeld, cx } from "@/components/ui/basis";
+import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
-import { Editor, Richtext } from "@/components/Editor";
+import { Editor, Richtext, klartext } from "@/components/Editor";
 import { useAkte } from "./Akte";
+import { Abschnitt, Aktenseite, Detail, Eintrag, Eintragsliste, useWahl } from "./Aktenseite";
 import { TermineKarte } from "./Uebersicht";
 
 function inTagen(tage: number) {
@@ -25,7 +24,7 @@ function inTagen(tage: number) {
   return datum(d);
 }
 
-function NeuerKontakt() {
+function NeuerKontakt({ onFertig }: { onFertig?: () => void }) {
   const { patient } = useAkte();
   const ich = useIch();
   const location = useLocation();
@@ -65,15 +64,13 @@ function NeuerKontakt() {
       setMitTermin(false);
       setUhr("");
       setFaellig(inTagen(7));
+      onFertig?.();
     },
   });
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
-    <div className="flex flex-col gap-3 px-[22px] py-[18px] border-b border-rand" data-testid="neuer-kontakt">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="lbl m-0">Neuer Kontakt</h2>
-        <span className="num text-[0.8125rem] gedaempft">{datum(heuteIso())}, jetzt · {ich.anzeigename}</span>
-      </div>
+    <div className="flex flex-col gap-3" data-testid="neuer-kontakt">
+      <span className="num text-[0.8125rem] gedaempft">{datum(heuteIso())}, jetzt · {ich.anzeigename}</span>
       <Editor key={fokus} wert={text} onAenderung={setText} label="Neuer Kontakt" werkzeuge={false} hoehe={84} autofokus={fokus > 0}
         platzhalter="Telefonat, Ambulanz, Absprache mit Versorger …" />
       {f.text ? <span className="fehlertext" role="alert">{f.text}</span> : null}
@@ -157,86 +154,105 @@ function Erreichbarkeit() {
 
 export function Kontakte() {
   const { patient, erfassen } = useAkte();
+  const [wahl, setWahl] = useWahl("kontakt");
   const [suche, setSuche] = useState("");
   const [begriff, setBegriff] = useState("");
   const [anzahl, setAnzahl] = useState(50);
+  const [neu, setNeu] = useState(false);
   const [storno, setStorno] = useState<Kontakt | null>(null);
   useOhneRechtSchliessen(erfassen, () => setStorno(null));
+  useOhneRechtSchliessen(erfassen, () => setNeu(false));
   useEffect(() => {
     const t = window.setTimeout(() => setBegriff(suche.trim()), 300);
     return () => window.clearTimeout(t);
   }, [suche]);
-  const liste = useQuery({
+  const abfrageliste = useQuery({
     queryKey: ["patient", patient.id, "kontakte", begriff, anzahl],
     queryFn: () => api<ApiSeite<Kontakt>>(`kontakte/${abfrage({ patient: patient.id, search: begriff, seitengroesse: anzahl })}`),
     placeholderData: (vorher: ApiSeite<Kontakt> | undefined) => vorher,
   });
-  const daten = liste.data;
-  const stufe = useStufe();
-  const kontakte = (
-      <Karte className="flex flex-col min-w-0 overflow-hidden">
-        {erfassen ? <NeuerKontakt /> : null}
-        <div className="flex items-center justify-between gap-3 px-[22px] pt-4 pb-2 flex-wrap">
-          <h2 className="lbl m-0">Kontakte · <span className="num">{daten ? zahl(daten.count) : "…"}</span> · neueste oben</h2>
-          <label className="relative w-[240px] block">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
-            <input className="inp pl-[34px]" type="search" aria-label="In Kontakten suchen" placeholder="In Kontakten suchen"
-              value={suche} onChange={(e) => setSuche(e.target.value)} />
-          </label>
-        </div>
-        {liste.isLoading ? <Laden /> : (
-          <ol className="m-0 p-0 list-none flex flex-col" data-testid="kontaktliste" aria-busy={liste.isFetching || undefined}>
-            {(daten?.results ?? []).map((k) => (
-              <li key={k.id} className="px-[22px] py-3.5 border-t border-rand flex flex-col gap-1.5" data-testid="kontakt">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="flex items-center gap-2.5 text-[0.8125rem] gedaempft">
-                    <span className="num">{datum(k.zeitpunkt)}, {uhrzeit(k.zeitpunkt)}</span><span>{k.erfasst_von_name}</span>
-                    {k.art_name ? <Chip data-testid="kontaktart">{k.art_name}</Chip> : null}
-                    {k.storniert_am ? <Chip art="fehler">storniert</Chip> : null}
-                  </span>
-                  {erfassen && !k.storniert_am ? (
-                    <button type="button" className="bg-transparent border-0 p-0 text-[0.8125rem] gedaempft hover:text-fehler cursor-pointer"
-                      onClick={() => setStorno(k)} aria-label={`Kontakt vom ${datum(k.zeitpunkt)}, ${uhrzeit(k.zeitpunkt)} stornieren`}>Stornieren</button>
-                  ) : null}
-                </div>
-                <Richtext html={k.text} className={cx("text-sm", k.storniert_am && "line-through opacity-60")} />
-                {k.termine.length ? (
-                  <span className="flex gap-2 flex-wrap">
-                    {k.termine.map((t) => (
-                      <Chip key={t.id} art={t.erledigt ? "ok" : "akzent"}><Icon name="kalender" />{t.ort ?? TERMINARTEN[t.art]} · {terminZeit(t.faellig_am, t.uhrzeit)}{t.erledigt ? " · erledigt" : ""}</Chip>
-                    ))}
-                  </span>
-                ) : null}
-                {k.storniert_am ? (
-                  <span className="text-[0.8125rem] text-fehler">Storniert {zeitpunkt(k.storniert_am)}{k.storniert_von_name ? ` von ${k.storniert_von_name}` : ""} · Grund: {k.storno_grund}</span>
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        )}
-        {daten && !daten.count ? <Leer>{begriff ? "Keine Kontakte mit diesem Text." : "Noch keine Kontakte erfasst."}</Leer> : null}
-        {daten?.next ? <div className="px-[22px] py-3 border-t border-rand"><Knopf klein onClick={() => setAnzahl(anzahl + 50)}>Weitere laden</Knopf></div> : null}
-        <Fehleranzeige fehler={liste.error} />
-      </Karte>
-  );
-  const info = (
-    <div className="meldung info flex gap-2.5 items-start text-[0.8125rem] leading-normal">
-      <Icon name="info" />
-      <span>Kontakte sind das Protokoll der Kommunikation mit dem Patienten. Ein gespeicherter Kontakt wird nicht mehr geändert.
-        Wurde etwas falsch erfasst, wird der Kontakt mit Grund storniert und neu geschrieben. Beides bleibt sichtbar.</span>
-    </div>
-  );
-  // Im Raster mit einstellbarer Größe je Karte (Fehlerliste 02.10.2026, Punkt 2). Der Verlauf der Akte steht nur noch
-  // im eigenen Reiter „Verlauf“ (Punkt 3), nicht mehr zusätzlich neben den Kontakten.
+  const daten = abfrageliste.data;
+  const liste = daten?.results ?? [];
+  const gewaehlt = liste.find((k) => String(k.id) === wahl) ?? liste[0];
+
   return (
     <>
-      <Bereiche seite="akte_kontakte" spalten={RASTER_SPALTEN[stufe]} testid="kontakte-stufe">
-        <Bereich id="kontakte" titel="Kontakte" standard={{ breite: stufe === "qhd" ? 3 : 2 }}>{kontakte}</Bereich>
-        <Bereich id="hinweis" titel="Hinweis" menue={false}>{info}</Bereich>
-        <Bereich id="erreichbarkeit" titel="Erreichbarkeit"><Erreichbarkeit /></Bereich>
-        <Bereich id="termine" titel="Termine"><TermineKarte /></Bereich>
-      </Bereiche>
-      {erfassen ? <StornoDialog kontakt={storno} onZu={() => setStorno(null)} /> : null}
+      <Aktenseite
+        testid="kontakte"
+        titel={daten?.count === 1 ? "Kontakt" : "Kontakte"}
+        anzahl={daten?.count}
+        laedt={abfrageliste.isLoading}
+        aktion={erfassen ? <Knopf variante="pri" icon="plus" onClick={() => setNeu(true)}>Neuer Kontakt</Knopf> : undefined}
+        kopfrechts={<>
+          <label className="relative block">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
+            <input className="inp pl-[34px] w-full" type="search" aria-label="In Kontakten suchen" placeholder="In Kontakten suchen"
+              value={suche} onChange={(e) => setSuche(e.target.value)} />
+          </label>
+          <Fehleranzeige fehler={abfrageliste.error} />
+        </>}
+        liste={
+          <Eintragsliste name="Kontakte" testid="kontaktliste"
+            leer={liste.length ? undefined : begriff ? "Keine Kontakte mit diesem Text." : "Noch keine Kontakte erfasst."}>
+            {liste.map((k) => (
+              <Eintrag key={k.id} aktiv={gewaehlt?.id === k.id} onWahl={() => setWahl(String(k.id))} warnung={!!k.storniert_am}
+                datum={`${datum(k.zeitpunkt)}, ${uhrzeit(k.zeitpunkt)}`}
+                merkmal={k.storniert_am ? <Chip art="fehler">storniert</Chip>
+                  : k.art_name ? <Chip data-testid="kontaktart">{k.art_name}</Chip> : null}
+                zeile={<span className={cx("line-clamp-2", k.storniert_am && "line-through opacity-60")}>{klartext(k.text)}</span>}
+                unten={[k.erfasst_von_name, k.termine.length ? `${k.termine.length} Termin${k.termine.length === 1 ? "" : "e"}` : ""]
+                  .filter(Boolean).join(" · ")} />
+            ))}
+            {daten?.next ? <Knopf klein className="self-start" onClick={() => setAnzahl(anzahl + 50)}>Weitere laden</Knopf> : null}
+          </Eintragsliste>
+        }
+        fuss={<>Kontakte sind das Protokoll der Kommunikation mit dem Patienten. Ein gespeicherter Kontakt wird nicht
+          mehr geändert; wurde etwas falsch erfasst, wird er mit Grund storniert und neu geschrieben. Beides bleibt
+          sichtbar.</>}
+        detail={gewaehlt ? (
+          <div className="flex flex-col gap-4" data-testid="kontakt">
+            <Detail testid="kontakt-detail"
+              titel={<span className="num">{datum(gewaehlt.zeitpunkt)}, {uhrzeit(gewaehlt.zeitpunkt)}</span>}
+              unter={[gewaehlt.art_name, gewaehlt.erfasst_von_name].filter(Boolean).join(" · ")}
+              aktionen={erfassen && !gewaehlt.storniert_am
+                ? <Knopf klein variante="dng" onClick={() => setStorno(gewaehlt)}>Stornieren</Knopf> : undefined}>
+              <Richtext html={gewaehlt.text} className={cx("text-sm", gewaehlt.storniert_am && "line-through opacity-60")} />
+              {gewaehlt.termine.length ? (
+                <Abschnitt titel="Termine aus diesem Kontakt">
+                  <span className="flex gap-2 flex-wrap">
+                    {gewaehlt.termine.map((x) => (
+                      <Chip key={x.id} art={x.erledigt ? "ok" : "akzent"}><Icon name="kalender" />
+                        {x.ort ?? TERMINARTEN[x.art]} · {terminZeit(x.faellig_am, x.uhrzeit)}{x.erledigt ? " · erledigt" : ""}</Chip>
+                    ))}
+                  </span>
+                </Abschnitt>
+              ) : null}
+              {gewaehlt.storniert_am ? (
+                <span className="text-[0.8125rem] text-fehler">
+                  Storniert {zeitpunkt(gewaehlt.storniert_am)}{gewaehlt.storniert_von_name ? ` von ${gewaehlt.storniert_von_name}` : ""} ·
+                  Grund: {gewaehlt.storno_grund}
+                </span>
+              ) : null}
+            </Detail>
+            <div className="grid gap-4 xl:grid-cols-2 items-start">
+              <Erreichbarkeit />
+              <TermineKarte />
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-2 items-start">
+            <Erreichbarkeit />
+            <TermineKarte />
+          </div>
+        )}
+      />
+      {erfassen ? <>
+        <Dialog offen={neu} onOffen={setNeu} titel="Neuer Kontakt" breite={760}
+          beschreibung="Ein gespeicherter Kontakt wird nicht mehr geändert.">
+          <NeuerKontakt onFertig={() => setNeu(false)} />
+        </Dialog>
+        <StornoDialog kontakt={storno} onZu={() => setStorno(null)} />
+      </> : null}
     </>
   );
 }

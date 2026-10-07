@@ -485,6 +485,7 @@ export function Akte() {
         <Reiter zu={basis} text="Übersicht" ende />
         <Reiter zu={`${basis}/diagnosen`} text="Diagnosen" zahl={k?.zaehler.diagnosen} />
         <Reiter zu={`${basis}/therapie`} text="Therapie" />
+        <Reiter zu={`${basis}/empfehlung`} text="Empfehlung" />
         <Reiter zu={`${basis}/kontakte`} text="Kontakte" zahl={k?.zaehler.kontakte} />
         <Reiter zu={`${basis}/plaene`} text="Infusionspläne" zahl={k?.zaehler.infusionsplaene} />
         {/* Wünsche aus der Praxis vom 06.10.2026 (F112–F115) */}

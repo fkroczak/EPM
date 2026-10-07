@@ -317,6 +317,7 @@ test("Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten", async
   const id = Number(page.url().split("/").pop());
   await expect(kopf.getByText("Testpatient")).toBeVisible();
   await kopf.getByRole("button", { name: "Kontakt" }).click();
+  await page.getByRole("button", { name: "Neuer Kontakt" }).click();
   const neu = page.getByTestId("neuer-kontakt");
   await neu.getByRole("textbox", { name: "Neuer Kontakt" }).fill("Testkontakt der Administration");
   await neu.getByRole("button", { name: "Kontakt speichern" }).click();

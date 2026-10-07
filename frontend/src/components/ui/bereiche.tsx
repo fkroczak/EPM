@@ -1,6 +1,6 @@
 /**
  * Karten im Raster mit einstellbarer Größe (Fehlerliste 02.10.2026, Punkt 2 und 4.1): wie die Kacheln der Startseite,
- * aber für die Karten der Akte (Übersicht, Diagnosen, Therapie, Kontakte) und der Systemseite. Jede Karte hat oben
+ * aber für die Karten der Übersicht einer Akte und der Systemseite. Jede Karte hat oben
  * rechts ein Menü „⋯“ für Breite (Spalten des Rasters) und Höhe (automatisch nach Inhalt oder 1–4 feste Rasterzeilen,
  * der Inhalt scrollt dann in der Karte). Gespeichert je Seite, Karte und Person (PATCH /api/auth/ich/ {bereiche}).
  *
@@ -18,7 +18,7 @@ import { useHinweis } from "./hinweise";
 import { cx } from "./basis";
 import { Icon } from "./icon";
 
-export type BereichSeite = "akte_uebersicht" | "akte_diagnosen" | "akte_therapie" | "akte_kontakte" | "system";
+export type BereichSeite = "akte_uebersicht" | "system";
 
 /** Höhe einer Zeile des Rasters in px (siehe .bereiche in index.css) */
 const EINHEIT = 8;
