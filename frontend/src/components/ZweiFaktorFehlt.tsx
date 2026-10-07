@@ -14,7 +14,7 @@ export function ZweiFaktorFehlt() {
   return (
     <Meldung art="warn">
       <span data-testid="zweifaktor-fehlt">Für diese Bestätigung ist die Zwei-Faktor-Anmeldung nötig. Bitte zuerst unter{" "}
-        <Link to="/konto#zwei-faktor">Mein Konto › Anmeldung und Sicherheit</Link> die Authenticator-App einrichten.</span>
+        <Link to="/konto#zwei-faktor">Mein Konto › Anmeldung und Sicherheit</Link> die Authenticator-App oder einen Passkey einrichten.</span>
     </Meldung>
   );
 }

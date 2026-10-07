@@ -38,6 +38,9 @@ export type Ich = {
   /** Authenticator-App eingerichtet / für dieses Konto Pflicht (sonst freiwillig, Festlegung 02.10.2026) */
   zweiter_faktor: boolean;
   zweiter_faktor_pflicht: boolean;
+  /** womit bestätigt werden kann (Festlegung 08.10.2026): Code aus der App und/oder Passkey */
+  authenticator?: boolean;
+  passkey?: boolean;
   /** Testbenutzer ausgeblendet (gesperrt, aus allen Listen) – Festlegung 03.10.2026 */
   ausgeblendet_am?: string | null;
   rechte: Recht[];
@@ -57,7 +60,15 @@ export type Status = {
   benutzer?: Ich;
   organisation?: { name: string; anschrift: string };
   notfallcodes?: string[];
+  /** Passkeys auf diesem Server möglich? (nur über den Namen mit Zertifikat der eigenen CA) */
+  passkey?: { verfuegbar: boolean; rp_id: string; grund: string };
+  /** im Schritt „2fa“: womit sich die Person anmelden kann */
+  faktoren?: { authenticator: boolean; passkey: boolean };
+  /** gerade eingerichteter Passkey */
+  passkey_neu?: PasskeyEintrag;
 };
+
+export type PasskeyEintrag = { id: number; name: string; angelegt_am: string; zuletzt_am: string | null; synchronisiert: boolean };
 
 export const ROLLEN: Record<string, string> = {
   betrachter: "Betrachter",
@@ -591,6 +602,9 @@ export type Benutzer = {
   anzeigename: string;
   zweiter_faktor: boolean;
   zweiter_faktor_pflicht: boolean;
+  /** womit bestätigt werden kann (Festlegung 08.10.2026): Code aus der App und/oder Passkey */
+  authenticator?: boolean;
+  passkey?: boolean;
   /** Testbenutzer ausgeblendet (gesperrt, aus allen Listen) – Festlegung 03.10.2026 */
   ausgeblendet_am?: string | null;
   muss_kennwort_aendern: boolean;

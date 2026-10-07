@@ -21,6 +21,7 @@ import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, 
   Textfeld, cx } from "@/components/ui/basis";
 import { Bereich, Bereiche } from "@/components/ui/bereiche";
 import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
+import { useZweiterFaktor } from "@/components/ZweiterFaktor";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
@@ -319,11 +320,11 @@ export function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; dat
   const melden = useHinweis();
   const ich = useIch();
   const [kennwort, setKennwort] = useState("");
-  const [code, setCode] = useState("");
+  const zf = useZweiterFaktor();
   const [minuten, setMinuten] = useState("0");
   const [text, setText] = useState("");
   const [pruefsummen, setPruefsummen] = useState(false);
-  useEffect(() => { setKennwort(""); setCode(""); setMinuten(wahl && wahl.art === "server" && wahl.aktion.warnen ? "5" : "0"); setText(""); setPruefsummen(false); }, [wahl]);
+  useEffect(() => { setKennwort(""); zf.zuruecksetzen(); setMinuten(wahl && wahl.art === "server" && wahl.aktion.warnen ? "5" : "0"); setText(""); setPruefsummen(false); }, [wahl]);
   const los = useMutation({
     mutationFn: () => {
       if (!wahl) throw new Error("keine Auswahl");
@@ -331,7 +332,7 @@ export function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; dat
       const a = wahl.aktion;
       return api<Auftrag>("system/auftraege/", { body: {
         aktion: a.code, ...(a.warnen ? { minuten: Number(minuten), hinweis: text.trim() || undefined } : {}),
-        ...(a.bestaetigung === "2fa" ? { kennwort, code } : {}),
+        ...(a.bestaetigung === "2fa" ? { kennwort, ...zf.body } : {}),
       } });
     },
     onSuccess: (a) => {
@@ -354,7 +355,7 @@ export function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; dat
       beschreibung={wahl.art === "server" ? wahl.aktion.beschreibung : wahl.aufgabe.beschreibung}
       fuss={<>
         <Knopf onClick={onZu}>Abbrechen</Knopf>
-        <Knopf variante={zfa ? "dng" : "pri"} laedt={los.isPending} disabled={zfa && (!ich.zweiter_faktor || !kennwort || !code)} onClick={() => los.mutate()}>
+        <Knopf variante={zfa ? "dng" : "pri"} laedt={los.isPending} disabled={zfa && (!ich.zweiter_faktor || !kennwort || !zf.bereit)} onClick={() => los.mutate()}>
           {zfa ? "Bestätigen und ausführen" : "Ausführen"}</Knopf>
       </>}>
       <form className="flex flex-col gap-3.5" onSubmit={(e) => { e.preventDefault(); los.mutate(); }}>
@@ -389,13 +390,11 @@ export function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; dat
         {zfa ? (
           <>
             <ZweiFaktorFehlt />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
               <Feld label="Ihr Passwort" fehler={f.kennwort} pflicht>
                 {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}
               </Feld>
-              <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={f.code} pflicht>
-                {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />}
-              </Feld>
+              {zf.feld(f.code)}
             </div>
           </>
         ) : null}
@@ -515,7 +514,7 @@ function LeerenDialog({ offen, daten, onZu }: { offen: boolean; daten: Uebersich
   const [behalten, setBehalten] = useState<Set<number>>(new Set());
   const [bestaetigung, setBestaetigung] = useState("");
   const [kennwort, setKennwort] = useState("");
-  const [code, setCode] = useState("");
+  const zf = useZweiterFaktor();
   const [minuten, setMinuten] = useState("5");
   const [frage, setFrage] = useState(false);
   const vorbereiten = useMutation({
@@ -525,12 +524,12 @@ function LeerenDialog({ offen, daten, onZu }: { offen: boolean; daten: Uebersich
   });
   const { mutate: holen, reset: zuruecksetzen } = vorbereiten;
   useEffect(() => {
-    setBestaetigung(""); setKennwort(""); setCode(""); setMinuten("5"); setFrage(false);
+    setBestaetigung(""); setKennwort(""); zf.zuruecksetzen(); setMinuten("5"); setFrage(false);
     if (offen) holen(); else zuruecksetzen();
   }, [offen, holen, zuruecksetzen]);
   const los = useMutation({
     mutationFn: () => api<Auftrag>("system/leeren/", { body: {
-      bestaetigung, wirklich: true, behalten: [...behalten], minuten: Number(minuten), kennwort, code } }),
+      bestaetigung, wirklich: true, behalten: [...behalten], minuten: Number(minuten), kennwort, ...zf.body } }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["system"] });
       void qc.invalidateQueries({ queryKey: ["systemhinweis"] });
@@ -543,7 +542,7 @@ function LeerenDialog({ offen, daten, onZu }: { offen: boolean; daten: Uebersich
   const v = vorbereiten.data;
   const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
   const codeOk = !!v && bestaetigung.replace(/\s/g, "").toUpperCase() === v.code;
-  const bereit = codeOk && !!ich.zweiter_faktor && !!kennwort && !!code;
+  const bereit = codeOk && !!ich.zweiter_faktor && !!kennwort && zf.bereit;
   const u = v?.umfang;
   const weg = v ? v.benutzer.filter((b) => !behalten.has(b.id)).length : 0;
   return (
@@ -609,13 +608,11 @@ function LeerenDialog({ offen, daten, onZu }: { offen: boolean; daten: Uebersich
               {(p) => <Eingabe {...p} autoComplete="off" value={bestaetigung} onChange={(ev) => setBestaetigung(ev.target.value)} />}
             </Feld>
             <ZweiFaktorFehlt />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
               <Feld label="Ihr Passwort" fehler={f.kennwort} pflicht>
                 {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(ev) => setKennwort(ev.target.value)} />}
               </Feld>
-              <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={f.code} pflicht>
-                {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(ev) => setCode(ev.target.value)} />}
-              </Feld>
+              {zf.feld(f.code)}
             </div>
           </>
         )}

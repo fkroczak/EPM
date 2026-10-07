@@ -19,8 +19,8 @@ export function Dialog({ offen, onOffen, titel, beschreibung, children, fuss, br
       <BaseDialog.Portal>
         <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/35" />
         <BaseDialog.Popup
-          className="card fixed left-1/2 top-[12vh] z-50 -translate-x-1/2 max-h-[80vh] overflow-auto p-6 flex flex-col gap-4"
-          style={{ width: `min(${breite}px, calc(100vw - 32px))` }}
+          className="card dialog-popup fixed left-1/2 top-3 sm:top-[12vh] z-50 -translate-x-1/2 max-h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] sm:max-h-[80vh] overflow-auto p-4 sm:p-6 flex flex-col gap-4"
+          style={{ width: `min(${breite}px, calc(100vw - 20px))` }}
         >
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col gap-1">
@@ -34,7 +34,7 @@ export function Dialog({ offen, onOffen, titel, beschreibung, children, fuss, br
             </BaseDialog.Close>
           </div>
           {children}
-          {fuss ? <div className="flex justify-end gap-2 flex-wrap">{fuss}</div> : null}
+          {fuss ? <div className="dialog-fuss flex justify-end gap-2 flex-wrap">{fuss}</div> : null}
         </BaseDialog.Popup>
       </BaseDialog.Portal>
     </BaseDialog.Root>

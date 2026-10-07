@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 07.10.2026 · Code-Stand: Wünsche aus der Praxis vom 06./07.10.2026 (F110–F121); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
+Stand: 08.10.2026 · Code-Stand: Passkey und Telefon (F130–F134); Wünsche aus der Praxis vom 06./07.10.2026 (F110–F124); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
 Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026, Prüfung nach DSGVO vom 02.10.2026 (`docs/DATENSCHUTZ.md`).
@@ -2440,6 +2440,81 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
   drei Sekunden ändern daran nichts. „Wie der Verlauf der Tätigkeit: so lange aktiv, bis der Job gelaufen ist.“
 - **Status:** ABGESCHLOSSEN. Auf Wunsch ohne Testlauf eingespielt (`[skip ci]`); ein Browsertest steht noch aus.
 
+## R · Passkey und Telefon (Festlegung 08.10.2026)
+
+Festlegungen vom 08.10.2026: „Stiftungsseite“ = das ganze neue EPM. Passkey **statt des Authenticator-Codes** (zweiter
+Faktor nach dem Passwort, neben App und Notfall-Codes; gilt auch für alle Bestätigungen). Aufruf künftig über einen
+**Namen mit Zertifikat einer eigenen CA** (Passkeys gehen nicht über eine IP-Adresse). Mobile Ansicht „sofern möglich“:
+Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blicke in die Akte und Notizen. Damit gilt
+„nur PC, keine Tablet-Optimierung“ (Altsystem-Datenanalyse) nicht mehr.
+
+### F130 Passkey einrichten, umbenennen, entfernen
+- **Ansicht:** Mein Konto › Anmeldung und Sicherheit › „Passkeys“ (Liste mit Name, angelegt, zuletzt verwendet,
+  synchronisiert; „Passkey hinzufügen“, umbenennen, entfernen); erste Anmeldung mit Pflicht zum zweiten Faktor:
+  Umschalter „Passkey | Authenticator-App“.
+- **Endpunkte:** `POST /api/auth/passkey/optionen/` `{zweck: "registrieren"}` → Optionen für
+  `navigator.credentials.create` (Challenge 5 Minuten in der Sitzung, einmal gültig; vorhandene Passkeys ausgeschlossen;
+  User Verification Pflicht); `POST /api/auth/passkey/registrieren/` `{antwort, name}` → Status mit `passkey_neu` und –
+  beim ersten zweiten Faktor ohne Notfall-Codes – `notfallcodes` (10, wie beim Authenticator); `GET /api/auth/passkeys/`;
+  `PATCH /api/auth/passkeys/<id>/` `{name}`; `POST /api/auth/passkeys/<id>/entfernen/` `{kennwort, code | passkey}`.
+- **Logik:** Modell `accounts.Passkey` ist ein django-otp-Gerät (öffentlicher Schlüssel, Zähler, Verbindungen, AAGUID,
+  synchronisiert); Prüfung mit `py_webauthn` 2.x (`accounts/passkey.py`), Herkunft = `EPM_PASSKEY_ORIGINS` (Standard:
+  `DJANGO_CSRF_TRUSTED_ORIGINS`), RP-ID = erster Name darin (`EPM_PASSKEY_RP_ID` überschreibt). Höchstens 10 je Konto.
+  Der letzte zweite Faktor lässt sich nur entfernen, solange er freiwillig ist; dann gehen auch die Notfall-Codes.
+  „2FA zurücksetzen“, „ohne Login“ und „Zwei-Faktor-Anmeldung ausschalten“ löschen auch Passkeys
+  (`zweifaktor.faktoren_loeschen`).
+- **Validierung:** Name ≤ 64 Zeichen; Antwort nur für diese Herkunft und RP-ID, mit User Verification, Challenge
+  einmal; über eine IP-Adresse 400 mit Grund (`passkey.verfuegbar`).
+- **Tabellen:** `accounts_passkey` (Migration `accounts/0008_passkey`)
+- **Audit-Log:** `2fa_eingerichtet` bzw. `2fa_zurueckgesetzt` mit `passkey: <Name>`
+- **Teststatus:** Backend-Tests `accounts.test_passkey.Passkeys.*` mit Software-Authenticator (echte P-256-Signaturen).
+  Browsertest `passkey.spec.ts` (virtueller Authenticator des Browsers); Neustart in `zz-neustart.spec.ts`
+  (Schlüssel in ein neues virtuelles Gerät übernommen, Anmeldung und Entfernen nach dem Neustart).
+- **Status:** siehe Änderungsprotokoll (Lauf)
+
+### F131 Anmelden mit Passkey
+- **Ansicht:** Anmeldung › nach dem Passwort „Mit Passkey anmelden“ (Umschalter „Passkey | Code“, wenn beides da ist);
+  über eine IP-Adresse ein Hinweis auf den Namen, dann nur Code bzw. Notfall-Code.
+- **Endpunkte:** `GET /api/auth/status/` → zusätzlich `passkey: {verfuegbar, rp_id, grund}` und im Schritt „2fa“
+  `faktoren: {authenticator, passkey}`; `POST /api/auth/passkey/optionen/` `{zweck: "anmelden"}`;
+  `POST /api/auth/passkey/` `{antwort}` → wie `POST /api/auth/2fa/` (Sitzung mit django-otp bestätigt).
+- **Fehlerfälle:** 400 Aufgabe fehlt/abgelaufen · 401 Passkey nicht erkannt (zählt als Fehlversuch, beim fünften
+  gesperrt) · 403 gesperrt
+- **Teststatus:** Backend-Tests (Anmeldung, falsche Herkunft, fremde Challenge, Wiederholung derselben Antwort, ohne
+  User Verification, Passkey eines anderen Kontos); Browsertest `passkey.spec.ts`.
+
+### F132 Bestätigen mit Passkey
+- **Ansicht:** jedes Feld „Code aus der Authenticator-App“ bei Bestätigungen (Backup, System, Import, Dokument und Akte
+  endgültig löschen, Zwei-Faktor ausschalten, Passkey entfernen) ist jetzt der Baustein `useZweiterFaktor`
+  (`components/ZweiterFaktor.tsx`): „Passkey | Code“, „Mit Passkey bestätigen“ → „Passkey bestätigt“.
+- **Endpunkte:** unverändert; statt `code` geht `passkey` (Antwort auf Optionen mit Zweck „bestaetigen“) mit.
+  `zweifaktor.zweiter_faktor_bestaetigt(request)` an allen Stellen (`system.api.bestaetigung_pruefen`, Import, Löschen).
+- **Logik:** Das Kennwort wird zuerst geprüft – bei falschem Kennwort bleibt die Passkey-Antwort gültig. Eine geprüfte
+  Antwort gilt genau einmal. Beim endgültigen Löschen bleiben Notfall-Codes ausgeschlossen, der Passkey zählt.
+- **Teststatus:** Backend-Tests `test_bestaetigung_mit_passkey_statt_code`, `PasskeyBeiSystemauftraegen`;
+  Browsertest `passkey.spec.ts` (Ausschalten mit Passkey, erst falsches, dann richtiges Passwort) und
+  `zz-neustart.spec.ts` (Passkey entfernen mit Passkey).
+
+### F133 EPM am Telefon
+- **Ansicht (unter 768 px):** Leiste unten (Start, Patienten, ＋ Notiz, Pläne → „Zur Freigabe“, Menü), Menü als
+  Schublade mit allen Bereichen, Kopfzeile mit Zurück, Titel, Suche (Lupe) und Hilfe; Patientenliste und
+  Infusionspläne als Karten; Akte: Reiter seitlich wischen, gewählter Eintrag bzw. Plan steht vor der Liste
+  (Freigeben ohne Scrollen), Antippen eines Eintrags holt ihn in den Blick; Dialoge fast bildschirmfüllend, einspaltig;
+  16 px in Eingabefeldern, Ziele zum Antippen ≥ 44 px; „＋ Notiz“ in einer offenen Akte für diesen Patienten.
+- **Logik:** `lib/stufen.ts` `useMobil()` (unter 768 px), `detailZeigen()`; nur Oberfläche, keine neuen Endpunkte.
+- **Teststatus:** Browsertest `mobil.spec.ts` (Pixel 7 mit Touch): Leiste, Menü, Suche, Zurück, keine Seite breiter als
+  der Bildschirm (Start, Kalender, Akte, Patienten, Infusionspläne, Konto, Hilfe, Versorger), Entwurf über „Pläne“
+  öffnen und freigeben, Notiz über die Leiste. Bildschirmfotos `bildschirmfotos-mobil.spec.ts` (manueller Start).
+
+### F134 Zertifikat der eigenen CA (Server)
+- **Werkzeug:** `sudo epm-zertifikat einrichten | erneuern | importieren CRT KEY [CA] | status`
+  (`rollout/epm-zertifikat.sh`, von `04-projekt.sh` nach `/usr/local/sbin` installiert). CA mit P-256, 10 Jahre,
+  **Namensbeschränkung** auf `EPM_WEB_NAME` und die Verwaltungs-IP; Serverzertifikat 397 Tage mit Kette.
+  Stammzertifikat unter `https://<Name>/epm-ca.crt` (Nginx, öffentlich) und `/etc/epm/ca/epm-ca.crt`; CA-Schlüssel nur
+  root, offline sichern. Ein neuer Server legt das Zertifikat gleich so an (`04-projekt.sh`), ein bestehendes bleibt bis
+  zum Aufruf von `einrichten`.
+- **Teststatus:** Skript lokal gegen OpenSSL 3 geprüft (CA, Kette, Namensbeschränkung, Erneuern).
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2530,11 +2605,15 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U59 | Welche **Berichtsarten** sollen in der Auswahlliste stehen? | F115 | Arztbrief, Verlaufsbericht, Stellungnahme, Sonstiges – unter Vorlagen änderbar |
 | U60 | Sprechstundenblatt: Nur **PDF** oder zusätzlich eine Ansicht am Bildschirm? | F116 | PDF |
 | U61 | Soll ein ausgeblendeter Hinweis auch dann **weg bleiben**, wenn sich die Lage ändert (z. B. „Kein Laborbefund“ ausgeblendet, danach wird einer erfasst)? Derzeit ja – die Stummschaltung läuft ab oder wird aufgehoben, der Hinweis entsteht ohnehin nur neu, wenn die Lage es hergibt | F119 | Stummschaltung bleibt bis zur Frist |
+| U62 | Unter welchem **Namen** soll EPM erreichbar sein (z. B. `epm.stiftung.lan`), und soll die CA auf dem Server (`epm-zertifikat einrichten`) oder auf der OPNsense liegen (`epm-zertifikat importieren`)? | F134, F130 | Name aus `EPM_WEB_NAME`, CA auf dem Server; beides unterstützt |
+| U63 | Soll das **Freigeben eines Plans** (am Telefon wie am PC) zusätzlich mit Passkey bzw. Code bestätigt werden? Heute genügt die Anmeldung, wie bisher beschlossen | F36, F132 | unverändert: ohne zusätzliche Bestätigung |
+
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Passkey und Telefon (Pull Request #14) | Passkeys (WebAuthn) als zweiter Faktor statt oder neben dem Authenticator-Code – einrichten, umbenennen, entfernen unter Mein Konto, Anmeldung und alle Bestätigungen mit Passkey (F130–F132; Modell `accounts.Passkey` als django-otp-Gerät, Migration `accounts/0008`, `py_webauthn` 2.x, Baustein `useZweiterFaktor` an allen Bestätigungen). Eigene CA mit Namensbeschränkung und Serverzertifikat (`sudo epm-zertifikat`, F134), Stammzertifikat unter `/epm-ca.crt`. Mobile Ansicht (F133): Leiste unten mit Notiz und Plänen, Menü als Schublade, Karten statt Tabellen, Akte mit Detail vor der Liste, Dialoge und Eingaben für Touch. Hilfe-Abschnitte „Passkey statt Code“ und „EPM am Telefon“. Offene Fragen U62, U63 |
 | 06.10.2026 | Wünsche aus der Praxis (Alice, 06.10.2026) | Infusionstage je Beutelart mit Übernahme in den Folgeplan, Vergleich und PDF (F110, Migration `infusionen/0007`); Präparate nach der Mail – Zusatzvolumen umbenannt und ergänzt, Natrovit, NutriLock/TauroLock, Hinweisfeld am Präparat, Dipeptamin und Omegaven ausgeblendet (F111, Migrationen `stammdaten/0012`, `0013`); Katalog der Laborparameter mit Alices Liste und Erfassungsmaske nach Gruppen (F112, F113, neue App `befunde`); BIA-Maske mit Beurteilung und Übernahme des Gewichts (F114); Berichte in der Akte mit Entwurf/Freigabe, PDF als Dokument und Trigger-Schutz (F115, neue App `berichte`, neues Recht „Berichte freigeben“); Sprechstundenblatt (F116); Diagnosen mit ICD-Code und mitwachsendem Katalog (F117, Migration `patienten/0010`); Versichertendaten GKV/PKV, Versicherung, Versichertennummer (F118). Neue Dokumentvorlagen „Bericht“ und „Unterlagen für die Sprechstunde“ (Migration `vorlagen/0003`), Audit-Arten `bericht_freigegeben` und `sprechstunde_erzeugt` (`audit/0008`). Endgültiges Löschen, Kopie der Akte und Verlauf um die neuen Bereiche erweitert. Konzept und 22 offene Fragen (U39–U60) in `docs/WUENSCHE-PRAXIS-2026-10-06.md`. Die Migrationen sind von Hand geschrieben (die Arbeitsumgebung hatte keinen Zugriff auf PyPI und npm); `makemigrations` in CI meldet dazu „No changes detected“. Die neuen Apps stehen jetzt auch in der `makemigrations`-Zeile des Workflows. Lauf 37525732042: 311 von 311 Backend-Tests, 98 von 98 Browsertests. Davor fand CI drei echte Fehler, die hier behoben sind: der Plan-Serializer gab die neuen Infusionstage-Felder weder aus noch nahm er sie entgegen (dadurch griff auch deren Prüfung nicht), der ICD-Code wurde nicht in Großschreibung vereinheitlicht, und das Frontend baute wegen eines doppelten Schlüssels in der Feldliste des Verlaufs nicht. Nebenwirkung der Umbenennung: Beim Altdaten-Import trifft „Sterofundin“ keinen Katalogeintrag mehr automatisch und wird einmal von Hand auf „Sterofundin ISO“ gelegt (U43) |
 | 07.10.2026 | Dokumente zurückgesetzt | Der Reiter Dokumente ist wieder in seiner ursprünglichen Form (Tabelle links, Details rechts); die übrigen Reiter behalten das gemeinsame Muster aus F122. Auf Wunsch ohne Testlauf eingespielt (`[skip ci]`); die Datei entspricht Zeile für Zeile dem Stand `8ccda52`, der zuletzt grün war |
 | 07.10.2026 | Wünsche aus der Praxis (07.10.2026) | Hinweise mit „×“ ausblenden – beim Wegklicken 3, 6 oder 12 Monate Ruhe oder „nicht mehr nötig“, mit Grund, Person und Zeitpunkt, in der Akte unter „Ausgeblendete Hinweise“ zurückholbar, alles im Verlauf (F119, neues Modell `patienten.Hinweisruhe`, Migration `patienten/0011`); Grenzen „gilt als alt“ für Laborbefund und BIA-Messung, Standard 12 Monate, einstellbar unter Vorlagen › Grenzwerte, mit Hinweis je Akte, zwei neuen Zeilen in „Nach und nach prüfen“ und zwei neuen Filtern der Patientenliste (F120, Migration `stammdaten/0014`); ein eigener Reiter je Bereich – „Diagnose & Therapie“ wird zu „Diagnosen“ und „Therapie“ (mit „zuletzt geändert“), „Labor & BIA“ zu „Labor“ und „BIA“, mit Zählern, Weiterleitung der alten Adresse und neuer Karte „Labor und BIA“ in der Übersicht (F121). Dabei behoben: Die Karte „Bemerkung“ war nie in der Liste der verstellbaren Karten, ihr Menü „⋯“ lief ins Leere (seit F97). Eine weitere offene Frage: U61 |

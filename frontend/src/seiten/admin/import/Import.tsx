@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import { useIch } from "@/lib/auth";
 import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
+import { useZweiterFaktor } from "@/components/ZweiterFaktor";
 import type { Feldfehler } from "@/lib/api";
 import { dateigroesse, zahl, zeitpunkt } from "@/lib/format";
 import { Seite } from "@/components/layout/Shell";
@@ -110,12 +111,12 @@ function Bestaetigung({ offen, onZu, titel, beschreibung, wort, knopf, pfad, zus
   zusatz?: Record<string, unknown>; onFertig: (lauf: Lauf) => void; children?: ReactNode;
 }) {
   const [kennwort, setKennwort] = useState("");
-  const [code, setCode] = useState("");
+  const zf = useZweiterFaktor();
   const zweiterFaktor = useIch().zweiter_faktor;
   const [eingabe, setEingabe] = useState("");
-  useEffect(() => { if (offen) { setKennwort(""); setCode(""); setEingabe(""); } }, [offen]);
+  useEffect(() => { if (offen) { setKennwort(""); zf.zuruecksetzen(); setEingabe(""); } }, [offen]);
   const los = useMutation({
-    mutationFn: () => api<Lauf>(pfad, { body: { kennwort, code, bestaetigung: eingabe, ...zusatz } }),
+    mutationFn: () => api<Lauf>(pfad, { body: { kennwort, ...zf.body, bestaetigung: eingabe, ...zusatz } }),
     onSuccess: (lauf) => { onFertig(lauf); onZu(); },
   });
   useEffect(() => { if (!offen) los.reset(); }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -124,7 +125,7 @@ function Bestaetigung({ offen, onZu, titel, beschreibung, wort, knopf, pfad, zus
     <Dialog offen={offen} onOffen={(o) => { if (!o) onZu(); }} titel={titel} beschreibung={beschreibung} breite={560}
       fuss={<>
         <Knopf onClick={onZu}>Abbrechen</Knopf>
-        <Knopf variante="dng" laedt={los.isPending} disabled={!zweiterFaktor || !kennwort || !code || (!!wort && !eingabe)} onClick={() => los.mutate()}>{knopf}</Knopf>
+        <Knopf variante="dng" laedt={los.isPending} disabled={!zweiterFaktor || !kennwort || !zf.bereit || (!!wort && !eingabe)} onClick={() => los.mutate()}>{knopf}</Knopf>
       </>}>
       <form className="flex flex-col gap-3.5" onSubmit={(e) => { e.preventDefault(); los.mutate(); }}>
         {children}
@@ -134,13 +135,11 @@ function Bestaetigung({ offen, onZu, titel, beschreibung, wort, knopf, pfad, zus
           </Feld>
         ) : null}
         <ZweiFaktorFehlt />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
           <Feld label="Ihr Passwort" fehler={f.kennwort} pflicht>
             {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}
           </Feld>
-          <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={f.code} pflicht>
-            {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />}
-          </Feld>
+          {zf.feld(f.code)}
         </div>
         {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
         <button type="submit" hidden />

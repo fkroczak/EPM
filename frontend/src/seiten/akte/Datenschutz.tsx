@@ -16,6 +16,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { PdfDialog } from "@/components/PdfDialog";
 import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
+import { useZweiterFaktor } from "@/components/ZweiterFaktor";
 import { name, useAkte } from "./Akte";
 
 const ARTEN = Object.keys(ERKLAERUNGEN) as ErklaerungsArt[];
@@ -401,7 +402,7 @@ function AkteLoeschenDialog({ patient, offen, onOffen }: { patient: Patient; off
   const melden = useHinweis();
   const [grund, setGrund] = useState("");
   const [kennwort, setKennwort] = useState("");
-  const [code, setCode] = useState("");
+  const zf = useZweiterFaktor({ notfallcodes: false });
   const zweiterFaktor = !!useAuth().ich?.zweiter_faktor;
   const [bestaetigung, setBestaetigung] = useState("");
   type Vorbereitung = { code: string; gueltig_bis: string; loeschen: AktenDatenschutz["loeschen"]; umfang: Record<string, number> };
@@ -411,12 +412,12 @@ function AkteLoeschenDialog({ patient, offen, onOffen }: { patient: Patient; off
   const { mutate: vorbereitenStarten, reset: vorbereitenZuruecksetzen } = vorbereiten;
   useEffect(() => {
     if (!offen) return;
-    setGrund(""); setKennwort(""); setCode(""); setBestaetigung("");
+    setGrund(""); setKennwort(""); zf.zuruecksetzen(); setBestaetigung("");
     vorbereitenZuruecksetzen();
     vorbereitenStarten();
   }, [offen, vorbereitenStarten, vorbereitenZuruecksetzen]);
   const loeschen = useMutation({
-    mutationFn: () => api(`patienten/${patient.id}/loeschen/`, { body: { grund: grund.trim(), kennwort, code: code.trim(), bestaetigung } }),
+    mutationFn: () => api(`patienten/${patient.id}/loeschen/`, { body: { grund: grund.trim(), kennwort, ...zf.body, bestaetigung } }),
     onSuccess: () => {
       melden(`Akte Nr. ${nummer(patient.nummer)} endgültig gelöscht.`);
       onOffen(false);
@@ -426,7 +427,7 @@ function AkteLoeschenDialog({ patient, offen, onOffen }: { patient: Patient; off
       void qc.invalidateQueries({ queryKey: ["startseite"] });
       void qc.invalidateQueries({ queryKey: ["datenschutz"] });
     },
-    onError: () => { setKennwort(""); setCode(""); },
+    onError: () => { setKennwort(""); zf.zuruecksetzen(); },
   });
   const f = felder(loeschen.error);
   const abgelaufen = /abgelaufen|neuen anfordern/.test(f.bestaetigung ?? "");
@@ -436,7 +437,7 @@ function AkteLoeschenDialog({ patient, offen, onOffen }: { patient: Patient; off
       beschreibung={`${name(patient)} · Nr. ${nummer(patient.nummer)}`}
       fuss={<><Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
         <Knopf variante="dng" laedt={loeschen.isPending} onClick={() => loeschen.mutate()}
-          disabled={!vorbereiten.data || grund.trim().length < 10 || !zweiterFaktor || !kennwort || code.trim().length < 6 || bestaetigung.trim().length < 6}>Akte endgültig löschen</Knopf></>}>
+          disabled={!vorbereiten.data || grund.trim().length < 10 || !zweiterFaktor || !kennwort || !zf.bereit || bestaetigung.trim().length < 6}>Akte endgültig löschen</Knopf></>}>
       <div className="flex flex-col gap-3" data-testid="akte-loeschen">
         <Meldung art="fehler">Die Akte wird mit allen Einträgen, Infusionsplänen, Dokumenten und ihrem gesamten Verlauf
           unwiederbringlich gelöscht. Es bleiben das Löschprotokoll (Patientennummer, Daten zu Abschluss und Frist, Rechtsgrund,
@@ -453,9 +454,9 @@ function AkteLoeschenDialog({ patient, offen, onOffen }: { patient: Patient; off
           {(p) => <Textfeld {...p} rows={2} value={grund} onChange={(e) => setGrund(e.target.value)} />}
         </Feld>
         <ZweiFaktorFehlt />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
           <Feld label="Kennwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
-          <Feld label="Code aus der Authenticator-App" fehler={f.code}>{(p) => <Eingabe {...p} inputMode="numeric" autoComplete="one-time-code" className="num" value={code} onChange={(e) => setCode(e.target.value)} />}</Feld>
+          {zf.feld(f.code)}
         </div>
         <div className="flex items-end gap-3 flex-wrap">
           <div className="flex flex-col gap-1">

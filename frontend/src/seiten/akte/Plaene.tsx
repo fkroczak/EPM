@@ -6,6 +6,7 @@ import { ApiFehler, abfrage, alle, api, apiDatei } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { datum, eingabeDatum, heuteIso, zahl, zeitpunkt } from "@/lib/format";
+import { detailZeigen } from "@/lib/stufen";
 import { FREIGABEWEGE } from "@/lib/typen";
 import type { Plan, Vergleich } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Leer, Meldung, Segmente, cx } from "@/components/ui/basis";
@@ -352,7 +353,8 @@ export function Plaene() {
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] fhd:grid-cols-[360px_minmax(0,1fr)] gap-6 items-start">
-      <div className="flex flex-col gap-3">
+      {/* unter 1280 px (Telefon) steht der gewählte Plan vor der Liste: Freigeben ohne Scrollen (Festlegung 08.10.2026) */}
+      <div className="flex flex-col gap-3 order-2 xl:order-none">
         <div className="flex items-center justify-between">
           <h2 className="lbl m-0">{liste.length} {liste.length === 1 ? "Plan" : "Pläne"} · neueste oben</h2>
         </div>
@@ -363,7 +365,7 @@ export function Plaene() {
             {liste.map((p) => (
               <button key={p.id} type="button" role="listitem" aria-current={p.id === gewaehlt?.id ? "true" : undefined}
                 className={cx("card text-left px-3.5 py-3 flex flex-col gap-1 cursor-pointer border", p.id === gewaehlt?.id ? "border-akzent bg-akzent-weich" : "hover:bg-fein")}
-                onClick={() => setParams(new URLSearchParams({ plan: String(p.id) }), { replace: true })}>
+                onClick={() => { setParams(new URLSearchParams({ plan: String(p.id) }), { replace: true }); detailZeigen("plan-detail"); }}>
                 <span className="flex items-center justify-between gap-2"><span className="num font-medium">{datum(p.gueltig_ab)}</span><StatusChip status={p.status} /></span>
                 <span className="num text-[0.8125rem]">{zahl(p.kcal)} kcal{p.laufzeit_h != null ? ` · ${zahl(p.laufzeit_h)} h` : ""}{p.tage_pro_woche ? ` · ${p.tage_pro_woche}×/Woche` : ""}</span>
                 <span className="text-xs gedaempft">
@@ -383,7 +385,7 @@ export function Plaene() {
       </div>
 
       {gewaehlt ? (
-        <div className="flex flex-col gap-4 min-w-0" data-testid="plan-detail">
+        <div className="flex flex-col gap-4 min-w-0 order-1 xl:order-none scroll-mt-20" data-testid="plan-detail">
           <Segmente label="Darstellung" wert={modus} onWahl={setModus}
             werte={[{ wert: "ansicht", text: "Ansicht wie PDF" }, { wert: "vergleich", text: "Vergleich mit Vorgänger" }]} className="self-start" />
           <div className="flex items-start justify-between gap-4 flex-wrap">

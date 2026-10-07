@@ -35,6 +35,17 @@ sudo epm-update --paket ~/epm-paket-<TAG>.tar                 # auf dem VPS: pr�
 Die Konfiguration des Servers liegt in `/etc/epm/epm.conf` (nicht im Repo). Die Oberfläche ist danach unter
 `https://<EPM_WEB_NAME>/` erreichbar, die Django-Verwaltung unter `/verwaltung/` (nur Rolle Admin).
 
+## Zertifikat und Passkeys
+Passkeys (zweiter Faktor mit Fingerabdruck, Gesicht oder PIN) gehen nur über einen Namen mit einem Zertifikat, dem die
+Geräte vertrauen – nicht über die IP-Adresse. Dafür gibt es eine eigene CA (nur für den EPM-Namen gültig):
+```bash
+sudo epm-zertifikat einrichten   # CA + Serverzertifikat für EPM_WEB_NAME, Nginx lädt neu
+sudo epm-zertifikat status       # Name, Aussteller, Ablauf (Serverzertifikat 397 Tage: jährlich „erneuern“)
+```
+Das Stammzertifikat liegt unter `https://<EPM_WEB_NAME>/epm-ca.crt` und wird einmal je PC/Telefon installiert
+(Anleitung in EPM unter Hilfe › „Passkey statt Code“). Den Namen auf der OPNsense per Unbound-Überschreibung auf die
+Server-IP zeigen lassen. Ein Zertifikat einer anderen CA (z. B. der OPNsense): `sudo epm-zertifikat importieren CRT KEY CA`.
+
 ## Datensicherung
 Täglich um 02:00 (`epm-backup.timer`), 30 Tage auf dem Server unter `/srv/epm/backup` (unter Administration › Backup
 auf 7, 14 oder 30 Tage einstellbar). Gesteuert wird alles unter

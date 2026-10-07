@@ -9,6 +9,7 @@ import type { Dokument, PatientZeile } from "@/lib/typen";
 import { useAuth } from "@/lib/auth";
 import { PatientWahl } from "@/components/PatientWahl";
 import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
+import { useZweiterFaktor } from "@/components/ZweiterFaktor";
 import { Anzeige, Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Leer, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
@@ -104,7 +105,7 @@ function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean
   const melden = useHinweis();
   const [grund, setGrund] = useState("");
   const [kennwort, setKennwort] = useState("");
-  const [code, setCode] = useState("");
+  const zf = useZweiterFaktor({ notfallcodes: false });
   const zweiterFaktor = !!useAuth().ich?.zweiter_faktor;
   const [bestaetigung, setBestaetigung] = useState("");
   const vorbereiten = useMutation({
@@ -113,19 +114,19 @@ function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean
   const { mutate: vorbereitenStarten, reset: vorbereitenZuruecksetzen } = vorbereiten;
   useEffect(() => {
     if (!offen) return;
-    setGrund(""); setKennwort(""); setCode(""); setBestaetigung("");
+    setGrund(""); setKennwort(""); zf.zuruecksetzen(); setBestaetigung("");
     vorbereitenZuruecksetzen();
     vorbereitenStarten();
   }, [offen, vorbereitenStarten, vorbereitenZuruecksetzen]);
   const loeschen = useMutation({
-    mutationFn: () => api(`dokumente/${dok.id}/loeschen/`, { body: { grund: grund.trim(), kennwort, code: code.trim(), bestaetigung } }),
+    mutationFn: () => api(`dokumente/${dok.id}/loeschen/`, { body: { grund: grund.trim(), kennwort, ...zf.body, bestaetigung } }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["patient", patient.id] });
       void qc.invalidateQueries({ queryKey: ["startseite"] });
       melden("Dokument endgültig gelöscht.");
       onOffen(false);
     },
-    onError: () => { setKennwort(""); setCode(""); },
+    onError: () => { setKennwort(""); zf.zuruecksetzen(); },
   });
   const f: Feldfehler = loeschen.error instanceof ApiFehler ? loeschen.error.felder : {};
   const abgelaufen = /abgelaufen|neuen anfordern/.test(f.bestaetigung ?? "");
@@ -134,16 +135,16 @@ function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean
       beschreibung={`„${dok.titel}“ bei ${name(patient)}`}
       fuss={<><Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
         <Knopf variante="dng" laedt={loeschen.isPending} onClick={() => loeschen.mutate()}
-          disabled={!vorbereiten.data || grund.trim().length < 10 || !zweiterFaktor || !kennwort || code.trim().length < 6 || bestaetigung.trim().length < 6}>Endgültig löschen</Knopf></>}>
+          disabled={!vorbereiten.data || grund.trim().length < 10 || !zweiterFaktor || !kennwort || !zf.bereit || bestaetigung.trim().length < 6}>Endgültig löschen</Knopf></>}>
       <div className="flex flex-col gap-3" data-testid="loeschen">
         <Meldung art="fehler">Datei, Inhalt, Titel, Dateiname, Notiz und Datum werden unwiederbringlich gelöscht – auch aus Historie und Audit-Log (Art. 17 DSGVO). Es bleibt nur der Nachweis ohne Inhalt: im Verlauf „endgültig gelöscht“ mit Grund, im Audit-Log Dokumentnummer, Typ, Prüfsumme, Person und Zeitpunkt. Ältere Sicherungen enthalten das Dokument noch bis zu ihrem Ablauf; nach einer Wiederherstellung wird es automatisch erneut gelöscht. Gehört das Dokument einem anderen Patienten der Stiftung, bitte stattdessen „Anderem Patienten zuordnen“.</Meldung>
         <Feld label="Grund" fehler={f.grund} hinweis="mindestens 10 Zeichen · ohne Namen oder Gesundheitsangaben der fremden Person – der Grund bleibt im Protokoll">
           {(p) => <Textfeld {...p} rows={2} value={grund} onChange={(e) => setGrund(e.target.value)} />}
         </Feld>
         <ZweiFaktorFehlt />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
           <Feld label="Kennwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
-          <Feld label="Code aus der Authenticator-App" fehler={f.code}>{(p) => <Eingabe {...p} inputMode="numeric" autoComplete="one-time-code" className="num" value={code} onChange={(e) => setCode(e.target.value)} />}</Feld>
+          {zf.feld(f.code)}
         </div>
         <div className="flex items-end gap-3 flex-wrap">
           <div className="flex flex-col gap-1">
