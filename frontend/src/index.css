@@ -52,6 +52,7 @@
   --rand: #d9d8e3;
   --fein: #e6e5ee;
   --akzent: #251f53;
+  --ladebalken: #e8730c;        /* Ladebalken oben (F124): Orange, hebt sich vom Akzent ab */
   --akzent-text: #251f53;
   --akzent-hover: #17123a;
   --akzent-weich: #e6e4f0;
@@ -96,6 +97,7 @@
   --rand: #5a5d63;
   --fein: #45474c;
   --akzent: #cfccea;
+  --ladebalken: #ffa64d;
   --akzent-text: #cfccea;
   --akzent-hover: #e2e0f2;
   --akzent-weich: #4c4a5c;
@@ -120,6 +122,7 @@
   --rand: #1a1a1a;
   --fein: #d4d4d4;
   --akzent: #0b0080;
+  --ladebalken: #c25400;
   --akzent-text: #0b0080;
   --akzent-hover: #06004d;
   --akzent-weich: #d8d6f7;
@@ -352,3 +355,44 @@ body {
   background: var(--warn-bg); color: var(--warn); border-bottom: 3px solid var(--warn); border-top: 3px solid var(--warn);
 }
 .systemhinweis.warnung .systemhinweis-titel { display: block; font-size: 1.1875rem; font-weight: 700; margin-bottom: 0.125rem; }
+
+/* Ladebalken am oberen Rand (F124): schmal, über allem, nimmt keine Klicks entgegen */
+.ladebalken {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 200; pointer-events: none;
+  background: color-mix(in srgb, var(--ladebalken) 18%, transparent);
+}
+.ladebalken-fuellung {
+  position: relative; height: 100%; width: 0; overflow: hidden;
+  background: var(--ladebalken);
+  box-shadow: 0 0 10px var(--ladebalken);
+  animation: ladebalken-fuellen 10s cubic-bezier(0.1, 0.7, 0.3, 1) forwards;
+}
+/* der wandernde Lichtstreifen */
+.ladebalken-fuellung::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.65) 50%, transparent 100%);
+  background-size: 40% 100%; background-repeat: no-repeat;
+  animation: ladebalken-glanz 1.1s ease-in-out infinite;
+}
+/* fertig: Die Füllung bleibt stehen und verblasst, darüber läuft der ganze Balken einmal voll auf und blendet aus.
+   (Die Breite der laufenden Animation lässt sich nicht als Startwert übernehmen – so gibt es keinen Sprung.) */
+.ladebalken.fertig .ladebalken-fuellung { animation-play-state: paused; opacity: 0; transition: opacity 0.2s ease-out; }
+.ladebalken.fertig .ladebalken-fuellung::after { animation: none; }
+.ladebalken.fertig::after {
+  content: ""; position: absolute; inset: 0;
+  background: var(--ladebalken); box-shadow: 0 0 10px var(--ladebalken);
+  animation: ladebalken-voll 0.45s ease-out forwards;
+}
+@keyframes ladebalken-fuellen {
+  0% { width: 0; } 15% { width: 30%; } 40% { width: 62%; } 70% { width: 80%; } 100% { width: 92%; }
+}
+@keyframes ladebalken-glanz {
+  from { background-position: -40% 0; } to { background-position: 140% 0; }
+}
+@keyframes ladebalken-voll {
+  0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ladebalken-fuellung { animation-duration: 0.01s; width: 92%; }
+  .ladebalken-fuellung::after { animation: none; }
+}

@@ -9,6 +9,7 @@ import { useAuth, useIch } from "@/lib/auth";
 import { datum, initialen, nummer, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
 import type { PatientZeile } from "@/lib/typen";
+import { Ladebalken } from "@/components/ui/Ladebalken";
 import { Chip, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "./logo";
@@ -256,6 +257,7 @@ export function Shell() {
   useRechteAktuell();
   return (
     <div className="flex min-h-screen bg-grund">
+      <Ladebalken />
       <Seitenleiste />
       <Outlet />
     </div>

@@ -3,6 +3,8 @@
  * Fehler kommen als ApiFehler mit Status, Meldung und Feldfehlern.
  */
 
+import { anfrageBeginnt } from "./laden";
+
 export type Feldfehler = Record<string, string>;
 
 export class ApiFehler extends Error {
@@ -107,7 +109,13 @@ export async function api<T = unknown>(pfad: string, opt: Optionen = {}): Promis
   }
   if (method !== "GET") headers["X-CSRFToken"] = csrfToken();
   const url = pfad.startsWith("/api/") ? pfad : `/api/${pfad.replace(/^\//, "")}`;
-  const antwort = await fetch(url, { method, headers, body, credentials: "same-origin", signal: opt.signal });
+  const ende = anfrageBeginnt();   // Ladebalken am oberen Rand (F124)
+  let antwort: Response;
+  try {
+    antwort = await fetch(url, { method, headers, body, credentials: "same-origin", signal: opt.signal });
+  } finally {
+    ende();
+  }
   rechteStandPruefen(antwort);
   if (antwort.status === 204) return undefined as T;
   const art = antwort.headers.get("Content-Type") ?? "";
@@ -149,7 +157,13 @@ export async function apiDatei(pfad: string, opt: Optionen = {}): Promise<{ date
   }
   if (method !== "GET") headers["X-CSRFToken"] = csrfToken();
   const url = pfad.startsWith("/api/") ? pfad : `/api/${pfad.replace(/^\//, "")}`;
-  const antwort = await fetch(url, { method, headers, body, credentials: "same-origin", signal: opt.signal });
+  const ende = anfrageBeginnt();   // Ladebalken am oberen Rand (F124)
+  let antwort: Response;
+  try {
+    antwort = await fetch(url, { method, headers, body, credentials: "same-origin", signal: opt.signal });
+  } finally {
+    ende();
+  }
   rechteStandPruefen(antwort);
   if (!antwort.ok) {
     const daten: unknown = await antwort.json().catch(() => null);

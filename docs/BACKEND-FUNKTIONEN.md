@@ -170,8 +170,9 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F121 | Ein eigener Reiter je Bereich: Diagnosen, Therapie, Labor, BIA | 4 Akte | ABGESCHLOSSEN UND GETESTET |
 | F122 | Ein gemeinsames Muster für die Reiter der Akte (außer Dokumente): links die Einträge mit Datum, rechts der gewählte; Knöpfe überall an derselben Stelle | 4–9 Akte | ABGESCHLOSSEN UND GETESTET |
 | F123 | EPM aus der Oberfläche aktualisieren (Systemagent-Aktion `epm_update`) | 17 System | ABGESCHLOSSEN UND GETESTET |
+| F124 | Ladebalken am oberen Rand bei jeder laufenden Anfrage (Laden, Speichern, Hochladen, PDF, Aufträge) | alle Seiten | ABGESCHLOSSEN (auf Wunsch ohne Testlauf eingespielt) |
 
-Summe (123 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
+Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
 Klärung von U1/U2 umgesetzt, F64 ist nach der Klärung von U9 nicht mehr blockiert, aber noch nicht umgesetzt.
 Neu in Runde 4 sind F74–F83 (Datenschutz nach DSGVO und Abschließen eines Plans nach Freigabe); offene Fragen dazu stehen
@@ -2421,6 +2422,19 @@ alle offenen Fragen stehen in `docs/WUENSCHE-PRAXIS-2026-10-06.md`.
 - **Teststatus:** Browsertests `akte.spec.ts`, `praxiswuensche.spec.ts`, `dokumente.spec.ts`, `oberflaeche.spec.ts`,
   `zz-neustart.spec.ts`, `datenschutz.spec.ts`, `aa-import.spec.ts` – an das neue Muster angepasst.
 - **Status:** ABGESCHLOSSEN UND GETESTET.
+
+### F124 Ladebalken am oberen Rand
+- **Anlass:** „Ich brauche Ladebalken bzw. Darstellung, was passiert, bei Updates, Speichern etc. Der obere
+  Bildbereich soll als Ladebalken … in Orange (oder passend zum Farbschema) wie ein Ladebalken sich füllen und sich
+  bewegen.“ Vorbild: die Umsetzung im Smokeping-Projekt.
+- **`lib/laden.ts`** zählt die laufenden Anfragen; `api` und `apiDatei` melden jede Anfrage an und ab (auch bei
+  Fehler oder Abbruch). Damit erfasst der Balken alles, was auf den Server wartet – Laden, Speichern, Hochladen,
+  PDFs, die Abfragen der Aufträge –, unabhängig von der Abfrage-Bibliothek.
+- **`Ladebalken.tsx`** in der Shell, ganz oben über allem (3 px, nimmt keine Klicks an): Läuft eine Anfrage länger
+  als 150 ms, füllt sich der Balken in Orange (`--ladebalken`, je Farbschema), ein Lichtstreifen wandert darüber;
+  sind alle Anfragen beantwortet, läuft er einmal voll und blendet aus. Kürzere Anfragen zeigen nichts – sonst
+  flackerte er bei jeder Statusabfrage. Bei „weniger Bewegung“ (Systemeinstellung) ohne Animation.
+- **Status:** ABGESCHLOSSEN. Auf Wunsch ohne Testlauf eingespielt (`[skip ci]`); ein Browsertest steht noch aus.
 
 ## Offene Backend-Funktionen
 
