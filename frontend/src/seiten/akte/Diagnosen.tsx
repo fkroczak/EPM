@@ -1,30 +1,28 @@
 /**
- * Diagnoseliste der Akte mit ICD-Code und Zusatzkennzeichen (Wunsch 06.10.2026, F117).
+ * Reiter „Diagnosen“: die Liste mit ICD-Code und die Notizen in einem Reiter (Wünsche 06./07.10.2026, F117, F122).
  *
- * Angezeigt wie gewünscht: „Kurzdarmsyndrom [K91.2G]“. Die Liste im Hintergrund (Vorlagen › Diagnosen) wächst
- * beim Eintragen von allein mit und schlägt beim nächsten Mal vor. Nicht mehr zutreffende Diagnosen werden auf
- * „nicht mehr zutreffend“ gesetzt, nicht gelöscht – jede Fassung bleibt im Verlauf.
+ * Aufbau wie überall in der Akte: links die Einträge mit Datum – obenan die Notizen, darunter die Diagnosen –,
+ * rechts der gewählte Eintrag. Angezeigt wie gewünscht: „Kurzdarmsyndrom [K91.2G]“. Die Liste im Hintergrund
+ * (Vorlagen › Labor und Diagnosen) wächst beim Eintragen von allein mit. Nicht mehr zutreffende Diagnosen werden
+ * auf „nicht mehr zutreffend“ gesetzt, nicht gelöscht – jede Fassung bleibt im Verlauf.
  */
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useDiagnoseliste } from "@/lib/daten";
-import { datum, eingabeDatum } from "@/lib/format";
+import { datum, eingabeDatum, zeitpunkt } from "@/lib/format";
 import { DIAGNOSE_KENNZEICHEN } from "@/lib/typen";
 import type { Diagnose } from "@/lib/typen";
-import { Auswahl, Chip, Eingabe, Feld, Fehleranzeige, Karte, KartenKopf, Knopf, Laden, Leer, Meldung }
-  from "@/components/ui/basis";
+import { Auswahl, Chip, Eingabe, Feld, Knopf, Meldung } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
-import { Icon } from "@/components/ui/icon";
-import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
-import { Bereich, Bereiche } from "@/components/ui/bereiche";
-import { Link } from "react-router";
 import { useAkte } from "./Akte";
-import { TextKarte } from "./TextKarte";
+import { Abschnitt, Aktenseite, Detail, Eintrag, Eintragsliste, useWahl } from "./Aktenseite";
+import { Textfassung, Textkopf } from "./TextKarte";
 
 const KATALOG_ID = "diagnoseliste";
+
 
 function DiagnoseDialog({ diagnose, offen, onOffen }: { diagnose: Diagnose | null; offen: boolean; onOffen: (o: boolean) => void }) {
   const { patient } = useAkte();
@@ -122,10 +120,24 @@ function DiagnoseDialog({ diagnose, offen, onOffen }: { diagnose: Diagnose | nul
   );
 }
 
-export function DiagnosenKarte() {
+/** Der Eintrag einer Diagnose in der Liste links. */
+function DiagnoseEintrag({ d, aktiv, onWahl }: { d: Diagnose; aktiv: boolean; onWahl: () => void }) {
+  return (
+    <Eintrag aktiv={aktiv} onWahl={onWahl} warnung={!d.aktiv}
+      datum={d.seit ? datum(d.seit) : datum(d.angelegt_am)}
+      merkmal={d.aktiv
+        ? (d.kennzeichen !== "G" ? <Chip art="warn">{d.kennzeichen}</Chip> : <Chip>{d.kennzeichen}</Chip>)
+        : <Chip art="warn">beendet</Chip>}
+      zeile={d.bezeichnung}
+      unten={<span className="num">{d.icd_code}{d.kennzeichen}</span>} />
+  );
+}
+
+export function Diagnosen() {
   const { patient, bearbeiten } = useAkte();
   const qc = useQueryClient();
   const melden = useHinweis();
+  const [wahl, setWahl] = useWahl("eintrag");
   const [dialog, setDialog] = useState<{ offen: boolean; diagnose: Diagnose | null }>({ offen: false, diagnose: null });
   const [beendete, setBeendete] = useState(false);
 
@@ -143,70 +155,83 @@ export function DiagnosenKarte() {
   });
 
   const alle = diagnosen.data ?? [];
-  const sichtbar = beendete ? alle : alle.filter((d) => d.aktiv);
-  const anzahlBeendet = alle.length - alle.filter((d) => d.aktiv).length;
+  const offene = alle.filter((d) => d.aktiv);
+  const sichtbar = beendete ? alle : offene;
+  const anzahlBeendet = alle.length - offene.length;
+  // „notizen“ steht obenan; sonst die gewählte Diagnose, ersatzweise die erste
+  const gewaehlt = wahl === "notizen" ? null : sichtbar.find((d) => String(d.id) === wahl) ?? (wahl ? null : sichtbar[0]);
+  const notizen = wahl === "notizen" || (!gewaehlt && !sichtbar.length);
 
   return (
-    <Karte className="px-[22px] py-[18px] flex flex-col gap-3 min-w-0" data-testid="karte-diagnosen">
-      <KartenKopf titel="Diagnosen (ICD)" unter="Gesichert (G), Verdacht (V), Zustand nach (Z), Ausschluss (A)"
-        rechts={bearbeiten ? <Knopf klein icon="plus" onClick={() => setDialog({ offen: true, diagnose: null })}>
-          Diagnose</Knopf> : undefined} />
-      {diagnosen.isPending ? <Laden /> : <Fehleranzeige fehler={diagnosen.error} />}
-      {sichtbar.length === 0 ? <Leer>Noch keine Diagnose mit ICD-Code eingetragen.</Leer> : (
-        <ul className="m-0 p-0 list-none flex flex-col gap-1.5" data-testid="diagnoseliste">
+    <>
+    <Aktenseite
+      testid="diagnosen"
+      titel={offene.length === 1 ? "Diagnose" : "Diagnosen"}
+      anzahl={offene.length}
+      laedt={diagnosen.isPending}
+      aktion={bearbeiten
+        ? <Knopf variante="pri" icon="plus" onClick={() => setDialog({ offen: true, diagnose: null })}>Neue Diagnose</Knopf>
+        : undefined}
+      fuss={<>Gesichert (G), Verdacht (V), Zustand nach (Z), Ausschluss (A). Beendete Diagnosen bleiben erhalten;
+        jede Fassung steht im Verlauf der Akte.</>}
+      liste={
+        <Eintragsliste name="Diagnosen" leer={sichtbar.length ? undefined : "Noch keine Diagnose mit ICD-Code."}>
+          <Textkopf feld="diagnose" titel="Notizen" aktiv={notizen} onWahl={() => setWahl("notizen")} />
           {sichtbar.map((d) => (
-            <li key={d.id} className="flex items-start justify-between gap-3 border-b border-rand pb-1.5 last:border-0">
-              <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="text-sm">
-                  {d.bezeichnung} <span className="num gedaempft">[{d.icd_code}{d.kennzeichen}]</span>
-                  {!d.aktiv ? <Chip className="ml-2">nicht mehr zutreffend</Chip> : null}
-                  {d.kennzeichen !== "G" && d.aktiv ? <Chip art="warn" className="ml-2">{d.kennzeichen_name}</Chip> : null}
-                </span>
-                {d.seit || d.notiz ? (
-                  <span className="text-[0.75rem] gedaempft">
-                    {[d.seit ? `seit ${datum(d.seit)}` : "", d.notiz].filter(Boolean).join(" · ")}
-                  </span>
-                ) : null}
-              </div>
-              {bearbeiten ? (
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Knopf klein onClick={() => setDialog({ offen: true, diagnose: d })}>Ändern</Knopf>
-                  <Knopf klein onClick={() => umschalten.mutate(d)}>{d.aktiv ? "Beenden" : "Wieder aktuell"}</Knopf>
-                </div>
-              ) : null}
-            </li>
+            <DiagnoseEintrag key={d.id} d={d} aktiv={gewaehlt?.id === d.id} onWahl={() => setWahl(String(d.id))} />
           ))}
-        </ul>
+          {anzahlBeendet ? (
+            <button type="button" className="self-start bg-transparent border-0 p-0 text-[0.8125rem] gedaempft cursor-pointer underline"
+              onClick={() => setBeendete((b) => !b)}>
+              {beendete ? "Beendete ausblenden" : `${anzahlBeendet} beendete anzeigen`}
+            </button>
+          ) : null}
+        </Eintragsliste>
+      }
+      detail={notizen || !gewaehlt ? (
+        <Textfassung feld="diagnose" titel="Notizen"
+          hinweis="Ausführliche Beschreibung zu den Diagnosen. Jede Fassung bleibt mit Person und Zeitpunkt erhalten." />
+      ) : (
+        <Detail testid="diagnose-detail"
+          titel={<>{gewaehlt.bezeichnung} <span className="num gedaempft">[{gewaehlt.icd_code}{gewaehlt.kennzeichen}]</span></>}
+          unter={[gewaehlt.kennzeichen_name, gewaehlt.seit ? `besteht seit ${datum(gewaehlt.seit)}` : "",
+            gewaehlt.aktiv ? "" : `beendet ${datum(gewaehlt.beendet_am)}`].filter(Boolean).join(" · ")}
+          aktionen={bearbeiten ? <>
+            <Knopf klein icon="stift" onClick={() => setDialog({ offen: true, diagnose: gewaehlt })}>Ändern</Knopf>
+            <Knopf klein laedt={umschalten.isPending} onClick={() => umschalten.mutate(gewaehlt)}>
+              {gewaehlt.aktiv ? "Beenden" : "Wieder aktuell"}</Knopf>
+          </> : undefined}>
+          {gewaehlt.notiz ? <Abschnitt titel="Notiz zur Diagnose"><p className="m-0 text-sm">{gewaehlt.notiz}</p></Abschnitt> : null}
+          <Abschnitt titel="Eingetragen">
+            <p className="m-0 text-sm gedaempft">
+              {zeitpunkt(gewaehlt.angelegt_am)}{gewaehlt.angelegt_von_name ? ` · ${gewaehlt.angelegt_von_name}` : ""}
+            </p>
+          </Abschnitt>
+        </Detail>
       )}
-      {anzahlBeendet ? (
-        <button type="button" className="self-start bg-transparent border-0 p-0 text-[0.8125rem] gedaempft cursor-pointer underline"
-          onClick={() => setBeendete((b) => !b)}>
-          {beendete ? "Beendete ausblenden" : `${anzahlBeendet} beendete anzeigen`}
-        </button>
-      ) : null}
-      {bearbeiten ? <DiagnoseDialog diagnose={dialog.diagnose} offen={dialog.offen}
-        onOffen={(o) => setDialog((d) => ({ ...d, offen: o }))} /> : null}
-    </Karte>
+    />
+    {bearbeiten ? <DiagnoseDialog diagnose={dialog.diagnose} offen={dialog.offen}
+      onOffen={(o) => setDialog((d) => ({ ...d, offen: o }))} /> : null}
+    </>
   );
 }
 
-/** Reiter „Diagnosen“ (Aufteilung 07.10.2026, F121): die Liste mit ICD-Code und daneben der lange Freitext (U51). */
-export function Diagnosen() {
-  const { patient } = useAkte();
-  const stufe = useStufe();
+/** Nur für die Übersicht der Akte: die zutreffenden Diagnosen in Kurzform. */
+export function DiagnosenKurz({ patientId }: { patientId: number }) {
+  const diagnosen = useQuery({
+    queryKey: ["diagnosen", patientId],
+    queryFn: () => api<Diagnose[]>(`diagnosen/?patient=${patientId}`),
+  });
+  const offene = (diagnosen.data ?? []).filter((d) => d.aktiv);
+  if (!offene.length) return <p className="m-0 text-sm gedaempft">Noch keine Diagnose mit ICD-Code.</p>;
   return (
-    <Bereiche seite="akte_diagnosen" spalten={RASTER_SPALTEN[stufe]} testid="diagnosen-stufe">
-      <Bereich id="diagnosen" titel="Diagnosen (ICD)" standard={{ breite: 2 }}><DiagnosenKarte /></Bereich>
-      <Bereich id="diagnose" titel="Diagnose (Freitext)"><TextKarte feld="diagnose" /></Bereich>
-      <Bereich id="hinweis" titel="Hinweis" menue={false}>
-        <div className="meldung info flex gap-2.5 items-start text-[0.8125rem] leading-normal">
-          <Icon name="info" />
-          <span>Die Liste mit ICD-Code und das Freitextfeld bestehen nebeneinander: In der Liste steht, was abgerechnet
-            und ausgewertet wird, im Freitext die ausführliche Beschreibung. Jede Fassung bleibt im{" "}
-            <Link to={`/patienten/${patient.id}/verlauf`}>Verlauf</Link> erhalten; Therapie und Empfehlung stehen unter{" "}
-            <Link to={`/patienten/${patient.id}/therapie`}>Therapie</Link>.</span>
-        </div>
-      </Bereich>
-    </Bereiche>
+    <ul className="m-0 p-0 list-none flex flex-col gap-0.5" data-testid="diagnosen-kurz">
+      {offene.slice(0, 6).map((d) => (
+        <li key={d.id} className="text-sm">
+          {d.bezeichnung} <span className="num gedaempft">[{d.icd_code}{d.kennzeichen}]</span>
+        </li>
+      ))}
+      {offene.length > 6 ? <li className="text-[0.8125rem] gedaempft">und {offene.length - 6} weitere</li> : null}
+    </ul>
   );
 }

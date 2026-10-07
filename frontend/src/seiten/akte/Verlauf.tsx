@@ -8,7 +8,7 @@ import { datum, uhrzeit } from "@/lib/format";
 import { ABSCHLUSSANLAESSE, ANFRAGEARTEN, ANFRAGE_ERGEBNISSE, ARZTROLLEN, ERKLAERUNGEN, FREIGABEWEGE, GESCHLECHTER, GEWICHTSQUELLEN,
   TERMINARTEN, ppiName, ppiZeiten } from "@/lib/typen";
 import type { Auswahlwert, Verlaufseintrag } from "@/lib/typen";
-import { Auswahl, Chip, Fehleranzeige, Karte, Knopf, Laden, Leer, Segmente } from "@/components/ui/basis";
+import { Auswahl, Chip, Fehleranzeige, Karte, Knopf, Laden, Leer } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
 import { klartext } from "@/components/Editor";
 import { useAkte } from "./Akte";
@@ -128,7 +128,11 @@ export function Verlauf() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Segmente label="Bereich" wert={bereich} onWahl={setBereich} werte={BEREICHE} />
+        {/* Mit den Reitern der Akte sind es zu viele Bereiche für eine Knopfreihe – darum eine Auswahlliste
+            wie bei der Person daneben (Wunsch 07.10.2026) */}
+        <Auswahl aria-label="Bereich" className="w-[240px]" value={bereich} onChange={(e) => setBereich(e.target.value)}>
+          {BEREICHE.map((b) => <option key={b.wert} value={b.wert}>{b.wert ? b.text : "Alle Bereiche"}</option>)}
+        </Auswahl>
         <div className="flex items-center gap-2.5">
           <Auswahl aria-label="Person" className="w-[220px]" value={person} onChange={(e) => setPerson(e.target.value)}>
             <option value="">Alle Personen</option>

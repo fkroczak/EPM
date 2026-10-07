@@ -15,7 +15,7 @@ import { Kontakte } from "./seiten/akte/Kontakte";
 import { Labor } from "./seiten/akte/Labor";
 import { PlanEditor } from "./seiten/akte/PlanEditor";
 import { Plaene } from "./seiten/akte/Plaene";
-import { Therapie } from "./seiten/akte/Therapie";
+import { Empfehlung, Therapie } from "./seiten/akte/Therapie";
 import { Uebersicht } from "./seiten/akte/Uebersicht";
 import { Verlauf } from "./seiten/akte/Verlauf";
 import { AuditLog } from "./seiten/admin/AuditLog";
@@ -67,6 +67,7 @@ const router = createBrowserRouter([
           // eigene Reiter seit 07.10.2026 (F121); die alten Adressen leiten weiter
           { path: "diagnosen", element: <Diagnosen /> },
           { path: "therapie", element: <Therapie /> },
+          { path: "empfehlung", element: <Empfehlung /> },
           { path: "kontakte", element: <Kontakte /> },
           { path: "plaene", element: <Plaene /> },
           { path: "plaene/neu", element: <PlanEditor /> },

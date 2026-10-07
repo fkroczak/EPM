@@ -10,11 +10,12 @@ import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { datum, eingabeDatum, heuteIso, zahl } from "@/lib/format";
 import type { BiaMessung } from "@/lib/typen";
-import { Eingabe, Feld, Fehleranzeige, Karte, KartenKopf, Knopf, Laden, Leer, Meldung } from "@/components/ui/basis";
+import { Eingabe, Feld, Fehleranzeige, Knopf, Meldung } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Editor, Richtext } from "@/components/Editor";
 import { useAkte } from "./Akte";
+import { Abschnitt, Aktenseite, Detail, Eintrag, Eintragsliste, Wertetabelle, useWahl } from "./Aktenseite";
 import { AlterHinweis } from "./Befunde";
 
 function BiaDialog({ messung, offen, onOffen }: { messung: BiaMessung | null; offen: boolean; onOffen: (o: boolean) => void }) {
@@ -107,61 +108,69 @@ function BiaDialog({ messung, offen, onOffen }: { messung: BiaMessung | null; of
   );
 }
 
-function BiaTabelle({ messungen, onAendern, aenderbar }: {
-  messungen: BiaMessung[]; onAendern: (m: BiaMessung) => void; aenderbar: boolean;
-}) {
-  if (!messungen.length) return <Leer>Noch keine BIA-Messung erfasst.</Leer>;
+/** Die gewählte Messung rechts. */
+function BiaDetail({ m, onAendern, aenderbar }: { m: BiaMessung; onAendern: () => void; aenderbar: boolean }) {
+  const wert = (x: number | string | null | undefined, einheit: string) =>
+    x != null && x !== "" ? `${zahl(x, 1)}${einheit ? ` ${einheit}` : ""}` : "—";
   return (
-    <div className="overflow-x-auto">
-      <table className="tabelle w-full" data-testid="bia-tabelle">
-        <thead>
-          <tr>
-            <th>Datum</th><th className="num">Gewicht</th><th className="num">BCM</th><th className="num">Fettmasse</th>
-            <th className="num">ECW</th><th className="num">Körperwasser</th><th className="num">BMI</th>
-            <th>Beurteilung</th>{aenderbar ? <th /> : null}
-          </tr>
-        </thead>
-        <tbody>
-          {messungen.map((m) => (
-            <tr key={m.id}>
-              <td className="num">{datum(m.gemessen_am)}</td>
-              <td className="num">{m.gewicht_kg != null ? `${zahl(m.gewicht_kg, 1)} kg` : "—"}</td>
-              <td className="num">{m.bcm_kg != null ? `${zahl(m.bcm_kg, 1)} kg` : "—"}</td>
-              <td className="num">{m.fettmasse_kg != null ? `${zahl(m.fettmasse_kg, 1)} kg` : "—"}</td>
-              <td className="num">{m.ecw_prozent != null ? `${zahl(m.ecw_prozent, 1)} %` : "—"}</td>
-              <td className="num">{m.koerperwasser_l != null ? `${zahl(m.koerperwasser_l, 1)} l` : "—"}</td>
-              <td className="num">{m.bmi != null ? zahl(m.bmi, 1) : "—"}</td>
-              <td className="max-w-[320px]"><Richtext html={m.beurteilung} className="text-sm" /></td>
-              {aenderbar ? <td className="text-right"><Knopf klein onClick={() => onAendern(m)}>Ändern</Knopf></td> : null}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Detail testid="bia-detail"
+      titel={<>BIA-Messung vom <span className="num">{datum(m.gemessen_am)}</span></>}
+      unter={m.erfasst_von_name ?? undefined}
+      aktionen={aenderbar ? <Knopf klein icon="stift" onClick={onAendern}>Ändern</Knopf> : undefined}>
+      <Wertetabelle werte={[
+        ["Gewicht", wert(m.gewicht_kg, "kg")],
+        ["BCM", wert(m.bcm_kg, "kg")],
+        ["Fettmasse", wert(m.fettmasse_kg, "kg")],
+        ["ECW (extrazelluläres Wasser)", wert(m.ecw_prozent, "%")],
+        ["Körperwasser", wert(m.koerperwasser_l, "l")],
+        ["BMI", wert(m.bmi, "")],
+      ]} />
+      {m.beurteilung ? <Abschnitt titel="Beurteilung"><Richtext html={m.beurteilung} className="text-sm" /></Abschnitt> : null}
+    </Detail>
   );
 }
 
 // ================================================================= Seite
 export function Bia() {
   const { patient, erfassen } = useAkte();
+  const [wahl, setWahl] = useWahl("messung");
   const [dialog, setDialog] = useState<{ offen: boolean; messung: BiaMessung | null }>({ offen: false, messung: null });
   const bia = useQuery({
     queryKey: ["bia", patient.id],
     queryFn: () => api<BiaMessung[]>(`bia-messungen/?patient=${patient.id}`),
   });
+  const liste = bia.data ?? [];
+  const gewaehlt = liste.find((m) => String(m.id) === wahl) ?? liste[0];
   return (
-    <div className="flex flex-col gap-4">
-      <Karte className="p-[22px] flex flex-col gap-3">
-        <KartenKopf titel="BIA-Messungen" unter="Körperzusammensetzung mit Beurteilung"
-          rechts={erfassen ? <Knopf variante="pri" klein onClick={() => setDialog({ offen: true, messung: null })}>
-            Neue Messung</Knopf> : undefined} />
-        <AlterHinweis art="bia" am={bia.data?.[0]?.gemessen_am} was="BIA-Messung" />
-        {bia.isPending ? <Laden /> : <Fehleranzeige fehler={bia.error} />}
-        {bia.data ? <BiaTabelle messungen={bia.data} aenderbar={erfassen}
-          onAendern={(m) => setDialog({ offen: true, messung: m })} /> : null}
-      </Karte>
+    <>
+      <Aktenseite
+        testid="bia"
+        titel={liste.length === 1 ? "BIA-Messung" : "BIA-Messungen"}
+        anzahl={liste.length}
+        laedt={bia.isPending}
+        aktion={erfassen
+          ? <Knopf variante="pri" icon="plus" onClick={() => setDialog({ offen: true, messung: null })}>Neue Messung</Knopf>
+          : undefined}
+        kopfrechts={<><Fehleranzeige fehler={bia.error} />
+          <AlterHinweis art="bia" am={liste[0]?.gemessen_am} was="BIA-Messung" /></>}
+        liste={
+          <Eintragsliste name="BIA-Messungen" leer={liste.length ? undefined : "Noch keine BIA-Messung erfasst."}>
+            {liste.map((m) => (
+              <Eintrag key={m.id} aktiv={gewaehlt?.id === m.id} onWahl={() => setWahl(String(m.id))}
+                datum={datum(m.gemessen_am)}
+                zeile={m.bcm_kg != null ? `BCM ${zahl(m.bcm_kg, 1)} kg` : "ohne BCM"}
+                unten={m.gewicht_kg != null ? `${zahl(m.gewicht_kg, 1)} kg` : ""} />
+            ))}
+          </Eintragsliste>
+        }
+        fuss={<>Körperzusammensetzung mit Beurteilung. Das Gewicht wandert auf Wunsch in den Gewichtsverlauf der Akte.</>}
+        detail={gewaehlt
+          ? <BiaDetail m={gewaehlt} aenderbar={erfassen} onAendern={() => setDialog({ offen: true, messung: gewaehlt })} />
+          : null}
+        leer="Links eine Messung wählen."
+      />
       {erfassen ? <BiaDialog messung={dialog.messung} offen={dialog.offen}
         onOffen={(o) => setDialog((d) => ({ ...d, offen: o }))} /> : null}
-    </div>
+    </>
   );
 }

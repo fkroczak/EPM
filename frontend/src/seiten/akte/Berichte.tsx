@@ -12,13 +12,13 @@ import { useAuth } from "@/lib/auth";
 import { useAuswahl } from "@/lib/daten";
 import { datum, eingabeDatum, heuteIso } from "@/lib/format";
 import type { Bericht } from "@/lib/typen";
-import { Auswahl, Chip, Eingabe, Feld, Fehleranzeige, Karte, KartenKopf, Knopf, Laden, Leer, Meldung }
-  from "@/components/ui/basis";
+import { Auswahl, Chip, Eingabe, Feld, Fehleranzeige, Knopf, Meldung } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Editor, Richtext } from "@/components/Editor";
 import { PdfDialog } from "@/components/PdfDialog";
 import { useAkte } from "./Akte";
+import { Aktenseite, Detail, Eintrag, Eintragsliste, useWahl } from "./Aktenseite";
 
 function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; offen: boolean; onOffen: (o: boolean) => void }) {
   const { patient } = useAkte();
@@ -133,6 +133,7 @@ export function Berichte() {
   const { darf } = useAuth();
   const qc = useQueryClient();
   const melden = useHinweis();
+  const [wahl, setWahl] = useWahl("bericht");
   const [dialog, setDialog] = useState<{ offen: boolean; bericht: Bericht | null }>({ offen: false, bericht: null });
   const [freigabe, setFreigabe] = useState<{ offen: boolean; bericht: Bericht | null }>({ offen: false, bericht: null });
   const [pdf, setPdf] = useState<Bericht | null>(null);
@@ -150,42 +151,57 @@ export function Berichte() {
     onError: (e) => melden(e.message, "fehler"),
   });
 
+  const liste = berichte.data ?? [];
+  const gewaehlt = liste.find((b) => String(b.id) === wahl) ?? liste[0];
+  const entwurf = gewaehlt?.status === "entwurf";
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h2 className="lbl m-0">Berichte{berichte.data?.length ? <span className="num ml-1.5 opacity-70">{berichte.data.length}</span> : null}</h2>
-        {erfassen ? <Knopf variante="pri" klein onClick={() => setDialog({ offen: true, bericht: null })}>Neuer Bericht</Knopf> : null}
-      </div>
-      {berichte.isPending ? <Laden /> : <Fehleranzeige fehler={berichte.error} />}
-      {berichte.data?.length === 0 ? <Karte className="p-[22px]"><Leer>Noch kein Bericht in dieser Akte.</Leer></Karte> : null}
-
-      {(berichte.data ?? []).map((b) => (
-        <Karte key={b.id} className="p-[22px] flex flex-col gap-3" data-testid={`bericht-${b.id}`}>
-          <KartenKopf
-            titel={<span className="flex items-center gap-2">{b.titel}
-              <Chip art={b.status === "freigegeben" ? "ok" : "warn"} data-testid="bericht-status">{b.status_name}</Chip></span>}
-            unter={[b.art_name, datum(b.datum), b.empfaenger ? `an ${b.empfaenger}` : "", b.erstellt_von_name]
-              .filter(Boolean).join(" · ")}
-            rechts={<>
-              {b.status === "entwurf" && erfassen ? (
-                <Knopf klein onClick={() => setDialog({ offen: true, bericht: b })}>Bearbeiten</Knopf>
-              ) : null}
-              {b.status === "entwurf" && erfassen && darf("berichte_freigeben") ? (
-                <Knopf klein variante="pri" onClick={() => setFreigabe({ offen: true, bericht: b })}>Freigeben</Knopf>
-              ) : null}
-              {b.status === "entwurf" && erfassen ? (
-                <Knopf klein variante="dng" laedt={verwerfen.isPending} onClick={() => verwerfen.mutate(b)}>Verwerfen</Knopf>
-              ) : null}
-              {b.status === "freigegeben" && b.dokument ? (
-                <Knopf klein onClick={() => setPdf(b)}>PDF ansehen</Knopf>
-              ) : null}
-            </>}
-          />
-          <Richtext html={b.inhalt} leer="Noch kein Text." />
-          {b.freigabevermerk ? <p className="m-0 text-[0.8125rem] gedaempft border-t border-rand pt-2">{b.freigabevermerk}</p> : null}
-        </Karte>
-      ))}
-
+    <>
+      <Aktenseite
+        testid="berichte"
+        titel={liste.length === 1 ? "Bericht" : "Berichte"}
+        anzahl={liste.length}
+        laedt={berichte.isPending}
+        aktion={erfassen
+          ? <Knopf variante="pri" icon="plus" onClick={() => setDialog({ offen: true, bericht: null })}>Neuer Bericht</Knopf>
+          : undefined}
+        kopfrechts={<Fehleranzeige fehler={berichte.error} />}
+        liste={
+          <Eintragsliste name="Berichte" leer={liste.length ? undefined : "Noch kein Bericht in dieser Akte."}>
+            {liste.map((b) => (
+              <Eintrag key={b.id} aktiv={gewaehlt?.id === b.id} onWahl={() => setWahl(String(b.id))}
+                warnung={b.status === "entwurf"}
+                datum={datum(b.datum)}
+                merkmal={<Chip art={b.status === "freigegeben" ? "ok" : "warn"} data-testid="bericht-status">{b.status_name}</Chip>}
+                zeile={b.titel}
+                unten={[b.art_name, b.empfaenger ? `an ${b.empfaenger}` : ""].filter(Boolean).join(" · ")} />
+            ))}
+          </Eintragsliste>
+        }
+        fuss={<>Ein freigegebener Bericht ist unveränderlich; seine PDF liegt bei den Dokumenten der Akte. Eine
+          Korrektur ist ein neuer Bericht.</>}
+        detail={gewaehlt ? (
+          <Detail testid="bericht-detail"
+            titel={<span className="flex items-center gap-2">{gewaehlt.titel}
+              <Chip art={gewaehlt.status === "freigegeben" ? "ok" : "warn"} data-testid="bericht-status">{gewaehlt.status_name}</Chip></span>}
+            unter={[gewaehlt.art_name, datum(gewaehlt.datum), gewaehlt.empfaenger ? `an ${gewaehlt.empfaenger}` : "",
+              gewaehlt.erstellt_von_name].filter(Boolean).join(" · ")}
+            aktionen={<>
+              {entwurf && erfassen ? <Knopf klein icon="stift" onClick={() => setDialog({ offen: true, bericht: gewaehlt })}>Bearbeiten</Knopf> : null}
+              {entwurf && erfassen && darf("berichte_freigeben")
+                ? <Knopf klein variante="pri" icon="haken" onClick={() => setFreigabe({ offen: true, bericht: gewaehlt })}>Freigeben</Knopf> : null}
+              {entwurf && erfassen
+                ? <Knopf klein variante="dng" laedt={verwerfen.isPending} onClick={() => verwerfen.mutate(gewaehlt)}>Verwerfen</Knopf> : null}
+              {gewaehlt.status === "freigegeben" && gewaehlt.dokument
+                ? <Knopf klein icon="dokument" onClick={() => setPdf(gewaehlt)}>PDF ansehen</Knopf> : null}
+            </>}>
+            <Richtext html={gewaehlt.inhalt} leer="Noch kein Text." />
+            {gewaehlt.freigabevermerk
+              ? <p className="m-0 text-[0.8125rem] gedaempft border-t border-rand pt-2">{gewaehlt.freigabevermerk}</p> : null}
+          </Detail>
+        ) : null}
+        leer="Links einen Bericht wählen."
+      />
       {erfassen ? <>
         <BerichtDialog bericht={dialog.bericht} offen={dialog.offen} onOffen={(o) => setDialog((d) => ({ ...d, offen: o }))} />
         <FreigabeDialog bericht={freigabe.bericht} offen={freigabe.offen} onOffen={(o) => setFreigabe((d) => ({ ...d, offen: o }))} />
@@ -193,6 +209,6 @@ export function Berichte() {
       <PdfDialog offen={!!pdf} onOffen={(o) => !o && setPdf(null)} titel={pdf?.titel ?? "Bericht"}
         pfad={pdf?.dokument ? `dokumente/${pdf.dokument}/datei/?anzeigen=1` : ""}
         dateiname={`Bericht-${patient.nummer}.pdf`} />
-    </div>
+    </>
   );
 }

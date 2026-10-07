@@ -29,16 +29,16 @@ async function oeffnen(page: Page, id: number, reiter = "") {
 test("Diagnose mit ICD-Code eintragen; die Liste im Hintergrund wächst mit", async ({ page }) => {
   const p = await neuerPatient();
   await oeffnen(page, p.id, "/diagnosen");
-  const karte = page.getByTestId("karte-diagnosen");
-  await karte.getByRole("button", { name: "Diagnose" }).click();
+  await page.getByRole("button", { name: "Neue Diagnose" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Diagnose").fill("Kurzdarmsyndrom");
   await dialog.getByLabel("ICD-Code").fill("K91.2");
   await dialog.getByLabel("Zusatzkennzeichen").selectOption("G");
   await expect(dialog.getByText("Kurzdarmsyndrom [K91.2G]")).toBeVisible();
   await dialog.getByRole("button", { name: "Speichern" }).click();
-  await expect(karte.getByTestId("diagnoseliste")).toContainText("Kurzdarmsyndrom");
-  await expect(karte.getByTestId("diagnoseliste")).toContainText("[K91.2G]");
+  const liste2 = page.getByTestId("eintragsliste");
+  await expect(liste2).toContainText("Kurzdarmsyndrom");
+  await expect(page.getByTestId("diagnose-detail")).toContainText("[K91.2G]");
 
   // der Katalog hat den Eintrag übernommen (Vorlagen › Labor und Diagnosen)
   const api = await apiAls("mitarbeiter");
@@ -78,8 +78,8 @@ test("Laborbefund über die Maske erfassen – nur Werte eintragen", async ({ pa
   await weitere.getByLabel("Einheit 1").fill("U/ml");
   await page.getByRole("button", { name: /Werte speichern/ }).click();
 
-  await expect(page.getByText("3 Werte")).toBeVisible();
-  await page.getByRole("button", { name: "Werte zeigen" }).click();
+  const detail = page.getByTestId("labor-detail");
+  await expect(detail).toContainText("3 Werte");
   await expect(page.getByText("Ferritin")).toBeVisible();
   await expect(page.getByText("µg/l")).toBeVisible();
   await expect(page.getByText("CA 19-9")).toBeVisible();
@@ -96,7 +96,7 @@ test("BIA-Messung mit Beurteilung; das Gewicht wandert in den Verlauf", async ({
   await page.getByLabel("Körperwasser (l)").fill("32,8");
   await expect(page.getByText(/aus Gewicht und Größe/)).toBeVisible();
   await page.getByRole("button", { name: "Speichern" }).click();
-  await expect(page.getByTestId("bia-tabelle")).toContainText("24,1 kg");
+  await expect(page.getByTestId("bia-detail")).toContainText("24,1 kg");
 
   await oeffnen(page, p.id);
   await expect(page.getByTestId("kennzahlen")).toContainText("61,2");
@@ -187,7 +187,7 @@ test("Hinweise mit „×“ wegklicken und wieder einschalten", async ({ page })
 
   // und steht im Verlauf der Akte
   await oeffnen(page, p.id, "/verlauf");
-  await page.getByRole("group", { name: "Bereich" }).getByRole("button", { name: "Hinweise ausgeblendet" }).click();
+  await page.getByLabel("Bereich").selectOption("hinweisruhe");
   await expect(page.getByTestId("verlauf")).toContainText("Labor ist beim Hausarzt angefordert");
 });
 
@@ -197,13 +197,14 @@ test("Jeder Bereich ein eigener Reiter; die alte Adresse leitet weiter", async (
   await oeffnen(page, p.id);
   // Diagnosen und Therapie getrennt (F121)
   await reiter.getByRole("link", { name: /^Diagnosen/ }).click();
-  await expect(page.getByTestId("karte-diagnosen")).toBeVisible();
-  await expect(page.getByTestId("karte-diagnose")).toBeVisible();
+  await expect(page.getByTestId("diagnosen")).toBeVisible();
+  await expect(page.getByTestId("karte-diagnose")).toBeVisible();   // „Notizen“ rechts
   await expect(page.getByTestId("karte-therapie")).toHaveCount(0);
   await reiter.getByRole("link", { name: /^Therapie/ }).click();
   await expect(page.getByTestId("karte-therapie")).toBeVisible();
-  await expect(page.getByTestId("zuletzt-therapie")).toBeVisible();
-  await expect(page.getByTestId("karte-diagnosen")).toHaveCount(0);
+  await reiter.getByRole("link", { name: /^Empfehlung/ }).click();
+  await expect(page.getByTestId("karte-empfehlung")).toBeVisible();
+  await expect(page.getByTestId("karte-therapie")).toHaveCount(0);
   // Labor und BIA getrennt
   await reiter.getByRole("link", { name: /^Labor/ }).click();
   await expect(page.getByRole("button", { name: "Neuer Laborbefund" })).toBeVisible();
