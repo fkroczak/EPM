@@ -80,6 +80,7 @@ AKTIONEN = {
     "updates_installieren": ("Ubuntu-Updates installieren", True),
     "server_neustart": ("Server neu starten", True),
     "epm_neustart": ("EPM neu starten", False),
+    "epm_update": ("EPM aktualisieren", False),   # epm-update sichert selbst, bevor es umstellt
     "sicherung": ("Sicherung erstellen", False),
     "docker_aufraeumen": ("Docker aufräumen", False),
     "pakete_aufraeumen": ("Paketreste entfernen", False),
@@ -1661,9 +1662,9 @@ class Agent:
         self.ergebnis(auftrag_id, status="erledigt" if rc == 0 else "fehler", rueckgabe=rc, beendet_am=jetzt_iso(),
                       ergebnis=kurz, ausgabe="".join(protokoll)[-AUSGABE_MAX:])
 
-    def schritt(self, titel, args, zeile, env=None, cwd=None, zeitlimit=3600):
+    def schritt(self, titel, args, zeile, env=None, cwd=None, zeitlimit=3600, eingabe=None):
         zeile(f"\n$ {' '.join(args)}\n")
-        rc, aus = self.befehl(args, env=env, cwd=cwd, zeitlimit=zeitlimit)
+        rc, aus = self.befehl(args, env=env, cwd=cwd, zeitlimit=zeitlimit, eingabe=eingabe)
         zeile(aus)
         if rc != 0:
             zeile(f"→ {titel}: Rückgabe {rc}\n")
@@ -1746,6 +1747,25 @@ class Agent:
             zeile("\n$ systemctl reboot\n")
             self.befehl(["systemctl", "reboot"], zeitlimit=60)
             return 0, "Neustart eingeleitet."
+
+        if aktion == "epm_update":
+            # Aktualisieren aus der Oberfläche (Wunsch 07.10.2026, F123). Das Skript holt den Stand, baut, sichert
+            # und stellt um; seine ausführliche Ausgabe steht in /var/log/epm-update.log. Ohne Terminal gibt es
+            # keine Tastatur, deshalb ausdrücklich ohne Standardeingabe.
+            skript = "/usr/local/sbin/epm-update"
+            args = [skript] if parameter.get("tests") else [skript, "--ohne-tests"]
+            if t:
+                zeile(f"\n(Probelauf) {' '.join(args)}\n")
+                return 0, "Probelauf: EPM nicht aktualisiert."
+            if not os.path.exists(skript):
+                return 2, "Auf diesem Server ist „epm-update“ nicht eingerichtet."
+            zeile("EPM wird aktualisiert. Beim Umstellen ist die Oberfläche kurz nicht erreichbar; der Auftrag\n"
+                  "läuft auf dem Server weiter, das Ergebnis steht danach hier.\n")
+            rc = self.schritt("Update", args, zeile, cwd=self.basis, zeitlimit=4 * 3600, eingabe="")
+            if rc == 0:
+                return 0, "EPM ist aktualisiert."
+            return rc, ("Das Update ist fehlgeschlagen – die Ausgabe steht oben, ausführlich in "
+                        "/var/log/epm-update.log. Die bisherige Version läuft weiter.")
 
         if aktion == "epm_neustart":
             if t:
