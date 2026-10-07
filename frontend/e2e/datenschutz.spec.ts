@@ -66,7 +66,7 @@ test("Erklärungen nachhalten: Hinweis im Aktenkopf, Vordruck als PDF, erfassen 
 
   // der Scan liegt als Dokument in der Akte; der Verlauf hält alles fest
   await page.goto(`/patienten/${p.id}/dokumente`);
-  await expect(page.getByTestId("dokumentliste").getByRole("listitem").filter({ hasText: "Einwilligung in die Datenverarbeitung (unterschrieben)" }))
+  await expect(page.getByTestId("dokumentliste").getByRole("row").filter({ hasText: "Einwilligung in die Datenverarbeitung (unterschrieben)" }))
     .toContainText("Einwilligung/Datenschutz");
   await page.goto(`/patienten/${p.id}/verlauf`);
   await page.getByTestId("verlauf-bereich").selectOption("erklaerungen");
@@ -272,7 +272,7 @@ test("Plan nach Freigabe per E-Mail abschließen: Mitarbeiter hält Mediziner, D
   await expect(page.getByTestId("plan-ansicht").getByTestId("pdf-text").first()).toContainText("im System abgeschlossen von S. Mitarbeit");
   // der Nachweis liegt in der Akte
   await page.goto(`/patienten/${p.id}/dokumente`);
-  await expect(page.getByTestId("dokumentliste").getByRole("listitem").filter({ hasText: "Freigabe Infusionsplan gültig ab" })).toContainText("Freigabe");
+  await expect(page.getByTestId("dokumentliste").getByRole("row").filter({ hasText: "Freigabe Infusionsplan gültig ab" })).toContainText("Freigabe");
   await med.ende();
   merken("plan_abgeschlossen", { patient: p.id, plan: entwurf.id });
   await ctx.close();

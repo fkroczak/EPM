@@ -146,7 +146,7 @@ test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", 
   const dok = gemerkt("dokumente").id;
   await page.goto(`/patienten/${dok}/dokumente`);
   const doks = page.getByTestId("dokumentliste");
-  await expect(doks.getByRole("listitem").filter({ hasText: "Arztbrief Klinikum Nord" })).toContainText("15.09.2026");
+  await expect(doks.getByRole("row").filter({ hasText: "Arztbrief Klinikum Nord" })).toContainText("15.09.2026");
   await expect(doks.getByRole("button", { name: "Port-Foto" })).toHaveCount(0);
   await page.getByLabel("Ausgeblendete anzeigen").check();
   await expect(doks.getByRole("button", { name: "Port-Foto" })).toBeVisible();
@@ -165,7 +165,7 @@ test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", 
   await expect(page.getByTestId("verlauf")).not.toContainText(weg.titel);
 
   await page.goto(`/patienten/${gemerkt("altdokument").patient}/dokumente`);
-  const alt = page.getByTestId("dokumentliste").getByRole("listitem").filter({ hasText: "Altdokument aus dem bisherigen System" });
+  const alt = page.getByTestId("dokumentliste").getByRole("row").filter({ hasText: "Altdokument aus dem bisherigen System" });
   await expect(alt).toContainText("Labor");
   await expect(alt).not.toContainText("Typ prüfen");
   await ctx.close();

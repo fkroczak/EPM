@@ -26,7 +26,7 @@ test("Dokumente hochladen, Typ am Inhalt prüfen, Metadaten ändern, ausblenden,
   const liste = page.getByTestId("dokumentliste");
   await expect(liste.getByRole("button", { name: "Arztbrief Klinik" })).toBeVisible();
   await expect(liste.getByRole("button", { name: "Port-Foto" })).toBeVisible();
-  await expect(liste.getByRole("listitem")).toHaveCount(2);   // Kopfzeile entfällt: die Liste ist keine Tabelle mehr
+  await expect(liste.getByRole("row")).toHaveCount(3);
 
   // Metadaten
   await liste.getByRole("button", { name: "Arztbrief Klinik" }).click();
@@ -39,7 +39,7 @@ test("Dokumente hochladen, Typ am Inhalt prüfen, Metadaten ändern, ausblenden,
   await details.getByLabel("Titel").fill("Arztbrief Klinikum Nord");
   await details.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Dokument gespeichert.")).toBeVisible();
-  const zeile = liste.getByRole("listitem").filter({ hasText: "Arztbrief Klinikum Nord" });
+  const zeile = liste.getByRole("row").filter({ hasText: "Arztbrief Klinikum Nord" });
   await expect(zeile).toContainText("15.09.2026");
   await expect(zeile).toContainText("Arztbrief");
 
@@ -81,9 +81,9 @@ test("Altdokument prüfen: Typ und Datum bestätigen", async ({ page }) => {
   await page.getByTestId("patientenliste").getByRole("link", { name: "Musterfrau, Erika" }).click();
   await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: /^Dokumente/ }).click();
   const liste = page.getByTestId("dokumentliste");
-  const alt = liste.getByRole("listitem").filter({ hasText: "Altdokument aus dem bisherigen System" });
+  const alt = liste.getByRole("row").filter({ hasText: "Altdokument aus dem bisherigen System" });
   await expect(alt).toContainText("Typ prüfen");
-  await alt.click();
+  await alt.getByRole("button").click();
   const details = page.getByTestId("dokument-details");
   await expect(details).toContainText("Aus dem Altsystem übernommen. Bitte Typ und Datum prüfen.");
   await expect(details).toContainText("Altsystem · Datum Dateidatum (keine Metadaten)");

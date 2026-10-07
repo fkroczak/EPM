@@ -253,7 +253,7 @@ test("Import: Probelauf, Übernahme mit Passwort und 2FA, Akte, Dokumente, Zurü
   const liste = akte.getByTestId("dokumentliste");
   await expect(liste.getByRole("button", { name: "Arztbrief alt" })).toBeVisible();
   await expect(liste.getByRole("button", { name: "notiz" })).toBeVisible();
-  await expect(liste.getByRole("listitem").filter({ hasText: "Arztbrief alt" })).toContainText("04.03.2022");
+  await expect(liste.getByRole("row").filter({ hasText: "Arztbrief alt" })).toContainText("04.03.2022");
   await expect(liste).not.toContainText("skript");
   await ctx.close();
 

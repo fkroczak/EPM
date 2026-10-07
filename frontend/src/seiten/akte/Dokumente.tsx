@@ -9,13 +9,12 @@ import type { Dokument, PatientZeile } from "@/lib/typen";
 import { useAuth } from "@/lib/auth";
 import { PatientWahl } from "@/components/PatientWahl";
 import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
-import { Anzeige, Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Knopf, Meldung, Textfeld, cx } from "@/components/ui/basis";
+import { Anzeige, Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Leer, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { Dialog } from "@/components/ui/dialog";
 import { PdfLeser, PdfVorschau } from "@/components/PdfAnsicht";
 import { name, useAkte } from "./Akte";
-import { Aktenseite, Detail, Eintrag, Eintragsliste } from "./Aktenseite";
 
 const DATUMSQUELLE: Record<string, string> = {
   eingabe: "eingegeben", pdf: "aus PDF-Metadaten", exif: "aus EXIF", dateidatum: "Dateidatum (keine Metadaten)",
@@ -205,15 +204,10 @@ function Details({ dok }: { dok: Dokument }) {
   });
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
-    <Detail testid="dokument-details" titel={dok.titel}
-      unter={`${quelle(dok)}${dok.hochgeladen_von_name ? ` · ${dok.hochgeladen_von_name}` : ""}`}
-      aktionen={<>
-        {istPdf(dok)
-          ? <Knopf klein variante="pri" icon="auge" onClick={() => setLesen(true)}>Öffnen</Knopf>
-          : <a className="btn pri klein" href={dateiUrl(dok, true)} target="_blank" rel="noopener"><Icon name="auge" />Öffnen</a>}
-        <a className="btn sec klein" href={dateiUrl(dok, false)} download><Icon name="herunterladen" />Herunterladen</a>
-      </>}>
+    <div className="flex flex-col gap-3" data-testid="dokument-details">
+      <span className="text-[0.8125rem] font-medium gedaempft">Vorschau</span>
       <Vorschau dok={dok} />
+      <span className="font-medium break-words">{dok.titel}</span>
       {!dok.typ_geprueft && erfassen ? (
         <div className="meldung warn flex gap-2 items-start text-[0.8125rem]"><Icon name="warnung" /><span>Aus dem Altsystem übernommen. Bitte Typ und Datum prüfen.</span></div>
       ) : null}
@@ -240,12 +234,19 @@ function Details({ dok }: { dok: Dokument }) {
         </div>
         <Anzeige label="Notiz" mehrzeilig>{dok.notiz}</Anzeige>
       </>}
-      <dl className="grid grid-cols-[90px_minmax(0,1fr)] gap-x-2.5 gap-y-1 text-[0.8125rem] m-0">
+      <dl className="grid grid-cols-[90px_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[0.8125rem] m-0">
+        <dt className="gedaempft">Quelle</dt><dd className="m-0">{quelle(dok)}{dok.hochgeladen_von_name ? ` · ${dok.hochgeladen_von_name}` : ""}</dd>
         <dt className="gedaempft">Datei</dt><dd className="m-0 break-all">{dok.originalname}</dd>
         <dt className="gedaempft">Größe</dt><dd className="m-0 num">{dateigroesse(dok.groesse)}</dd>
         <dt className="gedaempft">Prüfsumme</dt><dd className="m-0 num" title={dok.sha256}>SHA-256 · {dok.sha256.slice(0, 4)}…{dok.sha256.slice(-4)}</dd>
       </dl>
       {speichern.error && !Object.keys(f).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
+      <div className="flex gap-2 flex-wrap">
+        {istPdf(dok)
+          ? <Knopf variante="pri" icon="auge" onClick={() => setLesen(true)}>Öffnen</Knopf>
+          : <a className="btn pri" href={dateiUrl(dok, true)} target="_blank" rel="noopener"><Icon name="auge" />Öffnen</a>}
+        <a className="btn sec" href={dateiUrl(dok, false)} download><Icon name="herunterladen" />Herunterladen</a>
+      </div>
       {istPdf(dok) ? (
         <Dialog offen={lesen} onOffen={setLesen} titel={dok.titel} breite={1100}
           beschreibung={<>{dok.originalname} · <a href={dateiUrl(dok, false)} download>Herunterladen</a></>}>
@@ -270,7 +271,7 @@ function Details({ dok }: { dok: Dokument }) {
           {loeschenErlaubt ? <LoeschenDialog dok={dok} offen={falsch === "loeschen"} onOffen={(o) => setFalsch(o ? "loeschen" : null)} /> : null}
         </div>
       ) : null}
-    </Detail>
+    </div>
   );
 }
 
@@ -311,30 +312,27 @@ export function Dokumente() {
   };
 
   return (
-    <Aktenseite
-      testid="dokumente"
-      titel={liste.length === 1 ? "Dokument" : "Dokumente"}
-      anzahl={liste.length}
-      laedt={dokumente.isLoading}
-      aktion={erfassen ? (
-        <div
-          className={cx("rounded-[12px] border-2 border-dashed px-3 py-3 flex flex-col items-center justify-center gap-1.5 text-[0.8125rem] text-center",
-            ziehen ? "border-akzent bg-akzent-weich" : "border-rand bg-flaeche")}
-          onDragOver={(e) => { e.preventDefault(); setZiehen(true); }}
-          onDragLeave={() => setZiehen(false)}
-          onDrop={(e) => { e.preventDefault(); setZiehen(false); if (e.dataTransfer.files.length) void hochladen(e.dataTransfer.files); }}
-          data-testid="ablage">
-          <Knopf variante="pri" icon="hochladen" onClick={() => eingabe.current?.click()}>Dateien auswählen</Knopf>
-          <span className="gedaempft">oder hierher ziehen · PDF, JPG, PNG, TXT · max. 50 MB</span>
-          <input ref={eingabe} type="file" multiple hidden aria-label="Dateien hochladen" accept=".pdf,.jpg,.jpeg,.png,.txt,application/pdf,image/jpeg,image/png,text/plain"
-            onChange={(e) => { if (e.target.files?.length) void hochladen(e.target.files); e.target.value = ""; }} />
-        </div>
-      ) : undefined}
-      kopfrechts={<>
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] fhd:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
+      <div className="flex flex-col gap-4 min-w-0">
+        {erfassen ? (
+          <div
+            className={cx("rounded-[14px] border-2 border-dashed px-5 py-6 flex items-center justify-center gap-3 flex-wrap text-sm", ziehen ? "border-akzent bg-akzent-weich" : "border-rand bg-flaeche")}
+            onDragOver={(e) => { e.preventDefault(); setZiehen(true); }}
+            onDragLeave={() => setZiehen(false)}
+            onDrop={(e) => { e.preventDefault(); setZiehen(false); if (e.dataTransfer.files.length) void hochladen(e.dataTransfer.files); }}
+            data-testid="ablage">
+            <Icon name="hochladen" groesse={20} />
+            <span>Dateien hierher ziehen oder</span>
+            <Knopf onClick={() => eingabe.current?.click()}>Auswählen</Knopf>
+            <span className="gedaempft text-[0.8125rem]">PDF, JPG, PNG, TXT · max. 50 MB</span>
+            <input ref={eingabe} type="file" multiple hidden aria-label="Dateien hochladen" accept=".pdf,.jpg,.jpeg,.png,.txt,application/pdf,image/jpeg,image/png,text/plain"
+              onChange={(e) => { if (e.target.files?.length) void hochladen(e.target.files); e.target.value = ""; }} />
+          </div>
+        ) : null}
         {uploads.length ? (
           <ul className="m-0 p-0 list-none flex flex-col gap-1.5" aria-live="polite" data-testid="uploads">
             {uploads.map((u) => (
-              <li key={u.name} className={cx("meldung text-[0.8125rem] flex items-center gap-2", u.status === "fehler" ? "fehler" : u.status === "ok" ? "ok" : "info")}>
+              <li key={u.name} className={cx("meldung text-sm flex items-center gap-2", u.status === "fehler" ? "fehler" : u.status === "ok" ? "ok" : "info")}>
                 <Icon name={u.status === "fehler" ? "warnung" : u.status === "ok" ? "haken" : "sanduhr"} />
                 <span className="font-medium">{u.name}</span>
                 <span>{u.status === "laeuft" ? "wird hochgeladen …" : u.status === "ok" ? "hochgeladen" : u.meldung}</span>
@@ -342,30 +340,41 @@ export function Dokumente() {
             ))}
           </ul>
         ) : null}
-        <label className="flex items-center gap-2 text-[0.8125rem] cursor-pointer">
-          <input type="checkbox" checked={ausgeblendete} onChange={(e) => setAusgeblendete(e.target.checked)} /> Ausgeblendete anzeigen
-        </label>
-        <Fehleranzeige fehler={dokumente.error} />
-      </>}
-      liste={
-        <Eintragsliste name="Dokumente" testid="dokumentliste" leer={liste.length ? undefined : "Noch keine Dokumente."}>
-          {liste.map((d) => (
-            <Eintrag key={d.id} aktiv={d.id === aktiv?.id} onWahl={() => setGewaehlt(d.id)} warnung={!d.typ_geprueft}
-              datum={datum(d.datum)}
-              merkmal={!d.typ_geprueft ? <Chip art="warn">Typ prüfen</Chip>
-                : d.ausgeblendet ? <Chip>ausgeblendet</Chip> : null}
-              zeile={<span className="inline-flex items-center gap-1.5">
-                <Icon name={d.mime.startsWith("image/") ? "bild" : "dokument"} groesse={13} />{d.titel}</span>}
-              unten={[d.typ_name ?? "ohne Typ", dateigroesse(d.groesse),
-                d.herkunft === "altsystem" ? "Import" : d.herkunft === "system" ? "EPM" : d.hochgeladen_von_name ?? ""]
-                .filter(Boolean).join(" · ")} />
-          ))}
-        </Eintragsliste>
-      }
-      fuss={<>Dokumente aus dem Altsystem haben noch keinen geprüften Typ – beim Durchsehen rechts Typ und Datum
-        setzen. Gelöscht wird nichts, Fehlablagen werden ausgeblendet.</>}
-      detail={aktiv ? <Details dok={aktiv} /> : null}
-      leer="Links ein Dokument wählen."
-    />
+        <div className="flex items-center justify-between">
+          <span className="lbl">{liste.length} Dokumente</span>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" checked={ausgeblendete} onChange={(e) => setAusgeblendete(e.target.checked)} /> Ausgeblendete anzeigen
+          </label>
+        </div>
+        <Karte className="overflow-hidden">
+          {dokumente.isLoading ? <Laden /> : (
+            <table className="tabelle" data-testid="dokumentliste">
+              <thead><tr><th className="th">Dokument</th><th className="th">Typ</th><th className="th">Datum</th><th className="th text-right">Größe</th><th className="th">Von</th></tr></thead>
+              <tbody>
+                {liste.map((d) => (
+                  <tr key={d.id} className={cx(d.id === aktiv?.id && "gewaehlt", d.ausgeblendet && "opacity-60")}>
+                    <td className="td">
+                      <button type="button" className="bg-transparent border-0 p-0 cursor-pointer text-left inline-flex items-center gap-2 font-medium text-akzent-text"
+                        aria-current={d.id === aktiv?.id ? "true" : undefined} onClick={() => setGewaehlt(d.id)}>
+                        <Icon name={d.mime.startsWith("image/") ? "bild" : "dokument"} />{d.titel}
+                      </button>
+                    </td>
+                    <td className="td"><span className="inline-flex items-center gap-2">{d.typ_name ?? "—"}{!d.typ_geprueft ? <Chip art="warn">Typ prüfen</Chip> : null}</span></td>
+                    <td className="td num">{datum(d.datum)}</td>
+                    <td className="td num text-right">{dateigroesse(d.groesse)}</td>
+                    <td className="td">{d.herkunft === "altsystem" ? "Import" : d.herkunft === "system" ? "EPM" : d.hochgeladen_von_name ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {dokumente.data && !liste.length ? <Leer>Noch keine Dokumente.</Leer> : null}
+          <Fehleranzeige fehler={dokumente.error} />
+        </Karte>
+      </div>
+      <Karte className="px-5 py-[18px]">
+        {aktiv ? <Details dok={aktiv} /> : <span className="text-sm gedaempft">Kein Dokument ausgewählt.</span>}
+      </Karte>
+    </div>
   );
 }
