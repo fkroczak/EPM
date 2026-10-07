@@ -40,7 +40,8 @@ export function useZweiterFaktor({ notfallcodes = true, label = "Code aus der Au
   const [code, setCode] = useState("");
   const [antwort, setAntwort] = useState<PasskeyAntwort | null>(null);
   useEffect(() => { if (art === "passkey" && !passkeyGeht) setArt("code"); }, [art, passkeyGeht]);
-  const zuruecksetzen = () => { setCode(""); setAntwort(null); };
+  // beim Öffnen eines Dialogs: leer, und der Passkey vorgewählt, sobald es einen gibt
+  const zuruecksetzen = () => { setCode(""); setAntwort(null); setArt(passkeyGeht ? "passkey" : "code"); };
   return {
     bereit: art === "passkey" ? !!antwort : !!code.trim(),
     body: art === "passkey" && antwort ? { passkey: antwort } : { code: code.trim() },
