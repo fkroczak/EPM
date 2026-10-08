@@ -190,12 +190,35 @@ fi
 schritt "Projektdateien aktualisieren (Compose, Nginx, Skripte)"
 (cd "$CODE/rollout" && ./04-projekt.sh >/dev/null)
 install -m 0750 "$CODE/werkzeuge/epm-update.sh" /usr/local/sbin/epm-update
+install -m 0750 "$CODE/werkzeuge/ocr-modelle.sh" /usr/local/sbin/epm-ocr-modelle
+
+# OCR-Modelle (PP-OCRv5, UVDoc): offline vorbereitet und mit „epm-ocr-modelle einspielen“ abgelegt → in den
+# Bau-Kontext legen; der Bau übernimmt sie von dort statt sie von huggingface.co zu laden.
+MODELLE_VORRAT="$B/ocr-modelle"
+MODELLE_KONTEXT="$CODE/backend/scans/modelle/dateien"
+MODELLE_DA=0
+if [[ -d "$MODELLE_VORRAT" ]] && python3 "$CODE/backend/scans/modelle/holen.py" --nur-pruefen "$MODELLE_VORRAT" >/dev/null 2>&1; then
+  rm -rf "$MODELLE_KONTEXT"; mkdir -p "$MODELLE_KONTEXT"; cp -a "$MODELLE_VORRAT/." "$MODELLE_KONTEXT/"
+  MODELLE_DA=1
+fi
+# Ein schon gebautes Image ohne Modelle wird neu gebaut, sobald die Modelle bereitliegen.
+if [[ $MODELLE_DA -eq 1 ]] && docker image inspect "epm-backend:$TAG" >/dev/null 2>&1 \
+   && ! docker run --rm --entrypoint test "epm-backend:$TAG" -f /opt/ocr-modelle/detection/v5/det.onnx 2>/dev/null; then
+  echo "   OCR-Modelle liegen bereit – epm-backend:$TAG wird mit ihnen neu gebaut"
+  docker image rm "epm-backend:$TAG" >/dev/null
+fi
 
 if docker image inspect "epm-backend:$TAG" >/dev/null 2>&1 && docker image inspect "epm-web:$TAG" >/dev/null 2>&1; then
   schritt "Images epm-backend:$TAG und epm-web:$TAG sind schon gebaut"
 else
   schritt "Image epm-backend:$TAG bauen"
   docker build -t "epm-backend:$TAG" "$CODE/backend" >>"$PROTOKOLL" 2>&1
+  if docker run --rm --entrypoint test "epm-backend:$TAG" -f /opt/ocr-modelle/detection/v5/det.onnx 2>/dev/null; then
+    echo "   Texterkennung: Tesseract + PP-OCRv5"
+  else
+    echo "   Texterkennung: nur Tesseract – PP-OCRv5-Modelle fehlen (kein Zugang zu huggingface.co?)."
+    echo "   Offline nachreichen: werkzeuge/ocr-modelle.sh vorbereiten (PC) → sudo epm-ocr-modelle einspielen DATEI → sudo epm-update"
+  fi
   docker run --rm -e DJANGO_DEBUG=1 "epm-backend:$TAG" python manage.py check
   if ! docker run --rm -e DJANGO_DEBUG=1 "epm-backend:$TAG" python manage.py makemigrations --check --dry-run >/dev/null; then
     echo "ABBRUCH: Im Code fehlen Datenbank-Migrationen. Nichts wurde umgestellt."
