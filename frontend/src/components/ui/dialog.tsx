@@ -24,6 +24,8 @@ export function Dialog({ offen, onOffen, titel, beschreibung, children, fuss, br
           onKeyDown={(e) => {
             // Strg Enter (Mac: ⌘ Enter) speichert: löst den Hauptknopf unten rechts aus (Tastenkürzel, 08.10.2026)
             if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey) || e.defaultPrevented) return;
+            // nur für diesen Dialog, nicht für einen darin verschachtelten (der hat seinen eigenen Hauptknopf)
+            if (!e.currentTarget.contains(e.target as Node)) return;
             const knoepfe = e.currentTarget.querySelectorAll<HTMLButtonElement>(".dialog-fuss .btn.pri:not(:disabled)");
             const knopf = knoepfe[knoepfe.length - 1];
             if (!knopf) return;

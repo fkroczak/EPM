@@ -13,7 +13,10 @@ test("Kalender: Menüpunkt, Überfälliges und berechnete Fälligkeiten", async 
   await page.getByRole("navigation", { name: "Hauptnavigation" }).getByRole("link", { name: "Kalender" }).click();
   await expect(page.getByRole("heading", { name: "Kalender", level: 1 })).toBeVisible();
   await expect(page.getByTestId("kalender-monat")).toBeVisible();
-  // Musterdaten: Rückruf bei Musterfrau vor 3 Tagen ist überfällig; der Plan von Probe, Jonas ist älter als 12 Monate
+  // Musterdaten: Rückruf bei Musterfrau vor 3 Tagen ist überfällig; der Plan von Probe, Jonas ist älter als 12 Monate.
+  // Rechts die Reiter Tag | Überfällig | Fällig (Entwurf 08.10.2026), zuerst der heutige Tag
+  await expect(page.getByTestId("tagesliste")).toBeVisible();
+  await page.getByTestId("kalender-seite").getByRole("tab", { name: /Überfällig/ }).click();
   await expect(page.getByTestId("ueberfaellig-termine")).toContainText("Musterfrau, Erika");
   await expect(page.getByTestId("ueberfaellig-plan")).toContainText("Probe, Jonas");
   await page.getByTestId("ueberfaellig-plan").getByRole("button", { name: /Plan prüfen: Probe, Jonas/ }).click();
@@ -37,7 +40,7 @@ test("Kalender: Termin an einem Tag anlegen, öffnen, abhaken; Erledigte ausblen
   const ziel = tagIn(10);
   await page.goto(`/kalender?datum=${ziel}`);
   await page.getByTestId(`tag-${ziel}`).click();
-  await page.getByTestId("tagesliste").getByRole("button", { name: "Termin", exact: true }).click();
+  await page.getByTestId("tagesliste").getByRole("button", { name: /^Termin am / }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByLabel("Datum")).toHaveValue(ziel);
   await dialog.getByLabel("Patient").fill("Beispiel");
@@ -63,7 +66,12 @@ test("Kalender: Termin an einem Tag anlegen, öffnen, abhaken; Erledigte ausblen
   await page.getByTestId(`tag-${ziel}`).getByRole("button", { name: /E2E Kalender Kontrolle \(erledigt\)/ }).click();
   await expect(page.getByRole("dialog").getByTestId("eintrag-details")).toContainText("Erledigt");
   await page.keyboard.press("Escape");
-  await page.getByLabel("Erledigte zeigen").uncheck();
+  // „Anzeigen ▾“: Arten und Erledigte in einem Menü mit Legende
+  await page.getByTestId("anzeigen").click();
+  await page.getByTestId("anzeigen-auswahl").getByLabel("Erledigte zeigen").uncheck();
+  await expect(page.getByTestId("anzeigen")).toContainText("ohne Erledigte");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("anzeigen-auswahl")).toHaveCount(0);
   await expect(page.getByTestId(`tag-${ziel}`).getByRole("button", { name: /E2E Kalender Kontrolle/ })).toHaveCount(0);
   merken("kalender", { datum: ziel, titel: "E2E Kalender Kontrolle" });
 });
@@ -73,8 +81,10 @@ test("Kalender: Betrachter sieht alles, legt aber nichts an", async ({ browser }
   const page = await ctx.newPage();
   await page.goto("/kalender");
   await expect(page.getByTestId("kalender-monat")).toBeVisible();
-  await expect(page.getByTestId("ueberfaellig-termine")).toContainText("Musterfrau, Erika");
   await expect(page.getByRole("button", { name: "Termin", exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("tagesliste").getByRole("button", { name: /^Termin am / })).toHaveCount(0);
+  await page.getByRole("tab", { name: /Überfällig/ }).click();
+  await expect(page.getByTestId("ueberfaellig-termine")).toContainText("Musterfrau, Erika");
   await page.getByTestId("ueberfaellig-termine").getByRole("button", { name: /Musterfrau, Erika/ }).first().click();
   await expect(page.getByRole("dialog").getByRole("link", { name: "Akte öffnen" })).toBeVisible();
   await expect(page.getByRole("dialog").getByRole("button", { name: "Erledigt" })).toHaveCount(0);
@@ -89,6 +99,7 @@ test("Kalender: Termin mit „×“ ausblenden (3 Monate, Grund), in der Akte wi
   await api.post("termine/", { patient: p.id, art: "rueckruf", faellig_am: tagIn(-5), titel: "Rückruf E2E ausblenden" });
   await api.ende();
   await page.goto("/kalender");
+  await page.getByRole("tab", { name: /Überfällig/ }).click();
   const eintrag = page.getByTestId("ueberfaellig-termine").getByTestId("kalender-eintrag").filter({ hasText: `${nachname}, Ina` });
   await expect(eintrag).toBeVisible();
   await eintrag.locator("xpath=..").getByTestId("eintrag-ausblenden").click();
@@ -108,5 +119,37 @@ test("Kalender: Termin mit „×“ ausblenden (3 Monate, Grund), in der Akte wi
   await versteckt.getByRole("button", { name: "Wieder einschalten" }).click();
   await expect(page.getByText("Termin wieder eingeschaltet.")).toBeVisible();
   await page.goto("/kalender");
+  await page.getByRole("tab", { name: /Überfällig/ }).click();
   await expect(page.getByTestId("ueberfaellig-termine")).toContainText(`${nachname}, Ina`);
+});
+
+test("Kalender: eine Werkzeugzeile, Monat ohne Scrollen auf 1080p; Telefon mit Wochenband (Entwurf 08.10.2026)", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/kalender");
+  await expect(page.getByTestId("kalender-monat")).toBeVisible();
+  // Titel, Blättern, Ansicht, Anzeigen und „+ Termin“ in einer Zeile
+  const titel = (await page.getByTestId("kalender-titel").boundingBox())!;
+  const anzeigen = (await page.getByTestId("anzeigen").boundingBox())!;
+  expect(Math.abs(titel.y + titel.height / 2 - (anzeigen.y + anzeigen.height / 2))).toBeLessThan(12);
+  // der Monat passt in die Fensterhöhe
+  const monat = (await page.getByTestId("kalender-monat").boundingBox())!;
+  expect(monat.y + monat.height).toBeLessThanOrEqual(1080);
+  // Fällig-Reiter
+  await page.getByRole("tab", { name: /^Fällig/ }).click();
+  await expect(page.getByTestId("bald-kontakt")).toBeVisible();
+
+  // Telefon: Wochenband, Tag | Überfällig | Woche, keine waagerechte Scrollleiste
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/kalender");
+  const band = page.getByTestId("kalender-woche");
+  await expect(band.getByRole("button")).toHaveCount(7);
+  await expect(band.getByRole("button", { pressed: true })).toHaveCount(1);
+  await expect(page.getByTestId("tagesliste")).toBeVisible();
+  await page.getByRole("tab", { name: /Überfällig/ }).click();
+  await expect(page.getByTestId("ueberfaellig-termine")).toBeVisible();
+  await page.getByRole("tab", { name: "Woche" }).click();
+  await expect(page.getByTestId("kalender-liste").or(page.getByText("In diesem Zeitraum gibt es keine Einträge."))).toBeVisible();
+  await page.getByRole("button", { name: "Weiter" }).click();
+  await expect(band.getByRole("button", { pressed: true })).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });

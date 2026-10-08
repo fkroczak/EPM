@@ -3,18 +3,18 @@
  * Fälligkeiten (Kontakt fällig, Infusionsplan prüfen) und Feiertage (NRW) – als Monat, Woche oder Liste.
  * Termine anlegen, ändern und abhaken wie auf der Startseite (gleicher Dialog, gleiche Rechte).
  */
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { abfrage, api } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { datum, heuteIso, nummer, uhrzeit, zeitpunkt } from "@/lib/format";
-import { ab, useMobil, useStufe } from "@/lib/stufen";
+import { useMobil } from "@/lib/stufen";
 import { TERMINARTEN } from "@/lib/typen";
 import type { Termin } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
-import { Chip, Fehleranzeige, Karte, Knopf, Laden, Leer, Segmente, Seitenkopf, cx } from "@/components/ui/basis";
+import { Chip, Fehleranzeige, Karte, Knopf, Laden, Leer, Segmente, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
@@ -320,12 +320,12 @@ function Liste({ tage, feiertage, heute, onWahl }: {
   return (
     <div className="flex flex-col" data-testid="kalender-liste">
       {tage.map(([d, eintraege]) => (
-        <section key={d} data-testid={`tag-${d}`} className="grid grid-cols-[200px_minmax(0,1fr)] gap-3 py-2 border-b border-rand last:border-b-0">
+        <section key={d} data-testid={`tag-${d}`} className="grid grid-cols-1 sm:grid-cols-[200px_minmax(0,1fr)] gap-x-3 gap-y-1.5 py-2 border-b border-rand last:border-b-0">
           <div className="flex flex-col">
             <span className={cx("font-semibold text-sm", d === heute && "text-akzent-text")}>{langerTag(d)}</span>
             {feiertage.get(d) ? <span className="text-xs text-fehler">{feiertage.get(d)}</span> : null}
           </div>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-1.5">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(260px,100%),1fr))] gap-1.5">
             {eintraege.map((e) => <EintragKnopf key={e.schluessel} e={e} heute={heute} onWahl={onWahl} voll />)}
           </div>
         </section>
@@ -334,32 +334,97 @@ function Liste({ tage, feiertage, heute, onWahl }: {
   );
 }
 
-function Seitenliste({ titel, anzahl, children, testid }: { titel: string; anzahl: number; children: ReactNode; testid: string }) {
+// ---------------------------------------------------------------- Anzeigen ▾ (Filter und Legende in einem)
+const LEGENDE: Record<Filter, string> = {
+  praxistermin: "bg-akzent-weich", rueckruf: "bg-fein border border-rand", wiedervorlage: "bg-warn-bg", sonstiges: "bg-fein border border-rand",
+  kontakt: "border border-dashed border-fehler", plan: "border border-dashed border-akzent",
+};
+
+function Anzeigen({ filter, onFilter, erledigte, onErledigte }: {
+  filter: Filter[]; onFilter: (f: Filter[]) => void; erledigte: boolean; onErledigte: (e: boolean) => void;
+}) {
+  const [offen, setOffen] = useState(false);
+  const rahmen = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!offen) return;
+    const weg = (e: Event) => { if (rahmen.current && !rahmen.current.contains(e.target as Node)) setOffen(false); };
+    const taste = (e: KeyboardEvent) => { if (e.key === "Escape") setOffen(false); };
+    document.addEventListener("mousedown", weg);
+    document.addEventListener("keydown", taste);
+    return () => { document.removeEventListener("mousedown", weg); document.removeEventListener("keydown", taste); };
+  }, [offen]);
+  const alle = filter.length === FILTER.length;
   return (
-    <div className="flex flex-col gap-1.5" data-testid={testid}>
-      <h3 className="m-0 text-[0.8125rem] font-semibold flex items-center gap-2">{titel}<span className="num gedaempft font-normal">{anzahl}</span></h3>
-      {children}
+    <div className="relative" ref={rahmen}>
+      <button type="button" className="btn sec" aria-expanded={offen} aria-haspopup="dialog" onClick={() => setOffen(!offen)}
+        data-testid="anzeigen">
+        Anzeigen: {alle ? "alle" : filter.length ? `${filter.length} von ${FILTER.length}` : "nichts"}{!erledigte ? " · ohne Erledigte" : ""}
+        <span aria-hidden="true">▾</span>
+      </button>
+      {offen ? (
+        <div role="group" aria-label="Was anzeigen" className="card absolute right-0 top-[calc(100%+6px)] z-40 p-3 w-[250px] flex flex-col gap-1.5"
+          data-testid="anzeigen-auswahl">
+          <span className="lbl text-[0.75rem]">Anzeigen</span>
+          {FILTER.map((f) => (
+            <label key={f.wert} className="flex items-center gap-2.5 text-sm cursor-pointer py-0.5">
+              <input type="checkbox" checked={filter.includes(f.wert)}
+                onChange={() => onFilter(filter.includes(f.wert) ? filter.filter((x) => x !== f.wert) : [...filter, f.wert])} />
+              <span className={cx("w-4 h-3 rounded-sm shrink-0", LEGENDE[f.wert])} aria-hidden="true" />{f.text}
+            </label>
+          ))}
+          <label className="flex items-center gap-2.5 text-sm cursor-pointer pt-2 mt-1 border-t border-rand">
+            <input type="checkbox" checked={erledigte} onChange={(e) => onErledigte(e.target.checked)} /> Erledigte zeigen
+          </label>
+          <span className="text-xs gedaempft leading-snug pt-1">Rot: überfällig · gestrichelt: berechnet (Kontakt fällig, Plan prüfen)</span>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function Gekuerzt({ eintraege, heute, onWahl }: { eintraege: Eintrag[]; heute: string; onWahl: (e: Eintrag) => void }) {
-  const [alle, setAlle] = useState(false);
-  if (eintraege.length === 0) return <span className="text-xs gedaempft">keine</span>;
-  const zeigen = alle ? eintraege : eintraege.slice(0, 8);
+// ---------------------------------------------------------------- rechte Spalte (Tablet: darunter) mit Reitern
+type Reiter = "tag" | "ueberfaellig" | "faellig" | "woche";
+
+function Zeile({ e, heute, onWahl, links }: { e: Eintrag; heute: string; onWahl: (e: Eintrag) => void; links: string }) {
   return (
-    <div className="flex flex-col gap-1">
-      {zeigen.map((e) => (
-        <div key={e.schluessel} className="flex items-center gap-2 min-w-0">
-          <span className="num text-[0.75rem] gedaempft w-12 shrink-0">{kurz(e.datum)}</span>
-          <div className="grow min-w-0"><EintragKnopf e={e} heute={heute} onWahl={onWahl} /></div>
-        </div>
+    <div className="flex items-stretch gap-2 min-w-0">
+      <span className="num text-[0.75rem] gedaempft w-12 shrink-0 pt-1.5">{links}</span>
+      <div className="grow min-w-0"><EintragKnopf e={e} heute={heute} onWahl={onWahl} voll /></div>
+    </div>
+  );
+}
+
+function Gruppe({ titel, eintraege, heute, onWahl, testid, datumLinks }: {
+  titel?: string; eintraege: Eintrag[]; heute: string; onWahl: (e: Eintrag) => void; testid?: string; datumLinks?: boolean;
+}) {
+  const [alle, setAlle] = useState(false);
+  const zeigen = alle ? eintraege : eintraege.slice(0, 12);
+  return (
+    <div className="flex flex-col gap-1.5" data-testid={testid}>
+      {titel ? <h3 className="m-0 text-[0.75rem] font-semibold uppercase tracking-wide gedaempft flex items-center gap-2">{titel}
+        <span className="num font-normal">{eintraege.length}</span></h3> : null}
+      {eintraege.length === 0 ? <span className="text-xs gedaempft">keine</span> : zeigen.map((e) => (
+        <Zeile key={e.schluessel} e={e} heute={heute} onWahl={onWahl}
+          links={datumLinks ? kurz(e.datum) : e.termin ? (e.termin.uhrzeit ? uhrzeit(e.termin.uhrzeit) : "ganzt.") : "—"} />
       ))}
-      {eintraege.length > 8 ? (
-        <button type="button" className="text-left text-xs gedaempft bg-transparent border-0 cursor-pointer p-0" onClick={() => setAlle(!alle)}>
-          {alle ? "weniger anzeigen" : `alle ${eintraege.length} anzeigen`}
-        </button>
+      {eintraege.length > 12 ? (
+        <button type="button" className="self-start text-xs gedaempft bg-transparent border-0 cursor-pointer p-0" onClick={() => setAlle(!alle)}>
+          {alle ? "weniger anzeigen" : `alle ${eintraege.length} anzeigen`}</button>
       ) : null}
+    </div>
+  );
+}
+
+function Reiterleiste({ reiter, wert, onWahl }: { reiter: { wert: Reiter; text: ReactNode }[]; wert: Reiter; onWahl: (r: Reiter) => void }) {
+  return (
+    <div role="tablist" aria-label="Kalender-Liste" className="flex border-b border-rand shrink-0">
+      {reiter.map((r) => (
+        <button key={r.wert} type="button" role="tab" aria-selected={wert === r.wert} onClick={() => onWahl(r.wert)}
+          className={cx("grow basis-0 bg-transparent border-0 border-b-2 cursor-pointer px-2 py-2.5 text-sm text-center",
+            wert === r.wert ? "border-akzent font-semibold text-tinte" : "border-transparent gedaempft hover:text-tinte")}>
+          {r.text}
+        </button>
+      ))}
     </div>
   );
 }
@@ -368,10 +433,10 @@ function Gekuerzt({ eintraege, heute, onWahl }: { eintraege: Eintrag[]; heute: s
 export function Kalender() {
   const { darf, darfBei } = useAuth();
   const [params, setParams] = useSearchParams();
-  // am Telefon (Festlegung 08.10.2026) ist die Liste Standard – das Monatsraster ist dort zu eng zum Lesen
+  // Telefon (Entwurf 08.10.2026): Wochenband mit Tagen, darunter Tag | Überfällig | Woche
   const mobil = useMobil();
-  const ansicht = (["monat", "woche", "liste"].includes(params.get("ansicht") ?? "") ? params.get("ansicht")
-    : mobil ? "liste" : "monat") as Ansicht;
+  const ansichtWahl = (["monat", "woche", "liste"].includes(params.get("ansicht") ?? "") ? params.get("ansicht") : "monat") as Ansicht;
+  const ansicht: Ansicht = mobil ? "woche" : ansichtWahl;
   const bezug = /^\d{4}-\d{2}-\d{2}$/.test(params.get("datum") ?? "") ? params.get("datum")! : heuteIso();
   const setze = (werte: Record<string, string>) => setParams((p) => {
     const n = new URLSearchParams(p);
@@ -380,16 +445,17 @@ export function Kalender() {
   }, { replace: true });
   const [filter, setFilter] = useState<Filter[]>(FILTER.map((f) => f.wert));
   const [erledigte, setErledigte] = useState(true);
-  const [gewaehlt, setGewaehlt] = useState(heuteIso());
+  // gewählter Tag: aus ?datum= (Link auf einen Tag, Telefon-Wochenband), sonst heute
+  const [gewaehlt, setGewaehlt] = useState(() => (/^\d{4}-\d{2}-\d{2}$/.test(params.get("datum") ?? "") ? params.get("datum")! : heuteIso()));
+  const [reiter, setReiter] = useState<Reiter>("tag");
   const [eintrag, setEintrag] = useState<Eintrag | null>(null);
   const [neu, setNeu] = useState<{ datum: string; patient?: number; name?: string } | null>(null);
   const [aendern, setAendern] = useState<Termin | null>(null);
   const [weg, setWeg] = useState<Eintrag | null>(null);
   const schreiben = darf("eintraege_erfassen");
-  const stufe = useStufe();
   useOhneRechtSchliessen(schreiben, () => { setNeu(null); setAendern(null); });
 
-  const z = zeitraum(ansicht, bezug);
+  const z = zeitraum(ansicht, mobil ? gewaehlt : bezug);
   const daten = useQuery({
     queryKey: ["kalender", z.von, z.bis, erledigte],
     queryFn: () => api<KalenderDaten>(`kalender/${abfrage({ von: z.von, bis: z.bis, erledigte: erledigte ? 1 : 0 })}`),
@@ -437,96 +503,128 @@ export function Kalender() {
 
   const listenTage = [...tage.entries()].sort(([a], [b]) => a.localeCompare(b));
   const tagEintraege = tage.get(gewaehlt) ?? [];
+  const naechste = listenTage.filter(([d]) => d > gewaehlt && d <= plus(gewaehlt, 7)).flatMap(([, l]) => l);
+  const anzahlUeber = ueberfaellig.termine.length + ueberfaellig.kontakt.length + ueberfaellig.plan.length;
   const neuAm = schreiben ? (d: string) => setNeu({ datum: d }) : undefined;
   // Offener Termin, den die Person ändern darf: gleich „Termin bearbeiten“ (mit „Erledigt“ und „Akte öffnen“) statt erst
-  // einer Ansicht mit „Ändern“ (Vorschlag „Bearbeiten sichtbar“, 08.10.2026); Fälligkeiten und Erledigtes wie bisher
+  // einer Ansicht mit „Bearbeiten“ (Vorschlag „Bearbeiten sichtbar“, 08.10.2026); Fälligkeiten und Erledigtes wie bisher
   const waehlen = (e: Eintrag) => {
     const t = e.termin;
     if (t && !t.erledigt_am && schreiben && darfBei("eintraege_erfassen", { ist_test: t.patient_ist_test })) setAendern(t);
     else setEintrag(e);
   };
+  const tagWaehlen = (d: string) => { setGewaehlt(d); setReiter("tag"); };
+  const blaettern = (richtung: 1 | -1) => {
+    if (mobil) { const d = plus(gewaehlt, 7 * richtung); setGewaehlt(d); setze({ datum: d }); }
+    else setze({ datum: weiter(ansicht, bezug, richtung) });
+  };
+  const heuteWaehlen = () => { setze({ datum: heuteIso() }); setGewaehlt(heuteIso()); setReiter("tag"); };
+  const titel = mobil ? `${MONATE[tag(gewaehlt).getUTCMonth()]} ${tag(gewaehlt).getUTCFullYear()}` : z.titel;
+
+  // Inhalt eines Reiters (rechte Spalte, Tablet darunter, Telefon unter dem Wochenband)
+  const tagInhalt = (
+    <div className="flex flex-col gap-3" data-testid="tagesliste">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="lbl m-0">{langerTag(gewaehlt)}</h2>
+        {feiertage.get(gewaehlt) ? <span className="text-xs text-fehler">{feiertage.get(gewaehlt)}</span> : null}
+      </div>
+      <Gruppe eintraege={tagEintraege} heute={heute} onWahl={waehlen} />
+      {naechste.length ? <Gruppe titel="Nächste 7 Tage" eintraege={naechste} heute={heute} onWahl={waehlen} datumLinks /> : null}
+      {schreiben ? <Knopf klein icon="plus" className="self-start" onClick={() => setNeu({ datum: gewaehlt })}>Termin am {kurz(gewaehlt)}</Knopf> : null}
+    </div>
+  );
+  const ueberInhalt = (
+    <div className="flex flex-col gap-4" data-testid="ueberfaellig">
+      <Gruppe titel="Offene Termine" eintraege={ueberfaellig.termine} heute={heute} onWahl={waehlen} testid="ueberfaellig-termine" datumLinks />
+      <Gruppe titel={`Kontakt überfällig (über ${daten.data?.grenzen.kontakt_monate ?? "…"} Mon.)`} eintraege={ueberfaellig.kontakt}
+        heute={heute} onWahl={waehlen} testid="ueberfaellig-kontakt" datumLinks />
+      <Gruppe titel={`Plan prüfen (älter als ${daten.data?.grenzen.plan_monate ?? "…"} Mon.)`} eintraege={ueberfaellig.plan}
+        heute={heute} onWahl={waehlen} testid="ueberfaellig-plan" datumLinks />
+    </div>
+  );
+  const faelligInhalt = (
+    <Gruppe titel={`Kontakt bald fällig (über ${daten.data?.grenzen.kontakt_bald_monate ?? "…"} Mon.)`} eintraege={ueberfaellig.bald}
+      heute={heute} onWahl={waehlen} testid="bald-kontakt" datumLinks />
+  );
+  const zahlChip = (n: number, rot?: boolean) => n ? <span className={cx("num ml-1.5 px-1.5 rounded", rot ? "bg-fehler-bg text-fehler" : "gedaempft")}>{n}</span> : null;
 
   return (
     <Ausblenden.Provider value={setWeg}>
     <Seite pfad={[{ text: "Kalender" }]}>
-      <Seitenkopf titel="Kalender"
-        rechts={<>
-          <Segmente label="Ansicht" wert={ansicht} onWahl={(a) => setze({ ansicht: a })} werte={[
-            { wert: "monat", text: "Monat" }, { wert: "woche", text: "Woche" }, { wert: "liste", text: "Liste" }]} />
-          {schreiben ? <Knopf variante="pri" icon="plus" onClick={() => setNeu({ datum: gewaehlt })}>Termin</Knopf> : null}
-        </>} />
-      <div className="flex items-center gap-2.5 flex-wrap">
-        <Knopf klein className="icon" aria-label="Zurück" onClick={() => setze({ datum: weiter(ansicht, bezug, -1) })}>
-          <Icon name="pfeilLinks" /></Knopf>
-        <Knopf klein onClick={() => { setze({ datum: heuteIso() }); setGewaehlt(heuteIso()); }}>Heute</Knopf>
-        <Knopf klein className="icon" aria-label="Weiter" onClick={() => setze({ datum: weiter(ansicht, bezug, 1) })}>
-          <Icon name="pfeilRechts" /></Knopf>
-        <h2 className="m-0 text-lg font-semibold min-w-[220px]" data-testid="kalender-titel" aria-live="polite">{z.titel}</h2>
+      {/* eine Zeile (Entwurf 08.10.2026): Titel, Blättern, Monat; rechts Ansicht, „Anzeigen ▾“ und „+ Termin“ */}
+      <div className="seitenkopf flex items-center gap-x-2.5 gap-y-2 flex-wrap">
+        <h1 className="m-0 text-[1.25rem] leading-tight font-semibold whitespace-nowrap mr-1.5 max-md:hidden">Kalender</h1>
+        <Knopf className="icon" aria-label="Zurück" onClick={() => blaettern(-1)}><Icon name="pfeilLinks" /></Knopf>
+        {!mobil ? <Knopf onClick={heuteWaehlen}>Heute</Knopf> : null}
+        <Knopf className="icon" aria-label="Weiter" onClick={() => blaettern(1)}><Icon name="pfeilRechts" /></Knopf>
+        <h2 className="m-0 text-lg font-semibold whitespace-nowrap" data-testid="kalender-titel" aria-live="polite">{titel}</h2>
         {daten.isFetching ? <span className="text-xs gedaempft">wird geladen …</span> : null}
-        <div className="ml-auto flex items-center gap-1.5 flex-wrap" role="group" aria-label="Was anzeigen">
-          {FILTER.map((f) => (
-            <button key={f.wert} type="button" aria-pressed={filter.includes(f.wert)}
-              className={cx("chip h-[30px] cursor-pointer border", filter.includes(f.wert) ? "akzent border-akzent" : "border-rand bg-flaeche text-text2")}
-              onClick={() => setFilter(filter.includes(f.wert) ? filter.filter((x) => x !== f.wert) : [...filter, f.wert])}>{f.text}</button>
-          ))}
-          <label className="flex items-center gap-1.5 text-[0.8125rem] ml-1.5">
-            <input type="checkbox" checked={erledigte} onChange={(e) => setErledigte(e.target.checked)} /> Erledigte zeigen
-          </label>
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
+          {mobil ? <Knopf onClick={heuteWaehlen}>Heute</Knopf> : (
+            <>
+              <Segmente label="Ansicht" wert={ansichtWahl} onWahl={(a) => setze({ ansicht: a })} werte={[
+                { wert: "monat", text: "Monat" }, { wert: "woche", text: "Woche" }, { wert: "liste", text: "Liste" }]} />
+              <Anzeigen filter={filter} onFilter={setFilter} erledigte={erledigte} onErledigte={setErledigte} />
+            </>
+          )}
+          {schreiben ? (mobil ? <Knopf variante="pri" className="icon" aria-label="Neuer Termin" onClick={() => setNeu({ datum: gewaehlt })}><Icon name="plus" /></Knopf>
+            : <Knopf variante="pri" icon="plus" onClick={() => setNeu({ datum: gewaehlt })}>Termin</Knopf>) : null}
         </div>
       </div>
       <Fehleranzeige fehler={daten.error} />
-      {/* Stufen (S16, Entwurf 2): bis 1919 px Kalender mit Seitenspalte wie bisher, ab 1920 px Monat ¾ | Tagesliste ¼ */}
-      <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] hd:grid-cols-[minmax(0,1fr)_360px] fhd:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-5 items-start"
-        data-testid="kalender-stufe">
-        <Karte className="p-2 min-w-0">
-          {!daten.data ? <Laden /> : ansicht === "monat" ? (
-            <Monat von={z.von} bezug={bezug} heute={heute} tage={tage} feiertage={feiertage} gewaehlt={gewaehlt}
-              onTag={setGewaehlt} onWahl={waehlen} onNeu={neuAm} />
-          ) : ansicht === "woche" ? (
-            <Woche von={z.von} heute={heute} tage={tage} feiertage={feiertage} onWahl={waehlen} onNeu={neuAm} />
-          ) : (
-            <Liste tage={listenTage} feiertage={feiertage} heute={heute} onWahl={waehlen} />
-          )}
-        </Karte>
-        <div className="flex flex-col gap-4">
-          {ansicht === "monat" || ab(stufe, "fhd") ? (
-            <Karte className="px-4 py-3.5 flex flex-col gap-2" data-testid="tagesliste">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="lbl m-0">{langerTag(gewaehlt)}</h2>
-                {schreiben ? <Knopf klein icon="plus" onClick={() => setNeu({ datum: gewaehlt })}>Termin</Knopf> : null}
-              </div>
-              {feiertage.get(gewaehlt) ? <span className="text-xs text-fehler">{feiertage.get(gewaehlt)}</span> : null}
-              {tagEintraege.length === 0 ? <span className="text-sm gedaempft">Keine Einträge.</span>
-                : tagEintraege.map((e) => <EintragKnopf key={e.schluessel} e={e} heute={heute} onWahl={waehlen} voll />)}
-            </Karte>
-          ) : null}
-          <Karte className="px-4 py-3.5 flex flex-col gap-3" data-testid="ueberfaellig">
-            <h2 className="lbl m-0 flex items-center gap-2"><Icon name="warnung" groesse={16} />Überfällig</h2>
-            <Seitenliste titel="Offene Termine" anzahl={ueberfaellig.termine.length} testid="ueberfaellig-termine">
-              <Gekuerzt eintraege={ueberfaellig.termine} heute={heute} onWahl={waehlen} />
-            </Seitenliste>
-            <Seitenliste titel={`Kontakt überfällig (über ${daten.data?.grenzen.kontakt_monate ?? "…"} Mon.)`} anzahl={ueberfaellig.kontakt.length}
-              testid="ueberfaellig-kontakt">
-              <Gekuerzt eintraege={ueberfaellig.kontakt} heute={heute} onWahl={waehlen} />
-            </Seitenliste>
-            <Seitenliste titel={`Kontakt bald fällig (über ${daten.data?.grenzen.kontakt_bald_monate ?? "…"} Mon.)`} anzahl={ueberfaellig.bald.length}
-              testid="bald-kontakt">
-              <Gekuerzt eintraege={ueberfaellig.bald} heute={heute} onWahl={waehlen} />
-            </Seitenliste>
-            <Seitenliste titel={`Plan prüfen (älter als ${daten.data?.grenzen.plan_monate ?? "…"} Mon.)`} anzahl={ueberfaellig.plan.length}
-              testid="ueberfaellig-plan">
-              <Gekuerzt eintraege={ueberfaellig.plan} heute={heute} onWahl={waehlen} />
-            </Seitenliste>
-          </Karte>
-          <div className="flex flex-col gap-1.5 text-xs gedaempft px-1">
-            <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-sm bg-akzent-weich" />Praxistermin
-              <span className="w-3 h-3 rounded-sm bg-warn-bg ml-2" />Wiedervorlage<span className="w-3 h-3 rounded-sm bg-fehler-bg ml-2" />überfällig</span>
-            <span className="flex items-center gap-2 flex-wrap"><span className="w-3 h-3 rounded-sm border border-dashed border-warn" />berechnet: Kontakt bald fällig
-              <span className="w-3 h-3 rounded-sm border border-dashed border-fehler ml-2" />Kontakt überfällig
-              <span className="w-3 h-3 rounded-sm border border-dashed border-akzent ml-2" />Plan prüfen</span>
+
+      {mobil ? (
+        <Karte className="flex flex-col min-w-0 overflow-hidden" data-testid="kalender-stufe">
+          <div role="group" aria-label="Tag wählen" className="grid grid-cols-7 gap-1 p-2" data-testid="kalender-woche">
+            {Array.from({ length: 7 }, (_, i) => plus(montag(gewaehlt), i)).map((d, i) => {
+              const n = (tage.get(d) ?? []).length;
+              const an = d === gewaehlt;
+              return (
+                <button key={d} type="button" aria-pressed={an} data-testid={`tag-${d}`} onClick={() => tagWaehlen(d)} title={feiertage.get(d)}
+                  className={cx("flex flex-col items-center gap-0.5 rounded-[10px] border-0 py-1.5 cursor-pointer",
+                    an ? "bg-akzent text-auf-akzent" : d === heute ? "bg-akzent-weich text-akzent-text" : "bg-transparent text-tinte",
+                    feiertage.get(d) && !an && "text-fehler")}>
+                  <span className="text-xs">{WOCHENTAGE[i]}</span>
+                  <span className="num font-semibold">{tag(d).getUTCDate()}</span>
+                  <span className={cx("w-1.5 h-1.5 rounded-full", n ? (an ? "bg-auf-akzent" : "bg-fehler") : "bg-transparent")}
+                    aria-label={n ? `${n} Einträge` : undefined} />
+                </button>
+              );
+            })}
           </div>
+          <Reiterleiste wert={reiter === "faellig" ? "ueberfaellig" : reiter} onWahl={setReiter} reiter={[
+            { wert: "tag", text: "Tag" },
+            { wert: "ueberfaellig", text: <>Überfällig{zahlChip(anzahlUeber, true)}</> },
+            { wert: "woche", text: "Woche" }]} />
+          <div className="p-3 flex flex-col gap-4">
+            {!daten.data ? <Laden /> : reiter === "tag" ? tagInhalt : reiter === "woche" ? (
+              <Liste tage={listenTage} feiertage={feiertage} heute={heute} onWahl={waehlen} />
+            ) : <>{ueberInhalt}{faelligInhalt}</>}
+          </div>
+        </Karte>
+      ) : (
+        <div className="kalender-raster" data-testid="kalender-stufe">
+          <Karte className="p-2 min-w-0">
+            {!daten.data ? <Laden /> : ansicht === "monat" ? (
+              <Monat von={z.von} bezug={bezug} heute={heute} tage={tage} feiertage={feiertage} gewaehlt={gewaehlt}
+                onTag={tagWaehlen} onWahl={waehlen} onNeu={neuAm} />
+            ) : ansicht === "woche" ? (
+              <Woche von={z.von} heute={heute} tage={tage} feiertage={feiertage} onWahl={waehlen} onNeu={neuAm} />
+            ) : (
+              <Liste tage={listenTage} feiertage={feiertage} heute={heute} onWahl={waehlen} />
+            )}
+          </Karte>
+          <Karte className="kalender-seite flex flex-col min-w-0 overflow-hidden" data-testid="kalender-seite">
+            <Reiterleiste wert={reiter === "woche" ? "tag" : reiter} onWahl={setReiter} reiter={[
+              { wert: "tag", text: WOCHENTAGE[(tag(gewaehlt).getUTCDay() + 6) % 7] + " " + kurz(gewaehlt) },
+              { wert: "ueberfaellig", text: <>Überfällig{zahlChip(anzahlUeber, true)}</> },
+              { wert: "faellig", text: <>Fällig{zahlChip(ueberfaellig.bald.length)}</> }]} />
+            <div className="p-3 grow min-h-0 overflow-y-auto overscroll-contain">
+              {reiter === "ueberfaellig" ? ueberInhalt : reiter === "faellig" ? faelligInhalt : tagInhalt}
+            </div>
+          </Karte>
         </div>
-      </div>
+      )}
       <EintragDialog e={eintrag} heute={heute} onZu={() => setEintrag(null)}
         onTermin={(patient, name, d) => { setEintrag(null); setNeu({ datum: d, patient, name }); }}
         onAendern={(t) => { setEintrag(null); setAendern(t); }} />

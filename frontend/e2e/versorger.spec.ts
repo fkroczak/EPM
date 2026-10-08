@@ -13,19 +13,24 @@ test("Versorger anlegen, Ansprechpartner pflegen, deaktivieren mit Neuzuordnung"
   await page.getByRole("button", { name: "Neuer Versorger" }).click();
   const detail = page.getByTestId("versorger-detail");
   await expect(detail.getByRole("heading", { name: "Neuer Versorger" })).toBeVisible();
-  await detail.getByRole("button", { name: "Versorger anlegen" }).click();
+  await detail.getByRole("button", { name: "Speichern" }).click();
   await expect(detail.getByRole("alert").first()).toBeVisible();
   await detail.getByLabel("Firma").fill(firma);
   await detail.getByLabel("Ort").fill("Münster");
   await detail.getByLabel("Telefon Zentrale").fill("0251 123 456");
-  await detail.getByRole("button", { name: "Versorger anlegen" }).click();
+  await detail.getByRole("button", { name: "Speichern" }).click();
   await expect(detail.getByRole("heading", { name: firma })).toBeVisible();
   await expect(page.getByTestId("versorgerliste")).toContainText(firma);
+  // danach zum Lesen: Anschrift und Erreichbarkeit als Text, kein Formular (Entwurf 08.10.2026)
+  await expect(detail.getByRole("textbox")).toHaveCount(0);
+  await expect(detail).toContainText("0251 123 456");
 
-  // bearbeiten
+  // bearbeiten: „Bearbeiten“ öffnet das Formular an derselben Stelle
+  await detail.getByRole("button", { name: "Bearbeiten" }).click();
   await detail.getByLabel("Notiz").fill("Lieferung Di und Fr.");
   await detail.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Versorger gespeichert.")).toBeVisible();
+  await expect(detail).toContainText("Lieferung Di und Fr.");
 
   // zwei Ansprechpartner
   for (const [name, zust] of [["Anna Alpha", "Patienten A–K"], ["Bernd Beta", "Patienten L–Z"]]) {
@@ -69,9 +74,13 @@ test("Versorger anlegen, Ansprechpartner pflegen, deaktivieren mit Neuzuordnung"
 
   // Versorger deaktivieren: erscheint unter „Inaktiv“, nicht mehr bei neuen Patienten
   await page.goto(`/versorger?id=${versorger.id}`);
-  await detail.getByRole("button", { name: "Deaktivieren" }).click();
+  // Deaktivieren steckt im Menü „⋯“ und fragt nach (Eine Sprache, 08.10.2026)
+  await detail.getByRole("button", { name: "Weitere Aktionen" }).click();
+  await page.getByRole("menuitem", { name: "Deaktivieren …" }).click();
+  await expect(page.getByRole("dialog")).toContainText(firma);
+  await page.getByRole("dialog").getByTestId("bestaetigen").click();
   await expect(page.getByText("Versorger deaktiviert.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Inaktiv" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("group", { name: "Filter" }).getByRole("button", { name: /^Inaktiv/ })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("versorgerliste")).toContainText(firma);
   await page.goto("/patienten/neu");
   await expect(page.getByLabel("Versorger", { exact: true }).locator("option", { hasText: firma })).toHaveCount(0);
@@ -84,8 +93,10 @@ test("Betrachter sieht Versorger nur lesend", async ({ browser }) => {
   await page.goto("/versorger");
   // nur lesen: Werte als Text, keine (ausgegrauten) Eingabefelder
   const detail = page.getByTestId("versorger-detail");
-  await expect(detail.getByText("Firma", { exact: true })).toBeVisible();
+  await expect(detail.getByRole("heading", { level: 2 })).toBeVisible();
+  await expect(detail.getByText("Anschrift", { exact: true })).toBeVisible();
   await expect(detail.getByRole("textbox")).toHaveCount(0);
+  await expect(detail.getByRole("button", { name: "Bearbeiten" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Neuer Versorger" })).toHaveCount(0);
   await expect(page.getByTestId("versorger-detail").getByRole("button", { name: "Speichern" })).toHaveCount(0);
   await ctx.close();
@@ -101,4 +112,20 @@ test("Versorger suchen: Firma, Ort und Ansprechpartner (Wunsch 08.10.2026)", asy
   await expect(page.getByText("Kein Versorger passt zur Suche.")).toBeVisible();
   await page.getByLabel("Versorger filtern").fill("");
   await expect(liste).toContainText("Testversorger Nord (fiktiv)");
+});
+
+test("Versorger am Telefon: erst die Liste, dann der Eintrag, „Liste“ führt zurück (Entwurf 08.10.2026)", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/versorger");
+  const liste = page.getByTestId("versorgerliste");
+  await expect(liste).toBeVisible();
+  await expect(page.getByTestId("versorger-detail")).toHaveCount(0);
+  await liste.getByRole("button", { name: /Testversorger Nord \(fiktiv\)/ }).click();
+  const detail = page.getByTestId("versorger-detail");
+  await expect(detail.getByRole("heading", { name: "Testversorger Nord (fiktiv)" })).toBeVisible();
+  await expect(liste).toBeHidden();
+  await detail.getByRole("button", { name: "Liste" }).click();
+  await expect(liste).toBeVisible();
+  const breite = await page.evaluate(() => document.documentElement.scrollWidth);
+  expect(breite).toBeLessThanOrEqual(390);
 });

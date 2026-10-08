@@ -193,6 +193,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F153 | Eine Sprache: Bearbeiten / Speichern / Abbrechen / Erledigt / Deaktivieren; Rückfrage vor Verwerfen, Beenden, Deaktivieren; roter Knopf links | Akte, Kalender, alle Dialoge | ABGESCHLOSSEN (Lauf steht aus) |
 | F154 | Weniger Wege und Erklärtext: ein Suchfeld (Kopfzeile filtert die Patientenliste), „Prüfen …“ wählbar, Erklärtexte in der Hilfe | Patientenliste, Akte, Hilfe | ABGESCHLOSSEN (Lauf steht aus) |
 | F155 | Tastenkürzel: K, G, T, P, Alt+Ziffer in der Akte, Strg Enter in Dialogen, ? Übersicht | 4 Akte, alle Dialoge | ABGESCHLOSSEN (Lauf steht aus) |
+| F156 | Versorger/Ärzte und Kalender nach den Entwürfen (PC, Tablet, Telefon) | Versorger, Ärzte, Kalender | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2857,6 +2858,30 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
 - **Teststatus:** `akte.spec.ts` (K, G mit Strg Enter, T ohne Wirkung im Eingabefeld, Alt+Ziffer, ?, P ohne Recht).
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F156 Versorger, Ärzte und Kalender nach den Entwürfen
+- **Wunsch 08.10.2026:** „Kann man Versorger und Ärzte nicht besser lösen? … Kann man Kalender nicht besser lösen vom
+  Aufbau?“ – umgesetzt nach den Entwürfen für PC (1920 × 1080), Tablet (1024 × 768) und Telefon (390 × 844).
+- **Versorger und Ärzte** (gemeinsamer Aufbau `components/StammListe.tsx`): links eine schmale Liste (300 px, ab 1280 px
+  340 px) mit Suche, „Aktiv n | Inaktiv n | Alle“, je Eintrag Name, Ort/Fachrichtung, Zahl der Ansprechpartner und
+  rechts die Patientenzahl; sie scrollt in sich. Rechts der gewählte Eintrag zum **Lesen**: Kopf mit Name, Status,
+  „n Patienten · anzeigen“ (Versorger: Patientenliste gefiltert), **Bearbeiten** und Menü „⋯“ (Deaktivieren mit Rückfrage
+  bzw. Wieder aktivieren); darunter Anschrift, Erreichbarkeit und Notiz nebeneinander, Ansprechpartner als Tabelle
+  (Name, Zuständigkeit, Telefon, Patienten mit Link), Patienten in Betreuung drei-/zwei-/einspaltig (erst zwölf, dann
+  „… n weitere“; Versorger sortierbar nach Name oder Ansprechpartner; Nickel-Hinweis). „Bearbeiten“ und „Neuer …“
+  öffnen das Formular an derselben Stelle (Abbrechen/Speichern). Telefon: erst die Liste, ein Eintrag öffnet sich ganz,
+  „‹ Liste“ führt zurück (Zurück im Browser ebenso).
+- **Kalender:** eine Werkzeugzeile (Titel, ‹ Heute ›, Monat, Monat/Woche/Liste, **Anzeigen ▾**, + Termin). „Anzeigen“
+  fasst die sechs Arten und „Erledigte zeigen“ mit der Farblegende in einem Menü zusammen. Der Monat füllt die
+  Fensterhöhe; rechts (ab 1280 px) eine Spalte mit den Reitern **Tag** (gewählter Tag, nächste 7 Tage, „+ Termin am …“),
+  **Überfällig n** (offene Termine, Kontakt überfällig, Plan prüfen) und **Fällig n** (Kontakt bald fällig). Tablet:
+  kompakter Monat, die Reiter darunter. Telefon: Wochenband (7 Tage mit Punkt bei Einträgen), Reiter Tag | Überfällig |
+  Woche, ‹ › blättern wochenweise.
+- **Hilfe:** Abschnitte Versorger, Ärzte und Kalender beschreiben den neuen Aufbau.
+- **Teststatus:** `versorger.spec.ts` (Lesen/Bearbeiten, Deaktivieren über „⋯“ mit Rückfrage, Telefon Liste ↔ Eintrag),
+  `akte.spec.ts` (Ärzte), `kalender.spec.ts` (Reiter, Anzeigen ▾, eine Zeile, 1080p ohne Scrollen, Telefon),
+  `oberflaeche.spec.ts`.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2955,6 +2980,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Versorger/Ärzte, Kalender | Neuer Aufbau nach den Entwürfen für PC, Tablet und Telefon: Liste + Eintrag zum Lesen, Kalender mit einer Werkzeugzeile, „Anzeigen ▾“ und Reitern (F156). Lauf steht aus |
 | 08.10.2026 | Tastenkürzel | K, G, T, P, Alt+Ziffer und ? in der Akte, Strg Enter in Dialogen, Kürzel im Tooltip (F155). Lauf steht aus |
 | 08.10.2026 | Ein Suchfeld, Prüfen, Hilfe | Kopfzeile filtert die Patientenliste, „Prüfen …“ wählbar, Erklärtexte in die Hilfe, leere Reiter ohne Doppelhinweis (F154). Lauf steht aus |
 | 08.10.2026 | Eine Sprache | Bearbeiten/Speichern/Abbrechen/Erledigt/Deaktivieren überall; Rückfrage vor Bericht verwerfen, Diagnose beenden, Deaktivieren; roter Knopf links (F153). Lauf steht aus |

@@ -654,7 +654,16 @@ html { scrollbar-gutter: stable; }
 @media (max-width: 47.99rem) { .formular { grid-template-columns: minmax(0, 1fr) !important; } .formular > * { grid-column: 1 / -1 !important; } }
 
 /* Kalender (Wunsch 08.10.2026: ohne Scrollen auf 1080p): sechs Wochen füllen genau die Fensterhöhe */
-.kalender-zelle { height: max(5.25rem, calc((100vh - 15.5rem) / 6)); }
+/* Seit 08.10.2026 (Entwurf): eine Werkzeugzeile, Monat füllt den Bildschirm; rechts Tag | Überfällig | Fällig.
+   Tablet: Liste unter dem (kompakteren) Monat; Telefon: Wochenband (eigener Aufbau in Kalender.tsx). */
+.kalender-raster { display: grid; gap: var(--abstand, 1rem); grid-template-columns: minmax(0, 1fr); align-items: start; }
+.kalender-zelle { height: max(3.75rem, calc((100vh - 24rem) / 6)); }
+@media (min-width: 80rem) {
+  .kalender-raster { grid-template-columns: minmax(0, 1fr) 340px; }
+  .kalender-seite { position: sticky; top: 1rem; height: calc(100vh - 8.5rem); min-height: 24rem; }
+  .kalender-zelle { height: max(5.25rem, calc((100vh - 12.5rem) / 6)); }
+}
+@media (min-width: 120rem) { .kalender-raster { grid-template-columns: minmax(0, 1fr) 380px; } }
 
 /* Navigation (Wunsch 08.10.2026): schmale Leiste mit Symbolen – alle Einträge gleich groß (40 × 36 px) und mittig;
    Leiste mit Text 224 px statt 256 px. Hauptknopf im Seitenkopf („Neuer …“) überall gleich breit. */
@@ -664,3 +673,16 @@ html { scrollbar-gutter: stable; }
 }
 .seitenkopf .btn.pri { min-width: 10rem; }
 .benutzermenue-liste { margin-left: 0; }
+
+/* Versorger und Ärzte (Entwürfe 08.10.2026): schmale Liste links, Eintrag rechts; am Telefon eins von beiden */
+.stamm-raster { display: grid; gap: var(--abstand, 1rem); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 48rem) {
+  .stamm-raster { grid-template-columns: 300px minmax(0, 1fr); }
+  .stamm-liste { position: sticky; top: 1rem; height: calc(100vh - 8.5rem); min-height: 22rem; }
+}
+@media (min-width: 80rem) { .stamm-raster { grid-template-columns: 340px minmax(0, 1fr); } }
+@media (max-width: 47.99rem) { .stamm-liste { max-height: none; } }
+.stamm-eintrag { color: inherit; border-left: 3px solid transparent !important; }
+.stamm-eintrag:hover { background: var(--fein); }
+.stamm-eintrag.aktiv { background: var(--akzent-weich); border-left-color: var(--akzent) !important; }
+.stamm-eintrag:focus-visible { outline: 2px solid var(--akzent); outline-offset: -2px; }
