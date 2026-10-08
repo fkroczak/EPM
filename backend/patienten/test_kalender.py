@@ -98,3 +98,47 @@ class Kalender(Grundlage):
         self.assertEqual(c.get("/api/kalender/", {"von": "2026-01-01", "bis": "2027-12-31"}).status_code, 400)
         d = c.get("/api/kalender/", {"von": "2026-12-01", "bis": "2026-12-31"}).json()
         self.assertEqual([f["name"] for f in d["feiertage"]], ["1. Weihnachtstag", "2. Weihnachtstag"])
+
+    def test_termin_ausblenden(self):
+        """F142 (Wunsch 08.10.2026): „×“ am Termin – 3/6/12 Monate oder „nicht mehr nötig“, zurückholbar."""
+        c = client_fuer(self.mitarbeiter)
+        pfad = f"/api/termine/{self.t_alt.id}/ausblenden/"
+        # Betrachter darf nicht, ungültige Frist wird abgewiesen
+        self.assertEqual(client_fuer(self.betrachter).post(pfad, {"monate": 3}, format="json").status_code, 403)
+        r = c.post(pfad, {"monate": 4}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("monate", r.json())
+        r = c.post(pfad, {"monate": 3, "grund": "Patientin meldet sich selbst"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        t = r.json()
+        self.assertTrue(t["ausgeblendet"])
+        self.assertFalse(t["ausgeblendet_dauerhaft"])
+        self.assertEqual(t["ausblende_grund"], "Patientin meldet sich selbst")
+        self.assertGreater(t["ausgeblendet_bis"], self.heute.isoformat())
+        # weg aus Kalender (überfällig) und Startseite, in der Akte unter ``ausgeblendet=true``
+        self.assertNotIn(self.t_alt.id, {x["id"] for x in self.monat(c)["termine_ueberfaellig"]})
+        liste = c.get("/api/termine/", {"patient": self.lange.id, "ausgeblendet": "true"}).json()
+        ids = {x["id"] for x in (liste["results"] if isinstance(liste, dict) else liste)}
+        self.assertEqual(ids, {self.t_alt.id})
+        liste = c.get("/api/termine/", {"patient": self.lange.id, "ausgeblendet": "false"}).json()
+        self.assertEqual(liste["results"] if isinstance(liste, dict) else liste, [])
+        # „nicht mehr nötig“, dann zurückholen
+        self.assertTrue(c.post(pfad, {"dauerhaft": True}, format="json").json()["ausgeblendet_dauerhaft"])
+        r = c.post(pfad, {"aufheben": True}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertFalse(r.json()["ausgeblendet"])
+        self.assertIn(self.t_alt.id, {x["id"] for x in self.monat(c)["termine_ueberfaellig"]})
+        self.assertEqual(c.post(pfad, {"aufheben": True}, format="json").status_code, 400)
+        # jede Fassung steht in der Historie
+        self.assertGreaterEqual(Termin.history.filter(id=self.t_alt.id).count(), 4)
+
+    def test_faelligkeit_folgt_der_hinweisruhe(self):
+        """F142: „×“ an „Kontakt fällig“ im Kalender schaltet den Hinweis der Akte stumm (F119) – die Fälligkeit verschwindet."""
+        c = client_fuer(self.mitarbeiter)
+        bereich = {"von": (self.heute - timedelta(days=200)).isoformat(), "bis": (self.heute + timedelta(days=60)).isoformat()}
+        vorher = c.get("/api/kalender/", bereich).json()["faelligkeiten"]
+        self.assertIn(self.lange.id, {f["patient"] for f in vorher if f["art"] == "kontakt"})
+        r = c.post(f"/api/patienten/{self.lange.id}/hinweis-ruhe/", {"art": "kontakt", "monate": 3}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        nachher = c.get("/api/kalender/", bereich).json()["faelligkeiten"]
+        self.assertNotIn(self.lange.id, {f["patient"] for f in nachher if f["art"] == "kontakt"})

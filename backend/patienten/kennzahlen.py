@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from stammdaten.models import Einstellungen
 
-from .models import Gewichtsmessung, Kontakt, Patient, Termin, berechne_trend, ruhende_hinweise
+from .models import Gewichtsmessung, Kontakt, Patient, Termin, berechne_trend, ruhende_hinweise, sichtbare_termine
 
 TREND_SPANNE = Decimal("1.0")  # unter ±1 % gilt das Gewicht als gleichbleibend (Pfeil →)
 
@@ -101,7 +101,7 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
     )
     montag, sonntag = woche(heute)
     mit_termin = set(
-        Termin.objects.filter(patient_id__in=ids, erledigt_am__isnull=True, faellig_am__range=(montag, sonntag))
+        sichtbare_termine(Termin.objects.filter(patient_id__in=ids, erledigt_am__isnull=True, faellig_am__range=(montag, sonntag)))
         .values_list("patient_id", flat=True)
     )
     # Befunde (F120): jüngster Laborbefund und jüngste BIA-Messung je Akte
@@ -129,7 +129,7 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
         from .models import erklaerungen_stand
 
         # nächster offener Termin (überfällige zuerst, dann nach Datum)
-        for t in (Termin.objects.filter(patient_id__in=ids, erledigt_am__isnull=True)
+        for t in (sichtbare_termine(Termin.objects.filter(patient_id__in=ids, erledigt_am__isnull=True))
                   .order_by("patient_id", "faellig_am", "uhrzeit", "id")
                   .values("patient_id", "id", "art", "faellig_am", "uhrzeit", "titel")):
             naechste.setdefault(t["patient_id"], {k: v for k, v in t.items() if k != "patient_id"})

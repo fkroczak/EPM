@@ -329,6 +329,13 @@ export type Termin = {
   erledigt_von_name: string | null;
   angelegt_am: string;
   angelegt_von_name: string | null;
+  /** Ausblenden mit „×“ im Kalender (F142): heute ausgeblendet, Frist oder „nicht mehr nötig“, Grund, wer und wann */
+  ausgeblendet?: boolean;
+  ausgeblendet_bis?: string | null;
+  ausgeblendet_dauerhaft?: boolean;
+  ausblende_grund?: string;
+  ausgeblendet_am?: string | null;
+  ausgeblendet_von_name?: string | null;
 };
 
 export const TERMINARTEN: Record<string, string> = {

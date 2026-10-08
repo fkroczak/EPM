@@ -68,12 +68,14 @@ const FELDER: Record<string, string> = {
   vorlage_version: "Stand der Vorlage", eingegangen_am: "eingegangen am", gestellt_von: "gestellt von", inhalt: "Inhalt",
   frist_verlaengert: "Frist verlängert", verlaengerung_grund: "Grund der Verlängerung", ergebnis: "Ergebnis",
   begruendung: "Begründung", mitgeteilt_am: "mitgeteilt am",
+  ausgeblendet_bis: "ausgeblendet bis", ausgeblendet_dauerhaft: "ausgeblendet (nicht mehr nötig)",
+  ausblende_grund: "Grund des Ausblendens",
   freigabe_weg: "Weg der Freigabe", freigabe_datum: "Freigabe durch den Mediziner am",
 };
 /** technische Felder, die sich bei jeder Aktion mitändern */
 const VERBORGEN = new Set(["geaendert_am", "erfasst_am", "angelegt_am", "hochgeladen_am", "freigegeben_am", "freigegeben_von",
   "erledigt_von", "storniert_von", "angelegt_von", "erfasst_von", "hochgeladen_von", "erstellt_von", "erstellt_am", "id",
-  "eingeschraenkt_von", "abgeschlossen_von", "freigabe_nachweis", "pdf_datei", "pdf_sha256"]);
+  "eingeschraenkt_von", "abgeschlossen_von", "ausgeblendet_am", "ausgeblendet_von", "freigabe_nachweis", "pdf_datei", "pdf_sha256"]);
 const TEXTFELDER = new Set(["diagnose", "therapie", "empfehlung", "bemerkung", "text"]);
 
 function useWertAnzeige() {
