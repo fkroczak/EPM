@@ -98,7 +98,7 @@ export function Infusionsplaene() {
     p.tage_pro_woche ? `${p.tage_pro_woche}×/Woche` : null].filter(Boolean).join(" · ");
   return (
     <Seite pfad={[{ text: "Infusionspläne" }]}>
-      <Seitenkopf titel="Infusionspläne" unter="Alle Pläne aller Patienten. Bearbeitet und freigegeben wird in der Akte."
+      <Seitenkopf titel="Infusionspläne" unter="Bearbeitet und freigegeben wird in der Akte."
         rechts={anlegen ? <Knopf variante="pri" icon="plus" onClick={() => setNeu(true)}>Neuer Plan</Knopf> : null} />
       <div className="flex items-center gap-3 flex-wrap">
         <Segmente label="Pläne" wert={gruppe} onWahl={(g) => setParams(new URLSearchParams({ gruppe: g }), { replace: true })} werte={[

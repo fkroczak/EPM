@@ -31,13 +31,21 @@ test("Patientenliste: Filter, Schnellfilter, Sortierung, abgeschlossene Akten", 
   await expect(page.getByRole("group", { name: "Ansicht" }).getByRole("button", { name: /In Betreuung/ })).not.toContainText("Test");
   await expect(liste.getByRole("link", { name: "Demo, Karl" })).toHaveCount(0);
 
-  // Freitext
+  // Freitext (Feld oben in der Kopfzeile)
   await page.getByLabel("Liste filtern").fill("Muster");
   await expect(liste.getByRole("link", { name: "Musterfrau, Erika" })).toBeVisible();
   await expect(liste.getByRole("link", { name: "Probe, Jonas" })).toHaveCount(0);
   await expect(page).toHaveURL(/suche=Muster/);
+  // ein Suchfeld: das Feld oben in der Kopfzeile filtert hier die Liste (08.10.2026); der Begriff steht als Chip im Filter
+  await expect(page.getByTestId("suchbegriff")).toContainText("Muster");
   await page.getByRole("button", { name: "Filter zurücksetzen" }).click();
   await expect(liste.getByRole("link", { name: "Probe, Jonas" })).toBeVisible();
+  await expect(page.getByLabel("Liste filtern")).toHaveValue("");
+  // Prüffilter direkt wählbar
+  await page.getByLabel("Prüfen").selectOption({ label: "Nickelallergie nicht erfasst" });
+  await expect(page).toHaveURL(/pruefen=nickelallergie/);
+  await page.getByLabel("Prüfen").selectOption("");
+  await expect(page).not.toHaveURL(/pruefen=/);
 
   // Versorger und Ansprechpartner
   // „exact“, weil das „×“ an den Hinweisen „Versorger nicht erfasst“ ebenfalls auf Versorger lautet (F119)

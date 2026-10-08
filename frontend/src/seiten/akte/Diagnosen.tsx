@@ -176,8 +176,6 @@ export function Diagnosen() {
       aktion={bearbeiten
         ? <Knopf variante="pri" icon="plus" onClick={() => setDialog({ offen: true, diagnose: null })}>Neue Diagnose</Knopf>
         : undefined}
-      fuss={<>Gesichert (G), Verdacht (V), Zustand nach (Z), Ausschluss (A). Beendete Diagnosen bleiben erhalten;
-        jede Fassung steht im Verlauf der Akte.</>}
       liste={
         <Eintragsliste name="Diagnosen" leer={sichtbar.length ? undefined : "Noch keine Diagnose mit ICD-Code."}>
           <Textkopf feld="diagnose" titel="Notizen" aktiv={notizen} onWahl={() => setWahl("notizen")} />

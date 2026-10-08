@@ -449,7 +449,7 @@ export function Kalender() {
   return (
     <Ausblenden.Provider value={setWeg}>
     <Seite pfad={[{ text: "Kalender" }]}>
-      <Seitenkopf titel="Kalender" unter="Termine und Wiedervorlagen aller Patienten, fällige Kontakte und Pläne, Feiertage (NRW)."
+      <Seitenkopf titel="Kalender"
         rechts={<>
           <Segmente label="Ansicht" wert={ansicht} onWahl={(a) => setze({ ansicht: a })} werte={[
             { wert: "monat", text: "Monat" }, { wert: "woche", text: "Woche" }, { wert: "liste", text: "Liste" }]} />

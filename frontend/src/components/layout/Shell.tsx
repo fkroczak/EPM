@@ -3,7 +3,7 @@
  *  vollständige Menü als Schublade. */
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { Menu as BaseMenu } from "@base-ui/react/menu";
@@ -197,7 +197,12 @@ function MobilLeiste() {
 
 /** Patientensuche in der Kopfzeile (Strg K): Name, Nummer oder Geburtsdatum */
 function Suche({ vollbreit, onFertig }: { vollbreit?: boolean; onFertig?: () => void } = {}) {
-  const [text, setText] = useState("");
+  // Auf der Patientenliste filtert dieses Feld direkt die Liste (?suche=…) – ein Suchfeld statt zwei
+  // (Vorschlag „Weniger Wege“, 08.10.2026); überall sonst schlägt es Patienten zum Öffnen vor.
+  const { pathname } = useLocation();
+  const [params, setParams] = useSearchParams();
+  const listenModus = pathname === "/patienten";
+  const [text, setText] = useState(() => (listenModus ? params.get("suche") ?? "" : ""));
   const [offen, setOffen] = useState(false);
   const [markiert, setMarkiert] = useState(0);
   const feld = useRef<HTMLInputElement>(null);
@@ -207,8 +212,28 @@ function Suche({ vollbreit, onFertig }: { vollbreit?: boolean; onFertig?: () => 
   const treffer = useQuery({
     queryKey: ["suche", begriff],
     queryFn: () => api<ApiSeite<PatientZeile>>(`patienten/${abfrage({ suche: begriff, seitengroesse: 8, ordering: "nachname" })}`),
-    enabled: begriff.length >= 2 && darf("akten_lesen"),
+    enabled: !listenModus && begriff.length >= 2 && darf("akten_lesen"),
   });
+  // Liste: Adresse übernimmt den Text verzögert; geänderte Adresse (z. B. „Filter zurücksetzen“) übernimmt das Feld
+  const inAdresse = listenModus ? params.get("suche") ?? "" : "";
+  const zuletzt = useRef(inAdresse);
+  useEffect(() => {
+    if (!listenModus) { setText(""); return; }
+    if (inAdresse !== zuletzt.current) { zuletzt.current = inAdresse; setText(inAdresse); }
+  }, [listenModus, inAdresse]);
+  useEffect(() => {
+    if (!listenModus) return;
+    const t = window.setTimeout(() => {
+      const jetzt = new URLSearchParams(window.location.search);
+      if ((jetzt.get("suche") ?? "") === begriff) return;
+      if (begriff) jetzt.set("suche", begriff); else jetzt.delete("suche");
+      jetzt.delete("seite");
+      zuletzt.current = begriff;
+      setParams(jetzt, { replace: true });
+    }, 300);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [begriff, listenModus]);
   const liste = treffer.data?.results ?? [];
   useEffect(() => {
     const taste = (e: KeyboardEvent) => {
@@ -235,11 +260,11 @@ function Suche({ vollbreit, onFertig }: { vollbreit?: boolean; onFertig?: () => 
         ref={feld}
         className="inp pl-10 pr-16"
         type="search"
-        role="combobox"
-        aria-expanded={offen && begriff.length >= 2}
-        aria-controls="suche-ergebnisse"
-        aria-label="Suchen"
-        placeholder="Patient suchen: Name, Nr. oder Geburtsdatum"
+        role={listenModus ? undefined : "combobox"}
+        aria-expanded={listenModus ? undefined : offen && begriff.length >= 2}
+        aria-controls={listenModus ? undefined : "suche-ergebnisse"}
+        aria-label={listenModus ? "Liste filtern" : "Suchen"}
+        placeholder={listenModus ? "Liste filtern: Name, Nr. oder Geburtsdatum" : "Patient suchen: Name, Nr. oder Geburtsdatum"}
         value={text}
         onChange={(e) => { setText(e.target.value); setOffen(true); }}
         autoFocus={vollbreit}
@@ -248,14 +273,15 @@ function Suche({ vollbreit, onFertig }: { vollbreit?: boolean; onFertig?: () => 
         onKeyDown={(e) => {
           if (e.key === "ArrowDown") { e.preventDefault(); setMarkiert((m) => Math.min(m + 1, liste.length - 1)); }
           if (e.key === "ArrowUp") { e.preventDefault(); setMarkiert((m) => Math.max(m - 1, 0)); }
-          if (e.key === "Enter" && liste[markiert]) { e.preventDefault(); oeffnen(liste[markiert]); }
+          if (e.key === "Enter" && listenModus) { e.preventDefault(); onFertig?.(); }
+          if (e.key === "Enter" && !listenModus && liste[markiert]) { e.preventDefault(); oeffnen(liste[markiert]); }
           if (e.key === "Escape") { setOffen(false); onFertig?.(); }
         }}
       />
       <span className="max-md:hidden absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[0.6875rem] font-medium gedaempft border border-rand rounded-[5px] px-1.5 py-0.5 pointer-events-none">
         Strg K
       </span>
-      {offen && begriff.length >= 2 ? (
+      {!listenModus && offen && begriff.length >= 2 ? (
         <ul id="suche-ergebnisse" role="listbox" className="card absolute left-0 right-0 top-[calc(100%+6px)] z-50 m-0 p-1 list-none max-h-96 overflow-auto">
           {treffer.isLoading ? <li className="px-3 py-2 text-sm gedaempft">Suche …</li> : null}
           {!treffer.isLoading && liste.length === 0 ? <li className="px-3 py-2 text-sm gedaempft">Kein Patient gefunden.</li> : null}

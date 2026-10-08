@@ -191,6 +191,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F151 | Weniger Wege: „Entwurf fortsetzen“ im Aktenkopf, Dokument aus dem Kopf und per Ziehen auf die Akte, Arzt/Versorger im Dialog anlegen | 4 Akte, Neuer Patient, Arzt zuordnen | ABGESCHLOSSEN (Lauf steht aus) |
 | F152 | Bearbeiten sichtbar: „Bearbeiten“ auf Anschrift und Kontakt, Kalender öffnet „Termin ändern“, Karteikarte springt zum Eintrag, Therapie/Empfehlung erst lesen, Größen-Symbol statt „⋯“ | 4 Akte, Kalender | ABGESCHLOSSEN (Lauf steht aus) |
 | F153 | Eine Sprache: Bearbeiten / Speichern / Abbrechen / Erledigt / Deaktivieren; Rückfrage vor Verwerfen, Beenden, Deaktivieren; roter Knopf links | Akte, Kalender, alle Dialoge | ABGESCHLOSSEN (Lauf steht aus) |
+| F154 | Weniger Wege und Erklärtext: ein Suchfeld (Kopfzeile filtert die Patientenliste), „Prüfen …“ wählbar, Erklärtexte in der Hilfe | Patientenliste, Akte, Hilfe | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2823,6 +2824,26 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   `oberflaeche.spec.ts`, `praxiswuensche.spec.ts` (Diagnose beenden, Bericht verwerfen mit Rückfrage, roter Knopf links).
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F154 Ein Suchfeld, Prüffilter wählbar, Erklärtexte in der Hilfe
+- **Wunsch 08.10.2026:** Umsetzung „EPM intuitiver – Vorschläge“ (Abschnitte „Weniger Wege“ und „Weniger Erklärtext“).
+- **Ein Suchfeld:** Auf der Patientenliste filtert das Suchfeld oben in der Kopfzeile direkt die Liste (`?suche=`,
+  verzögert übernommen; Beschriftung „Liste filtern“); das zweite Feld „Liste filtern“ über der Liste entfällt. Der
+  Begriff steht als Chip bei den Filtern (mit „×“), „Filter zurücksetzen“ leert auch das Feld oben. Auf allen anderen
+  Seiten schlägt das Feld wie bisher Patienten zum Öffnen vor.
+- **Prüfen …:** Die zwölf Prüffilter (Kontakt fällig, Nickelallergie offen, Erklärungen fehlen …) sind in der
+  Patientenliste direkt wählbar; vorher nur über Links von Startseite und Datenschutz.
+- **Erklärtexte:** Lange Unterzeilen und Fußtexte (Kalender, Versorger, Ärzte, Datenschutz, Mein Konto, abgeschlossene
+  Akten, Reiter Diagnosen, Labor, BIA, Therapie, Empfehlung) stehen jetzt in der Hilfe zur jeweiligen Seite („?“ oben
+  rechts). Auf der Seite bleibt nur ein Satz, wo eine Handlung Folgen hat (Kontakte: „werden nicht geändert, sondern
+  storniert“; Berichte: „Freigegebene Berichte sind unveränderlich“). Neue Hilfe-Abschnitte „Labor und BIA“, „Berichte“,
+  „Tastenkürzel in der Akte“; überarbeitet: Patientenliste, Neuer Patient, Aktenkopf, Karten vergrößern,
+  Stammdaten/Diagnose/Therapie, Kontakt erfassen, Termine, Kalender, Gewicht.
+- **Leere Reiter:** Ohne Einträge zeigt der Detailbereich keinen Hinweis „Links … wählen“ mehr; die Liste sagt, was
+  fehlt, der Hauptknopf („Neuer …“) steht direkt darüber. Leere Patientenliste mit „Neuer Patient“.
+- **Fußzeile der Patientenliste:** „Klick auf die Zeile öffnet die Akte“ (vorher „auf den Namen“).
+- **Teststatus:** `patienten.spec.ts` (Suche über die Kopfzeile, Chip, Prüfen-Auswahl).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2921,6 +2942,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Ein Suchfeld, Prüfen, Hilfe | Kopfzeile filtert die Patientenliste, „Prüfen …“ wählbar, Erklärtexte in die Hilfe, leere Reiter ohne Doppelhinweis (F154). Lauf steht aus |
 | 08.10.2026 | Eine Sprache | Bearbeiten/Speichern/Abbrechen/Erledigt/Deaktivieren überall; Rückfrage vor Bericht verwerfen, Diagnose beenden, Deaktivieren; roter Knopf links (F153). Lauf steht aus |
 | 08.10.2026 | Bearbeiten sichtbar | „Bearbeiten“ auf Anschrift und Kontakt, Kalender öffnet „Termin ändern“ mit „Erledigt“, Karteikarte springt zum Eintrag, Therapie/Empfehlung erst lesen, Größen-Symbol (F152). Lauf steht aus |
 | 08.10.2026 | Weniger Wege | „Entwurf fortsetzen“ im Aktenkopf, Dokumente aus dem Kopf und per Ziehen auf die Akte, Arzt/Versorger im Dialog anlegen (F151). Lauf steht aus |
