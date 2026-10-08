@@ -653,8 +653,6 @@ class DarstellungSerializer(serializers.Serializer):
     aktenansicht = serializers.ChoiceField(["kopfzeile", "seitenleiste", "karteikarte"], default="kopfzeile")
     aktenkopf = serializers.ChoiceField(["minimal", "kompakt", "voll"], default="voll")
     aktenleiste_breite = serializers.IntegerField(min_value=240, max_value=480, default=300)
-    # Form (Wunsch 08.10.2026): „rund“ mit Abständen zwischen den Karten oder „eckig“ ohne Rundungen und Abstände
-    form = serializers.ChoiceField(["rund", "eckig"], default="rund")
 
     def to_internal_value(self, data):
         if isinstance(data, dict):

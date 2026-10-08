@@ -2939,8 +2939,11 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
 - **Teststatus:** `test_rein.py` Klasse `RegelnUndZusammenfassen` (Regel für alle Zeilen auch im frischen Dump, Vorrang
   der Einzelentscheidung, Regel mit Wert, unpassende Regel, Zusammenfassen 2/1/0 Tage, nach den Entscheidungen) – lokal
   grün; `tests.py` `test_regeln_mehrfachauswahl_und_zusammenfassen` (Schnittstelle, Prüfungen); `aa-import.spec.ts`
-  (Gruppe mit Regel, Mehrfachauswahl, Karte „Gewichte zusammenfassen“).
-- **Status:** ABGESCHLOSSEN – Lauf steht aus
+  (Gruppe mit Regel, Mehrfachauswahl, Karte „Gewichte zusammenfassen“). Am 09.10.2026 lokal gegen PostgreSQL 16 geprüft:
+  alle 357 Backend-Tests grün (davon 62 im Import), nachdem der seit F158 rote Test `test_form_wird_ignoriert` behoben
+  war (das verworfene Feld „form“ stand noch im Serializer der Darstellung und wurde gespeichert). Typprüfung der
+  geänderten Oberfläche grün; der Browsertest steht aus (GitHub Actions startete wegen des Ausgabenlimits nicht).
+- **Status:** ABGESCHLOSSEN – Browserlauf steht aus
 
 ## Offene Backend-Funktionen
 
