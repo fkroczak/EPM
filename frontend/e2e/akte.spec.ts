@@ -455,3 +455,43 @@ test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pfl
   await api.ende();
   merken("kontaktdaten", { patient: p.id, arzt: arztName });
 });
+
+test("Tastenkürzel in der Akte: K, G, T, P, Alt+Ziffer, Strg Enter, ? (08.10.2026)", async ({ page }) => {
+  const p = await neuerPatient();
+  await oeffnen(page, p.id);
+  await expect(page.getByTestId("aktenkopf")).toBeVisible();
+  // K öffnet „Kontakt erfassen“, Esc schließt
+  await page.keyboard.press("k");
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Kontakt erfassen" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // G öffnet „Gewicht erfassen“; Strg Enter speichert
+  await page.keyboard.press("g");
+  const gd = page.getByRole("dialog");
+  await expect(gd.getByRole("heading", { name: "Gewicht erfassen" })).toBeVisible();
+  await gd.getByLabel("Gewicht", { exact: true }).fill("60,2");
+  await page.keyboard.press("Control+Enter");
+  await expect(page.getByText(/^Gewicht 60,2 kg für .* gespeichert\.$/)).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // in Eingabefeldern wirken die Kürzel nicht
+  await page.keyboard.press("t");
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Neuer Termin" })).toBeVisible();
+  await page.getByRole("dialog").getByLabel("Titel").fill("kgtp");
+  await expect(page.getByRole("dialog")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  // Alt+Ziffer wechselt den Reiter (Reihenfolge der Reiter), Tooltip nennt das Kürzel
+  const kontakte = page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: /^Kontakte/ });
+  const titel = await kontakte.getAttribute("title");
+  const ziffer = /Alt\+(\d)/.exec(titel ?? "")![1];
+  await page.keyboard.press(`Alt+Digit${ziffer}`);
+  await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}/kontakte$`));
+  await page.keyboard.press("Alt+Digit1");
+  await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}$`));
+  // ? zeigt die Übersicht
+  await page.keyboard.press("?");
+  await expect(page.getByTestId("tastenkuerzel")).toContainText("Strg Enter");
+  await page.keyboard.press("Escape");
+  // P öffnet einen neuen Plan (nur mit Recht; der Mitarbeiter hat es nicht – nichts passiert)
+  await page.keyboard.press("p");
+  await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}$`));
+});

@@ -192,6 +192,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F152 | Bearbeiten sichtbar: „Bearbeiten“ auf Anschrift und Kontakt, Kalender öffnet „Termin ändern“, Karteikarte springt zum Eintrag, Therapie/Empfehlung erst lesen, Größen-Symbol statt „⋯“ | 4 Akte, Kalender | ABGESCHLOSSEN (Lauf steht aus) |
 | F153 | Eine Sprache: Bearbeiten / Speichern / Abbrechen / Erledigt / Deaktivieren; Rückfrage vor Verwerfen, Beenden, Deaktivieren; roter Knopf links | Akte, Kalender, alle Dialoge | ABGESCHLOSSEN (Lauf steht aus) |
 | F154 | Weniger Wege und Erklärtext: ein Suchfeld (Kopfzeile filtert die Patientenliste), „Prüfen …“ wählbar, Erklärtexte in der Hilfe | Patientenliste, Akte, Hilfe | ABGESCHLOSSEN (Lauf steht aus) |
+| F155 | Tastenkürzel: K, G, T, P, Alt+Ziffer in der Akte, Strg Enter in Dialogen, ? Übersicht | 4 Akte, alle Dialoge | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2844,6 +2845,18 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
 - **Teststatus:** `patienten.spec.ts` (Suche über die Kopfzeile, Chip, Prüfen-Auswahl).
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F155 Tastenkürzel in der Akte
+- **Wunsch 08.10.2026:** Umsetzung „EPM intuitiver – Vorschläge“ (Abschnitt „Schneller mit der Tastatur“).
+- **In einer geöffneten Akte** (nicht in Eingabefeldern, nicht bei offenem Dialog oder Menü): **K** Kontakt erfassen,
+  **G** Gewicht erfassen, **T** Neuer Termin, **P** Neuer Plan bzw. Entwurf fortsetzen (je nur mit Recht),
+  **Alt+1 … Alt+9, Alt+0** die ersten zehn Reiter in ihrer Reihenfolge, **?** Übersicht der Kürzel (Dialog).
+- **In jedem Dialog:** **Strg Enter** (Mac ⌘ Enter) löst den Hauptknopf unten rechts aus (Speichern, Freigeben …),
+  sofern er nicht gesperrt ist; **Esc** schließt wie bisher.
+- **Lernen nebenbei:** Die Knöpfe im Aktenkopf und die Reiter zeigen ihr Kürzel beim Überfahren (z. B. „Kontakt
+  erfassen (K)“, „Kontakte (Alt+5)“). Hilfe-Abschnitt „Tastenkürzel in der Akte“.
+- **Teststatus:** `akte.spec.ts` (K, G mit Strg Enter, T ohne Wirkung im Eingabefeld, Alt+Ziffer, ?, P ohne Recht).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2942,6 +2955,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Tastenkürzel | K, G, T, P, Alt+Ziffer und ? in der Akte, Strg Enter in Dialogen, Kürzel im Tooltip (F155). Lauf steht aus |
 | 08.10.2026 | Ein Suchfeld, Prüfen, Hilfe | Kopfzeile filtert die Patientenliste, „Prüfen …“ wählbar, Erklärtexte in die Hilfe, leere Reiter ohne Doppelhinweis (F154). Lauf steht aus |
 | 08.10.2026 | Eine Sprache | Bearbeiten/Speichern/Abbrechen/Erledigt/Deaktivieren überall; Rückfrage vor Bericht verwerfen, Diagnose beenden, Deaktivieren; roter Knopf links (F153). Lauf steht aus |
 | 08.10.2026 | Bearbeiten sichtbar | „Bearbeiten“ auf Anschrift und Kontakt, Kalender öffnet „Termin ändern“ mit „Erledigt“, Karteikarte springt zum Eintrag, Therapie/Empfehlung erst lesen, Größen-Symbol (F152). Lauf steht aus |
