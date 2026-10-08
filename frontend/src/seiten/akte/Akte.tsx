@@ -319,19 +319,19 @@ function EinsichtAnsicht({ info }: { info: Eingeschraenkt }) {
   );
 }
 
-type ReiterEintrag = { zu: string; text: string; zahl?: number; ende?: boolean; gruppe?: string };
+type ReiterEintrag = { zu: string; text: string; zahl?: number; ende?: boolean; gruppe?: string; kuerzel?: string };
 
-function Reiter({ zu, text, zahl: anzahl, ende, senkrecht }: ReiterEintrag & { senkrecht?: boolean }) {
+function Reiter({ zu, text, zahl: anzahl, ende, senkrecht, kuerzel }: ReiterEintrag & { senkrecht?: boolean }) {
   if (senkrecht) {
     return (
-      <NavLink to={zu} end={ende} className={({ isActive }) => cx("vreiter no-underline", isActive && "aktiv")}>
+      <NavLink to={zu} end={ende} title={kuerzel} className={({ isActive }) => cx("vreiter no-underline", isActive && "aktiv")}>
         <span className="truncate">{text}</span>
         {anzahl !== undefined ? <span className="num opacity-70 vreiter-zahl">{zahl(anzahl)}</span> : null}
       </NavLink>
     );
   }
   return (
-    <NavLink to={zu} end={ende} className={({ isActive }) => cx("segment no-underline", isActive && "aktiv")}>
+    <NavLink to={zu} end={ende} title={kuerzel} className={({ isActive }) => cx("segment no-underline", isActive && "aktiv")}>
       {text}{anzahl !== undefined ? <span className="num ml-1.5 opacity-70">{zahl(anzahl)}</span> : null}
     </NavLink>
   );
@@ -441,6 +441,15 @@ export function Akte() {
     gewicht: offenBei("eintraege_erfassen"),
   };
   useOhneRechtSchliessen(erlaubt[dialog], () => setDialog(""));
+  // Tastenkürzel: der Handler wird unten gesetzt (braucht Akte und Reiter), hier einmal angemeldet
+  const tasten = useRef<((e: KeyboardEvent) => void) | null>(null);
+  const [kuerzelHilfe, setKuerzelHilfe] = useState(false);
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => tasten.current?.(e);
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+  tasten.current = null; // erst mit geladener Akte (unten) wieder gesetzt
   useOhneRechtSchliessen(offenBei("eintraege_erfassen"), () => setAenderTermin(null));
   // Dokumente: „Dokument hochladen“ im Kopf und Dateien auf die ganze Akte ziehen (08.10.2026)
   const { waehlen: dateiWaehlen, ablage } = useAktenAblage(offenBei("eintraege_erfassen") && p ? p.id : null);
@@ -516,15 +525,15 @@ export function Akte() {
     <div className={cx("flex items-center flex-wrap", klein ? "gap-1.5" : "gap-2")} data-testid="aktenaktionen">
       {kontext.erfassen ? <>
         {/* Kontakt und Gewicht als Dialog wie „Termin“ (Wunsch 08.10.2026) – die Seite bleibt, wo sie ist */}
-        <Knopf klein={klein} icon="sprechblase" onClick={() => kontext.kontaktErfassen()}>Kontakt</Knopf>
-        <Knopf klein={klein} icon="waage" onClick={() => kontext.gewichtErfassen()}>Gewicht</Knopf>
-        <Knopf klein={klein} icon="kalender" onClick={() => setDialog("termin")}>Termin</Knopf>
+        <Knopf klein={klein} icon="sprechblase" title="Kontakt erfassen (K)" onClick={() => kontext.kontaktErfassen()}>Kontakt</Knopf>
+        <Knopf klein={klein} icon="waage" title="Gewicht erfassen (G)" onClick={() => kontext.gewichtErfassen()}>Gewicht</Knopf>
+        <Knopf klein={klein} icon="kalender" title="Neuer Termin (T)" onClick={() => setDialog("termin")}>Termin</Knopf>
       </> : null}
       {/* Offener Entwurf: fortsetzen statt eines zweiten Plans (Vorschlag „Erfassen“, 08.10.2026) */}
       {kontext.planen ? (p.kopf?.plan_entwurf
-        ? <Knopf klein={klein} icon="stift" title={`Entwurf vom ${datum(p.kopf.plan_entwurf.erstellt_am)}`}
+        ? <Knopf klein={klein} icon="stift" title={`Entwurf vom ${datum(p.kopf.plan_entwurf.erstellt_am)} fortsetzen (P)`}
             onClick={() => navigate(`${basis}/plaene/${p.kopf!.plan_entwurf!.id}/bearbeiten`)}>Entwurf fortsetzen</Knopf>
-        : <Knopf klein={klein} icon="tropfen" onClick={() => navigate(`${basis}/plaene/neu`)}>Neuer Plan</Knopf>) : null}
+        : <Knopf klein={klein} icon="tropfen" title="Neuer Plan (P)" onClick={() => navigate(`${basis}/plaene/neu`)}>Neuer Plan</Knopf>) : null}
       <Menue label="Weitere Aktionen" eintraege={[
         ...(kontext.bearbeiten ? [{ text: "Stammdaten bearbeiten", onClick: () => setDialog("stammdaten") }] : []),
         ...(kontext.erfassen ? [{ text: "Dokument hochladen …", onClick: dateiWaehlen }] : []),
@@ -623,7 +632,34 @@ export function Akte() {
     { zu: `${basis}/dokumente`, text: "Dokumente", zahl: k?.zaehler.dokumente, gruppe: "Unterlagen" },
     { zu: `${basis}/datenschutz`, text: "Datenschutz", zahl: k?.datenschutz_anfragen || undefined },
     { zu: `${basis}/verlauf`, text: "Verlauf" },
-  ];
+  ].map((r, i) => (i < 10 ? { ...r, kuerzel: `${r.text} (Alt+${(i + 1) % 10})` } : r));
+  // Tastenkürzel in der Akte (Vorschlag „Schneller mit der Tastatur“, 08.10.2026); nicht in Eingabefeldern und nicht,
+  // solange ein Dialog offen ist
+  tasten.current = (e: KeyboardEvent) => {
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey) return;
+    const ziel = e.target as HTMLElement | null;
+    if (ziel && (ziel.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(ziel.tagName))) return;
+    if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
+    if (e.altKey) {
+      const m = /^Digit(\d)$/.exec(e.code);
+      if (!m) return;
+      const r = reiter[(Number(m[1]) + 9) % 10];
+      if (!r) return;
+      e.preventDefault();
+      navigate(r.zu);
+      return;
+    }
+    const taste = e.key.toLowerCase();
+    const aktion = taste === "k" && kontext.erfassen ? () => kontext.kontaktErfassen()
+      : taste === "g" && kontext.erfassen ? () => kontext.gewichtErfassen()
+      : taste === "t" && kontext.erfassen ? () => setDialog("termin")
+      : taste === "p" && kontext.planen ? () => navigate(p.kopf?.plan_entwurf ? `${basis}/plaene/${p.kopf.plan_entwurf.id}/bearbeiten` : `${basis}/plaene/neu`)
+      : e.key === "?" ? () => setKuerzelHilfe(true)
+      : null;
+    if (!aktion) return;
+    e.preventDefault();
+    aktion();
+  };
   // Jeder Bereich ein eigener Reiter (Wunsch 07.10.2026, F121); bei schmalem Fenster umbrechen die Reiter, am
   // Telefon lassen sie sich seitlich wischen (der aktive bleibt im Blick)
   const reiterWaagerecht = (
@@ -669,6 +705,16 @@ export function Akte() {
       {kontext.erfassen ? <TerminDialog offen={!!aenderTermin} onOffen={(o) => { if (!o) setAenderTermin(null); }} termin={aenderTermin}
         patientName={name(p)} /> : null}
       {ablage}
+      <Dialog offen={kuerzelHilfe} onOffen={setKuerzelHilfe} titel="Tastenkürzel in der Akte" breite={460}
+        beschreibung="Nicht während in einem Eingabefeld geschrieben wird.">
+        <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm" data-testid="tastenkuerzel">
+          {([["K", "Kontakt erfassen"], ["G", "Gewicht erfassen"], ["T", "Neuer Termin"], ["P", "Neuer Plan bzw. Entwurf fortsetzen"],
+            ["Alt+1 … Alt+9", "Reiter der Akte wechseln"], ["Strg Enter", "im Dialog speichern"], ["Esc", "Dialog schließen"],
+            ["Strg K", "Patientensuche"], ["?", "diese Übersicht"]] as const).map(([t, w]) => (
+            <Fragment key={t}><dt><kbd className="num font-medium border border-rand rounded-[5px] px-1.5 py-0.5 text-[0.8125rem]">{t}</kbd></dt><dd className="m-0">{w}</dd></Fragment>
+          ))}
+        </dl>
+      </Dialog>
     </>
   );
   const pfad = [{ text: "Patienten", zu: "/patienten" }, { text: name(p) }];
