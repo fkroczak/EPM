@@ -648,6 +648,11 @@ class DarstellungSerializer(serializers.Serializer):
     dichte = serializers.ChoiceField(["grosszuegig", "normal", "kompakt", "sehrkompakt"], default="normal")
     schriftgroesse = serializers.ChoiceField(["klein", "normal", "gross", "sehrgross"], default="normal")
     schriftstaerke = serializers.ChoiceField(["normal", "kraeftig"], default="normal")
+    # Aufbau der Patientenakte (Wunsch 08.10.2026): Kopfzeile mit Gruppen, Seitenleiste mit senkrechten Reitern oder
+    # Karteikarte wie in einer Arztsoftware; Höhe des Kopfs in drei Stufen, Breite der Seitenleiste in Pixeln
+    aktenansicht = serializers.ChoiceField(["kopfzeile", "seitenleiste", "karteikarte"], default="kopfzeile")
+    aktenkopf = serializers.ChoiceField(["minimal", "kompakt", "voll"], default="voll")
+    aktenleiste_breite = serializers.IntegerField(min_value=240, max_value=480, default=300)
 
     def to_internal_value(self, data):
         if isinstance(data, dict):

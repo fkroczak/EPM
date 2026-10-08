@@ -1,5 +1,5 @@
 /** Entwurf 4 · Übersicht der Akte: Gewichtsverlauf mit Erfassung, Diagnose/Therapie, Termine, Plan, Kontakte. */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, alle, api } from "@/lib/api";
@@ -104,7 +104,9 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
     queryFn: () => alle<Gewicht>(`gewichte/${abfrage({ patient: patient.id })}`),
   });
   useEffect(() => {
-    const st = location.state as { gewicht?: number } | null;
+    const st = location.state as { gewicht?: number; wert?: string } | null;
+    // Kürzelzeile der Karteikarte („G 61,2“): Wert vorbelegen, gespeichert wird erst mit „Speichern“
+    if (st?.gewicht && st.wert) setWert(st.wert);
     if (st?.gewicht && feld.current) {
       feld.current.scrollIntoView({ block: "center" });
       feld.current.focus();
@@ -400,15 +402,37 @@ function BefundeKarte() {
 /** Übersicht im Raster (Fehlerliste 02.10.2026, Punkt 2): Spalten wie auf der Startseite (1/2/3/4/5 je Fensterbreite),
  *  jede Karte mit dem Menü „⋯“ für Breite und Höhe – je Person gespeichert. Der senkrechte Teiler entfällt hier. Ab
  *  2560 px beginnt das Gewichtsdiagramm mit 3 Jahren (S16). */
+/** Spalten des Rasters nach der tatsächlichen Breite der Fläche (Ansichten „Seitenleiste“ und „Karteikarte“): etwa die
+ *  Breiten, die der Inhalt bei den Fensterstufen 900/1440/1920/2560 px ohne Seitenleiste der Akte hat */
+function spaltenFuerBreite(px: number): number {
+  return px < 560 ? 1 : px < 1080 ? 2 : px < 1560 ? 3 : px < 2200 ? 4 : 5;
+}
+
+function useBreite(aktiv: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [breite, setBreite] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!aktiv || !el) return;
+    setBreite(el.clientWidth);
+    const beobachter = new ResizeObserver((eintraege) => setBreite(Math.round(eintraege[0]?.contentRect.width ?? el.clientWidth)));
+    beobachter.observe(el);
+    return () => beobachter.disconnect();
+  }, [aktiv]);
+  return [ref, breite] as const;
+}
+
 export function Uebersicht() {
   const stufe = useStufe();
-  const { patient, bearbeiten } = useAkte();
+  const { patient, bearbeiten, schmal } = useAkte();
+  const [flaeche, breite] = useBreite(schmal);
+  const spalten = schmal && breite > 0 ? Math.min(RASTER_SPALTEN[stufe], spaltenFuerBreite(breite)) : RASTER_SPALTEN[stufe];
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 min-w-0" ref={flaeche}>
       {/* Weggeklickte Hinweise stehen hier und lassen sich zurückholen (Wunsch 07.10.2026, F119) */}
       <StummKarte patientId={patient.id} aenderbar={bearbeiten} />
       <ImportHinweise />
-    <Bereiche seite="akte_uebersicht" spalten={RASTER_SPALTEN[stufe]} testid="uebersicht-stufe">
+    <Bereiche seite="akte_uebersicht" spalten={spalten} testid="uebersicht-stufe">
       <Bereich id="gewicht" titel="Gewichtsverlauf" standard={{ breite: 2 }}><GewichtKarte startZeitraum={stufe === "qhd" ? "y3" : "y1"} /></Bereich>
       <Bereich id="termine" titel="Termine"><TermineKarte /></Bereich>
       <Bereich id="plan" titel="Aktueller Infusionsplan"><PlanKarte /></Bereich>

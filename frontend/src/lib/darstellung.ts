@@ -13,7 +13,18 @@ export type Darstellung = {
   dichte: "grosszuegig" | "normal" | "kompakt" | "sehrkompakt";
   schriftgroesse: "klein" | "normal" | "gross" | "sehrgross";
   schriftstaerke: "normal" | "kraeftig";
+  /** Aufbau der Patientenakte (Wunsch 08.10.2026) */
+  aktenansicht: Aktenansicht;
+  /** Höhe des Aktenkopfs in der Ansicht „Kopfzeile“: nur Name, eine Zeile Kennzahlen oder alle Gruppen */
+  aktenkopf: "minimal" | "kompakt" | "voll";
+  /** Breite der Seitenleiste in der Ansicht „Seitenleiste“ (px) */
+  aktenleiste_breite: number;
 };
+
+export type Aktenansicht = "kopfzeile" | "seitenleiste" | "karteikarte";
+
+/** Grenzen und Einrastpunkte der Seitenleiste der Akte (wie im Backend: 240–480 px) */
+export const AKTENLEISTE = { min: 240, max: 480, standard: 300, punkte: [240, 300, 360, 420, 480] };
 
 export const STANDARD_DARSTELLUNG: Darstellung = {
   schema: "standard",
@@ -25,6 +36,9 @@ export const STANDARD_DARSTELLUNG: Darstellung = {
   dichte: "normal",
   schriftgroesse: "normal",
   schriftstaerke: "normal",
+  aktenansicht: "kopfzeile",
+  aktenkopf: "voll",
+  aktenleiste_breite: AKTENLEISTE.standard,
 };
 
 export const AKZENTE: Record<string, [string, string]> = {

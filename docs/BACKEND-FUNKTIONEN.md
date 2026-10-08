@@ -172,6 +172,8 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F122 | Ein gemeinsames Muster für die Reiter der Akte (außer Dokumente): links die Einträge mit Datum, rechts der gewählte; Knöpfe überall an derselben Stelle | 4–9 Akte | ABGESCHLOSSEN UND GETESTET |
 | F123 | EPM aus der Oberfläche aktualisieren (Systemagent-Aktion `epm_update`) | 17 System | ABGESCHLOSSEN UND GETESTET |
 | F124 | Ladebalken am oberen Rand bei jeder laufenden Anfrage (Laden, Speichern, Hochladen, PDF, Aufträge) | alle Seiten | ABGESCHLOSSEN (auf Wunsch ohne Testlauf eingespielt) |
+| F135 | Aufbau der Patientenakte je Person: Kopfzeile in Gruppen mit ziehbarer Höhe, Seitenleiste mit ziehbarer Breite und senkrechten Reitern, Karteikarte | 4 Akte, 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
+| F136 | Karteikarte: alle Einträge der Akte chronologisch mit Kürzel, Filter, Zeitraum und Kürzelzeile | 4 Akte | ABGESCHLOSSEN UND GETESTET |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2521,6 +2523,64 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
 - **Status:** ABGESCHLOSSEN (Server-Werkzeug; im Browsertest-Stack gibt es keine eigene CA)
 
 
+## S · Aufbau der Patientenakte (Wunsch 08.10.2026)
+
+> „Können wir 3 verschiedene Ansichten für Patienten erstellen? Das aktuelle mit den wichtigsten Daten in der Kopfzeile.
+> Das zweite, das im linken Viertel die wichtigsten Daten anzeigt und die Buttons … an den oberen Rand setzt, die Reiter
+> rechts davon, jedoch nicht als horizontale, sondern vertikale Reiter. Und eine andere Ansicht, die für eine
+> Arzt-Software sinnvoll wäre.“ Nach den Entwürfen: Kopfzeile mit Abstufungen wie die Seitenleiste; Knöpfe in der
+> Seitenleiste über dem Namen, etwas kleiner; Seitenleiste schmaler und selbst verstellbar, Kopfleiste ebenso; das Menü
+> links bleibt 1:1; Auswahl unter Mein Konto.
+
+### F135 Aufbau der Patientenakte je Person
+- **Ansicht:** Mein Konto › Karte „Patientenakte“ (drei Ansichten mit Skizze; je nach Wahl Höhe des Kopfs bzw. Breite
+  der Seitenleiste). Gilt für die Person an jedem PC; am Telefon (unter 768 px) immer „Kopfzeile“.
+  - **Kopfzeile** (Standard): Name, Merken, Hinweise (Testpatient, abgeschlossen, Erklärungen) und CAVE (Nickelallergie,
+    Gewichtsverlust) in einer Zeile, Knöpfe rechts; darunter die Angaben in vier Gruppen nebeneinander mit Trennlinie –
+    Ernährung (Gewicht mit Trend, BMI mit Größe, aktueller Plan, Katheter), Versorgung (Versorger, Ansprechpartner,
+    Hausarzt), Termine und Kontakt (nächster Termin, letzter Kontakt, Telefon), Hinweise und Auskunft (Nickelallergie,
+    Auskunft an, Versicherung). Griff unter dem Kopf: nach oben/unten ziehen in drei Stufen „Nur Name“, „Eine Zeile“
+    (Gewicht, Plan, Termin, Versorger, Nickelallergie), „Alle Angaben“; ↑ ↓ per Tastatur, Doppelklick = alle Angaben.
+  - **Seitenleiste:** links eine Leiste (Standard 300 px) mit den Knöpfen Kontakt, Gewicht, Termin, Neuer Plan, ⋯ (klein)
+    über dem Namen, darunter dieselben Gruppen untereinander; die Leiste bleibt beim Scrollen stehen. Rechts davon
+    senkrechte Reiter in Gruppen (Akte, Betreuung, Befunde, Unterlagen), dann der Inhalt. Breite am rechten Rand ziehen,
+    rastet bei 240/300/360/420/480 px ein, ← → per Tastatur, Doppelklick = 300 px. Unter 1280 px stehen Leiste, Reiter
+    (waagerecht) und Inhalt untereinander.
+  - **Karteikarte:** schmale Kopfzeile mit Name, Nummer, Geburtsdatum, CAVE, Gewicht, BMI, Plan, Termin und den Knöpfen;
+    waagerechte Reiter mit „Karteikarte“ vorn; rechts (ab 1440 px) eine feste Spalte mit allen Gruppen. Eine frisch
+    geöffnete Akte beginnt mit der Karteikarte (F136), „Übersicht“ bleibt als Reiter erreichbar.
+- **Übersicht neben Leiste oder Spalte:** Das Raster der Karten richtet sich dort nach der tatsächlichen Breite statt
+  nach der Fensterbreite (sonst wären bei 1920 px vier Spalten auf rund 1 000 px gedrängt). In der Kopfzeile unverändert.
+- **Endpunkt:** `PATCH /api/auth/ich/ {darstellung}` – drei neue Werte in `DarstellungSerializer`: `aktenansicht`
+  (`kopfzeile` | `seitenleiste` | `karteikarte`, Standard `kopfzeile`), `aktenkopf` (`minimal` | `kompakt` | `voll`,
+  Standard `voll`), `aktenleiste_breite` (240–480, Standard 300). Ältere gespeicherte Darstellungen ohne diese Werte
+  gelten als Standard; „Auf Standard zurücksetzen“ setzt sie mit zurück. Keine Migration (Feld `User.darstellung` ist JSON).
+- **Dateien:** `seiten/akte/ansicht.tsx` (Hook `useDarstellung`, Griffe), `seiten/akte/Akte.tsx` (drei Aufbauten aus
+  denselben Bausteinen), `seiten/Konto.tsx`, `seiten/akte/Uebersicht.tsx`, `index.css`.
+- **Teststatus:** Backend-Test `accounts.tests.MeinKonto.test_aktenansicht` (speichern, Standard, ungültige Werte).
+  Browsertest `aktenansicht.spec.ts` (Kopfzeile: Gruppen, Stufen per Tastatur und Ziehen, nach Neuladen erhalten;
+  Seitenleiste: Knöpfe über dem Namen, senkrechte Reiter, Breite per Tastatur und Ziehen mit Einrasten, nach Neuladen
+  erhalten, unter 1280 px ohne Griff; Karteikarte; zurücksetzen). Die bestehenden Tests der Akte laufen mit der
+  Kopfzeile (Kennzahlen, Auskunft, Nickelallergie „nicht erfasst“, Kopfhöhe mit Bezugspersonen gleich).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
+### F136 Karteikarte mit Kürzelzeile
+- **Ansicht:** Akte › Reiter „Karteikarte“ (`/patienten/{id}/kartei`, in jeder Ansicht aufrufbar, als Reiter nur in der
+  Ansicht „Karteikarte“). Alle Einträge chronologisch, neueste zuerst, nach Monaten getrennt: Kürzel K Kontakt, G Gewicht,
+  T Termin bzw. WV Wiedervorlage/Rückruf, P Infusionsplan, L Laborbefund, BIA BIA-Messung, D Diagnose (ICD), DOK
+  Dokument, B Bericht – mit Datum (Kontakte mit Uhrzeit), Text, Zusatz (storniert, erledigt, freigegeben, beendet) und
+  Person. Stornierte Kontakte und beendete Diagnosen durchgestrichen. Filter je Art mit Anzahl, Zeitraum 12 Monate /
+  3 Jahre / alle. Ein Klick auf einen Eintrag öffnet den passenden Reiter.
+- **Kürzelzeile** (nur mit Recht „Einträge erfassen“): „K Text“ öffnet „Neuer Kontakt“ mit dem Text, „G 61,2“ die
+  Gewichtserfassung mit dem Wert, „T“/„WV“ den Termin, „P“ einen neuen Plan (mit Recht). Gespeichert wird erst im
+  Formular – Kontakte bleiben nach dem Speichern unveränderlich. Unbekannte Kürzel melden sich.
+- **Endpunkte:** keine neuen; gelesen werden `kontakte/`, `gewichte/`, `termine/`, `infusionsplaene/`, `dokumente/`
+  (ohne ausgeblendete), `laborbefunde/`, `bia-messungen/`, `diagnosen/`, `berichte/` je `?patient=`. Fehlt ein Bereich
+  (z. B. ohne Recht), steht ein Hinweis darunter, der Rest bleibt sichtbar.
+- **Teststatus:** Browsertest `aktenansicht.spec.ts` (Einträge K und G, Filter, Übersicht erreichbar, „K Text“ → Kontakt
+  gespeichert und in der Karteikarte, „G 61,2“ → Wert vorbelegt, unbekanntes Kürzel).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2619,6 +2679,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Aufbau der Patientenakte (Wunsch 08.10.2026) | Drei Ansichten der Akte je Person unter Mein Konto › Patientenakte (F135): Kopfzeile mit den Angaben in vier Gruppen und Griff für die Höhe (nur Name · eine Zeile · alle Angaben), Seitenleiste mit Knöpfen über dem Namen, ziehbarer Breite (240–480 px, rastet ein) und senkrechten Reitern, Karteikarte wie in einer Arztsoftware mit fester Spalte rechts. Karteikarte mit allen Einträgen chronologisch, Filter, Zeitraum und Kürzelzeile K/G/T/WV/P (F136, neuer Reiter `kartei`). Darstellung um `aktenansicht`, `aktenkopf`, `aktenleiste_breite` erweitert (ohne Migration). CAVE (Nickelallergie, Gewichtsverlust) steht jetzt in jeder Ansicht beim Namen. Das Menü links ist unverändert. Die Arbeitsumgebung hatte keinen Zugriff auf PyPI, npm und Docker Hub; geprüft wurde in GitHub Actions |
 | 08.10.2026 | Passkey und Telefon (Pull Request #14) | Passkeys (WebAuthn) als zweiter Faktor statt oder neben dem Authenticator-Code – einrichten, umbenennen, entfernen unter Mein Konto, Anmeldung und alle Bestätigungen mit Passkey (F130–F132; Modell `accounts.Passkey` als django-otp-Gerät, Migration `accounts/0008`, `py_webauthn` 2.x, Baustein `useZweiterFaktor` an allen Bestätigungen). Eigene CA mit Namensbeschränkung und Serverzertifikat (`sudo epm-zertifikat`, F134), Stammzertifikat unter `/epm-ca.crt`. Mobile Ansicht (F133): Leiste unten mit Notiz und Plänen, Menü als Schublade, Karten statt Tabellen, Akte mit Detail vor der Liste, Dialoge und Eingaben für Touch. Hilfe-Abschnitte „Passkey statt Code“ und „EPM am Telefon“. Offene Fragen U62, U63. Dabei gefunden und behoben: Wer den Passkey entfernte, mit dem die Sitzung bestätigt war, war danach abgemeldet (Sitzung läuft jetzt mit einem verbliebenen Gerät weiter). Nach den Bildschirmfotos am Telefon (Lauf 37710345563) behoben: Kartenköpfe (z. B. „Diagnosen und Therapie“ mit drei Knöpfen) brechen um statt die Seite zu verbreitern, die Spalte „Versichertennummer“ überlappte (auch am PC), der Kalender startet am Telefon als Liste. Browsertests „Ärzte zuordnen …“ und „Benutzer ohne Login …“ stabilisiert (Meldung genau bzw. die letzte gesucht). Lauf 37714211870: 347 von 347 Backend-Tests, 108 von 108 Browsertests |
 | 06.10.2026 | Wünsche aus der Praxis (Alice, 06.10.2026) | Infusionstage je Beutelart mit Übernahme in den Folgeplan, Vergleich und PDF (F110, Migration `infusionen/0007`); Präparate nach der Mail – Zusatzvolumen umbenannt und ergänzt, Natrovit, NutriLock/TauroLock, Hinweisfeld am Präparat, Dipeptamin und Omegaven ausgeblendet (F111, Migrationen `stammdaten/0012`, `0013`); Katalog der Laborparameter mit Alices Liste und Erfassungsmaske nach Gruppen (F112, F113, neue App `befunde`); BIA-Maske mit Beurteilung und Übernahme des Gewichts (F114); Berichte in der Akte mit Entwurf/Freigabe, PDF als Dokument und Trigger-Schutz (F115, neue App `berichte`, neues Recht „Berichte freigeben“); Sprechstundenblatt (F116); Diagnosen mit ICD-Code und mitwachsendem Katalog (F117, Migration `patienten/0010`); Versichertendaten GKV/PKV, Versicherung, Versichertennummer (F118). Neue Dokumentvorlagen „Bericht“ und „Unterlagen für die Sprechstunde“ (Migration `vorlagen/0003`), Audit-Arten `bericht_freigegeben` und `sprechstunde_erzeugt` (`audit/0008`). Endgültiges Löschen, Kopie der Akte und Verlauf um die neuen Bereiche erweitert. Konzept und 22 offene Fragen (U39–U60) in `docs/WUENSCHE-PRAXIS-2026-10-06.md`. Die Migrationen sind von Hand geschrieben (die Arbeitsumgebung hatte keinen Zugriff auf PyPI und npm); `makemigrations` in CI meldet dazu „No changes detected“. Die neuen Apps stehen jetzt auch in der `makemigrations`-Zeile des Workflows. Lauf 37525732042: 311 von 311 Backend-Tests, 98 von 98 Browsertests. Davor fand CI drei echte Fehler, die hier behoben sind: der Plan-Serializer gab die neuen Infusionstage-Felder weder aus noch nahm er sie entgegen (dadurch griff auch deren Prüfung nicht), der ICD-Code wurde nicht in Großschreibung vereinheitlicht, und das Frontend baute wegen eines doppelten Schlüssels in der Feldliste des Verlaufs nicht. Nebenwirkung der Umbenennung: Beim Altdaten-Import trifft „Sterofundin“ keinen Katalogeintrag mehr automatisch und wird einmal von Hand auf „Sterofundin ISO“ gelegt (U43) |
 | 07.10.2026 | Dokumente zurückgesetzt | Der Reiter Dokumente ist wieder in seiner ursprünglichen Form (Tabelle links, Details rechts); die übrigen Reiter behalten das gemeinsame Muster aus F122. Auf Wunsch ohne Testlauf eingespielt (`[skip ci]`); die Datei entspricht Zeile für Zeile dem Stand `8ccda52`, der zuletzt grün war |

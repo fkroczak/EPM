@@ -11,6 +11,7 @@ import { Bia } from "./seiten/akte/Bia";
 import { Berichte } from "./seiten/akte/Berichte";
 import { Diagnosen } from "./seiten/akte/Diagnosen";
 import { Dokumente } from "./seiten/akte/Dokumente";
+import { Karteikarte } from "./seiten/akte/Karteikarte";
 import { Kontakte } from "./seiten/akte/Kontakte";
 import { Labor } from "./seiten/akte/Labor";
 import { PlanEditor } from "./seiten/akte/PlanEditor";
@@ -64,6 +65,8 @@ const router = createBrowserRouter([
         element: <Akte />,
         children: [
           { index: true, element: <Uebersicht /> },
+          // Ansicht „Karteikarte“ (Wunsch 08.10.2026): alle Einträge chronologisch mit Kürzelzeile
+          { path: "kartei", element: <Karteikarte /> },
           // eigene Reiter seit 07.10.2026 (F121); die alten Adressen leiten weiter
           { path: "diagnosen", element: <Diagnosen /> },
           { path: "therapie", element: <Therapie /> },
