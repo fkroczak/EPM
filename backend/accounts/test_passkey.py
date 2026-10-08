@@ -229,6 +229,25 @@ class Passkeys(Grundlage):
         self.assertFalse(r.json()["passkey"])
         self.assertEqual(c.get("/api/auth/passkeys/").json(), [])
 
+    def test_passkey_der_eigenen_sitzung_entfernen_bleibt_angemeldet(self):
+        """Wer den Passkey entfernt, mit dem die Sitzung bestätigt ist, bleibt angemeldet (Browsertest nach dem Neustart
+        fand die Abmeldung)."""
+        user = benutzer("pk_sitzung", Rolle.MITARBEITER)
+        codes = mit_zweitem_faktor(user)
+        c = APIClient()
+        r = c.post("/api/auth/anmelden/", {"benutzername": user.username, "kennwort": KENNWORT}, format="json")
+        r = c.post("/api/auth/2fa/", {"code": codes[0]}, format="json")
+        geraet, antwort = self.einrichten(c)
+        c2, status = anmelden_mit_kennwort(user)
+        optionen = c2.post("/api/auth/passkey/optionen/", {"zweck": "anmelden"}, format="json").json()
+        self.assertEqual(c2.post("/api/auth/passkey/", {"antwort": geraet.signieren(optionen)}, format="json").status_code, 200)
+        optionen = c2.post("/api/auth/passkey/optionen/", {"zweck": "bestaetigen"}, format="json").json()
+        r = c2.post(f"/api/auth/passkeys/{antwort['passkey_neu']['id']}/entfernen/",
+                    {"kennwort": KENNWORT, "passkey": geraet.signieren(optionen)}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(c2.get("/api/auth/status/").json()["schritt"], "fertig")
+        self.assertEqual(c2.get("/api/patienten/").status_code, 200)
+
     def test_letzter_faktor_bei_pflicht_bleibt(self):
         Anmelderegeln.objects.update_or_create(pk=1, defaults={"zweiter_faktor": Anmelderegeln.ZweiterFaktor.ALLE})
         user = benutzer("pk_letzter", Rolle.MITARBEITER)

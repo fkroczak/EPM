@@ -519,9 +519,17 @@ class PasskeyEntfernenView(APIView):
                 status=status.HTTP_400_BAD_REQUEST)
         bestaetigung_gelungen(request)
         name = geraet.name
+        sitzung_damit = getattr(getattr(user, "otp_device", None), "persistent_id", None) == geraet.persistent_id
         geraet.delete()
         if letzter:
             StaticDevice.objects.filter(user=user).delete()
+        elif sitzung_damit:
+            # Mit diesem Passkey war die Sitzung bestätigt: Ohne Ersatz gälte sie nicht mehr als angemeldet. Den zweiten
+            # Faktor hat die Person gerade eben bestätigt – die Sitzung läuft mit einem verbliebenen Gerät weiter.
+            ersatz = (TOTPDevice.objects.filter(user=user, confirmed=True).first()
+                      or Passkey.objects.filter(user=user, confirmed=True).first())
+            if ersatz is not None:
+                otp_login(request, ersatz)
         protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_ZURUECKGESETZT, request, objekt=user.username, selbst=True,
                       passkey=name, letzter=letzter)
         return Response(ich_daten(user))

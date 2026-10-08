@@ -105,6 +105,18 @@ test("Telefon: Notiz zur offenen Akte über „Notiz“ in der Leiste", async ({
   const reiter = page.getByRole("navigation", { name: "Aktenbereiche" });
   const hoehe = await reiter.evaluate((e) => e.getBoundingClientRect().height);
   expect(hoehe).toBeLessThan(60);
+  // Die Leiste liegt über dem Inhalt (Ziel des Antippens ist der Knopf selbst)
+  const lage = await page.evaluate(() => {
+    const knopf = document.querySelector<HTMLElement>('[data-testid="mobil-notiz"]')!;
+    const r = knopf.getBoundingClientRect();
+    const oben = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) as HTMLElement | null;
+    const leiste = getComputedStyle(knopf.parentElement!);
+    return { trifft: !!oben && knopf.contains(oben), oben: `${oben?.tagName}.${String(oben?.className ?? "").slice(0, 50)}`,
+      knopf: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)], fenster: [innerWidth, innerHeight],
+      sicht: [visualViewport?.width, visualViewport?.height, visualViewport?.offsetTop, visualViewport?.scale],
+      leiste: [leiste.position, leiste.zIndex, leiste.bottom], scrollY };
+  });
+  expect(lage.trifft, JSON.stringify(lage)).toBe(true);
   await page.getByTestId("mobil-notiz").click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "Kontakt erfassen" })).toBeVisible();
