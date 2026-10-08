@@ -1,7 +1,7 @@
 /** Entwurf 3 · Patientenliste (Variante 21 über die Darstellung „Hoher Kontrast“). */
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { abfrage, api } from "@/lib/api";
 import type { Seite as ApiSeite } from "@/lib/api";
@@ -11,7 +11,6 @@ import { datum, heuteIso, kg, nummer, prozent, relativ, terminZeit, zahl } from 
 import { ab, useMobil, useStufe } from "@/lib/stufen";
 import { ABSCHLUSSANLAESSE, ERKLAERUNGEN_KURZ, TERMINARTEN } from "@/lib/typen";
 import type { Kontakt, Patient, PatientZeile, Trend } from "@/lib/typen";
-import { Spalten } from "@/components/ui/spalten";
 import { Richtext, klartext } from "@/components/Editor";
 import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Fehleranzeige, Karte, KnopfLink, Knopf, Laden, Leer, Seitenkopf, Segmente, cx } from "@/components/ui/basis";
@@ -134,55 +133,10 @@ function Erklaerungen({ p }: { p: PatientZeile }) {
     : <Chip art="ok"><Icon name="haken" groesse={12} />vollständig</Chip>;
 }
 
-/** Vorschau der gewählten Akte (ab 2560 px rechts neben der Liste, S16) */
-function AktenVorschau({ id }: { id: number | null }) {
-  const akte = useQuery({ queryKey: ["patient", id], queryFn: () => api<Patient>(`patienten/${id}/`), enabled: !!id });
-  const kontakte = useQuery({
-    queryKey: ["patient", id, "kontakte", "letzte"],
-    queryFn: () => api<ApiSeite<Kontakt>>(`kontakte/${abfrage({ patient: id ?? undefined, seitengroesse: 3 })}`),
-    enabled: !!id,
-  });
-  if (!id) return <Karte className="px-5 py-6 text-sm gedaempft">Zeile anklicken: Vorschau der Akte.</Karte>;
-  const p = akte.data;
-  if (!p) return <Karte className="p-5">{akte.error ? <Fehleranzeige fehler={akte.error} /> : <Laden />}</Karte>;
-  const k = p.kopf;
-  return (
-    <Karte className="px-5 py-[18px] flex flex-col gap-3.5" data-testid="akten-vorschau">
-      <div className="flex justify-between items-start gap-3 flex-wrap">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="m-0 text-lg font-semibold">{p.nachname}, {p.vorname}</h2>
-          <span className="num text-[0.8125rem] gedaempft">Nr. {nummer(p.nummer)} · {datum(p.geburtsdatum)}</span>
-        </div>
-        <KnopfLink to={`/patienten/${p.id}`} klein variante="pri">Akte öffnen</KnopfLink>
-      </div>
-      {k ? (
-        <dl className="m-0 grid grid-cols-[120px_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
-          <dt className="gedaempft">Gewicht</dt><dd className="m-0">{k.gewicht ? <>{kg(k.gewicht.kg)} · {datum(k.gewicht.am)}</> : "—"}</dd>
-          <dt className="gedaempft">Katheter</dt><dd className="m-0">{k.katheter ?? "—"}</dd>
-          <dt className="gedaempft">Versorger</dt><dd className="m-0">{k.versorger ?? "—"}</dd>
-          <dt className="gedaempft">Aktueller Plan</dt><dd className="m-0">{k.aktueller_plan ? `${zahl(k.aktueller_plan.kcal)} kcal · seit ${datum(k.aktueller_plan.gueltig_ab)}` : "—"}</dd>
-          <dt className="gedaempft">Nächster Termin</dt><dd className="m-0">{k.naechster_termin ? terminZeit(k.naechster_termin.faellig_am, k.naechster_termin.uhrzeit) : "—"}</dd>
-          <dt className="gedaempft">Auskunft an</dt><dd className="m-0">{k.auskunft.length ? k.auskunft.map((a) => a.name).join(", ") : "niemand eingetragen"}</dd>
-        </dl>
-      ) : null}
-      <div className="flex flex-col gap-1"><span className="text-[0.8125rem] font-medium gedaempft">Diagnose</span>
-        <Richtext html={p.diagnose} leer="Noch keine Diagnose eingetragen." className="text-sm" /></div>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[0.8125rem] font-medium gedaempft">Letzte Kontakte</span>
-        {(kontakte.data?.results ?? []).length === 0 ? <span className="text-sm gedaempft">Noch keine Kontakte.</span>
-          : kontakte.data!.results.map((x) => (
-            <span key={x.id} className={cx("text-sm flex flex-col", x.storniert_am && "opacity-60 line-through")}>
-              <span className="text-[0.78125rem] gedaempft num">{datum(x.zeitpunkt)} · {x.erfasst_von_name}{x.art_name ? ` · ${x.art_name}` : ""}</span>
-              <span className="line-clamp-2">{klartext(x.text)}</span>
-            </span>
-          ))}
-      </div>
-    </Karte>
-  );
-}
 
 export function Patienten() {
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const { darf } = useAuth();
   const archiv = params.get("status") === "abgeschlossen";
   const versorgerId = params.get("versorger") ?? "";
@@ -195,7 +149,6 @@ export function Patienten() {
   const [suche, setSuche] = useState(params.get("suche") ?? "");
   const stufe = useStufe();
   const mobil = useMobil();
-  const [vorschau, setVorschau] = useState<number | null>(null);
 
   // Grundlage ist immer die aktuelle Adresse, nicht der Stand beim letzten Rendern: Der Router übernimmt eine neue
   // Adresse verzögert (Transition). Sonst überschreibt die verzögerte Suche einen kurz danach gewählten Filter.
@@ -249,10 +202,14 @@ export function Patienten() {
   const gefiltert = !!(params.get("suche") || versorgerId || apId || katheterId || schnell || pruefen);
 
   // Spalten je Fensterstufe (S16, Entwurf 2): unter 1440 px Nr., Name, Kontakt, Termin, Hinweise; ab 1440 px dazu Geboren,
-  // Katheter, Versorger, Gewicht mit Trend; ab 1920 px dazu Plan und Erklärungen; ab 2560 px rechts die Vorschau der Akte
+  // Katheter, Versorger, Gewicht mit Trend; ab 1920 px dazu Plan und Erklärungen (die Vorschau der Akte ab 2560 px entfällt seit 08.10.2026)
   const breit = ab(stufe, "hd");
   const sehrBreit = ab(stufe, "fhd");
-  const vorschauSpalte = stufe === "qhd" && !archiv;
+  // Keine Vorschau der Akte mehr (Wunsch 08.10.2026): ein Klick auf die Zeile öffnet die Akte
+  const oeffnen = (id: number) => (e: { target: EventTarget }) => {
+    if ((e.target as HTMLElement).closest("a, button, input, select")) return;
+    navigate(`/patienten/${id}`);
+  };
   const sortieren = (o: string) => setze({ ordering: o });
   const tabelle = (
     <Karte key="tabelle" className="overflow-x-auto">
@@ -287,7 +244,7 @@ export function Patienten() {
           </thead>
           <tbody>
             {(daten?.results ?? []).map((p) => archiv ? (
-              <tr key={p.id}>
+              <tr key={p.id} className="cursor-pointer" onClick={oeffnen(p.id)}>
                 <td className="td num gedaempft">{nummer(p.nummer)}</td>
                 <td className="td"><Link to={`/patienten/${p.id}`} className="font-medium no-underline text-text2">{p.nachname}, {p.vorname}</Link></td>
                 <td className="td num text-text2">{datum(p.geburtsdatum)}</td>
@@ -297,17 +254,12 @@ export function Patienten() {
                 <td className="td gedaempft">{ABSCHLUSSANLAESSE[p.abschluss_anlass] ?? p.abschluss_anlass}</td>
               </tr>
             ) : (
-              <tr key={p.id} className={cx(vorschauSpalte && "cursor-pointer", vorschauSpalte && vorschau === p.id && "gewaehlt")}
-                onClick={vorschauSpalte ? () => setVorschau(p.id) : undefined}>
+              <tr key={p.id} className="cursor-pointer" onClick={oeffnen(p.id)} data-testid="patientenzeile">
                 <td className="td num gedaempft">{nummer(p.nummer)}</td>
                 <td className="td">
                   <span className="inline-flex items-center gap-2 flex-wrap">
                     <Link to={`/patienten/${p.id}`} className="font-medium no-underline">{p.nachname}, {p.vorname}</Link>
                     {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
-                    {vorschauSpalte ? (
-                      <button type="button" className="btn icon klein geist" aria-label={`Vorschau: ${p.nachname}, ${p.vorname}`}
-                        aria-pressed={vorschau === p.id} onClick={(e) => { e.stopPropagation(); setVorschau(p.id); }}><Icon name="auge" groesse={15} /></button>
-                    ) : null}
                   </span>
                   {!breit ? <><br /><span className="text-[0.78rem] gedaempft"><span className="num">{datum(p.geburtsdatum)}</span> ({p.alter})</span></> : null}
                 </td>
@@ -454,10 +406,7 @@ export function Patienten() {
       </div>
 
       <Fehleranzeige fehler={liste.error} />
-      {vorschauSpalte ? (
-        <Spalten seite="patientenliste" stufe="qhd" standard={[2 / 3]} namen={["Patientenliste", "Vorschau der Akte"]} testid="patienten-stufe"
-          spalten={[tabelle, <AktenVorschau key="vorschau" id={vorschau} />]} />
-      ) : mobil ? karten : tabelle}
+      {mobil ? karten : tabelle}
 
       <div className="flex justify-between items-center gap-4 text-[0.8125rem] gedaempft flex-wrap">
         <span>

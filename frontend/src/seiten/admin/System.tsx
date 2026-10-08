@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
+import { AuftragFortschritt, LaufendeAuftraege } from "@/components/AuftragFortschritt";
 import { useHintergrundarbeit } from "@/lib/laden";
 import { dateigroesse, datum, relativ, uhrzeit, zahl, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
@@ -728,7 +729,7 @@ function Auftraege({ liste }: { liste: Auftrag[] }) {
                   <td className="td"><span className="font-medium">{a.name}</span> <span className="text-xs gedaempft">{a.ziel === "server" ? "Server" : "EPM"}</span>
                     {a.parameter.minuten ? <span className="text-xs gedaempft"> · Beginn nach {a.parameter.minuten} Min.</span> : null}</td>
                   <td className="td text-[0.8125rem]">{a.angefordert_von_name ?? "—"}</td>
-                  <td className="td"><AuftragStatus a={a} /></td>
+                  <td className="td"><AuftragStatus a={a} /><AuftragFortschritt a={a} liste={liste} className="mt-1.5" /></td>
                   <td className="td text-[0.8125rem] max-w-[420px]">{a.ergebnis || (a.status === "wartet" ? "wartet, bis der Server den Auftrag abholt" : "—")}</td>
                   <td className="td text-right whitespace-nowrap">
                     {a.status === "wartet" ? <Knopf klein laedt={zurueck.isPending} onClick={() => zurueck.mutate(a)}>Zurückziehen</Knopf> : null}
@@ -825,6 +826,8 @@ export function System() {
       <Seitenkopf titel="System" unter="Server und EPM: Auslastung, Updates, Wartung. Standardmäßig nur für die Administration (Vertretung unter Benutzer › Rechte)."
         rechts={<Knopf icon="neustart" laedt={daten.isFetching} onClick={() => { void daten.refetch(); void auftraege.refetch(); void qc.invalidateQueries({ queryKey: ["system", "verlauf"] }); }}>
           Neu laden</Knopf>} />
+      {/* laufende Tätigkeiten mit geschätztem Fortschritt (Wunsch 08.10.2026) */}
+      <LaufendeAuftraege liste={auftraege.data ?? []} />
 
       {!d.agent.verzeichnis ? (
         <Meldung art="fehler">Das Auftragsverzeichnis fehlt. Tätigkeiten für den Server sind erst möglich, wenn auf dem Server einmal
@@ -843,7 +846,7 @@ export function System() {
           {d.epm.schutz.fehlend.length ? `${d.epm.schutz.fehlend.length} Tabellen ohne Schutz vor Änderungen – „Unveränderlichkeit prüfen“ ausführen.` : ""}</Meldung>
       ) : null}
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 hd:grid-cols-6 gap-3" data-testid="kennzahlen">
+      <div className="stapel grid grid-cols-2 lg:grid-cols-3 hd:grid-cols-6 gap-3" data-testid="kennzahlen">
         <Kennzahl titel="CPU" testid="kennzahl-cpu" prozent={cpu} wert={cpu != null ? `${zahl(cpu, 0)} %` : last ? zahl(last[0]) : "—"}
           unter={`Last ${last ? last.map((x) => zahl(x)).join(" · ") : "—"} bei ${kerne ?? "?"} Kernen`} />
         <Kennzahl titel="Arbeitsspeicher" testid="kennzahl-ram" prozent={ram} wert={ram != null ? `${ram} %` : "—"}

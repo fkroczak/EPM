@@ -19,6 +19,8 @@ export type Darstellung = {
   aktenkopf: "minimal" | "kompakt" | "voll";
   /** Breite der Seitenleiste in der Ansicht „Seitenleiste“ (px) */
   aktenleiste_breite: number;
+  /** Form (Wunsch 08.10.2026): rund mit Abständen oder eckig ohne Rundungen und ohne Abstände zwischen den Karten */
+  form: "rund" | "eckig";
 };
 
 export type Aktenansicht = "kopfzeile" | "seitenleiste" | "karteikarte";
@@ -39,6 +41,7 @@ export const STANDARD_DARSTELLUNG: Darstellung = {
   aktenansicht: "kopfzeile",
   aktenkopf: "voll",
   aktenleiste_breite: AKTENLEISTE.standard,
+  form: "rund",
 };
 
 export const AKZENTE: Record<string, [string, string]> = {
@@ -134,11 +137,13 @@ export function individuelleFarben(d: Darstellung): Record<string, string> {
     "--gedaempft": `hsl(${h} 12% 39%)`,
     "--rand": `hsl(${h} 15% 85%)`,
     "--fein": `hsl(${h} 22% 91%)`,
+    // Ladebalken und Fortschritt in der gewählten Akzentfarbe (Wunsch 08.10.2026: passend zum Design)
+    "--ladebalken": roh,
   };
 }
 
 const INDIVIDUELL_VARIABLEN = ["--akzent", "--akzent-text", "--akzent-hover", "--akzent-weich", "--auf-akzent", "--grund",
-  "--tinte", "--text2", "--gedaempft", "--rand", "--fein"];
+  "--tinte", "--text2", "--gedaempft", "--rand", "--fein", "--ladebalken"];
 
 let dunkelAbfrage: MediaQueryList | null = null;
 let aktuell: Darstellung = STANDARD_DARSTELLUNG;
@@ -152,6 +157,7 @@ function anwenden() {
   wurzel.dataset.dichte = d.dichte;
   wurzel.dataset.schrift = d.schriftgroesse;
   wurzel.dataset.staerke = d.schriftstaerke;
+  wurzel.dataset.form = d.form === "eckig" ? "eckig" : "rund";
   for (const v of INDIVIDUELL_VARIABLEN) wurzel.style.removeProperty(v);
   if (schema === "individuell") {
     for (const [k, v] of Object.entries(individuelleFarben(d))) wurzel.style.setProperty(k, v);

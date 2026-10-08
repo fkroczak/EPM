@@ -8,7 +8,9 @@ test("Anmeldung mit Passwort und Code aus der Authenticator-App, Abmelden", asyn
   await expect(page.getByRole("navigation", { name: "Hauptnavigation" })).toBeVisible();
   // Betrachter sieht keine Administration
   await expect(page.getByRole("navigation", { name: "Administration" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Abmelden" }).click();
+  // unten links nur die Person; Abmelden steht im Menü dahinter (Wunsch 08.10.2026)
+  await page.getByTestId("benutzermenue").click();
+  await page.getByRole("menuitem", { name: "Abmelden" }).click();
   await expect(page.getByRole("heading", { name: "Anmelden" })).toBeVisible();
   // nach dem Abmelden ist die API gesperrt
   const status = await page.request.get("/api/auth/status/");

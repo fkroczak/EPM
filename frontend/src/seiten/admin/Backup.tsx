@@ -15,6 +15,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
+import { AuftragFortschritt, LaufendeAuftraege } from "@/components/AuftragFortschritt";
 import { useHintergrundarbeit } from "@/lib/laden";
 import type { Feldfehler } from "@/lib/api";
 import { useIch } from "@/lib/auth";
@@ -884,7 +885,7 @@ function Taetigkeiten({ liste }: { liste: Auftrag[] }) {
                     {a.parameter.stempel ? <span className="text-xs gedaempft"> · {a.parameter.stempel}</span> : null}
                     {a.parameter.minuten ? <span className="text-xs gedaempft"> · Beginn nach {a.parameter.minuten} Min.</span> : null}</td>
                   <td className="td text-[0.8125rem]">{a.angefordert_von_name ?? "—"}</td>
-                  <td className="td"><AuftragStatus a={a} /></td>
+                  <td className="td"><AuftragStatus a={a} /><AuftragFortschritt a={a} liste={liste} className="mt-1.5" /></td>
                   <td className="td text-[0.8125rem] max-w-[420px]">{a.ergebnis || (a.status === "wartet" ? "wartet, bis der Server den Auftrag abholt" : "—")}</td>
                   <td className="td text-right whitespace-nowrap">
                     {a.status === "wartet" ? <Knopf klein laedt={zurueck.isPending} onClick={() => zurueck.mutate(a)}>Zurückziehen</Knopf> : null}
@@ -957,6 +958,8 @@ export function Backup() {
           <Knopf icon="hochladen" disabled={!d.agent.verzeichnis} onClick={() => setOffen("hochladen")}>Sicherung hochladen</Knopf>
           <Knopf variante="pri" icon="backup" laedt={laufend.has("sicherung")} disabled={laufend.has("sicherung") || !d.agent.verzeichnis}
             onClick={() => setOffen("jetzt")}>Jetzt sichern</Knopf></>} />
+      {/* laufende Tätigkeiten mit geschätztem Fortschritt (Wunsch 08.10.2026) */}
+      <LaufendeAuftraege liste={d.auftraege} />
 
       {wiederherstellen ? (
         <Meldung art="warn"><span data-testid="wiederherstellen-laeuft"><strong>Wiederherstellen läuft</strong> ({wiederherstellen.parameter.stempel}):
@@ -977,7 +980,7 @@ export function Backup() {
         </Meldung>
       ) : null}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4" data-testid="kennzahlen">
+      <div className="stapel grid grid-cols-1 md:grid-cols-3 gap-4" data-testid="kennzahlen">
         <Kennzahl titel="Letzte Sicherung" testid="letzte-sicherung" wert={letzte ? relativ(letzte.zeitpunkt, true) : "—"}>
           {letzte ? (
             <span className="flex gap-1.5 flex-wrap items-center">
@@ -1020,7 +1023,7 @@ export function Backup() {
           angelegt. Zum Bestätigen müssen das eigene Passwort und der 2FA-Code eingegeben werden.</span>
       </div>
 
-      <div className="grid grid-cols-1 hd:grid-cols-2 gap-5 items-start">
+      <div className="stapel grid grid-cols-1 hd:grid-cols-2 gap-5 items-start">
         <Verschluesselung daten={d} onPasswort={() => setOffen("passwort")} onPruefen={() => setOffen("pruefen")} />
         <UebertragungKarte daten={d} offen={laufend} onZiel={() => setOffen("ziel")} onEntfernen={() => setOffen("ziel_entfernen")}
           onUebertragen={() => setOffen("uebertragen")} />

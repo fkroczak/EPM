@@ -99,7 +99,7 @@ export function Spalten({ seite, stufe, standard, spalten, namen, className, tes
 
   const inhalt: ReactNode[] = [];
   spalten.forEach((spalte, j) => {
-    inhalt.push(<div key={`s${j}`} className="flex flex-col gap-5 min-w-0" data-spalte={j}>{spalte}</div>);
+    inhalt.push(<div key={`s${j}`} className="stapel flex flex-col gap-5 min-w-0" data-spalte={j}>{spalte}</div>);
     if (j < standard.length) {
       const i = j;
       const ziele = punkte(werte, i, standard);

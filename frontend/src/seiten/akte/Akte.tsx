@@ -665,7 +665,7 @@ export function Akte() {
                 </Fragment>
               ))}
             </nav>
-            <div className="min-w-0 flex flex-col gap-4 md:gap-5">
+            <div className="stapel min-w-0 flex flex-col gap-4 md:gap-5">
               {meldungen}
               <Outlet context={kontext} />
             </div>
@@ -700,7 +700,7 @@ export function Akte() {
         {meldungen}
         {reiterWaagerecht}
         <div className="akte-kartei" data-testid="akte-ansicht" data-ansicht="karteikarte">
-          <div className="min-w-0 flex flex-col gap-4 md:gap-5"><Outlet context={kontext} /></div>
+          <div className="stapel min-w-0 flex flex-col gap-4 md:gap-5"><Outlet context={kontext} /></div>
           <aside className="akte-kartei-spalte" aria-label="Angaben zur Akte">
             <Karte className="px-4 py-4" data-testid="kennzahlen"><Gruppen gruppen={gruppen} art="leiste" /></Karte>
           </aside>

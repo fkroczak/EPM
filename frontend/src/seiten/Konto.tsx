@@ -194,6 +194,12 @@ function DarstellungKarten({ zuruecksetzenRef }: { zuruecksetzenRef: { current: 
         {fehler ? <Meldung art="fehler">{fehler}</Meldung> : null}
       </Karte>
       <Karte className="px-5 py-[18px] grid grid-cols-2 gap-4">
+        <div className="col-span-2 flex flex-col gap-2" data-testid="form">
+          <span className="lbl">Form</span>
+          <Segmente label="Form" wert={d.form} onWahl={(w) => aendern({ form: w })} className="self-start"
+            werte={[{ wert: "rund", text: "Rund" }, { wert: "eckig", text: "Eckig" }]} />
+          <span className="text-[0.8125rem] gedaempft">Eckig: keine Rundungen, keine Abstände zwischen den Karten und am Rand – mehr Platz für Inhalte.</span>
+        </div>
         <div className="col-span-2 flex flex-col gap-2">
           <span className="lbl">Dichte</span>
           <Segmente label="Dichte" wert={d.dichte} onWahl={(w) => aendern({ dichte: w })} className="self-start"
@@ -535,10 +541,10 @@ export function Konto() {
       <Seitenkopf titel="Mein Konto"
         unter={<span className="max-w-[80ch] inline-block leading-normal">Deine Einstellungen werden für dich gespeichert und gelten an jedem PC, an dem du dich anmeldest. Rolle und Rechte vergibt die Administration.</span>}
         rechts={<Knopf onClick={() => zuruecksetzen.current?.()}>Auf Standard zurücksetzen</Knopf>} />
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5 items-start">
+      <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5 items-start">
         {/* am Telefon zuerst Sicherheit (Passkey), Darstellung danach */}
-        <div className="flex flex-col gap-5 min-w-0 order-2 xl:order-1"><DarstellungKarten zuruecksetzenRef={zuruecksetzen} /></div>
-        <div className="flex flex-col gap-5 min-w-0 order-1 xl:order-2">
+        <div className="stapel flex flex-col gap-5 min-w-0 order-2 xl:order-1"><DarstellungKarten zuruecksetzenRef={zuruecksetzen} /></div>
+        <div className="stapel flex flex-col gap-5 min-w-0 order-1 xl:order-2">
           <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="profil">
             <h2 className="lbl m-0">Profil</h2>
             <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">

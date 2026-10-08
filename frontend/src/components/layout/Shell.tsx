@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
+import { Menu as BaseMenu } from "@base-ui/react/menu";
 import { RECHTE_GEAENDERT, abfrage, api } from "@/lib/api";
 import type { Seite as ApiSeite } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
@@ -37,9 +38,26 @@ function NavEintrag({ zu, icon, text, ende }: { zu: string; icon: string; text: 
   );
 }
 
+/** Angemeldete Person unten in der Seitenleiste: Kürzel im Kreis, Name und Rolle */
+function Person({ v }: { v: boolean }) {
+  const ich = useIch();
+  return (
+    <span className={cx("flex items-center gap-2.5 min-w-0", v ? "justify-start" : "justify-center hd:justify-start")}>
+      <span className="w-[34px] h-[34px] shrink-0 rounded-full bg-akzent-weich text-akzent-text flex items-center justify-center font-semibold text-[0.8125rem]">
+        {ich.kuerzel || initialen(ich.anzeigename)}
+      </span>
+      <span className={cx("flex-col min-w-0 text-left", v ? "flex" : "sr-only hd:not-sr-only hd:flex")}>
+        <span className="text-sm font-medium truncate text-tinte" data-testid={v ? undefined : "angemeldet-als"}>{ich.anzeigename}</span>
+        <span className="text-xs gedaempft">{ROLLEN[ich.rolle]}{ich.ist_test ? " · Testzugang" : ""}</span>
+      </span>
+    </span>
+  );
+}
+
 function Seitenleiste({ schublade }: { schublade?: boolean }) {
   const ich = useIch();
   const { abmelden, darf } = useAuth();
+  const navigate = useNavigate();
   const admin = [
     darf("backup_verwalten") ? <NavEintrag key="b" zu="/admin/backup" icon="backup" text="Backup" /> : null,
     darf("benutzer_verwalten") ? <NavEintrag key="u" zu="/admin/benutzer" icon="benutzer" text="Benutzer" /> : null,
@@ -79,25 +97,45 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
           {admin}
         </nav>
       ) : null}
+      {/* Unten links nur die angemeldete Person (Wunsch 08.10.2026); Hilfe, Mein Konto und Abmelden per Klick als Menü.
+          In der Schublade am Telefon bleiben die Einträge offen sichtbar. */}
       <div className={cx("mt-auto flex flex-col gap-2.5 border-t border-rand pt-3.5", v ? "px-1.5" : "hd:px-1.5")}>
-        <div className={cx("flex items-center gap-2.5", v ? "justify-start" : "justify-center hd:justify-start")} title={ich.anzeigename}>
-          <div className="w-[34px] h-[34px] rounded-full bg-akzent-weich text-akzent-text flex items-center justify-center font-semibold text-[0.8125rem]">
-            {ich.kuerzel || initialen(ich.anzeigename)}
-          </div>
-          <div className={cx("flex-col min-w-0", v ? "flex" : "sr-only hd:not-sr-only hd:flex")}>
-            <span className="text-sm font-medium truncate" data-testid={v ? undefined : "angemeldet-als"}>{ich.anzeigename}</span>
-            <span className="text-xs gedaempft">{ROLLEN[ich.rolle]}{ich.ist_test ? " · Testzugang" : ""}</span>
-          </div>
-        </div>
-        <NavLink to="/hilfe" title="Hilfe" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
-          <Icon name="hilfe" /> <NavText>Hilfe</NavText>
-        </NavLink>
-        <NavLink to="/konto" title="Mein Konto" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
-          <Icon name="konto" /> <NavText>Mein Konto</NavText>
-        </NavLink>
-        <button type="button" title="Abmelden" className="nav border-0 bg-transparent cursor-pointer text-left" onClick={() => void abmelden()}>
-          <Icon name="abmelden" /> <NavText>Abmelden</NavText>
-        </button>
+        {v ? <>
+          <Person v />
+          <NavLink to="/hilfe" title="Hilfe" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
+            <Icon name="hilfe" /> <NavText>Hilfe</NavText>
+          </NavLink>
+          <NavLink to="/konto" title="Mein Konto" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
+            <Icon name="konto" /> <NavText>Mein Konto</NavText>
+          </NavLink>
+          <button type="button" title="Abmelden" className="nav border-0 bg-transparent cursor-pointer text-left" onClick={() => void abmelden()}>
+            <Icon name="abmelden" /> <NavText>Abmelden</NavText>
+          </button>
+        </> : (
+          <BaseMenu.Root>
+            <BaseMenu.Trigger className="benutzerknopf" aria-label={`Benutzermenü: ${ich.anzeigename}`} title={`${ich.anzeigename} – Hilfe, Mein Konto, Abmelden`}
+              data-testid="benutzermenue">
+              <Person v={false} />
+              <span className="hidden hd:inline-flex ml-auto gedaempft" aria-hidden="true"><Icon name="hoch" groesse={14} /></span>
+            </BaseMenu.Trigger>
+            <BaseMenu.Portal>
+              <BaseMenu.Positioner side="top" align="start" sideOffset={6} className="z-50">
+                <BaseMenu.Popup className="card min-w-[220px] p-1 flex flex-col outline-none" data-testid="benutzermenue-liste">
+                  {[
+                    { text: "Hilfe", icon: "hilfe", tun: () => navigate("/hilfe") },
+                    { text: "Mein Konto", icon: "konto", tun: () => navigate("/konto") },
+                    { text: "Abmelden", icon: "abmelden", tun: () => void abmelden() },
+                  ].map((e) => (
+                    <BaseMenu.Item key={e.text} onClick={e.tun}
+                      className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm cursor-pointer outline-none data-[highlighted]:bg-fein">
+                      <Icon name={e.icon} />{e.text}
+                    </BaseMenu.Item>
+                  ))}
+                </BaseMenu.Popup>
+              </BaseMenu.Positioner>
+            </BaseMenu.Portal>
+          </BaseMenu.Root>
+        )}
       </div>
     </aside>
     </Voll.Provider>
@@ -325,7 +363,7 @@ export function Seite({ pfad, children, className }: { pfad: Pfadteil[]; childre
         </div>
       </header>}
       <Systemhinweis />
-      <main className={cx("grow min-h-0 min-w-0 w-full px-3 sm:px-4 schmal:px-8 py-4 md:py-7 flex flex-col gap-4 md:gap-5 max-md:pb-24", className)}>{children}</main>
+      <main className={cx("seite-inhalt grow min-h-0 min-w-0 w-full px-3 sm:px-4 schmal:px-8 py-4 md:py-7 flex flex-col gap-4 md:gap-5 max-md:pb-24", className)}>{children}</main>
     </div>
   );
 }

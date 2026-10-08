@@ -174,6 +174,11 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F124 | Ladebalken am oberen Rand bei jeder laufenden Anfrage (Laden, Speichern, Hochladen, PDF, Aufträge) | alle Seiten | ABGESCHLOSSEN (auf Wunsch ohne Testlauf eingespielt) |
 | F135 | Aufbau der Patientenakte je Person: Kopfzeile in Gruppen mit ziehbarer Höhe, Seitenleiste mit ziehbarer Breite und senkrechten Reitern, Karteikarte | 4 Akte, 14 Mein Konto | ABGESCHLOSSEN (Tests geschrieben, Lauf steht aus) |
 | F136 | Karteikarte: alle Einträge der Akte chronologisch mit Kürzel, Filter, Zeitraum und Kürzelzeile | 4 Akte | ABGESCHLOSSEN (Tests geschrieben, Lauf steht aus) |
+| F137 | Ladebalken 5 px und in „Individuell“ in der Akzentfarbe | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
+| F138 | Fortschritt laufender Aufträge mit ungefährer Restzeit (Backup, Updates, System) | 11 Backup, 17 System | ABGESCHLOSSEN (Lauf steht aus) |
+| F139 | Form „Rund“ oder „Eckig“ (ohne Rundungen und Abstände) je Person | alle Seiten, 14 Mein Konto | ABGESCHLOSSEN (Lauf steht aus) |
+| F140 | Unten links nur die Person; Hilfe, Mein Konto, Abmelden im Menü | Seitenleiste | ABGESCHLOSSEN (Lauf steht aus) |
+| F141 | Patientenliste ohne Vorschau der Akte; Klick auf die Zeile öffnet die Akte | 3 Patientenliste | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2581,6 +2586,53 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   gespeichert und in der Karteikarte, „G 61,2“ → Wert vorbelegt, unbekanntes Kürzel).
 - **Status:** ABGESCHLOSSEN – Tests geschrieben, noch nicht gelaufen: GitHub Actions startete am 08.10.2026 keine Jobs (Abrechnung des Kontos), die Arbeitsumgebung hatte keinen Zugriff auf PyPI, npm und Docker Hub. Geprüft: Syntax und Typen der eigenen Dateien (TypeScript mit Platzhaltern für die Bibliotheken)
 
+### F137 Ladebalken dicker und passend zum Farbschema
+- **Wunsch 08.10.2026:** „Den Ladebalken ein wenig dicker … Ist es farbresponsiv mit dem Design?“ – Vorher 3 px; Farbe je
+  Schema (Standard Orange #e8730c, Dunkel #ffa64d, Hoher Kontrast #c25400), in „Individuell“ aber immer Orange.
+- **Jetzt:** 5 px; in „Individuell“ folgt `--ladebalken` der gewählten Akzentfarbe (`individuelleFarben`), die übrigen
+  Schemata behalten ihre abgestimmte Farbe.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus (siehe F135)
+
+### F138 Fortschritt laufender Aufträge mit ungefährer Zeit
+- **Wunsch 08.10.2026:** „Fortschrittsbalken mit ungefährer Zeitangabe in gleicher Farbe wie der Ladebalken beim Backup
+  oder Update.“
+- **Ansicht:** Administration › Backup und › System: oben die Karte „Laufende Tätigkeiten“ (nur wenn etwas läuft oder
+  wartet), dazu in der Tabelle unter dem Status. Balken in `--ladebalken`, Text „42 % · noch ca. 3 Min. (üblich
+  ca. 6 Min.)“; wartet ein Auftrag mit verzögertem Beginn: „beginnt in ca. 12 Min.“.
+- **Logik (`components/AuftragFortschritt.tsx`):** Der Systemagent meldet keinen Prozentstand. Geschätzt wird aus dem
+  Median der letzten fünf erledigten Aufträge derselben Aktion (Beginn → Ende), ohne solche aus Erfahrungswerten
+  (z. B. Sicherung 3 Min., EPM aktualisieren 15 Min., „geschätzt“ im Text). Höchstens 95 %, bis der Auftrag fertig
+  ist; dauert er länger als üblich, sagt der Text das und der Balken läuft als Bewegung weiter. Keine neuen Endpunkte.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F139 Form „Rund“ oder „Eckig“
+- **Wunsch 08.10.2026:** „Das runde Design mit dem verschwendeten Platz bitte mit einem eckigen Design ausstatten und die
+  Abstände weglassen … Runde und eckige Design sollen im Menü Mein Konto einstellbar sein.“
+- **Ansicht:** Mein Konto › Darstellung › „Form“: Rund (Standard) | Eckig. Eckig: keine Rundungen (Karten, Knöpfe,
+  Felder, Chips, Reiter, Balken; Kreise wie Kürzel und Farbfelder bleiben rund), kein Schatten, kein Rand um den
+  Seiteninhalt und keine Abstände zwischen den Karten (Startseite, Übersicht der Akte, Spalten, Konto, Backup, System,
+  Aktenansichten); die Linien benachbarter Karten liegen übereinander. Innerhalb der Karten bleiben die Abstände.
+- **Endpunkt:** `PATCH /api/auth/ich/ {darstellung: {form: "rund" | "eckig"}}` (Standard „rund“, ohne Migration).
+- **Teststatus:** Backend-Test `MeinKonto.test_form`; Browsertest `konto.spec.ts` „Form „Eckig“ …“.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F140 Benutzermenü unten links
+- **Wunsch 08.10.2026:** „Unten links nur [die Person] anzeigen lassen. Beim Klick darauf dann die Menüpunkte.“
+- **Ansicht:** Seitenleiste unten: Kürzel, Name, Rolle als ein Knopf; Klick öffnet nach oben Hilfe, Mein Konto,
+  Abmelden. Am Telefon (Schublade) bleiben die drei Einträge offen sichtbar. Die übrigen Menüpunkte sind unverändert.
+- **Teststatus:** `konto.spec.ts` (Menü öffnen, Mein Konto); `anmeldung.spec.ts` und `passkey.spec.ts` melden sich über das
+  Menü ab.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F141 Patientenliste ohne Vorschau
+- **Wunsch 08.10.2026:** „Patienten ohne Vorschau der Akte. Man muss auf die Akte klicken, um sie zu sehen.“
+- **Ansicht:** Die Vorschau rechts neben der Liste (ab 2560 px, F14/F97) und der Knopf „Vorschau“ entfallen, ebenso der
+  Teiler der Patientenliste. Ein Klick auf die Zeile (auch bei abgeschlossenen Akten) öffnet die Akte; Links und
+  Knöpfe in der Zeile behalten ihre Wirkung. Die übrigen Spalten je Fensterstufe bleiben.
+- **Teststatus:** `oberflaeche.spec.ts` „Volle Breite in Stufen: 2560 px ohne Vorschau …“ (kein Teiler, keine Vorschau,
+  Klick auf die Zeile öffnet die Akte).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2679,6 +2731,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Form, Fortschritt, Benutzermenü (Wunsch 08.10.2026) | Ladebalken 5 px, in „Individuell“ in der Akzentfarbe (F137); Fortschritt laufender Aufträge mit ungefährer Restzeit aus der Dauer früherer Aufträge, Karte „Laufende Tätigkeiten“ auf Backup und System (F138); Form „Rund“/„Eckig“ unter Mein Konto, eckig ohne Rundungen und ohne Abstände zwischen den Karten (F139, `darstellung.form`, ohne Migration); unten links nur die Person, Hilfe/Mein Konto/Abmelden im Menü (F140); Patientenliste ohne Vorschau, Klick auf die Zeile öffnet die Akte (F141). GitHub Actions startete wegen der Abrechnung des Kontos weiterhin keine Jobs; die Tests sind geschrieben, der Lauf steht aus |
 | 08.10.2026 | Aufbau der Patientenakte (Wunsch 08.10.2026) | Drei Ansichten der Akte je Person unter Mein Konto › Patientenakte (F135): Kopfzeile mit den Angaben in vier Gruppen und Griff für die Höhe (nur Name · eine Zeile · alle Angaben), Seitenleiste mit Knöpfen über dem Namen, ziehbarer Breite (240–480 px, rastet ein) und senkrechten Reitern, Karteikarte wie in einer Arztsoftware mit fester Spalte rechts. Karteikarte mit allen Einträgen chronologisch, Filter, Zeitraum und Kürzelzeile K/G/T/WV/P (F136, neuer Reiter `kartei`). Darstellung um `aktenansicht`, `aktenkopf`, `aktenleiste_breite` erweitert (ohne Migration). CAVE (Nickelallergie, Gewichtsverlust) steht jetzt in jeder Ansicht beim Namen. Das Menü links ist unverändert. Die Arbeitsumgebung hatte keinen Zugriff auf PyPI, npm und Docker Hub, GitHub Actions startete wegen der Abrechnung des Kontos keine Jobs – Backend-Test und Browsertest sind geschrieben, aber noch nicht gelaufen (zuerst auf der Test-VM mit `sudo epm-update`) |
 | 08.10.2026 | Passkey und Telefon (Pull Request #14) | Passkeys (WebAuthn) als zweiter Faktor statt oder neben dem Authenticator-Code – einrichten, umbenennen, entfernen unter Mein Konto, Anmeldung und alle Bestätigungen mit Passkey (F130–F132; Modell `accounts.Passkey` als django-otp-Gerät, Migration `accounts/0008`, `py_webauthn` 2.x, Baustein `useZweiterFaktor` an allen Bestätigungen). Eigene CA mit Namensbeschränkung und Serverzertifikat (`sudo epm-zertifikat`, F134), Stammzertifikat unter `/epm-ca.crt`. Mobile Ansicht (F133): Leiste unten mit Notiz und Plänen, Menü als Schublade, Karten statt Tabellen, Akte mit Detail vor der Liste, Dialoge und Eingaben für Touch. Hilfe-Abschnitte „Passkey statt Code“ und „EPM am Telefon“. Offene Fragen U62, U63. Dabei gefunden und behoben: Wer den Passkey entfernte, mit dem die Sitzung bestätigt war, war danach abgemeldet (Sitzung läuft jetzt mit einem verbliebenen Gerät weiter). Nach den Bildschirmfotos am Telefon (Lauf 37710345563) behoben: Kartenköpfe (z. B. „Diagnosen und Therapie“ mit drei Knöpfen) brechen um statt die Seite zu verbreitern, die Spalte „Versichertennummer“ überlappte (auch am PC), der Kalender startet am Telefon als Liste. Browsertests „Ärzte zuordnen …“ und „Benutzer ohne Login …“ stabilisiert (Meldung genau bzw. die letzte gesucht). Lauf 37714211870: 347 von 347 Backend-Tests, 108 von 108 Browsertests |
 | 06.10.2026 | Wünsche aus der Praxis (Alice, 06.10.2026) | Infusionstage je Beutelart mit Übernahme in den Folgeplan, Vergleich und PDF (F110, Migration `infusionen/0007`); Präparate nach der Mail – Zusatzvolumen umbenannt und ergänzt, Natrovit, NutriLock/TauroLock, Hinweisfeld am Präparat, Dipeptamin und Omegaven ausgeblendet (F111, Migrationen `stammdaten/0012`, `0013`); Katalog der Laborparameter mit Alices Liste und Erfassungsmaske nach Gruppen (F112, F113, neue App `befunde`); BIA-Maske mit Beurteilung und Übernahme des Gewichts (F114); Berichte in der Akte mit Entwurf/Freigabe, PDF als Dokument und Trigger-Schutz (F115, neue App `berichte`, neues Recht „Berichte freigeben“); Sprechstundenblatt (F116); Diagnosen mit ICD-Code und mitwachsendem Katalog (F117, Migration `patienten/0010`); Versichertendaten GKV/PKV, Versicherung, Versichertennummer (F118). Neue Dokumentvorlagen „Bericht“ und „Unterlagen für die Sprechstunde“ (Migration `vorlagen/0003`), Audit-Arten `bericht_freigegeben` und `sprechstunde_erzeugt` (`audit/0008`). Endgültiges Löschen, Kopie der Akte und Verlauf um die neuen Bereiche erweitert. Konzept und 22 offene Fragen (U39–U60) in `docs/WUENSCHE-PRAXIS-2026-10-06.md`. Die Migrationen sind von Hand geschrieben (die Arbeitsumgebung hatte keinen Zugriff auf PyPI und npm); `makemigrations` in CI meldet dazu „No changes detected“. Die neuen Apps stehen jetzt auch in der `makemigrations`-Zeile des Workflows. Lauf 37525732042: 311 von 311 Backend-Tests, 98 von 98 Browsertests. Davor fand CI drei echte Fehler, die hier behoben sind: der Plan-Serializer gab die neuen Infusionstage-Felder weder aus noch nahm er sie entgegen (dadurch griff auch deren Prüfung nicht), der ICD-Code wurde nicht in Großschreibung vereinheitlicht, und das Frontend baute wegen eines doppelten Schlüssels in der Feldliste des Verlaufs nicht. Nebenwirkung der Umbenennung: Beim Altdaten-Import trifft „Sterofundin“ keinen Katalogeintrag mehr automatisch und wird einmal von Hand auf „Sterofundin ISO“ gelegt (U43) |

@@ -61,7 +61,7 @@ export function Aktenseite({ titel, anzahl, aktion, kopfrechts, liste, fuss, det
   const kennung = `${testid ?? "akte"}-detailbereich`;
   return (
     <DetailKennung.Provider value={kennung}>
-    <div className="grid grid-cols-1 xl:grid-cols-[290px_minmax(0,1fr)] fhd:grid-cols-[340px_minmax(0,1fr)] gap-x-5 gap-y-4 xl:gap-y-2.5 items-start
+    <div className="stapel grid grid-cols-1 xl:grid-cols-[290px_minmax(0,1fr)] fhd:grid-cols-[340px_minmax(0,1fr)] gap-x-5 gap-y-4 xl:gap-y-2.5 items-start
       [grid-template-areas:'kopf'_'detail'_'liste'] xl:[grid-template-areas:'kopf_detail'_'liste_detail'] xl:grid-rows-[auto_1fr]"
       data-testid={testid}>
       <div className="flex flex-col gap-2.5 [grid-area:kopf]">

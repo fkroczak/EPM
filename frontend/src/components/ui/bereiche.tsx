@@ -69,7 +69,8 @@ export function Bereich({ id, titel, standard, children, menue = true, className
   const messen = () => {
     const el = ref.current;
     if (!el || !el.parentElement) return;
-    const abstand = parseFloat(getComputedStyle(el.parentElement).columnGap) || 20;
+    const gemessen = parseFloat(getComputedStyle(el.parentElement).columnGap);
+    const abstand = Number.isNaN(gemessen) ? 20 : gemessen; // Form „eckig“: 0 px
     setZeilen(Math.max(1, Math.ceil((el.getBoundingClientRect().height + abstand) / EINHEIT)));
   };
   // vor dem ersten Zeichnen messen (sonst lägen die Karten kurz übereinander), danach bei jeder Größenänderung
