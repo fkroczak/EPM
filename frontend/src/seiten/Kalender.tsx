@@ -366,7 +366,7 @@ function Gekuerzt({ eintraege, heute, onWahl }: { eintraege: Eintrag[]; heute: s
 
 // ---------------------------------------------------------------- Seite
 export function Kalender() {
-  const { darf } = useAuth();
+  const { darf, darfBei } = useAuth();
   const [params, setParams] = useSearchParams();
   // am Telefon (Festlegung 08.10.2026) ist die Liste Standard – das Monatsraster ist dort zu eng zum Lesen
   const mobil = useMobil();
@@ -438,6 +438,13 @@ export function Kalender() {
   const listenTage = [...tage.entries()].sort(([a], [b]) => a.localeCompare(b));
   const tagEintraege = tage.get(gewaehlt) ?? [];
   const neuAm = schreiben ? (d: string) => setNeu({ datum: d }) : undefined;
+  // Offener Termin, den die Person ändern darf: gleich „Termin ändern“ (mit „Erledigt“ und „Akte öffnen“) statt erst
+  // einer Ansicht mit „Ändern“ (Vorschlag „Bearbeiten sichtbar“, 08.10.2026); Fälligkeiten und Erledigtes wie bisher
+  const waehlen = (e: Eintrag) => {
+    const t = e.termin;
+    if (t && !t.erledigt_am && schreiben && darfBei("eintraege_erfassen", { ist_test: t.patient_ist_test })) setAendern(t);
+    else setEintrag(e);
+  };
 
   return (
     <Ausblenden.Provider value={setWeg}>
@@ -474,11 +481,11 @@ export function Kalender() {
         <Karte className="p-2 min-w-0">
           {!daten.data ? <Laden /> : ansicht === "monat" ? (
             <Monat von={z.von} bezug={bezug} heute={heute} tage={tage} feiertage={feiertage} gewaehlt={gewaehlt}
-              onTag={setGewaehlt} onWahl={setEintrag} onNeu={neuAm} />
+              onTag={setGewaehlt} onWahl={waehlen} onNeu={neuAm} />
           ) : ansicht === "woche" ? (
-            <Woche von={z.von} heute={heute} tage={tage} feiertage={feiertage} onWahl={setEintrag} onNeu={neuAm} />
+            <Woche von={z.von} heute={heute} tage={tage} feiertage={feiertage} onWahl={waehlen} onNeu={neuAm} />
           ) : (
-            <Liste tage={listenTage} feiertage={feiertage} heute={heute} onWahl={setEintrag} />
+            <Liste tage={listenTage} feiertage={feiertage} heute={heute} onWahl={waehlen} />
           )}
         </Karte>
         <div className="flex flex-col gap-4">
@@ -490,25 +497,25 @@ export function Kalender() {
               </div>
               {feiertage.get(gewaehlt) ? <span className="text-xs text-fehler">{feiertage.get(gewaehlt)}</span> : null}
               {tagEintraege.length === 0 ? <span className="text-sm gedaempft">Keine Einträge.</span>
-                : tagEintraege.map((e) => <EintragKnopf key={e.schluessel} e={e} heute={heute} onWahl={setEintrag} voll />)}
+                : tagEintraege.map((e) => <EintragKnopf key={e.schluessel} e={e} heute={heute} onWahl={waehlen} voll />)}
             </Karte>
           ) : null}
           <Karte className="px-4 py-3.5 flex flex-col gap-3" data-testid="ueberfaellig">
             <h2 className="lbl m-0 flex items-center gap-2"><Icon name="warnung" groesse={16} />Überfällig</h2>
             <Seitenliste titel="Offene Termine" anzahl={ueberfaellig.termine.length} testid="ueberfaellig-termine">
-              <Gekuerzt eintraege={ueberfaellig.termine} heute={heute} onWahl={setEintrag} />
+              <Gekuerzt eintraege={ueberfaellig.termine} heute={heute} onWahl={waehlen} />
             </Seitenliste>
             <Seitenliste titel={`Kontakt überfällig (über ${daten.data?.grenzen.kontakt_monate ?? "…"} Mon.)`} anzahl={ueberfaellig.kontakt.length}
               testid="ueberfaellig-kontakt">
-              <Gekuerzt eintraege={ueberfaellig.kontakt} heute={heute} onWahl={setEintrag} />
+              <Gekuerzt eintraege={ueberfaellig.kontakt} heute={heute} onWahl={waehlen} />
             </Seitenliste>
             <Seitenliste titel={`Kontakt bald fällig (über ${daten.data?.grenzen.kontakt_bald_monate ?? "…"} Mon.)`} anzahl={ueberfaellig.bald.length}
               testid="bald-kontakt">
-              <Gekuerzt eintraege={ueberfaellig.bald} heute={heute} onWahl={setEintrag} />
+              <Gekuerzt eintraege={ueberfaellig.bald} heute={heute} onWahl={waehlen} />
             </Seitenliste>
             <Seitenliste titel={`Plan prüfen (älter als ${daten.data?.grenzen.plan_monate ?? "…"} Mon.)`} anzahl={ueberfaellig.plan.length}
               testid="ueberfaellig-plan">
-              <Gekuerzt eintraege={ueberfaellig.plan} heute={heute} onWahl={setEintrag} />
+              <Gekuerzt eintraege={ueberfaellig.plan} heute={heute} onWahl={waehlen} />
             </Seitenliste>
           </Karte>
           <div className="flex flex-col gap-1.5 text-xs gedaempft px-1">
@@ -528,7 +535,7 @@ export function Kalender() {
           patientId={neu?.patient} patientName={neu?.name} />
       ) : null}
       {schreiben ? <TerminDialog offen={!!aendern} onOffen={(o) => { if (!o) setAendern(null); }} termin={aendern}
-        patientName={aendern?.patient_name} /> : null}
+        patientName={aendern?.patient_name} mitAkte /> : null}
       {/* „×“: Termin oder Fälligkeit ausblenden – 3/6/12 Monate oder „nicht mehr nötig“, mit Grund (F142) */}
       <RuheDialog offen={!!weg} onOffen={(o) => { if (!o) setWeg(null); }}
         patientId={weg?.termin?.patient ?? weg?.faellig?.patient ?? 0} termin={weg?.termin ?? null}

@@ -1,7 +1,7 @@
 /**
  * Karten im Raster mit einstellbarer Größe (Fehlerliste 02.10.2026, Punkt 2 und 4.1): wie die Kacheln der Startseite,
  * aber für die Karten der Übersicht einer Akte und der Systemseite. Jede Karte hat oben
- * rechts ein Menü „⋯“ für Breite (Spalten des Rasters) und Höhe (automatisch nach Inhalt oder 1–4 feste Rasterzeilen,
+ * rechts ein Größen-Symbol (seit 08.10.2026 statt „⋯“) mit dem Menü für Breite (Spalten des Rasters) und Höhe (automatisch nach Inhalt oder 1–4 feste Rasterzeilen,
  * der Inhalt scrollt dann in der Karte). Gespeichert je Seite, Karte und Person (PATCH /api/auth/ich/ {bereiche}).
  *
  * Das Raster packt die Karten ohne Lücken untereinander: Es hat sehr flache Zeilen (8 px), jede Karte belegt so viele,
@@ -105,9 +105,10 @@ export function Bereich({ id, titel, standard, children, menue = true, className
       {children}
       {menue ? (
         <BaseMenu.Root>
-          <BaseMenu.Trigger className="bereich-menue btn geist icon" aria-label={`Größe: ${titel}`} title="Größe dieser Karte (gilt nur für dich)"
+          {/* Größen-Symbol statt „⋯“: „⋯“ ließ weitere Aktionen erwarten (Vorschlag „Bearbeiten sichtbar“, 08.10.2026) */}
+          <BaseMenu.Trigger className="bereich-menue btn geist icon" aria-label={`Größe: ${titel}`} title="Größe dieser Karte ändern (gilt nur für dich)"
             data-testid={`groesse-${id}`}>
-            <Icon name="mehr" />
+            <Icon name="ecke" groesse={15} />
           </BaseMenu.Trigger>
           <BaseMenu.Portal>
             <BaseMenu.Positioner side="bottom" align="end" sideOffset={4} className="z-50">

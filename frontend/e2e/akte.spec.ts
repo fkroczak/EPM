@@ -138,7 +138,7 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   await expect(diagnose.locator(".richtext strong")).toHaveText("Typ II");
   await expect(diagnose).toContainText("Version 2");
 
-  // Therapie: eigener Reiter, links die Fassungen, rechts der Text; der Editor ist direkt offen (F121/F122)
+  // Therapie: eigener Reiter, links die Fassungen, rechts der Text; bei leerem Text ist der Editor direkt offen (F121/F122)
   await oeffnen(page, p.id, "/therapie");
   const therapie = page.getByTestId("karte-therapie");
   await expect(therapie).toContainText("Noch nicht bearbeitet");
@@ -147,6 +147,15 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   await page.keyboard.type("HPE 5×/Woche über Port");
   await therapie.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Therapie gespeichert.")).toBeVisible();
+  // danach erst lesen, „Bearbeiten“ öffnet den Editor; „Abbrechen“ verwirft die Eingabe (08.10.2026)
+  await expect(therapie.getByRole("textbox", { name: "Therapie" })).toHaveCount(0);
+  await expect(therapie).toContainText("HPE 5×/Woche über Port");
+  await therapie.getByRole("button", { name: "Bearbeiten" }).click();
+  await therapie.getByRole("textbox", { name: "Therapie" }).click();
+  await page.keyboard.type(" – wird verworfen");
+  await therapie.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(therapie.getByRole("textbox", { name: "Therapie" })).toHaveCount(0);
+  await expect(therapie).not.toContainText("wird verworfen");
 
   // Bemerkung: seit dem 07.10.2026 kein Feld der Oberfläche mehr (nie benutzt, F122). Der Inhalt bleibt
   // erhalten und im Verlauf sichtbar – dort landen auch die Hinweise des Altdaten-Imports.
@@ -287,6 +296,11 @@ test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen 
   await expect(page.getByTestId("stammdaten")).toContainText("0251 98765");
   await expect(page.getByTestId("stammdaten").getByTestId("telefon2")).toHaveText("0171 2223334");
   await expect(page.getByTestId("stammdaten").getByTestId("krankenkasse")).toHaveText("AOK NordWest");
+  // „Bearbeiten“ direkt auf der Karte „Anschrift und Kontakt“ öffnet denselben Dialog (08.10.2026)
+  await page.getByTestId("stammdaten").getByRole("button", { name: "Bearbeiten" }).click();
+  await expect(page.getByRole("dialog").getByLabel("Telefon 2")).toHaveValue("0171 2223334");
+  await page.getByRole("dialog").getByRole("button", { name: "Abbrechen" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   const kennzahlen = page.getByTestId("kennzahlen");
   await expect(kennzahlen).not.toContainText("nicht erfasst");
   await expect(kennzahlen.locator("div").filter({ hasText: /^Katheter/ })).toContainText("kein");

@@ -49,11 +49,20 @@ test("Kalender: Termin an einem Tag anlegen, öffnen, abhaken; Erledigte ausblen
   await expect(dialog).toHaveCount(0);
   const eintrag = page.getByTestId(`tag-${ziel}`).getByRole("button", { name: /09:15 Wiedervorlage: Beispiel, Paula – E2E Kalender Kontrolle/ });
   await expect(eintrag).toBeVisible();
+  // Klick auf einen offenen Termin öffnet gleich „Termin ändern“ mit „Erledigt“ und „Akte öffnen“ (08.10.2026)
   await eintrag.click();
-  await expect(page.getByRole("dialog").getByTestId("eintrag-details")).toContainText("Wiedervorlage");
-  await page.getByRole("dialog").getByRole("button", { name: "Erledigt" }).click();
+  const td = page.getByRole("dialog");
+  await expect(td.getByRole("heading", { name: "Termin ändern" })).toBeVisible();
+  await expect(td.getByLabel("Titel")).toHaveValue("E2E Kalender Kontrolle");
+  await expect(td.getByRole("link", { name: "Akte öffnen" })).toBeVisible();
+  await expect(td.getByTestId("termin-angelegt")).toContainText("Angelegt");
+  await td.getByRole("button", { name: "Erledigt" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByTestId(`tag-${ziel}`).getByRole("button", { name: /E2E Kalender Kontrolle \(erledigt\)/ })).toBeVisible();
+  // Erledigtes öffnet die Ansicht (nicht mehr änderbar)
+  await page.getByTestId(`tag-${ziel}`).getByRole("button", { name: /E2E Kalender Kontrolle \(erledigt\)/ }).click();
+  await expect(page.getByRole("dialog").getByTestId("eintrag-details")).toContainText("Erledigt");
+  await page.keyboard.press("Escape");
   await page.getByLabel("Erledigte zeigen").uncheck();
   await expect(page.getByTestId(`tag-${ziel}`).getByRole("button", { name: /E2E Kalender Kontrolle/ })).toHaveCount(0);
   merken("kalender", { datum: ziel, titel: "E2E Kalender Kontrolle" });

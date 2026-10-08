@@ -26,7 +26,9 @@ function Textseite({ feld, fuss, testid }: { feld: Textfeld; fuss: React.ReactNo
           <TextfassungsListe feld={feld} gewaehlt={gewaehlt} onWahl={(v) => setWahl(String(v))} />
         </Eintragsliste>
       }
-      detail={<Textfassung feld={feld} version={gewaehlt} immerOffen={!gewaehlt || gewaehlt === kopf?.version} />}
+      // Erst lesen, dann „Bearbeiten“ (Vorschlag „Bearbeiten sichtbar“, 08.10.2026) – nur ein leerer Text öffnet
+      // gleich den Editor, damit niemand erst auf „Bearbeiten“ klicken muss, um etwas einzutragen
+      detail={<Textfassung feld={feld} version={gewaehlt} immerOffen={(!gewaehlt || gewaehlt === kopf?.version) && !patient[feld]} />}
     />
   );
 }

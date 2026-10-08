@@ -189,6 +189,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F149 | Akte: „Kontakt“ und „Gewicht“ öffnen einen Dialog wie „Termin“ | 4 Akte | ABGESCHLOSSEN (Lauf steht aus) |
 | F150 | Ein Dialog je Sache: „Neuer Kontakt“, „+ Gewicht“ und Kürzelzeile K/G öffnen dieselben Dialoge; Wiedervorlage standardmäßig in 14 Tagen, einstellbar | 4 Akte, Vorlagen › Grenzwerte | ABGESCHLOSSEN (Lauf steht aus) |
 | F151 | Weniger Wege: „Entwurf fortsetzen“ im Aktenkopf, Dokument aus dem Kopf und per Ziehen auf die Akte, Arzt/Versorger im Dialog anlegen | 4 Akte, Neuer Patient, Arzt zuordnen | ABGESCHLOSSEN (Lauf steht aus) |
+| F152 | Bearbeiten sichtbar: „Bearbeiten“ auf Anschrift und Kontakt, Kalender öffnet „Termin ändern“, Karteikarte springt zum Eintrag, Therapie/Empfehlung erst lesen, Größen-Symbol statt „⋯“ | 4 Akte, Kalender | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2784,6 +2785,25 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
 - **Teststatus:** `infusionen/tests.py` (`plan_entwurf`), `plaene.spec.ts`, `dokumente.spec.ts`, `patienten.spec.ts`.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F152 Bearbeiten sichtbar
+- **Wunsch 08.10.2026:** Umsetzung „EPM intuitiver – Vorschläge“ (Abschnitt „Bearbeiten sichtbar“): Was sich ändern
+  lässt, zeigt das dort, wo es steht.
+- **Anschrift und Kontakt:** Karte der Übersicht mit „Bearbeiten“ (öffnet „Stammdaten bearbeiten“, bisher nur über
+  „Weitere Aktionen“ oder „nicht erfasst“).
+- **Gewicht:** letzte Messung direkt korrigieren (siehe F150).
+- **Kalender:** Klick auf einen offenen Termin, den die Person ändern darf, öffnet gleich „Termin ändern“ – mit
+  „Erledigt“, „Akte öffnen“ und „Angelegt … von …“. Erledigte Termine, Fälligkeiten und Personen ohne Recht sehen wie
+  bisher die Ansicht des Eintrags.
+- **Karteikarte:** Klick auf eine Zeile öffnet genau diesen Eintrag im Reiter (Kontakt, Plan, Labor, BIA, Diagnose,
+  Dokument, Bericht; per `?kontakt=`, `?plan=`, `?befund=`, `?messung=`, `?eintrag=`, `?dokument=`, `?bericht=`), eine
+  beendete Diagnose samt „beendete anzeigen“. Offene Termine öffnen „Termin ändern“, ohne die Karteikarte zu verlassen.
+- **Therapie und Empfehlung:** erst lesen, „Bearbeiten“ öffnet den Editor (vorher war er immer offen); ein leerer Text
+  öffnet ihn gleich. Im Editor heißt „Verwerfen“ jetzt „Abbrechen“ (eine Sprache, F153).
+- **Kartengröße:** Das Menü für Breite und Höhe der Karten (Übersicht, System) öffnet sich über ein Größen-Symbol statt
+  „⋯“ – „⋯“ ließ weitere Aktionen erwarten. Dezent, bis die Maus über der Karte ist.
+- **Teststatus:** `akte.spec.ts`, `kalender.spec.ts`, `aktenansicht.spec.ts`.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2882,6 +2902,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Bearbeiten sichtbar | „Bearbeiten“ auf Anschrift und Kontakt, Kalender öffnet „Termin ändern“ mit „Erledigt“, Karteikarte springt zum Eintrag, Therapie/Empfehlung erst lesen, Größen-Symbol (F152). Lauf steht aus |
 | 08.10.2026 | Weniger Wege | „Entwurf fortsetzen“ im Aktenkopf, Dokumente aus dem Kopf und per Ziehen auf die Akte, Arzt/Versorger im Dialog anlegen (F151). Lauf steht aus |
 | 08.10.2026 | Ein Dialog je Sache | „Neuer Kontakt“, „+ Gewicht“, Kürzelzeile K/G öffnen dieselben Dialoge; letzte Messung direkt korrigieren; Wiedervorlage standardmäßig 14 Tage, unter Vorlagen › Grenzwerte einstellbar (F150). Lauf steht aus |
 | 08.10.2026 | Kontakt/Gewicht als Dialog | Akte: „Kontakt“ und „Gewicht“ öffnen Dialoge wie „Termin“ (F149). Lauf steht aus |

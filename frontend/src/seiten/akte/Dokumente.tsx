@@ -1,5 +1,6 @@
 /** Entwurf 9 · Dokumente: Hochladen (Typ am Inhalt geprüft), Vorschau, Metadaten, Altdokumente prüfen, ausblenden. */
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, alle, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
@@ -280,7 +281,9 @@ type Hochladen = { name: string; status: "laeuft" | "ok" | "fehler"; meldung?: s
 
 export function Dokumente() {
   const { patient, erfassen } = useAkte();
-  const [gewaehlt, setGewaehlt] = useState<number | null>(null);
+  // ?dokument=ID (z. B. aus der Karteikarte) wählt das Dokument vor
+  const [params] = useSearchParams();
+  const [gewaehlt, setGewaehlt] = useState<number | null>(() => Number(params.get("dokument")) || null);
   const [ausgeblendete, setAusgeblendete] = useState(false);
   const [ziehen, setZiehen] = useState(false);
   const [uploads, setUploads] = useState<Hochladen[]>([]);
