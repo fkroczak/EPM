@@ -306,6 +306,9 @@ class Einstellungen(models.Model):
     # Kontakte + 1 Monat), „überfällig“ ab 6 Monaten – beide einstellbar, „bald“ muss früher liegen als „überfällig“
     kontakt_bald_monate = models.PositiveSmallIntegerField("Kontakt bald fällig", default=4)
     kontakt_ueberfaellig_monate = models.PositiveSmallIntegerField("Kontakt überfällig", default=6)
+    # Wiedervorlage beim Erfassen eines Kontakts (Wunsch 08.10.2026): standardmäßig in 14 Tagen, einstellbar;
+    # im Dialog lässt sich das Datum je Kontakt weiterhin frei ändern
+    wiedervorlage_tage = models.PositiveSmallIntegerField("Wiedervorlage nach", default=14)
 
     # Plausibilitätsgrenzen (Eingaben außerhalb werden abgelehnt)
     gewicht_min_kg = models.DecimalField("Gewicht minimal", max_digits=5, decimal_places=1, default=Decimal("20.0"))

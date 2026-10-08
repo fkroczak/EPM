@@ -1,6 +1,6 @@
 /** Entwurf 4 · Übersicht der Akte: Gewichtsverlauf mit Erfassung, Diagnose/Therapie, Termine, Plan, Kontakte. */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, alle, api } from "@/lib/api";
 import type { Feldfehler, Seite as ApiSeite } from "@/lib/api";
@@ -26,7 +26,6 @@ import { KeinPlanHinweis } from "./Plaene";
 import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
 import { Bereich, Bereiche } from "@/components/ui/bereiche";
 
-const QUELLEN_NEU = ["telefonisch", "ambulanz", "versorger", "arztbrief"];
 const ZEITRAEUME: { wert: Zeitraum; text: string }[] = [
   { wert: "y1", text: "12 Monate" }, { wert: "y3", text: "3 Jahre" }, { wert: "y5", text: "5 Jahre" }, { wert: "alle", text: "Alle" },
 ];
@@ -85,61 +84,37 @@ function KorrekturDialog({ messung, onZu }: { messung: Gewicht | null; onZu: () 
 }
 
 function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
-  const { patient, erfassen } = useAkte();
-  const location = useLocation();
-  const feld = useRef<HTMLInputElement>(null);
+  // Erfassen nur noch über den Dialog „Gewicht erfassen“ wie im Aktenkopf (ein Dialog je Sache, 08.10.2026);
+  // die letzte Messung lässt sich direkt korrigieren (Klick auf den Wert oder „Korrigieren“)
+  const { patient, erfassen, gewichtErfassen } = useAkte();
   const [zeitraum, setZeitraum] = useState<Zeitraum>(startZeitraum);
   const [geglaettet, setGeglaettet] = useState(true);
-  const [wert, setWert] = useState("");
-  const [am, setAm] = useState(datum(heuteIso()));
-  const [quelle, setQuelle] = useState("telefonisch");
   const [liste, setListe] = useState(false);
   const [korrektur, setKorrektur] = useState<Gewicht | null>(null);
   useOhneRechtSchliessen(erfassen, () => setKorrektur(null));
   const einstellungen = useEinstellungen();
-  const neuLaden = useAkteNeuLaden();
-  const melden = useHinweis();
   const messungen = useQuery({
     queryKey: ["patient", patient.id, "gewichte"],
     queryFn: () => alle<Gewicht>(`gewichte/${abfrage({ patient: patient.id })}`),
   });
-  useEffect(() => {
-    const st = location.state as { gewicht?: number; wert?: string } | null;
-    // Kürzelzeile der Karteikarte („G 61,2“): Wert vorbelegen, gespeichert wird erst mit „Speichern“
-    if (st?.gewicht && st.wert) setWert(st.wert);
-    if (st?.gewicht && feld.current) {
-      feld.current.scrollIntoView({ block: "center" });
-      feld.current.focus();
-    }
-  }, [location.state]);
-  const speichern = useMutation({
-    mutationFn: () => {
-      const kgWert = eingabeZahl(wert);
-      const iso = eingabeDatum(am);
-      if (!kgWert || kgWert === "ungueltig") throw new ApiFehler(400, "", null, { gewicht_kg: "Bitte ein Gewicht eingeben, z. B. 54,6." });
-      if (!iso) throw new ApiFehler(400, "", null, { gemessen_am: "Bitte als TT.MM.JJJJ eingeben." });
-      return api<Gewicht>("gewichte/", { body: { patient: patient.id, gewicht_kg: kgWert, gemessen_am: iso, quelle } });
-    },
-    onSuccess: (g) => {
-      neuLaden();
-      melden(`Gewicht ${kg(g.gewicht_kg)} gespeichert.`);
-      setWert("");
-    },
-  });
-  const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   const k = patient.kopf;
   const trend = k?.gewichtstrend;
   const alleWerte = messungen.data ?? [];
   const sichtbar = imZeitraum(alleWerte, zeitraum);
   const e = einstellungen.data;
-  const grenzen = e ? `${zahl(e.gewicht_min_kg)}–${zahl(e.gewicht_max_kg)} kg` : "";
+  // letzte Messung = jüngstes Messdatum, bei gleichem Datum die zuletzt erfasste
+  const letzte = [...alleWerte].sort((x, y) => (y.gemessen_am.localeCompare(x.gemessen_am) || y.erfasst_am.localeCompare(x.erfasst_am)))[0];
   return (
     <Karte className="px-4 sm:px-[22px] py-4 sm:py-[18px] flex flex-col gap-4" data-testid="gewichtskarte">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex flex-col gap-1">
           <h2 className="lbl m-0">Gewichtsverlauf</h2>
           <div className="flex items-baseline gap-3 flex-wrap">
-            <span className="num text-[1.375rem] font-semibold" data-testid="aktuelles-gewicht">{k?.gewicht ? kg(k.gewicht.kg) : "—"}</span>
+            {erfassen && letzte ? (
+              <button type="button" className="num text-[1.375rem] font-semibold bg-transparent border-0 p-0 cursor-pointer text-inherit hover:underline"
+                data-testid="aktuelles-gewicht" title="Letzte Messung korrigieren" onClick={() => setKorrektur(letzte)}>
+                {k?.gewicht ? kg(k.gewicht.kg) : kg(letzte.gewicht_kg)}</button>
+            ) : <span className="num text-[1.375rem] font-semibold" data-testid="aktuelles-gewicht">{k?.gewicht ? kg(k.gewicht.kg) : "—"}</span>}
             <span className="text-[0.8125rem] gedaempft">
               {k?.gewicht ? `am ${datum(k.gewicht.am)}` : "noch keine Messung"}
               {patient.groesse_cm ? <> · {zahl(patient.groesse_cm)} cm</> : null}
@@ -148,27 +123,13 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
             </span>
           </div>
         </div>
+        {erfassen ? (
+          <div className="flex items-center gap-2">
+            {letzte ? <Knopf klein icon="stift" onClick={() => setKorrektur(letzte)} title={`Messung vom ${datum(letzte.gemessen_am)} korrigieren`}>Korrigieren</Knopf> : null}
+            <Knopf klein icon="plus" onClick={() => gewichtErfassen()}>Gewicht</Knopf>
+          </div>
+        ) : null}
       </div>
-
-      {erfassen ? (
-        <form className="flex items-end gap-3 flex-wrap" noValidate onSubmit={(ev) => { ev.preventDefault(); speichern.mutate(); }}>
-          <Feld label="Neues Gewicht" fehler={f.gewicht_kg}>
-            {(p) => (
-              <span className="relative block w-[120px]">
-                <Eingabe {...p} ref={feld} className="num pr-9" placeholder="0,0" value={wert} onChange={(ev) => setWert(ev.target.value)} inputMode="decimal" />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.8125rem] gedaempft pointer-events-none">kg</span>
-              </span>
-            )}
-          </Feld>
-          <Feld label="gemessen am" fehler={f.gemessen_am}>{(p) => <Eingabe {...p} className="num w-[120px]" value={am} onChange={(ev) => setAm(ev.target.value)} />}</Feld>
-          <Feld label="Quelle" fehler={f.quelle}>
-            {(p) => <Auswahl {...p} className="w-[190px]" value={quelle} onChange={(ev) => setQuelle(ev.target.value)}>{QUELLEN_NEU.map((q) => <option key={q} value={q}>{GEWICHTSQUELLEN[q]}</option>)}</Auswahl>}
-          </Feld>
-          <Knopf type="submit" variante="pri" laedt={speichern.isPending}>Speichern</Knopf>
-          <span className="text-xs gedaempft basis-full">Unplausible Werte{grenzen ? ` (außerhalb ${grenzen})` : ""} und Daten in der Zukunft werden abgewiesen.</span>
-          {speichern.error && !Object.keys(f).length ? <Meldung art="fehler" className="basis-full">{speichern.error.message}</Meldung> : null}
-        </form>
-      ) : null}
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Segmente label="Zeitraum" wert={zeitraum} onWahl={setZeitraum} werte={ZEITRAEUME} />
@@ -330,7 +291,7 @@ function KontakteKarte() {
   const liste = kontakte.data?.results ?? [];
   return (
     <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="letzte-kontakte">
-      <KartenKopf titel="Letzte Kontakte" rechts={erfassen ? <Knopf klein icon="plus" onClick={kontaktErfassen}>Kontakt</Knopf> : null} />
+      <KartenKopf titel="Letzte Kontakte" rechts={erfassen ? <Knopf klein icon="plus" onClick={() => kontaktErfassen()}>Kontakt</Knopf> : null} />
       {kontakte.isLoading ? <Laden /> : liste.length ? (
         <ul className="m-0 p-0 list-none flex flex-col gap-3">
           {liste.map((k) => (

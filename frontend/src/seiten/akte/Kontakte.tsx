@@ -1,116 +1,20 @@
 /** Entwurf 6 · Kontakte: Protokoll der Kommunikation. Nach dem Speichern unveränderlich, Korrektur nur per Storno. */
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api } from "@/lib/api";
 import type { Feldfehler, Seite as ApiSeite } from "@/lib/api";
-import { useIch, useOhneRechtSchliessen } from "@/lib/auth";
-import { useAuswahl, useVersorgerListe } from "@/lib/daten";
-import { datum, eingabeDatum, heuteIso, terminZeit, uhrzeit, zeitpunkt } from "@/lib/format";
+import { useOhneRechtSchliessen } from "@/lib/auth";
+import { useVersorgerListe } from "@/lib/daten";
+import { datum, terminZeit, uhrzeit, zeitpunkt } from "@/lib/format";
 import { TERMINARTEN } from "@/lib/typen";
 import type { Kontakt } from "@/lib/typen";
-import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Meldung, Textfeld, cx } from "@/components/ui/basis";
+import { Chip, Fehleranzeige, Feld, Karte, Knopf, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
-import { Editor, Richtext, klartext } from "@/components/Editor";
+import { Richtext, klartext } from "@/components/Editor";
 import { useAkte } from "./Akte";
 import { Abschnitt, Aktenseite, Detail, Eintrag, Eintragsliste, useWahl } from "./Aktenseite";
-import { TermineKarte } from "./Uebersicht";
-
-function inTagen(tage: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + tage);
-  return datum(d);
-}
-
-/** Text als einfacher Absatz für den Editor (Kürzelzeile der Karteikarte) */
-function absatz(text: string) {
-  return `<p>${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
-}
-
-function NeuerKontakt({ onFertig, vorlage }: { onFertig?: () => void; vorlage?: string }) {
-  const { patient } = useAkte();
-  const ich = useIch();
-  const location = useLocation();
-  // Kürzelzeile der Karteikarte („K Text“): Text vorbelegen, gespeichert wird erst mit „Kontakt speichern“
-  const [text, setText] = useState(() => (vorlage ? absatz(vorlage) : ""));
-  const [kontaktart, setKontaktart] = useState("");
-  const [mitTermin, setMitTermin] = useState(false);
-  const [art, setArt] = useState("rueckruf");
-  const [faellig, setFaellig] = useState(inTagen(7));
-  const [uhr, setUhr] = useState("");
-  const [fokus, setFokus] = useState(() => (vorlage ? 1 : 0));
-  const orte = useAuswahl("terminort");
-  const kontaktarten = useAuswahl("kontaktart");
-  const qc = useQueryClient();
-  const melden = useHinweis();
-  useEffect(() => {
-    const st = location.state as { neu?: number } | null;
-    if (st?.neu) setFokus(st.neu);
-  }, [location.state]);
-  const speichern = useMutation({
-    mutationFn: () => {
-      let wiedervorlage: Record<string, unknown> | null = null;
-      if (mitTermin) {
-        const iso = eingabeDatum(faellig);
-        if (!iso) throw new ApiFehler(400, "", null, { "wiedervorlage.faellig_am": "Bitte als TT.MM.JJJJ eingeben." });
-        const [a, ort] = art.startsWith("ort:") ? ["praxistermin", Number(art.slice(4))] : [art, null];
-        wiedervorlage = { art: a, ort, faellig_am: iso, uhrzeit: uhr || null };
-      }
-      return api<Kontakt>("kontakte/", { body: { patient: patient.id, text, art: kontaktart ? Number(kontaktart) : null, wiedervorlage } });
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["patient", patient.id] });
-      void qc.invalidateQueries({ queryKey: ["startseite"] });
-      void qc.invalidateQueries({ queryKey: ["patienten"] });
-      melden(mitTermin ? "Kontakt und Wiedervorlage gespeichert." : "Kontakt gespeichert.");
-      setText("");
-      setKontaktart("");
-      setMitTermin(false);
-      setUhr("");
-      setFaellig(inTagen(7));
-      onFertig?.();
-    },
-  });
-  const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
-  return (
-    <div className="flex flex-col gap-3" data-testid="neuer-kontakt">
-      <span className="num text-[0.8125rem] gedaempft">{datum(heuteIso())}, jetzt · {ich.anzeigename}</span>
-      <Editor key={fokus} wert={text} onAenderung={setText} label="Neuer Kontakt" werkzeuge={false} hoehe={84} autofokus={fokus > 0}
-        platzhalter="Telefonat, Ambulanz, Absprache mit Versorger …" />
-      {f.text ? <span className="fehlertext" role="alert">{f.text}</span> : null}
-      {/* Kontaktart seit 03.10.2026 sichtbar (Klärung U6); Liste unter Vorlagen › Auswahllisten */}
-      <div className="flex items-center gap-2.5 flex-wrap">
-        <Auswahl aria-label="Kontaktart" className="w-[260px]" value={kontaktart} onChange={(e) => setKontaktart(e.target.value)}>
-          <option value="">Kontaktart: — ohne Angabe —</option>
-          {(kontaktarten.data ?? []).map((o) => <option key={o.id} value={o.id}>{o.wert}</option>)}
-        </Auswahl>
-        {f.art ? <span className="fehlertext" role="alert">{f.art}</span> : null}
-      </div>
-      <div className="flex items-center gap-2.5 flex-wrap">
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox" checked={mitTermin} onChange={(e) => setMitTermin(e.target.checked)} /> Wiedervorlage
-        </label>
-        <Auswahl aria-label="Art" className="w-[220px]" value={art} disabled={!mitTermin} onChange={(e) => setArt(e.target.value)}>
-          <option value="rueckruf">{TERMINARTEN.rueckruf}</option>
-          <option value="wiedervorlage">{TERMINARTEN.wiedervorlage}</option>
-          {(orte.data ?? []).map((o) => <option key={o.id} value={`ort:${o.id}`}>{o.wert}</option>)}
-          <option value="sonstiges">{TERMINARTEN.sonstiges}</option>
-        </Auswahl>
-        <Eingabe aria-label="Datum" className="num w-[120px]" value={faellig} disabled={!mitTermin} onChange={(e) => setFaellig(e.target.value)}
-          aria-invalid={f["wiedervorlage.faellig_am"] ? true : undefined} />
-        <Eingabe aria-label="Uhrzeit" type="time" className="num w-[110px]" value={uhr} disabled={!mitTermin} onChange={(e) => setUhr(e.target.value)} />
-      </div>
-      {Object.entries(f).filter(([k]) => k.startsWith("wiedervorlage")).map(([k, v]) => <span key={k} className="fehlertext" role="alert">{v}</span>)}
-      {speichern.error && !Object.keys(f).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <span className="text-[0.8125rem] gedaempft">Nach dem Speichern nicht mehr änderbar. Die Wiedervorlage erscheint auf der Startseite.</span>
-        <Knopf variante="pri" laedt={speichern.isPending} disabled={!text} onClick={() => speichern.mutate()}>Kontakt speichern</Knopf>
-      </div>
-    </div>
-  );
-}
 
 function StornoDialog({ kontakt, onZu }: { kontakt: Kontakt | null; onZu: () => void }) {
   const { patient } = useAkte();
@@ -159,26 +63,13 @@ function Erreichbarkeit() {
 }
 
 export function Kontakte() {
-  const { patient, erfassen } = useAkte();
+  const { patient, erfassen, kontaktErfassen } = useAkte();
   const [wahl, setWahl] = useWahl("kontakt");
   const [suche, setSuche] = useState("");
   const [begriff, setBegriff] = useState("");
   const [anzahl, setAnzahl] = useState(50);
-  const [neu, setNeu] = useState(false);
-  const [vorlage, setVorlage] = useState("");
   const [storno, setStorno] = useState<Kontakt | null>(null);
-  // Kürzelzeile der Karteikarte („K Text“): Dialog „Neuer Kontakt“ gleich mit dem Text öffnen
-  const location = useLocation();
-  const navigate = useNavigate();
-  useEffect(() => {
-    const st = location.state as { neu?: number; text?: string } | null;
-    if (!st?.neu || typeof st.text !== "string" || !erfassen) return;
-    setVorlage(st.text);
-    setNeu(true);
-    navigate(location.pathname, { replace: true, state: null }); // beim Zurückblättern nicht noch einmal öffnen
-  }, [location.state, location.pathname, erfassen, navigate]);
   useOhneRechtSchliessen(erfassen, () => setStorno(null));
-  useOhneRechtSchliessen(erfassen, () => setNeu(false));
   useEffect(() => {
     const t = window.setTimeout(() => setBegriff(suche.trim()), 300);
     return () => window.clearTimeout(t);
@@ -199,7 +90,7 @@ export function Kontakte() {
         titel={daten?.count === 1 ? "Kontakt" : "Kontakte"}
         anzahl={daten?.count}
         laedt={abfrageliste.isLoading}
-        aktion={erfassen ? <Knopf variante="pri" icon="plus" onClick={() => setNeu(true)}>Neuer Kontakt</Knopf> : undefined}
+        aktion={erfassen ? <Knopf variante="pri" icon="plus" onClick={() => kontaktErfassen()}>Neuer Kontakt</Knopf> : undefined}
         kopfrechts={<>
           <label className="relative block">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
@@ -251,25 +142,15 @@ export function Kontakte() {
                 </span>
               ) : null}
             </Detail>
-            <div className="grid gap-4 xl:grid-cols-2 items-start">
-              <Erreichbarkeit />
-              <TermineKarte />
-            </div>
+            {/* Termine stehen auf der Übersicht und im Kalender (Vorschlag „Weniger Wege“, 08.10.2026) */}
+            <Erreichbarkeit />
           </div>
         ) : (
-          <div className="grid gap-4 xl:grid-cols-2 items-start">
-            <Erreichbarkeit />
-            <TermineKarte />
-          </div>
+          <Erreichbarkeit />
         )}
       />
-      {erfassen ? <>
-        <Dialog offen={neu} onOffen={(o) => { setNeu(o); if (!o) setVorlage(""); }} titel="Neuer Kontakt" breite={760}
-          beschreibung="Ein gespeicherter Kontakt wird nicht mehr geändert.">
-          <NeuerKontakt onFertig={() => { setNeu(false); setVorlage(""); }} vorlage={vorlage || undefined} />
-        </Dialog>
-        <StornoDialog kontakt={storno} onZu={() => setStorno(null)} />
-      </> : null}
+      {/* „Neuer Kontakt“ öffnet denselben Dialog wie „Kontakt“ im Aktenkopf (ein Dialog je Sache, 08.10.2026) */}
+      {erfassen ? <StornoDialog kontakt={storno} onZu={() => setStorno(null)} /> : null}
     </>
   );
 }

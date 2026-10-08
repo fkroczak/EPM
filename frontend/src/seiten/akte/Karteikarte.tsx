@@ -64,7 +64,7 @@ function zerlegen(eingabe: string): { kuerzel: string; rest: string } | null {
 }
 
 export function Karteikarte() {
-  const { patient, erfassen, planen, terminAnlegen } = useAkte();
+  const { patient, erfassen, planen, terminAnlegen, kontaktErfassen, gewichtErfassen } = useAkte();
   const navigate = useNavigate();
   const basis = `/patienten/${patient.id}`;
   const [filter, setFilter] = useState<Art | "">("");
@@ -172,9 +172,9 @@ export function Karteikarte() {
     setHinweis("");
     if (!b) return;
     if (b.kuerzel === "K") {
-      navigate(`${basis}/kontakte`, { state: { neu: Date.now(), text: b.rest } });
+      kontaktErfassen(b.rest);
     } else if (b.kuerzel === "G") {
-      navigate(basis, { state: { gewicht: Date.now(), wert: b.rest } });
+      gewichtErfassen(b.rest);
     } else if (b.kuerzel === "T" || b.kuerzel === "WV") {
       terminAnlegen();
     } else if (b.kuerzel === "P") {

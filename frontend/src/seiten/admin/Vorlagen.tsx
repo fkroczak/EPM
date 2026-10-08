@@ -274,6 +274,8 @@ const HINWEISE: { k: string; label: string; einheit: string }[] = [
   // Kontakt fällig in zwei Stufen (S04): erst „bald fällig“, dann „überfällig“
   { k: "kontakt_bald_monate", label: "Kontakt bald fällig nach", einheit: "Monaten" },
   { k: "kontakt_ueberfaellig_monate", label: "Kontakt überfällig nach", einheit: "Monaten" },
+  // Wunsch 08.10.2026: Vorgabe für „Wiedervorlage anlegen“ beim Erfassen eines Kontakts (im Dialog änderbar)
+  { k: "wiedervorlage_tage", label: "Wiedervorlage nach Kontakt in", einheit: "Tagen" },
 ];
 // Datenschutz (docs/DATENSCHUTZ.md): Fristen und die Erklärungen, die in jeder Akte vorliegen sollen
 const DATENSCHUTZ: { k: string; label: string; einheit: string; hinweis?: string }[] = [
@@ -352,7 +354,8 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
         </div>
         <span className="text-[0.8125rem] gedaempft">Beispiel: Warnung, wenn ein Patient mehr als {w.gewicht_warnung_prozent} % in {w.gewicht_warnung_monate} Monaten abnimmt.
           Kontakt: „bald fällig“ nach {w.kontakt_bald_monate}, „überfällig“ nach {w.kontakt_ueberfaellig_monate} Monaten ohne Kontakt
-          (Wiedereinbestellung auf der Startseite, Hinweis in der Liste, Kalender).</span>
+          (Wiedereinbestellung auf der Startseite, Hinweis in der Liste, Kalender). Wiedervorlage beim Erfassen eines Kontakts
+          standardmäßig in {w.wiedervorlage_tage} Tagen (im Dialog je Kontakt änderbar).</span>
       </Karte>
       <Karte className="px-5 py-[18px] flex flex-col gap-3.5" data-testid="grenzwerte-datenschutz">
         <h2 className="lbl m-0">Datenschutz</h2>

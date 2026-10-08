@@ -187,6 +187,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F147 | Ohne Scrollen auf 1080p: Formulare Versorger/Ärzte im 6-Spalten-Raster, Kalender füllt die Fensterhöhe, Benutzermenü bündig | Versorger, Ärzte, Kalender, Seitenleiste | ABGESCHLOSSEN (Lauf steht aus) |
 | F148 | Navigation: schmale Leiste mit gleich großen, mittigen Symbolen; Leiste mit Text 224 px; Hauptknöpfe gleich breit; leere Bereiche kompakt | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 | F149 | Akte: „Kontakt“ und „Gewicht“ öffnen einen Dialog wie „Termin“ | 4 Akte | ABGESCHLOSSEN (Lauf steht aus) |
+| F150 | Ein Dialog je Sache: „Neuer Kontakt“, „+ Gewicht“ und Kürzelzeile K/G öffnen dieselben Dialoge; Wiedervorlage standardmäßig in 14 Tagen, einstellbar | 4 Akte, Vorlagen › Grenzwerte | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2750,6 +2751,24 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
 - **Teststatus:** `akte.spec.ts` (Dialoge öffnen mit vorgegebenem Patienten).
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F150 Ein Dialog je Sache, Wiedervorlage einstellbar
+- **Wunsch 08.10.2026:** Umsetzung des Dokuments „EPM intuitiver – Vorschläge“ (Abschnitt „Erfassen“): jede Sache wird
+  überall mit demselben Dialog erfasst. Dazu: „Standard 14 Tagen jedoch anpassbar“ (Vorgabe der Wiedervorlage).
+- **Ansicht:** „Neuer Kontakt“ im Reiter Kontakte, „+ Kontakt“ der Übersicht und „K Text“ der Kürzelzeile öffnen den
+  Dialog „Kontakt erfassen“ (Text aus der Kürzelzeile vorbelegt, die Karteikarte bleibt stehen). Der bisherige eigene
+  Dialog „Neuer Kontakt“ entfällt; seine Möglichkeiten (Kontaktart, Rückruf/Wiedervorlage/Praxistermin mit Ort,
+  Sonstiges, Uhrzeit) hat der gemeinsame Dialog. Die Gewichtskarte hat kein eigenes Formular mehr: „+ Gewicht“ und
+  „G 61,2“ öffnen „Gewicht erfassen“ (Wert vorbelegt). Die letzte Messung lässt sich direkt korrigieren – Klick auf
+  den Wert oder „Korrigieren“ im Kartenkopf; ältere Messungen weiterhin über „Messwerte anzeigen“. Die Karte „Termine“
+  steht nicht mehr zusätzlich im Reiter Kontakte (Übersicht und Kalender zeigen sie).
+- **Wiedervorlage:** „Wiedervorlage anlegen“ im Kontakt-Dialog schlägt standardmäßig „in 14 Tagen“ vor (vorher je nach
+  Stelle 7 oder 14 Tage). Der Wert ist unter Vorlagen › Grenzwerte › „Wiedervorlage nach Kontakt in … Tagen“ einstellbar
+  (1–365, neues Feld `Einstellungen.wiedervorlage_tage`, Migration `stammdaten/0015`); im Dialog bleibt das Datum je
+  Kontakt frei änderbar, die Schnellwahl zeigt den eingestellten Wert.
+- **Teststatus:** `patienten/test_startseite.py` (Standard 14, Grenzen, Speichern), `akte.spec.ts`, `aktenansicht.spec.ts`,
+  `admin.spec.ts`, `zz-neustart.spec.ts` angepasst.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2848,6 +2867,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Ein Dialog je Sache | „Neuer Kontakt“, „+ Gewicht“, Kürzelzeile K/G öffnen dieselben Dialoge; letzte Messung direkt korrigieren; Wiedervorlage standardmäßig 14 Tage, unter Vorlagen › Grenzwerte einstellbar (F150). Lauf steht aus |
 | 08.10.2026 | Kontakt/Gewicht als Dialog | Akte: „Kontakt“ und „Gewicht“ öffnen Dialoge wie „Termin“ (F149). Lauf steht aus |
 | 08.10.2026 | Navigation | Gleich große, mittige Symbole in der schmalen Leiste, Leiste mit Text 224 px, gleich breite Hauptknöpfe, kompakte Leerzustände (F148). Entwürfe für Versorger/Ärzte und Kalender (PC, Tablet, Telefon) zur Abstimmung. Lauf steht aus |
 | 08.10.2026 | Ohne Scrollen auf 1080p | Versorger/Ärzte-Formular im 6-Spalten-Raster, engere Felder, Kalender in Fensterhöhe, Benutzermenü bündig (F147). Lauf steht aus |

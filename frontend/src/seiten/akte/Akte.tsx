@@ -33,8 +33,8 @@ export type AktenKontext = {
   planen: boolean;
   terminAnlegen: () => void;
   /** Dialoge „Kontakt erfassen“ / „Gewicht erfassen“ wie im Aktenkopf (F149) */
-  kontaktErfassen: () => void;
-  gewichtErfassen: () => void;
+  kontaktErfassen: (text?: string) => void;
+  gewichtErfassen: (wert?: string) => void;
   /** Inhalt neben einer Seitenleiste oder Spalte (Ansichten „Seitenleiste“ und „Karteikarte“): Raster nach der
    *  tatsächlichen Breite statt nach der Fensterbreite */
   schmal: boolean;
@@ -373,6 +373,8 @@ export function Akte() {
   const { darf, darfBei } = useAuth();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "kontakt" | "gewicht" | "pdf" | "sprechstunde">("");
+  // Vorbelegung aus der Kürzelzeile (Karteikarte: „K Text“, „G 54,6“)
+  const [vorbelegt, setVorbelegt] = useState("");
   const akte = useQuery({ queryKey: ["patient", pid], queryFn: () => api<Patient>(`patienten/${pid}/`), enabled: !!pid });
   const p = akte.data;
   const qc = useQueryClient();
@@ -452,8 +454,8 @@ export function Akte() {
     bearbeiten: offen && darfBei("akten_bearbeiten", p),
     planen: offen && darfBei("plaene_anlegen", p),
     terminAnlegen: () => setDialog("termin"),
-    kontaktErfassen: () => setDialog("kontakt"),
-    gewichtErfassen: () => setDialog("gewicht"),
+    kontaktErfassen: (text?: string) => { setVorbelegt(text ?? ""); setDialog("kontakt"); },
+    gewichtErfassen: (wert?: string) => { setVorbelegt(wert ?? ""); setDialog("gewicht"); },
     schmal: ansicht !== "kopfzeile",
   };
   const k = p.kopf;
@@ -503,8 +505,8 @@ export function Akte() {
     <div className={cx("flex items-center flex-wrap", klein ? "gap-1.5" : "gap-2")} data-testid="aktenaktionen">
       {kontext.erfassen ? <>
         {/* Kontakt und Gewicht als Dialog wie „Termin“ (Wunsch 08.10.2026) – die Seite bleibt, wo sie ist */}
-        <Knopf klein={klein} icon="sprechblase" onClick={() => setDialog("kontakt")}>Kontakt</Knopf>
-        <Knopf klein={klein} icon="waage" onClick={() => setDialog("gewicht")}>Gewicht</Knopf>
+        <Knopf klein={klein} icon="sprechblase" onClick={() => kontext.kontaktErfassen()}>Kontakt</Knopf>
+        <Knopf klein={klein} icon="waage" onClick={() => kontext.gewichtErfassen()}>Gewicht</Knopf>
         <Knopf klein={klein} icon="kalender" onClick={() => setDialog("termin")}>Termin</Knopf>
       </> : null}
       {kontext.planen ? <Knopf klein={klein} icon="tropfen" onClick={() => navigate(`${basis}/plaene/neu`)}>Neuer Plan</Knopf> : null}
@@ -645,9 +647,9 @@ export function Akte() {
         pfad={`patienten/${p.id}/sprechstunde/`} dateiname={`Sprechstunde-${p.nummer}.pdf`} />
       {kontext.erfassen ? <TerminDialog offen={dialog === "termin"} onOffen={(o) => setDialog(o ? "termin" : "")} patientId={p.id} patientName={name(p)} /> : null}
       {kontext.erfassen ? <KontaktDialog offen={dialog === "kontakt"} onOffen={(o) => setDialog(o ? "kontakt" : "")}
-        vorgabe={{ id: p.id, name: name(p), ist_test: p.ist_test }} /> : null}
+        vorgabe={{ id: p.id, name: name(p), ist_test: p.ist_test }} text={vorbelegt} /> : null}
       {kontext.erfassen ? <GewichtDialog offen={dialog === "gewicht"} onOffen={(o) => setDialog(o ? "gewicht" : "")}
-        vorgabe={{ id: p.id, name: name(p), ist_test: p.ist_test }} /> : null}
+        vorgabe={{ id: p.id, name: name(p), ist_test: p.ist_test }} wert={vorbelegt} /> : null}
     </>
   );
   const pfad = [{ text: "Patienten", zu: "/patienten" }, { text: name(p) }];

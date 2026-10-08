@@ -148,11 +148,25 @@ function useNeuLaden() {
 
 const ARTEN: { wert: string; text: string }[] = [
   { wert: "rueckruf", text: TERMINARTEN.rueckruf }, { wert: "wiedervorlage", text: TERMINARTEN.wiedervorlage },
-  { wert: "praxistermin", text: TERMINARTEN.praxistermin },
+  { wert: "praxistermin", text: TERMINARTEN.praxistermin }, { wert: "sonstiges", text: TERMINARTEN.sonstiges },
 ];
 
-export function KontaktDialog({ offen, onOffen, vorgabe }: { offen: boolean; onOffen: (o: boolean) => void; vorgabe?: Vorgabe | null }) {
+/** Wiedervorlage beim Kontakt: Standard 14 Tage, unter Vorlagen › Grenzwerte einstellbar (Wunsch 08.10.2026) */
+export function useWiedervorlageTage(): number {
+  const t = Number(useEinstellungen().data?.wiedervorlage_tage ?? 14);
+  return Number.isFinite(t) && t > 0 ? t : 14;
+}
+
+function absatz(text: string): string {
+  const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return esc ? `<p>${esc}</p>` : "";
+}
+
+export function KontaktDialog({ offen, onOffen, vorgabe, text: textVorgabe }: {
+  offen: boolean; onOffen: (o: boolean) => void; vorgabe?: Vorgabe | null; text?: string;
+}) {
   const ich = useIch();
+  const wvTage = useWiedervorlageTage();
   const melden = useHinweis();
   const neuLaden = useNeuLaden();
   const orte = useAuswahl("terminort");
@@ -169,7 +183,7 @@ export function KontaktDialog({ offen, onOffen, vorgabe }: { offen: boolean; onO
   const [mitTermin, setMitTermin] = useState(false);
   const [art, setArt] = useState("wiedervorlage");
   const [ort, setOrt] = useState("");
-  const [faellig, setFaellig] = useState(inTagen(14));
+  const [faellig, setFaellig] = useState(inTagen(wvTage));
   const [terminUhr, setTerminUhr] = useState("");
   const [titel, setTitel] = useState("");
   const [lokal, setLokal] = useState<Feldfehler>({});
@@ -179,9 +193,10 @@ export function KontaktDialog({ offen, onOffen, vorgabe }: { offen: boolean; onO
 
   useEffect(() => {
     if (!offen) return;
-    setPatient(null); setTag(datum(heuteIso())); setUhr(jetztUhr()); setText(""); setKontaktart(""); setMitGewicht(false); setWert("");
+    setPatient(null); setTag(datum(heuteIso())); setUhr(jetztUhr()); setText(absatz(textVorgabe ?? "")); setKontaktart(""); setMitGewicht(false); setWert("");
     setQuelle("telefonisch"); setGemessen(datum(heuteIso())); setMitTermin(false); setArt("wiedervorlage"); setOrt("");
-    setFaellig(inTagen(14)); setTerminUhr(""); setTitel(""); setLokal({}); setGespeichert(null); setEditorSchluessel((n) => n + 1);
+    setFaellig(inTagen(wvTage)); setTerminUhr(""); setTitel(""); setLokal({}); setGespeichert(null); setEditorSchluessel((n) => n + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offen]);
 
   const pid = vorgabe?.id ?? patient?.id ?? null;
@@ -333,7 +348,7 @@ export function KontaktDialog({ offen, onOffen, vorgabe }: { offen: boolean; onO
                   )}
                 </div>
                 <div className="flex gap-1.5 flex-wrap">
-                  {([["in 2 Wochen", inTagen(14)], ["in 1 Monat", inMonaten(1)], ["in 3 Monaten (Quartal)", inMonaten(3)]] as const).map(([t, d]) => (
+                  {([[wvTage === 14 ? "in 2 Wochen" : `in ${wvTage} Tagen`, inTagen(wvTage)], ["in 1 Monat", inMonaten(1)], ["in 3 Monaten (Quartal)", inMonaten(3)]] as const).map(([t, d]) => (
                     <button key={t} type="button" className={cx("chip h-[26px] cursor-pointer border", faellig === d ? "akzent border-akzent" : "border-rand bg-flaeche text-text2")}
                       onClick={() => setFaellig(d)}>{t}</button>
                   ))}
@@ -348,7 +363,9 @@ export function KontaktDialog({ offen, onOffen, vorgabe }: { offen: boolean; onO
   );
 }
 
-export function GewichtDialog({ offen, onOffen, vorgabe }: { offen: boolean; onOffen: (o: boolean) => void; vorgabe?: Vorgabe | null }) {
+export function GewichtDialog({ offen, onOffen, vorgabe, wert: wertVorgabe }: {
+  offen: boolean; onOffen: (o: boolean) => void; vorgabe?: Vorgabe | null; wert?: string;
+}) {
   const melden = useHinweis();
   const neuLaden = useNeuLaden();
   const [patient, setPatient] = useState<PatientZeile | null>(null);
@@ -356,7 +373,8 @@ export function GewichtDialog({ offen, onOffen, vorgabe }: { offen: boolean; onO
   const [quelle, setQuelle] = useState("telefonisch");
   const [am, setAm] = useState(datum(heuteIso()));
   useEffect(() => {
-    if (offen) { setPatient(null); setWert(""); setQuelle("telefonisch"); setAm(datum(heuteIso())); }
+    if (offen) { setPatient(null); setWert(wertVorgabe ?? ""); setQuelle("telefonisch"); setAm(datum(heuteIso())); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offen]);
   const pid = vorgabe?.id ?? patient?.id ?? null;
   const name = vorgabe?.name ?? (patient ? `${patient.nachname}, ${patient.vorname}` : "");

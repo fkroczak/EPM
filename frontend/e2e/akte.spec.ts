@@ -60,15 +60,18 @@ test("Gewicht erfassen, Plausibilität, korrigieren, Zeitraum", async ({ page })
   await gd.getByRole("button", { name: "Abbrechen" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
+  // Karte: kein Formular mehr, „+ Gewicht“ öffnet denselben Dialog (ein Dialog je Sache, 08.10.2026)
+  await expect(karte.getByLabel("Neues Gewicht")).toHaveCount(0);
+  await karte.getByRole("button", { name: "Gewicht", exact: true }).click();
   // Backend weist unplausible Werte ab
-  await karte.getByLabel("Neues Gewicht").fill("400");
-  await karte.getByRole("button", { name: "Speichern" }).click();
-  await expect(karte.getByText(/Gewicht muss zwischen/)).toBeVisible();
+  await gd.getByLabel("Gewicht", { exact: true }).fill("400");
+  await gd.getByRole("button", { name: "Gewicht speichern" }).click();
+  await expect(gd.getByText(/Gewicht muss zwischen/)).toBeVisible();
 
-  await karte.getByLabel("Neues Gewicht").fill("60,4");
-  await karte.getByLabel("Quelle").selectOption({ label: "Versorger" });
-  await karte.getByRole("button", { name: "Speichern" }).click();
-  await expect(page.getByText("Gewicht 60,4 kg gespeichert.")).toBeVisible();
+  await gd.getByLabel("Gewicht", { exact: true }).fill("60,4");
+  await gd.getByLabel("Quelle").selectOption({ label: "Versorger" });
+  await gd.getByRole("button", { name: "Gewicht speichern" }).click();
+  await expect(page.getByText(/^Gewicht 60,4 kg für .* gespeichert\.$/)).toBeVisible();
   await expect(karte.getByTestId("aktuelles-gewicht")).toHaveText("60,4 kg");
   await expect(page.getByTestId("kennzahlen")).toContainText("60,4 kg");
 
@@ -86,6 +89,12 @@ test("Gewicht erfassen, Plausibilität, korrigieren, Zeitraum", async ({ page })
   await dialog.getByRole("button", { name: "Speichern" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(karte.getByTestId("messwerte")).toContainText("60,6 kg");
+  // letzte Messung direkt korrigieren: Klick auf den Wert oder „Korrigieren“ im Kartenkopf (08.10.2026)
+  await karte.getByTestId("aktuelles-gewicht").click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Messung korrigieren" })).toBeVisible();
+  await expect(page.getByRole("dialog").getByLabel("Gewicht (kg)")).toHaveValue("60,6");
+  await page.getByRole("dialog").getByRole("button", { name: "Abbrechen" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
   // Diagramm: echte Zeitabstände (vor 400, 95, 10 Tagen, heute) und Glättung umschaltbar
   const diagramm = page.getByTestId("gewichtsdiagramm");
@@ -176,20 +185,23 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}/kontakte$`));
   // Erfassen im Dialog, Liste links, gewählter Kontakt rechts (F122)
   const erfassen = async (text: string, mitTermin = false) => {
+    // „Neuer Kontakt“ öffnet denselben Dialog wie „Kontakt“ im Aktenkopf (08.10.2026)
     await page.getByRole("button", { name: "Neuer Kontakt" }).click();
-    const neu = page.getByTestId("neuer-kontakt");
-    await neu.getByRole("textbox", { name: "Neuer Kontakt" }).fill(text);
+    const neu = page.getByRole("dialog");
+    await neu.getByRole("textbox", { name: "Notiz" }).fill(text);
     if (mitTermin) {
       // Kontaktart (Klärung U6 vom 03.10.2026)
       await neu.getByLabel("Kontaktart").selectOption({ label: "Telefon (angerufen)" });
-      await neu.getByLabel("Wiedervorlage").check();
-      await neu.getByLabel("Art", { exact: true }).selectOption({ label: "Rückruf" });
-      await neu.getByLabel("Uhrzeit").fill("10:00");
+      await neu.getByLabel("Wiedervorlage anlegen").check();
+      // Vorgabe: Wiedervorlage in 14 Tagen (unter Vorlagen › Grenzwerte einstellbar)
+      await expect(neu.getByRole("button", { name: "in 2 Wochen" })).toHaveClass(/akzent/);
+      await neu.getByRole("group", { name: "Art" }).getByRole("button", { name: "Rückruf" }).click();
+      await neu.getByLabel("Uhrzeit", { exact: true }).last().fill("10:00");
     }
-    await neu.getByRole("button", { name: "Kontakt speichern" }).click();
+    await neu.getByRole("button", { name: "Speichern", exact: true }).click();
   };
   await erfassen("Telefonat: Appetit schlechter, Trinkmenge dokumentieren.", true);
-  await expect(page.getByText("Kontakt und Wiedervorlage gespeichert.")).toBeVisible();
+  await expect(page.getByText(/^Kontakt und Wiedervorlage für .* gespeichert\.$/)).toBeVisible();
   const liste = page.getByTestId("kontaktliste");
   const erster = liste.getByRole("listitem").first();
   await expect(erster).toContainText("Appetit schlechter");
@@ -303,7 +315,7 @@ test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen 
 
   // danach nur lesbar, in der Liste unter „Abgeschlossen“
   await page.reload();
-  await expect(page.getByTestId("gewichtskarte").getByLabel("Neues Gewicht")).toHaveCount(0);
+  await expect(page.getByTestId("gewichtskarte").getByRole("button", { name: "Gewicht", exact: true })).toHaveCount(0);
   await page.goto(`/patienten?status=abgeschlossen&suche=${p.name.split(",")[0]}`);
   await expect(page.getByTestId("patientenliste")).toContainText("Therapie beendet");
 
