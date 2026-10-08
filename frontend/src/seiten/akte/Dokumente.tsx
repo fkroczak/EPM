@@ -326,8 +326,8 @@ export function Dokumente() {
             onDrop={(e) => { e.preventDefault(); setZiehen(false); if (e.dataTransfer.files.length) void hochladen(e.dataTransfer.files); }}
             data-testid="ablage">
             <Icon name="hochladen" groesse={20} />
-            <span>Dateien hierher ziehen oder</span>
-            <Knopf onClick={() => eingabe.current?.click()}>Auswählen</Knopf>
+            <span>Dateien hierher (oder irgendwo auf die Akte) ziehen oder</span>
+            <Knopf variante="pri" icon="plus" onClick={() => eingabe.current?.click()}>Neues Dokument</Knopf>
             <span className="gedaempft text-[0.8125rem]">PDF, JPG, PNG, TXT · max. 50 MB</span>
             <input ref={eingabe} type="file" multiple hidden aria-label="Dateien hochladen" accept=".pdf,.jpg,.jpeg,.png,.txt,application/pdf,image/jpeg,image/png,text/plain"
               onChange={(e) => { if (e.target.files?.length) void hochladen(e.target.files); e.target.value = ""; }} />

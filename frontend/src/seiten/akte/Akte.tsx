@@ -339,7 +339,7 @@ function Reiter({ zu, text, zahl: anzahl, ende, senkrecht, kuerzel }: ReiterEint
 
 /** Eine Angabe des Aktenkopfs (Kennzahl) – in den Gruppen als Zeile „Titel | Wert“, in einer Zeile als Spalte */
 type Angabe = { titel: string; inhalt: ReactNode; hinweis?: string };
-type Gruppe = { titel: string; angaben: Angabe[] };
+type Gruppe = { titel: string; angaben: Angabe[]; bearbeiten?: () => void };
 
 const VERSICHERUNG_KURZ: Record<string, string> = { gkv: "GKV", pkv: "PKV", selbstzahler: "Selbstzahler", sonstige: "Sonstige" };
 
@@ -364,7 +364,12 @@ function Gruppen({ gruppen, art }: { gruppen: Gruppe[]; art: "kopf" | "leiste" }
         <div key={g.titel} role="group" aria-label={g.titel}
           className={cx("flex flex-col gap-1.5 min-w-0",
             art === "kopf" ? i > 0 && "xl:border-l xl:border-rand xl:pl-6" : i > 0 && "border-t border-rand pt-3 mt-3")}>
-          <span className="text-[0.6875rem] font-semibold tracking-[.06em] uppercase gedaempft">{g.titel}</span>
+          <span className="flex items-center justify-between gap-2">
+            <span className="text-[0.6875rem] font-semibold tracking-[.06em] uppercase gedaempft">{g.titel}</span>
+            {/* Stift an der Gruppe (Vorschlag „Bearbeiten sichtbar“, 08.10.2026): öffnet „Stammdaten bearbeiten“ */}
+            {g.bearbeiten ? <button type="button" className="btn geist icon !h-6 !w-6 nicht-drucken" aria-label={`${g.titel} bearbeiten`}
+              title="Stammdaten bearbeiten" onClick={g.bearbeiten}><Icon name="stift" groesse={13} /></button> : null}
+          </span>
           {g.angaben.map((a) => <Angabezeile key={a.titel} a={a} />)}
         </div>
       ))}
@@ -612,7 +617,8 @@ export function Akte() {
   } : null;
   const gruppen: Gruppe[] = angabe ? [
     { titel: "Ernährung", angaben: [angabe.gewicht, angabe.bmi, angabe.plan, angabe.katheter] },
-    { titel: "Versorgung", angaben: [angabe.versorger, angabe.ansprechpartner, angabe.hausarzt] },
+    { titel: "Versorgung", angaben: [angabe.versorger, angabe.ansprechpartner, angabe.hausarzt],
+      bearbeiten: kontext.bearbeiten ? () => setDialog("stammdaten") : undefined },
     { titel: "Termine und Kontakt", angaben: [angabe.termin, angabe.kontakt, angabe.telefon] },
     { titel: "Hinweise und Auskunft", angaben: [angabe.nickel, angabe.auskunft, angabe.versicherung] },
   ] : [];

@@ -105,6 +105,10 @@ test("Gewicht erfassen, Plausibilität, korrigieren, Zeitraum", async ({ page })
   expect(await diagramm.locator("path").first().getAttribute("d")).toContain("C");
   await karte.getByLabel("Geglättet").uncheck();
   expect(await diagramm.locator("path").first().getAttribute("d")).not.toContain("C");
+  // Klick auf einen Messpunkt öffnet „Messung bearbeiten“ (08.10.2026)
+  await diagramm.getByTestId("messpunkt").first().click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Messung bearbeiten" })).toBeVisible();
+  await page.getByRole("dialog").getByRole("button", { name: "Abbrechen" }).click();
 
   // gespeichert in der Datenbank
   const api = await apiAls("mitarbeiter");
@@ -299,6 +303,11 @@ test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen 
   // „Bearbeiten“ direkt auf der Karte „Anschrift und Kontakt“ öffnet denselben Dialog (08.10.2026)
   await page.getByTestId("stammdaten").getByRole("button", { name: "Bearbeiten" }).click();
   await expect(page.getByRole("dialog").getByLabel("Telefon 2")).toHaveValue("0171 2223334");
+  await page.getByRole("dialog").getByRole("button", { name: "Abbrechen" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // ebenso der Stift an der Gruppe „Versorgung“ im Aktenkopf
+  await page.getByTestId("kennzahlen").getByRole("button", { name: "Versorgung bearbeiten" }).click();
+  await expect(page.getByRole("dialog").getByLabel("Versorger", { exact: true })).toBeVisible();
   await page.getByRole("dialog").getByRole("button", { name: "Abbrechen" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   const kennzahlen = page.getByTestId("kennzahlen");

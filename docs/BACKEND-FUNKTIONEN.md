@@ -194,6 +194,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F154 | Weniger Wege und Erklärtext: ein Suchfeld (Kopfzeile filtert die Patientenliste), „Prüfen …“ wählbar, Erklärtexte in der Hilfe | Patientenliste, Akte, Hilfe | ABGESCHLOSSEN (Lauf steht aus) |
 | F155 | Tastenkürzel: K, G, T, P, Alt+Ziffer in der Akte, Strg Enter in Dialogen, ? Übersicht | 4 Akte, alle Dialoge | ABGESCHLOSSEN (Lauf steht aus) |
 | F156 | Versorger/Ärzte und Kalender nach den Entwürfen (PC, Tablet, Telefon) | Versorger, Ärzte, Kalender | ABGESCHLOSSEN (Lauf steht aus) |
+| F157 | Rest der Vorschläge: Stift an „Versorgung“, Messpunkt im Diagramm bearbeiten, „Neues Dokument“ | 4 Akte | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2882,6 +2883,15 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   `oberflaeche.spec.ts`.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F157 Restliche Vorschläge „Bearbeiten sichtbar“ und „Erfassen“
+- **Versorgung im Aktenkopf:** Die Gruppe „Versorgung“ (Versorger, Ansprechpartner, Hausarzt) hat einen Stift, der
+  „Stammdaten bearbeiten“ öffnet (nur mit Recht; „Weitere Aktionen“ behält den Eintrag).
+- **Gewichtsdiagramm:** Ein Klick (oder Enter) auf einen Messpunkt öffnet „Messung bearbeiten“ für genau diese Messung.
+- **Reiter Dokumente:** Hauptknopf **Neues Dokument** (vorher „Auswählen“) an derselben Stelle wie bei den anderen
+  Reitern; die Ablage nennt, dass Dateien auch irgendwo auf die Akte gezogen werden können (F151).
+- **Teststatus:** `akte.spec.ts` (Stift an „Versorgung“, Klick auf Messpunkt).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2980,6 +2990,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Rest der Vorschläge | Stift an „Versorgung“, Messpunkt bearbeiten, „Neues Dokument“ (F157). Damit ist „EPM intuitiver – Vorschläge“ vollständig umgesetzt. Lauf steht aus |
 | 08.10.2026 | Versorger/Ärzte, Kalender | Neuer Aufbau nach den Entwürfen für PC, Tablet und Telefon: Liste + Eintrag zum Lesen, Kalender mit einer Werkzeugzeile, „Anzeigen ▾“ und Reitern (F156). Lauf steht aus |
 | 08.10.2026 | Tastenkürzel | K, G, T, P, Alt+Ziffer und ? in der Akte, Strg Enter in Dialogen, Kürzel im Tooltip (F155). Lauf steht aus |
 | 08.10.2026 | Ein Suchfeld, Prüfen, Hilfe | Kopfzeile filtert die Patientenliste, „Prüfen …“ wählbar, Erklärtexte in die Hilfe, leere Reiter ohne Doppelhinweis (F154). Lauf steht aus |
