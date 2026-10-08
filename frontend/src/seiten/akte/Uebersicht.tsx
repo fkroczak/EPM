@@ -322,7 +322,7 @@ function PlanKarte() {
 }
 
 function KontakteKarte() {
-  const { patient, erfassen } = useAkte();
+  const { patient, erfassen, kontaktErfassen } = useAkte();
   const kontakte = useQuery({
     queryKey: ["patient", patient.id, "kontakte", "letzte"],
     queryFn: () => api<ApiSeite<Kontakt>>(`kontakte/${abfrage({ patient: patient.id, seitengroesse: 3 })}`),
@@ -330,7 +330,7 @@ function KontakteKarte() {
   const liste = kontakte.data?.results ?? [];
   return (
     <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="letzte-kontakte">
-      <KartenKopf titel="Letzte Kontakte" rechts={erfassen ? <KnopfLink to={`/patienten/${patient.id}/kontakte`} state={{ neu: Date.now() }} klein icon="plus">Kontakt</KnopfLink> : null} />
+      <KartenKopf titel="Letzte Kontakte" rechts={erfassen ? <Knopf klein icon="plus" onClick={kontaktErfassen}>Kontakt</Knopf> : null} />
       {kontakte.isLoading ? <Laden /> : liste.length ? (
         <ul className="m-0 p-0 list-none flex flex-col gap-3">
           {liste.map((k) => (

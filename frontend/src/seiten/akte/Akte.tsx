@@ -32,6 +32,9 @@ export type AktenKontext = {
   /** Akte ist offen und die Person darf Infusionspläne anlegen */
   planen: boolean;
   terminAnlegen: () => void;
+  /** Dialoge „Kontakt erfassen“ / „Gewicht erfassen“ wie im Aktenkopf (F149) */
+  kontaktErfassen: () => void;
+  gewichtErfassen: () => void;
   /** Inhalt neben einer Seitenleiste oder Spalte (Ansichten „Seitenleiste“ und „Karteikarte“): Raster nach der
    *  tatsächlichen Breite statt nach der Fensterbreite */
   schmal: boolean;
@@ -449,6 +452,8 @@ export function Akte() {
     bearbeiten: offen && darfBei("akten_bearbeiten", p),
     planen: offen && darfBei("plaene_anlegen", p),
     terminAnlegen: () => setDialog("termin"),
+    kontaktErfassen: () => setDialog("kontakt"),
+    gewichtErfassen: () => setDialog("gewicht"),
     schmal: ansicht !== "kopfzeile",
   };
   const k = p.kopf;
