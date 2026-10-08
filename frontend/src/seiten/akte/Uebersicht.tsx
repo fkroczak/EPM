@@ -226,7 +226,7 @@ function TherapieKarte() {
         <KnopfLink to={`/patienten/${patient.id}/therapie`} klein icon={bearbeiten ? "stift" : undefined}>Therapie</KnopfLink>
         <KnopfLink to={`/patienten/${patient.id}/empfehlung`} klein icon={bearbeiten ? "stift" : undefined}>Empfehlung</KnopfLink>
       </>} />
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-3 sm:gap-5">
         <div className="flex flex-col gap-1.5 min-w-0">
           <span className="text-[0.8125rem] font-medium gedaempft">Diagnosen</span>
           <DiagnosenKurz patientId={patient.id} />
@@ -348,7 +348,7 @@ function StammKarte() {
   const { patient: p } = useAkte();
   const adresse = [p.strasse, [p.plz, p.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
   return (
-    <Karte className="px-4 sm:px-[22px] py-4 sm:py-[18px] grid grid-cols-[100px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm" data-testid="stammdaten">
+    <Karte className="px-4 sm:px-[22px] py-4 sm:py-[18px] grid grid-cols-[minmax(100px,max-content)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm" data-testid="stammdaten">
       <h2 className="lbl m-0 col-span-2 pb-1">Anschrift und Kontakt</h2>
       <span className="gedaempft">Adresse</span><span>{adresse || "—"}</span>
       <span className="gedaempft">Telefon</span><span className="num">{p.telefon || "—"}</span>

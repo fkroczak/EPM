@@ -44,12 +44,12 @@ export function Karte({ className, children, ...rest }: HTMLAttributes<HTMLEleme
 export function KartenKopf({ titel, rechts, unter, className }: { titel: ReactNode; rechts?: ReactNode; unter?: ReactNode;
   className?: string }) {
   return (
-    <div className={cx("flex items-start justify-between gap-3", className)}>
-      <div className="flex flex-col gap-1">
+    <div className={cx("flex items-start justify-between gap-3 flex-wrap", className)}>
+      <div className="flex flex-col gap-1 min-w-0">
         <h2 className="lbl m-0 text-[0.9375rem]">{titel}</h2>
         {unter ? <span className="text-[0.8125rem] gedaempft">{unter}</span> : null}
       </div>
-      {rechts ? <div className="flex items-center gap-2">{rechts}</div> : null}
+      {rechts ? <div className="flex items-center gap-2 flex-wrap">{rechts}</div> : null}
     </div>
   );
 }

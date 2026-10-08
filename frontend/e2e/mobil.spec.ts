@@ -100,6 +100,9 @@ test("Telefon: Notiz zur offenen Akte über „Notiz“ in der Leiste", async ({
   await page.goto(`/patienten/${p.id}`);
   await expect(page.getByTestId("aktenkopf")).toContainText(p.nachname);
   await expect(page.getByTestId("gewichtskarte")).toBeVisible();
+  // alle Karten der Übersicht geladen (die Karte „Diagnosen und Therapie“ mit drei Knöpfen war zu breit)
+  await expect(page.getByText("Noch keine Therapie eingetragen.")).toBeVisible();
+  await expect(page.getByText("Keine Bezugspersonen eingetragen.")).toBeVisible();
   await passtInDieBreite(page, "Akte ohne Einträge");
   // Reiter wischen seitlich statt umzubrechen
   const reiter = page.getByRole("navigation", { name: "Aktenbereiche" });

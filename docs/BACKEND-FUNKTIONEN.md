@@ -29,6 +29,7 @@ Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests. Beide laufe
   `werkzeuge/ci-stack.sh`: dieselbe Compose-Datei, Nginx-Konfiguration und dieselben Images wie auf dem Server, mit
   Musterdaten und eigenen Testkonten je Rolle.
 
+Stand 08.10.2026 (Passkey und Telefon, F130–F134, Pull Request #14): **347 von 347 Backend-Tests** und **108 von 108 Browsertests grün** (Lauf 37707454570; dazu 4 Bildschirmfoto-Tests, nur beim manuellen Start).
 Stand 02.10.2026 (Datenschutz F74–F83 und Systemseite/Kalender/Infusionspläne F84–F89 zusammen): **141 von 141 Backend-Tests** und **66 von 66 Browsertests grün** (Lauf 36976550763, Commit `97e5a5b`; dazu 1 Bildschirmfoto-Test, nur beim manuellen Start).
 Stand 02.10.2026 (Rechte: Löschen auch Admins, Systemverwaltung als Vertretung): **142 von 142 Backend-Tests** und **66 von 66 Browsertests grün** (Lauf 36989064354, Commit `0cca47d`).
 Stand 02.10.2026 (Startseite und Oberfläche S01–S17, F90–F97, Pull Request #7 auf `main` mit Pull Request #6): **236 von 236 Backend-Tests** und **82 von 82 Browsertests grün** (Lauf 37036210226, Commit `33612fa`; dazu 2 Bildschirmfoto-Tests, nur beim manuellen Start).
@@ -2470,7 +2471,7 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
 - **Teststatus:** Backend-Tests `accounts.test_passkey.Passkeys.*` mit Software-Authenticator (echte P-256-Signaturen).
   Browsertest `passkey.spec.ts` (virtueller Authenticator des Browsers); Neustart in `zz-neustart.spec.ts`
   (Schlüssel in ein neues virtuelles Gerät übernommen, Anmeldung und Entfernen nach dem Neustart).
-- **Status:** siehe Änderungsprotokoll (Lauf)
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F131 Anmelden mit Passkey
 - **Ansicht:** Anmeldung › nach dem Passwort „Mit Passkey anmelden“ (Umschalter „Passkey | Code“, wenn beides da ist);
@@ -2482,6 +2483,7 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   gesperrt) · 403 gesperrt
 - **Teststatus:** Backend-Tests (Anmeldung, falsche Herkunft, fremde Challenge, Wiederholung derselben Antwort, ohne
   User Verification, Passkey eines anderen Kontos); Browsertest `passkey.spec.ts`.
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F132 Bestätigen mit Passkey
 - **Ansicht:** jedes Feld „Code aus der Authenticator-App“ bei Bestätigungen (Backup, System, Import, Dokument und Akte
@@ -2494,6 +2496,7 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
 - **Teststatus:** Backend-Tests `test_bestaetigung_mit_passkey_statt_code`, `PasskeyBeiSystemauftraegen`;
   Browsertest `passkey.spec.ts` (Ausschalten mit Passkey, erst falsches, dann richtiges Passwort) und
   `zz-neustart.spec.ts` (Passkey entfernen mit Passkey).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F133 EPM am Telefon
 - **Ansicht (unter 768 px):** Leiste unten (Start, Patienten, ＋ Notiz, Pläne → „Zur Freigabe“, Menü), Menü als
@@ -2505,6 +2508,7 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
 - **Teststatus:** Browsertest `mobil.spec.ts` (Pixel 7 mit Touch): Leiste, Menü, Suche, Zurück, keine Seite breiter als
   der Bildschirm (Start, Kalender, Akte, Patienten, Infusionspläne, Konto, Hilfe, Versorger), Entwurf über „Pläne“
   öffnen und freigeben, Notiz über die Leiste. Bildschirmfotos `bildschirmfotos-mobil.spec.ts` (manueller Start).
+- **Status:** ABGESCHLOSSEN UND GETESTET
 
 ### F134 Zertifikat der eigenen CA (Server)
 - **Werkzeug:** `sudo epm-zertifikat einrichten | erneuern | importieren CRT KEY [CA] | status`
@@ -2514,6 +2518,8 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   root, offline sichern. Ein neuer Server legt das Zertifikat gleich so an (`04-projekt.sh`), ein bestehendes bleibt bis
   zum Aufruf von `einrichten`.
 - **Teststatus:** Skript lokal gegen OpenSSL 3 geprüft (CA, Kette, Namensbeschränkung, Erneuern).
+- **Status:** ABGESCHLOSSEN (Server-Werkzeug; im Browsertest-Stack gibt es keine eigene CA)
+
 
 ## Offene Backend-Funktionen
 
@@ -2613,7 +2619,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
-| 08.10.2026 | Passkey und Telefon (Pull Request #14) | Passkeys (WebAuthn) als zweiter Faktor statt oder neben dem Authenticator-Code – einrichten, umbenennen, entfernen unter Mein Konto, Anmeldung und alle Bestätigungen mit Passkey (F130–F132; Modell `accounts.Passkey` als django-otp-Gerät, Migration `accounts/0008`, `py_webauthn` 2.x, Baustein `useZweiterFaktor` an allen Bestätigungen). Eigene CA mit Namensbeschränkung und Serverzertifikat (`sudo epm-zertifikat`, F134), Stammzertifikat unter `/epm-ca.crt`. Mobile Ansicht (F133): Leiste unten mit Notiz und Plänen, Menü als Schublade, Karten statt Tabellen, Akte mit Detail vor der Liste, Dialoge und Eingaben für Touch. Hilfe-Abschnitte „Passkey statt Code“ und „EPM am Telefon“. Offene Fragen U62, U63 |
+| 08.10.2026 | Passkey und Telefon (Pull Request #14) | Passkeys (WebAuthn) als zweiter Faktor statt oder neben dem Authenticator-Code – einrichten, umbenennen, entfernen unter Mein Konto, Anmeldung und alle Bestätigungen mit Passkey (F130–F132; Modell `accounts.Passkey` als django-otp-Gerät, Migration `accounts/0008`, `py_webauthn` 2.x, Baustein `useZweiterFaktor` an allen Bestätigungen). Eigene CA mit Namensbeschränkung und Serverzertifikat (`sudo epm-zertifikat`, F134), Stammzertifikat unter `/epm-ca.crt`. Mobile Ansicht (F133): Leiste unten mit Notiz und Plänen, Menü als Schublade, Karten statt Tabellen, Akte mit Detail vor der Liste, Dialoge und Eingaben für Touch. Hilfe-Abschnitte „Passkey statt Code“ und „EPM am Telefon“. Offene Fragen U62, U63. Dabei gefunden und behoben: Wer den Passkey entfernte, mit dem die Sitzung bestätigt war, war danach abgemeldet (Sitzung läuft jetzt mit einem verbliebenen Gerät weiter). Browsertest „Ärzte zuordnen …“ stabilisiert (Meldung genau statt als Teiltext gesucht). Lauf 37707454570: 347 von 347 Backend-Tests, 108 von 108 Browsertests |
 | 06.10.2026 | Wünsche aus der Praxis (Alice, 06.10.2026) | Infusionstage je Beutelart mit Übernahme in den Folgeplan, Vergleich und PDF (F110, Migration `infusionen/0007`); Präparate nach der Mail – Zusatzvolumen umbenannt und ergänzt, Natrovit, NutriLock/TauroLock, Hinweisfeld am Präparat, Dipeptamin und Omegaven ausgeblendet (F111, Migrationen `stammdaten/0012`, `0013`); Katalog der Laborparameter mit Alices Liste und Erfassungsmaske nach Gruppen (F112, F113, neue App `befunde`); BIA-Maske mit Beurteilung und Übernahme des Gewichts (F114); Berichte in der Akte mit Entwurf/Freigabe, PDF als Dokument und Trigger-Schutz (F115, neue App `berichte`, neues Recht „Berichte freigeben“); Sprechstundenblatt (F116); Diagnosen mit ICD-Code und mitwachsendem Katalog (F117, Migration `patienten/0010`); Versichertendaten GKV/PKV, Versicherung, Versichertennummer (F118). Neue Dokumentvorlagen „Bericht“ und „Unterlagen für die Sprechstunde“ (Migration `vorlagen/0003`), Audit-Arten `bericht_freigegeben` und `sprechstunde_erzeugt` (`audit/0008`). Endgültiges Löschen, Kopie der Akte und Verlauf um die neuen Bereiche erweitert. Konzept und 22 offene Fragen (U39–U60) in `docs/WUENSCHE-PRAXIS-2026-10-06.md`. Die Migrationen sind von Hand geschrieben (die Arbeitsumgebung hatte keinen Zugriff auf PyPI und npm); `makemigrations` in CI meldet dazu „No changes detected“. Die neuen Apps stehen jetzt auch in der `makemigrations`-Zeile des Workflows. Lauf 37525732042: 311 von 311 Backend-Tests, 98 von 98 Browsertests. Davor fand CI drei echte Fehler, die hier behoben sind: der Plan-Serializer gab die neuen Infusionstage-Felder weder aus noch nahm er sie entgegen (dadurch griff auch deren Prüfung nicht), der ICD-Code wurde nicht in Großschreibung vereinheitlicht, und das Frontend baute wegen eines doppelten Schlüssels in der Feldliste des Verlaufs nicht. Nebenwirkung der Umbenennung: Beim Altdaten-Import trifft „Sterofundin“ keinen Katalogeintrag mehr automatisch und wird einmal von Hand auf „Sterofundin ISO“ gelegt (U43) |
 | 07.10.2026 | Dokumente zurückgesetzt | Der Reiter Dokumente ist wieder in seiner ursprünglichen Form (Tabelle links, Details rechts); die übrigen Reiter behalten das gemeinsame Muster aus F122. Auf Wunsch ohne Testlauf eingespielt (`[skip ci]`); die Datei entspricht Zeile für Zeile dem Stand `8ccda52`, der zuletzt grün war |
 | 07.10.2026 | Wünsche aus der Praxis (07.10.2026) | Hinweise mit „×“ ausblenden – beim Wegklicken 3, 6 oder 12 Monate Ruhe oder „nicht mehr nötig“, mit Grund, Person und Zeitpunkt, in der Akte unter „Ausgeblendete Hinweise“ zurückholbar, alles im Verlauf (F119, neues Modell `patienten.Hinweisruhe`, Migration `patienten/0011`); Grenzen „gilt als alt“ für Laborbefund und BIA-Messung, Standard 12 Monate, einstellbar unter Vorlagen › Grenzwerte, mit Hinweis je Akte, zwei neuen Zeilen in „Nach und nach prüfen“ und zwei neuen Filtern der Patientenliste (F120, Migration `stammdaten/0014`); ein eigener Reiter je Bereich – „Diagnose & Therapie“ wird zu „Diagnosen“ und „Therapie“ (mit „zuletzt geändert“), „Labor & BIA“ zu „Labor“ und „BIA“, mit Zählern, Weiterleitung der alten Adresse und neuer Karte „Labor und BIA“ in der Übersicht (F121). Dabei behoben: Die Karte „Bemerkung“ war nie in der Liste der verstellbaren Karten, ihr Menü „⋯“ lief ins Leere (seit F97). Eine weitere offene Frage: U61 |
