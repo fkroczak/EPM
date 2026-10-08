@@ -374,7 +374,7 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
     : `Version ${a.aktiv.version} ist aktiv`;
 
   return (
-    <div className="flex flex-col gap-5" data-testid="dokumentvorlagen">
+    <div className="stapel flex flex-col gap-5" data-testid="dokumentvorlagen">
       {aktionenZiel ? createPortal(<>
         <span className="text-[0.8125rem] gedaempft" data-testid="vorlage-stand">{verInfo}</span>
         <Knopf icon="dokument" onClick={() => setVorschau(true)}>Vorschau mit Testpatient</Knopf>
@@ -411,7 +411,7 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
       </Dialog>
       {fehlerListe.length ? <Meldung art="fehler"><ul className="m-0 pl-4" data-testid="vorlage-fehler">{fehlerListe.map((f) => <li key={f}>{f}</li>)}</ul></Meldung> : null}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)_300px] gap-5 items-start">
+      <div className="stapel grid grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)_300px] gap-5 items-start">
         <aside className="flex flex-col gap-3.5 min-w-0">
           <Karte className="p-2.5 flex flex-col gap-0.5" data-testid="aufbau">
             <span className="lbl px-1.5 pb-1.5 pt-1">Aufbau</span>

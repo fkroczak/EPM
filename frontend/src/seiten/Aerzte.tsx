@@ -121,7 +121,7 @@ export function Aerzte() {
         <input className="inp pl-[34px]" type="search" aria-label="Ärzte filtern" placeholder="Name, Praxis, Fachrichtung, Ort"
           value={suche} onChange={(e) => setSuche(e.target.value)} />
       </label>
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-5 items-start">
+      <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-5 items-start">
         <Karte className="overflow-hidden">
           {liste.isLoading ? <Laden /> : (
             <table className="tabelle" data-testid="aerzteliste">

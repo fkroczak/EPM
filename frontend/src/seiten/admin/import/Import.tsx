@@ -175,7 +175,7 @@ function Quelle({ stand }: { stand: Stand }) {
   const f: Feldfehler = laden.error instanceof ApiFehler ? laden.error.felder : {};
   const offen = stand.status === "leer" || stand.status === "geladen";
   return (
-    <div className="flex flex-col gap-5">
+    <div className="stapel flex flex-col gap-5">
       <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="dump-karte">
         <KartenKopf titel="Dump des Altsystems"
           unter="MySQL-Dump als .sql oder .sql.gz (mysqldump oder Export aus phpMyAdmin). Kennwörter werden beim Einlesen verworfen und nie gespeichert." />
@@ -236,7 +236,7 @@ function ImportSchritt({ stand, zuordnung }: { stand: Stand; zuordnung: Zuordnun
   const hindernisse = zuordnung?.hindernisse ?? [];
   const u = stand.uebernommen;
   return (
-    <div className="flex flex-col gap-5">
+    <div className="stapel flex flex-col gap-5">
       {stand.status === "leer" ? <Meldung art="info">Zuerst unter „1 · Dump“ einen Dump laden.</Meldung> : null}
       {stand.status === "geladen" ? (
         <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="import-karte">
@@ -332,7 +332,7 @@ function Dokumente({ stand }: { stand: Stand }) {
   const erledigt = fortschritt ? fortschritt.erledigt : s?.erledigt ?? 0;
   const offen = fortschritt ? fortschritt.offen : s?.offen ?? 0;
   return (
-    <div className="flex flex-col gap-5">
+    <div className="stapel flex flex-col gap-5">
       <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="dokumente-karte">
         <KartenKopf titel="Dokumente des Altsystems"
           unter="Die Dateien kommen nicht über den Browser, sondern aus einem Ordner auf dem Server. Sie werden in die Akten kopiert; der Ordner bleibt unverändert."

@@ -70,17 +70,17 @@
   --reihe-2: #eb6834;
   --randbreite: 1px;
   --schatten: 0 1px 2px rgba(0, 0, 0, 0.05);
-  /* Dichte „normal“ */
-  --steuer-h: 36px;
-  --zelle-py: 8px;
-  --zeile-gap: 12px;
+  /* Dichte „normal“ – seit 08.10.2026 kompakter („ich brauche den Platz“) */
+  --steuer-h: 32px;
+  --zelle-py: 6px;
+  --zeile-gap: 10px;
   font-size: 16px;
   color-scheme: light;
 }
 
-:root[data-dichte="grosszuegig"] { --steuer-h: 40px; --zelle-py: 12px; --zeile-gap: 16px; }
-:root[data-dichte="kompakt"] { --steuer-h: 32px; --zelle-py: 5px; --zeile-gap: 8px; }
-:root[data-dichte="sehrkompakt"] { --steuer-h: 28px; --zelle-py: 3px; --zeile-gap: 6px; }
+:root[data-dichte="grosszuegig"] { --steuer-h: 36px; --zelle-py: 9px; --zeile-gap: 14px; }
+:root[data-dichte="kompakt"] { --steuer-h: 30px; --zelle-py: 4px; --zeile-gap: 8px; }
+:root[data-dichte="sehrkompakt"] { --steuer-h: 26px; --zelle-py: 2px; --zeile-gap: 6px; }
 
 :root[data-schrift="klein"] { font-size: 14.86px; }
 :root[data-schrift="gross"] { font-size: 18.29px; }
@@ -202,7 +202,7 @@ body {
 
   .tabelle { width: 100%; border-collapse: collapse; }
   .th {
-    font: 500 0.875rem var(--font-sans); color: var(--tinte); text-align: left; height: 2.5rem; padding: 0 0.75rem;
+    font: 500 0.875rem var(--font-sans); color: var(--tinte); text-align: left; height: calc(var(--steuer-h) + 4px); padding: 0 0.75rem;
     background: var(--fein); border-bottom: var(--randbreite) solid var(--rand); white-space: nowrap; vertical-align: middle;
   }
   :root[data-schema="kontrast"] .th { font-weight: 700; }
@@ -238,7 +238,7 @@ body {
   input[type="checkbox"], input[type="radio"] { width: 1rem; height: 1rem; accent-color: var(--akzent); }
 
   .segmente {
-    display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: var(--fein);
+    display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 10px; background: var(--fein);
     box-sizing: border-box;
   }
   .segment {
@@ -612,4 +612,22 @@ main.seite-inhalt.akte-voll { padding: 0 !important; gap: 0 !important; }
   .akte-voll .akte-vreiter-innen { display: flex; flex-direction: column; gap: 1px; position: sticky; top: 0.75rem; }
   .akte-voll .vreiter.aktiv { background: var(--flaeche); box-shadow: 0 0 0 1px var(--rand); }
   .akte-voll .akte-leiste-flaeche { padding: 1.125rem 1.25rem 1.5rem; }
+}
+
+/* Einheitlich und kompakt (Wunsch 08.10.2026: „alle Menüpunkte und Untermenüs verschwenden extrem viel Platz … lesbar
+   und übersichtlich“; „wenn man zwischen den Menüs schaltet, springt alles“):
+   - Platz für den Scrollbalken immer reserviert – Seiten mit und ohne Scrollbalken stehen an derselben Stelle
+   - Seitenkopf einzeilig in Steuerhöhe, Unterzeile gekürzt
+   - Innenabstand der Karten einheitlich 16 px seitlich, 12 px oben/unten (vorher 18–22 px) – ohne Ebene, damit es die
+     gleichlautenden Hilfsklassen an allen Karten übersteuert */
+html { scrollbar-gutter: stable; }
+.seitenkopf { min-height: var(--steuer-h); }
+.seitenkopf-unter { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seitenkopf-unter > * { display: inline !important; max-width: none !important; }
+.card:is(.px-5, .px-6, .px-\[22px\], .px-\[18px\], .sm\:px-\[22px\]) { padding-left: 1rem; padding-right: 1rem; }
+.card:is(.py-4, .py-5, .py-\[18px\], .py-3\.5, .sm\:py-\[18px\]) { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.card:is(.p-5, .p-6) { padding: 1rem; }
+.card:is(.sm\:pt-\[18px\]) { padding-top: 0.75rem; }
+@media (max-width: 47.99rem) {
+  .card:is(.px-5, .px-6, .px-\[22px\], .px-\[18px\], .sm\:px-\[22px\]) { padding-left: 0.75rem; padding-right: 0.75rem; }
 }

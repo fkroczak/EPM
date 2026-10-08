@@ -46,7 +46,7 @@ function Spalten({ stand, speichern, laeuft }: { stand: Zuordnungsstand; speiche
   const q = stand.quelle;
   const ignorierteTabellen = q.uebrig.filter((u) => u.art === "ignoriert").map((u) => u.tabelle);
   return (
-    <div className="flex flex-col gap-5">
+    <div className="stapel flex flex-col gap-5">
       {q.tabellen.map((t) => {
         const ignoriert = t.rest.filter((r) => r.art === "ignoriert").map((r) => r.spalte);
         return (
@@ -282,7 +282,7 @@ const FESTE_WERTE: Record<"nickel" | "geschlecht", { titel: string; unter: strin
 function WerteTeil({ stand, bestand, speichern }: { stand: Zuordnungsstand; bestand: Bestand; speichern: Speichern }) {
   const katheter = (schluessel: string, wahl: KatheterWahl | null) => speichern({ bereich: "werte", aenderungen: { katheter: { [schluessel]: wahl } } });
   return (
-    <div className="flex flex-col gap-5">
+    <div className="stapel flex flex-col gap-5">
       <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="zuordnung-katheter">
         <KartenKopf titel="Katheter" unter="Die Werte des Altsystems werden Einträge der Auswahlliste „Katheter“ (Vorlagen › Auswahllisten)." />
         <table className="tabelle">
@@ -421,7 +421,7 @@ function PraeparateTeil({ stand, bestand, kategorien, speichern }: { stand: Zuor
   const felder = Object.entries(stand.praeparate).filter(([, f]) => f.zeilen.length);
   if (!felder.length) return <Karte className="px-5 py-4"><Leer>In den Infusionsplänen des Dumps stehen keine Präparate.</Leer></Karte>;
   return (
-    <div className="flex flex-col gap-5">
+    <div className="stapel flex flex-col gap-5">
       <Meldung art="info">Vorgeschlagen wird nur, was genau zu einem Präparat im EPM passt (Groß-/Kleinschreibung, Leerzeichen und „20%“ / „20 %“ sind egal).
         Schreibvarianten bitte dem richtigen Präparat zuordnen – so entsteht je Präparat nur ein Eintrag.</Meldung>
       {felder.map(([feld, f]) => (
@@ -581,7 +581,7 @@ export function Zuordnungen({ daten, speichern, laeuft, fehler }: { daten: Zuord
   const offen = (t: Teil) => stand.offen.filter((o) => o.bereich === t).length;
   const auswahl = daten.auswahl ?? { rollen: [], anlaesse: {}, kategorien: {} };
   return (
-    <div className="flex flex-col gap-5" aria-busy={laeuft || undefined}>
+    <div className="stapel flex flex-col gap-5" aria-busy={laeuft || undefined}>
       {stand.offen.length ? (
         <div className="meldung warn flex flex-col gap-1.5" data-testid="offene-punkte">
           <span className="font-medium flex items-center gap-2"><Icon name="warnung" />{stand.offen.length} offene Punkte – erst danach sind Probelauf und Import möglich</span>

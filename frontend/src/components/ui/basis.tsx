@@ -154,14 +154,18 @@ export function Fehleranzeige({ fehler }: { fehler: unknown }) {
   return <Meldung art="fehler">{text}</Meldung>;
 }
 
+/**
+ * Kopf jeder Seite – überall gleich hoch (Wunsch 08.10.2026: „wenn man zwischen den Menüs schaltet, springt alles“):
+ * Titel und Unterzeile in einer Zeile (die Unterzeile wird gekürzt, ganz im Tooltip), rechts die Knöpfe in Steuerhöhe.
+ */
 export function Seitenkopf({ titel, unter, rechts }: { titel: ReactNode; unter?: ReactNode; rechts?: ReactNode }) {
   return (
-    <div className="flex items-end justify-between gap-4 flex-wrap">
-      <div className="flex flex-col gap-1">
-        <h1 className="m-0 text-[1.625rem] font-semibold">{titel}</h1>
-        {unter ? <span className="text-sm gedaempft">{unter}</span> : null}
+    <div className="seitenkopf flex items-center justify-between gap-x-4 gap-y-2 flex-wrap">
+      <div className="flex items-baseline gap-x-3 min-w-0 flex-1">
+        <h1 className="m-0 text-[1.25rem] leading-tight font-semibold whitespace-nowrap">{titel}</h1>
+        {unter ? <span className="seitenkopf-unter text-[0.8125rem] gedaempft min-w-0" title={typeof unter === "string" ? unter : undefined}>{unter}</span> : null}
       </div>
-      {rechts ? <div className="flex items-center gap-3 flex-wrap">{rechts}</div> : null}
+      {rechts ? <div className="flex items-center gap-2 flex-wrap">{rechts}</div> : null}
     </div>
   );
 }

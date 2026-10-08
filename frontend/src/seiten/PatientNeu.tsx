@@ -154,7 +154,7 @@ export function PatientNeu() {
 
   return (
     <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: "Neu" }]}>
-      <form className="flex flex-col gap-5" noValidate onSubmit={(ev) => { ev.preventDefault(); absenden(); }}>
+      <form className="stapel flex flex-col gap-5" noValidate onSubmit={(ev) => { ev.preventDefault(); absenden(); }}>
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div className="flex flex-col gap-1">
             <span className="text-sm gedaempft"><Link to="/patienten" className="no-underline">Patienten</Link> / Neu</span>
@@ -178,7 +178,7 @@ export function PatientNeu() {
         </div>
         {ohneFeld ? <Meldung art="fehler">{anlegen.error?.message}</Meldung> : null}
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
+        <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
           <div className="flex flex-col gap-4 min-w-0">
             <Abschnitt titel="Person">
               <Feld label="Nachname" pflicht className="col-span-2" fehler={e.nachname}>
