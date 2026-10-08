@@ -258,16 +258,18 @@ test("Volle Breite in Stufen: 1920 px – Karten der Akte im Raster, Größe je 
   await expect(page.getByTestId("tagesliste")).toBeVisible();
 });
 
-test("Volle Breite in Stufen: 2560 px mit Vorschau in der Patientenliste und drei Spalten im Plan-Editor", async ({ page: seite }) => {
+test("Volle Breite in Stufen: 2560 px ohne Vorschau in der Patientenliste und drei Spalten im Plan-Editor", async ({ page: seite }) => {
   let page = seite;
   await page.setViewportSize({ width: 2560, height: 1440 });
   await page.goto("/");
   await expect(page.getByTestId("raster")).toHaveAttribute("data-spalten", "5");
+  // Patientenliste ohne Vorschau der Akte (Wunsch 08.10.2026): Klick auf die Zeile öffnet die Akte
   await page.goto("/patienten");
-  await expect(page.getByTestId("teiler-patientenliste-0")).toBeVisible();
-  await page.getByRole("button", { name: "Vorschau: Probe, Jonas" }).click();
-  await expect(page.getByTestId("akten-vorschau")).toContainText("Probe, Jonas");
-  await expect(page.getByTestId("akten-vorschau").getByRole("link", { name: "Akte öffnen" })).toBeVisible();
+  await expect(page.getByTestId("teiler-patientenliste-0")).toHaveCount(0);
+  await expect(page.getByTestId("akten-vorschau")).toHaveCount(0);
+  await page.getByTestId("patientenzeile").filter({ hasText: "Probe, Jonas" }).locator("td").first().click();
+  await expect(page).toHaveURL(/\/patienten\/\d+/);
+  await expect(page.getByTestId("aktenkopf")).toContainText("Probe, Jonas");
   // Plan-Editor (Recht „Infusionspläne anlegen“: Mediziner): Eingabe | Summen | PDF-Vorschau mit zwei Teilern
   const api = await apiAls("mediziner");
   const jonas = (await api.get("patienten/?suche=Probe")).results.find((x: { vorname: string }) => x.vorname === "Jonas");
