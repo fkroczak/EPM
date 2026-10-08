@@ -5,8 +5,9 @@ import { Link, useLocation } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
-import { AKZENTE, HINTERGRUENDE, STANDARD_DARSTELLUNG, aufAkzent, darstellungAnwenden, istHex, luminanz } from "@/lib/darstellung";
-import type { Darstellung } from "@/lib/darstellung";
+import { AKTENLEISTE, AKZENTE, HINTERGRUENDE, STANDARD_DARSTELLUNG, aufAkzent, darstellungAnwenden, istHex, luminanz } from "@/lib/darstellung";
+import { KOPFSTUFEN } from "./akte/ansicht";
+import type { Aktenansicht, Darstellung } from "@/lib/darstellung";
 import { datum, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
 import type { Ich, Status } from "@/lib/typen";
@@ -30,6 +31,45 @@ const SCHEMATA: { wert: Darstellung["schema"]; titel: string; text: string; farb
   { wert: "kontrast", titel: "Hoher Kontrast", text: "kräftige Kanten und Schrift", farben: ["#FFFFFF", "#FFFFFF", "#000000"] },
   { wert: "dunkel", titel: "Dunkel", text: "abends, blendet weniger", farben: ["#15131F", "#1F1C2C", "#B9B2F0"] },
 ];
+/** Aufbau der Patientenakte (Wunsch 08.10.2026): drei Ansichten mit kleiner Skizze */
+const AKTENANSICHTEN: { wert: Aktenansicht; titel: string; text: string }[] = [
+  { wert: "kopfzeile", titel: "Kopfzeile", text: "Angaben in Gruppen oben, Reiter darunter; Höhe ziehbar" },
+  { wert: "seitenleiste", titel: "Seitenleiste", text: "Angaben und Knöpfe links, senkrechte Reiter; Breite ziehbar" },
+  { wert: "karteikarte", titel: "Karteikarte", text: "wie eine Arztsoftware: alle Einträge chronologisch, Kürzelzeile" },
+];
+
+function AktenSkizze({ art }: { art: Aktenansicht }) {
+  const balken = (breite: string, stark = false) => (
+    <span className="block h-1.5 rounded-sm" style={{ width: breite, background: "var(--akzent)", opacity: stark ? 0.85 : 0.25 }} />
+  );
+  const flaeche = "bg-flaeche border border-rand rounded-[3px]";
+  return (
+    <span aria-hidden="true" className="block h-[72px] rounded-md border border-rand overflow-hidden bg-grund p-1.5">
+      {art === "kopfzeile" ? (
+        <span className="flex flex-col gap-1 h-full">
+          <span className={cx(flaeche, "p-1 grid grid-cols-4 gap-1")}>{[0, 1, 2, 3].map((i) => <span key={i} className="flex flex-col gap-0.5">{balken("80%", i === 0)}{balken("60%")}</span>)}</span>
+          <span className="flex gap-1">{balken("18%", true)}{balken("14%")}{balken("14%")}{balken("14%")}</span>
+          <span className="grow grid grid-cols-3 gap-1"><span className={flaeche} /><span className={flaeche} /><span className={flaeche} /></span>
+        </span>
+      ) : art === "seitenleiste" ? (
+        <span className="flex gap-1 h-full">
+          <span className={cx(flaeche, "w-[28%] p-1 flex flex-col gap-1")}>{balken("90%", true)}{balken("70%")}{balken("80%")}{balken("60%")}</span>
+          <span className="w-[16%] flex flex-col gap-1 pt-0.5">{balken("100%", true)}{balken("90%")}{balken("90%")}{balken("90%")}</span>
+          <span className="grow grid grid-cols-2 gap-1"><span className={flaeche} /><span className={flaeche} /></span>
+        </span>
+      ) : (
+        <span className="flex flex-col gap-1 h-full">
+          <span className={cx(flaeche, "p-1 flex gap-1 items-center")}>{balken("30%", true)}<span className="block h-1.5 w-[12%] rounded-sm bg-fehler opacity-70" /></span>
+          <span className="grow flex gap-1">
+            <span className={cx(flaeche, "grow p-1 flex flex-col gap-1")}>{balken("90%")}{balken("75%")}{balken("85%")}{balken("60%")}</span>
+            <span className={cx(flaeche, "w-[26%]")} />
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 const ZEILEN: Record<Darstellung["dichte"], string> = { grosszuegig: "ca. 11", normal: "ca. 14", kompakt: "ca. 19", sehrkompakt: "ca. 25" };
 
 function Mini({ farben }: { farben: [string, string, string] }) {
@@ -175,6 +215,44 @@ function DarstellungKarten({ zuruecksetzenRef }: { zuruecksetzenRef: { current: 
           <span className="text-[0.8125rem] gedaempft">Vorschau</span>
           <span className="card px-3 py-2 text-sm">Weber, Anna · <span className="num">54,6 kg</span> · Nr. <span className="num">0231</span></span>
         </div>
+      </Karte>
+      <Karte className="px-5 py-[18px] flex flex-col gap-4" data-testid="aktenansicht">
+        <div className="flex items-baseline justify-between gap-3 flex-wrap">
+          <h2 className="lbl m-0">Patientenakte</h2>
+          <span className="text-[0.8125rem] gedaempft">Aufbau der Akte – gilt für dich an jedem PC; am Telefon immer mit Kopf oben.</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" role="radiogroup" aria-label="Aufbau der Patientenakte">
+          {AKTENANSICHTEN.map((a) => (
+            <button key={a.wert} type="button" role="radio" aria-checked={d.aktenansicht === a.wert} aria-label={`Aktenansicht ${a.titel}`}
+              className={cx("card p-2.5 flex flex-col gap-2 text-left cursor-pointer border", d.aktenansicht === a.wert ? "border-akzent outline-2 outline-akzent" : "hover:bg-fein")}
+              onClick={() => aendern({ aktenansicht: a.wert })}>
+              <AktenSkizze art={a.wert} />
+              <span className="text-sm font-medium">{a.titel}</span>
+              <span className="text-xs gedaempft">{a.text}</span>
+            </button>
+          ))}
+        </div>
+        {d.aktenansicht === "kopfzeile" ? (
+          <div className="flex flex-col gap-2">
+            <span className="lbl">Höhe des Kopfs</span>
+            <Segmente label="Höhe des Aktenkopfs" wert={d.aktenkopf} onWahl={(w) => aendern({ aktenkopf: w })} className="self-start"
+              werte={KOPFSTUFEN.map((s) => ({ wert: s.wert, text: s.text }))} />
+            <span className="text-[0.8125rem] gedaempft">Auch direkt in der Akte: den Griff unter dem Kopf nach oben oder unten ziehen.</span>
+          </div>
+        ) : null}
+        {d.aktenansicht === "seitenleiste" ? (
+          <div className="flex flex-col gap-2">
+            <span className="lbl">Breite der Seitenleiste</span>
+            <Segmente label="Breite der Seitenleiste" wert={String(d.aktenleiste_breite)} onWahl={(w) => aendern({ aktenleiste_breite: Number(w) })}
+              className="self-start" werte={AKTENLEISTE.punkte.map((px) => ({ wert: String(px), text: `${px} px` }))} />
+            <span className="text-[0.8125rem] gedaempft">Auch direkt in der Akte: den Rand der Seitenleiste ziehen (rastet ein, Doppelklick: {AKTENLEISTE.standard} px). Unter 1280 px Fensterbreite stehen Leiste und Inhalt untereinander.</span>
+          </div>
+        ) : null}
+        {d.aktenansicht === "karteikarte" ? (
+          <span className="text-[0.8125rem] gedaempft">Die Akte öffnet mit der Karteikarte. In der Kürzelzeile öffnet <span className="num font-semibold">K Text</span> einen
+            neuen Kontakt, <span className="num font-semibold">G 61,2</span> das Gewicht, <span className="num font-semibold">T</span> einen Termin
+            und <span className="num font-semibold">P</span> einen neuen Plan – gespeichert wird erst im Formular.</span>
+        ) : null}
       </Karte>
     </>
   );

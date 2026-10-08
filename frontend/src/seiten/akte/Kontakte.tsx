@@ -1,6 +1,6 @@
 /** Entwurf 6 · Kontakte: Protokoll der Kommunikation. Nach dem Speichern unveränderlich, Korrektur nur per Storno. */
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api } from "@/lib/api";
 import type { Feldfehler, Seite as ApiSeite } from "@/lib/api";
@@ -24,17 +24,23 @@ function inTagen(tage: number) {
   return datum(d);
 }
 
-function NeuerKontakt({ onFertig }: { onFertig?: () => void }) {
+/** Text als einfacher Absatz für den Editor (Kürzelzeile der Karteikarte) */
+function absatz(text: string) {
+  return `<p>${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
+}
+
+function NeuerKontakt({ onFertig, vorlage }: { onFertig?: () => void; vorlage?: string }) {
   const { patient } = useAkte();
   const ich = useIch();
   const location = useLocation();
-  const [text, setText] = useState("");
+  // Kürzelzeile der Karteikarte („K Text“): Text vorbelegen, gespeichert wird erst mit „Kontakt speichern“
+  const [text, setText] = useState(() => (vorlage ? absatz(vorlage) : ""));
   const [kontaktart, setKontaktart] = useState("");
   const [mitTermin, setMitTermin] = useState(false);
   const [art, setArt] = useState("rueckruf");
   const [faellig, setFaellig] = useState(inTagen(7));
   const [uhr, setUhr] = useState("");
-  const [fokus, setFokus] = useState(0);
+  const [fokus, setFokus] = useState(() => (vorlage ? 1 : 0));
   const orte = useAuswahl("terminort");
   const kontaktarten = useAuswahl("kontaktart");
   const qc = useQueryClient();
@@ -159,7 +165,18 @@ export function Kontakte() {
   const [begriff, setBegriff] = useState("");
   const [anzahl, setAnzahl] = useState(50);
   const [neu, setNeu] = useState(false);
+  const [vorlage, setVorlage] = useState("");
   const [storno, setStorno] = useState<Kontakt | null>(null);
+  // Kürzelzeile der Karteikarte („K Text“): Dialog „Neuer Kontakt“ gleich mit dem Text öffnen
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const st = location.state as { neu?: number; text?: string } | null;
+    if (!st?.neu || typeof st.text !== "string" || !erfassen) return;
+    setVorlage(st.text);
+    setNeu(true);
+    navigate(location.pathname, { replace: true, state: null }); // beim Zurückblättern nicht noch einmal öffnen
+  }, [location.state, location.pathname, erfassen, navigate]);
   useOhneRechtSchliessen(erfassen, () => setStorno(null));
   useOhneRechtSchliessen(erfassen, () => setNeu(false));
   useEffect(() => {
@@ -247,9 +264,9 @@ export function Kontakte() {
         )}
       />
       {erfassen ? <>
-        <Dialog offen={neu} onOffen={setNeu} titel="Neuer Kontakt" breite={760}
+        <Dialog offen={neu} onOffen={(o) => { setNeu(o); if (!o) setVorlage(""); }} titel="Neuer Kontakt" breite={760}
           beschreibung="Ein gespeicherter Kontakt wird nicht mehr geändert.">
-          <NeuerKontakt onFertig={() => setNeu(false)} />
+          <NeuerKontakt onFertig={() => { setNeu(false); setVorlage(""); }} vorlage={vorlage || undefined} />
         </Dialog>
         <StornoDialog kontakt={storno} onZu={() => setStorno(null)} />
       </> : null}

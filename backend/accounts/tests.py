@@ -271,6 +271,25 @@ class MeinKonto(TestCase):
         self.assertEqual(self.darstellung(akzent="eigen", akzent_eigen="#1F3A5F").status_code, 200)
         self.assertEqual(self.darstellung(hintergrund="eigen", hintergrund_eigen="#F4EFE6").status_code, 200)
 
+    def test_aktenansicht(self):
+        """Aufbau der Patientenakte je Person (Wunsch 08.10.2026): Stil, Höhe des Kopfs, Breite der Seitenleiste."""
+        r = self.darstellung(aktenansicht="seitenleiste", aktenkopf="kompakt", aktenleiste_breite=360)
+        self.assertEqual(r.status_code, 200, r.content)
+        d = self.c.get("/api/auth/ich/").json()["darstellung"]
+        self.assertEqual((d["aktenansicht"], d["aktenkopf"], d["aktenleiste_breite"]), ("seitenleiste", "kompakt", 360))
+        # ohne Angabe gilt der Standard: Kopfzeile, voller Kopf, 300 px
+        self.assertEqual(self.darstellung(dichte="kompakt").status_code, 200)
+        d = self.c.get("/api/auth/ich/").json()["darstellung"]
+        self.assertEqual((d["aktenansicht"], d["aktenkopf"], d["aktenleiste_breite"]), ("kopfzeile", "voll", 300))
+        for werte, feld in [({"aktenansicht": "kacheln"}, "aktenansicht"), ({"aktenkopf": "riesig"}, "aktenkopf"),
+                            ({"aktenleiste_breite": 100}, "aktenleiste_breite"),
+                            ({"aktenleiste_breite": 900}, "aktenleiste_breite")]:
+            with self.subTest(werte=werte):
+                r = self.darstellung(**werte)
+                self.assertEqual(r.status_code, 400)
+                self.assertIn(feld, r.json())
+        self.assertEqual(self.darstellung(aktenansicht="karteikarte").status_code, 200)
+
     def test_startseite_karten(self):
         r = self.c.patch("/api/auth/ich/", {"startseite": {"karten": [{"id": "gewicht", "sichtbar": False},
                                                                       {"id": "termine"}]}}, format="json")
