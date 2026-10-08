@@ -137,7 +137,7 @@ export function Hilfe() {
         } />
       {daten.isLoading ? <Laden /> : <Fehleranzeige fehler={daten.error} />}
       {d ? (
-        <div className="grid grid-cols-1 hd:grid-cols-[260px_minmax(0,1fr)] fhd:grid-cols-[300px_minmax(0,1fr)] gap-6 items-start">
+        <div className="stapel grid grid-cols-1 hd:grid-cols-[260px_minmax(0,1fr)] fhd:grid-cols-[300px_minmax(0,1fr)] gap-6 items-start">
           <nav aria-label="Inhalt der Hilfe" className="card p-2 flex flex-col gap-1 hd:sticky hd:top-4 hd:max-h-[calc(100vh-2rem)] hd:overflow-auto"
             data-testid="hilfe-inhalt">
             {begriff ? (

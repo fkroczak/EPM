@@ -469,7 +469,7 @@ export function Kalender() {
       </div>
       <Fehleranzeige fehler={daten.error} />
       {/* Stufen (S16, Entwurf 2): bis 1919 px Kalender mit Seitenspalte wie bisher, ab 1920 px Monat ¾ | Tagesliste ¼ */}
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] hd:grid-cols-[minmax(0,1fr)_360px] fhd:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-5 items-start"
+      <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] hd:grid-cols-[minmax(0,1fr)_360px] fhd:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-5 items-start"
         data-testid="kalender-stufe">
         <Karte className="p-3 min-w-0">
           {!daten.data ? <Laden /> : ansicht === "monat" ? (

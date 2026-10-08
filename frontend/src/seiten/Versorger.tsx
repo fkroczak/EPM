@@ -164,7 +164,16 @@ export function Versorger() {
   const pflegen = darf("versorger_pflegen");
   const neu = params.get("neu") === "1";
   const alle = liste.data ?? [];
-  const sichtbar = alle.filter((v) => filter === "alle" || (filter === "aktiv") === v.aktiv);
+  // Suche (Wunsch 08.10.2026): Firma, Ort, PLZ, Telefon, E-Mail und Ansprechpartner (Name, Telefon, Zuständigkeit)
+  const [suche, setSuche] = useState("");
+  const woerter = suche.toLowerCase().split(/\s+/).filter(Boolean);
+  const trifft = (v: VersorgerTyp) => {
+    if (!woerter.length) return true;
+    const text = [v.name, v.ort, v.plz, v.strasse, v.telefon, v.email,
+      ...v.ansprechpartner.flatMap((a) => [a.name, a.telefon, a.mobil, a.zustaendigkeit])].join(" ").toLowerCase();
+    return woerter.every((w) => text.includes(w));
+  };
+  const sichtbar = alle.filter((v) => (filter === "alle" || (filter === "aktiv") === v.aktiv) && trifft(v));
   const gewaehltId = Number(params.get("id")) || sichtbar[0]?.id;
   const cur = neu ? undefined : alle.find((v) => v.id === gewaehltId);
   const [f, setF] = useState<VersorgerFormular>({ ...LEER_V });
@@ -216,7 +225,12 @@ export function Versorger() {
           {pflegen ? <Knopf variante="pri" icon="plus" onClick={() => setParams(new URLSearchParams({ neu: "1" }), { replace: true })}>Neuer Versorger</Knopf> : null}
         </>} />
       <Fehleranzeige fehler={liste.error} />
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-5 items-start">
+      <label className="relative w-[280px] block">
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
+        <input className="inp pl-[34px]" type="search" aria-label="Versorger filtern" placeholder="Firma, Ort, Telefon, Ansprechpartner"
+          value={suche} onChange={(e) => setSuche(e.target.value)} />
+      </label>
+      <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-5 items-start">
         <Karte className="overflow-hidden">
           {liste.isLoading ? <Laden /> : (
             <table className="tabelle" data-testid="versorgerliste">
@@ -240,7 +254,7 @@ export function Versorger() {
               </tbody>
             </table>
           )}
-          {liste.data && !sichtbar.length ? <Leer>{filter === "inaktiv" ? "Keine deaktivierten Versorger." : "Noch keine Versorger angelegt."}</Leer> : null}
+          {liste.data && !sichtbar.length ? <Leer>{woerter.length ? "Kein Versorger passt zur Suche." : filter === "inaktiv" ? "Keine deaktivierten Versorger." : "Noch keine Versorger angelegt."}</Leer> : null}
         </Karte>
 
         {cur || neu ? (

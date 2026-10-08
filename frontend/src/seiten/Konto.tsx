@@ -70,7 +70,7 @@ function AktenSkizze({ art }: { art: Aktenansicht }) {
   );
 }
 
-const ZEILEN: Record<Darstellung["dichte"], string> = { grosszuegig: "ca. 11", normal: "ca. 14", kompakt: "ca. 19", sehrkompakt: "ca. 25" };
+const ZEILEN: Record<Darstellung["dichte"], string> = { grosszuegig: "ca. 13", normal: "ca. 17", kompakt: "ca. 21", sehrkompakt: "ca. 26" };
 
 function Mini({ farben }: { farben: [string, string, string] }) {
   return (

@@ -330,7 +330,7 @@ export function PlanEditor() {
   );
 
   return (
-    <form className="flex flex-col gap-5" noValidate onSubmit={(ev) => { ev.preventDefault(); speichern.mutate(false); }} data-testid="plan-editor">
+    <form className="stapel flex flex-col gap-5" noValidate onSubmit={(ev) => { ev.preventDefault(); speichern.mutate(false); }} data-testid="plan-editor">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div className="flex flex-col gap-1">
           <span className="text-sm gedaempft">
@@ -549,13 +549,13 @@ function PlanSpalten({ stufe, eingabe, summen, vorschau }: { stufe: Stufe; einga
   }
   if (stufe === "fhd") {
     return (
-      <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-5 items-start" data-testid="plan-stufe">
+      <div className="stapel grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-5 items-start" data-testid="plan-stufe">
         {eingabe}{summen}<div className="flex flex-col gap-4 min-w-0">{vorschau}</div>
       </div>
     );
   }
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start" data-testid="plan-stufe">{eingabe}{summen}</div>
+    <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start" data-testid="plan-stufe">{eingabe}{summen}</div>
   );
 }
 

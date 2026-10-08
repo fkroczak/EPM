@@ -416,7 +416,7 @@ function Taetigkeiten({ daten, offen, onWahl }: { daten: Uebersicht; offen: Set<
   return (
     <Karte className="px-5 py-4 flex flex-col gap-4" data-testid="taetigkeiten">
       <KartenKopf titel="Tätigkeiten" unter="Jede Tätigkeit steht mit Person und Zeitpunkt im Audit-Log." />
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-6">
+      <div className="stapel grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-6">
         <div className="flex flex-col gap-1">
           <h3 className="m-0 text-sm font-semibold flex items-center gap-2"><Icon name="server" />Server (Ubuntu-VM)</h3>
           <span className="text-xs gedaempft mb-1">ausgeführt vom Systemagenten auf dem Server – nur diese festen Tätigkeiten</span>

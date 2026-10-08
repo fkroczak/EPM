@@ -183,6 +183,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F143 | Teiler und Ränder ohne Punkte-Griff; beim Überfahren breiter und farbig | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 | F144 | Rückmeldungen als Overlay: grün quittiert und blendet aus, rot bleibt länger | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 | F145 | Weniger Leerraum: Rand des Seiteninhalts und Abstände zwischen den Karten verkleinert | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
+| F146 | Einheitlich und kompakt: Seitenkopf in einer Zeile, gleiche Steuerhöhen, kleinere Innenabstände, kein Springen; Suche bei Versorger | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2693,6 +2694,23 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   `MeinKonto.test_form_wird_ignoriert`.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F146 Einheitlich und kompakt, Suche bei Versorger
+- **Wunsch 08.10.2026:** „Alle Menüpunkte und Untermenüs verschwenden extrem viel Platz. Ich brauche den Platz, es muss
+  aber lesbar und übersichtlich sein. Bei Versorger gibt es keine Suchfunktion. … Buttons bei Infusionsplänen,
+  Versorger und Ärzte von der Größe anpassen … wenn man zwischen den Menüs schaltet, springt alles.“
+- **Kein Springen:** Platz für den Scrollbalken ist immer reserviert (`scrollbar-gutter: stable`) – Seiten mit und ohne
+  Scrollbalken stehen an derselben Stelle. Der Seitenkopf (`Seitenkopf`) ist auf allen 14 Seiten einzeilig: Titel 20 px,
+  Unterzeile daneben gekürzt (ganz im Tooltip), rechts die Knöpfe – überall gleich hoch.
+- **Gleiche Steuerhöhe:** Umschalter (Aktiv/Inaktiv/Alle, Ansichten) sind jetzt genau so hoch wie Knöpfe und Felder
+  (vorher 2 px höher). Dichte „Normal“ 32 px statt 36 px (Großzügig 36, Kompakt 30, Sehr kompakt 26); Tabellenköpfe
+  in Steuerhöhe.
+- **Weniger Leerraum:** Innenabstand der Karten einheitlich 16 px seitlich und 12 px oben/unten (vorher 18–22 px),
+  am Telefon 12 px seitlich; Abstände zwischen Karten auf allen Seiten 12 px (30 weitere Bereiche umgestellt).
+- **Versorger:** Suchfeld „Versorger filtern“ über der Liste wie bei den Ärzten – Firma, Ort, PLZ, Straße, Telefon,
+  E-Mail und Ansprechpartner (Name, Telefon, Mobil, Zuständigkeit), mehrere Wörter = alle müssen passen.
+- **Teststatus:** `versorger.spec.ts` „Versorger suchen …“.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2791,6 +2809,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Einheitlich und kompakt | Seitenkopf einzeilig auf allen Seiten, gleiche Steuerhöhen (Umschalter = Knöpfe), Dichte „Normal“ 32 px, Karten mit 16/12 px Innenabstand, Scrollbalken-Platz reserviert gegen Springen; Suche bei Versorger (F146). Lauf steht aus |
 | 08.10.2026 | Form entfernt, weniger Leerraum | Form „Rund/Eckig“ samt Menüpunkt entfernt (F139); gespeicherte Werte werden verworfen. Stattdessen für alle weniger Rand und kleinere Abstände zwischen den Karten (F145). Dabei aufgefallen: Das Feld `form` war im Backend nie angekommen – „Eckig“ hätte sich auf der Test-VM nicht speichern lassen; mit dem Entfernen erledigt |
 | 08.10.2026 | Behebung nach `epm-update` | Frontend baute nicht: In `RuheDialog` (F142) lieferte die Speicherfunktion je nach Ziel einen Termin oder eine Hinweisruhe – TypeScript verlangte einen Typ (`HinweisChips.tsx`, Rückgabe jetzt `Promise<unknown>`). Backend-Image samt Migration `patienten/0012` lief auf der Test-VM ohne Befund durch |
 | 08.10.2026 | Rückmeldungen (Wunsch 08.10.2026) | Grünes bzw. rotes Overlay oben in der Mitte wie im alten EPM: grün ca. 3 s, rot ca. 9 s, „×“ schließt (F144). Lauf steht aus (GitHub Actions wegen Abrechnung gesperrt) |

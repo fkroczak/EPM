@@ -90,3 +90,15 @@ test("Betrachter sieht Versorger nur lesend", async ({ browser }) => {
   await expect(page.getByTestId("versorger-detail").getByRole("button", { name: "Speichern" })).toHaveCount(0);
   await ctx.close();
 });
+
+test("Versorger suchen: Firma, Ort und Ansprechpartner (Wunsch 08.10.2026)", async ({ page }) => {
+  await page.goto("/versorger");
+  const liste = page.getByTestId("versorgerliste");
+  await expect(liste).toContainText("Testversorger Nord (fiktiv)");
+  await page.getByLabel("Versorger filtern").fill("Nord");
+  await expect(liste).toContainText("Testversorger Nord (fiktiv)");
+  await page.getByLabel("Versorger filtern").fill("gibtesnichtxyz");
+  await expect(page.getByText("Kein Versorger passt zur Suche.")).toBeVisible();
+  await page.getByLabel("Versorger filtern").fill("");
+  await expect(liste).toContainText("Testversorger Nord (fiktiv)");
+});

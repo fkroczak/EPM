@@ -440,8 +440,8 @@ export function Benutzer() {
           <Fehleranzeige fehler={ausblenden.error} />
         </div>
       </Dialog>
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 items-start">
-        <div className="flex flex-col gap-5 min-w-0">
+      <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 items-start">
+        <div className="stapel flex flex-col gap-5 min-w-0">
           <Karte className="overflow-x-auto">
             {liste.isLoading ? <Laden /> : (
               <table className="tabelle" data-testid="benutzerliste">
