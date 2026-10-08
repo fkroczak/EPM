@@ -2933,7 +2933,7 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   eine neue Gruppe). Übernommen wird der zuletzt erfasste, bei gleichem Zeitpunkt der spätere im Dump. Das läuft nach
   allen Entscheidungen und Platzhalter-Regeln, sodass ein ausgelassener Wert keinen echten verdrängt. Zählung
   „zusammengefasst“, Protokoll Regel 2 mit den Nummern der ersetzten Einträge.
-- **Unklar (U64):** „innerhalb von 1–2 Tagen“ ist als Zeitfenster ab dem ersten Eintrag umgesetzt, Standard 2 Tage
+- **Geklärt 09.10.2026 (U64):** „innerhalb von 1–2 Tagen“ = Zeitfenster ab dem ersten Eintrag, Standard 2 Tage
   (48 Stunden); einstellbar. Ein „unverändert übernommenes“ unplausibles Gewicht (z. B. 1 kg) zählt beim Zusammenfassen
   mit und kann als jüngster Eintrag gewinnen – deshalb solche Werte zuerst per Regel „nicht übernehmen“.
 - **Teststatus:** `test_rein.py` Klasse `RegelnUndZusammenfassen` (Regel für alle Zeilen auch im frischen Dump, Vorrang
@@ -3037,7 +3037,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U61 | Soll ein ausgeblendeter Hinweis auch dann **weg bleiben**, wenn sich die Lage ändert (z. B. „Kein Laborbefund“ ausgeblendet, danach wird einer erfasst)? Derzeit ja – die Stummschaltung läuft ab oder wird aufgehoben, der Hinweis entsteht ohnehin nur neu, wenn die Lage es hergibt | F119 | Stummschaltung bleibt bis zur Frist |
 | U62 | Unter welchem **Namen** soll EPM erreichbar sein (z. B. `epm.stiftung.lan`), und soll die CA auf dem Server (`epm-zertifikat einrichten`) oder auf der OPNsense liegen (`epm-zertifikat importieren`)? | F134, F130 | Name aus `EPM_WEB_NAME`, CA auf dem Server; beides unterstützt |
 | U63 | Soll das **Freigeben eines Plans** (am Telefon wie am PC) zusätzlich mit Passkey bzw. Code bestätigt werden? Heute genügt die Anmeldung, wie bisher beschlossen | F36, F132 | unverändert: ohne zusätzliche Bestätigung |
-| U64 | Gewichte zusammenfassen: Ist „innerhalb von 1–2 Tagen“ als Fenster **ab dem ersten Eintrag** gemeint (umgesetzt, Standard 2 × 24 Stunden), oder je Kalendertag? | F159 | Fenster ab dem ersten Eintrag, 2 Tage; im Werkzeug einstellbar |
+| U64 | ~~Gewichte zusammenfassen: Fenster ab dem ersten Eintrag oder je Kalendertag?~~ **Geklärt 09.10.2026:** Fenster ab dem ersten Eintrag, Standard 2 × 24 Stunden; im Werkzeug einstellbar | F159 | – |
 
 
 ## Änderungsprotokoll
