@@ -134,7 +134,7 @@ export function Textfassung({ feld, titel, hinweis, version, immerOffen }: {
           <Editor wert={entwurf} onAenderung={setEntwurf} label={name} hoehe={immerOffen ? 420 : 220} autofokus={!immerOffen} />
           <Fehleranzeige fehler={speichern.error} />
           <div className="flex justify-end gap-2">
-            <Knopf disabled={!geaendert && immerOffen} onClick={() => { setEntwurf(gespeichert); setOffen(false); speichern.reset(); }}>Verwerfen</Knopf>
+            <Knopf disabled={!geaendert && immerOffen} onClick={() => { setEntwurf(gespeichert); setOffen(false); speichern.reset(); }}>Abbrechen</Knopf>
             <Knopf variante="pri" laedt={speichern.isPending} disabled={!geaendert} onClick={() => speichern.mutate()}>Speichern</Knopf>
           </div>
         </>

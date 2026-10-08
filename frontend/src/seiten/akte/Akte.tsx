@@ -11,7 +11,7 @@ import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useAuswahl, useVersorgerListe } from "@/lib/daten";
 import { alter, datum, eingabeDatum, eingabeZahl, heuteIso, kg, nummer, prozent, terminZeit, zahl } from "@/lib/format";
 import { ABSCHLUSSANLAESSE, ERKLAERUNGEN_KURZ, GESCHLECHTER, TERMINARTEN, VERSICHERUNGSARTEN } from "@/lib/typen";
-import type { Patient, Recht } from "@/lib/typen";
+import type { Patient, Recht, Termin } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog, Menue } from "@/components/ui/dialog";
@@ -33,9 +33,13 @@ export type AktenKontext = {
   /** Akte ist offen und die Person darf Infusionspläne anlegen */
   planen: boolean;
   terminAnlegen: () => void;
+  /** offenen Termin ändern (Karteikarte, 08.10.2026) */
+  terminAendern: (t: Termin) => void;
   /** Dialoge „Kontakt erfassen“ / „Gewicht erfassen“ wie im Aktenkopf (F149) */
   kontaktErfassen: (text?: string) => void;
   gewichtErfassen: (wert?: string) => void;
+  /** Dialog „Stammdaten bearbeiten“ (Stift auf der Karte „Anschrift und Kontakt“, 08.10.2026) */
+  stammdatenBearbeiten: () => void;
   /** Inhalt neben einer Seitenleiste oder Spalte (Ansichten „Seitenleiste“ und „Karteikarte“): Raster nach der
    *  tatsächlichen Breite statt nach der Fensterbreite */
   schmal: boolean;
@@ -376,6 +380,7 @@ export function Akte() {
   const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "kontakt" | "gewicht" | "pdf" | "sprechstunde">("");
   // Vorbelegung aus der Kürzelzeile (Karteikarte: „K Text“, „G 54,6“)
   const [vorbelegt, setVorbelegt] = useState("");
+  const [aenderTermin, setAenderTermin] = useState<Termin | null>(null);
   const akte = useQuery({ queryKey: ["patient", pid], queryFn: () => api<Patient>(`patienten/${pid}/`), enabled: !!pid });
   const p = akte.data;
   const qc = useQueryClient();
@@ -436,6 +441,7 @@ export function Akte() {
     gewicht: offenBei("eintraege_erfassen"),
   };
   useOhneRechtSchliessen(erlaubt[dialog], () => setDialog(""));
+  useOhneRechtSchliessen(offenBei("eintraege_erfassen"), () => setAenderTermin(null));
   // Dokumente: „Dokument hochladen“ im Kopf und Dateien auf die ganze Akte ziehen (08.10.2026)
   const { waehlen: dateiWaehlen, ablage } = useAktenAblage(offenBei("eintraege_erfassen") && p ? p.id : null);
   // Verarbeitung eingeschränkt (auch wenn es während der Arbeit geschieht oder die Einsicht abläuft): Was vorher
@@ -457,8 +463,10 @@ export function Akte() {
     bearbeiten: offen && darfBei("akten_bearbeiten", p),
     planen: offen && darfBei("plaene_anlegen", p),
     terminAnlegen: () => setDialog("termin"),
+    terminAendern: (t: Termin) => setAenderTermin(t),
     kontaktErfassen: (text?: string) => { setVorbelegt(text ?? ""); setDialog("kontakt"); },
     gewichtErfassen: (wert?: string) => { setVorbelegt(wert ?? ""); setDialog("gewicht"); },
+    stammdatenBearbeiten: () => setDialog("stammdaten"),
     schmal: ansicht !== "kopfzeile",
   };
   const k = p.kopf;
@@ -658,6 +666,8 @@ export function Akte() {
         vorgabe={{ id: p.id, name: name(p), ist_test: p.ist_test }} text={vorbelegt} /> : null}
       {kontext.erfassen ? <GewichtDialog offen={dialog === "gewicht"} onOffen={(o) => setDialog(o ? "gewicht" : "")}
         vorgabe={{ id: p.id, name: name(p), ist_test: p.ist_test }} wert={vorbelegt} /> : null}
+      {kontext.erfassen ? <TerminDialog offen={!!aenderTermin} onOffen={(o) => { if (!o) setAenderTermin(null); }} termin={aenderTermin}
+        patientName={name(p)} /> : null}
       {ablage}
     </>
   );

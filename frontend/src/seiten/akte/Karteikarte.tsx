@@ -2,7 +2,8 @@
  * Karteikarte (Ansicht „Karteikarte“, Wunsch 08.10.2026): alle Einträge der Akte chronologisch auf einer Seite – wie in
  * einer Arztsoftware – mit Kürzel je Art, Filter und Zeitraum. Darunter die Kürzelzeile: „K Text“ öffnet einen neuen
  * Kontakt mit diesem Text, „G 61,2“ das Gewicht, „T“ einen Termin, „P“ einen neuen Infusionsplan. Gespeichert wird
- * immer erst im jeweiligen Formular (Kontakte sind nach dem Speichern nicht mehr änderbar).
+ * immer erst im jeweiligen Formular (Kontakte sind nach dem Speichern nicht mehr änderbar). Ein Klick auf eine Zeile öffnet
+ * genau diesen Eintrag in seinem Reiter; offene Termine öffnen „Termin ändern“ (08.10.2026).
  */
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
@@ -44,6 +45,8 @@ type Eintrag = {
   person: string | null;
   durchgestrichen?: boolean;
   zu: string;
+  /** offener Termin: Klick öffnet „Termin ändern“ statt die Seite zu wechseln */
+  termin?: Termin;
 };
 
 function nurDatum(wert: string) {
@@ -64,7 +67,7 @@ function zerlegen(eingabe: string): { kuerzel: string; rest: string } | null {
 }
 
 export function Karteikarte() {
-  const { patient, erfassen, planen, terminAnlegen, kontaktErfassen, gewichtErfassen } = useAkte();
+  const { patient, erfassen, planen, terminAnlegen, terminAendern, kontaktErfassen, gewichtErfassen } = useAkte();
   const navigate = useNavigate();
   const basis = `/patienten/${patient.id}`;
   const [filter, setFilter] = useState<Art | "">("");
@@ -93,7 +96,7 @@ export function Karteikarte() {
         schluessel: `k${k.id}`, art: "K", kuerzel: "K", wann: k.zeitpunkt, zeit: uhrzeit(k.zeitpunkt),
         text: `${k.art_name ? `${k.art_name}: ` : ""}${klartext(k.text)}`,
         zusatz: k.storniert_am ? `storniert${k.storno_grund ? ` – ${k.storno_grund}` : ""}` : undefined,
-        person: k.erfasst_von_name, durchgestrichen: !!k.storniert_am, zu: `${basis}/kontakte`,
+        person: k.erfasst_von_name, durchgestrichen: !!k.storniert_am, zu: `${basis}/kontakte?kontakt=${k.id}`,
       });
     }
     for (const g of gewichte.data ?? []) {
@@ -109,7 +112,7 @@ export function Karteikarte() {
         schluessel: `t${t.id}`, art: "T", kuerzel: wv ? "WV" : "T", wann: t.faellig_am, zeit: t.uhrzeit ? t.uhrzeit.slice(0, 5) : undefined,
         text: `${TERMINARTEN[t.art] ?? t.art}${t.titel ? `: ${t.titel}` : ""}${t.ort_name ? ` · ${t.ort_name}` : ""}`,
         zusatz: t.erledigt_am ? `erledigt am ${datum(t.erledigt_am)}` : t.ausgeblendet ? "offen · ausgeblendet" : "offen",
-        person: t.angelegt_von_name, zu: basis,
+        person: t.angelegt_von_name, zu: basis, termin: t.erledigt_am ? undefined : t,
       });
     }
     for (const pl of plaene.data ?? []) {
@@ -118,14 +121,14 @@ export function Karteikarte() {
         schluessel: `p${pl.id}`, art: "P", kuerzel: "P", wann: pl.gueltig_ab,
         text: `Infusionsplan ab ${datum(pl.gueltig_ab)} · ${zahl(pl.kcal)} kcal${pl.gesamtvolumen_ml ? ` · ${zahl(pl.gesamtvolumen_ml)} ml` : ""}${pl.laufzeit_h ? ` · ${zahl(pl.laufzeit_h)} h` : ""}`,
         zusatz: pl.freigegeben_von_name ? `${status} · freigegeben von ${pl.freigegeben_von_name}` : status,
-        person: pl.freigegeben_von_name, zu: `${basis}/plaene`,
+        person: pl.freigegeben_von_name, zu: `${basis}/plaene?plan=${pl.id}`,
       });
     }
     for (const l of labor.data ?? []) {
       e.push({
         schluessel: `l${l.id}`, art: "L", kuerzel: "L", wann: l.abgenommen_am,
         text: `Labor${l.labor ? ` ${l.labor}` : ""}: ${zahl(l.anzahl_werte)} Werte`,
-        zusatz: l.beurteilung ? klartext(l.beurteilung) : undefined, person: l.erfasst_von_name, zu: `${basis}/labor`,
+        zusatz: l.beurteilung ? klartext(l.beurteilung) : undefined, person: l.erfasst_von_name, zu: `${basis}/labor?befund=${l.id}`,
       });
     }
     for (const b of bia.data ?? []) {
@@ -133,7 +136,7 @@ export function Karteikarte() {
         b.ecw_prozent != null ? `ECW ${zahl(b.ecw_prozent, 1)} %` : ""].filter(Boolean).join(" · ");
       e.push({
         schluessel: `b${b.id}`, art: "L", kuerzel: "BIA", wann: b.gemessen_am, text: `BIA-Messung${werte ? `: ${werte}` : ""}`,
-        zusatz: b.beurteilung ? klartext(b.beurteilung) : undefined, person: b.erfasst_von_name, zu: `${basis}/bia`,
+        zusatz: b.beurteilung ? klartext(b.beurteilung) : undefined, person: b.erfasst_von_name, zu: `${basis}/bia?messung=${b.id}`,
       });
     }
     for (const d of diagnosen.data ?? []) {
@@ -141,21 +144,21 @@ export function Karteikarte() {
         schluessel: `d${d.id}`, art: "D", kuerzel: "D", wann: d.seit ?? d.angelegt_am,
         text: d.anzeige || [d.icd_code, d.bezeichnung].filter(Boolean).join(" "),
         zusatz: d.aktiv ? undefined : `beendet${d.beendet_am ? ` am ${datum(d.beendet_am)}` : ""}`,
-        person: d.angelegt_von_name, durchgestrichen: !d.aktiv, zu: `${basis}/diagnosen`,
+        person: d.angelegt_von_name, durchgestrichen: !d.aktiv, zu: `${basis}/diagnosen?eintrag=${d.id}`,
       });
     }
     for (const d of dokumente.data ?? []) {
       e.push({
         schluessel: `o${d.id}`, art: "DOK", kuerzel: "DOK", wann: d.datum ?? d.hochgeladen_am,
         text: `${d.typ_name ?? "Dokument"}: ${d.titel || d.originalname}`, zusatz: d.notiz || undefined,
-        person: d.hochgeladen_von_name, zu: `${basis}/dokumente`,
+        person: d.hochgeladen_von_name, zu: `${basis}/dokumente?dokument=${d.id}`,
       });
     }
     for (const b of berichte.data ?? []) {
       e.push({
         schluessel: `r${b.id}`, art: "B", kuerzel: "B", wann: b.datum,
         text: `${b.art_name ?? "Bericht"}: ${b.titel}${b.empfaenger ? ` · an ${b.empfaenger}` : ""}`, zusatz: b.status_name,
-        person: b.freigegeben_von_name ?? b.erstellt_von_name, zu: `${basis}/berichte`,
+        person: b.freigegeben_von_name ?? b.erstellt_von_name, zu: `${basis}/berichte?bericht=${b.id}`,
       });
     }
     // neueste zuerst; am selben Tag Einträge mit Uhrzeit vor denen ohne
@@ -239,7 +242,7 @@ export function Karteikarte() {
                     </td>
                   </tr>
                 ) : null,
-                <tr key={e.schluessel} data-testid="karteieintrag" data-art={e.art} className="cursor-pointer" onClick={() => navigate(e.zu)}>
+                <tr key={e.schluessel} data-testid="karteieintrag" data-art={e.art} className="cursor-pointer" onClick={() => (e.termin && erfassen ? terminAendern(e.termin) : navigate(e.zu))}>
                   <td className="td num whitespace-nowrap w-[1%] pl-4 align-top">{datum(nurDatum(e.wann))}{e.zeit ? <span className="gedaempft"> {e.zeit}</span> : null}</td>
                   <td className="td w-[1%] align-top"><Chip className={cx("num font-semibold justify-center min-w-[2.75rem]", `kartei-${e.art}`)}>{e.kuerzel}</Chip></td>
                   <td className="td align-top">

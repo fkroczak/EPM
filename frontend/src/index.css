@@ -340,13 +340,15 @@ body {
 .bereich { position: relative; min-width: 0; display: flex; flex-direction: column; }
 .bereich > * { min-width: 0; }
 .bereich.fest > .card { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-/* Platz für das Menü „⋯“ oben rechts: Die Kopfzeile der Karte rückt ihre eigenen Knöpfe nach links */
+/* Platz für das Größen-Symbol oben rechts: Die Kopfzeile der Karte rückt ihre eigenen Knöpfe nach links */
 .bereich:not(.ohne-menue) > .card > :first-child { padding-right: 2.5rem; }
 .bereich-menue {
   position: absolute; top: 0.5rem; right: 0.5rem; z-index: 5; width: 1.75rem; height: 1.75rem;
   color: var(--gedaempft);
 }
 .bereich-menue:hover, .bereich-menue[data-popup-open] { color: var(--tinte); background: var(--fein); }
+/* dezent, bis die Maus über der Karte ist; per Tastatur immer sichtbar */
+@media (hover: hover) { .bereich-menue { opacity: 0.45; } .bereich:hover .bereich-menue, .bereich-menue:focus-visible, .bereich-menue[data-popup-open] { opacity: 1; } }
 
 /* Hinweis der Administration vor Wartungsarbeiten (Fehlerliste 02.10.2026, 4.3): Warnungen deutlich größer als
    Informationen, mit kräftigem Rand – sie sollen nicht zu übersehen sein. */

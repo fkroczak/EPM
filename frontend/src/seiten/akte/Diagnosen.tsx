@@ -156,7 +156,8 @@ export function Diagnosen() {
 
   const alle = diagnosen.data ?? [];
   const offene = alle.filter((d) => d.aktiv);
-  const sichtbar = beendete ? alle : offene;
+  // aus der Karteikarte auf eine beendete Diagnose gezeigt: beendete gleich mit anzeigen
+  const sichtbar = beendete || alle.some((d) => !d.aktiv && String(d.id) === wahl) ? alle : offene;
   const anzahlBeendet = alle.length - offene.length;
   // „notizen“ steht obenan; sonst die gewählte Diagnose, ersatzweise die erste
   const gewaehlt = wahl === "notizen" ? null : sichtbar.find((d) => String(d.id) === wahl) ?? (wahl ? null : sichtbar[0]);

@@ -150,6 +150,10 @@ test("Aktenansicht: Kopfzeile in Stufen, Seitenleiste mit Breite, Karteikarte mi
   await page.getByLabel("Kürzelzeile").fill("X etwas");
   await page.getByLabel("Kürzelzeile").press("Enter");
   await expect(page.getByTestId("kuerzelzeile").getByRole("alert")).toContainText("Unbekanntes Kürzel „X“");
+  // Klick auf eine Zeile öffnet genau diesen Eintrag in seinem Reiter (08.10.2026)
+  await kartei.locator('[data-testid="karteieintrag"][data-art="K"]').filter({ hasText: "Telefonat zur Ansicht" }).click();
+  await expect(page).toHaveURL(/\/kontakte\?kontakt=\d+$/);
+  await expect(page.getByTestId("kontakt-detail")).toContainText("Telefonat zur Ansicht");
 
   // zurück auf Standard: wieder Kopfzeile
   await page.goto("/konto");

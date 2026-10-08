@@ -308,11 +308,14 @@ function KontakteKarte() {
 }
 
 function StammKarte() {
-  const { patient: p } = useAkte();
+  const { patient: p, bearbeiten, stammdatenBearbeiten } = useAkte();
   const adresse = [p.strasse, [p.plz, p.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
   return (
     <Karte className="px-4 sm:px-[22px] py-4 sm:py-[18px] grid grid-cols-[minmax(100px,max-content)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm" data-testid="stammdaten">
-      <h2 className="lbl m-0 col-span-2 pb-1">Anschrift und Kontakt</h2>
+      <div className="col-span-2 pb-1 flex items-center justify-between gap-2">
+        <h2 className="lbl m-0">Anschrift und Kontakt</h2>
+        {bearbeiten ? <Knopf klein variante="geist" icon="stift" onClick={stammdatenBearbeiten}>Bearbeiten</Knopf> : null}
+      </div>
       <span className="gedaempft">Adresse</span><span>{adresse || "—"}</span>
       <span className="gedaempft">Telefon</span><span className="num">{p.telefon || "—"}</span>
       {/* Telefon 2 und Krankenkasse seit 03.10.2026 sichtbar (Klärung U5) */}
