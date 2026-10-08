@@ -1227,6 +1227,8 @@ class TerminViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.RetrieveM
 
 class DokumentSerializer(serializers.ModelSerializer):
     hochgeladen_von_name = serializers.SerializerMethodField()
+    # Scans (F161): erkannter Text vorhanden – lesen über /api/dokumente/{id}/text/
+    hat_text = serializers.SerializerMethodField()
     typ_name = serializers.CharField(source="typ.wert", read_only=True, default=None)
     datei = serializers.FileField(write_only=True, required=False)
 
@@ -1234,12 +1236,15 @@ class DokumentSerializer(serializers.ModelSerializer):
         model = Dokument
         fields = ["id", "patient", "typ", "typ_name", "titel", "datum", "datum_quelle", "typ_geprueft", "notiz",
                   "ausgeblendet", "datei", "originalname", "mime", "groesse", "sha256", "herkunft", "hochgeladen_am",
-                  "hochgeladen_von_name"]
+                  "hochgeladen_von_name", "hat_text"]
         read_only_fields = ["originalname", "mime", "groesse", "sha256", "herkunft", "hochgeladen_am",
                             "datum_quelle", "typ_geprueft"]
 
     def get_hochgeladen_von_name(self, obj):
         return benutzername(obj.hochgeladen_von)
+
+    def get_hat_text(self, obj):
+        return hasattr(obj, "erkannter_text")
 
     def validate_typ(self, typ):
         if typ is not None and typ.liste != Auswahlwert.Liste.DOKUMENTTYP:
@@ -1318,7 +1323,8 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
     serializer_class = DokumentSerializer
     parser_classes = [JSONParser, MultiPartParser, FormParser]
     filterset_fields = ["patient", "typ", "ausgeblendet"]
-    search_fields = ["titel", "originalname", "notiz"]
+    # Scans (F161): auch im erkannten Text suchen
+    search_fields = ["titel", "originalname", "notiz", "erkannter_text__text"]
 
     def perform_create(self, serializer):
         patient = serializer.validated_data["patient"]
@@ -1502,6 +1508,20 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
             transaction.on_commit(lambda: trage_ein(eintrag), robust=True)
             transaction.on_commit(lambda: pfad.unlink(missing_ok=True), robust=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("typ", "hochgeladen_von", "erkannter_text")
+
+    @action(detail=True, methods=["get"])
+    def text(self, request, pk=None):
+        """Erkannter Text (Scans, F161) zum Lesen und Kopieren."""
+        dok = self.get_object()
+        t = getattr(dok, "erkannter_text", None)
+        if t is None:
+            return Response({"fehler": "Für dieses Dokument gibt es keinen erkannten Text."},
+                            status=status.HTTP_404_NOT_FOUND)
+        return Response({"text": t.text, "sicherheit": t.sicherheit, "verfahren": t.verfahren,
+                         "erkannt_am": t.erkannt_am})
 
     @action(detail=True, methods=["get"])
     def datei(self, request, pk=None):

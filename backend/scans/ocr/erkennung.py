@@ -12,19 +12,26 @@ from .laden import Rohseite
 from .paddle import Paddle
 
 
-def verfahren_stand() -> dict:
-    """Welche Verfahren stehen bereit (für Systemseite und „Scans“)?"""
+def verfahren_stand(laden: bool = True) -> dict:
+    """Welche Verfahren stehen bereit (für Systemseite und „Scans“)? ``laden=False`` prüft nur, ob die Modelldateien
+    da sind – so lädt das Backend (Gunicorn) nie die Modelle in den Speicher; das tut nur der OCR-Dienst."""
+    from .paddle import DET, DICT, REC, UVDOC, modell_ordner
+
     ok, text = tesseract.verfuegbar()
     p = None
     fehler = ""
-    try:
-        p = Paddle.laden()
-    except Exception as e:  # noqa: BLE001 – defekte Modelldatei: anzeigen statt abstürzen
-        fehler = str(e)[:300]
+    ordner = modell_ordner()
+    vorhanden = all((ordner / f).is_file() for f in (DET, REC, DICT))
+    if laden and vorhanden:
+        try:
+            p = Paddle.laden()
+        except Exception as e:  # noqa: BLE001 – defekte Modelldatei: anzeigen statt abstürzen
+            fehler = str(e)[:300]
+    bereit = p is not None if laden else vorhanden
     return {
         "tesseract": {"bereit": ok, "text": text},
-        "paddle": {"bereit": p is not None, "glaetten": bool(p and p.uvdoc),
-                   "text": "PP-OCRv5 (Zeilen: server_det, Schrift: latin_mobile_rec)" if p else
+        "paddle": {"bereit": bereit, "glaetten": bool(p and p.uvdoc) if laden else (ordner / UVDOC).is_file(),
+                   "text": "PP-OCRv5 (Zeilen: server_det, Schrift: latin_mobile_rec)" if bereit else
                    (f"Modelle nicht ladbar: {fehler}" if fehler else "Modelle nicht vorhanden")},
     }
 

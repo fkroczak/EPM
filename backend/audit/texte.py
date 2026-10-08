@@ -24,6 +24,7 @@ GRUPPEN = {
     "dokument": ("Dokument", [A.DOKUMENT_UMGEHAENGT, A.DOKUMENT_GELOESCHT, A.DOKUMENT_LOESCHUNG_NACHGEHOLT]),
     # Administration › System: Aufträge an den Server, Wartung des EPM, Hinweise an alle Benutzer
     "system": ("System", [A.SYSTEM]),
+    "scan": ("Scan", [A.SCAN]),
     "datenschutz": ("Datenschutz", [A.DATENSCHUTZ, A.AKTE_EINGESCHRAENKT, A.AKTE_EINSCHRAENKUNG_AUFGEHOBEN,
                                     A.AKTE_EINSICHT, A.AKTE_GELOESCHT, A.PROTOKOLL_BEREINIGT]),
 }
@@ -230,10 +231,42 @@ def beschreibung(e) -> str:
         return f"{e.objekt} endgültig gelöscht ({rechtsgrund}), Grund: {d.get('grund', '')}"
     if art == A.AKTE_LOESCHEN_ABGELEHNT:
         return f"Löschen abgelehnt: {e.objekt} – {d.get('fehler', '')}"
+    if art == A.SCAN:
+        return _scan(e, d)
     if art == A.PROTOKOLL_BEREINIGT:
         return (f"{d.get('anzahl', 0)} Einträge älter als {d.get('jahre', '?')} Jahre entfernt "
                 f"(eingestellte Aufbewahrung des Audit-Logs)")
     return e.get_art_display() + (f" {e.objekt}" if e.objekt else "")
+
+
+def _scan(e, d) -> str:
+    """Scans (F158 ff.): Hochladen, Zuordnen, Verlängern, Löschen. Vor dem Zuordnen ohne Titel (Datensparsamkeit:
+    ein Dateiname kann einen Namen enthalten)."""
+    aktion = d.get("aktion", "")
+    seiten = f", {d['seiten']} Seite{'n' if d.get('seiten') != 1 else ''}" if d.get("seiten") else ""
+    if aktion == "hochgeladen":
+        return f"{e.objekt} hochgeladen{seiten}"
+    if aktion == "zugeordnet":
+        teile = [f"{e.objekt} {d.get('akte', '')} zugeordnet als Dokument {d.get('dokument', '')}"]
+        uebernommen = d.get("uebernommen") or {}
+        namen = {"laborwerte": "Laborwerte", "bia": "BIA-Messung", "diagnosen": "Diagnosen", "texte": "Texte"}
+        liste = [f"{namen.get(k, k)}: {v}" for k, v in uebernommen.items() if v]
+        if liste:
+            teile.append("übernommen: " + ", ".join(liste))
+        return "; ".join(teile)
+    if aktion == "verlaengert":
+        return f"{e.objekt} verlängert bis {_datum(d.get('bis', ''))}"
+    if aktion == "geloescht":
+        return f"{e.objekt} gelöscht{seiten}"
+    if aktion == "abgelaufen":
+        return f"{d.get('anzahl', 0)} abgelaufene Scans automatisch gelöscht (Aufbewahrung {d.get('tage', '?')} Tage)"
+    if aktion == "obergrenze":
+        return f"Scans: Speicher zu {d.get('prozent', '?')} % belegt"
+    if aktion == "aufgeteilt":
+        return f"{e.objekt} aufgeteilt: {d.get('seiten', '?')} Seiten als Scan Nr. {d.get('neu', '?')}"
+    if aktion == "zusammengefuehrt":
+        return f"Scan Nr. {d.get('mit', '?')} an {e.objekt} angehängt"
+    return f"{e.objekt}: {aktion}"
 
 
 def _bestaetigt(d) -> str:

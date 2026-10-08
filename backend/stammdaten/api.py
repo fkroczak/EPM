@@ -1,4 +1,6 @@
 """Stammdaten: lesen dürfen alle, ändern nur der Admin. Gelöscht wird nichts, nur deaktiviert."""
+import re
+
 from django.utils import timezone
 from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
@@ -280,6 +282,18 @@ class EinstellungenSerializer(serializers.ModelSerializer):
                                                 getattr(e, "kontakt_ueberfaellig_monate", None)))
         if fehler:
             raise serializers.ValidationError(fehler)
+        from .models import scans_fehler
+
+        fehler = scans_fehler(*(attrs.get(f, getattr(e, f, None)) for f in (
+            "scans_frist_tage", "scans_hoechst_tage", "scans_verlaengerung_tage", "scans_max_mb", "scans_max_anzahl")))
+        if fehler:
+            raise serializers.ValidationError(fehler)
+        if "ocr_fachwoerter" in attrs:
+            woerter = [w.strip() for w in attrs["ocr_fachwoerter"].splitlines() if w.strip()]
+            if len(woerter) > 5000 or any(len(w) > 60 or " " in w for w in woerter):
+                raise serializers.ValidationError({"ocr_fachwoerter": "Je Zeile ein Wort ohne Leerzeichen (höchstens "
+                                                                      "60 Zeichen, höchstens 5000 Wörter)."})
+            attrs["ocr_fachwoerter"] = "\n".join(dict.fromkeys(woerter))
         if "wiedervorlage_tage" in attrs and not 1 <= attrs["wiedervorlage_tage"] <= 365:
             raise serializers.ValidationError({"wiedervorlage_tage": "Bitte 1 bis 365 Tage angeben."})
         # Datenschutz: Fristen und die Erklärungen, die vorliegen sollen
@@ -510,7 +524,11 @@ class LaborparameterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Laborparameter
         fields = ["id", "gruppe", "gruppe_name", "name", "kurzname", "einheit", "referenz_von", "referenz_bis",
-                  "reihenfolge", "aktiv", "in_befunden"]
+                  "reihenfolge", "aktiv", "in_befunden", "suchbegriffe"]
+
+    def validate_suchbegriffe(self, wert):
+        teile = [t.strip() for t in re.split(r"[;,\n]", wert or "") if t.strip()]
+        return ", ".join(dict.fromkeys(teile))[:300]
 
     def validate_name(self, wert):
         if not wert.strip():

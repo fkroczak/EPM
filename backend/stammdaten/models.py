@@ -190,6 +190,10 @@ class Laborparameter(models.Model):
     gruppe = models.CharField(max_length=30, choices=Gruppe.choices)
     name = models.CharField(max_length=150)
     kurzname = models.CharField(max_length=60, blank=True, help_text="für enge Spalten, z. B. „GPT“")
+    # Scans (F164): weitere Schreibweisen, unter denen Labore den Wert drucken („ALAT“, „Krea“) – kommagetrennt.
+    # Die üblichen Schreibweisen kennt die Werterkennung schon (scans/ocr/auswertung.py, SYNONYME).
+    suchbegriffe = models.CharField("Suchbegriffe für Scans", max_length=300, blank=True,
+                                    help_text="weitere Schreibweisen auf Laborbefunden, durch Komma getrennt")
     einheit = models.CharField(max_length=30, blank=True, help_text="z. B. mg/dl, µg/l, U/l")
     # Referenzbereich: in der Mail nicht gewünscht, aber jedes Labor liefert ihn mit (U44). Bleibt leer, bis
     # Alice entschieden hat; erst dann markiert die Oberfläche abweichende Werte.
@@ -285,6 +289,25 @@ def kontaktstufen_fehler(bald, ueberfaellig) -> dict | None:
     return None
 
 
+def scans_fehler(frist, hoechst, verlaengerung, max_mb, max_anzahl) -> dict:
+    """Regeln für die Aufbewahrung der Scans (F163): Frist 1–365 Tage, Höchstdauer nicht kürzer als die Frist,
+    Verlängerung 1 Tag bis Höchstdauer, Obergrenzen in vernünftigen Grenzen."""
+    fehler = {}
+    if frist is not None and not 1 <= frist <= 365:
+        fehler["scans_frist_tage"] = "Bitte 1 bis 365 Tage angeben."
+    if hoechst is not None and not 1 <= hoechst <= 365:
+        fehler["scans_hoechst_tage"] = "Bitte 1 bis 365 Tage angeben."
+    elif frist is not None and hoechst is not None and hoechst < frist:
+        fehler["scans_hoechst_tage"] = "Die Höchstdauer darf nicht kürzer sein als die Aufbewahrung."
+    if verlaengerung is not None and (verlaengerung < 1 or (hoechst is not None and verlaengerung > hoechst)):
+        fehler["scans_verlaengerung_tage"] = "Bitte mindestens 1 Tag und höchstens die Höchstdauer angeben."
+    if max_mb is not None and not 100 <= max_mb <= 500_000:
+        fehler["scans_max_mb"] = "Bitte 100 bis 500 000 MB angeben."
+    if max_anzahl is not None and not 10 <= max_anzahl <= 10_000:
+        fehler["scans_max_anzahl"] = "Bitte 10 bis 10 000 angeben."
+    return fehler
+
+
 class Einstellungen(models.Model):
     """Genau ein Datensatz (pk=1): Absender, Warnschwellen, Plausibilitätsgrenzen, Fristen des Datenschutzes."""
 
@@ -343,6 +366,15 @@ class Einstellungen(models.Model):
     # Vordrucke ohne Wasserzeichen „ENTWURF“, obwohl die mitgelieferte Startvorlage noch aktiv ist (Festlegung 03.10.2026:
     # Entwurfsmodus manuell abschaltbar, Vorlagen › Dokumentvorlagen). Liste der Arten; nur über eigenen Endpunkt.
     vordrucke_ohne_entwurf = models.JSONField("Vordrucke ohne Wasserzeichen „ENTWURF“", default=list, blank=True)
+    # Scans und Texterkennung (Festlegung 08.10.2026, F163): Aufbewahrung nicht zugeordneter Scans, Verlängern je
+    # Scan bis zur Höchstdauer (ab dem Hochladen), Obergrenzen für Speicher und Anzahl; Fachwörter für die Erkennung
+    scans_frist_tage = models.PositiveSmallIntegerField("Scans aufbewahren (Tage)", default=7)
+    scans_hoechst_tage = models.PositiveSmallIntegerField("Scans höchstens aufbewahren (Tage)", default=30)
+    scans_verlaengerung_tage = models.PositiveSmallIntegerField("Scans verlängern um (Tage)", default=7)
+    scans_max_mb = models.PositiveIntegerField("Speicher für Scans (MB)", default=2000)
+    scans_max_anzahl = models.PositiveIntegerField("Scans höchstens (Anzahl)", default=300)
+    ocr_fachwoerter = models.TextField("Fachwörter für die Texterkennung", blank=True,
+                                       help_text="je Zeile ein Wort, z. B. Präparate und Diagnosen")
     # Musterdaten (Testbenutzer, Testpatienten ab Nr. 9001) bei jedem Update/Start anlegen? Nach „Datenbank leeren“
     # aus (Festlegung 03.10.2026); unter Administration › System umschaltbar.
     musterdaten_automatisch = models.BooleanField("Musterdaten automatisch anlegen", default=True)
@@ -375,6 +407,10 @@ class Einstellungen(models.Model):
             if getattr(self, feld) < 1:
                 raise ValidationError({feld: "Bitte mindestens 1 Monat angeben."})
         fehler = kontaktstufen_fehler(self.kontakt_bald_monate, self.kontakt_ueberfaellig_monate)
+        if fehler:
+            raise ValidationError(fehler)
+        fehler = scans_fehler(self.scans_frist_tage, self.scans_hoechst_tage, self.scans_verlaengerung_tage,
+                              self.scans_max_mb, self.scans_max_anzahl)
         if fehler:
             raise ValidationError(fehler)
         if (not isinstance(self.pflicht_erklaerungen, list)

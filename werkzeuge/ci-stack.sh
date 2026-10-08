@@ -25,7 +25,7 @@ case "${1:-start}" in
     sudo rm -rf "$B" "$WEBDAV"
     exit 0 ;;
   logs)
-    compose logs --tail 200 backend web
+    compose logs --tail 200 backend ocr web
     exit 0 ;;
   protokoll)
     # Zur Fehlersuche nach fehlgeschlagenen Browsertests: Anmeldungen und Benutzerverwaltung aus dem Audit-Log,
@@ -59,7 +59,7 @@ done
 
 echo "==> Projektverzeichnis $B"
 sudo rm -rf "$B"
-mkdir -p "$B/secrets" "$B/nginx/certs" "$B/data/dokumente" "$B/data/loeschliste" "$B/data/import" "$B/system/auftraege" "$B/system/status/auftraege" \
+mkdir -p "$B/secrets" "$B/nginx/certs" "$B/data/dokumente" "$B/data/loeschliste" "$B/data/import" "$B/data/scans" "$B/system/auftraege" "$B/system/status/auftraege" \
   "$B/system/download" "$B/system/upload" "$B/backup" "$B/konf-sicherung"
 chmod 0700 "$B/backup" "$B/konf-sicherung"
 cp rollout/projekt/compose.yaml "$B/"
