@@ -196,6 +196,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F156 | Versorger/Ärzte und Kalender nach den Entwürfen (PC, Tablet, Telefon) | Versorger, Ärzte, Kalender | ABGESCHLOSSEN (Lauf steht aus) |
 | F157 | Rest der Vorschläge: Stift an „Versorgung“, Messpunkt im Diagramm bearbeiten, „Neues Dokument“ | 4 Akte | ABGESCHLOSSEN (Lauf steht aus) |
 | F158 | Design und Mein Konto getrennt: eigener Menüpunkt „Design“ (/design) | Benutzermenü, Design, Mein Konto | ABGESCHLOSSEN (Lauf steht aus) |
+| F159 | Import: Auffälligkeiten gruppiert mit Regel je Wert, Mehrfachauswahl, Gewichte innerhalb weniger Tage zusammenfassen | Administration › Import | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2906,6 +2907,44 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   `bildschirmfotos-mobil.spec.ts` auf /design umgestellt.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F159 Import: Regeln je Wert, Mehrfachauswahl, Gewichte zusammenfassen
+- **Wunsch 09.10.2026** (nach dem ersten Probelauf mit dem echten Dump: 200 Auffälligkeiten, davon rund 150 „Gewicht 1 kg“):
+  „Kann ich eine Mehrfachauswahl haben, um bestimmte Werte, z. B. Gewicht 1 kg, nicht übernehmen zu können? Sonst muss ich
+  200 Werte händisch anhaken. Vielleicht auch zusammenfassen, wenn die Meldungen gleich sind.“ Und: „Beim Import muss
+  geprüft werden, ob bei einem Patienten mehrere Gewichtsanpassungen innerhalb von 1–2 Tagen durchgeführt worden sind.
+  Hierbei soll die genommen werden, die als letztes angepasst worden ist. Somit vermeiden wir Dopplungen.“
+- **Ansicht:** Auffälligkeiten „Gruppiert“ (Standard) oder „Einzeln mit Auswahl“. Eine Gruppe = gleiche Tabelle, gleiches
+  Feld, gleicher Wert im Dump (Anzahl Zeilen und Patienten); offene und große Gruppen zuerst; „Zeilen zeigen“ klappt die
+  einzelnen Zeilen auf. Je Gruppe „Für alle mit diesem Wert“: die Entscheidungen, die für alle Zeilen der Gruppe möglich
+  sind (bei „Wert eintragen“ mit Eingabe). Einzeln: Häkchen je Zeile, „Alle sichtbaren“, „Alle n auswählen“, Filter nach
+  Angabe; Sammelentscheidung mit den gemeinsamen Möglichkeiten oder „Entscheidungen der Auswahl zurücknehmen“. Darüber
+  die Karte „Gewichte zusammenfassen“ (nicht / 1–7 Tage, Standard 2) mit Zahl und Liste (übernommen ↔ ersetzt).
+- **Endpunkte:** `PATCH /api/altimport/zuordnung/` mit den neuen Bereichen `regeln` (`{"Tabelle:Feld:Wert": {art, wert?} |
+  null}`; der Server prüft, dass die Entscheidung für alle Zeilen der Gruppe möglich ist, und speichert Wahlmöglichkeiten
+  und Befund mit) und `einstellungen` (`{"gewichte_tage": 0–14 | null}`). Die Mehrfachauswahl nutzt `korrekturen` mit
+  mehreren Schlüsseln in einem Aufruf. `GET` liefert je Auffälligkeit `gruppe` und `regel`, dazu `zusammengefasst`
+  (`tage`, `anzahl`, `patienten`, `gruppen` – die ersten 300).
+- **Logik – Regeln:** Eine Regel gilt für jede Zeile, in der das Feld genau diesen Wert hat (ohne Rand-Leerraum; NULL wie
+  leer) – unabhängig von der Zeilennummer, also auch für neue Zeilen im frischen Dump. Eine Entscheidung zur einzelnen
+  Zeile hat Vorrang. Eine Regel, deren Entscheidung für eine Auffälligkeit nicht vorgesehen ist, wirkt dort nicht
+  (z. B. kann eine PLZ-Regel nie eine Akte auslassen). Ausgelassene Zeilen bleiben mit „per Regel“ sichtbar und änderbar.
+- **Logik – Gewichte zusammenfassen:** je Patient nach Erfassungszeitpunkt (`lastchange`) sortiert; eine Gruppe beginnt
+  beim ersten Eintrag und umfasst alle Einträge bis zu N × 24 Stunden danach (keine Kette: ein Eintrag danach beginnt
+  eine neue Gruppe). Übernommen wird der zuletzt erfasste, bei gleichem Zeitpunkt der spätere im Dump. Das läuft nach
+  allen Entscheidungen und Platzhalter-Regeln, sodass ein ausgelassener Wert keinen echten verdrängt. Zählung
+  „zusammengefasst“, Protokoll Regel 2 mit den Nummern der ersetzten Einträge.
+- **Geklärt 09.10.2026 (U64):** „innerhalb von 1–2 Tagen“ = Zeitfenster ab dem ersten Eintrag, Standard 2 Tage
+  (48 Stunden); einstellbar. Ein „unverändert übernommenes“ unplausibles Gewicht (z. B. 1 kg) zählt beim Zusammenfassen
+  mit und kann als jüngster Eintrag gewinnen – deshalb solche Werte zuerst per Regel „nicht übernehmen“.
+- **Teststatus:** `test_rein.py` Klasse `RegelnUndZusammenfassen` (Regel für alle Zeilen auch im frischen Dump, Vorrang
+  der Einzelentscheidung, Regel mit Wert, unpassende Regel, Zusammenfassen 2/1/0 Tage, nach den Entscheidungen) – lokal
+  grün; `tests.py` `test_regeln_mehrfachauswahl_und_zusammenfassen` (Schnittstelle, Prüfungen); `aa-import.spec.ts`
+  (Gruppe mit Regel, Mehrfachauswahl, Karte „Gewichte zusammenfassen“). Am 09.10.2026 lokal gegen PostgreSQL 16 geprüft:
+  alle 357 Backend-Tests grün (davon 62 im Import), nachdem der seit F158 rote Test `test_form_wird_ignoriert` behoben
+  war (das verworfene Feld „form“ stand noch im Serializer der Darstellung und wurde gespeichert). Typprüfung der
+  geänderten Oberfläche grün; der Browsertest steht aus (GitHub Actions startete wegen des Ausgabenlimits nicht).
+- **Status:** ABGESCHLOSSEN – Browserlauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2998,6 +3037,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U61 | Soll ein ausgeblendeter Hinweis auch dann **weg bleiben**, wenn sich die Lage ändert (z. B. „Kein Laborbefund“ ausgeblendet, danach wird einer erfasst)? Derzeit ja – die Stummschaltung läuft ab oder wird aufgehoben, der Hinweis entsteht ohnehin nur neu, wenn die Lage es hergibt | F119 | Stummschaltung bleibt bis zur Frist |
 | U62 | Unter welchem **Namen** soll EPM erreichbar sein (z. B. `epm.stiftung.lan`), und soll die CA auf dem Server (`epm-zertifikat einrichten`) oder auf der OPNsense liegen (`epm-zertifikat importieren`)? | F134, F130 | Name aus `EPM_WEB_NAME`, CA auf dem Server; beides unterstützt |
 | U63 | Soll das **Freigeben eines Plans** (am Telefon wie am PC) zusätzlich mit Passkey bzw. Code bestätigt werden? Heute genügt die Anmeldung, wie bisher beschlossen | F36, F132 | unverändert: ohne zusätzliche Bestätigung |
+| U64 | ~~Gewichte zusammenfassen: Fenster ab dem ersten Eintrag oder je Kalendertag?~~ **Geklärt 09.10.2026:** Fenster ab dem ersten Eintrag, Standard 2 × 24 Stunden; im Werkzeug einstellbar | F159 | – |
 
 
 ## Änderungsprotokoll

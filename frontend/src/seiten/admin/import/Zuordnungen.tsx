@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import type { InputHTMLAttributes, ReactNode } from "react";
-import { datum, zahl } from "@/lib/format";
+import { datum, zahl, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Karte, KartenKopf, Knopf, Leer, Meldung, Segmente, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
@@ -508,62 +508,282 @@ function GeloeschteTeil({ stand, anlaesse, speichern }: { stand: Zuordnungsstand
 const ENTSCHEIDUNG: Record<Entscheidungsart, string> = {
   wert: "Wert eintragen", leer: "leer lassen", unveraendert: "unverändert übernehmen", auslassen: "nicht übernehmen",
 };
+const ARTEN: Entscheidungsart[] = ["wert", "leer", "unveraendert", "auslassen"];
+type Wahl = { art: Entscheidungsart; wert?: string };
 
-function AuffaelligZeile({ a, speichern }: { a: Auffaelligkeit; speichern: Speichern }) {
-  const [art, setArt] = useState<string>(a.entscheidung?.art ?? "");
-  useEffect(() => { setArt(a.entscheidung?.art ?? ""); }, [a.entscheidung?.art]);
-  const setze = (wahl: { art: Entscheidungsart; wert?: string } | null) => speichern({ bereich: "korrekturen", aenderungen: { [a.schluessel]: wahl } });
+/** Wahlmöglichkeiten, die für alle angegebenen Auffälligkeiten gelten */
+function gemeinsam(liste: Auffaelligkeit[]): Entscheidungsart[] {
+  return ARTEN.filter((m) => liste.length > 0 && liste.every((a) => a.moeglich.includes(m)));
+}
+
+/** Entscheidung mit Werteingabe – für eine Zeile, eine Gruppe oder die Auswahl */
+function Entscheider({ label, wertLabel, moeglich, aktuell, leerText, eingabe, ungueltig, onWahl }: {
+  label: string; wertLabel: string; moeglich: Entscheidungsart[]; aktuell: Wahl | null; leerText: string; eingabe: "text" | "zahl" | "datum";
+  ungueltig?: boolean; onWahl: (w: Wahl | null) => void;
+}) {
+  const [art, setArt] = useState<string>(aktuell?.art ?? "");
+  useEffect(() => { setArt(aktuell?.art ?? ""); }, [aktuell?.art]);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Auswahl aria-label={label} value={art} aria-invalid={ungueltig ? true : undefined}
+        onChange={(e) => {
+          const v = e.target.value;
+          setArt(v);
+          if (v === "") onWahl(null);
+          else if (v !== "wert") onWahl({ art: v as Entscheidungsart });
+        }}>
+        <option value="">{leerText}</option>
+        {moeglich.map((m) => <option key={m} value={m}>{ENTSCHEIDUNG[m]}</option>)}
+      </Auswahl>
+      {art === "wert" ? (
+        eingabe === "datum" ? (
+          <Eingabe type="date" aria-label={wertLabel} defaultValue={/^\d{4}-\d{2}-\d{2}$/.test(aktuell?.wert ?? "") ? aktuell?.wert : ""}
+            onBlur={(e) => { if (e.target.value && e.target.value !== aktuell?.wert) onWahl({ art: "wert", wert: e.target.value }); }} />
+        ) : (
+          <Texteingabe aria-label={wertLabel} placeholder={eingabe === "zahl" ? "Zahl" : "Text"} wert={aktuell?.wert ?? ""}
+            onFertig={(t) => { if (t) onWahl({ art: "wert", wert: t }); }} />
+        )
+      ) : null}
+    </div>
+  );
+}
+
+function standardText(a: Auffaelligkeit) {
+  if (a.regel && a.entscheidung?.regel) return `Regel: ${ENTSCHEIDUNG[a.regel.art]}${a.regel.wert ? ` „${a.regel.wert}“` : ""}`;
+  return a.standard === "offen" ? "— bitte entscheiden —" : `Standard: ${ENTSCHEIDUNG[a.standard]}`;
+}
+
+function AuffaelligZeile({ a, speichern, gewaehlt, onWaehlen }: {
+  a: Auffaelligkeit; speichern: Speichern; gewaehlt?: boolean; onWaehlen?: (an: boolean) => void;
+}) {
   const was = `${a.tabelle_titel} ${a.id}: ${a.feld_titel}`;
+  // Entscheidung zur einzelnen Zeile (eine Regel erscheint als Vorgabe, nicht als eigene Entscheidung)
+  const eigene = a.entscheidung && !a.entscheidung.regel ? a.entscheidung : null;
   return (
     <tr data-testid={`auffaellig-${a.schluessel}`}>
+      {onWaehlen ? (
+        <td className="td align-top w-[36px]">
+          <input type="checkbox" aria-label={`${was} auswählen`} checked={!!gewaehlt} onChange={(e) => onWaehlen(e.target.checked)} />
+        </td>
+      ) : null}
       <td className="td align-top text-[0.8125rem] whitespace-nowrap">{a.tabelle_titel} <span className="num">{a.id}</span>
         {a.patient != null && a.tabelle !== "patienten" ? <><br /><span className="gedaempft">Patient {a.patient}</span></> : null}</td>
       <td className="td align-top">{a.feld_titel}</td>
       <td className="td align-top text-sm">{a.text}{a.wert !== null && a.art !== "korrigiert" ? <><br /><span className="text-xs gedaempft">im Dump: <span className="num">{a.wert || "(leer)"}</span></span></> : null}</td>
       <td className="td align-top">
-        <div className="flex flex-col gap-1.5">
-          <Auswahl aria-label={`Entscheidung für ${was}`} value={art} aria-invalid={a.blockiert ? true : undefined}
-            onChange={(e) => {
-              const v = e.target.value;
-              setArt(v);
-              if (v === "") setze(null);
-              else if (v !== "wert") setze({ art: v as Entscheidungsart });
-            }}>
-            <option value="">{a.standard === "offen" ? "— bitte entscheiden —" : `Standard: ${ENTSCHEIDUNG[a.standard]}`}</option>
-            {a.moeglich.map((m) => <option key={m} value={m}>{ENTSCHEIDUNG[m]}</option>)}
-          </Auswahl>
-          {art === "wert" ? (
-            a.eingabe === "datum" ? (
-              <Eingabe type="date" aria-label={`Wert für ${was}`} defaultValue={/^\d{4}-\d{2}-\d{2}$/.test(a.entscheidung?.wert ?? "") ? a.entscheidung?.wert : ""}
-                onBlur={(e) => { if (e.target.value && e.target.value !== a.entscheidung?.wert) setze({ art: "wert", wert: e.target.value }); }} />
-            ) : (
-              <Texteingabe aria-label={`Wert für ${was}`} placeholder={a.eingabe === "zahl" ? "Zahl" : "Text"} wert={a.entscheidung?.wert ?? ""}
-                onFertig={(t) => { if (t) setze({ art: "wert", wert: t }); }} />
-            )
-          ) : null}
-        </div>
+        <Entscheider label={`Entscheidung für ${was}`} wertLabel={`Wert für ${was}`} moeglich={a.moeglich} aktuell={eigene} leerText={standardText(a)}
+          eingabe={a.eingabe} ungueltig={a.blockiert}
+          onWahl={(w) => speichern({ bereich: "korrekturen", aenderungen: { [a.schluessel]: w } })} />
       </td>
       <td className="td align-top whitespace-nowrap">
-        {a.blockiert ? <Chip art="warn"><Icon name="warnung" />offen</Chip> : a.entscheidung ? <Chip art="akzent">entschieden</Chip> : <Chip>Standard</Chip>}
+        {a.blockiert ? <Chip art="warn"><Icon name="warnung" />offen</Chip>
+          : eigene ? <Chip art="akzent">entschieden</Chip>
+          : a.entscheidung?.regel ? <Chip art="akzent">per Regel</Chip> : <Chip>Standard</Chip>}
       </td>
     </tr>
   );
 }
 
-function AuffaelligkeitenTeil({ stand, speichern }: { stand: Zuordnungsstand; speichern: Speichern }) {
-  const [anzahl, setAnzahl] = useState(200);
-  const liste = stand.auffaelligkeiten;
-  if (!liste.length) return <Karte className="px-5 py-4"><Leer>Keine Auffälligkeiten.</Leer></Karte>;
+type Gruppe = { schluessel: string; titel: string; wert: string; liste: Auffaelligkeit[]; regel: Auffaelligkeit["regel"] };
+
+function gruppieren(liste: Auffaelligkeit[]): Gruppe[] {
+  const je = new Map<string, Gruppe>();
+  for (const a of liste) {
+    let g = je.get(a.gruppe);
+    if (!g) {
+      g = { schluessel: a.gruppe, titel: `${a.tabelle_titel} · ${a.feld_titel}`, wert: a.roh ?? "", liste: [], regel: a.regel };
+      je.set(a.gruppe, g);
+    }
+    g.liste.push(a);
+  }
+  // große Gruppen zuerst – dort spart eine Regel die meiste Arbeit; offene vor erledigten
+  return [...je.values()].sort((x, y) =>
+    Number(y.liste.some((a) => a.blockiert)) - Number(x.liste.some((a) => a.blockiert)) || y.liste.length - x.liste.length
+    || x.titel.localeCompare(y.titel) || x.wert.localeCompare(y.wert, "de", { numeric: true }));
+}
+
+/** Wahlmöglichkeiten einer Regel: wie beim Speichern im Server (dienst._regeln_pruefen) */
+function regelMoeglich(g: Gruppe): Entscheidungsart[] {
+  const mitglieder = g.liste.filter((a) => a.art !== "korrigiert");
+  if (g.regel && mitglieder.length && mitglieder.every((a) => a.art === "ausgelassen" && a.entscheidung?.regel)) return g.regel.moeglich;
+  return gemeinsam(mitglieder);
+}
+
+function GruppenZeile({ g, speichern }: { g: Gruppe; speichern: Speichern }) {
+  const [auf, setAuf] = useState(false);
+  const moeglich = regelMoeglich(g);
+  const offen = g.liste.filter((a) => a.blockiert).length;
+  const einzeln = g.liste.filter((a) => a.entscheidung && !a.entscheidung.regel).length;
+  const patienten = new Set(g.liste.map((a) => a.patient ?? (a.tabelle === "patienten" ? a.id : null)).filter((p) => p != null)).size;
+  const muster = g.liste.find((a) => a.art !== "ausgelassen" && a.art !== "korrigiert") ?? g.liste[0];
+  const befund = g.regel?.befund && muster.art === "ausgelassen" ? g.regel.befund : muster.text;
+  const standard = muster.standard === "offen" ? "— bitte entscheiden —" : `einzeln (Standard: ${ENTSCHEIDUNG[muster.standard]})`;
+  const label = `Regel für ${g.titel} „${g.wert || "(leer)"}“`;
   return (
-    <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="zuordnung-auffaelligkeiten">
-      <KartenKopf titel={`Auffälligkeiten (${liste.length})`}
-        unter="Einzelne Werte, die fehlen, nicht lesbar oder unplausibel sind. Ohne Entscheidung gilt der Standard; was als „offen“ markiert ist, muss entschieden werden. Eine Korrektur gilt nur, solange im Dump derselbe Wert steht." />
+    <>
+      <tr data-testid={`gruppe-${g.schluessel}`}>
+        <td className="td align-top text-[0.8125rem]">{g.titel}</td>
+        <td className="td align-top num">{g.wert || <span className="gedaempft">(leer)</span>}</td>
+        <td className="td align-top text-sm">{befund}
+          <br /><span className="text-xs gedaempft">{zahl(g.liste.length)} {g.liste.length === 1 ? "Zeile" : "Zeilen"}{patienten > 1 ? ` bei ${zahl(patienten)} Patienten` : ""}
+            {einzeln ? ` · ${zahl(einzeln)} einzeln entschieden (hat Vorrang)` : ""}</span>
+        </td>
+        <td className="td align-top">
+          {moeglich.length ? (
+            <Entscheider label={label} wertLabel={`Wert für alle: ${g.titel} „${g.wert || "(leer)"}“`} moeglich={moeglich} aktuell={g.regel} leerText={standard} eingabe={muster.eingabe}
+              ungueltig={offen > 0} onWahl={(w) => speichern({ bereich: "regeln", aenderungen: { [g.schluessel]: w } })} />
+          ) : <span className="text-[0.8125rem] gedaempft">nur einzeln entscheidbar</span>}
+        </td>
+        <td className="td align-top whitespace-nowrap">
+          <div className="flex flex-col items-start gap-1.5">
+            {offen ? <Chip art="warn"><Icon name="warnung" />{offen} offen</Chip> : g.regel ? <Chip art="akzent">Regel</Chip> : <Chip>Standard</Chip>}
+            <Knopf klein variante="geist" aria-expanded={auf} onClick={() => setAuf(!auf)}>{auf ? "Zeilen ausblenden" : "Zeilen zeigen"}</Knopf>
+          </div>
+        </td>
+      </tr>
+      {auf ? (
+        <tr><td className="td p-0" colSpan={5}>
+          <div className="pl-6 pr-2 py-2 bg-grund">
+            <table className="tabelle">
+              <tbody>{g.liste.slice(0, 300).map((a) => <AuffaelligZeile key={a.schluessel} a={a} speichern={speichern} />)}</tbody>
+            </table>
+            {g.liste.length > 300 ? <p className="text-[0.8125rem] gedaempft m-0 mt-2">Es werden die ersten 300 Zeilen gezeigt; die Regel gilt für alle {zahl(g.liste.length)}.</p> : null}
+          </div>
+        </td></tr>
+      ) : null}
+    </>
+  );
+}
+
+function Einzelliste({ liste, speichern }: { liste: Auffaelligkeit[]; speichern: Speichern }) {
+  const [anzahl, setAnzahl] = useState(200);
+  const [filter, setFilter] = useState("");
+  const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
+  const [sammelArt, setSammelArt] = useState<string>("");
+  const [sammelWert, setSammelWert] = useState("");
+  const angaben = [...new Map(liste.map((a) => [`${a.tabelle}:${a.feld}`, `${a.tabelle_titel} · ${a.feld_titel}`])).entries()];
+  const gefiltert = filter ? liste.filter((a) => `${a.tabelle}:${a.feld}` === filter) : liste;
+  const sichtbar = gefiltert.slice(0, anzahl);
+  const gewaehlt = liste.filter((a) => auswahl.has(a.schluessel));
+  const moeglich = gemeinsam(gewaehlt);
+  // Auswahl auf vorhandene Zeilen beschränken (nach dem Speichern kann sich die Liste ändern)
+  useEffect(() => {
+    const da = new Set(liste.map((a) => a.schluessel));
+    setAuswahl((alt) => { const neu = new Set([...alt].filter((s) => da.has(s))); return neu.size === alt.size ? alt : neu; });
+  }, [liste]);
+  useEffect(() => { if (sammelArt && !moeglich.includes(sammelArt as Entscheidungsart)) setSammelArt(""); }, [moeglich.join(), sammelArt]);
+  const waehle = (s: string, an: boolean) => setAuswahl((alt) => { const neu = new Set(alt); if (an) neu.add(s); else neu.delete(s); return neu; });
+  const alleSichtbar = sichtbar.length > 0 && sichtbar.every((a) => auswahl.has(a.schluessel));
+  const anwenden = (wahl: Wahl | null) => {
+    speichern({ bereich: "korrekturen", aenderungen: Object.fromEntries(gewaehlt.map((a) => [a.schluessel, wahl])) });
+    setAuswahl(new Set());
+    setSammelArt("");
+    setSammelWert("");
+  };
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-end gap-2 flex-wrap">
+        <Auswahl aria-label="Angabe filtern" className="w-[260px]" value={filter} onChange={(e) => { setFilter(e.target.value); setAnzahl(200); }}>
+          <option value="">Alle Angaben ({zahl(liste.length)})</option>
+          {angaben.map(([k, t]) => <option key={k} value={k}>{t} ({zahl(liste.filter((a) => `${a.tabelle}:${a.feld}` === k).length)})</option>)}
+        </Auswahl>
+        <Knopf klein variante="geist" onClick={() => setAuswahl(new Set([...auswahl, ...gefiltert.map((a) => a.schluessel)]))}>
+          Alle {zahl(gefiltert.length)} auswählen</Knopf>
+        {auswahl.size ? <Knopf klein variante="geist" onClick={() => setAuswahl(new Set())}>Auswahl aufheben</Knopf> : null}
+      </div>
+      {auswahl.size ? (
+        <div className="meldung info flex items-end gap-2 flex-wrap" data-testid="sammelentscheidung">
+          <span className="font-medium self-center">{zahl(auswahl.size)} ausgewählt:</span>
+          {moeglich.length ? (
+            <>
+              <Auswahl aria-label="Entscheidung für die Auswahl" className="w-[230px]" value={sammelArt} onChange={(e) => setSammelArt(e.target.value)}>
+                <option value="">— Entscheidung wählen —</option>
+                {moeglich.map((m) => <option key={m} value={m}>{ENTSCHEIDUNG[m]}</option>)}
+              </Auswahl>
+              {sammelArt === "wert" ? <Eingabe aria-label="Wert für die Auswahl" className="w-[160px]" value={sammelWert} onChange={(e) => setSammelWert(e.target.value)} /> : null}
+              <Knopf klein disabled={!sammelArt || (sammelArt === "wert" && !sammelWert.trim())}
+                onClick={() => anwenden(sammelArt === "wert" ? { art: "wert", wert: sammelWert.trim() } : { art: sammelArt as Entscheidungsart })}>
+                Für {zahl(auswahl.size)} übernehmen</Knopf>
+            </>
+          ) : <span className="text-[0.8125rem]">Für diese Auswahl gibt es keine gemeinsame Entscheidung – bitte nach Angabe filtern.</span>}
+          <Knopf klein variante="geist" onClick={() => anwenden(null)}>Entscheidungen der Auswahl zurücknehmen</Knopf>
+        </div>
+      ) : null}
       <table className="tabelle">
-        <thead><tr><th className="th w-[130px]">Zeile</th><th className="th w-[170px]">Angabe</th><th className="th">Befund</th><th className="th w-[320px]">Entscheidung</th><th className="th w-[110px]" /></tr></thead>
-        <tbody>{liste.slice(0, anzahl).map((a) => <AuffaelligZeile key={a.schluessel} a={a} speichern={speichern} />)}</tbody>
+        <thead><tr>
+          <th className="th w-[36px]"><input type="checkbox" aria-label="Alle sichtbaren auswählen" checked={alleSichtbar}
+            onChange={(e) => setAuswahl((alt) => { const neu = new Set(alt); sichtbar.forEach((a) => e.target.checked ? neu.add(a.schluessel) : neu.delete(a.schluessel)); return neu; })} /></th>
+          <th className="th w-[130px]">Zeile</th><th className="th w-[170px]">Angabe</th><th className="th">Befund</th><th className="th w-[320px]">Entscheidung</th><th className="th w-[110px]" />
+        </tr></thead>
+        <tbody>{sichtbar.map((a) => <AuffaelligZeile key={a.schluessel} a={a} speichern={speichern}
+          gewaehlt={auswahl.has(a.schluessel)} onWaehlen={(an) => waehle(a.schluessel, an)} />)}</tbody>
       </table>
-      {liste.length > anzahl ? <div><Knopf klein onClick={() => setAnzahl(anzahl + 200)}>Weitere anzeigen ({liste.length - anzahl})</Knopf></div> : null}
+      {gefiltert.length > anzahl ? <div><Knopf klein onClick={() => setAnzahl(anzahl + 200)}>Weitere anzeigen ({gefiltert.length - anzahl})</Knopf></div> : null}
+    </div>
+  );
+}
+
+const TAGE = [0, 1, 2, 3, 4, 5, 6, 7];
+
+function GewichteZusammenfassen({ z, speichern }: { z: Zuordnungsstand["zusammengefasst"]; speichern: Speichern }) {
+  const [auf, setAuf] = useState(false);
+  return (
+    <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="gewichte-zusammenfassen">
+      <KartenKopf titel="Gewichte zusammenfassen"
+        unter="Mehrere Gewichte eines Patienten kurz hintereinander sind im Altsystem meist Korrekturen derselben Messung. Alle Einträge, die höchstens so viele Tage (× 24 Stunden) nach dem ersten Eintrag einer Gruppe erfasst wurden, werden zu einem zusammengefasst; übernommen wird der zuletzt erfasste. Das gilt nach den Entscheidungen unten: Was „nicht übernommen“ wird, verdrängt keinen anderen Wert."
+        rechts={
+          <Auswahl aria-label="Gewichte zusammenfassen innerhalb von" className="w-[200px]" value={String(z.tage)}
+            onChange={(e) => speichern({ bereich: "einstellungen", aenderungen: { gewichte_tage: Number(e.target.value) } })}>
+            {TAGE.map((t) => <option key={t} value={t}>{t === 0 ? "nicht zusammenfassen" : `innerhalb von ${t} ${t === 1 ? "Tag" : "Tagen"}`}</option>)}
+          </Auswahl>} />
+      {z.tage ? (
+        <div className="flex items-center gap-3 flex-wrap text-sm">
+          <span data-testid="zusammengefasst-zahl">{z.anzahl ? `${zahl(z.anzahl)} Gewichte bei ${zahl(z.patienten)} Patienten werden nicht übernommen, weil ein später erfasster Wert sie ersetzt.` : "Keine Gewichte liegen so dicht beieinander."}</span>
+          {z.gruppen.length ? <Knopf klein variante="geist" aria-expanded={auf} onClick={() => setAuf(!auf)}>{auf ? "Liste ausblenden" : "Liste zeigen"}</Knopf> : null}
+        </div>
+      ) : <span className="text-sm gedaempft">Alle Gewichte werden einzeln übernommen.</span>}
+      {auf && z.tage ? (
+        <table className="tabelle">
+          <thead><tr><th className="th w-[90px]">Patient</th><th className="th">übernommen</th><th className="th">ersetzt (nicht übernommen)</th></tr></thead>
+          <tbody>
+            {z.gruppen.map((g) => (
+              <tr key={g.behalten.id}>
+                <td className="td align-top num">{g.patient}</td>
+                <td className="td align-top num">{g.behalten.kg.replace(".", ",")} kg · {zeitpunkt(g.behalten.zeit)}</td>
+                <td className="td align-top num text-[0.8125rem]">{g.verworfen.map((v) => `${v.kg.replace(".", ",")} kg · ${zeitpunkt(v.zeit)}`).join(" | ")}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : null}
+      {auf && z.gruppen.length < z.patienten ? <p className="text-[0.8125rem] gedaempft m-0">Es werden die ersten {zahl(z.gruppen.length)} Gruppen gezeigt; das Protokoll des Probelaufs nennt alle.</p> : null}
     </Karte>
+  );
+}
+
+function AuffaelligkeitenTeil({ stand, speichern }: { stand: Zuordnungsstand; speichern: Speichern }) {
+  const [ansicht, setAnsicht] = useState<"gruppen" | "einzeln">("gruppen");
+  const liste = stand.auffaelligkeiten;
+  const gruppen = gruppieren(liste);
+  return (
+    <div className="stapel flex flex-col gap-5">
+      {stand.zusammengefasst ? <GewichteZusammenfassen z={stand.zusammengefasst} speichern={speichern} /> : null}
+      {!liste.length ? <Karte className="px-5 py-4"><Leer>Keine Auffälligkeiten.</Leer></Karte> : (
+        <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="zuordnung-auffaelligkeiten">
+          <KartenKopf titel={`Auffälligkeiten (${zahl(liste.length)} in ${zahl(gruppen.length)} Gruppen)`}
+            unter="Einzelne Werte, die fehlen, nicht lesbar oder unplausibel sind. Ohne Entscheidung gilt der Standard; was als „offen“ markiert ist, muss entschieden werden. Gleiche Meldungen mit demselben Wert sind zu Gruppen zusammengefasst: Eine Regel gilt für alle Zeilen mit diesem Wert – auch im frischen Dump zum Go-live. Eine Entscheidung zu einer einzelnen Zeile hat Vorrang und gilt nur, solange im Dump derselbe Wert steht."
+            rechts={<Segmente label="Ansicht der Auffälligkeiten" wert={ansicht} onWahl={setAnsicht}
+              werte={[{ wert: "gruppen", text: "Gruppiert" }, { wert: "einzeln", text: "Einzeln mit Auswahl" }]} />} />
+          {ansicht === "gruppen" ? (
+            <table className="tabelle">
+              <thead><tr><th className="th w-[170px]">Angabe</th><th className="th w-[110px]">Wert im Dump</th><th className="th">Befund</th>
+                <th className="th w-[320px]">Für alle mit diesem Wert</th><th className="th w-[150px]" /></tr></thead>
+              <tbody>{gruppen.map((g) => <GruppenZeile key={g.schluessel} g={g} speichern={speichern} />)}</tbody>
+            </table>
+          ) : <Einzelliste liste={liste} speichern={speichern} />}
+        </Karte>
+      )}
+    </div>
   );
 }
 

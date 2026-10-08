@@ -15,7 +15,7 @@ danach lesbar in der Bemerkung; was nicht übernommen wird, steht im Protokoll.
 """
 import re
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from difflib import SequenceMatcher
 
@@ -23,6 +23,10 @@ from . import werte as W
 from .felder import ANLAESSE, JE_NAME, KATEGORIEN, LAENGEN, MEDI_KATEGORIEN, PRAEPARATFELDER, RECHTE, ROLLEN, TABELLEN
 
 GRUND = "Aus dem Altsystem übernommen"
+ARTEN = ("wert", "leer", "unveraendert", "auslassen")
+GEWICHTE_TAGE_STANDARD = 2      # Gewichte je Patient innerhalb von 2 Tagen zusammenfassen (Festlegung 09.10.2026)
+GEWICHTE_TAGE_MAX = 14
+GRUPPEN_ANZEIGE = 300           # so viele zusammengefasste Gruppen zeigt die Oberfläche einzeln
 BEISPIELE = 20
 KCAL_JE_G = (("glucose_g", Decimal(4)), ("aminosaeuren_g", Decimal(4)), ("lipide_g", Decimal("9.15")))
 
@@ -36,6 +40,7 @@ class Ergebnis:
     praeparate: dict = field(default_factory=dict)
     geloeschte: list = field(default_factory=list)
     auffaelligkeiten: list = field(default_factory=list)
+    zusammengefasst: dict = field(default_factory=lambda: {"tage": 0, "gruppen": [], "anzahl": 0, "patienten": 0})
     offen: list = field(default_factory=list)
     protokoll: list = field(default_factory=list)
     zahlen: dict = field(default_factory=dict)
@@ -45,7 +50,7 @@ class Ergebnis:
         """Für die Oberfläche (ohne die Datensätze selbst)."""
         return {"quelle": self.quelle, "benutzer": self.benutzer, "versorger": self.versorger, "werte": self.werte,
                 "praeparate": self.praeparate, "geloeschte": self.geloeschte,
-                "auffaelligkeiten": self.auffaelligkeiten, "offen": self.offen, "protokoll": self.protokoll,
+                "auffaelligkeiten": self.auffaelligkeiten, "zusammengefasst": self.zusammengefasst, "offen": self.offen, "protokoll": self.protokoll,
                 "zahlen": self.zahlen}
 
 
@@ -108,6 +113,16 @@ def _aehnlich(text: str, kandidaten: list, anzeige) -> list:
     return [k["id"] for r, k in bewertet[:3] if r >= 0.6]
 
 
+def wertschluessel(roh) -> str:
+    """Vergleichsform eines Rohwerts für Regeln: Text ohne Rand-Leerraum; NULL wie leer."""
+    return "" if roh is None else str(roh).strip()
+
+
+def gruppe(tab: str, feld: str, roh) -> str:
+    """Schlüssel einer Gruppe gleicher Auffälligkeiten und einer Regel: Tabelle:Feld:Wert."""
+    return f"{tab}:{feld}:{wertschluessel(roh)}"
+
+
 def _dez(wert, stellen: int) -> Decimal:
     return wert.quantize(Decimal(1).scaleb(-stellen), rounding=ROUND_HALF_UP)
 
@@ -131,6 +146,18 @@ class _Lauf:
         # was die übernommenen Datensätze tatsächlich brauchen (nur das wird neu angelegt)
         self.genutzt = {"benutzer": set(), "auswahlwerte": set(), "praeparate": set()}
         self.korrekturen = self.z.get("korrekturen") if isinstance(self.z.get("korrekturen"), dict) else {}
+        # Regeln je Wert: „alle Auffälligkeiten mit diesem Wert in diesem Feld“ (Schlüssel Tabelle:Feld:Wert).
+        # Sie gelten für jede Zeile mit genau diesem Wert – auch im frischen Dump zum Go-live. Eine Entscheidung zu
+        # einer einzelnen Zeile hat Vorrang.
+        regeln = self.z.get("regeln") if isinstance(self.z.get("regeln"), dict) else {}
+        self.regeln = {k: v for k, v in regeln.items() if isinstance(v, dict) and v.get("art") in ARTEN}
+        self.regel_auslassen = {}         # Tabelle → {Feld: {Wert, …}}
+        for k, v in self.regeln.items():
+            if v["art"] == "auslassen" and k.count(":") >= 2:
+                tab, feld, wert = k.split(":", 2)
+                self.regel_auslassen.setdefault(tab, {}).setdefault(feld, set()).add(wert)
+        tage = self.z.get("einstellungen", {}).get("gewichte_tage") if isinstance(self.z.get("einstellungen"), dict) else None
+        self.gewichte_tage = tage if isinstance(tage, int) and 0 <= tage <= GEWICHTE_TAGE_MAX else GEWICHTE_TAGE_STANDARD
         self.grenzen = {k: Decimal(str(v)) for k, v in (bestand.get("grenzen") or {}).items()}
         self.test_ab = int(bestand.get("testnummer_ab") or 9001)
         self.geloescht_epm = {int(n) for n in bestand.get("geloeschte_nummern") or []}
@@ -161,6 +188,8 @@ class _Lauf:
         """Auffälligkeit melden; liefert die wirksame Entscheidung (``standard``, wenn niemand entschieden hat)."""
         schluessel = f"{tab}:{kennung}:{feld}"
         k = self._korrektur(tab, kennung, feld, roh)
+        if k and k.get("regel") and k["art"] not in moeglich:
+            k = None                      # die Regel passt nicht zu dieser Art von Auffälligkeit
         entschieden = k["art"] if k and k["art"] in moeglich else None
         titel = feld
         try:
@@ -181,19 +210,23 @@ class _Lauf:
             "wert": None if roh is None else str(roh)[:200], "roh": None if roh is None else str(roh),
             "standard": standard, "moeglich": moeglich,
             "eingabe": eingabe, "blockiert": offen, "entscheidung": k if entschieden or untauglich else None,
+            "gruppe": gruppe(tab, feld, roh), "regel": self.regeln.get(gruppe(tab, feld, roh)),
         })
         if offen:
             self.sperre("auffaelligkeiten", "Es gibt Auffälligkeiten, über die noch entschieden werden muss.")
         return entschieden or standard
 
     def _korrektur(self, tab, kennung, feld, roh):
-        """Gespeicherte Entscheidung zu einem Wert – nur gültig, solange der Wert im Dump derselbe ist."""
+        """Gespeicherte Entscheidung zu einem Wert – nur gültig, solange der Wert im Dump derselbe ist. Ohne
+        Entscheidung zur einzelnen Zeile gilt eine Regel für diesen Wert (``regel`` nennt dann ihren Schlüssel)."""
         k = self.korrekturen.get(f"{tab}:{kennung}:{feld}")
-        if not isinstance(k, dict) or k.get("art") not in ("wert", "leer", "unveraendert", "auslassen"):
+        if isinstance(k, dict) and k.get("art") in ARTEN and k.get("alt") == (None if roh is None else str(roh)):
+            return k
+        g = gruppe(tab, feld, roh)
+        r = self.regeln.get(g)
+        if r is None:
             return None
-        if k.get("alt") != (None if roh is None else str(roh)):
-            return None
-        return k
+        return {**{x: r[x] for x in ("art", "wert") if x in r}, "alt": None if roh is None else str(roh), "regel": g}
 
     def lies(self, tab, kennung, feld, zeile):
         """Rohwert eines Felds – mit eingetragener Korrektur („wert“ ersetzt, „leer“ leert).
@@ -205,15 +238,30 @@ class _Lauf:
             return (str(k.get("wert", "")) if k["art"] == "wert" else None), roh
         return roh, roh
 
-    def ausgelassen(self, tab, kennung, zeile) -> bool:
-        """Hat jemand zu irgendeinem Feld dieser Zeile „nicht übernehmen“ entschieden?"""
+    def _auslassend(self, tab, kennung, zeile):
+        """Felder dieser Zeile, für die „nicht übernehmen“ gilt – einzeln entschieden oder per Regel für den Wert.
+        → [(Feld, Rohwert, Entscheidung)]"""
+        felder = set()
         vor = f"{tab}:{kennung}:"
         for schluessel, k in self.korrekturen.items():
             if schluessel.startswith(vor) and isinstance(k, dict) and k.get("art") == "auslassen":
-                feld = schluessel[len(vor):]
-                if self._korrektur(tab, kennung, feld, self.roh(tab, zeile, feld)):
-                    return True
-        return False
+                felder.add(schluessel[len(vor):])
+        for feld, werte in self.regel_auslassen.get(tab, {}).items():
+            if feld in self.q[tab]["idx"] and wertschluessel(self.roh(tab, zeile, feld)) in werte:
+                felder.add(feld)
+        aus = []
+        for feld in sorted(felder):
+            roh = self.roh(tab, zeile, feld)
+            k = self._korrektur(tab, kennung, feld, roh)
+            if k and k.get("regel") and "auslassen" not in (self.regeln[k["regel"]].get("moeglich") or ()):
+                continue                  # „nicht übernehmen“ ist für diese Auffälligkeit nicht vorgesehen
+            if k and k["art"] == "auslassen":
+                aus.append((feld, roh, k))
+        return aus
+
+    def ausgelassen(self, tab, kennung, zeile) -> bool:
+        """Gilt für ein Feld dieser Zeile „nicht übernehmen“ (einzeln entschieden oder per Regel)?"""
+        return bool(self._auslassend(tab, kennung, zeile))
 
     # ------------------------------------------------ Quelle: Tabellen und Spalten
     def roh(self, tab, zeile, feld):
@@ -1029,17 +1077,19 @@ class _Lauf:
             self.p(10, tab, "info", "Nickelallergie unbekannt (auch ohne Angabe) – die Akte zeigt dazu einen Hinweis.",
                    anzahl=nickel_unbekannt)
 
-    def _auffaelligkeiten_der_zeile(self, tab, kennung, zeile):
-        """Für eine ausgelassene Zeile die Entscheidung in der Liste sichtbar halten (damit sie änderbar bleibt)."""
-        vor = f"{tab}:{kennung}:"
-        for schluessel, k in self.korrekturen.items():
-            if schluessel.startswith(vor) and isinstance(k, dict) and k.get("art") == "auslassen":
-                feld = schluessel[len(vor):]
-                roh = self.roh(tab, zeile, feld)
-                if self._korrektur(tab, kennung, feld, roh):
-                    self.auffaellig(tab, kennung, feld, "ausgelassen", "Wird nicht übernommen (Entscheidung der Administration).",
-                                    roh, "auslassen", ["wert", "auslassen"],
-                                    "datum" if feld in ("geburtsdatum", "zeit", "erstellt") else "text")
+    def _auffaelligkeiten_der_zeile(self, tab, kennung, zeile, patient=None):
+        """Für eine ausgelassene Zeile die Entscheidung in der Liste sichtbar halten (damit sie änderbar bleibt).
+        Bei einer Regel bleiben die Wahlmöglichkeiten der ursprünglichen Auffälligkeit erhalten."""
+        for feld, roh, k in self._auslassend(tab, kennung, zeile):
+            eingabe = "datum" if feld in self.DATUMSFELDER else "text" if feld in self.TEXTFELDER else "zahl"
+            moeglich = ["wert", "auslassen"]
+            text = "Wird nicht übernommen (Entscheidung der Administration)."
+            if k.get("regel"):
+                r = self.regeln[k["regel"]]
+                moeglich = [m for m in r.get("moeglich") or moeglich if m in ARTEN] or moeglich
+                text = (f"Wird nicht übernommen – Regel für alle mit dem Wert „{'' if roh is None else roh}“"
+                        f"{(': ' + r['befund']) if r.get('befund') else ''}.")
+            self.auffaellig(tab, kennung, feld, "ausgelassen", text, roh, "auslassen", moeglich, eingabe, patient=patient)
 
     def _patient(self, tab, zeile, kennung, zaehler):
         """Patientennummer zu einem Eintrag – oder ``None`` mit Vermerk, warum er nicht übernommen wird."""
@@ -1067,7 +1117,7 @@ class _Lauf:
                 continue
             if self.ausgelassen(tab, kennung, z):
                 zaehler["ausgelassen"] += 1
-                self._auffaelligkeiten_der_zeile(tab, kennung, z)
+                self._auffaelligkeiten_der_zeile(tab, kennung, z, patient)
                 continue
             wert, roh = self.lies(tab, kennung, "gewicht", z)
             try:
@@ -1104,12 +1154,60 @@ class _Lauf:
                 continue
             saetze.append({"alt": kennung, "patient": patient, "gewicht_kg": kg, "gemessen_am": zeit.date(), "zeit": zeit,
                            "bearbeiter": self.bearbeiter(tab, z, "bearbeiter")})
+        saetze = self._gewichte_zusammenfassen(saetze, zaehler)
         self.e.saetze["gewichte"] = saetze
         self.e.zahlen[tab] = {"alt": len(self.q[tab]["zeilen"]), "neu": len(saetze),
                               "nicht": {k: v for k, v in zaehler.items() if v}}
         if saetze:
             self.p(2, tab, "info", "Messdatum = Tag der Erfassung im Altsystem; als „Datum ungenau“ und Quelle „Altsystem“ markiert.",
                    anzahl=len(saetze))
+
+    def _gewichte_zusammenfassen(self, saetze, zaehler):
+        """Mehrere Gewichte eines Patienten kurz hintereinander sind im Altsystem meist Korrekturen derselben Messung.
+        Je Patient bilden alle Einträge, die höchstens ``gewichte_tage`` × 24 Stunden nach dem ersten Eintrag der
+        Gruppe erfasst wurden, eine Gruppe; übernommen wird der zuletzt erfasste (bei gleichem Zeitpunkt der spätere
+        im Dump). 0 Tage = nicht zusammenfassen."""
+        tage = self.gewichte_tage
+        z = self.e.zusammengefasst
+        z["tage"] = tage
+        if not tage or not saetze:
+            return saetze
+        fenster = timedelta(days=tage)
+        je_patient = {}
+        for i, s in enumerate(saetze):
+            je_patient.setdefault(s["patient"], []).append((s["zeit"], i, s))
+        verworfen = set()
+        patienten = set()
+        for patient, liste in je_patient.items():
+            liste.sort(key=lambda x: (x[0], x[1]))
+            n = 0
+            while n < len(liste):
+                beginn = liste[n][0]
+                m = n
+                while m + 1 < len(liste) and liste[m + 1][0] - beginn <= fenster:
+                    m += 1
+                if m > n:
+                    gruppe_ = liste[n:m + 1]
+                    behalten = gruppe_[-1][2]
+                    weg = [x[2] for x in gruppe_[:-1]]
+                    verworfen.update(x[1] for x in gruppe_[:-1])
+                    patienten.add(patient)
+                    for s in weg:
+                        self.p(2, "gewichte", "hinweis",
+                               f"Mehrere Gewichte innerhalb von {tage} {'Tag' if tage == 1 else 'Tagen'} → nur der zuletzt "
+                               f"erfasste übernommen.", s["alt"])
+                    if len(z["gruppen"]) < GRUPPEN_ANZEIGE:
+                        z["gruppen"].append({
+                            "patient": patient,
+                            "behalten": {"id": behalten["alt"], "kg": f"{behalten['gewicht_kg']:f}", "zeit": behalten["zeit"].isoformat()},
+                            "verworfen": [{"id": s["alt"], "kg": f"{s['gewicht_kg']:f}", "zeit": s["zeit"].isoformat()} for s in weg],
+                        })
+                n = m + 1
+        z["anzahl"] = len(verworfen)
+        z["patienten"] = len(patienten)
+        if verworfen:
+            zaehler["zusammengefasst"] = len(verworfen)
+        return [s for i, s in enumerate(saetze) if i not in verworfen]
 
     # ------------------------------------------------ Kontakte
     def kontakte(self):
@@ -1123,7 +1221,7 @@ class _Lauf:
                 continue
             if self.ausgelassen(tab, kennung, z):
                 zaehler["ausgelassen"] += 1
-                self._auffaelligkeiten_der_zeile(tab, kennung, z)
+                self._auffaelligkeiten_der_zeile(tab, kennung, z, patient)
                 continue
             roh_text = self.text(tab, z, "text")
             if W.ist_leer(roh_text):
@@ -1171,7 +1269,7 @@ class _Lauf:
                 continue
             if self.ausgelassen(tab, kennung, z):
                 zaehler["ausgelassen"] += 1
-                self._auffaelligkeiten_der_zeile(tab, kennung, z)
+                self._auffaelligkeiten_der_zeile(tab, kennung, z, patient)
                 continue
             extras = []
             zeiten = {}
@@ -1344,7 +1442,7 @@ class _Lauf:
                 "text": f"Korrigiert: {neu} statt „{'' if roh is None else roh}“.",
                 "wert": None if roh is None else str(roh)[:200], "roh": None if roh is None else str(roh),
                 "standard": "unveraendert", "moeglich": ["wert", "leer"], "eingabe": eingabe, "blockiert": False,
-                "entscheidung": k,
+                "entscheidung": k, "gruppe": gruppe(tab, feld, roh), "regel": self.regeln.get(gruppe(tab, feld, roh)),
             })
             self.p(0, tab, "hinweis", f"„{JE_NAME[tab].feld(feld).titel}“ von der Administration korrigiert.", kennung)
         for tab, (n, beispiele) in sorted(self.repariert.items()):
