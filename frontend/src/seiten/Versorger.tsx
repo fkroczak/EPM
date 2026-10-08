@@ -156,6 +156,8 @@ function AnsprechpartnerDialog({ versorger, ap, offen, onOffen }: {
   );
 }
 
+const SPALTEN: Record<number, string> = { 1: "col-span-1", 2: "col-span-2", 3: "col-span-3", 4: "col-span-4", 6: "col-span-6" };
+
 export function Versorger() {
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<Filter>("aktiv");
@@ -207,10 +209,11 @@ export function Versorger() {
   const fehler: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   const geaendert = VERSORGER_FELDER.some((k) => f[k] !== formularVon(cur)[k]);
 
-  const feld = (k: (typeof VERSORGER_FELDER)[number], label: string, extra?: { num?: boolean; span?: boolean; typ?: string }) => !pflegen ? (
-    <Anzeige label={label} className={extra?.span ? "col-span-2" : undefined}>{f[k]}</Anzeige>
+  // 6-spaltiges Raster (Wunsch 08.10.2026: auf einem 1080p-Bildschirm ohne Scrollen): Angabe ``spalten`` von 6
+  const feld = (k: (typeof VERSORGER_FELDER)[number], label: string, extra?: { num?: boolean; spalten?: number; typ?: string }) => !pflegen ? (
+    <Anzeige label={label} className={SPALTEN[extra?.spalten ?? 3]}>{f[k]}</Anzeige>
   ) : (
-    <Feld label={label} className={extra?.span ? "col-span-2" : undefined} fehler={fehler[k]} pflicht={k === "name"}>
+    <Feld label={label} className={SPALTEN[extra?.spalten ?? 3]} fehler={fehler[k]} pflicht={k === "name"}>
       {(p) => <Eingabe {...p} className={extra?.num ? "num" : undefined} type={extra?.typ} value={f[k]}
         onChange={(e) => setF({ ...f, [k]: e.target.value })} />}
     </Feld>
@@ -264,21 +267,19 @@ export function Versorger() {
                 <h2 className="m-0 text-lg font-semibold">{cur ? cur.name : "Neuer Versorger"}</h2>
                 {cur ? <span className="text-[0.8125rem] gedaempft"><span className="num">{zahl(cur.patienten_anzahl)}</span> Patienten in Betreuung</span> : null}
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                {feld("name", "Firma", { span: true })}
+              <div className="formular grid grid-cols-6">
+                {feld("name", "Firma", { spalten: 6 })}
                 {feld("strasse", "Straße")}
-                <div className="grid grid-cols-[90px_1fr] gap-3">
-                  {feld("plz", "PLZ", { num: true })}
-                  {feld("ort", "Ort")}
-                </div>
-                {feld("telefon", "Telefon Zentrale", { num: true })}
-                {feld("fax", "Fax", { num: true })}
-                {feld("email", "E-Mail", { span: true, typ: "email" })}
+                {feld("plz", "PLZ", { num: true, spalten: 1 })}
+                {feld("ort", "Ort", { spalten: 2 })}
+                {feld("telefon", "Telefon Zentrale", { num: true, spalten: 2 })}
+                {feld("fax", "Fax", { num: true, spalten: 2 })}
+                {feld("email", "E-Mail", { spalten: 2, typ: "email" })}
                 {pflegen ? (
-                  <Feld label="Notiz" className="col-span-2" fehler={fehler.notiz}>
+                  <Feld label="Notiz" className="col-span-6" fehler={fehler.notiz}>
                     {(p) => <Textfeld {...p} rows={2} value={f.notiz} onChange={(e) => setF({ ...f, notiz: e.target.value })} />}
                   </Feld>
-                ) : <Anzeige label="Notiz" className="col-span-2" mehrzeilig>{f.notiz}</Anzeige>}
+                ) : <Anzeige label="Notiz" className="col-span-6" mehrzeilig>{f.notiz}</Anzeige>}
               </div>
               {speichern.error && !Object.keys(fehler).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
               {pflegen ? (
@@ -299,7 +300,7 @@ export function Versorger() {
                 </div>
                 <div className="flex flex-col" data-testid="ansprechpartner">
                   {cur.ansprechpartner.map((a) => (
-                    <div key={a.id} className={cx("grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 py-2 border-b border-rand last:border-b-0", !a.aktiv && "opacity-60")}>
+                    <div key={a.id} className={cx("grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 py-1 border-b border-rand last:border-b-0", !a.aktiv && "opacity-60")}>
                       <span className="flex flex-col gap-px min-w-0">
                         {pflegen ? (
                           <button type="button" className="bg-transparent border-0 p-0 text-left font-medium text-akzent-text cursor-pointer"
@@ -317,22 +318,16 @@ export function Versorger() {
                   ))}
                   {!cur.ansprechpartner.length ? <span className="text-sm gedaempft py-2">Keine Ansprechpartner hinterlegt.</span> : null}
                 </div>
-                <span className="text-[0.8125rem] gedaempft leading-normal">
-                  Jeder Patient ist einem Ansprechpartner zugeordnet. Wird jemand deaktiviert, zeigt EPM seine Patienten zum Neuzuordnen an.
-                </span>
+
               </div>
             ) : null}
 
-            {cur && cur.patienten_anzahl > 0 ? (
-              <div className="meldung info flex gap-2.5 items-start text-[0.8125rem] leading-normal">
-                <Icon name="info" />
-                <span>Versorger werden nie gelöscht, nur deaktiviert. Ein deaktivierter Versorger erscheint bei neuen Patienten nicht
-                  mehr in der Auswahl, bleibt aber in allen Akten und Plänen erhalten.</span>
-              </div>
-            ) : cur ? (
-              <span className="text-[0.8125rem] gedaempft">Keine Patienten zugeordnet. Ehemals betreute Patienten stehen weiter in deren Verlauf.</span>
-            ) : null}
-            <span className="text-xs gedaempft">Änderungen werden mit Person und Zeitpunkt protokolliert.</span>
+            {/* Hinweise in einer kleinen Zeile statt drei Absätzen (Wunsch 08.10.2026: ohne Scrollen auf 1080p) */}
+            <span className="text-xs gedaempft leading-snug">
+              Jeder Patient ist einem Ansprechpartner zugeordnet; wird jemand deaktiviert, zeigt EPM seine Patienten zum Neuzuordnen an.
+              Versorger werden nie gelöscht, nur deaktiviert – sie bleiben in allen Akten und Plänen erhalten.
+              Änderungen werden mit Person und Zeitpunkt protokolliert.
+            </span>
             {cur ? <AnsprechpartnerDialog versorger={cur} ap={apDialog.ap} offen={apDialog.offen} onOffen={(o) => setApDialog((d) => ({ ...d, offen: o }))} /> : null}
           </Karte>
         ) : null}

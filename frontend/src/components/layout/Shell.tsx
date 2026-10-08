@@ -119,16 +119,16 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
               <span className="hidden hd:inline-flex ml-auto gedaempft" aria-hidden="true"><Icon name="hoch" groesse={14} /></span>
             </BaseMenu.Trigger>
             <BaseMenu.Portal>
-              <BaseMenu.Positioner side="top" align="start" sideOffset={6} className="z-50">
-                <BaseMenu.Popup className="card min-w-[220px] p-1 flex flex-col outline-none" data-testid="benutzermenue-liste">
+              {/* so breit wie der Knopf, bündig darüber; Einträge wie im Hauptmenü (Wunsch 08.10.2026) */}
+              <BaseMenu.Positioner side="top" align="start" sideOffset={4} className="z-50">
+                <BaseMenu.Popup className="card benutzermenue-liste p-1 flex flex-col gap-0.5 outline-none" data-testid="benutzermenue-liste">
                   {[
                     { text: "Hilfe", icon: "hilfe", tun: () => navigate("/hilfe") },
                     { text: "Mein Konto", icon: "konto", tun: () => navigate("/konto") },
                     { text: "Abmelden", icon: "abmelden", tun: () => void abmelden() },
                   ].map((e) => (
-                    <BaseMenu.Item key={e.text} onClick={e.tun}
-                      className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm cursor-pointer outline-none data-[highlighted]:bg-fein">
-                      <Icon name={e.icon} />{e.text}
+                    <BaseMenu.Item key={e.text} onClick={e.tun} className="nav cursor-pointer outline-none data-[highlighted]:bg-fein data-[highlighted]:text-tinte">
+                      <Icon name={e.icon} groesse={18} />{e.text}
                     </BaseMenu.Item>
                   ))}
                 </BaseMenu.Popup>
