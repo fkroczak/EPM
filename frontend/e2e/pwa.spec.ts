@@ -1,9 +1,23 @@
 /** EPM als App (PWA, Festlegung 08.10.2026, F135): Manifest, Symbole, Service Worker ohne Patientendaten im
  *  Zwischenspeicher, „Keine Verbindung“ ohne Netz, Karte „EPM als App“ unter Mein Konto. */
+import { execSync } from "node:child_process";
 import { expect, test } from "@playwright/test";
-import { zustand } from "./hilfen";
+import { BASIS, zustand } from "./hilfen";
 
-test.use({ storageState: zustand("mitarbeiter") });
+// Service Worker gibt es nur mit gültigem Zertifikat. Der Teststand hat ein selbst signiertes; „ignoreHTTPSErrors“
+// reicht dafür nicht (SecurityError beim Anmelden des Workers), der Startschalter des Browsers schon.
+test.use({ storageState: zustand("mitarbeiter"), launchOptions: { args: ["--ignore-certificate-errors"] } });
+
+/** „Kein VPN“ nachstellen: Webserver anhalten bzw. wieder starten (setOffline wirkt nicht auf den Service Worker) */
+function webserver(an: boolean) {
+  const ordner = process.env.EPM_CI_BASIS ?? "/tmp/epm-ci";
+  execSync(`sudo docker compose -p epm-ci ${an ? "start" : "stop"} web`, { cwd: ordner, stdio: "inherit" });
+  if (!an) return;
+  for (let i = 0; i < 60; i++) {
+    try { execSync(`curl -ksf ${BASIS}/api/auth/status/ -o /dev/null`, { stdio: "ignore" }); return; } catch { execSync("sleep 1"); }
+  }
+  throw new Error("Webserver startet nicht");
+}
 
 test("Manifest und Symbole: installierbar mit Name, Startadresse, Farben und Kurzbefehlen", async ({ page }) => {
   await page.goto("/");
@@ -32,7 +46,7 @@ test("Manifest und Symbole: installierbar mit Name, Startadresse, Farben und Kur
   expect(sw.headers()["cache-control"]).toMatch(/no-cache/);
 });
 
-test("Service Worker: nur Programmdateien im Zwischenspeicher, ohne Netz „Keine Verbindung“", async ({ page, context }) => {
+test("Service Worker: nur Programmdateien im Zwischenspeicher, ohne Verbindung „Keine Verbindung“", async ({ page }) => {
   await page.goto("/patienten");
   await expect(page.getByTestId("patientenliste")).toBeVisible();
   const aktiv = await page.evaluate(async () => {
@@ -61,11 +75,14 @@ test("Service Worker: nur Programmdateien im Zwischenspeicher, ohne Netz „Kein
   expect(gespeichert.filter((p) => p.startsWith("/api/") || p.startsWith("/_geschuetzt/") || p === "/" || p.endsWith(".html") && p !== "/offline.html"))
     .toEqual([]);
 
-  await context.setOffline(true);
-  await page.goto("/patienten").catch(() => undefined);
-  await expect(page.getByRole("heading", { name: "Keine Verbindung zu EPM" })).toBeVisible();
-  await expect(page.getByText("VPN")).toBeVisible();
-  await context.setOffline(false);
+  webserver(false);
+  try {
+    await page.goto("/patienten").catch(() => undefined);
+    await expect(page.getByRole("heading", { name: "Keine Verbindung zu EPM" })).toBeVisible();
+    await expect(page.getByText("VPN").first()).toBeVisible();
+  } finally {
+    webserver(true);
+  }
   await page.getByRole("link", { name: "Erneut versuchen" }).click();
   await expect(page.getByTestId("angemeldet-als")).toBeVisible();
 });
