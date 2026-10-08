@@ -12,7 +12,8 @@ RUN /opt/venv/bin/pip install -r /tmp/requirements.txt \
 # (Administration › System und „Scans“ zeigen das an).
 FROM python:3.13-slim AS modelle
 COPY scans/modelle/ /tmp/modelle/
-RUN python /tmp/modelle/holen.py /opt/ocr-modelle || echo "WARNUNG: PP-OCR-Modelle fehlen im Image"
+RUN mkdir -p /opt/ocr-modelle \
+ && (python /tmp/modelle/holen.py /opt/ocr-modelle || echo "WARNUNG: PP-OCR-Modelle fehlen im Image")
 
 FROM python:3.13-slim
 ENV PATH="/opt/venv/bin:$PATH" \

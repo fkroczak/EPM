@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 08.10.2026 · Code-Stand: Passkey und Telefon (F130–F134); Wünsche aus der Praxis vom 06./07.10.2026 (F110–F124); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
+Stand: 09.10.2026 · Code-Stand: Scans und Texterkennung (F160–F167); Passkey und Telefon (F130–F134); Wünsche aus der Praxis vom 06./07.10.2026 (F110–F124); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
 Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026, Prüfung nach DSGVO vom 02.10.2026 (`docs/DATENSCHUTZ.md`).
@@ -2945,6 +2945,119 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   geänderten Oberfläche grün; der Browsertest steht aus (GitHub Actions startete wegen des Ausgabenlimits nicht).
 - **Status:** ABGESCHLOSSEN – Browserlauf steht aus
 
+## T · Scans und Texterkennung (Festlegung 08.10.2026)
+
+> „Ich habe teilweise handgescannte Dokumente, teilweise Bilder mit Text. Das alles nach Möglichkeit OCR erkennen lassen.“
+> – gedruckter Text, ohne externen Dienst. „Einen weiteren Menüpunkt … mit dem Namen Scans oder OCR. Hier wird dann ein
+> Scan hochgeladen und ggf. angepasst. Anschließend OCR durchgeführt. … dem Patienten zugeordnet werden oder einfach zum
+> Rauskopieren bereitgestellt. Die Textdokumente stehen bis zur eigenen Löschung oder 7 Tage bereit. Vorlage kann
+> Zeitraum erweitern.“ Präzisiert: eigener Menüpunkt in der Reihenfolge direkt nach „Datenschutz“; verlängern können
+> **beide** (Admin global, Mitarbeiter je Scan); automatische Bereinigung; „höchstbeste Erkennung für schlechte
+> Dokumente, da teilweise Patienten die Sachen einscannen“; kein Info-Blatt für Patienten; meist Arztbriefe, Diagnosen,
+> Blutwerte, BIA – „Werte automatisch beim Patienten in den entsprechenden Punkten ausfüllen“ (nach Bestätigung).
+
+### F160 Menüpunkt „Scans“
+- **Ansicht:** `/scans`, eigener Menüpunkt nach „Datenschutz“ mit Zahl der erkannten, noch nicht zugeordneten Scans
+  (Punkt, solange etwas erkannt wird). Links die Liste (Vorschaubild, Status, erkannte Art, Seiten, von wem, „gelöscht in
+  n Tagen“, Suche in Titel/Datei/Person, belegter Speicher), rechts der gewählte Scan oder die Ablage zum Hochladen
+  (Knopf, Ziehen auf die Seite, mehrere Dateien = mehrere Scans). PDF, JPG, PNG, TIFF, WEBP, HEIC; Größe wie beim
+  Dokument-Upload (`EPM_UPLOAD_MAX_MB`), bis `EPM_SCANS_MAX_SEITEN` (50) Seiten je Scan.
+- **Recht:** neues Recht „Scans bearbeiten“ (`scans_bearbeiten`), Standard Mitarbeiter, Mitarbeiter (erweitert),
+  Mediziner, Admin; Betrachter sehen den Menüpunkt nicht. Scans eines Testbenutzers sind nur mit „Testdaten sehen“
+  sichtbar und nur Testpatienten zuzuordnen.
+- **Startseite:** Hinweis „n Scans warten auf Zuordnung / laufen in 24 Stunden ab / Speicher fast voll“.
+- **Ablage:** eigener Ordner `data/scans` (Volume für Backend und OCR-Dienst), je Scan ein Ordner mit zufälligem Namen;
+  Datenbank: `scans.Scan`, `scans.ScanSeite`.
+- **Endpunkte:** `GET/POST /api/scans/`, `GET/PATCH/DELETE /api/scans/{id}/`, `GET /api/scans/stand/`,
+  `POST …/verlaengern/`, `…/erneut/`, `…/auswerten/`, `…/reihenfolge/`, `…/aufteilen/`, `…/zusammenfuehren/`,
+  `…/zuordnen/`; `GET …/pdf/`, `…/textdatei/`, `…/pruefen/?patient=`; Seiten: `GET …/seiten/{sid}/bild/?art=bild|roh|klein`,
+  `PATCH …/seiten/{sid}/`, `POST …/seiten/{sid}/bereich/`, `DELETE …/seiten/{sid}/entfernen/`.
+- **Audit-Log:** neue Art „Scan“ (hochgeladen, verlängert, gelöscht, abgelaufen, zugeordnet) – vor dem Zuordnen ohne
+  Titel (Datensparsamkeit).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F161 Seite anpassen
+- **Automatisch** je Seite: Blatt im Foto finden (Ecken), Perspektive entzerren, Drehung (Tesseract-OSD), Schräglage
+  (Projektionsprofil), Schatten/ungleichmäßiges Licht ausgleichen (Hintergrund-Division), Rauschen mindern, auf
+  Schrifthöhe skalieren, Sauvola-Binarisierung; bei gewölbten Seiten (Buchfalz, geknicktes Blatt) Glätten mit UVDoc.
+- **Von Hand** („Anpassen“, Dialog): Ecken ziehen, links/rechts drehen, Glätten, Schräglage, Schatten, Modus
+  (Automatisch, Graustufen, Schwarz-Weiß, Farbe), Kontrast, Helligkeit, Original anzeigen. „Übernehmen“ bereitet die
+  Seite neu auf und erkennt sie neu. Dazu: Seite entfernen, Reihenfolge ändern, Stapel ab einer Seite aufteilen, zwei
+  Scans zusammenführen.
+- **Bereich neu erkennen:** Rechteck aufziehen → nur dieser Ausschnitt wird mit stärkerer Vergrößerung neu gelesen.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F162 Texterkennung ohne externen Dienst
+- **OCR-Dienst:** eigener Container `ocr` (gleiches Image, `manage.py epm_ocr`), arbeitet die Warteschlange ab
+  (`select_for_update(skip_locked)`), Lebenszeichen je Auftrag, drei Versuche, Fortschritt je Seite.
+- **Zwei Verfahren, zusammengeführt:** Tesseract 5 mit dem genauesten deutschen Modell (`tessdata_best`, im Repo unter
+  `backend/scans/modelle/tesseract/`) und PP-OCRv5 (PaddleOCR, als ONNX über onnxruntime; Modelle beim Bau des Images
+  aus `huggingface.co/monkt/paddleocr-onnx`, feste Revision, geprüft gegen `modelle.json`). Stimmen beide überein, gilt
+  das Wort als sicher; weichen sie ab, wird das sicherere genommen und das Wort als **unsicher** (unter 80 %) mit der
+  anderen Lesart markiert. PDF mit Textebene: der Text wird übernommen, nicht neu gelesen.
+- **Fachwörter:** Namen und Kurznamen des Laborkatalogs und eine eigene Liste (Vorlagen › Grenzwerte) helfen Tesseract
+  beim Lesen.
+- **Ansicht:** Seitenbild mit markierten unsicheren Wörtern (abschaltbar), Text daneben (Reihen mit Tabulator getrennt,
+  lässt sich in eine Tabelle einfügen), Sicherheit in % und Zahl der unsicheren Wörter, „gelesen mit …“.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F163 Einem Patienten zuordnen
+- **Ablauf:** „Zuordnen“ → Patient (Vorschlag aus Name/Geburtsdatum im Dokument), Titel, Datum (aus dem Dokument),
+  Dokumenttyp, Notiz; Prüfung „passt das Dokument zum Patienten?“ (Name, Geburtsdatum). Gespeichert wird in **einer**
+  Transaktion: Dokument in der Akte (Herkunft „Scan“) als durchsuchbare PDF, auf Wunsch zusätzlich die unveränderte
+  Datei, dazu der erkannte Text (`patienten.DokumentText`) und die gewählten Werte (F166). Danach wird der Scan entfernt.
+- **In der Akte:** Reiter Dokumente sucht auch im erkannten Text; Kennzeichen „Text“; „Erkannter Text“ zum Lesen und
+  Kopieren (`GET /api/dokumente/{id}/text/`); Quelle „Aus ‚Scans‘ zugeordnet am … (Text erkannt)“.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F164 Text herauskopieren und herunterladen
+- „Text kopieren“ (ganzer Scan oder je Seite; ohne sicheren Kontext über ein Textfeld), „Als Text herunterladen“ (.txt),
+  „Als durchsuchbare PDF herunterladen“ (Seitenbilder mit unsichtbarem Text).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F165 Aufbewahrung und automatische Bereinigung
+- **Regeln** (Vorlagen › Grenzwerte › „Scans und Texterkennung“): nicht zugeordnete Scans löschen nach **7 Tagen**
+  (1–365), verlängern um **7 Tage** je Klick, höchstens **30 Tage** ab dem Hochladen (nicht kürzer als die Frist),
+  Speicher-Obergrenze (Standard 2000 MB) und Zahl der Scans (Standard 300); Fachwörter. Mitarbeiter verlängern je Scan
+  („verlängern“, bis zur Höchstdauer), löschen von Hand jederzeit.
+- **Bereinigung:** der OCR-Dienst räumt stündlich auf: abgelaufene Scans endgültig löschen (Datenbank und Dateien,
+  Audit-Log „abgelaufen“ mit Anzahl), verwaiste Ordner und Reste nach 24 Stunden, Scans ohne Dateien (nach einer
+  Wiederherstellung) und hängende Aufträge zurücksetzen. Abgelaufene Scans sind schon vor dem Aufräumen nicht mehr
+  sichtbar.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F166 Werte in die Akte übernehmen (nach Bestätigung)
+- **Erkannt** wird die Art (Laborbefund, BIA-Messung, Arztbrief), dazu Dokumentdatum, Abnahmedatum, Labor.
+  - **Labor:** Zeilen „Parameter – Wert – Einheit – Referenz“ gegen den Laborkatalog (Name, eingebaute Synonyme, neues
+    Feld **Suchbegriffe** je Parameter unter Vorlagen › Kataloge); Einheiten repariert (`mg/di` → mg/dl, `ng/mi` → ng/ml)
+    und in die Katalogeinheit umgerechnet (z. B. Albumin g/dl → g/l, Zink µg/dl → µg/l, Stoffmengen über die Molmasse);
+    Referenz und Kennzeichen H/L; Werte außerhalb plausibler Grenzen werden nicht vorgeschlagen.
+  - **BIA:** Phasenwinkel, Resistanz, Reaktanz, Zellmasse, ECM/BCM, Fett, Magermasse, Wasser … nach Beschriftung.
+  - **Diagnosen:** ICD-10-Codes nur im Zusammenhang („Diagnose“, „ICD“) und Abschnitte wie „Diagnosen“, „Beurteilung“.
+- **Prüfansicht** im Zuordnen-Dialog: jede Zeile mit Häkchen, editierbar, ein Klick zeigt die Stelle im Bild; unsichere
+  Werte sind **nicht** vorgewählt („Erkennung unsicher – bitte mit dem Original vergleichen“). Gespeichert wird nur,
+  was angehakt ist: Laborbefund mit Werten (Beurteilung als Text), BIA-Messung (Gewicht auf Wunsch in den Verlauf),
+  Diagnosen in die strukturierte Liste, Abschnitte als Anhang an Diagnose/Therapie/Empfehlung.
+- **Rechte beim Zuordnen:** zusätzlich „Kontakte, Gewichte, Termine, Dokumente erfassen“; Diagnosen und Texte zusätzlich
+  „Patienten anlegen, Diagnose, Therapie, Stammdaten ändern“ (Admins wie überall nur bei Testpatienten).
+  Knopf nennt, was übernommen wird („In die Akte legen + 6 Laborwerte“).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F167 Texterkennung unter Administration › System
+- Karte „Texterkennung“: bereitstehende Verfahren (Tesseract, Modell, PP-OCRv5 ja/nein), Lebenszeichen des OCR-Dienstes,
+  Warteschlange, Speicher; `epm_info` liefert dasselbe. Fehlen die PP-OCR-Modelle im Image, arbeitet die Erkennung mit
+  Tesseract allein und sagt das hier und in „Scans“.
+- **Betrieb:** Compose-Dienst `ocr` mit Speichergrenze und Healthcheck; `data/scans` legt `04-projekt.sh` an; beim
+  Wiederherstellen hält der Systemagent auch `ocr` an. **Scan-Dateien sind nicht in der Sicherung** (laufen ohnehin
+  nach Tagen ab); zugeordnete Dokumente sind es.
+- **Teststatus (für F160–F167):** `scans/tests.py` (24 Tests gegen PostgreSQL mit echter Erkennung: Foto mit
+  Perspektive/Schatten/Drehung, Laborwerte und Umrechnung, BIA, Verlängern bis Höchstdauer, Bereinigung, Zuordnen in
+  einer Transaktion, Rechte, Testdaten) – lokal grün; volle Backend-Suite lokal. Browsertest `e2e/scans.spec.ts`
+  (Foto hochladen → erkennen → kopieren → zuordnen mit Laborwerten → Suche im Text der Akte; Anpassen, Verlängern,
+  Löschen; Betrachter ohne Menüpunkt) – Ablauf lokal im Browser durchgespielt, **CI-Lauf steht aus** (GitHub Actions
+  läuft derzeit nicht: Abrechnung).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -3039,11 +3152,19 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U63 | Soll das **Freigeben eines Plans** (am Telefon wie am PC) zusätzlich mit Passkey bzw. Code bestätigt werden? Heute genügt die Anmeldung, wie bisher beschlossen | F36, F132 | unverändert: ohne zusätzliche Bestätigung |
 | U64 | ~~Gewichte zusammenfassen: Fenster ab dem ersten Eintrag oder je Kalendertag?~~ **Geklärt 09.10.2026:** Fenster ab dem ersten Eintrag, Standard 2 × 24 Stunden; im Werkzeug einstellbar | F159 | – |
 
+| U65 | Sollen auch Dokumente, die **direkt in der Akte** hochgeladen werden, und die **Dokumente aus dem Altsystem** automatisch erkannt (durchsuchbar) werden? | F163, F65 | nein – nur was über „Scans“ kommt |
+| U66 | **BIA-Geräte:** Welches Gerät bzw. welcher Ausdruck (Hersteller, Layout)? Beispielausdrucke würden die Erkennung gezielt verbessern | F166 | allgemeine Erkennung nach Beschriftung |
+| U67 | Der Bau des Images lädt die PP-OCRv5-Modelle von `huggingface.co`. Darf der Bau-Rechner (Test-VM/Proxy) das, oder sollen die Modelle (≈ 90 MB) ins Repo bzw. auf einen eigenen Spiegel? | F162 | ohne Zugang entsteht das Image trotzdem, Erkennung dann nur mit Tesseract (System zeigt es) |
+| U68 | Scan-Dateien sind **nicht in der Sicherung** (die Datenbankzeilen schon; nach einer Wiederherstellung werden Scans ohne Dateien entfernt) | F165, F61 | so umgesetzt |
+| U69 | Startseite: eigene **Kachel** „Scans“ oder Hinweis in der Hinweisliste? | F160 | Hinweis |
+| U70 | Gilt eine geänderte **Aufbewahrungsfrist** auch für bereits hochgeladene Scans? | F165 | nein – nur für neue; vorhandene behalten ihr Datum (verlängern geht bis zur neuen Höchstdauer) |
+| U71 | Laborwerte mit Text („< 0,1“, „negativ“) aus Scans übernehmen? | F166, U47 | nicht vorgeschlagen; nur Zahlen |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 09.10.2026 | Scans und Texterkennung | Neuer Menüpunkt „Scans“: Hochladen, Seite anpassen, Erkennung ohne externen Dienst (Tesseract best + PP-OCRv5, OCR-Dienst), Text kopieren, Zuordnen mit Übernahme von Labor/BIA/Diagnosen, Aufbewahrung 7/7/30 Tage mit Bereinigung (F160–F167). Lauf steht aus |
 | 09.10.2026 | Design eigener Menüpunkt | Design (/design) und Mein Konto (/konto) getrennt, beide im Benutzermenü (F158). Lauf steht aus |
 | 08.10.2026 | Rest der Vorschläge | Stift an „Versorgung“, Messpunkt bearbeiten, „Neues Dokument“ (F157). Damit ist „EPM intuitiver – Vorschläge“ vollständig umgesetzt. Lauf steht aus |
 | 08.10.2026 | Versorger/Ärzte, Kalender | Neuer Aufbau nach den Entwürfen für PC, Tablet und Telefon: Liste + Eintrag zum Lesen, Kalender mit einer Werkzeugzeile, „Anzeigen ▾“ und Reitern (F156). Lauf steht aus |
