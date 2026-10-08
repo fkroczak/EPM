@@ -18,6 +18,7 @@ import { Dialog, Menue } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
+import { GewichtDialog, KontaktDialog } from "@/components/Schnellerfassung";
 import type { Aktenansicht } from "@/lib/darstellung";
 import { useMobil } from "@/lib/stufen";
 import { Kopfgriff, Leistengriff, useDarstellung } from "./ansicht";
@@ -368,7 +369,7 @@ export function Akte() {
   const pid = Number(id);
   const { darf, darfBei } = useAuth();
   const navigate = useNavigate();
-  const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "pdf" | "sprechstunde">("");
+  const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "kontakt" | "gewicht" | "pdf" | "sprechstunde">("");
   const akte = useQuery({ queryKey: ["patient", pid], queryFn: () => api<Patient>(`patienten/${pid}/`), enabled: !!pid });
   const p = akte.data;
   const qc = useQueryClient();
@@ -425,6 +426,8 @@ export function Akte() {
     abschluss: offenBei("akten_abschliessen"),
     oeffnen: !!p && p.ist_abgeschlossen && darf("akten_wieder_oeffnen"),
     termin: offenBei("eintraege_erfassen"),
+    kontakt: offenBei("eintraege_erfassen"),
+    gewicht: offenBei("eintraege_erfassen"),
   };
   useOhneRechtSchliessen(erlaubt[dialog], () => setDialog(""));
   // Verarbeitung eingeschränkt (auch wenn es während der Arbeit geschieht oder die Einsicht abläuft): Was vorher
@@ -494,8 +497,9 @@ export function Akte() {
   const aktionen = (klein: boolean) => (
     <div className={cx("flex items-center flex-wrap", klein ? "gap-1.5" : "gap-2")} data-testid="aktenaktionen">
       {kontext.erfassen ? <>
-        <Knopf klein={klein} icon="sprechblase" onClick={() => navigate(`${basis}/kontakte`, { state: { neu: Date.now() } })}>Kontakt</Knopf>
-        <Knopf klein={klein} icon="waage" onClick={() => navigate(basis, { state: { gewicht: Date.now() } })}>Gewicht</Knopf>
+        {/* Kontakt und Gewicht als Dialog wie „Termin“ (Wunsch 08.10.2026) – die Seite bleibt, wo sie ist */}
+        <Knopf klein={klein} icon="sprechblase" onClick={() => setDialog("kontakt")}>Kontakt</Knopf>
+        <Knopf klein={klein} icon="waage" onClick={() => setDialog("gewicht")}>Gewicht</Knopf>
         <Knopf klein={klein} icon="kalender" onClick={() => setDialog("termin")}>Termin</Knopf>
       </> : null}
       {kontext.planen ? <Knopf klein={klein} icon="tropfen" onClick={() => navigate(`${basis}/plaene/neu`)}>Neuer Plan</Knopf> : null}
@@ -635,6 +639,10 @@ export function Akte() {
         titel={`Unterlagen für die Sprechstunde · ${name(p)}`}
         pfad={`patienten/${p.id}/sprechstunde/`} dateiname={`Sprechstunde-${p.nummer}.pdf`} />
       {kontext.erfassen ? <TerminDialog offen={dialog === "termin"} onOffen={(o) => setDialog(o ? "termin" : "")} patientId={p.id} patientName={name(p)} /> : null}
+      {kontext.erfassen ? <KontaktDialog offen={dialog === "kontakt"} onOffen={(o) => setDialog(o ? "kontakt" : "")}
+        vorgabe={{ id: p.id, name: name(p), ist_test: p.ist_test }} /> : null}
+      {kontext.erfassen ? <GewichtDialog offen={dialog === "gewicht"} onOffen={(o) => setDialog(o ? "gewicht" : "")}
+        vorgabe={{ id: p.id, name: name(p), ist_test: p.ist_test }} /> : null}
     </>
   );
   const pfad = [{ text: "Patienten", zu: "/patienten" }, { text: name(p) }];
