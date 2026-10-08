@@ -52,9 +52,13 @@ test("Gewicht erfassen, Plausibilität, korrigieren, Zeitraum", async ({ page })
   const karte = page.getByTestId("gewichtskarte");
   await expect(karte.getByTestId("aktuelles-gewicht")).toHaveText("61,0 kg");
 
-  // Schnellaktion „Gewicht“ setzt den Fokus ins Eingabefeld
+  // Schnellaktion „Gewicht“ öffnet den Dialog wie „Termin“ (Wunsch 08.10.2026) – Patient ist vorgegeben
   await page.getByTestId("aktenkopf").getByRole("button", { name: "Gewicht" }).click();
-  await expect(karte.getByLabel("Neues Gewicht")).toBeFocused();
+  const gd = page.getByRole("dialog");
+  await expect(gd.getByRole("heading", { name: "Gewicht erfassen" })).toBeVisible();
+  await expect(gd).toContainText(p.name);
+  await gd.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
   // Backend weist unplausible Werte ab
   await karte.getByLabel("Neues Gewicht").fill("400");
@@ -163,7 +167,12 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
 test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) => {
   const p = await neuerPatient();
   await oeffnen(page, p.id);
+  // Schnellaktion „Kontakt“ öffnet den Dialog wie „Termin“ (Wunsch 08.10.2026)
   await page.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt" }).click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Kontakt erfassen" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toContainText(p.name);
+  await page.getByRole("dialog").getByRole("button", { name: "Abbrechen" }).click();
+  await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: /^Kontakte/ }).click();
   await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}/kontakte$`));
   // Erfassen im Dialog, Liste links, gewählter Kontakt rechts (F122)
   const erfassen = async (text: string, mitTermin = false) => {

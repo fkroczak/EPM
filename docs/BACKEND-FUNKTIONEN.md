@@ -186,6 +186,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F146 | Einheitlich und kompakt: Seitenkopf in einer Zeile, gleiche Steuerhöhen, kleinere Innenabstände, kein Springen; Suche bei Versorger | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 | F147 | Ohne Scrollen auf 1080p: Formulare Versorger/Ärzte im 6-Spalten-Raster, Kalender füllt die Fensterhöhe, Benutzermenü bündig | Versorger, Ärzte, Kalender, Seitenleiste | ABGESCHLOSSEN (Lauf steht aus) |
 | F148 | Navigation: schmale Leiste mit gleich großen, mittigen Symbolen; Leiste mit Text 224 px; Hauptknöpfe gleich breit; leere Bereiche kompakt | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
+| F149 | Akte: „Kontakt“ und „Gewicht“ öffnen einen Dialog wie „Termin“ | 4 Akte | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2736,6 +2737,18 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   12 statt 24 px Abstand.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F149 Kontakt und Gewicht als Dialog in der Akte
+- **Wunsch 08.10.2026:** „Warum kann im Patienten selbst Kontakt und Gewicht als Button nicht ähnlich sein wie die
+  Erfassung von Terminen? Fühlt sich intuitiver an.“
+- **Ansicht:** Die Knöpfe „Kontakt“ und „Gewicht“ im Aktenkopf (alle drei Aktenansichten) öffnen jetzt dieselben
+  Dialoge wie die Schnellerfassung der Startseite – mit diesem Patienten vorgegeben: „Kontakt erfassen“ (Text, Art,
+  auf Wunsch mit Gewicht und Wiedervorlage, Kasten „Aus der Akte“) und „Gewicht erfassen“ (Wert, Quelle, Datum, Vergleich).
+  Vorher sprang „Kontakt“ in den Reiter Kontakte und „Gewicht“ zur Gewichtskarte der Übersicht. Die Seite bleibt jetzt,
+  wo sie ist; nach dem Speichern sind Kopf, Listen und Startseite aktuell. Die Kürzelzeile der Karteikarte (F136) bleibt
+  wie sie ist.
+- **Teststatus:** `akte.spec.ts` (Dialoge öffnen mit vorgegebenem Patienten).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2834,6 +2847,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Kontakt/Gewicht als Dialog | Akte: „Kontakt“ und „Gewicht“ öffnen Dialoge wie „Termin“ (F149). Lauf steht aus |
 | 08.10.2026 | Navigation | Gleich große, mittige Symbole in der schmalen Leiste, Leiste mit Text 224 px, gleich breite Hauptknöpfe, kompakte Leerzustände (F148). Entwürfe für Versorger/Ärzte und Kalender (PC, Tablet, Telefon) zur Abstimmung. Lauf steht aus |
 | 08.10.2026 | Ohne Scrollen auf 1080p | Versorger/Ärzte-Formular im 6-Spalten-Raster, engere Felder, Kalender in Fensterhöhe, Benutzermenü bündig (F147). Lauf steht aus |
 | 08.10.2026 | Einheitlich und kompakt | Seitenkopf einzeilig auf allen Seiten, gleiche Steuerhöhen (Umschalter = Knöpfe), Dichte „Normal“ 32 px, Karten mit 16/12 px Innenabstand, Scrollbalken-Platz reserviert gegen Springen; Suche bei Versorger (F146). Lauf steht aus |
