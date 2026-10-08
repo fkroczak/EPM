@@ -255,7 +255,7 @@ function Monat({ von, bezug, heute, tage, feiertage, gewaehlt, onTag, onWahl, on
               const wochenende = tag(d).getUTCDay() % 6 === 0;
               return (
                 <td key={d} data-testid={`tag-${d}`} onClick={() => onTag(d)}
-                  className={cx("align-top border border-rand p-1 h-[118px] cursor-pointer group",
+                  className={cx("kalender-zelle align-top border border-rand p-1 cursor-pointer group overflow-hidden",
                     fremd && "bg-grund/60", (wochenende || feiertag) && !fremd && "bg-fein/40", d === gewaehlt && "outline-2 outline-akzent -outline-offset-2")}>
                   <div className="flex items-center gap-1 mb-0.5 min-w-0">
                     <span className={cx("num text-[0.8125rem] w-6 h-6 inline-flex items-center justify-center rounded-full shrink-0",
@@ -297,7 +297,7 @@ function Woche({ von, heute, tage, feiertage, onWahl, onNeu }: {
         const eintraege = tage.get(d) ?? [];
         return (
           <section key={d} data-testid={`tag-${d}`} aria-label={langerTag(d)}
-            className={cx("flex flex-col gap-1.5 min-w-0 rounded-lg border border-rand p-2 min-h-[320px]", d === heute ? "bg-akzent-weich/40" : "bg-flaeche")}>
+            className={cx("flex flex-col gap-1 min-w-0 rounded-lg border border-rand p-1.5 min-h-[240px]", d === heute ? "bg-akzent-weich/40" : "bg-flaeche")}>
             <div className="flex items-center gap-1.5">
               <span className={cx("font-semibold text-sm", d === heute && "text-akzent-text")}>{WOCHENTAGE[(tag(d).getUTCDay() + 6) % 7]} {kurz(d)}</span>
               {onNeu ? <button type="button" aria-label={`Termin am ${datum(d)} anlegen`} title="Termin anlegen" className="ml-auto btn geist icon !h-6 !w-6"
@@ -320,7 +320,7 @@ function Liste({ tage, feiertage, heute, onWahl }: {
   return (
     <div className="flex flex-col" data-testid="kalender-liste">
       {tage.map(([d, eintraege]) => (
-        <section key={d} data-testid={`tag-${d}`} className="grid grid-cols-[200px_minmax(0,1fr)] gap-4 py-3 border-b border-rand last:border-b-0">
+        <section key={d} data-testid={`tag-${d}`} className="grid grid-cols-[200px_minmax(0,1fr)] gap-3 py-2 border-b border-rand last:border-b-0">
           <div className="flex flex-col">
             <span className={cx("font-semibold text-sm", d === heute && "text-akzent-text")}>{langerTag(d)}</span>
             {feiertage.get(d) ? <span className="text-xs text-fehler">{feiertage.get(d)}</span> : null}
@@ -471,7 +471,7 @@ export function Kalender() {
       {/* Stufen (S16, Entwurf 2): bis 1919 px Kalender mit Seitenspalte wie bisher, ab 1920 px Monat ¾ | Tagesliste ¼ */}
       <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] hd:grid-cols-[minmax(0,1fr)_360px] fhd:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] gap-5 items-start"
         data-testid="kalender-stufe">
-        <Karte className="p-3 min-w-0">
+        <Karte className="p-2 min-w-0">
           {!daten.data ? <Laden /> : ansicht === "monat" ? (
             <Monat von={z.von} bezug={bezug} heute={heute} tage={tage} feiertage={feiertage} gewaehlt={gewaehlt}
               onTag={setGewaehlt} onWahl={setEintrag} onNeu={neuAm} />

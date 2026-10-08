@@ -32,12 +32,13 @@ function ZugeordnetePatienten({ arzt }: { arzt: Arzt }) {
     queryFn: () => api<PatientZeile[]>(`aerzte/${arzt.id}/patienten/`),
   });
   return (
-    <div className="flex flex-col gap-2.5 border-t border-rand pt-3.5">
+    <div className="flex flex-col gap-1.5 border-t border-rand pt-2.5">
       <h3 className="lbl m-0">Patienten in Betreuung</h3>
       {patienten.isLoading ? <Laden /> : (patienten.data ?? []).length ? (
-        <ul className="m-0 p-0 list-none flex flex-col" data-testid="arzt-patienten">
+        // zweispaltig und eng: viele Patienten passen ohne Scrollen (Wunsch 08.10.2026)
+        <ul className="m-0 p-0 list-none grid grid-cols-1 sm:grid-cols-2 gap-x-6 max-h-[13.5rem] overflow-y-auto" data-testid="arzt-patienten">
           {patienten.data!.map((p) => (
-            <li key={p.id} className="py-1.5 border-b border-rand last:border-b-0 text-sm flex gap-3">
+            <li key={p.id} className="py-1 border-b border-rand text-sm flex items-center gap-2.5 min-w-0">
               <span className="num gedaempft">{nummer(p.nummer)}</span>
               <Link to={`/patienten/${p.id}`}>{p.nachname}, {p.vorname}</Link>
               {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
@@ -48,6 +49,8 @@ function ZugeordnetePatienten({ arzt }: { arzt: Arzt }) {
     </div>
   );
 }
+
+const SPALTEN: Record<number, string> = { 1: "col-span-1", 2: "col-span-2", 3: "col-span-3", 4: "col-span-4", 6: "col-span-6" };
 
 export function Aerzte() {
   const [params, setParams] = useSearchParams();
@@ -98,11 +101,12 @@ export function Aerzte() {
   const fehler: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   const geaendert = FELDER.some((k) => f[k] !== formularVon(cur)[k]);
 
-  const feld = (k: (typeof FELDER)[number], label: string, extra?: { num?: boolean; span?: boolean; typ?: string; hinweis?: string }) => !pflegen ? (
-    <Anzeige label={label} className={extra?.span ? "col-span-2" : undefined}>{f[k]}</Anzeige>
+  // 6-spaltiges Raster (Wunsch 08.10.2026: auf einem 1080p-Bildschirm ohne Scrollen): Angabe ``spalten`` von 6
+  const feld = (k: (typeof FELDER)[number], label: string, extra?: { num?: boolean; spalten?: number; typ?: string; platzhalter?: string }) => !pflegen ? (
+    <Anzeige label={label} className={SPALTEN[extra?.spalten ?? 3]}>{f[k]}</Anzeige>
   ) : (
-    <Feld label={label} className={extra?.span ? "col-span-2" : undefined} fehler={fehler[k]} pflicht={k === "name"} hinweis={extra?.hinweis}>
-      {(p) => <Eingabe {...p} className={extra?.num ? "num" : undefined} type={extra?.typ} value={f[k]}
+    <Feld label={label} className={SPALTEN[extra?.spalten ?? 3]} fehler={fehler[k]} pflicht={k === "name"}>
+      {(p) => <Eingabe {...p} className={extra?.num ? "num" : undefined} type={extra?.typ} value={f[k]} placeholder={extra?.platzhalter}
         onChange={(e) => setF({ ...f, [k]: e.target.value })} />}
     </Feld>
   );
@@ -157,23 +161,21 @@ export function Aerzte() {
                 <h2 className="m-0 text-lg font-semibold">{cur ? cur.name : "Neuer Arzt"}</h2>
                 {cur ? <span className="text-[0.8125rem] gedaempft"><span className="num">{zahl(cur.patienten_anzahl)}</span> Patienten in Betreuung</span> : null}
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                {feld("name", "Name", { span: true, hinweis: "mit Titel, z. B. „Dr. med. Anna Hausmann“" })}
+              <div className="formular grid grid-cols-6">
+                {feld("name", "Name", { spalten: 6, platzhalter: "mit Titel, z. B. „Dr. med. Anna Hausmann“" })}
                 {feld("praxis", "Praxis / Klinik")}
                 {feld("fachrichtung", "Fachrichtung")}
                 {feld("strasse", "Straße")}
-                <div className="grid grid-cols-[90px_1fr] gap-3">
-                  {feld("plz", "PLZ", { num: true })}
-                  {feld("ort", "Ort")}
-                </div>
-                {feld("telefon", "Telefon", { num: true })}
-                {feld("fax", "Fax", { num: true })}
-                {feld("email", "E-Mail", { span: true, typ: "email" })}
+                {feld("plz", "PLZ", { num: true, spalten: 1 })}
+                {feld("ort", "Ort", { spalten: 2 })}
+                {feld("telefon", "Telefon", { num: true, spalten: 2 })}
+                {feld("fax", "Fax", { num: true, spalten: 2 })}
+                {feld("email", "E-Mail", { spalten: 2, typ: "email" })}
                 {pflegen ? (
-                  <Feld label="Notiz" className="col-span-2" fehler={fehler.notiz}>
+                  <Feld label="Notiz" className="col-span-6" fehler={fehler.notiz}>
                     {(p) => <Textfeld {...p} rows={2} value={f.notiz} onChange={(e) => setF({ ...f, notiz: e.target.value })} />}
                   </Feld>
-                ) : <Anzeige label="Notiz" className="col-span-2" mehrzeilig>{f.notiz}</Anzeige>}
+                ) : <Anzeige label="Notiz" className="col-span-6" mehrzeilig>{f.notiz}</Anzeige>}
               </div>
               {speichern.error && !Object.keys(fehler).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
               {pflegen ? (
@@ -186,12 +188,8 @@ export function Aerzte() {
               ) : null}
             </form>
             {cur ? <ZugeordnetePatienten arzt={cur} /> : null}
-            <div className="meldung info flex gap-2.5 items-start text-[0.8125rem] leading-normal">
-              <Icon name="info" />
-              <span>Ärzte werden nie gelöscht, nur deaktiviert. Ein deaktivierter Arzt ist bei neuen Zuordnungen nicht mehr
-                wählbar, bleibt aber in allen Akten sichtbar.</span>
-            </div>
-            <span className="text-xs gedaempft">Änderungen werden mit Person und Zeitpunkt protokolliert.</span>
+            <span className="text-xs gedaempft leading-snug">Ärzte werden nie gelöscht, nur deaktiviert – ein deaktivierter Arzt ist bei
+              neuen Zuordnungen nicht mehr wählbar, bleibt aber in allen Akten sichtbar. Änderungen werden mit Person und Zeitpunkt protokolliert.</span>
           </Karte>
         ) : null}
       </div>

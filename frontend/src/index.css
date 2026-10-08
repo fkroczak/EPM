@@ -259,7 +259,7 @@ body {
   .reiter a:hover { color: var(--tinte); }
   .reiter a.aktiv { color: var(--akzent-text); border-bottom-color: var(--akzent); font-weight: 500; }
 
-  .feld { display: flex; flex-direction: column; gap: 6px; font-size: 0.84375rem; font-weight: 500; }
+  .feld { display: flex; flex-direction: column; gap: 3px; font-size: 0.8125rem; font-weight: 500; }
   .feld > .hinweis { font-weight: 400; font-size: 0.8125rem; color: var(--gedaempft); }
   .feld > .fehlertext { font-weight: 400; font-size: 0.8125rem; color: var(--fehler); }
 
@@ -547,6 +547,7 @@ main.seite-inhalt { padding: 0.75rem 1rem !important; gap: var(--abstand) !impor
   background: transparent; cursor: pointer; color: inherit; font: inherit;
 }
 .benutzerknopf:hover, .benutzerknopf[data-popup-open] { background: var(--fein); }
+.benutzermenue-liste { width: var(--anchor-width); min-width: 12rem; box-sizing: border-box; }
 
 /* Griffe ohne Punkte (Wunsch 08.10.2026): Teiler und Ränder zeigen erst beim Überfahren, dass sie sich ziehen lassen –
    die Linie wird breiter und färbt sich in der Akzentfarbe, der Mauszeiger wechselt. Der Hinweis beim Ziehen bleibt. */
@@ -631,3 +632,11 @@ html { scrollbar-gutter: stable; }
 @media (max-width: 47.99rem) {
   .card:is(.px-5, .px-6, .px-\[22px\], .px-\[18px\], .sm\:px-\[22px\]) { padding-left: 0.75rem; padding-right: 0.75rem; }
 }
+
+/* Formulare im Raster (Versorger, Ärzte; Wunsch 08.10.2026): enge Zeilen, damit alles ohne Scrollen auf 1080p passt */
+.formular { column-gap: 0.625rem; row-gap: 0.5rem; }
+.formular textarea.inp { min-height: 3.25rem; }
+@media (max-width: 47.99rem) { .formular { grid-template-columns: minmax(0, 1fr) !important; } .formular > * { grid-column: 1 / -1 !important; } }
+
+/* Kalender (Wunsch 08.10.2026: ohne Scrollen auf 1080p): sechs Wochen füllen genau die Fensterhöhe */
+.kalender-zelle { height: max(5.25rem, calc((100vh - 15.5rem) / 6)); }

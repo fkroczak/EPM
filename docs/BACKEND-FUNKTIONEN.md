@@ -184,6 +184,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F144 | Rückmeldungen als Overlay: grün quittiert und blendet aus, rot bleibt länger | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 | F145 | Weniger Leerraum: Rand des Seiteninhalts und Abstände zwischen den Karten verkleinert | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 | F146 | Einheitlich und kompakt: Seitenkopf in einer Zeile, gleiche Steuerhöhen, kleinere Innenabstände, kein Springen; Suche bei Versorger | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
+| F147 | Ohne Scrollen auf 1080p: Formulare Versorger/Ärzte im 6-Spalten-Raster, Kalender füllt die Fensterhöhe, Benutzermenü bündig | Versorger, Ärzte, Kalender, Seitenleiste | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2711,6 +2712,19 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
 - **Teststatus:** `versorger.spec.ts` „Versorger suchen …“.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F147 Ohne Scrollen auf 1080p
+- **Wunsch 08.10.2026:** „Man muss teilweise scrollen, um alles sehen zu können … auf einem 1080p-Monitor nicht müsste.“
+  „Bitte überall verdichten. Bei Kalender muss ich auch scrollen.“ „Die Ausrichtung bzw. Größe des Menüs ist komisch.“
+- **Versorger und Ärzte:** Detailformular im 6-Spalten-Raster – Firma/Name über die ganze Breite; Praxis | Fachrichtung;
+  Straße | PLZ | Ort in einer Zeile; Telefon | Fax | E-Mail in einer Zeile; Notiz zweizeilig. Felder allgemein enger
+  (Beschriftung 3 px über dem Feld statt 6 px, Zeilenabstand 8 px). Hinweistexte unten in einer kleinen Zeile statt drei
+  Absätzen; der Namenshinweis „mit Titel …“ steht als Platzhalter im Feld. Ansprechpartner-Zeilen enger; „Patienten in
+  Betreuung“ beim Arzt zweispaltig, ab 12 Zeilen scrollt nur die Liste. Am Telefon einspaltig.
+- **Kalender:** Die sechs Wochen des Monats füllen genau die Fensterhöhe (mindestens 84 px je Tag), Woche und Liste enger.
+- **Benutzermenü unten links:** so breit wie der Knopf und bündig darüber, Einträge wie im Hauptmenü (gleiche Höhe,
+  Symbole, Schrift).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2809,6 +2823,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Ohne Scrollen auf 1080p | Versorger/Ärzte-Formular im 6-Spalten-Raster, engere Felder, Kalender in Fensterhöhe, Benutzermenü bündig (F147). Lauf steht aus |
 | 08.10.2026 | Einheitlich und kompakt | Seitenkopf einzeilig auf allen Seiten, gleiche Steuerhöhen (Umschalter = Knöpfe), Dichte „Normal“ 32 px, Karten mit 16/12 px Innenabstand, Scrollbalken-Platz reserviert gegen Springen; Suche bei Versorger (F146). Lauf steht aus |
 | 08.10.2026 | Form entfernt, weniger Leerraum | Form „Rund/Eckig“ samt Menüpunkt entfernt (F139); gespeicherte Werte werden verworfen. Stattdessen für alle weniger Rand und kleinere Abstände zwischen den Karten (F145). Dabei aufgefallen: Das Feld `form` war im Backend nie angekommen – „Eckig“ hätte sich auf der Test-VM nicht speichern lassen; mit dem Entfernen erledigt |
 | 08.10.2026 | Behebung nach `epm-update` | Frontend baute nicht: In `RuheDialog` (F142) lieferte die Speicherfunktion je nach Ziel einen Termin oder eine Hinweisruhe – TypeScript verlangte einen Typ (`HinweisChips.tsx`, Rückgabe jetzt `Promise<unknown>`). Backend-Image samt Migration `patienten/0012` lief auf der Test-VM ohne Befund durch |
