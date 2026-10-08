@@ -39,7 +39,8 @@ export function RuheDialog({ patientId, hinweis, termin, offen, onOffen }: {
     setGrund("");
   }
   const speichern = useMutation({
-    mutationFn: () => termin
+    // Rückgabe ist je nach Ziel ein Termin oder eine Hinweisruhe – verwendet wird sie nicht
+    mutationFn: (): Promise<unknown> => termin
       ? api<Termin>(`termine/${termin.id}/ausblenden/`, {
         body: wahl === "dauerhaft" ? { dauerhaft: true, grund } : { monate: Number(wahl), grund },
       })
