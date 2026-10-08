@@ -94,7 +94,7 @@ test("Nach dem Neustart: Akten mit Gewicht, Diagnose und Versionen, Kontakten, T
   const abschluss = gemerkt("abschluss").id;
   await page.goto(`/patienten/${abschluss}`);
   await expect(page.getByTestId("stammdaten")).toContainText("0251 98765");
-  await expect(page.getByTestId("gewichtskarte").getByLabel("Neues Gewicht")).toBeVisible(); // wieder geöffnet
+  await expect(page.getByTestId("gewichtskarte").getByRole("button", { name: "Gewicht", exact: true })).toBeVisible(); // wieder geöffnet
   await page.goto(`/patienten/${abschluss}/verlauf`);
   const verlauf = page.getByTestId("verlauf");
   await expect(verlauf).toContainText("abgeschlossen");

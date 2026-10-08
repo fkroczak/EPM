@@ -130,22 +130,23 @@ test("Aktenansicht: Kopfzeile in Stufen, Seitenleiste mit Breite, Karteikarte mi
   await expect(page.getByTestId("gewichtskarte")).toBeVisible();
   await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Karteikarte" }).click();
 
-  // Kürzelzeile: „K Text“ öffnet den neuen Kontakt mit dem Text, gespeichert wird erst im Formular
+  // Kürzelzeile: „K Text“ öffnet den Dialog „Kontakt erfassen“ mit dem Text, die Karteikarte bleibt stehen
   await page.getByLabel("Kürzelzeile").fill("K Rückruf zur Kürzelzeile vereinbart");
   await page.getByLabel("Kürzelzeile").press("Enter");
-  await expect(page).toHaveURL(new RegExp(`${akte}/kontakte$`));
-  const neu = page.getByTestId("neuer-kontakt");
-  await expect(neu.getByRole("textbox", { name: "Neuer Kontakt" })).toContainText("Rückruf zur Kürzelzeile vereinbart");
-  await neu.getByRole("button", { name: "Kontakt speichern" }).click();
-  await expect(page.getByTestId("kontaktliste")).toContainText("Rückruf zur Kürzelzeile vereinbart");
-  await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Karteikarte" }).click();
+  const neu = page.getByRole("dialog");
+  await expect(neu.getByRole("heading", { name: "Kontakt erfassen" })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`${akte}/kartei$`));
+  await expect(neu.getByRole("textbox", { name: "Notiz" })).toContainText("Rückruf zur Kürzelzeile vereinbart");
+  await neu.getByRole("button", { name: "Speichern", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(kartei.locator('[data-testid="karteieintrag"][data-art="K"]')).toHaveCount(2);
-  // „G 61,2“ öffnet das Gewicht mit dem Wert; unbekannte Kürzel melden sich
+  // „G 61,2“ öffnet „Gewicht erfassen“ mit dem Wert; unbekannte Kürzel melden sich
   await page.getByLabel("Kürzelzeile").fill("G 61,2");
   await page.getByLabel("Kürzelzeile").press("Enter");
-  await expect(page).toHaveURL(new RegExp(`${akte}$`));
-  await expect(page.getByTestId("gewichtskarte").getByLabel("Neues Gewicht")).toHaveValue("61,2");
-  await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Karteikarte" }).click();
+  const gd = page.getByRole("dialog");
+  await expect(gd.getByRole("heading", { name: "Gewicht erfassen" })).toBeVisible();
+  await expect(gd.getByLabel("Gewicht", { exact: true })).toHaveValue("61,2");
+  await gd.getByRole("button", { name: "Abbrechen" }).click();
   await page.getByLabel("Kürzelzeile").fill("X etwas");
   await page.getByLabel("Kürzelzeile").press("Enter");
   await expect(page.getByTestId("kuerzelzeile").getByRole("alert")).toContainText("Unbekanntes Kürzel „X“");

@@ -46,6 +46,19 @@ class Kontaktstufen(Grundlage):
         self.assertEqual(sorted(eintrag.details["felder"]), ["kontakt_bald_monate", "kontakt_ueberfaellig_monate"])
 
 
+    def test_wiedervorlage_tage_standard_14_und_einstellbar(self):
+        """Wunsch 08.10.2026: Wiedervorlage beim Kontakt standardmäßig in 14 Tagen, einstellbar (1–365)."""
+        self.assertEqual(Einstellungen.aktuell().wiedervorlage_tage, 14)
+        c = client_fuer(self.mitarbeiter)
+        self.assertEqual(c.get("/api/einstellungen/").json()["wiedervorlage_tage"], 14)
+        for falsch in (0, 400):
+            r = c.patch("/api/einstellungen/", {"wiedervorlage_tage": falsch}, format="json")
+            self.assertEqual(r.status_code, 400, r.content)
+            self.assertIn("wiedervorlage_tage", r.json())
+        r = c.patch("/api/einstellungen/", {"wiedervorlage_tage": 21}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(Einstellungen.aktuell().wiedervorlage_tage, 21)
+
 class Startseite(Grundlage):
     @classmethod
     def setUpTestData(cls):

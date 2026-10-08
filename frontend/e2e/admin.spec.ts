@@ -286,7 +286,7 @@ test("Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten", async
   await expect(kopf.getByText("nur lesen")).toHaveCount(0);
   await expect(kopf.getByRole("button", { name: "Kontakt" })).toHaveCount(0);
   await expect(kopf.getByRole("button", { name: "Neuer Plan" })).toHaveCount(0);
-  await expect(page.getByTestId("gewichtskarte").getByLabel("Neues Gewicht")).toHaveCount(0);
+  await expect(page.getByTestId("gewichtskarte").getByRole("button", { name: "Gewicht" })).toHaveCount(0);
   await page.getByRole("button", { name: "Weitere Aktionen" }).click();
   await expect(page.getByRole("menuitem", { name: "Stammdaten bearbeiten" })).toHaveCount(0);
   // Ausnahme (Fehlerliste 02.10.2026, 6.3): Akten abschließen dürfen Admins auch bei echten Patienten
@@ -317,11 +317,10 @@ test("Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten", async
   const id = Number(page.url().split("/").pop());
   await expect(kopf.getByText("Testpatient")).toBeVisible();
   await kopf.getByRole("button", { name: "Kontakt" }).click();
-  await page.getByRole("button", { name: "Neuer Kontakt" }).click();
-  const neu = page.getByTestId("neuer-kontakt");
-  await neu.getByRole("textbox", { name: "Neuer Kontakt" }).fill("Testkontakt der Administration");
-  await neu.getByRole("button", { name: "Kontakt speichern" }).click();
-  await expect(page.getByText("Kontakt gespeichert.")).toBeVisible();
+  const neu = page.getByRole("dialog");
+  await neu.getByRole("textbox", { name: "Notiz" }).fill("Testkontakt der Administration");
+  await neu.getByRole("button", { name: "Speichern", exact: true }).click();
+  await expect(page.getByText(/^Kontakt für .* gespeichert\.$/)).toBeVisible();
   const p = await admin.get(`patienten/${id}/`);
   expect([p.ist_test, p.nummer >= 9001]).toEqual([true, true]);
   expect((await admin.get(`kontakte/?patient=${id}`)).results).toHaveLength(1);

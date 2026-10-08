@@ -280,6 +280,8 @@ class EinstellungenSerializer(serializers.ModelSerializer):
                                                 getattr(e, "kontakt_ueberfaellig_monate", None)))
         if fehler:
             raise serializers.ValidationError(fehler)
+        if "wiedervorlage_tage" in attrs and not 1 <= attrs["wiedervorlage_tage"] <= 365:
+            raise serializers.ValidationError({"wiedervorlage_tage": "Bitte 1 bis 365 Tage angeben."})
         # Datenschutz: Fristen und die Erklärungen, die vorliegen sollen
         if "aufbewahrung_jahre" in attrs and not 1 <= attrs["aufbewahrung_jahre"] <= 100:
             raise serializers.ValidationError({"aufbewahrung_jahre": "Bitte 1 bis 100 Jahre angeben."})
