@@ -2745,7 +2745,8 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   auf Wunsch mit Gewicht und Wiedervorlage, Kasten „Aus der Akte“) und „Gewicht erfassen“ (Wert, Quelle, Datum, Vergleich).
   Vorher sprang „Kontakt“ in den Reiter Kontakte und „Gewicht“ zur Gewichtskarte der Übersicht. Die Seite bleibt jetzt,
   wo sie ist; nach dem Speichern sind Kopf, Listen und Startseite aktuell. Die Kürzelzeile der Karteikarte (F136) bleibt
-  wie sie ist.
+  wie sie ist. Ebenso öffnet „+ Kontakt“ auf der Karte „Letzte Kontakte“ der Übersicht diesen Dialog – vorher sprang der
+  Link in den Reiter Kontakte, ohne den Dialog zu öffnen (Fehler seit F122).
 - **Teststatus:** `akte.spec.ts` (Dialoge öffnen mit vorgegebenem Patienten).
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
