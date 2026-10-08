@@ -8,6 +8,13 @@ Ablauf beim ersten Login:
   4. POST /api/auth/2fa/bestaetigen   ersten Code eingeben → Notfall-Codes (einmalig angezeigt)
 Danach bei jeder Anmeldung: 1. und POST /api/auth/2fa mit dem aktuellen Code.
 
+Passkey statt Code (Festlegung 08.10.2026, accounts/passkey.py):
+  POST /api/auth/passkey/optionen/      {"zweck": "anmelden"|"bestaetigen"|"registrieren"} → Optionen für den Browser
+  POST /api/auth/passkey/               Antwort des Browsers → Anmeldung abgeschlossen (wie POST /api/auth/2fa)
+  POST /api/auth/passkey/registrieren/  {"antwort", "name"} → Passkey gespeichert (erster zweiter Faktor: Notfall-Codes)
+  GET  /api/auth/passkeys/              eigene Passkeys; PATCH /api/auth/passkeys/<id>/ {"name"} umbenennen;
+  POST /api/auth/passkeys/<id>/entfernen/ mit Kennwort und zweitem Faktor
+
 Der zweite Faktor ist freiwillig (Festlegung 02.10.2026, ``Anmelderegeln``): Ohne Pflicht entfallen 3. und 4.; wer
 die Authenticator-App trotzdem einrichtet (Mein Konto), meldet sich danach immer mit Code an und kann sie dort mit
 POST /api/auth/2fa/ausschalten wieder ausschalten. Die Administration kann die Pflicht für Admins oder für alle setzen
@@ -41,9 +48,14 @@ from epm.api_basis import sichtbare_benutzer, wahr
 
 from .models import Anmelderegeln, Rolle, Sitzung, User
 from .sitzungen import aktive_sitzungen, alle_sitzungen_beenden, schluessel_erneuert, sitzung_beenden
-from .permissions import Angemeldet, BenutzerRecht, ist_verifiziert, zweiter_faktor_erfuellt
+from .permissions import Angemeldet, BenutzerRecht, ist_verifiziert, voll_angemeldet, zweiter_faktor_erfuellt
 from .rechte import schreibt_nur_testpatienten
-from .zweifaktor import code_gueltig, hat_zweiten_faktor, pflicht as zweiter_faktor_pflicht
+from . import passkey as passkeys
+from .models import Passkey
+from .zweifaktor import (
+    faktoren_loeschen, fehlertext as faktor_fehlertext, hat_authenticator, hat_passkey, hat_zweiten_faktor,
+    passkey_gesendet, pflicht as zweiter_faktor_pflicht, zweiter_faktor_bestaetigt,
+)
 
 ANZAHL_NOTFALLCODES = 10
 # S08: Hinweis auf der Startseite, sobald nur noch so viele Notfall-Codes übrig sind (abgeleitet: bei 3 von 10 bleibt
@@ -134,6 +146,9 @@ def ich_daten(user):
         # zweiter Faktor: eingerichtet? Pflicht? (Bestätigungen verlangen ihn immer – ohne ihn keine Bestätigung)
         "zweiter_faktor": hat_zweiten_faktor(user),
         "zweiter_faktor_pflicht": zweiter_faktor_pflicht(user),
+        # womit bestätigt werden kann (Festlegung 08.10.2026): Code aus der App und/oder Passkey
+        "authenticator": hat_authenticator(user),
+        "passkey": hat_passkey(user),
         "rechte": user.rechte,
         # Admins: Patientendaten nur bei Testpatienten schreiben (Oberfläche blendet Knöpfe bei echten Akten aus)
         "schreibt_nur_testpatienten": schreibt_nur_testpatienten(user),
@@ -157,7 +172,12 @@ def organisation():
 
 
 def status_antwort(request, **extra):
-    daten = {"schritt": naechster_schritt(request), "organisation": organisation(), **extra}
+    daten = {"schritt": naechster_schritt(request), "organisation": organisation(),
+             # Passkeys möglich? (nur über den eingerichteten Namen, nicht über eine IP-Adresse)
+             "passkey": passkeys.verfuegbar(), **extra}
+    if daten["schritt"] == "2fa":
+        # womit sich die Person im zweiten Schritt anmelden kann
+        daten["faktoren"] = {"authenticator": hat_authenticator(request.user), "passkey": hat_passkey(request.user)}
     if daten["schritt"] == "fertig":
         daten["benutzer"] = ich_daten(request.user)
     return Response(daten)
@@ -329,8 +349,8 @@ def neue_notfallcodes(user) -> list[str]:
 
 
 class ZweiterFaktorAusschaltenView(APIView):
-    """Eigenen zweiten Faktor ausschalten (nur solange er freiwillig ist): mit Kennwort und einem gültigen Code.
-    Authenticator und Notfall-Codes werden gelöscht; die Anmeldung braucht danach nur noch das Kennwort."""
+    """Eigenen zweiten Faktor ausschalten (nur solange er freiwillig ist): mit Kennwort und einem gültigen Code oder
+    Passkey. Authenticator, Passkeys und Notfall-Codes werden gelöscht; die Anmeldung braucht danach nur noch das Kennwort."""
 
     permission_classes = [Angemeldet]
 
@@ -346,14 +366,14 @@ class ZweiterFaktorAusschaltenView(APIView):
                           was="Zweiten Faktor ausschalten")
             return bestaetigung_fehlgeschlagen(request, "2fa_aus_kennwort") or Response(
                 {"kennwort": "Das Passwort stimmt nicht."}, status=status.HTTP_400_BAD_REQUEST)
-        if not code_gueltig(user, request.data.get("code", "")):
+        if not zweiter_faktor_bestaetigt(request):
             protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request, schritt="bestaetigung",
                           was="Zweiten Faktor ausschalten")
             return bestaetigung_fehlgeschlagen(request, "2fa_aus_code") or Response(
-                {"code": "Der Code ist ungültig oder wurde schon verwendet."}, status=status.HTTP_400_BAD_REQUEST)
+                {"code": faktor_fehlertext(request, "Der Code ist ungültig oder wurde schon verwendet.")},
+                status=status.HTTP_400_BAD_REQUEST)
         bestaetigung_gelungen(request)
-        TOTPDevice.objects.filter(user=user).delete()
-        StaticDevice.objects.filter(user=user).delete()
+        faktoren_loeschen(user)
         protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_ZURUECKGESETZT, request, objekt=user.username, selbst=True)
         return Response(ich_daten(user))
 
@@ -362,6 +382,157 @@ class AbmeldenView(OffenerView):
     def post(self, request):
         logout(request)
         return Response({"schritt": "anmelden"})
+
+
+# ---------------------------------------------------------------- Passkeys (Festlegung 08.10.2026)
+def _darf_einrichten(user) -> bool:
+    """Wie beim Authenticator: angemeldet, eigenes Kennwort gesetzt; wer schon einen zweiten Faktor hat, muss ihn in
+    dieser Sitzung bestätigt haben."""
+    return bool(user.is_authenticated and not user.muss_kennwort_aendern
+                and (not hat_zweiten_faktor(user) or ist_verifiziert(user)))
+
+
+class PasskeyOptionenView(OffenerView):
+    """Schritt 1 für jeden Passkey-Vorgang: Optionen für ``navigator.credentials.create`` bzw. ``.get``."""
+
+    def post(self, request):
+        user = request.user
+        zweck = str(request.data.get("zweck", ""))
+        if not user.is_authenticated:
+            return fehler("Bitte zuerst mit Kennwort anmelden.", status.HTTP_401_UNAUTHORIZED)
+        if zweck == "registrieren" and not _darf_einrichten(user):
+            return fehler("Erst vollständig anmelden.", status.HTTP_403_FORBIDDEN)
+        if zweck == "anmelden" and user.muss_kennwort_aendern:
+            return fehler("Erst ein eigenes Kennwort setzen.", status.HTTP_403_FORBIDDEN)
+        if zweck == "bestaetigen" and not voll_angemeldet(user):
+            return fehler(Angemeldet.message, status.HTTP_403_FORBIDDEN)
+        try:
+            return Response(passkeys.optionen(request, zweck))
+        except passkeys.PasskeyFehler as e:
+            return fehler(str(e))
+
+
+class PasskeyAnmeldenView(OffenerView):
+    """Zweiter Schritt der Anmeldung mit Passkey statt Code (wie POST /api/auth/2fa)."""
+
+    def post(self, request):
+        user = request.user
+        if not user.is_authenticated:
+            return fehler("Bitte zuerst mit Kennwort anmelden.", status.HTTP_401_UNAUTHORIZED)
+        antwort = request.data.get("antwort")
+        if not isinstance(antwort, dict):
+            return fehler("Antwort des Passkeys fehlt.")
+        try:
+            geraet = passkeys.pruefen(request, antwort, "anmelden")
+        except passkeys.PasskeyFehler as e:
+            return fehler(str(e))
+        if geraet is not None:
+            otp_login(request, geraet)
+            if user.fehlversuche:
+                user.fehlversuche = 0
+                user.save(update_fields=["fehlversuche"])
+            protokolliere(SystemEreignis.Art.ANMELDUNG, request, schritt="passkey", passkey=geraet.name)
+            return status_antwort(request)
+        protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request, versuch=user.fehlversuche + 1,
+                      passkey=True)
+        if fehlversuch(user, request, "passkey"):
+            logout(request)
+            return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
+        return fehler("Der Passkey wurde nicht erkannt.", status.HTTP_401_UNAUTHORIZED)
+
+
+class PasskeyRegistrierenView(OffenerView):
+    """Passkey einrichten – bei der ersten Anmeldung (statt der Authenticator-App) oder unter Mein Konto. Ist es der
+    erste zweite Faktor, gilt die Sitzung damit als bestätigt und es gibt Notfall-Codes (wie beim Authenticator)."""
+
+    def post(self, request):
+        user = request.user
+        if not _darf_einrichten(user):
+            return fehler("Erst vollständig anmelden.", status.HTTP_403_FORBIDDEN)
+        antwort = request.data.get("antwort")
+        if not isinstance(antwort, dict):
+            return fehler("Antwort des Passkeys fehlt.")
+        erster = not hat_zweiten_faktor(user)
+        try:
+            geraet = passkeys.registrieren(request, antwort, str(request.data.get("name", "")))
+        except passkeys.PasskeyFehler as e:
+            protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request, schritt="einrichten", passkey=True)
+            return fehler(str(e))
+        if not ist_verifiziert(user):
+            otp_login(request, geraet)
+        extra = {}
+        if erster and not StaticDevice.objects.filter(user=user, confirmed=True).exists():
+            extra["notfallcodes"] = neue_notfallcodes(user)
+        protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_EINGERICHTET, request, passkey=geraet.name)
+        return status_antwort(request, passkey_neu=passkeys.daten(geraet), **extra)
+
+
+class PasskeysView(APIView):
+    permission_classes = [Angemeldet]
+
+    def get(self, request):
+        return Response([passkeys.daten(p) for p in Passkey.objects.filter(user=request.user, confirmed=True)])
+
+
+class PasskeyView(APIView):
+    """Eigenen Passkey umbenennen."""
+
+    permission_classes = [Angemeldet]
+
+    def patch(self, request, pk):
+        geraet = Passkey.objects.filter(user=request.user, pk=pk).first()
+        if geraet is None:
+            return fehler("Nicht gefunden.", status.HTTP_404_NOT_FOUND)
+        name = str(request.data.get("name", "")).strip()
+        if not name:
+            return Response({"name": "Bitte einen Namen angeben."}, status=status.HTTP_400_BAD_REQUEST)
+        geraet.name = name[:64]
+        geraet.save(update_fields=["name"])
+        return Response(passkeys.daten(geraet))
+
+
+class PasskeyEntfernenView(APIView):
+    """Eigenen Passkey entfernen – mit Kennwort und zweitem Faktor (Code oder ein Passkey, auch dieser). Der letzte
+    zweite Faktor lässt sich nur entfernen, solange er freiwillig ist; dann gehen auch die Notfall-Codes."""
+
+    permission_classes = [Angemeldet]
+
+    def post(self, request, pk):
+        user = request.user
+        geraet = Passkey.objects.filter(user=user, pk=pk).first()
+        if geraet is None:
+            return fehler("Nicht gefunden.", status.HTTP_404_NOT_FOUND)
+        letzter = not hat_authenticator(user) and not Passkey.objects.filter(user=user, confirmed=True).exclude(pk=pk).exists()
+        if letzter and zweiter_faktor_pflicht(user):
+            return fehler("Der zweite Faktor ist für dieses Konto Pflicht. Bitte zuerst die Authenticator-App oder einen "
+                          "weiteren Passkey einrichten.", status.HTTP_403_FORBIDDEN)
+        if not user.check_password(str(request.data.get("kennwort", ""))):
+            protokolliere(SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request, grund="bestaetigung",
+                          was="Passkey entfernen")
+            return bestaetigung_fehlgeschlagen(request, "passkey_aus_kennwort") or Response(
+                {"kennwort": "Das Passwort stimmt nicht."}, status=status.HTTP_400_BAD_REQUEST)
+        if not zweiter_faktor_bestaetigt(request):
+            protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request, schritt="bestaetigung",
+                          was="Passkey entfernen", **({"passkey": True} if passkey_gesendet(request) else {}))
+            return bestaetigung_fehlgeschlagen(request, "passkey_aus_code") or Response(
+                {"code": faktor_fehlertext(request, "Der Code ist ungültig oder wurde schon verwendet.")},
+                status=status.HTTP_400_BAD_REQUEST)
+        bestaetigung_gelungen(request)
+        name = geraet.name
+        sitzung_damit = getattr(getattr(user, "otp_device", None), "persistent_id", None) == geraet.persistent_id
+        geraet.delete()
+        if letzter:
+            StaticDevice.objects.filter(user=user).delete()
+        elif sitzung_damit:
+            # Mit diesem Passkey war die Sitzung bestätigt: Ohne Ersatz gälte sie nicht mehr als angemeldet. Den zweiten
+            # Faktor hat die Person gerade eben bestätigt – die Sitzung läuft mit einem verbliebenen Gerät weiter.
+            ersatz = (TOTPDevice.objects.filter(user=user, confirmed=True).first()
+                      or Passkey.objects.filter(user=user, confirmed=True).first())
+            if ersatz is not None:
+                otp_login(request, ersatz)
+        protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_ZURUECKGESETZT, request, objekt=user.username, selbst=True,
+                      passkey=name, letzter=letzter)
+        return Response(ich_daten(user))
 
 
 AKZENTE = ["nachtblau", "petrol", "blau", "gruen", "orange", "aubergine", "schiefer", "eigen"]
@@ -629,6 +800,9 @@ class SicherheitView(APIView):
             "notfallcodes_gesamt": ANZAHL_NOTFALLCODES,
             # freiwillig (Festlegung 02.10.2026): ohne Pflicht lässt sich der zweite Faktor ausschalten
             "zweiter_faktor_pflicht": zweiter_faktor_pflicht(user),
+            # Passkeys (Festlegung 08.10.2026)
+            "passkeys": [passkeys.daten(p) for p in Passkey.objects.filter(user=user, confirmed=True)],
+            "passkey": passkeys.verfuegbar(),
         })
 
 
@@ -933,8 +1107,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user.muss_kennwort_aendern = True
         user.einmal_kennwort_gueltig_bis = None
         user.save()
-        TOTPDevice.objects.filter(user=user).delete()
-        StaticDevice.objects.filter(user=user).delete()
+        faktoren_loeschen(user)
         alle_sitzungen_beenden(user)
         protokolliere(SystemEreignis.Art.BENUTZER_GEAENDERT, request, objekt=user.username, ohne_login=True,
                       rolle_vorher=vorher)
@@ -975,7 +1148,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
 
     @action(detail=True, methods=["post"], url_path="2fa-zuruecksetzen")
     def zweiten_faktor_zuruecksetzen(self, request, pk=None):
-        """Telefon verloren: Authenticator und Notfall-Codes löschen.
+        """Telefon verloren: Authenticator, Passkeys und Notfall-Codes löschen.
 
         Zusätzlich gibt es ein neues Einmal-Kennwort: Nur wer das Zugangsblatt vom Admin
         erhält, kann den neuen Authenticator einrichten – das bisherige Kennwort allein reicht nicht.
@@ -983,8 +1156,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user = self.get_object()
         if user.nur_historisch:
             return fehler("Historische Benutzer haben keinen Zugang.")
-        TOTPDevice.objects.filter(user=user).delete()
-        StaticDevice.objects.filter(user=user).delete()
+        faktoren_loeschen(user)
         kennwort = user.neues_einmal_kennwort()
         user.save(update_fields=User.EINMAL_FELDER)
         alle_sitzungen_beenden(user)

@@ -8,7 +8,7 @@ import type { Seite as ApiSeite } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useAuswahl, useVersorgerListe } from "@/lib/daten";
 import { datum, heuteIso, kg, nummer, prozent, relativ, terminZeit, zahl } from "@/lib/format";
-import { ab, useStufe } from "@/lib/stufen";
+import { ab, useMobil, useStufe } from "@/lib/stufen";
 import { ABSCHLUSSANLAESSE, ERKLAERUNGEN_KURZ, TERMINARTEN } from "@/lib/typen";
 import type { Kontakt, Patient, PatientZeile, Trend } from "@/lib/typen";
 import { Spalten } from "@/components/ui/spalten";
@@ -194,6 +194,7 @@ export function Patienten() {
   const seite = Math.max(1, Number(params.get("seite") ?? "1") || 1);
   const [suche, setSuche] = useState(params.get("suche") ?? "");
   const stufe = useStufe();
+  const mobil = useMobil();
   const [vorschau, setVorschau] = useState<number | null>(null);
 
   // Grundlage ist immer die aktuelle Adresse, nicht der Stand beim letzten Rendern: Der Router übernimmt eine neue
@@ -339,6 +340,41 @@ export function Patienten() {
     </Karte>
   );
 
+  // Telefon (Festlegung 08.10.2026): Karten statt Tabelle – Name, Nummer, Geburtsdatum, letzter Kontakt, Termin, Hinweise
+  const karten = (
+    <div className="flex flex-col gap-2" key="karten">
+      {liste.isLoading ? <Laden /> : (
+        <div role="list" aria-label={archiv ? "Abgeschlossene Akten" : "Patienten"} className="flex flex-col gap-2" data-testid="patientenliste">
+          {(daten?.results ?? []).map((p) => (
+            <div key={p.id} role="listitem" className="card flex flex-col">
+              <Link to={`/patienten/${p.id}`} className="px-3.5 pt-3 pb-2 flex flex-col gap-0.5 no-underline text-tinte rounded-[12px]">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="font-medium truncate">{p.nachname}, {p.vorname}</span>
+                  <span className="num text-xs gedaempft shrink-0">Nr. {nummer(p.nummer)}</span>
+                </span>
+                <span className="text-[0.8125rem] gedaempft">
+                  <span className="num">{datum(p.geburtsdatum)}</span> ({p.alter})
+                  {archiv ? <> · abgeschlossen <span className="num">{datum(p.abgeschlossen_am)}</span></>
+                    : <> · Kontakt {relativ(p.kennzahlen?.letzter_kontakt)}{p.kennzahlen?.gewicht ? <> · <span className="num">{kg(p.kennzahlen.gewicht.kg)}</span><TrendPfeil trend={p.kennzahlen?.trend ?? null} /></> : null}</>}
+                </span>
+              </Link>
+              {!archiv ? (
+                <div className="px-3.5 pb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[0.8125rem]">
+                  {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
+                  {p.kennzahlen?.naechster_termin ? <NaechsterTermin p={p} /> : null}
+                  <Hinweise p={p} />
+                </div>
+              ) : <span className="pb-1" />}
+            </div>
+          ))}
+        </div>
+      )}
+      {daten && daten.count === 0 ? (
+        <Leer>{gefiltert ? "Keine Patienten passen zu diesen Filtern." : archiv ? "Noch keine abgeschlossenen Akten." : "Noch keine Patienten angelegt."}</Leer>
+      ) : null}
+    </div>
+  );
+
   const umschalter = (
     <Segmente label="Ansicht" wert={archiv ? "abgeschlossen" : "in_betreuung"}
       onWahl={(w) => {
@@ -371,29 +407,29 @@ export function Patienten() {
       )}
 
       <div className="flex items-center gap-2.5 flex-wrap">
-        <label className="relative w-[280px] block">
+        <label className="relative w-full sm:w-[280px] block">
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
           <input className="inp pl-[34px]" type="search" aria-label="Liste filtern" placeholder="Liste filtern"
             value={suche} onChange={(e) => setSuche(e.target.value)} />
         </label>
-        <Auswahl aria-label="Versorger" className="w-[190px]" value={versorgerId}
+        <Auswahl aria-label="Versorger" className="w-[calc(50%-0.35rem)] sm:w-[190px]" value={versorgerId}
           onChange={(e) => setze({ versorger: e.target.value || null, ansprechpartner: null })}>
           <option value="">Alle Versorger</option>
           {(versorger.data ?? []).map((v) => <option key={v.id} value={v.id}>{v.name}{v.aktiv ? "" : " (inaktiv)"}</option>)}
         </Auswahl>
-        <Auswahl aria-label="Ansprechpartner" className="w-[210px]" value={apId}
+        <Auswahl aria-label="Ansprechpartner" className="w-[calc(50%-0.35rem)] sm:w-[210px]" value={apId}
           onChange={(e) => setze({ ansprechpartner: e.target.value || null })}>
           <option value="">Alle Ansprechpartner</option>
           {ansprechpartner.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.versorger_name})</option>)}
         </Auswahl>
-        <Auswahl aria-label="Katheter" className="w-[160px]" value={katheterId}
+        <Auswahl aria-label="Katheter" className="w-[calc(50%-0.35rem)] sm:w-[160px]" value={katheterId}
           onChange={(e) => setze({ katheter: e.target.value || null })}>
           <option value="">Alle Katheter</option>
           {(katheter.data ?? []).map((k) => <option key={k.id} value={k.id}>{k.wert}</option>)}
         </Auswahl>
         {!archiv ? (
           <>
-            <span className="w-px h-6 bg-rand" aria-hidden="true" />
+            <span className="w-px h-6 bg-rand max-sm:hidden" aria-hidden="true" />
             {SCHNELLFILTER.map((f) => (
               <button key={f.wert} type="button" aria-pressed={schnell === f.wert}
                 className={cx("chip h-[30px] cursor-pointer border", schnell === f.wert ? "akzent border-akzent" : "border-rand bg-flaeche text-text2")}
@@ -421,7 +457,7 @@ export function Patienten() {
       {vorschauSpalte ? (
         <Spalten seite="patientenliste" stufe="qhd" standard={[2 / 3]} namen={["Patientenliste", "Vorschau der Akte"]} testid="patienten-stufe"
           spalten={[tabelle, <AktenVorschau key="vorschau" id={vorschau} />]} />
-      ) : tabelle}
+      ) : mobil ? karten : tabelle}
 
       <div className="flex justify-between items-center gap-4 text-[0.8125rem] gedaempft flex-wrap">
         <span>

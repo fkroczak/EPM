@@ -56,6 +56,46 @@ Pause meldet EPM von selbst ab.</p>""",
 Zugangsblatt aus.</p>""",
     },
     {
+        "id": "passkey", "gruppe": "erste_schritte", "titel": "Passkey statt Code (PC und Telefon)", "rechte": [],
+        "seiten": [],
+        "html": """
+<p>Ein <strong>Passkey</strong> ersetzt den Code aus der Authenticator-App: Nach dem Passwort bestätigt man die
+Anmeldung mit Fingerabdruck, Gesicht oder der PIN des Geräts (Windows Hello, iPhone, Android, Passwortmanager). Er gilt
+auch für alle Bestätigungen mit zweitem Faktor (endgültig löschen, Wiederherstellen, Updates, Import …). Der Code aus
+der App und die Notfall-Codes bleiben daneben gültig.</p>
+<p><strong>Einrichten:</strong> Mein Konto › Anmeldung und Sicherheit › <strong>Passkey hinzufügen</strong>, Namen
+vergeben (z. B. „iPhone“), bestätigen. Am besten auf PC <em>und</em> Telefon je einen anlegen. Wer noch keinen
+zweiten Faktor hatte, bekommt dabei Notfall-Codes.</p>
+<p><strong>Voraussetzung:</strong> EPM über den Namen aufrufen (z. B. <code>https://epm.stiftung.lan/</code>), nicht über
+die IP-Adresse, und das Stammzertifikat der Stiftung einmal auf dem Gerät installieren:
+<a href="/epm-ca.crt">Stammzertifikat herunterladen</a>.</p>
+<ul>
+<li><strong>Windows:</strong> Datei öffnen › Zertifikat installieren › Lokaler Computer › „Vertrauenswürdige
+Stammzertifizierungsstellen“.</li>
+<li><strong>iPhone/iPad:</strong> Datei laden › Einstellungen › Allgemein › VPN und Geräteverwaltung › Profil
+installieren; danach Einstellungen › Allgemein › Info › Zertifikatsvertrauenseinstellungen › EPM-CA einschalten.</li>
+<li><strong>Android:</strong> Einstellungen › Sicherheit › Weitere Einstellungen › Verschlüsselung und Anmeldedaten ›
+Zertifikat installieren › CA-Zertifikat.</li>
+</ul>
+<p>Gerät verloren? Den Passkey unter Mein Konto entfernen (von einem anderen Gerät aus) oder die Administration setzt
+den zweiten Faktor zurück.</p>""",
+    },
+    {
+        "id": "telefon", "gruppe": "erste_schritte", "titel": "EPM am Telefon", "rechte": [], "seiten": [],
+        "html": """
+<p>Der Arbeitsplatz für EPM ist der PC. Am Telefon (im VPN) geht das Wichtigste unterwegs:</p>
+<ul>
+<li><strong>Pläne freigeben:</strong> unten <strong>Pläne</strong> zeigt die Entwürfe zur Freigabe; Plan öffnen, prüfen
+(Ansicht wie PDF, Vergleich mit dem Vorgänger) und <strong>Freigeben</strong>.</li>
+<li><strong>Kurz nachsehen:</strong> Suche oben (Lupe) oder <strong>Patienten</strong>; der Aktenkopf zeigt Gewicht,
+Plan, Versorger und den nächsten Termin, die Reiter lassen sich seitlich wischen.</li>
+<li><strong>Notiz erfassen:</strong> <strong>＋ Notiz</strong> in der Leiste unten öffnet die Schnellerfassung – in einer
+offenen Akte gleich für diesen Patienten.</li>
+<li>Alles Übrige steht unter <strong>Menü</strong>.</li>
+</ul>
+<p>Anmelden am Telefon am einfachsten mit einem Passkey (siehe „Passkey statt Code“).</p>""",
+    },
+    {
         "id": "konto", "gruppe": "erste_schritte", "titel": "Mein Konto: Darstellung, Kennwort, Anmeldungen", "rechte": [],
         "seiten": ["/konto"],
         "html": """
@@ -64,7 +104,7 @@ und dunkel), Akzentfarbe, Hintergrund, Dichte, Schriftgröße und Schriftstärke
 an dem man sich anmeldet.</p>
 <ul>
 <li><strong>Kennwort ändern</strong>: altes Kennwort, dann zweimal das neue.</li>
-<li><strong>Zwei-Faktor-Anmeldung</strong>: einrichten, neues Gerät, Notfall-Codes; solange freiwillig auch ausschalten.</li>
+<li><strong>Zwei-Faktor-Anmeldung</strong>: Authenticator-App oder Passkey einrichten, neues Gerät, Notfall-Codes; solange freiwillig auch ausschalten.</li>
 <li><strong>Anmeldungen</strong>: zeigt, wo man gerade angemeldet ist; fremde Anmeldungen lassen sich einzeln beenden.</li>
 <li><strong>Startseite anpassen</strong> führt zur Startseite im Bearbeitungsmodus.</li>
 </ul>""",

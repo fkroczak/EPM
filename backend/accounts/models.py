@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 from django.utils import timezone
+from django_otp.models import Device
 from simple_history.models import HistoricalRecords
 
 
@@ -241,3 +242,29 @@ class Anmelderegeln(models.Model):
     @classmethod
     def aktuell(cls):
         return cls.objects.get_or_create(pk=1)[0]
+
+
+class Passkey(Device):
+    """Passkey (WebAuthn) als zweiter Faktor – gleichwertig zur Authenticator-App (Festlegung 08.10.2026).
+
+    Ein django-otp-Gerät: Nach der Prüfung meldet ``django_otp.login`` die Sitzung damit an, ``is_verified()`` gilt
+    wie beim Authenticator. Codes gibt es keine (``verify_token`` bleibt False). Gespeichert wird nur der öffentliche
+    Schlüssel; der private bleibt im Gerät (Telefon, Windows Hello, Sicherheitsschlüssel) bzw. im Passwortmanager."""
+
+    credential_id = models.CharField("Kennung", max_length=1400, unique=True)  # Base64URL
+    public_key = models.BinaryField("Öffentlicher Schlüssel")
+    sign_count = models.PositiveBigIntegerField("Zähler", default=0)
+    transports = models.JSONField("Verbindungen", default=list, blank=True)
+    aaguid = models.CharField("Gerätetyp (AAGUID)", max_length=36, blank=True)
+    synchronisiert = models.BooleanField("Synchronisiert", default=False,
+                                         help_text="Passkey liegt in einem Passwortmanager und kann auf mehreren Geräten sein.")
+    angelegt_am = models.DateTimeField("Angelegt am", auto_now_add=True)
+    zuletzt_am = models.DateTimeField("Zuletzt verwendet", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Passkey"
+        verbose_name_plural = "Passkeys"
+        ordering = ["angelegt_am"]
+
+    def verify_token(self, token):
+        return False

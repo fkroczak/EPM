@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { abfrage, api } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { datum, heuteIso, nummer, uhrzeit, zeitpunkt } from "@/lib/format";
-import { ab, useStufe } from "@/lib/stufen";
+import { ab, useMobil, useStufe } from "@/lib/stufen";
 import { TERMINARTEN } from "@/lib/typen";
 import type { Termin } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
@@ -352,7 +352,10 @@ function Gekuerzt({ eintraege, heute, onWahl }: { eintraege: Eintrag[]; heute: s
 export function Kalender() {
   const { darf } = useAuth();
   const [params, setParams] = useSearchParams();
-  const ansicht = (["monat", "woche", "liste"].includes(params.get("ansicht") ?? "") ? params.get("ansicht") : "monat") as Ansicht;
+  // am Telefon (Festlegung 08.10.2026) ist die Liste Standard – das Monatsraster ist dort zu eng zum Lesen
+  const mobil = useMobil();
+  const ansicht = (["monat", "woche", "liste"].includes(params.get("ansicht") ?? "") ? params.get("ansicht")
+    : mobil ? "liste" : "monat") as Ansicht;
   const bezug = /^\d{4}-\d{2}-\d{2}$/.test(params.get("datum") ?? "") ? params.get("datum")! : heuteIso();
   const setze = (werte: Record<string, string>) => setParams((p) => {
     const n = new URLSearchParams(p);

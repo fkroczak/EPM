@@ -26,6 +26,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { PdfDialog } from "@/components/PdfDialog";
+import { useZweiterFaktor } from "@/components/ZweiterFaktor";
+import type { ZweiterFaktorWert } from "@/components/ZweiterFaktor";
 import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
 
 // ---------------------------------------------------------------- Typen (GET /api/backup/)
@@ -122,27 +124,25 @@ function Wert({ label, children }: { label: ReactNode; children: ReactNode }) {
 
 /** Admin-Passwort und Code (Authenticator oder Notfall-Code) – für Aktionen mit Bestätigung „2fa“. Wer keine
  *  Zwei-Faktor-Anmeldung eingerichtet hat, kann nicht bestätigen und richtet sie zuerst ein (Festlegung 03.10.2026). */
-function Bestaetigung({ kennwort, code, onKennwort, onCode, fehler }: { kennwort: string; code: string;
-  onKennwort: (s: string) => void; onCode: (s: string) => void; fehler: Feldfehler }) {
+function Bestaetigung({ kennwort, zf, onKennwort, fehler }: { kennwort: string; zf: ZweiterFaktorWert;
+  onKennwort: (s: string) => void; fehler: Feldfehler }) {
   return (
     <>
       <ZweiFaktorFehlt />
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
         <Feld label="Ihr Passwort" fehler={fehler.kennwort} pflicht>
           {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => onKennwort(e.target.value)} />}
         </Feld>
-        <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={fehler.code} pflicht>
-          {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(e) => onCode(e.target.value)} />}
-        </Feld>
+        {zf.feld(fehler.code)}
       </div>
     </>
   );
 }
 
 /** Ist die Bestätigung vollständig ausgefüllt? */
-function useBestaetigt(kennwort: string, code: string) {
+function useBestaetigt(kennwort: string, zf: ZweiterFaktorWert) {
   const ich = useIch();
-  return ich.zweiter_faktor && !!kennwort && !!code;
+  return ich.zweiter_faktor && !!kennwort && zf.bereit;
 }
 
 function useAuftrag(pfad: string, onFertig?: (a: Auftrag) => void) {
@@ -180,17 +180,17 @@ function PasswortDialog({ offen, daten, onZu }: { offen: boolean; daten: Daten; 
   const [passwort2, setPasswort2] = useState("");
   const [zeigen, setZeigen] = useState(false);
   const [kennwort, setKennwort] = useState("");
-  const [code, setCode] = useState("");
+  const zf = useZweiterFaktor();
   const [kennung, setKennung] = useState<string | null>(null);
   const [blatt, setBlatt] = useState(false);
   useEffect(() => {
-    if (!offen) { setPasswort(""); setPasswort2(""); setZeigen(false); setKennwort(""); setCode(""); setKennung(null); setBlatt(false); }
+    if (!offen) { setPasswort(""); setPasswort2(""); setZeigen(false); setKennwort(""); zf.zuruecksetzen(); setKennung(null); setBlatt(false); }
   }, [offen]);
   const los = useAuftrag("backup/passwort/", (a) => setKennung(a.kennung));
   const auftrag = kennung ? daten.auftraege.find((a) => a.kennung === kennung) : undefined;
   const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
   const { min, max } = daten.passwort;
-  const bestaetigt = useBestaetigt(kennwort, code);
+  const bestaetigt = useBestaetigt(kennwort, zf);
   const vorschlag = () => { const p = passwortVorschlag(); setPasswort(p); setPasswort2(p); setZeigen(true); };
   const fertig = auftrag?.status === "erledigt";
   return (
@@ -207,7 +207,7 @@ function PasswortDialog({ offen, daten, onZu }: { offen: boolean; daten: Daten; 
           <>
             <Knopf onClick={onZu}>Abbrechen</Knopf>
             <Knopf variante="dng" laedt={los.isPending} disabled={!passwort || !passwort2 || !bestaetigt}
-              onClick={() => los.mutate({ passwort, passwort2, kennwort, code })}>Bestätigen und festlegen</Knopf>
+              onClick={() => los.mutate({ passwort, passwort2, kennwort, ...zf.body })}>Bestätigen und festlegen</Knopf>
           </>
         )}>
         {kennung ? (
@@ -224,7 +224,7 @@ function PasswortDialog({ offen, daten, onZu }: { offen: boolean; daten: Daten; 
             ) : null}
           </div>
         ) : (
-          <form className="flex flex-col gap-3.5" onSubmit={(e) => { e.preventDefault(); los.mutate({ passwort, passwort2, kennwort, code }); }}>
+          <form className="flex flex-col gap-3.5" onSubmit={(e) => { e.preventDefault(); los.mutate({ passwort, passwort2, kennwort, ...zf.body }); }}>
             <Meldung art="info">Das Passwort liegt nur auf dem Server (nur für root lesbar), damit die nächtliche Sicherung ohne Eingabe
               läuft – und schützt die Kopien in der Nextcloud und auf der NAS. Ältere Sicherungen bleiben mit ihrem bisherigen Passwort lesbar.</Meldung>
             <div className="flex items-end gap-2">
@@ -242,7 +242,7 @@ function PasswortDialog({ offen, daten, onZu }: { offen: boolean; daten: Daten; 
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={zeigen} onChange={(e) => setZeigen(e.target.checked)} />Passwort anzeigen
             </label>
-            <Bestaetigung kennwort={kennwort} code={code} onKennwort={setKennwort} onCode={setCode} fehler={f} />
+            <Bestaetigung kennwort={kennwort} zf={zf} onKennwort={setKennwort} fehler={f} />
             {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
             <button type="submit" hidden />
           </form>
@@ -296,20 +296,20 @@ function ZielDialog({ offen, ziel, onZu }: { offen: boolean; ziel: Ziel; onZu: (
   const [w, setW] = useState({ url: "", benutzer: "", ziel_kennwort: "", ordner: "EPM-Sicherungen", von: "02:00", bis: "05:00",
     aufbewahrung_tage: "30" });
   const [kennwort, setKennwort] = useState("");
-  const [code, setCode] = useState("");
+  const zf = useZweiterFaktor();
   useEffect(() => {
     if (offen) {
       setW({ url: ziel.url ?? "", benutzer: ziel.benutzer ?? "", ziel_kennwort: "", ordner: ziel.eingerichtet ? ziel.ordner ?? "" : "EPM-Sicherungen",
         von: ziel.von ?? "02:00", bis: ziel.bis ?? "05:00", aufbewahrung_tage: String(ziel.eingerichtet ? ziel.aufbewahrung_tage ?? 30 : 30) });
-      setKennwort(""); setCode("");
+      setKennwort(""); zf.zuruecksetzen();
     }
   }, [offen, ziel]);
   const los = useAuftrag("backup/ziel/", (a) => { melden(`${a.name}: Auftrag an den Server übergeben.`); onZu(); });
   useEffect(() => { if (offen) los.reset(); }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
   const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
   const setze = (k: keyof typeof w) => (e: { target: { value: string } }) => setW({ ...w, [k]: e.target.value });
-  const absenden = () => los.mutate({ ...w, aufbewahrung_tage: Number(w.aufbewahrung_tage), kennwort, code });
-  const bestaetigt = useBestaetigt(kennwort, code);
+  const absenden = () => los.mutate({ ...w, aufbewahrung_tage: Number(w.aufbewahrung_tage), kennwort, ...zf.body });
+  const bestaetigt = useBestaetigt(kennwort, zf);
   return (
     <Dialog offen={offen} onOffen={(o) => { if (!o) onZu(); }} breite={640}
       titel={ziel.eingerichtet ? "Übertragungsziel ändern" : "Übertragungsziel festlegen"}
@@ -347,7 +347,7 @@ function ZielDialog({ offen, ziel, onZu }: { offen: boolean; ziel: Ziel; onZu: (
           </Auswahl>}
         </Feld>
         <Meldung art="info">Übertragen werden nur verschlüsselte Sicherungen, und nur im Zeitfenster (von = bis: ganztägig). Der Server erreicht das Internet nur über den Proxy der OPNsense – die Adresse muss dort freigegeben sein.</Meldung>
-        <Bestaetigung kennwort={kennwort} code={code} onKennwort={setKennwort} onCode={setCode} fehler={f} />
+        <Bestaetigung kennwort={kennwort} zf={zf} onKennwort={setKennwort} fehler={f} />
         {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
         <button type="submit" hidden />
       </form>
@@ -358,19 +358,19 @@ function ZielDialog({ offen, ziel, onZu }: { offen: boolean; ziel: Ziel; onZu: (
 function ZielEntfernenDialog({ offen, onZu }: { offen: boolean; onZu: () => void }) {
   const melden = useHinweis();
   const [kennwort, setKennwort] = useState("");
-  const [code, setCode] = useState("");
+  const zf = useZweiterFaktor();
   const los = useAuftrag("backup/ziel/entfernen/", (a) => { melden(`${a.name}: Auftrag an den Server übergeben.`); onZu(); });
-  const bestaetigt = useBestaetigt(kennwort, code);
-  useEffect(() => { if (offen) { setKennwort(""); setCode(""); los.reset(); } }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bestaetigt = useBestaetigt(kennwort, zf);
+  useEffect(() => { if (offen) { setKennwort(""); zf.zuruecksetzen(); los.reset(); } }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
   const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
   return (
     <Dialog offen={offen} onOffen={(o) => { if (!o) onZu(); }} titel="Übertragungsziel entfernen" breite={560}
       beschreibung="Adresse und Zugangsdaten werden vom Server gelöscht. Sicherungen liegen danach nur noch auf dem Server."
       fuss={<><Knopf onClick={onZu}>Abbrechen</Knopf>
-        <Knopf variante="dng" laedt={los.isPending} disabled={!bestaetigt} onClick={() => los.mutate({ kennwort, code })}>Bestätigen und entfernen</Knopf></>}>
-      <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); los.mutate({ kennwort, code }); }}>
+        <Knopf variante="dng" laedt={los.isPending} disabled={!bestaetigt} onClick={() => los.mutate({ kennwort, ...zf.body })}>Bestätigen und entfernen</Knopf></>}>
+      <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); los.mutate({ kennwort, ...zf.body }); }}>
         <Meldung art="warn">Bereits übertragene Sicherungen bleiben im Ziel.</Meldung>
-        <Bestaetigung kennwort={kennwort} code={code} onKennwort={setKennwort} onCode={setCode} fehler={f} />
+        <Bestaetigung kennwort={kennwort} zf={zf} onKennwort={setKennwort} fehler={f} />
         {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
         <button type="submit" hidden />
       </form>
@@ -384,16 +384,16 @@ function WiederherstellenDialog({ s, daten, onZu }: { s: Sicherung | null; daten
   const [minuten, setMinuten] = useState("5");
   const [text, setText] = useState("");
   const [kennwort, setKennwort] = useState("");
-  const [code, setCode] = useState("");
+  const zf = useZweiterFaktor();
   const los = useAuftrag(s ? `backup/${s.stempel}/wiederherstellen/` : "backup/", (a) => {
     melden(`${a.name}: Auftrag an den Server übergeben.`);
     onZu();
   });
-  useEffect(() => { setMinuten(daten.angemeldet.length ? "5" : "0"); setText(""); setKennwort(""); setCode(""); los.reset(); }, [s]); // eslint-disable-line react-hooks/exhaustive-deps
-  const bestaetigt = useBestaetigt(kennwort, code);
+  useEffect(() => { setMinuten(daten.angemeldet.length ? "5" : "0"); setText(""); setKennwort(""); zf.zuruecksetzen(); los.reset(); }, [s]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bestaetigt = useBestaetigt(kennwort, zf);
   if (!s) return null;
   const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
-  const absenden = () => los.mutate({ minuten: Number(minuten), hinweis: text.trim() || undefined, kennwort, code });
+  const absenden = () => los.mutate({ minuten: Number(minuten), hinweis: text.trim() || undefined, kennwort, ...zf.body });
   return (
     <Dialog offen onOffen={(o) => { if (!o) onZu(); }} titel="Sicherung wiederherstellen" breite={620}
       beschreibung={<>Stand vom <strong>{zeitpunkt(s.zeitpunkt)}</strong> · {s.art_name}{s.ausgeloest_von ? ` · ${s.ausgeloest_von}` : ""} ·
@@ -417,7 +417,7 @@ function WiederherstellenDialog({ s, daten, onZu }: { s: Sicherung | null; daten
         <Feld label="Hinweis an die Benutzer" hinweis="leer = Standardtext; Uhrzeit des Beginns wird angehängt" fehler={f.hinweis}>
           {(p) => <Textfeld {...p} rows={2} maxLength={400} value={text} onChange={(e) => setText(e.target.value)} />}
         </Feld>
-        <Bestaetigung kennwort={kennwort} code={code} onKennwort={setKennwort} onCode={setCode} fehler={f} />
+        <Bestaetigung kennwort={kennwort} zf={zf} onKennwort={setKennwort} fehler={f} />
         {f.minuten ? <Meldung art="fehler">{f.minuten}</Meldung> : null}
         {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
         <button type="submit" hidden />
@@ -430,11 +430,11 @@ function WiederherstellenDialog({ s, daten, onZu }: { s: Sicherung | null; daten
 /** Die Sicherung als eine Datei: Der Server legt sie nach der Bestätigung für 2 Stunden bereit, dann lädt der Browser sie. */
 function HerunterladenDialog({ s, daten, onZu }: { s: Sicherung | null; daten: Daten; onZu: () => void }) {
   const [kennwort, setKennwort] = useState("");
-  const [code, setCode] = useState("");
+  const zf = useZweiterFaktor();
   const [kennung, setKennung] = useState<string | null>(null);
   const los = useAuftrag(s ? `backup/${s.stempel}/bereitstellen/` : "backup/", (a) => setKennung(a.kennung));
-  useEffect(() => { setKennwort(""); setCode(""); setKennung(null); los.reset(); }, [s?.stempel]); // eslint-disable-line react-hooks/exhaustive-deps
-  const bestaetigt = useBestaetigt(kennwort, code);
+  useEffect(() => { setKennwort(""); zf.zuruecksetzen(); setKennung(null); los.reset(); }, [s?.stempel]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bestaetigt = useBestaetigt(kennwort, zf);
   if (!s) return null;
   const bereit = (daten.bereitgestellt ?? []).find((b) => b.stempel === s.stempel);
   const auftrag = kennung ? daten.auftraege.find((a) => a.kennung === kennung) : undefined;
@@ -451,7 +451,7 @@ function HerunterladenDialog({ s, daten, onZu }: { s: Sicherung | null; daten: D
       ) : (
         <><Knopf onClick={onZu}>{kennung ? "Ausblenden" : "Abbrechen"}</Knopf>
           {!kennung || fehlgeschlagen ? <Knopf variante="pri" laedt={los.isPending} disabled={!bestaetigt || daten.austausch === false}
-            onClick={() => { setKennung(null); los.mutate({ kennwort, code }); }}>Bestätigen und bereitstellen</Knopf> : null}</>
+            onClick={() => { setKennung(null); los.mutate({ kennwort, ...zf.body }); }}>Bestätigen und bereitstellen</Knopf> : null}</>
       )}>
       <div className="flex flex-col gap-3.5" data-testid="herunterladen">
         {daten.austausch === false ? <Meldung art="fehler">Die Ordner für das Herunter- und Hochladen fehlen auf dem Server. Bitte dort einmal
@@ -470,11 +470,11 @@ function HerunterladenDialog({ s, daten, onZu }: { s: Sicherung | null; daten: D
           <Meldung art="info"><span className="flex items-center gap-2"><Icon name="sanduhr" groesse={14} />Der Server legt die Datei bereit …
             Bei großen Sicherungen dauert das einige Minuten.</span></Meldung>
         ) : (
-          <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); if (bestaetigt) los.mutate({ kennwort, code }); }}>
+          <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); if (bestaetigt) los.mutate({ kennwort, ...zf.body }); }}>
             {fehlgeschlagen ? <Meldung art="fehler">{auftrag?.ergebnis || "Die Datei konnte nicht bereitgestellt werden."}</Meldung> : null}
             <span className="text-sm">Der Server packt Datenbank, Dokumente und Löschliste dieser Sicherung in <strong>eine Datei</strong> und hält
               sie 2 Stunden zum Herunterladen bereit. Genau diese Datei lässt sich später wieder hochladen.</span>
-            <Bestaetigung kennwort={kennwort} code={code} onKennwort={setKennwort} onCode={setCode} fehler={f} />
+            <Bestaetigung kennwort={kennwort} zf={zf} onKennwort={setKennwort} fehler={f} />
             {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
             <button type="submit" hidden />
           </form>
@@ -490,12 +490,12 @@ function AufbewahrungDialog({ offen, daten, onZu }: { offen: boolean; daten: Dat
   const auswahl = daten.aufbewahrung_auswahl ?? [7, 14, 30];
   const [tage, setTage] = useState(String(daten.aufbewahrung_tage ?? 14));
   const [kennwort, setKennwort] = useState("");
-  const [code, setCode] = useState("");
+  const zf = useZweiterFaktor();
   const los = useAuftrag("backup/aufbewahrung/", (a) => { melden(`${a.name}: Auftrag an den Server übergeben.`); onZu(); });
-  useEffect(() => { if (offen) { setTage(String(daten.aufbewahrung_tage ?? 14)); setKennwort(""); setCode(""); los.reset(); } }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
-  const bestaetigt = useBestaetigt(kennwort, code);
+  useEffect(() => { if (offen) { setTage(String(daten.aufbewahrung_tage ?? 14)); setKennwort(""); zf.zuruecksetzen(); los.reset(); } }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bestaetigt = useBestaetigt(kennwort, zf);
   const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
-  const absenden = () => los.mutate({ tage: Number(tage), kennwort, code });
+  const absenden = () => los.mutate({ tage: Number(tage), kennwort, ...zf.body });
   const kuerzer = daten.aufbewahrung_tage != null && Number(tage) < daten.aufbewahrung_tage;
   return (
     <Dialog offen={offen} onOffen={(o) => { if (!o) onZu(); }} titel="Aufbewahrung der Sicherungen" breite={560}
@@ -514,7 +514,7 @@ function AufbewahrungDialog({ offen, daten, onZu }: { offen: boolean; daten: Dat
           Im Übertragungsziel gilt die dort eingestellte Aufbewahrung ({zielAufbewahrung(daten.ziel.aufbewahrung_tage)}).</Meldung>
           : <Meldung art="info">Mehr Tage brauchen mehr Speicher auf dem Server (aktuell {dateigroesse(daten.speicher.sicherungen ?? 0)} für
             {" "}{daten.sicherungen.length} Sicherungen, {daten.speicher.frei != null ? `${dateigroesse(daten.speicher.frei)} frei` : "freier Platz unbekannt"}).</Meldung>}
-        <Bestaetigung kennwort={kennwort} code={code} onKennwort={setKennwort} onCode={setCode} fehler={f} />
+        <Bestaetigung kennwort={kennwort} zf={zf} onKennwort={setKennwort} fehler={f} />
         {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
         <button type="submit" hidden />
       </form>

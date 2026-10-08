@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { expect, request } from "@playwright/test";
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { APIRequestContext, BrowserContext, CDPSession, Page } from "@playwright/test";
 
 export const BASIS = process.env.EPM_URL ?? "https://localhost";
 export const KENNWORT = "E2E-Kennwort-sicher-2026";
@@ -234,4 +234,15 @@ export async function kontrast(el: import("@playwright/test").Locator): Promise<
     const [a, b] = [lum(s.color), lum(s.backgroundColor)].sort((x, y) => y - x);
     return (a + 0.05) / (b + 0.05);
   });
+}
+
+/** Virtueller Authenticator des Browsers (Passkey mit Fingerabdruck/PIN „bestätigt“), Chrome DevTools-Protokoll */
+export async function virtuellerAuthenticator(ctx: BrowserContext, page: Page) {
+  const cdp: CDPSession = await ctx.newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true,
+      isUserVerified: true, automaticPresenceSimulation: true },
+  });
+  return { cdp, authenticatorId };
 }

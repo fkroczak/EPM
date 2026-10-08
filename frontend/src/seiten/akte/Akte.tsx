@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PdfDialog } from "@/components/PdfDialog";
 import type { ReactNode } from "react";
-import { NavLink, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
+import { NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
@@ -42,7 +42,7 @@ function richtung(p: number) {
 /** Eine Kennzahl im Aktenkopf: feste Spalte, eine Zeile (zu Langes wird gekürzt, ganz im Tooltip) – der Kopf springt nicht */
 function Kennzahl({ titel, children, hinweis }: { titel: string; children: ReactNode; hinweis?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 min-w-0 px-[18px] border-l border-rand" title={hinweis}>
+    <div className="flex flex-col gap-0.5 min-w-0 px-3 sm:px-[18px] border-l border-rand" title={hinweis}>
       <span className="lbl text-[0.78rem] gedaempft font-medium">{titel}</span>
       <span className="text-sm truncate">{children}</span>
     </div>
@@ -330,6 +330,15 @@ export function Akte() {
     },
     onError: (e) => melden(e.message, "fehler"),
   });
+  // Reiter am Telefon: Die Leiste wischt seitlich; der aktive Reiter wird in die Mitte geholt
+  const reiterLeiste = useRef<HTMLElement>(null);
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const leiste = reiterLeiste.current;
+    const aktiv = leiste?.querySelector<HTMLElement>(".segment.aktiv");
+    if (!leiste || !aktiv || leiste.scrollWidth <= leiste.clientWidth) return;
+    leiste.scrollLeft = aktiv.offsetLeft - (leiste.clientWidth - aktiv.offsetWidth) / 2;
+  }, [pathname, akte.data?.id]);
   const gemeldet = useRef<number | null>(null);
   useEffect(() => {
     if (!p || gemeldet.current === p.id) return;
@@ -374,11 +383,11 @@ export function Akte() {
   const basis = `/patienten/${p.id}`;
   return (
     <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: name(p) }]}>
-      <Karte className="px-[22px] py-[18px] flex flex-col gap-4" data-testid="aktenkopf">
+      <Karte className="px-4 sm:px-[22px] py-4 sm:py-[18px] flex flex-col gap-4" data-testid="aktenkopf">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="m-0 text-[1.625rem] font-semibold">{name(p)}</h1>
+              <h1 className="m-0 text-[1.375rem] sm:text-[1.625rem] font-semibold">{name(p)}</h1>
               <button type="button" className={cx("btn icon klein geist", k?.gemerkt ? "!text-akzent-text" : "")} data-testid="merken"
                 aria-pressed={!!k?.gemerkt} aria-label={k?.gemerkt ? "Von der Merkliste nehmen" : "Auf die Merkliste"}
                 title={k?.gemerkt ? "Von der Merkliste nehmen" : "Auf die Merkliste (erscheint auf der Startseite unter „Meine Akten“)"}
@@ -419,7 +428,7 @@ export function Akte() {
           </div>
         </div>
         {k ? (
-          <div className="overflow-hidden -mx-[18px]">
+          <div className="overflow-hidden -mx-3 sm:-mx-[18px]">
           {/* festes Raster (2 Zeilen à 5 auf breiten Bildschirmen): mehr Ärzte oder Personen verändern die Höhe nicht */}
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-y-3 -ml-px" data-testid="kennzahlen">
             <Kennzahl titel="Gewicht">
@@ -480,8 +489,9 @@ export function Akte() {
         </Meldung>
       ) : null}
 
-      {/* Jeder Bereich ein eigener Reiter (Wunsch 07.10.2026, F121); bei schmalem Fenster umbrechen die Reiter */}
-      <nav aria-label="Aktenbereiche" className="segmente self-start flex-wrap h-auto">
+      {/* Jeder Bereich ein eigener Reiter (Wunsch 07.10.2026, F121); bei schmalem Fenster umbrechen die Reiter, am
+          Telefon lassen sie sich seitlich wischen (der aktive bleibt im Blick) */}
+      <nav aria-label="Aktenbereiche" className="segmente self-start flex-wrap h-auto relative" ref={reiterLeiste}>
         <Reiter zu={basis} text="Übersicht" ende />
         <Reiter zu={`${basis}/diagnosen`} text="Diagnosen" zahl={k?.zaehler.diagnosen} />
         <Reiter zu={`${basis}/therapie`} text="Therapie" />

@@ -9,6 +9,7 @@ import { abfrage, api } from "@/lib/api";
 import type { Seite as ApiSeite } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { datum, nummer, zahl } from "@/lib/format";
+import { useMobil } from "@/lib/stufen";
 import type { PatientZeile, Plan } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Chip, Eingabe, Fehleranzeige, Karte, Knopf, KnopfLink, Laden, Leer, Meldung, Segmente, Seitenkopf } from "@/components/ui/basis";
@@ -92,6 +93,9 @@ export function Infusionsplaene() {
   const grenze = daten.data?.grenze_monate ?? 12;
   const zeilen = daten.data?.ergebnisse ?? [];
   const anzahl = (g: Gruppe) => <span className="num opacity-70">{z ? z[g] : "…"}</span>;
+  const mobil = useMobil();
+  const infusion = (p: Zeile) => [p.laufzeit_h ? `${zahl(p.laufzeit_h)} h` : null, p.rate_ml_h ? `${zahl(p.rate_ml_h)} ml/h` : null,
+    p.tage_pro_woche ? `${p.tage_pro_woche}×/Woche` : null].filter(Boolean).join(" · ");
   return (
     <Seite pfad={[{ text: "Infusionspläne" }]}>
       <Seitenkopf titel="Infusionspläne" unter="Alle Pläne aller Patienten. Bearbeitet und freigegeben wird in der Akte."
@@ -104,7 +108,7 @@ export function Infusionsplaene() {
           { wert: "abgeloest", text: <>Abgelöst {anzahl("abgeloest")}</> },
           { wert: "alle", text: <>Alle {anzahl("alle")}</> },
         ]} />
-        <Eingabe type="search" aria-label="Patient suchen" placeholder="Patient: Name oder Nr." className="w-[260px]"
+        <Eingabe type="search" aria-label="Patient suchen" placeholder="Patient: Name oder Nr." className="w-full sm:w-[260px]"
           value={suche} onChange={(e) => setSuche(e.target.value)} />
         <label className="flex items-center gap-1.5 text-sm">
           <input type="checkbox" checked={abgeschlossene} onChange={(e) => setAbgeschlossene(e.target.checked)} />
@@ -113,7 +117,35 @@ export function Infusionsplaene() {
         {daten.isFetching ? <span className="text-xs gedaempft">wird geladen …</span> : null}
       </div>
       <Fehleranzeige fehler={daten.error} />
-      <Karte className="overflow-x-auto">
+      {mobil ? (
+        // Telefon (Festlegung 08.10.2026): je Plan eine Karte; „Öffnen“ führt in die Akte, dort wird freigegeben
+        daten.isLoading ? <Laden /> : zeilen.length === 0 ? <Karte><Leer>Keine Pläne in dieser Auswahl.</Leer></Karte> : (
+          <div role="list" aria-label="Infusionspläne" className="flex flex-col gap-2" data-testid="plan-uebersicht">
+            {zeilen.map((p) => (
+              <div key={p.id} role="listitem" className="card flex flex-col">
+                <Link to={`/patienten/${p.patient}/plaene?plan=${p.id}`} className="px-3.5 pt-3 pb-2 flex flex-col gap-1 no-underline text-tinte rounded-[12px]"
+                  aria-label={`Plan von ${p.name} öffnen`}>
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="font-medium truncate">{p.name}</span>
+                    <StatusChip z={p} grenze={grenze} />
+                  </span>
+                  <span className="text-[0.8125rem] gedaempft">
+                    Nr. <span className="num">{nummer(p.nummer)}</span> · gültig ab <span className="num">{datum(p.gueltig_ab)}</span>
+                    {p.kcal != null ? <> · <span className="num">{zahl(p.kcal)} kcal</span></> : null}
+                  </span>
+                  {infusion(p) ? <span className="num text-[0.8125rem]">{infusion(p)}</span> : null}
+                  <span className="text-xs gedaempft">
+                    {p.freigegeben_am ? <>freigegeben <span className="num">{datum(p.freigegeben_am)}</span>{p.freigegeben_von ? ` · ${p.freigegeben_von}` : ""}</>
+                      : <>erstellt <span className="num">{datum(p.erstellt_am)}</span>{p.erstellt_von ? ` · ${p.erstellt_von}` : ""}</>}
+                    {p.ist_test ? " · Testpatient" : ""}{p.patient_abgeschlossen ? " · Akte abgeschlossen" : ""}
+                  </span>
+                </Link>
+                {p.pdf ? <div className="px-3.5 pb-3"><Knopf klein icon="dokument" onClick={() => setPdf(p)} aria-label={`PDF des Plans von ${p.name}`}>PDF</Knopf></div> : <span className="pb-1" />}
+              </div>
+            ))}
+          </div>
+        )
+      ) : <Karte className="overflow-x-auto">
         {daten.isLoading ? <Laden /> : zeilen.length === 0 ? <Leer>Keine Pläne in dieser Auswahl.</Leer> : (
           <table className="tabelle" data-testid="plan-uebersicht">
             <thead>
@@ -153,7 +185,7 @@ export function Infusionsplaene() {
             </tbody>
           </table>
         )}
-      </Karte>
+      </Karte>}
       {zeilen.length >= 1000 ? <span className="text-xs gedaempft">Die ersten 1.000 Pläne – bitte die Suche eingrenzen.</span> : null}
       {anlegen ? <NeuerPlanDialog offen={neu} onOffen={setNeu} /> : null}
       {pdf ? <PlanPdfDialog plan={{ id: pdf.id, gueltig_ab: pdf.gueltig_ab, pdf_sha256: pdf.pdf_sha256 ?? "" }} offen

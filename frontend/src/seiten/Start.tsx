@@ -310,7 +310,7 @@ export function Start() {
     <Seite pfad={[{ text: "Start" }]}>
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div className="flex flex-col gap-1">
-          <h1 className="m-0 text-[1.625rem] font-semibold">{langesDatum()}</h1>
+          <h1 className="m-0 text-[1.375rem] sm:text-[1.625rem] font-semibold">{langesDatum()}</h1>
           {verwaltung && ich.schreibt_nur_testpatienten ? (
             <span className="text-sm gedaempft">Administration · echte Akten sind für dich nur lesbar</span>
           ) : d ? (

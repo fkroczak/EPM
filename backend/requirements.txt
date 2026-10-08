@@ -8,5 +8,6 @@ psycopg[binary]>=3.3,<3.4
 nh3>=0.3,<0.4
 ftfy>=6.3,<7                 # Altdaten-Import: doppelt kodierte Umlaute reparieren (Regel 3 der Datenanalyse)
 qrcode>=8.2,<9
+webauthn>=2.8,<3            # Passkeys (WebAuthn) als zweiter Faktor; 2.x stabil, 3.0 erst seit 09/2026
 gunicorn>=26,<27
 weasyprint>=66,<70           # PDF-Erzeugung (offline, braucht Pango aus dem Image)

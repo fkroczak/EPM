@@ -15,10 +15,13 @@ import { Chip, Eingabe, Feld, Karte, Knopf, Laden, Meldung, Seitenkopf, Segmente
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
-import { AuthenticatorEinrichten, NotfallcodesAnzeige } from "./Anmeldung";
+import { useZweiterFaktor } from "@/components/ZweiterFaktor";
+import type { PasskeyEintrag } from "@/lib/typen";
+import { AuthenticatorEinrichten, NotfallcodesAnzeige, PasskeyEinrichten } from "./Anmeldung";
 
 type Sicherheit = { kennwort_geaendert_am: string | null; authenticator_aktiv: boolean; authenticator_eingerichtet_am: string | null;
-  notfallcodes_uebrig: number; notfallcodes_gesamt: number; zweiter_faktor_pflicht?: boolean };
+  notfallcodes_uebrig: number; notfallcodes_gesamt: number; zweiter_faktor_pflicht?: boolean; passkeys?: PasskeyEintrag[];
+  passkey?: { verfuegbar: boolean; rp_id: string; grund: string } };
 type Sitzung = { id: number; browser: string; ip: string | null; angemeldet_am: string; zuletzt_am: string; diese: boolean };
 
 const SCHEMATA: { wert: Darstellung["schema"]; titel: string; text: string; farben: [string, string, string] }[] = [
@@ -179,8 +182,8 @@ function DarstellungKarten({ zuruecksetzenRef }: { zuruecksetzenRef: { current: 
 
 function Zeile({ titel, unter, rechts }: { titel: ReactNode; unter?: ReactNode; rechts?: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-2.5 border-b border-rand last:border-b-0">
-      <span className="flex flex-col gap-0.5 text-sm"><span className="font-medium flex items-center gap-2">{titel}</span>{unter ? <span className="text-[0.8125rem] gedaempft">{unter}</span> : null}</span>
+    <div className="flex items-center justify-between gap-3 py-2.5 border-b border-rand last:border-b-0 flex-wrap">
+      <span className="flex flex-col gap-0.5 text-sm min-w-0"><span className="font-medium flex items-center gap-2 flex-wrap">{titel}</span>{unter ? <span className="text-[0.8125rem] gedaempft">{unter}</span> : null}</span>
       {rechts}
     </div>
   );
@@ -226,12 +229,12 @@ function KennwortDialog({ offen, onOffen }: { offen: boolean; onOffen: (o: boole
 /** Zwei-Faktor-Anmeldung ausschalten (nur solange sie freiwillig ist): mit Passwort und einem gültigen Code */
 function AusschaltenDialog({ offen, onOffen }: { offen: boolean; onOffen: (o: boolean) => void }) {
   const [kennwort, setKennwort] = useState("");
-  const [code, setCode] = useState("");
+  const zf = useZweiterFaktor();
   const { setIch } = useAuth();
   const qc = useQueryClient();
   const melden = useHinweis();
   const aus = useMutation({
-    mutationFn: () => api<Ich>("auth/2fa/ausschalten/", { body: { kennwort, code } }),
+    mutationFn: () => api<Ich>("auth/2fa/ausschalten/", { body: { kennwort, ...zf.body } }),
     onSuccess: (ich) => {
       setIch(ich);
       void qc.invalidateQueries({ queryKey: ["konto"] });
@@ -240,19 +243,18 @@ function AusschaltenDialog({ offen, onOffen }: { offen: boolean; onOffen: (o: bo
       onOffen(false);
     },
   });
-  useEffect(() => { if (offen) { setKennwort(""); setCode(""); aus.reset(); } }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (offen) { setKennwort(""); zf.zuruecksetzen(); aus.reset(); } }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
   const f = aus.error instanceof ApiFehler ? aus.error.felder : {};
   return (
     <Dialog offen={offen} onOffen={onOffen} titel="Zwei-Faktor-Anmeldung ausschalten" breite={520}
-      beschreibung="Authenticator und Notfall-Codes werden gelöscht. Zum Anmelden genügen danach Benutzername und Passwort."
+      beschreibung="Authenticator, Passkeys und Notfall-Codes werden gelöscht. Zum Anmelden genügen danach Benutzername und Passwort."
       fuss={<><Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
-        <Knopf variante="dng" laedt={aus.isPending} disabled={!kennwort || !code} onClick={() => aus.mutate()}>Ausschalten</Knopf></>}>
-      <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); if (kennwort && code) aus.mutate(); }}>
+        <Knopf variante="dng" laedt={aus.isPending} disabled={!kennwort || !zf.bereit} onClick={() => aus.mutate()}>Ausschalten</Knopf></>}>
+      <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); if (kennwort && zf.bereit) aus.mutate(); }}>
         <Meldung art="warn">Ohne zweiten Faktor schützt nur noch das Passwort dein Konto – und damit die Patientendaten, die du sehen darfst.</Meldung>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
           <Feld label="Dein Passwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
-          <Feld label="Code aus der Authenticator-App" hinweis="oder ein Notfall-Code" fehler={f.code}>
-            {(p) => <Eingabe {...p} inputMode="text" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />}</Feld>
+          {zf.feld(f.code)}
         </div>
         {aus.error && !Object.keys(f).length ? <Meldung art="fehler">{aus.error.message}</Meldung> : null}
         <button type="submit" hidden />
@@ -261,8 +263,63 @@ function AusschaltenDialog({ offen, onOffen }: { offen: boolean; onOffen: (o: bo
   );
 }
 
+/** Eigenen Passkey entfernen: mit Passwort und zweitem Faktor (Code oder ein Passkey) */
+function PasskeyEntfernenDialog({ passkey, onZu }: { passkey: PasskeyEintrag | null; onZu: () => void }) {
+  const [kennwort, setKennwort] = useState("");
+  const zf = useZweiterFaktor();
+  const { setIch } = useAuth();
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const weg = useMutation({
+    mutationFn: () => api<Ich>(`auth/passkeys/${passkey!.id}/entfernen/`, { body: { kennwort, ...zf.body } }),
+    onSuccess: (ich) => {
+      setIch(ich);
+      void qc.invalidateQueries({ queryKey: ["konto"] });
+      melden(`Passkey „${passkey?.name}“ entfernt.`);
+      onZu();
+    },
+  });
+  useEffect(() => { if (passkey) { setKennwort(""); zf.zuruecksetzen(); weg.reset(); } }, [passkey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const f = weg.error instanceof ApiFehler ? weg.error.felder : {};
+  return (
+    <Dialog offen={!!passkey} onOffen={(o) => { if (!o) onZu(); }} titel={`Passkey „${passkey?.name ?? ""}“ entfernen`} breite={520}
+      beschreibung="Mit diesem Passkey kannst du dich danach nicht mehr anmelden. Der Eintrag im Passwortmanager bzw. auf dem Gerät bleibt; dort kannst du ihn selbst löschen."
+      fuss={<><Knopf onClick={onZu}>Abbrechen</Knopf>
+        <Knopf variante="dng" laedt={weg.isPending} disabled={!kennwort || !zf.bereit} onClick={() => weg.mutate()}>Entfernen</Knopf></>}>
+      <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); if (kennwort && zf.bereit) weg.mutate(); }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+          <Feld label="Dein Passwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
+          {zf.feld(f.code)}
+        </div>
+        {weg.error && !Object.keys(f).length ? <Meldung art="fehler">{weg.error.message}</Meldung> : null}
+        <button type="submit" hidden />
+      </form>
+    </Dialog>
+  );
+}
+
+function PasskeyUmbenennen({ passkey }: { passkey: PasskeyEintrag }) {
+  const [offen, setOffen] = useState(false);
+  const [name, setName] = useState(passkey.name);
+  const qc = useQueryClient();
+  const speichern = useMutation({
+    mutationFn: () => api(`auth/passkeys/${passkey.id}/`, { method: "PATCH", body: { name: name.trim() } }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["konto"] }); setOffen(false); },
+  });
+  return <>
+    <Knopf klein variante="geist" icon="stift" aria-label={`${passkey.name} umbenennen`} onClick={() => { setName(passkey.name); setOffen(true); }} />
+    <Dialog offen={offen} onOffen={setOffen} titel="Passkey umbenennen" breite={440}
+      fuss={<><Knopf onClick={() => setOffen(false)}>Abbrechen</Knopf><Knopf variante="pri" laedt={speichern.isPending} disabled={!name.trim()} onClick={() => speichern.mutate()}>Speichern</Knopf></>}>
+      <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) speichern.mutate(); }}>
+        <Feld label="Name">{(p) => <Eingabe {...p} value={name} maxLength={64} onChange={(e) => setName(e.target.value)} autoFocus />}</Feld>
+      </form>
+    </Dialog>
+  </>;
+}
+
 function SicherheitKarte() {
-  const [dialog, setDialog] = useState<"" | "kennwort" | "geraet" | "codes" | "aus">("");
+  const [dialog, setDialog] = useState<"" | "kennwort" | "geraet" | "codes" | "aus" | "passkey">("");
+  const [entfernen, setEntfernen] = useState<PasskeyEintrag | null>(null);
   const [codes, setCodes] = useState<string[] | null>(null);
   const { setStatus } = useAuth();
   const qc = useQueryClient();
@@ -285,26 +342,67 @@ function SicherheitKarte() {
     }
   }, [location.state, location.hash, s.data]);
   const d = s.data;
+  const passkeys = d?.passkeys ?? [];
+  const zweiterFaktor = !!d && (d.authenticator_aktiv || passkeys.length > 0);
   return (
     <Karte className="px-5 py-[18px] flex flex-col gap-1" data-testid="sicherheit" id="zwei-faktor">
       <h2 className="lbl m-0 mb-1">Anmeldung und Sicherheit</h2>
       {s.isLoading || !d ? <Laden /> : <>
         <Zeile titel="Passwort" unter={d.kennwort_geaendert_am ? `zuletzt geändert ${datum(d.kennwort_geaendert_am)}` : "noch nie geändert"}
           rechts={<Knopf klein onClick={() => setDialog("kennwort")}>Ändern</Knopf>} />
-        <Zeile titel={<>Zwei-Faktor-Anmeldung (Authenticator-App) {d.authenticator_aktiv ? <Chip art="ok"><Icon name="haken" />aktiv</Chip>
-            : <Chip art={d.zweiter_faktor_pflicht ? "warn" : undefined}>nicht eingerichtet</Chip>}</>}
+        <Zeile titel={<>Authenticator-App {d.authenticator_aktiv ? <Chip art="ok"><Icon name="haken" />aktiv</Chip>
+            : <Chip art={d.zweiter_faktor_pflicht && !zweiterFaktor ? "warn" : undefined}>nicht eingerichtet</Chip>}</>}
           unter={d.authenticator_aktiv ? (d.authenticator_eingerichtet_am ? `eingerichtet ${datum(d.authenticator_eingerichtet_am)}` : undefined)
-            : d.zweiter_faktor_pflicht ? "für dein Konto Pflicht" : "freiwillig – schützt dein Konto zusätzlich mit einem Code vom Telefon"}
+            : d.zweiter_faktor_pflicht && !zweiterFaktor ? "zweiter Faktor für dein Konto Pflicht" : "Code vom Telefon als zweiter Faktor"}
           rechts={<span className="flex gap-1.5">
-            {d.authenticator_aktiv && !d.zweiter_faktor_pflicht ? <Knopf klein variante="geist" onClick={() => setDialog("aus")}>Ausschalten</Knopf> : null}
-            <Knopf klein variante={d.authenticator_aktiv ? "sec" : "pri"} onClick={() => setDialog("geraet")}>{d.authenticator_aktiv ? "Neues Gerät" : "Einrichten"}</Knopf>
+            <Knopf klein variante={d.authenticator_aktiv || passkeys.length ? "sec" : "pri"} onClick={() => setDialog("geraet")}>{d.authenticator_aktiv ? "Neues Gerät" : "Einrichten"}</Knopf>
           </span>} />
-        {d.authenticator_aktiv ? (
+        <div className="py-2.5 border-b border-rand flex flex-col gap-2" data-testid="passkeys">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <span className="flex flex-col gap-0.5 text-sm min-w-0">
+              <span className="font-medium flex items-center gap-2 flex-wrap">Passkeys {passkeys.length ? <Chip art="ok"><Icon name="haken" />{passkeys.length}</Chip> : <Chip>keiner</Chip>}</span>
+              <span className="text-[0.8125rem] gedaempft">Fingerabdruck, Gesicht oder PIN statt Code – am PC und am Telefon</span>
+            </span>
+            <Knopf klein icon="plus" variante={zweiterFaktor ? "sec" : "pri"} onClick={() => setDialog("passkey")}>Passkey hinzufügen</Knopf>
+          </div>
+          {passkeys.map((p) => (
+            <div key={p.id} className="flex items-center justify-between gap-2 pl-3 border-l-2 border-rand text-sm" data-testid="passkey-eintrag">
+              <span className="flex flex-col min-w-0">
+                <span className="font-medium truncate">{p.name}{p.synchronisiert ? <span className="gedaempft font-normal"> · synchronisiert</span> : null}</span>
+                <span className="text-[0.8125rem] gedaempft">angelegt {datum(p.angelegt_am)}{p.zuletzt_am ? ` · zuletzt ${zeitpunkt(p.zuletzt_am)}` : " · noch nicht verwendet"}</span>
+              </span>
+              <span className="flex gap-1 shrink-0">
+                <PasskeyUmbenennen passkey={p} />
+                <Knopf klein variante="geist" icon="x" aria-label={`${p.name} entfernen`} onClick={() => setEntfernen(p)} />
+              </span>
+            </div>
+          ))}
+        </div>
+        {zweiterFaktor && !d.zweiter_faktor_pflicht ? (
+          <Zeile titel="Zwei-Faktor-Anmeldung" unter="freiwillig – ausschalten löscht App, Passkeys und Notfall-Codes"
+            rechts={<Knopf klein variante="geist" onClick={() => setDialog("aus")}>Ausschalten</Knopf>} />
+        ) : null}
+        {zweiterFaktor ? (
           <Zeile titel="Notfall-Codes" unter={`${d.notfallcodes_uebrig} von ${d.notfallcodes_gesamt} übrig, für verlorenes Handy`}
             rechts={<Knopf klein onClick={() => setDialog("codes")}>Neu erzeugen</Knopf>} />
         ) : null}
       </>}
       <AusschaltenDialog offen={dialog === "aus"} onOffen={(o) => setDialog(o ? "aus" : "")} />
+      <PasskeyEntfernenDialog passkey={entfernen} onZu={() => setEntfernen(null)} />
+      <Dialog offen={dialog === "passkey"} onOffen={(o) => { setDialog(o ? "passkey" : ""); if (!o) setCodes(null); }} titel="Passkey hinzufügen" breite={520}>
+        {codes ? (
+          <NotfallcodesAnzeige codes={codes} weiterText="Fertig" onWeiter={() => { setCodes(null); setDialog(""); }} />
+        ) : dialog === "passkey" ? (
+          <PasskeyEinrichten onAbbrechen={() => setDialog("")} onFertig={(st) => {
+            const { notfallcodes, ...rest } = st;
+            setStatus(rest);
+            void qc.invalidateQueries({ queryKey: ["konto"] });
+            void qc.invalidateQueries({ queryKey: ["startseite"] });
+            melden(`Passkey „${st.passkey_neu?.name ?? ""}“ eingerichtet.`);
+            if (notfallcodes?.length) setCodes(notfallcodes); else setDialog("");
+          }} />
+        ) : null}
+      </Dialog>
       <KennwortDialog offen={dialog === "kennwort"} onOffen={(o) => setDialog(o ? "kennwort" : "")} />
       <Dialog offen={dialog === "geraet"} onOffen={(o) => { setDialog(o ? "geraet" : ""); if (!o) setCodes(null); }} titel={d?.authenticator_aktiv || codes ? "Neues Gerät einrichten" : "Zwei-Faktor-Anmeldung einrichten"} breite={560}
         beschreibung={d?.authenticator_aktiv ? "Das bisherige Gerät gilt nicht mehr, sobald das neue bestätigt ist. Danach gibt es neue Notfall-Codes."
@@ -360,8 +458,9 @@ export function Konto() {
         unter={<span className="max-w-[80ch] inline-block leading-normal">Deine Einstellungen werden für dich gespeichert und gelten an jedem PC, an dem du dich anmeldest. Rolle und Rechte vergibt die Administration.</span>}
         rechts={<Knopf onClick={() => zuruecksetzen.current?.()}>Auf Standard zurücksetzen</Knopf>} />
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5 items-start">
-        <div className="flex flex-col gap-5 min-w-0"><DarstellungKarten zuruecksetzenRef={zuruecksetzen} /></div>
-        <div className="flex flex-col gap-5 min-w-0">
+        {/* am Telefon zuerst Sicherheit (Passkey), Darstellung danach */}
+        <div className="flex flex-col gap-5 min-w-0 order-2 xl:order-1"><DarstellungKarten zuruecksetzenRef={zuruecksetzen} /></div>
+        <div className="flex flex-col gap-5 min-w-0 order-1 xl:order-2">
           <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="profil">
             <h2 className="lbl m-0">Profil</h2>
             <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">

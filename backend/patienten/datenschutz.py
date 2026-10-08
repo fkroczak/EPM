@@ -483,7 +483,7 @@ class DatenschutzAktionen:
         das Löschprotokoll (ohne Namen) und die Einträge im Audit-Log ohne Namen und Inhalte."""
         from datetime import datetime
 
-        from accounts.zweifaktor import OHNE_ZWEITEN_FAKTOR, code_bestaetigt, hat_zweiten_faktor
+        from accounts.zweifaktor import OHNE_ZWEITEN_FAKTOR, fehlertext, hat_zweiten_faktor, zweiter_faktor_bestaetigt
 
         patient = self._akte(pk, loeschen=True)
         pruefung = loeschbar(patient)
@@ -518,8 +518,8 @@ class DatenschutzAktionen:
         if not request.user.check_password(str(request.data.get("kennwort", ""))):
             antwort = abgelehnt("kennwort", "Kennwort falsch.")
             return bestaetigung_fehlgeschlagen(request, "loeschen_kennwort") or antwort
-        if not code_bestaetigt(request.user, request.data.get("code", ""), notfallcodes=False):
-            antwort = abgelehnt("code", "Code aus der Authenticator-App falsch oder schon verwendet.")
+        if not zweiter_faktor_bestaetigt(request, notfallcodes=False):
+            antwort = abgelehnt("code", fehlertext(request, "Code aus der Authenticator-App falsch oder schon verwendet."))
             return bestaetigung_fehlgeschlagen(request, "loeschen_2fa") or antwort
         bestaetigung_gelungen(request)
         request.session.pop(self.LOESCHCODE, None)

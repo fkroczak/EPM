@@ -1,29 +1,43 @@
-/** Seitenleiste und Kopfzeile wie im Entwurf (256 px Leiste, 60 px Kopf mit Pfad und Suche). */
-import { useEffect, useRef, useState } from "react";
+/** Seitenleiste und Kopfzeile wie im Entwurf (256 px Leiste, 60 px Kopf mit Pfad und Suche). Am Telefon (unter 768 px,
+ *  Festlegung 08.10.2026) statt der Seitenleiste eine Leiste unten (Start, Patienten, Notiz, Pläne, Menü) und das
+ *  vollständige Menü als Schublade. */
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { RECHTE_GEAENDERT, abfrage, api } from "@/lib/api";
 import type { Seite as ApiSeite } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
 import { datum, initialen, nummer, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
-import type { PatientZeile } from "@/lib/typen";
+import type { Patient, PatientZeile } from "@/lib/typen";
+import { KontaktDialog } from "@/components/Schnellerfassung";
+import type { Vorgabe } from "@/components/Schnellerfassung";
+import { useMobil } from "@/lib/stufen";
 import { Ladebalken } from "@/components/ui/Ladebalken";
 import { Chip, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "./logo";
 
+/** In der Schublade am Telefon stehen die Texte immer neben den Symbolen */
+const Voll = createContext(false);
+const TEXT = "sr-only hd:not-sr-only";
+
+function NavText({ children }: { children: ReactNode }) {
+  return <span className={useContext(Voll) ? undefined : TEXT}>{children}</span>;
+}
+
 function NavEintrag({ zu, icon, text, ende }: { zu: string; icon: string; text: string; ende?: boolean }) {
   return (
     <NavLink to={zu} end={ende} title={text} className={({ isActive }) => cx("nav", isActive && "aktiv")}>
       <Icon name={icon} groesse={18} />
-      <span className="sr-only hd:not-sr-only">{text}</span>
+      <NavText>{text}</NavText>
     </NavLink>
   );
 }
 
-function Seitenleiste() {
+function Seitenleiste({ schublade }: { schublade?: boolean }) {
   const ich = useIch();
   const { abmelden, darf } = useAuth();
   const admin = [
@@ -35,16 +49,19 @@ function Seitenleiste() {
     // nach der Übernahme unter System ausblendbar (U32); die Seite bleibt über System erreichbar
     darf("altdaten_importieren") && !ich.import_ausgeblendet ? <NavEintrag key="i" zu="/admin/import" icon="hochladen" text="Import" /> : null,
   ].filter(Boolean);
+  const v = !!schublade;
   return (
-    <aside className="w-16 hd:w-64 shrink-0 bg-flaeche border-r border-rand flex flex-col px-2 hd:px-3 py-4 gap-5 nicht-drucken sticky top-0 h-screen overflow-y-auto"
-      style={{ borderRightWidth: "var(--randbreite)" }}>
-      <div className="hidden hd:flex flex-col gap-2">
+    <Voll.Provider value={v}>
+    <aside className={cx("shrink-0 bg-flaeche border-r border-rand flex flex-col py-4 gap-5 nicht-drucken overflow-y-auto",
+      v ? "w-full h-full px-3" : "w-16 hd:w-64 px-2 hd:px-3 sticky top-0 h-screen max-md:hidden")}
+      style={{ borderRightWidth: "var(--randbreite)" }} data-testid={v ? "schublade" : "seitenleiste"}>
+      <div className={cx(v ? "flex" : "hidden hd:flex", "flex-col gap-2")}>
         <Logo className="w-[204px] h-[72px] px-1.5 py-1 rounded-lg bg-white" />
         <span className="px-1 font-mono text-[0.6875rem] font-medium tracking-[.07em] uppercase gedaempft">
           EPM · Patientenmanagement
         </span>
       </div>
-      <span className="hd:hidden self-center font-mono text-xs font-semibold tracking-[.07em] text-akzent-text" title="EPM · Patientenmanagement">EPM</span>
+      {v ? null : <span className="hd:hidden self-center font-mono text-xs font-semibold tracking-[.07em] text-akzent-text" title="EPM · Patientenmanagement">EPM</span>}
       <nav aria-label="Hauptnavigation" className="flex flex-col gap-0.5">
         <NavEintrag zu="/" icon="start" text="Start" ende />
         {darf("akten_lesen") ? <NavEintrag zu="/patienten" icon="patienten" text="Patienten" /> : null}
@@ -57,37 +74,89 @@ function Seitenleiste() {
       </nav>
       {admin.length ? (
         <nav aria-label="Administration" className="flex flex-col gap-0.5">
-          <div className="px-2 h-8 hidden hd:flex items-center text-xs font-medium gedaempft">Administration</div>
-          <div className="hd:hidden border-t border-rand my-1" aria-hidden="true" />
+          <div className={cx("px-2 h-8 items-center text-xs font-medium gedaempft", v ? "flex" : "hidden hd:flex")}>Administration</div>
+          {v ? null : <div className="hd:hidden border-t border-rand my-1" aria-hidden="true" />}
           {admin}
         </nav>
       ) : null}
-      <div className="mt-auto flex flex-col gap-2.5 border-t border-rand pt-3.5 hd:px-1.5">
-        <div className="flex items-center gap-2.5 justify-center hd:justify-start" title={ich.anzeigename}>
+      <div className={cx("mt-auto flex flex-col gap-2.5 border-t border-rand pt-3.5", v ? "px-1.5" : "hd:px-1.5")}>
+        <div className={cx("flex items-center gap-2.5", v ? "justify-start" : "justify-center hd:justify-start")} title={ich.anzeigename}>
           <div className="w-[34px] h-[34px] rounded-full bg-akzent-weich text-akzent-text flex items-center justify-center font-semibold text-[0.8125rem]">
             {ich.kuerzel || initialen(ich.anzeigename)}
           </div>
-          <div className="flex-col min-w-0 sr-only hd:not-sr-only hd:flex">
-            <span className="text-sm font-medium truncate" data-testid="angemeldet-als">{ich.anzeigename}</span>
+          <div className={cx("flex-col min-w-0", v ? "flex" : "sr-only hd:not-sr-only hd:flex")}>
+            <span className="text-sm font-medium truncate" data-testid={v ? undefined : "angemeldet-als"}>{ich.anzeigename}</span>
             <span className="text-xs gedaempft">{ROLLEN[ich.rolle]}{ich.ist_test ? " · Testzugang" : ""}</span>
           </div>
         </div>
         <NavLink to="/hilfe" title="Hilfe" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
-          <Icon name="hilfe" /> <span className="sr-only hd:not-sr-only">Hilfe</span>
+          <Icon name="hilfe" /> <NavText>Hilfe</NavText>
         </NavLink>
         <NavLink to="/konto" title="Mein Konto" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
-          <Icon name="konto" /> <span className="sr-only hd:not-sr-only">Mein Konto</span>
+          <Icon name="konto" /> <NavText>Mein Konto</NavText>
         </NavLink>
         <button type="button" title="Abmelden" className="nav border-0 bg-transparent cursor-pointer text-left" onClick={() => void abmelden()}>
-          <Icon name="abmelden" /> <span className="sr-only hd:not-sr-only">Abmelden</span>
+          <Icon name="abmelden" /> <NavText>Abmelden</NavText>
         </button>
       </div>
     </aside>
+    </Voll.Provider>
+  );
+}
+
+/** Telefon: Leiste unten mit den häufigsten Wegen; „Notiz“ öffnet die Schnellerfassung (in einer Akte für diese). */
+function MobilLeiste() {
+  const { darf } = useAuth();
+  const { pathname } = useLocation();
+  const qc = useQueryClient();
+  const [menue, setMenue] = useState(false);
+  const [notiz, setNotiz] = useState<{ vorgabe: Vorgabe | null } | null>(null);
+  useEffect(() => setMenue(false), [pathname]);
+  const notizOeffnen = () => {
+    const id = Number(pathname.match(/^\/patienten\/(\d+)/)?.[1] ?? 0);
+    const p = id ? qc.getQueryData<Patient>(["patient", id]) : undefined;
+    setNotiz({ vorgabe: p && !p.ist_abgeschlossen ? { id: p.id, name: `${p.nachname}, ${p.vorname}`, ist_test: p.ist_test } : null });
+  };
+  const eintrag = (zu: string, icon: string, text: string, ende?: boolean) => (
+    <NavLink to={zu} end={ende} className={({ isActive }) => cx("mobil-nav", isActive && "aktiv")}>
+      <Icon name={icon} groesse={22} /><span>{text}</span>
+    </NavLink>
+  );
+  return (
+    <>
+      <nav aria-label="Hauptnavigation (Telefon)" data-testid="mobil-leiste"
+        className="nicht-drucken fixed bottom-0 inset-x-0 z-30 bg-flaeche border-t border-rand grid grid-cols-5 pb-[env(safe-area-inset-bottom)]">
+        {eintrag("/", "start", "Start", true)}
+        {darf("akten_lesen") ? eintrag("/patienten", "patienten", "Patienten") : <span />}
+        {darf("eintraege_erfassen") ? (
+          <button type="button" className="mobil-nav" onClick={notizOeffnen} data-testid="mobil-notiz">
+            <span className="mobil-plus"><Icon name="plus" groesse={22} /></span><span>Notiz</span>
+          </button>
+        ) : <span />}
+        {darf("akten_lesen") ? eintrag("/infusionsplaene?gruppe=entwuerfe", "tropfen", "Pläne") : <span />}
+        <button type="button" className="mobil-nav" onClick={() => setMenue(true)} aria-haspopup="dialog" data-testid="mobil-menue">
+          <Icon name="menue" groesse={22} /><span>Menü</span>
+        </button>
+      </nav>
+      <BaseDialog.Root open={menue} onOpenChange={setMenue}>
+        <BaseDialog.Portal>
+          <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/35" />
+          <BaseDialog.Popup className="fixed inset-y-0 left-0 z-50 w-[min(320px,86vw)] bg-flaeche shadow-xl pt-[env(safe-area-inset-top)]">
+            <BaseDialog.Title className="sr-only">Menü</BaseDialog.Title>
+            <BaseDialog.Close className="btn geist icon absolute right-2 top-[calc(env(safe-area-inset-top)+0.5rem)] z-10" aria-label="Menü schließen">
+              <Icon name="x" />
+            </BaseDialog.Close>
+            <Seitenleiste schublade />
+          </BaseDialog.Popup>
+        </BaseDialog.Portal>
+      </BaseDialog.Root>
+      {notiz ? <KontaktDialog offen onOffen={(o) => { if (!o) setNotiz(null); }} vorgabe={notiz.vorgabe} /> : null}
+    </>
   );
 }
 
 /** Patientensuche in der Kopfzeile (Strg K): Name, Nummer oder Geburtsdatum */
-function Suche() {
+function Suche({ vollbreit, onFertig }: { vollbreit?: boolean; onFertig?: () => void } = {}) {
   const [text, setText] = useState("");
   const [offen, setOffen] = useState(false);
   const [markiert, setMarkiert] = useState(0);
@@ -116,10 +185,11 @@ function Suche() {
   const oeffnen = (p: PatientZeile) => {
     setOffen(false);
     setText("");
+    onFertig?.();
     navigate(`/patienten/${p.id}`);
   };
   return (
-    <div className="relative w-[400px] max-w-[45vw]">
+    <div className={cx("relative", vollbreit ? "w-full" : "w-[400px] max-w-[45vw]")}>
       <span className="absolute left-3 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" groesse={18} /></span>
       <input
         ref={feld}
@@ -132,16 +202,17 @@ function Suche() {
         placeholder="Patient suchen: Name, Nr. oder Geburtsdatum"
         value={text}
         onChange={(e) => { setText(e.target.value); setOffen(true); }}
+        autoFocus={vollbreit}
         onFocus={() => setOffen(true)}
         onBlur={() => window.setTimeout(() => setOffen(false), 150)}
         onKeyDown={(e) => {
           if (e.key === "ArrowDown") { e.preventDefault(); setMarkiert((m) => Math.min(m + 1, liste.length - 1)); }
           if (e.key === "ArrowUp") { e.preventDefault(); setMarkiert((m) => Math.max(m - 1, 0)); }
           if (e.key === "Enter" && liste[markiert]) { e.preventDefault(); oeffnen(liste[markiert]); }
-          if (e.key === "Escape") setOffen(false);
+          if (e.key === "Escape") { setOffen(false); onFertig?.(); }
         }}
       />
-      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[0.6875rem] font-medium gedaempft border border-rand rounded-[5px] px-1.5 py-0.5 pointer-events-none">
+      <span className="max-md:hidden absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[0.6875rem] font-medium gedaempft border border-rand rounded-[5px] px-1.5 py-0.5 pointer-events-none">
         Strg K
       </span>
       {offen && begriff.length >= 2 ? (
@@ -153,8 +224,8 @@ function Suche() {
               className={cx("px-3 py-2 rounded-md cursor-pointer flex items-center gap-3 text-sm", i === markiert && "bg-akzent-weich")}
               onMouseDown={(e) => { e.preventDefault(); oeffnen(p); }} onMouseEnter={() => setMarkiert(i)}>
               <span className="num gedaempft">{nummer(p.nummer)}</span>
-              <span className="font-medium">{p.nachname}, {p.vorname}</span>
-              <span className="gedaempft">{datum(p.geburtsdatum)}</span>
+              <span className="font-medium min-w-0 truncate">{p.nachname}, {p.vorname}</span>
+              <span className="gedaempft max-[380px]:hidden">{datum(p.geburtsdatum)}</span>
               {p.ist_abgeschlossen ? <Chip>abgeschlossen</Chip> : null}
               {p.ist_test ? <Chip art="warn">Test</Chip> : null}
             </li>
@@ -207,12 +278,34 @@ export type Pfadteil = { text: string; zu?: string };
 export function Seite({ pfad, children, className }: { pfad: Pfadteil[]; children: ReactNode; className?: string }) {
   const ich = useIch();
   const { pathname } = useLocation();
+  const [suchen, setSuchen] = useState(false);
+  const mobil = useMobil();
   useEffect(() => {
     document.title = `${pfad[pfad.length - 1]?.text ?? "Start"} · EPM`;
   }, [pfad]);
+  useEffect(() => setSuchen(false), [pathname]);
+  // Telefon: nur der letzte Teil des Pfads, davor ein Schritt zurück
+  const zurueck = [...pfad].slice(0, -1).reverse().find((t) => t.zu);
   return (
     <div className="grow min-w-0 flex flex-col min-h-screen">
-      <header className="h-[60px] shrink-0 flex items-center justify-between gap-6 px-8 bg-flaeche border-b border-rand nicht-drucken">
+      {mobil ? <header className="sticky top-0 z-20 shrink-0 bg-flaeche border-b border-rand nicht-drucken pt-[env(safe-area-inset-top)]"
+        data-testid="mobil-kopf">
+        <div className="h-14 flex items-center gap-1 px-2">
+          {zurueck ? (
+            <Link to={zurueck.zu!} className="btn icon geist shrink-0" aria-label={`Zurück: ${zurueck.text}`}><Icon name="zurueck" groesse={20} /></Link>
+          ) : <span className="w-2 shrink-0" />}
+          <span className="grow min-w-0 truncate font-semibold text-[0.9375rem]" aria-current="page">{pfad[pfad.length - 1]?.text}</span>
+          {ich.ist_test ? <Chip art="warn">Test</Chip> : null}
+          <button type="button" className="btn icon geist shrink-0" aria-label="Patient suchen" aria-expanded={suchen}
+            onClick={() => setSuchen((s) => !s)} data-testid="mobil-suche"><Icon name={suchen ? "x" : "suche"} groesse={20} /></button>
+          {pathname !== "/hilfe" ? (
+            <Link to={`/hilfe?seite=${encodeURIComponent(pathname)}`} className="btn icon geist shrink-0" aria-label="Hilfe zu dieser Seite">
+              <Icon name="hilfe" groesse={20} /></Link>
+          ) : null}
+        </div>
+        {suchen ? <div className="px-3 pb-3"><Suche vollbreit onFertig={() => setSuchen(false)} /></div> : null}
+      </header> : null}
+      {mobil ? null : <header className="h-[60px] shrink-0 flex items-center justify-between gap-6 px-8 bg-flaeche border-b border-rand nicht-drucken">
         <nav aria-label="Pfad" className="flex items-center gap-2.5 text-sm min-w-0">
           {pfad.map((t, i) => (
             <span key={i} className="flex items-center gap-2.5 min-w-0">
@@ -230,9 +323,9 @@ export function Seite({ pfad, children, className }: { pfad: Pfadteil[]; childre
           ) : null}
           {ich.ist_test ? <Chip art="warn" data-testid="testzugang">Testzugang</Chip> : null}
         </div>
-      </header>
+      </header>}
       <Systemhinweis />
-      <main className={cx("grow min-h-0 min-w-0 w-full px-4 schmal:px-8 py-7 flex flex-col gap-5", className)}>{children}</main>
+      <main className={cx("grow min-h-0 min-w-0 w-full px-3 sm:px-4 schmal:px-8 py-4 md:py-7 flex flex-col gap-4 md:gap-5 max-md:pb-24", className)}>{children}</main>
     </div>
   );
 }
@@ -255,11 +348,13 @@ function useRechteAktuell() {
 
 export function Shell() {
   useRechteAktuell();
+  const mobil = useMobil();
   return (
     <div className="flex min-h-screen bg-grund">
       <Ladebalken />
       <Seitenleiste />
       <Outlet />
+      {mobil ? <MobilLeiste /> : null}
     </div>
   );
 }

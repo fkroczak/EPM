@@ -158,8 +158,8 @@ function AnmeldungKarte({ onBenutzer }: { onBenutzer: (id: number) => void }) {
   if (!d || wert == null) return <Karte className="px-5 py-4" id="anmeldung">{daten.error ? <Fehleranzeige fehler={daten.error} /> : <Laden />}</Karte>;
   const TEXT: Record<string, string> = {
     freiwillig: "Jede Person entscheidet selbst unter „Mein Konto“. Anmelden geht mit Benutzername und Passwort.",
-    admins: "Admins müssen die Authenticator-App einrichten, alle anderen entscheiden selbst.",
-    alle: "Alle müssen die Authenticator-App einrichten, bevor sie mit EPM arbeiten können.",
+    admins: "Admins müssen einen zweiten Faktor einrichten (Authenticator-App oder Passkey), alle anderen entscheiden selbst.",
+    alle: "Alle müssen einen zweiten Faktor einrichten (Authenticator-App oder Passkey), bevor sie mit EPM arbeiten können.",
   };
   const betroffen = d.ohne_zweiten_faktor.filter((u) => wert === "alle" || (wert === "admins" && u.rolle === "admin"));
   return (
@@ -167,7 +167,7 @@ function AnmeldungKarte({ onBenutzer }: { onBenutzer: (id: number) => void }) {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex flex-col gap-1">
           <h2 className="lbl m-0">Anmeldung: Zwei-Faktor-Anmeldung (2FA)</h2>
-          <span className="text-[0.8125rem] gedaempft leading-normal max-w-[70ch]">Zweiter Faktor ist der Code aus einer Authenticator-App.
+          <span className="text-[0.8125rem] gedaempft leading-normal max-w-[70ch]">Zweiter Faktor ist der Code aus einer Authenticator-App oder ein Passkey (Fingerabdruck, Gesicht, PIN).
             Wer ihn eingerichtet hat, wird beim Anmelden immer danach gefragt – auch wenn er freiwillig ist.</span>
         </div>
         <Knopf klein variante="pri" disabled={wert === d.zweiter_faktor} laedt={speichern.isPending} onClick={() => speichern.mutate()}>Speichern</Knopf>
@@ -274,11 +274,11 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
   const name = benutzer ? benutzer.anzeigename : "die Person";
   const fragen = {
     kennwort: ["Einmal-Kennwort erzeugen", "Das bisherige Kennwort gilt danach nicht mehr, alle Anmeldungen der Person werden beendet."],
-    "2fa": ["2FA zurücksetzen", "Authenticator und Notfall-Codes werden gelöscht. Mit dem neuen Einmal-Kennwort richtet die Person die App neu ein."],
+    "2fa": ["2FA zurücksetzen", "Authenticator, Passkeys und Notfall-Codes werden gelöscht. Mit dem neuen Einmal-Kennwort richtet die Person den zweiten Faktor neu ein."],
     sperren: ["Benutzer sperren", "Die Person kann sich nicht mehr anmelden, alle Sitzungen werden beendet. Einträge bleiben zugeordnet."],
     testdaten: ["Testdaten zurücksetzen", "Alle Testpatienten (Nr. ab 9001) werden gelöscht und die Musterdaten neu angelegt. Echte Patienten bleiben unberührt."],
     ausblenden: ["Testbenutzer ausblenden", "Das Konto wird gesperrt, alle Anmeldungen werden beendet, und es erscheint in keiner Liste mehr (in der Benutzerverwaltung nur mit „Ausgeblendete zeigen“). Es wird nicht gelöscht; Einträge bleiben zugeordnet. Mit „Einblenden“ ist es wieder da."],
-    ohnelogin: ["Auf „ohne Login“ setzen", "Die Person kann sich nicht mehr anmelden und hat keine Rechte mehr (Rolle „Keine Berechtigung“). Passwort, Authenticator und Notfall-Codes werden gelöscht, alle Sitzungen beendet. Ihre Einträge bleiben ihr zugeordnet. Mit „Login geben“ lässt sie sich später wieder einbinden."],
+    ohnelogin: ["Auf „ohne Login“ setzen", "Die Person kann sich nicht mehr anmelden und hat keine Rechte mehr (Rolle „Keine Berechtigung“). Passwort, Authenticator, Passkeys und Notfall-Codes werden gelöscht, alle Sitzungen beendet. Ihre Einträge bleiben ihr zugeordnet. Mit „Login geben“ lässt sie sich später wieder einbinden."],
   } as const;
   const historisch = !!benutzer?.nur_historisch;
   const ohneLogin = neu ? f.ohne_login : historisch;

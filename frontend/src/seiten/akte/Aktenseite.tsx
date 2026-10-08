@@ -15,9 +15,14 @@
  * darunter der erklärende Satz. Rechts der Kopf mit Titel und Zusatz, die Aktionen in derselben Zeile rechts.
  * Die Abstände sind knapper als in den alten Karten, damit der Bildschirm nicht überfüllt wirkt.
  */
+import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
 import { useSearchParams } from "react-router";
+import { detailZeigen } from "@/lib/stufen";
 import { Karte, Laden, Leer, cx } from "@/components/ui/basis";
+
+/** Kennung des Detailbereichs dieses Reiters – ein gewählter Eintrag holt ihn am Telefon in den Blick */
+const DetailKennung = createContext("akte-detail");
 
 /**
  * Welcher Eintrag rechts steht – in der Adresse, damit ein Link darauf zeigen kann und ein Neuladen die Auswahl
@@ -51,19 +56,27 @@ export function Aktenseite({ titel, anzahl, aktion, kopfrechts, liste, fuss, det
   leer?: string;
   testid?: string;
 }) {
+  // Ab 1280 px links Kopf und Liste, rechts das Detail. Darunter (Telefon, schmale Fenster, Festlegung 08.10.2026)
+  // der Kopf mit dem Hauptknopf, dann das gewählte Detail, dann die Liste – der Blick in die Akte braucht kein Scrollen.
+  const kennung = `${testid ?? "akte"}-detailbereich`;
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[290px_minmax(0,1fr)] fhd:grid-cols-[340px_minmax(0,1fr)] gap-5 items-start"
+    <DetailKennung.Provider value={kennung}>
+    <div className="grid grid-cols-1 xl:grid-cols-[290px_minmax(0,1fr)] fhd:grid-cols-[340px_minmax(0,1fr)] gap-x-5 gap-y-4 xl:gap-y-2.5 items-start
+      [grid-template-areas:'kopf'_'detail'_'liste'] xl:[grid-template-areas:'kopf_detail'_'liste_detail'] xl:grid-rows-[auto_1fr]"
       data-testid={testid}>
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-2.5 [grid-area:kopf]">
         <h2 className="lbl m-0">{anzahl != null ? <span className="num mr-1.5">{anzahl}</span> : null}{titel}</h2>
         {aktion}
         {kopfrechts}
+      </div>
+      <div className="flex flex-col gap-2.5 [grid-area:liste]">
         {laedt ? <Laden /> : null}
         {liste}
         {fuss ? <span className="text-[0.8125rem] gedaempft leading-normal">{fuss}</span> : null}
       </div>
-      <div className="min-w-0">{detail ?? (leer ? <Hinweiskarte>{leer}</Hinweiskarte> : null)}</div>
+      <div className="min-w-0 [grid-area:detail] scroll-mt-20" data-testid={kennung}>{detail ?? (leer ? <Hinweiskarte>{leer}</Hinweiskarte> : null)}</div>
     </div>
+    </DetailKennung.Provider>
   );
 }
 
@@ -93,6 +106,7 @@ export function Eintrag({ datum: datumText, merkmal, zeile, unten, aktiv, onWahl
   /** hebt den Eintrag hervor (z. B. Entwurf, storniert) */
   warnung?: boolean;
 }) {
+  const kennung = useContext(DetailKennung);
   // Listenpunkt und Knopf getrennt: ``role="listitem"`` direkt auf dem Knopf würde dessen Rolle ersetzen – er
   // wäre dann für Hilfsmittel (und Tests) kein Knopf mehr.
   return (
@@ -100,7 +114,7 @@ export function Eintrag({ datum: datumText, merkmal, zeile, unten, aktiv, onWahl
       <button type="button" aria-current={aktiv ? "true" : undefined}
         className={cx("card w-full text-left px-3 py-2 flex flex-col gap-0.5 cursor-pointer border",
           aktiv ? "border-akzent bg-akzent-weich" : "hover:bg-fein", warnung && !aktiv && "border-warn")}
-        onClick={onWahl}>
+        onClick={() => { onWahl(); detailZeigen(kennung); }}>
         <span className="flex items-center justify-between gap-2 w-full">
           <span className="num font-medium text-sm">{datumText}</span>
           {merkmal}

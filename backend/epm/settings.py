@@ -180,6 +180,13 @@ EPM_EINMAL_KENNWORT_STUNDEN = int(env("EPM_EINMAL_KENNWORT_STUNDEN", "48"))
 OTP_TOTP_ISSUER = env("EPM_OTP_ISSUER", "EPM")
 OTP_TOTP_TOLERANCE = 1
 
+# Passkeys (WebAuthn, Festlegung 08.10.2026): funktionieren nur über einen Namen mit gültigem Zertifikat (eigene CA,
+# siehe rollout/epm-zertifikat.sh), nicht über eine IP-Adresse. Adresse(n) wie im Browser, Standard: die Adressen
+# aus DJANGO_CSRF_TRUSTED_ORIGINS; RP-ID = Name der ersten Adresse (z. B. epm.stiftung.lan).
+EPM_PASSKEY_ORIGINS = env_list("EPM_PASSKEY_ORIGINS", "") or CSRF_TRUSTED_ORIGINS
+EPM_PASSKEY_RP_ID = env("EPM_PASSKEY_RP_ID", "")
+EPM_PASSKEY_NAME = env("EPM_PASSKEY_NAME", "EPM")
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["accounts.permissions.Angemeldet"],

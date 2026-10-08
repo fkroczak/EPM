@@ -80,10 +80,9 @@ def epm_info():
     from accounts import zweifaktor
     from accounts.models import Rolle, User
     from patienten.models import Dokument, Patient
-    from django_otp.plugins.otp_totp.models import TOTPDevice
 
     konten = User.objects.filter(nur_historisch=False, ausgeblendet_am__isnull=True)  # ausgeblendete Testbenutzer nicht
-    mit_2fa = set(TOTPDevice.objects.filter(confirmed=True).values_list("user_id", flat=True))
+    mit_2fa = zweifaktor.nutzer_mit_zweitem_faktor()  # Authenticator oder Passkey
     ohne_2fa = list(konten.filter(is_active=True).exclude(id__in=mit_2fa).order_by("last_name", "first_name"))
     einmal = list(konten.filter(is_active=True, muss_kennwort_aendern=True).order_by("last_name", "first_name"))
     dokumente = Dokument.objects.all()

@@ -38,3 +38,26 @@ export function ab(stufe: Stufe, grenze: Stufe): boolean {
   const reihe: Stufe[] = ["eng", "schmal", "hd", "fhd", "qhd"];
   return reihe.indexOf(stufe) >= reihe.indexOf(grenze);
 }
+
+/**
+ * Telefon (Festlegung 08.10.2026): unter 768 px Breite – Hauptarbeitsplatz bleibt der PC, am Telefon geht es um
+ * schnelles Freigeben von Plänen, kurze Blicke in die Akte und Notizen. Dort: Leiste unten statt Seitenleiste,
+ * Listen statt breiter Tabellen, Details vor den Listen.
+ */
+const MOBIL = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(max-width: 767.98px)") : null;
+
+export function useMobil(): boolean {
+  return useSyncExternalStore(
+    (melden) => { MOBIL?.addEventListener("change", melden); return () => MOBIL?.removeEventListener("change", melden); },
+    () => !!MOBIL?.matches,
+    () => false,
+  );
+}
+
+/** Ohne Seitenspalten (unter 1280 px stehen Liste und Detail untereinander): gewählten Eintrag in den Blick holen. */
+export function detailZeigen(testid: string) {
+  if (typeof window === "undefined" || window.matchMedia("(min-width: 1280px)").matches) return;
+  window.requestAnimationFrame(() => {
+    document.querySelector(`[data-testid="${testid}"]`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
+}

@@ -65,6 +65,13 @@ auth = [
     path("ich/", konto.IchView.as_view()),
     path("notfallcodes/", konto.NotfallcodesView.as_view()),
     path("sicherheit/", konto.SicherheitView.as_view()),
+    # Passkeys (Festlegung 08.10.2026)
+    path("passkey/optionen/", konto.PasskeyOptionenView.as_view()),
+    path("passkey/", konto.PasskeyAnmeldenView.as_view()),
+    path("passkey/registrieren/", konto.PasskeyRegistrierenView.as_view()),
+    path("passkeys/", konto.PasskeysView.as_view()),
+    path("passkeys/<int:pk>/", konto.PasskeyView.as_view()),
+    path("passkeys/<int:pk>/entfernen/", konto.PasskeyEntfernenView.as_view()),
 ]
 
 urlpatterns = [

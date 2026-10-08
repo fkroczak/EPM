@@ -7,7 +7,7 @@
  */
 import { expect, test } from "@playwright/test";
 import type { Browser, Page } from "@playwright/test";
-import { apiAls, apiAnmelden, gemerkt, stackNeuStarten, totpBase32, zustand } from "./hilfen";
+import { OHNE_ANMELDUNG, apiAls, apiAnmelden, gemerkt, stackNeuStarten, totpBase32, virtuellerAuthenticator, zustand } from "./hilfen";
 import type { Rolle } from "./hilfen";
 
 test.describe.configure({ mode: "serial" });
@@ -321,4 +321,29 @@ test("Nach dem Neustart: Import – Dump, Zuordnungen und Läufe der Altdaten-Ü
     await expect(laeufe.getByTestId("lauf").filter({ hasText: art }).first()).toContainText("erfolgreich");
   }
   await a.ctx.close();
+});
+
+test("Nach dem Neustart: mit Passkey anmelden und mit Passkey bestätigen (Passkey entfernen)", async ({ browser }) => {
+  const k = gemerkt("passkey");
+  const ctx = await browser.newContext({ storageState: OHNE_ANMELDUNG, ignoreHTTPSErrors: true });
+  const page = await ctx.newPage();
+  const { cdp, authenticatorId } = await virtuellerAuthenticator(ctx, page);
+  await cdp.send("WebAuthn.addCredential", { authenticatorId, credential: k.credential });
+  await page.goto("/");
+  await page.getByLabel("Benutzername").fill(k.benutzername);
+  await page.getByLabel("Passwort").fill(k.kennwort);
+  await page.getByRole("button", { name: "Weiter" }).click();
+  await page.getByTestId("passkey-anmelden").click();
+  await expect(page.getByTestId("angemeldet-als")).toHaveText("P. Neustart");
+  await page.goto("/konto");
+  const eintrag = page.getByTestId("passkey-eintrag");
+  await expect(eintrag).toContainText("Telefon");
+  await eintrag.getByRole("button", { name: "Telefon entfernen" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Dein Passwort").fill(k.kennwort);
+  await dialog.getByTestId("passkey-bestaetigen").click();
+  await dialog.getByRole("button", { name: "Entfernen" }).click();
+  await expect(page.getByText("Passkey „Telefon“ entfernt.")).toBeVisible();
+  await expect(page.getByTestId("passkeys")).toContainText("keiner");
+  await ctx.close();
 });

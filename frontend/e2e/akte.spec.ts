@@ -345,7 +345,7 @@ test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pfl
   await dialog.getByLabel("Arzt").selectOption({ label: `${arztName} · Allgemeinmedizin (Münster)` });
   await dialog.getByLabel("Rolle").selectOption("hausarzt");
   await dialog.getByRole("button", { name: "Zuordnen" }).click();
-  await expect(page.getByText("Arzt zugeordnet.")).toBeVisible();
+  await expect(page.getByText("Arzt zugeordnet.", { exact: true })).toBeVisible();
   await expect(aerzte.getByTestId("arzt-zuordnung")).toContainText(arztName);
   await expect(aerzte.getByTestId("arzt-zuordnung")).toContainText("0251 12345");
   const kopf = page.getByTestId("kennzahlen");

@@ -10,7 +10,8 @@ EPM_MGMT_IP="192.168.56.10"        # IP dieser Karte, darauf lauscht HTTPS
 EPM_MGMT_NET="192.168.56.0/24"     # erlaubtes Quellnetz (VPS: VPN-Netz der OPNsense)
 EPM_SSH_PORT="22"
 
-# Name im Browser (muss zum Zertifikat passen)
+# Name im Browser (muss zum Zertifikat passen). Für Passkeys ein Name, keine IP (Festlegung 08.10.2026): auf der
+# OPNsense per Unbound-Überschreibung auf EPM_MGMT_IP zeigen lassen, Zertifikat mit  sudo epm-zertifikat einrichten
 EPM_WEB_NAME="epm.test"
 
 # Projektverzeichnis
