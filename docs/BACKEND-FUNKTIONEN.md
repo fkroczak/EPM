@@ -181,6 +181,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F141 | Patientenliste ohne Vorschau der Akte; Klick auf die Zeile öffnet die Akte | 3 Patientenliste | ABGESCHLOSSEN (Lauf steht aus) |
 | F142 | Kalender: „×“ an jedem Eintrag – Termine und Fälligkeiten ausblenden (3/6/12 Monate oder „nicht mehr nötig“, mit Grund) | 2 Start, 4 Akte, Kalender | ABGESCHLOSSEN (Lauf steht aus) |
 | F143 | Teiler und Ränder ohne Punkte-Griff; beim Überfahren breiter und farbig | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
+| F144 | Rückmeldungen als Overlay: grün quittiert und blendet aus, rot bleibt länger | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2666,6 +2667,18 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   Mauszeiger zeigt „Größe ändern“; beim Ziehen erscheint weiter der Hinweis zum Einrasten.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F144 Rückmeldungen als Overlay
+- **Wunsch 08.10.2026:** „Beim Speichern hatte ich beim ursprünglichen EPM ein grünes Overlay, das sich nach ein paar
+  Sekunden ausgeblendet hat … Auch kurze rote Fehler wurden so angezeigt, blieben aber länger stehen.“
+- **Ansicht (`components/ui/hinweise.tsx`):** statt der kleinen Meldung unten rechts ein Overlay oben in der Mitte
+  (unter der Kopfzeile, am Telefon unter der Titelleiste), kräftig grün mit Haken bzw. rot mit Warnzeichen, weicher
+  Ein- und Ausblendeffekt. Grün steht ca. 3 s, rot ca. 9 s; „×“ schließt sofort. Gleiche Meldungen kurz hintereinander
+  erscheinen nur einmal, höchstens vier gleichzeitig. Das Overlay fängt keine Klicks ab (nur das „×“). Farben je Schema
+  (`--ok`/`--auf-ok`, `--fehler`/`--auf-fehler`), bei „Hoher Kontrast“ mit Rahmen. Alle bisherigen Meldungen (über 90
+  Stellen) nutzen es ohne Änderung.
+- **Teststatus:** `oberflaeche.spec.ts` „Rückmeldung als Overlay …“.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2764,6 +2777,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Rückmeldungen (Wunsch 08.10.2026) | Grünes bzw. rotes Overlay oben in der Mitte wie im alten EPM: grün ca. 3 s, rot ca. 9 s, „×“ schließt (F144). Lauf steht aus (GitHub Actions wegen Abrechnung gesperrt) |
 | 08.10.2026 | Kalender ausblenden, Griffe (Wunsch 08.10.2026) | „×“ an jedem Kalendereintrag: Fälligkeiten schalten den Hinweis der Akte stumm, Termine werden mit Frist oder „nicht mehr nötig“ und Grund ausgeblendet und lassen sich in der Akte zurückholen (F142, Migration `patienten/0012`, von Hand geschrieben – `makemigrations --check` auf der Test-VM prüft sie). Der Kalender berücksichtigt jetzt auch stummgeschaltete Hinweise (vorher nicht). Teiler ohne Punkte-Griff, beim Überfahren hervorgehoben (F143). Lauf steht aus (GitHub Actions wegen Abrechnung gesperrt) |
 | 08.10.2026 | Form, Fortschritt, Benutzermenü (Wunsch 08.10.2026) | Ladebalken 5 px, in „Individuell“ in der Akzentfarbe (F137); Fortschritt laufender Aufträge mit ungefährer Restzeit aus der Dauer früherer Aufträge, Karte „Laufende Tätigkeiten“ auf Backup und System (F138); Form „Rund“/„Eckig“ unter Mein Konto, eckig ohne Rundungen und ohne Abstände zwischen den Karten (F139, `darstellung.form`, ohne Migration); unten links nur die Person, Hilfe/Mein Konto/Abmelden im Menü (F140); Patientenliste ohne Vorschau, Klick auf die Zeile öffnet die Akte (F141). GitHub Actions startete wegen der Abrechnung des Kontos weiterhin keine Jobs; die Tests sind geschrieben, der Lauf steht aus |
 | 08.10.2026 | Aufbau der Patientenakte (Wunsch 08.10.2026) | Drei Ansichten der Akte je Person unter Mein Konto › Patientenakte (F135): Kopfzeile mit den Angaben in vier Gruppen und Griff für die Höhe (nur Name · eine Zeile · alle Angaben), Seitenleiste mit Knöpfen über dem Namen, ziehbarer Breite (240–480 px, rastet ein) und senkrechten Reitern, Karteikarte wie in einer Arztsoftware mit fester Spalte rechts. Karteikarte mit allen Einträgen chronologisch, Filter, Zeitraum und Kürzelzeile K/G/T/WV/P (F136, neuer Reiter `kartei`). Darstellung um `aktenansicht`, `aktenkopf`, `aktenleiste_breite` erweitert (ohne Migration). CAVE (Nickelallergie, Gewichtsverlust) steht jetzt in jeder Ansicht beim Namen. Das Menü links ist unverändert. Die Arbeitsumgebung hatte keinen Zugriff auf PyPI, npm und Docker Hub, GitHub Actions startete wegen der Abrechnung des Kontos keine Jobs – Backend-Test und Browsertest sind geschrieben, aber noch nicht gelaufen (zuerst auf der Test-VM mit `sudo epm-update`) |
