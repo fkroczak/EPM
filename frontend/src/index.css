@@ -640,3 +640,12 @@ html { scrollbar-gutter: stable; }
 
 /* Kalender (Wunsch 08.10.2026: ohne Scrollen auf 1080p): sechs Wochen füllen genau die Fensterhöhe */
 .kalender-zelle { height: max(5.25rem, calc((100vh - 15.5rem) / 6)); }
+
+/* Navigation (Wunsch 08.10.2026): schmale Leiste mit Symbolen – alle Einträge gleich groß (40 × 36 px) und mittig;
+   Leiste mit Text 224 px statt 256 px. Hauptknopf im Seitenkopf („Neuer …“) überall gleich breit. */
+@media (max-width: 89.99rem) and (min-width: 48rem) {
+  .nav.nav-symbol { justify-content: center; gap: 0; padding: 0; width: 2.5rem; height: 2.25rem; margin: 0 auto; }
+  .benutzerknopf { justify-content: center; padding: 0.25rem 0; }
+}
+.seitenkopf .btn.pri { min-width: 10rem; }
+.benutzermenue-liste { margin-left: 0; }

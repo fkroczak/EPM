@@ -185,6 +185,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F145 | Weniger Leerraum: Rand des Seiteninhalts und Abstände zwischen den Karten verkleinert | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 | F146 | Einheitlich und kompakt: Seitenkopf in einer Zeile, gleiche Steuerhöhen, kleinere Innenabstände, kein Springen; Suche bei Versorger | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 | F147 | Ohne Scrollen auf 1080p: Formulare Versorger/Ärzte im 6-Spalten-Raster, Kalender füllt die Fensterhöhe, Benutzermenü bündig | Versorger, Ärzte, Kalender, Seitenleiste | ABGESCHLOSSEN (Lauf steht aus) |
+| F148 | Navigation: schmale Leiste mit gleich großen, mittigen Symbolen; Leiste mit Text 224 px; Hauptknöpfe gleich breit; leere Bereiche kompakt | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2725,6 +2726,16 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   Symbole, Schrift).
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F148 Navigation gleichmäßig und schmaler
+- **Wunsch 08.10.2026:** „Warum sind nicht alle Menüpunkte gleich groß? Kann die Seitenmenüleiste auch schmaler werden?
+  Warum ist das Menü nicht mittig, wenn klein?“
+- **Ansicht:** Zwischen 768 und 1440 px (nur Symbole) ist jeder Eintrag 40 × 36 px groß und das Symbol mittig – vorher
+  saß es links und der markierte Eintrag war breiter als das Symbol; der Benutzerknopf unten ist dort ebenfalls mittig.
+  Ab 1440 px ist die Leiste mit Text 224 statt 256 px breit (Logo passt sich an). Der Hauptknopf im Seitenkopf („Neuer
+  Versorger“, „Neuer Arzt“, „Neuer Plan“ …) ist überall mindestens 160 px breit. Leere Bereiche („Keine …“) mit
+  12 statt 24 px Abstand.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2823,6 +2834,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Navigation | Gleich große, mittige Symbole in der schmalen Leiste, Leiste mit Text 224 px, gleich breite Hauptknöpfe, kompakte Leerzustände (F148). Entwürfe für Versorger/Ärzte und Kalender (PC, Tablet, Telefon) zur Abstimmung. Lauf steht aus |
 | 08.10.2026 | Ohne Scrollen auf 1080p | Versorger/Ärzte-Formular im 6-Spalten-Raster, engere Felder, Kalender in Fensterhöhe, Benutzermenü bündig (F147). Lauf steht aus |
 | 08.10.2026 | Einheitlich und kompakt | Seitenkopf einzeilig auf allen Seiten, gleiche Steuerhöhen (Umschalter = Knöpfe), Dichte „Normal“ 32 px, Karten mit 16/12 px Innenabstand, Scrollbalken-Platz reserviert gegen Springen; Suche bei Versorger (F146). Lauf steht aus |
 | 08.10.2026 | Form entfernt, weniger Leerraum | Form „Rund/Eckig“ samt Menüpunkt entfernt (F139); gespeicherte Werte werden verworfen. Stattdessen für alle weniger Rand und kleinere Abstände zwischen den Karten (F145). Dabei aufgefallen: Das Feld `form` war im Backend nie angekommen – „Eckig“ hätte sich auf der Test-VM nicht speichern lassen; mit dem Entfernen erledigt |
