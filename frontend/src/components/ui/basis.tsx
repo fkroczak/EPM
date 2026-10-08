@@ -145,7 +145,7 @@ export function Meldung({ art = "info", children, className }: { art?: "info" | 
 }
 
 export function Leer({ children }: { children: ReactNode }) {
-  return <p className="m-0 py-6 text-center text-sm gedaempft">{children}</p>;
+  return <p className="m-0 py-3 text-center text-sm gedaempft">{children}</p>;
 }
 
 export function Fehleranzeige({ fehler }: { fehler: unknown }) {

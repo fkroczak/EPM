@@ -30,8 +30,10 @@ function NavText({ children }: { children: ReactNode }) {
 }
 
 function NavEintrag({ zu, icon, text, ende }: { zu: string; icon: string; text: string; ende?: boolean }) {
+  // schmale Leiste (nur Symbole): jeder Eintrag gleich groß und das Symbol mittig (Wunsch 08.10.2026)
+  const voll = useContext(Voll);
   return (
-    <NavLink to={zu} end={ende} title={text} className={({ isActive }) => cx("nav", isActive && "aktiv")}>
+    <NavLink to={zu} end={ende} title={text} className={({ isActive }) => cx("nav", !voll && "nav-symbol", isActive && "aktiv")}>
       <Icon name={icon} groesse={18} />
       <NavText>{text}</NavText>
     </NavLink>
@@ -71,10 +73,10 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
   return (
     <Voll.Provider value={v}>
     <aside className={cx("shrink-0 bg-flaeche border-r border-rand flex flex-col py-4 gap-5 nicht-drucken overflow-y-auto",
-      v ? "w-full h-full px-3" : "w-16 hd:w-64 px-2 hd:px-3 sticky top-0 h-screen max-md:hidden")}
+      v ? "w-full h-full px-3" : "w-16 hd:w-56 px-2 hd:px-2.5 sticky top-0 h-screen max-md:hidden")}
       style={{ borderRightWidth: "var(--randbreite)" }} data-testid={v ? "schublade" : "seitenleiste"}>
       <div className={cx(v ? "flex" : "hidden hd:flex", "flex-col gap-2")}>
-        <Logo className="w-[204px] h-[72px] px-1.5 py-1 rounded-lg bg-white" />
+        <Logo className="w-full max-w-[204px] h-[64px] px-1.5 py-1 rounded-lg bg-white" />
         <span className="px-1 font-mono text-[0.6875rem] font-medium tracking-[.07em] uppercase gedaempft">
           EPM · Patientenmanagement
         </span>
