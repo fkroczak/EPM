@@ -93,11 +93,26 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   await expect(page.getByRole("heading", { name: "Neuer Patient" })).toBeVisible();
   await expect(page.getByTestId("naechste-nummer")).toHaveText(/^\d{4}$/);
 
-  // Versorger direkt aus dem Formular neu anlegen
-  await page.getByRole("link", { name: "Neu anlegen" }).click();
-  await expect(page.getByTestId("versorger-detail").getByRole("heading", { name: "Neuer Versorger" })).toBeVisible();
-  await page.goBack();
+  // Versorger und Arzt direkt aus dem Formular neu anlegen – im Dialog, die Seite bleibt (08.10.2026)
+  const versorgerName = eindeutig("Versorger E2E");
+  await page.getByRole("button", { name: "Neuen Versorger anlegen" }).click();
+  const vd = page.getByRole("dialog");
+  await expect(vd.getByRole("heading", { name: "Neuer Versorger" })).toBeVisible();
+  await vd.getByRole("button", { name: "Anlegen" }).click();
+  await expect(vd.getByText("Bitte einen Namen eingeben.")).toBeVisible();
+  await vd.getByLabel("Name", { exact: true }).fill(versorgerName);
+  await vd.getByLabel("Ort").fill("Münster");
+  await vd.getByRole("button", { name: "Anlegen" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByLabel("Versorger", { exact: true }).locator("option:checked")).toHaveText(versorgerName);
   await expect(page.getByRole("heading", { name: "Neuer Patient" })).toBeVisible();
+  const arztName = eindeutig("Dr. E2E");
+  await page.getByRole("button", { name: "Neuen Arzt anlegen" }).click();
+  await page.getByRole("dialog").getByLabel("Name", { exact: true }).fill(arztName);
+  await page.getByRole("dialog").getByRole("button", { name: "Anlegen" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByLabel("Hausarzt").locator("option:checked")).toHaveText(arztName);
+  await expect(page).toHaveURL(/\/patienten\/neu$/);
 
   // Pflichtfelder (Prüfung in der Oberfläche)
   await page.getByRole("button", { name: "Anlegen und Akte öffnen" }).click();

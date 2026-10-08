@@ -19,6 +19,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
 import { GewichtDialog, KontaktDialog } from "@/components/Schnellerfassung";
+import { useAktenAblage } from "@/components/AktenAblage";
 import type { Aktenansicht } from "@/lib/darstellung";
 import { useMobil } from "@/lib/stufen";
 import { Kopfgriff, Leistengriff, useDarstellung } from "./ansicht";
@@ -435,6 +436,8 @@ export function Akte() {
     gewicht: offenBei("eintraege_erfassen"),
   };
   useOhneRechtSchliessen(erlaubt[dialog], () => setDialog(""));
+  // Dokumente: „Dokument hochladen“ im Kopf und Dateien auf die ganze Akte ziehen (08.10.2026)
+  const { waehlen: dateiWaehlen, ablage } = useAktenAblage(offenBei("eintraege_erfassen") && p ? p.id : null);
   // Verarbeitung eingeschränkt (auch wenn es während der Arbeit geschieht oder die Einsicht abläuft): Was vorher
   // geladen war, wird nicht weiter gezeigt
   const gesperrt = akte.error instanceof ApiFehler && akte.error.status === 403 ? akte.error.daten as Eingeschraenkt | null : null;
@@ -509,9 +512,14 @@ export function Akte() {
         <Knopf klein={klein} icon="waage" onClick={() => kontext.gewichtErfassen()}>Gewicht</Knopf>
         <Knopf klein={klein} icon="kalender" onClick={() => setDialog("termin")}>Termin</Knopf>
       </> : null}
-      {kontext.planen ? <Knopf klein={klein} icon="tropfen" onClick={() => navigate(`${basis}/plaene/neu`)}>Neuer Plan</Knopf> : null}
+      {/* Offener Entwurf: fortsetzen statt eines zweiten Plans (Vorschlag „Erfassen“, 08.10.2026) */}
+      {kontext.planen ? (p.kopf?.plan_entwurf
+        ? <Knopf klein={klein} icon="stift" title={`Entwurf vom ${datum(p.kopf.plan_entwurf.erstellt_am)}`}
+            onClick={() => navigate(`${basis}/plaene/${p.kopf!.plan_entwurf!.id}/bearbeiten`)}>Entwurf fortsetzen</Knopf>
+        : <Knopf klein={klein} icon="tropfen" onClick={() => navigate(`${basis}/plaene/neu`)}>Neuer Plan</Knopf>) : null}
       <Menue label="Weitere Aktionen" eintraege={[
         ...(kontext.bearbeiten ? [{ text: "Stammdaten bearbeiten", onClick: () => setDialog("stammdaten") }] : []),
+        ...(kontext.erfassen ? [{ text: "Dokument hochladen …", onClick: dateiWaehlen }] : []),
         { text: "Akte als PDF", onClick: () => setDialog("pdf") },
         // Unterlagen für die Sprechstunde (F116): der aktuellste Stand aller Bereiche auf einem Blatt
         { text: "Unterlagen für die Sprechstunde", onClick: () => setDialog("sprechstunde") },
@@ -650,6 +658,7 @@ export function Akte() {
         vorgabe={{ id: p.id, name: name(p), ist_test: p.ist_test }} text={vorbelegt} /> : null}
       {kontext.erfassen ? <GewichtDialog offen={dialog === "gewicht"} onOffen={(o) => setDialog(o ? "gewicht" : "")}
         vorgabe={{ id: p.id, name: name(p), ist_test: p.ist_test }} wert={vorbelegt} /> : null}
+      {ablage}
     </>
   );
   const pfad = [{ text: "Patienten", zu: "/patienten" }, { text: name(p) }];

@@ -139,3 +139,31 @@ test("PDF-Vorschau und Ansicht in EPM (ohne PDF-Programm des Browsers), Schaltfl
   // Herunterladen bleibt als Link mit lesbarer Schrift
   await expect(details.getByRole("link", { name: "Herunterladen" })).toBeVisible();
 });
+
+test("Dokument aus dem Aktenkopf und per Ziehen auf die Akte – die Seite bleibt, wo sie ist (08.10.2026)", async ({ page }) => {
+  const api = await apiAls("mitarbeiter");
+  const p = await api.post("patienten/", { nachname: eindeutig("Ablage"), vorname: "Doris", geburtsdatum: "1980-08-08" });
+  await page.goto(`/patienten/${p.id}`);
+  // „Weitere Aktionen › Dokument hochladen …“ öffnet die Dateiauswahl
+  await page.getByRole("button", { name: "Weitere Aktionen" }).click();
+  const [auswahl] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    page.getByRole("menuitem", { name: "Dokument hochladen …" }).click(),
+  ]);
+  await auswahl.setFiles([{ name: "Befund Kopf.txt", mimeType: "text/plain", buffer: Buffer.from("Befund (E2E)\n", "utf-8") }]);
+  await expect(page.getByText("Dokument „Befund Kopf.txt“ in die Akte gelegt.")).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}$`));
+  // Ziehen auf die Akte: Hinweis erscheint, Ablegen lädt hoch
+  const daten = await page.evaluateHandle(() => {
+    const dt = new DataTransfer();
+    dt.items.add(new File(["Brief (E2E)\n"], "Brief gezogen.txt", { type: "text/plain" }));
+    return dt;
+  });
+  await page.dispatchEvent("main", "dragenter", { dataTransfer: daten });
+  await expect(page.getByTestId("akten-ablage")).toBeVisible();
+  await page.dispatchEvent("main", "drop", { dataTransfer: daten });
+  await expect(page.getByTestId("akten-ablage")).toHaveCount(0);
+  await expect(page.getByText("Dokument „Brief gezogen.txt“ in die Akte gelegt.")).toBeVisible();
+  await expect.poll(async () => (await api.get(`dokumente/?patient=${p.id}`)).results.length).toBe(2);
+  await api.ende();
+});

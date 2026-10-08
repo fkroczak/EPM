@@ -74,6 +74,8 @@ class Infusionsplaene(PlanHilfen, Grundlage):
         self.assertEqual(c.delete(f"/api/infusionsplaene/{e1['id']}/").status_code, 403)
         # neuer Entwurf ist vorbelegt, Änderungen werden markiert
         e2 = self.entwurf(c)
+        # Aktenkopf kennt den offenen Entwurf („Entwurf fortsetzen“, 08.10.2026)
+        self.assertEqual(c.get(f"/api/patienten/{self.patient.id}/").json()["kopf"]["plan_entwurf"]["id"], e2["id"])
         self.assertEqual(float(e2["glucose_g"]), 200)
         self.assertEqual(e2["vorgaenger"], e1["id"])
         self.assertEqual(len(e2["vitamine"]), 2)
@@ -91,6 +93,7 @@ class Infusionsplaene(PlanHilfen, Grundlage):
         kopf = c.get(f"/api/patienten/{self.patient.id}/").json()["kopf"]
         self.assertEqual(kopf["aktueller_plan"]["id"], e2["id"])
         self.assertEqual(float(kopf["aktueller_plan"]["laufzeit_h"]), 12.0)
+        self.assertIsNone(kopf["plan_entwurf"])
 
     def test_entwurf_verwerfen(self):
         c = client_fuer(self.mediziner)
