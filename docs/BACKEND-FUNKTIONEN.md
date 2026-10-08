@@ -3048,7 +3048,11 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   Warteschlange, Speicher; `epm_info` liefert dasselbe. Fehlen die PP-OCR-Modelle im Image, arbeitet die Erkennung mit
   Tesseract allein und sagt das hier und in „Scans“.
 - **Betrieb:** Compose-Dienst `ocr` mit Speichergrenze und Healthcheck; `data/scans` legt `04-projekt.sh` an; beim
-  Wiederherstellen hält der Systemagent auch `ocr` an. **Scan-Dateien sind nicht in der Sicherung** (laufen ohnehin
+  Wiederherstellen hält der Systemagent auch `ocr` an. **Modelle offline:** `werkzeuge/ocr-modelle.sh vorbereiten` (bzw. `ocr-modelle.ps1`
+  unter Windows) lädt die Modelle auf einem beliebigen Rechner mit Internet und prüft sie gegen `modelle.json`;
+  `sudo epm-ocr-modelle einspielen DATEI.tar` legt sie auf der Test-VM nach `/srv/epm/ocr-modelle`, `epm-update` legt
+  sie vor dem Bau in den Bau-Kontext (`scans/modelle/dateien/`, nicht im Repo) und baut ein vorhandenes Image ohne
+  Modelle neu; das Update meldet „Texterkennung: Tesseract + PP-OCRv5“ bzw. „nur Tesseract“. **Scan-Dateien sind nicht in der Sicherung** (laufen ohnehin
   nach Tagen ab); zugeordnete Dokumente sind es.
 - **Teststatus (für F160–F167):** `scans/tests.py` (24 Tests gegen PostgreSQL mit echter Erkennung: Foto mit
   Perspektive/Schatten/Drehung, Laborwerte und Umrechnung, BIA, Verlängern bis Höchstdauer, Bereinigung, Zuordnen in
@@ -3154,7 +3158,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | U65 | ~~Auto-OCR auch für Dokumente aus der Akte und dem Altsystem?~~ **Geklärt 09.10.2026:** automatisch nur, was über „Scans“ kommt; Dokumente in der Akte bekommen einen Knopf „Text erkennen“, der das Dokument durch die erkannte Fassung ersetzt | F163 | folgt (nächster Schritt) |
 | U66 | ~~Welches BIA-Gerät?~~ **Geklärt 09.10.2026:** unterschiedliche Geräte (Patienten deutschlandweit) – allgemeine Erkennung nach Beschriftung, gängige Bezeichnungen der Geräte (auch englisch) werden ergänzt | F166 | folgt |
-| U67 | ~~PP-OCRv5-Modelle beim Bau von huggingface.co laden?~~ **Geklärt 09.10.2026:** die Modelle kommen mit dem Update (im Repo), der Bau braucht keinen Zugang zu huggingface.co | F162 | folgt |
+| U67 | ~~PP-OCRv5-Modelle beim Bau von huggingface.co laden?~~ **Geklärt 09.10.2026:** Modelle offline vorbereiten (`werkzeuge/ocr-modelle.sh` bzw. `.ps1`) und auf der Test-VM mit `epm-ocr-modelle einspielen` ablegen; `epm-update` baut sie ein. Ohne sie: nur Tesseract | F167 | – |
 | U68 | ~~Scan-Dateien nicht in der Sicherung~~ **Bestätigt 09.10.2026:** richtig so; Scans lassen sich jederzeit selbst sofort löschen | F165, F61 | – |
 | U69 | ~~Startseite: Kachel oder Hinweis?~~ **Bestätigt 09.10.2026:** Hinweis | F160 | – |
 | U70 | ~~Geänderte Frist auch für vorhandene Scans?~~ **Bestätigt 09.10.2026:** nur für neue Scans | F165 | – |
@@ -3164,6 +3168,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 09.10.2026 | OCR-Modelle offline | `ocr-modelle.sh vorbereiten/einspielen/status`, `ocr-modelle.ps1`, `epm-update` baut die Modelle ein und meldet den Stand der Texterkennung (U67) |
 | 09.10.2026 | Scans: Rückmeldungen | U65–U71 geklärt bzw. bestätigt; OCR-Knopf für Akten-Dokumente, BIA-Bezeichnungen und Modelle im Update folgen |
 | 09.10.2026 | Scans und Texterkennung | Neuer Menüpunkt „Scans“: Hochladen, Seite anpassen, Erkennung ohne externen Dienst (Tesseract best + PP-OCRv5, OCR-Dienst), Text kopieren, Zuordnen mit Übernahme von Labor/BIA/Diagnosen, Aufbewahrung 7/7/30 Tage mit Bereinigung (F160–F167). Lauf steht aus |
 | 09.10.2026 | Design eigener Menüpunkt | Design (/design) und Mein Konto (/konto) getrennt, beide im Benutzermenü (F158). Lauf steht aus |

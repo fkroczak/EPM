@@ -7,3 +7,6 @@ backend/dokumente/
 # Serverkonfiguration (Zugangsdaten) – nicht die Nginx-Konfiguration unter rollout/projekt/nginx/
 /epm.conf
 /rollout/epm.conf
+# OCR-Modelle, offline vorbereitet (werkzeuge/ocr-modelle.sh) – kommen nicht ins Repo
+backend/scans/modelle/dateien/
+epm-ocr-modelle-*.tar
