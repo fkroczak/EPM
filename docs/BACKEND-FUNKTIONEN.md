@@ -195,6 +195,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F155 | Tastenkürzel: K, G, T, P, Alt+Ziffer in der Akte, Strg Enter in Dialogen, ? Übersicht | 4 Akte, alle Dialoge | ABGESCHLOSSEN (Lauf steht aus) |
 | F156 | Versorger/Ärzte und Kalender nach den Entwürfen (PC, Tablet, Telefon) | Versorger, Ärzte, Kalender | ABGESCHLOSSEN (Lauf steht aus) |
 | F157 | Rest der Vorschläge: Stift an „Versorgung“, Messpunkt im Diagramm bearbeiten, „Neues Dokument“ | 4 Akte | ABGESCHLOSSEN (Lauf steht aus) |
+| F158 | Design und Mein Konto getrennt: eigener Menüpunkt „Design“ (/design) | Benutzermenü, Design, Mein Konto | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2892,6 +2893,19 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
 - **Teststatus:** `akte.spec.ts` (Stift an „Versorgung“, Klick auf Messpunkt).
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F158 Design und Mein Konto als getrennte Menüpunkte
+- **Wunsch 09.10.2026:** „Bitte Design und Mein Konto voneinander trennen und als separate Menüpunkte anbieten.“
+- **Menü:** Das Benutzermenü unten links (und die Schublade am Telefon) bietet jetzt Hilfe, **Design**, Mein Konto und
+  Abmelden. Neues Symbol „Palette“.
+- **Design** (`/design`): Farbschema, Akzent, Hintergrund, Dichte, Schrift, Aufbau der Patientenakte, „Auf Standard
+  zurücksetzen“ und „Startseite anpassen“ – unverändert gespeichert je Person (`darstellung`).
+- **Mein Konto** (`/konto`): Profil, Anmeldung und Sicherheit (Kennwort, Zwei-Faktor, Passkeys, Notfall-Codes) und
+  angemeldete Geräte. Links wie „/konto#zwei-faktor“ funktionieren wie bisher.
+- **Hilfe:** neuer Abschnitt „Design“ (zum „?“ auf /design), „Mein Konto“ angepasst.
+- **Teststatus:** `konto.spec.ts` (Menü mit Design, getrennte Seiten), `aktenansicht.spec.ts`, `zz-neustart.spec.ts`,
+  `bildschirmfotos-mobil.spec.ts` auf /design umgestellt.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2990,6 +3004,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 09.10.2026 | Design eigener Menüpunkt | Design (/design) und Mein Konto (/konto) getrennt, beide im Benutzermenü (F158). Lauf steht aus |
 | 08.10.2026 | Rest der Vorschläge | Stift an „Versorgung“, Messpunkt bearbeiten, „Neues Dokument“ (F157). Damit ist „EPM intuitiver – Vorschläge“ vollständig umgesetzt. Lauf steht aus |
 | 08.10.2026 | Versorger/Ärzte, Kalender | Neuer Aufbau nach den Entwürfen für PC, Tablet und Telefon: Liste + Eintrag zum Lesen, Kalender mit einer Werkzeugzeile, „Anzeigen ▾“ und Reitern (F156). Lauf steht aus |
 | 08.10.2026 | Tastenkürzel | K, G, T, P, Alt+Ziffer und ? in der Akte, Strg Enter in Dialogen, Kürzel im Tooltip (F155). Lauf steht aus |

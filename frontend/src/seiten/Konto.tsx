@@ -531,17 +531,17 @@ function SitzungenKarte() {
   );
 }
 
+/**
+ * Mein Konto (seit 09.10.2026 ohne Darstellung, Wunsch: „Design und Mein Konto voneinander trennen und als separate
+ * Menüpunkte anbieten“): Profil, Anmeldung und Sicherheit, angemeldete Geräte.
+ */
 export function Konto() {
   const ich = useIch();
-  const zuruecksetzen = useRef<(() => void) | null>(null);
   return (
     <Seite pfad={[{ text: "Mein Konto" }]}>
-      <Seitenkopf titel="Mein Konto"
-        rechts={<Knopf onClick={() => zuruecksetzen.current?.()}>Auf Standard zurücksetzen</Knopf>} />
-      <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5 items-start">
-        {/* am Telefon zuerst Sicherheit (Passkey), Darstellung danach */}
-        <div className="stapel flex flex-col gap-5 min-w-0 order-2 xl:order-1"><DarstellungKarten zuruecksetzenRef={zuruecksetzen} /></div>
-        <div className="stapel flex flex-col gap-5 min-w-0 order-1 xl:order-2">
+      <Seitenkopf titel="Mein Konto" />
+      <div className="stapel grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+        <div className="stapel flex flex-col gap-5 min-w-0">
           <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="profil">
             <h2 className="lbl m-0">Profil</h2>
             <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
@@ -553,12 +553,31 @@ export function Konto() {
             </div>
             <span className="text-[0.8125rem] gedaempft">Name, Titel, Kürzel und Rolle ändert die Administration unter „Benutzer“.</span>
           </Karte>
-          <SicherheitKarte />
           <SitzungenKarte />
-          <Link to="/" state={{ anpassen: Date.now() }} className="card px-5 py-4 flex items-center justify-between no-underline text-tinte hover:bg-fein">
-            <span className="font-medium">Startseite anpassen</span><span aria-hidden="true">→</span>
-          </Link>
         </div>
+        <div className="stapel flex flex-col gap-5 min-w-0">
+          <SicherheitKarte />
+        </div>
+      </div>
+    </Seite>
+  );
+}
+
+/**
+ * Design (eigener Menüpunkt seit 09.10.2026): Farben, Dichte, Schrift, Aufbau der Patientenakte – gespeichert je
+ * Person, an jedem PC gleich; dazu „Startseite anpassen“.
+ */
+export function Design() {
+  const zuruecksetzen = useRef<(() => void) | null>(null);
+  return (
+    <Seite pfad={[{ text: "Design" }]}>
+      <Seitenkopf titel="Design"
+        rechts={<Knopf onClick={() => zuruecksetzen.current?.()}>Auf Standard zurücksetzen</Knopf>} />
+      <div className="stapel flex flex-col gap-5 min-w-0 max-w-[1100px]" data-testid="design">
+        <DarstellungKarten zuruecksetzenRef={zuruecksetzen} />
+        <Link to="/" state={{ anpassen: Date.now() }} className="card px-5 py-4 flex items-center justify-between no-underline text-tinte hover:bg-fein">
+          <span className="font-medium">Startseite anpassen</span><span aria-hidden="true">→</span>
+        </Link>
       </div>
     </Seite>
   );

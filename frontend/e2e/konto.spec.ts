@@ -1,4 +1,5 @@
-/** Entwurf 14 · Mein Konto: Darstellung (gespeichert je Person), Passwort, Notfall-Codes, neues Gerät, Sitzungen. */
+/** Entwurf 14 · Design (eigener Menüpunkt seit 09.10.2026, gespeichert je Person) und Mein Konto: Passwort, Notfall-Codes,
+ *  neues Gerät, Sitzungen. */
 import { expect, test } from "@playwright/test";
 import { apiAnmelden, merken, neuesKonto, totpBase32 } from "./hilfen";
 
@@ -9,6 +10,11 @@ test("Darstellung wählen, eigene Farben prüfen, nach Neuladen erhalten, zurüc
   await page.goto("/konto");
   const html = page.locator("html");
   await expect(page.getByTestId("profil")).toContainText(konto.benutzername);
+  // Design und Mein Konto getrennt (Wunsch 09.10.2026): auf Mein Konto keine Darstellung mehr
+  await expect(page.getByRole("radio", { name: "Darstellung Dunkel" })).toHaveCount(0);
+  await page.goto("/design");
+  await expect(page.getByRole("heading", { name: "Design", level: 1 })).toBeVisible();
+  await expect(page.getByTestId("profil")).toHaveCount(0);
 
   await page.getByRole("radio", { name: "Darstellung Dunkel" }).click();
   await expect(html).toHaveAttribute("data-schema", "dunkel");
@@ -108,12 +114,17 @@ test("Benutzermenü unten links; weniger Rand um den Seiteninhalt", async ({ bro
   const ctx = await browser.newContext({ storageState: konto.zustand, ignoreHTTPSErrors: true });
   const page = await ctx.newPage();
   await page.goto("/");
-  // unten links nur die Person, Hilfe / Mein Konto / Abmelden im Menü
+  // unten links nur die Person, Hilfe / Design / Mein Konto / Abmelden im Menü (Design eigener Punkt seit 09.10.2026)
   await expect(page.getByTestId("seitenleiste").getByRole("button", { name: "Abmelden" })).toHaveCount(0);
   await page.getByTestId("benutzermenue").click();
   await expect(page.getByRole("menuitem", { name: "Hilfe" })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Design" }).click();
+  await expect(page).toHaveURL(/\/design$/);
+  await expect(page.getByRole("radio", { name: "Darstellung Dunkel" })).toBeVisible();
+  await page.getByTestId("benutzermenue").click();
   await page.getByRole("menuitem", { name: "Mein Konto" }).click();
   await expect(page).toHaveURL(/\/konto$/);
+  await expect(page.getByTestId("sicherheit")).toBeVisible();
   // keine Wahl „Form“ mehr; Rand des Inhalts 16 px statt 32 px
   await expect(page.getByRole("button", { name: "Eckig" })).toHaveCount(0);
   await expect.poll(() => page.locator("main").evaluate((e) => getComputedStyle(e).paddingLeft)).toBe("16px");
