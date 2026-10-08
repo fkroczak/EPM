@@ -379,7 +379,7 @@ test("Benutzer ohne Login: anlegen, setzen, wieder einbinden; Rolle „Keine Ber
   await detail.getByLabel("Rolle").selectOption("mitarbeiter");
   await detail.getByRole("checkbox", { name: /Testbenutzer/ }).uncheck();
   await detail.getByRole("button", { name: "Speichern" }).click();
-  await expect(page.getByText("Benutzer gespeichert.")).toBeVisible();
+  await expect(page.getByText("Benutzer gespeichert.").last()).toBeVisible();
   // wieder auf „ohne Login“: keine Rechte, Rolle „Keine Berechtigung“
   await detail.getByRole("button", { name: "Auf „ohne Login“ setzen" }).click();
   await dialog.getByRole("button", { name: "Auf „ohne Login“ setzen" }).click();
