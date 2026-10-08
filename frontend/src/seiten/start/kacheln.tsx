@@ -131,7 +131,7 @@ export function TermineKachel({ daten, breit }: { daten: Startdaten; breit: bool
         {zeilen.length === 0 ? <Leer>Keine offenen Termine.</Leer> : zeilen.map((t) => {
           const fertig = erledigt[t.id];
           const kaestchen = darfBei("eintraege_erfassen", { ist_test: t.patient_ist_test }) ? (
-            <input type="checkbox" aria-label={`Erledigt: ${t.patient_name}, ${t.titel}`} className="!w-5 !h-5"
+            <input type="checkbox" title="Erledigt" aria-label={`Erledigt: ${t.patient_name}, ${t.titel}`} className="!w-5 !h-5"
               checked={!!fertig || laeuft.includes(t.id)} disabled={!!fertig || laeuft.includes(t.id)} onChange={() => abhaken.mutate(t)} />
           ) : <span aria-hidden="true" />;
           const wer = (

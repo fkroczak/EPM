@@ -45,13 +45,13 @@ test("Erklärungen nachhalten: Hinweis im Aktenkopf, Vordruck als PDF, erfassen 
   await dialog.getByLabel("Unterschriebenes Blatt").setInputFiles({ name: "Einwilligung.pdf", mimeType: "application/pdf",
     buffer: einfachePdf(["Einwilligung unterschrieben (E2E)"]) });
   await dialog.getByLabel("Notiz").fill("Original im Ordner");
-  await dialog.getByRole("button", { name: "Erfassen" }).click();
+  await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(zeile("einwilligung")).toContainText(`liegt vor seit ${heute()}`);
   await expect(zeile("einwilligung")).toContainText("Scan unter „Dokumente“");
   for (const art of ["datenschutzinformation", "schweigepflichtentbindung"]) {
     await zeile(art).getByRole("button", { name: "Erfassen" }).click();
     dialog = page.getByRole("dialog");
-    await dialog.getByRole("button", { name: "Erfassen" }).click();
+    await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
     await expect(zeile(art)).toContainText("liegt vor seit");
   }
   await expect(page.getByTestId("erklaerungen-fehlen")).toHaveCount(0);
@@ -98,7 +98,7 @@ test("Anfrage mit Frist, Kopie der Akte, Löschwunsch → eingeschränkt, Einsic
   let dialog = page.getByRole("dialog");
   await dialog.getByLabel("Gestellt von").fill("Patientin selbst");
   await dialog.getByLabel("Inhalt der Anfrage").fill("Bittet um eine Kopie ihrer Akte");
-  await dialog.getByRole("button", { name: "Erfassen" }).click();
+  await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(anfragen.getByTestId("anfragen-liste")).toContainText("offen bis");
   await expect(page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: /Datenschutz/ })).toContainText("1");
 
@@ -111,10 +111,10 @@ test("Anfrage mit Frist, Kopie der Akte, Löschwunsch → eingeschränkt, Einsic
   await page.reload();
   await expect(page.getByTestId("kopien")).toContainText("Bisher erstellt");
 
-  await anfragen.getByRole("button", { name: "Erledigen" }).click();
+  await anfragen.getByRole("button", { name: "Erledigt" }).click();
   dialog = page.getByRole("dialog");
   await dialog.getByLabel("Der Person mitgeteilt am").fill(heute());
-  await dialog.getByRole("button", { name: "Erledigen" }).click();
+  await dialog.getByRole("button", { name: "Erledigt" }).click();
   await expect(page.getByText("Anfrage erledigt.")).toBeVisible();
   await expect(anfragen.getByTestId("anfragen-liste")).toContainText(`erfüllt · mitgeteilt am ${heute()}`);
 
@@ -123,11 +123,11 @@ test("Anfrage mit Frist, Kopie der Akte, Löschwunsch → eingeschränkt, Einsic
   await api.post("datenschutzanfragen/", { patient: p.id, art: "loeschung", gestellt_von: "Patientin selbst" });
   await page.reload();
   await expect(page.getByTestId("aufbewahrung-stand")).toContainText("Aufbewahrung 10 Jahre");
-  await anfragen.getByRole("button", { name: "Erledigen" }).click();
+  await anfragen.getByRole("button", { name: "Erledigt" }).click();
   dialog = page.getByRole("dialog");
   await expect(dialog.getByLabel("Ergebnis")).toHaveValue("eingeschraenkt");
   await dialog.getByLabel(/Begründung/).fill("Die Akte ist noch aufzubewahren (E2E)");
-  await dialog.getByRole("button", { name: "Erledigen" }).click();
+  await dialog.getByRole("button", { name: "Erledigt" }).click();
   // ab jetzt ist die Akte verschlossen – auch für die Person, die eingeschränkt hat
   const verschlossen = page.getByTestId("akte-eingeschraenkt");
   await expect(verschlossen).toContainText("Verarbeitung eingeschränkt");

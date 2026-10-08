@@ -201,7 +201,7 @@ function EintragDialog({ e, heute, onZu, onTermin, onAendern }: {
       fuss={<>
         {f?.art === "plan" ? <Link className="btn sec" to={`/patienten/${patient}/plaene`}>Pläne öffnen</Link>
           : <Link className="btn sec" to={`/patienten/${patient}`}>Akte öffnen</Link>}
-        {t && darf ? <Knopf icon="stift" onClick={() => onAendern(t)}>Ändern</Knopf> : null}
+        {t && darf ? <Knopf icon="stift" onClick={() => onAendern(t)}>Bearbeiten</Knopf> : null}
         {t && darf ? <Knopf variante="pri" icon="haken" laedt={abhaken.isPending} onClick={() => abhaken.mutate(t)}>Erledigt</Knopf> : null}
         {f && darf ? <Knopf variante="pri" icon="plus" onClick={() => onTermin(f.patient, f.name, f.faellig_am < heute ? heute : f.faellig_am)}>
           Termin anlegen</Knopf> : null}
@@ -438,7 +438,7 @@ export function Kalender() {
   const listenTage = [...tage.entries()].sort(([a], [b]) => a.localeCompare(b));
   const tagEintraege = tage.get(gewaehlt) ?? [];
   const neuAm = schreiben ? (d: string) => setNeu({ datum: d }) : undefined;
-  // Offener Termin, den die Person ändern darf: gleich „Termin ändern“ (mit „Erledigt“ und „Akte öffnen“) statt erst
+  // Offener Termin, den die Person ändern darf: gleich „Termin bearbeiten“ (mit „Erledigt“ und „Akte öffnen“) statt erst
   // einer Ansicht mit „Ändern“ (Vorschlag „Bearbeiten sichtbar“, 08.10.2026); Fälligkeiten und Erledigtes wie bisher
   const waehlen = (e: Eintrag) => {
     const t = e.termin;

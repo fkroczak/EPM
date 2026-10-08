@@ -116,7 +116,7 @@ function BiaDetail({ m, onAendern, aenderbar }: { m: BiaMessung; onAendern: () =
     <Detail testid="bia-detail"
       titel={<>BIA-Messung vom <span className="num">{datum(m.gemessen_am)}</span></>}
       unter={m.erfasst_von_name ?? undefined}
-      aktionen={aenderbar ? <Knopf klein icon="stift" onClick={onAendern}>Ändern</Knopf> : undefined}>
+      aktionen={aenderbar ? <Knopf klein icon="stift" onClick={onAendern}>Bearbeiten</Knopf> : undefined}>
       <Wertetabelle werte={[
         ["Gewicht", wert(m.gewicht_kg, "kg")],
         ["BCM", wert(m.bcm_kg, "kg")],

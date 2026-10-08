@@ -80,14 +80,14 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin, d
   });
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
-    <Dialog offen={offen} onOffen={onOffen} titel={termin ? "Termin ändern" : "Termin anlegen"}
+    <Dialog offen={offen} onOffen={onOffen} titel={termin ? "Termin bearbeiten" : "Neuer Termin"}
       beschreibung={patientName ? `für ${patientName}` : "Erscheint im Kalender und auf der Startseite unter „Termine und Wiedervorlagen“."}
       fuss={<>
         {termin && mitAkte ? <Link className="btn sec mr-auto" to={`/patienten/${termin.patient}`}>Akte öffnen</Link> : null}
         <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
         {termin && !termin.erledigt_am ? <Knopf icon="haken" laedt={abhaken.isPending} onClick={() => abhaken.mutate()}>Erledigt</Knopf> : null}
         <Knopf variante="pri" laedt={speichern.isPending} disabled={!termin && !patientId && !patient}
-          onClick={() => speichern.mutate()}>Termin speichern</Knopf>
+          onClick={() => speichern.mutate()}>Speichern</Knopf>
       </>}>
       <form className="grid grid-cols-2 gap-4" onSubmit={(e) => { e.preventDefault(); speichern.mutate(); }}>
         {!patientId && !termin ? (

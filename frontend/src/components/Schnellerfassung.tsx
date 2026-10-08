@@ -395,7 +395,7 @@ export function GewichtDialog({ offen, onOffen, vorgabe, wert: wertVorgabe }: {
       beschreibung="Unplausible Werte und Daten in der Zukunft werden abgewiesen. Eine falsche Messung lässt sich in der Akte korrigieren."
       fuss={<>
         <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
-        <Knopf variante="pri" icon="haken" laedt={speichern.isPending} disabled={!pid} onClick={() => speichern.mutate()}>Gewicht speichern</Knopf>
+        <Knopf variante="pri" icon="haken" laedt={speichern.isPending} disabled={!pid} onClick={() => speichern.mutate()}>Speichern</Knopf>
       </>}>
       <form className="flex flex-col gap-4" noValidate onSubmit={(e) => { e.preventDefault(); speichern.mutate(); }}>
         {vorgabe ? <div className="text-sm"><span className="gedaempft">Patient</span> <strong>{vorgabe.name}</strong></div> : (

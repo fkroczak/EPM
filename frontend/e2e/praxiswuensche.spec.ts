@@ -39,6 +39,18 @@ test("Diagnose mit ICD-Code eintragen; die Liste im Hintergrund wächst mit", as
   const liste2 = page.getByTestId("eintragsliste");
   await expect(liste2).toContainText("Kurzdarmsyndrom");
   await expect(page.getByTestId("diagnose-detail")).toContainText("[K91.2G]");
+  // „Beenden“ fragt nach – „Abbrechen“ lässt sie aktuell, erst die Rückfrage beendet (Eine Sprache, 08.10.2026)
+  await page.getByTestId("diagnose-detail").getByRole("button", { name: "Beenden" }).click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Diagnose beenden" })).toBeVisible();
+  await page.getByRole("dialog").getByRole("button", { name: "Abbrechen" }).click();
+  await expect(page.getByTestId("diagnose-detail")).not.toContainText("beendet");
+  await page.getByTestId("diagnose-detail").getByRole("button", { name: "Beenden" }).click();
+  await page.getByRole("dialog").getByTestId("bestaetigen").click();
+  await expect(page.getByText("Als nicht mehr zutreffend eingetragen.")).toBeVisible();
+  await page.getByRole("button", { name: /beendete anzeigen/ }).click();
+  await liste2.getByText("Kurzdarmsyndrom").click();
+  await page.getByTestId("diagnose-detail").getByRole("button", { name: "Wieder aktuell" }).click();
+  await expect(page.getByText("Wieder als zutreffend eingetragen.")).toBeVisible();
 
   // der Katalog hat den Eintrag übernommen (Vorlagen › Labor und Diagnosen)
   const api = await apiAls("mitarbeiter");
@@ -76,7 +88,7 @@ test("Laborbefund über die Maske erfassen – nur Werte eintragen", async ({ pa
   await weitere.getByLabel("Parameter 1").fill("CA 19-9");
   await weitere.getByLabel("Wert 1").fill("12,4");
   await weitere.getByLabel("Einheit 1").fill("U/ml");
-  await page.getByRole("button", { name: /Werte speichern/ }).click();
+  await page.getByRole("button", { name: /^Speichern \(\d+ Werte?\)$/ }).click();
 
   const detail = page.getByTestId("labor-detail");
   await expect(detail).toContainText("3 Werte");
@@ -235,4 +247,30 @@ test("Grenze „gilt als alt“ unter Vorlagen › Grenzwerte", async ({ browser
   const zurueck = await apiAls("admin");
   await zurueck.patch("einstellungen/", { labor_alter_warnung_monate: 12, bia_alter_warnung_monate: 12 });
   await zurueck.ende();
+});
+
+test("Bericht verwerfen fragt nach (Eine Sprache, 08.10.2026)", async ({ page }) => {
+  const p = await neuerPatient();
+  await oeffnen(page, p.id, "/berichte");
+  await page.getByRole("button", { name: "Neuer Bericht" }).click();
+  await page.getByLabel("Titel").fill("Bericht zum Verwerfen");
+  await page.getByLabel("Berichtsart").selectOption({ label: "Verlaufsbericht" });
+  await page.getByRole("textbox", { name: "Bericht" }).fill("Wird verworfen.");
+  await page.getByRole("button", { name: "Entwurf speichern" }).click();
+  const detail = page.getByTestId("bericht-detail");
+  await expect(detail.getByTestId("bericht-status")).toHaveText("Entwurf");
+  await detail.getByRole("button", { name: "Verwerfen" }).click();
+  const frage = page.getByRole("dialog");
+  await expect(frage.getByRole("heading", { name: "Entwurf verwerfen" })).toBeVisible();
+  await expect(frage).toContainText("Bericht zum Verwerfen");
+  // der rote Knopf steht links von „Abbrechen“
+  const rot = (await frage.getByTestId("bestaetigen").boundingBox())!;
+  const abbrechen = (await frage.getByRole("button", { name: "Abbrechen" }).boundingBox())!;
+  expect(rot.x).toBeLessThan(abbrechen.x);
+  await frage.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(detail).toContainText("Bericht zum Verwerfen");
+  await detail.getByRole("button", { name: "Verwerfen" }).click();
+  await page.getByRole("dialog").getByTestId("bestaetigen").click();
+  await expect(page.getByText("Entwurf verworfen.")).toBeVisible();
+  await expect(page.getByTestId("bericht-detail")).toHaveCount(0);
 });

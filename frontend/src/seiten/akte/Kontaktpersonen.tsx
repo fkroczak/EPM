@@ -19,6 +19,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { NeuerArztDialog } from "@/components/SchnellAnlegen";
+import { Bestaetigen } from "@/components/Bestaetigen";
 import { useAkte } from "./Akte";
 
 function useNeuLaden() {
@@ -68,8 +69,10 @@ function ArztZuordnungDialog({ zuordnung, offen, onOffen }: { zuordnung: Patient
   });
   const aktivSetzen = useMutation({
     mutationFn: (aktiv: boolean) => api<PatientArzt>(`patient-aerzte/${zuordnung!.id}/`, { method: "PATCH", body: { aktiv } }),
-    onSuccess: (z) => fertig(z.aktiv ? "Wieder zuständig." : "Als nicht mehr zuständig markiert."),
+    onSuccess: (z) => { setFrage(false); fertig(z.aktiv ? "Wieder zuständig." : "Als nicht mehr zuständig markiert."); },
   });
+  const [frage, setFrage] = useState(false);
+  useEffect(() => { if (!offen) setFrage(false); }, [offen]);
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
     <>
@@ -78,11 +81,11 @@ function ArztZuordnungDialog({ zuordnung, offen, onOffen }: { zuordnung: Patient
       beschreibung={zuordnung ? "Kontaktdaten ändern Sie in der Ärzteliste – sie gelten dann für alle Patienten."
         : "Aus der gemeinsamen Ärzteliste. Fehlt ein Arzt, legen Sie ihn hier mit „Neuen Arzt anlegen“ an."}
       fuss={<>
-        {zuordnung && zuordnung.aktiv ? <Knopf className="mr-auto" laedt={aktivSetzen.isPending} onClick={() => aktivSetzen.mutate(false)}>Nicht mehr zuständig</Knopf> : null}
-        {zuordnung && !zuordnung.aktiv ? <Knopf className="mr-auto" laedt={aktivSetzen.isPending} onClick={() => aktivSetzen.mutate(true)}>Wieder zuständig</Knopf> : null}
+        {zuordnung && zuordnung.aktiv ? <Knopf variante="dng" title="Nicht mehr zuständig" onClick={() => setFrage(true)}>Deaktivieren</Knopf> : null}
+        {zuordnung && !zuordnung.aktiv ? <Knopf className="mr-auto" laedt={aktivSetzen.isPending} onClick={() => aktivSetzen.mutate(true)}>Wieder aktivieren</Knopf> : null}
         <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
         <Knopf variante="pri" laedt={speichern.isPending} disabled={!zuordnung && !arzt} onClick={() => speichern.mutate()}>
-          {zuordnung ? "Speichern" : "Zuordnen"}
+          Speichern
         </Knopf>
       </>}>
       <form className="grid grid-cols-2 gap-3" onSubmit={(e) => { e.preventDefault(); speichern.mutate(); }}>
@@ -118,6 +121,9 @@ function ArztZuordnungDialog({ zuordnung, offen, onOffen }: { zuordnung: Patient
       </form>
     </Dialog>
     {!zuordnung ? <NeuerArztDialog offen={neuerArzt} onOffen={setNeuerArzt} onAngelegt={(a) => setArzt(String(a.id))} /> : null}
+    <Bestaetigen offen={frage} onOffen={setFrage} titel="Arzt deaktivieren" knopf="Deaktivieren"
+      text={<>{zuordnung?.arzt_daten.name} ist für diesen Patienten nicht mehr zuständig. Die Zuordnung bleibt sichtbar und lässt sich wieder aktivieren.</>}
+      laedt={aktivSetzen.isPending} fehler={aktivSetzen.error} onJa={() => aktivSetzen.mutate(false)} />
     </>
   );
 }
@@ -205,8 +211,10 @@ function BezugspersonDialog({ person, offen, onOffen }: { person: Bezugsperson |
   });
   const aktivSetzen = useMutation({
     mutationFn: (aktiv: boolean) => api<Bezugsperson>(`bezugspersonen/${person!.id}/`, { method: "PATCH", body: { aktiv } }),
-    onSuccess: (b) => fertig(b.aktiv ? "Wieder als aktuell markiert." : "Als nicht mehr aktuell markiert."),
+    onSuccess: (b) => { setFrage(false); fertig(b.aktiv ? "Bezugsperson wieder aktiviert." : "Bezugsperson deaktiviert."); },
   });
+  const [frage, setFrage] = useState(false);
+  useEffect(() => { if (!offen) setFrage(false); }, [offen]);
   const fe: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   const feld = (k: (typeof BP_FELDER)[number], label: string, extra?: { num?: boolean; span?: boolean; typ?: string }) => (
     <Feld label={label} className={extra?.span ? "col-span-2" : undefined} fehler={fe[k]} pflicht={k === "name"}>
@@ -215,11 +223,13 @@ function BezugspersonDialog({ person, offen, onOffen }: { person: Bezugsperson |
     </Feld>
   );
   return (
+    <>
     <Dialog offen={offen} onOffen={onOffen} breite={600} titel={person ? person.name : "Neue Bezugsperson"}
       beschreibung="Jede Änderung steht mit Person und Zeitpunkt im Verlauf der Akte."
       fuss={<>
-        {person && person.aktiv ? <Knopf className="mr-auto" laedt={aktivSetzen.isPending} onClick={() => aktivSetzen.mutate(false)}>Nicht mehr aktuell</Knopf> : null}
-        {person && !person.aktiv ? <Knopf className="mr-auto" laedt={aktivSetzen.isPending} onClick={() => aktivSetzen.mutate(true)}>Wieder aktuell</Knopf> : null}
+        {/* Eine Sprache (08.10.2026): „Deaktivieren“ mit Rückfrage, rot und links */}
+        {person && person.aktiv ? <Knopf variante="dng" onClick={() => setFrage(true)}>Deaktivieren</Knopf> : null}
+        {person && !person.aktiv ? <Knopf className="mr-auto" laedt={aktivSetzen.isPending} onClick={() => aktivSetzen.mutate(true)}>Wieder aktivieren</Knopf> : null}
         <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
         <Knopf variante="pri" laedt={speichern.isPending} onClick={() => speichern.mutate()}>Speichern</Knopf>
       </>}>
@@ -253,6 +263,10 @@ function BezugspersonDialog({ person, offen, onOffen }: { person: Bezugsperson |
         <button type="submit" hidden />
       </form>
     </Dialog>
+    <Bestaetigen offen={frage} onOffen={setFrage} titel="Bezugsperson deaktivieren" knopf="Deaktivieren"
+      text={<>{person?.name} wird nicht mehr als aktuelle Bezugsperson geführt (auch nicht unter „Auskunft an“). Der Eintrag bleibt erhalten und lässt sich wieder aktivieren.</>}
+      laedt={aktivSetzen.isPending} fehler={aktivSetzen.error} onJa={() => aktivSetzen.mutate(false)} />
+    </>
   );
 }
 

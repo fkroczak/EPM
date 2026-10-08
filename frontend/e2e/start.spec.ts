@@ -60,7 +60,7 @@ test("Termin von der Startseite anlegen und als erledigt abhaken", async ({ page
   await dialog.getByLabel("Art", { exact: true }).selectOption("rueckruf");
   await dialog.getByLabel("Uhrzeit").fill("23:30");
   await dialog.getByLabel("Titel").fill("E2E Rückruf Laborwerte");
-  await dialog.getByRole("button", { name: "Termin speichern" }).click();
+  await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   const zeile = page.getByTestId("terminliste").getByText("E2E Rückruf Laborwerte");
   await expect(zeile).toBeVisible();
