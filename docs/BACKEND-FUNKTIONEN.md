@@ -188,6 +188,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F148 | Navigation: schmale Leiste mit gleich großen, mittigen Symbolen; Leiste mit Text 224 px; Hauptknöpfe gleich breit; leere Bereiche kompakt | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 | F149 | Akte: „Kontakt“ und „Gewicht“ öffnen einen Dialog wie „Termin“ | 4 Akte | ABGESCHLOSSEN (Lauf steht aus) |
 | F150 | Ein Dialog je Sache: „Neuer Kontakt“, „+ Gewicht“ und Kürzelzeile K/G öffnen dieselben Dialoge; Wiedervorlage standardmäßig in 14 Tagen, einstellbar | 4 Akte, Vorlagen › Grenzwerte | ABGESCHLOSSEN (Lauf steht aus) |
+| F151 | Weniger Wege: „Entwurf fortsetzen“ im Aktenkopf, Dokument aus dem Kopf und per Ziehen auf die Akte, Arzt/Versorger im Dialog anlegen | 4 Akte, Neuer Patient, Arzt zuordnen | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2769,6 +2770,20 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   `admin.spec.ts`, `zz-neustart.spec.ts` angepasst.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F151 Weniger Wege beim Erfassen
+- **Wunsch 08.10.2026:** Umsetzung „EPM intuitiver – Vorschläge“ (Abschnitte „Erfassen“ und „Weniger Wege“).
+- **Entwurf fortsetzen:** Gibt es einen Entwurf eines Infusionsplans, zeigt der Aktenkopf „Entwurf fortsetzen“ (öffnet
+  den Entwurf zum Bearbeiten) statt „Neuer Plan“. Dazu liefert der Aktenkopf `kopf.plan_entwurf` (`id`, `erstellt_am`).
+- **Dokumente:** „Weitere Aktionen › Dokument hochladen …“ und Dateien irgendwo auf die geöffnete Akte ziehen
+  (ganzflächiger Hinweis „Datei loslassen …“). Die Seite bleibt, wo sie ist; jede Datei wird grün bzw. rot quittiert.
+  Im Reiter Dokumente bleibt dessen eigene Ablage mit Fortschrittsliste zuständig (keine doppelten Uploads).
+- **Arzt/Versorger anlegen:** „Neu anlegen“ bei Versorger und Hausarzt in „Neuer Patient“ sowie „Neuen Arzt anlegen“ in
+  „Arzt zuordnen“ öffnen einen Dialog (Name, Anschrift, Telefon, Fax, E-Mail; beim Arzt Praxis und Fachrichtung). Nach
+  „Anlegen“ ist der neue Eintrag gleich ausgewählt; das Formular bleibt mit allen Eingaben stehen. Vorher führte der
+  Link auf die Seite Versorger bzw. Ärzte und die Eingaben gingen verloren.
+- **Teststatus:** `infusionen/tests.py` (`plan_entwurf`), `plaene.spec.ts`, `dokumente.spec.ts`, `patienten.spec.ts`.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2867,6 +2882,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Weniger Wege | „Entwurf fortsetzen“ im Aktenkopf, Dokumente aus dem Kopf und per Ziehen auf die Akte, Arzt/Versorger im Dialog anlegen (F151). Lauf steht aus |
 | 08.10.2026 | Ein Dialog je Sache | „Neuer Kontakt“, „+ Gewicht“, Kürzelzeile K/G öffnen dieselben Dialoge; letzte Messung direkt korrigieren; Wiedervorlage standardmäßig 14 Tage, unter Vorlagen › Grenzwerte einstellbar (F150). Lauf steht aus |
 | 08.10.2026 | Kontakt/Gewicht als Dialog | Akte: „Kontakt“ und „Gewicht“ öffnen Dialoge wie „Termin“ (F149). Lauf steht aus |
 | 08.10.2026 | Navigation | Gleich große, mittige Symbole in der schmalen Leiste, Leiste mit Text 224 px, gleich breite Hauptknöpfe, kompakte Leerzustände (F148). Entwürfe für Versorger/Ärzte und Kalender (PC, Tablet, Telefon) zur Abstimmung. Lauf steht aus |

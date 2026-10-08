@@ -294,6 +294,8 @@ export type Patient = {
     auskunft: { id: number; name: string; beziehung: string | null; telefon: string }[];
     hausarzt: { id: number; name: string; praxis: string; telefon: string } | null;
     aktueller_plan: { id: number; gueltig_ab: string; kcal: number; laufzeit_h: number | null } | null;
+    /** offener Entwurf eines Infusionsplans (Aktenkopf „Entwurf fortsetzen“, 08.10.2026) */
+    plan_entwurf?: { id: number; erstellt_am: string } | null;
     /** „Kein Infusionsplan nötig“ bestätigt (Ergänzung zur Fehlerliste 02.10.2026) */
     kein_plan?: { grund: string; am: string | null; von: string | null } | null;
     naechster_termin: {

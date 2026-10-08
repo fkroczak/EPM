@@ -18,6 +18,7 @@ import { Auswahl, Chip, Eingabe, Feld, Karte, KartenKopf, Knopf, Laden, Leer, Me
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
+import { NeuerArztDialog } from "@/components/SchnellAnlegen";
 import { useAkte } from "./Akte";
 
 function useNeuLaden() {
@@ -45,6 +46,8 @@ function ArztZuordnungDialog({ zuordnung, offen, onOffen }: { zuordnung: Patient
   const { darf } = useAuth();
   const aerzte = useAerzteListe();
   const [arzt, setArzt] = useState("");
+  // Arzt anlegen, ohne den Dialog zu verlassen (Vorschlag „Weniger Wege“, 08.10.2026)
+  const [neuerArzt, setNeuerArzt] = useState(false);
   const [rolle, setRolle] = useState("hausarzt");
   const [notiz, setNotiz] = useState("");
   const neuLaden = useNeuLaden();
@@ -69,10 +72,11 @@ function ArztZuordnungDialog({ zuordnung, offen, onOffen }: { zuordnung: Patient
   });
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
+    <>
     <Dialog offen={offen} onOffen={onOffen} breite={560}
       titel={zuordnung ? zuordnung.arzt_daten.name : "Arzt zuordnen"}
       beschreibung={zuordnung ? "Kontaktdaten ändern Sie in der Ärzteliste – sie gelten dann für alle Patienten."
-        : "Aus der gemeinsamen Ärzteliste. Fehlt ein Arzt, legen Sie ihn dort einmal an."}
+        : "Aus der gemeinsamen Ärzteliste. Fehlt ein Arzt, legen Sie ihn hier mit „Neuen Arzt anlegen“ an."}
       fuss={<>
         {zuordnung && zuordnung.aktiv ? <Knopf className="mr-auto" laedt={aktivSetzen.isPending} onClick={() => aktivSetzen.mutate(false)}>Nicht mehr zuständig</Knopf> : null}
         {zuordnung && !zuordnung.aktiv ? <Knopf className="mr-auto" laedt={aktivSetzen.isPending} onClick={() => aktivSetzen.mutate(true)}>Wieder zuständig</Knopf> : null}
@@ -84,7 +88,8 @@ function ArztZuordnungDialog({ zuordnung, offen, onOffen }: { zuordnung: Patient
       <form className="grid grid-cols-2 gap-3" onSubmit={(e) => { e.preventDefault(); speichern.mutate(); }}>
         {!zuordnung ? (
           <div className="col-span-2 relative">
-            {darf("versorger_pflegen") ? <Link to="/aerzte?neu=1" className="absolute right-0 top-0 text-[0.8125rem]">Neuen Arzt anlegen</Link> : null}
+            {darf("versorger_pflegen") ? <button type="button" className="absolute right-0 top-0 text-[0.8125rem] bg-transparent border-0 p-0 text-akzent-text cursor-pointer hover:underline"
+              onClick={() => setNeuerArzt(true)}>Neuen Arzt anlegen</button> : null}
             <Feld label="Arzt" pflicht fehler={f.arzt}>
               {(p) => (
                 <Auswahl {...p} value={arzt} onChange={(e) => setArzt(e.target.value)}>
@@ -112,6 +117,8 @@ function ArztZuordnungDialog({ zuordnung, offen, onOffen }: { zuordnung: Patient
         <button type="submit" hidden />
       </form>
     </Dialog>
+    {!zuordnung ? <NeuerArztDialog offen={neuerArzt} onOffen={setNeuerArzt} onAngelegt={(a) => setArzt(String(a.id))} /> : null}
+    </>
   );
 }
 

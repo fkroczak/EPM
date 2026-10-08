@@ -142,6 +142,7 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
 
         letzte = obj.letzte_messung()
         plan = obj.infusionsplaene.filter(status=Infusionsplan.Status.AKTUELL).first()
+        entwurf = obj.infusionsplaene.filter(status=Infusionsplan.Status.ENTWURF).order_by("-erstellt_am").first()
         termin = sichtbare_termine(obj.termine.filter(erledigt_am__isnull=True, faellig_am__gte=timezone.localdate())).first()
         return {
             "gewicht": {"kg": letzte.gewicht_kg, "am": letzte.gemessen_am} if letzte else None,
@@ -170,6 +171,8 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
             "datenschutz_anfragen": obj.datenschutzanfragen.filter(erledigt_am__isnull=True).count(),
             "aktueller_plan": {"id": plan.id, "gueltig_ab": plan.gueltig_ab, "kcal": plan.kcal,
                                "laufzeit_h": plan.laufzeit_h} if plan else None,
+            # Offener Entwurf: Aktenkopf zeigt „Entwurf fortsetzen“ statt „Neuer Plan“ (Vorschlag „Erfassen“, 08.10.2026)
+            "plan_entwurf": {"id": entwurf.id, "erstellt_am": entwurf.erstellt_am} if entwurf else None,
             # „Kein Infusionsplan nötig“ bestätigt (Ergänzung zur Fehlerliste 02.10.2026)
             "kein_plan": {"grund": obj.kein_plan_grund, "am": obj.kein_plan_am,
                           "von": benutzername(obj.kein_plan_von)} if obj.kein_plan else None,

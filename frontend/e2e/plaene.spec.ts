@@ -158,6 +158,12 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await page.goto(`/patienten/${patient.id}/plaene/neu`);
   await expect(page.getByRole("heading", { name: "Entwurf bearbeiten" })).toBeVisible();
   await page.goto(`/patienten/${patient.id}/plaene`);
+  // Aktenkopf: bei offenem Entwurf „Entwurf fortsetzen“ statt „Neuer Plan“ (08.10.2026)
+  const kopfPlan = page.getByTestId("aktenkopf");
+  await expect(kopfPlan.getByRole("button", { name: "Neuer Plan" })).toHaveCount(0);
+  await kopfPlan.getByRole("button", { name: "Entwurf fortsetzen" }).click();
+  await expect(page.getByRole("heading", { name: "Entwurf bearbeiten" })).toBeVisible();
+  await page.goto(`/patienten/${patient.id}/plaene`);
 
   await detail.getByRole("button", { name: "Verwerfen" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Verwerfen" }).click();

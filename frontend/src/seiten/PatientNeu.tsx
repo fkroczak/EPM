@@ -13,6 +13,7 @@ import type { Patient, PatientZeile } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Eingabe, Feld, Karte, Knopf, KnopfLink, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
+import { NeuerArztDialog, NeuerVersorgerDialog } from "@/components/SchnellAnlegen";
 
 type Formular = {
   nachname: string; vorname: string; geschlecht: string; geburtsdatum: string; groesse: string; gewicht: string;
@@ -60,6 +61,8 @@ function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) 
 export function PatientNeu() {
   const [f, setF] = useState<Formular>({ ...LEER, gemessen_am: datum(heuteIso()) });
   const [andere, setAndere] = useState<number[]>([]);
+  // Arzt/Versorger anlegen, ohne die Seite zu verlassen (Vorschlag „Weniger Wege“, 08.10.2026)
+  const [schnell, setSchnell] = useState<"" | "arzt" | "versorger">("");
   const [lokal, setLokal] = useState<Feldfehler>({});
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -246,7 +249,8 @@ export function PatientNeu() {
             <Abschnitt titel="Betreuung">
               <div className="col-span-2 relative">
                 {darf("versorger_pflegen") ? (
-                  <Link to="/versorger?neu=1" className="absolute right-0 top-0 text-[0.8125rem]">Neu anlegen</Link>
+                  <button type="button" className="absolute right-0 top-0 text-[0.8125rem] bg-transparent border-0 p-0 text-akzent-text cursor-pointer hover:underline" aria-label="Neuen Versorger anlegen"
+                    onClick={() => setSchnell("versorger")}>Neu anlegen</button>
                 ) : null}
                 <Feld label="Versorger" fehler={e.versorger}>
                   {(p) => (
@@ -289,7 +293,8 @@ export function PatientNeu() {
               </fieldset>
               <div className="col-span-2 relative">
                 {darf("versorger_pflegen") ? (
-                  <Link to="/aerzte?neu=1" aria-label="Neuen Arzt anlegen" className="absolute right-0 top-0 text-[0.8125rem]">Neu anlegen</Link>
+                  <button type="button" className="absolute right-0 top-0 text-[0.8125rem] bg-transparent border-0 p-0 text-akzent-text cursor-pointer hover:underline" aria-label="Neuen Arzt anlegen"
+                    onClick={() => setSchnell("arzt")}>Neu anlegen</button>
                 ) : null}
                 <Feld label="Hausarzt" fehler={e.aufnahme_hausarzt ?? e.hausarzt}
                   hinweis="aus der Ärzteliste; weitere Ärzte und Bezugspersonen danach in der Akte">
@@ -347,6 +352,11 @@ export function PatientNeu() {
           </aside>
         </div>
       </form>
+      {/* außerhalb des Formulars: sonst würde „Anlegen“ im Dialog auch den Patienten absenden */}
+      <NeuerVersorgerDialog offen={schnell === "versorger"} onOffen={(o) => setSchnell(o ? "versorger" : "")}
+        onAngelegt={(v) => setF((alt) => ({ ...alt, versorger: String(v.id), ansprechpartner: "" }))} />
+      <NeuerArztDialog offen={schnell === "arzt"} onOffen={(o) => setSchnell(o ? "arzt" : "")}
+        onAngelegt={(a) => setF((alt) => ({ ...alt, hausarzt: String(a.id) }))} />
     </Seite>
   );
 }
