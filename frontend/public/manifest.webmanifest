@@ -1,0 +1,29 @@
+{
+  "id": "/",
+  "name": "EPM · Patientenmanagement",
+  "short_name": "EPM",
+  "description": "Elektronisches Patientenmanagement der Deutschen Stiftung Krankheitsbedingte Mangelernährung",
+  "lang": "de",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F3F4F6",
+  "theme_color": "#251F53",
+  "categories": ["medical", "productivity"],
+  "icons": [
+    { "src": "/icons/epm-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/epm-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/epm-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Pläne zur Freigabe", "short_name": "Freigabe", "url": "/infusionsplaene?gruppe=entwuerfe",
+      "icons": [{ "src": "/icons/epm-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Patienten", "url": "/patienten",
+      "icons": [{ "src": "/icons/epm-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Kalender", "url": "/kalender",
+      "icons": [{ "src": "/icons/epm-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ]
+}
