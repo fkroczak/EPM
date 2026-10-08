@@ -117,7 +117,10 @@ test("Telefon: Notiz zur offenen Akte über „Notiz“ in der Leiste", async ({
       leiste: [leiste.position, leiste.zIndex, leiste.bottom], scrollY };
   });
   expect(lage.trifft, JSON.stringify(lage)).toBe(true);
-  await page.getByTestId("mobil-notiz").click();
+  // Antippen an genau dieser Stelle: Playwrights „click“ scrollt vorher die Seite und rechnet bei fester Leiste in der
+  // Telefon-Nachbildung danach mit verschobenen Koordinaten (die Leiste selbst liegt richtig, siehe oben)
+  const [x, y, b, h] = lage.knopf;
+  await page.touchscreen.tap(x + b / 2, y + h / 2);
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "Kontakt erfassen" })).toBeVisible();
   await expect(dialog).toContainText(`${p.nachname}, ${p.vorname}`);   // die offene Akte ist vorgewählt
