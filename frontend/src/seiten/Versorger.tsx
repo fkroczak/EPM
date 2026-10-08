@@ -221,7 +221,7 @@ export function Versorger() {
 
   return (
     <Seite pfad={[{ text: "Versorger" }]}>
-      <Seitenkopf titel="Versorger" unter="Homecare-Unternehmen, die Infusionen liefern und Patienten zu Hause betreuen"
+      <Seitenkopf titel="Versorger"
         rechts={<>
           <Segmente label="Filter" wert={filter} onWahl={setFilter}
             werte={[{ wert: "aktiv", text: "Aktiv" }, { wert: "inaktiv", text: "Inaktiv" }, { wert: "alle", text: "Alle" }]} />

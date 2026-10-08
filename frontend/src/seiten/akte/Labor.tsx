@@ -247,8 +247,6 @@ export function Labor() {
           ))}
         </Eintragsliste>
       }
-      fuss={<>Eingetragen wird nur der gemessene Wert – die Einheit steht in der Maske schon da. Werte außerhalb des
-        Referenzbereichs sind hervorgehoben.</>}
       detail={gewaehlt
         ? <BefundDetail befund={gewaehlt} aenderbar={erfassen}
             onAendern={() => setDialog({ offen: true, befund: gewaehlt })} />

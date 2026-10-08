@@ -31,7 +31,7 @@ export function Datenschutz() {
   const d = daten.data;
   return (
     <Seite pfad={[{ text: "Datenschutz" }]}>
-      <Seitenkopf titel="Datenschutz" unter="Anfragen betroffener Personen, Aufbewahrungsfristen, eingeschränkte Akten und das Löschprotokoll." />
+      <Seitenkopf titel="Datenschutz" />
       {daten.isLoading ? <Laden /> : !d ? <Fehleranzeige fehler={daten.error ?? "Nicht geladen."} /> : (<>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3" data-testid="datenschutz-zahlen">
           <Zahl titel="offene Anfragen" wert={d.anfragen_offen.length} testid="zahl-anfragen" />

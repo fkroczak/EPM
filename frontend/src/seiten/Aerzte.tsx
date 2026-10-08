@@ -113,7 +113,7 @@ export function Aerzte() {
 
   return (
     <Seite pfad={[{ text: "Ärzte" }]}>
-      <Seitenkopf titel="Ärzte" unter="Hausärzte, Fachärzte und Kliniken mit Kontaktdaten – einmal gepflegt, in jeder Akte zugeordnet"
+      <Seitenkopf titel="Ärzte"
         rechts={<>
           <Segmente label="Filter" wert={filter} onWahl={setFilter}
             werte={[{ wert: "aktiv", text: "Aktiv" }, { wert: "inaktiv", text: "Inaktiv" }, { wert: "alle", text: "Alle" }]} />

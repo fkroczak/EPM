@@ -1,5 +1,4 @@
 /** Entwurf 3 · Patientenliste (Variante 21 über die Darstellung „Hoher Kontrast“). */
-import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -146,7 +145,8 @@ export function Patienten() {
   const pruefen = params.get("pruefen") ?? "";
   const sortierung = params.get("ordering") ?? (archiv ? "-abgeschlossen_am" : "-letzter_kontakt");
   const seite = Math.max(1, Number(params.get("seite") ?? "1") || 1);
-  const [suche, setSuche] = useState(params.get("suche") ?? "");
+  // Freitext kommt aus der Suche oben in der Kopfzeile (ein Suchfeld, Vorschlag „Weniger Wege“, 08.10.2026)
+  const suche = params.get("suche") ?? "";
   const stufe = useStufe();
   const mobil = useMobil();
 
@@ -160,16 +160,6 @@ export function Patienten() {
     if (!seiteBehalten) neu.delete("seite");
     setParams(neu, { replace: true });
   };
-
-  // Freitext mit kurzer Verzögerung in die Adresse übernehmen (Liste bleibt teilbar und „Zurück“ funktioniert)
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      const inAdresse = new URLSearchParams(window.location.search).get("suche") ?? "";
-      if (inAdresse !== suche.trim()) setze({ suche: suche.trim() || null });
-    }, 300);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suche]);
 
   const versorger = useVersorgerListe();
   const katheter = useAuswahl("katheter", false);
@@ -287,7 +277,8 @@ export function Patienten() {
         </table>
       )}
       {daten && daten.count === 0 ? (
-        <Leer>{gefiltert ? "Keine Patienten passen zu diesen Filtern." : archiv ? "Noch keine abgeschlossenen Akten." : "Noch keine Patienten angelegt."}</Leer>
+        <Leer>{gefiltert ? "Keine Patienten passen zu diesen Filtern." : archiv ? "Noch keine abgeschlossenen Akten." : "Noch keine Patienten angelegt."}
+          {!gefiltert && !archiv && darf("akten_bearbeiten") ? <> <KnopfLink to="/patienten/neu" klein icon="plus">Neuer Patient</KnopfLink></> : null}</Leer>
       ) : null}
     </Karte>
   );
@@ -332,7 +323,6 @@ export function Patienten() {
       onWahl={(w) => {
         const neu = new URLSearchParams();
         if (w === "abgeschlossen") neu.set("status", "abgeschlossen");
-        setSuche("");
         setParams(neu);
       }}
       werte={[
@@ -345,8 +335,6 @@ export function Patienten() {
     <Seite pfad={[{ text: "Patienten" }]}>
       {archiv ? (
         <Seitenkopf titel="Abgeschlossene Akten"
-          unter={<span className="max-w-[70ch] leading-normal inline-block">Hier liegen Akten, deren Betreuung beendet ist. Sie bleiben
-            vollständig lesbar und lassen sich als PDF ausgeben, werden aber nicht mehr verändert.</span>}
           rechts={umschalter} />
       ) : (
         <Seitenkopf titel="Patienten"
@@ -359,11 +347,13 @@ export function Patienten() {
       )}
 
       <div className="flex items-center gap-2.5 flex-wrap">
-        <label className="relative w-full sm:w-[280px] block">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
-          <input className="inp pl-[34px]" type="search" aria-label="Liste filtern" placeholder="Liste filtern"
-            value={suche} onChange={(e) => setSuche(e.target.value)} />
-        </label>
+        {suche ? (
+          <Chip art="akzent" className="h-[30px]" data-testid="suchbegriff">
+            <Icon name="suche" groesse={14} />„{suche}“
+            <button type="button" className="bg-transparent border-0 p-0 cursor-pointer text-inherit inline-flex"
+              aria-label="Suche entfernen" onClick={() => setze({ suche: null })}><Icon name="x" /></button>
+          </Chip>
+        ) : null}
         <Auswahl aria-label="Versorger" className="w-[calc(50%-0.35rem)] sm:w-[190px]" value={versorgerId}
           onChange={(e) => setze({ versorger: e.target.value || null, ansprechpartner: null })}>
           <option value="">Alle Versorger</option>
@@ -391,15 +381,15 @@ export function Patienten() {
             ))}
           </>
         ) : null}
-        {pruefen ? (
-          <Chip art="akzent" className="h-[30px]">
-            {PRUEFEN[pruefen] ?? pruefen}
-            <button type="button" className="bg-transparent border-0 p-0 cursor-pointer text-inherit inline-flex"
-              aria-label="Prüffilter entfernen" onClick={() => setze({ pruefen: null })}><Icon name="x" /></button>
-          </Chip>
-        ) : null}
+        {/* Prüffilter direkt wählbar (vorher nur über Links von Startseite und Datenschutz; 08.10.2026) */}
+        <Auswahl aria-label="Prüfen" className={cx("w-full sm:w-[230px]", pruefen && "!border-akzent")} value={pruefen}
+          onChange={(e) => setze({ pruefen: e.target.value || null })} data-testid="pruefen">
+          <option value="">Prüfen …</option>
+          {Object.entries(PRUEFEN).map(([k, t]) => <option key={k} value={k}>{t}</option>)}
+          {pruefen && !PRUEFEN[pruefen] ? <option value={pruefen}>{pruefen}</option> : null}
+        </Auswahl>
         {gefiltert ? (
-          <Knopf variante="geist" klein onClick={() => { setSuche(""); setParams(archiv ? new URLSearchParams("status=abgeschlossen") : new URLSearchParams()); }}>
+          <Knopf variante="geist" klein onClick={() => { setParams(archiv ? new URLSearchParams("status=abgeschlossen") : new URLSearchParams()); }}>
             Filter zurücksetzen
           </Knopf>
         ) : null}
@@ -412,7 +402,7 @@ export function Patienten() {
         <span>
           {archiv
             ? "Eine Akte wieder öffnen kann nur die Administration, zum Beispiel nach einem Versehen."
-            : `${SORTIERUNG_TEXT[sortierung] ?? "Sortiert"} · Klick auf den Namen öffnet die Akte · Testpatienten (Nr. ab 9001) zählen in keiner Statistik`}
+            : `${SORTIERUNG_TEXT[sortierung] ?? "Sortiert"} · Klick auf die Zeile öffnet die Akte`}
         </span>
         <span className="flex items-center gap-3">
           <span className="num" data-testid="listen-bereich">{daten ? `${zahl(von)}–${zahl(bis)} von ${zahl(daten.count)}` : ""}</span>

@@ -163,7 +163,6 @@ export function Bia() {
             ))}
           </Eintragsliste>
         }
-        fuss={<>Körperzusammensetzung mit Beurteilung. Das Gewicht wandert auf Wunsch in den Gewichtsverlauf der Akte.</>}
         detail={gewaehlt
           ? <BiaDetail m={gewaehlt} aenderbar={erfassen} onAendern={() => setDialog({ offen: true, messung: gewaehlt })} />
           : null}

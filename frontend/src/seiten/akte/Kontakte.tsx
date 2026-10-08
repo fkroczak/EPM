@@ -114,9 +114,7 @@ export function Kontakte() {
             {daten?.next ? <Knopf klein className="self-start" onClick={() => setAnzahl(anzahl + 50)}>Weitere laden</Knopf> : null}
           </Eintragsliste>
         }
-        fuss={<>Kontakte sind das Protokoll der Kommunikation mit dem Patienten. Ein gespeicherter Kontakt wird nicht
-          mehr geändert; wurde etwas falsch erfasst, wird er mit Grund storniert und neu geschrieben. Beides bleibt
-          sichtbar.</>}
+        fuss={<>Gespeicherte Kontakte werden nicht geändert, sondern storniert.</>}
         detail={gewaehlt ? (
           <div className="flex flex-col gap-4" data-testid="kontakt">
             <Detail testid="kontakt-detail"

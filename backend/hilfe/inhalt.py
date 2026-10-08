@@ -193,16 +193,25 @@ Kontakt gespeichert; EPM sagt das deutlich und lässt das Gewicht korrigieren un
         "id": "patientenliste", "gruppe": "patienten", "titel": "Patientenliste, Suche und Filter", "rechte": ["akten_lesen"],
         "seiten": ["/patienten"],
         "html": """
-<p>Die Liste zeigt Patienten <strong>in Betreuung</strong> oder <strong>abgeschlossene</strong> Akten. Die Suche oben in
-der Kopfzeile (Strg K) findet Patienten nach Name, Nummer oder Geburtsdatum von jeder Seite aus.</p>
+<p>Die Liste zeigt Patienten <strong>in Betreuung</strong> oder <strong>abgeschlossene</strong> Akten. Es gibt
+<strong>ein</strong> Suchfeld: das oben in der Kopfzeile (Strg K). Auf der Patientenliste filtert es direkt die Liste
+(Name, Nummer oder Geburtsdatum; der Begriff steht als Chip bei den Filtern), auf allen anderen Seiten schlägt es
+Patienten zum Öffnen vor.</p>
 <ul>
 <li>Filter nach Versorger, Ansprechpartner und Katheter; Schnellfilter „Nur mit Hinweisen“, „Gewichtsverlust“,
 „Termin diese Woche“.</li>
-<li>Klick auf eine Spaltenüberschrift sortiert; Klick auf den Namen öffnet die Akte.</li>
-<li>Je breiter das Fenster, desto mehr Spalten: ab 1440 px Versorger, Katheter und Plan, ab 1920 px Gewicht und
-Erklärungen. Ab 2560 px steht rechts eine <strong>Vorschau</strong> der gewählten Akte (Zeile anklicken).</li>
+<li><strong>Prüfen …</strong> wählt eine der Prüfungen: Kontakt fällig (bald fällig, überfällig), Wiedereinbestellung,
+Nickelallergie oder Versorger nicht erfasst, kein Infusionsplan, Labor oder BIA fehlt bzw. zu alt, Erklärungen zum
+Datenschutz fehlen, Abschluss prüfen, Altdokumente. Dieselben Listen öffnen sich auch über die Zahlen der Startseite
+und der Seite Datenschutz.</li>
+<li>Klick auf eine Spaltenüberschrift sortiert; Klick auf die Zeile öffnet die Akte.</li>
+<li>Je breiter das Fenster, desto mehr Spalten: ab 1440 px Geboren, Katheter, Versorger und Gewicht, ab 1920 px Plan
+und Erklärungen.</li>
 </ul>
-<p>Testpatienten (Nummern ab 9001) stehen in der Liste, zählen aber in keiner Statistik.</p>""",
+<p>Testpatienten (Nummern ab 9001) stehen in der Liste, zählen aber in keiner Statistik.</p>
+<p><strong>Abgeschlossene Akten</strong> sind Akten, deren Betreuung beendet ist. Sie bleiben vollständig lesbar und
+lassen sich als PDF ausgeben, werden aber nicht mehr verändert. Wieder öffnen kann nur die Administration, zum Beispiel
+nach einem Versehen.</p>""",
     },
     {
         "id": "neuer_patient", "gruppe": "patienten", "titel": "Neuer Patient", "rechte": ["akten_bearbeiten"],
@@ -214,7 +223,10 @@ schon gibt.</p>
 <p><strong>Als Testpatient anlegen</strong> (Häkchen oben) legt eine Übungsakte an, z. B. um Infusionspläne
 auszuprobieren: Nummer ab 9001, zählt in keiner Statistik. Testzugänge und Admins legen immer Testpatienten an.</p>
 <p>Gewicht bei Aufnahme, Hausarzt, Versorger, Katheter und Nickelallergie lassen sich gleich mit erfassen.
-„Kein Versorger“ bzw. „kein Katheter“ heißt bewusst keiner; leer heißt noch nicht erfasst.</p>""",
+„Kein Versorger“ bzw. „kein Katheter“ heißt bewusst keiner; leer heißt noch nicht erfasst. Fehlt ein Versorger oder
+Arzt in der Liste, legt <strong>Neu anlegen</strong> ihn in einem Dialog an – das Formular bleibt mit allen Eingaben
+stehen, der neue Eintrag ist gleich ausgewählt.</p>
+<p>Therapie, erster Infusionsplan, Dokumente und Termine werden danach in der Akte angelegt.</p>""",
     },
     {
         "id": "aktenkopf", "gruppe": "patienten", "titel": "Aktenkopf und Merkliste", "rechte": ["akten_lesen"],
@@ -223,10 +235,16 @@ auszuprobieren: Nummer ab 9001, zählt in keiner Statistik. Testzugänge und Adm
 <p>Der Kopf der Akte zeigt die Kerndaten: Gewicht mit Trend, BMI, Katheter, Versorger, Ansprechpartner, aktuellen Plan,
 nächsten Termin, Hausarzt, <strong>Auskunft an</strong> (Personen mit Schweigepflichtentbindung) und Nickelallergie.
 Fehlt eine Erklärung zum Datenschutz, steht ein Hinweis neben dem Namen.</p>
+<p>Die Knöpfe im Kopf: <strong>Kontakt</strong>, <strong>Gewicht</strong> und <strong>Termin</strong> öffnen jeweils
+denselben Dialog wie überall sonst (die Seite bleibt, wo sie ist); <strong>Neuer Plan</strong> – oder
+<strong>Entwurf fortsetzen</strong>, wenn es schon einen Entwurf gibt. Unter <strong>Weitere Aktionen</strong>:
+Stammdaten bearbeiten, Dokument hochladen, Akte als PDF, Unterlagen für die Sprechstunde, Akte abschließen.
+Dokumente lassen sich auch einfach auf die geöffnete Akte ziehen.</p>
 <p>Der <strong>Stern</strong> neben dem Namen setzt die Akte auf deine Merkliste; sie erscheint dann auf der Startseite
 unter „Meine Akten“. Dort stehen auch die zuletzt geöffneten Akten. Merkliste und Verlauf sieht nur die Person selbst.</p>
-<p>Jeder Bereich hat seinen eigenen Reiter: Übersicht, Diagnosen, Therapie, Kontakte, Infusionspläne, Labor, BIA,
-Berichte, Dokumente, Datenschutz und Verlauf.</p>
+<p>Jeder Bereich hat seinen eigenen Reiter: Übersicht, Diagnosen, Therapie, Empfehlung, Kontakte, Infusionspläne, Labor,
+BIA, Berichte, Dokumente, Datenschutz und Verlauf. Wie die Akte aufgebaut ist (Kopfzeile, Seitenleiste, Karteikarte),
+stellt jede Person unter <strong>Mein Konto › Darstellung</strong> ein. Tastenkürzel siehe „Tastenkürzel in der Akte“.</p>
 <p>Hinweise am Namen (Gewichtsverlust, Plan oder Befund zu alt, Kontakt fällig …) lassen sich mit dem <strong>×</strong>
 ausblenden. Dabei wird gewählt, wie lange Ruhe sein soll – 3, 6 oder 12 Monate, danach erscheint der Hinweis von allein
 wieder – oder <strong>nicht mehr nötig</strong>. Was gerade ausgeblendet ist, steht in der Übersicht der Akte unter
@@ -237,14 +255,14 @@ wieder – oder <strong>nicht mehr nötig</strong>. Was gerade ausgeblendet ist,
         "html": """
 <p>Auf breiten Bildschirmen nutzen alle Seiten die volle Breite und teilen sich in Stufen auf (ab 1440, 1920 und
 2560 px).</p>
-<p>In der Akte (Übersicht, Diagnosen, Therapie, Kontakte) und unter Administration › System stehen die Karten in einem
-Raster wie auf der Startseite. Das Menü <strong>⋯</strong> oben rechts an jeder Karte stellt ihre
-<strong>Breite</strong> (1 Spalte bis ganze Breite) und <strong>Höhe</strong> (automatisch oder 1–4 Zeilen; der Inhalt
-scrollt dann in der Karte) ein; <strong>Standardgröße</strong> setzt zurück. Gespeichert wird je Person.</p>
-<p>In der Patientenliste mit Vorschau und im Plan-Editor lässt sich der <strong>Teiler</strong> zwischen den Spalten
-ziehen wie bei einem Fenster.</p>
+<p>In der Übersicht der Akte und unter Administration › System stehen die Karten in einem Raster wie auf der
+Startseite. Das <strong>Größen-Symbol</strong> oben rechts an jeder Karte stellt ihre <strong>Breite</strong> (1 Spalte
+bis ganze Breite) und <strong>Höhe</strong> (automatisch oder 1–4 Zeilen; der Inhalt scrollt dann in der Karte) ein;
+<strong>Standardgröße</strong> setzt zurück. Gespeichert wird je Person.</p>
+<p>Im Plan-Editor lässt sich der <strong>Teiler</strong> zwischen den Spalten ziehen wie bei einem Fenster, in der
+Ansicht „Seitenleiste“ der Akte die Breite der Leiste.</p>
 <ul>
-<li>Er rastet bei <strong>⅓</strong>, <strong>½</strong> und <strong>⅔</strong> ein.</li>
+<li>Er rastet an festen Punkten ein.</li>
 <li><strong>Doppelklick</strong> auf den Teiler setzt auf den Standard zurück.</li>
 <li>Per Tastatur: Teiler mit Tab wählen, ← und → springen zum nächsten Einrastpunkt.</li>
 </ul>
@@ -252,13 +270,18 @@ ziehen wie bei einem Fenster.</p>
     },
     {
         "id": "stammdaten", "gruppe": "patienten", "titel": "Stammdaten, Diagnose und Therapie ändern",
-        "rechte": ["akten_bearbeiten"], "seiten": ["/patienten/:id/therapie", "/patienten/:id/diagnosen"],
+        "rechte": ["akten_bearbeiten"], "seiten": ["/patienten/:id/therapie", "/patienten/:id/empfehlung", "/patienten/:id/diagnosen"],
         "html": """
 <p>Stammdaten (Name, Anschrift, Telefon und Telefon 2, Versicherungsart, Versicherung und Versichertennummer, Versorger,
-Katheter, Nickelallergie …) ändert man über <strong>Weitere Aktionen › Stammdaten bearbeiten</strong> im Aktenkopf.
-Die Diagnoseliste mit ICD-Code und der Freitext „Diagnose“ stehen im Reiter <strong>Diagnosen</strong>, Therapie,
-Empfehlung und Bemerkung im Reiter <strong>Therapie</strong>; jede gespeicherte Fassung bekommt eine Versionsnummer,
-frühere Fassungen bleiben lesbar.</p>
+Katheter, Nickelallergie …) ändert <strong>Bearbeiten</strong> auf der Karte „Anschrift und Kontakt“ der Übersicht –
+oder <strong>Weitere Aktionen › Stammdaten bearbeiten</strong> im Aktenkopf.</p>
+<p>Die Diagnoseliste mit ICD-Code und die Notizen stehen im Reiter <strong>Diagnosen</strong>. Kennzeichen: gesichert
+(G), Verdacht (V), Zustand nach (Z), Ausschluss (A). <strong>Beenden</strong> fragt nach; beendete Diagnosen bleiben
+unter „beendete anzeigen“ erhalten und lassen sich wieder als aktuell eintragen.</p>
+<p><strong>Therapie</strong> und <strong>Empfehlung</strong> (aus der letzten Sprechstunde; sie steht auch auf den
+Unterlagen für die Sprechstunde) haben je einen Reiter: links die Fassungen, rechts der Text. Erst wird gelesen,
+<strong>Bearbeiten</strong> öffnet den Editor, <strong>Abbrechen</strong> verwirft die Eingabe. Jede gespeicherte
+Fassung bekommt eine Versionsnummer, frühere Fassungen bleiben lesbar.</p>
 <p>Jede Änderung steht mit Person und Zeitpunkt im Verlauf der Akte.</p>""",
     },
     {
@@ -279,21 +302,61 @@ Verlauf und im Audit-Log.</p>""",
 Korrekturen mit vorherigem Wert, Stornos, Pläne, Dokumente. Er lässt sich nach Bereich und Person filtern und als PDF
 ausgeben.</p>""",
     },
+    {
+        "id": "befunde", "gruppe": "patienten", "titel": "Labor und BIA", "rechte": ["akten_lesen"],
+        "seiten": ["/patienten/:id/labor", "/patienten/:id/bia"],
+        "html": """
+<p><strong>Labor:</strong> Eingetragen wird nur der gemessene Wert – die Einheit steht in der Maske schon da. Werte
+außerhalb des Referenzbereichs sind hervorgehoben. Die Parameter pflegt die Administration unter Vorlagen › Labor und
+Diagnosen.</p>
+<p><strong>BIA:</strong> Körperzusammensetzung (BCM, Fettmasse, ECW, Körperwasser …) mit Beurteilung. Das Gewicht der
+Messung wandert auf Wunsch in den Gewichtsverlauf der Akte.</p>
+<p>Ein Befund gilt nach der unter Vorlagen › Grenzwerte eingestellten Zeit als alt; die Akte zeigt dann einen Hinweis.
+<strong>Bearbeiten</strong> berichtigt einen Befund, die bisherige Fassung bleibt im Verlauf.</p>""",
+    },
+    {
+        "id": "berichte", "gruppe": "patienten", "titel": "Berichte", "rechte": ["akten_lesen"],
+        "seiten": ["/patienten/:id/berichte"],
+        "html": """
+<p><strong>Neuer Bericht</strong> legt einen Entwurf an (Titel, Berichtsart, Empfänger, Text). Entwürfe lassen sich
+bearbeiten oder <strong>verwerfen</strong> (mit Rückfrage). Wer das Recht hat, <strong>gibt frei</strong>: Der Bericht
+ist dann unveränderlich, seine PDF liegt bei den Dokumenten der Akte. Eine Korrektur ist ein neuer Bericht.</p>""",
+    },
+    {
+        "id": "tastatur", "gruppe": "patienten", "titel": "Tastenkürzel in der Akte", "rechte": ["akten_lesen"],
+        "seiten": [],
+        "html": """
+<p>In einer geöffneten Akte (nicht, während in einem Eingabefeld geschrieben wird):</p>
+<ul>
+<li><strong>K</strong> Kontakt erfassen · <strong>G</strong> Gewicht erfassen · <strong>T</strong> Neuer Termin</li>
+<li><strong>P</strong> Neuer Plan bzw. Entwurf fortsetzen</li>
+<li><strong>Alt+1 … Alt+9</strong> Reiter der Akte wechseln (in der Reihenfolge der Reiter)</li>
+<li><strong>?</strong> Übersicht der Tastenkürzel</li>
+</ul>
+<p>In Dialogen speichert <strong>Strg Enter</strong>, <strong>Esc</strong> schließt. Überall: <strong>Strg K</strong>
+Patientensuche. Die Knöpfe zeigen ihr Kürzel beim Überfahren mit der Maus. In der Ansicht „Karteikarte“ gibt es
+zusätzlich die Kürzelzeile („K Text“, „G 61,2“, „T“, „P“).</p>""",
+    },
     # ------------------------------------------------------------------ Kontakte und Termine
     {
         "id": "kontakt_erfassen", "gruppe": "kontakte", "titel": "Kontakt erfassen", "rechte": ["eintraege_erfassen"],
         "seiten": ["/patienten/:id/kontakte"],
         "html": """
-<p>Jedes Telefonat, jede Absprache mit dem Versorger und jeder Besuch wird als <strong>Kontakt</strong> in der Akte
-festgehalten. Ein gespeicherter Kontakt wird nicht mehr geändert.</p>
+<p>Kontakte sind das Protokoll der Kommunikation mit dem Patienten: jedes Telefonat, jede Absprache mit dem Versorger
+und jeder Besuch. Ein gespeicherter Kontakt wird nicht mehr geändert.</p>
 <ol>
-<li>Akte öffnen und <strong>Kontakt</strong> wählen – oder auf der Startseite <strong>Kontakt erfassen</strong>.</li>
-<li>Text eintragen und die <strong>Kontaktart</strong> wählen (Liste unter Vorlagen › Auswahllisten). Für einen Rückruf, eine Wiedervorlage oder einen Praxistermin den Haken
-<strong>Wiedervorlage</strong> setzen, Art und Datum wählen; sie erscheint auf der Startseite und im Kalender.</li>
-<li><strong>Kontakt speichern</strong>. Zeitpunkt und Person trägt EPM selbst ein.</li>
+<li><strong>Kontakt</strong> im Aktenkopf, <strong>Neuer Kontakt</strong> im Reiter Kontakte, <strong>+ Kontakt</strong>
+in der Übersicht, „K Text“ in der Kürzelzeile der Karteikarte, die Taste <strong>K</strong> oder
+<strong>Kontakt erfassen</strong> auf der Startseite – alle öffnen denselben Dialog.</li>
+<li>Text eintragen und die <strong>Kontaktart</strong> wählen (Liste unter Vorlagen › Auswahllisten). Auf Wunsch
+<strong>Gewicht mit erfassen</strong>.</li>
+<li>Für einen Rückruf, eine Wiedervorlage, einen Praxistermin oder Sonstiges <strong>Wiedervorlage anlegen</strong>
+wählen. Vorgeschlagen wird eine Wiedervorlage in 14 Tagen (einstellbar unter Vorlagen › Grenzwerte); Datum, Uhrzeit
+und Art lassen sich ändern. Sie erscheint auf der Startseite und im Kalender.</li>
+<li><strong>Speichern</strong> (oder Strg Enter). Erfasst-von trägt EPM selbst ein.</li>
 </ol>
 <p>Vor einer Auskunft am Telefon im Aktenkopf unter <strong>Auskunft an</strong> nachsehen, wem Auskunft gegeben werden
-darf.</p>""",
+darf. Termine der Akte stehen in der Übersicht und im Kalender.</p>""",
     },
     {
         "id": "kontakt_stornieren", "gruppe": "kontakte", "titel": "Kontakt stornieren", "rechte": ["eintraege_erfassen"],
@@ -309,8 +372,10 @@ erfassen. Ein Kontakt lässt sich genau einmal stornieren.</p>""",
         "html": """
 <p>Termine gibt es als <strong>Rückruf</strong>, <strong>Wiedervorlage</strong>, <strong>Praxistermin</strong> (mit
 Terminort) und <strong>Sonstiges</strong>. Ohne Uhrzeit gilt ein Termin als ganztägig.</p>
-<p>Anlegen über <strong>Termin</strong> in der Akte, auf der Startseite, im Kalender oder beim Kontakt. Offene Termine
-lassen sich ändern (Titel anklicken) und als erledigt abhaken.</p>""",
+<p><strong>Neuer Termin</strong> über <strong>Termin</strong> in der Akte (Taste <strong>T</strong>), auf der Startseite,
+im Kalender oder beim Kontakt. Offene Termine öffnet ein Klick (Titel in der Übersicht, Eintrag im Kalender oder in der
+Karteikarte) gleich in <strong>Termin bearbeiten</strong> – dort auch <strong>Erledigt</strong> und
+<strong>Akte öffnen</strong>. Auf Startseite und Übersicht hakt das Kästchen einen Termin als erledigt ab.</p>""",
     },
     {
         "id": "kalender", "gruppe": "kontakte", "titel": "Kalender", "rechte": ["akten_lesen"], "seiten": ["/kalender"],
@@ -322,19 +387,24 @@ lassen sich ändern (Titel anklicken) und als erledigt abhaken.</p>""",
 erreicht wird (Grenzwerte unter Vorlagen › Grenzwerte).</li>
 <li><strong>Plan prüfen</strong>, wenn der aktuelle Infusionsplan älter wird als eingestellt.</li>
 </ul>
-<p>Die Knöpfe oben filtern nach Art. Rechts stehen überfällige Termine und Fälligkeiten; ab 1920 px Fensterbreite dazu
-die Liste des gewählten Tages.</p>""",
+<p>Ein Klick auf einen offenen Termin öffnet <strong>Termin bearbeiten</strong> (mit Erledigt und Akte öffnen);
+Fälligkeiten und Erledigtes öffnen eine Ansicht. Das <strong>×</strong> an einem Eintrag blendet ihn aus – wie die
+Hinweise in der Akte für 3, 6 oder 12 Monate oder als „nicht mehr nötig“, mit Grund.</p>
+<p>Oben lässt sich nach Art filtern. Rechts bzw. darunter stehen der gewählte Tag, überfällige Termine und
+Fälligkeiten.</p>""",
     },
     # ------------------------------------------------------------------ Gewicht
     {
         "id": "gewicht", "gruppe": "gewicht", "titel": "Gewicht eintragen und korrigieren", "rechte": ["eintraege_erfassen"],
         "seiten": [],
         "html": """
-<p>In der Übersicht der Akte unter <strong>Gewichtsverlauf</strong> das neue Gewicht, das Messdatum und die Quelle
-(telefonisch, Ambulanz, Versorger, Arztbrief) eintragen und speichern – oder auf der Startseite über
-<strong>Gewicht</strong> bzw. beim Kontakt mit „Gewicht mit erfassen“.</p>
+<p><strong>Gewicht</strong> im Aktenkopf, <strong>+ Gewicht</strong> auf der Karte „Gewichtsverlauf“, „G 54,6“ in der
+Kürzelzeile, die Taste <strong>G</strong> oder <strong>Gewicht</strong> auf der Startseite öffnen denselben Dialog:
+Gewicht, Quelle (telefonisch, Ambulanz, Versorger, Arztbrief) und Messdatum eintragen, <strong>Speichern</strong>. Beim
+Kontakt geht es mit „Gewicht mit erfassen“ in einem Schritt, bei der BIA-Messung ebenso.</p>
 <p>Unplausible Werte (außerhalb der Grenzwerte) und Daten in der Zukunft werden abgewiesen. Eine falsche Messung wird
-unter <strong>Messwerte anzeigen › Korrigieren</strong> berichtigt; die bisherige Fassung bleibt im Verlauf sichtbar.</p>""",
+mit <strong>Bearbeiten</strong> berichtigt – die letzte direkt per Klick auf den Wert oder „Bearbeiten“ auf der Karte,
+ältere unter <strong>Messwerte anzeigen</strong>; die bisherige Fassung bleibt im Verlauf sichtbar.</p>""",
     },
     {
         "id": "gewicht_verlauf", "gruppe": "gewicht", "titel": "Gewichtsverlauf und Warnung", "rechte": ["akten_lesen"],

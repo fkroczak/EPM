@@ -180,8 +180,7 @@ export function Berichte() {
             ))}
           </Eintragsliste>
         }
-        fuss={<>Ein freigegebener Bericht ist unveränderlich; seine PDF liegt bei den Dokumenten der Akte. Eine
-          Korrektur ist ein neuer Bericht.</>}
+        fuss={<>Freigegebene Berichte sind unveränderlich.</>}
         detail={gewaehlt ? (
           <Detail testid="bericht-detail"
             titel={<span className="flex items-center gap-2">{gewaehlt.titel}

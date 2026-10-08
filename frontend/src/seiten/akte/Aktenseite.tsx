@@ -74,7 +74,9 @@ export function Aktenseite({ titel, anzahl, aktion, kopfrechts, liste, fuss, det
         {liste}
         {fuss ? <span className="text-[0.8125rem] gedaempft leading-normal">{fuss}</span> : null}
       </div>
-      <div className="min-w-0 [grid-area:detail] scroll-mt-20" data-testid={kennung}>{detail ?? (leer ? <Hinweiskarte>{leer}</Hinweiskarte> : null)}</div>
+      {/* Ohne Einträge sagt die Liste, was fehlt, und der Hauptknopf steht direkt darüber – kein zweiter Hinweis
+          „Links … wählen“ (Vorschlag „Weniger Erklärtext“, 08.10.2026) */}
+      <div className="min-w-0 [grid-area:detail] scroll-mt-20" data-testid={kennung}>{detail ?? (leer && !(anzahl === 0 && !laedt) ? <Hinweiskarte>{leer}</Hinweiskarte> : null)}</div>
     </div>
     </DetailKennung.Provider>
   );

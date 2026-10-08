@@ -537,7 +537,6 @@ export function Konto() {
   return (
     <Seite pfad={[{ text: "Mein Konto" }]}>
       <Seitenkopf titel="Mein Konto"
-        unter={<span className="max-w-[80ch] inline-block leading-normal">Deine Einstellungen werden für dich gespeichert und gelten an jedem PC, an dem du dich anmeldest. Rolle und Rechte vergibt die Administration.</span>}
         rechts={<Knopf onClick={() => zuruecksetzen.current?.()}>Auf Standard zurücksetzen</Knopf>} />
       <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5 items-start">
         {/* am Telefon zuerst Sicherheit (Passkey), Darstellung danach */}
