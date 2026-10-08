@@ -96,17 +96,26 @@ offenen Akte gleich für diesen Patienten.</li>
 <p>Anmelden am Telefon am einfachsten mit einem Passkey (siehe „Passkey statt Code“).</p>""",
     },
     {
-        "id": "konto", "gruppe": "erste_schritte", "titel": "Mein Konto: Darstellung, Kennwort, Anmeldungen", "rechte": [],
+        "id": "design", "gruppe": "erste_schritte", "titel": "Design: Farben, Dichte, Aufbau der Akte", "rechte": [],
+        "seiten": ["/design"],
+        "html": """
+<p>Unter <strong>Design</strong> (Menü unten links bei deinem Namen) stellt jede Person für sich ein, wie EPM aussieht:
+Farbschema (auch hoher Kontrast und dunkel), Akzentfarbe, Hintergrund, Dichte, Schriftgröße und Schriftstärke sowie den
+Aufbau der Patientenakte (Kopfzeile, Seitenleiste oder Karteikarte). Die Einstellungen gelten an jedem PC, an dem man
+sich anmeldet. <strong>Auf Standard zurücksetzen</strong> stellt alles zurück; <strong>Startseite anpassen</strong>
+führt zur Startseite im Bearbeitungsmodus.</p>""",
+    },
+    {
+        "id": "konto", "gruppe": "erste_schritte", "titel": "Mein Konto: Kennwort, Zwei-Faktor, Anmeldungen", "rechte": [],
         "seiten": ["/konto"],
         "html": """
-<p>Unter <strong>Mein Konto</strong> stellt jede Person für sich ein, wie EPM aussieht: Farbschema (auch hoher Kontrast
-und dunkel), Akzentfarbe, Hintergrund, Dichte, Schriftgröße und Schriftstärke. Die Einstellungen gelten an jedem PC,
-an dem man sich anmeldet.</p>
+<p><strong>Mein Konto</strong> zeigt das eigene Profil (Name, Funktion, Kürzel, Rolle – geändert von der
+Administration) und alles zur Anmeldung. Wie EPM aussieht, steht seit dem 09.10.2026 im eigenen Menüpunkt
+<strong>Design</strong>.</p>
 <ul>
 <li><strong>Kennwort ändern</strong>: altes Kennwort, dann zweimal das neue.</li>
 <li><strong>Zwei-Faktor-Anmeldung</strong>: Authenticator-App oder Passkey einrichten, neues Gerät, Notfall-Codes; solange freiwillig auch ausschalten.</li>
 <li><strong>Anmeldungen</strong>: zeigt, wo man gerade angemeldet ist; fremde Anmeldungen lassen sich einzeln beenden.</li>
-<li><strong>Startseite anpassen</strong> führt zur Startseite im Bearbeitungsmodus.</li>
 </ul>""",
     },
     {
@@ -244,7 +253,7 @@ Dokumente lassen sich auch einfach auf die geöffnete Akte ziehen.</p>
 unter „Meine Akten“. Dort stehen auch die zuletzt geöffneten Akten. Merkliste und Verlauf sieht nur die Person selbst.</p>
 <p>Jeder Bereich hat seinen eigenen Reiter: Übersicht, Diagnosen, Therapie, Empfehlung, Kontakte, Infusionspläne, Labor,
 BIA, Berichte, Dokumente, Datenschutz und Verlauf. Wie die Akte aufgebaut ist (Kopfzeile, Seitenleiste, Karteikarte),
-stellt jede Person unter <strong>Mein Konto › Darstellung</strong> ein. Tastenkürzel siehe „Tastenkürzel in der Akte“.</p>
+stellt jede Person unter <strong>Design</strong> ein. Tastenkürzel siehe „Tastenkürzel in der Akte“.</p>
 <p>Hinweise am Namen (Gewichtsverlust, Plan oder Befund zu alt, Kontakt fällig …) lassen sich mit dem <strong>×</strong>
 ausblenden. Dabei wird gewählt, wie lange Ruhe sein soll – 3, 6 oder 12 Monate, danach erscheint der Hinweis von allein
 wieder – oder <strong>nicht mehr nötig</strong>. Was gerade ausgeblendet ist, steht in der Übersicht der Akte unter

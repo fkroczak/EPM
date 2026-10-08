@@ -44,6 +44,8 @@ test("Bildschirmfotos am Telefon: Start, Menü, Patienten, Akte, Pläne, Konto",
   await foto(page, "kalender");
   await page.goto("/konto");
   await foto(page, "konto");
+  await page.goto("/design");
+  await foto(page, "design");
 });
 
 test("Bildschirmfotos am Telefon: Anmeldung", async ({ browser }) => {

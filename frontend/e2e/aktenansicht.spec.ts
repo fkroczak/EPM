@@ -21,9 +21,9 @@ async function ziehen(page: Page, griff: Locator, dx: number, dy: number) {
   await page.mouse.up();
 }
 
-/** In Mein Konto die Aktenansicht wählen und warten, bis sie gespeichert ist */
+/** Unter Design die Aktenansicht wählen und warten, bis sie gespeichert ist */
 async function ansichtWaehlen(page: Page, titel: string) {
-  await page.goto("/konto");
+  await page.goto("/design");
   const gespeichert = page.waitForResponse((r) => r.url().includes("/api/auth/ich/") && r.request().method() === "PATCH" && r.ok());
   await page.getByRole("radio", { name: `Aktenansicht ${titel}` }).click();
   await gespeichert;
@@ -156,7 +156,7 @@ test("Aktenansicht: Kopfzeile in Stufen, Seitenleiste mit Breite, Karteikarte mi
   await expect(page.getByTestId("kontakt-detail")).toContainText("Telefonat zur Ansicht");
 
   // zurück auf Standard: wieder Kopfzeile
-  await page.goto("/konto");
+  await page.goto("/design");
   await page.getByRole("button", { name: "Auf Standard zurücksetzen" }).click();
   await page.waitForTimeout(500);
   await page.goto(akte);

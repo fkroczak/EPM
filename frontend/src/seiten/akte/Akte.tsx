@@ -390,7 +390,7 @@ export function Akte() {
   const p = akte.data;
   const qc = useQueryClient();
   const melden = useHinweis();
-  // Aufbau der Akte je Person (Mein Konto › Darstellung › Patientenakte); am Telefon immer mit Kopf oben
+  // Aufbau der Akte je Person (Design › Patientenakte); am Telefon immer mit Kopf oben
   const [darstellung, darstellungAendern] = useDarstellung();
   const mobil = useMobil();
   const ansicht: Aktenansicht = mobil ? "kopfzeile" : darstellung.aktenansicht;

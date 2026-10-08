@@ -38,7 +38,7 @@ test("Vor dem Neustart: Grenzwert, Rechte, Darstellung und Startseite in der Obe
   await ctx.close();
 
   const d = await seiteAls(browser, gemerkt("darstellung"));
-  await d.page.goto("/konto");
+  await d.page.goto("/design");
   let antwort = gespeichert(d.page, "auth/ich/");
   await d.page.getByRole("radio", { name: "Darstellung Dunkel" }).click();
   await antwort;

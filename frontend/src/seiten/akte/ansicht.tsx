@@ -1,5 +1,5 @@
 /**
- * Aufbau der Patientenakte je Person (Wunsch 08.10.2026, Mein Konto › Darstellung › Patientenakte):
+ * Aufbau der Patientenakte je Person (Wunsch 08.10.2026, Design › Patientenakte):
  *   kopfzeile    Kopf mit den Angaben in Gruppen (wie die Seitenleiste), darunter waagerechte Reiter; die Höhe des
  *                Kopfs lässt sich am Griff unten in drei Stufen ziehen (nur Name · eine Zeile · alle Angaben)
  *   seitenleiste Angaben und Knöpfe links in einer Leiste, deren Breite sich ziehen lässt (240–480 px, rastet ein),

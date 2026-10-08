@@ -99,13 +99,16 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
           {admin}
         </nav>
       ) : null}
-      {/* Unten links nur die angemeldete Person (Wunsch 08.10.2026); Hilfe, Mein Konto und Abmelden per Klick als Menü.
+      {/* Unten links nur die angemeldete Person (Wunsch 08.10.2026); Hilfe, Design, Mein Konto und Abmelden per Klick als Menü (Design seit 09.10.2026 eigener Punkt).
           In der Schublade am Telefon bleiben die Einträge offen sichtbar. */}
       <div className={cx("mt-auto flex flex-col gap-2.5 border-t border-rand pt-3.5", v ? "px-1.5" : "hd:px-1.5")}>
         {v ? <>
           <Person v />
           <NavLink to="/hilfe" title="Hilfe" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
             <Icon name="hilfe" /> <NavText>Hilfe</NavText>
+          </NavLink>
+          <NavLink to="/design" title="Design" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
+            <Icon name="design" /> <NavText>Design</NavText>
           </NavLink>
           <NavLink to="/konto" title="Mein Konto" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
             <Icon name="konto" /> <NavText>Mein Konto</NavText>
@@ -115,7 +118,7 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
           </button>
         </> : (
           <BaseMenu.Root>
-            <BaseMenu.Trigger className="benutzerknopf" aria-label={`Benutzermenü: ${ich.anzeigename}`} title={`${ich.anzeigename} – Hilfe, Mein Konto, Abmelden`}
+            <BaseMenu.Trigger className="benutzerknopf" aria-label={`Benutzermenü: ${ich.anzeigename}`} title={`${ich.anzeigename} – Hilfe, Design, Mein Konto, Abmelden`}
               data-testid="benutzermenue">
               <Person v={false} />
               <span className="hidden hd:inline-flex ml-auto gedaempft" aria-hidden="true"><Icon name="hoch" groesse={14} /></span>
@@ -126,6 +129,7 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
                 <BaseMenu.Popup className="card benutzermenue-liste p-1 flex flex-col gap-0.5 outline-none" data-testid="benutzermenue-liste">
                   {[
                     { text: "Hilfe", icon: "hilfe", tun: () => navigate("/hilfe") },
+                    { text: "Design", icon: "design", tun: () => navigate("/design") },
                     { text: "Mein Konto", icon: "konto", tun: () => navigate("/konto") },
                     { text: "Abmelden", icon: "abmelden", tun: () => void abmelden() },
                   ].map((e) => (
