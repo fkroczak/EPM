@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#251F53">
+<title>Keine Verbindung · EPM</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; background: #F3F4F6; color: #1B1932;
+    display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
+  main { max-width: 420px; background: #fff; border: 2px solid #D9D8E3; border-radius: 14px; padding: 28px; }
+  .marke { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .marke img { width: 44px; height: 44px; border-radius: 10px; }
+  h1 { font-size: 1.25rem; margin: 0; }
+  p { line-height: 1.5; color: #3B3953; margin: 0 0 12px; }
+  ul { margin: 0 0 18px; padding-left: 1.2rem; color: #3B3953; line-height: 1.6; }
+  a.knopf { display: flex; align-items: center; justify-content: center; font-weight: 500; background: #251F53;
+    color: #fff; border-radius: 8px; min-height: 44px; padding: 0 18px; text-decoration: none; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #2E3033; color: #F2F2F2; } main { background: #3A3C40; border-color: #55585E; }
+    p, ul { color: #D7D8DB; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="marke"><img src="/icons/epm-192.png" alt=""><h1>Keine Verbindung zu EPM</h1></div>
+  <p>EPM ist nur über das VPN der Stiftung erreichbar. Gespeichert wird nichts auf diesem Gerät – ohne Verbindung
+    gibt es daher auch keine Patientendaten.</p>
+  <ul>
+    <li>VPN (OpenVPN/SSL-VPN der Stiftung) einschalten</li>
+    <li>Mobile Daten bzw. WLAN prüfen</li>
+  </ul>
+  <!-- ohne Skript (CSP: keine Inline-Skripte): Der Link lädt EPM neu, sobald die Verbindung wieder steht -->
+  <a class="knopf" href="/">Erneut versuchen</a>
+</main>
+</body>
+</html>

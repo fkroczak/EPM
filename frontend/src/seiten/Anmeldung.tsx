@@ -42,7 +42,7 @@ function Rahmen({ children }: { children: ReactNode }) {
           </span>
         </div>
       </div>
-      <main className="w-full md:w-[540px] shrink-0 px-4 sm:px-6 md:px-[72px] py-8 sm:py-16 flex flex-col justify-center gap-6 sm:gap-7 bg-flaeche">
+      <main className="w-full md:w-[540px] shrink-0 px-4 sm:px-6 md:px-[72px] pt-[max(2rem,env(safe-area-inset-top))] pb-8 sm:py-16 flex flex-col justify-center gap-6 sm:gap-7 bg-flaeche">
         <Logo className="w-[396px] max-w-full h-[96px] sm:h-[140px]" />
         {children}
         <div className="flex items-start gap-2 text-[0.8125rem] leading-normal gedaempft">

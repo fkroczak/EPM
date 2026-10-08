@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 08.10.2026 · Code-Stand: Passkey und Telefon (F130–F134); Wünsche aus der Praxis vom 06./07.10.2026 (F110–F124); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
+Stand: 08.10.2026 · Code-Stand: EPM als App (F135); Passkey und Telefon (F130–F134); Wünsche aus der Praxis vom 06./07.10.2026 (F110–F124); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
 Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026, Prüfung nach DSGVO vom 02.10.2026 (`docs/DATENSCHUTZ.md`).
@@ -2521,6 +2521,26 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
 - **Status:** ABGESCHLOSSEN (Server-Werkzeug; im Browsertest-Stack gibt es keine eigene CA)
 
 
+### F135 EPM als App (PWA)
+- **Festlegung 08.10.2026:** EPM lässt sich auf PC und Telefon als App installieren (Startbildschirm/Startmenü,
+  eigenes Fenster ohne Browserleisten).
+- **Dateien:** `frontend/public/manifest.webmanifest` (Name, `start_url` /, `display: standalone`, Stiftungsfarben,
+  Symbole 192/512, maskierbar 512, Kurzbefehle „Pläne zur Freigabe“, „Patienten“, „Kalender“), `icons/` (aus dem
+  Favicon-Motiv), `apple-touch-icon` und Meta-Angaben für iOS, `viewport-fit=cover` mit sicheren Rändern;
+  `public/sw.js` (Service Worker), `public/offline.html` („Keine Verbindung zu EPM“, ohne Skript).
+- **Datenschutz:** Der Service Worker speichert nur unveränderliche Programmdateien (`/assets/`, `/pdfjs/`,
+  `/icons/`, Favicon) und die Seite „Keine Verbindung“. API, Dokumente, PDFs, Sicherungen und `index.html` laufen am
+  Zwischenspeicher vorbei – auf dem Gerät liegen keine Patientendaten. Seiten kommen immer frisch vom Server (Updates
+  sofort wirksam); höchstens 300 Einträge, alte Versionen fallen beim Aktivieren heraus.
+- **Ansicht:** Mein Konto › „EPM als App“: „EPM installieren“ (Chrome, Edge, Android), Anleitung für iPhone/iPad
+  (Teilen › Zum Home-Bildschirm), „läuft als App“; Hinweis, wenn EPM nicht über den Namen mit Zertifikat aufgerufen
+  wird. Hilfe „EPM am Telefon und als App“.
+- **Voraussetzung:** wie beim Passkey der Name mit dem Zertifikat der eigenen CA (Service Worker und Installation
+  brauchen ein gültiges Zertifikat).
+- **Teststatus:** Browsertest `pwa.spec.ts` (Manifest, Symbole, `sw.js` nicht zwischengespeichert, Service Worker aktiv,
+  im Zwischenspeicher nur Programmdateien, ohne Netz „Keine Verbindung“ und zurück, Karte unter Mein Konto).
+- **Status:** ABGESCHLOSSEN UND GETESTET
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2619,6 +2639,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | EPM als App (PWA) | Manifest mit Symbolen und Kurzbefehlen, Service Worker nur für Programmdateien (keine Patientendaten auf dem Gerät), Seite „Keine Verbindung“, Karte „EPM als App“ unter Mein Konto, Hilfe ergänzt (F135) |
 | 08.10.2026 | Passkey und Telefon (Pull Request #14) | Passkeys (WebAuthn) als zweiter Faktor statt oder neben dem Authenticator-Code – einrichten, umbenennen, entfernen unter Mein Konto, Anmeldung und alle Bestätigungen mit Passkey (F130–F132; Modell `accounts.Passkey` als django-otp-Gerät, Migration `accounts/0008`, `py_webauthn` 2.x, Baustein `useZweiterFaktor` an allen Bestätigungen). Eigene CA mit Namensbeschränkung und Serverzertifikat (`sudo epm-zertifikat`, F134), Stammzertifikat unter `/epm-ca.crt`. Mobile Ansicht (F133): Leiste unten mit Notiz und Plänen, Menü als Schublade, Karten statt Tabellen, Akte mit Detail vor der Liste, Dialoge und Eingaben für Touch. Hilfe-Abschnitte „Passkey statt Code“ und „EPM am Telefon“. Offene Fragen U62, U63. Dabei gefunden und behoben: Wer den Passkey entfernte, mit dem die Sitzung bestätigt war, war danach abgemeldet (Sitzung läuft jetzt mit einem verbliebenen Gerät weiter). Nach den Bildschirmfotos am Telefon (Lauf 37710345563) behoben: Kartenköpfe (z. B. „Diagnosen und Therapie“ mit drei Knöpfen) brechen um statt die Seite zu verbreitern, die Spalte „Versichertennummer“ überlappte (auch am PC), der Kalender startet am Telefon als Liste. Browsertests „Ärzte zuordnen …“ und „Benutzer ohne Login …“ stabilisiert (Meldung genau bzw. die letzte gesucht). Lauf 37714211870: 347 von 347 Backend-Tests, 108 von 108 Browsertests |
 | 06.10.2026 | Wünsche aus der Praxis (Alice, 06.10.2026) | Infusionstage je Beutelart mit Übernahme in den Folgeplan, Vergleich und PDF (F110, Migration `infusionen/0007`); Präparate nach der Mail – Zusatzvolumen umbenannt und ergänzt, Natrovit, NutriLock/TauroLock, Hinweisfeld am Präparat, Dipeptamin und Omegaven ausgeblendet (F111, Migrationen `stammdaten/0012`, `0013`); Katalog der Laborparameter mit Alices Liste und Erfassungsmaske nach Gruppen (F112, F113, neue App `befunde`); BIA-Maske mit Beurteilung und Übernahme des Gewichts (F114); Berichte in der Akte mit Entwurf/Freigabe, PDF als Dokument und Trigger-Schutz (F115, neue App `berichte`, neues Recht „Berichte freigeben“); Sprechstundenblatt (F116); Diagnosen mit ICD-Code und mitwachsendem Katalog (F117, Migration `patienten/0010`); Versichertendaten GKV/PKV, Versicherung, Versichertennummer (F118). Neue Dokumentvorlagen „Bericht“ und „Unterlagen für die Sprechstunde“ (Migration `vorlagen/0003`), Audit-Arten `bericht_freigegeben` und `sprechstunde_erzeugt` (`audit/0008`). Endgültiges Löschen, Kopie der Akte und Verlauf um die neuen Bereiche erweitert. Konzept und 22 offene Fragen (U39–U60) in `docs/WUENSCHE-PRAXIS-2026-10-06.md`. Die Migrationen sind von Hand geschrieben (die Arbeitsumgebung hatte keinen Zugriff auf PyPI und npm); `makemigrations` in CI meldet dazu „No changes detected“. Die neuen Apps stehen jetzt auch in der `makemigrations`-Zeile des Workflows. Lauf 37525732042: 311 von 311 Backend-Tests, 98 von 98 Browsertests. Davor fand CI drei echte Fehler, die hier behoben sind: der Plan-Serializer gab die neuen Infusionstage-Felder weder aus noch nahm er sie entgegen (dadurch griff auch deren Prüfung nicht), der ICD-Code wurde nicht in Großschreibung vereinheitlicht, und das Frontend baute wegen eines doppelten Schlüssels in der Feldliste des Verlaufs nicht. Nebenwirkung der Umbenennung: Beim Altdaten-Import trifft „Sterofundin“ keinen Katalogeintrag mehr automatisch und wird einmal von Hand auf „Sterofundin ISO“ gelegt (U43) |
 | 07.10.2026 | Dokumente zurückgesetzt | Der Reiter Dokumente ist wieder in seiner ursprünglichen Form (Tabelle links, Details rechts); die übrigen Reiter behalten das gemeinsame Muster aus F122. Auf Wunsch ohne Testlauf eingespielt (`[skip ci]`); die Datei entspricht Zeile für Zeile dem Stand `8ccda52`, der zuletzt grün war |

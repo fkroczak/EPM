@@ -16,6 +16,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { useZweiterFaktor } from "@/components/ZweiterFaktor";
+import { useInstallation } from "@/lib/pwa";
 import type { PasskeyEintrag } from "@/lib/typen";
 import { AuthenticatorEinrichten, NotfallcodesAnzeige, PasskeyEinrichten } from "./Anmeldung";
 
@@ -429,6 +430,42 @@ function SicherheitKarte() {
   );
 }
 
+/** EPM als App auf PC und Telefon (PWA, Festlegung 08.10.2026) */
+function AppKarte() {
+  const app = useInstallation();
+  const { status } = useAuth();
+  const melden = useHinweis();
+  const name = status?.passkey?.rp_id;
+  const ueberName = !!name && (window.location.hostname === name || window.location.hostname.endsWith(`.${name}`));
+  return (
+    <Karte className="px-5 py-[18px] flex flex-col gap-2" data-testid="app-karte">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="lbl m-0">EPM als App</h2>
+        {app.alsApp ? <Chip art="ok"><Icon name="haken" />läuft als App</Chip> : null}
+      </div>
+      {app.alsApp ? (
+        <span className="text-[0.8125rem] gedaempft leading-normal">EPM ist auf diesem Gerät installiert und startet ohne Browserleisten.</span>
+      ) : app.kannInstallieren ? (
+        <>
+          <span className="text-[0.8125rem] gedaempft leading-normal">EPM wie eine App vom Startbildschirm bzw. aus dem Startmenü öffnen – eigenes Fenster, ohne Browserleisten.</span>
+          <Knopf variante="pri" icon="hochladen" className="self-start" onClick={() => void app.installieren().then((ok) => { if (ok) melden("EPM wird installiert."); })}>
+            EPM installieren</Knopf>
+        </>
+      ) : app.ios ? (
+        <span className="text-[0.8125rem] gedaempft leading-normal">In Safari unten auf <strong>Teilen</strong> tippen, dann
+          <strong> Zum Home-Bildschirm</strong>. EPM startet danach wie eine App.</span>
+      ) : (
+        <span className="text-[0.8125rem] gedaempft leading-normal">Im Menü des Browsers „App installieren“ bzw. „Zum
+          Startbildschirm hinzufügen“ wählen (Chrome, Edge, Android).</span>
+      )}
+      {!app.alsApp && !ueberName && name ? (
+        <Meldung art="info" className="text-[0.8125rem]">Installieren geht nur über https://{name}/ mit dem Zertifikat der Stiftung (wie beim Passkey).</Meldung>
+      ) : null}
+      <span className="text-xs gedaempft">Auf dem Gerät werden nur Programmdateien gespeichert, keine Patientendaten. Ohne VPN zeigt die App „Keine Verbindung“.</span>
+    </Karte>
+  );
+}
+
 function SitzungenKarte() {
   const qc = useQueryClient();
   const melden = useHinweis();
@@ -474,6 +511,7 @@ export function Konto() {
           </Karte>
           <SicherheitKarte />
           <SitzungenKarte />
+          <AppKarte />
           <Link to="/" state={{ anpassen: Date.now() }} className="card px-5 py-4 flex items-center justify-between no-underline text-tinte hover:bg-fein">
             <span className="font-medium">Startseite anpassen</span><span aria-hidden="true">→</span>
           </Link>

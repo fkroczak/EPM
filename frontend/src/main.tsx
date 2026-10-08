@@ -13,6 +13,9 @@ import { ApiFehler } from "./lib/api";
 import { AuthProvider } from "./lib/auth";
 import { HinweisProvider } from "./components/ui/hinweise";
 import { App } from "./App";
+import { pwaStarten } from "./lib/pwa";
+
+pwaStarten();
 
 const queryClient = new QueryClient({
   defaultOptions: {

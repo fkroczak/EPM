@@ -81,7 +81,7 @@ Zertifikat installieren › CA-Zertifikat.</li>
 den zweiten Faktor zurück.</p>""",
     },
     {
-        "id": "telefon", "gruppe": "erste_schritte", "titel": "EPM am Telefon", "rechte": [], "seiten": [],
+        "id": "telefon", "gruppe": "erste_schritte", "titel": "EPM am Telefon und als App", "rechte": [], "seiten": [],
         "html": """
 <p>Der Arbeitsplatz für EPM ist der PC. Am Telefon (im VPN) geht das Wichtigste unterwegs:</p>
 <ul>
@@ -93,7 +93,13 @@ Plan, Versorger und den nächsten Termin, die Reiter lassen sich seitlich wische
 offenen Akte gleich für diesen Patienten.</li>
 <li>Alles Übrige steht unter <strong>Menü</strong>.</li>
 </ul>
-<p>Anmelden am Telefon am einfachsten mit einem Passkey (siehe „Passkey statt Code“).</p>""",
+<p>Anmelden am Telefon am einfachsten mit einem Passkey (siehe „Passkey statt Code“).</p>
+<p><strong>Als App installieren</strong> (Startbildschirm bzw. Startmenü, eigenes Fenster ohne Browserleisten):
+<strong>Android/Chrome/Edge:</strong> Mein Konto › „EPM als App“ › <strong>EPM installieren</strong> oder im Menü des
+Browsers „App installieren“. <strong>iPhone/iPad:</strong> in Safari <strong>Teilen › Zum Home-Bildschirm</strong>.
+Voraussetzung wie beim Passkey: Aufruf über den Namen mit dem Zertifikat der Stiftung. Auf dem Gerät werden nur
+Programmdateien gespeichert, keine Patientendaten; ohne VPN zeigt die App „Keine Verbindung“. Lange auf das Symbol
+drücken führt direkt zu „Pläne zur Freigabe“, „Patienten“ oder „Kalender“.</p>""",
     },
     {
         "id": "konto", "gruppe": "erste_schritte", "titel": "Mein Konto: Darstellung, Kennwort, Anmeldungen", "rechte": [],
