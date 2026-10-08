@@ -70,7 +70,7 @@ export function Bereich({ id, titel, standard, children, menue = true, className
     const el = ref.current;
     if (!el || !el.parentElement) return;
     const gemessen = parseFloat(getComputedStyle(el.parentElement).columnGap);
-    const abstand = Number.isNaN(gemessen) ? 20 : gemessen; // Form „eckig“: 0 px
+    const abstand = Number.isNaN(gemessen) ? 20 : gemessen;
     setZeilen(Math.max(1, Math.ceil((el.getBoundingClientRect().height + abstand) / EINHEIT)));
   };
   // vor dem ersten Zeichnen messen (sonst lägen die Karten kurz übereinander), danach bei jeder Größenänderung

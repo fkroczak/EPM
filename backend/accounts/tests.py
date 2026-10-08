@@ -290,15 +290,11 @@ class MeinKonto(TestCase):
                 self.assertIn(feld, r.json())
         self.assertEqual(self.darstellung(aktenansicht="karteikarte").status_code, 200)
 
-    def test_form(self):
-        """Form der Oberfläche je Person (Wunsch 08.10.2026): rund (Standard) oder eckig ohne Abstände."""
-        self.assertEqual(self.darstellung(dichte="normal").status_code, 200)
-        self.assertEqual(self.c.get("/api/auth/ich/").json()["darstellung"]["form"], "rund")
-        self.assertEqual(self.darstellung(form="eckig").status_code, 200)
-        self.assertEqual(self.c.get("/api/auth/ich/").json()["darstellung"]["form"], "eckig")
-        r = self.darstellung(form="oval")
-        self.assertEqual(r.status_code, 400)
-        self.assertIn("form", r.json())
+    def test_form_wird_ignoriert(self):
+        """Die Form „rund/eckig“ gab es nur kurz (08.10.2026): mitgeschickt stört sie nicht, gespeichert wird sie nicht."""
+        r = self.darstellung(form="eckig", dichte="kompakt")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertNotIn("form", self.c.get("/api/auth/ich/").json()["darstellung"])
 
     def test_startseite_karten(self):
         r = self.c.patch("/api/auth/ich/", {"startseite": {"karten": [{"id": "gewicht", "sichtbar": False},

@@ -94,7 +94,11 @@ function DarstellungKarten({ zuruecksetzenRef }: { zuruecksetzenRef: { current: 
   const ich = useIch();
   const { setIch } = useAuth();
   const melden = useHinweis();
-  const [d, setD] = useState<Darstellung>({ ...STANDARD_DARSTELLUNG, ...ich.darstellung });
+  const [d, setD] = useState<Darstellung>(() => {
+    // „form“ (rund/eckig, nur kurz am 08.10.2026) wird beim nächsten Speichern nicht mehr mitgeschickt
+    const { form: _form, ...rest } = ich.darstellung as Partial<Darstellung> & { form?: string };
+    return { ...STANDARD_DARSTELLUNG, ...rest };
+  });
   const [fehler, setFehler] = useState("");
   const timer = useRef<number>(0);
   const offen = useRef<Darstellung | null>(null); // Eingabe, deren verzögertes Speichern noch aussteht
@@ -194,12 +198,6 @@ function DarstellungKarten({ zuruecksetzenRef }: { zuruecksetzenRef: { current: 
         {fehler ? <Meldung art="fehler">{fehler}</Meldung> : null}
       </Karte>
       <Karte className="px-5 py-[18px] grid grid-cols-2 gap-4">
-        <div className="col-span-2 flex flex-col gap-2" data-testid="form">
-          <span className="lbl">Form</span>
-          <Segmente label="Form" wert={d.form} onWahl={(w) => aendern({ form: w })} className="self-start"
-            werte={[{ wert: "rund", text: "Rund" }, { wert: "eckig", text: "Eckig" }]} />
-          <span className="text-[0.8125rem] gedaempft">Eckig: keine Rundungen, keine Abstände zwischen den Karten und am Rand – mehr Platz für Inhalte.</span>
-        </div>
         <div className="col-span-2 flex flex-col gap-2">
           <span className="lbl">Dichte</span>
           <Segmente label="Dichte" wert={d.dichte} onWahl={(w) => aendern({ dichte: w })} className="self-start"

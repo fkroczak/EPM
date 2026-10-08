@@ -343,7 +343,7 @@ export function Seite({ pfad, children, className }: { pfad: Pfadteil[]; childre
         </div>
         {suchen ? <div className="px-3 pb-3"><Suche vollbreit onFertig={() => setSuchen(false)} /></div> : null}
       </header> : null}
-      {mobil ? null : <header className="h-[60px] shrink-0 flex items-center justify-between gap-6 px-8 bg-flaeche border-b border-rand nicht-drucken">
+      {mobil ? null : <header className="h-[60px] shrink-0 flex items-center justify-between gap-6 px-4 bg-flaeche border-b border-rand nicht-drucken">
         <nav aria-label="Pfad" className="flex items-center gap-2.5 text-sm min-w-0">
           {pfad.map((t, i) => (
             <span key={i} className="flex items-center gap-2.5 min-w-0">

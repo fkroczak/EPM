@@ -254,7 +254,7 @@ export function Start() {
       e.currentTarget.setPointerCapture(e.pointerId);
       const stil = getComputedStyle(raster.current);
       const spalt = parseFloat(stil.columnGap);
-      const abstand = Number.isNaN(spalt) ? 20 : spalt; // Form „eckig“: 0 px
+      const abstand = Number.isNaN(spalt) ? 20 : spalt;
       const zelleB = (raster.current.clientWidth - (spalten - 1) * abstand) / spalten;
       const zelleH = parseFloat(stil.gridAutoRows) || 300;
       const kachel = e.currentTarget.closest<HTMLElement>("[data-kachel]")!.getBoundingClientRect();

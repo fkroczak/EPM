@@ -176,12 +176,13 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F136 | Karteikarte: alle Einträge der Akte chronologisch mit Kürzel, Filter, Zeitraum und Kürzelzeile | 4 Akte | ABGESCHLOSSEN (Tests geschrieben, Lauf steht aus) |
 | F137 | Ladebalken 5 px und in „Individuell“ in der Akzentfarbe | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 | F138 | Fortschritt laufender Aufträge mit ungefährer Restzeit (Backup, Updates, System) | 11 Backup, 17 System | ABGESCHLOSSEN (Lauf steht aus) |
-| F139 | Form „Rund“ oder „Eckig“ (ohne Rundungen und Abstände) je Person | alle Seiten, 14 Mein Konto | ABGESCHLOSSEN (Lauf steht aus) |
+| F139 | Form „Rund“ oder „Eckig“ – am 08.10.2026 wieder entfernt (ersetzt durch F145) | – | ENTFERNT |
 | F140 | Unten links nur die Person; Hilfe, Mein Konto, Abmelden im Menü | Seitenleiste | ABGESCHLOSSEN (Lauf steht aus) |
 | F141 | Patientenliste ohne Vorschau der Akte; Klick auf die Zeile öffnet die Akte | 3 Patientenliste | ABGESCHLOSSEN (Lauf steht aus) |
 | F142 | Kalender: „×“ an jedem Eintrag – Termine und Fälligkeiten ausblenden (3/6/12 Monate oder „nicht mehr nötig“, mit Grund) | 2 Start, 4 Akte, Kalender | ABGESCHLOSSEN (Lauf steht aus) |
 | F143 | Teiler und Ränder ohne Punkte-Griff; beim Überfahren breiter und farbig | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 | F144 | Rückmeldungen als Overlay: grün quittiert und blendet aus, rot bleibt länger | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
+| F145 | Weniger Leerraum: Rand des Seiteninhalts und Abstände zwischen den Karten verkleinert | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2617,7 +2618,7 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   Aktenansichten); die Linien benachbarter Karten liegen übereinander. Innerhalb der Karten bleiben die Abstände.
 - **Endpunkt:** `PATCH /api/auth/ich/ {darstellung: {form: "rund" | "eckig"}}` (Standard „rund“, ohne Migration).
 - **Teststatus:** Backend-Test `MeinKonto.test_form`; Browsertest `konto.spec.ts` „Form „Eckig“ …“.
-- **Status:** ABGESCHLOSSEN – Lauf steht aus
+- **Status:** ENTFERNT am 08.10.2026 („Das eckige Design kann wieder raus, als auch der Menüpunkt dazu.“). Ein noch gespeichertes `form` wird im Backend still verworfen und in der Oberfläche nicht mehr angewendet. Ersetzt durch F145.
 
 ### F140 Benutzermenü unten links
 - **Wunsch 08.10.2026:** „Unten links nur [die Person] anzeigen lassen. Beim Klick darauf dann die Menüpunkte.“
@@ -2677,6 +2678,19 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   (`--ok`/`--auf-ok`, `--fehler`/`--auf-fehler`), bei „Hoher Kontrast“ mit Rahmen. Alle bisherigen Meldungen (über 90
   Stellen) nutzen es ohne Änderung.
 - **Teststatus:** `oberflaeche.spec.ts` „Rückmeldung als Overlay …“.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F145 Weniger Leerraum
+- **Wunsch 08.10.2026:** „Verkleinere jedoch das Padding, damit nicht so viel Platz verschwendet wird.“
+- **Ansicht (für alle, ohne Einstellung):** Rand des Seiteninhalts 16 px statt 32 px (seitlich) und 12/16 px statt
+  16/28 px (oben/unten), am Telefon 8 px; Kopfzeile seitlich 16 px. Abstand zwischen Karten und Bereichen einheitlich
+  12 px (`--abstand`) statt 16–20 px – Startseite, Übersicht der Akte, Spalten, Konto, Backup, System, Aktenansichten.
+  Spaltenteiler 12 px statt 20 px breit. Innerhalb der Karten bleibt alles, wie es ist.
+  Ansicht „Seitenleiste“ der Akte wie im Entwurf: Leiste mit den Angaben (weiß) und senkrechte Reiter (grau, mit
+  Trennlinie) bündig an der Navigation über die volle Höhe, ohne Kartenrahmen; die Angaben bleiben beim Scrollen oben
+  stehen. Nur der Inhalt rechts hat Rand (18/20 px) und runde Karten. Unter 1280 px untereinander, ebenfalls bündig.
+- **Teststatus:** `konto.spec.ts` „Benutzermenü unten links; weniger Rand …“ (16 px, keine Wahl „Form“ mehr); Backend-Test
+  `MeinKonto.test_form_wird_ignoriert`.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
 ## Offene Backend-Funktionen
@@ -2777,6 +2791,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Form entfernt, weniger Leerraum | Form „Rund/Eckig“ samt Menüpunkt entfernt (F139); gespeicherte Werte werden verworfen. Stattdessen für alle weniger Rand und kleinere Abstände zwischen den Karten (F145). Dabei aufgefallen: Das Feld `form` war im Backend nie angekommen – „Eckig“ hätte sich auf der Test-VM nicht speichern lassen; mit dem Entfernen erledigt |
 | 08.10.2026 | Behebung nach `epm-update` | Frontend baute nicht: In `RuheDialog` (F142) lieferte die Speicherfunktion je nach Ziel einen Termin oder eine Hinweisruhe – TypeScript verlangte einen Typ (`HinweisChips.tsx`, Rückgabe jetzt `Promise<unknown>`). Backend-Image samt Migration `patienten/0012` lief auf der Test-VM ohne Befund durch |
 | 08.10.2026 | Rückmeldungen (Wunsch 08.10.2026) | Grünes bzw. rotes Overlay oben in der Mitte wie im alten EPM: grün ca. 3 s, rot ca. 9 s, „×“ schließt (F144). Lauf steht aus (GitHub Actions wegen Abrechnung gesperrt) |
 | 08.10.2026 | Kalender ausblenden, Griffe (Wunsch 08.10.2026) | „×“ an jedem Kalendereintrag: Fälligkeiten schalten den Hinweis der Akte stumm, Termine werden mit Frist oder „nicht mehr nötig“ und Grund ausgeblendet und lassen sich in der Akte zurückholen (F142, Migration `patienten/0012`, von Hand geschrieben – `makemigrations --check` auf der Test-VM prüft sie). Der Kalender berücksichtigt jetzt auch stummgeschaltete Hinweise (vorher nicht). Teiler ohne Punkte-Griff, beim Überfahren hervorgehoben (F143). Lauf steht aus (GitHub Actions wegen Abrechnung gesperrt) |

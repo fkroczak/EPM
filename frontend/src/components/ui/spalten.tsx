@@ -12,7 +12,7 @@ import { useHinweis } from "./hinweise";
 import { cx } from "./basis";
 
 export type TeilerSeite = "patientenliste" | "akte_uebersicht" | "akte_kontakte" | "plan_editor";
-const TEILER_BREITE = 20;
+const TEILER_BREITE = 12; // schmaler seit 08.10.2026 (weniger Leerraum)
 const MIN_SPALTE = 0.15;
 const EINRASTEN = [1 / 3, 1 / 2, 2 / 3];
 
