@@ -309,7 +309,7 @@ body {
 
 /* Spaltenteiler (S17): Griff in der Mitte, Linie über die ganze Höhe, rastet bei ⅓, ½, ⅔ ein */
 .teiler {
-  position: relative; width: 20px; flex-shrink: 0; align-self: stretch; cursor: col-resize; touch-action: none;
+  position: relative; width: 12px; flex-shrink: 0; align-self: stretch; cursor: col-resize; touch-action: none;
   display: flex; justify-content: center; outline: none;
 }
 .teiler::before { content: ""; width: 2px; border-radius: 1px; background: var(--rand); height: 100%; transition: background 0.1s; }
@@ -485,10 +485,10 @@ body {
 .vreiter.aktiv { background: var(--flaeche); color: var(--tinte); font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
 .vreiter-gruppe { display: none; }
 @media (min-width: 80rem) {
-  .akte-leiste { grid-template-columns: var(--leiste, 300px) 20px minmax(0, 1fr); gap: 0; }
+  .akte-leiste { grid-template-columns: var(--leiste, 300px) 12px minmax(0, 1fr); gap: 0; }
   .akte-leiste > .leistengriff { display: flex; }
   .akte-leiste-kopf { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
-  .akte-leiste-inhalt { display: grid; grid-template-columns: 11.5rem minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+  .akte-leiste-inhalt { display: grid; grid-template-columns: 11.5rem minmax(0, 1fr); gap: 0.75rem; align-items: start; }
   .akte-vreiter {
     position: sticky; top: 1rem; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 1px;
     padding: 0; background: transparent; border-radius: 0;
@@ -533,21 +533,13 @@ body {
   .fortschritt.unbestimmt .fortschritt-fuellung { animation: none; width: 100%; opacity: 0.5; }
 }
 
-/* Form „eckig“ (Wunsch 08.10.2026, Mein Konto › Darstellung): keine Rundungen, keine Abstände zwischen den Karten und
-   am Seitenrand – kein Platz wird verschenkt. Kreise (Avatare, Farbfelder) bleiben rund. Karten stoßen aneinander;
-   der negative Rand legt die Linien benachbarter Karten übereinander, statt sie zu verdoppeln. */
-:root[data-form="eckig"] :is(.card, .btn, .inp, .chip, .segmente, .segment, .nav, .vreiter, .fortschritt, .kopfgriff-griff,
-  .teiler-griff, .kopfgriff-hinweis, .leistengriff-hinweis, [class*="rounded"]:not(.rounded-full)) { border-radius: 0 !important; }
-:root[data-form="eckig"] .card { box-shadow: none; }
-:root[data-form="eckig"] main.seite-inhalt { padding: 0 !important; gap: 0 !important; }
-:root[data-form="eckig"] :is(.stapel, .akte-leiste, .akte-kartei, .akte-leiste-inhalt) { gap: 0 !important; }
-:root[data-form="eckig"] :is(.bereiche, .raster) { --raster-abstand: 0px; }
-:root[data-form="eckig"] :is(main.seite-inhalt, .stapel, .bereiche, .raster, .akte-leiste, .akte-kartei, .akte-leiste-inhalt) > .card,
-:root[data-form="eckig"] :is(.bereich, .kachel) > .card { margin: 0 -1px -1px 0; }
-:root[data-form="eckig"] main.seite-inhalt > :is(.segmente, .akte-vreiter, nav) { margin: 0; }
-:root[data-form="eckig"] .akte-leiste-kopf, :root[data-form="eckig"] .akte-vreiter, :root[data-form="eckig"] .akte-kartei-spalte { top: 0; }
-:root[data-form="eckig"] .akte-leiste-kopf { max-height: 100vh; }
-@media (max-width: 47.99rem) { :root[data-form="eckig"] main.seite-inhalt { padding-bottom: 6rem !important; } }
+/* Weniger Leerraum (Wunsch 08.10.2026: „das Padding verkleinern, damit nicht so viel Platz verschwendet wird“):
+   Rand des Seiteninhalts und Abstände zwischen den Karten einheitlich über --abstand. Innerhalb der Karten bleibt es. */
+:root { --abstand: 0.75rem; }
+main.seite-inhalt { padding: 0.75rem 1rem !important; gap: var(--abstand) !important; }
+@media (max-width: 47.99rem) { main.seite-inhalt { padding: 0.5rem 0.5rem 6rem !important; } }
+:is(.stapel, .akte-leiste-inhalt, .akte-kartei) { gap: var(--abstand) !important; }
+:is(.bereiche, .raster) { --raster-abstand: var(--abstand); }
 
 /* Benutzer unten links (Wunsch 08.10.2026): nur Person, Klick öffnet Hilfe, Mein Konto, Abmelden */
 .benutzerknopf {
@@ -595,3 +587,29 @@ body {
 @media (max-width: 47.99rem) { .rueckmeldungen { top: calc(64px + env(safe-area-inset-top)); } }
 @media (prefers-reduced-motion: reduce) { .rueckmeldung, .rueckmeldung.geht { animation-duration: 0.01s; } }
 :root[data-schema="kontrast"] .rueckmeldung { border: 2px solid var(--tinte); }
+
+/* Ansicht „Seitenleiste“ wie im Entwurf (Wunsch 08.10.2026): Leiste mit den Angaben und senkrechte Reiter bündig an der
+   Navigation, über die volle Höhe, ohne Kartenrahmen; nur der Inhalt rechts hat Rand und runde Karten. Die Trennlinie
+   zwischen Leiste und Reitern ist der Griff für die Breite. */
+main.seite-inhalt.akte-voll { padding: 0 !important; gap: 0 !important; }
+.akte-voll .akte-leiste { gap: 0 !important; align-items: stretch; min-height: calc(100vh - 60px); }
+.akte-voll .akte-leiste-kopf { background: var(--flaeche); padding: 1.25rem; border-bottom: 1px solid var(--rand); }
+.akte-voll .akte-leiste-inhalt { gap: 0 !important; }
+.akte-voll .akte-vreiter { margin: 0.75rem 1rem 0; align-self: flex-start; }
+.akte-voll .akte-vreiter-innen { display: contents; }
+.akte-voll .akte-leiste-flaeche { padding: 0.75rem 1rem 1.5rem; gap: var(--abstand) !important; }
+@media (min-width: 80rem) {
+  /* weiße Fläche der Leiste über die ganze Höhe; die Angaben selbst bleiben beim Scrollen oben stehen */
+  .akte-voll .akte-leiste { background: linear-gradient(to right, var(--flaeche) calc(var(--leiste, 300px) + 12px), transparent 0); }
+  .akte-voll .akte-leiste-kopf {
+    position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; border-bottom: 0; background: transparent;
+  }
+  .akte-voll .akte-leiste-inhalt { grid-template-columns: 12.5rem minmax(0, 1fr); align-items: stretch; }
+  .akte-voll .akte-vreiter {
+    position: static; margin: 0; align-self: stretch; display: block; background: var(--grund);
+    border-right: 1px solid var(--rand); padding: 0.75rem 0.5rem;
+  }
+  .akte-voll .akte-vreiter-innen { display: flex; flex-direction: column; gap: 1px; position: sticky; top: 0.75rem; }
+  .akte-voll .vreiter.aktiv { background: var(--flaeche); box-shadow: 0 0 0 1px var(--rand); }
+  .akte-voll .akte-leiste-flaeche { padding: 1.125rem 1.25rem 1.5rem; }
+}

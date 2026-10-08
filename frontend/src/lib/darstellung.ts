@@ -19,8 +19,6 @@ export type Darstellung = {
   aktenkopf: "minimal" | "kompakt" | "voll";
   /** Breite der Seitenleiste in der Ansicht „Seitenleiste“ (px) */
   aktenleiste_breite: number;
-  /** Form (Wunsch 08.10.2026): rund mit Abständen oder eckig ohne Rundungen und ohne Abstände zwischen den Karten */
-  form: "rund" | "eckig";
 };
 
 export type Aktenansicht = "kopfzeile" | "seitenleiste" | "karteikarte";
@@ -41,7 +39,6 @@ export const STANDARD_DARSTELLUNG: Darstellung = {
   aktenansicht: "kopfzeile",
   aktenkopf: "voll",
   aktenleiste_breite: AKTENLEISTE.standard,
-  form: "rund",
 };
 
 export const AKZENTE: Record<string, [string, string]> = {
@@ -157,7 +154,6 @@ function anwenden() {
   wurzel.dataset.dichte = d.dichte;
   wurzel.dataset.schrift = d.schriftgroesse;
   wurzel.dataset.staerke = d.schriftstaerke;
-  wurzel.dataset.form = d.form === "eckig" ? "eckig" : "rund";
   for (const v of INDIVIDUELL_VARIABLEN) wurzel.style.removeProperty(v);
   if (schema === "individuell") {
     for (const [k, v] of Object.entries(individuelleFarben(d))) wurzel.style.setProperty(k, v);
@@ -165,7 +161,9 @@ function anwenden() {
 }
 
 export function darstellungAnwenden(d: Partial<Darstellung> | null | undefined) {
-  aktuell = { ...STANDARD_DARSTELLUNG, ...(d ?? {}) };
+  // „form“ (rund/eckig) gab es kurz am 08.10.2026 – gespeicherte Werte werden nicht mehr angewendet
+  const { form: _form, ...rest } = (d ?? {}) as Partial<Darstellung> & { form?: string };
+  aktuell = { ...STANDARD_DARSTELLUNG, ...rest };
   if (!dunkelAbfrage && typeof window !== "undefined" && window.matchMedia) {
     dunkelAbfrage = window.matchMedia("(prefers-color-scheme: dark)");
     dunkelAbfrage.addEventListener("change", anwenden);

@@ -658,6 +658,8 @@ class DarstellungSerializer(serializers.Serializer):
 
     def to_internal_value(self, data):
         if isinstance(data, dict):
+            # „form“ (rund/eckig) gab es nur kurz am 08.10.2026 – ältere Oberflächen schicken es evtl. noch mit
+            data = {k: v for k, v in data.items() if k != "form"}
             unbekannt = set(data) - set(self.fields)
             if unbekannt:
                 raise serializers.ValidationError({k: "Unbekannte Einstellung." for k in unbekannt})

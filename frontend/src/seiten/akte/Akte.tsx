@@ -641,11 +641,13 @@ export function Akte() {
 
   // ---------------------------------------------------------------- Ansicht 2: Seitenleiste mit senkrechten Reitern
   if (ansicht === "seitenleiste") {
+    // wie im Entwurf: Leiste und senkrechte Reiter bündig über die volle Höhe, nur der Inhalt rechts mit Rand und
+    // runden Karten (Wunsch 08.10.2026)
     return (
-      <Seite pfad={pfad}>
+      <Seite pfad={pfad} className="akte-voll">
         <div className="akte-leiste" data-testid="akte-ansicht" data-ansicht="seitenleiste"
           style={{ "--leiste": `${leisteZug ?? darstellung.aktenleiste_breite}px` } as CSSProperties}>
-          <Karte className="akte-leiste-kopf px-4 py-4 flex flex-col gap-3" data-testid="aktenkopf">
+          <aside className="akte-leiste-kopf flex flex-col gap-3" data-testid="aktenkopf" aria-label="Angaben zur Akte">
             {aktionen(true)}
             <div className="flex flex-col gap-1.5 border-t border-rand pt-3">
               {titel(false)}
@@ -653,19 +655,21 @@ export function Akte() {
               <div className="flex items-center gap-1.5 flex-wrap empty:hidden">{status}{cave}</div>
             </div>
             {k ? <div className="border-t border-rand pt-3" data-testid="kennzahlen"><Gruppen gruppen={gruppen} art="leiste" /></div> : null}
-          </Karte>
+          </aside>
           <Leistengriff breite={darstellung.aktenleiste_breite} onBreite={(px) => darstellungAendern({ aktenleiste_breite: px })}
             onZiehen={setLeisteZug} />
           <div className="akte-leiste-inhalt">
             <nav aria-label="Aktenbereiche" className="akte-vreiter" data-testid="senkrechte-reiter">
-              {reiter.map((r) => (
-                <Fragment key={r.zu}>
-                  {r.gruppe ? <span className="vreiter-gruppe" aria-hidden="true">{r.gruppe}</span> : null}
-                  <Reiter {...r} senkrecht />
-                </Fragment>
-              ))}
+              <div className="akte-vreiter-innen">
+                {reiter.map((r) => (
+                  <Fragment key={r.zu}>
+                    {r.gruppe ? <span className="vreiter-gruppe" aria-hidden="true">{r.gruppe}</span> : null}
+                    <Reiter {...r} senkrecht />
+                  </Fragment>
+                ))}
+              </div>
             </nav>
-            <div className="stapel min-w-0 flex flex-col gap-4 md:gap-5">
+            <div className="akte-leiste-flaeche stapel min-w-0 flex flex-col gap-4 md:gap-5">
               {meldungen}
               <Outlet context={kontext} />
             </div>

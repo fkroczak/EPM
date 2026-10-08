@@ -103,30 +103,19 @@ test("Passwort ändern, Notfall-Codes neu, neues Gerät, andere Sitzung beenden"
   merken("konto", { benutzername: konto.benutzername, kennwort: `${konto.kennwort}-2`, geheim });
 });
 
-test("Form „Eckig“: keine Rundungen und keine Abstände, nach Neuladen erhalten; Benutzermenü unten links", async ({ browser }) => {
-  const konto = await neuesKonto("mitarbeiter", "Erik", "Eckig");
+test("Benutzermenü unten links; weniger Rand um den Seiteninhalt", async ({ browser }) => {
+  const konto = await neuesKonto("mitarbeiter", "Erik", "Menue");
   const ctx = await browser.newContext({ storageState: konto.zustand, ignoreHTTPSErrors: true });
   const page = await ctx.newPage();
-  await page.goto("/konto");
-  const html = page.locator("html");
-  await expect(html).toHaveAttribute("data-form", "rund");
+  await page.goto("/");
   // unten links nur die Person, Hilfe / Mein Konto / Abmelden im Menü
   await expect(page.getByTestId("seitenleiste").getByRole("button", { name: "Abmelden" })).toHaveCount(0);
   await page.getByTestId("benutzermenue").click();
   await expect(page.getByRole("menuitem", { name: "Hilfe" })).toBeVisible();
   await page.getByRole("menuitem", { name: "Mein Konto" }).click();
   await expect(page).toHaveURL(/\/konto$/);
-
-  await page.getByTestId("form").getByRole("button", { name: "Eckig" }).click();
-  await expect(html).toHaveAttribute("data-form", "eckig");
-  const profil = page.getByTestId("profil");
-  await expect.poll(() => profil.evaluate((e) => getComputedStyle(e).borderTopLeftRadius)).toBe("0px");
-  await expect.poll(() => page.locator("main").evaluate((e) => getComputedStyle(e).paddingLeft)).toBe("0px");
-  await page.waitForTimeout(500);
-  await page.reload();
-  await expect(html).toHaveAttribute("data-form", "eckig");
-  await page.getByTestId("form").getByRole("button", { name: "Rund" }).click();
-  await expect(html).toHaveAttribute("data-form", "rund");
-  await expect.poll(() => profil.evaluate((e) => getComputedStyle(e).borderTopLeftRadius)).not.toBe("0px");
+  // keine Wahl „Form“ mehr; Rand des Inhalts 16 px statt 32 px
+  await expect(page.getByRole("button", { name: "Eckig" })).toHaveCount(0);
+  await expect.poll(() => page.locator("main").evaluate((e) => getComputedStyle(e).paddingLeft)).toBe("16px");
   await ctx.close();
 });

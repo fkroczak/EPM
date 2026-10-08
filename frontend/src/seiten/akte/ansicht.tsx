@@ -30,7 +30,8 @@ export function useDarstellung(): [Darstellung, (teil: Partial<Darstellung>) => 
   const ich = useIch();
   const { setIch } = useAuth();
   const melden = useHinweis();
-  const d: Darstellung = { ...STANDARD_DARSTELLUNG, ...ich.darstellung };
+  const { form: _form, ...gespeichert } = ich.darstellung as Partial<Darstellung> & { form?: string };
+  const d: Darstellung = { ...STANDARD_DARSTELLUNG, ...gespeichert };
   const aendern = (teil: Partial<Darstellung>) => {
     const vorher: Ich = ich;
     const neu: Darstellung = { ...d, ...teil };
