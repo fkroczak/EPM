@@ -108,7 +108,8 @@ export function Karteikarte() {
       e.push({
         schluessel: `t${t.id}`, art: "T", kuerzel: wv ? "WV" : "T", wann: t.faellig_am, zeit: t.uhrzeit ? t.uhrzeit.slice(0, 5) : undefined,
         text: `${TERMINARTEN[t.art] ?? t.art}${t.titel ? `: ${t.titel}` : ""}${t.ort_name ? ` · ${t.ort_name}` : ""}`,
-        zusatz: t.erledigt_am ? `erledigt am ${datum(t.erledigt_am)}` : "offen", person: t.angelegt_von_name, zu: basis,
+        zusatz: t.erledigt_am ? `erledigt am ${datum(t.erledigt_am)}` : t.ausgeblendet ? "offen · ausgeblendet" : "offen",
+        person: t.angelegt_von_name, zu: basis,
       });
     }
     for (const pl of plaene.data ?? []) {

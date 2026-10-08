@@ -1,6 +1,6 @@
 /** Globaler Kalender (Wunsch 02.10.2026): Termine aller Patienten, Überfälliges, Fälligkeiten; Termin anlegen und abhaken. */
 import { expect, test } from "@playwright/test";
-import { merken, zustand } from "./hilfen";
+import { apiAls, eindeutig, merken, zustand } from "./hilfen";
 
 test.use({ storageState: zustand("mitarbeiter") });
 
@@ -70,4 +70,34 @@ test("Kalender: Betrachter sieht alles, legt aber nichts an", async ({ browser }
   await expect(page.getByRole("dialog").getByRole("link", { name: "Akte öffnen" })).toBeVisible();
   await expect(page.getByRole("dialog").getByRole("button", { name: "Erledigt" })).toHaveCount(0);
   await ctx.close();
+});
+
+test("Kalender: Termin mit „×“ ausblenden (3 Monate, Grund), in der Akte wieder einschalten", async ({ page }) => {
+  // eigener Patient mit einem überfälligen Rückruf (Musterdaten bleiben unberührt)
+  const api = await apiAls("mitarbeiter");
+  const nachname = eindeutig("Kalenderx");
+  const p = await api.post("patienten/", { nachname, vorname: "Ina", geburtsdatum: "1971-05-06" });
+  await api.post("termine/", { patient: p.id, art: "rueckruf", faellig_am: tagIn(-5), titel: "Rückruf E2E ausblenden" });
+  await api.ende();
+  await page.goto("/kalender");
+  const eintrag = page.getByTestId("ueberfaellig-termine").getByTestId("kalender-eintrag").filter({ hasText: `${nachname}, Ina` });
+  await expect(eintrag).toBeVisible();
+  await eintrag.locator("xpath=..").getByTestId("eintrag-ausblenden").click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Termin ausblenden" })).toBeVisible();
+  await expect(dialog).toContainText("Rückruf E2E ausblenden");
+  await dialog.getByRole("button", { name: "3 Monate" }).click();
+  await dialog.getByLabel("Grund").fill("Patientin meldet sich selbst");
+  await dialog.getByRole("button", { name: "Ausblenden" }).click();
+  await expect(page.getByText("Termin für 3 Monate ausgeblendet.")).toBeVisible();
+  await expect(page.getByTestId("ueberfaellig-termine")).not.toContainText(`${nachname}, Ina`);
+  // in der Akte unter „Ausgeblendete Hinweise“ mit Grund – und zurück
+  await page.goto(`/patienten/${p.id}`);
+  const versteckt = page.getByTestId("stumme-hinweise").getByTestId("ausgeblendeter-termin");
+  await expect(versteckt).toContainText("Rückruf E2E ausblenden");
+  await expect(versteckt).toContainText("Patientin meldet sich selbst");
+  await versteckt.getByRole("button", { name: "Wieder einschalten" }).click();
+  await expect(page.getByText("Termin wieder eingeschaltet.")).toBeVisible();
+  await page.goto("/kalender");
+  await expect(page.getByTestId("ueberfaellig-termine")).toContainText(`${nachname}, Ina`);
 });

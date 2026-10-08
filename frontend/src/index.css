@@ -553,3 +553,15 @@ body {
   background: transparent; cursor: pointer; color: inherit; font: inherit;
 }
 .benutzerknopf:hover, .benutzerknopf[data-popup-open] { background: var(--fein); }
+
+/* Griffe ohne Punkte (Wunsch 08.10.2026): Teiler und Ränder zeigen erst beim Überfahren, dass sie sich ziehen lassen –
+   die Linie wird breiter und färbt sich in der Akzentfarbe, der Mauszeiger wechselt. Der Hinweis beim Ziehen bleibt. */
+.teiler > .teiler-griff, .kopfgriff-griff { display: none !important; }
+.teiler::before { width: 1px; transition: background 0.12s, width 0.12s; }
+.teiler:hover::before, .teiler:focus-visible::before, .teiler.aktiv::before { width: 4px; background: var(--akzent); }
+.kopfgriff { height: 10px; }
+.kopfgriff::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; transform: translateY(-50%);
+  background: transparent; transition: background 0.12s, height 0.12s;
+}
+.kopfgriff:hover::before, .kopfgriff:focus-visible::before, .kopfgriff.aktiv::before { height: 4px; background: var(--akzent); }

@@ -3,7 +3,7 @@
  * Fälligkeiten (Kontakt fällig, Infusionsplan prüfen) und Feiertage (NRW) – als Monat, Woche oder Liste.
  * Termine anlegen, ändern und abhaken wie auf der Startseite (gleicher Dialog, gleiche Rechte).
  */
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -19,6 +19,10 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
+import { RuheDialog } from "@/components/HinweisChips";
+
+/** „×“ an jedem Eintrag (Wunsch 08.10.2026, F142): Termin bzw. Fälligkeit ausblenden – wie die Hinweise der Akte */
+const Ausblenden = createContext<((e: Eintrag) => void) | null>(null);
 
 /** stufe (nur Kontakt, S04): am Tag „bald fällig“ bzw. „überfällig“ – je Akte ein Eintrag je Stufe */
 type Faelligkeit = { art: "kontakt" | "plan"; stufe?: "bald" | "ueberfaellig"; patient: number; name: string; nummer: number;
@@ -133,11 +137,17 @@ function beschriftung(e: Eintrag) {
 function EintragKnopf({ e, heute, onWahl, voll }: { e: Eintrag; heute: string; onWahl: (e: Eintrag) => void; voll?: boolean }) {
   const t = e.termin;
   const f = e.faellig;
+  const ausblenden = useContext(Ausblenden);
+  const { darfBei } = useAuth();
+  // Termine: wer abhaken darf; Fälligkeiten: wer Hinweise der Akte wegklicken darf (F119)
+  const kann = !!ausblenden && (t ? !t.erledigt_am && darfBei("eintraege_erfassen", { ist_test: t.patient_ist_test })
+    : f ? darfBei("akten_bearbeiten", { ist_test: f.ist_test }) : false);
   return (
+    <div className={cx("w-full rounded-md min-w-0 flex items-stretch", farbe(e, heute))}>
     <button type="button" onClick={(ev) => { ev.stopPropagation(); onWahl(e); }} title={beschriftung(e)} aria-label={beschriftung(e)}
       data-testid="kalender-eintrag"
-      className={cx("w-full text-left rounded-md px-1.5 py-0.5 text-[0.75rem] leading-snug cursor-pointer border-0 min-w-0 flex gap-1 items-baseline",
-        farbe(e, heute), voll && "py-1.5 px-2 text-[0.8125rem] flex-col items-start gap-0.5")}>
+      className={cx("grow text-left rounded-md px-1.5 py-0.5 text-[0.75rem] leading-snug cursor-pointer border-0 min-w-0 flex gap-1 items-baseline bg-transparent text-inherit",
+        voll && "py-1.5 px-2 text-[0.8125rem] flex-col items-start gap-0.5")}>
       {t ? (
         <>
           <span className={cx("num shrink-0", !voll && "opacity-80")}>{t.uhrzeit ? uhrzeit(t.uhrzeit) : voll ? "ganztägig" : ""}</span>
@@ -151,6 +161,12 @@ function EintragKnopf({ e, heute, onWahl, voll }: { e: Eintrag; heute: string; o
         </>
       ) : null}
     </button>
+    {kann ? (
+      <button type="button" data-testid="eintrag-ausblenden" aria-label="Ausblenden" title={`Ausblenden … (${beschriftung(e)})`}
+        className="shrink-0 px-1.5 bg-transparent border-0 cursor-pointer text-inherit opacity-60 hover:opacity-100 leading-none text-[0.9375rem]"
+        onClick={(ev) => { ev.stopPropagation(); ausblenden!(e); }}>×</button>
+    ) : null}
+    </div>
   );
 }
 
@@ -368,6 +384,7 @@ export function Kalender() {
   const [eintrag, setEintrag] = useState<Eintrag | null>(null);
   const [neu, setNeu] = useState<{ datum: string; patient?: number; name?: string } | null>(null);
   const [aendern, setAendern] = useState<Termin | null>(null);
+  const [weg, setWeg] = useState<Eintrag | null>(null);
   const schreiben = darf("eintraege_erfassen");
   const stufe = useStufe();
   useOhneRechtSchliessen(schreiben, () => { setNeu(null); setAendern(null); });
@@ -423,6 +440,7 @@ export function Kalender() {
   const neuAm = schreiben ? (d: string) => setNeu({ datum: d }) : undefined;
 
   return (
+    <Ausblenden.Provider value={setWeg}>
     <Seite pfad={[{ text: "Kalender" }]}>
       <Seitenkopf titel="Kalender" unter="Termine und Wiedervorlagen aller Patienten, fällige Kontakte und Pläne, Feiertage (NRW)."
         rechts={<>
@@ -511,6 +529,11 @@ export function Kalender() {
       ) : null}
       {schreiben ? <TerminDialog offen={!!aendern} onOffen={(o) => { if (!o) setAendern(null); }} termin={aendern}
         patientName={aendern?.patient_name} /> : null}
+      {/* „×“: Termin oder Fälligkeit ausblenden – 3/6/12 Monate oder „nicht mehr nötig“, mit Grund (F142) */}
+      <RuheDialog offen={!!weg} onOffen={(o) => { if (!o) setWeg(null); }}
+        patientId={weg?.termin?.patient ?? weg?.faellig?.patient ?? 0} termin={weg?.termin ?? null}
+        hinweis={weg?.faellig ? { art: weg.faellig.art, text: `${faelligName(weg.faellig)}: ${weg.faellig.name} – ${weg.faellig.text}` } : null} />
     </Seite>
+    </Ausblenden.Provider>
   );
 }

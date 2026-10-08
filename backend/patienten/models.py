@@ -390,6 +390,15 @@ class Termin(AktenEintrag):
     )
     angelegt_am = models.DateTimeField(auto_now_add=True)
     angelegt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+    # Ausblenden mit „×“ im Kalender (Wunsch 08.10.2026, F142) – wie die Hinweise der Akte (F119): für 3, 6 oder 12
+    # Monate oder „nicht mehr nötig“, mit Grund, Person und Zeitpunkt; jede Fassung steht im Verlauf der Akte
+    ausgeblendet_bis = models.DateField("ausgeblendet bis", null=True, blank=True)
+    ausgeblendet_dauerhaft = models.BooleanField("ausgeblendet (nicht mehr nötig)", default=False)
+    ausblende_grund = models.CharField("Grund des Ausblendens", max_length=300, blank=True)
+    ausgeblendet_am = models.DateTimeField(null=True, blank=True)
+    ausgeblendet_von = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
 
     history = HistoricalRecords()
 
@@ -403,6 +412,17 @@ class Termin(AktenEintrag):
         self.erledigt_am = timezone.now()
         self.erledigt_von = benutzer
         self.save()
+
+    @property
+    def ist_ausgeblendet(self) -> bool:
+        """Heute ausgeblendet? (Frist noch nicht abgelaufen oder „nicht mehr nötig“)"""
+        return self.ausgeblendet_dauerhaft or (self.ausgeblendet_bis is not None
+                                               and self.ausgeblendet_bis >= timezone.localdate())
+
+
+def sichtbare_termine(qs):
+    """Termine ohne die heute ausgeblendeten (F142): für Kalender, Startseite und den nächsten Termin der Akte."""
+    return qs.exclude(ausgeblendet_dauerhaft=True).exclude(ausgeblendet_bis__gte=timezone.localdate())
 
 
 class Bezugsperson(AktenEintrag):

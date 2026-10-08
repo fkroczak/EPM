@@ -64,7 +64,7 @@ def faelligkeiten(patienten, bis: date):
     """Berechnete Fälligkeiten bis ``bis`` (auch schon überfällige), je offener Akte höchstens eine je Art."""
     from infusionen.models import Infusionsplan
 
-    from .models import Kontakt
+    from .models import Kontakt, ruhende_hinweise
 
     e = Einstellungen.aktuell()
     heute = timezone.localdate()
@@ -81,20 +81,23 @@ def faelligkeiten(patienten, bis: date):
     stufen = (("bald", 30 * e.kontakt_bald_monate, "bald fällig"),
               ("ueberfaellig", 30 * e.kontakt_ueberfaellig_monate, "überfällig"))
     plan_tage = 30 * e.plan_alter_warnung_monate
+    # weggeklickte Hinweise (F119/F142): „Kontakt fällig“ bzw. „Infusionsplan älter als …“ stummgeschaltet → keine Fälligkeit
+    stumm = ruhende_hinweise(ids)
     ergebnis = []
     for p in offen:
+        ruhig = stumm.get(p.id, set())
         basis = {"patient": p.id, "name": f"{p.nachname}, {p.vorname}", "nummer": p.nummer, "ist_test": p.ist_test}
         letzter = letzte.get(p.id)
         seit = timezone.localdate(letzter) if letzter else timezone.localdate(p.angelegt_am)
         for stufe, tage, wort in stufen:
             faellig = seit + timedelta(days=tage)
-            if faellig <= bis:
+            if faellig <= bis and "kontakt" not in ruhig:
                 ergebnis.append({**basis, "art": "kontakt", "stufe": stufe, "faellig_am": faellig, "seit": seit,
                                  "ueberfaellig": faellig < heute,
                                  "text": f"Kontakt {wort} – letzter Kontakt {seit:%d.%m.%Y}" if letzter
                                  else f"Kontakt {wort} – noch kein Kontakt erfasst"})
         gueltig_ab = plaene.get(p.id)
-        if gueltig_ab:
+        if gueltig_ab and "plan" not in ruhig:
             faellig = gueltig_ab + timedelta(days=plan_tage)
             if faellig <= bis:
                 ergebnis.append({**basis, "art": "plan", "faellig_am": faellig, "seit": gueltig_ab,

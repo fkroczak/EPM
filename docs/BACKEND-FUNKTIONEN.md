@@ -179,6 +179,8 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F139 | Form „Rund“ oder „Eckig“ (ohne Rundungen und Abstände) je Person | alle Seiten, 14 Mein Konto | ABGESCHLOSSEN (Lauf steht aus) |
 | F140 | Unten links nur die Person; Hilfe, Mein Konto, Abmelden im Menü | Seitenleiste | ABGESCHLOSSEN (Lauf steht aus) |
 | F141 | Patientenliste ohne Vorschau der Akte; Klick auf die Zeile öffnet die Akte | 3 Patientenliste | ABGESCHLOSSEN (Lauf steht aus) |
+| F142 | Kalender: „×“ an jedem Eintrag – Termine und Fälligkeiten ausblenden (3/6/12 Monate oder „nicht mehr nötig“, mit Grund) | 2 Start, 4 Akte, Kalender | ABGESCHLOSSEN (Lauf steht aus) |
+| F143 | Teiler und Ränder ohne Punkte-Griff; beim Überfahren breiter und farbig | alle Seiten | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2633,6 +2635,37 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   Klick auf die Zeile öffnet die Akte).
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F142 Kalender: Einträge mit „×“ ausblenden
+- **Wunsch 08.10.2026:** „Kalender → Termine alle mit einem ×. Dann wie beim Patienten Abfrage bzgl. Ausblenden des
+  Hinweises.“ Rückfrage geklärt: auch echte Termine werden wie Hinweise ausgeblendet (nicht abgehakt).
+- **Ansicht:** Jeder Eintrag im Kalender (Monat, Woche, Liste, Tagesliste, Überfällig) hat rechts ein **×**. Es öffnet
+  den Dialog der Hinweise (F119): 3, 6 oder 12 Monate oder „nicht mehr nötig“, dazu ein Grund.
+  - **Fälligkeiten** („Kontakt bald fällig/überfällig“, „Plan prüfen“): schaltet den Hinweis der Akte stumm (F119,
+    Arten `kontakt` bzw. `plan`) – die Fälligkeit verschwindet aus dem Kalender, ebenso der Hinweis in Liste und Akte.
+    Recht „Akten bearbeiten“.
+  - **Termine** (Praxistermin, Rückruf, Wiedervorlage, Sonstiges): der Termin verschwindet aus Kalender, Startseite,
+    „Nächster Termin“ der Akte und der Patientenliste und aus der Terminkarte der Übersicht. Recht „Einträge erfassen“,
+    nicht bei erledigten Terminen.
+  - In der Akte stehen ausgeblendete Termine unter **„Ausgeblendete Hinweise“** mit Frist, Grund, Person und Zeitpunkt –
+    „Wieder einschalten“. In der Karteikarte (F136) bleibt der Termin mit dem Zusatz „ausgeblendet“ sichtbar.
+- **Endpunkt:** `POST /api/termine/<id>/ausblenden/` `{"monate": 3|6|12, "grund"}` · `{"dauerhaft": true, "grund"}` ·
+  `{"aufheben": true}`; Filter `GET /api/termine/?ausgeblendet=true|false`. Termin-Antwort zusätzlich `ausgeblendet`,
+  `ausgeblendet_bis`, `ausgeblendet_dauerhaft`, `ausblende_grund`, `ausgeblendet_am`, `ausgeblendet_von_name`.
+  Der Kalender (`GET /api/kalender/`) lässt ausgeblendete Termine und stummgeschaltete Fälligkeiten weg.
+- **Tabellen:** `patienten_termin` + Historie (Migration `patienten/0012_termin_ausblenden`, von Hand geschrieben);
+  jede Fassung steht im Verlauf der Akte (Bereich „Termine“).
+- **Teststatus:** Backend-Tests `test_kalender.Kalender.test_termin_ausblenden`, `test_faelligkeit_folgt_der_hinweisruhe`;
+  Browsertest `kalender.spec.ts` „Termin mit „×“ ausblenden …“.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F143 Griffe ohne Punkte
+- **Wunsch 08.10.2026:** „Kann man das [Punkte-Griff] überall entfernen? Die [Linie] soll sich beim Hovern so verändern,
+  dass man sieht, dass man die Größe ändern kann.“
+- **Ansicht:** Spaltenteiler (Patientenakte, Plan-Editor, Kontakte …), Rand der Seitenleiste der Akte und Griff unter
+  dem Aktenkopf ohne Punkte. Beim Überfahren oder mit Tastaturfokus wird die Linie 4 px breit in der Akzentfarbe, der
+  Mauszeiger zeigt „Größe ändern“; beim Ziehen erscheint weiter der Hinweis zum Einrasten.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2731,6 +2764,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Kalender ausblenden, Griffe (Wunsch 08.10.2026) | „×“ an jedem Kalendereintrag: Fälligkeiten schalten den Hinweis der Akte stumm, Termine werden mit Frist oder „nicht mehr nötig“ und Grund ausgeblendet und lassen sich in der Akte zurückholen (F142, Migration `patienten/0012`, von Hand geschrieben – `makemigrations --check` auf der Test-VM prüft sie). Der Kalender berücksichtigt jetzt auch stummgeschaltete Hinweise (vorher nicht). Teiler ohne Punkte-Griff, beim Überfahren hervorgehoben (F143). Lauf steht aus (GitHub Actions wegen Abrechnung gesperrt) |
 | 08.10.2026 | Form, Fortschritt, Benutzermenü (Wunsch 08.10.2026) | Ladebalken 5 px, in „Individuell“ in der Akzentfarbe (F137); Fortschritt laufender Aufträge mit ungefährer Restzeit aus der Dauer früherer Aufträge, Karte „Laufende Tätigkeiten“ auf Backup und System (F138); Form „Rund“/„Eckig“ unter Mein Konto, eckig ohne Rundungen und ohne Abstände zwischen den Karten (F139, `darstellung.form`, ohne Migration); unten links nur die Person, Hilfe/Mein Konto/Abmelden im Menü (F140); Patientenliste ohne Vorschau, Klick auf die Zeile öffnet die Akte (F141). GitHub Actions startete wegen der Abrechnung des Kontos weiterhin keine Jobs; die Tests sind geschrieben, der Lauf steht aus |
 | 08.10.2026 | Aufbau der Patientenakte (Wunsch 08.10.2026) | Drei Ansichten der Akte je Person unter Mein Konto › Patientenakte (F135): Kopfzeile mit den Angaben in vier Gruppen und Griff für die Höhe (nur Name · eine Zeile · alle Angaben), Seitenleiste mit Knöpfen über dem Namen, ziehbarer Breite (240–480 px, rastet ein) und senkrechten Reitern, Karteikarte wie in einer Arztsoftware mit fester Spalte rechts. Karteikarte mit allen Einträgen chronologisch, Filter, Zeitraum und Kürzelzeile K/G/T/WV/P (F136, neuer Reiter `kartei`). Darstellung um `aktenansicht`, `aktenkopf`, `aktenleiste_breite` erweitert (ohne Migration). CAVE (Nickelallergie, Gewichtsverlust) steht jetzt in jeder Ansicht beim Namen. Das Menü links ist unverändert. Die Arbeitsumgebung hatte keinen Zugriff auf PyPI, npm und Docker Hub, GitHub Actions startete wegen der Abrechnung des Kontos keine Jobs – Backend-Test und Browsertest sind geschrieben, aber noch nicht gelaufen (zuerst auf der Test-VM mit `sudo epm-update`) |
 | 08.10.2026 | Passkey und Telefon (Pull Request #14) | Passkeys (WebAuthn) als zweiter Faktor statt oder neben dem Authenticator-Code – einrichten, umbenennen, entfernen unter Mein Konto, Anmeldung und alle Bestätigungen mit Passkey (F130–F132; Modell `accounts.Passkey` als django-otp-Gerät, Migration `accounts/0008`, `py_webauthn` 2.x, Baustein `useZweiterFaktor` an allen Bestätigungen). Eigene CA mit Namensbeschränkung und Serverzertifikat (`sudo epm-zertifikat`, F134), Stammzertifikat unter `/epm-ca.crt`. Mobile Ansicht (F133): Leiste unten mit Notiz und Plänen, Menü als Schublade, Karten statt Tabellen, Akte mit Detail vor der Liste, Dialoge und Eingaben für Touch. Hilfe-Abschnitte „Passkey statt Code“ und „EPM am Telefon“. Offene Fragen U62, U63. Dabei gefunden und behoben: Wer den Passkey entfernte, mit dem die Sitzung bestätigt war, war danach abgemeldet (Sitzung läuft jetzt mit einem verbliebenen Gerät weiter). Nach den Bildschirmfotos am Telefon (Lauf 37710345563) behoben: Kartenköpfe (z. B. „Diagnosen und Therapie“ mit drei Knöpfen) brechen um statt die Seite zu verbreitern, die Spalte „Versichertennummer“ überlappte (auch am PC), der Kalender startet am Telefon als Liste. Browsertests „Ärzte zuordnen …“ und „Benutzer ohne Login …“ stabilisiert (Meldung genau bzw. die letzte gesucht). Lauf 37714211870: 347 von 347 Backend-Tests, 108 von 108 Browsertests |

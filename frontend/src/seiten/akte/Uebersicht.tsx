@@ -247,7 +247,7 @@ export function TermineKarte() {
   const melden = useHinweis();
   const termine = useQuery({
     queryKey: ["patient", patient.id, "termine"],
-    queryFn: () => api<ApiSeite<Termin>>(`termine/${abfrage({ patient: patient.id, offen: "true", seitengroesse: 20 })}`),
+    queryFn: () => api<ApiSeite<Termin>>(`termine/${abfrage({ patient: patient.id, offen: "true", ausgeblendet: "false", seitengroesse: 20 })}`),
   });
   const abhaken = useMutation({
     mutationFn: (t: Termin) => api<Termin>(`termine/${t.id}/erledigt/`, { method: "POST" }),

@@ -36,7 +36,7 @@ from .kennzahlen import (abschluss_pruefen, befund_filter, kennzahlen, kontakt_f
 from .loeschung import PLATZHALTER, schwaerze_dokument, trage_ein
 from .models import (Bezugsperson, Datenschutzanfrage, Diagnose, Dokument, DokumentVorgang, Erklaerung,
                      Gewichtsmessung, Hinweisruhe, Kontakt, Patient, PatientArzt, Termin, dokument_pfad,
-                     plus_monate)
+                     plus_monate, sichtbare_termine)
 
 
 # ================================================================= Patient
@@ -142,7 +142,7 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
 
         letzte = obj.letzte_messung()
         plan = obj.infusionsplaene.filter(status=Infusionsplan.Status.AKTUELL).first()
-        termin = obj.termine.filter(erledigt_am__isnull=True, faellig_am__gte=timezone.localdate()).first()
+        termin = sichtbare_termine(obj.termine.filter(erledigt_am__isnull=True, faellig_am__gte=timezone.localdate())).first()
         return {
             "gewicht": {"kg": letzte.gewicht_kg, "am": letzte.gemessen_am} if letzte else None,
             "gewichtstrend": obj.gewichtstrend(),
@@ -1107,8 +1107,17 @@ class TerminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Termin
         fields = ["id", "patient", "patient_name", "patient_ist_test", "art", "ort", "ort_name", "faellig_am", "uhrzeit", "bei", "titel",
-                  "notiz", "kontakt", "erledigt_am", "erledigt_von_name", "angelegt_am", "angelegt_von_name"]
-        read_only_fields = ["erledigt_am", "angelegt_am"]
+                  "notiz", "kontakt", "erledigt_am", "erledigt_von_name", "angelegt_am", "angelegt_von_name",
+                  "ausgeblendet", "ausgeblendet_bis", "ausgeblendet_dauerhaft", "ausblende_grund", "ausgeblendet_am",
+                  "ausgeblendet_von_name"]
+        read_only_fields = ["erledigt_am", "angelegt_am", "ausgeblendet_bis", "ausgeblendet_dauerhaft", "ausblende_grund",
+                            "ausgeblendet_am"]
+
+    ausgeblendet = serializers.BooleanField(source="ist_ausgeblendet", read_only=True)
+    ausgeblendet_von_name = serializers.SerializerMethodField()
+
+    def get_ausgeblendet_von_name(self, obj):
+        return benutzername(obj.ausgeblendet_von) if obj.ausgeblendet_von_id else None
 
     def get_erledigt_von_name(self, obj):
         return benutzername(obj.erledigt_von)
@@ -1137,6 +1146,14 @@ class TerminFilter(filters.FilterSet):
     von = filters.DateFilter(field_name="faellig_am", lookup_expr="gte")
     bis = filters.DateFilter(field_name="faellig_am", lookup_expr="lte")
     offen = filters.BooleanFilter(field_name="erledigt_am", lookup_expr="isnull")
+    # F142: ``ausgeblendet=false`` nur sichtbare, ``ausgeblendet=true`` nur heute ausgeblendete Termine
+    ausgeblendet = filters.BooleanFilter(method="filter_ausgeblendet")
+
+    def filter_ausgeblendet(self, qs, name, wert):
+        if wert is None:
+            return qs
+        sichtbar = sichtbare_termine(qs)
+        return sichtbar if not wert else qs.exclude(id__in=sichtbar.values("id"))
 
     class Meta:
         model = Termin
@@ -1168,6 +1185,40 @@ class TerminViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.RetrieveM
         if termin.erledigt_am:
             return Response({"fehler": "Termin ist bereits erledigt."}, status=status.HTTP_400_BAD_REQUEST)
         termin.erledigen(request.user)
+        return Response(self.get_serializer(termin).data)
+
+    @action(detail=True, methods=["post"])
+    def ausblenden(self, request, pk=None):
+        """F142 (Wunsch 08.10.2026): ``{"monate": 3|6|12, "grund"}`` blendet den Termin für die Frist aus,
+        ``{"dauerhaft": true, "grund"}`` heißt „nicht mehr nötig“, ``{"aufheben": true}`` holt ihn zurück. Recht wie beim
+        Abhaken („Einträge erfassen“), nur bei offenen Akten; jede Fassung steht im Verlauf der Akte."""
+        termin = self.get_object()
+        self.pruefe_patient(termin.patient)
+        d = request.data if isinstance(request.data, dict) else {}
+        grund = str(d.get("grund") or "").strip()
+        if len(grund) > 300:
+            return Response({"grund": "Höchstens 300 Zeichen."}, status=status.HTTP_400_BAD_REQUEST)
+        if wahr(d.get("aufheben")):
+            if not (termin.ausgeblendet_dauerhaft or termin.ausgeblendet_bis):
+                return Response({"fehler": "Der Termin ist nicht ausgeblendet."}, status=status.HTTP_400_BAD_REQUEST)
+            termin.ausgeblendet_bis, termin.ausgeblendet_dauerhaft = None, False
+            termin.ausblende_grund, termin.ausgeblendet_am, termin.ausgeblendet_von = "", None, None
+        elif wahr(d.get("dauerhaft")):
+            termin.ausgeblendet_bis, termin.ausgeblendet_dauerhaft = None, True
+            termin.ausblende_grund, termin.ausgeblendet_am, termin.ausgeblendet_von = grund, timezone.now(), request.user
+        else:
+            try:
+                monate = int(d.get("monate"))
+            except (TypeError, ValueError):
+                monate = None
+            if monate not in Hinweisruhe.FRISTEN:
+                return Response({"monate": f"Bitte {', '.join(str(m) for m in Hinweisruhe.FRISTEN)} Monate – "
+                                           "oder „nicht mehr nötig“."}, status=status.HTTP_400_BAD_REQUEST)
+            termin.ausgeblendet_bis = plus_monate(timezone.localdate(), monate)
+            termin.ausgeblendet_dauerhaft = False
+            termin.ausblende_grund, termin.ausgeblendet_am, termin.ausgeblendet_von = grund, timezone.now(), request.user
+        termin._history_user = request.user
+        termin.save()
         return Response(self.get_serializer(termin).data)
 
 
@@ -1737,7 +1788,7 @@ def startseite_daten(user):
     heute = timezone.localdate()
     e = Einstellungen.aktuell()
     patienten = patienten_fuer(user).filter(abgeschlossen_am__isnull=True)
-    termine = Termin.objects.filter(patient__in=patienten, erledigt_am__isnull=True).select_related(
+    termine = sichtbare_termine(Termin.objects.filter(patient__in=patienten, erledigt_am__isnull=True)).select_related(
         "patient", "ort", "angelegt_von")
     sieben_tage = termine.filter(faellig_am__gte=heute, faellig_am__lte=heute + timedelta(days=6))
 
@@ -1872,8 +1923,9 @@ class KalenderViewSet(viewsets.ViewSet):
             return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
         heute = timezone.localdate()
         patienten = patienten_fuer(request.user)
-        termine = (Termin.objects.filter(patient__in=patienten).select_related("patient", "ort", "angelegt_von",
-                                                                                "erledigt_von")
+        # F142: ausgeblendete Termine erscheinen nicht im Kalender (zurückholen in der Akte)
+        termine = (sichtbare_termine(Termin.objects.filter(patient__in=patienten)).select_related("patient", "ort", "angelegt_von",
+                                                                                                    "erledigt_von")
                    .order_by("faellig_am", F("uhrzeit").asc(nulls_first=True), "id"))
         im_zeitraum = termine.filter(faellig_am__range=(von, bis))
         if str(p.get("erledigte", "1")).lower() in ("0", "false", "nein"):
