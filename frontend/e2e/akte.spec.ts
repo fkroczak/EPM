@@ -369,7 +369,7 @@ test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pfl
   await detail.getByLabel("Fachrichtung").fill("Allgemeinmedizin");
   await detail.getByLabel("Ort").fill("Münster");
   await detail.getByLabel("Telefon").fill("0251 12345");
-  await detail.getByRole("button", { name: "Arzt anlegen" }).click();
+  await detail.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Arzt angelegt.")).toBeVisible();
 
   // in der Akte als Hausarzt zuordnen → Kopf zeigt Name und Telefon
@@ -390,6 +390,7 @@ test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pfl
   await page.goto("/aerzte");
   await page.getByLabel("Ärzte filtern").fill(arztName);
   await page.getByTestId("aerzteliste").getByRole("button", { name: arztName }).click();
+  await page.getByTestId("arzt-detail").getByRole("button", { name: "Bearbeiten" }).click();
   await page.getByTestId("arzt-detail").getByLabel("Telefon").fill("0251 99999");
   await page.getByTestId("arzt-detail").getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Arzt gespeichert.")).toBeVisible();

@@ -390,8 +390,11 @@ erreicht wird (Grenzwerte unter Vorlagen › Grenzwerte).</li>
 <p>Ein Klick auf einen offenen Termin öffnet <strong>Termin bearbeiten</strong> (mit Erledigt und Akte öffnen);
 Fälligkeiten und Erledigtes öffnen eine Ansicht. Das <strong>×</strong> an einem Eintrag blendet ihn aus – wie die
 Hinweise in der Akte für 3, 6 oder 12 Monate oder als „nicht mehr nötig“, mit Grund.</p>
-<p>Oben lässt sich nach Art filtern. Rechts bzw. darunter stehen der gewählte Tag, überfällige Termine und
-Fälligkeiten.</p>""",
+<p><strong>Anzeigen ▾</strong> wählt die Arten (Praxistermine, Rückrufe, Wiedervorlagen, Sonstiges, Kontakt fällig,
+Plan prüfen) und ob Erledigte erscheinen – mit der Legende der Farben. Rechts (Tablet: darunter) stehen drei Reiter:
+<strong>Tag</strong> (gewählter Tag und die nächsten 7 Tage, „+ Termin am …“), <strong>Überfällig</strong> (offene
+Termine, Kontakt überfällig, Plan prüfen) und <strong>Fällig</strong> (Kontakt bald fällig). Am Telefon zeigt ein
+Wochenband die Tage; darunter Tag, Überfällig und Woche.</p>""",
     },
     # ------------------------------------------------------------------ Gewicht
     {
@@ -527,15 +530,28 @@ löscht EPM die Akte beim Start erneut.</p>""",
         "id": "versorger", "gruppe": "listen", "titel": "Versorger und Ansprechpartner", "rechte": [],
         "seiten": ["/versorger"],
         "html": """
-<p>Die Liste <strong>Versorger</strong> gilt für alle Akten: Versorger mit Telefon und Anschrift, darunter die
-Ansprechpartner. Mit dem Recht „Versorger, Ansprechpartner und Ärzte pflegen“ lassen sich Einträge anlegen, ändern und
-deaktivieren (nicht löschen); deaktivierte bleiben in bestehenden Akten sichtbar.</p>""",
+<p>Die Liste <strong>Versorger</strong> gilt für alle Akten. Links stehen die Versorger mit Ort, Zahl der
+Ansprechpartner und rechts der Zahl der Patienten in Betreuung; das Suchfeld findet Firma, Ort, Telefon und
+Ansprechpartner, „Aktiv | Inaktiv | Alle“ filtert. Rechts der gewählte Versorger zum Lesen: Anschrift, Erreichbarkeit,
+Notiz, die <strong>Ansprechpartner</strong> (mit Zuständigkeit, Telefon und Patientenzahl – ein Klick auf die Zahl
+öffnet die Patientenliste) und die <strong>Patienten in Betreuung</strong> (nach Name oder nach Ansprechpartner).</p>
+<p>Mit dem Recht „Versorger, Ansprechpartner und Ärzte pflegen“: <strong>Bearbeiten</strong> öffnet das Formular an
+derselben Stelle; <strong>+ Ansprechpartner</strong> legt einen an, ein Klick auf den Namen bearbeitet ihn.
+<strong>Deaktivieren</strong> (Menü „⋯“, mit Rückfrage) nimmt einen Versorger aus der Auswahl; gelöscht wird nie,
+deaktivierte bleiben in allen Akten und Plänen sichtbar. Wird ein Ansprechpartner deaktiviert, zeigt EPM seine
+Patienten zum Neuzuordnen an. Jede Änderung steht mit Person und Zeitpunkt im Audit-Log.</p>
+<p>Am Telefon erscheint erst die Liste; ein Eintrag öffnet sich ganz, „‹ Liste“ führt zurück.</p>""",
     },
     {
         "id": "aerzte", "gruppe": "listen", "titel": "Ärzte", "rechte": [], "seiten": ["/aerzte"],
         "html": """
-<p>Die Liste <strong>Ärzte</strong> enthält Hausärzte und andere Ärzte mit Praxis und Kontaktdaten. In der Akte werden
-sie unter „Ärzte“ mit ihrer Rolle zugeordnet; der Hausarzt erscheint im Aktenkopf.</p>""",
+<p>Die Liste <strong>Ärzte</strong> enthält Hausärzte und andere Ärzte mit Praxis und Kontaktdaten – aufgebaut wie die
+Versorger: links die Liste mit Suche (Name, Praxis, Fachrichtung, Ort) und Patientenzahl, rechts der gewählte Arzt mit
+Praxis, Erreichbarkeit, Notiz und den zugeordneten Patienten in Betreuung. <strong>Bearbeiten</strong> öffnet das
+Formular, <strong>Deaktivieren</strong> steht im Menü „⋯“ (mit Rückfrage): ein deaktivierter Arzt ist bei neuen
+Zuordnungen nicht mehr wählbar, bleibt aber in allen Akten sichtbar.</p>
+<p>In der Akte werden Ärzte unter „Ärzte“ mit ihrer Rolle zugeordnet; der Hausarzt erscheint im Aktenkopf. Fehlt ein
+Arzt, legt „Neuen Arzt anlegen“ ihn gleich im Dialog an.</p>""",
     },
     # ------------------------------------------------------------------ Administration
     {

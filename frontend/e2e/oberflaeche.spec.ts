@@ -253,7 +253,7 @@ test("Volle Breite in Stufen: 1920 px – Karten der Akte im Raster, Größe je 
   await expect(kontakte.getByTestId("kontaktliste")).toBeVisible();
   await expect(kontakte.getByRole("heading", { name: /Verlauf/ })).toHaveCount(0);
   await expect(page.locator(".teiler")).toHaveCount(0);
-  // Kalender: Monat ¾ | Tagesliste ¼, auch in der Woche
+  // Kalender: Monat bzw. Woche links, rechts Tag | Überfällig | Fällig (Entwurf 08.10.2026)
   await page.goto("/kalender?ansicht=woche");
   await expect(page.getByTestId("tagesliste")).toBeVisible();
 });
