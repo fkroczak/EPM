@@ -42,15 +42,17 @@ function schritt(spanne: number) {
   return 50;
 }
 
-export function GewichtsDiagramm({ werte, zeitraum, geglaettet, vergleich, beschriftung }: {
-  werte: Messpunkt[];
+export function GewichtsDiagramm<T extends Messpunkt>({ werte, zeitraum, geglaettet, vergleich, beschriftung, onPunkt }: {
+  werte: T[];
+  /** Klick auf einen Messpunkt (z. B. „Messung bearbeiten“, 08.10.2026) */
+  onPunkt?: (w: T) => void;
   zeitraum: Zeitraum;
   geglaettet: boolean;
   vergleich?: { am: string; kg: number | string } | null;
   beschriftung: string;
 }) {
   const punkte = werte
-    .map((w) => ({ t: alsDatum(w.gemessen_am)!.getTime(), kg: Number(w.gewicht_kg), am: w.gemessen_am }))
+    .map((w) => ({ t: alsDatum(w.gemessen_am)!.getTime(), kg: Number(w.gewicht_kg), am: w.gemessen_am, w }))
     .sort((a, b) => a.t - b.t);
   if (!punkte.length) {
     return <div className="h-[240px] flex items-center justify-center text-sm gedaempft border border-dashed border-rand rounded-lg">Keine Messwerte im Zeitraum.</div>;
@@ -90,7 +92,7 @@ export function GewichtsDiagramm({ werte, zeitraum, geglaettet, vergleich, besch
   const letzter = punkte[punkte.length - 1];
 
   return (
-    <svg viewBox={`0 0 ${B} ${H}`} className="w-full h-auto" role="img" data-testid="gewichtsdiagramm"
+    <svg viewBox={`0 0 ${B} ${H}`} className="w-full h-auto" role={onPunkt ? "group" : "img"} data-testid="gewichtsdiagramm"
       aria-label={`${beschriftung}, ${punkte.length} Messungen, zuletzt ${kg(letzter.kg)} am ${datum(letzter.am)}`}>
       {yTicks.map((v) => (
         <g key={v}>
@@ -108,6 +110,14 @@ export function GewichtsDiagramm({ werte, zeitraum, geglaettet, vergleich, besch
           <title>{`${datum(p.am)}: ${kg(p.kg)}`}</title>
         </circle>
       ))}
+      {/* größere, unsichtbare Klickflächen über den Punkten */}
+      {onPunkt ? punkte.map((p, i) => (
+        <rect key={`k-${p.am}-${i}`} x={xy[i].x - 9} y={xy[i].y - 9} width="18" height="18" rx="9" fill="transparent"
+          className="cursor-pointer" data-testid="messpunkt" role="button" tabIndex={0} aria-label={`Messung vom ${datum(p.am)} (${kg(p.kg)}) bearbeiten`}
+          onClick={() => onPunkt(p.w)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPunkt(p.w); } }}>
+          <title>{`${datum(p.am)}: ${kg(p.kg)} – bearbeiten`}</title>
+        </rect>
+      )) : null}
       {vergleich && vergleichT !== undefined && vergleichT >= t0 ? (
         <circle cx={x(vergleichT)} cy={y(Number(vergleich.kg))} r="6" fill="none" stroke="var(--warn)" strokeWidth="2">
           <title>{`Vergleichswert ${datum(vergleich.am)}: ${kg(vergleich.kg)}`}</title>

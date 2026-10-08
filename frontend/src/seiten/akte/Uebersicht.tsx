@@ -100,7 +100,7 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
   const k = patient.kopf;
   const trend = k?.gewichtstrend;
   const alleWerte = messungen.data ?? [];
-  const sichtbar = imZeitraum(alleWerte, zeitraum);
+  const sichtbar = imZeitraum<Gewicht>(alleWerte, zeitraum);
   const e = einstellungen.data;
   // letzte Messung = jüngstes Messdatum, bei gleichem Datum die zuletzt erfasste
   const letzte = [...alleWerte].sort((x, y) => (y.gemessen_am.localeCompare(x.gemessen_am) || y.erfasst_am.localeCompare(x.erfasst_am)))[0];
@@ -147,7 +147,7 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
         </div>
       ) : null}
       {messungen.isLoading ? <Laden /> : (
-        <GewichtsDiagramm werte={sichtbar} zeitraum={zeitraum} geglaettet={geglaettet}
+        <GewichtsDiagramm<Gewicht> werte={sichtbar} zeitraum={zeitraum} geglaettet={geglaettet} onPunkt={erfassen ? (w) => setKorrektur(w) : undefined}
           vergleich={trend ? { am: trend.von, kg: trend.vergleich_kg } : null}
           beschriftung={`Gewichtsverlauf ${ZEITRAEUME.find((z) => z.wert === zeitraum)!.text}`} />
       )}
