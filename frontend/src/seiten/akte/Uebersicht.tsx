@@ -428,7 +428,7 @@ export function Uebersicht() {
   const [flaeche, breite] = useBreite(schmal);
   const spalten = schmal && breite > 0 ? Math.min(RASTER_SPALTEN[stufe], spaltenFuerBreite(breite)) : RASTER_SPALTEN[stufe];
   return (
-    <div className="flex flex-col gap-4 min-w-0" ref={flaeche}>
+    <div className="stapel flex flex-col gap-4 min-w-0" ref={flaeche}>
       {/* Weggeklickte Hinweise stehen hier und lassen sich zurückholen (Wunsch 07.10.2026, F119) */}
       <StummKarte patientId={patient.id} aenderbar={bearbeiten} />
       <ImportHinweise />

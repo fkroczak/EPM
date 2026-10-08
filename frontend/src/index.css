@@ -356,9 +356,10 @@ body {
 }
 .systemhinweis.warnung .systemhinweis-titel { display: block; font-size: 1.1875rem; font-weight: 700; margin-bottom: 0.125rem; }
 
-/* Ladebalken am oberen Rand (F124): schmal, über allem, nimmt keine Klicks entgegen */
+/* Ladebalken am oberen Rand (F124): über allem, nimmt keine Klicks entgegen; seit 08.10.2026 5 px statt 3 px und in
+   „Individuell“ in der gewählten Akzentfarbe (--ladebalken aus lib/darstellung.ts) */
 .ladebalken {
-  position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 200; pointer-events: none;
+  position: fixed; top: 0; left: 0; right: 0; height: 5px; z-index: 200; pointer-events: none;
   background: color-mix(in srgb, var(--ladebalken) 18%, transparent);
 }
 .ladebalken-fuellung {
@@ -509,3 +510,46 @@ body {
 .chip.kartei-K { background: var(--akzent-weich); color: var(--akzent-text); }
 .chip.kartei-G { background: var(--ok-bg); color: var(--ok); }
 .chip.kartei-D { background: var(--warn-bg); color: var(--warn); }
+
+/* Fortschritt eines Auftrags (Backup, Update; components/AuftragFortschritt.tsx): gleiche Farbe wie der Ladebalken */
+.fortschritt {
+  position: relative; height: 8px; border-radius: 4px; overflow: hidden;
+  background: color-mix(in srgb, var(--ladebalken) 18%, transparent);
+}
+.fortschritt-fuellung {
+  position: relative; height: 100%; width: 0; border-radius: inherit; overflow: hidden;
+  background: var(--ladebalken); transition: width 0.9s linear;
+}
+.fortschritt-fuellung::after {
+  content: ""; position: absolute; inset: 0; width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: ladebalken-glanz 1.4s ease-in-out infinite;
+}
+.fortschritt.unbestimmt .fortschritt-fuellung { width: 35%; animation: ladebalken-dauer 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .fortschritt-fuellung::after { animation: none; }
+  .fortschritt.unbestimmt .fortschritt-fuellung { animation: none; width: 100%; opacity: 0.5; }
+}
+
+/* Form „eckig“ (Wunsch 08.10.2026, Mein Konto › Darstellung): keine Rundungen, keine Abstände zwischen den Karten und
+   am Seitenrand – kein Platz wird verschenkt. Kreise (Avatare, Farbfelder) bleiben rund. Karten stoßen aneinander;
+   der negative Rand legt die Linien benachbarter Karten übereinander, statt sie zu verdoppeln. */
+:root[data-form="eckig"] :is(.card, .btn, .inp, .chip, .segmente, .segment, .nav, .vreiter, .fortschritt, .kopfgriff-griff,
+  .teiler-griff, .kopfgriff-hinweis, .leistengriff-hinweis, [class*="rounded"]:not(.rounded-full)) { border-radius: 0 !important; }
+:root[data-form="eckig"] .card { box-shadow: none; }
+:root[data-form="eckig"] main.seite-inhalt { padding: 0 !important; gap: 0 !important; }
+:root[data-form="eckig"] :is(.stapel, .akte-leiste, .akte-kartei, .akte-leiste-inhalt) { gap: 0 !important; }
+:root[data-form="eckig"] :is(.bereiche, .raster) { --raster-abstand: 0px; }
+:root[data-form="eckig"] :is(main.seite-inhalt, .stapel, .bereiche, .raster, .akte-leiste, .akte-kartei, .akte-leiste-inhalt) > .card,
+:root[data-form="eckig"] :is(.bereich, .kachel) > .card { margin: 0 -1px -1px 0; }
+:root[data-form="eckig"] main.seite-inhalt > :is(.segmente, .akte-vreiter, nav) { margin: 0; }
+:root[data-form="eckig"] .akte-leiste-kopf, :root[data-form="eckig"] .akte-vreiter, :root[data-form="eckig"] .akte-kartei-spalte { top: 0; }
+:root[data-form="eckig"] .akte-leiste-kopf { max-height: 100vh; }
+@media (max-width: 47.99rem) { :root[data-form="eckig"] main.seite-inhalt { padding-bottom: 6rem !important; } }
+
+/* Benutzer unten links (Wunsch 08.10.2026): nur Person, Klick öffnet Hilfe, Mein Konto, Abmelden */
+.benutzerknopf {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.375rem; border: 0; border-radius: 8px;
+  background: transparent; cursor: pointer; color: inherit; font: inherit;
+}
+.benutzerknopf:hover, .benutzerknopf[data-popup-open] { background: var(--fein); }

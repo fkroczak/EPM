@@ -25,7 +25,9 @@ test("Passkey in Mein Konto anlegen, damit anmelden, Bestätigung mit Passkey", 
   expect(credentials).toHaveLength(1);
 
   // abmelden und mit Passkey statt Code wieder anmelden
-  await page.getByRole("button", { name: "Abmelden" }).click();
+  // unten links nur die Person; Abmelden steht im Menü dahinter (Wunsch 08.10.2026)
+  await page.getByTestId("benutzermenue").click();
+  await page.getByRole("menuitem", { name: "Abmelden" }).click();
   await page.getByLabel("Benutzername").fill(konto.benutzername);
   await page.getByLabel("Passwort").fill(konto.kennwort);
   await page.getByRole("button", { name: "Weiter" }).click();
