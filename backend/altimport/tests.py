@@ -215,6 +215,46 @@ class Zuordnungen(Basis):
                         {"bereich": "tabellen_ignoriert", "aenderungen": {"a": 1}}):
             self.assertEqual(self.a.patch("/api/altimport/zuordnung/", koerper, format="json").status_code, 409, koerper)
 
+    def test_regeln_mehrfachauswahl_und_zusammenfassen(self):
+        """Festlegung 09.10.2026: gleiche Auffälligkeiten gemeinsam entscheiden (Regel je Wert oder Mehrfachauswahl),
+        Gewichte eines Patienten innerhalb weniger Tage zusammenfassen."""
+        self.lade()
+        stand = self.a.get("/api/altimport/zuordnung/").json()["stand"]
+        a = {x["schluessel"]: x for x in stand["auffaelligkeiten"]}
+        gruppe = a["gewichte:7:gewicht"]["gruppe"]
+        self.assertEqual(gruppe, f"gewichte:gewicht:{a['gewichte:7:gewicht']['roh']}")
+        self.assertEqual(stand["zusammengefasst"]["tage"], 2)
+        # Regel für die Gruppe: Wahlmöglichkeiten und Befund setzt der Server
+        d = self.speichere("regeln", {gruppe: {"art": "auslassen"}})
+        regel = Importstand.aktuell().zuordnung["regeln"][gruppe]
+        self.assertEqual((regel["art"], regel["moeglich"]), ("auslassen", ["wert", "unveraendert", "auslassen"]))
+        self.assertIn("außerhalb der Plausibilitätsgrenzen", regel["befund"])
+        x = next(x for x in d["stand"]["auffaelligkeiten"] if x["schluessel"] == "gewichte:7:gewicht")
+        self.assertEqual((x["art"], x["entscheidung"]["regel"], x["regel"]["art"]), ("ausgelassen", gruppe, "auslassen"))
+        self.assertEqual(d["stand"]["zahlen"]["gewichte"]["nicht"]["ausgelassen"], 2)
+        # die Regel lässt sich ändern, solange ihre Zeilen ausgelassen sind (Wahl wie ursprünglich), und zurücknehmen
+        self.speichere("regeln", {gruppe: {"art": "unveraendert"}})
+        self.assertEqual(Importstand.aktuell().zuordnung["regeln"][gruppe]["art"], "unveraendert")
+        self.speichere("regeln", {gruppe: None})
+        self.assertEqual(Importstand.aktuell().zuordnung["regeln"], {})
+        # Mehrfachauswahl: mehrere Zeilen in einem Aufruf
+        d = self.speichere("korrekturen", {"gewichte:7:gewicht": {"art": "auslassen"}, "patienten:2:plz": {"art": "unveraendert"}})
+        x = {x["schluessel"]: x for x in d["stand"]["auffaelligkeiten"]}
+        self.assertEqual((x["gewichte:7:gewicht"]["entscheidung"]["art"], x["patienten:2:plz"]["entscheidung"]["art"]),
+                         ("auslassen", "unveraendert"))
+        # unbrauchbare Regeln und Einstellungen
+        for koerper in ({"bereich": "regeln", "aenderungen": {"gewichte:gewicht:12345": {"art": "auslassen"}}},
+                        {"bereich": "regeln", "aenderungen": {"patienten:plz:4109": {"art": "auslassen"}}},
+                        {"bereich": "regeln", "aenderungen": {gruppe: {"art": "wert", "wert": " "}}},
+                        {"bereich": "einstellungen", "aenderungen": {"gewichte_tage": 15}},
+                        {"bereich": "einstellungen", "aenderungen": {"gewichte_tage": "2"}},
+                        {"bereich": "einstellungen", "aenderungen": {"anderes": 1}}):
+            self.assertEqual(self.a.patch("/api/altimport/zuordnung/", koerper, format="json").status_code, 409, koerper)
+        d = self.speichere("einstellungen", {"gewichte_tage": 0})
+        self.assertEqual(d["stand"]["zusammengefasst"]["tage"], 0)
+        d = self.speichere("einstellungen", {"gewichte_tage": None})
+        self.assertEqual(d["stand"]["zusammengefasst"]["tage"], 2)
+
 
 class Probelauf(Basis):
     def test_probelauf_schreibt_nichts(self):

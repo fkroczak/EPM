@@ -1,6 +1,6 @@
 # EPM – Altdaten übernehmen (Administration › Import)
 
-Stand: 02.10.2026 · Funktion F65 in `docs/BACKEND-FUNKTIONEN.md` · Grundlage: Altsystem-Datenanalyse (17 Regeln)
+Stand: 09.10.2026 (Regeln je Wert, Gewichte zusammenfassen: F159) · Funktion F65 in `docs/BACKEND-FUNKTIONEN.md` · Grundlage: Altsystem-Datenanalyse (17 Regeln)
 
 Das Werkzeug übernimmt die Daten des bisherigen Systems (MySQL, 6 Tabellen, Dokumente in `PatData/`) in das EPM.
 Es schlägt Zuordnungen vor; die Administration prüft und korrigiert sie in der Oberfläche. Getestet ist es mit einem
@@ -67,7 +67,8 @@ möglich. Jede Änderung wird sofort gespeichert, „Vorschlag“ nimmt sie zur�
 | Katheter und Werte | Katheter → Einträge der Auswahlliste; unbekannte Werte bei Nickelallergie/Geschlecht zuordnen. |
 | Präparate | Schreibvarianten dem richtigen Präparat zuordnen, sonst entstehen doppelte Einträge. Unbekanntes: neu anlegen, als Text in die Bemerkung oder nicht übernehmen. |
 | Gelöschte Patienten | Standard: nicht übernehmen. Sonst als abgeschlossene Akte mit Anlass und Abschlussdatum (ab dann läuft die Aufbewahrungsfrist). |
-| Auffälligkeiten | Einzelne Werte: fehlendes Geburtsdatum (muss entschieden werden), unlesbare oder unplausible Zahlen, vierstellige PLZ, Gewichte ohne Zeitpunkt … Steht eine Patientennummer im Löschprotokoll des EPM (endgültig gelöschte Akte), lässt sich dieser Patient nur „nicht übernehmen“. |
+| Auffälligkeiten | Einzelne Werte: fehlendes Geburtsdatum (muss entschieden werden), unlesbare oder unplausible Zahlen, vierstellige PLZ, Gewichte ohne Zeitpunkt … Steht eine Patientennummer im Löschprotokoll des EPM (endgültig gelöschte Akte), lässt sich dieser Patient nur „nicht übernehmen“. Gleiche Meldungen mit demselben Wert stehen als **Gruppe** zusammen (z. B. „Gewichte · Gewicht 1“ mit 150 Zeilen): Eine **Regel** für die Gruppe gilt für alle Zeilen mit diesem Wert – auch im frischen Dump zum Go-live. Unter „Einzeln mit Auswahl“ lassen sich beliebige Zeilen anhaken und gemeinsam entscheiden. Eine Entscheidung zur einzelnen Zeile hat Vorrang vor der Regel. |
+| Gewichte zusammenfassen | Oben bei den Auffälligkeiten. Standard: innerhalb von 2 Tagen. Alle Gewichte eines Patienten, die höchstens 2 × 24 Stunden nach dem ersten Eintrag der Gruppe erfasst wurden, werden zu einem zusammengefasst; übernommen wird der zuletzt erfasste. Läuft nach den Entscheidungen (was „nicht übernommen“ wird, verdrängt keinen anderen Wert). 1–7 Tage oder „nicht zusammenfassen“ wählbar; die Liste zeigt, was ersetzt wird. |
 
 **3 · Probelauf und Import.** Der Probelauf zeigt die Zählung „im Altsystem / wird übernommen / nicht übernommen
 (warum)“ und das Protokoll nach Regeln. Bitte die Zählung gegen das Altsystem halten, bevor importiert wird. „Altdaten

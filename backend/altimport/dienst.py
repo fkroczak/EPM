@@ -182,7 +182,7 @@ def dump_entfernen(benutzer, request=None) -> Importstand:
 # ================================================================= Zuordnungen speichern
 ZWEISTUFIG = {"spalten", "werte", "praeparate"}
 BEREICHE = {"tabellen", "tabellen_ignoriert", "spalten", "spalten_ignoriert", "benutzer", "versorger", "werte",
-            "praeparate", "geloeschte", "korrekturen"}
+            "praeparate", "geloeschte", "korrekturen", "regeln", "einstellungen"}
 
 
 @transaction.atomic
@@ -208,6 +208,20 @@ def zuordnung_speichern(bereich: str, aenderungen, benutzer, request=None) -> Im
             if not isinstance(liste, list) or not all(isinstance(x, str) for x in liste):
                 raise Hindernis("Erwartet wird je Tabelle eine Liste von Spaltennamen.")
             ziel[str(tabelle)] = sorted(set(liste))
+        z[bereich] = ziel
+    elif bereich == "regeln":
+        z[bereich] = _regeln_pruefen(stand, dict(z.get(bereich) or {}), aenderungen)
+    elif bereich == "einstellungen":
+        ziel = dict(z.get(bereich) or {})
+        for schluessel, wert in aenderungen.items():
+            if schluessel != "gewichte_tage":
+                raise Hindernis("Unbekannte Einstellung.")
+            if wert is None:
+                ziel.pop(schluessel, None)
+            elif isinstance(wert, bool) or not isinstance(wert, int) or not 0 <= wert <= umsetzung.GEWICHTE_TAGE_MAX:
+                raise Hindernis(f"Bitte eine ganze Zahl von 0 bis {umsetzung.GEWICHTE_TAGE_MAX} Tagen angeben.")
+            else:
+                ziel[schluessel] = wert
         z[bereich] = ziel
     else:
         if bereich == "korrekturen" and aenderungen:
@@ -243,6 +257,41 @@ def zuordnung_speichern(bereich: str, aenderungen, benutzer, request=None) -> Im
     stand.zuordnung = z
     stand.save()
     return stand
+
+
+def _regeln_pruefen(stand: Importstand, regeln: dict, aenderungen: dict) -> dict:
+    """Regeln je Wert („alle mit Gewicht 1 → nicht übernehmen“) prüfen und eintragen. Erlaubt ist eine Entscheidung,
+    die für alle Auffälligkeiten der Gruppe möglich ist; die Wahlmöglichkeiten und der Befund werden mit der Regel
+    gespeichert, damit sie sichtbar und änderbar bleibt, auch wenn ihre Zeilen danach nicht mehr auffallen."""
+    gruppen = {}
+    for a in stand_berechnen(stand).auffaelligkeiten:
+        gruppen.setdefault(a["gruppe"], []).append(a)
+    for schluessel, wert in aenderungen.items():
+        schluessel = str(schluessel)
+        if wert is None:
+            regeln.pop(schluessel, None)
+            continue
+        if not isinstance(wert, dict) or wert.get("art") not in umsetzung.ARTEN:
+            raise Hindernis("Unbekannte Entscheidung.")
+        mitglieder = [a for a in gruppen.get(schluessel, []) if a["art"] != "korrigiert"]
+        bisher = regeln.get(schluessel) or {}
+        if mitglieder and all(a["art"] == "ausgelassen" and (a["entscheidung"] or {}).get("regel") for a in mitglieder) and bisher:
+            moeglich, befund = list(bisher.get("moeglich") or []), bisher.get("befund", "")
+        elif mitglieder:
+            moeglich = [m for m in umsetzung.ARTEN if all(m in a["moeglich"] for a in mitglieder)]
+            befund = next((a["text"] for a in mitglieder if a["art"] != "ausgelassen"), bisher.get("befund", ""))
+        else:
+            raise Hindernis(f"Zu „{schluessel}“ gibt es keine Auffälligkeiten (mehr). Bitte die Ansicht neu laden.")
+        if wert["art"] not in moeglich:
+            raise Hindernis("Diese Entscheidung ist nicht für alle Auffälligkeiten der Gruppe möglich.")
+        neu = {"art": wert["art"], "moeglich": moeglich, "befund": str(befund)[:300]}
+        if wert["art"] == "wert":
+            text = str(wert.get("wert", "")).strip()[:300]
+            if not text:
+                raise Hindernis("Bitte den Wert angeben, der für alle eingetragen werden soll.")
+            neu["wert"] = text
+        regeln[schluessel] = neu
+    return regeln
 
 
 # ================================================================= Schreiben

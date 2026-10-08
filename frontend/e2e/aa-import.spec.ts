@@ -176,8 +176,31 @@ test("Import: Dump laden und Zuordnungen in der Oberfläche korrigieren", async 
   await expect(geloescht.getByLabel("Anlass für Patient 4")).toHaveValue("therapie_beendet");
   await expect(page.getByTestId("geloescht-6").getByLabel("Entscheidung für Patient 6")).toHaveValue("nicht");
 
-  // Auffälligkeiten: fehlendes Geburtsdatum eintragen (Pflicht im EPM)
+  // Auffälligkeiten, gruppiert: gleiche Meldungen mit demselben Wert lassen sich mit einer Regel für alle entscheiden
   await bereich(page, /^Auffälligkeiten/).click();
+  await expect(page.getByTestId("gewichte-zusammenfassen")).toContainText("Keine Gewichte liegen so dicht beieinander");
+  await expect(page.getByLabel("Gewichte zusammenfassen innerhalb von")).toHaveValue("2");
+  const gewichtGruppe = page.locator('[data-testid^="gruppe-gewichte:gewicht:640"]');
+  await expect(gewichtGruppe).toContainText("außerhalb der Plausibilitätsgrenzen");
+  const regel = gewichtGruppe.getByLabel(/^Regel für Gewichte · Gewicht \(kg\)/);
+  await regel.selectOption("auslassen");
+  await expect(gewichtGruppe).toContainText("Regel");
+  await gewichtGruppe.getByRole("button", { name: "Zeilen zeigen" }).click();
+  await expect(page.getByTestId("auffaellig-gewichte:7:gewicht")).toContainText("per Regel");
+  await regel.selectOption("");                                  // zurück: einzeln (Standard)
+  await expect(page.getByTestId("auffaellig-gewichte:7:gewicht")).toContainText("Standard");
+
+  // Einzeln mit Auswahl: mehrere Zeilen auf einmal entscheiden
+  await page.getByRole("group", { name: "Ansicht der Auffälligkeiten" }).getByRole("button", { name: "Einzeln mit Auswahl" }).click();
+  await page.getByLabel("Gewichte 7: Gewicht (kg) auswählen").check();
+  await page.getByLabel("Patienten 2: PLZ auswählen").check();
+  await expect(page.getByTestId("sammelentscheidung")).toContainText("2 ausgewählt");
+  await page.getByLabel("Entscheidung für die Auswahl").selectOption("unveraendert");
+  await page.getByRole("button", { name: "Für 2 übernehmen" }).click();
+  await expect(page.getByTestId("auffaellig-gewichte:7:gewicht")).toContainText("entschieden");
+  await expect(page.getByTestId("auffaellig-patienten:2:plz")).toContainText("entschieden");
+
+  // fehlendes Geburtsdatum eintragen (Pflicht im EPM)
   const geburt = page.getByTestId("auffaellig-patienten:3:geburtsdatum");
   await expect(geburt).toContainText("offen");
   await geburt.getByLabel("Entscheidung für Patienten 3: Geburtsdatum").selectOption("wert");

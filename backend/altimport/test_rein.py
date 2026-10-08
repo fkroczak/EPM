@@ -769,3 +769,94 @@ class Pruefbefunde(unittest.TestCase):
         a = next(x for x in e.auffaelligkeiten if x["schluessel"] == "patienten:5:nummer")
         self.assertEqual((a["entscheidung"]["art"], a["blockiert"]), ("auslassen", False))
         self.assertEqual(e.zahlen["patienten"]["nicht"]["ausgelassen"], 1)
+
+
+class RegelnUndZusammenfassen(unittest.TestCase):
+    """Regeln je Wert (Mehrfachauswahl, Festlegung 09.10.2026) und Zusammenfassen von Gewichten innerhalb weniger Tage."""
+
+    @staticmethod
+    def mit_gewichten(zeilen):
+        """Beispiel-Dump mit zusätzlichen Gewichten [(ID, Patient, kg, Zeitpunkt)] (Spalten ID, PatID, gewicht, lastchange, edit)."""
+        t = beispiel()
+        for nr, pat, kg, zeit in zeilen:
+            t["gewichte"]["zeilen"].append([str(nr), str(pat), kg, zeit, "a.muster"])
+        return t
+
+    def test_regel_gilt_fuer_alle_mit_dem_wert_auch_im_frischen_dump(self):
+        t = self.mit_gewichten([(101, 1, "1", "2023-06-01 10:00:00"), (102, 7, "1", "2024-02-01 10:00:00"),
+                                (103, 2, "1", "2022-12-01 10:00:00")])
+        e = lauf(tabellen=deepcopy(t), zuordnung=entscheidungen())
+        gruppe = [a for a in e.auffaelligkeiten if a["gruppe"] == "gewichte:gewicht:1"]
+        self.assertEqual(sorted(a["id"] for a in gruppe), ["101", "102", "103"])
+        self.assertTrue(all(a["regel"] is None and a["art"] == "unplausibel" for a in gruppe))
+        z = entscheidungen()
+        z["regeln"] = {"gewichte:gewicht:1": {"art": "auslassen", "moeglich": ["wert", "unveraendert", "auslassen"],
+                                              "befund": "Gewicht 1.0 kg liegt außerhalb der Plausibilitätsgrenzen."}}
+        e = lauf(tabellen=deepcopy(t), zuordnung=z)
+        self.assertEqual(e.offen, [])
+        self.assertFalse({"101", "102", "103"} & {g["alt"] for g in e.saetze["gewichte"]})
+        self.assertEqual(e.zahlen["gewichte"]["nicht"]["ausgelassen"], 4)          # drei per Regel + Nr. 8 ohne Zeitpunkt
+        gruppe = [a for a in e.auffaelligkeiten if a["gruppe"] == "gewichte:gewicht:1"]
+        self.assertEqual(len(gruppe), 3)
+        a = gruppe[0]
+        self.assertEqual((a["art"], a["entscheidung"]["art"], a["entscheidung"]["regel"]), ("ausgelassen", "auslassen", "gewichte:gewicht:1"))
+        self.assertEqual(a["moeglich"], ["wert", "unveraendert", "auslassen"])     # Wahl bleibt wie ursprünglich
+        self.assertEqual(a["regel"]["art"], "auslassen")
+        # frischer Dump mit einer weiteren Zeile desselben Werts: die Regel gilt auch dort
+        t2 = deepcopy(t)
+        t2["gewichte"]["zeilen"].append(["104", "1", "1", "2023-07-01 10:00:00", "a.muster"])
+        e = lauf(tabellen=t2, zuordnung=z)
+        self.assertNotIn("104", {g["alt"] for g in e.saetze["gewichte"]})
+        # Entscheidung zur einzelnen Zeile hat Vorrang vor der Regel
+        z["korrekturen"]["gewichte:102:gewicht"] = {"art": "wert", "wert": "61", "alt": "1"}
+        e = lauf(tabellen=deepcopy(t), zuordnung=z)
+        g = {x["alt"]: x for x in e.saetze["gewichte"]}
+        self.assertEqual(g["102"]["gewicht_kg"], Decimal("61.0"))
+        self.assertNotIn("101", g)
+
+    def test_regel_mit_wert_und_unpassende_regel(self):
+        z = entscheidungen()
+        roh = next(a["roh"] for a in lauf(zuordnung=z).auffaelligkeiten if a["schluessel"] == "patienten:2:plz")
+        z["regeln"] = {f"patienten:plz:{roh}": {"art": "wert", "wert": "04109", "moeglich": ["wert", "unveraendert"]}}
+        e = lauf(zuordnung=z)
+        self.assertEqual(next(p for p in e.saetze["patienten"] if p["nummer"] == 2)["plz"], "04109")
+        # „nicht übernehmen“ ist bei der PLZ nicht vorgesehen: eine solche Regel darf keine Akte entfernen
+        z["regeln"] = {f"patienten:plz:{roh}": {"art": "auslassen", "moeglich": ["wert", "unveraendert"]}}
+        e = lauf(zuordnung=z)
+        self.assertIn(2, [p["nummer"] for p in e.saetze["patienten"]])
+        a = next(a for a in e.auffaelligkeiten if a["schluessel"] == "patienten:2:plz")
+        self.assertIsNone(a["entscheidung"])
+
+    def test_gewichte_innerhalb_von_zwei_tagen_zusammenfassen(self):
+        t = self.mit_gewichten([(201, 7, "62", "2024-03-01 09:00:00"), (202, 7, "62.5", "2024-03-01 15:00:00"),
+                                (203, 7, "63", "2024-03-03 08:59:00"), (204, 7, "64", "2024-03-03 09:01:00"),
+                                (205, 7, "65", "2024-03-10 09:00:00")])
+        e = lauf(tabellen=deepcopy(t), zuordnung=entscheidungen())
+        g = {x["alt"]: x for x in e.saetze["gewichte"] if x["patient"] == 7}
+        # 201–203 liegen innerhalb von 48 Stunden nach 201 → nur 203 (zuletzt erfasst); 204 beginnt eine neue Gruppe
+        self.assertEqual(sorted(g, key=int), ["10", "203", "204", "205"])
+        self.assertEqual(g["203"]["gewicht_kg"], Decimal("63.0"))
+        z = e.zusammengefasst
+        self.assertEqual((z["tage"], z["anzahl"], z["patienten"]), (2, 2, 1))
+        self.assertEqual([(x["behalten"]["id"], [v["id"] for v in x["verworfen"]]) for x in z["gruppen"]], [("203", ["201", "202"])])
+        self.assertEqual(e.zahlen["gewichte"]["nicht"]["zusammengefasst"], 2)
+        p = next(x for x in e.protokoll if x["text"].startswith("Mehrere Gewichte innerhalb von 2 Tagen"))
+        self.assertEqual((p["anzahl"], p["beispiele"]), (2, ["201", "202"]))
+        # 1 Tag: 201+202 und 203+204 jeweils zusammen; 0 = aus
+        zu = entscheidungen()
+        zu["einstellungen"] = {"gewichte_tage": 1}
+        g = {x["alt"] for x in lauf(tabellen=deepcopy(t), zuordnung=zu).saetze["gewichte"] if x["patient"] == 7}
+        self.assertEqual(sorted(g, key=int), ["10", "202", "204", "205"])
+        zu["einstellungen"] = {"gewichte_tage": 0}
+        e = lauf(tabellen=deepcopy(t), zuordnung=zu)
+        self.assertEqual(len([x for x in e.saetze["gewichte"] if x["patient"] == 7]), 6)
+        self.assertEqual(e.zusammengefasst["anzahl"], 0)
+
+    def test_zusammenfassen_nach_den_entscheidungen(self):
+        # ein ausgelassener Platzhalter verdrängt keinen echten Wert
+        t = self.mit_gewichten([(301, 7, "61", "2024-03-01 09:00:00"), (302, 7, "1", "2024-03-01 10:00:00")])
+        z = entscheidungen()
+        z["regeln"] = {"gewichte:gewicht:1": {"art": "auslassen", "moeglich": ["wert", "unveraendert", "auslassen"]}}
+        g = {x["alt"] for x in lauf(tabellen=t, zuordnung=z).saetze["gewichte"] if x["patient"] == 7}
+        self.assertIn("301", g)
+        self.assertNotIn("302", g)

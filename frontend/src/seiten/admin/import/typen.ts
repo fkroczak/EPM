@@ -77,10 +77,17 @@ export type Geloeschtzeile = { schluessel: string; name: string; geburtsdatum: s
   gewichte: number; kontakte: number; plaene: number; entscheidung: GeloeschtWahl | null; wirksam: GeloeschtWahl; fehler: string };
 
 export type Entscheidungsart = "wert" | "leer" | "unveraendert" | "auslassen";
+/** Regel für alle Auffälligkeiten mit demselben Wert im selben Feld (Schlüssel „Tabelle:Feld:Wert“) */
+export type Regel = { art: Entscheidungsart; wert?: string; moeglich: Entscheidungsart[]; befund?: string };
 export type Auffaelligkeit = { schluessel: string; tabelle: string; tabelle_titel: string; id: string; patient: number | null;
   feld: string; feld_titel: string; art: string; text: string; wert: string | null; roh: string | null;
   standard: Entscheidungsart | "offen"; moeglich: Entscheidungsart[]; eingabe: "text" | "zahl" | "datum"; blockiert: boolean;
-  entscheidung: { art: Entscheidungsart; wert?: string; alt: string | null } | null };
+  entscheidung: { art: Entscheidungsart; wert?: string; alt: string | null; regel?: string } | null;
+  gruppe: string; regel: Regel | null };
+
+export type Gewichtseintrag = { id: string; kg: string; zeit: string };
+export type Zusammengefasst = { tage: number; anzahl: number; patienten: number;
+  gruppen: { patient: number; behalten: Gewichtseintrag; verworfen: Gewichtseintrag[] }[] };
 
 export type Offen = { bereich: "spalten" | "benutzer" | "versorger" | "werte" | "praeparate" | "geloeschte" | "auffaelligkeiten"; text: string };
 
@@ -89,7 +96,7 @@ export type Zuordnungsstand = {
   benutzer: Benutzerzeile[]; versorger: Versorgerzeile[];
   werte: { katheter: Katheterzeile[]; nickel: Wertzeile[]; geschlecht: Wertzeile[] };
   praeparate: Record<string, Praeparatfeld>;
-  geloeschte: Geloeschtzeile[]; auffaelligkeiten: Auffaelligkeit[]; offen: Offen[];
+  geloeschte: Geloeschtzeile[]; auffaelligkeiten: Auffaelligkeit[]; zusammengefasst: Zusammengefasst; offen: Offen[];
   protokoll: Protokollzeile[]; zahlen: Zahlen;
 };
 
@@ -125,4 +132,5 @@ export const NICHT: Record<string, string> = {
   geloescht: "im Altsystem gelöscht", ausgelassen: "ausgelassen (siehe Auffälligkeiten)", fehler: "offene Auffälligkeit",
   patient_nicht_uebernommen: "Patient wird nicht übernommen", ohne_patient: "ohne Patient",
   platzhalter: "Platzhalter (leer, 0, 9999)", leer: "ohne Text",
+  zusammengefasst: "zusammengefasst (mehrere Gewichte innerhalb weniger Tage)",
 };
