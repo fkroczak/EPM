@@ -291,3 +291,28 @@ test("Volle Breite in Stufen: 2560 px ohne Vorschau in der Patientenliste und dr
   }
   await ctx.close();
 });
+
+test("Rückmeldung als Overlay: grün quittiert und blendet aus, rot bleibt länger und lässt sich schließen", async ({ page }) => {
+  await page.goto("/patienten");
+  await page.getByTestId("patientenliste").getByRole("link", { name: "Mustermann, Max" }).click();
+  const stern = page.getByTestId("merken");
+  const vorher = await stern.getAttribute("aria-pressed");
+  await stern.click();
+  const gruen = page.getByTestId("rueckmeldung").filter({ hasText: vorher === "true" ? "Von der Merkliste genommen." : "Auf die Merkliste gesetzt." });
+  await expect(gruen).toBeVisible();
+  await expect(gruen).toHaveAttribute("data-art", "ok");
+  expect(await gruen.evaluate((e) => getComputedStyle(e).backgroundColor)).not.toBe("rgba(0, 0, 0, 0)");
+  // nach rund 3 Sekunden ausgeblendet
+  await expect(gruen).toHaveCount(0, { timeout: 6000 });
+  await stern.click(); // Merkliste wie vorher
+  await expect(stern).toHaveAttribute("aria-pressed", vorher ?? "false");
+  // Fehler: rot, nach 5 Sekunden noch da, „×“ schließt
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("epm:hinweis", { detail: "Testfehler aus dem Browsertest" })));
+  const rot = page.getByTestId("rueckmeldung").filter({ hasText: "Testfehler aus dem Browsertest" });
+  await expect(rot).toHaveAttribute("data-art", "fehler");
+  await expect(rot).toHaveAttribute("role", "alert");
+  await page.waitForTimeout(5000);
+  await expect(rot).toBeVisible();
+  await rot.getByRole("button", { name: "Meldung schließen" }).click();
+  await expect(rot).toHaveCount(0);
+});

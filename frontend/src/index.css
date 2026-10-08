@@ -64,6 +64,7 @@
   --auf-fehler: #ffffff;
   --ok: #23613a;
   --ok-bg: #e0f0e5;
+  --auf-ok: #ffffff;
   /* Diagrammreihen (Systemseite: CPU, Arbeitsspeicher) – geprüft auf Farbsehschwächen, eigene Stufen für „dunkel“ */
   --reihe-1: #2a78d6;
   --reihe-2: #eb6834;
@@ -109,6 +110,7 @@
   --auf-fehler: #1f2022;
   --ok: #97e0b5;
   --ok-bg: #304a3c;
+  --auf-ok: #1f2022;
   color-scheme: dark;
 }
 
@@ -565,3 +567,31 @@ body {
   background: transparent; transition: background 0.12s, height 0.12s;
 }
 .kopfgriff:hover::before, .kopfgriff:focus-visible::before, .kopfgriff.aktiv::before { height: 4px; background: var(--akzent); }
+
+/* Rückmeldungen als Overlay (Wunsch 08.10.2026, wie im alten EPM; components/ui/hinweise.tsx): oben in der Mitte,
+   grün = gespeichert (blendet nach ca. 3 s aus), rot = Fehler (bleibt ca. 9 s, „×“ schließt). Klicks gehen hindurch. */
+.rueckmeldungen {
+  position: fixed; top: 72px; left: 50%; transform: translateX(-50%); z-index: 70; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: min(560px, calc(100vw - 2rem));
+}
+.rueckmeldung {
+  display: flex; align-items: center; gap: 0.75rem; width: 100%; box-sizing: border-box;
+  padding: 0.875rem 0.75rem 0.875rem 1.125rem; border-radius: 12px; font-size: 0.9375rem; font-weight: 500; line-height: 1.4;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
+  animation: rueckmeldung-ein 0.22s ease-out both;
+}
+.rueckmeldung.ok { background: color-mix(in srgb, var(--ok) 94%, transparent); color: var(--auf-ok); }
+.rueckmeldung.fehler { background: color-mix(in srgb, var(--fehler) 95%, transparent); color: var(--auf-fehler); }
+.rueckmeldung.geht { animation: rueckmeldung-aus 0.35s ease-in forwards; }
+.rueckmeldung svg { flex-shrink: 0; }
+.rueckmeldung-text { flex: 1 1 auto; min-width: 0; }
+.rueckmeldung-zu {
+  pointer-events: auto; flex-shrink: 0; width: 1.75rem; height: 1.75rem; display: inline-flex; align-items: center;
+  justify-content: center; border: 0; border-radius: 6px; background: transparent; color: inherit; opacity: 0.75; cursor: pointer;
+}
+.rueckmeldung-zu:hover { opacity: 1; background: rgba(255, 255, 255, 0.18); }
+@keyframes rueckmeldung-ein { from { opacity: 0; transform: translateY(-10px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes rueckmeldung-aus { to { opacity: 0; transform: translateY(-8px); } }
+@media (max-width: 47.99rem) { .rueckmeldungen { top: calc(64px + env(safe-area-inset-top)); } }
+@media (prefers-reduced-motion: reduce) { .rueckmeldung, .rueckmeldung.geht { animation-duration: 0.01s; } }
+:root[data-schema="kontrast"] .rueckmeldung { border: 2px solid var(--tinte); }
