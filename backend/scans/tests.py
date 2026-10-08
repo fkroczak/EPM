@@ -1,4 +1,4 @@
-"""Scans und Texterkennung (F158–F165) gegen die echte Datenbank – mit echter Erkennung (Tesseract, PP-OCR).
+"""Scans und Texterkennung (F160–F167) gegen die echte Datenbank – mit echter Erkennung (Tesseract, PP-OCR).
 
 Die Erkennung läuft hier im Testprozess (``dienst.bearbeiten``) statt im OCR-Dienst; es sind dieselben Funktionen.
 In GitHub Actions müssen beide Verfahren bereitstehen (``EPM_OCR_PADDLE_PFLICHT=1``).

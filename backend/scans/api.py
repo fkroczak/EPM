@@ -1,4 +1,4 @@
-"""API des Menüpunkts „Scans“ (F158–F165). Alle Endpunkte unter ``/api/scans/``.
+"""API des Menüpunkts „Scans“ (F160–F167). Alle Endpunkte unter ``/api/scans/``.
 
 Recht „Scans: hochladen, erkennen, zuordnen“ für alles; Zuordnen zusätzlich „Einträge erfassen“ für die Akte
 (Admins wie überall nur bei Testpatienten), Diagnosen und Texte in die Akte zusätzlich „Akten bearbeiten“.

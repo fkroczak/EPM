@@ -50,6 +50,7 @@ def einheit(token: str | None) -> str | None:
     r = re.sub(r"(?<=/)[I1|]$", "l", r)
     r = re.sub(r"(?<=/m)[I1|]$", "l", r)
     r = re.sub(r"(?<=/m)l[iI1|]$", "l", r)
+    r = re.sub(r"(?<=/m)[iI]$", "l", r)       # „ng/mi“
     r = re.sub(r"(?<=/n)[I1|]$", "l", r)
     r = re.sub(r"(?<=/p)[I1|]$", "l", r)
     kandidaten.append(r)

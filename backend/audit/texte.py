@@ -240,7 +240,7 @@ def beschreibung(e) -> str:
 
 
 def _scan(e, d) -> str:
-    """Scans (F158 ff.): Hochladen, Zuordnen, Verlängern, Löschen. Vor dem Zuordnen ohne Titel (Datensparsamkeit:
+    """Scans (F160 ff.): Hochladen, Zuordnen, Verlängern, Löschen. Vor dem Zuordnen ohne Titel (Datensparsamkeit:
     ein Dateiname kann einen Namen enthalten)."""
     aktion = d.get("aktion", "")
     seiten = f", {d['seiten']} Seite{'n' if d.get('seiten') != 1 else ''}" if d.get("seiten") else ""

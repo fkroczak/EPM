@@ -1,5 +1,5 @@
 /**
- * Seite vor der Erkennung anpassen (F159): Ecken des Blatts verschieben (Perspektive), drehen, glätten, Schräglage,
+ * Seite vor der Erkennung anpassen (F161): Ecken des Blatts verschieben (Perspektive), drehen, glätten, Schräglage,
  * Darstellung (Graustufen, Farbe, Schwarz-Weiß), Kontrast und Helligkeit. Nach „Übernehmen“ wird die Seite neu
  * aufbereitet und erkannt; was automatisch erkannt wurde, steht vorbelegt da.
  */

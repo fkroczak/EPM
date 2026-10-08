@@ -415,7 +415,8 @@ def katalog() -> list[dict]:
 def auswerten(scan: Scan):
     """Gesamttext, Kennzahlen und Werte aus allen Seiten (auch nach jeder Änderung einer Seite)."""
     seiten = list(scan.seiten.order_by("nr", "id"))
-    ergebnisse = [s.ergebnis for s in seiten if s.status == ScanSeite.Status.FERTIG and s.ergebnis]
+    # je Seite ein Eintrag (auch für nicht erkannte), damit „seite“ in den Vorschlägen der Nummer der Seite entspricht
+    ergebnisse = [s.ergebnis if s.status == ScanSeite.Status.FERTIG and s.ergebnis else {"reihen": []} for s in seiten]
     scan.text = "\n\n".join(s.text for s in seiten if s.text)
     gewicht = sum(max(1, len(s.text)) for s in seiten if s.sicherheit is not None)
     scan.sicherheit = (sum(s.sicherheit * max(1, len(s.text)) for s in seiten if s.sicherheit is not None) / gewicht

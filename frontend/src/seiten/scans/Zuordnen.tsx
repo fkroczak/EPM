@@ -1,5 +1,5 @@
 /**
- * Scan einem Patienten zuordnen – mit Prüfansicht der erkannten Werte (F161, F164).
+ * Scan einem Patienten zuordnen – mit Prüfansicht der erkannten Werte (F163, F166).
  *
  * Links bleibt die Seite stehen: Wer eine Zeile anklickt oder ein Feld bearbeitet, sieht die Stelle im Original
  * markiert. Nichts wird ohne Bestätigung übernommen; Vorschläge mit unsicherer Erkennung oder unplausiblem Wert sind

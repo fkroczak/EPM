@@ -1,4 +1,4 @@
-/** Gemeinsames für den Menüpunkt „Scans“ (F158 ff.): Adressen, Bezeichnungen, Text. */
+/** Gemeinsames für den Menüpunkt „Scans“ (F160 ff.): Adressen, Bezeichnungen, Text. */
 import type { ScanErgebnis, ScanSeite, ScanWort, ScanZeile } from "@/lib/typen";
 
 /** Wörter mit geringerer Sicherheit werden markiert (wie im Backend: scans/ocr/fusion.py, UNSICHER) */

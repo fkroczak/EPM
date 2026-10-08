@@ -16,7 +16,7 @@ Festlegungen vom 01.10.2026:
   einstellbar; Konten ohne Login haben immer diese Rolle.
 - Festlegung 03.10.2026 (U22): Rolle „Mitarbeiter (erweitert)“ zwischen Mitarbeiter und Mediziner – Standard wie
   Mitarbeiter und zusätzlich Infusionspläne anlegen; alles je Gruppe umstellbar.
-- Festlegung 08.10.2026 (Scans, F158): Menüpunkt „Scans“ mit eigenem Recht – Standard Mitarbeiter, Mitarbeiter
+- Festlegung 08.10.2026 (Scans, F160): Menüpunkt „Scans“ mit eigenem Recht – Standard Mitarbeiter, Mitarbeiter
   (erweitert), Mediziner und Admin; Betrachter nicht (nicht zugeordnete Scans enthalten Patientendaten). Zuordnen
   verlangt zusätzlich „Einträge erfassen“ für die Akte (Admins wie überall nur bei Testpatienten).
 - Festlegung 03.10.2026: „Testdaten sehen“ (Testpatienten und Testbenutzer) je Gruppe einstellbar – ohne das Recht

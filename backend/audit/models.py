@@ -46,7 +46,7 @@ class SystemEreignis(models.Model):
         AKTE_GELOESCHT = "akte_geloescht", "Akte endgültig gelöscht"
         AKTE_LOESCHEN_ABGELEHNT = "akte_loeschen_abgelehnt", "Löschen einer Akte abgelehnt"
         PROTOKOLL_BEREINIGT = "protokoll_bereinigt", "Audit-Log bereinigt"
-        # Scans und Texterkennung (Festlegung 08.10.2026, F158 ff.)
+        # Scans und Texterkennung (Festlegung 08.10.2026, F160 ff.)
         SCAN = "scan", "Scan"
 
     zeitpunkt = models.DateTimeField(auto_now_add=True, db_index=True)

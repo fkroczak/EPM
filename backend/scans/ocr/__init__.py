@@ -1,4 +1,4 @@
-"""Texterkennung (OCR) für den Menüpunkt „Scans“ (Festlegung 08.10.2026, F158 ff.).
+"""Texterkennung (OCR) für den Menüpunkt „Scans“ (Festlegung 08.10.2026, F160 ff.).
 
 Alles läuft lokal im Container ``ocr`` – ohne Netz, ohne externe Dienste, ohne Sprachmodell:
 

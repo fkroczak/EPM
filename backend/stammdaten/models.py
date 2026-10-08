@@ -190,7 +190,7 @@ class Laborparameter(models.Model):
     gruppe = models.CharField(max_length=30, choices=Gruppe.choices)
     name = models.CharField(max_length=150)
     kurzname = models.CharField(max_length=60, blank=True, help_text="für enge Spalten, z. B. „GPT“")
-    # Scans (F164): weitere Schreibweisen, unter denen Labore den Wert drucken („ALAT“, „Krea“) – kommagetrennt.
+    # Scans (F166): weitere Schreibweisen, unter denen Labore den Wert drucken („ALAT“, „Krea“) – kommagetrennt.
     # Die üblichen Schreibweisen kennt die Werterkennung schon (scans/ocr/auswertung.py, SYNONYME).
     suchbegriffe = models.CharField("Suchbegriffe für Scans", max_length=300, blank=True,
                                     help_text="weitere Schreibweisen auf Laborbefunden, durch Komma getrennt")
@@ -290,7 +290,7 @@ def kontaktstufen_fehler(bald, ueberfaellig) -> dict | None:
 
 
 def scans_fehler(frist, hoechst, verlaengerung, max_mb, max_anzahl) -> dict:
-    """Regeln für die Aufbewahrung der Scans (F163): Frist 1–365 Tage, Höchstdauer nicht kürzer als die Frist,
+    """Regeln für die Aufbewahrung der Scans (F165): Frist 1–365 Tage, Höchstdauer nicht kürzer als die Frist,
     Verlängerung 1 Tag bis Höchstdauer, Obergrenzen in vernünftigen Grenzen."""
     fehler = {}
     if frist is not None and not 1 <= frist <= 365:
@@ -366,7 +366,7 @@ class Einstellungen(models.Model):
     # Vordrucke ohne Wasserzeichen „ENTWURF“, obwohl die mitgelieferte Startvorlage noch aktiv ist (Festlegung 03.10.2026:
     # Entwurfsmodus manuell abschaltbar, Vorlagen › Dokumentvorlagen). Liste der Arten; nur über eigenen Endpunkt.
     vordrucke_ohne_entwurf = models.JSONField("Vordrucke ohne Wasserzeichen „ENTWURF“", default=list, blank=True)
-    # Scans und Texterkennung (Festlegung 08.10.2026, F163): Aufbewahrung nicht zugeordneter Scans, Verlängern je
+    # Scans und Texterkennung (Festlegung 08.10.2026, F165): Aufbewahrung nicht zugeordneter Scans, Verlängern je
     # Scan bis zur Höchstdauer (ab dem Hochladen), Obergrenzen für Speicher und Anzahl; Fachwörter für die Erkennung
     scans_frist_tage = models.PositiveSmallIntegerField("Scans aufbewahren (Tage)", default=7)
     scans_hoechst_tage = models.PositiveSmallIntegerField("Scans höchstens aufbewahren (Tage)", default=30)

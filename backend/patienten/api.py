@@ -1227,7 +1227,7 @@ class TerminViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.RetrieveM
 
 class DokumentSerializer(serializers.ModelSerializer):
     hochgeladen_von_name = serializers.SerializerMethodField()
-    # Scans (F161): erkannter Text vorhanden – lesen über /api/dokumente/{id}/text/
+    # Scans (F163): erkannter Text vorhanden – lesen über /api/dokumente/{id}/text/
     hat_text = serializers.SerializerMethodField()
     typ_name = serializers.CharField(source="typ.wert", read_only=True, default=None)
     datei = serializers.FileField(write_only=True, required=False)
@@ -1323,7 +1323,7 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
     serializer_class = DokumentSerializer
     parser_classes = [JSONParser, MultiPartParser, FormParser]
     filterset_fields = ["patient", "typ", "ausgeblendet"]
-    # Scans (F161): auch im erkannten Text suchen
+    # Scans (F163): auch im erkannten Text suchen
     search_fields = ["titel", "originalname", "notiz", "erkannter_text__text"]
 
     def perform_create(self, serializer):
@@ -1514,7 +1514,7 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
 
     @action(detail=True, methods=["get"])
     def text(self, request, pk=None):
-        """Erkannter Text (Scans, F161) zum Lesen und Kopieren."""
+        """Erkannter Text (Scans, F163) zum Lesen und Kopieren."""
         dok = self.get_object()
         t = getattr(dok, "erkannter_text", None)
         if t is None:

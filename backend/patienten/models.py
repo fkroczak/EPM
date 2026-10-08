@@ -632,7 +632,7 @@ class Dokument(AktenEintrag):
 
 
 class DokumentText(models.Model):
-    """Erkannter Text eines Dokuments (Menüpunkt „Scans“, F161): damit die Akte das Dokument über seinen Inhalt findet.
+    """Erkannter Text eines Dokuments (Menüpunkt „Scans“, F163): damit die Akte das Dokument über seinen Inhalt findet.
 
     Ohne eigenen Verlauf – der Text ergibt sich aus der Datei. Er hängt am Dokument und geht mit ihm: beim Zuordnen zu
     einem anderen Patienten mit, beim endgültigen Löschen (Art. 17 DSGVO) mit weg."""

@@ -1,4 +1,4 @@
-"""Menüpunkt „Scans“ (Festlegung 08.10.2026, F158 ff.): Posteingang für gescannte und fotografierte Dokumente.
+"""Menüpunkt „Scans“ (Festlegung 08.10.2026, F160 ff.): Posteingang für gescannte und fotografierte Dokumente.
 
 Ablauf: hochladen → Seiten aufbereiten (automatisch, je Seite von Hand korrigierbar) → Text erkennen (OCR-Dienst)
 → einem Patienten zuordnen (mit Übernahme von Laborwerten, BIA, Diagnosen) oder den Text herauskopieren.

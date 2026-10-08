@@ -49,7 +49,7 @@ const PFADE: Record<string, ReactNode> = {
   zurueck: (<><path d="M15 18l-6-6 6-6" /></>),
   menue: (<><path d="M4 6h16" /><path d="M4 12h16" /><path d="M4 18h16" /></>),
   passkey: (<><circle cx="8" cy="9" r="4" /><path d="M2 21v-1a5 5 0 0 1 5-5h2" /><circle cx="17" cy="15" r="2.5" /><path d="M17 17.5V22" /><path d="M17 20h2" /></>),
-  // Scans (F158): Blatt mit Leselinie, Kopieren, Drehen
+  // Scans (F160): Blatt mit Leselinie, Kopieren, Drehen
   scan: (<><path d="M4 7V5a2 2 0 0 1 2-2h2" /><path d="M16 3h2a2 2 0 0 1 2 2v2" /><path d="M20 17v2a2 2 0 0 1-2 2h-2" /><path d="M8 21H6a2 2 0 0 1-2-2v-2" /><path d="M3 12h18" /><path d="M8 8h8" /><path d="M8 16h5" /></>),
   kopieren: (<><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>),
   drehen_links: (<><path d="M3 12a9 9 0 1 0 2.64-6.36" /><path d="M3 3v6h6" /></>),

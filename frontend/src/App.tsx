@@ -27,6 +27,7 @@ import { Infusionsplaene } from "./seiten/Infusionsplaene";
 import { Kalender } from "./seiten/Kalender";
 import { Benutzer } from "./seiten/admin/Benutzer";
 import { Datenschutz } from "./seiten/Datenschutz";
+import { Scans } from "./seiten/scans/Scans";
 import { Vorlagen } from "./seiten/admin/Vorlagen";
 import { Hilfe } from "./seiten/Hilfe";
 import { Design, Konto } from "./seiten/Konto";
@@ -89,6 +90,7 @@ const router = createBrowserRouter([
       { path: "versorger", element: <Versorger /> },
       { path: "aerzte", element: <Aerzte /> },
       { path: "datenschutz", element: <MitRecht recht={["datenschutz_bearbeiten", "datenschutz_entscheiden"]}><Datenschutz /></MitRecht> },
+      { path: "scans", element: <MitRecht recht="scans_bearbeiten" titel="Scans"><Scans /></MitRecht> },
       { path: "konto", element: <Konto /> },
       { path: "design", element: <Design /> },
       { path: "hilfe", element: <Hilfe /> },

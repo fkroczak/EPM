@@ -15,6 +15,7 @@ import { AuftragFortschritt, LaufendeAuftraege } from "@/components/AuftragForts
 import { useHintergrundarbeit } from "@/lib/laden";
 import { dateigroesse, datum, relativ, uhrzeit, zahl, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
+import type { ScansStand } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { useStufe } from "@/lib/stufen";
 import type { Stufe } from "@/lib/stufen";
@@ -66,6 +67,8 @@ export type Uebersicht = {
     dokumente: { anzahl: number; groesse: number; ungeprueft: number; platz: { gesamt: number; frei: number } | null };
     konten: { aktiv: number; gesperrt: number; ohne_2fa: number; einmal_kennwort_offen: number; admins: number;
       zweiter_faktor?: "freiwillig" | "admins" | "alle"; ohne_2fa_konten?: Konto[]; einmal_kennwort_konten?: Konto[]; gesperrt_konten?: Konto[] };
+    /** Scans und OCR-Dienst (F167) */
+    texterkennung?: { verfahren: ScansStand["verfahren"] & { fehler?: string }; dienst: ScansStand["dienst"]; scans: ScansStand };
   };
   angemeldet: Sitzung[];
   hinweis: Hinweis | null;
@@ -770,6 +773,31 @@ function KontenLinks({ konten, ich, zweifaktor }: { konten?: Konto[]; ich: numbe
 }
 
 // ---------------------------------------------------------------- Seite
+/** Texterkennung für „Scans“ (F167): Verfahren im Image, Lebenszeichen des OCR-Dienstes, Warteschlange, Speicher */
+function TexterkennungKarte({ t }: { t: NonNullable<Uebersicht["epm"]["texterkennung"]> }) {
+  const v = t.verfahren;
+  const s = t.scans;
+  return (
+    <Karte className="px-5 py-4 flex flex-col gap-2" data-testid="texterkennung-karte">
+      <KartenKopf titel="Texterkennung (Scans)" unter="lokal im Container „ocr“, ohne Netz nach außen" />
+      <dl className="m-0">
+        <Zeile label="OCR-Dienst">{t.dienst ? (t.dienst.laeuft
+          ? <><Chip art="ok">läuft</Chip> <span className="gedaempft">seit {zeitpunkt(t.dienst.gestartet)} · {t.dienst.bearbeitet} Scans erkannt · {t.dienst.threads} Threads</span></>
+          : <><Chip art="fehler">kein Lebenszeichen</Chip> <span className="gedaempft">zuletzt {relativ(t.dienst.lebenszeichen, true)}</span></>)
+          : <Chip art="warn">noch nie gestartet</Chip>}</Zeile>
+        <Zeile label="Tesseract">{v?.tesseract ? <><Chip art={v.tesseract.bereit ? "ok" : "fehler"}>{v.tesseract.bereit ? "bereit" : "fehlt"}</Chip> <span className="gedaempft">{v.tesseract.text}</span></> : "—"}</Zeile>
+        <Zeile label="PP-OCRv5">{v?.paddle ? <><Chip art={v.paddle.bereit ? "ok" : "warn"}>{v.paddle.bereit ? "bereit" : "fehlt"}</Chip>{" "}
+          <span className="gedaempft">{v.paddle.bereit ? `${v.paddle.text}${v.paddle.glaetten ? " · Glätten (UVDoc)" : ""}` : "Erkennung nur mit Tesseract – Modelle beim Bau des Images laden (Zugang zu huggingface.co)"}</span></> : "—"}</Zeile>
+        <Zeile label="Warteschlange">{s.laufend ? `${s.laufend} in Arbeit` : "leer"}{s.fehler ? <> · <Chip art="fehler">{s.fehler} mit Fehler</Chip></> : null}</Zeile>
+        <Zeile label="Scans">{zahl(s.anzahl_alle)} von höchstens {zahl(s.anzahl_grenze)} · {s.offen} warten auf Zuordnung
+          {s.laeuft_bald_ab ? ` · ${s.laeuft_bald_ab} laufen in 24 Std. ab` : ""}</Zeile>
+        <Zeile label="Speicher"><span className={s.prozent >= 80 ? "text-warn font-medium" : undefined}>{dateigroesse(s.belegt)} von {dateigroesse(s.grenze)} ({String(s.prozent).replace(".", ",")} %)</span></Zeile>
+      </dl>
+      {v?.fehler ? <Meldung art="fehler">{v.fehler}</Meldung> : null}
+    </Karte>
+  );
+}
+
 export function System() {
   const ich = useIch();
   const daten = useQuery({ queryKey: ["system", "uebersicht"], queryFn: () => api<Uebersicht>("system/uebersicht/"), refetchInterval: 60_000 });
@@ -955,6 +983,9 @@ export function System() {
           </table>
         </Karte>
         </Bereich>
+        {d.epm.texterkennung ? (
+          <Bereich id="texterkennung" titel="Texterkennung (Scans)"><TexterkennungKarte t={d.epm.texterkennung} /></Bereich>
+        ) : null}
         <Bereich id="hinweis" titel="Hinweis an alle Benutzer"><HinweisKarte hinweis={d.hinweis} /></Bereich>
         <Bereich id="angemeldet" titel="Angemeldet"><Angemeldet liste={d.angemeldet} /></Bereich>
         {d.einstellungen ? (

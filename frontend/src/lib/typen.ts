@@ -499,7 +499,7 @@ export type Dokument = {
   herkunft: "upload" | "altsystem" | "system" | "scan";
   hochgeladen_am: string;
   hochgeladen_von_name: string | null;
-  /** erkannter Text vorhanden (aus „Scans“, F161) – lesen über dokumente/{id}/text/ */
+  /** erkannter Text vorhanden (aus „Scans“, F163) – lesen über dokumente/{id}/text/ */
   hat_text?: boolean;
 };
 
@@ -714,6 +714,8 @@ export type Laborparameter = {
   reihenfolge: number;
   aktiv: boolean;
   in_befunden: number;
+  /** weitere Schreibweisen für die Werterkennung in „Scans“ (F166), durch Komma getrennt */
+  suchbegriffe?: string;
 };
 
 export type Laborwert = {
@@ -810,7 +812,7 @@ export type Hinweisruhe = {
   aufgehoben_von_name: string | null;
 };
 
-// ================================================================= Scans (F158 ff.)
+// ================================================================= Scans (F160 ff.)
 /** Wort der Erkennung: Text, x, y, Breite, Höhe (Pixel der aufbereiteten Seite), Sicherheit 0–1, andere Lesart */
 export type ScanWort = [string, number, number, number, number, number, string?];
 export type ScanStueck = { q: "p" | "t" | "m" | "d"; w: ScanWort[] };

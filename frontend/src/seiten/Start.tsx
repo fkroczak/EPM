@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
 import { langesDatum, relativ, zahl } from "@/lib/format";
 import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
-import type { Ich, Karte, KartenId, Recht } from "@/lib/typen";
+import type { Ich, Karte, KartenId, Recht, ScansStand } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Chip, Fehleranzeige, Karte as KarteBox, Knopf, KnopfLink, Laden, cx } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
@@ -57,6 +57,32 @@ function BackupStatus({ s, verweis }: { s: Startdaten["sicherung"]; verweis: boo
     <Link to="/admin/backup" className={cx("chip h-7 no-underline", art)} title={titel} data-testid="backup-status">{inhalt}</Link>
   ) : (
     <Chip art={art} className="h-7" title={titel} data-testid="backup-status">{inhalt}</Chip>
+  );
+}
+
+// ---------------------------------------------------------------- Scans (F165): warten auf Zuordnung, laufen ab, Speicher
+function ScansHinweis() {
+  const { darf } = useAuth();
+  const stand = useQuery({
+    queryKey: ["scans", "stand"],
+    queryFn: () => api<ScansStand>("scans/stand/"),
+    enabled: darf("scans_bearbeiten"),
+    staleTime: 30_000,
+  });
+  const s = stand.data;
+  if (!s || (!s.offen && !s.laeuft_bald_ab && s.prozent < 80)) return null;
+  const teile = [
+    s.offen ? `${s.offen === 1 ? "1 Scan wartet" : `${s.offen} Scans warten`} auf Zuordnung` : "",
+    s.laeuft_bald_ab ? `${s.laeuft_bald_ab === 1 ? "1 Scan wird" : `${s.laeuft_bald_ab} Scans werden`} in 24 Stunden automatisch gelöscht` : "",
+    s.prozent >= 80 ? `Speicher für Scans zu ${String(s.prozent).replace(".", ",")} % belegt` : "",
+  ].filter(Boolean);
+  return (
+    <div role="status" className={cx("meldung flex items-center gap-2.5", s.laeuft_bald_ab || s.prozent >= 80 ? "warn" : "info")}
+      data-testid="scans-hinweis">
+      <Icon name="scan" groesse={18} />
+      <span className="grow">{teile.join(" · ")}.</span>
+      <Link to="/scans" className="font-medium whitespace-nowrap">Zu den Scans</Link>
+    </div>
   );
 }
 
@@ -339,6 +365,7 @@ export function Start() {
           <Link to={`/admin/benutzer?id=${k.id}`} className="font-medium whitespace-nowrap text-fehler">Zum Benutzer</Link>
         </div>
       ))}
+      <ScansHinweis />
       {ich.rolle === "keine" ? (
         <div role="status" className="meldung info flex items-center gap-2.5" data-testid="keine-berechtigung">
           <Icon name="info" groesse={18} />

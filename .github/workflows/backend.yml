@@ -37,7 +37,7 @@ jobs:
       DJANGO_ALLOWED_HOSTS: localhost,testserver
       EPM_DOKUMENTE: /tmp/epm-dokumente
       EPM_SCANS: /tmp/epm-scans
-      # Scans (F158 ff.): Tesseract mit dem deutschen Modell aus dem Repo, PP-OCRv5 aus dem Zwischenspeicher – beide Pflicht
+      # Scans (F160 ff.): Tesseract mit dem deutschen Modell aus dem Repo, PP-OCRv5 aus dem Zwischenspeicher – beide Pflicht
       EPM_TESSDATA: /tmp/tessdata
       EPM_OCR_MODELLE: /home/runner/ocr-modelle
       EPM_OCR_PADDLE_PFLICHT: "1"

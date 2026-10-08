@@ -686,3 +686,21 @@ html { scrollbar-gutter: stable; }
 .stamm-eintrag:hover { background: var(--fein); }
 .stamm-eintrag.aktiv { background: var(--akzent-weich); border-left-color: var(--akzent) !important; }
 .stamm-eintrag:focus-visible { outline: 2px solid var(--akzent); outline-offset: -2px; }
+
+/* Scans (F160 ff.): Zähler in der Navigation, Markierungen auf der Seite, unsichere Wörter im Text */
+.nav-zahl {
+  min-width: 1.25rem; height: 1.25rem; padding: 0 0.375rem; border-radius: 999px; background: var(--akzent);
+  color: var(--auf-akzent); font-size: 0.6875rem; font-weight: 600; display: inline-flex; align-items: center;
+  justify-content: center; line-height: 1;
+}
+.nav-punkt { position: absolute; top: 5px; right: 6px; width: 8px; height: 8px; border-radius: 999px; background: var(--ladebalken); }
+.scan-unsicher { fill: rgba(250, 204, 21, 0.33); stroke: rgba(202, 138, 4, 0.75); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.scan-unsicher:hover { fill: rgba(250, 204, 21, 0.55); }
+.scan-markiert { fill: color-mix(in srgb, var(--akzent) 14%, transparent); stroke: var(--akzent); stroke-width: 2.5; vector-effect: non-scaling-stroke; pointer-events: none; }
+.scan-bereich { fill: color-mix(in srgb, var(--akzent) 10%, transparent); stroke: var(--akzent); stroke-width: 2; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; }
+.scan-neu-erkannt { fill: none; stroke: var(--ok); stroke-width: 1.5; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; pointer-events: none; }
+.scan-ecken { fill: color-mix(in srgb, var(--akzent) 10%, transparent); stroke: var(--akzent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.scan-griff { fill: var(--flaeche); stroke: var(--akzent); stroke-width: 3; vector-effect: non-scaling-stroke; cursor: grab; }
+.scan-griff:active { cursor: grabbing; fill: var(--akzent-weich); }
+.scan-wort-unsicher { background: var(--warn-bg); border-bottom: 2px solid var(--warn); border-radius: 2px; cursor: help; }
+.scan-text { tab-size: 4; }

@@ -356,6 +356,9 @@ def aufbereiten(rohbild: np.ndarray, e: Einstellungen, *, herkunft: str = "bild"
     elif e.ecken == "auto":
         ecken, sicher = blatt_finden(bild)
         if ecken is not None:
+            # ein Stück nach innen: sonst bleibt am Rand ein Streifen vom Tisch stehen (dunkler Rahmen)
+            mitte = ecken.mean(axis=0)
+            ecken = mitte + (ecken - mitte) * 0.985
             info["ecken_quelle"] = "auto"
             info["ecken_sicherheit"] = round(sicher, 2)
     foto = herkunft == "bild" and (kamera or (ecken is not None and info.get("ecken_quelle") == "auto"))

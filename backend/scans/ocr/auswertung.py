@@ -237,6 +237,8 @@ def dokumentdatum(reihen: list[list[T]], heute: date | None = None) -> tuple[dat
 # ---------------------------------------------------------------- Labor
 _OP = re.compile(r"^([<>≤≥]=?|<=|>=)$")
 _WERT = re.compile(r"^(?P<op>[<>≤≥]=?)?(?P<zahl>[-+]?\d+(?:[.,]\d+)*)(?P<flag>\+\+|--|[HhLl+*↑↓!])?$")
+# Zahl mit angehängtem, unbekanntem Zeichen („3,2U“ statt „3,2 L“): Zahl übernehmen, als unsicher markieren
+_WERT_REST = re.compile(r"^(?P<op>[<>≤≥]=?)?(?P<zahl>\d+(?:[.,]\d+)?)(?P<rest>[A-Za-z↑↓*!+|]{1,2})$")
 _FLAG = re.compile(r"^(\+\+|--|[HhLl+*↑↓!]|hoch|tief|niedrig)$")
 _SPANNE = re.compile(r"(?P<von>\d+(?:[.,]\d+)?)\s*[-–—]\s*(?P<bis>\d+(?:[.,]\d+)?)")
 _KLEINER = re.compile(r"(?:^|\s)(?:<|≤|<=|bis|kleiner)\s*(?P<bis>\d+(?:[.,]\d+)?)")
@@ -346,7 +348,7 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
             if _OP.match(txt) and i + 1 < len(r) and E.zahl(r[i + 1].text.rstrip("HhLl+*↑↓!")) is not None:
                 k = i
                 break
-            if _ist_wert(txt):
+            if _ist_wert(txt) or _WERT_REST.match(txt.replace(" ", "")):
                 k = i
                 break
         if k is None:
@@ -366,10 +368,15 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
             j = 1
         roh = rest[j].text.replace(" ", "")
         m = _WERT.match(roh)
+        angehaengt = ""
+        if not m and param is not None:
+            m = _WERT_REST.match(roh)
+            if m:
+                angehaengt = m.group("rest")
         if m:
             op = op or (m.group("op") or "")
             wert = E.zahl(m.group("zahl"))
-            flag = m.group("flag") or ""
+            flag = (m.groupdict().get("flag") or "") if not angehaengt else ""
         elif norm(roh) in TEXTWERTE:
             wert_text = rest[j].text
         else:
@@ -398,6 +405,9 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
         wert_woerter = [t for t in rest[:j] if re.search(r"\d", t.text)] or rest[:1]
         sicher = min(t.c for t in wert_woerter)
         hinweise = []
+        if angehaengt:
+            sicher = min(sicher, UNSICHER - 0.15)
+            hinweise.append(f"gelesen als „{roh}“ – Zahl übernommen, Zusatz „{angehaengt}“ (H/L?) bitte prüfen")
         if op and wert is not None:
             wert_text, wert = f"{op} {m.group('zahl') if m else _dez(wert)}", None
             hinweise.append("unter bzw. über der Messgrenze – als Text übernommen")
