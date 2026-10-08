@@ -65,12 +65,12 @@ test("Gewicht erfassen, Plausibilität, korrigieren, Zeitraum", async ({ page })
   await karte.getByRole("button", { name: "Gewicht", exact: true }).click();
   // Backend weist unplausible Werte ab
   await gd.getByLabel("Gewicht", { exact: true }).fill("400");
-  await gd.getByRole("button", { name: "Gewicht speichern" }).click();
+  await gd.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(gd.getByText(/Gewicht muss zwischen/)).toBeVisible();
 
   await gd.getByLabel("Gewicht", { exact: true }).fill("60,4");
   await gd.getByLabel("Quelle").selectOption({ label: "Versorger" });
-  await gd.getByRole("button", { name: "Gewicht speichern" }).click();
+  await gd.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(page.getByText(/^Gewicht 60,4 kg für .* gespeichert\.$/)).toBeVisible();
   await expect(karte.getByTestId("aktuelles-gewicht")).toHaveText("60,4 kg");
   await expect(page.getByTestId("kennzahlen")).toContainText("60,4 kg");
@@ -83,7 +83,7 @@ test("Gewicht erfassen, Plausibilität, korrigieren, Zeitraum", async ({ page })
   // korrigieren
   await karte.getByRole("button", { name: /Messwerte anzeigen/ }).click();
   const zeile = karte.getByTestId("messwerte").getByRole("row").filter({ hasText: "60,4 kg" });
-  await zeile.getByRole("button", { name: "Korrigieren" }).click();
+  await zeile.getByRole("button", { name: "Bearbeiten" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Gewicht (kg)").fill("60,6");
   await dialog.getByRole("button", { name: "Speichern" }).click();
@@ -91,7 +91,7 @@ test("Gewicht erfassen, Plausibilität, korrigieren, Zeitraum", async ({ page })
   await expect(karte.getByTestId("messwerte")).toContainText("60,6 kg");
   // letzte Messung direkt korrigieren: Klick auf den Wert oder „Korrigieren“ im Kartenkopf (08.10.2026)
   await karte.getByTestId("aktuelles-gewicht").click();
-  await expect(page.getByRole("dialog").getByRole("heading", { name: "Messung korrigieren" })).toBeVisible();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Messung bearbeiten" })).toBeVisible();
   await expect(page.getByRole("dialog").getByLabel("Gewicht (kg)")).toHaveValue("60,6");
   await page.getByRole("dialog").getByRole("button", { name: "Abbrechen" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -254,10 +254,10 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   // Termin ändern (F29): Titel und Uhrzeit
   await page.getByTestId("aktentermine").getByRole("button", { name: "Rückruf" }).click();
   const td = page.getByRole("dialog");
-  await expect(td.getByRole("heading", { name: "Termin ändern" })).toBeVisible();
+  await expect(td.getByRole("heading", { name: "Termin bearbeiten" })).toBeVisible();
   await td.getByLabel("Titel").fill("Rückruf Trinkmenge");
   await td.getByLabel("Uhrzeit").fill("11:15");
-  await td.getByRole("button", { name: "Termin speichern" }).click();
+  await td.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(page.getByText("Termin geändert.")).toBeVisible();
   await expect(page.getByTestId("aktentermine")).toContainText("Rückruf Trinkmenge");
   const geaendert = await api.get(`termine/${termine.results[0].id}/`);
@@ -269,7 +269,7 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   await pt.getByLabel("Art", { exact: true }).selectOption("praxistermin");
   await pt.getByLabel("Ort").selectOption({ label: "Praxis Dr. Holtmeier" });
   await pt.getByLabel("Titel").fill("Kontrolle in der Praxis");
-  await pt.getByRole("button", { name: "Termin speichern" }).click();
+  await pt.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(page.getByText("Termin angelegt.")).toBeVisible();
   await expect(page.getByTestId("aktentermine")).toContainText("Kontrolle in der Praxis");
   const praxis = (await api.get(`termine/?patient=${p.id}&offen=true`)).results.find((t: { titel: string }) => t.titel === "Kontrolle in der Praxis");
@@ -379,7 +379,7 @@ test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pfl
   let dialog = page.getByRole("dialog");
   await dialog.getByLabel("Arzt").selectOption({ label: `${arztName} · Allgemeinmedizin (Münster)` });
   await dialog.getByLabel("Rolle").selectOption("hausarzt");
-  await dialog.getByRole("button", { name: "Zuordnen" }).click();
+  await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(page.getByText("Arzt zugeordnet.", { exact: true })).toBeVisible();
   await expect(aerzte.getByTestId("arzt-zuordnung")).toContainText(arztName);
   await expect(aerzte.getByTestId("arzt-zuordnung")).toContainText("0251 12345");
@@ -425,10 +425,14 @@ test("Ärzte aus der gemeinsamen Liste zuordnen, Bezugspersonen mit Auskunft pfl
   await expect(personen.getByTestId("bezugsperson").filter({ hasText: "Margit Akte" })).toHaveAttribute("aria-current", "true");
   expect((await page.getByTestId("kennzahlen").boundingBox())!.height).toBeCloseTo(kopfHoehe, 0);
 
-  // nicht löschen, sondern „nicht mehr aktuell“ – bleibt unter „Frühere anzeigen“ und im Verlauf
+  // nicht löschen, sondern deaktivieren – bleibt unter „Frühere anzeigen“ und im Verlauf
   await personen.getByRole("button", { name: "Margit Akte" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Nicht mehr aktuell" }).click();
-  await expect(page.getByText("Als nicht mehr aktuell markiert.")).toBeVisible();
+  // „Deaktivieren“ fragt nach (rot, links); erst „Deaktivieren“ in der Rückfrage wirkt (08.10.2026)
+  await page.getByRole("dialog").getByRole("button", { name: "Deaktivieren" }).click();
+  const frage = page.getByRole("dialog").filter({ hasText: "Bezugsperson deaktivieren" });
+  await expect(frage).toContainText("Margit Akte");
+  await frage.getByTestId("bestaetigen").click();
+  await expect(page.getByText("Bezugsperson deaktiviert.")).toBeVisible();
   await expect(page.getByTestId("auskunft")).toContainText("niemand eingetragen");
   await expect(personen.getByTestId("bezugsperson")).toHaveCount(1);
   await personen.getByRole("button", { name: /Frühere anzeigen/ }).click();

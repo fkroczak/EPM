@@ -63,11 +63,11 @@ function KorrekturDialog({ messung, onZu }: { messung: Gewicht | null; onZu: () 
       if (!iso) throw new ApiFehler(400, "", null, { gemessen_am: "Bitte als TT.MM.JJJJ eingeben." });
       return api<Gewicht>(`gewichte/${messung!.id}/`, { method: "PATCH", body: { gewicht_kg: kgWert, gemessen_am: iso, quelle, notiz } });
     },
-    onSuccess: () => { neuLaden(); melden("Messung korrigiert."); onZu(); },
+    onSuccess: () => { neuLaden(); melden("Messung gespeichert."); onZu(); },
   });
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
-    <Dialog offen={!!messung} onOffen={(o) => { if (!o) onZu(); }} titel="Messung korrigieren" breite={520}
+    <Dialog offen={!!messung} onOffen={(o) => { if (!o) onZu(); }} titel="Messung bearbeiten" breite={520}
       beschreibung="Die bisherige Fassung bleibt im Verlauf der Akte sichtbar."
       fuss={<><Knopf onClick={onZu}>Abbrechen</Knopf><Knopf variante="pri" laedt={speichern.isPending} onClick={() => speichern.mutate()}>Speichern</Knopf></>}>
       <div className="grid grid-cols-2 gap-3">
@@ -85,7 +85,7 @@ function KorrekturDialog({ messung, onZu }: { messung: Gewicht | null; onZu: () 
 
 function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
   // Erfassen nur noch über den Dialog „Gewicht erfassen“ wie im Aktenkopf (ein Dialog je Sache, 08.10.2026);
-  // die letzte Messung lässt sich direkt korrigieren (Klick auf den Wert oder „Korrigieren“)
+  // die letzte Messung lässt sich direkt bearbeiten (Klick auf den Wert oder „Bearbeiten“)
   const { patient, erfassen, gewichtErfassen } = useAkte();
   const [zeitraum, setZeitraum] = useState<Zeitraum>(startZeitraum);
   const [geglaettet, setGeglaettet] = useState(true);
@@ -112,7 +112,7 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
           <div className="flex items-baseline gap-3 flex-wrap">
             {erfassen && letzte ? (
               <button type="button" className="num text-[1.375rem] font-semibold bg-transparent border-0 p-0 cursor-pointer text-inherit hover:underline"
-                data-testid="aktuelles-gewicht" title="Letzte Messung korrigieren" onClick={() => setKorrektur(letzte)}>
+                data-testid="aktuelles-gewicht" title="Letzte Messung bearbeiten" onClick={() => setKorrektur(letzte)}>
                 {k?.gewicht ? kg(k.gewicht.kg) : kg(letzte.gewicht_kg)}</button>
             ) : <span className="num text-[1.375rem] font-semibold" data-testid="aktuelles-gewicht">{k?.gewicht ? kg(k.gewicht.kg) : "—"}</span>}
             <span className="text-[0.8125rem] gedaempft">
@@ -125,7 +125,7 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
         </div>
         {erfassen ? (
           <div className="flex items-center gap-2">
-            {letzte ? <Knopf klein icon="stift" onClick={() => setKorrektur(letzte)} title={`Messung vom ${datum(letzte.gemessen_am)} korrigieren`}>Korrigieren</Knopf> : null}
+            {letzte ? <Knopf klein icon="stift" onClick={() => setKorrektur(letzte)} title={`Messung vom ${datum(letzte.gemessen_am)} bearbeiten`}>Bearbeiten</Knopf> : null}
             <Knopf klein icon="plus" onClick={() => gewichtErfassen()}>Gewicht</Knopf>
           </div>
         ) : null}
@@ -168,7 +168,7 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
                 <td className="td num text-right">{kg(g.gewicht_kg)}</td>
                 <td className="td">{GEWICHTSQUELLEN[g.quelle] ?? g.quelle}{g.notiz ? <span className="gedaempft"> · {g.notiz}</span> : null}</td>
                 <td className="td text-[0.8125rem] gedaempft">{zeitpunkt(g.erfasst_am)}{g.erfasst_von_name ? ` · ${g.erfasst_von_name}` : ""}</td>
-                <td className="td text-right">{erfassen ? <Knopf klein variante="geist" onClick={() => setKorrektur(g)}>Korrigieren</Knopf> : null}</td>
+                <td className="td text-right">{erfassen ? <Knopf klein variante="geist" onClick={() => setKorrektur(g)}>Bearbeiten</Knopf> : null}</td>
               </tr>
             ))}
           </tbody>
@@ -223,13 +223,13 @@ export function TermineKarte() {
           {liste.map((t) => (
             <li key={t.id} className="flex items-center gap-2.5 py-1.5 border-b border-rand last:border-b-0 text-sm">
               {erfassen ? (
-                <input type="checkbox" aria-label={`Erledigt: ${t.titel}`} disabled={abhaken.isPending} onChange={() => abhaken.mutate(t)} />
+                <input type="checkbox" title="Erledigt" aria-label={`Erledigt: ${t.titel}`} disabled={abhaken.isPending} onChange={() => abhaken.mutate(t)} />
               ) : null}
               <span className={cx("num w-[104px] shrink-0 text-[0.84rem]", t.faellig_am < heuteIso() && "text-fehler")}>{terminZeit(t.faellig_am, t.uhrzeit)}</span>
               <Chip>{t.ort_name ?? TERMINARTEN[t.art]}</Chip>
               {erfassen ? (
                 <button type="button" className="bg-transparent border-0 p-0 text-left truncate cursor-pointer text-akzent-text"
-                  title="Termin ändern" onClick={() => setBearbeiten(t)}>{t.titel}</button>
+                  title="Termin bearbeiten" onClick={() => setBearbeiten(t)}>{t.titel}</button>
               ) : <span className="truncate">{t.titel}</span>}
             </li>
           ))}

@@ -190,6 +190,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F150 | Ein Dialog je Sache: „Neuer Kontakt“, „+ Gewicht“ und Kürzelzeile K/G öffnen dieselben Dialoge; Wiedervorlage standardmäßig in 14 Tagen, einstellbar | 4 Akte, Vorlagen › Grenzwerte | ABGESCHLOSSEN (Lauf steht aus) |
 | F151 | Weniger Wege: „Entwurf fortsetzen“ im Aktenkopf, Dokument aus dem Kopf und per Ziehen auf die Akte, Arzt/Versorger im Dialog anlegen | 4 Akte, Neuer Patient, Arzt zuordnen | ABGESCHLOSSEN (Lauf steht aus) |
 | F152 | Bearbeiten sichtbar: „Bearbeiten“ auf Anschrift und Kontakt, Kalender öffnet „Termin ändern“, Karteikarte springt zum Eintrag, Therapie/Empfehlung erst lesen, Größen-Symbol statt „⋯“ | 4 Akte, Kalender | ABGESCHLOSSEN (Lauf steht aus) |
+| F153 | Eine Sprache: Bearbeiten / Speichern / Abbrechen / Erledigt / Deaktivieren; Rückfrage vor Verwerfen, Beenden, Deaktivieren; roter Knopf links | Akte, Kalender, alle Dialoge | ABGESCHLOSSEN (Lauf steht aus) |
 
 Summe (124 Funktionen, gezählt aus der Tabelle): 123 abgeschlossen und getestet, F124 abgeschlossen ohne Testlauf (F65 mit erfundenem Beispiel-Dump, der echte steht aus) · 0 teilweise abgeschlossen · 0 nicht abgeschlossen · 0 blockiert. (Die Summe vor Runde 7 zählte F65 noch als nicht abgeschlossen.)
 Gegenüber Runde 1 ist keine Funktion zurückgestuft worden. Neu ist F66 (Rechte je Gruppe). F38 und F39 sind nach der
@@ -2804,6 +2805,24 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
 - **Teststatus:** `akte.spec.ts`, `kalender.spec.ts`, `aktenansicht.spec.ts`.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F153 Eine Sprache in Knöpfen und Rückfragen
+- **Wunsch 08.10.2026:** Umsetzung „EPM intuitiver – Vorschläge“ (Abschnitt „Eine Sprache“).
+- **Wörter:** „Ändern“ und „Korrigieren“ heißen „Bearbeiten“ (Labor, BIA, Diagnose, Kalender, Gewichtsmessung; Dialoge
+  „Termin bearbeiten“, „Messung bearbeiten“). Der Knopf zum Sichern heißt in Dialogen „Speichern“ statt „Termin
+  speichern“, „Gewicht speichern“, „Zuordnen“, „Erfassen“ oder „n Werte speichern“ (Labor zeigt die Zahl in Klammern).
+  Ausnahmen mit Folge bleiben: „Freigeben“, „Entwurf speichern“, „Als Entwurf speichern“. Anlegen bleibt „Neuer/Neue X“
+  bzw. „+ X“ („Neuer Termin“ statt „Termin anlegen“). „Erledigen“ (Datenschutz-Anfragen) heißt „Erledigt“ mit Haken;
+  die Kästchen auf Startseite und Übersicht zeigen „Erledigt“ beim Überfahren. Bezugspersonen und Arzt-Zuordnungen:
+  „Deaktivieren“ / „Wieder aktivieren“ statt „Nicht mehr aktuell/zuständig“ bzw. „Wieder aktuell/zuständig“.
+  Diagnosen behalten „Beenden“ (fachlich richtig). Im Editor von Texten heißt „Verwerfen“ jetzt „Abbrechen“.
+- **Rückfragen:** Einheitlicher Dialog (`components/Bestaetigen.tsx`) vor „Bericht verwerfen“ (löschte bisher sofort),
+  „Diagnose beenden“, „Bezugsperson deaktivieren“, „Arzt deaktivieren“ (Versorger/Ärzte siehe F156).
+- **Anordnung:** In allen Dialogen steht ein roter Knopf (löschen, verwerfen, deaktivieren, endgültig …) links, getrennt
+  von „Abbrechen“ und „Speichern“/„Freigeben“ rechts (`.dialog-fuss .btn.dng`).
+- **Teststatus:** `akte.spec.ts`, `kalender.spec.ts`, `start.spec.ts`, `datenschutz.spec.ts`, `dokumente-falsch.spec.ts`,
+  `oberflaeche.spec.ts`, `praxiswuensche.spec.ts` (Diagnose beenden, Bericht verwerfen mit Rückfrage, roter Knopf links).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -2902,6 +2921,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 08.10.2026 | Eine Sprache | Bearbeiten/Speichern/Abbrechen/Erledigt/Deaktivieren überall; Rückfrage vor Bericht verwerfen, Diagnose beenden, Deaktivieren; roter Knopf links (F153). Lauf steht aus |
 | 08.10.2026 | Bearbeiten sichtbar | „Bearbeiten“ auf Anschrift und Kontakt, Kalender öffnet „Termin ändern“ mit „Erledigt“, Karteikarte springt zum Eintrag, Therapie/Empfehlung erst lesen, Größen-Symbol (F152). Lauf steht aus |
 | 08.10.2026 | Weniger Wege | „Entwurf fortsetzen“ im Aktenkopf, Dokumente aus dem Kopf und per Ziehen auf die Akte, Arzt/Versorger im Dialog anlegen (F151). Lauf steht aus |
 | 08.10.2026 | Ein Dialog je Sache | „Neuer Kontakt“, „+ Gewicht“, Kürzelzeile K/G öffnen dieselben Dialoge; letzte Messung direkt korrigieren; Wiedervorlage standardmäßig 14 Tage, unter Vorlagen › Grenzwerte einstellbar (F150). Lauf steht aus |

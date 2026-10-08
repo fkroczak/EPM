@@ -17,6 +17,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Editor, Richtext } from "@/components/Editor";
 import { PdfDialog } from "@/components/PdfDialog";
+import { Bestaetigen } from "@/components/Bestaetigen";
 import { useAkte } from "./Akte";
 import { Aktenseite, Detail, Eintrag, Eintragsliste, useWahl } from "./Aktenseite";
 
@@ -137,6 +138,7 @@ export function Berichte() {
   const [dialog, setDialog] = useState<{ offen: boolean; bericht: Bericht | null }>({ offen: false, bericht: null });
   const [freigabe, setFreigabe] = useState<{ offen: boolean; bericht: Bericht | null }>({ offen: false, bericht: null });
   const [pdf, setPdf] = useState<Bericht | null>(null);
+  const [weg, setWeg] = useState<Bericht | null>(null);
 
   const berichte = useQuery({
     queryKey: ["berichte", patient.id],
@@ -147,8 +149,8 @@ export function Berichte() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["berichte", patient.id] });
       melden("Entwurf verworfen.");
+      setWeg(null);
     },
-    onError: (e) => melden(e.message, "fehler"),
   });
 
   const liste = berichte.data ?? [];
@@ -191,7 +193,7 @@ export function Berichte() {
               {entwurf && erfassen && darf("berichte_freigeben")
                 ? <Knopf klein variante="pri" icon="haken" onClick={() => setFreigabe({ offen: true, bericht: gewaehlt })}>Freigeben</Knopf> : null}
               {entwurf && erfassen
-                ? <Knopf klein variante="dng" laedt={verwerfen.isPending} onClick={() => verwerfen.mutate(gewaehlt)}>Verwerfen</Knopf> : null}
+                ? <Knopf klein variante="dng" onClick={() => { verwerfen.reset(); setWeg(gewaehlt); }}>Verwerfen</Knopf> : null}
               {gewaehlt.status === "freigegeben" && gewaehlt.dokument
                 ? <Knopf klein icon="dokument" onClick={() => setPdf(gewaehlt)}>PDF ansehen</Knopf> : null}
             </>}>
@@ -205,6 +207,10 @@ export function Berichte() {
       {erfassen ? <>
         <BerichtDialog bericht={dialog.bericht} offen={dialog.offen} onOffen={(o) => setDialog((d) => ({ ...d, offen: o }))} />
         <FreigabeDialog bericht={freigabe.bericht} offen={freigabe.offen} onOffen={(o) => setFreigabe((d) => ({ ...d, offen: o }))} />
+        {/* Rückfrage vor dem Verwerfen (Vorschlag „Eine Sprache“, 08.10.2026) – vorher wirkte der Knopf sofort */}
+        <Bestaetigen offen={!!weg} onOffen={(o) => { if (!o) setWeg(null); }} titel="Entwurf verwerfen" knopf="Verwerfen"
+          text={<>Der Entwurf „{weg?.titel}“ wird gelöscht.</>} laedt={verwerfen.isPending} fehler={verwerfen.error}
+          onJa={() => weg && verwerfen.mutate(weg)} />
       </> : null}
       <PdfDialog offen={!!pdf} onOffen={(o) => !o && setPdf(null)} titel={pdf?.titel ?? "Bericht"}
         pfad={pdf?.dokument ? `dokumente/${pdf.dokument}/datei/?anzeigen=1` : ""}

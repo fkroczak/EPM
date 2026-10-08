@@ -45,14 +45,14 @@ test("Kalender: Termin an einem Tag anlegen, öffnen, abhaken; Erledigte ausblen
   await dialog.getByLabel("Art", { exact: true }).selectOption("wiedervorlage");
   await dialog.getByLabel("Uhrzeit").fill("09:15");
   await dialog.getByLabel("Titel").fill("E2E Kalender Kontrolle");
-  await dialog.getByRole("button", { name: "Termin speichern" }).click();
+  await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   const eintrag = page.getByTestId(`tag-${ziel}`).getByRole("button", { name: /09:15 Wiedervorlage: Beispiel, Paula – E2E Kalender Kontrolle/ });
   await expect(eintrag).toBeVisible();
   // Klick auf einen offenen Termin öffnet gleich „Termin ändern“ mit „Erledigt“ und „Akte öffnen“ (08.10.2026)
   await eintrag.click();
   const td = page.getByRole("dialog");
-  await expect(td.getByRole("heading", { name: "Termin ändern" })).toBeVisible();
+  await expect(td.getByRole("heading", { name: "Termin bearbeiten" })).toBeVisible();
   await expect(td.getByLabel("Titel")).toHaveValue("E2E Kalender Kontrolle");
   await expect(td.getByRole("link", { name: "Akte öffnen" })).toBeVisible();
   await expect(td.getByTestId("termin-angelegt")).toContainText("Angelegt");

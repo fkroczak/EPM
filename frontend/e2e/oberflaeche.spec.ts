@@ -68,7 +68,7 @@ test("Schnellerfassung (S02): Kontakt mit Wiedervorlage; das Gewicht scheitert g
   await g.getByLabel("Patient").fill(p.nachname);
   await g.getByRole("option", { name: new RegExp(p.name) }).click();
   await g.getByLabel("Gewicht", { exact: true }).fill("59,1");
-  await g.getByRole("button", { name: "Gewicht speichern" }).click();
+  await g.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(g).toHaveCount(0);
   await expect(page.getByText(`Gewicht 59,1 kg für ${p.name} gespeichert.`)).toBeVisible();
 });

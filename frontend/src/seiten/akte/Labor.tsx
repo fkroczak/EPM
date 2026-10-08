@@ -119,7 +119,7 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
       fuss={<>
         <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
         <Knopf variante="pri" laedt={speichern.isPending} disabled={!anzahl} onClick={() => speichern.mutate()}>
-          {anzahl ? `${anzahl} ${anzahl === 1 ? "Wert" : "Werte"} speichern` : "Speichern"}
+          Speichern{anzahl ? <span className="num opacity-80"> ({anzahl} {anzahl === 1 ? "Wert" : "Werte"})</span> : null}
         </Knopf>
       </>}>
       <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
@@ -192,7 +192,7 @@ function BefundDetail({ befund, onAendern, aenderbar }: { befund: Laborbefund; o
     <Detail testid="labor-detail"
       titel={<>Laborbefund vom <span className="num">{datum(befund.abgenommen_am)}</span></>}
       unter={[befund.labor, `${befund.anzahl_werte} Werte`, befund.erfasst_von_name].filter(Boolean).join(" · ")}
-      aktionen={aenderbar ? <Knopf klein icon="stift" onClick={onAendern}>Ändern</Knopf> : undefined}>
+      aktionen={aenderbar ? <Knopf klein icon="stift" onClick={onAendern}>Bearbeiten</Knopf> : undefined}>
       {nachGruppe.map(([gruppe, liste]) => (
         <Abschnitt key={gruppe} titel={LABORGRUPPEN[gruppe] ?? "Weitere Parameter"}>
           <div className="grid gap-x-5 sm:grid-cols-2 lg:grid-cols-3">

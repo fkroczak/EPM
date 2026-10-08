@@ -346,6 +346,9 @@ body {
   position: absolute; top: 0.5rem; right: 0.5rem; z-index: 5; width: 1.75rem; height: 1.75rem;
   color: var(--gedaempft);
 }
+/* Eine Sprache (08.10.2026): Was Daten löscht oder aus der Auswahl nimmt, steht im Dialog rot und links –
+   getrennt von „Abbrechen“, „Speichern“ und „Freigeben“ rechts */
+.dialog-fuss > .btn.dng { order: -1; margin-right: auto; }
 .bereich-menue:hover, .bereich-menue[data-popup-open] { color: var(--tinte); background: var(--fein); }
 /* dezent, bis die Maus über der Karte ist; per Tastatur immer sichtbar */
 @media (hover: hover) { .bereich-menue { opacity: 0.45; } .bereich:hover .bereich-menue, .bereich-menue:focus-visible, .bereich-menue[data-popup-open] { opacity: 1; } }

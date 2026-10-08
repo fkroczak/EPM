@@ -20,6 +20,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { useAkte } from "./Akte";
 import { Abschnitt, Aktenseite, Detail, Eintrag, Eintragsliste, useWahl } from "./Aktenseite";
 import { Textfassung, Textkopf } from "./TextKarte";
+import { Bestaetigen } from "@/components/Bestaetigen";
 
 const KATALOG_ID = "diagnoseliste";
 
@@ -140,6 +141,7 @@ export function Diagnosen() {
   const [wahl, setWahl] = useWahl("eintrag");
   const [dialog, setDialog] = useState<{ offen: boolean; diagnose: Diagnose | null }>({ offen: false, diagnose: null });
   const [beendete, setBeendete] = useState(false);
+  const [beenden, setBeenden] = useState<Diagnose | null>(null);
 
   const diagnosen = useQuery({
     queryKey: ["diagnosen", patient.id],
@@ -150,8 +152,9 @@ export function Diagnosen() {
     onSuccess: (d) => {
       void qc.invalidateQueries({ queryKey: ["diagnosen", patient.id] });
       melden(d.aktiv ? "Wieder als zutreffend eingetragen." : "Als nicht mehr zutreffend eingetragen.");
+      setBeenden(null);
     },
-    onError: (e) => melden(e.message, "fehler"),
+    onError: (e) => { if (!beenden) melden(e.message, "fehler"); },
   });
 
   const alle = diagnosen.data ?? [];
@@ -198,9 +201,10 @@ export function Diagnosen() {
           unter={[gewaehlt.kennzeichen_name, gewaehlt.seit ? `besteht seit ${datum(gewaehlt.seit)}` : "",
             gewaehlt.aktiv ? "" : `beendet ${datum(gewaehlt.beendet_am)}`].filter(Boolean).join(" · ")}
           aktionen={bearbeiten ? <>
-            <Knopf klein icon="stift" onClick={() => setDialog({ offen: true, diagnose: gewaehlt })}>Ändern</Knopf>
-            <Knopf klein laedt={umschalten.isPending} onClick={() => umschalten.mutate(gewaehlt)}>
-              {gewaehlt.aktiv ? "Beenden" : "Wieder aktuell"}</Knopf>
+            <Knopf klein icon="stift" onClick={() => setDialog({ offen: true, diagnose: gewaehlt })}>Bearbeiten</Knopf>
+            {/* „Beenden“ fragt nach (Vorschlag „Eine Sprache“, 08.10.2026); „Wieder aktuell“ wirkt sofort */}
+            {gewaehlt.aktiv ? <Knopf klein variante="dng" onClick={() => { umschalten.reset(); setBeenden(gewaehlt); }}>Beenden</Knopf>
+              : <Knopf klein laedt={umschalten.isPending} onClick={() => umschalten.mutate(gewaehlt)}>Wieder aktuell</Knopf>}
           </> : undefined}>
           {gewaehlt.notiz ? <Abschnitt titel="Notiz zur Diagnose"><p className="m-0 text-sm">{gewaehlt.notiz}</p></Abschnitt> : null}
           <Abschnitt titel="Eingetragen">
@@ -211,6 +215,9 @@ export function Diagnosen() {
         </Detail>
       )}
     />
+    {bearbeiten ? <Bestaetigen offen={!!beenden} onOffen={(o) => { if (!o) setBeenden(null); }} titel="Diagnose beenden" knopf="Beenden"
+      text={<>„{beenden?.bezeichnung}“ trifft nicht mehr zu. Sie bleibt unter „beendete anzeigen“ sichtbar und lässt sich wieder als aktuell eintragen.</>}
+      laedt={umschalten.isPending} fehler={umschalten.error} onJa={() => beenden && umschalten.mutate(beenden)} /> : null}
     {bearbeiten ? <DiagnoseDialog diagnose={dialog.diagnose} offen={dialog.offen}
       onOffen={(o) => setDialog((d) => ({ ...d, offen: o }))} /> : null}
     </>

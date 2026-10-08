@@ -21,9 +21,9 @@ test("Dokument beim falschen Patienten dem richtigen zuordnen; Verlauf neutral b
   await dialog.getByLabel("Richtiger Patient").fill(bernd.nachname);
   await dialog.getByRole("option", { name: new RegExp(bernd.nachname) }).click();
   await dialog.getByLabel("Grund").fill("beim falschen Patienten hochgeladen");
-  await expect(dialog.getByRole("button", { name: "Zuordnen" })).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "Speichern", exact: true })).toBeDisabled();
   await dialog.getByRole("checkbox").check();
-  await dialog.getByRole("button", { name: "Zuordnen" }).click();
+  await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
   await expect(page.getByText(`Dokument ${bernd.nachname}, Bernd zugeordnet.`)).toBeVisible();
   await expect(page.getByText("Noch keine Dokumente.")).toBeVisible();
 

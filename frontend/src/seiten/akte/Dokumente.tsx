@@ -73,7 +73,7 @@ function UmhaengenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolea
     <Dialog offen={offen} onOffen={onOffen} titel="Dokument dem richtigen Patienten zuordnen" breite={620}
       beschreibung={`„${dok.titel}“ ist bei ${name(patient)} abgelegt.`}
       fuss={<><Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
-        <Knopf variante="pri" laedt={umhaengen.isPending} disabled={!ziel || grund.trim().length < 5 || !geprueft} onClick={() => umhaengen.mutate()}>Zuordnen</Knopf></>}>
+        <Knopf variante="pri" laedt={umhaengen.isPending} disabled={!ziel || grund.trim().length < 5 || !geprueft} onClick={() => umhaengen.mutate()}>Speichern</Knopf></>}>
       <div className="flex flex-col gap-3" data-testid="umhaengen">
         <Feld label="Richtiger Patient" fehler={f.patient}>
           {(p) => <PatientWahl id={p.id} wert={ziel} onWahl={(z) => { setZiel(z); setGeprueft(false); }} fehler={!!f.patient}

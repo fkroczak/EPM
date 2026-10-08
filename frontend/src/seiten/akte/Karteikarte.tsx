@@ -3,7 +3,7 @@
  * einer Arztsoftware – mit Kürzel je Art, Filter und Zeitraum. Darunter die Kürzelzeile: „K Text“ öffnet einen neuen
  * Kontakt mit diesem Text, „G 61,2“ das Gewicht, „T“ einen Termin, „P“ einen neuen Infusionsplan. Gespeichert wird
  * immer erst im jeweiligen Formular (Kontakte sind nach dem Speichern nicht mehr änderbar). Ein Klick auf eine Zeile öffnet
- * genau diesen Eintrag in seinem Reiter; offene Termine öffnen „Termin ändern“ (08.10.2026).
+ * genau diesen Eintrag in seinem Reiter; offene Termine öffnen „Termin bearbeiten“ (08.10.2026).
  */
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
@@ -45,7 +45,7 @@ type Eintrag = {
   person: string | null;
   durchgestrichen?: boolean;
   zu: string;
-  /** offener Termin: Klick öffnet „Termin ändern“ statt die Seite zu wechseln */
+  /** offener Termin: Klick öffnet „Termin bearbeiten“ statt die Seite zu wechseln */
   termin?: Termin;
 };
 

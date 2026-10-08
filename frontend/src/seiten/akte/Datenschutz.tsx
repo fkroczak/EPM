@@ -76,7 +76,7 @@ function ErfassenDialog({ art, patient, abgeschlossen, offen, onOffen }: {
       beschreibung={art === "datenschutzinformation" ? "Wann hat die Patientin oder der Patient die Information erhalten?"
         : "Wann wurde die Erklärung unterschrieben?"}
       fuss={<><Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
-        <Knopf variante="pri" laedt={speichern.isPending} onClick={() => speichern.mutate()}>Erfassen</Knopf></>}>
+        <Knopf variante="pri" laedt={speichern.isPending} onClick={() => speichern.mutate()}>Speichern</Knopf></>}>
       <div className="flex flex-col gap-3" data-testid="erklaerung-erfassen">
         <Feld label={art === "datenschutzinformation" ? "Ausgehändigt am" : "Unterschrieben am"} pflicht fehler={f.erteilt_am}>
           {(p) => <Eingabe {...p} className="num w-40" value={am} onChange={(e) => setAm(e.target.value)} placeholder="TT.MM.JJJJ" />}
@@ -229,7 +229,7 @@ function AnfrageDialog({ patient, offen, onOffen }: { patient: Patient; offen: b
     <Dialog offen={offen} onOffen={onOffen} titel="Datenschutz-Anfrage erfassen" breite={600}
       beschreibung="Zu beantworten unverzüglich, spätestens einen Monat nach Eingang (Art. 12 Abs. 3 DSGVO)."
       fuss={<><Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
-        <Knopf variante="pri" laedt={speichern.isPending} onClick={() => speichern.mutate()}>Erfassen</Knopf></>}>
+        <Knopf variante="pri" laedt={speichern.isPending} onClick={() => speichern.mutate()}>Speichern</Knopf></>}>
       <div className="grid grid-cols-2 gap-3" data-testid="anfrage-erfassen">
         <Feld label="Worum geht es?" fehler={f.art}>
           {(p) => <Auswahl {...p} value={art} onChange={(e) => setArt(e.target.value)}>
@@ -293,7 +293,7 @@ function ErledigenDialog({ anfrage, patient, offen, onOffen }: { anfrage: Datens
     <Dialog offen={offen} onOffen={onOffen} titel="Anfrage erledigen" breite={600}
       beschreibung={`${anfrage.art_name}, eingegangen am ${datum(anfrage.eingegangen_am)} · Frist ${datum(anfrage.frist_bis)}`}
       fuss={<><Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
-        <Knopf variante="pri" laedt={erledigen.isPending} onClick={() => erledigen.mutate()}>Erledigen</Knopf></>}>
+        <Knopf variante="pri" icon="haken" laedt={erledigen.isPending} onClick={() => erledigen.mutate()}>Erledigt</Knopf></>}>
       <div className="flex flex-col gap-3" data-testid="anfrage-erledigen">
         {loeschung ? (
           <Meldung art="info">Eine Löschung wird mit „Akte endgültig löschen“ erfüllt (unten auf dieser Seite, Mediziner oder Admin). Steht
@@ -357,7 +357,7 @@ function AnfragenKarte({ daten, patient, darf, entscheiden }: { daten: AktenDate
                   {a.ist_offen ? (
                     <div className="flex gap-2 flex-wrap justify-end">
                       {darf && !a.frist_verlaengert ? <Knopf klein onClick={() => setVerlaengern(a)}>Frist verlängern</Knopf> : null}
-                      {entscheiden ? <Knopf klein variante="pri" onClick={() => setErledigen(a)}>Erledigen</Knopf> : null}
+                      {entscheiden ? <Knopf klein variante="pri" icon="haken" onClick={() => setErledigen(a)}>Erledigt</Knopf> : null}
                     </div>
                   ) : null}
                 </td>
