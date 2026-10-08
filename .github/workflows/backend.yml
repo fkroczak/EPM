@@ -36,6 +36,11 @@ jobs:
       DB_PASSWORD: epm
       DJANGO_ALLOWED_HOSTS: localhost,testserver
       EPM_DOKUMENTE: /tmp/epm-dokumente
+      EPM_SCANS: /tmp/epm-scans
+      # Scans (F160 ff.): Tesseract mit dem deutschen Modell aus dem Repo, PP-OCRv5 aus dem Zwischenspeicher – beide Pflicht
+      EPM_TESSDATA: /tmp/tessdata
+      EPM_OCR_MODELLE: /home/runner/ocr-modelle
+      EPM_OCR_PADDLE_PFLICHT: "1"
       PYTHONUNBUFFERED: "1"
     defaults:
       run:
@@ -50,8 +55,22 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
-      - name: Systembibliotheken für die PDF-Erzeugung
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-ibm-plex fonts-dejavu-core poppler-utils >/dev/null
+      - name: Systembibliotheken für die PDF-Erzeugung und die Texterkennung
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-ibm-plex fonts-dejavu-core poppler-utils tesseract-ocr tesseract-ocr-osd >/dev/null
+          mkdir -p /tmp/tessdata
+          cp scans/modelle/tesseract/deu.traineddata /tmp/tessdata/
+          cp /usr/share/tesseract-ocr/5/tessdata/osd.traineddata /tmp/tessdata/
+          TESSDATA_PREFIX=/tmp/tessdata tesseract --list-langs
+
+      - name: Modelle der zweiten Texterkennung (Zwischenspeicher)
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/ocr-modelle
+          key: ocr-modelle-${{ hashFiles('backend/scans/modelle/modelle.json') }}
+
+      - name: Modelle laden und prüfen
+        run: python scans/modelle/holen.py /home/runner/ocr-modelle
 
       - name: Abhängigkeiten installieren
         run: pip install -r requirements.txt && pip freeze > /tmp/versionen.txt
@@ -60,7 +79,7 @@ jobs:
         id: mig
         run: |
           set -o pipefail
-          python manage.py makemigrations --noinput accounts stammdaten patienten infusionen befunde berichte vorlagen audit system altimport hilfe 2>&1 | tee -a ci-protokoll.txt
+          python manage.py makemigrations --noinput accounts stammdaten patienten infusionen befunde berichte vorlagen audit system altimport hilfe scans 2>&1 | tee -a ci-protokoll.txt
           if [ -n "$(git status --porcelain -- '*/migrations/*.py')" ]; then
             echo "neu=1" >> "$GITHUB_OUTPUT"
             git status --porcelain -- '*/migrations/*.py'

@@ -29,15 +29,36 @@ function NavText({ children }: { children: ReactNode }) {
   return <span className={useContext(Voll) ? undefined : TEXT}>{children}</span>;
 }
 
-function NavEintrag({ zu, icon, text, ende }: { zu: string; icon: string; text: string; ende?: boolean }) {
+function NavEintrag({ zu, icon, text, ende, zahl, testid }: { zu: string; icon: string; text: string; ende?: boolean;
+  /** Zähler (z. B. offene Scans): neben dem Text, in der schmalen Leiste als Punkt am Symbol */
+  zahl?: number; testid?: string }) {
   // schmale Leiste (nur Symbole): jeder Eintrag gleich groß und das Symbol mittig (Wunsch 08.10.2026)
   const voll = useContext(Voll);
+  const titel = zahl ? `${text} (${zahl})` : text;
   return (
-    <NavLink to={zu} end={ende} title={text} className={({ isActive }) => cx("nav", !voll && "nav-symbol", isActive && "aktiv")}>
+    <NavLink to={zu} end={ende} title={titel} className={({ isActive }) => cx("nav", !voll && "nav-symbol", isActive && "aktiv", "relative")}
+      data-testid={testid}>
       <Icon name={icon} groesse={18} />
       <NavText>{text}</NavText>
+      {zahl ? <>
+        <span className={cx("nav-zahl num", voll ? "ml-auto" : "max-hd:hidden ml-auto")} aria-label={`${zahl} offen`}>{zahl}</span>
+        {voll ? null : <span className="nav-punkt hd:hidden" aria-hidden="true" />}
+      </> : null}
     </NavLink>
   );
+}
+
+/** Zahl der Scans, die auf Zuordnung warten oder gerade erkannt werden (Navigation, einmal je Minute) */
+function useScansOffen(): number {
+  const { darf } = useAuth();
+  const stand = useQuery({
+    queryKey: ["scans", "stand"],
+    queryFn: () => api<{ offen: number; laufend: number }>("scans/stand/"),
+    enabled: darf("scans_bearbeiten"),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+  return stand.data ? stand.data.offen + stand.data.laufend : 0;
 }
 
 /** Angemeldete Person unten in der Seitenleiste: Kürzel im Kreis, Name und Rolle */
@@ -59,6 +80,7 @@ function Person({ v }: { v: boolean }) {
 function Seitenleiste({ schublade }: { schublade?: boolean }) {
   const ich = useIch();
   const { abmelden, darf } = useAuth();
+  const scansOffen = useScansOffen();
   const navigate = useNavigate();
   const admin = [
     darf("backup_verwalten") ? <NavEintrag key="b" zu="/admin/backup" icon="backup" text="Backup" /> : null,
@@ -91,6 +113,8 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
         {ich.rolle !== "keine" ? <NavEintrag zu="/versorger" icon="versorger" text="Versorger" /> : null}
         {ich.rolle !== "keine" ? <NavEintrag zu="/aerzte" icon="arzt" text="Ärzte" /> : null}
         {darf("datenschutz_bearbeiten") || darf("datenschutz_entscheiden") ? <NavEintrag zu="/datenschutz" icon="schloss" text="Datenschutz" /> : null}
+        {/* eigener Menüpunkt direkt nach Datenschutz (Festlegung 08.10.2026, F160 ff.) */}
+        {darf("scans_bearbeiten") ? <NavEintrag zu="/scans" icon="scan" text="Scans" zahl={scansOffen} testid="nav-scans" /> : null}
       </nav>
       {admin.length ? (
         <nav aria-label="Administration" className="flex flex-col gap-0.5">

@@ -12,7 +12,7 @@ import { eingabeZahl, zahl } from "@/lib/format";
 import { ERKLAERUNGEN } from "@/lib/typen";
 import type { Auswahlwert, Einstellungen, ErklaerungsArt, Praeparat } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
-import { Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Seitenkopf, Segmente, cx } from "@/components/ui/basis";
+import { Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Seitenkopf, Segmente, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { useSortierbar } from "@/components/ui/sortierbar";
@@ -283,6 +283,14 @@ const DATENSCHUTZ: { k: string; label: string; einheit: string; hinweis?: string
   { k: "abschluss_pruefen_monate", label: "„Abschluss prüfen“, wenn kein Kontakt seit", einheit: "Monaten" },
   { k: "protokoll_aufbewahrung_jahre", label: "Audit-Log aufbewahren", einheit: "Jahre", hinweis: "0 = unbegrenzt; sonst werden ältere Einträge täglich endgültig entfernt" },
 ];
+// Scans (Festlegung 08.10.2026, F165): Aufbewahrung nicht zugeordneter Scans und Obergrenzen
+const SCANS: { k: string; label: string; einheit: string; hinweis?: string }[] = [
+  { k: "scans_frist_tage", label: "Nicht zugeordnete Scans löschen nach", einheit: "Tagen" },
+  { k: "scans_verlaengerung_tage", label: "„Verlängern“ verschiebt um", einheit: "Tage" },
+  { k: "scans_hoechst_tage", label: "Höchstens aufbewahren", einheit: "Tage", hinweis: "ab dem Hochladen, auch mit Verlängern" },
+  { k: "scans_max_anzahl", label: "Höchstens", einheit: "Scans" },
+  { k: "scans_max_mb", label: "Speicher für Scans", einheit: "MB", hinweis: "ab 80 % Hinweis auf der Startseite" },
+];
 const GRENZEN: { text: string; min: string; max: string; einheit: string }[] = [
   { text: "Energie", min: "kcal_min_tag", max: "kcal_max_tag", einheit: "kcal" },
   { text: "Volumen im Mischbeutel", min: "volumen_min_ml", max: "volumen_max_ml", einheit: "ml" },
@@ -315,9 +323,11 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
   }, [daten.data, w]);
   const speichern = useMutation({
     mutationFn: () => {
-      const felder = [...HINWEISE.map((h) => h.k), ...(datenschutz ? DATENSCHUTZ.map((h) => h.k) : []), ...GRENZEN.flatMap((g) => [g.min, g.max])];
+      const felder = [...HINWEISE.map((h) => h.k), ...(datenschutz ? DATENSCHUTZ.map((h) => h.k) : []), ...GRENZEN.flatMap((g) => [g.min, g.max]),
+        ...SCANS.map((h) => h.k)];
       const fehler: Feldfehler = {};
       const body: Record<string, string | string[] | null> = datenschutz ? { pflicht_erklaerungen: pflicht } : {};
+      body.ocr_fachwoerter = w!.ocr_fachwoerter ?? "";
       for (const k of felder) {
         const z = eingabeZahl(w![k] ?? "");
         if (!z || z === "ungueltig") fehler[k] = "Bitte eine Zahl eingeben.";
@@ -379,6 +389,24 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
           {f.pflicht_erklaerungen ? <span className="fehlertext" role="alert">{f.pflicht_erklaerungen}</span> : null}
           <span className="text-[0.8125rem] gedaempft">Fehlt eine davon oder ist sie widerrufen, steht es im Kopf der Akte und auf der Startseite unter „Nach und nach prüfen“.</span>
         </fieldset>
+      </Karte>
+      <Karte className="px-5 py-[18px] flex flex-col gap-3.5" data-testid="grenzwerte-scans">
+        <h2 className="lbl m-0">Scans und Texterkennung</h2>
+        <div className="grid grid-cols-2 gap-3">
+          {SCANS.map((h) => (
+            <Feld key={h.k} label={h.label} fehler={f[h.k]} hinweis={h.hinweis}>
+              {(p) => <Einheit einheit={h.einheit}><Eingabe {...p} className="num pr-20" value={w[h.k] ?? ""} onChange={(e) => setW({ ...w, [h.k]: e.target.value })} /></Einheit>}
+            </Feld>
+          ))}
+        </div>
+        <Feld label="Fachwörter für die Texterkennung" fehler={f.ocr_fachwoerter}
+          hinweis="Je Zeile ein Wort, z. B. Präparate, Wirkstoffe, Diagnosen. Die Erkennung liest diese Wörter dann zuverlässiger; die Namen des Laborkatalogs kennt sie schon.">
+          {(p) => <Textfeld {...p} rows={5} className="font-mono text-[0.8125rem]" value={w.ocr_fachwoerter ?? ""}
+            onChange={(e) => setW({ ...w, ocr_fachwoerter: e.target.value })} />}
+        </Feld>
+        <span className="text-[0.8125rem] gedaempft">Scans werden {w.scans_frist_tage} Tage nach dem Hochladen automatisch gelöscht, wenn sie
+          keinem Patienten zugeordnet sind; jede Person mit Zugriff auf „Scans“ kann einen Scan um {w.scans_verlaengerung_tage} Tage verlängern,
+          höchstens bis {w.scans_hoechst_tage} Tage nach dem Hochladen.</span>
       </Karte>
       </div>
       <Karte className="px-5 py-[18px] flex flex-col gap-3">

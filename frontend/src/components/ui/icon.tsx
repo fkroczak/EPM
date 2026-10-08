@@ -49,6 +49,13 @@ const PFADE: Record<string, ReactNode> = {
   zurueck: (<><path d="M15 18l-6-6 6-6" /></>),
   menue: (<><path d="M4 6h16" /><path d="M4 12h16" /><path d="M4 18h16" /></>),
   passkey: (<><circle cx="8" cy="9" r="4" /><path d="M2 21v-1a5 5 0 0 1 5-5h2" /><circle cx="17" cy="15" r="2.5" /><path d="M17 17.5V22" /><path d="M17 20h2" /></>),
+  // Scans (F160): Blatt mit Leselinie, Kopieren, Drehen
+  scan: (<><path d="M4 7V5a2 2 0 0 1 2-2h2" /><path d="M16 3h2a2 2 0 0 1 2 2v2" /><path d="M20 17v2a2 2 0 0 1-2 2h-2" /><path d="M8 21H6a2 2 0 0 1-2-2v-2" /><path d="M3 12h18" /><path d="M8 8h8" /><path d="M8 16h5" /></>),
+  kopieren: (<><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>),
+  drehen_links: (<><path d="M3 12a9 9 0 1 0 2.64-6.36" /><path d="M3 3v6h6" /></>),
+  drehen_rechts: (<><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></>),
+  rahmen: (<><path d="M3 8V5a2 2 0 0 1 2-2h3" /><path d="M16 3h3a2 2 0 0 1 2 2v3" /><path d="M21 16v3a2 2 0 0 1-2 2h-3" /><path d="M8 21H5a2 2 0 0 1-2-2v-3" /></>),
+  kamera: (<><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></>),
   buch: (<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></>),
 };
 

@@ -1,4 +1,4 @@
-# EPM – Betrieb: Datenbank, Backend (Django), Webserver (Nginx)
+# EPM – Betrieb: Datenbank, Backend (Django), Texterkennung (OCR-Dienst), Webserver (Nginx)
 # Aktivieren: in .env  COMPOSE_FILE=compose.yaml
 name: epm
 
@@ -39,11 +39,14 @@ services:
       EPM_LOESCHLISTE: /data/loeschliste/loeschliste.jsonl
       EPM_SYSTEM: /data/system
       EPM_IMPORT: /data/import
+      EPM_SCANS: /data/scans
       EPM_VERSION: ${EPM_VERSION}
       TZ: Europe/Berlin
     secrets: [db_password, django_secret_key]
     volumes:
       - ./data/dokumente:/data/dokumente
+      # Menüpunkt „Scans“: hochgeladene Scans bis zur Zuordnung (nicht in der Sicherung – sie laufen nach Tagen ab)
+      - ./data/scans:/data/scans
       - ./data/loeschliste:/data/loeschliste   # Art. 17 DSGVO: übersteht eine Wiederherstellung
       # Übernahme der Altdaten (Administration › Import): Dokumente des Altsystems unter data/import/PatData/, nur lesen
       - ./data/import:/data/import:ro
@@ -60,6 +63,46 @@ services:
     tmpfs: [/tmp]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
+
+  ocr:
+    # Texterkennung für „Scans“ (gleiches Image wie das Backend): Tesseract + PP-OCRv5 lokal, ohne Netz nach außen.
+    # Arbeitet einen Scan nach dem anderen ab (niedrige Priorität) und löscht abgelaufene Scans stündlich.
+    image: epm-backend:${EPM_VERSION}
+    command: ["ocr"]
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    user: "10001:101"
+    env_file: backend.env
+    environment:
+      DB_HOST: db
+      DB_NAME: epm
+      DB_USER: epm
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
+      EPM_DOKUMENTE: /data/dokumente
+      EPM_SCANS: /data/scans
+      EPM_OCR_THREADS: ${EPM_OCR_THREADS:-2}
+      EPM_VERSION: ${EPM_VERSION}
+      TZ: Europe/Berlin
+    secrets: [db_password, django_secret_key]
+    volumes:
+      - ./data/scans:/data/scans
+    networks: [intern]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # Obergrenze für den Speicher (in .env änderbar); die Rechenzeit begrenzen niedrige Priorität (nice) und
+    # EPM_OCR_THREADS – eine feste CPU-Grenze würde auf Servern mit weniger Kernen den Start verhindern
+    mem_limit: ${EPM_OCR_SPEICHER:-3g}
+    healthcheck:
+      # der Dienst berührt die Datei bei jedem Durchlauf (zwischen zwei Seiten höchstens wenige Minuten)
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time()-os.path.getmtime('/tmp/epm-ocr-lebt') < 900 else 1)"]
+      interval: 60s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
 
   web:
     # Nginx mit dem gebauten Frontend (frontend/Dockerfile); Konfiguration und Zertifikat vom Server

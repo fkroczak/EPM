@@ -98,6 +98,16 @@ Antrag sein Eingangsdatum, Zeitpunkt, Person – kein Name, nicht der Anlass des
 Audit-Log als „Akte Nr. N (gelöscht)“ ohne Namen, Titel und Freitexte. Die Patientennummer wird nicht neu vergeben.
 Ein Dokument, das einer anderen Akte zugeordnet wurde, gehört zu jener Akte und bleibt dort.
 
+**Menüpunkt „Scans“ (F160–F167):** Hochgeladene Scans gehören zu keiner Akte und liegen getrennt in `data/scans`.
+Die Texterkennung läuft vollständig auf dem eigenen Server (Tesseract, PP-OCRv5 als ONNX) – kein externer Dienst, keine
+Übertragung; die Modelle werden nur beim Bau des Images geladen. Nicht zugeordnete Scans werden nach der eingestellten
+Frist (Standard 7 Tage, verlängerbar bis höchstens 30 Tage ab dem Hochladen) **automatisch endgültig gelöscht**
+(Datenbank und Dateien, stündlich durch den OCR-Dienst); beim Zuordnen wird der Scan zum Dokument der Akte (mit
+erkanntem Text, `DokumentText`, der mit dem Dokument gelöscht wird) und verschwindet aus „Scans“. Das Audit-Log nennt
+vor dem Zuordnen keinen Titel. Scan-Dateien sind nicht in der Sicherung; eine wiederhergestellte Datenbankzeile ohne
+Dateien wird beim nächsten Aufräumen entfernt. Werte (Labor, BIA, Diagnosen) gelangen nur nach Bestätigung je Zeile in
+die Akte.
+
 **Sicherungen:** Eine ältere Sicherung enthält gelöschte Akten und Dokumente noch bis zu ihrem Ablauf (30 Tage). Jede
 Löschung steht in der Löschliste (`data/loeschliste/loeschliste.jsonl`: dieselben Angaben wie im Löschprotokoll, kein
 Name); nach einer Wiederherstellung löscht das Backend beim Start alles erneut, was die Sicherung zurückgebracht hat

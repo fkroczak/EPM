@@ -22,6 +22,7 @@ from stammdaten.api import (
 )
 from befunde.api import BiaMessungViewSet, LaborbefundViewSet
 from berichte.api import BerichtViewSet
+from scans.api import ScanViewSet
 
 router = DefaultRouter()
 router.register("startseite", StartseiteViewSet, basename="startseite")
@@ -52,6 +53,7 @@ router.register("benutzer", konto.BenutzerViewSet, basename="benutzer")
 router.register("protokoll", SystemEreignisViewSet, basename="protokoll")
 router.register("testdaten", TestdatenViewSet, basename="testdaten")
 router.register("sitzungen", konto.SitzungenViewSet, basename="sitzung")
+router.register("scans", ScanViewSet, basename="scan")
 
 auth = [
     path("status/", konto.StatusView.as_view()),

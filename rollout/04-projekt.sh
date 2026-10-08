@@ -19,6 +19,9 @@ chown "$EPM_APP_UID:101" "$B/data" "$B/data/dokumente"; chmod 0750 "$B/data"; ch
 # Löschliste (Art. 17 DSGVO): nur das Backend; bewusst nicht im Dokumentordner, damit eine Wiederherstellung sie nicht ersetzt
 install -d -m 0700 -o "$EPM_APP_UID" -g 101 "$B/data/loeschliste"
 chown "$EPM_APP_UID:101" "$B/data/loeschliste"; chmod 0700 "$B/data/loeschliste"
+# Scans (F160 ff.): Backend und OCR-Dienst (beide UID $EPM_APP_UID); nicht in der Sicherung – Scans laufen nach Tagen ab
+install -d -m 0750 -o "$EPM_APP_UID" -g 101 "$B/data/scans"
+chown "$EPM_APP_UID:101" "$B/data/scans"; chmod 0750 "$B/data/scans"
 # Übernahme der Altdaten (Administration › Import): Hierhin kommen die Dokumente des Altsystems (PatData/<PatientenID>/…).
 # Das Backend liest nur (Gruppe 101); setgid vererbt die Gruppe an alles, was hineinkopiert wird.
 install -d -m 2750 -o root -g 101 "$B/data/import"

@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "system",
     "altimport",
     "hilfe",
+    "scans",
 ]
 if EPM_DJANGO_ADMIN:
     INSTALLED_APPS.insert(0, "django.contrib.admin")
@@ -148,6 +149,10 @@ EPM_SYSTEM = Path(env("EPM_SYSTEM", "/data/system"))
 EPM_IMPORT = Path(env("EPM_IMPORT", "/data/import"))
 EPM_VERSION = env("EPM_VERSION", "")
 EPM_UPLOAD_MAX_MB = int(env("EPM_UPLOAD_MAX_MB", "50"))
+# Menüpunkt „Scans“ (F160 ff.): hochgeladene Scans bis zur Zuordnung bzw. bis zum Ablauf, getrennt von den
+# Dokumenten der Akten. Backend (Hochladen, Zuordnen) und OCR-Dienst (Erkennen) teilen sich das Verzeichnis.
+EPM_SCANS = Path(env("EPM_SCANS", str(EPM_DOKUMENTE.parent / "scans")))
+EPM_SCANS_MAX_SEITEN = int(env("EPM_SCANS_MAX_SEITEN", "50"))
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 FILE_UPLOAD_TEMP_DIR = env("EPM_UPLOAD_TMP", "/tmp")

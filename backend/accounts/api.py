@@ -566,7 +566,7 @@ BEREICH_SEITEN = {
     "akte_diagnosen": ("diagnosen", "diagnose", "hinweis"),
     "akte_therapie": ("therapie", "empfehlung", "bemerkung", "hinweis"),
     "akte_kontakte": ("kontakte", "hinweis", "erreichbarkeit", "termine"),
-    "system": ("verlauf", "taetigkeiten", "auftraege", "server", "epm", "hinweis", "angemeldet"),
+    "system": ("verlauf", "taetigkeiten", "auftraege", "server", "epm", "hinweis", "angemeldet", "texterkennung"),
 }
 BEREICH_BREITEN = (1, 2, 3, 4, 5)
 BEREICH_HOEHEN = (0, 1, 2, 3, 4)

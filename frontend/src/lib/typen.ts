@@ -7,7 +7,7 @@ export type Recht =
   | "datenschutz_bearbeiten" | "datenschutz_entscheiden" | "akten_loeschen"
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
   | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "testdaten_sehen" | "system_verwalten"
-  | "altdaten_importieren" | "berichte_freigeben";
+  | "altdaten_importieren" | "berichte_freigeben" | "scans_bearbeiten";
 
 /** Kacheln der Startseite (S11): klinische und – mit dem jeweiligen Recht – die der Administration (S12–S14) */
 export type KartenId =
@@ -496,9 +496,11 @@ export type Dokument = {
   mime: string;
   groesse: number;
   sha256: string;
-  herkunft: "upload" | "altsystem" | "system";
+  herkunft: "upload" | "altsystem" | "system" | "scan";
   hochgeladen_am: string;
   hochgeladen_von_name: string | null;
+  /** erkannter Text vorhanden (aus „Scans“, F163) – lesen über dokumente/{id}/text/ */
+  hat_text?: boolean;
 };
 
 export type Plan = {
@@ -712,6 +714,8 @@ export type Laborparameter = {
   reihenfolge: number;
   aktiv: boolean;
   in_befunden: number;
+  /** weitere Schreibweisen für die Werterkennung in „Scans“ (F166), durch Komma getrennt */
+  suchbegriffe?: string;
 };
 
 export type Laborwert = {
@@ -806,4 +810,74 @@ export type Hinweisruhe = {
   gesetzt_von_name: string | null;
   aufgehoben_am: string | null;
   aufgehoben_von_name: string | null;
+};
+
+// ================================================================= Scans (F160 ff.)
+/** Wort der Erkennung: Text, x, y, Breite, Höhe (Pixel der aufbereiteten Seite), Sicherheit 0–1, andere Lesart */
+export type ScanWort = [string, number, number, number, number, number, string?];
+export type ScanStueck = { q: "p" | "t" | "m" | "d"; w: ScanWort[] };
+export type ScanErgebnis = {
+  breite: number; hoehe: number; verfahren?: string[]; reihen: ScanStueck[][];
+  zeit?: Record<string, number | null> | number; bereiche?: number[][];
+};
+export type SeitenEinstellungen = {
+  ecken: "auto" | "aus" | number[][];
+  glaetten: "auto" | "ein" | "aus";
+  drehung: 0 | 90 | 180 | 270 | null;
+  schraeglage: "auto" | "aus" | number;
+  schatten: boolean;
+  modus: "graustufen" | "farbe" | "sw";
+  kontrast: number;
+  helligkeit: number;
+  textebene?: boolean;
+};
+export type ScanSeite = {
+  id: number; nr: number; status: "wartet" | "fertig" | "fehler"; fehler: string;
+  roh_breite: number; roh_hoehe: number; herkunft: "pdf" | "bild"; kamera: boolean;
+  einstellungen: Partial<SeitenEinstellungen>;
+  info: { ecken?: number[][]; ecken_quelle?: "auto" | "hand"; foto?: boolean; drehung?: number; drehung_quelle?: string;
+    schraeglage?: number; geglaettet?: boolean; textebene?: boolean; skala?: number; entrauscht?: number;
+    texthoehe?: number | null };
+  auftrag: { art: "seite" | "bereich"; box?: number[]; staerke?: number } | null;
+  breite: number; hoehe: number; ergebnis: ScanErgebnis | Record<string, never>; text: string;
+  sicherheit: number | null; unsicher: number; erkannt_am: string | null; textebene_vorhanden: boolean;
+};
+export type ScanLaborwert = {
+  parameter: number | null; parameter_name: string | null; erkannt_als: string; zuordnung: "genau" | "aehnlich" | "frei";
+  freitext_name: string; wert: string | null; wert_text: string; einheit: string; einheit_gelesen: string;
+  referenz_von: string | null; referenz_bis: string | null; markierung: string; seite: number; box: number[] | null;
+  zeile: string; sicherheit: number; hinweise: string[]; vorschlag: boolean;
+  umrechnung?: { von: string; faktor: string; wert_gelesen: string };
+};
+export type ScanBiaWert = { wert: string; einheit: string; erkannt_als: string; seite: number; box: number[] | null;
+  sicherheit: number; vorschlag: boolean; hinweise?: string[] };
+export type ScanDiagnose = { bezeichnung: string; icd_code: string; kennzeichen: "G" | "V" | "Z" | "A"; zeile: string;
+  seite: number; box: number[] | null; sicherheit: number; vorschlag: boolean };
+export type ScanAuswertung = {
+  arten?: ("labor" | "bia" | "arztbrief")[];
+  datum?: string | null; datum_quelle?: string;
+  labor?: { name: string; werte: ScanLaborwert[] };
+  bia?: { werte: Partial<Record<"gewicht_kg" | "bcm_kg" | "fettmasse_kg" | "ecw_prozent" | "koerperwasser_l" | "bmi", ScanBiaWert>>;
+    weitere: { name: string; wert: string; einheit: string; seite: number; box: number[] | null }[] };
+  diagnosen?: ScanDiagnose[];
+  abschnitte?: Partial<Record<"diagnosen" | "anamnese" | "befund" | "therapie" | "verlauf" | "procedere", string>>;
+  originale?: { name: string; mime: string }[];
+};
+export type ScanVorschlag = { id: number; nummer: number; name: string; geburtsdatum: string | null; ist_test: boolean;
+  abgeschlossen: boolean; punkte: number; grund: string };
+export type ScanZeile = {
+  id: number; titel: string; originalname: string; mime: string; groesse: number;
+  status: "wartet" | "laeuft" | "fertig" | "fehler"; fortschritt: number; schritt: string; fehler: string;
+  hochgeladen_am: string; hochgeladen_von_name: string | null; eigener: boolean; ist_test: boolean;
+  laeuft_ab_am: string; hoechst_bis: string; verlaengerbar: boolean; verlaengert_anzahl: number; seiten_anzahl: number;
+  vorschau: string | null; sicherheit: number | null; unsicher: number; arten: string[]; dokumentdatum: string | null;
+  verfahren: string[]; belegt: number; erkannt_am: string | null; dauer_s: number | null;
+};
+export type Scan = ScanZeile & { text: string; seiten: ScanSeite[]; auswertung: ScanAuswertung; vorschlaege?: ScanVorschlag[] };
+export type ScansStand = {
+  offen: number; laufend: number; fehler: number; gesamt: number; laeuft_bald_ab: number; belegt: number; grenze: number;
+  prozent: number; anzahl_grenze: number; anzahl_alle: number; frist_tage: number; hoechst_tage: number;
+  verlaengerung_tage: number; max_mb: number; max_seiten: number; upload_max_mb: number;
+  verfahren?: { tesseract: { bereit: boolean; text: string }; paddle: { bereit: boolean; glaetten: boolean; text: string } };
+  dienst?: { gestartet: string; lebenszeichen: string; laeuft: boolean; bearbeitet: number; threads: string } | null;
 };

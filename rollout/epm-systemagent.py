@@ -1504,7 +1504,7 @@ class Agent:
         daten = os.path.join(self.basis, "data")
         dok = os.path.join(daten, "dokumente")
         zeile("\nBackend und Webserver anhalten …\n")
-        self.schritt("Anhalten", self.compose("stop", "backend", "web"), zeile, cwd=self.basis, zeitlimit=300)
+        self.schritt("Anhalten", self.compose("stop", "backend", "ocr", "web"), zeile, cwd=self.basis, zeitlimit=300)
         db_getauscht = dok_getauscht = False
         try:
             if self.psql("DROP DATABASE IF EXISTS epm_wiederherstellung", zeile) != 0 or \
@@ -1535,12 +1535,12 @@ class Agent:
             os.chmod(dok, modus)
             zeile("Dokumente getauscht.\n")
             vermerken("umgestellt")
-            self.schritt("Starten", self.compose("up", "-d", "backend", "web"), zeile, cwd=self.basis, zeitlimit=600)
+            self.schritt("Starten", self.compose("up", "-d", "backend", "ocr", "web"), zeile, cwd=self.basis, zeitlimit=600)
             if not self.backend_gesund(zeile):
                 raise RuntimeError("Das Backend startet mit der wiederhergestellten Sicherung nicht.")
         except Exception as e:  # noqa: BLE001 – zurücktauschen, dann melden
             zeile(f"\nFEHLER: {e}\nVorigen Stand zurückstellen …\n")
-            self.schritt("Anhalten", self.compose("stop", "backend", "web"), zeile, cwd=self.basis, zeitlimit=300)
+            self.schritt("Anhalten", self.compose("stop", "backend", "ocr", "web"), zeile, cwd=self.basis, zeitlimit=300)
             if db_getauscht:
                 self.umbenennen("epm", "epm_fehlgeschlagen", zeile)
                 self.umbenennen(alt_db, "epm", zeile)
@@ -1552,7 +1552,7 @@ class Agent:
             if os.path.isdir(alt_dok) and not os.path.isdir(dok):
                 os.rename(alt_dok, dok)
             vermerken("fehler", f"Wiederherstellen fehlgeschlagen ({e}) – der vorige Stand läuft weiter.")
-            self.schritt("Starten", self.compose("up", "-d", "backend", "web"), zeile, cwd=self.basis, zeitlimit=600)
+            self.schritt("Starten", self.compose("up", "-d", "backend", "ocr", "web"), zeile, cwd=self.basis, zeitlimit=600)
             self.backend_gesund(zeile)
             return 1, f"Wiederherstellen fehlgeschlagen ({e}) – der vorige Stand läuft weiter."
         # Erfolg: den beiseitegelegten Stand entfernen (er steckt in der Sicherung, die vorher erstellt wurde)

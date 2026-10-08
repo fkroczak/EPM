@@ -24,21 +24,22 @@ function ParameterDialog({ eintrag, gruppe, onZu }: {
   const qc = useQueryClient();
   const melden = useHinweis();
   const vorhanden = eintrag && eintrag !== "neu" ? eintrag : null;
-  const [f, setF] = useState({ name: "", kurzname: "", einheit: "", referenz_von: "", referenz_bis: "", gruppe });
+  const [f, setF] = useState({ name: "", kurzname: "", einheit: "", referenz_von: "", referenz_bis: "", gruppe, suchbegriffe: "" });
   const [gesetzt, setGesetzt] = useState<unknown>(undefined);
   if (eintrag && gesetzt !== eintrag) {
     setGesetzt(eintrag);
     setF(vorhanden
       ? { name: vorhanden.name, kurzname: vorhanden.kurzname, einheit: vorhanden.einheit,
           referenz_von: vorhanden.referenz_von != null ? zahl(vorhanden.referenz_von) : "",
-          referenz_bis: vorhanden.referenz_bis != null ? zahl(vorhanden.referenz_bis) : "", gruppe: vorhanden.gruppe }
-      : { name: "", kurzname: "", einheit: "", referenz_von: "", referenz_bis: "", gruppe });
+          referenz_bis: vorhanden.referenz_bis != null ? zahl(vorhanden.referenz_bis) : "", gruppe: vorhanden.gruppe,
+          suchbegriffe: vorhanden.suchbegriffe ?? "" }
+      : { name: "", kurzname: "", einheit: "", referenz_von: "", referenz_bis: "", gruppe, suchbegriffe: "" });
   }
   const zahlOderNull = (t: string) => (t.trim() ? t.trim().replace(",", ".") : null);
   const speichern = useMutation({
     mutationFn: () => {
       const daten = { gruppe: f.gruppe, name: f.name.trim(), kurzname: f.kurzname.trim(), einheit: f.einheit.trim(),
-        referenz_von: zahlOderNull(f.referenz_von), referenz_bis: zahlOderNull(f.referenz_bis) };
+        referenz_von: zahlOderNull(f.referenz_von), referenz_bis: zahlOderNull(f.referenz_bis), suchbegriffe: f.suchbegriffe };
       return vorhanden
         ? api(`laborparameter/${vorhanden.id}/`, { method: "PATCH", body: daten })
         : api("laborparameter/", { body: daten });
@@ -73,6 +74,10 @@ function ParameterDialog({ eintrag, gruppe, onZu }: {
         <div />
         <Feld label="Referenz von" fehler={e.referenz_von}>{(p) => <Eingabe {...p} className="num" inputMode="decimal" value={f.referenz_von} onChange={setz("referenz_von")} />}</Feld>
         <Feld label="Referenz bis" fehler={e.referenz_bis}>{(p) => <Eingabe {...p} className="num" inputMode="decimal" value={f.referenz_bis} onChange={setz("referenz_bis")} />}</Feld>
+        <Feld label="Suchbegriffe für Scans" fehler={e.suchbegriffe} className="sm:col-span-2"
+          hinweis="Weitere Schreibweisen auf Laborbefunden, durch Komma getrennt (z. B. „ALAT, SGPT“) – damit „Scans“ den Wert erkennt. Übliche Schreibweisen sind schon bekannt.">
+          {(p) => <Eingabe {...p} value={f.suchbegriffe} maxLength={300} onChange={setz("suchbegriffe")} />}
+        </Feld>
       </div>
       <Meldung art="info">
         Referenzbereiche sind freiwillig. Sind sie gesetzt, markiert EPM abweichende Werte im Befund.

@@ -25,6 +25,7 @@ const DATUMSQUELLE: Record<string, string> = {
 function quelle(d: Dokument) {
   if (d.herkunft === "altsystem") return `Altsystem · Datum ${DATUMSQUELLE[d.datum_quelle] ?? d.datum_quelle}`;
   if (d.herkunft === "system") return `Im System erzeugt am ${zeitpunkt(d.hochgeladen_am)}`;
+  if (d.herkunft === "scan") return `Aus „Scans“ zugeordnet am ${zeitpunkt(d.hochgeladen_am)} (Text erkannt)`;
   return `Hochgeladen am ${zeitpunkt(d.hochgeladen_am)}`;
 }
 
@@ -167,6 +168,33 @@ function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean
   );
 }
 
+/** Erkannter Text eines Dokuments aus „Scans“ (F163): lesen und kopieren */
+function TextDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean; onOffen: (o: boolean) => void }) {
+  const melden = useHinweis();
+  const text = useQuery({
+    queryKey: ["dokument", dok.id, "text"],
+    queryFn: () => api<{ text: string; sicherheit: number | null; verfahren: string; erkannt_am: string }>(`dokumente/${dok.id}/text/`),
+    enabled: offen,
+  });
+  const kopieren = async () => {
+    try {
+      await navigator.clipboard.writeText(text.data?.text ?? "");
+      melden("Text kopiert.");
+    } catch {
+      melden("Kopieren nicht möglich – bitte den Text markieren und mit Strg C kopieren.", "fehler");
+    }
+  };
+  return (
+    <Dialog offen={offen} onOffen={onOffen} titel={`Erkannter Text: ${dok.titel}`} breite={900}
+      beschreibung={text.data ? `erkannt am ${zeitpunkt(text.data.erkannt_am)}${text.data.verfahren ? ` · ${text.data.verfahren}` : ""}${text.data.sicherheit != null ? ` · ${Math.round(text.data.sicherheit * 100)} % sicher` : ""}` : undefined}
+      fuss={<><Knopf icon="kopieren" disabled={!text.data} onClick={() => void kopieren()}>Kopieren</Knopf><Knopf onClick={() => onOffen(false)}>Schließen</Knopf></>}>
+      {text.isLoading ? <Laden /> : <pre className="m-0 font-mono text-[0.8125rem] whitespace-pre-wrap break-words max-h-[60vh] overflow-auto border border-rand rounded-lg p-3"
+        data-testid="dokument-text">{text.data?.text}</pre>}
+      <Fehleranzeige fehler={text.error} />
+    </Dialog>
+  );
+}
+
 function Details({ dok }: { dok: Dokument }) {
   const { patient, erfassen } = useAkte();
   const { darfBei } = useAuth();
@@ -179,6 +207,7 @@ function Details({ dok }: { dok: Dokument }) {
   const [am, setAm] = useState(dok.datum ? datum(dok.datum) : "");
   const [notiz, setNotiz] = useState(dok.notiz);
   const [lesen, setLesen] = useState(false);
+  const [textOffen, setTextOffen] = useState(false);
   const qc = useQueryClient();
   const melden = useHinweis();
   useEffect(() => {
@@ -248,7 +277,9 @@ function Details({ dok }: { dok: Dokument }) {
           ? <Knopf variante="pri" icon="auge" onClick={() => setLesen(true)}>Öffnen</Knopf>
           : <a className="btn pri" href={dateiUrl(dok, true)} target="_blank" rel="noopener"><Icon name="auge" />Öffnen</a>}
         <a className="btn sec" href={dateiUrl(dok, false)} download><Icon name="herunterladen" />Herunterladen</a>
+        {dok.hat_text ? <Knopf icon="scan" onClick={() => setTextOffen(true)} data-testid="dokument-text-zeigen">Erkannter Text</Knopf> : null}
       </div>
+      {dok.hat_text ? <TextDialog dok={dok} offen={textOffen} onOffen={setTextOffen} /> : null}
       {istPdf(dok) ? (
         <Dialog offen={lesen} onOffen={setLesen} titel={dok.titel} breite={1100}
           beschreibung={<>{dok.originalname} · <a href={dateiUrl(dok, false)} download>Herunterladen</a></>}>
@@ -287,11 +318,15 @@ export function Dokumente() {
   const [ausgeblendete, setAusgeblendete] = useState(false);
   const [ziehen, setZiehen] = useState(false);
   const [uploads, setUploads] = useState<Hochladen[]>([]);
+  // Suche in Titel, Notiz und – bei Dokumenten aus „Scans“ – im erkannten Text (F163)
+  const [suche, setSuche] = useState("");
+  const begriff = suche.trim();
   const eingabe = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
   const dokumente = useQuery({
-    queryKey: ["patient", patient.id, "dokumente", ausgeblendete],
-    queryFn: () => alle<Dokument>(`dokumente/${abfrage({ patient: patient.id, ausgeblendet: ausgeblendete ? undefined : "false" })}`),
+    queryKey: ["patient", patient.id, "dokumente", ausgeblendete, begriff],
+    queryFn: () => alle<Dokument>(`dokumente/${abfrage({ patient: patient.id, ausgeblendet: ausgeblendete ? undefined : "false", search: begriff.length >= 2 ? begriff : undefined })}`),
+    placeholderData: (vorher) => vorher,
   });
   const liste = dokumente.data ?? [];
   const aktiv = liste.find((d) => d.id === gewaehlt) ?? liste[0];
@@ -344,8 +379,13 @@ export function Dokumente() {
             ))}
           </ul>
         ) : null}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <span className="lbl">{liste.length} Dokumente</span>
+          <label className="relative block grow max-w-sm">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
+            <input className="inp pl-[34px]" type="search" aria-label="Dokumente durchsuchen" placeholder="Suchen in Titel, Notiz und erkanntem Text"
+              value={suche} onChange={(e) => setSuche(e.target.value)} data-testid="dokumente-suche" />
+          </label>
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input type="checkbox" checked={ausgeblendete} onChange={(e) => setAusgeblendete(e.target.checked)} /> Ausgeblendete anzeigen
           </label>
@@ -362,6 +402,7 @@ export function Dokumente() {
                         aria-current={d.id === aktiv?.id ? "true" : undefined} onClick={() => setGewaehlt(d.id)}>
                         <Icon name={d.mime.startsWith("image/") ? "bild" : "dokument"} />{d.titel}
                       </button>
+                      {d.hat_text ? <Chip className="ml-2" title="Text erkannt – durchsuchbar">Text</Chip> : null}
                     </td>
                     <td className="td"><span className="inline-flex items-center gap-2">{d.typ_name ?? "—"}{!d.typ_geprueft ? <Chip art="warn">Typ prüfen</Chip> : null}</span></td>
                     <td className="td num">{datum(d.datum)}</td>
@@ -372,7 +413,7 @@ export function Dokumente() {
               </tbody>
             </table>
           )}
-          {dokumente.data && !liste.length ? <Leer>Noch keine Dokumente.</Leer> : null}
+          {dokumente.data && !liste.length ? <Leer>{begriff.length >= 2 ? "Kein Dokument gefunden." : "Noch keine Dokumente."}</Leer> : null}
           <Fehleranzeige fehler={dokumente.error} />
         </Karte>
       </div>

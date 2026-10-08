@@ -17,6 +17,7 @@ GRUPPEN = [
     ("plaene", "Infusionspläne"),
     ("dokumente", "Dokumente"),
     ("datenschutz", "Datenschutz"),
+    ("scans", "Scans und Texterkennung"),
     ("listen", "Versorger und Ärzte"),
     ("administration", "Administration"),
 ]
@@ -535,6 +536,75 @@ werden – mit Kennwort, Code aus der Authenticator-App und Bestätigungscode. E
 löscht EPM die Akte beim Start erneut.</p>""",
     },
     # ------------------------------------------------------------------ Versorger und Ärzte
+    # ------------------------------------------------------------------ Scans und Texterkennung (F160 ff.)
+    {
+        "id": "scans", "gruppe": "scans", "titel": "Scans: hochladen, erkennen, zuordnen", "rechte": ["scans_bearbeiten"],
+        "seiten": ["/scans"],
+        "html": """
+<p>Unter <strong>Scans</strong> kommen gescannte oder fotografierte Unterlagen an, bevor sie zu einer Akte gehören –
+Arztbriefe, Laborbefunde, BIA-Ausdrucke, auch was Patienten selbst einscannen oder fotografieren.</p>
+<ol>
+<li><strong>Hochladen</strong> wählen oder Dateien irgendwo auf die Seite ziehen (PDF, JPG, PNG, TIFF, WEBP, HEIC). Mehrere
+Fotos werden auf Wunsch ein Dokument mit mehreren Seiten. Am Telefon gibt es den Knopf <strong>Foto</strong>.</li>
+<li>Die Seiten werden automatisch aufbereitet: Das Blatt wird im Foto gefunden und gerade gezogen, gewellte Seiten
+geglättet, Drehung und Schräglage ausgeglichen, Schatten und Rauschen entfernt. Danach wird der Text erkannt – im
+EPM selbst, ohne Internet und ohne fremde Dienste. Das dauert je Seite einige Sekunden bis etwa eine halbe Minute.</li>
+<li>Den erkannten Text mit <strong>Text kopieren</strong> übernehmen (Tabellen werden mit Tabulator kopiert und lassen
+sich so in eine Tabelle einfügen) – oder den Scan mit <strong>Zuordnen</strong> in eine Akte legen.</li>
+</ol>
+<p>Nicht zugeordnete Scans werden nach der eingestellten Frist (Standard 7 Tage) automatisch gelöscht. Mit
+<strong>verlängern</strong> bleibt ein Scan länger, höchstens bis zur Höchstdauer ab dem Hochladen (Standard 30 Tage).
+Die Fristen stellt ein, wer Vorlagen pflegt (<strong>Vorlagen › Grenzwerte › Scans und Texterkennung</strong>).</p>
+<p>Die Zahl neben „Scans“ in der Navigation nennt die Scans, die auf Zuordnung warten oder gerade erkannt werden.
+Gesehen und bearbeitet werden Scans von allen mit dem Recht „Scans“; Betrachter sehen sie nicht.</p>""",
+    },
+    {
+        "id": "scans_erkennung", "gruppe": "scans", "titel": "Unsichere Stellen, Seite anpassen, Bereich neu erkennen",
+        "rechte": ["scans_bearbeiten"], "seiten": [],
+        "html": """
+<p>Jede Seite wird mit <strong>zwei Verfahren</strong> gelesen (Tesseract mit dem genauesten deutschen Modell und
+PP-OCR). Lesen beide dasselbe, gilt das Wort als sicher. Weichen sie ab, gewinnt die sicherere Lesart, das Wort ist
+aber <strong>gelb unterlegt</strong> – beim Überfahren steht die andere Lesart. Gelbe Stellen bitte mit dem Bild
+vergleichen.</p>
+<ul>
+<li><strong>Anpassen</strong>: Ecken des Blatts von Hand verschieben, drehen, Glätten an/aus, Schräglage, Darstellung
+(Graustufen, Farbe, Schwarz-Weiß), Kontrast und Helligkeit. Danach wird die Seite neu aufbereitet und erkannt.</li>
+<li><strong>Bereich neu erkennen</strong>: einen schlecht lesbaren Bereich mit der Maus einrahmen; er wird vergrößert
+und neu gelesen, der übrige Text bleibt.</li>
+<li><strong>Original</strong> zeigt die Seite so, wie sie hochgeladen wurde.</li>
+<li>Mehrere Seiten lassen sich umsortieren und entfernen. Ein Stapel mit Unterlagen mehrerer Patienten lässt sich
+im Menü „⋯“ <strong>ab einer Seite abtrennen</strong>; umgekehrt lässt sich ein anderer Scan hinten anhängen.</li>
+</ul>
+<p>Handschrift wird nicht zuverlässig erkannt. Am besten lesbar sind Scans mit mindestens 300 dpi oder Fotos, auf
+denen das Blatt flach und vollständig zu sehen ist.</p>
+<p>Fachwörter, die oft falsch gelesen werden (Präparate, Wirkstoffe), lassen sich unter <strong>Vorlagen ›
+Grenzwerte › Fachwörter für die Texterkennung</strong> eintragen.</p>""",
+    },
+    {
+        "id": "scans_zuordnen", "gruppe": "scans", "titel": "Zuordnen und Werte übernehmen (Labor, BIA, Diagnosen)",
+        "rechte": ["scans_bearbeiten"], "seiten": [],
+        "html": """
+<p><strong>Zuordnen</strong> legt den Scan als Dokument in die Akte: eine durchsuchbare PDF (das aufbereitete Bild mit
+dem erkannten Text darüber). Auf Wunsch wird die hochgeladene Datei zusätzlich unverändert abgelegt. Danach ist der
+Scan aus „Scans“ verschwunden. Im Reiter <strong>Dokumente</strong> der Akte lässt sich auch im erkannten Text suchen.</p>
+<ul>
+<li><strong>Patient</strong>: Steht ein Name, eine Nummer oder ein Geburtsdatum im Dokument, schlägt EPM den Patienten
+vor. Passt das Dokument nicht zum gewählten Patienten (anderes Geburtsdatum, Name kommt nicht vor), erscheint ein
+Hinweis – bitte dann genau prüfen.</li>
+<li><strong>Laborbefund</strong>: Die erkannten Werte stehen in einer Tabelle mit Parameter, Wert, Einheit und
+Referenzbereich. Werte in anderen Einheiten werden in die Einheit des Laborkatalogs umgerechnet (z. B. g/dl → g/l).
+Ein Klick auf eine Zeile zeigt die Stelle im Bild. Unsicher gelesene oder unplausible Werte sind
+<strong>nicht vorgewählt</strong>. Abnahmedatum und Labor werden vorbelegt.</li>
+<li><strong>BIA-Messung</strong>: Gewicht, BCM, Fettmasse, ECW, Körperwasser, BMI; weitere Werte des Protokolls
+(z. B. Phasenwinkel) kommen in die Beurteilung. Das Gewicht kann zugleich in den Gewichtsverlauf.</li>
+<li><strong>Diagnosen mit ICD-Code</strong> (z. B. „K91.2 G“) aus Arztbriefen; „V.a.“ wird zu V, „Z.n.“ zu Z.</li>
+<li><strong>Texte</strong>: Abschnitte wie „Diagnosen:“, „Therapie:“, „Procedere:“ lassen sich an die Textfelder der Akte
+anhängen – mit Quelle und Datum.</li>
+</ul>
+<p>Nichts wird ohne Bestätigung übernommen. Ist etwas ungültig, entsteht gar nichts und die Fehler stehen an der
+jeweiligen Zeile. Laborparameter, die ein Labor anders schreibt, lassen sich unter <strong>Vorlagen › Labor und
+Diagnosen</strong> mit <strong>Suchbegriffen</strong> ergänzen.</p>""",
+    },
     {
         "id": "versorger", "gruppe": "listen", "titel": "Versorger und Ansprechpartner", "rechte": [],
         "seiten": ["/versorger"],

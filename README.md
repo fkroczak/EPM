@@ -11,7 +11,10 @@
 
 ## Images
 
-- `epm-backend` – Django mit Gunicorn (`backend/Dockerfile`)
+- `epm-backend` – Django mit Gunicorn (`backend/Dockerfile`); dasselbe Image läuft als OCR-Dienst (Compose-Dienst `ocr`,
+  Menüpunkt „Scans“). Die Texterkennung arbeitet nur auf dem Server: Tesseract mit dem deutschen Modell liegt im Repo,
+  die PP-OCRv5-Modelle lädt der Bau von `huggingface.co` (Proxy-Freigabe; ohne Zugang entsteht das Image trotzdem und
+  erkennt nur mit Tesseract – Administration › System zeigt es)
 - `epm-web` – Nginx mit dem gebauten Frontend (`frontend/Dockerfile`). Zum Bauen braucht der Server Zugang zu
   `registry.npmjs.org` (Proxy-Freigabe); ohne Zugang die Images mit `werkzeuge/bauen.sh` auf einem anderen Rechner bauen
   und als `epm-<VERSION>.tar` mit `rollout/05-backend.sh` einspielen.

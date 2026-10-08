@@ -124,7 +124,20 @@ def epm_info():
                                 for u in konten.filter(gesperrt_am__isnull=False).order_by("last_name", "first_name")],
             "admins": konten.filter(is_active=True, rolle=Rolle.ADMIN).count(),
         },
+        "texterkennung": texterkennung_info(),
     }
+
+
+def texterkennung_info():
+    """Scans und OCR-Dienst (F167): Verfahren im Image, Lebenszeichen des Dienstes, Warteschlange, Speicher."""
+    from scans import dienst
+    from scans.ocr.erkennung import verfahren_stand
+
+    try:
+        verfahren = verfahren_stand(laden=False)
+    except Exception as e:  # noqa: BLE001 – Systemseite soll trotzdem laden
+        verfahren = {"fehler": str(e)[:200]}
+    return {"verfahren": verfahren, "dienst": dienst.dienst_stand(), "scans": dienst.stand()}
 
 
 def angemeldete_sitzungen():

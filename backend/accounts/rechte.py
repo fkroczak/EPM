@@ -16,6 +16,9 @@ Festlegungen vom 01.10.2026:
   einstellbar; Konten ohne Login haben immer diese Rolle.
 - Festlegung 03.10.2026 (U22): Rolle „Mitarbeiter (erweitert)“ zwischen Mitarbeiter und Mediziner – Standard wie
   Mitarbeiter und zusätzlich Infusionspläne anlegen; alles je Gruppe umstellbar.
+- Festlegung 08.10.2026 (Scans, F160): Menüpunkt „Scans“ mit eigenem Recht – Standard Mitarbeiter, Mitarbeiter
+  (erweitert), Mediziner und Admin; Betrachter nicht (nicht zugeordnete Scans enthalten Patientendaten). Zuordnen
+  verlangt zusätzlich „Einträge erfassen“ für die Akte (Admins wie überall nur bei Testpatienten).
 - Festlegung 03.10.2026: „Testdaten sehen“ (Testpatienten und Testbenutzer) je Gruppe einstellbar – ohne das Recht
   erscheinen sie nirgends. Standard: alle Rollen wie bisher; Admin fest (legt nur Testpatienten an und verlöre sonst
   alles, was er schreiben darf). Testbenutzer sehen ihre Testpatienten immer.
@@ -36,6 +39,10 @@ RECHTE = [
      "bei falsch zugeordneten Dokumenten; mit Grund, im Verlauf beider Akten und im Audit-Log"),
     ("dokumente_loeschen", "Dokumente endgültig löschen",
      "nur Mediziner und Admin; mit Kennwort, Code aus der Authenticator-App und Bestätigungscode; im Audit-Log"),
+    ("scans_bearbeiten", "Scans: hochladen, erkennen, zuordnen",
+     "Menüpunkt „Scans“: Dokumente hochladen, aufbereiten, Text erkennen lassen und kopieren, Scans verlängern und "
+     "löschen; einem Patienten zuordnen und Werte übernehmen nur zusätzlich mit „Kontakte, Gewichte, Termine, "
+     "Dokumente erfassen“"),
     ("plaene_anlegen", "Infusionspläne anlegen", "Entwürfe anlegen, bearbeiten und verwerfen"),
     ("plaene_freigeben", "Infusionspläne freigeben", ""),
     ("plaene_abschliessen", "Infusionspläne nach Freigabe abschließen",
@@ -106,10 +113,10 @@ STANDARD = {
     # entscheiden, einschränken und löschen bleibt beim Mediziner
     Rolle.MITARBEITER: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
                         "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten", "plaene_abschliessen",
-                        "testdaten_sehen"},
+                        "testdaten_sehen", "scans_bearbeiten"},
     Rolle.MITARBEITER_PLUS: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
                                   "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten",
-                                  "plaene_abschliessen", "plaene_anlegen", "testdaten_sehen"},
+                                  "plaene_abschliessen", "plaene_anlegen", "testdaten_sehen", "scans_bearbeiten"},
     Rolle.MEDIZINER: _ALLE - _ADMIN_SPEZIAL,
     Rolle.ADMIN: _ALLE - {c for c, rollen in NUR_ROLLEN.items() if Rolle.ADMIN not in rollen},
 }

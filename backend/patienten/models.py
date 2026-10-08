@@ -590,6 +590,7 @@ class Dokument(AktenEintrag):
         UPLOAD = "upload", "Hochgeladen"
         ALTSYSTEM = "altsystem", "Altsystem"
         SYSTEM = "system", "Von EPM erzeugt"
+        SCAN = "scan", "Aus „Scans“ (Text erkannt)"
 
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="dokumente")
     typ = models.ForeignKey(
@@ -628,6 +629,26 @@ class Dokument(AktenEintrag):
     @property
     def pfad(self):
         return settings.EPM_DOKUMENTE / self.datei
+
+
+class DokumentText(models.Model):
+    """Erkannter Text eines Dokuments (Menüpunkt „Scans“, F163): damit die Akte das Dokument über seinen Inhalt findet.
+
+    Ohne eigenen Verlauf – der Text ergibt sich aus der Datei. Er hängt am Dokument und geht mit ihm: beim Zuordnen zu
+    einem anderen Patienten mit, beim endgültigen Löschen (Art. 17 DSGVO) mit weg."""
+
+    dokument = models.OneToOneField(Dokument, on_delete=models.CASCADE, primary_key=True, related_name="erkannter_text")
+    text = models.TextField()
+    sicherheit = models.FloatField(null=True, blank=True, help_text="0–1, nach Zeichen gewichtet")
+    verfahren = models.CharField(max_length=100, blank=True)
+    erkannt_am = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "Erkannter Text"
+        verbose_name_plural = "Erkannte Texte"
+
+    def __str__(self):
+        return f"Text von Dokument {self.dokument_id}"
 
 
 class DokumentVorgang(models.Model):
