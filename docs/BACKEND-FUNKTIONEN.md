@@ -3152,18 +3152,19 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U63 | Soll das **Freigeben eines Plans** (am Telefon wie am PC) zusätzlich mit Passkey bzw. Code bestätigt werden? Heute genügt die Anmeldung, wie bisher beschlossen | F36, F132 | unverändert: ohne zusätzliche Bestätigung |
 | U64 | ~~Gewichte zusammenfassen: Fenster ab dem ersten Eintrag oder je Kalendertag?~~ **Geklärt 09.10.2026:** Fenster ab dem ersten Eintrag, Standard 2 × 24 Stunden; im Werkzeug einstellbar | F159 | – |
 
-| U65 | Sollen auch Dokumente, die **direkt in der Akte** hochgeladen werden, und die **Dokumente aus dem Altsystem** automatisch erkannt (durchsuchbar) werden? | F163, F65 | nein – nur was über „Scans“ kommt |
-| U66 | **BIA-Geräte:** Welches Gerät bzw. welcher Ausdruck (Hersteller, Layout)? Beispielausdrucke würden die Erkennung gezielt verbessern | F166 | allgemeine Erkennung nach Beschriftung |
-| U67 | Der Bau des Images lädt die PP-OCRv5-Modelle von `huggingface.co`. Darf der Bau-Rechner (Test-VM/Proxy) das, oder sollen die Modelle (≈ 90 MB) ins Repo bzw. auf einen eigenen Spiegel? | F162 | ohne Zugang entsteht das Image trotzdem, Erkennung dann nur mit Tesseract (System zeigt es) |
-| U68 | Scan-Dateien sind **nicht in der Sicherung** (die Datenbankzeilen schon; nach einer Wiederherstellung werden Scans ohne Dateien entfernt) | F165, F61 | so umgesetzt |
-| U69 | Startseite: eigene **Kachel** „Scans“ oder Hinweis in der Hinweisliste? | F160 | Hinweis |
-| U70 | Gilt eine geänderte **Aufbewahrungsfrist** auch für bereits hochgeladene Scans? | F165 | nein – nur für neue; vorhandene behalten ihr Datum (verlängern geht bis zur neuen Höchstdauer) |
-| U71 | Laborwerte mit Text („< 0,1“, „negativ“) aus Scans übernehmen? | F166, U47 | nicht vorgeschlagen; nur Zahlen |
+| U65 | ~~Auto-OCR auch für Dokumente aus der Akte und dem Altsystem?~~ **Geklärt 09.10.2026:** automatisch nur, was über „Scans“ kommt; Dokumente in der Akte bekommen einen Knopf „Text erkennen“, der das Dokument durch die erkannte Fassung ersetzt | F163 | folgt (nächster Schritt) |
+| U66 | ~~Welches BIA-Gerät?~~ **Geklärt 09.10.2026:** unterschiedliche Geräte (Patienten deutschlandweit) – allgemeine Erkennung nach Beschriftung, gängige Bezeichnungen der Geräte (auch englisch) werden ergänzt | F166 | folgt |
+| U67 | ~~PP-OCRv5-Modelle beim Bau von huggingface.co laden?~~ **Geklärt 09.10.2026:** die Modelle kommen mit dem Update (im Repo), der Bau braucht keinen Zugang zu huggingface.co | F162 | folgt |
+| U68 | ~~Scan-Dateien nicht in der Sicherung~~ **Bestätigt 09.10.2026:** richtig so; Scans lassen sich jederzeit selbst sofort löschen | F165, F61 | – |
+| U69 | ~~Startseite: Kachel oder Hinweis?~~ **Bestätigt 09.10.2026:** Hinweis | F160 | – |
+| U70 | ~~Geänderte Frist auch für vorhandene Scans?~~ **Bestätigt 09.10.2026:** nur für neue Scans | F165 | – |
+| U71 | ~~Textwerte („< 0,1“, „negativ“) aus Scans übernehmen?~~ **Bestätigt 09.10.2026:** nein, nur Zahlen | F166, U47 | – |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 09.10.2026 | Scans: Rückmeldungen | U65–U71 geklärt bzw. bestätigt; OCR-Knopf für Akten-Dokumente, BIA-Bezeichnungen und Modelle im Update folgen |
 | 09.10.2026 | Scans und Texterkennung | Neuer Menüpunkt „Scans“: Hochladen, Seite anpassen, Erkennung ohne externen Dienst (Tesseract best + PP-OCRv5, OCR-Dienst), Text kopieren, Zuordnen mit Übernahme von Labor/BIA/Diagnosen, Aufbewahrung 7/7/30 Tage mit Bereinigung (F160–F167). Lauf steht aus |
 | 09.10.2026 | Design eigener Menüpunkt | Design (/design) und Mein Konto (/konto) getrennt, beide im Benutzermenü (F158). Lauf steht aus |
 | 08.10.2026 | Rest der Vorschläge | Stift an „Versorgung“, Messpunkt bearbeiten, „Neues Dokument“ (F157). Damit ist „EPM intuitiver – Vorschläge“ vollständig umgesetzt. Lauf steht aus |
