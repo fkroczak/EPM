@@ -80,7 +80,7 @@ test("Versorger anlegen, Ansprechpartner pflegen, deaktivieren mit Neuzuordnung"
   await expect(page.getByRole("dialog")).toContainText(firma);
   await page.getByRole("dialog").getByTestId("bestaetigen").click();
   await expect(page.getByText("Versorger deaktiviert.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Inaktiv" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("group", { name: "Filter" }).getByRole("button", { name: /^Inaktiv/ })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("versorgerliste")).toContainText(firma);
   await page.goto("/patienten/neu");
   await expect(page.getByLabel("Versorger", { exact: true }).locator("option", { hasText: firma })).toHaveCount(0);

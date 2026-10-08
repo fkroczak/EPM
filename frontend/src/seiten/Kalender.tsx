@@ -445,7 +445,8 @@ export function Kalender() {
   }, { replace: true });
   const [filter, setFilter] = useState<Filter[]>(FILTER.map((f) => f.wert));
   const [erledigte, setErledigte] = useState(true);
-  const [gewaehlt, setGewaehlt] = useState(heuteIso());
+  // gewählter Tag: aus ?datum= (Link auf einen Tag, Telefon-Wochenband), sonst heute
+  const [gewaehlt, setGewaehlt] = useState(() => (/^\d{4}-\d{2}-\d{2}$/.test(params.get("datum") ?? "") ? params.get("datum")! : heuteIso()));
   const [reiter, setReiter] = useState<Reiter>("tag");
   const [eintrag, setEintrag] = useState<Eintrag | null>(null);
   const [neu, setNeu] = useState<{ datum: string; patient?: number; name?: string } | null>(null);

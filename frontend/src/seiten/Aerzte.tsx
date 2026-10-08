@@ -114,6 +114,7 @@ export function Aerzte() {
       melden(a.aktiv ? "Arzt wieder aktiv." : "Arzt deaktiviert.");
       setFrage(false);
       setFilter(a.aktiv ? "aktiv" : "inaktiv");
+      waehlen(a.id); // der eben geänderte Eintrag bleibt gewählt
     },
   });
   const fehler: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};

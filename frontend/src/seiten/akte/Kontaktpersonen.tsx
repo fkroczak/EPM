@@ -75,7 +75,6 @@ function ArztZuordnungDialog({ zuordnung, offen, onOffen }: { zuordnung: Patient
   useEffect(() => { if (!offen) setFrage(false); }, [offen]);
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
-    <>
     <Dialog offen={offen} onOffen={onOffen} breite={560}
       titel={zuordnung ? zuordnung.arzt_daten.name : "Arzt zuordnen"}
       beschreibung={zuordnung ? "Kontaktdaten ändern Sie in der Ärzteliste – sie gelten dann für alle Patienten."
@@ -119,12 +118,12 @@ function ArztZuordnungDialog({ zuordnung, offen, onOffen }: { zuordnung: Patient
         {aktivSetzen.error ? <Meldung art="fehler" className="col-span-2">{aktivSetzen.error.message}</Meldung> : null}
         <button type="submit" hidden />
       </form>
+      {/* verschachtelt im Dialog (Base UI: Dialog im Dialog), außerhalb des Formulars */}
+      {!zuordnung ? <NeuerArztDialog offen={neuerArzt} onOffen={setNeuerArzt} onAngelegt={(a) => setArzt(String(a.id))} /> : null}
+      <Bestaetigen offen={frage} onOffen={setFrage} titel="Arzt deaktivieren" knopf="Deaktivieren"
+        text={<>{zuordnung?.arzt_daten.name} ist für diesen Patienten nicht mehr zuständig. Die Zuordnung bleibt sichtbar und lässt sich wieder aktivieren.</>}
+        laedt={aktivSetzen.isPending} fehler={aktivSetzen.error} onJa={() => aktivSetzen.mutate(false)} />
     </Dialog>
-    {!zuordnung ? <NeuerArztDialog offen={neuerArzt} onOffen={setNeuerArzt} onAngelegt={(a) => setArzt(String(a.id))} /> : null}
-    <Bestaetigen offen={frage} onOffen={setFrage} titel="Arzt deaktivieren" knopf="Deaktivieren"
-      text={<>{zuordnung?.arzt_daten.name} ist für diesen Patienten nicht mehr zuständig. Die Zuordnung bleibt sichtbar und lässt sich wieder aktivieren.</>}
-      laedt={aktivSetzen.isPending} fehler={aktivSetzen.error} onJa={() => aktivSetzen.mutate(false)} />
-    </>
   );
 }
 
@@ -223,7 +222,6 @@ function BezugspersonDialog({ person, offen, onOffen }: { person: Bezugsperson |
     </Feld>
   );
   return (
-    <>
     <Dialog offen={offen} onOffen={onOffen} breite={600} titel={person ? person.name : "Neue Bezugsperson"}
       beschreibung="Jede Änderung steht mit Person und Zeitpunkt im Verlauf der Akte."
       fuss={<>
@@ -262,11 +260,10 @@ function BezugspersonDialog({ person, offen, onOffen }: { person: Bezugsperson |
         {aktivSetzen.error ? <Meldung art="fehler" className="col-span-2">{aktivSetzen.error.message}</Meldung> : null}
         <button type="submit" hidden />
       </form>
+      <Bestaetigen offen={frage} onOffen={setFrage} titel="Bezugsperson deaktivieren" knopf="Deaktivieren"
+        text={<>{person?.name} wird nicht mehr als aktuelle Bezugsperson geführt (auch nicht unter „Auskunft an“). Der Eintrag bleibt erhalten und lässt sich wieder aktivieren.</>}
+        laedt={aktivSetzen.isPending} fehler={aktivSetzen.error} onJa={() => aktivSetzen.mutate(false)} />
     </Dialog>
-    <Bestaetigen offen={frage} onOffen={setFrage} titel="Bezugsperson deaktivieren" knopf="Deaktivieren"
-      text={<>{person?.name} wird nicht mehr als aktuelle Bezugsperson geführt (auch nicht unter „Auskunft an“). Der Eintrag bleibt erhalten und lässt sich wieder aktivieren.</>}
-      laedt={aktivSetzen.isPending} fehler={aktivSetzen.error} onJa={() => aktivSetzen.mutate(false)} />
-    </>
   );
 }
 

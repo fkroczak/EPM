@@ -259,6 +259,7 @@ export function Versorger() {
       melden(v.aktiv ? "Versorger wieder aktiv." : "Versorger deaktiviert.");
       setFrage(false);
       setFilter(v.aktiv ? "aktiv" : "inaktiv");
+      waehlen(v.id); // der eben geänderte Eintrag bleibt gewählt
     },
   });
   const fehler: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};

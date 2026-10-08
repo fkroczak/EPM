@@ -222,7 +222,7 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
 
   // zweiter Kontakt und Suche
   await erfassen("Versorger: Lieferung bestätigt.");
-  await expect(page.getByText("Kontakt gespeichert.")).toBeVisible();
+  await expect(page.getByText(/^Kontakt für .* gespeichert\.$/)).toBeVisible();
   await expect(liste.getByRole("listitem")).toHaveCount(2);
   await page.getByLabel("In Kontakten suchen").fill("Appetit");
   await expect(liste.getByRole("listitem")).toHaveCount(1);
@@ -480,6 +480,7 @@ test("Tastenkürzel in der Akte: K, G, T, P, Alt+Ziffer, Strg Enter, ? (08.10.20
   await page.getByRole("dialog").getByLabel("Titel").fill("kgtp");
   await expect(page.getByRole("dialog")).toHaveCount(1);
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   // Alt+Ziffer wechselt den Reiter (Reihenfolge der Reiter), Tooltip nennt das Kürzel
   const kontakte = page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: /^Kontakte/ });
   const titel = await kontakte.getAttribute("title");
@@ -492,6 +493,7 @@ test("Tastenkürzel in der Akte: K, G, T, P, Alt+Ziffer, Strg Enter, ? (08.10.20
   await page.keyboard.press("?");
   await expect(page.getByTestId("tastenkuerzel")).toContainText("Strg Enter");
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   // P öffnet einen neuen Plan (nur mit Recht; der Mitarbeiter hat es nicht – nichts passiert)
   await page.keyboard.press("p");
   await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}$`));
