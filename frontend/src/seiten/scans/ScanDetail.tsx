@@ -18,7 +18,7 @@ import { ARTEN, STATUS, UNSICHER, bildUrl, bisDatum, hatErgebnis, inZwischenabla
 import { Seitenansicht } from "./Seitenansicht";
 import { SeiteBearbeiten } from "./SeiteBearbeiten";
 import { Zuordnen } from "./Zuordnen";
-import type { Stelle } from "./Zuordnen";
+import type { Stelle, Ziel } from "./Zuordnen";
 
 function Fortschritt({ scan }: { scan: Scan }) {
   return (
@@ -94,6 +94,8 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
   const [ansicht, setAnsicht] = useState<"seite" | "alle">("alle");
   const [zuordnen, setZuordnen] = useState(false);
   const [stelle, setStelle] = useState<Stelle>(null);
+  // Zuordnen: gewähltes Feld, in das ein Klick auf ein Wort im Bild den Wert schreibt
+  const [ziel, setZiel] = useState<Ziel>(null);
   const [unsicher, setUnsicher] = useState(true);
   const [original, setOriginal] = useState(false);
   const [bereichModus, setBereichModus] = useState(false);
@@ -106,7 +108,7 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
   const [zusammenMit, setZusammenMit] = useState("");
 
   // beim Wechsel des Scans von vorn
-  useEffect(() => { setSeiteIndex(0); setZuordnen(false); setStelle(null); setBereichModus(false); setOriginal(false); }, [id]);
+  useEffect(() => { setSeiteIndex(0); setZuordnen(false); setStelle(null); setZiel(null); setBereichModus(false); setOriginal(false); }, [id]);
   // eine markierte Stelle auf einer anderen Seite: dorthin blättern
   useEffect(() => {
     if (stelle && s && s.seiten[seiteIndex]?.nr !== stelle.seite + 1) {
@@ -183,6 +185,11 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
         <button type="button" className="btn sec klein md:hidden" onClick={onListe}><Icon name="zurueck" groesse={14} />Liste</button>
         <h2 className="m-0 text-lg font-semibold min-w-0 break-words" data-testid="scan-titel">{s.titel}</h2>
         <Chip art={s.status === "fertig" ? "ok" : s.status === "fehler" ? "fehler" : "warn"} data-testid="scan-status">{STATUS[s.status]}</Chip>
+        {s.quelle ? (
+          <Chip title="Arbeitskopie eines Dokuments der Akte – beim Übernehmen entsteht kein neues Dokument" data-testid="scan-quelle">
+            aus der Akte: {s.quelle.patient.nachname}, {s.quelle.patient.vorname}
+          </Chip>
+        ) : null}
         {fertig && s.sicherheit != null ? (
           <Chip art={s.unsicher ? "warn" : "neutral"} title="Sicherheit der Erkennung, nach Zeichen gewichtet">
             {prozent(s.sicherheit)} sicher{s.unsicher ? ` · ${zahl(s.unsicher)} unsichere Wörter` : ""}
@@ -192,7 +199,7 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
         {s.ist_test ? <Chip art="warn">Test</Chip> : null}
         <div className="ml-auto flex items-center gap-2">
           {fertig && !zuordnen && darf("eintraege_erfassen") ? (
-            <Knopf variante="pri" icon="patienten" onClick={() => setZuordnen(true)} data-testid="scan-zuordnen">Zuordnen</Knopf>
+            <Knopf variante="pri" icon="patienten" onClick={() => setZuordnen(true)} data-testid="scan-zuordnen">{s.quelle ? "Werte übernehmen" : "Zuordnen"}</Knopf>
           ) : null}
           {fertig ? <Knopf icon="kopieren" onClick={() => void kopieren(s.text)} data-testid="scan-kopieren">Text kopieren</Knopf> : null}
           <Menue label="Weitere Aktionen" eintraege={menue} />
@@ -219,8 +226,9 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
 
       {seite ? (
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-5 px-4 sm:px-5 py-4">
-          {/* Seite */}
-          <div className="flex flex-col gap-2.5 min-w-0">
+          {/* Seite – beim Zuordnen bleibt sie stehen, während rechts die Felder gescrollt werden */}
+          <div className={cx("flex flex-col gap-2.5 min-w-0", zuordnen && "xl:sticky xl:top-2 xl:self-start xl:max-h-[calc(100dvh-1rem)] xl:overflow-y-auto")}
+            data-testid="scan-seite-spalte">
             <div className="flex items-center gap-2 flex-wrap">
               {s.seiten.length > 1 ? (
                 <span className="flex items-center gap-1">
@@ -242,8 +250,16 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
               </label>
             </div>
             {bereichModus ? <Meldung art="info">Rahmen um den Bereich aufziehen, der neu erkannt werden soll.</Meldung> : null}
-            <Seitenansicht scanId={s.id} seite={seite} unsicher={unsicher} original={original} bereichModus={bereichModus}
+            {zuordnen && ziel && !bereichModus && !original ? (
+              <div className="meldung info flex items-center gap-2" role="status" data-testid="wort-waehlen">
+                <Icon name="info" groesse={16} />
+                <span className="grow">Für <strong className="font-semibold">{ziel.name}</strong> eine Zahl oder ein Wort im Bild anklicken.</span>
+                <Knopf klein variante="geist" onClick={() => setZiel(null)}>Fertig</Knopf>
+              </div>
+            ) : null}
+            <Seitenansicht scanId={s.id} seite={seite} unsicher={unsicher && !(zuordnen && ziel)} original={original} bereichModus={bereichModus}
               markiert={stelle && stelle.seite + 1 === seite.nr ? stelle.box : null}
+              onWort={zuordnen && ziel ? (w, box) => { const st = { seite: seite.nr - 1, box }; ziel.setzen(w[0], st); setStelle(st); } : undefined}
               onBereich={(b) => { setBereich(b); setStaerke(0); setBereichModus(false); }} />
             {s.seiten.length > 1 ? (
               <div className="flex gap-2 overflow-x-auto pb-1" role="list" aria-label="Seiten" data-testid="scan-seiten">
@@ -279,13 +295,20 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
                   seite.info.entrauscht ? "Rauschen entfernt" : ""].filter(Boolean).join(" · ")}
               </span>
             ) : null}
+            {seite.info.sparstufe ? (
+              <span className="text-xs text-warn" data-testid="seite-sparsam">
+                {seite.info.sparstufe >= 2 ? "Nur mit Tesseract erkannt" : "Sparsam erkannt (ohne Glätten, kleinere Zeilensuche)"}
+                {" "}– der Erkennungsdienst wurde vorher bei dieser Seite beendet (Speichergrenze). „Anpassen“ erkennt sie erneut.
+              </span>
+            ) : null}
           </div>
 
           {/* Text oder Zuordnen */}
           <div className="flex flex-col gap-3 min-w-0">
             {zuordnen && fertig ? (
-              <Zuordnen key={s.id} scan={s} onStelle={setStelle} onAbbrechen={() => { setZuordnen(false); setStelle(null); }}
-                onFertig={(patientId, dokumentId) => { setZuordnen(false); onZugeordnet(patientId, dokumentId, s.titel); }} />
+              <Zuordnen key={s.id} scan={s} onStelle={setStelle} ziel={ziel} onZiel={setZiel}
+                onAbbrechen={() => { setZuordnen(false); setStelle(null); setZiel(null); }}
+                onFertig={(patientId, dokumentId) => { setZuordnen(false); setZiel(null); onZugeordnet(patientId, dokumentId, s.titel); }} />
             ) : (
               <>
                 <div className="flex items-center gap-2 flex-wrap">

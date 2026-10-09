@@ -3,6 +3,7 @@
  * Foto eines Laborbefunds hochladen → Blatt wird gefunden, entzerrt, erkannt → Text kopieren → einem Testpatienten
  * zuordnen und die Laborwerte übernehmen → Dokument mit Text in der Akte, Befund mit Werten.
  */
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { apiAls, eindeutig, zustand } from "./hilfen";
 
@@ -74,6 +75,52 @@ test("Foto eines Laborbefunds: erkennen, Text kopieren, zuordnen mit Laborwerten
   await expect(page.getByTestId("dokument-text")).toContainText("Kalium");
 });
 
+test("Werte von Hand übertragen: BIA nicht erkannt – Feld wählen, Wert im Bild anklicken; Laborwert ergänzen", async ({ page }) => {
+  test.setTimeout(240_000);
+  const api = await apiAls("mitarbeiter");
+  const nachname = eindeutig("Handwert");
+  // anderes Geburtsdatum als im Dokument: kein automatischer Vorschlag, der Patient wird gesucht
+  const p = await api.post("patienten/", { nachname, vorname: "Hanna", geburtsdatum: "1970-05-20", geschlecht: "w", ist_test: true });
+
+  await page.goto("/scans");
+  await page.getByTestId("scan-datei").setInputFiles(FOTO);
+  const detail = page.getByTestId("scan-detail");
+  await expect(detail.getByTestId("scan-status")).toHaveText("erkannt", { timeout: 180_000 });
+  await detail.getByTestId("scan-zuordnen").click();
+  const zuordnen = page.getByTestId("zuordnen");
+  if (await zuordnen.getByTestId("zuordnen-patient").isVisible()) await zuordnen.getByRole("button", { name: "ändern" }).click();
+  await zuordnen.getByPlaceholder(/Name, Nr\. oder Geburtsdatum/).fill(nachname);
+  await zuordnen.getByRole("option", { name: new RegExp(nachname) }).click();
+  await expect(zuordnen.getByTestId("zuordnen-patient")).toContainText(nachname);
+
+  // BIA wurde nicht erkannt: einschalten, Feld wählen, Zahl im Bild anklicken
+  const bia = zuordnen.getByTestId("zuordnen-bia");
+  await bia.getByRole("checkbox").first().check();
+  const gewicht = bia.getByRole("textbox", { name: "Gewicht (kg)" });
+  await gewicht.click();
+  await expect(page.getByTestId("wort-waehlen")).toContainText("Gewicht");
+  await page.locator('[data-testid="waehlbares-wort"][data-wort="62"]').first().click();
+  await expect(gewicht).toHaveValue("62");
+
+  // Laborwert ergänzen: + Wert, Parameter wählen, Wert im Bild anklicken
+  await zuordnen.getByTestId("labor-wert-neu").click();
+  const neu = zuordnen.getByTestId("laborzeile").last();
+  await neu.getByLabel("Parameter").selectOption({ label: "Phosphat" });
+  await neu.getByLabel("Wert", { exact: true }).click();
+  await page.locator('[data-testid="waehlbares-wort"][data-wort="1,12"]').first().click();
+  await expect(neu.getByLabel("Wert", { exact: true })).toHaveValue("1,12");
+  await expect(zuordnen.getByTestId("zuordnen-speichern")).toContainText("+ BIA");
+  await zuordnen.getByTestId("zuordnen-speichern").click();
+  await expect(page.getByTestId("zuletzt-zugeordnet")).toBeVisible();
+
+  const messungen = await api.get(`bia-messungen/?patient=${p.id}`);
+  expect(Number((messungen.results ?? messungen)[0].gewicht_kg)).toBe(62);
+  const befunde = await api.get(`laborbefunde/?patient=${p.id}`);
+  const phosphat = (befunde[0].werte as { bezeichnung: string; wert: string }[]).find((w) => w.bezeichnung === "Phosphat");
+  expect(Number(phosphat?.wert)).toBe(1.12);
+  await api.ende();
+});
+
 test("Scan verlängern, Seite anpassen und löschen; Einstellungen unter Vorlagen", async ({ page }) => {
   test.setTimeout(240_000);
   await page.goto("/scans");
@@ -116,4 +163,51 @@ test("Betrachter sehen „Scans“ nicht", async ({ browser }) => {
   await seite.goto("/scans");
   await expect(seite).toHaveURL(/\/$/);
   await ctx.close();
+});
+
+test("Akte: „Text erkennen“ (OCRmyPDF) und „Werte übernehmen“ an einem Dokument", async ({ page }) => {
+  test.setTimeout(300_000);
+  const api = await apiAls("mitarbeiter");
+  const nachname = eindeutig("Aktetext");
+  const p = await api.post("patienten/", { nachname, vorname: "Erika", geburtsdatum: "1961-03-14", geschlecht: "w", ist_test: true });
+  const hoch = await api.roh.post("/api/dokumente/", {
+    headers: await api.kopf(),
+    multipart: { patient: String(p.id), titel: "Laborbefund (Foto)",
+      datei: { name: "befund-foto.jpg", mimeType: "image/jpeg", buffer: readFileSync(FOTO) } },
+  });
+  expect(hoch.status()).toBe(201);
+  const dok = await hoch.json();
+
+  await page.goto(`/patienten/${p.id}/dokumente`);
+  await page.getByTestId("dokumentliste").getByText("Laborbefund (Foto)").click();
+  const details = page.getByTestId("dokument-details");
+  // Text erkennen: Datei wird durch dieselbe PDF/A mit Textebene ersetzt
+  await details.getByTestId("dokument-text-erkennen").click();
+  await page.getByRole("dialog").getByRole("button", { name: "Erkennen und ersetzen" }).click();
+  await expect(page.getByText("Text erkannt – das Dokument ist jetzt durchsuchbar.")).toBeVisible({ timeout: 240_000 });
+  const neu = await api.get(`dokumente/${dok.id}/`);
+  expect(neu.mime).toBe("application/pdf");
+  expect(neu.sha256).not.toBe(dok.sha256);
+  expect(neu.hat_text).toBeTruthy();
+  await page.getByTestId("dokumente-suche").fill("Kalium");
+  await expect(page.getByTestId("dokumentliste")).toContainText("Laborbefund (Foto)");
+
+  // Werte übernehmen: Prüfansicht in „Scans“, kein neues Dokument
+  await page.getByTestId("dokumentliste").getByText("Laborbefund (Foto)").click();
+  await details.getByTestId("dokument-werte-uebernehmen").click();
+  await expect(page).toHaveURL(/\/scans\?id=\d+/);
+  const detail = page.getByTestId("scan-detail");
+  await expect(detail.getByTestId("scan-status")).toHaveText("erkannt", { timeout: 180_000 });
+  await expect(detail.getByTestId("scan-quelle")).toContainText(nachname);
+  await detail.getByTestId("scan-zuordnen").click();
+  const zuordnen = page.getByTestId("zuordnen");
+  await expect(zuordnen.getByTestId("zuordnen-quelle")).toBeVisible();
+  await expect(zuordnen.getByTestId("zuordnen-speichern")).toContainText("Übernehmen");
+  await zuordnen.getByTestId("zuordnen-speichern").click();
+  await expect(page.getByText(/verknüpft mit „Laborbefund \(Foto\)“/)).toBeVisible();
+  const befunde = await api.get(`laborbefunde/?patient=${p.id}`);
+  expect(befunde[0].dokument).toBe(dok.id);
+  const dokumente = await api.get(`dokumente/?patient=${p.id}`);
+  expect(dokumente.results).toHaveLength(1);
+  await api.ende();
 });

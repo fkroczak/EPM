@@ -1,6 +1,6 @@
 /** Entwurf 9 · Dokumente: Hochladen (Typ am Inhalt geprüft), Vorschau, Metadaten, Altdokumente prüfen, ausblenden. */
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, alle, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
@@ -16,6 +16,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { Dialog } from "@/components/ui/dialog";
 import { PdfLeser, PdfVorschau } from "@/components/PdfAnsicht";
+import { Bestaetigen } from "@/components/Bestaetigen";
 import { name, useAkte } from "./Akte";
 
 const DATUMSQUELLE: Record<string, string> = {
@@ -195,6 +196,87 @@ function TextDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean; on
   );
 }
 
+const TEXT_TYPEN = ["application/pdf", "image/jpeg", "image/png", "image/tiff"];
+
+/**
+ * „Text erkennen“ (F170): Der OCR-Dienst legt mit OCRmyPDF eine unsichtbare Textebene über die Seiten und ersetzt die
+ * Datei durch diese PDF/A – das Aussehen bleibt. „Werte übernehmen“ (F171): Arbeitskopie in „Scans“ mit Prüfansicht.
+ */
+function Texterkennung({ dok }: { dok: Dokument }) {
+  const { patient, erfassen } = useAkte();
+  const { darf } = useAuth();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const [frage, setFrage] = useState(false);
+  const laeuft = (e?: Dokument["erkennung"]) => !!e && (e.status === "wartet" || e.status === "laeuft");
+  const stand = useQuery({
+    queryKey: ["dokument", dok.id, "erkennung"],
+    queryFn: () => api<Dokument>(`dokumente/${dok.id}/`),
+    enabled: laeuft(dok.erkennung),
+    refetchInterval: (q) => (laeuft(q.state.data?.erkennung ?? dok.erkennung) ? 2500 : false),
+  });
+  const e = stand.data?.erkennung ?? dok.erkennung ?? null;
+  const vorher = useRef(e?.status);
+  useEffect(() => {
+    if (laeuft({ status: vorher.current } as Dokument["erkennung"]) && e && !laeuft(e)) {
+      void qc.invalidateQueries({ queryKey: ["patient", patient.id] });
+      melden(e.status === "fertig" ? "Text erkannt – das Dokument ist jetzt durchsuchbar." : `Text nicht erkannt: ${e.fehler}`,
+        e.status === "fertig" ? "ok" : "fehler");
+    }
+    vorher.current = e?.status;
+  }, [e?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  const anfordern = useMutation({
+    mutationFn: () => api<Dokument>(`dokumente/${dok.id}/text-erkennen/`, { method: "POST" }),
+    onSuccess: (d) => {
+      setFrage(false);
+      qc.setQueryData(["dokument", dok.id, "erkennung"], d);
+      void qc.invalidateQueries({ queryKey: ["patient", patient.id] });
+    },
+  });
+  const werte = useMutation({
+    mutationFn: () => api<{ scan: number }>(`dokumente/${dok.id}/werte-uebernehmen/`, { method: "POST" }),
+    onSuccess: (r) => navigate(`/scans?id=${r.scan}`),
+  });
+  const textMoeglich = erfassen && !patient.ist_abgeschlossen && !!dok.text_erkennbar?.moeglich;
+  const werteMoeglich = erfassen && !patient.ist_abgeschlossen && darf("scans_bearbeiten")
+    && dok.herkunft !== "system" && TEXT_TYPEN.includes(dok.mime);
+  if (!textMoeglich && !werteMoeglich && !e) return null;
+  return (
+    <div className="flex flex-col gap-2" data-testid="dokument-texterkennung">
+      {laeuft(e) ? (
+        <Meldung art="info"><span className="flex items-center gap-2" data-testid="dokument-erkennung-laeuft">
+          <span className="ladekreis" aria-hidden />
+          {e!.status === "wartet" ? "Text erkennen: wartet auf den Erkennungsdienst …" : `Text wird erkannt … ${e!.schritt}`}
+        </span></Meldung>
+      ) : e?.status === "fehler" ? (
+        <Meldung art="fehler">Text nicht erkannt: {e.fehler}</Meldung>
+      ) : null}
+      {anfordern.error ? <Meldung art="fehler">{anfordern.error.message}</Meldung> : null}
+      {werte.error ? <Meldung art="fehler">{werte.error.message}</Meldung> : null}
+      <div className="flex gap-2 flex-wrap">
+        {textMoeglich && !laeuft(e) ? (
+          <Knopf icon="scan" onClick={() => setFrage(true)} data-testid="dokument-text-erkennen">
+            {dok.hat_text ? "Text neu erkennen" : "Text erkennen"}
+          </Knopf>
+        ) : null}
+        {werteMoeglich ? (
+          <Knopf icon="pfeilRechts" laedt={werte.isPending} onClick={() => werte.mutate()} data-testid="dokument-werte-uebernehmen"
+            title="Laborwerte, BIA oder Diagnosen aus diesem Dokument in die Akte übernehmen (Prüfansicht in „Scans“)">
+            Werte übernehmen
+          </Knopf>
+        ) : null}
+      </div>
+      <Bestaetigen offen={frage} onOffen={setFrage} titel={dok.hat_text ? "Text neu erkennen" : "Text erkennen"} knopf="Erkennen und ersetzen"
+        laedt={anfordern.isPending} fehler={anfordern.error} onJa={() => anfordern.mutate()}
+        text={<>Die Datei wird durch dieselbe Datei als PDF/A mit unsichtbarer Textebene ersetzt. Die Seiten sehen
+          danach genauso aus wie vorher{dok.mime !== "application/pdf" ? " (das Bild wird dabei zur PDF)" : ""}; Titel,
+          Typ, Datum und Notiz bleiben. Danach lässt sich das Dokument durchsuchen und der Text kopieren. Je nach
+          Seitenzahl dauert das einige Minuten – die Akte kann währenddessen weiter benutzt werden.</>} />
+    </div>
+  );
+}
+
 function Details({ dok }: { dok: Dokument }) {
   const { patient, erfassen } = useAkte();
   const { darfBei } = useAuth();
@@ -279,6 +361,7 @@ function Details({ dok }: { dok: Dokument }) {
         <a className="btn sec" href={dateiUrl(dok, false)} download><Icon name="herunterladen" />Herunterladen</a>
         {dok.hat_text ? <Knopf icon="scan" onClick={() => setTextOffen(true)} data-testid="dokument-text-zeigen">Erkannter Text</Knopf> : null}
       </div>
+      <Texterkennung key={dok.id} dok={dok} />
       {dok.hat_text ? <TextDialog dok={dok} offen={textOffen} onOffen={setTextOffen} /> : null}
       {istPdf(dok) ? (
         <Dialog offen={lesen} onOffen={setLesen} titel={dok.titel} breite={1100}

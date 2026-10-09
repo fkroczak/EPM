@@ -131,10 +131,9 @@ def epm_info():
 def texterkennung_info():
     """Scans und OCR-Dienst (F167): Verfahren im Image, Lebenszeichen des Dienstes, Warteschlange, Speicher."""
     from scans import dienst
-    from scans.ocr.erkennung import verfahren_stand
 
     try:
-        verfahren = verfahren_stand(laden=False)
+        verfahren = dienst.verfahren()
     except Exception as e:  # noqa: BLE001 – Systemseite soll trotzdem laden
         verfahren = {"fehler": str(e)[:200]}
     return {"verfahren": verfahren, "dienst": dienst.dienst_stand(), "scans": dienst.stand()}

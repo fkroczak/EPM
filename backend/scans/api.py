@@ -59,19 +59,29 @@ class ScanListeSerializer(serializers.ModelSerializer):
     hoechst_bis = serializers.SerializerMethodField()
     verlaengerbar = serializers.SerializerMethodField()
     eigener = serializers.SerializerMethodField()
+    quelle = serializers.SerializerMethodField()
 
     class Meta:
         model = Scan
         fields = ["id", "titel", "originalname", "mime", "groesse", "status", "fortschritt", "schritt", "fehler",
                   "hochgeladen_am", "hochgeladen_von_name", "eigener", "ist_test", "laeuft_ab_am", "hoechst_bis",
                   "verlaengerbar", "verlaengert_anzahl", "seiten_anzahl", "vorschau", "sicherheit", "unsicher",
-                  "arten", "dokumentdatum", "verfahren", "belegt", "erkannt_am", "dauer_s"]
+                  "arten", "dokumentdatum", "verfahren", "belegt", "erkannt_am", "dauer_s", "quelle"]
 
     def get_hochgeladen_von_name(self, obj):
         return benutzername(obj.hochgeladen_von)
 
     def get_eigener(self, obj):
         return obj.hochgeladen_von_id == self.context["request"].user.id
+
+    def get_quelle(self, obj):
+        """Arbeitskopie eines Akte-Dokuments („Werte übernehmen“, F171): Dokument und Patient."""
+        d = obj.quelldokument
+        if d is None:
+            return None
+        p = d.patient
+        return {"dokument": d.id, "titel": d.titel, "patient": {"id": p.id, "nummer": p.nummer, "nachname": p.nachname,
+                "vorname": p.vorname, "geburtsdatum": p.geburtsdatum, "ist_test": p.ist_test}}
 
     def get_seiten_anzahl(self, obj):
         return len(obj.seiten.all())
@@ -194,15 +204,13 @@ class ScanViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=["get"])
     def stand(self, request):
         """Zähler für Navigation und Startseite, Grenzen der Aufbewahrung, bereitstehende Verfahren."""
-        from .ocr.erkennung import verfahren_stand
-
         e = Einstellungen.aktuell()
         daten = dienst.stand(request.user)
         daten.update({"frist_tage": e.scans_frist_tage, "hoechst_tage": e.scans_hoechst_tage,
                       "verlaengerung_tage": e.scans_verlaengerung_tage, "max_mb": e.scans_max_mb,
                       "max_seiten": settings.EPM_SCANS_MAX_SEITEN, "upload_max_mb": settings.EPM_UPLOAD_MAX_MB})
         if str(request.query_params.get("verfahren", "")) == "1":
-            daten["verfahren"] = verfahren_stand(laden=False)
+            daten["verfahren"] = dienst.verfahren()
             daten["dienst"] = dienst.dienst_stand()
         return Response(daten)
 
@@ -497,6 +505,37 @@ def _absaetze(text: str) -> str:
     return "".join(f"<p>{html.escape(z)}</p>" for z in zeilen if z)
 
 
+def _dokument_anlegen(view, scan, patient, user, titel, typ, datum, notiz, original, originale_info, geschrieben):
+    """Neues Dokument aus dem Scan (durchsuchbare PDF mit Text), auf Wunsch zusätzlich die Originale."""
+    from patienten.api import speichere_datei
+    from patienten.models import Dokument, DokumentText
+
+    upload = ContentFile(view._pdf(scan), name=f"{titel}.pdf")
+    meta = speichere_datei(patient, upload, "application/pdf")
+    geschrieben.append(settings.EPM_DOKUMENTE / meta["datei"])
+    dok = Dokument(patient=patient, typ=typ, titel=titel, datum=datum or scan.dokumentdatum, notiz=notiz,
+                   herkunft=Dokument.Herkunft.SCAN, hochgeladen_von=user,
+                   datum_quelle=Dokument.DatumQuelle.EINGABE, **meta)
+    dok._history_user = user
+    dok.save()
+    DokumentText.objects.create(dokument=dok, text=scan.text, sicherheit=scan.sicherheit,
+                                verfahren=", ".join(scan.verfahren or [])[:100],
+                                erkannt_am=scan.erkannt_am or timezone.now())
+    weitere = []
+    if original:
+        for nr, (pfad, info) in enumerate(zip(dienst.originale(scan), originale_info), 1):
+            zusatz = f" {nr}" if len(originale_info) > 1 else ""
+            upload = ContentFile(pfad.read_bytes(), name=info.get("name") or pfad.name)
+            m = speichere_datei(patient, upload, info.get("mime"))
+            geschrieben.append(settings.EPM_DOKUMENTE / m["datei"])
+            o = Dokument(patient=patient, typ=typ, titel=f"{titel} (Original{zusatz})"[:200],
+                         datum=dok.datum, herkunft=Dokument.Herkunft.SCAN, hochgeladen_von=user, **m)
+            o._history_user = user
+            o.save()
+            weitere.append(o.id)
+    return dok, weitere
+
+
 def zuordnen(view: ScanViewSet, request, pk):
     """Scan → Dokument der Akte (durchsuchbare PDF mit erkanntem Text), dazu auf Wunsch:
 
@@ -506,10 +545,13 @@ def zuordnen(view: ScanViewSet, request, pk):
     - ``diagnosen``: Liste wie unter Diagnosen (``bezeichnung``, ``icd_code``, ``kennzeichen``, ``seit``),
     - ``texte``: ``{"diagnose": "…", "therapie": "…", "empfehlung": "…"}`` – wird an das Textfeld angehängt.
 
-    Alles in einer Transaktion: Ist etwas davon ungültig, entsteht nichts. Danach ist der Scan aus „Scans“ entfernt."""
+    Alles in einer Transaktion: Ist etwas davon ungültig, entsteht nichts. Danach ist der Scan aus „Scans“ entfernt.
+
+    Arbeitskopie eines Akte-Dokuments („Werte übernehmen“, F171): kein neues Dokument; Patient ist der des Dokuments,
+    Laborbefund und BIA-Messung werden mit dem vorhandenen Dokument verknüpft."""
     from befunde.api import BiaMessungSerializer, LaborbefundSerializer
-    from patienten.api import DiagnoseSerializer, speichere_datei
-    from patienten.models import Dokument, DokumentText
+    from patienten.api import DiagnoseSerializer
+    from patienten.models import DokumentText
     from stammdaten.models import Diagnosevorlage
 
     user = request.user
@@ -519,8 +561,15 @@ def zuordnen(view: ScanViewSet, request, pk):
     if scan.status != Scan.Status.FERTIG:
         return _fehler("Der Scan ist noch nicht erkannt.")
     d = request.data if isinstance(request.data, dict) else {}
+    quelle = scan.quelldokument
     pid = str(d.get("patient") or "")
     patient = patienten_fuer(user).filter(pk=pid).first() if pid.isdigit() else None
+    if quelle is not None:
+        patient = patienten_fuer(user).filter(pk=quelle.patient_id).first()
+        if patient is None:
+            return _fehler("Die Akte des Dokuments ist nicht zugänglich.", feld="patient")
+        if pid.isdigit() and int(pid) != quelle.patient_id:
+            return _fehler("Werte aus einem Dokument gehen nur in dessen Akte.", feld="patient")
     if patient is None:
         return _fehler("Bitte den Patienten wählen.", feld="patient")
     if scan.ist_test and not patient.ist_test:
@@ -558,36 +607,28 @@ def zuordnen(view: ScanViewSet, request, pk):
     erlaubt = {"application/pdf", "image/jpeg", "image/png"}
     if original and any(o.get("mime") not in erlaubt for o in originale_info):
         fehler["original"] = "Das Original kann nur bei PDF, JPG oder PNG zusätzlich abgelegt werden."
+    if quelle is not None:
+        fehler.pop("titel", None)
+        fehler.pop("original", None)
+        if not (d.get("labor") or d.get("bia") or diagnosen or texte):
+            fehler["fehler"] = "Bitte mindestens einen Laborbefund, eine BIA-Messung, Diagnosen oder Texte wählen."
     if fehler:
         return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
 
-    pdf_daten = view._pdf(scan)
     geschrieben = []
     try:
         with transaction.atomic():
-            upload = ContentFile(pdf_daten, name=f"{titel}.pdf")
-            meta = speichere_datei(patient, upload, "application/pdf")
-            geschrieben.append(settings.EPM_DOKUMENTE / meta["datei"])
-            dok = Dokument(patient=patient, typ=typ, titel=titel, datum=datum or scan.dokumentdatum, notiz=notiz,
-                           herkunft=Dokument.Herkunft.SCAN, hochgeladen_von=user,
-                           datum_quelle=Dokument.DatumQuelle.EINGABE, **meta)
-            dok._history_user = user
-            dok.save()
-            DokumentText.objects.create(dokument=dok, text=scan.text, sicherheit=scan.sicherheit,
-                                        verfahren=", ".join(scan.verfahren or [])[:100],
-                                        erkannt_am=scan.erkannt_am or timezone.now())
-            weitere = []
-            if original:
-                for nr, (pfad, info) in enumerate(zip(dienst.originale(scan), originale_info), 1):
-                    zusatz = f" {nr}" if len(originale_info) > 1 else ""
-                    upload = ContentFile(pfad.read_bytes(), name=info.get("name") or pfad.name)
-                    m = speichere_datei(patient, upload, info.get("mime"))
-                    geschrieben.append(settings.EPM_DOKUMENTE / m["datei"])
-                    o = Dokument(patient=patient, typ=typ, titel=f"{titel} (Original{zusatz})"[:200],
-                                 datum=dok.datum, herkunft=Dokument.Herkunft.SCAN, hochgeladen_von=user, **m)
-                    o._history_user = user
-                    o.save()
-                    weitere.append(o.id)
+            if quelle is not None:
+                dok, weitere = quelle, []
+                titel = dok.titel
+                if not DokumentText.objects.filter(dokument=dok).exists():
+                    # die Erkennung der Arbeitskopie macht das Dokument auch durchsuchbar (die Datei bleibt)
+                    DokumentText.objects.create(dokument=dok, text=scan.text, sicherheit=scan.sicherheit,
+                                                verfahren=", ".join(scan.verfahren or [])[:100],
+                                                erkannt_am=scan.erkannt_am or timezone.now())
+            else:
+                dok, weitere = _dokument_anlegen(view, scan, patient, user, titel, typ, datum, notiz, original,
+                                                 originale_info, geschrieben)
             ergebnis = {"dokument": dok.id, "originale": weitere, "patient": patient.id}
             uebernommen = {}
             ctx = {"request": request}
@@ -626,15 +667,17 @@ def zuordnen(view: ScanViewSet, request, pk):
                 ergebnis["diagnosen"] = ids
                 uebernommen["diagnosen"] = len(ids)
             if texte:
-                quelle = f"Aus „{html.escape(titel)}“" + (f" vom {dok.datum:%d.%m.%Y}" if dok.datum else "") + " (Scan):"
+                herkunft = f"Aus „{html.escape(titel)}“" + (f" vom {dok.datum:%d.%m.%Y}" if dok.datum else "") \
+                    + (" (Dokument):" if quelle is not None else " (Scan):")
                 for feld, text in texte.items():
                     alt = getattr(patient, feld) or ""
-                    neu = f"{alt}<p><em>{quelle}</em></p>{_absaetze(text)}"
+                    neu = f"{alt}<p><em>{herkunft}</em></p>{_absaetze(text)}"
                     setattr(patient, feld, bereinige_html(neu))
                 patient._history_user = user
                 patient.save()
                 uebernommen["texte"] = len(texte)
-            protokolliere(A.SCAN, request, objekt=str(scan), aktion="zugeordnet", scan=scan.pk, dokument=dok.id,
+            protokolliere(A.SCAN, request, objekt=str(scan),
+                          aktion="werte_uebernommen" if quelle is not None else "zugeordnet", scan=scan.pk, dokument=dok.id,
                           akte=akte_text(patient), patient_id=patient.id, titel=titel, uebernommen=uebernommen,
                           seiten=scan.seiten.count())
             dienst.entfernen(scan)

@@ -183,6 +183,7 @@ export function Scans() {
                         <StatusChip s={s} />
                         {s.arten.slice(0, 2).map((a) => <Chip key={a} art="akzent">{ARTEN[a] ?? a}</Chip>)}
                         {s.ist_test ? <Chip art="warn">Test</Chip> : null}
+                        {s.quelle ? <Chip title={`Arbeitskopie von „${s.quelle.titel}“`}>aus der Akte</Chip> : null}
                       </span>
                       <span className="text-xs gedaempft truncate">
                         {zahl(s.seiten_anzahl)} S. · {s.hochgeladen_von_name ?? "—"} · <span className={cx(["heute", "morgen"].includes(bisDatum(s.laeuft_ab_am)) && "text-warn font-medium")}>

@@ -37,6 +37,8 @@ class SystemEreignis(models.Model):
         DOKUMENT_GELOESCHT = "dokument_geloescht", "Dokument endgültig gelöscht"
         DOKUMENT_LOESCHEN_ABGELEHNT = "dokument_loeschen_abgelehnt", "Löschen eines Dokuments abgelehnt"
         DOKUMENT_LOESCHUNG_NACHGEHOLT = "dokument_loeschung_nachgeholt", "Löschung eines Dokuments nachgeholt"
+        # „Text erkennen“ an einem Dokument der Akte (F170): Datei durch dieselbe PDF mit Textebene ersetzt
+        DOKUMENT_TEXT_ERKANNT = "dokument_text_erkannt", "Text eines Dokuments erkannt (Datei ersetzt)"
         SYSTEM = "system", "Systemverwaltung"
         # Datenschutz (Festlegung 02.10.2026)
         DATENSCHUTZ = "datenschutz", "Datenschutz"

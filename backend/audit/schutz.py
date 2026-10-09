@@ -37,7 +37,8 @@ BEGIN
             END IF;
         ELSIF TG_TABLE_NAME = 'audit_systemereignis' THEN
             IF OLD.objekt = 'Dokument ' || split_part(ziel, ':', 2)
-               AND OLD.art IN ('dokument_umgehaengt', 'dokument_geloescht', 'dokument_loeschen_abgelehnt')
+               AND OLD.art IN ('dokument_umgehaengt', 'dokument_geloescht', 'dokument_loeschen_abgelehnt',
+                               'dokument_text_erkannt')
                AND OLD.details ->> 'sha256' = split_part(ziel, ':', 3)
                AND NEW.details ->> 'titel' = '[entfernt]'
                AND (NEW.details - 'titel') = (OLD.details - 'titel')

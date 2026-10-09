@@ -5,6 +5,10 @@
  * markiert. Nichts wird ohne Bestätigung übernommen; Vorschläge mit unsicherer Erkennung oder unplausiblem Wert sind
  * nicht vorgewählt. Alles entsteht in einem Schritt: das Dokument (durchsuchbare PDF mit Text) und auf Wunsch
  * Laborbefund, BIA-Messung, Diagnosen und Ergänzungen der Textfelder.
+ *
+ * Laborbefund und BIA-Messung lassen sich auch dann übernehmen, wenn die Art nicht erkannt wurde (anderes Gerät,
+ * anderes Layout): Abschnitt einschalten, Feld anklicken und dann den Wert im Bild links anklicken – oder tippen.
+ * Laborwerte lassen sich mit „+ Wert“ ergänzen (09.10.2026).
  */
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
@@ -22,11 +26,13 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { ARTEN, UNSICHER } from "./hilfen";
 
 export type Stelle = { seite: number; box: number[] } | null;
+/** Gewähltes Feld: Ein Klick auf ein Wort im Bild schreibt dessen Text hinein */
+export type Ziel = { schluessel: string; name: string; setzen: (text: string, stelle: Stelle) => void } | null;
 
 type Wahl = { id: number; nummer: number; nachname: string; vorname: string; geburtsdatum: string | null; ist_test: boolean };
 
 type LaborZeile = { an: boolean; parameter: number | null; freitext_name: string; wert: string; wert_text: string;
-  einheit: string; referenz_von: string; referenz_bis: string; quelle: ScanLaborwert };
+  einheit: string; referenz_von: string; referenz_bis: string; quelle: ScanLaborwert | null; stelle?: Stelle };
 
 const BIA_FELDER: [keyof NonNullable<Scan["auswertung"]["bia"]>["werte"], string, string][] = [
   ["gewicht_kg", "Gewicht", "kg"], ["bcm_kg", "BCM", "kg"], ["fettmasse_kg", "Fettmasse", "kg"],
@@ -38,6 +44,18 @@ type Textfeldname = (typeof TEXTFELDER)[number][0];
 
 function komma(v: string | null | undefined): string {
   return v == null ? "" : String(v).replace(".", ",");
+}
+
+/** Zahl aus einem angeklickten Wort („3,21“, „138mmol/l“, „<0.5“ → „3,21“, „138“, „0,5“) */
+function zahlAus(text: string): string {
+  const m = text.replace(/\s/g, "").match(/[-+]?\d+(?:[.,]\d+)?/);
+  return m ? m[0].replace(".", ",") : text.trim();
+}
+
+/** Referenzbereich aus einem Wort („3,5-5,1“) → [von, bis]; sonst nur eine Zahl */
+function bereichAus(text: string): [string, string] | null {
+  const m = text.replace(/\s/g, "").match(/(\d+(?:[.,]\d+)?)[-–](\d+(?:[.,]\d+)?)/);
+  return m ? [m[1].replace(".", ","), m[2].replace(".", ",")] : null;
 }
 
 function html(text: string): string {
@@ -69,8 +87,9 @@ function Abschnitt({ titel, an, onAn, zahl, children, testid }: {
   );
 }
 
-export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
+export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, onZiel = () => {} }: {
   scan: Scan; onStelle: (s: Stelle) => void; onFertig: (patientId: number, dokumentId: number) => void; onAbbrechen: () => void;
+  ziel?: Ziel; onZiel?: (z: Ziel) => void;
 }) {
   const a = scan.auswertung ?? {};
   const arten = a.arten ?? [];
@@ -80,7 +99,9 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
   const katalog = useLaborparameter();
   const typen = useAuswahl("dokumenttyp");
 
-  const [patient, setPatient] = useState<Wahl | null>(null);
+  // Arbeitskopie eines Akte-Dokuments (F171): Patient steht fest, es entsteht kein neues Dokument
+  const quelle = scan.quelle ?? null;
+  const [patient, setPatient] = useState<Wahl | null>(quelle ? { ...quelle.patient } : null);
   const [titel, setTitel] = useState(scan.titel);
   const [typ, setTyp] = useState("");
   const [dokDatum, setDokDatum] = useState(scan.dokumentdatum ?? "");
@@ -133,14 +154,18 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
   });
 
   const katalogNamen = useMemo(() => new Map((katalog.data ?? []).map((p) => [p.id, p])), [katalog.data]);
-  const gewaehlteWerte = werte.filter((w) => w.an);
+  // übernommen werden angehakte Zeilen mit Wert und Parameter (bzw. Freitext-Namen)
+  const gewaehlteWerte = werte.filter((w) => w.an && (w.wert.trim() || w.wert_text.trim()) && (w.parameter || w.freitext_name.trim()));
   const biaGewaehlt = BIA_FELDER.filter(([k]) => bia[k]?.trim());
   const diagnosenGewaehlt = diagnosen.filter((d) => d.an);
   const texteGewaehlt = TEXTFELDER.filter(([k]) => texte[k].an && texte[k].text.trim());
+  const etwasGewaehlt = (laborAn && gewaehlteWerte.length > 0) || (biaAn && biaGewaehlt.length > 0)
+    || diagnosenGewaehlt.length > 0 || texteGewaehlt.length > 0;
 
   const zuordnen = useMutation({
     mutationFn: () => {
-      const body: Record<string, unknown> = { patient: patient!.id, titel, typ: typ || null, datum: dokDatum || null, notiz, original };
+      const body: Record<string, unknown> = quelle ? { patient: patient!.id }
+        : { patient: patient!.id, titel, typ: typ || null, datum: dokDatum || null, notiz, original };
       if (laborAn && gewaehlteWerte.length) {
         body.labor = {
           abgenommen_am: abnahme || null, labor: laborName, beurteilung: beurteilung ? html(beurteilung) : "",
@@ -170,7 +195,8 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
     onSuccess: (e) => {
       const teile = [e.laborbefund ? `${gewaehlteWerte.length} Laborwerte` : "", e.bia ? "BIA-Messung" : "",
         e.diagnosen?.length ? `${e.diagnosen.length} Diagnosen` : ""].filter(Boolean);
-      melden(`Als Dokument in die Akte gelegt${teile.length ? ` – übernommen: ${teile.join(", ")}` : ""}.`);
+      melden(quelle ? `Übernommen: ${teile.join(", ") || "Texte"} – verknüpft mit „${quelle.titel}“.`
+        : `Als Dokument in die Akte gelegt${teile.length ? ` – übernommen: ${teile.join(", ")}` : ""}.`);
       void qc.invalidateQueries({ queryKey: ["scans"] });
       void qc.invalidateQueries({ queryKey: ["patient", e.patient] });
       onFertig(e.patient, e.dokument);
@@ -181,12 +207,37 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
   const originaleErlaubt = (a.originale ?? []).length > 0 && (a.originale ?? []).every((o) => ["application/pdf", "image/jpeg", "image/png"].includes(o.mime));
   const nurTest = scan.ist_test || !!ich?.schreibt_nur_testpatienten;
 
-  const zeile = (i: number, neu: Partial<LaborZeile>) => setWerte(werte.map((w, j) => (j === i ? { ...w, ...neu } : w)));
+  // funktional: Auch ein Klick ins Bild (Ziel) ändert die aktuelle Fassung, nicht die beim Wählen des Felds
+  const zeile = (i: number, neu: Partial<LaborZeile>) => setWerte((alt) => alt.map((w, j) => (j === i ? { ...w, ...neu } : w)));
+  const leereZeile = (): LaborZeile => ({ an: true, parameter: null, freitext_name: "", wert: "", wert_text: "", einheit: "",
+    referenz_von: "", referenz_bis: "", quelle: null });
+  const laborName_ = (w: LaborZeile) => (w.parameter ? katalogNamen.get(w.parameter)?.name : "") || w.freitext_name || w.quelle?.erkannt_als || "neuer Wert";
+  // Feld als Ziel für einen Klick ins Bild wählen; zugleich die Stelle zeigen, an der der Wert gelesen wurde
+  const zielFuer = (schluessel: string, name: string, setzen: (text: string, stelle: Stelle) => void, stelle?: Stelle) => {
+    onZiel({ schluessel, name, setzen });
+    if (stelle) onStelle(stelle);
+  };
+  const istZiel = (schluessel: string) => ziel?.schluessel === schluessel;
+  const laborZiel = (i: number, w: LaborZeile, feld: "wert" | "einheit" | "referenz_von" | "referenz_bis") => {
+    const namen = { wert: "Wert", einheit: "Einheit", referenz_von: "Referenz von", referenz_bis: "Referenz bis" };
+    const st = w.stelle ?? (w.quelle?.box ? { seite: w.quelle.seite, box: w.quelle.box } : undefined);
+    zielFuer(`labor-${i}-${feld}`, `${namen[feld]} „${laborName_(w)}“`, (text, stelle) => {
+      if (feld === "einheit") zeile(i, { einheit: text.trim(), an: true });
+      else if (feld === "wert") zeile(i, { wert: zahlAus(text), wert_text: "", an: true, stelle });
+      else {
+        const b = bereichAus(text);
+        zeile(i, b ? { referenz_von: b[0], referenz_bis: b[1] } : { [feld]: zahlAus(text) });
+      }
+    }, st);
+  };
+  // Ziel aufgeben, wenn der Abschnitt geschlossen wird
+  useEffect(() => { if (!laborAn && ziel?.schluessel.startsWith("labor")) onZiel(null); }, [laborAn]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!biaAn && ziel?.schluessel.startsWith("bia")) onZiel(null); }, [biaAn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col gap-4" data-testid="zuordnen">
       <div className="flex items-center gap-2">
-        <h3 className="m-0 text-base font-semibold grow">Einem Patienten zuordnen</h3>
+        <h3 className="m-0 text-base font-semibold grow">{quelle ? "Werte in die Akte übernehmen" : "Einem Patienten zuordnen"}</h3>
         <Knopf klein variante="geist" onClick={onAbbrechen}>Abbrechen</Knopf>
       </div>
 
@@ -200,7 +251,7 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
             <span className="gedaempft">{datum(patient.geburtsdatum)}</span>
             {patient.ist_test ? <Chip art="warn">Test</Chip> : null}
             <Link to={`/patienten/${patient.id}`} target="_blank" className="text-[0.8125rem]">Akte öffnen</Link>
-            <Knopf klein variante="geist" onClick={() => setPatient(null)}>ändern</Knopf>
+            {quelle ? null : <Knopf klein variante="geist" onClick={() => setPatient(null)}>ändern</Knopf>}
           </div>
         ) : (
           <>
@@ -233,7 +284,11 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
         {patient && !darfZuordnen ? <Meldung art="info">Als Admin nur bei Testpatienten möglich.</Meldung> : null}
       </section>
 
-      {/* 2. Dokument */}
+      {/* 2. Dokument – bei einer Arbeitskopie gibt es das Dokument schon */}
+      {quelle ? (
+        <Meldung art="info"><span data-testid="zuordnen-quelle">Kein neues Dokument: Die Werte werden mit „{quelle.titel}“ in der Akte
+          verknüpft. Die Datei des Dokuments bleibt unverändert.</span></Meldung>
+      ) : (
       <section className="formular grid grid-cols-6 gap-x-3 gap-y-2.5">
         <Feld label="Titel" className="col-span-6 sm:col-span-4" fehler={fehler.titel} pflicht>
           {(p) => <Eingabe {...p} value={titel} onChange={(e) => setTitel(e.target.value)} maxLength={200} />}
@@ -260,6 +315,7 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
         ) : null}
         {fehler.original ? <span className="col-span-6 fehlertext">{fehler.original}</span> : null}
       </section>
+      )}
 
       {/* 3. Werte */}
       {arten.length ? (
@@ -267,9 +323,16 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
           ein Klick auf eine Zeile zeigt die Stelle links.</span>
       ) : null}
 
-      {werte.length ? (
-        <Abschnitt titel="Laborbefund übernehmen" an={laborAn} onAn={setLaborAn} testid="zuordnen-labor"
-          zahl={`${gewaehlteWerte.length} von ${werte.length} Werten gewählt`}>
+      {!arten.length ? (
+        <span className="text-[0.8125rem] gedaempft">Die Art des Dokuments wurde nicht erkannt. Laborbefund oder BIA-Messung lassen
+          sich trotzdem übernehmen: Abschnitt einschalten, Feld anklicken und den Wert im Bild links anklicken.</span>
+      ) : null}
+
+      {(
+        <Abschnitt titel="Laborbefund übernehmen" an={laborAn}
+          onAn={(an) => { setLaborAn(an); if (an && !werte.length) setWerte([leereZeile()]); if (an && !abnahme) setAbnahme(a.datum ?? dokDatum); }}
+          testid="zuordnen-labor"
+          zahl={werte.length ? `${gewaehlteWerte.length} von ${werte.length} Werten gewählt` : "nicht erkannt – Werte von Hand übernehmen"}>
           <div className="grid grid-cols-6 gap-x-3 gap-y-2.5 formular">
             <Feld label="Abnahme am" className="col-span-3 sm:col-span-2" fehler={fehler["labor.abgenommen_am"]}>
               {(p) => <Eingabe {...p} type="date" value={abnahme} onChange={(e) => setAbnahme(e.target.value)} />}
@@ -288,51 +351,66 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
                 {werte.map((w, i) => {
                   const q = w.quelle;
                   const p = w.parameter ? katalogNamen.get(w.parameter) : undefined;
-                  const unsicher = q.sicherheit < UNSICHER || q.hinweise.length > 0;
+                  const unsicher = !!q && (q.sicherheit < UNSICHER || q.hinweise.length > 0);
+                  const st = w.stelle ?? (q?.box ? { seite: q.seite, box: q.box } : null);
                   return (
                     <tr key={i} className={cx(!w.an && "opacity-60", unsicher && w.an && "bg-warn-bg/40")}
-                      onClick={() => onStelle(q.box ? { seite: q.seite, box: q.box } : null)} data-testid="laborzeile">
-                      <td className="td"><input type="checkbox" checked={w.an} aria-label={`${p?.name ?? w.freitext_name} übernehmen`}
+                      onClick={() => onStelle(st)} data-testid="laborzeile">
+                      <td className="td"><input type="checkbox" checked={w.an} aria-label={`${p?.name ?? (w.freitext_name || "Wert")} übernehmen`}
                         onChange={(e) => zeile(i, { an: e.target.checked })} /></td>
                       <td className="td min-w-[11rem]">
                         <Auswahl value={w.parameter ?? ""} aria-label="Parameter" className="min-w-0"
                           onChange={(e) => {
                             const id = e.target.value ? Number(e.target.value) : null;
                             const neu = id ? katalogNamen.get(id) : undefined;
-                            zeile(i, { parameter: id, freitext_name: id ? "" : q.erkannt_als, einheit: neu?.einheit || w.einheit });
+                            zeile(i, { parameter: id, freitext_name: id ? "" : q?.erkannt_als ?? w.freitext_name, einheit: neu?.einheit || w.einheit, an: true });
                           }}>
-                          <option value="">Freitext: {w.freitext_name || q.erkannt_als}</option>
+                          <option value="">{q ? `Freitext: ${w.freitext_name || q.erkannt_als}` : w.freitext_name ? `Freitext: ${w.freitext_name}` : "— Parameter wählen —"}</option>
                           {(katalog.data ?? []).map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
                         </Auswahl>
-                        {q.hinweise.length ? <span className="block text-xs text-warn mt-0.5">{q.hinweise.join(" · ")}</span> : null}
+                        {!q && !w.parameter ? (
+                          <Eingabe value={w.freitext_name} aria-label="Name (wenn nicht im Katalog)" placeholder="oder Name, wenn nicht im Katalog"
+                            className="mt-1" maxLength={100} onChange={(e) => zeile(i, { freitext_name: e.target.value })} />
+                        ) : null}
+                        {q?.hinweise.length ? <span className="block text-xs text-warn mt-0.5">{q.hinweise.join(" · ")}</span> : null}
                       </td>
                       <td className="td">
                         {w.wert_text ? (
-                          <Eingabe value={w.wert_text} aria-label="Wert (Text)" className="w-24"
-                            onChange={(e) => zeile(i, { wert_text: e.target.value })} />
+                          <Eingabe value={w.wert_text} aria-label="Wert (Text)" className={cx("w-24", istZiel(`labor-${i}-wert`) && "scan-feld-ziel")}
+                            onFocus={() => laborZiel(i, w, "wert")} onChange={(e) => zeile(i, { wert_text: e.target.value })} />
                         ) : (
-                          <Eingabe value={w.wert} aria-label="Wert" className="num w-24" inputMode="decimal"
-                            onChange={(e) => zeile(i, { wert: e.target.value })} />
+                          <Eingabe value={w.wert} aria-label="Wert" className={cx("num w-24", istZiel(`labor-${i}-wert`) && "scan-feld-ziel")} inputMode="decimal"
+                            onFocus={() => laborZiel(i, w, "wert")} onChange={(e) => zeile(i, { wert: e.target.value })} />
                         )}
-                        {q.markierung ? <Chip className="ml-1" art={/[Hh+↑]/.test(q.markierung) ? "fehler" : "warn"}>{q.markierung}</Chip> : null}
+                        {q?.markierung ? <Chip className="ml-1" art={/[Hh+↑]/.test(q.markierung) ? "fehler" : "warn"}>{q.markierung}</Chip> : null}
                       </td>
-                      <td className="td"><Eingabe value={w.einheit} aria-label="Einheit" className="w-24" onChange={(e) => zeile(i, { einheit: e.target.value })} /></td>
+                      <td className="td"><Eingabe value={w.einheit} aria-label="Einheit" className={cx("w-24", istZiel(`labor-${i}-einheit`) && "scan-feld-ziel")}
+                        onFocus={() => laborZiel(i, w, "einheit")} onChange={(e) => zeile(i, { einheit: e.target.value })} /></td>
                       <td className="td whitespace-nowrap">
-                        <Eingabe value={w.referenz_von} aria-label="Referenz von" className="num w-16 inline-block" inputMode="decimal"
-                          onChange={(e) => zeile(i, { referenz_von: e.target.value })} />
+                        <Eingabe value={w.referenz_von} aria-label="Referenz von" className={cx("num w-16 inline-block", istZiel(`labor-${i}-referenz_von`) && "scan-feld-ziel")} inputMode="decimal"
+                          onFocus={() => laborZiel(i, w, "referenz_von")} onChange={(e) => zeile(i, { referenz_von: e.target.value })} />
                         <span className="px-1 gedaempft">–</span>
-                        <Eingabe value={w.referenz_bis} aria-label="Referenz bis" className="num w-16 inline-block" inputMode="decimal"
-                          onChange={(e) => zeile(i, { referenz_bis: e.target.value })} />
+                        <Eingabe value={w.referenz_bis} aria-label="Referenz bis" className={cx("num w-16 inline-block", istZiel(`labor-${i}-referenz_bis`) && "scan-feld-ziel")} inputMode="decimal"
+                          onFocus={() => laborZiel(i, w, "referenz_bis")} onChange={(e) => zeile(i, { referenz_bis: e.target.value })} />
                       </td>
-                      <td className="td text-xs gedaempft max-w-[14rem]" title={q.zeile}>
-                        <span className="truncate block">{q.zeile}</span>
-                        <Sicherheit c={q.sicherheit} hinweise={q.hinweise} />
+                      <td className="td text-xs gedaempft max-w-[14rem]" title={q?.zeile}>
+                        {q ? <><span className="truncate block">{q.zeile}</span><Sicherheit c={q.sicherheit} hinweise={q.hinweise} /></>
+                          : <span>von Hand</span>}
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+          </div>
+          <div>
+            <Knopf klein icon="plus" onClick={() => {
+              const i = werte.length;
+              setWerte((alt) => [...alt, leereZeile()]);
+              onZiel(null);
+              // das neue Parameterfeld wählen
+              requestAnimationFrame(() => (document.querySelectorAll<HTMLSelectElement>('[data-testid="labor-pruefen"] select[aria-label="Parameter"]')[i])?.focus());
+            }} data-testid="labor-wert-neu">Wert</Knopf>
           </div>
           <Feld label="Beurteilung" fehler={fehler["labor.beurteilung"]}>
             {(p) => <Textfeld {...p} rows={2} value={beurteilung} onChange={(e) => setBeurteilung(e.target.value)} />}
@@ -341,11 +419,13 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
             <Meldung art="fehler">{Object.entries(fehler).filter(([k]) => k.startsWith("labor")).map(([k, v]) => `${k.replace("labor.", "")}: ${v}`).join(" · ")}</Meldung>
           ) : null}
         </Abschnitt>
-      ) : null}
+      )}
 
-      {Object.keys(biaQuelle).length ? (
-        <Abschnitt titel="BIA-Messung übernehmen" an={biaAn} onAn={setBiaAn} testid="zuordnen-bia"
-          zahl={`${biaGewaehlt.length} Werte`}>
+      {(
+        <Abschnitt titel="BIA-Messung übernehmen" an={biaAn} testid="zuordnen-bia"
+          onAn={(an) => { setBiaAn(an); if (an && !gemessen) setGemessen(a.datum ?? dokDatum); }}
+          zahl={Object.keys(biaQuelle).length ? `${biaGewaehlt.length} Werte` : "nicht erkannt – Werte von Hand übernehmen"}>
+          <span className="text-[0.8125rem] gedaempft">Feld anklicken, dann den Wert im Bild links anklicken – oder eintippen.</span>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-2.5 formular">
             <Feld label="Gemessen am" fehler={fehler["bia.gemessen_am"]}>
               {(p) => <Eingabe {...p} type="date" value={gemessen} onChange={(e) => setGemessen(e.target.value)} />}
@@ -356,10 +436,11 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
                 <Feld key={k} label={`${name} (${einheit})`} fehler={fehler[`bia.${k}`]}
                   hinweis={q ? <span onMouseEnter={() => onStelle(q.box ? { seite: q.seite, box: q.box } : null)}>
                     gelesen: {q.erkannt_als} <Sicherheit c={q.sicherheit} hinweise={q.hinweise} />{q.hinweise?.length ? ` · ${q.hinweise.join(" · ")}` : ""}
-                  </span> : "nicht im Dokument"}>
-                  {(p) => <Eingabe {...p} className="num" inputMode="decimal" value={bia[k] ?? ""}
-                    onFocus={() => onStelle(q?.box ? { seite: q.seite, box: q.box } : null)}
-                    onChange={(e) => setBia({ ...bia, [k]: e.target.value })} />}
+                  </span> : undefined}>
+                  {(p) => <Eingabe {...p} className={cx("num", istZiel(`bia-${k}`) && "scan-feld-ziel")} inputMode="decimal" value={bia[k] ?? ""}
+                    onFocus={() => zielFuer(`bia-${k}`, name, (text) => setBia((alt) => ({ ...alt, [k]: zahlAus(text) })),
+                      q?.box ? { seite: q.seite, box: q.box } : undefined)}
+                    onChange={(e) => { const v = e.target.value; setBia((alt) => ({ ...alt, [k]: v })); }} />}
                 </Feld>
               );
             })}
@@ -375,7 +456,7 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
             <Meldung art="fehler">{Object.entries(fehler).filter(([k]) => k.startsWith("bia")).map(([, v]) => v).join(" · ")}</Meldung>
           ) : null}
         </Abschnitt>
-      ) : null}
+      )}
 
       {diagnosen.length ? (
         <Abschnitt titel="Diagnosen mit ICD-Code übernehmen" an={diagnosenGewaehlt.length > 0}
@@ -421,11 +502,13 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen }: {
       ) : null}
 
       {zuordnen.error && !Object.keys(fehler).length ? <Meldung art="fehler">{zuordnen.error.message}</Meldung> : null}
+      {fehler.fehler ? <Meldung art="fehler">{fehler.fehler}</Meldung> : null}
       <div className="flex justify-end gap-2 flex-wrap sticky bottom-0 bg-flaeche py-2 border-t border-rand">
         <Knopf onClick={onAbbrechen}>Abbrechen</Knopf>
-        <Knopf variante="pri" icon="haken" laedt={zuordnen.isPending} disabled={!darfZuordnen || !titel.trim()}
+        <Knopf variante="pri" icon="haken" laedt={zuordnen.isPending}
+          disabled={!darfZuordnen || (quelle ? !etwasGewaehlt : !titel.trim())}
           onClick={() => zuordnen.mutate()} data-testid="zuordnen-speichern">
-          In die Akte legen{gewaehlteWerte.length && laborAn ? ` + ${gewaehlteWerte.length} Laborwerte` : ""}
+          {quelle ? "Übernehmen" : "In die Akte legen"}{gewaehlteWerte.length && laborAn ? ` + ${gewaehlteWerte.length} Laborwerte` : ""}
           {biaAn && biaGewaehlt.length ? " + BIA" : ""}{diagnosenGewaehlt.length ? ` + ${diagnosenGewaehlt.length} Diagnosen` : ""}
         </Knopf>
       </div>

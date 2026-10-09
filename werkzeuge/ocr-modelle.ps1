@@ -43,7 +43,8 @@ try {
         $Ok = $false
         foreach ($Versuch in 1..3) {
             try {
-                Invoke-WebRequest -Uri ($Daten.quelle + $Eintrag.pfad) -OutFile $Pfad -UseBasicParsing `
+                $Url = if ($Eintrag.url) { $Eintrag.url } else { $Daten.quelle + $Eintrag.pfad }
+                Invoke-WebRequest -Uri $Url -OutFile $Pfad -UseBasicParsing `
                     -UserAgent "EPM-Bau" -TimeoutSec 300
             } catch {
                 Write-Host "Versuch ${Versuch}: $($Eintrag.pfad): $($_.Exception.Message)"

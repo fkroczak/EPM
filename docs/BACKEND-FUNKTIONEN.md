@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 09.10.2026 · Code-Stand: Scans und Texterkennung (F160–F167); Passkey und Telefon (F130–F134); Wünsche aus der Praxis vom 06./07.10.2026 (F110–F124); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
+Stand: 09.10.2026 · Code-Stand: Scans und Texterkennung (F160–F171); Passkey und Telefon (F130–F134); Wünsche aus der Praxis vom 06./07.10.2026 (F110–F124); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
 Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026, Prüfung nach DSGVO vom 02.10.2026 (`docs/DATENSCHUTZ.md`).
@@ -3062,6 +3062,102 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   läuft derzeit nicht: Abrechnung).
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+### F168 Texterkennung auf kleinen Servern: Sparmodus und Absturzschutz
+- **Anlass 09.10.2026 (Test-VM, 4 GB RAM, 2 Kerne):** „Seite 2 wird nicht erkannt, dauert bisher 3-mal so lange wie
+  die erste Seite.“ Befund: Swap voll, OCR-Dienst neu gestartet. Großes Zeilenmodell + Glätten + der wachsende
+  Speicher von onnxruntime bei wechselnden Bildgrößen übersteigen den RAM; nach dem Absturz blieb der Scan bis zur
+  stündlichen Bereinigung auf „wird erkannt“. Festlegung: **Sparmodus**; ein späterer Umzug auf einen VPS mit 8 GB ist
+  möglich und braucht keine Einstellung.
+- **Sparmodus** (`EPM_OCR_MODUS` = auto | voll | sparsam; auto: unter 2,5 GB für den Dienst): kleines Zeilenmodell
+  PP-OCRv5_mobile_det (4,8 MB, Apache-2.0, Prüfsumme in `modelle.json`, eigene Quelle), kein Glätten, Zeilensuche
+  bis 1536 px. Voller Modus: server_det, UVDoc, 2048 px. Systemseite und „Scans“ zeigen den Modus („· Sparmodus“).
+- **Speichergrenze und Kerne nach dem Server** (`04-projekt.sh`, nur wenn in `/srv/epm/.env` noch nicht gesetzt):
+  unter 6 GB RAM 1,5 GB, unter 12 GB 3 GB, sonst 4 GB (`EPM_OCR_SPEICHER`); Kerne = Anzahl − 1, mindestens 2,
+  höchstens 6 (`EPM_OCR_THREADS`). Test-VM → 1,5 GB/2 Kerne → Sparmodus; VPS 1000 G12 (8 GB, 4 Kerne) → 3 GB/3 Kerne →
+  voller Modus. Kein zusätzlicher Swap für den Container (`memswap_limit`): Reicht der Speicher nicht, bricht der
+  Dienst ab, statt die VM ins Auslagern zu treiben.
+- **Speicher:** onnxruntime ohne Speicher-Arena und Speichermuster (gibt den Speicher nach jeder Seite zurück),
+  Aufräumen nach jeder Seite.
+- **Schneller im Sparmodus (09.10.2026):** mit PP-OCR nur ein Tesseract-Durchgang (die zweite Lesart liefert PP-OCR),
+  spart rund ein Drittel der Zeit je Seite; ohne PP-OCR bleiben beide Durchgänge für den Abgleich.
+- **Absturzschutz:** Der Dienst schreibt während der Erkennung alle 20 s ein Lebenszeichen (eigener Faden). Fehlt es
+  90 s lang, kommt der Scan sofort wieder in die Warteschlange (vorher: bis zu einer Stunde). Je Seite wird ein
+  abgebrochener Versuch erkannt (`begonnen_am`, `abbrueche`): 1. Wiederholung sparsam (ohne Glätten, kleinere
+  Zeilensuche), 2. nur Tesseract, nach dem 3. Abbruch nur diese Seite als Fehler mit Hinweis; andere Seiten laufen
+  weiter. Nach vier Abbrüchen ohne Fortschritt: Scan als Fehler („Erneut erkennen“ möglich). Reguläres Beenden
+  (Update, `docker stop`) stellt den Scan sofort zurück und zählt nicht als Abbruch.
+- **Anzeige:** Fortschritt innerhalb der Seite („Seite 2 von 3: PP-OCR liest“); Seite mit Hinweis, wenn sie sparsam
+  erkannt wurde; Systemseite: „in Arbeit“/„wartend“ getrennt, Speicher des Dienstes (belegt, Höchststand, Grenze –
+  ab 90 % mit Hinweis, `EPM_OCR_SPEICHER` zu erhöhen), Zahl der Seiten mit Abbrüchen.
+- **Teststatus:** `scans/tests.py` (Absturz mitten in Seite 2 → Sparstufe 1, dritter Abbruch markiert nur die Seite,
+  Stufe 2 nur Tesseract, zu viele Abbrüche, geplantes Beenden, Herzschlag, Moduswahl nach Speicher). Speicherbedarf
+  der Modelle auf der Test-VM: **Lauf steht aus** (hier nicht messbar, die Modelle sind in dieser Umgebung nicht ladbar).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F169 Werte von Hand in Labor und BIA übertragen
+- **Wunsch 09.10.2026:** „Mir fehlt die Möglichkeit, die Werte direkt in ein Labor oder BIA zu übertragen. Die Felder
+  liegen ja vor.“ – „Es muss halt sauber die Werte in die Felder übertragen und performant sein.“
+- **Zuordnen:** „Laborbefund übernehmen“ und „BIA-Messung übernehmen“ stehen immer zur Wahl, auch wenn die Art nicht
+  erkannt wurde (anderes Gerät, anderes Layout). Feld anklicken → Hinweis über dem Bild („Für Gewicht eine Zahl im Bild
+  anklicken“) → Wort im Bild anklicken: die Zahl steht im Feld (aus „3,21L“ wird 3,21; ein Referenzbereich „3,5-5,1“
+  füllt von und bis; Einheit als Text). Tippen geht weiter. Das Bild bleibt beim Scrollen der Felder stehen.
+- **Labor:** „+ Wert“ fügt eine Zeile hinzu (Parameter aus dem Katalog – Einheit wird vorbelegt – oder Name als
+  Freitext). Übernommen werden angehakte Zeilen mit Wert und Parameter/Name. Abnahmedatum wird mit dem Datum aus dem
+  Dokument vorbelegt.
+- **BIA:** alle Felder der BIA-Messung (Gewicht, BCM, Fettmasse, ECW %, Körperwasser, BMI), weitere Werte als
+  Beurteilung. Erkennung erweitert um Bezeichnungen gängiger Geräte (deutsch/englisch: seca, Data Input/Nutriguard,
+  Akern, InBody, Tanita, RJL, Bodystat); ECW als Verhältnis („ECW/TBW 0,385“) wird mit Hinweis in Prozent umgerechnet;
+  Skelettmuskelmasse, ICW, viszerales Fett u. a. als weitere Werte (U66).
+- **Teststatus:** `scans/tests.py` (BIA anderer Geräte); `e2e/scans.spec.ts` „Werte von Hand übertragen“ (BIA nicht
+  erkannt → Gewicht per Klick ins Bild, Laborwert ergänzt, gespeichert und in der Akte geprüft) – Ablauf lokal im
+  Browser durchgespielt; CI-Lauf steht aus.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F170 „Text erkennen“ an Dokumenten der Akte (OCRmyPDF)
+- **Festlegung 09.10.2026:** Automatisch erkannt wird nur, was über „Scans“ kommt (U65). Dokumente, die direkt in der
+  Akte liegen (auch aus dem Altsystem), bekommen einen Knopf, der sie erkennt und die Datei „überschreibt“. Auf
+  Nachfrage mit **OCRmyPDF** statt der Scans-Erkennung, weil das Aussehen der Seiten so erhalten bleibt.
+- **Akte › Dokumente › Details:** „Text erkennen“ (bzw. „Text neu erkennen“) mit Rückfrage. Der OCR-Dienst legt mit
+  OCRmyPDF (Tesseract, deutsches Modell) eine unsichtbare Textebene über die Seiten und ersetzt die Datei durch diese
+  **PDF/A**: `--rotate-pages`, `--skip-text` (Seiten mit Text bleiben), `--optimize 1` (verlustfrei); Bilder werden zur
+  PDF. Titel, Typ, Datum, Notiz bleiben; Dateiname endet auf .pdf. Danach: Kennzeichen „Text“, Suche im Reiter
+  Dokumente, „Erkannter Text“ zum Kopieren. Fortschritt und Fehler stehen am Dokument; die Akte bleibt benutzbar.
+- **Nicht möglich:** von EPM erzeugte Dokumente, Freigabe-Nachweise von Infusionsplänen, andere Dateitypen als PDF,
+  JPG, PNG, TIFF, abgeschlossene Akten. Recht: wie Dokumente bearbeiten (Admins nur bei Testpatienten).
+- **Sicher ersetzen:** neue Datei schreiben → Datenbank in einer Transaktion (nur wenn die Prüfsumme noch die vom
+  Anfordern ist und die Akte offen) → alte Datei löschen; scheitert etwas, bleibt das Dokument unverändert und die
+  neue Datei wird entfernt. Verlauf: „Text erkannt: Datei durch dieselbe PDF mit Textebene ersetzt“; Audit-Log (neue
+  Art „Text eines Dokuments erkannt“) mit beiden Prüfsummen und Seitenzahl. OCRmyPDF-Fehler werden verständlich
+  gemeldet (verschlüsselt, keine lesbare PDF, kein Text gefunden …); „PDF/A nicht möglich“ ergibt eine gültige PDF.
+- **Art. 17 DSGVO:** Durch das Ersetzen hat ein Dokument mehrere Prüfsummen. Endgültiges Löschen schwärzt jetzt alle
+  Fassungen in Historie und Audit-Log und schreibt die früheren Prüfsummen in die Löschliste (`fruehere_sha256`);
+  das Nachholen nach einer Wiederherstellung erkennt das Dokument auch mit einer früheren Prüfsumme (vorher wäre ein
+  Dokument aus einer Sicherung von vor dem Ersetzen zurückgekommen).
+- **Betrieb:** Ghostscript (AGPL) und OCRmyPDF (MPL-2.0) im Image; der OCR-Container bindet `data/dokumente` ein.
+  Aufträge laufen nach den Scans; Lebenszeichen, Abbruch und geplantes Beenden wie F168; erledigte Aufträge werden
+  nach 30 Tagen entfernt. Administration › System zeigt „OCRmyPDF bereit“.
+- **Endpunkte:** `POST /api/dokumente/{id}/text-erkennen/` (202, idempotent); `GET /api/dokumente/{id}/` liefert
+  `erkennung` (Status, Schritt, Fehler) und `text_erkennbar`.
+- **Teststatus:** `scans/test_dokumente.py` – Ersetzen, Befehl, Fehlerfälle, geänderte Datei, abgeschlossene Akte,
+  Rechte, Abbruch, Löschung früherer Fassungen (mit einem Ersatz für das externe Programm); **der Test mit dem echten
+  OCRmyPDF** ist in CI Pflicht (`EPM_OCRMYPDF_PFLICHT`), lief hier aber nicht (OCRmyPDF in dieser Umgebung nicht
+  installierbar). `e2e/scans.spec.ts` „Akte: Text erkennen und Werte übernehmen“. **Lauf steht aus.**
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F171 „Werte übernehmen“ aus einem Dokument der Akte
+- **Akte › Dokumente › Details:** „Werte übernehmen“ legt eine Arbeitskopie des Dokuments in „Scans“ an (Kennzeichen
+  „aus der Akte“) und öffnet sie. Erkennung und Prüfansicht wie bei einem Scan (Laborbefund, BIA, Diagnosen, Texte;
+  Feld anklicken → Wert im Bild anklicken, F169). Der Patient steht fest; **es entsteht kein neues Dokument** –
+  Laborbefund und BIA-Messung werden mit dem vorhandenen Dokument verknüpft. Hatte das Dokument noch keinen Text,
+  wird der erkannte Text ergänzt (durchsuchbar, Datei unverändert). Danach ist die Arbeitskopie entfernt.
+- **Schutz:** Arbeitskopien sieht nur, wer die Akte sieht (z. B. nicht nach einer Einschränkung nach Art. 18);
+  beim endgültigen Löschen des Dokuments werden sie samt Dateien sofort entfernt; sonst gilt die Aufbewahrung der Scans.
+- **Endpunkt:** `POST /api/dokumente/{id}/werte-uebernehmen/` → `{"scan": ID}` (vorhandene Arbeitskopie desselben
+  Benutzers wird wiederverwendet); Zuordnen einer Arbeitskopie ohne Titel/Typ/Datum, nur mit gewählten Werten.
+- **Teststatus:** `scans/test_dokumente.py` (Werte aus Akte-Dokument, kein neues Dokument, Patient fest, Sichtbarkeit)
+  mit der echten Erkennung; im Browser lokal durchgespielt.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -3156,8 +3252,8 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U63 | Soll das **Freigeben eines Plans** (am Telefon wie am PC) zusätzlich mit Passkey bzw. Code bestätigt werden? Heute genügt die Anmeldung, wie bisher beschlossen | F36, F132 | unverändert: ohne zusätzliche Bestätigung |
 | U64 | ~~Gewichte zusammenfassen: Fenster ab dem ersten Eintrag oder je Kalendertag?~~ **Geklärt 09.10.2026:** Fenster ab dem ersten Eintrag, Standard 2 × 24 Stunden; im Werkzeug einstellbar | F159 | – |
 
-| U65 | ~~Auto-OCR auch für Dokumente aus der Akte und dem Altsystem?~~ **Geklärt 09.10.2026:** automatisch nur, was über „Scans“ kommt; Dokumente in der Akte bekommen einen Knopf „Text erkennen“, der das Dokument durch die erkannte Fassung ersetzt | F163 | folgt (nächster Schritt) |
-| U66 | ~~Welches BIA-Gerät?~~ **Geklärt 09.10.2026:** unterschiedliche Geräte (Patienten deutschlandweit) – allgemeine Erkennung nach Beschriftung, gängige Bezeichnungen der Geräte (auch englisch) werden ergänzt | F166 | folgt |
+| U65 | ~~Auto-OCR auch für Dokumente aus der Akte und dem Altsystem?~~ **Geklärt 09.10.2026:** automatisch nur, was über „Scans“ kommt; Dokumente in der Akte bekommen „Text erkennen“ (OCRmyPDF, ersetzt die Datei durch dieselbe PDF/A mit Textebene) und „Werte übernehmen“ | F170, F171 | umgesetzt |
+| U66 | ~~Welches BIA-Gerät?~~ **Geklärt 09.10.2026:** unterschiedliche Geräte (Patienten deutschlandweit) – allgemeine Erkennung nach Beschriftung, gängige Bezeichnungen der Geräte (auch englisch) werden ergänzt | F166, F169 | umgesetzt (F169) |
 | U67 | ~~PP-OCRv5-Modelle beim Bau von huggingface.co laden?~~ **Geklärt 09.10.2026:** Modelle offline vorbereiten (`werkzeuge/ocr-modelle.sh` bzw. `.ps1`) und auf der Test-VM mit `epm-ocr-modelle einspielen` ablegen; `epm-update` baut sie ein. Ohne sie: nur Tesseract | F167 | – |
 | U68 | ~~Scan-Dateien nicht in der Sicherung~~ **Bestätigt 09.10.2026:** richtig so; Scans lassen sich jederzeit selbst sofort löschen | F165, F61 | – |
 | U69 | ~~Startseite: Kachel oder Hinweis?~~ **Bestätigt 09.10.2026:** Hinweis | F160 | – |
@@ -3168,6 +3264,8 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 09.10.2026 | Text erkennen in der Akte | „Text erkennen“ mit OCRmyPDF (PDF/A mit Textebene, Datei ersetzt, Art.-17-Löschung über alle Fassungen) (F170), „Werte übernehmen“ aus Akte-Dokumenten ohne neues Dokument (F171), Sparmodus mit einem Tesseract-Durchgang (F168). Lauf steht aus |
+| 09.10.2026 | Texterkennung auf kleinen Servern, Werte von Hand | Sparmodus (kleines Zeilenmodell, ohne Glätten) und Speichergrenze nach RAM, Absturzschutz mit Lebenszeichen und Sparstufen je Seite (F168); Labor/BIA immer übertragbar, Wert per Klick ins Bild, „+ Wert“, mehr BIA-Bezeichnungen (F169). Lauf steht aus |
 | 09.10.2026 | OCR-Modelle offline | `ocr-modelle.sh vorbereiten/einspielen/status`, `ocr-modelle.ps1`, `epm-update` baut die Modelle ein und meldet den Stand der Texterkennung (U67) |
 | 09.10.2026 | Scans: Rückmeldungen | U65–U71 geklärt bzw. bestätigt; OCR-Knopf für Akten-Dokumente, BIA-Bezeichnungen und Modelle im Update folgen |
 | 09.10.2026 | Scans und Texterkennung | Neuer Menüpunkt „Scans“: Hochladen, Seite anpassen, Erkennung ohne externen Dienst (Tesseract best + PP-OCRv5, OCR-Dienst), Text kopieren, Zuordnen mit Übernahme von Labor/BIA/Diagnosen, Aufbewahrung 7/7/30 Tage mit Bereinigung (F160–F167). Lauf steht aus |

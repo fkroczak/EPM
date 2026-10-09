@@ -5,12 +5,14 @@ einen Scan nach dem anderen ab und räumt stündlich auf. Das Backend legt nur A
 """
 from __future__ import annotations
 
+import gc
 import hashlib
 import logging
 import os
 import secrets
 import shutil
 import tempfile
+import threading
 import time
 from datetime import timedelta
 from pathlib import Path
@@ -31,8 +33,15 @@ from .ocr import auswertung, fusion, laden
 log = logging.getLogger("epm.scans")
 A = SystemEreignis.Art
 
-HAENGT_NACH = timedelta(minutes=15)   # ohne Lebenszeichen gilt eine laufende Erkennung als abgebrochen
-MAX_VERSUCHE = 3
+# Während der Erkennung schreibt der Dienst alle HERZSCHLAG_S Sekunden ein Lebenszeichen (eigener Faden, auch mitten
+# in einer langen Seite). Bleibt es länger als HAENGT_NACH aus, ist der Dienst beendet worden (Neustart, Speicher-
+# grenze) – der Scan kommt sofort wieder in die Warteschlange, nicht erst bei der stündlichen Bereinigung.
+HERZSCHLAG_S = 20
+HAENGT_NACH = timedelta(seconds=90)
+# Abbrüche ohne Fortschritt (keine Seite fertig geworden), danach Fehler. Eine einzelne Seite wird nach dem ersten
+# Abbruch sparsamer, nach dem zweiten nur mit Tesseract erkannt und nach dem dritten als Fehler markiert.
+MAX_VERSUCHE = 4
+MAX_ABBRUECHE_SEITE = 3
 
 
 class ScanFehler(ValueError):
@@ -79,6 +88,17 @@ def dienst_stand() -> dict | None:
     return daten
 
 
+def verfahren() -> dict:
+    """Bereitstehende Verfahren, wie der OCR-Dienst sie meldet (er allein lädt die Modelle und kennt seine
+    Speichergrenze); ohne frische Meldung aus dem Image geschätzt."""
+    from .ocr.erkennung import verfahren_stand
+
+    d = dienst_stand()
+    if d and d.get("laeuft") and isinstance(d.get("verfahren"), dict):
+        return d["verfahren"]
+    return verfahren_stand(laden=False)
+
+
 def stand(user=None) -> dict:
     """Zahlen für Navigation, Startseite und Systemseite."""
     e = Einstellungen.aktuell()
@@ -89,6 +109,10 @@ def stand(user=None) -> dict:
     return {
         "offen": qs.filter(status=Scan.Status.FERTIG).count(),
         "laufend": qs.filter(status__in=[Scan.Status.WARTET, Scan.Status.LAEUFT]).count(),
+        "in_arbeit": qs.filter(status=Scan.Status.LAEUFT).count(),
+        "wartend": qs.filter(status=Scan.Status.WARTET).count(),
+        # Seiten, bei denen der Dienst schon einmal abgebrochen wurde (meist Speichergrenze, siehe Systemseite)
+        "abbrueche": ScanSeite.objects.filter(Q(abbrueche__gt=0) | Q(info__sparstufe__gte=1), scan__in=qs).count(),
         "fehler": qs.filter(status=Scan.Status.FEHLER).count(),
         "gesamt": qs.count(),
         "laeuft_bald_ab": qs.filter(laeuft_ab_am__lte=jetzt + timedelta(hours=24)).count(),
@@ -104,8 +128,10 @@ def sichtbare_scans(user):
     """Scans, die diese Person sieht: Scans von Testbenutzern nur mit „Testdaten sehen“; Testbenutzer sehen nur
     Scans von Testbenutzern (wie bei den Akten)."""
     from accounts.rechte import sieht_testdaten
+    from epm.api_basis import patienten_fuer
 
-    qs = Scan.objects.all()
+    # Arbeitskopien von Akte-Dokumenten (F171) nur für Personen, die die Akte sehen (z. B. nicht bei Einschränkung)
+    qs = Scan.objects.filter(Q(quelldokument__isnull=True) | Q(quelldokument__patient__in=patienten_fuer(user)))
     if getattr(user, "ist_test", False):
         return qs.filter(ist_test=True)
     if not sieht_testdaten(user):
@@ -258,14 +284,80 @@ def bereinigen() -> dict:
                 with transaction.atomic():
                     entfernen(scan)
                 ergebnis["ohne_dateien"] = ergebnis.get("ohne_dateien", 0) + 1
-    # Hängende Aufträge zurücksetzen (OCR-Dienst neu gestartet)
-    for scan in Scan.objects.filter(status=Scan.Status.LAEUFT, lebenszeichen__lt=jetzt - HAENGT_NACH):
-        if scan.versuche >= MAX_VERSUCHE:
-            Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.FEHLER,
-                                                   fehler="Die Erkennung wurde mehrfach abgebrochen.")
-        else:
-            Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.WARTET, schritt="erneut in der Warteschlange")
+    ergebnis["abgebrochen"] = haengende_zuruecksetzen()
+    from . import dokumente
+
+    ergebnis["auftraege"] = dokumente.bereinigen()
     return ergebnis
+
+
+def haengende_zuruecksetzen() -> int:
+    """Aufträge ohne Lebenszeichen (der OCR-Dienst wurde beendet) zurück in die Warteschlange – nach zu vielen
+    Abbrüchen ohne Fortschritt als Fehler. Läuft bei jedem Durchlauf des Dienstes (eine Abfrage)."""
+    anzahl = 0
+    for scan in Scan.objects.filter(status=Scan.Status.LAEUFT, lebenszeichen__lt=timezone.now() - HAENGT_NACH):
+        anzahl += 1
+        if scan.versuche >= MAX_VERSUCHE:
+            Scan.objects.filter(pk=scan.pk).update(
+                status=Scan.Status.FEHLER, schritt="",
+                fehler="Die Erkennung wurde mehrfach abgebrochen (der Erkennungsdienst wurde beendet, vermutlich an "
+                       "seiner Speichergrenze). „Erneut erkennen“ versucht es noch einmal.")
+        else:
+            Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.WARTET,
+                                                   schritt="nach einem Abbruch erneut in der Warteschlange")
+    from . import dokumente
+
+    return anzahl + dokumente.haengende_zuruecksetzen(HAENGT_NACH)
+
+
+def geplant_beendet(scan: Scan):
+    """Der Dienst wird regulär beendet (Update, Neustart): Scan zurück in die Warteschlange, ohne dass es als Abbruch
+    zählt (die Seite wird beim nächsten Mal normal erkannt)."""
+    from django.db.models import F
+    from django.db.models.functions import Greatest
+
+    ScanSeite.objects.filter(scan_id=scan.pk, begonnen_am__isnull=False).update(begonnen_am=None)
+    Scan.objects.filter(pk=scan.pk, status=Scan.Status.LAEUFT).update(
+        status=Scan.Status.WARTET, schritt="Erkennungsdienst neu gestartet – geht gleich weiter",
+        versuche=Greatest(F("versuche") - 1, 0))
+
+
+class herzschlag:
+    """Solange der Block läuft, schreibt ein eigener Faden alle HERZSCHLAG_S Sekunden das Lebenszeichen des Scans
+    (und ruft ``zusatz`` auf, z. B. um die Datei für den Healthcheck zu berühren)."""
+
+    def __init__(self, scan, zusatz=None, takt: float = HERZSCHLAG_S):
+        # Scan oder Auftrag „Text erkennen“ (beide mit status „laeuft“ und lebenszeichen)
+        self.modell, self.scan_id, self.zusatz, self.takt = type(scan), scan.pk, zusatz, takt
+        self._stopp = threading.Event()
+        self._faden = threading.Thread(target=self._lauf, name="epm-ocr-herzschlag", daemon=True)
+
+    def schlag(self):
+        """Ein Lebenszeichen: Zeitpunkt am Scan, dazu ``zusatz`` (Healthcheck, Stand für die Systemseite)."""
+        self.modell.objects.filter(pk=self.scan_id, status="laeuft").update(lebenszeichen=timezone.now())
+        if self.zusatz:
+            self.zusatz()
+
+    def _lauf(self):
+        from django.db import connection
+
+        try:
+            while not self._stopp.wait(self.takt):
+                try:
+                    self.schlag()
+                except Exception:  # noqa: BLE001 – ein ausgefallener Herzschlag darf die Erkennung nicht stören
+                    log.warning("Lebenszeichen nicht geschrieben", exc_info=True)
+        finally:
+            connection.close()
+
+    def __enter__(self):
+        self._faden.start()
+        return self
+
+    def __exit__(self, *_):
+        self._stopp.set()
+        self._faden.join(timeout=5)
+        return False
 
 
 _zuletzt_bereinigt = 0.0
@@ -366,7 +458,7 @@ def _rohseite(seite: ScanSeite) -> laden.Rohseite:
                           exif={"kamera": "ja"} if seite.kamera else {})
 
 
-def seite_erkennen(seite: ScanSeite, paddle, woerterliste: str | None):
+def seite_erkennen(seite: ScanSeite, paddle, woerterliste: str | None, *, stufe: int = 0, schritt=None):
     from .ocr import erkennung
 
     auftrag = seite.auftrag or {"art": "seite"}
@@ -380,7 +472,7 @@ def seite_erkennen(seite: ScanSeite, paddle, woerterliste: str | None):
     else:
         textebene = (seite.einstellungen or {}).get("textebene", True) is not False
         auf, daten = erkennung.seite_erkennen(_rohseite(seite), seite.einstellungen, woerterliste=woerterliste,
-                                              paddle=paddle, textebene=textebene)
+                                              paddle=paddle, textebene=textebene, stufe=stufe, schritt=schritt)
         token = secrets.token_hex(6)
         sw = auf.bild.ndim == 2 and bool(np.isin(auf.bild[::7, ::7], (0, 255)).all())
         seite.bild = f"bild-{token}.{'png' if sw else 'jpg'}"
@@ -402,6 +494,8 @@ def seite_erkennen(seite: ScanSeite, paddle, woerterliste: str | None):
     seite.fehler = ""
     seite.auftrag = None
     seite.erkannt_am = timezone.now()
+    seite.begonnen_am = None
+    seite.abbrueche = 0  # gelungen; die Stufe steht in info["sparstufe"], „Anpassen“ versucht es wieder normal
     seite.save()
 
 
@@ -472,17 +566,37 @@ def bearbeiten(scan: Scan, paddle=None, abbrechen=lambda: False) -> Scan:
             for i, seite in enumerate(offen):
                 if abbrechen():
                     Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.WARTET, schritt="unterbrochen")
+                    ScanSeite.objects.filter(pk=seite.pk).update(begonnen_am=None)
                     return scan
-                _fortschritt(scan, 5 + int(90 * i / max(len(offen), 1)),
-                             f"Seite {i + 1} von {len(offen)} wird erkannt")
+                prozent = 5 + int(90 * i / max(len(offen), 1))
+                kopf = f"Seite {i + 1} von {len(offen)}"
+                # Stand der Vorversuche: war die Seite schon begonnen, wurde der Dienst dabei beendet
+                if seite.begonnen_am is not None:
+                    seite.abbrueche += 1
+                    log.warning("%s von %s: voriger Versuch abgebrochen (%s. Mal)", kopf, scan, seite.abbrueche)
+                if seite.abbrueche >= MAX_ABBRUECHE_SEITE:
+                    ScanSeite.objects.filter(pk=seite.pk).update(
+                        status=ScanSeite.Status.FEHLER, auftrag=None, begonnen_am=None, abbrueche=seite.abbrueche,
+                        fehler=f"Die Erkennung dieser Seite wurde {seite.abbrueche}-mal abgebrochen (vermutlich an der "
+                               "Speichergrenze des Erkennungsdienstes). Bitte die Seite anpassen (z. B. Ecken enger "
+                               "setzen) oder kleiner einscannen.")
+                    Scan.objects.filter(pk=scan.pk).update(versuche=0)
+                    continue
+                ScanSeite.objects.filter(pk=seite.pk).update(begonnen_am=timezone.now(), abbrueche=seite.abbrueche)
+                _fortschritt(scan, prozent, f"{kopf} wird erkannt")
                 try:
-                    seite_erkennen(seite, paddle, str(liste))
+                    seite_erkennen(seite, paddle, str(liste), stufe=seite.abbrueche,
+                                   schritt=lambda t, p=prozent, k=kopf: _fortschritt(scan, p, f"{k}: {t}"))
                 except ScanFehler:
+                    ScanSeite.objects.filter(pk=seite.pk).update(begonnen_am=None)
                     raise
                 except Exception as fehler:  # noqa: BLE001 – eine Seite darf die anderen nicht aufhalten
                     log.exception("Seite %s von %s nicht erkannt", seite.nr, scan)
                     ScanSeite.objects.filter(pk=seite.pk).update(status=ScanSeite.Status.FEHLER, auftrag=None,
-                                                                 fehler=str(fehler)[:500])
+                                                                 begonnen_am=None, fehler=str(fehler)[:500])
+                # Fortschritt: Abbrüche davor zählen nicht mehr gegen den Scan
+                Scan.objects.filter(pk=scan.pk).update(versuche=0)
+                gc.collect()  # große Bilder der Seite sofort freigeben
         scan.refresh_from_db()
         auswerten(scan)
         scan.status = Scan.Status.FERTIG

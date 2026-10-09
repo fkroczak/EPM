@@ -54,6 +54,32 @@ def _seite(*reihen):
 
 
 # ======================================================================= ohne Datenbank, ohne Erkennung
+class SparmodusTest(SimpleTestCase):
+    def test_modus_nach_speicher_und_einstellung(self):
+        from unittest import mock
+
+        from .ocr import paddle
+
+        with mock.patch.dict(os.environ, {"EPM_OCR_MODUS": "auto"}):
+            with mock.patch.object(paddle, "speicher_mb", return_value=1536):
+                self.assertEqual(paddle.modus(), "sparsam")   # Test-VM: 4 GB RAM, Grenze 1,5 GB
+            with mock.patch.object(paddle, "speicher_mb", return_value=3072):
+                self.assertEqual(paddle.modus(), "voll")      # VPS mit 8 GB, Grenze 3 GB
+            with mock.patch.object(paddle, "speicher_mb", return_value=None):
+                self.assertEqual(paddle.modus(), "voll")
+        with mock.patch.dict(os.environ, {"EPM_OCR_MODUS": "sparsam"}):
+            self.assertEqual(paddle.modus(), "sparsam")
+        with mock.patch.dict(os.environ, {"EPM_OCR_MODUS": "voll"}), \
+                mock.patch.object(paddle, "speicher_mb", return_value=1000):
+            self.assertEqual(paddle.modus(), "voll")
+
+    def test_speicher_wird_gelesen(self):
+        from .ocr import paddle
+
+        mb = paddle.speicher_mb()
+        self.assertTrue(mb is None or mb > 100)
+
+
 class EinheitenTest(SimpleTestCase):
     def test_lesefehler_der_einheiten(self):
         """Typische Fehler der Erkennung („dI“, „Hg/dl“ statt „µg/dl“, „mmol/1“) werden repariert."""
@@ -141,6 +167,20 @@ class AuswertungTest(SimpleTestCase):
         self.assertEqual(w["fettmasse_kg"]["wert"], "17.2")
         self.assertEqual(w["bcm_kg"]["wert"], "18.9")
         self.assertEqual(a["bia"]["weitere"][0]["name"], "Phasenwinkel")
+
+    def test_bia_andere_geraete(self):
+        """Englisches Protokoll (InBody-Art): ECW/TBW als Verhältnis, Muskelmasse unter „weitere“."""
+        seite = _seite("Body Composition Analysis 12.09.2026", "Weight 72,3 kg", "Total Body Water 38,1 L",
+                       "ECW/TBW 0,385", "Body Fat Mass 21,0 kg", "Skeletal Muscle Mass 28,4 kg", "Phase Angle 5,2 °")
+        a = auswertung.auswerten([seite], KATALOG_BEISPIEL)
+        self.assertIn("bia", a["arten"])
+        w = a["bia"]["werte"]
+        self.assertEqual(w["gewicht_kg"]["wert"], "72.3")
+        self.assertEqual(w["koerperwasser_l"]["wert"], "38.1")
+        self.assertEqual(w["fettmasse_kg"]["wert"], "21")
+        self.assertEqual(w["ecw_prozent"]["wert"], "38.5")
+        self.assertTrue(w["ecw_prozent"]["hinweise"])
+        self.assertEqual({x["name"] for x in a["bia"]["weitere"]}, {"Skelettmuskelmasse", "Phasenwinkel"})
 
     def test_arztbrief(self):
         seite = _seite("Klinikum Beispielstadt", "Beispielstadt, den 15.08.2026", "Sehr geehrte Frau Kollegin,",
@@ -534,6 +574,106 @@ class ScansApiTest(Grundlage):
         self.assertIn("Bild", d["fehler"])
         r = c.post(f"/api/scans/{scan['id']}/erneut/")
         self.assertEqual(r.json()["status"], "wartet")
+
+    # ---------------------------------------------------------------- Absturzschutz (09.10.2026)
+    def _zwei_seiten(self):
+        """Scan mit zwei Seiten, Seiten angelegt, aber noch nicht erkannt."""
+        inhalt = testbilder.pdf(testbilder.seite(testbilder.LABOR), testbilder.seite(testbilder.LABOR))
+        scan = Scan.objects.get(pk=self.hochladen(inhalt, "zwei.pdf")["id"])
+        dienst.seiten_anlegen(scan)
+        return scan
+
+    def test_abgebrochener_dienst_seite_wird_sparsam_wiederholt(self):
+        """Der Dienst stirbt mitten in Seite 2 (Speichergrenze): Nach 90 s ohne Lebenszeichen ist der Scan wieder in
+        der Warteschlange, Seite 1 bleibt erkannt, Seite 2 wird in Sparstufe 1 erkannt."""
+        scan = self._zwei_seiten()
+        s1, s2 = scan.seiten.order_by("nr")
+        # Seite 1 schon fertig, Seite 2 begonnen – dann Absturz
+        geholt = dienst.auftrag_holen()
+        self.assertEqual(geholt.pk, scan.pk)
+        dienst.seite_erkennen(s1, None, None)
+        ScanSeite.objects.filter(pk=s2.pk).update(begonnen_am=timezone.now())
+        # frisches Lebenszeichen: noch nicht zurücksetzen
+        self.assertEqual(dienst.haengende_zuruecksetzen(), 0)
+        Scan.objects.filter(pk=scan.pk).update(lebenszeichen=timezone.now() - timedelta(seconds=120))
+        self.assertEqual(dienst.haengende_zuruecksetzen(), 1)
+        scan.refresh_from_db()
+        self.assertEqual(scan.status, Scan.Status.WARTET)
+        self.erkennen()
+        scan.refresh_from_db()
+        self.assertEqual(scan.status, Scan.Status.FERTIG, scan.fehler)
+        s1.refresh_from_db(); s2.refresh_from_db()
+        self.assertEqual(s1.status, ScanSeite.Status.FERTIG)
+        self.assertNotIn("sparstufe", s1.info)
+        self.assertEqual(s2.status, ScanSeite.Status.FERTIG)
+        self.assertEqual(s2.info.get("sparstufe"), 1)
+        self.assertEqual((s2.abbrueche, s2.begonnen_am), (0, None))
+        self.assertIn("Kalium", s2.text)
+        self.assertEqual(dienst.stand()["abbrueche"], 1)
+        self.assertEqual(scan.versuche, 0)
+
+    def test_dritter_abbruch_markiert_nur_die_seite(self):
+        scan = self._zwei_seiten()
+        s1, s2 = scan.seiten.order_by("nr")
+        ScanSeite.objects.filter(pk=s2.pk).update(begonnen_am=timezone.now(), abbrueche=2)
+        self.erkennen()
+        scan.refresh_from_db(); s1.refresh_from_db(); s2.refresh_from_db()
+        self.assertEqual(scan.status, Scan.Status.FERTIG)
+        self.assertEqual(s1.status, ScanSeite.Status.FERTIG)
+        self.assertEqual(s2.status, ScanSeite.Status.FEHLER)
+        self.assertIn("3-mal abgebrochen", s2.fehler)
+        self.assertIsNone(s2.begonnen_am)
+
+    def test_sparstufe_2_nur_tesseract(self):
+        roh = laden.seiten_laden(self.labor_png(), 5)[1][0]
+        _auf, daten = seite_erkennen(roh, {}, paddle=object(), stufe=2)  # PP-OCR wird gar nicht angefasst
+        self.assertEqual(daten["verfahren"], ["tesseract"])
+        schritte = []
+        auf, _d = seite_erkennen(roh, {}, stufe=1, schritt=schritte.append)
+        self.assertEqual(auf.info["sparstufe"], 1)
+        self.assertIn("Tesseract liest", schritte)
+        self.assertEqual(schritte[0], "Blatt suchen und entzerren")
+
+    def test_zu_viele_abbrueche_ohne_fortschritt(self):
+        scan = self._zwei_seiten()
+        Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.LAEUFT, versuche=dienst.MAX_VERSUCHE,
+                                               lebenszeichen=timezone.now() - timedelta(minutes=5))
+        dienst.haengende_zuruecksetzen()
+        scan.refresh_from_db()
+        self.assertEqual(scan.status, Scan.Status.FEHLER)
+        self.assertIn("mehrfach abgebrochen", scan.fehler)
+
+    def test_geplantes_beenden_zaehlt_nicht_als_abbruch(self):
+        scan = self._zwei_seiten()
+        geholt = dienst.auftrag_holen()
+        s2 = scan.seiten.order_by("nr").last()
+        ScanSeite.objects.filter(pk=s2.pk).update(begonnen_am=timezone.now())
+        dienst.geplant_beendet(geholt)
+        scan.refresh_from_db(); s2.refresh_from_db()
+        self.assertEqual(scan.status, Scan.Status.WARTET)
+        self.assertEqual(scan.versuche, 0)
+        self.assertIsNone(s2.begonnen_am)
+        self.erkennen()
+        s2.refresh_from_db()
+        self.assertNotIn("sparstufe", s2.info)
+
+    def test_herzschlag_schreibt_lebenszeichen(self):
+        import time as zeit
+
+        scan = self._zwei_seiten()
+        geholt = dienst.auftrag_holen()
+        alt = timezone.now() - timedelta(minutes=10)
+        Scan.objects.filter(pk=scan.pk).update(lebenszeichen=alt)
+        aufrufe = []
+        # der Faden schlägt im Takt (eigene Verbindung – sieht die Testdaten der offenen Transaktion nicht) …
+        with dienst.herzschlag(geholt, zusatz=lambda: aufrufe.append(1), takt=0.05):
+            zeit.sleep(0.4)
+        self.assertGreaterEqual(len(aufrufe), 3)
+        # … und jeder Schlag schreibt das Lebenszeichen
+        dienst.herzschlag(geholt).schlag()
+        scan.refresh_from_db()
+        self.assertGreater(scan.lebenszeichen, alt)
+        self.assertEqual(dienst.haengende_zuruecksetzen(), 0)
 
     @classmethod
     def tearDownClass(cls):

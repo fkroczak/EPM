@@ -18,6 +18,9 @@
   `werkzeuge/ocr-modelle.sh vorbereiten` (Windows: `werkzeuge\ocr-modelle.ps1`) → Datei per `scp` auf die Test-VM →
   `sudo epm-ocr-modelle einspielen DATEI.tar` → `sudo epm-update` (baut das Image mit den Modellen neu;
   `sudo epm-ocr-modelle status` zeigt den Stand)
+  Auf Servern mit wenig RAM (unter 6 GB) arbeitet die Texterkennung automatisch im Sparmodus (kleines Zeilenmodell,
+  ohne Glätten); Speichergrenze und Rechenkerne des OCR-Dienstes trägt `04-projekt.sh` einmalig nach dem Server in
+  `/srv/epm/.env` ein (`EPM_OCR_SPEICHER`, `EPM_OCR_THREADS`, Modus erzwingen mit `EPM_OCR_MODUS=voll|sparsam`)
 - `epm-web` – Nginx mit dem gebauten Frontend (`frontend/Dockerfile`). Zum Bauen braucht der Server Zugang zu
   `registry.npmjs.org` (Proxy-Freigabe); ohne Zugang die Images mit `werkzeuge/bauen.sh` auf einem anderen Rechner bauen
   und als `epm-<VERSION>.tar` mit `rollout/05-backend.sh` einspielen.

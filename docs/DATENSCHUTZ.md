@@ -107,6 +107,10 @@ erkanntem Text, `DokumentText`, der mit dem Dokument gelöscht wird) und verschw
 vor dem Zuordnen keinen Titel. Scan-Dateien sind nicht in der Sicherung; eine wiederhergestellte Datenbankzeile ohne
 Dateien wird beim nächsten Aufräumen entfernt. Werte (Labor, BIA, Diagnosen) gelangen nur nach Bestätigung je Zeile in
 die Akte.
+„Text erkennen“ an einem Dokument der Akte (F170) ersetzt dessen Datei durch dieselbe PDF/A mit Textebene; Verlauf und
+Audit-Log nennen beide Prüfsummen. Beim endgültigen Löschen werden alle Fassungen geschwärzt und in der Löschliste
+geführt, sodass auch eine ältere Sicherung das Dokument nicht zurückbringt. Dafür bindet der OCR-Dienst das
+Dokumentenverzeichnis ein. Ghostscript (für OCRmyPDF) steht unter AGPL – unkritisch für den Betrieb auf eigenen Servern.
 
 **Sicherungen:** Eine ältere Sicherung enthält gelöschte Akten und Dokumente noch bis zu ihrem Ablauf (30 Tage). Jede
 Löschung steht in der Löschliste (`data/loeschliste/loeschliste.jsonl`: dieselben Angaben wie im Löschprotokoll, kein

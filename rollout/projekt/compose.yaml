@@ -83,11 +83,14 @@ services:
       EPM_DOKUMENTE: /data/dokumente
       EPM_SCANS: /data/scans
       EPM_OCR_THREADS: ${EPM_OCR_THREADS:-2}
+      EPM_OCR_MODUS: ${EPM_OCR_MODUS:-auto}
       EPM_VERSION: ${EPM_VERSION}
       TZ: Europe/Berlin
     secrets: [db_password, django_secret_key]
     volumes:
       - ./data/scans:/data/scans
+      # „Text erkennen“ (F170): ersetzt die Datei eines Dokuments durch dieselbe PDF mit Textebene
+      - ./data/dokumente:/data/dokumente
     networks: [intern]
     read_only: true
     tmpfs: [/tmp]
@@ -96,6 +99,9 @@ services:
     # Obergrenze für den Speicher (in .env änderbar); die Rechenzeit begrenzen niedrige Priorität (nice) und
     # EPM_OCR_THREADS – eine feste CPU-Grenze würde auf Servern mit weniger Kernen den Start verhindern
     mem_limit: ${EPM_OCR_SPEICHER:-3g}
+    # kein zusätzlicher Swap: Reicht der Speicher nicht, bricht der Dienst sofort ab (die Seite wird dann sparsamer
+    # erkannt) – statt die ganze VM ins Auslagern zu treiben (Test-VM 09.10.2026: Swap voll, alles langsam)
+    memswap_limit: ${EPM_OCR_SPEICHER:-3g}
     healthcheck:
       # der Dienst berührt die Datei bei jedem Durchlauf (zwischen zwei Seiten höchstens wenige Minuten)
       test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time()-os.path.getmtime('/tmp/epm-ocr-lebt') < 900 else 1)"]

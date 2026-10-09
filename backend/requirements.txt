@@ -19,3 +19,4 @@ pypdfium2>=5.13,<6
 reportlab>=5.0,<5.1
 pillow>=12.3,<13
 pillow-heif>=1.0,<2          # HEIC/HEIF (Fotos vom iPhone)
+ocrmypdf>=16,<18             # „Text erkennen“ an Dokumenten der Akte (F170): Textebene über das Original, PDF/A
