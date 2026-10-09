@@ -302,7 +302,9 @@ body {
 @media (min-width: 120rem) { .raster { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (min-width: 160rem) { .raster { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 .kachel { min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; }
-.kachel > .kachel-inhalt { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+/* der Inhalt steckt in einem display:contents-Wrapper (inert beim Anpassen) – daher beide Wege; ohne diese Regel lief
+   langer Inhalt über die Kachel hinaus (Fehler 09.10.2026) */
+.kachel > .kachel-inhalt, .kachel > .contents > .kachel-inhalt { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .kachel.bearbeiten { outline: 2px dashed var(--akzent); outline-offset: -2px; }
 .kachel.zieht { opacity: 0.45; }
 .kachel.ziel { box-shadow: 0 0 0 3px var(--akzent); }
@@ -753,3 +755,15 @@ html { scrollbar-gutter: stable; }
   .seitenkopf h1 { white-space: normal; overflow-wrap: break-word; }
   .seitenkopf-unter { max-width: 100%; white-space: normal; }
 }
+
+/* Datenschutz (Wunsch 09.10.2026 „besser designen“): Kennzahlen als Leiste mit Ampel, Abschnitte mit Symbol */
+.ds-zahlen > .ds-zahl { border-left: 1px solid var(--rand); border-top: 1px solid var(--rand); margin: -1px 0 0 -1px; }
+.ds-punkt { width: 0.625rem; height: 0.625rem; border-radius: 999px; flex-shrink: 0; background: var(--ok); }
+.ds-punkt.warn { background: var(--ladebalken); }
+.ds-punkt.fehler { background: var(--fehler); }
+.ds-symbol {
+  width: 2.25rem; height: 2.25rem; border-radius: 0.625rem; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  background: var(--ok-bg); color: var(--ok);
+}
+.ds-symbol.warn { background: var(--warn-bg); color: var(--warn); }
+.ds-symbol.fehler { background: var(--fehler-bg); color: var(--fehler); }
