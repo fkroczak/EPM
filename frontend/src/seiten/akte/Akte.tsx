@@ -327,13 +327,14 @@ function Reiter({ zu, text, zahl: anzahl, ende, senkrecht, kuerzel }: ReiterEint
     return (
       <NavLink to={zu} end={ende} title={kuerzel} className={({ isActive }) => cx("vreiter no-underline", isActive && "aktiv")}>
         <span className="truncate">{text}</span>
-        {anzahl !== undefined ? <span className="num opacity-70 vreiter-zahl">{zahl(anzahl)}</span> : null}
+        {anzahl ? <span className="num opacity-70 vreiter-zahl">{zahl(anzahl)}</span> : null}
       </NavLink>
     );
   }
   return (
     <NavLink to={zu} end={ende} title={kuerzel} className={({ isActive }) => cx("segment no-underline", isActive && "aktiv")}>
-      {text}{anzahl !== undefined ? <span className="num ml-1.5 opacity-70">{zahl(anzahl)}</span> : null}
+      {/* Zähler nur, wo etwas da ist – „0“ an jedem leeren Reiter war Lärm (Wunsch 10.10.2026) */}
+      {text}{anzahl ? <span className="num ml-1.5 opacity-70">{zahl(anzahl)}</span> : null}
     </NavLink>
   );
 }
@@ -350,6 +351,66 @@ function Angabezeile({ a }: { a: Angabe }) {
     <div className="grid grid-cols-[7.75rem_minmax(0,1fr)] gap-x-3 items-baseline min-w-0" title={a.hinweis}>
       <span className="text-[0.8125rem] gedaempft md:truncate">{a.titel}</span>
       <span className="text-sm min-w-0 md:truncate max-md:[overflow-wrap:anywhere]">{a.inhalt}</span>
+    </div>
+  );
+}
+
+/** „heute“, „gestern“, „vor 12 Tagen“ – wie lange der letzte Kontakt her ist */
+function vorTagen(tag: string): string {
+  const tage = Math.round((new Date(heuteIso()).getTime() - new Date(tag.slice(0, 10)).getTime()) / 86400000);
+  return tage <= 0 ? "heute" : tage === 1 ? "gestern" : `vor ${zahl(tage)} Tagen`;
+}
+
+/** Große Kennzahl im Kopf (Stufe „voll“): Bezeichnung, Wert, eine Zeile darunter */
+function Kopfzahl({ titel, wert, unter, hinweis }: { titel: string; wert: ReactNode; unter?: ReactNode; hinweis?: string }) {
+  return (
+    <div className="flex flex-col gap-0.5 min-w-0" title={hinweis}>
+      <span className="text-[0.75rem] gedaempft">{titel}</span>
+      <span className="text-[1.125rem] font-semibold leading-snug min-w-0 md:truncate">{wert}</span>
+      {unter ? <span className="text-[0.75rem] gedaempft min-w-0 md:truncate">{unter}</span> : null}
+    </div>
+  );
+}
+
+/** Kleine Angabe in der zweiten Zeile des Kopfs: „Titel Wert“, gekürzt, ganz im Tooltip */
+function Kopfangabe({ a }: { a: Angabe }) {
+  return (
+    <div className="inline-flex items-baseline gap-1.5 min-w-0 max-w-full md:max-w-[22rem]" title={a.hinweis}>
+      <span className="gedaempft shrink-0">{a.titel}</span>
+      <span className="min-w-0 md:truncate max-md:[overflow-wrap:anywhere]">{a.inhalt}</span>
+    </div>
+  );
+}
+
+/**
+ * Kopf der Akte, Stufe „voll“ (Wunsch 10.10.2026: „überfüllte Übersicht, zu viele Infos“): vorn vier große Werte –
+ * Gewicht, Infusionsplan, nächster Termin, letzter Kontakt –, darunter eine schmale Zeile mit Versorgung und
+ * Hinweisen. Telefon und Versicherung stehen in der Karte „Anschrift und Kontakt“ der Übersicht.
+ */
+function KopfVoll({ angabe, unter, bearbeiten }: { angabe: Record<string, Angabe>; unter: Record<string, ReactNode>;
+  bearbeiten?: () => void }) {
+  return (
+    <div className="border-t border-rand pt-3.5 flex flex-col gap-3" data-testid="kennzahlen">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+        <div role="group" aria-label="Ernährung" className="grid grid-cols-2 gap-x-6 min-w-0">
+          <Kopfzahl titel="Gewicht" wert={angabe.gewicht.inhalt} unter={unter.gewicht} hinweis={angabe.gewicht.hinweis} />
+          <Kopfzahl titel="Infusionsplan" wert={angabe.plan.inhalt} unter={unter.plan} hinweis={angabe.plan.hinweis} />
+        </div>
+        <div role="group" aria-label="Termine und Kontakt" className="grid grid-cols-2 gap-x-6 min-w-0 md:border-l md:border-rand md:pl-6">
+          <Kopfzahl titel="Nächster Termin" wert={unter.terminWann ?? "—"} unter={unter.terminWo} hinweis={angabe.termin.hinweis} />
+          <Kopfzahl titel="Letzter Kontakt" wert={angabe.kontakt.inhalt} unter={unter.kontakt} />
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-1.5 border-t border-fein pt-2.5 pb-1 text-[0.8125rem]">
+        <div role="group" aria-label="Versorgung" className="flex flex-wrap items-center gap-x-5 gap-y-1 min-w-0">
+          {[angabe.versorger, angabe.ansprechpartner, angabe.hausarzt, angabe.katheter].map((a) => <Kopfangabe key={a.titel} a={a} />)}
+          {bearbeiten ? <button type="button" className="btn geist icon !h-6 !w-6 nicht-drucken" aria-label="Versorgung bearbeiten"
+            title="Stammdaten bearbeiten" onClick={bearbeiten}><Icon name="stift" groesse={13} /></button> : null}
+        </div>
+        <div role="group" aria-label="Hinweise und Auskunft" className="flex flex-wrap items-center gap-x-5 gap-y-1 min-w-0">
+          {[angabe.nickel, angabe.auskunft].map((a) => <Kopfangabe key={a.titel} a={a} />)}
+        </div>
+      </div>
     </div>
   );
 }
@@ -828,7 +889,13 @@ export function Akte() {
           {aktionen(false)}
         </div>
         {k && stufe === "voll" && angabe ? (
-          <div className="border-t border-rand pt-3.5" data-testid="kennzahlen"><Gruppen gruppen={gruppen} art="kopf" /></div>
+          <KopfVoll angabe={angabe} bearbeiten={kontext.bearbeiten ? () => setDialog("stammdaten") : undefined} unter={{
+            gewicht: [k.bmi != null ? `BMI ${zahl(k.bmi, 1)}` : "", k.gewicht ? `gemessen ${datum(k.gewicht.am)}` : ""].filter(Boolean).join(" · ") || undefined,
+            plan: k.aktueller_plan ? `gültig ab ${datum(k.aktueller_plan.gueltig_ab)}` : undefined,
+            terminWann: k.naechster_termin ? terminZeit(k.naechster_termin.faellig_am, k.naechster_termin.uhrzeit) : undefined,
+            terminWo: k.naechster_termin ? k.naechster_termin.ort ?? TERMINARTEN[k.naechster_termin.art] : undefined,
+            kontakt: k.letzter_kontakt ? vorTagen(k.letzter_kontakt) : undefined,
+          }} />
         ) : null}
         {k && stufe === "kompakt" && angabe ? (
           <div className="overflow-hidden -mx-3 sm:-mx-[1.125rem]">
