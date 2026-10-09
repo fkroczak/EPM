@@ -640,6 +640,57 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
             antwort["X-EPM-Dokument"] = str(abgelegt.pk)
         return antwort
 
+    @action(detail=True, methods=["post"], permission_classes=[EintragRecht])
+    def schreiben(self, request, pk=None):
+        """Schreiben an den Patienten aus einer Dokumentvorlage (F172): Patientenaufnahme, Terminbestätigung,
+        Reisebescheinigung.
+
+        ``{"art", "ausgabe": "pdf"|"email"|"eml", "termin"?, "tage"?, "attest"?, "ablegen"?, "anlagen"?,
+        "betreff"?, "text"?, "an"?}`` – ``pdf`` liefert die PDF, ``email`` Empfänger, Betreff und Text aus der
+        Vorlage (zum Anpassen im Dialog), ``eml`` eine fertige E-Mail mit der PDF und den gewählten Anlagen im
+        Anhang. ``ablegen`` legt die PDF zusätzlich als Dokument der Akte ab (nur offene Akten)."""
+        from vorlagen.felder import Kontext
+        from vorlagen.pdf import als_dokument, wasserzeichen_fuer
+        from vorlagen.schreiben import AUS_DER_AKTE, ausgeben, dateiname_sicher
+        from vorlagen.models import Dokumentvorlage
+
+        patient = self.get_object()
+        d = request.data
+        art = d.get("art")
+        if art not in AUS_DER_AKTE:
+            return Response({"art": "Bitte ein Schreiben wählen."}, status=status.HTTP_400_BAD_REQUEST)
+        termin = None
+        if AUS_DER_AKTE[art]["termin"]:
+            termin = Termin.objects.filter(patient=patient, pk=d.get("termin") if isinstance(d.get("termin"), int)
+                                           else None).select_related("ort").first()
+            if termin is None:
+                return Response({"termin": "Bitte einen Termin wählen."}, status=status.HTTP_400_BAD_REQUEST)
+        tage = d.get("tage")
+        if tage not in (None, "") and (not isinstance(tage, int) or isinstance(tage, bool) or not 1 <= tage <= 999):
+            return Response({"tage": "Reisedauer in Tagen (1 bis 999)."}, status=status.HTTP_400_BAD_REQUEST)
+        ablegen = d.get("ablegen") is True and d.get("ausgabe", "pdf") != "email"
+        if ablegen:
+            pruefe_schreibbereich(request.user, patient)
+            patient.pruefe_bearbeitbar()
+        name = Dokumentvorlage.Art(art).label
+        kontext = Kontext(patient=patient, termin=termin, benutzer=request.user)
+        heute = timezone.localdate()
+        dateiname = dateiname_sicher(f"{name.split(' (')[0]}-{patient.nachname}-{heute:%Y-%m-%d}")
+        optionen = {"attest": d.get("attest") is not False, "tage": tage or None} \
+            if art == Dokumentvorlage.Art.REISEBESCHEINIGUNG else {}
+        antwort, pdf = ausgeben(request, art, kontext, dateiname, f"{name} – {patient.nachname}, {patient.vorname}",
+                                wasserzeichen=wasserzeichen_fuer(patient), an=patient.email or "", pdf_optionen=optionen)
+        if pdf is None:
+            return antwort
+        abgelegt = None
+        if ablegen:
+            titel = name.split(" (")[0] + (f" für den {termin.faellig_am:%d.%m.%Y}" if termin else f" vom {heute:%d.%m.%Y}")
+            abgelegt = als_dokument(patient, pdf, titel, "Schreiben", heute, request.user, f"{dateiname}.pdf")
+            antwort["X-EPM-Dokument"] = str(abgelegt.pk)
+        protokolliere(SystemEreignis.Art.EXPORT, request, objekt=akte_text(patient), was=name,
+                      ausgabe=d.get("ausgabe", "pdf"), abgelegt=bool(abgelegt), patient_id=patient.id)
+        return antwort
+
     @action(detail=True, methods=["get"], url_path="verlauf/pdf")
     def verlauf_pdf(self, request, pk=None):
         """Verlauf als PDF (F24), mit denselben Filtern wie die Ansicht."""
@@ -2024,3 +2075,46 @@ class KalenderViewSet(viewsets.ViewSet):
         if str(p.get("faelligkeiten", "1")).lower() not in ("0", "false", "nein"):
             daten["faelligkeiten"], daten["grenzen"] = faelligkeiten(patienten, bis)
         return Response(daten)
+
+    @action(detail=False, methods=["post"], permission_classes=[EintragRecht])
+    def ankuendigung(self, request):
+        """Patientenankündigung für die Sprechstunden (F173): alle Praxistermine im Zeitraum, nach Tag und Uhrzeit.
+
+        ``{"von", "bis", "ort"?, "ausgabe": "pdf"|"email"|"eml", "anlagen"?, "betreff"?, "text"?, "an"?}`` –
+        ``ort`` ist der Terminort der Sprechstunde (Termine an anderen Orten, z. B. „Telefon“, stehen mit diesem Ort
+        als Hinweis in der Liste). Testpatienten erscheinen nicht; ausgeblendete Termine auch nicht."""
+        from vorlagen.felder import Kontext
+        from vorlagen.schreiben import ausgeben
+
+        d = request.data
+        von, bis = _datum(str(d.get("von") or "")), _datum(str(d.get("bis") or ""))
+        fehler = {}
+        if von is None:
+            fehler["von"] = "Bitte ein Datum (JJJJ-MM-TT) angeben."
+        if bis is None:
+            fehler["bis"] = "Bitte ein Datum (JJJJ-MM-TT) angeben."
+        if not fehler and bis < von:
+            fehler["bis"] = "„bis“ liegt vor „von“."
+        if not fehler and (bis - von).days > 62:
+            fehler["bis"] = "Höchstens zwei Monate auf einmal."
+        ort = None
+        if d.get("ort") not in (None, ""):
+            ort = Auswahlwert.objects.filter(pk=d.get("ort") if isinstance(d.get("ort"), int) else None,
+                                             liste=Auswahlwert.Liste.TERMINORT).first()
+            if ort is None:
+                fehler["ort"] = "Unbekannter Terminort."
+        if fehler:
+            return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
+        termine = list(sichtbare_termine(Termin.objects.filter(
+            patient__in=patienten_fuer(request.user).filter(ist_test=False), art=Termin.Art.PRAXISTERMIN,
+            faellig_am__range=(von, bis))).select_related("patient", "ort")
+            .order_by("faellig_am", F("uhrzeit").asc(nulls_last=True), "id"))
+        kontext = Kontext(patient=None, zeitraum=(von, bis), terminort=ort, termine=termine, benutzer=request.user)
+        dateiname = f"Patientenankuendigung-{von:%Y-%m-%d}"
+        antwort, pdf = ausgeben(request, "patientenankuendigung", kontext, dateiname,
+                                f"Patientenankündigung {von:%d.%m.%Y}–{bis:%d.%m.%Y}")
+        if pdf is not None:
+            protokolliere(SystemEreignis.Art.EXPORT, request, objekt="Patientenankündigung",
+                          was="Patientenankündigung", von=str(von), bis=str(bis), termine=len(termine),
+                          ausgabe=d.get("ausgabe", "pdf"))
+        return antwort

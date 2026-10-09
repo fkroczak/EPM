@@ -30,8 +30,8 @@ AUSWAHLWERTE = {
     # „Einwilligung/Datenschutz“: unterschriebene Erklärungen; „Freigabe“: Nachweis der Freigabe eines Plans (E-Mail)
     # „Bericht“ und „Sprechstunde“: von EPM erzeugte PDFs (F115, F116); „BIA“: Geräteprotokoll der Messung
     Auswahlwert.Liste.DOKUMENTTYP: ["Arztbrief", "Labor", "BIA", "Infusionsplan", "Bild", "Patientendatenblatt",
-                                    "Bericht", "Sprechstunde", "Sonstiges", "Einwilligung/Datenschutz", "Freigabe"],
-    Auswahlwert.Liste.TERMINORT: ["Praxis Dr. Holtmeier"],
+                                    "Bericht", "Sprechstunde", "Schreiben", "Sonstiges", "Einwilligung/Datenschutz", "Freigabe"],
+    Auswahlwert.Liste.TERMINORT: ["Praxis Dr. Holtmeier", "Telefon/Video"],
     # Festlegung 01.10.2026: Beziehung der Bezugsperson, unter Vorlagen › Auswahllisten erweiterbar
     Auswahlwert.Liste.BEZIEHUNG: ["Mutter", "Vater", "Ehepartner/in", "Kind", "Betreuer/in (gesetzlich)",
                                   "Pflegedienst", "Sonstige"],

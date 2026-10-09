@@ -376,10 +376,11 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | 
             teile.append(f'<div class="{_klassen(b)}">{briefkopf_html(b.get("absender", True), b.get("linienfarbe"), b.get("falzmarken", False), b.get("mit_linie", True), neben)}</div>')
         elif typ == "zweispaltig":
             links, _ = ersetze.zeilen(b.get("links", ""))
-            rechts, _ = ersetze.zeilen(b.get("rechts", ""))
+            # eigener Name: „rechts“ ist die rechte Fußzeile (ohne Fußzeilen-Block stand sonst die rechte Spalte unten)
+            spalte, _ = ersetze.zeilen(b.get("rechts", ""))
             klein = " klein" if b.get("rechts_klein") else ""
             teile.append(f'<div class="{_klassen(b)} spalten"><div class="links">{links}</div>'
-                         f'<div class="rechts{klein}">{rechts}</div></div>')
+                         f'<div class="rechts{klein}">{spalte}</div></div>')
         elif typ == "titel":
             if b is titel_neben:
                 continue
