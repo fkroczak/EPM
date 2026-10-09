@@ -403,11 +403,13 @@ function KopfVoll({ angabe, unter, bearbeiten }: { angabe: Record<string, Angabe
       </div>
       <div className="flex flex-wrap items-center gap-x-8 gap-y-1.5 border-t border-fein pt-2.5 pb-1 text-[0.8125rem]">
         <div role="group" aria-label="Versorgung" className="flex flex-wrap items-center gap-x-5 gap-y-1 min-w-0">
+          <span className="sr-only">Versorgung:</span>
           {[angabe.versorger, angabe.ansprechpartner, angabe.hausarzt, angabe.katheter].map((a) => <Kopfangabe key={a.titel} a={a} />)}
           {bearbeiten ? <button type="button" className="btn geist icon !h-6 !w-6 nicht-drucken" aria-label="Versorgung bearbeiten"
             title="Stammdaten bearbeiten" onClick={bearbeiten}><Icon name="stift" groesse={13} /></button> : null}
         </div>
         <div role="group" aria-label="Hinweise und Auskunft" className="flex flex-wrap items-center gap-x-5 gap-y-1 min-w-0">
+          <span className="sr-only">Hinweise und Auskunft:</span>
           {[angabe.nickel, angabe.auskunft].map((a) => <Kopfangabe key={a.titel} a={a} />)}
         </div>
       </div>

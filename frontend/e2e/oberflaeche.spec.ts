@@ -242,7 +242,8 @@ test("Volle Breite in Stufen: 1920 px – Karten der Akte im Raster, Größe je 
   const reiter = page.getByRole("navigation", { name: "Aktenbereiche" });
   await reiter.getByRole("link", { name: /^Diagnosen/ }).click();
   await expect(page.getByTestId("diagnosen")).toBeVisible();
-  await expect(page.getByTestId("eintragsliste")).toBeVisible();
+  // Diagnosen seit 10.10.2026 als zusammenhängende Liste wie im Arztbrief, daneben die Notizen
+  await expect(page.getByTestId("diagnoseliste")).toBeVisible();
   await expect(page.getByTestId("karte-diagnose")).toBeVisible();
   await reiter.getByRole("link", { name: /^Therapie/ }).click();
   await expect(page.getByTestId("karte-therapie")).toBeVisible();

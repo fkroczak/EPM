@@ -767,3 +767,23 @@ html { scrollbar-gutter: stable; }
 }
 .ds-symbol.warn { background: var(--warn-bg); color: var(--warn); }
 .ds-symbol.fehler { background: var(--fehler-bg); color: var(--fehler); }
+
+/* Diagnosen als Liste wie im Arztbrief (Wunsch 10.10.2026): Code-Marke, Bezeichnung, Aktionen */
+.diagnose-zeile {
+  display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) auto; gap: 0.25rem 1rem; align-items: start;
+  padding: 0.75rem 1.25rem; border-top: 1px solid var(--fein);
+}
+.diagnose-zeile.markiert { background: var(--akzent-weich); }
+.diagnose-zeile.beendet { color: var(--gedaempft); }
+.diagnose-code {
+  display: inline-flex; align-items: baseline; gap: 0.25rem; justify-self: start; white-space: nowrap;
+  font: 500 0.8125rem var(--font-mono); padding: 0.125rem 0.5rem; border-radius: 0.375rem;
+  background: var(--akzent-weich); color: var(--akzent-text);
+}
+.diagnose-code .diagnose-kz { font-weight: 600; opacity: 0.75; }
+.diagnose-code.anders { background: var(--warn-bg); color: var(--warn); }
+.diagnose-code.beendet { background: var(--fein); color: var(--gedaempft); }
+@media (max-width: 47.99rem) {
+  .diagnose-zeile { grid-template-columns: auto minmax(0, 1fr); padding: 0.75rem; }
+  .diagnose-zeile > :last-child { grid-column: 1 / -1; justify-content: flex-start; }
+}
