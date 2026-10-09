@@ -114,7 +114,7 @@ class SchreibenTest(Grundlage):
         from pypdf import PdfReader
 
         leser = PdfReader(io.BytesIO(r.content))
-        self.assertEqual(len(leser.pages), 3)  # Bescheinigung (2 Seiten) + ADAC-Attest
+        self.assertEqual(len(leser.pages), 2)  # Bescheinigung (eine Seite) + ADAC-Attest
         felder = leser.get_fields()
         self.assertTrue(felder["Name des PatientenPatients namenom du patientnombre del paciente"]["/V"]
                         .startswith("Marija Kaufmann, geb. "))
@@ -197,3 +197,45 @@ class SchreibenTest(Grundlage):
                 mail = c.post(f"/api/vorlagen/{art}/vorschau/", {"patient": test.id, "ausgabe": "email"},
                               format="json").json()
                 self.assertTrue(mail["betreff"])
+
+    def test_eigenes_schreiben(self):
+        """F176: unter Vorlagen ein eigenes Schreiben anlegen, bearbeiten, aus der Akte erzeugen, deaktivieren."""
+        admin = client_fuer(self.mitarbeiter)
+        self.assertEqual(client_fuer(self.betrachter).post("/api/vorlagen/", {"name": "x"}, format="json").status_code, 403)
+        self.assertEqual(admin.post("/api/vorlagen/", {"name": ""}, format="json").status_code, 400)
+        self.assertEqual(admin.post("/api/vorlagen/", {"name": "Reisebescheinigung"}, format="json").status_code, 400)
+        r = admin.post("/api/vorlagen/", {"name": "Rezeptanforderung", "beschreibung": "an den Hausarzt",
+                                          "mit_termin": True}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        art = r.json()["art"]
+        self.assertTrue(art.startswith("eigen-"))
+        self.assertEqual((r.json()["name"], r.json()["aktiv"]["version"]), ("Rezeptanforderung", 1))
+        self.assertIn(art, [v["art"] for v in admin.get("/api/vorlagen/").json()])
+        self.assertEqual(admin.post("/api/vorlagen/", {"name": "rezeptanforderung"}, format="json").status_code, 400)
+        d = admin.get(f"/api/vorlagen/{art}/").json()
+        self.assertIn("email", [b["typ"] for b in d["bausteine"]])
+        self.assertIn("Termin.Datum", [f["name"] for f in d["felder"]])
+
+        # Entwurf bearbeiten und veröffentlichen
+        bloecke = admin.get(f"/api/vorlagen/{art}/entwurf/").json()["bloecke"]
+        inhalt = next(b for b in bloecke if b["id"] == "inhalt")
+        inhalt["text"] = "{{Patient.Briefanrede}},\n\nbitte stellen Sie ein Rezept aus (Termin {{Termin.Datum}})."
+        self.assertEqual(admin.put(f"/api/vorlagen/{art}/entwurf/", {"bloecke": bloecke}, format="json").status_code, 200)
+        self.assertEqual(admin.post(f"/api/vorlagen/{art}/veroeffentlichen/").status_code, 200)
+
+        liste = self.c.get("/api/schreiben/").json()
+        self.assertEqual([x["name"] for x in liste if x["eigen"]], ["Rezeptanforderung"])
+        self.assertEqual(self.schreiben(art=art).status_code, 400)  # Termin fehlt
+        r = self.schreiben(art=art, termin=self.termin.id, ablegen=True)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIn(kompakt(f"bitte stellen Sie ein Rezept aus (Termin"), kompakt(pdf_text(r.content)))
+        self.assertIn(f"{self.tag:%d.%m.%Y}", pdf_text(r.content))
+        self.assertIn("Rezeptanforderung", Dokument.objects.get(pk=r["X-EPM-Dokument"]).titel)
+        mail = self.schreiben(art=art, termin=self.termin.id, ausgabe="email").json()
+        self.assertEqual(mail["betreff"], "Rezeptanforderung")
+
+        # deaktivieren: nicht mehr wählbar
+        self.assertEqual(admin.patch(f"/api/vorlagen/{art}/eigen/", {"aktiv": False}, format="json").status_code, 200)
+        self.assertNotIn(art, [x["art"] for x in self.c.get("/api/schreiben/").json()])
+        self.assertEqual(self.schreiben(art=art, termin=self.termin.id).status_code, 400)
+        self.assertEqual(self.schreiben(art="eigen-gibtsnicht").status_code, 400)

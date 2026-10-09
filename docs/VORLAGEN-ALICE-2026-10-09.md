@@ -17,6 +17,10 @@ fertigen Entwurf mit Empfänger, Betreff, Text und PDF im Anhang – prüfen und
 Baustein „E-Mail“ der jeweiligen Dokumentvorlage (Vorlagen › Dokumentvorlagen) und lassen sich dort dauerhaft bzw. im
 Dialog für die eine E-Mail ändern.
 
+**Eigene Vorlagen:** Vorlagen › Dokumentvorlagen › „+ Neue Vorlage“ legt ein weiteres Schreiben an (Name,
+Beschreibung, wahlweise mit Termin). Es startet als Brief mit Anrede und E-Mail-Text und erscheint nach dem Anlegen in
+der Akte unter „Schreiben und E-Mail“ › „Eigene Vorlagen“.
+
 **Texte und Adressen ändern:** Alle vier Schreiben sind normale Dokumentvorlagen (Entwurf → Vorschau mit Testpatient →
 Veröffentlichen). Die Anschrift der Praxis Dr. Holtmeier steht als Text in den Vorlagen.
 

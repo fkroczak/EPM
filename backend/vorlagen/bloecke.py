@@ -6,7 +6,7 @@ In der Fußzeile stehen zusätzlich ``{Seite}`` und ``{Seiten}``.
 """
 import re
 
-from .felder import FELDER, TABELLEN
+from .felder import FELDER, TABELLEN, JeArt, ist_eigen
 
 PLATZHALTER = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
 ID_MUSTER = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
@@ -41,7 +41,12 @@ NEBENEINANDER = {"text", "datenfelder", "tabelle", "unterschrift"}
 DARSTELLUNGEN = {"paare", "befund"}
 MAX_BLOECKE = 60
 # Schreiben mit E-Mail-Text (F172, F173)
-MIT_EMAIL = {"patientenaufnahme", "terminbestaetigung", "reisebescheinigung", "patientenankuendigung"}
+class _MitEmail(set):
+    def __contains__(self, art):
+        return super().__contains__(art) or ist_eigen(art)  # eigene Schreiben (F176) haben ebenfalls eine E-Mail
+
+
+MIT_EMAIL = _MitEmail({"patientenaufnahme", "terminbestaetigung", "reisebescheinigung", "patientenankuendigung"})
 MAX_FELDER = 30
 MAX_TEXT = 4000
 
@@ -185,7 +190,7 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
         elif typ == "email":
             erlaubt |= {"betreff", "text"}
             if art not in MIT_EMAIL:
-                fehler.append(f"{name}: Eine E-Mail gibt es nur bei den Schreiben ({', '.join(sorted(MIT_EMAIL))}).")
+                fehler.append(f"{name}: Eine E-Mail gibt es nur bei den Schreiben.")
             _text(b.get("betreff"), f"{name} (Betreff)", fehler, pflicht=True, laenge=200)
             _text(b.get("text"), f"{name} (Text)", fehler, pflicht=True)
             for feld in ("betreff", "text"):
@@ -534,6 +539,29 @@ PATIENTENANKUENDIGUNG = [
              "{{Absender.Name}}\nTelefon {{Absender.Telefon}}"},
 ]
 
+def eigene_startvorlage(titel: str = "Titel") -> list:
+    """Startvorlage eines eigenen Schreibens (F176): Brief an den Patienten mit E-Mail – Text in [eckigen Klammern]."""
+    return [
+        {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF},
+        ABSENDERZEILE, EMPFAENGER_PATIENT,
+        {"id": "leerraum", "typ": "leerraum", "bezeichnung": "Abstand", "hoehe_mm": 6},
+        {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": titel[:200] or "Titel"},
+        {"id": "inhalt", "typ": "text", "bezeichnung": "Text",
+         "text": "{{Patient.Briefanrede}},\n\n[Text des Schreibens]"},
+        {"id": "gruss", "typ": "text", "bezeichnung": "Gruß", "text": GRUSS_TEAM, "optionen": {"nicht_teilen": True}},
+        {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
+        {"id": "email", "typ": "email", "bezeichnung": "E-Mail", "betreff": titel[:200] or "Betreff",
+         "text": "{{Patient.Briefanrede}},\n\nanbei erhalten Sie [...].\n\n" + GRUSS_TEAM},
+    ]
+
+
+def _eigene_startvorlage_zu(art):
+    from .models import EigenesSchreiben
+
+    e = EigenesSchreiben.objects.filter(schluessel=art).first()
+    return eigene_startvorlage(e.name if e else "Titel")
+
+
 # Startvorlagen. Patientendatenblatt: Aufbau wie im Entwurf „EPM Oberfläche“ (Dokumentvorlagen).
 STARTVORLAGEN = {
     "patientenaufnahme": PATIENTENAUFNAHME,
@@ -688,3 +716,13 @@ STARTVORLAGEN = {
         {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
     ],
 }
+
+
+class _Startvorlagen(JeArt):
+    def __missing__(self, art):
+        if ist_eigen(art):
+            return _eigene_startvorlage_zu(art)
+        raise KeyError(art)
+
+
+STARTVORLAGEN = _Startvorlagen(STARTVORLAGEN, None)

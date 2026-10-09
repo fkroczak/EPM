@@ -651,16 +651,17 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
         Anhang. ``ablegen`` legt die PDF zusätzlich als Dokument der Akte ab (nur offene Akten)."""
         from vorlagen.felder import Kontext
         from vorlagen.pdf import als_dokument, wasserzeichen_fuer
-        from vorlagen.schreiben import AUS_DER_AKTE, ausgeben, dateiname_sicher
-        from vorlagen.models import Dokumentvorlage
+        from vorlagen.models import Dokumentvorlage, art_name
+        from vorlagen.schreiben import ausgeben, dateiname_sicher, schreiben_aus_akte
 
         patient = self.get_object()
         d = request.data
         art = d.get("art")
-        if art not in AUS_DER_AKTE:
+        angaben = schreiben_aus_akte(art)
+        if angaben is None:
             return Response({"art": "Bitte ein Schreiben wählen."}, status=status.HTTP_400_BAD_REQUEST)
         termin = None
-        if AUS_DER_AKTE[art]["termin"]:
+        if angaben["termin"]:
             termin = Termin.objects.filter(patient=patient, pk=d.get("termin") if isinstance(d.get("termin"), int)
                                            else None).select_related("ort").first()
             if termin is None:
@@ -672,7 +673,7 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
         if ablegen:
             pruefe_schreibbereich(request.user, patient)
             patient.pruefe_bearbeitbar()
-        name = Dokumentvorlage.Art(art).label
+        name = art_name(art)
         kontext = Kontext(patient=patient, termin=termin, benutzer=request.user)
         heute = timezone.localdate()
         dateiname = dateiname_sicher(f"{name.split(' (')[0]}-{patient.nachname}-{heute:%Y-%m-%d}")

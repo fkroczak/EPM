@@ -433,11 +433,38 @@ ANKUENDIGUNG = {
     "Benutzer.Name": ANSCHREIBEN["Benutzer.Name"],
 }
 
+# Eigene Schreiben (F176): unter Vorlagen › Dokumentvorlagen angelegt, Kennung „eigen-…“. Sie haben alle dieselben
+# Datenfelder: Patient, Anrede, Absender und – wenn beim Erzeugen ein Termin gewählt ist – den Termin.
+EIGEN_PRAEFIX = "eigen-"
+EIGEN = {**GEMEINSAM, **ANSCHREIBEN, **TERMIN}
+
+
+def ist_eigen(art) -> bool:
+    return isinstance(art, str) and art.startswith(EIGEN_PRAEFIX) and len(art) > len(EIGEN_PRAEFIX)
+
+
+class JeArt(dict):
+    """Wert je Vorlagenart; eigene Schreiben teilen sich einen Wert (``eigen``)."""
+
+    def __init__(self, werte, eigen):
+        super().__init__(werte)
+        self.eigen = eigen
+
+    def __missing__(self, art):
+        if ist_eigen(art):
+            return self.eigen() if callable(self.eigen) else self.eigen
+        raise KeyError(art)
+
+    def __contains__(self, art):
+        return super().__contains__(art) or ist_eigen(art)
+
+
 FELDER = {"infusionsplan": INFUSIONSPLAN, "patientendatenblatt": PATIENTENDATENBLATT,
           "datenschutzinformation": ERKLAERUNG, "einwilligung": ERKLAERUNG, "schweigepflichtentbindung": ERKLAERUNG,
           "bericht": BERICHT, "sprechstunde": SPRECHSTUNDE,
           "patientenaufnahme": PATIENTENAUFNAHME, "terminbestaetigung": TERMINBESTAETIGUNG,
           "reisebescheinigung": REISEBESCHEINIGUNG, "patientenankuendigung": ANKUENDIGUNG}
+FELDER = JeArt(FELDER, EIGEN)
 
 # Tabellen mit festem Aufbau je Art (Spalten stehen fest, damit nichts Falsches gedruckt werden kann).
 # (Name, Spalten, Ausrichtung je Spalte): "zahl" rechtsbündig, "einheit" schmal und grau – wie im Laborbefund.
@@ -476,6 +503,7 @@ TABELLEN = {
                          ["Tag", "Uhrzeit", "Patient", "Hinweis"], ["", "", "", ""]),
     },
 }
+TABELLEN = JeArt(TABELLEN, {"diagnosen": ("Diagnosen mit ICD-Code", ["Diagnose", "ICD", "seit"], ["", "", ""])})
 
 
 class Fett(str):

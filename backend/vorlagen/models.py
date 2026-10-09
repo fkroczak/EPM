@@ -37,7 +37,8 @@ class Dokumentvorlage(models.Model):
         AKTIV = "aktiv", "aktiv"
         ABGELOEST = "abgeloest", "abgelöst"
 
-    art = models.CharField(max_length=30, choices=Art.choices)
+    # feste Arten (``Art``) oder eigene Schreiben „eigen-…“ (F176, ``EigenesSchreiben``) – daher ohne choices
+    art = models.CharField(max_length=30)
     version = models.PositiveIntegerField(null=True, blank=True, help_text="leer beim Entwurf")
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.ENTWURF)
     bloecke = models.JSONField(default=list)
@@ -69,6 +70,9 @@ class Dokumentvorlage(models.Model):
 
     def __str__(self):
         return f"{self.get_art_display()} {'Entwurf' if self.version is None else f'v{self.version}'}"
+
+    def get_art_display(self) -> str:
+        return art_name(self.art)
 
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")
@@ -139,6 +143,56 @@ class Dokumentvorlage(models.Model):
         self.veroeffentlicht_von = benutzer
         super().save()  # letzter Schreibvorgang, danach unveränderlich
         return self
+
+
+def art_name(art: str) -> str:
+    """Anzeigename einer Vorlagenart, auch eines eigenen Schreibens (F176)."""
+    if art in Dokumentvorlage.Art.values:
+        return Dokumentvorlage.Art(art).label
+    e = EigenesSchreiben.objects.filter(schluessel=art).only("name").first()
+    return e.name if e else art
+
+
+def gibt_es_art(art) -> bool:
+    return isinstance(art, str) and (art in Dokumentvorlage.Art.values
+                                     or EigenesSchreiben.objects.filter(schluessel=art).exists())
+
+
+class EigenesSchreiben(models.Model):
+    """Unter Vorlagen › Dokumentvorlagen selbst angelegtes Schreiben (F176), z. B. „Rezeptanforderung“. Der Aufbau
+    liegt wie bei den festen Arten in ``Dokumentvorlage`` (Art = ``schluessel``); hier stehen Name, Beschreibung und ob
+    beim Erzeugen ein Termin gewählt wird. Nie gelöscht, nur deaktiviert (dann nicht mehr in der Akte wählbar)."""
+
+    schluessel = models.CharField(max_length=30, unique=True, editable=False)
+    name = models.CharField(max_length=100, unique=True)
+    beschreibung = models.CharField(max_length=300, blank=True)
+    mit_termin = models.BooleanField("Termin wählen", default=False)
+    aktiv = models.BooleanField(default=True)
+    erstellt_am = models.DateTimeField(auto_now_add=True)
+    erstellt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                     related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Eigenes Schreiben"
+        verbose_name_plural = "Eigene Schreiben"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Eigene Schreiben werden nicht gelöscht, nur deaktiviert.")
+
+    def save(self, *args, **kwargs):
+        if not self.schluessel:
+            import secrets
+
+            from .felder import EIGEN_PRAEFIX
+
+            self.schluessel = f"{EIGEN_PRAEFIX}{secrets.token_hex(5)}"
+        super().save(*args, **kwargs)
 
 
 class Anlage(models.Model):

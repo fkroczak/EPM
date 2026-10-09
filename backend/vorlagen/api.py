@@ -31,14 +31,14 @@ from epm.api_basis import benutzername, patienten_fuer
 
 from .bloecke import MIT_EMAIL, OPTIONEN, TYPEN, pruefe_bloecke
 from .felder import FELDER, TABELLEN, Kontext
-from .models import Dokumentvorlage
+from .models import Dokumentvorlage, EigenesSchreiben, art_name, gibt_es_art
 from .pdf import erzeuge_aus_vorlage
 
 VorlagenRecht = recht("vorlagen_pflegen", lesen="vorlagen_pflegen")
 
 
 def _art(art):
-    if art not in Dokumentvorlage.Art.values:
+    if not gibt_es_art(art):
         raise Http404("Unbekannte Vorlagenart.")
     return art
 
@@ -58,7 +58,11 @@ def _uebersicht(art):
         .select_related("veroeffentlicht_von").order_by("-version")
     from stammdaten.models import Einstellungen
 
-    return {"art": art, "name": Dokumentvorlage.Art(art).label, "aktiv": _version(aktiv),
+    eigen = EigenesSchreiben.objects.filter(schluessel=art).first()
+    return {"art": art, "name": art_name(art), "aktiv": _version(aktiv),
+            # eigenes Schreiben (F176): Beschreibung, Termin, aktiv
+            "eigen": {"beschreibung": eigen.beschreibung, "mit_termin": eigen.mit_termin, "aktiv": eigen.aktiv}
+            if eigen else None,
             "entwurf": _version(Dokumentvorlage.entwurf_von(art)), "versionen": [_version(v) for v in versionen],
             # Vordrucke: Wasserzeichen „ENTWURF“ (Startvorlage ungeprüft) und ob es manuell abgeschaltet ist (U17)
             "entwurfsmodus": {"moeglich": art in Dokumentvorlage.VORDRUCKE and aktiv.veroeffentlicht_von_id is None,
@@ -70,7 +74,80 @@ class VorlagenView(APIView):
     permission_classes = [VorlagenRecht]
 
     def get(self, request):
-        return Response([_uebersicht(a) for a in Dokumentvorlage.Art.values])
+        arten = [*Dokumentvorlage.Art.values, *EigenesSchreiben.objects.values_list("schluessel", flat=True)]
+        return Response([_uebersicht(a) for a in arten])
+
+    @transaction.atomic
+    def post(self, request):
+        """Eigenes Schreiben anlegen (F176): ``{"name", "beschreibung"?, "mit_termin"?}``. Die Startvorlage (Brief an
+        den Patienten mit E-Mail) wird gleich als Version 1 aktiv und kann danach bearbeitet werden."""
+        e = EigenesSchreiben(erstellt_von=request.user)
+        fehler = _eigen_setzen(e, request.data, neu=True)
+        if fehler:
+            return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
+        e._history_user = request.user
+        e.save()
+        protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {e.name}", aktion="eigenes Schreiben angelegt")
+        return Response(_uebersicht(e.schluessel), status=status.HTTP_201_CREATED)
+
+
+def _eigen_setzen(e, d, neu=False) -> dict:
+    fehler = {}
+    if neu or "name" in d:
+        name = d.get("name")
+        if not isinstance(name, str) or not name.strip() or len(name.strip()) > 100:
+            fehler["name"] = "Bitte einen Namen angeben (höchstens 100 Zeichen)."
+        elif (EigenesSchreiben.objects.filter(name__iexact=name.strip()).exclude(pk=e.pk).exists()
+              or name.strip().lower() in {x.label.lower() for x in Dokumentvorlage.Art}):
+            fehler["name"] = "Diesen Namen gibt es schon."
+        else:
+            e.name = name.strip()
+    if "beschreibung" in d:
+        if not isinstance(d["beschreibung"], str) or len(d["beschreibung"]) > 300:
+            fehler["beschreibung"] = "Höchstens 300 Zeichen."
+        else:
+            e.beschreibung = d["beschreibung"].strip()
+    for feld in ("mit_termin", "aktiv"):
+        if feld in d:
+            if not isinstance(d[feld], bool):
+                fehler[feld] = "Bitte true oder false."
+            else:
+                setattr(e, feld, d[feld])
+    return fehler
+
+
+class EigenesSchreibenView(APIView):
+    """``PATCH /api/vorlagen/{art}/eigen/`` – Name, Beschreibung, Termin wählen, aktiv (F176)."""
+
+    permission_classes = [VorlagenRecht]
+
+    def patch(self, request, art):
+        e = EigenesSchreiben.objects.filter(schluessel=art).first()
+        if e is None:
+            raise Http404("Kein eigenes Schreiben.")
+        fehler = _eigen_setzen(e, request.data)
+        if fehler:
+            return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
+        e._history_user = request.user
+        e.save()
+        protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {e.name}",
+                      aktion="eigenes Schreiben geändert")
+        return Response(_uebersicht(art))
+
+
+class SchreibenListeView(APIView):
+    """``GET /api/schreiben/`` – die Schreiben, die sich aus der Akte erzeugen lassen (F172, F176)."""
+
+    permission_classes = [recht("eintraege_erfassen", lesen="eintraege_erfassen")]
+
+    def get(self, request):
+        from .schreiben import AUS_DER_AKTE
+
+        liste = [{"art": a, "name": art_name(a), "beschreibung": v["beschreibung"], "termin": v["termin"], "eigen": False}
+                 for a, v in AUS_DER_AKTE.items()]
+        liste += [{"art": e.schluessel, "name": e.name, "beschreibung": e.beschreibung, "termin": e.mit_termin,
+                   "eigen": True} for e in EigenesSchreiben.objects.filter(aktiv=True)]
+        return Response(liste)
 
 
 class VorlageView(APIView):
@@ -124,7 +201,7 @@ class EntwurfView(APIView):
             return Response({"fehler": "Es gibt keinen Entwurf."}, status=status.HTTP_404_NOT_FOUND)
         entwurf._history_user = request.user
         entwurf.delete()
-        protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {Dokumentvorlage.Art(art).label}",
+        protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {art_name(art)}",
                       aktion="Entwurf verworfen")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -152,7 +229,7 @@ class EntwurfsmodusView(APIView):
             e.vordrucke_ohne_entwurf = sorted(liste)
             e._history_user = request.user
             e.save()
-            protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {Dokumentvorlage.Art(art).label}",
+            protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {art_name(art)}",
                           aktion="Wasserzeichen „ENTWURF“ ausgeschaltet" if aus else "Wasserzeichen „ENTWURF“ eingeschaltet")
         return Response(_uebersicht(art))
 
@@ -231,6 +308,8 @@ class VorschauView(APIView):
         kontext = Kontext(patient=patient, plan=plan, benutzer=request.user)
         if art in VORSCHAU_SCHREIBEN:
             kontext = VORSCHAU_SCHREIBEN[art](patient, request.user)
+        elif art not in Dokumentvorlage.Art.values:
+            kontext = _vorschau_termin(patient, request.user)  # eigenes Schreiben (F176), ggf. mit Termin
         elif art == Dokumentvorlage.Art.SPRECHSTUNDE:
             # Vorschau mit dem aktuellsten Stand des Testpatienten (F116)
             from .listen import sprechstunde_kontext
@@ -250,7 +329,7 @@ class VorschauView(APIView):
 
             return Response(email_aus_vorlage(art, kontext, bloecke) or {"betreff": "", "text": ""})
         pdf, _ = erzeuge_aus_vorlage(art, kontext, bloecke=bloecke, wasserzeichen="ENTWURF",
-                                     titel=f"Vorschau {Dokumentvorlage.Art(art).label}")
+                                     titel=f"Vorschau {art_name(art)}")
         if art == Dokumentvorlage.Art.REISEBESCHEINIGUNG:
             from .schreiben import anhaengen, reise_attest
 

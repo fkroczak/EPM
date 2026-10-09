@@ -21,8 +21,12 @@ import { PdfLeser } from "@/components/PdfAnsicht";
 
 type Art = "infusionsplan" | "patientendatenblatt" | "datenschutzinformation" | "einwilligung" | "schweigepflichtentbindung"
   // Schreiben mit E-Mail (Vorlagen von Alice Hessel, 09.10.2026; F172, F173)
-  | "patientenaufnahme" | "terminbestaetigung" | "reisebescheinigung" | "patientenankuendigung";
-const MIT_EMAIL: Art[] = ["patientenaufnahme", "terminbestaetigung", "reisebescheinigung", "patientenankuendigung"];
+  | "patientenaufnahme" | "terminbestaetigung" | "reisebescheinigung" | "patientenankuendigung"
+  // eigene Schreiben, unter Vorlagen angelegt (F176)
+  | `eigen-${string}`;
+const SCHREIBEN_FEST: Art[] = ["patientenaufnahme", "terminbestaetigung", "reisebescheinigung", "patientenankuendigung"];
+const istEigen = (art: Art) => art.startsWith("eigen-");
+const mitEmailArt = (art: Art) => SCHREIBEN_FEST.includes(art) || istEigen(art);
 type Optionen = {
   schrift?: "klein" | "normal" | "gross"; ausrichtung?: "links" | "mitte" | "rechts"; fett?: boolean; kursiv?: boolean;
   ausblenden_wenn_leer?: boolean; nicht_teilen?: boolean; ueberschrift?: boolean; linie_oben?: boolean;
@@ -45,7 +49,9 @@ type Version = {
 };
 type Uebersicht = { art: Art; name: string; aktiv: Version; entwurf: Version | null; versionen: Version[];
   /** Vordrucke: Wasserzeichen „ENTWURF“ der Startvorlage, manuell abschaltbar (U17) */
-  entwurfsmodus?: { moeglich: boolean; aktiv: boolean; aus: boolean } };
+  entwurfsmodus?: { moeglich: boolean; aktiv: boolean; aus: boolean };
+  /** eigenes Schreiben (F176) */
+  eigen?: { beschreibung: string; mit_termin: boolean; aktiv: boolean } | null };
 type Aufbau = Uebersicht & {
   bausteine: { typ: string; name: string }[];
   felder: { name: string; beschreibung: string; html: boolean }[];
@@ -274,6 +280,11 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
   const [veroeffentlichen, setVeroeffentlichen] = useState(false);
   const [verwerfen, setVerwerfen] = useState(false);
   const [modusFrage, setModusFrage] = useState(false);
+  // eigene Schreiben (F176)
+  const [neueVorlage, setNeueVorlage] = useState(false);
+  const [eigenAendern, setEigenAendern] = useState(false);
+  const liste = useQuery({ queryKey: ["vorlagen", "liste"], queryFn: () => api<Uebersicht[]>("vorlagen/") });
+  const eigene = (liste.data ?? []).filter((v) => istEigen(v.art));
   // Entwurfsmodus der Vordrucke manuell aus- bzw. wieder einschalten (Festlegung 03.10.2026, U17)
   const modus = useMutation({
     mutationFn: (aus: boolean) => api<Uebersicht>(`vorlagen/${art}/entwurfsmodus/`, { body: { aus } }),
@@ -402,9 +413,20 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
           { wert: "datenschutzinformation", text: "Datenschutzinformation" }, { wert: "einwilligung", text: "Einwilligung" },
           { wert: "schweigepflichtentbindung", text: "Schweigepflichtentbindung" },
           { wert: "patientenaufnahme", text: "Patientenaufnahme" }, { wert: "terminbestaetigung", text: "Terminbestätigung" },
-          { wert: "reisebescheinigung", text: "Reisebescheinigung" }, { wert: "patientenankuendigung", text: "Patientenankündigung" }]}
+          { wert: "reisebescheinigung", text: "Reisebescheinigung" }, { wert: "patientenankuendigung", text: "Patientenankündigung" },
+          ...eigene.map((e) => ({ wert: e.art, text: e.eigen?.aktiv ? e.name : `${e.name} (deaktiviert)` }))]}
         className="self-start flex-wrap" />
-      {art !== "infusionsplan" && art !== "patientendatenblatt" && !MIT_EMAIL.includes(art) && !a.aktiv.veroeffentlicht_von ? (
+      <div className="flex items-center gap-3 flex-wrap -mt-2">
+        <Knopf klein icon="plus" onClick={() => setNeueVorlage(true)}>Neue Vorlage</Knopf>
+        {a.eigen ? <>
+          <span className="text-[13px] gedaempft">Eigenes Schreiben{a.eigen.beschreibung ? ` · ${a.eigen.beschreibung}` : ""}
+            {a.eigen.mit_termin ? " · mit Termin" : ""}{a.eigen.aktiv ? "" : " · deaktiviert"}</span>
+          <Knopf klein icon="stift" onClick={() => setEigenAendern(true)}>Name und Einstellungen</Knopf>
+        </> : <span className="text-[13px] gedaempft">Eigene Schreiben anlegen, z. B. für Hausärzte oder Kliniken – sie erscheinen in der Akte unter „Schreiben und E-Mail“.</span>}
+      </div>
+      <EigeneVorlageDialog offen={neueVorlage} onOffen={setNeueVorlage} onAngelegt={(neu) => setArt(neu)} />
+      {a.eigen ? <EigeneVorlageDialog offen={eigenAendern} onOffen={setEigenAendern} vorlage={a} /> : null}
+      {art !== "infusionsplan" && art !== "patientendatenblatt" && !mitEmailArt(art) && !a.aktiv.veroeffentlicht_von ? (
         a.entwurfsmodus?.aus ? (
           <Meldung><span className="flex items-start justify-between gap-3 flex-wrap" data-testid="entwurfsmodus-aus">
             <span>Entwurfsmodus ausgeschaltet: Die PDFs dieser mitgelieferten Vorlage tragen kein Wasserzeichen „ENTWURF“ und keinen
@@ -687,6 +709,72 @@ function FeldWert({ wert, onWert, fokus, nummer }: { wert: string; onWert: (w: s
   );
 }
 
+/** Eigenes Schreiben anlegen (ohne ``vorlage``) oder Name, Beschreibung, Termin und aktiv ändern (F176). */
+function EigeneVorlageDialog({ offen, onOffen, vorlage, onAngelegt }: {
+  offen: boolean; onOffen: (o: boolean) => void; vorlage?: Uebersicht; onAngelegt?: (art: Art) => void;
+}) {
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const [name, setName] = useState("");
+  const [beschreibung, setBeschreibung] = useState("");
+  const [mitTermin, setMitTermin] = useState(false);
+  const [aktiv, setAktiv] = useState(true);
+  const [gesetzt, setGesetzt] = useState(false);
+  if (offen && !gesetzt) {
+    setGesetzt(true);
+    setName(vorlage?.name ?? "");
+    setBeschreibung(vorlage?.eigen?.beschreibung ?? "");
+    setMitTermin(!!vorlage?.eigen?.mit_termin);
+    setAktiv(vorlage?.eigen?.aktiv ?? true);
+  }
+  if (!offen && gesetzt) setGesetzt(false);
+  const speichern = useMutation({
+    mutationFn: () => {
+      const body = { name: name.trim(), beschreibung: beschreibung.trim(), mit_termin: mitTermin, ...(vorlage ? { aktiv } : {}) };
+      return vorlage ? api<Uebersicht>(`vorlagen/${vorlage.art}/eigen/`, { method: "PATCH", body })
+        : api<Uebersicht>("vorlagen/", { body });
+    },
+    onSuccess: (u) => {
+      void qc.invalidateQueries({ queryKey: ["vorlagen"] });
+      void qc.invalidateQueries({ queryKey: ["schreiben"] });
+      melden(vorlage ? "Gespeichert." : `„${u.name}“ angelegt – jetzt Text und Aufbau anpassen und veröffentlichen.`);
+      onOffen(false);
+      onAngelegt?.(u.art);
+    },
+  });
+  const f = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
+  return (
+    <Dialog offen={offen} onOffen={onOffen} titel={vorlage ? `„${vorlage.name}“ ändern` : "Neue Vorlage (eigenes Schreiben)"}
+      beschreibung={vorlage ? undefined : "Startet mit einem Brief an den Patienten (Briefkopf, Anrede, Text, Gruß) und einem E-Mail-Text. Danach wie jede Vorlage bearbeiten und veröffentlichen."}
+      fuss={<>
+        <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
+        <Knopf variante="pri" laedt={speichern.isPending} disabled={!name.trim()} onClick={() => speichern.mutate()}>
+          {vorlage ? "Speichern" : "Anlegen"}</Knopf>
+      </>}>
+      <div className="flex flex-col gap-3">
+        <Feld label="Name" fehler={f.name} pflicht>
+          {(p) => <Eingabe {...p} value={name} maxLength={100} placeholder="z. B. Bitte um Laborwerte an den Hausarzt"
+            onChange={(e) => setName(e.target.value)} />}
+        </Feld>
+        <Feld label="Beschreibung" fehler={f.beschreibung} hinweis="erscheint in der Akte bei der Auswahl des Schreibens">
+          {(p) => <Eingabe {...p} value={beschreibung} maxLength={300} onChange={(e) => setBeschreibung(e.target.value)} />}
+        </Feld>
+        <label className="flex items-center gap-2 text-[13.5px]">
+          <input type="checkbox" checked={mitTermin} onChange={(e) => setMitTermin(e.target.checked)} />
+          Beim Erzeugen einen Termin wählen (Datenfelder Termin.Datum, Termin.Uhrzeit …)
+        </label>
+        {vorlage ? (
+          <label className="flex items-center gap-2 text-[13.5px]">
+            <input type="checkbox" checked={aktiv} onChange={(e) => setAktiv(e.target.checked)} />
+            Aktiv (in der Akte wählbar)
+          </label>
+        ) : null}
+        {speichern.error && !Object.keys(f).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
+      </div>
+    </Dialog>
+  );
+}
+
 type Testpatient = { id: number; nachname: string; vorname: string; nummer: number };
 
 function VorschauDialog({ art, bloecke, offen, onOffen }: { art: Art; bloecke: Block[]; offen: boolean; onOffen: (o: boolean) => void }) {
@@ -704,7 +792,7 @@ function VorschauDialog({ art, bloecke, offen, onOffen }: { art: Art; bloecke: B
     enabled: offen && !!patient && !!schluessel,
     gcTime: 0,
   });
-  const mitEmail = MIT_EMAIL.includes(art) && bloecke.some((b) => b.typ === "email");
+  const mitEmail = mitEmailArt(art) && bloecke.some((b) => b.typ === "email");
   const mail = useQuery({
     queryKey: ["vorlagen", art, "vorschau-mail", patient, schluessel],
     queryFn: () => api<{ betreff: string; text: string }>(`vorlagen/${art}/vorschau/`, { body: { patient: Number(patient),

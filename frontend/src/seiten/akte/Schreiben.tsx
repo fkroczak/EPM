@@ -1,4 +1,5 @@
-/** Schreiben aus der Akte (F172): Patientenaufnahme, Terminbestätigung, Reisebescheinigung – als PDF oder E-Mail. */
+/** Schreiben aus der Akte (F172): Patientenaufnahme, Terminbestätigung, Reisebescheinigung und die eigenen Schreiben
+ *  aus Vorlagen › Dokumentvorlagen (F176) – als PDF oder E-Mail. */
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { abfrage, api } from "@/lib/api";
@@ -9,23 +10,21 @@ import { TERMINARTEN } from "@/lib/typen";
 import { Auswahl, Eingabe, Feld } from "@/components/ui/basis";
 import { SchreibenDialog } from "@/components/SchreibenDialog";
 
-export const SCHREIBEN = [
-  { art: "patientenaufnahme", name: "Patientenaufnahme", hinweis: "Welche Daten und Unterlagen wir vorab brauchen" },
-  { art: "terminbestaetigung", name: "Terminbestätigung Sprechstunde", hinweis: "Termin in der Praxis Dr. Holtmeier, Gesundheitskarte mitbringen, keine Überweisung nötig" },
-  { art: "reisebescheinigung", name: "Reisebescheinigung", hinweis: "Briefkopf Dr. Holtmeier, deutsch/englisch, mit ärztlichem Attest des ADAC" },
-] as const;
-type Art = (typeof SCHREIBEN)[number]["art"];
+type Schreiben = { art: string; name: string; beschreibung: string; termin: boolean; eigen: boolean };
 
 export function SchreibenAusAkte({ patient, offen, onOffen }: { patient: Patient; offen: boolean; onOffen: (o: boolean) => void }) {
   const qc = useQueryClient();
-  const [art, setArt] = useState<Art>("patientenaufnahme");
+  const schreiben = useQuery({ queryKey: ["schreiben"], queryFn: () => api<Schreiben[]>("schreiben/"), enabled: offen });
+  const [art, setArt] = useState("patientenaufnahme");
+  const gewaehlt = schreiben.data?.find((s) => s.art === art);
+  const mitTermin = !!gewaehlt?.termin;
   const [termin, setTermin] = useState("");
   const [tage, setTage] = useState("");
   const [attest, setAttest] = useState(true);
   const termine = useQuery({
     queryKey: ["patient", patient.id, "termine", "schreiben"],
     queryFn: () => api<ApiSeite<Termin>>(`termine/${abfrage({ patient: patient.id, offen: "true", ausgeblendet: "false", seitengroesse: 50 })}`),
-    enabled: offen && art === "terminbestaetigung",
+    enabled: offen && mitTermin,
   });
   // Vorschlag: der nächste Praxistermin
   const liste = termine.data?.results ?? [];
@@ -33,10 +32,10 @@ export function SchreibenAusAkte({ patient, offen, onOffen }: { patient: Patient
   const terminId = termin || (vorschlag ? String(vorschlag.id) : "");
   const tageZahl = /^\d{1,3}$/.test(tage) && Number(tage) > 0 ? Number(tage) : null;
   const koerper: Record<string, unknown> = { art };
-  if (art === "terminbestaetigung") koerper.termin = terminId ? Number(terminId) : null;
+  if (mitTermin) koerper.termin = terminId ? Number(terminId) : null;
   if (art === "reisebescheinigung") Object.assign(koerper, { attest, tage: tageZahl });
-  const bereit = art !== "terminbestaetigung" || !!terminId;
-  const beschreibung = SCHREIBEN.find((s) => s.art === art)?.hinweis;
+  const bereit = !!gewaehlt && (!mitTermin || !!terminId);
+  const beschreibung = gewaehlt?.beschreibung || undefined;
 
   return (
     <SchreibenDialog offen={offen} onOffen={onOffen} titel="Schreiben und E-Mail" pfad={`patienten/${patient.id}/schreiben/`}
@@ -48,12 +47,17 @@ export function SchreibenAusAkte({ patient, offen, onOffen }: { patient: Patient
       optionen={<>
         <Feld label="Schreiben" hinweis={beschreibung}>
           {(p) => (
-            <Auswahl {...p} value={art} onChange={(e) => setArt(e.target.value as Art)}>
-              {SCHREIBEN.map((s) => <option key={s.art} value={s.art}>{s.name}</option>)}
+            <Auswahl {...p} value={art} onChange={(e) => setArt(e.target.value)}>
+              {(schreiben.data ?? []).filter((s) => !s.eigen).map((s) => <option key={s.art} value={s.art}>{s.name}</option>)}
+              {schreiben.data?.some((s) => s.eigen) ? (
+                <optgroup label="Eigene Vorlagen">
+                  {schreiben.data.filter((s) => s.eigen).map((s) => <option key={s.art} value={s.art}>{s.name}</option>)}
+                </optgroup>
+              ) : null}
             </Auswahl>
           )}
         </Feld>
-        {art === "terminbestaetigung" ? (
+        {mitTermin ? (
           <Feld label="Termin" hinweis={termine.isSuccess && !liste.length ? "Keine offenen Termine – bitte zuerst einen Termin anlegen." : undefined}>
             {(p) => (
               <Auswahl {...p} value={terminId} onChange={(e) => setTermin(e.target.value)} disabled={!liste.length}>

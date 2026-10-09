@@ -279,7 +279,8 @@ vorher im Dialog ändern; <strong>Weitere Anlagen</strong> (z. B. Leitfaden Zott
 <p>Die <strong>Patientenankündigung</strong> für die Praxis entsteht im <strong>Kalender › Ankündigung</strong> aus den
 Praxisterminen eines Zeitraums. Hinweise wie „1 h, Neuaufnahme“ oder „+ Labor“ im Termin unter „bei/Ort“ eintragen.</p>
 <p>Texte ändern: Vorlagen › Dokumentvorlagen; Betreff und Text der E-Mail stehen dort im Baustein <strong>E-Mail</strong>.
-Anlagen hochladen: Vorlagen › Anlagen für E-Mails. Für eine <strong>Fallzusammenfassung</strong> im Reiter Berichte die
+Eigene Schreiben (z. B. an Hausärzte) legt <strong>+ Neue Vorlage</strong> unter Vorlagen › Dokumentvorlagen an; sie
+erscheinen danach hier unter „Eigene Vorlagen“. Anlagen hochladen: Vorlagen › Anlagen für E-Mails. Für eine <strong>Fallzusammenfassung</strong> im Reiter Berichte die
 Berichtsart „Fallzusammenfassung“ wählen und <strong>Gliederung einfügen</strong>.</p>""",
     },
     {

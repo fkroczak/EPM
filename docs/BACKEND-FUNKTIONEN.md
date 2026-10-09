@@ -48,6 +48,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 
 | Nr. | Funktion | Ansicht (Entwurf) | Status |
 |---|---|---|---|
+| 09.10.2026 | Eigene Vorlagen | „+ Neue Vorlage“ unter Vorlagen › Dokumentvorlagen: eigene Schreiben mit E-Mail anlegen, bearbeiten, deaktivieren; in der Akte wählbar (F176). Lauf steht aus |
 | F01 | Sitzungsstatus und CSRF-Token | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F02 | Anmeldung mit Benutzername und Kennwort | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F03 | Zweiter Faktor bei der Anmeldung | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
@@ -3215,6 +3216,21 @@ dem Namen nach Bedarf erstellen und vorgefertigte E-Mail-Texte **mit Anhang** zu
   Quante): Anlass und Unterlagen · Diagnosen · Anamnese und Verlauf · Symptomatik · Ernährungsstatus/Anthropometrie
   (GLIM) · Ernährungstherapie · Medikation/Allergien · Labor · Bildgebung · Beurteilung · Empfehlungen · Offene Fragen
   und Unstimmigkeiten. Hinweise in [eckigen Klammern] werden überschrieben; Freigabe und PDF wie jeder Bericht (F115).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F176 Eigene Vorlagen (Schreiben selbst anlegen)
+- **Wunsch Filip 09.10.2026:** „Unter Vorlagen manuell Schreiben hinzufügen – Button für Dokumentvorlage erstellen.“
+- **Vorlagen › Dokumentvorlagen › „+ Neue Vorlage“:** Name, Beschreibung und „beim Erzeugen einen Termin wählen“.
+  Die Vorlage startet als Brief an den Patienten (Briefkopf, Absenderzeile, Anschrift, Titel = Name, Anrede, Text in
+  [eckigen Klammern], Gruß, Fußzeile) mit E-Mail-Baustein und ist sofort als Version 1 aktiv; danach wie jede Vorlage
+  bearbeiten, Vorschau, veröffentlichen. „Name und Einstellungen“ ändert Name, Beschreibung, Termin und aktiv
+  (deaktiviert = in der Akte nicht mehr wählbar; gelöscht wird nichts, Versionen bleiben).
+- **Akte:** Eigene Vorlagen stehen im Dialog „Schreiben und E-Mail“ unter „Eigene Vorlagen“ – PDF, E-Mail (.eml),
+  Ablage wie F172. Datenfelder: Patient, Anrede, Absender, Benutzer und Termin.
+- **Technik:** Modell `vorlagen.EigenesSchreiben` (Kennung `eigen-…`, Historie); die Art einer `Dokumentvorlage` ist
+  dafür keine feste Auswahl mehr (Migration `vorlagen/0005`). Endpunkte: `POST /api/vorlagen/` (anlegen),
+  `PATCH /api/vorlagen/{art}/eigen/`, `GET /api/schreiben/` (wählbare Schreiben der Akte).
+- **Teststatus:** `vorlagen/test_schreiben.py::test_eigenes_schreiben`; im Browser lokal durchgespielt.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
 ## Offene Backend-Funktionen

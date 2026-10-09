@@ -32,10 +32,22 @@ ATTEST_FELDER = {
 
 # Schreiben aus der Akte (je Patient) und ob sie einen Termin brauchen
 AUS_DER_AKTE = {
-    Dokumentvorlage.Art.PATIENTENAUFNAHME: {"termin": False},
-    Dokumentvorlage.Art.TERMINBESTAETIGUNG: {"termin": True},
-    Dokumentvorlage.Art.REISEBESCHEINIGUNG: {"termin": False},
+    Dokumentvorlage.Art.PATIENTENAUFNAHME: {"termin": False, "beschreibung": "Welche Daten und Unterlagen wir vorab brauchen"},
+    Dokumentvorlage.Art.TERMINBESTAETIGUNG: {"termin": True, "beschreibung": "Termin in der Praxis Dr. Holtmeier, "
+                                             "Gesundheitskarte mitbringen, keine Überweisung nötig"},
+    Dokumentvorlage.Art.REISEBESCHEINIGUNG: {"termin": False, "beschreibung": "Briefkopf Dr. Holtmeier, deutsch/englisch, "
+                                             "mit ärztlichem Attest des ADAC"},
 }
+
+
+def schreiben_aus_akte(art) -> dict | None:
+    """Feste Schreiben und aktive eigene Schreiben (F176): → {"termin": bool} oder None."""
+    if art in AUS_DER_AKTE:
+        return AUS_DER_AKTE[art]
+    from .models import EigenesSchreiben
+
+    e = EigenesSchreiben.objects.filter(schluessel=art, aktiv=True).first() if isinstance(art, str) else None
+    return {"termin": e.mit_termin, "beschreibung": e.beschreibung} if e else None
 
 
 def _klartext(wert: str) -> str:

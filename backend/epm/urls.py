@@ -89,6 +89,8 @@ urlpatterns = [
     path("api/vorlagen/<str:art>/", vorlagen.VorlageView.as_view()),
     path("api/vorlagen/<str:art>/entwurf/", vorlagen.EntwurfView.as_view()),
     path("api/vorlagen/<str:art>/veroeffentlichen/", vorlagen.VeroeffentlichenView.as_view()),
+    path("api/vorlagen/<str:art>/eigen/", vorlagen.EigenesSchreibenView.as_view()),
+    path("api/schreiben/", vorlagen.SchreibenListeView.as_view()),
     path("api/vorlagen/<str:art>/entwurfsmodus/", vorlagen.EntwurfsmodusView.as_view()),
     path("api/vorlagen/<str:art>/versionen/<int:version>/", vorlagen.VersionView.as_view()),
     path("api/vorlagen/<str:art>/startvorlage/", vorlagen.StartvorlageView.as_view()),

@@ -468,13 +468,13 @@ def wasserzeichen_fuer(patient, plan=None, vorschau=False) -> str | None:
 def erzeuge_aus_vorlage(art: str, kontext: Kontext, vorlage=None, bloecke=None, wasserzeichen=None,
                         titel: str = "") -> tuple[bytes, int | None]:
     """PDF aus der aktiven (oder übergebenen) Vorlage. → (PDF, Vorlagenversion)."""
-    from .models import Dokumentvorlage
+    from .models import Dokumentvorlage, art_name
 
     if bloecke is None:
         vorlage = vorlage or Dokumentvorlage.aktive(art)
         bloecke = vorlage.bloecke
     inhalt, fuss, rechts = bloecke_html(art, bloecke, kontext)
-    pdf = html_zu_pdf(seite(titel or Dokumentvorlage.Art(art).label, inhalt, fuss, wasserzeichen, rechts))
+    pdf = html_zu_pdf(seite(titel or art_name(art), inhalt, fuss, wasserzeichen, rechts))
     return pdf, (vorlage.version if vorlage is not None else None)
 
 
