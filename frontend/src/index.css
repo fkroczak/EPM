@@ -787,3 +787,22 @@ html { scrollbar-gutter: stable; }
   .diagnose-zeile { grid-template-columns: auto minmax(0, 1fr); padding: 0.75rem; }
   .diagnose-zeile > :last-child { grid-column: 1 / -1; justify-content: flex-start; }
 }
+
+/* Verlauf der Therapie als Zeitleiste (Wunsch 10.10.2026) */
+.therapie-schritt { display: grid; grid-template-columns: 6.5rem 1.25rem minmax(0, 1fr) auto; gap: 0 0.75rem; align-items: start; }
+.therapie-punkt { display: flex; flex-direction: column; align-items: center; align-self: stretch; }
+.therapie-punkt > span {
+  width: 0.625rem; height: 0.625rem; margin-top: 0.375rem; border-radius: 999px; border: 2px solid var(--akzent);
+  background: var(--flaeche); box-sizing: border-box;
+}
+.therapie-punkt > span.erster { background: var(--akzent); }
+.therapie-punkt > i { flex: 1; width: 2px; margin-top: 0.25rem; background: var(--rand); }
+@media (max-width: 47.99rem) { .therapie-schritt { grid-template-columns: 5.75rem 1rem minmax(0, 1fr) auto; gap: 0 0.5rem; } }
+
+/* Kontakte als Zeitleiste (Wunsch 10.10.2026) */
+.kontakt-zeile {
+  display: grid; grid-template-columns: 4.5rem minmax(0, 1fr) auto; gap: 0.25rem 1rem; align-items: start;
+  padding: 0.75rem 1.25rem; border-top: 1px solid var(--fein);
+}
+.kontakt-zeile.markiert { background: var(--akzent-weich); }
+@media (max-width: 47.99rem) { .kontakt-zeile { grid-template-columns: 3.75rem minmax(0, 1fr) auto; gap: 0.25rem 0.625rem; padding: 0.75rem; } }

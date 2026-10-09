@@ -703,6 +703,11 @@ export type Diagnose = {
   angelegt_von_name: string | null;
 };
 
+/** Schritt im Verlauf der Therapie (Wunsch 10.10.2026) */
+export type Therapieschritt = {
+  id: number; patient: number; datum: string; text: string; aktiv: boolean; angelegt_am: string; angelegt_von_name: string | null;
+};
+
 export type Diagnosevorlage = { id: number; icd_code: string; bezeichnung: string; aktiv: boolean; anzeige: string };
 
 export const LABORGRUPPEN: Record<string, string> = {

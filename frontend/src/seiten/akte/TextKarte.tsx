@@ -8,6 +8,7 @@
  * Notizen); ``TextfassungsListe`` ist die ganze Spalte für Reiter, die nur aus einem Text bestehen.
  */
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { datum, uhrzeit, zeitpunkt } from "@/lib/format";
@@ -26,7 +27,7 @@ export const TITEL: Record<Textfeld, string> = {
   diagnose: "Notizen", therapie: "Therapie", empfehlung: "Empfehlung", bemerkung: "Bemerkung",
 };
 
-function useFassungen(feld: Textfeld, an = true) {
+export function useFassungen(feld: Textfeld, an = true) {
   const { patient } = useAkte();
   return useQuery({
     queryKey: ["patient", patient.id, "versionen", feld],
@@ -78,8 +79,10 @@ export function TextfassungsListe({ feld, gewaehlt, onWahl }: {
  * Der Text rechts. Ohne ``version`` (oder mit der aktuellen) ist er bearbeitbar, sonst nur lesbar.
  * ``immerOffen`` öffnet den Editor sofort – für Reiter, auf denen hauptsächlich geschrieben wird.
  */
-export function Textfassung({ feld, titel, hinweis, version, immerOffen }: {
+export function Textfassung({ feld, titel, hinweis, version, immerOffen, vorAktionen }: {
   feld: Textfeld; titel?: string; hinweis?: string; version?: number | null; immerOffen?: boolean;
+  /** weitere Knöpfe vor „Bearbeiten“ (z. B. „Frühere Fassungen“) */
+  vorAktionen?: ReactNode;
 }) {
   const { patient, bearbeiten } = useAkte();
   const name = titel ?? TITEL[feld];
@@ -124,9 +127,12 @@ export function Textfassung({ feld, titel, hinweis, version, immerOffen }: {
           ? `Version ${kopf.version} · geändert ${zeitpunkt(kopf.zeitpunkt)}${kopf.person ? ` von ${kopf.person}` : ""}`
           : (hinweis ?? "Noch nicht bearbeitet"))
         : alt ? `gespeichert ${zeitpunkt(alt.zeitpunkt)}${alt.person ? ` von ${alt.person}` : ""} · nur lesbar` : "nur lesbar"}
-      aktionen={aktuell && bearbeiten && !immerOffen && !offen
-        ? <Knopf klein icon="stift" onClick={() => { setEntwurf(gespeichert); setOffen(true); }}>Bearbeiten</Knopf>
-        : undefined}>
+      aktionen={<>
+        {vorAktionen}
+        {aktuell && bearbeiten && !immerOffen && !offen
+          ? <Knopf klein variante="pri" icon="stift" onClick={() => { setEntwurf(gespeichert); setOffen(true); }}>Bearbeiten</Knopf>
+          : null}
+      </>}>
       {!aktuell ? (
         fassungen.isPending ? <Laden /> : <div data-testid="fassung"><Richtext html={alt?.text ?? ""} leer="(leer)" /></div>
       ) : editor ? (

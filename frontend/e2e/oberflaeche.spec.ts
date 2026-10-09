@@ -247,7 +247,7 @@ test("Volle Breite in Stufen: 1920 px – Karten der Akte im Raster, Größe je 
   await expect(page.getByTestId("karte-diagnose")).toBeVisible();
   await reiter.getByRole("link", { name: /^Therapie/ }).click();
   await expect(page.getByTestId("karte-therapie")).toBeVisible();
-  // Kontakte: seit F122 dasselbe Muster wie überall – links die Kontakte, rechts der gewählte, ohne Teiler.
+  // Kontakte: seit 10.10.2026 Schnelleingabe und Zeitleiste, ohne Teiler.
   // Der Verlauf der Akte steht nur im eigenen Reiter „Verlauf“ (Fehlerliste 02.10.2026, 3)
   await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: /^Kontakte/ }).click();
   const kontakte = page.getByTestId("kontakte");

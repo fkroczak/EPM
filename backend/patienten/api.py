@@ -34,7 +34,7 @@ from .kennzahlen import (abschluss_pruefen, befund_filter, kennzahlen, kontakt_f
                          ohne_plan, pruefliste,
                          schnellfilter, zaehler)
 from .loeschung import PLATZHALTER, schwaerze_dokument, trage_ein
-from .models import (Bezugsperson, Datenschutzanfrage, Diagnose, Dokument, DokumentVorgang, Erklaerung,
+from .models import (Bezugsperson, Datenschutzanfrage, Diagnose, Dokument, DokumentVorgang, Erklaerung, Therapieschritt,
                      Gewichtsmessung, Hinweisruhe, Kontakt, Patient, PatientArzt, Termin, dokument_pfad,
                      plus_monate, sichtbare_termine)
 
@@ -716,7 +716,7 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
 
         Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, bemerkung, gewichte, kontakte, termine,
         dokumente, infusionsplaene, bezugspersonen, aerzte, erklaerungen, datenschutz, diagnosen, laborbefunde,
-        bia_messungen, berichte, hinweisruhe; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
+        bia_messungen, berichte, hinweisruhe, therapieschritte; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
         die Bereiche Stammdaten, Diagnose, Therapie, Empfehlung und Bemerkung verteilt.
         """
         patient = self.get_object()
@@ -749,6 +749,8 @@ def _aktion(name, h, aenderungen):
         return "wieder eingeschaltet"
     if name == "diagnosen" and "aktiv" in felder:
         return "wieder zutreffend" if h.aktiv else "nicht mehr zutreffend"
+    if name == "therapieschritte" and "aktiv" in felder:
+        return "wieder aufgenommen" if h.aktiv else "entfernt"
     if name == "berichte" and "status" in felder:
         return "freigegeben" if h.status == "freigegeben" else "geändert"
     if name == "stammdaten" and "abgeschlossen_am" in felder:
@@ -832,6 +834,8 @@ def _beschreibung(name, h, aktion) -> str:
             if h.widerrufen_am:
                 teile.append(f"widerrufen am {h.widerrufen_am:%d.%m.%Y}")
             return " · ".join(teile)
+        if name == "therapieschritte":
+            return f"{h.datum:%d.%m.%Y}: {h.text}"
         if name == "diagnosen":
             teile = [f"{h.bezeichnung} [{h.icd_code}{h.kennzeichen}]"]
             if h.seit:
@@ -900,6 +904,7 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         "datenschutz": Datenschutzanfrage.history.filter(patient_id=patient.id),
         # Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
         "diagnosen": Diagnose.history.filter(patient_id=patient.id),
+        "therapieschritte": Therapieschritt.history.filter(patient_id=patient.id),
         "hinweisruhe": Hinweisruhe.history.filter(patient_id=patient.id),
         "laborbefunde": Laborbefund.history.filter(patient_id=patient.id),
         "bia_messungen": BiaMessung.history.filter(patient_id=patient.id),
@@ -1818,6 +1823,40 @@ class DiagnoseViewSet(_StammEintragViewSet):
     def perform_update(self, serializer):
         super().perform_update(serializer)
         self._in_katalog(serializer.instance)
+
+
+class TherapieschrittSerializer(_PatientFest, serializers.ModelSerializer):
+    """Schritt im Verlauf der Therapie (Wunsch 10.10.2026)."""
+
+    angelegt_von_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Therapieschritt
+        fields = ["id", "patient", "datum", "text", "aktiv", "angelegt_am", "angelegt_von_name"]
+        read_only_fields = ["angelegt_am"]
+
+    def get_angelegt_von_name(self, obj):
+        return benutzername(obj.angelegt_von)
+
+    def validate_text(self, wert):
+        if not wert.strip():
+            raise serializers.ValidationError("Bitte beschreiben, was sich geändert hat.")
+        return wert.strip()
+
+    def validate_datum(self, wert):
+        if wert > timezone.localdate():
+            raise serializers.ValidationError("Das Datum liegt in der Zukunft.")
+        return wert
+
+
+class TherapieschrittViewSet(_StammEintragViewSet):
+    """Verlauf der Therapie eines Patienten: ``?patient=ID&aktiv=true``. Kein Löschen, nur ``aktiv: false``."""
+
+    model = Therapieschritt
+    serializer_class = TherapieschrittSerializer
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("angelegt_von")
 
 
 def _zuletzt_eingetragen(patienten, anzahl=10, person=None):

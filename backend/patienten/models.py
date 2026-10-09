@@ -543,6 +543,7 @@ class Diagnose(AktenEintrag):
     def anzeige(self) -> str:
         return f"{self.bezeichnung} [{self.icd_code}{self.kennzeichen}]"
 
+
     def clean(self):
         import re
 
@@ -581,6 +582,35 @@ class Diagnose(AktenEintrag):
 def dokument_pfad(patient: Patient, originalname: str) -> str:
     endung = "".join(c for c in (originalname.rsplit(".", 1)[-1] if "." in originalname else "") if c.isalnum())[:10]
     return f"{patient.nummer}/{uuid.uuid4().hex}{'.' + endung.lower() if endung else ''}"
+
+
+
+class Therapieschritt(AktenEintrag):
+    """Ein Schritt im Verlauf der Therapie mit Datum, z. B. „Beginn HPE“, „Umstellung Lipide“ (Wunsch 10.10.2026).
+
+    Der Text „Therapie“ der Akte beschreibt, was aktuell gilt; der Verlauf steht daneben als Liste. Nichts wird
+    gelöscht: ein falscher Schritt wird mit ``aktiv = False`` entfernt und bleibt im Verlauf der Akte."""
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="therapieschritte")
+    datum = models.DateField()
+    text = models.CharField(max_length=300)
+    aktiv = models.BooleanField(default=True)
+    angelegt_am = models.DateTimeField(auto_now_add=True)
+    angelegt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Schritt der Therapie"
+        verbose_name_plural = "Verlauf der Therapie"
+        ordering = ["-datum", "-id"]
+        indexes = [models.Index(fields=["patient", "aktiv"], name="therapieschritt_patient_aktiv")]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Schritte der Therapie werden nicht gelöscht, sondern entfernt (aktiv = False).")
+
+    def __str__(self):
+        return f"{self.datum}: {self.text}"
 
 
 class Dokument(AktenEintrag):
