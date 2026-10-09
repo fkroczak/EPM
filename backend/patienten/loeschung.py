@@ -21,7 +21,7 @@ from django.conf import settings
 from django.db import connection, transaction
 
 PLATZHALTER = "[entfernt]"
-DOKUMENT_ARTEN = ["dokument_umgehaengt", "dokument_geloescht", "dokument_loeschen_abgelehnt"]
+DOKUMENT_ARTEN = ["dokument_umgehaengt", "dokument_geloescht", "dokument_loeschen_abgelehnt", "dokument_text_erkannt"]
 
 
 def schwaerze_dokument(dokument_id: int, sha256: str) -> dict:

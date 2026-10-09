@@ -57,6 +57,10 @@ class Scan(models.Model):
     dokumentdatum = models.DateField(null=True, blank=True)
     # Für die Liste: wie viel Platz die Dateien des Scans belegen (Original, Seiten, Vorschauen)
     belegt = models.PositiveBigIntegerField(default=0)
+    # „Werte übernehmen“ aus einem Dokument der Akte (F171): Der Scan ist eine Arbeitskopie dieses Dokuments; beim
+    # Zuordnen entsteht kein neues Dokument, die Werte werden mit dem vorhandenen verknüpft
+    quelldokument = models.ForeignKey("patienten.Dokument", on_delete=models.CASCADE, null=True, blank=True,
+                                      related_name="+")
 
     class Meta:
         verbose_name = "Scan"
@@ -141,3 +145,44 @@ class ScanSeite(models.Model):
 
     def datei(self, name: str) -> Path:
         return self.scan.pfad / name
+
+
+class DokumentErkennung(models.Model):
+    """„Text erkennen“ an einem Dokument der Akte (F170): Der OCR-Dienst legt mit OCRmyPDF eine unsichtbare Textebene
+    über die Seiten (das Aussehen bleibt, PDF/A) und ersetzt die Datei des Dokuments durch diese PDF. Der Text kommt
+    in ``DokumentText`` (Suche, Kopieren). Ein Auftrag je Dokument zur gleichen Zeit."""
+
+    class Status(models.TextChoices):
+        WARTET = "wartet", "wartet"
+        LAEUFT = "laeuft", "wird erkannt"
+        FERTIG = "fertig", "erkannt"
+        FEHLER = "fehler", "Fehler"
+
+    dokument = models.ForeignKey("patienten.Dokument", on_delete=models.CASCADE, related_name="erkennungen")
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.WARTET, db_index=True)
+    angefordert_am = models.DateTimeField(auto_now_add=True)
+    angefordert_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True,
+                                        related_name="+")
+    begonnen_am = models.DateTimeField(null=True, blank=True)
+    lebenszeichen = models.DateTimeField(null=True, blank=True)
+    beendet_am = models.DateTimeField(null=True, blank=True)
+    versuche = models.PositiveSmallIntegerField(default=0)
+    schritt = models.CharField(max_length=120, blank=True)
+    fehler = models.TextField(blank=True)
+    # Prüfsumme beim Anfordern: Wurde die Datei inzwischen anders ersetzt, wird nichts überschrieben
+    sha256_vorher = models.CharField(max_length=64)
+    sha256_nachher = models.CharField(max_length=64, blank=True)
+    seiten = models.PositiveIntegerField(null=True, blank=True)
+    dauer_s = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Texterkennung eines Dokuments"
+        verbose_name_plural = "Texterkennungen von Dokumenten"
+        ordering = ["angefordert_am", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["dokument"], condition=models.Q(status__in=["wartet", "laeuft"]),
+                                    name="scans_dokumenterkennung_ein_offener_auftrag"),
+        ]
+
+    def __str__(self):
+        return f"Texterkennung Dokument {self.dokument_id}"

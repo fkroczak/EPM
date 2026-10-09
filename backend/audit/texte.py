@@ -21,7 +21,8 @@ GRUPPEN = {
     "abschluss": ("Abschluss", [A.AKTE_ABGESCHLOSSEN, A.AKTE_GEOEFFNET]),
     # ohne eigenen Filterknopf im Entwurf, erscheint unter „alle“
     "infusionsplan": ("Infusionsplan", [A.PLAN_FREIGEGEBEN]),
-    "dokument": ("Dokument", [A.DOKUMENT_UMGEHAENGT, A.DOKUMENT_GELOESCHT, A.DOKUMENT_LOESCHUNG_NACHGEHOLT]),
+    "dokument": ("Dokument", [A.DOKUMENT_UMGEHAENGT, A.DOKUMENT_GELOESCHT, A.DOKUMENT_LOESCHUNG_NACHGEHOLT,
+                              A.DOKUMENT_TEXT_ERKANNT]),
     # Administration › System: Aufträge an den Server, Wartung des EPM, Hinweise an alle Benutzer
     "system": ("System", [A.SYSTEM]),
     "scan": ("Scan", [A.SCAN]),
@@ -210,6 +211,10 @@ def beschreibung(e) -> str:
                 f"(Art. 17 DSGVO), Grund: {d.get('grund', '')}")
     if art == A.DOKUMENT_LOESCHEN_ABGELEHNT:
         return f"Löschen von {_dokument(e)} abgelehnt: {d.get('fehler', '')}"
+    if art == A.DOKUMENT_TEXT_ERKANNT:
+        seiten = d.get("seiten")
+        return (f"{_dokument(e)}: Text erkannt{f' ({seiten} Seiten)' if seiten else ''} – Datei durch dieselbe PDF mit "
+                f"Textebene ersetzt (Prüfsumme vorher {str(d.get('sha256_vorher', ''))[:12]}…)")
     if art == A.DOKUMENT_LOESCHUNG_NACHGEHOLT:
         return (f"{_dokument(e)} war durch eine Wiederherstellung zurückgekommen und wurde erneut gelöscht "
                 f"(Löschung vom {_datum(d.get('geloescht_am', ''))})")

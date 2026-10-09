@@ -1489,6 +1489,9 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
         request.session.pop(self.LOESCHCODE, None)
         pfad = dok.pfad
         dok_id, sha, datei = dok.id, dok.sha256, dok.datei
+        # Frühere Fassungen derselben Datei (z. B. vor „Text erkennen“, F170): auch sie gelten als gelöscht – sonst
+        # brächte eine ältere Sicherung das Dokument mit der alten Prüfsumme zurück
+        fruehere = sorted({x for x in dok.history.values_list("sha256", flat=True) if x and x != sha})
         akte = f"{dok.patient.nachname}, {dok.patient.vorname} (Nr. {dok.patient.nummer})"
         with transaction.atomic():
             vorgang = DokumentVorgang.objects.create(art=DokumentVorgang.Art.GELOESCHT, dokument_id=dok_id,
@@ -1502,9 +1505,12 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
             dok._history_user = request.user
             dok._change_reason = "Endgültig gelöscht"
             dok.delete()
-            schwaerze_dokument(dok_id, sha)
+            for pruefsumme in (sha, *fruehere):
+                schwaerze_dokument(dok_id, pruefsumme)
             eintrag = {"dokument": dok_id, "sha256": sha, "datei": datei, "patient": vorgang.von_patient_id,
                        "person": request.user.id, "geloescht_am": timezone.now().isoformat(timespec="seconds")}
+            if fruehere:
+                eintrag["fruehere_sha256"] = fruehere
             transaction.on_commit(lambda: trage_ein(eintrag), robust=True)
             transaction.on_commit(lambda: pfad.unlink(missing_ok=True), robust=True)
         return Response(status=status.HTTP_204_NO_CONTENT)

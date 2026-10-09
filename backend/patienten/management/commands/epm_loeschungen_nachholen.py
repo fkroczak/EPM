@@ -121,7 +121,9 @@ def nachholen() -> dict:
             ergebnis["liste_ergaenzt"] += 1
 
     for (dok_id, sha), e in aus_liste.items():
-        dok = Dokument.objects.filter(id=dok_id, sha256=sha).select_related("patient").first()
+        # auch eine frühere Fassung (vor „Text erkennen“, F170) ist dasselbe gelöschte Dokument
+        fruehere = [x for x in (e.get("fruehere_sha256") or []) if isinstance(x, str) and x]
+        dok = Dokument.objects.filter(id=dok_id, sha256__in=[sha, *fruehere]).select_related("patient").first()
         if dok is not None:
             pfad = dok.pfad
             with transaction.atomic():
@@ -149,8 +151,9 @@ def nachholen() -> dict:
                     ergebnis["dateien"] += 1
             except OSError:
                 pass
-        geaendert = schwaerze_dokument(dok_id, sha)
-        ergebnis["geschwaerzt"] += geaendert["historie"] + geaendert["protokoll"]
+        for pruefsumme in (sha, *fruehere):
+            geaendert = schwaerze_dokument(dok_id, pruefsumme)
+            ergebnis["geschwaerzt"] += geaendert["historie"] + geaendert["protokoll"]
     return ergebnis
 
 

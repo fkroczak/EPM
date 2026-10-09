@@ -65,7 +65,8 @@ def akte_entfernen(patient_id: int, nummer: int, dokument_ids=(), namen=()) -> i
     eigene = {f"Dokument {i}" for i in dokument_ids}
     bedingung = akte_bedingung(patient_id, nummer)
     if eigene:
-        bedingung |= Q(art__in=[A.DOKUMENT_UMGEHAENGT, A.DOKUMENT_GELOESCHT, A.DOKUMENT_LOESCHEN_ABGELEHNT],
+        bedingung |= Q(art__in=[A.DOKUMENT_UMGEHAENGT, A.DOKUMENT_GELOESCHT, A.DOKUMENT_LOESCHEN_ABGELEHNT,
+                                A.DOKUMENT_TEXT_ERKANNT],
                        objekt__in=sorted(eigene))
     anzahl = 0
     for e in SystemEreignis.objects.filter(bedingung):
