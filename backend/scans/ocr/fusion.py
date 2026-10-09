@@ -284,7 +284,29 @@ def reihen(stuecke: list[Stueck]) -> list[list[Stueck]]:
     return aus
 
 
+_DATUM_ALTER = re.compile(r"^(\d{1,2}\.\d{1,2}\.(?:19|20)\d{2})(\d{1,3})$")
+
+
+def datum_und_alter_trennen(woerter: list[Wort]) -> list[Wort]:
+    """„26.11.1970 ♀ 54 Jahre“: Das Geschlechtszeichen kennt die Erkennung nicht, Datum und Alter verschmelzen zu
+    „26.11.197054“ – das Datum wäre so nicht mehr lesbar. Vor „Jahre“/„J.“ wird wieder getrennt."""
+    aus: list[Wort] = []
+    for i, w in enumerate(woerter):
+        m = _DATUM_ALTER.match(w.t)
+        folgt = woerter[i + 1].t if i + 1 < len(woerter) else ""
+        if m and re.match(r"^(?:jahr|j\.?$)", folgt, re.I):
+            datum, alter = m.groups()
+            breite = w.w / len(w.t)
+            aus.append(Wort(datum, w.x, w.y, breite * len(datum), w.h, w.c))
+            aus.append(Wort(alter, w.x + w.w - breite * len(alter), w.y, breite * len(alter), w.h, w.c))
+        else:
+            aus.append(w)
+    return aus
+
+
 def seite_json(stuecke: list[Stueck], breite: int, hoehe: int, verfahren: list[str]) -> dict:
+    for s in stuecke:
+        s.woerter = datum_und_alter_trennen(s.woerter)
     rs = reihen(stuecke)
     return {
         "breite": int(breite), "hoehe": int(hoehe), "verfahren": verfahren,

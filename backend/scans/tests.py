@@ -318,6 +318,19 @@ class AuswertungTest(SimpleTestCase):
         texte = sorted(s.text for s in stuecke)
         self.assertEqual(texte, ["10.8", "3.67", "Eisen", "Kalium", "Natrium"])
 
+    def test_datum_und_alter_getrennt(self):
+        """„26.11.1970 ♀ 54 Jahre“ als „26.11.197054 Jahre“ gelesen → Datum und Alter wieder getrennt."""
+        W = fusion.Wort
+        aus = fusion.datum_und_alter_trennen([W("geb.", 0, 0, 40, 20, 0.9), W("26.11.197054", 50, 0, 120, 20, 0.9),
+                                              W("Jahre", 180, 0, 50, 20, 0.9)])
+        self.assertEqual([w.t for w in aus], ["geb.", "26.11.1970", "54", "Jahre"])
+        # ohne „Jahre“ dahinter bleibt das Wort, wie es ist
+        self.assertEqual([w.t for w in fusion.datum_und_alter_trennen([W("26.11.197054", 0, 0, 120, 20, 0.9)])],
+                         ["26.11.197054"])
+        d = fusion.seite_json([fusion.Stueck(aus, "p").rahmen()], 1000, 1000, ["paddle"])
+        a = auswertung.patient_hinweise(auswertung.reihen_aus([d]))
+        self.assertEqual(a["geburtsdaten"], ["1970-11-26"])
+
     def test_vergleich_zweier_lesarten(self):
         """Übereinstimmung macht sicher; Abweichung bleibt markiert und nennt die andere Lesart."""
         W = fusion.Wort
