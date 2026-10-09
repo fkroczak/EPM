@@ -31,7 +31,8 @@ SYNONYME = {
     "bilirubin direkt": ["bilirubin direkt", "bilirubin dir", "direktes bilirubin", "bilirubin konjugiert"],
     "kreatinin": ["kreatinin", "creatinin", "krea", "crea", "kreatinin serum", "creatinin enzym", "kreatinin enzym"],
     "gfr ckd epi": ["gfr ckd epi", "egfr ckd epi", "egfr", "gfr nach ckd epi", "egfr nach ckd epi", "ckd epi",
-                    "gfr berechnet ckd epi"],
+                    "gfr berechnet ckd epi", "egfrcrea", "egfr crea", "egfrcrea nach ckd epi",
+                    "egfr crea nach ckd epi", "egfrcrea ckd epi", "egfr kreatinin nach ckd epi"],
     "gfr": ["gfr", "glomerulaere filtrationsrate"],
     "harnstoff": ["harnstoff", "urea", "harnstoff n"],
     "harnsaeure": ["harnsaeure", "urat"],
@@ -99,7 +100,8 @@ STOFF = {
     "albumin": "albumin", "gesamteiweiss": "gesamteiweiss", "crp": "crp", "natrium": "natrium", "kalium": "kalium",
     "calcium": "calcium", "magnesium": "magnesium", "phosphat": "phosphat", "chlorid": "chlorid", "kupfer": "kupfer",
     "zink": "zink", "selen": "selen", "mangan": "mangan", "leukozyten": "leukozyten", "erythrozyten": "erythrozyten",
-    "haemoglobin": "haemoglobin", "haematokrit": "haematokrit", "mcv": "mcv", "thrombozyten": "thrombozyten",
+    "haemoglobin": "haemoglobin", "haematokrit": "haematokrit", "mcv": "mcv", "mch": "mch", "mchc": "mchc",
+    "thrombozyten": "thrombozyten",
     "vitamin a": "vitamin_a", "vitamin b1": "vitamin_b1", "vitamin b6": "vitamin_b6", "vitamin b12": "vitamin_b12",
     "folsaeure": "folsaeure", "vitamin k1": "vitamin_k1", "vitamin e": "vitamin_e",
     "calcidiol 25 hydroxy vitamin d": "calcidiol", "calcitriol 1 25 dihydroxy vitamin d": "calcitriol",
@@ -238,6 +240,8 @@ def dokumentdatum(reihen: list[list[T]], heute: date | None = None) -> tuple[dat
 _OP = re.compile(r"^([<>≤≥]=?|<=|>=)$")
 _WERT = re.compile(r"^(?P<op>[<>≤≥]=?)?(?P<zahl>[-+]?\d+(?:[.,]\d+)*)(?P<flag>\+\+|--|[HhLl+*↑↓!])?$")
 # Zahl mit angehängtem, unbekanntem Zeichen („3,2U“ statt „3,2 L“): Zahl übernehmen, als unsicher markieren
+# Pfeil vor dem Wert („↑18.69“, „↓27.7“), von der Erkennung oft als „!“ oder „|“ gelesen – als „1“ siehe _pfeil_als_eins
+_PFEIL = re.compile(r"^(?P<pfeil>[↑↓!|ı])(?P<zahl>\d+(?:[.,]\d+)?)$")
 _WERT_REST = re.compile(r"^(?P<op>[<>≤≥]=?)?(?P<zahl>\d+(?:[.,]\d+)?)(?P<rest>[A-Za-z↑↓*!+|]{1,2})$")
 _FLAG = re.compile(r"^(\+\+|--|[HhLl+*↑↓!]|hoch|tief|niedrig)$")
 _SPANNE = re.compile(r"(?P<von>\d+(?:[.,]\d+)?)\s*[-–—]\s*(?P<bis>\d+(?:[.,]\d+)?)")
@@ -296,8 +300,28 @@ def _suche_parameter(label: str, index, eintraege) -> tuple[Katalogeintrag | Non
             if len(kurz) <= 3 and k < len(teile):
                 continue
             return index[kurz][0], "genau"
+    bester = _aehnlich(n, index)
+    if bester:
+        return bester, "aehnlich"
+    # Methode in Klammern („MCH (berechnet)“, „CRP (Turbidimetrie)“, „eGFR nach CKD-EPI (2009)“): ohne sie dürfen
+    # auch kurze Kürzel treffen; danach ähnliche Schreibweise des Namens allein („Hamoglobin (Photometrie)“)
+    ohne = re.sub(r"\([^)]*\)?|\[[^\]]*\]?", " ", label)
+    if norm(ohne) and norm(ohne) != n:
+        n2 = norm(ohne)
+        if n2 in index and len(index[n2]) == 1:
+            return index[n2][0], "genau"
+        teile = n2.split()
+        for k in range(len(teile), 0, -1):
+            bester = _aehnlich(" ".join(teile[:k]), index)
+            if bester:
+                return bester, "aehnlich"
+    return None, ""
+
+
+def _aehnlich(n: str, index) -> Katalogeintrag | None:
+    """Katalogbegriff mit höchstens 1–2 Lesefehlern Abstand (nur Begriffe ab 5 Zeichen, eindeutig)."""
     if len(n) < 5:
-        return None, ""
+        return None
     bester, bester_abstand = None, 99
     for begriff, liste in index.items():
         if len(begriff) < 5 or len(liste) != 1:
@@ -306,9 +330,7 @@ def _suche_parameter(label: str, index, eintraege) -> tuple[Katalogeintrag | Non
         a = abstand(n, begriff)
         if a <= grenze and a < bester_abstand:
             bester, bester_abstand = liste[0], a
-    if bester:
-        return bester, "aehnlich"
-    return None, ""
+    return bester
 
 
 def _referenz(text: str) -> tuple[Decimal | None, Decimal | None]:
@@ -332,25 +354,63 @@ def _dez(d: Decimal | None, stellen: int = 4) -> str | None:
     return text
 
 
+def _wertstelle(r: list[T]) -> int | None:
+    """Stelle des Werts in der Reihe: Etikett = Wörter bis zum ersten Wert (Zahl, „< 2,0“, „negativ“)."""
+    for i, t in enumerate(r):
+        if i == 0:
+            continue
+        txt = t.text
+        if _OP.match(txt) and i + 1 < len(r) and E.zahl(r[i + 1].text.rstrip("HhLl+*↑↓!")) is not None:
+            return i
+        roh = txt.replace(" ", "")
+        if _ist_wert(txt) or _WERT_REST.match(roh) or _PFEIL.match(roh):
+            return i
+    return None
+
+
+def _wertspalten(reihen: list[list[T]]) -> dict[int, tuple[float, float]]:
+    """Je Seite: linke Kante der Wertespalte und Zeichenbreite – nur wenn die Werte linksbündig untereinander stehen.
+
+    Ein Pfeil vor dem Wert („↑18.69“) ragt dann um ein Zeichen nach links heraus; die Erkennung liest ihn oft als
+    „1“ („118.69“). Ohne linksbündige Spalte lässt sich das nicht unterscheiden."""
+    je_seite: dict[int, list[tuple[float, float]]] = {}
+    for r in reihen:
+        k = _wertstelle(r) if len(r) >= 2 else None
+        if k is None or not re.search(r"[A-Za-zÄÖÜäöü]", _text(r[:k])):
+            continue
+        t = r[k]
+        if not re.fullmatch(r"\d+(?:[.,]\d+)?", t.text) or t.text.startswith("1"):
+            continue
+        je_seite.setdefault(t.seite, []).append((t.box[0], t.box[2] / max(len(t.text), 1)))
+    aus = {}
+    for seite, xs in je_seite.items():
+        if len(xs) < 4:
+            continue
+        links = sorted(x for x, _ in xs)[len(xs) // 2]
+        zeichen = sorted(z for _, z in xs)[len(xs) // 2]
+        if sum(1 for x, _ in xs if abs(x - links) <= 0.35 * zeichen) >= 0.7 * len(xs):
+            aus[seite] = (links, zeichen)
+    return aus
+
+
+def _pfeil_als_eins(t: T, roh: str, spalten) -> bool:
+    """„118.69“, dessen „1“ links aus der Wertespalte ragt: ein als „1“ gelesener Pfeil."""
+    if t.seite not in spalten or not re.fullmatch(r"1\d+(?:[.,]\d+)?", roh):
+        return False
+    links, zeichen = spalten[t.seite]
+    eigenes = t.box[2] / len(roh)
+    return t.box[0] < links - 0.6 * zeichen and abs(t.box[0] + eigenes - links) <= 0.5 * zeichen
+
+
 def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
     """Zeilen eines Laborbefunds → vorgeschlagene Werte (Parameter aus dem Katalog oder Freitext)."""
     index, eintraege = katalog_index(parameter)
-    vorschlaege, gesehen = [], set()
+    spalten = _wertspalten(reihen)
+    vorschlaege = []
     for r in reihen:
         if len(r) < 2:
             continue
-        # Etikett = Wörter bis zum ersten Wert (Zahl, „< 2,0“, „negativ“)
-        k = None
-        for i, t in enumerate(r):
-            if i == 0:
-                continue
-            txt = t.text
-            if _OP.match(txt) and i + 1 < len(r) and E.zahl(r[i + 1].text.rstrip("HhLl+*↑↓!")) is not None:
-                k = i
-                break
-            if _ist_wert(txt) or _WERT_REST.match(txt.replace(" ", "")):
-                k = i
-                break
+        k = _wertstelle(r)
         if k is None:
             continue
         etikett = _text(r[:k])
@@ -366,7 +426,13 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
         if _OP.match(rest[0].text) and len(rest) > 1:
             op = rest[0].text
             j = 1
-        roh = rest[j].text.replace(" ", "")
+        roh = gelesen = rest[j].text.replace(" ", "")
+        pfeil = ""
+        p = _PFEIL.match(roh)
+        if p:
+            pfeil, roh = p.group("pfeil"), p.group("zahl")
+        elif _pfeil_als_eins(rest[j], roh, spalten):
+            pfeil, roh = "1", roh[1:]
         m = _WERT.match(roh)
         angehaengt = ""
         if not m and param is not None:
@@ -408,6 +474,16 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
         if angehaengt:
             sicher = min(sicher, UNSICHER - 0.15)
             hinweise.append(f"gelesen als „{roh}“ – Zahl übernommen, Zusatz „{angehaengt}“ (H/L?) bitte prüfen")
+        if pfeil and wert is not None:
+            if pfeil in "↑↓":
+                flag = flag or pfeil
+            else:
+                if ref_bis is not None and wert > ref_bis:
+                    flag = flag or "↑"
+                elif ref_von is not None and wert < ref_von:
+                    flag = flag or "↓"
+                sicher = min(sicher, UNSICHER - 0.05)
+                hinweise.append(f"gelesen als „{gelesen}“ – erstes Zeichen als Pfeil (↑/↓) gewertet, bitte prüfen")
         if op and wert is not None:
             wert_text, wert = f"{op} {m.group('zahl') if m else _dez(wert)}", None
             hinweise.append("unter bzw. über der Messgrenze – als Text übernommen")
@@ -437,16 +513,39 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
             hinweise.append("Erkennung unsicher – bitte mit dem Original vergleichen")
         if param and wert is not None:
             ziel = param.einheit
-            if einheit_ and ziel and einheit_ != ziel:
-                f = E.faktor(einheit_, ziel, param.stoff)
+            # „127.7“ für MCH: unmöglich, ohne die führende „1“ aber plausibel – ein als „1“ gelesener Pfeil
+            if not pfeil and m and re.fullmatch(r"1\d+(?:[.,]\d+)?", m.group("zahl")):
+                bez = einheit_ or ziel
+                ohne = E.zahl(m.group("zahl")[1:])
+                if (bez and E.plausibel(param.stoff, wert, bez) is False
+                        and E.plausibel(param.stoff, ohne, bez)):
+                    wert = ohne
+                    eintrag["wert"] = _dez(wert)
+                    if not flag:
+                        flag = ("↑" if ref_bis is not None and wert > ref_bis
+                                else "↓" if ref_von is not None and wert < ref_von else "")
+                        eintrag["markierung"] = flag
+                    sicher = min(sicher, UNSICHER - 0.05)
+                    eintrag["sicherheit"] = round(sicher, 3)
+                    hinweise.append(f"gelesen als „{gelesen}“ – unmöglich; erstes Zeichen als Pfeil (↑/↓) gewertet, "
+                                    f"bitte prüfen")
+            # keine Einheit gelesen und der Wert passt nicht zum Katalog, aber zu einer üblichen anderen Einheit
+            geraten = E.einheit_raten(param.stoff, wert, ziel) if not einheit_ and ziel else None
+            von = einheit_ or geraten
+            if von and ziel and von != ziel:
+                f = E.faktor(von, ziel, param.stoff)
                 if f is not None:
-                    eintrag["umrechnung"] = {"von": einheit_, "faktor": _dez(f, 8), "wert_gelesen": _dez(wert)}
+                    eintrag["umrechnung"] = {"von": von, "faktor": _dez(f, 8), "wert_gelesen": _dez(wert)}
                     wert = wert * f
                     eintrag["wert"] = _dez(wert)
                     eintrag["einheit"] = ziel
                     eintrag["referenz_von"] = _dez(ref_von * f) if ref_von is not None else None
                     eintrag["referenz_bis"] = _dez(ref_bis * f) if ref_bis is not None else None
-                    hinweise.append(f"umgerechnet von {einheit_} in {ziel}")
+                    if geraten:
+                        hinweise.append(f"keine Einheit gelesen – der Wert passt nur zu {geraten}: umgerechnet in "
+                                        f"{ziel}, bitte prüfen")
+                    else:
+                        hinweise.append(f"umgerechnet von {einheit_} in {ziel}")
                 else:
                     hinweise.append(f"Einheit {einheit_} statt {ziel} (Katalog) – nicht umrechenbar, so übernommen")
             elif not einheit_ and ziel:
@@ -458,14 +557,23 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
         if param is None:
             eintrag["vorschlag"] = False
             hinweise.append("nicht im Katalog – nur auf Wunsch als freier Parameter")
-        if param is not None:
-            if param.id in gesehen:
-                eintrag["vorschlag"] = False
-                hinweise.append("steht mehrfach im Befund – nur die erste Zeile ist vorgewählt")
-            gesehen.add(param.id)
         if sicher < 0.5:
             eintrag["vorschlag"] = False
         vorschlaege.append(eintrag)
+    # Steht ein Parameter mehrfach im Befund (z. B. „Eisen (Photometrie)“ in µmol/l und „Eisen (Umrechnung)“ in
+    # µg/dl), ist nur eine Zeile vorgewählt: eine brauchbare, möglichst schon in der Einheit des Katalogs.
+    je_parameter: dict[int, list[dict]] = {}
+    for v in vorschlaege:
+        if v["parameter"] is not None:
+            je_parameter.setdefault(v["parameter"], []).append(v)
+    for liste in je_parameter.values():
+        if len(liste) < 2:
+            continue
+        beste = min(liste, key=lambda v: (not v["vorschlag"], "umrechnung" in v or not v["einheit_gelesen"]))
+        for v in liste:
+            if v is not beste:
+                v["vorschlag"] = False
+                v["hinweise"].append("steht mehrfach im Befund – eine andere Zeile ist vorgewählt")
     return vorschlaege
 
 
