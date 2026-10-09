@@ -40,16 +40,16 @@ function istPdf(dok: Dokument) {
 
 function Vorschau({ dok }: { dok: Dokument }) {
   if (dok.mime.startsWith("image/")) {
-    return <img src={dateiUrl(dok, true)} alt={dok.titel} className="w-full max-h-[320px] object-contain rounded-lg border border-rand bg-fein" />;
+    return <img src={dateiUrl(dok, true)} alt={dok.titel} className="w-full max-h-[20rem] object-contain rounded-lg border border-rand bg-fein" />;
   }
   if (istPdf(dok)) {
     // eigene Anzeige statt PDF-Programm des Browsers (Adobe Reader blendet dort eine schwarze Leiste ein)
     return <PdfVorschau url={dateiUrl(dok, true)} titel={dok.titel} />;
   }
   if (dok.mime.startsWith("text/")) {
-    return <iframe title={`Vorschau ${dok.titel}`} src={dateiUrl(dok, true)} className="w-full h-[320px] rounded-lg border border-rand bg-white" />;
+    return <iframe title={`Vorschau ${dok.titel}`} src={dateiUrl(dok, true)} className="w-full h-[20rem] rounded-lg border border-rand bg-white" />;
   }
-  return <div className="h-[120px] flex items-center justify-center text-sm gedaempft border border-dashed border-rand rounded-lg">Keine Vorschau</div>;
+  return <div className="h-[7.5rem] flex items-center justify-center text-sm gedaempft border border-dashed border-rand rounded-lg">Keine Vorschau</div>;
 }
 
 /** Falscher Patient: Dokument dem richtigen Patienten zuordnen (Festlegung 02.10.2026). */
@@ -157,7 +157,7 @@ function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean
               className="select-none font-mono text-[1.375rem] font-semibold tracking-[0.3em] px-3 py-1 rounded-md bg-fein border border-rand">
               {vorbereiten.data?.code ?? "······"}</span>
           </div>
-          <Feld label="Code abtippen" fehler={f.bestaetigung} className="flex-1 min-w-[160px]">
+          <Feld label="Code abtippen" fehler={f.bestaetigung} className="flex-1 min-w-[10rem]">
             {(p) => <Eingabe {...p} autoComplete="off" className="font-mono uppercase tracking-[0.2em]" value={bestaetigung} onChange={(e) => setBestaetigung(e.target.value)} />}
           </Feld>
         </div>
@@ -347,7 +347,7 @@ function Details({ dok }: { dok: Dokument }) {
         </div>
         <Anzeige label="Notiz" mehrzeilig>{dok.notiz}</Anzeige>
       </>}
-      <dl className="grid grid-cols-[90px_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[0.8125rem] m-0">
+      <dl className="grid grid-cols-[5.625rem_minmax(0,1fr)] gap-x-2.5 gap-y-1.5 text-[0.8125rem] m-0">
         <dt className="gedaempft">Quelle</dt><dd className="m-0">{quelle(dok)}{dok.hochgeladen_von_name ? ` · ${dok.hochgeladen_von_name}` : ""}</dd>
         <dt className="gedaempft">Datei</dt><dd className="m-0 break-all">{dok.originalname}</dd>
         <dt className="gedaempft">Größe</dt><dd className="m-0 num">{dateigroesse(dok.groesse)}</dd>
@@ -434,11 +434,11 @@ export function Dokumente() {
   };
 
   return (
-    <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] fhd:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
+    <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_21.25rem] fhd:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
       <div className="flex flex-col gap-4 min-w-0">
         {erfassen ? (
           <div
-            className={cx("rounded-[14px] border-2 border-dashed px-5 py-6 flex items-center justify-center gap-3 flex-wrap text-sm", ziehen ? "border-akzent bg-akzent-weich" : "border-rand bg-flaeche")}
+            className={cx("rounded-[0.875rem] border-2 border-dashed px-5 py-6 flex items-center justify-center gap-3 flex-wrap text-sm", ziehen ? "border-akzent bg-akzent-weich" : "border-rand bg-flaeche")}
             onDragOver={(e) => { e.preventDefault(); setZiehen(true); }}
             onDragLeave={() => setZiehen(false)}
             onDrop={(e) => { e.preventDefault(); setZiehen(false); if (e.dataTransfer.files.length) void hochladen(e.dataTransfer.files); }}
@@ -466,7 +466,7 @@ export function Dokumente() {
           <span className="lbl">{liste.length} Dokumente</span>
           <label className="relative block grow max-w-sm">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
-            <input className="inp pl-[34px]" type="search" aria-label="Dokumente durchsuchen" placeholder="Suchen in Titel, Notiz und erkanntem Text"
+            <input className="inp pl-[2.125rem]" type="search" aria-label="Dokumente durchsuchen" placeholder="Suchen in Titel, Notiz und erkanntem Text"
               value={suche} onChange={(e) => setSuche(e.target.value)} data-testid="dokumente-suche" />
           </label>
           <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -500,7 +500,7 @@ export function Dokumente() {
           <Fehleranzeige fehler={dokumente.error} />
         </Karte>
       </div>
-      <Karte className="px-5 py-[18px]">
+      <Karte className="px-5 py-[1.125rem]">
         {aktiv ? <Details dok={aktiv} /> : <span className="text-sm gedaempft">Kein Dokument ausgewählt.</span>}
       </Karte>
     </div>

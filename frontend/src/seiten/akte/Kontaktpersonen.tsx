@@ -245,7 +245,7 @@ function BezugspersonDialog({ person, offen, onOffen }: { person: Bezugsperson |
         {feld("mobil", "Mobil", { num: true })}
         {feld("email", "E-Mail", { span: true, typ: "email" })}
         {feld("strasse", "Straße", { span: true })}
-        <div className="col-span-2 grid grid-cols-[110px_1fr] gap-3">
+        <div className="col-span-2 grid grid-cols-[6.875rem_1fr] gap-3">
           {feld("plz", "PLZ", { num: true })}
           {feld("ort", "Ort")}
         </div>

@@ -2,7 +2,7 @@
  *  in die Akte schauen und Notizen erfassen. Geprüft mit der Bildschirmgröße eines Android-Telefons (Touch). */
 import { devices, expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { apiAls, eindeutig, merken, zustand } from "./hilfen";
+import { apiAls, eindeutig, merken, neuesKonto, zustand } from "./hilfen";
 
 const { defaultBrowserType: _browser, ...telefon } = devices["Pixel 7"];
 test.use({ ...telefon, storageState: zustand("mediziner") });
@@ -134,4 +134,55 @@ test("Telefon: Notiz zur offenen Akte über „Notiz“ in der Leiste", async ({
   await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: /Kontakte/ }).click();
   await expect(page.getByTestId("kontaktliste")).toContainText(text);
   merken("mobil_notiz", { patient: p.id, text });
+});
+
+test.describe("Administration am Telefon", () => {
+  test.use({ storageState: zustand("admin") });
+
+  /** Wunsch 09.10.2026: auf Backup ragten die Tabellen über den Bildschirm, die Knöpfe lagen über dem Titel */
+  test("Telefon: Tabellen werden zu Zeilen, Seitenkopf bricht um – alles passt in die Breite", async ({ page }) => {
+    for (const [pfad, titel] of [["/admin/backup", "Backup und Wiederherstellung"], ["/admin/benutzer", "Benutzer"],
+      ["/admin/audit-log", "Audit-Log"], ["/admin/system", "System"], ["/admin/vorlagen", "Vorlagen"]]) {
+      await page.goto(pfad);
+      const h1 = page.getByRole("heading", { level: 1, name: titel });
+      await expect(h1).toBeVisible();
+      await page.waitForLoadState("networkidle");
+      await passtInDieBreite(page, titel);
+      // kein Knopf des Seitenkopfs liegt über dem Titel
+      const kopf = await h1.boundingBox();
+      for (const knopf of await page.locator(".seitenkopf .btn").all()) {
+        const k = await knopf.boundingBox();
+        if (k && kopf) expect(k.y >= kopf.y + kopf.height - 1 || k.x >= kopf.x + kopf.width - 1, `${titel}: Knopf über dem Titel`).toBe(true);
+      }
+    }
+    // Zellen tragen ihre Spaltenüberschrift (Benutzerliste: Name als Titel, Rolle beschriftet)
+    await page.goto("/admin/benutzer");
+    await expect(page.locator('td[data-label="Rolle"]').first()).toBeVisible();
+    await expect(page.locator("td[data-titel]").first()).toBeVisible();
+  });
+});
+
+/** Festlegung 09.10.2026: Maße in rem – „Schriftgröße“ vergrößert die ganze Oberfläche, auch am Telefon passt alles */
+test("Telefon: Schriftgröße „Sehr groß“ vergrößert die ganze Oberfläche, nichts ragt heraus", async ({ browser }) => {
+  const konto = await neuesKonto("mediziner", "Gerda", "Gross");
+  const ctx = await browser.newContext({ ...telefon, storageState: konto.zustand, ignoreHTTPSErrors: true });
+  const page = await ctx.newPage();
+  await page.goto("/design");
+  const leiste = page.getByTestId("mobil-leiste");
+  const vorher = (await leiste.boundingBox())!.height;
+  const knopfVorher = (await page.getByRole("button", { name: "Patient suchen" }).boundingBox())!.width;
+  const gespeichert = page.waitForResponse((r) => r.url().endsWith("/api/auth/ich/") && r.request().method() === "PATCH");
+  await page.getByRole("group", { name: "Schriftgröße" }).getByRole("button", { name: "Sehr groß" }).click();
+  expect((await gespeichert).ok()).toBe(true);
+  await expect(page.locator("html")).toHaveAttribute("data-schrift", "sehrgross");
+  // nicht nur die Schrift: Leiste und Knöpfe wachsen mit (rem statt px)
+  await expect.poll(async () => (await leiste.boundingBox())!.height).toBeGreaterThan(vorher * 1.2);
+  expect((await page.getByRole("button", { name: "Patient suchen" }).boundingBox())!.width).toBeGreaterThan(knopfVorher * 1.2);
+  for (const pfad of ["/", "/patienten", "/kalender", "/infusionsplaene", "/konto", "/hilfe", "/versorger"]) {
+    await page.goto(pfad);
+    await expect(leiste).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await passtInDieBreite(page, `${pfad} (sehr groß)`);
+  }
+  await ctx.close();
 });

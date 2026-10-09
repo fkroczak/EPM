@@ -101,7 +101,7 @@ function LaborparameterBereich() {
   const gefiltert = useMemo(() => (liste.data ?? []).filter((p) => p.gruppe === gruppe), [liste.data, gruppe]);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+    <div className="grid gap-4 lg:grid-cols-[16.25rem_minmax(0,1fr)]">
       <Karte className="p-4 flex flex-col gap-1 h-fit">
         <h3 className="lbl m-0 mb-1">Gruppen</h3>
         {Object.entries(LABORGRUPPEN).map(([k, text]) => {
@@ -115,7 +115,7 @@ function LaborparameterBereich() {
           );
         })}
       </Karte>
-      <Karte className="p-[22px] flex flex-col gap-3">
+      <Karte className="p-[1.375rem] flex flex-col gap-3">
         <KartenKopf titel={LABORGRUPPEN[gruppe]} unter="Ausgeblendete Parameter erscheinen nicht in neuen Befunden."
           rechts={<Knopf klein variante="pri" onClick={() => setDialog("neu")}>Parameter hinzufügen</Knopf>} />
         {liste.isPending ? <Laden /> : <Fehleranzeige fehler={liste.error} />}
@@ -189,7 +189,7 @@ function DiagnoseEintragDialog({ eintrag, onZu }: { eintrag: Diagnosevorlage | "
         {(p) => <Eingabe {...p} value={bezeichnung} maxLength={200} onChange={(ev) => setBezeichnung(ev.target.value)} autoFocus />}
       </Feld>
       <Feld label="ICD-Code" fehler={e.icd_code} hinweis="z. B. K91.2" pflicht>
-        {(p) => <Eingabe {...p} className="num w-[160px]" value={icd} maxLength={10}
+        {(p) => <Eingabe {...p} className="num w-[10rem]" value={icd} maxLength={10}
           onChange={(ev) => setIcd(ev.target.value.toUpperCase())} />}
       </Feld>
       {speichern.error && !Object.keys(e).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
@@ -212,11 +212,11 @@ function DiagnosenBereich() {
     !suche.trim() || `${d.bezeichnung} ${d.icd_code}`.toLowerCase().includes(suche.trim().toLowerCase()));
 
   return (
-    <Karte className="p-[22px] flex flex-col gap-3">
+    <Karte className="p-[1.375rem] flex flex-col gap-3">
       <KartenKopf titel="Diagnosen mit ICD-Code"
         unter="Wächst beim Eintragen in einer Akte von allein mit; hier wird sie korrigiert und ausgeblendet."
         rechts={<>
-          <Eingabe aria-label="Suchen" className="w-[220px]" placeholder="Suchen …" value={suche}
+          <Eingabe aria-label="Suchen" className="w-[13.75rem]" placeholder="Suchen …" value={suche}
             onChange={(e) => setSuche(e.target.value)} />
           <Knopf klein variante="pri" onClick={() => setDialog("neu")}>Diagnose hinzufügen</Knopf>
         </>} />

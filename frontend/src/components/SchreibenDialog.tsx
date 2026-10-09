@@ -124,7 +124,7 @@ export function SchreibenDialog({ offen, onOffen, titel, pfad, koerper, bereit =
             <Feld label="Text" fehler={f.text}>
               {(p) => <Textfeld {...p} rows={9} value={text} onChange={(e) => setze({ text: e.target.value })} className="font-[inherit] leading-snug" />}
             </Feld>
-            <div className="flex items-center gap-3 flex-wrap text-[13px]">
+            <div className="flex items-center gap-3 flex-wrap text-[0.8125rem]">
               <span className="gedaempft">Anhang: {mail.data.dateiname}</span>
               <Knopf klein onClick={() => void kopieren()}>Text kopieren</Knopf>
               {geaendert.text !== undefined || geaendert.betreff !== undefined
@@ -134,7 +134,7 @@ export function SchreibenDialog({ offen, onOffen, titel, pfad, koerper, bereit =
               <fieldset className="flex flex-col gap-1.5 border border-rand rounded-lg px-3 py-2">
                 <legend className="lbl px-1">Weitere Anlagen</legend>
                 {anlagen.data.map((a) => (
-                  <div key={a.id} className="flex items-center gap-2 text-[13.5px]">
+                  <div key={a.id} className="flex items-center gap-2 text-[0.8438rem]">
                     <label className="flex items-center gap-2 cursor-pointer min-w-0">
                       <input type="checkbox" checked={gewaehlt.includes(a.id)}
                         onChange={(e) => setGewaehlt(e.target.checked ? [...gewaehlt, a.id] : gewaehlt.filter((x) => x !== a.id))} />
@@ -148,7 +148,7 @@ export function SchreibenDialog({ offen, onOffen, titel, pfad, koerper, bereit =
             {f.anlagen ? <Meldung art="fehler">{f.anlagen}</Meldung> : null}
           </> : null}
           {ablegen ? (
-            <label className="flex items-center gap-2 text-[13.5px]">
+            <label className="flex items-center gap-2 text-[0.8438rem]">
               <input type="checkbox" checked={ablage} onChange={(e) => setAblage(e.target.checked)} />
               PDF beim Herunterladen bzw. Vorbereiten der E-Mail als Dokument „Schreiben“ in der Akte ablegen
             </label>

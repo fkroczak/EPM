@@ -26,7 +26,7 @@ export function ListenSpalte<T extends { id: number; aktiv: boolean }>({ eintrae
       <div className="flex flex-col gap-2 p-2.5 border-b border-rand">
         <label className="relative block">
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
-          <input className="inp pl-[34px]" type="search" aria-label={sucheLabel} placeholder={platzhalter}
+          <input className="inp pl-[2.125rem]" type="search" aria-label={sucheLabel} placeholder={platzhalter}
             value={suche} onChange={(e) => onSuche(e.target.value)} />
         </label>
         <Segmente label="Filter" wert={filter} onWahl={onFilter} className="self-start" werte={[

@@ -1,5 +1,6 @@
 /** Strichsymbole wie im Entwurf (24er-Raster, 1,8 px Linie). */
 import type { ReactNode, SVGProps } from "react";
+import { rem } from "@/lib/masse";
 
 const PFADE: Record<string, ReactNode> = {
   start: (<><path d="M3 10.5L12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /><path d="M10 21v-6h4v6" /></>),
@@ -62,9 +63,10 @@ const PFADE: Record<string, ReactNode> = {
 
 export type IconName = keyof typeof PFADE;
 
-export function Icon({ name, groesse = 16, ...rest }: { name: string; groesse?: number } & SVGProps<SVGSVGElement>) {
+/** ``groesse`` in px beim Grundwert 16 px; gezeichnet in rem, damit Symbole mit der Schrift wachsen */
+export function Icon({ name, groesse = 16, style, ...rest }: { name: string; groesse?: number } & SVGProps<SVGSVGElement>) {
   return (
-    <svg width={groesse} height={groesse} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}
+    <svg width={groesse} height={groesse} style={{ width: rem(groesse), height: rem(groesse), ...style }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}
       strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" {...rest}>
       {PFADE[name] ?? null}
     </svg>

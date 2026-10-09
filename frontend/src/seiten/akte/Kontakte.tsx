@@ -51,7 +51,7 @@ function Erreichbarkeit() {
   return (
     <Karte className="px-5 py-4 flex flex-col gap-3">
       <h2 className="lbl m-0">Erreichbarkeit</h2>
-      <div className="grid grid-cols-[90px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
+      <div className="grid grid-cols-[5.625rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
         <span className="gedaempft">Telefon</span><span className="num">{p.telefon || "—"}</span>
         <span className="gedaempft">E-Mail</span><span className="truncate">{p.email || "—"}</span>
         <span className="gedaempft">Versorger</span><span>{v ? <>{v.name}{v.telefon ? <> · <span className="num">{v.telefon}</span></> : null}</> : "—"}</span>
@@ -94,7 +94,7 @@ export function Kontakte() {
         kopfrechts={<>
           <label className="relative block">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
-            <input className="inp pl-[34px] w-full" type="search" aria-label="In Kontakten suchen" placeholder="In Kontakten suchen"
+            <input className="inp pl-[2.125rem] w-full" type="search" aria-label="In Kontakten suchen" placeholder="In Kontakten suchen"
               value={suche} onChange={(e) => setSuche(e.target.value)} />
           </label>
           <Fehleranzeige fehler={abfrageliste.error} />

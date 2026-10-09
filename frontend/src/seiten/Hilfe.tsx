@@ -129,7 +129,7 @@ export function Hilfe() {
       <Seitenkopf titel="Hilfe"
         unter={`Abschnitte passend zu deinen Rechten${d?.darf_ergaenzen ? " · Ergänzungen schreiben mit „Vorlagen pflegen“" : ""}`}
         rechts={
-          <label className="relative w-[340px] max-w-full block">
+          <label className="relative w-[21.25rem] max-w-full block">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" groesse={18} /></span>
             <input className="inp pl-10" type="search" aria-label="In der Hilfe suchen" placeholder="In der Hilfe suchen" value={suche}
               onChange={(e) => setSuche(e.target.value)} />
@@ -137,7 +137,7 @@ export function Hilfe() {
         } />
       {daten.isLoading ? <Laden /> : <Fehleranzeige fehler={daten.error} />}
       {d ? (
-        <div className="stapel grid grid-cols-1 hd:grid-cols-[260px_minmax(0,1fr)] fhd:grid-cols-[300px_minmax(0,1fr)] gap-6 items-start">
+        <div className="stapel grid grid-cols-1 hd:grid-cols-[16.25rem_minmax(0,1fr)] fhd:grid-cols-[18.75rem_minmax(0,1fr)] gap-6 items-start">
           <nav aria-label="Inhalt der Hilfe" className="card p-2 flex flex-col gap-1 hd:sticky hd:top-4 hd:max-h-[calc(100vh-2rem)] hd:overflow-auto"
             data-testid="hilfe-inhalt">
             {begriff ? (
@@ -153,14 +153,14 @@ export function Hilfe() {
                 <span className="text-xs font-semibold gedaempft px-2 pt-2 pb-0.5 uppercase tracking-[.04em]">{g.titel}</span>
                 {g.abschnitte.map((a) => (
                   <button key={a.id} type="button" aria-current={gewaehlt?.id === a.id ? "page" : undefined}
-                    className={cx("nav text-left border-0 bg-transparent cursor-pointer h-[30px] text-[0.84375rem]", gewaehlt?.id === a.id && "aktiv")}
+                    className={cx("nav text-left border-0 bg-transparent cursor-pointer h-[1.875rem] text-[0.84375rem]", gewaehlt?.id === a.id && "aktiv")}
                     onClick={() => waehle(a.id)}>{a.titel}</button>
                 ))}
               </div>
             ))}
           </nav>
           {gewaehlt ? (
-            <Karte className="px-7 py-6 flex flex-col gap-3.5 max-w-[860px]" data-testid="hilfe-abschnitt">
+            <Karte className="px-7 py-6 flex flex-col gap-3.5 max-w-[53.75rem]" data-testid="hilfe-abschnitt">
               <div className="flex justify-between items-center gap-3 flex-wrap">
                 <span className="text-[0.8125rem] gedaempft">{gewaehlt.gruppe}</span>
                 <Chip><Icon name="buch" groesse={12} />mitgeliefert · EPM {d.version ?? "Entwicklungsstand"}</Chip>

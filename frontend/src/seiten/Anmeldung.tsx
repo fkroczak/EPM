@@ -26,27 +26,27 @@ function Rahmen({ children }: { children: ReactNode }) {
           <circle cx="690" cy="720" r="190" fill="#E8BD76" fillOpacity=".10" />
           <circle cx="690" cy="720" r="120" fill="none" stroke="#E8BD76" strokeOpacity=".45" strokeWidth="2" />
         </svg>
-        <div className="relative flex flex-col justify-between px-[72px] py-16 w-full">
+        <div className="relative flex flex-col justify-between px-[4.5rem] py-16 w-full">
           <span className="font-mono text-xs font-medium uppercase tracking-[.12em]" style={{ color: "#E8BD76" }}>
             EPM · Elektronisches Patientenmanagement
           </span>
-          <div className="flex flex-col gap-[18px] max-w-[560px]">
+          <div className="flex flex-col gap-[1.125rem] max-w-[35rem]">
             <span className="font-serif italic text-[3.5rem] leading-[1.1] tracking-[-.01em]" style={{ color: "#F6F4FB" }}>
               Salus aegroti<br />suprema lex
             </span>
-            <span className="w-14 h-[3px] rounded-sm" style={{ background: "#ED6D3C" }} />
+            <span className="w-14 h-[0.1875rem] rounded-sm" style={{ background: "#ED6D3C" }} />
             <span className="text-lg leading-normal" style={{ color: "#CFCBEA" }}>Das Wohl des Kranken ist oberstes Gesetz.</span>
           </div>
-          <span className="text-[0.8125rem] leading-normal max-w-[420px]" style={{ color: "#A7A2CC" }}>
+          <span className="text-[0.8125rem] leading-normal max-w-[26.25rem]" style={{ color: "#A7A2CC" }}>
             {[org?.name, org?.anschrift].filter(Boolean).join(" · ")}
           </span>
         </div>
       </div>
-      <main className="w-full md:w-[540px] shrink-0 px-4 sm:px-6 md:px-[72px] py-8 sm:py-16 flex flex-col justify-center gap-6 sm:gap-7 bg-flaeche">
-        <Logo className="w-[396px] max-w-full h-[96px] sm:h-[140px]" />
+      <main className="w-full md:w-[33.75rem] shrink-0 px-4 sm:px-6 md:px-[4.5rem] py-8 sm:py-16 flex flex-col justify-center gap-6 sm:gap-7 bg-flaeche">
+        <Logo className="w-[24.75rem] max-w-full h-[6rem] sm:h-[8.75rem]" />
         {children}
         <div className="flex items-start gap-2 text-[0.8125rem] leading-normal gedaempft">
-          <Icon name="schloss" groesse={14} className="mt-[3px] shrink-0" />
+          <Icon name="schloss" groesse={14} className="mt-[0.1875rem] shrink-0" />
           <span>Nur im VPN erreichbar. Nach 30 Minuten ohne Aktivität wirst du abgemeldet.</span>
         </div>
       </main>
@@ -166,11 +166,11 @@ function SchrittCode() {
           werte={[{ wert: "passkey", text: "Passkey" }, { wert: "code", text: faktoren.authenticator ? "Code" : "Notfall-Code" }]} />
       ) : null}
       {art === "passkey" ? (
-        <Knopf type="submit" variante="pri" icon="passkey" className="w-full h-[52px]" laedt={laedt} autoFocus
+        <Knopf type="submit" variante="pri" icon="passkey" className="w-full h-[3.25rem]" laedt={laedt} autoFocus
           data-testid="passkey-anmelden">Mit Passkey anmelden</Knopf>
       ) : <>
         <Feld label="Code">
-          {(p) => <Eingabe {...p} className="num text-[1.375rem] tracking-[.3em] h-[52px] text-center" inputMode="text"
+          {(p) => <Eingabe {...p} className="num text-[1.375rem] tracking-[.3em] h-[3.25rem] text-center" inputMode="text"
             autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} autoFocus />}
         </Feld>
       </>}
@@ -263,7 +263,7 @@ export function AuthenticatorEinrichten({ onFertig, onAbbrechen }: {
         </div>
       ) : !fehler ? <span className="text-sm gedaempft">QR-Code wird erzeugt …</span> : null}
       <Feld label="Code aus der App">
-        {(p) => <Eingabe {...p} className="num text-[1.375rem] tracking-[.3em] h-[52px] text-center" inputMode="numeric"
+        {(p) => <Eingabe {...p} className="num text-[1.375rem] tracking-[.3em] h-[3.25rem] text-center" inputMode="numeric"
           autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />}
       </Feld>
       {fehler ? <Meldung art="fehler">{fehler}</Meldung> : null}
@@ -339,7 +339,7 @@ export function NotfallcodesAnzeige({ codes, onWeiter, weiterText = "Codes notie
         Jeder Code gilt einmal, falls das Handy verloren geht. Die Codes werden nur jetzt angezeigt:
         ausdrucken oder notieren und sicher aufbewahren.
       </p>
-      <ol className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-x-6 gap-y-1 m-0 pl-6 num text-[0.9375rem]" data-testid="notfallcodes">
+      <ol className="grid grid-cols-1 min-[23.75rem]:grid-cols-2 gap-x-6 gap-y-1 m-0 pl-6 num text-[0.9375rem]" data-testid="notfallcodes">
         {codes.map((c) => <li key={c}>{c}</li>)}
       </ol>
       <div className="flex gap-2">

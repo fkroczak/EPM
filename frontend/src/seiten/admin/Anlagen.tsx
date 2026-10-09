@@ -50,10 +50,10 @@ export function AnlagenBereich() {
   });
   const f = neu.error instanceof ApiFehler ? neu.error.felder : {};
   return (
-    <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-5 items-start">
-      <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="anlagen">
+    <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_23.75rem] gap-5 items-start">
+      <Karte className="px-5 py-[1.125rem] flex flex-col gap-3" data-testid="anlagen">
         <h2 className="lbl m-0">Anlagen</h2>
-        <span className="text-[13px] gedaempft">Diese PDFs lassen sich beim Schreiben aus der Akte und bei der Patientenankündigung an die
+        <span className="text-[0.8125rem] gedaempft">Diese PDFs lassen sich beim Schreiben aus der Akte und bei der Patientenankündigung an die
           E-Mail hängen (z. B. Leitfaden Zottentraining, Handlungsempfehlung Locklösungen). Deaktivierte Anlagen stehen dort nicht mehr zur Wahl.</span>
         {liste.isLoading ? <Laden /> : null}
         <Fehleranzeige fehler={liste.error} />
@@ -73,7 +73,7 @@ export function AnlagenBereich() {
           ))}
         </ul>
       </Karte>
-      <Karte className="px-5 py-[18px] flex flex-col gap-3">
+      <Karte className="px-5 py-[1.125rem] flex flex-col gap-3">
         <h2 className="lbl m-0">Neue Anlage</h2>
         <Feld label="Name" fehler={f.name} pflicht>
           {(p) => <Eingabe {...p} value={name} maxLength={150} onChange={(e) => setName(e.target.value)} placeholder="z. B. Merkblatt Katheterpflege" />}
@@ -83,7 +83,7 @@ export function AnlagenBereich() {
         </Feld>
         <div className="flex items-center gap-3 flex-wrap">
           <Knopf icon="hochladen" onClick={() => eingabe.current?.click()}>PDF wählen</Knopf>
-          <span className="text-[13px] gedaempft truncate">{datei ? datei.name : "höchstens 20 MB"}</span>
+          <span className="text-[0.8125rem] gedaempft truncate">{datei ? datei.name : "höchstens 20 MB"}</span>
           <input ref={eingabe} type="file" hidden aria-label="PDF-Datei der Anlage" accept=".pdf,application/pdf"
             onChange={(e) => { setDatei(e.target.files?.[0] ?? null); e.target.value = ""; }} />
         </div>

@@ -96,7 +96,7 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
         <Knopf variante="pri" laedt={speichern.isPending} disabled={!titel.trim()}
           onClick={() => speichern.mutate()}>Entwurf speichern</Knopf>
       </>}>
-      <div className="grid gap-3 sm:grid-cols-[1fr_200px_160px]">
+      <div className="grid gap-3 sm:grid-cols-[1fr_12.5rem_10rem]">
         <Feld label="Titel" fehler={f.titel} pflicht>
           {(p) => <Eingabe {...p} value={titel} maxLength={200} onChange={(e) => setTitel(e.target.value)}
             placeholder="z. B. Verlaufsbericht 2026" />}
@@ -118,7 +118,7 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
           onChange={(e) => setEmpfaenger(e.target.value)} />}
       </Feld>
       {istFall ? (
-        <div className="flex items-center gap-3 flex-wrap text-[13px]">
+        <div className="flex items-center gap-3 flex-wrap text-[0.8125rem]">
           <Knopf klein icon="plus" onClick={gliederung}>Gliederung einfügen</Knopf>
           <span className="gedaempft">Einheitlicher Aufbau in 12 Abschnitten; Hinweise in [eckigen Klammern] überschreiben.</span>
         </div>

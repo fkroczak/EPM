@@ -44,7 +44,7 @@ function Zaehltabelle({ zahlen }: { zahlen: Zahlen }) {
   if (!zeilen.some(([, z]) => z)) return null;
   return (
     <table className="tabelle" data-testid="zaehlung">
-      <thead><tr><th className="th">Zählung</th><th className="th text-right w-[120px]">im Altsystem</th><th className="th text-right w-[120px]">wird übernommen</th><th className="th">nicht übernommen</th></tr></thead>
+      <thead><tr><th className="th">Zählung</th><th className="th text-right w-[7.5rem]">im Altsystem</th><th className="th text-right w-[7.5rem]">wird übernommen</th><th className="th">nicht übernommen</th></tr></thead>
       <tbody>
         {zeilen.map(([name, z]) => z ? (
           <tr key={name}>
@@ -70,7 +70,7 @@ function Protokoll({ zeilen }: { zeilen: Protokollzeile[] }) {
   if (!zeilen.length) return <Leer>Kein Protokoll.</Leer>;
   return (
     <table className="tabelle" data-testid="protokoll">
-      <thead><tr><th className="th w-[90px]" /><th className="th w-[130px]">Bereich</th><th className="th w-[80px] text-right">Anzahl</th><th className="th">Was</th><th className="th w-[240px]">z. B. Nr.</th></tr></thead>
+      <thead><tr><th className="th w-[5.625rem]" /><th className="th w-[8.125rem]">Bereich</th><th className="th w-[5rem] text-right">Anzahl</th><th className="th">Was</th><th className="th w-[15rem]">z. B. Nr.</th></tr></thead>
       <tbody>
         {zeilen.map((p, i) => (
           <tr key={i}>
@@ -180,7 +180,7 @@ function Quelle({ stand }: { stand: Stand }) {
         <KartenKopf titel="Dump des Altsystems"
           unter="MySQL-Dump als .sql oder .sql.gz (mysqldump oder Export aus phpMyAdmin). Kennwörter werden beim Einlesen verworfen und nie gespeichert." />
         {stand.dump ? (
-          <dl className="m-0 grid grid-cols-[160px_1fr] gap-x-3 gap-y-1.5 text-sm">
+          <dl className="m-0 grid grid-cols-[10rem_1fr] gap-x-3 gap-y-1.5 text-sm">
             <dt className="gedaempft">Datei</dt><dd className="m-0 font-medium" data-testid="dump-name">{stand.dump.name} <span className="font-normal gedaempft">· {dateigroesse(stand.dump.groesse)}</span></dd>
             <dt className="gedaempft">Geladen</dt><dd className="m-0">{zeitpunkt(stand.dump.geladen_am)}{stand.dump.geladen_von ? ` · ${stand.dump.geladen_von}` : ""}</dd>
             <dt className="gedaempft">Prüfsumme</dt><dd className="m-0 num text-[0.8125rem] break-all">SHA-256 {stand.dump.sha256}</dd>
@@ -343,7 +343,7 @@ function Dokumente({ stand }: { stand: Stand }) {
             Die Dateien mit Zeitstempel kopieren (z. B. <code>rsync -a</code>), damit das Dateidatum als Dokumentdatum erhalten bleibt, und für die Gruppe 101 lesbar machen.</span></Meldung>
         ) : (
           <>
-            <dl className="m-0 grid grid-cols-[220px_1fr] gap-x-3 gap-y-1.5 text-sm" data-testid="dokumente-stand">
+            <dl className="m-0 grid grid-cols-[13.75rem_1fr] gap-x-3 gap-y-1.5 text-sm" data-testid="dokumente-stand">
               <dt className="gedaempft">Ordner im Backend</dt><dd className="m-0 num text-[0.8125rem]">{s.pfad}</dd>
               <dt className="gedaempft">Gefunden</dt><dd className="m-0">{zahl(s.ordner)} Patientenordner · {zahl(s.dateien)} Dateien · {dateigroesse(s.bytes)}</dd>
               <dt className="gedaempft">Übernommen</dt><dd className="m-0"><strong>{zahl(erledigt)}</strong>{stand.status === "importiert" ? ` von ${zahl(gesamt)}` : ""}</dd>

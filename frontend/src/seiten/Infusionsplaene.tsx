@@ -108,7 +108,7 @@ export function Infusionsplaene() {
           { wert: "abgeloest", text: <>Abgelöst {anzahl("abgeloest")}</> },
           { wert: "alle", text: <>Alle {anzahl("alle")}</> },
         ]} />
-        <Eingabe type="search" aria-label="Patient suchen" placeholder="Patient: Name oder Nr." className="w-full sm:w-[260px]"
+        <Eingabe type="search" aria-label="Patient suchen" placeholder="Patient: Name oder Nr." className="w-full sm:w-[16.25rem]"
           value={suche} onChange={(e) => setSuche(e.target.value)} />
         <label className="flex items-center gap-1.5 text-sm">
           <input type="checkbox" checked={abgeschlossene} onChange={(e) => setAbgeschlossene(e.target.checked)} />
@@ -123,7 +123,7 @@ export function Infusionsplaene() {
           <div role="list" aria-label="Infusionspläne" className="flex flex-col gap-2" data-testid="plan-uebersicht">
             {zeilen.map((p) => (
               <div key={p.id} role="listitem" className="card flex flex-col">
-                <Link to={`/patienten/${p.patient}/plaene?plan=${p.id}`} className="px-3.5 pt-3 pb-2 flex flex-col gap-1 no-underline text-tinte rounded-[12px]"
+                <Link to={`/patienten/${p.patient}/plaene?plan=${p.id}`} className="px-3.5 pt-3 pb-2 flex flex-col gap-1 no-underline text-tinte rounded-[0.75rem]"
                   aria-label={`Plan von ${p.name} öffnen`}>
                   <span className="flex items-center justify-between gap-2">
                     <span className="font-medium truncate">{p.name}</span>

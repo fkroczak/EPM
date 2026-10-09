@@ -13,6 +13,7 @@ import { ApiFehler } from "./lib/api";
 import { AuthProvider } from "./lib/auth";
 import { HinweisProvider } from "./components/ui/hinweise";
 import { App } from "./App";
+import { tabellenFuerTelefon } from "./lib/tabellen";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,6 +24,8 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+tabellenFuerTelefon();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

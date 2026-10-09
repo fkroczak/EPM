@@ -105,7 +105,7 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
   // letzte Messung = jüngstes Messdatum, bei gleichem Datum die zuletzt erfasste
   const letzte = [...alleWerte].sort((x, y) => (y.gemessen_am.localeCompare(x.gemessen_am) || y.erfasst_am.localeCompare(x.erfasst_am)))[0];
   return (
-    <Karte className="px-4 sm:px-[22px] py-4 sm:py-[18px] flex flex-col gap-4" data-testid="gewichtskarte">
+    <Karte className="px-4 sm:px-[1.375rem] py-4 sm:py-[1.125rem] flex flex-col gap-4" data-testid="gewichtskarte">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex flex-col gap-1">
           <h2 className="lbl m-0">Gewichtsverlauf</h2>
@@ -152,7 +152,7 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
           beschriftung={`Gewichtsverlauf ${ZEITRAEUME.find((z) => z.wert === zeitraum)!.text}`} />
       )}
       <div className="flex items-center gap-5 text-xs gedaempft flex-wrap">
-        <span className="flex items-center gap-1.5"><span className="w-[18px] h-[3px] rounded-sm bg-akzent" />Verlauf</span>
+        <span className="flex items-center gap-1.5"><span className="w-[1.125rem] h-[0.1875rem] rounded-sm bg-akzent" />Verlauf</span>
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full border-[1.5px] border-gedaempft" />Messwert</span>
         {trend ? <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full border-2 border-warn" />Vergleichswert vor {e ? zahl(e.gewicht_warnung_monate) : "…"} Monaten</span> : null}
         <button type="button" className="ml-auto bg-transparent border-0 p-0 text-akzent-text cursor-pointer text-xs" aria-expanded={liste}
@@ -182,7 +182,7 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
 function TherapieKarte() {
   const { patient, bearbeiten } = useAkte();
   return (
-    <Karte className="px-4 sm:px-[22px] py-4 sm:py-[18px] flex flex-col gap-4">
+    <Karte className="px-4 sm:px-[1.375rem] py-4 sm:py-[1.125rem] flex flex-col gap-4">
       {/* seit 07.10.2026 je ein eigener Reiter (F121, F122) */}
       <KartenKopf titel="Diagnosen und Therapie" rechts={<>
         <KnopfLink to={`/patienten/${patient.id}/diagnosen`} klein icon={bearbeiten ? "stift" : undefined}>Diagnosen</KnopfLink>
@@ -225,7 +225,7 @@ export function TermineKarte() {
               {erfassen ? (
                 <input type="checkbox" title="Erledigt" aria-label={`Erledigt: ${t.titel}`} disabled={abhaken.isPending} onChange={() => abhaken.mutate(t)} />
               ) : null}
-              <span className={cx("num w-[104px] shrink-0 text-[0.84rem]", t.faellig_am < heuteIso() && "text-fehler")}>{terminZeit(t.faellig_am, t.uhrzeit)}</span>
+              <span className={cx("num w-[6.5rem] shrink-0 text-[0.84rem]", t.faellig_am < heuteIso() && "text-fehler")}>{terminZeit(t.faellig_am, t.uhrzeit)}</span>
               <Chip>{t.ort_name ?? TERMINARTEN[t.art]}</Chip>
               {erfassen ? (
                 <button type="button" className="bg-transparent border-0 p-0 text-left truncate cursor-pointer text-akzent-text"
@@ -311,7 +311,7 @@ function StammKarte() {
   const { patient: p, bearbeiten, stammdatenBearbeiten } = useAkte();
   const adresse = [p.strasse, [p.plz, p.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
   return (
-    <Karte className="px-4 sm:px-[22px] py-4 sm:py-[18px] grid grid-cols-[minmax(100px,max-content)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm" data-testid="stammdaten">
+    <Karte className="px-4 sm:px-[1.375rem] py-4 sm:py-[1.125rem] grid grid-cols-[minmax(6.25rem,max-content)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm" data-testid="stammdaten">
       <div className="col-span-2 pb-1 flex items-center justify-between gap-2">
         <h2 className="lbl m-0">Anschrift und Kontakt</h2>
         {bearbeiten ? <Knopf klein variante="geist" icon="stift" onClick={stammdatenBearbeiten}>Bearbeiten</Knopf> : null}
@@ -353,7 +353,7 @@ function ImportHinweise() {
 function BefundeKarte() {
   const { patient } = useAkte();
   return (
-    <Karte className="px-4 sm:px-[22px] py-4 sm:py-[18px] flex flex-col gap-4" data-testid="karte-befunde">
+    <Karte className="px-4 sm:px-[1.375rem] py-4 sm:py-[1.125rem] flex flex-col gap-4" data-testid="karte-befunde">
       <KartenKopf titel="Labor und BIA" rechts={<>
         <KnopfLink to={`/patienten/${patient.id}/labor`} klein>Labor</KnopfLink>
         <KnopfLink to={`/patienten/${patient.id}/bia`} klein>BIA</KnopfLink>

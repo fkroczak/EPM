@@ -142,7 +142,7 @@ export function Spalten({ seite, stufe, standard, spalten, namen, className, tes
               <circle cx="2" cy="8" r="1.2" /><circle cx="6" cy="8" r="1.2" /><circle cx="2" cy="12" r="1.2" /><circle cx="6" cy="12" r="1.2" /></g></svg>
           </span>
           {einrasten !== null ? (
-            <span className="absolute top-[172px] left-[22px] z-10 whitespace-nowrap px-2.5 py-1.5 rounded-lg bg-akzent text-auf-akzent text-[0.8125rem] font-medium shadow-lg"
+            <span className="absolute top-[10.75rem] left-[1.375rem] z-10 whitespace-nowrap px-2.5 py-1.5 rounded-lg bg-akzent text-auf-akzent text-[0.8125rem] font-medium shadow-lg"
               role="status">{bruch(einrasten)} · rastet ein · Doppelklick: Standard {bruch(standard[i])}</span>
           ) : null}
         </div>,

@@ -22,7 +22,7 @@ export function AnkuendigungDialog({ offen, onOffen, von: vonVorgabe, bis: bisVo
       ohneEmpfaenger="E-Mail-Adresse der Praxis eintragen – oder hier leer lassen und im Entwurf ergänzen."
       koerper={{ von: a, bis: b, ort: ortId ? Number(ortId) : null }}
       optionen={<>
-        <div className="grid gap-3 sm:grid-cols-[160px_160px_1fr]">
+        <div className="grid gap-3 sm:grid-cols-[10rem_10rem_1fr]">
           <Feld label="von">{(p) => <Eingabe {...p} type="date" value={a} onChange={(e) => setVon(e.target.value)} />}</Feld>
           <Feld label="bis">{(p) => <Eingabe {...p} type="date" value={b} onChange={(e) => setBis(e.target.value)} />}</Feld>
           <Feld label="Terminort der Sprechstunde" hinweis="Termine an anderen Orten (z. B. Telefon) stehen mit Ort und Telefonnummer als Hinweis in der Liste">
@@ -34,7 +34,7 @@ export function AnkuendigungDialog({ offen, onOffen, von: vonVorgabe, bis: bisVo
             )}
           </Feld>
         </div>
-        <span className="text-[13px] gedaempft">Angekündigt werden alle Praxistermine im Zeitraum (ohne Testpatienten). Hinweise wie
+        <span className="text-[0.8125rem] gedaempft">Angekündigt werden alle Praxistermine im Zeitraum (ohne Testpatienten). Hinweise wie
           „1 h, Neuaufnahme“ oder „+ Labor“ im Termin unter „bei/Ort“ eintragen – sie erscheinen hinter dem Namen.</span>
       </>} />
   );

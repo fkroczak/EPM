@@ -6,6 +6,7 @@ import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNo
   TextareaHTMLAttributes } from "react";
 import { Link } from "react-router";
 import type { LinkProps } from "react-router";
+import { rem } from "@/lib/masse";
 import { Icon } from "./icon";
 
 export function cx(...klassen: (string | false | null | undefined)[]) {
@@ -124,7 +125,7 @@ export function Segmente<T extends string>({ werte, wert, onWahl, label, classNa
 
 export function Ladekreis({ groesse = 16 }: { groesse?: number }) {
   return (
-    <svg width={groesse} height={groesse} viewBox="0 0 24 24" aria-hidden="true" className="animate-spin">
+    <svg width={groesse} height={groesse} style={{ width: rem(groesse), height: rem(groesse) }} viewBox="0 0 24 24" aria-hidden="true" className="animate-spin">
       <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity=".25" strokeWidth="3" />
       <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
     </svg>
@@ -165,14 +166,14 @@ export function Seitenkopf({ titel, unter, rechts }: { titel: ReactNode; unter?:
         <h1 className="m-0 text-[1.25rem] leading-tight font-semibold whitespace-nowrap">{titel}</h1>
         {unter ? <span className="seitenkopf-unter text-[0.8125rem] gedaempft min-w-0" title={typeof unter === "string" ? unter : undefined}>{unter}</span> : null}
       </div>
-      {rechts ? <div className="flex items-center gap-2 flex-wrap">{rechts}</div> : null}
+      {rechts ? <div className="flex items-center gap-2 flex-wrap min-w-0 max-w-full">{rechts}</div> : null}
     </div>
   );
 }
 
 export function Wertzeile({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[minmax(110px,40%)_1fr] gap-3 py-1.5 text-sm">
+    <div className="grid grid-cols-[minmax(6.875rem,40%)_1fr] gap-3 py-1.5 text-sm">
       <dt className="gedaempft">{label}</dt>
       <dd className="m-0">{children}</dd>
     </div>

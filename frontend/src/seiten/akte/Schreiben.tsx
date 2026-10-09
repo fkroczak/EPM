@@ -72,12 +72,12 @@ export function SchreibenAusAkte({ patient, offen, onOffen }: { patient: Patient
         ) : null}
         {art === "reisebescheinigung" ? (
           <div className="flex items-end gap-4 flex-wrap">
-            <label className="flex items-center gap-2 text-[13.5px] pb-2">
+            <label className="flex items-center gap-2 text-[0.8438rem] pb-2">
               <input type="checkbox" checked={attest} onChange={(e) => setAttest(e.target.checked)} />
               Ärztliches Attest des ADAC anhängen (Name, Ort und Datum sind eingetragen)
             </label>
             {attest ? (
-              <Feld label="Reisedauer in Tagen" hinweis="leer lassen, um sie von Hand einzutragen" className="w-[200px]">
+              <Feld label="Reisedauer in Tagen" hinweis="leer lassen, um sie von Hand einzutragen" className="w-[12.5rem]">
                 {(p) => <Eingabe {...p} className="num" inputMode="numeric" value={tage} maxLength={3}
                   onChange={(e) => setTage(e.target.value.replace(/\D/g, ""))} />}
               </Feld>

@@ -112,7 +112,7 @@ export function Bereich({ id, titel, standard, children, menue = true, className
           </BaseMenu.Trigger>
           <BaseMenu.Portal>
             <BaseMenu.Positioner side="bottom" align="end" sideOffset={4} className="z-50">
-              <BaseMenu.Popup className="card min-w-[210px] p-1 flex flex-col outline-none" data-testid="groesse-menue">
+              <BaseMenu.Popup className="card min-w-[13.125rem] p-1 flex flex-col outline-none" data-testid="groesse-menue">
                 <div className="px-3 pt-1.5 pb-1 text-xs font-medium gedaempft">Breite</div>
                 {BREITEN.filter((b) => b <= k.spalten).map((b) => (
                   <BaseMenu.Item key={`b${b}`} className={eintrag} onClick={() => speichern({ breite: b, hoehe: g.hoehe })}>

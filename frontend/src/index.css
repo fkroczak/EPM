@@ -71,20 +71,20 @@
   --randbreite: 1px;
   --schatten: 0 1px 2px rgba(0, 0, 0, 0.05);
   /* Dichte „normal“ – seit 08.10.2026 kompakter („ich brauche den Platz“) */
-  --steuer-h: 32px;
-  --zelle-py: 6px;
-  --zeile-gap: 10px;
-  font-size: 16px;
+  --steuer-h: 2rem;
+  --zelle-py: 0.375rem;
+  --zeile-gap: 0.625rem;
+  font-size: 100%;   /* Grundwert aus Browser bzw. Telefon (16 px, wenn nichts eingestellt) */
   color-scheme: light;
 }
 
-:root[data-dichte="grosszuegig"] { --steuer-h: 36px; --zelle-py: 9px; --zeile-gap: 14px; }
-:root[data-dichte="kompakt"] { --steuer-h: 30px; --zelle-py: 4px; --zeile-gap: 8px; }
-:root[data-dichte="sehrkompakt"] { --steuer-h: 26px; --zelle-py: 2px; --zeile-gap: 6px; }
+:root[data-dichte="grosszuegig"] { --steuer-h: 2.25rem; --zelle-py: 0.5625rem; --zeile-gap: 0.875rem; }
+:root[data-dichte="kompakt"] { --steuer-h: 1.875rem; --zelle-py: 0.25rem; --zeile-gap: 0.5rem; }
+:root[data-dichte="sehrkompakt"] { --steuer-h: 1.625rem; --zelle-py: 2px; --zeile-gap: 0.375rem; }
 
-:root[data-schrift="klein"] { font-size: 14.86px; }
-:root[data-schrift="gross"] { font-size: 18.29px; }
-:root[data-schrift="sehrgross"] { font-size: 20.57px; }
+:root[data-schrift="klein"] { font-size: 92.875%; }
+:root[data-schrift="gross"] { font-size: 114.3125%; }
+:root[data-schrift="sehrgross"] { font-size: 128.5625%; }
 
 :root[data-schema="dunkel"] {
   --reihe-1: #3987e5;
@@ -164,7 +164,7 @@ body {
 
 @layer components {
   .nav {
-    display: flex; align-items: center; gap: 8px; padding: 0 8px; height: 2rem; border-radius: 8px;
+    display: flex; align-items: center; gap: 0.5rem; padding: 0 0.5rem; height: 2rem; border-radius: 0.5rem;
     color: var(--text2); text-decoration: none; font-size: 0.875rem;
   }
   .nav:hover { background: var(--fein); color: var(--tinte); }
@@ -175,8 +175,8 @@ body {
   .nav svg { width: 1rem; height: 1rem; flex-shrink: 0; }
 
   .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: var(--steuer-h);
-    padding: 0 1rem; border-radius: 8px; font: 500 0.875rem var(--font-sans); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; height: var(--steuer-h);
+    padding: 0 1rem; border-radius: 0.5rem; font: 500 0.875rem var(--font-sans); cursor: pointer;
     text-decoration: none; box-sizing: border-box; white-space: nowrap; box-shadow: var(--schatten);
     transition: background 0.15s, color 0.15s; border: var(--randbreite) solid transparent;
   }
@@ -189,11 +189,11 @@ body {
   .btn.dng { background: var(--fehler); color: var(--auf-fehler); }
   .btn.geist { background: transparent; color: var(--text2); box-shadow: none; }
   .btn.geist:hover:not(:disabled) { background: var(--fein); color: var(--tinte); }
-  .btn.klein { height: calc(var(--steuer-h) - 6px); padding: 0 0.625rem; font-size: 0.8125rem; }
+  .btn.klein { height: calc(var(--steuer-h) - 0.375rem); padding: 0 0.625rem; font-size: 0.8125rem; }
   .btn.icon { width: var(--steuer-h); padding: 0; }
 
   .card {
-    background: var(--flaeche); border: var(--randbreite) solid var(--rand); border-radius: 14px;
+    background: var(--flaeche); border: var(--randbreite) solid var(--rand); border-radius: 0.875rem;
     box-shadow: var(--schatten);
   }
   .lbl { font: 600 0.875rem var(--font-sans); color: var(--tinte); line-height: 1.2; }
@@ -202,7 +202,7 @@ body {
 
   .tabelle { width: 100%; border-collapse: collapse; }
   .th {
-    font: 500 0.875rem var(--font-sans); color: var(--tinte); text-align: left; height: calc(var(--steuer-h) + 4px); padding: 0 0.75rem;
+    font: 500 0.875rem var(--font-sans); color: var(--tinte); text-align: left; height: calc(var(--steuer-h) + 0.25rem); padding: 0 0.75rem;
     background: var(--fein); border-bottom: var(--randbreite) solid var(--rand); white-space: nowrap; vertical-align: middle;
   }
   :root[data-schema="kontrast"] .th { font-weight: 700; }
@@ -211,13 +211,13 @@ body {
   .tabelle tbody tr.gewaehlt { background: var(--akzent-weich); }
 
   .chip {
-    display: inline-flex; align-items: center; gap: 4px; height: 1.375rem; padding: 0 0.5rem; border-radius: 6px;
+    display: inline-flex; align-items: center; gap: 0.25rem; height: 1.375rem; padding: 0 0.5rem; border-radius: 0.375rem;
     font-size: 0.75rem; font-weight: 500; white-space: nowrap; border: var(--randbreite) solid transparent;
     background: var(--fein); color: var(--text2);
   }
   .chip svg { width: 0.75rem; height: 0.75rem; }
   /* Platzhalter in Dokumentvorlagen (Entwurf 18) */
-  .feldchip { background: #EEF0FA; color: #3A3470; border-radius: 3px; padding: 0 3px; font-family: var(--font-mono); font-size: 0.95em; }
+  .feldchip { background: #EEF0FA; color: #3A3470; border-radius: 0.1875rem; padding: 0 0.1875rem; font-family: var(--font-mono); font-size: 0.95em; }
   .chip.warn { background: var(--warn-bg); color: var(--warn); }
   .chip.fehler { background: var(--fehler-bg); color: var(--fehler); }
   .chip.ok { background: var(--ok-bg); color: var(--ok); }
@@ -225,7 +225,7 @@ body {
   :root[data-schema="kontrast"] .chip { border-color: currentColor; }
 
   .inp {
-    height: var(--steuer-h); box-sizing: border-box; border: var(--randbreite) solid var(--rand); border-radius: 8px;
+    height: var(--steuer-h); box-sizing: border-box; border: var(--randbreite) solid var(--rand); border-radius: 0.5rem;
     padding: 0 0.75rem; font: 0.875rem var(--font-sans); color: var(--tinte); background: var(--eingabe); width: 100%;
     box-shadow: var(--schatten);
   }
@@ -238,12 +238,12 @@ body {
   input[type="checkbox"], input[type="radio"] { width: 1rem; height: 1rem; accent-color: var(--akzent); }
 
   .segmente {
-    display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 10px; background: var(--fein);
+    display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 0.625rem; background: var(--fein);
     box-sizing: border-box;
   }
   .segment {
-    border: 0; height: calc(var(--steuer-h) - 4px); padding: 0 0.875rem; border-radius: 6px; font: 0.875rem var(--font-sans);
-    cursor: pointer; background: transparent; color: var(--text2); display: inline-flex; align-items: center; gap: 6px;
+    border: 0; height: calc(var(--steuer-h) - 0.25rem); padding: 0 0.875rem; border-radius: 0.375rem; font: 0.875rem var(--font-sans);
+    cursor: pointer; background: transparent; color: var(--text2); display: inline-flex; align-items: center; gap: 0.375rem;
     white-space: nowrap; text-decoration: none;
   }
   .segment:hover { color: var(--tinte); }
@@ -251,19 +251,19 @@ body {
     background: var(--flaeche); color: var(--tinte); font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   }
 
-  .reiter { display: flex; gap: 4px; border-bottom: 1px solid var(--rand); }
+  .reiter { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--rand); }
   .reiter a {
-    display: inline-flex; align-items: center; gap: 6px; height: 2.5rem; padding: 0 0.75rem; font-size: 0.875rem;
+    display: inline-flex; align-items: center; gap: 0.375rem; height: 2.5rem; padding: 0 0.75rem; font-size: 0.875rem;
     color: var(--text2); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
   }
   .reiter a:hover { color: var(--tinte); }
   .reiter a.aktiv { color: var(--akzent-text); border-bottom-color: var(--akzent); font-weight: 500; }
 
-  .feld { display: flex; flex-direction: column; gap: 3px; font-size: 0.8125rem; font-weight: 500; }
+  .feld { display: flex; flex-direction: column; gap: 0.1875rem; font-size: 0.8125rem; font-weight: 500; }
   .feld > .hinweis { font-weight: 400; font-size: 0.8125rem; color: var(--gedaempft); }
   .feld > .fehlertext { font-weight: 400; font-size: 0.8125rem; color: var(--fehler); }
 
-  .meldung { border-radius: 10px; padding: 0.625rem 0.875rem; font-size: 0.875rem; line-height: 1.5; }
+  .meldung { border-radius: 0.625rem; padding: 0.625rem 0.875rem; font-size: 0.875rem; line-height: 1.5; }
   .meldung.warn { background: var(--warn-bg); color: var(--warn); }
   .meldung.fehler { background: var(--fehler-bg); color: var(--fehler); }
   .meldung.ok { background: var(--ok-bg); color: var(--ok); }
@@ -313,16 +313,16 @@ body {
   display: flex; justify-content: center; outline: none;
 }
 .teiler::before { content: ""; width: 2px; border-radius: 1px; background: var(--rand); height: 100%; transition: background 0.1s; }
-.teiler:hover::before, .teiler:focus-visible::before, .teiler.aktiv::before { width: 4px; background: var(--akzent); }
+.teiler:hover::before, .teiler:focus-visible::before, .teiler.aktiv::before { width: 0.25rem; background: var(--akzent); }
 .teiler > .teiler-griff {
-  position: absolute; top: 120px; left: 50%; transform: translateX(-50%);
-  width: 14px; height: 44px; border-radius: 7px; background: var(--flaeche); border: 1px solid var(--rand);
+  position: absolute; top: 7.5rem; left: 50%; transform: translateX(-50%);
+  width: 0.875rem; height: 2.75rem; border-radius: 0.4375rem; background: var(--flaeche); border: 1px solid var(--rand);
   display: flex; align-items: center; justify-content: center; color: var(--gedaempft);
 }
 .teiler:hover > .teiler-griff, .teiler:focus-visible > .teiler-griff, .teiler.aktiv > .teiler-griff {
   background: var(--akzent); border-color: var(--akzent); color: var(--auf-akzent);
 }
-.teiler:focus-visible { box-shadow: 0 0 0 3px var(--akzent-weich); border-radius: 4px; }
+.teiler:focus-visible { box-shadow: 0 0 0 3px var(--akzent-weich); border-radius: 0.25rem; }
 
 /* Karten mit einstellbarer Größe (Akte, System; components/ui/bereiche.tsx): Spalten wie die Startseite, die Zeilen
    sind sehr flach (8 px) – jede Karte belegt so viele, wie sie hoch ist, und die Karten rücken lückenlos auf. Feste
@@ -366,7 +366,7 @@ body {
 /* Ladebalken am oberen Rand (F124): über allem, nimmt keine Klicks entgegen; seit 08.10.2026 5 px statt 3 px und in
    „Individuell“ in der gewählten Akzentfarbe (--ladebalken aus lib/darstellung.ts) */
 .ladebalken {
-  position: fixed; top: 0; left: 0; right: 0; height: 5px; z-index: 200; pointer-events: none;
+  position: fixed; top: 0; left: 0; right: 0; height: 0.3125rem; z-index: 200; pointer-events: none;
   background: color-mix(in srgb, var(--ladebalken) 18%, transparent);
 }
 .ladebalken-fuellung {
@@ -431,10 +431,17 @@ body {
   .systemhinweis, .systemhinweis.warnung { padding-left: 1rem; padding-right: 1rem; }
   .systemhinweis.warnung { font-size: 0.9375rem; }
   /* lange Umschalter (Reiter der Akte, Planfilter) seitlich wischen statt umbrechen */
-  .segmente { max-width: 100%; overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap !important; }
-  .segmente::-webkit-scrollbar { display: none; }
+  /* Reiter der Akte seitlich wischen statt umbrechen (rechts ausgeblendet, solange noch mehr kommt); andere Umschalter
+     brechen um, damit kein Eintrag abgeschnitten ist (Wunsch 09.10.2026) */
+  .segmente { max-width: 100%; flex-wrap: wrap !important; height: auto; }
+  nav.segmente { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap !important; }
+  nav.segmente::-webkit-scrollbar { display: none; }
+  nav.segmente { --rand-l: 1.5rem; --rand-r: 1.5rem;
+    mask-image: linear-gradient(to right, transparent, #000 var(--rand-l), #000 calc(100% - var(--rand-r)), transparent); }
+  nav.segmente.am-anfang { --rand-l: 0px; }
+  nav.segmente.am-ende { --rand-r: 0px; }
   .segment { flex-shrink: 0; }
-  .card { border-radius: 12px; }
+  .card { border-radius: 0.75rem; }
   .raster { --raster-zeile: 17rem; --raster-abstand: 0.875rem; }
   .bereiche { --raster-abstand: 0.875rem; }
   .dialog-popup .grid { grid-template-columns: minmax(0, 1fr) !important; }
@@ -455,36 +462,36 @@ body {
    Griff der Seitenleiste (.teiler.leistengriff) unter 1280 px wirklich verschwindet */
 /* Kopfzeile: Griff unten am Kopf – nach oben kleiner, nach unten größer (drei Stufen) */
 .kopfgriff {
-  position: relative; height: 14px; margin: 0 -1rem; cursor: row-resize; touch-action: none; outline: none;
+  position: relative; height: 0.875rem; margin: 0 -1rem; cursor: row-resize; touch-action: none; outline: none;
   display: flex; align-items: center; justify-content: center; color: var(--gedaempft);
 }
 .kopfgriff-griff {
-  display: flex; align-items: center; justify-content: center; width: 44px; height: 10px; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center; width: 2.75rem; height: 0.625rem; border-radius: 0.3125rem;
   background: var(--flaeche); border: 1px solid var(--rand);
 }
 .kopfgriff:hover .kopfgriff-griff, .kopfgriff:focus-visible .kopfgriff-griff, .kopfgriff.aktiv .kopfgriff-griff {
   background: var(--akzent); border-color: var(--akzent); color: var(--auf-akzent);
 }
-.kopfgriff:focus-visible { box-shadow: 0 0 0 3px var(--akzent-weich); border-radius: 4px; }
+.kopfgriff:focus-visible { box-shadow: 0 0 0 3px var(--akzent-weich); border-radius: 0.25rem; }
 .kopfgriff-hinweis, .leistengriff-hinweis {
-  position: absolute; z-index: 10; white-space: nowrap; padding: 0.375rem 0.625rem; border-radius: 8px;
+  position: absolute; z-index: 10; white-space: nowrap; padding: 0.375rem 0.625rem; border-radius: 0.5rem;
   background: var(--akzent); color: var(--auf-akzent); font-size: 0.8125rem; font-weight: 500;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
 }
-.kopfgriff-hinweis { top: 18px; left: 50%; transform: translateX(-50%); }
-.leistengriff-hinweis { top: 172px; left: 22px; }
+.kopfgriff-hinweis { top: 1.125rem; left: 50%; transform: translateX(-50%); }
+.leistengriff-hinweis { top: 10.75rem; left: 1.375rem; }
 
 /* Seitenleiste: Angaben und Knöpfe links, Breite ziehbar; unter 1280 px stehen Leiste, Reiter und Inhalt untereinander */
 .akte-leiste { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: start; }
 .akte-leiste > .leistengriff { display: none; }
 .akte-leiste-inhalt { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
 .akte-vreiter {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: var(--fein);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 0.1875rem; border-radius: 0.625rem; background: var(--fein);
   align-self: flex-start; max-width: 100%;
 }
 .vreiter {
-  display: inline-flex; align-items: center; gap: 6px; height: calc(var(--steuer-h) - 4px); padding: 0 0.75rem;
-  border-radius: 6px; font-size: 0.875rem; color: var(--text2); white-space: nowrap; min-width: 0;
+  display: inline-flex; align-items: center; gap: 0.375rem; height: calc(var(--steuer-h) - 0.25rem); padding: 0 0.75rem;
+  border-radius: 0.375rem; font-size: 0.875rem; color: var(--text2); white-space: nowrap; min-width: 0;
 }
 .vreiter:hover { color: var(--tinte); }
 .vreiter.aktiv { background: var(--flaeche); color: var(--tinte); font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
@@ -498,7 +505,7 @@ body {
     position: sticky; top: 1rem; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 1px;
     padding: 0; background: transparent; border-radius: 0;
   }
-  .vreiter { display: flex; border-left: 3px solid transparent; border-radius: 0 6px 6px 0; padding-left: 0.625rem; }
+  .vreiter { display: flex; border-left: 3px solid transparent; border-radius: 0 0.375rem 0.375rem 0; padding-left: 0.625rem; }
   .vreiter.aktiv { border-left-color: var(--akzent); }
   .vreiter-zahl { margin-left: auto; }
   .vreiter-gruppe {
@@ -520,7 +527,7 @@ body {
 
 /* Fortschritt eines Auftrags (Backup, Update; components/AuftragFortschritt.tsx): gleiche Farbe wie der Ladebalken */
 .fortschritt {
-  position: relative; height: 8px; border-radius: 4px; overflow: hidden;
+  position: relative; height: 0.5rem; border-radius: 0.25rem; overflow: hidden;
   background: color-mix(in srgb, var(--ladebalken) 18%, transparent);
 }
 .fortschritt-fuellung {
@@ -548,7 +555,7 @@ main.seite-inhalt { padding: 0.75rem 1rem !important; gap: var(--abstand) !impor
 
 /* Benutzer unten links (Wunsch 08.10.2026): nur Person, Klick öffnet Hilfe, Mein Konto, Abmelden */
 .benutzerknopf {
-  display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.375rem; border: 0; border-radius: 8px;
+  display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.375rem; border: 0; border-radius: 0.5rem;
   background: transparent; cursor: pointer; color: inherit; font: inherit;
 }
 .benutzerknopf:hover, .benutzerknopf[data-popup-open] { background: var(--fein); }
@@ -558,23 +565,23 @@ main.seite-inhalt { padding: 0.75rem 1rem !important; gap: var(--abstand) !impor
    die Linie wird breiter und färbt sich in der Akzentfarbe, der Mauszeiger wechselt. Der Hinweis beim Ziehen bleibt. */
 .teiler > .teiler-griff, .kopfgriff-griff { display: none !important; }
 .teiler::before { width: 1px; transition: background 0.12s, width 0.12s; }
-.teiler:hover::before, .teiler:focus-visible::before, .teiler.aktiv::before { width: 4px; background: var(--akzent); }
-.kopfgriff { height: 10px; }
+.teiler:hover::before, .teiler:focus-visible::before, .teiler.aktiv::before { width: 0.25rem; background: var(--akzent); }
+.kopfgriff { height: 0.625rem; }
 .kopfgriff::before {
   content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; transform: translateY(-50%);
   background: transparent; transition: background 0.12s, height 0.12s;
 }
-.kopfgriff:hover::before, .kopfgriff:focus-visible::before, .kopfgriff.aktiv::before { height: 4px; background: var(--akzent); }
+.kopfgriff:hover::before, .kopfgriff:focus-visible::before, .kopfgriff.aktiv::before { height: 0.25rem; background: var(--akzent); }
 
 /* Rückmeldungen als Overlay (Wunsch 08.10.2026, wie im alten EPM; components/ui/hinweise.tsx): oben in der Mitte,
    grün = gespeichert (blendet nach ca. 3 s aus), rot = Fehler (bleibt ca. 9 s, „×“ schließt). Klicks gehen hindurch. */
 .rueckmeldungen {
-  position: fixed; top: 72px; left: 50%; transform: translateX(-50%); z-index: 70; pointer-events: none;
-  display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: min(560px, calc(100vw - 2rem));
+  position: fixed; top: 4.5rem; left: 50%; transform: translateX(-50%); z-index: 70; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: min(35rem, calc(100vw - 2rem));
 }
 .rueckmeldung {
   display: flex; align-items: center; gap: 0.75rem; width: 100%; box-sizing: border-box;
-  padding: 0.875rem 0.75rem 0.875rem 1.125rem; border-radius: 12px; font-size: 0.9375rem; font-weight: 500; line-height: 1.4;
+  padding: 0.875rem 0.75rem 0.875rem 1.125rem; border-radius: 0.75rem; font-size: 0.9375rem; font-weight: 500; line-height: 1.4;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
   animation: rueckmeldung-ein 0.22s ease-out both;
 }
@@ -585,12 +592,12 @@ main.seite-inhalt { padding: 0.75rem 1rem !important; gap: var(--abstand) !impor
 .rueckmeldung-text { flex: 1 1 auto; min-width: 0; }
 .rueckmeldung-zu {
   pointer-events: auto; flex-shrink: 0; width: 1.75rem; height: 1.75rem; display: inline-flex; align-items: center;
-  justify-content: center; border: 0; border-radius: 6px; background: transparent; color: inherit; opacity: 0.75; cursor: pointer;
+  justify-content: center; border: 0; border-radius: 0.375rem; background: transparent; color: inherit; opacity: 0.75; cursor: pointer;
 }
 .rueckmeldung-zu:hover { opacity: 1; background: rgba(255, 255, 255, 0.18); }
 @keyframes rueckmeldung-ein { from { opacity: 0; transform: translateY(-10px) scale(0.98); } to { opacity: 1; transform: none; } }
 @keyframes rueckmeldung-aus { to { opacity: 0; transform: translateY(-8px); } }
-@media (max-width: 47.99rem) { .rueckmeldungen { top: calc(64px + env(safe-area-inset-top)); } }
+@media (max-width: 47.99rem) { .rueckmeldungen { top: calc(4rem + env(safe-area-inset-top)); } }
 @media (prefers-reduced-motion: reduce) { .rueckmeldung, .rueckmeldung.geht { animation-duration: 0.01s; } }
 
 /* Dateien auf die Akte ziehen (08.10.2026): ganzflächiger Hinweis, fängt keine Klicks ab */
@@ -599,7 +606,7 @@ main.seite-inhalt { padding: 0.75rem 1rem !important; gap: var(--abstand) !impor
   background: color-mix(in srgb, var(--akzent) 10%, transparent); border: 3px dashed var(--akzent);
 }
 .akten-ablage-kasten {
-  display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 1.25rem 1.75rem; border-radius: 14px;
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 1.25rem 1.75rem; border-radius: 0.875rem;
   background: var(--flaeche); color: var(--tinte); font-weight: 600; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
 }
 :root[data-schema="kontrast"] .rueckmeldung { border: 2px solid var(--tinte); }
@@ -608,7 +615,7 @@ main.seite-inhalt { padding: 0.75rem 1rem !important; gap: var(--abstand) !impor
    Navigation, über die volle Höhe, ohne Kartenrahmen; nur der Inhalt rechts hat Rand und runde Karten. Die Trennlinie
    zwischen Leiste und Reitern ist der Griff für die Breite. */
 main.seite-inhalt.akte-voll { padding: 0 !important; gap: 0 !important; }
-.akte-voll .akte-leiste { gap: 0 !important; align-items: stretch; min-height: calc(100vh - 60px); }
+.akte-voll .akte-leiste { gap: 0 !important; align-items: stretch; min-height: calc(100vh - 3.75rem); }
 .akte-voll .akte-leiste-kopf { background: var(--flaeche); padding: 1.25rem; border-bottom: 1px solid var(--rand); }
 .akte-voll .akte-leiste-inhalt { gap: 0 !important; }
 .akte-voll .akte-vreiter { margin: 0.75rem 1rem 0; align-self: flex-start; }
@@ -640,12 +647,12 @@ html { scrollbar-gutter: stable; }
 .seitenkopf { min-height: var(--steuer-h); }
 .seitenkopf-unter { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seitenkopf-unter > * { display: inline !important; max-width: none !important; }
-.card:is(.px-5, .px-6, .px-\[22px\], .px-\[18px\], .sm\:px-\[22px\]) { padding-left: 1rem; padding-right: 1rem; }
-.card:is(.py-4, .py-5, .py-\[18px\], .py-3\.5, .sm\:py-\[18px\]) { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.card:is(.px-5, .px-6, .px-\[1\.375rem\], .px-\[1\.125rem\], .sm\:px-\[1\.375rem\]) { padding-left: 1rem; padding-right: 1rem; }
+.card:is(.py-4, .py-5, .py-\[1\.125rem\], .py-3\.5, .sm\:py-\[1\.125rem\]) { padding-top: 0.75rem; padding-bottom: 0.75rem; }
 .card:is(.p-5, .p-6) { padding: 1rem; }
-.card:is(.sm\:pt-\[18px\]) { padding-top: 0.75rem; }
+.card:is(.sm\:pt-\[1\.125rem\]) { padding-top: 0.75rem; }
 @media (max-width: 47.99rem) {
-  .card:is(.px-5, .px-6, .px-\[22px\], .px-\[18px\], .sm\:px-\[22px\]) { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .card:is(.px-5, .px-6, .px-\[1\.375rem\], .px-\[1\.125rem\], .sm\:px-\[1\.375rem\]) { padding-left: 0.75rem; padding-right: 0.75rem; }
 }
 
 /* Formulare im Raster (Versorger, Ärzte; Wunsch 08.10.2026): enge Zeilen, damit alles ohne Scrollen auf 1080p passt */
@@ -659,11 +666,11 @@ html { scrollbar-gutter: stable; }
 .kalender-raster { display: grid; gap: var(--abstand, 1rem); grid-template-columns: minmax(0, 1fr); align-items: start; }
 .kalender-zelle { height: max(3.75rem, calc((100vh - 24rem) / 6)); }
 @media (min-width: 80rem) {
-  .kalender-raster { grid-template-columns: minmax(0, 1fr) 340px; }
+  .kalender-raster { grid-template-columns: minmax(0, 1fr) 21.25rem; }
   .kalender-seite { position: sticky; top: 1rem; height: calc(100vh - 8.5rem); min-height: 24rem; }
   .kalender-zelle { height: max(5.25rem, calc((100vh - 12.5rem) / 6)); }
 }
-@media (min-width: 120rem) { .kalender-raster { grid-template-columns: minmax(0, 1fr) 380px; } }
+@media (min-width: 120rem) { .kalender-raster { grid-template-columns: minmax(0, 1fr) 23.75rem; } }
 
 /* Navigation (Wunsch 08.10.2026): schmale Leiste mit Symbolen – alle Einträge gleich groß (40 × 36 px) und mittig;
    Leiste mit Text 224 px statt 256 px. Hauptknopf im Seitenkopf („Neuer …“) überall gleich breit. */
@@ -677,10 +684,10 @@ html { scrollbar-gutter: stable; }
 /* Versorger und Ärzte (Entwürfe 08.10.2026): schmale Liste links, Eintrag rechts; am Telefon eins von beiden */
 .stamm-raster { display: grid; gap: var(--abstand, 1rem); grid-template-columns: minmax(0, 1fr); align-items: start; }
 @media (min-width: 48rem) {
-  .stamm-raster { grid-template-columns: 300px minmax(0, 1fr); }
+  .stamm-raster { grid-template-columns: 18.75rem minmax(0, 1fr); }
   .stamm-liste { position: sticky; top: 1rem; height: calc(100vh - 8.5rem); min-height: 22rem; }
 }
-@media (min-width: 80rem) { .stamm-raster { grid-template-columns: 340px minmax(0, 1fr); } }
+@media (min-width: 80rem) { .stamm-raster { grid-template-columns: 21.25rem minmax(0, 1fr); } }
 @media (max-width: 47.99rem) { .stamm-liste { max-height: none; } }
 .stamm-eintrag { color: inherit; border-left: 3px solid transparent !important; }
 .stamm-eintrag:hover { background: var(--fein); }
@@ -693,7 +700,7 @@ html { scrollbar-gutter: stable; }
   color: var(--auf-akzent); font-size: 0.6875rem; font-weight: 600; display: inline-flex; align-items: center;
   justify-content: center; line-height: 1;
 }
-.nav-punkt { position: absolute; top: 5px; right: 6px; width: 8px; height: 8px; border-radius: 999px; background: var(--ladebalken); }
+.nav-punkt { position: absolute; top: 0.3125rem; right: 0.375rem; width: 0.5rem; height: 0.5rem; border-radius: 999px; background: var(--ladebalken); }
 .scan-unsicher { fill: rgba(250, 204, 21, 0.33); stroke: rgba(202, 138, 4, 0.75); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .scan-unsicher:hover { fill: rgba(250, 204, 21, 0.55); }
 .scan-markiert { fill: color-mix(in srgb, var(--akzent) 14%, transparent); stroke: var(--akzent); stroke-width: 2.5; vector-effect: non-scaling-stroke; pointer-events: none; }
@@ -713,3 +720,36 @@ html { scrollbar-gutter: stable; }
 .scan-feld-ziel { outline: 2px solid var(--akzent); outline-offset: 1px; }
 .scan-wort-unsicher { background: var(--warn-bg); border-bottom: 2px solid var(--warn); border-radius: 2px; cursor: help; }
 .scan-text { tab-size: 4; }
+
+/* Telefon (Wunsch 09.10.2026: nichts ragt heraus, nichts wird abgeschnitten): Tabellen werden zu Zeilen-Karten – die
+   erste beschriftete Zelle als Titel, die übrigen paarweise mit ihrer Spaltenüberschrift darüber (lib/tabellen.ts setzt
+   data-label und data-titel). Ausgeblendete Zellen (hidden, max-sm:hidden …) bleiben ausgeblendet, weil die Zellen als
+   Rasterelemente nur ihre Anzeige erben. „tabelle-fest“ behält die Tabelle (scrollt dann in ihrer Karte). */
+@media (max-width: 47.99rem) {
+  table.tabelle:not(.tabelle-fest), table.tabelle:not(.tabelle-fest) > :is(tbody, tfoot) { display: block; width: 100% !important; }
+  table.tabelle:not(.tabelle-fest) > thead {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  table.tabelle:not(.tabelle-fest) > :is(tbody, tfoot) > tr {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.375rem 0.75rem; padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--rand);
+  }
+  table.tabelle:not(.tabelle-fest) > :is(tbody, tfoot) > tr:last-child { border-bottom: 0; }
+  table.tabelle:not(.tabelle-fest) > :is(tbody, tfoot) > tr > td {
+    padding: 0 !important; border: 0 !important; min-width: 0; width: auto !important; max-width: none !important; height: auto;
+    text-align: left !important; white-space: normal !important; overflow-wrap: anywhere; vertical-align: top;
+  }
+  table.tabelle:not(.tabelle-fest) > :is(tbody, tfoot) > tr > td:is(:not([data-label]), [data-titel], :has(select, textarea)) { grid-column: 1 / -1; }
+  table.tabelle:not(.tabelle-fest) > :is(tbody, tfoot) > tr > td[data-titel] { font-weight: 500; }
+  table.tabelle:not(.tabelle-fest) > :is(tbody, tfoot) > tr > td:empty { display: none; }
+  table.tabelle:not(.tabelle-fest) > :is(tbody, tfoot) > tr > td[data-label]:not([data-titel])::before {
+    content: attr(data-label); display: block; margin-bottom: 1px; font: 500 0.75rem/1.3 var(--font-sans); color: var(--gedaempft);
+  }
+  /* Felder und Knöpfe mit fester Breite nie breiter als der Bildschirm */
+  main :is(.inp, .btn) { max-width: 100%; }
+  /* Seitenkopf: Titel ganze Breite (bricht an Wörtern um), Unterzeile darunter, Knöpfe in der nächsten Zeile – statt
+     dass die Knöpfe über dem Titel liegen */
+  .seitenkopf > :first-child { flex: 1 1 100%; flex-direction: column; align-items: flex-start; gap: 0.125rem; }
+  .seitenkopf h1 { white-space: normal; overflow-wrap: break-word; }
+  .seitenkopf-unter { max-width: 100%; white-space: normal; }
+}

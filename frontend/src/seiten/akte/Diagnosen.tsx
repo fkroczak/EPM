@@ -93,7 +93,7 @@ function DiagnoseDialog({ diagnose, offen, onOffen }: { diagnose: Diagnose | nul
           </datalist>
         </>}
       </Feld>
-      <div className="grid gap-3 sm:grid-cols-[140px_1fr_160px]">
+      <div className="grid gap-3 sm:grid-cols-[8.75rem_1fr_10rem]">
         <Feld label="ICD-Code" fehler={f.icd_code} pflicht>
           {(p) => <Eingabe {...p} className="num" value={icd} maxLength={10} placeholder="K91.2"
             onChange={(e) => setIcd(e.target.value.toUpperCase())} />}

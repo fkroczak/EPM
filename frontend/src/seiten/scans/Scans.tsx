@@ -165,7 +165,7 @@ export function Scans() {
             <div className="flex flex-col gap-2 p-2.5 border-b border-rand">
               <label className="relative block">
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
-                <input className="inp pl-[34px]" type="search" aria-label="Scans filtern" placeholder="Titel, Datei, hochgeladen von"
+                <input className="inp pl-[2.125rem]" type="search" aria-label="Scans filtern" placeholder="Titel, Datei, hochgeladen von"
                   value={suche} onChange={(e) => setSuche(e.target.value)} />
               </label>
             </div>

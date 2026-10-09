@@ -66,7 +66,7 @@ function Person({ v }: { v: boolean }) {
   const ich = useIch();
   return (
     <span className={cx("flex items-center gap-2.5 min-w-0", v ? "justify-start" : "justify-center hd:justify-start")}>
-      <span className="w-[34px] h-[34px] shrink-0 rounded-full bg-akzent-weich text-akzent-text flex items-center justify-center font-semibold text-[0.8125rem]">
+      <span className="w-[2.125rem] h-[2.125rem] shrink-0 rounded-full bg-akzent-weich text-akzent-text flex items-center justify-center font-semibold text-[0.8125rem]">
         {ich.kuerzel || initialen(ich.anzeigename)}
       </span>
       <span className={cx("flex-col min-w-0 text-left", v ? "flex" : "sr-only hd:not-sr-only hd:flex")}>
@@ -98,7 +98,7 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
       v ? "w-full h-full px-3" : "w-16 hd:w-56 px-2 hd:px-2.5 sticky top-0 h-screen max-md:hidden")}
       style={{ borderRightWidth: "var(--randbreite)" }} data-testid={v ? "schublade" : "seitenleiste"}>
       <div className={cx(v ? "flex" : "hidden hd:flex", "flex-col gap-2")}>
-        <Logo className="w-full max-w-[204px] h-[64px] px-1.5 py-1 rounded-lg bg-white" />
+        <Logo className="w-full max-w-[12.75rem] h-[4rem] px-1.5 py-1 rounded-lg bg-white" />
         <span className="px-1 font-mono text-[0.6875rem] font-medium tracking-[.07em] uppercase gedaempft">
           EPM · Patientenmanagement
         </span>
@@ -209,7 +209,7 @@ function MobilLeiste() {
       <BaseDialog.Root open={menue} onOpenChange={setMenue}>
         <BaseDialog.Portal>
           <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/35" />
-          <BaseDialog.Popup className="fixed inset-y-0 left-0 z-50 w-[min(320px,86vw)] bg-flaeche shadow-xl pt-[env(safe-area-inset-top)]">
+          <BaseDialog.Popup className="fixed inset-y-0 left-0 z-50 w-[min(20rem,86vw)] bg-flaeche shadow-xl pt-[env(safe-area-inset-top)]">
             <BaseDialog.Title className="sr-only">Menü</BaseDialog.Title>
             <BaseDialog.Close className="btn geist icon absolute right-2 top-[calc(env(safe-area-inset-top)+0.5rem)] z-10" aria-label="Menü schließen">
               <Icon name="x" />
@@ -282,7 +282,7 @@ function Suche({ vollbreit, onFertig }: { vollbreit?: boolean; onFertig?: () => 
     navigate(`/patienten/${p.id}`);
   };
   return (
-    <div className={cx("relative", vollbreit ? "w-full" : "w-[400px] max-w-[45vw]")}>
+    <div className={cx("relative", vollbreit ? "w-full" : "w-[25rem] max-w-[45vw]")}>
       <span className="absolute left-3 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" groesse={18} /></span>
       <input
         ref={feld}
@@ -306,11 +306,11 @@ function Suche({ vollbreit, onFertig }: { vollbreit?: boolean; onFertig?: () => 
           if (e.key === "Escape") { setOffen(false); onFertig?.(); }
         }}
       />
-      <span className="max-md:hidden absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[0.6875rem] font-medium gedaempft border border-rand rounded-[5px] px-1.5 py-0.5 pointer-events-none">
+      <span className="max-md:hidden absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[0.6875rem] font-medium gedaempft border border-rand rounded-[0.3125rem] px-1.5 py-0.5 pointer-events-none">
         Strg K
       </span>
       {!listenModus && offen && begriff.length >= 2 ? (
-        <ul id="suche-ergebnisse" role="listbox" className="card absolute left-0 right-0 top-[calc(100%+6px)] z-50 m-0 p-1 list-none max-h-96 overflow-auto">
+        <ul id="suche-ergebnisse" role="listbox" className="card absolute left-0 right-0 top-[calc(100%+0.375rem)] z-50 m-0 p-1 list-none max-h-96 overflow-auto">
           {treffer.isLoading ? <li className="px-3 py-2 text-sm gedaempft">Suche …</li> : null}
           {!treffer.isLoading && liste.length === 0 ? <li className="px-3 py-2 text-sm gedaempft">Kein Patient gefunden.</li> : null}
           {liste.map((p, i) => (
@@ -319,7 +319,7 @@ function Suche({ vollbreit, onFertig }: { vollbreit?: boolean; onFertig?: () => 
               onMouseDown={(e) => { e.preventDefault(); oeffnen(p); }} onMouseEnter={() => setMarkiert(i)}>
               <span className="num gedaempft">{nummer(p.nummer)}</span>
               <span className="font-medium min-w-0 truncate">{p.nachname}, {p.vorname}</span>
-              <span className="gedaempft max-[380px]:hidden">{datum(p.geburtsdatum)}</span>
+              <span className="gedaempft max-[23.75rem]:hidden">{datum(p.geburtsdatum)}</span>
               {p.ist_abgeschlossen ? <Chip>abgeschlossen</Chip> : null}
               {p.ist_test ? <Chip art="warn">Test</Chip> : null}
             </li>
@@ -399,7 +399,7 @@ export function Seite({ pfad, children, className }: { pfad: Pfadteil[]; childre
         </div>
         {suchen ? <div className="px-3 pb-3"><Suche vollbreit onFertig={() => setSuchen(false)} /></div> : null}
       </header> : null}
-      {mobil ? null : <header className="h-[60px] shrink-0 flex items-center justify-between gap-6 px-4 bg-flaeche border-b border-rand nicht-drucken">
+      {mobil ? null : <header className="h-[3.75rem] shrink-0 flex items-center justify-between gap-6 px-4 bg-flaeche border-b border-rand nicht-drucken">
         <nav aria-label="Pfad" className="flex items-center gap-2.5 text-sm min-w-0">
           {pfad.map((t, i) => (
             <span key={i} className="flex items-center gap-2.5 min-w-0">

@@ -57,11 +57,11 @@ export function AuditLog() {
       <PdfDialog offen={pdf} onOffen={setPdf} titel="Audit-Log als PDF" dateiname="Audit-Log.pdf"
         pfad={`protokoll/pdf/${abfrage({ ...werte, seitengroesse: undefined })}`} />
       <div className="flex items-center gap-2.5 flex-wrap">
-        <Auswahl aria-label="Zeitraum" className="w-[180px]" value={zeitraum} onChange={(e) => setZeitraum(e.target.value)}>
+        <Auswahl aria-label="Zeitraum" className="w-[11.25rem]" value={zeitraum} onChange={(e) => setZeitraum(e.target.value)}>
           {Object.entries(ZEITRAEUME).map(([k, v]) => <option key={k} value={k}>{v.text}</option>)}
         </Auswahl>
         {darf("benutzer_verwalten") ? (
-          <Auswahl aria-label="Person" className="w-[220px]" value={person} onChange={(e) => setPerson(e.target.value)}>
+          <Auswahl aria-label="Person" className="w-[13.75rem]" value={person} onChange={(e) => setPerson(e.target.value)}>
             <option value="">Alle Personen</option>
             {(benutzer.data ?? []).map((b) => <option key={b.id} value={b.id}>{b.anzeigename} ({b.username})</option>)}
           </Auswahl>
@@ -69,7 +69,7 @@ export function AuditLog() {
         <span className="w-px h-6 bg-rand" aria-hidden="true" />
         {GRUPPEN.map((g) => (
           <button key={g.wert} type="button" aria-pressed={gruppen.includes(g.wert)}
-            className={cx("chip h-[30px] cursor-pointer border", gruppen.includes(g.wert) ? "akzent border-akzent" : "border-rand bg-flaeche text-text2")}
+            className={cx("chip h-[1.875rem] cursor-pointer border", gruppen.includes(g.wert) ? "akzent border-akzent" : "border-rand bg-flaeche text-text2")}
             onClick={() => setGruppen(gruppen.includes(g.wert) ? gruppen.filter((x) => x !== g.wert) : [...gruppen, g.wert])}>{g.text}</button>
         ))}
       </div>
@@ -83,7 +83,7 @@ export function AuditLog() {
       <Karte className="overflow-hidden">
         {liste.isLoading ? <Laden /> : (
           <table className="tabelle" data-testid="auditlog" aria-busy={liste.isFetching || undefined}>
-            <thead><tr><th className="th w-[150px]">Zeitpunkt</th><th className="th">Person</th><th className="th">Art</th><th className="th">Details</th><th className="th">Gerät / Adresse</th></tr></thead>
+            <thead><tr><th className="th w-[9.375rem]">Zeitpunkt</th><th className="th">Person</th><th className="th">Art</th><th className="th">Details</th><th className="th">Gerät / Adresse</th></tr></thead>
             <tbody>
               {(daten?.results ?? []).map((e) => (
                 <tr key={e.id}>
