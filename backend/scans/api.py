@@ -288,6 +288,26 @@ class ScanViewSet(viewsets.GenericViewSet):
         scan.refresh_from_db()
         return Response(ScanSerializer(scan, context={"request": request}).data)
 
+    @action(detail=True, methods=["post"], url_path=r"seiten/(?P<sid>\d+)/vorschau")
+    def vorschau(self, request, pk=None, sid=None):
+        """Vorschau beim Anpassen: die Seite mit den übergebenen Einstellungen aufbereitet (ohne Erkennung, verkleinert,
+        ohne Glätten). Nichts wird gespeichert."""
+        scan = self._scan(pk)
+        seite = self._seite(scan, sid)
+        roh = request.data.get("einstellungen")
+        if not isinstance(roh, dict):
+            return _fehler("Bitte Einstellungen angeben.", feld="einstellungen")
+        if not seite.roh:
+            return _fehler("Diese Seite hat (noch) kein Bild.", status.HTTP_404_NOT_FOUND)
+        try:
+            bild, mime = dienst.vorschau(seite, roh)
+        except dienst.ScanFehler as fehler:
+            return _fehler(str(fehler))
+        antwort = HttpResponse(bild, content_type=mime)
+        antwort["Cache-Control"] = "no-store"
+        antwort["X-Content-Type-Options"] = "nosniff"
+        return antwort
+
     @action(detail=True, methods=["post"], url_path=r"seiten/(?P<sid>\d+)/bereich")
     def bereich(self, request, pk=None, sid=None):
         """Einen Bereich neu erkennen: ``{"box": [x, y, b, h] (0–1), "staerke": -50…50}``."""

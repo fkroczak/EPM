@@ -92,6 +92,8 @@ type Optionen = {
   signal?: AbortSignal;
   /** 403 „Anmeldung erforderlich“ nicht als Abmeldung behandeln (z. B. bei der Anmeldung selbst) */
   ohneAbmeldeSignal?: boolean;
+  /** Antwort als Blob (z. B. ein Bild); Fehler kommen weiter als JSON */
+  alsBlob?: boolean;
 };
 
 export async function api<T = unknown>(pfad: string, opt: Optionen = {}): Promise<T> {
@@ -118,6 +120,7 @@ export async function api<T = unknown>(pfad: string, opt: Optionen = {}): Promis
   }
   rechteStandPruefen(antwort);
   if (antwort.status === 204) return undefined as T;
+  if (opt.alsBlob && antwort.ok) return (await antwort.blob()) as T;
   const art = antwort.headers.get("Content-Type") ?? "";
   const daten: unknown = art.includes("application/json") ? await antwort.json().catch(() => null) : await antwort.text();
   if (!antwort.ok) {
