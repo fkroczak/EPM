@@ -26,7 +26,7 @@ _EXAKT.update({"GA": "G/l", "G/A": "G/l", "G/": "G/l", "TA": "T/l", "T/A": "T/l"
 _INDEX = {k.lower().replace(" ", ""): k for k in KANONISCH if k not in ("G/l", "T/l")}
 _INDEX.update({"u/l": "U/l", "iu/l": "U/l", "ie/l": "U/l", "mu/l": "mU/l", "miu/l": "mU/l", "mie/l": "mU/l",
                "µiu/ml": "mU/l", "µu/ml": "mU/l", "uu/ml": "mU/l", "ml/min/1.73m²": "ml/min/1,73 m²",
-               "ml/min/1,73m2": "ml/min/1,73 m²", "ml/min/1.73m2": "ml/min/1,73 m²", "ml/min/1,73qm": "ml/min/1,73 m²",
+               "ml/min/1,73m2": "ml/min/1,73 m²", "ml/min/1.73m2": "ml/min/1,73 m²", "ml/min/1,73qm": "ml/min/1,73 m²", "ml/min/1.73qm": "ml/min/1,73 m²",
                "giga/l": "G/l", "tera/l": "T/l", "x10^9/l": "G/l", "x10^12/l": "T/l", "10^9/l": "G/l",
                "10^12/l": "T/l", "1/nl": "/nl", "1/pl": "/pl", "1/µl": "/µl", "tsd./µl": "Tsd/µl",
                "mio./µl": "Mio/µl", "kg/m2": "kg/m²", "sec": "s", "grad": "°", "fl.": "fl", "ohm": "Ω"})

@@ -246,6 +246,22 @@ class AuswertungTest(SimpleTestCase):
         self.assertEqual([x["wert"] for x in a["labor"]["werte"] if x["parameter_name"] == "Kalium"], ["4.6", "1"])
         self.assertEqual(w["Albumin"]["wert"], "45.8")
 
+    def test_ausstehend_erlaeuterung_und_referenz_an_der_einheit(self):
+        """„folgt“ wird nicht vorgewählt; „Vitamin D-Mangel: < 50“ (Beurteilungsstufe) ist kein Wert;
+        „ml/min/1.73qm> 60“: das Zeichen des Referenzbereichs klebt an der Einheit."""
+        katalog = KATALOG_BEISPIEL + [
+            {"id": 40, "name": "Vitamin D", "kurzname": "", "einheit": "µg/l", "gruppe": "", "suchbegriffe": ""},
+            {"id": 41, "name": "GFR (CKD-EPI)", "kurzname": "", "einheit": "ml/min/1,73 m²", "gruppe": "",
+             "suchbegriffe": ""}]
+        a = auswertung.auswerten([_seite("Zink (ICP-MS) folgt", "Vitamin D-Mangel: < 50",
+                                         "GFR (rechn. nach CKD-EPI) 85 ml/min/1.73qm> 60 85 (07.03.23)",
+                                         "Natrium 143 mmol/l 133-150", "Kalium (Plasma) 4.0 mmol/l 3.4-5.1")], katalog)
+        werte = {w["parameter_name"]: w for w in a["labor"]["werte"]}
+        self.assertFalse(werte["Zink"]["vorschlag"])
+        self.assertNotIn("Vitamin D", werte)
+        gfr = werte["GFR (CKD-EPI)"]
+        self.assertEqual((gfr["wert"], gfr["referenz_von"], gfr["einheit"]), ("85", "60", "ml/min/1,73 m²"))
+
     def test_eins_ohne_pfeil_bleibt(self):
         """Eine „1“ in der Wertespalte ist kein Pfeil: Thrombozyten 195, Leukozyten 11,2 bleiben."""
         katalog = KATALOG_BEISPIEL + [

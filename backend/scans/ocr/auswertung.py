@@ -112,6 +112,7 @@ STOFF = {
     "tsh basal": "tsh", "ft3": "ft3", "ft4": "ft4",
 }
 
+AUSSTEHEND = {"folgt", "s u", "siehe unten", "n b", "nb", "kommt", "in arbeit", "ausstehend"}
 TEXTWERTE = {"negativ", "positiv", "neg", "pos", "n b", "nb", "nicht nachweisbar", "nachweisbar", "folgt", "s u",
              "siehe unten", "normal", "unauffaellig", "kein", "keine"}
 
@@ -246,6 +247,8 @@ _WERT = re.compile(r"^(?P<op>[<>≤≥]=?)?(?P<zahl>[-+]?\d+(?:[.,]\d+)*)(?P<fla
 # Pfeil vor dem Wert („↑18.69“, „↓27.7“), von der Erkennung oft als „!“ oder „|“ gelesen – als „1“ siehe _pfeil_als_eins
 _PFEIL = re.compile(r"^(?P<pfeil>[↑↓!|ı])(?P<zahl>\d+(?:[.,]\d+)?)$")
 _PFEIL_GELESEN = {"1", "11", "17", "71", "t", "T", "f", "!", "|", "I", "l", "ı"}
+_ERLAEUTERUNG = re.compile(r"\b(?:mangel|zielwert|praevention|hypervitaminose|insuffizienz|optimal|toxisch|"
+                          r"wuenschenswert|grenzwertig|empfohlen|therapeutisch|intoxikation|defizit)\b")
 _PFEIL_WORT = {"↑", "↓", "|", "!", "ı"}  # Pfeil als eigenes Wort zwischen Name und Wert
 _DATUM_WORT = re.compile(r"^\(?\d{1,2}\.\d{1,2}\.\d{2,4}\)?$")
 _WERT_REST = re.compile(r"^(?P<op>[<>≤≥]=?)?(?P<zahl>\d+(?:[.,]\d+)?)(?P<rest>[A-Za-z↑↓*!+|]{1,2})$")
@@ -420,6 +423,8 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
         if k is None:
             continue
         etikett = _text(r[:k - 1] if r[k - 1].text in _PFEIL_WORT and k > 1 else r[:k])
+        if _ERLAEUTERUNG.search(norm(etikett)):
+            continue  # Beurteilungsstufen unter dem Wert, kein eigener Wert
         if not re.search(r"[A-Za-zÄÖÜäöü]", etikett) or len(etikett) > 60:
             continue
         if alle_daten(etikett) or _DATUM_WORT.match(r[k + 1].text if _OP.match(r[k].text) and k + 1 < len(r)
@@ -474,8 +479,14 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
             j += 1
         # Einheit: das nächste Wort, wenn es eine bekannte Einheit ist (Lesefehler werden repariert)
         einheit_gelesen, einheit_ = "", ""
+        ref_vorn = ""
         if j < len(rest):
             e = E.einheit(rest[j].text)
+            if e is None and re.search(r"[<>≤≥]$", rest[j].text):
+                # „ml/min/1.73qm> 60“: das Zeichen des Referenzbereichs klebt an der Einheit
+                e = E.einheit(rest[j].text.rstrip("<>≤≥"))
+                if e:
+                    ref_vorn = rest[j].text[-1] + " "
             if e is None and j + 1 < len(rest):
                 e = E.einheit(rest[j].text + rest[j + 1].text)  # „mmol /l“
                 if e:
@@ -483,7 +494,7 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
             if e is not None:
                 einheit_gelesen, einheit_ = rest[j].text, e
                 j += 1
-        ref_text = _text(rest[j:])
+        ref_text = ref_vorn + _text(rest[j:])
         ref_von, ref_bis = _referenz(ref_text)
         if param is None and not einheit_:
             continue  # ohne Katalogtreffer nur Zeilen, die eindeutig wie ein Laborwert aussehen
@@ -585,6 +596,9 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
             hinweise.append("nicht im Katalog – nur auf Wunsch als freier Parameter")
         if sicher < 0.5:
             eintrag["vorschlag"] = False
+        if wert is None and norm(wert_text) in AUSSTEHEND:
+            eintrag["vorschlag"] = False
+            hinweise.append("Ergebnis steht noch aus – nicht vorgewählt")
         vorschlaege.append(eintrag)
     # Steht ein Parameter mehrfach im Befund (z. B. „Eisen (Photometrie)“ in µmol/l und „Eisen (Umrechnung)“ in
     # µg/dl), ist nur eine Zeile vorgewählt: eine brauchbare, möglichst schon in der Einheit des Katalogs.
