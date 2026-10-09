@@ -83,6 +83,7 @@ services:
       EPM_DOKUMENTE: /data/dokumente
       EPM_SCANS: /data/scans
       EPM_OCR_THREADS: ${EPM_OCR_THREADS:-2}
+      EPM_OCR_MODUS: ${EPM_OCR_MODUS:-auto}
       EPM_VERSION: ${EPM_VERSION}
       TZ: Europe/Berlin
     secrets: [db_password, django_secret_key]

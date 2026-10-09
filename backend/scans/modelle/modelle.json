@@ -1,5 +1,5 @@
 {
-  "beschreibung": "Modelle der zweiten Erkennung (PaddleOCR PP-OCRv5, als ONNX) und zum Glätten gewellter Seiten (UVDoc). Werden beim Bau des Images geladen und geprüft; zur Laufzeit wird nichts nachgeladen.",
+  "beschreibung": "Modelle der zweiten Erkennung (PaddleOCR PP-OCRv5, als ONNX; großes und – für den Sparmodus – kleines Zeilenmodell) und zum Glätten gewellter Seiten (UVDoc). Werden beim Bau des Images geladen und geprüft; zur Laufzeit wird nichts nachgeladen.",
   "lizenz": "Apache-2.0 – PaddleOCR (PaddlePaddle Team), ONNX-Fassung: huggingface.co/monkt/paddleocr-onnx",
   "quelle": "https://huggingface.co/monkt/paddleocr-onnx/resolve/7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65/",
   "dateien": [
@@ -10,6 +10,10 @@
     {"pfad": "languages/latin/dict.txt", "groesse": 1634,
      "git_sha1": "e2497aec268ef61cac813a7d34181fd960f8ded6"},
     {"pfad": "preprocessing/doc-unwarping/UVDoc.onnx", "groesse": 31684112,
-     "sha256": "3f5ec09f1c6c5947ae7cc8db93ed7dd6dd2d164d3d99a6a70387c98848cfb00c"}
+     "sha256": "3f5ec09f1c6c5947ae7cc8db93ed7dd6dd2d164d3d99a6a70387c98848cfb00c"},
+    {"pfad": "detection/v5-mobile/det.onnx", "groesse": 4826518,
+     "sha256": "a431985659dc921974177a95adcfbb90fd9e51989a5e04d70d0b75f597b6e61d",
+     "url": "https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx/resolve/e6f4fa85f00e168c862bc462aebca69eef9b3d3d/inference.onnx",
+     "zweck": "Sparmodus (Server mit wenig RAM): kleines Zeilenmodell PP-OCRv5_mobile_det, Apache-2.0 (PaddlePaddle)"}
   ]
 }

@@ -15,23 +15,32 @@ from .paddle import Paddle
 def verfahren_stand(laden: bool = True) -> dict:
     """Welche Verfahren stehen bereit (für Systemseite und „Scans“)? ``laden=False`` prüft nur, ob die Modelldateien
     da sind – so lädt das Backend (Gunicorn) nie die Modelle in den Speicher; das tut nur der OCR-Dienst."""
-    from .paddle import DET, DICT, REC, UVDOC, modell_ordner
+    from .paddle import DET, DET_KLEIN, DICT, REC, UVDOC, modell_ordner, modus, speicher_mb
 
     ok, text = tesseract.verfuegbar()
     p = None
     fehler = ""
     ordner = modell_ordner()
-    vorhanden = all((ordner / f).is_file() for f in (DET, REC, DICT))
+    vorhanden = ((ordner / DET).is_file() or (ordner / DET_KLEIN).is_file()) and all(
+        (ordner / f).is_file() for f in (REC, DICT))
     if laden and vorhanden:
         try:
             p = Paddle.laden()
         except Exception as e:  # noqa: BLE001 – defekte Modelldatei: anzeigen statt abstürzen
             fehler = str(e)[:300]
     bereit = p is not None if laden else vorhanden
+    if p is not None:
+        sparsam, det_name, glaetten = p.sparsam, p.det_name, bool(p.uvdoc)
+    else:  # ohne Laden (Backend): so, wie der Dienst es mit demselben Image und derselben Umgebung täte
+        sparsam = modus() == "sparsam" or not (ordner / DET).is_file()
+        det_name = "mobile_det" if sparsam and (ordner / DET_KLEIN).is_file() else "server_det"
+        glaetten = not sparsam and (ordner / UVDOC).is_file()
     return {
         "tesseract": {"bereit": ok, "text": text},
-        "paddle": {"bereit": bereit, "glaetten": bool(p and p.uvdoc) if laden else (ordner / UVDOC).is_file(),
-                   "text": "PP-OCRv5 (Zeilen: server_det, Schrift: latin_mobile_rec)" if bereit else
+        "paddle": {"bereit": bereit, "glaetten": glaetten, "sparsam": sparsam if bereit else False,
+                   "speicher_mb": speicher_mb(),
+                   "text": (f"PP-OCRv5 (Zeilen: {det_name}, Schrift: latin_mobile_rec)"
+                            + (" · Sparmodus" if sparsam else "")) if bereit else
                    (f"Modelle nicht ladbar: {fehler}" if fehler else "Modelle nicht vorhanden")},
     }
 

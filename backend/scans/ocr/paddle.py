@@ -4,6 +4,10 @@
 - Texterkennung (Recognition): latin_PP-OCRv5_mobile_rec – lateinische Schrift mit Umlauten und ß.
 - Glätten: UVDoc – entzerrt gewölbte oder geknickte Seiten.
 
+Sparmodus (Server mit wenig RAM, Festlegung 09.10.2026 für die Test-VM mit 4 GB): kleines Zeilenmodell
+PP-OCRv5_mobile_det, kein Glätten, kleinere Zeilensuche. ``EPM_OCR_MODUS`` = auto (Standard: Sparmodus, wenn der
+Container bzw. Server weniger als SPAR_GRENZE_MB Speicher hat) | voll | sparsam.
+
 Es ist ein reines Texterkennungsmodell, kein Sprachmodell: Es liest Zeichen, schlägt nichts vor und ergänzt nichts.
 Die Modelle liegen im Image (``EPM_OCR_MODELLE``, Herkunft und Prüfsummen in ``scans/modelle.json``); zur Laufzeit
 wird nichts nachgeladen. Fehlen sie, arbeitet die Erkennung nur mit Tesseract – die Systemseite und „Scans“ sagen das.
@@ -20,6 +24,9 @@ import cv2
 import numpy as np
 
 DET = "detection/v5/det.onnx"
+DET_KLEIN = "detection/v5-mobile/det.onnx"
+SPAR_GRENZE_MB = 2500
+DET_MAX_KLEIN = 1536
 REC = "languages/latin/rec.onnx"
 DICT = "languages/latin/dict.txt"
 UVDOC = "preprocessing/doc-unwarping/UVDoc.onnx"
@@ -68,19 +75,51 @@ def _sitzung(pfad: Path):
     return ort.InferenceSession(str(pfad), sess_options=opt, providers=["CPUExecutionProvider"])
 
 
+def speicher_mb() -> int | None:
+    """Speicher, der dem Dienst zusteht: Grenze des Containers (cgroup v2/v1), sonst RAM des Rechners."""
+    for pfad in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
+        try:
+            wert = Path(pfad).read_text().strip()
+        except OSError:
+            continue
+        if wert.isdigit() and int(wert) < 1 << 50:  # „max“ bzw. riesiger Wert = keine Grenze
+            return int(wert) // (1024 * 1024)
+    try:
+        for zeile in Path("/proc/meminfo").read_text().splitlines():
+            if zeile.startswith("MemTotal:"):
+                return int(zeile.split()[1]) // 1024
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
+def modus() -> str:
+    """"voll" oder "sparsam" – aus EPM_OCR_MODUS bzw. (auto) aus dem verfügbaren Speicher."""
+    wahl = os.environ.get("EPM_OCR_MODUS", "auto").strip().lower()
+    if wahl in ("voll", "sparsam"):
+        return wahl
+    mb = speicher_mb()
+    return "sparsam" if mb is not None and mb < SPAR_GRENZE_MB else "voll"
+
+
 class Paddle:
     """Lädt die Modelle einmal je Prozess (der Worker hält sie im Speicher)."""
 
     _instanz = None
     _sperre = threading.Lock()
 
-    def __init__(self, ordner: Path):
+    def __init__(self, ordner: Path, sparsam: bool = False):
         self.ordner = ordner
-        self.det = _sitzung(ordner / DET)
+        # Sparmodus: kleines Zeilenmodell (falls vorhanden), kein Glätten, kleinere Zeilensuche
+        self.sparsam = sparsam
+        klein = ordner / DET_KLEIN
+        self.det_name = "mobile_det" if sparsam and klein.is_file() else "server_det"
+        self.det = _sitzung(klein if self.det_name == "mobile_det" else ordner / DET)
+        self.det_max = DET_MAX_KLEIN if sparsam else DET_MAX_SEITE
         self.rec = _sitzung(ordner / REC)
         zeichen = (ordner / DICT).read_text(encoding="utf-8").splitlines()
         self.dict = [z for z in zeichen if z != ""] if zeichen and zeichen[-1] == "" else zeichen
-        self.uvdoc = _sitzung(ordner / UVDOC) if (ordner / UVDOC).is_file() else None
+        self.uvdoc = _sitzung(ordner / UVDOC) if (not sparsam and (ordner / UVDOC).is_file()) else None
         form = self.rec.get_inputs()[0].shape
         self.rec_hoehe = form[2] if isinstance(form[2], int) and form[2] > 0 else REC_HOEHE
 
@@ -89,16 +128,18 @@ class Paddle:
         with cls._sperre:
             if cls._instanz is None:
                 ordner = modell_ordner()
-                if not ((ordner / DET).is_file() and (ordner / REC).is_file() and (ordner / DICT).is_file()):
+                if not (((ordner / DET).is_file() or (ordner / DET_KLEIN).is_file())
+                        and (ordner / REC).is_file() and (ordner / DICT).is_file()):
                     return None
-                cls._instanz = cls(ordner)
+                sparsam = modus() == "sparsam" or not (ordner / DET).is_file()
+                cls._instanz = cls(ordner, sparsam=sparsam)
             return cls._instanz
 
     # ------------------------------------------------------------ Zeilen finden
     def zeilen_finden(self, bild: np.ndarray, det_max: int | None = None) -> list[np.ndarray]:
         bgr = bild if bild.ndim == 3 else cv2.cvtColor(bild, cv2.COLOR_GRAY2BGR)
         h, w = bgr.shape[:2]
-        f = min(1.0, (det_max or DET_MAX_SEITE) / max(h, w))
+        f = min(1.0, min(det_max or self.det_max, self.det_max) / max(h, w))
         nh = max(32, int(round(h * f / 32)) * 32)
         nw = max(32, int(round(w * f / 32)) * 32)
         klein = cv2.resize(bgr, (nw, nh), interpolation=cv2.INTER_AREA if f < 1 else cv2.INTER_LINEAR)

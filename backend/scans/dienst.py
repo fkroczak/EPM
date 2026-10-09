@@ -88,6 +88,17 @@ def dienst_stand() -> dict | None:
     return daten
 
 
+def verfahren() -> dict:
+    """Bereitstehende Verfahren, wie der OCR-Dienst sie meldet (er allein lädt die Modelle und kennt seine
+    Speichergrenze); ohne frische Meldung aus dem Image geschätzt."""
+    from .ocr.erkennung import verfahren_stand
+
+    d = dienst_stand()
+    if d and d.get("laeuft") and isinstance(d.get("verfahren"), dict):
+        return d["verfahren"]
+    return verfahren_stand(laden=False)
+
+
 def stand(user=None) -> dict:
     """Zahlen für Navigation, Startseite und Systemseite."""
     e = Einstellungen.aktuell()
@@ -313,16 +324,19 @@ class herzschlag:
         self._stopp = threading.Event()
         self._faden = threading.Thread(target=self._lauf, name="epm-ocr-herzschlag", daemon=True)
 
+    def schlag(self):
+        """Ein Lebenszeichen: Zeitpunkt am Scan, dazu ``zusatz`` (Healthcheck, Stand für die Systemseite)."""
+        Scan.objects.filter(pk=self.scan_id, status=Scan.Status.LAEUFT).update(lebenszeichen=timezone.now())
+        if self.zusatz:
+            self.zusatz()
+
     def _lauf(self):
         from django.db import connection
 
         try:
             while not self._stopp.wait(self.takt):
                 try:
-                    Scan.objects.filter(pk=self.scan_id, status=Scan.Status.LAEUFT).update(
-                        lebenszeichen=timezone.now())
-                    if self.zusatz:
-                        self.zusatz()
+                    self.schlag()
                 except Exception:  # noqa: BLE001 – ein ausgefallener Herzschlag darf die Erkennung nicht stören
                     log.warning("Lebenszeichen nicht geschrieben", exc_info=True)
         finally:

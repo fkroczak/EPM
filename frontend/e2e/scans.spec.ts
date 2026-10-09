@@ -74,6 +74,52 @@ test("Foto eines Laborbefunds: erkennen, Text kopieren, zuordnen mit Laborwerten
   await expect(page.getByTestId("dokument-text")).toContainText("Kalium");
 });
 
+test("Werte von Hand übertragen: BIA nicht erkannt – Feld wählen, Wert im Bild anklicken; Laborwert ergänzen", async ({ page }) => {
+  test.setTimeout(240_000);
+  const api = await apiAls("mitarbeiter");
+  const nachname = eindeutig("Handwert");
+  // anderes Geburtsdatum als im Dokument: kein automatischer Vorschlag, der Patient wird gesucht
+  const p = await api.post("patienten/", { nachname, vorname: "Hanna", geburtsdatum: "1970-05-20", geschlecht: "w", ist_test: true });
+
+  await page.goto("/scans");
+  await page.getByTestId("scan-datei").setInputFiles(FOTO);
+  const detail = page.getByTestId("scan-detail");
+  await expect(detail.getByTestId("scan-status")).toHaveText("erkannt", { timeout: 180_000 });
+  await detail.getByTestId("scan-zuordnen").click();
+  const zuordnen = page.getByTestId("zuordnen");
+  if (await zuordnen.getByTestId("zuordnen-patient").isVisible()) await zuordnen.getByRole("button", { name: "ändern" }).click();
+  await zuordnen.getByPlaceholder(/Name, Nr\. oder Geburtsdatum/).fill(nachname);
+  await zuordnen.getByRole("option", { name: new RegExp(nachname) }).click();
+  await expect(zuordnen.getByTestId("zuordnen-patient")).toContainText(nachname);
+
+  // BIA wurde nicht erkannt: einschalten, Feld wählen, Zahl im Bild anklicken
+  const bia = zuordnen.getByTestId("zuordnen-bia");
+  await bia.getByRole("checkbox").first().check();
+  const gewicht = bia.getByRole("textbox", { name: "Gewicht (kg)" });
+  await gewicht.click();
+  await expect(page.getByTestId("wort-waehlen")).toContainText("Gewicht");
+  await page.locator('[data-testid="waehlbares-wort"][data-wort="62"]').first().click();
+  await expect(gewicht).toHaveValue("62");
+
+  // Laborwert ergänzen: + Wert, Parameter wählen, Wert im Bild anklicken
+  await zuordnen.getByTestId("labor-wert-neu").click();
+  const neu = zuordnen.getByTestId("laborzeile").last();
+  await neu.getByLabel("Parameter").selectOption({ label: "Phosphat" });
+  await neu.getByLabel("Wert", { exact: true }).click();
+  await page.locator('[data-testid="waehlbares-wort"][data-wort="1,12"]').first().click();
+  await expect(neu.getByLabel("Wert", { exact: true })).toHaveValue("1,12");
+  await expect(zuordnen.getByTestId("zuordnen-speichern")).toContainText("+ BIA");
+  await zuordnen.getByTestId("zuordnen-speichern").click();
+  await expect(page.getByTestId("zuletzt-zugeordnet")).toBeVisible();
+
+  const messungen = await api.get(`bia-messungen/?patient=${p.id}`);
+  expect(Number((messungen.results ?? messungen)[0].gewicht_kg)).toBe(62);
+  const befunde = await api.get(`laborbefunde/?patient=${p.id}`);
+  const phosphat = (befunde[0].werte as { bezeichnung: string; wert: string }[]).find((w) => w.bezeichnung === "Phosphat");
+  expect(Number(phosphat?.wert)).toBe(1.12);
+  await api.ende();
+});
+
 test("Scan verlängern, Seite anpassen und löschen; Einstellungen unter Vorlagen", async ({ page }) => {
   test.setTimeout(240_000);
   await page.goto("/scans");

@@ -197,9 +197,15 @@ install -m 0750 "$CODE/werkzeuge/ocr-modelle.sh" /usr/local/sbin/epm-ocr-modelle
 MODELLE_VORRAT="$B/ocr-modelle"
 MODELLE_KONTEXT="$CODE/backend/scans/modelle/dateien"
 MODELLE_DA=0
-if [[ -d "$MODELLE_VORRAT" ]] && python3 "$CODE/backend/scans/modelle/holen.py" --nur-pruefen "$MODELLE_VORRAT" >/dev/null 2>&1; then
+if [[ -d "$MODELLE_VORRAT" ]]; then
+  # auch ein unvollständiger Vorrat hilft (z. B. vor einer neuen Datei in modelle.json): der Bau übernimmt, was die
+  # Prüfsumme besteht, und lädt nur den Rest
   rm -rf "$MODELLE_KONTEXT"; mkdir -p "$MODELLE_KONTEXT"; cp -a "$MODELLE_VORRAT/." "$MODELLE_KONTEXT/"
-  MODELLE_DA=1
+  if python3 "$CODE/backend/scans/modelle/holen.py" --nur-pruefen "$MODELLE_VORRAT" >/dev/null 2>&1; then
+    MODELLE_DA=1
+  else
+    echo "   OCR-Modelle: Vorrat unvollständig – fehlende Dateien lädt der Bau (sonst: epm-ocr-modelle neu vorbereiten)"
+  fi
 fi
 # Ein schon gebautes Image ohne Modelle wird neu gebaut, sobald die Modelle bereitliegen.
 if [[ $MODELLE_DA -eq 1 ]] && docker image inspect "epm-backend:$TAG" >/dev/null 2>&1 \

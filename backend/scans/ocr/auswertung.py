@@ -481,22 +481,37 @@ def labor_name(reihen: list[list[T]]) -> str:
 
 # ---------------------------------------------------------------- BIA
 BIA_FELDER = {
-    "gewicht_kg": (["koerpergewicht", "gewicht", "aktuelles gewicht", "body weight"], ["kg"]),
-    "bcm_kg": (["bcm", "koerperzellmasse", "body cell mass", "zellmasse"], ["kg"]),
-    "fettmasse_kg": (["fettmasse", "fm", "koerperfett", "fett", "fat mass"], ["kg"]),
-    "ecw_prozent": (["ecw", "extrazellulaeres wasser", "extrazellulaerwasser", "ecw tbw"], ["%"]),
-    "koerperwasser_l": (["koerperwasser", "tbw", "gesamtkoerperwasser", "total body water", "wasser"], ["l"]),
-    "bmi": (["bmi", "body mass index", "koerpermassenindex"], ["kg/m²", ""]),
+    # Bezeichnungen gängiger Geräte und Protokolle (seca mBCA, Data Input/Nutriguard, Akern/Bodygram, InBody, Tanita,
+    # RJL, Bodystat, Maltron) – deutsch und englisch, nach norm() (Kleinschrift, Umlaute ausgeschrieben, ohne Zeichen)
+    "gewicht_kg": (["koerpergewicht", "gewicht", "aktuelles gewicht", "body weight", "weight", "gewicht kg",
+                    "kg gewicht"], ["kg"]),
+    "bcm_kg": (["bcm", "koerperzellmasse", "body cell mass", "zellmasse", "koerperzellmasse bcm", "bcm koerperzellmasse",
+                "bcm body cell mass", "body cell mass bcm", "zellmasse bcm"], ["kg"]),
+    "fettmasse_kg": (["fettmasse", "fm", "koerperfett", "fett", "fat mass", "fettmasse fm", "fm fettmasse",
+                      "body fat mass", "bfm", "koerperfettmasse", "fett masse"], ["kg"]),
+    "ecw_prozent": (["ecw", "extrazellulaeres wasser", "extrazellulaerwasser", "ecw tbw", "ecw anteil",
+                     "anteil ecw", "ecw ratio", "ecw tbw ratio", "extrazellulaeres wasser ecw", "ecw extrazellulaeres wasser"],
+                    ["%"]),
+    "koerperwasser_l": (["koerperwasser", "tbw", "gesamtkoerperwasser", "total body water", "wasser", "gesamtwasser",
+                         "tbw total body water", "total body water tbw", "koerperwasser tbw", "tbw koerperwasser",
+                         "gesamtkoerperwasser tbw"], ["l"]),
+    "bmi": (["bmi", "body mass index", "koerpermassenindex", "body mass index bmi", "bmi body mass index"],
+            ["kg/m²", ""]),
 }
 BIA_WEITERE = {
-    "Phasenwinkel": ["phasenwinkel", "phase angle", "phi", "pa"],
-    "Magermasse": ["magermasse", "ffm", "fettfreie masse", "lean body mass", "lbm"],
-    "ECM": ["ecm", "extrazellulaere masse"],
+    "Phasenwinkel": ["phasenwinkel", "phase angle", "phi", "pa", "pha", "phasenwinkel 50 khz", "phase angle 50 khz",
+                     "phasenwinkel phi", "phasenwinkel pa"],
+    "Magermasse": ["magermasse", "ffm", "fettfreie masse", "lean body mass", "lbm", "fat free mass", "ffm fettfreie masse",
+                   "fettfreie masse ffm", "lean mass"],
+    "Skelettmuskelmasse": ["skelettmuskelmasse", "smm", "skeletal muscle mass", "muskelmasse", "muscle mass"],
+    "ECM": ["ecm", "extrazellulaere masse", "ecm extrazellulaere masse"],
     "ECM/BCM-Index": ["ecm bcm", "ecm bcm index"],
+    "ICW": ["icw", "intrazellulaeres wasser", "intracellular water"],
     "Zellanteil": ["zellanteil", "bcm anteil"],
-    "Grundumsatz": ["grundumsatz", "bmr", "ruheumsatz"],
-    "Resistanz": ["resistanz", "resistance", "r"],
-    "Reaktanz": ["reaktanz", "reactance", "xc"],
+    "Grundumsatz": ["grundumsatz", "bmr", "ruheumsatz", "basal metabolic rate"],
+    "Viszerales Fett": ["viszerales fett", "visceral fat", "vfa", "viszerale fettflaeche"],
+    "Resistanz": ["resistanz", "resistance", "r", "resistanz r", "r 50 khz"],
+    "Reaktanz": ["reaktanz", "reactance", "xc", "reaktanz xc", "xc 50 khz"],
 }
 
 
@@ -555,6 +570,10 @@ def bia_werte(reihen: list[list[T]]) -> dict:
                     weitere.append({"name": _text(r[:k]), "wert": _dez(wert), "einheit": e, "seite": r[0].seite,
                                     "box": _rahmen(r[:k] + woerter)})
                     break
+                if feld == "ecw_prozent" and not e and wert is not None and 0 < wert < 1:
+                    # als Verhältnis gedruckt (ECW/TBW 0,380) – das Feld erwartet Prozent
+                    hinweis = hinweis or f"als Verhältnis {_dez(wert)} gedruckt – in Prozent umgerechnet"
+                    wert, e = wert * 100, "%"
                 if feld not in felder:
                     felder[feld] = {"wert": _dez(wert), "einheit": e, "erkannt_als": _text(r[:k]),
                                     "seite": r[0].seite, "box": _rahmen(r[:k] + woerter),

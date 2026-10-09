@@ -194,15 +194,13 @@ class ScanViewSet(viewsets.GenericViewSet):
     @action(detail=False, methods=["get"])
     def stand(self, request):
         """Zähler für Navigation und Startseite, Grenzen der Aufbewahrung, bereitstehende Verfahren."""
-        from .ocr.erkennung import verfahren_stand
-
         e = Einstellungen.aktuell()
         daten = dienst.stand(request.user)
         daten.update({"frist_tage": e.scans_frist_tage, "hoechst_tage": e.scans_hoechst_tage,
                       "verlaengerung_tage": e.scans_verlaengerung_tage, "max_mb": e.scans_max_mb,
                       "max_seiten": settings.EPM_SCANS_MAX_SEITEN, "upload_max_mb": settings.EPM_UPLOAD_MAX_MB})
         if str(request.query_params.get("verfahren", "")) == "1":
-            daten["verfahren"] = verfahren_stand(laden=False)
+            daten["verfahren"] = dienst.verfahren()
             daten["dienst"] = dienst.dienst_stand()
         return Response(daten)
 

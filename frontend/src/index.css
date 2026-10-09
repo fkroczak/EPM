@@ -702,5 +702,9 @@ html { scrollbar-gutter: stable; }
 .scan-ecken { fill: color-mix(in srgb, var(--akzent) 10%, transparent); stroke: var(--akzent); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .scan-griff { fill: var(--flaeche); stroke: var(--akzent); stroke-width: 3; vector-effect: non-scaling-stroke; cursor: grab; }
 .scan-griff:active { cursor: grabbing; fill: var(--akzent-weich); }
+/* Zuordnen: Wort im Bild anklicken übernimmt es in das gewählte Feld */
+.scan-wort-waehlbar { fill: transparent; stroke: transparent; cursor: pointer; vector-effect: non-scaling-stroke; }
+.scan-wort-waehlbar:hover { fill: color-mix(in srgb, var(--akzent) 18%, transparent); stroke: var(--akzent); stroke-width: 1.5; }
+.scan-feld-ziel { outline: 2px solid var(--akzent); outline-offset: 1px; }
 .scan-wort-unsicher { background: var(--warn-bg); border-bottom: 2px solid var(--warn); border-radius: 2px; cursor: help; }
 .scan-text { tab-size: 4; }

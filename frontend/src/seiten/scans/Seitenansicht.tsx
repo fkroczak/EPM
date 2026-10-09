@@ -5,7 +5,7 @@
  */
 import { useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import type { ScanSeite } from "@/lib/typen";
+import type { ScanSeite, ScanWort } from "@/lib/typen";
 import { cx } from "@/components/ui/basis";
 import { UNSICHER, bildUrl, hatErgebnis, woerter } from "./hilfen";
 
@@ -15,7 +15,8 @@ function begrenzen(v: number) {
   return Math.max(0, Math.min(1, v));
 }
 
-export function Seitenansicht({ scanId, seite, markiert, unsicher = true, bereichModus = false, onBereich, original = false }: {
+export function Seitenansicht({ scanId, seite, markiert, unsicher = true, bereichModus = false, onBereich, original = false,
+  onWort }: {
   scanId: number;
   seite: ScanSeite;
   /** Stelle eines Werts (relativ 0–1: x, y, Breite, Höhe) */
@@ -25,6 +26,8 @@ export function Seitenansicht({ scanId, seite, markiert, unsicher = true, bereic
   onBereich?: (box: number[]) => void;
   /** Rohbild (vor der Aufbereitung) statt der aufbereiteten Seite */
   original?: boolean;
+  /** Wort anklicken übernimmt es in das gewählte Feld (Zuordnen); Lage relativ 0–1 */
+  onWort?: (wort: ScanWort, box: number[]) => void;
 }) {
   const svg = useRef<SVGSVGElement>(null);
   const [ziehen, setZiehen] = useState<Rahmen | null>(null);
@@ -81,6 +84,13 @@ export function Seitenansicht({ scanId, seite, markiert, unsicher = true, bereic
               <title>neu erkannter Bereich</title>
             </rect>
           ))}
+          {onWort && !bereichModus ? woerter(seite.ergebnis).map((w, i) => (
+            <rect key={`w${i}`} x={w[1]} y={w[2]} width={w[3]} height={w[4]} className="scan-wort-waehlbar"
+              data-testid="waehlbares-wort" data-wort={w[0]}
+              onClick={(ev) => { ev.stopPropagation(); onWort(w, [w[1] / breite, w[2] / hoehe, w[3] / breite, w[4] / hoehe]); }}>
+              <title>{`„${w[0]}“ übernehmen`}</title>
+            </rect>
+          )) : null}
           {markiert ? (
             <rect x={markiert[0] * breite - breite * 0.004} y={markiert[1] * hoehe - breite * 0.004}
               width={markiert[2] * breite + breite * 0.008} height={markiert[3] * hoehe + breite * 0.008} rx={breite * 0.004}

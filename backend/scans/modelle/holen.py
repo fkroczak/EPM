@@ -51,7 +51,7 @@ def holen(ziel: Path, laden: bool = True) -> bool:
             alles_da = False
             continue
         pfad.parent.mkdir(parents=True, exist_ok=True)
-        url = liste["quelle"] + eintrag["pfad"]
+        url = eintrag.get("url") or liste["quelle"] + eintrag["pfad"]
         for versuch in range(1, 4):
             tmp = pfad.with_suffix(pfad.suffix + ".teil")
             try:

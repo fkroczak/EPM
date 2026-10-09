@@ -88,6 +88,23 @@ EPM_VERSION=0.1.0
 EOF
   chmod 0600 "$B/.env"
 fi
+# Speichergrenze des OCR-Dienstes nach dem RAM des Servers (nur, wenn noch nicht gesetzt – ein eigener Wert bleibt).
+# Unter 6 GB RAM arbeitet die Texterkennung im Sparmodus (kleines Zeilenmodell, ohne Glätten), siehe docs.
+if ! grep -q '^EPM_OCR_SPEICHER=' "$B/.env"; then
+  ram_mb=$(( $(awk '/^MemTotal:/ {print $2}' /proc/meminfo) / 1024 ))
+  if   (( ram_mb < 6000 ));  then ocr_speicher=1536m
+  elif (( ram_mb < 12000 )); then ocr_speicher=3g
+  else                            ocr_speicher=4g
+  fi
+  printf '# Speichergrenze des OCR-Dienstes (aus %s MB RAM ermittelt; anpassbar)\nEPM_OCR_SPEICHER=%s\n' \
+    "$ram_mb" "$ocr_speicher" >> "$B/.env"
+  echo "   OCR-Dienst: Speichergrenze $ocr_speicher (RAM $ram_mb MB)"
+fi
+# Rechenkerne für die Texterkennung: einen für Datenbank und Backend freihalten (mindestens 2, höchstens 6)
+if ! grep -q '^EPM_OCR_THREADS=' "$B/.env"; then
+  kerne=$(nproc); threads=$(( kerne - 1 )); (( threads < 2 )) && threads=2; (( threads > 6 )) && threads=6
+  printf '# Rechenkerne der Texterkennung (aus %s Kernen ermittelt; anpassbar)\nEPM_OCR_THREADS=%s\n' "$kerne" "$threads" >> "$B/.env"
+fi
 
 echo "==> Programme für Sicherung und Übertragung (GnuPG, rclone, jq)"
 fehlend=()

@@ -54,6 +54,32 @@ def _seite(*reihen):
 
 
 # ======================================================================= ohne Datenbank, ohne Erkennung
+class SparmodusTest(SimpleTestCase):
+    def test_modus_nach_speicher_und_einstellung(self):
+        from unittest import mock
+
+        from .ocr import paddle
+
+        with mock.patch.dict(os.environ, {"EPM_OCR_MODUS": "auto"}):
+            with mock.patch.object(paddle, "speicher_mb", return_value=1536):
+                self.assertEqual(paddle.modus(), "sparsam")   # Test-VM: 4 GB RAM, Grenze 1,5 GB
+            with mock.patch.object(paddle, "speicher_mb", return_value=3072):
+                self.assertEqual(paddle.modus(), "voll")      # VPS mit 8 GB, Grenze 3 GB
+            with mock.patch.object(paddle, "speicher_mb", return_value=None):
+                self.assertEqual(paddle.modus(), "voll")
+        with mock.patch.dict(os.environ, {"EPM_OCR_MODUS": "sparsam"}):
+            self.assertEqual(paddle.modus(), "sparsam")
+        with mock.patch.dict(os.environ, {"EPM_OCR_MODUS": "voll"}), \
+                mock.patch.object(paddle, "speicher_mb", return_value=1000):
+            self.assertEqual(paddle.modus(), "voll")
+
+    def test_speicher_wird_gelesen(self):
+        from .ocr import paddle
+
+        mb = paddle.speicher_mb()
+        self.assertTrue(mb is None or mb > 100)
+
+
 class EinheitenTest(SimpleTestCase):
     def test_lesefehler_der_einheiten(self):
         """Typische Fehler der Erkennung („dI“, „Hg/dl“ statt „µg/dl“, „mmol/1“) werden repariert."""
@@ -141,6 +167,20 @@ class AuswertungTest(SimpleTestCase):
         self.assertEqual(w["fettmasse_kg"]["wert"], "17.2")
         self.assertEqual(w["bcm_kg"]["wert"], "18.9")
         self.assertEqual(a["bia"]["weitere"][0]["name"], "Phasenwinkel")
+
+    def test_bia_andere_geraete(self):
+        """Englisches Protokoll (InBody-Art): ECW/TBW als Verhältnis, Muskelmasse unter „weitere“."""
+        seite = _seite("Body Composition Analysis 12.09.2026", "Weight 72,3 kg", "Total Body Water 38,1 L",
+                       "ECW/TBW 0,385", "Body Fat Mass 21,0 kg", "Skeletal Muscle Mass 28,4 kg", "Phase Angle 5,2 °")
+        a = auswertung.auswerten([seite], KATALOG_BEISPIEL)
+        self.assertIn("bia", a["arten"])
+        w = a["bia"]["werte"]
+        self.assertEqual(w["gewicht_kg"]["wert"], "72.3")
+        self.assertEqual(w["koerperwasser_l"]["wert"], "38.1")
+        self.assertEqual(w["fettmasse_kg"]["wert"], "21")
+        self.assertEqual(w["ecw_prozent"]["wert"], "38.5")
+        self.assertTrue(w["ecw_prozent"]["hinweise"])
+        self.assertEqual({x["name"] for x in a["bia"]["weitere"]}, {"Skelettmuskelmasse", "Phasenwinkel"})
 
     def test_arztbrief(self):
         seite = _seite("Klinikum Beispielstadt", "Beispielstadt, den 15.08.2026", "Sehr geehrte Frau Kollegin,",
@@ -625,11 +665,14 @@ class ScansApiTest(Grundlage):
         alt = timezone.now() - timedelta(minutes=10)
         Scan.objects.filter(pk=scan.pk).update(lebenszeichen=alt)
         aufrufe = []
+        # der Faden schlägt im Takt (eigene Verbindung – sieht die Testdaten der offenen Transaktion nicht) …
         with dienst.herzschlag(geholt, zusatz=lambda: aufrufe.append(1), takt=0.05):
             zeit.sleep(0.4)
+        self.assertGreaterEqual(len(aufrufe), 3)
+        # … und jeder Schlag schreibt das Lebenszeichen
+        dienst.herzschlag(geholt).schlag()
         scan.refresh_from_db()
         self.assertGreater(scan.lebenszeichen, alt)
-        self.assertTrue(aufrufe)
         self.assertEqual(dienst.haengende_zuruecksetzen(), 0)
 
     @classmethod
