@@ -32,7 +32,9 @@ SYNONYME = {
     "kreatinin": ["kreatinin", "creatinin", "krea", "crea", "kreatinin serum", "creatinin enzym", "kreatinin enzym"],
     "gfr ckd epi": ["gfr ckd epi", "egfr ckd epi", "egfr", "gfr nach ckd epi", "egfr nach ckd epi", "ckd epi",
                     "gfr berechnet ckd epi", "egfrcrea", "egfr crea", "egfrcrea nach ckd epi",
-                    "egfr crea nach ckd epi", "egfrcrea ckd epi", "egfr kreatinin nach ckd epi"],
+                    "egfr crea nach ckd epi", "egfrcrea ckd epi", "egfr kreatinin nach ckd epi",
+                    "gfr rechn nach ckd epi", "gfr berechn nach ckd epi", "gfr berechnet nach ckd epi",
+                    "gfr rechnerisch nach ckd epi", "gfr nach ckd epi formel"],
     "gfr": ["gfr", "glomerulaere filtrationsrate"],
     "harnstoff": ["harnstoff", "urea", "harnstoff n"],
     "harnsaeure": ["harnsaeure", "urat"],
@@ -78,6 +80,7 @@ SYNONYME = {
     "calcidiol 25 hydroxy vitamin d": ["25 oh vitamin d", "25 oh d", "25 hydroxy vitamin d", "25 oh vitamin d3",
                                         "calcidiol", "25 oh d3", "vitamin d 25 oh", "25 hydroxyvitamin d"],
     "calcitriol 1 25 dihydroxy vitamin d": ["1 25 dihydroxy vitamin d", "1 25 oh 2 d", "1 25 oh2 d", "calcitriol",
+                                             "1 25 oh 2 vitamin d", "1 25 oh2 vitamin d", "1 25 oh 2 vitamin d3",
                                              "1 25 dihydroxyvitamin d"],
     "parathormon": ["parathormon", "pth", "intaktes parathormon", "ipth", "pth intakt"],
     "amylase": ["amylase", "alpha amylase", "pankreas amylase"],
@@ -242,6 +245,9 @@ _WERT = re.compile(r"^(?P<op>[<>≤≥]=?)?(?P<zahl>[-+]?\d+(?:[.,]\d+)*)(?P<fla
 # Zahl mit angehängtem, unbekanntem Zeichen („3,2U“ statt „3,2 L“): Zahl übernehmen, als unsicher markieren
 # Pfeil vor dem Wert („↑18.69“, „↓27.7“), von der Erkennung oft als „!“ oder „|“ gelesen – als „1“ siehe _pfeil_als_eins
 _PFEIL = re.compile(r"^(?P<pfeil>[↑↓!|ı])(?P<zahl>\d+(?:[.,]\d+)?)$")
+_PFEIL_GELESEN = {"1", "11", "17", "71", "t", "T", "f", "!", "|", "I", "l", "ı"}
+_PFEIL_WORT = {"↑", "↓", "|", "!", "ı"}  # Pfeil als eigenes Wort zwischen Name und Wert
+_DATUM_WORT = re.compile(r"^\(?\d{1,2}\.\d{1,2}\.\d{2,4}\)?$")
 _WERT_REST = re.compile(r"^(?P<op>[<>≤≥]=?)?(?P<zahl>\d+(?:[.,]\d+)?)(?P<rest>[A-Za-z↑↓*!+|]{1,2})$")
 _FLAG = re.compile(r"^(\+\+|--|[HhLl+*↑↓!]|hoch|tief|niedrig)$")
 _SPANNE = re.compile(r"(?P<von>\d+(?:[.,]\d+)?)\s*[-–—]\s*(?P<bis>\d+(?:[.,]\d+)?)")
@@ -413,11 +419,12 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
         k = _wertstelle(r)
         if k is None:
             continue
-        etikett = _text(r[:k])
+        etikett = _text(r[:k - 1] if r[k - 1].text in _PFEIL_WORT and k > 1 else r[:k])
         if not re.search(r"[A-Za-zÄÖÜäöü]", etikett) or len(etikett) > 60:
             continue
-        if alle_daten(etikett) or re.search(r"\d{1,2}\.\d{1,2}\.\d{2,4}", _text(r)):
-            continue  # Kopfzeilen mit Datum
+        if alle_daten(etikett) or _DATUM_WORT.match(r[k + 1].text if _OP.match(r[k].text) and k + 1 < len(r)
+                                                    else r[k].text):
+            continue  # Kopfzeilen mit Datum („Eingang 19.11.2024“); ein Datum beim Vorwert hinten zählt nicht
         param, art = _suche_parameter(etikett, index, eintraege)
         rest = r[k:]
         # Wert
@@ -426,10 +433,24 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
         if _OP.match(rest[0].text) and len(rest) > 1:
             op = rest[0].text
             j = 1
-        roh = gelesen = rest[j].text.replace(" ", "")
         pfeil = ""
+        # Pfeil als eigenes Wort vor dem Wert: „↑ 37,3“ (steht dann am Ende des Etiketts) oder als Zahl gelesen
+        # („Ferritin 17 252 µg/l“: eine kurze Zahl, dahinter noch eine Zahl und erst dann die Einheit)
+        pfeil_wort = k > 1 and r[k - 1].text in _PFEIL_WORT
+        if pfeil_wort:
+            pfeil = r[k - 1].text
+        elif (not op and rest[j].text in _PFEIL_GELESEN and j + 1 < len(rest) and E.zahl(rest[j + 1].text) is not None
+              and (j + 2 >= len(rest) or (E.zahl(rest[j + 2].text) is None and rest[j + 2].text not in "-–—"))):
+            # „1 9,7 G/l 4,0 - 9,0“: nicht aber „1 3,5 - 5,1“ (Wert 1, danach der Referenzbereich)
+            pfeil = "1"
+            j += 1
+        roh = gelesen = rest[j].text.replace(" ", "")
+        if pfeil == "1":
+            gelesen = f"{rest[j - 1].text} {roh}"
         p = _PFEIL.match(roh)
-        if p:
+        if pfeil:
+            pass
+        elif p:
             pfeil, roh = p.group("pfeil"), p.group("zahl")
         elif _pfeil_als_eins(rest[j], roh, spalten):
             pfeil, roh = "1", roh[1:]
@@ -477,6 +498,11 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
         if pfeil and wert is not None:
             if pfeil in "↑↓":
                 flag = flag or pfeil
+            elif pfeil_wort:  # eigenes Wort vor dem Wert: Richtung aus dem Referenzbereich, die Zahl selbst ist sicher
+                if ref_bis is not None and wert > ref_bis:
+                    flag = flag or "↑"
+                elif ref_von is not None and wert < ref_von:
+                    flag = flag or "↓"
             else:
                 if ref_bis is not None and wert > ref_bis:
                     flag = flag or "↑"

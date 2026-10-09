@@ -220,6 +220,32 @@ class AuswertungTest(SimpleTestCase):
         self.assertEqual(gewaehlt["Eisen"]["wert"], "60.3")
         self.assertEqual(len([w for w in werte if w["parameter_name"] == "Eisen"]), 2)
 
+    def test_vorwert_mit_datum_und_pfeile_als_eigenes_wort(self):
+        """Spalte „Vorwert“ mit Datum („7,9 (19.11.24)“) macht aus der Zeile keine Kopfzeile – der Befund gilt als
+        Labor. Pfeile als eigenes Wort („|“, „1“ vor dem Wert), „G/l“ als „GA“ gelesen."""
+        katalog = KATALOG_BEISPIEL + [
+            {"id": 30, "name": "Leukozyten", "kurzname": "", "einheit": "/nl", "gruppe": "", "suchbegriffe": ""},
+            {"id": 31, "name": "Erythrozyten", "kurzname": "", "einheit": "/pl", "gruppe": "", "suchbegriffe": ""},
+            {"id": 32, "name": "Thrombozyten", "kurzname": "", "einheit": "/nl", "gruppe": "", "suchbegriffe": ""},
+        ]
+        a = auswertung.auswerten([_seite(
+            "Kostenträger Kasse Endbefund 30.01.2025", "Eingang 19.11.2024 08:54",
+            "Leukozyten 1 9,7 GA 4,0 - 9,0 7,9 (19.11.24)", "Erythrozyten | 3,6 TA 3,9 - 5,3 3,9 (19.11.24)",
+            "Thrombozyten 353 GA 150 - 400 390 (19.11.24)", "Natrium 144 mmol/4 136 - 145 145 (05.09.24)",
+            "Kalium - Plasma 4,6 mmol4 3,4 - 5,1 4,6 (05.09.24)", "Albumin i.S. (phot.) 45,8 g/ 35,0 - 52,0 45,6 (19.11.24)",
+            "Kalium 1 3,5 - 5,1")], katalog)
+        self.assertIn("labor", a["arten"])
+        werte = [w for w in a["labor"]["werte"] if w["vorschlag"]]
+        w = {x["parameter_name"]: x for x in werte}
+        self.assertEqual((w["Leukozyten"]["wert"], w["Leukozyten"]["markierung"], w["Leukozyten"]["einheit_gelesen"]),
+                         ("9.7", "↑", "GA"))
+        self.assertEqual((w["Erythrozyten"]["wert"], w["Erythrozyten"]["markierung"]), ("3.6", "↓"))
+        self.assertFalse(any("Pfeil" in h for h in w["Erythrozyten"]["hinweise"]))
+        self.assertEqual(w["Natrium"]["referenz_bis"], "145")
+        self.assertEqual(w["Kalium"]["wert"], "4.6")  # die erste Kalium-Zeile; „Kalium 1 3,5 - 5,1“ bleibt Wert 1
+        self.assertEqual([x["wert"] for x in a["labor"]["werte"] if x["parameter_name"] == "Kalium"], ["4.6", "1"])
+        self.assertEqual(w["Albumin"]["wert"], "45.8")
+
     def test_eins_ohne_pfeil_bleibt(self):
         """Eine „1“ in der Wertespalte ist kein Pfeil: Thrombozyten 195, Leukozyten 11,2 bleiben."""
         katalog = KATALOG_BEISPIEL + [

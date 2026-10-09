@@ -20,6 +20,8 @@ KANONISCH = [
     "kg", "l", "l/l", "kg/m²", "°", "Ω", "cm",
 ]
 _EXAKT = {k.replace(" ", ""): k for k in KANONISCH}
+# „G/l“, „T/l“ mit „l“ als „A“ oder ganz verloren gelesen (schmale Schrift)
+_EXAKT.update({"GA": "G/l", "G/A": "G/l", "G/": "G/l", "TA": "T/l", "T/A": "T/l", "T/": "T/l"})
 # ohne Beachtung der Groß-/Kleinschreibung – außer G/l und T/l (Giga, Tera), die sonst mit g/l verwechselt würden
 _INDEX = {k.lower().replace(" ", ""): k for k in KANONISCH if k not in ("G/l", "T/l")}
 _INDEX.update({"u/l": "U/l", "iu/l": "U/l", "ie/l": "U/l", "mu/l": "mU/l", "miu/l": "mU/l", "mie/l": "mU/l",
