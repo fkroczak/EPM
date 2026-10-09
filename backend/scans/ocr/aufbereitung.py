@@ -340,12 +340,14 @@ def anpassen(bild: np.ndarray, kontrast: int, helligkeit: int) -> np.ndarray:
 
 # ---------------------------------------------------------------- Gesamtablauf
 def aufbereiten(rohbild: np.ndarray, e: Einstellungen, *, herkunft: str = "bild", kamera: bool = False,
-                glaetter=None) -> Aufbereitet:
+                glaetter=None, schritt=None) -> Aufbereitet:
     """Rohbild (BGR) → aufbereitete Seite. ``glaetter``: Funktion BGR → BGR (UVDoc) oder None.
 
     Als Foto gilt ein Bild (keine PDF-Seite) mit Kameradaten oder mit einem Blatt, das sich vom Grund abhebt."""
     info: dict = {}
     bild = rohbild
+    melden = schritt or (lambda _t: None)
+    melden("Blatt suchen und entzerren")
 
     # 1. Blatt im Bild finden und entzerren
     ecken = None
@@ -370,6 +372,7 @@ def aufbereiten(rohbild: np.ndarray, e: Einstellungen, *, herkunft: str = "bild"
 
     # 2. gewellte Seite glätten (UVDoc) – automatisch nur bei Fotos
     if glaetter is not None and (e.glaetten == "ein" or (e.glaetten == "auto" and foto)):
+        melden("Seite glätten")
         try:
             bild = glaetter(bild)
             info["geglaettet"] = True
@@ -378,6 +381,7 @@ def aufbereiten(rohbild: np.ndarray, e: Einstellungen, *, herkunft: str = "bild"
             info["glaetten_fehler"] = str(fehler)[:200]
 
     # 3. Ausrichtung in 90°-Schritten
+    melden("Ausrichtung, Schräglage, Ausleuchtung")
     if e.drehung is not None:
         bild = drehen(bild, e.drehung)
         info["drehung"] = e.drehung

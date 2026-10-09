@@ -279,6 +279,12 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
                   seite.info.entrauscht ? "Rauschen entfernt" : ""].filter(Boolean).join(" · ")}
               </span>
             ) : null}
+            {seite.info.sparstufe ? (
+              <span className="text-xs text-warn" data-testid="seite-sparsam">
+                {seite.info.sparstufe >= 2 ? "Nur mit Tesseract erkannt" : "Sparsam erkannt (ohne Glätten, kleinere Zeilensuche)"}
+                {" "}– der Erkennungsdienst wurde vorher bei dieser Seite beendet (Speichergrenze). „Anpassen“ erkennt sie erneut.
+              </span>
+            ) : null}
           </div>
 
           {/* Text oder Zuordnen */}

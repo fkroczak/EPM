@@ -837,7 +837,9 @@ export type ScanSeite = {
   einstellungen: Partial<SeitenEinstellungen>;
   info: { ecken?: number[][]; ecken_quelle?: "auto" | "hand"; foto?: boolean; drehung?: number; drehung_quelle?: string;
     schraeglage?: number; geglaettet?: boolean; textebene?: boolean; skala?: number; entrauscht?: number;
-    texthoehe?: number | null };
+    texthoehe?: number | null;
+    /** nach Abbrüchen des Dienstes sparsamer erkannt: 1 = ohne Glätten, kleinere Zeilensuche; 2 = nur Tesseract */
+    sparstufe?: number };
   auftrag: { art: "seite" | "bereich"; box?: number[]; staerke?: number } | null;
   breite: number; hoehe: number; ergebnis: ScanErgebnis | Record<string, never>; text: string;
   sicherheit: number | null; unsicher: number; erkannt_am: string | null; textebene_vorhanden: boolean;
@@ -875,9 +877,11 @@ export type ScanZeile = {
 };
 export type Scan = ScanZeile & { text: string; seiten: ScanSeite[]; auswertung: ScanAuswertung; vorschlaege?: ScanVorschlag[] };
 export type ScansStand = {
-  offen: number; laufend: number; fehler: number; gesamt: number; laeuft_bald_ab: number; belegt: number; grenze: number;
+  offen: number; laufend: number; in_arbeit: number; wartend: number; abbrueche: number; fehler: number; gesamt: number; laeuft_bald_ab: number; belegt: number; grenze: number;
   prozent: number; anzahl_grenze: number; anzahl_alle: number; frist_tage: number; hoechst_tage: number;
   verlaengerung_tage: number; max_mb: number; max_seiten: number; upload_max_mb: number;
   verfahren?: { tesseract: { bereit: boolean; text: string }; paddle: { bereit: boolean; glaetten: boolean; text: string } };
-  dienst?: { gestartet: string; lebenszeichen: string; laeuft: boolean; bearbeitet: number; threads: string } | null;
+  dienst?: { gestartet: string; lebenszeichen: string; laeuft: boolean; bearbeitet: number; threads: string;
+    /** Speicher des Containers „ocr“ in Bytes (cgroup v2), Höchststand seit dem Start */
+    speicher?: { belegt: number; hoechst: number | null; grenze: number | null } | null } | null;
 };

@@ -535,6 +535,103 @@ class ScansApiTest(Grundlage):
         r = c.post(f"/api/scans/{scan['id']}/erneut/")
         self.assertEqual(r.json()["status"], "wartet")
 
+    # ---------------------------------------------------------------- Absturzschutz (09.10.2026)
+    def _zwei_seiten(self):
+        """Scan mit zwei Seiten, Seiten angelegt, aber noch nicht erkannt."""
+        inhalt = testbilder.pdf(testbilder.seite(testbilder.LABOR), testbilder.seite(testbilder.LABOR))
+        scan = Scan.objects.get(pk=self.hochladen(inhalt, "zwei.pdf")["id"])
+        dienst.seiten_anlegen(scan)
+        return scan
+
+    def test_abgebrochener_dienst_seite_wird_sparsam_wiederholt(self):
+        """Der Dienst stirbt mitten in Seite 2 (Speichergrenze): Nach 90 s ohne Lebenszeichen ist der Scan wieder in
+        der Warteschlange, Seite 1 bleibt erkannt, Seite 2 wird in Sparstufe 1 erkannt."""
+        scan = self._zwei_seiten()
+        s1, s2 = scan.seiten.order_by("nr")
+        # Seite 1 schon fertig, Seite 2 begonnen – dann Absturz
+        geholt = dienst.auftrag_holen()
+        self.assertEqual(geholt.pk, scan.pk)
+        dienst.seite_erkennen(s1, None, None)
+        ScanSeite.objects.filter(pk=s2.pk).update(begonnen_am=timezone.now())
+        # frisches Lebenszeichen: noch nicht zurücksetzen
+        self.assertEqual(dienst.haengende_zuruecksetzen(), 0)
+        Scan.objects.filter(pk=scan.pk).update(lebenszeichen=timezone.now() - timedelta(seconds=120))
+        self.assertEqual(dienst.haengende_zuruecksetzen(), 1)
+        scan.refresh_from_db()
+        self.assertEqual(scan.status, Scan.Status.WARTET)
+        self.erkennen()
+        scan.refresh_from_db()
+        self.assertEqual(scan.status, Scan.Status.FERTIG, scan.fehler)
+        s1.refresh_from_db(); s2.refresh_from_db()
+        self.assertEqual(s1.status, ScanSeite.Status.FERTIG)
+        self.assertNotIn("sparstufe", s1.info)
+        self.assertEqual(s2.status, ScanSeite.Status.FERTIG)
+        self.assertEqual(s2.info.get("sparstufe"), 1)
+        self.assertEqual((s2.abbrueche, s2.begonnen_am), (0, None))
+        self.assertIn("Kalium", s2.text)
+        self.assertEqual(dienst.stand()["abbrueche"], 1)
+        self.assertEqual(scan.versuche, 0)
+
+    def test_dritter_abbruch_markiert_nur_die_seite(self):
+        scan = self._zwei_seiten()
+        s1, s2 = scan.seiten.order_by("nr")
+        ScanSeite.objects.filter(pk=s2.pk).update(begonnen_am=timezone.now(), abbrueche=2)
+        self.erkennen()
+        scan.refresh_from_db(); s1.refresh_from_db(); s2.refresh_from_db()
+        self.assertEqual(scan.status, Scan.Status.FERTIG)
+        self.assertEqual(s1.status, ScanSeite.Status.FERTIG)
+        self.assertEqual(s2.status, ScanSeite.Status.FEHLER)
+        self.assertIn("3-mal abgebrochen", s2.fehler)
+        self.assertIsNone(s2.begonnen_am)
+
+    def test_sparstufe_2_nur_tesseract(self):
+        roh = laden.seiten_laden(self.labor_png(), 5)[1][0]
+        _auf, daten = seite_erkennen(roh, {}, paddle=object(), stufe=2)  # PP-OCR wird gar nicht angefasst
+        self.assertEqual(daten["verfahren"], ["tesseract"])
+        schritte = []
+        auf, _d = seite_erkennen(roh, {}, stufe=1, schritt=schritte.append)
+        self.assertEqual(auf.info["sparstufe"], 1)
+        self.assertIn("Tesseract liest", schritte)
+        self.assertEqual(schritte[0], "Blatt suchen und entzerren")
+
+    def test_zu_viele_abbrueche_ohne_fortschritt(self):
+        scan = self._zwei_seiten()
+        Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.LAEUFT, versuche=dienst.MAX_VERSUCHE,
+                                               lebenszeichen=timezone.now() - timedelta(minutes=5))
+        dienst.haengende_zuruecksetzen()
+        scan.refresh_from_db()
+        self.assertEqual(scan.status, Scan.Status.FEHLER)
+        self.assertIn("mehrfach abgebrochen", scan.fehler)
+
+    def test_geplantes_beenden_zaehlt_nicht_als_abbruch(self):
+        scan = self._zwei_seiten()
+        geholt = dienst.auftrag_holen()
+        s2 = scan.seiten.order_by("nr").last()
+        ScanSeite.objects.filter(pk=s2.pk).update(begonnen_am=timezone.now())
+        dienst.geplant_beendet(geholt)
+        scan.refresh_from_db(); s2.refresh_from_db()
+        self.assertEqual(scan.status, Scan.Status.WARTET)
+        self.assertEqual(scan.versuche, 0)
+        self.assertIsNone(s2.begonnen_am)
+        self.erkennen()
+        s2.refresh_from_db()
+        self.assertNotIn("sparstufe", s2.info)
+
+    def test_herzschlag_schreibt_lebenszeichen(self):
+        import time as zeit
+
+        scan = self._zwei_seiten()
+        geholt = dienst.auftrag_holen()
+        alt = timezone.now() - timedelta(minutes=10)
+        Scan.objects.filter(pk=scan.pk).update(lebenszeichen=alt)
+        aufrufe = []
+        with dienst.herzschlag(geholt, zusatz=lambda: aufrufe.append(1), takt=0.05):
+            zeit.sleep(0.4)
+        scan.refresh_from_db()
+        self.assertGreater(scan.lebenszeichen, alt)
+        self.assertTrue(aufrufe)
+        self.assertEqual(dienst.haengende_zuruecksetzen(), 0)
+
     @classmethod
     def tearDownClass(cls):
         super().tearDownClass()

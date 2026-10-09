@@ -61,9 +61,21 @@ def _digital(roh: Rohseite) -> dict | None:
     return fusion.seite_json(stuecke, b, h, ["textebene"])
 
 
+# Sparstufen nach abgebrochenen Versuchen (der Dienst wurde während der Seite beendet, meist an der Speichergrenze):
+# 1 = ohne Glätten und mit kleinerer Zeilensuche, 2 = nur Tesseract
+SPARSTUFEN = {1: "sparsam erkannt (ohne Glätten, kleinere Zeilensuche)", 2: "nur mit Tesseract erkannt"}
+DET_MAX_SPARSAM = 1280
+
+
 def seite_erkennen(roh: Rohseite, einstellungen: dict | None, *, woerterliste: str | None = None,
-                   paddle: Paddle | None = None, textebene: bool = True) -> tuple[Aufbereitet, dict]:
-    """→ (aufbereitete Seite, Ergebnis-JSON mit Reihen, Verfahren, Zeiten)."""
+                   paddle: Paddle | None = None, textebene: bool = True, stufe: int = 0,
+                   schritt=None) -> tuple[Aufbereitet, dict]:
+    """→ (aufbereitete Seite, Ergebnis-JSON mit Reihen, Verfahren, Zeiten).
+
+    ``stufe``: Sparstufe (siehe SPARSTUFEN); ``schritt``: Funktion(text), meldet den Teilschritt (Fortschritt)."""
+    melden = schritt or (lambda _t: None)
+    if stufe >= 2:
+        paddle = None
     t0 = time.monotonic()
     e = Einstellungen.aus_json(einstellungen)
     if textebene:
@@ -76,16 +88,23 @@ def seite_erkennen(roh: Rohseite, einstellungen: dict | None, *, woerterliste: s
             digital["zeit"] = round(time.monotonic() - t0, 2)
             return auf, digital
     auf = aufbereiten(roh.bild, e, herkunft=roh.herkunft, kamera=bool(roh.exif),
-                      glaetter=paddle.glaetten if (paddle and paddle.uvdoc) else None)
+                      glaetter=paddle.glaetten if (paddle and paddle.uvdoc and stufe < 1) else None, schritt=melden)
+    if stufe:
+        auf.info["sparstufe"] = stufe
     t1 = time.monotonic()
+    melden("Tesseract liest")
     tg = fusion.tesseract_stuecke(tesseract.erkennen(auf.grau, woerterliste=woerterliste))
+    melden("Tesseract liest (Schwarz-Weiß)")
     ts = fusion.tesseract_stuecke(tesseract.erkennen(auf.sw, woerterliste=woerterliste))
     t2 = time.monotonic()
     pz = None
     verfahren = ["tesseract"]
     if paddle is not None:
-        pz = [fusion.paddle_stueck(z) for z in paddle.erkennen(auf.grau)]
+        melden("PP-OCR liest")
+        pz = [fusion.paddle_stueck(z) for z in
+              paddle.erkennen(auf.grau, det_max=DET_MAX_SPARSAM if stufe >= 1 else None)]
         verfahren.insert(0, "paddle")
+    melden("Ergebnisse zusammenführen")
     t3 = time.monotonic()
     stuecke = fusion.zusammenfuehren(pz, tg, ts)
     h, b = auf.grau.shape[:2]

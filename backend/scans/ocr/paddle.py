@@ -59,6 +59,11 @@ def _sitzung(pfad: Path):
     opt.intra_op_num_threads = max(1, threads)
     opt.inter_op_num_threads = 1
     opt.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    # Jede Seite hat eine andere Größe: Mit Speicher-Arena und Speichermuster behält onnxruntime den Höchststand jeder
+    # Größe und wächst von Seite zu Seite – bis zur Speichergrenze des Containers (Seite 2 bricht ab). Ohne beides
+    # wird der Speicher nach jedem Lauf zurückgegeben; das kostet wenig Zeit.
+    opt.enable_cpu_mem_arena = False
+    opt.enable_mem_pattern = False
     opt.log_severity_level = 3
     return ort.InferenceSession(str(pfad), sess_options=opt, providers=["CPUExecutionProvider"])
 
@@ -90,10 +95,10 @@ class Paddle:
             return cls._instanz
 
     # ------------------------------------------------------------ Zeilen finden
-    def zeilen_finden(self, bild: np.ndarray) -> list[np.ndarray]:
+    def zeilen_finden(self, bild: np.ndarray, det_max: int | None = None) -> list[np.ndarray]:
         bgr = bild if bild.ndim == 3 else cv2.cvtColor(bild, cv2.COLOR_GRAY2BGR)
         h, w = bgr.shape[:2]
-        f = min(1.0, DET_MAX_SEITE / max(h, w))
+        f = min(1.0, (det_max or DET_MAX_SEITE) / max(h, w))
         nh = max(32, int(round(h * f / 32)) * 32)
         nw = max(32, int(round(w * f / 32)) * 32)
         klein = cv2.resize(bgr, (nw, nh), interpolation=cv2.INTER_AREA if f < 1 else cv2.INTER_LINEAR)
@@ -130,8 +135,8 @@ class Paddle:
                 ergebnis[i] = PZeile(ecken=boxen[i], text=text, c=c, zeichen=zeichen)
         return [z for z in ergebnis if z is not None and z.text.strip()]
 
-    def erkennen(self, bild: np.ndarray) -> list[PZeile]:
-        return self.lesen(bild, self.zeilen_finden(bild))
+    def erkennen(self, bild: np.ndarray, det_max: int | None = None) -> list[PZeile]:
+        return self.lesen(bild, self.zeilen_finden(bild, det_max))
 
     # ------------------------------------------------------------ Glätten
     def glaetten(self, bild: np.ndarray) -> np.ndarray:

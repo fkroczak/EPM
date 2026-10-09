@@ -114,6 +114,10 @@ class ScanSeite(models.Model):
     info = models.JSONField(default=dict, blank=True)
     # Auftrag an den OCR-Dienst für diese Seite: {"art": "seite"} oder {"art": "bereich", "box": [...], "staerke": n}
     auftrag = models.JSONField(null=True, blank=True)
+    # Absturzschutz: gesetzt, solange der Dienst an der Seite arbeitet. Findet er beim nächsten Start einen Wert vor,
+    # brach der vorige Versuch ab (z. B. Speichergrenze des Containers) – die Seite wird dann sparsamer erkannt.
+    begonnen_am = models.DateTimeField(null=True, blank=True)
+    abbrueche = models.PositiveSmallIntegerField(default=0, help_text="abgebrochene Versuche an dieser Seite")
 
     bild = models.CharField(max_length=80, blank=True, help_text="aufbereitete Seite (Anzeige, PDF)")
     grau = models.CharField(max_length=80, blank=True, help_text="aufbereitete Seite für die Erkennung")

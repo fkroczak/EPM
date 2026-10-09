@@ -777,6 +777,8 @@ function KontenLinks({ konten, ich, zweifaktor }: { konten?: Konto[]; ich: numbe
 function TexterkennungKarte({ t }: { t: NonNullable<Uebersicht["epm"]["texterkennung"]> }) {
   const v = t.verfahren;
   const s = t.scans;
+  const sp = t.dienst?.speicher ?? null;
+  const nahGrenze = !!(sp?.grenze && (sp.hoechst ?? sp.belegt) >= 0.9 * sp.grenze);
   return (
     <Karte className="px-5 py-4 flex flex-col gap-2" data-testid="texterkennung-karte">
       <KartenKopf titel="Texterkennung (Scans)" unter="lokal im Container „ocr“, ohne Netz nach außen" />
@@ -788,7 +790,16 @@ function TexterkennungKarte({ t }: { t: NonNullable<Uebersicht["epm"]["texterken
         <Zeile label="Tesseract">{v?.tesseract ? <><Chip art={v.tesseract.bereit ? "ok" : "fehler"}>{v.tesseract.bereit ? "bereit" : "fehlt"}</Chip> <span className="gedaempft">{v.tesseract.text}</span></> : "—"}</Zeile>
         <Zeile label="PP-OCRv5">{v?.paddle ? <><Chip art={v.paddle.bereit ? "ok" : "warn"}>{v.paddle.bereit ? "bereit" : "fehlt"}</Chip>{" "}
           <span className="gedaempft">{v.paddle.bereit ? `${v.paddle.text}${v.paddle.glaetten ? " · Glätten (UVDoc)" : ""}` : "Erkennung nur mit Tesseract – Modelle beim Bau des Images laden (Zugang zu huggingface.co)"}</span></> : "—"}</Zeile>
-        <Zeile label="Warteschlange">{s.laufend ? `${s.laufend} in Arbeit` : "leer"}{s.fehler ? <> · <Chip art="fehler">{s.fehler} mit Fehler</Chip></> : null}</Zeile>
+        <Zeile label="Warteschlange">{s.laufend
+          ? [s.in_arbeit ? `${s.in_arbeit} in Arbeit` : "", s.wartend ? `${s.wartend} wartend` : ""].filter(Boolean).join(" · ")
+          : "leer"}{s.fehler ? <> · <Chip art="fehler">{s.fehler} mit Fehler</Chip></> : null}</Zeile>
+        {sp ? <Zeile label="Speicher des Dienstes">
+          <span className={nahGrenze ? "text-warn font-medium" : undefined}>{dateigroesse(sp.belegt)}
+            {sp.hoechst ? ` · Höchststand ${dateigroesse(sp.hoechst)}` : ""}{sp.grenze ? ` von ${dateigroesse(sp.grenze)}` : ""}</span>
+          {nahGrenze ? <span className="gedaempft"> – nahe der Grenze: in /srv/epm/.env „EPM_OCR_SPEICHER“ erhöhen (z. B. 6g), dann EPM neu starten</span> : null}
+        </Zeile> : null}
+        {s.abbrueche ? <Zeile label="Abbrüche"><Chip art="warn">{s.abbrueche} {s.abbrueche === 1 ? "Seite" : "Seiten"}</Chip>{" "}
+          <span className="gedaempft">Der Dienst wurde während der Erkennung beendet (meist an der Speichergrenze); diese Seiten werden sparsamer erkannt.</span></Zeile> : null}
         <Zeile label="Scans">{zahl(s.anzahl_alle)} von höchstens {zahl(s.anzahl_grenze)} · {s.offen} warten auf Zuordnung
           {s.laeuft_bald_ab ? ` · ${s.laeuft_bald_ab} laufen in 24 Std. ab` : ""}</Zeile>
         <Zeile label="Speicher"><span className={s.prozent >= 80 ? "text-warn font-medium" : undefined}>{dateigroesse(s.belegt)} von {dateigroesse(s.grenze)} ({String(s.prozent).replace(".", ",")} %)</span></Zeile>

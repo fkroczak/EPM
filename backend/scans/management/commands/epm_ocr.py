@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import signal
+import threading
 import time
 from pathlib import Path
 
@@ -40,13 +41,31 @@ class Command(BaseCommand):
             os.nice(int(os.environ.get("EPM_OCR_NICE", "10")))
         except OSError:
             pass
-        ende = {"jetzt": False}
+        ende = {"jetzt": False, "scan": None}
 
-        def stopp(*_):
-            ende["jetzt"] = True
+        if einmal:
+            def stopp(*_):
+                ende["jetzt"] = True
 
-        signal.signal(signal.SIGTERM, stopp)
-        signal.signal(signal.SIGINT, stopp)
+            signal.signal(signal.SIGTERM, stopp)
+            signal.signal(signal.SIGINT, stopp)
+        else:
+            # Beenden (docker stop, Update): Ein eigener Faden nimmt das Signal sofort an – auch mitten in einer
+            # Seite, wo der Hauptfaden in onnxruntime oder Tesseract steckt –, stellt den laufenden Scan zurück in
+            # die Warteschlange (zählt nicht als Abbruch) und beendet den Prozess.
+            signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM, signal.SIGINT})
+
+            def warten():
+                signal.sigwait({signal.SIGTERM, signal.SIGINT})
+                ende["jetzt"] = True
+                try:
+                    if ende["scan"] is not None:
+                        dienst.geplant_beendet(ende["scan"])
+                    log.info("OCR-Dienst beendet")
+                finally:
+                    os._exit(0)
+
+            threading.Thread(target=warten, name="epm-ocr-signal", daemon=True).start()
         try:
             paddle = Paddle.laden()
         except Exception:  # noqa: BLE001 – ohne PP-OCR weiter mit Tesseract (Systemseite zeigt es)
@@ -57,23 +76,29 @@ class Command(BaseCommand):
                  stand_text["paddle"]["text"])
         lebt = Path(os.environ.get("EPM_OCR_LEBT", "/tmp/epm-ocr-lebt"))
         start = timezone.now()
-        zuletzt_stand = 0.0
-        bearbeitet = 0
-        while not ende["jetzt"]:
+        zaehler = {"bearbeitet": 0, "zuletzt_stand": 0.0}
+
+        def lebenszeichen():
+            """Datei für den Healthcheck und – alle 30 s – Stand für die Systemseite (das Backend liest die Datei;
+            es lädt selbst keine Modelle). Läuft auch mitten in einer Erkennung (Herzschlag)."""
             try:
                 lebt.touch()
             except OSError:
                 pass
-            if time.monotonic() - zuletzt_stand > 30:
-                # Stand für die Systemseite (das Backend liest die Datei; es lädt selbst keine Modelle)
-                zuletzt_stand = time.monotonic()
+            if time.monotonic() - zaehler["zuletzt_stand"] > 30:
+                zaehler["zuletzt_stand"] = time.monotonic()
                 stand_schreiben({"gestartet": start.isoformat(timespec="seconds"),
                                  "lebenszeichen": timezone.now().isoformat(timespec="seconds"),
-                                 "verfahren": stand_text, "bearbeitet": bearbeitet,
-                                 "threads": os.environ.get("EPM_OCR_THREADS", "2")})
+                                 "verfahren": stand_text, "bearbeitet": zaehler["bearbeitet"],
+                                 "threads": os.environ.get("EPM_OCR_THREADS", "2"), "speicher": speicher()})
+
+        while not ende["jetzt"]:
+            lebenszeichen()
             try:
                 close_old_connections()
                 dienst.bereinigen_hoechstens_stuendlich()
+                # nach einem Neustart (z. B. Speichergrenze erreicht): abgebrochene Aufträge sofort wieder einreihen
+                dienst.haengende_zuruecksetzen()
                 scan = dienst.auftrag_holen()
             except Exception:  # noqa: BLE001 – z. B. Datenbank startet noch oder Migration läuft
                 log.exception("Warteschlange nicht lesbar – neuer Versuch in 10 Sekunden")
@@ -85,10 +110,30 @@ class Command(BaseCommand):
                 time.sleep(2)
                 continue
             log.info("Erkenne %s", scan)
-            fertig = dienst.bearbeiten(scan, paddle, abbrechen=lambda: ende["jetzt"])
-            bearbeitet += 1
+            ende["scan"] = scan
+            with dienst.herzschlag(scan, zusatz=lebenszeichen):
+                fertig = dienst.bearbeiten(scan, paddle, abbrechen=lambda: ende["jetzt"])
+            ende["scan"] = None
+            zaehler["bearbeitet"] += 1
             log.info("%s: %s (%s s)", fertig, fertig.get_status_display(), fertig.dauer_s)
         close_old_connections()
+
+
+def speicher() -> dict | None:
+    """Speicher des Containers (cgroup v2): belegt, Höchststand seit dem Start, Grenze – in Bytes."""
+    basis = Path("/sys/fs/cgroup")
+
+    def lies(name):
+        try:
+            wert = (basis / name).read_text().strip()
+        except OSError:
+            return None
+        return None if wert == "max" else int(wert) if wert.isdigit() else None
+
+    belegt = lies("memory.current")
+    if belegt is None:
+        return None
+    return {"belegt": belegt, "hoechst": lies("memory.peak"), "grenze": lies("memory.max")}
 
 
 def stand_schreiben(daten: dict):
