@@ -19,7 +19,10 @@ import { Icon } from "@/components/ui/icon";
 import { useSortierbar, verschiebe } from "@/components/ui/sortierbar";
 import { PdfLeser } from "@/components/PdfAnsicht";
 
-type Art = "infusionsplan" | "patientendatenblatt" | "datenschutzinformation" | "einwilligung" | "schweigepflichtentbindung";
+type Art = "infusionsplan" | "patientendatenblatt" | "datenschutzinformation" | "einwilligung" | "schweigepflichtentbindung"
+  // Schreiben mit E-Mail (Vorlagen von Alice Hessel, 09.10.2026; F172, F173)
+  | "patientenaufnahme" | "terminbestaetigung" | "reisebescheinigung" | "patientenankuendigung";
+const MIT_EMAIL: Art[] = ["patientenaufnahme", "terminbestaetigung", "reisebescheinigung", "patientenankuendigung"];
 type Optionen = {
   schrift?: "klein" | "normal" | "gross"; ausrichtung?: "links" | "mitte" | "rechts"; fett?: boolean; kursiv?: boolean;
   ausblenden_wenn_leer?: boolean; nicht_teilen?: boolean; ueberschrift?: boolean; linie_oben?: boolean;
@@ -33,6 +36,8 @@ export type Block = {
   linie?: string; hoehe_mm?: number; links?: string; rechts?: string; rechts_klein?: boolean;
   absender?: boolean; linienfarbe?: string; falzmarken?: boolean; mit_linie?: boolean;
   untertitel?: string; darstellung?: "paare" | "befund"; spaltenkoepfe?: boolean; neben_logo?: boolean;
+  /** Block „E-Mail“ der Schreiben (F172): steht nicht auf der PDF */
+  betreff?: string;
 };
 type Version = {
   id: number; version: number | null; status: "entwurf" | "aktiv" | "abgeloest"; notiz: string; erstellt_am: string;
@@ -51,6 +56,7 @@ type Entwurf = Version & { ist_entwurf: boolean; grundlage?: number; bloecke: Bl
 const TYPNAME: Record<string, string> = {
   briefkopf: "Briefkopf", titel: "Titel", text: "Text", zweispaltig: "Zwei Spalten", datenfelder: "Datenfelder", tabelle: "Tabelle", trennlinie: "Trennlinie",
   leerraum: "Leerraum", unterschrift: "Unterschrift", seitenumbruch: "Seitenumbruch", fusszeile: "Fußzeile", kopfkarte: "Kopfkarte",
+  email: "E-Mail",
 };
 const HINWEIS: Record<string, string> = {
   briefkopf: "Logo (und auf Wunsch Absender) aus „Briefkopf und Logo“, auf Wunsch darunter eine farbige Linie; Falzmarken am linken Rand.",
@@ -64,10 +70,11 @@ const HINWEIS: Record<string, string> = {
   leerraum: "Abstand in Millimetern.",
   unterschrift: "Angaben zur Freigabe und eine Linie für die Unterschrift.",
   seitenumbruch: "Alles danach beginnt auf einer neuen Seite.",
+  email: "Betreff und Text der E-Mail, mit der das Schreiben verschickt wird (die PDF hängt an). Steht nicht auf der PDF; im Dialog vor dem Versand änderbar.",
   fusszeile: "Steht auf jeder Seite unten (bis 8 Zeilen links, rechts z. B. die Seitenzahl). {Seite} und {Seiten} werden zur Seitenzahl.",
 };
 /** Bausteine aus dem Entwurf; Briefkopf, Titel und Fußzeile gibt es je Vorlage einmal */
-const BAUSTEINE = ["text", "zweispaltig", "datenfelder", "tabelle", "kopfkarte", "trennlinie", "leerraum", "unterschrift", "seitenumbruch", "titel", "briefkopf", "fusszeile"];
+const BAUSTEINE = ["text", "zweispaltig", "datenfelder", "tabelle", "kopfkarte", "trennlinie", "leerraum", "unterschrift", "seitenumbruch", "titel", "briefkopf", "fusszeile", "email"];
 /** Diese Blöcke lassen sich neben den vorherigen setzen (wie auf dem Server geprüft) */
 const NEBENEINANDER = ["text", "datenfelder", "tabelle", "unterschrift"];
 const BREITE: Record<Breite, number> = { drittel: 34, haelfte: 48.5, zwei_drittel: 63 };
@@ -104,6 +111,7 @@ function neuerBlock(typ: string, bloecke: Block[], tabellen: Aufbau["tabellen"])
   if (typ === "tabelle") b.quelle = tabellen[0]?.quelle;
   if (typ === "unterschrift") Object.assign(b, { felder: [], linie: "Unterschrift" });
   if (typ === "leerraum") b.hoehe_mm = 6;
+  if (typ === "email") Object.assign(b, { betreff: "Betreff", text: "{{Patient.Briefanrede}},\n\n" });
   return b;
 }
 
@@ -228,6 +236,14 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
       return <hr className="border-0 border-t border-[#ccc] m-0" />;
     case "leerraum":
       return <div style={{ height: (b.hoehe_mm ?? 6) * 2.1 }} className="bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,#f2f1f6_4px,#f2f1f6_8px)]" />;
+    case "email":
+      return (
+        <div className="border border-dashed border-[#9a98b3] rounded-md px-2 py-1.5 text-[0.95em] bg-[#f7f7fb]">
+          <div className="text-[0.85em] text-[#5d5b72] mb-0.5">E-Mail (nicht auf der PDF)</div>
+          <div className="font-semibold"><MitFeldern text={b.betreff} /></div>
+          <div className="line-clamp-6"><MitFeldern text={b.text} /></div>
+        </div>
+      );
     case "seitenumbruch":
       return <div className="text-center text-[0.9em] text-[#888] border-t border-dashed border-[#bbb] pt-0.5">Seitenumbruch</div>;
     default:
@@ -338,7 +354,7 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
   const entferne = (id: string) => { const neu = bloecke.filter((b) => b.id !== id); setBloecke(neu); setAuswahl(neu[0]?.id ?? null); };
   const hinzufuegen = (typ: string) => {
     const b = neuerBlock(typ, bloecke, a.tabellen);
-    const nach = typ === "briefkopf" ? 0 : typ === "fusszeile" ? bloecke.length : index >= 0 ? index + 1 : bloecke.length;
+    const nach = typ === "briefkopf" ? 0 : typ === "fusszeile" || typ === "email" ? bloecke.length : index >= 0 ? index + 1 : bloecke.length;
     const neu = [...bloecke];
     neu.splice(nach, 0, b);
     setBloecke(neu);
@@ -365,7 +381,7 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
       <div style={{ fontSize: SCHRIFT_PX[b.optionen?.schrift ?? "normal"] }}><BlockAnsicht b={b} tabellen={a.tabellen} /></div>
     </div>
   );
-  const einmal = (typ: string) => ["briefkopf", "fusszeile"].includes(typ) && bloecke.some((b) => b.typ === typ);
+  const einmal = (typ: string) => ["briefkopf", "fusszeile", "email"].includes(typ) && bloecke.some((b) => b.typ === typ);
   const serverFehler = [speichern.error, freigeben.error].find((e) => e instanceof ApiFehler) as ApiFehler | undefined;
   const fehlerListe = serverFehler ? (Array.isArray((serverFehler.daten as { bloecke?: string[] })?.bloecke)
     ? (serverFehler.daten as { bloecke: string[] }).bloecke : [serverFehler.message]) : [];
@@ -384,8 +400,11 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
       <Segmente label="Vorlage" wert={art} onWahl={(w) => { if (!geaendert || window.confirm("Ungespeicherte Änderungen verwerfen?")) setArt(w); }}
         werte={[{ wert: "infusionsplan", text: "Infusionsplan" }, { wert: "patientendatenblatt", text: "Patientendatenblatt" },
           { wert: "datenschutzinformation", text: "Datenschutzinformation" }, { wert: "einwilligung", text: "Einwilligung" },
-          { wert: "schweigepflichtentbindung", text: "Schweigepflichtentbindung" }]} className="self-start" />
-      {art !== "infusionsplan" && art !== "patientendatenblatt" && !a.aktiv.veroeffentlicht_von ? (
+          { wert: "schweigepflichtentbindung", text: "Schweigepflichtentbindung" },
+          { wert: "patientenaufnahme", text: "Patientenaufnahme" }, { wert: "terminbestaetigung", text: "Terminbestätigung" },
+          { wert: "reisebescheinigung", text: "Reisebescheinigung" }, { wert: "patientenankuendigung", text: "Patientenankündigung" }]}
+        className="self-start flex-wrap" />
+      {art !== "infusionsplan" && art !== "patientendatenblatt" && !MIT_EMAIL.includes(art) && !a.aktiv.veroeffentlicht_von ? (
         a.entwurfsmodus?.aus ? (
           <Meldung><span className="flex items-start justify-between gap-3 flex-wrap" data-testid="entwurfsmodus-aus">
             <span>Entwurfsmodus ausgeschaltet: Die PDFs dieser mitgelieferten Vorlage tragen kein Wasserzeichen „ENTWURF“ und keinen
@@ -541,7 +560,7 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
   const setzeEintrag = (i: number, neu: Partial<Eintrag>) => aendere({ felder: eintraege.map((e, j) => (j === i ? { ...e, ...neu } : e)) });
   // Reihenfolge der Felder: Ziehen am Griff, Pfeiltasten am Griff oder ▲ ▼
   const feldSort = useSortierbar(eintraege, (neu) => aendere({ felder: neu }));
-  const textartig = !["briefkopf", "trennlinie", "leerraum", "seitenumbruch"].includes(b.typ);
+  const textartig = !["briefkopf", "trennlinie", "leerraum", "seitenumbruch", "email"].includes(b.typ);
   return (
     <Karte className="p-4 flex flex-col gap-3" data-testid="block-eigenschaften">
       <div className="flex justify-between items-center"><span className="lbl">Block</span><Chip art="akzent">{TYPNAME[b.typ]}</Chip></div>
@@ -557,6 +576,10 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
         <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!b.neben_logo} onChange={(e) => aendere({ neben_logo: e.target.checked })} />Rechts neben dem Logo</label>
       </> : null}
       {b.typ === "text" || b.typ === "fusszeile" ? <FeldText label="Text" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} mehrzeilig /> : null}
+      {b.typ === "email" ? <>
+        <FeldText label="Betreff" wert={b.betreff ?? ""} onWert={(w) => aendere({ betreff: w })} fokus={fokus} />
+        <FeldText label="Text" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} mehrzeilig />
+      </> : null}
       {b.typ === "fusszeile" ? <FeldText label="Rechts" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} /> : null}
       {b.typ === "zweispaltig" ? <>
         <FeldText label="Links" wert={b.links ?? ""} onWert={(w) => aendere({ links: w })} fokus={fokus} mehrzeilig />
@@ -634,7 +657,7 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
       </> : null}
       {textartig && b.typ !== "fusszeile" && b.typ !== "titel" ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.ueberschrift} onChange={(e) => aendereOptionen({ ueberschrift: e.target.checked })} />Bezeichnung als Überschrift drucken</label> : null}
       {["text", "datenfelder", "tabelle"].includes(b.typ) ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.ausblenden_wenn_leer} onChange={(e) => aendereOptionen({ ausblenden_wenn_leer: e.target.checked })} />Ausblenden, wenn leer</label> : null}
-      {b.typ !== "fusszeile" && b.typ !== "seitenumbruch" ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.nicht_teilen} onChange={(e) => aendereOptionen({ nicht_teilen: e.target.checked })} />Nicht über Seitenumbruch teilen</label> : null}
+      {!["fusszeile", "seitenumbruch", "email"].includes(b.typ) ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.nicht_teilen} onChange={(e) => aendereOptionen({ nicht_teilen: e.target.checked })} />Nicht über Seitenumbruch teilen</label> : null}
       {textartig && b.typ !== "fusszeile" ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.linie_oben} onChange={(e) => aendereOptionen({ linie_oben: e.target.checked })} />Linie darüber</label> : null}
       {NEBENEINANDER.includes(b.typ) ? (
         <Feld label="Neben dem vorherigen Block">{(p) => <Auswahl {...p} value={o.neben_vorherigem ?? ""} onChange={(e) => aendereOptionen({ neben_vorherigem: (e.target.value || undefined) as Breite | undefined })}>
@@ -681,6 +704,14 @@ function VorschauDialog({ art, bloecke, offen, onOffen }: { art: Art; bloecke: B
     enabled: offen && !!patient && !!schluessel,
     gcTime: 0,
   });
+  const mitEmail = MIT_EMAIL.includes(art) && bloecke.some((b) => b.typ === "email");
+  const mail = useQuery({
+    queryKey: ["vorlagen", art, "vorschau-mail", patient, schluessel],
+    queryFn: () => api<{ betreff: string; text: string }>(`vorlagen/${art}/vorschau/`, { body: { patient: Number(patient),
+      bloecke: JSON.parse(schluessel), ausgabe: "email" } }),
+    enabled: offen && mitEmail && !!patient && !!schluessel,
+    gcTime: 0,
+  });
   useEffect(() => { if (offen) setSchluessel(stand); }, [offen, stand]);
   useEffect(() => {
     if (!patient && patienten.data?.results[0]) setPatient(String(patienten.data.results[0].id));
@@ -698,6 +729,13 @@ function VorschauDialog({ art, bloecke, offen, onOffen }: { art: Art; bloecke: B
         <Fehleranzeige fehler={pdf.error} />
         {pdf.isFetching ? <Laden text="PDF wird erzeugt …" /> : pdf.data ? (
           <PdfLeser url={`vorschau-${art}-${patient}-${pdf.dataUpdatedAt}`} laden={() => Promise.resolve(pdf.data.daten)} className="h-[64vh]" />
+        ) : null}
+        {mail.data ? (
+          <div className="border border-rand rounded-lg px-3 py-2 text-[13.5px]" data-testid="vorschau-email">
+            <div className="lbl mb-1">E-Mail</div>
+            <div className="font-semibold mb-1">{mail.data.betreff}</div>
+            <div className="whitespace-pre-wrap">{mail.data.text}</div>
+          </div>
         ) : null}
       </div>
     </Dialog>

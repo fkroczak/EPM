@@ -20,6 +20,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
 import { RuheDialog } from "@/components/HinweisChips";
+import { AnkuendigungDialog } from "@/components/AnkuendigungDialog";
 
 /** „×“ an jedem Eintrag (Wunsch 08.10.2026, F142): Termin bzw. Fälligkeit ausblenden – wie die Hinweise der Akte */
 const Ausblenden = createContext<((e: Eintrag) => void) | null>(null);
@@ -452,8 +453,10 @@ export function Kalender() {
   const [neu, setNeu] = useState<{ datum: string; patient?: number; name?: string } | null>(null);
   const [aendern, setAendern] = useState<Termin | null>(null);
   const [weg, setWeg] = useState<Eintrag | null>(null);
+  // Patientenankündigung für die Praxis (F173)
+  const [ankuendigung, setAnkuendigung] = useState(false);
   const schreiben = darf("eintraege_erfassen");
-  useOhneRechtSchliessen(schreiben, () => { setNeu(null); setAendern(null); });
+  useOhneRechtSchliessen(schreiben, () => { setNeu(null); setAendern(null); setAnkuendigung(false); });
 
   const z = zeitraum(ansicht, mobil ? gewaehlt : bezug);
   const daten = useQuery({
@@ -567,6 +570,8 @@ export function Kalender() {
               <Anzeigen filter={filter} onFilter={setFilter} erledigte={erledigte} onErledigte={setErledigte} />
             </>
           )}
+          {schreiben ? (mobil ? <Knopf className="icon" aria-label="Patientenankündigung" onClick={() => setAnkuendigung(true)}><Icon name="mail" /></Knopf>
+            : <Knopf icon="mail" title="Patientenankündigung für die Sprechstunden (PDF oder E-Mail)" onClick={() => setAnkuendigung(true)}>Ankündigung</Knopf>) : null}
           {schreiben ? (mobil ? <Knopf variante="pri" className="icon" aria-label="Neuer Termin" onClick={() => setNeu({ datum: gewaehlt })}><Icon name="plus" /></Knopf>
             : <Knopf variante="pri" icon="plus" onClick={() => setNeu({ datum: gewaehlt })}>Termin</Knopf>) : null}
         </div>
@@ -634,6 +639,8 @@ export function Kalender() {
       ) : null}
       {schreiben ? <TerminDialog offen={!!aendern} onOffen={(o) => { if (!o) setAendern(null); }} termin={aendern}
         patientName={aendern?.patient_name} mitAkte /> : null}
+      {schreiben ? <AnkuendigungDialog offen={ankuendigung} onOffen={setAnkuendigung}
+        von={montag(gewaehlt)} bis={plus(montag(gewaehlt), 6)} /> : null}
       {/* „×“: Termin oder Fälligkeit ausblenden – 3/6/12 Monate oder „nicht mehr nötig“, mit Grund (F142) */}
       <RuheDialog offen={!!weg} onOffen={(o) => { if (!o) setWeg(null); }}
         patientId={weg?.termin?.patient ?? weg?.faellig?.patient ?? 0} termin={weg?.termin ?? null}
