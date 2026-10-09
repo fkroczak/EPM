@@ -313,6 +313,23 @@ export type Patient = {
   } | null;
 };
 
+/** PDF zum Anhängen an die E-Mails der Schreiben (F174) */
+export type Anlage = {
+  id: number;
+  name: string;
+  beschreibung: string;
+  dateiname: string;
+  groesse: number;
+  aktiv: boolean;
+  reihenfolge: number;
+  mitgeliefert: boolean;
+  hochgeladen_am: string;
+  hochgeladen_von: string | null;
+};
+
+/** Text der E-Mail eines Schreibens (F172), im Dialog anpassbar */
+export type Mailtext = { an: string; betreff: string; text: string; dateiname: string };
+
 export type Termin = {
   id: number;
   patient: number;

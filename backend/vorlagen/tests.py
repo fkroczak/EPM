@@ -72,6 +72,9 @@ class Vorlagen(Grundlage):
                          [("infusionsplan", 1, None), ("patientendatenblatt", 1, None),
                           # Wünsche aus der Praxis vom 06.10.2026 (F115, F116)
                           ("bericht", 1, None), ("sprechstunde", 1, None),
+                          # Schreiben mit E-Mail-Text (Vorlagen von Alice Hessel, 09.10.2026; F172, F173)
+                          ("patientenaufnahme", 1, None), ("terminbestaetigung", 1, None),
+                          ("reisebescheinigung", 1, None), ("patientenankuendigung", 1, None),
                           ("datenschutzinformation", 1, None), ("einwilligung", 1, None),
                           ("schweigepflichtentbindung", 1, None)])
         self.assertEqual(client_fuer(self.betrachter).get("/api/vorlagen/").status_code, 403)

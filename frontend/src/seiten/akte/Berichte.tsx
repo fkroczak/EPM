@@ -21,6 +21,24 @@ import { Bestaetigen } from "@/components/Bestaetigen";
 import { useAkte } from "./Akte";
 import { Aktenseite, Detail, Eintrag, Eintragsliste, useWahl } from "./Aktenseite";
 
+/** Einheitliche Gliederung der Fallzusammenfassung (F175), zusammengeführt aus den Fallzusammenfassungen von
+ *  Prof. Masin (Wunsch von Alice Hessel, 09.10.2026). Die Hinweise in [eckigen Klammern] werden überschrieben. */
+const GLIEDERUNG_FALL: [string, string][] = [
+  ["1. Anlass und zugrunde liegende Unterlagen", "[Zuweisung bzw. Kontakt (z. B. über die Stiftung, Datum); vorliegende Unterlagen mit Absender und Datum; Anlass der Zusammenfassung]"],
+  ["2. Grunderkrankung und Diagnosen", "[Diagnosen mit ICD-10 und Quelle; die Diagnosen der Akte stehen zusätzlich als Tabelle im Bericht]"],
+  ["3. Anamnese und Krankheitsverlauf", "[Beginn und Verlauf; Operationen und Eingriffe chronologisch; stationäre Aufenthalte und Reha]"],
+  ["4. Aktuelle Symptomatik und Eigenangaben", "[gastrointestinale und vegetative Beschwerden, Kostaufbau, was die Patientin bzw. der Patient selbst berichtet]"],
+  ["5. Ernährungsstatus und Anthropometrie", "[Größe; Gewichtsverlauf prämorbid bis aktuell; BMI; Gewichtsverlust in %; Einordnung nach GLIM]"],
+  ["6. Bisherige und aktuelle Ernährungstherapie", "[oral, Trinknahrung, enteral, parenteral (Regime, Zugang); ernährungstherapeutische Begleitung]"],
+  ["7. Medikation, Supplemente, Allergien und Unverträglichkeiten", "[aktuelle Medikation; Supplementationsversuche und Verträglichkeit; Allergien]"],
+  ["8. Laborbefunde", "[Schlüsselbefunde mit Datum und Verlauf; Mikronährstoffstatus; fehlende Parameter]"],
+  ["9. Bildgebung und weitere Befunde", "[Befund, Datum, Einrichtung]"],
+  ["10. Zusammenfassende Beurteilung", "[ernährungsmedizinische Einordnung des Falles]"],
+  ["11. Empfehlungen und weiteres Vorgehen", "[nummerierte Handlungsvorschläge, z. B. Sprechstunde, Substitution, Monitoring]"],
+  ["12. Offene Fragen, Unstimmigkeiten und fehlende Unterlagen", "[z. B. abweichende Angaben zu Größe oder Geburtsdatum in den Unterlagen; noch angeforderte Befunde]"],
+];
+const GLIEDERUNG_HTML = GLIEDERUNG_FALL.map(([h, t]) => `<h3>${h}</h3><p>${t}</p>`).join("");
+
 function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; offen: boolean; onOffen: (o: boolean) => void }) {
   const { patient } = useAkte();
   const arten = useAuswahl("berichtart");
@@ -61,6 +79,14 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
     },
   });
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
+  const istFall = arten.data?.find((a) => String(a.id) === art)?.wert === "Fallzusammenfassung";
+  const gliederung = () => {
+    const leer = !inhalt.replace(/<[^>]+>/g, "").trim();
+    if (!leer && !window.confirm("Die Gliederung vor den bisherigen Text setzen?")) return;
+    setInhalt(GLIEDERUNG_HTML + (leer ? "" : inhalt));
+    if (!titel.trim()) setTitel("Fallzusammenfassung");
+    setStand((s) => s + 1);
+  };
 
   return (
     <Dialog offen={offen} onOffen={onOffen} breite={780} titel={bericht ? "Bericht bearbeiten" : "Neuer Bericht"}
@@ -91,6 +117,12 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
         {(p) => <Eingabe {...p} value={empfaenger} maxLength={200} placeholder="z. B. Hausarzt Dr. Hausmann"
           onChange={(e) => setEmpfaenger(e.target.value)} />}
       </Feld>
+      {istFall ? (
+        <div className="flex items-center gap-3 flex-wrap text-[13px]">
+          <Knopf klein icon="plus" onClick={gliederung}>Gliederung einfügen</Knopf>
+          <span className="gedaempft">Einheitlicher Aufbau in 12 Abschnitten; Hinweise in [eckigen Klammern] überschreiben.</span>
+        </div>
+      ) : null}
       <Feld label="Bericht" fehler={f.inhalt}>
         {() => <Editor key={stand} wert={inhalt} onAenderung={setInhalt} label="Bericht" hoehe={300} />}
       </Feld>

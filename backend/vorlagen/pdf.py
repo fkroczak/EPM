@@ -376,10 +376,11 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | 
             teile.append(f'<div class="{_klassen(b)}">{briefkopf_html(b.get("absender", True), b.get("linienfarbe"), b.get("falzmarken", False), b.get("mit_linie", True), neben)}</div>')
         elif typ == "zweispaltig":
             links, _ = ersetze.zeilen(b.get("links", ""))
-            rechts, _ = ersetze.zeilen(b.get("rechts", ""))
+            # eigener Name: „rechts“ ist die rechte Fußzeile (ohne Fußzeilen-Block stand sonst die rechte Spalte unten)
+            spalte, _ = ersetze.zeilen(b.get("rechts", ""))
             klein = " klein" if b.get("rechts_klein") else ""
             teile.append(f'<div class="{_klassen(b)} spalten"><div class="links">{links}</div>'
-                         f'<div class="rechts{klein}">{rechts}</div></div>')
+                         f'<div class="rechts{klein}">{spalte}</div></div>')
         elif typ == "titel":
             if b is titel_neben:
                 continue
@@ -467,13 +468,13 @@ def wasserzeichen_fuer(patient, plan=None, vorschau=False) -> str | None:
 def erzeuge_aus_vorlage(art: str, kontext: Kontext, vorlage=None, bloecke=None, wasserzeichen=None,
                         titel: str = "") -> tuple[bytes, int | None]:
     """PDF aus der aktiven (oder übergebenen) Vorlage. → (PDF, Vorlagenversion)."""
-    from .models import Dokumentvorlage
+    from .models import Dokumentvorlage, art_name
 
     if bloecke is None:
         vorlage = vorlage or Dokumentvorlage.aktive(art)
         bloecke = vorlage.bloecke
     inhalt, fuss, rechts = bloecke_html(art, bloecke, kontext)
-    pdf = html_zu_pdf(seite(titel or Dokumentvorlage.Art(art).label, inhalt, fuss, wasserzeichen, rechts))
+    pdf = html_zu_pdf(seite(titel or art_name(art), inhalt, fuss, wasserzeichen, rechts))
     return pdf, (vorlage.version if vorlage is not None else None)
 
 
