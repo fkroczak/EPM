@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import type { Editor as TiptapEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { rem } from "@/lib/masse";
 import { cx } from "./ui/basis";
 import type { EditorProps } from "./Editor";
 
@@ -72,7 +73,7 @@ export default function TiptapFeld({ wert, onAenderung, label, werkzeuge = true,
         role: "textbox",
         "aria-multiline": "true",
         "aria-label": label,
-        style: `min-height:${hoehe}px`,
+        style: `min-height:${rem(hoehe)}`,
       },
     },
     onUpdate: ({ editor: e }: { editor: TiptapEditor }) => onAenderung(html(e)),

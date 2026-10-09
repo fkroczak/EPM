@@ -208,7 +208,7 @@ export function Patienten() {
           <thead>
             {archiv ? (
               <tr>
-                <Spalte feld="nummer" breite="64px" sortierung={sortierung} onSortieren={sortieren}>Nr.</Spalte>
+                <Spalte feld="nummer" breite="4rem" sortierung={sortierung} onSortieren={sortieren}>Nr.</Spalte>
                 <Spalte feld="nachname" sortierung={sortierung} onSortieren={sortieren}>Name</Spalte>
                 <Spalte feld="geburtsdatum" sortierung={sortierung} onSortieren={sortieren}>Geboren</Spalte>
                 <Spalte sortierung={sortierung} onSortieren={() => undefined}>Katheter</Spalte>
@@ -218,7 +218,7 @@ export function Patienten() {
               </tr>
             ) : (
               <tr>
-                <Spalte feld="nummer" breite="64px" sortierung={sortierung} onSortieren={sortieren}>Nr.</Spalte>
+                <Spalte feld="nummer" breite="4rem" sortierung={sortierung} onSortieren={sortieren}>Nr.</Spalte>
                 <Spalte feld="nachname" sortierung={sortierung} onSortieren={sortieren}>Name</Spalte>
                 {breit ? <Spalte feld="geburtsdatum" sortierung={sortierung} onSortieren={sortieren}>Geboren</Spalte> : null}
                 {breit ? <Spalte sortierung={sortierung} onSortieren={() => undefined}>Katheter</Spalte> : null}
@@ -290,7 +290,7 @@ export function Patienten() {
         <div role="list" aria-label={archiv ? "Abgeschlossene Akten" : "Patienten"} className="flex flex-col gap-2" data-testid="patientenliste">
           {(daten?.results ?? []).map((p) => (
             <div key={p.id} role="listitem" className="card flex flex-col">
-              <Link to={`/patienten/${p.id}`} className="px-3.5 pt-3 pb-2 flex flex-col gap-0.5 no-underline text-tinte rounded-[12px]">
+              <Link to={`/patienten/${p.id}`} className="px-3.5 pt-3 pb-2 flex flex-col gap-0.5 no-underline text-tinte rounded-[0.75rem]">
                 <span className="flex items-center justify-between gap-2">
                   <span className="font-medium truncate">{p.nachname}, {p.vorname}</span>
                   <span className="num text-xs gedaempft shrink-0">Nr. {nummer(p.nummer)}</span>
@@ -348,23 +348,23 @@ export function Patienten() {
 
       <div className="flex items-center gap-2.5 flex-wrap">
         {suche ? (
-          <Chip art="akzent" className="h-[30px]" data-testid="suchbegriff">
+          <Chip art="akzent" className="h-[1.875rem]" data-testid="suchbegriff">
             <Icon name="suche" groesse={14} />„{suche}“
             <button type="button" className="bg-transparent border-0 p-0 cursor-pointer text-inherit inline-flex"
               aria-label="Suche entfernen" onClick={() => setze({ suche: null })}><Icon name="x" /></button>
           </Chip>
         ) : null}
-        <Auswahl aria-label="Versorger" className="w-[calc(50%-0.35rem)] sm:w-[190px]" value={versorgerId}
+        <Auswahl aria-label="Versorger" className="w-[calc(50%-0.35rem)] sm:w-[11.875rem]" value={versorgerId}
           onChange={(e) => setze({ versorger: e.target.value || null, ansprechpartner: null })}>
           <option value="">Alle Versorger</option>
           {(versorger.data ?? []).map((v) => <option key={v.id} value={v.id}>{v.name}{v.aktiv ? "" : " (inaktiv)"}</option>)}
         </Auswahl>
-        <Auswahl aria-label="Ansprechpartner" className="w-[calc(50%-0.35rem)] sm:w-[210px]" value={apId}
+        <Auswahl aria-label="Ansprechpartner" className="w-[calc(50%-0.35rem)] sm:w-[13.125rem]" value={apId}
           onChange={(e) => setze({ ansprechpartner: e.target.value || null })}>
           <option value="">Alle Ansprechpartner</option>
           {ansprechpartner.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.versorger_name})</option>)}
         </Auswahl>
-        <Auswahl aria-label="Katheter" className="w-[calc(50%-0.35rem)] sm:w-[160px]" value={katheterId}
+        <Auswahl aria-label="Katheter" className="w-[calc(50%-0.35rem)] sm:w-[10rem]" value={katheterId}
           onChange={(e) => setze({ katheter: e.target.value || null })}>
           <option value="">Alle Katheter</option>
           {(katheter.data ?? []).map((k) => <option key={k.id} value={k.id}>{k.wert}</option>)}
@@ -374,7 +374,7 @@ export function Patienten() {
             <span className="w-px h-6 bg-rand max-sm:hidden" aria-hidden="true" />
             {SCHNELLFILTER.map((f) => (
               <button key={f.wert} type="button" aria-pressed={schnell === f.wert}
-                className={cx("chip h-[30px] cursor-pointer border", schnell === f.wert ? "akzent border-akzent" : "border-rand bg-flaeche text-text2")}
+                className={cx("chip h-[1.875rem] cursor-pointer border", schnell === f.wert ? "akzent border-akzent" : "border-rand bg-flaeche text-text2")}
                 onClick={() => setze({ schnellfilter: schnell === f.wert ? null : f.wert })}>
                 {f.text} <span className="num gedaempft">{z ? zahl(z[f.zahl]) : ""}</span>
               </button>
@@ -382,7 +382,7 @@ export function Patienten() {
           </>
         ) : null}
         {/* Prüffilter direkt wählbar (vorher nur über Links von Startseite und Datenschutz; 08.10.2026) */}
-        <Auswahl aria-label="Prüfen" className={cx("w-full sm:w-[230px]", pruefen && "!border-akzent")} value={pruefen}
+        <Auswahl aria-label="Prüfen" className={cx("w-full sm:w-[14.375rem]", pruefen && "!border-akzent")} value={pruefen}
           onChange={(e) => setze({ pruefen: e.target.value || null })} data-testid="pruefen">
           <option value="">Prüfen …</option>
           {Object.entries(PRUEFEN).map(([k, t]) => <option key={k} value={k}>{t}</option>)}

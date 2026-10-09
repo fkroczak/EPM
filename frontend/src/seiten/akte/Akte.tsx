@@ -60,7 +60,7 @@ function richtung(p: number) {
 /** Eine Kennzahl im Aktenkopf: feste Spalte, eine Zeile (zu Langes wird gekürzt, ganz im Tooltip) – der Kopf springt nicht */
 function Kennzahl({ titel, children, hinweis }: { titel: string; children: ReactNode; hinweis?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 min-w-0 px-3 sm:px-[18px] border-l border-rand" title={hinweis}>
+    <div className="flex flex-col gap-0.5 min-w-0 px-3 sm:px-[1.125rem] border-l border-rand" title={hinweis}>
       <span className="lbl text-[0.78rem] gedaempft font-medium">{titel}</span>
       <span className="text-sm truncate">{children}</span>
     </div>
@@ -294,7 +294,7 @@ function EinsichtAnsicht({ info }: { info: Eingeschraenkt }) {
   const f: Feldfehler = einsicht.error instanceof ApiFehler ? einsicht.error.felder : {};
   return (
     <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: `Akte Nr. ${nummer(info.nummer)}` }]}>
-      <Karte className="px-[22px] py-[18px] flex flex-col gap-3 max-w-[720px]" data-testid="akte-eingeschraenkt">
+      <Karte className="px-[1.375rem] py-[1.125rem] flex flex-col gap-3 max-w-[45rem]" data-testid="akte-eingeschraenkt">
         <div className="flex items-center gap-2.5 flex-wrap">
           <h1 className="m-0 text-[1.625rem] font-semibold">Akte Nr. {nummer(info.nummer)}</h1>
           <Chip art="warn"><Icon name="schloss" />Verarbeitung eingeschränkt</Chip>
@@ -726,7 +726,7 @@ export function Akte() {
           {([["K", "Kontakt erfassen"], ["G", "Gewicht erfassen"], ["T", "Neuer Termin"], ["P", "Neuer Plan bzw. Entwurf fortsetzen"],
             ["Alt+1 … Alt+9", "Reiter der Akte wechseln"], ["Strg Enter", "im Dialog speichern"], ["Esc", "Dialog schließen"],
             ["Strg K", "Patientensuche"], ["?", "diese Übersicht"]] as const).map(([t, w]) => (
-            <Fragment key={t}><dt><kbd className="num font-medium border border-rand rounded-[5px] px-1.5 py-0.5 text-[0.8125rem]">{t}</kbd></dt><dd className="m-0">{w}</dd></Fragment>
+            <Fragment key={t}><dt><kbd className="num font-medium border border-rand rounded-[0.3125rem] px-1.5 py-0.5 text-[0.8125rem]">{t}</kbd></dt><dd className="m-0">{w}</dd></Fragment>
           ))}
         </dl>
       </Dialog>
@@ -780,7 +780,7 @@ export function Akte() {
     const kurz = [angabe.gewicht, angabe.bmi, angabe.plan, angabe.termin];
     return (
       <Seite pfad={pfad}>
-        <Karte className="px-4 sm:px-[18px] py-3 flex items-center gap-x-5 gap-y-2 flex-wrap" data-testid="aktenkopf">
+        <Karte className="px-4 sm:px-[1.125rem] py-3 flex items-center gap-x-5 gap-y-2 flex-wrap" data-testid="aktenkopf">
           <div className="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0">
             {titel(true)}
             {meta}
@@ -813,7 +813,7 @@ export function Akte() {
   const stufe = darstellung.aktenkopf;
   return (
     <Seite pfad={pfad}>
-      <Karte className={cx("px-4 sm:px-[22px] pt-4 sm:pt-[18px] flex flex-col gap-4", mobil ? "pb-4" : "pb-0")}
+      <Karte className={cx("px-4 sm:px-[1.375rem] pt-4 sm:pt-[1.125rem] flex flex-col gap-4", mobil ? "pb-4" : "pb-0")}
         data-testid="aktenkopf" data-stufe={stufe}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex flex-col gap-1 min-w-0">
@@ -826,7 +826,7 @@ export function Akte() {
           <div className="border-t border-rand pt-3.5" data-testid="kennzahlen"><Gruppen gruppen={gruppen} art="kopf" /></div>
         ) : null}
         {k && stufe === "kompakt" && angabe ? (
-          <div className="overflow-hidden -mx-3 sm:-mx-[18px]">
+          <div className="overflow-hidden -mx-3 sm:-mx-[1.125rem]">
             {/* eine Zeile mit den wichtigsten Angaben */}
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-y-3 -ml-px" data-testid="kennzahlen">
               {[angabe.gewicht, angabe.plan, angabe.termin, angabe.versorger, angabe.nickel].map((a) => (

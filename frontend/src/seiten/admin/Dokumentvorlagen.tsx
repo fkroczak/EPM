@@ -139,7 +139,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
     case "briefkopf":
       return (
         <div className={cx("flex justify-between items-end pb-2", b.mit_linie !== false && "border-b-2")} style={{ borderColor: /^#[0-9a-f]{6}$/i.test(b.linienfarbe ?? "") ? b.linienfarbe : "#251F53" }}>
-          <Logo className="w-[150px] h-[53px]" version={briefkopf.data?.logo.sha256} />
+          <Logo className="w-[9.375rem] h-[3.3125rem]" version={briefkopf.data?.logo.sha256} />
           {b.absender !== false ? <div className="flex flex-col items-end text-[0.9em] text-[#555]">
             {a ? <><span>{a.strasse} · {a.plz} {a.ort}</span><span>Tel. {a.telefon}</span><span>{a.email}</span></> : null}
           </div> : null}
@@ -203,12 +203,12 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
           <table className="w-full border-collapse text-[1em]"><tbody>
             {zeilen.map((z, i) => (
               <tr key={i}>{z.map((e, j) => <Fragment key={j}>
-                <td className="py-[3px] pr-2 text-[#666] border-b border-[#eee] align-top" style={{ width: `${36 / n}%` }}>{e.label}</td>
-                <td className="py-[3px] pr-2 border-b border-[#eee] align-top"><MitFeldern text={e.wert} /></td>
+                <td className="py-[0.1875rem] pr-2 text-[#666] border-b border-[#eee] align-top" style={{ width: `${36 / n}%` }}>{e.label}</td>
+                <td className="py-[0.1875rem] pr-2 border-b border-[#eee] align-top"><MitFeldern text={e.wert} /></td>
               </Fragment>)}</tr>
             ))}
           </tbody></table>
-          {b.typ === "unterschrift" ? <div className="mt-6 w-[200px] border-t border-[#1b1932] pt-0.5 text-[0.85em] text-[#5d5b72]">{b.linie || "Unterschrift"}</div> : null}
+          {b.typ === "unterschrift" ? <div className="mt-6 w-[12.5rem] border-t border-[#1b1932] pt-0.5 text-[0.85em] text-[#5d5b72]">{b.linie || "Unterschrift"}</div> : null}
         </div>
       );
     }
@@ -218,8 +218,8 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
         <div className={cx(karte, stil(b.optionen))}>
           {kopf}
           <table className="w-full border-collapse text-[1em]">
-            <thead><tr>{(t?.spalten ?? []).map((s, i) => <th key={i} className="text-left font-semibold text-[#666] border-b border-[#ccc] py-[3px] pr-2">{s}</th>)}</tr></thead>
-            <tbody><tr><td colSpan={t?.spalten.length ?? 1} className="py-[3px] text-[#888] italic">{t?.name ?? "unbekannte Tabelle"}</td></tr></tbody>
+            <thead><tr>{(t?.spalten ?? []).map((s, i) => <th key={i} className="text-left font-semibold text-[#666] border-b border-[#ccc] py-[0.1875rem] pr-2">{s}</th>)}</tr></thead>
+            <tbody><tr><td colSpan={t?.spalten.length ?? 1} className="py-[0.1875rem] text-[#888] italic">{t?.name ?? "unbekannte Tabelle"}</td></tr></tbody>
           </table>
         </div>
       );
@@ -355,11 +355,11 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
       onClick={() => setAuswahl(b.id)} onKeyDown={(e) => { if (e.key === "Enter") setAuswahl(b.id); }}
       className={cx("relative px-2 py-1.5 rounded cursor-pointer", b.id === auswahl ? "outline outline-2 outline-[#251F53]" : "hover:outline hover:outline-1 hover:outline-[#c9c8d4]")}>
       {b.id === auswahl ? <>
-        <span className="absolute -top-2.5 left-1.5 text-[10px] bg-[#251F53] text-white px-1.5 rounded-sm">{b.bezeichnung || TYPNAME[b.typ]}</span>
+        <span className="absolute -top-2.5 left-1.5 text-[0.625rem] bg-[#251F53] text-white px-1.5 rounded-sm">{b.bezeichnung || TYPNAME[b.typ]}</span>
         <span className="absolute -top-3 right-1 flex gap-0.5">
-          <button type="button" aria-label="nach oben" disabled={i === 0} onClick={(e) => { e.stopPropagation(); verschiebe(i, i - 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[11px] p-0 cursor-pointer">↑</button>
-          <button type="button" aria-label="nach unten" disabled={i === bloecke.length - 1} onClick={(e) => { e.stopPropagation(); verschiebe(i, i + 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[11px] p-0 cursor-pointer">↓</button>
-          <button type="button" aria-label="entfernen" onClick={(e) => { e.stopPropagation(); entferne(b.id); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[11px] p-0 cursor-pointer">×</button>
+          <button type="button" aria-label="nach oben" disabled={i === 0} onClick={(e) => { e.stopPropagation(); verschiebe(i, i - 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[0.6875rem] p-0 cursor-pointer">↑</button>
+          <button type="button" aria-label="nach unten" disabled={i === bloecke.length - 1} onClick={(e) => { e.stopPropagation(); verschiebe(i, i + 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[0.6875rem] p-0 cursor-pointer">↓</button>
+          <button type="button" aria-label="entfernen" onClick={(e) => { e.stopPropagation(); entferne(b.id); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[0.6875rem] p-0 cursor-pointer">×</button>
         </span>
       </> : null}
       <div style={{ fontSize: SCHRIFT_PX[b.optionen?.schrift ?? "normal"] }}><BlockAnsicht b={b} tabellen={a.tabellen} /></div>
@@ -411,17 +411,17 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
       </Dialog>
       {fehlerListe.length ? <Meldung art="fehler"><ul className="m-0 pl-4" data-testid="vorlage-fehler">{fehlerListe.map((f) => <li key={f}>{f}</li>)}</ul></Meldung> : null}
 
-      <div className="stapel grid grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)_300px] gap-5 items-start">
+      <div className="stapel grid grid-cols-1 xl:grid-cols-[13.75rem_minmax(0,1fr)_18.75rem] gap-5 items-start">
         <aside className="flex flex-col gap-3.5 min-w-0">
           <Karte className="p-2.5 flex flex-col gap-0.5" data-testid="aufbau">
             <span className="lbl px-1.5 pb-1.5 pt-1">Aufbau</span>
             {bloecke.map((b, i) => (
               <div key={b.id} {...sort.zeile(i)} className={cx("flex items-center rounded-md", sort.ueber === i && "outline outline-2 outline-akzent")}>
                 <button type="button" aria-current={b.id === auswahl ? "true" : undefined} onClick={() => setAuswahl(b.id)}
-                  className={cx("flex-1 flex justify-between items-center gap-2 px-2.5 py-[7px] border-0 rounded-md text-[13.5px] text-left cursor-pointer",
+                  className={cx("flex-1 min-w-0 flex justify-between items-center gap-2 px-2.5 py-[0.4375rem] border-0 rounded-md text-[0.8438rem] text-left cursor-pointer",
                     b.id === auswahl ? "bg-akzent-weich text-akzent-text font-medium" : "bg-transparent hover:bg-fein")}>
                   <span className="truncate">{b.bezeichnung || TYPNAME[b.typ]}</span>
-                  <span className="text-[11.5px] gedaempft shrink-0">{TYPNAME[b.typ]}</span>
+                  <span className="text-[0.7188rem] gedaempft shrink-0">{TYPNAME[b.typ]}</span>
                 </button>
                 <span tabIndex={0} {...sort.griff(i, b.bezeichnung || TYPNAME[b.typ], `vorlage-${art}`)} className="px-1 cursor-grab gedaempft"><Icon name="griff" /></span>
               </div>
@@ -432,7 +432,7 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
             <div className="flex flex-wrap gap-1.5">
               {BAUSTEINE.filter((t) => a.bausteine.some((x) => x.typ === t)).map((t) => (
                 <button key={t} type="button" disabled={einmal(t)} onClick={() => hinzufuegen(t)}
-                  className="px-2.5 py-1.5 border border-dashed border-rand rounded-lg bg-flaeche text-[13px] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                  className="px-2.5 py-1.5 border border-dashed border-rand rounded-lg bg-flaeche text-[0.8125rem] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                   + {TYPNAME[t]}
                 </button>
               ))}
@@ -441,7 +441,7 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
           </Karte>
           <Karte className="p-3.5 flex flex-col gap-1.5" data-testid="versionen">
             <span className="lbl">Versionen</span>
-            <ul className="m-0 p-0 list-none flex flex-col gap-1 text-[13px]">
+            <ul className="m-0 p-0 list-none flex flex-col gap-1 text-[0.8125rem]">
               {a.entwurf ? <li><strong>Entwurf</strong> · {datum(a.entwurf.geaendert_am)}{a.entwurf.geaendert_von ? ` · ${a.entwurf.geaendert_von}` : ""}</li> : null}
               {a.versionen.map((v) => (
                 <li key={v.id} className="flex items-center justify-between gap-2">
@@ -457,7 +457,7 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
         </aside>
 
         <div className="py-6 bg-[#E6E5EE] rounded-xl overflow-auto min-w-0" data-testid="vorlage-seite">
-          <div className="w-[560px] min-h-[792px] mx-auto px-[38px] py-[34px] bg-white text-[#1a1a1a] shadow-md flex flex-col gap-2.5">
+          <div className="w-[35rem] min-h-[49.5rem] mx-auto px-[2.375rem] py-[2.125rem] bg-white text-[#1a1a1a] shadow-md flex flex-col gap-2.5">
             {gruppen.map((g) => g.length === 1 ? rahmen(bloecke[g[0]], g[0]) : (
               <div key={`paar-${bloecke[g[0]].id}`} className="flex justify-between items-start" data-testid="nebeneinander">
                 {g.map((i, j) => <div key={bloecke[i].id} style={{ width: `${breitenFuer(g.map((x) => bloecke[x]))[j]}%` }}>{rahmen(bloecke[i], i)}</div>)}
@@ -474,12 +474,12 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
               {a.felder.map((f) => (
                 <button key={f.name} type="button" title={f.beschreibung} onMouseDown={(e) => e.preventDefault()}
                   onClick={() => fokus.current?.setze(f.name)}
-                  className="px-1.5 py-0.5 rounded bg-fein border-0 text-[12px] font-mono text-text2 cursor-pointer hover:bg-akzent-weich">{f.name}</button>
+                  className="px-1.5 py-0.5 rounded bg-fein border-0 text-[0.75rem] font-mono text-text2 cursor-pointer hover:bg-akzent-weich max-w-full text-left [overflow-wrap:anywhere]">{f.name}</button>
               ))}
             </div>
             <span className="text-xs gedaempft">Nur diese Felder sind erlaubt. Tippfehler in Platzhaltern sind damit ausgeschlossen. Zuerst in ein Textfeld des Blocks klicken.</span>
           </Karte>
-          <div className="flex gap-2 p-3 rounded-lg bg-fein text-[12.5px] leading-normal text-text2">
+          <div className="flex gap-2 p-3 rounded-lg bg-fein text-[0.7812rem] leading-normal text-text2">
             <Icon name="info" /><span>Neue Version gilt ab Veröffentlichung. Bereits freigegebene Pläne behalten ihr PDF unverändert.</span>
           </div>
           {entwurf.data.ist_entwurf ? <Knopf variante="geist" onClick={() => setVerwerfen(true)}>Entwurf verwerfen</Knopf> : null}
@@ -526,8 +526,8 @@ function FeldText({ label, wert, onWert, fokus, mehrzeilig }: {
   return (
     <Feld label={label}>
       {(p) => mehrzeilig
-        ? <Textfeld {...p} ref={ref} rows={4} value={wert} onFocus={merken} onChange={(e) => onWert(e.target.value)} className="font-mono text-[13px]" />
-        : <Eingabe {...p} ref={ref} value={wert} onFocus={merken} onChange={(e) => onWert(e.target.value)} className="font-mono text-[13px]" />}
+        ? <Textfeld {...p} ref={ref} rows={4} value={wert} onFocus={merken} onChange={(e) => onWert(e.target.value)} className="font-mono text-[0.8125rem]" />
+        : <Eingabe {...p} ref={ref} value={wert} onFocus={merken} onChange={(e) => onWert(e.target.value)} className="font-mono text-[0.8125rem]" />}
     </Feld>
   );
 }
@@ -546,7 +546,7 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
     <Karte className="p-4 flex flex-col gap-3" data-testid="block-eigenschaften">
       <div className="flex justify-between items-center"><span className="lbl">Block</span><Chip art="akzent">{TYPNAME[b.typ]}</Chip></div>
       <Feld label="Bezeichnung">{(p) => <Eingabe {...p} value={b.bezeichnung ?? ""} onChange={(e) => aendere({ bezeichnung: e.target.value })} />}</Feld>
-      <span className="text-[12.5px] gedaempft leading-normal">{HINWEIS[b.typ]}</span>
+      <span className="text-[0.7812rem] gedaempft leading-normal">{HINWEIS[b.typ]}</span>
 
       {b.typ === "titel" ? <>
         <FeldText label="Text" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} />
@@ -554,20 +554,20 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
           <Feld label="Zusatz">{(p) => <Eingabe {...p} value={b.zusatz_label ?? ""} onChange={(e) => aendere({ zusatz_label: e.target.value })} />}</Feld>
           <FeldText label="Wert" wert={b.zusatz ?? ""} onWert={(w) => aendere({ zusatz: w })} fokus={fokus} />
         </div>
-        <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!b.neben_logo} onChange={(e) => aendere({ neben_logo: e.target.checked })} />Rechts neben dem Logo</label>
+        <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.neben_logo} onChange={(e) => aendere({ neben_logo: e.target.checked })} />Rechts neben dem Logo</label>
       </> : null}
       {b.typ === "text" || b.typ === "fusszeile" ? <FeldText label="Text" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} mehrzeilig /> : null}
       {b.typ === "fusszeile" ? <FeldText label="Rechts" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} /> : null}
       {b.typ === "zweispaltig" ? <>
         <FeldText label="Links" wert={b.links ?? ""} onWert={(w) => aendere({ links: w })} fokus={fokus} mehrzeilig />
         <FeldText label="Rechts" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} mehrzeilig />
-        <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!b.rechts_klein} onChange={(e) => aendere({ rechts_klein: e.target.checked })} />Rechte Spalte kleiner</label>
+        <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.rechts_klein} onChange={(e) => aendere({ rechts_klein: e.target.checked })} />Rechte Spalte kleiner</label>
       </> : null}
       {b.typ === "briefkopf" ? <>
-        <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={b.absender !== false} onChange={(e) => aendere({ absender: e.target.checked })} />Absender neben dem Logo</label>
-        <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!b.falzmarken} onChange={(e) => aendere({ falzmarken: e.target.checked })} />Falzmarken am linken Rand</label>
-        <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={b.mit_linie !== false} onChange={(e) => aendere({ mit_linie: e.target.checked })} />Linie unter dem Logo</label>
-        {b.mit_linie !== false ? <label className="flex items-center gap-2 text-[13.5px]">Linienfarbe
+        <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={b.absender !== false} onChange={(e) => aendere({ absender: e.target.checked })} />Absender neben dem Logo</label>
+        <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.falzmarken} onChange={(e) => aendere({ falzmarken: e.target.checked })} />Falzmarken am linken Rand</label>
+        <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={b.mit_linie !== false} onChange={(e) => aendere({ mit_linie: e.target.checked })} />Linie unter dem Logo</label>
+        {b.mit_linie !== false ? <label className="flex items-center gap-2 text-[0.8438rem]">Linienfarbe
           <input type="color" aria-label="Linienfarbe" value={(b.linienfarbe ?? "#251F53").toLowerCase()} onChange={(e) => aendere({ linienfarbe: e.target.value.toUpperCase() })} /></label> : null}
       </> : null}
       {b.typ === "kopfkarte" ? <>
@@ -580,7 +580,7 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
           <option value="paare">Bezeichnung und Wert, auch nebeneinander</option>
           <option value="befund">Wie Laborbefund (Menge rechtsbündig, Einheit eigene Spalte)</option></Auswahl>}</Feld>
         {b.darstellung === "befund"
-          ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!b.spaltenkoepfe} onChange={(e) => aendere({ spaltenkoepfe: e.target.checked })} />Spaltenköpfe (Bestandteil, Menge, Einheit)</label>
+          ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.spaltenkoepfe} onChange={(e) => aendere({ spaltenkoepfe: e.target.checked })} />Spaltenköpfe (Bestandteil, Menge, Einheit)</label>
           : <Feld label="Spalten">{(p) => <Auswahl {...p} value={b.spalten ?? 1} onChange={(e) => aendere({ spalten: Number(e.target.value) })}>
             {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}</Auswahl>}</Feld>}
       </> : null}
@@ -596,9 +596,9 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
               <FeldWert wert={e.wert} onWert={(w) => setzeEintrag(i, { wert: w })} fokus={fokus} nummer={i + 1} />
               <span className="flex flex-col">
                 <button type="button" aria-label={`Feld ${i + 1} nach oben`} disabled={i === 0} onClick={() => aendere({ felder: verschiebe(eintraege, i, i - 1) })}
-                  className="h-[15px] w-5 p-0 border-0 bg-transparent text-[11px] leading-none cursor-pointer gedaempft disabled:opacity-30 disabled:cursor-default">▲</button>
+                  className="h-[0.9375rem] w-5 p-0 border-0 bg-transparent text-[0.6875rem] leading-none cursor-pointer gedaempft disabled:opacity-30 disabled:cursor-default">▲</button>
                 <button type="button" aria-label={`Feld ${i + 1} nach unten`} disabled={i === eintraege.length - 1} onClick={() => aendere({ felder: verschiebe(eintraege, i, i + 1) })}
-                  className="h-[15px] w-5 p-0 border-0 bg-transparent text-[11px] leading-none cursor-pointer gedaempft disabled:opacity-30 disabled:cursor-default">▼</button>
+                  className="h-[0.9375rem] w-5 p-0 border-0 bg-transparent text-[0.6875rem] leading-none cursor-pointer gedaempft disabled:opacity-30 disabled:cursor-default">▼</button>
               </span>
               <Knopf klein variante="geist" icon="x" aria-label={`Feld ${i + 1} entfernen`} onClick={() => aendere({ felder: eintraege.filter((_, j) => j !== i) })} />
             </div>
@@ -621,21 +621,21 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
             <Auswahl aria-label="Schriftgröße" value={o.schrift ?? "normal"} onChange={(e) => aendereOptionen({ schrift: e.target.value as Optionen["schrift"] })}>
               <option value="klein">Klein</option><option value="normal">Normal</option><option value="gross">Groß</option>
             </Auswahl>
-            <Knopf aria-label="Fett" aria-pressed={!!o.fett} className={cx("w-[34px] px-0 justify-center font-bold", o.fett && "bg-akzent-weich")} onClick={() => aendereOptionen({ fett: !o.fett })}>B</Knopf>
-            <Knopf aria-label="Kursiv" aria-pressed={!!o.kursiv} className={cx("w-[34px] px-0 justify-center italic", o.kursiv && "bg-akzent-weich")} onClick={() => aendereOptionen({ kursiv: !o.kursiv })}>I</Knopf>
+            <Knopf aria-label="Fett" aria-pressed={!!o.fett} className={cx("w-[2.125rem] px-0 justify-center font-bold", o.fett && "bg-akzent-weich")} onClick={() => aendereOptionen({ fett: !o.fett })}>B</Knopf>
+            <Knopf aria-label="Kursiv" aria-pressed={!!o.kursiv} className={cx("w-[2.125rem] px-0 justify-center italic", o.kursiv && "bg-akzent-weich")} onClick={() => aendereOptionen({ kursiv: !o.kursiv })}>I</Knopf>
           </div>
         </div>
         {b.typ === "titel" && b.neben_logo
-          ? <span className="text-[12.5px] gedaempft">Ausrichtung: steht rechts neben dem Logo.</span>
+          ? <span className="text-[0.7812rem] gedaempft">Ausrichtung: steht rechts neben dem Logo.</span>
           : <div className="flex flex-col gap-2"><span className="text-sm font-medium">Ausrichtung</span>
             <Segmente label="Ausrichtung" wert={o.ausrichtung ?? "links"} onWahl={(w) => aendereOptionen({ ausrichtung: w })}
               werte={[{ wert: "links", text: "Links" }, { wert: "mitte", text: "Mitte" }, { wert: "rechts", text: "Rechts" }]} />
           </div>}
       </> : null}
-      {textartig && b.typ !== "fusszeile" && b.typ !== "titel" ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.ueberschrift} onChange={(e) => aendereOptionen({ ueberschrift: e.target.checked })} />Bezeichnung als Überschrift drucken</label> : null}
-      {["text", "datenfelder", "tabelle"].includes(b.typ) ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.ausblenden_wenn_leer} onChange={(e) => aendereOptionen({ ausblenden_wenn_leer: e.target.checked })} />Ausblenden, wenn leer</label> : null}
-      {b.typ !== "fusszeile" && b.typ !== "seitenumbruch" ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.nicht_teilen} onChange={(e) => aendereOptionen({ nicht_teilen: e.target.checked })} />Nicht über Seitenumbruch teilen</label> : null}
-      {textartig && b.typ !== "fusszeile" ? <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" checked={!!o.linie_oben} onChange={(e) => aendereOptionen({ linie_oben: e.target.checked })} />Linie darüber</label> : null}
+      {textartig && b.typ !== "fusszeile" && b.typ !== "titel" ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!o.ueberschrift} onChange={(e) => aendereOptionen({ ueberschrift: e.target.checked })} />Bezeichnung als Überschrift drucken</label> : null}
+      {["text", "datenfelder", "tabelle"].includes(b.typ) ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!o.ausblenden_wenn_leer} onChange={(e) => aendereOptionen({ ausblenden_wenn_leer: e.target.checked })} />Ausblenden, wenn leer</label> : null}
+      {b.typ !== "fusszeile" && b.typ !== "seitenumbruch" ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!o.nicht_teilen} onChange={(e) => aendereOptionen({ nicht_teilen: e.target.checked })} />Nicht über Seitenumbruch teilen</label> : null}
+      {textartig && b.typ !== "fusszeile" ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!o.linie_oben} onChange={(e) => aendereOptionen({ linie_oben: e.target.checked })} />Linie darüber</label> : null}
       {NEBENEINANDER.includes(b.typ) ? (
         <Feld label="Neben dem vorherigen Block">{(p) => <Auswahl {...p} value={o.neben_vorherigem ?? ""} onChange={(e) => aendereOptionen({ neben_vorherigem: (e.target.value || undefined) as Breite | undefined })}>
           <option value="">nein, darunter</option>
@@ -650,7 +650,7 @@ function FeldWert({ wert, onWert, fokus, nummer }: { wert: string; onWert: (w: s
   const aktuellerWert = useRef(onWert);
   aktuellerWert.current = onWert;
   return (
-    <Eingabe ref={ref} aria-label={`Wert ${nummer}`} value={wert} className="font-mono text-[12.5px]" onChange={(e) => onWert(e.target.value)}
+    <Eingabe ref={ref} aria-label={`Wert ${nummer}`} value={wert} className="font-mono text-[0.7812rem]" onChange={(e) => onWert(e.target.value)}
       onFocus={() => {
         fokus.current = {
           setze: (feld) => {

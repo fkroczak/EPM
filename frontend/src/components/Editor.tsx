@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import type { ComponentType } from "react";
+import { rem } from "@/lib/masse";
 import { cx } from "./ui/basis";
 
 export type EditorProps = {
@@ -32,7 +33,7 @@ function Platzhalter({ werkzeuge = true, hoehe = 120, className }: EditorProps) 
   return (
     <div className={cx("flex flex-col gap-2", className)} aria-busy="true">
       {werkzeuge ? <div className="h-8" /> : null}
-      <div className="inp h-auto py-2"><div style={{ minHeight: hoehe }} /></div>
+      <div className="inp h-auto py-2"><div style={{ minHeight: rem(hoehe) }} /></div>
     </div>
   );
 }

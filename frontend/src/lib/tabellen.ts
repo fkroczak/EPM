@@ -5,7 +5,7 @@
  * ``data-label`` an die Zelle; die erste beschriftete Zelle einer Zeile wird zum Titel der Zeile (``data-titel``).
  * Tabellen mit ``tabelle-fest`` bleiben Tabellen (sie scrollen in ihrer Karte).
  */
-const TELEFON = "(max-width: 767.98px)";
+const TELEFON = "(max-width: 47.99em)"; // wie index.css (47.99rem): bezogen auf die Schriftgröße des Browsers
 
 /** Überschrift je Spalte; bei mehrzeiligem Kopf die unterste Zelle, die die Spalte abdeckt (rowSpan und colSpan) */
 function ueberschriften(tabelle: HTMLTableElement): string[] {

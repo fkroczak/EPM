@@ -52,7 +52,7 @@ function Messung({ label, prozent, text }: { label: string; prozent: number | nu
 
 function Feld3({ titel, wert, unter }: { titel: string; wert: ReactNode; unter?: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 px-3.5 py-3 border border-fein rounded-[10px] min-w-0">
+    <div className="flex flex-col gap-1 px-3.5 py-3 border border-fein rounded-[0.625rem] min-w-0">
       <span className="text-[0.8125rem] gedaempft">{titel}</span>
       <span className="text-lg font-semibold leading-tight">{wert}</span>
       {unter}

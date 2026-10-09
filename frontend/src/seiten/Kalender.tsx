@@ -206,7 +206,7 @@ function EintragDialog({ e, heute, onZu, onTermin, onAendern }: {
         {f && darf ? <Knopf variante="pri" icon="plus" onClick={() => onTermin(f.patient, f.name, f.faellig_am < heute ? heute : f.faellig_am)}>
           Termin anlegen</Knopf> : null}
       </>}>
-      <dl className="m-0 grid grid-cols-[130px_1fr] gap-y-1.5 text-sm" data-testid="eintrag-details">
+      <dl className="m-0 grid grid-cols-[8.125rem_1fr] gap-y-1.5 text-sm" data-testid="eintrag-details">
         {t ? (
           <>
             <dt className="gedaempft">Art</dt><dd className="m-0">{TERMINARTEN[t.art]}</dd>
@@ -297,7 +297,7 @@ function Woche({ von, heute, tage, feiertage, onWahl, onNeu }: {
         const eintraege = tage.get(d) ?? [];
         return (
           <section key={d} data-testid={`tag-${d}`} aria-label={langerTag(d)}
-            className={cx("flex flex-col gap-1 min-w-0 rounded-lg border border-rand p-1.5 min-h-[240px]", d === heute ? "bg-akzent-weich/40" : "bg-flaeche")}>
+            className={cx("flex flex-col gap-1 min-w-0 rounded-lg border border-rand p-1.5 min-h-[15rem]", d === heute ? "bg-akzent-weich/40" : "bg-flaeche")}>
             <div className="flex items-center gap-1.5">
               <span className={cx("font-semibold text-sm", d === heute && "text-akzent-text")}>{WOCHENTAGE[(tag(d).getUTCDay() + 6) % 7]} {kurz(d)}</span>
               {onNeu ? <button type="button" aria-label={`Termin am ${datum(d)} anlegen`} title="Termin anlegen" className="ml-auto btn geist icon !h-6 !w-6"
@@ -320,12 +320,12 @@ function Liste({ tage, feiertage, heute, onWahl }: {
   return (
     <div className="flex flex-col" data-testid="kalender-liste">
       {tage.map(([d, eintraege]) => (
-        <section key={d} data-testid={`tag-${d}`} className="grid grid-cols-1 sm:grid-cols-[200px_minmax(0,1fr)] gap-x-3 gap-y-1.5 py-2 border-b border-rand last:border-b-0">
+        <section key={d} data-testid={`tag-${d}`} className="grid grid-cols-1 sm:grid-cols-[12.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 py-2 border-b border-rand last:border-b-0">
           <div className="flex flex-col">
             <span className={cx("font-semibold text-sm", d === heute && "text-akzent-text")}>{langerTag(d)}</span>
             {feiertage.get(d) ? <span className="text-xs text-fehler">{feiertage.get(d)}</span> : null}
           </div>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(260px,100%),1fr))] gap-1.5">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(16.25rem,100%),1fr))] gap-1.5">
             {eintraege.map((e) => <EintragKnopf key={e.schluessel} e={e} heute={heute} onWahl={onWahl} voll />)}
           </div>
         </section>
@@ -362,7 +362,7 @@ function Anzeigen({ filter, onFilter, erledigte, onErledigte }: {
         <span aria-hidden="true">▾</span>
       </button>
       {offen ? (
-        <div role="group" aria-label="Was anzeigen" className="card absolute right-0 top-[calc(100%+6px)] z-40 p-3 w-[250px] flex flex-col gap-1.5"
+        <div role="group" aria-label="Was anzeigen" className="card absolute right-0 top-[calc(100%+0.375rem)] z-40 p-3 w-[15.625rem] flex flex-col gap-1.5"
           data-testid="anzeigen-auswahl">
           <span className="lbl text-[0.75rem]">Anzeigen</span>
           {FILTER.map((f) => (
@@ -581,7 +581,7 @@ export function Kalender() {
               const an = d === gewaehlt;
               return (
                 <button key={d} type="button" aria-pressed={an} data-testid={`tag-${d}`} onClick={() => tagWaehlen(d)} title={feiertage.get(d)}
-                  className={cx("flex flex-col items-center gap-0.5 rounded-[10px] border-0 py-1.5 cursor-pointer",
+                  className={cx("flex flex-col items-center gap-0.5 rounded-[0.625rem] border-0 py-1.5 cursor-pointer",
                     an ? "bg-akzent text-auf-akzent" : d === heute ? "bg-akzent-weich text-akzent-text" : "bg-transparent text-tinte",
                     feiertage.get(d) && !an && "text-fehler")}>
                   <span className="text-xs">{WOCHENTAGE[i]}</span>

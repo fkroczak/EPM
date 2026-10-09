@@ -54,7 +54,7 @@ function Spalten({ stand, speichern, laeuft }: { stand: Zuordnungsstand; speiche
             <KartenKopf titel={`${t.titel} → ${t.ziel}`}
               unter={t.tabelle ? `${zahl(t.zeilen)} Zeilen in der Tabelle „${t.tabelle}“` : t.art === "ohne" ? "bewusst nicht vorhanden" : "im Dump nicht gefunden"}
               rechts={
-                <Auswahl aria-label={`Tabelle im Dump für ${t.titel}`} className="w-[240px]"
+                <Auswahl aria-label={`Tabelle im Dump für ${t.titel}`} className="w-[15rem]"
                   value={t.art === "ohne" ? "__ohne" : t.tabelle ?? ""}
                   onChange={(e) => speichern({ bereich: "tabellen", aenderungen: { [t.name]: e.target.value === "__ohne" ? "" : e.target.value || null } })}>
                   {t.tabelle ? null : <option value="">— bitte zuordnen —</option>}
@@ -63,7 +63,7 @@ function Spalten({ stand, speichern, laeuft }: { stand: Zuordnungsstand; speiche
                 </Auswahl>} />
             {t.tabelle ? (
               <table className="tabelle">
-                <thead><tr><th className="th">Angabe im EPM</th><th className="th w-[260px]">Spalte im Dump</th><th className="th w-[130px]" /><th className="th">Hinweis</th></tr></thead>
+                <thead><tr><th className="th">Angabe im EPM</th><th className="th w-[16.25rem]">Spalte im Dump</th><th className="th w-[8.125rem]" /><th className="th">Hinweis</th></tr></thead>
                 <tbody>
                   {t.felder.map((f) => (
                     <tr key={f.name}>
@@ -141,7 +141,7 @@ function BenutzerTeil({ stand, bestand, rollen, speichern }: { stand: Zuordnungs
         unter="Namen aus der Benutzertabelle und aus „bearbeitet von“. Konten entstehen ohne Kennwort – danach unter Benutzer ein Einmal-Kennwort erzeugen. Historische Benutzer können sich nie anmelden; sie stehen nur als Bearbeiter an alten Einträgen." />
       {stand.benutzer.length === 0 ? <Leer>Im Dump kommen keine Benutzer vor.</Leer> : (
         <table className="tabelle">
-          <thead><tr><th className="th">Im Altsystem</th><th className="th w-[90px]">Einträge</th><th className="th w-[250px]">Im EPM</th><th className="th">Angaben</th><th className="th w-[150px]" /></tr></thead>
+          <thead><tr><th className="th">Im Altsystem</th><th className="th w-[5.625rem]">Einträge</th><th className="th w-[15.625rem]">Im EPM</th><th className="th">Angaben</th><th className="th w-[9.375rem]" /></tr></thead>
           <tbody>
             {stand.benutzer.map((b) => {
               const w = b.wirksam;
@@ -179,7 +179,7 @@ function BenutzerTeil({ stand, bestand, rollen, speichern }: { stand: Zuordnungs
                         </div>
                       ) : null}
                       {w.art === "konto" ? (
-                        <Auswahl aria-label={`Rolle für ${b.name}`} value={w.rolle} className="w-[200px]" onChange={(e) => setze(b, { ...w, rolle: e.target.value })}>
+                        <Auswahl aria-label={`Rolle für ${b.name}`} value={w.rolle} className="w-[12.5rem]" onChange={(e) => setze(b, { ...w, rolle: e.target.value })}>
                           {rollen.includes(w.rolle) ? null : <option value="">— Rolle wählen —</option>}
                           {rollen.map((r) => <option key={r} value={r}>{ROLLEN[r] ?? r}</option>)}
                         </Auswahl>
@@ -214,7 +214,7 @@ function VersorgerTeil({ stand, bestand, speichern }: { stand: Zuordnungsstand; 
         unter="Im Altsystem ist jede Zeile eine Firma mit einer Person. Im EPM wird daraus ein Versorger mit Ansprechpartnern: gleiche Firma = ein Versorger." />
       {stand.versorger.length === 0 ? <Leer>Im Dump kommen keine Versorger vor.</Leer> : (
         <table className="tabelle">
-          <thead><tr><th className="th w-[50px]">Nr.</th><th className="th">Im Altsystem</th><th className="th w-[90px]">Patienten</th><th className="th w-[230px]">Im EPM</th><th className="th">Versorger · Ansprechpartner</th><th className="th w-[150px]" /></tr></thead>
+          <thead><tr><th className="th w-[3.125rem]">Nr.</th><th className="th">Im Altsystem</th><th className="th w-[5.625rem]">Patienten</th><th className="th w-[14.375rem]">Im EPM</th><th className="th">Versorger · Ansprechpartner</th><th className="th w-[9.375rem]" /></tr></thead>
           <tbody>
             {stand.versorger.map((v) => {
               const w = v.wirksam;
@@ -286,7 +286,7 @@ function WerteTeil({ stand, bestand, speichern }: { stand: Zuordnungsstand; best
       <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="zuordnung-katheter">
         <KartenKopf titel="Katheter" unter="Die Werte des Altsystems werden Einträge der Auswahlliste „Katheter“ (Vorlagen › Auswahllisten)." />
         <table className="tabelle">
-          <thead><tr><th className="th">Im Altsystem</th><th className="th w-[90px]">Patienten</th><th className="th w-[300px]">Im EPM</th><th className="th" /><th className="th w-[150px]" /></tr></thead>
+          <thead><tr><th className="th">Im Altsystem</th><th className="th w-[5.625rem]">Patienten</th><th className="th w-[18.75rem]">Im EPM</th><th className="th" /><th className="th w-[9.375rem]" /></tr></thead>
           <tbody>
             {stand.werte.katheter.map((k) => {
               const w = k.wirksam;
@@ -326,7 +326,7 @@ function WerteTeil({ stand, bestand, speichern }: { stand: Zuordnungsstand; best
         <Karte key={feld} className="px-5 py-4 flex flex-col gap-3" data-testid={`zuordnung-${feld}`}>
           <KartenKopf titel={FESTE_WERTE[feld].titel} unter={FESTE_WERTE[feld].unter} />
           <table className="tabelle">
-            <thead><tr><th className="th">Im Altsystem</th><th className="th w-[90px]">Patienten</th><th className="th w-[300px]">Im EPM</th><th className="th w-[150px]" /></tr></thead>
+            <thead><tr><th className="th">Im Altsystem</th><th className="th w-[5.625rem]">Patienten</th><th className="th w-[18.75rem]">Im EPM</th><th className="th w-[9.375rem]" /></tr></thead>
             <tbody>
               {stand.werte[feld].map((z) => (
                 <tr key={z.schluessel} data-testid={`${feld}-${z.schluessel || "leer"}`}>
@@ -430,7 +430,7 @@ function PraeparateTeil({ stand, bestand, kategorien, speichern }: { stand: Zuor
             ? "Ein Präparat der Kategorie „Katheterschutz“ wird der Katheterschutz des Plans; alles andere steht unter „Weitere Bestandteile“ – mit dem Wortlaut des Altsystems."
             : feld === "vitamine" ? "„A | B“ im Altsystem = mehrere Vitamine am Plan." : undefined} />
           <table className="tabelle">
-            <thead><tr><th className="th">Im Altsystem</th><th className="th w-[70px]">Pläne</th><th className="th w-[320px]">Im EPM</th><th className="th" /><th className="th w-[150px]" /></tr></thead>
+            <thead><tr><th className="th">Im Altsystem</th><th className="th w-[4.375rem]">Pläne</th><th className="th w-[20rem]">Im EPM</th><th className="th" /><th className="th w-[9.375rem]" /></tr></thead>
             <tbody>{f.zeilen.map((z) => <PraeparatZeile key={z.schluessel} feld={feld} f={f} z={z} bestand={bestand} kategorien={kategorien} speichern={speichern} />)}</tbody>
           </table>
         </Karte>
@@ -449,7 +449,7 @@ function GeloeschteTeil({ stand, anlaesse, speichern }: { stand: Zuordnungsstand
       <KartenKopf titel={`Im Altsystem gelöschte Patienten (${stand.geloeschte.length})`}
         unter="Standard: nicht übernehmen – mit allen ihren Gewichten, Kontakten und Plänen. Oder als abgeschlossene Akte übernehmen: Dann läuft die Aufbewahrungsfrist ab dem Abschlussdatum." />
       <div className="flex items-end gap-2 flex-wrap">
-        <Auswahl aria-label="Anlass für alle" className="w-[240px]" value={alle} onChange={(e) => setAlle(e.target.value)}>
+        <Auswahl aria-label="Anlass für alle" className="w-[15rem]" value={alle} onChange={(e) => setAlle(e.target.value)}>
           <option value="">Anlass für alle wählen …</option>
           {Object.entries(anlaesse).map(([k, name]) => <option key={k} value={k}>{name}</option>)}
         </Auswahl>
@@ -460,8 +460,8 @@ function GeloeschteTeil({ stand, anlaesse, speichern }: { stand: Zuordnungsstand
           Alle nicht übernehmen</Knopf>
       </div>
       <table className="tabelle">
-        <thead><tr><th className="th w-[60px]">Nr.</th><th className="th">Name</th><th className="th">geboren</th><th className="th">gelöscht am</th><th className="th">Einträge</th>
-          <th className="th w-[250px]">Entscheidung</th><th className="th">Anlass · Abschlussdatum</th></tr></thead>
+        <thead><tr><th className="th w-[3.75rem]">Nr.</th><th className="th">Name</th><th className="th">geboren</th><th className="th">gelöscht am</th><th className="th">Einträge</th>
+          <th className="th w-[15.625rem]">Entscheidung</th><th className="th">Anlass · Abschlussdatum</th></tr></thead>
         <tbody>
           {stand.geloeschte.map((g) => {
             const w = g.wirksam;
@@ -562,7 +562,7 @@ function AuffaelligZeile({ a, speichern, gewaehlt, onWaehlen }: {
   return (
     <tr data-testid={`auffaellig-${a.schluessel}`}>
       {onWaehlen ? (
-        <td className="td align-top w-[36px]">
+        <td className="td align-top w-[2.25rem]">
           <input type="checkbox" aria-label={`${was} auswählen`} checked={!!gewaehlt} onChange={(e) => onWaehlen(e.target.checked)} />
         </td>
       ) : null}
@@ -683,7 +683,7 @@ function Einzelliste({ liste, speichern }: { liste: Auffaelligkeit[]; speichern:
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-end gap-2 flex-wrap">
-        <Auswahl aria-label="Angabe filtern" className="w-[260px]" value={filter} onChange={(e) => { setFilter(e.target.value); setAnzahl(200); }}>
+        <Auswahl aria-label="Angabe filtern" className="w-[16.25rem]" value={filter} onChange={(e) => { setFilter(e.target.value); setAnzahl(200); }}>
           <option value="">Alle Angaben ({zahl(liste.length)})</option>
           {angaben.map(([k, t]) => <option key={k} value={k}>{t} ({zahl(liste.filter((a) => `${a.tabelle}:${a.feld}` === k).length)})</option>)}
         </Auswahl>
@@ -696,11 +696,11 @@ function Einzelliste({ liste, speichern }: { liste: Auffaelligkeit[]; speichern:
           <span className="font-medium self-center">{zahl(auswahl.size)} ausgewählt:</span>
           {moeglich.length ? (
             <>
-              <Auswahl aria-label="Entscheidung für die Auswahl" className="w-[230px]" value={sammelArt} onChange={(e) => setSammelArt(e.target.value)}>
+              <Auswahl aria-label="Entscheidung für die Auswahl" className="w-[14.375rem]" value={sammelArt} onChange={(e) => setSammelArt(e.target.value)}>
                 <option value="">— Entscheidung wählen —</option>
                 {moeglich.map((m) => <option key={m} value={m}>{ENTSCHEIDUNG[m]}</option>)}
               </Auswahl>
-              {sammelArt === "wert" ? <Eingabe aria-label="Wert für die Auswahl" className="w-[160px]" value={sammelWert} onChange={(e) => setSammelWert(e.target.value)} /> : null}
+              {sammelArt === "wert" ? <Eingabe aria-label="Wert für die Auswahl" className="w-[10rem]" value={sammelWert} onChange={(e) => setSammelWert(e.target.value)} /> : null}
               <Knopf klein disabled={!sammelArt || (sammelArt === "wert" && !sammelWert.trim())}
                 onClick={() => anwenden(sammelArt === "wert" ? { art: "wert", wert: sammelWert.trim() } : { art: sammelArt as Entscheidungsart })}>
                 Für {zahl(auswahl.size)} übernehmen</Knopf>
@@ -711,9 +711,9 @@ function Einzelliste({ liste, speichern }: { liste: Auffaelligkeit[]; speichern:
       ) : null}
       <table className="tabelle">
         <thead><tr>
-          <th className="th w-[36px]"><input type="checkbox" aria-label="Alle sichtbaren auswählen" checked={alleSichtbar}
+          <th className="th w-[2.25rem]"><input type="checkbox" aria-label="Alle sichtbaren auswählen" checked={alleSichtbar}
             onChange={(e) => setAuswahl((alt) => { const neu = new Set(alt); sichtbar.forEach((a) => e.target.checked ? neu.add(a.schluessel) : neu.delete(a.schluessel)); return neu; })} /></th>
-          <th className="th w-[130px]">Zeile</th><th className="th w-[170px]">Angabe</th><th className="th">Befund</th><th className="th w-[320px]">Entscheidung</th><th className="th w-[110px]" />
+          <th className="th w-[8.125rem]">Zeile</th><th className="th w-[10.625rem]">Angabe</th><th className="th">Befund</th><th className="th w-[20rem]">Entscheidung</th><th className="th w-[6.875rem]" />
         </tr></thead>
         <tbody>{sichtbar.map((a) => <AuffaelligZeile key={a.schluessel} a={a} speichern={speichern}
           gewaehlt={auswahl.has(a.schluessel)} onWaehlen={(an) => waehle(a.schluessel, an)} />)}</tbody>
@@ -732,7 +732,7 @@ function GewichteZusammenfassen({ z, speichern }: { z: Zuordnungsstand["zusammen
       <KartenKopf titel="Gewichte zusammenfassen"
         unter="Mehrere Gewichte eines Patienten kurz hintereinander sind im Altsystem meist Korrekturen derselben Messung. Alle Einträge, die höchstens so viele Tage (× 24 Stunden) nach dem ersten Eintrag einer Gruppe erfasst wurden, werden zu einem zusammengefasst; übernommen wird der zuletzt erfasste. Das gilt nach den Entscheidungen unten: Was „nicht übernommen“ wird, verdrängt keinen anderen Wert."
         rechts={
-          <Auswahl aria-label="Gewichte zusammenfassen innerhalb von" className="w-[200px]" value={String(z.tage)}
+          <Auswahl aria-label="Gewichte zusammenfassen innerhalb von" className="w-[12.5rem]" value={String(z.tage)}
             onChange={(e) => speichern({ bereich: "einstellungen", aenderungen: { gewichte_tage: Number(e.target.value) } })}>
             {TAGE.map((t) => <option key={t} value={t}>{t === 0 ? "nicht zusammenfassen" : `innerhalb von ${t} ${t === 1 ? "Tag" : "Tagen"}`}</option>)}
           </Auswahl>} />
@@ -744,7 +744,7 @@ function GewichteZusammenfassen({ z, speichern }: { z: Zuordnungsstand["zusammen
       ) : <span className="text-sm gedaempft">Alle Gewichte werden einzeln übernommen.</span>}
       {auf && z.tage ? (
         <table className="tabelle">
-          <thead><tr><th className="th w-[90px]">Patient</th><th className="th">übernommen</th><th className="th">ersetzt (nicht übernommen)</th></tr></thead>
+          <thead><tr><th className="th w-[5.625rem]">Patient</th><th className="th">übernommen</th><th className="th">ersetzt (nicht übernommen)</th></tr></thead>
           <tbody>
             {z.gruppen.map((g) => (
               <tr key={g.behalten.id}>
@@ -776,8 +776,8 @@ function AuffaelligkeitenTeil({ stand, speichern }: { stand: Zuordnungsstand; sp
               werte={[{ wert: "gruppen", text: "Gruppiert" }, { wert: "einzeln", text: "Einzeln mit Auswahl" }]} />} />
           {ansicht === "gruppen" ? (
             <table className="tabelle">
-              <thead><tr><th className="th w-[170px]">Angabe</th><th className="th w-[110px]">Wert im Dump</th><th className="th">Befund</th>
-                <th className="th w-[320px]">Für alle mit diesem Wert</th><th className="th w-[150px]" /></tr></thead>
+              <thead><tr><th className="th w-[10.625rem]">Angabe</th><th className="th w-[6.875rem]">Wert im Dump</th><th className="th">Befund</th>
+                <th className="th w-[20rem]">Für alle mit diesem Wert</th><th className="th w-[9.375rem]" /></tr></thead>
               <tbody>{gruppen.map((g) => <GruppenZeile key={g.schluessel} g={g} speichern={speichern} />)}</tbody>
             </table>
           ) : <Einzelliste liste={liste} speichern={speichern} />}

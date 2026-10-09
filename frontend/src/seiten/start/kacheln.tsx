@@ -51,7 +51,7 @@ function Person({ name, zu, unter, extra }: { name: ReactNode; zu: string; unter
 }
 
 function Zeile({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("flex justify-between items-center gap-3 py-[9px] border-b border-rand last:border-b-0", className)}>{children}</div>;
+  return <div className={cx("flex justify-between items-center gap-3 py-[0.5625rem] border-b border-rand last:border-b-0", className)}>{children}</div>;
 }
 
 // ---------------------------------------------------------------- Termine und Wiedervorlagen (S03: Wochenstreifen)
@@ -73,13 +73,13 @@ function Wochenstreifen({ woche, tag, onTag }: { woche: Startdaten["woche"]; tag
         return (
           <button key={w.datum} type="button" aria-pressed={an} onClick={() => onTag(an ? null : w.datum)}
             title={w.feiertag ?? undefined} data-testid={`tag-${w.datum}`}
-            className={cx("flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-[10px] border text-left cursor-pointer min-w-0",
+            className={cx("flex flex-col items-start gap-0.5 px-2.5 py-1.5 rounded-[0.625rem] border text-left cursor-pointer min-w-0",
               an ? "border-akzent bg-akzent-weich" : frei ? "border-dashed border-rand bg-grund" : "border-rand bg-flaeche",
               frei && !an && "text-gedaempft")}>
             <span className={cx("text-xs", an || i === 0 ? "text-akzent-text font-semibold" : "gedaempft")}>{WOCHENTAGE[d.getDay()]}{i === 0 ? " · heute" : ""}</span>
             <span className="text-sm font-medium">{d.toLocaleDateString("de-DE", { day: "numeric", month: "short" })}</span>
             <span className="text-[0.78125rem] truncate max-w-full">{w.feiertag ?? (w.anzahl ? `${w.anzahl} ${w.anzahl === 1 ? "Termin" : "Termine"}` : "—")}</span>
-            <span className="flex gap-[3px] h-1.5" aria-label={w.praxistermine ? `${w.praxistermine} Praxistermine` : undefined}>
+            <span className="flex gap-[0.1875rem] h-1.5" aria-label={w.praxistermine ? `${w.praxistermine} Praxistermine` : undefined}>
               {Array.from({ length: Math.min(w.praxistermine, 6) }, (_, j) => <span key={j} className="w-1.5 h-1.5 rounded-full bg-akzent" />)}
             </span>
           </button>
@@ -144,14 +144,14 @@ export function TermineKachel({ daten, breit }: { daten: Startdaten; breit: bool
               <span className="text-text2">· {t.titel}{t.notiz ? ` – ${t.notiz}` : ""}</span></span>
           );
           return breit ? (
-            <div key={t.id} className="grid grid-cols-[28px_128px_168px_minmax(0,1fr)] items-center gap-3 py-[9px] border-b border-rand last:border-b-0">
+            <div key={t.id} className="grid grid-cols-[1.75rem_8rem_10.5rem_minmax(0,1fr)] items-center gap-3 py-[0.5625rem] border-b border-rand last:border-b-0">
               {kaestchen}
               <span className="num text-[0.84375rem] text-text2">{terminZeit(t.faellig_am, t.uhrzeit)}</span>
               <span className="min-w-0 truncate">{terminChip(t)}</span>
               <span className="flex flex-col gap-px min-w-0">{text}{wer}</span>
             </div>
           ) : (
-            <div key={t.id} className="grid grid-cols-[28px_minmax(0,1fr)] items-start gap-2.5 py-[9px] border-b border-rand last:border-b-0">
+            <div key={t.id} className="grid grid-cols-[1.75rem_minmax(0,1fr)] items-start gap-2.5 py-[0.5625rem] border-b border-rand last:border-b-0">
               {kaestchen}
               <span className="flex flex-col gap-1 min-w-0">
                 <span className="flex items-center gap-2 flex-wrap"><span className="num text-[0.8125rem] text-text2">{terminZeit(t.faellig_am, t.uhrzeit)}</span>{terminChip(t)}</span>
@@ -342,7 +342,7 @@ export function PlaeneKachel({ daten }: { daten: Startdaten }) {
             </Zeile>
           ))}
         </div>
-        <Link to="/infusionsplaene?gruppe=alt" className="mt-1.5 flex justify-between items-center px-3 py-2.5 rounded-[10px] bg-grund no-underline text-tinte text-sm">
+        <Link to="/infusionsplaene?gruppe=alt" className="mt-1.5 flex justify-between items-center px-3 py-2.5 rounded-[0.625rem] bg-grund no-underline text-tinte text-sm">
           <span>Älter als {p.grenze_monate} Monate</span><Chip art={p.anzahl_aelter ? "warn" : undefined} className="num" data-testid="plaene-alt">{p.anzahl_aelter}</Chip>
         </Link>
       </KachelInhalt>
@@ -422,7 +422,7 @@ export function AktivKachel({ daten, breit }: { daten: Startdaten; breit: boolea
         <Segmente label="Wer" wert={wer} onWahl={setWer} werte={[{ wert: "alle", text: "Alle" }, { wert: "ich", text: "Von mir" }]} />} />
       <KachelInhalt className="text-[0.84375rem]" testid="zuletzt-eingetragen">
         {liste.length === 0 ? <Leer>{wer === "alle" ? "Noch nichts eingetragen." : "Von dir ist noch nichts eingetragen."}</Leer> : liste.map((z, i) => breit ? (
-          <div key={`${z.bereich}-${z.objekt_id}-${i}`} className="grid grid-cols-[64px_120px_90px_minmax(0,1fr)_minmax(0,160px)] items-center gap-3 py-[7px] border-b border-rand last:border-b-0">
+          <div key={`${z.bereich}-${z.objekt_id}-${i}`} className="grid grid-cols-[4rem_7.5rem_5.625rem_minmax(0,1fr)_minmax(0,10rem)] items-center gap-3 py-[0.4375rem] border-b border-rand last:border-b-0">
             <span className="num gedaempft">{wann(z.zeitpunkt)}</span>
             <span className="truncate">{z.person ?? "—"}</span>
             <span><Chip>{BEREICHE[z.bereich] ?? z.bereich}</Chip></span>
@@ -430,7 +430,7 @@ export function AktivKachel({ daten, breit }: { daten: Startdaten; breit: boolea
             <Link to={`/patienten/${z.patient}`} className="font-medium no-underline truncate">{z.name ?? "Akte"}</Link>
           </div>
         ) : (
-          <div key={`${z.bereich}-${z.objekt_id}-${i}`} className="py-[7px] border-b border-rand last:border-b-0">
+          <div key={`${z.bereich}-${z.objekt_id}-${i}`} className="py-[0.4375rem] border-b border-rand last:border-b-0">
             <span className="num gedaempft">{wann(z.zeitpunkt)}</span> {z.person ?? "—"} · {z.bezeichnung}{" "}
             <Link to={`/patienten/${z.patient}`} className="underline">{z.name?.split(",")[0] ?? "Akte"}</Link>
           </div>

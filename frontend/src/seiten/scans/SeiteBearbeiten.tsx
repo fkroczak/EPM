@@ -88,7 +88,7 @@ export function SeiteBearbeiten({ scan, seite, offen, onOffen }: {
         <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
         <Knopf variante="pri" laedt={speichern.isPending} onClick={() => speichern.mutate()} data-testid="seite-uebernehmen">Übernehmen und neu erkennen</Knopf>
       </>}>
-      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_18.75rem] gap-5 items-start">
         <div className="flex flex-col gap-2 min-w-0">
           {e.ecken === "aus" ? (
             <img src={bildUrl(scan.id, seite, "roh")} alt={`Seite ${seite.nr} (Original)`} className="block w-full h-auto rounded-md border border-rand" />

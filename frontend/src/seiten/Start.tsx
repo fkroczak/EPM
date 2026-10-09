@@ -159,7 +159,7 @@ function Bearbeitungsleiste({ karte, titel, spalten, onGroesse, onAusblenden, gr
     onPointerUp: (e: PointerEvent<HTMLButtonElement>) => void; onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => void };
 }) {
   return (
-    <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 p-1 rounded-[10px] bg-flaeche border border-rand shadow-md"
+    <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 p-1 rounded-[0.625rem] bg-flaeche border border-rand shadow-md"
       data-testid={`leiste-${karte.id}`}>
       <button type="button" className="btn icon klein geist cursor-grab touch-none" data-griff={karte.id}
         aria-label={`${titel} verschieben (Pfeiltasten; Umschalt + Pfeiltasten: Größe)`} title="Ziehen oder mit Pfeiltasten verschieben"
@@ -180,7 +180,7 @@ function AnpassenBanner({ ausgeblendet, onEinblenden, onStandard, onFertig, spal
   ausgeblendet: Karte[]; onEinblenden: (id: KartenId) => void; onStandard: () => void; onFertig: () => void; spalten: number;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 flex-wrap px-[18px] py-3.5 rounded-[14px] bg-akzent-weich text-akzent-text border border-akzent/30"
+    <div className="flex items-start justify-between gap-4 flex-wrap px-[1.125rem] py-3.5 rounded-[0.875rem] bg-akzent-weich text-akzent-text border border-akzent/30"
       data-testid="anpassen">
       <div className="flex flex-col gap-1 max-w-[110ch]">
         <h2 className="m-0 text-[0.9375rem] font-semibold">Startseite anpassen</h2>
@@ -443,7 +443,7 @@ export function Start() {
           );
         })}
         {zug?.art === "groesse" ? (
-          <div aria-hidden="true" className="absolute z-30 rounded-[14px] border-2 border-akzent bg-akzent/5 pointer-events-none flex items-end justify-end p-3"
+          <div aria-hidden="true" className="absolute z-30 rounded-[0.875rem] border-2 border-akzent bg-akzent/5 pointer-events-none flex items-end justify-end p-3"
             style={{ left: zug.links, top: zug.oben, width: zug.breite * zug.zelleB + (zug.breite - 1) * zug.abstand,
               height: zug.hoehe * zug.zelleH + (zug.hoehe - 1) * zug.abstand }}>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-akzent text-auf-akzent text-[0.8125rem] font-medium">

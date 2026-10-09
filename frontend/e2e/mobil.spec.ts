@@ -2,7 +2,7 @@
  *  in die Akte schauen und Notizen erfassen. Geprüft mit der Bildschirmgröße eines Android-Telefons (Touch). */
 import { devices, expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { apiAls, eindeutig, merken, zustand } from "./hilfen";
+import { apiAls, eindeutig, merken, neuesKonto, zustand } from "./hilfen";
 
 const { defaultBrowserType: _browser, ...telefon } = devices["Pixel 7"];
 test.use({ ...telefon, storageState: zustand("mediziner") });
@@ -160,4 +160,29 @@ test.describe("Administration am Telefon", () => {
     await expect(page.locator('td[data-label="Rolle"]').first()).toBeVisible();
     await expect(page.locator("td[data-titel]").first()).toBeVisible();
   });
+});
+
+/** Festlegung 09.10.2026: Maße in rem – „Schriftgröße“ vergrößert die ganze Oberfläche, auch am Telefon passt alles */
+test("Telefon: Schriftgröße „Sehr groß“ vergrößert die ganze Oberfläche, nichts ragt heraus", async ({ browser }) => {
+  const konto = await neuesKonto("mediziner", "Gerda", "Gross");
+  const ctx = await browser.newContext({ ...telefon, storageState: konto.zustand, ignoreHTTPSErrors: true });
+  const page = await ctx.newPage();
+  await page.goto("/design");
+  const leiste = page.getByTestId("mobil-leiste");
+  const vorher = (await leiste.boundingBox())!.height;
+  const knopfVorher = (await page.getByRole("button", { name: "Patient suchen" }).boundingBox())!.width;
+  const gespeichert = page.waitForResponse((r) => r.url().endsWith("/api/auth/ich/") && r.request().method() === "PATCH");
+  await page.getByRole("group", { name: "Schriftgröße" }).getByRole("button", { name: "Sehr groß" }).click();
+  expect((await gespeichert).ok()).toBe(true);
+  await expect(page.locator("html")).toHaveAttribute("data-schrift", "sehrgross");
+  // nicht nur die Schrift: Leiste und Knöpfe wachsen mit (rem statt px)
+  await expect.poll(async () => (await leiste.boundingBox())!.height).toBeGreaterThan(vorher * 1.2);
+  expect((await page.getByRole("button", { name: "Patient suchen" }).boundingBox())!.width).toBeGreaterThan(knopfVorher * 1.2);
+  for (const pfad of ["/", "/patienten", "/kalender", "/infusionsplaene", "/konto", "/hilfe", "/versorger"]) {
+    await page.goto(pfad);
+    await expect(leiste).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await passtInDieBreite(page, `${pfad} (sehr groß)`);
+  }
+  await ctx.close();
 });

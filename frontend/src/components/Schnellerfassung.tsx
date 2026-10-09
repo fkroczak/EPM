@@ -64,10 +64,10 @@ function Kontextkasten({ patientId }: { patientId: number }) {
   const akte = useQuery({ queryKey: ["patient", patientId], queryFn: () => api<Patient>(`patienten/${patientId}/`) });
   const k = akte.data?.kopf;
   if (akte.error) return <Meldung art="fehler">{akte.error.message}</Meldung>;
-  if (!k) return <div className="rounded-[10px] bg-grund border border-fein px-4 py-3.5 text-sm gedaempft">Akte wird geladen …</div>;
+  if (!k) return <div className="rounded-[0.625rem] bg-grund border border-fein px-4 py-3.5 text-sm gedaempft">Akte wird geladen …</div>;
   const t = k.gewichtstrend;
   return (
-    <section aria-label="Aus der Akte" className="rounded-[10px] bg-grund border border-fein px-4 py-3.5 flex flex-col gap-2.5"
+    <section aria-label="Aus der Akte" className="rounded-[0.625rem] bg-grund border border-fein px-4 py-3.5 flex flex-col gap-2.5"
       data-testid="kontextkasten">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2.5">
         <Wert titel="Letzter Kontakt">{k.letzter_kontakt ? <><span className="num">{datum(k.letzter_kontakt)}</span> · {vorZeit(k.letzter_kontakt)}</>
@@ -109,7 +109,7 @@ function GewichtFelder({ patientId, wert, quelle, am, onWert, onQuelle, onAm, fe
   const v = neu && neu !== "ungueltig" && iso && messungen.data ? veraenderung(messungen.data, iso, Number(neu), monate) : null;
   return (
     <>
-      <div className="grid grid-cols-[140px_minmax(0,1fr)_minmax(0,1fr)] gap-3">
+      <div className="grid grid-cols-[8.75rem_minmax(0,1fr)_minmax(0,1fr)] gap-3">
         <Feld label="Gewicht" fehler={fehler.gewicht_kg}>
           {(p) => (
             <span className="relative block">
@@ -311,9 +311,9 @@ export function KontaktDialog({ offen, onOffen, vorgabe, text: textVorgabe }: {
           </>
         )}
 
-        <fieldset className="m-0 border border-rand rounded-[10px] px-4 py-3.5 flex flex-col gap-3" disabled={nurGewichtOffen ? false : !!gespeichert}>
+        <fieldset className="m-0 border border-rand rounded-[0.625rem] px-4 py-3.5 flex flex-col gap-3" disabled={nurGewichtOffen ? false : !!gespeichert}>
           <label className="flex items-center gap-2.5 text-sm font-medium cursor-pointer">
-            <input type="checkbox" className="!w-[18px] !h-[18px]" checked={mitGewicht} disabled={!!gespeichert}
+            <input type="checkbox" className="!w-[1.125rem] !h-[1.125rem]" checked={mitGewicht} disabled={!!gespeichert}
               onChange={(e) => setMitGewicht(e.target.checked)} />Gewicht mit erfassen
           </label>
           {mitGewicht && pid ? (
@@ -324,15 +324,15 @@ export function KontaktDialog({ offen, onOffen, vorgabe, text: textVorgabe }: {
         </fieldset>
 
         {!gespeichert ? (
-          <fieldset className="m-0 border border-rand rounded-[10px] px-4 py-3.5 flex flex-col gap-3">
+          <fieldset className="m-0 border border-rand rounded-[0.625rem] px-4 py-3.5 flex flex-col gap-3">
             <label className="flex items-center gap-2.5 text-sm font-medium cursor-pointer">
-              <input type="checkbox" className="!w-[18px] !h-[18px]" checked={mitTermin} onChange={(e) => setMitTermin(e.target.checked)} />
+              <input type="checkbox" className="!w-[1.125rem] !h-[1.125rem]" checked={mitTermin} onChange={(e) => setMitTermin(e.target.checked)} />
               Wiedervorlage anlegen
             </label>
             {mitTermin ? (
               <>
                 <Segmente label="Art" wert={art} onWahl={setArt} werte={ARTEN} className="self-start" />
-                <div className="grid grid-cols-[140px_110px_minmax(0,1fr)] gap-3">
+                <div className="grid grid-cols-[8.75rem_6.875rem_minmax(0,1fr)] gap-3">
                   <Feld label="Fällig am" fehler={f["wiedervorlage.faellig_am"]}>
                     {(p) => <Eingabe {...p} className="num" value={faellig} onChange={(e) => setFaellig(e.target.value)} />}</Feld>
                   <Feld label="Uhrzeit" fehler={f["wiedervorlage.uhrzeit"]}>
@@ -349,7 +349,7 @@ export function KontaktDialog({ offen, onOffen, vorgabe, text: textVorgabe }: {
                 </div>
                 <div className="flex gap-1.5 flex-wrap">
                   {([[wvTage === 14 ? "in 2 Wochen" : `in ${wvTage} Tagen`, inTagen(wvTage)], ["in 1 Monat", inMonaten(1)], ["in 3 Monaten (Quartal)", inMonaten(3)]] as const).map(([t, d]) => (
-                    <button key={t} type="button" className={cx("chip h-[26px] cursor-pointer border", faellig === d ? "akzent border-akzent" : "border-rand bg-flaeche text-text2")}
+                    <button key={t} type="button" className={cx("chip h-[1.625rem] cursor-pointer border", faellig === d ? "akzent border-akzent" : "border-rand bg-flaeche text-text2")}
                       onClick={() => setFaellig(d)}>{t}</button>
                   ))}
                 </div>

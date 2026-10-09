@@ -50,7 +50,7 @@ function Einheit({ children, einheit }: { children: ReactNode; einheit: string }
 
 function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) {
   return (
-    <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
+    <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5">
       <h2 className="lbl m-0">{titel}</h2>
       {/* Formulare in Stufen (S16): 2 breite Felder je Zeile, ab 1920 px 3, ab 2560 px 4 */}
       <div className="grid grid-cols-2 md:grid-cols-4 fhd:grid-cols-6 qhd:grid-cols-8 gap-x-3 md:gap-x-4 gap-y-3.5 items-start">{children}</div>
@@ -181,7 +181,7 @@ export function PatientNeu() {
         </div>
         {ohneFeld ? <Meldung art="fehler">{anlegen.error?.message}</Meldung> : null}
 
-        <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
+        <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_21.25rem] gap-5 items-start">
           <div className="flex flex-col gap-4 min-w-0">
             <Abschnitt titel="Person">
               <Feld label="Nachname" pflicht className="col-span-2" fehler={e.nachname}>
@@ -313,7 +313,7 @@ export function PatientNeu() {
               </Feld>
             </Abschnitt>
 
-            <Karte className="px-5 py-[18px] flex flex-col gap-3">
+            <Karte className="px-5 py-[1.125rem] flex flex-col gap-3">
               <label htmlFor="neu-diagnose" className="lbl">Diagnose (optional, später in der Akte ergänzbar)</label>
               <Textfeld id="neu-diagnose" rows={3} placeholder="z. B. Kurzdarmsyndrom nach Dünndarmresektion …"
                 value={f.diagnose} onChange={setze("diagnose")} aria-invalid={e.diagnose ? true : undefined} />

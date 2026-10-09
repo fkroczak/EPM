@@ -43,7 +43,7 @@ export function Datenschutz() {
         </div>
 
         <Karte className="overflow-hidden">
-          <h2 className="lbl m-0 px-5 pt-[18px] pb-2 text-[0.9375rem]">Offene Anfragen</h2>
+          <h2 className="lbl m-0 px-5 pt-[1.125rem] pb-2 text-[0.9375rem]">Offene Anfragen</h2>
           {d.anfragen_offen.length ? (
             <table className="tabelle" data-testid="offene-anfragen">
               <thead><tr><th className="th">Frist</th><th className="th">Anfrage</th><th className="th">Akte</th><th className="th">eingegangen</th><th className="th">erfasst von</th></tr></thead>
@@ -71,7 +71,7 @@ export function Datenschutz() {
 
         <div className="stapel grid grid-cols-1 hd:grid-cols-2 fhd:grid-cols-3 gap-5 items-start">
           <Karte className="overflow-hidden">
-            <div className="px-5 pt-[18px] pb-2 flex flex-col gap-1">
+            <div className="px-5 pt-[1.125rem] pb-2 flex flex-col gap-1">
               <h2 className="lbl m-0 text-[0.9375rem]">Aufbewahrung abgelaufen</h2>
               <span className="text-[0.8125rem] gedaempft">Abgeschlossen vor mehr als {d.einstellungen.aufbewahrung_jahre} Jahren. Löschen kann ein
                 Mediziner im Reiter „Datenschutz“ der Akte – oder die Aufbewahrung im Einzelfall verlängern.</span>
@@ -103,7 +103,7 @@ export function Datenschutz() {
           </Karte>
 
           <Karte className="overflow-hidden">
-            <div className="px-5 pt-[18px] pb-2 flex flex-col gap-1">
+            <div className="px-5 pt-[1.125rem] pb-2 flex flex-col gap-1">
               <h2 className="lbl m-0 text-[0.9375rem]">Verarbeitung eingeschränkt</h2>
               <span className="text-[0.8125rem] gedaempft">Diese Akten erscheinen in keiner Liste und keiner Suche. Lesbar sind sie nur mit begründeter Einsicht. Name und Grund sieht hier nur, wer Einsicht nehmen darf (wer über Anfragen entscheidet; die Administration nur bei Testpatienten) – alle anderen sehen die Nummer.</span>
             </div>
@@ -126,7 +126,7 @@ export function Datenschutz() {
         </div>
 
         <Karte className="overflow-hidden">
-          <div className="px-5 pt-[18px] pb-2 flex flex-col gap-1">
+          <div className="px-5 pt-[1.125rem] pb-2 flex flex-col gap-1">
             <h2 className="lbl m-0 text-[0.9375rem]">Löschprotokoll</h2>
             <span className="text-[0.8125rem] gedaempft">Endgültig gelöschte Akten – ohne Namen und Inhalte. Der Nachweis, dass und warum gelöscht wurde; unveränderlich.</span>
           </div>
