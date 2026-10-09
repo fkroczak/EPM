@@ -137,9 +137,10 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
           <input type="checkbox" checked={geglaettet} onChange={(ev) => setGeglaettet(ev.target.checked)} /> Geglättet
         </label>
       </div>
-      {trend ? (
-        <div className={cx("meldung flex items-start gap-2.5", trend.warnung ? "warn" : "info")} data-testid="gewichtstrend">
-          <Icon name={trend.warnung ? "warnung" : "info"} />
+      {/* nur als Warnung – die Veränderung steht ohnehin im Kopf der Akte (Wunsch 10.10.2026: weniger Infos) */}
+      {trend?.warnung ? (
+        <div className="meldung flex items-start gap-2.5 warn" data-testid="gewichtstrend">
+          <Icon name="warnung" />
           <span>
             <strong>{prozent(trend.prozent)}</strong> in {e ? zahl(e.gewicht_warnung_monate) : "…"} Monaten ({datum(trend.von)}: {kg(trend.vergleich_kg)}).
             {e ? ` Hinweis ab mehr als ${zahl(e.gewicht_warnung_prozent)} % in ${zahl(e.gewicht_warnung_monate)} Monaten, berechnet aus den echten Messwerten.` : ""}
@@ -397,15 +398,16 @@ export function Uebersicht() {
       <StummKarte patientId={patient.id} aenderbar={bearbeiten} />
       <ImportHinweise />
     <Bereiche seite="akte_uebersicht" spalten={spalten} testid="uebersicht-stufe">
+      {/* Reihenfolge nach Bedeutung (Wunsch 10.10.2026): Verlauf und Behandlung vorn, Kontaktdaten zuletzt */}
       <Bereich id="gewicht" titel="Gewichtsverlauf" standard={{ breite: 2 }}><GewichtKarte startZeitraum={stufe === "qhd" ? "y3" : "y1"} /></Bereich>
-      <Bereich id="termine" titel="Termine"><TermineKarte /></Bereich>
       <Bereich id="plan" titel="Aktueller Infusionsplan"><PlanKarte /></Bereich>
-      <Bereich id="therapie" titel="Diagnose und Therapie" standard={{ breite: 2 }}><TherapieKarte /></Bereich>
       <Bereich id="kontakte" titel="Letzte Kontakte"><KontakteKarte /></Bereich>
-      <Bereich id="stamm" titel="Anschrift und Kontakt"><StammKarte /></Bereich>
+      <Bereich id="therapie" titel="Diagnose und Therapie" standard={{ breite: 2 }}><TherapieKarte /></Bereich>
+      <Bereich id="termine" titel="Termine"><TermineKarte /></Bereich>
+      <Bereich id="befunde" titel="Labor und BIA"><BefundeKarte /></Bereich>
       <Bereich id="aerzte" titel="Ärzte"><AerzteKarte /></Bereich>
       <Bereich id="bezug" titel="Bezugspersonen"><BezugspersonenKarte /></Bereich>
-      <Bereich id="befunde" titel="Labor und BIA"><BefundeKarte /></Bereich>
+      <Bereich id="stamm" titel="Anschrift und Kontakt"><StammKarte /></Bereich>
     </Bereiche>
     </div>
   );

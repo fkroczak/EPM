@@ -36,20 +36,20 @@ test("Diagnose mit ICD-Code eintragen; die Liste im Hintergrund wächst mit", as
   await dialog.getByLabel("Zusatzkennzeichen").selectOption("G");
   await expect(dialog.getByText("Kurzdarmsyndrom [K91.2G]")).toBeVisible();
   await dialog.getByRole("button", { name: "Speichern" }).click();
-  const liste2 = page.getByTestId("eintragsliste");
+  // alle Diagnosen zusammen als Liste wie im Arztbrief (Wunsch 10.10.2026)
+  const liste2 = page.getByTestId("diagnoseliste");
   await expect(liste2).toContainText("Kurzdarmsyndrom");
-  await expect(page.getByTestId("diagnose-detail")).toContainText("[K91.2G]");
+  await expect(liste2.getByTestId("diagnose-zeile").first()).toContainText("K91.2G");
   // „Beenden“ fragt nach – „Abbrechen“ lässt sie aktuell, erst die Rückfrage beendet (Eine Sprache, 08.10.2026)
-  await page.getByTestId("diagnose-detail").getByRole("button", { name: "Beenden" }).click();
+  await liste2.getByRole("button", { name: "Kurzdarmsyndrom beenden" }).click();
   await expect(page.getByRole("dialog").getByRole("heading", { name: "Diagnose beenden" })).toBeVisible();
   await page.getByRole("dialog").getByRole("button", { name: "Abbrechen" }).click();
-  await expect(page.getByTestId("diagnose-detail")).not.toContainText("beendet");
-  await page.getByTestId("diagnose-detail").getByRole("button", { name: "Beenden" }).click();
+  await expect(liste2.getByRole("button", { name: "Kurzdarmsyndrom beenden" })).toBeVisible();
+  await liste2.getByRole("button", { name: "Kurzdarmsyndrom beenden" }).click();
   await page.getByRole("dialog").getByTestId("bestaetigen").click();
   await expect(page.getByText("Als nicht mehr zutreffend eingetragen.")).toBeVisible();
-  await page.getByRole("button", { name: /beendete anzeigen/ }).click();
-  await liste2.getByText("Kurzdarmsyndrom").click();
-  await page.getByTestId("diagnose-detail").getByRole("button", { name: "Wieder aktuell" }).click();
+  await liste2.getByRole("button", { name: /beendete anzeigen/ }).click();
+  await liste2.getByRole("button", { name: "Kurzdarmsyndrom wieder aktuell" }).click();
   await expect(page.getByText("Wieder als zutreffend eingetragen.")).toBeVisible();
 
   // der Katalog hat den Eintrag übernommen (Vorlagen › Labor und Diagnosen)
@@ -116,12 +116,23 @@ test("BIA-Messung mit Beurteilung; das Gewicht wandert in den Verlauf", async ({
 
 test("Bericht: Entwurf, Freigabe durch den Mediziner, danach unveränderlich", async ({ page, browser }) => {
   const p = await neuerPatient();
+  const api = await apiAls("mitarbeiter");
+  await api.post("diagnosen/", { patient: p.id, bezeichnung: "Kurzdarmsyndrom", icd_code: "K91.2", kennzeichen: "G", seit: "2020-03-01" });
+  await api.post("diagnosen/", { patient: p.id, bezeichnung: "Verdacht auf Eisenmangel", icd_code: "D50.9", kennzeichen: "V" });
+  await api.ende();
   await oeffnen(page, p.id, "/berichte");
   await page.getByRole("button", { name: "Neuer Bericht" }).click();
   await page.getByLabel("Titel").fill("Verlaufsbericht 2026");
   await page.getByLabel("Berichtsart").selectOption({ label: "Verlaufsbericht" });
   await page.getByLabel("Empfänger").fill("Hausarzt Dr. Hausmann");
   await page.getByRole("textbox", { name: "Bericht" }).fill("Stabiler Verlauf unter heimparenteraler Ernährung.");
+  // alle Diagnosen der Akte stehen im Dialog und lassen sich in den Text übernehmen (Wunsch 10.10.2026)
+  const diagnosen = page.getByRole("dialog").getByTestId("bericht-diagnosen");
+  await expect(diagnosen).toContainText("Kurzdarmsyndrom");
+  await expect(diagnosen).toContainText("Verdacht auf Eisenmangel");
+  await diagnosen.getByRole("button", { name: "In den Text übernehmen" }).click();
+  await expect(page.getByRole("textbox", { name: "Bericht" })).toContainText("Kurzdarmsyndrom (ICD-10 K91.2 G, seit 01.03.2020)");
+  await expect(page.getByRole("textbox", { name: "Bericht" })).toContainText("Stabiler Verlauf");
   await page.getByRole("button", { name: "Entwurf speichern" }).click();
   // der Status steht links am Eintrag und rechts im Detail – hier das Detail (F122)
   await expect(page.getByTestId("bericht-detail").getByTestId("bericht-status")).toHaveText("Entwurf");
@@ -136,7 +147,7 @@ test("Bericht: Entwurf, Freigabe durch den Mediziner, danach unveränderlich", a
   await expect(medizinerSeite.getByTestId("bericht-detail").getByTestId("bericht-status")).toHaveText("freigegeben");
   await expect(medizinerSeite.getByText(/Maschinell erstellt, geprüft und freigegeben von/)).toBeVisible();
   // Bearbeiten ist weg, die PDF liegt in den Dokumenten
-  await expect(medizinerSeite.getByRole("button", { name: "Bearbeiten" })).toHaveCount(0);
+  await expect(medizinerSeite.getByRole("button", { name: "Bearbeiten", exact: true })).toHaveCount(0);
   await medizinerSeite.goto(`/patienten/${p.id}/dokumente`);
   // genau treffen: Die Vorschau der PDF trägt den Titel im unsichtbaren Textlayer ein zweites Mal
   await expect(medizinerSeite.getByTestId("dokument-details")

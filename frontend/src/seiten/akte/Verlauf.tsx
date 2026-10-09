@@ -15,7 +15,8 @@ import { useAkte } from "./Akte";
 
 const BEREICHE: { wert: string; text: string }[] = [
   { wert: "", text: "Alle" }, { wert: "stammdaten", text: "Stammdaten" }, { wert: "diagnose", text: "Diagnose" },
-  { wert: "therapie", text: "Therapie" }, { wert: "empfehlung", text: "Empfehlung" }, { wert: "bemerkung", text: "Bemerkung" },
+  { wert: "therapie", text: "Therapie" }, { wert: "therapieschritte", text: "Therapie (Verlauf)" }, { wert: "empfehlung", text: "Empfehlung" },
+  { wert: "bemerkung", text: "Bemerkung" },
   { wert: "kontakte", text: "Kontakte" },
   { wert: "gewichte", text: "Gewicht" }, { wert: "termine", text: "Termine" }, { wert: "infusionsplaene", text: "Infusionspläne" },
   { wert: "dokumente", text: "Dokumente" }, { wert: "aerzte", text: "Ärzte" }, { wert: "bezugspersonen", text: "Bezugspersonen" },
