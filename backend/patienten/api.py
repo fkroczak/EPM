@@ -1229,6 +1229,9 @@ class DokumentSerializer(serializers.ModelSerializer):
     hochgeladen_von_name = serializers.SerializerMethodField()
     # Scans (F163): erkannter Text vorhanden – lesen über /api/dokumente/{id}/text/
     hat_text = serializers.SerializerMethodField()
+    # „Text erkennen“ (F170): letzter Auftrag und ob es für dieses Dokument geht
+    erkennung = serializers.SerializerMethodField()
+    text_erkennbar = serializers.SerializerMethodField()
     typ_name = serializers.CharField(source="typ.wert", read_only=True, default=None)
     datei = serializers.FileField(write_only=True, required=False)
 
@@ -1236,7 +1239,7 @@ class DokumentSerializer(serializers.ModelSerializer):
         model = Dokument
         fields = ["id", "patient", "typ", "typ_name", "titel", "datum", "datum_quelle", "typ_geprueft", "notiz",
                   "ausgeblendet", "datei", "originalname", "mime", "groesse", "sha256", "herkunft", "hochgeladen_am",
-                  "hochgeladen_von_name", "hat_text"]
+                  "hochgeladen_von_name", "hat_text", "erkennung", "text_erkennbar"]
         read_only_fields = ["originalname", "mime", "groesse", "sha256", "herkunft", "hochgeladen_am",
                             "datum_quelle", "typ_geprueft"]
 
@@ -1245,6 +1248,17 @@ class DokumentSerializer(serializers.ModelSerializer):
 
     def get_hat_text(self, obj):
         return hasattr(obj, "erkannter_text")
+
+    def get_erkennung(self, obj):
+        from scans.dokumente import stand
+
+        return stand(obj)
+
+    def get_text_erkennbar(self, obj):
+        from scans.dokumente import erkennbar
+
+        grund = erkennbar(obj)
+        return {"moeglich": grund is None, "grund": grund or ""}
 
     def validate_typ(self, typ):
         if typ is not None and typ.liste != Auswahlwert.Liste.DOKUMENTTYP:
@@ -1354,6 +1368,38 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
         dok._history_user = request.user
         dok.save()
         return Response(DokumentSerializer(dok, context=self.get_serializer_context()).data)
+
+    # ------------------------------------------------ Texterkennung (F170, F171)
+    @action(detail=True, methods=["post"], url_path="text-erkennen")
+    def text_erkennen(self, request, pk=None):
+        """„Text erkennen“: Auftrag an den OCR-Dienst (OCRmyPDF). Ersetzt die Datei durch dieselbe PDF mit Textebene."""
+        from scans.dokumente import ErkennungFehler, anfordern
+
+        dok = self.get_object()
+        self.pruefe_patient(dok.patient)
+        try:
+            anfordern(dok, request.user)
+        except ErkennungFehler as fehler:
+            return Response({"fehler": str(fehler)}, status=status.HTTP_400_BAD_REQUEST)
+        dok.refresh_from_db()
+        return Response(DokumentSerializer(dok, context=self.get_serializer_context()).data,
+                        status=status.HTTP_202_ACCEPTED)
+
+    @action(detail=True, methods=["post"], url_path="werte-uebernehmen")
+    def werte_uebernehmen(self, request, pk=None):
+        """Werte (Labor, BIA, Diagnosen) aus diesem Dokument übernehmen: Arbeitskopie als Scan → Prüfansicht in
+        „Scans“. Beim Zuordnen entsteht kein neues Dokument (F171)."""
+        from scans.dokumente import ErkennungFehler, als_scan
+
+        dok = self.get_object()
+        self.pruefe_patient(dok.patient)
+        if not request.user.hat_recht("scans_bearbeiten"):
+            raise PermissionDenied("Dafür fehlt das Recht „Scans: hochladen, erkennen, zuordnen“.")
+        try:
+            scan = als_scan(dok, request.user)
+        except ErkennungFehler as fehler:
+            return Response({"fehler": str(fehler)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"scan": scan.id}, status=status.HTTP_201_CREATED)
 
     # ------------------------------------------------ falsch zugeordnet: umhängen oder endgültig löschen
     def _nicht_systemdokument(self, dok):
@@ -1502,6 +1548,12 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
                           grund=grund, sha256=sha, groesse=dok.groesse, typ=dok.typ.wert if dok.typ else "",
                           hochgeladen_am=dok.hochgeladen_am.isoformat() if dok.hochgeladen_am else "",
                           patient_id=dok.patient_id)
+            # Arbeitskopien in „Scans“ (Werte übernehmen, F171) samt Dateien sofort mit entfernen
+            from scans import dienst as scans_dienst
+            from scans.models import Scan
+
+            for arbeitskopie in Scan.objects.filter(quelldokument=dok):
+                scans_dienst.entfernen(arbeitskopie)
             dok._history_user = request.user
             dok._change_reason = "Endgültig gelöscht"
             dok.delete()

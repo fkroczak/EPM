@@ -18,7 +18,7 @@ from django.utils import timezone
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections
 
-from scans import dienst
+from scans import dienst, dokumente
 from scans.ocr.erkennung import verfahren_stand
 from scans.ocr.paddle import Paddle
 
@@ -59,8 +59,11 @@ class Command(BaseCommand):
                 signal.sigwait({signal.SIGTERM, signal.SIGINT})
                 ende["jetzt"] = True
                 try:
-                    if ende["scan"] is not None:
-                        dienst.geplant_beendet(ende["scan"])
+                    aktuell = ende["scan"]
+                    if isinstance(aktuell, dokumente.DokumentErkennung):
+                        dokumente.geplant_beendet(aktuell)
+                    elif aktuell is not None:
+                        dienst.geplant_beendet(aktuell)
                     log.info("OCR-Dienst beendet")
                 finally:
                     os._exit(0)
@@ -100,9 +103,25 @@ class Command(BaseCommand):
                 # nach einem Neustart (z. B. Speichergrenze erreicht): abgebrochene Aufträge sofort wieder einreihen
                 dienst.haengende_zuruecksetzen()
                 scan = dienst.auftrag_holen()
+                # „Text erkennen“ an Dokumenten der Akte (F170), wenn keine Scans warten
+                auftrag = None if scan is not None else dokumente.auftrag_holen()
             except Exception:  # noqa: BLE001 – z. B. Datenbank startet noch oder Migration läuft
                 log.exception("Warteschlange nicht lesbar – neuer Versuch in 10 Sekunden")
                 time.sleep(10)
+                continue
+            if scan is None and auftrag is not None:
+                log.info("Text erkennen: %s", auftrag)
+                ende["scan"] = auftrag
+
+                def melden(text, a=auftrag):
+                    dokumente.DokumentErkennung.objects.filter(pk=a.pk).update(schritt=text[:120],
+                                                                                lebenszeichen=timezone.now())
+
+                with dienst.herzschlag(auftrag, zusatz=lebenszeichen):
+                    fertig_a = dokumente.ausfuehren(auftrag, schritt=melden)
+                ende["scan"] = None
+                zaehler["bearbeitet"] += 1
+                log.info("%s: %s", fertig_a, fertig_a.get_status_display())
                 continue
             if scan is None:
                 if einmal:

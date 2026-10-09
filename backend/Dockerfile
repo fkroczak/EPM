@@ -26,16 +26,19 @@ ENV PATH="/opt/venv/bin:$PATH" \
 # Pango/HarfBuzz für WeasyPrint (PDF-Erzeugung). Die Schrift IBM Plex liegt im Repo (schriften/, OFL-Lizenz):
 # Debian 13 (trixie) hat kein Paket fonts-ibm-plex mehr, so baut das Image auch offline und unabhängig davon.
 # Tesseract mit Ausrichtungserkennung (osd) für „Scans“; das deutsche Modell ist das genaueste (tessdata_best) aus dem Repo
+# Ghostscript für OCRmyPDF („Text erkennen“ in der Akte, F170: PDF/A). Lizenz AGPL – Betrieb nur auf eigenen Servern
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 \
-      fontconfig fonts-dejavu-core tesseract-ocr tesseract-ocr-osd \
+      fontconfig fonts-dejavu-core tesseract-ocr tesseract-ocr-osd ghostscript \
  && rm -rf /var/lib/apt/lists/*
 COPY scans/modelle/tesseract/deu.traineddata /usr/share/tesseract-ocr/5/tessdata/deu.traineddata
 RUN tesseract --list-langs 2>&1 | grep -qx deu && tesseract --list-langs 2>&1 | grep -qx osd
+RUN gs --version
 COPY schriften/ /usr/local/share/fonts/ibm-plex/
 RUN fc-cache -f /usr/local/share/fonts && fc-list | grep -q "IBM Plex Sans"
 RUN groupadd --gid 10001 epm && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin epm
 COPY --from=bau /opt/venv /opt/venv
+RUN /opt/venv/bin/ocrmypdf --version
 COPY --from=modelle /opt/ocr-modelle /opt/ocr-modelle
 WORKDIR /app
 COPY --chown=root:root . /app

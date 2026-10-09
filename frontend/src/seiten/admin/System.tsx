@@ -788,6 +788,8 @@ function TexterkennungKarte({ t }: { t: NonNullable<Uebersicht["epm"]["texterken
           : <><Chip art="fehler">kein Lebenszeichen</Chip> <span className="gedaempft">zuletzt {relativ(t.dienst.lebenszeichen, true)}</span></>)
           : <Chip art="warn">noch nie gestartet</Chip>}</Zeile>
         <Zeile label="Tesseract">{v?.tesseract ? <><Chip art={v.tesseract.bereit ? "ok" : "fehler"}>{v.tesseract.bereit ? "bereit" : "fehlt"}</Chip> <span className="gedaempft">{v.tesseract.text}</span></> : "—"}</Zeile>
+        <Zeile label="OCRmyPDF">{v?.ocrmypdf ? <><Chip art={v.ocrmypdf.bereit ? "ok" : "warn"}>{v.ocrmypdf.bereit ? "bereit" : "fehlt"}</Chip>{" "}
+          <span className="gedaempft">{v.ocrmypdf.text} – „Text erkennen“ an Dokumenten der Akte</span></> : "—"}</Zeile>
         <Zeile label="PP-OCRv5">{v?.paddle ? <><Chip art={v.paddle.bereit ? "ok" : "warn"}>{v.paddle.bereit ? "bereit" : "fehlt"}</Chip>{" "}
           <span className="gedaempft">{v.paddle.bereit ? `${v.paddle.text}${v.paddle.glaetten ? " · Glätten (UVDoc)" : ""}` : "Erkennung nur mit Tesseract – Modelle beim Bau des Images laden (Zugang zu huggingface.co)"}</span></> : "—"}</Zeile>
         <Zeile label="Warteschlange">{s.laufend

@@ -99,7 +99,9 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
   const katalog = useLaborparameter();
   const typen = useAuswahl("dokumenttyp");
 
-  const [patient, setPatient] = useState<Wahl | null>(null);
+  // Arbeitskopie eines Akte-Dokuments (F171): Patient steht fest, es entsteht kein neues Dokument
+  const quelle = scan.quelle ?? null;
+  const [patient, setPatient] = useState<Wahl | null>(quelle ? { ...quelle.patient } : null);
   const [titel, setTitel] = useState(scan.titel);
   const [typ, setTyp] = useState("");
   const [dokDatum, setDokDatum] = useState(scan.dokumentdatum ?? "");
@@ -157,10 +159,13 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
   const biaGewaehlt = BIA_FELDER.filter(([k]) => bia[k]?.trim());
   const diagnosenGewaehlt = diagnosen.filter((d) => d.an);
   const texteGewaehlt = TEXTFELDER.filter(([k]) => texte[k].an && texte[k].text.trim());
+  const etwasGewaehlt = (laborAn && gewaehlteWerte.length > 0) || (biaAn && biaGewaehlt.length > 0)
+    || diagnosenGewaehlt.length > 0 || texteGewaehlt.length > 0;
 
   const zuordnen = useMutation({
     mutationFn: () => {
-      const body: Record<string, unknown> = { patient: patient!.id, titel, typ: typ || null, datum: dokDatum || null, notiz, original };
+      const body: Record<string, unknown> = quelle ? { patient: patient!.id }
+        : { patient: patient!.id, titel, typ: typ || null, datum: dokDatum || null, notiz, original };
       if (laborAn && gewaehlteWerte.length) {
         body.labor = {
           abgenommen_am: abnahme || null, labor: laborName, beurteilung: beurteilung ? html(beurteilung) : "",
@@ -190,7 +195,8 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
     onSuccess: (e) => {
       const teile = [e.laborbefund ? `${gewaehlteWerte.length} Laborwerte` : "", e.bia ? "BIA-Messung" : "",
         e.diagnosen?.length ? `${e.diagnosen.length} Diagnosen` : ""].filter(Boolean);
-      melden(`Als Dokument in die Akte gelegt${teile.length ? ` – übernommen: ${teile.join(", ")}` : ""}.`);
+      melden(quelle ? `Übernommen: ${teile.join(", ") || "Texte"} – verknüpft mit „${quelle.titel}“.`
+        : `Als Dokument in die Akte gelegt${teile.length ? ` – übernommen: ${teile.join(", ")}` : ""}.`);
       void qc.invalidateQueries({ queryKey: ["scans"] });
       void qc.invalidateQueries({ queryKey: ["patient", e.patient] });
       onFertig(e.patient, e.dokument);
@@ -231,7 +237,7 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
   return (
     <div className="flex flex-col gap-4" data-testid="zuordnen">
       <div className="flex items-center gap-2">
-        <h3 className="m-0 text-base font-semibold grow">Einem Patienten zuordnen</h3>
+        <h3 className="m-0 text-base font-semibold grow">{quelle ? "Werte in die Akte übernehmen" : "Einem Patienten zuordnen"}</h3>
         <Knopf klein variante="geist" onClick={onAbbrechen}>Abbrechen</Knopf>
       </div>
 
@@ -245,7 +251,7 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
             <span className="gedaempft">{datum(patient.geburtsdatum)}</span>
             {patient.ist_test ? <Chip art="warn">Test</Chip> : null}
             <Link to={`/patienten/${patient.id}`} target="_blank" className="text-[0.8125rem]">Akte öffnen</Link>
-            <Knopf klein variante="geist" onClick={() => setPatient(null)}>ändern</Knopf>
+            {quelle ? null : <Knopf klein variante="geist" onClick={() => setPatient(null)}>ändern</Knopf>}
           </div>
         ) : (
           <>
@@ -278,7 +284,11 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
         {patient && !darfZuordnen ? <Meldung art="info">Als Admin nur bei Testpatienten möglich.</Meldung> : null}
       </section>
 
-      {/* 2. Dokument */}
+      {/* 2. Dokument – bei einer Arbeitskopie gibt es das Dokument schon */}
+      {quelle ? (
+        <Meldung art="info"><span data-testid="zuordnen-quelle">Kein neues Dokument: Die Werte werden mit „{quelle.titel}“ in der Akte
+          verknüpft. Die Datei des Dokuments bleibt unverändert.</span></Meldung>
+      ) : (
       <section className="formular grid grid-cols-6 gap-x-3 gap-y-2.5">
         <Feld label="Titel" className="col-span-6 sm:col-span-4" fehler={fehler.titel} pflicht>
           {(p) => <Eingabe {...p} value={titel} onChange={(e) => setTitel(e.target.value)} maxLength={200} />}
@@ -305,6 +315,7 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
         ) : null}
         {fehler.original ? <span className="col-span-6 fehlertext">{fehler.original}</span> : null}
       </section>
+      )}
 
       {/* 3. Werte */}
       {arten.length ? (
@@ -491,11 +502,13 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
       ) : null}
 
       {zuordnen.error && !Object.keys(fehler).length ? <Meldung art="fehler">{zuordnen.error.message}</Meldung> : null}
+      {fehler.fehler ? <Meldung art="fehler">{fehler.fehler}</Meldung> : null}
       <div className="flex justify-end gap-2 flex-wrap sticky bottom-0 bg-flaeche py-2 border-t border-rand">
         <Knopf onClick={onAbbrechen}>Abbrechen</Knopf>
-        <Knopf variante="pri" icon="haken" laedt={zuordnen.isPending} disabled={!darfZuordnen || !titel.trim()}
+        <Knopf variante="pri" icon="haken" laedt={zuordnen.isPending}
+          disabled={!darfZuordnen || (quelle ? !etwasGewaehlt : !titel.trim())}
           onClick={() => zuordnen.mutate()} data-testid="zuordnen-speichern">
-          In die Akte legen{gewaehlteWerte.length && laborAn ? ` + ${gewaehlteWerte.length} Laborwerte` : ""}
+          {quelle ? "Übernehmen" : "In die Akte legen"}{gewaehlteWerte.length && laborAn ? ` + ${gewaehlteWerte.length} Laborwerte` : ""}
           {biaAn && biaGewaehlt.length ? " + BIA" : ""}{diagnosenGewaehlt.length ? ` + ${diagnosenGewaehlt.length} Diagnosen` : ""}
         </Knopf>
       </div>

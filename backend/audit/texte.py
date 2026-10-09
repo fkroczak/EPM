@@ -259,6 +259,11 @@ def _scan(e, d) -> str:
         if liste:
             teile.append("übernommen: " + ", ".join(liste))
         return "; ".join(teile)
+    if aktion == "werte_uebernommen":
+        namen = {"laborwerte": "Laborwerte", "bia": "BIA-Messung", "diagnosen": "Diagnosen", "texte": "Texte"}
+        liste = [f"{namen.get(k, k)}: {v}" for k, v in (d.get("uebernommen") or {}).items() if v]
+        return (f"Werte aus Dokument {d.get('dokument', '')} {d.get('akte', '')} übernommen"
+                + (f" – {', '.join(liste)}" if liste else ""))
     if aktion == "verlaengert":
         return f"{e.objekt} verlängert bis {_datum(d.get('bis', ''))}"
     if aktion == "geloescht":

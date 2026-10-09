@@ -185,6 +185,11 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
         <button type="button" className="btn sec klein md:hidden" onClick={onListe}><Icon name="zurueck" groesse={14} />Liste</button>
         <h2 className="m-0 text-lg font-semibold min-w-0 break-words" data-testid="scan-titel">{s.titel}</h2>
         <Chip art={s.status === "fertig" ? "ok" : s.status === "fehler" ? "fehler" : "warn"} data-testid="scan-status">{STATUS[s.status]}</Chip>
+        {s.quelle ? (
+          <Chip title="Arbeitskopie eines Dokuments der Akte – beim Übernehmen entsteht kein neues Dokument" data-testid="scan-quelle">
+            aus der Akte: {s.quelle.patient.nachname}, {s.quelle.patient.vorname}
+          </Chip>
+        ) : null}
         {fertig && s.sicherheit != null ? (
           <Chip art={s.unsicher ? "warn" : "neutral"} title="Sicherheit der Erkennung, nach Zeichen gewichtet">
             {prozent(s.sicherheit)} sicher{s.unsicher ? ` · ${zahl(s.unsicher)} unsichere Wörter` : ""}
@@ -194,7 +199,7 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
         {s.ist_test ? <Chip art="warn">Test</Chip> : null}
         <div className="ml-auto flex items-center gap-2">
           {fertig && !zuordnen && darf("eintraege_erfassen") ? (
-            <Knopf variante="pri" icon="patienten" onClick={() => setZuordnen(true)} data-testid="scan-zuordnen">Zuordnen</Knopf>
+            <Knopf variante="pri" icon="patienten" onClick={() => setZuordnen(true)} data-testid="scan-zuordnen">{s.quelle ? "Werte übernehmen" : "Zuordnen"}</Knopf>
           ) : null}
           {fertig ? <Knopf icon="kopieren" onClick={() => void kopieren(s.text)} data-testid="scan-kopieren">Text kopieren</Knopf> : null}
           <Menue label="Weitere Aktionen" eintraege={menue} />

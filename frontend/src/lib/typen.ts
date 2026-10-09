@@ -501,6 +501,10 @@ export type Dokument = {
   hochgeladen_von_name: string | null;
   /** erkannter Text vorhanden (aus „Scans“, F163) – lesen über dokumente/{id}/text/ */
   hat_text?: boolean;
+  /** „Text erkennen“ (F170): letzter Auftrag */
+  erkennung?: { id: number; status: "wartet" | "laeuft" | "fertig" | "fehler"; schritt: string; fehler: string;
+    angefordert_am: string; beendet_am: string | null; seiten: number | null } | null;
+  text_erkennbar?: { moeglich: boolean; grund: string };
 };
 
 export type Plan = {
@@ -874,13 +878,16 @@ export type ScanZeile = {
   laeuft_ab_am: string; hoechst_bis: string; verlaengerbar: boolean; verlaengert_anzahl: number; seiten_anzahl: number;
   vorschau: string | null; sicherheit: number | null; unsicher: number; arten: string[]; dokumentdatum: string | null;
   verfahren: string[]; belegt: number; erkannt_am: string | null; dauer_s: number | null;
+  /** Arbeitskopie eines Dokuments der Akte („Werte übernehmen“, F171) */
+  quelle?: { dokument: number; titel: string; patient: { id: number; nummer: number; nachname: string; vorname: string;
+    geburtsdatum: string | null; ist_test: boolean } } | null;
 };
 export type Scan = ScanZeile & { text: string; seiten: ScanSeite[]; auswertung: ScanAuswertung; vorschlaege?: ScanVorschlag[] };
 export type ScansStand = {
   offen: number; laufend: number; in_arbeit: number; wartend: number; abbrueche: number; fehler: number; gesamt: number; laeuft_bald_ab: number; belegt: number; grenze: number;
   prozent: number; anzahl_grenze: number; anzahl_alle: number; frist_tage: number; hoechst_tage: number;
   verlaengerung_tage: number; max_mb: number; max_seiten: number; upload_max_mb: number;
-  verfahren?: { tesseract: { bereit: boolean; text: string }; paddle: { bereit: boolean; glaetten: boolean; text: string; sparsam?: boolean; speicher_mb?: number | null } };
+  verfahren?: { tesseract: { bereit: boolean; text: string }; ocrmypdf?: { bereit: boolean; text: string }; paddle: { bereit: boolean; glaetten: boolean; text: string; sparsam?: boolean; speicher_mb?: number | null } };
   dienst?: { gestartet: string; lebenszeichen: string; laeuft: boolean; bearbeitet: number; threads: string;
     /** Speicher des Containers „ocr“ in Bytes (cgroup v2), Höchststand seit dem Start */
     speicher?: { belegt: number; hoechst: number | null; grenze: number | null } | null } | null;

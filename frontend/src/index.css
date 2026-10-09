@@ -702,6 +702,11 @@ html { scrollbar-gutter: stable; }
 .scan-ecken { fill: color-mix(in srgb, var(--akzent) 10%, transparent); stroke: var(--akzent); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .scan-griff { fill: var(--flaeche); stroke: var(--akzent); stroke-width: 3; vector-effect: non-scaling-stroke; cursor: grab; }
 .scan-griff:active { cursor: grabbing; fill: var(--akzent-weich); }
+/* kleiner Ladekreis in Meldungen (z. B. „Text wird erkannt …“) */
+.ladekreis { width: 0.875rem; height: 0.875rem; border-radius: 999px; border: 2px solid currentColor; border-right-color: transparent;
+  display: inline-block; flex: none; animation: ladekreis-drehen 0.8s linear infinite; }
+@keyframes ladekreis-drehen { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ladekreis { animation-duration: 2.4s; } }
 /* Zuordnen: Wort im Bild anklicken übernimmt es in das gewählte Feld */
 .scan-wort-waehlbar { fill: transparent; stroke: transparent; cursor: pointer; vector-effect: non-scaling-stroke; }
 .scan-wort-waehlbar:hover { fill: color-mix(in srgb, var(--akzent) 18%, transparent); stroke: var(--akzent); stroke-width: 1.5; }

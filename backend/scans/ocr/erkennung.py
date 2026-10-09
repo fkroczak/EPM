@@ -35,8 +35,13 @@ def verfahren_stand(laden: bool = True) -> dict:
         sparsam = modus() == "sparsam" or not (ordner / DET).is_file()
         det_name = "mobile_det" if sparsam and (ordner / DET_KLEIN).is_file() else "server_det"
         glaetten = not sparsam and (ordner / UVDOC).is_file()
+    from ..dokumente import verfuegbar as ocrmypdf_verfuegbar
+
+    o_ok, o_text = ocrmypdf_verfuegbar()
     return {
         "tesseract": {"bereit": ok, "text": text},
+        # „Text erkennen“ an Dokumenten der Akte (F170)
+        "ocrmypdf": {"bereit": o_ok, "text": o_text},
         "paddle": {"bereit": bereit, "glaetten": glaetten, "sparsam": sparsam if bereit else False,
                    "speicher_mb": speicher_mb(),
                    "text": (f"PP-OCRv5 (Zeilen: {det_name}, Schrift: latin_mobile_rec)"
@@ -103,8 +108,14 @@ def seite_erkennen(roh: Rohseite, einstellungen: dict | None, *, woerterliste: s
     t1 = time.monotonic()
     melden("Tesseract liest")
     tg = fusion.tesseract_stuecke(tesseract.erkennen(auf.grau, woerterliste=woerterliste))
-    melden("Tesseract liest (Schwarz-Weiß)")
-    ts = fusion.tesseract_stuecke(tesseract.erkennen(auf.sw, woerterliste=woerterliste))
+    # Sparmodus mit PP-OCR: ein Tesseract-Durchgang genügt – die zweite Lesart liefert PP-OCR (spart rund ein Drittel
+    # der Zeit). Ohne PP-OCR bleiben beide Durchgänge, sonst gäbe es keinen Abgleich und keine unsicheren Wörter.
+    if paddle is not None and getattr(paddle, "sparsam", False):
+        ts = []
+        auf.info["tesseract_einmal"] = True
+    else:
+        melden("Tesseract liest (Schwarz-Weiß)")
+        ts = fusion.tesseract_stuecke(tesseract.erkennen(auf.sw, woerterliste=woerterliste))
     t2 = time.monotonic()
     pz = None
     verfahren = ["tesseract"]

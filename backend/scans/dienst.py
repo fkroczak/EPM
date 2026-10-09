@@ -128,8 +128,10 @@ def sichtbare_scans(user):
     """Scans, die diese Person sieht: Scans von Testbenutzern nur mit „Testdaten sehen“; Testbenutzer sehen nur
     Scans von Testbenutzern (wie bei den Akten)."""
     from accounts.rechte import sieht_testdaten
+    from epm.api_basis import patienten_fuer
 
-    qs = Scan.objects.all()
+    # Arbeitskopien von Akte-Dokumenten (F171) nur für Personen, die die Akte sehen (z. B. nicht bei Einschränkung)
+    qs = Scan.objects.filter(Q(quelldokument__isnull=True) | Q(quelldokument__patient__in=patienten_fuer(user)))
     if getattr(user, "ist_test", False):
         return qs.filter(ist_test=True)
     if not sieht_testdaten(user):
@@ -283,6 +285,9 @@ def bereinigen() -> dict:
                     entfernen(scan)
                 ergebnis["ohne_dateien"] = ergebnis.get("ohne_dateien", 0) + 1
     ergebnis["abgebrochen"] = haengende_zuruecksetzen()
+    from . import dokumente
+
+    ergebnis["auftraege"] = dokumente.bereinigen()
     return ergebnis
 
 
@@ -300,7 +305,9 @@ def haengende_zuruecksetzen() -> int:
         else:
             Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.WARTET,
                                                    schritt="nach einem Abbruch erneut in der Warteschlange")
-    return anzahl
+    from . import dokumente
+
+    return anzahl + dokumente.haengende_zuruecksetzen(HAENGT_NACH)
 
 
 def geplant_beendet(scan: Scan):
@@ -319,14 +326,15 @@ class herzschlag:
     """Solange der Block läuft, schreibt ein eigener Faden alle HERZSCHLAG_S Sekunden das Lebenszeichen des Scans
     (und ruft ``zusatz`` auf, z. B. um die Datei für den Healthcheck zu berühren)."""
 
-    def __init__(self, scan: Scan, zusatz=None, takt: float = HERZSCHLAG_S):
-        self.scan_id, self.zusatz, self.takt = scan.pk, zusatz, takt
+    def __init__(self, scan, zusatz=None, takt: float = HERZSCHLAG_S):
+        # Scan oder Auftrag „Text erkennen“ (beide mit status „laeuft“ und lebenszeichen)
+        self.modell, self.scan_id, self.zusatz, self.takt = type(scan), scan.pk, zusatz, takt
         self._stopp = threading.Event()
         self._faden = threading.Thread(target=self._lauf, name="epm-ocr-herzschlag", daemon=True)
 
     def schlag(self):
         """Ein Lebenszeichen: Zeitpunkt am Scan, dazu ``zusatz`` (Healthcheck, Stand für die Systemseite)."""
-        Scan.objects.filter(pk=self.scan_id, status=Scan.Status.LAEUFT).update(lebenszeichen=timezone.now())
+        self.modell.objects.filter(pk=self.scan_id, status="laeuft").update(lebenszeichen=timezone.now())
         if self.zusatz:
             self.zusatz()
 

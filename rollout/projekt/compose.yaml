@@ -89,6 +89,8 @@ services:
     secrets: [db_password, django_secret_key]
     volumes:
       - ./data/scans:/data/scans
+      # „Text erkennen“ (F170): ersetzt die Datei eines Dokuments durch dieselbe PDF mit Textebene
+      - ./data/dokumente:/data/dokumente
     networks: [intern]
     read_only: true
     tmpfs: [/tmp]
