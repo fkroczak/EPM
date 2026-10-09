@@ -135,3 +135,29 @@ test("Telefon: Notiz zur offenen Akte über „Notiz“ in der Leiste", async ({
   await expect(page.getByTestId("kontaktliste")).toContainText(text);
   merken("mobil_notiz", { patient: p.id, text });
 });
+
+test.describe("Administration am Telefon", () => {
+  test.use({ storageState: zustand("admin") });
+
+  /** Wunsch 09.10.2026: auf Backup ragten die Tabellen über den Bildschirm, die Knöpfe lagen über dem Titel */
+  test("Telefon: Tabellen werden zu Zeilen, Seitenkopf bricht um – alles passt in die Breite", async ({ page }) => {
+    for (const [pfad, titel] of [["/admin/backup", "Backup und Wiederherstellung"], ["/admin/benutzer", "Benutzer"],
+      ["/admin/audit-log", "Audit-Log"], ["/admin/system", "System"], ["/admin/vorlagen", "Vorlagen"]]) {
+      await page.goto(pfad);
+      const h1 = page.getByRole("heading", { level: 1, name: titel });
+      await expect(h1).toBeVisible();
+      await page.waitForLoadState("networkidle");
+      await passtInDieBreite(page, titel);
+      // kein Knopf des Seitenkopfs liegt über dem Titel
+      const kopf = await h1.boundingBox();
+      for (const knopf of await page.locator(".seitenkopf .btn").all()) {
+        const k = await knopf.boundingBox();
+        if (k && kopf) expect(k.y >= kopf.y + kopf.height - 1 || k.x >= kopf.x + kopf.width - 1, `${titel}: Knopf über dem Titel`).toBe(true);
+      }
+    }
+    // Zellen tragen ihre Spaltenüberschrift (Benutzerliste: Name als Titel, Rolle beschriftet)
+    await page.goto("/admin/benutzer");
+    await expect(page.locator('td[data-label="Rolle"]').first()).toBeVisible();
+    await expect(page.locator("td[data-titel]").first()).toBeVisible();
+  });
+});

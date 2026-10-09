@@ -313,10 +313,10 @@ export function ZugriffeKachel() {
   return (
     <>
       <KachelKopf id="zugriffe" titel="Zugriffe · 7 Tage" />
-      <KachelInhalt className="flex flex-col gap-2.5 text-sm" testid="kachel-zugriffe">
+      <KachelInhalt className="flex flex-col gap-0.5 text-sm" testid="kachel-zugriffe">
         {!daten.data ? (daten.error ? <Fehleranzeige fehler={daten.error} /> : <Laden />) : daten.data.zeilen.map((z) => (
           <Link key={z.schluessel} to={`/admin/audit-log?gruppe=${z.gruppe}&tage=${daten.data!.tage}`}
-            className="flex justify-between gap-3 no-underline text-tinte hover:text-akzent-text">
+            className="flex justify-between gap-3 py-1 no-underline text-tinte hover:text-akzent-text">
             <span>{z.text}</span><span className={cx("num", z.schluessel === "fehlversuche" && z.anzahl ? "text-fehler" : "text-akzent-text")}
               data-testid={`zugriffe-${z.schluessel}`}>{z.anzahl}</span>
           </Link>

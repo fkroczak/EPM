@@ -347,8 +347,8 @@ const VERSICHERUNG_KURZ: Record<string, string> = { gkv: "GKV", pkv: "PKV", selb
 function Angabezeile({ a }: { a: Angabe }) {
   return (
     <div className="grid grid-cols-[7.75rem_minmax(0,1fr)] gap-x-3 items-baseline min-w-0" title={a.hinweis}>
-      <span className="text-[0.8125rem] gedaempft truncate">{a.titel}</span>
-      <span className="text-sm truncate min-w-0">{a.inhalt}</span>
+      <span className="text-[0.8125rem] gedaempft md:truncate">{a.titel}</span>
+      <span className="text-sm min-w-0 md:truncate max-md:[overflow-wrap:anywhere]">{a.inhalt}</span>
     </div>
   );
 }
@@ -413,8 +413,17 @@ export function Akte() {
   useEffect(() => {
     const leiste = reiterLeiste.current;
     const aktiv = leiste?.querySelector<HTMLElement>(".segment.aktiv");
-    if (!leiste || !aktiv || leiste.scrollWidth <= leiste.clientWidth) return;
-    leiste.scrollLeft = aktiv.offsetLeft - (leiste.clientWidth - aktiv.offsetWidth) / 2;
+    if (!leiste) return;
+    if (aktiv && leiste.scrollWidth > leiste.clientWidth) leiste.scrollLeft = aktiv.offsetLeft - (leiste.clientWidth - aktiv.offsetWidth) / 2;
+    // am Telefon blendet der Rand aus, wo noch Reiter kommen (index.css, nav.segmente)
+    const raender = () => {
+      leiste.classList.toggle("am-anfang", leiste.scrollLeft <= 1);
+      leiste.classList.toggle("am-ende", leiste.scrollLeft + leiste.clientWidth >= leiste.scrollWidth - 1);
+    };
+    raender();
+    leiste.addEventListener("scroll", raender, { passive: true });
+    window.addEventListener("resize", raender);
+    return () => { leiste.removeEventListener("scroll", raender); window.removeEventListener("resize", raender); };
   }, [pathname, akte.data?.id]);
   // Karteikarte: Eine frisch geöffnete Akte beginnt mit der Karteikarte; „Übersicht“ bleibt als Reiter erreichbar
   const umgeleitet = useRef<number | null>(null);

@@ -387,14 +387,14 @@ export function PruefenKachel({ daten }: { daten: Startdaten }) {
             </div>
           </div>
         ) : null}
-        <div className="flex flex-col gap-2.5 text-sm">
+        <div className="flex flex-col gap-0.5 text-sm">
           {eintraege.map(([text, n, filter]) => (
-            <Link key={filter} to={`/patienten?pruefen=${filter}`} className="flex justify-between gap-3 no-underline text-tinte hover:text-akzent-text">
+            <Link key={filter} to={`/patienten?pruefen=${filter}`} className="flex justify-between gap-3 py-1 no-underline text-tinte hover:text-akzent-text">
               <span>{text}</span><span className="num text-akzent-text" data-testid={`pruefen-${filter}`}>{n}</span>
             </Link>
           ))}
           {datenschutz ? (
-            <Link to="/datenschutz" className="flex justify-between gap-3 no-underline text-tinte hover:text-akzent-text">
+            <Link to="/datenschutz" className="flex justify-between gap-3 py-1 no-underline text-tinte hover:text-akzent-text">
               <span>Offene Datenschutz-Anfragen{p.datenschutz_ueberfaellig ? <span className="text-fehler" data-testid="pruefen-datenschutz-ueberfaellig"> · {p.datenschutz_ueberfaellig} überfällig</span> : null}</span>
               <span className="num text-akzent-text" data-testid="pruefen-datenschutz">{p.datenschutz_anfragen}</span>
             </Link>
@@ -432,7 +432,7 @@ export function AktivKachel({ daten, breit }: { daten: Startdaten; breit: boolea
         ) : (
           <div key={`${z.bereich}-${z.objekt_id}-${i}`} className="py-[7px] border-b border-rand last:border-b-0">
             <span className="num gedaempft">{wann(z.zeitpunkt)}</span> {z.person ?? "—"} · {z.bezeichnung}{" "}
-            <Link to={`/patienten/${z.patient}`}>{z.name?.split(",")[0] ?? "Akte"}</Link>
+            <Link to={`/patienten/${z.patient}`} className="underline">{z.name?.split(",")[0] ?? "Akte"}</Link>
           </div>
         ))}
       </KachelInhalt>

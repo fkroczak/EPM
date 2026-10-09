@@ -53,7 +53,7 @@ function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) 
     <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
       <h2 className="lbl m-0">{titel}</h2>
       {/* Formulare in Stufen (S16): 2 breite Felder je Zeile, ab 1920 px 3, ab 2560 px 4 */}
-      <div className="grid grid-cols-4 fhd:grid-cols-6 qhd:grid-cols-8 gap-x-4 gap-y-3.5 items-start">{children}</div>
+      <div className="grid grid-cols-2 md:grid-cols-4 fhd:grid-cols-6 qhd:grid-cols-8 gap-x-3 md:gap-x-4 gap-y-3.5 items-start">{children}</div>
     </Karte>
   );
 }
@@ -163,7 +163,7 @@ export function PatientNeu() {
             <span className="text-sm gedaempft"><Link to="/patienten" className="no-underline">Patienten</Link> / Neu</span>
             <h1 className="m-0 text-[1.625rem] font-semibold">Neuer Patient</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <span className="text-[0.84rem] gedaempft">
               Nr. <span className="num text-tinte font-semibold" data-testid="naechste-nummer">{naechste.data ? nummer(naechste.data.nummer) : "…"}</span> wird automatisch vergeben
             </span>

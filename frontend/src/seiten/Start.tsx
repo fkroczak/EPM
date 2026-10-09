@@ -98,7 +98,20 @@ function Kennzahl({ titel, wert, unter, zu, testid }: { titel: string; wert: Rea
   );
 }
 
-function Kennzahlen({ d }: { d: Startdaten }) {
+function Kennzahlen({ d }: { d?: Startdaten }) {
+  if (!d) {
+    return (
+      <section aria-label="Kennzahlen" aria-busy="true" className="card grid grid-cols-2 schmal:grid-cols-5 gap-y-3 py-4" data-testid="kennzahlen-laden">
+        {["In Betreuung", "Mit offenem Termin", "Termine in 7 Tagen", "Kontakt fällig", "Termine überfällig"].map((t) => (
+          <div key={t} className="flex flex-col gap-1 px-5 py-1 min-w-0 border-rand schmal:border-l schmal:first:border-l-0">
+            <span className="text-[0.8125rem] gedaempft">{t}</span>
+            <span className="num text-2xl font-semibold leading-tight gedaempft">–</span>
+            <span className="text-[0.78125rem] gedaempft">{t === "Kontakt fällig" ? <span className="chip invisible">…</span> : "\u00a0"}</span>
+          </div>
+        ))}
+      </section>
+    );
+  }
   const z = d.zahlen;
   const anteil = z.in_betreuung ? Math.round((100 * z.mit_offenem_termin) / z.in_betreuung) : 0;
   return (
@@ -347,7 +360,8 @@ export function Start() {
           ) : null}
         </div>
         <div className="flex items-center gap-2.5 flex-wrap">
-          {d?.sicherung ? <BackupStatus s={d.sicherung} verweis={darf("backup_verwalten")} /> : null}
+          {d?.sicherung ? <BackupStatus s={d.sicherung} verweis={darf("backup_verwalten")} />
+            : daten.isLoading ? <Chip className="h-7 invisible" aria-hidden="true">Backup-Status wird geladen</Chip> : null}
           {erfassen && lesen ? <>
             <Knopf variante="pri" icon="telefon" onClick={() => oeffne("kontakt")}>Kontakt erfassen</Knopf>
             <Knopf icon="waage" onClick={() => oeffne("gewicht")}>Gewicht</Knopf>
@@ -401,8 +415,8 @@ export function Start() {
       ) : null}
       <span className="sr-only" aria-live="polite">{ansage}</span>
 
-      {lesen && d ? <Kennzahlen d={d} /> : null}
-      {lesen && daten.isLoading ? <Laden /> : null}
+      {/* beim Laden gleich hoch mit Platzhaltern, damit die Kacheln darunter nicht springen (Lighthouse 09.10.2026) */}
+      {lesen && (d || daten.isLoading) ? <Kennzahlen d={d} /> : null}
 
       <div ref={raster} className="raster" data-testid="raster" data-spalten={spalten}>
         {sichtbar.map((k) => {

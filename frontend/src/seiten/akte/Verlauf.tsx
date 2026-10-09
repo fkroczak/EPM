@@ -132,11 +132,11 @@ export function Verlauf() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         {/* Mit den Reitern der Akte sind es zu viele Bereiche für eine Knopfreihe – darum eine Auswahlliste
             wie bei der Person daneben (Wunsch 07.10.2026) */}
-        <Auswahl aria-label="Bereich" data-testid="verlauf-bereich" className="w-[240px]" value={bereich} onChange={(e) => setBereich(e.target.value)}>
+        <Auswahl aria-label="Bereich" data-testid="verlauf-bereich" className="w-[240px] max-md:w-full" value={bereich} onChange={(e) => setBereich(e.target.value)}>
           {BEREICHE.map((b) => <option key={b.wert} value={b.wert}>{b.wert ? b.text : "Alle Bereiche"}</option>)}
         </Auswahl>
-        <div className="flex items-center gap-2.5">
-          <Auswahl aria-label="Person" className="w-[220px]" value={person} onChange={(e) => setPerson(e.target.value)}>
+        <div className="flex items-center gap-2.5 flex-wrap max-md:w-full">
+          <Auswahl aria-label="Person" className="w-[220px] max-md:w-auto max-md:grow" value={person} onChange={(e) => setPerson(e.target.value)}>
             <option value="">Alle Personen</option>
             {[...personen.entries()].map(([id, n]) => <option key={id} value={id}>{n}</option>)}
           </Auswahl>
