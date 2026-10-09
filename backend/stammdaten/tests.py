@@ -47,7 +47,8 @@ class Praeparate(Grundlage):
 
     def test_auswahllisten_wie_im_entwurf(self):
         orte = list(Auswahlwert.objects.filter(liste="terminort").values_list("wert", flat=True))
-        self.assertEqual(orte, ["Praxis Dr. Holtmeier"])
+        # „Telefon/Video“: Telefontermine in der Patientenankündigung (F173)
+        self.assertEqual(orte, ["Praxis Dr. Holtmeier", "Telefon/Video"])
         katheter = list(Auswahlwert.objects.filter(liste="katheter").order_by("reihenfolge")
                         .values_list("wert", flat=True))
         self.assertEqual(katheter, ["Port", "Hickman", "Broviac", "PICC", "Port 1-Kammer", "Port 2-Kammer"])
