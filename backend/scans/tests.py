@@ -89,6 +89,20 @@ class EinheitenTest(SimpleTestCase):
             self.assertEqual(einheiten.einheit(gelesen), richtig, gelesen)
         self.assertIsNone(einheiten.einheit("Hauptstraße"))
 
+    def test_einheiten_mit_zusatz_und_ohne_schraegstrich(self):
+        """„pg/Ery“ (MCH), „ml/min/1,73m²KOF“ (eGFR), „l/l“ (Hämatokrit), Schrägstrich nicht gelesen („mmol1“)."""
+        for gelesen, richtig in [("pg/Ery", "pg"), ("ml/min/1,73m²KOF", "ml/min/1,73 m²"),
+                                 ("ml/min/1,73m2KOF", "ml/min/1,73 m²"), ("l/l", "l/l"), ("I/l", "l/l"),
+                                 ("mmol1", "mmol/l"), ("mmolI", "mmol/l"), ("µmol1", "µmol/l"), ("mgdl", "mg/dl")]:
+            self.assertEqual(einheiten.einheit(gelesen), richtig, gelesen)
+        self.assertEqual(einheiten.faktor("l/l", "%"), Decimal(100))
+
+    def test_einheit_erschliessen(self):
+        """Ohne gelesene Einheit: Hämatokrit 0,37 passt nur zu l/l; ein plausibler Wert bleibt in der Katalogeinheit."""
+        self.assertEqual(einheiten.einheit_raten("haematokrit", Decimal("0.37"), "%"), "l/l")
+        self.assertIsNone(einheiten.einheit_raten("haematokrit", Decimal("37"), "%"))
+        self.assertIsNone(einheiten.einheit_raten("tumormarker", Decimal("0.37"), "%"))
+
     def test_umrechnung(self):
         self.assertEqual(einheiten.faktor("g/dl", "g/l"), Decimal(10))
         self.assertEqual(einheiten.faktor("ng/ml", "µg/l"), Decimal(1))
@@ -150,6 +164,114 @@ class AuswertungTest(SimpleTestCase):
         self.assertFalse(natrium["vorschlag"])
         self.assertTrue(any("außerhalb" in h for h in natrium["hinweise"]))
 
+    def test_kleines_blutbild_mit_methode_in_klammern_und_pfeilen(self):
+        """Befund wie von Laboren üblich: Methode in Klammern hinter kurzen Namen (MCH, CRP, GGT), Pfeile vor
+        auffälligen Werten, die die Erkennung als „1“ oder „!“ liest, Hämatokrit in l/l ohne gelesene Einheit."""
+        katalog = KATALOG_BEISPIEL + [
+            {"id": 20, "name": "Hämoglobin", "kurzname": "Hb", "einheit": "g/dl", "gruppe": "", "suchbegriffe": ""},
+            {"id": 21, "name": "Hämatokrit", "kurzname": "Hkt", "einheit": "%", "gruppe": "", "suchbegriffe": ""},
+            {"id": 22, "name": "MCH", "kurzname": "", "einheit": "pg", "gruppe": "", "suchbegriffe": ""},
+            {"id": 23, "name": "MCV", "kurzname": "", "einheit": "fl", "gruppe": "", "suchbegriffe": ""},
+            {"id": 24, "name": "CRP", "kurzname": "", "einheit": "mg/l", "gruppe": "", "suchbegriffe": ""},
+            {"id": 25, "name": "Gamma-GT", "kurzname": "γ-GT", "einheit": "U/l", "gruppe": "", "suchbegriffe": ""},
+            {"id": 26, "name": "GFR (CKD-EPI)", "kurzname": "", "einheit": "ml/min/1,73 m²", "gruppe": "",
+             "suchbegriffe": ""},
+            {"id": 27, "name": "Eisen", "kurzname": "", "einheit": "µg/dl", "gruppe": "", "suchbegriffe": ""},
+        ]
+        # Etikett links, Werte linksbündig ab x = 700 (10 Pixel je Zeichen); ein Pfeil ragt ein Zeichen heraus
+        zeilen = [("Hamoglobin (Photometrie)", "12.4", 700, "g/dl 11.5 - 16.0"),
+                  ("Hämatokrit (berechnet)", "0.37", 700, "M 0.36 - 0.48"),
+                  ("MCH (berechnet)", "!27.7", 690, "pg/Ery 28.0 - 33.0"),
+                  ("MCV (berechnet)", "83.3", 700, "fl 80.0 - 96.0"),
+                  ("Eisen (Photometrie)", "10.8", 700, "µmol/l 10.7 - 32.2"),
+                  ("Eisen (Umrechnung)", "60.3", 700, "µg/dl 60 - 180"),
+                  ("Kalium (ISE)", "3.67", 700, "mmol1 3.5 - 5.1"),
+                  ("eGFRCrea nach CKD-EPI (2009)", "188", 690, "ml/min/1,73m²KOF ≥ 90"),
+                  ("GGT (Photometrie)", "25", 700, "U/l < 40"),
+                  ("CRP (Turbidimetrie)", "118.69", 690, "mg/l < 5.0")]
+        reihen, y = [], 10
+        for etikett, wert, x_wert, rest in zeilen:
+            woerter, x = [], 10
+            for wort in etikett.split():
+                woerter.append([wort, x, y, 10 * len(wort), 20, 0.95])
+                x += 10 * len(wort) + 12
+            woerter.append([wert, x_wert, y, 10 * len(wert), 20, 0.95])
+            x = x_wert + 10 * len(wert) + 30
+            for wort in rest.split():
+                woerter.append([wort, x, y, 10 * len(wort), 20, 0.95])
+                x += 10 * len(wort) + 12
+            reihen.append([{"q": "p", "w": woerter}])
+            y += 30
+        werte = auswertung.laborwerte(auswertung.reihen_aus([{"breite": 2000, "hoehe": 3000, "reihen": reihen}]),
+                                      katalog)
+        gewaehlt = {w["parameter_name"]: w for w in werte if w["vorschlag"]}
+        self.assertEqual(set(gewaehlt), {"Hämoglobin", "Hämatokrit", "MCH", "MCV", "Eisen", "Kalium",
+                                         "GFR (CKD-EPI)", "Gamma-GT", "CRP"})
+        self.assertEqual(gewaehlt["Hämoglobin"]["zuordnung"], "aehnlich")
+        # 0,37 l/l → 37 %
+        self.assertEqual((gewaehlt["Hämatokrit"]["wert"], gewaehlt["Hämatokrit"]["referenz_von"]), ("37", "36"))
+        # Pfeile: „!27.7“, „188“ und „118.69“ mit herausragender „1“
+        self.assertEqual((gewaehlt["MCH"]["wert"], gewaehlt["MCH"]["markierung"]), ("27.7", "↓"))
+        self.assertEqual((gewaehlt["GFR (CKD-EPI)"]["wert"], gewaehlt["GFR (CKD-EPI)"]["markierung"]), ("88", "↓"))
+        self.assertEqual((gewaehlt["CRP"]["wert"], gewaehlt["CRP"]["markierung"]), ("18.69", "↑"))
+        self.assertTrue(any("Pfeil" in h for h in gewaehlt["CRP"]["hinweise"]))
+        self.assertEqual(gewaehlt["Kalium"]["einheit_gelesen"], "mmol1")
+        # Eisen steht zweimal im Befund: vorgewählt ist die Zeile, die schon in der Einheit des Katalogs steht
+        self.assertEqual(gewaehlt["Eisen"]["wert"], "60.3")
+        self.assertEqual(len([w for w in werte if w["parameter_name"] == "Eisen"]), 2)
+
+    def test_vorwert_mit_datum_und_pfeile_als_eigenes_wort(self):
+        """Spalte „Vorwert“ mit Datum („7,9 (19.11.24)“) macht aus der Zeile keine Kopfzeile – der Befund gilt als
+        Labor. Pfeile als eigenes Wort („|“, „1“ vor dem Wert), „G/l“ als „GA“ gelesen."""
+        katalog = KATALOG_BEISPIEL + [
+            {"id": 30, "name": "Leukozyten", "kurzname": "", "einheit": "/nl", "gruppe": "", "suchbegriffe": ""},
+            {"id": 31, "name": "Erythrozyten", "kurzname": "", "einheit": "/pl", "gruppe": "", "suchbegriffe": ""},
+            {"id": 32, "name": "Thrombozyten", "kurzname": "", "einheit": "/nl", "gruppe": "", "suchbegriffe": ""},
+        ]
+        a = auswertung.auswerten([_seite(
+            "Kostenträger Kasse Endbefund 30.01.2025", "Eingang 19.11.2024 08:54",
+            "Leukozyten 1 9,7 GA 4,0 - 9,0 7,9 (19.11.24)", "Erythrozyten | 3,6 TA 3,9 - 5,3 3,9 (19.11.24)",
+            "Thrombozyten 353 GA 150 - 400 390 (19.11.24)", "Natrium 144 mmol/4 136 - 145 145 (05.09.24)",
+            "Kalium - Plasma 4,6 mmol4 3,4 - 5,1 4,6 (05.09.24)", "Albumin i.S. (phot.) 45,8 g/ 35,0 - 52,0 45,6 (19.11.24)",
+            "Kalium 1 3,5 - 5,1")], katalog)
+        self.assertIn("labor", a["arten"])
+        werte = [w for w in a["labor"]["werte"] if w["vorschlag"]]
+        w = {x["parameter_name"]: x for x in werte}
+        self.assertEqual((w["Leukozyten"]["wert"], w["Leukozyten"]["markierung"], w["Leukozyten"]["einheit_gelesen"]),
+                         ("9.7", "↑", "GA"))
+        self.assertEqual((w["Erythrozyten"]["wert"], w["Erythrozyten"]["markierung"]), ("3.6", "↓"))
+        self.assertFalse(any("Pfeil" in h for h in w["Erythrozyten"]["hinweise"]))
+        self.assertEqual(w["Natrium"]["referenz_bis"], "145")
+        self.assertEqual(w["Kalium"]["wert"], "4.6")  # die erste Kalium-Zeile; „Kalium 1 3,5 - 5,1“ bleibt Wert 1
+        self.assertEqual([x["wert"] for x in a["labor"]["werte"] if x["parameter_name"] == "Kalium"], ["4.6", "1"])
+        self.assertEqual(w["Albumin"]["wert"], "45.8")
+
+    def test_ausstehend_erlaeuterung_und_referenz_an_der_einheit(self):
+        """„folgt“ wird nicht vorgewählt; „Vitamin D-Mangel: < 50“ (Beurteilungsstufe) ist kein Wert;
+        „ml/min/1.73qm> 60“: das Zeichen des Referenzbereichs klebt an der Einheit."""
+        katalog = KATALOG_BEISPIEL + [
+            {"id": 40, "name": "Vitamin D", "kurzname": "", "einheit": "µg/l", "gruppe": "", "suchbegriffe": ""},
+            {"id": 41, "name": "GFR (CKD-EPI)", "kurzname": "", "einheit": "ml/min/1,73 m²", "gruppe": "",
+             "suchbegriffe": ""}]
+        a = auswertung.auswerten([_seite("Zink (ICP-MS) folgt", "Vitamin D-Mangel: < 50",
+                                         "GFR (rechn. nach CKD-EPI) 85 ml/min/1.73qm> 60 85 (07.03.23)",
+                                         "Natrium 143 mmol/l 133-150", "Kalium (Plasma) 4.0 mmol/l 3.4-5.1")], katalog)
+        werte = {w["parameter_name"]: w for w in a["labor"]["werte"]}
+        self.assertFalse(werte["Zink"]["vorschlag"])
+        self.assertNotIn("Vitamin D", werte)
+        gfr = werte["GFR (CKD-EPI)"]
+        self.assertEqual((gfr["wert"], gfr["referenz_von"], gfr["einheit"]), ("85", "60", "ml/min/1,73 m²"))
+
+    def test_eins_ohne_pfeil_bleibt(self):
+        """Eine „1“ in der Wertespalte ist kein Pfeil: Thrombozyten 195, Leukozyten 11,2 bleiben."""
+        katalog = KATALOG_BEISPIEL + [
+            {"id": 30, "name": "Thrombozyten", "kurzname": "", "einheit": "/nl", "gruppe": "", "suchbegriffe": ""}]
+        a = auswertung.auswerten([_seite("Thrombozyten 195 G/l 140 - 360", "Natrium 138 mmol/l",
+                                         "Kalium 4,1 mmol/l", "Albumin 40 g/l", "Zink 101 µg/l")], katalog)
+        werte = {w["parameter_name"]: w for w in a["labor"]["werte"]}
+        self.assertEqual(werte["Thrombozyten"]["wert"], "195")
+        self.assertEqual(werte["Zink"]["wert"], "101")
+
     def test_bia(self):
         seite = _seite("Bioelektrische Impedanzanalyse", "Datum der Messung: 20.09.2026",
                        "Körpergewicht 58,4 kg", "BMI 21,2 kg/m?", "Körperwasser (TBW) 29,81",
@@ -199,6 +321,31 @@ class AuswertungTest(SimpleTestCase):
         self.assertTrue(d["K91.2"]["bezeichnung"].startswith("Kurzdarmsyndrom"))
         self.assertIn("Parenterale", a["abschnitte"]["therapie"])
         self.assertEqual(a["patient"]["geburtsdaten"], ["1961-03-14"])
+
+    def test_tesseract_zeile_uebereinander_wird_geteilt(self):
+        """Fasst Tesseract übereinander stehende Wörter zu einer Zeile zusammen, werden daraus wieder Zeilen;
+        unsichere Riesenwörter über mehrere Zeilen entfallen."""
+        from .ocr.tesseract import TWort
+        woerter = [TWort("Eisen", 100, 466, 90, 30, 0.9, (4, 1, 1)), TWort("10.8", 700, 466, 40, 30, 0.9, (4, 1, 1)),
+                   TWort("Kalium", 100, 537, 110, 30, 0.9, (4, 1, 1)), TWort("3.67", 700, 537, 40, 30, 0.9, (4, 1, 1)),
+                   TWort("Natrium", 100, 600, 110, 30, 0.9, (4, 2, 1)),
+                   TWort("En", 100, 291, 300, 245, 0.08, (4, 3, 1))]
+        stuecke = fusion.tesseract_stuecke(woerter)
+        texte = sorted(s.text for s in stuecke)
+        self.assertEqual(texte, ["10.8", "3.67", "Eisen", "Kalium", "Natrium"])
+
+    def test_datum_und_alter_getrennt(self):
+        """„26.11.1970 ♀ 54 Jahre“ als „26.11.197054 Jahre“ gelesen → Datum und Alter wieder getrennt."""
+        W = fusion.Wort
+        aus = fusion.datum_und_alter_trennen([W("geb.", 0, 0, 40, 20, 0.9), W("26.11.197054", 50, 0, 120, 20, 0.9),
+                                              W("Jahre", 180, 0, 50, 20, 0.9)])
+        self.assertEqual([w.t for w in aus], ["geb.", "26.11.1970", "54", "Jahre"])
+        # ohne „Jahre“ dahinter bleibt das Wort, wie es ist
+        self.assertEqual([w.t for w in fusion.datum_und_alter_trennen([W("26.11.197054", 0, 0, 120, 20, 0.9)])],
+                         ["26.11.197054"])
+        d = fusion.seite_json([fusion.Stueck(aus, "p").rahmen()], 1000, 1000, ["paddle"])
+        a = auswertung.patient_hinweise(auswertung.reihen_aus([d]))
+        self.assertEqual(a["geburtsdaten"], ["1970-11-26"])
 
     def test_vergleich_zweier_lesarten(self):
         """Übereinstimmung macht sicher; Abweichung bleibt markiert und nennt die andere Lesart."""

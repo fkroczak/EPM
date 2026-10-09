@@ -27,6 +27,13 @@ class Kontext:
     bericht: object = None
     labor: object = None
     bia: object = None
+    # Schreiben aus der Akte (Vorlagen von Alice, 09.10.2026, F172): Termin der Terminbestätigung; bei der
+    # Patientenankündigung (ohne Patient) der Zeitraum, der Terminort und die Termine darin
+    termin: object = None
+    zeitraum: tuple = None
+    terminort: object = None
+    termine: list = None
+    benutzer: object = None
 
     def __post_init__(self):
         self.heute = self.heute or timezone.localdate()
@@ -181,6 +188,51 @@ GEMEINSAM = {
     "Absender.Telefon": Feld("Telefon des Absenders", lambda k: _absender(k).telefon or None),
     "Absender.E-Mail": Feld("E-Mail des Absenders", lambda k: _absender(k).email or None),
     "Absender.Fußzeile": Feld("Fußzeile des Absenders", lambda k: _absender(k).fusszeile or None),
+}
+
+def _je_geschlecht(weiblich, maennlich, sonst):
+    return lambda k: {"w": weiblich, "m": maennlich}.get(k.patient.geschlecht, sonst)
+
+
+WOCHENTAGE = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")
+
+
+def tag_lang(d) -> str | None:
+    """„Montag, 17.08.2026“"""
+    return f"{WOCHENTAGE[d.weekday()]}, {d:%d.%m.%Y}" if d else None
+
+
+def _termin(funktion):
+    return lambda k: funktion(k.termin) if k.termin is not None else None
+
+
+# Anschreiben an Patienten (F172): Anrede und die Wörter, die vom Geschlecht abhängen (Reisebescheinigung)
+ANSCHREIBEN = {
+    "Patient.Vorname_Name": Feld("Vorname Nachname", lambda k: f"{k.patient.vorname} {k.patient.nachname}".strip()),
+    "Patient.Briefanrede": Feld("Sehr geehrte Frau … / Sehr geehrter Herr … / Guten Tag Vorname Nachname",
+                                lambda k: {"w": f"Sehr geehrte Frau {k.patient.nachname}",
+                                           "m": f"Sehr geehrter Herr {k.patient.nachname}"}.get(
+                                    k.patient.geschlecht, f"Guten Tag {k.patient.vorname} {k.patient.nachname}")),
+    "Patient.E-Mail": Feld("E-Mail", lambda k: k.patient.email or None),
+    "Patient.Telefon": Feld("Telefon", lambda k: k.patient.telefon or None),
+    "Patient.der_Patientin": Feld("der Patientin / des Patienten",
+                                  _je_geschlecht("der Patientin", "des Patienten", "der Patientin bzw. des Patienten")),
+    "Patient.die_Patientin": Feld("die Patientin / der Patient",
+                                  _je_geschlecht("die Patientin", "der Patient", "die Patientin bzw. der Patient")),
+    "Patient.ihre": Feld("ihre / seine", _je_geschlecht("ihre", "seine", "ihre bzw. seine")),
+    "Patient.ihrer": Feld("ihrer / seiner", _je_geschlecht("ihrer", "seiner", "ihrer bzw. seiner")),
+    "Patient.Mrs": Feld("englische Anrede: Mrs. / Mr. (leer bei divers)", _je_geschlecht("Mrs.", "Mr.", None)),
+    "Patient.her": Feld("englisch: her / his / their", _je_geschlecht("her", "his", "their")),
+    "Benutzer.Name": Feld("wer das Schreiben erstellt (angemeldete Person)", lambda k: _person(k.benutzer)),
+}
+
+TERMIN = {
+    "Termin.Datum": Feld("Tag des Termins mit Wochentag (Montag, 17.08.2026)", _termin(lambda t: tag_lang(t.faellig_am))),
+    "Termin.Uhrzeit": Feld("Uhrzeit des Termins (14:30 Uhr)",
+                           _termin(lambda t: f"{t.uhrzeit:%H:%M} Uhr" if t.uhrzeit else None)),
+    "Termin.Ort": Feld("Terminort", _termin(lambda t: str(t.ort) if t.ort_id else None)),
+    "Termin.bei": Feld("bei/Ort (Freitext) des Termins", _termin(lambda t: t.bei or None)),
+    "Termin.Titel": Feld("Titel des Termins", _termin(lambda t: t.titel or None)),
 }
 
 INFUSIONSPLAN = {
@@ -362,9 +414,57 @@ SPRECHSTUNDE = {
                             _bia(lambda b: b.beurteilung or None), html=True),
 }
 
+# Schreiben aus der Akte (F172)
+PATIENTENAUFNAHME = {**GEMEINSAM, **ANSCHREIBEN}
+TERMINBESTAETIGUNG = {**GEMEINSAM, **ANSCHREIBEN, **TERMIN}
+REISEBESCHEINIGUNG = {**GEMEINSAM, **ANSCHREIBEN, "Patient.Diagnosen": GEMEINSAM["Patient.Diagnosen"]}
+
+# Patientenankündigung (F173): ohne Patient – Absender, Datum, Zeitraum und Terminort
+ANKUENDIGUNG = {
+    **{name: feld for name, feld in GEMEINSAM.items() if name.startswith("Absender.") or name == "Heute"},
+    "Zeitraum.von": Feld("erster Tag (Montag, 17.08.2026)", lambda k: tag_lang(k.zeitraum[0]) if k.zeitraum else None),
+    "Zeitraum.bis": Feld("letzter Tag (Mittwoch, 19.08.2026)", lambda k: tag_lang(k.zeitraum[1]) if k.zeitraum else None),
+    "Zeitraum": Feld("Zeitraum (17.08.2026 bis 19.08.2026, an einem Tag nur das Datum)",
+                     lambda k: None if not k.zeitraum else datum(k.zeitraum[0]) if k.zeitraum[0] == k.zeitraum[1]
+                     else f"{datum(k.zeitraum[0])} bis {datum(k.zeitraum[1])}"),
+    "Terminort": Feld("gewählter Terminort", lambda k: str(k.terminort) if k.terminort is not None else None),
+    "Anzahl": Feld("Zahl der angekündigten Termine", lambda k: str(len(k.termine or []))),
+    "Termine.Liste": Feld("Termine als Text, nach Tagen geordnet (für die E-Mail)", lambda k: termine_als_text(k)),
+    "Benutzer.Name": ANSCHREIBEN["Benutzer.Name"],
+}
+
+# Eigene Schreiben (F176): unter Vorlagen › Dokumentvorlagen angelegt, Kennung „eigen-…“. Sie haben alle dieselben
+# Datenfelder: Patient, Anrede, Absender und – wenn beim Erzeugen ein Termin gewählt ist – den Termin.
+EIGEN_PRAEFIX = "eigen-"
+EIGEN = {**GEMEINSAM, **ANSCHREIBEN, **TERMIN}
+
+
+def ist_eigen(art) -> bool:
+    return isinstance(art, str) and art.startswith(EIGEN_PRAEFIX) and len(art) > len(EIGEN_PRAEFIX)
+
+
+class JeArt(dict):
+    """Wert je Vorlagenart; eigene Schreiben teilen sich einen Wert (``eigen``)."""
+
+    def __init__(self, werte, eigen):
+        super().__init__(werte)
+        self.eigen = eigen
+
+    def __missing__(self, art):
+        if ist_eigen(art):
+            return self.eigen() if callable(self.eigen) else self.eigen
+        raise KeyError(art)
+
+    def __contains__(self, art):
+        return super().__contains__(art) or ist_eigen(art)
+
+
 FELDER = {"infusionsplan": INFUSIONSPLAN, "patientendatenblatt": PATIENTENDATENBLATT,
           "datenschutzinformation": ERKLAERUNG, "einwilligung": ERKLAERUNG, "schweigepflichtentbindung": ERKLAERUNG,
-          "bericht": BERICHT, "sprechstunde": SPRECHSTUNDE}
+          "bericht": BERICHT, "sprechstunde": SPRECHSTUNDE,
+          "patientenaufnahme": PATIENTENAUFNAHME, "terminbestaetigung": TERMINBESTAETIGUNG,
+          "reisebescheinigung": REISEBESCHEINIGUNG, "patientenankuendigung": ANKUENDIGUNG}
+FELDER = JeArt(FELDER, EIGEN)
 
 # Tabellen mit festem Aufbau je Art (Spalten stehen fest, damit nichts Falsches gedruckt werden kann).
 # (Name, Spalten, Ausrichtung je Spalte): "zahl" rechtsbündig, "einheit" schmal und grau – wie im Laborbefund.
@@ -394,7 +494,16 @@ TABELLEN = {
         "bilanz": ("Laufzeit und Volumen (Mischbeutel, Zusatzlösung, Gesamt)",
                    ["", "Mischbeutel", "Zusatzlösung", "Gesamt", ""], ["", "zahl", "zahl", "zahl", "einheit"]),
     },
+    "patientenaufnahme": {}, "terminbestaetigung": {},
+    "reisebescheinigung": {
+        "diagnosen": ("Diagnosen mit ICD-Code", ["Diagnose", "ICD", "seit"], ["", "", ""]),
+    },
+    "patientenankuendigung": {
+        "ankuendigung": ("Termine im Zeitraum (Tag, Uhrzeit, Patient, Hinweis)",
+                         ["Tag", "Uhrzeit", "Patient", "Hinweis"], ["", "", "", ""]),
+    },
 }
+TABELLEN = JeArt(TABELLEN, {"diagnosen": ("Diagnosen mit ICD-Code", ["Diagnose", "ICD", "seit"], ["", "", ""])})
 
 
 class Fett(str):
@@ -469,6 +578,14 @@ def tabellenzeilen(art: str, quelle: str, k: Kontext) -> list[list[str]]:
                   ("Magermasse", b.magermasse_kg, "kg"), ("ECW (extrazelluläres Wasser)", b.ecw_prozent, "%"),
                   ("Körperwasser", b.koerperwasser_l, "l"), ("BMI", b.bmi, "")]
         return [[name, _zahl(wert), einheit] for name, wert, einheit in zeilen if wert is not None]
+    if quelle == "ankuendigung":
+        zeilen, vorher = [], None
+        for t in k.termine or []:
+            tag = tag_lang(t.faellig_am)
+            zeilen.append([Fett(tag) if tag != vorher else "", f"{t.uhrzeit:%H:%M}" if t.uhrzeit else "—",
+                           f"{t.patient.vorname} {t.patient.nachname}", ankuendigung_hinweis(t, k.terminort) or ""])
+            vorher = tag
+        return zeilen
     if quelle == "termine":
         from patienten.models import Termin
 
@@ -477,3 +594,33 @@ def tabellenzeilen(art: str, quelle: str, k: Kontext) -> list[list[str]]:
         return [[datum(t.faellig_am) + (f", {t.uhrzeit:%H:%M} Uhr" if t.uhrzeit else ""), t.get_art_display(), t.titel,
                  str(t.ort) if t.ort_id else (t.bei or "—")] for t in termine]
     return []
+
+
+def ankuendigung_hinweis(t, terminort=None) -> str | None:
+    """Hinweis zu einem Termin der Patientenankündigung (F173): ein abweichender Terminort – bei Telefon- oder
+    Videoterminen mit der Telefonnummer der Akte – und der Freitext „bei/Ort“ (z. B. „1 h, Neuaufnahme“)."""
+    teile = []
+    if t.ort_id and (terminort is None or t.ort_id != terminort.pk):
+        ort = str(t.ort)
+        if any(w in ort.lower() for w in ("telefon", "video")):
+            nummer = t.patient.telefon or t.patient.telefon2
+            ort = f"{ort} {nummer}" if nummer else ort
+        teile.append(ort)
+    if t.bei:
+        teile.append(t.bei)
+    return " · ".join(teile) or None
+
+
+def termine_als_text(k) -> str | None:
+    """Die Termine der Patientenankündigung als Text, je Tag eine Überschrift (F173)."""
+    zeilen, vorher = [], None
+    for t in k.termine or []:
+        if t.faellig_am != vorher:
+            if zeilen:
+                zeilen.append("")
+            zeilen.append(tag_lang(t.faellig_am))
+            vorher = t.faellig_am
+        hinweis = ankuendigung_hinweis(t, k.terminort)
+        zeilen.append(f"{t.uhrzeit:%H:%M}" if t.uhrzeit else "—")
+        zeilen[-1] += f"  {t.patient.vorname} {t.patient.nachname}" + (f" → {hinweis}" if hinweis else "")
+    return "\n".join(zeilen) or None

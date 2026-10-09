@@ -6,7 +6,7 @@ In der Fußzeile stehen zusätzlich ``{Seite}`` und ``{Seiten}``.
 """
 import re
 
-from .felder import FELDER, TABELLEN
+from .felder import FELDER, TABELLEN, JeArt, ist_eigen
 
 PLATZHALTER = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
 ID_MUSTER = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
@@ -25,6 +25,8 @@ TYPEN = {
     "seitenumbruch": "Seitenumbruch",
     "fusszeile": "Fußzeile",
     "kopfkarte": "Kopfkarte",
+    # Text der E-Mail zum Schreiben (F172): steht nicht auf der PDF
+    "email": "E-Mail",
 }
 OPTIONEN = {
     "schrift": {"klein", "normal", "gross"},
@@ -38,6 +40,13 @@ OPTIONEN = {
 NEBENEINANDER = {"text", "datenfelder", "tabelle", "unterschrift"}
 DARSTELLUNGEN = {"paare", "befund"}
 MAX_BLOECKE = 60
+# Schreiben mit E-Mail-Text (F172, F173)
+class _MitEmail(set):
+    def __contains__(self, art):
+        return super().__contains__(art) or ist_eigen(art)  # eigene Schreiben (F176) haben ebenfalls eine E-Mail
+
+
+MIT_EMAIL = _MitEmail({"patientenaufnahme", "terminbestaetigung", "reisebescheinigung", "patientenankuendigung"})
 MAX_FELDER = 30
 MAX_TEXT = 4000
 
@@ -89,7 +98,7 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
         return [f"Höchstens {MAX_BLOECKE} Blöcke."]
     fehler: list[str] = []
     ids = set()
-    zaehler = {"briefkopf": 0, "fusszeile": 0}
+    zaehler = {"briefkopf": 0, "fusszeile": 0, "email": 0}
     for nr, b in enumerate(bloecke, 1):
         if not isinstance(b, dict):
             fehler.append(f"Block {nr}: ungültig.")
@@ -178,6 +187,14 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
             erlaubt |= {"quelle"}
             if b.get("quelle") not in TABELLEN[art]:
                 fehler.append(f"{name}: unbekannte Tabelle. Möglich: {', '.join(TABELLEN[art])}.")
+        elif typ == "email":
+            erlaubt |= {"betreff", "text"}
+            if art not in MIT_EMAIL:
+                fehler.append(f"{name}: Eine E-Mail gibt es nur bei den Schreiben.")
+            _text(b.get("betreff"), f"{name} (Betreff)", fehler, pflicht=True, laenge=200)
+            _text(b.get("text"), f"{name} (Text)", fehler, pflicht=True)
+            for feld in ("betreff", "text"):
+                _felder_pruefen(art, b.get(feld), name, fehler)
         elif typ == "leerraum":
             erlaubt |= {"hoehe_mm"}
             h = b.get("hoehe_mm", 6)
@@ -329,8 +346,228 @@ SCHWEIGEPFLICHTENTBINDUNG = [
     {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
 ]
 
+# ------------------------------------------------------------------------------------------------ Schreiben
+# Vorlagen von Alice Hessel (09.10.2026, F172/F173). Texte wie in ihren Word-Vorlagen; die Anschrift der Praxis
+# Dr. Holtmeier (Ort der Sprechstunden) steht im Text und wird hier gepflegt, wenn sie sich ändert.
+ABSENDERZEILE = {"id": "absenderzeile", "typ": "text", "bezeichnung": "Absenderzeile",
+                 "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}", "optionen": {"schrift": "klein"}}
+EMPFAENGER_PATIENT = {"id": "empfaenger", "typ": "zweispaltig", "bezeichnung": "Empfänger und Datum",
+                      "links": "{{Patient.Anrede}}\n{{Patient.Vorname_Name}}\n{{Patient.Straße}}\n{{Patient.PLZ_Ort}}",
+                      "rechts": "{{Heute}}"}
+PRAXIS_HOLTMEIER = "Praxis Dr. med. Martin Holtmeier\nHamannplatz 23\n48157 Münster"
+UNTERLAGEN = (
+    "• Vorname, Name\n"
+    "• Anschrift\n"
+    "• Telefonnummer (Festnetz/Handy)\n"
+    "• E-Mail-Adresse (sofern vorhanden)\n"
+    "• Körpergröße und Gewicht (vor und nach Erkrankung)\n"
+    "• Bekannte Allergien (z. B. Nickel, Medikamente, Nahrungsmittelunverträglichkeiten)\n"
+    "• Name, Adresse, Telefonnummer des Hausarztes\n"
+    "• Aktuellste Blutwerte (im Optimalfall nicht älter als 14 Tage):\n"
+    "\u2003– Elektrolyte (Magnesium, Kalium, Calcium, Natrium, Phosphat)\n"
+    "\u2003– Spurenelemente (Kupfer, Zink, Selen, Mangan, Eisen)\n"
+    "\u2003– Transaminasen (GPT, GGT, ALKP, GOT), ggf. Bilirubin gesamt + direkt\n"
+    "\u2003– Ferritin, Albumin, CRP, Triglyceride\n"
+    "\u2003– Vitamin B1, B2, B6, B12 sowie A, D3, E, K\n"
+    "\u2003– Kleines Blutbild inkl. Gerinnung\n"
+    "\u2003– Kreatinin, GFR, Harnstoff, Harnsäure\n"
+    "• Alle Unterlagen über gestellte Diagnosen und aktuelle Behandlungen oder vorangegangene Operationen "
+    "(z. B. Arztbriefe, Krankenhausberichte)\n"
+    "• Übersicht über aktuell verordnete Medikamente oder andere medizinische Versorgungen\n"
+    "• Übersicht über aktuelle (par-)enterale Ernährung\n"
+    "• Auflistung aktueller Symptome und/oder Problematiken (bspw. Auftreten von Krämpfen in den Extremitäten, "
+    "Ödembildung, Haarausfall, trockene Haut etc.)"
+)
+AUFNAHME_EINLEITUNG = (
+    "wir bedanken uns schon jetzt für Ihr Vertrauen in die Deutsche Stiftung Krankheitsbedingte Mangelernährung. "
+    "Prof. Dr. Masin und sein Team stehen Ihnen im Rahmen Ihrer Behandlung gern beratend zur Seite.\n\n"
+    "Damit wir uns einen Überblick über Ihren aktuellen Gesundheitsstatus machen können, benötigen wir vorab "
+    "einige Daten und Unterlagen von Ihnen:"
+)
+AUFNAHME_SCHLUSS = (
+    "Die Stiftung unterliegt der EU-Datenschutz-Grundverordnung (DSGVO) vom 25.05.2018. Alle Informationen zum "
+    "Datenschutz entnehmen Sie unserer Homepage {{Absender.Internet}}.\n\n"
+    "Nach Zusendung bzw. Übermittlung der o. g. Angaben kann Prof. Masin vorab eine ernährungsmedizinische "
+    "Beurteilung Ihres persönlichen Falles erstellen. Dem schließt sich dann entweder eine persönliche Vorstellung "
+    "in unserer ernährungsmedizinischen Sprechstunde in Münster an oder auch ein Telefonat mit Ihnen, sollte die "
+    "Anreise nicht sofort möglich sein. In jedem Fall besprechen wir mit Ihnen gemeinsam das weitere mögliche "
+    "Vorgehen.\n\n"
+    "Im Rahmen von Fragen, Terminvereinbarungen und Rücksprachen steht Ihnen Frau Hessel montags bis freitags in "
+    "der Zeit von 9.00 bis 13.00 Uhr telefonisch unter {{Absender.Telefon}} zur Verfügung. Gern sind wir bereit, "
+    "mit Ihrem Hausarzt/Ihrer Hausärztin und anderen mitbehandelnden Ärzten auf Ihren Wunsch hin Kontakt "
+    "aufzunehmen."
+)
+GRUSS_TEAM = "Mit freundlichen Grüßen\n\nIhr Team der Deutschen Stiftung Krankheitsbedingte Mangelernährung"
+
+PATIENTENAUFNAHME = [
+    {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF},
+    ABSENDERZEILE, EMPFAENGER_PATIENT,
+    {"id": "leerraum", "typ": "leerraum", "bezeichnung": "Abstand", "hoehe_mm": 6},
+    {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Patientenaufnahme"},
+    {"id": "einleitung", "typ": "text", "bezeichnung": "Einleitung",
+     "text": "{{Patient.Briefanrede}},\n\n" + AUFNAHME_EINLEITUNG},
+    {"id": "unterlagen", "typ": "text", "bezeichnung": "Benötigte Daten und Unterlagen", "text": UNTERLAGEN},
+    {"id": "schluss", "typ": "text", "bezeichnung": "Datenschutz und weiteres Vorgehen", "text": AUFNAHME_SCHLUSS},
+    {"id": "gruss", "typ": "text", "bezeichnung": "Gruß", "text": GRUSS_TEAM, "optionen": {"nicht_teilen": True}},
+    {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
+    {"id": "email", "typ": "email", "bezeichnung": "E-Mail", "betreff": "Ihre Anfrage – benötigte Unterlagen",
+     "text": "{{Patient.Briefanrede}},\n\n" + AUFNAHME_EINLEITUNG + "\n\n" + UNTERLAGEN + "\n\n" + AUFNAHME_SCHLUSS
+             + "\n\nDiese Übersicht finden Sie auch im Anhang zum Ausdrucken.\n\n" + GRUSS_TEAM},
+]
+
+TERMIN_TEXT = ("hiermit bestätigen wir Ihren Termin in der ernährungsmedizinischen Sprechstunde von "
+               "Prof. Dr. Markus Masin.")
+TERMIN_HINWEIS = (
+    "Bitte bringen Sie Ihre Gesundheitskarte (Versichertenkarte Ihrer Krankenkasse) mit. "
+    "Eine Überweisung ist nicht notwendig.\n\n"
+    "Neue Befunde, Arztbriefe oder Laborwerte, die uns noch nicht vorliegen, bringen Sie bitte ebenfalls mit."
+)
+TERMIN_ABSAGE = ("Sollten Sie den Termin nicht wahrnehmen können, sagen Sie bitte rechtzeitig ab. Frau Hessel ist "
+                 "montags bis freitags von 9.00 bis 13.00 Uhr unter {{Absender.Telefon}} für Sie erreichbar.")
+
+TERMINBESTAETIGUNG = [
+    {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF},
+    ABSENDERZEILE, EMPFAENGER_PATIENT,
+    {"id": "leerraum", "typ": "leerraum", "bezeichnung": "Abstand", "hoehe_mm": 6},
+    {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Terminbestätigung"},
+    {"id": "einleitung", "typ": "text", "bezeichnung": "Einleitung",
+     "text": "{{Patient.Briefanrede}},\n\n" + TERMIN_TEXT},
+    {"id": "termin", "typ": "datenfelder", "bezeichnung": "Ihr Termin", "spalten": 1,
+     "optionen": {"ueberschrift": True, "nicht_teilen": True}, "felder": [
+        {"label": "Tag", "wert": "{{Termin.Datum}}"}, {"label": "Uhrzeit", "wert": "{{Termin.Uhrzeit}}"},
+        {"label": "Ort", "wert": PRAXIS_HOLTMEIER}]},
+    {"id": "hinweis", "typ": "text", "bezeichnung": "Bitte mitbringen", "text": TERMIN_HINWEIS,
+},
+    {"id": "absage", "typ": "text", "bezeichnung": "Absage", "text": TERMIN_ABSAGE},
+    {"id": "gruss", "typ": "text", "bezeichnung": "Gruß", "text": GRUSS_TEAM, "optionen": {"nicht_teilen": True}},
+    {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
+    {"id": "email", "typ": "email", "bezeichnung": "E-Mail",
+     "betreff": "Terminbestätigung: ernährungsmedizinische Sprechstunde am {{Termin.Datum}}",
+     "text": "{{Patient.Briefanrede}},\n\n" + TERMIN_TEXT + "\n\nTag: {{Termin.Datum}}\nUhrzeit: {{Termin.Uhrzeit}}\n"
+             "Ort: " + PRAXIS_HOLTMEIER.replace("\n", ", ") + "\n\n" + TERMIN_HINWEIS + "\n\n" + TERMIN_ABSAGE
+             + "\n\n" + GRUSS_TEAM},
+]
+
+# Reisebescheinigung im Briefkopf von Dr. Holtmeier (mit seiner Zustimmung, Abstimmung durch Alice Hessel).
+# Gehört mit dem ärztlichen Attest des ADAC zusammen: EPM hängt es als zweite Seite an (pdf.reise_attest).
+REISEBESCHEINIGUNG = [
+    {"id": "kopf", "typ": "zweispaltig", "bezeichnung": "Briefkopf Dr. Holtmeier",
+     "links": "Dr. med. Martin Holtmeier\nFacharzt für Allgemeinmedizin\nChirotherapie & Sportmedizin\n"
+              "Akademische Lehrpraxis der Westfälischen Wilhelms-Universität Münster",
+     "rechts": "Hamannplatz 23\n48157 Münster\nTel.: 0251 249999\nFax: 0251 246182", "rechts_klein": True},
+    {"id": "linie", "typ": "trennlinie", "bezeichnung": "Linie"},
+    {"id": "absenderzeile", "typ": "text", "bezeichnung": "Absenderzeile",
+     "text": "Dr. med. Martin Holtmeier · Hamannplatz 23 · 48157 Münster", "optionen": {"schrift": "klein"}},
+    {"id": "empfaenger", "typ": "zweispaltig", "bezeichnung": "Empfänger und Datum",
+     "links": "{{Patient.Anrede}}\n{{Patient.Vorname_Name}}\n{{Patient.Straße}}\n{{Patient.PLZ_Ort}}",
+     "rechts": "Münster, {{Heute}}"},
+    {"id": "leerraum", "typ": "leerraum", "bezeichnung": "Abstand", "hoehe_mm": 4},
+    {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Bescheinigung / Certificate"},
+    {"id": "deutsch", "typ": "text", "bezeichnung": "Bescheinigung (deutsch)",
+     "text": "{{Patient.Anrede}} {{Patient.Vorname_Name}}, geb. {{Patient.Geburtsdatum}}, wohnhaft "
+             "{{Patient.Anschrift}}, erhält aufgrund komplexer Grunderkrankungen eine individuell hergestellte "
+             "parenterale Ernährungstherapie, die medizinisch indiziert und für die Sicherstellung {{Patient.ihrer}} "
+             "lebensnotwendigen Nährstoffversorgung unverzichtbar ist.\n\n"
+             "Die Therapie dient der täglichen intravenösen Applikation von Makro- und Mikronährstoffen über einen "
+             "zentralvenösen Langzeitkatheter und ist für das Überleben {{Patient.der_Patientin}} essenziell. Eine "
+             "kontinuierliche Fortführung der parenteralen Ernährung ist auch während Reisen im In- und Ausland "
+             "medizinisch zwingend erforderlich.\n\n"
+             "Aus diesem Grund ist die Mitführung der patientenindividuell hergestellten parenteralen "
+             "Infusionslösungen sowie der für die Durchführung der Therapie erforderlichen Medizinprodukte und "
+             "Verbrauchsmaterialien notwendig.\n\n"
+             "Die patientenspezifisch hergestellten Infusionsbeutel sind durchgehend unter Einhaltung der Kühlkette "
+             "bei einer Lagertemperatur von 2–8 °C aufzubewahren. Zur sicheren Applikation der Infusionslösung ist "
+             "die Verwendung einer speziellen ambulanten Infusionspumpe erforderlich. Darüber hinaus müssen Spül- und "
+             "Blocklösungen sowie weiteres steriles Verbrauchsmaterial zur sachgerechten Katheterpflege und zur "
+             "Aufrechterhaltung der Katheterfunktion jederzeit mitgeführt werden.",
+     "optionen": {"schrift": "klein"}},
+    {"id": "englisch", "typ": "text", "bezeichnung": "Certificate (English)",
+     "text": "{{Patient.Mrs}} {{Patient.Vorname_Name}}, born {{Patient.Geburtsdatum}}, resident at "
+             "{{Patient.Anschrift}}, receives an individually compounded parenteral nutrition therapy due to complex "
+             "underlying medical conditions. This therapy is medically indicated and indispensable for maintaining "
+             "{{Patient.her}} vital nutritional requirements.\n\n"
+             "The treatment consists of the daily intravenous administration of macro- and micronutrients via a "
+             "long-term central venous catheter and is essential for the patient's survival. Continuous "
+             "administration of parenteral nutrition is medically mandatory, including during domestic and "
+             "international travel.\n\n"
+             "For this reason, the patient must carry {{Patient.her}} individually compounded parenteral nutrition "
+             "bags together with all medical devices and consumable supplies required for the safe administration "
+             "of the therapy.\n\n"
+             "The patient-specific parenteral nutrition bags must be stored continuously under refrigerated "
+             "conditions at a temperature of 2–8 °C (35.6–46.4 °F) to maintain product stability. Administration of "
+             "the infusion requires the use of a dedicated ambulatory infusion pump. In addition, catheter flushing "
+             "solutions, catheter lock solutions, and other sterile consumable supplies necessary for appropriate "
+             "catheter care and maintenance of catheter function must be carried at all times.",
+     "optionen": {"schrift": "klein", "kursiv": True}},
+    {"id": "gruss", "typ": "text", "bezeichnung": "Gruß", "text": "Mit freundlichen Grüßen",
+     "optionen": {"nicht_teilen": True}},
+    {"id": "abstand_unterschrift", "typ": "leerraum", "bezeichnung": "Platz für die Unterschriften", "hoehe_mm": 12},
+    {"id": "holtmeier", "typ": "text", "bezeichnung": "Unterschrift Dr. Holtmeier",
+     "text": "Dr. Martin Holtmeier\nFacharzt für Allgemeinmedizin\nund Chirotherapie",
+     "optionen": {"linie_oben": True, "nicht_teilen": True, "schrift": "klein"}},
+    {"id": "masin", "typ": "text", "bezeichnung": "Unterschrift Prof. Masin",
+     "text": "Prof. Dr. Markus Masin\nKonsiliarius, Vorstand Deutsche Stiftung\nKrankheitsbedingte Mangelernährung",
+     "optionen": {"linie_oben": True, "nicht_teilen": True, "schrift": "klein", "neben_vorherigem": "haelfte"}},
+    {"id": "email", "typ": "email", "bezeichnung": "E-Mail",
+     "betreff": "Ihre Reisebescheinigung für die parenterale Ernährung",
+     "text": "{{Patient.Briefanrede}},\n\n"
+             "anbei erhalten Sie Ihre Reisebescheinigung (deutsch/englisch) zusammen mit dem ärztlichen Attest für "
+             "Medikamente und medizinisches Material (ADAC-Formular). Beide Dokumente gehören zusammen: Bitte drucken "
+             "Sie sie aus und führen Sie sie auf Ihrer Reise mit, insbesondere bei der Kontrolle am Flughafen.\n\n"
+             "Wir wünschen Ihnen eine gute Reise!\n\n" + GRUSS_TEAM},
+]
+
+PATIENTENANKUENDIGUNG = [
+    {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF},
+    ABSENDERZEILE,
+    {"id": "empfaenger", "typ": "zweispaltig", "bezeichnung": "Empfänger und Datum",
+     "links": PRAXIS_HOLTMEIER, "rechts": "{{Heute}}"},
+    {"id": "leerraum", "typ": "leerraum", "bezeichnung": "Abstand", "hoehe_mm": 6},
+    {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Patientenankündigung Sprechstunde",
+     "zusatz": "{{Zeitraum}}"},
+    {"id": "einleitung", "typ": "text", "bezeichnung": "Einleitung",
+     "text": "Sehr geehrter Dr. Holtmeier, liebes Praxisteam,\n\n"
+             "für die kommenden Sprechstunden möchten wir folgende Patienten ankündigen:"},
+    {"id": "termine", "typ": "tabelle", "bezeichnung": "Termine", "quelle": "ankuendigung"},
+    {"id": "gruss", "typ": "text", "bezeichnung": "Gruß", "text": "Mit freundlichen Grüßen\n\n{{Benutzer.Name}}",
+     "optionen": {"nicht_teilen": True}},
+    {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
+    {"id": "email", "typ": "email", "bezeichnung": "E-Mail", "betreff": "Patientenankündigung Sprechstunde {{Zeitraum}}",
+     "text": "Sehr geehrter Dr. Holtmeier, liebes Praxisteam,\n\n"
+             "für die kommenden Sprechstunden möchten wir folgende Patienten ankündigen:\n\n{{Termine.Liste}}\n\n"
+             "Die Übersicht finden Sie auch im Anhang.\n\nMit freundlichen Grüßen\n\n{{Benutzer.Name}}\n"
+             "{{Absender.Name}}\nTelefon {{Absender.Telefon}}"},
+]
+
+def eigene_startvorlage(titel: str = "Titel") -> list:
+    """Startvorlage eines eigenen Schreibens (F176): Brief an den Patienten mit E-Mail – Text in [eckigen Klammern]."""
+    return [
+        {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF},
+        ABSENDERZEILE, EMPFAENGER_PATIENT,
+        {"id": "leerraum", "typ": "leerraum", "bezeichnung": "Abstand", "hoehe_mm": 6},
+        {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": titel[:200] or "Titel"},
+        {"id": "inhalt", "typ": "text", "bezeichnung": "Text",
+         "text": "{{Patient.Briefanrede}},\n\n[Text des Schreibens]"},
+        {"id": "gruss", "typ": "text", "bezeichnung": "Gruß", "text": GRUSS_TEAM, "optionen": {"nicht_teilen": True}},
+        {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
+        {"id": "email", "typ": "email", "bezeichnung": "E-Mail", "betreff": titel[:200] or "Betreff",
+         "text": "{{Patient.Briefanrede}},\n\nanbei erhalten Sie [...].\n\n" + GRUSS_TEAM},
+    ]
+
+
+def _eigene_startvorlage_zu(art):
+    from .models import EigenesSchreiben
+
+    e = EigenesSchreiben.objects.filter(schluessel=art).first()
+    return eigene_startvorlage(e.name if e else "Titel")
+
+
 # Startvorlagen. Patientendatenblatt: Aufbau wie im Entwurf „EPM Oberfläche“ (Dokumentvorlagen).
 STARTVORLAGEN = {
+    "patientenaufnahme": PATIENTENAUFNAHME,
+    "terminbestaetigung": TERMINBESTAETIGUNG,
+    "reisebescheinigung": REISEBESCHEINIGUNG,
+    "patientenankuendigung": PATIENTENANKUENDIGUNG,
     "datenschutzinformation": DATENSCHUTZINFORMATION,
     "einwilligung": EINWILLIGUNG,
     "schweigepflichtentbindung": SCHWEIGEPFLICHTENTBINDUNG,
@@ -479,3 +716,13 @@ STARTVORLAGEN = {
         {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
     ],
 }
+
+
+class _Startvorlagen(JeArt):
+    def __missing__(self, art):
+        if ist_eigen(art):
+            return _eigene_startvorlage_zu(art)
+        raise KeyError(art)
+
+
+STARTVORLAGEN = _Startvorlagen(STARTVORLAGEN, None)

@@ -19,8 +19,9 @@ import { useSortierbar } from "@/components/ui/sortierbar";
 import { LOGO_URL, Logo } from "@/components/layout/logo";
 import { DokumentvorlagenBereich } from "@/seiten/admin/Dokumentvorlagen";
 import { KatalogeBereich } from "@/seiten/admin/Kataloge";
+import { AnlagenBereich } from "@/seiten/admin/Anlagen";
 
-type Bereich = "briefkopf" | "listen" | "kataloge" | "grenzwerte" | "dokumente";
+type Bereich = "briefkopf" | "listen" | "kataloge" | "grenzwerte" | "anlagen" | "dokumente";
 type SpeichernRef = { current: (() => void) | null };
 
 const ABSENDER_FELDER: { k: keyof Absender; label: string; span: number; num?: boolean }[] = [
@@ -456,15 +457,16 @@ export function Vorlagen() {
     <Seite pfad={[{ text: "Administration" }, { text: "Vorlagen" }]}>
       <Seitenkopf titel="Vorlagen" unter="Alles, was sich ohne IT anpassen lassen soll. Jede Änderung steht im Audit-Log."
         rechts={bereich === "dokumente" ? <div ref={setAktionen} className="flex items-center gap-2.5 flex-wrap" />
-          : bereich !== "listen" && bereich !== "kataloge" ? <Knopf variante="pri" onClick={() => speichern.current?.()}>Speichern</Knopf> : null} />
+          : bereich !== "listen" && bereich !== "kataloge" && bereich !== "anlagen" ? <Knopf variante="pri" onClick={() => speichern.current?.()}>Speichern</Knopf> : null} />
       <Segmente label="Bereich" wert={bereich} onWahl={waehle} className="self-start"
         werte={[{ wert: "briefkopf", text: "Briefkopf und Logo" }, { wert: "listen", text: "Auswahllisten" },
           { wert: "kataloge", text: "Labor und Diagnosen" }, { wert: "grenzwerte", text: "Grenzwerte" },
-          { wert: "dokumente", text: "Dokumentvorlagen" }]} />
+          { wert: "anlagen", text: "Anlagen für E-Mails" }, { wert: "dokumente", text: "Dokumentvorlagen" }]} />
       {bereich === "briefkopf" ? <BriefkopfBereich speichernRef={speichern} />
         : bereich === "listen" ? <ListenBereich />
         : bereich === "kataloge" ? <KatalogeBereich />
         : bereich === "grenzwerte" ? <GrenzwerteBereich speichernRef={speichern} />
+        : bereich === "anlagen" ? <AnlagenBereich />
         : <DokumentvorlagenBereich aktionenZiel={aktionen} onGeaendert={merkeGeaendert} />}
     </Seite>
   );

@@ -340,8 +340,10 @@ def anpassen(bild: np.ndarray, kontrast: int, helligkeit: int) -> np.ndarray:
 
 # ---------------------------------------------------------------- Gesamtablauf
 def aufbereiten(rohbild: np.ndarray, e: Einstellungen, *, herkunft: str = "bild", kamera: bool = False,
-                glaetter=None, schritt=None) -> Aufbereitet:
+                glaetter=None, schritt=None, vorschau: bool = False) -> Aufbereitet:
     """Rohbild (BGR) → aufbereitete Seite. ``glaetter``: Funktion BGR → BGR (UVDoc) oder None.
+
+    ``vorschau``: für die Vorschau beim Anpassen – Größe bleibt (kein Skalieren auf die Schrifthöhe der Erkennung).
 
     Als Foto gilt ein Bild (keine PDF-Seite) mit Kameradaten oder mit einem Blatt, das sich vom Grund abhebt."""
     info: dict = {}
@@ -425,7 +427,7 @@ def aufbereiten(rohbild: np.ndarray, e: Einstellungen, *, herkunft: str = "bild"
     grau = strecken(grau)
 
     faktor = 1.0
-    if zeichen:
+    if zeichen and not vorschau:
         faktor = max(0.5, min(3.0, ZIEL_TEXTHOEHE / zeichen))
         if 0.85 <= faktor <= 1.2:
             faktor = 1.0

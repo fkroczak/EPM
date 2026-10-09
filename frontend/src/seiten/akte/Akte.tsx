@@ -23,6 +23,7 @@ import { useAktenAblage } from "@/components/AktenAblage";
 import type { Aktenansicht } from "@/lib/darstellung";
 import { useMobil } from "@/lib/stufen";
 import { Kopfgriff, Leistengriff, useDarstellung } from "./ansicht";
+import { SchreibenAusAkte } from "./Schreiben";
 
 export type AktenKontext = {
   patient: Patient;
@@ -382,7 +383,7 @@ export function Akte() {
   const pid = Number(id);
   const { darf, darfBei } = useAuth();
   const navigate = useNavigate();
-  const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "kontakt" | "gewicht" | "pdf" | "sprechstunde">("");
+  const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "kontakt" | "gewicht" | "pdf" | "sprechstunde" | "schreiben">("");
   // Vorbelegung aus der Kürzelzeile (Karteikarte: „K Text“, „G 54,6“)
   const [vorbelegt, setVorbelegt] = useState("");
   const [aenderTermin, setAenderTermin] = useState<Termin | null>(null);
@@ -452,6 +453,8 @@ export function Akte() {
     oeffnen: !!p && p.ist_abgeschlossen && darf("akten_wieder_oeffnen"),
     termin: offenBei("eintraege_erfassen"),
     kontakt: offenBei("eintraege_erfassen"),
+    // Schreiben mit E-Mail (F172): Patientenaufnahme, Terminbestätigung, Reisebescheinigung
+    schreiben: offenBei("eintraege_erfassen"),
     gewicht: offenBei("eintraege_erfassen"),
   };
   useOhneRechtSchliessen(erlaubt[dialog], () => setDialog(""));
@@ -554,6 +557,7 @@ export function Akte() {
         { text: "Akte als PDF", onClick: () => setDialog("pdf") },
         // Unterlagen für die Sprechstunde (F116): der aktuellste Stand aller Bereiche auf einem Blatt
         { text: "Unterlagen für die Sprechstunde", onClick: () => setDialog("sprechstunde") },
+        ...(erlaubt.schreiben ? [{ text: "Schreiben und E-Mail …", onClick: () => setDialog("schreiben") }] : []),
         ...(erlaubt.abschluss ? [{ text: "Akte abschließen", onClick: () => setDialog("abschluss"), gefaehrlich: true }] : []),
         ...(erlaubt.oeffnen ? [{ text: "Akte wieder öffnen", onClick: () => setDialog("oeffnen") }] : []),
       ]} />
@@ -712,6 +716,7 @@ export function Akte() {
       <PdfDialog offen={dialog === "sprechstunde"} onOffen={(o) => setDialog(o ? "sprechstunde" : "")}
         titel={`Unterlagen für die Sprechstunde · ${name(p)}`}
         pfad={`patienten/${p.id}/sprechstunde/`} dateiname={`Sprechstunde-${p.nummer}.pdf`} />
+      {erlaubt.schreiben ? <SchreibenAusAkte patient={p} offen={dialog === "schreiben"} onOffen={(o) => setDialog(o ? "schreiben" : "")} /> : null}
       {kontext.erfassen ? <TerminDialog offen={dialog === "termin"} onOffen={(o) => setDialog(o ? "termin" : "")} patientId={p.id} patientName={name(p)} /> : null}
       {kontext.erfassen ? <KontaktDialog offen={dialog === "kontakt"} onOffen={(o) => setDialog(o ? "kontakt" : "")}
         vorgabe={{ id: p.id, name: name(p), ist_test: p.ist_test }} text={vorbelegt} /> : null}

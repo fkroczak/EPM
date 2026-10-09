@@ -458,6 +458,27 @@ def _rohseite(seite: ScanSeite) -> laden.Rohseite:
                           exif={"kamera": "ja"} if seite.kamera else {})
 
 
+VORSCHAU_SEITE = 1400  # längere Seite des Rohbilds für die Vorschau (Pixel)
+
+
+def vorschau(seite: ScanSeite, einstellungen: dict) -> tuple[bytes, str]:
+    """Seite mit ``einstellungen`` aufbereiten wie vor der Erkennung – verkleinert, ohne Glätten (UVDoc läuft nur im
+    OCR-Dienst) und mit der zuletzt erkannten Ausrichtung, wenn „automatisch“ (spart den Tesseract-Aufruf).
+    → (Bild, MIME-Typ)."""
+    from .ocr.aufbereitung import Einstellungen as SeitenEinstellungen, aufbereiten
+
+    e = SeitenEinstellungen.aus_json(einstellungen)
+    if e.drehung is None:
+        e.drehung = int((seite.info or {}).get("drehung") or 0)
+    bild = _klein(lade_bild(seite.datei(seite.roh)), VORSCHAU_SEITE)
+    auf = aufbereiten(bild, e, herkunft=seite.herkunft, kamera=bool(seite.kamera), vorschau=True)
+    sw = auf.bild.ndim == 2 and bool(np.isin(auf.bild[::7, ::7], (0, 255)).all())
+    ok, daten = cv2.imencode(".png" if sw else ".jpg", auf.bild, [] if sw else [cv2.IMWRITE_JPEG_QUALITY, 82])
+    if not ok:
+        raise ScanFehler("Die Vorschau ließ sich nicht erstellen.")
+    return daten.tobytes(), "image/png" if sw else "image/jpeg"
+
+
 def seite_erkennen(seite: ScanSeite, paddle, woerterliste: str | None, *, stufe: int = 0, schritt=None):
     from .ocr import erkennung
 
