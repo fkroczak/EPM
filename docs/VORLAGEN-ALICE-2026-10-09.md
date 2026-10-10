@@ -39,6 +39,8 @@ wie die Briefanrede werden per Klick eingefügt, und „Als eigene Vorlage kopie
    einem Häkchen dazunehmen (dann mit Telefonnummer). Soll das Häkchen standardmäßig gesetzt sein – braucht die Praxis
    die Telefontermine auch? Hinweise wie „1 h, Neuaufnahme“ oder „+ Labor“ ins Feld „bei/Ort“ des Termins. Und an
    welche E-Mail-Adresse bzw. Faxnummer geht das Infoblatt (kann in der Vorlage stehen)?
+   **Entschieden: Nein, Standard bleibt aus (10.10.2026)** – Telefon- und Videotermine stehen nur auf dem Infoblatt,
+   wenn das Häkchen im Dialog gesetzt wird (F190). Offen bleibt die Frage nach E-Mail-Adresse bzw. Faxnummer.
 4. **Terminbestätigung:** Zusätzlich zu Gesundheitskarte und Überweisung steht drin „Neue Befunde … bitte
    mitbringen“ und der Hinweis auf telefonische Absage bei Frau Hessel (9–13 Uhr). Streichen oder so lassen?
 5. **Blutuntersuchung:** Das Schreiben an die Hausärzte liegt als PDF-Anlage bei. Soll es zusätzlich eine eigene

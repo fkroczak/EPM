@@ -1,5 +1,6 @@
 """Infusionspläne: Entwurf → Freigabe → unveränderlich, Vorbelegung, Vergleich (echte Datenbank)."""
 from datetime import timedelta
+from decimal import Decimal
 
 from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
@@ -525,3 +526,69 @@ class PlanHinweise(PlanHilfen, Grundlage):
         # fremder Plan als Bezug → 400
         plan = self.freigegebener_plan()
         self.assertEqual(client_fuer(self.mediziner).get(self.URL, {"patient": test.id, "plan": plan.id}).status_code, 400)
+
+    def test_fehlender_referenzbereich_im_katalog(self):
+        """F190: Fehlt im Katalog der Referenzbereich eines Parameters, der zum Plan gehört, sagt der Editor, dass die
+        Hinweise unvollständig sind – EPM trägt keine Bereiche selbst ein."""
+        from stammdaten.models import Laborparameter
+
+        d = self.abrufen(bestandteile="kalium,magnesium")
+        fehlt = [h for h in d["hinweise"] if h["art"] == "referenz_fehlt"]
+        self.assertEqual(len(fehlt), 1)
+        self.assertIn("Für Kalium und Magnesium ist kein Referenzbereich hinterlegt", fehlt[0]["text"])
+        kalium = Laborparameter.objects.get(name="Kalium")
+        kalium.referenz_von, kalium.referenz_bis = Decimal("3.5"), Decimal("5.1")
+        kalium.save()
+        fehlt = [h for h in self.abrufen(bestandteile="kalium,magnesium")["hinweise"] if h["art"] == "referenz_fehlt"]
+        self.assertEqual(fehlt[0]["parameter"], ["Magnesium"])
+        # nicht im Plan → kein Hinweis zu fehlenden Bereichen
+        self.assertFalse([h for h in self.abrufen(bestandteile="kalium")["hinweise"] if h["art"] == "referenz_fehlt"])
+        # Katalogbereich gilt, wenn der Befund keinen eigenen mitbringt
+        self.befund(0, [("Kalium", "6.0", None, None)])
+        self.assertIn("Kalium", [h["parameter"] for h in self.abrufen(bestandteile="kalium")["hinweise"] if h["art"] == "labor"])
+        # Vitamine als Gruppe gezählt
+        self.assertRegex([h for h in self.abrufen(bestandteile="vitamine")["hinweise"] if h["art"] == "referenz_fehlt"][0]["text"],
+                         r"Für \d+ Vitamine ist kein Referenzbereich")
+
+
+class PlanPraxisvorgabe(PlanHilfen, Grundlage):
+    """Mengen je kg für „Mengen nach Praxisvorgabe“ unter Vorlagen › Grenzwerte (Entscheidung der Praxis, F190)."""
+
+    def test_vorbelegung_nutzt_einstellung_mit_grenzen_und_historie(self):
+        from stammdaten.models import Einstellungen
+
+        e = Einstellungen.aktuell()
+        # Startwerte wie im Altsystem
+        self.assertEqual([e.vorgabe_glucose_g_kg, e.vorgabe_magnesium_mmol_kg], [Decimal("3.5"), Decimal("0.2")])
+        self.assertIsNone(e.vorgabe_geaendert_am)
+        client_fuer(self.mitarbeiter).post("/api/gewichte/", {"patient": self.patient.id, "gewicht_kg": "60.0"}, format="json")
+        c = client_fuer(self.mediziner)
+        v = c.get(f"/api/infusionsplaene/vorbelegung/?patient={self.patient.id}").json()
+        self.assertEqual(float(v["werte"]["glucose_g"]), 210.0)  # 60 × 3,5
+        self.assertIsNone(v["stand"])
+        a = client_fuer(self.admin)
+        fassungen = Einstellungen.history.count()
+        # Grenzen: nicht negativ, nicht unplausibel hoch
+        r = a.patch("/api/einstellungen/", {"vorgabe_glucose_g_kg": "-1"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("vorgabe_glucose_g_kg", r.json())
+        self.assertEqual(a.patch("/api/einstellungen/", {"vorgabe_kalium_mmol_kg": "11"}, format="json").status_code, 400)
+        r = a.patch("/api/einstellungen/", {"vorgabe_glucose_g_kg": "4", "vorgabe_kalium_mmol_kg": "0"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIsNotNone(r.json()["vorgabe_geaendert_am"])
+        self.assertEqual(Einstellungen.history.count(), fassungen + 1)
+        v = c.get(f"/api/infusionsplaene/vorbelegung/?patient={self.patient.id}").json()
+        self.assertEqual([float(v["werte"]["glucose_g"]), float(v["werte"]["kalium_mmol"])], [240.0, 0.0])
+        self.assertIsNotNone(v["stand"])
+        # Gewicht für den Plan gilt nach 6 Monaten als alt (Entscheidung 10.10.2026), einstellbar 1–60 Monate
+        self.assertEqual(Einstellungen.aktuell().plan_gewicht_alter_monate, 6)
+        self.assertEqual(a.patch("/api/einstellungen/", {"plan_gewicht_alter_monate": 0}, format="json").status_code, 400)
+        self.assertEqual(a.patch("/api/einstellungen/", {"plan_gewicht_alter_monate": 4}, format="json").status_code, 200)
+        # andere Einstellungen ändern den Stand der Vorgabe nicht
+        stand = Einstellungen.aktuell().vorgabe_geaendert_am
+        self.assertEqual(a.patch("/api/einstellungen/", {"kcal_max_tag": 4800}, format="json").status_code, 200)
+        self.assertEqual(Einstellungen.aktuell().vorgabe_geaendert_am, stand)
+        # im Audit-Log
+        from audit.models import SystemEreignis
+
+        self.assertTrue(SystemEreignis.objects.filter(objekt="Einstellungen", details__felder__contains=["vorgabe_glucose_g_kg"]).exists())

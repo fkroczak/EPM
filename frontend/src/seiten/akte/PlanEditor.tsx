@@ -46,7 +46,13 @@ const MAKRO: { feld: "glucose" | "aminosaeuren" | "lipide" | "albumin"; menge: Z
   { feld: "albumin", menge: "albumin_ml", einheit: "ml", text: "Humanalbumin", kategorie: "albumin", kcal: null },
 ];
 /** Vorbelegung des ersten Plans je kg Körpergewicht – kommt vom Server (wie im Altsystem) */
-type Vorbelegung = { gewicht_kg: number | null; je_kg: Record<string, number>; werte: Record<string, number> | null };
+type Vorbelegung = { gewicht_kg: number | null; je_kg: Record<string, number | string>; werte: Record<string, number> | null;
+  /** wann die Praxis die Mengen je kg zuletzt geändert hat (Vorlagen › Grenzwerte, F190); null = Startwerte des Altsystems */
+  stand: string | null };
+const JE_KG_TEXT: [string, string, string][] = [
+  ["glucose_g", "Glucose", "g"], ["aminosaeuren_g", "Aminosäuren", "g"], ["lipide_g", "Lipide", "g"], ["natrium_mmol", "Natrium", "mmol"],
+  ["kalium_mmol", "Kalium", "mmol"], ["phosphat_mmol", "Phosphat", "mmol"], ["calcium_mmol", "Calcium", "mmol"], ["magnesium_mmol", "Magnesium", "mmol"],
+];
 /** Gesamtvolumen wie im Altsystem: Körpergewicht × 35 ml, auf 2 Stellen gerundet */
 const ML_JE_KG = 35;
 /** Stabilität wie im Altsystem: Calcium + Magnesium (mmol) höchstens Gesamtvolumen ÷ 100 */
@@ -353,6 +359,8 @@ export function PlanEditor() {
   const pe = zahlWert(f.tage_pro_woche);
   const zusatzTage = zahlWert(f.zusatz_tage_pro_woche);
   const freiTage = zahlWert(f.freie_tage_pro_woche);
+  // Entscheidung der Praxis 10.10.2026: nach 6 Monaten „bitte prüfen“ (Vorlagen › Grenzwerte, F190)
+  const gewichtGrenzeMonate = Number(es?.plan_gewicht_alter_monate ?? 6);
   const gewichtAlterTage = patient.kopf?.gewicht ? Math.round((Date.parse(heuteIso()) - Date.parse(patient.kopf.gewicht.am.slice(0, 10))) / 86400000) : null;
   const ohnePraeparat = MAKRO.filter((m) => zahlWert(f[m.menge]) && !f[`${m.feld}_praeparat` as AuswahlFeld]).map((m) => m.text);
   const bestandteile = ([
@@ -364,7 +372,8 @@ export function PlanEditor() {
   const pruefpunkte: { ok: boolean; text: string }[] = [
     gewicht == null
       ? { ok: false, text: "Kein Gewicht erfasst: Gesamtvolumen (35 ml/kg) und Rate fehlen. Bitte zuerst das Gewicht eintragen." }
-      : { ok: gewichtAlterTage == null || gewichtAlterTage <= 90, text: `Gewicht ${kg(gewicht)} vom ${datum(patient.kopf!.gewicht!.am)}${gewichtAlterTage != null && gewichtAlterTage > 90 ? ` – älter als 3 Monate, bitte prüfen` : ""}.` },
+      : { ok: gewichtAlterTage == null || gewichtAlterTage <= gewichtGrenzeMonate * 30,
+        text: `Gewicht ${kg(gewicht)} vom ${datum(patient.kopf!.gewicht!.am)}${gewichtAlterTage != null && gewichtAlterTage > gewichtGrenzeMonate * 30 ? ` – älter als ${gewichtGrenzeMonate} Monate, bitte prüfen` : ""}.` },
     ohnePraeparat.length
       ? { ok: false, text: `Präparat fehlt bei ${ohnePraeparat.join(", ")}.` }
       : { ok: true, text: "Zu jeder Menge ist ein Präparat gewählt." },
@@ -400,16 +409,20 @@ export function PlanEditor() {
           <h2 className="m-0 text-[1.625rem] font-semibold">{planId ? "Entwurf bearbeiten" : "Neuer Infusionsplan"}</h2>
           <span className="text-sm gedaempft">
             {leerBegonnen ? "Leer begonnen. " : vorgaenger.data ? `${planId ? "Vorgänger" : vorlageId ? "Vorlage geladen, Vorgänger" : "Vorbelegt mit dem aktuellen Plan"} vom ${datum(vorgaenger.data.gueltig_ab)}. `
-              : `Erster Plan dieses Patienten. ${!planId && vorbelegung.data?.werte ? `Vorbelegt je kg Körpergewicht (${kg(vorbelegung.data.gewicht_kg)}) wie im Altsystem. ` : ""}`}
+              : `Erster Plan dieses Patienten. ${!planId && vorbelegung.data?.werte ? `Vorbelegt je kg Körpergewicht (${kg(vorbelegung.data.gewicht_kg)}) ${vorbelegung.data.stand ? `nach Praxisvorgabe vom ${datum(vorbelegung.data.stand)}` : "wie im Altsystem"}. ` : ""}`}
             {vorher ? <>Geänderte Werte sind <span className="bg-warn-bg border border-warn rounded px-1">markiert</span>.</> : null}
           </span>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {/* Vorgabe der Praxis (wie im Altsystem): Mengen je kg des letzten Gewichts; Präparate und Zusätze bleiben */}
+          {/* Vorgabe der Praxis: Mengen je kg des letzten Gewichts (Vorlagen › Grenzwerte, F190); Präparate und Zusätze bleiben */}
           {vorbelegung.data?.werte ? (
-            <Knopf icon="waage" title={`Je kg Körpergewicht (${kg(vorbelegung.data.gewicht_kg)}): Glucose 3,5 g · Aminosäuren 1,2 g · Lipide 1 g · Natrium 1,3 · Kalium 0,7 · Phosphat 0,3 · Calcium 0,15 · Magnesium 0,2 mmol`}
-              onClick={() => setF((a) => ({ ...a!, ...Object.fromEntries(Object.entries(vorbelegung.data!.werte!).map(([k, v]) => [k, zahl(v)])) }))}>
-              Mengen nach Praxisvorgabe</Knopf>
+            <span className="flex items-center gap-2 flex-wrap">
+              <Knopf icon="waage" title={`Je kg Körpergewicht (${kg(vorbelegung.data.gewicht_kg)}): ${JE_KG_TEXT.map(([k, t, e]) => `${t} ${zahl(Number(vorbelegung.data!.je_kg[k] ?? 0))} ${e}`).join(" · ")}`}
+                onClick={() => setF((a) => ({ ...a!, ...Object.fromEntries(Object.entries(vorbelegung.data!.werte!).map(([k, v]) => [k, zahl(Number(v))])) }))}>
+                Mengen nach Praxisvorgabe</Knopf>
+              <span className="text-xs gedaempft" data-testid="praxisvorgabe-stand">{vorbelegung.data.stand
+                ? `nach Praxisvorgabe vom ${datum(vorbelegung.data.stand)}` : "Startwerte wie im Altsystem"}</span>
+            </span>
           ) : null}
           {!planId ? <Knopf onClick={() => { setF(leer()); setLeerBegonnen(true); }}>Leer beginnen</Knopf> : null}
           <KnopfLink to={`/patienten/${patient.id}/plaene`}>Frühere Pläne</KnopfLink>
@@ -624,7 +637,7 @@ export function PlanEditor() {
 }
 
 type PlanHinweis = {
-  art: "labor" | "labor_alt" | "gewicht" | "plaene"; stufe: "warn" | "info"; text: string;
+  art: "labor" | "labor_alt" | "gewicht" | "plaene" | "referenz_fehlt"; stufe: "warn" | "info"; text: string;
   parameter?: string; bestandteil?: string; einheit?: string; richtung?: "niedrig" | "hoch";
   verlauf?: { am: string; wert: number | string }[]; trend?: "steigend" | "fallend" | "gleichbleibend" | "wechselnd" | null;
   anlage?: number | null;
@@ -640,6 +653,7 @@ const TREND_TEXT: Record<string, string> = { steigend: "steigend", fallend: "fal
  */
 function HinweiseAusLabor({ patientId, planId, bestandteile }: { patientId: number; planId: number | null; bestandteile: string[] }) {
   const { schreibenOeffnen } = useAkte();
+  const { darf } = useAuth();
   const daten = useQuery({
     queryKey: ["patient", patientId, "plan-hinweise", planId, bestandteile.join(",")],
     queryFn: () => api<{ hinweise: PlanHinweis[]; seit: string }>(`infusionsplaene/hinweise/${abfrage({ patient: patientId, plan: planId ?? undefined, bestandteile: bestandteile.join(",") })}`),
@@ -660,8 +674,12 @@ function HinweiseAusLabor({ patientId, planId, bestandteile }: { patientId: numb
               <span className={cx("shrink-0 mt-0.5", h.stufe === "warn" ? "text-warn" : "gedaempft")}>
                 <Icon name={h.art === "labor" ? (h.richtung === "hoch" ? "hoch" : "runter") : h.stufe === "warn" ? "warnung" : "info"} groesse={14} />
               </span>
-              <span className="flex flex-col gap-0.5 min-w-0 [overflow-wrap:anywhere]">
+              <span className={cx("flex flex-col gap-0.5 min-w-0 [overflow-wrap:anywhere]", h.art === "referenz_fehlt" && "gedaempft")}>
                 <span>{h.text}</span>
+                {/* fehlende Referenzbereiche pflegt die Praxis selbst (F190) – Link nur für „Vorlagen pflegen“ */}
+                {h.art === "referenz_fehlt" && darf("vorlagen_pflegen") ? (
+                  <Link to="/admin/vorlagen?bereich=kataloge&labor=ohne_referenz" className="self-start">Referenzbereiche im Laborkatalog nachtragen</Link>
+                ) : null}
                 {h.art === "labor" && h.verlauf && h.verlauf.length > 1 ? (
                   <span className="gedaempft">
                     Verlauf: {h.verlauf.map((v) => `${zahl(Number(v.wert))} (${datum(v.am).slice(0, 6)})`).join(" → ")}

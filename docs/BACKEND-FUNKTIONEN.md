@@ -54,6 +54,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F188 | Notfallpaket und Wiederaufbau-Plan: alles für einen Neuaufbau ohne Internet in einer Datei, Aufbauskript, Offline-Modus der Rollout-Skripte, Ampel-Kachel | Administration › System › Notfall, Systemverwaltung, Hilfe | ABGESCHLOSSEN – Lauf steht aus |
 | F181 | Akte ohne Seiten-Scrollen, kompakter Kopf, Reiter nach Bedeutung, PDF neben dem Plan, Plan nach Praxisvorgabe, PDF-Vorschau mit ungespeicherten Eingaben | Patientenakte, Infusionspläne, Plan-Editor | ABGESCHLOSSEN – Lauf steht aus |
 | F187 | Hinweise aus Labor und Gewicht im Plan-Editor (ohne Dosisvorschlag) | Plan-Editor | ABGESCHLOSSEN – Lauf steht aus |
+| F190 | Entscheidungen der Praxis: Tablet zwei Spalten, Mengen je kg einstellbar, Referenzbereiche nachtragen, Infoblatt ohne Telefontermine | Akte, Vorlagen › Grenzwerte und Labor, Plan-Editor | ABGESCHLOSSEN – Lauf steht aus |
 | F01 | Sitzungsstatus und CSRF-Token | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F02 | Anmeldung mit Benutzername und Kennwort | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F03 | Zweiter Faktor bei der Anmeldung | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
@@ -3630,7 +3631,7 @@ Praxis erstellen lassen.“ Befunde, Messung vorher/nachher und Rückfragen: `do
 - **Reiter:** Übersicht, Diagnosen, Therapie, Empfehlung, Infusionspläne, Kontakte groß; Labor, BIA, Berichte,
   Dokumente kleiner nach einem Strich; Verlauf und Datenschutz klein am rechten Rand. Alle bleiben eigene Reiter
   (F121); Alt+Ziffer folgt der neuen Reihenfolge.
-- **Fenster füllen (ab 1024 × 600 px):** `Seite fuellen` (Shell) begrenzt die Seite auf die Fensterhöhe; unter den
+- **Fenster füllen (ab 1024 × 600 px, seit F190 ab 1280 × 600 px):** `Seite fuellen` (Shell) begrenzt die Seite auf die Fensterhöhe; unter den
   Reitern liegt `.akte-flaeche`, die bei Bedarf scrollt; Reiter mit zwei Spalten (`.akte-spalten`: Diagnosen,
   Therapie, Empfehlung, Kontakte, Infusionspläne, Labor, BIA, Berichte, Dokumente, Datenschutz) scrollen ab 1280 px je
   Spalte. Kopf und Reiter bleiben stehen. Darunter (Telefon, Tablet hochkant) scrollt die Seite wie bisher.
@@ -3646,7 +3647,7 @@ Praxis erstellen lassen.“ Befunde, Messung vorher/nachher und Rückfragen: `do
   Vorgänger“ mit Zahl der Änderungen.
 - **Menüpunkt Infusionspläne:** „PDF“ an jedem Plan (Entwürfe: `ansicht/`); ab 1920 px rechts neben der Tabelle.
 - **Plan-Editor:** „Mengen nach Praxisvorgabe“ (je kg des letzten Gewichts wie im Altsystem, `GET …/vorbelegung/`) auch
-  beim Folgeplan; Karte **Prüfung vor der Freigabe** (Gewicht vorhanden/≤ 3 Monate, Präparat zu jeder Menge, Ca/Mg
+  beim Folgeplan; Karte **Prüfung vor der Freigabe** (Gewicht vorhanden/≤ 3 Monate, seit F190 6 Monate und einstellbar, Präparat zu jeder Menge, Ca/Mg
   stabil, Infusionstage stimmig, Laufzeit, Protonenpumpenhemmer mit Zeiten); **PDF-Vorschau** mit den Eingaben im
   Formular auf jeder Bildschirmgröße (neuer Plan: einmal als Entwurf gespeichert).
 - **Hinweise im Kopf (Nacharbeit 10.10.2026):** ein Hinweis steht direkt als Chip da; ab zwei Hinweisen ein Chip
@@ -3823,6 +3824,45 @@ Internet, ohne Entwickler, mit einem gedruckten Plan.
   `apt-get download`/`docker save`/`docker load`, PDF aus dem Container im Agenten, `notfall-einspielen` von Ende zu Ende.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+## AD · Entscheidungen der Praxis (10.10.2026)
+
+Antworten des Auftraggebers auf die Rückfragen aus F181, F187 und F177 (`docs/UI-UX-AKTE-2026-10-10.md`,
+`docs/VORLAGEN-ALICE-2026-10-09.md`).
+
+### F190 Tablet mit zwei Spalten, Mengen je kg einstellbar, Referenzbereiche nachtragen, Infoblatt ohne Telefontermine
+- **Tablet 1024 × 768:** zwei breite Spalten in der Übersicht der Akte, die Seite darf scrollen (vorher drei schmale
+  Spalten ohne Scrollen). Das Fenster ohne Seiten-Scrollen gilt jetzt ab 1280 × 600 px (`index.css`, `.seite-fuellt`;
+  `Uebersicht.tsx`: Spalten nach Breite der Fläche, unter 1100 px zwei). Ab 1366 × 768 unverändert kein Seiten-Scrollen.
+- **Mengen je kg für „Mengen nach Praxisvorgabe“:** Vorlagen › Grenzwerte, Karte „Mengen je kg für ‚Mengen nach
+  Praxisvorgabe‘“ – je Bestandteil ein Feld mit Einheit (Glucose, Aminosäuren, Lipide in g/kg; Natrium, Kalium, Phosphat,
+  Calcium, Magnesium in mmol/kg), 0 = nicht vorbelegen. Neue Felder `Einstellungen.vorgabe_*_kg` (Migration
+  `stammdaten/0020_praxisvorgabe_je_kg`, Startwerte = Werte des Altsystems 3,5 / 1,2 / 1 / 1,3 / 0,7 / 0,3 / 0,15 /
+  0,2) und `vorgabe_geaendert_am` (gesetzt, sobald sich ein Wert ändert). Prüfung 0 bis Obergrenze (Glucose 10 g/kg,
+  Aminosäuren und Lipide 5 g/kg, Natrium und Kalium 10 mmol/kg, Phosphat, Calcium, Magnesium 5 mmol/kg) im Serializer
+  und im Modell; Historie wie alle Einstellungen, Audit-Log „Einstellungen“ mit Feldnamen. `GET …/vorbelegung/` nutzt
+  die Einstellung und liefert `stand`; der Plan-Editor zeigt neben „Mengen nach Praxisvorgabe“ „nach Praxisvorgabe vom
+  <Datum>“ (bzw. „Startwerte wie im Altsystem“), der Tooltip die Mengen je kg.
+- **Referenzbereiche im Laborkatalog:** Vorlagen › Labor und Diagnosen › Laborparameter hat oben „Ohne Referenzbereich
+  (N)“ – Liste der aktiven Parameter ohne Bereich, zuerst die für die Infusionsplan-Hinweise (Na, K, Ca, Mg, P, Albumin,
+  Glucose, Triglyceride, Cu, Zn, Se, Mn, dann Vitamine; markiert „Infusionsplan“), mit Erklärtext (vom eigenen Labor
+  übernehmen; gilt nur, wenn ein Befund keinen eigenen Bereich mitbringt). Adresse
+  `/admin/vorlagen?bereich=kataloge&labor=ohne_referenz`. EPM trägt **keine** Referenzwerte selbst ein.
+  Im Plan-Editor (F187) neuer dezenter Hinweis `referenz_fehlt`: „Für Kalium und Magnesium ist kein Referenzbereich
+  hinterlegt – Hinweise aus dem Labor sind deshalb unvollständig …“, mit Link zum Katalog nur für „Vorlagen pflegen“.
+- **Telefon- und Videotermine auf dem Infoblatt:** Nein, der Standard bleibt aus (U72 geschlossen); keine Änderung am
+  Code.
+- **Labor-Hinweise (F187) zählen ab dem Tag der Freigabe des letzten Plans** – entschieden 10.10.2026, so bleibt es.
+- **Gewicht vor der Freigabe:** „bitte prüfen“ nach **6 Monaten** (entschieden 10.10.2026; vorher vorläufig 3 Monate fest im
+  Plan-Editor). Neue Einstellung `plan_gewicht_alter_monate` (Standard 6, 1–60) in derselben Migration, unter Vorlagen ›
+  Grenzwerte in der Karte der Mengen je kg; „Prüfung vor der Freigabe“ nutzt sie. Eine frühere Einstellung mit Wert 3 gab
+  es nicht, daher genügt der Standardwert (keine Umstellung bestehender Werte nötig).
+- **Teststatus:** Backend `infusionen.tests.PlanPraxisvorgabe` (Vorbelegung nutzt die Einstellung, Grenzen, Historie,
+  Stand, Audit-Log), `PlanHinweise.test_fehlender_referenzbereich_im_katalog`; `manage.py test infusionen stammdaten
+  befunde patienten` grün. Browsertests `layout.spec.ts` (Tablet zwei Spalten, scrollen erlaubt, nichts ragt heraus),
+  `plaene.spec.ts` (Praxisvorgabe geändert → Editor nutzt die neuen Mengen und nennt den Stand). Lokal grün, CI-Lauf
+  steht aus.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -3924,7 +3964,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U69 | ~~Startseite: Kachel oder Hinweis?~~ **Bestätigt 09.10.2026:** Hinweis | F160 | – |
 | U70 | ~~Geänderte Frist auch für vorhandene Scans?~~ **Bestätigt 09.10.2026:** nur für neue Scans | F165 | – |
 | U71 | ~~Textwerte („< 0,1“, „negativ“) aus Scans übernehmen?~~ **Bestätigt 09.10.2026:** nein, nur Zahlen | F166, U47 | – |
-| U72 | Sollen Telefon- und Videotermine standardmäßig mit auf das Infoblatt an die Praxis (Rückfrage an Alice, `docs/VORLAGEN-ALICE-2026-10-09.md`)? | F177 | standardmäßig nicht; im Dialog ankreuzbar |
+| U72 | ~~Sollen Telefon- und Videotermine standardmäßig mit auf das Infoblatt an die Praxis (Rückfrage an Alice, `docs/VORLAGEN-ALICE-2026-10-09.md`)?~~ **Entschieden 10.10.2026: Nein, Standard bleibt aus** (F190) | F177 | standardmäßig nicht; im Dialog ankreuzbar |
 | U73 | In welchem Rhythmus und wie viele Tage vorher soll das Infoblatt verschickt werden (Rückfrage an Alice)? | F177 | wöchentlich (nächste Woche Mo–So), Erinnerung 3 Tage vorher; unter Vorlagen › Grenzwerte änderbar |
 | U74 | ~~„Datenbank leeren“ soll auch die gelernten Zuordnungen und die Kennzahl leeren: `scans.lernen.leeren()` steht bereit, der Aufruf in `system/leeren.py` (`datenbank_leeren`, plus `umfang`) gehört zu einem anderen Auftrag und fehlt noch. Ebenso entfernt das Leeren keine nicht zugeordneten Scans (`scans.Scan` mit Dateien unter `EPM_SCANS`, enthalten Patientendaten; sie laufen erst nach der Aufbewahrungsfrist ab)~~ **Erledigt 10.10.2026:** `datenbank_leeren` entfernt alle Scans samt Dateien (der Stand des OCR-Dienstes in `.dienst` bleibt) und ruft `scans.lernen.leeren()` auf; `umfang` zählt die Scans; Test `system/test_leeren.py` | F182 | – |
 | U75 | Gelernte Zuordnungen sind laut Auftrag auch für „Vorlagen pflegen“ gedacht; die API lässt das zu, in der Oberfläche liegt der Bereich aber unter Scans (Route und Menü nur mit Recht „Scans“). Ein Link unter Vorlagen › Labor wäre der Weg für Rollen ohne „Scans“ | F182 | Standardrollen haben beide Rechte; Link unter Vorlagen nicht gesetzt (anderer Auftrag) |
@@ -3933,6 +3973,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 10.10.2026 | Entscheidungen der Praxis | Tablet mit zwei Spalten und Scrollen, Mengen je kg unter Vorlagen › Grenzwerte (Migration mit den Werten des Altsystems, Historie, Audit-Log, Stand im Plan-Editor), Gewicht für den Plan nach 6 Monaten „bitte prüfen“ (einstellbar), Labor-Hinweise ab Freigabe des letzten Plans (entschieden), Laborparameter „Ohne Referenzbereich“ zum Nachtragen und Hinweis im Plan-Editor, Telefontermine bleiben vom Infoblatt aus (U72) (F190). Lauf steht aus |
 | 10.10.2026 | Version 2.0.0 | Zweite Fassung von EPM: Versionsnummer von 0.2.0 auf 2.0.0 (Festlegung Filip 10.10.2026); enthält F177–F189. Images heißen `epm-backend:2.0.0-<Commit>` |
 | 10.10.2026 | Hinweise im Infusionsplan | Plan-Editor zeigt Laborwerte außerhalb des Referenzbereichs seit dem letzten Plan (nur Bestandteile des Plans) mit Verlauf der letzten drei Werte, deutliche Gewichtsänderung, Entwicklung der eigenen Pläne und fehlendes Labor mit „Blutuntersuchung anfordern“ – nur zum Prüfen, ohne Dosisvorschlag (MDR) (F187). Lauf steht aus |
 | 10.10.2026 | Erkennung verbessern | „Falsch erkannt“ mit Grund (verwirft sofort, lernt „nicht auswerten“/Sperre/weniger Bestätigungen je Labor), „Bereich markieren“ liest nur den aufgezogenen Rahmen mit Tesseract neu (Maus und Touch, Tabelle zeilenweise) und lernt den Bereich je Labor, Steuerung des Lernens (pausieren, Schwelle 1–3), Anleitung in Hilfe, Prüfansicht und `docs/SCANS-VERBESSERN.md` (F189). Lauf steht aus |

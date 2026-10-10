@@ -398,7 +398,7 @@ export type Pfadteil = { text: string; zu?: string };
  *  teilen sich in Stufen auf (lib/stufen.ts). Das „?“ führt zum passenden Abschnitt der Hilfe (S15). */
 export function Seite({ pfad, children, className, fuellen }: { pfad: Pfadteil[]; children: ReactNode; className?: string;
   /** Seite füllt das Fenster und scrollt nicht als Ganzes (Patientenakte, 10.10.2026): Kopf und Reiter bleiben stehen,
-   *  gescrollt wird nur in Karten bzw. Spalten. Gilt ab 1024 × 600 px (index.css, .seite-fuellt); darunter scrollt die Seite. */
+   *  gescrollt wird nur in Karten bzw. Spalten. Gilt ab 1280 × 600 px (index.css, .seite-fuellt); darunter scrollt die Seite. */
   fuellen?: boolean }) {
   const ich = useIch();
   const { pathname } = useLocation();

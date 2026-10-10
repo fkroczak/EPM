@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 
@@ -308,6 +309,19 @@ def scans_fehler(frist, hoechst, verlaengerung, max_mb, max_anzahl) -> dict:
     return fehler
 
 
+def vorgabe_fehler(werte: dict) -> dict:
+    """Mengen je kg der Praxisvorgabe: nicht negativ und unter einer großzügigen Obergrenze (Tippfehler abfangen)."""
+    fehler = {}
+    for feld, wert in werte.items():
+        if wert is None:
+            fehler[feld] = "Bitte einen Wert angeben (0 = nicht vorbelegen)."
+            continue
+        oben = Einstellungen.VORGABE_JE_KG[feld][1]
+        if not Decimal(0) <= Decimal(wert) <= oben:
+            fehler[feld] = f"Bitte 0 bis {str(oben).replace('.', ',')} je kg angeben."
+    return fehler
+
+
 class Einstellungen(models.Model):
     """Genau ein Datensatz (pk=1): Absender, Warnschwellen, Plausibilitätsgrenzen, Fristen des Datenschutzes."""
 
@@ -365,6 +379,19 @@ class Einstellungen(models.Model):
     # Gesamtvolumen = Gewicht × 35 ml (Festlegung 01.10.2026); Standard deckt 20–250 kg ab
     volumen_min_ml = models.DecimalField("Gesamtvolumen minimal", max_digits=7, decimal_places=0, default=Decimal("0"))
     volumen_max_ml = models.DecimalField("Gesamtvolumen maximal", max_digits=7, decimal_places=0, default=Decimal("9000"))
+    # „Mengen nach Praxisvorgabe“ im Plan-Editor (Entscheidung der Praxis 10.10.2026, F190): Mengen je kg des letzten
+    # Gewichts, Startwerte wie im Altsystem (EPM_infuplan.php). Unter Vorlagen › Grenzwerte einstellbar.
+    vorgabe_glucose_g_kg = models.DecimalField("Glucose je kg", max_digits=5, decimal_places=2, default=Decimal("3.5"))
+    vorgabe_aminosaeuren_g_kg = models.DecimalField("Aminosäuren je kg", max_digits=5, decimal_places=2, default=Decimal("1.2"))
+    vorgabe_lipide_g_kg = models.DecimalField("Lipide je kg", max_digits=5, decimal_places=2, default=Decimal("1"))
+    vorgabe_natrium_mmol_kg = models.DecimalField("Natrium je kg", max_digits=5, decimal_places=2, default=Decimal("1.3"))
+    vorgabe_kalium_mmol_kg = models.DecimalField("Kalium je kg", max_digits=5, decimal_places=2, default=Decimal("0.7"))
+    vorgabe_phosphat_mmol_kg = models.DecimalField("Phosphat je kg", max_digits=5, decimal_places=2, default=Decimal("0.3"))
+    vorgabe_calcium_mmol_kg = models.DecimalField("Calcium je kg", max_digits=5, decimal_places=2, default=Decimal("0.15"))
+    vorgabe_magnesium_mmol_kg = models.DecimalField("Magnesium je kg", max_digits=5, decimal_places=2, default=Decimal("0.2"))
+    # Gewicht vor der Freigabe eines Plans „bitte prüfen“, wenn älter (Entscheidung der Praxis 10.10.2026: 6 Monate)
+    plan_gewicht_alter_monate = models.PositiveSmallIntegerField("Gewicht für den Plan gilt als alt nach", default=6)
+    vorgabe_geaendert_am = models.DateTimeField("Praxisvorgabe je kg zuletzt geändert", null=True, blank=True, editable=False)
 
     # Datenschutz (Festlegung 02.10.2026)
     aufbewahrung_jahre = models.PositiveSmallIntegerField("Aufbewahrung nach Abschluss der Akte", default=10)
@@ -404,8 +431,22 @@ class Einstellungen(models.Model):
         ("kalium_min_mmol", "kalium_max_mmol"), ("volumen_min_ml", "volumen_max_ml"),
     ]
 
+    # Feld der Praxisvorgabe je kg → Feld im Plan, Obergrenze je kg (Plausibilität, keine medizinische Vorgabe)
+    VORGABE_JE_KG = {
+        "vorgabe_glucose_g_kg": ("glucose_g", Decimal("10")), "vorgabe_aminosaeuren_g_kg": ("aminosaeuren_g", Decimal("5")),
+        "vorgabe_lipide_g_kg": ("lipide_g", Decimal("5")), "vorgabe_natrium_mmol_kg": ("natrium_mmol", Decimal("10")),
+        "vorgabe_kalium_mmol_kg": ("kalium_mmol", Decimal("10")), "vorgabe_phosphat_mmol_kg": ("phosphat_mmol", Decimal("5")),
+        "vorgabe_calcium_mmol_kg": ("calcium_mmol", Decimal("5")), "vorgabe_magnesium_mmol_kg": ("magnesium_mmol", Decimal("5")),
+    }
+
     def save(self, *args, **kwargs):
         self.pk = 1
+        fehler = vorgabe_fehler({f: getattr(self, f) for f in self.VORGABE_JE_KG})
+        if fehler:
+            raise ValidationError(fehler)
+        bisher = Einstellungen.objects.filter(pk=1).values(*self.VORGABE_JE_KG).first()
+        if bisher and any(Decimal(bisher[f]) != Decimal(getattr(self, f)) for f in self.VORGABE_JE_KG):
+            self.vorgabe_geaendert_am = timezone.now()
         for unten, oben in self.GRENZPAARE:
             if getattr(self, unten) >= getattr(self, oben):
                 raise ValidationError({unten: "Untere Grenze muss kleiner als obere Grenze sein."})
@@ -414,7 +455,7 @@ class Einstellungen(models.Model):
         if self.abschluss_pruefen_monate < 1:
             raise ValidationError({"abschluss_pruefen_monate": "Bitte mindestens 1 Monat angeben."})
         for feld in ("plan_alter_warnung_monate", "labor_alter_warnung_monate", "bia_alter_warnung_monate",
-                     "gewicht_fehlt_monate"):
+                     "gewicht_fehlt_monate", "plan_gewicht_alter_monate"):
             if getattr(self, feld) < 1:
                 raise ValidationError({feld: "Bitte mindestens 1 Monat angeben."})
         fehler = kontaktstufen_fehler(self.kontakt_bald_monate, self.kontakt_ueberfaellig_monate)

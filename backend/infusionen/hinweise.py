@@ -152,6 +152,31 @@ def labor_hinweise(patient, bestandteile: set[str], seit) -> list[dict]:
     return ergebnis
 
 
+def referenz_fehlt_hinweis(bestandteile: set[str]) -> dict | None:
+    """Für Parameter, die zum Plan gehören, steht im Laborkatalog kein Referenzbereich (Entscheidung der Praxis
+    10.10.2026, F190): Hinweise aus dem Labor sind dann unvollständig – Befunde ohne eigenen Bereich werden nicht
+    bewertet. Die Werte pflegt die Praxis selbst unter Vorlagen › Labor und Diagnosen; EPM trägt keine ein."""
+    from stammdaten.models import Laborparameter
+
+    namen, vitamine = [], 0
+    for schluessel in sorted(bestandteile, key=lambda k: list(BESTANDTEILE).index(k) if k in BESTANDTEILE else 99):
+        b = BESTANDTEILE.get(schluessel)
+        if not b:
+            continue
+        ohne = Laborparameter.objects.filter(aktiv=True, referenz_von__isnull=True, referenz_bis__isnull=True)
+        if "gruppe" in b:
+            vitamine = ohne.filter(gruppe=b["gruppe"]).count()
+        else:
+            namen += list(ohne.filter(name__in=b["parameter"]).order_by("reihenfolge", "name").values_list("name", flat=True))
+    teile = namen + ([f"{vitamine} Vitamin{'e' if vitamine != 1 else ''}"] if vitamine else [])
+    if not teile:
+        return None
+    liste = ", ".join(teile[:-1]) + (" und " if len(teile) > 1 else "") + teile[-1]
+    return {"art": "referenz_fehlt", "stufe": "info", "parameter": namen,
+            "text": f"Für {liste} ist kein Referenzbereich hinterlegt – Hinweise aus dem Labor sind deshalb unvollständig "
+                    f"(Befunde ohne eigenen Bereich werden nicht bewertet). Bitte prüfen."}
+
+
 def plan_statistik(patient) -> list[dict]:
     """Wie sich die freigegebenen Pläne der Akte entwickelt haben: ein Bestandteil, der in den letzten drei Plänen
     jeweils erhöht bzw. verringert wurde (nur eine Beobachtung, keine Bewertung)."""
@@ -247,4 +272,7 @@ def hinweise(patient, plan=None, bestandteile: set[str] | None = None) -> dict:
         liste.append(gewicht)
     liste += labor_hinweise(patient, bestandteile, seit)
     liste += plan_statistik(patient)
+    fehlt = referenz_fehlt_hinweis(bestandteile)
+    if fehlt:
+        liste.append(fehlt)
     return {"seit": seit, "bezug": bezug.id if bezug else None, "bestandteile": sorted(bestandteile), "hinweise": liste}

@@ -45,7 +45,7 @@ test("Akte ohne Seiten-Scrollen (F181): 1366 × 768 und 1920 × 1080 – sechs K
   const api = await apiAls("mitarbeiter");
   const viele = await api.post("patienten/", { nachname: eindeutig("Vielhinweis"), vorname: "Vera", geburtsdatum: "1960-05-05" });
   await api.ende();
-  for (const [breite, hoehe] of [[1366, 768], [1920, 1080], [1024, 768]] as const) {
+  for (const [breite, hoehe] of [[1366, 768], [1920, 1080]] as const) {
     await page.setViewportSize({ width: breite, height: hoehe });
     await page.goto(`/patienten/${viele.id}`);
     const sammel = page.getByTestId("aktenkopf").getByTestId("hinweise-sammel");
@@ -53,6 +53,15 @@ test("Akte ohne Seiten-Scrollen (F181): 1366 × 768 und 1920 × 1080 – sechs K
     await expect(page.getByTestId("akte-uebersicht")).toHaveAttribute("data-fuellt", "1");
     await expect.poll(() => page.evaluate(() => document.scrollingElement!.scrollHeight - innerHeight)).toBeLessThanOrEqual(0);
   }
+  // Tablet quer (Entscheidung der Praxis 10.10.2026, F190): zwei breite Spalten, die Seite darf scrollen,
+  // nichts ragt waagerecht heraus
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto(`/patienten/${viele.id}`);
+  await expect(page.getByTestId("aktenkopf").getByTestId("hinweise-sammel")).toContainText(/\d+ Hinweise/);
+  await expect(page.getByTestId("uebersicht-stufe")).toHaveAttribute("data-spalten", "2");
+  await expect(page.getByTestId("akte-uebersicht")).not.toHaveAttribute("data-fuellt", "1");
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - document.scrollingElement!.clientWidth)).toBeLessThanOrEqual(0);
+  await page.setViewportSize({ width: 1366, height: 768 });
   await page.getByTestId("aktenkopf").getByTestId("hinweise-sammel").click();
   const liste = page.getByTestId("hinweise-liste");
   await expect(liste).toContainText("Kein Laborbefund");

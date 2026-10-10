@@ -600,12 +600,14 @@ Bestätigung.</p>""",
 <p><strong>Neuer Plan</strong> übernimmt die Werte des aktuellen Plans; geänderte Werte sind markiert. Beim ersten Plan
 schlägt EPM Werte je kg Körpergewicht vor (Vorgabe der Praxis wie im Altsystem: Glucose 3,5 g, Aminosäuren 1,2 g,
 Lipide 1 g, Natrium 1,3, Kalium 0,7, Phosphat 0,3, Calcium 0,15, Magnesium 0,2 mmol je kg). <strong>Mengen nach
-Praxisvorgabe</strong> setzt diese Mengen jederzeit neu aus dem letzten Gewicht ein – Präparate und Zusätze bleiben.
+Praxisvorgabe</strong> setzt diese Mengen jederzeit neu aus dem letzten Gewicht ein – Präparate und Zusätze bleiben. Die
+Mengen je kg pflegt die Praxis unter <strong>Vorlagen › Grenzwerte</strong>; neben dem Knopf steht, von wann die Vorgabe
+ist.
 <strong>Leer beginnen</strong> startet ohne Werte; <strong>Als Vorlage für neuen Plan</strong> (an einem früheren Plan)
 übernimmt dessen Werte.</p>
 <p>Volumen im Mischbeutel (letztes Gewicht × 35 ml) und Rate rechnet EPM mit. Die Karte <strong>Prüfung vor der
 Freigabe</strong> sagt in einfachen Worten, was noch fehlt oder nicht passt: Gewicht vorhanden und nicht älter als
-3 Monate, Präparat zu jeder Menge, Calcium + Magnesium stabil, Infusionstage stimmig, Laufzeit eingetragen,
+6 Monate (unter Vorlagen › Grenzwerte einstellbar), Präparat zu jeder Menge, Calcium + Magnesium stabil, Infusionstage stimmig, Laufzeit eingetragen,
 Protonenpumpenhemmer mit Zeiten. Werte außerhalb der Grenzwerte stehen darüber. <strong>Als Entwurf speichern</strong>
 macht den Plan für das Team sichtbar, noch nicht für den Versorger.</p>
 <p>Die Karte <strong>Hinweise aus Labor und Gewicht</strong> zeigt, was seit dem letzten Plan in der Akte steht:
@@ -613,7 +615,9 @@ Laborwerte außerhalb des Referenzbereichs – nur für Bestandteile, die im Pla
 Spurenelemente, Vitamine) – mit den letzten drei Werten, eine deutliche Gewichtsänderung, Bestandteile, die in den letzten
 drei Plänen jeweils erhöht oder verringert wurden, und ob Laborwerte fehlen oder zu alt sind (<strong>Blutuntersuchung
 anfordern</strong> öffnet „Schreiben und E-Mail“ mit der Anlage „Blutuntersuchung“). Das sind <strong>Hinweise zum
-Prüfen</strong>: EPM schlägt keine Mengen vor – die Entscheidung trifft die Ärztin bzw. der Arzt.</p>
+Prüfen</strong>: EPM schlägt keine Mengen vor – die Entscheidung trifft die Ärztin bzw. der Arzt. Bewertet werden Werte
+mit Referenzbereich (vom Befund, sonst aus dem Laborkatalog); fehlt er im Katalog, sagt die Karte das. Nachtragen unter
+Vorlagen › Labor und Diagnosen › „Ohne Referenzbereich“ – bitte die Bereiche des eigenen Labors übernehmen.</p>
 <p><strong>PDF-Vorschau</strong> zeigt die PDF mit genau den Werten, die gerade im Formular stehen – auch ungespeicherte;
 gespeichert wird dabei nichts (ein neuer Plan wird dafür einmal als Entwurf gespeichert). Ab 1920 px zeigt zusätzlich eine
 dritte Spalte die Vorschau des zuletzt gespeicherten Entwurfs.</p>""",

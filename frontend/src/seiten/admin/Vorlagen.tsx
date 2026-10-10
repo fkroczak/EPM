@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth";
 import type { Feldfehler } from "@/lib/api";
 import { useBriefkopf } from "@/lib/daten";
 import type { Absender, Briefkopf } from "@/lib/daten";
-import { eingabeZahl, zahl } from "@/lib/format";
+import { datum, eingabeZahl, zahl } from "@/lib/format";
 import { ERKLAERUNGEN } from "@/lib/typen";
 import type { Einstellungen, ErklaerungsArt } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
@@ -156,6 +156,18 @@ const GRENZEN: { text: string; min: string; max: string; einheit: string }[] = [
   { text: "Größe", min: "groesse_min_cm", max: "groesse_max_cm", einheit: "cm" },
 ];
 
+/** „Mengen nach Praxisvorgabe“ im Plan-Editor (F190): Mengen je kg des letzten Gewichts; Start wie im Altsystem */
+const VORGABE_JE_KG: { k: string; text: string; einheit: string }[] = [
+  { k: "vorgabe_glucose_g_kg", text: "Glucose", einheit: "g/kg" },
+  { k: "vorgabe_aminosaeuren_g_kg", text: "Aminosäuren", einheit: "g/kg" },
+  { k: "vorgabe_lipide_g_kg", text: "Lipide", einheit: "g/kg" },
+  { k: "vorgabe_natrium_mmol_kg", text: "Natrium", einheit: "mmol/kg" },
+  { k: "vorgabe_kalium_mmol_kg", text: "Kalium", einheit: "mmol/kg" },
+  { k: "vorgabe_phosphat_mmol_kg", text: "Phosphat", einheit: "mmol/kg" },
+  { k: "vorgabe_calcium_mmol_kg", text: "Calcium", einheit: "mmol/kg" },
+  { k: "vorgabe_magnesium_mmol_kg", text: "Magnesium", einheit: "mmol/kg" },
+];
+
 function Einheit({ children, einheit }: { children: ReactNode; einheit: string }) {
   return <span className="relative block">{children}<span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.8125rem] gedaempft pointer-events-none">{einheit}</span></span>;
 }
@@ -177,7 +189,7 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
   const speichern = useMutation({
     mutationFn: () => {
       const felder = [...HINWEISE.map((h) => h.k), ...(datenschutz ? DATENSCHUTZ.map((h) => h.k) : []), ...GRENZEN.flatMap((g) => [g.min, g.max]),
-        ...SCANS.map((h) => h.k)];
+        ...SCANS.map((h) => h.k), ...VORGABE_JE_KG.map((v) => v.k), "plan_gewicht_alter_monate"];
       const fehler: Feldfehler = {};
       const body: Record<string, string | string[] | boolean | null> = datenschutz ? { pflicht_erklaerungen: pflicht } : {};
       // F185: nach dem Speichern eines Praxistermins „Terminbestätigung schicken?“ anbieten
@@ -188,7 +200,8 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
       felder.push("infoblatt_vorlauf_tage");
       for (const k of felder) {
         const z = eingabeZahl(w![k] ?? "");
-        if (!z || z === "ungueltig") fehler[k] = "Bitte eine Zahl eingeben.";
+        // Mengen je kg dürfen 0 sein (= nicht vorbelegen)
+        if (z === "ungueltig" || (!z && !(k.startsWith("vorgabe_") && (w![k] ?? "").trim() === "0"))) fehler[k] = "Bitte eine Zahl eingeben.";
         body[k] = z;
       }
       if (Object.keys(fehler).length) throw new ApiFehler(400, "Bitte die markierten Werte prüfen.", null, fehler);
@@ -299,6 +312,7 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
           höchstens bis {w.scans_hoechst_tage} Tage nach dem Hochladen.</span>
       </Karte>
       </div>
+      <div className="stapel flex flex-col gap-5 min-w-0">
       <Karte className="px-5 py-[1.125rem] flex flex-col gap-3">
         <h2 className="lbl m-0">Plausibilitätsgrenzen bei der Eingabe</h2>
         <table className="tabelle">
@@ -318,6 +332,29 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
         <div className="text-[0.8125rem] gedaempft">Werte außerhalb werden nicht gespeichert. Im Altsystem standen z. B. 433.564 kcal und 9.999 kg.</div>
         {speichern.error && !Object.keys(f).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
       </Karte>
+      {/* Entscheidung der Praxis 10.10.2026 (F190): die Werte je kg pflegt die Praxis selbst */}
+      <Karte className="px-5 py-[1.125rem] flex flex-col gap-3" data-testid="grenzwerte-je-kg">
+        <h2 className="lbl m-0">Mengen je kg für „Mengen nach Praxisvorgabe“</h2>
+        <span className="text-[0.8125rem] gedaempft">Im Plan-Editor setzt „Mengen nach Praxisvorgabe“ (und der erste Plan eines Patienten)
+          diese Mengen je kg des letzten Gewichts ein; Präparate und Zusätze bleiben. 0 = nicht vorbelegen. Startwerte wie im Altsystem.</span>
+        <div className="grid grid-cols-2 gap-3">
+          {VORGABE_JE_KG.map((v) => (
+            <Feld key={v.k} label={v.text} fehler={f[v.k]}>
+              {(p) => <Einheit einheit={v.einheit}><Eingabe {...p} className="num pr-24" inputMode="decimal" value={w[v.k] ?? ""}
+                onChange={(e) => setW({ ...w, [v.k]: e.target.value })} /></Einheit>}
+            </Feld>
+          ))}
+        </div>
+        <Feld label="Gewicht für den Plan gilt als alt nach" fehler={f.plan_gewicht_alter_monate}
+          hinweis="Ist das letzte Gewicht älter, sagt „Prüfung vor der Freigabe“: bitte prüfen (Mengen je kg und Gesamtvolumen hängen daran).">
+          {(p) => <Einheit einheit="Monaten"><Eingabe {...p} className="num pr-24" value={w.plan_gewicht_alter_monate ?? ""}
+            onChange={(e) => setW({ ...w, plan_gewicht_alter_monate: e.target.value })} /></Einheit>}
+        </Feld>
+        <span className="text-xs gedaempft" data-testid="je-kg-stand">{(daten.data as unknown as { vorgabe_geaendert_am?: string | null })?.vorgabe_geaendert_am
+          ? `Zuletzt geändert am ${datum((daten.data as unknown as { vorgabe_geaendert_am: string }).vorgabe_geaendert_am)}.`
+          : "Noch die Startwerte des Altsystems."} Jede Änderung steht mit Person und Zeitpunkt im Audit-Log.</span>
+      </Karte>
+      </div>
     </div>
   );
 }

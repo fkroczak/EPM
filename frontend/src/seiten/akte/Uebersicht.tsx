@@ -426,11 +426,12 @@ function BefundeKarte() {
 /** Spalten des Rasters nach der tatsächlichen Breite der Fläche: etwa die Breiten, die der Inhalt bei 1366/1920/2560 px
  *  hat (1366 px: drei Spalten, 1920 px: vier). */
 function spaltenFuerBreite(px: number): number {
-  return px < 560 ? 1 : px < 880 ? 2 : px < 1560 ? 3 : px < 2200 ? 4 : 5;
+  // Tablet (1024 px, Fläche ~940 px): zwei breite Spalten (Entscheidung der Praxis 10.10.2026, F190)
+  return px < 560 ? 1 : px < 1100 ? 2 : px < 1560 ? 3 : px < 2200 ? 4 : 5;
 }
 
 /** Fensterstufe, ab der die Akte das Fenster füllt (index.css, .seite-fuellt) */
-const FUELLT = "(min-width: 64rem) and (min-height: 37.5rem)";
+const FUELLT = "(min-width: 80rem) and (min-height: 37.5rem)";
 /** Kleinste sinnvolle Höhe einer Kartenzeile; darunter scrollt die Fläche statt die Karten zu quetschen */
 const MIN_ZEILE = 170;
 
@@ -469,7 +470,7 @@ function useFlaeche() {
 /**
  * Übersicht der Akte (Wunsch 10.10.2026: „deutlich entschlanken, im besten Fall ohne Scrollen“): sechs Karten statt
  * neun – Gewicht, Infusionsplan, Diagnosen/Therapie/Empfehlung, Kontakte und Termine, Labor und BIA, Personen und
- * Anschrift. Ab 1024 × 600 px und mindestens drei Spalten füllen sie in zwei Reihen genau das Fenster; was nicht
+ * Anschrift. Ab 1280 × 600 px und mindestens drei Spalten füllen sie in zwei Reihen genau das Fenster; was nicht
  * hineinpasst, scrollt in der Karte (wie die Kacheln der Startseite). Jede Karte behält das Menü für Breite und Höhe
  * (je Person gespeichert); wer selbst eine Größe wählt, bekommt sie – dann darf die Fläche auch scrollen.
  */

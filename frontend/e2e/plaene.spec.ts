@@ -15,7 +15,8 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   const editor = page.getByTestId("plan-editor");
   await expect(editor).toContainText("Erster Plan dieses Patienten.");
   // erster Plan je kg Körpergewicht vorbelegt wie im Altsystem (60 kg)
-  await expect(editor).toContainText("Vorbelegt je kg Körpergewicht (60,0 kg) wie im Altsystem.");
+  // Startwerte wie im Altsystem bzw. – nachdem die Praxis sie geändert hat (F190) – „nach Praxisvorgabe vom …“
+  await expect(editor).toContainText(/Vorbelegt je kg Körpergewicht \(60,0 kg\) (wie im Altsystem|nach Praxisvorgabe vom \d{2}\.\d{2}\.\d{4})\./);
   for (const [feld, wert] of [["Menge Glucose in g", "210"], ["Menge Aminosäuren in g", "72"], ["Menge Lipide in g", "60"],
     ["Natrium", "78"], ["Kalium", "42"], ["Phosphat", "18"], ["Calcium", "9"], ["Magnesium", "12"]]) {
     await expect(editor.getByLabel(feld)).toHaveValue(wert);
@@ -262,15 +263,43 @@ test("Hinweise aus Labor und Gewicht im Plan-Editor: kein Labor, Wert außerhalb
   }
   await page.reload();
   // der erste Plan ist je kg vorbelegt – Magnesium kommt also vor
-  const mg = hinweise.getByTestId("plan-hinweis").filter({ hasText: "Magnesium" });
+  const mg = hinweise.locator('[data-art="labor"]').filter({ hasText: "Magnesium" });
   await expect(mg).toContainText(/Magnesium 0,58 mmol\/l am \d{2}\.\d{2}\.\d{4} – unter dem Referenzbereich \(0,66–1,07\)\. Bitte prüfen\./);
   await expect(mg).toContainText("Verlauf: 0,9");
   await expect(mg).toContainText("fallend");
   await expect(hinweise).not.toContainText("Ferritin");
   await expect(hinweise).not.toContainText("Noch kein Laborbefund");
   await expect(hinweise).toContainText("EPM schlägt keine Mengen vor");
+  // fehlt im Katalog der Referenzbereich, sagt der Editor, dass die Hinweise unvollständig sind – mit Weg zum Katalog (F190)
+  const fehlt = hinweise.locator('[data-art="referenz_fehlt"]');
+  await expect(fehlt).toContainText("ist kein Referenzbereich hinterlegt");
+  await expect(fehlt.getByRole("link", { name: "Referenzbereiche im Laborkatalog nachtragen" }))
+    .toHaveAttribute("href", "/admin/vorlagen?bereich=kataloge&labor=ohne_referenz");
   // ohne Magnesium im Formular verschwindet der Hinweis
   await page.getByTestId("plan-editor").getByLabel("Magnesium").fill("");
-  await expect(hinweise.getByTestId("plan-hinweis").filter({ hasText: "Magnesium" })).toHaveCount(0);
+  await expect(hinweise.locator('[data-art="labor"]').filter({ hasText: "Magnesium" })).toHaveCount(0);
   await api.ende();
+});
+
+test("Mengen je kg nach Praxisvorgabe: unter Vorlagen › Grenzwerte geändert, im Plan-Editor angewandt (F190)", async ({ page }) => {
+  const admin = await apiAls("admin");
+  const vorher = await admin.get("einstellungen/");
+  await admin.patch("einstellungen/", { vorgabe_glucose_g_kg: "4" });
+  try {
+    const api = await apiAls("mediziner");
+    const patient = await api.post("patienten/", { nachname: eindeutig("Vorgabe"), vorname: "Vera", geburtsdatum: "1965-06-06" });
+    await api.post("gewichte/", { patient: patient.id, gewicht_kg: "60.0", quelle: "telefonisch" });
+    await api.ende();
+    await page.goto(`/patienten/${patient.id}/plaene/neu`);
+    const editor = page.getByTestId("plan-editor");
+    await expect(editor).toContainText(/Vorbelegt je kg Körpergewicht \(60,0 kg\) nach Praxisvorgabe vom \d{2}\.\d{2}\.\d{4}\./);
+    await expect(editor.getByLabel("Menge Glucose in g")).toHaveValue("240"); // 60 × 4
+    await editor.getByLabel("Menge Glucose in g").fill("100");
+    await editor.getByRole("button", { name: "Mengen nach Praxisvorgabe" }).click();
+    await expect(editor.getByLabel("Menge Glucose in g")).toHaveValue("240");
+    await expect(page.getByTestId("praxisvorgabe-stand")).toContainText("nach Praxisvorgabe vom");
+  } finally {
+    await admin.patch("einstellungen/", { vorgabe_glucose_g_kg: vorher.vorgabe_glucose_g_kg });
+    await admin.ende();
+  }
 });

@@ -838,14 +838,15 @@ html { scrollbar-gutter: stable; }
 .kontakt-zeile.markiert { background: var(--akzent-weich); }
 @media (max-width: 47.99rem) { .kontakt-zeile { grid-template-columns: 3.75rem minmax(0, 1fr) auto; gap: 0.25rem 0.625rem; padding: 0.75rem; } }
 
-/* Patientenakte ohne Seiten-Scrollen (Wunsch 10.10.2026, F181): ab 1024 × 600 px füllt die Akte das Fenster. Kopf und
+/* Patientenakte ohne Seiten-Scrollen (Wunsch 10.10.2026, F181): ab 1280 × 600 px füllt die Akte das Fenster (Tablet
+   1024 × 768: zwei breite Spalten mit Seiten-Scrollen, Entscheidung der Praxis 10.10.2026, F190). Kopf und
    Reiter bleiben stehen; gescrollt wird in der Fläche darunter, in zweispaltigen Reitern je Spalte und in der Übersicht
    je Karte. Darunter (Telefon, Tablet hochkant) scrollt die Seite wie bisher. */
 .akte-flaeche { display: flex; flex-direction: column; gap: var(--abstand); min-width: 0; }
 /* Scrollbereiche halten auch absolut gesetzte Kinder (z. B. Text nur für Bildschirmleser) – sonst verlängern diese die
    Seite und es entsteht doch wieder ein Seiten-Scrollbalken */
 .seite-fuellt .akte-flaeche, .seite-fuellt .akte-spalten > *, .bereich.fest > .card { position: relative; }
-@media (min-width: 64rem) and (min-height: 37.5rem) {
+@media (min-width: 80rem) and (min-height: 37.5rem) {
   .seite-fuellt { height: 100vh; height: 100dvh; min-height: 0 !important; overflow: hidden; }
   .seite-fuellt > main.seite-inhalt { min-height: 0; overflow: hidden; }
   .seite-fuellt .akte-flaeche {

@@ -19,7 +19,9 @@ KCAL_JE_G = {
     "lipide_g": Decimal("9.15"),
 }
 
-# Vorbelegung des ersten Plans je kg Körpergewicht wie im Altsystem (EPM_infuplan.php; Festlegung 01.10.2026)
+# Vorbelegung je kg Körpergewicht wie im Altsystem (EPM_infuplan.php; Festlegung 01.10.2026). Seit F190 (Entscheidung
+# der Praxis 10.10.2026) unter Vorlagen › Grenzwerte einstellbar (Einstellungen.vorgabe_*); diese Werte sind nur noch die
+# Startwerte zum Nachlesen (dieselben Zahlen stehen als Standard der Felder in stammdaten/models.py).
 VORBELEGUNG_JE_KG = {
     "glucose_g": Decimal("3.5"),
     "aminosaeuren_g": Decimal("1.2"),
@@ -662,11 +664,22 @@ models.signals.m2m_changed.connect(_vitamine_schutz, sender=Infusionsplan.vitami
                                    dispatch_uid="epm_vitamine_schutz")
 
 
+def je_kg_der_praxis() -> tuple[dict, object]:
+    """Mengen je kg nach der Vorgabe der Praxis (Vorlagen › Grenzwerte, F190) und wann sie zuletzt geändert wurde."""
+    from stammdaten.models import Einstellungen
+
+    e = Einstellungen.aktuell()
+    return ({plan_feld: Decimal(getattr(e, feld)) for feld, (plan_feld, _) in Einstellungen.VORGABE_JE_KG.items()},
+            e.vorgabe_geaendert_am)
+
+
 def vorbelegung(patient):
-    """Werte für den ersten Plan aus dem letzten Gewicht (je kg wie im Altsystem), auf die Feldgenauigkeit 0,1 gerundet."""
+    """Werte je kg des letzten Gewichts nach der Vorgabe der Praxis (F190; Start: wie im Altsystem), auf die
+    Feldgenauigkeit 0,1 gerundet. ``stand``: wann die Vorgabe zuletzt geändert wurde (``None`` = Startwerte)."""
     gewicht = (Gewichtsmessung.objects.filter(patient=patient)
                .order_by("-gemessen_am", "-id").values_list("gewicht_kg", flat=True).first())
+    je_kg, stand = je_kg_der_praxis()
     werte = None
     if gewicht is not None:
-        werte = {f: (gewicht * je_kg).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP) for f, je_kg in VORBELEGUNG_JE_KG.items()}
-    return {"gewicht_kg": gewicht, "je_kg": VORBELEGUNG_JE_KG, "werte": werte}
+        werte = {f: (gewicht * menge).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP) for f, menge in je_kg.items()}
+    return {"gewicht_kg": gewicht, "je_kg": je_kg, "werte": werte, "stand": stand}

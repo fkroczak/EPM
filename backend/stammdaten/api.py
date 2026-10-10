@@ -294,6 +294,13 @@ class EinstellungenSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"ocr_fachwoerter": "Je Zeile ein Wort ohne Leerzeichen (höchstens "
                                                                       "60 Zeichen, höchstens 5000 Wörter)."})
             attrs["ocr_fachwoerter"] = "\n".join(dict.fromkeys(woerter))
+        from .models import vorgabe_fehler
+
+        fehler = vorgabe_fehler({f: attrs[f] for f in Einstellungen.VORGABE_JE_KG if f in attrs})
+        if fehler:
+            raise serializers.ValidationError(fehler)
+        if "plan_gewicht_alter_monate" in attrs and not 1 <= attrs["plan_gewicht_alter_monate"] <= 60:
+            raise serializers.ValidationError({"plan_gewicht_alter_monate": "Bitte 1 bis 60 Monate angeben."})
         if "gewicht_fehlt_monate" in attrs and not 1 <= attrs["gewicht_fehlt_monate"] <= 120:
             raise serializers.ValidationError({"gewicht_fehlt_monate": "Bitte 1 bis 120 Monate angeben."})
         if "wiedervorlage_tage" in attrs and not 1 <= attrs["wiedervorlage_tage"] <= 365:
