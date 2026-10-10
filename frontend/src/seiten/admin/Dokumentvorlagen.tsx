@@ -344,6 +344,7 @@ function VorlagenListe({ onWahl }: { onWahl: (a: Art) => void }) {
                         className="card flex-1 flex flex-col gap-1.5 px-4 py-3 text-left cursor-pointer border border-transparent hover:border-akzent bg-flaeche text-tinte font-[inherit]">
                         <span className="flex items-start justify-between gap-2 w-full">
                           <span className="font-semibold text-[0.9375rem] leading-snug">{v.name}</span>
+                          {/* Begriff: Entwurf („Änderungen noch nicht freigegeben“) · Begriff: Fassung (Version) */}
                           <Chip art={st.art} className="shrink-0">{st.text}</Chip>
                         </span>
                         {v.wofuer ? <span className="text-[0.8438rem] leading-normal">{v.wofuer}</span> : null}
@@ -553,6 +554,7 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
     <FeldNamen.Provider value={felderNach}>
     <div className="stapel flex flex-col gap-5" data-testid="dokumentvorlagen">
       {aktionenZiel ? createPortal(<>
+        {/* Begriff: Entwurf („Gespeichert, noch nicht freigegeben“) · Begriff: Fassung (Version) */}
         <span className={cx("text-[0.8125rem]", geaendert ? "text-warn font-medium" : "gedaempft")} data-testid="vorlage-stand">{verInfo}</span>
         <Knopf laedt={speichern.isPending} disabled={!geaendert} onClick={() => speichern.mutate()}
           title="Speichert die Änderungen, ohne sie freizugeben – in der Praxis gilt weiter die bisherige Fassung.">Speichern</Knopf>
@@ -580,6 +582,7 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
           {schrittKnopf(1, "1 · Bearbeiten", "Text und Aufbau ändern, dann „Speichern“", () => setAnsicht("seite"), { aktiv: schritt === 1 })}
           {schrittKnopf(2, "2 · Vorschau prüfen", "So sieht es mit einem Testpatienten aus", () => setAnsicht("vorschau"),
             { aktiv: schritt === 2, fertig: geprueft === stand && freigebbar })}
+          {/* Begriff: Freigeben (Veröffentlichen) */}
           {schrittKnopf(3, "3 · Freigeben", `Ab dann gilt es für alle neuen PDFs (Fassung ${naechste})`, () => setFreigabeFrage(true),
             { aus: !freigebbar, titelHinweis: freigebbar ? undefined : "Noch keine Änderungen – erst bearbeiten" })}
         </ol>
@@ -644,11 +647,13 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
             <span className="text-xs gedaempft leading-normal">Der neue Abschnitt kommt hinter den markierten.</span>
           </Karte>
           <Karte className="p-3.5 flex flex-col gap-1.5" data-testid="versionen">
+            {/* Begriff: Fassung (Version) */}
             <span className="lbl flex items-center gap-1.5">Frühere Fassungen
               <Erklaerung titel="Fassungen">Bei jedem Freigeben entsteht eine neue Fassung; die alten bleiben erhalten. „Ansehen“ zeigt eine
                 Fassung mit Testpatient, „Wiederherstellen“ übernimmt sie als Grundlage – in Gebrauch ist sie erst nach dem Freigeben.
                 Jede PDF vermerkt, mit welcher Fassung sie erzeugt wurde.</Erklaerung></span>
             <ul className="m-0 p-0 list-none flex flex-col gap-1.5 text-[0.8125rem]">
+              {/* Begriff: Entwurf */}
               {a.entwurf ? <li className="text-warn"><strong className="font-medium">Noch nicht freigegeben</strong> · {datum(a.entwurf.geaendert_am)}{a.entwurf.geaendert_von ? ` · ${a.entwurf.geaendert_von}` : ""}{a.entwurf.notiz ? ` · ${a.entwurf.notiz}` : ""}</li> : null}
               {a.versionen.map((v) => (
                 <li key={v.id} className="flex flex-col gap-0.5" data-testid="fassung">
@@ -1082,7 +1087,8 @@ function LiveVorschau({ art, bloecke, onGeprueft, hoehe = "h-[72vh]" }: {
         Akte, die als Testpatient markiert ist – echte Akten erscheinen hier nie.</Meldung> : null}
       <Fehleranzeige fehler={pdf.error} />
       {pdf.data ? (
-        <PdfLeser url={`vorschau-${art}-${patient}-${pdf.dataUpdatedAt}`} laden={() => Promise.resolve(pdf.data.daten)} className={hoehe} />
+        // Kopie: pdf.js übergibt den Puffer an seinen Worker (danach leer); die Vorschau lädt beim Neuzeichnen erneut
+        <PdfLeser url={`vorschau-${art}-${patient}-${pdf.dataUpdatedAt}`} laden={() => Promise.resolve(pdf.data.daten.slice())} className={hoehe} />
       ) : pdf.isFetching ? <Laden text="PDF wird erzeugt …" /> : null}
       {mail.data ? (
         <div className="border border-rand rounded-lg px-3 py-2 text-[0.8438rem] bg-flaeche" data-testid="vorschau-email">

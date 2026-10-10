@@ -127,6 +127,10 @@ test("Rechte je Gruppe: Admin erlaubt Mitarbeitern Pläne, wirkt sofort, Standar
 test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", async ({ page }) => {
   const admin = await apiAls("admin");
   await page.goto("/admin/vorlagen");
+  // Startseite der Vorlagen ist die Übersicht in Alltagssprache (F180)
+  await expect(page.getByTestId("vorlagen-start")).toBeVisible();
+  await page.getByRole("group", { name: "Bereich" }).getByRole("button", { name: "Briefkopf und Logo" }).click();
+  await expect(page).toHaveURL(/\?bereich=briefkopf$/);
 
   // Logo: zu klein und mit Skript abgewiesen, gültiges SVG angenommen
   const logo = page.getByTestId("logo");
@@ -163,6 +167,11 @@ test("Vorlagen: Logo, Absender, Auswahllisten mit Reihenfolge, Grenzwerte", asyn
   await expect(page.getByText("Reihenfolge gespeichert.")).toBeVisible();
   const orte = await admin.get("auswahlwerte/?liste=terminort");
   expect(orte.map((o: { wert: string }) => o.wert).indexOf(ort)).toBe(orte.length - 2);
+  // ▲ ▼ für Tablet und Telefon (F180) – zurück ans Ende
+  await liste.getByRole("button", { name: `${ort} nach unten` }).click();
+  await expect.poll(async () => (await admin.get("auswahlwerte/?liste=terminort")).map((o: { wert: string }) => o.wert).indexOf(ort))
+    .toBe(orte.length - 1);
+  await expect(page.getByTestId("liste-wo")).toContainText("Termin");
   await liste.getByRole("checkbox", { name: `${ort} in der Auswahl` }).uncheck();
   await expect(liste.getByRole("row").filter({ hasText: ort })).toContainText("ausgeblendet");
   await expect.poll(async () => (await admin.get("auswahlwerte/?liste=terminort")).find((o: { wert: string }) => o.wert === ort).aktiv).toBe(false);
@@ -226,7 +235,7 @@ test("Administration je Recht: Betrachter sieht nichts, Mitarbeiter Vorlagen, Me
   await expect(mnav.getByRole("link", { name: "Audit-Log" })).toHaveCount(0);
   await expect(mnav.getByRole("link", { name: "Benutzer" })).toHaveCount(0);
   await mnav.getByRole("link", { name: "Vorlagen" }).click();
-  await expect(mp.getByTestId("logo")).toBeVisible();
+  await expect(mp.getByTestId("vorlagen-start")).toBeVisible();
   await m.close();
   const d = await browser.newContext({ storageState: zustand("mediziner"), ignoreHTTPSErrors: true });
   const dp = await d.newPage();

@@ -116,6 +116,7 @@ export function VorlagenStart() {
 
       {offen.length ? (
         <div className="meldung warn" role="status" data-testid="vorlagen-offen">
+          {/* Begriff: Entwurf */}
           <span>Noch nicht freigegebene Änderungen an {offen.length === 1 ? "einer Vorlage" : `${offen.length} Vorlagen`}:{" "}
             {offen.map((v, i) => <span key={v.art}>{i ? ", " : ""}<Link to={`${DOKUMENTE_PFAD}?art=${v.art}`}>{v.name}</Link></span>)}.
             {" "}Bis zum Freigeben gilt in der Praxis die bisherige Fassung.</span>
