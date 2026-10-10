@@ -686,9 +686,12 @@ Grenzwerte › Fachwörter für die Texterkennung</strong> eintragen.</p>""",
 dem erkannten Text darüber). Auf Wunsch wird die hochgeladene Datei zusätzlich unverändert abgelegt. Danach ist der
 Scan aus „Scans“ verschwunden. Im Reiter <strong>Dokumente</strong> der Akte lässt sich auch im erkannten Text suchen.</p>
 <ul>
-<li><strong>Patient</strong>: Steht ein Name, eine Nummer oder ein Geburtsdatum im Dokument, schlägt EPM den Patienten
-vor. Passt das Dokument nicht zum gewählten Patienten (anderes Geburtsdatum, Name kommt nicht vor), erscheint ein
-Hinweis – bitte dann genau prüfen.</li>
+<li><strong>Patient</strong>: Stehen Name und Geburtsdatum im Dokument, steht oben „Wahrscheinlich: Erika Muster,
+geb. 14.03.1968 – übernehmen?“ mit dem Grund (z. B. „Name und Geburtsdatum erkannt“, auch wenn der Name leicht falsch
+gelesen wurde). Ein Klick auf <strong>Übernehmen</strong> wählt den Patienten; zugeordnet wird erst mit „In die Akte
+legen“. Passen mehrere Akten, wählen Sie eine aus; ist der Treffer unsicher, steht dort nur ein Hinweis. Vorgeschlagen
+werden nur Akten, die Sie sehen dürfen. Passt das Dokument nicht zum gewählten Patienten (anderes Geburtsdatum, Name
+kommt nicht vor), erscheint ein Hinweis – bitte dann genau prüfen.</li>
 <li><strong>Laborbefund</strong>: Die erkannten Werte stehen in einer Tabelle mit Parameter, Wert, Einheit und
 Referenzbereich. Werte in anderen Einheiten werden in die Einheit des Laborkatalogs umgerechnet (z. B. g/dl → g/l).
 Ein Klick auf eine Zeile zeigt die Stelle im Bild. Unsicher gelesene oder unplausible Werte sind
@@ -701,7 +704,28 @@ anhängen – mit Quelle und Datum.</li>
 </ul>
 <p>Nichts wird ohne Bestätigung übernommen. Ist etwas ungültig, entsteht gar nichts und die Fehler stehen an der
 jeweiligen Zeile. Laborparameter, die ein Labor anders schreibt, lassen sich unter <strong>Vorlagen › Labor und
-Diagnosen</strong> mit <strong>Suchbegriffen</strong> ergänzen.</p>""",
+Diagnosen</strong> mit <strong>Suchbegriffen</strong> ergänzen – oder EPM lernt sie (nächster Abschnitt).</p>""",
+    },
+    {
+        "id": "scans_gelernt", "gruppe": "scans", "titel": "Die Texterkennung lernt mit (gelernte Zuordnungen)",
+        "rechte": ["scans_bearbeiten"], "seiten": [],
+        "html": """
+<p>Die Texterkennung lernt aus Ihren Korrekturen. Ordnen Sie beim Zuordnen eine Zeile einem anderen Laborwert zu,
+verbessern Sie einen falsch gelesenen Namen (auch bei Diagnosen) oder ergänzen Sie einen Wert, indem Sie ihn im Bild
+anklicken, merkt sich EPM die <strong>Bezeichnung auf dem Befund</strong> und wohin sie gehört – für dieses Labor und
+allgemein. Bei Laboren, die ihre Werte immer an derselben Stelle drucken, merkt sich EPM auch die Spalte.</p>
+<ul>
+<li>Beim nächsten Befund steht dann ein Vorschlag mit dem Zeichen <strong>„gelernt?“</strong> da – noch nicht
+angehakt. Ab der zweiten Bestätigung gilt die Zuordnung als sicher (<strong>„gelernt“</strong>) und ist vorgewählt.</li>
+<li>Prüfen und übernehmen müssen Sie wie immer selbst: Ohne Ihre Bestätigung kommt nichts in die Akte.</li>
+<li>Gespeichert werden nur Bezeichnungen, z. B. „Harnstoff-N → Harnstoff“ – keine Werte und keine Angaben zu
+Patienten. Alles bleibt auf dem Server; nichts geht ins Internet.</li>
+</ul>
+<p>Unter <strong>Scans › Gelernte Zuordnungen</strong> sehen Sie alles Gelernte mit Suche und Filter nach Labor und
+Art. Stimmt eine Zuordnung nicht, wählen Sie <strong>Löschen</strong> (sie kann neu gelernt werden) oder
+<strong>Sperren</strong> – dann ordnet EPM diese Bezeichnung nie wieder so zu.</p>
+<p>Unten in der Liste der Scans steht, welcher Anteil der übernommenen Werte in diesem Monat noch korrigiert werden
+musste, mit Pfeil im Vergleich zum Vormonat (▼ = besser). Ein Klick zeigt den Verlauf über zwölf Monate.</p>""",
     },
     {
         "id": "versorger", "gruppe": "listen", "titel": "Versorger und Ansprechpartner", "rechte": [],

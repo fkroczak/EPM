@@ -3468,6 +3468,85 @@ Zielgruppe: Pflegekräfte ohne IT-Erfahrung und ein Praxismanager mit IT-Erfahru
   (PostgreSQL 16) grün, Lauf im CI steht aus.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+## Z · Texterkennung lernt mit (10.10.2026)
+
+Auftrag: Die Texterkennung (F160 ff.) soll aus den Korrekturen der Pflegekräfte lernen – Stufe 1, feste Regeln statt
+Sprachmodell, komplett offline. Dazu der Zusatzauftrag, den Patienten aus dem Scan zu erkennen. Die Prüfung, ob EPM
+zur Laufzeit etwas nach außen schickt, steht in `docs/OFFLINE-BETRIEB-2026-10-10.md`.
+
+### F182 Texterkennung lernt aus Korrekturen (gelernte Zuordnungen, Kennzahl, offline)
+- **Lernen beim Übernehmen** (`scans/lernen.py`, `aus_zuordnung`): `POST /api/scans/{id}/zuordnen/` nimmt zusätzlich
+  `herkunft` = `{"labor": [{"index": Nr. der erkannten Zeile | null, "stelle": {seite, box} | null}, …], "bia":
+  {feld: {seite, box} | null}, "diagnosen": [Nr. | null, …]}` (die Oberfläche schickt es mit). Verglichen wird, was
+  erkannt und was übernommen wurde; gelernt werden
+  - erkannte Bezeichnung → gewählter Laborparameter (auch bei Zeilen, die nur als Freitext erkannt wurden),
+  - Lesefehler in Bezeichnungen (ähnlich gelesen, z. B. „Kreatimin“ → Kreatinin; bei Diagnosen Bezeichnung und Code),
+  - von Hand ergänzte Labor- und BIA-Werte: die Bezeichnung links neben der im Bild angeklickten Zahl
+    (`auswertung.etikett_an`), z. B. „Aktive Zellen“ → BCM,
+  - je Absender (erkannter `labor_name`) die Spaltenlage der Werte (linke Kante, Zeichenbreite; ab drei
+    linksbündigen, unverändert übernommenen Werten).
+  Gespeichert wird je Absender und allgemein (`GelernteZuordnung`: Art, Quelle, erkannter Text normalisiert und wie
+  gelesen, Ziel, Bestätigungen, erstmals/zuletzt am, zuletzt von, gesperrt, Lesefehler). Wird eine gelernte
+  Zuordnung nicht übernommen, verliert sie eine Bestätigung (bei 0 entfällt sie). Testzugänge lernen nicht mit.
+- **Keine Patientendaten:** kein Bezug zu Patient, Scan oder Dokument, keine Werte, keine Namen. Bezeichnungen mit
+  Datum, langen Zahlen, Wörtern zur Person („Name“, „geb.“, „Patient“, „Straße“ …) oder dem Namen des Patienten
+  werden verworfen (`lernen.zulaessig`). Darum bleibt das Gelernte, wenn Scans, Dokumente oder Akten gelöscht werden;
+  es ist in der Datensicherung (pg_dump der ganzen Datenbank). „Datenbank leeren“ soll es mit leeren:
+  `scans.lernen.leeren()` steht bereit, der Aufruf in `system/leeren.py` fehlt noch (Bereich eines anderen Auftrags,
+  siehe Unklarheiten U74).
+- **Anwenden** (`auswertung.Gelerntes`, `_suche_parameter`): Reihenfolge sicher Gelerntes (erst dasselbe Labor, dann
+  allgemein) → Katalog und Suchbegriffe → gelernter Vorschlag → ähnliche Schreibweise. Ab `SCHWELLE` = 2
+  Bestätigungen ist eine Zuordnung sicher (vorgewählt, Hinweis „gelernt: so schon n-mal übernommen“), darunter nur
+  Vorschlag (`zuordnung: "gelernt_vorschlag"`, nicht vorgewählt, Kennzeichen „gelernt?“). Gesperrte Zuordnungen
+  („nie wieder so zuordnen“) fallen auf jeder Stufe weg, auch bei Synonymen und Ähnlichkeit; allgemein gesperrt gilt
+  für alle Labore. Gleiches für BIA-Felder und Diagnosen (sicher: korrigierte Bezeichnung und Code eingesetzt;
+  Vorschlag: Knopf „„…“?“ in der Prüfansicht). Die gelernte Spaltenlage hilft, wenn auf einer Seite zu wenige Werte
+  stehen, um die Spalte selbst zu finden (Pfeil vor dem Wert, als „1“ gelesen). Häufig bestätigte Bezeichnungen (ab
+  2, ohne Lesefehler) kommen in die Wörterliste für Tesseract (`--user-words`). In die Akte kommt weiterhin nichts
+  ohne Bestätigung.
+- **Verwalten:** Scans › „Gelernte Zuordnungen“ (`/scans?bereich=gelernt`): Liste mit Suche, Filter nach Art und
+  Labor, Sperren/Entsperren, Löschen (mit Rückfrage), Erklärung in einfacher Sprache. API: `GET /api/scans/gelernt/
+  ?suche=&art=&quelle=` (`allgemein` = nur allgemeine), `PATCH /api/scans/gelernt/{id}/ {"gesperrt": bool}`,
+  `DELETE /api/scans/gelernt/{id}/`; beides im Audit-Log (nur Bezeichnung und Ziel). Recht „Scans“ oder „Vorlagen
+  pflegen“; Testzugänge nur lesen.
+- **Messen:** Kennzahl „Wie oft musste korrigiert werden“ (`KorrekturZaehler` je Monat und Art: übernommene und davon
+  geänderte oder von Hand ergänzte Werte; nur Zahlen). `GET /api/scans/kennzahl/` → 12 Monate, aktueller Monat,
+  Vormonat, Trend in Prozentpunkten. Unten in der Scan-Liste „korrigiert im Okt.: 33,3 % ▼ 16,7“, ein Klick öffnet die
+  große Ansicht (Säulen je Monat, Tabelle je Art).
+- **Komplett offline:** EPM nutzt weder PaddleOCR noch PaddleX (die Modelle werden als ONNX mit onnxruntime gelesen),
+  es gibt keinen Programmteil, der Modelle laden könnte. Zusätzlich setzt `paddle.offline_erzwingen()` die Schalter
+  gegen Downloads und Telemetrie (Hugging Face, PaddleX), `EPM_OCR_MODELLE` muss ein Verzeichnis sein, `_sitzung`
+  öffnet nur vorhandene Dateien. Tesseract liest nur `EPM_TESSDATA` (im Image: deutsches Modell aus dem Repo, osd aus
+  dem Paket). Test `OfflineTest` erkennt eine Seite, während jeder Netzwerkzugriff verboten ist – mit PP-OCR, falls
+  die Modelle da sind, und ohne (nur Tesseract).
+- **Teststatus:** `scans/test_lernen.py` (Anwenden je Labor vor allgemein, Schwelle, Sperren/Löschen, Lernen beim
+  Übernehmen, von Hand ergänzte Werte, Diagnose/BIA, keine Personendaten, Testzugang, Kennzahl, Verwalten und
+  Rechte, Leeren, Offline) und die übrigen Tests von `scans`, `befunde`, `system`, `hilfe` grün (155 Tests,
+  nacheinander; mit `--parallel` bricht der Testrunner hier schon an `scans.test_dokumente` ab – nicht übertragbarer
+  Traceback, unabhängig von F182); lokal ohne PP-OCR-Modelle (kein Zugang zu huggingface.co), d. h. Erkennung nur mit
+  Tesseract. `npm run typecheck` und `npm run build` grün.
+  **Browsertests: Lauf steht aus.**
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F183 Scan erkennt den Patienten
+- **Lesen:** `auswertung.patient_hinweise` liest zusätzlich Namen nach „Patient:“, „Name:“, „Frau“, „Herr“, „über“,
+  „Versicherte(r)“ … (`namen`); Geburtsdaten wie bisher (auch „26.11.1970 ♀ 54 Jahre“, siehe `fusion.datum_und_alter_trennen`).
+- **Vorschlagen** (`dienst.patient_vorschlaege`, im `GET /api/scans/{id}/` als `vorschlaege`): nur Akten aus
+  `patienten_fuer` (Testzugang nur Testpatienten, eingeschränkte Akten nicht). Nachname und Vorname exakt oder mit
+  Lesefehlern (1 Fehler ab 4, 2 ab 8 Zeichen, nur unter den gelesenen Namen), Geburtsdatum exakt als starkes Merkmal;
+  passt das Geburtsdatum im Dokument nicht, sinkt der Treffer. Je Vorschlag `stufe`: „sicher“ (Name und
+  Geburtsdatum), „wahrscheinlich“, „unsicher“; `grund` in Worten („Name und Geburtsdatum erkannt“, „Name ähnlich
+  gelesen („Musler“)“, „Geburtsdatum im Dokument passt nicht“).
+- **Oberfläche:** oben in der Scan-Ansicht und beim Zuordnen „Wahrscheinlich: Erika Muster, geb. 14.03.1968 –
+  übernehmen?“ mit Begründung; mehrere Treffer als Auswahl, unsichere nur als Hinweis. Nie automatisch: Der Patient
+  wird erst mit einem Klick gewählt (die frühere Vorauswahl beim Öffnen von „Zuordnen“ entfällt), in die Akte erst
+  mit „In die Akte legen“.
+- **Datenschutz:** Die Hinweise bleiben im Server (nicht in der Antwort), werden nicht gelernt und nicht protokolliert –
+  außer im bestehenden Audit-Eintrag beim Zuordnen.
+- **Teststatus:** exakter Treffer, Lesefehler im Namen, zwei Gleichnamige mit verschiedenem Geburtsdatum, fremde
+  (eingeschränkte) Akte und Testzugang, kein Treffer (`PatientErkennenTest`) grün. **Browsertests: Lauf steht aus.**
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -3571,11 +3650,14 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U71 | ~~Textwerte („< 0,1“, „negativ“) aus Scans übernehmen?~~ **Bestätigt 09.10.2026:** nein, nur Zahlen | F166, U47 | – |
 | U72 | Sollen Telefon- und Videotermine standardmäßig mit auf das Infoblatt an die Praxis (Rückfrage an Alice, `docs/VORLAGEN-ALICE-2026-10-09.md`)? | F177 | standardmäßig nicht; im Dialog ankreuzbar |
 | U73 | In welchem Rhythmus und wie viele Tage vorher soll das Infoblatt verschickt werden (Rückfrage an Alice)? | F177 | wöchentlich (nächste Woche Mo–So), Erinnerung 3 Tage vorher; unter Vorlagen › Grenzwerte änderbar |
+| U74 | „Datenbank leeren“ soll auch die gelernten Zuordnungen und die Kennzahl leeren: `scans.lernen.leeren()` steht bereit, der Aufruf in `system/leeren.py` (`datenbank_leeren`, plus `umfang`) gehört zu einem anderen Auftrag und fehlt noch. Ebenso entfernt das Leeren keine nicht zugeordneten Scans (`scans.Scan` mit Dateien unter `EPM_SCANS`, enthalten Patientendaten; sie laufen erst nach der Aufbewahrungsfrist ab) | F182 | offen – im Bereich System nachzutragen |
+| U75 | Gelernte Zuordnungen sind laut Auftrag auch für „Vorlagen pflegen“ gedacht; die API lässt das zu, in der Oberfläche liegt der Bereich aber unter Scans (Route und Menü nur mit Recht „Scans“). Ein Link unter Vorlagen › Labor wäre der Weg für Rollen ohne „Scans“ | F182 | Standardrollen haben beide Rechte; Link unter Vorlagen nicht gesetzt (anderer Auftrag) |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 10.10.2026 | Texterkennung lernt mit | Gelernte Zuordnungen aus Korrekturen beim Übernehmen (Labor, BIA, Diagnosen, Spaltenlage je Labor; ohne Patientendaten), Anwendung vor der Ähnlichkeitssuche mit Schwelle, Bereich „Gelernte Zuordnungen“, Kennzahl „korrigiert“ (F182); Patient aus Name und Geburtsdatum vorschlagen, nur per Klick (F183); Offline-Prüfung (`docs/OFFLINE-BETRIEB-2026-10-10.md`). Lauf steht aus |
 | 10.10.2026 | Systemverwaltung ohne SSH | Neue Seite Systemverwaltung mit Ampel und häufigen Aufgaben; System und Backup in Reitern; Graphen klein, groß im Dialog; Sicherungen mit Mehrfachauswahl löschen; Dienste einzeln neu starten, Version zurückschalten, Update-Paket und OCR-Modelle hochladen, Paket erstellen, Zertifikat erneuern/importieren, Protokolle ansehen – alles über den Systemagenten (F179). Lauf steht aus |
 | 10.10.2026 | Vorlagen-Portal einfacher | Übersicht mit Kacheln in Alltagssprache und Suche, Liste der Dokumentvorlagen mit Zweck/Ort/Stand, geführter Ablauf Bearbeiten → Vorschau → Freigeben mit Live-Vorschau, Angaben aus der Akte per Klick als lesbare Chips, frühere Fassung ansehen/wiederherstellen, als eigene Vorlage kopieren, ▲ ▼ und „Wo benutzt“ in den Auswahllisten, Warnung beim Verlassen (F180). Lauf steht aus |
 | 10.10.2026 | Bedienung für Pflegekräfte | Nachsichtige Datums-/Uhrzeiteingabe, Fehlermeldungen mit Lösungsweg, leere Zustände mit nächstem Schritt, Hilfe „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“, weniger Fachjargon (F178, `docs/BEDIENBARKEIT-2026-10-10.md`). Lauf steht aus |

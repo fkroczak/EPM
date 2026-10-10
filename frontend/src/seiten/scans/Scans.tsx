@@ -5,6 +5,9 @@
  * Text erkannt (OCR-Dienst, lokal) → einem Patienten zuordnen (mit Übernahme der Werte) oder den Text kopieren.
  * Nicht zugeordnete Scans werden nach der eingestellten Frist automatisch gelöscht. Aufbau wie Versorger und Ärzte:
  * links die Liste, rechts der gewählte Scan; am Telefon entweder Liste oder Scan.
+ *
+ * Texterkennung lernt mit (F182): Knopf „Gelernte Zuordnungen“ (Bereich ``?bereich=gelernt``) und unten in der Liste die
+ * Kennzahl „korrigiert im …“ mit Trend; ein Klick darauf öffnet die große Ansicht.
  */
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
@@ -21,6 +24,7 @@ import { Icon } from "@/components/ui/icon";
 import { useHinweis } from "@/components/ui/hinweise";
 import { ARTEN, STATUS, bisDatum, dateiname } from "./hilfen";
 import { ScanDetail } from "./ScanDetail";
+import { GelernteZuordnungen, KorrekturKennzahl } from "./Gelernt";
 import { Begriff } from "@/components/ui/Begriff";
 
 const DATEITYPEN = ".pdf,.jpg,.jpeg,.png,.tif,.tiff,.webp,.bmp,.heic,.heif,application/pdf,image/*";
@@ -61,6 +65,9 @@ export function Scans() {
   const sichtbar = alle.filter((s) => !wort || [s.titel, s.originalname, s.hochgeladen_von_name ?? ""].some((t) => t.toLowerCase().includes(wort)));
   const gewaehltId = Number(params.get("id")) || (mobil ? null : sichtbar[0]?.id ?? null);
   const waehlen = (id: number | null) => setParams(id ? new URLSearchParams({ id: String(id) }) : new URLSearchParams(), { replace: !mobil });
+  // Bereich „Gelernte Zuordnungen“ (F182) – für alle mit „Scans“ (der Server lässt auch „Vorlagen pflegen“ zu)
+  const gelerntOffen = params.get("bereich") === "gelernt";
+  const darfGelernt = darf("scans_bearbeiten") || darf("vorlagen_pflegen");
 
   const hochladen = useMutation({
     mutationFn: async (gruppen: File[][]) => {
@@ -137,6 +144,10 @@ export function Scans() {
       <Seitenkopf titel="Scans"
         unter={st ? `Nicht zugeordnete Scans werden nach ${st.frist_tage} Tagen gelöscht (verlängerbar bis ${st.hoechst_tage} Tage)` : undefined}
         rechts={<>
+          {darfGelernt && !gelerntOffen ? (
+            <Knopf icon="buch" onClick={() => setParams(new URLSearchParams({ bereich: "gelernt" }))} data-testid="scans-gelernt">
+              Gelernte Zuordnungen</Knopf>
+          ) : null}
           {mobil ? <Knopf icon="kamera" onClick={() => kamera.current?.click()} data-testid="scan-foto">Foto</Knopf> : null}
           <Knopf variante="pri" icon="hochladen" laedt={hochladen.isPending} onClick={() => eingabe.current?.click()} data-testid="scan-hochladen">Hochladen</Knopf>
         </>} />
@@ -160,6 +171,7 @@ export function Scans() {
       ) : null}
       <Fehleranzeige fehler={liste.error} />
 
+      {gelerntOffen ? <GelernteZuordnungen onZurueck={() => setParams(new URLSearchParams())} /> : (
       <div className="stamm-raster">
         {liste.isLoading ? <Laden /> : (
           <Karte className={cx("stamm-liste flex flex-col min-h-0 overflow-hidden", zeigeDetail && "max-md:hidden")}>
@@ -205,6 +217,7 @@ export function Scans() {
               <span><span className="num">{zahl(alle.length)}</span> Scans</span>
               {st ? <span>· Speicher {String(st.prozent).replace(".", ",")} % belegt</span> : null}
               {st && st.laeuft_bald_ab ? <span className="text-warn">· {st.laeuft_bald_ab} werden in 24 Std. gelöscht</span> : null}
+              <KorrekturKennzahl />
             </div>
           </Karte>
         )}
@@ -223,6 +236,7 @@ export function Scans() {
           </Karte>
         ) : null}
       </div>
+      )}
 
       {ziehen ? (
         <div className="akten-ablage nicht-drucken" aria-hidden="true">

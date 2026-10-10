@@ -14,7 +14,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.http import FileResponse, HttpResponse
 from django.utils import timezone
-from rest_framework import serializers, status, viewsets
+from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
@@ -26,11 +26,27 @@ from epm.api_basis import benutzername, patienten_fuer, pruefe_schreibbereich
 from epm.sanitize import bereinige_html
 from stammdaten.models import Auswahlwert, Einstellungen
 
-from . import dienst
-from .models import Scan, ScanSeite
+from . import dienst, lernen
+from .models import GelernteZuordnung, Scan, ScanSeite
 
 A = SystemEreignis.Art
 ScansRecht = nur_recht("scans_bearbeiten")
+
+
+class GelerntRecht(permissions.BasePermission):
+    """Gelernte Zuordnungen und Kennzahl (F182): wer Scans bearbeitet oder die Kataloge pflegt (Vorlagen pflegen).
+    Ändern (sperren, löschen) nicht für Testzugänge – das Gelernte wirkt für alle."""
+
+    message = "Dafür fehlt das Recht „Scans: hochladen, erkennen, zuordnen“ oder „Vorlagen pflegen“."
+
+    def has_permission(self, request, view):
+        u = request.user
+        if not (u and u.is_authenticated and (u.hat_recht("scans_bearbeiten") or u.hat_recht("vorlagen_pflegen"))):
+            return False
+        return request.method in permissions.SAFE_METHODS or not getattr(u, "ist_test", False)
+
+
+GELERNT_AKTIONEN = {"gelernt", "gelernt_eintrag", "kennzahl"}
 
 
 def _fehler(text: str, code=status.HTTP_400_BAD_REQUEST, feld: str = "fehler"):
@@ -137,6 +153,11 @@ class ScanViewSet(viewsets.GenericViewSet):
     parser_classes = [JSONParser, MultiPartParser, FormParser]
     pagination_class = None
 
+    def get_permissions(self):
+        if getattr(self, "action", None) in GELERNT_AKTIONEN:
+            return [GelerntRecht()]
+        return super().get_permissions()
+
     def get_queryset(self):
         return (dienst.sichtbare_scans(self.request.user).filter(laeuft_ab_am__gt=timezone.now())
                 .select_related("hochgeladen_von").prefetch_related("seiten"))
@@ -213,6 +234,62 @@ class ScanViewSet(viewsets.GenericViewSet):
             daten["verfahren"] = dienst.verfahren()
             daten["dienst"] = dienst.dienst_stand()
         return Response(daten)
+
+    # ------------------------------------------------------------ Gelernte Zuordnungen und Kennzahl (F182)
+    @action(detail=False, methods=["get"])
+    def gelernt(self, request):
+        """Liste der gelernten Zuordnungen: ``?suche=…&art=labor|bia|diagnose|spalte&quelle=<normalisiert>|allgemein``."""
+        from django.db.models import Q
+
+        qs = GelernteZuordnung.objects.select_related("parameter", "zuletzt_von")
+        art = request.query_params.get("art") or ""
+        if art in GelernteZuordnung.Art.values:
+            qs = qs.filter(art=art)
+        quelle = request.query_params.get("quelle")
+        if quelle == "allgemein":
+            qs = qs.filter(quelle="")
+        elif quelle:
+            qs = qs.filter(quelle=quelle)
+        suche = (request.query_params.get("suche") or "").strip()
+        if suche:
+            qs = qs.filter(Q(erkannt_anzeige__icontains=suche) | Q(erkannt__icontains=suche)
+                           | Q(ziel_text__icontains=suche) | Q(ziel__icontains=suche)
+                           | Q(quelle_anzeige__icontains=suche))
+        qs = qs.order_by("-zuletzt_am", "-id")[:1000]
+        quellen = (GelernteZuordnung.objects.exclude(quelle="").order_by("quelle")
+                   .values_list("quelle", "quelle_anzeige").distinct())
+        return Response({
+            "eintraege": [_gelernt_daten(g) for g in qs],
+            "quellen": [{"quelle": q, "name": n or q} for q, n in dict(quellen).items()],
+            "schwelle": lernen.auswertung.SCHWELLE,
+            "darf_aendern": not getattr(request.user, "ist_test", False),
+        })
+
+    @action(detail=False, methods=["patch", "delete"], url_path=r"gelernt/(?P<gid>\d+)")
+    def gelernt_eintrag(self, request, gid=None):
+        """Sperren bzw. entsperren (``{"gesperrt": true}`` = „nie wieder so zuordnen“) oder löschen."""
+        g = GelernteZuordnung.objects.filter(pk=gid).first()
+        if g is None:
+            return _fehler("Diese gelernte Zuordnung gibt es nicht (mehr).", status.HTTP_404_NOT_FOUND)
+        beschreibung = {"bereich": g.art, "quelle": g.quelle_anzeige or "allgemein", "erkannt": g.erkannt_anzeige,
+                        "ziel": g.ziel_text or g.ziel}
+        if request.method == "DELETE":
+            g.delete()
+            protokolliere(A.SCAN, request, objekt="Gelernte Zuordnung", aktion="gelernt_geloescht", **beschreibung)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        if not isinstance(request.data.get("gesperrt"), bool):
+            return _fehler("Bitte „gesperrt“ angeben.", feld="gesperrt")
+        g.gesperrt = request.data["gesperrt"]
+        g.zuletzt_von = request.user
+        g.save(update_fields=["gesperrt", "zuletzt_von"])
+        protokolliere(A.SCAN, request, objekt="Gelernte Zuordnung",
+                      aktion="gelernt_gesperrt" if g.gesperrt else "gelernt_entsperrt", **beschreibung)
+        return Response(_gelernt_daten(g))
+
+    @action(detail=False, methods=["get"])
+    def kennzahl(self, request):
+        """Wie oft musste korrigiert werden? Anteil je Monat (letzte 12), dazu Trend zum Vormonat."""
+        return Response(lernen.kennzahl())
 
     @action(detail=True, methods=["post"])
     def verlaengern(self, request, pk=None):
@@ -511,6 +588,26 @@ class ScanViewSet(viewsets.GenericViewSet):
         return zuordnen(self, request, pk)
 
 
+BIA_NAMEN = {"gewicht_kg": "Gewicht (kg)", "bcm_kg": "BCM (kg)", "fettmasse_kg": "Fettmasse (kg)",
+             "ecw_prozent": "ECW (%)", "koerperwasser_l": "Körperwasser (l)", "bmi": "BMI"}
+
+
+def _gelernt_daten(g: GelernteZuordnung) -> dict:
+    if g.art == GelernteZuordnung.Art.LABOR:
+        ziel = g.parameter.name if g.parameter else g.ziel_text or g.ziel
+    elif g.art == GelernteZuordnung.Art.BIA:
+        ziel = BIA_NAMEN.get(g.ziel, g.ziel)
+    elif g.art == GelernteZuordnung.Art.DIAGNOSE:
+        ziel = f"{g.ziel_text} ({g.ziel})"
+    else:
+        ziel = f"Werte ab {round(100 * (g.spalte_x or 0))} % der Seitenbreite"
+    return {"id": g.id, "art": g.art, "art_name": g.get_art_display(), "quelle": g.quelle,
+            "quelle_name": g.quelle_anzeige or ("allgemein" if not g.quelle else g.quelle),
+            "erkannt": g.erkannt_anzeige or g.erkannt, "ziel": ziel, "bestaetigt": g.bestaetigt,
+            "sicher": g.bestaetigt >= lernen.auswertung.SCHWELLE, "gesperrt": g.gesperrt, "lesefehler": g.lesefehler,
+            "zuletzt_am": g.zuletzt_am, "zuletzt_von": benutzername(g.zuletzt_von)}
+
+
 class _Konflikt(serializers.ValidationError):
     status_code = status.HTTP_409_CONFLICT
 
@@ -696,6 +793,10 @@ def zuordnen(view: ScanViewSet, request, pk):
                 patient._history_user = user
                 patient.save()
                 uebernommen["texte"] = len(texte)
+            # Texterkennung lernt mit (F182): nur Bezeichnungen, keine Werte und keine Angaben zur Person
+            gelernt = lernen.aus_zuordnung(scan, d, user, patient)
+            if gelernt["gelernt"]:
+                uebernommen["gelernt"] = gelernt["gelernt"]
             protokolliere(A.SCAN, request, objekt=str(scan),
                           aktion="werte_uebernommen" if quelle is not None else "zugeordnet", scan=scan.pk, dokument=dok.id,
                           akte=akte_text(patient), patient_id=patient.id, titel=titel, uebernommen=uebernommen,
