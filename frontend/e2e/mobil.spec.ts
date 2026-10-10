@@ -40,6 +40,13 @@ test("Telefon: Leiste unten, Menü, Suche, Seiten passen in die Breite", async (
   await expect(schublade).toBeHidden();
   await expect(page).toHaveURL(/\/kalender/);
   await passtInDieBreite(page, "Kalender");
+  // Infoblatt an die Praxis (F177): Knopf in der Kopfzeile, der Dialog passt aufs Telefon
+  await page.getByRole("button", { name: /^Praxis informieren/ }).click();
+  const infoblatt = page.getByRole("dialog", { name: "Infoblatt an die Praxis" });
+  await expect(infoblatt.getByTestId("infoblatt-zeitraum").getByRole("button")).toHaveCount(4);
+  await passtInDieBreite(page, "Infoblatt an die Praxis");
+  await page.keyboard.press("Escape");
+  await expect(infoblatt).toHaveCount(0);
 
   // Patientensuche aus der Kopfzeile
   await page.getByTestId("mobil-suche").click();

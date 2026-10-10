@@ -2,7 +2,7 @@
 Rechte für die API – je Gruppe einstellbar (accounts/rechte.py, Oberfläche: Benutzer › Rechte).
 
 Lesen setzt „Akten lesen“ voraus, Schreiben das jeweilige Recht. Jeder Zugriff setzt eine
-vollständige Anmeldung voraus: Kennwort, kein offenes Einmal-Kennwort und – wenn eingerichtet oder
+vollständige Anmeldung voraus: Passwort, kein offenes Einmal-Passwort und – wenn eingerichtet oder
 Pflicht (accounts/zweifaktor.py) – der zweite Faktor.
 """
 from rest_framework.permissions import SAFE_METHODS, BasePermission

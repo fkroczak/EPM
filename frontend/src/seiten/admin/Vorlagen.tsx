@@ -13,7 +13,7 @@ import { eingabeZahl, zahl } from "@/lib/format";
 import { ERKLAERUNGEN } from "@/lib/typen";
 import type { Einstellungen, ErklaerungsArt } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
-import { Eingabe, Feld, Karte, Knopf, Laden, Meldung, Seitenkopf, Segmente, Textfeld } from "@/components/ui/basis";
+import { Auswahl, Eingabe, Feld, Karte, Knopf, Laden, Meldung, Seitenkopf, Segmente, Textfeld } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
 import { LOGO_URL, Logo } from "@/components/layout/logo";
 import { DokumentvorlagenBereich } from "@/seiten/admin/Dokumentvorlagen";
@@ -179,6 +179,9 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
       const fehler: Feldfehler = {};
       const body: Record<string, string | string[] | null> = datenschutz ? { pflicht_erklaerungen: pflicht } : {};
       body.ocr_fachwoerter = w!.ocr_fachwoerter ?? "";
+      // Infoblatt an die Praxis (F177): Erinnerung auf der Startseite
+      body.infoblatt_rhythmus = w!.infoblatt_rhythmus ?? "woche";
+      felder.push("infoblatt_vorlauf_tage");
       for (const k of felder) {
         const z = eingabeZahl(w![k] ?? "");
         if (!z || z === "ungueltig") fehler[k] = "Bitte eine Zahl eingeben.";
@@ -217,6 +220,28 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
           Kontakt: „bald fällig“ nach {w.kontakt_bald_monate}, „überfällig“ nach {w.kontakt_ueberfaellig_monate} Monaten ohne Kontakt
           (Wiedereinbestellung auf der Startseite, Hinweis in der Liste, Kalender). Wiedervorlage beim Erfassen eines Kontakts
           standardmäßig in {w.wiedervorlage_tage} Tagen (im Dialog je Kontakt änderbar).</span>
+      </Karte>
+      <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5" data-testid="grenzwerte-infoblatt">
+        <h2 className="lbl m-0">Infoblatt an die Praxis</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <Feld label="Erinnerung auf der Startseite" fehler={f.infoblatt_rhythmus}>
+            {(p) => (
+              <Auswahl {...p} value={w.infoblatt_rhythmus ?? "woche"} onChange={(e) => setW({ ...w, infoblatt_rhythmus: e.target.value })}>
+                <option value="woche">wöchentlich (nächste Woche)</option>
+                <option value="monat">monatlich (nächster Monat)</option>
+                <option value="aus">keine Erinnerung</option>
+              </Auswahl>
+            )}
+          </Feld>
+          <Feld label="Erinnern ab" fehler={f.infoblatt_vorlauf_tage}>
+            {(p) => <Einheit einheit="Tage vorher"><Eingabe {...p} className="num pr-28" disabled={w.infoblatt_rhythmus === "aus"}
+              value={w.infoblatt_vorlauf_tage ?? ""} onChange={(e) => setW({ ...w, infoblatt_vorlauf_tage: e.target.value })} /></Einheit>}
+          </Feld>
+        </div>
+        <span className="text-[0.8125rem] gedaempft">{w.infoblatt_rhythmus === "aus"
+          ? "Die Startseite erinnert nicht an das Infoblatt. Es lässt sich jederzeit im Kalender unter „Praxis informieren“ erstellen."
+          : `Die Startseite zeigt ${w.infoblatt_vorlauf_tage} Tage vor ${w.infoblatt_rhythmus === "monat" ? "dem nächsten Monat" : "der nächsten Woche (Montag)"}
+            den Hinweis „Praxis informieren“ – bis das Infoblatt für diesen Zeitraum erstellt ist.`}</span>
       </Karte>
       <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5" data-testid="grenzwerte-datenschutz">
         <h2 className="lbl m-0">Datenschutz</h2>

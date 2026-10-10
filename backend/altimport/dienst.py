@@ -1,7 +1,7 @@
 """
 Übernahme der Altdaten – Datenbank und Dateien.
 
-- ``dump_laden``            Dump lesen und speichern (Kennwort-Spalten werden vorher geleert)
+- ``dump_laden``            Dump lesen und speichern (Passwort-Spalten werden vorher geleert)
 - ``stand_berechnen``       Zuordnungen, offene Punkte, Protokoll und neue Datensätze (``umsetzung``)
 - ``probelauf``             alles schreiben und wieder zurückrollen – zeigt, ob der Import durchläuft
 - ``importiere``            schreiben; nur in ein System ohne echte Akten
@@ -148,7 +148,7 @@ def dump_laden(daten: bytes, name: str, benutzer, request=None) -> Importstand:
                    zeilen=t["zeilen"]) for n, t in ergebnis["tabellen"].items()])
     hinweise = list(ergebnis["hinweise"])
     if entfernt:
-        hinweise.append("Kennwörter werden nicht übernommen (Regel 1) – geleert und nicht gespeichert: "
+        hinweise.append("Passwörter werden nicht übernommen (Regel 1) – geleert und nicht gespeichert: "
                         + ", ".join(f"{t}.{s}" for t, s in entfernt) + ".")
     hinweise.extend(zeit_hinweise)
     stand.status = S.GELADEN

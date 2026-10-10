@@ -67,7 +67,7 @@ test("Passwort ändern, Notfall-Codes neu, neues Gerät, andere Sitzung beenden"
   await dialog.getByLabel("Neues Passwort", { exact: true }).fill(`${konto.kennwort}-2`);
   await dialog.getByLabel("Neues Passwort wiederholen").fill(`${konto.kennwort}-2`);
   await dialog.getByRole("button", { name: "Passwort ändern" }).click();
-  await expect(dialog.getByRole("alert")).toContainText("Bisheriges Kennwort ist falsch.");
+  await expect(dialog.getByRole("alert")).toContainText("Bisheriges Passwort ist falsch.");
   await dialog.getByLabel("Bisheriges Passwort").fill(konto.kennwort);
   await dialog.getByRole("button", { name: "Passwort ändern" }).click();
   await expect(page.getByText("Passwort geändert. Andere Anmeldungen wurden beendet.")).toBeVisible();

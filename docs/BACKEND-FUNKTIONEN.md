@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 09.10.2026 · Code-Stand: Scans und Texterkennung (F160–F171); Passkey und Telefon (F130–F134); Wünsche aus der Praxis vom 06./07.10.2026 (F110–F124); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
+Stand: 10.10.2026 · Code-Stand: Infoblatt an die Praxis (F177); Schreiben mit E-Mail (F172–F176); Scans und Texterkennung (F160–F171); Passkey und Telefon (F130–F134); Wünsche aus der Praxis vom 06./07.10.2026 (F110–F124); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
 Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026, Prüfung nach DSGVO vom 02.10.2026 (`docs/DATENSCHUTZ.md`).
@@ -1168,7 +1168,7 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 - **Endpunkt:** `GET /api/protokoll/?gruppe=anmeldung,fehlversuch,benutzer,vorlage,backup,export,abschluss,dokument,datenschutz&benutzer&von&bis&search`
   → `[{id, zeitpunkt, art, art_name, gruppe, gruppe_name, beschreibung, benutzer, person, benutzername, objekt, details, ip, geraet}]`
 - **Logik:** `beschreibung` wie im Entwurf („Anmeldung mit 2FA“, „Falsches Passwort (3. Versuch)“, „5 falsche Passwörter in
-  4 Minuten, Konto gesperrt“, „Benutzer k.oezdemir angelegt (Mitarbeiter), Einmal-Kennwort erzeugt“, „Akte Weber, Anna
+  4 Minuten, Konto gesperrt“, „Benutzer k.oezdemir angelegt (Mitarbeiter), Einmal-Passwort erzeugt“, „Akte Weber, Anna
   (Nr. 0231) abgeschlossen, Anlass: verstorben“, „Grenzwert „Kontakt überfällig“ von 6 auf 12 Monate geändert“).
   Hinweis auf gesperrte Konten: F08.
 - **Validierung:** Recht „Audit-Log lesen“ (Standard: Mediziner, Admin); unbekannte Gruppe → 400.
@@ -3201,6 +3201,8 @@ dem Namen nach Bedarf erstellen und vorgefertigte E-Mail-Texte **mit Anhang** zu
   `Termine.Liste` (Text für die E-Mail), `Zeitraum`, `Zeitraum.von/bis`, `Terminort`, `Anzahl`.
 - **Endpunkt:** `POST /api/kalender/ankuendigung/` `{"von", "bis", "ort"?, "ausgabe", …}` (höchstens zwei Monate).
 - **Teststatus:** `vorlagen/test_schreiben.py` (Reihenfolge, Hinweis, ohne Testpatient und Wiedervorlage, .eml).
+- **Geändert durch F177 (10.10.2026):** Knopf heißt „Praxis informieren“, Dialog „Infoblatt an die Praxis“; mit
+  gewähltem Ort stehen nur noch die Termine an diesem Ort auf dem Blatt (Telefon/Video auf Wunsch).
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
 ### F174 Anlagen für E-Mails
@@ -3232,6 +3234,91 @@ dem Namen nach Bedarf erstellen und vorgefertigte E-Mail-Texte **mit Anhang** zu
   dafür keine feste Auswahl mehr (Migration `vorlagen/0005`). Endpunkte: `POST /api/vorlagen/` (anlegen),
   `PATCH /api/vorlagen/{art}/eigen/`, `GET /api/schreiben/` (wählbare Schreiben der Akte).
 - **Teststatus:** `vorlagen/test_schreiben.py::test_eigenes_schreiben`; im Browser lokal durchgespielt.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F177 Infoblatt an die Praxis (alle Termine in der Praxis Holtmeier auf einem Blatt)
+- **Anlass (10.10.2026):** Die Patientenankündigung (F173) war zu versteckt („Ankündigung“ im Kalender), und die
+  Pflegekräfte hielten sie für ein Schreiben zu einem Patienten. Gewünscht: alle Patiententermine, die im Kalender mit
+  der Praxis Holtmeier vereinbart sind, als ein Informationsblatt an die Praxis – zu einem festen Zeitpunkt.
+- **Kalender › „Praxis informieren“** (Recht „Kontakte, Gewichte, Termine, Dokumente erfassen“; Telefon: Briefsymbol
+  mit gleichlautender Beschriftung für Screenreader) öffnet **„Infoblatt an die Praxis“**: große Auswahl
+  „Nächste Woche“ (Mo–So) | „Übernächste Woche“ | „Nächster Monat“ | „Eigener Zeitraum“ (von/bis; Vorgabe je nach
+  Einstellung nächste Woche oder nächster Monat), Ort (vorbelegt: Terminort mit „Holtmeier“ im Namen) und
+  „Telefon- und Videotermine auch aufführen“. Darunter die Vorschau „Diese N Patienten stehen auf dem Infoblatt“ nach
+  Tagen mit Uhrzeit, Name (Link zur Akte) und Hinweis, Markierung **neu** bzw. „verschoben, vorher …“, „Zuletzt
+  erstellt am … von … für …“, die Termine, die auf dem letzten Blatt standen und jetzt fehlen, und ein verständlicher
+  leerer Zustand. Darunter wie bisher PDF ansehen/herunterladen und E-Mail vorbereiten (F172); ohne Termine sind die
+  Knöpfe aus.
+- **Nur Termine am gewählten Ort:** Mit Ort stehen nur Praxistermine an diesem Ort auf dem Blatt, mit `telefon_mit`
+  zusätzlich Telefon-/Videotermine (Hinweis mit Telefonnummer wie bisher), andere Orte fehlen. Praxistermine **ohne
+  Ort** fehlen und erscheinen als Warnung „Bei diesen Terminen fehlt der Ort – bitte im Termin eintragen“ mit Link zur
+  Akte und „Ort eintragen“ (öffnet den Termin, Ort ist vorgeschlagen). Ohne Ort („– alle Praxistermine –“) wie F173.
+- **Termin:** Bei Art „Praxistermin“ ist der Ort mit „Holtmeier“ im Namen vorbelegt, solange kein Ort gewählt ist
+  (auch beim Bearbeiten eines Praxistermins ohne Ort); „—“ lässt sich bewusst wählen, dann erscheint der Hinweis,
+  dass der Termin nicht auf dem Infoblatt steht.
+- **Merken, was verschickt wurde:** Modell `patienten.Ankuendigung` (Migration `patienten/0015`): erstellt am, Person,
+  von, bis, Ort, mit Telefonterminen, Ausgabe (pdf/eml), Anzahl und Schnappschuss `[{termin, datum, uhrzeit}]` –
+  **ohne Namen**. Angelegt bei „PDF herunterladen“ und „E-Mail vorbereiten“ (.eml), nicht bei der Vorschau-Liste,
+  dem E-Mail-Text und „PDF ansehen“ (`"vorschau": true` – nur angesehen, nicht verschickt). „neu“ =
+  Termin fehlt im Schnappschuss des zuletzt erstellten Blatts (gleicher Ort), das diesen Tag umfasst, oder steht dort
+  mit anderer Uhrzeit; für Tage ohne früheres Blatt ist nichts „neu“. Keine Historie (das Modell ist selbst das
+  Protokoll); das Erzeugen steht außerdem wie bisher als „Export“ im Audit-Log (nur Zeitraum, Anzahl, Ausgabe).
+- **Löschung:** Beim endgültigen Löschen einer Akte (Art. 17) und beim Zurücksetzen der Testdaten entfernt
+  `datenschutz.akten_entfernen` die Termine dieser Akte (auch aus der Historie bekannte Nummern) aus allen
+  Schnappschüssen; die Anzahl bleibt. „Datenbank leeren“ entfernt alle Infoblätter.
+- **Erinnerung auf der Startseite:** Einstellungen `infoblatt_rhythmus` (woche = nächste Kalenderwoche Mo–So |
+  monat = nächster Kalendermonat | aus) und `infoblatt_vorlauf_tage` (Standard: woche, 3 Tage; 1–6 bei wöchentlich,
+  1–27 bei monatlich), gepflegt unter Vorlagen › Grenzwerte › „Infoblatt an die Praxis“ (Migration
+  `stammdaten/0018`). Ab Beginn − Vorlauf bis zum Beginn zeigt die Startseite „Praxis Holtmeier informieren: X Termine
+  vom … bis …“ mit Knopf „Infoblatt erstellen“ (öffnet den Dialog mit genau diesem Zeitraum) – nur mit dem Recht
+  „Einträge erfassen“, nur wenn im Zeitraum Termine stehen (auch solche ohne Ort) und solange kein Blatt (dieser Ort
+  oder alle Orte) die Tage mit Terminen umfasst.
+- **Endpunkte:** `POST /api/kalender/ankuendigung/` `{"von", "bis", "ort"?, "telefon_mit"?: bool, "ausgabe":
+  "liste"|"pdf"|"email"|"eml", …}` – `liste` liefert `{von, bis, ort, telefon_mit, anzahl, termine: [{termin,
+  patient, name, datum, uhrzeit, hinweis, neu, vorher}], ohne_ort: [...], entfallen: [...], letzte: {erstellt_am,
+  von_name, von, bis, anzahl, ausgabe} | null}`. `GET /api/startseite/` → `infoblatt: {von, bis, rhythmus, anzahl,
+  ohne_ort, ort} | null`; `GET /api/kalender/` → `infoblatt_rhythmus`. Logik in `patienten/infoblatt.py`.
+- **Hilfe:** neuer Abschnitt „Infoblatt an die Praxis (alle Termine bei Dr. Holtmeier)“ (Kalender und Startseite).
+- **Teststatus:** `patienten/test_infoblatt.py` (Ortsfilter, `telefon_mit`, Vorschau-JSON, Prüfungen und Rechte,
+  Schnappschuss ohne Namen, „neu“/verschoben/entfallen, Art.-17-Löschung, Erinnerung mit Startseite, Einstellungen),
+  `vorlagen/test_schreiben.py::test_patientenankuendigung` angepasst; Browsertests `kalender.spec.ts` („Praxis
+  informieren“ mit Vorschau, Ort eintragen, PDF) und `mobil.spec.ts` (Dialog am Telefon) – Lauf steht aus.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+## V · Bedienung für Pflegekräfte (10.10.2026)
+
+Auftrag: EPM soll von Pflegekräften ohne nennenswerte IT-Erfahrung intuitiv bedient werden können. Befunde, Umsetzung
+und Empfehlungen stehen in `docs/BEDIENBARKEIT-2026-10-10.md`. Akte, Navigation und Infusionspläne werden parallel
+strukturell überarbeitet und sind hier bewusst nur in Texten berührt.
+
+### F178 Verständliche Rückmeldungen, nachsichtige Eingaben, nächste Schritte
+- **Eingaben:** Datumsfelder verstehen neben „14.03.1968“ auch „14.3.68“, „14,3,68“ (Komma vom Ziffernblock), „14/3/1968“,
+  „14-3-1968“, „14031968“, „140368“, „heute“ und „gestern“ (`eingabeDatum`, wirkt in allen Formularen). Die Uhrzeit im
+  Dialog „Kontakt erfassen“ geht auch als „10.30“, „1030“, „930“ oder „10“; ein Fehler steht jetzt am Feld Uhrzeit.
+- **Rückmeldungen:** „Kontakt erfassen“ sagt neben dem gesperrten Knopf, was fehlt („Zuerst den Patienten wählen.“ /
+  „Zum Speichern bitte eine Notiz schreiben.“). „Neuer Patient“ fasst fehlende Angaben oben zusammen, springt zum
+  ersten roten Feld und bestätigt das Anlegen mit Name und Nummer.
+- **Fehlermeldungen mit Lösungsweg:** keine Verbindung (statt der englischen Browsermeldung „Failed to fetch“), Server
+  nicht erreichbar (502/503), Zeitüberschreitung (504), Serverfehler (500), Datei zu groß (413); Anmeldung mit
+  Hinweis auf Schreibweise, Feststelltaste und Sperre nach fünf Fehlversuchen, Code mit Hinweis auf den 30-Sekunden-Wechsel;
+  Warnung bei eingeschalteter Feststelltaste im Passwortfeld. Verbindungsfehler werden wie bisher zweimal wiederholt.
+- **Leere Zustände:** Die Patientenliste ohne Treffer nennt den Suchbegriff, gibt einen Suchtipp und bietet „Alle Filter
+  entfernen“, „In abgeschlossenen Akten suchen“ und „Neuer Patient“. Die Patientenauswahl in Dialogen erklärt zu kurze
+  Eingaben und fehlende Treffer. Dokumente ohne Eintrag sagen, wie man eines ablegt; „1 Dokument“ statt „1 Dokumente“.
+- **Sprache:** „PDF/A mit unsichtbarer Textebene“, „Audit-Log“ und Programmnamen der Texterkennung (PP-OCR, Tesseract)
+  aus den Texten für die Pflege genommen (Programmnamen bleiben im Tooltip). Menüs hinter „⋯“ zeigen ihren Namen als Tooltip.
+- **Hilfe:** neue Abschnitte „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“ ganz oben; Anmelden und
+  Dokumente an die Oberfläche angeglichen („Passwort“, „Weiter“, „Neues Dokument“); zweizeilige Einträge im Inhalt der
+  Hilfe überlappen nicht mehr. Aufzählungen in formatiertem Text (Notizen, Hilfe) zeigen wieder Punkte bzw. Nummern.
+- **„Passwort“ statt „Kennwort“** (Entscheidung vom 10.10.2026) in allen Texten des Backends außer `vorlagen` und
+  `infusionen` (Meldungen, Audit-Texte, Hilfe, Einrichtungsbefehle) und in der Anmeldung; Bezeichner, API-Felder,
+  Modelle und Migrationen unverändert. Administration, Akte und Zugangsblatt folgen beim Abgleich.
+- **Fachbegriffe erklärt** (Entscheidung vom 10.10.2026): Baustein `<Begriff>` (Popover von Base UI; Hover, Fokus,
+  Antippen, `aria-describedby`) mit den Texten aus `lib/begriffe.ts` (BIA, Entwurf, BMI, PE, Wiedervorlage,
+  Wiedereinbestellung, GLIM, Testpatient, storniert); eingesetzt in Patientenliste, „Kontakt erfassen“ und Scans.
+- **Teststatus:** `npm run typecheck` und `npm run build` grün; Backend-Tests `accounts` (u. a. `/api/hilfe/`) grün;
+  Datums-/Uhrzeiteingabe stichprobenartig geprüft; Patientenliste, Neuer Patient, Anmeldung, Kontaktdialog und Hilfe am
+  PC (1440 px) und Telefon (390 px) per Bildschirmfoto gegen die Entwicklungsumgebung geprüft. **Browsertests: Lauf steht aus.**
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
 ## X · Vorlagen-Portal einfacher (10.10.2026)
@@ -3273,8 +3360,9 @@ Zielgruppe: Pflegekräfte ohne IT-Erfahrung und ein Praxismanager mit IT-Erfahru
   „Ausblenden statt löschen“. Kleine **„?“-Erklärungen** an Aufbau, Fassungen, Angaben und Auswahllisten.
 - **Verlassen mit ungespeicherten Änderungen** an einer Dokumentvorlage fragt nach – auch bei „Zurück“, anderer
   Vorlage, anderer Seite (React Router `useBlocker`) und beim Schließen/Neuladen des Fensters (`beforeunload`).
-- **Nebenbei behoben:** Die Vorschau zeigte „ArrayBuffer … already detached“, wenn pdf.js dieselbe PDF ein zweites Mal
-  lud (der Puffer geht an den Worker); jetzt mit Kopie.
+- **Nebenbei behoben:** PDF-Anzeigen zeigten „Anzeige nicht möglich: … ArrayBuffer … already detached“, wenn pdf.js
+  dieselben Daten ein zweites Mal lud (der Puffer geht an den Worker) – im Entwicklungsmodus (StrictMode) bei jeder
+  Vorschau mit `laden`; `components/PdfAnsicht.tsx` gibt pdf.js jetzt eine Kopie.
 - **Endpunkte:** `GET /api/vorlagen/` und `/api/vorlagen/{art}/` liefern zusätzlich `gruppe`, `wofuer`, `wo`, je
   Datenfeld `bezeichnung` und `gruppe` (`vorlagen/portal.py`; `felder.py` unverändert).
   `POST /api/vorlagen/{art}/versionen/{n}/wiederherstellen/` (ersetzt einen vorhandenen Entwurf, geprüft mit
@@ -3390,12 +3478,16 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U69 | ~~Startseite: Kachel oder Hinweis?~~ **Bestätigt 09.10.2026:** Hinweis | F160 | – |
 | U70 | ~~Geänderte Frist auch für vorhandene Scans?~~ **Bestätigt 09.10.2026:** nur für neue Scans | F165 | – |
 | U71 | ~~Textwerte („< 0,1“, „negativ“) aus Scans übernehmen?~~ **Bestätigt 09.10.2026:** nein, nur Zahlen | F166, U47 | – |
+| U72 | Sollen Telefon- und Videotermine standardmäßig mit auf das Infoblatt an die Praxis (Rückfrage an Alice, `docs/VORLAGEN-ALICE-2026-10-09.md`)? | F177 | standardmäßig nicht; im Dialog ankreuzbar |
+| U73 | In welchem Rhythmus und wie viele Tage vorher soll das Infoblatt verschickt werden (Rückfrage an Alice)? | F177 | wöchentlich (nächste Woche Mo–So), Erinnerung 3 Tage vorher; unter Vorlagen › Grenzwerte änderbar |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
 | 10.10.2026 | Vorlagen-Portal einfacher | Übersicht mit Kacheln in Alltagssprache und Suche, Liste der Dokumentvorlagen mit Zweck/Ort/Stand, geführter Ablauf Bearbeiten → Vorschau → Freigeben mit Live-Vorschau, Angaben aus der Akte per Klick als lesbare Chips, frühere Fassung ansehen/wiederherstellen, als eigene Vorlage kopieren, ▲ ▼ und „Wo benutzt“ in den Auswahllisten, Warnung beim Verlassen (F180). Lauf steht aus |
+| 10.10.2026 | Bedienung für Pflegekräfte | Nachsichtige Datums-/Uhrzeiteingabe, Fehlermeldungen mit Lösungsweg, leere Zustände mit nächstem Schritt, Hilfe „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“, weniger Fachjargon (F178, `docs/BEDIENBARKEIT-2026-10-10.md`). Lauf steht aus |
+| 10.10.2026 | Infoblatt an die Praxis | Kalender › „Praxis informieren“: Infoblatt mit allen Terminen in der Praxis Holtmeier, Zeitraum per Knopf, Vorschau mit „neu“ und Warnung bei fehlendem Ort, nur Termine am gewählten Ort (Telefon/Video wahlweise), gemerkte Blätter ohne Namen, Erinnerung auf der Startseite, Ort im Termin vorbelegt (F177). Lauf steht aus |
 | 09.10.2026 | Schreiben mit E-Mail | Vorlagen von Alice: Patientenaufnahme, Terminbestätigung, Reisebescheinigung mit ADAC-Attest als PDF und als fertige E-Mail (.eml mit Anhang) aus der Akte (F172), Patientenankündigung aus dem Kalender (F173), Anlagen für E-Mails (F174), Fallzusammenfassung mit Gliederung (F175). Lauf steht aus |
 | 09.10.2026 | Text erkennen in der Akte | „Text erkennen“ mit OCRmyPDF (PDF/A mit Textebene, Datei ersetzt, Art.-17-Löschung über alle Fassungen) (F170), „Werte übernehmen“ aus Akte-Dokumenten ohne neues Dokument (F171), Sparmodus mit einem Tesseract-Durchgang (F168). Lauf steht aus |
 | 09.10.2026 | Texterkennung auf kleinen Servern, Werte von Hand | Sparmodus (kleines Zeilenmodell, ohne Glätten) und Speichergrenze nach RAM, Absturzschutz mit Lebenszeichen und Sparstufen je Seite (F168); Labor/BIA immer übertragbar, Wert per Klick ins Bild, „+ Wert“, mehr BIA-Bezeichnungen (F169). Lauf steht aus |

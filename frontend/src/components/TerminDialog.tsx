@@ -30,6 +30,10 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin, d
   const [titel, setTitel] = useState("");
   const [notiz, setNotiz] = useState("");
   const orte = useAuswahl("terminort");
+  // Praxistermin ohne Ort: Praxis Dr. Holtmeier vorschlagen, damit der Termin auf dem Infoblatt an die Praxis steht (F177)
+  const holtmeier = orte.data?.find((o) => /holtmeier/i.test(o.wert));
+  // „kein“: bewusst ohne Ort gewählt – dann nichts vorschlagen
+  const ortWert = ort === "kein" ? "" : ort || (art === "praxistermin" && holtmeier ? String(holtmeier.id) : "");
   const qc = useQueryClient();
   const melden = useHinweis();
   useEffect(() => {
@@ -45,7 +49,7 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin, d
     mutationFn: () => {
       const daten = {
         art,
-        ort: art === "praxistermin" && ort ? Number(ort) : null,
+        ort: art === "praxistermin" && ortWert ? Number(ortWert) : null,
         faellig_am: faellig,
         uhrzeit: uhr || null,
         titel: titel.trim() || TERMINARTEN[art],
@@ -102,9 +106,10 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin, d
             </Auswahl>
           )}
         </Feld>
-        <Feld label="Ort" fehler={f.ort} hinweis={art !== "praxistermin" ? "nur bei Praxisterminen" : undefined}>
+        <Feld label="Ort" fehler={f.ort} hinweis={art !== "praxistermin" ? "nur bei Praxisterminen"
+          : !ortWert ? "Ohne Ort steht der Termin nicht auf dem Infoblatt an die Praxis" : undefined}>
           {(p) => (
-            <Auswahl {...p} value={ort} disabled={art !== "praxistermin"} onChange={(e) => setOrt(e.target.value)}>
+            <Auswahl {...p} value={ortWert} disabled={art !== "praxistermin"} onChange={(e) => setOrt(e.target.value || "kein")}>
               <option value="">—</option>
               {(orte.data ?? []).map((o) => <option key={o.id} value={o.id}>{o.wert}</option>)}
             </Auswahl>

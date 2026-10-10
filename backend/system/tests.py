@@ -351,7 +351,7 @@ class Auftraege(Systemverzeichnis):
 
     def test_ohne_zweiten_faktor_geht_es_nicht(self):
         """Festlegung 03.10.2026: Update, Neustart, Wiederherstellen nur mit eingerichtetem zweitem Faktor – auch wenn
-        die Anmeldung ohne ihn erlaubt ist. Das Kennwort allein genügt nicht."""
+        die Anmeldung ohne ihn erlaubt ist. Das Passwort allein genügt nicht."""
         from accounts.zweifaktor import OHNE_ZWEITEN_FAKTOR
 
         ohne = benutzer("ohne2fa", Rolle.ADMIN)

@@ -33,6 +33,8 @@ type KalenderDaten = {
   termine: Termin[]; termine_ueberfaellig: Termin[]; faelligkeiten: Faelligkeit[];
   grenzen: { kontakt_monate?: number; kontakt_bald_monate?: number; plan_monate?: number };
   feiertage: { datum: string; name: string }[];
+  /** F177: Vorschlag für den Zeitraum des Infoblatts („woche“ | „monat“ | „aus“) */
+  infoblatt_rhythmus?: string;
 };
 type Ansicht = "monat" | "woche" | "liste";
 type Filter = "praxistermin" | "rueckruf" | "wiedervorlage" | "sonstiges" | "kontakt" | "plan";
@@ -453,7 +455,7 @@ export function Kalender() {
   const [neu, setNeu] = useState<{ datum: string; patient?: number; name?: string } | null>(null);
   const [aendern, setAendern] = useState<Termin | null>(null);
   const [weg, setWeg] = useState<Eintrag | null>(null);
-  // Patientenankündigung für die Praxis (F173)
+  // Infoblatt an die Praxis (F173, F177)
   const [ankuendigung, setAnkuendigung] = useState(false);
   const schreiben = darf("eintraege_erfassen");
   useOhneRechtSchliessen(schreiben, () => { setNeu(null); setAendern(null); setAnkuendigung(false); });
@@ -570,8 +572,11 @@ export function Kalender() {
               <Anzeigen filter={filter} onFilter={setFilter} erledigte={erledigte} onErledigte={setErledigte} />
             </>
           )}
-          {schreiben ? (mobil ? <Knopf className="icon" aria-label="Patientenankündigung" onClick={() => setAnkuendigung(true)}><Icon name="mail" /></Knopf>
-            : <Knopf icon="mail" title="Patientenankündigung für die Sprechstunden (PDF oder E-Mail)" onClick={() => setAnkuendigung(true)}>Ankündigung</Knopf>) : null}
+          {/* Infoblatt an die Praxis (F177): eigener, gut sichtbarer Knopf statt „Ankündigung“ */}
+          {schreiben ? (mobil ? <Knopf className="icon" aria-label="Praxis informieren: Infoblatt mit allen Terminen an die Praxis Holtmeier"
+            title="Praxis informieren" onClick={() => setAnkuendigung(true)}><Icon name="mail" /></Knopf>
+            : <Knopf icon="mail" title="Infoblatt mit allen Terminen an die Praxis Holtmeier – PDF oder E-Mail" onClick={() => setAnkuendigung(true)}>
+              Praxis informieren</Knopf>) : null}
           {schreiben ? (mobil ? <Knopf variante="pri" className="icon" aria-label="Neuer Termin" onClick={() => setNeu({ datum: gewaehlt })}><Icon name="plus" /></Knopf>
             : <Knopf variante="pri" icon="plus" onClick={() => setNeu({ datum: gewaehlt })}>Termin</Knopf>) : null}
         </div>
@@ -639,8 +644,7 @@ export function Kalender() {
       ) : null}
       {schreiben ? <TerminDialog offen={!!aendern} onOffen={(o) => { if (!o) setAendern(null); }} termin={aendern}
         patientName={aendern?.patient_name} mitAkte /> : null}
-      {schreiben ? <AnkuendigungDialog offen={ankuendigung} onOffen={setAnkuendigung}
-        von={montag(gewaehlt)} bis={plus(montag(gewaehlt), 6)} /> : null}
+      {schreiben ? <AnkuendigungDialog offen={ankuendigung} onOffen={setAnkuendigung} rhythmus={daten.data?.infoblatt_rhythmus} /> : null}
       {/* „×“: Termin oder Fälligkeit ausblenden – 3/6/12 Monate oder „nicht mehr nötig“, mit Grund (F142) */}
       <RuheDialog offen={!!weg} onOffen={(o) => { if (!o) setWeg(null); }}
         patientId={weg?.termin?.patient ?? weg?.faellig?.patient ?? 0} termin={weg?.termin ?? null}

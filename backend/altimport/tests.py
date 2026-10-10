@@ -393,7 +393,7 @@ class Import(Basis):
         angelegt = SystemEreignis.objects.filter(art=SystemEreignis.Art.BENUTZER_ANGELEGT, objekt="a.muster").get()
         self.assertEqual(angelegt.details["quelle"], "altdaten")
         protokoll = self.a.get("/api/protokoll/?gruppe=benutzer").json()["results"]
-        self.assertIn("Benutzer a.muster bei der Übernahme der Altdaten angelegt (Mitarbeiter), noch ohne Kennwort",
+        self.assertIn("Benutzer a.muster bei der Übernahme der Altdaten angelegt (Mitarbeiter), noch ohne Passwort",
                       [x["beschreibung"] for x in protokoll])
         self.assertFalse(SystemEreignis.objects.filter(art=SystemEreignis.Art.BENUTZER_ANGELEGT, objekt="hans.alt").exists())
 

@@ -28,7 +28,7 @@ class Command(BaseCommand):
         user, kennwort = testbenutzer_anlegen()
         if kennwort:
             self.stdout.write(self.style.WARNING(
-                f"Testbenutzer '{user.username}' angelegt. Einmal-Kennwort: {kennwort}"))
+                f"Testbenutzer '{user.username}' angelegt. Einmal-Passwort: {kennwort}"))
         else:
             self.stdout.write(f"Testbenutzer '{user.username}' ist vorhanden.")
         if opt["zuruecksetzen"]:

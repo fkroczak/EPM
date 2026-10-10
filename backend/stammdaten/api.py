@@ -296,6 +296,12 @@ class EinstellungenSerializer(serializers.ModelSerializer):
             attrs["ocr_fachwoerter"] = "\n".join(dict.fromkeys(woerter))
         if "wiedervorlage_tage" in attrs and not 1 <= attrs["wiedervorlage_tage"] <= 365:
             raise serializers.ValidationError({"wiedervorlage_tage": "Bitte 1 bis 365 Tage angeben."})
+        # Infoblatt an die Praxis (F177): Vorlauf kürzer als der Zeitraum, sonst stünde der Hinweis immer da
+        rhythmus = attrs.get("infoblatt_rhythmus", getattr(e, "infoblatt_rhythmus", "woche"))
+        vorlauf = attrs.get("infoblatt_vorlauf_tage", getattr(e, "infoblatt_vorlauf_tage", 3))
+        hoechstens = 6 if rhythmus == "woche" else 27
+        if ("infoblatt_vorlauf_tage" in attrs or "infoblatt_rhythmus" in attrs) and not 1 <= vorlauf <= hoechstens:
+            raise serializers.ValidationError({"infoblatt_vorlauf_tage": f"Bitte 1 bis {hoechstens} Tage angeben."})
         # Datenschutz: Fristen und die Erklärungen, die vorliegen sollen
         if "aufbewahrung_jahre" in attrs and not 1 <= attrs["aufbewahrung_jahre"] <= 100:
             raise serializers.ValidationError({"aufbewahrung_jahre": "Bitte 1 bis 100 Jahre angeben."})

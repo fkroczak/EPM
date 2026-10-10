@@ -25,25 +25,71 @@ GRUPPEN = [
 ABSCHNITTE = [
     # ------------------------------------------------------------------ Erste Schritte
     {
-        "id": "anmelden", "gruppe": "erste_schritte", "titel": "Anmelden mit Kennwort und Authenticator", "rechte": [],
+        # Bedienung für Pflegekräfte (10.10.2026, F178): die Alltagswege auf einen Blick, ganz oben in der Hilfe
+        "id": "alltag", "gruppe": "erste_schritte", "titel": "Die wichtigsten Wege im Alltag", "rechte": [],
         "seiten": [],
         "html": """
-<p>Angemeldet wird mit Benutzername und <strong>Kennwort</strong>. Die <strong>Zwei-Faktor-Anmeldung</strong> (Code aus
+<p>Für die tägliche Arbeit reichen wenige Wege. Jede Seite hat oben rechts ein <strong>?</strong> – es öffnet die Hilfe
+genau zu dieser Seite.</p>
+<ul>
+<li><strong>Patient suchen:</strong> ins Suchfeld oben tippen (Name, Teil des Namens, Nummer oder Geburtsdatum) und den
+Treffer anklicken. Schneller: <strong>Strg K</strong>. Am Telefon die Lupe oben.</li>
+<li><strong>Telefonat oder Gespräch festhalten:</strong> in der Akte <strong>Kontakt</strong>, auf der Startseite
+<strong>Kontakt erfassen</strong>. Notiz schreiben, <strong>Speichern</strong>. Gewicht und Wiedervorlage lassen sich im
+selben Fenster mit erfassen.</li>
+<li><strong>Gewicht eintragen:</strong> in der Akte <strong>Gewicht</strong>.</li>
+<li><strong>Termin oder Rückruf:</strong> in der Akte <strong>Termin</strong> (mehr unter „Termine, Rückrufe und
+Wiedervorlagen“).</li>
+<li><strong>Brief oder Befund ablegen:</strong> Datei auf die geöffnete Akte ziehen oder im Reiter
+<strong>Dokumente</strong> <strong>Neues Dokument</strong> wählen.</li>
+<li><strong>Neuer Patient:</strong> in der Patientenliste <strong>Neuer Patient</strong>. Pflicht sind nur Nachname,
+Vorname und Geburtsdatum.</li>
+</ul>
+<p>Nach jedem Speichern erscheint oben kurz eine <strong>grüne</strong> Bestätigung. Eine <strong>rote</strong> Meldung
+bleibt länger stehen und sagt, was fehlt; mit dem × lässt sie sich schließen.</p>""",
+    },
+    {
+        "id": "wenn_es_hakt", "gruppe": "erste_schritte", "titel": "Wenn etwas nicht klappt", "rechte": [], "seiten": [],
+        "html": """
+<ul>
+<li><strong>Ein Knopf ist grau:</strong> es fehlt noch eine Angabe. Daneben steht meist, welche – zum Beispiel
+„Zuerst den Patienten wählen“ oder „Zum Speichern bitte eine Notiz schreiben“.</li>
+<li><strong>Ein Feld ist rot umrandet:</strong> darunter steht, was nicht passt. Beim neuen Patienten springt EPM zum
+ersten roten Feld.</li>
+<li><strong>Datum:</strong> am einfachsten „14.03.2026“. EPM versteht auch „14.3.26“, „14,3,26“, „14032026“ sowie
+„heute“ und „gestern“. Uhrzeiten gehen als „10:30“, „10.30“ oder „1030“.</li>
+<li><strong>Patient nicht gefunden:</strong> nur einen Teil des Namens eingeben (z. B. „Mül“) oder nach Nummer bzw.
+Geburtsdatum suchen. Abgeschlossene Akten stehen in der Patientenliste unter <strong>Abgeschlossen</strong>; ohne
+Treffer bietet die Liste auch „In abgeschlossenen Akten suchen“ und „Neuer Patient“ an.</li>
+<li><strong>„Keine Verbindung zu EPM“:</strong> Netzwerk bzw. VPN prüfen und es noch einmal versuchen – die Eingaben
+bleiben stehen. Steht dort, dass EPM gerade nicht erreichbar ist, wird es meist neu gestartet oder aktualisiert:
+ein paar Minuten warten.</li>
+<li><strong>Konto gesperrt</strong> (nach fünf falschen Passwörtern): die Administration entsperrt es.</li>
+<li><strong>Etwas versehentlich gespeichert:</strong> Kontakte werden storniert (mit Grund), Messungen bearbeitet; alle
+früheren Fassungen bleiben im <strong>Verlauf</strong> der Akte sichtbar. Es geht nichts verloren.</li>
+</ul>""",
+    },
+    {
+        "id": "anmelden", "gruppe": "erste_schritte", "titel": "Anmelden mit Passwort und Authenticator", "rechte": [],
+        "seiten": [],
+        "html": """
+<p>Angemeldet wird mit Benutzername und <strong>Passwort</strong>. Die <strong>Zwei-Faktor-Anmeldung</strong> (Code aus
 einer Authenticator-App auf dem Telefon) ist freiwillig – die Administration kann sie für Admins oder für alle zur
 Pflicht machen. Wer sie eingerichtet hat, wird bei jeder Anmeldung nach dem Code gefragt.</p>
 <ol>
-<li>Benutzername und Kennwort eingeben, <strong>Anmelden</strong> wählen.</li>
+<li>Benutzername und Passwort eingeben, <strong>Weiter</strong> wählen. Groß- und Kleinschreibung zählt; ist die
+Feststelltaste an, weist EPM darauf hin.</li>
 <li>Mit Zwei-Faktor-Anmeldung: den sechsstelligen Code aus der Authenticator-App eingeben. Er wechselt alle 30 Sekunden.</li>
-<li>Bei der ersten Anmeldung mit dem Einmal-Kennwort vom Zugangsblatt wird zuerst ein eigenes Kennwort festgelegt. Ist
+<li>Bei der ersten Anmeldung mit dem Einmal-Passwort vom Zugangsblatt wird zuerst ein eigenes Passwort festgelegt. Ist
 die Zwei-Faktor-Anmeldung Pflicht, wird danach die Authenticator-App eingerichtet (QR-Code scannen); sonst geht das
 jederzeit unter <strong>Mein Konto › Anmeldung und Sicherheit › Einrichten</strong>. Danach zeigt EPM einmalig die
 Notfall-Codes.</li>
 </ol>
-<p>Solange sie freiwillig ist, lässt sich die Zwei-Faktor-Anmeldung unter Mein Konto mit Kennwort und Code auch wieder
-ausschalten. Bestätigungen (endgültig löschen, Wiederherstellen, Updates, Sicherung, Import) verlangen immer Kennwort
+<p>Solange sie freiwillig ist, lässt sich die Zwei-Faktor-Anmeldung unter Mein Konto mit Passwort und Code auch wieder
+ausschalten. Bestätigungen (endgültig löschen, Wiederherstellen, Updates, Sicherung, Import) verlangen immer Passwort
 <strong>und</strong> Code – wer sie ausführen soll (z. B. Mediziner, Administration), muss die Zwei-Faktor-Anmeldung
 eingerichtet haben.</p>
-<p>Nach mehreren falschen Kennwörtern wird das Konto gesperrt; entsperren kann die Administration. Nach längerer
+<p>Nach mehreren falschen Passwörtern wird das Konto gesperrt; entsperren kann die Administration. Nach längerer
 Pause meldet EPM von selbst ab.</p>""",
     },
     {
@@ -107,14 +153,14 @@ sich anmeldet. <strong>Auf Standard zurücksetzen</strong> stellt alles zurück;
 führt zur Startseite im Bearbeitungsmodus.</p>""",
     },
     {
-        "id": "konto", "gruppe": "erste_schritte", "titel": "Mein Konto: Kennwort, Zwei-Faktor, Anmeldungen", "rechte": [],
+        "id": "konto", "gruppe": "erste_schritte", "titel": "Mein Konto: Passwort, Zwei-Faktor, Anmeldungen", "rechte": [],
         "seiten": ["/konto"],
         "html": """
 <p><strong>Mein Konto</strong> zeigt das eigene Profil (Name, Funktion, Kürzel, Rolle – geändert von der
 Administration) und alles zur Anmeldung. Wie EPM aussieht, steht seit dem 09.10.2026 im eigenen Menüpunkt
 <strong>Design</strong>.</p>
 <ul>
-<li><strong>Kennwort ändern</strong>: altes Kennwort, dann zweimal das neue.</li>
+<li><strong>Passwort ändern</strong>: altes Passwort, dann zweimal das neue.</li>
 <li><strong>Zwei-Faktor-Anmeldung</strong>: Authenticator-App oder Passkey einrichten, neues Gerät, Notfall-Codes; solange freiwillig auch ausschalten.</li>
 <li><strong>Anmeldungen</strong>: zeigt, wo man gerade angemeldet ist; fremde Anmeldungen lassen sich einzeln beenden.</li>
 </ul>""",
@@ -276,8 +322,8 @@ Entwurf mit Empfänger, Betreff, Text und der PDF im Anhang – prüfen und send
 vorher im Dialog ändern; <strong>Weitere Anlagen</strong> (z. B. Leitfaden Zottentraining) werden mit angehängt.</li>
 <li>Auf Wunsch wird die PDF als Dokument „Schreiben“ in der Akte abgelegt.</li>
 </ul>
-<p>Die <strong>Patientenankündigung</strong> für die Praxis entsteht im <strong>Kalender › Ankündigung</strong> aus den
-Praxisterminen eines Zeitraums. Hinweise wie „1 h, Neuaufnahme“ oder „+ Labor“ im Termin unter „bei/Ort“ eintragen.</p>
+<p>Das <strong>Infoblatt an die Praxis</strong> mit allen Patienten der nächsten Sprechstunden entsteht im
+<strong>Kalender › Praxis informieren</strong> (siehe „Infoblatt an die Praxis“).</p>
 <p>Texte ändern: Vorlagen › Dokumentvorlagen; Betreff und Text der E-Mail stehen dort im Baustein <strong>E-Mail</strong>.
 Eigene Schreiben (z. B. an Hausärzte) legt <strong>+ Neue Vorlage</strong> unter Vorlagen › Dokumentvorlagen an; sie
 erscheinen danach hier unter „Eigene Vorlagen“. Anlagen hochladen: Vorlagen › Anlagen für E-Mails. Für eine <strong>Fallzusammenfassung</strong> im Reiter Berichte die
@@ -429,6 +475,32 @@ Plan prüfen) und ob Erledigte erscheinen – mit der Legende der Farben. Rechts
 Termine, Kontakt überfällig, Plan prüfen) und <strong>Fällig</strong> (Kontakt bald fällig). Am Telefon zeigt ein
 Wochenband die Tage; darunter Tag, Überfällig und Woche.</p>""",
     },
+    {
+        "id": "infoblatt", "gruppe": "kontakte", "titel": "Infoblatt an die Praxis (alle Termine bei Dr. Holtmeier)",
+        "rechte": ["eintraege_erfassen"], "seiten": ["/kalender", "/"],
+        "html": """
+<p>Die Praxis Dr. Holtmeier bekommt rechtzeitig <strong>ein Blatt mit allen Patienten</strong>, die dort in den
+nächsten Tagen einen Termin haben – nicht ein Blatt je Patient. So geht es:</p>
+<ol>
+<li>Im <strong>Kalender</strong> oben auf <strong>Praxis informieren</strong> klicken – oder auf der Startseite auf
+<strong>Infoblatt erstellen</strong>, wenn dort „Praxis Holtmeier informieren“ steht.</li>
+<li>Den Zeitraum wählen: <strong>Nächste Woche</strong>, <strong>Übernächste Woche</strong>, <strong>Nächster
+Monat</strong> oder <strong>Eigener Zeitraum</strong>.</li>
+<li>Die Liste prüfen: Dort steht, wer auf dem Blatt steht, nach Tagen geordnet. <strong>neu</strong> heißt: seit dem
+letzten Infoblatt dazugekommen oder verschoben.</li>
+<li><strong>PDF herunterladen</strong> (zum Faxen) oder <strong>E-Mail vorbereiten</strong> (Outlook öffnet einen
+fertigen Entwurf mit dem Blatt im Anhang).</li>
+</ol>
+<p>Auf dem Blatt stehen die Termine mit der Art <strong>Praxistermin</strong> und dem Ort <strong>Praxis Dr.
+Holtmeier</strong>. Beim Anlegen eines Praxistermins ist dieser Ort schon eingetragen. Fehlt bei einem Praxistermin der
+Ort, steht er nicht auf dem Blatt – der Dialog zeigt ihn dann gelb mit <strong>Ort eintragen</strong>.
+Telefon- und Videotermine kommen nur dazu, wenn das Häkchen <strong>Telefon- und Videotermine auch aufführen</strong>
+gesetzt ist (dann mit Telefonnummer). Hinweise wie „1 h, Neuaufnahme“ oder „+ Labor“ im Termin unter „bei/Ort“
+eintragen – sie stehen hinter dem Namen. Testpatienten erscheinen nie.</p>
+<p>Die Startseite erinnert vor der nächsten Woche (oder dem nächsten Monat), bis das Infoblatt erstellt ist. Wann sie
+erinnert, steht unter Vorlagen › Grenzwerte › „Infoblatt an die Praxis“. Den Text des Blatts ändert man unter
+Vorlagen › Dokumentvorlagen › „Patientenankündigung“.</p>""",
+    },
     # ------------------------------------------------------------------ Gewicht
     {
         "id": "gewicht", "gruppe": "gewicht", "titel": "Gewicht eintragen und korrigieren", "rechte": ["eintraege_erfassen"],
@@ -497,9 +569,12 @@ der Freigabe und der Nachweis (z. B. die E-Mail als PDF).</p>""",
         "id": "dokumente", "gruppe": "dokumente", "titel": "Dokumente hochladen und ansehen", "rechte": ["akten_lesen"],
         "seiten": ["/patienten/:id/dokumente"],
         "html": """
-<p>Im Reiter <strong>Dokumente</strong> liegen Arztbriefe, Befunde, Erklärungen und erzeugte PDFs. Hochladen mit
-<strong>Datei auswählen</strong> (PDF oder Bild), dazu Typ, Titel und Dokumentdatum. EPM schlägt das Datum aus den
-Metadaten der Datei vor.</p>
+<p>Im Reiter <strong>Dokumente</strong> liegen Arztbriefe, Befunde, Erklärungen und erzeugte PDFs. Ablegen mit
+<strong>Neues Dokument</strong> (PDF, Bild oder Text, höchstens 50 MB) – oder die Datei einfach auf die geöffnete Akte
+ziehen; im Aktenkopf geht es auch über <strong>Weitere Aktionen › Dokument hochladen</strong>. Danach rechts Typ, Titel
+und Dokumentdatum ergänzen und <strong>Speichern</strong>. EPM schlägt das Datum aus der Datei vor.</p>
+<p>Die Suche über der Liste findet Wörter in Titel und Notiz und – nach <strong>Text erkennen</strong> – auch im
+Inhalt eines gescannten Briefs.</p>
 <p>Dokumente werden in EPM angezeigt, ohne das PDF-Programm des PCs. Ausgeblendete Dokumente sind nicht gelöscht.</p>""",
     },
     {
@@ -516,7 +591,7 @@ bei Bedarf korrigieren und <strong>Typ und Datum bestätigen</strong>.</p>""",
         "html": """
 <p>Liegt ein Dokument in der falschen Akte, ordnet <strong>Anderem Patienten zuordnen</strong> es mit Grund um. Beide
 Akten zeigen den Vorgang im Verlauf, ohne den jeweils anderen Patienten zu nennen.</p>
-<p>Gehört es in keine Akte, kann es <strong>endgültig gelöscht</strong> werden (nur Mediziner und Admin): mit Kennwort,
+<p>Gehört es in keine Akte, kann es <strong>endgültig gelöscht</strong> werden (nur Mediziner und Admin): mit Passwort,
 Code aus der Authenticator-App und einem Bestätigungscode. Datei, Titel und Inhalt werden entfernt; im Audit-Log bleibt
 ein neutraler Nachweis.</p>""",
     },
@@ -554,7 +629,7 @@ keiner Liste. Lesen kann sie nur, wer über Anfragen entscheidet – mit einer <
         "seiten": [],
         "html": """
 <p>Nach Ablauf der Aufbewahrungsfrist oder auf Antrag kann eine abgeschlossene Akte <strong>endgültig gelöscht</strong>
-werden – mit Kennwort, Code aus der Authenticator-App und Bestätigungscode. Es bleibt nur ein Eintrag im Löschprotokoll
+werden – mit Passwort, Code aus der Authenticator-App und Bestätigungscode. Es bleibt nur ein Eintrag im Löschprotokoll
 (Nummer, Daten der Frist, Grund, Umfang) ohne Namen und Inhalte. Wird später eine ältere Sicherung zurückgespielt,
 löscht EPM die Akte beim Start erneut.</p>""",
     },
@@ -666,7 +741,7 @@ Arzt, legt „Neuen Arzt anlegen“ ihn gleich im Dialog an.</p>""",
 <li><strong>Datensicherung</strong>: letzte Sicherung, Übertragung, Speicher; „Jetzt sichern“.</li>
 <li><strong>Server</strong> und <strong>Ubuntu-Updates</strong>: Auslastung, offene Updates; Updates installieren und
 Server neu starten – mit Passwort und 2FA, vorher automatische Sicherung, angemeldete Benutzer werden gewarnt.</li>
-<li><strong>Konten</strong>: gesperrt, Einmal-Kennwort offen, ohne zweiten Faktor, Notfall-Codes knapp.</li>
+<li><strong>Konten</strong>: gesperrt, Einmal-Passwort offen, ohne zweiten Faktor, Notfall-Codes knapp.</li>
 <li><strong>Angemeldet</strong>, <strong>Hinweis an alle</strong>, <strong>Zugriffe · 7 Tage</strong> aus dem Audit-Log
 und <strong>Testumgebung</strong>.</li>
 </ul>""",
@@ -721,14 +796,14 @@ die Bearbeiter) auch ohne Bearbeiten abschalten – die Lücken bleiben dann ste
         "id": "benutzer", "gruppe": "administration", "titel": "Benutzer und Rechte", "rechte": ["benutzer_verwalten"],
         "seiten": ["/admin/benutzer"],
         "html": """
-<p><strong>Benutzer anlegen</strong> erzeugt ein Einmal-Kennwort; das <strong>Zugangsblatt</strong> lässt sich nur
-drucken, solange das Kennwort angezeigt wird. Benutzer werden nie gelöscht, nur gesperrt. Weitere Aktionen: entsperren,
-neues Einmal-Kennwort (Kennwort vergessen), zweiten Faktor zurücksetzen (Telefon verloren).</p>
+<p><strong>Benutzer anlegen</strong> erzeugt ein Einmal-Passwort; das <strong>Zugangsblatt</strong> lässt sich nur
+drucken, solange das Passwort angezeigt wird. Benutzer werden nie gelöscht, nur gesperrt. Weitere Aktionen: entsperren,
+neues Einmal-Passwort (Passwort vergessen), zweiten Faktor zurücksetzen (Telefon verloren).</p>
 <p><strong>Ohne Login</strong>: Konten, die nur als Name für Einträge dienen (z. B. frühere Mitarbeiter oder aus dem
 Altsystem übernommen), können sich nicht anmelden und haben die Rolle <strong>Keine Berechtigung</strong> – also keine
-Rechte. Ein Konto lässt sich auf „ohne Login“ setzen (Kennwort und zweiter Faktor werden gelöscht, Einträge bleiben
+Rechte. Ein Konto lässt sich auf „ohne Login“ setzen (Passwort und zweiter Faktor werden gelöscht, Einträge bleiben
 zugeordnet) und mit <strong>Login geben</strong> wieder einbinden, z. B. als Mitarbeiter; dabei entsteht ein neues
-Einmal-Kennwort.</p>
+Einmal-Passwort.</p>
 <p><strong>Testbenutzer</strong> (Schalter im Konto, für Betrachter, Mitarbeiter, Mitarbeiter (erweitert) und Mediziner) sehen und bearbeiten
 ausschließlich Testpatienten. Nicht mehr gebrauchte Testbenutzer lassen sich <strong>ausblenden</strong> (einzeln oder
 „Alle Testbenutzer ausblenden“): gesperrt und in keiner Liste mehr, aber nicht gelöscht; „Ausgeblendete zeigen“ und
@@ -766,7 +841,7 @@ erreichbar, deshalb vorher Eingaben speichern. Der Auftrag läuft auf dem Server
 Zwischenzeit nicht antwortet – das Ergebnis erscheint danach unter <strong>Aufträge</strong> samt Ausgabe. Geht etwas
 schief, bleibt die bisherige Version in Betrieb; über <strong>Ausgabe</strong> ist zu sehen, woran es lag.</p>
 <p>Außerdem: <strong>Hinweis an alle Benutzer</strong> setzen und angemeldete Benutzer abmelden. Bei den Konten führen die
-Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Kennwort) direkt zur Person in der Benutzerverwaltung.</p>
+Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Passwort) direkt zur Person in der Benutzerverwaltung.</p>
 <p><strong>Testphase und Go-live</strong>: <strong>Musterdaten automatisch anlegen</strong> abschalten, damit beim Start
 keine Testpatienten und Testkonten mehr entstehen. <strong>Menüpunkt „Import“ ausblenden</strong>, wenn die Altdaten
 übernommen sind – die Seite bleibt über die Karte erreichbar, der Menüpunkt lässt sich wieder einblenden.

@@ -15,6 +15,7 @@ import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Fehleranzeige, Karte, KnopfLink, Knopf, Laden, Leer, Seitenkopf, Segmente, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
 import { HinweisChips } from "@/components/HinweisChips";
+import { Begriff } from "@/components/ui/Begriff";
 
 type Zaehler = { in_betreuung: number; abgeschlossen: number; mit_hinweisen: number; gewichtsverlust: number; termin_woche: number };
 /** Testpatienten zählen nicht mit; ihre Anzahl kommt getrennt (nicht für Testbenutzer). */
@@ -121,7 +122,7 @@ function PlanZelle({ p }: { p: PatientZeile }) {
   return (
     <span className="text-[0.8125rem] inline-flex flex-col gap-0.5 items-start">
       {plan.gueltig_ab ? <span className={cx("num", plan.alt && "text-warn")} title={plan.alt ? "älter als eingestellt" : undefined}>seit {datum(plan.gueltig_ab)}</span> : null}
-      {plan.entwurf ? <Chip>Entwurf</Chip> : null}
+      {plan.entwurf ? <Chip><Begriff name="entwurf">Entwurf</Begriff></Chip> : null}
     </span>
   );
 }
@@ -201,6 +202,26 @@ export function Patienten() {
     navigate(`/patienten/${id}`);
   };
   const sortieren = (o: string) => setze({ ordering: o });
+  // Leere Liste: sagen, woran es liegen kann, und den nächsten Schritt anbieten (Bedienung für Pflegekräfte, 10.10.2026)
+  const zuruecksetzen = () => setParams(archiv ? new URLSearchParams("status=abgeschlossen") : new URLSearchParams());
+  const leer = (
+    <div className="flex flex-col items-center gap-2.5 py-4 px-3 text-center text-sm" data-testid="liste-leer">
+      <span className="gedaempft">
+        {suche ? <>Kein Patient zu „{suche}“ {archiv ? "unter den abgeschlossenen Akten" : "in Betreuung"} gefunden.</>
+          : gefiltert ? "Keine Patienten passen zu diesen Filtern."
+          : archiv ? "Noch keine abgeschlossenen Akten." : "Noch keine Patienten angelegt."}
+      </span>
+      {suche ? <span className="gedaempft text-[0.8125rem]">Tipp: nur einen Teil des Namens eingeben (z. B. „Mül“), oder nach Nummer bzw.
+        Geburtsdatum (14.03.1968) suchen.</span> : null}
+      <span className="flex gap-2 flex-wrap justify-center">
+        {gefiltert ? <Knopf klein onClick={zuruecksetzen}>Alle Filter entfernen</Knopf> : null}
+        {suche && !archiv ? <Knopf klein onClick={() => setParams(new URLSearchParams({ status: "abgeschlossen", suche }))}>
+          In abgeschlossenen Akten suchen</Knopf> : null}
+        {!archiv && darf("akten_bearbeiten") && (suche || !gefiltert)
+          ? <KnopfLink to="/patienten/neu" klein variante="pri" icon="plus">Neuer Patient</KnopfLink> : null}
+      </span>
+    </div>
+  );
   const tabelle = (
     <Karte key="tabelle" className="overflow-x-auto">
       {liste.isLoading ? <Laden /> : (
@@ -249,7 +270,7 @@ export function Patienten() {
                 <td className="td">
                   <span className="inline-flex items-center gap-2 flex-wrap">
                     <Link to={`/patienten/${p.id}`} className="font-medium no-underline">{p.nachname}, {p.vorname}</Link>
-                    {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
+                    {p.ist_test ? <Chip art="warn"><Begriff name="testpatient">Testpatient</Begriff></Chip> : null}
                   </span>
                   {!breit ? <><br /><span className="text-[0.78rem] gedaempft"><span className="num">{datum(p.geburtsdatum)}</span> ({p.alter})</span></> : null}
                 </td>
@@ -276,10 +297,7 @@ export function Patienten() {
           </tbody>
         </table>
       )}
-      {daten && daten.count === 0 ? (
-        <Leer>{gefiltert ? "Keine Patienten passen zu diesen Filtern." : archiv ? "Noch keine abgeschlossenen Akten." : "Noch keine Patienten angelegt."}
-          {!gefiltert && !archiv && darf("akten_bearbeiten") ? <> <KnopfLink to="/patienten/neu" klein icon="plus">Neuer Patient</KnopfLink></> : null}</Leer>
-      ) : null}
+      {daten && daten.count === 0 ? leer : null}
     </Karte>
   );
 
@@ -303,7 +321,7 @@ export function Patienten() {
               </Link>
               {!archiv ? (
                 <div className="px-3.5 pb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[0.8125rem]">
-                  {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
+                  {p.ist_test ? <Chip art="warn"><Begriff name="testpatient">Testpatient</Begriff></Chip> : null}
                   {p.kennzahlen?.naechster_termin ? <NaechsterTermin p={p} /> : null}
                   <Hinweise p={p} />
                 </div>
@@ -312,9 +330,7 @@ export function Patienten() {
           ))}
         </div>
       )}
-      {daten && daten.count === 0 ? (
-        <Leer>{gefiltert ? "Keine Patienten passen zu diesen Filtern." : archiv ? "Noch keine abgeschlossenen Akten." : "Noch keine Patienten angelegt."}</Leer>
-      ) : null}
+      {daten && daten.count === 0 ? leer : null}
     </div>
   );
 
@@ -389,7 +405,7 @@ export function Patienten() {
           {pruefen && !PRUEFEN[pruefen] ? <option value={pruefen}>{pruefen}</option> : null}
         </Auswahl>
         {gefiltert ? (
-          <Knopf variante="geist" klein onClick={() => { setParams(archiv ? new URLSearchParams("status=abgeschlossen") : new URLSearchParams()); }}>
+          <Knopf variante="geist" klein onClick={zuruecksetzen}>
             Filter zurücksetzen
           </Knopf>
         ) : null}

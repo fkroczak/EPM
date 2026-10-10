@@ -125,6 +125,11 @@ def akten_entfernen(ids: list[int]) -> None:
     DokumentVorgang.objects.filter(von_patient_id__in=ids).update(von_patient=None, grund=OHNE_GRUND)
     DokumentVorgang.objects.filter(nach_patient_id__in=ids).update(nach_patient=None, grund=OHNE_GRUND)
     DokumentVorgang.objects.filter(von_patient__isnull=True, nach_patient__isnull=True).delete()
+    # Infoblätter an die Praxis (F177): die Termine dieser Akten aus den Schnappschüssen nehmen (dort stehen nur
+    # Nummer, Datum und Uhrzeit; ohne den Termin bliebe sonst ein Rest, der auf die Akte verweist)
+    termin_ids = set(Termin.objects.filter(patient_id__in=ids).values_list("id", flat=True))
+    termin_ids |= set(Termin.history.filter(patient_id__in=ids).values_list("id", flat=True))
+    infoblaetter_bereinigen(termin_ids)
     # Positionen und Pläne zuerst (Vorgänger- und Nachweis-Verweise), dann die Akten mit allem, was daran hängt
     InfusionsplanPosition.objects.filter(plan_id__in=plan_ids).delete()
     Infusionsplan.objects.filter(id__in=plan_ids).update(vorgaenger=None, freigabe_nachweis=None)
@@ -149,6 +154,22 @@ def akten_entfernen(ids: list[int]) -> None:
     Laborwert.history.filter(befund_id__in=befund_ids).delete()
     # Historie der Vitamin-Zuordnung (eigene Tabelle von django-simple-history, ohne Fremdschlüssel in der Datenbank)
     apps.get_model("infusionen", "HistoricalInfusionsplan_vitamine").objects.filter(infusionsplan_id__in=plan_ids).delete()
+
+
+def infoblaetter_bereinigen(termin_ids) -> int:
+    """Termine aus den Schnappschüssen der Infoblätter entfernen (F177). → Zahl der geänderten Blätter."""
+    from .models import Ankuendigung
+
+    termin_ids = set(termin_ids)
+    if not termin_ids:
+        return 0
+    geaendert = 0
+    for a in Ankuendigung.objects.only("id", "termine").iterator():
+        rest = [e for e in a.termine if not (isinstance(e, dict) and e.get("termin") in termin_ids)]
+        if len(rest) != len(a.termine):
+            Ankuendigung.objects.filter(pk=a.pk).update(termine=rest)
+            geaendert += 1
+    return geaendert
 
 
 def dateien_entfernen(nummer: int) -> None:
@@ -479,7 +500,7 @@ class DatenschutzAktionen:
 
     @action(detail=True, methods=["post"], permission_classes=[AkteLoeschenRecht])
     def loeschen(self, request, pk=None):
-        """Schritt 2: Akte endgültig löschen (Mediziner und Admin, Recht „Akten endgültig löschen“) – mit Grund, Kennwort, Code aus der Authenticator-App
+        """Schritt 2: Akte endgültig löschen (Mediziner und Admin, Recht „Akten endgültig löschen“) – mit Grund, Passwort, Code aus der Authenticator-App
         und dem abgetippten Bestätigungscode. Danach sind alle Einträge, die Historie und die Dateien weg; es bleiben
         das Löschprotokoll (ohne Namen) und die Einträge im Audit-Log ohne Namen und Inhalte."""
         from datetime import datetime
@@ -517,7 +538,7 @@ class DatenschutzAktionen:
             # Festlegung 03.10.2026: endgültig löschen nur mit eingerichtetem zweitem Faktor
             return abgelehnt("code", OHNE_ZWEITEN_FAKTOR)
         if not request.user.check_password(str(request.data.get("kennwort", ""))):
-            antwort = abgelehnt("kennwort", "Kennwort falsch.")
+            antwort = abgelehnt("kennwort", "Passwort falsch.")
             return bestaetigung_fehlgeschlagen(request, "loeschen_kennwort") or antwort
         if not zweiter_faktor_bestaetigt(request, notfallcodes=False):
             antwort = abgelehnt("code", fehlertext(request, "Code aus der Authenticator-App falsch oder schon verwendet."))

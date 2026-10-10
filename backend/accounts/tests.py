@@ -1,4 +1,4 @@
-"""Anmeldung, Sperre, Einmal-Kennwort, Sitzungen und Einstellungen in „Mein Konto“ (echte Datenbank)."""
+"""Anmeldung, Sperre, Einmal-Passwort, Sitzungen und Einstellungen in „Mein Konto“ (echte Datenbank)."""
 from datetime import timedelta
 
 from django.contrib.sessions.models import Session
@@ -44,7 +44,7 @@ class Anmeldung(TestCase):
         self.assertEqual(self.c.get("/api/patienten/").status_code, 403)
         # 2FA darf erst nach eigenem Kennwort eingerichtet werden
         self.assertEqual(self.c.post("/api/auth/2fa/einrichten/").status_code, 403)
-        r = self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Kennwort-42"}, format="json")
+        r = self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Passwort-42"}, format="json")
         self.assertEqual(r.json()["schritt"], "2fa_einrichten")
         self.user.refresh_from_db()
         self.assertIsNone(self.user.einmal_kennwort_gueltig_bis)
@@ -71,7 +71,7 @@ class Anmeldung(TestCase):
         self.assertEqual((s["notfallcodes_uebrig"], s["notfallcodes_gesamt"]), (10, 10))
         # nächste Anmeldung: Kennwort + Notfallcode
         self.c.post("/api/auth/abmelden/")
-        self.anmelden("Ein-langes-neues-Kennwort-42")
+        self.anmelden("Ein-langes-neues-Passwort-42")
         self.assertEqual(self.c.get("/api/auth/status/").json()["schritt"], "2fa")
         r = self.c.post("/api/auth/2fa/", {"code": r.json()["notfallcodes"][0]}, format="json")
         self.assertEqual(r.json()["schritt"], "fertig")
@@ -197,7 +197,7 @@ class Sitzungen(TestCase):
     def test_kennwortwechsel_beendet_andere_sitzungen(self):
         a = echte_anmeldung(self.user, self.codes[0])
         b = echte_anmeldung(self.user, self.codes[1])
-        r = a.post("/api/auth/kennwort/", {"alt": KENNWORT, "neu": "Ganz-neues-Kennwort-2026"}, format="json")
+        r = a.post("/api/auth/kennwort/", {"alt": KENNWORT, "neu": "Ganz-neues-Passwort-2026"}, format="json")
         self.assertEqual(r.json()["schritt"], "fertig", r.content)
         self.assertEqual(a.get("/api/patienten/").status_code, 200)
         self.assertEqual(b.get("/api/patienten/").status_code, 403)
@@ -205,7 +205,7 @@ class Sitzungen(TestCase):
 
     def test_admin_sitzung_bleibt_bei_benutzerverwaltung(self):
         """Ablauf wie in der Oberfläche: anlegen, erste Anmeldung der neuen Person, sperren, entsperren,
-        Einmal-Kennwort, 2FA zurücksetzen – die Sitzung des Admins bleibt gültig, die der Person endet."""
+        Einmal-Passwort, 2FA zurücksetzen – die Sitzung des Admins bleibt gültig, die der Person endet."""
         chef = benutzer("chef", Rolle.ADMIN)
         a = echte_anmeldung(chef, mit_zweitem_faktor(chef)[0])
         r = a.post("/api/benutzer/", {"username": "neu.heilmann", "titel": "Dr. med.", "first_name": "Henrike",
@@ -471,7 +471,7 @@ class ZweiterFaktorFreiwillig(TestCase):
     def test_erstanmeldung_ohne_zweiten_faktor(self):
         self.assertEqual(Anmelderegeln.aktuell().zweiter_faktor, "freiwillig")  # Standard
         self.assertEqual(self.anmelden(self.einmal).json()["schritt"], "kennwort_aendern")
-        r = self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Kennwort-42"}, format="json")
+        r = self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Passwort-42"}, format="json")
         self.assertEqual(r.json()["schritt"], "fertig", r.content)
         ich = r.json()["benutzer"]
         self.assertEqual((ich["zweiter_faktor"], ich["zweiter_faktor_pflicht"]), (False, False))
@@ -479,21 +479,21 @@ class ZweiterFaktorFreiwillig(TestCase):
         # nächste Anmeldung: das Kennwort genügt; im Audit-Log steht, dass ohne zweiten Faktor angemeldet wurde
         self.c.post("/api/auth/abmelden/")
         self.assertEqual(self.anmelden("falsch").status_code, 401)
-        r = self.anmelden("Ein-langes-neues-Kennwort-42")
+        r = self.anmelden("Ein-langes-neues-Passwort-42")
         self.assertEqual(r.json()["schritt"], "fertig")
         self.user.refresh_from_db()
         self.assertEqual(self.user.fehlversuche, 0)  # der Fehlversuch davor ist mit der Anmeldung erledigt
         eintrag = SystemEreignis.objects.filter(art="anmeldung", benutzer=self.user).order_by("-id").first()
         self.assertEqual(eintrag.details["schritt"], "ohne_2fa")
         log = client_fuer(self.admin).get("/api/protokoll/?gruppe=anmeldung").json()["results"]
-        self.assertIn("Anmeldung mit Kennwort (ohne zweiten Faktor)", [e["beschreibung"] for e in log])
+        self.assertIn("Anmeldung mit Passwort (ohne zweiten Faktor)", [e["beschreibung"] for e in log])
         # „Mein Konto“ zeigt den Stand
         s = self.c.get("/api/auth/sicherheit/").json()
         self.assertEqual((s["authenticator_aktiv"], s["zweiter_faktor_pflicht"]), (False, False))
 
     def test_freiwillig_einrichten_und_wieder_ausschalten(self):
         self.anmelden(self.einmal)
-        self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Kennwort-42"}, format="json")
+        self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Passwort-42"}, format="json")
         # freiwillig einrichten (Mein Konto)
         self.assertEqual(self.c.post("/api/auth/2fa/einrichten/").status_code, 200)
         geraet = TOTPDevice.objects.get(user=self.user)
@@ -504,26 +504,26 @@ class ZweiterFaktorFreiwillig(TestCase):
         self.assertTrue(self.c.get("/api/auth/ich/").json()["zweiter_faktor"])
         # wer ihn eingerichtet hat, braucht ihn bei jeder Anmeldung
         neu = APIClient()
-        self.assertEqual(self.anmelden("Ein-langes-neues-Kennwort-42", neu).json()["schritt"], "2fa")
+        self.assertEqual(self.anmelden("Ein-langes-neues-Passwort-42", neu).json()["schritt"], "2fa")
         self.assertEqual(neu.get("/api/patienten/").status_code, 403)
         self.assertEqual(neu.post("/api/auth/2fa/", {"code": notfall[0]}, format="json").json()["schritt"], "fertig")
         # ausschalten: Kennwort und Code; falsche Eingaben werden abgewiesen
         r = neu.post("/api/auth/2fa/ausschalten/", {"kennwort": "falsch", "code": notfall[1]}, format="json")
         self.assertEqual((r.status_code, list(r.json())), (400, ["kennwort"]))
-        r = neu.post("/api/auth/2fa/ausschalten/", {"kennwort": "Ein-langes-neues-Kennwort-42", "code": "000000x"},
+        r = neu.post("/api/auth/2fa/ausschalten/", {"kennwort": "Ein-langes-neues-Passwort-42", "code": "000000x"},
                      format="json")
         self.assertEqual((r.status_code, list(r.json())), (400, ["code"]))
         # django-otp bremst nach einem falschen Code kurz (1 s, 2 s, 4 s …) – hier nicht abwarten
         from django_otp.plugins.otp_static.models import StaticDevice
         for modell in (TOTPDevice, StaticDevice):
             modell.objects.filter(user=self.user).update(throttling_failure_timestamp=None, throttling_failure_count=0)
-        r = neu.post("/api/auth/2fa/ausschalten/", {"kennwort": "Ein-langes-neues-Kennwort-42", "code": notfall[1]},
+        r = neu.post("/api/auth/2fa/ausschalten/", {"kennwort": "Ein-langes-neues-Passwort-42", "code": notfall[1]},
                      format="json")
         self.assertEqual(r.status_code, 200, r.content)
         self.assertFalse(r.json()["zweiter_faktor"])
         self.assertFalse(TOTPDevice.objects.filter(user=self.user).exists())
         self.assertEqual(neu.get("/api/patienten/").status_code, 200)  # die Sitzung gilt weiter
-        self.assertEqual(self.anmelden("Ein-langes-neues-Kennwort-42", APIClient()).json()["schritt"], "fertig")
+        self.assertEqual(self.anmelden("Ein-langes-neues-Passwort-42", APIClient()).json()["schritt"], "fertig")
         texte = [e["beschreibung"] for e in client_fuer(self.admin).get("/api/protokoll/?gruppe=benutzer").json()["results"]]
         self.assertIn("Zweiten Faktor (Authenticator-App) selbst ausgeschaltet", texte)
         # ohne zweiten Faktor gibt es nichts auszuschalten
@@ -531,7 +531,7 @@ class ZweiterFaktorFreiwillig(TestCase):
 
     def test_pflicht_durch_die_administration(self):
         self.anmelden(self.einmal)
-        self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Kennwort-42"}, format="json")
+        self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Passwort-42"}, format="json")
         self.assertEqual(self.c.get("/api/patienten/").status_code, 200)
         a = client_fuer(self.admin)
         stand = a.get("/api/benutzer/anmeldung/").json()
@@ -555,7 +555,7 @@ class ZweiterFaktorFreiwillig(TestCase):
         self.assertEqual(r.json()["schritt"], "fertig", r.content)
         self.assertEqual(self.c.get("/api/patienten/").status_code, 200)
         # bei Pflicht lässt er sich nicht ausschalten
-        r = self.c.post("/api/auth/2fa/ausschalten/", {"kennwort": "Ein-langes-neues-Kennwort-42",
+        r = self.c.post("/api/auth/2fa/ausschalten/", {"kennwort": "Ein-langes-neues-Passwort-42",
                                                        "code": r.json()["notfallcodes"][0]}, format="json")
         self.assertEqual(r.status_code, 403)
         texte = [e["beschreibung"] for e in a.get("/api/protokoll/?gruppe=benutzer").json()["results"]]
@@ -566,7 +566,7 @@ class ZweiterFaktorFreiwillig(TestCase):
 
     def test_konten_kachel_meldet_fehlenden_faktor_nur_bei_pflicht(self):
         self.anmelden(self.einmal)
-        self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Kennwort-42"}, format="json")
+        self.c.post("/api/auth/kennwort/", {"neu": "Ein-langes-neues-Passwort-42"}, format="json")
         a = client_fuer(self.admin)
         self.assertNotIn(self.user.id, [k["id"] for k in a.get("/api/benutzer/konten/").json()])
         Anmelderegeln.objects.update_or_create(pk=1, defaults={"zweiter_faktor": "alle"})
@@ -615,7 +615,7 @@ class OhneLoginUndTestbenutzer(TestCase):
         self.assertEqual(self.a.post(f"/api/benutzer/{self.user.id}/login-geben/", {"rolle": "mitarbeiter"}, format="json").status_code, 400)
         texte = [e["beschreibung"] for e in self.a.get("/api/protokoll/?gruppe=benutzer").json()["results"]]
         self.assertIn("Benutzer ehemalig auf „ohne Login“ gesetzt (keine Anmeldung, keine Rechte)", texte)
-        self.assertIn("Benutzer ehemalig erhält wieder einen Login (Mitarbeiter), Einmal-Kennwort erzeugt", texte)
+        self.assertIn("Benutzer ehemalig erhält wieder einen Login (Mitarbeiter), Einmal-Passwort erzeugt", texte)
 
     def test_ohne_login_anlegen(self):
         r = self.a.post("/api/benutzer/", {"username": "frueher", "first_name": "Frida", "last_name": "Früher",
