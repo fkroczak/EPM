@@ -369,9 +369,9 @@ function Kopfzahl({ titel, wert, unter, hinweis }: { titel: string; wert: ReactN
   return (
     <div className="flex flex-col min-w-0" title={hinweis}>
       <span className="text-[0.75rem] gedaempft leading-tight">{titel}</span>
-      <span className="flex items-baseline gap-2 min-w-0 leading-snug">
-        <span className="text-base font-semibold shrink-0 max-w-full md:truncate">{wert}</span>
-        {unter ? <span className="text-[0.75rem] gedaempft min-w-0 md:truncate">{unter}</span> : null}
+      <span className="flex flex-wrap md:flex-nowrap items-baseline gap-x-2 min-w-0 leading-snug">
+        <span className="text-base font-semibold md:shrink-0 max-w-full md:truncate">{wert}</span>
+        {unter ? <span className="text-[0.75rem] gedaempft min-w-0 md:truncate max-md:[overflow-wrap:anywhere]">{unter}</span> : null}
       </span>
     </div>
   );
@@ -393,8 +393,11 @@ function Kopfangabe({ a }: { a: Angabe }) {
  * Kontakt – in einer Zeile, Versorgung und Hinweise in einer schmalen Zeile darunter. Telefon und Versicherung stehen
  * in „Personen und Anschrift“ der Übersicht. Rund 70 px statt vorher 170 px.
  */
-function KopfVoll({ angabe, unter, bearbeiten }: { angabe: Record<string, Angabe>; unter: Record<string, ReactNode>;
-  bearbeiten?: () => void }) {
+function KopfVoll({ angabe, unter, bearbeiten, mobil }: { angabe: Record<string, Angabe>; unter: Record<string, ReactNode>;
+  bearbeiten?: () => void; mobil?: boolean }) {
+  // Telefon: Versorgung und Hinweise auf Antippen – sonst schöbe der Kopf die Akte eine Bildschirmhöhe nach unten
+  // (Nickelallergie und Gewichtsverlust stehen als CAVE ohnehin beim Namen)
+  const [mehr, setMehr] = useState(false);
   return (
     <div className="border-t border-rand pt-2 pb-1.5 flex flex-col gap-1.5" data-testid="kennzahlen">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-6 gap-y-2">
@@ -407,7 +410,12 @@ function KopfVoll({ angabe, unter, bearbeiten }: { angabe: Record<string, Angabe
           <Kopfzahl titel="Letzter Kontakt" wert={angabe.kontakt.inhalt} unter={unter.kontakt} />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-fein pt-1.5 text-[0.8125rem] min-w-0">
+      {mobil ? (
+        <button type="button" className="self-start bg-transparent border-0 p-0 text-[0.8125rem] text-akzent-text cursor-pointer inline-flex items-center gap-1"
+          aria-expanded={mehr} onClick={() => setMehr(!mehr)} data-testid="kopf-mehr">
+          {mehr ? "Weniger anzeigen" : "Versorgung und Hinweise"}<Icon name={mehr ? "hoch" : "runter"} groesse={14} /></button>
+      ) : null}
+      <div className={cx("flex-wrap items-center gap-x-6 gap-y-1 border-t border-fein pt-1.5 text-[0.8125rem] min-w-0", mobil && !mehr ? "hidden" : "flex")}>
         <div role="group" aria-label="Versorgung" className="flex flex-wrap items-center gap-x-4 gap-y-1 min-w-0">
           <span className="sr-only">Versorgung:</span>
           {[angabe.versorger, angabe.ansprechpartner, angabe.hausarzt, angabe.katheter].map((a) => <Kopfangabe key={a.titel} a={a} />)}
@@ -907,7 +915,7 @@ export function Akte() {
           {aktionen(!fhd)}
         </div>
         {k && stufe === "voll" && angabe ? (
-          <KopfVoll angabe={angabe} bearbeiten={kontext.bearbeiten ? () => setDialog("stammdaten") : undefined} unter={{
+          <KopfVoll angabe={angabe} mobil={mobil} bearbeiten={kontext.bearbeiten ? () => setDialog("stammdaten") : undefined} unter={{
             gewicht: k.bmi != null || k.gewicht ? <>{k.bmi != null ? <><Begriff name="bmi">BMI</Begriff> {zahl(k.bmi, 1)}</> : null}
               {k.bmi != null && k.gewicht ? " · " : null}{k.gewicht ? `gemessen ${datum(k.gewicht.am)}` : null}</> : undefined,
             plan: k.aktueller_plan ? `gültig ab ${datum(k.aktueller_plan.gueltig_ab)}` : undefined,
