@@ -9,7 +9,7 @@
  */
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { KENNWORT, OHNE_ANMELDUNG, anmeldenUI, naechsterNotfallcode } from "./hilfen";
+import { KENNWORT, OHNE_ANMELDUNG, adminNavigation, anmeldenUI, naechsterNotfallcode } from "./hilfen";
 
 test.describe.configure({ mode: "serial" });
 // beim manuellen Start des Workflows folgen Bildschirmfotos mit Musterdaten (.github/workflows/backend.yml)
@@ -28,7 +28,7 @@ test("Testphase: Menüpunkt „Import“ ausblenden und wieder einblenden; Muste
   await anmelden(page);
   await page.goto("/admin/system");
   const karte = page.getByTestId("golive-karte");
-  const nav = page.getByRole("navigation", { name: "Administration" });
+  const nav = await adminNavigation(page);
   await expect(nav.getByRole("link", { name: "Import" })).toBeVisible();
   const import_aus = karte.getByRole("checkbox", { name: /Menüpunkt „Import“ ausblenden/ });
   await expect(import_aus).not.toBeChecked();

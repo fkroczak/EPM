@@ -3,13 +3,13 @@
  * (in CI im Probelauf), Tätigkeiten für Server und EPM, Bestätigung mit Passwort + 2FA, Hinweis an alle Benutzer.
  */
 import { expect, test } from "@playwright/test";
-import { KENNWORT, merken, naechsterNotfallcode, zustand } from "./hilfen";
+import { KENNWORT, adminNavigation, merken, naechsterNotfallcode, zustand } from "./hilfen";
 
 test.use({ storageState: zustand("admin") });
 
 test("System: Standard nur Admin, Vertretung je Gruppe freischaltbar und wieder zurücknehmbar", async ({ page, browser }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "System" }).click();
+  await (await adminNavigation(page)).getByRole("link", { name: "System" }).click();
   await expect(page.getByRole("heading", { name: "System", level: 1 })).toBeVisible();
   // Standard: nur Admin; für eine Urlaubsvertretung je Gruppe freischaltbar (Festlegung 02.10.2026)
   await page.goto("/admin/benutzer");
@@ -35,7 +35,7 @@ test("System: Standard nur Admin, Vertretung je Gruppe freischaltbar und wieder 
   const ctx = await browser.newContext({ storageState: zustand("mediziner"), ignoreHTTPSErrors: true });
   const p = await ctx.newPage();
   await p.goto("/");
-  await p.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "System" }).click();
+  await (await adminNavigation(p)).getByRole("link", { name: "System" }).click();
   await expect(p.getByRole("heading", { name: "System", level: 1 })).toBeVisible();
   await expect(p.getByTestId("taetigkeiten")).toBeVisible();
   await mediziner.uncheck();

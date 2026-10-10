@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, request, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { BASIS, KENNWORT, anmeldenUI, apiAls, eindeutig, naechsterNotfallcode, zustand } from "./hilfen";
+import { BASIS, KENNWORT, adminNavigation, anmeldenUI, apiAls, eindeutig, naechsterNotfallcode, zustand } from "./hilfen";
 
 test.describe.configure({ mode: "serial" });
 test.use({ storageState: zustand("admin") });
@@ -86,7 +86,7 @@ test("Backup: nur mit Recht „Sicherungen verwalten“; Sicherungs-Passwort fes
   }
 
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Backup" }).click();
+  await (await adminNavigation(page)).getByRole("link", { name: "Backup" }).click();
   await expect(page.getByRole("heading", { name: "Backup und Wiederherstellung", level: 1 })).toBeVisible();
   await expect(page.getByTestId("agent-fehlt")).toHaveCount(0);
   const karte = page.getByTestId("verschluesselung");

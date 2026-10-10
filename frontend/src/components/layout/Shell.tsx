@@ -77,6 +77,8 @@ function Person({ v }: { v: boolean }) {
   );
 }
 
+const ADMIN_OFFEN = "epm.navigation.administration";
+
 function Seitenleiste({ schublade }: { schublade?: boolean }) {
   const ich = useIch();
   const { abmelden, darf } = useAuth();
@@ -92,6 +94,16 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
     darf("altdaten_importieren") && !ich.import_ausgeblendet ? <NavEintrag key="i" zu="/admin/import" icon="hochladen" text="Import" /> : null,
   ].filter(Boolean);
   const v = !!schublade;
+  // Administration aufgeklappt: gemerkt je Browser; auf einer Seite der Administration immer offen
+  const { pathname } = useLocation();
+  const [adminGemerkt, setAdminGemerkt] = useState(() => {
+    try { return window.localStorage.getItem(ADMIN_OFFEN) === "1"; } catch { return false; }
+  });
+  const adminOffen = adminGemerkt || pathname.startsWith("/admin");
+  const adminUmschalten = (offen: boolean) => {
+    setAdminGemerkt(offen);
+    try { window.localStorage.setItem(ADMIN_OFFEN, offen ? "1" : "0"); } catch { /* ohne Speicher: nur für diese Sitzung */ }
+  };
   return (
     <Voll.Provider value={v}>
     <aside className={cx("shrink-0 bg-flaeche border-r border-rand flex flex-col py-4 gap-5 nicht-drucken overflow-y-auto",
@@ -118,9 +130,22 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
       </nav>
       {admin.length ? (
         <nav aria-label="Administration" className="flex flex-col gap-0.5">
-          <div className={cx("px-2 h-8 items-center text-xs font-medium gedaempft", v ? "flex" : "hidden hd:flex")}>Administration</div>
-          {v ? null : <div className="hd:hidden border-t border-rand my-1" aria-hidden="true" />}
-          {admin}
+          {/* Wer viele Verwaltungsseiten hat (Praxismanagement), sieht sie als eine Gruppe zum Aufklappen – die
+              tägliche Arbeit steht oben ohne Ablenkung (Wunsch 10.10.2026, F181). Bis zu zwei Punkte (Vorlagen,
+              Audit-Log) bleiben offen; in der Schublade am Telefon und auf Seiten der Administration ist sie offen. */}
+          {!v && admin.length > 2 ? (
+            <button type="button" className={cx("nav nav-symbol hd:!justify-start border-0 bg-transparent cursor-pointer w-full", adminOffen && "text-tinte")}
+              aria-expanded={adminOffen} title={adminOffen ? "Administration einklappen" : `Administration (${admin.length} Seiten)`}
+              onClick={() => adminUmschalten(!adminOffen)} data-testid="nav-administration">
+              <Icon name="zahnrad" groesse={18} />
+              <span className="sr-only hd:not-sr-only">Administration</span>
+              <span className="hidden hd:inline-flex ml-auto gedaempft" aria-hidden="true"><Icon name={adminOffen ? "hoch" : "runter"} groesse={14} /></span>
+            </button>
+          ) : <>
+            <div className={cx("px-2 h-8 items-center text-xs font-medium gedaempft", v ? "flex" : "hidden hd:flex")}>Administration</div>
+            {v ? null : <div className="hd:hidden border-t border-rand my-1" aria-hidden="true" />}
+          </>}
+          {v || admin.length <= 2 || adminOffen ? <div className={cx("flex flex-col gap-0.5", !v && admin.length > 2 && "hd:pl-2")}>{admin}</div> : null}
         </nav>
       ) : null}
       {/* Unten links nur die angemeldete Person (Wunsch 08.10.2026); Hilfe, Design, Mein Konto und Abmelden per Klick als Menü (Design seit 09.10.2026 eigener Punkt).

@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import { KENNWORT, apiAls, einfachePdf, merken, naechsterNotfallcode, zustand } from "./hilfen";
+import { KENNWORT, adminNavigation, apiAls, einfachePdf, merken, naechsterNotfallcode, zustand } from "./hilfen";
 
 test.use({ storageState: zustand("admin") });
 
@@ -60,7 +60,7 @@ test.afterAll(async () => {
 
 test("Import: nur für Admin – Menü, Seite und Recht nur für die Rolle Admin", async ({ page, browser }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Import" }).click();
+  await (await adminNavigation(page)).getByRole("link", { name: "Import" }).click();
   await expect(page.getByRole("heading", { name: "Import", level: 1 })).toBeVisible();
   await expect(page.getByTestId("import-status")).toHaveText("kein Dump geladen");
   await expect(page.getByTestId("echte-akten")).toHaveCount(0);

@@ -1,6 +1,6 @@
 /** Entwürfe 17, 18, 20 · Administration: Benutzer, Rechte je Gruppe, Vorlagen, Audit-Log; Zugriff nur mit Recht. */
 import { expect, test } from "@playwright/test";
-import { BASIS, OHNE_ANMELDUNG, apiAls, eindeutig, merken, neuesKonto, sitzungGilt, zustand } from "./hilfen";
+import { BASIS, OHNE_ANMELDUNG, adminNavigation, apiAls, eindeutig, merken, neuesKonto, sitzungGilt, zustand } from "./hilfen";
 import { request } from "@playwright/test";
 
 test.use({ storageState: zustand("admin") });
@@ -14,7 +14,7 @@ const SVG_SKRIPT = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="6
 test("Benutzer anlegen, Einmal-Kennwort, sperren und entsperren", async ({ page }) => {
   const name = eindeutig("e2e.neu");
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Benutzer" }).click();
+  await (await adminNavigation(page)).getByRole("link", { name: "Benutzer" }).click();
   await page.getByRole("button", { name: "Benutzer anlegen" }).click();
   const detail = page.getByTestId("benutzer-detail");
   await detail.getByLabel("Titel").selectOption("Dr. med.");
@@ -74,7 +74,7 @@ test("Benutzer anlegen, Einmal-Kennwort, sperren und entsperren", async ({ page 
   expect(zweites).not.toBe(einmal);
 
   // Audit-Log: Benutzer angelegt und gesperrt
-  await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Audit-Log" }).click();
+  await (await adminNavigation(page)).getByRole("link", { name: "Audit-Log" }).click();
   await page.getByRole("button", { name: "Benutzer", exact: true }).click();
   const log = page.getByTestId("auditlog");
   await expect(log).toContainText(name);

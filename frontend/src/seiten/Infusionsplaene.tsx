@@ -6,16 +6,18 @@ import { Begriff } from "@/components/ui/Begriff";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { abfrage, api } from "@/lib/api";
+import { abfrage, api, apiDatei } from "@/lib/api";
 import type { Seite as ApiSeite } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { datum, nummer, zahl } from "@/lib/format";
-import { useMobil } from "@/lib/stufen";
+import { ab, useMobil, useStufe } from "@/lib/stufen";
 import type { PatientZeile, Plan } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Chip, Eingabe, Fehleranzeige, Karte, Knopf, KnopfLink, Laden, Leer, Meldung, Segmente, Seitenkopf } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { PatientWahl } from "@/components/PatientWahl";
+import { PdfLeser } from "@/components/PdfAnsicht";
+import { PdfDialog } from "@/components/PdfDialog";
 import { PlanPdfDialog } from "./akte/Plaene";
 
 type Gruppe = "entwuerfe" | "aktuell" | "alt" | "abgeloest" | "alle";
@@ -73,6 +75,41 @@ function NeuerPlanDialog({ offen, onOffen }: { offen: boolean; onOffen: (o: bool
   );
 }
 
+/**
+ * PDF eines Plans neben der Liste (ab 1920 px; Wunsch 10.10.2026: „PDFs einfach einsehbar“): freigegeben = gespeicherte
+ * PDF mit Prüfsumme, Entwurf = Ansicht mit der aktiven Dokumentvorlage (Wasserzeichen „ENTWURF“).
+ */
+function PdfSeitlich({ z, onZu }: { z: Zeile; onZu: () => void }) {
+  const original = z.pdf;
+  const datei = useQuery({
+    queryKey: ["plan", z.id, original ? "pdf" : "ansicht", z.status],
+    queryFn: () => apiDatei(original ? `infusionsplaene/${z.id}/pdf/` : `infusionsplaene/${z.id}/ansicht/`),
+    staleTime: 0,
+    gcTime: 0,
+  });
+  const pruefung = datei.data?.kopf.get("X-EPM-Pruefung");
+  return (
+    <Karte className="px-4 py-3.5 flex flex-col gap-2 min-w-0 sticky top-4 h-[calc(100vh-7.5rem)] min-h-[30rem]" data-testid="plan-pdf-seitlich">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col min-w-0">
+          <span className="font-semibold truncate">{z.name}</span>
+          <span className="text-[0.8125rem] gedaempft">gültig ab {datum(z.gueltig_ab)} · {original
+            ? pruefung === "ok" ? "gespeicherte PDF, Prüfsumme stimmt" : pruefung ? "Prüfsumme weicht ab – bitte die Administration informieren" : "gespeicherte PDF"
+            : "Ansicht mit der aktiven Dokumentvorlage"}</span>
+        </div>
+        <span className="flex gap-1.5 shrink-0">
+          <KnopfLink klein to={`/patienten/${z.patient}/plaene?plan=${z.id}`}>Öffnen</KnopfLink>
+          <Knopf klein variante="geist" icon="x" aria-label="PDF schließen" onClick={onZu} />
+        </span>
+      </div>
+      <Fehleranzeige fehler={datei.error} />
+      {datei.isLoading ? <Laden text="PDF wird geladen …" /> : datei.data ? (
+        <PdfLeser url={`seitlich-${z.id}-${datei.dataUpdatedAt}`} einpassen laden={() => Promise.resolve(datei.data!.daten)} className="flex-1" />
+      ) : null}
+    </Karte>
+  );
+}
+
 export function Infusionsplaene() {
   const { darf } = useAuth();
   const [params, setParams] = useSearchParams();
@@ -95,6 +132,7 @@ export function Infusionsplaene() {
   const zeilen = daten.data?.ergebnisse ?? [];
   const anzahl = (g: Gruppe) => <span className="num opacity-70">{z ? z[g] : "…"}</span>;
   const mobil = useMobil();
+  const seitlich = ab(useStufe(), "fhd");
   const infusion = (p: Zeile) => [p.laufzeit_h ? `${zahl(p.laufzeit_h)} h` : null, p.rate_ml_h ? `${zahl(p.rate_ml_h)} ml/h` : null,
     p.tage_pro_woche ? `${p.tage_pro_woche}×/Woche` : null].filter(Boolean).join(" · ");
   return (
@@ -141,12 +179,13 @@ export function Infusionsplaene() {
                     {p.ist_test ? " · Testpatient" : ""}{p.patient_abgeschlossen ? " · Akte abgeschlossen" : ""}
                   </span>
                 </Link>
-                {p.pdf ? <div className="px-3.5 pb-3"><Knopf klein icon="dokument" onClick={() => setPdf(p)} aria-label={`PDF des Plans von ${p.name}`}>PDF</Knopf></div> : <span className="pb-1" />}
+                <div className="px-3.5 pb-3"><Knopf klein icon="dokument" onClick={() => setPdf(p)} aria-label={`PDF des Plans von ${p.name}`}>PDF</Knopf></div>
               </div>
             ))}
           </div>
         )
-      ) : <Karte className="overflow-x-auto">
+      ) : <div className={seitlich && pdf ? "grid grid-cols-[minmax(0,1fr)_minmax(24rem,0.55fr)] gap-[var(--abstand)] items-start" : "contents"}>
+      <Karte className="overflow-x-auto">
         {daten.isLoading ? <Laden /> : zeilen.length === 0 ? <Leer>Keine Pläne in dieser Auswahl.</Leer> : (
           <table className="tabelle" data-testid="plan-uebersicht">
             <thead>
@@ -177,7 +216,8 @@ export function Infusionsplaene() {
                     : p.herkunft === "altsystem" ? <span className="gedaempft">aus dem Altsystem</span> : "—"}</td>
                   <td className="td">
                     <div className="flex gap-1.5 justify-end">
-                      {p.pdf ? <Knopf klein icon="dokument" onClick={() => setPdf(p)} aria-label={`PDF des Plans von ${p.name}`}>PDF</Knopf> : null}
+                      <Knopf klein icon="dokument" variante={pdf?.id === p.id && seitlich ? "pri" : undefined} onClick={() => setPdf(p)}
+                        aria-label={`PDF des Plans von ${p.name}`} title={p.pdf ? "Gespeicherte PDF ansehen" : "Ansicht mit der aktiven Dokumentvorlage"}>PDF</Knopf>
                       <KnopfLink klein to={`/patienten/${p.patient}/plaene?plan=${p.id}`} aria-label={`Plan von ${p.name} öffnen`}>Öffnen</KnopfLink>
                     </div>
                   </td>
@@ -186,11 +226,15 @@ export function Infusionsplaene() {
             </tbody>
           </table>
         )}
-      </Karte>}
+      </Karte>
+      {seitlich && pdf ? <PdfSeitlich key={pdf.id} z={pdf} onZu={() => setPdf(null)} /> : null}
+      </div>}
       {zeilen.length >= 1000 ? <span className="text-xs gedaempft">Die ersten 1.000 Pläne – bitte die Suche eingrenzen.</span> : null}
       {anlegen ? <NeuerPlanDialog offen={neu} onOffen={setNeu} /> : null}
-      {pdf ? <PlanPdfDialog plan={{ id: pdf.id, gueltig_ab: pdf.gueltig_ab, pdf_sha256: pdf.pdf_sha256 ?? "" }} offen
+      {pdf && !seitlich && pdf.pdf ? <PlanPdfDialog plan={{ id: pdf.id, gueltig_ab: pdf.gueltig_ab, pdf_sha256: pdf.pdf_sha256 ?? "" }} offen
         onOffen={(o) => { if (!o) setPdf(null); }} /> : null}
+      {pdf && !seitlich && !pdf.pdf ? <PdfDialog offen onOffen={(o) => { if (!o) setPdf(null); }} titel={`Infusionsplan ${pdf.name} · gültig ab ${datum(pdf.gueltig_ab)}`}
+        pfad={`infusionsplaene/${pdf.id}/ansicht/`} dateiname={`Infusionsplan-${pdf.nummer}-Ansicht.pdf`} /> : null}
     </Seite>
   );
 }
