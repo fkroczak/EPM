@@ -55,10 +55,11 @@ export function Dialog({ offen, onOffen, titel, beschreibung, children, fuss, br
 
 export type MenuEintrag = { text: ReactNode; onClick: () => void; gefaehrlich?: boolean; aus?: boolean; hinweis?: string };
 
+/** Menü hinter „⋯“; der Name erscheint zusätzlich als Tooltip (Bedienung für Pflegekräfte, 10.10.2026). */
 export function Menue({ label, eintraege, ausloeser }: { label: string; eintraege: MenuEintrag[]; ausloeser?: ReactNode }) {
   return (
     <BaseMenu.Root>
-      <BaseMenu.Trigger className="btn sec icon" aria-label={label}>
+      <BaseMenu.Trigger className="btn sec icon" aria-label={label} title={label}>
         {ausloeser ?? <Icon name="mehr" />}
       </BaseMenu.Trigger>
       <BaseMenu.Portal>

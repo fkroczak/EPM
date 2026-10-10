@@ -51,7 +51,29 @@ const MELDUNGEN: Record<number, string> = {
   404: "Nicht gefunden.",
   409: "Die Akte ist abgeschlossen und kann nicht mehr geändert werden.",
   429: "Zu viele Versuche. Bitte kurz warten.",
+  // mit Lösungsweg statt nur einer Nummer (Bedienung für Pflegekräfte, 10.10.2026)
+  413: "Die Datei ist zu groß. Bitte eine kleinere Datei wählen (höchstens 50 MB) oder das Dokument in Teilen scannen.",
+  500: "Auf dem Server ist ein Fehler aufgetreten. Bitte noch einmal versuchen; tritt er wieder auf, der Administration "
+    + "Bescheid geben (Uhrzeit und was gerade gemacht wurde).",
+  502: "EPM ist gerade nicht erreichbar – vermutlich wird es neu gestartet oder aktualisiert. Bitte in ein paar Minuten "
+    + "noch einmal versuchen.",
+  503: "EPM ist gerade nicht erreichbar – vermutlich wird es neu gestartet oder aktualisiert. Bitte in ein paar Minuten "
+    + "noch einmal versuchen.",
+  504: "Der Server hat zu lange nicht geantwortet. Bitte noch einmal versuchen; Eingaben vorher nicht verwerfen.",
 };
+
+/** Keine Antwort vom Server (Netz, VPN, Server aus): verständlicher Text statt der englischen Browsermeldung */
+export const KEINE_VERBINDUNG = "Keine Verbindung zu EPM. Bitte Netzwerk bzw. VPN prüfen und es gleich noch einmal versuchen – "
+  + "die Eingaben bleiben stehen.";
+
+async function holen(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
+    throw new ApiFehler(0, KEINE_VERBINDUNG, null, {});
+  }
+}
 
 export const ABGEMELDET = "epm:abgemeldet";
 /** Rechte haben sich geändert (Kopf ``X-EPM-Rechte`` anders als bisher oder Anfrage wegen fehlenden Rechts abgelehnt):
@@ -112,7 +134,7 @@ export async function api<T = unknown>(pfad: string, opt: Optionen = {}): Promis
   const ende = anfrageBeginnt();   // Ladebalken am oberen Rand (F124)
   let antwort: Response;
   try {
-    antwort = await fetch(url, { method, headers, body, credentials: "same-origin", signal: opt.signal });
+    antwort = await holen(url, { method, headers, body, credentials: "same-origin", signal: opt.signal });
   } finally {
     ende();
   }
@@ -160,7 +182,7 @@ export async function apiDatei(pfad: string, opt: Optionen = {}): Promise<{ date
   const ende = anfrageBeginnt();   // Ladebalken am oberen Rand (F124)
   let antwort: Response;
   try {
-    antwort = await fetch(url, { method, headers, body, credentials: "same-origin", signal: opt.signal });
+    antwort = await holen(url, { method, headers, body, credentials: "same-origin", signal: opt.signal });
   } finally {
     ende();
   }

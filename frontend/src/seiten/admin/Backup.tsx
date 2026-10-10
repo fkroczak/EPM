@@ -580,7 +580,7 @@ function HochladenDialog({ offen, daten, onZu }: { offen: boolean; daten: Daten;
           const erhalten = e instanceof ApiFehler && e.status === 409 ? (e.daten as { erhalten?: number } | null)?.erhalten : undefined;
           if (typeof erhalten === "number") { versatz = erhalten; continue; }
           // Netz kurz weg: einige Male mit Pause wiederholen, dann aufgeben (Fortsetzen bleibt möglich)
-          if (e instanceof ApiFehler || ++versuche > 5) throw e;
+          if ((e instanceof ApiFehler && e.status !== 0) || ++versuche > 5) throw e;
           await warten(1500 * versuche);
         }
         setStand({ phase: "laden", erhalten: versatz, upload });

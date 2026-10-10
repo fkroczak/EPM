@@ -15,7 +15,7 @@ import { ApiFehler, abfrage, alle, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useIch } from "@/lib/auth";
 import { useAuswahl, useEinstellungen } from "@/lib/daten";
-import { datum, eingabeDatum, eingabeZahl, heuteIso, inMonaten, inTagen, kg, prozent, terminZeit, uhrzeit, vorZeit,
+import { datum, eingabeDatum, eingabeUhrzeit, eingabeZahl, heuteIso, inMonaten, inTagen, kg, prozent, terminZeit, uhrzeit, vorZeit,
   zahl } from "@/lib/format";
 import { GEWICHTSQUELLEN, TERMINARTEN } from "@/lib/typen";
 import type { Gewicht, Kontakt, Patient, PatientZeile } from "@/lib/typen";
@@ -217,8 +217,9 @@ export function KontaktDialog({ offen, onOffen, vorgabe, text: textVorgabe }: {
       if (!kontakt) {
         const fehler: Feldfehler = {};
         const isoTag = eingabeDatum(tag);
-        if (!isoTag) fehler.zeitpunkt = "Datum als TT.MM.JJJJ eingeben.";
-        if (!/^\d{1,2}:\d{2}$/.test(uhr.trim())) fehler.zeitpunkt = "Uhrzeit als HH:MM eingeben.";
+        if (!isoTag) fehler.zeitpunkt = "Datum bitte so eingeben: 14.03.2026 (oder „heute“).";
+        const uhrText = eingabeUhrzeit(uhr);
+        if (!uhrText) fehler.uhrzeit = "Uhrzeit bitte so eingeben: 10:30 (oder 1030).";
         let wiedervorlage: Record<string, unknown> | null = null;
         if (mitTermin) {
           const isoFaellig = eingabeDatum(faellig);
@@ -233,8 +234,7 @@ export function KontaktDialog({ offen, onOffen, vorgabe, text: textVorgabe }: {
         }
         setLokal(fehler);
         if (Object.keys(fehler).length) throw new ApiFehler(400, "", null, fehler);
-        const [h, m] = uhr.trim().split(":").map(Number);
-        const zeitpunkt = new Date(`${isoTag}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`).toISOString();
+        const zeitpunkt = new Date(`${isoTag}T${uhrText}:00`).toISOString();
         kontakt = await api<Kontakt>("kontakte/", { body: { patient: pid, text, zeitpunkt, art: kontaktart ? Number(kontaktart) : null,
           wiedervorlage } });
         setGespeichert(kontakt);
@@ -266,7 +266,10 @@ export function KontaktDialog({ offen, onOffen, vorgabe, text: textVorgabe }: {
     <Dialog offen={offen} onOffen={onOffen} titel="Kontakt erfassen" breite={720}
       beschreibung="Telefonat, E-Mail oder Gespräch festhalten. Nach dem Speichern nicht mehr änderbar, nur stornierbar."
       fuss={<>
-        <span className="mr-auto self-center text-[0.8125rem] gedaempft">Erfasst von {ich.anzeigename} · steht danach im Verlauf der Akte</span>
+        {/* Warum „Speichern“ noch nicht geht, steht gleich daneben (Bedienung für Pflegekräfte, 10.10.2026) */}
+        <span className="mr-auto self-center text-[0.8125rem] gedaempft" data-testid="kontakt-fuss">
+          {!pid ? "Zuerst den Patienten wählen." : !gespeichert && !text ? "Zum Speichern bitte eine Notiz schreiben."
+            : `Erfasst von ${ich.anzeigename} · steht danach im Verlauf der Akte`}</span>
         <Knopf onClick={() => onOffen(false)}>{gespeichert ? "Schließen" : "Abbrechen"}</Knopf>
         <Knopf variante="pri" icon="haken" laedt={speichern.isPending} disabled={!pid || (!gespeichert && !text)}
           onClick={() => speichern.mutate()}>{nurGewichtOffen ? "Gewicht speichern" : "Speichern"}</Knopf>
@@ -291,7 +294,7 @@ export function KontaktDialog({ offen, onOffen, vorgabe, text: textVorgabe }: {
           <>
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] gap-3 items-end">
               <Feld label="Datum" fehler={f.zeitpunkt}>{(p) => <Eingabe {...p} className="num" value={tag} onChange={(e) => setTag(e.target.value)} />}</Feld>
-              <Feld label="Uhrzeit" hinweis="vorbelegt mit jetzt">{(p) => <Eingabe {...p} className="num" value={uhr} onChange={(e) => setUhr(e.target.value)} />}</Feld>
+              <Feld label="Uhrzeit" hinweis="vorbelegt mit jetzt" fehler={f.uhrzeit}>{(p) => <Eingabe {...p} className="num" value={uhr} onChange={(e) => setUhr(e.target.value)} />}</Feld>
               {/* Kontaktart seit 03.10.2026 sichtbar (Klärung U6) */}
               <Feld label="Kontaktart" fehler={f.art}>
                 {(p) => (

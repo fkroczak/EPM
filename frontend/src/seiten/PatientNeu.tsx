@@ -1,5 +1,5 @@
 /** Entwurf 12 · Neuer Patient: Grunddaten, Doppelungsprüfung, Gewicht bei Aufnahme als erste Messung. */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, Navigate, useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,6 +13,7 @@ import type { Patient, PatientZeile } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Eingabe, Feld, Karte, Knopf, KnopfLink, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
+import { useHinweis } from "@/components/ui/hinweise";
 import { NeuerArztDialog, NeuerVersorgerDialog } from "@/components/SchnellAnlegen";
 
 type Formular = {
@@ -67,6 +68,8 @@ export function PatientNeu() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { darf } = useAuth();
+  const melden = useHinweis();
+  const formular = useRef<HTMLFormElement>(null);
   const setze = (feld: keyof Formular) => (e: { target: { value: string } }) => setF((alt) => ({ ...alt, [feld]: e.target.value }));
 
   // Testpatient (Fehlerliste 02.10.2026, 6.4): Mitarbeiter und Mediziner können beim Anlegen einen Testpatienten wählen –
@@ -100,6 +103,7 @@ export function PatientNeu() {
     onSuccess: (p) => {
       void qc.invalidateQueries({ queryKey: ["patienten"] });
       void qc.invalidateQueries({ queryKey: ["startseite"] });
+      melden(`${p.nachname}, ${p.vorname} angelegt (Nr. ${nummer(p.nummer)}). Die Akte ist geöffnet.`);
       navigate(`/patienten/${p.id}`);
     },
   });
@@ -116,7 +120,15 @@ export function PatientNeu() {
     const gemessen = f.gemessen_am.trim() ? eingabeDatum(f.gemessen_am) : null;
     if (gewicht && f.gemessen_am.trim() && !gemessen) fehler.aufnahme_gemessen_am = "Bitte als TT.MM.JJJJ eingeben.";
     setLokal(fehler);
-    if (Object.keys(fehler).length) return;
+    if (Object.keys(fehler).length) {
+      // das erste fehlende Feld in den Blick holen – im langen Formular steht es sonst womöglich außerhalb des Bildschirms
+      window.setTimeout(() => {
+        const feld = formular.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
+        feld?.scrollIntoView({ block: "center", behavior: "smooth" });
+        feld?.focus({ preventScroll: true });
+      }, 0);
+      return;
+    }
     anlegen.mutate({
       nachname: f.nachname.trim(),
       vorname: f.vorname.trim(),
@@ -151,13 +163,14 @@ export function PatientNeu() {
   const server: Feldfehler = anlegen.error instanceof ApiFehler ? anlegen.error.felder : {};
   const e: Feldfehler = { ...server, ...lokal };
   const ohneFeld = anlegen.error && !Object.keys(server).length;
+  const fehlerzahl = Object.keys(e).length;
 
   // ohne Recht gibt es diese Seite nicht (Festlegung 01.10.2026: Nicht Erlaubtes wird nicht gezeigt)
   if (!darf("akten_bearbeiten")) return <Navigate to="/patienten" replace />;
 
   return (
     <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: "Neu" }]}>
-      <form className="stapel flex flex-col gap-5" noValidate onSubmit={(ev) => { ev.preventDefault(); absenden(); }}>
+      <form ref={formular} className="stapel flex flex-col gap-5" noValidate onSubmit={(ev) => { ev.preventDefault(); absenden(); }}>
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div className="flex flex-col gap-1">
             <span className="text-sm gedaempft"><Link to="/patienten" className="no-underline">Patienten</Link> / Neu</span>
@@ -180,6 +193,13 @@ export function PatientNeu() {
           </div>
         </div>
         {ohneFeld ? <Meldung art="fehler">{anlegen.error?.message}</Meldung> : null}
+        {/* Zusammenfassung oben: was fehlt, bevor angelegt werden kann (Bedienung für Pflegekräfte, 10.10.2026) */}
+        {fehlerzahl && !ohneFeld ? (
+          <Meldung art="fehler" className="text-sm">
+            Noch nicht angelegt: {fehlerzahl === 1 ? "Ein Feld ist" : `${fehlerzahl} Felder sind`} rot markiert. Bitte ergänzen bzw.
+            korrigieren und dann erneut „Anlegen und Akte öffnen“ wählen.
+          </Meldung>
+        ) : null}
 
         <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
           <div className="flex flex-col gap-4 min-w-0">

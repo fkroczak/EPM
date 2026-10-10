@@ -110,11 +110,21 @@ export function langesDatum(d = new Date()): string {
   return d.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: TZ });
 }
 
-/** Eingabe „14.03.1968“ oder „1968-03-14“ → „1968-03-14“ (sonst null) */
+/**
+ * Eingabe „14.03.1968“ oder „1968-03-14“ → „1968-03-14“ (sonst null).
+ * Nachsichtig wie auf Papier (Bedienung für Pflegekräfte, 10.10.2026): auch „14,3,68“ (Komma vom Ziffernblock),
+ * „14/3/1968“, „14-3-1968“, „14 3 1968“, nur Ziffern „14031968“ bzw. „140368“ und die Wörter „heute“ und „gestern“.
+ */
 export function eingabeDatum(text: string): string | null {
-  const t = text.trim();
+  const t = text.trim().toLowerCase();
   if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
-  const m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/);
+  if (t === "heute" || t === "gestern") {
+    const d = new Date();
+    if (t === "gestern") d.setDate(d.getDate() - 1);
+    return tagesSchluessel(d);
+  }
+  const m = t.match(/^(\d{1,2})\s*[.,/\- ]\s*(\d{1,2})\s*[.,/\- ]\s*(\d{2}|\d{4})\.?$/)
+    ?? t.match(/^(\d{2})(\d{2})(\d{4}|\d{2})$/);
   if (!m) return null;
   let jahr = Number(m[3]);
   if (m[3].length === 2) jahr += jahr > Number(String(new Date().getFullYear()).slice(2)) ? 1900 : 2000;
@@ -122,6 +132,16 @@ export function eingabeDatum(text: string): string | null {
   const d = new Date(jahr, monat - 1, tag);
   if (d.getFullYear() !== jahr || d.getMonth() !== monat - 1 || d.getDate() !== tag) return null;
   return `${jahr}-${String(monat).padStart(2, "0")}-${String(tag).padStart(2, "0")}`;
+}
+
+/** Uhrzeit „10:30“, auch „10.30“, „10,30“, „1030“, „930“ oder nur „10“ → „10:30“ bzw. „10:00“ (sonst null) */
+export function eingabeUhrzeit(text: string): string | null {
+  const t = text.trim().replace(/\s*uhr$/i, "");
+  const m = t.match(/^(\d{1,2})(?:\s*[:.,h]\s*(\d{2}))?$/) ?? t.match(/^(\d{1,2})(\d{2})$/);
+  if (!m) return null;
+  const h = Number(m[1]), min = Number(m[2] ?? "0");
+  if (h > 23 || min > 59) return null;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
 /** Dezimaleingabe mit Komma → Zahl als String für die API („54,6“ → „54.6“) */
