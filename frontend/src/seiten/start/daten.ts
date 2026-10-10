@@ -35,6 +35,9 @@ export type Startdaten = {
   /** S01 */
   zahlen: { in_betreuung: number; mit_offenem_termin: number; termine_7_tage: number; praxistermine_7_tage: number;
     termine_ueberfaellig: number; kontakt_ueberfaellig: number; kontakt_bald: number };
+  /** F177: „Praxis … informieren“ vor dem nächsten Zeitraum (nur mit „Einträge erfassen“, bis ein Infoblatt erstellt ist) */
+  infoblatt?: { von: string; bis: string; rhythmus: "woche" | "monat"; anzahl: number; ohne_ort: number;
+    ort: { id: number; wert: string } | null } | null;
   /** S08 */
   notfallcodes: { uebrig: number; gesamt: number; eingerichtet: boolean; warnen_ab: number };
   /** O-07: Zustand der Sicherungen (vom Systemagenten), für alle sichtbar */

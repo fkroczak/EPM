@@ -596,13 +596,18 @@ def tabellenzeilen(art: str, quelle: str, k: Kontext) -> list[list[str]]:
     return []
 
 
+def ist_telefonort(ort) -> bool:
+    """Telefon- oder Videotermin? Erkannt am Namen des Terminorts („Telefon“, „Video“)."""
+    return ort is not None and any(w in str(ort).lower() for w in ("telefon", "video"))
+
+
 def ankuendigung_hinweis(t, terminort=None) -> str | None:
     """Hinweis zu einem Termin der Patientenankündigung (F173): ein abweichender Terminort – bei Telefon- oder
     Videoterminen mit der Telefonnummer der Akte – und der Freitext „bei/Ort“ (z. B. „1 h, Neuaufnahme“)."""
     teile = []
     if t.ort_id and (terminort is None or t.ort_id != terminort.pk):
         ort = str(t.ort)
-        if any(w in ort.lower() for w in ("telefon", "video")):
+        if ist_telefonort(ort):
             nummer = t.patient.telefon or t.patient.telefon2
             ort = f"{ort} {nummer}" if nummer else ort
         teile.append(ort)
