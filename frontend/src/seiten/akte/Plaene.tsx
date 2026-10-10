@@ -307,7 +307,7 @@ export function PlanPdfDialog({ plan, offen, onOffen }: { plan: Pick<Plan, "id" 
         <Fehleranzeige fehler={datei.error} />
         {pruefung === "ok" ? (
           <div className="meldung ok flex items-center gap-2 text-sm" data-testid="pdf-pruefung">
-            <Icon name="haken" />Prüfsumme stimmt: unverändert seit der Freigabe{version ? ` · Dokumentvorlage Version ${version}` : ""}.
+            <Icon name="haken" />Prüfsumme stimmt: unverändert seit der Freigabe{version ? ` · Dokumentvorlage Fassung ${version}` : ""}.
           </div>
         ) : pruefung ? (
           <Meldung art="fehler"><span data-testid="pdf-pruefung">Die gespeicherte PDF weicht von der Prüfsumme ab und wurde nach der Freigabe verändert. Bitte die Administration informieren.</span></Meldung>

@@ -130,7 +130,7 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   await editor.fill("Kurzdarmsyndrom nach Resektion");
   await diagnose.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Notizen gespeichert.")).toBeVisible();
-  await expect(diagnose).toContainText("Version 1");
+  await expect(diagnose).toContainText("Fassung 1");
 
   await diagnose.getByRole("button", { name: "Bearbeiten" }).click();
   await editor.click();
@@ -140,7 +140,7 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   await page.keyboard.type("Typ II");
   await diagnose.getByRole("button", { name: "Speichern" }).click();
   await expect(diagnose.locator(".richtext strong")).toHaveText("Typ II");
-  await expect(diagnose).toContainText("Version 2");
+  await expect(diagnose).toContainText("Fassung 2");
 
   // Therapie: eigener Reiter, links die Fassungen, rechts der Text; bei leerem Text ist der Editor direkt offen (F121/F122)
   await oeffnen(page, p.id, "/therapie");

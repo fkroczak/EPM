@@ -44,7 +44,7 @@ function FassungenDialog({ feld, offen, onOffen, gewaehlt, onWahl }: {
                   className={cx("w-full text-left rounded-lg border px-3 py-2 flex items-center justify-between gap-3 cursor-pointer",
                     an ? "border-akzent bg-akzent-weich" : "border-rand bg-flaeche hover:bg-fein")}>
                   <span className="flex flex-col">
-                    <span className="font-medium">Version {f.version}</span>
+                    <span className="font-medium">Fassung {f.version}</span>
                     <span className="text-[0.8125rem] gedaempft">{datum(f.zeitpunkt)}, {uhrzeit(f.zeitpunkt)} Uhr · {f.person ?? "—"}</span>
                   </span>
                   {f.version === aktuell ? <Chip art="ok">aktuell</Chip> : null}
@@ -71,7 +71,7 @@ function Dokument({ feld }: { feld: Textfeld }) {
       {alt ? (
         <Meldung art="info">
           <span className="flex items-center justify-between gap-3 flex-wrap">
-            Sie sehen Version {gewaehlt} – nur lesbar.
+            Sie sehen Fassung {gewaehlt} – nur lesbar.
             <Knopf klein onClick={() => setWahl("")}>Zur aktuellen Fassung</Knopf>
           </span>
         </Meldung>

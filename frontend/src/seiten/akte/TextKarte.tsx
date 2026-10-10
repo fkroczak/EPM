@@ -45,7 +45,7 @@ export function Textkopf({ feld, titel, aktiv, onWahl }: {
   return (
     <Eintrag aktiv={aktiv} onWahl={onWahl}
       datum={v ? datum(v.zeitpunkt) : "—"}
-      merkmal={v ? <span className="text-xs gedaempft">Version {v.version}</span> : null}
+      merkmal={v ? <span className="text-xs gedaempft">Fassung {v.version}</span> : null}
       zeile={titel ?? TITEL[feld]}
       unten={v ? (v.person ?? "") : "noch nicht bearbeitet"} />
   );
@@ -68,7 +68,7 @@ export function TextfassungsListe({ feld, gewaehlt, onWahl }: {
         <Eintrag key={f.version} aktiv={(gewaehlt ?? aktuell) === f.version} onWahl={() => onWahl(f.version)}
           datum={datum(f.zeitpunkt)}
           merkmal={f.version === aktuell ? <span className="text-xs gedaempft">aktuell</span> : null}
-          zeile={`Version ${f.version}`}
+          zeile={`Fassung ${f.version}`}
           unten={`${uhrzeit(f.zeitpunkt)} Uhr · ${f.person ?? "—"}`} />
       ))}
     </>
@@ -121,10 +121,10 @@ export function Textfassung({ feld, titel, hinweis, version, immerOffen, vorAkti
 
   return (
     <Detail testid={`karte-${feld}`}
-      titel={aktuell ? name : `${name} · Version ${version}`}
+      titel={aktuell ? name : `${name} · Fassung ${version}`}
       unter={aktuell
         ? (kopf
-          ? `Version ${kopf.version} · geändert ${zeitpunkt(kopf.zeitpunkt)}${kopf.person ? ` von ${kopf.person}` : ""}`
+          ? `Fassung ${kopf.version} · geändert ${zeitpunkt(kopf.zeitpunkt)}${kopf.person ? ` von ${kopf.person}` : ""}`
           : (hinweis ?? "Noch nicht bearbeitet"))
         : alt ? `gespeichert ${zeitpunkt(alt.zeitpunkt)}${alt.person ? ` von ${alt.person}` : ""} · nur lesbar` : "nur lesbar"}
       aktionen={<>
