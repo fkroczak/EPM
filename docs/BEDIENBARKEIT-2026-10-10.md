@@ -48,8 +48,8 @@ Schwere: **hoch** = hält die Arbeit auf oder führt zu Fehlern · **mittel** = 
 | Akte › Kontakte | „Ansprechp.“ abgekürzt | gering | nein – Empfehlung |
 | Akte nicht gefunden | Nur die Fehlermeldung, kein Weg zurück | gering | nein – Empfehlung |
 | Dialoge mit viel Inhalt | „Speichern“ steht unten außerhalb des Bildschirms (z. B. „Kontakt erfassen“ auf einem 900-px-Bildschirm) | mittel | nein – Empfehlung |
-| Ganze Anwendung | „Passwort“ und „Kennwort“ gemischt (Anmeldung/Konto: Passwort; Hilfe, Löschen, Benutzer: Kennwort) | gering | nein – Rückfrage |
-| Kopf der Akte | „BIA“, „Entwurf“, „Wiedervorlage“ | – | bewusst nicht geändert: Fachbegriffe der Praxis (Alice benutzt sie selbst) |
+| Ganze Anwendung | „Passwort“ und „Kennwort“ gemischt (Anmeldung/Konto: Passwort; Hilfe, Löschen, Benutzer: Kennwort) | gering | ja – Backend, Hilfe, Anmeldung; Administration und Akte folgen beim Abgleich |
+| Fachbegriffe | „BIA“, „Entwurf“, „Wiedervorlage“ ohne Erklärung | mittel | ja – Erklärung beim Draufzeigen (Baustein `Begriff`); Einbau in Akte, Administration und Infusionspläne folgt beim Abgleich |
 
 ## Was umgesetzt wurde (F178)
 
@@ -101,11 +101,18 @@ vollständigen Stack) sind hier nicht gelaufen – keine geänderte Beschriftung
 - **Klickflächen am Tablet:** Chips der Schnellfilter (30 px) und kleine Knöpfe (32 px) liegen unter den empfohlenen
   44 px; am Telefon ist das schon vergrößert, am Tablet im Querformat nicht.
 
-**Rückfragen an den Auftraggeber:**
+**Rückfragen an den Auftraggeber (beantwortet am 10.10.2026):**
 
-1. **„Passwort“ oder „Kennwort“?** Beides kommt vor. Vorschlag: überall „Passwort“ (so steht es auf der Anmeldeseite).
-   Betrifft auch Administration und Backend-Meldungen, daher nicht eigenmächtig.
-2. **Fachbegriffe** „BIA“, „Entwurf“ (Infusionsplan), „Wiedervorlage“, „stornieren“: bewusst stehen gelassen. Falls
-   neue Kolleginnen damit Mühe haben, könnte ein kurzer Tooltip je Begriff helfen – gewünscht?
-3. **Einweisung:** Eine einseitige Kurzanleitung zum Ausdrucken (die Inhalte von „Die wichtigsten Wege im Alltag“) –
-   gewünscht?
+1. **„Passwort“ oder „Kennwort“?** – **entschieden: ja, umgesetzt („Passwort“ überall).** Alle Meldungen und Texte
+   des Backends (Anmeldung, Konto, Bestätigungen, Audit-Texte, Hilfe, Befehle für die Einrichtung), die Anmeldung und
+   die Browsertests sagen „Passwort“. Feld- und Variablennamen, API-Felder, Modelle und Migrationen bleiben. Noch offen,
+   weil dort gerade umgebaut wird: Administration (Benutzer, System, Backup, Import), Akte (Löschen-Dialoge),
+   Startseite der Administration, Zugangsblatt (`backend/vorlagen/listen.py`) und die Bezeichnungen in
+   `audit/models.py` und `accounts/models.py` (brauchen eine Migration).
+2. **Fachbegriffe erklären?** – **entschieden: ja, umgesetzt.** Neuer Baustein `components/ui/Begriff.tsx`: gepunktet
+   unterstrichen, Erklärung bei Maus-Hover, Tastaturfokus und Antippen, für Screenreader per `aria-describedby`.
+   Die Texte stehen an einer Stelle in `lib/begriffe.ts`: BIA, Entwurf, BMI, PE (parenterale Ernährung), Wiedervorlage,
+   Wiedereinbestellung, GLIM, Testpatient, storniert. Eingebaut in Patientenliste (Entwurf, Testpatient),
+   „Kontakt erfassen“ (Wiedervorlage) und Scans (BIA); Akte, Infusionspläne, Startseite und Administration folgen beim
+   Abgleich.
+3. **Einweisung:** Eine einseitige Kurzanleitung zum Ausdrucken – **entschieden: nein.**

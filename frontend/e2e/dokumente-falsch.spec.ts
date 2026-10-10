@@ -71,7 +71,7 @@ test("Endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code und B
   await dialog.getByLabel("Code aus der Authenticator-App").fill(totpBase32(konto.geheim, Date.now() + 30_000));
   await dialog.getByLabel("Code abtippen").fill(code.toLowerCase());
   await dialog.getByRole("button", { name: "Endgültig löschen" }).click();
-  await expect(dialog).toContainText("Kennwort falsch.");
+  await expect(dialog).toContainText("Passwort falsch.");
   await dialog.getByLabel("Kennwort").fill(konto.kennwort);
   await dialog.getByLabel("Code aus der Authenticator-App").fill(totpBase32(konto.geheim, Date.now() + 30_000));
   await dialog.getByRole("button", { name: "Endgültig löschen" }).click();
@@ -88,7 +88,7 @@ test("Endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code und B
   await page.getByRole("button", { name: "Fehlversuch", exact: true }).click();
   const log = page.getByTestId("auditlog");
   await expect(log).toContainText(/Dokument Nr\. \d+ \(SHA-256 [0-9a-f]{8}…\) aus .+ endgültig gelöscht – Datei, Titel und Inhalt entfernt \(Art\. 17 DSGVO\), Grund: Dokument eines fremden Patienten/);
-  await expect(log).toContainText(/Löschen von Dokument Nr\. \d+ \(SHA-256 [0-9a-f]{8}…\) abgelehnt: Kennwort falsch\./);
+  await expect(log).toContainText(/Löschen von Dokument Nr\. \d+ \(SHA-256 [0-9a-f]{8}…\) abgelehnt: Passwort falsch\./);
   await expect(log).not.toContainText("Fremdes Dokument");
   const protokoll = await api.get("protokoll/?gruppe=dokument,fehlversuch");
   const texte = protokoll.results.map((e: { beschreibung: string }) => e.beschreibung).join("\n");

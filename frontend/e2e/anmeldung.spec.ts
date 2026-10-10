@@ -22,7 +22,7 @@ test("Falsches Passwort wird abgewiesen", async ({ page }) => {
   await page.getByLabel("Benutzername").fill("e2e.mediziner");
   await page.getByLabel("Passwort").fill("falsch-falsch-falsch");
   await page.getByRole("button", { name: "Weiter" }).click();
-  await expect(page.getByRole("alert")).toContainText("Benutzername oder Kennwort falsch");
+  await expect(page.getByRole("alert")).toContainText("Benutzername oder Passwort falsch");
   await expect(page.getByLabel("Passwort")).toHaveValue("");
 });
 

@@ -3,7 +3,7 @@ Zweiter Faktor (Authenticator-App, Notfall-Codes): eingerichtet? Pflicht? Code g
 
 Festlegung 02.10.2026: Der zweite Faktor ist freiwillig (``Anmelderegeln``); die Administration kann ihn für Admins oder
 für alle zur Pflicht machen. Wer ihn eingerichtet hat, meldet sich immer damit an.
-Festlegung 03.10.2026: Bestätigungen mit Kennwort und Code (endgültig löschen, Wiederherstellen, Updates, Neustart,
+Festlegung 03.10.2026: Bestätigungen mit Passwort und Code (endgültig löschen, Wiederherstellen, Updates, Neustart,
 Sicherungs-Passwort, Übertragungsziel, Import …) verlangen **immer** den zweiten Faktor. Wer keinen eingerichtet hat,
 muss ihn zuerst unter Mein Konto einrichten – ohne geht es nicht.
 Festlegung 08.10.2026: Ein Passkey (WebAuthn, accounts/passkey.py) ist ein gleichwertiger zweiter Faktor – bei der

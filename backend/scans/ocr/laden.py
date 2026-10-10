@@ -90,7 +90,7 @@ def _pdf_seiten(daten: bytes, max_seiten: int) -> list[Rohseite]:
     try:
         pdf = pdfium.PdfDocument(daten)
     except Exception as e:  # noqa: BLE001
-        raise Unlesbar("Die PDF-Datei lässt sich nicht öffnen (beschädigt oder mit Kennwort geschützt).") from e
+        raise Unlesbar("Die PDF-Datei lässt sich nicht öffnen (beschädigt oder mit Passwort geschützt).") from e
     try:
         if len(pdf) == 0:
             raise Unlesbar("Die PDF-Datei hat keine Seiten.")
