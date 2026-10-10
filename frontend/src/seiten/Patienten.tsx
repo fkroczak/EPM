@@ -47,6 +47,12 @@ const PRUEFEN: Record<string, string> = {
   wiedereinbestellung: "Wiedereinbestellung fällig (kein Termin geplant)",
   erklaerungen: "Erklärungen zum Datenschutz fehlen",
   abschluss_pruefen: "Abschluss prüfen (lange kein Kontakt)",
+  // fehlende Angaben (F186), aus der Tagesliste der Startseite
+  ohne_telefon: "Keine Telefonnummer",
+  ohne_hausarzt: "Kein Hausarzt erfasst",
+  ohne_diagnose: "Keine Diagnose",
+  ohne_gewicht: "Kein aktuelles Gewicht",
+  termin_ohne_ort: "Praxistermin ohne Ort",
 };
 
 const SORTIERUNG_TEXT: Record<string, string> = {

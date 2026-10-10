@@ -124,6 +124,10 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
         if abgeschlossen is None:
             in_betreuung.add(pid)
     grenzen = kontakt_grenzen(e)
+    # Fehlende Angaben (F186): nur Akten in Betreuung, ohne Testpatienten
+    from .luecken import hinweis_text, luecken
+
+    fehlend = luecken(ids, e)
     naechste, entwuerfe, erklaerungen = {}, set(), {}
     if liste:
         from .models import erklaerungen_stand
@@ -172,6 +176,8 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
                 hinweise.append({"art": "bia", "text": "Keine BIA-Messung"})
             elif bias[p.id] < bia_grenze:
                 hinweise.append({"art": "bia", "text": f"BIA älter als {e.bia_alter_warnung_monate} Mon."})
+        for art in fehlend.get(p.id, []):
+            hinweise.append({"art": art, "text": hinweis_text(art, e)})
         # weggeklickte Hinweise erscheinen nicht; sie stehen in der Akte unter „Stummgeschaltet“ (F119)
         ruht = stumm.get(p.id, set())
         unterdrueckt = [h["art"] for h in hinweise if h["art"] in ruht]

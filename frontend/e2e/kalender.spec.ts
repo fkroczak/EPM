@@ -201,3 +201,44 @@ test("Kalender: „Praxis informieren“ – Infoblatt mit Vorschau, fehlendem O
   expect(download.suggestedFilename()).toMatch(/^Patientenankuendigung-\d{4}-\d{2}-\d{2}\.pdf$/);
   await expect(dialog.getByTestId("infoblatt-letzte")).toContainText("Zuletzt erstellt am");
 });
+
+test("Kalender: Terminbestätigung nach dem Speichern anbieten, „Nicht jetzt“, später als E-Mail vorbereiten (F185)", async ({ page }) => {
+  const api = await apiAls("mitarbeiter");
+  const nachname = eindeutig("Bestaetigung");
+  await api.post("patienten/", { nachname, vorname: "Berta", geburtsdatum: "1962-02-02", geschlecht: "w",
+    email: "berta@example.org" });
+  await api.ende();
+  const ziel = tagIn(12);
+  await page.goto(`/kalender?datum=${ziel}`);
+  await page.getByTestId(`tag-${ziel}`).click({ position: { x: 6, y: 6 } });  // auf den Tag, nicht auf einen Eintrag
+  await page.getByTestId("tagesliste").getByRole("button", { name: /^Termin am / }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Patient").fill(nachname);
+  await dialog.getByRole("option", { name: new RegExp(nachname) }).click();
+  await dialog.getByLabel("Art", { exact: true }).selectOption("praxistermin");
+  await dialog.getByLabel("Uhrzeit").fill("10:30");
+  await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
+  // direkt danach die Frage – „Nicht jetzt“ schließt sie, nichts wird erstellt
+  const frage = page.getByRole("dialog", { name: `Terminbestätigung an Frau ${nachname} schicken?` });
+  await expect(frage).toBeVisible();
+  await expect(frage).toContainText("Verschickt wird erst, wenn du es selbst tust.");
+  await frage.getByRole("button", { name: "Nicht jetzt" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // im Termin: „Bestätigung fehlt“ → „Bestätigung erstellen“ öffnet „Schreiben und E-Mail“ mit genau diesem Termin
+  await page.getByTestId(`tag-${ziel}`).getByRole("button", { name: new RegExp(`10:30 Praxistermin: ${nachname}`) }).click();
+  const td = page.getByRole("dialog", { name: "Termin bearbeiten" });
+  await expect(td.getByTestId("termin-bestaetigung")).toContainText("Bestätigung fehlt");
+  await td.getByRole("button", { name: "Bestätigung erstellen" }).click();
+  const schreiben = page.getByRole("dialog", { name: `Terminbestätigung an Frau ${nachname}` });
+  await expect(schreiben.getByTestId("bestaetigung-termin")).toContainText("10:30");
+  await expect(schreiben.getByLabel("An", { exact: true })).toHaveValue("berta@example.org");
+  const [download] = await Promise.all([page.waitForEvent("download"),
+    schreiben.getByRole("button", { name: "E-Mail vorbereiten" }).click()]);
+  // Inhalt statt Dateiname prüfen (der Name mit „ä“ kommt im Testbrowser nicht immer an)
+  const { readFileSync } = await import("node:fs");
+  expect(readFileSync((await download.path())!, "utf8")).toContain("berta@example.org");
+  await schreiben.getByRole("button", { name: "Schließen" }).first().click();
+  // der Termin merkt sich die Bestätigung
+  await page.getByTestId(`tag-${ziel}`).getByRole("button", { name: new RegExp(`10:30 Praxistermin: ${nachname}`) }).click();
+  await expect(page.getByRole("dialog", { name: "Termin bearbeiten" }).getByTestId("bestaetigung-erstellt")).toContainText("Bestätigung erstellt am");
+});

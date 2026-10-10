@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 10.10.2026 · Code-Stand: Infoblatt an die Praxis (F177); Schreiben mit E-Mail (F172–F176); Scans und Texterkennung (F160–F171); Passkey und Telefon (F130–F134); Wünsche aus der Praxis vom 06./07.10.2026 (F110–F124); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
+Stand: 10.10.2026 · Code-Stand: Automatisierungen für die Pflege (F184–F186); Infoblatt an die Praxis (F177); Schreiben mit E-Mail (F172–F176); Scans und Texterkennung (F160–F171); Passkey und Telefon (F130–F134); Wünsche aus der Praxis vom 06./07.10.2026 (F110–F124); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
 Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026, Prüfung nach DSGVO vom 02.10.2026 (`docs/DATENSCHUTZ.md`).
@@ -3601,6 +3601,68 @@ Praxis erstellen lassen.“ Befunde, Messung vorher/nachher und Rückfragen: `do
   `aktenansicht`, `plaene`, `infusionsplaene`, `mobil`, `dokumente`, `praxiswuensche`, `oberflaeche` bis auf
   „Volle Breite: 1280 px“ (Startseite, Breite von `main` um die Scrollleiste zu klein – nicht von F181 berührt).
   CI-Lauf steht aus.
+## AA · Automatisierungen für die Pflege (10.10.2026)
+
+Ziel: Automatisierungen nehmen der Pflege Arbeit ab, versenden aber nie von allein etwas und schreiben nichts
+ungefragt in die Akte – am Ende entscheidet immer ein Klick der Pflegekraft. Alles läuft offline.
+
+### F184 Tagesliste „Heute zu tun“ (Startseite)
+- **Oberfläche:** Bereich „Heute zu tun“ ganz oben auf der Startseite für alle mit „Akten lesen“ außer der
+  Administration (deren Startseite bleibt unverändert). Kurze, priorisierte Liste mit Anzahl: Termine heute (Uhrzeit,
+  Patient, Ort; „erledigt“ zum Abhaken), fällige oder überfällige Rückrufe und Wiedervorlagen (abhaken), Infoblatt an
+  die Praxis fällig (Knopf „Infoblatt erstellen“, ersetzt den bisherigen Einzelhinweis aus F177), Terminbestätigung
+  fehlt (F185, Knopf „Bestätigung vorbereiten“), überfällige Kontakte ohne geplanten Termin (Grenze aus den
+  Einstellungen, zur gefilterten Patientenliste), Infusionspläne zur Prüfung, Scans zum Zuordnen (ersetzt „Scans
+  warten auf Zuordnung“ im Scan-Hinweis; Warnungen zu Ablauf und Speicher bleiben dort), Praxistermine ohne Ort
+  (Knopf „Ort eintragen“ öffnet den Termin) und fehlende Angaben (F186, je Regel „3 Akten ohne Telefonnummer“ mit Klick
+  auf die gefilterte Liste). Je Gruppe höchstens drei Einträge, danach „… und n weitere“. Erledigtes verschwindet
+  sofort; leer: „Für heute ist alles erledigt.“ Fachbegriffe (Wiedervorlage, Wiedereinbestellung) mit Erklärung
+  (`Begriff`). Kacheln und Kennzahlen darunter bleiben, wie jede Person sie eingerichtet hat.
+- **Endpunkt:** `GET /api/startseite/` liefert zusätzlich `tagesliste` (`patienten/api.py: tagesliste`):
+  `termine_heute`, `rueckrufe` (+ `rueckrufe_anzahl`, `rueckrufe_ueberfaellig`), `kontakt_ueberfaellig`,
+  `kontakt_monate`, `plaene_pruefen`, `fehlende_angaben` (Anzahl Akten je Regel), `gewicht_fehlt_monate`,
+  `bestaetigung_fehlt` und `ohne_ort` (beide nur mit „Einträge erfassen“). Ohne Testpatienten (Testzugänge: nur
+  Testpatienten) und ohne abgeschlossene Akten. Offene Scans holt die Oberfläche wie bisher aus `GET /api/scans/stand/`.
+- **Teststatus:** `patienten/test_automatisierungen.py` › `Tagesliste` (Inhalt ohne Testpatienten und abgeschlossene
+  Akten, Erledigtes verschwindet, Rechte, Testzugang, Einstellung). Browsertest `start.spec.ts` „Heute zu tun“.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F185 Terminbestätigung automatisch vorbereiten
+- **Ablauf:** Speichert die Pflegekraft einen neuen Praxistermin oder verschiebt ihn (Datum, Uhrzeit, Ort, Art) für
+  einen Patienten mit vollständiger Anschrift oder E-Mail-Adresse, fragt EPM direkt danach „Terminbestätigung an Frau
+  X schicken?“ (`components/TerminBestaetigung.tsx`, aus `TerminDialog` – damit überall, wo Termine gespeichert
+  werden: Startseite, Kalender, Akte). „Ja, Bestätigung vorbereiten“ öffnet „Schreiben und E-Mail“ (F172) mit Art
+  „terminbestaetigung“ und genau diesem Termin; „Nicht jetzt“ schließt. Im Termin steht „Terminbestätigung: fehlt“
+  bzw. „erstellt am …“ mit Knopf „Bestätigung erstellen“/„Erneut erstellen“.
+- **Vermerk:** `Termin.bestaetigung_am`, `bestaetigung_von` (Migration `patienten/0016`). Gesetzt, wenn
+  `POST /api/patienten/{id}/schreiben/` mit `art: "terminbestaetigung"` eine PDF oder E-Mail (.eml) erzeugt – nicht
+  bei `ausgabe: "email"` (nur Text für den Dialog) und nicht bei „PDF ansehen“ (`vorschau: true`); nicht ohne
+  Schreibrecht an der Akte (Admin bei echten Akten), nicht bei erledigten Terminen oder abgeschlossenen Akten. Im
+  Verlauf der Akte als „Terminbestätigung erstellt“. Ändern sich Datum, Uhrzeit oder Ort, wird der Vermerk geleert.
+- **Termin-API:** `TerminSerializer` liefert `bestaetigung_am`, `bestaetigung_von_name` und bei Praxisterminen
+  `bestaetigung: {angebot, email, anrede}` (`angebot`: Einstellung an, Anschrift oder E-Mail, Termin offen und nicht
+  vorbei, Akte in Betreuung).
+- **Einstellung:** `Einstellungen.terminbestaetigung_anbieten` (Standard an, Migration `stammdaten/0019`), unter
+  Vorlagen › Grenzwerte „Terminbestätigung“. Aus: keine Frage und keine Zeile in der Tagesliste.
+- **Teststatus:** `test_automatisierungen.py` › `Terminbestaetigung` (Angebot, ohne Anschrift/E-Mail, Einstellung,
+  Vermerk nach PDF/E-Mail und nicht nach Vorschau, andere Schreiben, Verschieben, Admin). Browsertest
+  `kalender.spec.ts` „Terminbestätigung nach dem Speichern“.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F186 Fehlende Angaben melden
+- **Regeln** (`patienten/luecken.py`), nur Akten in Betreuung, ohne Testpatienten: kein Arzt zugeordnet und kein
+  Hausarzt im Freitext (`hausarzt`); weder Telefon noch Telefon 2 und keine aktive Kontaktperson mit Telefon/Mobil
+  (`telefon`); keine Gewichtsmessung in den letzten X Monaten (`gewicht_fehlt`, Einstellung
+  `gewicht_fehlt_monate`, Standard 3, 1–120, Vorlagen › Grenzwerte); keine aktive Diagnose und leeres Feld Diagnose
+  (`diagnose`); offener Praxistermin in den nächsten 8 Wochen ohne Ort, nur wenn es den Terminort der Praxis gibt –
+  wie beim Infoblatt (`termin_ort`, `infoblatt.praxisort`/`aufteilen`).
+- **Anzeige:** als zusätzliche Hinweisarten in `kennzahlen` (Patientenliste mit „×“ zum Ausblenden für 3/6/12 Monate
+  oder „nicht mehr nötig“, `Hinweisruhe.Art` erweitert, Migration `patienten/0016`); Detail einer Akte liefert im
+  `kopf` jetzt `hinweise` und `hinweise_stumm` (zum Anzeigen mit `HinweisChips` im Aktenkopf – die Anzeige in der
+  Akte selbst ist noch nicht eingebaut). Tagesliste: Anzahl je Regel (ausgeblendete zählen nicht), Klick auf
+  `/patienten?pruefen=ohne_telefon|ohne_hausarzt|ohne_gewicht|ohne_diagnose|termin_ohne_ort`.
+- **Teststatus:** `test_automatisierungen.py` › `FehlendeAngaben` (je Regel, Ausnahmen, Hinweis in Akte und Liste,
+  Ausblenden, Filter) und `Einstellungsfelder`.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
 ## Offene Backend-Funktionen
@@ -3715,6 +3777,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 |---|---|---|
 | 10.10.2026 | Texterkennung lernt mit | Gelernte Zuordnungen aus Korrekturen beim Übernehmen (Labor, BIA, Diagnosen, Spaltenlage je Labor; ohne Patientendaten), Anwendung vor der Ähnlichkeitssuche mit Schwelle, Bereich „Gelernte Zuordnungen“, Kennzahl „korrigiert“ (F182); Patient aus Name und Geburtsdatum vorschlagen, nur per Klick (F183); Offline-Prüfung (`docs/OFFLINE-BETRIEB-2026-10-10.md`). Lauf steht aus |
 | 10.10.2026 | Akte entschlankt | Akte ab 1024 × 600 px ohne Seiten-Scrollen (Kopf und Reiter bleiben stehen, Inhalt scrollt in Karte bzw. Spalte), kompakter Kopf, Reiter nach Bedeutung (Infusionspläne nach Empfehlung, Verlauf/Datenschutz klein), Übersicht mit sechs Karten in zwei Reihen, PDF des Plans in voller Höhe neben der Liste und im Menüpunkt Infusionspläne, Plan nach Praxisvorgabe je kg, Prüfung vor der Freigabe, PDF-Vorschau mit ungespeicherten Eingaben (`POST …/vorschau/`), Administration zum Aufklappen (F181). Lauf steht aus |
+| 10.10.2026 | Automatisierungen für die Pflege | Startseite „Heute zu tun“ mit Terminen, Rückrufen, Infoblatt, fehlenden Bestätigungen, Kontakten, Plänen, Scans und fehlenden Angaben (F184); „Terminbestätigung schicken?“ nach dem Speichern eines Praxistermins mit Vermerk am Termin (F185); fehlende Angaben als Hinweise (Hausarzt, Telefon, Gewicht, Diagnose, Termin ohne Ort), ausblendbar (F186). Lauf steht aus |
 | 10.10.2026 | Systemverwaltung ohne SSH | Neue Seite Systemverwaltung mit Ampel und häufigen Aufgaben; System und Backup in Reitern; Graphen klein, groß im Dialog; Sicherungen mit Mehrfachauswahl löschen; Dienste einzeln neu starten, Version zurückschalten, Update-Paket und OCR-Modelle hochladen, Paket erstellen, Zertifikat erneuern/importieren, Protokolle ansehen – alles über den Systemagenten (F179). Lauf steht aus |
 | 10.10.2026 | Vorlagen-Portal einfacher | Übersicht mit Kacheln in Alltagssprache und Suche, Liste der Dokumentvorlagen mit Zweck/Ort/Stand, geführter Ablauf Bearbeiten → Vorschau → Freigeben mit Live-Vorschau, Angaben aus der Akte per Klick als lesbare Chips, frühere Fassung ansehen/wiederherstellen, als eigene Vorlage kopieren, ▲ ▼ und „Wo benutzt“ in den Auswahllisten, Warnung beim Verlassen (F180). Lauf steht aus |
 | 10.10.2026 | Bedienung für Pflegekräfte | Nachsichtige Datums-/Uhrzeiteingabe, Fehlermeldungen mit Lösungsweg, leere Zustände mit nächstem Schritt, Hilfe „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“, weniger Fachjargon (F178, `docs/BEDIENBARKEIT-2026-10-10.md`). Lauf steht aus |

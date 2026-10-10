@@ -178,3 +178,43 @@ test("Wiedereinbestellung (S04): Stufen und Kontakt direkt aus der Kachel", asyn
   await expect(dialog.getByTestId("kontextkasten")).toBeVisible();
   await dialog.getByRole("button", { name: "Abbrechen" }).click();
 });
+
+test("Heute zu tun: ganz oben, Rückruf abhaken, fehlende Angaben führen zur gefilterten Liste (F184, F186)", async ({ page }) => {
+  const api = await apiAls("mitarbeiter");
+  // echte Akte ohne Telefon, Hausarzt, Gewicht und Diagnose; ein heute fälliger Rückruf
+  const nachname = `Morgenrunde${Date.now().toString(36).slice(-5)}`;
+  const p = await api.post("patienten/", { nachname, vorname: "Toni", geburtsdatum: "1966-06-06" });
+  // lange überfällig, damit er oben in der Gruppe steht (sie zeigt die ältesten zuerst)
+  const vorher = new Date(Date.now() - 400 * 86_400_000).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+  await api.post("termine/", { patient: p.id, art: "rueckruf", faellig_am: vorher, titel: "E2E Rückruf Morgenrunde" });
+  await api.ende();
+
+  await page.goto("/");
+  const liste = page.getByTestId("heute-zu-tun");
+  await expect(liste.getByRole("heading", { name: /Heute zu tun/ })).toBeVisible();
+  // ganz oben: vor der Kennzahlenleiste und den Kacheln
+  await expect(page.getByTestId("kennzahlenleiste")).toBeVisible();
+  expect((await liste.boundingBox())!.y).toBeLessThan((await page.getByTestId("kennzahlenleiste").boundingBox())!.y);
+  // Rückruf abhaken: verschwindet aus der Liste
+  const rueckrufe = liste.getByTestId("tl-rueckrufe");
+  await expect(rueckrufe).toContainText("E2E Rückruf Morgenrunde");
+  await rueckrufe.getByRole("checkbox", { name: new RegExp(`Erledigt: ${nachname}`) }).click();  // Zeile verschwindet sofort
+  await expect(page.getByText(`Erledigt: ${nachname}, Toni`)).toBeVisible();
+  await expect(liste).not.toContainText("E2E Rückruf Morgenrunde");
+  // fehlende Angaben: „n Akten ohne Telefonnummer“ → Patientenliste mit Filter
+  await liste.getByTestId("tl-luecke-telefon").getByRole("link").click();
+  await expect(page).toHaveURL(/pruefen=ohne_telefon/);
+  await expect(page.getByTestId("pruefen")).toHaveValue("ohne_telefon");
+  await expect(page.getByRole("link", { name: new RegExp(nachname) }).first()).toBeVisible();
+});
+
+test("Heute zu tun: Betrachter sieht die Liste ohne Knöpfe zum Vorbereiten", async ({ browser }) => {
+  const ctx = await browser.newContext({ storageState: zustand("betrachter"), ignoreHTTPSErrors: true });
+  const page = await ctx.newPage();
+  await page.goto("/");
+  const liste = page.getByTestId("heute-zu-tun");
+  await expect(liste).toBeVisible();
+  await expect(liste.getByTestId("tl-bestaetigung")).toHaveCount(0);
+  await expect(liste.getByTestId("tl-ohne-ort")).toHaveCount(0);
+  await ctx.close();
+});

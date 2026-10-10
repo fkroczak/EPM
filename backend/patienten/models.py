@@ -399,6 +399,12 @@ class Termin(AktenEintrag):
     ausgeblendet_von = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
     )
+    # Terminbestätigung (F185): wann zuletzt eine Bestätigung als PDF oder E-Mail erstellt wurde. Wird der Termin
+    # verschoben (Datum, Uhrzeit, Ort), gilt die alte Bestätigung nicht mehr und das Feld wird geleert.
+    bestaetigung_am = models.DateTimeField("Terminbestätigung erstellt am", null=True, blank=True)
+    bestaetigung_von = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
 
     history = HistoricalRecords()
 
@@ -912,6 +918,12 @@ class Hinweisruhe(models.Model):
         KONTAKT = "kontakt", "Kontakt fällig"
         LABOR = "labor", "Laborbefund älter als …"
         BIA = "bia", "BIA-Messung älter als …"
+        # Fehlende Angaben (F186, 10.10.2026)
+        HAUSARZT = "hausarzt", "Kein Hausarzt erfasst"
+        TELEFON = "telefon", "Keine Telefonnummer"
+        GEWICHT_FEHLT = "gewicht_fehlt", "Kein aktuelles Gewicht"
+        DIAGNOSE = "diagnose", "Keine Diagnose"
+        TERMIN_ORT = "termin_ort", "Praxistermin ohne Ort"
 
     FRISTEN = (3, 6, 12)
 
