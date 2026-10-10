@@ -19,6 +19,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
+import { HinweisChips } from "@/components/HinweisChips";
 import { GewichtDialog, KontaktDialog } from "@/components/Schnellerfassung";
 import { useAktenAblage } from "@/components/AktenAblage";
 import type { Aktenansicht } from "@/lib/darstellung";
@@ -613,6 +614,8 @@ export function Akte() {
           {k.erklaerungen.fehlt.length === 1 ? `${ERKLAERUNGEN_KURZ[k.erklaerungen.fehlt[0]]} fehlt` : `${k.erklaerungen.fehlt.length} Erklärungen fehlen`}
         </button>
       ) : null}
+      {/* Hinweise wie in der Patientenliste, dazu fehlende Angaben (F186); mit „×“ für 3/6/12 Monate ausblendbar (F119) */}
+      <HinweisChips hinweise={k?.hinweise ?? []} patientId={p.id} ausblendbar={kontext.bearbeiten} />
     </>
   );
   // CAVE: Nickelallergie und Gewichtsverlust stehen in jeder Ansicht direkt beim Namen

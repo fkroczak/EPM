@@ -10,6 +10,7 @@
  * Touchgeräten nicht antippen lässt. Nicht in Knöpfe oder Links setzen (Knopf im Knopf) – dort den Text daneben stellen.
  */
 import { useId, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { Popover } from "@base-ui/react/popover";
 import { BEGRIFFE } from "@/lib/begriffe";
@@ -31,8 +32,10 @@ export function Begriff({ name, erklaerung, children, className }: {
         onFocus={(e) => { if (e.currentTarget.matches(":focus-visible")) setOffen(true); }} onBlur={() => setOffen(false)}>
         {children}
       </Popover.Trigger>
-      {/* immer im DOM, nur für Hilfsmittel – die sichtbare Blase unten ist für sie ausgeblendet */}
-      <span id={`${id}-erklaerung`} className="sr-only">{text}</span>
+      {/* immer im DOM, nur für Hilfsmittel – die sichtbare Blase unten ist für sie ausgeblendet. Per Portal außerhalb
+          des Begriffs, damit die Erklärung in einer Feldbeschriftung nicht Teil des Feldnamens wird (getByLabel) */}
+      {typeof document === "undefined" ? null
+        : createPortal(<span id={`${id}-erklaerung`} className="sr-only">{text}</span>, document.body)}
       <Popover.Portal>
         <Popover.Positioner side="top" sideOffset={6} collisionPadding={8} className="z-[60]">
           <Popover.Popup role="tooltip" aria-hidden="true" initialFocus={false} finalFocus={false}
