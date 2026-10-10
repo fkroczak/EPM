@@ -156,6 +156,24 @@ class NotfallAgent(Backupverzeichnis):
             tar.extractall(ziel, filter="data")
         return ziel
 
+    def test_unverschluesselte_sicherung_nicht_im_paket(self):
+        # Patientendaten im Klartext gehören nicht auf einen USB-Stick
+        for p in (self.basis / "backup").iterdir():
+            p.unlink()
+        for n in (f"epm-db_{ST}.dump", f"epm-dokumente_{ST}.tar.gz", f"epm_{ST}.sha256"):
+            (self.basis / "backup" / n).write_bytes(b"klartext" * 10)
+        a = self.agent()
+        self.assertFalse(a.sicherungen()[0]["verschluesselt"])
+        ausgabe = []
+        rc, _ = a.notfallpaket(True, "a" * 32, ausgabe.append)
+        self.assertEqual(rc, 0, "".join(ausgabe))
+        stand = json.loads((self.ordner / "status" / "notfall.json").read_text())
+        aus = self.auspacken(self.ordner / "download" / stand["datei"])
+        inhalt = json.loads((aus / "INHALT.json").read_text())
+        self.assertEqual((inhalt["mit_sicherung"], inhalt["sicherung"]), (False, None))
+        self.assertTrue(any("unverschlüsselt" in f for f in inhalt["fehlt"]), inhalt["fehlt"])
+        self.assertFalse((aus / "sicherung").exists())
+
     def test_paket_inhalt_pruefsummen_keine_geheimnisse(self):
         a = self.agent()
         ausgabe = []

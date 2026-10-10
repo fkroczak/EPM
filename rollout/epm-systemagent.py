@@ -2981,7 +2981,12 @@ class Agent:
             # 5. jüngste Sicherung (verschlüsselt wie immer)
             if mit_sicherung:
                 liste = self.sicherungen()
-                if liste:
+                if liste and not liste[0]["verschluesselt"]:
+                    # Patientendaten im Klartext gehören nicht auf einen USB-Stick: dann ohne Sicherung
+                    zeile("Die jüngste Sicherung ist unverschlüsselt – sie kommt nicht ins Notfallpaket.\n")
+                    fehlt.append("Sicherung (die jüngste ist unverschlüsselt – erst das Sicherungs-Passwort festlegen "
+                                 "und eine neue Sicherung erstellen)")
+                elif liste:
                     s = liste[0]
                     stempel = s["stempel"]
                     os.makedirs(os.path.join(arbeit, "sicherung"))
@@ -2990,8 +2995,6 @@ class Agent:
                     with tarfile.open(os.path.join(arbeit, "sicherung", f"epm-sicherung_{stempel}.tar"), "w") as tar:
                         for n in namen:
                             tar.add(os.path.join(self.backup, n), arcname=n, recursive=False)
-                    if not s["verschluesselt"]:
-                        zeile("ACHTUNG: Die jüngste Sicherung ist unverschlüsselt.\n")
                 else:
                     fehlt.append("Sicherung (es gibt noch keine)")
             # 6. Konfiguration ohne Geheimnisse
