@@ -302,6 +302,9 @@ export type Patient = {
       id: number; art: string; titel: string; faellig_am: string; uhrzeit: string | null; ort: string | null; bei: string;
     } | null;
     versionen: Record<"diagnose" | "therapie" | "empfehlung" | "bemerkung", Versionskopf>;
+    /** Hinweise wie in der Patientenliste, dazu fehlende Angaben (F186); ausgeblendete unter ``hinweise_stumm`` */
+    hinweise?: { art: HinweisArt; text: string; stufe?: Kontaktstufe }[];
+    hinweise_stumm?: HinweisArt[];
     /** Schnellerfassung (S02): Zeitpunkt des letzten gültigen Kontakts */
     letzter_kontakt: string | null;
     /** Merkliste der angemeldeten Person (S05) */
@@ -355,6 +358,11 @@ export type Termin = {
   ausblende_grund?: string;
   ausgeblendet_am?: string | null;
   ausgeblendet_von_name?: string | null;
+  /** Terminbestätigung (F185): wann zuletzt als PDF oder E-Mail erstellt (beim Verschieben wieder leer) */
+  bestaetigung_am?: string | null;
+  bestaetigung_von_name?: string | null;
+  /** nur bei Praxisterminen: ``angebot`` = „Terminbestätigung schicken?“ anbieten bzw. „Bestätigung fehlt“ zeigen */
+  bestaetigung?: { angebot: boolean; email: boolean; anrede: string } | null;
 };
 
 export const TERMINARTEN: Record<string, string> = {
@@ -819,7 +827,9 @@ export type Bericht = {
 
 
 // ================================================================= Hinweise stummschalten (07.10.2026, F119)
-export type HinweisArt = "gewicht" | "plan" | "ohne_plan" | "versorger" | "kontakt" | "labor" | "bia";
+export type HinweisArt = "gewicht" | "plan" | "ohne_plan" | "versorger" | "kontakt" | "labor" | "bia"
+  // fehlende Angaben (F186)
+  | "hausarzt" | "telefon" | "gewicht_fehlt" | "diagnose" | "termin_ort";
 
 /** Fristen, die beim Wegklicken zur Wahl stehen; „nicht mehr nötig“ ist die vierte Möglichkeit */
 export const RUHE_FRISTEN = [3, 6, 12] as const;

@@ -294,6 +294,8 @@ class EinstellungenSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"ocr_fachwoerter": "Je Zeile ein Wort ohne Leerzeichen (höchstens "
                                                                       "60 Zeichen, höchstens 5000 Wörter)."})
             attrs["ocr_fachwoerter"] = "\n".join(dict.fromkeys(woerter))
+        if "gewicht_fehlt_monate" in attrs and not 1 <= attrs["gewicht_fehlt_monate"] <= 120:
+            raise serializers.ValidationError({"gewicht_fehlt_monate": "Bitte 1 bis 120 Monate angeben."})
         if "wiedervorlage_tage" in attrs and not 1 <= attrs["wiedervorlage_tage"] <= 365:
             raise serializers.ValidationError({"wiedervorlage_tage": "Bitte 1 bis 365 Tage angeben."})
         # Infoblatt an die Praxis (F177): Vorlauf kürzer als der Zeitraum, sonst stünde der Hinweis immer da

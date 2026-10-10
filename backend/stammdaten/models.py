@@ -338,6 +338,10 @@ class Einstellungen(models.Model):
                                           choices=[("woche", "wöchentlich"), ("monat", "monatlich"),
                                                    ("aus", "keine Erinnerung")])
     infoblatt_vorlauf_tage = models.PositiveSmallIntegerField("Erinnerung an das Infoblatt (Tage vorher)", default=3)
+    # Automatisierungen für die Pflege (10.10.2026): „Kein Gewicht seit … Monaten“ (F186) und das Angebot
+    # „Terminbestätigung schicken?“ nach dem Speichern eines Praxistermins (F185)
+    gewicht_fehlt_monate = models.PositiveSmallIntegerField("Gewicht fehlt, wenn keine Messung seit", default=3)
+    terminbestaetigung_anbieten = models.BooleanField("Terminbestätigung nach dem Speichern anbieten", default=True)
 
     # Plausibilitätsgrenzen (Eingaben außerhalb werden abgelehnt)
     gewicht_min_kg = models.DecimalField("Gewicht minimal", max_digits=5, decimal_places=1, default=Decimal("20.0"))
@@ -409,7 +413,8 @@ class Einstellungen(models.Model):
             raise ValidationError({"aufbewahrung_jahre": "Bitte 1 bis 100 Jahre angeben."})
         if self.abschluss_pruefen_monate < 1:
             raise ValidationError({"abschluss_pruefen_monate": "Bitte mindestens 1 Monat angeben."})
-        for feld in ("plan_alter_warnung_monate", "labor_alter_warnung_monate", "bia_alter_warnung_monate"):
+        for feld in ("plan_alter_warnung_monate", "labor_alter_warnung_monate", "bia_alter_warnung_monate",
+                     "gewicht_fehlt_monate"):
             if getattr(self, feld) < 1:
                 raise ValidationError({feld: "Bitte mindestens 1 Monat angeben."})
         fehler = kontaktstufen_fehler(self.kontakt_bald_monate, self.kontakt_ueberfaellig_monate)

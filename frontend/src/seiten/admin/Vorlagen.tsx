@@ -277,6 +277,8 @@ const HINWEISE: { k: string; label: string; einheit: string }[] = [
   { k: "kontakt_ueberfaellig_monate", label: "Kontakt überfällig nach", einheit: "Monaten" },
   // Wunsch 08.10.2026: Vorgabe für „Wiedervorlage anlegen“ beim Erfassen eines Kontakts (im Dialog änderbar)
   { k: "wiedervorlage_tage", label: "Wiedervorlage nach Kontakt in", einheit: "Tagen" },
+  // Fehlende Angaben (F186): Hinweis „Kein Gewicht seit … Monaten“ in Akte, Liste und Tagesliste
+  { k: "gewicht_fehlt_monate", label: "Gewicht fehlt, wenn keine Messung seit", einheit: "Monaten" },
 ];
 // Datenschutz (docs/DATENSCHUTZ.md): Fristen und die Erklärungen, die in jeder Akte vorliegen sollen
 const DATENSCHUTZ: { k: string; label: string; einheit: string; hinweis?: string }[] = [
@@ -327,7 +329,9 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
       const felder = [...HINWEISE.map((h) => h.k), ...(datenschutz ? DATENSCHUTZ.map((h) => h.k) : []), ...GRENZEN.flatMap((g) => [g.min, g.max]),
         ...SCANS.map((h) => h.k)];
       const fehler: Feldfehler = {};
-      const body: Record<string, string | string[] | null> = datenschutz ? { pflicht_erklaerungen: pflicht } : {};
+      const body: Record<string, string | string[] | boolean | null> = datenschutz ? { pflicht_erklaerungen: pflicht } : {};
+      // F185: nach dem Speichern eines Praxistermins „Terminbestätigung schicken?“ anbieten
+      body.terminbestaetigung_anbieten = w!.terminbestaetigung_anbieten !== "false";
       body.ocr_fachwoerter = w!.ocr_fachwoerter ?? "";
       // Infoblatt an die Praxis (F177): Erinnerung auf der Startseite
       body.infoblatt_rhythmus = w!.infoblatt_rhythmus ?? "woche";
@@ -392,6 +396,16 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
           ? "Die Startseite erinnert nicht an das Infoblatt. Es lässt sich jederzeit im Kalender unter „Praxis informieren“ erstellen."
           : `Die Startseite zeigt ${w.infoblatt_vorlauf_tage} Tage vor ${w.infoblatt_rhythmus === "monat" ? "dem nächsten Monat" : "der nächsten Woche (Montag)"}
             den Hinweis „Praxis informieren“ – bis das Infoblatt für diesen Zeitraum erstellt ist.`}</span>
+      </Karte>
+      <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5" data-testid="grenzwerte-terminbestaetigung">
+        <h2 className="lbl m-0">Terminbestätigung</h2>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={w.terminbestaetigung_anbieten !== "false"}
+            onChange={(e) => setW({ ...w, terminbestaetigung_anbieten: String(e.target.checked) })} />
+          <span>Nach dem Speichern eines neuen oder verschobenen Praxistermins fragen: „Terminbestätigung schicken?“</span>
+        </label>
+        <span className="text-[0.8125rem] gedaempft">Gilt für Patienten mit Anschrift oder E-Mail-Adresse. Die Tagesliste der Startseite zeigt dann auch
+          Praxistermine der nächsten zwei Wochen ohne Bestätigung. Verschickt wird nie von allein.</span>
       </Karte>
       <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5" data-testid="grenzwerte-datenschutz">
         <h2 className="lbl m-0">Datenschutz</h2>
