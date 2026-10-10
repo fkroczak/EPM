@@ -208,6 +208,9 @@ def pem_angaben(crt: str, key: str, ca: str | None):
             continue
         if not isinstance(text, str) or len(text) > PEM_MAX or "\0" in text or f"{marke}-----" not in text:
             return {feld: "Bitte eine PEM-Datei wählen (Text, beginnt mit „-----BEGIN …“)."}, None
+    if len(crt) + len(key) + len(ca or "") > 3 * PEM_MAX - 10000:
+        # die Auftragsdatei an den Agenten darf höchstens 64 KB groß sein
+        return {"zertifikat": "Zertifikat, Schlüssel und CA sind zusammen zu groß (höchstens 50.000 Zeichen)."}, None
     try:
         from cryptography import x509
         from cryptography.hazmat.primitives import hashes, serialization
