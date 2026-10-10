@@ -19,7 +19,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
-import { HinweisChips } from "@/components/HinweisChips";
+import { HinweisChips, HinweisChipsKompakt } from "@/components/HinweisChips";
 import { GewichtDialog, KontaktDialog } from "@/components/Schnellerfassung";
 import { useAktenAblage } from "@/components/AktenAblage";
 import type { Aktenansicht } from "@/lib/darstellung";
@@ -406,8 +406,10 @@ function Kopfangabe({ a }: { a: Angabe }) {
  * Kontakt – in einer Zeile, Versorgung und Hinweise in einer schmalen Zeile darunter. Telefon und Versicherung stehen
  * in „Personen und Anschrift“ der Übersicht. Rund 70 px statt vorher 170 px.
  */
-function KopfVoll({ angabe, unter, bearbeiten, mobil }: { angabe: Record<string, Angabe>; unter: Record<string, ReactNode>;
-  bearbeiten?: () => void; mobil?: boolean }) {
+function KopfVoll({ angabe, unter, bearbeiten, mobil, hinweise, anzahlHinweise = 0 }: { angabe: Record<string, Angabe>;
+  unter: Record<string, ReactNode>; bearbeiten?: () => void; mobil?: boolean;
+  /** Telefon: Hinweis-Chips im aufklappbaren Teil */
+  hinweise?: ReactNode; anzahlHinweise?: number }) {
   // Telefon und Tablet: Versorgung und Hinweise auf Antippen – sonst schöbe der Kopf die Akte weit nach unten bzw. ließe
   // der Übersicht im Fenster zu wenig Platz (Nickelallergie und Gewichtsverlust stehen als CAVE ohnehin beim Namen)
   const [mehr, setMehr] = useState(false);
@@ -426,8 +428,9 @@ function KopfVoll({ angabe, unter, bearbeiten, mobil }: { angabe: Record<string,
       {mobil ? (
         <button type="button" className="self-start bg-transparent border-0 p-0 text-[0.8125rem] text-akzent-text cursor-pointer inline-flex items-center gap-1"
           aria-expanded={mehr} onClick={() => setMehr(!mehr)} data-testid="kopf-mehr">
-          {mehr ? "Weniger anzeigen" : "Versorgung und Hinweise"}<Icon name={mehr ? "hoch" : "runter"} groesse={14} /></button>
+          {mehr ? "Weniger anzeigen" : `Versorgung und Hinweise${anzahlHinweise ? ` (${anzahlHinweise})` : ""}`}<Icon name={mehr ? "hoch" : "runter"} groesse={14} /></button>
       ) : null}
+      {hinweise && (!mobil || mehr) ? <div className="flex flex-wrap gap-1.5" data-testid="kopf-hinweise">{hinweise}</div> : null}
       <div className={cx("flex-wrap items-center gap-x-6 gap-y-1 border-t border-fein pt-1.5 text-[0.8125rem] min-w-0", mobil && !mehr ? "hidden" : "flex")}>
         <div role="group" aria-label="Versorgung" className="flex flex-wrap items-center gap-x-4 gap-y-1 min-w-0">
           <span className="sr-only">Versorgung:</span>
@@ -575,6 +578,8 @@ export function Akte() {
     );
   }
   const offen = !p.ist_abgeschlossen;
+  // Telefon mit Kopf „Alle Angaben“: Hinweise im aufklappbaren Teil des Kopfs statt neben dem Namen
+  const hinweiseImKopf = mobil && ansicht === "kopfzeile" && darstellung.aktenkopf === "voll" && !!p.kopf?.hinweise?.length;
   const kontext: AktenKontext = {
     patient: p,
     erfassen: offen && darfBei("eintraege_erfassen", p),
@@ -618,7 +623,8 @@ export function Akte() {
         </button>
       ) : null}
       {/* Hinweise wie in der Patientenliste, dazu fehlende Angaben (F186); mit „×“ für 3/6/12 Monate ausblendbar (F119) */}
-      <HinweisChips hinweise={k?.hinweise ?? []} patientId={p.id} ausblendbar={kontext.bearbeiten} />
+      {/* ruhig: ab zwei Hinweisen ein Chip „N Hinweise ▾“ (Nacharbeit F181); am Telefon stehen sie unter „Versorgung und Hinweise“ */}
+      {hinweiseImKopf ? null : <HinweisChipsKompakt hinweise={k?.hinweise ?? []} patientId={p.id} ausblendbar={kontext.bearbeiten} />}
     </>
   );
   // CAVE: Nickelallergie und Gewichtsverlust stehen in jeder Ansicht direkt beim Namen
@@ -932,7 +938,9 @@ export function Akte() {
           {aktionen(!fhd)}
         </div>
         {k && stufe === "voll" && angabe ? (
-          <KopfVoll angabe={angabe} mobil={schmalerKopf} bearbeiten={kontext.bearbeiten ? () => setDialog("stammdaten") : undefined} unter={{
+          <KopfVoll angabe={angabe} mobil={schmalerKopf}
+            hinweise={hinweiseImKopf ? <HinweisChips hinweise={[...(k.hinweise ?? [])].sort((x, y) => Number(y.stufe === "ueberfaellig") - Number(x.stufe === "ueberfaellig"))} patientId={p.id} ausblendbar={kontext.bearbeiten} /> : undefined}
+            anzahlHinweise={hinweiseImKopf ? k.hinweise?.length : 0} bearbeiten={kontext.bearbeiten ? () => setDialog("stammdaten") : undefined} unter={{
             gewicht: k.bmi != null || k.gewicht ? <>{k.bmi != null ? <><Begriff name="bmi">BMI</Begriff> {zahl(k.bmi, 1)}</> : null}
               {k.bmi != null && k.gewicht ? " · " : null}{k.gewicht ? `gemessen ${datum(k.gewicht.am)}` : null}</> : undefined,
             plan: k.aktueller_plan ? `gültig ab ${datum(k.aktueller_plan.gueltig_ab)}` : undefined,

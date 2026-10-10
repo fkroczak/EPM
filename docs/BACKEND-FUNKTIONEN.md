@@ -3601,6 +3601,12 @@ Praxis erstellen lassen.“ Befunde, Messung vorher/nachher und Rückfragen: `do
   beim Folgeplan; Karte **Prüfung vor der Freigabe** (Gewicht vorhanden/≤ 3 Monate, Präparat zu jeder Menge, Ca/Mg
   stabil, Infusionstage stimmig, Laufzeit, Protonenpumpenhemmer mit Zeiten); **PDF-Vorschau** mit den Eingaben im
   Formular auf jeder Bildschirmgröße (neuer Plan: einmal als Entwurf gespeichert).
+- **Hinweise im Kopf (Nacharbeit 10.10.2026):** ein Hinweis steht direkt als Chip da; ab zwei Hinweisen ein Chip
+  „N Hinweise ▾“ (rot und „· n überfällig“, wenn Überfälliges dabei ist), der die Liste mit den einzelnen Chips und
+  ihrem „×“ aufklappt (Ausblenden über den RuheDialog, F119). Am Telefon stehen die Hinweise unter „Versorgung und
+  Hinweise (N) ▾“. Gemessen mit einer Akte mit 5 Hinweisen und 3 fehlenden Erklärungen: 1366 × 768, 1920 × 1080 und
+  1024 × 768 ohne Seiten-Scrollen (vorher auch, aber Kopf mit sieben Chips in zwei Zeilen, Ende bei 297 px; jetzt
+  271 px, eine Chipzeile). `HinweisChipsKompakt` in `components/HinweisChips.tsx`; Browsertest `layout.spec.ts`.
 - **Navigation:** Administration ab drei Seiten als Gruppe zum Aufklappen (`nav-administration`, gemerkt je Browser,
   auf `/admin…` offen); Routen unverändert.
 - **PDF-Anzeige:** pdf.js als „legacy“-Fassung aus demselben Paket (keine neue Abhängigkeit) – mit der Standardfassung
