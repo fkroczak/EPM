@@ -288,20 +288,27 @@ stehen, der neue Eintrag ist gleich ausgewählt.</p>
         "id": "aktenkopf", "gruppe": "patienten", "titel": "Aktenkopf und Merkliste", "rechte": ["akten_lesen"],
         "seiten": ["/patienten/:id"],
         "html": """
-<p>Der Kopf der Akte zeigt die Kerndaten: Gewicht mit Trend, BMI, Katheter, Versorger, Ansprechpartner, aktuellen Plan,
-nächsten Termin, Hausarzt, <strong>Auskunft an</strong> (Personen mit Schweigepflichtentbindung) und Nickelallergie.
-Fehlt eine Erklärung zum Datenschutz, steht ein Hinweis neben dem Namen.</p>
-<p>Die Knöpfe im Kopf: <strong>Kontakt</strong>, <strong>Gewicht</strong> und <strong>Termin</strong> öffnen jeweils
-denselben Dialog wie überall sonst (die Seite bleibt, wo sie ist); <strong>Neuer Plan</strong> – oder
-<strong>Entwurf fortsetzen</strong>, wenn es schon einen Entwurf gibt. Unter <strong>Weitere Aktionen</strong>:
-Stammdaten bearbeiten, Dokument hochladen, Akte als PDF, Unterlagen für die Sprechstunde, Schreiben und E-Mail,
-Akte abschließen.
-Dokumente lassen sich auch einfach auf die geöffnete Akte ziehen.</p>
+<p>Der Kopf der Akte ist schmal: in der ersten Zeile Name, Nummer, Geburtsdatum und die Knöpfe, darunter vier Kennzahlen –
+<strong>Gewicht</strong> (mit Trend und BMI), <strong>Infusionsplan</strong>, <strong>nächster Termin</strong>,
+<strong>letzter Kontakt</strong> – und eine Zeile mit Versorger, Ansprechpartner, Hausarzt, Katheter, Nickelallergie und
+<strong>Auskunft an</strong> (Personen mit Schweigepflichtentbindung). Auf dem Tablet und am Telefon steht diese Zeile hinter
+<strong>Versorgung und Hinweise</strong>. Fehlt eine Erklärung zum Datenschutz, steht ein Hinweis neben dem Namen.</p>
+<p>Die Knöpfe im Kopf: <strong>Kontakt</strong>, <strong>Gewicht</strong>, <strong>Termin</strong> und
+<strong>Dokument</strong> öffnen jeweils denselben Dialog bzw. die Dateiauswahl (die Seite bleibt, wo sie ist);
+<strong>Neuer Plan</strong> – oder <strong>Entwurf fortsetzen</strong>, wenn es schon einen Entwurf gibt. Unter
+<strong>Weitere Aktionen</strong> (⋯): Stammdaten bearbeiten, Akte als PDF, Unterlagen für die Sprechstunde, Schreiben
+und E-Mail, Akte abschließen. Dokumente lassen sich auch einfach auf die geöffnete Akte ziehen.</p>
 <p>Der <strong>Stern</strong> neben dem Namen setzt die Akte auf deine Merkliste; sie erscheint dann auf der Startseite
 unter „Meine Akten“. Dort stehen auch die zuletzt geöffneten Akten. Merkliste und Verlauf sieht nur die Person selbst.</p>
-<p>Jeder Bereich hat seinen eigenen Reiter: Übersicht, Diagnosen, Therapie, Empfehlung, Kontakte, Infusionspläne, Labor,
-BIA, Berichte, Dokumente, Datenschutz und Verlauf. Wie die Akte aufgebaut ist (Kopfzeile, Seitenleiste, Karteikarte),
-stellt jede Person unter <strong>Design</strong> ein. Tastenkürzel siehe „Tastenkürzel in der Akte“.</p>
+<p>Jeder Bereich hat seinen eigenen Reiter. Vorn stehen die Bereiche der Behandlung – <strong>Übersicht, Diagnosen,
+Therapie, Empfehlung, Infusionspläne, Kontakte</strong> –, kleiner danach Labor, BIA, Berichte und Dokumente, ganz rechts
+Verlauf und Datenschutz. Wie die Akte aufgebaut ist (Kopfzeile, Seitenleiste, Karteikarte), stellt jede Person unter
+<strong>Design</strong> ein. Tastenkürzel siehe „Tastenkürzel in der Akte“.</p>
+<p><strong>Ohne Scrollen:</strong> Am PC (ab 1024 × 600 Bildpunkten) passt die Akte ins Fenster. Kopf und Reiter bleiben
+immer stehen; ist ein Bereich länger, scrollt nur er – in der Übersicht jede Karte für sich, in Reitern mit zwei Spalten
+jede Spalte für sich. Die Übersicht zeigt sechs Karten in zwei Reihen: Gewicht, aktueller Infusionsplan (mit
+<strong>PDF ansehen</strong>), Diagnosen/Therapie/Empfehlung, Kontakte und Termine, Labor und BIA, Personen und Anschrift
+(Bezugspersonen, Ärzte, Anschrift). Am Telefon scrollt die Seite wie gewohnt.</p>
 <p>Hinweise am Namen (Gewichtsverlust, Plan oder Befund zu alt, Kontakt fällig …) lassen sich mit dem <strong>×</strong>
 ausblenden. Dabei wird gewählt, wie lange Ruhe sein soll – 3, 6 oder 12 Monate, danach erscheint der Hinweis von allein
 wieder – oder <strong>nicht mehr nötig</strong>. Was gerade ausgeblendet ist, steht in der Übersicht der Akte unter
@@ -531,9 +538,13 @@ kleinen Verlauf der letzten 6 Monate in echten Zeitabständen.</p>""",
 <p>Der Reiter <strong>Infusionspläne</strong> der Akte zeigt den aktuellen Plan, Entwürfe und frühere Pläne mit den
 Änderungen gegenüber dem Vorgänger. Ein freigegebener Plan hat eine gespeicherte PDF mit Prüfsumme; EPM prüft beim Öffnen,
 ob sie unverändert ist.</p>
-<p>Die Ansicht wie PDF erscheint klein als Vorschau; ein Klick darauf (oder „Groß ansehen“) öffnet sie groß.</p>
+<p>Die <strong>PDF</strong> steht direkt neben der Liste der Pläne, so hoch wie das Fenster: eine ganze Seite auf einen
+Blick (<strong>Ganze Seite</strong>; − und + vergrößern auf die Breite). <strong>Groß ansehen</strong> öffnet sie im
+Fenster, <strong>Herunterladen</strong> speichert sie. Entwürfe zeigen die Ansicht mit der aktiven Dokumentvorlage und dem
+Wasserzeichen „ENTWURF“.</p>
 <p>Der Menüpunkt <strong>Infusionspläne</strong> zeigt die Pläne aller Patienten: zur Freigabe, aktuell und älter als
-eingestellt. Beim Überfahren des Status steht die Frist, ab der ein Plan als alt gilt.</p>
+eingestellt. Beim Überfahren des Status steht die Frist, ab der ein Plan als alt gilt. <strong>PDF</strong> gibt es an
+jedem Plan (auch an Entwürfen); ab 1920 Bildpunkten Breite erscheint sie rechts neben der Liste, sonst im Fenster.</p>
 <p>Jede Akte in Betreuung braucht einen freigegebenen Plan, sonst erscheint der Hinweis <strong>Kein
 Infusionsplan</strong>. Braucht ein Patient keinen, unter Infusionspläne <strong>Kein Plan nötig</strong> wählen (mit
 Grund): Der Hinweis und die Warnung „Plan älter als …“ entfallen; mit der nächsten Freigabe eines Plans endet die
@@ -544,11 +555,19 @@ Bestätigung.</p>""",
         "seiten": ["/patienten/:id/plaene/neu", "/patienten/:id/plaene/:id/bearbeiten"],
         "html": """
 <p><strong>Neuer Plan</strong> übernimmt die Werte des aktuellen Plans; geänderte Werte sind markiert. Beim ersten Plan
-schlägt EPM Werte je kg Körpergewicht vor. <strong>Leer beginnen</strong> startet ohne Werte.</p>
-<p>Volumen im Mischbeutel und Rate rechnet EPM aus dem letzten Gewicht; Werte außerhalb der Grenzwerte werden
-angemahnt. <strong>Als Entwurf speichern</strong> macht den Plan für das Team sichtbar, noch nicht für den Versorger.</p>
-<p>Ab 1920 px Fensterbreite zeigt eine dritte Spalte die <strong>PDF-Vorschau</strong> des zuletzt gespeicherten
-Entwurfs (mit Wasserzeichen „ENTWURF“); nach jedem Speichern wird sie neu erzeugt.</p>""",
+schlägt EPM Werte je kg Körpergewicht vor (Vorgabe der Praxis wie im Altsystem: Glucose 3,5 g, Aminosäuren 1,2 g,
+Lipide 1 g, Natrium 1,3, Kalium 0,7, Phosphat 0,3, Calcium 0,15, Magnesium 0,2 mmol je kg). <strong>Mengen nach
+Praxisvorgabe</strong> setzt diese Mengen jederzeit neu aus dem letzten Gewicht ein – Präparate und Zusätze bleiben.
+<strong>Leer beginnen</strong> startet ohne Werte; <strong>Als Vorlage für neuen Plan</strong> (an einem früheren Plan)
+übernimmt dessen Werte.</p>
+<p>Volumen im Mischbeutel (letztes Gewicht × 35 ml) und Rate rechnet EPM mit. Die Karte <strong>Prüfung vor der
+Freigabe</strong> sagt in einfachen Worten, was noch fehlt oder nicht passt: Gewicht vorhanden und nicht älter als
+3 Monate, Präparat zu jeder Menge, Calcium + Magnesium stabil, Infusionstage stimmig, Laufzeit eingetragen,
+Protonenpumpenhemmer mit Zeiten. Werte außerhalb der Grenzwerte stehen darüber. <strong>Als Entwurf speichern</strong>
+macht den Plan für das Team sichtbar, noch nicht für den Versorger.</p>
+<p><strong>PDF-Vorschau</strong> zeigt die PDF mit genau den Werten, die gerade im Formular stehen – auch ungespeicherte;
+gespeichert wird dabei nichts (ein neuer Plan wird dafür einmal als Entwurf gespeichert). Ab 1920 px zeigt zusätzlich eine
+dritte Spalte die Vorschau des zuletzt gespeicherten Entwurfs.</p>""",
     },
     {
         "id": "plan_freigeben", "gruppe": "plaene", "titel": "Plan freigeben", "rechte": ["plaene_freigeben"], "seiten": [],
