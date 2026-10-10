@@ -11,6 +11,12 @@ Container bzw. Server weniger als SPAR_GRENZE_MB Speicher hat) | voll | sparsam.
 Es ist ein reines Texterkennungsmodell, kein Sprachmodell: Es liest Zeichen, schlägt nichts vor und ergänzt nichts.
 Die Modelle liegen im Image (``EPM_OCR_MODELLE``, Herkunft und Prüfsummen in ``scans/modelle.json``); zur Laufzeit
 wird nichts nachgeladen. Fehlen sie, arbeitet die Erkennung nur mit Tesseract – die Systemseite und „Scans“ sagen das.
+
+Komplett offline (Vorgabe 10.10.2026, F182): EPM nutzt weder die Bibliothek PaddleOCR noch PaddleX, sondern liest die
+ONNX-Dateien selbst mit onnxruntime – es gibt keinen Programmteil, der Modelle herunterladen könnte. Zur Sicherheit
+setzt ``offline_erzwingen()`` beim Laden die Schalter, mit denen Paddle, PaddleX und Hugging Face jeden Download
+unterlassen, und ``_sitzung`` öffnet nur Dateien unter ``EPM_OCR_MODELLE`` (keine Adressen). Geprüft wird das mit
+einem Test, der während der Erkennung jeden Netzwerkzugriff verbietet (scans/test_lernen.py, OfflineTest).
 """
 from __future__ import annotations
 
@@ -54,12 +60,40 @@ class PZeile:
     zeichen: list
 
 
+# Schalter gegen automatische Downloads (falls doch einmal eine dieser Bibliotheken im Image landet)
+OFFLINE_UMGEBUNG = {
+    "HF_HUB_OFFLINE": "1",                        # Hugging Face Hub: nur Zwischenspeicher, kein Netz
+    "TRANSFORMERS_OFFLINE": "1",
+    "HF_HUB_DISABLE_TELEMETRY": "1",
+    "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK": "True",  # PaddleX: keine Prüfung der Modellquellen im Netz
+    "PADDLEOCR_DISABLE_AUTO_DOWNLOAD": "1",
+    "DISABLE_MODEL_SOURCE_CHECK": "True",
+    "DO_NOT_TRACK": "1",
+}
+
+
+def offline_erzwingen():
+    """Download- und Telemetrie-Schalter setzen (vorhandene Werte bleiben, außer sie würden Downloads erlauben)."""
+    for name, wert in OFFLINE_UMGEBUNG.items():
+        os.environ[name] = wert
+
+
+offline_erzwingen()
+
+
 def modell_ordner() -> Path:
-    return Path(os.environ.get("EPM_OCR_MODELLE", "/opt/ocr-modelle"))
+    ordner = os.environ.get("EPM_OCR_MODELLE", "/opt/ocr-modelle")
+    if "://" in ordner:
+        raise ValueError("EPM_OCR_MODELLE muss ein Verzeichnis auf dem Server sein, keine Adresse.")
+    return Path(ordner)
 
 
 def _sitzung(pfad: Path):
     import onnxruntime as ort
+
+    pfad = Path(pfad)
+    if "://" in str(pfad) or not pfad.is_file():
+        raise FileNotFoundError(f"Modelldatei fehlt: {pfad} – es wird nichts heruntergeladen")
 
     opt = ort.SessionOptions()
     threads = int(os.environ.get("EPM_OCR_THREADS", "2"))

@@ -438,8 +438,11 @@ def seiten_anlegen(scan: Scan) -> list[ScanSeite]:
 
 
 def woerterliste_schreiben(ziel: Path):
-    """Fachwörter (Vorlagen › Grenzwerte) und Namen des Laborkatalogs als Wörterliste für Tesseract."""
+    """Fachwörter (Vorlagen › Grenzwerte), Namen des Laborkatalogs und häufig bestätigte gelernte Bezeichnungen (F182)
+    als Wörterliste für Tesseract."""
     from stammdaten.models import Laborparameter
+
+    from . import lernen
 
     woerter = set()
     for w in (Einstellungen.aktuell().ocr_fachwoerter or "").splitlines():
@@ -449,6 +452,7 @@ def woerterliste_schreiben(ziel: Path):
         for teil in f"{name} {kurz}".replace("(", " ").replace(")", " ").split():
             if len(teil) >= 3 and any(c.isalpha() for c in teil):
                 woerter.add(teil)
+    woerter |= lernen.woerter()
     ziel.write_text("\n".join(sorted(woerter)) + "\n", encoding="utf-8")
 
 
@@ -544,7 +548,9 @@ def auswerten(scan: Scan):
                 verfahren.append(v)
     scan.verfahren = verfahren
     originale_info = (scan.auswertung or {}).get("originale", [])
-    a = auswertung.auswerten(ergebnisse, katalog(), timezone.localdate())
+    from . import lernen
+
+    a = auswertung.auswerten(ergebnisse, katalog(), timezone.localdate(), lernen.gelerntes())
     a["originale"] = originale_info
     scan.auswertung = a
     scan.dokumentdatum = a.get("datum") or None
@@ -640,42 +646,102 @@ def bearbeiten(scan: Scan, paddle=None, abbrechen=lambda: False) -> Scan:
 
 
 # ---------------------------------------------------------------- Patient finden und prüfen
+def _aehnlicher_name(teil: str, kandidaten: set[str]) -> str | None:
+    """Ein Wort aus ``kandidaten``, das ``teil`` mit wenigen Lesefehlern entspricht (1 Fehler ab 4, 2 ab 8 Zeichen)."""
+    if len(teil) < 4:
+        return None
+    grenze = 1 if len(teil) < 8 else 2
+    beste = None
+    for k in kandidaten:
+        if k == teil:
+            return k
+        a = auswertung.abstand(teil, k)
+        if 0 < a <= grenze and (beste is None or a < beste[0]):
+            beste = (a, k)
+    return beste[1] if beste else None
+
+
 def patient_vorschlaege(scan: Scan, user, anzahl: int = 3) -> list[dict]:
-    """Patienten, auf die das Dokument hinweist (Nummer, Geburtsdatum, Name). Bestätigen muss immer ein Mensch."""
+    """Patienten, auf die das Dokument hinweist (F183): Name (auch mit Lesefehlern), Geburtsdatum (exakt, starkes
+    Merkmal), Nummer. Nur Akten, die diese Person sehen darf. Zugeordnet wird nie automatisch – bestätigen muss immer
+    ein Mensch.
+
+    Stufe je Vorschlag: „sicher“ (Name und Geburtsdatum), „wahrscheinlich“ (genug Merkmale), „unsicher“ (nur ein
+    schwaches Merkmal – die Oberfläche zeigt dann nur einen Hinweis). Passt das Geburtsdatum im Dokument nicht zur Akte,
+    sinkt die Stufe (zwei Personen gleichen Namens)."""
     from epm.api_basis import patienten_fuer
 
     h = (scan.auswertung or {}).get("patient") or {}
     nummern = set(h.get("nummern") or [])
     geburt = set(h.get("geburtsdaten") or [])
     woerter = set(h.get("woerter") or [])
-    if not (nummern or geburt or woerter):
+    namen = set(h.get("namen") or [])
+    if not (nummern or geburt or woerter or namen):
         return []
     qs = patienten_fuer(user)
     if scan.ist_test:
         qs = qs.filter(ist_test=True)
     kandidaten = []
     for p in qs.only("id", "nummer", "nachname", "vorname", "geburtsdatum", "ist_test", "abgeschlossen_am").iterator():
-        punkte, gruende = 0, []
-        if p.nummer in nummern:
-            punkte += 3
-            gruende.append(f"Nr. {p.nummer}")
-        if p.geburtsdatum and p.geburtsdatum.isoformat() in geburt:
-            punkte += 3
-            gruende.append("Geburtsdatum")
+        punkte, gruende = 0.0, []
+        name_ok = name_aehnlich = False
         nach = auswertung.norm(p.nachname).split()
-        if nach and all(t in woerter for t in nach):
-            punkte += 2
-            gruende.append("Nachname")
         vor = auswertung.norm(p.vorname).split()[:1]
-        if vor and vor[0] in woerter:
-            punkte += 2 if nach and all(t in woerter for t in nach) else 1
-            gruende.append("Vorname")
-        if punkte >= 4:
-            kandidaten.append({"id": p.id, "nummer": p.nummer, "name": f"{p.nachname}, {p.vorname}",
-                               "geburtsdatum": p.geburtsdatum, "ist_test": p.ist_test,
-                               "abgeschlossen": p.abgeschlossen_am is not None, "punkte": punkte,
-                               "grund": ", ".join(gruende)})
-    kandidaten.sort(key=lambda k: (-k["punkte"], k["name"]))
+        if nach and all(t in woerter or t in namen for t in nach):
+            punkte += 2
+            name_ok = True
+        elif nach and namen:
+            gelesen = [_aehnlicher_name(t, namen) for t in nach]
+            if all(gelesen):
+                punkte += 1.5
+                name_aehnlich = True
+                gruende.append(f"Name ähnlich gelesen („{' '.join(gelesen)}“)")
+        vorname = False
+        if vor and (vor[0] in woerter or vor[0] in namen):
+            punkte += 2 if (name_ok or name_aehnlich) else 1
+            vorname = True
+        elif vor and namen and _aehnlicher_name(vor[0], namen):
+            punkte += 1
+            vorname = True
+        geb_ok = bool(p.geburtsdatum and p.geburtsdatum.isoformat() in geburt)
+        geb_falsch = bool(geburt and p.geburtsdatum and not geb_ok)
+        if geb_ok:
+            punkte += 3
+        elif geb_falsch:
+            punkte -= 2
+        nummer_ok = p.nummer in nummern
+        if nummer_ok:
+            punkte += 3
+        if punkte < 2:
+            continue
+        if (name_ok or name_aehnlich) and geb_ok:
+            stufe = "sicher"
+            gruende.insert(0, "Name und Geburtsdatum erkannt" if name_ok else "Geburtsdatum erkannt")
+        elif punkte >= 4 and not geb_falsch:
+            stufe = "wahrscheinlich"
+        else:
+            stufe = "unsicher"
+        if not gruende or gruende[0] not in ("Name und Geburtsdatum erkannt", "Geburtsdatum erkannt"):
+            teile = []
+            if name_ok:
+                teile.append("Name" if vorname else "Nachname")
+            elif vorname and not name_aehnlich:
+                teile.append("Vorname")
+            if geb_ok:
+                teile.append("Geburtsdatum")
+            if teile:
+                gruende.insert(0, " und ".join(teile) + " erkannt")
+        if nummer_ok:
+            gruende.append(f"Nr. {p.nummer}")
+        if geb_falsch:
+            gruende.append("Geburtsdatum im Dokument passt nicht")
+        kandidaten.append({"id": p.id, "nummer": p.nummer, "name": f"{p.nachname}, {p.vorname}",
+                           "nachname": p.nachname, "vorname": p.vorname,
+                           "geburtsdatum": p.geburtsdatum, "ist_test": p.ist_test,
+                           "abgeschlossen": p.abgeschlossen_am is not None, "punkte": punkte, "stufe": stufe,
+                           "grund": ", ".join(gruende)})
+    rang = {"sicher": 0, "wahrscheinlich": 1, "unsicher": 2}
+    kandidaten.sort(key=lambda k: (rang[k["stufe"]], -k["punkte"], k["name"]))
     return kandidaten[:anzahl]
 
 

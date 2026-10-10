@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, apiDatei } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { datum, zahl, zeitpunkt } from "@/lib/format";
-import type { Scan, ScanZeile } from "@/lib/typen";
+import type { Scan, ScanVorschlag, ScanZeile } from "@/lib/typen";
 import { Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Segmente, cx } from "@/components/ui/basis";
 import { Dialog, Menue } from "@/components/ui/dialog";
 import type { MenuEintrag } from "@/components/ui/dialog";
@@ -19,6 +19,7 @@ import { Seitenansicht } from "./Seitenansicht";
 import { SeiteBearbeiten } from "./SeiteBearbeiten";
 import { Zuordnen } from "./Zuordnen";
 import type { Stelle, Ziel } from "./Zuordnen";
+import { PatientVorschlag } from "./PatientVorschlag";
 
 function Fortschritt({ scan }: { scan: Scan }) {
   return (
@@ -93,6 +94,8 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
   const [seiteIndex, setSeiteIndex] = useState(0);
   const [ansicht, setAnsicht] = useState<"seite" | "alle">("alle");
   const [zuordnen, setZuordnen] = useState(false);
+  // F183: in der Ansicht mit einem Klick übernommener Patientenvorschlag (zugeordnet wird erst beim Speichern)
+  const [startPatient, setStartPatient] = useState<ScanVorschlag | null>(null);
   const [stelle, setStelle] = useState<Stelle>(null);
   // Zuordnen: gewähltes Feld, in das ein Klick auf ein Wort im Bild den Wert schreibt
   const [ziel, setZiel] = useState<Ziel>(null);
@@ -108,7 +111,7 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
   const [zusammenMit, setZusammenMit] = useState("");
 
   // beim Wechsel des Scans von vorn
-  useEffect(() => { setSeiteIndex(0); setZuordnen(false); setStelle(null); setZiel(null); setBereichModus(false); setOriginal(false); }, [id]);
+  useEffect(() => { setSeiteIndex(0); setZuordnen(false); setStartPatient(null); setStelle(null); setZiel(null); setBereichModus(false); setOriginal(false); }, [id]);
   // eine markierte Stelle auf einer anderen Seite: dorthin blättern
   useEffect(() => {
     if (stelle && s && s.seiten[seiteIndex]?.nr !== stelle.seite + 1) {
@@ -219,6 +222,12 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
           {s.verfahren.every((v) => v === "textebene") ? "Text aus der PDF übernommen" : "Text automatisch erkannt – bitte prüfen"}</span> : null}
       </div>
       {laeuft ? <Fortschritt scan={s} /> : null}
+      {fertig && !zuordnen && !s.quelle && darf("eintraege_erfassen") && s.vorschlaege?.length ? (
+        <div className="px-4 sm:px-5 py-3 border-b border-rand">
+          <PatientVorschlag vorschlaege={s.vorschlaege} knopf="Übernehmen und zuordnen"
+            onWahl={(v) => { setStartPatient(v); setZuordnen(true); }} />
+        </div>
+      ) : null}
       {s.status === "fehler" ? (
         <div className="px-4 sm:px-5 py-3 border-b border-rand">
           <Meldung art="fehler"><span className="flex items-center gap-3 flex-wrap">{s.fehler || "Die Erkennung ist fehlgeschlagen."}
@@ -310,8 +319,8 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
           {/* Text oder Zuordnen */}
           <div className="flex flex-col gap-3 min-w-0">
             {zuordnen && fertig ? (
-              <Zuordnen key={s.id} scan={s} onStelle={setStelle} ziel={ziel} onZiel={setZiel}
-                onAbbrechen={() => { setZuordnen(false); setStelle(null); setZiel(null); }}
+              <Zuordnen key={s.id} scan={s} onStelle={setStelle} ziel={ziel} onZiel={setZiel} startPatient={startPatient}
+                onAbbrechen={() => { setZuordnen(false); setStartPatient(null); setStelle(null); setZiel(null); }}
                 onFertig={(patientId, dokumentId) => { setZuordnen(false); setZiel(null); onZugeordnet(patientId, dokumentId, s.titel); }} />
             ) : (
               <>
