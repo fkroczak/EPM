@@ -214,7 +214,9 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
           <button type="button" className="bg-transparent border-0 p-0 text-akzent-text cursor-pointer text-[0.8125rem]"
             onClick={() => aktion.mutate({ pfad: "verlaengern/" })} data-testid="scan-verlaengern">verlängern</button>
         ) : <span>Höchstdauer erreicht ({datum(s.hoechst_bis)})</span>}
-        {s.verfahren.length ? <span>gelesen mit {s.verfahren.map((v) => ({ paddle: "PP-OCR", tesseract: "Tesseract", textebene: "Text der PDF" }[v] ?? v)).join(" + ")}</span> : null}
+        {/* Programmnamen nur im Tooltip – für die Arbeit zählt, wie der Text zustande kam (Bedienung für Pflegekräfte, 10.10.2026) */}
+        {s.verfahren.length ? <span title={`gelesen mit ${s.verfahren.map((v) => ({ paddle: "PP-OCR", tesseract: "Tesseract", textebene: "Text der PDF" }[v] ?? v)).join(" + ")}`}>
+          {s.verfahren.every((v) => v === "textebene") ? "Text aus der PDF übernommen" : "Text automatisch erkannt – bitte prüfen"}</span> : null}
       </div>
       {laeuft ? <Fortschritt scan={s} /> : null}
       {s.status === "fehler" ? (
@@ -297,8 +299,10 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
             ) : null}
             {seite.info.sparstufe ? (
               <span className="text-xs text-warn" data-testid="seite-sparsam">
-                {seite.info.sparstufe >= 2 ? "Nur mit Tesseract erkannt" : "Sparsam erkannt (ohne Glätten, kleinere Zeilensuche)"}
-                {" "}– der Erkennungsdienst wurde vorher bei dieser Seite beendet (Speichergrenze). „Anpassen“ erkennt sie erneut.
+                <span title={seite.info.sparstufe >= 2 ? "nur mit Tesseract erkannt" : "sparsam erkannt (ohne Glätten, kleinere Zeilensuche)"}>
+                  Vereinfacht erkannt</span>
+                {" "}– für diese Seite reichte der Arbeitsspeicher des Servers nicht. Bitte den Text besonders genau prüfen;
+                „Anpassen“ erkennt die Seite erneut.
               </span>
             ) : null}
           </div>

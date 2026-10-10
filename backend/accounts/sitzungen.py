@@ -65,7 +65,7 @@ def aktive_sitzungen(user):
 
 
 def schluessel_erneuert(alt: str | None, neu: str | None):
-    """Nach ``cycle_key`` (z. B. Kennwortwechsel) gehört die erfasste Sitzung zum neuen Schlüssel."""
+    """Nach ``cycle_key`` (z. B. Passwortwechsel) gehört die erfasste Sitzung zum neuen Schlüssel."""
     if alt and neu and alt != neu:
         Sitzung.objects.filter(sitzungsschluessel=alt).update(sitzungsschluessel=neu)
 
@@ -76,7 +76,7 @@ def sitzung_beenden(sitzung: Sitzung):
 
 
 def alle_sitzungen_beenden(user, ausser: str | None = None):
-    """z. B. nach Sperre oder neuem Einmal-Kennwort: alle anderen Anmeldungen beenden."""
+    """z. B. nach Sperre oder neuem Einmal-Passwort: alle anderen Anmeldungen beenden."""
     for s in Sitzung.objects.filter(benutzer=user).exclude(sitzungsschluessel=ausser or ""):
         sitzung_beenden(s)
 

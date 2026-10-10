@@ -38,7 +38,7 @@ RECHTE = [
     ("dokumente_umhaengen", "Dokumente einem anderen Patienten zuordnen",
      "bei falsch zugeordneten Dokumenten; mit Grund, im Verlauf beider Akten und im Audit-Log"),
     ("dokumente_loeschen", "Dokumente endgültig löschen",
-     "nur Mediziner und Admin; mit Kennwort, Code aus der Authenticator-App und Bestätigungscode; im Audit-Log"),
+     "nur Mediziner und Admin; mit Passwort, Code aus der Authenticator-App und Bestätigungscode; im Audit-Log"),
     ("scans_bearbeiten", "Scans: hochladen, erkennen, zuordnen",
      "Menüpunkt „Scans“: Dokumente hochladen, aufbereiten, Text erkennen lassen und kopieren, Scans verlängern und "
      "löschen; einem Patienten zuordnen und Werte übernehmen nur zusätzlich mit „Kontakte, Gewichte, Termine, "
@@ -58,14 +58,14 @@ RECHTE = [
     ("datenschutz_entscheiden", "Datenschutz: Anfragen entscheiden, Verarbeitung einschränken",
      "Anfragen mit Ergebnis erledigen; Akten einschränken, Einsicht nehmen; Aufbewahrung verlängern"),
     ("akten_loeschen", "Akten endgültig löschen",
-     "nur Mediziner und Admin; nach Ablauf der Aufbewahrungsfrist oder auf Antrag; mit Kennwort, Code aus der "
+     "nur Mediziner und Admin; nach Ablauf der Aufbewahrungsfrist oder auf Antrag; mit Passwort, Code aus der "
      "Authenticator-App und Bestätigungscode; im Löschprotokoll und im Audit-Log"),
     ("versorger_pflegen", "Versorger, Ansprechpartner und Ärzte pflegen",
      "gemeinsame Listen: Versorger mit Ansprechpartnern, Ärzte mit Kontaktdaten"),
     ("vorlagen_pflegen", "Vorlagen pflegen", "Briefkopf und Logo, Auswahllisten, Präparate, Grenzwerte"),
     ("audit_lesen", "Audit-Log lesen", ""),
     ("benutzer_verwalten", "Benutzer und Rechte verwalten",
-     "Benutzer anlegen, sperren, Einmal-Kennwort, 2FA zurücksetzen, Rechte der Gruppen"),
+     "Benutzer anlegen, sperren, Einmal-Passwort, 2FA zurücksetzen, Rechte der Gruppen"),
     ("backup_verwalten", "Sicherungen verwalten", "Sicherung starten, wiederherstellen"),
     ("testdaten_sehen", "Testdaten sehen (Testpatienten und Testbenutzer)",
      "ohne dieses Recht erscheinen Testpatienten (Nr. ab 9001) und Testbenutzer nirgends – nicht in Listen, Suche, "

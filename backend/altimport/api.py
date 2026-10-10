@@ -134,7 +134,7 @@ class ProbelaufView(APIView):
 
 
 def _bestaetigt(request, was: str, wort: str | None = None):
-    """Kennwort und zweiter Faktor; bei unumkehrbaren Schritten zusätzlich das abgetippte Wort. → Fehler oder None."""
+    """Passwort und zweiter Faktor; bei unumkehrbaren Schritten zusätzlich das abgetippte Wort. → Fehler oder None."""
     from system.api import bestaetigung_pruefen
 
     if wort is not None:

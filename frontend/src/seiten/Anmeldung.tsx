@@ -1,6 +1,6 @@
 /**
  * Entwurf 1 · Anmeldung mit 2FA. Dazu die Schritte der ersten Anmeldung:
- * eigenes Kennwort festlegen → Authenticator einrichten → Notfall-Codes notieren.
+ * eigenes Passwort festlegen → Authenticator einrichten → Notfall-Codes notieren.
  */
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
@@ -62,6 +62,11 @@ function fehlertext(e: unknown) {
   return "Keine Verbindung zum Server. Bitte später erneut versuchen.";
 }
 
+/** Lösungsweg zur Fehlermeldung (Bedienung für Pflegekräfte, 10.10.2026): was als Nächstes zu tun ist */
+const WEITER_ANMELDEN = "Bitte Schreibweise prüfen – Groß- und Kleinschreibung zählt (Feststelltaste?). Nach fünf "
+  + "Fehlversuchen wird das Konto gesperrt; entsperren kann die Administration.";
+const WEITER_CODE = "Der Code wechselt alle 30 Sekunden – bitte den gerade angezeigten eingeben. Ohne Telefon geht ein Notfall-Code.";
+
 function Formular({ titel, text, onSubmit, children }: { titel: string; text?: ReactNode;
   onSubmit: (e: FormEvent) => void; children: ReactNode }) {
   return (
@@ -79,6 +84,7 @@ function SchrittAnmelden() {
   const [kennwort, setKennwort] = useState("");
   const [fehler, setFehler] = useState("");
   const [laedt, setLaedt] = useState(false);
+  const [gross, setGross] = useState(false);
   const absenden = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !kennwort) {
@@ -90,7 +96,7 @@ function SchrittAnmelden() {
     try {
       setStatus(await api<Status>("auth/anmelden/", { body: { benutzername: name.trim(), kennwort }, ohneAbmeldeSignal: true }));
     } catch (err) {
-      setFehler(fehlertext(err));
+      setFehler(err instanceof ApiFehler && err.status === 401 ? `${fehlertext(err)} ${WEITER_ANMELDEN}` : fehlertext(err));
       setKennwort("");
     } finally {
       setLaedt(false);
@@ -103,8 +109,12 @@ function SchrittAnmelden() {
       </Feld>
       <Feld label="Passwort">
         {(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort}
-          onChange={(e) => setKennwort(e.target.value)} />}
+          onChange={(e) => setKennwort(e.target.value)}
+          onKeyUp={(e) => setGross(e.getModifierState?.("CapsLock") ?? false)}
+          onBlur={() => setGross(false)} />}
       </Feld>
+      {gross ? <span className="text-[0.8125rem] text-warn flex items-center gap-1.5 -mt-2" role="status" data-testid="feststelltaste">
+        <Icon name="warnung" groesse={14} />Die Feststelltaste ist an – das Passwort wird in Großbuchstaben getippt.</span> : null}
       {fehler ? <Meldung art="fehler">{fehler}</Meldung> : null}
       <Knopf type="submit" variante="pri" className="w-full" laedt={laedt}>Weiter</Knopf>
     </Formular>
@@ -124,7 +134,8 @@ function SchrittCode() {
   const vorrat = useRef(new PasskeyVorrat("anmelden"));
   useEffect(() => { if (art === "passkey") vorrat.current.vorbereiten(); }, [art]);
   const beiFehler = async (err: unknown) => {
-    setFehler(err instanceof ApiFehler || !(err instanceof Error) ? fehlertext(err) : err.message);
+    const text = err instanceof ApiFehler || !(err instanceof Error) ? fehlertext(err) : err.message;
+    setFehler(err instanceof ApiFehler && err.status === 401 && art === "code" && text.startsWith("Code") ? `${text} ${WEITER_CODE}` : text);
     if (err instanceof ApiFehler && err.status === 403) await abmelden();
   };
   const absenden = async (e: FormEvent) => {
@@ -204,7 +215,7 @@ function SchrittKennwort() {
   };
   return (
     <Formular titel="Eigenes Passwort festlegen"
-      text="Das Einmal-Kennwort gilt nur für die erste Anmeldung. Wähle jetzt ein eigenes Passwort mit mindestens 12 Zeichen."
+      text="Das Einmal-Passwort gilt nur für die erste Anmeldung. Wähle jetzt ein eigenes Passwort mit mindestens 12 Zeichen."
       onSubmit={absenden}>
       <Feld label="Neues Passwort" hinweis="Mindestens 12 Zeichen, nicht nur Ziffern, nicht ähnlich zum Benutzernamen.">
         {(p) => <Eingabe {...p} type="password" autoComplete="new-password" value={neu} onChange={(e) => setNeu(e.target.value)} autoFocus />}
