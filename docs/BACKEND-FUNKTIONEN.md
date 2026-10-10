@@ -3838,6 +3838,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 10.10.2026 | Version 2.0.0 | Zweite Fassung von EPM: Versionsnummer von 0.2.0 auf 2.0.0 (Festlegung Filip 10.10.2026); enthält F177–F189. Images heißen `epm-backend:2.0.0-<Commit>` |
 | 10.10.2026 | Hinweise im Infusionsplan | Plan-Editor zeigt Laborwerte außerhalb des Referenzbereichs seit dem letzten Plan (nur Bestandteile des Plans) mit Verlauf der letzten drei Werte, deutliche Gewichtsänderung, Entwicklung der eigenen Pläne und fehlendes Labor mit „Blutuntersuchung anfordern“ – nur zum Prüfen, ohne Dosisvorschlag (MDR) (F187). Lauf steht aus |
 | 10.10.2026 | Nachtrag Systemverwaltung | Zeitplan der nächtlichen Sicherung (Uhrzeit, täglich/werktags, Warnung zum Übertragungsfenster), Journal und alte Versionen aufräumen (laufende und vorherige geschützt), Uhrzeit mit eigenem Zeitserver einstellen, OCR-Modelle mit 2FA (F179l–F179o). Lauf steht aus |
 | 10.10.2026 | Texterkennung lernt mit | Gelernte Zuordnungen aus Korrekturen beim Übernehmen (Labor, BIA, Diagnosen, Spaltenlage je Labor; ohne Patientendaten), Anwendung vor der Ähnlichkeitssuche mit Schwelle, Bereich „Gelernte Zuordnungen“, Kennzahl „korrigiert“ (F182); Patient aus Name und Geburtsdatum vorschlagen, nur per Klick (F183); Offline-Prüfung (`docs/OFFLINE-BETRIEB-2026-10-10.md`). Lauf steht aus |

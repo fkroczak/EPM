@@ -130,7 +130,7 @@ while [[ $# -gt 0 ]]; do
       echo "Zurückgeschaltet auf $TAG. Achtung: Datenbank-Migrationen werden dabei nicht zurückgedreht."
       exit 0 ;;
     --paket-erstellen) paket_erstellen; exit 0 ;;
-    --paket) PAKET="${2:?Paketdatei angeben, z. B. sudo epm-update --paket ~/epm-paket-0.2.0-1a2b3c4.tar}"; shift ;;
+    --paket) PAKET="${2:?Paketdatei angeben, z. B. sudo epm-update --paket ~/epm-paket-2.0.0-1a2b3c4.tar}"; shift ;;
     --ohne-tests) TESTS=0 ;;
     *) sed -n '2,18p' "$0"; exit 1 ;;
   esac
