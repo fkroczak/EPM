@@ -11,10 +11,15 @@ export DEBIAN_FRONTEND=noninteractive
 [[ -n "$EPM_APT_PROXY" ]] && export http_proxy="$EPM_APT_PROXY" https_proxy="$EPM_APT_PROXY"
 
 echo "==> Konfliktpakete entfernen (falls vorhanden)"
-for p in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
+[[ "${EPM_OFFLINE:-0}" == 1 ]] || for p in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
   apt-get -y remove "$p" >/dev/null 2>&1 || true
 done
 
+if [[ "${EPM_OFFLINE:-0}" == 1 ]]; then
+  # Wiederaufbau aus dem Notfallpaket (F188): Docker kommt aus debs/, kein Repository, kein Download
+  echo "==> Offline (Notfallpaket): Docker ist aus dem Notfallpaket installiert"
+  command -v docker >/dev/null || { echo "ABBRUCH: docker fehlt – Pakete aus debs/ installieren (epm-notfall-aufbau.sh)."; exit 1; }
+else
 echo "==> Docker-Repository einrichten"
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
@@ -32,6 +37,7 @@ apt-get update
 
 echo "==> Docker installieren"
 apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+fi
 
 echo "==> Docker-Daemon konfigurieren"
 # Eigene Adressbereiche („EPM-Server Aufbau“ B3): Docker nimmt sonst 172.17.0.0/16 und aufwärts – das kollidiert gern mit

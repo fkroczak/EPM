@@ -51,6 +51,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | 10.10.2026 | Vorlagen-Portal einfacher | Übersicht mit Suche, geführter Ablauf mit Live-Vorschau, Angaben per Klick, frühere Fassung wiederherstellen, als eigene Vorlage kopieren (F180). Lauf steht aus |
 | 09.10.2026 | Eigene Vorlagen | „+ Neue Vorlage“ unter Vorlagen › Dokumentvorlagen: eigene Schreiben mit E-Mail anlegen, bearbeiten, deaktivieren; in der Akte wählbar (F176). Lauf steht aus |
 | F179 | Systemverwaltung ohne SSH: Ampel, Reiter, kompakte Graphen, Sicherungen mehrfach löschen, Dienste, Versionen, Pakete, Zertifikat, Protokolle | Administration › Systemverwaltung, System, Backup | ABGESCHLOSSEN – Lauf steht aus |
+| F188 | Notfallpaket und Wiederaufbau-Plan: alles für einen Neuaufbau ohne Internet in einer Datei, Aufbauskript, Offline-Modus der Rollout-Skripte, Ampel-Kachel | Administration › System › Notfall, Systemverwaltung, Hilfe | ABGESCHLOSSEN – Lauf steht aus |
 | F181 | Akte ohne Seiten-Scrollen, kompakter Kopf, Reiter nach Bedeutung, PDF neben dem Plan, Plan nach Praxisvorgabe, PDF-Vorschau mit ungespeicherten Eingaben | Patientenakte, Infusionspläne, Plan-Editor | ABGESCHLOSSEN – Lauf steht aus |
 | F187 | Hinweise aus Labor und Gewicht im Plan-Editor (ohne Dosisvorschlag) | Plan-Editor | ABGESCHLOSSEN – Lauf steht aus |
 | F01 | Sitzungsstatus und CSRF-Token | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
@@ -3781,6 +3782,47 @@ letzten Plan sagen – sachlich und **ohne Dosisvorschlag**.
   steht aus.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+## AC · Notfallpaket (10.10.2026)
+
+Ziel: Nach einem Totalausfall (Festplatte, Diebstahl, Brand) baut die Praxis EPM auf neuer Hardware wieder auf – ohne
+Internet, ohne Entwickler, mit einem gedruckten Plan.
+
+### F188 Notfallpaket und Wiederaufbau-Plan
+- **Paket** (`epm-notfall-<TAG>-<JJJJ-MM-TT_hhmm>.tar`, Systemagent-Aktion `notfallpaket`, `AGENT_VERSION` 7, im
+  Gleichschritt mit `system/host.py`): `images/` (`docker save` genau der laufenden Images, Tag aus `.env`),
+  `rollout/` (Skripte 01–04, Agent, `epm-update`, `epm-notfall-aufbau.sh`), `code/` (Compose, `docs/`), `debs/`
+  (Debian-Pakete für 01/02/03 per `apt-cache depends --recurse` + `apt-get download`, sonst aus dem apt-Cache; was fehlt,
+  steht in `INHALT.json` › `fehlt`), `ocr-modelle/`, wahlweise `sicherung/` (jüngste Sicherung, verschlüsselt wie
+  immer), `konfiguration/` (`epm.conf` ohne Geheimnisse, Einstellungen ohne Zugangsdaten), `ca/` (Zertifikat; Schlüssel
+  nur als `ca.key.gpg`, symmetrisch mit dem Sicherungs-Passwort – ohne gesetztes Passwort kein Schlüssel und keine
+  Sicherung), `NOTFALLPLAN.pdf`/`.md`, `INHALT.json`, `SHA256SUMS`. **Nicht hinein:** Sicherungs-Passwort,
+  WebDAV-Zugang, Django-Secret, DB-Passwort (werden beim Aufbau neu erzeugt; Sitzungen enden, TOTP und Passkeys bleiben
+  gültig, da in der Datenbank bzw. an `EPM_WEB_NAME` gebunden). Datei 0640 im Download-Ordner, 6 Stunden bereit.
+- **Oberfläche:** System › Reiter **Notfall**: letztes Paket (Zeit, Version, Größe, SHA-256, was fehlt), Hinweis bei
+  älter als 30 Tage oder neuerer EPM-Version, „Notfallpaket erstellen“ mit Schätzung und Wahl „jüngste Sicherung mit
+  hinein“ (Passwort + zweiter Faktor), Download-Link, Wiederaufbau-Plan zum Lesen und als PDF. Systemverwaltung:
+  Ampel-Kachel „Notfallpaket“ (zuletzt erstellt … / älter als 30 Tage / noch nie) und Eintrag unter „Häufige Aufgaben“.
+  Hilfe-Abschnitt „Notfallpaket und Wiederaufbau nach Totalausfall“ mit Link auf das PDF.
+- **API:** `POST /api/system/notfall/` `{mit_sicherung, kennwort, code}` (Recht Systemverwaltung, 2FA, Agent aktuell,
+  prüft freien Speicher gegen die Schätzung: 2 × Schätzung + 512 MB, sonst 409); `GET /api/system/notfall/<datei>/`
+  (X-Accel, Audit „Notfallpaket heruntergeladen“); `GET /api/system/notfallplan/?art=html|pdf|md` (auch mit „Sicherungen
+  verwalten“; `art` statt `format`, da DRF `format` selbst auswertet). `manage.py epm_notfallplan --format md|html|pdf`
+  erzeugt den Plan für den Agenten.
+- **Plan:** `docs/NOTFALLPLAN.md` (gleich `backend/system/notfallplan.md`, ein Test hält beide gleich): nummerierte
+  Schritte, Kapitel „nur EPM kaputt“ und „nur die Datenbank kaputt“, Checkliste zum Ausdrucken, Dauer 1,5–3 Stunden.
+- **Aufbau:** `rollout/epm-notfall-aufbau.sh [--probelauf] [--mit-internet]`: Prüfsummen, Ubuntu-Version, `epm.conf`
+  und Netz, Sicherungs-Passwort, `debs/*.deb`, 01/02 mit `EPM_OFFLINE=1` (überspringt `apt-get update`/Repository), CA
+  entschlüsseln, 04, `docker load`, Start, `epm-systemagent notfall-einspielen` (Sicherung einlesen, Passwort setzen,
+  wiederherstellen), 03 nur wenn ein SSH-Schlüssel hinterlegt ist. Ohne Shell im Agenten (Listen-Aufrufe), Audit-Log
+  für Anfordern und Herunterladen.
+- **Teststatus:** `system/test_notfall.py` (17 Tests mit `Auftraege`): Rechte, 2FA, ohne Agent 409, Audit-Texte,
+  Download/X-Accel, Plan in drei Formaten; Agent im Prozess mit nachgebildetem `docker save`: Inhalt, Prüfsummen, keine
+  Geheimnisse in irgendeiner Datei, CA-Schlüssel mit dem Passwort entschlüsselbar, Rechte 0640, ohne Passwort kein
+  Schlüssel und keine Sicherung, Trockenlauf, Fristen; Probelauf des Aufbauskripts (und Abbruch bei verändertem Paket);
+  Browsertest Reiter Notfall und Ampel. **Nicht geprüft:** echter Neuaufbau auf frischem Ubuntu, echtes
+  `apt-get download`/`docker save`/`docker load`, PDF aus dem Container im Agenten, `notfall-einspielen` von Ende zu Ende.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -3894,6 +3936,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | 10.10.2026 | Version 2.0.0 | Zweite Fassung von EPM: Versionsnummer von 0.2.0 auf 2.0.0 (Festlegung Filip 10.10.2026); enthält F177–F189. Images heißen `epm-backend:2.0.0-<Commit>` |
 | 10.10.2026 | Hinweise im Infusionsplan | Plan-Editor zeigt Laborwerte außerhalb des Referenzbereichs seit dem letzten Plan (nur Bestandteile des Plans) mit Verlauf der letzten drei Werte, deutliche Gewichtsänderung, Entwicklung der eigenen Pläne und fehlendes Labor mit „Blutuntersuchung anfordern“ – nur zum Prüfen, ohne Dosisvorschlag (MDR) (F187). Lauf steht aus |
 | 10.10.2026 | Erkennung verbessern | „Falsch erkannt“ mit Grund (verwirft sofort, lernt „nicht auswerten“/Sperre/weniger Bestätigungen je Labor), „Bereich markieren“ liest nur den aufgezogenen Rahmen mit Tesseract neu (Maus und Touch, Tabelle zeilenweise) und lernt den Bereich je Labor, Steuerung des Lernens (pausieren, Schwelle 1–3), Anleitung in Hilfe, Prüfansicht und `docs/SCANS-VERBESSERN.md` (F189). Lauf steht aus |
+| 10.10.2026 | Notfallpaket | Notfallpaket mit Images, Rollout-Skripten, Debian-Paketen, OCR-Modellen, wahlweise jüngster Sicherung, Einstellungen ohne Geheimnisse, verschlüsseltem CA-Schlüssel, Prüfsummen und Plan; Aufbauskript `epm-notfall-aufbau.sh` mit Probelauf, Offline-Modus der Rollout-Skripte, Reiter „Notfall“, Ampel-Kachel, `docs/NOTFALLPLAN.md` (F188). Lauf steht aus |
 | 10.10.2026 | Nachtrag Systemverwaltung | Zeitplan der nächtlichen Sicherung (Uhrzeit, täglich/werktags, Warnung zum Übertragungsfenster), Journal und alte Versionen aufräumen (laufende und vorherige geschützt), Uhrzeit mit eigenem Zeitserver einstellen, OCR-Modelle mit 2FA (F179l–F179o). Lauf steht aus |
 | 10.10.2026 | Texterkennung lernt mit | Gelernte Zuordnungen aus Korrekturen beim Übernehmen (Labor, BIA, Diagnosen, Spaltenlage je Labor; ohne Patientendaten), Anwendung vor der Ähnlichkeitssuche mit Schwelle, Bereich „Gelernte Zuordnungen“, Kennzahl „korrigiert“ (F182); Patient aus Name und Geburtsdatum vorschlagen, nur per Klick (F183); Offline-Prüfung (`docs/OFFLINE-BETRIEB-2026-10-10.md`). Lauf steht aus |
 | 10.10.2026 | Akte entschlankt | Akte ab 1024 × 600 px ohne Seiten-Scrollen (Kopf und Reiter bleiben stehen, Inhalt scrollt in Karte bzw. Spalte), kompakter Kopf, Reiter nach Bedeutung (Infusionspläne nach Empfehlung, Verlauf/Datenschutz klein), Übersicht mit sechs Karten in zwei Reihen, PDF des Plans in voller Höhe neben der Liste und im Menüpunkt Infusionspläne, Plan nach Praxisvorgabe je kg, Prüfung vor der Freigabe, PDF-Vorschau mit ungespeicherten Eingaben (`POST …/vorschau/`), Administration zum Aufklappen (F181). Lauf steht aus |

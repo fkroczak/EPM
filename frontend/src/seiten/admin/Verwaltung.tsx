@@ -82,6 +82,15 @@ export function ampeln(sys: Uebersicht | undefined, backup: BackupDaten | undefi
       stand: !t ? "unbekannt" : !t.dienst?.laeuft || t.verfahren?.fehler ? "fehler" : !t.verfahren?.paddle?.bereit || t.scans.fehler ? "warn" : "ok",
       wert: !t ? "—" : t.dienst?.laeuft ? "läuft" : "kein Lebenszeichen",
       text: !t ? "" : `${t.verfahren?.paddle?.bereit ? "Tesseract + PP-OCRv5" : "nur Tesseract"}${t.scans.fehler ? ` · ${t.scans.fehler} Scans mit Fehler` : ""}` });
+    const nf = h?.notfall;
+    const nfAlter = nf?.letztes ? (Date.now() - Date.parse(nf.letztes.zeit)) / 86400_000 : null;
+    const nfVersion = !!nf?.letztes && !!h?.versionen?.aktiv && nf.letztes.epm_version !== h.versionen.aktiv;
+    liste.push({ id: "notfall", titel: "Notfallpaket", zu: "/admin/system?reiter=notfall",
+      stand: !h ? "unbekannt" : nfAlter == null || nfAlter > 30 || nfVersion ? "warn" : "ok",
+      wert: nf?.letztes ? relativ(nf.letztes.zeit, true) : "noch nie erstellt",
+      text: !h ? "kommt vom Systemagenten" : nfAlter == null ? "für den Wiederaufbau ohne Internet erstellen und getrennt lagern"
+        : nfAlter > 30 ? "älter als 30 Tage – neu erstellen" : nfVersion ? "EPM wurde seitdem aktualisiert – neu erstellen"
+        : `EPM ${nf!.letztes!.epm_version}` });
     const uhr = h?.uhr;
     liste.push({ id: "uhr", titel: "Uhrzeit", zu: "/admin/system",
       stand: !uhr?.verfuegbar ? "unbekannt" : uhr.synchronisiert ? "ok" : "warn",
@@ -185,6 +194,9 @@ export function Verwaltung() {
                   </Aufgabe>
                   <Aufgabe icon="schloss" titel="Zertifikat" text="Ablauf prüfen, erneuern, eigenes Zertifikat importieren, Stammzertifikat für Geräte.">
                     <KnopfLink klein to="/admin/system?reiter=zertifikat">Zertifikat</KnopfLink>
+                  </Aufgabe>
+                  <Aufgabe icon="backup" titel="Notfallpaket" text="Alles für einen Wiederaufbau ohne Internet in eine Datei; dazu der Wiederaufbau-Plan.">
+                    <KnopfLink klein to="/admin/system?reiter=notfall">Notfall</KnopfLink>
                   </Aufgabe>
                   <Aufgabe icon="dokument" titel="Protokolle" text="Container, Systemagent, Sicherung, Update – letzte Zeilen ansehen und herunterladen.">
                     <KnopfLink klein to="/admin/system?reiter=protokolle">Protokolle</KnopfLink>

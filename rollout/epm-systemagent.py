@@ -44,7 +44,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
-VERSION = 6  # 5: Systemverwaltung ohne SSH (10.10.2026); 6: Zeitplan der Sicherung, Journal und Images aufräumen, Uhrzeit
+VERSION = 7  # 5: Systemverwaltung ohne SSH (10.10.2026); 6: Zeitplan, Aufräumen, Uhrzeit; 7: Notfallpaket (F188)
 KONF = "/etc/epm/epm.conf"
 BACKUP_SKRIPT = "/usr/local/sbin/epm-backup"
 KONF_SICHERUNG = "/etc/epm/sicherung"
@@ -114,6 +114,8 @@ AKTIONEN = {
     "journal_aufraeumen": ("Journal aufräumen", False),
     "images_loeschen": ("Alte Versionen löschen", False),
     "uhr_einstellen": ("Uhrzeit einstellen", False),
+    # Notfallpaket für den Wiederaufbau ohne Internet (F188)
+    "notfallpaket": ("Notfallpaket erstellen", False),
 }
 # Aktionen, die Sicherungen schreiben, übertragen oder zurückspielen – und das Leeren der Datenbank, das nur den
 # EPM-Stack betrifft: mit --sicherung-echt auch im Probelauf echt (Browsertests gegen den echten Stack)
@@ -168,6 +170,17 @@ NTP_SERVER_MUSTER = re.compile(r"^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A
                                r"[A-Za-z0-9])?$|^[0-9a-fA-F:]{2,39}$")
 NTP_SERVER_MAX = 4
 ZEIT_SETZEN_MUSTER = re.compile(r"^20[2-9][0-9]-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01]) ([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$")
+# Notfallpaket (F188): alles für einen Neuaufbau ohne Internet; liegt 6 Stunden zum Herunterladen bereit
+NOTFALL_MUSTER = re.compile(r"^epm-notfall-([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})-(\d{4}-\d{2}-\d{2}_\d{4})\.tar$")
+NOTFALL_STUNDEN = 6
+# Debian-Pakete, die rollout/01-basis.sh, 02-docker.sh und 03-security.sh installieren (mit Abhängigkeiten)
+NOTFALL_PAKETE = ("ca-certificates", "curl", "gnupg", "vim", "htop", "rsync", "unzip", "jq", "tree", "unattended-upgrades",
+                  "apt-listchanges", "needrestart", "openssl", "rclone", "docker-ce", "docker-ce-cli", "containerd.io",
+                  "docker-buildx-plugin", "docker-compose-plugin", "ufw", "fail2ban")
+PAKETNAME_MUSTER = re.compile(r"^[a-z0-9][a-z0-9+.-]{0,100}$")
+IMAGE_NAME_MUSTER = re.compile(r"^[a-z0-9][a-z0-9._/-]{0,200}:[A-Za-z0-9._-]{1,128}$")
+# Abschrift von /etc/epm/epm.conf: nur Einstellungen, nie etwas, das nach Zugangsdaten aussieht
+KONF_GEHEIM = re.compile(r"PASS|SECRET|TOKEN|SCHLUESSEL|KEY|KENNWORT", re.I)
 
 APT_ENV = {"DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE": "a", "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"}
 
@@ -283,6 +296,10 @@ class Agent:
         self.systemd = "/etc/systemd/system"
         self.timesyncd = "/etc/systemd/timesyncd.conf.d"
         self.chrony = "/etc/chrony"
+        # Notfallpaket: Code des Servers (rollout/, werkzeuge/), eigene CA, Konfiguration
+        self.code = "/srv/epm-code"
+        self.ca_ordner = CA_ORDNER
+        self.konf_datei = KONF
         einstellungen = lese_konf()
         self.proxy = einstellungen.get("EPM_APT_PROXY", "")
         try:
@@ -766,6 +783,7 @@ class Agent:
             "werkzeuge": self.werkzeuge(),
             "journal": self.journal(),
             "image_dateien": self.image_dateien(),
+            "notfall": self.notfall_stand(),
             "protokolle": [{"quelle": q, "name": n} for q, n in PROTOKOLLE.items()],
             "trocken": self.trocken,
         }
@@ -1334,9 +1352,10 @@ class Agent:
                 continue
             for n in namen:
                 pfad = os.path.join(ordner, n)
+                frist = NOTFALL_STUNDEN if ordner == self.download and NOTFALL_MUSTER.match(n) else stunden
                 try:
                     info = os.lstat(pfad)
-                    if stat.S_ISREG(info.st_mode) and jetzt - info.st_mtime > stunden * 3600:
+                    if stat.S_ISREG(info.st_mode) and jetzt - info.st_mtime > frist * 3600:
                         os.unlink(pfad)
                 except OSError:
                     pass
@@ -2176,6 +2195,9 @@ class Agent:
         if aktion == "images_loeschen":
             return self.images_loeschen(parameter.get("dateien"), parameter.get("tags"), zeile, simuliert=t)
 
+        if aktion == "notfallpaket":
+            return self.notfallpaket(bool(parameter.get("mit_sicherung")), auftrag_id, zeile, simuliert=t)
+
         if aktion == "uhr_einstellen":
             return self.uhr_einstellen(parameter, zeile, simuliert=t)
 
@@ -2734,6 +2756,368 @@ class Agent:
                    else "Zeitsynchronisation aus" + (f", Uhrzeit auf {zeit} gesetzt" if zeit else "")) + \
             (f"; Zeitzone {zone}" if zone else "") + "."
 
+    # ------------------------------------------------------------ Notfallpaket (F188)
+    def laufende_version(self):
+        try:
+            with open(os.path.join(self.basis, ".env"), encoding="utf-8") as f:
+                for z in f:
+                    if z.startswith("EPM_VERSION="):
+                        return z.split("=", 1)[1].strip().strip("\"'")
+        except OSError:
+            pass
+        return ""
+
+    def compose_images(self, tag):
+        """Alle Images aus compose.yaml (mit der laufenden Version eingesetzt) – genau so, wie sie laufen."""
+        images = []
+        try:
+            with open(os.path.join(self.basis, "compose.yaml"), encoding="utf-8") as f:
+                for z in f:
+                    m = re.match(r"^\s*image:\s*[\"']?([^\"'\s#]+)", z)
+                    if m:
+                        name = m.group(1).replace("${EPM_VERSION}", tag)
+                        if IMAGE_NAME_MUSTER.match(name) and name not in images:
+                            images.append(name)
+        except OSError:
+            pass
+        return images
+
+    def notfall_schaetzung(self, tag=None):
+        """Ungefähre Größe des Notfallpakets: Images, jüngste Sicherung, OCR-Modelle, Debian-Pakete (geschätzt 400 MB)"""
+        tag = tag or self.laufende_version()
+        groesse = 400 * 1024 * 1024
+        images = self.compose_images(tag) if TAG_MUSTER.match(tag or "") else []
+        if images:
+            rc, aus = self.befehl(["docker", "image", "inspect", "-f", "{{.Size}}", *images], zeitlimit=30)
+            if rc == 0:
+                groesse += sum(int(z) for z in aus.split() if z.isdigit())
+        liste = self.sicherungen()
+        if liste:
+            groesse += liste[0]["groesse"]
+        groesse += self.ocr_vorrat()["groesse"]
+        return groesse
+
+    def notfall_stand(self):
+        bereit = []
+        try:
+            namen = sorted(os.listdir(self.download))
+        except OSError:
+            namen = []
+        for n in namen:
+            if not NOTFALL_MUSTER.match(n):
+                continue
+            try:
+                info = os.lstat(os.path.join(self.download, n))
+            except OSError:
+                continue
+            bereit.append({"datei": n, "groesse": info.st_size, "bis": datetime.fromtimestamp(
+                info.st_mtime + NOTFALL_STUNDEN * 3600, timezone.utc).astimezone().isoformat(timespec="seconds")})
+        letztes = self.lies(os.path.join(self.status, "notfall.json"))
+        return {"letztes": letztes if isinstance(letztes, dict) else None, "bereit": bereit,
+                "schaetzung": self.notfall_schaetzung(), "eigene_ca": os.path.isfile(os.path.join(self.ca_ordner, "epm-ca.key")),
+                "passwort": bool(self.passwort_stand().get("aktuell"))}
+
+    @staticmethod
+    def ordner_kopieren(quelle, ziel):
+        """Ordner ohne symbolische Links kopieren (nur Dateien und Ordner)."""
+        for wurzel, ordner, dateien in os.walk(quelle, followlinks=False):
+            rel = os.path.relpath(wurzel, quelle)
+            os.makedirs(os.path.join(ziel, rel), exist_ok=True)
+            ordner[:] = [o for o in ordner if not os.path.islink(os.path.join(wurzel, o)) and o != "__pycache__"]
+            for d in dateien:
+                q = os.path.join(wurzel, d)
+                if os.path.islink(q) or not os.path.isfile(q) or d.endswith(".pyc"):
+                    continue
+                shutil.copy2(q, os.path.join(ziel, rel, d), follow_symlinks=False)
+
+    def debs_sammeln(self, ziel, zeile):
+        """Debian-Pakete für den Aufbau ohne Internet: die Pakete der Rollout-Skripte mit allen Abhängigkeiten,
+        passend zur laufenden Ubuntu-Version (apt-get download über die Paketquellen des Servers, sonst aus dem
+        Paketcache). Rückgabe: Liste der Pakete, die fehlen."""
+        os.makedirs(ziel, exist_ok=True)
+        rc, aus = self.befehl(["apt-cache", "depends", "--recurse", "--no-recommends", "--no-suggests", "--no-conflicts",
+                               "--no-breaks", "--no-replaces", "--no-enhances", *NOTFALL_PAKETE], env=APT_ENV, zeitlimit=300)
+        if rc != 0:
+            zeile("apt-cache nicht verfügbar – keine Debian-Pakete im Notfallpaket.\n")
+            return ["alle Debian-Pakete (apt-cache nicht verfügbar)"]
+        namen = sorted({z.strip() for z in aus.splitlines() if z.strip() and not z.startswith(" ")
+                        and PAKETNAME_MUSTER.match(z.strip())})
+        zeile(f"{len(namen)} Debian-Pakete (mit Abhängigkeiten) …\n")
+        env = dict(APT_ENV)
+        if self.proxy:
+            env.update({"http_proxy": self.proxy, "https_proxy": self.proxy})
+        rc, aus = self.befehl(["apt-get", "download", "-q", *namen], env=env, cwd=ziel, zeitlimit=3600)
+        vorhanden = {n.split("_", 1)[0] for n in os.listdir(ziel) if n.endswith(".deb")}
+        fehlt = []
+        for n in namen:
+            if n in vorhanden:
+                continue
+            # einzeln nachladen, sonst aus dem Paketcache des Servers
+            rc, _ = self.befehl(["apt-get", "download", "-q", n], env=env, cwd=ziel, zeitlimit=600)
+            if rc == 0:
+                continue
+            treffer = sorted(d for d in os.listdir("/var/cache/apt/archives") if d.startswith(f"{n}_") and d.endswith(".deb")) \
+                if os.path.isdir("/var/cache/apt/archives") else []
+            if treffer:
+                shutil.copy2(os.path.join("/var/cache/apt/archives", treffer[-1]), ziel)
+            else:
+                fehlt.append(f"Debian-Paket {n}")
+        zeile(f"Debian-Pakete: {len(os.listdir(ziel))} Dateien, {len(fehlt)} fehlen.\n")
+        return fehlt
+
+    def konfiguration_schreiben(self, ziel):
+        """Abschrift der Einstellungen ohne Geheimnisse: epm.conf (nur EPM_-Werte ohne Zugangsdaten) und
+        einstellungen.json (Zeitplan, Aufbewahrung, Übertragungsziel ohne Passwort, Zeitserver, Zeitzone)."""
+        os.makedirs(ziel, exist_ok=True)
+        zeilen = ["# Abschrift von /etc/epm/epm.conf aus dem Notfallpaket – ohne Zugangsdaten.\n",
+                  "# Vor dem Aufbau prüfen: EPM_MGMT_IF (Netzwerkkarte), EPM_MGMT_IP, EPM_WEB_NAME.\n"]
+        try:
+            with open(self.konf_datei, encoding="utf-8") as f:
+                for z in f:
+                    m = re.match(r"^\s*(EPM_[A-Z0-9_]+)=", z)
+                    if m and not KONF_GEHEIM.search(m.group(1)):
+                        zeilen.append(z if z.endswith("\n") else z + "\n")
+        except OSError:
+            zeilen.append("# (keine /etc/epm/epm.conf gefunden)\n")
+        with open(os.path.join(ziel, "epm.conf"), "w", encoding="utf-8") as f:
+            f.writelines(zeilen)
+        ziel_angaben = self.ziel_lesen() or {}
+        einstellungen = {
+            "zeitplan": self.zeitplan(),
+            "aufbewahrung_tage": self.aufbewahrung_tage(),
+            "uebertragungsziel": {k: ziel_angaben.get(k) for k in ("url", "benutzer", "ordner", "von", "bis",
+                                                                     "aufbewahrung_tage")} if ziel_angaben else None,
+            "uebertragungsziel_passwort": "nicht im Paket – neu eingeben (z. B. neues App-Passwort der Nextcloud)",
+            "zeitserver": self.ntp_server(),
+            "sicherungs_passwort": "nicht im Paket – Passwortblatt im Tresor",
+        }
+        self.schreibe(os.path.join(ziel, "einstellungen.json"), einstellungen)
+
+    def notfallplan_holen(self, ziel, zeile):
+        """Plan als Markdown und PDF aus dem Backend (manage.py epm_notfallplan); sonst Markdown aus dem Code."""
+        fehlt = []
+        for art, name in (("md", "NOTFALLPLAN.md"), ("pdf", "NOTFALLPLAN.pdf")):
+            pfad = os.path.join(ziel, name)
+            try:
+                with open(pfad, "wb") as f:
+                    p = subprocess.run(self.compose("exec", "-T", "backend", "python", "manage.py", "epm_notfallplan",
+                                                    "--format", art), cwd=self.basis, stdout=f, stderr=subprocess.PIPE,
+                                       timeout=300, check=False)
+                ok = p.returncode == 0 and os.path.getsize(pfad) > 100
+            except (OSError, subprocess.SubprocessError):
+                ok = False
+            if ok:
+                continue
+            os.unlink(pfad)
+            ersatz = os.path.join(self.code, "docs", "NOTFALLPLAN.md")
+            if art == "md" and os.path.isfile(ersatz):
+                shutil.copy2(ersatz, pfad)
+                continue
+            fehlt.append(f"{name} (Backend nicht erreichbar)")
+        if fehlt:
+            zeile(f"Plan: {', '.join(fehlt)} fehlt.\n")
+        return fehlt
+
+    def notfallpaket(self, mit_sicherung, auftrag_id, zeile, simuliert=False):
+        """Notfallpaket für den Wiederaufbau ohne Internet (F188): Images, Rollout-Skripte, Debian-Pakete, OCR-Modelle,
+        jüngste Sicherung (wahlweise), Konfiguration ohne Geheimnisse, CA (Schlüssel nur verschlüsselt mit dem
+        Sicherungs-Passwort), Plan, SHA256SUMS und INHALT.json. Keine Passwörter, kein Django-Secret, kein
+        DB-Passwort. Liegt danach 6 Stunden zum Herunterladen bereit."""
+        tag = self.laufende_version()
+        if not TAG_MUSTER.match(tag or ""):
+            return 2, "Die laufende Version ist nicht bekannt – kein Notfallpaket möglich."
+        images = self.compose_images(tag)
+        if not images:
+            return 2, "In compose.yaml stehen keine Images – kein Notfallpaket möglich."
+        schaetzung = self.notfall_schaetzung(tag)
+        zeile(f"Version {tag} · Images: {', '.join(images)} · mit Sicherung: {'ja' if mit_sicherung else 'nein'} · "
+              f"geschätzt {schaetzung // (1024 * 1024)} MB\n")
+        if simuliert:
+            zeile("(Probelauf) docker save, Rollout, Debian-Pakete, OCR-Modelle, Sicherung, Konfiguration, CA, Plan, "
+                  "SHA256SUMS\n")
+            return 0, f"Probelauf: kein Notfallpaket erstellt (geschätzt {schaetzung // (1024 * 1024)} MB)."
+        self.austausch_ordner()
+        try:
+            frei = os.statvfs(self.download)
+            if frei.f_bavail * frei.f_frsize < 2 * schaetzung + 512 * 1024 * 1024:
+                return 1, (f"Zu wenig freier Speicher: nötig etwa {2 * schaetzung // (1024 * 1024) + 512} MB, frei "
+                           f"{frei.f_bavail * frei.f_frsize // (1024 * 1024)} MB. Vorher aufräumen (System › Wartung).")
+        except OSError:
+            pass
+        os.makedirs(os.path.join(self.basis, "images"), mode=0o755, exist_ok=True)
+        arbeit = os.path.join(self.basis, "images", f".notfall-{auftrag_id[:12]}")
+        shutil.rmtree(arbeit, ignore_errors=True)
+        os.makedirs(arbeit, mode=0o700)
+        fehlt = []
+        stempel = None
+        try:
+            # 1. Images, genau wie laufend
+            os.makedirs(os.path.join(arbeit, "images"))
+            if self.schritt("Images", ["docker", "save", "-o", os.path.join(arbeit, "images", "images.tar"), *images],
+                            zeile, zeitlimit=3 * 3600) != 0:
+                return 1, "Die Images ließen sich nicht speichern (docker save) – kein Notfallpaket."
+            # 2. Rollout-Skripte, Werkzeuge, Version
+            if not os.path.isdir(os.path.join(self.code, "rollout")):
+                return 1, f"Die Rollout-Dateien fehlen ({self.code}/rollout) – einmal „EPM aktualisieren“, dann erneut."
+            for teil in ("rollout", "werkzeuge"):
+                if os.path.isdir(os.path.join(self.code, teil)):
+                    self.ordner_kopieren(os.path.join(self.code, teil), os.path.join(arbeit, teil))
+            for datei in ("VERSION",):
+                if os.path.isfile(os.path.join(self.code, datei)):
+                    shutil.copy2(os.path.join(self.code, datei), arbeit)
+            with open(os.path.join(arbeit, "TAG"), "w", encoding="utf-8") as f:
+                f.write(tag + "\n")
+            aufbau = os.path.join(arbeit, "rollout", "epm-notfall-aufbau.sh")
+            if os.path.isfile(aufbau):
+                shutil.copy2(aufbau, os.path.join(arbeit, "epm-notfall-aufbau.sh"))
+                os.chmod(os.path.join(arbeit, "epm-notfall-aufbau.sh"), 0o755)
+            else:
+                fehlt.append("epm-notfall-aufbau.sh (Code älter als F188 – erst EPM aktualisieren)")
+            # 3. Debian-Pakete
+            fehlt += self.debs_sammeln(os.path.join(arbeit, "debs"), zeile)
+            # 4. OCR-Modelle (offline eingespielter Vorrat; im Image stecken sie ohnehin)
+            if os.path.isdir(os.path.join(self.basis, "ocr-modelle")):
+                self.ordner_kopieren(os.path.join(self.basis, "ocr-modelle"), os.path.join(arbeit, "ocr-modelle"))
+            # 5. jüngste Sicherung (verschlüsselt wie immer)
+            if mit_sicherung:
+                liste = self.sicherungen()
+                if liste:
+                    s = liste[0]
+                    stempel = s["stempel"]
+                    os.makedirs(os.path.join(arbeit, "sicherung"))
+                    namen = list(s["dateien"]) + [f"epm_{stempel}.{e}" for e in ("sha256", "json")
+                                                  if os.path.exists(os.path.join(self.backup, f"epm_{stempel}.{e}"))]
+                    with tarfile.open(os.path.join(arbeit, "sicherung", f"epm-sicherung_{stempel}.tar"), "w") as tar:
+                        for n in namen:
+                            tar.add(os.path.join(self.backup, n), arcname=n, recursive=False)
+                    if not s["verschluesselt"]:
+                        zeile("ACHTUNG: Die jüngste Sicherung ist unverschlüsselt.\n")
+                else:
+                    fehlt.append("Sicherung (es gibt noch keine)")
+            # 6. Konfiguration ohne Geheimnisse
+            self.konfiguration_schreiben(os.path.join(arbeit, "konfiguration"))
+            # 7. CA: Zertifikat; Schlüssel nur verschlüsselt mit dem Sicherungs-Passwort
+            ca_crt = os.path.join(self.ca_ordner, "epm-ca.crt")
+            ca_key = os.path.join(self.ca_ordner, "epm-ca.key")
+            if os.path.isfile(ca_crt):
+                os.makedirs(os.path.join(arbeit, "ca"))
+                shutil.copy2(ca_crt, os.path.join(arbeit, "ca", "epm-ca.crt"))
+                nr = self.passwort_stand().get("aktuell")
+                pw = self.passwort_datei(nr) if nr else None
+                if os.path.isfile(ca_key) and pw:
+                    heim = tempfile.mkdtemp(prefix="epm-gpg-")
+                    try:
+                        rc, _ = self.befehl(["gpg", "--homedir", heim, "--batch", "--yes", "--quiet", "--no-symkey-cache",
+                                             "--pinentry-mode", "loopback", "--passphrase-file", pw, "--symmetric",
+                                             "--cipher-algo", "AES256", "-o", os.path.join(arbeit, "ca", "epm-ca.key.gpg"),
+                                             ca_key], zeitlimit=120)
+                    finally:
+                        self.befehl(["gpgconf", "--homedir", heim, "--kill", "all"], zeitlimit=30)
+                        shutil.rmtree(heim, ignore_errors=True)
+                    if rc != 0:
+                        fehlt.append("CA-Schlüssel (Verschlüsselung fehlgeschlagen)")
+                elif os.path.isfile(ca_key):
+                    fehlt.append("CA-Schlüssel (kein Sicherungs-Passwort festgelegt – er kommt nie unverschlüsselt ins Paket)")
+            # 8. Plan
+            fehlt += self.notfallplan_holen(arbeit, zeile)
+            # 9. Inhalt und Prüfsummen
+            os_name = {}
+            try:
+                with open("/etc/os-release", encoding="utf-8") as f:
+                    for z in f:
+                        k, _, v = z.strip().partition("=")
+                        if k in ("PRETTY_NAME", "VERSION_ID", "VERSION_CODENAME"):
+                            os_name[k.lower()] = v.strip('"')
+            except OSError:
+                pass
+            _rc, arch = self.befehl(["dpkg", "--print-architecture"], zeitlimit=10)
+            dateien = []
+            for wurzel, _o, namen in os.walk(arbeit):
+                for n in namen:
+                    rel = os.path.relpath(os.path.join(wurzel, n), arbeit)
+                    dateien.append((rel, os.path.getsize(os.path.join(wurzel, n))))
+            dateien.sort()
+            jetzt = datetime.now()
+            inhalt = {"version": 1, "epm_version": tag, "erstellt": jetzt_iso(), "rechner": socket.gethostname(),
+                      "ubuntu": os_name, "architektur": arch.strip() if _rc == 0 else "", "images": images,
+                      "mit_sicherung": bool(stempel), "sicherung": stempel, "fehlt": fehlt,
+                      "dateien": [{"pfad": p, "groesse": g} for p, g in dateien],
+                      "nicht_im_paket": ["Sicherungs-Passwort (Passwortblatt im Tresor)", "Passwort des Übertragungsziels",
+                                         "Datenbank-Passwort und Django-Secret (werden beim Aufbau neu erzeugt)"]}
+            self.schreibe(os.path.join(arbeit, "INHALT.json"), inhalt)
+            summen = []
+            for rel, _g in dateien + [("INHALT.json", 0)]:
+                h = hashlib.sha256()
+                with open(os.path.join(arbeit, rel), "rb") as f:
+                    for block in iter(lambda: f.read(1 << 20), b""):
+                        h.update(block)
+                summen.append(f"{h.hexdigest()}  {rel}\n")
+            with open(os.path.join(arbeit, "SHA256SUMS"), "w", encoding="utf-8") as f:
+                f.writelines(sorted(summen, key=lambda z: z[66:]))
+            # 10. eine Datei zum Herunterladen
+            name = f"epm-notfall-{tag}-{jetzt:%Y-%m-%d_%H%M}.tar"
+            ziel = os.path.join(self.download, name)
+            tmp = f"{ziel}.teil"
+            try:
+                with tarfile.open(tmp, "w") as tar:
+                    for eintrag in sorted(os.listdir(arbeit)):
+                        tar.add(os.path.join(arbeit, eintrag), arcname=eintrag)
+                if os.geteuid() == 0:
+                    os.chown(tmp, 0, APP_GID)
+                os.chmod(tmp, 0o640)
+                os.replace(tmp, ziel)
+            finally:
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+            h = hashlib.sha256()
+            with open(ziel, "rb") as f:
+                for block in iter(lambda: f.read(1 << 20), b""):
+                    h.update(block)
+            groesse = os.path.getsize(ziel)
+            self.schreibe(os.path.join(self.status, "notfall.json"),
+                          {"zeit": jetzt_iso(), "epm_version": tag, "datei": name, "groesse": groesse,
+                           "sha256": h.hexdigest(), "mit_sicherung": bool(stempel), "sicherung": stempel, "fehlt": fehlt,
+                           "ubuntu": os_name.get("pretty_name", "")})
+            zeile(f"Notfallpaket {name}: {groesse} Bytes, SHA-256 {h.hexdigest()}\n" +
+                  (f"Es fehlt: {'; '.join(fehlt)}\n" if fehlt else ""))
+            return 0, (f"Notfallpaket erstellt ({groesse // (1024 * 1024)} MB), {NOTFALL_STUNDEN} Stunden zum Herunterladen "
+                       f"bereit." + (f" Es fehlt: {len(fehlt)} Teil(e), siehe Ausgabe." if fehlt else ""))
+        finally:
+            shutil.rmtree(arbeit, ignore_errors=True)
+
+    def notfall_einspielen(self, datei, passwort, zeile):
+        """Wiederaufbau (Notfallplan Schritt C6): eine Sicherung (epm-sicherung_<Stempel>.tar) einlesen und zurückspielen
+        – auf der Kommandozeile, auch wenn noch niemand an EPM angemeldet ist. Das Passwort der Sicherung wird danach
+        auch für neue Sicherungen hinterlegt."""
+        try:
+            info = os.stat(datei)
+        except OSError:
+            return 2, f"Datei {datei} nicht gefunden."
+        self.austausch_ordner()
+        kennung = os.urandom(16).hex()
+        quelle = os.path.join(self.upload, f"{kennung}.teil")
+        shutil.copyfile(datei, quelle)
+        self.schreibe(os.path.join(self.upload, f"{kennung}.json"),
+                      {"art": "sicherung", "name": os.path.basename(datei), "groesse": info.st_size, "von": "notfall"})
+        vorher = {s["stempel"] for s in self.sicherungen()}
+        rc, text = self.einlesen(kennung, passwort, "notfall", zeile)
+        zeile(text + "\n")
+        if rc != 0:
+            for p in (quelle, os.path.join(self.upload, f"{kennung}.json")):
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
+            return rc, text
+        neu = [s["stempel"] for s in self.sicherungen() if s["stempel"] not in vorher]
+        if not neu:
+            return 1, "Die Sicherung wurde nicht übernommen."
+        if passwort and not self.passwort_stand().get("aktuell") and len(passwort) >= PASSWORT_MIN:
+            self.passwort_setzen(passwort, "notfall", zeile)
+        return self.wiederherstellen(neu[0], "notfall", os.urandom(16).hex(), zeile)
+
     def ergebnisse_aufraeumen(self):
         try:
             dateien = sorted((os.path.join(self.ergebnisse, d) for d in os.listdir(self.ergebnisse)
@@ -2753,7 +3137,8 @@ def teile_host(url):
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("befehl", choices=["status", "auftraege", "uebertragen", "schleife"])
+    p.add_argument("befehl", choices=["status", "auftraege", "uebertragen", "schleife", "notfall-einspielen"])
+    p.add_argument("datei", nargs="?", help="notfall-einspielen: die Sicherung (epm-sicherung_<Zeitpunkt>.tar)")
     p.add_argument("--basis")
     p.add_argument("--projekt")
     p.add_argument("--konf")
@@ -2769,6 +3154,17 @@ def main(argv=None):
         agent.status_schreiben()
     elif a.befehl == "auftraege":
         agent.auftraege_ausfuehren()
+    elif a.befehl == "notfall-einspielen":
+        if not a.datei:
+            print("Bitte die Sicherung angeben: epm-systemagent notfall-einspielen DATEI.tar")
+            return 2
+        passwort = os.environ.get("EPM_SICHERUNG_PASSWORT")
+        if passwort is None:
+            import getpass
+            passwort = getpass.getpass("Sicherungs-Passwort (vom Passwortblatt; leer bei unverschlüsselter Sicherung): ")
+        rc, text = agent.notfall_einspielen(a.datei, passwort or None, lambda t: sys.stdout.write(t))
+        print(text)
+        return rc
     elif a.befehl == "uebertragen":
         rc, text = agent.uebertragen(lambda t: sys.stdout.write(t))
         print(text)

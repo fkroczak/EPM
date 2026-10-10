@@ -86,6 +86,15 @@ Ziels muss im Proxy der OPNsense freigegeben sein. Nicht mehr gebrauchte Sicheru
 und gesammelt löschen (die jüngste bleibt immer); Protokolle der nächtlichen Sicherung und der Übertragung stehen unter
 Administration › System › Protokolle. Ohne EPM entschlüsseln: `gpg -d -o epm-db_….dump epm-db_….dump.gpg`.
 
+## Notfallpaket und Wiederaufbau (10.10.2026)
+Administration › System › Notfall › „Notfallpaket erstellen“ (Passwort und zweiter Faktor) packt alles für einen
+Neuaufbau ohne Internet in `epm-notfall-<TAG>-<Datum>.tar`: Images, Rollout-Skripte, Debian-Pakete, OCR-Modelle,
+wahlweise die jüngste Sicherung, Einstellungen ohne Geheimnisse, CA (Schlüssel mit dem Sicherungs-Passwort
+verschlüsselt), `SHA256SUMS`, `INHALT.json` und den Plan. Nach jedem Update und spätestens alle 30 Tage neu erstellen,
+zwei Kopien getrennt lagern. Aufbau auf frischem Ubuntu Server: auspacken, im Ordner `sudo ./epm-notfall-aufbau.sh`
+(`--probelauf` zeigt nur, was geschähe); die Rollout-Skripte laufen dabei mit `EPM_OFFLINE=1`. Plan:
+[`docs/NOTFALLPLAN.md`](docs/NOTFALLPLAN.md).
+
 ## Tests
 Bei jedem Push laufen in GitHub Actions (`.github/workflows/backend.yml`):
 1. Backend-Tests gegen PostgreSQL 18 (`backend/*/tests.py`), fehlende Migrationen werden erzeugt und eingecheckt.

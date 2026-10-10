@@ -24,7 +24,7 @@ const UEBLICH_S: Record<string, number> = {
   epm_neustart: 90, docker_aufraeumen: 120, pakete_aufraeumen: 120, datenbank_leeren: 180,
   // Wartung ohne SSH (10.10.2026)
   sicherung_loeschen: 15, dienst_neustart: 45, epm_zurueck: 300, epm_paket: 900, epm_paket_erstellen: 600, zertifikat_erneuern: 20,
-  zertifikat_importieren: 20, ocr_modelle: 90, protokoll: 10,
+  zertifikat_importieren: 20, ocr_modelle: 90, protokoll: 10, notfallpaket: 900,
 };
 const STANDARD_S = 120;
 

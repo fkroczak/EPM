@@ -282,3 +282,35 @@ test("Wartung: Journal aufräumen, alte Versionen löschen (laufende und vorheri
   await expect(page.getByTestId("auftraege").getByRole("row", { name: /Uhrzeit einstellen/ }).first()).toContainText("erledigt (Probelauf)", { timeout: 30_000 });
   await expect(page.getByTestId("auftraege").getByRole("row", { name: /Journal aufräumen/ }).first()).toContainText("erledigt (Probelauf)", { timeout: 30_000 });
 });
+
+test("Notfallpaket: Ampel, Reiter Notfall, Plan lesen, Paket erstellen (Probelauf)", async ({ page }) => {
+  // F188 (10.10.2026): Wiederaufbau ohne Internet, Plan in EPM abrufbar
+  await page.goto("/admin");
+  const kachel = page.getByTestId("ampel-notfall");
+  await expect(kachel).toBeVisible();
+  await expect(kachel).toContainText("Notfallpaket");
+  await kachel.click();
+  await expect(page).toHaveURL(/reiter=notfall/);
+  const karte = page.getByTestId("notfall-karte");
+  await expect(karte).toContainText("Nicht enthalten: Sicherungs-Passwort");
+  // Plan: lesen und als PDF
+  const plan = page.getByTestId("notfallplan-karte");
+  await expect(plan.getByRole("link", { name: "PDF" })).toHaveAttribute("href", "/api/system/notfallplan/?art=pdf");
+  await plan.getByRole("button", { name: "Plan hier lesen" }).click();
+  await expect(page.getByTestId("notfallplan")).toContainText("Checkliste");
+  await expect(page.getByTestId("notfallplan")).toContainText("Wenn nur EPM kaputt ist");
+  // Erstellen mit Passwort und 2FA (der Agent läuft im Probelauf)
+  await karte.getByRole("button", { name: "Notfallpaket erstellen" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Geschätzte Größe");
+  await dialog.getByLabel(/Jüngste Sicherung mit hineinlegen/).uncheck();
+  await dialog.getByLabel("Ihr Passwort").fill(KENNWORT);
+  await dialog.getByLabel("Code aus der Authenticator-App").fill(naechsterNotfallcode("e2e.admin"));
+  await dialog.getByRole("button", { name: "Bestätigen und erstellen" }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.getByTestId("system-reiter").getByRole("tab", { name: /^Verlauf/ }).click();
+  await expect(page.getByTestId("auftraege").getByRole("row", { name: /Notfallpaket erstellen/ }).first()).toContainText("erledigt (Probelauf)", { timeout: 30_000 });
+  await page.goto("/admin/audit-log");
+  await page.getByRole("button", { name: "System", exact: true }).click();
+  await expect(page.getByText(/Notfallpaket angefordert \(ohne jüngste Sicherung\)/).first()).toBeVisible();
+});

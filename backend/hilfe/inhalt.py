@@ -1038,6 +1038,28 @@ auf; stammt sie von einem anderen Server, wird ihr Passwort einmal abgefragt. Zu
 <strong>Wiederherstellen</strong>.</p>""",
     },
     {
+        "id": "notfall", "gruppe": "administration", "titel": "Notfallpaket und Wiederaufbau nach Totalausfall",
+        "rechte": ["system_verwalten", "backup_verwalten"], "seiten": ["/admin/system"],
+        "html": """
+<p>Fällt der Server ganz aus (Festplatte defekt, Diebstahl, Brand), wird EPM auf neuer Hardware mit dem
+<strong>Notfallpaket</strong> wieder aufgebaut – ohne Internet und ohne Entwickler. Es entsteht unter
+<strong>System › Notfall</strong> mit „Notfallpaket erstellen“ (Passwort und Code aus der Authenticator-App) und liegt
+danach 6 Stunden als <code>epm-notfall-….tar</code> zum Herunterladen bereit; jeder Abruf steht im Audit-Log.</p>
+<p>Im Paket: die laufenden Programme (Images) genau dieser Version, die Rollout-Skripte, die Debian-Pakete (Docker,
+gpg, Firewall), die OCR-Modelle, wahlweise die jüngste Sicherung, die Einstellungen <em>ohne</em> Passwörter, das
+CA-Zertifikat (den Schlüssel nur verschlüsselt mit dem Sicherungs-Passwort), Prüfsummen und der Wiederaufbau-Plan als
+PDF. <strong>Nicht</strong> im Paket: Sicherungs-Passwort (steht auf dem Passwortblatt im Tresor), Zugang zum
+Übertragungsziel; Datenbank-Passwort und geheimer Schlüssel werden beim Aufbau neu erzeugt.</p>
+<p>Nach jedem EPM-Update und mindestens alle 30 Tage neu erstellen; die Ampel der Systemverwaltung erinnert daran. Zwei
+Kopien an getrennten Orten aufbewahren (USB-Stick im Tresor, NAS), zusammen mit dem ausgedruckten Plan.</p>
+<p>Der Wiederaufbau dauert etwa 1,5 bis 3 Stunden: Ubuntu Server installieren, Paket auf den Server kopieren und
+auspacken, <code>sudo ./epm-notfall-aufbau.sh</code> starten und das Sicherungs-Passwort eingeben. Danach müssen sich
+alle neu anmelden; Authenticator-Apps und Passkeys gelten weiter.
+<a href="/api/system/notfallplan/?art=pdf">Wiederaufbau-Plan als PDF</a> (mit Checkliste zum Ausdrucken); im
+Reiter „Notfall“ lässt er sich auch direkt lesen. Eigene Kapitel gibt es für „nur EPM kaputt“ und „nur die Datenbank
+kaputt“.</p>""",
+    },
+    {
         "id": "testdaten", "gruppe": "administration", "titel": "Testumgebung und Testpatienten",
         "rechte": ["testdaten_zuruecksetzen"], "seiten": [],
         "html": """

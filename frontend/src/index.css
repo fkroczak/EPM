@@ -292,6 +292,19 @@ body {
   .richtext ol { list-style: decimal; }
   .richtext li { margin: 0.125rem 0; }
   .richtext > :last-child { margin-bottom: 0; }
+  /* Wiederaufbau-Plan (F188), serverseitig aus Markdown */
+  .notfallplan h1 { font-size: 1.125rem; font-weight: 600; margin: 0 0 0.5rem; }
+  .notfallplan h2 { font-size: 1rem; font-weight: 600; margin: 1rem 0 0.375rem; }
+  .notfallplan h3 { font-size: 0.9375rem; font-weight: 600; margin: 0.75rem 0 0.25rem; }
+  .notfallplan p { margin: 0 0 0.5rem; }
+  .notfallplan ul, .notfallplan ol { margin: 0 0 0.5rem; padding-left: 1.25rem; }
+  .notfallplan ul { list-style: disc; }
+  .notfallplan ol { list-style: decimal; }
+  .notfallplan code { font-size: 0.8125rem; background: var(--akzent-weich); padding: 0 0.25rem; border-radius: 0.25rem; }
+  .notfallplan pre { overflow-x: auto; background: var(--akzent-weich); padding: 0.5rem; border-radius: 0.375rem; margin: 0 0 0.5rem; }
+  .notfallplan pre code { background: none; padding: 0; }
+  .notfallplan table { border-collapse: collapse; margin: 0 0 0.5rem; width: 100%; }
+  .notfallplan th, .notfallplan td { border: 1px solid var(--rand); padding: 0.25rem 0.5rem; text-align: left; vertical-align: top; }
 
   .pdf-blatt {
     background: #ffffff; color: #1b1932; border: 1px solid var(--rand); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);

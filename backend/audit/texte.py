@@ -378,6 +378,11 @@ def _system(e, d) -> str:
         if d.get("zeit"):
             teile.append(f"Uhrzeit {d['zeit']}")
         return "Uhrzeit einstellen angefordert: " + ", ".join(teile) + _bestaetigt(d)
+    if ereignis == "angefordert" and aktion == "notfallpaket":
+        return ("Notfallpaket angefordert (" + ("mit" if d.get("mit_sicherung") else "ohne") + " jüngste Sicherung)"
+                + _bestaetigt(d))
+    if ereignis == "notfall_heruntergeladen":
+        return f"Notfallpaket heruntergeladen: {d.get('datei', '')}"
     if ereignis == "angefordert" and aktion == "protokoll":
         return f"Protokoll abgerufen: {e.objekt} (letzte {d.get('zeilen', '?')} Zeilen)"
     if ereignis == "protokoll_heruntergeladen":
