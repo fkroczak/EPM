@@ -1,7 +1,8 @@
 /**
  * Eine Seite eines Scans: aufbereitetes Bild, darüber unsichere Wörter gelb markiert (beim Überfahren Sicherheit und
- * die andere Lesart), die Stelle eines gewählten Werts (Prüfansicht) und – im Modus „Bereich neu erkennen“ – ein Rahmen,
- * der mit der Maus aufgezogen wird.
+ * die andere Lesart), die Stelle eines gewählten Werts (Prüfansicht) und – in den Modi „Bereich neu erkennen“ und
+ * „Bereich markieren“ (F189) – ein Rahmen, der mit Maus oder Finger aufgezogen wird (Pointer-Ereignisse, relativ zur
+ * angezeigten Größe, daher auch bei Zoom richtig).
  */
 import { useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
@@ -59,7 +60,9 @@ export function Seitenansicht({ scanId, seite, markiert, unsicher = true, bereic
           className={cx("absolute inset-0 w-full h-full", bereichModus && "cursor-crosshair touch-none")}
           onPointerDown={(ev) => {
             if (!bereichModus) return;
-            ev.currentTarget.setPointerCapture(ev.pointerId);
+            try {
+              ev.currentTarget.setPointerCapture(ev.pointerId);
+            } catch { /* nachgestellte Ereignisse (Tests) haben keinen echten Zeiger */ }
             const p = punkt(ev);
             setZiehen({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
           }}
@@ -73,7 +76,10 @@ export function Seitenansicht({ scanId, seite, markiert, unsicher = true, bereic
             const b = box(ziehen);
             setZiehen(null);
             if (b[2] > 0.01 && b[3] > 0.005) onBereich?.(b);
-          }}>
+          }}
+          // Touch: bricht der Browser die Geste ab (z. B. Scrollen mit zwei Fingern), keinen halben Rahmen stehen lassen
+          onPointerCancel={() => setZiehen(null)}
+          data-testid={bereichModus ? "bereich-flaeche" : undefined}>
           {unsicher ? woerter(seite.ergebnis).filter((w) => w[5] < UNSICHER).map((w, i) => (
             <rect key={i} x={w[1]} y={w[2]} width={w[3]} height={w[4]} className="scan-unsicher" data-testid="unsicheres-wort">
               <title>{`„${w[0]}“ – Sicherheit ${Math.round(w[5] * 100)} %${w[6] ? ` · andere Lesart: „${w[6]}“` : ""}`}</title>

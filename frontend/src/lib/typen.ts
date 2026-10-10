@@ -302,6 +302,9 @@ export type Patient = {
       id: number; art: string; titel: string; faellig_am: string; uhrzeit: string | null; ort: string | null; bei: string;
     } | null;
     versionen: Record<"diagnose" | "therapie" | "empfehlung" | "bemerkung", Versionskopf>;
+    /** Hinweise wie in der Patientenliste, dazu fehlende Angaben (F186); ausgeblendete unter ``hinweise_stumm`` */
+    hinweise?: { art: HinweisArt; text: string; stufe?: Kontaktstufe }[];
+    hinweise_stumm?: HinweisArt[];
     /** Schnellerfassung (S02): Zeitpunkt des letzten gültigen Kontakts */
     letzter_kontakt: string | null;
     /** Merkliste der angemeldeten Person (S05) */
@@ -355,6 +358,11 @@ export type Termin = {
   ausblende_grund?: string;
   ausgeblendet_am?: string | null;
   ausgeblendet_von_name?: string | null;
+  /** Terminbestätigung (F185): wann zuletzt als PDF oder E-Mail erstellt (beim Verschieben wieder leer) */
+  bestaetigung_am?: string | null;
+  bestaetigung_von_name?: string | null;
+  /** nur bei Praxisterminen: ``angebot`` = „Terminbestätigung schicken?“ anbieten bzw. „Bestätigung fehlt“ zeigen */
+  bestaetigung?: { angebot: boolean; email: boolean; anrede: string } | null;
 };
 
 export const TERMINARTEN: Record<string, string> = {
@@ -819,7 +827,9 @@ export type Bericht = {
 
 
 // ================================================================= Hinweise stummschalten (07.10.2026, F119)
-export type HinweisArt = "gewicht" | "plan" | "ohne_plan" | "versorger" | "kontakt" | "labor" | "bia";
+export type HinweisArt = "gewicht" | "plan" | "ohne_plan" | "versorger" | "kontakt" | "labor" | "bia"
+  // fehlende Angaben (F186)
+  | "hausarzt" | "telefon" | "gewicht_fehlt" | "diagnose" | "termin_ort";
 
 /** Fristen, die beim Wegklicken zur Wahl stehen; „nicht mehr nötig“ ist die vierte Möglichkeit */
 export const RUHE_FRISTEN = [3, 6, 12] as const;
@@ -871,16 +881,25 @@ export type ScanSeite = {
   sicherheit: number | null; unsicher: number; erkannt_am: string | null; textebene_vorhanden: boolean;
 };
 export type ScanLaborwert = {
-  parameter: number | null; parameter_name: string | null; erkannt_als: string; zuordnung: "genau" | "aehnlich" | "frei";
+  /** „gelernt“: aus Korrekturen beim Übernehmen gelernt, sicher; „gelernt_vorschlag“: erst einmal bestätigt (F182) */
+  parameter: number | null; parameter_name: string | null; erkannt_als: string;
+  zuordnung: "genau" | "aehnlich" | "frei" | "gelernt" | "gelernt_vorschlag";
   freitext_name: string; wert: string | null; wert_text: string; einheit: string; einheit_gelesen: string;
   referenz_von: string | null; referenz_bis: string | null; markierung: string; seite: number; box: number[] | null;
   zeile: string; sicherheit: number; hinweise: string[]; vorschlag: boolean;
   umrechnung?: { von: string; faktor: string; wert_gelesen: string };
+  wert_x?: number; wert_zeichen?: number;
+  /** F189: aus einem markierten Bereich gelesen; „Falsch erkannt“ angemerkt (Grund) */
+  bereich?: number[] | null; verworfen?: string;
 };
 export type ScanBiaWert = { wert: string; einheit: string; erkannt_als: string; seite: number; box: number[] | null;
-  sicherheit: number; vorschlag: boolean; hinweise?: string[] };
+  sicherheit: number; vorschlag: boolean; hinweise?: string[]; zuordnung?: "gelernt" | "gelernt_vorschlag";
+  verworfen?: string };
 export type ScanDiagnose = { bezeichnung: string; icd_code: string; kennzeichen: "G" | "V" | "Z" | "A"; zeile: string;
-  seite: number; box: number[] | null; sicherheit: number; vorschlag: boolean };
+  seite: number; box: number[] | null; sicherheit: number; vorschlag: boolean; erkannt_als?: string;
+  hinweise?: string[]; zuordnung?: "gelernt" | "gelernt_vorschlag";
+  /** gelernte Korrektur, erst einmal bestätigt: zum Übernehmen angeboten (F182) */
+  gelernt?: { bezeichnung: string; icd_code: string }; verworfen?: string };
 export type ScanAuswertung = {
   arten?: ("labor" | "bia" | "arztbrief")[];
   datum?: string | null; datum_quelle?: string;
@@ -892,7 +911,9 @@ export type ScanAuswertung = {
   originale?: { name: string; mime: string }[];
 };
 export type ScanVorschlag = { id: number; nummer: number; name: string; geburtsdatum: string | null; ist_test: boolean;
-  abgeschlossen: boolean; punkte: number; grund: string };
+  abgeschlossen: boolean; punkte: number; grund: string;
+  /** F183: „sicher“ = Name und Geburtsdatum erkannt; „unsicher“ nur als Hinweis */
+  stufe?: "sicher" | "wahrscheinlich" | "unsicher"; nachname?: string; vorname?: string };
 export type ScanZeile = {
   id: number; titel: string; originalname: string; mime: string; groesse: number;
   status: "wartet" | "laeuft" | "fertig" | "fehler"; fortschritt: number; schritt: string; fehler: string;

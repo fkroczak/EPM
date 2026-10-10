@@ -14,12 +14,13 @@ import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useAerzteListe, useAuswahl } from "@/lib/daten";
 import { ARZTROLLEN } from "@/lib/typen";
 import type { Bezugsperson, PatientArzt } from "@/lib/typen";
-import { Auswahl, Chip, Eingabe, Feld, Karte, KartenKopf, Knopf, Laden, Leer, Meldung, Textfeld, cx } from "@/components/ui/basis";
+import { Auswahl, Chip, Eingabe, Feld, KartenKopf, Knopf, Laden, Leer, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { NeuerArztDialog } from "@/components/SchnellAnlegen";
 import { Bestaetigen } from "@/components/Bestaetigen";
+import { KarteOderAbschnitt } from "./Aktenseite";
 import { useAkte } from "./Akte";
 
 function useNeuLaden() {
@@ -127,7 +128,7 @@ function ArztZuordnungDialog({ zuordnung, offen, onOffen }: { zuordnung: Patient
   );
 }
 
-export function AerzteKarte() {
+export function AerzteKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
   const { patient, bearbeiten } = useAkte();
   const [frueher, setFrueher] = useState(false);
   const [dialog, setDialog] = useState<{ offen: boolean; z: PatientArzt | null }>({ offen: false, z: null });
@@ -140,7 +141,7 @@ export function AerzteKarte() {
   const sichtbar = alle.filter((z) => frueher || z.aktiv);
   const anzahlFrueher = alle.filter((z) => !z.aktiv).length;
   return (
-    <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="aerzte">
+    <KarteOderAbschnitt rahmenlos={rahmenlos} className="px-5 py-4 flex flex-col gap-3" testid="aerzte">
       <KartenKopf titel="Ärzte" rechts={bearbeiten ? <Knopf klein icon="plus" onClick={() => setDialog({ offen: true, z: null })}>Arzt</Knopf> : null} />
       {liste.isLoading ? <Laden /> : sichtbar.length ? (
         <ul className="m-0 p-0 list-none flex flex-col gap-3">
@@ -175,7 +176,7 @@ export function AerzteKarte() {
         <Link to="/aerzte">Ärzteliste</Link>
       </div>
       {bearbeiten ? <ArztZuordnungDialog zuordnung={dialog.z} offen={dialog.offen} onOffen={(o) => setDialog((d) => ({ ...d, offen: o }))} /> : null}
-    </Karte>
+    </KarteOderAbschnitt>
   );
 }
 
@@ -267,7 +268,7 @@ function BezugspersonDialog({ person, offen, onOffen }: { person: Bezugsperson |
   );
 }
 
-export function BezugspersonenKarte() {
+export function BezugspersonenKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
   const { patient, bearbeiten } = useAkte();
   const [frueher, setFrueher] = useState(false);
   const [dialog, setDialog] = useState<{ offen: boolean; p: Bezugsperson | null }>({ offen: false, p: null });
@@ -299,7 +300,7 @@ export function BezugspersonenKarte() {
   }, [markiert]);
   const anzahlFrueher = alle.filter((b) => !b.aktiv).length;
   return (
-    <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="bezugspersonen">
+    <KarteOderAbschnitt rahmenlos={rahmenlos} className="px-5 py-4 flex flex-col gap-3" testid="bezugspersonen">
       <KartenKopf titel="Bezugspersonen" unter="Angehörige, Betreuer/in, Pflegedienst"
         rechts={bearbeiten ? <Knopf klein icon="plus" onClick={() => setDialog({ offen: true, p: null })}>Person</Knopf> : null} />
       {liste.isLoading ? <Laden /> : sichtbar.length ? (
@@ -333,6 +334,6 @@ export function BezugspersonenKarte() {
         </button>
       ) : null}
       {bearbeiten ? <BezugspersonDialog person={dialog.p} offen={dialog.offen} onOffen={(o) => setDialog((d) => ({ ...d, offen: o }))} /> : null}
-    </Karte>
+    </KarteOderAbschnitt>
   );
 }

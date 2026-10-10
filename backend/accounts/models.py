@@ -52,9 +52,9 @@ class User(AbstractUser):
         help_text="Ohne Login: Name, dem Einträge zugeordnet bleiben (aus dem Altsystem übernommen oder von der "
                   "Administration so gesetzt). Kann sich nicht anmelden und hat keine Rechte.",
     )
-    muss_kennwort_aendern = models.BooleanField("Muss Kennwort ändern", default=True)
-    einmal_kennwort_gueltig_bis = models.DateTimeField("Einmal-Kennwort gültig bis", null=True, blank=True)
-    kennwort_geaendert_am = models.DateTimeField("Kennwort geändert am", null=True, blank=True)
+    muss_kennwort_aendern = models.BooleanField("Muss Passwort ändern", default=True)
+    einmal_kennwort_gueltig_bis = models.DateTimeField("Einmal-Passwort gültig bis", null=True, blank=True)
+    kennwort_geaendert_am = models.DateTimeField("Passwort geändert am", null=True, blank=True)
     fehlversuche = models.PositiveSmallIntegerField("Fehlversuche seit letzter Anmeldung", default=0)
     gesperrt_am = models.DateTimeField("Gesperrt am", null=True, blank=True)
     # Testbenutzer ausblenden (Festlegung 03.10.2026): gesperrt und aus allen Listen genommen, nicht gelöscht

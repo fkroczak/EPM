@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ApiFehler, api, apiDatei } from "@/lib/api";
+import { ApiFehler, abfrage, api, apiDatei } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useEinstellungen, usePraeparate } from "@/lib/daten";
@@ -15,8 +15,11 @@ import type { Plan, Praeparat } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, KnopfLink, Laden, Meldung, cx } from "@/components/ui/basis";
 import { Spalten } from "@/components/ui/spalten";
 import { PdfLeser } from "@/components/PdfAnsicht";
+import { PdfDialog } from "@/components/PdfDialog";
 import { useHinweis } from "@/components/ui/hinweise";
+import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
+import { anlageOeffnen } from "@/seiten/admin/Anlagen";
 import { Editor } from "@/components/Editor";
 import { name, useAkte } from "./Akte";
 
@@ -43,7 +46,13 @@ const MAKRO: { feld: "glucose" | "aminosaeuren" | "lipide" | "albumin"; menge: Z
   { feld: "albumin", menge: "albumin_ml", einheit: "ml", text: "Humanalbumin", kategorie: "albumin", kcal: null },
 ];
 /** Vorbelegung des ersten Plans je kg Körpergewicht – kommt vom Server (wie im Altsystem) */
-type Vorbelegung = { gewicht_kg: number | null; je_kg: Record<string, number>; werte: Record<string, number> | null };
+type Vorbelegung = { gewicht_kg: number | null; je_kg: Record<string, number | string>; werte: Record<string, number> | null;
+  /** wann die Praxis die Mengen je kg zuletzt geändert hat (Vorlagen › Grenzwerte, F190); null = Startwerte des Altsystems */
+  stand: string | null };
+const JE_KG_TEXT: [string, string, string][] = [
+  ["glucose_g", "Glucose", "g"], ["aminosaeuren_g", "Aminosäuren", "g"], ["lipide_g", "Lipide", "g"], ["natrium_mmol", "Natrium", "mmol"],
+  ["kalium_mmol", "Kalium", "mmol"], ["phosphat_mmol", "Phosphat", "mmol"], ["calcium_mmol", "Calcium", "mmol"], ["magnesium_mmol", "Magnesium", "mmol"],
+];
 /** Gesamtvolumen wie im Altsystem: Körpergewicht × 35 ml, auf 2 Stellen gerundet */
 const ML_JE_KG = 35;
 /** Stabilität wie im Altsystem: Calcium + Magnesium (mmol) höchstens Gesamtvolumen ÷ 100 */
@@ -193,8 +202,8 @@ export function PlanEditor() {
   const vorbelegung = useQuery({
     queryKey: ["patient", patient.id, "vorbelegung"],
     queryFn: () => api<Vorbelegung>(`infusionsplaene/vorbelegung/?patient=${patient.id}`),
-    enabled: ersterPlan,
   });
+  const [vorschau, setVorschau] = useState<{ id: number; daten: Record<string, unknown> } | null>(null);
 
   // Formular einmal füllen: Entwurf, sonst Vorlage bzw. aktueller Plan, sonst leer
   useEffect(() => {
@@ -202,10 +211,10 @@ export function PlanEditor() {
     if (planId) { if (entwurf.data) setF(ausPlan(entwurf.data)); return; }
     if (!vorlageId && !aktuellBekannt) return; // erst wissen, ob es einen aktuellen Plan gibt
     if (quelleId) { if (quelle.data) setF(ausPlan(quelle.data, datum(heuteIso()))); return; }
-    if (!vorbelegung.isFetchedAfterMount || vorbelegung.isFetching) return;
+    if (!ersterPlan || !vorbelegung.isFetchedAfterMount || vorbelegung.isFetching) return;
     const werte = vorbelegung.data?.werte;
     setF(werte ? { ...leer(), ...Object.fromEntries(Object.entries(werte).map(([k, v]) => [k, zahl(v)])) } : leer());
-  }, [f, planId, entwurf.data, vorlageId, aktuellBekannt, quelleId, quelle.data, vorbelegung.data, vorbelegung.isFetching, vorbelegung.isFetchedAfterMount]);
+  }, [f, planId, entwurf.data, vorlageId, aktuellBekannt, quelleId, quelle.data, ersterPlan, vorbelegung.data, vorbelegung.isFetching, vorbelegung.isFetchedAfterMount]);
 
   // höchstens ein Entwurf je Patient: einen vorhandenen Entwurf bearbeiten statt einen zweiten anzulegen
   const offeneEntwuerfe = useQuery({
@@ -222,8 +231,8 @@ export function PlanEditor() {
   const vorher = useMemo(() => (vorgaenger.data ? ausPlan(vorgaenger.data) : null), [vorgaenger.data]);
   const geaendert = (k: keyof Formular) => !!(vorher && f && k !== "gueltig_ab" && norm(f, k) !== norm(vorher, k));
 
-  const speichern = useMutation({
-    mutationFn: async (freigeben: boolean) => {
+  /** Werte des Formulars für PATCH bzw. Vorschau; Eingabefehler stehen danach in ``lokal`` */
+  const formularDaten = (): Record<string, unknown> => {
       const fehler: Feldfehler = {};
       const daten: Record<string, unknown> = {};
       for (const k of ZAHLEN) {
@@ -246,6 +255,10 @@ export function PlanEditor() {
       if (Object.keys(fehler).length) throw new ApiFehler(400, "Bitte die markierten Felder prüfen.", null, fehler);
       Object.assign(daten, { gueltig_ab: gueltig, vitamine: f!.vitamine, bemerkung: f!.bemerkung, pantozol_stufe: Number(f!.pantozol_stufe),
         positionen });
+      return daten;
+  };
+  /** Entwurf beim ersten Speichern anlegen (vorher gibt es keinen) */
+  const entwurfId = async (): Promise<number> => {
       let id = planId ? Number(planId) : neueId;
       if (!id) {
         const neu = await api<Plan>("infusionsplaene/entwurf/", {
@@ -254,6 +267,12 @@ export function PlanEditor() {
         id = neu.id;
         setNeueId(neu.id);
       }
+      return id;
+  };
+  const speichern = useMutation({
+    mutationFn: async (freigeben: boolean) => {
+      const daten = formularDaten();
+      const id = await entwurfId();
       await api<Plan>(`infusionsplaene/${id}/`, { method: "PATCH", body: daten });
       if (freigeben) await api<Plan>(`infusionsplaene/${id}/freigeben/`, { method: "POST" });
       return id;
@@ -270,6 +289,19 @@ export function PlanEditor() {
     },
   });
 
+  // PDF-Vorschau mit den Eingaben, wie sie gerade im Formular stehen (Wunsch 10.10.2026: „PDFs einfach einsehbar“).
+  // Ein neuer Plan wird dafür einmal als Entwurf gespeichert – vorher gibt es nichts, wozu eine PDF gehört.
+  const vorschauM = useMutation({
+    mutationFn: async () => {
+      const daten = formularDaten();
+      const neu = !planId && !neueId;
+      const id = await entwurfId();
+      if (neu) await api<Plan>(`infusionsplaene/${id}/`, { method: "PATCH", body: daten });
+      return { id, daten };
+    },
+    onSuccess: (v) => setVorschau(v),
+  });
+
   // ohne Recht bzw. bei abgeschlossener Akte gibt es den Editor nicht: zurück zu den Plänen
   if (patient.ist_abgeschlossen || !darfBei("plaene_anlegen", patient)) {
     return <Navigate to={`/patienten/${patient.id}/plaene`} replace />;
@@ -279,7 +311,8 @@ export function PlanEditor() {
     return <Meldung art="warn">Dieser Plan ist freigegeben und unveränderlich. Bitte einen neuen Plan anlegen.</Meldung>;
   }
 
-  const server: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
+  const fehlerQuelle = speichern.error ?? vorschauM.error;
+  const server: Feldfehler = fehlerQuelle instanceof ApiFehler && fehlerQuelle !== null ? fehlerQuelle.felder : {};
   const e: Feldfehler = { ...server, ...lokal };
   const p = praeparate.data ?? [];
   const setze = (k: keyof Formular) => (wert: string) => setF((a) => ({ ...a!, [k]: wert }));
@@ -321,8 +354,44 @@ export function PlanEditor() {
     pruefe(zahlWert(f.kalium_mmol), es.kalium_min_mmol, es.kalium_max_mmol, "Kalium", "mmol");
   }
   if (caMgStabil === false) warnungen.push(`Instabil: Calcium + Magnesium ${zahl(caMg)} mmol über ${zahl(caMgGrenze)} mmol (Mischbeutel ÷ 100)`);
+  // Prüfung vor der Freigabe in Alltagssprache (Wunsch 10.10.2026: „Grenzwert-Warnungen verständlich, Freigabe klar“):
+  // jeder Punkt grün oder mit dem, was zu tun ist. Der Server prüft beim Speichern und Freigeben dasselbe noch einmal.
+  const pe = zahlWert(f.tage_pro_woche);
+  const zusatzTage = zahlWert(f.zusatz_tage_pro_woche);
+  const freiTage = zahlWert(f.freie_tage_pro_woche);
+  // Entscheidung der Praxis 10.10.2026: nach 6 Monaten „bitte prüfen“ (Vorlagen › Grenzwerte, F190)
+  const gewichtGrenzeMonate = Number(es?.plan_gewicht_alter_monate ?? 6);
+  const gewichtAlterTage = patient.kopf?.gewicht ? Math.round((Date.parse(heuteIso()) - Date.parse(patient.kopf.gewicht.am.slice(0, 10))) / 86400000) : null;
+  const ohnePraeparat = MAKRO.filter((m) => zahlWert(f[m.menge]) && !f[`${m.feld}_praeparat` as AuswahlFeld]).map((m) => m.text);
+  const bestandteile = ([
+    ["natrium", zahlWert(f.natrium_mmol)], ["kalium", zahlWert(f.kalium_mmol)], ["phosphat", zahlWert(f.phosphat_mmol)],
+    ["calcium", zahlWert(f.calcium_mmol)], ["magnesium", zahlWert(f.magnesium_mmol)], ["albumin", zahlWert(f.albumin_ml)],
+    ["glucose", zahlWert(f.glucose_g)], ["lipide", zahlWert(f.lipide_g)], ["spurenelemente", f.spurenelemente ? 1 : null],
+    ["vitamine", f.vitamine.length || null],
+  ] as const).filter(([, w]) => w).map(([k]) => k as string);
+  const pruefpunkte: { ok: boolean; text: string }[] = [
+    gewicht == null
+      ? { ok: false, text: "Kein Gewicht erfasst: Gesamtvolumen (35 ml/kg) und Rate fehlen. Bitte zuerst das Gewicht eintragen." }
+      : { ok: gewichtAlterTage == null || gewichtAlterTage <= gewichtGrenzeMonate * 30,
+        text: `Gewicht ${kg(gewicht)} vom ${datum(patient.kopf!.gewicht!.am)}${gewichtAlterTage != null && gewichtAlterTage > gewichtGrenzeMonate * 30 ? ` – älter als ${gewichtGrenzeMonate} Monate, bitte prüfen` : ""}.` },
+    ohnePraeparat.length
+      ? { ok: false, text: `Präparat fehlt bei ${ohnePraeparat.join(", ")}.` }
+      : { ok: true, text: "Zu jeder Menge ist ein Präparat gewählt." },
+    caMgStabil === false
+      ? { ok: false, text: `Mischung instabil: Calcium + Magnesium ${zahl(caMg)} mmol, erlaubt sind ${zahl(caMgGrenze)} mmol. Calcium oder Magnesium verringern.` }
+      : { ok: true, text: caMgStabil == null ? "Stabilität Calcium + Magnesium: noch nicht prüfbar." : "Calcium + Magnesium stabil." },
+    pe == null
+      ? { ok: false, text: "Infusionstage pro Woche (PE) fehlen." }
+      : pe > 7 || (freiTage != null && freiTage > 7 - Math.max(pe, zusatzTage ?? 0))
+        ? { ok: false, text: "Infusionstage passen nicht zusammen: infusionsfreie Tage höchstens 7 − Infusionstage." }
+        : { ok: true, text: `PE ${zahl(pe)}× pro Woche${zusatzTage ? `, Zusatzvolumen ${zahl(zusatzTage)}×` : ""}${freiTage ? `, ${zahl(freiTage)} infusionsfrei` : ""}.` },
+    laufzeit
+      ? { ok: true, text: `Laufzeit ${zahl(laufzeit)} h${rate != null ? ` – Rate ${zahl(rate)} ml/h` : ""}.` }
+      : { ok: false, text: "Laufzeit fehlt – ohne sie gibt es keine Rate." },
+    ...(f.pantozol_stufe !== "0" && !ppiMaske ? [{ ok: false, text: "Protonenpumpenhemmer gewählt, aber keine Zeit (morgens, mittags, abends)." }] : []),
+  ];
   const vitamineListe = p.filter((x) => x.kategorie === "vitamine");
-  const zahlFeld = (k: ZahlFeld, label: string, einheit: string, extra?: ReactNode) => (
+  const zahlFeld = (k: ZahlFeld, label: ReactNode, einheit: string, extra?: ReactNode) => (
     <Feld label={label} fehler={e[k]} hinweis={extra}>
       {(pp) => <Einheit einheit={einheit}><Eingabe {...pp} className={cx("num pr-14", geaendert(k) && "border-warn bg-warn-bg")} value={f[k]}
         onChange={(ev) => setze(k)(ev.target.value)} inputMode="decimal" /></Einheit>}
@@ -340,11 +409,21 @@ export function PlanEditor() {
           <h2 className="m-0 text-[1.625rem] font-semibold">{planId ? "Entwurf bearbeiten" : "Neuer Infusionsplan"}</h2>
           <span className="text-sm gedaempft">
             {leerBegonnen ? "Leer begonnen. " : vorgaenger.data ? `${planId ? "Vorgänger" : vorlageId ? "Vorlage geladen, Vorgänger" : "Vorbelegt mit dem aktuellen Plan"} vom ${datum(vorgaenger.data.gueltig_ab)}. `
-              : `Erster Plan dieses Patienten. ${!planId && vorbelegung.data?.werte ? `Vorbelegt je kg Körpergewicht (${kg(vorbelegung.data.gewicht_kg)}) wie im Altsystem. ` : ""}`}
+              : `Erster Plan dieses Patienten. ${!planId && vorbelegung.data?.werte ? `Vorbelegt je kg Körpergewicht (${kg(vorbelegung.data.gewicht_kg)}) ${vorbelegung.data.stand ? `nach Praxisvorgabe vom ${datum(vorbelegung.data.stand)}` : "wie im Altsystem"}. ` : ""}`}
             {vorher ? <>Geänderte Werte sind <span className="bg-warn-bg border border-warn rounded px-1">markiert</span>.</> : null}
           </span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {/* Vorgabe der Praxis: Mengen je kg des letzten Gewichts (Vorlagen › Grenzwerte, F190); Präparate und Zusätze bleiben */}
+          {vorbelegung.data?.werte ? (
+            <span className="flex items-center gap-2 flex-wrap">
+              <Knopf icon="waage" title={`Je kg Körpergewicht (${kg(vorbelegung.data.gewicht_kg)}): ${JE_KG_TEXT.map(([k, t, e]) => `${t} ${zahl(Number(vorbelegung.data!.je_kg[k] ?? 0))} ${e}`).join(" · ")}`}
+                onClick={() => setF((a) => ({ ...a!, ...Object.fromEntries(Object.entries(vorbelegung.data!.werte!).map(([k, v]) => [k, zahl(Number(v))])) }))}>
+                Mengen nach Praxisvorgabe</Knopf>
+              <span className="text-xs gedaempft" data-testid="praxisvorgabe-stand">{vorbelegung.data.stand
+                ? `nach Praxisvorgabe vom ${datum(vorbelegung.data.stand)}` : "Startwerte wie im Altsystem"}</span>
+            </span>
+          ) : null}
           {!planId ? <Knopf onClick={() => { setF(leer()); setLeerBegonnen(true); }}>Leer beginnen</Knopf> : null}
           <KnopfLink to={`/patienten/${patient.id}/plaene`}>Frühere Pläne</KnopfLink>
         </div>
@@ -453,7 +532,7 @@ export function PlanEditor() {
             {/* Infusionstage je Beutelart (Wunsch 06.10.2026, F110): unabhängig von der Zusammensetzung */}
             <h3 className="lbl m-0">Infusionstage pro Woche</h3>
             <div className="grid grid-cols-3 gap-3" data-testid="infusionstage">
-              {zahlFeld("tage_pro_woche", "PE (Mischbeutel)", "×")}
+              {zahlFeld("tage_pro_woche", <><Begriff name="pe">PE</Begriff> (Mischbeutel)</>, "×")}
               {zahlFeld("zusatz_tage_pro_woche", "Zusatzvolumen", "×")}
               {zahlFeld("freie_tage_pro_woche", "Infusionsfrei", "Tg")}
             </div>
@@ -520,7 +599,22 @@ export function PlanEditor() {
               <Meldung art="warn"><ul className="m-0 pl-4">{warnungen.map((w) => <li key={w}>{w}</li>)}</ul></Meldung>
             ) : <div className="meldung ok flex items-center gap-2 text-sm"><Icon name="haken" />Alle Werte im üblichen Bereich</div>}
           </Karte>
-          {speichern.error && !Object.keys(server).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
+          <Karte className="px-5 py-[1.125rem] flex flex-col gap-2" data-testid="plan-pruefung">
+            <h3 className="lbl m-0">Prüfung vor der Freigabe</h3>
+            <ul className="m-0 p-0 list-none flex flex-col gap-1.5 text-[0.8125rem]">
+              {pruefpunkte.map((x) => (
+                <li key={x.text} className="flex items-start gap-2" data-ok={x.ok ? "1" : "0"}>
+                  <span className={cx("shrink-0 mt-0.5", x.ok ? "text-ok" : "text-warn")}><Icon name={x.ok ? "haken" : "warnung"} groesse={14} /></span>
+                  <span>{x.text}</span>
+                </li>
+              ))}
+            </ul>
+            <Knopf icon="dokument" laedt={vorschauM.isPending} disabled={speichern.isPending} onClick={() => vorschauM.mutate()}
+              title="So sieht die PDF mit den Werten aus, die gerade im Formular stehen">
+              {planId || neueId ? "PDF-Vorschau" : "Speichern und PDF-Vorschau"}</Knopf>
+          </Karte>
+          <HinweiseAusLabor patientId={patient.id} planId={planId ? Number(planId) : neueId} bestandteile={bestandteile} />
+          {fehlerQuelle && !Object.keys(server).length ? <Meldung art="fehler">{fehlerQuelle.message}</Meldung> : null}
           {Object.keys(e).length ? <Meldung art="fehler">Bitte die markierten Felder prüfen.{e.fehler ? ` ${e.fehler}` : ""}</Meldung> : null}
           <div className="flex flex-col gap-2">
             {darfBei("plaene_freigeben", patient) ? (
@@ -536,7 +630,82 @@ export function PlanEditor() {
           </div>
         </aside>
       } />
+      {vorschau ? <PdfDialog offen onOffen={(o) => { if (!o) setVorschau(null); }} titel={`Vorschau Infusionsplan · ${name(patient)}`}
+        pfad={`infusionsplaene/${vorschau.id}/vorschau/`} body={vorschau.daten} dateiname={`Infusionsplan-${patient.nummer}-Vorschau.pdf`} /> : null}
     </form>
+  );
+}
+
+type PlanHinweis = {
+  art: "labor" | "labor_alt" | "gewicht" | "plaene" | "referenz_fehlt"; stufe: "warn" | "info"; text: string;
+  parameter?: string; bestandteil?: string; einheit?: string; richtung?: "niedrig" | "hoch";
+  verlauf?: { am: string; wert: number | string }[]; trend?: "steigend" | "fallend" | "gleichbleibend" | "wechselnd" | null;
+  anlage?: number | null;
+};
+const TREND_TEXT: Record<string, string> = { steigend: "steigend", fallend: "fallend", gleichbleibend: "gleichbleibend", wechselnd: "schwankend" };
+
+/**
+ * Hinweise aus Labor und Gewicht (F187): Laborwerte seit dem letzten Plan außerhalb des Referenzbereichs (nur für
+ * Bestandteile, die gerade im Formular vorkommen), Verlauf der letzten drei Werte, deutliche Gewichtsänderung, wie sich
+ * die eigenen Pläne entwickelt haben, fehlendes Labor.
+ * WICHTIG: nur Hinweise zum Prüfen – EPM schlägt hier nie eine Menge vor und berechnet keine Dosis (sonst ggf.
+ * Medizinprodukt nach MDR). Texte kommen vom Server (infusionen/hinweise.py) und sind dort so formuliert.
+ */
+function HinweiseAusLabor({ patientId, planId, bestandteile }: { patientId: number; planId: number | null; bestandteile: string[] }) {
+  const { schreibenOeffnen } = useAkte();
+  const { darf } = useAuth();
+  const daten = useQuery({
+    queryKey: ["patient", patientId, "plan-hinweise", planId, bestandteile.join(",")],
+    queryFn: () => api<{ hinweise: PlanHinweis[]; seit: string }>(`infusionsplaene/hinweise/${abfrage({ patient: patientId, plan: planId ?? undefined, bestandteile: bestandteile.join(",") })}`),
+    placeholderData: (vorher) => vorher,
+  });
+  const liste = daten.data?.hinweise ?? [];
+  return (
+    <Karte className="px-5 py-[1.125rem] flex flex-col gap-2" data-testid="plan-hinweise">
+      <h3 className="lbl m-0">Hinweise aus Labor und Gewicht</h3>
+      <span className="text-xs gedaempft leading-normal">
+        Seit dem letzten Plan{daten.data?.seit ? ` (${datum(daten.data.seit)})` : ""}; Laborwerte nur zu Bestandteilen dieses Plans,
+        außerhalb des <Begriff name="referenzbereich">Referenzbereichs</Begriff>. Zum Prüfen – EPM schlägt keine Mengen vor.
+      </span>
+      {daten.isLoading ? <Laden /> : liste.length ? (
+        <ul className="m-0 p-0 list-none flex flex-col gap-2 text-[0.8125rem]">
+          {liste.map((h, i) => (
+            <li key={`${h.art}-${h.parameter ?? i}`} className="flex items-start gap-2 min-w-0" data-art={h.art} data-testid="plan-hinweis">
+              <span className={cx("shrink-0 mt-0.5", h.stufe === "warn" ? "text-warn" : "gedaempft")}>
+                <Icon name={h.art === "labor" ? (h.richtung === "hoch" ? "hoch" : "runter") : h.stufe === "warn" ? "warnung" : "info"} groesse={14} />
+              </span>
+              <span className={cx("flex flex-col gap-0.5 min-w-0 [overflow-wrap:anywhere]", h.art === "referenz_fehlt" && "gedaempft")}>
+                <span>{h.text}</span>
+                {/* fehlende Referenzbereiche pflegt die Praxis selbst (F190) – Link nur für „Vorlagen pflegen“ */}
+                {h.art === "referenz_fehlt" && darf("vorlagen_pflegen") ? (
+                  <Link to="/admin/vorlagen?bereich=kataloge&labor=ohne_referenz" className="self-start">Referenzbereiche im Laborkatalog nachtragen</Link>
+                ) : null}
+                {h.art === "labor" && h.verlauf && h.verlauf.length > 1 ? (
+                  <span className="gedaempft">
+                    Verlauf: {h.verlauf.map((v) => `${zahl(Number(v.wert))} (${datum(v.am).slice(0, 6)})`).join(" → ")}
+                    {h.trend ? ` · ${TREND_TEXT[h.trend] ?? h.trend}` : ""}
+                  </span>
+                ) : null}
+                {h.art === "labor_alt" ? (
+                  <span className="flex gap-3 flex-wrap">
+                    {schreibenOeffnen ? (
+                      <button type="button" className="bg-transparent border-0 p-0 text-akzent-text cursor-pointer underline"
+                        onClick={schreibenOeffnen} title="Schreiben und E-Mail öffnen – dort die Anlage „Blutuntersuchung“ anhaken">
+                        Blutuntersuchung anfordern</button>
+                    ) : null}
+                    {h.anlage ? (
+                      <button type="button" className="bg-transparent border-0 p-0 text-akzent-text cursor-pointer underline"
+                        onClick={() => void anlageOeffnen({ id: h.anlage! })}>Schreiben „Blutuntersuchung“ ansehen</button>
+                    ) : null}
+                  </span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : <span className="text-[0.8125rem] flex items-center gap-2"><span className="text-ok"><Icon name="haken" groesse={14} /></span>Keine Auffälligkeiten.</span>}
+      <Fehleranzeige fehler={daten.error} />
+    </Karte>
   );
 }
 

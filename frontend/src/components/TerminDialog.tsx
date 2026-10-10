@@ -1,4 +1,5 @@
-/** Termin anlegen oder ändern: Rückruf, Wiedervorlage, Praxistermin (mit Terminort), Sonstiges. */
+/** Termin anlegen oder ändern: Rückruf, Wiedervorlage, Praxistermin (mit Terminort), Sonstiges.
+ *  Nach dem Speichern eines neuen oder verschobenen Praxistermins: „Terminbestätigung an … schicken?“ (F185). */
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -12,6 +13,7 @@ import { Auswahl, Eingabe, Feld, Knopf, Meldung, Textfeld } from "@/components/u
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { PatientWahl } from "./PatientWahl";
+import { BestaetigungAngebot, BestaetigungChip, BestaetigungDialog, bestaetigungFehlt } from "./TerminBestaetigung";
 
 export function TerminDialog({ offen, onOffen, patientId, patientName, termin, datum, mitAkte }: {
   offen: boolean; onOffen: (o: boolean) => void; patientId?: number; patientName?: string;
@@ -30,8 +32,15 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin, d
   const [titel, setTitel] = useState("");
   const [notiz, setNotiz] = useState("");
   const orte = useAuswahl("terminort");
+  // Praxistermin ohne Ort: Praxis Dr. Holtmeier vorschlagen, damit der Termin auf dem Infoblatt an die Praxis steht (F177)
+  const holtmeier = orte.data?.find((o) => /holtmeier/i.test(o.wert));
+  // „kein“: bewusst ohne Ort gewählt – dann nichts vorschlagen
+  const ortWert = ort === "kein" ? "" : ort || (art === "praxistermin" && holtmeier ? String(holtmeier.id) : "");
   const qc = useQueryClient();
   const melden = useHinweis();
+  // F185: nach dem Speichern die Frage „Terminbestätigung schicken?“, danach „Schreiben und E-Mail“
+  const [angebot, setAngebot] = useState<Termin | null>(null);
+  const [bestaetigen, setBestaetigen] = useState<Termin | null>(null);
   useEffect(() => {
     if (offen && termin) {
       setArt(termin.art); setOrt(termin.ort ? String(termin.ort) : ""); setFaellig(termin.faellig_am);
@@ -45,7 +54,7 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin, d
     mutationFn: () => {
       const daten = {
         art,
-        ort: art === "praxistermin" && ort ? Number(ort) : null,
+        ort: art === "praxistermin" && ortWert ? Number(ortWert) : null,
         faellig_am: faellig,
         uhrzeit: uhr || null,
         titel: titel.trim() || TERMINARTEN[art],
@@ -55,7 +64,11 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin, d
         ? api<Termin>(`termine/${termin.id}/`, { method: "PATCH", body: daten })
         : api<Termin>("termine/", { body: { ...daten, patient: patientId ?? patient?.id } });
     },
-    onSuccess: () => {
+    onSuccess: (neu) => {
+      // neu angelegt, zum Praxistermin gemacht oder verschoben (Datum, Uhrzeit, Ort): Bestätigung anbieten
+      const verschoben = !termin || termin.art !== neu.art || termin.faellig_am !== neu.faellig_am
+        || (termin.uhrzeit ?? "").slice(0, 5) !== (neu.uhrzeit ?? "").slice(0, 5) || termin.ort !== neu.ort;
+      if (verschoben && bestaetigungFehlt(neu)) setAngebot(neu);
       void qc.invalidateQueries({ queryKey: ["startseite"] });
       void qc.invalidateQueries({ queryKey: ["termine"] });
       void qc.invalidateQueries({ queryKey: ["kalender"] });
@@ -79,7 +92,9 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin, d
     },
   });
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
+  const bestaetigung = termin && termin.art === "praxistermin" && (termin.bestaetigung_am || bestaetigungFehlt(termin));
   return (
+    <>
     <Dialog offen={offen} onOffen={onOffen} titel={termin ? "Termin bearbeiten" : "Neuer Termin"}
       beschreibung={patientName ? `für ${patientName}` : "Erscheint im Kalender und auf der Startseite unter „Termine und Wiedervorlagen“."}
       fuss={<>
@@ -102,9 +117,10 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin, d
             </Auswahl>
           )}
         </Feld>
-        <Feld label="Ort" fehler={f.ort} hinweis={art !== "praxistermin" ? "nur bei Praxisterminen" : undefined}>
+        <Feld label="Ort" fehler={f.ort} hinweis={art !== "praxistermin" ? "nur bei Praxisterminen"
+          : !ortWert ? "Ohne Ort steht der Termin nicht auf dem Infoblatt an die Praxis" : undefined}>
           {(p) => (
-            <Auswahl {...p} value={ort} disabled={art !== "praxistermin"} onChange={(e) => setOrt(e.target.value)}>
+            <Auswahl {...p} value={ortWert} disabled={art !== "praxistermin"} onChange={(e) => setOrt(e.target.value || "kein")}>
               <option value="">—</option>
               {(orte.data ?? []).map((o) => <option key={o.id} value={o.id}>{o.wert}</option>)}
             </Auswahl>
@@ -124,10 +140,23 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin, d
         </Feld>
         {speichern.error && !Object.keys(f).length ? <Meldung art="fehler" className="col-span-2">{speichern.error.message}</Meldung> : null}
         {abhaken.error ? <Meldung art="fehler" className="col-span-2">{abhaken.error.message}</Meldung> : null}
+        {bestaetigung ? (
+          <div className="col-span-2 flex items-center gap-2 flex-wrap text-[0.8125rem]" data-testid="termin-bestaetigung">
+            <span className="gedaempft">Terminbestätigung:</span>
+            <BestaetigungChip termin={termin} />
+            {termin.bestaetigung_am && termin.bestaetigung_von_name ? <span className="gedaempft">von {termin.bestaetigung_von_name}</span> : null}
+            <Knopf klein icon="mail" onClick={() => { onOffen(false); setBestaetigen(termin); }}>
+              {termin.bestaetigung_am ? "Erneut erstellen" : "Bestätigung erstellen"}</Knopf>
+          </div>
+        ) : null}
         {termin ? <span className="col-span-2 text-[0.8125rem] gedaempft" data-testid="termin-angelegt">
           Angelegt {zeitpunkt(termin.angelegt_am)}{termin.angelegt_von_name ? ` von ${termin.angelegt_von_name}` : ""}</span> : null}
         <button type="submit" hidden />
       </form>
     </Dialog>
+    <BestaetigungAngebot termin={angebot} onNein={() => setAngebot(null)}
+      onJa={() => { setBestaetigen(angebot); setAngebot(null); }} />
+    <BestaetigungDialog termin={bestaetigen} offen={!!bestaetigen} onOffen={(o) => { if (!o) setBestaetigen(null); }} />
+    </>
   );
 }

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
@@ -117,6 +117,75 @@ TEXTWERTE = {"negativ", "positiv", "neg", "pos", "n b", "nb", "nicht nachweisbar
              "siehe unten", "normal", "unauffaellig", "kein", "keine"}
 
 
+# ---------------------------------------------------------------- Gelerntes (F182)
+# Ab so vielen Bestätigungen gilt eine gelernte Zuordnung als sicher (vorgewählt); darunter nur als Vorschlag
+SCHWELLE = 2
+
+
+@dataclass
+class Treffer:
+    """Gelernte Zuordnung für eine erkannte Bezeichnung."""
+
+    ziel: str
+    ziel_text: str
+    bestaetigt: int
+    labor: bool          # gilt für diesen Absender (sonst allgemein)
+    schwelle: int = SCHWELLE
+
+    @property
+    def sicher(self) -> bool:
+        return self.bestaetigt >= self.schwelle
+
+
+@dataclass
+class Gelerntes:
+    """Gelernte Zuordnungen, wie ``scans.lernen.gelerntes()`` sie aus der Datenbank liest.
+
+    ``eintraege``: (Art, Quelle, Bezeichnung) → [(Ziel, Zieltext, Bestätigungen)], Quelle „“ = allgemein;
+    ``gesperrt``: (Art, Quelle, Bezeichnung, Ziel) – „nie wieder so zuordnen“ (Quelle „“ = bei allen Absendern);
+    ``spalten``: Quelle → (linke Kante der Wertespalte, Zeichenbreite), nur bestätigte Lagen;
+    ``ignorieren``: (Quelle, Bezeichnung) – „falsch erkannt, gehört nicht dazu“ (F189), Quelle „“ = überall;
+    ``bereiche``: Quelle → [[x, y, b, h], …] – markierte Bereiche der Werte (F189, liest der OCR-Dienst gezielt nach);
+    ``schwelle``: ab so vielen Bestätigungen sicher (Gelernte Zuordnungen › Steuerung, 1–3)."""
+
+    eintraege: dict
+    gesperrt: set
+    spalten: dict
+    ignorieren: set = field(default_factory=set)
+    bereiche: dict = field(default_factory=dict)
+    schwelle: int = SCHWELLE
+
+    @classmethod
+    def leer(cls) -> "Gelerntes":
+        return cls({}, set(), {})
+
+    def ist_gesperrt(self, art: str, quelle: str, erkannt: str, ziel) -> bool:
+        ziel = str(ziel)
+        return (art, "", erkannt, ziel) in self.gesperrt or (bool(quelle) and (art, quelle, erkannt, ziel) in self.gesperrt)
+
+    def _bester(self, art, quelle, erkannt) -> Treffer | None:
+        liste = [e for e in self.eintraege.get((art, quelle, erkannt), [])
+                 if not self.ist_gesperrt(art, quelle, erkannt, e[0])]
+        if not liste:
+            return None
+        ziel, text, n = max(liste, key=lambda e: e[2])
+        return Treffer(ziel, text, n, bool(quelle), self.schwelle)
+
+    def ignoriert(self, quelle: str, erkannt: str) -> bool:
+        return bool(erkannt) and ((("", erkannt) in self.ignorieren) or (bool(quelle) and (quelle, erkannt) in self.ignorieren))
+
+    def finden(self, art: str, quelle: str, erkannt: str) -> Treffer | None:
+        """Zuerst das für denselben Absender Gelernte, dann das allgemeine; sichere Treffer vor Vorschlägen."""
+        if not erkannt:
+            return None
+        eigen = self._bester(art, quelle, erkannt) if quelle else None
+        allgemein = self._bester(art, "", erkannt)
+        for t in (eigen, allgemein):
+            if t and t.sicher:
+                return t
+        return eigen or allgemein
+
+
 def norm(text: str) -> str:
     """Für Vergleiche: klein, Umlaute als ae/oe/ue, ß als ss, γ als g, nur Buchstaben und Ziffern."""
     t = unicodedata.normalize("NFKC", text or "").lower()
@@ -150,20 +219,28 @@ class T:
     seite: int
     box: tuple
     c: float
+    bereich: tuple | None = None   # aus einem markierten Bereich nachgelesen (F189)
 
 
 def reihen_aus(seiten: list[dict]) -> list[list[T]]:
     """Ergebnis-JSON aller Seiten → Reihen von Wörtern (Seite für Seite, oben nach unten)."""
     aus = []
     for nr, d in enumerate(seiten):
-        b, h = max(d.get("breite") or 1, 1), max(d.get("hoehe") or 1, 1)
-        for r in d.get("reihen", []):
-            reihe = []
-            for s in r:
-                for w in s["w"]:
-                    reihe.append(T(str(w[0]), nr, (w[1] / b, w[2] / h, w[3] / b, w[4] / h), float(w[5])))
-            if reihe:
-                aus.append(reihe)
+        aus += reihen_der_seite(d, nr)
+    return aus
+
+
+def reihen_der_seite(d: dict, nr: int, bereich=None) -> list[list[T]]:
+    b, h = max(d.get("breite") or 1, 1), max(d.get("hoehe") or 1, 1)
+    aus = []
+    for r in d.get("reihen", []):
+        reihe = []
+        for s in r:
+            for w in s["w"]:
+                reihe.append(T(str(w[0]), nr, (w[1] / b, w[2] / h, w[3] / b, w[4] / h), float(w[5]),
+                               tuple(bereich) if bereich else None))
+        if reihe:
+            aus.append(reihe)
     return aus
 
 
@@ -293,11 +370,33 @@ def _ist_wert(t: str) -> bool:
     return bool(_WERT.match(t.replace(" ", ""))) or norm(t) in TEXTWERTE
 
 
-def _suche_parameter(label: str, index, eintraege) -> tuple[Katalogeintrag | None, str]:
-    """→ (Parameter, „genau“ | „ähnlich“ | „“)."""
+def _suche_parameter(label: str, index, eintraege, gelernt: Gelerntes | None = None,
+                     quelle: str = "") -> tuple[Katalogeintrag | None, str, Treffer | None]:
+    """→ (Parameter, „gelernt“ | „genau“ | „gelernt_vorschlag“ | „aehnlich“ | „“, gelernte Zuordnung).
+
+    Reihenfolge: sicher Gelerntes (erst für diesen Absender, dann allgemein) → Katalog und Suchbegriffe → gelernter
+    Vorschlag → ähnliche Schreibweise. Gesperrte Zuordnungen („nie wieder so“) fallen auf jeder Stufe weg."""
     n = norm(label)
     if not n:
-        return None, ""
+        return None, "", None
+    t = gelernt.finden("labor", quelle, n) if gelernt else None
+    nach_id = {str(e.id): e for e in eintraege}
+    if t is not None and t.ziel not in nach_id:
+        t = None  # Parameter inzwischen deaktiviert
+    if t is not None and t.sicher:
+        return nach_id[t.ziel], "gelernt", t
+    p, art = _suche_katalog(label, n, index)
+    if p is not None and gelernt and gelernt.ist_gesperrt("labor", quelle, n, p.id):
+        p, art = None, ""
+    if p is not None and art == "genau":
+        return p, art, None
+    if t is not None:
+        return nach_id[t.ziel], "gelernt_vorschlag", t
+    return p, art, None
+
+
+def _suche_katalog(label: str, n: str, index) -> tuple[Katalogeintrag | None, str]:
+    """→ (Parameter, „genau“ | „aehnlich“ | „“) allein aus Katalog, Synonymen und Suchbegriffen."""
     if n in index and len(index[n]) == 1:
         return index[n][0], "genau"
     # ohne Zusätze in Klammern oder am Ende („Kreatinin (enzym.)“, „Albumin i.S.“)
@@ -377,7 +476,7 @@ def _wertstelle(r: list[T]) -> int | None:
     return None
 
 
-def _wertspalten(reihen: list[list[T]]) -> dict[int, tuple[float, float]]:
+def _wertspalten(reihen: list[list[T]], gelernt: tuple[float, float] | None = None) -> dict[int, tuple[float, float]]:
     """Je Seite: linke Kante der Wertespalte und Zeichenbreite – nur wenn die Werte linksbündig untereinander stehen.
 
     Ein Pfeil vor dem Wert („↑18.69“) ragt dann um ein Zeichen nach links heraus; die Erkennung liest ihn oft als
@@ -399,6 +498,11 @@ def _wertspalten(reihen: list[list[T]]) -> dict[int, tuple[float, float]]:
         zeichen = sorted(z for _, z in xs)[len(xs) // 2]
         if sum(1 for x, _ in xs if abs(x - links) <= 0.35 * zeichen) >= 0.7 * len(xs):
             aus[seite] = (links, zeichen)
+    if gelernt:
+        # zu wenige Werte auf der Seite: die bestätigte Spaltenlage dieses Absenders (F182)
+        for r in reihen:
+            if r and r[0].seite not in aus:
+                aus[r[0].seite] = gelernt
     return aus
 
 
@@ -411,10 +515,13 @@ def _pfeil_als_eins(t: T, roh: str, spalten) -> bool:
     return t.box[0] < links - 0.6 * zeichen and abs(t.box[0] + eigenes - links) <= 0.5 * zeichen
 
 
-def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
-    """Zeilen eines Laborbefunds → vorgeschlagene Werte (Parameter aus dem Katalog oder Freitext)."""
+def laborwerte(reihen: list[list[T]], parameter: list[dict], gelernt: Gelerntes | None = None,
+               quelle: str = "") -> list[dict]:
+    """Zeilen eines Laborbefunds → vorgeschlagene Werte (Parameter aus dem Katalog oder Freitext).
+
+    ``gelernt``/``quelle``: gelernte Zuordnungen (F182) und der normalisierte Absender des Befunds."""
     index, eintraege = katalog_index(parameter)
-    spalten = _wertspalten(reihen)
+    spalten = _wertspalten(reihen, gelernt.spalten.get(quelle) if gelernt and quelle else None)
     vorschlaege = []
     for r in reihen:
         if len(r) < 2:
@@ -425,12 +532,14 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
         etikett = _text(r[:k - 1] if r[k - 1].text in _PFEIL_WORT and k > 1 else r[:k])
         if _ERLAEUTERUNG.search(norm(etikett)):
             continue  # Beurteilungsstufen unter dem Wert, kein eigener Wert
+        if gelernt and gelernt.ignoriert(quelle, norm(etikett)):
+            continue  # „falsch erkannt – gehört nicht dazu“ (F189)
         if not re.search(r"[A-Za-zÄÖÜäöü]", etikett) or len(etikett) > 60:
             continue
         if alle_daten(etikett) or _DATUM_WORT.match(r[k + 1].text if _OP.match(r[k].text) and k + 1 < len(r)
                                                     else r[k].text):
             continue  # Kopfzeilen mit Datum („Eingang 19.11.2024“); ein Datum beim Vorwert hinten zählt nicht
-        param, art = _suche_parameter(etikett, index, eintraege)
+        param, art, gelernt_treffer = _suche_parameter(etikett, index, eintraege, gelernt, quelle)
         rest = r[k:]
         # Wert
         op, wert, wert_text, flag = "", None, "", ""
@@ -449,6 +558,7 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
             # „1 9,7 G/l 4,0 - 9,0“: nicht aber „1 3,5 - 5,1“ (Wert 1, danach der Referenzbereich)
             pfeil = "1"
             j += 1
+        wert_wort = rest[j]
         roh = gelesen = rest[j].text.replace(" ", "")
         if pfeil == "1":
             gelesen = f"{rest[j - 1].text} {roh}"
@@ -543,7 +653,18 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict]) -> list[dict]:
             "sicherheit": round(sicher, 3),
             "hinweise": hinweise,
             "vorschlag": True,
+            # Lage des Werts (für die Spaltenlage je Absender, F182)
+            "wert_x": round(wert_wort.box[0], 4),
+            # aus einem markierten Bereich nachgelesen (F189): dieser Bereich
+            "bereich": list(r[0].bereich) if r[0].bereich else None,
+            "wert_zeichen": round(wert_wort.box[2] / max(len(wert_wort.text), 1), 5),
         }
+        if art == "gelernt":
+            hinweise.append(f"gelernt: so schon {gelernt_treffer.bestaetigt}-mal übernommen"
+                            + ("" if gelernt_treffer.labor else " (allgemein)"))
+        elif art == "gelernt_vorschlag":
+            eintrag["vorschlag"] = False
+            hinweise.append(f"gelernt, erst {gelernt_treffer.bestaetigt}-mal bestätigt – bitte prüfen")
         if art == "aehnlich":
             hinweise.append(f"Name ähnlich gelesen: „{etikett}“")
         if sicher < UNSICHER:
@@ -682,7 +803,7 @@ def _wert_mit_einheit(rest: list[T], erwartet: list[str] | None = None) -> tuple
     return None, "", [], ""
 
 
-def bia_werte(reihen: list[list[T]]) -> dict:
+def bia_werte(reihen: list[list[T]], gelernt: Gelerntes | None = None, quelle: str = "") -> dict:
     felder, weitere = {}, []
     for r in reihen:
         if len(r) < 2:
@@ -693,9 +814,21 @@ def bia_werte(reihen: list[list[T]]) -> dict:
             etikett = norm(_text(r[:k]))
             if not etikett:
                 continue
+            if gelernt and gelernt.ignoriert(quelle, etikett):
+                break
             treffer = None
+            # gelernt (F182): Bezeichnungen anderer Geräte, die die Pflegekraft einem Feld zugeordnet hat
+            gl = gelernt.finden("bia", quelle, etikett) if gelernt else None
+            if gl is not None and gl.ziel in BIA_FELDER:
+                treffer = ("feld", gl.ziel, BIA_FELDER[gl.ziel][1])
+            else:
+                gl = None
             for feld, (begriffe, einheiten_) in BIA_FELDER.items():
+                if treffer is not None:
+                    break
                 if etikett in begriffe or any(etikett.startswith(b + " ") and len(b) > 3 for b in begriffe):
+                    if gelernt and gelernt.ist_gesperrt("bia", quelle, etikett, feld):
+                        continue
                     treffer = ("feld", feld, einheiten_)
                     break
             if treffer is None:
@@ -723,10 +856,17 @@ def bia_werte(reihen: list[list[T]]) -> dict:
                     hinweis = hinweis or f"als Verhältnis {_dez(wert)} gedruckt – in Prozent umgerechnet"
                     wert, e = wert * 100, "%"
                 if feld not in felder:
+                    hinweise = [hinweis] if hinweis else []
+                    if gl is not None:
+                        hinweise.append(f"gelernt: so schon {gl.bestaetigt}-mal übernommen" if gl.sicher
+                                        else f"gelernt, erst {gl.bestaetigt}-mal bestätigt – bitte prüfen")
                     felder[feld] = {"wert": _dez(wert), "einheit": e, "erkannt_als": _text(r[:k]),
                                     "seite": r[0].seite, "box": _rahmen(r[:k] + woerter),
-                                    "sicherheit": round(sicher, 3), "vorschlag": sicher >= 0.5,
-                                    "hinweise": [hinweis] if hinweis else []}
+                                    "sicherheit": round(sicher, 3),
+                                    "vorschlag": sicher >= 0.5 and (gl is None or gl.sicher),
+                                    "hinweise": hinweise}
+                    if gl is not None:
+                        felder[feld]["zuordnung"] = "gelernt" if gl.sicher else "gelernt_vorschlag"
             else:
                 weitere.append({"name": treffer[1], "wert": _dez(wert), "einheit": e, "seite": r[0].seite,
                                 "box": _rahmen(r[:k] + woerter)})
@@ -748,7 +888,7 @@ ABSCHNITTE = {
 }
 
 
-def diagnosen(reihen: list[list[T]]) -> list[dict]:
+def diagnosen(reihen: list[list[T]], gelernt: Gelerntes | None = None, quelle: str = "") -> list[dict]:
     aus, gesehen = [], set()
     for r in reihen:
         zeile = _text(r)
@@ -781,11 +921,27 @@ def diagnosen(reihen: list[list[T]]) -> list[dict]:
                     kennzeichen = "A"
                 else:
                     kennzeichen = "G"
+            if gelernt and gelernt.ignoriert(quelle, norm(text)):
+                continue  # „falsch erkannt – gehört nicht dazu“ (F189)
             gesehen.add(code)
             woerter = [t for t in r]
-            aus.append({"bezeichnung": text[:200], "icd_code": code + (m.group(2) or ""), "kennzeichen": kennzeichen,
-                        "zeile": zeile[:200], "seite": r[0].seite, "box": _rahmen(woerter),
-                        "sicherheit": round(min(t.c for t in r), 3), "vorschlag": True})
+            eintrag = {"bezeichnung": text[:200], "icd_code": code + (m.group(2) or ""), "kennzeichen": kennzeichen,
+                       "erkannt_als": text[:200], "erkannt_code": code + (m.group(2) or ""), "zeile": zeile[:200], "seite": r[0].seite, "box": _rahmen(woerter),
+                       "sicherheit": round(min(t.c for t in r), 3), "vorschlag": True, "hinweise": []}
+            # gelernt (F182): Lesefehler in der Bezeichnung bzw. im Code, die die Pflegekraft korrigiert hat
+            gl = gelernt.finden("diagnose", quelle, norm(text)) if gelernt else None
+            if gl is not None and gl.ziel_text:
+                if gl.sicher:
+                    eintrag.update(bezeichnung=gl.ziel_text[:200], icd_code=gl.ziel or eintrag["icd_code"],
+                                   zuordnung="gelernt")
+                    eintrag["hinweise"].append(f"gelernt: gelesen „{text[:80]}“, so schon {gl.bestaetigt}-mal "
+                                               f"korrigiert")
+                else:
+                    eintrag["zuordnung"] = "gelernt_vorschlag"
+                    eintrag["gelernt"] = {"bezeichnung": gl.ziel_text[:200], "icd_code": gl.ziel or eintrag["icd_code"]}
+                    eintrag["hinweise"].append(f"gelernt, erst {gl.bestaetigt}-mal korrigiert: „{gl.ziel_text[:80]}“"
+                                               f" ({gl.ziel}) – bitte prüfen")
+            aus.append(eintrag)
     return aus
 
 
@@ -827,12 +983,33 @@ def abschnitte(reihen: list[list[T]]) -> dict:
 
 
 # ---------------------------------------------------------------- Patient
+# „Patient: Muster, Erika“, „Name: Erika Muster“, „wir berichten über Frau Erika Muster, geb. …“ (F183)
+_NAME_VOR = re.compile(r"(?i:\b(?:patient(?:in)?|pat\.|name|versicherte[rn]?|betrifft|betr\.|herrn?|frau|über|ueber|für|"
+                       r"fuer)\b\.?\s*:?\s*)((?:[A-ZÄÖÜ][A-Za-zÄÖÜäöüß'\-]+\.?,?\s*){1,4})")
+_KEIN_NAME = {"geb", "geboren", "geburtsdatum", "nr", "pat", "patient", "patientin", "name", "frau", "herr", "herrn", "dr",
+              "med", "prof", "dipl", "und", "mit", "der", "die", "das", "den", "im", "am", "vom", "datum", "befund",
+              "labor", "station", "kollege", "kollegin", "sehr", "geehrte", "geehrter", "auftrag", "einsender"}
+
+
+def _namen(zeile: str) -> set[str]:
+    """Wörter, die nach einem Hinweis wie „Patient:“ oder „Frau“ als Name stehen (normalisiert)."""
+    aus = set()
+    for m in _NAME_VOR.finditer(zeile):
+        for w in re.split(r"[\s,]+", m.group(1)):
+            n = norm(w)
+            if len(n) >= 2 and not n.isdigit() and n not in _KEIN_NAME:
+                aus.update(n.split())
+    return aus
+
+
 def patient_hinweise(reihen: list[list[T]], heute: date | None = None) -> dict:
-    """Was im Dokument auf den Patienten hinweist: Nummern, Geburtsdaten, Wörter (für den Abgleich mit der Datenbank)."""
+    """Was im Dokument auf den Patienten hinweist: Nummern, Geburtsdaten, Namen (nach „Patient:“, „Frau“ …) und alle
+    Wörter – für den Abgleich mit der Datenbank. Bleibt im Server, wird weder gelernt noch protokolliert (F183)."""
     heute = heute or date.today()
-    nummern, geburt, woerter = [], [], set()
+    nummern, geburt, woerter, namen = [], [], set(), set()
     for r in reihen[:80]:
         zeile = _text(r)
+        namen |= _namen(zeile)
         for m in re.finditer(r"(?:pat(?:ienten)?\.?\s*-?\s*(?:nr|nummer|id)\.?|epm\s*-?\s*nr\.?|fallnr\.?|"
                              r"nr\.)\s*[:#]?\s*(\d{1,7})\b", zeile, re.I):
             nummern.append(int(m.group(1)))
@@ -846,16 +1023,46 @@ def patient_hinweise(reihen: list[list[T]], heute: date | None = None) -> dict:
             if len(w) >= 3 and not w.isdigit():
                 woerter.add(w)
     return {"nummern": sorted(set(nummern)), "geburtsdaten": sorted({d.isoformat() for d in geburt}),
-            "woerter": sorted(woerter)}
+            "woerter": sorted(woerter), "namen": sorted(namen)}
+
+
+def etikett_an(reihen: list[list[T]], seite: int, box) -> str:
+    """Bezeichnung links von einer angeklickten Stelle (Wert, den die Pflegekraft im Bild gewählt hat): die Wörter der
+    Reihe vor diesem Wort, ohne Zahlen und Pfeile. „“, wenn dort nichts Brauchbares steht (F182)."""
+    try:
+        mx, my = float(box[0]) + float(box[2]) / 2, float(box[1]) + float(box[3]) / 2
+    except (TypeError, ValueError, IndexError):
+        return ""
+    for r in reihen:
+        if not r or r[0].seite != seite:
+            continue
+        for k, t in enumerate(r):
+            x, y, b, h = t.box
+            if x - 0.002 <= mx <= x + b + 0.002 and y - 0.002 <= my <= y + h + 0.002:
+                vorn = r[:k]
+                while vorn and (vorn[-1].text in _PFEIL_WORT or _ist_wert(vorn[-1].text) or _OP.match(vorn[-1].text)):
+                    vorn = vorn[:-1]
+                text = _text(vorn).strip(" :")
+                if not re.search(r"[A-Za-zÄÖÜäöü]{2}", text) or len(text) > 60:
+                    return ""
+                return text
+    return ""
 
 
 # ---------------------------------------------------------------- Gesamtauswertung
-def auswerten(seiten: list[dict], parameter: list[dict], heute: date | None = None) -> dict:
+def auswerten(seiten: list[dict], parameter: list[dict], heute: date | None = None,
+              gelernt: Gelerntes | None = None, zusatz: list | None = None) -> dict:
+    """``zusatz``: aus markierten Bereichen nachgelesene Reihen (F189) als [(Seitenindex, Ergebnis-JSON, Bereich)] –
+    sie kommen hinter alle anderen Reihen, damit die Nummern der übrigen Vorschläge gleich bleiben."""
     reihen = reihen_aus(seiten)
+    for nr, d, bereich in zusatz or []:
+        reihen += reihen_der_seite(d, nr, bereich)
     d, quelle = dokumentdatum(reihen, heute)
-    werte = laborwerte(reihen, parameter)
-    bia = bia_werte(reihen)
-    dg = diagnosen(reihen)
+    absender = labor_name(reihen)
+    q = norm(absender)[:150]
+    werte = laborwerte(reihen, parameter, gelernt, q)
+    bia = bia_werte(reihen, gelernt, q)
+    dg = diagnosen(reihen, gelernt, q)
     ab = abschnitte(reihen)
     arten = []
     if sum(1 for w in werte if w["parameter"]) >= 3:
@@ -871,7 +1078,7 @@ def auswerten(seiten: list[dict], parameter: list[dict], heute: date | None = No
         "arten": arten,
         "datum": d.isoformat() if d else None,
         "datum_quelle": quelle,
-        "labor": {"name": labor_name(reihen), "werte": werte},
+        "labor": {"name": absender, "werte": werte},
         "bia": bia,
         "diagnosen": dg,
         "abschnitte": ab,

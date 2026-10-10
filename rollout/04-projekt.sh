@@ -111,7 +111,9 @@ fehlend=()
 for paar in gpg:gnupg rclone:rclone jq:jq; do
   command -v "${paar%%:*}" >/dev/null 2>&1 || fehlend+=("${paar##*:}")
 done
-if [[ ${#fehlend[@]} -gt 0 ]]; then
+if [[ ${#fehlend[@]} -gt 0 && "${EPM_OFFLINE:-0}" == 1 ]]; then
+  echo "WARNUNG: ${fehlend[*]} fehlen (Offline-Aufbau ohne diese Pakete) – ohne gpg keine Verschlüsselung."
+elif [[ ${#fehlend[@]} -gt 0 ]]; then
   # der VPS erreicht die Paketquellen über den Proxy der OPNsense (apt.conf.d/95epm-proxy aus 01-basis.sh)
   DEBIAN_FRONTEND=noninteractive apt-get install -y -q "${fehlend[@]}" >/dev/null \
     || echo "WARNUNG: ${fehlend[*]} nicht installiert – ohne gpg keine Verschlüsselung, ohne rclone keine Übertragung."

@@ -91,9 +91,9 @@ function UmhaengenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolea
           </label>
         ) : null}
         <span className="text-[0.8125rem] gedaempft leading-normal">
-          Datei und Prüfsumme bleiben unverändert. Hier im Verlauf steht danach nur „einer anderen Akte zugeordnet“ – ohne Titel
+          Die Datei bleibt unverändert. Hier im Verlauf steht danach nur „einer anderen Akte zugeordnet“ – ohne Titel
           und ohne den anderen Patienten. Beim richtigen Patienten steht „von einer anderen Akte übernommen“ mit Grund. Das
-          Audit-Log hält den Vorgang vollständig fest.
+          Protokoll der Administration hält den Vorgang vollständig fest.
         </span>
         {umhaengen.error && !Object.keys(f).length ? <Fehleranzeige fehler={umhaengen.error} /> : null}
       </div>
@@ -101,7 +101,7 @@ function UmhaengenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolea
   );
 }
 
-/** Endgültig löschen: Mediziner und Admin (auch bei echten Akten), mit Kennwort, Code aus der Authenticator-App und abgetipptem Bestätigungscode. */
+/** Endgültig löschen: Mediziner und Admin (auch bei echten Akten), mit Passwort, Code aus der Authenticator-App und abgetipptem Bestätigungscode. */
 function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean; onOffen: (o: boolean) => void }) {
   const { patient } = useAkte();
   const qc = useQueryClient();
@@ -146,7 +146,7 @@ function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean
         </Feld>
         <ZweiFaktorFehlt />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-          <Feld label="Kennwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
+          <Feld label="Passwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
           {zf.feld(f.code)}
         </div>
         <div className="flex items-end gap-3 flex-wrap">
@@ -269,7 +269,7 @@ function Texterkennung({ dok }: { dok: Dokument }) {
       </div>
       <Bestaetigen offen={frage} onOffen={setFrage} titel={dok.hat_text ? "Text neu erkennen" : "Text erkennen"} knopf="Erkennen und ersetzen"
         laedt={anfordern.isPending} fehler={anfordern.error} onJa={() => anfordern.mutate()}
-        text={<>Die Datei wird durch dieselbe Datei als PDF/A mit unsichtbarer Textebene ersetzt. Die Seiten sehen
+        text={<>EPM liest den Text aus dem Dokument und speichert eine durchsuchbare Fassung. Die Seiten sehen
           danach genauso aus wie vorher{dok.mime !== "application/pdf" ? " (das Bild wird dabei zur PDF)" : ""}; Titel,
           Typ, Datum und Notiz bleiben. Danach lässt sich das Dokument durchsuchen und der Text kopieren. Je nach
           Seitenzahl dauert das einige Minuten – die Akte kann währenddessen weiter benutzt werden.</>} />
@@ -434,7 +434,7 @@ export function Dokumente() {
   };
 
   return (
-    <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_21.25rem] fhd:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
+    <div className="akte-spalten stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_21.25rem] fhd:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
       <div className="flex flex-col gap-4 min-w-0">
         {erfassen ? (
           <div
@@ -463,7 +463,7 @@ export function Dokumente() {
           </ul>
         ) : null}
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <span className="lbl">{liste.length} Dokumente</span>
+          <span className="lbl">{liste.length} {liste.length === 1 ? "Dokument" : "Dokumente"}</span>
           <label className="relative block grow max-w-sm">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
             <input className="inp pl-[2.125rem]" type="search" aria-label="Dokumente durchsuchen" placeholder="Suchen in Titel, Notiz und erkanntem Text"
@@ -496,7 +496,10 @@ export function Dokumente() {
               </tbody>
             </table>
           )}
-          {dokumente.data && !liste.length ? <Leer>{begriff.length >= 2 ? "Kein Dokument gefunden." : "Noch keine Dokumente."}</Leer> : null}
+          {dokumente.data && !liste.length ? <Leer>{begriff.length >= 2 ? "Kein Dokument gefunden." : "Noch keine Dokumente."}
+            {/* nächster Schritt statt leerer Fläche (Bedienung für Pflegekräfte, 10.10.2026) */}
+            {begriff.length >= 2 ? <><br />Anderes Suchwort versuchen oder „Ausgeblendete anzeigen“ anhaken.</>
+              : erfassen ? <><br />Brief oder Befund mit „Neues Dokument“ auswählen oder die Datei oben in das Feld ziehen.</> : null}</Leer> : null}
           <Fehleranzeige fehler={dokumente.error} />
         </Karte>
       </div>

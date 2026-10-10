@@ -9,6 +9,14 @@
  * Laborbefund und BIA-Messung lassen sich auch dann übernehmen, wenn die Art nicht erkannt wurde (anderes Gerät,
  * anderes Layout): Abschnitt einschalten, Feld anklicken und dann den Wert im Bild links anklicken – oder tippen.
  * Laborwerte lassen sich mit „+ Wert“ ergänzen (09.10.2026).
+ *
+ * Texterkennung lernt mit (F182): Mit dem Zuordnen geht an den Server, welche Zeile der Erkennung zu welchem
+ * übernommenen Wert gehört bzw. wo ein von Hand ergänzter Wert im Bild steht („herkunft“). Daraus lernt er Bezeichnungen;
+ * gelernte Zuordnungen sind hier mit „gelernt“ gekennzeichnet. Der Patient wird vorgeschlagen, nie selbst gewählt (F183).
+ *
+ * Erkennung verbessern (F189): Jede erkannte Zeile hat „Falsch erkannt“ (mit Grund; wirkt sofort, der Server lernt
+ * daraus), „Bereich markieren“ liest nur einen im Bild aufgezogenen Rahmen neu – die Zeilen darin kommen als neue
+ * Werte dazu. Der Hinweis „So helfen Sie EPM, besser zu lesen“ erscheint einmal und ist über „?“ wieder abrufbar.
  */
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
@@ -18,12 +26,16 @@ import { ApiFehler, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useAuswahl, useLaborparameter } from "@/lib/daten";
 import { datum, eingabeZahl, nummer } from "@/lib/format";
-import type { PatientZeile, Scan, ScanBiaWert, ScanDiagnose, ScanLaborwert } from "@/lib/typen";
+import type { PatientZeile, Scan, ScanBiaWert, ScanDiagnose, ScanLaborwert, ScanVorschlag } from "@/lib/typen";
 import { PatientWahl } from "@/components/PatientWahl";
 import { Auswahl, Chip, Eingabe, Feld, Knopf, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
 import { useHinweis } from "@/components/ui/hinweise";
 import { ARTEN, UNSICHER } from "./hilfen";
+import { PatientVorschlag } from "./PatientVorschlag";
+import { BereichKnopf, FalschKnopf, GRUND_TEXT, VerbessernHinweis } from "./Verbessern";
+import type { Grund } from "./Verbessern";
+import { Begriff } from "@/components/ui/Begriff";
 
 export type Stelle = { seite: number; box: number[] } | null;
 /** Gewähltes Feld: Ein Klick auf ein Wort im Bild schreibt dessen Text hinein */
@@ -32,7 +44,25 @@ export type Ziel = { schluessel: string; name: string; setzen: (text: string, st
 type Wahl = { id: number; nummer: number; nachname: string; vorname: string; geburtsdatum: string | null; ist_test: boolean };
 
 type LaborZeile = { an: boolean; parameter: number | null; freitext_name: string; wert: string; wert_text: string;
-  einheit: string; referenz_von: string; referenz_bis: string; quelle: ScanLaborwert | null; stelle?: Stelle };
+  einheit: string; referenz_von: string; referenz_bis: string; quelle: ScanLaborwert | null; stelle?: Stelle;
+  /** Nummer der Zeile in der Erkennung (null = von Hand ergänzt) – für das Lernen (F182) */
+  index: number | null };
+
+function GelerntChip({ zuordnung }: { zuordnung?: string }) {
+  if (zuordnung !== "gelernt" && zuordnung !== "gelernt_vorschlag") return null;
+  return (
+    <Chip art={zuordnung === "gelernt" ? "akzent" : "warn"} className="ml-1" data-testid="chip-gelernt"
+      title={zuordnung === "gelernt" ? "aus früheren Korrekturen gelernt" : "gelernt, aber erst einmal bestätigt – bitte prüfen"}>
+      gelernt{zuordnung === "gelernt_vorschlag" ? "?" : ""}
+    </Chip>
+  );
+}
+
+function alsWahl(v: ScanVorschlag): Wahl {
+  const [nach, ...vor] = v.name.split(", ");
+  return { id: v.id, nummer: v.nummer, nachname: v.nachname ?? nach, vorname: v.vorname ?? vor.join(", "),
+    geburtsdatum: v.geburtsdatum, ist_test: v.ist_test };
+}
 
 const BIA_FELDER: [keyof NonNullable<Scan["auswertung"]["bia"]>["werte"], string, string][] = [
   ["gewicht_kg", "Gewicht", "kg"], ["bcm_kg", "BCM", "kg"], ["fettmasse_kg", "Fettmasse", "kg"],
@@ -87,9 +117,16 @@ function Abschnitt({ titel, an, onAn, zahl, children, testid }: {
   );
 }
 
-export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, onZiel = () => {} }: {
+export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, onZiel = () => {}, startPatient = null,
+  bereichAktiv = false, bereichLaedt = false, onBereich, neueWerte = null }: {
   scan: Scan; onStelle: (s: Stelle) => void; onFertig: (patientId: number, dokumentId: number) => void; onAbbrechen: () => void;
   ziel?: Ziel; onZiel?: (z: Ziel) => void;
+  /** in der Scan-Ansicht mit einem Klick übernommener Vorschlag (F183) */
+  startPatient?: ScanVorschlag | null;
+  /** F189: „Bereich markieren“ – der Rahmen wird in der Seitenansicht aufgezogen (ScanDetail) */
+  bereichAktiv?: boolean; bereichLaedt?: boolean; onBereich?: () => void;
+  /** F189: Nummern der Laborwerte, die der markierte Bereich ergeben hat (``nr`` wechselt mit jedem Bereich) */
+  neueWerte?: { nr: number; indices: number[] } | null;
 }) {
   const a = scan.auswertung ?? {};
   const arten = a.arten ?? [];
@@ -101,7 +138,7 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
 
   // Arbeitskopie eines Akte-Dokuments (F171): Patient steht fest, es entsteht kein neues Dokument
   const quelle = scan.quelle ?? null;
-  const [patient, setPatient] = useState<Wahl | null>(quelle ? { ...quelle.patient } : null);
+  const [patient, setPatient] = useState<Wahl | null>(quelle ? { ...quelle.patient } : startPatient ? alsWahl(startPatient) : null);
   const [titel, setTitel] = useState(scan.titel);
   const [typ, setTyp] = useState("");
   const [dokDatum, setDokDatum] = useState(scan.dokumentdatum ?? "");
@@ -112,40 +149,76 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
   const [abnahme, setAbnahme] = useState(a.datum_quelle === "abnahme" || a.datum_quelle === "befund" ? a.datum ?? "" : a.datum ?? "");
   const [laborName, setLaborName] = useState(a.labor?.name ?? "");
   const [beurteilung, setBeurteilung] = useState(arten.includes("labor") ? a.abschnitte?.verlauf ?? "" : "");
-  const [werte, setWerte] = useState<LaborZeile[]>(() => (a.labor?.werte ?? []).map((w) => ({
+  const [werte, setWerte] = useState<LaborZeile[]>(() => (a.labor?.werte ?? []).map((w, i) => ({
     an: w.vorschlag, parameter: w.parameter, freitext_name: w.freitext_name, wert: komma(w.wert), wert_text: w.wert_text,
-    einheit: w.einheit, referenz_von: komma(w.referenz_von), referenz_bis: komma(w.referenz_bis), quelle: w,
-  })));
+    einheit: w.einheit, referenz_von: komma(w.referenz_von), referenz_bis: komma(w.referenz_bis), quelle: w, index: i,
+  })).filter((z) => !z.quelle?.verworfen));
 
-  const biaQuelle = a.bia?.werte ?? {};
+  // „Falsch erkannt“ angemerkte BIA-Werte (F189) erscheinen nicht mehr als „gelesen“
+  const [biaWeg, setBiaWeg] = useState<string[]>([]);
+  const biaQuelle = Object.fromEntries(Object.entries(a.bia?.werte ?? {})
+    .filter(([k, v]) => v && !v.verworfen && !biaWeg.includes(k))) as NonNullable<NonNullable<typeof a.bia>["werte"]>;
   const [biaAn, setBiaAn] = useState(arten.includes("bia"));
   const [gemessen, setGemessen] = useState(arten.includes("bia") ? a.datum ?? "" : "");
   const [bia, setBia] = useState<Record<string, string>>(() => Object.fromEntries(
     BIA_FELDER.map(([k]) => [k, (biaQuelle[k]?.vorschlag ?? false) ? komma(biaQuelle[k]?.wert) : ""])));
+  // Stelle im Bild, an der ein BIA-Wert angeklickt wurde (zum Lernen der Bezeichnung daneben)
+  const [biaStellen, setBiaStellen] = useState<Record<string, Stelle>>({});
   const [gewichtUebernehmen, setGewichtUebernehmen] = useState(true);
   const [biaBeurteilung, setBiaBeurteilung] = useState(() => (a.bia?.weitere ?? [])
     .map((w) => `${w.name}: ${komma(w.wert)}${w.einheit ? ` ${w.einheit}` : ""}`).join("\n"));
 
   const darfAkte = darf("akten_bearbeiten");
-  const [diagnosen, setDiagnosen] = useState<(ScanDiagnose & { an: boolean })[]>(() =>
-    (a.diagnosen ?? []).map((d) => ({ ...d, an: d.vorschlag && darfAkte })));
+  const [diagnosen, setDiagnosen] = useState<(ScanDiagnose & { an: boolean; index: number })[]>(() =>
+    (a.diagnosen ?? []).map((d, i) => ({ ...d, an: d.vorschlag && darfAkte, index: i })).filter((d) => !d.verworfen));
   const [texte, setTexte] = useState<Record<Textfeldname, { an: boolean; text: string }>>(() => ({
     diagnose: { an: false, text: a.abschnitte?.diagnosen ?? "" },
     therapie: { an: false, text: a.abschnitte?.therapie ?? "" },
     empfehlung: { an: false, text: a.abschnitte?.procedere ?? "" },
   }));
 
-  // Vorschlag übernehmen, sobald er da ist (nur der erste, eindeutige)
+  // Vorschläge für den Patienten (F183): nie selbst wählen – die Pflegekraft übernimmt mit einem Klick
   const vorschlaege = scan.vorschlaege ?? [];
+
+  // F189: Zeilen aus einem markierten Bereich hinten anfügen (vorgewählt, wenn ein Laborwert erkannt wurde)
   useEffect(() => {
-    if (!patient && vorschlaege.length >= 1 && (vorschlaege.length === 1 || vorschlaege[0].punkte > vorschlaege[1].punkte)) {
-      const v = vorschlaege[0];
-      if (!v.abgeschlossen) {
-        const [nach, ...vor] = v.name.split(", ");
-        setPatient({ id: v.id, nummer: v.nummer, nachname: nach, vorname: vor.join(", "), geburtsdatum: v.geburtsdatum, ist_test: v.ist_test });
+    if (!neueWerte) return;
+    const liste = scan.auswertung?.labor?.werte ?? [];
+    setWerte((alt) => {
+      const da = new Set(alt.map((z) => z.index));
+      const neu = neueWerte.indices.filter((i) => !da.has(i) && liste[i]).map((i): LaborZeile => {
+        const w = liste[i];
+        return { an: !!w.parameter && w.vorschlag, parameter: w.parameter, freitext_name: w.freitext_name, wert: komma(w.wert),
+          wert_text: w.wert_text, einheit: w.einheit, referenz_von: komma(w.referenz_von), referenz_bis: komma(w.referenz_bis),
+          quelle: w, index: i };
+      });
+      return [...alt, ...neu];
+    });
+    setLaborAn(true);
+    melden(neueWerte.indices.length
+      ? `${neueWerte.indices.length === 1 ? "Eine Zeile" : `${neueWerte.indices.length} Zeilen`} aus dem markierten Bereich gelesen – bitte prüfen.`
+      : "Im markierten Bereich wurde kein Text gefunden. Bitte einen etwas größeren Rahmen ziehen.", neueWerte.indices.length ? "ok" : "fehler");
+  }, [neueWerte?.nr]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // F189: „Falsch erkannt“ – sofort verwerfen, der Server lernt daraus
+  const falsch = useMutation({
+    mutationFn: (x: { art: "labor" | "bia" | "diagnose"; index: number | string; grund: Grund }) =>
+      api<{ gelernt: string }>(`scans/${scan.id}/falsch/`, { body: x }),
+    onSuccess: (e, x) => {
+      if (x.art === "labor") setWerte((alt) => alt.filter((z) => z.index !== x.index));
+      if (x.art === "bia") {
+        setBiaWeg((alt) => [...alt, String(x.index)]);
+        setBia((alt) => ({ ...alt, [String(x.index)]: "" }));
       }
-    }
-  }, [scan.id]); // eslint-disable-line react-hooks/exhaustive-deps
+      if (x.art === "diagnose") setDiagnosen((alt) => alt.filter((d) => d.index !== x.index));
+      const folge = { ignorieren: " EPM lässt diese Zeile bei diesem Labor künftig weg.",
+        gesperrt: " EPM ordnet diese Bezeichnung bei diesem Labor nicht mehr so zu.",
+        widersprochen: " Die gelernte Zuordnung zählt jetzt weniger." }[e.gelernt] ?? "";
+      melden(`Verworfen (${GRUND_TEXT[x.grund]}).${folge}`);
+      void qc.invalidateQueries({ queryKey: ["scans", "gelernt"] });
+    },
+    onError: (e) => melden(e instanceof Error ? e.message : String(e), "fehler"),
+  });
 
   const pruefung = useQuery({
     queryKey: ["scan", scan.id, "pruefen", patient?.id],
@@ -189,6 +262,12 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
         body.diagnosen = diagnosenGewaehlt.map((d) => ({ bezeichnung: d.bezeichnung, icd_code: d.icd_code, kennzeichen: d.kennzeichen }));
       }
       if (texteGewaehlt.length) body.texte = Object.fromEntries(texteGewaehlt.map(([k]) => [k, texte[k].text]));
+      // Woher die Werte stammen – daraus lernt die Erkennung Bezeichnungen (F182); Werte selbst lernt sie nicht
+      body.herkunft = {
+        labor: laborAn ? gewaehlteWerte.map((w) => ({ index: w.index, stelle: w.stelle ?? null })) : [],
+        bia: biaAn ? Object.fromEntries(biaGewaehlt.map(([k]) => [k, biaStellen[k] ?? null])) : {},
+        diagnosen: diagnosenGewaehlt.map((d) => d.index),
+      };
       return api<{ dokument: number; patient: number; laborbefund?: number; bia?: number; diagnosen?: number[] }>(
         `scans/${scan.id}/zuordnen/`, { body });
     },
@@ -210,7 +289,7 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
   // funktional: Auch ein Klick ins Bild (Ziel) ändert die aktuelle Fassung, nicht die beim Wählen des Felds
   const zeile = (i: number, neu: Partial<LaborZeile>) => setWerte((alt) => alt.map((w, j) => (j === i ? { ...w, ...neu } : w)));
   const leereZeile = (): LaborZeile => ({ an: true, parameter: null, freitext_name: "", wert: "", wert_text: "", einheit: "",
-    referenz_von: "", referenz_bis: "", quelle: null });
+    referenz_von: "", referenz_bis: "", quelle: null, index: null });
   const laborName_ = (w: LaborZeile) => (w.parameter ? katalogNamen.get(w.parameter)?.name : "") || w.freitext_name || w.quelle?.erkannt_als || "neuer Wert";
   // Feld als Ziel für einen Klick ins Bild wählen; zugleich die Stelle zeigen, an der der Wert gelesen wurde
   const zielFuer = (schluessel: string, name: string, setzen: (text: string, stelle: Stelle) => void, stelle?: Stelle) => {
@@ -255,20 +334,7 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
           </div>
         ) : (
           <>
-            {vorschlaege.length ? (
-              <div className="flex flex-wrap gap-2" data-testid="patient-vorschlaege">
-                {vorschlaege.map((v) => (
-                  <button key={v.id} type="button" disabled={v.abgeschlossen}
-                    className="btn sec klein" title={v.abgeschlossen ? "Akte ist abgeschlossen" : `erkannt an: ${v.grund}`}
-                    onClick={() => {
-                      const [nach, ...vor] = v.name.split(", ");
-                      setPatient({ id: v.id, nummer: v.nummer, nachname: nach, vorname: vor.join(", "), geburtsdatum: v.geburtsdatum, ist_test: v.ist_test });
-                    }}>
-                    <Icon name="patienten" groesse={14} />{v.name} <span className="gedaempft">({v.grund})</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
+            <PatientVorschlag vorschlaege={vorschlaege} onWahl={(v) => setPatient(alsWahl(v))} />
             <PatientWahl wert={null} test={nurTest ? "nur" : undefined} fehler={!!fehler.patient}
               onWahl={(p: PatientZeile | null) => p && setPatient({ id: p.id, nummer: p.nummer, nachname: p.nachname, vorname: p.vorname,
                 geburtsdatum: p.geburtsdatum, ist_test: p.ist_test })} />
@@ -317,14 +383,15 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
       </section>
       )}
 
-      {/* 3. Werte */}
+      {/* 3. Werte – mit Hinweis, wie man die Erkennung verbessert (F189) */}
+      {!quelle || arten.length ? <VerbessernHinweis /> : null}
       {arten.length ? (
         <span className="text-[0.8125rem] gedaempft">Erkannt: {arten.map((x) => ARTEN[x] ?? x).join(", ")}. Bitte jeden Wert mit dem Original vergleichen –
           ein Klick auf eine Zeile zeigt die Stelle links.</span>
       ) : null}
 
       {!arten.length ? (
-        <span className="text-[0.8125rem] gedaempft">Die Art des Dokuments wurde nicht erkannt. Laborbefund oder BIA-Messung lassen
+        <span className="text-[0.8125rem] gedaempft">Die Art des Dokuments wurde nicht erkannt. Laborbefund oder <Begriff name="bia">BIA</Begriff>-Messung lassen
           sich trotzdem übernehmen: Abschnitt einschalten, Feld anklicken und den Wert im Bild links anklicken.</span>
       ) : null}
 
@@ -346,6 +413,7 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
               <thead><tr>
                 <th className="th w-8"><span className="sr-only">übernehmen</span></th><th className="th">Parameter</th>
                 <th className="th">Wert</th><th className="th">Einheit</th><th className="th">Referenz</th><th className="th">gelesen</th>
+                <th className="th"><span className="sr-only">falsch erkannt</span></th>
               </tr></thead>
               <tbody>
                 {werte.map((w, i) => {
@@ -372,6 +440,7 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
                           <Eingabe value={w.freitext_name} aria-label="Name (wenn nicht im Katalog)" placeholder="oder Name, wenn nicht im Katalog"
                             className="mt-1" maxLength={100} onChange={(e) => zeile(i, { freitext_name: e.target.value })} />
                         ) : null}
+                        {q && q.parameter === w.parameter ? <GelerntChip zuordnung={q.zuordnung} /> : null}
                         {q?.hinweise.length ? <span className="block text-xs text-warn mt-0.5">{q.hinweise.join(" · ")}</span> : null}
                       </td>
                       <td className="td">
@@ -394,8 +463,17 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
                           onFocus={() => laborZiel(i, w, "referenz_bis")} onChange={(e) => zeile(i, { referenz_bis: e.target.value })} />
                       </td>
                       <td className="td text-xs gedaempft max-w-[14rem]" title={q?.zeile}>
-                        {q ? <><span className="truncate block">{q.zeile}</span><Sicherheit c={q.sicherheit} hinweise={q.hinweise} /></>
+                        {q ? <><span className="truncate block">{q.zeile}</span><Sicherheit c={q.sicherheit} hinweise={q.hinweise} />
+                          {q.bereich ? <Chip className="ml-1" title="aus dem markierten Bereich gelesen">Bereich</Chip> : null}</>
                           : <span>von Hand</span>}
+                      </td>
+                      <td className="td">
+                        {q && w.index !== null ? (
+                          <FalschKnopf name={laborName_(w)} onGrund={(grund) => falsch.mutate({ art: "labor", index: w.index!, grund })} />
+                        ) : (
+                          <Knopf klein variante="geist" icon="x" aria-label="Zeile entfernen" title="Zeile entfernen"
+                            onClick={(e) => { e.stopPropagation(); setWerte((alt) => alt.filter((_, j) => j !== i)); }} />
+                        )}
                       </td>
                     </tr>
                   );
@@ -403,7 +481,8 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
               </tbody>
             </table>
           </div>
-          <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {onBereich ? <BereichKnopf aktiv={bereichAktiv} laedt={bereichLaedt} onClick={onBereich} /> : null}
             <Knopf klein icon="plus" onClick={() => {
               const i = werte.length;
               setWerte((alt) => [...alt, leereZeile()]);
@@ -435,10 +514,15 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
               return (
                 <Feld key={k} label={`${name} (${einheit})`} fehler={fehler[`bia.${k}`]}
                   hinweis={q ? <span onMouseEnter={() => onStelle(q.box ? { seite: q.seite, box: q.box } : null)}>
-                    gelesen: {q.erkannt_als} <Sicherheit c={q.sicherheit} hinweise={q.hinweise} />{q.hinweise?.length ? ` · ${q.hinweise.join(" · ")}` : ""}
+                    gelesen: {q.erkannt_als} <Sicherheit c={q.sicherheit} hinweise={q.hinweise} /><GelerntChip zuordnung={q.zuordnung} />
+                    {q.hinweise?.length ? ` · ${q.hinweise.join(" · ")}` : ""}
+                    <FalschKnopf name={name} onGrund={(grund) => falsch.mutate({ art: "bia", index: k, grund })} />
                   </span> : undefined}>
                   {(p) => <Eingabe {...p} className={cx("num", istZiel(`bia-${k}`) && "scan-feld-ziel")} inputMode="decimal" value={bia[k] ?? ""}
-                    onFocus={() => zielFuer(`bia-${k}`, name, (text) => setBia((alt) => ({ ...alt, [k]: zahlAus(text) })),
+                    onFocus={() => zielFuer(`bia-${k}`, name, (text, stelle) => {
+                      setBia((alt) => ({ ...alt, [k]: zahlAus(text) }));
+                      setBiaStellen((alt) => ({ ...alt, [k]: stelle }));
+                    },
                       q?.box ? { seite: q.seite, box: q.box } : undefined)}
                     onChange={(e) => { const v = e.target.value; setBia((alt) => ({ ...alt, [k]: v })); }} />}
                 </Feld>
@@ -475,6 +559,14 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
                   onChange={(e) => setDiagnosen(diagnosen.map((x, j) => (j === i ? { ...x, kennzeichen: e.target.value as ScanDiagnose["kennzeichen"] } : x)))}>
                   <option value="G">G</option><option value="V">V</option><option value="Z">Z</option><option value="A">A</option>
                 </Auswahl>
+                <GelerntChip zuordnung={d.zuordnung} />
+                <FalschKnopf name={d.bezeichnung} onGrund={(grund) => falsch.mutate({ art: "diagnose", index: d.index, grund })} />
+                {d.gelernt && d.gelernt.bezeichnung !== d.bezeichnung ? (
+                  <Knopf klein variante="geist" title="früher so korrigiert"
+                    onClick={(e) => { e.stopPropagation(); setDiagnosen(diagnosen.map((x, j) => (j === i ? { ...x, bezeichnung: d.gelernt!.bezeichnung, icd_code: d.gelernt!.icd_code } : x))); }}>
+                    „{d.gelernt.bezeichnung}“?
+                  </Knopf>
+                ) : null}
               </li>
             ))}
           </ul>

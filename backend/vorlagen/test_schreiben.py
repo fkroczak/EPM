@@ -143,7 +143,9 @@ class SchreibenTest(Grundlage):
         test.ist_test = True
         test.save()
         Termin.objects.create(patient=test, art=Termin.Art.PRAXISTERMIN, faellig_am=self.tag, titel="Test")
-        koerper = {"von": str(self.tag - timedelta(days=1)), "bis": str(self.tag + timedelta(days=2)), "ort": self.ort.id}
+        # F177: mit Ort nur die Termine dort – Telefon- und Videotermine nur mit „telefon_mit“
+        koerper = {"von": str(self.tag - timedelta(days=1)), "bis": str(self.tag + timedelta(days=2)), "ort": self.ort.id,
+                   "telefon_mit": True}
         mail = self.c.post("/api/kalender/ankuendigung/", {**koerper, "ausgabe": "email"}, format="json").json()
         self.assertIn("Sehr geehrter Dr. Holtmeier", mail["text"])
         self.assertIn(f"{self.tag:%d.%m.%Y}\n14:30  Marija Kaufmann\n15:00  Angelika Flegel → Telefon/Video "

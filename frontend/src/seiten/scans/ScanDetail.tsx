@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, apiDatei } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { datum, zahl, zeitpunkt } from "@/lib/format";
-import type { Scan, ScanZeile } from "@/lib/typen";
+import type { Scan, ScanVorschlag, ScanZeile } from "@/lib/typen";
 import { Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Segmente, cx } from "@/components/ui/basis";
 import { Dialog, Menue } from "@/components/ui/dialog";
 import type { MenuEintrag } from "@/components/ui/dialog";
@@ -19,6 +19,7 @@ import { Seitenansicht } from "./Seitenansicht";
 import { SeiteBearbeiten } from "./SeiteBearbeiten";
 import { Zuordnen } from "./Zuordnen";
 import type { Stelle, Ziel } from "./Zuordnen";
+import { PatientVorschlag } from "./PatientVorschlag";
 
 function Fortschritt({ scan }: { scan: Scan }) {
   return (
@@ -93,12 +94,17 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
   const [seiteIndex, setSeiteIndex] = useState(0);
   const [ansicht, setAnsicht] = useState<"seite" | "alle">("alle");
   const [zuordnen, setZuordnen] = useState(false);
+  // F183: in der Ansicht mit einem Klick übernommener Patientenvorschlag (zugeordnet wird erst beim Speichern)
+  const [startPatient, setStartPatient] = useState<ScanVorschlag | null>(null);
   const [stelle, setStelle] = useState<Stelle>(null);
   // Zuordnen: gewähltes Feld, in das ein Klick auf ein Wort im Bild den Wert schreibt
   const [ziel, setZiel] = useState<Ziel>(null);
   const [unsicher, setUnsicher] = useState(true);
   const [original, setOriginal] = useState(false);
   const [bereichModus, setBereichModus] = useState(false);
+  // F189: Rahmen beim Zuordnen = „richtigen Bereich markieren“ (nur diesen Teil neu lesen, Zeilen als neue Werte)
+  const [bereichWerte, setBereichWerte] = useState(false);
+  const [neueWerte, setNeueWerte] = useState<{ nr: number; indices: number[] } | null>(null);
   const [bereich, setBereich] = useState<number[] | null>(null);
   const [staerke, setStaerke] = useState(0);
   const [bearbeiten, setBearbeiten] = useState(false);
@@ -108,7 +114,7 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
   const [zusammenMit, setZusammenMit] = useState("");
 
   // beim Wechsel des Scans von vorn
-  useEffect(() => { setSeiteIndex(0); setZuordnen(false); setStelle(null); setZiel(null); setBereichModus(false); setOriginal(false); }, [id]);
+  useEffect(() => { setSeiteIndex(0); setZuordnen(false); setStartPatient(null); setStelle(null); setZiel(null); setBereichModus(false); setBereichWerte(false); setNeueWerte(null); setOriginal(false); }, [id]);
   // eine markierte Stelle auf einer anderen Seite: dorthin blättern
   useEffect(() => {
     if (stelle && s && s.seiten[seiteIndex]?.nr !== stelle.seite + 1) {
@@ -128,6 +134,15 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
     mutationFn: ({ pfad, body, method }: { pfad: string; body?: unknown; method?: "POST" | "PATCH" | "DELETE" }) =>
       api<Scan>(`scans/${id}/${pfad}`, { method: method ?? "POST", body: body ?? {} }),
     onSuccess: neu,
+    onError: (e) => melden(e instanceof Error ? e.message : String(e), "fehler"),
+  });
+  const ausschnitt = useMutation({
+    mutationFn: ({ sid, box }: { sid: number; box: number[] }) =>
+      api<{ scan: Scan; neu: number[] }>(`scans/${id}/seiten/${sid}/ausschnitt/`, { body: { box } }),
+    onSuccess: (e) => {
+      qc.setQueryData(["scan", id], e.scan);
+      setNeueWerte((alt) => ({ nr: (alt?.nr ?? 0) + 1, indices: e.neu }));
+    },
     onError: (e) => melden(e instanceof Error ? e.message : String(e), "fehler"),
   });
   const weg = useMutation({
@@ -214,9 +229,17 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
           <button type="button" className="bg-transparent border-0 p-0 text-akzent-text cursor-pointer text-[0.8125rem]"
             onClick={() => aktion.mutate({ pfad: "verlaengern/" })} data-testid="scan-verlaengern">verlängern</button>
         ) : <span>Höchstdauer erreicht ({datum(s.hoechst_bis)})</span>}
-        {s.verfahren.length ? <span>gelesen mit {s.verfahren.map((v) => ({ paddle: "PP-OCR", tesseract: "Tesseract", textebene: "Text der PDF" }[v] ?? v)).join(" + ")}</span> : null}
+        {/* Programmnamen nur im Tooltip – für die Arbeit zählt, wie der Text zustande kam (Bedienung für Pflegekräfte, 10.10.2026) */}
+        {s.verfahren.length ? <span title={`gelesen mit ${s.verfahren.map((v) => ({ paddle: "PP-OCR", tesseract: "Tesseract", textebene: "Text der PDF" }[v] ?? v)).join(" + ")}`}>
+          {s.verfahren.every((v) => v === "textebene") ? "Text aus der PDF übernommen" : "Text automatisch erkannt – bitte prüfen"}</span> : null}
       </div>
       {laeuft ? <Fortschritt scan={s} /> : null}
+      {fertig && !zuordnen && !s.quelle && darf("eintraege_erfassen") && s.vorschlaege?.length ? (
+        <div className="px-4 sm:px-5 py-3 border-b border-rand">
+          <PatientVorschlag vorschlaege={s.vorschlaege} knopf="Übernehmen und zuordnen"
+            onWahl={(v) => { setStartPatient(v); setZuordnen(true); }} />
+        </div>
+      ) : null}
       {s.status === "fehler" ? (
         <div className="px-4 sm:px-5 py-3 border-b border-rand">
           <Meldung art="fehler"><span className="flex items-center gap-3 flex-wrap">{s.fehler || "Die Erkennung ist fehlgeschlagen."}
@@ -240,7 +263,7 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
               <span className="grow" />
               <Knopf klein icon="rahmen" disabled={laeuft} onClick={() => setBearbeiten(true)} data-testid="seite-bearbeiten">Anpassen</Knopf>
               <Knopf klein icon="scan" disabled={laeuft || seite.status !== "fertig" || original} aria-pressed={bereichModus}
-                variante={bereichModus ? "pri" : "sec"} onClick={() => setBereichModus(!bereichModus)} data-testid="bereich-modus"
+                variante={bereichModus && !bereichWerte ? "pri" : "sec"} onClick={() => { setBereichWerte(false); setBereichModus(!bereichModus || bereichWerte); }} data-testid="bereich-modus"
                 title="Einen schlecht lesbaren Bereich mit der Maus markieren und neu erkennen lassen">Bereich neu erkennen</Knopf>
               <label className="flex items-center gap-1.5 text-[0.8125rem]">
                 <input type="checkbox" checked={unsicher} onChange={(e) => setUnsicher(e.target.checked)} />unsichere Wörter
@@ -249,7 +272,14 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
                 <input type="checkbox" checked={original} onChange={(e) => { setOriginal(e.target.checked); setBereichModus(false); }} />Original
               </label>
             </div>
-            {bereichModus ? <Meldung art="info">Rahmen um den Bereich aufziehen, der neu erkannt werden soll.</Meldung> : null}
+            {bereichModus ? (
+              <Meldung art="info"><span className="flex items-center gap-2 flex-wrap" data-testid="bereich-anleitung">
+                <span className="grow">{bereichWerte
+                  ? "Mit Maus oder Finger einen Rahmen um die richtigen Zeilen ziehen. EPM liest nur diesen Teil noch einmal und zeigt die Zeilen rechts als neue Werte."
+                  : "Rahmen um den Bereich aufziehen, der neu erkannt werden soll."}</span>
+                <Knopf klein variante="geist" onClick={() => { setBereichModus(false); setBereichWerte(false); }}>Abbrechen</Knopf>
+              </span></Meldung>
+            ) : null}
             {zuordnen && ziel && !bereichModus && !original ? (
               <div className="meldung info flex items-center gap-2" role="status" data-testid="wort-waehlen">
                 <Icon name="info" groesse={16} />
@@ -260,7 +290,11 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
             <Seitenansicht scanId={s.id} seite={seite} unsicher={unsicher && !(zuordnen && ziel)} original={original} bereichModus={bereichModus}
               markiert={stelle && stelle.seite + 1 === seite.nr ? stelle.box : null}
               onWort={zuordnen && ziel ? (w, box) => { const st = { seite: seite.nr - 1, box }; ziel.setzen(w[0], st); setStelle(st); } : undefined}
-              onBereich={(b) => { setBereich(b); setStaerke(0); setBereichModus(false); }} />
+              onBereich={(b) => {
+                setBereichModus(false);
+                if (bereichWerte) { setBereichWerte(false); ausschnitt.mutate({ sid: seite.id, box: b }); return; }
+                setBereich(b); setStaerke(0);
+              }} />
             {s.seiten.length > 1 ? (
               <div className="flex gap-2 overflow-x-auto pb-1" role="list" aria-label="Seiten" data-testid="scan-seiten">
                 {s.seiten.map((x, i) => (
@@ -297,8 +331,10 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
             ) : null}
             {seite.info.sparstufe ? (
               <span className="text-xs text-warn" data-testid="seite-sparsam">
-                {seite.info.sparstufe >= 2 ? "Nur mit Tesseract erkannt" : "Sparsam erkannt (ohne Glätten, kleinere Zeilensuche)"}
-                {" "}– der Erkennungsdienst wurde vorher bei dieser Seite beendet (Speichergrenze). „Anpassen“ erkennt sie erneut.
+                <span title={seite.info.sparstufe >= 2 ? "nur mit Tesseract erkannt" : "sparsam erkannt (ohne Glätten, kleinere Zeilensuche)"}>
+                  Vereinfacht erkannt</span>
+                {" "}– für diese Seite reichte der Arbeitsspeicher des Servers nicht. Bitte den Text besonders genau prüfen;
+                „Anpassen“ erkennt die Seite erneut.
               </span>
             ) : null}
           </div>
@@ -306,8 +342,10 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
           {/* Text oder Zuordnen */}
           <div className="flex flex-col gap-3 min-w-0">
             {zuordnen && fertig ? (
-              <Zuordnen key={s.id} scan={s} onStelle={setStelle} ziel={ziel} onZiel={setZiel}
-                onAbbrechen={() => { setZuordnen(false); setStelle(null); setZiel(null); }}
+              <Zuordnen key={s.id} scan={s} onStelle={setStelle} ziel={ziel} onZiel={setZiel} startPatient={startPatient}
+                bereichAktiv={bereichModus && bereichWerte} bereichLaedt={ausschnitt.isPending} neueWerte={neueWerte}
+                onBereich={() => { const an = !(bereichModus && bereichWerte); setOriginal(false); setZiel(null); setBereichWerte(an); setBereichModus(an); }}
+                onAbbrechen={() => { setZuordnen(false); setStartPatient(null); setStelle(null); setZiel(null); }}
                 onFertig={(patientId, dokumentId) => { setZuordnen(false); setZiel(null); onZugeordnet(patientId, dokumentId, s.titel); }} />
             ) : (
               <>

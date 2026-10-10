@@ -40,6 +40,13 @@ test("Telefon: Leiste unten, Menü, Suche, Seiten passen in die Breite", async (
   await expect(schublade).toBeHidden();
   await expect(page).toHaveURL(/\/kalender/);
   await passtInDieBreite(page, "Kalender");
+  // Infoblatt an die Praxis (F177): Knopf in der Kopfzeile, der Dialog passt aufs Telefon
+  await page.getByRole("button", { name: /^Praxis informieren/ }).click();
+  const infoblatt = page.getByRole("dialog", { name: "Infoblatt an die Praxis" });
+  await expect(infoblatt.getByTestId("infoblatt-zeitraum").getByRole("button")).toHaveCount(4);
+  await passtInDieBreite(page, "Infoblatt an die Praxis");
+  await page.keyboard.press("Escape");
+  await expect(infoblatt).toHaveCount(0);
 
   // Patientensuche aus der Kopfzeile
   await page.getByTestId("mobil-suche").click();
@@ -142,7 +149,8 @@ test.describe("Administration am Telefon", () => {
   /** Wunsch 09.10.2026: auf Backup ragten die Tabellen über den Bildschirm, die Knöpfe lagen über dem Titel */
   test("Telefon: Tabellen werden zu Zeilen, Seitenkopf bricht um – alles passt in die Breite", async ({ page }) => {
     for (const [pfad, titel] of [["/admin/backup", "Backup und Wiederherstellung"], ["/admin/benutzer", "Benutzer"],
-      ["/admin/audit-log", "Audit-Log"], ["/admin/system", "System"], ["/admin/vorlagen", "Vorlagen"]]) {
+      ["/admin/audit-log", "Audit-Log"], ["/admin/system", "System"], ["/admin/vorlagen", "Vorlagen"],
+      ["/admin/vorlagen/dokumente", "Vorlagen"], ["/admin/vorlagen/dokumente?art=terminbestaetigung", "Vorlagen"]]) {
       await page.goto(pfad);
       const h1 = page.getByRole("heading", { level: 1, name: titel });
       await expect(h1).toBeVisible();

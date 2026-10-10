@@ -77,12 +77,16 @@ function Person({ v }: { v: boolean }) {
   );
 }
 
+const ADMIN_OFFEN = "epm.navigation.administration";
+
 function Seitenleiste({ schublade }: { schublade?: boolean }) {
   const ich = useIch();
   const { abmelden, darf } = useAuth();
   const scansOffen = useScansOffen();
   const navigate = useNavigate();
   const admin = [
+    // Übersicht mit Ampel und häufigen Aufgaben (Wunsch 10.10.2026)
+    darf("system_verwalten") || darf("backup_verwalten") ? <NavEintrag key="sv" zu="/admin" icon="aktivitaet" text="Systemverwaltung" ende /> : null,
     darf("backup_verwalten") ? <NavEintrag key="b" zu="/admin/backup" icon="backup" text="Backup" /> : null,
     darf("benutzer_verwalten") ? <NavEintrag key="u" zu="/admin/benutzer" icon="benutzer" text="Benutzer" /> : null,
     darf("vorlagen_pflegen") ? <NavEintrag key="v" zu="/admin/vorlagen" icon="vorlagen" text="Vorlagen" /> : null,
@@ -92,6 +96,16 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
     darf("altdaten_importieren") && !ich.import_ausgeblendet ? <NavEintrag key="i" zu="/admin/import" icon="hochladen" text="Import" /> : null,
   ].filter(Boolean);
   const v = !!schublade;
+  // Administration aufgeklappt: gemerkt je Browser; auf einer Seite der Administration immer offen
+  const { pathname } = useLocation();
+  const [adminGemerkt, setAdminGemerkt] = useState(() => {
+    try { return window.localStorage.getItem(ADMIN_OFFEN) === "1"; } catch { return false; }
+  });
+  const adminOffen = adminGemerkt || pathname.startsWith("/admin");
+  const adminUmschalten = (offen: boolean) => {
+    setAdminGemerkt(offen);
+    try { window.localStorage.setItem(ADMIN_OFFEN, offen ? "1" : "0"); } catch { /* ohne Speicher: nur für diese Sitzung */ }
+  };
   return (
     <Voll.Provider value={v}>
     <aside className={cx("shrink-0 bg-flaeche border-r border-rand flex flex-col py-4 gap-5 nicht-drucken overflow-y-auto",
@@ -118,9 +132,22 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
       </nav>
       {admin.length ? (
         <nav aria-label="Administration" className="flex flex-col gap-0.5">
-          <div className={cx("px-2 h-8 items-center text-xs font-medium gedaempft", v ? "flex" : "hidden hd:flex")}>Administration</div>
-          {v ? null : <div className="hd:hidden border-t border-rand my-1" aria-hidden="true" />}
-          {admin}
+          {/* Wer viele Verwaltungsseiten hat (Praxismanagement), sieht sie als eine Gruppe zum Aufklappen – die
+              tägliche Arbeit steht oben ohne Ablenkung (Wunsch 10.10.2026, F181). Bis zu zwei Punkte (Vorlagen,
+              Audit-Log) bleiben offen; in der Schublade am Telefon und auf Seiten der Administration ist sie offen. */}
+          {!v && admin.length > 2 ? (
+            <button type="button" className={cx("nav nav-symbol hd:!justify-start border-0 bg-transparent cursor-pointer w-full", adminOffen && "text-tinte")}
+              aria-expanded={adminOffen} title={adminOffen ? "Administration einklappen" : `Administration (${admin.length} Seiten)`}
+              onClick={() => adminUmschalten(!adminOffen)} data-testid="nav-administration">
+              <Icon name="zahnrad" groesse={18} />
+              <span className="sr-only hd:not-sr-only">Administration</span>
+              <span className="hidden hd:inline-flex ml-auto gedaempft" aria-hidden="true"><Icon name={adminOffen ? "hoch" : "runter"} groesse={14} /></span>
+            </button>
+          ) : <>
+            <div className={cx("px-2 h-8 items-center text-xs font-medium gedaempft", v ? "flex" : "hidden hd:flex")}>Administration</div>
+            {v ? null : <div className="hd:hidden border-t border-rand my-1" aria-hidden="true" />}
+          </>}
+          {v || admin.length <= 2 || adminOffen ? <div className={cx("flex flex-col gap-0.5", !v && admin.length > 2 && "hd:pl-2")}>{admin}</div> : null}
         </nav>
       ) : null}
       {/* Unten links nur die angemeldete Person (Wunsch 08.10.2026); Hilfe, Design, Mein Konto und Abmelden per Klick als Menü (Design seit 09.10.2026 eigener Punkt).
@@ -369,7 +396,10 @@ export type Pfadteil = { text: string; zu?: string };
 
 /** Kopfzeile + Inhalt einer Seite. Der Inhalt nutzt die volle Fensterbreite (S16, Festlegung 01.10.2026); die Seiten
  *  teilen sich in Stufen auf (lib/stufen.ts). Das „?“ führt zum passenden Abschnitt der Hilfe (S15). */
-export function Seite({ pfad, children, className }: { pfad: Pfadteil[]; children: ReactNode; className?: string }) {
+export function Seite({ pfad, children, className, fuellen }: { pfad: Pfadteil[]; children: ReactNode; className?: string;
+  /** Seite füllt das Fenster und scrollt nicht als Ganzes (Patientenakte, 10.10.2026): Kopf und Reiter bleiben stehen,
+   *  gescrollt wird nur in Karten bzw. Spalten. Gilt ab 1280 × 600 px (index.css, .seite-fuellt); darunter scrollt die Seite. */
+  fuellen?: boolean }) {
   const ich = useIch();
   const { pathname } = useLocation();
   const [suchen, setSuchen] = useState(false);
@@ -381,7 +411,7 @@ export function Seite({ pfad, children, className }: { pfad: Pfadteil[]; childre
   // Telefon: nur der letzte Teil des Pfads, davor ein Schritt zurück
   const zurueck = [...pfad].slice(0, -1).reverse().find((t) => t.zu);
   return (
-    <div className="grow min-w-0 flex flex-col min-h-screen">
+    <div className={cx("grow min-w-0 flex flex-col min-h-screen", fuellen && "seite-fuellt")}>
       {mobil ? <header className="sticky top-0 z-20 shrink-0 bg-flaeche border-b border-rand nicht-drucken pt-[env(safe-area-inset-top)]"
         data-testid="mobil-kopf">
         <div className="h-14 flex items-center gap-1 px-2">

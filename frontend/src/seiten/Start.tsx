@@ -9,7 +9,7 @@ import { Link, useLocation } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
-import { langesDatum, relativ, zahl } from "@/lib/format";
+import { datum, langesDatum, relativ, zahl } from "@/lib/format";
 import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
 import type { Ich, Karte, KartenId, Recht, ScansStand } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
@@ -18,9 +18,11 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { verschiebe } from "@/components/ui/sortierbar";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
+import { AnkuendigungDialog } from "@/components/AnkuendigungDialog";
 import { GewichtDialog, KontaktDialog } from "@/components/Schnellerfassung";
 import type { Vorgabe } from "@/components/Schnellerfassung";
 import type { Startdaten } from "./start/daten";
+import { Tagesliste } from "./start/tagesliste";
 import { AktivKachel, GewichtKachel, MeineKachel, PlaeneKachel, PruefenKachel, TermineKachel, WiederKachel } from "./start/kacheln";
 import { AngemeldetKachel, HinweisKachel, KontenKachel, ServerKachel, SicherungKachel, TestKachel, UpdatesKachel, ZugriffeKachel,
   useKonten } from "./start/admin";
@@ -61,7 +63,29 @@ function BackupStatus({ s, verweis }: { s: Startdaten["sicherung"]; verweis: boo
 }
 
 // ---------------------------------------------------------------- Scans (F165): warten auf Zuordnung, laufen ab, Speicher
-function ScansHinweis() {
+/** „Praxis Holtmeier informieren: 5 Termine vom … bis …“ mit großem Knopf, der das Infoblatt für genau diesen Zeitraum öffnet */
+function InfoblattHinweis({ h }: { h: NonNullable<Startdaten["infoblatt"]> }) {
+  const [offen, setOffen] = useState(false);
+  const praxis = h.ort?.wert.replace(/\bDr\.\s*/, "") ?? "Praxis";
+  const kurz = (iso: string) => datum(iso).slice(0, 6);
+  return (
+    <div role="status" className="meldung info flex items-center gap-x-4 gap-y-2.5 flex-wrap" data-testid="infoblatt-hinweis">
+      <Icon name="mail" groesse={22} />
+      <span className="grow min-w-[14rem] flex flex-col gap-0.5">
+        <strong className="text-base">{praxis} informieren: {h.anzahl} {h.anzahl === 1 ? "Termin" : "Termine"} vom {kurz(h.von)} bis {datum(h.bis)}</strong>
+        <span className="text-[0.8125rem]">
+          {h.rhythmus === "monat" ? "Das Infoblatt für den nächsten Monat ist noch nicht erstellt." : "Das Infoblatt für die nächste Woche ist noch nicht erstellt."}
+          {h.ohne_ort ? ` Bei ${h.ohne_ort} ${h.ohne_ort === 1 ? "Termin" : "Terminen"} fehlt noch der Ort.` : ""}
+        </span>
+      </span>
+      <Knopf variante="pri" icon="mail" className="min-h-11 px-5" onClick={() => setOffen(true)}>Infoblatt erstellen</Knopf>
+      <AnkuendigungDialog offen={offen} onOffen={setOffen} von={h.von} bis={h.bis} rhythmus={h.rhythmus} />
+    </div>
+  );
+}
+
+/** Mit der Tagesliste (F184) steht „Scans warten auf Zuordnung“ dort; hier bleiben nur die Warnungen. */
+function ScansHinweis({ ohneOffen = false }: { ohneOffen?: boolean }) {
   const { darf } = useAuth();
   const stand = useQuery({
     queryKey: ["scans", "stand"],
@@ -70,9 +94,9 @@ function ScansHinweis() {
     staleTime: 30_000,
   });
   const s = stand.data;
-  if (!s || (!s.offen && !s.laeuft_bald_ab && s.prozent < 80)) return null;
+  if (!s || ((ohneOffen || !s.offen) && !s.laeuft_bald_ab && s.prozent < 80)) return null;
   const teile = [
-    s.offen ? `${s.offen === 1 ? "1 Scan wartet" : `${s.offen} Scans warten`} auf Zuordnung` : "",
+    s.offen && !ohneOffen ? `${s.offen === 1 ? "1 Scan wartet" : `${s.offen} Scans warten`} auf Zuordnung` : "",
     s.laeuft_bald_ab ? `${s.laeuft_bald_ab === 1 ? "1 Scan wird" : `${s.laeuft_bald_ab} Scans werden`} in 24 Stunden automatisch gelöscht` : "",
     s.prozent >= 80 ? `Speicher für Scans zu ${String(s.prozent).replace(".", ",")} % belegt` : "",
   ].filter(Boolean);
@@ -345,6 +369,8 @@ export function Start() {
     && !(ich.startseite.notfallhinweis_bei != null && codes.uebrig >= ich.startseite.notfallhinweis_bei);
   const gesperrt = (konten.data ?? []).filter((k) => k.probleme.includes("gesperrt") && /Fehlversuche/.test(k.sperrgrund));
   const verwaltung = ich.rolle === "admin";
+  // „Heute zu tun“ (F184) für alle, die mit den Akten arbeiten – nicht auf der Startseite der Administration
+  const tagesliste = lesen && !verwaltung;
 
   return (
     <Seite pfad={[{ text: "Start" }]}>
@@ -372,6 +398,12 @@ export function Start() {
         </div>
       </div>
 
+      {tagesliste && d?.tagesliste ? <Tagesliste d={d} /> : tagesliste && daten.isLoading ? (
+        <section className="card px-5 py-4 min-h-[7.5rem]" aria-busy="true" aria-label="Heute zu tun" data-testid="heute-zu-tun-laden">
+          <h2 className="m-0 text-[1.0625rem] font-semibold">Heute zu tun</h2><Laden />
+        </section>
+      ) : null}
+
       {gesperrt.map((k) => (
         <div key={k.id} role="alert" className="meldung fehler flex items-center gap-2.5" data-testid="konto-gesperrt">
           <Icon name="warnung" groesse={18} />
@@ -379,7 +411,7 @@ export function Start() {
           <Link to={`/admin/benutzer?id=${k.id}`} className="font-medium whitespace-nowrap text-fehler">Zum Benutzer</Link>
         </div>
       ))}
-      <ScansHinweis />
+      <ScansHinweis ohneOffen={tagesliste} />
       {ich.rolle === "keine" ? (
         <div role="status" className="meldung info flex items-center gap-2.5" data-testid="keine-berechtigung">
           <Icon name="info" groesse={18} />
@@ -397,6 +429,8 @@ export function Start() {
             onClick={() => speichern({ zweifaktorhinweis_aus: true })}><Icon name="x" /></button>
         </div>
       ) : null}
+      {/* Infoblatt an die Praxis (F177): rechtzeitig vor der nächsten Woche bzw. dem nächsten Monat, bis es erstellt ist */}
+      {erfassen && d?.infoblatt && !tagesliste ? <InfoblattHinweis h={d.infoblatt} /> : null}
       {codesHinweis && codes ? (
         <div role="status" className="meldung warn flex items-center gap-2.5" data-testid="notfallcodes-hinweis">
           <Icon name="warnung" groesse={18} />

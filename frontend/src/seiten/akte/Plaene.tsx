@@ -12,9 +12,10 @@ import type { Plan, Vergleich } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Leer, Meldung, Segmente, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
+import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { klartext } from "@/components/Editor";
-import { PdfLeser, PdfVorschau } from "@/components/PdfAnsicht";
+import { PdfLeser } from "@/components/PdfAnsicht";
 import { name, useAkte } from "./Akte";
 
 export const STATUS_TEXT: Record<Plan["status"], string> = { entwurf: "Entwurf", aktuell: "aktuell gültig", abgeloest: "abgelöst" };
@@ -32,8 +33,8 @@ function kopfText(plan: Plan) {
 
 /** „Ansicht wie PDF“: die echte PDF. Freigegebene Pläne zeigen das gespeicherte Original (Prüfsumme geprüft),
  *  Entwürfe und Pläne ohne gespeicherte PDF werden mit der aktiven Dokumentvorlage gezeichnet – so sieht die Akte
- *  immer genauso aus wie die PDF. Klein als Vorschau wie unter „Dokumente“; ein Klick öffnet die große Ansicht
- *  (Fehlerliste 02.10.2026, 1.3). */
+ *  immer genauso aus wie die PDF. Seit 10.10.2026 („PDFs einfach einsehbar“) direkt neben der Liste in voller Höhe,
+ *  eine ganze Seite auf einen Blick; „Groß ansehen“ öffnet sie im Dialog (vorher kleine Vorschau, Fehlerliste 1.3). */
 function PlanAnsicht({ plan }: { plan: Plan }) {
   const original = !!plan.pdf_sha256;
   const pfad = original ? `infusionsplaene/${plan.id}/pdf/` : `infusionsplaene/${plan.id}/ansicht/`;
@@ -47,25 +48,26 @@ function PlanAnsicht({ plan }: { plan: Plan }) {
   const pruefung = datei.data?.kopf.get("X-EPM-Pruefung");
   const daten = datei.data?.daten;
   const kennung = `plan-ansicht-${plan.id}-${datei.dataUpdatedAt}`;
+  const herunterladen = () => {
+    if (!daten) return;
+    const url = URL.createObjectURL(new Blob([daten as BlobPart], { type: "application/pdf" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Infusionsplan-${datum(plan.gueltig_ab)}${original ? "" : "-Ansicht"}.pdf`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
   return (
-    <div className="flex flex-col gap-2 w-full max-w-[21.25rem]" data-testid="plan-ansicht">
+    <div className="flex flex-col gap-2 w-full flex-1 min-h-[22rem]" data-testid="plan-ansicht">
       {pruefung === "abweichend" ? <Meldung art="fehler">Die gespeicherte PDF weicht von der Prüfsumme ab und wurde nach der Freigabe verändert. Bitte die Administration informieren.</Meldung> : null}
       <Fehleranzeige fehler={datei.error} />
       {datei.isLoading ? <Laden text="PDF wird geladen …" /> : daten ? (
-        <>
-          {/* Klick auf das Blatt öffnet die große Ansicht; die Knöpfe zum Blättern bleiben bedienbar */}
-          <div className="cursor-zoom-in" title="Zum Vergrößern anklicken" data-testid="plan-vorschau"
-            onClick={(e) => { if ((e.target as HTMLElement).tagName === "CANVAS") setGross(true); }}>
-            <PdfVorschau url={kennung} titel={`Infusionsplan gültig ab ${datum(plan.gueltig_ab)}`} hoehe={430} laden={() => Promise.resolve(daten.slice())} />
-          </div>
-          <Knopf klein icon="dokument" className="self-start" onClick={() => setGross(true)}>Groß ansehen</Knopf>
-          <Dialog offen={gross} onOffen={setGross} titel={`Infusionsplan gültig ab ${datum(plan.gueltig_ab)}`} breite={1100}
-            beschreibung={original ? "Gespeicherte PDF der Freigabe" : "Ansicht mit der aktiven Dokumentvorlage"}>
-            <div data-testid="plan-gross">
-              {gross ? <PdfLeser url={`${kennung}-gross`} laden={() => Promise.resolve(daten.slice())} className="h-[72vh]" /> : null}
-            </div>
-          </Dialog>
-        </>
+        <div className="flex-1 min-h-0 flex flex-col" data-testid="plan-vorschau">
+          <PdfLeser url={kennung} einpassen laden={() => Promise.resolve(daten.slice())} className="flex-1" werkzeuge={<>
+            <Knopf klein icon="dokument" onClick={() => setGross(true)}>Groß ansehen</Knopf>
+            <Knopf klein icon="herunterladen" onClick={herunterladen}>Herunterladen</Knopf>
+          </>} />
+        </div>
       ) : null}
       <span className="text-[0.8125rem] gedaempft leading-normal" data-testid="ansicht-herkunft">
         {original ? <>Gespeicherte PDF der Freigabe{pruefung === "ok" ? " · Prüfsumme stimmt" : ""}.</>
@@ -73,6 +75,14 @@ function PlanAnsicht({ plan }: { plan: Plan }) {
           : plan.herkunft === "altsystem" ? "Aus dem Altsystem übernommen – dort gab es keine gespeicherte PDF. Ansicht mit der aktiven Dokumentvorlage."
           : "Für diesen Plan ist keine PDF gespeichert (vor Einführung der PDF-Erzeugung freigegeben). Ansicht mit der aktiven Dokumentvorlage."}
       </span>
+      {daten ? (
+        <Dialog offen={gross} onOffen={setGross} titel={`Infusionsplan gültig ab ${datum(plan.gueltig_ab)}`} breite={1100}
+          beschreibung={original ? "Gespeicherte PDF der Freigabe" : "Ansicht mit der aktiven Dokumentvorlage"}>
+          <div data-testid="plan-gross">
+            {gross ? <PdfLeser url={`${kennung}-gross`} laden={() => Promise.resolve(daten.slice())} className="h-[72vh]" /> : null}
+          </div>
+        </Dialog>
+      ) : null}
     </div>
   );
 }
@@ -297,7 +307,7 @@ export function PlanPdfDialog({ plan, offen, onOffen }: { plan: Pick<Plan, "id" 
         <Fehleranzeige fehler={datei.error} />
         {pruefung === "ok" ? (
           <div className="meldung ok flex items-center gap-2 text-sm" data-testid="pdf-pruefung">
-            <Icon name="haken" />Prüfsumme stimmt: unverändert seit der Freigabe{version ? ` · Dokumentvorlage Version ${version}` : ""}.
+            <Icon name="haken" />Prüfsumme stimmt: unverändert seit der Freigabe{version ? ` · Dokumentvorlage Fassung ${version}` : ""}.
           </div>
         ) : pruefung ? (
           <Meldung art="fehler"><span data-testid="pdf-pruefung">Die gespeicherte PDF weicht von der Prüfsumme ab und wurde nach der Freigabe verändert. Bitte die Administration informieren.</span></Meldung>
@@ -352,7 +362,7 @@ export function Plaene() {
   const entwurfDa = liste.some((p) => p.status === "entwurf");
 
   return (
-    <div className="stapel grid grid-cols-1 xl:grid-cols-[18.75rem_minmax(0,1fr)] fhd:grid-cols-[22.5rem_minmax(0,1fr)] gap-6 items-start">
+    <div className="akte-spalten stapel grid grid-cols-1 xl:grid-cols-[18.75rem_minmax(0,1fr)] fhd:grid-cols-[22.5rem_minmax(0,1fr)] gap-6 items-start">
       {/* unter 1280 px (Telefon) steht der gewählte Plan vor der Liste: Freigeben ohne Scrollen (Festlegung 08.10.2026) */}
       <div className="flex flex-col gap-3 order-2 xl:order-none">
         <div className="flex items-center justify-between">
@@ -385,12 +395,11 @@ export function Plaene() {
       </div>
 
       {gewaehlt ? (
-        <div className="flex flex-col gap-4 min-w-0 order-1 xl:order-none scroll-mt-20" data-testid="plan-detail">
-          <Segmente label="Darstellung" wert={modus} onWahl={setModus}
-            werte={[{ wert: "ansicht", text: "Ansicht wie PDF" }, { wert: "vergleich", text: "Vergleich mit Vorgänger" }]} className="self-start" />
+        <div className="flex flex-col gap-3 min-w-0 order-1 xl:order-none scroll-mt-20" data-testid="plan-detail">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex flex-col gap-1">
-              <span className="text-lg font-semibold">{kopfText(gewaehlt)}</span>
+              <span className="text-lg font-semibold">{gewaehlt.status === "entwurf"
+                ? <><Begriff name="entwurf">Entwurf</Begriff> · {datum(gewaehlt.gueltig_ab)}</> : kopfText(gewaehlt)}</span>
               <span className="text-[0.8125rem] gedaempft max-w-[70ch]">
                 {gewaehlt.status === "entwurf"
                   ? "Entwurf: nur für das Team sichtbar, noch nicht beim Versorger."
@@ -416,6 +425,8 @@ export function Plaene() {
               </> : null}
             </div>
           </div>
+          <Segmente label="Darstellung" wert={modus} onWahl={setModus}
+            werte={[{ wert: "ansicht", text: "Ansicht wie PDF" }, { wert: "vergleich", text: <>Vergleich mit Vorgänger{vergleich.data?.vorgaenger ? <span className="num opacity-70">{vergleich.data.anzahl_geaendert}</span> : null}</> }]} className="self-start" />
           {modus === "ansicht" ? <PlanAnsicht key={gewaehlt.id} plan={gewaehlt} />
             : vergleich.isLoading ? <Laden /> : vergleich.data ? <VergleichTabelle plan={gewaehlt} vergleich={vergleich.data} />
             : <Fehleranzeige fehler={vergleich.error} />}

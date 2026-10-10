@@ -1,9 +1,9 @@
 """
-Anmeldung (Kennwort → ggf. eigenes Kennwort → Authenticator-App → Code) und Benutzerverwaltung.
+Anmeldung (Passwort → ggf. eigenes Passwort → Authenticator-App → Code) und Benutzerverwaltung.
 
 Ablauf beim ersten Login:
-  1. POST /api/auth/anmelden          Benutzername + Einmal-Kennwort
-  2. POST /api/auth/kennwort          eigenes Kennwort wählen
+  1. POST /api/auth/anmelden          Benutzername + Einmal-Passwort
+  2. POST /api/auth/kennwort          eigenes Passwort wählen
   3. POST /api/auth/2fa/einrichten    QR-Code für die Authenticator-App
   4. POST /api/auth/2fa/bestaetigen   ersten Code eingeben → Notfall-Codes (einmalig angezeigt)
 Danach bei jeder Anmeldung: 1. und POST /api/auth/2fa mit dem aktuellen Code.
@@ -13,7 +13,7 @@ Passkey statt Code (Festlegung 08.10.2026, accounts/passkey.py):
   POST /api/auth/passkey/               Antwort des Browsers → Anmeldung abgeschlossen (wie POST /api/auth/2fa)
   POST /api/auth/passkey/registrieren/  {"antwort", "name"} → Passkey gespeichert (erster zweiter Faktor: Notfall-Codes)
   GET  /api/auth/passkeys/              eigene Passkeys; PATCH /api/auth/passkeys/<id>/ {"name"} umbenennen;
-  POST /api/auth/passkeys/<id>/entfernen/ mit Kennwort und zweitem Faktor
+  POST /api/auth/passkeys/<id>/entfernen/ mit Passwort und zweitem Faktor
 
 Der zweite Faktor ist freiwillig (Festlegung 02.10.2026, ``Anmelderegeln``): Ohne Pflicht entfallen 3. und 4.; wer
 die Authenticator-App trotzdem einrichtet (Mein Konto), meldet sich danach immer mit Code an und kann sie dort mit
@@ -109,8 +109,8 @@ GESPERRT_TEXT = "Das Konto ist gesperrt. Bitte an die Administration wenden."
 
 
 def bestaetigung_fehlgeschlagen(request, art: str):
-    """Falsches Kennwort oder falscher Authenticator-Code bei einer Bestätigung in der Sitzung (endgültiges Löschen):
-    zählt wie ein Fehlversuch bei der Anmeldung – sonst ließe sich das Kennwort dort beliebig oft probieren.
+    """Falsches Passwort oder falscher Authenticator-Code bei einer Bestätigung in der Sitzung (endgültiges Löschen):
+    zählt wie ein Fehlversuch bei der Anmeldung – sonst ließe sich das Passwort dort beliebig oft probieren.
     Liefert die Antwort „gesperrt“, wenn das Konto damit gesperrt wurde, sonst None."""
     if fehlversuch(request.user, request, art):
         return Response({"fehler": GESPERRT_TEXT}, status=status.HTTP_403_FORBIDDEN)
@@ -205,7 +205,7 @@ class AnmeldenView(OffenerView):
         name = str(request.data.get("benutzername", "")).strip()
         kennwort = str(request.data.get("kennwort", ""))
         if not name or not kennwort:
-            return fehler("Benutzername und Kennwort angeben.")
+            return fehler("Benutzername und Passwort angeben.")
         konto = User.objects.filter(username=name, nur_historisch=False).first()
         if konto is not None and konto.ist_gesperrt:
             # Sperre nur verraten, wenn das Kennwort stimmt (sonst wie ein normaler Fehlversuch)
@@ -213,15 +213,15 @@ class AnmeldenView(OffenerView):
                 protokolliere(SystemEreignis.Art.ANMELDUNG_GESPERRT, request, benutzer=konto, versuch_trotz_sperre=True)
                 return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
             protokolliere(SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request, benutzername=name)
-            return fehler("Benutzername oder Kennwort falsch.", status.HTTP_401_UNAUTHORIZED)
+            return fehler("Benutzername oder Passwort falsch.", status.HTTP_401_UNAUTHORIZED)
         user = authenticate(request, username=name, password=kennwort)  # Fehlversuch → Signal → Protokoll
         if user is None:
             if konto is not None and konto.is_active and fehlversuch(konto, request, "kennwort"):
                 return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
-            return fehler("Benutzername oder Kennwort falsch.", status.HTTP_401_UNAUTHORIZED)
+            return fehler("Benutzername oder Passwort falsch.", status.HTTP_401_UNAUTHORIZED)
         if user.einmal_kennwort_abgelaufen:
             protokolliere(SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request, benutzer=user, grund="einmal_kennwort_abgelaufen")
-            return fehler("Das Einmal-Kennwort ist abgelaufen. Bitte bei der Administration ein neues anfordern.",
+            return fehler("Das Einmal-Passwort ist abgelaufen. Bitte bei der Administration ein neues anfordern.",
                           status.HTTP_401_UNAUTHORIZED, abgelaufen=True)
         login(request, user)  # Sitzungs-ID wird erneuert
         if naechster_schritt(request) == "fertig" and user.fehlversuche:
@@ -235,7 +235,7 @@ class ZweiterFaktorView(OffenerView):
     def post(self, request):
         user = request.user
         if not user.is_authenticated:
-            return fehler("Bitte zuerst mit Kennwort anmelden.", status.HTTP_401_UNAUTHORIZED)
+            return fehler("Bitte zuerst mit Passwort anmelden.", status.HTTP_401_UNAUTHORIZED)
         code = str(request.data.get("code", "")).replace(" ", "")
         for geraet in [*TOTPDevice.objects.filter(user=user, confirmed=True),
                        *StaticDevice.objects.filter(user=user, confirmed=True)]:
@@ -258,7 +258,7 @@ class ZweiterFaktorView(OffenerView):
 
 
 class KennwortView(OffenerView):
-    """Eigenes Kennwort setzen: beim ersten Login ohne altes Kennwort, sonst mit."""
+    """Eigenes Passwort setzen: beim ersten Login ohne altes Passwort, sonst mit."""
 
     def post(self, request):
         user = request.user
@@ -269,14 +269,14 @@ class KennwortView(OffenerView):
             if not zweiter_faktor_erfuellt(user):
                 return fehler("Anmeldung mit zweitem Faktor erforderlich.", status.HTTP_403_FORBIDDEN)
             if not user.check_password(str(request.data.get("alt", ""))):
-                return fehler("Bisheriges Kennwort ist falsch.")
+                return fehler("Bisheriges Passwort ist falsch.")
         neu = str(request.data.get("neu", ""))
         if user.check_password(neu):
-            return fehler("Das neue Kennwort muss sich vom bisherigen unterscheiden.")
+            return fehler("Das neue Passwort muss sich vom bisherigen unterscheiden.")
         try:
             password_validation.validate_password(neu, user)
         except DjangoValidationError as e:
-            return fehler("Kennwort zu schwach.", details=e.messages)
+            return fehler("Passwort zu schwach.", details=e.messages)
         user.set_password(neu)
         user.muss_kennwort_aendern = False
         user.einmal_kennwort_gueltig_bis = None
@@ -302,7 +302,7 @@ class ZweiterFaktorEinrichtenView(OffenerView):
     def post(self, request):
         user = request.user
         if not user.is_authenticated or user.muss_kennwort_aendern:
-            return fehler("Erst anmelden und eigenes Kennwort setzen.", status.HTTP_403_FORBIDDEN)
+            return fehler("Erst anmelden und eigenes Passwort setzen.", status.HTTP_403_FORBIDDEN)
         # Ein bestehendes Gerät darf nur ersetzt werden, wer bereits voll angemeldet ist
         if hat_zweiten_faktor(user) and not ist_verifiziert(user):
             return fehler("Authenticator ist bereits eingerichtet.", status.HTTP_403_FORBIDDEN)
@@ -315,7 +315,7 @@ class ZweiterFaktorBestaetigenView(OffenerView):
     def post(self, request):
         user = request.user
         if not user.is_authenticated or user.muss_kennwort_aendern:
-            return fehler("Erst anmelden und eigenes Kennwort setzen.", status.HTTP_403_FORBIDDEN)
+            return fehler("Erst anmelden und eigenes Passwort setzen.", status.HTTP_403_FORBIDDEN)
         geraet = TOTPDevice.objects.filter(user=user, confirmed=False).order_by("-id").first()
         if not geraet:
             return fehler("Bitte zuerst die Einrichtung starten.")
@@ -349,8 +349,8 @@ def neue_notfallcodes(user) -> list[str]:
 
 
 class ZweiterFaktorAusschaltenView(APIView):
-    """Eigenen zweiten Faktor ausschalten (nur solange er freiwillig ist): mit Kennwort und einem gültigen Code oder
-    Passkey. Authenticator, Passkeys und Notfall-Codes werden gelöscht; die Anmeldung braucht danach nur noch das Kennwort."""
+    """Eigenen zweiten Faktor ausschalten (nur solange er freiwillig ist): mit Passwort und einem gültigen Code oder
+    Passkey. Authenticator, Passkeys und Notfall-Codes werden gelöscht; die Anmeldung braucht danach nur noch das Passwort."""
 
     permission_classes = [Angemeldet]
 
@@ -386,7 +386,7 @@ class AbmeldenView(OffenerView):
 
 # ---------------------------------------------------------------- Passkeys (Festlegung 08.10.2026)
 def _darf_einrichten(user) -> bool:
-    """Wie beim Authenticator: angemeldet, eigenes Kennwort gesetzt; wer schon einen zweiten Faktor hat, muss ihn in
+    """Wie beim Authenticator: angemeldet, eigenes Passwort gesetzt; wer schon einen zweiten Faktor hat, muss ihn in
     dieser Sitzung bestätigt haben."""
     return bool(user.is_authenticated and not user.muss_kennwort_aendern
                 and (not hat_zweiten_faktor(user) or ist_verifiziert(user)))
@@ -399,11 +399,11 @@ class PasskeyOptionenView(OffenerView):
         user = request.user
         zweck = str(request.data.get("zweck", ""))
         if not user.is_authenticated:
-            return fehler("Bitte zuerst mit Kennwort anmelden.", status.HTTP_401_UNAUTHORIZED)
+            return fehler("Bitte zuerst mit Passwort anmelden.", status.HTTP_401_UNAUTHORIZED)
         if zweck == "registrieren" and not _darf_einrichten(user):
             return fehler("Erst vollständig anmelden.", status.HTTP_403_FORBIDDEN)
         if zweck == "anmelden" and user.muss_kennwort_aendern:
-            return fehler("Erst ein eigenes Kennwort setzen.", status.HTTP_403_FORBIDDEN)
+            return fehler("Erst ein eigenes Passwort setzen.", status.HTTP_403_FORBIDDEN)
         if zweck == "bestaetigen" and not voll_angemeldet(user):
             return fehler(Angemeldet.message, status.HTTP_403_FORBIDDEN)
         try:
@@ -418,7 +418,7 @@ class PasskeyAnmeldenView(OffenerView):
     def post(self, request):
         user = request.user
         if not user.is_authenticated:
-            return fehler("Bitte zuerst mit Kennwort anmelden.", status.HTTP_401_UNAUTHORIZED)
+            return fehler("Bitte zuerst mit Passwort anmelden.", status.HTTP_401_UNAUTHORIZED)
         antwort = request.data.get("antwort")
         if not isinstance(antwort, dict):
             return fehler("Antwort des Passkeys fehlt.")
@@ -492,7 +492,7 @@ class PasskeyView(APIView):
 
 
 class PasskeyEntfernenView(APIView):
-    """Eigenen Passkey entfernen – mit Kennwort und zweitem Faktor (Code oder ein Passkey, auch dieser). Der letzte
+    """Eigenen Passkey entfernen – mit Passwort und zweitem Faktor (Code oder ein Passkey, auch dieser). Der letzte
     zweite Faktor lässt sich nur entfernen, solange er freiwillig ist; dann gehen auch die Notfall-Codes."""
 
     permission_classes = [Angemeldet]
@@ -1003,7 +1003,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
 
     @action(detail=True, methods=["post"])
     def zugangsblatt(self, request, pk=None):
-        """Zugangsblatt als PDF (F55). Das Einmal-Kennwort ist nur als Prüfsumme gespeichert; die Oberfläche schickt es
+        """Zugangsblatt als PDF (F55). Das Einmal-Passwort ist nur als Prüfsumme gespeichert; die Oberfläche schickt es
         mit, solange sie es anzeigt. Es wird geprüft und muss noch gültig sein."""
         from vorlagen.api import pdf_antwort
         from vorlagen.listen import zugangsblatt_pdf
@@ -1011,9 +1011,9 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user = self.get_object()
         kennwort = str(request.data.get("kennwort", ""))
         if not user.muss_kennwort_aendern or user.einmal_kennwort_abgelaufen:
-            return fehler("Für diesen Benutzer gibt es kein gültiges Einmal-Kennwort. Bitte ein neues erzeugen.")
+            return fehler("Für diesen Benutzer gibt es kein gültiges Einmal-Passwort. Bitte ein neues erzeugen.")
         if not kennwort or not user.check_password(kennwort):
-            return fehler("Das Einmal-Kennwort passt nicht zu diesem Benutzer.")
+            return fehler("Das Einmal-Passwort passt nicht zu diesem Benutzer.")
         adresse = f"https://{request.get_host()}/"
         pdf = zugangsblatt_pdf(user, kennwort, adresse)
         protokolliere(SystemEreignis.Art.EXPORT, request, objekt=user.username, was="Zugangsblatt")
@@ -1031,7 +1031,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
     @action(detail=False, methods=["get"])
     def konten(self, request):
         """Admin-Startseite, Kachel „Konten“ (S12): Konten, um die sich die Administration kümmern sollte – gesperrt,
-        Einmal-Kennwort offen oder abgelaufen, ohne zweiten Faktor, Notfall-Codes knapp. Ohne Kennwörter oder Codes,
+        Einmal-Passwort offen oder abgelaufen, ohne zweiten Faktor, Notfall-Codes knapp. Ohne Passwörter oder Codes,
         nur Zustände und Anzahlen."""
         zeilen = []
         for u in sichtbare_benutzer(request.user, User.objects.filter(nur_historisch=False)).order_by("last_name", "first_name"):
@@ -1099,7 +1099,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
     @action(detail=True, methods=["post"], url_path="ohne-login")
     def ohne_login(self, request, pk=None):
         """Konto auf „ohne Login“ setzen (Fehlerliste 02.10.2026): Die Person kann sich nicht mehr anmelden und hat
-        keine Rechte mehr (Rolle „Keine Berechtigung“); ihre Einträge bleiben ihr zugeordnet. Kennwort, Authenticator
+        keine Rechte mehr (Rolle „Keine Berechtigung“); ihre Einträge bleiben ihr zugeordnet. Passwort, Authenticator
         und Notfall-Codes werden gelöscht, alle Anmeldungen beendet. Zurück geht es mit „Login geben“."""
         user = self.get_object()
         if user == request.user:
@@ -1122,7 +1122,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
 
     @action(detail=True, methods=["post"], url_path="login-geben")
     def login_geben(self, request, pk=None):
-        """Konto ohne Login wieder einbinden: ``{"rolle": "mitarbeiter"}`` → Rolle setzen und ein Einmal-Kennwort
+        """Konto ohne Login wieder einbinden: ``{"rolle": "mitarbeiter"}`` → Rolle setzen und ein Einmal-Passwort
         für das Zugangsblatt erzeugen (wie beim Anlegen)."""
         user = self.get_object()
         if not user.nur_historisch:
@@ -1143,7 +1143,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
 
     @action(detail=True, methods=["post"], url_path="einmal-kennwort")
     def einmal_kennwort(self, request, pk=None):
-        """Kennwort vergessen: neues Einmal-Kennwort für das Zugangsblatt."""
+        """Passwort vergessen: neues Einmal-Passwort für das Zugangsblatt."""
         user = self.get_object()
         if user.nur_historisch:
             return fehler("Historische Benutzer haben keinen Zugang.")
@@ -1157,8 +1157,8 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
     def zweiten_faktor_zuruecksetzen(self, request, pk=None):
         """Telefon verloren: Authenticator, Passkeys und Notfall-Codes löschen.
 
-        Zusätzlich gibt es ein neues Einmal-Kennwort: Nur wer das Zugangsblatt vom Admin
-        erhält, kann den neuen Authenticator einrichten – das bisherige Kennwort allein reicht nicht.
+        Zusätzlich gibt es ein neues Einmal-Passwort: Nur wer das Zugangsblatt vom Admin
+        erhält, kann den neuen Authenticator einrichten – das bisherige Passwort allein reicht nicht.
         """
         user = self.get_object()
         if user.nur_historisch:

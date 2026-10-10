@@ -12,7 +12,9 @@ import { RUHE_FRISTEN } from "@/lib/typen";
 import { TERMINARTEN } from "@/lib/typen";
 import type { HinweisArt, Hinweisruhe, Kontaktstufe, Termin } from "@/lib/typen";
 import { datum, zeitpunkt } from "@/lib/format";
-import { Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, Meldung, Segmente } from "@/components/ui/basis";
+import { Popover } from "@base-ui/react/popover";
+import { Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, Meldung, Segmente, cx } from "@/components/ui/basis";
+import { Icon } from "@/components/ui/icon";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 
@@ -95,10 +97,13 @@ export function RuheDialog({ patientId, hinweis, termin, offen, onOffen }: {
 }
 
 /** Chips der Hinweise; mit ``patientId`` und Recht lässt sich jeder einzeln wegklicken. */
-export function HinweisChips({ hinweise, patientId, ausblendbar }: {
+export function HinweisChips({ hinweise, patientId, ausblendbar, onAusblenden }: {
   hinweise: Hinweis[]; patientId?: number; ausblendbar?: boolean;
+  /** „×“ meldet den Hinweis nach außen, statt den Dialog selbst zu öffnen (z. B. aus einer aufgeklappten Liste) */
+  onAusblenden?: (h: Hinweis) => void;
 }) {
-  const [dialog, setDialog] = useState<Hinweis | null>(null);
+  const [eigenerDialog, setDialog] = useState<Hinweis | null>(null);
+  const dialog = onAusblenden ? null : eigenerDialog;
   const kann = !!patientId && !!ausblendbar;
   return (
     <>
@@ -108,12 +113,54 @@ export function HinweisChips({ hinweise, patientId, ausblendbar }: {
           {kann ? (
             <button type="button" className="ml-1 bg-transparent border-0 p-0 cursor-pointer opacity-70 hover:opacity-100"
               aria-label={`Hinweis „${h.text}“ ausblenden`} title="Ausblenden"
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDialog(h); }}>×</button>
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); (onAusblenden ?? setDialog)(h); }}>×</button>
           ) : null}
         </Chip>
       ))}
-      {kann ? <RuheDialog patientId={patientId!} hinweis={dialog} offen={!!dialog}
+      {kann && !onAusblenden ? <RuheDialog patientId={patientId!} hinweis={dialog} offen={!!dialog}
         onOffen={(o) => { if (!o) setDialog(null); }} /> : null}
+    </>
+  );
+}
+
+/**
+ * Hinweise im Aktenkopf, ruhig (Nacharbeit F181, 10.10.2026): ein Hinweis steht direkt als Chip da; ab zwei Hinweisen
+ * nur ein Chip „N Hinweise ▾“, der die Liste mit den einzelnen Chips und ihrem „×“ aufklappt. Überfälliges (rot) zuerst –
+ * und dann ist auch der Sammel-Chip rot und nennt es.
+ */
+export function HinweisChipsKompakt({ hinweise, patientId, ausblendbar }: {
+  hinweise: Hinweis[]; patientId?: number; ausblendbar?: boolean;
+}) {
+  const [offen, setOffen] = useState(false);
+  const [dialog, setDialog] = useState<Hinweis | null>(null);
+  const sortiert = [...hinweise].sort((a, b) => Number(b.stufe === "ueberfaellig") - Number(a.stufe === "ueberfaellig"));
+  if (sortiert.length < 2) return <HinweisChips hinweise={sortiert} patientId={patientId} ausblendbar={ausblendbar} />;
+  const rot = sortiert.filter((h) => h.stufe === "ueberfaellig").length;
+  return (
+    <>
+    <Popover.Root open={offen} onOpenChange={setOffen}>
+      <Popover.Trigger className={cx("chip border-0 cursor-pointer inline-flex items-center gap-1", rot ? "fehler" : "warn")}
+        data-testid="hinweise-sammel" aria-label={`${sortiert.length} Hinweise anzeigen`}
+        title={sortiert.map((h) => h.text).join("\n")}>
+        <Icon name="warnung" />
+        {sortiert.length} Hinweise{rot ? ` · ${rot} überfällig` : ""}
+        <Icon name="runter" groesse={12} />
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner side="bottom" align="start" sideOffset={6} collisionPadding={8} className="z-50">
+          <Popover.Popup className="card p-3 flex flex-col gap-2 max-w-[min(26rem,calc(100vw-1rem))] outline-none" data-testid="hinweise-liste">
+            <span className="text-xs gedaempft">Hinweise zu dieser Akte{ausblendbar ? " – „×“ blendet einen Hinweis für eine Weile aus" : ""}</span>
+            <div className="flex flex-wrap gap-1.5">
+              {/* der Dialog „Ausblenden“ hängt außerhalb der Liste – sonst schlösse er mit ihr */}
+              <HinweisChips hinweise={sortiert} patientId={patientId} ausblendbar={ausblendbar}
+                onAusblenden={(h) => { setOffen(false); setDialog(h); }} />
+            </div>
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
+    {patientId && ausblendbar ? <RuheDialog patientId={patientId} hinweis={dialog} offen={!!dialog}
+      onOffen={(o) => { if (!o) setDialog(null); }} /> : null}
     </>
   );
 }

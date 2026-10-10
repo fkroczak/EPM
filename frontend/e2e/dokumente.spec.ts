@@ -144,11 +144,10 @@ test("Dokument aus dem Aktenkopf und per Ziehen auf die Akte – die Seite bleib
   const api = await apiAls("mitarbeiter");
   const p = await api.post("patienten/", { nachname: eindeutig("Ablage"), vorname: "Doris", geburtsdatum: "1980-08-08" });
   await page.goto(`/patienten/${p.id}`);
-  // „Weitere Aktionen › Dokument hochladen …“ öffnet die Dateiauswahl
-  await page.getByRole("button", { name: "Weitere Aktionen" }).click();
+  // „Dokument“ im Aktenkopf (seit F181 eigener Knopf statt unter „⋯“) öffnet die Dateiauswahl
   const [auswahl] = await Promise.all([
     page.waitForEvent("filechooser"),
-    page.getByRole("menuitem", { name: "Dokument hochladen …" }).click(),
+    page.getByTestId("aktenkopf").getByRole("button", { name: "Dokument", exact: true }).click(),
   ]);
   await auswahl.setFiles([{ name: "Befund Kopf.txt", mimeType: "text/plain", buffer: Buffer.from("Befund (E2E)\n", "utf-8") }]);
   await expect(page.getByText("Dokument „Befund Kopf.txt“ in die Akte gelegt.")).toBeVisible();

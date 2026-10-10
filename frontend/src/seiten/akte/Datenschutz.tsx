@@ -455,7 +455,7 @@ function AkteLoeschenDialog({ patient, offen, onOffen }: { patient: Patient; off
         </Feld>
         <ZweiFaktorFehlt />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-          <Feld label="Kennwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
+          <Feld label="Passwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
           {zf.feld(f.code)}
         </div>
         <div className="flex items-end gap-3 flex-wrap">
@@ -602,7 +602,7 @@ export function AkteDatenschutz() {
   // Recht „Akten endgültig löschen“: Mediziner und Admin, Admins auch bei echten Akten (Festlegung 02.10.2026)
   const loeschenErlaubt = darfBei("akten_loeschen", patient);
   return (
-    <div className="stapel grid grid-cols-1 xl:grid-cols-2 gap-5 items-start" data-testid="akte-datenschutz">
+    <div className="akte-spalten stapel grid grid-cols-1 xl:grid-cols-2 gap-5 items-start" data-testid="akte-datenschutz">
       <div className="stapel flex flex-col gap-5 min-w-0">
         <ErklaerungenKarte daten={daten.data} patient={patient} darf={darf} />
         <AnfragenKarte daten={daten.data} patient={patient} darf={darf} entscheiden={entscheiden} />

@@ -89,6 +89,11 @@ class PatientListSerializer(serializers.ModelSerializer):
         return self.context.get("kennzahlen", {}).get(obj.id)
 
 
+def _hinweise_kopf(patient) -> dict:
+    k = kennzahlen([patient]).get(patient.id) or {}
+    return {"hinweise": k.get("hinweise", []), "hinweise_stumm": k.get("hinweise_stumm", [])}
+
+
 class PatientSerializer(ModelClean, serializers.ModelSerializer):
     diagnose = RichText()
     therapie = RichText()
@@ -182,6 +187,9 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                  "bei": termin.bei} if termin else None
             ),
             "versionen": {feld: _versionskopf(obj, feld) for feld in TEXTFELDER},
+            # Hinweise wie in der Patientenliste (F119), dazu die fehlenden Angaben (F186) – zum Anzeigen mit
+            # HinweisChips im Aktenkopf; ausgeblendete stehen unter ``hinweise_stumm``
+            **_hinweise_kopf(obj),
             # Schnellerfassung (S02): letzter Kontakt im Kontextkasten; Merkliste (S05): Stern im Aktenkopf
             "letzter_kontakt": obj.kontakte.filter(storniert_am__isnull=True).aggregate(z=Max("zeitpunkt"))["z"],
             "gemerkt": _gemerkt(self.context.get("request"), obj),
@@ -312,6 +320,10 @@ class PatientFilter(filters.FilterSet):
                  ("wiedereinbestellung", "Wiedereinbestellung fällig (Kontakt fällig, kein Termin geplant)"),
                  ("erklaerungen", "Erklärungen zum Datenschutz fehlen"),
                  ("abschluss_pruefen", "Abschluss prüfen (lange kein Kontakt)"),
+                 # fehlende Angaben (F186)
+                 ("ohne_telefon", "Keine Telefonnummer"), ("ohne_hausarzt", "Kein Hausarzt erfasst"),
+                 ("ohne_diagnose", "Keine Diagnose"), ("ohne_gewicht", "Kein aktuelles Gewicht"),
+                 ("termin_ohne_ort", "Praxistermin ohne Ort"),
                  ("labor_faellig", "Laborbefund fehlt oder ist zu alt"),
                  ("bia_faellig", "BIA-Messung fehlt oder ist zu alt")],
         method="filter_pruefen",
@@ -341,6 +353,10 @@ class PatientFilter(filters.FilterSet):
             return qs.filter(id__in=abschluss_pruefen(Patient.objects.all()).values("id"))
         if wert in ("labor_faellig", "bia_faellig"):
             return befund_filter(qs, wert)  # F120: Befund fehlt oder ist älter als die eingestellte Grenze
+        from .luecken import FILTER, filter_ids
+
+        if wert in FILTER.values():
+            return qs.filter(id__in=filter_ids(qs.order_by(), wert))  # F186: fehlende Angaben
         return qs
 
     def filter_status(self, qs, name, wert):
@@ -688,6 +704,8 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
             titel = name.split(" (")[0] + (f" für den {termin.faellig_am:%d.%m.%Y}" if termin else f" vom {heute:%d.%m.%Y}")
             abgelegt = als_dokument(patient, pdf, titel, "Schreiben", heute, request.user, f"{dateiname}.pdf")
             antwort["X-EPM-Dokument"] = str(abgelegt.pk)
+        if art == Dokumentvorlage.Art.TERMINBESTAETIGUNG and d.get("vorschau") is not True:
+            _bestaetigung_vermerken(request.user, termin)
         protokolliere(SystemEreignis.Art.EXPORT, request, objekt=akte_text(patient), was=name,
                       ausgabe=d.get("ausgabe", "pdf"), abgelegt=bool(abgelegt), patient_id=patient.id)
         return antwort
@@ -725,6 +743,22 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
         return Response(verlauf_eintraege(patient, bereich, person))
 
 
+def _bestaetigung_vermerken(user, termin):
+    """Terminbestätigung als PDF oder E-Mail erstellt (F185): am Termin vermerken, damit Termin und Tagesliste
+    „Bestätigung erstellt am …“ zeigen statt „Bestätigung fehlt“. „PDF ansehen“ (``vorschau``) zählt nicht. Ohne
+    Schreibrecht an der Akte (Admin bei echten Akten) oder bei erledigten Terminen bleibt es beim Schreiben."""
+    if termin is None or termin.erledigt_am is not None or termin.patient.abgeschlossen_am is not None:
+        return
+    try:
+        pruefe_schreibbereich(user, termin.patient)
+    except PermissionError:
+        return
+    termin.bestaetigung_am = timezone.now()
+    termin.bestaetigung_von = user
+    termin._history_user = user
+    termin.save(update_fields=["bestaetigung_am", "bestaetigung_von"])
+
+
 def _aktion(name, h, aenderungen):
     """Fachliche Bezeichnung der Aktion („storniert“, „freigegeben“ …)."""
     felder = {a["feld"] for a in aenderungen}
@@ -736,6 +770,9 @@ def _aktion(name, h, aenderungen):
         return "storniert"
     if name == "termine" and "erledigt_am" in felder:
         return "erledigt"
+    if name == "termine" and "bestaetigung_am" in felder and felder <= {"bestaetigung_am", "bestaetigung_von"} \
+            and h.bestaetigung_am:
+        return "Terminbestätigung erstellt"  # F185
     if name == "infusionsplaene" and "status" in felder:
         if h.status == "aktuell" and h.abgeschlossen_von_id:
             # der Mediziner hat außerhalb von EPM freigegeben; die eintragende Person hat nur abgeschlossen
@@ -1157,6 +1194,19 @@ class KontaktViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retrieve
         return Response(self.get_serializer(kontakt).data)
 
 
+def bestaetigung_angaben(termin, einstellung_an: bool) -> dict:
+    p = termin.patient
+    email = bool(p.email.strip())
+    anschrift = bool(p.strasse.strip() and p.plz.strip() and p.ort.strip())
+    anrede = {"w": "Frau", "m": "Herrn"}.get(p.geschlecht)
+    return {
+        "angebot": bool(einstellung_an and (email or anschrift) and termin.erledigt_am is None
+                        and termin.faellig_am >= timezone.localdate() and p.abgeschlossen_am is None),
+        "email": email,
+        "anrede": f"{anrede} {p.nachname}" if anrede else f"{p.vorname} {p.nachname}",
+    }
+
+
 class TerminSerializer(serializers.ModelSerializer):
     ort_name = serializers.CharField(source="ort.wert", read_only=True, default=None)
     erledigt_von_name = serializers.SerializerMethodField()
@@ -1169,12 +1219,37 @@ class TerminSerializer(serializers.ModelSerializer):
         fields = ["id", "patient", "patient_name", "patient_ist_test", "art", "ort", "ort_name", "faellig_am", "uhrzeit", "bei", "titel",
                   "notiz", "kontakt", "erledigt_am", "erledigt_von_name", "angelegt_am", "angelegt_von_name",
                   "ausgeblendet", "ausgeblendet_bis", "ausgeblendet_dauerhaft", "ausblende_grund", "ausgeblendet_am",
-                  "ausgeblendet_von_name"]
+                  "ausgeblendet_von_name", "bestaetigung_am", "bestaetigung_von_name", "bestaetigung"]
         read_only_fields = ["erledigt_am", "angelegt_am", "ausgeblendet_bis", "ausgeblendet_dauerhaft", "ausblende_grund",
-                            "ausgeblendet_am"]
+                            "ausgeblendet_am", "bestaetigung_am"]
 
     ausgeblendet = serializers.BooleanField(source="ist_ausgeblendet", read_only=True)
     ausgeblendet_von_name = serializers.SerializerMethodField()
+    bestaetigung_von_name = serializers.SerializerMethodField()
+    bestaetigung = serializers.SerializerMethodField()
+
+    def get_bestaetigung_von_name(self, obj):
+        return benutzername(obj.bestaetigung_von) if obj.bestaetigung_von_id else None
+
+    def get_bestaetigung(self, obj):
+        """Terminbestätigung (F185), nur bei Praxisterminen: ``angebot`` – nach dem Speichern „Terminbestätigung
+        schicken?“ anbieten bzw. „Bestätigung fehlt“ zeigen (Einstellung an, Anschrift oder E-Mail vorhanden, Termin
+        offen und nicht vorbei, Akte in Betreuung); ``anrede`` für die Frage („Frau Muster“)."""
+        if obj.art != Termin.Art.PRAXISTERMIN:
+            return None
+        if "_bestaetigung_an" not in self.context:
+            from stammdaten.models import Einstellungen
+
+            self.context["_bestaetigung_an"] = Einstellungen.aktuell().terminbestaetigung_anbieten
+        return bestaetigung_angaben(obj, self.context["_bestaetigung_an"])
+
+    def update(self, instance, validated_data):
+        # verschoben (Datum, Uhrzeit, Ort): die bisherige Terminbestätigung stimmt nicht mehr (F185)
+        if instance.bestaetigung_am and any(
+                f in validated_data and validated_data[f] != getattr(instance, f) for f in ("faellig_am", "uhrzeit", "ort")):
+            validated_data["bestaetigung_am"] = None
+            validated_data["bestaetigung_von"] = None
+        return super().update(instance, validated_data)
 
     def get_ausgeblendet_von_name(self, obj):
         return benutzername(obj.ausgeblendet_von) if obj.ausgeblendet_von_id else None
@@ -1546,7 +1621,7 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
 
     @action(detail=True, methods=["post"], permission_classes=[LoeschenRecht])
     def loeschen(self, request, pk=None):
-        """Schritt 2: endgültig löschen (Mediziner und Admin, Recht „Dokumente endgültig löschen“) mit Grund, Kennwort, Code aus der Authenticator-App und dem
+        """Schritt 2: endgültig löschen (Mediziner und Admin, Recht „Dokumente endgültig löschen“) mit Grund, Passwort, Code aus der Authenticator-App und dem
         abgetippten Bestätigungscode. Datei und Inhalt sind danach weg; Audit-Log und Verlauf („endgültig gelöscht“)
         bleiben. Jede Ablehnung steht im Audit-Log."""
         from datetime import datetime
@@ -1583,7 +1658,7 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
             # Festlegung 03.10.2026: endgültig löschen nur mit eingerichtetem zweitem Faktor
             return abgelehnt("code", OHNE_ZWEITEN_FAKTOR)
         if not request.user.check_password(str(request.data.get("kennwort", ""))):
-            antwort = abgelehnt("kennwort", "Kennwort falsch.")
+            antwort = abgelehnt("kennwort", "Passwort falsch.")
             return bestaetigung_fehlgeschlagen(request, "loeschen_kennwort") or antwort
         if not zweiter_faktor_bestaetigt(request, notfallcodes=False):
             antwort = abgelehnt("code", fehlertext(request, "Code aus der Authenticator-App falsch oder schon verwendet."))
@@ -1952,10 +2027,64 @@ def _woche(termine_qs, heute):
              "feiertag": feiertage.get(heute + timedelta(days=i))} for i in range(7)]
 
 
+BESTAETIGUNG_TAGE = 14  # F185: Praxistermine ab morgen bis in zwei Wochen ohne Terminbestätigung
+
+
+def tagesliste(user, patienten, termine, wieder, e) -> dict:
+    """„Heute zu tun“ auf der Startseite (F184): kurze, priorisierte Liste für die Pflege.
+
+    ``patienten`` und ``termine`` sind schon auf Akten in Betreuung ohne Testpatienten beschränkt (Testzugänge: nur
+    Testpatienten). Was erledigt ist, fehlt von allein: erledigte Termine, erstellte Bestätigungen, nachgetragene
+    Angaben. Bestätigungen und Praxistermine ohne Ort nur mit dem Recht „Einträge erfassen“."""
+    from infusionen.models import Infusionsplan
+
+    from . import infoblatt, luecken
+
+    heute = timezone.localdate()
+
+    def t(qs, n=50):
+        return TerminSerializer(qs.order_by("faellig_am", F("uhrzeit").asc(nulls_first=True), "id")[:n], many=True,
+                                context={"_bestaetigung_an": e.terminbestaetigung_anbieten}).data
+
+    nachfassen = termine.filter(art__in=[Termin.Art.RUECKRUF, Termin.Art.WIEDERVORLAGE], faellig_am__lte=heute)
+    erfassen = user.hat_recht("eintraege_erfassen")
+    daten = {
+        "termine_heute": t(termine.filter(faellig_am=heute).exclude(
+            art__in=[Termin.Art.RUECKRUF, Termin.Art.WIEDERVORLAGE])),
+        "rueckrufe": t(nachfassen),
+        "rueckrufe_anzahl": nachfassen.count(),
+        "rueckrufe_ueberfaellig": nachfassen.filter(faellig_am__lt=heute).count(),
+        "kontakt_ueberfaellig": wieder["anzahl_ueberfaellig"],
+        "kontakt_monate": e.kontakt_ueberfaellig_monate,
+        "plaene_pruefen": Infusionsplan.objects.filter(patient__in=patienten,
+                                                       status=Infusionsplan.Status.ENTWURF).count(),
+        "fehlende_angaben": luecken.zaehlen(patienten, e),
+        "gewicht_fehlt_monate": e.gewicht_fehlt_monate,
+        "bestaetigung_fehlt": [],
+        "ohne_ort": [],
+    }
+    if erfassen and e.terminbestaetigung_anbieten:
+        kandidaten = termine.filter(art=Termin.Art.PRAXISTERMIN, bestaetigung_am__isnull=True,
+                                    faellig_am__range=(heute + timedelta(days=1),
+                                                       heute + timedelta(days=BESTAETIGUNG_TAGE)))
+        kandidaten = kandidaten.filter(~Q(patient__email="") | (
+            ~Q(patient__strasse="") & ~Q(patient__plz="") & ~Q(patient__ort="")))
+        daten["bestaetigung_fehlt"] = t(kandidaten)
+    if erfassen:
+        # wie das Infoblatt an die Praxis (F177): Praxistermine ohne Ort fehlen dort
+        _, ohne = infoblatt.aufteilen(luecken.ort_termine(patienten.values_list("id", flat=True))
+                                      .filter(id__in=termine.values("id")).select_related("patient", "ort"),
+                                      infoblatt.praxisort())
+        daten["ohne_ort"] = TerminSerializer(ohne[:50], many=True).data
+    return daten
+
+
 def startseite_daten(user):
     from accounts.api import notfallcodes_stand
     from infusionen.models import Infusionsplan
     from stammdaten.models import Einstellungen
+
+    from .infoblatt import erinnerung as infoblatt_erinnerung
 
     heute = timezone.localdate()
     e = Einstellungen.aktuell()
@@ -2047,6 +2176,10 @@ def startseite_daten(user):
         },
         # S08: Hinweis „Nur noch n Notfall-Codes übrig“ für die angemeldete Person
         "notfallcodes": notfallcodes_stand(user),
+        # F177: „Praxis … informieren“ vor dem nächsten Zeitraum, solange dafür noch kein Infoblatt erstellt ist
+        "infoblatt": infoblatt_erinnerung(user),
+        # F184: „Heute zu tun“ – ohne Testpatienten (für Testzugänge: nur Testpatienten) und ohne abgeschlossene Akten
+        "tagesliste": tagesliste(user, statistik, stat_termine, stat_wieder, e),
         # Kopfzeile (O-07): Zustand der Sicherungen vom Systemagenten – für alle sichtbar, ohne Zugangsdaten
         "sicherung": sicherung_kurz(),
     }
@@ -2078,6 +2211,8 @@ class KalenderViewSet(viewsets.ViewSet):
     permission_classes = [recht("akten_lesen")]
 
     def list(self, request):
+        from stammdaten.models import Einstellungen
+
         from .kalender import MAX_TAGE, faelligkeiten, feiertage_zwischen
 
         p = request.query_params
@@ -2111,6 +2246,8 @@ class KalenderViewSet(viewsets.ViewSet):
             "faelligkeiten": [],
             "grenzen": {},
             "feiertage": feiertage_zwischen(von, bis),
+            # Infoblatt an die Praxis (F177): Vorschlag für den Zeitraum im Dialog (nächste Woche oder nächster Monat)
+            "infoblatt_rhythmus": Einstellungen.aktuell().infoblatt_rhythmus,
         }
         if str(p.get("faelligkeiten", "1")).lower() not in ("0", "false", "nein"):
             daten["faelligkeiten"], daten["grenzen"] = faelligkeiten(patienten, bis)
@@ -2118,13 +2255,19 @@ class KalenderViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], permission_classes=[EintragRecht])
     def ankuendigung(self, request):
-        """Patientenankündigung für die Sprechstunden (F173): alle Praxistermine im Zeitraum, nach Tag und Uhrzeit.
+        """Infoblatt an die Praxis (F177, vorher Patientenankündigung F173): Praxistermine im Zeitraum, nach Tag und
+        Uhrzeit.
 
-        ``{"von", "bis", "ort"?, "ausgabe": "pdf"|"email"|"eml", "anlagen"?, "betreff"?, "text"?, "an"?}`` –
-        ``ort`` ist der Terminort der Sprechstunde (Termine an anderen Orten, z. B. „Telefon“, stehen mit diesem Ort
-        als Hinweis in der Liste). Testpatienten erscheinen nicht; ausgeblendete Termine auch nicht."""
+        ``{"von", "bis", "ort"?, "telefon_mit"?, "ausgabe": "liste"|"pdf"|"email"|"eml", "anlagen"?, "betreff"?,
+        "text"?, "an"?}`` – mit ``ort`` stehen nur die Praxistermine an diesem Ort auf dem Blatt, mit ``telefon_mit``
+        zusätzlich Telefon- und Videotermine (mit Telefonnummer als Hinweis); Praxistermine ohne Ort fehlen und stehen
+        in der Vorschau als Warnung. Ohne ``ort`` alle Praxistermine. Testpatienten und ausgeblendete Termine
+        erscheinen nicht. ``liste`` liefert die Vorschau als JSON (patienten/infoblatt.py); PDF und E-Mail (.eml)
+        werden mit einem Schnappschuss der Termine gemerkt – außer mit ``"vorschau": true`` („PDF ansehen“)."""
         from vorlagen.felder import Kontext
         from vorlagen.schreiben import ausgeben
+
+        from . import infoblatt
 
         d = request.data
         von, bis = _datum(str(d.get("von") or "")), _datum(str(d.get("bis") or ""))
@@ -2143,18 +2286,24 @@ class KalenderViewSet(viewsets.ViewSet):
                                              liste=Auswahlwert.Liste.TERMINORT).first()
             if ort is None:
                 fehler["ort"] = "Unbekannter Terminort."
+        telefon_mit = d.get("telefon_mit", False)
+        if not isinstance(telefon_mit, bool):
+            fehler["telefon_mit"] = "Ja oder nein (true/false)."
+        ausgabe = d.get("ausgabe", "pdf")
         if fehler:
             return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
-        termine = list(sichtbare_termine(Termin.objects.filter(
-            patient__in=patienten_fuer(request.user).filter(ist_test=False), art=Termin.Art.PRAXISTERMIN,
-            faellig_am__range=(von, bis))).select_related("patient", "ort")
-            .order_by("faellig_am", F("uhrzeit").asc(nulls_last=True), "id"))
+        if ausgabe == "liste":
+            return Response(infoblatt.vorschau(request.user, von, bis, ort, telefon_mit))
+        termine, _ = infoblatt.aufteilen(infoblatt.praxistermine(request.user, von, bis), ort, telefon_mit)
         kontext = Kontext(patient=None, zeitraum=(von, bis), terminort=ort, termine=termine, benutzer=request.user)
         dateiname = f"Patientenankuendigung-{von:%Y-%m-%d}"
         antwort, pdf = ausgeben(request, "patientenankuendigung", kontext, dateiname,
                                 f"Patientenankündigung {von:%d.%m.%Y}–{bis:%d.%m.%Y}")
-        if pdf is not None:
+        if pdf is not None and antwort.status_code == 200:
+            # „PDF ansehen“ im Dialog (``vorschau``) gilt nicht als verschickt
+            if d.get("vorschau") is not True:
+                infoblatt.merken(request.user, von, bis, ort, telefon_mit, ausgabe, termine)
             protokolliere(SystemEreignis.Art.EXPORT, request, objekt="Patientenankündigung",
-                          was="Patientenankündigung", von=str(von), bis=str(bis), termine=len(termine),
-                          ausgabe=d.get("ausgabe", "pdf"))
+                          was="Infoblatt an die Praxis", von=str(von), bis=str(bis), termine=len(termine),
+                          ausgabe=ausgabe)
         return antwort

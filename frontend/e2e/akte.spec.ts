@@ -130,7 +130,7 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   await editor.fill("Kurzdarmsyndrom nach Resektion");
   await diagnose.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Notizen gespeichert.")).toBeVisible();
-  await expect(diagnose).toContainText("Version 1");
+  await expect(diagnose).toContainText("Fassung 1");
 
   await diagnose.getByRole("button", { name: "Bearbeiten" }).click();
   await editor.click();
@@ -140,7 +140,7 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   await page.keyboard.type("Typ II");
   await diagnose.getByRole("button", { name: "Speichern" }).click();
   await expect(diagnose.locator(".richtext strong")).toHaveText("Typ II");
-  await expect(diagnose).toContainText("Version 2");
+  await expect(diagnose).toContainText("Fassung 2");
 
   // Therapie: eigener Reiter, links die Fassungen, rechts der Text; bei leerem Text ist der Editor direkt offen (F121/F122)
   await oeffnen(page, p.id, "/therapie");
@@ -223,7 +223,7 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   await expect(neu.getByRole("textbox", { name: "Notiz" })).toContainText("Appetit schlechter");
   // Kontaktart (Klärung U6 vom 03.10.2026)
   await neu.getByLabel("Kontaktart").selectOption({ label: "Telefon (angerufen)" });
-  await neu.getByLabel("Wiedervorlage anlegen").check();
+  await neu.getByLabel(/^Wiedervorlage.*anlegen$/).check();
   // Vorgabe: Wiedervorlage in 14 Tagen (unter Vorlagen › Grenzwerte einstellbar)
   await expect(neu.getByRole("button", { name: "in 2 Wochen" })).toHaveClass(/akzent/);
   await neu.getByRole("group", { name: "Art" }).getByRole("button", { name: "Rückruf" }).click();

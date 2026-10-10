@@ -10,7 +10,6 @@ wiederherstellen) gehen wie unter Administration › System als Auftragsdatei an
 """
 import hashlib
 import hmac
-import os
 import re
 import uuid
 from datetime import timedelta
@@ -39,6 +38,37 @@ UPLOAD_TEIL = 4 * 1024 * 1024                    # Bytes je Anfrage beim Hochlad
 UPLOAD_MAX = 200 * 1024 ** 3                     # größte Sicherung, die sich hochladen lässt
 
 
+ZEITPLAN_STANDARD = {"uhrzeit": "02:00", "tage": "taeglich", "eingestellt": False}
+ZEITPLAN_VERZUG_H = 3          # so lange darf es nach der Sicherung dauern, bis das Übertragungsfenster offen ist
+
+
+def _minuten(hhmm: str) -> int:
+    return int(hhmm[:2]) * 60 + int(hhmm[3:])
+
+
+def zeitplan_hinweis(uhrzeit: str, ziel: dict | None) -> str:
+    """Verträgt sich die Uhrzeit der Sicherung mit dem Zeitfenster der Übertragung? Leer = ja. Übertragen wird nur im
+    Zeitfenster; liegt es lange nach der Sicherung (oder endet es gleich danach), wartet die Kopie bis zum nächsten."""
+    if not ziel or not ziel.get("eingerichtet") or not ZEIT_MUSTER.match(uhrzeit or "") \
+            or not ZEIT_MUSTER.match(ziel.get("von") or "") or not ZEIT_MUSTER.match(ziel.get("bis") or ""):
+        return ""
+    s, a, b = _minuten(uhrzeit), _minuten(ziel["von"]), _minuten(ziel["bis"])
+    if a == b:                                        # ganztägig
+        return ""
+    offen = (a <= s < b) if a < b else (s >= a or s < b)
+    if offen:
+        # Sicherung im Fenster: nur warnen, wenn bis zum Ende kaum Zeit bleibt (unter 30 Minuten)
+        if (b - s) % 1440 >= 30:
+            return ""
+        return (f"Das Übertragungsfenster ({ziel['von']}–{ziel['bis']}) endet kurz nach der Sicherung – sie wird dann meist "
+                "erst im nächsten Zeitfenster übertragen.")
+    verzug = (a - s) % 1440
+    if verzug <= ZEITPLAN_VERZUG_H * 60:
+        return ""
+    return (f"Das Übertragungsfenster ({ziel['von']}–{ziel['bis']}) öffnet erst {verzug // 60} Stunden nach der Sicherung – "
+            "bis dahin liegt die neue Sicherung nur auf dem Server. Besser die Sicherung kurz vor oder im Zeitfenster.")
+
+
 def buendel_name(stempel: str) -> str:
     return f"epm-sicherung_{stempel}.tar"
 
@@ -55,26 +85,11 @@ def bereitgestellt(daten=None) -> list:
 
 
 def uploads() -> list:
-    """Hochgeladene, noch nicht eingelesene Sicherungen: [{upload, name, groesse, erhalten, vollstaendig, von, …}]"""
-    ordner = host.ordner_upload()
-    liste = []
-    try:
-        namen = sorted(n for n in os.listdir(ordner) if n.endswith(".json"))
-    except OSError:
-        return liste
-    for n in namen:
-        kennung = n[:-5]
-        meta = host._lies(ordner / n)
-        if not ID_MUSTER.match(kennung) or not isinstance(meta, dict):
-            continue
-        try:
-            erhalten = os.stat(ordner / f"{kennung}.teil").st_size
-        except OSError:
-            continue
-        liste.append({"upload": kennung, "name": str(meta.get("name") or ""), "groesse": meta.get("groesse"),
-                      "erhalten": erhalten, "vollstaendig": erhalten == meta.get("groesse"),
-                      "von": str(meta.get("von") or ""), "begonnen_am": meta.get("begonnen_am")})
-    return liste
+    """Hochgeladene, noch nicht eingelesene Sicherungen: [{upload, name, groesse, erhalten, vollstaendig, von, …}]
+    (Update-Pakete und OCR-Modelle aus Administration › System stehen nicht hier)."""
+    from .hochladen import liste
+
+    return liste(("sicherung",))
 
 
 

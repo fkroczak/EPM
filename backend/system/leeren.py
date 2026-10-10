@@ -3,7 +3,8 @@ Datenbank leeren (Festlegung 03.10.2026, U27): vor dem Go-live alles aus der Tes
 ein leeres System übernommen werden können.
 
 Weg: alle Akten (echte und Testpatienten) mit Einträgen, Plänen, Dokumenten und Historie, die Dateien, das
-Löschprotokoll und die Löschliste, Merklisten, der Stand des Altdaten-Imports, Versorger mit Ansprechpartnern, Ärzte,
+Löschprotokoll und die Löschliste, Merklisten, alle Scans mit ihren Dateien (auch nicht zugeordnete – sie enthalten
+Patientendaten), was die Texterkennung gelernt hat, die gemerkten Infoblätter an die Praxis, der Stand des Altdaten-Imports, Versorger mit Ansprechpartnern, Ärzte,
 alle Benutzer außer den ausgewählten (das eigene Konto bleibt immer) und das Audit-Log.
 Bleiben: Präparate, Auswahllisten, Grenzwerte und Einstellungen, Briefkopf und Logo, Dokumentvorlagen, Rechte der
 Gruppen, Hilfe-Ergänzungen, Sicherungen. Musterdaten (Testpatienten) werden danach nicht mehr automatisch angelegt.
@@ -25,6 +26,7 @@ def umfang() -> dict:
     """Was beim Leeren entfernt würde – für die Rückfrage in der Oberfläche."""
     from altimport.models import Importlauf
     from patienten.models import Dokument, Kontakt, Loeschprotokoll, Patient
+    from scans.models import Scan
     from stammdaten.models import Arzt, Versorger
 
     return {
@@ -36,6 +38,7 @@ def umfang() -> dict:
         "versorger": Versorger.objects.count(),
         "aerzte": Arzt.objects.count(),
         "importlaeufe": Importlauf.objects.count(),
+        "scans": Scan.objects.count(),
     }
 
 
@@ -66,7 +69,9 @@ def datenbank_leeren(ausfuehrend, behalten: list[int]) -> dict:
     from altimport.models import Alttabelle, Importlauf, Importobjekt, Importstand
     from audit.models import SystemEreignis
     from patienten.datenschutz import akten_entfernen
-    from patienten.models import Akteneinsicht, Loeschprotokoll, Merkeintrag, Patient
+    from patienten.models import Akteneinsicht, Ankuendigung, Loeschprotokoll, Merkeintrag, Patient
+    from scans import lernen
+    from scans.models import Scan
     from stammdaten.models import Ansprechpartner, Arzt, Einstellungen, Versorger
 
     zahlen = umfang()
@@ -74,9 +79,12 @@ def datenbank_leeren(ausfuehrend, behalten: list[int]) -> dict:
     weg = list(User.objects.exclude(pk__in=bleiben))
     with transaction.atomic(), wartungsmodus():
         akten_entfernen(list(Patient.objects.values_list("id", flat=True)))
-        for modell in (Merkeintrag, Akteneinsicht):
+        for modell in (Merkeintrag, Akteneinsicht, Ankuendigung):
             modell.objects.all().delete()
         Loeschprotokoll.objects.all().delete()
+        # Scans enthalten Patientendaten, auch solange sie keiner Akte zugeordnet sind; das Gelernte beginnt neu
+        Scan.objects.all().delete()
+        lernen.leeren()
         if hasattr(Loeschprotokoll, "history"):
             Loeschprotokoll.history.all().delete()
         # Altdaten-Import: Stand, Dump und Läufe – die Übernahme beginnt danach von vorn
@@ -109,6 +117,16 @@ def datenbank_leeren(ausfuehrend, behalten: list[int]) -> dict:
             if eintrag.is_dir() and not eintrag.is_symlink():
                 shutil.rmtree(eintrag, ignore_errors=True)
             elif eintrag.is_file():
+                eintrag.unlink(missing_ok=True)
+    # Dateien der Scans (der Stand des OCR-Dienstes in „.dienst“ bleibt)
+    scans = Path(settings.EPM_SCANS)
+    if scans.is_dir():
+        for eintrag in scans.iterdir():
+            if eintrag.name.startswith("."):
+                continue
+            if eintrag.is_dir() and not eintrag.is_symlink():
+                shutil.rmtree(eintrag, ignore_errors=True)
+            elif eintrag.is_file() or eintrag.is_symlink():
                 eintrag.unlink(missing_ok=True)
     liste = Path(settings.EPM_LOESCHLISTE)
     if liste.exists():

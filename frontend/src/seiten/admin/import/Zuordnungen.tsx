@@ -138,7 +138,7 @@ function BenutzerTeil({ stand, bestand, rollen, speichern }: { stand: Zuordnungs
   return (
     <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="zuordnung-benutzer">
       <KartenKopf titel="Benutzer und Bearbeiter"
-        unter="Namen aus der Benutzertabelle und aus „bearbeitet von“. Konten entstehen ohne Kennwort – danach unter Benutzer ein Einmal-Kennwort erzeugen. Historische Benutzer können sich nie anmelden; sie stehen nur als Bearbeiter an alten Einträgen." />
+        unter="Namen aus der Benutzertabelle und aus „bearbeitet von“. Konten entstehen ohne Passwort – danach unter Benutzer ein Einmal-Passwort erzeugen. Historische Benutzer können sich nie anmelden; sie stehen nur als Bearbeiter an alten Einträgen." />
       {stand.benutzer.length === 0 ? <Leer>Im Dump kommen keine Benutzer vor.</Leer> : (
         <table className="tabelle">
           <thead><tr><th className="th">Im Altsystem</th><th className="th w-[5.625rem]">Einträge</th><th className="th w-[15.625rem]">Im EPM</th><th className="th">Angaben</th><th className="th w-[9.375rem]" /></tr></thead>

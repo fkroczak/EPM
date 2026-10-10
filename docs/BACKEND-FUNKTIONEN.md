@@ -1,6 +1,6 @@
 # EPM – Nachweis der Backend-Funktionen
 
-Stand: 09.10.2026 · Code-Stand: Scans und Texterkennung (F160–F171); Passkey und Telefon (F130–F134); Wünsche aus der Praxis vom 06./07.10.2026 (F110–F124); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
+Stand: 10.10.2026 · Code-Stand: Automatisierungen für die Pflege (F184–F186); Infoblatt an die Praxis (F177); Schreiben mit E-Mail (F172–F176); Scans und Texterkennung (F160–F171); Passkey und Telefon (F130–F134); Wünsche aus der Praxis vom 06./07.10.2026 (F110–F124); Fehlerliste vom 02.10.2026 (F98–F106, geändert F03, F05, F09, F20, F31, F52, F72, F85, F86, F97); Runde 7 (Startseite und Oberfläche S01–S17, F90–F97); Runde 6 (Altdaten übernehmen, F65: Werkzeug Administration › Import); Runde 5 (Datensicherung aus der Oberfläche, F61–F64, O-07, O-23, O-24); Runde 4 (Datenschutz nach DSGVO, F74–F83; davor Runde 3 bis `e74f4ff`: PDF-Erzeugung,
 Dokumentvorlagen, Rückmeldungen aus dem Testsystem, falsch zugeordnete Dokumente, Löschen nach Art. 17 DSGVO) ·
 Grundlage: Altsystem-Datenanalyse mit Entscheidungen, Entwurf „EPM Oberfläche“ (23 Ansichten), „EPM-Server Aufbau“,
 Festlegung zu den Rechten vom 01.10.2026, Prüfung nach DSGVO vom 02.10.2026 (`docs/DATENSCHUTZ.md`).
@@ -48,7 +48,13 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 
 | Nr. | Funktion | Ansicht (Entwurf) | Status |
 |---|---|---|---|
+| 10.10.2026 | Vorlagen-Portal einfacher | Übersicht mit Suche, geführter Ablauf mit Live-Vorschau, Angaben per Klick, frühere Fassung wiederherstellen, als eigene Vorlage kopieren (F180). Lauf steht aus |
 | 09.10.2026 | Eigene Vorlagen | „+ Neue Vorlage“ unter Vorlagen › Dokumentvorlagen: eigene Schreiben mit E-Mail anlegen, bearbeiten, deaktivieren; in der Akte wählbar (F176). Lauf steht aus |
+| F179 | Systemverwaltung ohne SSH: Ampel, Reiter, kompakte Graphen, Sicherungen mehrfach löschen, Dienste, Versionen, Pakete, Zertifikat, Protokolle | Administration › Systemverwaltung, System, Backup | ABGESCHLOSSEN – Lauf steht aus |
+| F188 | Notfallpaket und Wiederaufbau-Plan: alles für einen Neuaufbau ohne Internet in einer Datei, Aufbauskript, Offline-Modus der Rollout-Skripte, Ampel-Kachel | Administration › System › Notfall, Systemverwaltung, Hilfe | ABGESCHLOSSEN – Lauf steht aus |
+| F181 | Akte ohne Seiten-Scrollen, kompakter Kopf, Reiter nach Bedeutung, PDF neben dem Plan, Plan nach Praxisvorgabe, PDF-Vorschau mit ungespeicherten Eingaben | Patientenakte, Infusionspläne, Plan-Editor | ABGESCHLOSSEN – Lauf steht aus |
+| F187 | Hinweise aus Labor und Gewicht im Plan-Editor (ohne Dosisvorschlag) | Plan-Editor | ABGESCHLOSSEN – Lauf steht aus |
+| F190 | Entscheidungen der Praxis: Tablet zwei Spalten, Mengen je kg einstellbar, Referenzbereiche nachtragen, Infoblatt ohne Telefontermine | Akte, Vorlagen › Grenzwerte und Labor, Plan-Editor | ABGESCHLOSSEN – Lauf steht aus |
 | F01 | Sitzungsstatus und CSRF-Token | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F02 | Anmeldung mit Benutzername und Kennwort | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F03 | Zweiter Faktor bei der Anmeldung | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
@@ -1167,7 +1173,7 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 - **Endpunkt:** `GET /api/protokoll/?gruppe=anmeldung,fehlversuch,benutzer,vorlage,backup,export,abschluss,dokument,datenschutz&benutzer&von&bis&search`
   → `[{id, zeitpunkt, art, art_name, gruppe, gruppe_name, beschreibung, benutzer, person, benutzername, objekt, details, ip, geraet}]`
 - **Logik:** `beschreibung` wie im Entwurf („Anmeldung mit 2FA“, „Falsches Passwort (3. Versuch)“, „5 falsche Passwörter in
-  4 Minuten, Konto gesperrt“, „Benutzer k.oezdemir angelegt (Mitarbeiter), Einmal-Kennwort erzeugt“, „Akte Weber, Anna
+  4 Minuten, Konto gesperrt“, „Benutzer k.oezdemir angelegt (Mitarbeiter), Einmal-Passwort erzeugt“, „Akte Weber, Anna
   (Nr. 0231) abgeschlossen, Anlass: verstorben“, „Grenzwert „Kontakt überfällig“ von 6 auf 12 Monate geändert“).
   Hinweis auf gesperrte Konten: F08.
 - **Validierung:** Recht „Audit-Log lesen“ (Standard: Mediziner, Admin); unbekannte Gruppe → 400.
@@ -3200,6 +3206,8 @@ dem Namen nach Bedarf erstellen und vorgefertigte E-Mail-Texte **mit Anhang** zu
   `Termine.Liste` (Text für die E-Mail), `Zeitraum`, `Zeitraum.von/bis`, `Terminort`, `Anzahl`.
 - **Endpunkt:** `POST /api/kalender/ankuendigung/` `{"von", "bis", "ort"?, "ausgabe", …}` (höchstens zwei Monate).
 - **Teststatus:** `vorlagen/test_schreiben.py` (Reihenfolge, Hinweis, ohne Testpatient und Wiedervorlage, .eml).
+- **Geändert durch F177 (10.10.2026):** Knopf heißt „Praxis informieren“, Dialog „Infoblatt an die Praxis“; mit
+  gewähltem Ort stehen nur noch die Termine an diesem Ort auf dem Blatt (Telefon/Video auf Wunsch).
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
 ### F174 Anlagen für E-Mails
@@ -3231,6 +3239,628 @@ dem Namen nach Bedarf erstellen und vorgefertigte E-Mail-Texte **mit Anhang** zu
   dafür keine feste Auswahl mehr (Migration `vorlagen/0005`). Endpunkte: `POST /api/vorlagen/` (anlegen),
   `PATCH /api/vorlagen/{art}/eigen/`, `GET /api/schreiben/` (wählbare Schreiben der Akte).
 - **Teststatus:** `vorlagen/test_schreiben.py::test_eigenes_schreiben`; im Browser lokal durchgespielt.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F177 Infoblatt an die Praxis (alle Termine in der Praxis Holtmeier auf einem Blatt)
+- **Anlass (10.10.2026):** Die Patientenankündigung (F173) war zu versteckt („Ankündigung“ im Kalender), und die
+  Pflegekräfte hielten sie für ein Schreiben zu einem Patienten. Gewünscht: alle Patiententermine, die im Kalender mit
+  der Praxis Holtmeier vereinbart sind, als ein Informationsblatt an die Praxis – zu einem festen Zeitpunkt.
+- **Kalender › „Praxis informieren“** (Recht „Kontakte, Gewichte, Termine, Dokumente erfassen“; Telefon: Briefsymbol
+  mit gleichlautender Beschriftung für Screenreader) öffnet **„Infoblatt an die Praxis“**: große Auswahl
+  „Nächste Woche“ (Mo–So) | „Übernächste Woche“ | „Nächster Monat“ | „Eigener Zeitraum“ (von/bis; Vorgabe je nach
+  Einstellung nächste Woche oder nächster Monat), Ort (vorbelegt: Terminort mit „Holtmeier“ im Namen) und
+  „Telefon- und Videotermine auch aufführen“. Darunter die Vorschau „Diese N Patienten stehen auf dem Infoblatt“ nach
+  Tagen mit Uhrzeit, Name (Link zur Akte) und Hinweis, Markierung **neu** bzw. „verschoben, vorher …“, „Zuletzt
+  erstellt am … von … für …“, die Termine, die auf dem letzten Blatt standen und jetzt fehlen, und ein verständlicher
+  leerer Zustand. Darunter wie bisher PDF ansehen/herunterladen und E-Mail vorbereiten (F172); ohne Termine sind die
+  Knöpfe aus.
+- **Nur Termine am gewählten Ort:** Mit Ort stehen nur Praxistermine an diesem Ort auf dem Blatt, mit `telefon_mit`
+  zusätzlich Telefon-/Videotermine (Hinweis mit Telefonnummer wie bisher), andere Orte fehlen. Praxistermine **ohne
+  Ort** fehlen und erscheinen als Warnung „Bei diesen Terminen fehlt der Ort – bitte im Termin eintragen“ mit Link zur
+  Akte und „Ort eintragen“ (öffnet den Termin, Ort ist vorgeschlagen). Ohne Ort („– alle Praxistermine –“) wie F173.
+- **Termin:** Bei Art „Praxistermin“ ist der Ort mit „Holtmeier“ im Namen vorbelegt, solange kein Ort gewählt ist
+  (auch beim Bearbeiten eines Praxistermins ohne Ort); „—“ lässt sich bewusst wählen, dann erscheint der Hinweis,
+  dass der Termin nicht auf dem Infoblatt steht.
+- **Merken, was verschickt wurde:** Modell `patienten.Ankuendigung` (Migration `patienten/0015`): erstellt am, Person,
+  von, bis, Ort, mit Telefonterminen, Ausgabe (pdf/eml), Anzahl und Schnappschuss `[{termin, datum, uhrzeit}]` –
+  **ohne Namen**. Angelegt bei „PDF herunterladen“ und „E-Mail vorbereiten“ (.eml), nicht bei der Vorschau-Liste,
+  dem E-Mail-Text und „PDF ansehen“ (`"vorschau": true` – nur angesehen, nicht verschickt). „neu“ =
+  Termin fehlt im Schnappschuss des zuletzt erstellten Blatts (gleicher Ort), das diesen Tag umfasst, oder steht dort
+  mit anderer Uhrzeit; für Tage ohne früheres Blatt ist nichts „neu“. Keine Historie (das Modell ist selbst das
+  Protokoll); das Erzeugen steht außerdem wie bisher als „Export“ im Audit-Log (nur Zeitraum, Anzahl, Ausgabe).
+- **Löschung:** Beim endgültigen Löschen einer Akte (Art. 17) und beim Zurücksetzen der Testdaten entfernt
+  `datenschutz.akten_entfernen` die Termine dieser Akte (auch aus der Historie bekannte Nummern) aus allen
+  Schnappschüssen; die Anzahl bleibt. „Datenbank leeren“ entfernt alle Infoblätter.
+- **Erinnerung auf der Startseite:** Einstellungen `infoblatt_rhythmus` (woche = nächste Kalenderwoche Mo–So |
+  monat = nächster Kalendermonat | aus) und `infoblatt_vorlauf_tage` (Standard: woche, 3 Tage; 1–6 bei wöchentlich,
+  1–27 bei monatlich), gepflegt unter Vorlagen › Grenzwerte › „Infoblatt an die Praxis“ (Migration
+  `stammdaten/0018`). Ab Beginn − Vorlauf bis zum Beginn zeigt die Startseite „Praxis Holtmeier informieren: X Termine
+  vom … bis …“ mit Knopf „Infoblatt erstellen“ (öffnet den Dialog mit genau diesem Zeitraum) – nur mit dem Recht
+  „Einträge erfassen“, nur wenn im Zeitraum Termine stehen (auch solche ohne Ort) und solange kein Blatt (dieser Ort
+  oder alle Orte) die Tage mit Terminen umfasst.
+- **Endpunkte:** `POST /api/kalender/ankuendigung/` `{"von", "bis", "ort"?, "telefon_mit"?: bool, "ausgabe":
+  "liste"|"pdf"|"email"|"eml", …}` – `liste` liefert `{von, bis, ort, telefon_mit, anzahl, termine: [{termin,
+  patient, name, datum, uhrzeit, hinweis, neu, vorher}], ohne_ort: [...], entfallen: [...], letzte: {erstellt_am,
+  von_name, von, bis, anzahl, ausgabe} | null}`. `GET /api/startseite/` → `infoblatt: {von, bis, rhythmus, anzahl,
+  ohne_ort, ort} | null`; `GET /api/kalender/` → `infoblatt_rhythmus`. Logik in `patienten/infoblatt.py`.
+- **Hilfe:** neuer Abschnitt „Infoblatt an die Praxis (alle Termine bei Dr. Holtmeier)“ (Kalender und Startseite).
+- **Teststatus:** `patienten/test_infoblatt.py` (Ortsfilter, `telefon_mit`, Vorschau-JSON, Prüfungen und Rechte,
+  Schnappschuss ohne Namen, „neu“/verschoben/entfallen, Art.-17-Löschung, Erinnerung mit Startseite, Einstellungen),
+  `vorlagen/test_schreiben.py::test_patientenankuendigung` angepasst; Browsertests `kalender.spec.ts` („Praxis
+  informieren“ mit Vorschau, Ort eintragen, PDF) und `mobil.spec.ts` (Dialog am Telefon) – Lauf steht aus.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+## V · Bedienung für Pflegekräfte (10.10.2026)
+
+Auftrag: EPM soll von Pflegekräften ohne nennenswerte IT-Erfahrung intuitiv bedient werden können. Befunde, Umsetzung
+und Empfehlungen stehen in `docs/BEDIENBARKEIT-2026-10-10.md`. Akte, Navigation und Infusionspläne werden parallel
+strukturell überarbeitet und sind hier bewusst nur in Texten berührt.
+
+### F178 Verständliche Rückmeldungen, nachsichtige Eingaben, nächste Schritte
+- **Eingaben:** Datumsfelder verstehen neben „14.03.1968“ auch „14.3.68“, „14,3,68“ (Komma vom Ziffernblock), „14/3/1968“,
+  „14-3-1968“, „14031968“, „140368“, „heute“ und „gestern“ (`eingabeDatum`, wirkt in allen Formularen). Die Uhrzeit im
+  Dialog „Kontakt erfassen“ geht auch als „10.30“, „1030“, „930“ oder „10“; ein Fehler steht jetzt am Feld Uhrzeit.
+- **Rückmeldungen:** „Kontakt erfassen“ sagt neben dem gesperrten Knopf, was fehlt („Zuerst den Patienten wählen.“ /
+  „Zum Speichern bitte eine Notiz schreiben.“). „Neuer Patient“ fasst fehlende Angaben oben zusammen, springt zum
+  ersten roten Feld und bestätigt das Anlegen mit Name und Nummer.
+- **Fehlermeldungen mit Lösungsweg:** keine Verbindung (statt der englischen Browsermeldung „Failed to fetch“), Server
+  nicht erreichbar (502/503), Zeitüberschreitung (504), Serverfehler (500), Datei zu groß (413); Anmeldung mit
+  Hinweis auf Schreibweise, Feststelltaste und Sperre nach fünf Fehlversuchen, Code mit Hinweis auf den 30-Sekunden-Wechsel;
+  Warnung bei eingeschalteter Feststelltaste im Passwortfeld. Verbindungsfehler werden wie bisher zweimal wiederholt.
+- **Leere Zustände:** Die Patientenliste ohne Treffer nennt den Suchbegriff, gibt einen Suchtipp und bietet „Alle Filter
+  entfernen“, „In abgeschlossenen Akten suchen“ und „Neuer Patient“. Die Patientenauswahl in Dialogen erklärt zu kurze
+  Eingaben und fehlende Treffer. Dokumente ohne Eintrag sagen, wie man eines ablegt; „1 Dokument“ statt „1 Dokumente“.
+- **Sprache:** „PDF/A mit unsichtbarer Textebene“, „Audit-Log“ und Programmnamen der Texterkennung (PP-OCR, Tesseract)
+  aus den Texten für die Pflege genommen (Programmnamen bleiben im Tooltip). Menüs hinter „⋯“ zeigen ihren Namen als Tooltip.
+- **Hilfe:** neue Abschnitte „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“ ganz oben; Anmelden und
+  Dokumente an die Oberfläche angeglichen („Passwort“, „Weiter“, „Neues Dokument“); zweizeilige Einträge im Inhalt der
+  Hilfe überlappen nicht mehr. Aufzählungen in formatiertem Text (Notizen, Hilfe) zeigen wieder Punkte bzw. Nummern.
+- **„Passwort“ statt „Kennwort“** (Entscheidung vom 10.10.2026) in allen Texten des Backends außer `vorlagen` und
+  `infusionen` (Meldungen, Audit-Texte, Hilfe, Einrichtungsbefehle) und in der Anmeldung; Bezeichner, API-Felder,
+  Modelle und Migrationen unverändert. Administration, Akte und Zugangsblatt folgen beim Abgleich.
+- **Fachbegriffe erklärt** (Entscheidung vom 10.10.2026): Baustein `<Begriff>` (Popover von Base UI; Hover, Fokus,
+  Antippen, `aria-describedby`) mit den Texten aus `lib/begriffe.ts` (BIA, Entwurf, BMI, PE, Wiedervorlage,
+  Wiedereinbestellung, GLIM, Testpatient, storniert); eingesetzt in Patientenliste, „Kontakt erfassen“ und Scans.
+- **Teststatus:** `npm run typecheck` und `npm run build` grün; Backend-Tests `accounts` (u. a. `/api/hilfe/`) grün;
+  Datums-/Uhrzeiteingabe stichprobenartig geprüft; Patientenliste, Neuer Patient, Anmeldung, Kontaktdialog und Hilfe am
+  PC (1440 px) und Telefon (390 px) per Bildschirmfoto gegen die Entwicklungsumgebung geprüft. **Browsertests: Lauf steht aus.**
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+## W · Systemverwaltung ohne SSH (10.10.2026)
+
+Auftrag: „Der Praxismanager soll sich nie wieder per SSH auf den Server schalten müssen.“ Alles, was bisher nur per SSH
+ging, läuft jetzt als Auftrag über den Systemagenten (`rollout/epm-systemagent.py`, feste Allowlist `AKTIONEN`,
+Version 5) – mit Bestätigung wie unter Tätigkeiten (Rückfrage bzw. Passwort + zweiter Faktor über
+`bestaetigung_pruefen`), mit Eintrag im Audit-Log und im Probelauf (`--trocken`) simuliert. Per SSH bleibt nur die
+Ersteinrichtung des Servers (`rollout/01…05`, `epm-git-einrichten.sh`, `epm-zertifikat einrichten` für die eigene CA).
+
+### F179 Systemverwaltung: Ampel, Reiter, kompakte Graphen, Wartung ohne SSH
+- **F179a Sicherungen mit Mehrfachauswahl löschen** (Administration › Backup › Sicherungen): Checkbox je Zeile,
+  „alle auswählen“ (außer der jüngsten), Leiste „N ausgewählt · Größe“, Knopf „N Sicherungen löschen“ → Dialog mit
+  Anzahl, Größe, Liste, Hinweis „endgültig“ und Warnung, wenn Sicherungen nirgends sonst liegen (nicht übertragen /
+  kein Ziel); Bestätigung mit Passwort und 2FA. Die **jüngste Sicherung ist nie löschbar** (Backend und Agent).
+  `POST /api/backup/loeschen/` `{"stempel": [...], "kennwort", "code"}` (Recht „Sicherungen verwalten“; 1–200 Stempel,
+  Muster `JJJJ-MM-TT_HHMM[SS]`, keine Doppelten, alle bekannt, Agent muss laufen, kein Wiederherstellen offen).
+  Agent-Aktion `sicherung_loeschen`: prüft noch einmal, sucht die Dateien über den Ordnerinhalt (dieselben Muster wie
+  die Liste), löscht nur gewöhnliche Dateien (symbolische Links werden übersprungen), nimmt die Sperre der Sicherung,
+  bricht ab, solange eine Übertragung läuft, entfernt eine bereitgelegte Download-Kopie und den Übertragungsstand.
+  Audit-Log „Backup“: Stempel, Anzahl, Größe, Zahl der unverschlüsselten, bestätigt.
+- **F179b Systemverwaltung** (`/admin`, neuer Menüpunkt, Recht Systemverwaltung oder Sicherungen verwalten): Ampel für
+  Systemagent, Dienste/Container, Speicherplatz, Ubuntu-Updates (Sicherheitsupdates, Neustart nötig), Zertifikat
+  (Ablauf < 30 Tage Hinweis, < 7 Fehler, selbst signiert Hinweis), Texterkennung, Uhrzeit/NTP, letzte Sicherung,
+  Übertragung, fehlgeschlagene Aufträge in 24 h; jede Kachel führt zum passenden Reiter. Daneben „Häufige Aufgaben“
+  (Jetzt sichern, Ubuntu-Updates, EPM aktualisieren, Server neu starten, Dienste, Software, Zertifikat, Protokolle,
+  Hinweis an alle, Benutzer, Audit-Log) und die Auslastung als kleiner Verlauf.
+- **F179c Reiter statt Endlos-Seiten**: Administration › System: Übersicht · Wartung · Software · Zertifikat ·
+  Protokolle · Anmeldungen und Hinweis · Verlauf · Testphase; Administration › Backup: Sicherungen · Verschlüsselung ·
+  Übertragung · Tätigkeiten. Reiter in der Adresse (`?reiter=…`), am Telefon seitlich wischbar
+  (`components/ui/reiter.tsx`).
+- **F179d Graphen kompakt**: CPU, Arbeitsspeicher und Platte als Zahl mit kleinem Verlauf (24 h,
+  `components/ui/sparkline.tsx`); „Größer anzeigen“ bzw. Klick auf die Karte öffnet das große Diagramm mit Zeitraum
+  im Dialog (`seiten/admin/auslastung.tsx`). Backup: Größe je Sicherung als kleine Säulen, groß im Dialog.
+- **F179e Dienste einzeln neu starten** (Wartung): backend, web, ocr, db; `POST /api/system/dienste/neustart/`
+  `{"dienst", "minuten", "hinweis"?, "kennwort", "code"}`, warnt die Angemeldeten; Agent `dienst_neustart`
+  (`docker compose restart <dienst>`).
+- **F179f Version zurückschalten** (Software): Liste der vorhandenen Versionen (Images `epm-backend`/`epm-web` vom
+  Agenten im Status, laufende aus `.env`); `POST /api/system/versionen/zurueck/` `{"tag", "minuten", …}` (Muster
+  `X.Y.Z-<commit>`, muss vollständig vorhanden und nicht aktiv sein, Agent muss laufen); Agent `epm_zurueck`: vorher
+  Sicherung (`vor_update`), dann `epm-update --zurueck TAG`.
+- **F179g Update-Paket hochladen und erstellen** (Software): Hochladen in Stücken wie bei Sicherungen
+  (`system/hochladen.py`, gemeinsam für Sicherung/Paket/OCR, Arten getrennt: ein Paket lässt sich nicht als Sicherung
+  einlesen und umgekehrt); `POST /api/system/hochladen/` `{"art": "paket"|"ocr", "name", "groesse"}`, `PUT …/<upload>/
+  ?versatz=N`, `DELETE …/<upload>/`, `POST …/<upload>/einspielen/`. Agent `epm_paket`: kopiert die Datei in einen nur
+  für root beschreibbaren Ordner (das Backend kann sie danach nicht mehr ändern), berechnet die SHA-256 (steht in der
+  Ausgabe zum Vergleich mit der Test-VM), prüft das tar (nur `TAG`, `VERSION`, `SHA256SUMS`, `images.tar`,
+  `rollout/…`, `werkzeuge/…`; keine Verweise, keine absoluten Pfade, kein „..“), dann `epm-update --paket … --ohne-tests`
+  (prüft die Prüfsummen, sichert, stellt um). `epm_paket_erstellen` (`POST /api/system/pakete/erstellen/`): `epm-update
+  --paket-erstellen`, Paket 2 Stunden unter `system/download/`; `GET /api/system/pakete/<datei>/` (X-Accel, Audit-Log).
+- **F179h OCR-Modelle einspielen** (Software): Upload Art `ocr`, Agent `ocr_modelle` prüft den Inhalt (`modelle.json`,
+  `dateien/…`) und ruft `epm-ocr-modelle einspielen` auf; Vorrat auf dem Server und Stand im Image werden angezeigt.
+- **F179i Zertifikat** (Zertifikat): Inhaber, Namen, Aussteller, Ablauf, eigene CA/selbst signiert (Agent liest
+  `nginx/certs/epm.crt` mit openssl), Stammzertifikat `/epm-ca.crt` zum Herunterladen. `POST /api/system/zertifikat/
+  erneuern/` (nur mit eigener CA; `epm-zertifikat erneuern`), `POST /api/system/zertifikat/importieren/`
+  `{"zertifikat", "schluessel", "ca"?}` als PEM: Backend prüft Lesbarkeit, Schlüssel passt, Kette zur CA
+  (cryptography); Zertifikat, Schlüssel und CA nur in der Auftragsdatei (`geheim`, 0600) – im Audit-Log nur Inhaber,
+  Aussteller, Ablauf, Fingerabdruck. Agent schreibt sie in einen temporären Ordner (0700) und ruft `epm-zertifikat
+  importieren` auf.
+- **F179j Protokolle** (nur lesend): backend, web, ocr, db (`docker compose logs --tail N`), Systemagent, nächtliche
+  Sicherung, Übertragung (`journalctl -u …`), letztes Update (`/var/log/epm-update.log`); 100/500/2000 Zeilen.
+  `POST /api/system/protokolle/` `{"quelle", "zeilen"}` → Agent `protokoll` legt den Text unter
+  `status/protokolle/<Auftrag>.log` ab (0640, Gruppe des Backends, nach 1 Stunde gelöscht) – **nicht** in der
+  Datenbank; `GET /api/system/protokolle/<kennung>/` (`?herunterladen=1` als Datei, Audit-Log). Filter in der Oberfläche.
+- **F179k Status erweitert**: Versionen, Pakete, Zertifikat, Uhrzeit/NTP (`timedatectl`), OCR-Vorrat, vorhandene
+  Werkzeuge; „Neustart nötig“ und Speicher wie bisher.
+- **Begriffe**: „Passwort“ statt „Kennwort“ in den sichtbaren Texten von Benutzer, System, Backup, Startseite
+  (Administration), Hilfe Administration/Backup; Erklärungen beim Draufzeigen für Systemagent, Container, CA,
+  Update-Paket, Übertragungsziel (`lib/begriffe.ts`).
+- **Teststatus:** Backend `system/test_verwaltung.py` (Mehrfach-Löschen: Rechte, Validierung, Pfadtricks, jüngste,
+  Agent nicht erreichbar, Audit-Log; echter Agent löscht echt und folgt keinem Verweis; Probeläufe aller neuen Aktionen;
+  Uploads mit Inhaltsprüfung inkl. Verweis/„..“/fremder Datei; Zertifikat-Import ohne Schlüssel in der Datenbank;
+  Protokolle; Stand im Status) – 112 Tests `system accounts audit` lokal grün. Browsertests `system.spec.ts` (neuer
+  Test Systemverwaltung) lokal grün gegen Vite + Django + Agent im Probelauf; `zzz-sicherung.spec.ts` (neuer Test
+  Mehrfach-Löschen) braucht den CI-Stack.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+- **F179l Zeitplan der nächtlichen Sicherung** (Nachtrag 10.10.2026; Backup › Sicherungen, „Zeitplan … Ändern“):
+  Uhrzeit (HH:MM) und täglich/werktags; `POST /api/backup/zeitplan/` `{"uhrzeit", "tage", "kennwort", "code"}` (Recht
+  „Sicherungen verwalten“, Passwort + 2FA). Agent `sicherung_zeitplan` schreibt das Drop-in
+  `/etc/systemd/system/epm-backup.timer.d/zeitplan.conf` (`OnCalendar=` leeren, dann `*-*-* HH:MM:00` bzw.
+  `Mon..Fri *-*-* HH:MM:00`), `systemctl daemon-reload`, Timer neu; der Status meldet den Zeitplan, die Seite zeigt
+  ihn und „nächste“. Warnung, wenn das Übertragungsfenster mehr als 3 Stunden nach der Sicherung öffnet oder kurz
+  danach endet (`sicherung.zeitplan_hinweis`, gleich im Dialog). Bleibt auch mit `--sicherung-echt` ein Probelauf.
+- **F179m Speicher aufräumen** (System › Wartung): Journal-Belegung (`journalctl --disk-usage`, alle 15 Minuten) und
+  Aufräumen mit fester Auswahl (`--vacuum-size` 100M/200M/500M/1G, `--vacuum-time` 2 Wochen bis 6 Monate; einfache
+  Rückfrage; `POST /api/system/journal/aufraeumen/`). Alte Versionen: Image-Dateien `images/epm-<TAG>.tar`, Update-Pakete
+  `images/epm-paket-<TAG>.tar` und Docker-Images `epm-backend/epm-web:<TAG>` mehrfach auswählbar löschen
+  (`POST /api/system/images/loeschen/` `{"dateien", "tags", …}`, Passwort + 2FA). Die laufende und die vorherige
+  Version (für „Zurückschalten“) sind geschützt – im Backend und im Agenten; ist die laufende Version nicht bekannt,
+  wird nichts gelöscht. Docker-Images werden ohne `-f` entfernt (ein benutztes lehnt docker ab).
+- **F179n Uhrzeit einstellen** (System › Wartung): Zeitzone (Allowlist aus `timedatectl list-timezones`), NTP an/aus,
+  bis zu 4 Zeitserver (Name oder IP, streng geprüft; für den abgeschotteten Betrieb z. B. die OPNsense) – je nach
+  Server als chrony-Quelle (`/etc/chrony/sources.d/epm.sources`, öffentliche Pools aus/wieder an) oder
+  systemd-timesyncd-Drop-in (`/etc/systemd/timesyncd.conf.d/epm.conf`), wie `rollout/01-basis.sh`; bei
+  ausgeschaltetem NTP Uhrzeit von Hand (`timedatectl set-time`) mit Warnung. Abweichung Server–Browser wird angezeigt.
+  `POST /api/system/uhr/` `{"zeitzone"?, "ntp", "server", "zeit"?, …}`, Passwort + 2FA.
+- **F179o OCR-Modelle einspielen** jetzt mit Passwort + 2FA wie das Update-Paket.
+- **Teststatus Nachtrag:** `system/test_verwaltung.py` Klasse `Nachtrag` (Prüfung der Eingaben, Rechte, Drop-ins für
+  Timer, timesyncd und chrony in eigenen Ordnern, Schutz der laufenden und vorherigen Version, echter Agent im
+  Probelauf); Browsertests `system.spec.ts` (Wartung: Journal, geschützte Versionen, Uhrzeit – lokal grün) und
+  `zzz-sicherung.spec.ts` (Zeitplan, braucht den CI-Stack). Agent Version 6.
+
+**Bewusst nicht umgesetzt (Empfehlungen):**
+- *Protokolle ohne Patientendaten*: Container-Protokolle können in Fehlermeldungen Inhalte enthalten; sie werden
+  deshalb nur auf Anforderung gelesen, nicht gespeichert und nach 1 Stunde gelöscht. Eine Maskierung (Namen,
+  Geburtsdaten) wäre unzuverlässig und ist nicht eingebaut.
+- *Update-Pakete signieren*: Die Prüfsummen im Paket schützen vor Beschädigung, nicht vor einem untergeschobenen Paket.
+  Schutz heute: nur mit Recht Systemverwaltung, Passwort + 2FA, SHA-256 zum Vergleich. Empfehlung: Signatur mit einem
+  Schlüssel der Test-VM, den der VPS kennt.
+
+## X · Vorlagen-Portal einfacher (10.10.2026)
+
+Wunsch: „Erweitere das Vorlagen-Portal um eine intuitivere Bedienung für Praxismanager und Krankenschwestern.“
+Zielgruppe: Pflegekräfte ohne IT-Erfahrung und ein Praxismanager mit IT-Erfahrung.
+
+### F180 Vorlagen in Alltagssprache, geführter Ablauf, Angaben per Klick, frühere Fassung, Kopie
+- **Prüfung vorher (Stolperstellen):** Startseite der Vorlagen war direkt der Briefkopf; zwölf Dokumentvorlagen als
+  eine lange Knopfreihe ohne Erklärung, wofür sie sind und wo sie benutzt werden („Bericht“ und „Unterlagen für die
+  Sprechstunde“ waren gar nicht erreichbar); Begriffe Entwurf/Version/Veröffentlichen/Baustein/Datenfeld; Platzhalter
+  als `{{Patient.Briefanrede}}` in Schreibmaschinenschrift; Datenfeld einfügen ging nur nach vorherigem Klick ins
+  Textfeld, sonst passierte nichts; Vorschau nur im Dialog; „laden“ einer Version ohne Hinweis, dass danach noch
+  gespeichert und veröffentlicht werden muss; Auswahllisten ohne Hinweis, wo sie benutzt werden; Reihenfolge nur per
+  Ziehen/Tastatur (am Tablet schwer).
+- **Vorlagen › Übersicht** (neue Startseite, Adresse `/admin/vorlagen`): Kacheln „Briefe, Formulare und E-Mail-Texte“,
+  „Briefkopf und Logo“, „Medikamente und Präparate“, „Auswahllisten“, „Labor und Diagnosen“, „Grenzwerte und
+  Fristen“, „Anlagen für E-Mails“ – je mit „Wofür?“, „Wo benutzt?“ und dem Namen im Menü. **Suche** „Was möchten Sie
+  ändern?“ über Vorlagen, Listen, Präparate, Einträge und Anlagen. Hinweis auf Vorlagen mit noch nicht freigegebenen
+  Änderungen. Jeder Bereich hat eine Adresse (`?bereich=listen&liste=vitamine`), „Zurück“ im Browser funktioniert.
+- **Dokumentvorlagen:** zuerst die **Liste** aller Vorlagen nach Gruppen (Briefe und E-Mails an Patienten, Eigene
+  Vorlagen, Pläne/Berichte/Unterlagen, Vordrucke zum Datenschutz) mit Beschreibung, „Wo benutzt“ und Stand („in
+  Gebrauch · Fassung n“, „Änderungen noch nicht freigegeben“, „Mustertext, noch nicht geprüft“, „deaktiviert“);
+  Suche. Im Editor (`?art=…`) Kopf mit Name, Zweck und Ort, **geführter Ablauf** „1 · Bearbeiten → 2 · Vorschau prüfen
+  → 3 · Freigeben“; **Live-Vorschau** (echte PDF mit wählbarem Testpatienten und E-Mail-Text) in der Mitte neben den
+  Eigenschaften, folgt jeder Änderung nach 0,7 s; der Freigabe-Dialog weist darauf hin, wenn der Stand noch nicht in
+  der Vorschau zu sehen war. In der Oberfläche heißt eine Version jetzt **Fassung** und Veröffentlichen
+  **Freigeben**; Baustein/Block heißen **Abschnitt** (API und Audit-Log unverändert).
+- **Angaben aus der Akte per Klick:** Feldeinfüger mit lesbaren Namen nach Gruppen (Patient, Termin, Absender …) und
+  Suche; ein Klick fügt auch ohne vorheriges Hineinklicken ins erste Textfeld des markierten Abschnitts ein (an der
+  Schreibmarke, wenn schon hineingeklickt wurde). Platzhalter erscheinen auf der Seite und unter dem Textfeld als
+  lesbare Chips („Briefanrede“), unbekannte rot.
+- **Frühere Fassung ansehen/wiederherstellen:** „ansehen“ zeigt die PDF der Fassung mit Testpatient, „wiederherstellen“
+  übernimmt sie als gespeicherten Entwurf (Notiz „wiederhergestellt aus Fassung n“); in Gebrauch erst nach Freigeben.
+- **Als eigene Vorlage kopieren** (Schreiben außer der Patientenankündigung): neue eigene Vorlage (F176) mit Text und
+  Aufbau der Fassung in Gebrauch, sofort in der Akte wählbar; mit Termin, wenn die Vorlage Termin-Angaben benutzt.
+- **Auswahllisten:** Gliederung „Präparate für Infusionspläne“ / „Weitere Auswahllisten“, je Liste „Wo benutzt“,
+  ▲ ▼ je Zeile für Tablet und Telefon, Suche in langen Listen, „wird angeboten“/„ausgeblendet“ mit Erklärung
+  „Ausblenden statt löschen“. Kleine **„?“-Erklärungen** an Aufbau, Fassungen, Angaben und Auswahllisten.
+- **Verlassen mit ungespeicherten Änderungen** an einer Dokumentvorlage fragt nach – auch bei „Zurück“, anderer
+  Vorlage, anderer Seite (React Router `useBlocker`) und beim Schließen/Neuladen des Fensters (`beforeunload`).
+- **Nebenbei behoben:** PDF-Anzeigen zeigten „Anzeige nicht möglich: … ArrayBuffer … already detached“, wenn pdf.js
+  dieselben Daten ein zweites Mal lud (der Puffer geht an den Worker) – im Entwicklungsmodus (StrictMode) bei jeder
+  Vorschau mit `laden`; `components/PdfAnsicht.tsx` gibt pdf.js jetzt eine Kopie.
+- **Endpunkte:** `GET /api/vorlagen/` und `/api/vorlagen/{art}/` liefern zusätzlich `gruppe`, `wofuer`, `wo`, je
+  Datenfeld `bezeichnung` und `gruppe` (`vorlagen/portal.py`; `felder.py` unverändert).
+  `POST /api/vorlagen/{art}/versionen/{n}/wiederherstellen/` (ersetzt einen vorhandenen Entwurf, geprüft mit
+  `pruefe_bloecke`, Audit-Log „Fassung n als Entwurf wiederhergestellt“).
+  `POST /api/vorlagen/{art}/duplizieren/` `{"name", "beschreibung"?, "mit_termin"?}` → 201 mit der Übersicht der neuen
+  eigenen Vorlage; 400, wenn die Vorlage Datenfelder oder Tabellen enthält, die eigene Schreiben nicht kennen.
+  Keine Migration.
+- **Teststatus:** `vorlagen/test_portal.py` (5 Tests: Beschreibungen, lesbare Felder, Wiederherstellen mit Rechten und
+  Ersetzen des Entwurfs, Kopieren, Kopieren nur mit erlaubten Feldern). Browsertests angepasst
+  (`dokumentvorlagen.spec.ts`, `admin.spec.ts`, `mobil.spec.ts`, `zz-neustart.spec.ts`) und neu „Vorlagen-Portal:
+  Suche, Angabe per Klick, geführter Ablauf, frühere Fassung, Kopie als eigene Vorlage“; lokal gegen Vite + Django
+  (PostgreSQL 16) grün, Lauf im CI steht aus.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+## Z · Texterkennung lernt mit (10.10.2026)
+
+Auftrag: Die Texterkennung (F160 ff.) soll aus den Korrekturen der Pflegekräfte lernen – Stufe 1, feste Regeln statt
+Sprachmodell, komplett offline. Dazu der Zusatzauftrag, den Patienten aus dem Scan zu erkennen. Die Prüfung, ob EPM
+zur Laufzeit etwas nach außen schickt, steht in `docs/OFFLINE-BETRIEB-2026-10-10.md`.
+
+### F182 Texterkennung lernt aus Korrekturen (gelernte Zuordnungen, Kennzahl, offline)
+- **Lernen beim Übernehmen** (`scans/lernen.py`, `aus_zuordnung`): `POST /api/scans/{id}/zuordnen/` nimmt zusätzlich
+  `herkunft` = `{"labor": [{"index": Nr. der erkannten Zeile | null, "stelle": {seite, box} | null}, …], "bia":
+  {feld: {seite, box} | null}, "diagnosen": [Nr. | null, …]}` (die Oberfläche schickt es mit). Verglichen wird, was
+  erkannt und was übernommen wurde; gelernt werden
+  - erkannte Bezeichnung → gewählter Laborparameter (auch bei Zeilen, die nur als Freitext erkannt wurden),
+  - Lesefehler in Bezeichnungen (ähnlich gelesen, z. B. „Kreatimin“ → Kreatinin; bei Diagnosen Bezeichnung und Code),
+  - von Hand ergänzte Labor- und BIA-Werte: die Bezeichnung links neben der im Bild angeklickten Zahl
+    (`auswertung.etikett_an`), z. B. „Aktive Zellen“ → BCM,
+  - je Absender (erkannter `labor_name`) die Spaltenlage der Werte (linke Kante, Zeichenbreite; ab drei
+    linksbündigen, unverändert übernommenen Werten).
+  Gespeichert wird je Absender und allgemein (`GelernteZuordnung`: Art, Quelle, erkannter Text normalisiert und wie
+  gelesen, Ziel, Bestätigungen, erstmals/zuletzt am, zuletzt von, gesperrt, Lesefehler). Wird eine gelernte
+  Zuordnung nicht übernommen, verliert sie eine Bestätigung (bei 0 entfällt sie). Testzugänge lernen nicht mit.
+- **Keine Patientendaten:** kein Bezug zu Patient, Scan oder Dokument, keine Werte, keine Namen. Bezeichnungen mit
+  Datum, langen Zahlen, Wörtern zur Person („Name“, „geb.“, „Patient“, „Straße“ …) oder dem Namen des Patienten
+  werden verworfen (`lernen.zulaessig`). Darum bleibt das Gelernte, wenn Scans, Dokumente oder Akten gelöscht werden;
+  es ist in der Datensicherung (pg_dump der ganzen Datenbank). „Datenbank leeren“ soll es mit leeren:
+  `scans.lernen.leeren()` steht bereit, der Aufruf in `system/leeren.py` fehlt noch (Bereich eines anderen Auftrags,
+  siehe Unklarheiten U74).
+- **Anwenden** (`auswertung.Gelerntes`, `_suche_parameter`): Reihenfolge sicher Gelerntes (erst dasselbe Labor, dann
+  allgemein) → Katalog und Suchbegriffe → gelernter Vorschlag → ähnliche Schreibweise. Ab `SCHWELLE` = 2
+  Bestätigungen ist eine Zuordnung sicher (vorgewählt, Hinweis „gelernt: so schon n-mal übernommen“), darunter nur
+  Vorschlag (`zuordnung: "gelernt_vorschlag"`, nicht vorgewählt, Kennzeichen „gelernt?“). Gesperrte Zuordnungen
+  („nie wieder so zuordnen“) fallen auf jeder Stufe weg, auch bei Synonymen und Ähnlichkeit; allgemein gesperrt gilt
+  für alle Labore. Gleiches für BIA-Felder und Diagnosen (sicher: korrigierte Bezeichnung und Code eingesetzt;
+  Vorschlag: Knopf „„…“?“ in der Prüfansicht). Die gelernte Spaltenlage hilft, wenn auf einer Seite zu wenige Werte
+  stehen, um die Spalte selbst zu finden (Pfeil vor dem Wert, als „1“ gelesen). Häufig bestätigte Bezeichnungen (ab
+  2, ohne Lesefehler) kommen in die Wörterliste für Tesseract (`--user-words`). In die Akte kommt weiterhin nichts
+  ohne Bestätigung.
+- **Verwalten:** Scans › „Gelernte Zuordnungen“ (`/scans?bereich=gelernt`): Liste mit Suche, Filter nach Art und
+  Labor, Sperren/Entsperren, Löschen (mit Rückfrage), Erklärung in einfacher Sprache. API: `GET /api/scans/gelernt/
+  ?suche=&art=&quelle=` (`allgemein` = nur allgemeine), `PATCH /api/scans/gelernt/{id}/ {"gesperrt": bool}`,
+  `DELETE /api/scans/gelernt/{id}/`; beides im Audit-Log (nur Bezeichnung und Ziel). Recht „Scans“ oder „Vorlagen
+  pflegen“; Testzugänge nur lesen.
+- **Messen:** Kennzahl „Wie oft musste korrigiert werden“ (`KorrekturZaehler` je Monat und Art: übernommene und davon
+  geänderte oder von Hand ergänzte Werte; nur Zahlen). `GET /api/scans/kennzahl/` → 12 Monate, aktueller Monat,
+  Vormonat, Trend in Prozentpunkten. Unten in der Scan-Liste „korrigiert im Okt.: 33,3 % ▼ 16,7“, ein Klick öffnet die
+  große Ansicht (Säulen je Monat, Tabelle je Art).
+- **Komplett offline:** EPM nutzt weder PaddleOCR noch PaddleX (die Modelle werden als ONNX mit onnxruntime gelesen),
+  es gibt keinen Programmteil, der Modelle laden könnte. Zusätzlich setzt `paddle.offline_erzwingen()` die Schalter
+  gegen Downloads und Telemetrie (Hugging Face, PaddleX), `EPM_OCR_MODELLE` muss ein Verzeichnis sein, `_sitzung`
+  öffnet nur vorhandene Dateien. Tesseract liest nur `EPM_TESSDATA` (im Image: deutsches Modell aus dem Repo, osd aus
+  dem Paket). Test `OfflineTest` erkennt eine Seite, während jeder Netzwerkzugriff verboten ist – mit PP-OCR, falls
+  die Modelle da sind, und ohne (nur Tesseract).
+- **Teststatus:** `scans/test_lernen.py` (Anwenden je Labor vor allgemein, Schwelle, Sperren/Löschen, Lernen beim
+  Übernehmen, von Hand ergänzte Werte, Diagnose/BIA, keine Personendaten, Testzugang, Kennzahl, Verwalten und
+  Rechte, Leeren, Offline) und die übrigen Tests von `scans`, `befunde`, `system`, `hilfe` grün (155 Tests,
+  nacheinander; mit `--parallel` bricht der Testrunner hier schon an `scans.test_dokumente` ab – nicht übertragbarer
+  Traceback, unabhängig von F182); lokal ohne PP-OCR-Modelle (kein Zugang zu huggingface.co), d. h. Erkennung nur mit
+  Tesseract. `npm run typecheck` und `npm run build` grün.
+  **Browsertests: Lauf steht aus.**
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F183 Scan erkennt den Patienten
+- **Lesen:** `auswertung.patient_hinweise` liest zusätzlich Namen nach „Patient:“, „Name:“, „Frau“, „Herr“, „über“,
+  „Versicherte(r)“ … (`namen`); Geburtsdaten wie bisher (auch „26.11.1970 ♀ 54 Jahre“, siehe `fusion.datum_und_alter_trennen`).
+- **Vorschlagen** (`dienst.patient_vorschlaege`, im `GET /api/scans/{id}/` als `vorschlaege`): nur Akten aus
+  `patienten_fuer` (Testzugang nur Testpatienten, eingeschränkte Akten nicht). Nachname und Vorname exakt oder mit
+  Lesefehlern (1 Fehler ab 4, 2 ab 8 Zeichen, nur unter den gelesenen Namen), Geburtsdatum exakt als starkes Merkmal;
+  passt das Geburtsdatum im Dokument nicht, sinkt der Treffer. Je Vorschlag `stufe`: „sicher“ (Name und
+  Geburtsdatum), „wahrscheinlich“, „unsicher“; `grund` in Worten („Name und Geburtsdatum erkannt“, „Name ähnlich
+  gelesen („Musler“)“, „Geburtsdatum im Dokument passt nicht“).
+- **Oberfläche:** oben in der Scan-Ansicht und beim Zuordnen „Wahrscheinlich: Erika Muster, geb. 14.03.1968 –
+  übernehmen?“ mit Begründung; mehrere Treffer als Auswahl, unsichere nur als Hinweis. Nie automatisch: Der Patient
+  wird erst mit einem Klick gewählt (die frühere Vorauswahl beim Öffnen von „Zuordnen“ entfällt), in die Akte erst
+  mit „In die Akte legen“.
+- **Datenschutz:** Die Hinweise bleiben im Server (nicht in der Antwort), werden nicht gelernt und nicht protokolliert –
+  außer im bestehenden Audit-Eintrag beim Zuordnen.
+- **Teststatus:** exakter Treffer, Lesefehler im Namen, zwei Gleichnamige mit verschiedenem Geburtsdatum, fremde
+  (eingeschränkte) Akte und Testzugang, kein Treffer (`PatientErkennenTest`) grün. **Browsertests: Lauf steht aus.**
+### F189 Erkennung verbessern: falsch erkannt anmerken, richtigen Bereich markieren
+- **Falsch erkannt** (`POST /api/scans/{id}/falsch/` `{"art": "labor"|"bia"|"diagnose", "index": Nr. bzw. BIA-Feld,
+  "grund": "falsche_zeile"|"falscher_wert"|"gehoert_nicht_dazu"}`, `lernen.falsch_erkannt`): In der Prüfansicht hat
+  jede erkannte Labor-Zeile, jeder BIA-Wert und jede Diagnose den Knopf „Falsch erkannt“ mit Grund. Wirkt sofort (die
+  Zeile verschwindet, im Scan als `verworfen` markiert, bleibt es auch bei neuer Auswertung) und lernt:
+  - *gehört nicht dazu* (Kopfzeile, Referenzbereich, Datum): Bezeichnung für diesen Absender „nicht auswerten“
+    (`GelernteZuordnung.Art.IGNORIEREN`, gilt ab der ersten Anmerkung, nur für dieses Labor bzw. ohne Labor allgemein);
+  - *falsche Zeile*: gelernte Zuordnung verliert eine Bestätigung; eine nur ähnlich geratene (bzw. ein BIA-Feld) wird
+    für diesen Absender gesperrt; ein exakter Katalogtreffer bleibt (meist ist dann die Zeile verrutscht);
+  - *falscher Wert*: nichts gelernt.
+  Gezählt als `verworfen` in der Kennzahl (`KorrekturZaehler.verworfen`). Keine Patientendaten: Bezeichnungen mit
+  Wörtern, die im Dokument als Name gelesen wurden (F183-Hinweise), Datum oder Angaben zur Person werden nicht
+  gelernt. Audit-Log nur mit Art und Grund, ohne Inhalt. Testzugänge und pausiertes Lernen: verwerfen ja, lernen nein.
+- **Richtigen Bereich markieren** (`POST /api/scans/{id}/seiten/{sid}/ausschnitt/` `{"box": [x, y, b, h]}` relativ
+  0–1, `dienst.bereich_lesen`, `scans/ocr/ausschnitt.py`): Knopf „Bereich markieren“ beim Laborbefund, dann Rahmen im
+  Bild aufziehen – mit Maus oder Finger (Pointer-Ereignisse mit `touch-action: none`, Koordinaten relativ zur
+  angezeigten Größe, also auch bei Zoom richtig; abgebrochene Touch-Gesten verwerfen den Rahmen). Der Server liest nur
+  diesen Ausschnitt mit Tesseract: Rand dazu, auf etwa 40 px Texthöhe vergrößert (höchstens 4-fach), psm 7 bei einer
+  Zeile, sonst psm 6 (Tabelle, jede Zeile ein Vorschlag), Fachwörterliste wie sonst; offline, im Backend. Die Lage
+  wird auf die ganze Seite zurückgerechnet. Die Zeilen kommen **hinten** an `auswertung.labor.werte` (die Nummern der
+  übrigen Vorschläge bleiben, die Prüfansicht fügt sie an) und in `ScanSeite.info["zusatz"]` (bleiben bei neuer
+  Auswertung; „Erneut erkennen“ verwirft sie). Ohne erkennbaren Wert erscheint der gelesene Text als Freitext, nicht
+  vorgewählt. Grenzen: Rahmen mindestens 1 % breit, innerhalb der Seite (über den Rand wird begrenzt), keine
+  unendlichen Werte, Seite erkannt, Scan nicht in Arbeit; Recht „Scans“, nur sichtbare Scans. Fehlt Tesseract: 503
+  mit verständlicher Meldung. Die Klick-ins-Bild-Funktionen (F169, „+ Wert“) bleiben für einzelne Werte.
+- **Bereich lernen:** Werden Werte aus einem markierten Bereich übernommen, merkt sich EPM den Bereich je Absender
+  (`Art.BEREICH`, nur Lage `bereich` = [x, y, b, h], ähnliche Bereiche ab 50 % Überdeckung werden gemittelt). Ab der
+  Schwelle liest der OCR-Dienst beim nächsten Befund dieses Labors den Bereich von sich aus nach
+  (`dienst.bereiche_nachlesen` nach der Erkennung) – die Auswertung findet die Werte dann dort.
+- **Steuerung des Lernens** (`GET|PATCH /api/scans/gelernt/steuerung/`, Modell `LernEinstellung`): „Lernen
+  pausieren“ (nichts Neues lernen, Gelerntes weiter anwenden, Kennzahl weiter zählen) und „Sicher ab“ 1–3
+  Bestätigungen (`lernen.schwelle()`, gilt für Anwendung, Wörterliste und Bereiche). Ändern nur mit „Vorlagen pflegen“
+  (keine Testzugänge), im Audit-Log (`lernen_gesteuert`, vorher/nachher). Zusammengefasst, wer was darf: lernen tut jedes
+  Zuordnen mit Recht „Scans“ (Testzugänge nie); ansehen, sperren, löschen mit „Scans“ oder „Vorlagen pflegen“;
+  pausieren und Schwelle mit „Vorlagen pflegen“; die Kennzahl zeigt, ob es besser wird.
+- **Anleitung:** Hilfe › Scans „So verbessern Sie die Erkennung“ (vier Schritte mit Beispielen) und „Wer darf was?“;
+  in Zuordnen der einmal eingeblendete Hinweis „So helfen Sie EPM, besser zu lesen“ (wegklickbar, über „Besser lesen
+  helfen“ wieder aufrufbar); unter „Gelernte Zuordnungen“ der Kasten „Falsches korrigieren“; Begriffe „Texterkennung“
+  und „gelernt“ in `lib/begriffe.ts`; Blatt zum Ausdrucken `docs/SCANS-VERBESSERN.md`.
+- **Teststatus:** `scans/test_verbessern.py` (Ausschnitt wirklich mit Tesseract gelesen: Tabelle zeilenweise, Werte,
+  Lage innerhalb des Rahmens; Grenzen, Rechte, fremde Seite; Bereich gelernt und beim nächsten Befund nachgelesen;
+  „falsch erkannt“: ignorieren je Labor, sperren, Bestätigung weniger, falscher Wert, BIA, Diagnose, keine
+  Personendaten, pausiert, Testzugang, Fehler; Steuerung mit Recht, Grenzen und Audit-Log) grün, dazu `scans` und
+  `befunde` (`--parallel 1`). Browsertests in `scans.spec.ts` ergänzt (falsch erkannt, Bereich mit Maus und mit
+  Touch-Ereignissen, Steuerung) – **Lauf steht aus** (hier kein Docker).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+## Y · Akte entschlankt (10.10.2026)
+
+Wunsch: „Vor allem soll die Patientenakte deutlich entschlankt werden. Unterpunkte wie Diagnosen, Therapien und
+Empfehlungen sowie die Infusionspläne sollen einfacher erreichbar sein. Im besten Fall muss man auf der Seite nicht
+scrollen. Beim Infusionsplan sollen die PDFs einfach einsehbar sein, und die Pläne sollen sich nach den Vorgaben der
+Praxis erstellen lassen.“ Befunde, Messung vorher/nachher und Rückfragen: `docs/UI-UX-AKTE-2026-10-10.md`.
+
+### F181 Akte ohne Seiten-Scrollen, PDF neben dem Plan, Plan nach Praxisvorgabe
+- **Kopf (Ansicht „Kopfzeile“, Stufe „Alle Angaben“):** Name, Nummer, Geschlecht (Buchstabe, ausgeschrieben im Tooltip),
+  Geburtsdatum und Knöpfe in einer Zeile; vier Kennzahlen zweizeilig; Versorgung/Hinweise eine Zeile, unter 1280 px
+  hinter „Versorgung und Hinweise ▾“. Knopf **Dokument** im Kopf (vorher „⋯ › Dokument hochladen …“). Gruppen und
+  Testkennungen (`kennzahlen`, Gruppen „Ernährung“, „Versorgung“ …) unverändert. Bei 1366 × 768 endet der Kopf bei
+  258 px statt 346 px.
+- **Reiter:** Übersicht, Diagnosen, Therapie, Empfehlung, Infusionspläne, Kontakte groß; Labor, BIA, Berichte,
+  Dokumente kleiner nach einem Strich; Verlauf und Datenschutz klein am rechten Rand. Alle bleiben eigene Reiter
+  (F121); Alt+Ziffer folgt der neuen Reihenfolge.
+- **Fenster füllen (ab 1024 × 600 px, seit F190 ab 1280 × 600 px):** `Seite fuellen` (Shell) begrenzt die Seite auf die Fensterhöhe; unter den
+  Reitern liegt `.akte-flaeche`, die bei Bedarf scrollt; Reiter mit zwei Spalten (`.akte-spalten`: Diagnosen,
+  Therapie, Empfehlung, Kontakte, Infusionspläne, Labor, BIA, Berichte, Dokumente, Datenschutz) scrollen ab 1280 px je
+  Spalte. Kopf und Reiter bleiben stehen. Darunter (Telefon, Tablet hochkant) scrollt die Seite wie bisher.
+- **Übersicht:** sechs Karten statt neun (Gewicht · Aktueller Infusionsplan · Diagnosen, Therapie, Empfehlung ·
+  Kontakte und Termine · Labor und BIA · Personen und Anschrift). Spalten nach der tatsächlichen Breite (1366 px: 3,
+  1920 px: 4); im Fenster zwei Reihen mit fester Höhe (`--raster-zeile` aus der verfügbaren Höhe, auf das 8-px-Raster
+  gerundet), Inhalt scrollt in der Karte. Größe je Karte weiter über das Menü (je Person); Standardhöhe im Fenster
+  1 Zeile. Gewichtsdiagramm zeichnet in der echten Größe (`GewichtsDiagramm masse`). Plan-Karte mit „PDF ansehen“ und
+  Hinweis auf einen offenen Entwurf.
+- **Akte › Infusionspläne:** PDF in voller Spaltenhöhe neben der Liste (`PdfLeser einpassen`: „Ganze Seite“, sonst auf
+  die Breite, wenn die Seite sonst unter 360 px schmal wäre), „Groß ansehen“, „Herunterladen“; Herkunft
+  (gespeicherte PDF mit Prüfsumme bzw. Ansicht mit aktiver Dokumentvorlage) darunter; Umschalter „Vergleich mit
+  Vorgänger“ mit Zahl der Änderungen.
+- **Menüpunkt Infusionspläne:** „PDF“ an jedem Plan (Entwürfe: `ansicht/`); ab 1920 px rechts neben der Tabelle.
+- **Plan-Editor:** „Mengen nach Praxisvorgabe“ (je kg des letzten Gewichts wie im Altsystem, `GET …/vorbelegung/`) auch
+  beim Folgeplan; Karte **Prüfung vor der Freigabe** (Gewicht vorhanden/≤ 3 Monate, seit F190 6 Monate und einstellbar, Präparat zu jeder Menge, Ca/Mg
+  stabil, Infusionstage stimmig, Laufzeit, Protonenpumpenhemmer mit Zeiten); **PDF-Vorschau** mit den Eingaben im
+  Formular auf jeder Bildschirmgröße (neuer Plan: einmal als Entwurf gespeichert).
+- **Hinweise im Kopf (Nacharbeit 10.10.2026):** ein Hinweis steht direkt als Chip da; ab zwei Hinweisen ein Chip
+  „N Hinweise ▾“ (rot und „· n überfällig“, wenn Überfälliges dabei ist), der die Liste mit den einzelnen Chips und
+  ihrem „×“ aufklappt (Ausblenden über den RuheDialog, F119). Am Telefon stehen die Hinweise unter „Versorgung und
+  Hinweise (N) ▾“. Gemessen mit einer Akte mit 5 Hinweisen und 3 fehlenden Erklärungen: 1366 × 768, 1920 × 1080 und
+  1024 × 768 ohne Seiten-Scrollen (vorher auch, aber Kopf mit sieben Chips in zwei Zeilen, Ende bei 297 px; jetzt
+  271 px, eine Chipzeile). `HinweisChipsKompakt` in `components/HinweisChips.tsx`; Browsertest `layout.spec.ts`.
+- **Navigation:** Administration ab drei Seiten als Gruppe zum Aufklappen (`nav-administration`, gemerkt je Browser,
+  auf `/admin…` offen); Routen unverändert.
+- **PDF-Anzeige:** pdf.js als „legacy“-Fassung aus demselben Paket (keine neue Abhängigkeit) – mit der Standardfassung
+  blieben Seiten in nicht ganz aktuellen Browsern (Chromium 141) beim Laden stehen.
+- **Endpunkt:** `POST /api/infusionsplaene/{id}/vorschau/` – Body wie `PATCH`; nur Entwürfe (sonst 400), Recht
+  „Infusionspläne anlegen“, Akte offen; Prüfung wie beim Speichern (400 mit Feldfehlern). Die Werte werden in einer
+  Transaktion eingetragen, die PDF mit der aktiven Vorlage erzeugt (Wasserzeichen „ENTWURF“), danach wird
+  zurückgerollt – keine Änderung, keine neue Fassung im Verlauf. Antwort `application/pdf`, Kopf
+  `X-EPM-Vorlage-Version`. Keine Migration.
+- **Teststatus:** Backend `infusionen.tests.PlanVorschau` (Vorschau zeigt die Eingabe, Datenbank und Verlauf
+  unverändert, Wasserzeichen; Prüfung wie beim Speichern, ohne Recht 403, freigegebener Plan 400) – grün, alle
+  `infusionen`-Tests grün (17). Browsertests angepasst: `layout.spec.ts` (neu: 1366 × 768 und 1920 × 1080 ohne
+  Seiten-Scrollen, sechs Karten, Kopf bleibt stehen), `oberflaeche.spec.ts` (sechs Karten, Standardhöhe),
+  `plaene.spec.ts` (PDF neben der Liste, Herunterladen, Groß ansehen), `dokumente.spec.ts` (Knopf „Dokument“),
+  Administration aufklappen (`hilfen.adminNavigation` in `admin`, `system`, `aa-import`, `zz-neustart`,
+  `zzz-sicherung`, `zzzz-leeren`), Begriffe in Beschriftungen (`akte`, `oberflaeche`, `praxiswuensche`). Lokal gegen
+  Vite + Django (PostgreSQL 16, Chromium 141) grün: `layout`, `akte` (bis auf den Neustart über Docker),
+  `aktenansicht`, `plaene`, `infusionsplaene`, `mobil`, `dokumente`, `praxiswuensche`, `oberflaeche` bis auf
+  „Volle Breite: 1280 px“ (Startseite, Breite von `main` um die Scrollleiste zu klein – nicht von F181 berührt).
+  CI-Lauf steht aus.
+## AA · Automatisierungen für die Pflege (10.10.2026)
+
+Ziel: Automatisierungen nehmen der Pflege Arbeit ab, versenden aber nie von allein etwas und schreiben nichts
+ungefragt in die Akte – am Ende entscheidet immer ein Klick der Pflegekraft. Alles läuft offline.
+
+### F184 Tagesliste „Heute zu tun“ (Startseite)
+- **Oberfläche:** Bereich „Heute zu tun“ ganz oben auf der Startseite für alle mit „Akten lesen“ außer der
+  Administration (deren Startseite bleibt unverändert). Kurze, priorisierte Liste mit Anzahl: Termine heute (Uhrzeit,
+  Patient, Ort; „erledigt“ zum Abhaken), fällige oder überfällige Rückrufe und Wiedervorlagen (abhaken), Infoblatt an
+  die Praxis fällig (Knopf „Infoblatt erstellen“, ersetzt den bisherigen Einzelhinweis aus F177), Terminbestätigung
+  fehlt (F185, Knopf „Bestätigung vorbereiten“), überfällige Kontakte ohne geplanten Termin (Grenze aus den
+  Einstellungen, zur gefilterten Patientenliste), Infusionspläne zur Prüfung, Scans zum Zuordnen (ersetzt „Scans
+  warten auf Zuordnung“ im Scan-Hinweis; Warnungen zu Ablauf und Speicher bleiben dort), Praxistermine ohne Ort
+  (Knopf „Ort eintragen“ öffnet den Termin) und fehlende Angaben (F186, je Regel „3 Akten ohne Telefonnummer“ mit Klick
+  auf die gefilterte Liste). Je Gruppe höchstens drei Einträge, danach „… und n weitere“. Erledigtes verschwindet
+  sofort; leer: „Für heute ist alles erledigt.“ Fachbegriffe (Wiedervorlage, Wiedereinbestellung) mit Erklärung
+  (`Begriff`). Kacheln und Kennzahlen darunter bleiben, wie jede Person sie eingerichtet hat.
+- **Endpunkt:** `GET /api/startseite/` liefert zusätzlich `tagesliste` (`patienten/api.py: tagesliste`):
+  `termine_heute`, `rueckrufe` (+ `rueckrufe_anzahl`, `rueckrufe_ueberfaellig`), `kontakt_ueberfaellig`,
+  `kontakt_monate`, `plaene_pruefen`, `fehlende_angaben` (Anzahl Akten je Regel), `gewicht_fehlt_monate`,
+  `bestaetigung_fehlt` und `ohne_ort` (beide nur mit „Einträge erfassen“). Ohne Testpatienten (Testzugänge: nur
+  Testpatienten) und ohne abgeschlossene Akten. Offene Scans holt die Oberfläche wie bisher aus `GET /api/scans/stand/`.
+- **Teststatus:** `patienten/test_automatisierungen.py` › `Tagesliste` (Inhalt ohne Testpatienten und abgeschlossene
+  Akten, Erledigtes verschwindet, Rechte, Testzugang, Einstellung). Browsertest `start.spec.ts` „Heute zu tun“.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F185 Terminbestätigung automatisch vorbereiten
+- **Ablauf:** Speichert die Pflegekraft einen neuen Praxistermin oder verschiebt ihn (Datum, Uhrzeit, Ort, Art) für
+  einen Patienten mit vollständiger Anschrift oder E-Mail-Adresse, fragt EPM direkt danach „Terminbestätigung an Frau
+  X schicken?“ (`components/TerminBestaetigung.tsx`, aus `TerminDialog` – damit überall, wo Termine gespeichert
+  werden: Startseite, Kalender, Akte). „Ja, Bestätigung vorbereiten“ öffnet „Schreiben und E-Mail“ (F172) mit Art
+  „terminbestaetigung“ und genau diesem Termin; „Nicht jetzt“ schließt. Im Termin steht „Terminbestätigung: fehlt“
+  bzw. „erstellt am …“ mit Knopf „Bestätigung erstellen“/„Erneut erstellen“.
+- **Vermerk:** `Termin.bestaetigung_am`, `bestaetigung_von` (Migration `patienten/0016`). Gesetzt, wenn
+  `POST /api/patienten/{id}/schreiben/` mit `art: "terminbestaetigung"` eine PDF oder E-Mail (.eml) erzeugt – nicht
+  bei `ausgabe: "email"` (nur Text für den Dialog) und nicht bei „PDF ansehen“ (`vorschau: true`); nicht ohne
+  Schreibrecht an der Akte (Admin bei echten Akten), nicht bei erledigten Terminen oder abgeschlossenen Akten. Im
+  Verlauf der Akte als „Terminbestätigung erstellt“. Ändern sich Datum, Uhrzeit oder Ort, wird der Vermerk geleert.
+- **Termin-API:** `TerminSerializer` liefert `bestaetigung_am`, `bestaetigung_von_name` und bei Praxisterminen
+  `bestaetigung: {angebot, email, anrede}` (`angebot`: Einstellung an, Anschrift oder E-Mail, Termin offen und nicht
+  vorbei, Akte in Betreuung).
+- **Einstellung:** `Einstellungen.terminbestaetigung_anbieten` (Standard an, Migration `stammdaten/0019`), unter
+  Vorlagen › Grenzwerte „Terminbestätigung“. Aus: keine Frage und keine Zeile in der Tagesliste.
+- **Teststatus:** `test_automatisierungen.py` › `Terminbestaetigung` (Angebot, ohne Anschrift/E-Mail, Einstellung,
+  Vermerk nach PDF/E-Mail und nicht nach Vorschau, andere Schreiben, Verschieben, Admin). Browsertest
+  `kalender.spec.ts` „Terminbestätigung nach dem Speichern“.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F186 Fehlende Angaben melden
+- **Regeln** (`patienten/luecken.py`), nur Akten in Betreuung, ohne Testpatienten: kein Arzt zugeordnet und kein
+  Hausarzt im Freitext (`hausarzt`); weder Telefon noch Telefon 2 und keine aktive Kontaktperson mit Telefon/Mobil
+  (`telefon`); keine Gewichtsmessung in den letzten X Monaten (`gewicht_fehlt`, Einstellung
+  `gewicht_fehlt_monate`, Standard 3, 1–120, Vorlagen › Grenzwerte); keine aktive Diagnose und leeres Feld Diagnose
+  (`diagnose`); offener Praxistermin in den nächsten 8 Wochen ohne Ort, nur wenn es den Terminort der Praxis gibt –
+  wie beim Infoblatt (`termin_ort`, `infoblatt.praxisort`/`aufteilen`).
+- **Anzeige:** als zusätzliche Hinweisarten in `kennzahlen` (Patientenliste mit „×“ zum Ausblenden für 3/6/12 Monate
+  oder „nicht mehr nötig“, `Hinweisruhe.Art` erweitert, Migration `patienten/0016`); Detail einer Akte liefert im
+  `kopf` jetzt `hinweise` und `hinweise_stumm` (zum Anzeigen mit `HinweisChips` im Aktenkopf – die Anzeige in der
+  Akte selbst ist noch nicht eingebaut). Tagesliste: Anzahl je Regel (ausgeblendete zählen nicht), Klick auf
+  `/patienten?pruefen=ohne_telefon|ohne_hausarzt|ohne_gewicht|ohne_diagnose|termin_ohne_ort`.
+- **Teststatus:** `test_automatisierungen.py` › `FehlendeAngaben` (je Regel, Ausnahmen, Hinweis in Akte und Liste,
+  Ausblenden, Filter) und `Einstellungsfelder`.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+## AB · Hinweise im Infusionsplan (10.10.2026)
+
+Wunsch (Plan-Punkt 2, freigegeben): Beim Erstellen eines Plans soll sichtbar sein, was Labor und Gewicht seit dem
+letzten Plan sagen – sachlich und **ohne Dosisvorschlag**.
+
+> **Grenze zur Medizinprodukte-Verordnung:** Die Hinweise zeigen nur, was in der Akte steht, und bitten ums Prüfen. Sie
+> schlagen nie eine Menge vor und berechnen keine Dosis. Eine Software, die aus Patientendaten Therapiemengen ableitet,
+> wäre ggf. ein Medizinprodukt nach MDR (Regel 11). Neue Hinweise bitte ebenso formulieren („… bitte prüfen“, nie
+> „… auf x erhöhen“). So steht es auch als Kommentar in `infusionen/hinweise.py` und `PlanEditor.tsx`.
+
+### F187 Hinweise aus Labor und Gewicht im Plan-Editor
+- **Ansicht:** Plan-Editor, rechte Spalte unter „Prüfung vor der Freigabe“: Karte **Hinweise aus Labor und Gewicht**
+  (Begriff „Referenzbereich“ mit Erklärung). Am Telefon untereinander, lange Zeilen brechen um.
+  - **Laborwerte außerhalb des Referenzbereichs** seit dem letzten Plan (Tag der Freigabe des Vorgängers bzw. des
+    aktuellen Plans; ohne Plan: innerhalb „Laborbefund gilt als alt nach“), nur für Parameter, deren Bestandteil
+    gerade im Formular vorkommt: Natrium, Kalium, Phosphat, Calcium, Magnesium → gleichnamige Parameter; Humanalbumin →
+    Albumin; Glucose → Glucose; Lipide → Triglyceride; Spurenelemente → Kupfer, Zink, Selen, Mangan; Vitamine → Gruppe
+    Vitamine. Text z. B. „Magnesium 0,58 mmol/l am 02.10.2026 – unter dem Referenzbereich (0,66–1,07). Bitte prüfen.“,
+    Pfeil ↑/↓, darunter der **Verlauf der letzten drei Werte** mit Trend (steigend, fallend, gleichbleibend,
+    schwankend). Referenz aus dem Wert, sonst aus dem Katalog (U44: im Katalog meist leer).
+  - **Gewicht:** Änderung seit dem Bezugsplan (Gewicht, mit dem dessen Gesamtvolumen berechnet wurde) ab der Grenze
+    „Warnung Gewichtsverlust“ (Standard 5 %), auf- und abwärts: „… von 60 auf 54 kg gesunken (−10 %). Mengen je kg und
+    Gesamtvolumen bitte prüfen.“
+  - **Eigene Pläne:** ein Bestandteil, der in den letzten drei freigegebenen Plänen jeweils erhöht bzw. verringert
+    wurde („Kalium wurde in den letzten 3 Plänen jeweils erhöht (40 → 50 → 60 mmol) …“).
+  - **Kein bzw. altes Labor** („Laborbefund gilt als alt nach“, F120): Hinweis mit **Blutuntersuchung anfordern**
+    (öffnet „Schreiben und E-Mail“ der Akte, dort die Anlage „Blutuntersuchung“ anhaken) und **Schreiben
+    „Blutuntersuchung“ ansehen** (Anlage aus F174).
+- **Endpunkt:** `GET /api/infusionsplaene/hinweise/?patient=ID&plan=ID&bestandteile=natrium,kalium,…` →
+  `{seit, bezug, bestandteile, hinweise: [{art: labor|labor_alt|gewicht|plaene, stufe, text, …}]}`; `plan` = der
+  Entwurf (Bezug ist sein Vorgänger), `bestandteile` = was im Formular vorkommt (sonst aus Entwurf bzw. aktuellem Plan;
+  unbekannte werden ignoriert). Lesen mit „Akten lesen“; Patient außerhalb des eigenen Bereichs (z. B. Testzugang und
+  echte Akte) bzw. fremder Plan → 400. Keine Migration, keine Speicherung.
+- **Dateien:** `backend/infusionen/hinweise.py`, `infusionen/api.py`, `frontend/src/seiten/akte/PlanEditor.tsx`
+  (`HinweiseAusLabor`), `lib/begriffe.ts` (`referenzbereich`), `seiten/akte/Akte.tsx` (`schreibenOeffnen`).
+- **Teststatus:** Backend `infusionen.tests.PlanHinweise` (6 Tests: außerhalb des Referenzbereichs mit Verlauf und
+  Trend, nicht im Plan vorkommende Parameter ignoriert, Bestandteile aus dem Formular, Werte vor dem letzten Plan zählen
+  nicht, kein/altes Labor, Gewichtsänderung mit Grenze, Statistik der eigenen Pläne, Rechte, Testzugang und
+  Testpatient, keine Mengenempfehlung im Text); `manage.py test infusionen befunde patienten` grün (207). Browsertest
+  `plaene.spec.ts` „Hinweise aus Labor und Gewicht im Plan-Editor …“ lokal grün (Vite + Django, Chromium 141). CI-Lauf
+  steht aus.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+## AC · Notfallpaket (10.10.2026)
+
+Ziel: Nach einem Totalausfall (Festplatte, Diebstahl, Brand) baut die Praxis EPM auf neuer Hardware wieder auf – ohne
+Internet, ohne Entwickler, mit einem gedruckten Plan.
+
+### F188 Notfallpaket und Wiederaufbau-Plan
+- **Paket** (`epm-notfall-<TAG>-<JJJJ-MM-TT_hhmm>.tar`, Systemagent-Aktion `notfallpaket`, `AGENT_VERSION` 7, im
+  Gleichschritt mit `system/host.py`): `images/` (`docker save` genau der laufenden Images, Tag aus `.env`),
+  `rollout/` (Skripte 01–04, Agent, `epm-update`, `epm-notfall-aufbau.sh`), `code/` (Compose, `docs/`), `debs/`
+  (Debian-Pakete für 01/02/03 per `apt-cache depends --recurse` + `apt-get download`, sonst aus dem apt-Cache; was fehlt,
+  steht in `INHALT.json` › `fehlt`), `ocr-modelle/`, wahlweise `sicherung/` (jüngste Sicherung, verschlüsselt wie
+  immer), `konfiguration/` (`epm.conf` ohne Geheimnisse, Einstellungen ohne Zugangsdaten), `ca/` (Zertifikat; Schlüssel
+  nur als `ca.key.gpg`, symmetrisch mit dem Sicherungs-Passwort – ohne gesetztes Passwort kein Schlüssel und keine
+  Sicherung), `NOTFALLPLAN.pdf`/`.md`, `INHALT.json`, `SHA256SUMS`. **Nicht hinein:** Sicherungs-Passwort,
+  WebDAV-Zugang, Django-Secret, DB-Passwort (werden beim Aufbau neu erzeugt; Sitzungen enden, TOTP und Passkeys bleiben
+  gültig, da in der Datenbank bzw. an `EPM_WEB_NAME` gebunden). Datei 0640 im Download-Ordner, 6 Stunden bereit.
+- **Oberfläche:** System › Reiter **Notfall**: letztes Paket (Zeit, Version, Größe, SHA-256, was fehlt), Hinweis bei
+  älter als 30 Tage oder neuerer EPM-Version, „Notfallpaket erstellen“ mit Schätzung und Wahl „jüngste Sicherung mit
+  hinein“ (Passwort + zweiter Faktor), Download-Link, Wiederaufbau-Plan zum Lesen und als PDF. Systemverwaltung:
+  Ampel-Kachel „Notfallpaket“ (zuletzt erstellt … / älter als 30 Tage / noch nie) und Eintrag unter „Häufige Aufgaben“.
+  Hilfe-Abschnitt „Notfallpaket und Wiederaufbau nach Totalausfall“ mit Link auf das PDF.
+- **API:** `POST /api/system/notfall/` `{mit_sicherung, kennwort, code}` (Recht Systemverwaltung, 2FA, Agent aktuell,
+  prüft freien Speicher gegen die Schätzung: 2 × Schätzung + 512 MB, sonst 409); `GET /api/system/notfall/<datei>/`
+  (X-Accel, Audit „Notfallpaket heruntergeladen“); `GET /api/system/notfallplan/?art=html|pdf|md` (auch mit „Sicherungen
+  verwalten“; `art` statt `format`, da DRF `format` selbst auswertet). `manage.py epm_notfallplan --format md|html|pdf`
+  erzeugt den Plan für den Agenten.
+- **Plan:** `docs/NOTFALLPLAN.md` (gleich `backend/system/notfallplan.md`, ein Test hält beide gleich): nummerierte
+  Schritte, Kapitel „nur EPM kaputt“ und „nur die Datenbank kaputt“, Checkliste zum Ausdrucken, Dauer 1,5–3 Stunden.
+- **Aufbau:** `rollout/epm-notfall-aufbau.sh [--probelauf] [--mit-internet]`: Prüfsummen, Ubuntu-Version, `epm.conf`
+  und Netz, Sicherungs-Passwort, `debs/*.deb`, 01/02 mit `EPM_OFFLINE=1` (überspringt `apt-get update`/Repository), CA
+  entschlüsseln, 04, `docker load`, Start, `epm-systemagent notfall-einspielen` (Sicherung einlesen, Passwort setzen,
+  wiederherstellen), 03 nur wenn ein SSH-Schlüssel hinterlegt ist. Ohne Shell im Agenten (Listen-Aufrufe), Audit-Log
+  für Anfordern und Herunterladen.
+- **Teststatus:** `system/test_notfall.py` (17 Tests mit `Auftraege`): Rechte, 2FA, ohne Agent 409, Audit-Texte,
+  Download/X-Accel, Plan in drei Formaten; Agent im Prozess mit nachgebildetem `docker save`: Inhalt, Prüfsummen, keine
+  Geheimnisse in irgendeiner Datei, CA-Schlüssel mit dem Passwort entschlüsselbar, Rechte 0640, ohne Passwort kein
+  Schlüssel und keine Sicherung, Trockenlauf, Fristen; Probelauf des Aufbauskripts (und Abbruch bei verändertem Paket);
+  Browsertest Reiter Notfall und Ampel. **Nicht geprüft:** echter Neuaufbau auf frischem Ubuntu, echtes
+  `apt-get download`/`docker save`/`docker load`, PDF aus dem Container im Agenten, `notfall-einspielen` von Ende zu Ende.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+## AD · Entscheidungen der Praxis (10.10.2026)
+
+Antworten des Auftraggebers auf die Rückfragen aus F181, F187 und F177 (`docs/UI-UX-AKTE-2026-10-10.md`,
+`docs/VORLAGEN-ALICE-2026-10-09.md`).
+
+### F190 Tablet mit zwei Spalten, Mengen je kg einstellbar, Referenzbereiche nachtragen, Infoblatt ohne Telefontermine
+- **Tablet 1024 × 768:** zwei breite Spalten in der Übersicht der Akte, die Seite darf scrollen (vorher drei schmale
+  Spalten ohne Scrollen). Das Fenster ohne Seiten-Scrollen gilt jetzt ab 1280 × 600 px (`index.css`, `.seite-fuellt`;
+  `Uebersicht.tsx`: Spalten nach Breite der Fläche, unter 1100 px zwei). Ab 1366 × 768 unverändert kein Seiten-Scrollen.
+- **Mengen je kg für „Mengen nach Praxisvorgabe“:** Vorlagen › Grenzwerte, Karte „Mengen je kg für ‚Mengen nach
+  Praxisvorgabe‘“ – je Bestandteil ein Feld mit Einheit (Glucose, Aminosäuren, Lipide in g/kg; Natrium, Kalium, Phosphat,
+  Calcium, Magnesium in mmol/kg), 0 = nicht vorbelegen. Neue Felder `Einstellungen.vorgabe_*_kg` (Migration
+  `stammdaten/0020_praxisvorgabe_je_kg`, Startwerte = Werte des Altsystems 3,5 / 1,2 / 1 / 1,3 / 0,7 / 0,3 / 0,15 /
+  0,2) und `vorgabe_geaendert_am` (gesetzt, sobald sich ein Wert ändert). Prüfung 0 bis Obergrenze (Glucose 10 g/kg,
+  Aminosäuren und Lipide 5 g/kg, Natrium und Kalium 10 mmol/kg, Phosphat, Calcium, Magnesium 5 mmol/kg) im Serializer
+  und im Modell; Historie wie alle Einstellungen, Audit-Log „Einstellungen“ mit Feldnamen. `GET …/vorbelegung/` nutzt
+  die Einstellung und liefert `stand`; der Plan-Editor zeigt neben „Mengen nach Praxisvorgabe“ „nach Praxisvorgabe vom
+  <Datum>“ (bzw. „Startwerte wie im Altsystem“), der Tooltip die Mengen je kg.
+- **Referenzbereiche im Laborkatalog:** Vorlagen › Labor und Diagnosen › Laborparameter hat oben „Ohne Referenzbereich
+  (N)“ – Liste der aktiven Parameter ohne Bereich, zuerst die für die Infusionsplan-Hinweise (Na, K, Ca, Mg, P, Albumin,
+  Glucose, Triglyceride, Cu, Zn, Se, Mn, dann Vitamine; markiert „Infusionsplan“), mit Erklärtext (vom eigenen Labor
+  übernehmen; gilt nur, wenn ein Befund keinen eigenen Bereich mitbringt). Adresse
+  `/admin/vorlagen?bereich=kataloge&labor=ohne_referenz`. EPM trägt **keine** Referenzwerte selbst ein.
+  Im Plan-Editor (F187) neuer dezenter Hinweis `referenz_fehlt`: „Für Kalium und Magnesium ist kein Referenzbereich
+  hinterlegt – Hinweise aus dem Labor sind deshalb unvollständig …“, mit Link zum Katalog nur für „Vorlagen pflegen“.
+- **Telefon- und Videotermine auf dem Infoblatt:** Nein, der Standard bleibt aus (U72 geschlossen); keine Änderung am
+  Code.
+- **Labor-Hinweise (F187) zählen ab dem Tag der Freigabe des letzten Plans** – entschieden 10.10.2026, so bleibt es.
+- **Gewicht vor der Freigabe:** „bitte prüfen“ nach **6 Monaten** (entschieden 10.10.2026; vorher vorläufig 3 Monate fest im
+  Plan-Editor). Neue Einstellung `plan_gewicht_alter_monate` (Standard 6, 1–60) in derselben Migration, unter Vorlagen ›
+  Grenzwerte in der Karte der Mengen je kg; „Prüfung vor der Freigabe“ nutzt sie. Eine frühere Einstellung mit Wert 3 gab
+  es nicht, daher genügt der Standardwert (keine Umstellung bestehender Werte nötig).
+- **Teststatus:** Backend `infusionen.tests.PlanPraxisvorgabe` (Vorbelegung nutzt die Einstellung, Grenzen, Historie,
+  Stand, Audit-Log), `PlanHinweise.test_fehlender_referenzbereich_im_katalog`; `manage.py test infusionen stammdaten
+  befunde patienten` grün. Browsertests `layout.spec.ts` (Tablet zwei Spalten, scrollen erlaubt, nichts ragt heraus),
+  `plaene.spec.ts` (Praxisvorgabe geändert → Editor nutzt die neuen Mengen und nennt den Stand). Lokal grün, CI-Lauf
+  steht aus.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
 ## Offene Backend-Funktionen
@@ -3334,11 +3964,28 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U69 | ~~Startseite: Kachel oder Hinweis?~~ **Bestätigt 09.10.2026:** Hinweis | F160 | – |
 | U70 | ~~Geänderte Frist auch für vorhandene Scans?~~ **Bestätigt 09.10.2026:** nur für neue Scans | F165 | – |
 | U71 | ~~Textwerte („< 0,1“, „negativ“) aus Scans übernehmen?~~ **Bestätigt 09.10.2026:** nein, nur Zahlen | F166, U47 | – |
+| U72 | ~~Sollen Telefon- und Videotermine standardmäßig mit auf das Infoblatt an die Praxis (Rückfrage an Alice, `docs/VORLAGEN-ALICE-2026-10-09.md`)?~~ **Entschieden 10.10.2026: Nein, Standard bleibt aus** (F190) | F177 | standardmäßig nicht; im Dialog ankreuzbar |
+| U73 | In welchem Rhythmus und wie viele Tage vorher soll das Infoblatt verschickt werden (Rückfrage an Alice)? | F177 | wöchentlich (nächste Woche Mo–So), Erinnerung 3 Tage vorher; unter Vorlagen › Grenzwerte änderbar |
+| U74 | ~~„Datenbank leeren“ soll auch die gelernten Zuordnungen und die Kennzahl leeren: `scans.lernen.leeren()` steht bereit, der Aufruf in `system/leeren.py` (`datenbank_leeren`, plus `umfang`) gehört zu einem anderen Auftrag und fehlt noch. Ebenso entfernt das Leeren keine nicht zugeordneten Scans (`scans.Scan` mit Dateien unter `EPM_SCANS`, enthalten Patientendaten; sie laufen erst nach der Aufbewahrungsfrist ab)~~ **Erledigt 10.10.2026:** `datenbank_leeren` entfernt alle Scans samt Dateien (der Stand des OCR-Dienstes in `.dienst` bleibt) und ruft `scans.lernen.leeren()` auf; `umfang` zählt die Scans; Test `system/test_leeren.py` | F182 | – |
+| U75 | Gelernte Zuordnungen sind laut Auftrag auch für „Vorlagen pflegen“ gedacht; die API lässt das zu, in der Oberfläche liegt der Bereich aber unter Scans (Route und Menü nur mit Recht „Scans“). Ein Link unter Vorlagen › Labor wäre der Weg für Rollen ohne „Scans“ | F182 | Standardrollen haben beide Rechte; Link unter Vorlagen nicht gesetzt (anderer Auftrag) |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 10.10.2026 | Entscheidungen der Praxis | Tablet mit zwei Spalten und Scrollen, Mengen je kg unter Vorlagen › Grenzwerte (Migration mit den Werten des Altsystems, Historie, Audit-Log, Stand im Plan-Editor), Gewicht für den Plan nach 6 Monaten „bitte prüfen“ (einstellbar), Labor-Hinweise ab Freigabe des letzten Plans (entschieden), Laborparameter „Ohne Referenzbereich“ zum Nachtragen und Hinweis im Plan-Editor, Telefontermine bleiben vom Infoblatt aus (U72) (F190). Lauf steht aus |
+| 10.10.2026 | Version 2.0.0 | Zweite Fassung von EPM: Versionsnummer von 0.2.0 auf 2.0.0 (Festlegung Filip 10.10.2026); enthält F177–F189. Images heißen `epm-backend:2.0.0-<Commit>` |
+| 10.10.2026 | Hinweise im Infusionsplan | Plan-Editor zeigt Laborwerte außerhalb des Referenzbereichs seit dem letzten Plan (nur Bestandteile des Plans) mit Verlauf der letzten drei Werte, deutliche Gewichtsänderung, Entwicklung der eigenen Pläne und fehlendes Labor mit „Blutuntersuchung anfordern“ – nur zum Prüfen, ohne Dosisvorschlag (MDR) (F187). Lauf steht aus |
+| 10.10.2026 | Erkennung verbessern | „Falsch erkannt“ mit Grund (verwirft sofort, lernt „nicht auswerten“/Sperre/weniger Bestätigungen je Labor), „Bereich markieren“ liest nur den aufgezogenen Rahmen mit Tesseract neu (Maus und Touch, Tabelle zeilenweise) und lernt den Bereich je Labor, Steuerung des Lernens (pausieren, Schwelle 1–3), Anleitung in Hilfe, Prüfansicht und `docs/SCANS-VERBESSERN.md` (F189). Lauf steht aus |
+| 10.10.2026 | Notfallpaket | Notfallpaket mit Images, Rollout-Skripten, Debian-Paketen, OCR-Modellen, wahlweise jüngster Sicherung, Einstellungen ohne Geheimnisse, verschlüsseltem CA-Schlüssel, Prüfsummen und Plan; Aufbauskript `epm-notfall-aufbau.sh` mit Probelauf, Offline-Modus der Rollout-Skripte, Reiter „Notfall“, Ampel-Kachel, `docs/NOTFALLPLAN.md` (F188). Lauf steht aus |
+| 10.10.2026 | Nachtrag Systemverwaltung | Zeitplan der nächtlichen Sicherung (Uhrzeit, täglich/werktags, Warnung zum Übertragungsfenster), Journal und alte Versionen aufräumen (laufende und vorherige geschützt), Uhrzeit mit eigenem Zeitserver einstellen, OCR-Modelle mit 2FA (F179l–F179o). Lauf steht aus |
+| 10.10.2026 | Texterkennung lernt mit | Gelernte Zuordnungen aus Korrekturen beim Übernehmen (Labor, BIA, Diagnosen, Spaltenlage je Labor; ohne Patientendaten), Anwendung vor der Ähnlichkeitssuche mit Schwelle, Bereich „Gelernte Zuordnungen“, Kennzahl „korrigiert“ (F182); Patient aus Name und Geburtsdatum vorschlagen, nur per Klick (F183); Offline-Prüfung (`docs/OFFLINE-BETRIEB-2026-10-10.md`). Lauf steht aus |
+| 10.10.2026 | Akte entschlankt | Akte ab 1024 × 600 px ohne Seiten-Scrollen (Kopf und Reiter bleiben stehen, Inhalt scrollt in Karte bzw. Spalte), kompakter Kopf, Reiter nach Bedeutung (Infusionspläne nach Empfehlung, Verlauf/Datenschutz klein), Übersicht mit sechs Karten in zwei Reihen, PDF des Plans in voller Höhe neben der Liste und im Menüpunkt Infusionspläne, Plan nach Praxisvorgabe je kg, Prüfung vor der Freigabe, PDF-Vorschau mit ungespeicherten Eingaben (`POST …/vorschau/`), Administration zum Aufklappen (F181). Lauf steht aus |
+| 10.10.2026 | Automatisierungen für die Pflege | Startseite „Heute zu tun“ mit Terminen, Rückrufen, Infoblatt, fehlenden Bestätigungen, Kontakten, Plänen, Scans und fehlenden Angaben (F184); „Terminbestätigung schicken?“ nach dem Speichern eines Praxistermins mit Vermerk am Termin (F185); fehlende Angaben als Hinweise (Hausarzt, Telefon, Gewicht, Diagnose, Termin ohne Ort), ausblendbar (F186). Lauf steht aus |
+| 10.10.2026 | Systemverwaltung ohne SSH | Neue Seite Systemverwaltung mit Ampel und häufigen Aufgaben; System und Backup in Reitern; Graphen klein, groß im Dialog; Sicherungen mit Mehrfachauswahl löschen; Dienste einzeln neu starten, Version zurückschalten, Update-Paket und OCR-Modelle hochladen, Paket erstellen, Zertifikat erneuern/importieren, Protokolle ansehen – alles über den Systemagenten (F179). Lauf steht aus |
+| 10.10.2026 | Vorlagen-Portal einfacher | Übersicht mit Kacheln in Alltagssprache und Suche, Liste der Dokumentvorlagen mit Zweck/Ort/Stand, geführter Ablauf Bearbeiten → Vorschau → Freigeben mit Live-Vorschau, Angaben aus der Akte per Klick als lesbare Chips, frühere Fassung ansehen/wiederherstellen, als eigene Vorlage kopieren, ▲ ▼ und „Wo benutzt“ in den Auswahllisten, Warnung beim Verlassen (F180). Lauf steht aus |
+| 10.10.2026 | Bedienung für Pflegekräfte | Nachsichtige Datums-/Uhrzeiteingabe, Fehlermeldungen mit Lösungsweg, leere Zustände mit nächstem Schritt, Hilfe „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“, weniger Fachjargon (F178, `docs/BEDIENBARKEIT-2026-10-10.md`). Lauf steht aus |
+| 10.10.2026 | Infoblatt an die Praxis | Kalender › „Praxis informieren“: Infoblatt mit allen Terminen in der Praxis Holtmeier, Zeitraum per Knopf, Vorschau mit „neu“ und Warnung bei fehlendem Ort, nur Termine am gewählten Ort (Telefon/Video wahlweise), gemerkte Blätter ohne Namen, Erinnerung auf der Startseite, Ort im Termin vorbelegt (F177). Lauf steht aus |
 | 09.10.2026 | Schreiben mit E-Mail | Vorlagen von Alice: Patientenaufnahme, Terminbestätigung, Reisebescheinigung mit ADAC-Attest als PDF und als fertige E-Mail (.eml mit Anhang) aus der Akte (F172), Patientenankündigung aus dem Kalender (F173), Anlagen für E-Mails (F174), Fallzusammenfassung mit Gliederung (F175). Lauf steht aus |
 | 09.10.2026 | Text erkennen in der Akte | „Text erkennen“ mit OCRmyPDF (PDF/A mit Textebene, Datei ersetzt, Art.-17-Löschung über alle Fassungen) (F170), „Werte übernehmen“ aus Akte-Dokumenten ohne neues Dokument (F171), Sparmodus mit einem Tesseract-Durchgang (F168). Lauf steht aus |
 | 09.10.2026 | Texterkennung auf kleinen Servern, Werte von Hand | Sparmodus (kleines Zeilenmodell, ohne Glätten) und Speichergrenze nach RAM, Absturzschutz mit Lebenszeichen und Sparstufen je Seite (F168); Labor/BIA immer übertragbar, Wert per Klick ins Bild, „+ Wert“, mehr BIA-Bezeichnungen (F169). Lauf steht aus |

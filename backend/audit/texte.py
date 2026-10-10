@@ -109,14 +109,14 @@ def beschreibung(e) -> str:
         return {
             "2fa": "Anmeldung mit 2FA",
             "notfallcode": f"Anmeldung mit Notfall-Code (noch {d.get('verbleibend', '?')} übrig)",
-            "kennwort": "Kennwort richtig, zweiter Faktor ausstehend",
-            "ohne_2fa": "Anmeldung mit Kennwort (ohne zweiten Faktor)",
+            "kennwort": "Passwort richtig, zweiter Faktor ausstehend",
+            "ohne_2fa": "Anmeldung mit Passwort (ohne zweiten Faktor)",
         }.get(d.get("schritt"), "Anmeldung")
     if art == A.ABMELDUNG:
         return "Abmeldung"
     if art == A.ANMELDUNG_FEHLGESCHLAGEN:
         if d.get("grund") == "einmal_kennwort_abgelaufen":
-            return "Einmal-Kennwort abgelaufen"
+            return "Einmal-Passwort abgelaufen"
         if d.get("grund") == "bestaetigung":
             return f"Falsches Passwort bei der Bestätigung: {d.get('was', 'Systemaktion')}"
         return "Falsches Passwort" + (f" ({d['versuch']}. Versuch)" if d.get("versuch") else "")
@@ -133,7 +133,7 @@ def beschreibung(e) -> str:
         zeit = f" in {d['minuten']} Minuten" if d.get("minuten") else ""
         return f"{d.get('fehlversuche', '')} {was}{zeit}, Konto gesperrt".strip()
     if art == A.KENNWORT_GEAENDERT:
-        return "Eigenes Kennwort bei der ersten Anmeldung gesetzt" if d.get("erstanmeldung") else "Kennwort geändert"
+        return "Eigenes Passwort bei der ersten Anmeldung gesetzt" if d.get("erstanmeldung") else "Passwort geändert"
     if art == A.ZWEITER_FAKTOR_EINGERICHTET:
         if d.get("notfallcodes_neu"):
             return "Notfall-Codes neu erzeugt"
@@ -143,10 +143,10 @@ def beschreibung(e) -> str:
 
         rolle = dict(Rolle.choices).get(d.get("rolle"), d.get("rolle", ""))
         if d.get("quelle") == "altdaten":
-            return f"Benutzer {e.objekt} bei der Übernahme der Altdaten angelegt ({rolle}), noch ohne Kennwort"
+            return f"Benutzer {e.objekt} bei der Übernahme der Altdaten angelegt ({rolle}), noch ohne Passwort"
         if d.get("ohne_login"):
             return f"Benutzer {e.objekt} ohne Login angelegt (keine Rechte)"
-        return f"Benutzer {e.objekt} angelegt ({rolle}), Einmal-Kennwort erzeugt"
+        return f"Benutzer {e.objekt} angelegt ({rolle}), Einmal-Passwort erzeugt"
     if art == A.BENUTZER_GEAENDERT:
         if d.get("entsperrt"):
             return f"Benutzer {e.objekt} entsperrt"
@@ -156,7 +156,7 @@ def beschreibung(e) -> str:
             from accounts.models import Rolle
 
             rolle = dict(Rolle.choices).get(d.get("rolle"), d.get("rolle", ""))
-            return f"Benutzer {e.objekt} erhält wieder einen Login ({rolle}), Einmal-Kennwort erzeugt"
+            return f"Benutzer {e.objekt} erhält wieder einen Login ({rolle}), Einmal-Passwort erzeugt"
         felder = ", ".join(d.get("aenderungen") or {})
         return f"Benutzer {e.objekt} geändert" + (f": {felder}" if felder else "")
     if art == A.RECHTE_GEAENDERT and d.get("zweiter_faktor"):
@@ -169,11 +169,11 @@ def beschreibung(e) -> str:
     if art == A.BENUTZER_GESPERRT:
         return f"Benutzer {e.objekt} gesperrt"
     if art == A.EINMAL_KENNWORT:
-        return f"Neues Einmal-Kennwort für {e.objekt} erzeugt"
+        return f"Neues Einmal-Passwort für {e.objekt} erzeugt"
     if art == A.ZWEITER_FAKTOR_ZURUECKGESETZT:
         if d.get("selbst"):
             return "Zweiten Faktor (Authenticator-App) selbst ausgeschaltet"
-        return f"2FA für {e.objekt} zurückgesetzt, Einmal-Kennwort erzeugt"
+        return f"2FA für {e.objekt} zurückgesetzt, Einmal-Passwort erzeugt"
     if art == A.AKTE_ABGESCHLOSSEN:
         from patienten.models import Patient
 
@@ -310,6 +310,17 @@ def _backup(e, d) -> str:
     if ereignis == "heruntergeladen":
         zeit = _datum(d.get("sicherung_zeitpunkt", "")) or d.get("stempel", "")
         return f"Sicherung vom {zeit} heruntergeladen" + ("" if d.get("verschluesselt") else " (unverschlüsselt)")
+    if ereignis == "angefordert" and d.get("aktion") == "sicherung_loeschen":
+        liste = d.get("stempel") or []
+        groesse = d.get("groesse") or 0
+        return (f"{d.get('anzahl', len(liste))} Sicherung(en) zum Löschen angefordert ({', '.join(liste[:10])}"
+                f"{' …' if len(liste) > 10 else ''}; zusammen {groesse / 1024 ** 2:.0f} MB)"
+                + _bestaetigt(d))
+    if ereignis == "angefordert" and d.get("aktion") == "sicherung_zeitplan":
+        return (f"Zeitplan der Sicherung: {'werktags' if d.get('tage') == 'werktags' else 'täglich'} um "
+                f"{d.get('uhrzeit', '?')} Uhr" + _bestaetigt(d))
+    if ereignis == "upload_begonnen" and d.get("upload_art") in ("paket", "ocr"):
+        return _system(e, d)
     if ereignis == "upload_begonnen":
         return f"Hochladen einer Sicherung begonnen: {d.get('datei', '')}"
     if ereignis == "upload_abgebrochen":
@@ -340,6 +351,48 @@ def _backup(e, d) -> str:
 def _system(e, d) -> str:
     name = d.get("name") or e.objekt or "Systemaktion"
     ereignis = d.get("ereignis")
+    # Wartung ohne SSH (F179)
+    aktion = d.get("aktion")
+    if ereignis == "angefordert" and aktion == "dienst_neustart":
+        return (f"Neustart des Dienstes „{d.get('dienst', '')}“ angefordert"
+                + (f", Beginn in {d['minuten']} Min." if d.get("minuten") else "") + _bestaetigt(d))
+    if ereignis == "angefordert" and aktion == "epm_zurueck":
+        return (f"Zurückschalten auf Version {d.get('tag', '')} angefordert (bisher {d.get('bisher') or '?'})"
+                + (f", Beginn in {d['minuten']} Min." if d.get("minuten") else "") + _bestaetigt(d))
+    if ereignis == "angefordert" and aktion in ("epm_paket", "ocr_modelle"):
+        return f"{name} angefordert: {d.get('datei', '')}" + _bestaetigt(d)
+    if ereignis == "angefordert" and aktion == "zertifikat_importieren":
+        return (f"Zertifikat importieren angefordert: {d.get('inhaber', '')}, ausgestellt von {d.get('aussteller', '')}"
+                + (f", gültig bis {_datum(d['gueltig_bis'])}" if d.get("gueltig_bis") else "") + _bestaetigt(d))
+    if ereignis == "angefordert" and aktion == "journal_aufraeumen":
+        return f"Journal aufräumen angefordert ({'auf' if d.get('journal_art') == 'groesse' else 'älter als'} {d.get('wert', '?')})"
+    if ereignis == "angefordert" and aktion == "images_loeschen":
+        teile = [*(d.get("dateien") or []), *(f"Docker-Images {t}" for t in d.get("tags") or [])]
+        return f"Alte Versionen löschen angefordert: {', '.join(teile[:8])}{' …' if len(teile) > 8 else ''}" + _bestaetigt(d)
+    if ereignis == "angefordert" and aktion == "uhr_einstellen":
+        teile = [f"Zeitsynchronisation {'an' if d.get('ntp') else 'aus'}"]
+        if d.get("server"):
+            teile.append(f"Zeitserver {', '.join(d['server'])}")
+        if d.get("zeitzone"):
+            teile.append(f"Zeitzone {d['zeitzone']}")
+        if d.get("zeit"):
+            teile.append(f"Uhrzeit {d['zeit']}")
+        return "Uhrzeit einstellen angefordert: " + ", ".join(teile) + _bestaetigt(d)
+    if ereignis == "angefordert" and aktion == "notfallpaket":
+        return ("Notfallpaket angefordert (" + ("mit" if d.get("mit_sicherung") else "ohne") + " jüngste Sicherung)"
+                + _bestaetigt(d))
+    if ereignis == "notfall_heruntergeladen":
+        return f"Notfallpaket heruntergeladen: {d.get('datei', '')}"
+    if ereignis == "angefordert" and aktion == "protokoll":
+        return f"Protokoll abgerufen: {e.objekt} (letzte {d.get('zeilen', '?')} Zeilen)"
+    if ereignis == "protokoll_heruntergeladen":
+        return f"Protokoll heruntergeladen: {e.objekt}"
+    if ereignis == "upload_begonnen":
+        return f"Hochladen begonnen ({e.objekt}): {d.get('datei', '')}"
+    if ereignis == "upload_abgebrochen":
+        return f"Hochgeladene Datei verworfen ({e.objekt}): {d.get('datei', '')}"
+    if ereignis == "paket_heruntergeladen":
+        return f"{e.objekt} heruntergeladen"
     if ereignis == "angefordert":
         teile = [f"{name} angefordert"]
         if d.get("minuten"):

@@ -20,7 +20,7 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 20_000,
       refetchOnWindowFocus: true,
-      retry: (anzahl, fehler) => !(fehler instanceof ApiFehler && fehler.status < 500) && anzahl < 2,
+      retry: (anzahl, fehler) => !(fehler instanceof ApiFehler && fehler.status >= 400 && fehler.status < 500) && anzahl < 2,
     },
   },
 });

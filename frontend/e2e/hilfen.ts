@@ -246,3 +246,13 @@ export async function virtuellerAuthenticator(ctx: BrowserContext, page: Page) {
   });
   return { cdp, authenticatorId };
 }
+
+/** Navigation „Administration“: Wer mehr als zwei Verwaltungsseiten hat, sieht sie als Gruppe zum Aufklappen (F181).
+ *  Klappt sie bei Bedarf auf und gibt die Navigation zurück. */
+export async function adminNavigation(page: Page) {
+  const nav = page.getByRole("navigation", { name: "Administration" });
+  const knopf = nav.getByTestId("nav-administration");
+  await nav.waitFor(); // sonst zählt count() vor dem ersten Zeichnen 0 und der Bereich bleibt zu
+  if (await knopf.count() && (await knopf.getAttribute("aria-expanded")) !== "true") await knopf.click();
+  return nav;
+}

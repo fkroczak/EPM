@@ -199,7 +199,7 @@ export function Diagnosen() {
 
   return (
     <>
-    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-[var(--abstand)] items-start" data-testid="diagnosen">
+    <div className="akte-spalten grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-[var(--abstand)] items-start" data-testid="diagnosen">
       <Karte className="overflow-hidden" data-testid="diagnoseliste">
         <div className="px-5 pt-4 pb-3 flex items-center justify-between gap-3 flex-wrap">
           <h2 className="lbl m-0 text-[0.9375rem] flex items-center gap-2">

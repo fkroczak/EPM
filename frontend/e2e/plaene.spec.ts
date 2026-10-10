@@ -15,7 +15,8 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   const editor = page.getByTestId("plan-editor");
   await expect(editor).toContainText("Erster Plan dieses Patienten.");
   // erster Plan je kg Körpergewicht vorbelegt wie im Altsystem (60 kg)
-  await expect(editor).toContainText("Vorbelegt je kg Körpergewicht (60,0 kg) wie im Altsystem.");
+  // Startwerte wie im Altsystem bzw. – nachdem die Praxis sie geändert hat (F190) – „nach Praxisvorgabe vom …“
+  await expect(editor).toContainText(/Vorbelegt je kg Körpergewicht \(60,0 kg\) (wie im Altsystem|nach Praxisvorgabe vom \d{2}\.\d{2}\.\d{4})\./);
   for (const [feld, wert] of [["Menge Glucose in g", "210"], ["Menge Aminosäuren in g", "72"], ["Menge Lipide in g", "60"],
     ["Natrium", "78"], ["Kalium", "42"], ["Phosphat", "18"], ["Calcium", "9"], ["Magnesium", "12"]]) {
     await expect(editor.getByLabel(feld)).toHaveValue(wert);
@@ -53,7 +54,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await editor.getByRole("button", { name: "+ Soluvit N" }).click();
   await editor.getByRole("button", { name: "+ Vitalipid adult" }).click();
   await editor.getByLabel("Laufzeit").fill("12");
-  await editor.getByTestId("infusionstage").getByLabel("PE (Mischbeutel)").fill("5");
+  await editor.getByTestId("infusionstage").getByLabel(/^PE.*\(Mischbeutel\)$/).fill("5");
   // wie auf der alten PDF: Mischbeutel = letztes Gewicht × 35 ml, Zusatzvolumen = Basislösung, Gesamtvolumen = Summe;
   // Laufzeit manuell, Rate = Gesamtvolumen ÷ Laufzeit (2.600 ÷ 12)
   await expect(editor.getByTestId("plan-mischbeutel")).toHaveText("2.100 ml");
@@ -91,19 +92,21 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(blatt).toContainText(/Laufmenge je Stunde\s+216,7\s+ml\/h/);
   await expect(blatt).toContainText("Pantozol® Kurzinfusion 1 Amp. 40 mg in 50 ml Trägerlösung · 1-0-1");
   await expect(detail.getByTestId("planvergleich")).toHaveCount(0);
-  // klein als Vorschau wie unter „Dokumente“ (Fehlerliste 02.10.2026, 1.3); ein Klick öffnet die große Ansicht
-  await expect(ansicht.getByTestId("pdf-vorschau")).toBeVisible();
-  expect((await ansicht.boundingBox())!.width).toBeLessThanOrEqual(342);
+  // seit F181 direkt neben der Liste in voller Spaltenhöhe (vorher kleine Vorschau, Fehlerliste 02.10.2026, 1.3):
+  // eine Seite ganz, ohne Klick; „Groß ansehen“ öffnet sie im Dialog, „Herunterladen“ speichert sie
+  const leser = ansicht.getByTestId("pdf-leser");
+  await expect(leser).toBeVisible();
+  expect((await ansicht.boundingBox())!.width).toBeGreaterThan(500);
   await expect(ansicht.getByTestId("pdf-seite").first()).toHaveAttribute("data-fertig", "1");
-  await ansicht.getByTestId("pdf-seite").first().click();
+  await expect(leser.getByRole("button", { name: "Ganze Seite" })).toBeVisible();
+  const [laden] = await Promise.all([page.waitForEvent("download"), ansicht.getByRole("button", { name: "Herunterladen" }).click()]);
+  expect(laden.suggestedFilename()).toMatch(/^Infusionsplan-.*-Ansicht\.pdf$/);
+  await ansicht.getByRole("button", { name: "Groß ansehen" }).click();
   const gross = page.getByRole("dialog").getByTestId("plan-gross");
   await expect(gross.getByTestId("pdf-leser").locator("canvas").first()).toBeVisible();
   await expect(gross.getByTestId("pdf-text").first()).toContainText(/Kalorien\s+1\.509/);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await ansicht.getByRole("button", { name: "Groß ansehen" }).click();
-  await expect(page.getByRole("dialog").getByTestId("pdf-leser")).toBeVisible();
-  await page.keyboard.press("Escape");
 
   // Freigeben (Recht „Pläne freigeben“)
   await detail.getByRole("button", { name: "Freigeben" }).click();
@@ -235,4 +238,68 @@ test("Mitarbeiter sieht Pläne, legt aber keine an", async ({ browser }) => {
   await expect(page.getByRole("button", { name: "Neuer Plan" })).toHaveCount(0);
   await expect(page.getByTestId("plan-detail").getByRole("button", { name: "Freigeben" })).toHaveCount(0);
   await ctx.close();
+});
+
+test("Hinweise aus Labor und Gewicht im Plan-Editor: kein Labor, Wert außerhalb des Referenzbereichs mit Verlauf (F187)", async ({ page }) => {
+  const api = await apiAls("mediziner");
+  const patient = await api.post("patienten/", { nachname: eindeutig("Hinweis"), vorname: "Hanna", geburtsdatum: "1971-03-03" });
+  await api.post("gewichte/", { patient: patient.id, gewicht_kg: "60.0", quelle: "telefonisch" });
+  await page.goto(`/patienten/${patient.id}/plaene/neu`);
+  const hinweise = page.getByTestId("plan-hinweise");
+  // noch kein Labor: Hinweis mit Weg zur Blutuntersuchung
+  await expect(hinweise).toContainText("Noch kein Laborbefund in der Akte.");
+  await hinweise.getByRole("button", { name: "Blutuntersuchung anfordern" }).click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Schreiben und E-Mail" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  // Magnesium unter dem Referenzbereich, fallend; Ferritin kommt im Plan nicht vor und bleibt außen vor
+  const parameter = await api.get("laborparameter/?aktiv=true");
+  const id = (name: string) => parameter.find((p: { name: string }) => p.name === name).id;
+  const tag = (vor: number) => new Date(Date.now() - vor * 86400000).toISOString().slice(0, 10);
+  for (const [vor, mg] of [[60, "0.90"], [30, "0.75"], [0, "0.58"]] as const) {
+    await api.post("laborbefunde/", { patient: patient.id, abgenommen_am: tag(vor), werte: [
+      { parameter: id("Magnesium"), wert: mg, referenz_von: "0.66", referenz_bis: "1.07" },
+      { parameter: id("Ferritin"), wert: "5", referenz_von: "30", referenz_bis: "400" },
+    ] });
+  }
+  await page.reload();
+  // der erste Plan ist je kg vorbelegt – Magnesium kommt also vor
+  const mg = hinweise.locator('[data-art="labor"]').filter({ hasText: "Magnesium" });
+  await expect(mg).toContainText(/Magnesium 0,58 mmol\/l am \d{2}\.\d{2}\.\d{4} – unter dem Referenzbereich \(0,66–1,07\)\. Bitte prüfen\./);
+  await expect(mg).toContainText("Verlauf: 0,9");
+  await expect(mg).toContainText("fallend");
+  await expect(hinweise).not.toContainText("Ferritin");
+  await expect(hinweise).not.toContainText("Noch kein Laborbefund");
+  await expect(hinweise).toContainText("EPM schlägt keine Mengen vor");
+  // fehlt im Katalog der Referenzbereich, sagt der Editor, dass die Hinweise unvollständig sind – mit Weg zum Katalog (F190)
+  const fehlt = hinweise.locator('[data-art="referenz_fehlt"]');
+  await expect(fehlt).toContainText("ist kein Referenzbereich hinterlegt");
+  await expect(fehlt.getByRole("link", { name: "Referenzbereiche im Laborkatalog nachtragen" }))
+    .toHaveAttribute("href", "/admin/vorlagen?bereich=kataloge&labor=ohne_referenz");
+  // ohne Magnesium im Formular verschwindet der Hinweis
+  await page.getByTestId("plan-editor").getByLabel("Magnesium").fill("");
+  await expect(hinweise.locator('[data-art="labor"]').filter({ hasText: "Magnesium" })).toHaveCount(0);
+  await api.ende();
+});
+
+test("Mengen je kg nach Praxisvorgabe: unter Vorlagen › Grenzwerte geändert, im Plan-Editor angewandt (F190)", async ({ page }) => {
+  const admin = await apiAls("admin");
+  const vorher = await admin.get("einstellungen/");
+  await admin.patch("einstellungen/", { vorgabe_glucose_g_kg: "4" });
+  try {
+    const api = await apiAls("mediziner");
+    const patient = await api.post("patienten/", { nachname: eindeutig("Vorgabe"), vorname: "Vera", geburtsdatum: "1965-06-06" });
+    await api.post("gewichte/", { patient: patient.id, gewicht_kg: "60.0", quelle: "telefonisch" });
+    await api.ende();
+    await page.goto(`/patienten/${patient.id}/plaene/neu`);
+    const editor = page.getByTestId("plan-editor");
+    await expect(editor).toContainText(/Vorbelegt je kg Körpergewicht \(60,0 kg\) nach Praxisvorgabe vom \d{2}\.\d{2}\.\d{4}\./);
+    await expect(editor.getByLabel("Menge Glucose in g")).toHaveValue("240"); // 60 × 4
+    await editor.getByLabel("Menge Glucose in g").fill("100");
+    await editor.getByRole("button", { name: "Mengen nach Praxisvorgabe" }).click();
+    await expect(editor.getByLabel("Menge Glucose in g")).toHaveValue("240");
+    await expect(page.getByTestId("praxisvorgabe-stand")).toContainText("nach Praxisvorgabe vom");
+  } finally {
+    await admin.patch("einstellungen/", { vorgabe_glucose_g_kg: vorher.vorgabe_glucose_g_kg });
+    await admin.ende();
+  }
 });

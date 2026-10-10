@@ -6,6 +6,7 @@
  * hier wird sie korrigiert.
  */
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
@@ -18,6 +19,17 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 
 // ================================================================= Laborparameter
+
+/** Pseudo-Gruppe „ohne Referenzbereich“ (Entscheidung der Praxis 10.10.2026, F190) */
+const OHNE_REFERENZ = "ohne_referenz";
+/** Parameter, die für die Hinweise im Infusionsplan zählen (F187) – beim Nachtragen zuerst */
+const FUER_PLAENE = ["Natrium", "Kalium", "Calcium", "Magnesium", "Phosphat", "Albumin", "Glucose", "Triglyceride",
+  "Kupfer", "Zink", "Selen", "Mangan"];
+const rangPlan = (p: Laborparameter) => {
+  const i = FUER_PLAENE.indexOf(p.name);
+  return i >= 0 ? i : p.gruppe === "vitamine" ? FUER_PLAENE.length : FUER_PLAENE.length + 1;
+};
+
 function ParameterDialog({ eintrag, gruppe, onZu }: {
   eintrag: Laborparameter | "neu" | null; gruppe: string; onZu: () => void;
 }) {
@@ -88,7 +100,9 @@ function ParameterDialog({ eintrag, gruppe, onZu }: {
 }
 
 function LaborparameterBereich() {
-  const [gruppe, setGruppe] = useState("transaminasen");
+  // ?labor=ohne_referenz (Link aus dem Plan-Editor) öffnet gleich die Liste zum Nachtragen
+  const [params] = useSearchParams();
+  const [gruppe, setGruppe] = useState(params.get("labor") === OHNE_REFERENZ ? OHNE_REFERENZ : "transaminasen");
   const [dialog, setDialog] = useState<Laborparameter | "neu" | null>(null);
   const qc = useQueryClient();
   const melden = useHinweis();
@@ -98,12 +112,23 @@ function LaborparameterBereich() {
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["laborparameter"] }); melden("Gespeichert."); },
     onError: (e) => melden(e.message, "fehler"),
   });
-  const gefiltert = useMemo(() => (liste.data ?? []).filter((p) => p.gruppe === gruppe), [liste.data, gruppe]);
+  const ohneReferenz = useMemo(() => (liste.data ?? []).filter((p) => p.aktiv && p.referenz_von == null && p.referenz_bis == null)
+    .sort((a, b) => rangPlan(a) - rangPlan(b) || a.name.localeCompare(b.name, "de")), [liste.data]);
+  const gefiltert = useMemo(() => (gruppe === OHNE_REFERENZ ? ohneReferenz : (liste.data ?? []).filter((p) => p.gruppe === gruppe)),
+    [liste.data, gruppe, ohneReferenz]);
+  const dialogGruppe = gruppe === OHNE_REFERENZ ? "transaminasen" : gruppe;
 
   return (
     <div className="grid gap-4 lg:grid-cols-[16.25rem_minmax(0,1fr)]">
       <Karte className="p-4 flex flex-col gap-1 h-fit">
         <h3 className="lbl m-0 mb-1">Gruppen</h3>
+        {ohneReferenz.length ? (
+          <button type="button" aria-current={gruppe === OHNE_REFERENZ ? "true" : undefined} data-testid="ohne-referenz"
+            className={`w-full text-left bg-transparent border-0 rounded-md px-2.5 py-1.5 mb-1 cursor-pointer text-sm flex justify-between gap-2 text-warn font-medium ${gruppe === OHNE_REFERENZ ? "bg-akzent-weich" : "hover:bg-fein"}`}
+            onClick={() => setGruppe(OHNE_REFERENZ)}>
+            <span>Ohne Referenzbereich</span><span className="num">{ohneReferenz.length}</span>
+          </button>
+        ) : null}
         {Object.entries(LABORGRUPPEN).map(([k, text]) => {
           const anzahl = (liste.data ?? []).filter((p) => p.gruppe === k).length;
           return (
@@ -116,8 +141,14 @@ function LaborparameterBereich() {
         })}
       </Karte>
       <Karte className="p-[1.375rem] flex flex-col gap-3">
-        <KartenKopf titel={LABORGRUPPEN[gruppe]} unter="Ausgeblendete Parameter erscheinen nicht in neuen Befunden."
-          rechts={<Knopf klein variante="pri" onClick={() => setDialog("neu")}>Parameter hinzufügen</Knopf>} />
+        <KartenKopf titel={gruppe === OHNE_REFERENZ ? `${ohneReferenz.length} Laborwerte ohne Referenzbereich` : LABORGRUPPEN[gruppe]}
+          unter={gruppe === OHNE_REFERENZ ? "Zuerst die Werte, die für die Hinweise im Infusionsplan zählen." : "Ausgeblendete Parameter erscheinen nicht in neuen Befunden."}
+          rechts={gruppe === OHNE_REFERENZ ? null : <Knopf klein variante="pri" onClick={() => setDialog("neu")}>Parameter hinzufügen</Knopf>} />
+        {gruppe === OHNE_REFERENZ ? (
+          <Meldung art="info">Bitte den Referenzbereich vom eigenen Labor übernehmen (steht auf jedem Befund). Er gilt nur, wenn ein
+            Befund keinen eigenen Bereich mitbringt, und ist die Grundlage für die Hinweise „außerhalb des Referenzbereichs“ im
+            Infusionsplan. „Bearbeiten“ öffnet den Parameter.</Meldung>
+        ) : null}
         {liste.isPending ? <Laden /> : <Fehleranzeige fehler={liste.error} />}
         {gefiltert.length === 0 && !liste.isPending ? <Leer>In dieser Gruppe gibt es noch keine Parameter.</Leer> : null}
         {gefiltert.length ? (
@@ -127,7 +158,8 @@ function LaborparameterBereich() {
               <tbody>
                 {gefiltert.map((p) => (
                   <tr key={p.id} className={p.aktiv ? "" : "opacity-60"}>
-                    <td>{p.name}{!p.aktiv ? <Chip className="ml-2">ausgeblendet</Chip> : null}</td>
+                    <td>{p.name}{!p.aktiv ? <Chip className="ml-2">ausgeblendet</Chip> : null}
+                      {gruppe === OHNE_REFERENZ && rangPlan(p) <= FUER_PLAENE.length ? <Chip art="akzent" className="ml-2">Infusionsplan</Chip> : null}</td>
                     <td>{p.kurzname || "—"}</td>
                     <td>{p.einheit || "—"}</td>
                     <td className="num">
@@ -146,7 +178,7 @@ function LaborparameterBereich() {
           </div>
         ) : null}
       </Karte>
-      <ParameterDialog eintrag={dialog} gruppe={gruppe} onZu={() => setDialog(null)} />
+      <ParameterDialog eintrag={dialog} gruppe={dialogGruppe} onZu={() => setDialog(null)} />
     </div>
   );
 }
@@ -248,6 +280,7 @@ function DiagnosenBereich() {
 
 export function KatalogeBereich() {
   const [teil, setTeil] = useState<"labor" | "diagnosen">("labor");
+  // Hinweis „N Laborwerte ohne Referenzbereich“ (F190) steht in LaborparameterBereich
   return (
     <div className="flex flex-col gap-4">
       <Segmente label="Katalog" wert={teil} onWahl={setTeil} className="self-start"

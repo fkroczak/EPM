@@ -397,15 +397,18 @@ class Patientenliste(Grundlage):
         v = zeilen[self.verlust.id]["kennzahlen"]
         self.assertEqual(Decimal(str(v["gewicht"]["kg"])), Decimal("64.0"))
         self.assertEqual((v["trend"]["richtung"], v["trend"]["warnung"]), ("down", True))
-        # seit F120 hat jede Akte in Betreuung ohne Befunde zusätzlich „labor“ und „bia“
-        self.assertEqual([h["art"] for h in v["hinweise"]], ["gewicht", "ohne_plan", "labor", "bia"])
+        # seit F120 hat jede Akte in Betreuung ohne Befunde zusätzlich „labor“ und „bia“, seit F186 die fehlenden
+        # Angaben (hier ohne Hausarzt, Telefon und Diagnose; das Gewicht ist aktuell)
+        self.assertEqual([h["art"] for h in v["hinweise"]],
+                         ["gewicht", "ohne_plan", "labor", "bia", "hausarzt", "telefon", "diagnose"])
         s = zeilen[self.stabil.id]["kennzahlen"]
         self.assertEqual(s["trend"]["richtung"], "flat")
         self.assertTrue(s["termin_woche"])
-        self.assertEqual([h["art"] for h in s["hinweise"]], ["labor", "bia"])
+        self.assertEqual([h["art"] for h in s["hinweise"]], ["labor", "bia", "hausarzt", "telefon", "diagnose"])
         ohne = zeilen[self.patient.id]["kennzahlen"]
         self.assertEqual({h["art"] for h in ohne["hinweise"]},
-                         {"versorger", "kontakt", "ohne_plan", "labor", "bia"})
+                         {"versorger", "kontakt", "ohne_plan", "labor", "bia", "hausarzt", "telefon", "gewicht_fehlt",
+                          "diagnose"})
         self.assertIsNone(ohne["gewicht"])
         # Standard-Reihenfolge: letzter Kontakt, neueste zuerst; ohne Kontakt ans Ende
         self.assertEqual(r["results"][-1]["id"], self.patient.id)
@@ -1010,7 +1013,7 @@ class FalschZugeordneteDokumente(Grundlage):
             for ereignis in SystemEreignis.objects.filter(objekt=f"Dokument {dok.id}"):
                 self.assertNotIn(verboten, json.dumps(ereignis.details, ensure_ascii=False))
         self.assertIn(f"Dokument Nr. {dok.id} (SHA-256 {dok.sha256[:8]}…) aus Falsch, Sabine", texte)
-        self.assertIn("abgelehnt: Kennwort falsch.", texte)
+        self.assertIn("abgelehnt: Passwort falsch.", texte)
         # Löschliste: eine Zeile, ohne Titel und Dateinamen
         zeilen = LOESCHLISTE.read_text(encoding="utf-8").splitlines()
         self.assertEqual(len(zeilen), 1)
@@ -1108,7 +1111,7 @@ class FalschZugeordneteDokumente(Grundlage):
         DokumentVorgang.objects.create(art=DokumentVorgang.Art.GELOESCHT, dokument_id=dok.id, von_patient=self.sabine,
                                        grund="fremdes Dokument", person=self.mediziner)
         protokolliere(SystemEreignis.Art.DOKUMENT_LOESCHEN_ABGELEHNT, objekt=f"Dokument {nummer}", titel=dok.titel,
-                      fehler="Kennwort falsch.")
+                      fehler="Passwort falsch.")
         protokolliere(SystemEreignis.Art.DOKUMENT_GELOESCHT, objekt=f"Dokument {nummer}", titel=dok.titel,
                       akte="Falsch, Sabine", grund="fremdes Dokument", sha256=sha, groesse=dok.groesse)
         dok.delete()

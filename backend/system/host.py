@@ -7,13 +7,14 @@ der Agent (root, systemd) führt nur seine fest eingetragenen Aktionen aus und s
 """
 import json
 import os
+import re
 from datetime import datetime
 
 from django.conf import settings
 from django.utils import timezone
 
 # Code -> Angaben. Dieselben Aktionen stehen im Agenten (AKTIONEN); andere führt er nicht aus.
-# bestaetigung: "keine" | "einfach" (Rückfrage) | "2fa" (Admin-Kennwort und – wenn ein zweiter Faktor eingerichtet
+# bestaetigung: "keine" | "einfach" (Rückfrage) | "2fa" (Admin-Passwort und – wenn ein zweiter Faktor eingerichtet
 # ist – der Code; Festlegungen 01. und 02.10.2026)
 # sichern: der Agent erstellt vorher eine Sicherung; warnen: angemeldete Benutzer bekommen vorher einen Hinweis
 AKTIONEN = {
@@ -65,8 +66,9 @@ AKTIONEN = {
     # /api/system/leeren/ (Bestätigungscode abtippen, Rückfrage, Auswahl der Konten), vorher immer eine Sicherung.
     "datenbank_leeren": {
         "name": "Datenbank leeren", "bestaetigung": "2fa", "sichern": True, "warnen": True, "intern": True,
-        "beschreibung": "Entfernt alle Akten, Dokumente, Versorger, Ärzte, Benutzer (außer den ausgewählten) und das "
-                        "Audit-Log. Präparate, Vorlagen und Einstellungen bleiben. Vorher automatische Sicherung.",
+        "beschreibung": "Entfernt alle Akten, Dokumente, Scans, Gelerntes der Texterkennung, Versorger, Ärzte, Benutzer "
+                        "(außer den ausgewählten) und das Audit-Log. Präparate, Vorlagen und Einstellungen bleiben. Vorher "
+                        "automatische Sicherung.",
         "hinweis": "EPM wird geleert (Ende der Testphase). Alle Anmeldungen werden beendet – bitte nichts mehr eingeben.",
     },
     "pakete_aufraeumen": {
@@ -121,12 +123,114 @@ AKTIONEN = {
         "hinweis": "EPM wird auf eine Sicherung zurückgesetzt und ist einige Minuten nicht erreichbar. Eingaben nach dem "
                    "Zeitpunkt der Sicherung gehen verloren; danach bitte neu anmelden.",
     },
+    # ---- Systemverwaltung ohne SSH (Wunsch 10.10.2026, F179): was bisher nur per SSH ging. „intern“: nur über eigene
+    # Endpunkte mit geprüften Angaben (Stempel, Version, Dienst, Upload, Protokoll), nicht unter „Tätigkeiten“.
+    "sicherung_loeschen": {
+        "name": "Sicherungen löschen", "bestaetigung": "2fa", "recht": "backup_verwalten", "intern": True,
+        "beschreibung": "Ausgewählte Sicherungen endgültig vom Server löschen. Die jüngste Sicherung bleibt immer; im "
+                        "Übertragungsziel gilt dessen eigene Aufbewahrung.",
+    },
+    "dienst_neustart": {
+        "name": "Dienst neu starten", "bestaetigung": "2fa", "warnen": True, "intern": True,
+        "beschreibung": "Einen einzelnen Container neu starten (backend, web, ocr oder db), z. B. wenn er hängt.",
+        "hinweis": "Ein Teil von EPM wird neu gestartet und ist kurz nicht erreichbar – bitte Eingaben vorher speichern.",
+    },
+    "epm_zurueck": {
+        "name": "EPM-Version zurückschalten", "bestaetigung": "2fa", "sichern": True, "warnen": True, "intern": True,
+        "beschreibung": "Auf eine frühere, noch vorhandene Version umstellen (sudo epm-update --zurueck). Vorher "
+                        "automatische Sicherung; Datenbank-Migrationen werden nicht zurückgedreht.",
+        "hinweis": "EPM wird auf eine frühere Version umgestellt und ist kurz nicht erreichbar – bitte Eingaben vorher "
+                   "speichern.",
+    },
+    "epm_paket": {
+        "name": "Update-Paket einspielen", "bestaetigung": "2fa", "warnen": True, "intern": True,
+        "beschreibung": "Ein hochgeladenes Update-Paket der Test-VM prüfen und einspielen (sudo epm-update --paket). "
+                        "epm-update sichert vorher; geht etwas schief, läuft die bisherige Version weiter.",
+        "hinweis": "EPM wird auf einen neuen Stand gebracht. Beim Umstellen ist es kurz nicht erreichbar – bitte "
+                   "Eingaben vorher speichern.",
+    },
+    "epm_paket_erstellen": {
+        "name": "Update-Paket erstellen", "bestaetigung": "einfach", "intern": True,
+        "beschreibung": "Paket der laufenden, getesteten Version für einen Server ohne Internet (sudo epm-update "
+                        "--paket-erstellen, nur Test-VM); es liegt danach 2 Stunden zum Herunterladen bereit.",
+    },
+    "zertifikat_erneuern": {
+        "name": "Zertifikat erneuern", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Neues Serverzertifikat der eigenen CA ausstellen (sudo epm-zertifikat erneuern, 397 Tage); "
+                        "Geräte, die der CA vertrauen, merken nichts davon.",
+    },
+    "zertifikat_importieren": {
+        "name": "Zertifikat importieren", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Zertifikat einer anderen CA (z. B. der OPNsense) mit Schlüssel und CA-Zertifikat übernehmen "
+                        "(sudo epm-zertifikat importieren).",
+    },
+    "ocr_modelle": {
+        # Nachtrag 10.10.2026: wie die anderen Uploads, die Dateien auf den Server bringen, mit Passwort und 2FA
+        "name": "OCR-Modelle einspielen", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Offline vorbereitete Modelle der zweiten Texterkennung prüfen und ablegen (sudo epm-ocr-modelle "
+                        "einspielen); das nächste „EPM aktualisieren“ baut sie ins Image.",
+    },
+    "protokoll": {
+        "name": "Protokoll abrufen", "bestaetigung": "keine", "intern": True, "mehrfach": True,
+        "beschreibung": "Letzte Zeilen eines Protokolls (Container, Systemagent, Sicherung, Update) – nur lesend.",
+    },
+    # ---- Nachtrag 10.10.2026 (F179l–F179n)
+    "sicherung_zeitplan": {
+        "name": "Zeitplan der Sicherung festlegen", "bestaetigung": "2fa", "recht": "backup_verwalten", "intern": True,
+        "beschreibung": "Uhrzeit der nächtlichen Sicherung (täglich oder werktags). Der Server stellt den Timer um.",
+    },
+    "journal_aufraeumen": {
+        "name": "Journal aufräumen", "bestaetigung": "einfach", "intern": True,
+        "beschreibung": "Ältere Einträge des Systemprotokolls (Journal) entfernen – auf eine Größe oder ein Alter.",
+    },
+    "images_loeschen": {
+        "name": "Alte Versionen löschen", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Gespeicherte Image-Dateien, Update-Pakete und Docker-Images alter Versionen löschen. Die "
+                        "laufende und die vorherige Version (für „Zurückschalten“) bleiben immer.",
+    },
+    # ---- Notfallpaket (F188)
+    "notfallpaket": {
+        "name": "Notfallpaket erstellen", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Alles für einen Wiederaufbau ohne Internet in eine Datei: Programme (Images), Rollout-Skripte, "
+                        "Debian-Pakete, OCR-Modelle, wahlweise die jüngste Sicherung, Einstellungen ohne Passwörter, die "
+                        "CA (Schlüssel verschlüsselt) und den Notfallplan. Liegt danach 6 Stunden zum Herunterladen bereit.",
+    },
+    "uhr_einstellen": {
+        "name": "Uhrzeit einstellen", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Zeitzone, Zeitsynchronisation (NTP) mit eigenem Zeitserver, z. B. der OPNsense, oder die "
+                        "Uhrzeit von Hand.",
+    },
 }
 
 # Aktionen der Seite Administration › Backup (für deren Liste der Tätigkeiten)
 SICHERUNG_AKTIONEN = ("sicherung", "sicherung_passwort", "sicherung_ziel", "sicherung_ziel_entfernen",
                       "sicherung_ziel_testen", "sicherung_uebertragen", "sicherung_aufbewahrung",
-                      "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen")
+                      "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen", "sicherung_loeschen",
+                      "sicherung_zeitplan")
+
+# Systemverwaltung ohne SSH (10.10.2026): dieselben Listen und Muster wie im Agenten (der prüft noch einmal)
+DIENSTE = ("backend", "web", "ocr", "db")
+TAG_MUSTER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40}$")
+PAKET_MUSTER = re.compile(r"^epm-paket-([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})\.tar$")
+PROTOKOLLE = {
+    "backend": "Container backend (Django)", "web": "Container web (Nginx)", "ocr": "Container ocr (Texterkennung)",
+    "db": "Container db (PostgreSQL)", "systemagent": "Systemagent", "backup": "Nächtliche Sicherung",
+    "uebertragung": "Übertragung der Sicherungen", "update": "Letztes EPM-Update (/var/log/epm-update.log)",
+}
+PROTOKOLL_ZEILEN = (100, 500, 2000)
+LOESCHEN_MAX = 200
+# Nachtrag 10.10.2026: wie im Agenten
+ZEITPLAN_TAGE = ("taeglich", "werktags")
+NOTFALL_MUSTER = re.compile(r"^epm-notfall-([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})-(\d{4}-\d{2}-\d{2}_\d{4})\.tar$")
+NOTFALL_ALT_TAGE = 30          # älter: Hinweis in der Systemverwaltung
+JOURNAL_GROESSE = ("100M", "200M", "500M", "1G")
+JOURNAL_ZEIT = ("2weeks", "1month", "3months", "6months")
+IMAGE_DATEI_MUSTER = re.compile(r"^epm-(paket-)?([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})\.tar$")
+ZEITZONE_MUSTER = re.compile(r"^[A-Za-z]+(/[A-Za-z0-9_+-]+){0,2}$|^UTC$")
+NTP_SERVER_MUSTER = re.compile(r"^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*[A-Za-z0-9]([A-Za-z0-9-]{0,61}"
+                               r"[A-Za-z0-9])?$|^[0-9a-fA-F:]{2,39}$")
+NTP_SERVER_MAX = 4
+ZEIT_SETZEN_MUSTER = re.compile(r"^20[2-9][0-9]-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01]) ([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$")
 
 STATUS_VERALTET_S = 180   # der Agent misst jede Minute; älter heißt: Agent läuft nicht
 
@@ -145,8 +249,14 @@ def ordner_download():
 
 
 def ordner_upload():
-    """Hochgeladene Sicherungen (schreibt das Backend, der Agent liest sie ein und entfernt sie)."""
+    """Hochgeladene Sicherungen, Update-Pakete und OCR-Modelle (schreibt das Backend, der Agent übernimmt sie und
+    entfernt sie)."""
     return settings.EPM_SYSTEM / "upload"
+
+
+def protokoll_datei(auftrag):
+    """Vom Agenten abgerufenes Protokoll (``status/protokolle/<Auftrag>.log``, nach 1 Stunde entfernt)."""
+    return ordner_status() / "protokolle" / f"{auftrag.kennung.hex}.log"
 
 
 def _lies(pfad):

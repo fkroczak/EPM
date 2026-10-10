@@ -31,7 +31,7 @@ function dateinameAus(kopf: Headers, ersatz: string) {
   return m ? decodeURIComponent(m[1]) : ersatz;
 }
 
-export function SchreibenDialog({ offen, onOffen, titel, pfad, koerper, bereit = true, optionen, ablegen, onAbgelegt,
+export function SchreibenDialog({ offen, onOffen, titel, pfad, koerper, bereit = true, optionen, ablegen, onAbgelegt, onErzeugt,
   ohneEmpfaenger = "In der Akte ist keine E-Mail-Adresse hinterlegt – im Entwurf eintragen." }: {
   offen: boolean;
   onOffen: (o: boolean) => void;
@@ -47,6 +47,8 @@ export function SchreibenDialog({ offen, onOffen, titel, pfad, koerper, bereit =
   /** „In der Akte ablegen“ anbieten (nur aus der Akte, offene Akten) */
   ablegen?: boolean;
   onAbgelegt?: () => void;
+  /** nach „PDF herunterladen“ bzw. „E-Mail vorbereiten“ (z. B. Infoblatt: „zuletzt erstellt“ neu laden) */
+  onErzeugt?: () => void;
   /** Hinweis, wenn die Vorlage keinen Empfänger vorgibt */
   ohneEmpfaenger?: string;
 }) {
@@ -76,6 +78,7 @@ export function SchreibenDialog({ offen, onOffen, titel, pfad, koerper, bereit =
       ablegen: !!ablegen && ablage } }),
     onSuccess: ({ daten, kopf }) => {
       speichern(daten, "message/rfc822", dateinameAus(kopf, "Schreiben.eml"));
+      onErzeugt?.();
       if (kopf.get("X-EPM-Dokument")) onAbgelegt?.();
       melden(kopf.get("X-EPM-Dokument") ? "E-Mail vorbereitet, PDF in der Akte abgelegt." : "E-Mail vorbereitet – Datei öffnen und absenden.");
     },
@@ -84,6 +87,7 @@ export function SchreibenDialog({ offen, onOffen, titel, pfad, koerper, bereit =
     mutationFn: () => apiDatei(pfad, { body: { ...koerper, ausgabe: "pdf", ablegen: !!ablegen && ablage } }),
     onSuccess: ({ daten, kopf }) => {
       speichern(daten, "application/pdf", dateinameAus(kopf, "Schreiben.pdf"));
+      onErzeugt?.();
       if (kopf.get("X-EPM-Dokument")) { onAbgelegt?.(); melden("PDF heruntergeladen und in der Akte abgelegt."); }
     },
   });
@@ -156,7 +160,7 @@ export function SchreibenDialog({ offen, onOffen, titel, pfad, koerper, bereit =
           {fehler && !Object.keys(f).length ? <Fehleranzeige fehler={fehler} /> : null}
         </div>
       </Dialog>
-      <PdfDialog offen={pdfOffen} onOffen={setPdfOffen} titel={titel} pfad={pfad} body={{ ...koerper, ausgabe: "pdf" }}
+      <PdfDialog offen={pdfOffen} onOffen={setPdfOffen} titel={titel} pfad={pfad} body={{ ...koerper, ausgabe: "pdf", vorschau: true }}
         dateiname={mail.data?.dateiname ?? "Schreiben.pdf"} />
     </>
   );

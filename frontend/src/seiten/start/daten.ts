@@ -35,6 +35,12 @@ export type Startdaten = {
   /** S01 */
   zahlen: { in_betreuung: number; mit_offenem_termin: number; termine_7_tage: number; praxistermine_7_tage: number;
     termine_ueberfaellig: number; kontakt_ueberfaellig: number; kontakt_bald: number };
+  /** F177: „Praxis … informieren“ vor dem nächsten Zeitraum (nur mit „Einträge erfassen“, bis ein Infoblatt erstellt ist) */
+  infoblatt?: { von: string; bis: string; rhythmus: "woche" | "monat"; anzahl: number; ohne_ort: number;
+    ort: { id: number; wert: string } | null } | null;
+  /** F184: „Heute zu tun“ – ohne Testpatienten und abgeschlossene Akten; Bestätigungen und Termine ohne Ort nur mit
+   *  „Einträge erfassen“ */
+  tagesliste?: Tagesliste;
   /** S08 */
   notfallcodes: { uebrig: number; gesamt: number; eingerichtet: boolean; warnen_ab: number };
   /** O-07: Zustand der Sicherungen (vom Systemagenten), für alle sichtbar */
@@ -47,3 +53,19 @@ export type MeineAkte = { patient: number; name: string; nummer: number; ist_tes
   gewicht: { kg: number; am: string } | null; trend: { richtung: "down" | "up" | "flat" | null; prozent: number; warnung: boolean } | null;
   naechster_termin: { id: number; art: string; faellig_am: string; uhrzeit: string | null; titel: string } | null; plan_entwurf: boolean };
 export type MeineAkten = { merkliste: MeineAkte[]; zuletzt: MeineAkte[] };
+
+/** F186: fehlende Angaben, gezählt je Regel (Akten) */
+export type LueckenArt = "hausarzt" | "telefon" | "gewicht_fehlt" | "diagnose" | "termin_ort";
+
+export type Tagesliste = {
+  termine_heute: Termin[];
+  /** Rückrufe und Wiedervorlagen, heute fällig oder überfällig */
+  rueckrufe: Termin[]; rueckrufe_anzahl: number; rueckrufe_ueberfaellig: number;
+  kontakt_ueberfaellig: number; kontakt_monate: number;
+  plaene_pruefen: number;
+  fehlende_angaben: Record<LueckenArt, number>; gewicht_fehlt_monate: number;
+  /** F185: Praxistermine der nächsten zwei Wochen ohne Terminbestätigung */
+  bestaetigung_fehlt: Termin[];
+  /** Praxistermine ohne Ort (fehlen auf dem Infoblatt an die Praxis) */
+  ohne_ort: Termin[];
+};

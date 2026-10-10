@@ -438,8 +438,11 @@ def seiten_anlegen(scan: Scan) -> list[ScanSeite]:
 
 
 def woerterliste_schreiben(ziel: Path):
-    """Fachwörter (Vorlagen › Grenzwerte) und Namen des Laborkatalogs als Wörterliste für Tesseract."""
+    """Fachwörter (Vorlagen › Grenzwerte), Namen des Laborkatalogs und häufig bestätigte gelernte Bezeichnungen (F182)
+    als Wörterliste für Tesseract."""
     from stammdaten.models import Laborparameter
+
+    from . import lernen
 
     woerter = set()
     for w in (Einstellungen.aktuell().ocr_fachwoerter or "").splitlines():
@@ -449,6 +452,7 @@ def woerterliste_schreiben(ziel: Path):
         for teil in f"{name} {kurz}".replace("(", " ").replace(")", " ").split():
             if len(teil) >= 3 and any(c.isalpha() for c in teil):
                 woerter.add(teil)
+    woerter |= lernen.woerter()
     ziel.write_text("\n".join(sorted(woerter)) + "\n", encoding="utf-8")
 
 
@@ -543,11 +547,140 @@ def auswerten(scan: Scan):
             if v not in verfahren:
                 verfahren.append(v)
     scan.verfahren = verfahren
-    originale_info = (scan.auswertung or {}).get("originale", [])
-    a = auswertung.auswerten(ergebnisse, katalog(), timezone.localdate())
+    alt = scan.auswertung or {}
+    originale_info = alt.get("originale", [])
+    from . import lernen
+
+    a = auswertung.auswerten(ergebnisse, katalog(), timezone.localdate(), lernen.gelerntes(), zusatz_reihen(seiten))
     a["originale"] = originale_info
+    _verworfen_uebernehmen(alt, a)
     scan.auswertung = a
     scan.dokumentdatum = a.get("datum") or None
+
+
+def zusatz_reihen(seiten: list[ScanSeite]) -> list:
+    """Aus markierten bzw. gelernten Bereichen nachgelesene Reihen (F189), je Seite in ``info["zusatz"]``."""
+    aus = []
+    for i, s in enumerate(seiten):
+        if s.status != ScanSeite.Status.FERTIG:
+            continue
+        for z in (s.info or {}).get("zusatz") or []:
+            if isinstance(z, dict) and z.get("reihen"):
+                aus.append((i, z, z.get("box")))
+    return aus
+
+
+def _verworfen_uebernehmen(alt: dict, neu: dict):
+    """„Falsch erkannt“ angemerkte Vorschläge bleiben verworfen, wenn der Scan neu ausgewertet wird."""
+    labor = {(w.get("zeile"), w.get("erkannt_als")): w["verworfen"] for w in (alt.get("labor") or {}).get("werte") or []
+             if w.get("verworfen")}
+    for w in (neu.get("labor") or {}).get("werte") or []:
+        if (w.get("zeile"), w.get("erkannt_als")) in labor:
+            w["verworfen"] = labor[(w.get("zeile"), w.get("erkannt_als"))]
+    bia = {k: v["verworfen"] for k, v in ((alt.get("bia") or {}).get("werte") or {}).items() if v.get("verworfen")}
+    for k, v in ((neu.get("bia") or {}).get("werte") or {}).items():
+        if k in bia:
+            v["verworfen"] = bia[k]
+    dg = {(d.get("icd_code"), d.get("erkannt_als")): d["verworfen"] for d in alt.get("diagnosen") or []
+          if d.get("verworfen")}
+    for d in neu.get("diagnosen") or []:
+        if (d.get("icd_code"), d.get("erkannt_als")) in dg:
+            d["verworfen"] = dg[(d.get("icd_code"), d.get("erkannt_als"))]
+
+
+MAX_ZUSATZ_SEITE = 12
+
+
+def _zusatz_merken(seite: ScanSeite, daten: dict, herkunft: str):
+    info = dict(seite.info or {})
+    liste = [z for z in info.get("zusatz") or [] if z.get("box") != daten["box"]]
+    liste.append({**daten, "herkunft": herkunft})
+    info["zusatz"] = liste[-MAX_ZUSATZ_SEITE:]
+    seite.info = info
+    ScanSeite.objects.filter(pk=seite.pk).update(info=info)
+
+
+def bereich_lesen(scan: Scan, seite: ScanSeite, box) -> list[int]:
+    """„Richtigen Bereich markieren“ (F189): nur diesen Bereich der Seite neu lesen (Tesseract, vergrößert) und die
+    Zeilen darin als neue Laborwerte anbieten. Die bisherigen Vorschläge behalten ihre Nummern (die neuen kommen
+    hinten dazu). → Nummern der neuen Vorschläge in ``auswertung.labor.werte``."""
+    from . import lernen
+    from .ocr import ausschnitt
+
+    box = ausschnitt.pruefen(box)
+    if seite.status != ScanSeite.Status.FERTIG or not seite.grau:
+        raise ausschnitt.BereichFehler("Die Seite ist noch nicht erkannt.")
+    grau = lade_bild(seite.datei(seite.grau), grau=True)
+    with tempfile.TemporaryDirectory(prefix="epm-woerter-") as tmp:
+        liste = Path(tmp) / "fachwoerter.txt"
+        woerterliste_schreiben(liste)
+        daten = ausschnitt.lesen(grau, box, str(liste))
+    _zusatz_merken(seite, daten, "markiert")
+    seiten = list(scan.seiten.order_by("nr", "id"))
+    nr = next(i for i, s in enumerate(seiten) if s.pk == seite.pk)
+    a = dict(scan.auswertung or {})
+    labor = dict(a.get("labor") or {"name": "", "werte": []})
+    werte = list(labor.get("werte") or [])
+    quelle = auswertung.norm(labor.get("name") or "")[:150]
+    reihen = auswertung.reihen_der_seite(daten, nr, box)
+    neu = auswertung.laborwerte(reihen, katalog(), lernen.gelerntes(), quelle)
+    if not neu:
+        # keine Zeile sieht wie ein Laborwert aus: den gelesenen Text trotzdem anbieten (Freitext, nicht vorgewählt)
+        for r in reihen:
+            text = " ".join(t.text for t in r)
+            neu.append({"parameter": None, "parameter_name": None, "erkannt_als": text[:150], "zuordnung": "frei",
+                        "freitext_name": text[:150], "wert": None, "wert_text": "", "einheit": "", "einheit_gelesen": "",
+                        "referenz_von": None, "referenz_bis": None, "markierung": "", "seite": nr,
+                        "box": [round(min(t.box[0] for t in r), 4), round(min(t.box[1] for t in r), 4),
+                                round(max(t.box[0] + t.box[2] for t in r) - min(t.box[0] for t in r), 4),
+                                round(max(t.box[1] + t.box[3] for t in r) - min(t.box[1] for t in r), 4)],
+                        "zeile": text[:200], "sicherheit": round(min(t.c for t in r), 3),
+                        "hinweise": ["aus dem markierten Bereich gelesen – kein Wert erkannt"], "vorschlag": False,
+                        "bereich": box})
+    for w in neu:
+        w["hinweise"] = ["aus dem markierten Bereich gelesen"] + list(w.get("hinweise") or [])
+    start = len(werte)
+    werte += neu
+    labor["werte"] = werte
+    a["labor"] = labor
+    if neu and "labor" not in (a.get("arten") or []):
+        a["arten"] = list(a.get("arten") or []) + ["labor"]
+    scan.auswertung = a
+    Scan.objects.filter(pk=scan.pk).update(auswertung=a)
+    return list(range(start, len(werte)))
+
+
+def bereiche_nachlesen(scan: Scan) -> int:
+    """Im OCR-Dienst nach der Erkennung: gelernte Bereiche der Werte dieses Absenders (F189) gezielt nachlesen, damit
+    die Auswertung dort sucht. → Zahl der gelesenen Bereiche. Fehler stören die Erkennung nicht."""
+    from . import lernen
+    from .ocr import ausschnitt, tesseract
+
+    seiten = list(scan.seiten.order_by("nr", "id"))
+    ergebnisse = [s.ergebnis if s.status == ScanSeite.Status.FERTIG and s.ergebnis else {"reihen": []} for s in seiten]
+    quelle = auswertung.norm(auswertung.labor_name(auswertung.reihen_aus(ergebnisse)))[:150]
+    bereiche = lernen.gelerntes().bereiche.get(quelle) if quelle else None
+    if not bereiche or not tesseract.verfuegbar()[0]:
+        return 0
+    anzahl = 0
+    with tempfile.TemporaryDirectory(prefix="epm-woerter-") as tmp:
+        liste = Path(tmp) / "fachwoerter.txt"
+        woerterliste_schreiben(liste)
+        for s in seiten:
+            if s.status != ScanSeite.Status.FERTIG or not s.grau:
+                continue
+            vorhanden = [z.get("box") for z in (s.info or {}).get("zusatz") or []]
+            for box in bereiche:
+                if box in vorhanden:
+                    continue
+                try:
+                    daten = ausschnitt.lesen(lade_bild(s.datei(s.grau), grau=True), ausschnitt.pruefen(box), str(liste))
+                except Exception:  # noqa: BLE001 – ein gelernter Bereich darf die Erkennung nicht stören
+                    log.warning("Gelernten Bereich auf Seite %s von %s nicht gelesen", s.nr, scan, exc_info=True)
+                    continue
+                _zusatz_merken(s, daten, "gelernt")
+                anzahl += 1
+    return anzahl
 
 
 def auftrag_holen() -> Scan | None:
@@ -619,6 +752,7 @@ def bearbeiten(scan: Scan, paddle=None, abbrechen=lambda: False) -> Scan:
                 Scan.objects.filter(pk=scan.pk).update(versuche=0)
                 gc.collect()  # große Bilder der Seite sofort freigeben
         scan.refresh_from_db()
+        bereiche_nachlesen(scan)
         auswerten(scan)
         scan.status = Scan.Status.FERTIG
         scan.fortschritt = 100
@@ -640,42 +774,102 @@ def bearbeiten(scan: Scan, paddle=None, abbrechen=lambda: False) -> Scan:
 
 
 # ---------------------------------------------------------------- Patient finden und prüfen
+def _aehnlicher_name(teil: str, kandidaten: set[str]) -> str | None:
+    """Ein Wort aus ``kandidaten``, das ``teil`` mit wenigen Lesefehlern entspricht (1 Fehler ab 4, 2 ab 8 Zeichen)."""
+    if len(teil) < 4:
+        return None
+    grenze = 1 if len(teil) < 8 else 2
+    beste = None
+    for k in kandidaten:
+        if k == teil:
+            return k
+        a = auswertung.abstand(teil, k)
+        if 0 < a <= grenze and (beste is None or a < beste[0]):
+            beste = (a, k)
+    return beste[1] if beste else None
+
+
 def patient_vorschlaege(scan: Scan, user, anzahl: int = 3) -> list[dict]:
-    """Patienten, auf die das Dokument hinweist (Nummer, Geburtsdatum, Name). Bestätigen muss immer ein Mensch."""
+    """Patienten, auf die das Dokument hinweist (F183): Name (auch mit Lesefehlern), Geburtsdatum (exakt, starkes
+    Merkmal), Nummer. Nur Akten, die diese Person sehen darf. Zugeordnet wird nie automatisch – bestätigen muss immer
+    ein Mensch.
+
+    Stufe je Vorschlag: „sicher“ (Name und Geburtsdatum), „wahrscheinlich“ (genug Merkmale), „unsicher“ (nur ein
+    schwaches Merkmal – die Oberfläche zeigt dann nur einen Hinweis). Passt das Geburtsdatum im Dokument nicht zur Akte,
+    sinkt die Stufe (zwei Personen gleichen Namens)."""
     from epm.api_basis import patienten_fuer
 
     h = (scan.auswertung or {}).get("patient") or {}
     nummern = set(h.get("nummern") or [])
     geburt = set(h.get("geburtsdaten") or [])
     woerter = set(h.get("woerter") or [])
-    if not (nummern or geburt or woerter):
+    namen = set(h.get("namen") or [])
+    if not (nummern or geburt or woerter or namen):
         return []
     qs = patienten_fuer(user)
     if scan.ist_test:
         qs = qs.filter(ist_test=True)
     kandidaten = []
     for p in qs.only("id", "nummer", "nachname", "vorname", "geburtsdatum", "ist_test", "abgeschlossen_am").iterator():
-        punkte, gruende = 0, []
-        if p.nummer in nummern:
-            punkte += 3
-            gruende.append(f"Nr. {p.nummer}")
-        if p.geburtsdatum and p.geburtsdatum.isoformat() in geburt:
-            punkte += 3
-            gruende.append("Geburtsdatum")
+        punkte, gruende = 0.0, []
+        name_ok = name_aehnlich = False
         nach = auswertung.norm(p.nachname).split()
-        if nach and all(t in woerter for t in nach):
-            punkte += 2
-            gruende.append("Nachname")
         vor = auswertung.norm(p.vorname).split()[:1]
-        if vor and vor[0] in woerter:
-            punkte += 2 if nach and all(t in woerter for t in nach) else 1
-            gruende.append("Vorname")
-        if punkte >= 4:
-            kandidaten.append({"id": p.id, "nummer": p.nummer, "name": f"{p.nachname}, {p.vorname}",
-                               "geburtsdatum": p.geburtsdatum, "ist_test": p.ist_test,
-                               "abgeschlossen": p.abgeschlossen_am is not None, "punkte": punkte,
-                               "grund": ", ".join(gruende)})
-    kandidaten.sort(key=lambda k: (-k["punkte"], k["name"]))
+        if nach and all(t in woerter or t in namen for t in nach):
+            punkte += 2
+            name_ok = True
+        elif nach and namen:
+            gelesen = [_aehnlicher_name(t, namen) for t in nach]
+            if all(gelesen):
+                punkte += 1.5
+                name_aehnlich = True
+                gruende.append(f"Name ähnlich gelesen („{' '.join(gelesen)}“)")
+        vorname = False
+        if vor and (vor[0] in woerter or vor[0] in namen):
+            punkte += 2 if (name_ok or name_aehnlich) else 1
+            vorname = True
+        elif vor and namen and _aehnlicher_name(vor[0], namen):
+            punkte += 1
+            vorname = True
+        geb_ok = bool(p.geburtsdatum and p.geburtsdatum.isoformat() in geburt)
+        geb_falsch = bool(geburt and p.geburtsdatum and not geb_ok)
+        if geb_ok:
+            punkte += 3
+        elif geb_falsch:
+            punkte -= 2
+        nummer_ok = p.nummer in nummern
+        if nummer_ok:
+            punkte += 3
+        if punkte < 2:
+            continue
+        if (name_ok or name_aehnlich) and geb_ok:
+            stufe = "sicher"
+            gruende.insert(0, "Name und Geburtsdatum erkannt" if name_ok else "Geburtsdatum erkannt")
+        elif punkte >= 4 and not geb_falsch:
+            stufe = "wahrscheinlich"
+        else:
+            stufe = "unsicher"
+        if not gruende or gruende[0] not in ("Name und Geburtsdatum erkannt", "Geburtsdatum erkannt"):
+            teile = []
+            if name_ok:
+                teile.append("Name" if vorname else "Nachname")
+            elif vorname and not name_aehnlich:
+                teile.append("Vorname")
+            if geb_ok:
+                teile.append("Geburtsdatum")
+            if teile:
+                gruende.insert(0, " und ".join(teile) + " erkannt")
+        if nummer_ok:
+            gruende.append(f"Nr. {p.nummer}")
+        if geb_falsch:
+            gruende.append("Geburtsdatum im Dokument passt nicht")
+        kandidaten.append({"id": p.id, "nummer": p.nummer, "name": f"{p.nachname}, {p.vorname}",
+                           "nachname": p.nachname, "vorname": p.vorname,
+                           "geburtsdatum": p.geburtsdatum, "ist_test": p.ist_test,
+                           "abgeschlossen": p.abgeschlossen_am is not None, "punkte": punkte, "stufe": stufe,
+                           "grund": ", ".join(gruende)})
+    rang = {"sicher": 0, "wahrscheinlich": 1, "unsicher": 2}
+    kandidaten.sort(key=lambda k: (rang[k["stufe"]], -k["punkte"], k["name"]))
     return kandidaten[:anzahl]
 
 

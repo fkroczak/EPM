@@ -44,7 +44,7 @@ function FassungenDialog({ feld, offen, onOffen, gewaehlt, onWahl }: {
                   className={cx("w-full text-left rounded-lg border px-3 py-2 flex items-center justify-between gap-3 cursor-pointer",
                     an ? "border-akzent bg-akzent-weich" : "border-rand bg-flaeche hover:bg-fein")}>
                   <span className="flex flex-col">
-                    <span className="font-medium">Version {f.version}</span>
+                    <span className="font-medium">Fassung {f.version}</span>
                     <span className="text-[0.8125rem] gedaempft">{datum(f.zeitpunkt)}, {uhrzeit(f.zeitpunkt)} Uhr · {f.person ?? "—"}</span>
                   </span>
                   {f.version === aktuell ? <Chip art="ok">aktuell</Chip> : null}
@@ -71,7 +71,7 @@ function Dokument({ feld }: { feld: Textfeld }) {
       {alt ? (
         <Meldung art="info">
           <span className="flex items-center justify-between gap-3 flex-wrap">
-            Sie sehen Version {gewaehlt} – nur lesbar.
+            Sie sehen Fassung {gewaehlt} – nur lesbar.
             <Knopf klein onClick={() => setWahl("")}>Zur aktuellen Fassung</Knopf>
           </span>
         </Meldung>
@@ -211,7 +211,7 @@ function Seitenspalte({ feld }: { feld: Textfeld }) {
 
 function Textseite({ feld, testid }: { feld: Textfeld; testid: string }) {
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(17.5rem,22rem)] gap-[var(--abstand)] items-start" data-testid={testid}>
+    <div className="akte-spalten grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(17.5rem,22rem)] gap-[var(--abstand)] items-start" data-testid={testid}>
       <div className="flex flex-col gap-[var(--abstand)] min-w-0 xl:max-w-[60rem]">
         <Dokument feld={feld} />
         {feld === "therapie" ? <Verlauf /> : null}

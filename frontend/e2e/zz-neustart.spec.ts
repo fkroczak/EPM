@@ -7,7 +7,7 @@
  */
 import { expect, test } from "@playwright/test";
 import type { Browser, Page } from "@playwright/test";
-import { OHNE_ANMELDUNG, apiAls, apiAnmelden, gemerkt, stackNeuStarten, totpBase32, virtuellerAuthenticator, zustand } from "./hilfen";
+import { OHNE_ANMELDUNG, adminNavigation, apiAls, apiAnmelden, gemerkt, stackNeuStarten, totpBase32, virtuellerAuthenticator, zustand } from "./hilfen";
 import type { Rolle } from "./hilfen";
 
 test.describe.configure({ mode: "serial" });
@@ -76,7 +76,7 @@ test("Nach dem Neustart: Akten mit Gewicht, Diagnose und Versionen, Kontakten, T
   await page.goto(`/patienten/${gemerkt("diagnose").id}/diagnosen`);
   const diagnose = page.getByTestId("karte-diagnose");
   await expect(diagnose.locator(".richtext strong")).toHaveText("Typ II");
-  await expect(diagnose).toContainText("Version 2");
+  await expect(diagnose).toContainText("Fassung 2");
   await page.goto(`/patienten/${gemerkt("diagnose").id}/therapie`);
   await expect(page.getByTestId("karte-therapie")).toContainText("HPE 5×/Woche über Port");
   await expect(page.getByTestId("karte-therapie")).toContainText("geändert");
@@ -136,8 +136,8 @@ test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", 
   await expect(page.getByRole("dialog").getByTestId("pdf-leser").locator("canvas").first()).toBeVisible();
   await page.keyboard.press("Escape");
   // veröffentlichte Dokumentvorlage
-  await page.goto("/admin/vorlagen/dokumente");
-  await expect(page.getByTestId("vorlage-stand")).toHaveText(`Version ${gemerkt("vorlage").version} ist aktiv`);
+  await page.goto("/admin/vorlagen/dokumente?art=infusionsplan");
+  await expect(page.getByTestId("vorlage-stand")).toHaveText(`Fassung ${gemerkt("vorlage").version} ist in Gebrauch`);
   await page.getByTestId("aufbau").getByRole("button", { name: /Freigabevermerk/ }).click();
   await expect(page.getByTestId("block-eigenschaften").getByLabel("Text")).toHaveValue("Rückfragen an die Stiftung, Stand {{Heute}}");
 
@@ -223,7 +223,7 @@ test("Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Re
   await rechte.getByRole("button", { name: /^Speichern \(\d+\)$/ }).click();
   await expect(page.getByText("Rechte gespeichert. Sie gelten ab sofort.")).toBeVisible();
 
-  await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Audit-Log" }).click();
+  await (await adminNavigation(page)).getByRole("link", { name: "Audit-Log" }).click();
   await page.getByRole("button", { name: "Benutzer", exact: true }).click();
   await expect(page.getByTestId("auditlog")).toContainText(name);
   await page.getByRole("button", { name: "Dokument", exact: true }).click();
@@ -231,7 +231,7 @@ test("Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Re
   await expect(page.getByTestId("auditlog")).not.toContainText(gemerkt("geloescht").titel);
 
   const { ort, vitamin } = gemerkt("vorlagen");
-  await page.goto("/admin/vorlagen");
+  await page.goto("/admin/vorlagen?bereich=briefkopf");
   await expect(page.getByTestId("logo")).toContainText("öffnen");
   await page.getByRole("button", { name: "Auswahllisten" }).click();
   const listen = page.getByRole("navigation", { name: "Listen" });
@@ -284,7 +284,7 @@ test("Nach dem Neustart: Termin im Kalender (erledigt) und Tätigkeiten der Syst
 
   const s = gemerkt("system");
   const a = await seiteAls(browser, "admin");
-  await a.page.goto("/admin/system");
+  await a.page.goto("/admin/system?reiter=verlauf");
   const zeilen = a.page.getByTestId("auftraege");
   await expect(zeilen.getByRole("row", { name: new RegExp(s.taetigkeit) }).first()).toContainText("erledigt");
   await expect(zeilen.getByRole("row", { name: /Server neu starten/ }).first()).toContainText("erledigt");

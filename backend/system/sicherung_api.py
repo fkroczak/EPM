@@ -19,6 +19,9 @@ POST /api/backup/hochladen/                        {name, groesse} → {upload, 
 PUT  /api/backup/hochladen/<upload>/?versatz=N     nächstes Stück (application/octet-stream, höchstens „teil“ Bytes)
 DELETE /api/backup/hochladen/<upload>/             hochgeladene Datei verwerfen
 POST /api/backup/hochladen/<upload>/einlesen/      {passwort?} → der Server prüft die Sicherung und nimmt sie in die Liste
+POST /api/backup/zeitplan/                         {uhrzeit: "HH:MM", tage: "taeglich" | "werktags", kennwort, code}
+POST /api/backup/loeschen/                         {stempel: [...], kennwort, code} → ausgewählte Sicherungen löschen
+                                                   (die jüngste bleibt immer; Auftrag an den Server, Audit-Log)
 
 Der zweite Faktor ist freiwillig (Festlegung 02.10.2026): „code“ wird nur geprüft, wenn die Person einen eingerichtet hat.
 
@@ -26,23 +29,20 @@ Passwörter (Sicherungs-Passwort, Zugang zum Ziel) gehen nur in die Auftragsdate
 sie sofort nach dem Lesen) – nie in die Datenbank, das Audit-Log oder eine Antwort. Ausnahme ist das Passwortblatt:
 Es druckt das Passwort, das die Oberfläche gerade mitschickt, nachdem es gegen den Prüfwert des Servers geprüft ist.
 """
-import json
-import os
-import uuid
 from urllib.parse import quote, urlsplit
 
 from django.conf import settings
 from django.http import FileResponse, HttpResponse
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.parsers import BaseParser, JSONParser
+from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import nur_recht
 from audit.models import SystemEreignis, protokolliere
 
-from . import epm_aufgaben, host, sicherung
+from . import epm_aufgaben, hochladen, host, sicherung
 from .api import MINUTEN_ERLAUBT, AuftragSerializer, auftraege_abgleichen, auftrag_anlegen, auftrag_zurueckziehen
 from .models import Systemauftrag
 
@@ -111,6 +111,10 @@ class UebersichtView(APIView):
             "uploads": sicherung.uploads(),
             "upload": {"teil": sicherung.UPLOAD_TEIL, "max": sicherung.UPLOAD_MAX},
             "naechste_sicherung": d.get("naechste_sicherung"),
+            # Zeitplan der nächtlichen Sicherung (Nachtrag 10.10.2026) mit Hinweis zum Übertragungsfenster
+            "zeitplan": {**(d.get("zeitplan") or sicherung.ZEITPLAN_STANDARD),
+                         "hinweis": sicherung.zeitplan_hinweis((d.get("zeitplan") or sicherung.ZEITPLAN_STANDARD)["uhrzeit"],
+                                                               d.get("ziel"))},
             "nachts_fehlgeschlagen": bool(d.get("nachts_fehlgeschlagen")),
             "gpg": d.get("gpg"),
             "wiederherstellungen": d.get("wiederherstellungen") or [],
@@ -387,25 +391,9 @@ class DateiView(APIView):
         return antwort
 
 
-class RohParser(BaseParser):
-    """Ein Stück der hochgeladenen Datei, unverändert (höchstens ``UPLOAD_TEIL`` Bytes je Anfrage)."""
-
-    media_type = "application/octet-stream"
-
-    def parse(self, stream, media_type=None, parser_context=None):
-        return stream.read(sicherung.UPLOAD_TEIL + 1)
-
-
 def _upload(kennung):
-    """(Pfad der Datei, Angaben) eines begonnenen Uploads oder (None, None)."""
-    if not sicherung.ID_MUSTER.match(kennung or ""):
-        return None, None
-    ordner = host.ordner_upload()
-    meta = host._lies(ordner / f"{kennung}.json")
-    pfad = ordner / f"{kennung}.teil"
-    if not isinstance(meta, dict) or not pfad.is_file() or pfad.is_symlink():
-        return None, None
-    return pfad, meta
+    """(Pfad der Datei, Angaben) einer begonnenen hochgeladenen Sicherung oder (None, None)."""
+    return hochladen.finde(kennung, ("sicherung",))
 
 
 class HochladenView(APIView):
@@ -416,67 +404,19 @@ class HochladenView(APIView):
     permission_classes = [BackupRecht]
 
     def post(self, request):
-        ordner = host.ordner_upload()
-        if not ordner.is_dir():
-            return Response({"fehler": AUSTAUSCH_FEHLT}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        name = os.path.basename(str(request.data.get("name") or "").replace("\\", "/"))[:200]
-        groesse = request.data.get("groesse")
-        if not name.lower().endswith(".tar") or any(z in STEUERZEICHEN for z in name):
-            return _fehler("name", "Bitte die Datei wählen, die „Herunterladen“ geliefert hat "
-                                   "(epm-sicherung_<Zeitpunkt>.tar).")
-        if isinstance(groesse, bool) or not isinstance(groesse, int) or not (0 < groesse <= sicherung.UPLOAD_MAX):
-            return _fehler("groesse", "Die Datei ist leer oder zu groß.")
-        try:
-            frei = os.statvfs(ordner)
-            # Platz für die hochgeladene Datei und für das Auspacken in den Backup-Ordner
-            if frei.f_bavail * frei.f_frsize < 2 * groesse + 64 * 1024 * 1024:
-                return _fehler("groesse", "Auf dem Server ist dafür zu wenig Speicher frei.")
-        except OSError:
-            pass
-        kennung = uuid.uuid4().hex
-        try:
-            fd = os.open(ordner / f"{kennung}.teil", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
-            os.close(fd)
-            with open(ordner / f"{kennung}.json", "w", encoding="utf-8") as f:
-                json.dump({"name": name, "groesse": groesse, "von": request.user.get_username(),
-                           "begonnen_am": timezone.now().isoformat(timespec="seconds")}, f, ensure_ascii=False)
-        except OSError as e:
-            return Response({"fehler": f"Die Datei konnte nicht angelegt werden ({e.strerror}). Rechte des Ordners für "
-                                       "hochgeladene Sicherungen prüfen."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        protokolliere(SystemEreignis.Art.BACKUP, request, objekt="Sicherung hochladen", ereignis="upload_begonnen",
-                      datei=name, groesse=groesse, upload=kennung)
-        return Response({"upload": kennung, "teil": sicherung.UPLOAD_TEIL, "erhalten": 0, "groesse": groesse},
-                        status=status.HTTP_201_CREATED)
+        return hochladen.beginnen(request, "sicherung", AUSTAUSCH_FEHLT)
 
 
 class HochladenTeilView(APIView):
     permission_classes = [BackupRecht]
-    parser_classes = [RohParser, JSONParser]
+    parser_classes = [hochladen.RohParser, JSONParser]
 
     def put(self, request, kennung):
         pfad, meta = _upload(kennung)
         if pfad is None:
             return Response({"fehler": "Dieser Upload ist nicht (mehr) bekannt. Bitte neu beginnen."},
                             status=status.HTTP_404_NOT_FOUND)
-        daten = request.data
-        if not isinstance(daten, (bytes, bytearray)) or not daten:
-            return _fehler("fehler", "Erwartet wird ein Stück der Datei (application/octet-stream).")
-        if len(daten) > sicherung.UPLOAD_TEIL:
-            return _fehler("fehler", "Das Stück ist zu groß.", status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
-        erhalten = pfad.stat().st_size
-        try:
-            versatz = int(request.query_params.get("versatz", ""))
-        except ValueError:
-            versatz = -1
-        if versatz != erhalten:
-            # z. B. nach einer unterbrochenen Verbindung: Die Oberfläche setzt an der gemeldeten Stelle fort
-            return Response({"fehler": "Das Stück passt nicht an das bisher Empfangene.", "erhalten": erhalten},
-                            status=status.HTTP_409_CONFLICT)
-        if erhalten + len(daten) > meta.get("groesse", 0):
-            return _fehler("fehler", "Es kommt mehr an, als angekündigt wurde.")
-        with open(pfad, "ab") as f:
-            f.write(daten)
-        return Response({"erhalten": erhalten + len(daten), "groesse": meta.get("groesse")})
+        return hochladen.teil_anhaengen(request, pfad, meta)
 
     def delete(self, request, kennung):
         pfad, meta = _upload(kennung)
@@ -486,11 +426,7 @@ class HochladenTeilView(APIView):
                                         parameter__upload=kennung,
                                         status__in=[Systemauftrag.Status.WARTET, Systemauftrag.Status.LAEUFT]).exists():
             return Response({"fehler": "Der Server liest diese Datei gerade ein."}, status=status.HTTP_409_CONFLICT)
-        for datei in (pfad, pfad.with_suffix(".json")):
-            try:
-                os.unlink(datei)
-            except OSError:
-                pass
+        hochladen.entfernen(pfad)
         protokolliere(SystemEreignis.Art.BACKUP, request, objekt="Sicherung hochladen", ereignis="upload_abgebrochen",
                       datei=str(meta.get("name") or ""), upload=kennung)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -523,3 +459,59 @@ class EinlesenView(APIView):
                                geheim={"passwort": passwort} if passwort else None,
                                objekt=f"Sicherung {name}"[:200],
                                protokoll_details={"datei": name, "groesse": erhalten, "mit_passwort": passwort is not None})
+
+
+class LoeschenView(APIView):
+    """Mehrere Sicherungen auf einmal löschen (Wunsch 10.10.2026, F179): Auswahl in der Liste, Bestätigung mit Passwort
+    und zweitem Faktor. Die jüngste Sicherung bleibt immer, damit nie keine mehr da ist; im Übertragungsziel gilt
+    dessen eigene Aufbewahrung. Das Backend prüft die Auswahl gegen den Stand des Servers, der Agent noch einmal und
+    löscht nur Dateien, deren Namen genau zu diesen Sicherungen passen."""
+
+    permission_classes = [BackupRecht]
+
+    def post(self, request):
+        stempel = request.data.get("stempel")
+        if not isinstance(stempel, list) or not stempel or len(stempel) > host.LOESCHEN_MAX \
+                or any(not isinstance(s, str) or not sicherung.STEMPEL_MUSTER.match(s) for s in stempel) \
+                or len(set(stempel)) != len(stempel):
+            return _fehler("stempel", f"Bitte 1 bis {host.LOESCHEN_MAX} Sicherungen auswählen.")
+        daten = sicherung.status()
+        if daten is None or not daten.get("aktuell"):
+            return Response({"fehler": "Der Systemagent auf dem Server meldet sich gerade nicht. Löschen ist erst "
+                                       "möglich, wenn er wieder läuft."}, status=status.HTTP_409_CONFLICT)
+        liste = sicherung.sicherungen(daten)
+        bekannt = {s["stempel"]: s for s in liste}
+        fehlen = [s for s in stempel if s not in bekannt]
+        if fehlen:
+            return _fehler("stempel", f"Diese Sicherungen gibt es auf dem Server nicht (mehr): {', '.join(fehlen[:5])}.")
+        if liste and liste[0]["stempel"] in stempel:
+            return _fehler("stempel", "Die jüngste Sicherung bleibt immer erhalten – bitte abwählen.")
+        if Systemauftrag.objects.filter(ziel=Systemauftrag.Ziel.SERVER, aktion="wiederherstellen",
+                                        status__in=[Systemauftrag.Status.WARTET, Systemauftrag.Status.LAEUFT]).exists():
+            return Response({"fehler": "Gerade wird eine Sicherung wiederhergestellt – bitte danach löschen."},
+                            status=status.HTTP_409_CONFLICT)
+        groesse = sum(int(bekannt[s].get("groesse") or 0) for s in stempel)
+        reihe = sorted(stempel)
+        return auftrag_anlegen(request, "sicherung_loeschen", parameter={"stempel": reihe},
+                               objekt=f"{len(reihe)} Sicherung{'' if len(reihe) == 1 else 'en'}",
+                               protokoll_details={"stempel": reihe, "anzahl": len(reihe), "groesse": groesse,
+                                                  "unverschluesselt": sum(1 for s in reihe
+                                                                          if not bekannt[s].get("verschluesselt"))})
+
+
+class ZeitplanView(APIView):
+    """Uhrzeit der nächtlichen Sicherung (Nachtrag 10.10.2026, F179l): täglich oder werktags, HH:MM. Der Agent schreibt ein
+    Drop-in für epm-backup.timer. Mit Passwort und zweitem Faktor wie die anderen Einstellungen der Sicherung."""
+
+    permission_classes = [BackupRecht]
+
+    def post(self, request):
+        uhrzeit, tage = request.data.get("uhrzeit"), request.data.get("tage", "taeglich")
+        if not isinstance(uhrzeit, str) or not sicherung.ZEIT_MUSTER.match(uhrzeit):
+            return _fehler("uhrzeit", "Bitte die Uhrzeit als HH:MM angeben, z. B. 02:00.")
+        if tage not in host.ZEITPLAN_TAGE:
+            return _fehler("tage", "Bitte täglich oder werktags wählen.")
+        hinweis = sicherung.zeitplan_hinweis(uhrzeit, (sicherung.status() or {}).get("ziel"))
+        return auftrag_anlegen(request, "sicherung_zeitplan", parameter={"uhrzeit": uhrzeit, "tage": tage},
+                               objekt="Zeitplan der Sicherung",
+                               protokoll_details={"uhrzeit": uhrzeit, "tage": tage, "hinweis": hinweis})

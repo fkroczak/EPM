@@ -109,7 +109,8 @@ class Uebersicht(Backupverzeichnis):
         self.assertEqual(set(d["aktionen"]), {"sicherung", "sicherung_passwort", "sicherung_ziel",
                                               "sicherung_ziel_entfernen", "sicherung_ziel_testen",
                                               "sicherung_uebertragen", "sicherung_aufbewahrung",
-                                              "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen"})
+                                              "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen",
+                                              "sicherung_loeschen", "sicherung_zeitplan"})
         self.assertEqual((d["aufbewahrung_auswahl"], d["austausch"], d["bereitgestellt"], d["uploads"]),
                          ([7, 14, 30], True, [], []))
         self.assertEqual(d["aktionen"]["wiederherstellen"]["bestaetigung"], "2fa")

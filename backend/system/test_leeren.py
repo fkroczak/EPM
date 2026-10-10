@@ -17,7 +17,8 @@ from .models import Systemauftrag
 from .tests import AGENT, Systemverzeichnis
 
 
-@override_settings(EPM_DOKUMENTE=Path(TMP) / "leeren-dokumente", EPM_LOESCHLISTE=Path(TMP) / "leeren-loeschliste.jsonl")
+@override_settings(EPM_DOKUMENTE=Path(TMP) / "leeren-dokumente", EPM_LOESCHLISTE=Path(TMP) / "leeren-loeschliste.jsonl",
+                   EPM_SCANS=Path(TMP) / "leeren-scans")
 class DatenbankLeeren(Systemverzeichnis):
     def setUp(self):
         super().setUp()
@@ -30,6 +31,19 @@ class DatenbankLeeren(Systemverzeichnis):
         ordner.mkdir(parents=True, exist_ok=True)
         (ordner / "x.txt").write_text("x")
         Path(settings.EPM_LOESCHLISTE).write_text('{"nummer": 1}\n')
+        # ein nicht zugeordneter Scan (Patientendaten) und Gelerntes der Texterkennung
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from scans.models import GelernteZuordnung, Scan
+
+        (Path(settings.EPM_SCANS) / "abc123").mkdir(parents=True, exist_ok=True)
+        (Path(settings.EPM_SCANS) / "abc123" / "seite-1.png").write_bytes(b"x")
+        (Path(settings.EPM_SCANS) / ".dienst").mkdir(exist_ok=True)
+        Scan.objects.create(titel="Befund", originalname="b.png", mime="image/png", groesse=1, sha256="0" * 64,
+                            ordner="abc123", hochgeladen_von=self.tester, laeuft_ab_am=timezone.now() + timedelta(days=7))
+        GelernteZuordnung.objects.create(art=GelernteZuordnung.Art.BIA, erkannt="fettmasse", ziel="fettmasse_kg")
 
     def test_ablauf_und_pruefungen(self):
         c = self.a
@@ -92,6 +106,11 @@ class DatenbankLeeren(Systemverzeichnis):
         self.assertFalse(Einstellungen.aktuell().musterdaten_automatisch)
         self.assertEqual(list(Path(settings.EPM_DOKUMENTE).iterdir()), [])
         self.assertEqual(Path(settings.EPM_LOESCHLISTE).read_text(), "")
+        # Scans mit Dateien und Gelerntes sind weg, der Stand des OCR-Dienstes bleibt
+        from scans.models import GelernteZuordnung, Scan
+
+        self.assertEqual(Scan.objects.count() + GelernteZuordnung.objects.count(), 0)
+        self.assertEqual([p.name for p in Path(settings.EPM_SCANS).iterdir()], [".dienst"])
         # Audit-Log beginnt neu mit „Datenbank geleert“
         e = SystemEreignis.objects.get()
         self.assertEqual((e.details["ereignis"], e.benutzer), ("datenbank_geleert", self.admin))

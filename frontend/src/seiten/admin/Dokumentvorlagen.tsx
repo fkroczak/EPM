@@ -1,19 +1,27 @@
 /**
- * Entwurf 18 · Dokumentvorlagen: Infusionsplan und Patientendatenblatt aus Blöcken (WYSIWYG).
+ * Entwurf 18 · Dokumentvorlagen: Infusionsplan, Patientendatenblatt, Schreiben und Vordrucke aus Blöcken (WYSIWYG).
  * Aufbau links, Seite in der Mitte, Eigenschaften des markierten Blocks rechts. Platzhalter nur aus der festen Liste
  * des Servers. Entwurf → Veröffentlichen; jede Version bleibt erhalten, freigegebene Pläne behalten ihr PDF.
+ *
+ * Vorlagen-Portal einfacher (F180): zuerst die Liste aller Vorlagen mit „Wofür?“, „Wo benutzt?“ und Stand; im Editor
+ * der geführte Ablauf „1 Bearbeiten → 2 Vorschau prüfen → 3 Freigeben“, Live-Vorschau mit Testpatient neben den
+ * Eigenschaften, Angaben aus der Akte per Klick aus einer lesbaren Liste, frühere Fassung ansehen/wiederherstellen,
+ * „Als eigene Vorlage kopieren“. In der Oberfläche heißt eine Version „Fassung“ und Veröffentlichen „Freigeben“.
  */
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api, apiDatei } from "@/lib/api";
 import type { Seite as Seitenliste } from "@/lib/api";
 import { useBriefkopf } from "@/lib/daten";
-import { datum, zeitpunkt } from "@/lib/format";
+import { datum } from "@/lib/format";
 import { Logo } from "@/components/layout/logo";
-import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Segmente, Textfeld, cx } from "@/components/ui/basis";
+import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Ladekreis, Meldung, Segmente, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
+import { Begriff } from "@/components/ui/Begriff";
+import { Erklaerung } from "@/components/ui/erklaerung";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { useSortierbar, verschiebe } from "@/components/ui/sortierbar";
@@ -51,10 +59,15 @@ type Uebersicht = { art: Art; name: string; aktiv: Version; entwurf: Version | n
   /** Vordrucke: Wasserzeichen „ENTWURF“ der Startvorlage, manuell abschaltbar (U17) */
   entwurfsmodus?: { moeglich: boolean; aktiv: boolean; aus: boolean };
   /** eigenes Schreiben (F176) */
-  eigen?: { beschreibung: string; mit_termin: boolean; aktiv: boolean } | null };
+  eigen?: { beschreibung: string; mit_termin: boolean; aktiv: boolean } | null;
+  /** Vorlagen-Portal (F180): Gruppe der Liste, wofür die Vorlage ist und wo sie in der Praxis benutzt wird */
+  gruppe?: Gruppe; wofuer?: string; wo?: string };
+export type VorlagenUebersicht = Uebersicht;
+type Gruppe = "schreiben" | "eigen" | "plaene" | "datenschutz";
+type Datenfeld = { name: string; beschreibung: string; html: boolean; bezeichnung?: string; gruppe?: string };
 type Aufbau = Uebersicht & {
   bausteine: { typ: string; name: string }[];
-  felder: { name: string; beschreibung: string; html: boolean }[];
+  felder: Datenfeld[];
   tabellen: { quelle: string; name: string; spalten: string[] }[];
 };
 type Entwurf = Version & { ist_entwurf: boolean; grundlage?: number; bloecke: Block[] };
@@ -121,13 +134,24 @@ function neuerBlock(typ: string, bloecke: Block[], tabellen: Aufbau["tabellen"])
   return b;
 }
 
+/** Lesbare Namen der erlaubten Datenfelder (F180): Platzhalter erscheinen als „Briefanrede“ statt Patient.Briefanrede */
+const FeldNamen = createContext<Map<string, Datenfeld> | null>(null);
+
+/** Ein Platzhalter als Chip: lesbarer Name, technischer Name im Tooltip; unbekannte rot (der Server weist sie ab) */
+function FeldChip({ name }: { name: string }) {
+  const felder = useContext(FeldNamen);
+  const f = felder?.get(name);
+  if (felder && !f) return <span className="feldchip feldchip-unbekannt" title={`Unbekannte Angabe {{${name}}} – bitte aus der Liste rechts einfügen`}>{name}?</span>;
+  return <span className="feldchip" title={f ? `{{${name}}} · ${f.beschreibung}` : undefined}>{f?.bezeichnung ?? name}</span>;
+}
+
 /** Text mit Platzhaltern als Chips (wie im Entwurf) */
 function MitFeldern({ text }: { text?: string }) {
   const teile: ReactNode[] = [];
   let pos = 0;
   for (const m of (text ?? "").matchAll(PLATZHALTER)) {
     teile.push(text!.slice(pos, m.index));
-    teile.push(<span key={m.index} className="feldchip">{m[1]}</span>);
+    teile.push(<FeldChip key={m.index} name={m[1]} />);
     pos = (m.index ?? 0) + m[0].length;
   }
   teile.push((text ?? "").slice(pos));
@@ -257,17 +281,93 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
   }
 }
 
-/** Bereich „Dokumentvorlagen“ der Seite Vorlagen (wie Briefkopf, Auswahllisten, Grenzwerte). Die Knöpfe stehen oben
- *  rechts im Seitenkopf, wo die anderen Bereiche „Speichern“ haben. */
+const GRUPPEN: { gruppe: Gruppe; titel: string; leer?: string }[] = [
+  { gruppe: "schreiben", titel: "Briefe und E-Mails an Patienten" },
+  { gruppe: "eigen", titel: "Eigene Vorlagen",
+    leer: "Noch keine eigenen Vorlagen. „+ Neue Vorlage“ legt z. B. ein Schreiben an Hausärzte an; „Als eigene Vorlage kopieren“ im Editor nimmt ein bestehendes Schreiben als Grundlage." },
+  { gruppe: "plaene", titel: "Pläne, Berichte und Unterlagen" },
+  { gruppe: "datenschutz", titel: "Vordrucke zum Datenschutz" },
+];
+
+/** Stand einer Vorlage in Alltagssprache (Liste und Kopf des Editors) */
+export function vorlageStatus(u: Uebersicht): { text: string; art: "ok" | "warn" | "neutral" } {
+  if (u.eigen && !u.eigen.aktiv) return { text: "deaktiviert", art: "neutral" };
+  if (u.entwurf) return { text: "Änderungen noch nicht freigegeben", art: "warn" };
+  if (u.entwurfsmodus?.aktiv) return { text: "Mustertext, noch nicht geprüft", art: "warn" };
+  return { text: `in Gebrauch · Fassung ${u.aktiv.version}`, art: "ok" };
+}
+
+/** Schreiben, die sich als eigene Vorlage kopieren lassen (die Ankündigung hat eigene Datenfelder, F173) */
+const kopierbar = (art: Art) => mitEmailArt(art) && art !== "patientenankuendigung";
+
+/** Bereich „Dokumentvorlagen“ der Seite Vorlagen (wie Briefkopf, Auswahllisten, Grenzwerte). Ohne ``?art=`` die Liste
+ *  aller Vorlagen, mit ``?art=…`` der Editor; die Knöpfe stehen oben rechts im Seitenkopf, wo die anderen Bereiche
+ *  „Speichern“ haben. */
 export function DokumentvorlagenBereich({ aktionenZiel, onGeaendert }: {
   aktionenZiel: HTMLElement | null; onGeaendert: (geaendert: boolean) => void;
 }) {
-  const [art, setArt] = useState<Art>("infusionsplan");
-  return <EditorFuerArt key={art} art={art} setArt={setArt} aktionenZiel={aktionenZiel} onGeaendert={onGeaendert} />;
+  const [parameter, setParameter] = useSearchParams();
+  const art = parameter.get("art") as Art | null;
+  const waehle = (a: Art | null) => setParameter(a ? { art: a } : {});
+  if (!art) return <VorlagenListe onWahl={waehle} />;
+  return <EditorFuerArt key={art} art={art} onArt={waehle} aktionenZiel={aktionenZiel} onGeaendert={onGeaendert} />;
 }
 
-function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
-  art: Art; setArt: (a: Art) => void; aktionenZiel: HTMLElement | null; onGeaendert: (geaendert: boolean) => void;
+function VorlagenListe({ onWahl }: { onWahl: (a: Art) => void }) {
+  const liste = useQuery({ queryKey: ["vorlagen", "liste"], queryFn: () => api<Uebersicht[]>("vorlagen/") });
+  const [neu, setNeu] = useState(false);
+  const [filter, setFilter] = useState("");
+  const s = filter.trim().toLocaleLowerCase("de");
+  const passend = (liste.data ?? []).filter((v) => !s || `${v.name} ${v.wofuer ?? ""}`.toLocaleLowerCase("de").includes(s));
+  return (
+    <div className="stapel flex flex-col gap-5" data-testid="vorlagenliste">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Eingabe type="search" aria-label="Vorlage suchen" placeholder="Vorlage suchen …" value={filter}
+          onChange={(e) => setFilter(e.target.value)} className="w-[18rem] max-w-full" />
+        <Knopf icon="plus" onClick={() => setNeu(true)}>Neue Vorlage</Knopf>
+        <span className="text-[0.8125rem] gedaempft">Vorlage anklicken, um Text und Aussehen zu ändern. Geändert wird erst, was Sie freigeben.</span>
+      </div>
+      <Fehleranzeige fehler={liste.error} />
+      {liste.isLoading ? <Laden /> : null}
+      {GRUPPEN.map((g) => {
+        const eintraege = passend.filter((v) => (v.gruppe ?? "plaene") === g.gruppe);
+        if (!eintraege.length && (s || !g.leer)) return null;
+        return (
+          <section key={g.gruppe} aria-label={g.titel} className="flex flex-col gap-2.5">
+            <h2 className="lbl m-0">{g.titel}</h2>
+            {eintraege.length ? (
+              <ul className="m-0 p-0 list-none grid gap-3 grid-cols-1 md:grid-cols-2 2xl:grid-cols-3">
+                {eintraege.map((v) => {
+                  const st = vorlageStatus(v);
+                  return (
+                    <li key={v.art} className="flex">
+                      <button type="button" onClick={() => onWahl(v.art)} data-testid="vorlage-karte"
+                        className="card flex-1 flex flex-col gap-1.5 px-4 py-3 text-left cursor-pointer border border-transparent hover:border-akzent bg-flaeche text-tinte font-[inherit]">
+                        <span className="flex items-start justify-between gap-2 w-full">
+                          <span className="font-semibold text-[0.9375rem] leading-snug">{v.name}</span>
+                          <Chip art={st.art} className="shrink-0">{st.text}</Chip>
+                        </span>
+                        {v.wofuer ? <span className="text-[0.8438rem] leading-normal">{v.wofuer}</span> : null}
+                        {v.wo ? <span className="text-[0.7812rem] gedaempft leading-normal"><strong className="font-medium text-text2">Wo benutzt:</strong> {v.wo}</span> : null}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : <span className="text-[0.8125rem] gedaempft">{g.leer}</span>}
+          </section>
+        );
+      })}
+      {s && !passend.length ? <span className="text-sm gedaempft">Keine Vorlage enthält „{filter.trim()}“.</span> : null}
+      <EigeneVorlageDialog offen={neu} onOffen={setNeu} onAngelegt={onWahl} />
+    </div>
+  );
+}
+
+type Ansicht = "seite" | "vorschau";
+
+function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
+  art: Art; onArt: (a: Art | null) => void; aktionenZiel: HTMLElement | null; onGeaendert: (geaendert: boolean) => void;
 }) {
   const qc = useQueryClient();
   const melden = useHinweis();
@@ -276,15 +376,17 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
   const [bloecke, setBloecke] = useState<Block[] | null>(null);
   const [geladen, setGeladen] = useState("");
   const [auswahl, setAuswahl] = useState<string | null>(null);
-  const [vorschau, setVorschau] = useState(false);
-  const [veroeffentlichen, setVeroeffentlichen] = useState(false);
+  const [ansicht, setAnsicht] = useState<Ansicht>("seite");
+  // Stand, der zuletzt in der Vorschau mit Testpatient zu sehen war (Schritt 2 „geprüft“)
+  const [geprueft, setGeprueft] = useState("");
+  const [freigabeFrage, setFreigabeFrage] = useState(false);
   const [verwerfen, setVerwerfen] = useState(false);
   const [modusFrage, setModusFrage] = useState(false);
-  // eigene Schreiben (F176)
-  const [neueVorlage, setNeueVorlage] = useState(false);
+  const [fassung, setFassung] = useState<number | null>(null);
+  const [wiederherstellen, setWiederherstellen] = useState<number | null>(null);
+  // eigene Schreiben (F176) und Kopie als eigene Vorlage (F180)
   const [eigenAendern, setEigenAendern] = useState(false);
-  const liste = useQuery({ queryKey: ["vorlagen", "liste"], queryFn: () => api<Uebersicht[]>("vorlagen/") });
-  const eigene = (liste.data ?? []).filter((v) => istEigen(v.art));
+  const [kopieren, setKopieren] = useState(false);
   // Entwurfsmodus der Vordrucke manuell aus- bzw. wieder einschalten (Festlegung 03.10.2026, U17)
   const modus = useMutation({
     mutationFn: (aus: boolean) => api<Uebersicht>(`vorlagen/${art}/entwurfsmodus/`, { body: { aus } }),
@@ -296,6 +398,11 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
     },
   });
   const fokus = useRef<{ setze: (feld: string) => void } | null>(null);
+  const waehleBlock = (id: string | null) => {
+    // das Einfügen gilt dem ersten Textfeld des neuen Blocks, bis in ein anderes geklickt wird (FeldText meldet sich an)
+    if (id !== auswahl) fokus.current = null;
+    setAuswahl(id);
+  };
 
   useEffect(() => {
     if (entwurf.data && bloecke === null) {
@@ -308,6 +415,8 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
   const neuLaden = (b: Block[]) => { setBloecke(structuredClone(b)); setGeladen(JSON.stringify(b)); };
   const geaendert = bloecke !== null && JSON.stringify(bloecke) !== geladen;
   useEffect(() => { onGeaendert(geaendert); }, [geaendert, onGeaendert]);
+  useEffect(() => () => onGeaendert(false), [onGeaendert]);
+  const felderNach = useMemo(() => new Map((aufbau.data?.felder ?? []).map((f) => [f.name, f])), [aufbau.data]);
 
   const speichern = useMutation({
     mutationFn: () => api<Entwurf>(`vorlagen/${art}/entwurf/`, { method: "PUT", body: { bloecke } }),
@@ -315,7 +424,8 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
       neuLaden(e.bloecke);
       qc.setQueryData(["vorlagen", art, "entwurf"], e);
       void qc.invalidateQueries({ queryKey: ["vorlagen", art], exact: true });
-      melden("Entwurf gespeichert.");
+      void qc.invalidateQueries({ queryKey: ["vorlagen", "liste"] });
+      melden(`Gespeichert. In der Praxis gilt weiter Fassung ${aufbau.data?.aktiv.version} – zum Übernehmen „Freigeben“.`);
     },
   });
   const freigeben = useMutation({
@@ -324,10 +434,11 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
       return api<Uebersicht>(`vorlagen/${art}/veroeffentlichen/`, { method: "POST" });
     },
     onSuccess: (u) => {
-      setVeroeffentlichen(false);
+      setFreigabeFrage(false);
       setBloecke(null);
+      setAnsicht("seite");
       void qc.invalidateQueries({ queryKey: ["vorlagen"] });
-      melden(`Version ${u.aktiv.version} veröffentlicht. Sie gilt ab sofort für neue PDFs.`);
+      melden(`Fassung ${u.aktiv.version} freigegeben. Sie gilt ab sofort für neue PDFs und E-Mails.`);
     },
   });
   const verwerfenM = useMutation({
@@ -336,12 +447,21 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
       setVerwerfen(false);
       setBloecke(null);
       void qc.invalidateQueries({ queryKey: ["vorlagen"] });
-      melden("Entwurf verworfen.");
+      melden(`Änderungen verworfen. Fassung ${aufbau.data?.aktiv.version} bleibt in Gebrauch.`);
     },
   });
-  const uebernehmen = useMutation({
-    mutationFn: (v: number) => api<Entwurf>(`vorlagen/${art}/versionen/${v}/`),
-    onSuccess: (v) => { setBloecke(structuredClone(v.bloecke)); setAuswahl(v.bloecke[0]?.id ?? null); melden(`Version ${v.version} als Grundlage geladen – noch nicht gespeichert.`); },
+  const wiederherstellenM = useMutation({
+    mutationFn: (v: number) => api<Entwurf>(`vorlagen/${art}/versionen/${v}/wiederherstellen/`, { method: "POST" }),
+    onSuccess: (e, v) => {
+      setWiederherstellen(null);
+      setFassung(null);
+      neuLaden(e.bloecke);
+      setAuswahl(e.bloecke[0]?.id ?? null);
+      qc.setQueryData(["vorlagen", art, "entwurf"], e);
+      void qc.invalidateQueries({ queryKey: ["vorlagen", art], exact: true });
+      void qc.invalidateQueries({ queryKey: ["vorlagen", "liste"] });
+      melden(`Fassung ${v} wiederhergestellt und gespeichert. Bitte in der Vorschau prüfen und freigeben.`);
+    },
   });
   const startvorlage = useMutation({
     mutationFn: () => api<{ bloecke: Block[] }>(`vorlagen/${art}/startvorlage/`),
@@ -349,7 +469,15 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
   });
 
   const sort = useSortierbar(bloecke ?? [], (neu) => setBloecke(neu));
-  if (!aufbau.data || !entwurf.data || !bloecke) return <><Fehleranzeige fehler={aufbau.error ?? entwurf.error} /><Laden /></>;
+  if (aufbau.error || entwurf.error) {
+    return (
+      <div className="flex flex-col gap-3 items-start">
+        <Fehleranzeige fehler={aufbau.error ?? entwurf.error} />
+        <Knopf icon="zurueck" onClick={() => onArt(null)}>Alle Vorlagen</Knopf>
+      </div>
+    );
+  }
+  if (!aufbau.data || !entwurf.data || !bloecke) return <Laden />;
   const a = aufbau.data;
   const gewaehlt = bloecke.find((b) => b.id === auswahl) ?? null;
   const index = gewaehlt ? bloecke.indexOf(gewaehlt) : -1;
@@ -362,14 +490,18 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
     neu.splice(nach, 0, x);
     setBloecke(neu);
   };
-  const entferne = (id: string) => { const neu = bloecke.filter((b) => b.id !== id); setBloecke(neu); setAuswahl(neu[0]?.id ?? null); };
+  const entferne = (id: string) => { const neu = bloecke.filter((b) => b.id !== id); setBloecke(neu); waehleBlock(neu[0]?.id ?? null); };
   const hinzufuegen = (typ: string) => {
     const b = neuerBlock(typ, bloecke, a.tabellen);
     const nach = typ === "briefkopf" ? 0 : typ === "fusszeile" || typ === "email" ? bloecke.length : index >= 0 ? index + 1 : bloecke.length;
     const neu = [...bloecke];
     neu.splice(nach, 0, b);
     setBloecke(neu);
-    setAuswahl(b.id);
+    waehleBlock(b.id);
+  };
+  const einfuegen = (name: string) => {
+    if (fokus.current) fokus.current.setze(name);
+    else melden(gewaehlt ? "Dieser Abschnitt hat kein Textfeld. Bitte einen Abschnitt mit Text markieren (z. B. „Text“)." : "Bitte zuerst einen Abschnitt markieren.");
   };
   // Blöcke mit „neben dem vorherigen“ in eine Zeile setzen, wie im PDF
   const gruppen: number[][] = [];
@@ -379,63 +511,96 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
   });
   const rahmen = (b: Block, i: number) => (
     <div key={b.id} role="button" tabIndex={0} aria-label={`Block ${b.bezeichnung || TYPNAME[b.typ]}`}
-      onClick={() => setAuswahl(b.id)} onKeyDown={(e) => { if (e.key === "Enter") setAuswahl(b.id); }}
+      onClick={() => waehleBlock(b.id)} onKeyDown={(e) => { if (e.key === "Enter") waehleBlock(b.id); }}
       className={cx("relative px-2 py-1.5 rounded cursor-pointer", b.id === auswahl ? "outline outline-2 outline-[#251F53]" : "hover:outline hover:outline-1 hover:outline-[#c9c8d4]")}>
       {b.id === auswahl ? <>
         <span className="absolute -top-2.5 left-1.5 text-[0.625rem] bg-[#251F53] text-white px-1.5 rounded-sm">{b.bezeichnung || TYPNAME[b.typ]}</span>
         <span className="absolute -top-3 right-1 flex gap-0.5">
-          <button type="button" aria-label="nach oben" disabled={i === 0} onClick={(e) => { e.stopPropagation(); verschiebe(i, i - 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[0.6875rem] p-0 cursor-pointer">↑</button>
-          <button type="button" aria-label="nach unten" disabled={i === bloecke.length - 1} onClick={(e) => { e.stopPropagation(); verschiebe(i, i + 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[0.6875rem] p-0 cursor-pointer">↓</button>
-          <button type="button" aria-label="entfernen" onClick={(e) => { e.stopPropagation(); entferne(b.id); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[0.6875rem] p-0 cursor-pointer">×</button>
+          <button type="button" aria-label="nach oben" title="nach oben" disabled={i === 0} onClick={(e) => { e.stopPropagation(); verschiebe(i, i - 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[0.6875rem] p-0 cursor-pointer">↑</button>
+          <button type="button" aria-label="nach unten" title="nach unten" disabled={i === bloecke.length - 1} onClick={(e) => { e.stopPropagation(); verschiebe(i, i + 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[0.6875rem] p-0 cursor-pointer">↓</button>
+          <button type="button" aria-label="entfernen" title="Abschnitt entfernen" onClick={(e) => { e.stopPropagation(); entferne(b.id); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[0.6875rem] p-0 cursor-pointer">×</button>
         </span>
       </> : null}
       <div style={{ fontSize: SCHRIFT_PX[b.optionen?.schrift ?? "normal"] }}><BlockAnsicht b={b} tabellen={a.tabellen} /></div>
     </div>
   );
   const einmal = (typ: string) => ["briefkopf", "fusszeile", "email"].includes(typ) && bloecke.some((b) => b.typ === typ);
-  const serverFehler = [speichern.error, freigeben.error].find((e) => e instanceof ApiFehler) as ApiFehler | undefined;
+  const serverFehler = [speichern.error, freigeben.error, wiederherstellenM.error].find((e) => e instanceof ApiFehler) as ApiFehler | undefined;
   const fehlerListe = serverFehler ? (Array.isArray((serverFehler.daten as { bloecke?: string[] })?.bloecke)
     ? (serverFehler.daten as { bloecke: string[] }).bloecke : [serverFehler.message]) : [];
+  const freigebbar = geaendert || entwurf.data.ist_entwurf;
+  const stand = JSON.stringify(bloecke);
+  const naechste = Math.max(0, ...a.versionen.map((v) => v.version ?? 0)) + 1;
   const verInfo = geaendert ? "Ungespeicherte Änderungen"
-    : entwurf.data.ist_entwurf ? `Entwurf · gespeichert ${zeitpunkt(entwurf.data.geaendert_am)}`
-    : `Version ${a.aktiv.version} ist aktiv`;
+    : entwurf.data.ist_entwurf ? "Gespeichert, noch nicht freigegeben"
+    : `Fassung ${a.aktiv.version} ist in Gebrauch`;
+  const schritt = ansicht === "vorschau" ? 2 : 1;
+  const schrittKnopf = (nr: number, titel: string, unter: string, onClick: () => void, opt: { aktiv?: boolean; fertig?: boolean; aus?: boolean; titelHinweis?: string } = {}) => (
+    <li className="flex-1 min-w-[12rem]">
+      <button type="button" onClick={onClick} disabled={opt.aus} aria-current={opt.aktiv ? "step" : undefined} title={opt.titelHinweis}
+        className={cx("w-full h-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left cursor-pointer font-[inherit] disabled:cursor-not-allowed disabled:opacity-60",
+          opt.aktiv ? "border-akzent bg-akzent-weich text-akzent-text" : "border-rand bg-flaeche text-tinte hover:border-akzent")}>
+        <span className={cx("w-6 h-6 rounded-full inline-flex items-center justify-center text-[0.8125rem] font-semibold shrink-0",
+          opt.fertig ? "bg-ok text-white" : opt.aktiv ? "bg-akzent text-auf-akzent" : "bg-fein text-text2")}>{opt.fertig ? <Icon name="haken" /> : nr}</span>
+        <span className="flex flex-col min-w-0">
+          <span className="font-medium text-[0.875rem]">{titel}</span>
+          <span className="text-[0.75rem] gedaempft leading-snug">{unter}</span>
+        </span>
+      </button>
+    </li>
+  );
 
   return (
+    <FeldNamen.Provider value={felderNach}>
     <div className="stapel flex flex-col gap-5" data-testid="dokumentvorlagen">
       {aktionenZiel ? createPortal(<>
-        <span className="text-[0.8125rem] gedaempft" data-testid="vorlage-stand">{verInfo}</span>
-        <Knopf icon="dokument" onClick={() => setVorschau(true)}>Vorschau mit Testpatient</Knopf>
-        <Knopf laedt={speichern.isPending} disabled={!geaendert} onClick={() => speichern.mutate()}>Entwurf speichern</Knopf>
-        <Knopf variante="pri" icon="haken" onClick={() => setVeroeffentlichen(true)} disabled={!geaendert && !entwurf.data.ist_entwurf}>Veröffentlichen</Knopf>
+        {(() => {
+          const standText = <span className={cx("text-[0.8125rem]", geaendert ? "text-warn font-medium" : "gedaempft")} data-testid="vorlage-stand">{verInfo}</span>;
+          return geaendert ? standText : <Begriff name={entwurf.data.ist_entwurf ? "entwurf" : "fassung"}>{standText}</Begriff>;
+        })()}
+        <Knopf laedt={speichern.isPending} disabled={!geaendert} onClick={() => speichern.mutate()}
+          title="Speichert die Änderungen, ohne sie freizugeben – in der Praxis gilt weiter die bisherige Fassung.">Speichern</Knopf>
+        <Knopf variante="pri" icon="haken" onClick={() => setFreigabeFrage(true)} disabled={!freigebbar}
+          title={freigebbar ? "Änderungen für die Praxis übernehmen" : "Keine Änderungen zum Freigeben"}>Freigeben</Knopf>
       </>, aktionenZiel) : null}
-      <Segmente label="Vorlage" wert={art} onWahl={(w) => { if (!geaendert || window.confirm("Ungespeicherte Änderungen verwerfen?")) setArt(w); }}
-        werte={[{ wert: "infusionsplan", text: "Infusionsplan" }, { wert: "patientendatenblatt", text: "Patientendatenblatt" },
-          { wert: "datenschutzinformation", text: "Datenschutzinformation" }, { wert: "einwilligung", text: "Einwilligung" },
-          { wert: "schweigepflichtentbindung", text: "Schweigepflichtentbindung" },
-          { wert: "patientenaufnahme", text: "Patientenaufnahme" }, { wert: "terminbestaetigung", text: "Terminbestätigung" },
-          { wert: "reisebescheinigung", text: "Reisebescheinigung" }, { wert: "patientenankuendigung", text: "Patientenankündigung" },
-          ...eigene.map((e) => ({ wert: e.art, text: e.eigen?.aktiv ? e.name : `${e.name} (deaktiviert)` }))]}
-        className="self-start flex-wrap" />
-      <div className="flex items-center gap-3 flex-wrap -mt-2">
-        <Knopf klein icon="plus" onClick={() => setNeueVorlage(true)}>Neue Vorlage</Knopf>
-        {a.eigen ? <>
-          <span className="text-[0.8125rem] gedaempft">Eigenes Schreiben{a.eigen.beschreibung ? ` · ${a.eigen.beschreibung}` : ""}
-            {a.eigen.mit_termin ? " · mit Termin" : ""}{a.eigen.aktiv ? "" : " · deaktiviert"}</span>
-          <Knopf klein icon="stift" onClick={() => setEigenAendern(true)}>Name und Einstellungen</Knopf>
-        </> : <span className="text-[0.8125rem] gedaempft">Eigene Schreiben anlegen, z. B. für Hausärzte oder Kliniken – sie erscheinen in der Akte unter „Schreiben und E-Mail“.</span>}
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex flex-col gap-1 min-w-0 max-w-[52rem]">
+            <button type="button" onClick={() => onArt(null)}
+              className="self-start inline-flex items-center gap-1 bg-transparent border-0 p-0 cursor-pointer text-[0.8125rem] text-akzent-text font-[inherit]">
+              <Icon name="zurueck" /> Alle Vorlagen</button>
+            <h2 className="m-0 text-[1.125rem] font-semibold flex items-center gap-2 flex-wrap" data-testid="vorlage-name">
+              {a.name} <Chip art={vorlageStatus(a).art}>{vorlageStatus(a).text}</Chip></h2>
+            {a.wofuer ? <span className="text-sm">{a.wofuer}</span> : null}
+            {a.wo ? <span className="text-[0.8125rem] gedaempft"><strong className="font-medium text-text2">Wo benutzt:</strong> {a.wo}</span> : null}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {a.eigen ? <Knopf klein icon="stift" onClick={() => setEigenAendern(true)}>Name und Einstellungen</Knopf> : null}
+            {kopierbar(art) ? <Knopf klein icon="kopieren" onClick={() => setKopieren(true)}>Als eigene Vorlage kopieren</Knopf> : null}
+          </div>
+        </div>
+        <ol className="m-0 p-0 list-none flex gap-2 flex-wrap" aria-label="So ändern Sie eine Vorlage" data-testid="schritte">
+          {schrittKnopf(1, "1 · Bearbeiten", "Text und Aufbau ändern, dann „Speichern“", () => setAnsicht("seite"), { aktiv: schritt === 1 })}
+          {schrittKnopf(2, "2 · Vorschau prüfen", "So sieht es mit einem Testpatienten aus", () => setAnsicht("vorschau"),
+            { aktiv: schritt === 2, fertig: geprueft === stand && freigebbar })}
+          {schrittKnopf(3, "3 · Freigeben", `Ab dann gilt es für alle neuen PDFs (Fassung ${naechste})`, () => setFreigabeFrage(true),
+            { aus: !freigebbar, titelHinweis: freigebbar ? undefined : "Noch keine Änderungen – erst bearbeiten" })}
+        </ol>
       </div>
-      <EigeneVorlageDialog offen={neueVorlage} onOffen={setNeueVorlage} onAngelegt={(neu) => setArt(neu)} />
+
       {a.eigen ? <EigeneVorlageDialog offen={eigenAendern} onOffen={setEigenAendern} vorlage={a} /> : null}
-      {art !== "infusionsplan" && art !== "patientendatenblatt" && !mitEmailArt(art) && !a.aktiv.veroeffentlicht_von ? (
+      <EigeneVorlageDialog offen={kopieren} onOffen={setKopieren} kopieVon={a} onAngelegt={(neu) => onArt(neu)} />
+      {art !== "infusionsplan" && art !== "patientendatenblatt" && !mitEmailArt(art) && !a.aktiv.veroeffentlicht_von && a.entwurfsmodus?.moeglich ? (
         a.entwurfsmodus?.aus ? (
           <Meldung><span className="flex items-start justify-between gap-3 flex-wrap" data-testid="entwurfsmodus-aus">
             <span>Entwurfsmodus ausgeschaltet: Die PDFs dieser mitgelieferten Vorlage tragen kein Wasserzeichen „ENTWURF“ und keinen
-              Hinweisblock mehr. Stellen in [eckigen Klammern] bleiben stehen, bis die Vorlage bearbeitet und veröffentlicht ist.</span>
+              Hinweisblock mehr. Stellen in [eckigen Klammern] bleiben stehen, bis die Vorlage bearbeitet und freigegeben ist.</span>
             <Knopf klein laedt={modus.isPending} onClick={() => modus.mutate(false)}>Entwurfsmodus wieder einschalten</Knopf></span></Meldung>
         ) : (
           <Meldung art="warn"><span className="flex items-start justify-between gap-3 flex-wrap">
-            <span data-testid="vorlage-ungeprueft">Diese Vorlage ist der mitgelieferte Entwurf: Stellen in [eckigen Klammern]
-              sind von der Stiftung auszufüllen, der Text ist rechtlich zu prüfen. Bis sie hier bearbeitet und veröffentlicht ist,
+            <span data-testid="vorlage-ungeprueft">Diese Vorlage ist der mitgelieferte <Begriff name="entwurf">Entwurf</Begriff>: Stellen in [eckigen Klammern]
+              sind von der Stiftung auszufüllen, der Text ist rechtlich zu prüfen. Bis sie hier bearbeitet und freigegeben ist,
               tragen die PDFs in den Akten das Wasserzeichen „ENTWURF“.</span>
             <Knopf klein onClick={() => { modus.reset(); setModusFrage(true); }}>Entwurfsmodus ausschalten</Knopf></span></Meldung>
         )
@@ -452,13 +617,15 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
       </Dialog>
       {fehlerListe.length ? <Meldung art="fehler"><ul className="m-0 pl-4" data-testid="vorlage-fehler">{fehlerListe.map((f) => <li key={f}>{f}</li>)}</ul></Meldung> : null}
 
-      <div className="stapel grid grid-cols-1 xl:grid-cols-[13.75rem_minmax(0,1fr)_18.75rem] gap-5 items-start">
+      <div className="stapel grid grid-cols-1 xl:grid-cols-[13.75rem_minmax(0,1fr)_20rem] gap-5 items-start">
         <aside className="flex flex-col gap-3.5 min-w-0">
           <Karte className="p-2.5 flex flex-col gap-0.5" data-testid="aufbau">
-            <span className="lbl px-1.5 pb-1.5 pt-1">Aufbau</span>
+            <span className="lbl px-1.5 pb-1.5 pt-1 flex items-center gap-1.5">Aufbau
+              <Erklaerung titel="Aufbau der Vorlage">Die Vorlage besteht aus Abschnitten von oben nach unten (Briefkopf, Text, Tabelle …).
+                Einen Abschnitt anklicken, um ihn rechts zu ändern. Reihenfolge per Ziehen am Griff oder mit ↑ ↓ am markierten Abschnitt.</Erklaerung></span>
             {bloecke.map((b, i) => (
               <div key={b.id} {...sort.zeile(i)} className={cx("flex items-center rounded-md", sort.ueber === i && "outline outline-2 outline-akzent")}>
-                <button type="button" aria-current={b.id === auswahl ? "true" : undefined} onClick={() => setAuswahl(b.id)}
+                <button type="button" aria-current={b.id === auswahl ? "true" : undefined} onClick={() => waehleBlock(b.id)}
                   className={cx("flex-1 min-w-0 flex justify-between items-center gap-2 px-2.5 py-[0.4375rem] border-0 rounded-md text-[0.8438rem] text-left cursor-pointer",
                     b.id === auswahl ? "bg-akzent-weich text-akzent-text font-medium" : "bg-transparent hover:bg-fein")}>
                   <span className="truncate">{b.bezeichnung || TYPNAME[b.typ]}</span>
@@ -469,26 +636,36 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
             ))}
           </Karte>
           <Karte className="p-3 flex flex-col gap-2" data-testid="bausteine">
-            <span className="lbl">Bausteine</span>
+            <span className="lbl">Abschnitt hinzufügen</span>
             <div className="flex flex-wrap gap-1.5">
               {BAUSTEINE.filter((t) => a.bausteine.some((x) => x.typ === t)).map((t) => (
-                <button key={t} type="button" disabled={einmal(t)} onClick={() => hinzufuegen(t)}
+                <button key={t} type="button" disabled={einmal(t)} onClick={() => hinzufuegen(t)} title={HINWEIS[t]}
                   className="px-2.5 py-1.5 border border-dashed border-rand rounded-lg bg-flaeche text-[0.8125rem] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                   + {TYPNAME[t]}
                 </button>
               ))}
             </div>
-            <span className="text-xs gedaempft leading-normal">Neuer Block kommt hinter den markierten. Reihenfolge per Ziehen im Aufbau, mit den Pfeiltasten am Griff oder mit ↑ ↓ am markierten Block.</span>
+            <span className="text-xs gedaempft leading-normal">Der neue Abschnitt kommt hinter den markierten.</span>
           </Karte>
           <Karte className="p-3.5 flex flex-col gap-1.5" data-testid="versionen">
-            <span className="lbl">Versionen</span>
-            <ul className="m-0 p-0 list-none flex flex-col gap-1 text-[0.8125rem]">
-              {a.entwurf ? <li><strong>Entwurf</strong> · {datum(a.entwurf.geaendert_am)}{a.entwurf.geaendert_von ? ` · ${a.entwurf.geaendert_von}` : ""}</li> : null}
+            <span className="lbl flex items-center gap-1.5">Frühere <Begriff name="fassung">Fassungen</Begriff>
+              <Erklaerung titel="Fassungen">Bei jedem Freigeben entsteht eine neue Fassung; die alten bleiben erhalten. „Ansehen“ zeigt eine
+                Fassung mit Testpatient, „Wiederherstellen“ übernimmt sie als Grundlage – in Gebrauch ist sie erst nach dem Freigeben.
+                Jede PDF vermerkt, mit welcher Fassung sie erzeugt wurde.</Erklaerung></span>
+            <ul className="m-0 p-0 list-none flex flex-col gap-1.5 text-[0.8125rem]">
+              {a.entwurf ? <li className="text-warn"><strong className="font-medium"><Begriff name="entwurf">Noch nicht freigegeben</Begriff></strong> · {datum(a.entwurf.geaendert_am)}{a.entwurf.geaendert_von ? ` · ${a.entwurf.geaendert_von}` : ""}{a.entwurf.notiz ? ` · ${a.entwurf.notiz}` : ""}</li> : null}
               {a.versionen.map((v) => (
-                <li key={v.id} className="flex items-center justify-between gap-2">
-                  <span>v{v.version} · {v.status === "aktiv" ? `aktiv seit ${datum(v.veroeffentlicht_am)}` : datum(v.veroeffentlicht_am)}{v.notiz ? ` · ${v.notiz}` : ""}</span>
-                  <button type="button" className="text-xs underline bg-transparent border-0 cursor-pointer text-akzent-text p-0"
-                    onClick={() => uebernehmen.mutate(v.version!)} title="Blöcke dieser Version in den Editor laden">laden</button>
+                <li key={v.id} className="flex flex-col gap-0.5" data-testid="fassung">
+                  <span><strong className="font-medium">Fassung {v.version}</strong> · {v.status === "aktiv" ? `in Gebrauch seit ${datum(v.veroeffentlicht_am)}` : datum(v.veroeffentlicht_am)}
+                    {v.veroeffentlicht_von ? ` · ${v.veroeffentlicht_von}` : ""}{v.notiz ? <span className="gedaempft"> · {v.notiz}</span> : null}</span>
+                  <span className="flex gap-3">
+                    <button type="button" className="text-xs underline bg-transparent border-0 cursor-pointer text-akzent-text p-0"
+                      onClick={() => setFassung(v.version!)} aria-label={`Fassung ${v.version} ansehen`}>ansehen</button>
+                    {v.status !== "aktiv" || a.entwurf ? (
+                      <button type="button" className="text-xs underline bg-transparent border-0 cursor-pointer text-akzent-text p-0"
+                        onClick={() => { wiederherstellenM.reset(); setWiederherstellen(v.version!); }} aria-label={`Fassung ${v.version} wiederherstellen`}>wiederherstellen</button>
+                    ) : null}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -497,85 +674,172 @@ function EditorFuerArt({ art, setArt, aktionenZiel, onGeaendert }: {
           </Karte>
         </aside>
 
-        <div className="py-6 bg-[#E6E5EE] rounded-xl overflow-auto min-w-0" data-testid="vorlage-seite">
-          <div className="w-[35rem] min-h-[49.5rem] mx-auto px-[2.375rem] py-[2.125rem] bg-white text-[#1a1a1a] shadow-md flex flex-col gap-2.5">
-            {gruppen.map((g) => g.length === 1 ? rahmen(bloecke[g[0]], g[0]) : (
-              <div key={`paar-${bloecke[g[0]].id}`} className="flex justify-between items-start" data-testid="nebeneinander">
-                {g.map((i, j) => <div key={bloecke[i].id} style={{ width: `${breitenFuer(g.map((x) => bloecke[x]))[j]}%` }}>{rahmen(bloecke[i], i)}</div>)}
+        <div className="flex flex-col gap-2.5 min-w-0">
+          <Segmente label="Ansicht" wert={ansicht} onWahl={setAnsicht} className="self-start"
+            werte={[{ wert: "seite", text: "Seite bearbeiten" }, { wert: "vorschau", text: "Vorschau mit Testpatient" }]} />
+          {ansicht === "seite" ? (
+            <div className="py-6 bg-[#E6E5EE] rounded-xl overflow-auto min-w-0" data-testid="vorlage-seite">
+              <div className="w-[35rem] min-h-[49.5rem] mx-auto px-[2.375rem] py-[2.125rem] bg-white text-[#1a1a1a] shadow-md flex flex-col gap-2.5">
+                {gruppen.map((g) => g.length === 1 ? rahmen(bloecke[g[0]], g[0]) : (
+                  <div key={`paar-${bloecke[g[0]].id}`} className="flex justify-between items-start" data-testid="nebeneinander">
+                    {g.map((i, j) => <div key={bloecke[i].id} style={{ width: `${breitenFuer(g.map((x) => bloecke[x]))[j]}%` }}>{rahmen(bloecke[i], i)}</div>)}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ) : <LiveVorschau art={art} bloecke={bloecke} onGeprueft={setGeprueft} />}
         </div>
 
         <aside className="flex flex-col gap-3.5 min-w-0">
-          {gewaehlt ? <BlockEigenschaften b={gewaehlt} aufbau={a} aendere={aendere} aendereOptionen={aendereOptionen} fokus={fokus} /> : <Karte className="p-4 text-sm gedaempft">Block im Aufbau oder auf der Seite markieren.</Karte>}
-          <Karte className="p-4 flex flex-col gap-2" data-testid="datenfelder">
-            <span className="lbl">Datenfeld einfügen</span>
-            <div className="flex flex-wrap gap-1">
-              {a.felder.map((f) => (
-                <button key={f.name} type="button" title={f.beschreibung} onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => fokus.current?.setze(f.name)}
-                  className="px-1.5 py-0.5 rounded bg-fein border-0 text-[0.75rem] font-mono text-text2 cursor-pointer hover:bg-akzent-weich max-w-full text-left [overflow-wrap:anywhere]">{f.name}</button>
-              ))}
-            </div>
-            <span className="text-xs gedaempft">Nur diese Felder sind erlaubt. Tippfehler in Platzhaltern sind damit ausgeschlossen. Zuerst in ein Textfeld des Blocks klicken.</span>
-          </Karte>
+          {gewaehlt ? <BlockEigenschaften key={gewaehlt.id} b={gewaehlt} aufbau={a} aendere={aendere} aendereOptionen={aendereOptionen} fokus={fokus} />
+            : <Karte className="p-4 text-sm gedaempft">Abschnitt im Aufbau oder auf der Seite anklicken.</Karte>}
+          <Feldeinfueger felder={a.felder} onWahl={einfuegen} />
           <div className="flex gap-2 p-3 rounded-lg bg-fein text-[0.7812rem] leading-normal text-text2">
-            <Icon name="info" /><span>Neue Version gilt ab Veröffentlichung. Bereits freigegebene Pläne behalten ihr PDF unverändert.</span>
+            <Icon name="info" /><span>Änderungen gelten erst nach „Freigeben“. Schon erzeugte PDFs und freigegebene Pläne bleiben unverändert.</span>
           </div>
-          {entwurf.data.ist_entwurf ? <Knopf variante="geist" onClick={() => setVerwerfen(true)}>Entwurf verwerfen</Knopf> : null}
+          {entwurf.data.ist_entwurf ? <Knopf variante="geist" onClick={() => setVerwerfen(true)}>Nicht freigegebene Änderungen verwerfen</Knopf> : null}
         </aside>
       </div>
 
-      <VorschauDialog art={art} bloecke={bloecke} offen={vorschau} onOffen={setVorschau} />
-      <Dialog offen={veroeffentlichen} onOffen={setVeroeffentlichen} titel={`${a.name}: neue Version veröffentlichen`} breite={520}
-        beschreibung={`Wird Version ${Math.max(0, ...a.versionen.map((v) => v.version ?? 0)) + 1}. Sie gilt ab sofort für neue PDFs; Version ${a.aktiv.version} bleibt erhalten.`}
-        fuss={<><Knopf onClick={() => setVeroeffentlichen(false)}>Abbrechen</Knopf><Knopf variante="pri" laedt={freigeben.isPending} onClick={() => freigeben.mutate()}>Veröffentlichen</Knopf></>}>
-        <span className="text-sm">Bereits freigegebene Pläne behalten ihr PDF unverändert.</span>
-        <Fehleranzeige fehler={freigeben.error} />
+      <Dialog offen={freigabeFrage} onOffen={setFreigabeFrage} titel={`${a.name}: Änderungen freigeben`} breite={540}
+        beschreibung={`Wird Fassung ${naechste} und gilt ab sofort für alle neuen PDFs${mitEmailArt(art) ? " und E-Mails" : ""}. Fassung ${a.aktiv.version} bleibt erhalten und lässt sich wiederherstellen.`}
+        fuss={<><Knopf onClick={() => setFreigabeFrage(false)}>Abbrechen</Knopf><Knopf variante="pri" laedt={freigeben.isPending} onClick={() => freigeben.mutate()}>Freigeben</Knopf></>}>
+        <div className="flex flex-col gap-3">
+          {geprueft !== stand ? (
+            <Meldung art="warn"><span className="flex items-start justify-between gap-3 flex-wrap" data-testid="freigabe-ungeprueft">
+              <span>Diesen Stand haben Sie noch nicht in der Vorschau mit Testpatient angesehen.</span>
+              <Knopf klein onClick={() => { setFreigabeFrage(false); setAnsicht("vorschau"); }}>Erst Vorschau ansehen</Knopf></span></Meldung>
+          ) : <Meldung art="ok">In der Vorschau geprüft.</Meldung>}
+          <span className="text-sm">Bereits erzeugte PDFs und freigegebene Pläne behalten ihr Aussehen.</span>
+          <Fehleranzeige fehler={freigeben.error} />
+        </div>
       </Dialog>
-      <Dialog offen={verwerfen} onOffen={setVerwerfen} titel="Entwurf verwerfen" breite={480}
-        beschreibung={`Die aktive Version ${a.aktiv.version} bleibt unverändert.`}
+      <Dialog offen={verwerfen} onOffen={setVerwerfen} titel="Nicht freigegebene Änderungen verwerfen" breite={480}
+        beschreibung={`Fassung ${a.aktiv.version} bleibt unverändert in Gebrauch.`}
         fuss={<><Knopf onClick={() => setVerwerfen(false)}>Abbrechen</Knopf><Knopf variante="dng" laedt={verwerfenM.isPending} onClick={() => verwerfenM.mutate()}>Verwerfen</Knopf></>}>
         <Fehleranzeige fehler={verwerfenM.error} />
       </Dialog>
+      <Dialog offen={wiederherstellen !== null} onOffen={(o) => { if (!o) setWiederherstellen(null); }} titel={`Fassung ${wiederherstellen} wiederherstellen`} breite={520}
+        beschreibung="Die Fassung wird als Grundlage übernommen und gespeichert. In Gebrauch ist sie erst, wenn Sie sie danach freigeben."
+        fuss={<><Knopf onClick={() => setWiederherstellen(null)}>Abbrechen</Knopf>
+          <Knopf variante="pri" laedt={wiederherstellenM.isPending} onClick={() => wiederherstellenM.mutate(wiederherstellen!)}>Wiederherstellen</Knopf></>}>
+        <div className="flex flex-col gap-3">
+          {geaendert || entwurf.data.ist_entwurf ? <Meldung art="warn">Ihre noch nicht freigegebenen Änderungen werden dabei ersetzt.</Meldung> : null}
+          <Fehleranzeige fehler={wiederherstellenM.error} />
+        </div>
+      </Dialog>
+      <FassungDialog art={art} version={fassung} onZu={() => setFassung(null)}
+        onWiederherstellen={a.versionen.find((v) => v.version === fassung)?.status === "aktiv" && !a.entwurf ? undefined
+          : (v) => { wiederherstellenM.reset(); setWiederherstellen(v); }} />
     </div>
+    </FeldNamen.Provider>
   );
 }
 
-/** Textfeld, in das „Datenfeld einfügen“ an der Schreibmarke einsetzt */
-function FeldText({ label, wert, onWert, fokus, mehrzeilig }: {
-  label: string; wert: string; onWert: (w: string) => void; fokus: { current: { setze: (f: string) => void } | null }; mehrzeilig?: boolean;
-}) {
-  const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+/** Angaben aus der Akte per Klick einfügen (F180): verständliche Namen nach Gruppen, mit Suche; der Platzhalter
+ *  ({{Patient.Briefanrede}}) steht nur im Tooltip und in der Bezeichnung des Knopfs für Tastatur und Vorlesen. */
+function Feldeinfueger({ felder, onWahl }: { felder: Datenfeld[]; onWahl: (name: string) => void }) {
+  const [suche, setSuche] = useState("");
+  const s = suche.trim().toLocaleLowerCase("de");
+  const passend = felder.filter((f) => !s || `${f.bezeichnung ?? ""} ${f.beschreibung} ${f.name}`.toLocaleLowerCase("de").includes(s));
+  const gruppen: [string, Datenfeld[]][] = [];
+  for (const f of passend) {
+    const g = f.gruppe ?? "Angaben";
+    const vorhanden = gruppen.find(([n]) => n === g);
+    if (vorhanden) vorhanden[1].push(f);
+    else gruppen.push([g, [f]]);
+  }
+  return (
+    <Karte className="p-4 flex flex-col gap-2.5" data-testid="datenfelder">
+      <span className="lbl flex items-center gap-1.5">Angabe aus der Akte einfügen
+        <Erklaerung titel="Angaben aus der Akte">Erst in ein Textfeld des Abschnitts klicken, dann hier eine Angabe wählen. Sie erscheint im Text
+          als <span className="feldchip">Briefanrede</span> und wird beim Erstellen durch die Daten des Patienten ersetzt, z. B.
+          „Sehr geehrte Frau Muster“. Nur diese Angaben sind möglich – Tippfehler sind damit ausgeschlossen.</Erklaerung></span>
+      {felder.length > 12 ? (
+        <Eingabe type="search" aria-label="Angabe suchen" placeholder="Angabe suchen, z. B. Anrede, Termin …" value={suche}
+          onChange={(e) => setSuche(e.target.value)} />
+      ) : null}
+      <div className="flex flex-col gap-2.5 max-h-[26rem] overflow-y-auto pr-1">
+        {gruppen.map(([gruppe, liste]) => (
+          <div key={gruppe} className="flex flex-col gap-1" role="group" aria-label={gruppe}>
+            <span className="text-[0.75rem] font-medium gedaempft">{gruppe}</span>
+            <div className="flex flex-wrap gap-1">
+              {liste.map((f) => (
+                <button key={f.name} type="button" title={`{{${f.name}}} · ${f.beschreibung}`} aria-label={`${f.bezeichnung ?? f.name} einfügen`}
+                  onMouseDown={(e) => e.preventDefault()} onClick={() => onWahl(f.name)}
+                  className="px-2 py-1 rounded-md bg-fein border border-transparent text-[0.7812rem] text-text2 cursor-pointer hover:bg-akzent-weich hover:border-akzent max-w-full text-left [overflow-wrap:anywhere]">
+                  + {f.bezeichnung ?? f.name}</button>
+              ))}
+            </div>
+          </div>
+        ))}
+        {!passend.length ? <span className="text-[0.8125rem] gedaempft">Keine Angabe passt zu „{suche.trim()}“.</span> : null}
+      </div>
+    </Karte>
+  );
+}
+
+type Fokus = { current: { setze: (f: string) => void } | null };
+
+/** Einsetzen an der Schreibmarke; war das Feld noch nie fokussiert, am Ende (F180: ohne vorher hineinzuklicken) */
+function useEinsetzen(ref: { current: HTMLInputElement | HTMLTextAreaElement | null }, wert: string, onWert: (w: string) => void, fokus: Fokus) {
   const aktuellerWert = useRef(onWert);
   aktuellerWert.current = onWert;
-  const merken = () => {
-    fokus.current = {
-      setze: (feld) => {
-        // aktuellen Inhalt aus dem Feld lesen, nicht den Stand beim Fokussieren
-        const el = ref.current;
-        const aktuell = el?.value ?? wert;
-        const pos = el?.selectionStart ?? aktuell.length;
-        const ende = el?.selectionEnd ?? pos;
-        const einfuegen = `{{${feld}}}`;
-        aktuellerWert.current(aktuell.slice(0, pos) + einfuegen + aktuell.slice(ende));
-        requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(pos + einfuegen.length, pos + einfuegen.length); });
-      },
-    };
+  const benutzt = useRef(false);
+  const ziel = useRef({
+    setze: (feld: string) => {
+      // aktuellen Inhalt aus dem Feld lesen, nicht den Stand beim Fokussieren
+      const el = ref.current;
+      const aktuell = el?.value ?? wert;
+      const pos = benutzt.current ? el?.selectionStart ?? aktuell.length : aktuell.length;
+      const ende = benutzt.current ? el?.selectionEnd ?? pos : pos;
+      const einfuegen = `{{${feld}}}`;
+      aktuellerWert.current(aktuell.slice(0, pos) + einfuegen + aktuell.slice(ende));
+      requestAnimationFrame(() => { benutzt.current = true; el?.focus(); el?.setSelectionRange(pos + einfuegen.length, pos + einfuegen.length); });
+    },
+  });
+  // abmelden, wenn das Feld verschwindet
+  useEffect(() => () => { if (fokus.current === ziel.current) fokus.current = null; }, [fokus]);
+  return {
+    anmelden: () => { fokus.current = ziel.current; },
+    onFocus: () => { benutzt.current = true; fokus.current = ziel.current; },
   };
+}
+
+/** Die Angaben im Text als lesbare Chips („Briefanrede“ statt {{Patient.Briefanrede}}) */
+function AngabenImText({ text }: { text: string }) {
+  const namen = [...new Set([...text.matchAll(PLATZHALTER)].map((m) => m[1]))];
+  if (!namen.length) return null;
   return (
-    <Feld label={label}>
-      {(p) => mehrzeilig
-        ? <Textfeld {...p} ref={ref} rows={4} value={wert} onFocus={merken} onChange={(e) => onWert(e.target.value)} className="font-mono text-[0.8125rem]" />
-        : <Eingabe {...p} ref={ref} value={wert} onFocus={merken} onChange={(e) => onWert(e.target.value)} className="font-mono text-[0.8125rem]" />}
-    </Feld>
+    <span className="flex flex-wrap items-center gap-1 text-[0.75rem] gedaempft" data-testid="angaben-im-text">
+      Angaben: {namen.map((n) => <FeldChip key={n} name={n} />)}
+    </span>
+  );
+}
+
+/** Textfeld, in das „Angabe aus der Akte einfügen“ an der Schreibmarke einsetzt. Das erste Textfeld eines Blocks
+ *  meldet sich gleich an, damit ein Klick auf eine Angabe auch ohne vorheriges Hineinklicken etwas einfügt. */
+function FeldText({ label, wert, onWert, fokus, mehrzeilig }: {
+  label: string; wert: string; onWert: (w: string) => void; fokus: Fokus; mehrzeilig?: boolean;
+}) {
+  const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+  const einsetzen = useEinsetzen(ref, wert, onWert, fokus);
+  useEffect(() => { if (!fokus.current) einsetzen.anmelden(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="flex flex-col gap-1">
+      <Feld label={label}>
+        {(p) => mehrzeilig
+          ? <Textfeld {...p} ref={ref} rows={5} value={wert} onFocus={einsetzen.onFocus} onChange={(e) => onWert(e.target.value)} className="text-[0.8438rem] leading-normal" />
+          : <Eingabe {...p} ref={ref} value={wert} onFocus={einsetzen.onFocus} onChange={(e) => onWert(e.target.value)} className="text-[0.8438rem]" />}
+      </Feld>
+      <AngabenImText text={wert} />
+    </div>
   );
 }
 
 function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
   b: Block; aufbau: Aufbau; aendere: (n: Partial<Block>) => void; aendereOptionen: (n: Partial<Optionen>) => void;
-  fokus: { current: { setze: (f: string) => void } | null };
+  fokus: Fokus;
 }) {
   const o = b.optionen ?? {};
   const eintraege = b.felder ?? [];
@@ -585,7 +849,7 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
   const textartig = !["briefkopf", "trennlinie", "leerraum", "seitenumbruch", "email"].includes(b.typ);
   return (
     <Karte className="p-4 flex flex-col gap-3" data-testid="block-eigenschaften">
-      <div className="flex justify-between items-center"><span className="lbl">Block</span><Chip art="akzent">{TYPNAME[b.typ]}</Chip></div>
+      <div className="flex justify-between items-center"><span className="lbl">Abschnitt</span><Chip art="akzent">{TYPNAME[b.typ]}</Chip></div>
       <Feld label="Bezeichnung">{(p) => <Eingabe {...p} value={b.bezeichnung ?? ""} onChange={(e) => aendere({ bezeichnung: e.target.value })} />}</Feld>
       <span className="text-[0.7812rem] gedaempft leading-normal">{HINWEIS[b.typ]}</span>
 
@@ -690,28 +954,19 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
   );
 }
 
-function FeldWert({ wert, onWert, fokus, nummer }: { wert: string; onWert: (w: string) => void; fokus: { current: { setze: (f: string) => void } | null }; nummer: number }) {
+function FeldWert({ wert, onWert, fokus, nummer }: { wert: string; onWert: (w: string) => void; fokus: Fokus; nummer: number }) {
   const ref = useRef<HTMLInputElement>(null);
-  const aktuellerWert = useRef(onWert);
-  aktuellerWert.current = onWert;
+  const einsetzen = useEinsetzen(ref, wert, onWert, fokus);
   return (
     <Eingabe ref={ref} aria-label={`Wert ${nummer}`} value={wert} className="font-mono text-[0.7812rem]" onChange={(e) => onWert(e.target.value)}
-      onFocus={() => {
-        fokus.current = {
-          setze: (feld) => {
-            const aktuell = ref.current?.value ?? wert;
-            const pos = ref.current?.selectionStart ?? aktuell.length;
-            const ende = ref.current?.selectionEnd ?? pos;
-            aktuellerWert.current(`${aktuell.slice(0, pos)}{{${feld}}}${aktuell.slice(ende)}`);
-          },
-        };
-      }} />
+      onFocus={einsetzen.onFocus} title={wert.includes("{{") ? wert : undefined} />
   );
 }
 
-/** Eigenes Schreiben anlegen (ohne ``vorlage``) oder Name, Beschreibung, Termin und aktiv ändern (F176). */
-function EigeneVorlageDialog({ offen, onOffen, vorlage, onAngelegt }: {
-  offen: boolean; onOffen: (o: boolean) => void; vorlage?: Uebersicht; onAngelegt?: (art: Art) => void;
+/** Eigenes Schreiben anlegen (ohne ``vorlage``) oder Name, Beschreibung, Termin und aktiv ändern (F176); mit
+ *  ``kopieVon`` als Kopie einer bestehenden Vorlage anlegen (F180). */
+function EigeneVorlageDialog({ offen, onOffen, vorlage, kopieVon, onAngelegt }: {
+  offen: boolean; onOffen: (o: boolean) => void; vorlage?: Uebersicht; kopieVon?: Uebersicht; onAngelegt?: (art: Art) => void;
 }) {
   const qc = useQueryClient();
   const melden = useHinweis();
@@ -722,9 +977,9 @@ function EigeneVorlageDialog({ offen, onOffen, vorlage, onAngelegt }: {
   const [gesetzt, setGesetzt] = useState(false);
   if (offen && !gesetzt) {
     setGesetzt(true);
-    setName(vorlage?.name ?? "");
-    setBeschreibung(vorlage?.eigen?.beschreibung ?? "");
-    setMitTermin(!!vorlage?.eigen?.mit_termin);
+    setName(vorlage?.name ?? (kopieVon ? `${kopieVon.name} (Kopie)` : ""));
+    setBeschreibung(vorlage?.eigen?.beschreibung ?? (kopieVon?.eigen?.beschreibung ?? ""));
+    setMitTermin(!!(vorlage?.eigen?.mit_termin ?? kopieVon?.eigen?.mit_termin ?? kopieVon?.art === "terminbestaetigung"));
     setAktiv(vorlage?.eigen?.aktiv ?? true);
   }
   if (!offen && gesetzt) setGesetzt(false);
@@ -732,24 +987,27 @@ function EigeneVorlageDialog({ offen, onOffen, vorlage, onAngelegt }: {
     mutationFn: () => {
       const body = { name: name.trim(), beschreibung: beschreibung.trim(), mit_termin: mitTermin, ...(vorlage ? { aktiv } : {}) };
       return vorlage ? api<Uebersicht>(`vorlagen/${vorlage.art}/eigen/`, { method: "PATCH", body })
+        : kopieVon ? api<Uebersicht>(`vorlagen/${kopieVon.art}/duplizieren/`, { body })
         : api<Uebersicht>("vorlagen/", { body });
     },
     onSuccess: (u) => {
       void qc.invalidateQueries({ queryKey: ["vorlagen"] });
       void qc.invalidateQueries({ queryKey: ["schreiben"] });
-      melden(vorlage ? "Gespeichert." : `„${u.name}“ angelegt – jetzt Text und Aufbau anpassen und veröffentlichen.`);
+      melden(vorlage ? "Gespeichert." : `„${u.name}“ angelegt und in der Akte wählbar – jetzt Text anpassen, in der Vorschau prüfen und freigeben.`);
       onOffen(false);
       onAngelegt?.(u.art);
     },
   });
   const f = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
-    <Dialog offen={offen} onOffen={onOffen} titel={vorlage ? `„${vorlage.name}“ ändern` : "Neue Vorlage (eigenes Schreiben)"}
-      beschreibung={vorlage ? undefined : "Startet mit einem Brief an den Patienten (Briefkopf, Anrede, Text, Gruß) und einem E-Mail-Text. Danach wie jede Vorlage bearbeiten und veröffentlichen."}
+    <Dialog offen={offen} onOffen={onOffen} titel={vorlage ? `„${vorlage.name}“ ändern` : kopieVon ? `„${kopieVon.name}“ als eigene Vorlage kopieren` : "Neue Vorlage (eigenes Schreiben)"}
+      beschreibung={vorlage ? undefined : kopieVon
+        ? `Die neue Vorlage startet mit Text und Aufbau der Fassung ${kopieVon.aktiv.version} von „${kopieVon.name}“ und steht in der Akte unter „Schreiben und E-Mail“ › „Eigene Vorlagen“. Das Original bleibt unverändert.${kopieVon.art === "reisebescheinigung" ? " Das ADAC-Attest hängt nur an der Reisebescheinigung selbst an." : ""}`
+        : "Startet mit einem Brief an den Patienten (Briefkopf, Anrede, Text, Gruß) und einem E-Mail-Text. Danach wie jede Vorlage bearbeiten und freigeben."}
       fuss={<>
         <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
         <Knopf variante="pri" laedt={speichern.isPending} disabled={!name.trim()} onClick={() => speichern.mutate()}>
-          {vorlage ? "Speichern" : "Anlegen"}</Knopf>
+          {vorlage ? "Speichern" : kopieVon ? "Kopie anlegen" : "Anlegen"}</Knopf>
       </>}>
       <div className="flex flex-col gap-3">
         <Feld label="Name" fehler={f.name} pflicht>
@@ -777,55 +1035,86 @@ function EigeneVorlageDialog({ offen, onOffen, vorlage, onAngelegt }: {
 
 type Testpatient = { id: number; nachname: string; vorname: string; nummer: number };
 
-function VorschauDialog({ art, bloecke, offen, onOffen }: { art: Art; bloecke: Block[]; offen: boolean; onOffen: (o: boolean) => void }) {
+/** Vorschau mit Testpatient als echte PDF (F180: neben dem Editor statt im Dialog). Folgt dem Stand im Editor – auch
+ *  ungespeichert – kurz nach jeder Änderung; ``onGeprueft`` meldet, welcher Stand zu sehen war. */
+function LiveVorschau({ art, bloecke, onGeprueft, hoehe = "h-[72vh]" }: {
+  art: Art; bloecke: Block[]; onGeprueft?: (stand: string) => void; hoehe?: string;
+}) {
   const patienten = useQuery({
     queryKey: ["patienten", "testpatienten"],
     queryFn: () => api<Seitenliste<Testpatient>>(`patienten/${abfrage({ test: "nur", seitengroesse: 50 })}`),
-    enabled: offen,
   });
   const [patient, setPatient] = useState("");
-  const [schluessel, setSchluessel] = useState("");
   const stand = useMemo(() => JSON.stringify(bloecke), [bloecke]);
+  const [schluessel, setSchluessel] = useState(stand);
+  useEffect(() => {
+    if (stand === schluessel) return;
+    const t = window.setTimeout(() => setSchluessel(stand), 700);
+    return () => window.clearTimeout(t);
+  }, [stand, schluessel]);
+  useEffect(() => {
+    if (!patient && patienten.data?.results[0]) setPatient(String(patienten.data.results[0].id));
+  }, [patienten.data, patient]);
   const pdf = useQuery({
     queryKey: ["vorlagen", art, "vorschau", patient, schluessel],
     queryFn: () => apiDatei(`vorlagen/${art}/vorschau/`, { method: "POST", body: { patient: Number(patient), bloecke: JSON.parse(schluessel) } }),
-    enabled: offen && !!patient && !!schluessel,
-    gcTime: 0,
+    enabled: !!patient, gcTime: 0, retry: false, placeholderData: keepPreviousData,
   });
   const mitEmail = mitEmailArt(art) && bloecke.some((b) => b.typ === "email");
   const mail = useQuery({
     queryKey: ["vorlagen", art, "vorschau-mail", patient, schluessel],
     queryFn: () => api<{ betreff: string; text: string }>(`vorlagen/${art}/vorschau/`, { body: { patient: Number(patient),
       bloecke: JSON.parse(schluessel), ausgabe: "email" } }),
-    enabled: offen && mitEmail && !!patient && !!schluessel,
-    gcTime: 0,
+    enabled: mitEmail && !!patient, gcTime: 0, retry: false, placeholderData: keepPreviousData,
   });
-  useEffect(() => { if (offen) setSchluessel(stand); }, [offen, stand]);
-  useEffect(() => {
-    if (!patient && patienten.data?.results[0]) setPatient(String(patienten.data.results[0].id));
-  }, [patienten.data, patient]);
+  const aktuell = !!pdf.data && !pdf.isPlaceholderData && !pdf.isFetching && schluessel === stand;
+  useEffect(() => { if (aktuell) onGeprueft?.(schluessel); }, [aktuell, schluessel, onGeprueft]);
   return (
-    <Dialog offen={offen} onOffen={onOffen} titel="Vorschau mit Testpatient" breite={1000}
-      beschreibung="Aus dem aktuellen Stand im Editor, auch ungespeichert. Wasserzeichen „ENTWURF“.">
-      <div className="flex flex-col gap-3" data-testid="vorlage-vorschau">
-        <Feld label="Testpatient">{(p) => (
+    <div className="flex flex-col gap-2.5 min-w-0" data-testid="vorlage-vorschau">
+      <div className="flex items-end gap-3 flex-wrap">
+        <Feld label="Testpatient" className="min-w-[16rem]">{(p) => (
           <Auswahl {...p} value={patient} onChange={(e) => setPatient(e.target.value)}>
             {(patienten.data?.results ?? []).map((t) => <option key={t.id} value={t.id}>{t.nachname}, {t.vorname} · Nr. {t.nummer}</option>)}
           </Auswahl>
         )}</Feld>
-        {patienten.data && !patienten.data.results.length ? <Meldung art="warn">Es gibt keine Testpatienten.</Meldung> : null}
-        <Fehleranzeige fehler={pdf.error} />
-        {pdf.isFetching ? <Laden text="PDF wird erzeugt …" /> : pdf.data ? (
-          <PdfLeser url={`vorschau-${art}-${patient}-${pdf.dataUpdatedAt}`} laden={() => Promise.resolve(pdf.data.daten)} className="h-[64vh]" />
-        ) : null}
-        {mail.data ? (
-          <div className="border border-rand rounded-lg px-3 py-2 text-[0.8438rem]" data-testid="vorschau-email">
-            <div className="lbl mb-1">E-Mail</div>
-            <div className="font-semibold mb-1">{mail.data.betreff}</div>
-            <div className="whitespace-pre-wrap">{mail.data.text}</div>
-          </div>
-        ) : null}
+        <span className="text-[0.75rem] gedaempft pb-2 flex items-center gap-1.5" data-testid="vorschau-stand">
+          {pdf.isFetching || schluessel !== stand ? <><Ladekreis groesse={12} /> wird aktualisiert …</>
+            : aktuell ? "Zeigt den aktuellen Stand – auch ungespeicherte Änderungen. Wasserzeichen „ENTWURF“." : null}
+        </span>
       </div>
+      {patienten.data && !patienten.data.results.length ? <Meldung art="warn">Es gibt keine Testpatienten. Eine Vorschau braucht eine
+        Akte, die als Testpatient markiert ist – echte Akten erscheinen hier nie.</Meldung> : null}
+      <Fehleranzeige fehler={pdf.error} />
+      {pdf.data ? (
+        <PdfLeser url={`vorschau-${art}-${patient}-${pdf.dataUpdatedAt}`} laden={() => Promise.resolve(pdf.data.daten)} className={hoehe} />
+      ) : pdf.isFetching ? <Laden text="PDF wird erzeugt …" /> : null}
+      {mail.data ? (
+        <div className="border border-rand rounded-lg px-3 py-2 text-[0.8438rem] bg-flaeche" data-testid="vorschau-email">
+          <div className="lbl mb-1">E-Mail (wird beim Versand vorgeschlagen)</div>
+          <div className="font-semibold mb-1">{mail.data.betreff}</div>
+          <div className="whitespace-pre-wrap">{mail.data.text}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Frühere Fassung ansehen (F180): PDF mit Testpatient, auf Wunsch wiederherstellen */
+function FassungDialog({ art, version, onZu, onWiederherstellen }: {
+  art: Art; version: number | null; onZu: () => void; onWiederherstellen?: (v: number) => void;
+}) {
+  const v = useQuery({
+    queryKey: ["vorlagen", art, "versionen", version],
+    queryFn: () => api<Entwurf>(`vorlagen/${art}/versionen/${version}/`),
+    enabled: version !== null,
+  });
+  return (
+    <Dialog offen={version !== null} onOffen={(o) => { if (!o) onZu(); }} titel={`Fassung ${version ?? ""} ansehen`} breite={1000}
+      beschreibung={v.data ? `${v.data.status === "aktiv" ? "In Gebrauch" : "Freigegeben"} am ${datum(v.data.veroeffentlicht_am)}${v.data.veroeffentlicht_von ? ` von ${v.data.veroeffentlicht_von}` : ""}${v.data.notiz ? ` · ${v.data.notiz}` : ""}.` : undefined}
+      fuss={<><Knopf onClick={onZu}>Schließen</Knopf>
+        {onWiederherstellen && version !== null ? <Knopf variante="pri" onClick={() => onWiederherstellen(version)}>Diese Fassung wiederherstellen</Knopf> : null}</>}>
+      <Fehleranzeige fehler={v.error} />
+      {v.data ? <LiveVorschau art={art} bloecke={v.data.bloecke} hoehe="h-[60vh]" /> : <Laden />}
     </Dialog>
   );
 }

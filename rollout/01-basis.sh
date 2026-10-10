@@ -36,10 +36,15 @@ $nrconf{override_rc}{qr(^(docker|containerd)\.service$)} = 0;
 NEEDRESTART
 
 echo "==> System aktualisieren"
-apt-get update
-apt-get -y full-upgrade
-apt-get -y install ca-certificates curl gnupg vim htop rsync unzip jq tree \
-  unattended-upgrades apt-listchanges needrestart openssl rclone
+if [[ "${EPM_OFFLINE:-0}" == 1 ]]; then
+  # Wiederaufbau aus dem Notfallpaket (F188): epm-notfall-aufbau.sh hat die Pakete schon aus debs/ installiert
+  echo "   Offline (Notfallpaket): Pakete kommen aus dem Notfallpaket, kein apt-get update"
+else
+  apt-get update
+  apt-get -y full-upgrade
+  apt-get -y install ca-certificates curl gnupg vim htop rsync unzip jq tree \
+    unattended-upgrades apt-listchanges needrestart openssl rclone
+fi
 
 echo "==> Automatische Sicherheitsupdates, ohne Neustart"
 cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'

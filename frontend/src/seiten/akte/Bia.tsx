@@ -4,6 +4,7 @@
  * Vorgefertigte Maske für die Körperzusammensetzung: Gewicht, BCM, Fettmasse, ECW, Körperwasser und BMI, dazu ein
  * Feld für die Beurteilung. Das Gewicht kann auf Wunsch gleich in den Gewichtsverlauf übernommen werden.
  */
+import { Begriff } from "@/components/ui/Begriff";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
@@ -145,7 +146,7 @@ export function Bia() {
     <>
       <Aktenseite
         testid="bia"
-        titel={liste.length === 1 ? "BIA-Messung" : "BIA-Messungen"}
+        titel={<><Begriff name="bia">BIA</Begriff>-{liste.length === 1 ? "Messung" : "Messungen"}</>}
         anzahl={liste.length}
         laedt={bia.isPending}
         aktion={erfassen
