@@ -9,7 +9,7 @@
  * die Höhe der längsten in ihrer Reihe zu warten.
  */
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import { api } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
@@ -33,12 +33,14 @@ function gueltig(g: unknown): g is Bereichsgroesse {
 }
 
 /** Raster einer Seite. ``spalten``: Spalten bei der aktuellen Fensterbreite (lib/stufen.ts). */
-export function Bereiche({ seite, spalten, children, testid, className }: {
+export function Bereiche({ seite, spalten, children, testid, className, style }: {
   seite: BereichSeite; spalten: number; children: ReactNode; testid?: string; className?: string;
+  /** z. B. ``--raster-zeile``, wenn die Karten das Fenster füllen sollen (Übersicht der Akte, 10.10.2026) */
+  style?: CSSProperties;
 }) {
   return (
     <Kontext.Provider value={{ seite, spalten }}>
-      <div className={cx("bereiche", className)} style={{ gridTemplateColumns: `repeat(${spalten}, minmax(0, 1fr))` }}
+      <div className={cx("bereiche", className)} style={{ ...style, gridTemplateColumns: `repeat(${spalten}, minmax(0, 1fr))` }}
         data-testid={testid} data-spalten={spalten}>
         {children}
       </div>

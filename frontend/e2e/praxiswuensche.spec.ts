@@ -106,7 +106,7 @@ test("BIA-Messung mit Beurteilung; das Gewicht wandert in den Verlauf", async ({
   await page.getByLabel("Fettmasse (kg)").fill("18,6");
   await page.getByLabel("ECW – extrazelluläres Wasser (%)").fill("46,2");
   await page.getByLabel("Körperwasser (l)").fill("32,8");
-  await expect(page.getByText(/aus Gewicht und Größe/)).toBeVisible();
+  await expect(page.getByRole("dialog").getByText(/aus Gewicht und Größe/)).toBeVisible(); // nur im Dialog (der Kopf erklärt „BMI“ ähnlich)
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByTestId("bia-detail")).toContainText("24,1 kg");
 
@@ -135,7 +135,7 @@ test("Bericht: Entwurf, Freigabe durch den Mediziner, danach unveränderlich", a
   await expect(page.getByRole("textbox", { name: "Bericht" })).toContainText("Stabiler Verlauf");
   await page.getByRole("button", { name: "Entwurf speichern" }).click();
   // der Status steht links am Eintrag und rechts im Detail – hier das Detail (F122)
-  await expect(page.getByTestId("bericht-detail").getByTestId("bericht-status")).toHaveText("Entwurf");
+  await expect(page.getByTestId("bericht-detail").getByTestId("bericht-status")).toContainText("Entwurf"); // mit Erklärung zum Begriff (F181)
 
   // Mitarbeiter dürfen nicht freigeben – der Knopf erscheint erst gar nicht
   await expect(page.getByRole("button", { name: "Freigeben" })).toHaveCount(0);
@@ -160,14 +160,14 @@ test("Infusionstage je Beutelart im Plan-Editor", async ({ browser }) => {
   const seite = await (await browser.newContext({ storageState: zustand("mediziner") })).newPage();
   await seite.goto(`/patienten/${p.id}/plaene/neu`);
   const tage = seite.getByTestId("infusionstage");
-  await tage.getByLabel("PE (Mischbeutel)").fill("5");
+  await tage.getByLabel(/^PE.*\(Mischbeutel\)$/).fill("5");
   await tage.getByLabel("Zusatzvolumen").fill("2");
   await tage.getByLabel("Infusionsfrei").fill("4");
   await seite.getByRole("button", { name: "Entwurf speichern" }).click();
   await expect(seite.getByText(/höchstens 2 infusionsfreie Tage/)).toBeVisible();
   await tage.getByLabel("Infusionsfrei").fill("0");
   await seite.getByRole("button", { name: "Entwurf speichern" }).click();
-  await expect(seite.getByTestId("infusionstage").getByLabel("PE (Mischbeutel)")).toHaveValue("5");
+  await expect(seite.getByTestId("infusionstage").getByLabel(/^PE.*\(Mischbeutel\)$/)).toHaveValue("5");
   await seite.close();
 });
 
@@ -269,7 +269,7 @@ test("Bericht verwerfen fragt nach (Eine Sprache, 08.10.2026)", async ({ page })
   await page.getByRole("textbox", { name: "Bericht" }).fill("Wird verworfen.");
   await page.getByRole("button", { name: "Entwurf speichern" }).click();
   const detail = page.getByTestId("bericht-detail");
-  await expect(detail.getByTestId("bericht-status")).toHaveText("Entwurf");
+  await expect(detail.getByTestId("bericht-status")).toContainText("Entwurf"); // mit Erklärung zum Begriff (F181)
   await detail.getByRole("button", { name: "Verwerfen" }).click();
   const frage = page.getByRole("dialog");
   await expect(frage.getByRole("heading", { name: "Entwurf verwerfen" })).toBeVisible();

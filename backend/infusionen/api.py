@@ -311,6 +311,38 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
         antwort["X-EPM-Vorlage-Version"] = str(version or "")
         return antwort
 
+    @action(detail=True, methods=["post"])
+    def vorschau(self, request, pk=None):
+        """PDF-Vorschau des Entwurfs mit den Eingaben, die im Editor stehen – auch noch nicht gespeicherte (Wunsch
+        10.10.2026: „PDFs einfach einsehbar“, F181). Der Body ist derselbe wie bei ``PATCH``; geprüft wird genauso.
+        Gespeichert wird nichts: Die Werte werden in einer Transaktion eingetragen, die PDF wird erzeugt, dann wird
+        alles zurückgerollt (auch Verlauf und Audit-Trigger). Wasserzeichen „ENTWURF“ wie bei ``ansicht/``."""
+        from vorlagen.api import pdf_antwort
+        from vorlagen.felder import Kontext
+        from vorlagen.pdf import erzeuge_aus_vorlage, wasserzeichen_fuer
+
+        plan = self.get_object()
+        if plan.status != Infusionsplan.Status.ENTWURF:
+            return Response({"fehler": "Die Vorschau gibt es nur für Entwürfe. Freigegebene Pläne haben ihre gespeicherte PDF."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        pruefe_schreibbereich(request.user, plan.patient)
+        plan.patient.pruefe_bearbeitbar()
+        with transaction.atomic():
+            serializer = self.get_serializer(plan, data=request.data, partial=True)
+            if not serializer.is_valid():
+                transaction.set_rollback(True)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            serializer.save()
+            # frisch laden: der Viewset-Queryset hält Vitamine und Positionen vorgeladen (veraltet nach dem Speichern)
+            frisch = Infusionsplan.objects.select_related("patient").get(pk=plan.pk)
+            pdf, version = erzeuge_aus_vorlage("infusionsplan", Kontext(patient=frisch.patient, plan=frisch),
+                                               wasserzeichen=wasserzeichen_fuer(frisch.patient, frisch),
+                                               titel=f"Infusionsplan {frisch.patient.nachname}, {frisch.patient.vorname}")
+            transaction.set_rollback(True)
+        antwort = pdf_antwort(pdf, f"Infusionsplan-{plan.patient.nummer}-Vorschau.pdf")
+        antwort["X-EPM-Vorlage-Version"] = str(version or "")
+        return antwort
+
     @action(detail=True, methods=["post"], permission_classes=[FreigabeRecht])
     def freigeben(self, request, pk=None):
         plan = self.get_object()

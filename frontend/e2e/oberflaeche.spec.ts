@@ -37,7 +37,7 @@ test("Schnellerfassung (S02): Kontakt mit Wiedervorlage; das Gewicht scheitert g
   await dialog.getByLabel("Gewicht mit erfassen").check();
   await dialog.getByLabel("Gewicht", { exact: true }).fill("590"); // unplausibel: das Backend weist es ab
   await expect(dialog.getByTestId("gewicht-veraenderung")).toContainText("gegenüber");
-  await dialog.getByLabel("Wiedervorlage anlegen").check();
+  await dialog.getByLabel(/^Wiedervorlage.*anlegen$/).check();
   await dialog.getByRole("group", { name: "Art" }).getByRole("button", { name: "Rückruf" }).click();
   await dialog.getByRole("button", { name: "in 1 Monat" }).click();
   await dialog.getByLabel("Titel").fill("E2E Schnell Rückruf");
@@ -198,7 +198,10 @@ test("Volle Breite in Stufen: 1920 px – Karten der Akte im Raster, Größe je 
   await expect(page.locator(".teiler")).toHaveCount(0);
   const gewicht = stufe.locator('[data-bereich="gewicht"]');
   await expect(gewicht).toHaveAttribute("data-breite", "2"); // Standard: Gewichtsverlauf doppelt breit
-  await expect(stufe.locator("[data-bereich]")).toHaveCount(9); // seit F121 zusätzlich „Labor und BIA“
+  // seit F181 sechs Karten (Kontakte und Termine, Personen und Anschrift je in einer Karte), die das Fenster füllen:
+  // Standardhöhe eine Zeile, der Inhalt scrollt in der Karte
+  await expect(stufe.locator("[data-bereich]")).toHaveCount(6);
+  await expect(gewicht).toHaveAttribute("data-hoehe", "1");
   const b0 = (await gewicht.boundingBox())!;
   // „⋯“: Breite 3 Spalten
   let antwort = gespeichert(page);
@@ -208,17 +211,17 @@ test("Volle Breite in Stufen: 1920 px – Karten der Akte im Raster, Größe je 
   await expect(gewicht).toHaveAttribute("data-breite", "3");
   await expect.poll(async () => (await gewicht.boundingBox())!.width).toBeGreaterThan(b0.width * 1.3);
   const api = await apiAls("mitarbeiter");
-  expect((await api.get("auth/ich/")).bereiche.akte_uebersicht.gewicht).toEqual({ breite: 3, hoehe: 0 });
-  // feste Höhe: 1 Zeile – der Inhalt scrollt in der Karte
+  expect((await api.get("auth/ich/")).bereiche.akte_uebersicht.gewicht).toEqual({ breite: 3, hoehe: 1 });
+  // feste Höhe: 2 Zeilen – die Fläche darf dann scrollen
   antwort = gespeichert(page);
   await page.getByTestId("groesse-gewicht").click();
-  await page.getByRole("menuitem", { name: "Höhe: 1 Zeile" }).click();
+  await page.getByRole("menuitem", { name: "Höhe: 2 Zeilen" }).click();
   await antwort;
-  await expect(gewicht).toHaveAttribute("data-hoehe", "1");
+  await expect(gewicht).toHaveAttribute("data-hoehe", "2");
   // gespeichert je Person: nach dem Neuladen gleich
   await page.reload();
   await expect(page.getByTestId("uebersicht-stufe").locator('[data-bereich="gewicht"]')).toHaveAttribute("data-breite", "3");
-  await expect(page.getByTestId("uebersicht-stufe").locator('[data-bereich="gewicht"]')).toHaveAttribute("data-hoehe", "1");
+  await expect(page.getByTestId("uebersicht-stufe").locator('[data-bereich="gewicht"]')).toHaveAttribute("data-hoehe", "2");
   // Karten überdecken sich nicht (nach dem Neuladen erst, wenn alle Karten ihre Daten haben und das Raster steht)
   await expect(async () => {
     const karten = await page.getByTestId("uebersicht-stufe").locator("[data-bereich]").evaluateAll((els) => els.map((e) => {

@@ -1,5 +1,5 @@
 /** Falsch zugeordnete Dokumente (Festlegung 02.10.2026): dem richtigen Patienten zuordnen; endgültig löschen nur
- *  Mediziner mit Kennwort, Code aus der Authenticator-App und abgetipptem Bestätigungscode. */
+ *  Mediziner mit Passwort, Code aus der Authenticator-App und abgetipptem Bestätigungscode. */
 import { expect, test } from "@playwright/test";
 import { apiAls, eindeutig, merken, neuesKonto, totpBase32, zustand } from "./hilfen";
 
@@ -49,7 +49,7 @@ test("Dokument beim falschen Patienten dem richtigen zuordnen; Verlauf neutral b
   await api.ende();
 });
 
-test("Endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code und Bestätigungscode", async ({ browser }) => {
+test("Endgültig löschen: nur Mediziner, mit Passwort, Authenticator-Code und Bestätigungscode", async ({ browser }) => {
   const konto = await neuesKonto("mediziner", "Martha", "Loesch");
   const ctx = await browser.newContext({ storageState: konto.zustand, ignoreHTTPSErrors: true });
   const page = await ctx.newPage();
@@ -66,13 +66,13 @@ test("Endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code und B
   const code = (await dialog.getByTestId("bestaetigungscode").textContent())!.trim();
   expect(code).toMatch(/^[A-Z0-9]{6}$/);
   await dialog.getByLabel("Grund").fill("Dokument eines fremden Patienten, nicht aus der Stiftung");
-  await dialog.getByLabel("Kennwort").fill("falsches-Kennwort");
+  await dialog.getByLabel("Passwort").fill("falsches-Kennwort");
   // Code des nächsten 30-s-Fensters: der Code der Einrichtung ist schon verbraucht
   await dialog.getByLabel("Code aus der Authenticator-App").fill(totpBase32(konto.geheim, Date.now() + 30_000));
   await dialog.getByLabel("Code abtippen").fill(code.toLowerCase());
   await dialog.getByRole("button", { name: "Endgültig löschen" }).click();
   await expect(dialog).toContainText("Passwort falsch.");
-  await dialog.getByLabel("Kennwort").fill(konto.kennwort);
+  await dialog.getByLabel("Passwort").fill(konto.kennwort);
   await dialog.getByLabel("Code aus der Authenticator-App").fill(totpBase32(konto.geheim, Date.now() + 30_000));
   await dialog.getByRole("button", { name: "Endgültig löschen" }).click();
   await expect(page.getByText("Dokument endgültig gelöscht.")).toBeVisible();

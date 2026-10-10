@@ -182,7 +182,7 @@ test("Anfrage mit Frist, Kopie der Akte, Löschwunsch → eingeschränkt, Einsic
   await ctx.close();
 });
 
-test("Akte endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code und Bestätigungscode", async ({ browser }) => {
+test("Akte endgültig löschen: nur Mediziner, mit Passwort, Authenticator-Code und Bestätigungscode", async ({ browser }) => {
   const konto = await neuesKonto("mediziner", "Lars", "Loescher");
   const { ctx, page } = await seiteAls(browser, konto);
   const api = await apiAls("mediziner");
@@ -203,12 +203,12 @@ test("Akte endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code 
   const code = (await dialog.getByTestId("bestaetigungscode").textContent())!.trim();
   await expect(dialog.getByTestId("loesch-umfang")).toContainText("1 Kontakte");
   await dialog.getByLabel("Grund").fill("Antrag der Patientin, keine Aufbewahrungspflicht (E2E)");
-  await dialog.getByLabel("Kennwort").fill("falsches-Kennwort");
+  await dialog.getByLabel("Passwort").fill("falsches-Kennwort");
   await dialog.getByLabel("Code aus der Authenticator-App").fill(totpBase32(konto.geheim, Date.now() + 30_000));
   await dialog.getByLabel("Code abtippen").fill(code.toLowerCase());
   await dialog.getByRole("button", { name: "Akte endgültig löschen" }).click();
   await expect(dialog).toContainText("Passwort falsch.");
-  await dialog.getByLabel("Kennwort").fill(konto.kennwort);
+  await dialog.getByLabel("Passwort").fill(konto.kennwort);
   await dialog.getByLabel("Code aus der Authenticator-App").fill(totpBase32(konto.geheim, Date.now() + 30_000));
   await dialog.getByRole("button", { name: "Akte endgültig löschen" }).click();
   await expect(page.getByText(/Akte Nr\. \d+ endgültig gelöscht\./)).toBeVisible();

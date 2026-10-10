@@ -5,6 +5,7 @@
  * mitgelieferten JavaScript-Fassungen aus /pdfjs/ (siehe vite.config.ts).
  */
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { Knopf, Ladekreis, cx } from "@/components/ui/basis";
 import { rem } from "@/lib/masse";
@@ -12,11 +13,13 @@ import { rem } from "@/lib/masse";
 type PdfJs = typeof import("pdfjs-dist");
 let pdfjsLaden: Promise<PdfJs> | null = null;
 
-/** pdf.js erst laden, wenn eine PDF angezeigt wird (hält das Hauptpaket klein). */
+/** pdf.js erst laden, wenn eine PDF angezeigt wird (hält das Hauptpaket klein). Die „legacy“-Fassung aus demselben
+ *  Paket bringt Ersatz für sehr neue JavaScript-Funktionen mit (z. B. Math.sumPrecise): Mit der Standardfassung blieben
+ *  die Seiten in nicht ganz aktuellen Browsern beim Laden stehen (gefunden 10.10.2026 mit Chromium 141). */
 function pdfjs(): Promise<PdfJs> {
   pdfjsLaden ??= Promise.all([
-    import("pdfjs-dist"),
-    import("pdfjs-dist/build/pdf.worker.min.mjs?worker&url"),
+    import("pdfjs-dist/legacy/build/pdf.mjs") as Promise<PdfJs>,
+    import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?worker&url"),
   ]).then(([bibliothek, worker]) => {
     bibliothek.GlobalWorkerOptions.workerSrc = worker.default;
     return bibliothek;
@@ -155,29 +158,65 @@ export function PdfVorschau({ url, titel, hoehe = 320, laden }: { url: string; t
 
 const ZOOM = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
-/** Große Ansicht: alle Seiten untereinander, Zoom. */
-export function PdfLeser({ url, className, laden }: { url: string; className?: string; laden?: () => Promise<Uint8Array> }) {
+/** Höhe ÷ Breite der ersten Seite (für „Ganze Seite“) */
+function useSeitenverhaeltnis(doc: PDFDocumentProxy | null) {
+  const [verhaeltnis, setVerhaeltnis] = useState(Math.SQRT2);
+  useEffect(() => {
+    if (!doc) return;
+    let aktiv = true;
+    void doc.getPage(1).then((seite) => {
+      const v = seite.getViewport({ scale: 1 });
+      if (aktiv && v.width > 0) setVerhaeltnis(v.height / v.width);
+    }).catch(() => undefined);
+    return () => { aktiv = false; };
+  }, [doc]);
+  return verhaeltnis;
+}
+
+/** Große Ansicht: alle Seiten untereinander, Zoom. ``einpassen``: beginnt mit „Ganze Seite“ – eine Seite passt ganz in
+ *  die Fläche, ohne zu scrollen (Infusionsplan neben dem Plan, Wunsch 10.10.2026: „PDFs einfach einsehbar“). */
+export function PdfLeser({ url, className, laden, einpassen, werkzeuge }: { url: string; className?: string; laden?: () => Promise<Uint8Array>; einpassen?: boolean;
+  /** weitere Knöpfe rechts in der Werkzeugzeile (z. B. „Groß ansehen“, „Herunterladen“) */
+  werkzeuge?: ReactNode }) {
   const { doc, fehler } = useDokument(url, laden);
   const [stufe, setStufe] = useState(2);
+  // null = noch nicht gewählt: dann „Ganze Seite“, sofern die Seite dabei lesbar groß bleibt (sonst auf die Breite)
+  const [ganzGewaehlt, setGanz] = useState<boolean | null>(einpassen ? null : false);
   const { ref, breite } = useBreite();
+  const [hoehe, setHoehe] = useState(0);
+  useEffect(() => {
+    if (!ref.current) return;
+    const beobachter = new ResizeObserver(([e]) => setHoehe(Math.floor(e.contentRect.height)));
+    beobachter.observe(ref.current);
+    return () => beobachter.disconnect();
+  }, [ref]);
+  const verhaeltnis = useSeitenverhaeltnis(doc);
   const zoom = ZOOM[stufe];
+  // „Ganze Seite“: so breit, dass die Seite in die Höhe passt (höchstens die volle Breite)
+  // Rand (Innenabstand 2 × 12 px, Rahmen der Seite) großzügig abziehen: ein Scrollbalken, der kommt und geht, würde die
+  // Breite und damit die Seite immer wieder ändern
+  const ganzBreite = hoehe > 0 ? Math.min(breite - 24, Math.floor((hoehe - 36) / verhaeltnis)) : breite - 24;
+  const ganz = ganzGewaehlt ?? ganzBreite >= 360;
   return (
     <div className={cx("flex flex-col gap-2 min-h-0", className)} data-testid="pdf-leser">
-      <div className="flex items-center gap-2 text-[0.8125rem]">
-        <Knopf klein icon="minus" aria-label="Verkleinern" disabled={stufe <= 0} onClick={() => setStufe(stufe - 1)} />
-        <span className="num w-12 text-center">{Math.round(zoom * 100)} %</span>
-        <Knopf klein icon="plus" aria-label="Vergrößern" disabled={stufe >= ZOOM.length - 1} onClick={() => setStufe(stufe + 1)} />
+      <div className="flex items-center gap-2 text-[0.8125rem] flex-wrap">
+        <Knopf klein icon="minus" aria-label="Verkleinern" disabled={!ganz && stufe <= 0} onClick={() => { if (ganz) setGanz(false); else setStufe(stufe - 1); }} />
+        <span className="num w-12 text-center">{ganz ? "Seite" : `${Math.round(zoom * 100)} %`}</span>
+        <Knopf klein icon="plus" aria-label="Vergrößern" disabled={!ganz && stufe >= ZOOM.length - 1} onClick={() => { if (ganz) setGanz(false); else setStufe(stufe + 1); }} />
+        <Knopf klein variante={ganz ? "pri" : undefined} aria-pressed={ganz} onClick={() => setGanz(!ganz)}
+          title="Eine Seite ganz zeigen (aus: auf die Breite vergrößern)">Ganze Seite</Knopf>
         {doc ? <span className="num gedaempft ml-2">{doc.numPages} {doc.numPages === 1 ? "Seite" : "Seiten"}</span> : null}
+        {werkzeuge ? <span className="ml-auto flex gap-2 flex-wrap">{werkzeuge}</span> : null}
       </div>
-      <div ref={ref} className="flex-1 min-h-0 overflow-auto rounded-lg border border-rand bg-fein p-3">
+      <div ref={ref} className="flex-1 min-h-0 overflow-auto rounded-lg border border-rand bg-fein p-3 [scrollbar-gutter:stable]">
         {fehler ? <div className="py-10 text-center text-sm gedaempft">Anzeige nicht möglich: {fehler}</div>
           : doc && breite ? (
             <div className="flex flex-col gap-3">
-              {Array.from({ length: doc.numPages }, (_, i) => <Seite key={i} doc={doc} nummer={i + 1} breite={breite - 24} zoom={zoom} />)}
+              {Array.from({ length: doc.numPages }, (_, i) => <Seite key={i} doc={doc} nummer={i + 1}
+                breite={ganz ? Math.max(120, ganzBreite) : breite - 24} zoom={ganz ? 1 : zoom} />)}
             </div>
           ) : <div className="py-10 flex justify-center gedaempft"><Ladekreis /></div>}
       </div>
     </div>
   );
 }
-

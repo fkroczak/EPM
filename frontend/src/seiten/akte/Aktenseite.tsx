@@ -41,7 +41,7 @@ export function useWahl(name: string): [string, (wert: string) => void] {
 /** Rahmen eines Reiters: links Liste, rechts Detail. */
 export function Aktenseite({ titel, anzahl, aktion, kopfrechts, liste, fuss, detail, laedt, leer, testid }: {
   /** Überschrift der linken Spalte, z. B. „Diagnosen“ (Einzahl/Mehrzahl macht ``anzahl``) */
-  titel: string;
+  titel: ReactNode;
   /** Zahl vor der Überschrift; ohne Angabe nur die Überschrift */
   anzahl?: number;
   /** Hauptknopf unter der Überschrift („Neue Diagnose“) – auf jedem Reiter an derselben Stelle */
@@ -61,7 +61,7 @@ export function Aktenseite({ titel, anzahl, aktion, kopfrechts, liste, fuss, det
   const kennung = `${testid ?? "akte"}-detailbereich`;
   return (
     <DetailKennung.Provider value={kennung}>
-    <div className="stapel grid grid-cols-1 xl:grid-cols-[18.125rem_minmax(0,1fr)] fhd:grid-cols-[21.25rem_minmax(0,1fr)] gap-x-5 gap-y-4 xl:gap-y-2.5 items-start
+    <div className="akte-spalten stapel grid grid-cols-1 xl:grid-cols-[18.125rem_minmax(0,1fr)] fhd:grid-cols-[21.25rem_minmax(0,1fr)] gap-x-5 gap-y-4 xl:gap-y-2.5 items-start
       [grid-template-areas:'kopf'_'detail'_'liste'] xl:[grid-template-areas:'kopf_detail'_'liste_detail'] xl:grid-rows-[auto_1fr]"
       data-testid={testid}>
       <div className="flex flex-col gap-2.5 [grid-area:kopf]">
@@ -181,4 +181,15 @@ export function Abschnitt({ titel, children, rechts }: { titel: string; children
       {children}
     </section>
   );
+}
+
+/**
+ * Eine Karte – oder, mit ``rahmenlos``, ein Abschnitt in einer größeren Karte (Übersicht der Akte, 10.10.2026: z. B.
+ * Bezugspersonen, Ärzte und Anschrift zusammen in „Personen und Anschrift“, damit die Übersicht ins Fenster passt).
+ */
+export function KarteOderAbschnitt({ rahmenlos, className, abschnittKlasse, children, testid }: {
+  rahmenlos?: boolean; className?: string; abschnittKlasse?: string; children: ReactNode; testid?: string;
+}) {
+  if (rahmenlos) return <section className={cx("karten-abschnitt min-w-0", abschnittKlasse ?? "flex flex-col gap-2.5")} data-testid={testid}>{children}</section>;
+  return <Karte className={className} data-testid={testid}>{children}</Karte>;
 }

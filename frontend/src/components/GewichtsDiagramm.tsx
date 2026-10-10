@@ -4,7 +4,7 @@ import { alsDatum, datum, kg, zahl } from "@/lib/format";
 export type Messpunkt = { gemessen_am: string; gewicht_kg: number | string };
 export type Zeitraum = "y1" | "y3" | "y5" | "alle";
 
-const B = 700, H = 240, L = 44, R = 14, O = 14, U = 30;
+const B0 = 700, H0 = 240, L = 44, R = 14, O = 14, U = 30;
 const MONATE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
 export function imZeitraum<T extends Messpunkt>(werte: T[], zeitraum: Zeitraum): T[] {
@@ -42,7 +42,10 @@ function schritt(spanne: number) {
   return 50;
 }
 
-export function GewichtsDiagramm<T extends Messpunkt>({ werte, zeitraum, geglaettet, vergleich, beschriftung, onPunkt }: {
+export function GewichtsDiagramm<T extends Messpunkt>({ werte, zeitraum, geglaettet, vergleich, beschriftung, onPunkt, masse }: {
+  /** tatsächliche Größe in px (Karte mit fester Höhe, 10.10.2026): gezeichnet wird dann genau so groß, die Schrift
+   *  bleibt lesbar, statt dass ein festes Seitenverhältnis verkleinert wird */
+  masse?: { breite: number; hoehe: number };
   werte: T[];
   /** Klick auf einen Messpunkt (z. B. „Messung bearbeiten“, 08.10.2026) */
   onPunkt?: (w: T) => void;
@@ -51,11 +54,13 @@ export function GewichtsDiagramm<T extends Messpunkt>({ werte, zeitraum, geglaet
   vergleich?: { am: string; kg: number | string } | null;
   beschriftung: string;
 }) {
+  const B = masse && masse.breite > 120 ? masse.breite : B0;
+  const H = masse && masse.hoehe > 80 ? masse.hoehe : H0;
   const punkte = werte
     .map((w) => ({ t: alsDatum(w.gemessen_am)!.getTime(), kg: Number(w.gewicht_kg), am: w.gemessen_am, w }))
     .sort((a, b) => a.t - b.t);
   if (!punkte.length) {
-    return <div className="h-[15rem] flex items-center justify-center text-sm gedaempft border border-dashed border-rand rounded-lg">Keine Messwerte im Zeitraum.</div>;
+    return <div className="h-[15rem] max-h-full grow flex items-center justify-center text-sm gedaempft border border-dashed border-rand rounded-lg">Keine Messwerte im Zeitraum.</div>;
   }
   const heute = Date.now();
   let t0 = punkte[0].t;

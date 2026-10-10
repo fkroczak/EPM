@@ -1,6 +1,6 @@
 /** Entwurf 4 · Patientenakte: Kopf mit Kerndaten und Schnellaktionen, Reiter mit Zählern – in drei Ansichten je Person
  *  (Kopfzeile, Seitenleiste, Karteikarte; Wunsch 08.10.2026, siehe ./ansicht.tsx). */
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { PdfDialog } from "@/components/PdfDialog";
 import type { CSSProperties, ReactNode } from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams } from "react-router";
@@ -16,12 +16,13 @@ import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog, Menue } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
+import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
 import { GewichtDialog, KontaktDialog } from "@/components/Schnellerfassung";
 import { useAktenAblage } from "@/components/AktenAblage";
 import type { Aktenansicht } from "@/lib/darstellung";
-import { useMobil } from "@/lib/stufen";
+import { ab, useMobil, useStufe } from "@/lib/stufen";
 import { Kopfgriff, Leistengriff, useDarstellung } from "./ansicht";
 import { SchreibenAusAkte } from "./Schreiben";
 
@@ -65,6 +66,16 @@ function Kennzahl({ titel, children, hinweis }: { titel: string; children: React
       <span className="lbl text-[0.78rem] gedaempft font-medium">{titel}</span>
       <span className="text-sm truncate">{children}</span>
     </div>
+  );
+}
+
+/** Unter 1280 px (Telefon, Tablet, kleine Fenster): Versorgung und Hinweise im Kopf erst auf Antippen */
+const SCHMALER_KOPF = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(max-width: 79.99em)") : null;
+function useSchmalerKopf(): boolean {
+  return useSyncExternalStore(
+    (melden) => { SCHMALER_KOPF?.addEventListener("change", melden); return () => SCHMALER_KOPF?.removeEventListener("change", melden); },
+    () => !!SCHMALER_KOPF?.matches,
+    () => false,
   );
 }
 
@@ -320,9 +331,11 @@ function EinsichtAnsicht({ info }: { info: Eingeschraenkt }) {
   );
 }
 
-type ReiterEintrag = { zu: string; text: string; zahl?: number; ende?: boolean; gruppe?: string; kuerzel?: string };
+/** ``stufe``: haupt = Bereiche der Behandlung (groß), neben = Befunde und Unterlagen, ende = Verlauf und Datenschutz (klein
+ *  am Ende der Leiste, Wunsch 10.10.2026 „Menüpunkte verkleinern“) */
+type ReiterEintrag = { zu: string; text: string; zahl?: number; ende?: boolean; gruppe?: string; kuerzel?: string; stufe?: "haupt" | "neben" | "ende" };
 
-function Reiter({ zu, text, zahl: anzahl, ende, senkrecht, kuerzel }: ReiterEintrag & { senkrecht?: boolean }) {
+function Reiter({ zu, text, zahl: anzahl, ende, senkrecht, kuerzel, stufe }: ReiterEintrag & { senkrecht?: boolean }) {
   if (senkrecht) {
     return (
       <NavLink to={zu} end={ende} title={kuerzel} className={({ isActive }) => cx("vreiter no-underline", isActive && "aktiv")}>
@@ -332,7 +345,7 @@ function Reiter({ zu, text, zahl: anzahl, ende, senkrecht, kuerzel }: ReiterEint
     );
   }
   return (
-    <NavLink to={zu} end={ende} title={kuerzel} className={({ isActive }) => cx("segment no-underline", isActive && "aktiv")}>
+    <NavLink to={zu} end={ende} title={kuerzel} className={({ isActive }) => cx("segment no-underline", stufe && stufe !== "haupt" && "neben", isActive && "aktiv")}>
       {/* Zähler nur, wo etwas da ist – „0“ an jedem leeren Reiter war Lärm (Wunsch 10.10.2026) */}
       {text}{anzahl ? <span className="num ml-1.5 opacity-70">{zahl(anzahl)}</span> : null}
     </NavLink>
@@ -361,13 +374,15 @@ function vorTagen(tag: string): string {
   return tage <= 0 ? "heute" : tage === 1 ? "gestern" : `vor ${zahl(tage)} Tagen`;
 }
 
-/** Große Kennzahl im Kopf (Stufe „voll“): Bezeichnung, Wert, eine Zeile darunter */
+/** Kennzahl im Kopf (Stufe „voll“): Bezeichnung klein darüber, Wert kräftig, Zusatz grau dahinter – zwei Zeilen hoch */
 function Kopfzahl({ titel, wert, unter, hinweis }: { titel: string; wert: ReactNode; unter?: ReactNode; hinweis?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 min-w-0" title={hinweis}>
-      <span className="text-[0.75rem] gedaempft">{titel}</span>
-      <span className="text-[1.125rem] font-semibold leading-snug min-w-0 md:truncate">{wert}</span>
-      {unter ? <span className="text-[0.75rem] gedaempft min-w-0 md:truncate">{unter}</span> : null}
+    <div className="flex flex-col min-w-0" title={hinweis}>
+      <span className="text-[0.75rem] gedaempft leading-tight">{titel}</span>
+      <span className="flex flex-wrap md:flex-nowrap items-baseline gap-x-2 min-w-0 leading-snug">
+        <span className="text-base font-semibold md:shrink-0 max-w-full md:truncate">{wert}</span>
+        {unter ? <span className="text-[0.75rem] gedaempft min-w-0 md:truncate max-md:[overflow-wrap:anywhere]">{unter}</span> : null}
+      </span>
     </div>
   );
 }
@@ -375,7 +390,7 @@ function Kopfzahl({ titel, wert, unter, hinweis }: { titel: string; wert: ReactN
 /** Kleine Angabe in der zweiten Zeile des Kopfs: „Titel Wert“, gekürzt, ganz im Tooltip */
 function Kopfangabe({ a }: { a: Angabe }) {
   return (
-    <div className="inline-flex items-baseline gap-1.5 min-w-0 max-w-full md:max-w-[22rem]" title={a.hinweis}>
+    <div className="inline-flex items-baseline gap-1.5 min-w-0 max-w-full md:max-w-[20rem]" title={a.hinweis}>
       <span className="gedaempft shrink-0">{a.titel}</span>
       <span className="min-w-0 md:truncate max-md:[overflow-wrap:anywhere]">{a.inhalt}</span>
     </div>
@@ -383,32 +398,41 @@ function Kopfangabe({ a }: { a: Angabe }) {
 }
 
 /**
- * Kopf der Akte, Stufe „voll“ (Wunsch 10.10.2026: „überfüllte Übersicht, zu viele Infos“): vorn vier große Werte –
- * Gewicht, Infusionsplan, nächster Termin, letzter Kontakt –, darunter eine schmale Zeile mit Versorgung und
- * Hinweisen. Telefon und Versicherung stehen in der Karte „Anschrift und Kontakt“ der Übersicht.
+ * Kopf der Akte, Stufe „voll“ (Wunsch 10.10.2026: „überfüllte Übersicht, zu viele Infos“, dann „Akte deutlich
+ * entschlanken, möglichst ohne Scrollen“): vier Kennzahlen – Gewicht, Infusionsplan, nächster Termin, letzter
+ * Kontakt – in einer Zeile, Versorgung und Hinweise in einer schmalen Zeile darunter. Telefon und Versicherung stehen
+ * in „Personen und Anschrift“ der Übersicht. Rund 70 px statt vorher 170 px.
  */
-function KopfVoll({ angabe, unter, bearbeiten }: { angabe: Record<string, Angabe>; unter: Record<string, ReactNode>;
-  bearbeiten?: () => void }) {
+function KopfVoll({ angabe, unter, bearbeiten, mobil }: { angabe: Record<string, Angabe>; unter: Record<string, ReactNode>;
+  bearbeiten?: () => void; mobil?: boolean }) {
+  // Telefon und Tablet: Versorgung und Hinweise auf Antippen – sonst schöbe der Kopf die Akte weit nach unten bzw. ließe
+  // der Übersicht im Fenster zu wenig Platz (Nickelallergie und Gewichtsverlust stehen als CAVE ohnehin beim Namen)
+  const [mehr, setMehr] = useState(false);
   return (
-    <div className="border-t border-rand pt-3.5 flex flex-col gap-3" data-testid="kennzahlen">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-        <div role="group" aria-label="Ernährung" className="grid grid-cols-2 gap-x-6 min-w-0">
+    <div className="border-t border-rand pt-2 pb-1.5 flex flex-col gap-1.5" data-testid="kennzahlen">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-6 gap-y-2">
+        <div role="group" aria-label="Ernährung" className="grid grid-cols-2 gap-x-5 min-w-0">
           <Kopfzahl titel="Gewicht" wert={angabe.gewicht.inhalt} unter={unter.gewicht} hinweis={angabe.gewicht.hinweis} />
           <Kopfzahl titel="Infusionsplan" wert={angabe.plan.inhalt} unter={unter.plan} hinweis={angabe.plan.hinweis} />
         </div>
-        <div role="group" aria-label="Termine und Kontakt" className="grid grid-cols-2 gap-x-6 min-w-0 md:border-l md:border-rand md:pl-6">
+        <div role="group" aria-label="Termine und Kontakt" className="grid grid-cols-2 gap-x-5 min-w-0 md:border-l md:border-rand md:pl-6">
           <Kopfzahl titel="Nächster Termin" wert={unter.terminWann ?? "—"} unter={unter.terminWo} hinweis={angabe.termin.hinweis} />
           <Kopfzahl titel="Letzter Kontakt" wert={angabe.kontakt.inhalt} unter={unter.kontakt} />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-1.5 border-t border-fein pt-2.5 pb-1 text-[0.8125rem]">
-        <div role="group" aria-label="Versorgung" className="flex flex-wrap items-center gap-x-5 gap-y-1 min-w-0">
+      {mobil ? (
+        <button type="button" className="self-start bg-transparent border-0 p-0 text-[0.8125rem] text-akzent-text cursor-pointer inline-flex items-center gap-1"
+          aria-expanded={mehr} onClick={() => setMehr(!mehr)} data-testid="kopf-mehr">
+          {mehr ? "Weniger anzeigen" : "Versorgung und Hinweise"}<Icon name={mehr ? "hoch" : "runter"} groesse={14} /></button>
+      ) : null}
+      <div className={cx("flex-wrap items-center gap-x-6 gap-y-1 border-t border-fein pt-1.5 text-[0.8125rem] min-w-0", mobil && !mehr ? "hidden" : "flex")}>
+        <div role="group" aria-label="Versorgung" className="flex flex-wrap items-center gap-x-4 gap-y-1 min-w-0">
           <span className="sr-only">Versorgung:</span>
           {[angabe.versorger, angabe.ansprechpartner, angabe.hausarzt, angabe.katheter].map((a) => <Kopfangabe key={a.titel} a={a} />)}
-          {bearbeiten ? <button type="button" className="btn geist icon !h-6 !w-6 nicht-drucken" aria-label="Versorgung bearbeiten"
+          {bearbeiten ? <button type="button" className="btn geist icon !h-6 !w-6 shrink-0 nicht-drucken" aria-label="Versorgung bearbeiten"
             title="Stammdaten bearbeiten" onClick={bearbeiten}><Icon name="stift" groesse={13} /></button> : null}
         </div>
-        <div role="group" aria-label="Hinweise und Auskunft" className="flex flex-wrap items-center gap-x-5 gap-y-1 min-w-0">
+        <div role="group" aria-label="Hinweise und Auskunft" className="flex flex-wrap items-center gap-x-4 gap-y-1 min-w-0">
           <span className="sr-only">Hinweise und Auskunft:</span>
           {[angabe.nickel, angabe.auskunft].map((a) => <Kopfangabe key={a.titel} a={a} />)}
         </div>
@@ -457,6 +481,8 @@ export function Akte() {
   // Aufbau der Akte je Person (Design › Patientenakte); am Telefon immer mit Kopf oben
   const [darstellung, darstellungAendern] = useDarstellung();
   const mobil = useMobil();
+  const fhd = ab(useStufe(), "fhd");
+  const schmalerKopf = useSchmalerKopf();
   const ansicht: Aktenansicht = mobil ? "kopfzeile" : darstellung.aktenansicht;
   const [leisteZug, setLeisteZug] = useState<number | null>(null);
   // „Meine Akten“ (S05): Stern im Aktenkopf, und die Akte meldet sich einmal je Aufruf als „zuletzt geöffnet“
@@ -575,7 +601,7 @@ export function Akte() {
   );
   const status = (
     <>
-      {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
+      {p.ist_test ? <Chip art="warn"><Begriff name="testpatient">Testpatient</Begriff></Chip> : null}
       {p.ist_abgeschlossen ? <Chip>abgeschlossen</Chip> : null}
       {p.ist_eingeschraenkt ? <Chip art="warn"><Icon name="schloss" />Verarbeitung eingeschränkt</Chip> : null}
       {/* Erklärungen zum Datenschutz: nachgehalten wie die Nickelallergie – fehlt eine, steht es hier */}
@@ -596,9 +622,10 @@ export function Akte() {
       {trend?.warnung ? <Chip art="warn" title={`seit ${datum(trend.von)}`}>Gewicht {richtung(Number(trend.prozent))} {prozent(trend.prozent, false)}</Chip> : null}
     </span>
   ) : null;
+  // neben dem Namen knapp: Geschlecht als Buchstabe (ausgeschrieben im Tooltip und in den Stammdaten)
   const meta = (
-    <span className="num text-sm gedaempft">
-      Nr. {nummer(p.nummer)}{p.geschlecht ? ` · ${GESCHLECHTER[p.geschlecht]}` : ""} · {datum(p.geburtsdatum)} ({alter(p.geburtsdatum)} J.)
+    <span className="num text-sm gedaempft" title={p.geschlecht ? GESCHLECHTER[p.geschlecht] : undefined}>
+      Nr. {nummer(p.nummer)}{p.geschlecht ? ` · ${p.geschlecht}` : ""} · {datum(p.geburtsdatum)} ({alter(p.geburtsdatum)} J.)
     </span>
   );
   const aktionen = (klein: boolean) => (
@@ -608,6 +635,8 @@ export function Akte() {
         <Knopf klein={klein} icon="sprechblase" title="Kontakt erfassen (K)" onClick={() => kontext.kontaktErfassen()}>Kontakt</Knopf>
         <Knopf klein={klein} icon="waage" title="Gewicht erfassen (G)" onClick={() => kontext.gewichtErfassen()}>Gewicht</Knopf>
         <Knopf klein={klein} icon="kalender" title="Neuer Termin (T)" onClick={() => setDialog("termin")}>Termin</Knopf>
+        {/* eigener Knopf statt unter „⋯“ (Bedienbarkeits-Review 10.10.2026); Ziehen auf die Akte geht weiterhin */}
+        <Knopf klein={klein} icon="hochladen" title="Dokument in die Akte legen (Datei auswählen oder auf die Akte ziehen)" onClick={dateiWaehlen}>Dokument</Knopf>
       </> : null}
       {/* Offener Entwurf: fortsetzen statt eines zweiten Plans (Vorschlag „Erfassen“, 08.10.2026) */}
       {kontext.planen ? (p.kopf?.plan_entwurf
@@ -616,7 +645,6 @@ export function Akte() {
         : <Knopf klein={klein} icon="tropfen" title="Neuer Plan (P)" onClick={() => navigate(`${basis}/plaene/neu`)}>Neuer Plan</Knopf>) : null}
       <Menue label="Weitere Aktionen" eintraege={[
         ...(kontext.bearbeiten ? [{ text: "Stammdaten bearbeiten", onClick: () => setDialog("stammdaten") }] : []),
-        ...(kontext.erfassen ? [{ text: "Dokument hochladen …", onClick: dateiWaehlen }] : []),
         { text: "Akte als PDF", onClick: () => setDialog("pdf") },
         // Unterlagen für die Sprechstunde (F116): der aktuellste Stand aller Bereiche auf einem Blatt
         { text: "Unterlagen für die Sprechstunde", onClick: () => setDialog("sprechstunde") },
@@ -699,22 +727,25 @@ export function Akte() {
     { titel: "Hinweise und Auskunft", angaben: [angabe.nickel, angabe.auskunft, angabe.versicherung] },
   ] : [];
 
-  const reiter: ReiterEintrag[] = [
-    ...(ansicht === "karteikarte" ? [{ zu: `${basis}/kartei`, text: "Karteikarte" }] : []),
-    { zu: basis, text: "Übersicht", ende: true, gruppe: "Akte" },
-    { zu: `${basis}/diagnosen`, text: "Diagnosen", zahl: k?.zaehler.diagnosen },
-    { zu: `${basis}/therapie`, text: "Therapie" },
-    { zu: `${basis}/empfehlung`, text: "Empfehlung" },
-    { zu: `${basis}/kontakte`, text: "Kontakte", zahl: k?.zaehler.kontakte, gruppe: "Betreuung" },
-    { zu: `${basis}/plaene`, text: "Infusionspläne", zahl: k?.zaehler.infusionsplaene },
+  // Reihenfolge (Wunsch 10.10.2026): Diagnosen, Therapie, Empfehlung und Infusionspläne direkt nach der Übersicht –
+  // ein Klick, ohne Suchen; Befunde und Unterlagen danach; Verlauf und Datenschutz (selten) klein am Ende. Jeder
+  // Bereich bleibt ein eigener Reiter (F121).
+  const reiter: ReiterEintrag[] = ([
+    ...(ansicht === "karteikarte" ? [{ zu: `${basis}/kartei`, text: "Karteikarte", stufe: "haupt" }] : []),
+    { zu: basis, text: "Übersicht", ende: true, gruppe: "Akte", stufe: "haupt" },
+    { zu: `${basis}/diagnosen`, text: "Diagnosen", zahl: k?.zaehler.diagnosen, gruppe: "Behandlung", stufe: "haupt" },
+    { zu: `${basis}/therapie`, text: "Therapie", stufe: "haupt" },
+    { zu: `${basis}/empfehlung`, text: "Empfehlung", stufe: "haupt" },
+    { zu: `${basis}/plaene`, text: "Infusionspläne", zahl: k?.zaehler.infusionsplaene, stufe: "haupt" },
+    { zu: `${basis}/kontakte`, text: "Kontakte", zahl: k?.zaehler.kontakte, stufe: "haupt" },
     // Wünsche aus der Praxis vom 06.10.2026 (F112–F115)
-    { zu: `${basis}/labor`, text: "Labor", zahl: k?.zaehler.laborbefunde, gruppe: "Befunde" },
-    { zu: `${basis}/bia`, text: "BIA", zahl: k?.zaehler.bia_messungen },
-    { zu: `${basis}/berichte`, text: "Berichte", zahl: k?.zaehler.berichte },
-    { zu: `${basis}/dokumente`, text: "Dokumente", zahl: k?.zaehler.dokumente, gruppe: "Unterlagen" },
-    { zu: `${basis}/datenschutz`, text: "Datenschutz", zahl: k?.datenschutz_anfragen || undefined },
-    { zu: `${basis}/verlauf`, text: "Verlauf" },
-  ].map((r, i) => (i < 10 ? { ...r, kuerzel: `${r.text} (Alt+${(i + 1) % 10})` } : r));
+    { zu: `${basis}/labor`, text: "Labor", zahl: k?.zaehler.laborbefunde, gruppe: "Befunde und Unterlagen", stufe: "neben" },
+    { zu: `${basis}/bia`, text: "BIA", zahl: k?.zaehler.bia_messungen, stufe: "neben" },
+    { zu: `${basis}/berichte`, text: "Berichte", zahl: k?.zaehler.berichte, stufe: "neben" },
+    { zu: `${basis}/dokumente`, text: "Dokumente", zahl: k?.zaehler.dokumente, stufe: "neben" },
+    { zu: `${basis}/verlauf`, text: "Verlauf", gruppe: "Weiteres", stufe: "ende" },
+    { zu: `${basis}/datenschutz`, text: "Datenschutz", zahl: k?.datenschutz_anfragen || undefined, stufe: "ende" },
+  ] as ReiterEintrag[]).map((r, i) => (i < 10 ? { ...r, kuerzel: `${r.text} (Alt+${(i + 1) % 10})` } : r));
   // Tastenkürzel in der Akte (Vorschlag „Schneller mit der Tastatur“, 08.10.2026); nicht in Eingabefeldern und nicht,
   // solange ein Dialog offen ist
   tasten.current = (e: KeyboardEvent) => {
@@ -745,8 +776,14 @@ export function Akte() {
   // Jeder Bereich ein eigener Reiter (Wunsch 07.10.2026, F121); bei schmalem Fenster umbrechen die Reiter, am
   // Telefon lassen sie sich seitlich wischen (der aktive bleibt im Blick)
   const reiterWaagerecht = (
-    <nav aria-label="Aktenbereiche" className="segmente self-start flex-wrap h-auto relative" ref={reiterLeiste}>
-      {reiter.map((r) => <Reiter key={r.zu} {...r} />)}
+    <nav aria-label="Aktenbereiche" className="segmente akte-reiter self-start flex-wrap h-auto relative shrink-0" ref={reiterLeiste}>
+      {reiter.map((r, i) => (
+        <Fragment key={r.zu}>
+          {i > 0 && r.stufe === "neben" && reiter[i - 1].stufe === "haupt" ? <span className="reiter-trenner" aria-hidden="true" /> : null}
+          {r.stufe === "ende" && reiter[i - 1]?.stufe !== "ende" ? <span className="reiter-ende" aria-hidden="true" /> : null}
+          <Reiter {...r} />
+        </Fragment>
+      ))}
     </nav>
   );
 
@@ -880,19 +917,18 @@ export function Akte() {
   // ---------------------------------------------------------------- Ansicht 1: Kopfzeile mit Gruppen (Standard)
   const stufe = darstellung.aktenkopf;
   return (
-    <Seite pfad={pfad}>
-      <Karte className={cx("px-4 sm:px-[1.375rem] pt-4 sm:pt-[1.125rem] flex flex-col gap-4", mobil ? "pb-4" : "pb-0")}
+    <Seite pfad={pfad} fuellen>
+      <Karte className={cx("px-4 sm:px-[1.125rem] pt-3 flex flex-col gap-2 shrink-0", mobil ? "pb-3" : "pb-0")}
         data-testid="aktenkopf" data-stufe={stufe}>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex flex-col gap-1 min-w-0">
-            <div className="flex items-center gap-2.5 flex-wrap">{titel(false)}{status}{cave}</div>
-            {meta}
-          </div>
-          {aktionen(false)}
+        <div className="flex items-center justify-between gap-x-4 gap-y-2 flex-wrap">
+          {/* Name, Hinweise und Nummer/Geburtsdatum in einer Zeile (vorher zwei) */}
+          <div className="flex items-center gap-x-2.5 gap-y-1 flex-wrap min-w-0">{titel(true)}{status}{cave}{meta}</div>
+          {aktionen(!fhd)}
         </div>
         {k && stufe === "voll" && angabe ? (
-          <KopfVoll angabe={angabe} bearbeiten={kontext.bearbeiten ? () => setDialog("stammdaten") : undefined} unter={{
-            gewicht: [k.bmi != null ? `BMI ${zahl(k.bmi, 1)}` : "", k.gewicht ? `gemessen ${datum(k.gewicht.am)}` : ""].filter(Boolean).join(" · ") || undefined,
+          <KopfVoll angabe={angabe} mobil={schmalerKopf} bearbeiten={kontext.bearbeiten ? () => setDialog("stammdaten") : undefined} unter={{
+            gewicht: k.bmi != null || k.gewicht ? <>{k.bmi != null ? <><Begriff name="bmi">BMI</Begriff> {zahl(k.bmi, 1)}</> : null}
+              {k.bmi != null && k.gewicht ? " · " : null}{k.gewicht ? `gemessen ${datum(k.gewicht.am)}` : null}</> : undefined,
             plan: k.aktueller_plan ? `gültig ab ${datum(k.aktueller_plan.gueltig_ab)}` : undefined,
             terminWann: k.naechster_termin ? terminZeit(k.naechster_termin.faellig_am, k.naechster_termin.uhrzeit) : undefined,
             terminWo: k.naechster_termin ? k.naechster_termin.ort ?? TERMINARTEN[k.naechster_termin.art] : undefined,
@@ -913,7 +949,7 @@ export function Akte() {
       </Karte>
       {meldungen}
       {reiterWaagerecht}
-      <Outlet context={kontext} />
+      <div className="akte-flaeche" data-testid="akte-flaeche"><Outlet context={kontext} /></div>
       {dialoge}
     </Seite>
   );

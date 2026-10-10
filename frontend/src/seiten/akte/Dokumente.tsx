@@ -101,7 +101,7 @@ function UmhaengenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolea
   );
 }
 
-/** Endgültig löschen: Mediziner und Admin (auch bei echten Akten), mit Kennwort, Code aus der Authenticator-App und abgetipptem Bestätigungscode. */
+/** Endgültig löschen: Mediziner und Admin (auch bei echten Akten), mit Passwort, Code aus der Authenticator-App und abgetipptem Bestätigungscode. */
 function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean; onOffen: (o: boolean) => void }) {
   const { patient } = useAkte();
   const qc = useQueryClient();
@@ -146,7 +146,7 @@ function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean
         </Feld>
         <ZweiFaktorFehlt />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-          <Feld label="Kennwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
+          <Feld label="Passwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
           {zf.feld(f.code)}
         </div>
         <div className="flex items-end gap-3 flex-wrap">
@@ -434,7 +434,7 @@ export function Dokumente() {
   };
 
   return (
-    <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_21.25rem] fhd:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
+    <div className="akte-spalten stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_21.25rem] fhd:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
       <div className="flex flex-col gap-4 min-w-0">
         {erfassen ? (
           <div

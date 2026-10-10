@@ -7,7 +7,7 @@
  */
 import { expect, test } from "@playwright/test";
 import type { Browser, Page } from "@playwright/test";
-import { OHNE_ANMELDUNG, apiAls, apiAnmelden, gemerkt, stackNeuStarten, totpBase32, virtuellerAuthenticator, zustand } from "./hilfen";
+import { OHNE_ANMELDUNG, adminNavigation, apiAls, apiAnmelden, gemerkt, stackNeuStarten, totpBase32, virtuellerAuthenticator, zustand } from "./hilfen";
 import type { Rolle } from "./hilfen";
 
 test.describe.configure({ mode: "serial" });
@@ -76,7 +76,7 @@ test("Nach dem Neustart: Akten mit Gewicht, Diagnose und Versionen, Kontakten, T
   await page.goto(`/patienten/${gemerkt("diagnose").id}/diagnosen`);
   const diagnose = page.getByTestId("karte-diagnose");
   await expect(diagnose.locator(".richtext strong")).toHaveText("Typ II");
-  await expect(diagnose).toContainText("Version 2");
+  await expect(diagnose).toContainText("Fassung 2");
   await page.goto(`/patienten/${gemerkt("diagnose").id}/therapie`);
   await expect(page.getByTestId("karte-therapie")).toContainText("HPE 5×/Woche über Port");
   await expect(page.getByTestId("karte-therapie")).toContainText("geändert");
@@ -223,7 +223,7 @@ test("Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Re
   await rechte.getByRole("button", { name: /^Speichern \(\d+\)$/ }).click();
   await expect(page.getByText("Rechte gespeichert. Sie gelten ab sofort.")).toBeVisible();
 
-  await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Audit-Log" }).click();
+  await (await adminNavigation(page)).getByRole("link", { name: "Audit-Log" }).click();
   await page.getByRole("button", { name: "Benutzer", exact: true }).click();
   await expect(page.getByTestId("auditlog")).toContainText(name);
   await page.getByRole("button", { name: "Dokument", exact: true }).click();

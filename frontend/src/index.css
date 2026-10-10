@@ -824,3 +824,41 @@ html { scrollbar-gutter: stable; }
 }
 .kontakt-zeile.markiert { background: var(--akzent-weich); }
 @media (max-width: 47.99rem) { .kontakt-zeile { grid-template-columns: 3.75rem minmax(0, 1fr) auto; gap: 0.25rem 0.625rem; padding: 0.75rem; } }
+
+/* Patientenakte ohne Seiten-Scrollen (Wunsch 10.10.2026, F181): ab 1024 × 600 px füllt die Akte das Fenster. Kopf und
+   Reiter bleiben stehen; gescrollt wird in der Fläche darunter, in zweispaltigen Reitern je Spalte und in der Übersicht
+   je Karte. Darunter (Telefon, Tablet hochkant) scrollt die Seite wie bisher. */
+.akte-flaeche { display: flex; flex-direction: column; gap: var(--abstand); min-width: 0; }
+/* Scrollbereiche halten auch absolut gesetzte Kinder (z. B. Text nur für Bildschirmleser) – sonst verlängern diese die
+   Seite und es entsteht doch wieder ein Seiten-Scrollbalken */
+.seite-fuellt .akte-flaeche, .seite-fuellt .akte-spalten > *, .bereich.fest > .card { position: relative; }
+@media (min-width: 64rem) and (min-height: 37.5rem) {
+  .seite-fuellt { height: 100vh; height: 100dvh; min-height: 0 !important; overflow: hidden; }
+  .seite-fuellt > main.seite-inhalt { min-height: 0; overflow: hidden; }
+  .seite-fuellt .akte-flaeche {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    /* Schatten und Fokusrahmen der Karten nicht abschneiden */
+    margin: -0.25rem; padding: 0.25rem;
+  }
+}
+/* zweispaltige Reiter (Liste | Eintrag, Text | Seitenleiste): ab 1280 px scrollt jede Spalte für sich */
+@media (min-width: 80rem) and (min-height: 37.5rem) {
+  .seite-fuellt .akte-flaeche:has(> .akte-spalten) { overflow: hidden; }
+  .seite-fuellt .akte-spalten { flex: 1 1 auto; min-height: 0; height: 100%; align-items: stretch !important; align-content: stretch; }
+  .seite-fuellt .akte-spalten > * {
+    min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: -0.25rem; padding: 0.25rem;
+  }
+}
+
+/* Reiter der Akte: Hauptbereiche vorn, Befunde und Unterlagen danach, Verlauf und Datenschutz klein am Ende */
+.akte-reiter { width: 100%; }
+.akte-reiter .reiter-trenner { width: 1px; align-self: stretch; margin: 0.375rem 0.25rem; background: var(--rand); flex-shrink: 0; }
+.akte-reiter .segment.neben { font-size: 0.8125rem; padding: 0 0.625rem; color: var(--gedaempft); }
+.akte-reiter .segment.neben.aktiv { color: var(--tinte); }
+.akte-reiter .reiter-ende { margin-left: auto; }
+@media (max-width: 47.99rem) { .akte-reiter .reiter-ende { margin-left: 0; } }
+
+/* Übersicht der Akte im Fenster: Diagramm füllt die Karte, Abschnitte in einer Karte durch eine Linie getrennt */
+.gewicht-fuellen { flex: 1 1 0; min-height: 7rem; display: flex; overflow: hidden; position: relative; }
+.gewicht-fuellen > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.karten-abschnitt + .karten-abschnitt { border-top: 1px solid var(--rand); padding-top: 0.75rem; }
