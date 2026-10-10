@@ -369,7 +369,10 @@ export type Pfadteil = { text: string; zu?: string };
 
 /** Kopfzeile + Inhalt einer Seite. Der Inhalt nutzt die volle Fensterbreite (S16, Festlegung 01.10.2026); die Seiten
  *  teilen sich in Stufen auf (lib/stufen.ts). Das „?“ führt zum passenden Abschnitt der Hilfe (S15). */
-export function Seite({ pfad, children, className }: { pfad: Pfadteil[]; children: ReactNode; className?: string }) {
+export function Seite({ pfad, children, className, fuellen }: { pfad: Pfadteil[]; children: ReactNode; className?: string;
+  /** Seite füllt das Fenster und scrollt nicht als Ganzes (Patientenakte, 10.10.2026): Kopf und Reiter bleiben stehen,
+   *  gescrollt wird nur in Karten bzw. Spalten. Gilt ab 1024 × 600 px (index.css, .seite-fuellt); darunter scrollt die Seite. */
+  fuellen?: boolean }) {
   const ich = useIch();
   const { pathname } = useLocation();
   const [suchen, setSuchen] = useState(false);
@@ -381,7 +384,7 @@ export function Seite({ pfad, children, className }: { pfad: Pfadteil[]; childre
   // Telefon: nur der letzte Teil des Pfads, davor ein Schritt zurück
   const zurueck = [...pfad].slice(0, -1).reverse().find((t) => t.zu);
   return (
-    <div className="grow min-w-0 flex flex-col min-h-screen">
+    <div className={cx("grow min-w-0 flex flex-col min-h-screen", fuellen && "seite-fuellt")}>
       {mobil ? <header className="sticky top-0 z-20 shrink-0 bg-flaeche border-b border-rand nicht-drucken pt-[env(safe-area-inset-top)]"
         data-testid="mobil-kopf">
         <div className="h-14 flex items-center gap-1 px-2">

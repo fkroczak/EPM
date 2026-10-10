@@ -602,7 +602,7 @@ export function AkteDatenschutz() {
   // Recht „Akten endgültig löschen“: Mediziner und Admin, Admins auch bei echten Akten (Festlegung 02.10.2026)
   const loeschenErlaubt = darfBei("akten_loeschen", patient);
   return (
-    <div className="stapel grid grid-cols-1 xl:grid-cols-2 gap-5 items-start" data-testid="akte-datenschutz">
+    <div className="akte-spalten stapel grid grid-cols-1 xl:grid-cols-2 gap-5 items-start" data-testid="akte-datenschutz">
       <div className="stapel flex flex-col gap-5 min-w-0">
         <ErklaerungenKarte daten={daten.data} patient={patient} darf={darf} />
         <AnfragenKarte daten={daten.data} patient={patient} darf={darf} entscheiden={entscheiden} />

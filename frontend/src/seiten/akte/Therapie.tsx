@@ -211,7 +211,7 @@ function Seitenspalte({ feld }: { feld: Textfeld }) {
 
 function Textseite({ feld, testid }: { feld: Textfeld; testid: string }) {
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(17.5rem,22rem)] gap-[var(--abstand)] items-start" data-testid={testid}>
+    <div className="akte-spalten grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(17.5rem,22rem)] gap-[var(--abstand)] items-start" data-testid={testid}>
       <div className="flex flex-col gap-[var(--abstand)] min-w-0 xl:max-w-[60rem]">
         <Dokument feld={feld} />
         {feld === "therapie" ? <Verlauf /> : null}

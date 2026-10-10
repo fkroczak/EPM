@@ -1,5 +1,6 @@
 /** Entwurf 4 · Übersicht der Akte: Gewichtsverlauf mit Erfassung, Diagnose/Therapie, Termine, Plan, Kontakte. */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, alle, api } from "@/lib/api";
@@ -22,12 +23,17 @@ import { BefundeKurz } from "./Befunde";
 import { DiagnosenKurz } from "./Diagnosen";
 import { StummKarte } from "@/components/HinweisChips";
 import { AerzteKarte, BezugspersonenKarte } from "./Kontaktpersonen";
-import { KeinPlanHinweis } from "./Plaene";
+import { KeinPlanHinweis, PlanPdfDialog } from "./Plaene";
+import { KarteOderAbschnitt } from "./Aktenseite";
 import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
 import { Bereich, Bereiche } from "@/components/ui/bereiche";
 
 const ZEITRAEUME: { wert: Zeitraum; text: string }[] = [
   { wert: "y1", text: "12 Monate" }, { wert: "y3", text: "3 Jahre" }, { wert: "y5", text: "5 Jahre" }, { wert: "alle", text: "Alle" },
+];
+/** in der Karte mit fester Höhe knapp, damit Zeitraum und „Geglättet“ in eine Zeile passen */
+const ZEITRAEUME_KURZ: { wert: Zeitraum; text: string }[] = [
+  { wert: "y1", text: "12 Mon." }, { wert: "y3", text: "3 J." }, { wert: "y5", text: "5 J." }, { wert: "alle", text: "Alle" },
 ];
 
 function useAkteNeuLaden() {
@@ -83,7 +89,9 @@ function KorrekturDialog({ messung, onZu }: { messung: Gewicht | null; onZu: () 
   );
 }
 
-function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
+function GewichtKarte({ startZeitraum = "y1", fuellen }: { startZeitraum?: Zeitraum;
+  /** Karte mit fester Höhe (Übersicht im Fenster): das Diagramm füllt den Platz */
+  fuellen?: boolean }) {
   // Erfassen nur noch über den Dialog „Gewicht erfassen“ wie im Aktenkopf (ein Dialog je Sache, 08.10.2026);
   // die letzte Messung lässt sich direkt bearbeiten (Klick auf den Wert oder „Bearbeiten“)
   const { patient, erfassen, gewichtErfassen } = useAkte();
@@ -93,6 +101,21 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
   const [korrektur, setKorrektur] = useState<Gewicht | null>(null);
   useOhneRechtSchliessen(erfassen, () => setKorrektur(null));
   const einstellungen = useEinstellungen();
+  // Größe der Zeichenfläche (nur in der Karte mit fester Höhe gebraucht)
+  const diagrammRef = useRef<HTMLDivElement>(null);
+  const [diagrammMasse, setDiagrammMasse] = useState({ breite: 0, hoehe: 0 });
+  useLayoutEffect(() => {
+    const el = diagrammRef.current;
+    if (!fuellen || !el) return;
+    const messen = () => setDiagrammMasse((alt) => {
+      const neu = { breite: Math.floor(el.clientWidth), hoehe: Math.floor(el.clientHeight) };
+      return alt.breite === neu.breite && alt.hoehe === neu.hoehe ? alt : neu;
+    });
+    messen();
+    const beobachter = new ResizeObserver(messen);
+    beobachter.observe(el);
+    return () => beobachter.disconnect();
+  });
   const messungen = useQuery({
     queryKey: ["patient", patient.id, "gewichte"],
     queryFn: () => alle<Gewicht>(`gewichte/${abfrage({ patient: patient.id })}`),
@@ -104,35 +127,47 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
   const e = einstellungen.data;
   // letzte Messung = jüngstes Messdatum, bei gleichem Datum die zuletzt erfasste
   const letzte = [...alleWerte].sort((x, y) => (y.gemessen_am.localeCompare(x.gemessen_am) || y.erfasst_am.localeCompare(x.erfasst_am)))[0];
+  const wert = erfassen && letzte ? (
+    <button type="button" className={cx("num font-semibold bg-transparent border-0 p-0 cursor-pointer text-inherit hover:underline whitespace-nowrap shrink-0", fuellen ? "text-lg" : "text-[1.375rem]")}
+      data-testid="aktuelles-gewicht" title="Letzte Messung bearbeiten" onClick={() => setKorrektur(letzte)}>
+      {k?.gewicht ? kg(k.gewicht.kg) : kg(letzte.gewicht_kg)}</button>
+  ) : <span className={cx("num font-semibold whitespace-nowrap shrink-0", fuellen ? "text-lg" : "text-[1.375rem]")} data-testid="aktuelles-gewicht">{k?.gewicht ? kg(k.gewicht.kg) : "—"}</span>;
+  const zusatz = (
+    <span className={cx("text-[0.8125rem] gedaempft", fuellen && "truncate min-w-0")}
+      title={fuellen && k?.gewicht ? `am ${datum(k.gewicht.am)} · ${sichtbar.length} Messungen im Zeitraum` : undefined}>
+      {k?.gewicht ? `am ${datum(k.gewicht.am)}` : "noch keine Messung"}
+      {patient.groesse_cm ? <> · {zahl(patient.groesse_cm)} cm</> : null}
+      {k?.bmi != null ? <> · BMI <span className="num">{zahl(k.bmi, 1)}</span></> : null}
+      {" · "}<span className="num">{sichtbar.length}</span> Messungen im Zeitraum
+    </span>
+  );
   return (
-    <Karte className="px-4 sm:px-[1.375rem] py-4 sm:py-[1.125rem] flex flex-col gap-4" data-testid="gewichtskarte">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex flex-col gap-1">
-          <h2 className="lbl m-0">Gewichtsverlauf</h2>
-          <div className="flex items-baseline gap-3 flex-wrap">
-            {erfassen && letzte ? (
-              <button type="button" className="num text-[1.375rem] font-semibold bg-transparent border-0 p-0 cursor-pointer text-inherit hover:underline"
-                data-testid="aktuelles-gewicht" title="Letzte Messung bearbeiten" onClick={() => setKorrektur(letzte)}>
-                {k?.gewicht ? kg(k.gewicht.kg) : kg(letzte.gewicht_kg)}</button>
-            ) : <span className="num text-[1.375rem] font-semibold" data-testid="aktuelles-gewicht">{k?.gewicht ? kg(k.gewicht.kg) : "—"}</span>}
-            <span className="text-[0.8125rem] gedaempft">
-              {k?.gewicht ? `am ${datum(k.gewicht.am)}` : "noch keine Messung"}
-              {patient.groesse_cm ? <> · {zahl(patient.groesse_cm)} cm</> : null}
-              {k?.bmi != null ? <> · BMI <span className="num">{zahl(k.bmi, 1)}</span></> : null}
-              {" · "}<span className="num">{sichtbar.length}</span> Messungen im Zeitraum
-            </span>
+    <Karte className={cx("flex flex-col", fuellen ? "px-4 py-3 gap-2" : "px-4 sm:px-[1.375rem] py-4 sm:py-[1.125rem] gap-4")} data-testid="gewichtskarte">
+      {fuellen ? (
+        // Karte mit fester Höhe: Kopf in einer Zeile, damit das Diagramm Platz hat
+        <div className="flex items-center justify-between gap-3 min-w-0">
+          <div className="flex items-baseline gap-2.5 min-w-0">
+            <h2 className="lbl m-0 shrink-0">Gewicht</h2>{wert}{zusatz}
           </div>
+          {erfassen ? <Knopf klein icon="plus" className="shrink-0" onClick={() => gewichtErfassen()}>Gewicht</Knopf> : null}
         </div>
-        {erfassen ? (
-          <div className="flex items-center gap-2">
-            {letzte ? <Knopf klein icon="stift" onClick={() => setKorrektur(letzte)} title={`Messung vom ${datum(letzte.gemessen_am)} bearbeiten`}>Bearbeiten</Knopf> : null}
-            <Knopf klein icon="plus" onClick={() => gewichtErfassen()}>Gewicht</Knopf>
+      ) : (
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex flex-col gap-1">
+            <h2 className="lbl m-0">Gewichtsverlauf</h2>
+            <div className="flex items-baseline gap-3 flex-wrap">{wert}{zusatz}</div>
           </div>
-        ) : null}
-      </div>
+          {erfassen ? (
+            <div className="flex items-center gap-2">
+              {letzte ? <Knopf klein icon="stift" onClick={() => setKorrektur(letzte)} title={`Messung vom ${datum(letzte.gemessen_am)} bearbeiten`}>Bearbeiten</Knopf> : null}
+              <Knopf klein icon="plus" onClick={() => gewichtErfassen()}>Gewicht</Knopf>
+            </div>
+          ) : null}
+        </div>
+      )}
 
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Segmente label="Zeitraum" wert={zeitraum} onWahl={setZeitraum} werte={ZEITRAEUME} />
+      <div className={cx("flex items-center justify-between gap-3", fuellen ? "flex-nowrap" : "flex-wrap")}>
+        <Segmente label="Zeitraum" wert={zeitraum} onWahl={setZeitraum} werte={fuellen ? ZEITRAEUME_KURZ : ZEITRAEUME} />
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input type="checkbox" checked={geglaettet} onChange={(ev) => setGeglaettet(ev.target.checked)} /> Geglättet
         </label>
@@ -148,13 +183,15 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
         </div>
       ) : null}
       {messungen.isLoading ? <Laden /> : (
-        <GewichtsDiagramm<Gewicht> werte={sichtbar} zeitraum={zeitraum} geglaettet={geglaettet} onPunkt={erfassen ? (w) => setKorrektur(w) : undefined}
+        <div className={fuellen ? "gewicht-fuellen" : undefined} ref={diagrammRef}><GewichtsDiagramm<Gewicht> masse={fuellen ? diagrammMasse : undefined} werte={sichtbar} zeitraum={zeitraum} geglaettet={geglaettet} onPunkt={erfassen ? (w) => setKorrektur(w) : undefined}
           vergleich={trend ? { am: trend.von, kg: trend.vergleich_kg } : null}
-          beschriftung={`Gewichtsverlauf ${ZEITRAEUME.find((z) => z.wert === zeitraum)!.text}`} />
+          beschriftung={`Gewichtsverlauf ${ZEITRAEUME.find((z) => z.wert === zeitraum)!.text}`} /></div>
       )}
       <div className="flex items-center gap-5 text-xs gedaempft flex-wrap">
-        <span className="flex items-center gap-1.5"><span className="w-[1.125rem] h-[0.1875rem] rounded-sm bg-akzent" />Verlauf</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full border-[1.5px] border-gedaempft" />Messwert</span>
+        {fuellen ? null : <>
+          <span className="flex items-center gap-1.5"><span className="w-[1.125rem] h-[0.1875rem] rounded-sm bg-akzent" />Verlauf</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full border-[1.5px] border-gedaempft" />Messwert</span>
+        </>}
         {trend ? <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full border-2 border-warn" />Vergleichswert vor {e ? zahl(e.gewicht_warnung_monate) : "…"} Monaten</span> : null}
         <button type="button" className="ml-auto bg-transparent border-0 p-0 text-akzent-text cursor-pointer text-xs" aria-expanded={liste}
           onClick={() => setListe(!liste)}>{liste ? "Messwerte ausblenden" : `Messwerte anzeigen (${alleWerte.length})`}</button>
@@ -180,28 +217,34 @@ function GewichtKarte({ startZeitraum = "y1" }: { startZeitraum?: Zeitraum }) {
   );
 }
 
-function TherapieKarte() {
+/** Diagnosen, Therapie und Empfehlung auf einen Blick – je ein Klick in den Reiter (Wunsch 10.10.2026: „einfacher
+ *  erreichbar“). Ganz zu lesen und zu bearbeiten in den Reitern. */
+function BehandlungKarte() {
   const { patient, bearbeiten } = useAkte();
+  const icon = bearbeiten ? "stift" : undefined;
   return (
-    <Karte className="px-4 sm:px-[1.375rem] py-4 sm:py-[1.125rem] flex flex-col gap-4">
-      {/* seit 07.10.2026 je ein eigener Reiter (F121, F122) */}
-      <KartenKopf titel="Diagnosen und Therapie" rechts={<>
-        <KnopfLink to={`/patienten/${patient.id}/diagnosen`} klein icon={bearbeiten ? "stift" : undefined}>Diagnosen</KnopfLink>
-        <KnopfLink to={`/patienten/${patient.id}/therapie`} klein icon={bearbeiten ? "stift" : undefined}>Therapie</KnopfLink>
-        <KnopfLink to={`/patienten/${patient.id}/empfehlung`} klein icon={bearbeiten ? "stift" : undefined}>Empfehlung</KnopfLink>
-      </>} />
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-3 sm:gap-5">
-        <div className="flex flex-col gap-1.5 min-w-0">
-          <span className="text-[0.8125rem] font-medium gedaempft">Diagnosen</span>
-          <DiagnosenKurz patientId={patient.id} />
-        </div>
-        <div className="flex flex-col gap-1.5 min-w-0"><span className="text-[0.8125rem] font-medium gedaempft">Therapie</span><Richtext html={patient.therapie} leer="Noch keine Therapie eingetragen." /></div>
-      </div>
+    <Karte className="px-4 py-3.5 flex flex-col gap-3" data-testid="behandlung">
+      <KartenKopf titel="Diagnosen, Therapie, Empfehlung" />
+      <section className="karten-abschnitt flex flex-col gap-1.5 min-w-0">
+        <div className="flex items-center justify-between gap-2"><h3 className="lbl m-0 text-[0.8125rem]">Diagnosen</h3>
+          <KnopfLink to={`/patienten/${patient.id}/diagnosen`} klein variante="geist" icon={icon}>Diagnosen</KnopfLink></div>
+        <DiagnosenKurz patientId={patient.id} />
+      </section>
+      <section className="karten-abschnitt flex flex-col gap-1.5 min-w-0">
+        <div className="flex items-center justify-between gap-2"><h3 className="lbl m-0 text-[0.8125rem]">Therapie</h3>
+          <KnopfLink to={`/patienten/${patient.id}/therapie`} klein variante="geist" icon={icon}>Therapie</KnopfLink></div>
+        <Richtext html={patient.therapie} leer="Noch keine Therapie eingetragen." className="text-sm" />
+      </section>
+      <section className="karten-abschnitt flex flex-col gap-1.5 min-w-0" data-testid="empfehlung-kurz">
+        <div className="flex items-center justify-between gap-2"><h3 className="lbl m-0 text-[0.8125rem]">Empfehlung</h3>
+          <KnopfLink to={`/patienten/${patient.id}/empfehlung`} klein variante="geist" icon={icon}>Empfehlung</KnopfLink></div>
+        <Richtext html={patient.empfehlung} leer="Noch keine Empfehlung eingetragen." className="text-sm" />
+      </section>
     </Karte>
   );
 }
 
-export function TermineKarte() {
+export function TermineKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
   const { patient, erfassen, terminAnlegen } = useAkte();
   const [bearbeiten, setBearbeiten] = useState<Termin | null>(null);
   useOhneRechtSchliessen(erfassen, () => setBearbeiten(null));
@@ -217,7 +260,7 @@ export function TermineKarte() {
   });
   const liste = termine.data?.results ?? [];
   return (
-    <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="aktentermine">
+    <KarteOderAbschnitt rahmenlos={rahmenlos} className="px-5 py-4 flex flex-col gap-3" testid="aktentermine">
       <KartenKopf titel="Termine" rechts={erfassen ? <Knopf klein icon="plus" onClick={terminAnlegen}>Termin</Knopf> : null} />
       {termine.isLoading ? <Laden /> : liste.length ? (
         <ul className="m-0 p-0 list-none flex flex-col">
@@ -239,14 +282,16 @@ export function TermineKarte() {
       <Fehleranzeige fehler={abhaken.error} />
       <TerminDialog offen={!!bearbeiten && erfassen} onOffen={(o) => { if (!o) setBearbeiten(null); }} termin={bearbeiten}
         patientId={patient.id} patientName={`${patient.nachname}, ${patient.vorname}`} />
-    </Karte>
+    </KarteOderAbschnitt>
   );
 }
 
 function PlanKarte() {
   const { patient } = useAkte();
   const { darfBei } = useAuth();
+  const [pdf, setPdf] = useState(false);
   const aktuell = patient.kopf?.aktueller_plan;
+  const entwurf = patient.kopf?.plan_entwurf;
   const plan = useQuery({
     queryKey: ["patient", patient.id, "plan", aktuell?.id],
     queryFn: () => api<Plan>(`infusionsplaene/${aktuell!.id}/`),
@@ -275,15 +320,25 @@ function PlanKarte() {
         </>
       ) : null}
       <KeinPlanHinweis />
+      {/* Ein offener Entwurf ist das, was als Nächstes zu tun ist: freigeben oder weiter bearbeiten */}
+      {entwurf ? (
+        <div className="meldung warn flex items-center justify-between gap-2 text-[0.8125rem]" data-testid="plan-entwurf-hinweis">
+          <span>Entwurf vom {datum(entwurf.erstellt_am)} wartet auf Freigabe.</span>
+          <KnopfLink to={`/patienten/${patient.id}/plaene?plan=${entwurf.id}`} klein>Ansehen</KnopfLink>
+        </div>
+      ) : null}
       <div className="flex gap-2 flex-wrap">
-        {!patient.ist_abgeschlossen && darfBei("plaene_anlegen", patient) ? <KnopfLink to={`/patienten/${patient.id}/plaene/neu`} variante="pri" klein>Neuer Plan</KnopfLink> : null}
+        {/* PDF mit einem Klick (Wunsch 10.10.2026: „PDFs einfach einsehbar“) */}
+        {plan.data?.pdf_sha256 ? <Knopf klein icon="dokument" onClick={() => setPdf(true)}>PDF ansehen</Knopf> : null}
+        {!patient.ist_abgeschlossen && darfBei("plaene_anlegen", patient) && !entwurf ? <KnopfLink to={`/patienten/${patient.id}/plaene/neu`} variante="pri" klein>Neuer Plan</KnopfLink> : null}
         <KnopfLink to={`/patienten/${patient.id}/plaene`} klein>Alle Pläne</KnopfLink>
       </div>
+      {plan.data?.pdf_sha256 ? <PlanPdfDialog plan={plan.data} offen={pdf} onOffen={setPdf} /> : null}
     </Karte>
   );
 }
 
-function KontakteKarte() {
+function KontakteKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
   const { patient, erfassen, kontaktErfassen } = useAkte();
   const kontakte = useQuery({
     queryKey: ["patient", patient.id, "kontakte", "letzte"],
@@ -291,7 +346,7 @@ function KontakteKarte() {
   });
   const liste = kontakte.data?.results ?? [];
   return (
-    <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="letzte-kontakte">
+    <KarteOderAbschnitt rahmenlos={rahmenlos} className="px-5 py-4 flex flex-col gap-3" testid="letzte-kontakte">
       <KartenKopf titel="Letzte Kontakte" rechts={erfassen ? <Knopf klein icon="plus" onClick={() => kontaktErfassen()}>Kontakt</Knopf> : null} />
       {kontakte.isLoading ? <Laden /> : liste.length ? (
         <ul className="m-0 p-0 list-none flex flex-col gap-3">
@@ -304,15 +359,17 @@ function KontakteKarte() {
         </ul>
       ) : <Leer>Noch keine Kontakte.</Leer>}
       <Link to={`/patienten/${patient.id}/kontakte`} className="text-[0.8125rem]">Alle Kontakte</Link>
-    </Karte>
+    </KarteOderAbschnitt>
   );
 }
 
-function StammKarte() {
+function StammKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
   const { patient: p, bearbeiten, stammdatenBearbeiten } = useAkte();
   const adresse = [p.strasse, [p.plz, p.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
   return (
-    <Karte className="px-4 sm:px-[1.375rem] py-4 sm:py-[1.125rem] grid grid-cols-[minmax(6.25rem,max-content)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm" data-testid="stammdaten">
+    <KarteOderAbschnitt rahmenlos={rahmenlos} testid="stammdaten"
+      className="px-4 sm:px-[1.375rem] py-4 sm:py-[1.125rem] grid grid-cols-[minmax(6.25rem,max-content)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm"
+      abschnittKlasse="grid grid-cols-[minmax(6.25rem,max-content)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
       <div className="col-span-2 pb-1 flex items-center justify-between gap-2">
         <h2 className="lbl m-0">Anschrift und Kontakt</h2>
         {bearbeiten ? <Knopf klein variante="geist" icon="stift" onClick={stammdatenBearbeiten}>Bearbeiten</Knopf> : null}
@@ -329,7 +386,7 @@ function StammKarte() {
       {p.hausarzt ? <><span className="gedaempft">Hausarzt</span><span title="bisheriger Freitext; Ärzte mit Kontaktdaten unter „Ärzte“">{p.hausarzt}</span></> : null}
       <span className="gedaempft">Überweisung</span><span>{p.ueberweisung_durch || "—"}</span>
       <span className="gedaempft">Größe</span><span className="num">{p.groesse_cm != null ? `${zahl(p.groesse_cm)} cm` : "—"}</span>
-    </Karte>
+    </KarteOderAbschnitt>
   );
 }
 
@@ -364,51 +421,96 @@ function BefundeKarte() {
   );
 }
 
-/** Übersicht im Raster (Fehlerliste 02.10.2026, Punkt 2): Spalten wie auf der Startseite (1/2/3/4/5 je Fensterbreite),
- *  jede Karte mit dem Menü „⋯“ für Breite und Höhe – je Person gespeichert. Der senkrechte Teiler entfällt hier. Ab
- *  2560 px beginnt das Gewichtsdiagramm mit 3 Jahren (S16). */
-/** Spalten des Rasters nach der tatsächlichen Breite der Fläche (Ansichten „Seitenleiste“ und „Karteikarte“): etwa die
- *  Breiten, die der Inhalt bei den Fensterstufen 900/1440/1920/2560 px ohne Seitenleiste der Akte hat */
+/** Spalten des Rasters nach der tatsächlichen Breite der Fläche: etwa die Breiten, die der Inhalt bei 1366/1920/2560 px
+ *  hat (1366 px: drei Spalten, 1920 px: vier). */
 function spaltenFuerBreite(px: number): number {
-  return px < 560 ? 1 : px < 1080 ? 2 : px < 1560 ? 3 : px < 2200 ? 4 : 5;
+  return px < 560 ? 1 : px < 880 ? 2 : px < 1560 ? 3 : px < 2200 ? 4 : 5;
 }
 
-function useBreite(aktiv: boolean) {
+/** Fensterstufe, ab der die Akte das Fenster füllt (index.css, .seite-fuellt) */
+const FUELLT = "(min-width: 64rem) and (min-height: 37.5rem)";
+/** Kleinste sinnvolle Höhe einer Kartenzeile; darunter scrollt die Fläche statt die Karten zu quetschen */
+const MIN_ZEILE = 170;
+
+/**
+ * Breite der Übersicht und – wenn die Akte das Fenster füllt – die Höhe, die für das Raster bleibt (Fläche unter den
+ * Reitern abzüglich Hinweiskarten darüber).
+ */
+function useFlaeche() {
   const ref = useRef<HTMLDivElement>(null);
-  const [breite, setBreite] = useState(0);
+  const raster = useRef<HTMLDivElement>(null);
+  const [mass, setMass] = useState({ breite: 0, hoehe: 0 });
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!aktiv || !el) return;
-    setBreite(el.clientWidth);
-    const beobachter = new ResizeObserver((eintraege) => setBreite(Math.round(eintraege[0]?.contentRect.width ?? el.clientWidth)));
+    const flaeche = el?.closest<HTMLElement>(".akte-flaeche");
+    if (!el) return;
+    const messen = () => {
+      const fuellt = !!flaeche && window.matchMedia(FUELLT).matches;
+      let hoehe = 0;
+      if (fuellt && raster.current) {
+        const stil = getComputedStyle(flaeche!);
+        const innen = flaeche!.clientHeight - parseFloat(stil.paddingTop) - parseFloat(stil.paddingBottom);
+        hoehe = Math.floor(innen - (raster.current.getBoundingClientRect().top - el.getBoundingClientRect().top));
+      }
+      setMass({ breite: Math.round(el.clientWidth), hoehe });
+    };
+    messen();
+    const beobachter = new ResizeObserver(messen);
     beobachter.observe(el);
-    return () => beobachter.disconnect();
-  }, [aktiv]);
-  return [ref, breite] as const;
+    if (flaeche) beobachter.observe(flaeche);
+    window.addEventListener("resize", messen);
+    return () => { beobachter.disconnect(); window.removeEventListener("resize", messen); };
+  }, []);
+  return [ref, raster, mass] as const;
 }
 
+/**
+ * Übersicht der Akte (Wunsch 10.10.2026: „deutlich entschlanken, im besten Fall ohne Scrollen“): sechs Karten statt
+ * neun – Gewicht, Infusionsplan, Diagnosen/Therapie/Empfehlung, Kontakte und Termine, Labor und BIA, Personen und
+ * Anschrift. Ab 1024 × 600 px und mindestens drei Spalten füllen sie in zwei Reihen genau das Fenster; was nicht
+ * hineinpasst, scrollt in der Karte (wie die Kacheln der Startseite). Jede Karte behält das Menü für Breite und Höhe
+ * (je Person gespeichert); wer selbst eine Größe wählt, bekommt sie – dann darf die Fläche auch scrollen.
+ */
 export function Uebersicht() {
   const stufe = useStufe();
-  const { patient, bearbeiten, schmal } = useAkte();
-  const [flaeche, breite] = useBreite(schmal);
-  const spalten = schmal && breite > 0 ? Math.min(RASTER_SPALTEN[stufe], spaltenFuerBreite(breite)) : RASTER_SPALTEN[stufe];
+  const { patient, bearbeiten } = useAkte();
+  const [flaeche, rasterRef, mass] = useFlaeche();
+  const spalten = mass.breite > 0 ? Math.min(RASTER_SPALTEN.qhd, spaltenFuerBreite(mass.breite)) : RASTER_SPALTEN[stufe];
+  const abstand = 12; // --abstand (0,75 rem bei 16 px); genau genug für die Aufteilung
+  // Das Raster zählt in 8-px-Zeilen (components/ui/bereiche.tsx): die Höhe so wählen, dass zwei Reihen samt Abstand
+  // genau aufgehen, sonst ragt die zweite Reihe um ein paar Pixel über das Fenster
+  const zeile = spalten >= 3 && mass.hoehe > 0 ? Math.floor(mass.hoehe / 2 / 8) * 8 - abstand : 0;
+  const fuellen = zeile >= MIN_ZEILE;
+  const h = fuellen ? 1 : 0;
   return (
-    <div className="stapel flex flex-col gap-4 min-w-0" ref={flaeche}>
+    <div className="stapel flex flex-col gap-4 min-w-0" ref={flaeche} data-testid="akte-uebersicht" data-fuellt={fuellen ? "1" : undefined}>
       {/* Weggeklickte Hinweise stehen hier und lassen sich zurückholen (Wunsch 07.10.2026, F119) */}
       <StummKarte patientId={patient.id} aenderbar={bearbeiten} />
       <ImportHinweise />
-    <Bereiche seite="akte_uebersicht" spalten={spalten} testid="uebersicht-stufe">
-      {/* Reihenfolge nach Bedeutung (Wunsch 10.10.2026): Verlauf und Behandlung vorn, Kontaktdaten zuletzt */}
-      <Bereich id="gewicht" titel="Gewichtsverlauf" standard={{ breite: 2 }}><GewichtKarte startZeitraum={stufe === "qhd" ? "y3" : "y1"} /></Bereich>
-      <Bereich id="plan" titel="Aktueller Infusionsplan"><PlanKarte /></Bereich>
-      <Bereich id="kontakte" titel="Letzte Kontakte"><KontakteKarte /></Bereich>
-      <Bereich id="therapie" titel="Diagnose und Therapie" standard={{ breite: 2 }}><TherapieKarte /></Bereich>
-      <Bereich id="termine" titel="Termine"><TermineKarte /></Bereich>
-      <Bereich id="befunde" titel="Labor und BIA"><BefundeKarte /></Bereich>
-      <Bereich id="aerzte" titel="Ärzte"><AerzteKarte /></Bereich>
-      <Bereich id="bezug" titel="Bezugspersonen"><BezugspersonenKarte /></Bereich>
-      <Bereich id="stamm" titel="Anschrift und Kontakt"><StammKarte /></Bereich>
-    </Bereiche>
+      <div ref={rasterRef} className="min-w-0">
+        <Bereiche seite="akte_uebersicht" spalten={spalten} testid="uebersicht-stufe"
+          style={fuellen ? ({ "--raster-zeile": `${zeile}px` } as CSSProperties) : undefined}>
+          {/* Reihenfolge nach Bedeutung: Verlauf und Behandlung vorn, Kontaktdaten zuletzt */}
+          <Bereich id="gewicht" titel="Gewichtsverlauf" standard={{ breite: fuellen && spalten < 4 ? 1 : 2, hoehe: h }}>
+            <GewichtKarte startZeitraum={stufe === "qhd" ? "y3" : "y1"} fuellen={fuellen} /></Bereich>
+          <Bereich id="plan" titel="Aktueller Infusionsplan" standard={{ hoehe: h }}><PlanKarte /></Bereich>
+          <Bereich id="therapie" titel="Diagnosen, Therapie, Empfehlung" standard={{ breite: fuellen ? 1 : 2, hoehe: h }}><BehandlungKarte /></Bereich>
+          <Bereich id="kontakte" titel="Kontakte und Termine" standard={{ breite: spalten === 4 ? 2 : 1, hoehe: h }}>
+            <Karte className="px-4 py-3.5 flex flex-col gap-3" data-testid="kontakte-termine">
+              <KontakteKarte rahmenlos />
+              <TermineKarte rahmenlos />
+            </Karte>
+          </Bereich>
+          <Bereich id="befunde" titel="Labor und BIA" standard={{ hoehe: h }}><BefundeKarte /></Bereich>
+          <Bereich id="personen" titel="Personen und Anschrift" standard={{ hoehe: h }}>
+            <Karte className="px-4 py-3.5 flex flex-col gap-3" data-testid="personen">
+              <BezugspersonenKarte rahmenlos />
+              <AerzteKarte rahmenlos />
+              <StammKarte rahmenlos />
+            </Karte>
+          </Bereich>
+        </Bereiche>
+      </div>
     </div>
   );
 }

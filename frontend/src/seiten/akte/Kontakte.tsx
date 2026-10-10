@@ -255,7 +255,7 @@ export function Kontakte() {
 
   return (
     <>
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(17.5rem,22rem)] gap-[var(--abstand)] items-start" data-testid="kontakte">
+      <div className="akte-spalten grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(17.5rem,22rem)] gap-[var(--abstand)] items-start" data-testid="kontakte">
         <div className="flex flex-col gap-[var(--abstand)] min-w-0">
           {erfassen ? <Schnelleingabe /> : null}
           <Karte className="overflow-hidden">

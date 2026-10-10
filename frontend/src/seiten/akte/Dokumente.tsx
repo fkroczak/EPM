@@ -434,7 +434,7 @@ export function Dokumente() {
   };
 
   return (
-    <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_21.25rem] fhd:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
+    <div className="akte-spalten stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_21.25rem] fhd:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
       <div className="flex flex-col gap-4 min-w-0">
         {erfassen ? (
           <div
