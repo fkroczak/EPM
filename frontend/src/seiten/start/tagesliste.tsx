@@ -17,7 +17,8 @@ import { useAuth } from "@/lib/auth";
 import { datum, terminZeit } from "@/lib/format";
 import { TERMINARTEN } from "@/lib/typen";
 import type { ScansStand, Termin } from "@/lib/typen";
-import { Chip, Knopf, cx } from "@/components/ui/basis";
+import { Chip, Knopf, KnopfLink, cx } from "@/components/ui/basis";
+import { Begriff } from "@/components/ui/Begriff";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { AnkuendigungDialog } from "@/components/AnkuendigungDialog";
@@ -26,7 +27,7 @@ import { BestaetigungDialog } from "@/components/TerminBestaetigung";
 import type { LueckenArt, Startdaten } from "./daten";
 
 /** Wie viele Einträge eine Gruppe aufgeklappt zeigt, bevor „… weitere“ zum Ziel führt */
-const HOECHSTENS = 4;
+const HOECHSTENS = 3;
 
 const LUECKEN: { art: LueckenArt; filter: string; text: (n: number, monate: number) => string }[] = [
   { art: "telefon", filter: "ohne_telefon", text: (n) => `${n === 1 ? "1 Akte" : `${n} Akten`} ohne Telefonnummer` },
@@ -64,7 +65,9 @@ function Punkt({ icon, art, text, unter, anzahl, zu, aktion, children, testid }:
           {kopf}<Icon name="pfeilRechts" groesse={16} className="shrink-0 gedaempft" />
         </Link>
       ) : (
-        <div className="flex items-center gap-3 min-h-12 py-2 flex-wrap">{kopf}{aktion}</div>
+        <div className="flex items-center gap-x-3 gap-y-2 min-h-12 py-2 flex-wrap">
+          <span className="grow min-w-[min(100%,16rem)] flex items-center gap-3">{kopf}</span>{aktion}
+        </div>
       )}
       {children ? <ul className="m-0 p-0 list-none pl-11 pb-2 flex flex-col">{children}</ul> : null}
     </li>
@@ -76,13 +79,13 @@ function TerminZeile({ t, aktion, zeit = "uhr" }: { t: Termin; aktion?: ReactNod
   const wann = zeit === "uhr" ? (t.uhrzeit ? t.uhrzeit.slice(0, 5) : "ganztägig") : terminZeit(t.faellig_am, t.uhrzeit);
   const wo = t.art === "praxistermin" ? (t.ort_name || t.bei || "Ort fehlt") : TERMINARTEN[t.art];
   return (
-    <li className="flex items-center gap-x-3 gap-y-1 py-1.5 flex-wrap text-[0.875rem]" data-testid="tagesliste-termin">
-      <span className="num text-text2 w-[4.5rem] shrink-0">{wann}</span>
+    <li className="flex items-center gap-x-3 gap-y-1 py-1.5 flex-wrap text-[0.875rem]" data-testid="heute-zu-tun-termin">
+      <span className={cx("num text-text2 shrink-0 whitespace-nowrap", zeit === "uhr" ? "w-[4.5rem]" : "w-[8.5rem]")}>{wann}</span>
       <span className="min-w-0 grow flex flex-col gap-px">
         <Link to={`/patienten/${t.patient}`} className="font-medium no-underline truncate">{t.patient_name}</Link>
         <span className="text-[0.78125rem] gedaempft truncate">{wo}{t.titel && t.titel !== TERMINARTEN[t.art] ? ` · ${t.titel}` : ""}</span>
       </span>
-      {aktion}
+      {aktion ? <span className="ml-auto">{aktion}</span> : null}
     </li>
   );
 }
@@ -147,7 +150,8 @@ export function Tagesliste({ d }: { d: Startdaten }) {
   if (rueckrufAnzahl) {
     punkte.push(
       <Punkt key="rueckrufe" icon="telefon" art={tl.rueckrufe_ueberfaellig ? "fehler" : "warn"} testid="tl-rueckrufe" anzahl={rueckrufAnzahl}
-        text={`${mehrzahl(rueckrufAnzahl, "Rückruf oder Wiedervorlage", "Rückrufe und Wiedervorlagen")} fällig`}
+        text={<>{rueckrufAnzahl} {rueckrufAnzahl === 1 ? <>Rückruf oder <Begriff name="wiedervorlage">Wiedervorlage</Begriff></>
+          : <>Rückrufe und <Begriff name="wiedervorlage">Wiedervorlagen</Begriff></>} fällig</>}
         unter={tl.rueckrufe_ueberfaellig ? `davon ${tl.rueckrufe_ueberfaellig} überfällig` : "heute fällig"}>
         {rueckrufe.slice(0, HOECHSTENS).map((t) => <TerminZeile key={t.id} t={t} zeit="datum" aktion={kaestchen(t)} />)}
         <Weitere n={rueckrufAnzahl - Math.min(rueckrufe.length, HOECHSTENS)} zu="/kalender?ansicht=liste" text="im Kalender" />
@@ -181,9 +185,10 @@ export function Tagesliste({ d }: { d: Startdaten }) {
   if (tl.kontakt_ueberfaellig) {
     punkte.push(
       <Punkt key="kontakt" icon="sprechblase" art="fehler" testid="tl-kontakt" anzahl={tl.kontakt_ueberfaellig}
-        zu="/patienten?pruefen=wiedereinbestellung"
         text={`${mehrzahl(tl.kontakt_ueberfaellig, "Patient", "Patienten")} ohne Kontakt seit über ${tl.kontakt_monate} Monaten`}
-        unter="und kein Termin geplant – anrufen oder Termin anlegen" />,
+        unter={<><Begriff name="wiedereinbestellung">Wiedereinbestellung</Begriff> fällig: kein Termin geplant – anrufen oder Termin anlegen</>}
+        aktion={<KnopfLink klein to="/patienten?pruefen=wiedereinbestellung" aria-label="Wiedereinbestellung: zur Patientenliste">
+          Zur Liste</KnopfLink>} />,
     );
   }
   if (tl.plaene_pruefen) {
@@ -220,15 +225,15 @@ export function Tagesliste({ d }: { d: Startdaten }) {
   }
 
   return (
-    <section className="card px-5 pt-4 pb-2 flex flex-col" aria-labelledby="heute-zu-tun" data-testid="tagesliste">
+    <section className="card px-5 pt-4 pb-2 flex flex-col" aria-labelledby="heute-zu-tun" data-testid="heute-zu-tun">
       <div className="flex items-center justify-between gap-3 flex-wrap pb-1">
         <h2 id="heute-zu-tun" className="m-0 text-[1.0625rem] font-semibold flex items-center gap-2">
-          Heute zu tun {punkte.length ? <Chip art="akzent" className="num" data-testid="tagesliste-anzahl">{punkte.length}</Chip> : null}
+          Heute zu tun {punkte.length ? <Chip art="akzent" className="num" data-testid="heute-zu-tun-anzahl">{punkte.length}</Chip> : null}
         </h2>
         {punkte.length ? <span className="text-[0.8125rem] gedaempft">Wichtigstes zuerst · ein Klick führt hin</span> : null}
       </div>
       {punkte.length ? <ul className="m-0 p-0 list-none">{punkte}</ul> : (
-        <p className="m-0 py-3 flex items-center gap-2.5 text-[0.9375rem]" data-testid="tagesliste-leer">
+        <p className="m-0 py-3 flex items-center gap-2.5 text-[0.9375rem]" data-testid="heute-zu-tun-leer">
           <span className="w-8 h-8 rounded-full flex items-center justify-center bg-ok-bg text-ok"><Icon name="haken" groesse={16} /></span>
           Für heute ist alles erledigt.
         </p>

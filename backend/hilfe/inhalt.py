@@ -191,6 +191,26 @@ der Verweis unten führt zur vollständigen Liste.</p>
 <p>Je nach Fensterbreite stehen 1 bis 5 Spalten nebeneinander; die Kacheln behalten ihre Größe.</p>""",
     },
     {
+        "id": "heute_zu_tun", "gruppe": "startseite", "titel": "Heute zu tun: die Tagesliste am Morgen",
+        "rechte": ["akten_lesen"], "seiten": ["/"],
+        "html": """
+<p>Ganz oben auf der Startseite steht <strong>Heute zu tun</strong>: eine kurze Liste, das Wichtigste zuerst, jeweils mit
+Anzahl. Ein Klick auf eine Zeile führt direkt hin.</p>
+<ul>
+<li><strong>Termine heute</strong> mit Uhrzeit, Patient und Ort; das Kästchen „erledigt“ hakt ab.</li>
+<li><strong>Rückrufe und Wiedervorlagen</strong>, die heute fällig oder schon überfällig sind – ebenfalls zum Abhaken.</li>
+<li><strong>Praxis informieren</strong>: das Infoblatt an die Praxis ist fällig – „Infoblatt erstellen“.</li>
+<li><strong>Terminbestätigung fehlt</strong> bei Praxisterminen der nächsten zwei Wochen – „Bestätigung vorbereiten“.</li>
+<li><strong>Kein Kontakt</strong> seit der eingestellten Zeit und kein Termin geplant, <strong>Infusionspläne zur
+Prüfung</strong>, <strong>Scans</strong>, die auf Zuordnung warten.</li>
+<li><strong>Praxistermine ohne Ort</strong> („Ort eintragen“) und <strong>fehlende Angaben</strong> in den Akten, z. B.
+„3 Akten ohne Telefonnummer“ – der Klick öffnet die Patientenliste mit genau diesen Akten.</li>
+</ul>
+<p>Was erledigt ist, verschwindet von allein. Ist nichts mehr offen, steht dort „Für heute ist alles erledigt.“
+EPM verschickt dabei nichts und trägt nichts ein: Die Knöpfe öffnen nur den passenden Dialog, entscheiden tust du.
+Testpatienten und abgeschlossene Akten stehen nicht in der Liste.</p>""",
+    },
+    {
         "id": "startseite_anpassen", "gruppe": "startseite", "titel": "Startseite anpassen", "rechte": [], "seiten": [],
         "html": """
 <p><strong>Startseite anpassen</strong> schaltet den Bearbeitungsmodus ein. Die Einstellung gilt nur für dich.</p>
@@ -305,7 +325,12 @@ stellt jede Person unter <strong>Design</strong> ein. Tastenkürzel siehe „Tas
 <p>Hinweise am Namen (Gewichtsverlust, Plan oder Befund zu alt, Kontakt fällig …) lassen sich mit dem <strong>×</strong>
 ausblenden. Dabei wird gewählt, wie lange Ruhe sein soll – 3, 6 oder 12 Monate, danach erscheint der Hinweis von allein
 wieder – oder <strong>nicht mehr nötig</strong>. Was gerade ausgeblendet ist, steht in der Übersicht der Akte unter
-„Ausgeblendete Hinweise“ und lässt sich dort wieder einschalten.</p>""",
+„Ausgeblendete Hinweise“ und lässt sich dort wieder einschalten.</p>
+<p><strong>Fehlende Angaben</strong> meldet EPM ebenfalls als Hinweis: kein Hausarzt bzw. Arzt erfasst, keine
+Telefonnummer (auch keine bei den Kontaktpersonen), kein Gewicht seit einigen Monaten (Grenze unter Vorlagen ›
+Grenzwerte), keine Diagnose und ein Praxistermin ohne Ort. Ist etwas bewusst nicht zu haben, den Hinweis mit
+<strong>×</strong> ausblenden. Abgeschlossene Akten und Testpatienten bekommen diese Hinweise nicht. Die Startseite
+zählt sie unter „Heute zu tun“ zusammen.</p>""",
     },
     {
         "id": "schreiben", "gruppe": "patienten", "titel": "Schreiben und E-Mail: Aufnahme, Terminbestätigung, Reise",
@@ -455,6 +480,24 @@ Terminort) und <strong>Sonstiges</strong>. Ohne Uhrzeit gilt ein Termin als ganz
 im Kalender oder beim Kontakt. Offene Termine öffnet ein Klick (Titel in der Übersicht, Eintrag im Kalender oder in der
 Karteikarte) gleich in <strong>Termin bearbeiten</strong> – dort auch <strong>Erledigt</strong> und
 <strong>Akte öffnen</strong>. Auf Startseite und Übersicht hakt das Kästchen einen Termin als erledigt ab.</p>""",
+    },
+    {
+        "id": "terminbestaetigung", "gruppe": "kontakte", "titel": "Terminbestätigung nach dem Speichern",
+        "rechte": ["eintraege_erfassen"], "seiten": ["/kalender"],
+        "html": """
+<p>Speicherst du einen <strong>neuen Praxistermin</strong> oder <strong>verschiebst</strong> einen (Datum, Uhrzeit oder
+Ort) und der Patient hat eine Anschrift oder E-Mail-Adresse, fragt EPM direkt danach:
+<strong>„Terminbestätigung an Frau … schicken?“</strong></p>
+<ul>
+<li><strong>Ja, Bestätigung vorbereiten</strong> öffnet „Schreiben und E-Mail“ mit genau diesem Termin. Dort ein Klick auf
+<strong>E-Mail vorbereiten</strong> (Outlook öffnet den Entwurf, du schickst ihn ab) oder <strong>PDF
+herunterladen</strong> zum Drucken.</li>
+<li><strong>Nicht jetzt</strong> schließt die Frage. Die Bestätigung lässt sich später im Termin („Bestätigung erstellen“)
+oder in der Tagesliste nachholen.</li>
+</ul>
+<p>Der Termin merkt sich, wann eine Bestätigung erstellt wurde: Im Termin steht <strong>„Bestätigung erstellt am …“</strong>
+oder <strong>„Bestätigung fehlt“</strong>. Wird der Termin verschoben, fehlt sie wieder. „PDF ansehen“ zählt nicht als
+erstellt. Ob die Frage erscheint, stellt ein, wer Vorlagen pflegt (Vorlagen › Grenzwerte › Terminbestätigung).</p>""",
     },
     {
         "id": "kalender", "gruppe": "kontakte", "titel": "Kalender", "rechte": ["akten_lesen"], "seiten": ["/kalender"],

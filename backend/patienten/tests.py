@@ -397,15 +397,18 @@ class Patientenliste(Grundlage):
         v = zeilen[self.verlust.id]["kennzahlen"]
         self.assertEqual(Decimal(str(v["gewicht"]["kg"])), Decimal("64.0"))
         self.assertEqual((v["trend"]["richtung"], v["trend"]["warnung"]), ("down", True))
-        # seit F120 hat jede Akte in Betreuung ohne Befunde zusätzlich „labor“ und „bia“
-        self.assertEqual([h["art"] for h in v["hinweise"]], ["gewicht", "ohne_plan", "labor", "bia"])
+        # seit F120 hat jede Akte in Betreuung ohne Befunde zusätzlich „labor“ und „bia“, seit F186 die fehlenden
+        # Angaben (hier ohne Hausarzt, Telefon und Diagnose; das Gewicht ist aktuell)
+        self.assertEqual([h["art"] for h in v["hinweise"]],
+                         ["gewicht", "ohne_plan", "labor", "bia", "hausarzt", "telefon", "diagnose"])
         s = zeilen[self.stabil.id]["kennzahlen"]
         self.assertEqual(s["trend"]["richtung"], "flat")
         self.assertTrue(s["termin_woche"])
-        self.assertEqual([h["art"] for h in s["hinweise"]], ["labor", "bia"])
+        self.assertEqual([h["art"] for h in s["hinweise"]], ["labor", "bia", "hausarzt", "telefon", "diagnose"])
         ohne = zeilen[self.patient.id]["kennzahlen"]
         self.assertEqual({h["art"] for h in ohne["hinweise"]},
-                         {"versorger", "kontakt", "ohne_plan", "labor", "bia"})
+                         {"versorger", "kontakt", "ohne_plan", "labor", "bia", "hausarzt", "telefon", "gewicht_fehlt",
+                          "diagnose"})
         self.assertIsNone(ohne["gewicht"])
         # Standard-Reihenfolge: letzter Kontakt, neueste zuerst; ohne Kontakt ans Ende
         self.assertEqual(r["results"][-1]["id"], self.patient.id)
