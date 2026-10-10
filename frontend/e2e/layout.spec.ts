@@ -1,6 +1,6 @@
 /** Bildschirmgrößen: unter 1440 px Seitenleiste mit Symbolen und die Akte einspaltig (S16, Stufen je Seite). */
 import { expect, test } from "@playwright/test";
-import { zustand } from "./hilfen";
+import { apiAls, eindeutig, zustand } from "./hilfen";
 
 test.use({ storageState: zustand("mitarbeiter") });
 
@@ -40,6 +40,27 @@ test("Akte ohne Seiten-Scrollen (F181): 1366 × 768 und 1920 × 1080 – sechs K
     expect(await page.evaluate(() => document.scrollingElement!.scrollHeight - innerHeight)).toBeLessThanOrEqual(0);
     await expect(page.getByTestId("aktenkopf")).toBeInViewport();
   }
+  // Akte mit vielen Hinweisen (kein Plan, kein Versorger, kein Kontakt, kein Labor, keine BIA …): im Kopf nur ein Chip
+  // „N Hinweise“, der die Liste aufklappt – der Kopf bleibt ruhig und die Akte passt weiter ins Fenster
+  const api = await apiAls("mitarbeiter");
+  const viele = await api.post("patienten/", { nachname: eindeutig("Vielhinweis"), vorname: "Vera", geburtsdatum: "1960-05-05" });
+  await api.ende();
+  for (const [breite, hoehe] of [[1366, 768], [1920, 1080], [1024, 768]] as const) {
+    await page.setViewportSize({ width: breite, height: hoehe });
+    await page.goto(`/patienten/${viele.id}`);
+    const sammel = page.getByTestId("aktenkopf").getByTestId("hinweise-sammel");
+    await expect(sammel).toContainText(/\d+ Hinweise/);
+    await expect(page.getByTestId("akte-uebersicht")).toHaveAttribute("data-fuellt", "1");
+    await expect.poll(() => page.evaluate(() => document.scrollingElement!.scrollHeight - innerHeight)).toBeLessThanOrEqual(0);
+  }
+  await page.getByTestId("aktenkopf").getByTestId("hinweise-sammel").click();
+  const liste = page.getByTestId("hinweise-liste");
+  await expect(liste).toContainText("Kein Laborbefund");
+  // „×“ in der Liste öffnet den Dialog zum Ausblenden (die Liste schließt dabei)
+  await liste.getByRole("button", { name: /Hinweis „Kein Laborbefund“ ausblenden/ }).click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Hinweis ausblenden" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
   // Tablet hochkant: die Seite scrollt wie bisher, die Karten stehen untereinander bzw. zu zweit
   await page.setViewportSize({ width: 820, height: 1180 });
   await page.reload();
