@@ -15,6 +15,7 @@ import type { Plan, Praeparat } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, KnopfLink, Laden, Meldung, cx } from "@/components/ui/basis";
 import { Spalten } from "@/components/ui/spalten";
 import { PdfLeser } from "@/components/PdfAnsicht";
+import { PdfDialog } from "@/components/PdfDialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
@@ -194,8 +195,8 @@ export function PlanEditor() {
   const vorbelegung = useQuery({
     queryKey: ["patient", patient.id, "vorbelegung"],
     queryFn: () => api<Vorbelegung>(`infusionsplaene/vorbelegung/?patient=${patient.id}`),
-    enabled: ersterPlan,
   });
+  const [vorschau, setVorschau] = useState<{ id: number; daten: Record<string, unknown> } | null>(null);
 
   // Formular einmal füllen: Entwurf, sonst Vorlage bzw. aktueller Plan, sonst leer
   useEffect(() => {
@@ -203,10 +204,10 @@ export function PlanEditor() {
     if (planId) { if (entwurf.data) setF(ausPlan(entwurf.data)); return; }
     if (!vorlageId && !aktuellBekannt) return; // erst wissen, ob es einen aktuellen Plan gibt
     if (quelleId) { if (quelle.data) setF(ausPlan(quelle.data, datum(heuteIso()))); return; }
-    if (!vorbelegung.isFetchedAfterMount || vorbelegung.isFetching) return;
+    if (!ersterPlan || !vorbelegung.isFetchedAfterMount || vorbelegung.isFetching) return;
     const werte = vorbelegung.data?.werte;
     setF(werte ? { ...leer(), ...Object.fromEntries(Object.entries(werte).map(([k, v]) => [k, zahl(v)])) } : leer());
-  }, [f, planId, entwurf.data, vorlageId, aktuellBekannt, quelleId, quelle.data, vorbelegung.data, vorbelegung.isFetching, vorbelegung.isFetchedAfterMount]);
+  }, [f, planId, entwurf.data, vorlageId, aktuellBekannt, quelleId, quelle.data, ersterPlan, vorbelegung.data, vorbelegung.isFetching, vorbelegung.isFetchedAfterMount]);
 
   // höchstens ein Entwurf je Patient: einen vorhandenen Entwurf bearbeiten statt einen zweiten anzulegen
   const offeneEntwuerfe = useQuery({
@@ -223,8 +224,8 @@ export function PlanEditor() {
   const vorher = useMemo(() => (vorgaenger.data ? ausPlan(vorgaenger.data) : null), [vorgaenger.data]);
   const geaendert = (k: keyof Formular) => !!(vorher && f && k !== "gueltig_ab" && norm(f, k) !== norm(vorher, k));
 
-  const speichern = useMutation({
-    mutationFn: async (freigeben: boolean) => {
+  /** Werte des Formulars für PATCH bzw. Vorschau; Eingabefehler stehen danach in ``lokal`` */
+  const formularDaten = (): Record<string, unknown> => {
       const fehler: Feldfehler = {};
       const daten: Record<string, unknown> = {};
       for (const k of ZAHLEN) {
@@ -247,6 +248,10 @@ export function PlanEditor() {
       if (Object.keys(fehler).length) throw new ApiFehler(400, "Bitte die markierten Felder prüfen.", null, fehler);
       Object.assign(daten, { gueltig_ab: gueltig, vitamine: f!.vitamine, bemerkung: f!.bemerkung, pantozol_stufe: Number(f!.pantozol_stufe),
         positionen });
+      return daten;
+  };
+  /** Entwurf beim ersten Speichern anlegen (vorher gibt es keinen) */
+  const entwurfId = async (): Promise<number> => {
       let id = planId ? Number(planId) : neueId;
       if (!id) {
         const neu = await api<Plan>("infusionsplaene/entwurf/", {
@@ -255,6 +260,12 @@ export function PlanEditor() {
         id = neu.id;
         setNeueId(neu.id);
       }
+      return id;
+  };
+  const speichern = useMutation({
+    mutationFn: async (freigeben: boolean) => {
+      const daten = formularDaten();
+      const id = await entwurfId();
       await api<Plan>(`infusionsplaene/${id}/`, { method: "PATCH", body: daten });
       if (freigeben) await api<Plan>(`infusionsplaene/${id}/freigeben/`, { method: "POST" });
       return id;
@@ -271,6 +282,19 @@ export function PlanEditor() {
     },
   });
 
+  // PDF-Vorschau mit den Eingaben, wie sie gerade im Formular stehen (Wunsch 10.10.2026: „PDFs einfach einsehbar“).
+  // Ein neuer Plan wird dafür einmal als Entwurf gespeichert – vorher gibt es nichts, wozu eine PDF gehört.
+  const vorschauM = useMutation({
+    mutationFn: async () => {
+      const daten = formularDaten();
+      const neu = !planId && !neueId;
+      const id = await entwurfId();
+      if (neu) await api<Plan>(`infusionsplaene/${id}/`, { method: "PATCH", body: daten });
+      return { id, daten };
+    },
+    onSuccess: (v) => setVorschau(v),
+  });
+
   // ohne Recht bzw. bei abgeschlossener Akte gibt es den Editor nicht: zurück zu den Plänen
   if (patient.ist_abgeschlossen || !darfBei("plaene_anlegen", patient)) {
     return <Navigate to={`/patienten/${patient.id}/plaene`} replace />;
@@ -280,7 +304,8 @@ export function PlanEditor() {
     return <Meldung art="warn">Dieser Plan ist freigegeben und unveränderlich. Bitte einen neuen Plan anlegen.</Meldung>;
   }
 
-  const server: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
+  const fehlerQuelle = speichern.error ?? vorschauM.error;
+  const server: Feldfehler = fehlerQuelle instanceof ApiFehler && fehlerQuelle !== null ? fehlerQuelle.felder : {};
   const e: Feldfehler = { ...server, ...lokal };
   const p = praeparate.data ?? [];
   const setze = (k: keyof Formular) => (wert: string) => setF((a) => ({ ...a!, [k]: wert }));
@@ -322,6 +347,33 @@ export function PlanEditor() {
     pruefe(zahlWert(f.kalium_mmol), es.kalium_min_mmol, es.kalium_max_mmol, "Kalium", "mmol");
   }
   if (caMgStabil === false) warnungen.push(`Instabil: Calcium + Magnesium ${zahl(caMg)} mmol über ${zahl(caMgGrenze)} mmol (Mischbeutel ÷ 100)`);
+  // Prüfung vor der Freigabe in Alltagssprache (Wunsch 10.10.2026: „Grenzwert-Warnungen verständlich, Freigabe klar“):
+  // jeder Punkt grün oder mit dem, was zu tun ist. Der Server prüft beim Speichern und Freigeben dasselbe noch einmal.
+  const pe = zahlWert(f.tage_pro_woche);
+  const zusatzTage = zahlWert(f.zusatz_tage_pro_woche);
+  const freiTage = zahlWert(f.freie_tage_pro_woche);
+  const gewichtAlterTage = patient.kopf?.gewicht ? Math.round((Date.parse(heuteIso()) - Date.parse(patient.kopf.gewicht.am.slice(0, 10))) / 86400000) : null;
+  const ohnePraeparat = MAKRO.filter((m) => zahlWert(f[m.menge]) && !f[`${m.feld}_praeparat` as AuswahlFeld]).map((m) => m.text);
+  const pruefpunkte: { ok: boolean; text: string }[] = [
+    gewicht == null
+      ? { ok: false, text: "Kein Gewicht erfasst: Gesamtvolumen (35 ml/kg) und Rate fehlen. Bitte zuerst das Gewicht eintragen." }
+      : { ok: gewichtAlterTage == null || gewichtAlterTage <= 90, text: `Gewicht ${kg(gewicht)} vom ${datum(patient.kopf!.gewicht!.am)}${gewichtAlterTage != null && gewichtAlterTage > 90 ? ` – älter als 3 Monate, bitte prüfen` : ""}.` },
+    ohnePraeparat.length
+      ? { ok: false, text: `Präparat fehlt bei ${ohnePraeparat.join(", ")}.` }
+      : { ok: true, text: "Zu jeder Menge ist ein Präparat gewählt." },
+    caMgStabil === false
+      ? { ok: false, text: `Mischung instabil: Calcium + Magnesium ${zahl(caMg)} mmol, erlaubt sind ${zahl(caMgGrenze)} mmol. Calcium oder Magnesium verringern.` }
+      : { ok: true, text: caMgStabil == null ? "Stabilität Calcium + Magnesium: noch nicht prüfbar." : "Calcium + Magnesium stabil." },
+    pe == null
+      ? { ok: false, text: "Infusionstage pro Woche (PE) fehlen." }
+      : pe > 7 || (freiTage != null && freiTage > 7 - Math.max(pe, zusatzTage ?? 0))
+        ? { ok: false, text: "Infusionstage passen nicht zusammen: infusionsfreie Tage höchstens 7 − Infusionstage." }
+        : { ok: true, text: `PE ${zahl(pe)}× pro Woche${zusatzTage ? `, Zusatzvolumen ${zahl(zusatzTage)}×` : ""}${freiTage ? `, ${zahl(freiTage)} infusionsfrei` : ""}.` },
+    laufzeit
+      ? { ok: true, text: `Laufzeit ${zahl(laufzeit)} h${rate != null ? ` – Rate ${zahl(rate)} ml/h` : ""}.` }
+      : { ok: false, text: "Laufzeit fehlt – ohne sie gibt es keine Rate." },
+    ...(f.pantozol_stufe !== "0" && !ppiMaske ? [{ ok: false, text: "Protonenpumpenhemmer gewählt, aber keine Zeit (morgens, mittags, abends)." }] : []),
+  ];
   const vitamineListe = p.filter((x) => x.kategorie === "vitamine");
   const zahlFeld = (k: ZahlFeld, label: ReactNode, einheit: string, extra?: ReactNode) => (
     <Feld label={label} fehler={e[k]} hinweis={extra}>
@@ -345,7 +397,13 @@ export function PlanEditor() {
             {vorher ? <>Geänderte Werte sind <span className="bg-warn-bg border border-warn rounded px-1">markiert</span>.</> : null}
           </span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {/* Vorgabe der Praxis (wie im Altsystem): Mengen je kg des letzten Gewichts; Präparate und Zusätze bleiben */}
+          {vorbelegung.data?.werte ? (
+            <Knopf icon="waage" title={`Je kg Körpergewicht (${kg(vorbelegung.data.gewicht_kg)}): Glucose 3,5 g · Aminosäuren 1,2 g · Lipide 1 g · Natrium 1,3 · Kalium 0,7 · Phosphat 0,3 · Calcium 0,15 · Magnesium 0,2 mmol`}
+              onClick={() => setF((a) => ({ ...a!, ...Object.fromEntries(Object.entries(vorbelegung.data!.werte!).map(([k, v]) => [k, zahl(v)])) }))}>
+              Mengen nach Praxisvorgabe</Knopf>
+          ) : null}
           {!planId ? <Knopf onClick={() => { setF(leer()); setLeerBegonnen(true); }}>Leer beginnen</Knopf> : null}
           <KnopfLink to={`/patienten/${patient.id}/plaene`}>Frühere Pläne</KnopfLink>
         </div>
@@ -521,7 +579,21 @@ export function PlanEditor() {
               <Meldung art="warn"><ul className="m-0 pl-4">{warnungen.map((w) => <li key={w}>{w}</li>)}</ul></Meldung>
             ) : <div className="meldung ok flex items-center gap-2 text-sm"><Icon name="haken" />Alle Werte im üblichen Bereich</div>}
           </Karte>
-          {speichern.error && !Object.keys(server).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
+          <Karte className="px-5 py-[1.125rem] flex flex-col gap-2" data-testid="plan-pruefung">
+            <h3 className="lbl m-0">Prüfung vor der Freigabe</h3>
+            <ul className="m-0 p-0 list-none flex flex-col gap-1.5 text-[0.8125rem]">
+              {pruefpunkte.map((x) => (
+                <li key={x.text} className="flex items-start gap-2" data-ok={x.ok ? "1" : "0"}>
+                  <span className={cx("shrink-0 mt-0.5", x.ok ? "text-ok" : "text-warn")}><Icon name={x.ok ? "haken" : "warnung"} groesse={14} /></span>
+                  <span>{x.text}</span>
+                </li>
+              ))}
+            </ul>
+            <Knopf icon="dokument" laedt={vorschauM.isPending} disabled={speichern.isPending} onClick={() => vorschauM.mutate()}
+              title="So sieht die PDF mit den Werten aus, die gerade im Formular stehen">
+              {planId || neueId ? "PDF-Vorschau" : "Speichern und PDF-Vorschau"}</Knopf>
+          </Karte>
+          {fehlerQuelle && !Object.keys(server).length ? <Meldung art="fehler">{fehlerQuelle.message}</Meldung> : null}
           {Object.keys(e).length ? <Meldung art="fehler">Bitte die markierten Felder prüfen.{e.fehler ? ` ${e.fehler}` : ""}</Meldung> : null}
           <div className="flex flex-col gap-2">
             {darfBei("plaene_freigeben", patient) ? (
@@ -537,6 +609,8 @@ export function PlanEditor() {
           </div>
         </aside>
       } />
+      {vorschau ? <PdfDialog offen onOffen={(o) => { if (!o) setVorschau(null); }} titel={`Vorschau Infusionsplan · ${name(patient)}`}
+        pfad={`infusionsplaene/${vorschau.id}/vorschau/`} body={vorschau.daten} dateiname={`Infusionsplan-${patient.nummer}-Vorschau.pdf`} /> : null}
     </form>
   );
 }

@@ -39,7 +39,9 @@ function useDokument(url: string, laden?: () => Promise<Uint8Array>) {
     (async () => {
       let daten: Uint8Array;
       if (laden) {
-        daten = await laden();
+        // Kopie: pdf.js übergibt den Puffer an seinen Worker (danach ist er leer) – ein zweites Zeichnen, z. B. nach
+        // einem erneuten Rendern, fände sonst nur noch einen abgelösten Puffer vor
+        daten = (await laden()).slice();
       } else {
         const antwort = await fetch(url, { credentials: "same-origin" });
         if (!antwort.ok) throw new Error(`Datei nicht verfügbar (${antwort.status}).`);
