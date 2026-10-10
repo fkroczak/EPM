@@ -26,7 +26,7 @@ async function anmelden(page: Page) {
 
 test("Testphase: Menüpunkt „Import“ ausblenden und wieder einblenden; Musterdaten-Schalter", async ({ page }) => {
   await anmelden(page);
-  await page.goto("/admin/system");
+  await page.goto("/admin/system?reiter=testphase");
   const karte = page.getByTestId("golive-karte");
   const nav = page.getByRole("navigation", { name: "Administration" });
   await expect(nav.getByRole("link", { name: "Import" })).toBeVisible();
@@ -64,7 +64,7 @@ test("Datenbank leeren: Kontenauswahl, Code abtippen, Passwort + 2FA, Rückfrage
   const mediziner = liste.find((b) => b.username === "e2e.mediziner")!;
   expect(betrachter && mediziner).toBeTruthy();
 
-  await page.goto("/admin/system");
+  await page.goto("/admin/system?reiter=testphase");
   await page.getByTestId("golive-karte").getByRole("button", { name: "Datenbank leeren …" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByTestId("leeren-umfang")).toContainText("Testpatienten");
@@ -120,7 +120,7 @@ test("Datenbank leeren: Kontenauswahl, Code abtippen, Passwort + 2FA, Rückfrage
   // Sicherung vorher, Musterdaten aus, Audit-Log neu begonnen
   const backup = await (await page.request.get("/api/backup/")).json();
   expect(backup.sicherungen[0].art).toBe("vor_leeren");
-  await page.goto("/admin/system");
+  await page.goto("/admin/system?reiter=testphase");
   await expect(page.getByTestId("golive-karte").getByRole("checkbox", { name: /Musterdaten automatisch anlegen/ })).not.toBeChecked();
   await page.goto("/admin/audit-log");
   await page.getByRole("button", { name: "System", exact: true }).click();

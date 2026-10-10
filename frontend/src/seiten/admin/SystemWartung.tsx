@@ -15,6 +15,7 @@ import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, 
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
+import { Begriff } from "@/components/ui/Begriff";
 import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
 import { useZweiterFaktor } from "@/components/ZweiterFaktor";
 import type { Auftrag, Uebersicht, VerwaltungAktion } from "./System";
@@ -119,7 +120,7 @@ export function DiensteKarte({ daten, offen }: { daten: Uebersicht; offen: Set<s
   const container = daten.host?.container?.liste ?? [];
   return (
     <Karte className="px-5 py-4 flex flex-col gap-2" data-testid="dienste-karte">
-      <KartenKopf titel="Dienste" unter="Einzelne Container neu starten, z. B. wenn die Texterkennung hängt – statt „docker compose restart“ per SSH." />
+      <KartenKopf titel="Dienste" unter={<>Einzelne <Begriff name="container">Container</Begriff> neu starten, z. B. wenn die Texterkennung hängt – statt „docker compose restart“ per SSH.</>} />
       {(daten.dienste ?? []).map((d) => {
         const c = container.find((x) => x.dienst === d);
         const gut = c && c.zustand === "running" && (!c.gesundheit || c.gesundheit === "healthy");
@@ -192,7 +193,7 @@ function useStueckweise(art: "paket" | "ocr") {
 
 /** Datei wählen, hochladen, danach einspielen (Auftrag) – für Update-Pakete und OCR-Modelle */
 function HochladenKarte({ art, titel, unter, hinweis, knopf, daten, offen, testid, children }: {
-  art: "paket" | "ocr"; titel: string; unter: string; hinweis: string; knopf: string; daten: Uebersicht; offen: Set<string>; testid: string;
+  art: "paket" | "ocr"; titel: string; unter: ReactNode; hinweis: string; knopf: string; daten: Uebersicht; offen: Set<string>; testid: string;
   children?: ReactNode;
 }) {
   const qc = useQueryClient();
@@ -308,7 +309,7 @@ export function SoftwareBereich({ daten, offen, onAktualisieren }: { daten: Uebe
 
       <div className="flex flex-col gap-4">
         <HochladenKarte art="paket" titel="Update-Paket einspielen" testid="paket-karte" daten={daten} offen={offen} knopf="Einspielen"
-          unter="Für Server ohne Internet: das Paket der Test-VM hochladen statt per scp – dann prüfen und einspielen (epm-update --paket)."
+          unter={<>Für Server ohne Internet: das <Begriff name="update_paket">Update-Paket</Begriff> der Test-VM hochladen statt per scp – dann prüfen und einspielen (epm-update --paket).</>}
           hinweis="epm-paket-<Version>.tar · der Server prüft Inhalt und Prüfsummen, sichert und stellt um; geht etwas schief, läuft die bisherige Version weiter." />
         <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="paket-erstellen-karte">
           <KartenKopf titel="Update-Paket erstellen" unter="Nur auf der Test-VM: Paket der laufenden, getesteten Version für den Server ohne Internet."
@@ -378,7 +379,7 @@ export function ZertifikatBereich({ daten, offen }: { daten: Uebersicht; offen: 
   return (
     <div className="stapel grid grid-cols-1 hd:grid-cols-2 gap-4 items-start">
       <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="zertifikat-karte">
-        <KartenKopf titel="Serverzertifikat" unter="Für HTTPS und Passkeys; Geräte, die der eigenen CA vertrauen, zeigen keine Warnung."
+        <KartenKopf titel="Serverzertifikat" unter={<>Für HTTPS und Passkeys; Geräte, die der eigenen <Begriff name="ca">CA</Begriff> vertrauen, zeigen keine Warnung.</>}
           rechts={z?.vorhanden && tage != null ? <Chip art={art}>{tage < 0 ? "abgelaufen" : `noch ${tage} Tage`}</Chip> : null} />
         {!h ? <span className="text-sm gedaempft">Der Stand des Zertifikats kommt vom Systemagenten.</span> : !z?.vorhanden ? (
           <Meldung art="warn">Kein Zertifikat gefunden.</Meldung>

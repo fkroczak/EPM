@@ -14,6 +14,7 @@ import { relativ, zahl } from "@/lib/format";
 import { Seite } from "@/components/layout/Shell";
 import { Fehleranzeige, Karte, KartenKopf, Knopf, KnopfLink, Laden, Meldung, Seitenkopf, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
+import { Begriff } from "@/components/ui/Begriff";
 import { AusfuehrenDialog, anteil } from "./System";
 import type { Auftrag, Uebersicht, Wahl } from "./System";
 import { Rueckfrage } from "./Backup";
@@ -147,7 +148,7 @@ export function Verwaltung() {
   const h = d?.host && d.host.aktuell ? d.host : null;
   return (
     <Seite pfad={[{ text: "Administration" }, { text: "Systemverwaltung" }]}>
-      <Seitenkopf titel="Systemverwaltung" unter="Zustand von Server und EPM auf einen Blick – und die häufigen Aufgaben, ohne SSH." />
+      <Seitenkopf titel="Systemverwaltung" unter={<>Zustand von Server und EPM auf einen Blick – und die häufigen Aufgaben, ohne SSH. Ausgeführt vom <Begriff name="systemagent">Systemagenten</Begriff> auf dem Server.</>} />
       {system ? <Fehleranzeige fehler={sys.error} /> : null}
       {backupRecht ? <Fehleranzeige fehler={backup.error} /> : null}
       {laden ? <Laden /> : (

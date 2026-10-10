@@ -9,7 +9,7 @@ test.use({ storageState: zustand("admin") });
 
 test("System: Standard nur Admin, Vertretung je Gruppe freischaltbar und wieder zurücknehmbar", async ({ page, browser }) => {
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "System" }).click();
+  await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "System", exact: true }).click();
   await expect(page.getByRole("heading", { name: "System", level: 1 })).toBeVisible();
   // Standard: nur Admin; für eine Urlaubsvertretung je Gruppe freischaltbar (Festlegung 02.10.2026)
   await page.goto("/admin/benutzer");
@@ -35,7 +35,7 @@ test("System: Standard nur Admin, Vertretung je Gruppe freischaltbar und wieder 
   const ctx = await browser.newContext({ storageState: zustand("mediziner"), ignoreHTTPSErrors: true });
   const p = await ctx.newPage();
   await p.goto("/");
-  await p.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "System" }).click();
+  await p.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "System", exact: true }).click();
   await expect(p.getByRole("heading", { name: "System", level: 1 })).toBeVisible();
   await p.getByTestId("system-reiter").getByRole("tab", { name: "Wartung" }).click();
   await expect(p.getByTestId("taetigkeiten")).toBeVisible();

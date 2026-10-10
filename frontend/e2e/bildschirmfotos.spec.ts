@@ -13,9 +13,17 @@ test("Bildschirmfotos: System, Kalender, Infusionspläne", async ({ page }) => {
   mkdirSync(ORDNER, { recursive: true });
   await page.goto("/admin/system");
   await expect(page.getByTestId("kennzahl-cpu")).toBeVisible();
-  await expect(page.getByTestId("verlauf").or(page.getByText("Noch kein Verlauf"))).toBeVisible();
+  await expect(page.getByTestId("auslastung")).toBeVisible();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${ORDNER}/system.png`, fullPage: true });
+  await page.getByTestId("auslastung-gross").click();
+  await expect(page.getByRole("dialog").getByTestId("verlauf")).toBeVisible();
+  await page.screenshot({ path: `${ORDNER}/system-auslastung.png` });
+  await page.keyboard.press("Escape");
+  await page.goto("/admin");
+  await expect(page.getByTestId("ampeln")).toBeVisible();
+  await page.screenshot({ path: `${ORDNER}/systemverwaltung.png`, fullPage: true });
+  await page.goto("/admin/system?reiter=wartung");
   await page.getByTestId("aktion-server_neustart").getByRole("button", { name: "Server neu starten" }).click();
   await page.getByRole("dialog").getByLabel("Beginn").selectOption("15");
   await page.screenshot({ path: `${ORDNER}/system-neustart-dialog.png` });

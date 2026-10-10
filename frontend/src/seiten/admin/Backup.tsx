@@ -26,6 +26,7 @@ import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, 
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
+import { Begriff } from "@/components/ui/Begriff";
 import { PdfDialog } from "@/components/PdfDialog";
 import { useZweiterFaktor } from "@/components/ZweiterFaktor";
 import type { ZweiterFaktorWert } from "@/components/ZweiterFaktor";
@@ -848,7 +849,7 @@ function UebertragungKarte({ daten, offen, onZiel, onEntfernen, onUebertragen }:
   const testen = useAuftrag("backup/ziel/testen/");
   return (
     <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="uebertragung">
-      <KartenKopf titel="Übertragung" unter="Kopie der verschlüsselten Sicherungen in einen WebDAV-Ordner (rclone); ältere entfernt der Server dort nach der Aufbewahrung"
+      <KartenKopf titel="Übertragung" unter={<>Kopie der verschlüsselten Sicherungen in das <Begriff name="uebertragungsziel">Übertragungsziel</Begriff> (WebDAV, rclone); ältere entfernt der Server dort nach der Aufbewahrung</>}
         rechts={z.eingerichtet ? (u.letzter_fehler ? <Chip art="fehler">Fehler</Chip> : u.laeuft ? <Chip art="warn">läuft</Chip> : <Chip art="ok">eingerichtet</Chip>)
           : <Chip art="warn">kein Ziel</Chip>} />
       {z.eingerichtet ? (

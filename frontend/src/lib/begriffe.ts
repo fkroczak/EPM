@@ -20,6 +20,16 @@ export const BEGRIFFE = {
   testpatient: "Übungsakte (Nummer ab 9001): zum Ausprobieren, zählt in keiner Statistik.",
   storniert: "Als falsch gekennzeichnet: Der Eintrag bleibt durchgestrichen sichtbar, mit Grund, Person und Zeitpunkt. "
     + "Gelöscht wird nichts.",
+  // Administration (Systemverwaltung ohne SSH, 10.10.2026)
+  systemagent: "Kleines Programm auf dem Server, das nur eine feste Liste von Tätigkeiten ausführt (Updates, Neustart, "
+    + "Sicherung …) und jede Minute den Zustand meldet. EPM selbst hat keinen Zugriff auf den Server.",
+  container: "Ein abgeschlossener Teil von EPM, der für sich läuft: backend (Anwendung), web (liefert die Oberfläche "
+    + "aus), ocr (Texterkennung), db (Datenbank). Einzeln neu startbar.",
+  ca: "Zertifizierungsstelle: stellt das Zertifikat aus. Vertraut ein Gerät der CA (Stammzertifikat installiert), "
+    + "zeigt der Browser keine Warnung, und Passkeys funktionieren.",
+  update_paket: "Eine Datei mit einer fertigen, auf der Test-VM geprüften EPM-Version – für den Server ohne Internet.",
+  uebertragungsziel: "Ordner außerhalb des Servers (WebDAV, z. B. Nextcloud), in den die verschlüsselten Sicherungen "
+    + "kopiert werden – damit sie einen Ausfall des Servers überstehen.",
 } as const;
 
 export type BegriffSchluessel = keyof typeof BEGRIFFE;
