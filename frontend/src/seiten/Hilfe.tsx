@@ -153,7 +153,7 @@ export function Hilfe() {
                 <span className="text-xs font-semibold gedaempft px-2 pt-2 pb-0.5 uppercase tracking-[.04em]">{g.titel}</span>
                 {g.abschnitte.map((a) => (
                   <button key={a.id} type="button" aria-current={gewaehlt?.id === a.id ? "page" : undefined}
-                    className={cx("nav text-left border-0 bg-transparent cursor-pointer h-[1.875rem] text-[0.84375rem]", gewaehlt?.id === a.id && "aktiv")}
+                    className={cx("nav text-left border-0 bg-transparent cursor-pointer h-auto min-h-[1.875rem] py-1 leading-snug text-[0.84375rem]", gewaehlt?.id === a.id && "aktiv")}
                     onClick={() => waehle(a.id)}>{a.titel}</button>
                 ))}
               </div>

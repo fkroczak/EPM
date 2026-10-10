@@ -1010,7 +1010,7 @@ class FalschZugeordneteDokumente(Grundlage):
             for ereignis in SystemEreignis.objects.filter(objekt=f"Dokument {dok.id}"):
                 self.assertNotIn(verboten, json.dumps(ereignis.details, ensure_ascii=False))
         self.assertIn(f"Dokument Nr. {dok.id} (SHA-256 {dok.sha256[:8]}…) aus Falsch, Sabine", texte)
-        self.assertIn("abgelehnt: Kennwort falsch.", texte)
+        self.assertIn("abgelehnt: Passwort falsch.", texte)
         # Löschliste: eine Zeile, ohne Titel und Dateinamen
         zeilen = LOESCHLISTE.read_text(encoding="utf-8").splitlines()
         self.assertEqual(len(zeilen), 1)
@@ -1108,7 +1108,7 @@ class FalschZugeordneteDokumente(Grundlage):
         DokumentVorgang.objects.create(art=DokumentVorgang.Art.GELOESCHT, dokument_id=dok.id, von_patient=self.sabine,
                                        grund="fremdes Dokument", person=self.mediziner)
         protokolliere(SystemEreignis.Art.DOKUMENT_LOESCHEN_ABGELEHNT, objekt=f"Dokument {nummer}", titel=dok.titel,
-                      fehler="Kennwort falsch.")
+                      fehler="Passwort falsch.")
         protokolliere(SystemEreignis.Art.DOKUMENT_GELOESCHT, objekt=f"Dokument {nummer}", titel=dok.titel,
                       akte="Falsch, Sabine", grund="fremdes Dokument", sha256=sha, groesse=dok.groesse)
         dok.delete()

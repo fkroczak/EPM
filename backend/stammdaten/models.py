@@ -332,6 +332,12 @@ class Einstellungen(models.Model):
     # Wiedervorlage beim Erfassen eines Kontakts (Wunsch 08.10.2026): standardmäßig in 14 Tagen, einstellbar;
     # im Dialog lässt sich das Datum je Kontakt weiterhin frei ändern
     wiedervorlage_tage = models.PositiveSmallIntegerField("Wiedervorlage nach", default=14)
+    # Infoblatt an die Praxis (F177): Die Startseite erinnert ab „Vorlauf“ Tagen vor dem nächsten Zeitraum (nächste
+    # Woche Mo–So oder nächster Monat), bis für diesen Zeitraum ein Infoblatt erstellt ist
+    infoblatt_rhythmus = models.CharField("Infoblatt an die Praxis", max_length=10, default="woche",
+                                          choices=[("woche", "wöchentlich"), ("monat", "monatlich"),
+                                                   ("aus", "keine Erinnerung")])
+    infoblatt_vorlauf_tage = models.PositiveSmallIntegerField("Erinnerung an das Infoblatt (Tage vorher)", default=3)
 
     # Plausibilitätsgrenzen (Eingaben außerhalb werden abgelehnt)
     gewicht_min_kg = models.DecimalField("Gewicht minimal", max_digits=5, decimal_places=1, default=Decimal("20.0"))

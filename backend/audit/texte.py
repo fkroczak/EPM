@@ -109,14 +109,14 @@ def beschreibung(e) -> str:
         return {
             "2fa": "Anmeldung mit 2FA",
             "notfallcode": f"Anmeldung mit Notfall-Code (noch {d.get('verbleibend', '?')} übrig)",
-            "kennwort": "Kennwort richtig, zweiter Faktor ausstehend",
-            "ohne_2fa": "Anmeldung mit Kennwort (ohne zweiten Faktor)",
+            "kennwort": "Passwort richtig, zweiter Faktor ausstehend",
+            "ohne_2fa": "Anmeldung mit Passwort (ohne zweiten Faktor)",
         }.get(d.get("schritt"), "Anmeldung")
     if art == A.ABMELDUNG:
         return "Abmeldung"
     if art == A.ANMELDUNG_FEHLGESCHLAGEN:
         if d.get("grund") == "einmal_kennwort_abgelaufen":
-            return "Einmal-Kennwort abgelaufen"
+            return "Einmal-Passwort abgelaufen"
         if d.get("grund") == "bestaetigung":
             return f"Falsches Passwort bei der Bestätigung: {d.get('was', 'Systemaktion')}"
         return "Falsches Passwort" + (f" ({d['versuch']}. Versuch)" if d.get("versuch") else "")
@@ -133,7 +133,7 @@ def beschreibung(e) -> str:
         zeit = f" in {d['minuten']} Minuten" if d.get("minuten") else ""
         return f"{d.get('fehlversuche', '')} {was}{zeit}, Konto gesperrt".strip()
     if art == A.KENNWORT_GEAENDERT:
-        return "Eigenes Kennwort bei der ersten Anmeldung gesetzt" if d.get("erstanmeldung") else "Kennwort geändert"
+        return "Eigenes Passwort bei der ersten Anmeldung gesetzt" if d.get("erstanmeldung") else "Passwort geändert"
     if art == A.ZWEITER_FAKTOR_EINGERICHTET:
         if d.get("notfallcodes_neu"):
             return "Notfall-Codes neu erzeugt"
@@ -143,10 +143,10 @@ def beschreibung(e) -> str:
 
         rolle = dict(Rolle.choices).get(d.get("rolle"), d.get("rolle", ""))
         if d.get("quelle") == "altdaten":
-            return f"Benutzer {e.objekt} bei der Übernahme der Altdaten angelegt ({rolle}), noch ohne Kennwort"
+            return f"Benutzer {e.objekt} bei der Übernahme der Altdaten angelegt ({rolle}), noch ohne Passwort"
         if d.get("ohne_login"):
             return f"Benutzer {e.objekt} ohne Login angelegt (keine Rechte)"
-        return f"Benutzer {e.objekt} angelegt ({rolle}), Einmal-Kennwort erzeugt"
+        return f"Benutzer {e.objekt} angelegt ({rolle}), Einmal-Passwort erzeugt"
     if art == A.BENUTZER_GEAENDERT:
         if d.get("entsperrt"):
             return f"Benutzer {e.objekt} entsperrt"
@@ -156,7 +156,7 @@ def beschreibung(e) -> str:
             from accounts.models import Rolle
 
             rolle = dict(Rolle.choices).get(d.get("rolle"), d.get("rolle", ""))
-            return f"Benutzer {e.objekt} erhält wieder einen Login ({rolle}), Einmal-Kennwort erzeugt"
+            return f"Benutzer {e.objekt} erhält wieder einen Login ({rolle}), Einmal-Passwort erzeugt"
         felder = ", ".join(d.get("aenderungen") or {})
         return f"Benutzer {e.objekt} geändert" + (f": {felder}" if felder else "")
     if art == A.RECHTE_GEAENDERT and d.get("zweiter_faktor"):
@@ -169,11 +169,11 @@ def beschreibung(e) -> str:
     if art == A.BENUTZER_GESPERRT:
         return f"Benutzer {e.objekt} gesperrt"
     if art == A.EINMAL_KENNWORT:
-        return f"Neues Einmal-Kennwort für {e.objekt} erzeugt"
+        return f"Neues Einmal-Passwort für {e.objekt} erzeugt"
     if art == A.ZWEITER_FAKTOR_ZURUECKGESETZT:
         if d.get("selbst"):
             return "Zweiten Faktor (Authenticator-App) selbst ausgeschaltet"
-        return f"2FA für {e.objekt} zurückgesetzt, Einmal-Kennwort erzeugt"
+        return f"2FA für {e.objekt} zurückgesetzt, Einmal-Passwort erzeugt"
     if art == A.AKTE_ABGESCHLOSSEN:
         from patienten.models import Patient
 
