@@ -81,7 +81,7 @@ export function AuftragFortschritt({ a, liste, className }: { a: AuftragZeit; li
     text = bis > 5 ? `beginnt in ${ungefaehr(bis)} · Dauer dann ${ungefaehr(ueblich.s)}` : `wartet, bis der Server den Auftrag abholt · Dauer dann ${ungefaehr(ueblich.s)}`;
   }
   return (
-    <div className={cx("flex flex-col gap-1 min-w-[180px]", className)} data-testid="auftrag-fortschritt">
+    <div className={cx("flex flex-col gap-1 min-w-[11.25rem]", className)} data-testid="auftrag-fortschritt">
       <div className={cx("fortschritt", unbestimmt && "unbestimmt")} role="progressbar" aria-label="Fortschritt (geschätzt)"
         aria-valuemin={0} aria-valuemax={100} aria-valuenow={unbestimmt ? undefined : Math.round(anteil)} aria-valuetext={text}>
         <div className="fortschritt-fuellung" style={unbestimmt ? undefined : { width: `${anteil}%` }} />

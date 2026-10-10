@@ -1,6 +1,7 @@
 /**
  * Stufen der Fensterbreite (S16, Festlegungen 01./02.10.2026): Seiten nutzen die volle Breite und teilen sich in Stufen
- * auf statt nur breiter zu werden. Grenzen wie in index.css (--breakpoint-…):
+ * auf statt nur breiter zu werden. Grenzen wie in index.css (--breakpoint-…), als em abgefragt (px beim Grundwert 16 px;
+ * mit größerer Browser-Schrift greifen die Stufen entsprechend früher):
  *   eng    unter 900 px      Startseite 1 Spalte
  *   schmal 900–1439 px      Startseite 2 Spalten, Seitenleiste als Symbole
  *   hd     1440–1919 px     Startseite 3 Spalten
@@ -8,12 +9,13 @@
  *   qhd    ab 2560 px       Startseite 5 Spalten
  */
 import { useSyncExternalStore } from "react";
+import { em } from "./masse";
 
 export type Stufe = "eng" | "schmal" | "hd" | "fhd" | "qhd";
 
 const GRENZEN: [Stufe, number][] = [["qhd", 2560], ["fhd", 1920], ["hd", 1440], ["schmal", 900]];
 const ABFRAGEN = typeof window !== "undefined" && window.matchMedia
-  ? GRENZEN.map(([stufe, px]) => [stufe, window.matchMedia(`(min-width: ${px}px)`)] as const)
+  ? GRENZEN.map(([stufe, px]) => [stufe, window.matchMedia(`(min-width: ${em(px)})`)] as const)
   : [];
 
 function aktuelleStufe(): Stufe {
@@ -44,7 +46,7 @@ export function ab(stufe: Stufe, grenze: Stufe): boolean {
  * schnelles Freigeben von Plänen, kurze Blicke in die Akte und Notizen. Dort: Leiste unten statt Seitenleiste,
  * Listen statt breiter Tabellen, Details vor den Listen.
  */
-const MOBIL = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(max-width: 767.98px)") : null;
+const MOBIL = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(max-width: 47.99em)") : null;
 
 export function useMobil(): boolean {
   return useSyncExternalStore(
@@ -56,7 +58,7 @@ export function useMobil(): boolean {
 
 /** Ohne Seitenspalten (unter 1280 px stehen Liste und Detail untereinander): gewählten Eintrag in den Blick holen. */
 export function detailZeigen(testid: string) {
-  if (typeof window === "undefined" || window.matchMedia("(min-width: 1280px)").matches) return;
+  if (typeof window === "undefined" || window.matchMedia("(min-width: 80em)").matches) return;
   window.requestAnimationFrame(() => {
     document.querySelector(`[data-testid="${testid}"]`)?.scrollIntoView({ block: "start", behavior: "smooth" });
   });

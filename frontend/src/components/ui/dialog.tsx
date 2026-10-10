@@ -2,6 +2,7 @@
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import type { ReactNode } from "react";
+import { rem } from "@/lib/masse";
 import { cx } from "./basis";
 import { Icon } from "./icon";
 
@@ -20,7 +21,7 @@ export function Dialog({ offen, onOffen, titel, beschreibung, children, fuss, br
         <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/35" />
         <BaseDialog.Popup
           className="card dialog-popup fixed left-1/2 top-3 sm:top-[12vh] z-50 -translate-x-1/2 max-h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] sm:max-h-[80vh] overflow-auto p-4 sm:p-6 flex flex-col gap-4"
-          style={{ width: `min(${breite}px, calc(100vw - 20px))` }}
+          style={{ width: `min(${rem(breite)}, calc(100vw - 1.25rem))` }}
           onKeyDown={(e) => {
             // Strg Enter (Mac: ⌘ Enter) speichert: löst den Hauptknopf unten rechts aus (Tastenkürzel, 08.10.2026)
             if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey) || e.defaultPrevented) return;
@@ -64,7 +65,7 @@ export function Menue({ label, eintraege, ausloeser }: { label: string; eintraeg
       </BaseMenu.Trigger>
       <BaseMenu.Portal>
         <BaseMenu.Positioner side="bottom" align="end" sideOffset={6} className="z-50">
-          <BaseMenu.Popup className="card min-w-[220px] p-1 flex flex-col outline-none">
+          <BaseMenu.Popup className="card min-w-[13.75rem] p-1 flex flex-col outline-none">
             {eintraege.map((e, i) => (
               <BaseMenu.Item
                 key={i}

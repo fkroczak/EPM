@@ -122,7 +122,7 @@ function WeitereBestandteile({ positionen, praeparate, fehler, markiert, onAende
       <span className="text-sm font-medium">Weitere Bestandteile</span>
       {positionen.length ? (
         <table className="tabelle">
-          <thead><tr><th className="th">Präparat</th><th className="th w-[96px]">Menge</th><th className="th w-[96px]">Einheit</th><th className="th">Häufigkeit</th><th className="th">Bemerkung</th><th className="th w-[40px]" /></tr></thead>
+          <thead><tr><th className="th">Präparat</th><th className="th w-[6rem]">Menge</th><th className="th w-[6rem]">Einheit</th><th className="th">Häufigkeit</th><th className="th">Bemerkung</th><th className="th w-[2.5rem]" /></tr></thead>
           <tbody>
             {positionen.map((x, i) => (
               <tr key={i}>
@@ -352,7 +352,7 @@ export function PlanEditor() {
 
       <PlanSpalten stufe={stufe} vorschau={<PlanVorschau id={planId ? Number(planId) : neueId} />} eingabe={
         <div className="flex flex-col gap-4 min-w-0">
-          <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
+          <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5">
             <h3 className="lbl m-0">Basislösung</h3>
             <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
               <Feld label="Präparat" fehler={e.basis_praeparat}>
@@ -362,7 +362,7 @@ export function PlanEditor() {
             </div>
           </Karte>
 
-          <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
+          <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5">
             <h3 className="lbl m-0">Makronährstoffe</h3>
             <table className="tabelle">
               <thead><tr><th className="th">Komponente</th><th className="th">Präparat</th><th className="th text-right">vorher</th><th className="th">Menge</th><th className="th text-right">kcal/g</th><th className="th text-right">kcal</th></tr></thead>
@@ -381,7 +381,7 @@ export function PlanEditor() {
                         {e[pFeld] ? <span className="fehlertext" role="alert">{e[pFeld]}</span> : null}
                       </td>
                       <td className="td num text-right gedaempft">{vorher?.[gFeld] || "—"}</td>
-                      <td className="td w-[120px]">
+                      <td className="td w-[7.5rem]">
                         <Eingabe aria-label={`Menge ${m.text} in ${m.einheit}`} className={cx("num", geaendert(gFeld) && "border-warn bg-warn-bg")} value={f[gFeld]}
                           onChange={(ev) => setze(gFeld)(ev.target.value)} inputMode="decimal" aria-invalid={e[gFeld] ? true : undefined} />
                         {e[gFeld] ? <span className="fehlertext" role="alert">{e[gFeld]}</span> : null}
@@ -396,16 +396,16 @@ export function PlanEditor() {
             <span className="text-[0.8125rem] gedaempft">kcal werden berechnet wie im Altsystem: Glucose und Aminosäuren 4 kcal/g, Lipide 9,15 kcal/g. Humanalbumin in ml, ohne Energie.</span>
           </Karte>
 
-          <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
+          <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5">
             <h3 className="lbl m-0">Elektrolyte</h3>
-            <div className="grid grid-cols-5 gap-3">{ELEKTROLYTE.map((x) => <div key={x.feld}>{zahlFeld(x.feld, x.text, "mmol")}</div>)}</div>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-3">{ELEKTROLYTE.map((x) => <div key={x.feld}>{zahlFeld(x.feld, x.text, "mmol")}</div>)}</div>
             <span className={cx("text-[0.8125rem]", caMgStabil === false ? "text-warn font-medium" : "gedaempft")} data-testid="ca-mg-stabilitaet">
               {caMgStabil == null ? "Stabilität Calcium + Magnesium: wird geprüft, sobald Mischbeutel-Volumen und Werte vorliegen."
                 : `Calcium + Magnesium ${zahl(caMg)} mmol, Grenze ${zahl(caMgGrenze)} mmol (Mischbeutel ÷ 100): ${caMgStabil ? "stabil" : "instabil"}`}
             </span>
           </Karte>
 
-          <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
+          <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5">
             <h3 className="lbl m-0">Zusätze</h3>
             <div className="grid grid-cols-2 gap-3">
               <Feld label="Spurenelemente" fehler={e.spurenelemente}>
@@ -428,7 +428,7 @@ export function PlanEditor() {
                   );
                 })}
                 {vitamineListe.filter((v) => v.aktiv && !f.vitamine.includes(v.id)).map((v) => (
-                  <button key={v.id} type="button" className="bg-transparent border border-dashed border-rand rounded-md px-2 h-[22px] text-xs cursor-pointer text-text2"
+                  <button key={v.id} type="button" className="bg-transparent border border-dashed border-rand rounded-md px-2 h-[1.375rem] text-xs cursor-pointer text-text2"
                     onClick={() => setF((a) => ({ ...a!, vitamine: [...a!.vitamine, v.id] }))}>+ {v.anzeige}</button>
                 ))}
               </div>
@@ -444,7 +444,7 @@ export function PlanEditor() {
         </div>} summen={
 
         <aside className="flex flex-col gap-4">
-          <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
+          <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5">
             <h3 className="lbl m-0">Gültigkeit, Laufzeit</h3>
             <div className="grid grid-cols-2 gap-3">
               <Feld label="gültig ab" fehler={e.gueltig_ab}>{(pp) => <Eingabe {...pp} className="num" value={f.gueltig_ab} onChange={(ev) => setze("gueltig_ab")(ev.target.value)} />}</Feld>
@@ -480,7 +480,7 @@ export function PlanEditor() {
                 : "Kein Gewicht erfasst: Volumen und Rate werden berechnet, sobald ein Gewicht eingetragen ist.")}
             </span>
           </Karte>
-          <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
+          <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5">
             <h3 className="lbl m-0">Protonenpumpenhemmer</h3>
             <Feld label="Präparat (Kurzinfusion)" fehler={e.pantozol_stufe}>
               {(pp) => (
@@ -506,7 +506,7 @@ export function PlanEditor() {
                 : vorher && geaendert("pantozol_tage") ? <span className="hinweis">vorher {ppiZeiten(zahlWert(vorher.pantozol_tage)) || "—"}</span> : null}
             </fieldset>
           </Karte>
-          <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="plan-summe">
+          <Karte className="px-5 py-[1.125rem] flex flex-col gap-3" data-testid="plan-summe">
             <h3 className="lbl m-0">Summe</h3>
             {zahlFeld("kcal_manuell", "Energie manuell", "kcal", kcalManuell != null
               ? `berechnet wären ${zahl(kcalBerechnet)} kcal` : "leer = berechnet aus den Makronährstoffen")}
@@ -555,7 +555,7 @@ function PlanSpalten({ stufe, eingabe, summen, vorschau }: { stufe: Stufe; einga
     );
   }
   return (
-    <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start" data-testid="plan-stufe">{eingabe}{summen}</div>
+    <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_21.25rem] gap-5 items-start" data-testid="plan-stufe">{eingabe}{summen}</div>
   );
 }
 

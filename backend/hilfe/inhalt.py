@@ -294,7 +294,8 @@ Fehlt eine Erklärung zum Datenschutz, steht ein Hinweis neben dem Namen.</p>
 <p>Die Knöpfe im Kopf: <strong>Kontakt</strong>, <strong>Gewicht</strong> und <strong>Termin</strong> öffnen jeweils
 denselben Dialog wie überall sonst (die Seite bleibt, wo sie ist); <strong>Neuer Plan</strong> – oder
 <strong>Entwurf fortsetzen</strong>, wenn es schon einen Entwurf gibt. Unter <strong>Weitere Aktionen</strong>:
-Stammdaten bearbeiten, Dokument hochladen, Akte als PDF, Unterlagen für die Sprechstunde, Akte abschließen.
+Stammdaten bearbeiten, Dokument hochladen, Akte als PDF, Unterlagen für die Sprechstunde, Schreiben und E-Mail,
+Akte abschließen.
 Dokumente lassen sich auch einfach auf die geöffnete Akte ziehen.</p>
 <p>Der <strong>Stern</strong> neben dem Namen setzt die Akte auf deine Merkliste; sie erscheint dann auf der Startseite
 unter „Meine Akten“. Dort stehen auch die zuletzt geöffneten Akten. Merkliste und Verlauf sieht nur die Person selbst.</p>
@@ -305,6 +306,28 @@ stellt jede Person unter <strong>Design</strong> ein. Tastenkürzel siehe „Tas
 ausblenden. Dabei wird gewählt, wie lange Ruhe sein soll – 3, 6 oder 12 Monate, danach erscheint der Hinweis von allein
 wieder – oder <strong>nicht mehr nötig</strong>. Was gerade ausgeblendet ist, steht in der Übersicht der Akte unter
 „Ausgeblendete Hinweise“ und lässt sich dort wieder einschalten.</p>""",
+    },
+    {
+        "id": "schreiben", "gruppe": "patienten", "titel": "Schreiben und E-Mail: Aufnahme, Terminbestätigung, Reise",
+        "rechte": ["eintraege_erfassen"], "seiten": [],
+        "html": """
+<p>In der Akte unter <strong>Weitere Aktionen › Schreiben und E-Mail …</strong> entstehen aus den Dokumentvorlagen
+<strong>Patientenaufnahme</strong> (welche Unterlagen wir brauchen), <strong>Terminbestätigung</strong> (Termin wählen;
+Praxis Dr. Holtmeier, Gesundheitskarte mitbringen, keine Überweisung nötig) und <strong>Reisebescheinigung</strong>
+(Briefkopf Dr. Holtmeier, deutsch und englisch, mit dem ärztlichen Attest des ADAC als zweiter Seite).</p>
+<ul>
+<li><strong>PDF ansehen / herunterladen</strong> – zum Drucken, Faxen oder Ablegen.</li>
+<li><strong>E-Mail vorbereiten</strong> lädt eine Datei <em>.eml</em>. Ein Doppelklick öffnet sie in Outlook als fertigen
+Entwurf mit Empfänger, Betreff, Text und der PDF im Anhang – prüfen und senden. Empfänger, Betreff und Text lassen sich
+vorher im Dialog ändern; <strong>Weitere Anlagen</strong> (z. B. Leitfaden Zottentraining) werden mit angehängt.</li>
+<li>Auf Wunsch wird die PDF als Dokument „Schreiben“ in der Akte abgelegt.</li>
+</ul>
+<p>Die <strong>Patientenankündigung</strong> für die Praxis entsteht im <strong>Kalender › Ankündigung</strong> aus den
+Praxisterminen eines Zeitraums. Hinweise wie „1 h, Neuaufnahme“ oder „+ Labor“ im Termin unter „bei/Ort“ eintragen.</p>
+<p>Texte ändern: Vorlagen › Dokumentvorlagen; Betreff und Text der E-Mail stehen dort im Baustein <strong>E-Mail</strong>.
+Eigene Schreiben (z. B. an Hausärzte) legt <strong>+ Neue Vorlage</strong> unter Vorlagen › Dokumentvorlagen an; sie
+erscheinen danach hier unter „Eigene Vorlagen“. Anlagen hochladen: Vorlagen › Anlagen für E-Mails. Für eine <strong>Fallzusammenfassung</strong> im Reiter Berichte die
+Berichtsart „Fallzusammenfassung“ wählen und <strong>Gliederung einfügen</strong>.</p>""",
     },
     {
         "id": "spalten", "gruppe": "patienten", "titel": "Karten vergrößern und Spalten verbreitern", "rechte": [], "seiten": [],

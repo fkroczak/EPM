@@ -122,7 +122,7 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
           Speichern{anzahl ? <span className="num opacity-80"> ({anzahl} {anzahl === 1 ? "Wert" : "Werte"})</span> : null}
         </Knopf>
       </>}>
-      <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
+      <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
         <Feld label="Abnahme am" fehler={f.abgenommen_am} pflicht>
           {(p) => <Eingabe {...p} className="num" value={abgenommen} onChange={(e) => setAbgenommen(e.target.value)} />}
         </Feld>
@@ -139,11 +139,11 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
             <h3 className="lbl m-0 text-[0.8125rem]">{LABORGRUPPEN[gruppe] ?? gruppe}</h3>
             <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
               {liste.map((p) => (
-                <label key={p.id} className="grid grid-cols-[1fr_84px_auto] items-center gap-2 text-sm">
+                <label key={p.id} className="grid grid-cols-[1fr_5.25rem_auto] items-center gap-2 text-sm">
                   <span className="truncate" title={p.name}>{p.name}</span>
                   <Eingabe className="num klein" inputMode="decimal" aria-label={p.name}
                     value={werte[p.id] ?? ""} onChange={(e) => setWerte((w) => ({ ...w, [p.id]: e.target.value }))} />
-                  <span className="gedaempft text-[0.75rem] w-[72px]">{p.einheit}</span>
+                  <span className="gedaempft text-[0.75rem] w-[4.5rem]">{p.einheit}</span>
                 </label>
               ))}
             </div>
@@ -155,7 +155,7 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
       <section className="flex flex-col gap-2" data-testid="weitere-parameter">
         <h3 className="lbl m-0 text-[0.8125rem]">Weitere Parameter</h3>
         {frei.map((z, i) => (
-          <div key={i} className="grid grid-cols-[1fr_96px_96px_1fr_auto] items-center gap-2">
+          <div key={i} className="grid grid-cols-[1fr_6rem_6rem_1fr_auto] items-center gap-2">
             <Eingabe aria-label={`Parameter ${i + 1}`} placeholder="z. B. CA 19-9" value={z.freitext_name}
               onChange={(e) => setFrei((l) => l.map((x, j) => (j === i ? { ...x, freitext_name: e.target.value } : x)))} />
             <Eingabe aria-label={`Wert ${i + 1}`} className="num" value={z.wert}
@@ -200,7 +200,7 @@ function BefundDetail({ befund, onAendern, aenderbar }: { befund: Laborbefund; o
               <div key={w.id ?? i} className="grid grid-cols-[1fr_auto_auto] items-baseline gap-2 text-sm border-b border-rand py-1">
                 <span className="truncate" title={w.bezeichnung}>{w.bezeichnung}</span>
                 <span className={cx("num", w.ausserhalb && "font-semibold text-warn")}>{anzeigeWert(w)}</span>
-                <span className="gedaempft text-[0.75rem] w-[58px]">{w.einheit}</span>
+                <span className="gedaempft text-[0.75rem] w-[3.625rem]">{w.einheit}</span>
                 {w.ausserhalb ? <span className="col-span-3 text-[0.75rem] gedaempft">
                   {w.ausserhalb === "hoch" ? "über" : "unter"} Referenz {referenzText(w)}</span> : null}
               </div>

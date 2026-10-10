@@ -148,6 +148,12 @@ def aktenkopie_pdf(patient) -> bytes:
         ["Diagnose", "ICD", "Kennzeichen", "seit", "Stand", "Notiz"], diagnosen,
         [None, "20mm", "34mm", "22mm", "30mm", None])))
 
+    schritte = [[_e(datum(t.datum)), _e(t.text), "aktuell" if t.aktiv else "entfernt"]
+                for t in p.therapieschritte.order_by("datum", "id")]
+    if schritte:
+        teile.append(_abschnitt("Therapie (Verlauf)", _tabelle(["Datum", "Schritt", "Stand"], schritte,
+                                                               ["24mm", None, "24mm"])))
+
     for titel, text in (("Diagnose (Freitext)", p.diagnose), ("Therapie", p.therapie),
                         ("Empfehlung", p.empfehlung), ("Bemerkung", p.bemerkung)):
         if text:
@@ -258,7 +264,7 @@ BEREICHE = {"stammdaten": "Stammdaten", "diagnose": "Diagnose (Text)", "therapie
             "aerzte": "Arzt", "erklaerungen": "Erklärung", "datenschutz": "Datenschutz",
             # Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
             "diagnosen": "Diagnose (ICD)", "laborbefunde": "Laborbefund", "bia_messungen": "BIA-Messung",
-            "berichte": "Bericht",
+            "berichte": "Bericht", "therapieschritte": "Therapie (Verlauf)",
             # Hinweise stummschalten (Wunsch 07.10.2026, F119)
             "hinweisruhe": "Hinweis stummgeschaltet"}
 

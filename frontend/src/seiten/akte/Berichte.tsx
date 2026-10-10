@@ -20,6 +20,59 @@ import { PdfDialog } from "@/components/PdfDialog";
 import { Bestaetigen } from "@/components/Bestaetigen";
 import { useAkte } from "./Akte";
 import { Aktenseite, Detail, Eintrag, Eintragsliste, useWahl } from "./Aktenseite";
+import { DiagnosenKurz } from "./Diagnosen";
+import type { Diagnose } from "@/lib/typen";
+
+/** Einheitliche Gliederung der Fallzusammenfassung (F175), zusammengeführt aus den Fallzusammenfassungen von
+ *  Prof. Masin (Wunsch von Alice Hessel, 09.10.2026). Die Hinweise in [eckigen Klammern] werden überschrieben. */
+const GLIEDERUNG_FALL: [string, string][] = [
+  ["1. Anlass und zugrunde liegende Unterlagen", "[Zuweisung bzw. Kontakt (z. B. über die Stiftung, Datum); vorliegende Unterlagen mit Absender und Datum; Anlass der Zusammenfassung]"],
+  ["2. Grunderkrankung und Diagnosen", "[Diagnosen mit ICD-10 und Quelle; die Diagnosen der Akte stehen zusätzlich als Tabelle im Bericht]"],
+  ["3. Anamnese und Krankheitsverlauf", "[Beginn und Verlauf; Operationen und Eingriffe chronologisch; stationäre Aufenthalte und Reha]"],
+  ["4. Aktuelle Symptomatik und Eigenangaben", "[gastrointestinale und vegetative Beschwerden, Kostaufbau, was die Patientin bzw. der Patient selbst berichtet]"],
+  ["5. Ernährungsstatus und Anthropometrie", "[Größe; Gewichtsverlauf prämorbid bis aktuell; BMI; Gewichtsverlust in %; Einordnung nach GLIM]"],
+  ["6. Bisherige und aktuelle Ernährungstherapie", "[oral, Trinknahrung, enteral, parenteral (Regime, Zugang); ernährungstherapeutische Begleitung]"],
+  ["7. Medikation, Supplemente, Allergien und Unverträglichkeiten", "[aktuelle Medikation; Supplementationsversuche und Verträglichkeit; Allergien]"],
+  ["8. Laborbefunde", "[Schlüsselbefunde mit Datum und Verlauf; Mikronährstoffstatus; fehlende Parameter]"],
+  ["9. Bildgebung und weitere Befunde", "[Befund, Datum, Einrichtung]"],
+  ["10. Zusammenfassende Beurteilung", "[ernährungsmedizinische Einordnung des Falles]"],
+  ["11. Empfehlungen und weiteres Vorgehen", "[nummerierte Handlungsvorschläge, z. B. Sprechstunde, Substitution, Monitoring]"],
+  ["12. Offene Fragen, Unstimmigkeiten und fehlende Unterlagen", "[z. B. abweichende Angaben zu Größe oder Geburtsdatum in den Unterlagen; noch angeforderte Befunde]"],
+];
+const GLIEDERUNG_HTML = GLIEDERUNG_FALL.map(([h, t]) => `<h3>${h}</h3><p>${t}</p>`).join("");
+const DIAGNOSEN_PLATZHALTER = `<p>${GLIEDERUNG_FALL[1][1]}</p>`;
+
+function html(text: string) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Die zutreffenden Diagnosen der Akte als Liste für den Berichtstext: „Kurzdarmsyndrom (ICD-10 K91.2 G, seit …)“ */
+function diagnosenHtml(liste: Diagnose[]): string {
+  const art: Record<string, string> = { V: "Verdacht", Z: "Zustand nach", A: "Ausschluss" };
+  return `<ul>${liste.map((d) => `<li>${html(d.bezeichnung)} (ICD-10 ${html(d.icd_code)} ${d.kennzeichen}${
+    art[d.kennzeichen] ? `, ${art[d.kennzeichen]}` : ""}${d.seit ? `, seit ${datum(d.seit)}` : ""})</li>`).join("")}</ul>`;
+}
+
+/**
+ * Alle Diagnosen der Akte im Bericht (Wunsch 10.10.2026: „in Berichten als komplette Übersicht mit allen Diagnosen“):
+ * im PDF stehen sie ohnehin als Tabelle; hier sieht man sie beim Schreiben und kann sie in den Text übernehmen.
+ */
+function DiagnosenImBericht({ patientId, onUebernehmen }: { patientId: number; onUebernehmen?: (html: string) => void }) {
+  const diagnosen = useQuery({ queryKey: ["diagnosen", patientId], queryFn: () => api<Diagnose[]>(`diagnosen/?patient=${patientId}`) });
+  const offene = (diagnosen.data ?? []).filter((d) => d.aktiv);
+  return (
+    <div className="rounded-lg border border-rand bg-grund px-3.5 py-3 flex flex-col gap-2" data-testid="bericht-diagnosen">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <span className="text-sm font-medium">Diagnosen der Akte{offene.length ? ` (${offene.length})` : ""}</span>
+        {onUebernehmen && offene.length ? (
+          <Knopf klein icon="plus" onClick={() => onUebernehmen(diagnosenHtml(offene))}>In den Text übernehmen</Knopf>
+        ) : null}
+      </div>
+      <DiagnosenKurz patientId={patientId} alle />
+      <span className="text-[0.75rem] gedaempft">Im PDF des Berichts stehen alle zutreffenden Diagnosen zusätzlich als Tabelle.</span>
+    </div>
+  );
+}
 
 function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; offen: boolean; onOffen: (o: boolean) => void }) {
   const { patient } = useAkte();
@@ -61,6 +114,14 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
     },
   });
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
+  const istFall = arten.data?.find((a) => String(a.id) === art)?.wert === "Fallzusammenfassung";
+  const gliederung = () => {
+    const leer = !inhalt.replace(/<[^>]+>/g, "").trim();
+    if (!leer && !window.confirm("Die Gliederung vor den bisherigen Text setzen?")) return;
+    setInhalt(GLIEDERUNG_HTML + (leer ? "" : inhalt));
+    if (!titel.trim()) setTitel("Fallzusammenfassung");
+    setStand((s) => s + 1);
+  };
 
   return (
     <Dialog offen={offen} onOffen={onOffen} breite={780} titel={bericht ? "Bericht bearbeiten" : "Neuer Bericht"}
@@ -70,7 +131,7 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
         <Knopf variante="pri" laedt={speichern.isPending} disabled={!titel.trim()}
           onClick={() => speichern.mutate()}>Entwurf speichern</Knopf>
       </>}>
-      <div className="grid gap-3 sm:grid-cols-[1fr_200px_160px]">
+      <div className="grid gap-3 sm:grid-cols-[1fr_12.5rem_10rem]">
         <Feld label="Titel" fehler={f.titel} pflicht>
           {(p) => <Eingabe {...p} value={titel} maxLength={200} onChange={(e) => setTitel(e.target.value)}
             placeholder="z. B. Verlaufsbericht 2026" />}
@@ -91,6 +152,17 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
         {(p) => <Eingabe {...p} value={empfaenger} maxLength={200} placeholder="z. B. Hausarzt Dr. Hausmann"
           onChange={(e) => setEmpfaenger(e.target.value)} />}
       </Feld>
+      {istFall ? (
+        <div className="flex items-center gap-3 flex-wrap text-[0.8125rem]">
+          <Knopf klein icon="plus" onClick={gliederung}>Gliederung einfügen</Knopf>
+          <span className="gedaempft">Einheitlicher Aufbau in 12 Abschnitten; Hinweise in [eckigen Klammern] überschreiben.</span>
+        </div>
+      ) : null}
+      <DiagnosenImBericht patientId={patient.id} onUebernehmen={(liste) => {
+        // in der Fallzusammenfassung an Abschnitt 2, sonst als eigener Abschnitt ans Ende
+        setInhalt((alt) => alt.includes(DIAGNOSEN_PLATZHALTER) ? alt.replace(DIAGNOSEN_PLATZHALTER, liste) : `${alt}<h3>Diagnosen</h3>${liste}`);
+        setStand((x) => x + 1);
+      }} />
       <Feld label="Bericht" fehler={f.inhalt}>
         {() => <Editor key={stand} wert={inhalt} onAenderung={setInhalt} label="Bericht" hoehe={300} />}
       </Feld>
@@ -197,6 +269,7 @@ export function Berichte() {
                 ? <Knopf klein icon="dokument" onClick={() => setPdf(gewaehlt)}>PDF ansehen</Knopf> : null}
             </>}>
             <Richtext html={gewaehlt.inhalt} leer="Noch kein Text." />
+            {entwurf ? <DiagnosenImBericht patientId={patient.id} /> : null}
             {gewaehlt.freigabevermerk
               ? <p className="m-0 text-[0.8125rem] gedaempft border-t border-rand pt-2">{gewaehlt.freigabevermerk}</p> : null}
           </Detail>

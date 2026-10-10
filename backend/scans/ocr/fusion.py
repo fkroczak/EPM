@@ -81,10 +81,14 @@ def plausibel(text: str) -> float:
 def tesseract_stuecke(woerter, q: str = "t") -> list[Stueck]:
     """Wörter je Tesseract-Zeile; große Lücken (Tabellenspalten) trennen eine Zeile in mehrere Stücke."""
     zeilen: dict = {}
+    # Unsichere Wörter, die viel höher als die Schrift sind, hat Tesseract über mehrere Zeilen gelegt (eng gesetzte
+    # Tabellen, kleine Schrift): Ihr Rahmen würde ganze Tabellenzeilen der anderen Lesart verschlucken.
+    hoehe = float(np.median([w.h for w in woerter])) if woerter else 0.0
+    woerter = [w for w in woerter if not (w.h > 2.2 * hoehe and w.c < 0.6)]
     for w in woerter:
         zeilen.setdefault(w.zeile, []).append(w)
     stuecke = []
-    for liste in zeilen.values():
+    for liste in (t for z in zeilen.values() for t in _uebereinander(z)):
         liste.sort(key=lambda w: w.x)
         hoehe = float(np.median([w.h for w in liste])) if liste else 10.0
         aktuell = [liste[0]]
@@ -95,6 +99,23 @@ def tesseract_stuecke(woerter, q: str = "t") -> list[Stueck]:
             aktuell.append(w)
         stuecke.append(aktuell)
     return [Stueck([Wort(w.text, w.x, w.y, w.w, w.h, w.c) for w in s], q).rahmen() for s in stuecke if s]
+
+
+def _uebereinander(liste: list) -> list[list]:
+    """Eine Tesseract-Zeile in echte Zeilen teilen: Bei engen Tabellen fasst Tesseract mitunter übereinander stehende
+    Wörter (eine Spalte mit „Eisen“, „Eisen“, „Kalium“) zu einer Zeile zusammen – nach links/rechts sortiert ergäbe
+    das Wortsalat aus mehreren Tabellenzeilen."""
+    if len(liste) < 2:
+        return [liste]
+    hoehe = float(np.median([w.h for w in liste])) or 10.0
+    teile: list[list] = []
+    for w in sorted(liste, key=lambda w: w.y + w.h / 2):
+        mitte = w.y + w.h / 2
+        if teile and abs(mitte - float(np.median([x.y + x.h / 2 for x in teile[-1]]))) <= 0.6 * hoehe:
+            teile[-1].append(w)
+        else:
+            teile.append([w])
+    return teile
 
 
 # ---------------------------------------------------------------- PP-OCR → Stücke
@@ -263,7 +284,29 @@ def reihen(stuecke: list[Stueck]) -> list[list[Stueck]]:
     return aus
 
 
+_DATUM_ALTER = re.compile(r"^(\d{1,2}\.\d{1,2}\.(?:19|20)\d{2})(\d{1,3})$")
+
+
+def datum_und_alter_trennen(woerter: list[Wort]) -> list[Wort]:
+    """„26.11.1970 ♀ 54 Jahre“: Das Geschlechtszeichen kennt die Erkennung nicht, Datum und Alter verschmelzen zu
+    „26.11.197054“ – das Datum wäre so nicht mehr lesbar. Vor „Jahre“/„J.“ wird wieder getrennt."""
+    aus: list[Wort] = []
+    for i, w in enumerate(woerter):
+        m = _DATUM_ALTER.match(w.t)
+        folgt = woerter[i + 1].t if i + 1 < len(woerter) else ""
+        if m and re.match(r"^(?:jahr|j\.?$)", folgt, re.I):
+            datum, alter = m.groups()
+            breite = w.w / len(w.t)
+            aus.append(Wort(datum, w.x, w.y, breite * len(datum), w.h, w.c))
+            aus.append(Wort(alter, w.x + w.w - breite * len(alter), w.y, breite * len(alter), w.h, w.c))
+        else:
+            aus.append(w)
+    return aus
+
+
 def seite_json(stuecke: list[Stueck], breite: int, hoehe: int, verfahren: list[str]) -> dict:
+    for s in stuecke:
+        s.woerter = datum_und_alter_trennen(s.woerter)
     rs = reihen(stuecke)
     return {
         "breite": int(breite), "hoehe": int(hoehe), "verfahren": verfahren,

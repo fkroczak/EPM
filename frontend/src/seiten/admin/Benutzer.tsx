@@ -89,7 +89,7 @@ function RechteMatrix() {
   const geaendert = rollen.reduce((n, r) => n + d.rechte.filter((x) => m[r.code][x.code] !== d.matrix[r.code][x.code]).length, 0);
   const standard = () => setM({ ...m, ...Object.fromEntries(rollen.map((r) => [r.code, Object.fromEntries(d.rechte.map((x) => [x.code, (d.standard[r.code] ?? []).includes(x.code) || fest.has(`${r.code}.${x.code}`)]))])) });
   return (
-    <Karte className="px-5 py-[18px] flex flex-col gap-3 overflow-x-auto" data-testid="rechte">
+    <Karte className="px-5 py-[1.125rem] flex flex-col gap-3 overflow-x-auto" data-testid="rechte">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex flex-col gap-1">
           <h2 className="lbl m-0">Was die Rollen dürfen</h2>
@@ -163,7 +163,7 @@ function AnmeldungKarte({ onBenutzer }: { onBenutzer: (id: number) => void }) {
   };
   const betroffen = d.ohne_zweiten_faktor.filter((u) => wert === "alle" || (wert === "admins" && u.rolle === "admin"));
   return (
-    <Karte className="px-5 py-[18px] flex flex-col gap-3" id="anmeldung" data-testid="anmeldung">
+    <Karte className="px-5 py-[1.125rem] flex flex-col gap-3" id="anmeldung" data-testid="anmeldung">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex flex-col gap-1">
           <h2 className="lbl m-0">Anmeldung: Zwei-Faktor-Anmeldung (2FA)</h2>
@@ -284,7 +284,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
   const ohneLogin = neu ? f.ohne_login : historisch;
   const testMoeglich = !ohneLogin && TESTBENUTZER_ROLLEN.includes(f.rolle) && benutzer?.id !== ich.id;
   return (
-    <Karte className="px-5 py-[18px] flex flex-col gap-4 min-w-0" data-testid="benutzer-detail">
+    <Karte className="px-5 py-[1.125rem] flex flex-col gap-4 min-w-0" data-testid="benutzer-detail">
       <div className="flex items-center gap-2.5 flex-wrap">
         <h2 className="m-0 text-lg font-semibold">{neu ? "Neuer Benutzer" : name}</h2>
         {z ? <Chip art={z.art}>{z.art === "ok" ? <Icon name="haken" /> : z.art === "fehler" ? <Icon name="schloss" /> : null}{z.text}</Chip> : null}

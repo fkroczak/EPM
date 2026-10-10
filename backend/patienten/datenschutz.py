@@ -87,6 +87,7 @@ def umfang(patient) -> dict:
         # Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
         "diagnosen": patient.diagnosen.count(), "laborbefunde": patient.laborbefunde.count(),
         "bia_messungen": patient.bia_messungen.count(), "berichte": patient.berichte.count(),
+        "therapieschritte": patient.therapieschritte.count(),
     }
 
 
@@ -110,7 +111,7 @@ def akten_entfernen(ids: list[int]) -> None:
     from berichte.models import Bericht
     from infusionen.models import Infusionsplan, InfusionsplanPosition
 
-    from .models import Diagnose, Hinweisruhe
+    from .models import Diagnose, Hinweisruhe, Therapieschritt
 
     ids = list(ids)
     eigene = eigene_dokumente(ids)
@@ -142,7 +143,7 @@ def akten_entfernen(ids: list[int]) -> None:
     bleibt = set(Dokument.objects.filter(id__in=frueher.values("id")).values_list("id", flat=True))
     frueher.exclude(id__in=bleibt).delete()
     for modell in (Gewichtsmessung, Kontakt, Termin, Infusionsplan, Bezugsperson, PatientArzt, Erklaerung,
-                   Datenschutzanfrage, Diagnose, Laborbefund, BiaMessung, Bericht, Hinweisruhe):
+                   Datenschutzanfrage, Diagnose, Laborbefund, BiaMessung, Bericht, Hinweisruhe, Therapieschritt):
         modell.history.filter(patient_id__in=ids).delete()
     InfusionsplanPosition.history.filter(plan_id__in=plan_ids).delete()
     Laborwert.history.filter(befund_id__in=befund_ids).delete()

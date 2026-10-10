@@ -84,7 +84,7 @@ function BiaDialog({ messung, offen, onOffen }: { messung: BiaMessung | null; of
         <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
         <Knopf variante="pri" laedt={speichern.isPending} onClick={() => speichern.mutate()}>Speichern</Knopf>
       </>}>
-      <Feld label="Gemessen am" fehler={fe.gemessen_am} className="w-[180px]" pflicht>
+      <Feld label="Gemessen am" fehler={fe.gemessen_am} className="w-[11.25rem]" pflicht>
         {(p) => <Eingabe {...p} className="num" value={f2.gemessen_am} onChange={setz("gemessen_am")} />}
       </Feld>
       <div className="grid gap-3 sm:grid-cols-2">

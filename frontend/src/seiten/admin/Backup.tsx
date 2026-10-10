@@ -116,7 +116,7 @@ function AuftragStatus({ a }: { a: Auftrag }) {
 
 function Wert({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[minmax(120px,36%)_1fr] gap-3 py-1 text-sm border-b border-rand last:border-b-0">
+    <div className="grid grid-cols-[minmax(7.5rem,36%)_1fr] gap-3 py-1 text-sm border-b border-rand last:border-b-0">
       <dt className="gedaempft">{label}</dt>
       <dd className="m-0 min-w-0 break-words">{children}</dd>
     </div>
@@ -234,7 +234,7 @@ function PasswortDialog({ offen, daten, onZu }: { offen: boolean; daten: Daten; 
                 {(p) => <Eingabe {...p} type={zeigen ? "text" : "password"} autoComplete="new-password" spellCheck={false}
                   className="num" value={passwort} onChange={(e) => setPasswort(e.target.value)} />}
               </Feld>
-              <Knopf onClick={vorschlag} className="mb-[22px]">Vorschlag erzeugen</Knopf>
+              <Knopf onClick={vorschlag} className="mb-[1.375rem]">Vorschlag erzeugen</Knopf>
             </div>
             <Feld label="Sicherungs-Passwort wiederholen" fehler={f.passwort2} pflicht>
               {(p) => <Eingabe {...p} type={zeigen ? "text" : "password"} autoComplete="new-password" spellCheck={false}
@@ -330,7 +330,7 @@ function ZielDialog({ offen, ziel, onZu }: { offen: boolean; ziel: Ziel; onZu: (
             {(p) => <Eingabe {...p} type="password" autoComplete="new-password" value={w.ziel_kennwort} onChange={setze("ziel_kennwort")} />}
           </Feld>
         </div>
-        <div className="grid grid-cols-[minmax(0,1fr)_130px_130px] gap-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_8.125rem_8.125rem] gap-3">
           <Feld label="Ordner im Ziel" fehler={f.ordner} hinweis="wird angelegt, falls er fehlt">
             {(p) => <Eingabe {...p} spellCheck={false} value={w.ordner} onChange={setze("ordner")} />}
           </Feld>
@@ -735,7 +735,7 @@ function OffeneUploads({ daten, laufend }: { daten: Daten; laufend: Set<string> 
 // ---------------------------------------------------------------- Teile der Seite
 function Kennzahl({ titel, wert, children, testid }: { titel: string; wert: ReactNode; children?: ReactNode; testid?: string }) {
   return (
-    <Karte className="px-[18px] py-4 flex flex-col gap-1.5 min-w-0" data-testid={testid}>
+    <Karte className="px-[1.125rem] py-4 flex flex-col gap-1.5 min-w-0" data-testid={testid}>
       <span className="lbl">{titel}</span>
       <span className="num text-xl font-medium">{wert}</span>
       {children}
@@ -886,7 +886,7 @@ function Taetigkeiten({ liste }: { liste: Auftrag[] }) {
                     {a.parameter.minuten ? <span className="text-xs gedaempft"> · Beginn nach {a.parameter.minuten} Min.</span> : null}</td>
                   <td className="td text-[0.8125rem]">{a.angefordert_von_name ?? "—"}</td>
                   <td className="td"><AuftragStatus a={a} /><AuftragFortschritt a={a} liste={liste} className="mt-1.5" /></td>
-                  <td className="td text-[0.8125rem] max-w-[420px]">{a.ergebnis || (a.status === "wartet" ? "wartet, bis der Server den Auftrag abholt" : "—")}</td>
+                  <td className="td text-[0.8125rem] max-w-[26.25rem]">{a.ergebnis || (a.status === "wartet" ? "wartet, bis der Server den Auftrag abholt" : "—")}</td>
                   <td className="td text-right whitespace-nowrap">
                     {a.status === "wartet" ? <Knopf klein laedt={zurueck.isPending} onClick={() => zurueck.mutate(a)}>Zurückziehen</Knopf> : null}
                     {a.ausgabe ? <Knopf klein variante="geist" onClick={() => setAuf(auf === a.id ? null : a.id)} aria-expanded={auf === a.id}>
@@ -895,7 +895,7 @@ function Taetigkeiten({ liste }: { liste: Auftrag[] }) {
                 </tr>
                 {auf === a.id ? (
                   <tr><td colSpan={6} className="td">
-                    <pre className="m-0 max-h-[360px] overflow-auto text-[0.75rem] leading-snug bg-grund rounded-lg p-3 whitespace-pre-wrap" data-testid="auftrag-ausgabe">{a.ausgabe}</pre>
+                    <pre className="m-0 max-h-[22.5rem] overflow-auto text-[0.75rem] leading-snug bg-grund rounded-lg p-3 whitespace-pre-wrap" data-testid="auftrag-ausgabe">{a.ausgabe}</pre>
                   </td></tr>
                 ) : null}
               </Fragment>

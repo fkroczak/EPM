@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { Knopf, Ladekreis, cx } from "@/components/ui/basis";
+import { rem } from "@/lib/masse";
 
 type PdfJs = typeof import("pdfjs-dist");
 let pdfjsLaden: Promise<PdfJs> | null = null;
@@ -134,7 +135,7 @@ export function PdfVorschau({ url, titel, hoehe = 320, laden }: { url: string; t
   const anzahl = doc?.numPages ?? 0;
   return (
     <div className="flex flex-col gap-2" data-testid="pdf-vorschau" aria-label={`Vorschau ${titel}`}>
-      <div ref={ref} className="rounded-lg border border-rand bg-fein overflow-auto p-2" style={{ height: hoehe }}>
+      <div ref={ref} className="rounded-lg border border-rand bg-fein overflow-auto p-2" style={{ height: rem(hoehe) }}>
         {fehler ? <div className="h-full flex items-center justify-center text-sm gedaempft text-center px-4">Vorschau nicht möglich: {fehler}</div>
           : doc && breite ? <Seite doc={doc} nummer={seite} breite={breite - 16} />
           : <div className="h-full flex items-center justify-center gedaempft"><Ladekreis /></div>}

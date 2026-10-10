@@ -156,7 +156,7 @@ export function StummKarte({ patientId, aenderbar }: { patientId: number; aender
   const versteckt = termine.data ?? [];
   if (!laufend.length && !versteckt.length) return null;
   return (
-    <Karte className="px-[22px] py-[18px] flex flex-col gap-2" data-testid="stumme-hinweise">
+    <Karte className="px-[1.375rem] py-[1.125rem] flex flex-col gap-2" data-testid="stumme-hinweise">
       <KartenKopf titel="Ausgeblendete Hinweise" unter="Hinweise und Termine – erscheinen nach Ablauf der Frist von allein wieder." />
       <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
         {laufend.map((r) => (

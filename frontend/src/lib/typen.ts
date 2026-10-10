@@ -313,6 +313,23 @@ export type Patient = {
   } | null;
 };
 
+/** PDF zum Anhängen an die E-Mails der Schreiben (F174) */
+export type Anlage = {
+  id: number;
+  name: string;
+  beschreibung: string;
+  dateiname: string;
+  groesse: number;
+  aktiv: boolean;
+  reihenfolge: number;
+  mitgeliefert: boolean;
+  hochgeladen_am: string;
+  hochgeladen_von: string | null;
+};
+
+/** Text der E-Mail eines Schreibens (F172), im Dialog anpassbar */
+export type Mailtext = { an: string; betreff: string; text: string; dateiname: string };
+
 export type Termin = {
   id: number;
   patient: number;
@@ -684,6 +701,11 @@ export type Diagnose = {
   beendet_am: string | null;
   angelegt_am: string;
   angelegt_von_name: string | null;
+};
+
+/** Schritt im Verlauf der Therapie (Wunsch 10.10.2026) */
+export type Therapieschritt = {
+  id: number; patient: number; datum: string; text: string; aktiv: boolean; angelegt_am: string; angelegt_von_name: string | null;
 };
 
 export type Diagnosevorlage = { id: number; icd_code: string; bezeichnung: string; aktiv: boolean; anzeige: string };

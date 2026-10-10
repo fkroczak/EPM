@@ -42,9 +42,9 @@ function AktenSkizze({ art }: { art: Aktenansicht }) {
   const balken = (breite: string, stark = false) => (
     <span className="block h-1.5 rounded-sm" style={{ width: breite, background: "var(--akzent)", opacity: stark ? 0.85 : 0.25 }} />
   );
-  const flaeche = "bg-flaeche border border-rand rounded-[3px]";
+  const flaeche = "bg-flaeche border border-rand rounded-[0.1875rem]";
   return (
-    <span aria-hidden="true" className="block h-[72px] rounded-md border border-rand overflow-hidden bg-grund p-1.5">
+    <span aria-hidden="true" className="block h-[4.5rem] rounded-md border border-rand overflow-hidden bg-grund p-1.5">
       {art === "kopfzeile" ? (
         <span className="flex flex-col gap-1 h-full">
           <span className={cx(flaeche, "p-1 grid grid-cols-4 gap-1")}>{[0, 1, 2, 3].map((i) => <span key={i} className="flex flex-col gap-0.5">{balken("80%", i === 0)}{balken("60%")}</span>)}</span>
@@ -74,7 +74,7 @@ const ZEILEN: Record<Darstellung["dichte"], string> = { grosszuegig: "ca. 13", n
 
 function Mini({ farben }: { farben: [string, string, string] }) {
   return (
-    <span aria-hidden="true" className="block h-[64px] rounded-md border border-rand overflow-hidden" style={{ background: farben[0] }}>
+    <span aria-hidden="true" className="block h-[4rem] rounded-md border border-rand overflow-hidden" style={{ background: farben[0] }}>
       <span className="flex h-full">
         <span className="w-[30%] h-full flex flex-col gap-1 p-1.5" style={{ background: farben[1] }}>
           <span className="h-1.5 rounded-sm" style={{ background: farben[2], opacity: 0.85 }} />
@@ -133,7 +133,7 @@ function DarstellungKarten({ zuruecksetzenRef }: { zuruecksetzenRef: { current: 
   const akzentName = d.akzent === "eigen" ? `Eigene Farbe ${d.akzent_eigen ?? ""}` : AKZENTE[d.akzent]?.[0] ?? "";
   return (
     <>
-      <Karte className="px-5 py-[18px] flex flex-col gap-4" data-testid="darstellung">
+      <Karte className="px-5 py-[1.125rem] flex flex-col gap-4" data-testid="darstellung">
         <div className="flex items-baseline justify-between gap-3 flex-wrap">
           <h2 className="lbl m-0">Darstellung</h2>
           <span className="text-[0.8125rem] gedaempft">Warnfarben für Gewicht, Nickelallergie und Fehler bleiben überall gleich.</span>
@@ -155,7 +155,7 @@ function DarstellungKarten({ zuruecksetzenRef }: { zuruecksetzenRef: { current: 
         </label>
         {d.schema === "individuell" ? (
           <div className="flex flex-col gap-3 border-t border-rand pt-3.5">
-            <div className="grid grid-cols-[110px_minmax(0,1fr)] items-center gap-3">
+            <div className="grid grid-cols-[6.875rem_minmax(0,1fr)] items-center gap-3">
               <span className="text-sm font-medium">Akzentfarbe</span>
               <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Akzentfarbe">
                 {Object.entries(AKZENTE).map(([k, [n, hex]]) => (
@@ -197,7 +197,7 @@ function DarstellungKarten({ zuruecksetzenRef }: { zuruecksetzenRef: { current: 
         ) : null}
         {fehler ? <Meldung art="fehler">{fehler}</Meldung> : null}
       </Karte>
-      <Karte className="px-5 py-[18px] grid grid-cols-2 gap-4">
+      <Karte className="px-5 py-[1.125rem] grid grid-cols-2 gap-4">
         <div className="col-span-2 flex flex-col gap-2">
           <span className="lbl">Dichte</span>
           <Segmente label="Dichte" wert={d.dichte} onWahl={(w) => aendern({ dichte: w })} className="self-start"
@@ -220,7 +220,7 @@ function DarstellungKarten({ zuruecksetzenRef }: { zuruecksetzenRef: { current: 
           <span className="card px-3 py-2 text-sm">Weber, Anna · <span className="num">54,6 kg</span> · Nr. <span className="num">0231</span></span>
         </div>
       </Karte>
-      <Karte className="px-5 py-[18px] flex flex-col gap-4" data-testid="aktenansicht">
+      <Karte className="px-5 py-[1.125rem] flex flex-col gap-4" data-testid="aktenansicht">
         <div className="flex items-baseline justify-between gap-3 flex-wrap">
           <h2 className="lbl m-0">Patientenakte</h2>
           <span className="text-[0.8125rem] gedaempft">Aufbau der Akte – gilt für dich an jedem PC; am Telefon immer mit Kopf oben.</span>
@@ -427,7 +427,7 @@ function SicherheitKarte() {
   const passkeys = d?.passkeys ?? [];
   const zweiterFaktor = !!d && (d.authenticator_aktiv || passkeys.length > 0);
   return (
-    <Karte className="px-5 py-[18px] flex flex-col gap-1" data-testid="sicherheit" id="zwei-faktor">
+    <Karte className="px-5 py-[1.125rem] flex flex-col gap-1" data-testid="sicherheit" id="zwei-faktor">
       <h2 className="lbl m-0 mb-1">Anmeldung und Sicherheit</h2>
       {s.isLoading || !d ? <Laden /> : <>
         <Zeile titel="Passwort" unter={d.kennwort_geaendert_am ? `zuletzt geändert ${datum(d.kennwort_geaendert_am)}` : "noch nie geändert"}
@@ -520,7 +520,7 @@ function SitzungenKarte() {
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["konto", "sitzungen"] }); melden("Anmeldung beendet."); },
   });
   return (
-    <Karte className="px-5 py-[18px] flex flex-col gap-1" data-testid="sitzungen">
+    <Karte className="px-5 py-[1.125rem] flex flex-col gap-1" data-testid="sitzungen">
       <h2 className="lbl m-0 mb-1">Angemeldet</h2>
       {sitzungen.isLoading ? <Laden /> : (sitzungen.data ?? []).map((s) => (
         <Zeile key={s.id} titel={<>{s.diese ? "Dieser PC" : "Anderes Gerät"} · {s.browser || "Browser"}</>}
@@ -542,9 +542,9 @@ export function Konto() {
       <Seitenkopf titel="Mein Konto" />
       <div className="stapel grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
         <div className="stapel flex flex-col gap-5 min-w-0">
-          <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="profil">
+          <Karte className="px-5 py-[1.125rem] flex flex-col gap-3" data-testid="profil">
             <h2 className="lbl m-0">Profil</h2>
-            <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
+            <div className="grid grid-cols-[6.875rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
               <span className="gedaempft">Name</span><span>{[ich.titel, ich.vorname, ich.nachname].filter(Boolean).join(" ")}</span>
               <span className="gedaempft">Funktion</span><span>{ich.funktion || "—"}</span>
               <span className="gedaempft">Kürzel</span><span className="num">{ich.kuerzel || "—"}</span>
@@ -573,7 +573,7 @@ export function Design() {
     <Seite pfad={[{ text: "Design" }]}>
       <Seitenkopf titel="Design"
         rechts={<Knopf onClick={() => zuruecksetzen.current?.()}>Auf Standard zurücksetzen</Knopf>} />
-      <div className="stapel flex flex-col gap-5 min-w-0 max-w-[1100px]" data-testid="design">
+      <div className="stapel flex flex-col gap-5 min-w-0 max-w-[68.75rem]" data-testid="design">
         <DarstellungKarten zuruecksetzenRef={zuruecksetzen} />
         <Link to="/" state={{ anpassen: Date.now() }} className="card px-5 py-4 flex items-center justify-between no-underline text-tinte hover:bg-fein">
           <span className="font-medium">Startseite anpassen</span><span aria-hidden="true">→</span>

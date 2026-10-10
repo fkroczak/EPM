@@ -19,8 +19,9 @@ import { useSortierbar } from "@/components/ui/sortierbar";
 import { LOGO_URL, Logo } from "@/components/layout/logo";
 import { DokumentvorlagenBereich } from "@/seiten/admin/Dokumentvorlagen";
 import { KatalogeBereich } from "@/seiten/admin/Kataloge";
+import { AnlagenBereich } from "@/seiten/admin/Anlagen";
 
-type Bereich = "briefkopf" | "listen" | "kataloge" | "grenzwerte" | "dokumente";
+type Bereich = "briefkopf" | "listen" | "kataloge" | "grenzwerte" | "anlagen" | "dokumente";
 type SpeichernRef = { current: (() => void) | null };
 
 const ABSENDER_FELDER: { k: keyof Absender; label: string; span: number; num?: boolean }[] = [
@@ -55,12 +56,12 @@ function BriefkopfBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   const version = briefkopf.data.logo.sha256;
   return (
-    <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-5 items-start">
+    <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_26.25rem] gap-5 items-start">
       <div className="flex flex-col gap-4 min-w-0">
-        <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="logo">
+        <Karte className="px-5 py-[1.125rem] flex flex-col gap-3" data-testid="logo">
           <h2 className="lbl m-0">Logo</h2>
           <div className="flex items-center gap-5 flex-wrap">
-            <Logo className="h-[72px] w-[240px] border border-rand rounded-lg p-1.5 bg-white" version={version} />
+            <Logo className="h-[4.5rem] w-[15rem] border border-rand rounded-lg p-1.5 bg-white" version={version} />
             <div className="flex flex-col gap-1.5">
               <Knopf icon="hochladen" laedt={hochladen.isPending} onClick={() => datei.current?.click()}>Neues Logo hochladen</Knopf>
               <span className="text-xs gedaempft">PNG oder SVG, quer, mind. 600 px breit</span>
@@ -72,7 +73,7 @@ function BriefkopfBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
           {briefkopf.data.logo.vorhanden ? <span className="text-xs gedaempft">{briefkopf.data.logo.mime === "image/svg+xml" ? "SVG" : `PNG ${briefkopf.data.logo.breite} × ${briefkopf.data.logo.hoehe} px`} · <a href={`${LOGO_URL}?v=${version?.slice(0, 12)}`} target="_blank" rel="noopener">öffnen</a></span>
             : <span className="text-xs gedaempft">Noch kein eigenes Logo hochgeladen – angezeigt wird das mitgelieferte Stiftungslogo.</span>}
         </Karte>
-        <Karte className="px-5 py-[18px] flex flex-col gap-3.5" data-testid="absender">
+        <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5" data-testid="absender">
           <h2 className="lbl m-0">Absender auf Infusionsplänen und PDFs</h2>
           <div role="radiogroup" aria-label="Absender" className="flex gap-5">
             {briefkopf.data.arten.map((x) => (
@@ -92,12 +93,12 @@ function BriefkopfBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
           {speichern.error && !Object.keys(f).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
         </Karte>
       </div>
-      <Karte className="px-5 py-[18px] flex flex-col gap-3">
+      <Karte className="px-5 py-[1.125rem] flex flex-col gap-3">
         <h2 className="lbl m-0">Vorschau Briefkopf</h2>
         <div className="pdf-blatt px-6 py-5 flex flex-col gap-3 text-[#1b1932]" data-testid="briefkopf-vorschau">
           <div className="flex items-start justify-between gap-4">
-            <Logo className="h-[48px] w-[160px]" version={version} />
-            <div className="flex flex-col items-end text-[10px] leading-snug">
+            <Logo className="h-[3rem] w-[10rem] min-w-0 shrink" version={version} />
+            <div className="flex flex-col items-end text-right text-[0.625rem] leading-snug min-w-0 [overflow-wrap:anywhere]">
               <span>{a.strasse} · {a.plz} {a.ort}</span>
               {a.telefon ? <span>Tel. {a.telefon}</span> : null}
               {a.email ? <span>{a.email}</span> : null}
@@ -105,7 +106,7 @@ function BriefkopfBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
           </div>
           <div className="text-base font-semibold border-b border-[#1b1932] pb-1">Infusionsplan</div>
           <div className="h-2 rounded bg-[#e6e5ee] w-4/5" /><div className="h-2 rounded bg-[#e6e5ee] w-3/5" /><div className="h-2 rounded bg-[#e6e5ee] w-2/3" />
-          <div className="text-[9px] text-[#5d5b72] text-center border-t border-[#e6e5ee] pt-1.5">{[a.name, a.fusszeile].filter(Boolean).join(" · ")}</div>
+          <div className="text-[0.5625rem] text-[#5d5b72] text-center border-t border-[#e6e5ee] pt-1.5">{[a.name, a.fusszeile].filter(Boolean).join(" · ")}</div>
         </div>
         <span className="text-xs gedaempft">Gilt für neue PDFs. Bereits freigegebene Pläne behalten ihren Briefkopf.</span>
       </Karte>
@@ -215,7 +216,7 @@ function ListenBereich() {
   const anzahl = (l: Liste) => l.art === "praeparat" ? (praeparate.data ?? []).filter((p) => p.kategorie === l.schluessel).length
     : (auswahl.data ?? []).filter((a) => a.liste === l.schluessel).length;
   return (
-    <div className="stapel grid grid-cols-1 xl:grid-cols-[240px_minmax(0,1fr)] gap-5 items-start">
+    <div className="stapel grid grid-cols-1 xl:grid-cols-[15rem_minmax(0,1fr)] gap-5 items-start">
       <nav aria-label="Listen" className="card p-1.5 flex flex-col">
         {LISTEN.map((l) => (
           <button key={l.schluessel} type="button" aria-current={gewaehlt.schluessel === l.schluessel ? "true" : undefined}
@@ -225,7 +226,7 @@ function ListenBereich() {
           </button>
         ))}
       </nav>
-      <Karte className="px-5 py-[18px] flex flex-col gap-3" data-testid="liste">
+      <Karte className="px-5 py-[1.125rem] flex flex-col gap-3" data-testid="liste">
         <div className="flex items-center justify-between gap-3">
           <h2 className="lbl m-0">{gewaehlt.titel} · {gewaehlt.art === "praeparat" ? "Präparate" : "Auswahlwerte"}</h2>
           <Knopf klein icon="plus" onClick={() => setDialog("neu")}>{gewaehlt.art === "praeparat" ? "Präparat" : "Wert"}</Knopf>
@@ -353,7 +354,7 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
   return (
     <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-5 items-start" data-testid="grenzwerte">
       <div className="stapel flex flex-col gap-5 min-w-0">
-      <Karte className="px-5 py-[18px] flex flex-col gap-3.5">
+      <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5">
         <h2 className="lbl m-0">Hinweise auf Startseite und in der Liste</h2>
         <div className="grid grid-cols-2 gap-3">
           {HINWEISE.map((h) => (
@@ -367,7 +368,7 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
           (Wiedereinbestellung auf der Startseite, Hinweis in der Liste, Kalender). Wiedervorlage beim Erfassen eines Kontakts
           standardmäßig in {w.wiedervorlage_tage} Tagen (im Dialog je Kontakt änderbar).</span>
       </Karte>
-      <Karte className="px-5 py-[18px] flex flex-col gap-3.5" data-testid="grenzwerte-datenschutz">
+      <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5" data-testid="grenzwerte-datenschutz">
         <h2 className="lbl m-0">Datenschutz</h2>
         <div className="grid grid-cols-2 gap-3">
           {DATENSCHUTZ.map((h) => (
@@ -390,7 +391,7 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
           <span className="text-[0.8125rem] gedaempft">Fehlt eine davon oder ist sie widerrufen, steht es im Kopf der Akte und auf der Startseite unter „Nach und nach prüfen“.</span>
         </fieldset>
       </Karte>
-      <Karte className="px-5 py-[18px] flex flex-col gap-3.5" data-testid="grenzwerte-scans">
+      <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5" data-testid="grenzwerte-scans">
         <h2 className="lbl m-0">Scans und Texterkennung</h2>
         <div className="grid grid-cols-2 gap-3">
           {SCANS.map((h) => (
@@ -409,7 +410,7 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
           höchstens bis {w.scans_hoechst_tage} Tage nach dem Hochladen.</span>
       </Karte>
       </div>
-      <Karte className="px-5 py-[18px] flex flex-col gap-3">
+      <Karte className="px-5 py-[1.125rem] flex flex-col gap-3">
         <h2 className="lbl m-0">Plausibilitätsgrenzen bei der Eingabe</h2>
         <table className="tabelle">
           <thead><tr><th className="th">Wert</th><th className="th">Minimum</th><th className="th">Maximum</th><th className="th">Einheit</th></tr></thead>
@@ -456,15 +457,16 @@ export function Vorlagen() {
     <Seite pfad={[{ text: "Administration" }, { text: "Vorlagen" }]}>
       <Seitenkopf titel="Vorlagen" unter="Alles, was sich ohne IT anpassen lassen soll. Jede Änderung steht im Audit-Log."
         rechts={bereich === "dokumente" ? <div ref={setAktionen} className="flex items-center gap-2.5 flex-wrap" />
-          : bereich !== "listen" && bereich !== "kataloge" ? <Knopf variante="pri" onClick={() => speichern.current?.()}>Speichern</Knopf> : null} />
+          : bereich !== "listen" && bereich !== "kataloge" && bereich !== "anlagen" ? <Knopf variante="pri" onClick={() => speichern.current?.()}>Speichern</Knopf> : null} />
       <Segmente label="Bereich" wert={bereich} onWahl={waehle} className="self-start"
         werte={[{ wert: "briefkopf", text: "Briefkopf und Logo" }, { wert: "listen", text: "Auswahllisten" },
           { wert: "kataloge", text: "Labor und Diagnosen" }, { wert: "grenzwerte", text: "Grenzwerte" },
-          { wert: "dokumente", text: "Dokumentvorlagen" }]} />
+          { wert: "anlagen", text: "Anlagen für E-Mails" }, { wert: "dokumente", text: "Dokumentvorlagen" }]} />
       {bereich === "briefkopf" ? <BriefkopfBereich speichernRef={speichern} />
         : bereich === "listen" ? <ListenBereich />
         : bereich === "kataloge" ? <KatalogeBereich />
         : bereich === "grenzwerte" ? <GrenzwerteBereich speichernRef={speichern} />
+        : bereich === "anlagen" ? <AnlagenBereich />
         : <DokumentvorlagenBereich aktionenZiel={aktionen} onGeaendert={merkeGeaendert} />}
     </Seite>
   );

@@ -5,37 +5,7 @@ import type { Recht } from "./lib/typen";
 import { Laden } from "./components/ui/basis";
 import { Seite, Shell } from "./components/layout/Shell";
 import { Anmeldung } from "./seiten/Anmeldung";
-import { Akte } from "./seiten/akte/Akte";
-import { AkteDatenschutz } from "./seiten/akte/Datenschutz";
-import { Bia } from "./seiten/akte/Bia";
-import { Berichte } from "./seiten/akte/Berichte";
-import { Diagnosen } from "./seiten/akte/Diagnosen";
-import { Dokumente } from "./seiten/akte/Dokumente";
-import { Karteikarte } from "./seiten/akte/Karteikarte";
-import { Kontakte } from "./seiten/akte/Kontakte";
-import { Labor } from "./seiten/akte/Labor";
-import { PlanEditor } from "./seiten/akte/PlanEditor";
-import { Plaene } from "./seiten/akte/Plaene";
-import { Empfehlung, Therapie } from "./seiten/akte/Therapie";
-import { Uebersicht } from "./seiten/akte/Uebersicht";
-import { Verlauf } from "./seiten/akte/Verlauf";
-import { AuditLog } from "./seiten/admin/AuditLog";
-import { Backup } from "./seiten/admin/Backup";
-import { System } from "./seiten/admin/System";
-import { Import } from "./seiten/admin/import/Import";
-import { Infusionsplaene } from "./seiten/Infusionsplaene";
-import { Kalender } from "./seiten/Kalender";
-import { Benutzer } from "./seiten/admin/Benutzer";
-import { Datenschutz } from "./seiten/Datenschutz";
-import { Scans } from "./seiten/scans/Scans";
-import { Vorlagen } from "./seiten/admin/Vorlagen";
-import { Hilfe } from "./seiten/Hilfe";
-import { Design, Konto } from "./seiten/Konto";
-import { PatientNeu } from "./seiten/PatientNeu";
-import { Patienten } from "./seiten/Patienten";
 import { Start } from "./seiten/Start";
-import { Versorger } from "./seiten/Versorger";
-import { Aerzte } from "./seiten/Aerzte";
 
 function NichtGefunden() {
   return (
@@ -54,53 +24,59 @@ function MitRecht({ recht, children }: { recht: Recht | Recht[]; titel?: string;
   return <Navigate to="/" replace />;
 }
 
+/** Jede Seite als eigene Datei, geladen beim ersten Aufruf (Lighthouse 09.10.2026: vorher ein Paket mit 1,7 MB für
+ *  alle Seiten, auch für die Anmeldung). Der Router wartet auf die Datei und zeigt solange die bisherige Seite. */
+function seite(laden: () => Promise<ReactNode>) {
+  return { lazy: async () => ({ element: await laden() }) };
+}
+
 const router = createBrowserRouter([
   {
     element: <Shell />,
     children: [
       { index: true, element: <Start /> },
-      { path: "patienten", element: <Patienten /> },
-      { path: "patienten/neu", element: <PatientNeu /> },
+      { path: "patienten", ...seite(() => import("./seiten/Patienten").then(({ Patienten }) => <Patienten />)) },
+      { path: "patienten/neu", ...seite(() => import("./seiten/PatientNeu").then(({ PatientNeu }) => <PatientNeu />)) },
       {
         path: "patienten/:id",
-        element: <Akte />,
+        ...seite(() => import("./seiten/akte/Akte").then(({ Akte }) => <Akte />)),
         children: [
-          { index: true, element: <Uebersicht /> },
+          { index: true, ...seite(() => import("./seiten/akte/Uebersicht").then(({ Uebersicht }) => <Uebersicht />)) },
           // Ansicht „Karteikarte“ (Wunsch 08.10.2026): alle Einträge chronologisch mit Kürzelzeile
-          { path: "kartei", element: <Karteikarte /> },
+          { path: "kartei", ...seite(() => import("./seiten/akte/Karteikarte").then(({ Karteikarte }) => <Karteikarte />)) },
           // eigene Reiter seit 07.10.2026 (F121); die alten Adressen leiten weiter
-          { path: "diagnosen", element: <Diagnosen /> },
-          { path: "therapie", element: <Therapie /> },
-          { path: "empfehlung", element: <Empfehlung /> },
-          { path: "kontakte", element: <Kontakte /> },
-          { path: "plaene", element: <Plaene /> },
-          { path: "plaene/neu", element: <PlanEditor /> },
-          { path: "plaene/:planId/bearbeiten", element: <PlanEditor key="bearbeiten" /> },
-          { path: "labor", element: <Labor /> },
-          { path: "bia", element: <Bia /> },
+          { path: "diagnosen", ...seite(() => import("./seiten/akte/Diagnosen").then(({ Diagnosen }) => <Diagnosen />)) },
+          { path: "therapie", ...seite(() => import("./seiten/akte/Therapie").then(({ Therapie }) => <Therapie />)) },
+          { path: "empfehlung", ...seite(() => import("./seiten/akte/Therapie").then(({ Empfehlung }) => <Empfehlung />)) },
+          { path: "kontakte", ...seite(() => import("./seiten/akte/Kontakte").then(({ Kontakte }) => <Kontakte />)) },
+          { path: "plaene", ...seite(() => import("./seiten/akte/Plaene").then(({ Plaene }) => <Plaene />)) },
+          { path: "plaene/neu", ...seite(() => import("./seiten/akte/PlanEditor").then(({ PlanEditor }) => <PlanEditor />)) },
+          { path: "plaene/:planId/bearbeiten", ...seite(() => import("./seiten/akte/PlanEditor").then(({ PlanEditor }) => <PlanEditor key="bearbeiten" />)) },
+          { path: "labor", ...seite(() => import("./seiten/akte/Labor").then(({ Labor }) => <Labor />)) },
+          { path: "bia", ...seite(() => import("./seiten/akte/Bia").then(({ Bia }) => <Bia />)) },
           { path: "befunde", element: <Navigate to="../labor" replace /> },
-          { path: "berichte", element: <Berichte /> },
-          { path: "dokumente", element: <Dokumente /> },
-          { path: "datenschutz", element: <AkteDatenschutz /> },
-          { path: "verlauf", element: <Verlauf /> },
+          { path: "berichte", ...seite(() => import("./seiten/akte/Berichte").then(({ Berichte }) => <Berichte />)) },
+          { path: "dokumente", ...seite(() => import("./seiten/akte/Dokumente").then(({ Dokumente }) => <Dokumente />)) },
+          { path: "datenschutz", ...seite(() => import("./seiten/akte/Datenschutz").then(({ AkteDatenschutz }) => <AkteDatenschutz />)) },
+          { path: "verlauf", ...seite(() => import("./seiten/akte/Verlauf").then(({ Verlauf }) => <Verlauf />)) },
         ],
       },
-      { path: "kalender", element: <MitRecht recht="akten_lesen" titel="Kalender"><Kalender /></MitRecht> },
-      { path: "infusionsplaene", element: <MitRecht recht="akten_lesen" titel="Infusionspläne"><Infusionsplaene /></MitRecht> },
-      { path: "versorger", element: <Versorger /> },
-      { path: "aerzte", element: <Aerzte /> },
-      { path: "datenschutz", element: <MitRecht recht={["datenschutz_bearbeiten", "datenschutz_entscheiden"]}><Datenschutz /></MitRecht> },
-      { path: "scans", element: <MitRecht recht="scans_bearbeiten" titel="Scans"><Scans /></MitRecht> },
-      { path: "konto", element: <Konto /> },
-      { path: "design", element: <Design /> },
-      { path: "hilfe", element: <Hilfe /> },
-      { path: "admin/backup", element: <MitRecht recht="backup_verwalten" titel="Backup"><Backup /></MitRecht> },
-      { path: "admin/benutzer", element: <MitRecht recht="benutzer_verwalten" titel="Benutzer"><Benutzer /></MitRecht> },
-      { path: "admin/vorlagen", element: <MitRecht recht="vorlagen_pflegen" titel="Vorlagen"><Vorlagen /></MitRecht> },
-      { path: "admin/vorlagen/dokumente", element: <MitRecht recht="vorlagen_pflegen" titel="Dokumentvorlagen"><Vorlagen /></MitRecht> },
-      { path: "admin/audit-log", element: <MitRecht recht="audit_lesen" titel="Audit-Log"><AuditLog /></MitRecht> },
-      { path: "admin/system", element: <MitRecht recht="system_verwalten" titel="System"><System /></MitRecht> },
-      { path: "admin/import", element: <MitRecht recht="altdaten_importieren" titel="Import"><Import /></MitRecht> },
+      { path: "kalender", ...seite(() => import("./seiten/Kalender").then(({ Kalender }) => <MitRecht recht="akten_lesen" titel="Kalender"><Kalender /></MitRecht>)) },
+      { path: "infusionsplaene", ...seite(() => import("./seiten/Infusionsplaene").then(({ Infusionsplaene }) => <MitRecht recht="akten_lesen" titel="Infusionspläne"><Infusionsplaene /></MitRecht>)) },
+      { path: "versorger", ...seite(() => import("./seiten/Versorger").then(({ Versorger }) => <Versorger />)) },
+      { path: "aerzte", ...seite(() => import("./seiten/Aerzte").then(({ Aerzte }) => <Aerzte />)) },
+      { path: "datenschutz", ...seite(() => import("./seiten/Datenschutz").then(({ Datenschutz }) => <MitRecht recht={["datenschutz_bearbeiten", "datenschutz_entscheiden"]}><Datenschutz /></MitRecht>)) },
+      { path: "scans", ...seite(() => import("./seiten/scans/Scans").then(({ Scans }) => <MitRecht recht="scans_bearbeiten" titel="Scans"><Scans /></MitRecht>)) },
+      { path: "konto", ...seite(() => import("./seiten/Konto").then(({ Konto }) => <Konto />)) },
+      { path: "design", ...seite(() => import("./seiten/Konto").then(({ Design }) => <Design />)) },
+      { path: "hilfe", ...seite(() => import("./seiten/Hilfe").then(({ Hilfe }) => <Hilfe />)) },
+      { path: "admin/backup", ...seite(() => import("./seiten/admin/Backup").then(({ Backup }) => <MitRecht recht="backup_verwalten" titel="Backup"><Backup /></MitRecht>)) },
+      { path: "admin/benutzer", ...seite(() => import("./seiten/admin/Benutzer").then(({ Benutzer }) => <MitRecht recht="benutzer_verwalten" titel="Benutzer"><Benutzer /></MitRecht>)) },
+      { path: "admin/vorlagen", ...seite(() => import("./seiten/admin/Vorlagen").then(({ Vorlagen }) => <MitRecht recht="vorlagen_pflegen" titel="Vorlagen"><Vorlagen /></MitRecht>)) },
+      { path: "admin/vorlagen/dokumente", ...seite(() => import("./seiten/admin/Vorlagen").then(({ Vorlagen }) => <MitRecht recht="vorlagen_pflegen" titel="Dokumentvorlagen"><Vorlagen /></MitRecht>)) },
+      { path: "admin/audit-log", ...seite(() => import("./seiten/admin/AuditLog").then(({ AuditLog }) => <MitRecht recht="audit_lesen" titel="Audit-Log"><AuditLog /></MitRecht>)) },
+      { path: "admin/system", ...seite(() => import("./seiten/admin/System").then(({ System }) => <MitRecht recht="system_verwalten" titel="System"><System /></MitRecht>)) },
+      { path: "admin/import", ...seite(() => import("./seiten/admin/import/Import").then(({ Import }) => <MitRecht recht="altdaten_importieren" titel="Import"><Import /></MitRecht>)) },
       { path: "*", element: <NichtGefunden /> },
     ],
   },

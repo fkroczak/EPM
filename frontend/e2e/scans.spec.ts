@@ -134,8 +134,12 @@ test("Scan verlängern, Seite anpassen und löschen; Einstellungen unter Vorlage
   // Seite anpassen: Schwarz-Weiß → neu aufbereitet und erkannt
   await detail.getByTestId("seite-bearbeiten").click();
   const dialog = page.getByRole("dialog");
+  // Vorschau zeigt die aufbereitete Seite; die Ecken liegen auf der zweiten Ansicht
+  await expect(dialog.getByTestId("seite-vorschau").getByRole("img")).toBeVisible();
+  await dialog.getByRole("button", { name: "Ecken setzen" }).click();
   await expect(dialog.getByTestId("ecke-0")).toBeVisible();
   await dialog.getByRole("button", { name: "Schwarz-Weiß" }).click();
+  await expect(dialog.getByTestId("seite-vorschau").getByRole("img")).toBeVisible();
   await dialog.getByTestId("seite-uebernehmen").click();
   await expect(detail.getByTestId("scan-status")).toHaveText(/wartet|wird erkannt|erkannt/);
   await expect(detail.getByTestId("scan-status")).toHaveText("erkannt", { timeout: 180_000 });

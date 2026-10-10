@@ -48,7 +48,7 @@ function PlanAnsicht({ plan }: { plan: Plan }) {
   const daten = datei.data?.daten;
   const kennung = `plan-ansicht-${plan.id}-${datei.dataUpdatedAt}`;
   return (
-    <div className="flex flex-col gap-2 w-full max-w-[340px]" data-testid="plan-ansicht">
+    <div className="flex flex-col gap-2 w-full max-w-[21.25rem]" data-testid="plan-ansicht">
       {pruefung === "abweichend" ? <Meldung art="fehler">Die gespeicherte PDF weicht von der Prüfsumme ab und wurde nach der Freigabe verändert. Bitte die Administration informieren.</Meldung> : null}
       <Fehleranzeige fehler={datei.error} />
       {datei.isLoading ? <Laden text="PDF wird geladen …" /> : daten ? (
@@ -352,7 +352,7 @@ export function Plaene() {
   const entwurfDa = liste.some((p) => p.status === "entwurf");
 
   return (
-    <div className="stapel grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] fhd:grid-cols-[360px_minmax(0,1fr)] gap-6 items-start">
+    <div className="stapel grid grid-cols-1 xl:grid-cols-[18.75rem_minmax(0,1fr)] fhd:grid-cols-[22.5rem_minmax(0,1fr)] gap-6 items-start">
       {/* unter 1280 px (Telefon) steht der gewählte Plan vor der Liste: Freigeben ohne Scrollen (Festlegung 08.10.2026) */}
       <div className="flex flex-col gap-3 order-2 xl:order-none">
         <div className="flex items-center justify-between">

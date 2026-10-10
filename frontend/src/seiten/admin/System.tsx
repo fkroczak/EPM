@@ -138,7 +138,7 @@ function Kennzahl({ titel, wert, unter, prozent, testid }: { titel: string; wert
 
 function Zeile({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[minmax(130px,42%)_1fr] gap-3 py-1 text-sm border-b border-rand last:border-b-0">
+    <div className="grid grid-cols-[minmax(8.125rem,42%)_1fr] gap-3 py-1 text-sm border-b border-rand last:border-b-0">
       <dt className="gedaempft">{label}</dt>
       <dd className="m-0 min-w-0 break-words">{children}</dd>
     </div>
@@ -271,7 +271,7 @@ function VerlaufDiagramm({ verlauf }: { verlauf: Verlauf }) {
         ) : null}
         {p ? (
           <div className="card absolute top-1 px-2.5 py-1.5 text-xs pointer-events-none flex flex-col gap-0.5"
-            style={{ left: `min(calc(${((x(p[0]!) / B) * 100).toFixed(1)}% + 10px), calc(100% - 190px))` }}>
+            style={{ left: `min(calc(${((x(p[0]!) / B) * 100).toFixed(1)}% + 0.625rem), calc(100% - 11.875rem))` }}>
             <span className="font-medium">{zeitpunkt(new Date(p[0]! * 1000))}</span>
             <span>CPU {wert(p, iCpu)} · RAM {wert(p, iRam)}</span>
             {mitSpitzen ? <span>Spitze: CPU {wert(p, iCpuMax)} · RAM {wert(p, iRamMax)}</span> : null}
@@ -419,7 +419,7 @@ function Taetigkeiten({ daten, offen, onWahl }: { daten: Uebersicht; offen: Set<
   return (
     <Karte className="px-5 py-4 flex flex-col gap-4" data-testid="taetigkeiten">
       <KartenKopf titel="Tätigkeiten" unter="Jede Tätigkeit steht mit Person und Zeitpunkt im Audit-Log." />
-      <div className="stapel grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-6">
+      <div className="stapel grid grid-cols-[repeat(auto-fit,minmax(min(100%,21.25rem),1fr))] gap-6">
         <div className="flex flex-col gap-1">
           <h3 className="m-0 text-sm font-semibold flex items-center gap-2"><Icon name="server" />Server (Ubuntu-VM)</h3>
           <span className="text-xs gedaempft mb-1">ausgeführt vom Systemagenten auf dem Server – nur diese festen Tätigkeiten</span>
@@ -655,7 +655,7 @@ function HinweisKarte({ hinweis }: { hinweis: Hinweis | null }) {
           <Knopf klein laedt={beenden.isPending} onClick={() => beenden.mutate()}>Beenden</Knopf>
         </div>
       ) : <span className="text-sm gedaempft">Gerade ist kein Hinweis aktiv.</span>}
-      <form className="flex flex-wrap gap-2.5 items-end [&>.feld]:grow [&>.feld:first-child]:basis-[260px]" onSubmit={(e) => { e.preventDefault(); setzen.mutate(); }}>
+      <form className="flex flex-wrap gap-2.5 items-end [&>.feld]:grow [&>.feld:first-child]:basis-[16.25rem]" onSubmit={(e) => { e.preventDefault(); setzen.mutate(); }}>
         <Feld label="Neuer Hinweis" fehler={f.text}>
           {(p) => <Eingabe {...p} maxLength={500} value={text} onChange={(e) => setText(e.target.value)} placeholder="z. B. Heute ab 18 Uhr Wartung" />}
         </Feld>
@@ -733,7 +733,7 @@ function Auftraege({ liste }: { liste: Auftrag[] }) {
                     {a.parameter.minuten ? <span className="text-xs gedaempft"> · Beginn nach {a.parameter.minuten} Min.</span> : null}</td>
                   <td className="td text-[0.8125rem]">{a.angefordert_von_name ?? "—"}</td>
                   <td className="td"><AuftragStatus a={a} /><AuftragFortschritt a={a} liste={liste} className="mt-1.5" /></td>
-                  <td className="td text-[0.8125rem] max-w-[420px]">{a.ergebnis || (a.status === "wartet" ? "wartet, bis der Server den Auftrag abholt" : "—")}</td>
+                  <td className="td text-[0.8125rem] max-w-[26.25rem]">{a.ergebnis || (a.status === "wartet" ? "wartet, bis der Server den Auftrag abholt" : "—")}</td>
                   <td className="td text-right whitespace-nowrap">
                     {a.status === "wartet" ? <Knopf klein laedt={zurueck.isPending} onClick={() => zurueck.mutate(a)}>Zurückziehen</Knopf> : null}
                     {a.ausgabe ? <Knopf klein variante="geist" onClick={() => setAuf(auf === a.id ? null : a.id)} aria-expanded={auf === a.id}>
@@ -743,7 +743,7 @@ function Auftraege({ liste }: { liste: Auftrag[] }) {
                 {auf === a.id ? (
                   <tr>
                     <td colSpan={6} className="td">
-                      <pre className="m-0 max-h-[360px] overflow-auto text-[0.75rem] leading-snug bg-grund rounded-lg p-3 whitespace-pre-wrap" data-testid="auftrag-ausgabe">{a.ausgabe}</pre>
+                      <pre className="m-0 max-h-[22.5rem] overflow-auto text-[0.75rem] leading-snug bg-grund rounded-lg p-3 whitespace-pre-wrap" data-testid="auftrag-ausgabe">{a.ausgabe}</pre>
                     </td>
                   </tr>
                 ) : null}

@@ -143,7 +143,7 @@ function ErklaerungenKarte({ daten, patient, darf }: { daten: AktenDatenschutz; 
   const [erfassen, setErfassen] = useState<ErklaerungsArt | null>(null);
   const [widerruf, setWiderruf] = useState<Erklaerung | null>(null);
   return (
-    <Karte className="px-5 py-[18px] flex flex-col gap-3 min-w-0" data-testid="erklaerungen">
+    <Karte className="px-5 py-[1.125rem] flex flex-col gap-3 min-w-0" data-testid="erklaerungen">
       <div className="flex flex-col gap-1">
         <h2 className="lbl m-0 text-[0.9375rem]">Erklärungen</h2>
         <span className="text-[0.8125rem] gedaempft">Vordruck als PDF ausdrucken, unterschreiben lassen und hier erfassen – auf Wunsch mit Scan.</span>
@@ -323,7 +323,7 @@ function AnfragenKarte({ daten, patient, darf, entscheiden }: { daten: AktenDate
   const [verlaengern, setVerlaengern] = useState<Datenschutzanfrage | null>(null);
   const [erledigen, setErledigen] = useState<Datenschutzanfrage | null>(null);
   return (
-    <Karte className="px-5 py-[18px] flex flex-col gap-3 min-w-0" data-testid="anfragen">
+    <Karte className="px-5 py-[1.125rem] flex flex-col gap-3 min-w-0" data-testid="anfragen">
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h2 className="lbl m-0 text-[0.9375rem]">Anfragen der betroffenen Person</h2>
@@ -465,7 +465,7 @@ function AkteLoeschenDialog({ patient, offen, onOffen }: { patient: Patient; off
               className="select-none font-mono text-[1.375rem] font-semibold tracking-[0.3em] px-3 py-1 rounded-md bg-fein border border-rand">
               {vorbereiten.data?.code ?? "······"}</span>
           </div>
-          <Feld label="Code abtippen" fehler={f.bestaetigung} className="flex-1 min-w-[160px]">
+          <Feld label="Code abtippen" fehler={f.bestaetigung} className="flex-1 min-w-[10rem]">
             {(p) => <Eingabe {...p} autoComplete="off" className="font-mono uppercase tracking-[0.2em]" value={bestaetigung} onChange={(e) => setBestaetigung(e.target.value)} />}
           </Feld>
         </div>
@@ -506,7 +506,7 @@ function AufbewahrungKarte({ daten, patient, darf, entscheiden, loeschenErlaubt 
   const fv = felder(verlaengern.error);
   const fa = felder(aufheben.error);
   return (
-    <Karte className="px-5 py-[18px] flex flex-col gap-4 min-w-0" data-testid="aufbewahrung">
+    <Karte className="px-5 py-[1.125rem] flex flex-col gap-4 min-w-0" data-testid="aufbewahrung">
       <div className="flex flex-col gap-2">
         <h2 className="lbl m-0 text-[0.9375rem]">Aufbewahrung</h2>
         {patient.ist_abgeschlossen && a.bis ? (

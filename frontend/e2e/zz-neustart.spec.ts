@@ -84,10 +84,8 @@ test("Nach dem Neustart: Akten mit Gewicht, Diagnose und Versionen, Kontakten, T
   const kontakte = gemerkt("kontakte").id;
   await page.goto(`/patienten/${kontakte}/kontakte`);
   const liste = page.getByTestId("kontaktliste");
-  await liste.getByRole("listitem").filter({ hasText: "Lieferung" }).click();
-  await expect(page.getByTestId("kontakt-detail")).toContainText("Grund: falscher Patient");
-  await liste.getByRole("listitem").filter({ hasText: "Appetit schlechter" }).click();
-  await expect(page.getByTestId("kontakt-detail")).toContainText("Rückruf");
+  await expect(liste.getByRole("listitem").filter({ hasText: "Lieferung" })).toContainText("Grund: falscher Patient");
+  await expect(liste.getByRole("listitem").filter({ hasText: "Appetit schlechter" })).toContainText("Rückruf");
   await page.goto(`/patienten/${kontakte}`);
   await expect(page.getByTestId("aktentermine")).toContainText("Rückruf Trinkmenge");
 

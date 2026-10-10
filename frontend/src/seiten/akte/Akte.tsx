@@ -23,6 +23,7 @@ import { useAktenAblage } from "@/components/AktenAblage";
 import type { Aktenansicht } from "@/lib/darstellung";
 import { useMobil } from "@/lib/stufen";
 import { Kopfgriff, Leistengriff, useDarstellung } from "./ansicht";
+import { SchreibenAusAkte } from "./Schreiben";
 
 export type AktenKontext = {
   patient: Patient;
@@ -60,7 +61,7 @@ function richtung(p: number) {
 /** Eine Kennzahl im Aktenkopf: feste Spalte, eine Zeile (zu Langes wird gekürzt, ganz im Tooltip) – der Kopf springt nicht */
 function Kennzahl({ titel, children, hinweis }: { titel: string; children: ReactNode; hinweis?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 min-w-0 px-3 sm:px-[18px] border-l border-rand" title={hinweis}>
+    <div className="flex flex-col gap-0.5 min-w-0 px-3 sm:px-[1.125rem] border-l border-rand" title={hinweis}>
       <span className="lbl text-[0.78rem] gedaempft font-medium">{titel}</span>
       <span className="text-sm truncate">{children}</span>
     </div>
@@ -294,7 +295,7 @@ function EinsichtAnsicht({ info }: { info: Eingeschraenkt }) {
   const f: Feldfehler = einsicht.error instanceof ApiFehler ? einsicht.error.felder : {};
   return (
     <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: `Akte Nr. ${nummer(info.nummer)}` }]}>
-      <Karte className="px-[22px] py-[18px] flex flex-col gap-3 max-w-[720px]" data-testid="akte-eingeschraenkt">
+      <Karte className="px-[1.375rem] py-[1.125rem] flex flex-col gap-3 max-w-[45rem]" data-testid="akte-eingeschraenkt">
         <div className="flex items-center gap-2.5 flex-wrap">
           <h1 className="m-0 text-[1.625rem] font-semibold">Akte Nr. {nummer(info.nummer)}</h1>
           <Chip art="warn"><Icon name="schloss" />Verarbeitung eingeschränkt</Chip>
@@ -326,13 +327,14 @@ function Reiter({ zu, text, zahl: anzahl, ende, senkrecht, kuerzel }: ReiterEint
     return (
       <NavLink to={zu} end={ende} title={kuerzel} className={({ isActive }) => cx("vreiter no-underline", isActive && "aktiv")}>
         <span className="truncate">{text}</span>
-        {anzahl !== undefined ? <span className="num opacity-70 vreiter-zahl">{zahl(anzahl)}</span> : null}
+        {anzahl ? <span className="num opacity-70 vreiter-zahl">{zahl(anzahl)}</span> : null}
       </NavLink>
     );
   }
   return (
     <NavLink to={zu} end={ende} title={kuerzel} className={({ isActive }) => cx("segment no-underline", isActive && "aktiv")}>
-      {text}{anzahl !== undefined ? <span className="num ml-1.5 opacity-70">{zahl(anzahl)}</span> : null}
+      {/* Zähler nur, wo etwas da ist – „0“ an jedem leeren Reiter war Lärm (Wunsch 10.10.2026) */}
+      {text}{anzahl ? <span className="num ml-1.5 opacity-70">{zahl(anzahl)}</span> : null}
     </NavLink>
   );
 }
@@ -347,8 +349,70 @@ const VERSICHERUNG_KURZ: Record<string, string> = { gkv: "GKV", pkv: "PKV", selb
 function Angabezeile({ a }: { a: Angabe }) {
   return (
     <div className="grid grid-cols-[7.75rem_minmax(0,1fr)] gap-x-3 items-baseline min-w-0" title={a.hinweis}>
-      <span className="text-[0.8125rem] gedaempft truncate">{a.titel}</span>
-      <span className="text-sm truncate min-w-0">{a.inhalt}</span>
+      <span className="text-[0.8125rem] gedaempft md:truncate">{a.titel}</span>
+      <span className="text-sm min-w-0 md:truncate max-md:[overflow-wrap:anywhere]">{a.inhalt}</span>
+    </div>
+  );
+}
+
+/** „heute“, „gestern“, „vor 12 Tagen“ – wie lange der letzte Kontakt her ist */
+function vorTagen(tag: string): string {
+  const tage = Math.round((new Date(heuteIso()).getTime() - new Date(tag.slice(0, 10)).getTime()) / 86400000);
+  return tage <= 0 ? "heute" : tage === 1 ? "gestern" : `vor ${zahl(tage)} Tagen`;
+}
+
+/** Große Kennzahl im Kopf (Stufe „voll“): Bezeichnung, Wert, eine Zeile darunter */
+function Kopfzahl({ titel, wert, unter, hinweis }: { titel: string; wert: ReactNode; unter?: ReactNode; hinweis?: string }) {
+  return (
+    <div className="flex flex-col gap-0.5 min-w-0" title={hinweis}>
+      <span className="text-[0.75rem] gedaempft">{titel}</span>
+      <span className="text-[1.125rem] font-semibold leading-snug min-w-0 md:truncate">{wert}</span>
+      {unter ? <span className="text-[0.75rem] gedaempft min-w-0 md:truncate">{unter}</span> : null}
+    </div>
+  );
+}
+
+/** Kleine Angabe in der zweiten Zeile des Kopfs: „Titel Wert“, gekürzt, ganz im Tooltip */
+function Kopfangabe({ a }: { a: Angabe }) {
+  return (
+    <div className="inline-flex items-baseline gap-1.5 min-w-0 max-w-full md:max-w-[22rem]" title={a.hinweis}>
+      <span className="gedaempft shrink-0">{a.titel}</span>
+      <span className="min-w-0 md:truncate max-md:[overflow-wrap:anywhere]">{a.inhalt}</span>
+    </div>
+  );
+}
+
+/**
+ * Kopf der Akte, Stufe „voll“ (Wunsch 10.10.2026: „überfüllte Übersicht, zu viele Infos“): vorn vier große Werte –
+ * Gewicht, Infusionsplan, nächster Termin, letzter Kontakt –, darunter eine schmale Zeile mit Versorgung und
+ * Hinweisen. Telefon und Versicherung stehen in der Karte „Anschrift und Kontakt“ der Übersicht.
+ */
+function KopfVoll({ angabe, unter, bearbeiten }: { angabe: Record<string, Angabe>; unter: Record<string, ReactNode>;
+  bearbeiten?: () => void }) {
+  return (
+    <div className="border-t border-rand pt-3.5 flex flex-col gap-3" data-testid="kennzahlen">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+        <div role="group" aria-label="Ernährung" className="grid grid-cols-2 gap-x-6 min-w-0">
+          <Kopfzahl titel="Gewicht" wert={angabe.gewicht.inhalt} unter={unter.gewicht} hinweis={angabe.gewicht.hinweis} />
+          <Kopfzahl titel="Infusionsplan" wert={angabe.plan.inhalt} unter={unter.plan} hinweis={angabe.plan.hinweis} />
+        </div>
+        <div role="group" aria-label="Termine und Kontakt" className="grid grid-cols-2 gap-x-6 min-w-0 md:border-l md:border-rand md:pl-6">
+          <Kopfzahl titel="Nächster Termin" wert={unter.terminWann ?? "—"} unter={unter.terminWo} hinweis={angabe.termin.hinweis} />
+          <Kopfzahl titel="Letzter Kontakt" wert={angabe.kontakt.inhalt} unter={unter.kontakt} />
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-1.5 border-t border-fein pt-2.5 pb-1 text-[0.8125rem]">
+        <div role="group" aria-label="Versorgung" className="flex flex-wrap items-center gap-x-5 gap-y-1 min-w-0">
+          <span className="sr-only">Versorgung:</span>
+          {[angabe.versorger, angabe.ansprechpartner, angabe.hausarzt, angabe.katheter].map((a) => <Kopfangabe key={a.titel} a={a} />)}
+          {bearbeiten ? <button type="button" className="btn geist icon !h-6 !w-6 nicht-drucken" aria-label="Versorgung bearbeiten"
+            title="Stammdaten bearbeiten" onClick={bearbeiten}><Icon name="stift" groesse={13} /></button> : null}
+        </div>
+        <div role="group" aria-label="Hinweise und Auskunft" className="flex flex-wrap items-center gap-x-5 gap-y-1 min-w-0">
+          <span className="sr-only">Hinweise und Auskunft:</span>
+          {[angabe.nickel, angabe.auskunft].map((a) => <Kopfangabe key={a.titel} a={a} />)}
+        </div>
+      </div>
     </div>
   );
 }
@@ -382,7 +446,7 @@ export function Akte() {
   const pid = Number(id);
   const { darf, darfBei } = useAuth();
   const navigate = useNavigate();
-  const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "kontakt" | "gewicht" | "pdf" | "sprechstunde">("");
+  const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "kontakt" | "gewicht" | "pdf" | "sprechstunde" | "schreiben">("");
   // Vorbelegung aus der Kürzelzeile (Karteikarte: „K Text“, „G 54,6“)
   const [vorbelegt, setVorbelegt] = useState("");
   const [aenderTermin, setAenderTermin] = useState<Termin | null>(null);
@@ -413,8 +477,17 @@ export function Akte() {
   useEffect(() => {
     const leiste = reiterLeiste.current;
     const aktiv = leiste?.querySelector<HTMLElement>(".segment.aktiv");
-    if (!leiste || !aktiv || leiste.scrollWidth <= leiste.clientWidth) return;
-    leiste.scrollLeft = aktiv.offsetLeft - (leiste.clientWidth - aktiv.offsetWidth) / 2;
+    if (!leiste) return;
+    if (aktiv && leiste.scrollWidth > leiste.clientWidth) leiste.scrollLeft = aktiv.offsetLeft - (leiste.clientWidth - aktiv.offsetWidth) / 2;
+    // am Telefon blendet der Rand aus, wo noch Reiter kommen (index.css, nav.segmente)
+    const raender = () => {
+      leiste.classList.toggle("am-anfang", leiste.scrollLeft <= 1);
+      leiste.classList.toggle("am-ende", leiste.scrollLeft + leiste.clientWidth >= leiste.scrollWidth - 1);
+    };
+    raender();
+    leiste.addEventListener("scroll", raender, { passive: true });
+    window.addEventListener("resize", raender);
+    return () => { leiste.removeEventListener("scroll", raender); window.removeEventListener("resize", raender); };
   }, [pathname, akte.data?.id]);
   // Karteikarte: Eine frisch geöffnete Akte beginnt mit der Karteikarte; „Übersicht“ bleibt als Reiter erreichbar
   const umgeleitet = useRef<number | null>(null);
@@ -443,6 +516,8 @@ export function Akte() {
     oeffnen: !!p && p.ist_abgeschlossen && darf("akten_wieder_oeffnen"),
     termin: offenBei("eintraege_erfassen"),
     kontakt: offenBei("eintraege_erfassen"),
+    // Schreiben mit E-Mail (F172): Patientenaufnahme, Terminbestätigung, Reisebescheinigung
+    schreiben: offenBei("eintraege_erfassen"),
     gewicht: offenBei("eintraege_erfassen"),
   };
   useOhneRechtSchliessen(erlaubt[dialog], () => setDialog(""));
@@ -545,6 +620,7 @@ export function Akte() {
         { text: "Akte als PDF", onClick: () => setDialog("pdf") },
         // Unterlagen für die Sprechstunde (F116): der aktuellste Stand aller Bereiche auf einem Blatt
         { text: "Unterlagen für die Sprechstunde", onClick: () => setDialog("sprechstunde") },
+        ...(erlaubt.schreiben ? [{ text: "Schreiben und E-Mail …", onClick: () => setDialog("schreiben") }] : []),
         ...(erlaubt.abschluss ? [{ text: "Akte abschließen", onClick: () => setDialog("abschluss"), gefaehrlich: true }] : []),
         ...(erlaubt.oeffnen ? [{ text: "Akte wieder öffnen", onClick: () => setDialog("oeffnen") }] : []),
       ]} />
@@ -703,6 +779,7 @@ export function Akte() {
       <PdfDialog offen={dialog === "sprechstunde"} onOffen={(o) => setDialog(o ? "sprechstunde" : "")}
         titel={`Unterlagen für die Sprechstunde · ${name(p)}`}
         pfad={`patienten/${p.id}/sprechstunde/`} dateiname={`Sprechstunde-${p.nummer}.pdf`} />
+      {erlaubt.schreiben ? <SchreibenAusAkte patient={p} offen={dialog === "schreiben"} onOffen={(o) => setDialog(o ? "schreiben" : "")} /> : null}
       {kontext.erfassen ? <TerminDialog offen={dialog === "termin"} onOffen={(o) => setDialog(o ? "termin" : "")} patientId={p.id} patientName={name(p)} /> : null}
       {kontext.erfassen ? <KontaktDialog offen={dialog === "kontakt"} onOffen={(o) => setDialog(o ? "kontakt" : "")}
         vorgabe={{ id: p.id, name: name(p), ist_test: p.ist_test }} text={vorbelegt} /> : null}
@@ -717,7 +794,7 @@ export function Akte() {
           {([["K", "Kontakt erfassen"], ["G", "Gewicht erfassen"], ["T", "Neuer Termin"], ["P", "Neuer Plan bzw. Entwurf fortsetzen"],
             ["Alt+1 … Alt+9", "Reiter der Akte wechseln"], ["Strg Enter", "im Dialog speichern"], ["Esc", "Dialog schließen"],
             ["Strg K", "Patientensuche"], ["?", "diese Übersicht"]] as const).map(([t, w]) => (
-            <Fragment key={t}><dt><kbd className="num font-medium border border-rand rounded-[5px] px-1.5 py-0.5 text-[0.8125rem]">{t}</kbd></dt><dd className="m-0">{w}</dd></Fragment>
+            <Fragment key={t}><dt><kbd className="num font-medium border border-rand rounded-[0.3125rem] px-1.5 py-0.5 text-[0.8125rem]">{t}</kbd></dt><dd className="m-0">{w}</dd></Fragment>
           ))}
         </dl>
       </Dialog>
@@ -771,7 +848,7 @@ export function Akte() {
     const kurz = [angabe.gewicht, angabe.bmi, angabe.plan, angabe.termin];
     return (
       <Seite pfad={pfad}>
-        <Karte className="px-4 sm:px-[18px] py-3 flex items-center gap-x-5 gap-y-2 flex-wrap" data-testid="aktenkopf">
+        <Karte className="px-4 sm:px-[1.125rem] py-3 flex items-center gap-x-5 gap-y-2 flex-wrap" data-testid="aktenkopf">
           <div className="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0">
             {titel(true)}
             {meta}
@@ -804,7 +881,7 @@ export function Akte() {
   const stufe = darstellung.aktenkopf;
   return (
     <Seite pfad={pfad}>
-      <Karte className={cx("px-4 sm:px-[22px] pt-4 sm:pt-[18px] flex flex-col gap-4", mobil ? "pb-4" : "pb-0")}
+      <Karte className={cx("px-4 sm:px-[1.375rem] pt-4 sm:pt-[1.125rem] flex flex-col gap-4", mobil ? "pb-4" : "pb-0")}
         data-testid="aktenkopf" data-stufe={stufe}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex flex-col gap-1 min-w-0">
@@ -814,10 +891,16 @@ export function Akte() {
           {aktionen(false)}
         </div>
         {k && stufe === "voll" && angabe ? (
-          <div className="border-t border-rand pt-3.5" data-testid="kennzahlen"><Gruppen gruppen={gruppen} art="kopf" /></div>
+          <KopfVoll angabe={angabe} bearbeiten={kontext.bearbeiten ? () => setDialog("stammdaten") : undefined} unter={{
+            gewicht: [k.bmi != null ? `BMI ${zahl(k.bmi, 1)}` : "", k.gewicht ? `gemessen ${datum(k.gewicht.am)}` : ""].filter(Boolean).join(" · ") || undefined,
+            plan: k.aktueller_plan ? `gültig ab ${datum(k.aktueller_plan.gueltig_ab)}` : undefined,
+            terminWann: k.naechster_termin ? terminZeit(k.naechster_termin.faellig_am, k.naechster_termin.uhrzeit) : undefined,
+            terminWo: k.naechster_termin ? k.naechster_termin.ort ?? TERMINARTEN[k.naechster_termin.art] : undefined,
+            kontakt: k.letzter_kontakt ? vorTagen(k.letzter_kontakt) : undefined,
+          }} />
         ) : null}
         {k && stufe === "kompakt" && angabe ? (
-          <div className="overflow-hidden -mx-3 sm:-mx-[18px]">
+          <div className="overflow-hidden -mx-3 sm:-mx-[1.125rem]">
             {/* eine Zeile mit den wichtigsten Angaben */}
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-y-3 -ml-px" data-testid="kennzahlen">
               {[angabe.gewicht, angabe.plan, angabe.termin, angabe.versorger, angabe.nickel].map((a) => (

@@ -48,6 +48,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 
 | Nr. | Funktion | Ansicht (Entwurf) | Status |
 |---|---|---|---|
+| 09.10.2026 | Eigene Vorlagen | „+ Neue Vorlage“ unter Vorlagen › Dokumentvorlagen: eigene Schreiben mit E-Mail anlegen, bearbeiten, deaktivieren; in der Akte wählbar (F176). Lauf steht aus |
 | F01 | Sitzungsstatus und CSRF-Token | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F02 | Anmeldung mit Benutzername und Kennwort | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F03 | Zweiter Faktor bei der Anmeldung | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
@@ -3158,6 +3159,80 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   mit der echten Erkennung; im Browser lokal durchgespielt.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+## U · Schreiben mit E-Mail (Vorlagen von Alice Hessel, 09.10.2026)
+
+Alice hat ihre Vorlagen geschickt (Patientenaufnahme, Reisebescheinigung mit ADAC-Attest, Patientenankündigung,
+Fallzusammenfassungen von Prof. Masin, Merkblätter) und eine Terminbestätigung gewünscht. Wunsch von Filip: PDFs mit
+dem Namen nach Bedarf erstellen und vorgefertigte E-Mail-Texte **mit Anhang** zum Versand vorbereiten.
+Übersicht und Rückfragen: `docs/VORLAGEN-ALICE-2026-10-09.md`.
+
+### F172 Schreiben aus der Akte: PDF und fertige E-Mail
+- **Akte › ⋯ › „Schreiben und E-Mail …“** (Recht „Kontakte, Gewichte, Termine, Dokumente erfassen“, offene Akten):
+  Patientenaufnahme (benötigte Unterlagen), Terminbestätigung Sprechstunde (Termin wählen; Praxis Dr. Holtmeier,
+  Gesundheitskarte mitbringen, keine Überweisung nötig), Reisebescheinigung (Briefkopf Dr. Holtmeier, deutsch/englisch,
+  Wörter nach Geschlecht: „der Patientin/des Patienten“, „Mrs./Mr.“, „her/his“).
+- **Reisebescheinigung + ADAC-Attest:** Das ärztliche Attest des ADAC hängt als zweite Seite an
+  (`vorlagen/statisch/adac-attest.pdf`); Name mit Geburtsdatum, Ort „Münster“, Datum und auf Wunsch die Reisedauer in
+  Tagen sind eingetragen, die übrigen Felder (Medikamente, Unterschrift) bleiben ausfüllbar (pypdf).
+- **E-Mail:** Neuer Baustein „E-Mail“ in den Dokumentvorlagen (Betreff und Text mit Datenfeldern, nicht auf der PDF,
+  höchstens einmal, nur bei den Schreiben). Im Dialog sind Empfänger (E-Mail der Akte), Betreff und Text änderbar.
+  „E-Mail vorbereiten“ lädt eine **.eml** mit Text, PDF und gewählten Anlagen; `X-Unsent: 1` → Outlook öffnet sie als
+  Entwurf zum Absenden (ein `mailto:`-Link kann keine Anhänge mitgeben). Außerdem „PDF ansehen/herunterladen“,
+  „Text kopieren“ und „in der Akte ablegen“ (Dokumenttyp „Schreiben“, Migration `stammdaten/0017`).
+- **Neue Datenfelder:** `Patient.Vorname_Name`, `Patient.Briefanrede` („Sehr geehrte Frau …“), `Patient.der_Patientin`,
+  `Patient.die_Patientin`, `Patient.ihre`, `Patient.ihrer`, `Patient.Mrs`, `Patient.her`, `Benutzer.Name`,
+  `Termin.Datum` (mit Wochentag), `Termin.Uhrzeit`, `Termin.Ort`, `Termin.bei`, `Termin.Titel`.
+- **Endpunkt:** `POST /api/patienten/{id}/schreiben/` `{"art", "ausgabe": "pdf"|"email"|"eml", "termin"?, "tage"?,
+  "attest"?, "ablegen"?, "anlagen"?, "betreff"?, "text"?, "an"?}`; Audit-Log „Export“ mit Art und Ausgabe.
+  Vorschau im Editor: `POST /api/vorlagen/{art}/vorschau/` mit `"ausgabe": "email"` liefert Betreff und Text.
+- **Nebenbei behoben:** Eine Vorlage mit „Zwei Spalten“, aber ohne Fußzeile, druckte die rechte Spalte unten rechts
+  auf jede Seite (Variablenname in `pdf.bloecke_html`).
+- **Teststatus:** `vorlagen/test_schreiben.py` (PDF, E-Mail-Text, .eml mit Anhängen, Ablage, Rechte, fremder
+  Termin, Attest-Felder, Geschlecht); im Browser lokal durchgespielt.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F173 Patientenankündigung aus dem Kalender
+- **Kalender › „Ankündigung“:** Zeitraum (Vorgabe: Woche des gewählten Tages) und Terminort der Sprechstunde wählen →
+  alle Praxistermine im Zeitraum nach Tag und Uhrzeit, ohne Testpatienten und ausgeblendete Termine. Termine an
+  einem anderen Ort stehen mit diesem Ort als Hinweis (bei „Telefon“/„Video“ mit der Telefonnummer der Akte), dazu
+  der Freitext „bei/Ort“ des Termins (z. B. „1 h, Neuaufnahme“, „+ Labor“). PDF zum Faxen oder E-Mail wie F172.
+- **Vorlage** „Patientenankündigung Sprechstunde“ mit Tabelle „Termine im Zeitraum“ und dem Datenfeld
+  `Termine.Liste` (Text für die E-Mail), `Zeitraum`, `Zeitraum.von/bis`, `Terminort`, `Anzahl`.
+- **Endpunkt:** `POST /api/kalender/ankuendigung/` `{"von", "bis", "ort"?, "ausgabe", …}` (höchstens zwei Monate).
+- **Teststatus:** `vorlagen/test_schreiben.py` (Reihenfolge, Hinweis, ohne Testpatient und Wiedervorlage, .eml).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F174 Anlagen für E-Mails
+- **Vorlagen › „Anlagen für E-Mails“:** PDFs hochladen (höchstens 20 MB), öffnen, deaktivieren (nie löschen).
+  Mitgeliefert und beim ersten Aufruf angelegt: Leitfaden Kurzdarmsyndrom und Zottentraining, Handlungsempfehlung
+  Aspiration NutriLock/TauroLock, Blutuntersuchung – Schreiben an Hausärzte. Im Dialog der Schreiben ankreuzbar.
+- **Ablage:** `EPM_DOKUMENTE/anlagen/` (mit in der Datensicherung), Modell `vorlagen.Anlage` mit Historie.
+- **Endpunkte:** `GET/POST /api/anlagen/`, `PATCH /api/anlagen/{id}/`, `GET /api/anlagen/{id}/datei/`.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F175 Fallzusammenfassung mit einheitlicher Gliederung
+- Neue Berichtsart „Fallzusammenfassung“ (Migration `stammdaten/0017`). Im Bericht-Dialog „Gliederung einfügen“:
+  12 Abschnitte, zusammengeführt aus den Fallzusammenfassungen von Prof. Masin (Kaufmann, Wilkening, Steiner,
+  Quante): Anlass und Unterlagen · Diagnosen · Anamnese und Verlauf · Symptomatik · Ernährungsstatus/Anthropometrie
+  (GLIM) · Ernährungstherapie · Medikation/Allergien · Labor · Bildgebung · Beurteilung · Empfehlungen · Offene Fragen
+  und Unstimmigkeiten. Hinweise in [eckigen Klammern] werden überschrieben; Freigabe und PDF wie jeder Bericht (F115).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+### F176 Eigene Vorlagen (Schreiben selbst anlegen)
+- **Wunsch Filip 09.10.2026:** „Unter Vorlagen manuell Schreiben hinzufügen – Button für Dokumentvorlage erstellen.“
+- **Vorlagen › Dokumentvorlagen › „+ Neue Vorlage“:** Name, Beschreibung und „beim Erzeugen einen Termin wählen“.
+  Die Vorlage startet als Brief an den Patienten (Briefkopf, Absenderzeile, Anschrift, Titel = Name, Anrede, Text in
+  [eckigen Klammern], Gruß, Fußzeile) mit E-Mail-Baustein und ist sofort als Version 1 aktiv; danach wie jede Vorlage
+  bearbeiten, Vorschau, veröffentlichen. „Name und Einstellungen“ ändert Name, Beschreibung, Termin und aktiv
+  (deaktiviert = in der Akte nicht mehr wählbar; gelöscht wird nichts, Versionen bleiben).
+- **Akte:** Eigene Vorlagen stehen im Dialog „Schreiben und E-Mail“ unter „Eigene Vorlagen“ – PDF, E-Mail (.eml),
+  Ablage wie F172. Datenfelder: Patient, Anrede, Absender, Benutzer und Termin.
+- **Technik:** Modell `vorlagen.EigenesSchreiben` (Kennung `eigen-…`, Historie); die Art einer `Dokumentvorlage` ist
+  dafür keine feste Auswahl mehr (Migration `vorlagen/0005`). Endpunkte: `POST /api/vorlagen/` (anlegen),
+  `PATCH /api/vorlagen/{art}/eigen/`, `GET /api/schreiben/` (wählbare Schreiben der Akte).
+- **Teststatus:** `vorlagen/test_schreiben.py::test_eigenes_schreiben`; im Browser lokal durchgespielt.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## V · Bedienung für Pflegekräfte (10.10.2026)
 
 Auftrag: EPM soll von Pflegekräften ohne nennenswerte IT-Erfahrung intuitiv bedient werden können. Befunde, Umsetzung
@@ -3295,6 +3370,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | Datum | Stand | Änderung |
 |---|---|---|
 | 10.10.2026 | Bedienung für Pflegekräfte | Nachsichtige Datums-/Uhrzeiteingabe, Fehlermeldungen mit Lösungsweg, leere Zustände mit nächstem Schritt, Hilfe „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“, weniger Fachjargon (F178, `docs/BEDIENBARKEIT-2026-10-10.md`). Lauf steht aus |
+| 09.10.2026 | Schreiben mit E-Mail | Vorlagen von Alice: Patientenaufnahme, Terminbestätigung, Reisebescheinigung mit ADAC-Attest als PDF und als fertige E-Mail (.eml mit Anhang) aus der Akte (F172), Patientenankündigung aus dem Kalender (F173), Anlagen für E-Mails (F174), Fallzusammenfassung mit Gliederung (F175). Lauf steht aus |
 | 09.10.2026 | Text erkennen in der Akte | „Text erkennen“ mit OCRmyPDF (PDF/A mit Textebene, Datei ersetzt, Art.-17-Löschung über alle Fassungen) (F170), „Werte übernehmen“ aus Akte-Dokumenten ohne neues Dokument (F171), Sparmodus mit einem Tesseract-Durchgang (F168). Lauf steht aus |
 | 09.10.2026 | Texterkennung auf kleinen Servern, Werte von Hand | Sparmodus (kleines Zeilenmodell, ohne Glätten) und Speichergrenze nach RAM, Absturzschutz mit Lebenszeichen und Sparstufen je Seite (F168); Labor/BIA immer übertragbar, Wert per Klick ins Bild, „+ Wert“, mehr BIA-Bezeichnungen (F169). Lauf steht aus |
 | 09.10.2026 | OCR-Modelle offline | `ocr-modelle.sh vorbereiten/einspielen/status`, `ocr-modelle.ps1`, `epm-update` baut die Modelle ein und meldet den Stand der Texterkennung (U67) |

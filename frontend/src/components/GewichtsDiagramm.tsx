@@ -55,7 +55,7 @@ export function GewichtsDiagramm<T extends Messpunkt>({ werte, zeitraum, geglaet
     .map((w) => ({ t: alsDatum(w.gemessen_am)!.getTime(), kg: Number(w.gewicht_kg), am: w.gemessen_am, w }))
     .sort((a, b) => a.t - b.t);
   if (!punkte.length) {
-    return <div className="h-[240px] flex items-center justify-center text-sm gedaempft border border-dashed border-rand rounded-lg">Keine Messwerte im Zeitraum.</div>;
+    return <div className="h-[15rem] flex items-center justify-center text-sm gedaempft border border-dashed border-rand rounded-lg">Keine Messwerte im Zeitraum.</div>;
   }
   const heute = Date.now();
   let t0 = punkte[0].t;

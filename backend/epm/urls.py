@@ -10,7 +10,7 @@ from system import sicherung_api as backup
 from infusionen.api import InfusionsplanViewSet
 from vorlagen import api as vorlagen
 from patienten.api import (
-    BezugspersonViewSet, DiagnoseViewSet, DokumentViewSet, GewichtViewSet, KalenderViewSet, KontaktViewSet,
+    BezugspersonViewSet, DiagnoseViewSet, TherapieschrittViewSet, DokumentViewSet, GewichtViewSet, KalenderViewSet, KontaktViewSet,
     PatientArztViewSet, PatientViewSet, StartseiteViewSet, TerminViewSet,
 )
 from hilfe import api as hilfe
@@ -35,6 +35,7 @@ router.register("dokumente", DokumentViewSet, basename="dokument")
 router.register("bezugspersonen", BezugspersonViewSet, basename="bezugsperson")
 router.register("patient-aerzte", PatientArztViewSet, basename="patientarzt")
 router.register("diagnosen", DiagnoseViewSet, basename="diagnose")
+router.register("therapieschritte", TherapieschrittViewSet, basename="therapieschritt")
 router.register("laborbefunde", LaborbefundViewSet, basename="laborbefund")
 router.register("bia-messungen", BiaMessungViewSet, basename="biamessung")
 router.register("berichte", BerichtViewSet, basename="bericht")
@@ -82,10 +83,15 @@ urlpatterns = [
     path("api/rechte/", konto.RechteView.as_view()),
     path("api/briefkopf/", BriefkopfView.as_view()),
     path("api/briefkopf/logo/", LogoView.as_view()),
+    path("api/anlagen/", vorlagen.AnlagenView.as_view()),
+    path("api/anlagen/<int:pk>/", vorlagen.AnlageView.as_view()),
+    path("api/anlagen/<int:pk>/datei/", vorlagen.AnlageDateiView.as_view()),
     path("api/vorlagen/", vorlagen.VorlagenView.as_view()),
     path("api/vorlagen/<str:art>/", vorlagen.VorlageView.as_view()),
     path("api/vorlagen/<str:art>/entwurf/", vorlagen.EntwurfView.as_view()),
     path("api/vorlagen/<str:art>/veroeffentlichen/", vorlagen.VeroeffentlichenView.as_view()),
+    path("api/vorlagen/<str:art>/eigen/", vorlagen.EigenesSchreibenView.as_view()),
+    path("api/schreiben/", vorlagen.SchreibenListeView.as_view()),
     path("api/vorlagen/<str:art>/entwurfsmodus/", vorlagen.EntwurfsmodusView.as_view()),
     path("api/vorlagen/<str:art>/versionen/<int:version>/", vorlagen.VersionView.as_view()),
     path("api/vorlagen/<str:art>/startvorlage/", vorlagen.StartvorlageView.as_view()),
