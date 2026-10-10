@@ -15,6 +15,7 @@ import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Fehleranzeige, Karte, KnopfLink, Knopf, Laden, Leer, Seitenkopf, Segmente, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
 import { HinweisChips } from "@/components/HinweisChips";
+import { Begriff } from "@/components/ui/Begriff";
 
 type Zaehler = { in_betreuung: number; abgeschlossen: number; mit_hinweisen: number; gewichtsverlust: number; termin_woche: number };
 /** Testpatienten zählen nicht mit; ihre Anzahl kommt getrennt (nicht für Testbenutzer). */
@@ -127,7 +128,7 @@ function PlanZelle({ p }: { p: PatientZeile }) {
   return (
     <span className="text-[0.8125rem] inline-flex flex-col gap-0.5 items-start">
       {plan.gueltig_ab ? <span className={cx("num", plan.alt && "text-warn")} title={plan.alt ? "älter als eingestellt" : undefined}>seit {datum(plan.gueltig_ab)}</span> : null}
-      {plan.entwurf ? <Chip>Entwurf</Chip> : null}
+      {plan.entwurf ? <Chip><Begriff name="entwurf">Entwurf</Begriff></Chip> : null}
     </span>
   );
 }
@@ -275,7 +276,7 @@ export function Patienten() {
                 <td className="td">
                   <span className="inline-flex items-center gap-2 flex-wrap">
                     <Link to={`/patienten/${p.id}`} className="font-medium no-underline">{p.nachname}, {p.vorname}</Link>
-                    {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
+                    {p.ist_test ? <Chip art="warn"><Begriff name="testpatient">Testpatient</Begriff></Chip> : null}
                   </span>
                   {!breit ? <><br /><span className="text-[0.78rem] gedaempft"><span className="num">{datum(p.geburtsdatum)}</span> ({p.alter})</span></> : null}
                 </td>
@@ -326,7 +327,7 @@ export function Patienten() {
               </Link>
               {!archiv ? (
                 <div className="px-3.5 pb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[0.8125rem]">
-                  {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
+                  {p.ist_test ? <Chip art="warn"><Begriff name="testpatient">Testpatient</Begriff></Chip> : null}
                   {p.kennzahlen?.naechster_termin ? <NaechsterTermin p={p} /> : null}
                   <Hinweise p={p} />
                 </div>

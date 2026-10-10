@@ -500,7 +500,7 @@ class DatenschutzAktionen:
 
     @action(detail=True, methods=["post"], permission_classes=[AkteLoeschenRecht])
     def loeschen(self, request, pk=None):
-        """Schritt 2: Akte endgültig löschen (Mediziner und Admin, Recht „Akten endgültig löschen“) – mit Grund, Kennwort, Code aus der Authenticator-App
+        """Schritt 2: Akte endgültig löschen (Mediziner und Admin, Recht „Akten endgültig löschen“) – mit Grund, Passwort, Code aus der Authenticator-App
         und dem abgetippten Bestätigungscode. Danach sind alle Einträge, die Historie und die Dateien weg; es bleiben
         das Löschprotokoll (ohne Namen) und die Einträge im Audit-Log ohne Namen und Inhalte."""
         from datetime import datetime
@@ -538,7 +538,7 @@ class DatenschutzAktionen:
             # Festlegung 03.10.2026: endgültig löschen nur mit eingerichtetem zweitem Faktor
             return abgelehnt("code", OHNE_ZWEITEN_FAKTOR)
         if not request.user.check_password(str(request.data.get("kennwort", ""))):
-            antwort = abgelehnt("kennwort", "Kennwort falsch.")
+            antwort = abgelehnt("kennwort", "Passwort falsch.")
             return bestaetigung_fehlgeschlagen(request, "loeschen_kennwort") or antwort
         if not zweiter_faktor_bestaetigt(request, notfallcodes=False):
             antwort = abgelehnt("code", fehlertext(request, "Code aus der Authenticator-App falsch oder schon verwendet."))

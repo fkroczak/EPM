@@ -45,7 +45,9 @@ function useDokument(url: string, laden?: () => Promise<Uint8Array>) {
       const bib = await pdfjs();
       const basis = new URL("/pdfjs/", window.location.origin).href;
       geladen = await bib.getDocument({
-        data: daten,
+        // Kopie: pdf.js übergibt den Puffer an seinen Worker (danach ist er leer). Ohne Kopie schlug ein zweites Laden
+        // derselben Daten fehl („ArrayBuffer … already detached“), z. B. im Entwicklungsmodus (StrictMode) (F180)
+        data: daten.slice(),
         useWasm: false,
         wasmUrl: `${basis}wasm/`,
         standardFontDataUrl: `${basis}standard_fonts/`,

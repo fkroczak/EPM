@@ -1,6 +1,6 @@
 /**
  * Entwurf 1 · Anmeldung mit 2FA. Dazu die Schritte der ersten Anmeldung:
- * eigenes Kennwort festlegen → Authenticator einrichten → Notfall-Codes notieren.
+ * eigenes Passwort festlegen → Authenticator einrichten → Notfall-Codes notieren.
  */
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
@@ -215,7 +215,7 @@ function SchrittKennwort() {
   };
   return (
     <Formular titel="Eigenes Passwort festlegen"
-      text="Das Einmal-Kennwort gilt nur für die erste Anmeldung. Wähle jetzt ein eigenes Passwort mit mindestens 12 Zeichen."
+      text="Das Einmal-Passwort gilt nur für die erste Anmeldung. Wähle jetzt ein eigenes Passwort mit mindestens 12 Zeichen."
       onSubmit={absenden}>
       <Feld label="Neues Passwort" hinweis="Mindestens 12 Zeichen, nicht nur Ziffern, nicht ähnlich zum Benutzernamen.">
         {(p) => <Eingabe {...p} type="password" autoComplete="new-password" value={neu} onChange={(e) => setNeu(e.target.value)} autoFocus />}

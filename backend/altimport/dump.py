@@ -4,7 +4,7 @@ MySQL-Dump lesen – ``mysqldump`` und phpMyAdmin-Export, auch gzip-gepackt. Rei
 Gelesen werden nur ``CREATE TABLE`` (Spalten) und ``INSERT``/``REPLACE`` (Zeilen); alles andere wird überlesen.
 Jeder Wert kommt als Text oder ``None`` (NULL) zurück – Zahlen und Daten deutet erst ``werte``.
 
-Kennwörter werden nie gespeichert (Regel 1 der Datenanalyse): ``ohne_kennwoerter`` leert solche Spalten sofort
+Passwörter werden nie gespeichert (Regel 1 der Datenanalyse): ``ohne_kennwoerter`` leert solche Spalten sofort
 nach dem Lesen.
 """
 import gzip
@@ -322,7 +322,7 @@ _KENNWORT_WERT = re.compile(r"^(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{40}|[0-9a-fA-F]{64
 
 
 def ohne_kennwoerter(tabellen: dict) -> list[tuple[str, str]]:
-    """Leert Spalten, die Kennwörter oder deren Prüfsummen enthalten – am Namen oder am Inhalt erkannt.
+    """Leert Spalten, die Passwörter oder deren Prüfsummen enthalten – am Namen oder am Inhalt erkannt.
     Liefert die betroffenen (Tabelle, Spalte) und vermerkt sie je Tabelle unter ``entfernt``."""
     betroffen = []
     for name, t in tabellen.items():

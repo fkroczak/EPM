@@ -1,6 +1,7 @@
-/** Entwurf 18 · Vorlagen: Briefkopf und Logo, Auswahllisten und Präparate (Reihenfolge), Grenzwerte. */
+/** Entwurf 18 · Vorlagen: Übersicht mit Suche (F180), Briefkopf und Logo, Grenzwerte; Auswahllisten und Präparate in
+ *  Auswahllisten.tsx, Dokumentvorlagen in Dokumentvorlagen.tsx. */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useBlocker, useLocation, useNavigate, useSearchParams } from "react-router";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
@@ -10,18 +11,18 @@ import { useBriefkopf } from "@/lib/daten";
 import type { Absender, Briefkopf } from "@/lib/daten";
 import { eingabeZahl, zahl } from "@/lib/format";
 import { ERKLAERUNGEN } from "@/lib/typen";
-import type { Auswahlwert, Einstellungen, ErklaerungsArt, Praeparat } from "@/lib/typen";
+import type { Einstellungen, ErklaerungsArt } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
-import { Auswahl, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Seitenkopf, Segmente, Textfeld, cx } from "@/components/ui/basis";
-import { Dialog } from "@/components/ui/dialog";
+import { Auswahl, Eingabe, Feld, Karte, Knopf, Laden, Meldung, Seitenkopf, Segmente, Textfeld } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
-import { useSortierbar } from "@/components/ui/sortierbar";
 import { LOGO_URL, Logo } from "@/components/layout/logo";
 import { DokumentvorlagenBereich } from "@/seiten/admin/Dokumentvorlagen";
 import { KatalogeBereich } from "@/seiten/admin/Kataloge";
 import { AnlagenBereich } from "@/seiten/admin/Anlagen";
+import { ListenBereich } from "@/seiten/admin/Auswahllisten";
+import { VorlagenStart } from "@/seiten/admin/VorlagenStart";
 
-type Bereich = "briefkopf" | "listen" | "kataloge" | "grenzwerte" | "anlagen" | "dokumente";
+type Bereich = "start" | "briefkopf" | "listen" | "kataloge" | "grenzwerte" | "anlagen" | "dokumente";
 type SpeichernRef = { current: (() => void) | null };
 
 const ABSENDER_FELDER: { k: keyof Absender; label: string; span: number; num?: boolean }[] = [
@@ -110,157 +111,6 @@ function BriefkopfBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
         </div>
         <span className="text-xs gedaempft">Gilt für neue PDFs. Bereits freigegebene Pläne behalten ihren Briefkopf.</span>
       </Karte>
-    </div>
-  );
-}
-
-type Liste = { schluessel: string; titel: string; art: "praeparat" | "auswahl" };
-const LISTEN: Liste[] = [
-  { schluessel: "aminosaeuren", titel: "Aminosäuren", art: "praeparat" }, { schluessel: "lipide", titel: "Lipide", art: "praeparat" },
-  { schluessel: "basisloesung", titel: "Basislösungen", art: "praeparat" }, { schluessel: "glucose", titel: "Glucose", art: "praeparat" },
-  { schluessel: "albumin", titel: "Albumin", art: "praeparat" }, { schluessel: "spurenelemente", titel: "Spurenelemente", art: "praeparat" },
-  { schluessel: "vitamine", titel: "Vitamine", art: "praeparat" }, { schluessel: "katheterschutz", titel: "Katheterblock", art: "praeparat" },
-  { schluessel: "elektrolyte", titel: "Elektrolytzusätze", art: "praeparat" }, { schluessel: "medikament", titel: "Medikamente", art: "praeparat" },
-  { schluessel: "sonstiges", titel: "Sonstige Bestandteile", art: "praeparat" },
-  { schluessel: "katheter", titel: "Katheter", art: "auswahl" }, { schluessel: "terminort", titel: "Terminorte", art: "auswahl" },
-  { schluessel: "dokumenttyp", titel: "Dokumenttypen", art: "auswahl" },
-  { schluessel: "kontaktart", titel: "Kontaktarten", art: "auswahl" },
-  { schluessel: "beziehung", titel: "Beziehungen (Bezugspersonen)", art: "auswahl" },
-  { schluessel: "berichtart", titel: "Berichtsarten", art: "auswahl" },
-];
-
-function EintragDialog({ liste, eintrag, onZu }: { liste: Liste; eintrag: Praeparat | Auswahlwert | null | "neu"; onZu: () => void }) {
-  const qc = useQueryClient();
-  const melden = useHinweis();
-  const [name, setName] = useState("");
-  const [konz, setKonz] = useState("");
-  const [einheit, setEinheit] = useState("ml");
-  const [hinweis, setHinweis] = useState("");
-  useEffect(() => {
-    if (eintrag && eintrag !== "neu") {
-      if ("kategorie" in eintrag) {
-        setName(eintrag.name); setKonz(eintrag.konzentration); setEinheit(eintrag.einheit); setHinweis(eintrag.hinweis ?? "");
-      } else setName(eintrag.wert);
-    } else { setName(""); setKonz(""); setEinheit("ml"); setHinweis(""); }
-  }, [eintrag]);
-  const speichern = useMutation({
-    mutationFn: () => {
-      const neu = eintrag === "neu";
-      if (liste.art === "praeparat") {
-        const daten = { name, konzentration: konz, einheit, hinweis, ...(neu ? { kategorie: liste.schluessel } : {}) };
-        return neu ? api("praeparate/", { body: daten }) : api(`praeparate/${(eintrag as Praeparat).id}/`, { method: "PATCH", body: daten });
-      }
-      return neu ? api("auswahlwerte/", { body: { liste: liste.schluessel, wert: name } })
-        : api(`auswahlwerte/${(eintrag as Auswahlwert).id}/`, { method: "PATCH", body: { wert: name } });
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: [liste.art === "praeparat" ? "praeparate" : "auswahlwerte"] });
-      melden("Gespeichert.");
-      onZu();
-    },
-  });
-  const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
-  return (
-    <Dialog offen={!!eintrag} onOffen={(o) => { if (!o) onZu(); }} titel={`${liste.titel}: ${eintrag === "neu" ? "neuer Eintrag" : "bearbeiten"}`} breite={520}
-      beschreibung="Änderungen gelten für neue Einträge und Pläne; bestehende Pläne behalten ihre Werte."
-      fuss={<><Knopf onClick={onZu}>Abbrechen</Knopf><Knopf variante="pri" laedt={speichern.isPending} onClick={() => speichern.mutate()}>Speichern</Knopf></>}>
-      <form className="grid grid-cols-3 gap-3" onSubmit={(e) => { e.preventDefault(); speichern.mutate(); }}>
-        <Feld label={liste.art === "praeparat" ? "Name" : "Wert"} className={liste.art === "praeparat" ? "col-span-3" : "col-span-3"} fehler={f.name ?? f.wert ?? f.non_field_errors}>
-          {(p) => <Eingabe {...p} value={name} onChange={(e) => setName(e.target.value)} autoFocus />}
-        </Feld>
-        {liste.art === "praeparat" ? <>
-          <Feld label="Konzentration" hinweis="z. B. 13,4 %" className="col-span-2" fehler={f.konzentration}>{(p) => <Eingabe {...p} value={konz} onChange={(e) => setKonz(e.target.value)} />}</Feld>
-          <Feld label="Einheit" fehler={f.einheit}>{(p) => <Eingabe {...p} value={einheit} onChange={(e) => setEinheit(e.target.value)} />}</Feld>
-          {/* Hinweis zum Praeparat (F111), z. B. reines Taurolidin 2 % oder baugleich zu Cernevit */}
-          <Feld label="Hinweis" className="col-span-3" hinweis="erscheint bei der Auswahl und auf der Plan-PDF" fehler={f.hinweis}>
-            {(p) => <Eingabe {...p} maxLength={200} value={hinweis} onChange={(e) => setHinweis(e.target.value)} />}
-          </Feld>
-        </> : null}
-        {speichern.error && !Object.keys(f).length ? <Meldung art="fehler" className="col-span-3">{speichern.error.message}</Meldung> : null}
-        <button type="submit" hidden />
-      </form>
-    </Dialog>
-  );
-}
-
-function ListenBereich() {
-  const [gewaehlt, setGewaehlt] = useState<Liste>(LISTEN[0]);
-  const [dialog, setDialog] = useState<Praeparat | Auswahlwert | null | "neu">(null);
-  const qc = useQueryClient();
-  const melden = useHinweis();
-  const praeparate = useQuery({ queryKey: ["praeparate", "alle"], queryFn: () => api<Praeparat[]>("praeparate/") });
-  const auswahl = useQuery({ queryKey: ["auswahlwerte", "verwaltung"], queryFn: () => api<Auswahlwert[]>("auswahlwerte/") });
-  const eintraege: (Praeparat | Auswahlwert)[] = gewaehlt.art === "praeparat"
-    ? (praeparate.data ?? []).filter((p) => p.kategorie === gewaehlt.schluessel)
-    : (auswahl.data ?? []).filter((a) => a.liste === gewaehlt.schluessel);
-  const [reihe, setReihe] = useState<(Praeparat | Auswahlwert)[]>([]);
-  const signatur = eintraege.map((e) => `${e.id}:${e.reihenfolge}:${e.aktiv}:${"name" in e ? e.anzeige : e.wert}`).join("|");
-  useEffect(() => setReihe(eintraege), [signatur, gewaehlt.schluessel]); // eslint-disable-line react-hooks/exhaustive-deps
-  const pfad = gewaehlt.art === "praeparat" ? "praeparate" : "auswahlwerte";
-  const neuLaden = () => {
-    void qc.invalidateQueries({ queryKey: ["praeparate"] });
-    void qc.invalidateQueries({ queryKey: ["auswahlwerte"] });
-  };
-  const reihenfolge = useMutation({
-    mutationFn: (ids: number[]) => api(`${pfad}/reihenfolge/`, { body: { ids } }),
-    onSuccess: () => { neuLaden(); melden("Reihenfolge gespeichert."); },
-  });
-  const aktiv = useMutation({
-    mutationFn: (e: Praeparat | Auswahlwert) => api(`${pfad}/${e.id}/`, { method: "PATCH", body: { aktiv: !e.aktiv } }),
-    // Häkchen sofort umschalten; bei einem Fehler den gespeicherten Stand wieder anzeigen
-    onMutate: (e) => setReihe((r) => r.map((x) => (x.id === e.id ? { ...x, aktiv: !e.aktiv } : x))),
-    onError: (_f, e) => setReihe((r) => r.map((x) => (x.id === e.id ? { ...x, aktiv: e.aktiv } : x))),
-    onSettled: () => neuLaden(),
-  });
-  const sort = useSortierbar(reihe, (neu) => { setReihe(neu); reihenfolge.mutate(neu.map((e) => e.id)); });
-  const anzahl = (l: Liste) => l.art === "praeparat" ? (praeparate.data ?? []).filter((p) => p.kategorie === l.schluessel).length
-    : (auswahl.data ?? []).filter((a) => a.liste === l.schluessel).length;
-  return (
-    <div className="stapel grid grid-cols-1 xl:grid-cols-[15rem_minmax(0,1fr)] gap-5 items-start">
-      <nav aria-label="Listen" className="card p-1.5 flex flex-col">
-        {LISTEN.map((l) => (
-          <button key={l.schluessel} type="button" aria-current={gewaehlt.schluessel === l.schluessel ? "true" : undefined}
-            className={cx("flex items-center justify-between px-3 py-2 rounded-md border-0 cursor-pointer text-sm text-left", gewaehlt.schluessel === l.schluessel ? "bg-akzent-weich text-akzent-text font-medium" : "bg-transparent hover:bg-fein")}
-            onClick={() => setGewaehlt(l)}>
-            <span>{l.titel}</span><span className="num text-xs gedaempft">{anzahl(l)}</span>
-          </button>
-        ))}
-      </nav>
-      <Karte className="px-5 py-[1.125rem] flex flex-col gap-3" data-testid="liste">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="lbl m-0">{gewaehlt.titel} · {gewaehlt.art === "praeparat" ? "Präparate" : "Auswahlwerte"}</h2>
-          <Knopf klein icon="plus" onClick={() => setDialog("neu")}>{gewaehlt.art === "praeparat" ? "Präparat" : "Wert"}</Knopf>
-        </div>
-        {praeparate.isLoading || auswahl.isLoading ? <Laden /> : (
-          <table className="tabelle">
-            <thead><tr><th className="th w-10" /><th className="th">Name</th>{gewaehlt.art === "praeparat" ? <><th className="th">Konzentration</th><th className="th text-right">in Plänen</th></> : null}<th className="th">Auswahl</th></tr></thead>
-            <tbody>
-              {reihe.map((e, i) => (
-                <tr key={e.id} {...sort.zeile(i)} className={cx(sort.ueber === i && "outline-2 outline-akzent", sort.zieht === i && "opacity-50", !e.aktiv && "opacity-70")}>
-                  <td className="td"><button type="button" className="border-0 bg-transparent cursor-grab gedaempft p-0 tracking-[-2px]" {...sort.griff(i, "name" in e ? e.anzeige : e.wert, "vorlagen")}>⋮⋮</button></td>
-                  <td className="td">
-                    <button type="button" className="bg-transparent border-0 p-0 cursor-pointer text-left text-akzent-text font-medium" onClick={() => setDialog(e)}>
-                      {"name" in e ? e.anzeige : e.wert}
-                    </button>
-                  </td>
-                  {"name" in e ? <><td className="td num">{e.konzentration || "—"}</td><td className="td num text-right">{zahl(e.in_plaenen)}</td></> : null}
-                  <td className="td">
-                    <label className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input type="checkbox" checked={e.aktiv} aria-label={`${"name" in e ? e.anzeige : e.wert} in der Auswahl`} onChange={() => aktiv.mutate(e)} />
-                      {e.aktiv ? "aktiv" : "ausgeblendet"}
-                    </label>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        <Fehleranzeige fehler={reihenfolge.error ?? aktiv.error} />
-        <div className="text-[0.8125rem] gedaempft leading-normal">
-          Reihenfolge per Ziehen am Griff oder mit den Pfeiltasten. Ausgeblendete Einträge erscheinen nicht mehr bei neuen Plänen und Akten, bestehende behalten sie. Gelöscht wird nichts.
-        </div>
-      </Karte>
-      <EintragDialog liste={gewaehlt} eintrag={dialog} onZu={() => setDialog(null)} />
     </div>
   );
 }
@@ -472,37 +322,53 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
   );
 }
 
+const BEREICHE: Bereich[] = ["start", "briefkopf", "listen", "kataloge", "grenzwerte", "anlagen", "dokumente"];
+
 export function Vorlagen() {
-  // Dokumentvorlagen sind ein Bereich wie die anderen; eigene Adresse /admin/vorlagen/dokumente (direkt aufrufbar)
+  // Jeder Bereich hat eine Adresse (/admin/vorlagen?bereich=listen&liste=vitamine), damit die Übersicht und die Suche
+  // dorthin verlinken und „Zurück“ im Browser funktioniert; Dokumentvorlagen unter /admin/vorlagen/dokumente (F180)
   const ort = useLocation();
   const navigate = useNavigate();
-  const [lokal, setLokal] = useState<Exclude<Bereich, "dokumente">>("briefkopf");
-  const bereich: Bereich = ort.pathname.replace(/\/$/, "").endsWith("/vorlagen/dokumente") ? "dokumente" : lokal;
+  const [parameter] = useSearchParams();
+  const imPfad = ort.pathname.replace(/\/$/, "").endsWith("/vorlagen/dokumente");
+  const gewuenscht = parameter.get("bereich") as Bereich | null;
+  const bereich: Bereich = imPfad ? "dokumente" : gewuenscht && BEREICHE.includes(gewuenscht) ? gewuenscht : "start";
   const speichern = useRef<(() => void) | null>(null);
   const [aktionen, setAktionen] = useState<HTMLElement | null>(null);
   const dokUngespeichert = useRef(false);
   const merkeGeaendert = useCallback((g: boolean) => { dokUngespeichert.current = g; }, []);
+  // Warnung beim Verlassen mit ungespeicherten Änderungen an einer Dokumentvorlage: in EPM (andere Seite, anderer
+  // Bereich, andere Vorlage, „Zurück“) und beim Schließen oder Neuladen des Browserfensters
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => dokUngespeichert.current
+    && (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search));
+  useEffect(() => {
+    if (blocker.state !== "blocked") return;
+    if (window.confirm("Ungespeicherte Änderungen an der Vorlage verwerfen?")) { dokUngespeichert.current = false; blocker.proceed(); }
+    else blocker.reset();
+  }, [blocker]);
+  useEffect(() => {
+    const warnen = (e: BeforeUnloadEvent) => { if (dokUngespeichert.current) e.preventDefault(); };
+    window.addEventListener("beforeunload", warnen);
+    return () => window.removeEventListener("beforeunload", warnen);
+  }, []);
   const waehle = (b: Bereich) => {
     if (b === bereich) return;
-    if (bereich === "dokumente" && dokUngespeichert.current && !window.confirm("Ungespeicherte Änderungen an der Dokumentvorlage verwerfen?")) return;
-    if (b === "dokumente") {
-      navigate("/admin/vorlagen/dokumente");
-      return;
-    }
-    setLokal(b);
-    if (bereich === "dokumente") navigate("/admin/vorlagen");
+    navigate(b === "dokumente" ? "/admin/vorlagen/dokumente" : b === "start" ? "/admin/vorlagen" : `/admin/vorlagen?bereich=${b}`);
   };
   return (
     <Seite pfad={[{ text: "Administration" }, { text: "Vorlagen" }]}>
-      <Seitenkopf titel="Vorlagen" unter="Alles, was sich ohne IT anpassen lassen soll. Jede Änderung steht im Audit-Log."
+      <Seitenkopf titel="Vorlagen" unter="Was in EPM zur Auswahl steht und wie Briefe, E-Mails und PDFs aussehen. Jede Änderung steht im Audit-Log."
         rechts={bereich === "dokumente" ? <div ref={setAktionen} className="flex items-center gap-2.5 flex-wrap" />
-          : bereich !== "listen" && bereich !== "kataloge" && bereich !== "anlagen" ? <Knopf variante="pri" onClick={() => speichern.current?.()}>Speichern</Knopf> : null} />
+          : bereich === "briefkopf" || bereich === "grenzwerte" ? <Knopf variante="pri" onClick={() => speichern.current?.()}>Speichern</Knopf> : null} />
       <Segmente label="Bereich" wert={bereich} onWahl={waehle} className="self-start"
-        werte={[{ wert: "briefkopf", text: "Briefkopf und Logo" }, { wert: "listen", text: "Auswahllisten" },
+        werte={[{ wert: "start", text: "Übersicht" }, { wert: "dokumente", text: "Dokumentvorlagen" },
+          { wert: "briefkopf", text: "Briefkopf und Logo" }, { wert: "listen", text: "Auswahllisten" },
           { wert: "kataloge", text: "Labor und Diagnosen" }, { wert: "grenzwerte", text: "Grenzwerte" },
-          { wert: "anlagen", text: "Anlagen für E-Mails" }, { wert: "dokumente", text: "Dokumentvorlagen" }]} />
-      {bereich === "briefkopf" ? <BriefkopfBereich speichernRef={speichern} />
-        : bereich === "listen" ? <ListenBereich />
+          { wert: "anlagen", text: "Anlagen für E-Mails" }]} />
+      {bereich === "start" ? <VorlagenStart />
+        : bereich === "briefkopf" ? <BriefkopfBereich speichernRef={speichern} />
+        : bereich === "listen" ? <ListenBereich liste={parameter.get("liste")}
+            onListe={(l) => navigate(`/admin/vorlagen?bereich=listen&liste=${l}`, { replace: true })} />
         : bereich === "kataloge" ? <KatalogeBereich />
         : bereich === "grenzwerte" ? <GrenzwerteBereich speichernRef={speichern} />
         : bereich === "anlagen" ? <AnlagenBereich />
