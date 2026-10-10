@@ -50,9 +50,10 @@ export function PatientWahl({ id, wert, onWahl, fehler, test, ohne }: {
               </button>
             </li>
           ))}
-          {treffer.data && treffer.data.results.length === 0 ? <li className="px-3 py-2 text-sm gedaempft">Kein Patient gefunden.</li> : null}
+          {treffer.data && treffer.data.results.length === 0 ? <li className="px-3 py-2 text-sm gedaempft">Kein Patient gefunden. Nur einen
+            Teil des Namens, die Nummer oder das Geburtsdatum (14.03.1968) versuchen. Abgeschlossene Akten stehen hier nicht zur Wahl.</li> : null}
         </ul>
-      ) : null}
+      ) : begriff.length === 1 ? <span className="text-[0.8125rem] gedaempft">Bitte mindestens zwei Zeichen eingeben.</span> : null}
     </div>
   );
 }

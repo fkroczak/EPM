@@ -25,6 +25,51 @@ GRUPPEN = [
 ABSCHNITTE = [
     # ------------------------------------------------------------------ Erste Schritte
     {
+        # Bedienung für Pflegekräfte (10.10.2026, F178): die Alltagswege auf einen Blick, ganz oben in der Hilfe
+        "id": "alltag", "gruppe": "erste_schritte", "titel": "Die wichtigsten Wege im Alltag", "rechte": [],
+        "seiten": [],
+        "html": """
+<p>Für die tägliche Arbeit reichen wenige Wege. Jede Seite hat oben rechts ein <strong>?</strong> – es öffnet die Hilfe
+genau zu dieser Seite.</p>
+<ul>
+<li><strong>Patient suchen:</strong> ins Suchfeld oben tippen (Name, Teil des Namens, Nummer oder Geburtsdatum) und den
+Treffer anklicken. Schneller: <strong>Strg K</strong>. Am Telefon die Lupe oben.</li>
+<li><strong>Telefonat oder Gespräch festhalten:</strong> in der Akte <strong>Kontakt</strong>, auf der Startseite
+<strong>Kontakt erfassen</strong>. Notiz schreiben, <strong>Speichern</strong>. Gewicht und Wiedervorlage lassen sich im
+selben Fenster mit erfassen.</li>
+<li><strong>Gewicht eintragen:</strong> in der Akte <strong>Gewicht</strong>.</li>
+<li><strong>Termin oder Rückruf:</strong> in der Akte <strong>Termin</strong> (mehr unter „Termine, Rückrufe und
+Wiedervorlagen“).</li>
+<li><strong>Brief oder Befund ablegen:</strong> Datei auf die geöffnete Akte ziehen oder im Reiter
+<strong>Dokumente</strong> <strong>Neues Dokument</strong> wählen.</li>
+<li><strong>Neuer Patient:</strong> in der Patientenliste <strong>Neuer Patient</strong>. Pflicht sind nur Nachname,
+Vorname und Geburtsdatum.</li>
+</ul>
+<p>Nach jedem Speichern erscheint oben kurz eine <strong>grüne</strong> Bestätigung. Eine <strong>rote</strong> Meldung
+bleibt länger stehen und sagt, was fehlt; mit dem × lässt sie sich schließen.</p>""",
+    },
+    {
+        "id": "wenn_es_hakt", "gruppe": "erste_schritte", "titel": "Wenn etwas nicht klappt", "rechte": [], "seiten": [],
+        "html": """
+<ul>
+<li><strong>Ein Knopf ist grau:</strong> es fehlt noch eine Angabe. Daneben steht meist, welche – zum Beispiel
+„Zuerst den Patienten wählen“ oder „Zum Speichern bitte eine Notiz schreiben“.</li>
+<li><strong>Ein Feld ist rot umrandet:</strong> darunter steht, was nicht passt. Beim neuen Patienten springt EPM zum
+ersten roten Feld.</li>
+<li><strong>Datum:</strong> am einfachsten „14.03.2026“. EPM versteht auch „14.3.26“, „14,3,26“, „14032026“ sowie
+„heute“ und „gestern“. Uhrzeiten gehen als „10:30“, „10.30“ oder „1030“.</li>
+<li><strong>Patient nicht gefunden:</strong> nur einen Teil des Namens eingeben (z. B. „Mül“) oder nach Nummer bzw.
+Geburtsdatum suchen. Abgeschlossene Akten stehen in der Patientenliste unter <strong>Abgeschlossen</strong>; ohne
+Treffer bietet die Liste auch „In abgeschlossenen Akten suchen“ und „Neuer Patient“ an.</li>
+<li><strong>„Keine Verbindung zu EPM“:</strong> Netzwerk bzw. VPN prüfen und es noch einmal versuchen – die Eingaben
+bleiben stehen. Steht dort, dass EPM gerade nicht erreichbar ist, wird es meist neu gestartet oder aktualisiert:
+ein paar Minuten warten.</li>
+<li><strong>Konto gesperrt</strong> (nach fünf falschen Passwörtern): die Administration entsperrt es.</li>
+<li><strong>Etwas versehentlich gespeichert:</strong> Kontakte werden storniert (mit Grund), Messungen bearbeitet; alle
+früheren Fassungen bleiben im <strong>Verlauf</strong> der Akte sichtbar. Es geht nichts verloren.</li>
+</ul>""",
+    },
+    {
         "id": "anmelden", "gruppe": "erste_schritte", "titel": "Anmelden mit Kennwort und Authenticator", "rechte": [],
         "seiten": [],
         "html": """
@@ -32,7 +77,8 @@ ABSCHNITTE = [
 einer Authenticator-App auf dem Telefon) ist freiwillig – die Administration kann sie für Admins oder für alle zur
 Pflicht machen. Wer sie eingerichtet hat, wird bei jeder Anmeldung nach dem Code gefragt.</p>
 <ol>
-<li>Benutzername und Kennwort eingeben, <strong>Anmelden</strong> wählen.</li>
+<li>Benutzername und Passwort eingeben, <strong>Weiter</strong> wählen. Groß- und Kleinschreibung zählt; ist die
+Feststelltaste an, weist EPM darauf hin.</li>
 <li>Mit Zwei-Faktor-Anmeldung: den sechsstelligen Code aus der Authenticator-App eingeben. Er wechselt alle 30 Sekunden.</li>
 <li>Bei der ersten Anmeldung mit dem Einmal-Kennwort vom Zugangsblatt wird zuerst ein eigenes Kennwort festgelegt. Ist
 die Zwei-Faktor-Anmeldung Pflicht, wird danach die Authenticator-App eingerichtet (QR-Code scannen); sonst geht das
@@ -523,9 +569,12 @@ der Freigabe und der Nachweis (z. B. die E-Mail als PDF).</p>""",
         "id": "dokumente", "gruppe": "dokumente", "titel": "Dokumente hochladen und ansehen", "rechte": ["akten_lesen"],
         "seiten": ["/patienten/:id/dokumente"],
         "html": """
-<p>Im Reiter <strong>Dokumente</strong> liegen Arztbriefe, Befunde, Erklärungen und erzeugte PDFs. Hochladen mit
-<strong>Datei auswählen</strong> (PDF oder Bild), dazu Typ, Titel und Dokumentdatum. EPM schlägt das Datum aus den
-Metadaten der Datei vor.</p>
+<p>Im Reiter <strong>Dokumente</strong> liegen Arztbriefe, Befunde, Erklärungen und erzeugte PDFs. Ablegen mit
+<strong>Neues Dokument</strong> (PDF, Bild oder Text, höchstens 50 MB) – oder die Datei einfach auf die geöffnete Akte
+ziehen; im Aktenkopf geht es auch über <strong>Weitere Aktionen › Dokument hochladen</strong>. Danach rechts Typ, Titel
+und Dokumentdatum ergänzen und <strong>Speichern</strong>. EPM schlägt das Datum aus der Datei vor.</p>
+<p>Die Suche über der Liste findet Wörter in Titel und Notiz und – nach <strong>Text erkennen</strong> – auch im
+Inhalt eines gescannten Briefs.</p>
 <p>Dokumente werden in EPM angezeigt, ohne das PDF-Programm des PCs. Ausgeblendete Dokumente sind nicht gelöscht.</p>""",
     },
     {
