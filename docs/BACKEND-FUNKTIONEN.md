@@ -3521,8 +3521,10 @@ zur Laufzeit etwas nach außen schickt, steht in `docs/OFFLINE-BETRIEB-2026-10-1
   die Modelle da sind, und ohne (nur Tesseract).
 - **Teststatus:** `scans/test_lernen.py` (Anwenden je Labor vor allgemein, Schwelle, Sperren/Löschen, Lernen beim
   Übernehmen, von Hand ergänzte Werte, Diagnose/BIA, keine Personendaten, Testzugang, Kennzahl, Verwalten und
-  Rechte, Leeren, Offline) und die übrigen Tests von `scans`, `befunde`, `system` grün; lokal ohne PP-OCR-Modelle
-  (kein Zugang zu huggingface.co), d. h. Erkennung nur mit Tesseract. `npm run typecheck` und `npm run build` grün.
+  Rechte, Leeren, Offline) und die übrigen Tests von `scans`, `befunde`, `system`, `hilfe` grün (155 Tests,
+  nacheinander; mit `--parallel` bricht der Testrunner hier schon an `scans.test_dokumente` ab – nicht übertragbarer
+  Traceback, unabhängig von F182); lokal ohne PP-OCR-Modelle (kein Zugang zu huggingface.co), d. h. Erkennung nur mit
+  Tesseract. `npm run typecheck` und `npm run build` grün.
   **Browsertests: Lauf steht aus.**
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
