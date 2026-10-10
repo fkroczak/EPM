@@ -18,6 +18,7 @@ import type { Kontakt } from "@/lib/typen";
 import { Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog, Menue } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
+import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { Richtext } from "@/components/Editor";
 import { useWiedervorlageTage } from "@/components/Schnellerfassung";
@@ -199,7 +200,7 @@ function KontaktZeile({ k, markiert, onStorno }: { k: Kontakt; markiert: boolean
       </span>
       <div className="flex flex-col gap-1.5 min-w-0">
         <span className="flex items-center gap-1.5 flex-wrap text-xs gedaempft">
-          {k.storniert_am ? <Chip art="fehler">storniert</Chip> : null}
+          {k.storniert_am ? <Chip art="fehler"><Begriff name="storniert">storniert</Begriff></Chip> : null}
           {k.art_name ? <Chip data-testid="kontaktart">{k.art_name}</Chip> : null}
           <span>{k.erfasst_von_name ?? ""}</span>
           <span className="sr-only">{datum(k.zeitpunkt)}</span>

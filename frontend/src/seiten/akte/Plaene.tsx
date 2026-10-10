@@ -12,6 +12,7 @@ import type { Plan, Vergleich } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Leer, Meldung, Segmente, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
+import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { klartext } from "@/components/Editor";
 import { PdfLeser } from "@/components/PdfAnsicht";
@@ -397,7 +398,8 @@ export function Plaene() {
         <div className="flex flex-col gap-3 min-w-0 order-1 xl:order-none scroll-mt-20" data-testid="plan-detail">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex flex-col gap-1">
-              <span className="text-lg font-semibold">{kopfText(gewaehlt)}</span>
+              <span className="text-lg font-semibold">{gewaehlt.status === "entwurf"
+                ? <><Begriff name="entwurf">Entwurf</Begriff> · {datum(gewaehlt.gueltig_ab)}</> : kopfText(gewaehlt)}</span>
               <span className="text-[0.8125rem] gedaempft max-w-[70ch]">
                 {gewaehlt.status === "entwurf"
                   ? "Entwurf: nur für das Team sichtbar, noch nicht beim Versorger."
@@ -423,7 +425,6 @@ export function Plaene() {
               </> : null}
             </div>
           </div>
-          {/* Begriff: Entwurf */}
           <Segmente label="Darstellung" wert={modus} onWahl={setModus}
             werte={[{ wert: "ansicht", text: "Ansicht wie PDF" }, { wert: "vergleich", text: <>Vergleich mit Vorgänger{vergleich.data?.vorgaenger ? <span className="num opacity-70">{vergleich.data.anzahl_geaendert}</span> : null}</> }]} className="self-start" />
           {modus === "ansicht" ? <PlanAnsicht key={gewaehlt.id} plan={gewaehlt} />

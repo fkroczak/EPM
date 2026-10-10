@@ -16,6 +16,7 @@ import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, KnopfLink, L
 import { Spalten } from "@/components/ui/spalten";
 import { PdfLeser } from "@/components/PdfAnsicht";
 import { useHinweis } from "@/components/ui/hinweise";
+import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { Editor } from "@/components/Editor";
 import { name, useAkte } from "./Akte";
@@ -322,7 +323,7 @@ export function PlanEditor() {
   }
   if (caMgStabil === false) warnungen.push(`Instabil: Calcium + Magnesium ${zahl(caMg)} mmol über ${zahl(caMgGrenze)} mmol (Mischbeutel ÷ 100)`);
   const vitamineListe = p.filter((x) => x.kategorie === "vitamine");
-  const zahlFeld = (k: ZahlFeld, label: string, einheit: string, extra?: ReactNode) => (
+  const zahlFeld = (k: ZahlFeld, label: ReactNode, einheit: string, extra?: ReactNode) => (
     <Feld label={label} fehler={e[k]} hinweis={extra}>
       {(pp) => <Einheit einheit={einheit}><Eingabe {...pp} className={cx("num pr-14", geaendert(k) && "border-warn bg-warn-bg")} value={f[k]}
         onChange={(ev) => setze(k)(ev.target.value)} inputMode="decimal" /></Einheit>}
@@ -453,7 +454,7 @@ export function PlanEditor() {
             {/* Infusionstage je Beutelart (Wunsch 06.10.2026, F110): unabhängig von der Zusammensetzung */}
             <h3 className="lbl m-0">Infusionstage pro Woche</h3>
             <div className="grid grid-cols-3 gap-3" data-testid="infusionstage">
-              {zahlFeld("tage_pro_woche", "PE (Mischbeutel)", "×")}
+              {zahlFeld("tage_pro_woche", <><Begriff name="pe">PE</Begriff> (Mischbeutel)</>, "×")}
               {zahlFeld("zusatz_tage_pro_woche", "Zusatzvolumen", "×")}
               {zahlFeld("freie_tage_pro_woche", "Infusionsfrei", "Tg")}
             </div>

@@ -2,6 +2,7 @@
  * Menüpunkt „Infusionspläne“ (Wunsch 02.10.2026): alle Pläne aller Patienten – Entwürfe zur Freigabe, aktuelle Pläne,
  * Pläne älter als der Grenzwert, abgelöste. Öffnen führt in die Akte (Pläne), dort wird bearbeitet und freigegeben.
  */
+import { Begriff } from "@/components/ui/Begriff";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -29,7 +30,7 @@ type Antwort = { zaehler: Record<Gruppe, number>; grenze_monate: number; ergebni
 
 /** Status; beim Überfahren mit der Maus (und für Bildschirmleser) steht die Frist dabei (Fehlerliste 02.10.2026, 1.2). */
 function StatusChip({ z, grenze }: { z: Zeile; grenze: number }) {
-  if (z.status === "entwurf") return <Chip art="warn" title="Entwurf: noch nicht freigegeben" className="cursor-help">Entwurf</Chip>;
+  if (z.status === "entwurf") return <Chip art="warn"><Begriff name="entwurf">Entwurf</Begriff></Chip>;
   if (z.status === "abgeloest") return <Chip title="Durch einen neueren Plan abgelöst" className="cursor-help">abgelöst</Chip>;
   const frist = z.alt_ab ? datum(z.alt_ab) : "—";
   return z.aelter_als_grenze

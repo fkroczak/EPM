@@ -41,7 +41,7 @@ export function useWahl(name: string): [string, (wert: string) => void] {
 /** Rahmen eines Reiters: links Liste, rechts Detail. */
 export function Aktenseite({ titel, anzahl, aktion, kopfrechts, liste, fuss, detail, laedt, leer, testid }: {
   /** Überschrift der linken Spalte, z. B. „Diagnosen“ (Einzahl/Mehrzahl macht ``anzahl``) */
-  titel: string;
+  titel: ReactNode;
   /** Zahl vor der Überschrift; ohne Angabe nur die Überschrift */
   anzahl?: number;
   /** Hauptknopf unter der Überschrift („Neue Diagnose“) – auf jedem Reiter an derselben Stelle */

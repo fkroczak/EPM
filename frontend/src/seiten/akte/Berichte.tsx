@@ -4,6 +4,7 @@
  * Entwürfe lassen sich beliebig ändern. Mit der Freigabe entsteht die PDF, sie wird als Dokument der Akte
  * abgelegt, und der Bericht ist danach unveränderlich – eine Korrektur ist ein neuer Bericht.
  */
+import { Begriff } from "@/components/ui/Begriff";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
@@ -256,7 +257,8 @@ export function Berichte() {
         detail={gewaehlt ? (
           <Detail testid="bericht-detail"
             titel={<span className="flex items-center gap-2">{gewaehlt.titel}
-              <Chip art={gewaehlt.status === "freigegeben" ? "ok" : "warn"} data-testid="bericht-status">{gewaehlt.status_name}</Chip></span>}
+              <Chip art={gewaehlt.status === "freigegeben" ? "ok" : "warn"} data-testid="bericht-status">{gewaehlt.status === "entwurf"
+                ? <Begriff name="entwurf">{gewaehlt.status_name}</Begriff> : gewaehlt.status_name}</Chip></span>}
             unter={[gewaehlt.art_name, datum(gewaehlt.datum), gewaehlt.empfaenger ? `an ${gewaehlt.empfaenger}` : "",
               gewaehlt.erstellt_von_name].filter(Boolean).join(" · ")}
             aktionen={<>

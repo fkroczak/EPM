@@ -101,7 +101,7 @@ function UmhaengenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolea
   );
 }
 
-/** Endgültig löschen: Mediziner und Admin (auch bei echten Akten), mit Kennwort, Code aus der Authenticator-App und abgetipptem Bestätigungscode. */
+/** Endgültig löschen: Mediziner und Admin (auch bei echten Akten), mit Passwort, Code aus der Authenticator-App und abgetipptem Bestätigungscode. */
 function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean; onOffen: (o: boolean) => void }) {
   const { patient } = useAkte();
   const qc = useQueryClient();
@@ -146,7 +146,7 @@ function LoeschenDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean
         </Feld>
         <ZweiFaktorFehlt />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-          <Feld label="Kennwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
+          <Feld label="Passwort" fehler={f.kennwort}>{(p) => <Eingabe {...p} type="password" autoComplete="current-password" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}</Feld>
           {zf.feld(f.code)}
         </div>
         <div className="flex items-end gap-3 flex-wrap">

@@ -4,6 +4,7 @@
  * Die Masken selbst stehen in eigenen Reitern (Aufteilung 07.10.2026, F121): Labor.tsx und Bia.tsx. Ab welchem Alter
  * ein Befund als zu alt gilt, steht unter Vorlagen › Grenzwerte (F120, Standard zwölf Monate).
  */
+import { Begriff } from "@/components/ui/Begriff";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useEinstellungen } from "@/lib/daten";
@@ -46,7 +47,7 @@ export function BefundeKurz({ patientId }: { patientId: number }) {
       <Anzeige label="Letzter Laborbefund">
         {letzterBefund ? `${datum(letzterBefund.abgenommen_am)} · ${letzterBefund.anzahl_werte} Werte` : ""}
       </Anzeige>
-      <Anzeige label="Letzte BIA-Messung">
+      <Anzeige label={<>Letzte <Begriff name="bia">BIA</Begriff>-Messung</>}>
         {letzteBia ? `${datum(letzteBia.gemessen_am)}${letzteBia.bcm_kg != null ? ` · BCM ${zahl(letzteBia.bcm_kg, 1)} kg` : ""}` : ""}
       </Anzeige>
     </div>

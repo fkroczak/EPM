@@ -135,7 +135,7 @@ test("Bericht: Entwurf, Freigabe durch den Mediziner, danach unveränderlich", a
   await expect(page.getByRole("textbox", { name: "Bericht" })).toContainText("Stabiler Verlauf");
   await page.getByRole("button", { name: "Entwurf speichern" }).click();
   // der Status steht links am Eintrag und rechts im Detail – hier das Detail (F122)
-  await expect(page.getByTestId("bericht-detail").getByTestId("bericht-status")).toHaveText("Entwurf");
+  await expect(page.getByTestId("bericht-detail").getByTestId("bericht-status")).toContainText("Entwurf"); // mit Erklärung zum Begriff (F181)
 
   // Mitarbeiter dürfen nicht freigeben – der Knopf erscheint erst gar nicht
   await expect(page.getByRole("button", { name: "Freigeben" })).toHaveCount(0);
@@ -269,7 +269,7 @@ test("Bericht verwerfen fragt nach (Eine Sprache, 08.10.2026)", async ({ page })
   await page.getByRole("textbox", { name: "Bericht" }).fill("Wird verworfen.");
   await page.getByRole("button", { name: "Entwurf speichern" }).click();
   const detail = page.getByTestId("bericht-detail");
-  await expect(detail.getByTestId("bericht-status")).toHaveText("Entwurf");
+  await expect(detail.getByTestId("bericht-status")).toContainText("Entwurf"); // mit Erklärung zum Begriff (F181)
   await detail.getByRole("button", { name: "Verwerfen" }).click();
   const frage = page.getByRole("dialog");
   await expect(frage.getByRole("heading", { name: "Entwurf verwerfen" })).toBeVisible();

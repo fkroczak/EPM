@@ -16,6 +16,7 @@ import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog, Menue } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
+import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
 import { GewichtDialog, KontaktDialog } from "@/components/Schnellerfassung";
@@ -581,7 +582,7 @@ export function Akte() {
   );
   const status = (
     <>
-      {p.ist_test ? <Chip art="warn">Testpatient</Chip> : null}
+      {p.ist_test ? <Chip art="warn"><Begriff name="testpatient">Testpatient</Begriff></Chip> : null}
       {p.ist_abgeschlossen ? <Chip>abgeschlossen</Chip> : null}
       {p.ist_eingeschraenkt ? <Chip art="warn"><Icon name="schloss" />Verarbeitung eingeschränkt</Chip> : null}
       {/* Erklärungen zum Datenschutz: nachgehalten wie die Nickelallergie – fehlt eine, steht es hier */}
@@ -907,7 +908,8 @@ export function Akte() {
         </div>
         {k && stufe === "voll" && angabe ? (
           <KopfVoll angabe={angabe} bearbeiten={kontext.bearbeiten ? () => setDialog("stammdaten") : undefined} unter={{
-            gewicht: [k.bmi != null ? `BMI ${zahl(k.bmi, 1)}` : "", k.gewicht ? `gemessen ${datum(k.gewicht.am)}` : ""].filter(Boolean).join(" · ") || undefined,
+            gewicht: k.bmi != null || k.gewicht ? <>{k.bmi != null ? <><Begriff name="bmi">BMI</Begriff> {zahl(k.bmi, 1)}</> : null}
+              {k.bmi != null && k.gewicht ? " · " : null}{k.gewicht ? `gemessen ${datum(k.gewicht.am)}` : null}</> : undefined,
             plan: k.aktueller_plan ? `gültig ab ${datum(k.aktueller_plan.gueltig_ab)}` : undefined,
             terminWann: k.naechster_termin ? terminZeit(k.naechster_termin.faellig_am, k.naechster_termin.uhrzeit) : undefined,
             terminWo: k.naechster_termin ? k.naechster_termin.ort ?? TERMINARTEN[k.naechster_termin.art] : undefined,
