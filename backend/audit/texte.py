@@ -316,6 +316,9 @@ def _backup(e, d) -> str:
         return (f"{d.get('anzahl', len(liste))} Sicherung(en) zum Löschen angefordert ({', '.join(liste[:10])}"
                 f"{' …' if len(liste) > 10 else ''}; zusammen {groesse / 1024 ** 2:.0f} MB)"
                 + _bestaetigt(d))
+    if ereignis == "angefordert" and d.get("aktion") == "sicherung_zeitplan":
+        return (f"Zeitplan der Sicherung: {'werktags' if d.get('tage') == 'werktags' else 'täglich'} um "
+                f"{d.get('uhrzeit', '?')} Uhr" + _bestaetigt(d))
     if ereignis == "upload_begonnen" and d.get("upload_art") in ("paket", "ocr"):
         return _system(e, d)
     if ereignis == "upload_begonnen":
@@ -361,6 +364,20 @@ def _system(e, d) -> str:
     if ereignis == "angefordert" and aktion == "zertifikat_importieren":
         return (f"Zertifikat importieren angefordert: {d.get('inhaber', '')}, ausgestellt von {d.get('aussteller', '')}"
                 + (f", gültig bis {_datum(d['gueltig_bis'])}" if d.get("gueltig_bis") else "") + _bestaetigt(d))
+    if ereignis == "angefordert" and aktion == "journal_aufraeumen":
+        return f"Journal aufräumen angefordert ({'auf' if d.get('journal_art') == 'groesse' else 'älter als'} {d.get('wert', '?')})"
+    if ereignis == "angefordert" and aktion == "images_loeschen":
+        teile = [*(d.get("dateien") or []), *(f"Docker-Images {t}" for t in d.get("tags") or [])]
+        return f"Alte Versionen löschen angefordert: {', '.join(teile[:8])}{' …' if len(teile) > 8 else ''}" + _bestaetigt(d)
+    if ereignis == "angefordert" and aktion == "uhr_einstellen":
+        teile = [f"Zeitsynchronisation {'an' if d.get('ntp') else 'aus'}"]
+        if d.get("server"):
+            teile.append(f"Zeitserver {', '.join(d['server'])}")
+        if d.get("zeitzone"):
+            teile.append(f"Zeitzone {d['zeitzone']}")
+        if d.get("zeit"):
+            teile.append(f"Uhrzeit {d['zeit']}")
+        return "Uhrzeit einstellen angefordert: " + ", ".join(teile) + _bestaetigt(d)
     if ereignis == "angefordert" and aktion == "protokoll":
         return f"Protokoll abgerufen: {e.objekt} (letzte {d.get('zeilen', '?')} Zeilen)"
     if ereignis == "protokoll_heruntergeladen":

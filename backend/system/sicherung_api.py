@@ -19,6 +19,7 @@ POST /api/backup/hochladen/                        {name, groesse} → {upload, 
 PUT  /api/backup/hochladen/<upload>/?versatz=N     nächstes Stück (application/octet-stream, höchstens „teil“ Bytes)
 DELETE /api/backup/hochladen/<upload>/             hochgeladene Datei verwerfen
 POST /api/backup/hochladen/<upload>/einlesen/      {passwort?} → der Server prüft die Sicherung und nimmt sie in die Liste
+POST /api/backup/zeitplan/                         {uhrzeit: "HH:MM", tage: "taeglich" | "werktags", kennwort, code}
 POST /api/backup/loeschen/                         {stempel: [...], kennwort, code} → ausgewählte Sicherungen löschen
                                                    (die jüngste bleibt immer; Auftrag an den Server, Audit-Log)
 
@@ -110,6 +111,10 @@ class UebersichtView(APIView):
             "uploads": sicherung.uploads(),
             "upload": {"teil": sicherung.UPLOAD_TEIL, "max": sicherung.UPLOAD_MAX},
             "naechste_sicherung": d.get("naechste_sicherung"),
+            # Zeitplan der nächtlichen Sicherung (Nachtrag 10.10.2026) mit Hinweis zum Übertragungsfenster
+            "zeitplan": {**(d.get("zeitplan") or sicherung.ZEITPLAN_STANDARD),
+                         "hinweis": sicherung.zeitplan_hinweis((d.get("zeitplan") or sicherung.ZEITPLAN_STANDARD)["uhrzeit"],
+                                                               d.get("ziel"))},
             "nachts_fehlgeschlagen": bool(d.get("nachts_fehlgeschlagen")),
             "gpg": d.get("gpg"),
             "wiederherstellungen": d.get("wiederherstellungen") or [],
@@ -492,3 +497,21 @@ class LoeschenView(APIView):
                                protokoll_details={"stempel": reihe, "anzahl": len(reihe), "groesse": groesse,
                                                   "unverschluesselt": sum(1 for s in reihe
                                                                           if not bekannt[s].get("verschluesselt"))})
+
+
+class ZeitplanView(APIView):
+    """Uhrzeit der nächtlichen Sicherung (Nachtrag 10.10.2026, F179l): täglich oder werktags, HH:MM. Der Agent schreibt ein
+    Drop-in für epm-backup.timer. Mit Passwort und zweitem Faktor wie die anderen Einstellungen der Sicherung."""
+
+    permission_classes = [BackupRecht]
+
+    def post(self, request):
+        uhrzeit, tage = request.data.get("uhrzeit"), request.data.get("tage", "taeglich")
+        if not isinstance(uhrzeit, str) or not sicherung.ZEIT_MUSTER.match(uhrzeit):
+            return _fehler("uhrzeit", "Bitte die Uhrzeit als HH:MM angeben, z. B. 02:00.")
+        if tage not in host.ZEITPLAN_TAGE:
+            return _fehler("tage", "Bitte täglich oder werktags wählen.")
+        hinweis = sicherung.zeitplan_hinweis(uhrzeit, (sicherung.status() or {}).get("ziel"))
+        return auftrag_anlegen(request, "sicherung_zeitplan", parameter={"uhrzeit": uhrzeit, "tage": tage},
+                               objekt="Zeitplan der Sicherung",
+                               protokoll_details={"uhrzeit": uhrzeit, "tage": tage, "hinweis": hinweis})

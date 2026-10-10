@@ -44,7 +44,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
-VERSION = 5  # 5: Systemverwaltung ohne SSH (10.10.2026): Sicherungen löschen, Versionen, Pakete, Zertifikat, Protokolle
+VERSION = 6  # 5: Systemverwaltung ohne SSH (10.10.2026); 6: Zeitplan der Sicherung, Journal und Images aufräumen, Uhrzeit
 KONF = "/etc/epm/epm.conf"
 BACKUP_SKRIPT = "/usr/local/sbin/epm-backup"
 KONF_SICHERUNG = "/etc/epm/sicherung"
@@ -109,13 +109,18 @@ AKTIONEN = {
     "zertifikat_importieren": ("Zertifikat importieren", False),
     "ocr_modelle": ("OCR-Modelle einspielen", False),
     "protokoll": ("Protokoll abrufen", False),
+    # Nachtrag 10.10.2026 (F179l–F179n)
+    "sicherung_zeitplan": ("Zeitplan der Sicherung festlegen", False),
+    "journal_aufraeumen": ("Journal aufräumen", False),
+    "images_loeschen": ("Alte Versionen löschen", False),
+    "uhr_einstellen": ("Uhrzeit einstellen", False),
 }
 # Aktionen, die Sicherungen schreiben, übertragen oder zurückspielen – und das Leeren der Datenbank, das nur den
 # EPM-Stack betrifft: mit --sicherung-echt auch im Probelauf echt (Browsertests gegen den echten Stack)
 SICHERUNG_AKTIONEN = {"sicherung", "sicherung_passwort", "sicherung_ziel", "sicherung_ziel_entfernen",
                       "sicherung_ziel_testen", "sicherung_uebertragen", "sicherung_aufbewahrung",
                       "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen", "datenbank_leeren",
-                      "sicherung_loeschen"}
+                      "sicherung_loeschen", "sicherung_zeitplan"}
 # Art der Sicherung, die eine Aktion vorher erstellt
 VORHER_ART = {"updates_installieren": "vor_update", "server_neustart": "vor_aenderung",
               "wiederherstellen": "vor_wiederherstellung", "datenbank_leeren": "vor_leeren", "epm_zurueck": "vor_update"}
@@ -146,6 +151,22 @@ PEM_MAX = 20000                   # Zeichen je PEM-Datei beim Zertifikat-Import
 # nur Dateien und Ordner – keine Verweise, keine absoluten Pfade, kein „..“
 PAKET_INHALT = re.compile(r"^(TAG|VERSION|SHA256SUMS|images\.tar|(rollout|werkzeuge)(/[A-Za-z0-9._+-]+)*)$")
 OCR_INHALT = re.compile(r"^(modelle\.json|dateien(/[A-Za-z0-9._+-]+)*)$")
+# Zeitplan der nächtlichen Sicherung (Drop-in für epm-backup.timer): Uhrzeit HH:MM, nur diese Wochentag-Muster
+ZEITPLAN_TAGE = {"taeglich": "*-*-*", "werktags": "Mon..Fri *-*-*"}
+ZEITPLAN_STANDARD = {"uhrzeit": "02:00", "tage": "taeglich"}
+ZEITPLAN_DATEI = "epm-backup.timer.d/zeitplan.conf"
+# Journal aufräumen: feste Auswahl (journalctl --vacuum-size / --vacuum-time)
+JOURNAL_GROESSE = ("100M", "200M", "500M", "1G")
+JOURNAL_ZEIT = ("2weeks", "1month", "3months", "6months")
+JOURNAL_CACHE_S = 15 * 60
+# Image-Dateien unter <EPM_BASE>/images: gespeicherte Images je Version und Update-Pakete
+IMAGE_DATEI_MUSTER = re.compile(r"^epm-(paket-)?([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})\.tar$")
+# Uhrzeit: Zeitzone wie „Europe/Berlin“, Zeitserver als Name oder IP-Adresse, Zeit „JJJJ-MM-TT HH:MM:SS“
+ZEITZONE_MUSTER = re.compile(r"^[A-Za-z]+(/[A-Za-z0-9_+-]+){0,2}$|^UTC$")
+NTP_SERVER_MUSTER = re.compile(r"^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*[A-Za-z0-9]([A-Za-z0-9-]{0,61}"
+                               r"[A-Za-z0-9])?$|^[0-9a-fA-F:]{2,39}$")
+NTP_SERVER_MAX = 4
+ZEIT_SETZEN_MUSTER = re.compile(r"^20[2-9][0-9]-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01]) ([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$")
 
 APT_ENV = {"DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE": "a", "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"}
 
@@ -257,6 +278,10 @@ class Agent:
         self.upload = os.path.join(basis, "system", "upload")
         # abgerufene Protokolle (Administration › System › Protokolle): nur für das Backend lesbar, nach 1 Stunde weg
         self.protokolle = os.path.join(self.status, "protokolle")
+        # Systemdateien (in den Tests eigene Ordner): Drop-ins für Timer und Zeitsynchronisation
+        self.systemd = "/etc/systemd/system"
+        self.timesyncd = "/etc/systemd/timesyncd.conf.d"
+        self.chrony = "/etc/chrony"
         einstellungen = lese_konf()
         self.proxy = einstellungen.get("EPM_APT_PROXY", "")
         try:
@@ -563,7 +588,108 @@ class Agent:
         rc, aus = self.befehl(["timedatectl", "show", "-p", "NTPSynchronized", "-p", "NTP", "-p", "Timezone"], zeitlimit=10)
         werte = dict(z.split("=", 1) for z in aus.splitlines() if "=" in z) if rc == 0 else {}
         return {"verfuegbar": rc == 0, "synchronisiert": werte.get("NTPSynchronized") == "yes",
-                "ntp": werte.get("NTP") == "yes", "zeitzone": werte.get("Timezone", "")}
+                "ntp": werte.get("NTP") == "yes", "zeitzone": werte.get("Timezone", ""),
+                "zeit_unix": time.time(), "server": self.ntp_server(), "dienst": self.ntp_dienst(),
+                "zeitzonen": self.zeitzonen()}
+
+    def ntp_dienst(self):
+        """chrony (Ubuntu-Server mit chrony) oder systemd-timesyncd"""
+        return "chrony" if os.path.isdir(os.path.join(self.chrony, "sources.d")) else "timesyncd"
+
+    def ntp_server(self):
+        """Eingetragene Zeitserver (von rollout/01-basis.sh bzw. aus der Oberfläche)"""
+        if self.ntp_dienst() == "chrony":
+            pfad, muster = os.path.join(self.chrony, "sources.d", "epm.sources"), re.compile(r"^\s*(?:server|pool)\s+(\S+)")
+        else:
+            pfad, muster = os.path.join(self.timesyncd, "epm.conf"), None
+        try:
+            with open(pfad, encoding="utf-8") as f:
+                text = f.read()
+        except OSError:
+            return []
+        if muster:
+            return [m.group(1) for m in (muster.match(z) for z in text.splitlines()) if m]
+        m = re.search(r"^NTP=(.*)$", text, re.M)
+        return m.group(1).split() if m else []
+
+    def zeitzonen(self):
+        """Erlaubte Zeitzonen (timedatectl list-timezones), einmal je Tag gelesen"""
+        cache = os.path.join(self.status, ".zeitzonen.json")
+        daten = self.lies(cache) or {}
+        if daten.get("liste") and time.time() - daten.get("zeit", 0) < 86400:
+            return daten["liste"]
+        rc, aus = self.befehl(["timedatectl", "list-timezones"], zeitlimit=20)
+        liste = [z.strip() for z in aus.splitlines() if ZEITZONE_MUSTER.match(z.strip())] if rc == 0 else []
+        if liste:
+            self.schreibe(cache, {"zeit": time.time(), "liste": liste}, kompakt=True)
+        return liste
+
+    def journal(self):
+        """Belegung des Journals (journalctl --disk-usage), höchstens alle 15 Minuten gemessen"""
+        cache = os.path.join(self.status, ".journal.json")
+        daten = self.lies(cache) or {}
+        if daten.get("zeit") and time.time() - daten["zeit"] < JOURNAL_CACHE_S:
+            return daten.get("journal")
+        rc, aus = self.befehl(["journalctl", "--disk-usage"], zeitlimit=30)
+        m = re.search(r"take up ([0-9.]+)([KMGT]?)", aus)
+        if rc != 0 or not m:
+            ergebnis = {"verfuegbar": False}
+        else:
+            faktor = {"": 1, "K": 1024, "M": 1024 ** 2, "G": 1024 ** 3, "T": 1024 ** 4}[m.group(2)]
+            ergebnis = {"verfuegbar": True, "groesse": int(float(m.group(1)) * faktor)}
+        self.schreibe(cache, {"zeit": time.time(), "journal": ergebnis})
+        return ergebnis
+
+    def geschuetzte_tags(self, versionen=None):
+        """Laufende und vorherige Version (für „Zurückschalten“) – nie löschen. Ohne Liste der Versionen: None."""
+        v = versionen or self.epm_versionen()
+        if not v.get("verfuegbar") or not v.get("aktiv"):
+            return None
+        tags = [e["tag"] for e in v["liste"]]
+        geschuetzt = {v["aktiv"]}
+        if v["aktiv"] in tags:
+            i = tags.index(v["aktiv"])
+            if i + 1 < len(tags):
+                geschuetzt.add(tags[i + 1])
+        else:
+            geschuetzt.update(tags[:1])
+        return geschuetzt
+
+    def image_dateien(self, versionen=None):
+        """Image-Dateien und Update-Pakete unter images/ mit Version, Größe und Schutz"""
+        geschuetzt = self.geschuetzte_tags(versionen) or set()
+        ordner = os.path.join(self.basis, "images")
+        liste = []
+        try:
+            namen = sorted(os.listdir(ordner))
+        except OSError:
+            return liste
+        for n in namen:
+            m = IMAGE_DATEI_MUSTER.match(n)
+            if not m:
+                continue
+            try:
+                info = os.lstat(os.path.join(ordner, n))
+            except OSError:
+                continue
+            if not stat.S_ISREG(info.st_mode):
+                continue
+            liste.append({"datei": n, "tag": m.group(2), "art": "paket" if m.group(1) else "images", "groesse": info.st_size,
+                          "zeit": datetime.fromtimestamp(info.st_mtime, timezone.utc).astimezone().isoformat(timespec="seconds"),
+                          "geschuetzt": m.group(2) in geschuetzt})
+        return sorted(liste, key=lambda e: e["zeit"], reverse=True)
+
+    def zeitplan(self):
+        """Zeitplan der nächtlichen Sicherung aus dem Drop-in (sonst Standard 02:00 täglich)"""
+        try:
+            with open(os.path.join(self.systemd, ZEITPLAN_DATEI), encoding="utf-8") as f:
+                text = f.read()
+        except OSError:
+            return {**ZEITPLAN_STANDARD, "eingestellt": False}
+        m = re.search(r"^OnCalendar=(Mon\.\.Fri )?\*-\*-\* ([0-2][0-9]:[0-5][0-9])", text, re.M)
+        if not m:
+            return {**ZEITPLAN_STANDARD, "eingestellt": False}
+        return {"uhrzeit": m.group(2), "tage": "werktags" if m.group(1) else "taeglich", "eingestellt": True}
 
     def ocr_vorrat(self):
         """Offline eingespielte Modelle der zweiten Texterkennung (epm-ocr-modelle einspielen)."""
@@ -637,6 +763,8 @@ class Agent:
             "uhr": self.uhr(),
             "ocr_vorrat": self.ocr_vorrat(),
             "werkzeuge": self.werkzeuge(),
+            "journal": self.journal(),
+            "image_dateien": self.image_dateien(),
             "protokolle": [{"quelle": q, "name": n} for q, n in PROTOKOLLE.items()],
             "trocken": self.trocken,
         }
@@ -1495,6 +1623,7 @@ class Agent:
             "bereitgestellt": self.bereitgestellt(),
             "austausch": os.path.isdir(self.download) and os.path.isdir(self.upload),
             "naechste_sicherung": naechste_sicherung,
+            "zeitplan": self.zeitplan(),
             "nachts_fehlgeschlagen": nachts_fehlgeschlagen,
             "gpg": bool(shutil.which("gpg")),
             "wiederherstellungen": (self.lies(os.path.join(self.status, "wiederherstellungen.json")) or [])[-20:],
@@ -2037,6 +2166,18 @@ class Agent:
         if aktion == "ocr_modelle":
             return self.ocr_einspielen(parameter.get("upload"), zeile, simuliert=t)
 
+        if aktion == "sicherung_zeitplan":
+            return self.zeitplan_setzen(parameter.get("uhrzeit"), parameter.get("tage"), zeile, simuliert=t)
+
+        if aktion == "journal_aufraeumen":
+            return self.journal_aufraeumen(parameter.get("art"), parameter.get("wert"), zeile, simuliert=t)
+
+        if aktion == "images_loeschen":
+            return self.images_loeschen(parameter.get("dateien"), parameter.get("tags"), zeile, simuliert=t)
+
+        if aktion == "uhr_einstellen":
+            return self.uhr_einstellen(parameter, zeile, simuliert=t)
+
         if aktion == "protokoll":
             return self.protokoll_abrufen(parameter.get("quelle"), parameter.get("zeilen"), auftrag_id, zeile)
 
@@ -2434,6 +2575,163 @@ class Agent:
             return 1, f"Leeren fehlgeschlagen – die Sicherung {vorher} enthält den Stand davor."
         return 0, (f"Datenbank geleert (Sicherung vorher: {vorher}). Alle anderen Anmeldungen sind beendet; Musterdaten "
                    "werden nicht mehr automatisch angelegt.")
+
+    # ------------------------------------------------------------ Nachtrag 10.10.2026: Zeitplan, Aufräumen, Uhrzeit
+    def zeitplan_setzen(self, uhrzeit, tage, zeile, simuliert=False):
+        """Zeitplan der nächtlichen Sicherung: Drop-in für epm-backup.timer (OnCalendar), daemon-reload, Timer neu."""
+        if not isinstance(uhrzeit, str) or not ZEIT_MUSTER.match(uhrzeit) or tage not in ZEITPLAN_TAGE:
+            return 2, "Ungültiger Zeitplan – bitte Uhrzeit (HH:MM) und täglich oder werktags wählen."
+        inhalt = ("# Zeitplan aus Administration › Backup (epm-systemagent)\n[Timer]\nOnCalendar=\n"
+                  f"OnCalendar={ZEITPLAN_TAGE[tage]} {uhrzeit}:00\n")
+        text = f"{'werktags (Mo–Fr)' if tage == 'werktags' else 'täglich'} um {uhrzeit} Uhr"
+        zeile(f"Zeitplan: {text}\n{inhalt}")
+        if simuliert:
+            return 0, f"Probelauf: Zeitplan ({text}) nicht gesetzt."
+        pfad = os.path.join(self.systemd, ZEITPLAN_DATEI)
+        os.makedirs(os.path.dirname(pfad), mode=0o755, exist_ok=True)
+        tmp = f"{pfad}.tmp{os.getpid()}"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(inhalt)
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, pfad)
+        rc = self.schritt("systemd", ["systemctl", "daemon-reload"], zeile, zeitlimit=60)
+        if rc == 0:
+            rc = self.schritt("Timer", ["systemctl", "restart", "epm-backup.timer"], zeile, zeitlimit=60)
+        self.sicherung_status_schreiben()
+        if rc != 0:
+            return rc, f"Zeitplan gespeichert ({text}), aber systemd hat ihn nicht übernommen – Ausgabe prüfen."
+        return 0, f"Die Sicherung läuft ab jetzt {text}."
+
+    def journal_aufraeumen(self, art, wert, zeile, simuliert=False):
+        if art == "groesse" and wert in JOURNAL_GROESSE:
+            args = ["journalctl", f"--vacuum-size={wert}"]
+        elif art == "zeit" and wert in JOURNAL_ZEIT:
+            args = ["journalctl", f"--vacuum-time={wert}"]
+        else:
+            return 2, "Ungültige Auswahl – nichts aufgeräumt."
+        if simuliert:
+            zeile(f"\n(Probelauf) {' '.join(args)}\n")
+            return 0, "Probelauf: Journal nicht aufgeräumt."
+        rc = self.schritt("Journal", args, zeile, zeitlimit=600)
+        try:
+            os.unlink(os.path.join(self.status, ".journal.json"))
+        except OSError:
+            pass
+        j = self.journal() or {}
+        return (0, "Journal aufgeräumt" + (f" – belegt jetzt {j['groesse'] // (1024 * 1024)} MB." if j.get("groesse") else ".")) \
+            if rc == 0 else (rc, "Aufräumen des Journals fehlgeschlagen.")
+
+    def images_loeschen(self, dateien, tags, zeile, simuliert=False):
+        """Alte Image-Dateien/Update-Pakete unter images/ und alte Docker-Images von EPM löschen. Die laufende und die
+        vorherige Version (Zurückschalten) bleiben immer; ohne Liste der Versionen wird nichts gelöscht."""
+        dateien = dateien or []
+        tags = tags or []
+        if not isinstance(dateien, list) or not isinstance(tags, list) or not (dateien or tags) \
+                or len(dateien) + len(tags) > 100 \
+                or any(not isinstance(d, str) or not IMAGE_DATEI_MUSTER.match(d) for d in dateien) \
+                or any(not isinstance(x, str) or not TAG_MUSTER.match(x) for x in tags):
+            return 2, "Ungültige Auswahl – nichts gelöscht."
+        v = self.epm_versionen()
+        geschuetzt = self.geschuetzte_tags(v)
+        if geschuetzt is None:
+            return 1, "Die laufende Version ist nicht zu ermitteln – zur Sicherheit wird nichts gelöscht."
+        betroffen = sorted({IMAGE_DATEI_MUSTER.match(d).group(2) for d in dateien} | set(tags))
+        if betroffen and set(betroffen) & geschuetzt:
+            return 2, (f"Die laufende und die vorherige Version ({', '.join(sorted(geschuetzt))}) bleiben immer – "
+                       "nichts gelöscht.")
+        vorhanden = {e["datei"] for e in self.image_dateien(v)}
+        bekannt = {e["tag"] for e in v["liste"]}
+        fehlen = [d for d in dateien if d not in vorhanden] + [x for x in tags if x not in bekannt]
+        if fehlen:
+            return 2, f"Nicht (mehr) vorhanden: {', '.join(fehlen[:5])} – nichts gelöscht."
+        zeile(f"Geschützt: {', '.join(sorted(geschuetzt))}\nDateien: {', '.join(dateien) or '—'}\n"
+              f"Docker-Images: {', '.join(tags) or '—'}\n")
+        if simuliert:
+            return 0, f"Probelauf: {len(dateien)} Dateien und {len(tags)} Versionen nicht gelöscht."
+        frei, fehler = 0, 0
+        for d in dateien:
+            pfad = os.path.join(self.basis, "images", d)
+            try:
+                info = os.lstat(pfad)
+                if stat.S_ISREG(info.st_mode):
+                    os.unlink(pfad)
+                    frei += info.st_size
+            except OSError as e:
+                fehler += 1
+                zeile(f"Nicht gelöscht: {d} ({e.strerror})\n")
+        for x in tags:
+            for image in ("epm-backend", "epm-web"):
+                # ohne -f: ein Image, das ein Container benutzt, lehnt docker ab
+                if self.schritt("Image", ["docker", "image", "rm", f"{image}:{x}"], zeile, zeitlimit=300) != 0:
+                    fehler += 1
+        if fehler:
+            return 1, f"Nicht alles ließ sich löschen ({fehler} Fehler) – Ausgabe prüfen."
+        return 0, f"{len(dateien)} Dateien ({frei // (1024 * 1024)} MB) und {len(tags)} Versionen gelöscht."
+
+    def uhr_einstellen(self, p, zeile, simuliert=False):
+        """Zeitzone, Zeitsynchronisation (an/aus, eigene Zeitserver z. B. die OPNsense) und – ohne NTP – die Uhrzeit."""
+        zone, ntp, server, zeit = p.get("zeitzone"), p.get("ntp"), p.get("server"), p.get("zeit")
+        if not isinstance(ntp, bool) or not isinstance(server, list) or len(server) > NTP_SERVER_MAX \
+                or any(not isinstance(s, str) or not NTP_SERVER_MUSTER.match(s) for s in server):
+            return 2, "Ungültige Angaben zur Zeitsynchronisation – nichts geändert."
+        if zone is not None and (not isinstance(zone, str) or not ZEITZONE_MUSTER.match(zone)):
+            return 2, "Unbekannte Zeitzone – nichts geändert."
+        if zone is not None and self.zeitzonen() and zone not in self.zeitzonen():
+            return 2, f"Die Zeitzone „{zone}“ kennt der Server nicht – nichts geändert."
+        if zeit is not None and (ntp or not isinstance(zeit, str) or not ZEIT_SETZEN_MUSTER.match(zeit)):
+            return 2, "Die Uhrzeit lässt sich nur bei ausgeschalteter Zeitsynchronisation setzen (JJJJ-MM-TT HH:MM:SS)."
+        schritte = []
+        if zone:
+            schritte.append(("Zeitzone", ["timedatectl", "set-timezone", zone]))
+        dienst = self.ntp_dienst()
+        zeile(f"Zeitsynchronisation über {dienst}: {'an' if ntp else 'aus'}; Zeitserver: {' '.join(server) or 'Standard'}\n")
+        if simuliert:
+            for titel, args in schritte:
+                zeile(f"(Probelauf) {' '.join(args)}\n")
+            zeile(f"(Probelauf) Zeitserver eintragen, timedatectl set-ntp {'true' if ntp else 'false'}"
+                  + (f", timedatectl set-time '{zeit}'" if zeit else "") + "\n")
+            return 0, "Probelauf: Uhrzeit nicht geändert."
+        for titel, args in schritte:
+            if self.schritt(titel, args, zeile, zeitlimit=60) != 0:
+                return 1, "Die Zeitzone ließ sich nicht setzen – nichts weiter geändert."
+        if dienst == "chrony":
+            pfad = os.path.join(self.chrony, "sources.d", "epm.sources")
+            if server:
+                with open(pfad, "w", encoding="utf-8") as f:
+                    f.write("".join(f"server {s} iburst\n" for s in server))
+            elif os.path.exists(pfad):
+                os.unlink(pfad)
+            konf = os.path.join(self.chrony, "chrony.conf")
+            try:
+                with open(konf, encoding="utf-8") as f:
+                    text = f.read()
+                # eigene Zeitserver: öffentliche Pools aus; ohne eigene wieder an (wie rollout/01-basis.sh)
+                neu = re.sub(r"^(pool .*)$", r"# \1", text, flags=re.M) if server else \
+                    re.sub(r"^# (pool .*)$", r"\1", text, flags=re.M)
+                if neu != text:
+                    with open(konf, "w", encoding="utf-8") as f:
+                        f.write(neu)
+            except OSError:
+                pass
+            einheit = "chrony"
+        else:
+            pfad = os.path.join(self.timesyncd, "epm.conf")
+            if server:
+                os.makedirs(self.timesyncd, mode=0o755, exist_ok=True)
+                with open(pfad, "w", encoding="utf-8") as f:
+                    f.write(f"[Time]\nNTP={' '.join(server)}\nFallbackNTP=\n")
+            elif os.path.exists(pfad):
+                os.unlink(pfad)
+            einheit = "systemd-timesyncd"
+        self.schritt("Zeitsynchronisation", ["timedatectl", "set-ntp", "true" if ntp else "false"], zeile, zeitlimit=60)
+        if ntp:
+            self.schritt("Zeitserver", ["systemctl", "restart", einheit], zeile, zeitlimit=60)
+        if zeit:
+            if self.schritt("Uhrzeit", ["timedatectl", "set-time", zeit], zeile, zeitlimit=60) != 0:
+                return 1, "Die Uhrzeit ließ sich nicht setzen – Ausgabe prüfen."
+        return 0, ("Zeitsynchronisation an" + (f" (Zeitserver {', '.join(server)})" if server else "") if ntp
+                   else "Zeitsynchronisation aus" + (f", Uhrzeit auf {zeit} gesetzt" if zeit else "")) + \
+            (f"; Zeitzone {zone}" if zone else "") + "."
 
     def ergebnisse_aufraeumen(self):
         try:

@@ -164,7 +164,8 @@ AKTIONEN = {
                         "(sudo epm-zertifikat importieren).",
     },
     "ocr_modelle": {
-        "name": "OCR-Modelle einspielen", "bestaetigung": "einfach", "intern": True,
+        # Nachtrag 10.10.2026: wie die anderen Uploads, die Dateien auf den Server bringen, mit Passwort und 2FA
+        "name": "OCR-Modelle einspielen", "bestaetigung": "2fa", "intern": True,
         "beschreibung": "Offline vorbereitete Modelle der zweiten Texterkennung prüfen und ablegen (sudo epm-ocr-modelle "
                         "einspielen); das nächste „EPM aktualisieren“ baut sie ins Image.",
     },
@@ -172,12 +173,32 @@ AKTIONEN = {
         "name": "Protokoll abrufen", "bestaetigung": "keine", "intern": True, "mehrfach": True,
         "beschreibung": "Letzte Zeilen eines Protokolls (Container, Systemagent, Sicherung, Update) – nur lesend.",
     },
+    # ---- Nachtrag 10.10.2026 (F179l–F179n)
+    "sicherung_zeitplan": {
+        "name": "Zeitplan der Sicherung festlegen", "bestaetigung": "2fa", "recht": "backup_verwalten", "intern": True,
+        "beschreibung": "Uhrzeit der nächtlichen Sicherung (täglich oder werktags). Der Server stellt den Timer um.",
+    },
+    "journal_aufraeumen": {
+        "name": "Journal aufräumen", "bestaetigung": "einfach", "intern": True,
+        "beschreibung": "Ältere Einträge des Systemprotokolls (Journal) entfernen – auf eine Größe oder ein Alter.",
+    },
+    "images_loeschen": {
+        "name": "Alte Versionen löschen", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Gespeicherte Image-Dateien, Update-Pakete und Docker-Images alter Versionen löschen. Die "
+                        "laufende und die vorherige Version (für „Zurückschalten“) bleiben immer.",
+    },
+    "uhr_einstellen": {
+        "name": "Uhrzeit einstellen", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Zeitzone, Zeitsynchronisation (NTP) mit eigenem Zeitserver, z. B. der OPNsense, oder die "
+                        "Uhrzeit von Hand.",
+    },
 }
 
 # Aktionen der Seite Administration › Backup (für deren Liste der Tätigkeiten)
 SICHERUNG_AKTIONEN = ("sicherung", "sicherung_passwort", "sicherung_ziel", "sicherung_ziel_entfernen",
                       "sicherung_ziel_testen", "sicherung_uebertragen", "sicherung_aufbewahrung",
-                      "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen", "sicherung_loeschen")
+                      "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen", "sicherung_loeschen",
+                      "sicherung_zeitplan")
 
 # Systemverwaltung ohne SSH (10.10.2026): dieselben Listen und Muster wie im Agenten (der prüft noch einmal)
 DIENSTE = ("backend", "web", "ocr", "db")
@@ -190,6 +211,16 @@ PROTOKOLLE = {
 }
 PROTOKOLL_ZEILEN = (100, 500, 2000)
 LOESCHEN_MAX = 200
+# Nachtrag 10.10.2026: wie im Agenten
+ZEITPLAN_TAGE = ("taeglich", "werktags")
+JOURNAL_GROESSE = ("100M", "200M", "500M", "1G")
+JOURNAL_ZEIT = ("2weeks", "1month", "3months", "6months")
+IMAGE_DATEI_MUSTER = re.compile(r"^epm-(paket-)?([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})\.tar$")
+ZEITZONE_MUSTER = re.compile(r"^[A-Za-z]+(/[A-Za-z0-9_+-]+){0,2}$|^UTC$")
+NTP_SERVER_MUSTER = re.compile(r"^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*[A-Za-z0-9]([A-Za-z0-9-]{0,61}"
+                               r"[A-Za-z0-9])?$|^[0-9a-fA-F:]{2,39}$")
+NTP_SERVER_MAX = 4
+ZEIT_SETZEN_MUSTER = re.compile(r"^20[2-9][0-9]-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01]) ([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$")
 
 STATUS_VERALTET_S = 180   # der Agent misst jede Minute; älter heißt: Agent läuft nicht
 

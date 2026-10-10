@@ -31,7 +31,8 @@ from .models import Systemauftrag, Systemhinweis
 MINUTEN_ERLAUBT = (0, 5, 10, 15, 30, 60)
 # Aufträge der Wartung ohne SSH (F179, system/verwaltung_api.py) – eigene Endpunkte, eigene Bereiche der Seite
 VERWALTUNG_AKTIONEN = ("dienst_neustart", "epm_zurueck", "epm_paket", "epm_paket_erstellen", "zertifikat_erneuern",
-                       "zertifikat_importieren", "ocr_modelle", "protokoll")
+                       "zertifikat_importieren", "ocr_modelle", "protokoll", "journal_aufraeumen", "images_loeschen",
+                       "uhr_einstellen")
 # so lange bleibt die Warnung nach dem Beginn stehen (falls der Auftrag sie nicht vorher beendet)
 WARNUNG_NACHLAUF = {"updates_installieren": 60, "server_neustart": 15, "epm_neustart": 5, "wiederherstellen": 30,
                     "dienst_neustart": 5, "epm_zurueck": 15, "epm_paket": 30}
