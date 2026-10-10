@@ -27,12 +27,21 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
-from .models import GelernteZuordnung, KorrekturZaehler
+from .models import GelernteZuordnung, KorrekturZaehler, LernEinstellung
 from .ocr import auswertung
 
 G = GelernteZuordnung.Art
-# In die Wörterliste für Tesseract kommen Bezeichnungen ab so vielen Bestätigungen
-WOERTER_AB = auswertung.SCHWELLE
+
+
+def schwelle() -> int:
+    """Ab so vielen Bestätigungen gilt eine gelernte Zuordnung als sicher (Steuerung, 1–3; Standard 2). Ab derselben
+    Zahl kommen Bezeichnungen in die Wörterliste für Tesseract."""
+    return max(1, min(3, LernEinstellung.aktuell().schwelle))
+
+
+def pausiert() -> bool:
+    """„Lernen pausieren“ (F189): nichts Neues lernen; Gelerntes wird weiter angewandt, die Kennzahl weiter gezählt."""
+    return LernEinstellung.aktuell().pausiert
 
 # Wörter, die auf Angaben zur Person hindeuten – solche Bezeichnungen werden nie gelernt
 _PERSON = {"patient", "patientin", "name", "vorname", "nachname", "geb", "geboren", "geburtsdatum", "herr", "herrn",
@@ -44,25 +53,35 @@ _DATUM = re.compile(r"\d{1,2}\s?[.\-/]\s?\d{1,2}\s?[.\-/]\s?\d{2,4}")
 # ---------------------------------------------------------------- Lesen für die Auswertung
 def gelerntes() -> auswertung.Gelerntes:
     """Alle gelernten Zuordnungen für ``auswertung.auswerten`` (eine Abfrage)."""
-    eintraege, gesperrt, spalten = {}, set(), {}
+    eintraege, gesperrt, spalten, ignorieren, bereiche = {}, set(), {}, set(), {}
+    n = schwelle()
     for g in GelernteZuordnung.objects.only("art", "quelle", "erkannt", "ziel", "ziel_text", "bestaetigt", "gesperrt",
-                                            "spalte_x", "spalte_zeichen").iterator():
+                                            "spalte_x", "spalte_zeichen", "bereich").iterator():
         if g.gesperrt:
             gesperrt.add((g.art, g.quelle, g.erkannt, g.ziel))
             continue
         if g.art == G.SPALTE:
-            if g.quelle and g.spalte_x and g.spalte_zeichen and g.bestaetigt >= auswertung.SCHWELLE:
+            if g.quelle and g.spalte_x and g.spalte_zeichen and g.bestaetigt >= n:
                 spalten[g.quelle] = (g.spalte_x, g.spalte_zeichen)
             continue
+        if g.art == G.IGNORIEREN:
+            # ausdrücklich angemerkt – gilt sofort (eine Anmerkung reicht)
+            if g.bestaetigt >= 1:
+                ignorieren.add((g.quelle, g.erkannt))
+            continue
+        if g.art == G.BEREICH:
+            if g.quelle and isinstance(g.bereich, list) and len(g.bereich) == 4 and g.bestaetigt >= n:
+                bereiche.setdefault(g.quelle, []).append(g.bereich)
+            continue
         eintraege.setdefault((g.art, g.quelle, g.erkannt), []).append((g.ziel, g.ziel_text, g.bestaetigt))
-    return auswertung.Gelerntes(eintraege, gesperrt, spalten)
+    return auswertung.Gelerntes(eintraege, gesperrt, spalten, ignorieren, bereiche, n)
 
 
 def woerter() -> set[str]:
     """Häufig bestätigte Bezeichnungen für die Wörterliste von Tesseract (``--user-words``) – ohne Lesefehler."""
     aus = set()
-    qs = GelernteZuordnung.objects.filter(gesperrt=False, lesefehler=False, bestaetigt__gte=WOERTER_AB).exclude(
-        art=G.SPALTE)
+    qs = GelernteZuordnung.objects.filter(gesperrt=False, lesefehler=False, bestaetigt__gte=schwelle()).filter(
+        art__in=[G.LABOR, G.BIA, G.DIAGNOSE])
     for anzeige, ziel_text, art in qs.values_list("erkannt_anzeige", "ziel_text", "art"):
         text = ziel_text if art == G.DIAGNOSE else anzeige
         for teil in re.split(r"[\s()\[\],;:/]+", text or ""):
@@ -79,7 +98,7 @@ def _namensteile(patient) -> set[str]:
     return teile
 
 
-def zulaessig(text: str, patient=None) -> bool:
+def zulaessig(text: str, patient=None, namen: set | None = None) -> bool:
     """Darf diese Bezeichnung gelernt werden? Nein bei Datum, langen Zahlen, Wörtern zur Person, dem Namen des
     Patienten oder sehr langen Texten (dann ist es keine Bezeichnung)."""
     if not text or len(text) > 80 or _DATUM.search(text) or re.search(r"\d{5,}", text):
@@ -92,18 +111,25 @@ def zulaessig(text: str, patient=None) -> bool:
         return False
     if patient is not None and teile & _namensteile(patient):
         return False
+    if namen and teile & {t for t in namen if len(t) >= 3}:
+        return False   # im Dokument als Name gelesen (F183-Hinweise)
     return True
 
 
 # ---------------------------------------------------------------- Schreiben
 def _merken(art: str, quelle: str, quelle_anzeige: str, erkannt: str, ziel: str, user, *, ziel_text: str = "",
-            parameter=None, lesefehler: bool = False):
-    """Eine Zuordnung je Absender und allgemein bestätigen (anlegen oder hochzählen)."""
+            parameter=None, lesefehler: bool = False, nur_quelle: bool = False):
+    """Eine Zuordnung je Absender und allgemein bestätigen (anlegen oder hochzählen). ``nur_quelle``: nur für diesen
+    Absender (ohne Absender allgemein)."""
     n = auswertung.norm(erkannt)[:200]
     if not n or not ziel:
         return
     jetzt = timezone.now()
-    for q, q_anzeige in ({(quelle, quelle_anzeige), ("", "")} if quelle else {("", "")}):
+    if nur_quelle:
+        ziele = {(quelle, quelle_anzeige)}
+    else:
+        ziele = {(quelle, quelle_anzeige), ("", "")} if quelle else {("", "")}
+    for q, q_anzeige in ziele:
         g, neu = GelernteZuordnung.objects.get_or_create(
             art=art, quelle=q, erkannt=n, ziel=str(ziel)[:40],
             defaults={"quelle_anzeige": q_anzeige[:150], "erkannt_anzeige": erkannt[:200], "ziel_text": ziel_text[:200],
@@ -187,7 +213,8 @@ def aus_zuordnung(scan, daten: dict, user, patient=None) -> dict:
     → {"gelernt": Anzahl, "zahlen": {art: [übernommen, korrigiert]}}"""
     a = scan.auswertung or {}
     herkunft = daten.get("herkunft") if isinstance(daten.get("herkunft"), dict) else {}
-    lernt = not getattr(user, "ist_test", False)
+    zaehlt = not getattr(user, "ist_test", False)
+    lernt = zaehlt and not pausiert()
     absender = str((a.get("labor") or {}).get("name") or "")
     quelle = auswertung.norm(absender)[:150]
     reihen = None
@@ -207,7 +234,7 @@ def aus_zuordnung(scan, daten: dict, user, patient=None) -> dict:
     if labor:
         erkannte = (a.get("labor") or {}).get("werte") or []
         herk = herkunft.get("labor") if isinstance(herkunft.get("labor"), list) else []
-        lagen = []
+        lagen, bereiche_bestaetigt = [], []
         from stammdaten.models import Laborparameter
 
         for i, w in enumerate(labor.get("werte") or []):
@@ -225,6 +252,8 @@ def aus_zuordnung(scan, daten: dict, user, patient=None) -> dict:
             zahlen["labor"][1] += int(korrigiert)
             if q is not None and not korrigiert and q.get("wert_x") and q.get("wert_zeichen"):
                 lagen.append((float(q["wert_x"]), float(q["wert_zeichen"])))
+            if q is not None and param and str(q.get("parameter") or "") == param and isinstance(q.get("bereich"), list):
+                bereiche_bestaetigt.append(tuple(q["bereich"]))
             if not lernt or not param:
                 continue
             p = Laborparameter.objects.filter(pk=param).first()
@@ -249,6 +278,9 @@ def aus_zuordnung(scan, daten: dict, user, patient=None) -> dict:
                 gelernt += 1
         if lernt:
             _spalte_merken(quelle, absender, lagen, user)
+            # markierte Bereiche, aus denen Werte übernommen wurden: dort sucht der OCR-Dienst beim nächsten Befund
+            for box in set(bereiche_bestaetigt):
+                bereich_merken(quelle, absender, list(box), user)
 
     # ------------------------------------------------ BIA
     bia = daten.get("bia") if isinstance(daten.get("bia"), dict) else None
@@ -304,9 +336,127 @@ def aus_zuordnung(scan, daten: dict, user, patient=None) -> dict:
                         lesefehler=auswertung.norm(erkannt) != auswertung.norm(bez))
                 gelernt += 1
 
-    if lernt:
+    if zaehlt:
         _zaehlen(zahlen)
     return {"gelernt": gelernt, "zahlen": zahlen}
+
+
+# ---------------------------------------------------------------- F189: Bereich und „falsch erkannt“
+def _ueberdeckung(a, b) -> float:
+    """Anteil der Überdeckung zweier Rahmen (Schnitt durch Vereinigung)."""
+    x0, y0 = max(a[0], b[0]), max(a[1], b[1])
+    x1, y1 = min(a[0] + a[2], b[0] + b[2]), min(a[1] + a[3], b[1] + b[3])
+    schnitt = max(0.0, x1 - x0) * max(0.0, y1 - y0)
+    verein = a[2] * a[3] + b[2] * b[3] - schnitt
+    return schnitt / verein if verein > 0 else 0.0
+
+
+def bereich_merken(quelle: str, quelle_anzeige: str, box: list, user):
+    """Bereich der Werte für diesen Absender bestätigen: ähnlicher Bereich → hochzählen und mitteln, sonst neu.
+    Ohne Absender wird nichts gelernt (ein Bereich gilt nur für ein Layout)."""
+    if not quelle or len(box) != 4:
+        return
+    box = [round(float(v), 4) for v in box]
+    for eintrag in GelernteZuordnung.objects.filter(art=G.BEREICH, quelle=quelle):
+        if isinstance(eintrag.bereich, list) and _ueberdeckung(eintrag.bereich, box) >= 0.5:
+            if eintrag.gesperrt:
+                return
+            n = eintrag.bestaetigt
+            eintrag.bereich = [round((a * n + b) / (n + 1), 4) for a, b in zip(eintrag.bereich, box)]
+            eintrag.bestaetigt = n + 1
+            eintrag.zuletzt_am, eintrag.zuletzt_von = timezone.now(), user
+            eintrag.save(update_fields=["bereich", "bestaetigt", "zuletzt_am", "zuletzt_von"])
+            return
+    nr = GelernteZuordnung.objects.filter(art=G.BEREICH, quelle=quelle).count() + 1
+    GelernteZuordnung.objects.create(art=G.BEREICH, quelle=quelle, quelle_anzeige=quelle_anzeige[:150],
+                                     erkannt=f"bereich {nr}", erkannt_anzeige=f"Bereich {nr} der Werte", ziel=f"b{nr}",
+                                     bereich=box, bestaetigt=1, zuletzt_von=user)
+
+
+GRUENDE = {"falsche_zeile": "falsche Zeile", "falscher_wert": "falscher Wert", "gehoert_nicht_dazu": "gehört nicht dazu"}
+
+
+def _sperren(art: str, quelle: str, quelle_anzeige: str, erkannt: str, ziel: str, user):
+    """Für diesen Absender (ohne Absender: allgemein) „nie wieder so zuordnen“."""
+    n = auswertung.norm(erkannt)[:200]
+    if not n or not ziel:
+        return
+    eintrag, neu = GelernteZuordnung.objects.get_or_create(
+        art=art, quelle=quelle, erkannt=n, ziel=str(ziel)[:40],
+        defaults={"quelle_anzeige": quelle_anzeige[:150], "erkannt_anzeige": erkannt[:200], "gesperrt": True,
+                  "zuletzt_von": user})
+    if not neu and not eintrag.gesperrt:
+        GelernteZuordnung.objects.filter(pk=eintrag.pk).update(gesperrt=True, zuletzt_am=timezone.now(),
+                                                               zuletzt_von=user)
+
+
+@transaction.atomic
+def falsch_erkannt(scan, art: str, index, grund: str, user) -> dict:
+    """„Falsch erkannt“ (F189): Vorschlag verwerfen (bleibt im Scan als verworfen markiert) und daraus lernen.
+
+    - gehört nicht dazu (Kopfzeile, Referenzbereich, Datum …): die Bezeichnung wird für diesen Absender nicht mehr
+      ausgewertet (``IGNORIEREN``);
+    - falsche Zeile (die Bezeichnung gehört nicht zu diesem Laborwert/Feld): eine gelernte Zuordnung verliert eine
+      Bestätigung; eine nur ähnlich geratene wird für diesen Absender gesperrt;
+    - falscher Wert (Zahl falsch gelesen): nichts zu lernen, nur gezählt.
+    Keine Patientendaten: nur die Bezeichnung, und nur, wenn sie nichts zur Person enthält.
+    → {"gelernt": "ignorieren" | "widersprochen" | "gesperrt" | "", "art": …}"""
+    if grund not in GRUENDE:
+        raise ValueError("Bitte einen Grund wählen.")
+    a = dict(scan.auswertung or {})
+    absender = str((a.get("labor") or {}).get("name") or "")
+    quelle = auswertung.norm(absender)[:150]
+    namen = set(((a.get("patient") or {}).get("namen")) or [])
+    if art == "labor":
+        liste = (a.get("labor") or {}).get("werte") or []
+        try:
+            q = liste[int(index)]
+        except (TypeError, ValueError, IndexError):
+            raise ValueError("Diese Zeile gibt es nicht (mehr).") from None
+        etikett, ziel = q.get("erkannt_als") or "", str(q.get("parameter") or "")
+        lernart = G.LABOR
+    elif art == "bia":
+        werte = (a.get("bia") or {}).get("werte") or {}
+        q = werte.get(str(index))
+        if q is None:
+            raise ValueError("Diesen Wert gibt es nicht (mehr).")
+        etikett, ziel = q.get("erkannt_als") or "", str(index)
+        lernart = G.BIA
+    elif art == "diagnose":
+        liste = a.get("diagnosen") or []
+        try:
+            q = liste[int(index)]
+        except (TypeError, ValueError, IndexError):
+            raise ValueError("Diese Diagnose gibt es nicht (mehr).") from None
+        etikett, ziel = q.get("erkannt_als") or q.get("bezeichnung") or "", q.get("icd_code") or ""
+        lernart = G.DIAGNOSE
+    else:
+        raise ValueError("Unbekannte Art.")
+    q["verworfen"] = grund
+    from .models import Scan
+
+    Scan.objects.filter(pk=scan.pk).update(auswertung=a)
+    scan.auswertung = a
+    ergebnis = ""
+    zaehlt = not getattr(user, "ist_test", False)
+    if zaehlt and not pausiert() and zulaessig(etikett, None, namen):
+        zuordnung = q.get("zuordnung") or ""
+        if grund == "gehoert_nicht_dazu":
+            _merken(G.IGNORIEREN, quelle, absender, etikett, "ignorieren", user, ziel_text=GRUENDE[grund],
+                    nur_quelle=True)
+            ergebnis = "ignorieren"
+        elif grund == "falsche_zeile" and ziel:
+            if zuordnung in ("gelernt", "gelernt_vorschlag"):
+                _widersprechen(lernart, quelle, etikett, ziel)
+                ergebnis = "widersprochen"
+            elif zuordnung == "aehnlich" or lernart == G.BIA:
+                _sperren(lernart, quelle, absender, etikett, ziel, user)
+                ergebnis = "gesperrt"
+    if zaehlt:
+        monat = timezone.localdate().replace(day=1)
+        z, _ = KorrekturZaehler.objects.get_or_create(monat=monat, art=art)
+        KorrekturZaehler.objects.filter(pk=z.pk).update(verworfen=F("verworfen") + 1)
+    return {"gelernt": ergebnis, "art": art}
 
 
 # ---------------------------------------------------------------- Kennzahl
@@ -322,13 +472,14 @@ def kennzahl(monate: int = 12, heute: date | None = None) -> dict:
     aus = []
     for m in liste:
         arten = {}
-        summe_u = summe_k = 0
+        summe_u = summe_k = summe_v = 0
         for art in ("labor", "bia", "diagnose"):
             z = zaehler.get((m, art))
-            u, k = (z.uebernommen, z.korrigiert) if z else (0, 0)
-            summe_u, summe_k = summe_u + u, summe_k + k
-            arten[art] = {"uebernommen": u, "korrigiert": k, "anteil": round(100 * k / u, 1) if u else None}
-        aus.append({"monat": m.isoformat(), "uebernommen": summe_u, "korrigiert": summe_k,
+            u, k, v = (z.uebernommen, z.korrigiert, z.verworfen) if z else (0, 0, 0)
+            summe_u, summe_k, summe_v = summe_u + u, summe_k + k, summe_v + v
+            arten[art] = {"uebernommen": u, "korrigiert": k, "verworfen": v,
+                          "anteil": round(100 * k / u, 1) if u else None}
+        aus.append({"monat": m.isoformat(), "uebernommen": summe_u, "korrigiert": summe_k, "verworfen": summe_v,
                     "anteil": round(100 * summe_k / summe_u, 1) if summe_u else None, "arten": arten})
     aktuell, vorher = aus[-1], aus[-2] if len(aus) > 1 else None
     trend = None
@@ -336,7 +487,7 @@ def kennzahl(monate: int = 12, heute: date | None = None) -> dict:
         trend = round(aktuell["anteil"] - vorher["anteil"], 1)
     return {"monate": aus, "aktuell": aktuell, "vormonat": vorher, "trend": trend,
             "gelernt": GelernteZuordnung.objects.filter(gesperrt=False).exclude(art=G.SPALTE).count(),
-            "schwelle": auswertung.SCHWELLE}
+            "schwelle": schwelle(), "pausiert": pausiert()}
 
 
 # ---------------------------------------------------------------- Leeren

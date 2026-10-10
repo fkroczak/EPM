@@ -3565,6 +3565,53 @@ zur Laufzeit etwas nach außen schickt, steht in `docs/OFFLINE-BETRIEB-2026-10-1
   außer im bestehenden Audit-Eintrag beim Zuordnen.
 - **Teststatus:** exakter Treffer, Lesefehler im Namen, zwei Gleichnamige mit verschiedenem Geburtsdatum, fremde
   (eingeschränkte) Akte und Testzugang, kein Treffer (`PatientErkennenTest`) grün. **Browsertests: Lauf steht aus.**
+### F189 Erkennung verbessern: falsch erkannt anmerken, richtigen Bereich markieren
+- **Falsch erkannt** (`POST /api/scans/{id}/falsch/` `{"art": "labor"|"bia"|"diagnose", "index": Nr. bzw. BIA-Feld,
+  "grund": "falsche_zeile"|"falscher_wert"|"gehoert_nicht_dazu"}`, `lernen.falsch_erkannt`): In der Prüfansicht hat
+  jede erkannte Labor-Zeile, jeder BIA-Wert und jede Diagnose den Knopf „Falsch erkannt“ mit Grund. Wirkt sofort (die
+  Zeile verschwindet, im Scan als `verworfen` markiert, bleibt es auch bei neuer Auswertung) und lernt:
+  - *gehört nicht dazu* (Kopfzeile, Referenzbereich, Datum): Bezeichnung für diesen Absender „nicht auswerten“
+    (`GelernteZuordnung.Art.IGNORIEREN`, gilt ab der ersten Anmerkung, nur für dieses Labor bzw. ohne Labor allgemein);
+  - *falsche Zeile*: gelernte Zuordnung verliert eine Bestätigung; eine nur ähnlich geratene (bzw. ein BIA-Feld) wird
+    für diesen Absender gesperrt; ein exakter Katalogtreffer bleibt (meist ist dann die Zeile verrutscht);
+  - *falscher Wert*: nichts gelernt.
+  Gezählt als `verworfen` in der Kennzahl (`KorrekturZaehler.verworfen`). Keine Patientendaten: Bezeichnungen mit
+  Wörtern, die im Dokument als Name gelesen wurden (F183-Hinweise), Datum oder Angaben zur Person werden nicht
+  gelernt. Audit-Log nur mit Art und Grund, ohne Inhalt. Testzugänge und pausiertes Lernen: verwerfen ja, lernen nein.
+- **Richtigen Bereich markieren** (`POST /api/scans/{id}/seiten/{sid}/ausschnitt/` `{"box": [x, y, b, h]}` relativ
+  0–1, `dienst.bereich_lesen`, `scans/ocr/ausschnitt.py`): Knopf „Bereich markieren“ beim Laborbefund, dann Rahmen im
+  Bild aufziehen – mit Maus oder Finger (Pointer-Ereignisse mit `touch-action: none`, Koordinaten relativ zur
+  angezeigten Größe, also auch bei Zoom richtig; abgebrochene Touch-Gesten verwerfen den Rahmen). Der Server liest nur
+  diesen Ausschnitt mit Tesseract: Rand dazu, auf etwa 40 px Texthöhe vergrößert (höchstens 4-fach), psm 7 bei einer
+  Zeile, sonst psm 6 (Tabelle, jede Zeile ein Vorschlag), Fachwörterliste wie sonst; offline, im Backend. Die Lage
+  wird auf die ganze Seite zurückgerechnet. Die Zeilen kommen **hinten** an `auswertung.labor.werte` (die Nummern der
+  übrigen Vorschläge bleiben, die Prüfansicht fügt sie an) und in `ScanSeite.info["zusatz"]` (bleiben bei neuer
+  Auswertung; „Erneut erkennen“ verwirft sie). Ohne erkennbaren Wert erscheint der gelesene Text als Freitext, nicht
+  vorgewählt. Grenzen: Rahmen mindestens 1 % breit, innerhalb der Seite (über den Rand wird begrenzt), keine
+  unendlichen Werte, Seite erkannt, Scan nicht in Arbeit; Recht „Scans“, nur sichtbare Scans. Fehlt Tesseract: 503
+  mit verständlicher Meldung. Die Klick-ins-Bild-Funktionen (F169, „+ Wert“) bleiben für einzelne Werte.
+- **Bereich lernen:** Werden Werte aus einem markierten Bereich übernommen, merkt sich EPM den Bereich je Absender
+  (`Art.BEREICH`, nur Lage `bereich` = [x, y, b, h], ähnliche Bereiche ab 50 % Überdeckung werden gemittelt). Ab der
+  Schwelle liest der OCR-Dienst beim nächsten Befund dieses Labors den Bereich von sich aus nach
+  (`dienst.bereiche_nachlesen` nach der Erkennung) – die Auswertung findet die Werte dann dort.
+- **Steuerung des Lernens** (`GET|PATCH /api/scans/gelernt/steuerung/`, Modell `LernEinstellung`): „Lernen
+  pausieren“ (nichts Neues lernen, Gelerntes weiter anwenden, Kennzahl weiter zählen) und „Sicher ab“ 1–3
+  Bestätigungen (`lernen.schwelle()`, gilt für Anwendung, Wörterliste und Bereiche). Ändern nur mit „Vorlagen pflegen“
+  (keine Testzugänge), im Audit-Log (`lernen_gesteuert`, vorher/nachher). Zusammengefasst, wer was darf: lernen tut jedes
+  Zuordnen mit Recht „Scans“ (Testzugänge nie); ansehen, sperren, löschen mit „Scans“ oder „Vorlagen pflegen“;
+  pausieren und Schwelle mit „Vorlagen pflegen“; die Kennzahl zeigt, ob es besser wird.
+- **Anleitung:** Hilfe › Scans „So verbessern Sie die Erkennung“ (vier Schritte mit Beispielen) und „Wer darf was?“;
+  in Zuordnen der einmal eingeblendete Hinweis „So helfen Sie EPM, besser zu lesen“ (wegklickbar, über „Besser lesen
+  helfen“ wieder aufrufbar); unter „Gelernte Zuordnungen“ der Kasten „Falsches korrigieren“; Begriffe „Texterkennung“
+  und „gelernt“ in `lib/begriffe.ts`; Blatt zum Ausdrucken `docs/SCANS-VERBESSERN.md`.
+- **Teststatus:** `scans/test_verbessern.py` (Ausschnitt wirklich mit Tesseract gelesen: Tabelle zeilenweise, Werte,
+  Lage innerhalb des Rahmens; Grenzen, Rechte, fremde Seite; Bereich gelernt und beim nächsten Befund nachgelesen;
+  „falsch erkannt“: ignorieren je Labor, sperren, Bestätigung weniger, falscher Wert, BIA, Diagnose, keine
+  Personendaten, pausiert, Testzugang, Fehler; Steuerung mit Recht, Grenzen und Audit-Log) grün, dazu `scans` und
+  `befunde` (`--parallel 1`). Browsertests in `scans.spec.ts` ergänzt (falsch erkannt, Bereich mit Maus und mit
+  Touch-Ereignissen, Steuerung) – **Lauf steht aus** (hier kein Docker).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Y · Akte entschlankt (10.10.2026)
 
 Wunsch: „Vor allem soll die Patientenakte deutlich entschlankt werden. Unterpunkte wie Diagnosen, Therapien und
@@ -3794,6 +3841,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 10.10.2026 | Erkennung verbessern | „Falsch erkannt“ mit Grund (verwirft sofort, lernt „nicht auswerten“/Sperre/weniger Bestätigungen je Labor), „Bereich markieren“ liest nur den aufgezogenen Rahmen mit Tesseract neu (Maus und Touch, Tabelle zeilenweise) und lernt den Bereich je Labor, Steuerung des Lernens (pausieren, Schwelle 1–3), Anleitung in Hilfe, Prüfansicht und `docs/SCANS-VERBESSERN.md` (F189). Lauf steht aus |
 | 10.10.2026 | Nachtrag Systemverwaltung | Zeitplan der nächtlichen Sicherung (Uhrzeit, täglich/werktags, Warnung zum Übertragungsfenster), Journal und alte Versionen aufräumen (laufende und vorherige geschützt), Uhrzeit mit eigenem Zeitserver einstellen, OCR-Modelle mit 2FA (F179l–F179o). Lauf steht aus |
 | 10.10.2026 | Texterkennung lernt mit | Gelernte Zuordnungen aus Korrekturen beim Übernehmen (Labor, BIA, Diagnosen, Spaltenlage je Labor; ohne Patientendaten), Anwendung vor der Ähnlichkeitssuche mit Schwelle, Bereich „Gelernte Zuordnungen“, Kennzahl „korrigiert“ (F182); Patient aus Name und Geburtsdatum vorschlagen, nur per Klick (F183); Offline-Prüfung (`docs/OFFLINE-BETRIEB-2026-10-10.md`). Lauf steht aus |
 | 10.10.2026 | Akte entschlankt | Akte ab 1024 × 600 px ohne Seiten-Scrollen (Kopf und Reiter bleiben stehen, Inhalt scrollt in Karte bzw. Spalte), kompakter Kopf, Reiter nach Bedeutung (Infusionspläne nach Empfehlung, Verlauf/Datenschutz klein), Übersicht mit sechs Karten in zwei Reihen, PDF des Plans in voller Höhe neben der Liste und im Menüpunkt Infusionspläne, Plan nach Praxisvorgabe je kg, Prüfung vor der Freigabe, PDF-Vorschau mit ungespeicherten Eingaben (`POST …/vorschau/`), Administration zum Aufklappen (F181). Lauf steht aus |

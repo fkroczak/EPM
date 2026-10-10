@@ -5,6 +5,9 @@
  * Beim Übernehmen merkt sich EPM, welche Bezeichnung auf einem Befund zu welchem Laborparameter, BIA-Feld oder welcher
  * Diagnose gehört – je Labor und allgemein, ohne Patientendaten. Hier lassen sich einzelne Zuordnungen ansehen, löschen
  * oder sperren („nie wieder so zuordnen“). Sichtbar mit „Scans“ oder „Vorlagen pflegen“ (Server prüft).
+ *
+ * F189: Steuerung des Lernens (pausieren, Schwelle 1–3) für „Vorlagen pflegen“, Erklärung „Falsches korrigieren“,
+ * neue Arten „nicht auswerten“ (aus „Falsch erkannt – gehört nicht dazu“) und „Bereich der Werte“.
  */
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -17,17 +20,20 @@ import { Icon } from "@/components/ui/icon";
 import { useHinweis } from "@/components/ui/hinweise";
 
 type Eintrag = {
-  id: number; art: "labor" | "bia" | "diagnose" | "spalte"; art_name: string; quelle: string; quelle_name: string;
+  id: number; art: "labor" | "bia" | "diagnose" | "spalte" | "ignorieren" | "bereich"; art_name: string; quelle: string; quelle_name: string;
   erkannt: string; ziel: string; bestaetigt: number; sicher: boolean; gesperrt: boolean; lesefehler: boolean;
   zuletzt_am: string; zuletzt_von: string | null;
 };
-type Liste = { eintraege: Eintrag[]; quellen: { quelle: string; name: string }[]; schwelle: number; darf_aendern: boolean };
+type Steuerung = { pausiert: boolean; schwelle: number; geaendert_am: string | null; geaendert_von: string | null; darf_steuern: boolean };
+type Liste = { eintraege: Eintrag[]; quellen: { quelle: string; name: string }[]; schwelle: number; darf_aendern: boolean;
+  steuerung: Steuerung };
 
-type Monat = { monat: string; uebernommen: number; korrigiert: number; anteil: number | null;
+type Monat = { monat: string; uebernommen: number; korrigiert: number; verworfen?: number; anteil: number | null;
   arten: Record<"labor" | "bia" | "diagnose", { uebernommen: number; korrigiert: number; anteil: number | null }> };
 export type Kennzahl = { monate: Monat[]; aktuell: Monat; vormonat: Monat | null; trend: number | null; gelernt: number; schwelle: number };
 
-const ARTEN_NAMEN: Record<string, string> = { labor: "Labor", bia: "BIA", diagnose: "Diagnosen", spalte: "Spaltenlage" };
+const ARTEN_NAMEN: Record<string, string> = { labor: "Labor", bia: "BIA", diagnose: "Diagnosen", spalte: "Spaltenlage",
+  ignorieren: "Nicht auswerten", bereich: "Bereich der Werte" };
 
 function monatName(iso: string, lang = false): string {
   const d = new Date(`${iso}T12:00:00`);
@@ -83,7 +89,8 @@ function KennzahlGross({ k }: { k: Kennzahl }) {
       <div className="overflow-x-auto">
         <table className="tabelle text-sm">
           <thead><tr><th className="th">Monat</th><th className="th">übernommen</th><th className="th">korrigiert</th>
-            <th className="th">Labor</th><th className="th">BIA</th><th className="th">Diagnosen</th></tr></thead>
+            <th className="th">Labor</th><th className="th">BIA</th><th className="th">Diagnosen</th>
+            <th className="th" title="„Falsch erkannt“ angemerkt">verworfen</th></tr></thead>
           <tbody>
             {[...k.monate].reverse().filter((m) => m.uebernommen).map((m) => (
               <tr key={m.monat}>
@@ -93,6 +100,7 @@ function KennzahlGross({ k }: { k: Kennzahl }) {
                 <td className="td num">{anteil(m.arten.labor.anteil)}</td>
                 <td className="td num">{anteil(m.arten.bia.anteil)}</td>
                 <td className="td num">{anteil(m.arten.diagnose.anteil)}</td>
+                <td className="td num">{zahl(m.verworfen ?? 0)}</td>
               </tr>
             ))}
           </tbody>
@@ -142,6 +150,16 @@ export function GelernteZuordnungen({ onZurueck }: { onZurueck: () => void }) {
   });
   const d = liste.data;
   const darf = d?.darf_aendern ?? false;
+  const steuern = useMutation({
+    mutationFn: (x: Partial<Pick<Steuerung, "pausiert" | "schwelle">>) => api<Steuerung>("scans/gelernt/steuerung/", { method: "PATCH", body: x }),
+    onSuccess: (st) => {
+      melden(st.pausiert ? "Lernen pausiert – Gelerntes wird weiter genutzt." : `Lernen aktiv, sicher ab ${st.schwelle} Bestätigung${st.schwelle === 1 ? "" : "en"}.`);
+      void qc.invalidateQueries({ queryKey: ["scans", "gelernt"] });
+      void qc.invalidateQueries({ queryKey: ["scans", "kennzahl"] });
+    },
+    onError: (e) => melden(e instanceof Error ? e.message : String(e), "fehler"),
+  });
+  const st = d?.steuerung;
 
   return (
     <Karte className="min-w-0 flex flex-col" data-testid="gelernt">
@@ -161,6 +179,34 @@ export function GelernteZuordnungen({ onZurueck }: { onZurueck: () => void }) {
           <p className="m-0">Gespeichert werden nur Bezeichnungen (z. B. „Harnstoff-N → Harnstoff“), keine Werte und keine
             Angaben zu Patienten. Stimmt eine Zuordnung nicht, löschen Sie sie oder wählen „Sperren“: Dann ordnet EPM diese
             Bezeichnung nie wieder so zu. Alles bleibt auf dem Server; nichts geht ins Internet.</p>
+        </div>
+      ) : null}
+      <div className="px-4 sm:px-5 py-3 border-b border-rand text-sm flex flex-col gap-1" data-testid="gelernt-korrigieren">
+        <strong className="font-semibold">Falsches korrigieren</strong>
+        <span>Beim Zuordnen: bei einer falschen Zeile auf <strong>Falsch erkannt</strong> tippen und den Grund wählen; fehlt ein
+          Wert, mit <strong>Bereich markieren</strong> einen Rahmen um die richtigen Zeilen im Bild ziehen. Hier: eine falsche
+          Zuordnung <strong>sperren</strong> (nie wieder so) oder <strong>löschen</strong> (darf neu gelernt werden).
+          „Nicht auswerten“ heißt: Diese Zeile lässt EPM bei diesem Labor weg – löschen, wenn sie doch ein Wert ist.</span>
+      </div>
+      {st ? (
+        <div className="flex items-center gap-x-4 gap-y-2 flex-wrap px-4 sm:px-5 py-2.5 border-b border-rand text-sm" data-testid="gelernt-steuerung">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={st.pausiert} disabled={!st.darf_steuern || steuern.isPending}
+              onChange={(e) => steuern.mutate({ pausiert: e.target.checked })} data-testid="lernen-pausieren" />
+            Lernen pausieren
+          </label>
+          <label className="flex items-center gap-2">
+            Sicher ab
+            <Auswahl value={String(st.schwelle)} disabled={!st.darf_steuern || steuern.isPending} aria-label="Sicher ab Bestätigungen"
+              className="w-auto" onChange={(e) => steuern.mutate({ schwelle: Number(e.target.value) })} data-testid="lernen-schwelle">
+              <option value="1">1 Bestätigung</option><option value="2">2 Bestätigungen</option><option value="3">3 Bestätigungen</option>
+            </Auswahl>
+          </label>
+          <span className="text-xs gedaempft grow">
+            {st.pausiert ? "Pausiert: Neues wird nicht gelernt, Gelerntes weiter genutzt. " : ""}
+            {st.darf_steuern ? "Gilt für alle." : "Ändern darf, wer Vorlagen pflegt."}
+            {st.geaendert_von ? ` Zuletzt geändert von ${st.geaendert_von} am ${datum(st.geaendert_am)}.` : ""}
+          </span>
         </div>
       ) : null}
       <div className="flex items-center gap-2 flex-wrap px-4 sm:px-5 py-2.5 border-b border-rand">

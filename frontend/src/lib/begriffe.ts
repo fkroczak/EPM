@@ -4,6 +4,10 @@
  * (components/ui/Begriff.tsx). Kurz halten: ein bis zwei Sätze, in Alltagssprache.
  */
 export const BEGRIFFE = {
+  texterkennung: "EPM liest den Text aus dem Bild eines Scans – auf dem eigenen Server, ohne Internet. Dabei kann es sich "
+    + "verlesen; darum prüfen Sie jeden Wert, bevor er in die Akte kommt.",
+  gelernt: "EPM merkt sich Ihre Korrekturen: welche Bezeichnung auf dem Befund zu welchem Laborwert gehört und welche "
+    + "Zeilen keine Werte sind. Gespeichert werden nur Bezeichnungen, keine Werte und keine Namen.",
   bia: "Bioelektrische Impedanzanalyse: Messung der Körperzusammensetzung (Muskel-, Fett- und Wasseranteil) mit "
     + "schwachem Strom über Elektroden an Hand und Fuß.",
   entwurf: "Noch nicht freigegeben: Änderungen sind gespeichert, gelten aber erst nach „Freigeben“ bzw. "

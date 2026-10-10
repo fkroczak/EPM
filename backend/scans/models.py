@@ -202,6 +202,10 @@ class GelernteZuordnung(models.Model):
         BIA = "bia", "BIA-Feld"
         DIAGNOSE = "diagnose", "Diagnose"
         SPALTE = "spalte", "Spaltenlage der Werte"
+        # F189: „Falsch erkannt – gehört nicht dazu“ (Kopfzeile, Referenzbereich, Datum …): nicht mehr als Wert anbieten
+        IGNORIEREN = "ignorieren", "nicht auswerten"
+        # F189: Bereich der Seite, in dem dieses Labor seine Werte druckt (die Pflegekraft hat ihn markiert)
+        BEREICH = "bereich", "Bereich der Werte"
 
     art = models.CharField(max_length=10, choices=Art.choices, db_index=True)
     # normalisierter Name des Absenders (scans.ocr.auswertung.norm); leer = allgemein, für alle Absender
@@ -218,6 +222,8 @@ class GelernteZuordnung(models.Model):
     # Spaltenlage: linke Kante der Wertespalte und Zeichenbreite (relativ zur Seitenbreite)
     spalte_x = models.FloatField(null=True, blank=True)
     spalte_zeichen = models.FloatField(null=True, blank=True)
+    # Bereich der Werte (F189): [x, y, Breite, Höhe] relativ zur Seite – nur Lage, kein Inhalt
+    bereich = models.JSONField(null=True, blank=True)
     # Die Bezeichnung war ein Lesefehler (ähnlich gelesen) – kommt nicht in die Wörterliste für Tesseract
     lesefehler = models.BooleanField(default=False)
     bestaetigt = models.PositiveIntegerField(default=0, help_text="wie oft beim Übernehmen bestätigt")
@@ -247,6 +253,8 @@ class KorrekturZaehler(models.Model):
     art = models.CharField(max_length=10, choices=GelernteZuordnung.Art.choices[:3])
     uebernommen = models.PositiveIntegerField(default=0)
     korrigiert = models.PositiveIntegerField(default=0)
+    # „Falsch erkannt“ angemerkt (F189): verworfene Vorschläge
+    verworfen = models.PositiveIntegerField(default=0)
 
     class Meta:
         verbose_name = "Zähler der Korrekturen"
@@ -256,3 +264,26 @@ class KorrekturZaehler(models.Model):
 
     def __str__(self):
         return f"{self.monat:%m/%Y} {self.art}: {self.korrigiert}/{self.uebernommen}"
+
+
+class LernEinstellung(models.Model):
+    """Steuerung des Lernens (F189), eine Zeile: pausieren und Schwelle (ab wie vielen Bestätigungen eine gelernte
+    Zuordnung als sicher gilt). Ändern mit „Vorlagen pflegen“, im Audit-Log."""
+
+    pausiert = models.BooleanField(default=False, help_text="nichts Neues lernen; Gelerntes wird weiter angewandt")
+    schwelle = models.PositiveSmallIntegerField(default=2, help_text="1–3 Bestätigungen bis „sicher“")
+    geaendert_am = models.DateTimeField(null=True, blank=True)
+    geaendert_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                                      related_name="+")
+
+    class Meta:
+        verbose_name = "Steuerung des Lernens"
+        verbose_name_plural = "Steuerung des Lernens"
+
+    def __str__(self):
+        return f"Lernen {'pausiert' if self.pausiert else 'aktiv'}, Schwelle {self.schwelle}"
+
+    @classmethod
+    def aktuell(cls) -> "LernEinstellung":
+        e = cls.objects.order_by("id").first()
+        return e or cls.objects.create()
