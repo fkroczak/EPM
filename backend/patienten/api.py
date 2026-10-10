@@ -1957,6 +1957,8 @@ def startseite_daten(user):
     from infusionen.models import Infusionsplan
     from stammdaten.models import Einstellungen
 
+    from .infoblatt import erinnerung as infoblatt_erinnerung
+
     heute = timezone.localdate()
     e = Einstellungen.aktuell()
     patienten = patienten_fuer(user).filter(abgeschlossen_am__isnull=True)
@@ -2047,6 +2049,8 @@ def startseite_daten(user):
         },
         # S08: Hinweis „Nur noch n Notfall-Codes übrig“ für die angemeldete Person
         "notfallcodes": notfallcodes_stand(user),
+        # F177: „Praxis … informieren“ vor dem nächsten Zeitraum, solange dafür noch kein Infoblatt erstellt ist
+        "infoblatt": infoblatt_erinnerung(user),
         # Kopfzeile (O-07): Zustand der Sicherungen vom Systemagenten – für alle sichtbar, ohne Zugangsdaten
         "sicherung": sicherung_kurz(),
     }
@@ -2078,6 +2082,8 @@ class KalenderViewSet(viewsets.ViewSet):
     permission_classes = [recht("akten_lesen")]
 
     def list(self, request):
+        from stammdaten.models import Einstellungen
+
         from .kalender import MAX_TAGE, faelligkeiten, feiertage_zwischen
 
         p = request.query_params
@@ -2111,6 +2117,8 @@ class KalenderViewSet(viewsets.ViewSet):
             "faelligkeiten": [],
             "grenzen": {},
             "feiertage": feiertage_zwischen(von, bis),
+            # Infoblatt an die Praxis (F177): Vorschlag für den Zeitraum im Dialog (nächste Woche oder nächster Monat)
+            "infoblatt_rhythmus": Einstellungen.aktuell().infoblatt_rhythmus,
         }
         if str(p.get("faelligkeiten", "1")).lower() not in ("0", "false", "nein"):
             daten["faelligkeiten"], daten["grenzen"] = faelligkeiten(patienten, bis)
@@ -2118,13 +2126,19 @@ class KalenderViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], permission_classes=[EintragRecht])
     def ankuendigung(self, request):
-        """Patientenankündigung für die Sprechstunden (F173): alle Praxistermine im Zeitraum, nach Tag und Uhrzeit.
+        """Infoblatt an die Praxis (F177, vorher Patientenankündigung F173): Praxistermine im Zeitraum, nach Tag und
+        Uhrzeit.
 
-        ``{"von", "bis", "ort"?, "ausgabe": "pdf"|"email"|"eml", "anlagen"?, "betreff"?, "text"?, "an"?}`` –
-        ``ort`` ist der Terminort der Sprechstunde (Termine an anderen Orten, z. B. „Telefon“, stehen mit diesem Ort
-        als Hinweis in der Liste). Testpatienten erscheinen nicht; ausgeblendete Termine auch nicht."""
+        ``{"von", "bis", "ort"?, "telefon_mit"?, "ausgabe": "liste"|"pdf"|"email"|"eml", "anlagen"?, "betreff"?,
+        "text"?, "an"?}`` – mit ``ort`` stehen nur die Praxistermine an diesem Ort auf dem Blatt, mit ``telefon_mit``
+        zusätzlich Telefon- und Videotermine (mit Telefonnummer als Hinweis); Praxistermine ohne Ort fehlen und stehen
+        in der Vorschau als Warnung. Ohne ``ort`` alle Praxistermine. Testpatienten und ausgeblendete Termine
+        erscheinen nicht. ``liste`` liefert die Vorschau als JSON (patienten/infoblatt.py); PDF und E-Mail (.eml)
+        werden mit einem Schnappschuss der Termine gemerkt – außer mit ``"vorschau": true`` („PDF ansehen“)."""
         from vorlagen.felder import Kontext
         from vorlagen.schreiben import ausgeben
+
+        from . import infoblatt
 
         d = request.data
         von, bis = _datum(str(d.get("von") or "")), _datum(str(d.get("bis") or ""))
@@ -2143,18 +2157,24 @@ class KalenderViewSet(viewsets.ViewSet):
                                              liste=Auswahlwert.Liste.TERMINORT).first()
             if ort is None:
                 fehler["ort"] = "Unbekannter Terminort."
+        telefon_mit = d.get("telefon_mit", False)
+        if not isinstance(telefon_mit, bool):
+            fehler["telefon_mit"] = "Ja oder nein (true/false)."
+        ausgabe = d.get("ausgabe", "pdf")
         if fehler:
             return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
-        termine = list(sichtbare_termine(Termin.objects.filter(
-            patient__in=patienten_fuer(request.user).filter(ist_test=False), art=Termin.Art.PRAXISTERMIN,
-            faellig_am__range=(von, bis))).select_related("patient", "ort")
-            .order_by("faellig_am", F("uhrzeit").asc(nulls_last=True), "id"))
+        if ausgabe == "liste":
+            return Response(infoblatt.vorschau(request.user, von, bis, ort, telefon_mit))
+        termine, _ = infoblatt.aufteilen(infoblatt.praxistermine(request.user, von, bis), ort, telefon_mit)
         kontext = Kontext(patient=None, zeitraum=(von, bis), terminort=ort, termine=termine, benutzer=request.user)
         dateiname = f"Patientenankuendigung-{von:%Y-%m-%d}"
         antwort, pdf = ausgeben(request, "patientenankuendigung", kontext, dateiname,
                                 f"Patientenankündigung {von:%d.%m.%Y}–{bis:%d.%m.%Y}")
-        if pdf is not None:
+        if pdf is not None and antwort.status_code == 200:
+            # „PDF ansehen“ im Dialog (``vorschau``) gilt nicht als verschickt
+            if d.get("vorschau") is not True:
+                infoblatt.merken(request.user, von, bis, ort, telefon_mit, ausgabe, termine)
             protokolliere(SystemEreignis.Art.EXPORT, request, objekt="Patientenankündigung",
-                          was="Patientenankündigung", von=str(von), bis=str(bis), termine=len(termine),
-                          ausgabe=d.get("ausgabe", "pdf"))
+                          was="Infoblatt an die Praxis", von=str(von), bis=str(bis), termine=len(termine),
+                          ausgabe=ausgabe)
         return antwort

@@ -9,7 +9,7 @@ import { Link, useLocation } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
-import { langesDatum, relativ, zahl } from "@/lib/format";
+import { datum, langesDatum, relativ, zahl } from "@/lib/format";
 import { RASTER_SPALTEN, useStufe } from "@/lib/stufen";
 import type { Ich, Karte, KartenId, Recht, ScansStand } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
@@ -18,6 +18,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { verschiebe } from "@/components/ui/sortierbar";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
+import { AnkuendigungDialog } from "@/components/AnkuendigungDialog";
 import { GewichtDialog, KontaktDialog } from "@/components/Schnellerfassung";
 import type { Vorgabe } from "@/components/Schnellerfassung";
 import type { Startdaten } from "./start/daten";
@@ -61,6 +62,27 @@ function BackupStatus({ s, verweis }: { s: Startdaten["sicherung"]; verweis: boo
 }
 
 // ---------------------------------------------------------------- Scans (F165): warten auf Zuordnung, laufen ab, Speicher
+/** „Praxis Holtmeier informieren: 5 Termine vom … bis …“ mit großem Knopf, der das Infoblatt für genau diesen Zeitraum öffnet */
+function InfoblattHinweis({ h }: { h: NonNullable<Startdaten["infoblatt"]> }) {
+  const [offen, setOffen] = useState(false);
+  const praxis = h.ort?.wert.replace(/\bDr\.\s*/, "") ?? "Praxis";
+  const kurz = (iso: string) => datum(iso).slice(0, 6);
+  return (
+    <div role="status" className="meldung info flex items-center gap-x-4 gap-y-2.5 flex-wrap" data-testid="infoblatt-hinweis">
+      <Icon name="mail" groesse={22} />
+      <span className="grow min-w-[14rem] flex flex-col gap-0.5">
+        <strong className="text-base">{praxis} informieren: {h.anzahl} {h.anzahl === 1 ? "Termin" : "Termine"} vom {kurz(h.von)} bis {datum(h.bis)}</strong>
+        <span className="text-[0.8125rem]">
+          {h.rhythmus === "monat" ? "Das Infoblatt für den nächsten Monat ist noch nicht erstellt." : "Das Infoblatt für die nächste Woche ist noch nicht erstellt."}
+          {h.ohne_ort ? ` Bei ${h.ohne_ort} ${h.ohne_ort === 1 ? "Termin" : "Terminen"} fehlt noch der Ort.` : ""}
+        </span>
+      </span>
+      <Knopf variante="pri" icon="mail" className="min-h-11 px-5" onClick={() => setOffen(true)}>Infoblatt erstellen</Knopf>
+      <AnkuendigungDialog offen={offen} onOffen={setOffen} von={h.von} bis={h.bis} rhythmus={h.rhythmus} />
+    </div>
+  );
+}
+
 function ScansHinweis() {
   const { darf } = useAuth();
   const stand = useQuery({
@@ -397,6 +419,8 @@ export function Start() {
             onClick={() => speichern({ zweifaktorhinweis_aus: true })}><Icon name="x" /></button>
         </div>
       ) : null}
+      {/* Infoblatt an die Praxis (F177): rechtzeitig vor der nächsten Woche bzw. dem nächsten Monat, bis es erstellt ist */}
+      {erfassen && d?.infoblatt ? <InfoblattHinweis h={d.infoblatt} /> : null}
       {codesHinweis && codes ? (
         <div role="status" className="meldung warn flex items-center gap-2.5" data-testid="notfallcodes-hinweis">
           <Icon name="warnung" groesse={18} />

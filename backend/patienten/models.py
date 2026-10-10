@@ -994,3 +994,38 @@ class Merkeintrag(models.Model):
         verbose_name_plural = "Einträge in „Meine Akten“"
         ordering = ["-zeitpunkt", "-id"]
         constraints = [models.UniqueConstraint(fields=["benutzer", "patient", "art"], name="merkeintrag_eindeutig")]
+
+
+class Ankuendigung(models.Model):
+    """Ein erstelltes „Infoblatt an die Praxis“ (F177): wann, von wem, für welchen Zeitraum und Ort, als PDF oder
+    E-Mail – und welche Termine darauf standen.
+
+    Der Schnappschuss enthält je Termin nur Nummer, Datum und Uhrzeit, keine Namen: Daraus ergibt sich beim nächsten
+    Infoblatt, welche Termine neu hinzugekommen oder verschoben sind. Wird eine Akte endgültig gelöscht (Art. 17 DSGVO)
+    oder werden die Testdaten zurückgesetzt, entfallen ihre Termine auch hier (``datenschutz.akten_entfernen``).
+    Angelegt nur beim Erzeugen der PDF bzw. der E-Mail, nicht bei der Vorschau."""
+
+    class Ausgabe(models.TextChoices):
+        PDF = "pdf", "PDF"
+        EML = "eml", "E-Mail"
+
+    erstellt_am = models.DateTimeField(default=timezone.now)
+    benutzer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+    von = models.DateField()
+    bis = models.DateField()
+    ort = models.ForeignKey(Auswahlwert, on_delete=models.PROTECT, null=True, blank=True, related_name="+",
+                            limit_choices_to={"liste": Auswahlwert.Liste.TERMINORT}, verbose_name="Terminort")
+    telefon_mit = models.BooleanField("mit Telefon- und Videoterminen", default=False)
+    ausgabe = models.CharField(max_length=5, choices=Ausgabe.choices)
+    anzahl = models.PositiveIntegerField("Zahl der Termine", default=0)
+    # [{"termin": Nummer, "datum": "JJJJ-MM-TT", "uhrzeit": "HH:MM" oder null}, …]
+    termine = models.JSONField("Termine auf dem Blatt", default=list, blank=True)
+
+    class Meta:
+        verbose_name = "Infoblatt an die Praxis"
+        verbose_name_plural = "Infoblätter an die Praxis"
+        ordering = ["-erstellt_am", "-id"]
+        indexes = [models.Index(fields=["von", "bis"], name="ankuendigung_zeitraum")]
+
+    def __str__(self):
+        return f"Infoblatt {self.von:%d.%m.%Y}–{self.bis:%d.%m.%Y} vom {self.erstellt_am:%d.%m.%Y}"

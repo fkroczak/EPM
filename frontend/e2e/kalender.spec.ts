@@ -153,3 +153,51 @@ test("Kalender: eine Werkzeugzeile, Monat ohne Scrollen auf 1080p; Telefon mit W
   await expect(band.getByRole("button", { pressed: true })).toHaveCount(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+test("Kalender: „Praxis informieren“ – Infoblatt mit Vorschau, fehlendem Ort und PDF (F177)", async ({ page }) => {
+  const api = await apiAls("mitarbeiter");
+  const orte: { id: number; wert: string }[] = await api.get("auswahlwerte/?liste=terminort");
+  const praxis = orte.find((o) => /holtmeier/i.test(o.wert))!;
+  // nächste Woche (Mo–So); Testpatienten stehen nie auf dem Blatt, darum zwei echte Akten
+  const wochentag = (new Date(`${tagIn(0)}T12:00:00Z`).getUTCDay() + 6) % 7;
+  const montag = tagIn(7 - wochentag);
+  const dienstag = tagIn(8 - wochentag);
+  const ina = await api.post("patienten/", { nachname: eindeutig("Infoblatt"), vorname: "Ina", geburtsdatum: "1965-05-05" });
+  const olga = await api.post("patienten/", { nachname: eindeutig("Ohneort"), vorname: "Olga", geburtsdatum: "1964-04-04" });
+  await api.post("termine/", { patient: ina.id, art: "praxistermin", faellig_am: montag, uhrzeit: "10:15", ort: praxis.id, titel: "Sprechstunde" });
+  await api.post("termine/", { patient: olga.id, art: "praxistermin", faellig_am: dienstag, uhrzeit: "11:30", ort: null, titel: "Sprechstunde" });
+  await api.ende();
+
+  await page.goto("/kalender");
+  const knopf = page.getByRole("button", { name: "Praxis informieren" });
+  await expect(knopf).toHaveAttribute("title", /Infoblatt mit allen Terminen an die Praxis Holtmeier/);
+  await knopf.click();
+  const dialog = page.getByRole("dialog", { name: "Infoblatt an die Praxis" });
+  await expect(dialog.getByRole("heading", { name: "Infoblatt an die Praxis" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Nächste Woche", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(dialog.getByLabel("Ort der Sprechstunde")).toHaveValue(String(praxis.id));
+  const vorschau = dialog.getByTestId("infoblatt-vorschau");
+  await expect(vorschau).toContainText(/Diese \d+ Patienten stehen auf dem Infoblatt|Dieser Patient steht auf dem Infoblatt/);
+  await expect(dialog.getByTestId("infoblatt-liste")).toContainText(`Ina ${ina.nachname}`);
+  await expect(dialog.getByTestId("infoblatt-liste")).not.toContainText(olga.nachname);
+  // Termin ohne Ort: Warnung, „Ort eintragen“ schlägt die Praxis vor – danach steht er auf dem Blatt
+  await expect(dialog.getByTestId("infoblatt-ohne-ort")).toHaveText("Bei diesen Terminen fehlt der Ort – bitte im Termin eintragen.");
+  await vorschau.getByRole("listitem").filter({ hasText: olga.nachname }).getByRole("button", { name: "Ort eintragen" }).click();
+  const termin = page.getByRole("dialog", { name: "Termin bearbeiten" });
+  await expect(termin.getByLabel("Ort")).toHaveValue(String(praxis.id));
+  await termin.getByRole("button", { name: "Speichern", exact: true }).click();
+  await expect(termin).toHaveCount(0);
+  await expect(dialog.getByTestId("infoblatt-liste")).toContainText(`Olga ${olga.nachname}`);
+  // andere Zeiträume
+  await dialog.getByRole("button", { name: "Eigener Zeitraum" }).click();
+  await expect(dialog.getByLabel("von", { exact: true })).toHaveValue(montag);
+  await dialog.getByRole("button", { name: "Nächster Monat" }).click();
+  await expect(dialog.getByTestId("infoblatt-zeitraum-text")).toContainText(", 01.");   // vom Ersten des nächsten Monats
+  await dialog.getByRole("button", { name: "Nächste Woche", exact: true }).click();
+  await expect(dialog.getByTestId("infoblatt-liste")).toContainText(`Ina ${ina.nachname}`);
+  // PDF herunterladen merkt das Blatt: „Zuletzt erstellt am … von …“
+  const [download] = await Promise.all([page.waitForEvent("download"),
+    dialog.getByRole("button", { name: "PDF herunterladen" }).click()]);
+  expect(download.suggestedFilename()).toMatch(/^Patientenankuendigung-\d{4}-\d{2}-\d{2}\.pdf$/);
+  await expect(dialog.getByTestId("infoblatt-letzte")).toContainText("Zuletzt erstellt am");
+});

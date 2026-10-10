@@ -276,8 +276,8 @@ Entwurf mit Empfänger, Betreff, Text und der PDF im Anhang – prüfen und send
 vorher im Dialog ändern; <strong>Weitere Anlagen</strong> (z. B. Leitfaden Zottentraining) werden mit angehängt.</li>
 <li>Auf Wunsch wird die PDF als Dokument „Schreiben“ in der Akte abgelegt.</li>
 </ul>
-<p>Die <strong>Patientenankündigung</strong> für die Praxis entsteht im <strong>Kalender › Ankündigung</strong> aus den
-Praxisterminen eines Zeitraums. Hinweise wie „1 h, Neuaufnahme“ oder „+ Labor“ im Termin unter „bei/Ort“ eintragen.</p>
+<p>Das <strong>Infoblatt an die Praxis</strong> mit allen Patienten der nächsten Sprechstunden entsteht im
+<strong>Kalender › Praxis informieren</strong> (siehe „Infoblatt an die Praxis“).</p>
 <p>Texte ändern: Vorlagen › Dokumentvorlagen; Betreff und Text der E-Mail stehen dort im Baustein <strong>E-Mail</strong>.
 Eigene Schreiben (z. B. an Hausärzte) legt <strong>+ Neue Vorlage</strong> unter Vorlagen › Dokumentvorlagen an; sie
 erscheinen danach hier unter „Eigene Vorlagen“. Anlagen hochladen: Vorlagen › Anlagen für E-Mails. Für eine <strong>Fallzusammenfassung</strong> im Reiter Berichte die
@@ -428,6 +428,32 @@ Plan prüfen) und ob Erledigte erscheinen – mit der Legende der Farben. Rechts
 <strong>Tag</strong> (gewählter Tag und die nächsten 7 Tage, „+ Termin am …“), <strong>Überfällig</strong> (offene
 Termine, Kontakt überfällig, Plan prüfen) und <strong>Fällig</strong> (Kontakt bald fällig). Am Telefon zeigt ein
 Wochenband die Tage; darunter Tag, Überfällig und Woche.</p>""",
+    },
+    {
+        "id": "infoblatt", "gruppe": "kontakte", "titel": "Infoblatt an die Praxis (alle Termine bei Dr. Holtmeier)",
+        "rechte": ["eintraege_erfassen"], "seiten": ["/kalender", "/"],
+        "html": """
+<p>Die Praxis Dr. Holtmeier bekommt rechtzeitig <strong>ein Blatt mit allen Patienten</strong>, die dort in den
+nächsten Tagen einen Termin haben – nicht ein Blatt je Patient. So geht es:</p>
+<ol>
+<li>Im <strong>Kalender</strong> oben auf <strong>Praxis informieren</strong> klicken – oder auf der Startseite auf
+<strong>Infoblatt erstellen</strong>, wenn dort „Praxis Holtmeier informieren“ steht.</li>
+<li>Den Zeitraum wählen: <strong>Nächste Woche</strong>, <strong>Übernächste Woche</strong>, <strong>Nächster
+Monat</strong> oder <strong>Eigener Zeitraum</strong>.</li>
+<li>Die Liste prüfen: Dort steht, wer auf dem Blatt steht, nach Tagen geordnet. <strong>neu</strong> heißt: seit dem
+letzten Infoblatt dazugekommen oder verschoben.</li>
+<li><strong>PDF herunterladen</strong> (zum Faxen) oder <strong>E-Mail vorbereiten</strong> (Outlook öffnet einen
+fertigen Entwurf mit dem Blatt im Anhang).</li>
+</ol>
+<p>Auf dem Blatt stehen die Termine mit der Art <strong>Praxistermin</strong> und dem Ort <strong>Praxis Dr.
+Holtmeier</strong>. Beim Anlegen eines Praxistermins ist dieser Ort schon eingetragen. Fehlt bei einem Praxistermin der
+Ort, steht er nicht auf dem Blatt – der Dialog zeigt ihn dann gelb mit <strong>Ort eintragen</strong>.
+Telefon- und Videotermine kommen nur dazu, wenn das Häkchen <strong>Telefon- und Videotermine auch aufführen</strong>
+gesetzt ist (dann mit Telefonnummer). Hinweise wie „1 h, Neuaufnahme“ oder „+ Labor“ im Termin unter „bei/Ort“
+eintragen – sie stehen hinter dem Namen. Testpatienten erscheinen nie.</p>
+<p>Die Startseite erinnert vor der nächsten Woche (oder dem nächsten Monat), bis das Infoblatt erstellt ist. Wann sie
+erinnert, steht unter Vorlagen › Grenzwerte › „Infoblatt an die Praxis“. Den Text des Blatts ändert man unter
+Vorlagen › Dokumentvorlagen › „Patientenankündigung“.</p>""",
     },
     # ------------------------------------------------------------------ Gewicht
     {

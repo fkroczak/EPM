@@ -3,7 +3,7 @@ Datenbank leeren (Festlegung 03.10.2026, U27): vor dem Go-live alles aus der Tes
 ein leeres System übernommen werden können.
 
 Weg: alle Akten (echte und Testpatienten) mit Einträgen, Plänen, Dokumenten und Historie, die Dateien, das
-Löschprotokoll und die Löschliste, Merklisten, der Stand des Altdaten-Imports, Versorger mit Ansprechpartnern, Ärzte,
+Löschprotokoll und die Löschliste, Merklisten, die gemerkten Infoblätter an die Praxis, der Stand des Altdaten-Imports, Versorger mit Ansprechpartnern, Ärzte,
 alle Benutzer außer den ausgewählten (das eigene Konto bleibt immer) und das Audit-Log.
 Bleiben: Präparate, Auswahllisten, Grenzwerte und Einstellungen, Briefkopf und Logo, Dokumentvorlagen, Rechte der
 Gruppen, Hilfe-Ergänzungen, Sicherungen. Musterdaten (Testpatienten) werden danach nicht mehr automatisch angelegt.
@@ -66,7 +66,7 @@ def datenbank_leeren(ausfuehrend, behalten: list[int]) -> dict:
     from altimport.models import Alttabelle, Importlauf, Importobjekt, Importstand
     from audit.models import SystemEreignis
     from patienten.datenschutz import akten_entfernen
-    from patienten.models import Akteneinsicht, Loeschprotokoll, Merkeintrag, Patient
+    from patienten.models import Akteneinsicht, Ankuendigung, Loeschprotokoll, Merkeintrag, Patient
     from stammdaten.models import Ansprechpartner, Arzt, Einstellungen, Versorger
 
     zahlen = umfang()
@@ -74,7 +74,7 @@ def datenbank_leeren(ausfuehrend, behalten: list[int]) -> dict:
     weg = list(User.objects.exclude(pk__in=bleiben))
     with transaction.atomic(), wartungsmodus():
         akten_entfernen(list(Patient.objects.values_list("id", flat=True)))
-        for modell in (Merkeintrag, Akteneinsicht):
+        for modell in (Merkeintrag, Akteneinsicht, Ankuendigung):
             modell.objects.all().delete()
         Loeschprotokoll.objects.all().delete()
         if hasattr(Loeschprotokoll, "history"):
