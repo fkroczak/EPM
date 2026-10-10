@@ -889,14 +889,17 @@ export type ScanLaborwert = {
   zeile: string; sicherheit: number; hinweise: string[]; vorschlag: boolean;
   umrechnung?: { von: string; faktor: string; wert_gelesen: string };
   wert_x?: number; wert_zeichen?: number;
+  /** F189: aus einem markierten Bereich gelesen; „Falsch erkannt“ angemerkt (Grund) */
+  bereich?: number[] | null; verworfen?: string;
 };
 export type ScanBiaWert = { wert: string; einheit: string; erkannt_als: string; seite: number; box: number[] | null;
-  sicherheit: number; vorschlag: boolean; hinweise?: string[]; zuordnung?: "gelernt" | "gelernt_vorschlag" };
+  sicherheit: number; vorschlag: boolean; hinweise?: string[]; zuordnung?: "gelernt" | "gelernt_vorschlag";
+  verworfen?: string };
 export type ScanDiagnose = { bezeichnung: string; icd_code: string; kennzeichen: "G" | "V" | "Z" | "A"; zeile: string;
   seite: number; box: number[] | null; sicherheit: number; vorschlag: boolean; erkannt_als?: string;
   hinweise?: string[]; zuordnung?: "gelernt" | "gelernt_vorschlag";
   /** gelernte Korrektur, erst einmal bestätigt: zum Übernehmen angeboten (F182) */
-  gelernt?: { bezeichnung: string; icd_code: string } };
+  gelernt?: { bezeichnung: string; icd_code: string }; verworfen?: string };
 export type ScanAuswertung = {
   arten?: ("labor" | "bia" | "arztbrief")[];
   datum?: string | null; datum_quelle?: string;

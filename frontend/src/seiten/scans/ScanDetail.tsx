@@ -102,6 +102,9 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
   const [unsicher, setUnsicher] = useState(true);
   const [original, setOriginal] = useState(false);
   const [bereichModus, setBereichModus] = useState(false);
+  // F189: Rahmen beim Zuordnen = „richtigen Bereich markieren“ (nur diesen Teil neu lesen, Zeilen als neue Werte)
+  const [bereichWerte, setBereichWerte] = useState(false);
+  const [neueWerte, setNeueWerte] = useState<{ nr: number; indices: number[] } | null>(null);
   const [bereich, setBereich] = useState<number[] | null>(null);
   const [staerke, setStaerke] = useState(0);
   const [bearbeiten, setBearbeiten] = useState(false);
@@ -111,7 +114,7 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
   const [zusammenMit, setZusammenMit] = useState("");
 
   // beim Wechsel des Scans von vorn
-  useEffect(() => { setSeiteIndex(0); setZuordnen(false); setStartPatient(null); setStelle(null); setZiel(null); setBereichModus(false); setOriginal(false); }, [id]);
+  useEffect(() => { setSeiteIndex(0); setZuordnen(false); setStartPatient(null); setStelle(null); setZiel(null); setBereichModus(false); setBereichWerte(false); setNeueWerte(null); setOriginal(false); }, [id]);
   // eine markierte Stelle auf einer anderen Seite: dorthin blättern
   useEffect(() => {
     if (stelle && s && s.seiten[seiteIndex]?.nr !== stelle.seite + 1) {
@@ -131,6 +134,15 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
     mutationFn: ({ pfad, body, method }: { pfad: string; body?: unknown; method?: "POST" | "PATCH" | "DELETE" }) =>
       api<Scan>(`scans/${id}/${pfad}`, { method: method ?? "POST", body: body ?? {} }),
     onSuccess: neu,
+    onError: (e) => melden(e instanceof Error ? e.message : String(e), "fehler"),
+  });
+  const ausschnitt = useMutation({
+    mutationFn: ({ sid, box }: { sid: number; box: number[] }) =>
+      api<{ scan: Scan; neu: number[] }>(`scans/${id}/seiten/${sid}/ausschnitt/`, { body: { box } }),
+    onSuccess: (e) => {
+      qc.setQueryData(["scan", id], e.scan);
+      setNeueWerte((alt) => ({ nr: (alt?.nr ?? 0) + 1, indices: e.neu }));
+    },
     onError: (e) => melden(e instanceof Error ? e.message : String(e), "fehler"),
   });
   const weg = useMutation({
@@ -251,7 +263,7 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
               <span className="grow" />
               <Knopf klein icon="rahmen" disabled={laeuft} onClick={() => setBearbeiten(true)} data-testid="seite-bearbeiten">Anpassen</Knopf>
               <Knopf klein icon="scan" disabled={laeuft || seite.status !== "fertig" || original} aria-pressed={bereichModus}
-                variante={bereichModus ? "pri" : "sec"} onClick={() => setBereichModus(!bereichModus)} data-testid="bereich-modus"
+                variante={bereichModus && !bereichWerte ? "pri" : "sec"} onClick={() => { setBereichWerte(false); setBereichModus(!bereichModus || bereichWerte); }} data-testid="bereich-modus"
                 title="Einen schlecht lesbaren Bereich mit der Maus markieren und neu erkennen lassen">Bereich neu erkennen</Knopf>
               <label className="flex items-center gap-1.5 text-[0.8125rem]">
                 <input type="checkbox" checked={unsicher} onChange={(e) => setUnsicher(e.target.checked)} />unsichere Wörter
@@ -260,7 +272,14 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
                 <input type="checkbox" checked={original} onChange={(e) => { setOriginal(e.target.checked); setBereichModus(false); }} />Original
               </label>
             </div>
-            {bereichModus ? <Meldung art="info">Rahmen um den Bereich aufziehen, der neu erkannt werden soll.</Meldung> : null}
+            {bereichModus ? (
+              <Meldung art="info"><span className="flex items-center gap-2 flex-wrap" data-testid="bereich-anleitung">
+                <span className="grow">{bereichWerte
+                  ? "Mit Maus oder Finger einen Rahmen um die richtigen Zeilen ziehen. EPM liest nur diesen Teil noch einmal und zeigt die Zeilen rechts als neue Werte."
+                  : "Rahmen um den Bereich aufziehen, der neu erkannt werden soll."}</span>
+                <Knopf klein variante="geist" onClick={() => { setBereichModus(false); setBereichWerte(false); }}>Abbrechen</Knopf>
+              </span></Meldung>
+            ) : null}
             {zuordnen && ziel && !bereichModus && !original ? (
               <div className="meldung info flex items-center gap-2" role="status" data-testid="wort-waehlen">
                 <Icon name="info" groesse={16} />
@@ -271,7 +290,11 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
             <Seitenansicht scanId={s.id} seite={seite} unsicher={unsicher && !(zuordnen && ziel)} original={original} bereichModus={bereichModus}
               markiert={stelle && stelle.seite + 1 === seite.nr ? stelle.box : null}
               onWort={zuordnen && ziel ? (w, box) => { const st = { seite: seite.nr - 1, box }; ziel.setzen(w[0], st); setStelle(st); } : undefined}
-              onBereich={(b) => { setBereich(b); setStaerke(0); setBereichModus(false); }} />
+              onBereich={(b) => {
+                setBereichModus(false);
+                if (bereichWerte) { setBereichWerte(false); ausschnitt.mutate({ sid: seite.id, box: b }); return; }
+                setBereich(b); setStaerke(0);
+              }} />
             {s.seiten.length > 1 ? (
               <div className="flex gap-2 overflow-x-auto pb-1" role="list" aria-label="Seiten" data-testid="scan-seiten">
                 {s.seiten.map((x, i) => (
@@ -320,6 +343,8 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
           <div className="flex flex-col gap-3 min-w-0">
             {zuordnen && fertig ? (
               <Zuordnen key={s.id} scan={s} onStelle={setStelle} ziel={ziel} onZiel={setZiel} startPatient={startPatient}
+                bereichAktiv={bereichModus && bereichWerte} bereichLaedt={ausschnitt.isPending} neueWerte={neueWerte}
+                onBereich={() => { const an = !(bereichModus && bereichWerte); setOriginal(false); setZiel(null); setBereichWerte(an); setBereichModus(an); }}
                 onAbbrechen={() => { setZuordnen(false); setStartPatient(null); setStelle(null); setZiel(null); }}
                 onFertig={(patientId, dokumentId) => { setZuordnen(false); setZiel(null); onZugeordnet(patientId, dokumentId, s.titel); }} />
             ) : (

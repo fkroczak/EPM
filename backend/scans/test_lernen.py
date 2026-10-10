@@ -236,7 +236,7 @@ class LernenTest(Grundlage):
         self.assertEqual(verweise, {"stammdaten.Laborparameter", settings.AUTH_USER_MODEL})
         self.assertFalse(felder & {"patient", "scan", "dokument", "wert", "wert_text", "befund", "text"})
         self.assertFalse({f.name for f in KorrekturZaehler._meta.get_fields()} - {"id", "monat", "art", "uebernommen",
-                                                                                     "korrigiert"})
+                                                                                     "korrigiert", "verworfen"})
         # Bezeichnungen mit Name, Datum oder Angaben zur Person werden nie gelernt
         self.assertFalse(lernen.zulaessig("Muster Erika", self.testpatient))
         self.assertFalse(lernen.zulaessig("Kontrolle 14.03.1961"))

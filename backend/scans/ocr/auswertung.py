@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
@@ -130,10 +130,11 @@ class Treffer:
     ziel_text: str
     bestaetigt: int
     labor: bool          # gilt für diesen Absender (sonst allgemein)
+    schwelle: int = SCHWELLE
 
     @property
     def sicher(self) -> bool:
-        return self.bestaetigt >= SCHWELLE
+        return self.bestaetigt >= self.schwelle
 
 
 @dataclass
@@ -142,11 +143,17 @@ class Gelerntes:
 
     ``eintraege``: (Art, Quelle, Bezeichnung) → [(Ziel, Zieltext, Bestätigungen)], Quelle „“ = allgemein;
     ``gesperrt``: (Art, Quelle, Bezeichnung, Ziel) – „nie wieder so zuordnen“ (Quelle „“ = bei allen Absendern);
-    ``spalten``: Quelle → (linke Kante der Wertespalte, Zeichenbreite), nur bestätigte Lagen."""
+    ``spalten``: Quelle → (linke Kante der Wertespalte, Zeichenbreite), nur bestätigte Lagen;
+    ``ignorieren``: (Quelle, Bezeichnung) – „falsch erkannt, gehört nicht dazu“ (F189), Quelle „“ = überall;
+    ``bereiche``: Quelle → [[x, y, b, h], …] – markierte Bereiche der Werte (F189, liest der OCR-Dienst gezielt nach);
+    ``schwelle``: ab so vielen Bestätigungen sicher (Gelernte Zuordnungen › Steuerung, 1–3)."""
 
     eintraege: dict
     gesperrt: set
     spalten: dict
+    ignorieren: set = field(default_factory=set)
+    bereiche: dict = field(default_factory=dict)
+    schwelle: int = SCHWELLE
 
     @classmethod
     def leer(cls) -> "Gelerntes":
@@ -162,7 +169,10 @@ class Gelerntes:
         if not liste:
             return None
         ziel, text, n = max(liste, key=lambda e: e[2])
-        return Treffer(ziel, text, n, bool(quelle))
+        return Treffer(ziel, text, n, bool(quelle), self.schwelle)
+
+    def ignoriert(self, quelle: str, erkannt: str) -> bool:
+        return bool(erkannt) and ((("", erkannt) in self.ignorieren) or (bool(quelle) and (quelle, erkannt) in self.ignorieren))
 
     def finden(self, art: str, quelle: str, erkannt: str) -> Treffer | None:
         """Zuerst das für denselben Absender Gelernte, dann das allgemeine; sichere Treffer vor Vorschlägen."""
@@ -209,20 +219,28 @@ class T:
     seite: int
     box: tuple
     c: float
+    bereich: tuple | None = None   # aus einem markierten Bereich nachgelesen (F189)
 
 
 def reihen_aus(seiten: list[dict]) -> list[list[T]]:
     """Ergebnis-JSON aller Seiten → Reihen von Wörtern (Seite für Seite, oben nach unten)."""
     aus = []
     for nr, d in enumerate(seiten):
-        b, h = max(d.get("breite") or 1, 1), max(d.get("hoehe") or 1, 1)
-        for r in d.get("reihen", []):
-            reihe = []
-            for s in r:
-                for w in s["w"]:
-                    reihe.append(T(str(w[0]), nr, (w[1] / b, w[2] / h, w[3] / b, w[4] / h), float(w[5])))
-            if reihe:
-                aus.append(reihe)
+        aus += reihen_der_seite(d, nr)
+    return aus
+
+
+def reihen_der_seite(d: dict, nr: int, bereich=None) -> list[list[T]]:
+    b, h = max(d.get("breite") or 1, 1), max(d.get("hoehe") or 1, 1)
+    aus = []
+    for r in d.get("reihen", []):
+        reihe = []
+        for s in r:
+            for w in s["w"]:
+                reihe.append(T(str(w[0]), nr, (w[1] / b, w[2] / h, w[3] / b, w[4] / h), float(w[5]),
+                               tuple(bereich) if bereich else None))
+        if reihe:
+            aus.append(reihe)
     return aus
 
 
@@ -514,6 +532,8 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict], gelernt: Gelerntes 
         etikett = _text(r[:k - 1] if r[k - 1].text in _PFEIL_WORT and k > 1 else r[:k])
         if _ERLAEUTERUNG.search(norm(etikett)):
             continue  # Beurteilungsstufen unter dem Wert, kein eigener Wert
+        if gelernt and gelernt.ignoriert(quelle, norm(etikett)):
+            continue  # „falsch erkannt – gehört nicht dazu“ (F189)
         if not re.search(r"[A-Za-zÄÖÜäöü]", etikett) or len(etikett) > 60:
             continue
         if alle_daten(etikett) or _DATUM_WORT.match(r[k + 1].text if _OP.match(r[k].text) and k + 1 < len(r)
@@ -635,6 +655,8 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict], gelernt: Gelerntes 
             "vorschlag": True,
             # Lage des Werts (für die Spaltenlage je Absender, F182)
             "wert_x": round(wert_wort.box[0], 4),
+            # aus einem markierten Bereich nachgelesen (F189): dieser Bereich
+            "bereich": list(r[0].bereich) if r[0].bereich else None,
             "wert_zeichen": round(wert_wort.box[2] / max(len(wert_wort.text), 1), 5),
         }
         if art == "gelernt":
@@ -792,6 +814,8 @@ def bia_werte(reihen: list[list[T]], gelernt: Gelerntes | None = None, quelle: s
             etikett = norm(_text(r[:k]))
             if not etikett:
                 continue
+            if gelernt and gelernt.ignoriert(quelle, etikett):
+                break
             treffer = None
             # gelernt (F182): Bezeichnungen anderer Geräte, die die Pflegekraft einem Feld zugeordnet hat
             gl = gelernt.finden("bia", quelle, etikett) if gelernt else None
@@ -897,6 +921,8 @@ def diagnosen(reihen: list[list[T]], gelernt: Gelerntes | None = None, quelle: s
                     kennzeichen = "A"
                 else:
                     kennzeichen = "G"
+            if gelernt and gelernt.ignoriert(quelle, norm(text)):
+                continue  # „falsch erkannt – gehört nicht dazu“ (F189)
             gesehen.add(code)
             woerter = [t for t in r]
             eintrag = {"bezeichnung": text[:200], "icd_code": code + (m.group(2) or ""), "kennzeichen": kennzeichen,
@@ -1025,8 +1051,12 @@ def etikett_an(reihen: list[list[T]], seite: int, box) -> str:
 
 # ---------------------------------------------------------------- Gesamtauswertung
 def auswerten(seiten: list[dict], parameter: list[dict], heute: date | None = None,
-              gelernt: Gelerntes | None = None) -> dict:
+              gelernt: Gelerntes | None = None, zusatz: list | None = None) -> dict:
+    """``zusatz``: aus markierten Bereichen nachgelesene Reihen (F189) als [(Seitenindex, Ergebnis-JSON, Bereich)] –
+    sie kommen hinter alle anderen Reihen, damit die Nummern der übrigen Vorschläge gleich bleiben."""
     reihen = reihen_aus(seiten)
+    for nr, d, bereich in zusatz or []:
+        reihen += reihen_der_seite(d, nr, bereich)
     d, quelle = dokumentdatum(reihen, heute)
     absender = labor_name(reihen)
     q = norm(absender)[:150]

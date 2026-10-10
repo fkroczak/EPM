@@ -793,7 +793,41 @@ Patienten. Alles bleibt auf dem Server; nichts geht ins Internet.</li>
 Art. Stimmt eine Zuordnung nicht, wählen Sie <strong>Löschen</strong> (sie kann neu gelernt werden) oder
 <strong>Sperren</strong> – dann ordnet EPM diese Bezeichnung nie wieder so zu.</p>
 <p>Unten in der Liste der Scans steht, welcher Anteil der übernommenen Werte in diesem Monat noch korrigiert werden
-musste, mit Pfeil im Vergleich zum Vormonat (▼ = besser). Ein Klick zeigt den Verlauf über zwölf Monate.</p>""",
+musste, mit Pfeil im Vergleich zum Vormonat (▼ = besser). Ein Klick zeigt den Verlauf über zwölf Monate.</p>
+<p><strong>Wer darf was?</strong> Lernen tut EPM bei jedem, der Scans zuordnet (Übungszugänge ausgenommen). Ansehen,
+sperren und löschen dürfen alle mit dem Recht „Scans“ oder „Vorlagen pflegen“. Unter <strong>Gelernte
+Zuordnungen</strong> kann, wer Vorlagen pflegt, das Lernen <strong>pausieren</strong> (Gelerntes wird weiter genutzt)
+und einstellen, ab wie vielen Bestätigungen (1, 2 oder 3) etwas als sicher gilt. Jede Änderung steht im Protokoll.</p>""",
+    },
+    {
+        "id": "scans_verbessern", "gruppe": "scans", "titel": "So verbessern Sie die Erkennung",
+        "rechte": ["scans_bearbeiten"], "seiten": ["/scans"],
+        "html": """
+<p>EPM liest den Text aus dem Bild. Manchmal verliest es sich: Es nimmt eine Kopfzeile für einen Wert, liest
+„Kreatimin“ statt „Kreatinin“ oder übersieht eine Zeile. Mit diesen Schritten machen Sie den nächsten Befund besser.</p>
+<ol>
+<li><strong>Vergleichen.</strong> Tippen Sie beim Zuordnen auf eine Zeile. Links im Bild leuchtet die Stelle auf,
+an der EPM gelesen hat.</li>
+<li><strong>Falsches anmerken.</strong> Stimmt eine Zeile nicht, tippen Sie auf <strong>Falsch erkannt</strong> und
+wählen den Grund:
+<ul>
+<li><em>Gehört nicht dazu</em> – zum Beispiel die Zeile „Referenzbereich“, eine Überschrift oder ein Datum.
+EPM lässt diese Zeile bei diesem Labor künftig weg.</li>
+<li><em>Falsche Zeile</em> – die Bezeichnung gehört zu einem anderen Wert, zum Beispiel „Eisen“ wurde dem Ferritin
+zugeordnet. EPM ordnet das bei diesem Labor nicht mehr so zu.</li>
+<li><em>Falscher Wert</em> – die Zahl ist falsch gelesen, zum Beispiel 3,8 statt 3,0. Die Zeile verschwindet; tragen Sie
+den Wert mit <strong>+ Wert</strong> richtig ein.</li>
+</ul></li>
+<li><strong>Fehlendes markieren.</strong> Fehlt ein Wert, tippen Sie auf <strong>Bereich markieren</strong> und ziehen
+mit der Maus oder dem Finger einen Rahmen um die richtigen Zeilen im Bild. EPM liest nur diesen Teil noch einmal
+genauer und zeigt jede Zeile als neuen Wert. Einen einzelnen Wert können Sie auch anklicken: Feld wählen, dann die
+Zahl im Bild antippen.</li>
+<li><strong>Prüfen und übernehmen.</strong> Wählen Sie bei Bedarf den richtigen Laborwert aus der Liste und legen Sie
+alles in die Akte. Erst dann merkt sich EPM Ihre Auswahl – für dieses Labor und allgemein.</li>
+</ol>
+<p>Beim nächsten Befund desselben Labors macht EPM es dann selbst richtig oder schlägt es vor („gelernt?“). Gespeichert
+werden nur Bezeichnungen und die Lage auf der Seite, keine Werte und keine Namen. Hat EPM etwas Falsches gelernt,
+löschen oder sperren Sie es unter <strong>Scans › Gelernte Zuordnungen</strong>.</p>""",
     },
     {
         "id": "versorger", "gruppe": "listen", "titel": "Versorger und Ansprechpartner", "rechte": [],
