@@ -2410,7 +2410,7 @@ class Agent:
         anzahl = text.count("\n")
         zeile(f"{PROTOKOLLE[quelle]}: {anzahl} Zeilen abgerufen (liegt eine Stunde zum Ansehen bereit).\n")
         if rc != 0:
-            return 1, f"{PROTOKOLLE[quelle]}: nicht vollständig lesbar (Rückgabe {rc}) – Inhalt unter „Ansehen“."
+            return 1, f"{PROTOKOLLE[quelle]}: nicht vollständig lesbar (Rückgabe {rc}) – was zu lesen war, steht unten."
         return 0, f"{PROTOKOLLE[quelle]}: {anzahl} Zeilen."
 
     def leeren(self, behalten, von, zeile, vorher=None, simuliert=False):
