@@ -30,6 +30,8 @@ import { PdfDialog } from "@/components/PdfDialog";
 import { useZweiterFaktor } from "@/components/ZweiterFaktor";
 import type { ZweiterFaktorWert } from "@/components/ZweiterFaktor";
 import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
+import { Reiter, ReiterInhalt, useReiter } from "@/components/ui/reiter";
+import { Sparkline } from "@/components/ui/sparkline";
 
 // ---------------------------------------------------------------- Typen (GET /api/backup/)
 type Sicherung = {
@@ -743,22 +745,45 @@ function Kennzahl({ titel, wert, children, testid }: { titel: string; wert: Reac
   );
 }
 
-function SicherungenTabelle({ daten, onWiederherstellen, onHerunterladen }: { daten: Daten; onWiederherstellen: (s: Sicherung) => void;
-  onHerunterladen: (s: Sicherung) => void }) {
+function SicherungenTabelle({ daten, onWiederherstellen, onHerunterladen, auswahl, onAuswahl, onLoeschen, loeschtGerade }: { daten: Daten;
+  onWiederherstellen: (s: Sicherung) => void; onHerunterladen: (s: Sicherung) => void;
+  /** Mehrfachauswahl zum Löschen (Wunsch 10.10.2026); die jüngste Sicherung ist nicht wählbar */
+  auswahl: Set<string>; onAuswahl: (a: Set<string>) => void; onLoeschen: () => void; loeschtGerade: boolean }) {
   const bereit = new Set((daten.bereitgestellt ?? []).map((b) => b.stempel));
   const ziel = daten.ziel.eingerichtet;
   const ue = daten.uebertragung;
   if (!daten.sicherungen.length) {
     return <Karte className="px-5 py-4"><Leer>{daten.status.vorhanden ? "Noch keine Sicherung auf dem Server." : "Der Server hat noch keinen Stand der Sicherungen gemeldet."}</Leer></Karte>;
   }
+  const juengste = daten.sicherungen[0].stempel;
+  const waehlbar = daten.sicherungen.filter((s) => s.stempel !== juengste);
+  const alle = waehlbar.length > 0 && waehlbar.every((s) => auswahl.has(s.stempel));
+  const groesse = daten.sicherungen.filter((s) => auswahl.has(s.stempel)).reduce((n, s) => n + s.groesse, 0);
+  const umschalten = (st: string, an: boolean) => { const n = new Set(auswahl); if (an) n.add(st); else n.delete(st); onAuswahl(n); };
   return (
     <Karte className="overflow-x-auto" data-testid="sicherungen">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-rand flex-wrap" data-testid="auswahl-leiste">
+        <span className="text-sm gedaempft">{auswahl.size ? <><strong className="text-tinte">{auswahl.size} ausgewählt</strong> · {dateigroesse(groesse)}</>
+          : `${daten.sicherungen.length} Sicherungen · zum Löschen links ankreuzen (die jüngste bleibt immer)`}</span>
+        <span className="flex gap-2">
+          {auswahl.size ? <Knopf klein variante="geist" onClick={() => onAuswahl(new Set())}>Auswahl aufheben</Knopf> : null}
+          <Knopf klein variante="dng" disabled={!auswahl.size || loeschtGerade || !daten.agent.verzeichnis} laedt={loeschtGerade}
+            onClick={onLoeschen} data-testid="auswahl-loeschen">
+            {auswahl.size ? `${auswahl.size} ${auswahl.size === 1 ? "Sicherung" : "Sicherungen"} löschen` : "Sicherungen löschen"}</Knopf>
+        </span>
+      </div>
       <table className="tabelle">
-        <thead><tr><th className="th">Zeitpunkt</th><th className="th">Art</th><th className="th text-right">Größe</th><th className="th">Schutz</th>
+        <thead><tr><th className="th w-8"><input type="checkbox" aria-label="Alle Sicherungen auswählen (außer der jüngsten)" data-testid="alle-waehlen"
+          checked={alle} disabled={!waehlbar.length} onChange={(e) => onAuswahl(e.target.checked ? new Set(waehlbar.map((s) => s.stempel)) : new Set())} /></th>
+          <th className="th">Zeitpunkt</th><th className="th">Art</th><th className="th text-right">Größe</th><th className="th">Schutz</th>
           <th className="th">{daten.ziel.hersteller === "nextcloud" ? "Nextcloud" : "Übertragung"}</th><th className="th" /></tr></thead>
         <tbody>
           {daten.sicherungen.map((s) => (
-            <tr key={s.stempel} data-testid={`sicherung-${s.stempel}`}>
+            <tr key={s.stempel} data-testid={`sicherung-${s.stempel}`} className={auswahl.has(s.stempel) ? "bg-fehler-bg/40" : undefined}>
+              <td className="td">{s.stempel === juengste
+                ? <input type="checkbox" disabled aria-label="Die jüngste Sicherung bleibt immer" title="Die jüngste Sicherung bleibt immer" />
+                : <input type="checkbox" checked={auswahl.has(s.stempel)} aria-label={`Sicherung vom ${zeitpunkt(s.zeitpunkt)} auswählen`}
+                  data-testid={`waehlen-${s.stempel}`} onChange={(e) => umschalten(s.stempel, e.target.checked)} />}</td>
               <td className="td num">{zeitpunkt(s.zeitpunkt)}</td>
               <td className="td text-text2">{s.art_name}{s.ausgeloest_von ? ` · ${s.ausgeloest_von}` : ""}</td>
               <td className="td num text-right">{dateigroesse(s.groesse)}</td>
@@ -907,8 +932,74 @@ function Taetigkeiten({ liste }: { liste: Auftrag[] }) {
   );
 }
 
+// ---------------------------------------------------------------- Mehrere Sicherungen löschen (Wunsch 10.10.2026)
+function LoeschenDialog({ offen, daten, auswahl, onZu, onFertig }: { offen: boolean; daten: Daten; auswahl: Set<string>; onZu: () => void;
+  onFertig: () => void }) {
+  const melden = useHinweis();
+  const [kennwort, setKennwort] = useState("");
+  const zf = useZweiterFaktor();
+  const los = useAuftrag("backup/loeschen/", (a) => { melden(`${a.name}: Auftrag an den Server übergeben.`); onFertig(); onZu(); });
+  useEffect(() => { if (offen) { setKennwort(""); zf.zuruecksetzen(); los.reset(); } }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bestaetigt = useBestaetigt(kennwort, zf);
+  if (!offen) return null;
+  const liste = daten.sicherungen.filter((s) => auswahl.has(s.stempel));
+  const groesse = liste.reduce((n, s) => n + s.groesse, 0);
+  const unverschluesselt = liste.filter((s) => !s.verschluesselt).length;
+  const nichtUebertragen = daten.ziel.eingerichtet ? liste.filter((s) => !s.uebertragen).length : liste.length;
+  const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
+  const absenden = () => los.mutate({ stempel: liste.map((s) => s.stempel), kennwort, ...zf.body });
+  const n = liste.length;
+  return (
+    <Dialog offen onOffen={(o) => { if (!o) onZu(); }} breite={600} titel={`${n} ${n === 1 ? "Sicherung" : "Sicherungen"} endgültig löschen?`}
+      beschreibung={`Zusammen ${dateigroesse(groesse)} auf dem Server. Gelöschte Sicherungen lassen sich nicht wiederherstellen.`}
+      fuss={<><Knopf onClick={onZu}>Abbrechen</Knopf>
+        <Knopf variante="dng" laedt={los.isPending} disabled={!bestaetigt || !n} onClick={absenden}>Bestätigen und {n} löschen</Knopf></>}>
+      <form className="flex flex-col gap-3.5" onSubmit={(e) => { e.preventDefault(); if (bestaetigt) absenden(); }} data-testid="loeschen-dialog">
+        <Meldung art="fehler"><strong>Das ist endgültig.</strong> Die Dateien werden vom Server gelöscht. Die jüngste Sicherung bleibt immer erhalten.
+          {daten.ziel.eingerichtet ? " Kopien im Übertragungsziel bleiben, bis die dortige Aufbewahrung sie entfernt." : ""}</Meldung>
+        {nichtUebertragen ? <Meldung art="warn">{nichtUebertragen} der ausgewählten {nichtUebertragen === 1 ? "Sicherung ist" : "Sicherungen sind"} nirgends
+          sonst gespeichert{daten.ziel.eingerichtet ? " (nicht übertragen)" : " (kein Übertragungsziel)"} – sie sind danach ganz weg.</Meldung> : null}
+        <ul className="m-0 pl-5 text-sm max-h-48 overflow-y-auto" data-testid="loeschen-liste">
+          {liste.map((s) => <li key={s.stempel}>{zeitpunkt(s.zeitpunkt)} · {s.art_name} · {dateigroesse(s.groesse)}
+            {s.verschluesselt ? "" : " · unverschlüsselt"}</li>)}
+        </ul>
+        {unverschluesselt ? <span className="text-xs gedaempft">Darunter {unverschluesselt} unverschlüsselte.</span> : null}
+        <Bestaetigung kennwort={kennwort} zf={zf} onKennwort={setKennwort} fehler={f} />
+        {f.stempel ? <Meldung art="fehler">{f.stempel}</Meldung> : null}
+        {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
+        <button type="submit" hidden />
+      </form>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------- Größe der Sicherungen (klein, groß im Dialog)
+function GroessenDiagramm({ daten }: { daten: Daten }) {
+  const liste = [...daten.sicherungen].reverse();
+  const max = Math.max(1, ...liste.map((s) => s.groesse));
+  const H = 220;
+  return (
+    <div className="flex flex-col gap-2" data-testid="groessen-diagramm">
+      <div className="flex items-end gap-1 overflow-x-auto pb-1" style={{ height: `${H / 16}rem` }} role="img"
+        aria-label={`Größe der ${liste.length} Sicherungen, größte ${dateigroesse(max)}`}>
+        {liste.map((s) => (
+          <div key={s.stempel} className="flex flex-col items-center justify-end h-full min-w-[1.5rem] grow" title={`${zeitpunkt(s.zeitpunkt)} · ${dateigroesse(s.groesse)}`}>
+            <span className="text-[0.625rem] gedaempft num whitespace-nowrap">{dateigroesse(s.groesse)}</span>
+            <div className={cx("w-full rounded-t", s.verschluesselt ? "bg-akzent" : "bg-warn")} style={{ height: `${Math.max(2, (s.groesse / max) * (H - 40))}px` }} />
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-between text-xs gedaempft"><span>{liste.length ? zeitpunkt(liste[0].zeitpunkt) : ""}</span>
+        <span>{liste.length ? zeitpunkt(liste[liste.length - 1].zeitpunkt) : ""}</span></div>
+      <span className="text-xs gedaempft">Blau: verschlüsselt · Gelb: unverschlüsselt. Wächst die Größe sprunghaft, lohnt ein Blick auf neue Dokumente.</span>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Seite
-type Offen = null | "jetzt" | "passwort" | "pruefen" | "ziel" | "ziel_entfernen" | "uebertragen" | "aufbewahrung" | "hochladen";
+type Offen = null | "jetzt" | "passwort" | "pruefen" | "ziel" | "ziel_entfernen" | "uebertragen" | "aufbewahrung" | "hochladen" | "loeschen" | "groessen";
+type BackupReiter = "sicherungen" | "verschluesselung" | "uebertragung" | "taetigkeiten";
+const BACKUP_REITER: BackupReiter[] = ["sicherungen", "verschluesselung", "uebertragung", "taetigkeiten"];
 
 export function Backup() {
   const qc = useQueryClient();
@@ -923,7 +1014,13 @@ export function Backup() {
   const [offen, setOffen] = useState<Offen>(null);
   const [wahl, setWahl] = useState<Sicherung | null>(null);
   const [laden, setLaden] = useState<string | null>(null);
+  const [auswahl, setAuswahlRoh] = useState<Set<string>>(new Set());
+  const [reiter, setReiter] = useReiter(BACKUP_REITER);
   const d = daten.data;
+  // nur Sicherungen, die es (noch) gibt, bleiben ausgewählt
+  const vorhanden = useMemo(() => new Set((d?.sicherungen ?? []).slice(1).map((s) => s.stempel)), [d]);
+  const gewaehlt = useMemo(() => new Set([...auswahl].filter((s) => vorhanden.has(s))), [auswahl, vorhanden]);
+  const setAuswahl = (a: Set<string>) => setAuswahlRoh(a);
   const laufend = useMemo(() => new Set((d?.auftraege ?? []).filter((a) => a.offen).map((a) => a.aktion)), [d]);
   // Ist ein Auftrag fertig geworden, auch den Hinweis an alle Benutzer neu laden (Wiederherstellen setzt ihn)
   const vorher = useRef("");
@@ -935,7 +1032,7 @@ export function Backup() {
 
   if (!d) {
     return (
-      <Seite pfad={[{ text: "Administration" }, { text: "Backup" }]}>
+      <Seite pfad={[{ text: "Administration", zu: "/admin" }, { text: "Backup" }]}>
         <Seitenkopf titel="Backup und Wiederherstellung" />
         {daten.error ? <Fehleranzeige fehler={daten.error} /> : <Laden />}
       </Seite>
@@ -950,7 +1047,7 @@ export function Backup() {
   const wiederherstellen = d.auftraege.find((a) => a.aktion === "wiederherstellen" && a.offen);
 
   return (
-    <Seite pfad={[{ text: "Administration" }, { text: "Backup" }]}>
+    <Seite pfad={[{ text: "Administration", zu: "/admin" }, { text: "Backup" }]}>
       <Seitenkopf titel="Backup und Wiederherstellung"
         unter={`Datenbank, Dokumente und Löschliste täglich um 02:00${d.aufbewahrung_tage ? `, ${d.aufbewahrung_tage} Tage auf dem Server` : ""}${
           d.verschluesselung.eingerichtet ? ", verschlüsselt" : ""}${z.eingerichtet ? ", Kopie im Übertragungsziel" : ""}.`}
@@ -980,56 +1077,79 @@ export function Backup() {
         </Meldung>
       ) : null}
 
-      <div className="stapel grid grid-cols-1 md:grid-cols-3 gap-4" data-testid="kennzahlen">
-        <Kennzahl titel="Letzte Sicherung" testid="letzte-sicherung" wert={letzte ? relativ(letzte.zeitpunkt, true) : "—"}>
-          {letzte ? (
-            <span className="flex gap-1.5 flex-wrap items-center">
-              <Chip art={d.kurz.zustand === "fehler" ? "fehler" : "ok"}>{d.kurz.zustand === "fehler" ? <Icon name="warnung" groesse={12} /> : <Icon name="haken" groesse={12} />}
-                {d.nachts_fehlgeschlagen ? "nächtliche fehlgeschlagen" : d.kurz.zustand === "fehler" ? "zu alt" : "erfolgreich"}</Chip>
-              <span className="text-[0.8125rem] gedaempft">{letzte.art_name} · {dateigroesse(letzte.groesse)}</span>
-            </span>
-          ) : <span className="text-[0.8125rem] gedaempft">noch keine Sicherung</span>}
-          {naechste ? <span className="text-[0.8125rem] gedaempft">nächste: {naechste}</span> : null}
-        </Kennzahl>
-        <Kennzahl titel={z.hersteller === "nextcloud" ? "Übertragung Nextcloud" : "Übertragung"} testid="letzte-uebertragung"
-          wert={z.eingerichtet ? (u.letzter_erfolg ? relativ(u.letzter_erfolg, true) : "noch nie") : "—"}>
-          <span className="text-[0.8125rem] gedaempft">{!z.eingerichtet ? "kein Ziel festgelegt"
-            : u.laeuft ? "läuft gerade" : z.von === z.bis ? "Zeitfenster ganztägig" : `Zeitfenster ${z.von}–${z.bis}${u.im_zeitfenster ? " (offen)" : ""}`}</span>
-          {u.letzter_fehler ? <span className="text-[0.8125rem] text-fehler">{u.letzter_fehler}</span> : null}
-        </Kennzahl>
-        <Kennzahl titel="Speicher" testid="speicher" wert={sp.belegt != null && sp.gesamt ? `${dateigroesse(sp.belegt)} von ${dateigroesse(sp.gesamt)}` : "—"}>
-          {belegtProzent != null ? (
-            <div className="h-1.5 rounded-full bg-fein overflow-hidden" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={belegtProzent}
-              aria-label={`Speicher belegt: ${belegtProzent} %`}>
-              <div className={cx("h-full rounded-full", belegtProzent < 80 ? "bg-akzent" : belegtProzent < 90 ? "bg-warn" : "bg-fehler")}
-                style={{ width: `${Math.max(2, belegtProzent)}%` }} />
-            </div>
-          ) : null}
-          <span className="text-[0.8125rem] gedaempft">Sicherungen: {dateigroesse(sp.sicherungen ?? 0)} · {d.sicherungen.length} vorhanden</span>
-          <span className="text-[0.8125rem] flex items-center gap-2 flex-wrap" data-testid="aufbewahrung">
-            <span>Aufbewahrung: <strong className="num">{d.aufbewahrung_tage ?? "—"} Tage</strong></span>
-            <Knopf klein disabled={!d.agent.verzeichnis || laufend.has("sicherung_aufbewahrung")} laedt={laufend.has("sicherung_aufbewahrung")}
-              onClick={() => setOffen("aufbewahrung")}>Ändern</Knopf>
-          </span>
-        </Kennzahl>
-      </div>
+      <Reiter label="Bereiche der Backup-Seite" wert={reiter} onWahl={setReiter} testid="backup-reiter" eintraege={[
+        { wert: "sicherungen", text: "Sicherungen", zahl: d.sicherungen.length || undefined },
+        { wert: "verschluesselung", text: "Verschlüsselung", zahl: d.verschluesselung.eingerichtet ? undefined : 1, warn: true },
+        { wert: "uebertragung", text: "Übertragung", zahl: !z.eingerichtet || u.letzter_fehler ? 1 : undefined, warn: true },
+        { wert: "taetigkeiten", text: "Tätigkeiten", zahl: d.auftraege.filter((a) => a.offen).length || undefined },
+      ]} />
 
-      <SicherungenTabelle daten={d} onWiederherstellen={setWahl} onHerunterladen={(s) => setLaden(s.stempel)} />
-      <OffeneUploads daten={d} laufend={laufend} />
+      {reiter === "sicherungen" ? (
+        <ReiterInhalt testid="reiter-sicherungen">
+          <div className="stapel grid grid-cols-1 md:grid-cols-3 gap-4" data-testid="kennzahlen">
+            <Kennzahl titel="Letzte Sicherung" testid="letzte-sicherung" wert={letzte ? relativ(letzte.zeitpunkt, true) : "—"}>
+              {letzte ? (
+                <span className="flex gap-1.5 flex-wrap items-center">
+                  <Chip art={d.kurz.zustand === "fehler" ? "fehler" : "ok"}>{d.kurz.zustand === "fehler" ? <Icon name="warnung" groesse={12} /> : <Icon name="haken" groesse={12} />}
+                    {d.nachts_fehlgeschlagen ? "nächtliche fehlgeschlagen" : d.kurz.zustand === "fehler" ? "zu alt" : "erfolgreich"}</Chip>
+                  <span className="text-[0.8125rem] gedaempft">{letzte.art_name} · {dateigroesse(letzte.groesse)}</span>
+                </span>
+              ) : <span className="text-[0.8125rem] gedaempft">noch keine Sicherung</span>}
+              {naechste ? <span className="text-[0.8125rem] gedaempft">nächste: {naechste}</span> : null}
+            </Kennzahl>
+            <Kennzahl titel={z.hersteller === "nextcloud" ? "Übertragung Nextcloud" : "Übertragung"} testid="letzte-uebertragung"
+              wert={z.eingerichtet ? (u.letzter_erfolg ? relativ(u.letzter_erfolg, true) : "noch nie") : "—"}>
+              <span className="text-[0.8125rem] gedaempft">{!z.eingerichtet ? "kein Ziel festgelegt"
+                : u.laeuft ? "läuft gerade" : z.von === z.bis ? "Zeitfenster ganztägig" : `Zeitfenster ${z.von}–${z.bis}${u.im_zeitfenster ? " (offen)" : ""}`}</span>
+              {u.letzter_fehler ? <span className="text-[0.8125rem] text-fehler">{u.letzter_fehler}</span> : null}
+            </Kennzahl>
+            <Kennzahl titel="Speicher" testid="speicher" wert={sp.belegt != null && sp.gesamt ? `${dateigroesse(sp.belegt)} von ${dateigroesse(sp.gesamt)}` : "—"}>
+              {belegtProzent != null ? (
+                <div className="h-1.5 rounded-full bg-fein overflow-hidden" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={belegtProzent}
+                  aria-label={`Speicher belegt: ${belegtProzent} %`}>
+                  <div className={cx("h-full rounded-full", belegtProzent < 80 ? "bg-akzent" : belegtProzent < 90 ? "bg-warn" : "bg-fehler")}
+                    style={{ width: `${Math.max(2, belegtProzent)}%` }} />
+                </div>
+              ) : null}
+              <span className="text-[0.8125rem] gedaempft">Sicherungen: {dateigroesse(sp.sicherungen ?? 0)} · {d.sicherungen.length} vorhanden</span>
+              {d.sicherungen.length > 1 ? (
+                <button type="button" className="bg-transparent border-0 p-0 cursor-pointer text-left flex flex-col gap-1" data-testid="groessen-klein"
+                  onClick={() => setOffen("groessen")} aria-label="Größe der Sicherungen – größer anzeigen">
+                  <Sparkline balken werte={[...d.sicherungen].reverse().map((s) => s.groesse)} hoehe={28} label="Größe der Sicherungen" />
+                  <span className="text-xs text-akzent-text">Größe je Sicherung · größer anzeigen</span>
+                </button>
+              ) : null}
+              <span className="text-[0.8125rem] flex items-center gap-2 flex-wrap" data-testid="aufbewahrung">
+                <span>Aufbewahrung: <strong className="num">{d.aufbewahrung_tage ?? "—"} Tage</strong></span>
+                <Knopf klein disabled={!d.agent.verzeichnis || laufend.has("sicherung_aufbewahrung")} laedt={laufend.has("sicherung_aufbewahrung")}
+                  onClick={() => setOffen("aufbewahrung")}>Ändern</Knopf>
+              </span>
+            </Kennzahl>
+          </div>
 
-      <div className="flex gap-2.5 px-4 py-3 rounded-lg bg-fehler-bg text-fehler text-sm leading-normal items-start" data-testid="warnung-wiederherstellen">
-        <Icon name="warnung" groesse={18} />
-        <span><strong>Wiederherstellen ersetzt den aktuellen Datenbestand.</strong> Vorher wird automatisch eine Sicherung des jetzigen Stands
-          angelegt. Zum Bestätigen müssen das eigene Passwort und der 2FA-Code eingegeben werden.</span>
-      </div>
+          <SicherungenTabelle daten={d} onWiederherstellen={setWahl} onHerunterladen={(s) => setLaden(s.stempel)}
+            auswahl={gewaehlt} onAuswahl={setAuswahl} onLoeschen={() => setOffen("loeschen")} loeschtGerade={laufend.has("sicherung_loeschen")} />
+          <OffeneUploads daten={d} laufend={laufend} />
 
-      <div className="stapel grid grid-cols-1 hd:grid-cols-2 gap-5 items-start">
-        <Verschluesselung daten={d} onPasswort={() => setOffen("passwort")} onPruefen={() => setOffen("pruefen")} />
-        <UebertragungKarte daten={d} offen={laufend} onZiel={() => setOffen("ziel")} onEntfernen={() => setOffen("ziel_entfernen")}
-          onUebertragen={() => setOffen("uebertragen")} />
-      </div>
-
-      <Taetigkeiten liste={d.auftraege} />
+          <div className="flex gap-2.5 px-4 py-3 rounded-lg bg-fehler-bg text-fehler text-sm leading-normal items-start" data-testid="warnung-wiederherstellen">
+            <Icon name="warnung" groesse={18} />
+            <span><strong>Wiederherstellen ersetzt den aktuellen Datenbestand.</strong> Vorher wird automatisch eine Sicherung des jetzigen Stands
+              angelegt. Zum Bestätigen müssen das eigene Passwort und der 2FA-Code eingegeben werden.</span>
+          </div>
+        </ReiterInhalt>
+      ) : null}
+      {reiter === "verschluesselung" ? (
+        <ReiterInhalt testid="reiter-verschluesselung">
+          <Verschluesselung daten={d} onPasswort={() => setOffen("passwort")} onPruefen={() => setOffen("pruefen")} />
+        </ReiterInhalt>
+      ) : null}
+      {reiter === "uebertragung" ? (
+        <ReiterInhalt testid="reiter-uebertragung">
+          <UebertragungKarte daten={d} offen={laufend} onZiel={() => setOffen("ziel")} onEntfernen={() => setOffen("ziel_entfernen")}
+            onUebertragen={() => setOffen("uebertragen")} />
+        </ReiterInhalt>
+      ) : null}
+      {reiter === "taetigkeiten" ? <ReiterInhalt testid="reiter-taetigkeiten"><Taetigkeiten liste={d.auftraege} /></ReiterInhalt> : null}
       {d.probelauf ? <span className="text-xs gedaempft">Testumgebung: Der Systemagent läuft im Probelauf; Sicherung, Übertragung und Wiederherstellen sind echt.</span> : null}
       <span className="text-xs gedaempft">Stand vom Server {d.status.zeit ? `um ${uhrzeit(d.status.zeit)} Uhr` : "—"} · wird alle 30 Sekunden neu geladen.</span>
 
@@ -1049,6 +1169,11 @@ export function Backup() {
       <HerunterladenDialog s={d.sicherungen.find((x) => x.stempel === laden) ?? null} daten={d} onZu={() => setLaden(null)} />
       <AufbewahrungDialog offen={offen === "aufbewahrung"} daten={d} onZu={() => setOffen(null)} />
       <HochladenDialog offen={offen === "hochladen"} daten={d} onZu={() => setOffen(null)} />
+      <LoeschenDialog offen={offen === "loeschen"} daten={d} auswahl={gewaehlt} onZu={() => setOffen(null)} onFertig={() => setAuswahl(new Set())} />
+      <Dialog offen={offen === "groessen"} onOffen={(o) => { if (!o) setOffen(null); }} titel="Größe der Sicherungen" breite={960}
+        beschreibung={`${d.sicherungen.length} Sicherungen auf dem Server, zusammen ${dateigroesse(sp.sicherungen ?? 0)}`}>
+        <GroessenDiagramm daten={d} />
+      </Dialog>
     </Seite>
   );
 }

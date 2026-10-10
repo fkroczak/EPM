@@ -14,7 +14,7 @@ from django.conf import settings
 from django.utils import timezone
 
 # Code -> Angaben. Dieselben Aktionen stehen im Agenten (AKTIONEN); andere führt er nicht aus.
-# bestaetigung: "keine" | "einfach" (Rückfrage) | "2fa" (Admin-Kennwort und – wenn ein zweiter Faktor eingerichtet
+# bestaetigung: "keine" | "einfach" (Rückfrage) | "2fa" (Admin-Passwort und – wenn ein zweiter Faktor eingerichtet
 # ist – der Code; Festlegungen 01. und 02.10.2026)
 # sichern: der Agent erstellt vorher eine Sicherung; warnen: angemeldete Benutzer bekommen vorher einen Hinweis
 AKTIONEN = {

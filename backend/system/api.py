@@ -96,7 +96,7 @@ def auftraege_abgleichen():
 
 
 def bestaetigung_pruefen(request, was: str):
-    """Admin-Kennwort und zweiter Faktor (Authenticator, Notfall-Code oder Passkey), wie beim Wiederherstellen (F63). Ohne
+    """Admin-Passwort und zweiter Faktor (Authenticator, Notfall-Code oder Passkey), wie beim Wiederherstellen (F63). Ohne
     eingerichteten zweiten Faktor geht es nicht (Festlegung 03.10.2026).
     Fehlversuche stehen im Audit-Log, sperren das Konto aber nicht (die Anmeldung selbst ist schon bestätigt)."""
     user = request.user

@@ -83,6 +83,8 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
   const scansOffen = useScansOffen();
   const navigate = useNavigate();
   const admin = [
+    // Übersicht mit Ampel und häufigen Aufgaben (Wunsch 10.10.2026)
+    darf("system_verwalten") || darf("backup_verwalten") ? <NavEintrag key="sv" zu="/admin" icon="aktivitaet" text="Systemverwaltung" ende /> : null,
     darf("backup_verwalten") ? <NavEintrag key="b" zu="/admin/backup" icon="backup" text="Backup" /> : null,
     darf("benutzer_verwalten") ? <NavEintrag key="u" zu="/admin/benutzer" icon="benutzer" text="Benutzer" /> : null,
     darf("vorlagen_pflegen") ? <NavEintrag key="v" zu="/admin/vorlagen" icon="vorlagen" text="Vorlagen" /> : null,

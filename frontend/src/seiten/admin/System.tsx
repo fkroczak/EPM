@@ -5,7 +5,7 @@
  * Update und Neustart: Bestätigung mit Admin-Passwort und 2FA, vorher automatische Sicherung, Benutzer werden gewarnt.
  */
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import type { PointerEvent as ZeigerEreignis, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
@@ -13,13 +13,13 @@ import type { Feldfehler } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
 import { AuftragFortschritt, LaufendeAuftraege } from "@/components/AuftragFortschritt";
 import { useHintergrundarbeit } from "@/lib/laden";
-import { dateigroesse, datum, relativ, uhrzeit, zahl, zeitpunkt } from "@/lib/format";
+import { dateigroesse, datum, relativ, zahl, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
 import type { ScansStand } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { useStufe } from "@/lib/stufen";
 import type { Stufe } from "@/lib/stufen";
-import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, Laden, Leer, Meldung, Segmente, Seitenkopf,
+import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, Laden, Leer, Meldung, Seitenkopf,
   Textfeld, cx } from "@/components/ui/basis";
 import { Bereich, Bereiche } from "@/components/ui/bereiche";
 import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
@@ -27,6 +27,10 @@ import { useZweiterFaktor } from "@/components/ZweiterFaktor";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
+import { Reiter, ReiterInhalt, useReiter } from "@/components/ui/reiter";
+import type { ReiterEintrag } from "@/components/ui/reiter";
+import { AuslastungKarte } from "./auslastung";
+import { DiensteKarte, ProtokolleBereich, SoftwareBereich, ZertifikatBereich } from "./SystemWartung";
 
 export type Platte = { pfad: string; bezeichnung: string; gesamt: number; frei: number };
 export type Speicher = { gesamt: number | null; verfuegbar: number | null; swap_gesamt: number | null; swap_frei: number | null } | null;
@@ -44,7 +48,23 @@ export type HostStatus = {
     status: string }[]; hinweis?: string };
   sicherung?: { verfuegbar: boolean; anzahl?: number; gesamt?: number; letzte_am?: string | null; letzte_groesse?: number };
   dienste?: Record<string, string>;
+  // Wartung ohne SSH (F179)
+  versionen?: { verfuegbar: boolean; aktiv: string; quelle: string; hinweis?: string;
+    liste: { tag: string; erstellt: string; backend: boolean; web: boolean; aktiv: boolean; vollstaendig: boolean }[] };
+  pakete?: { erstellt: PaketDatei[]; bereit: PaketDatei[] };
+  zertifikat?: { vorhanden: boolean; name?: string; ca_schluessel?: boolean; ca_download?: boolean; inhaber?: string; aussteller?: string;
+    gueltig_bis?: string | null; gueltig_ab?: string | null; tage?: number; namen?: string; selbst_signiert?: boolean; eigene_ca?: boolean; hinweis?: string };
+  uhr?: { verfuegbar: boolean; synchronisiert: boolean; ntp: boolean; zeitzone: string };
+  ocr_vorrat?: { vorhanden: boolean; dateien: number; groesse: number; geaendert: string | null };
+  werkzeuge?: { epm_update: boolean; epm_zertifikat: boolean; epm_ocr_modelle: boolean };
+  protokolle?: { quelle: string; name: string }[];
 };
+type PaketDatei = { tag: string; datei: string; groesse: number; zeit: string; bis?: string };
+/** Aufträge der Wartung ohne SSH (eigene Endpunkte): Bestätigung und Beschreibung vom Backend */
+export type VerwaltungAktion = { name: string; bestaetigung: "keine" | "einfach" | "2fa"; beschreibung: string; sichern?: boolean;
+  warnen?: boolean; recht?: string; mehrfach?: boolean };
+export type SystemReiter = "uebersicht" | "wartung" | "software" | "zertifikat" | "protokolle" | "anmeldungen" | "verlauf" | "testphase";
+const SYSTEM_REITER: SystemReiter[] = ["uebersicht", "wartung", "software", "zertifikat", "protokolle", "anmeldungen", "verlauf", "testphase"];
 type Konto = { id: number; anzeigename: string; benutzername: string };
 export type Aktion = { code: string; name: string; bestaetigung: "keine" | "einfach" | "2fa"; beschreibung: string; sichern: boolean;
   warnen: boolean; erlaubt: boolean };
@@ -79,6 +99,12 @@ export type Uebersicht = {
   einstellungen?: Einstellungen;
   /** „Datenbank leeren“ nur für die Rolle Admin */
   leeren_erlaubt?: boolean;
+  verwaltung?: Record<string, VerwaltungAktion>;
+  uploads?: { upload: string; art: string; name: string; groesse: number; erhalten: number; vollstaendig: boolean; von: string;
+    begonnen_am: string | null }[];
+  upload?: { teil: number; max: Record<string, number> };
+  austausch?: boolean;
+  dienste?: string[];
 };
 type Einstellungen = { musterdaten_automatisch: boolean; import_ausgeblendet: boolean };
 type LeerenKonto = { id: number; anzeigename: string; benutzername: string; rolle: string; ist_test: boolean; nur_historisch: boolean;
@@ -88,13 +114,8 @@ type LeerenVorbereitung = { code: string; gueltig_bis: string; benutzer: LeerenK
     aerzte: number; importlaeufe: number } };
 export type Auftrag = { id: number; kennung: string; ziel: "server" | "epm"; aktion: string; name: string;
   status: "wartet" | "laeuft" | "erledigt" | "fehler" | "abgebrochen"; status_name: string; offen: boolean;
-  parameter: { minuten?: number; pruefsummen?: boolean }; angefordert_von_name: string | null; angefordert_am: string;
+  parameter: { minuten?: number; pruefsummen?: boolean; quelle?: string; zeilen?: number; tag?: string; dienst?: string; upload?: string; datei?: string }; angefordert_von_name: string | null; angefordert_am: string;
   begonnen_am: string | null; beendet_am: string | null; ergebnis: string; ausgabe: string; rueckgabe: number | null; probelauf: boolean };
-type Zeitraum = "1h" | "3h" | "24h" | "7t" | "14t" | "1m" | "6m";
-type Verlauf = { felder: string[]; punkte: (number | null)[][]; zeitraum: Zeitraum; name: string; schritt_s: number; von: number; bis: number;
-  zeitraeume: { code: Zeitraum; name: string }[] };
-const ZEITRAUM_KURZ: Record<Zeitraum, string> = { "1h": "1 h", "3h": "3 h", "24h": "24 h", "7t": "7 Tage", "14t": "14 Tage", "1m": "1 Monat", "6m": "6 Monate" };
-const ZEITRAUM_MERKER = "epm-system-zeitraum";
 /** Spalten des Rasters der Systemseite je Fensterstufe (S16, Entwurf 2: ab 1440 px 2, ab 1920 px 3, ab 2560 px 4) */
 const SYSTEM_SPALTEN: Record<Stufe, number> = { eng: 1, schmal: 1, hd: 2, fhd: 3, qhd: 4 };
 
@@ -149,171 +170,6 @@ function AuftragStatus({ a }: { a: Auftrag }) {
   const art = a.status === "erledigt" ? "ok" : a.status === "fehler" ? "fehler" : a.status === "abgebrochen" ? undefined : "warn";
   return <Chip art={art}>{a.status === "laeuft" || a.status === "wartet" ? <Icon name="sanduhr" groesse={12} /> : null}{a.status_name}
     {a.probelauf ? " (Probelauf)" : ""}</Chip>;
-}
-
-// ---------------------------------------------------------------- Verlauf der Auslastung
-const WOCHENTAG = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
-const zwei = (n: number) => String(n).padStart(2, "0");
-
-/**
- * CPU und Arbeitsspeicher in % auf einer gemeinsamen Achse (0–100 %), mit Fadenkreuz und Werten beim Überfahren.
- * Zeitraum wählbar (1 h bis 6 Monate, Fehlerliste 02.10.2026, 4.1): Die Zeitachse reicht immer über den ganzen Zeitraum,
- * auch wenn der Verlauf noch nicht so weit zurückreicht. Bei längeren Zeiträumen sind die Punkte Mittelwerte
- * (15 Minuten, 1 Stunde, 6 Stunden); die Spitzen in dieser Zeit stehen als dünne gestrichelte Linie dabei.
- * Das Diagramm füllt die Karte: Breite und Höhe folgen der eingestellten Größe der Karte.
- */
-function VerlaufDiagramm({ verlauf }: { verlauf: Verlauf }) {
-  const [zeiger, setZeiger] = useState<number | null>(null);
-  const flaeche = useRef<SVGSVGElement>(null);
-  const rahmen = useRef<HTMLDivElement>(null);
-  const [mass, setMass] = useState({ b: 720, h: 200 });
-  useEffect(() => {
-    if (!rahmen.current || typeof ResizeObserver === "undefined") return;
-    const beobachter = new ResizeObserver(([e]) => {
-      const b = Math.max(280, Math.floor(e.contentRect.width)), h = Math.max(160, Math.floor(e.contentRect.height));
-      setMass((m) => (m.b === b && m.h === h ? m : { b, h }));
-    });
-    beobachter.observe(rahmen.current);
-    return () => beobachter.disconnect();
-  }, []);
-  const punkte = verlauf.punkte;
-  const B = mass.b, H = mass.h, L = 36, R = 64, O = 10, U = 24;
-  const spalte = (name: string) => verlauf.felder.indexOf(name);
-  const iCpu = spalte("cpu"), iRam = spalte("ram"), iLast = spalte("last"), iPlatte = spalte("platte");
-  const iCpuMax = spalte("cpu_max"), iRamMax = spalte("ram_max");
-  const t0 = verlauf.von, t1 = Math.max(verlauf.bis, t0 + 1);
-  const x = (t: number) => L + ((t - t0) / (t1 - t0)) * (B - L - R);
-  const y = (p: number) => O + (1 - Math.min(100, Math.max(0, p)) / 100) * (H - O - U);
-  // Lücken (Server aus, Agent pausiert) nicht überbrücken: ab dem Dreifachen des Messabstands neu ansetzen
-  const luecke = Math.max(180, 3 * (verlauf.schritt_s || 60));
-  const linie = (i: number) => {
-    if (i < 0) return "";
-    let d = "";
-    let vorher: number | null = null;
-    for (const p of punkte) {
-      const v = p[i];
-      if (v == null) { vorher = null; continue; }
-      d += `${vorher != null && p[0]! - vorher <= luecke ? "L" : "M"}${x(p[0]!).toFixed(1)},${y(v).toFixed(1)}`;
-      vorher = p[0]!;
-    }
-    return d;
-  };
-  const lang = t1 - t0 > 36 * 3600, sehrLang = t1 - t0 > 20 * 86400;
-  const achse = (t: number) => {
-    const d = new Date(t * 1000);
-    return sehrLang ? `${zwei(d.getDate())}.${zwei(d.getMonth() + 1)}.` : lang ? `${WOCHENTAG[d.getDay()]} ${zwei(d.getDate())}.${zwei(d.getMonth() + 1)}.` : uhrzeit(d);
-  };
-  const marken = Math.max(2, Math.min(7, Math.floor((B - L - R) / 110)));
-  const letzte = punkte.length ? punkte[punkte.length - 1] : null;
-  const p = zeiger != null ? punkte[zeiger] ?? null : null;
-  const bewegen = (e: ZeigerEreignis<SVGSVGElement>) => {
-    const r = flaeche.current?.getBoundingClientRect();
-    if (!r || !punkte.length) return;
-    const t = t0 + ((((e.clientX - r.left) / r.width) * B - L) / (B - L - R)) * (t1 - t0);
-    let best = 0;
-    for (let i = 1; i < punkte.length; i++) if (Math.abs(punkte[i][0]! - t) < Math.abs(punkte[best][0]! - t)) best = i;
-    setZeiger(best);
-  };
-  const reihen = [
-    { i: iCpu, max: iCpuMax, name: "CPU", kurz: "CPU", farbe: "var(--reihe-1)" },
-    { i: iRam, max: iRamMax, name: "Arbeitsspeicher", kurz: "RAM", farbe: "var(--reihe-2)" }].filter((r) => r.i >= 0);
-  const mitSpitzen = iCpuMax >= 0 || iRamMax >= 0;
-  const wert = (z: (number | null)[], i: number, einheit = " %") => (i >= 0 && z[i] != null ? `${zahl(z[i])}${einheit}` : "—");
-  const mittel = verlauf.schritt_s >= 86400 / 4 ? "6 Stunden" : verlauf.schritt_s >= 3600 ? "1 Stunde" : verlauf.schritt_s >= 900 ? "15 Minuten" : "";
-  return (
-    <div className="flex flex-col gap-2 grow min-h-0" data-testid="verlauf" data-zeitraum={verlauf.zeitraum} data-punkte={punkte.length}>
-      <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-text2" aria-hidden="true">
-        {reihen.map((r) => <span key={r.i} className="flex items-center gap-1.5"><span className="w-4 h-0.5 rounded" style={{ background: r.farbe }} />{r.name}</span>)}
-        {mitSpitzen ? <span className="flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-current" />Spitze</span> : null}
-        <span className="gedaempft">Werte in %{mittel ? ` · Mittel über ${mittel}` : ""}</span>
-      </div>
-      <div ref={rahmen} className="relative grow" style={{ minHeight: Math.round(Math.min(300, Math.max(180, B * 0.2))) }}>
-        <svg ref={flaeche} viewBox={`0 0 ${B} ${H}`} className="absolute inset-0 w-full h-full touch-none" role="img"
-          aria-label={letzte ? `Auslastung, ${verlauf.name}: CPU zuletzt ${wert(letzte, iCpu)}, Arbeitsspeicher ${wert(letzte, iRam)}`
-            : `Auslastung, ${verlauf.name}: noch keine Messwerte`}
-          onPointerMove={bewegen} onPointerLeave={() => setZeiger(null)}>
-          {[0, 25, 50, 75, 100].map((g) => (
-            <g key={g}>
-              <line x1={L} x2={B - R} y1={y(g)} y2={y(g)} stroke="var(--rand)" strokeWidth={1} strokeDasharray={g % 50 ? "2 4" : undefined} />
-              {g % 50 === 0 || H > 220 ? <text x={L - 6} y={y(g) + 4} textAnchor="end" fontSize={11} fill="var(--gedaempft)">{g}</text> : null}
-            </g>
-          ))}
-          {Array.from({ length: marken + 1 }, (_, k) => {
-            const t = t0 + ((t1 - t0) * k) / marken;
-            return (
-              <g key={k}>
-                {k > 0 && k < marken ? <line x1={x(t)} x2={x(t)} y1={O} y2={H - U} stroke="var(--rand)" strokeWidth={1} strokeDasharray="2 4" /> : null}
-                <text x={x(t)} y={H - 6} fontSize={11} fill="var(--gedaempft)" textAnchor={k === 0 ? "start" : k === marken ? "end" : "middle"}>{achse(t)}</text>
-              </g>
-            );
-          })}
-          {reihen.map((r) => (
-            <g key={r.i}>
-              {r.max >= 0 ? <path d={linie(r.max)} fill="none" stroke={r.farbe} strokeWidth={1} strokeDasharray="3 3" opacity={0.7} /> : null}
-              <path d={linie(r.i)} fill="none" stroke={r.farbe} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-              {letzte && letzte[r.i] != null ? (
-                <text x={x(letzte[0]!) + 6} y={y(letzte[r.i]!) + 4} fontSize={11} fill="var(--text2)">{r.kurz} {zahl(letzte[r.i], 0)}</text>
-              ) : null}
-            </g>
-          ))}
-          {p ? (
-            <g>
-              <line x1={x(p[0]!)} x2={x(p[0]!)} y1={O} y2={H - U} stroke="var(--gedaempft)" strokeWidth={1} strokeDasharray="3 3" />
-              {reihen.map((r) => p[r.i] != null ? <circle key={r.i} cx={x(p[0]!)} cy={y(p[r.i]!)} r={4} fill={r.farbe}
-                stroke="var(--flaeche)" strokeWidth={2} /> : null)}
-            </g>
-          ) : null}
-        </svg>
-        {punkte.length < 2 ? (
-          <div className="absolute inset-0 flex items-center justify-center text-sm gedaempft text-center px-10 pointer-events-none" data-testid="verlauf-leer">
-            {verlauf.schritt_s > 60 ? "Für diesen Zeitraum gibt es noch keine Werte – der Systemagent sammelt sie ab jetzt." : "Noch kein Verlauf – der Systemagent misst jede Minute."}
-          </div>
-        ) : null}
-        {p ? (
-          <div className="card absolute top-1 px-2.5 py-1.5 text-xs pointer-events-none flex flex-col gap-0.5"
-            style={{ left: `min(calc(${((x(p[0]!) / B) * 100).toFixed(1)}% + 0.625rem), calc(100% - 11.875rem))` }}>
-            <span className="font-medium">{zeitpunkt(new Date(p[0]! * 1000))}</span>
-            <span>CPU {wert(p, iCpu)} · RAM {wert(p, iRam)}</span>
-            {mitSpitzen ? <span>Spitze: CPU {wert(p, iCpuMax)} · RAM {wert(p, iRamMax)}</span> : null}
-            <span className="gedaempft">Last {wert(p, iLast, "")} · Platte {wert(p, iPlatte)}</span>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function gemerkterZeitraum(): Zeitraum {
-  try {
-    const w = window.localStorage.getItem(ZEITRAUM_MERKER);
-    if (w && w in ZEITRAUM_KURZ) return w as Zeitraum;
-  } catch { /* ohne Speicher: Standard */ }
-  return "24h";
-}
-
-/** Karte „Auslastung“ mit wählbarem Zeitraum; die Wahl bleibt in diesem Browser gemerkt. */
-function AuslastungKarte() {
-  const [zeitraum, setZeitraumRoh] = useState<Zeitraum>(gemerkterZeitraum);
-  const setZeitraum = (z: Zeitraum) => {
-    setZeitraumRoh(z);
-    try { window.localStorage.setItem(ZEITRAUM_MERKER, z); } catch { /* nur bequem, nicht nötig */ }
-  };
-  const verlauf = useQuery({
-    queryKey: ["system", "verlauf", zeitraum],
-    queryFn: () => api<Verlauf>(`system/verlauf/?zeitraum=${zeitraum}`),
-    refetchInterval: 60_000,
-    placeholderData: (vorher: Verlauf | undefined) => vorher,
-  });
-  return (
-    <Karte className="px-5 py-4 flex flex-col gap-2.5 min-h-0" data-testid="auslastung">
-      <KartenKopf titel={`Auslastung · ${verlauf.data?.name ?? ZEITRAUM_KURZ[zeitraum]}`}
-        unter="CPU und Arbeitsspeicher in Prozent, gemessen jede Minute vom Systemagenten" />
-      <Segmente label="Zeitraum" wert={zeitraum} onWahl={setZeitraum} className="self-start flex-wrap"
-        werte={(Object.keys(ZEITRAUM_KURZ) as Zeitraum[]).map((z) => ({ wert: z, text: ZEITRAUM_KURZ[z] }))} />
-      <Fehleranzeige fehler={verlauf.error} />
-      {verlauf.data ? <VerlaufDiagramm verlauf={verlauf.data} /> : verlauf.error ? null : <Laden />}
-    </Karte>
-  );
 }
 
 // ---------------------------------------------------------------- Bestätigen und ausführen
@@ -825,6 +681,7 @@ export function System() {
   const [wahl, setWahl] = useState<Wahl | null>(null);
   const [leeren, setLeeren] = useState(false);
   const [pakete, setPakete] = useState(false);
+  const [reiter, setReiter] = useReiter(SYSTEM_REITER);
   const qc = useQueryClient();
   // Ist ein Auftrag fertig geworden, die Übersicht neu laden (Updates, Sicherung, Status)
   const offenVorher = useRef<string>("");
@@ -862,9 +719,23 @@ export function System() {
   const sicherung = h?.sicherung;
   const letzteSicherungAlt = sicherung?.letzte_am ? Date.now() - new Date(sicherung.letzte_am).getTime() > 36 * 3600 * 1000 : true;
 
+  const offeneFehler = (auftraege.data ?? []).filter((a) => a.status === "fehler" && Date.now() - Date.parse(a.angefordert_am) < 86400_000).length;
+  const zt = h?.zertifikat?.tage;
+  const eintraege: ReiterEintrag<SystemReiter>[] = [
+    { wert: "uebersicht", text: "Übersicht" },
+    { wert: "wartung", text: "Wartung", zahl: h?.updates?.sicherheit || undefined, warn: true },
+    { wert: "software", text: "Software" },
+    { wert: "zertifikat", text: "Zertifikat", zahl: zt != null && zt < 30 ? 1 : undefined, warn: true },
+    { wert: "protokolle", text: "Protokolle" },
+    { wert: "anmeldungen", text: "Anmeldungen und Hinweis", zahl: d.angemeldet.length || undefined },
+    { wert: "verlauf", text: "Verlauf", zahl: offeneFehler || undefined, warn: true },
+    ...(d.einstellungen ? [{ wert: "testphase" as const, text: "Testphase" }] : []),
+  ];
+  const updateAktion = d.aktionen.find((a) => a.code === "epm_update");
+
   return (
-    <Seite pfad={[{ text: "Administration" }, { text: "System" }]}>
-      <Seitenkopf titel="System" unter="Server und EPM: Auslastung, Updates, Wartung. Standardmäßig nur für die Administration (Vertretung unter Benutzer › Rechte)."
+    <Seite pfad={[{ text: "Administration", zu: "/admin" }, { text: "System" }]}>
+      <Seitenkopf titel="System" unter="Server und EPM: Zustand, Wartung, Software, Zertifikat und Protokolle – ohne SSH. Standardmäßig nur für die Administration (Vertretung unter Benutzer › Rechte)."
         rechts={<Knopf icon="neustart" laedt={daten.isFetching} onClick={() => { void daten.refetch(); void auftraege.refetch(); void qc.invalidateQueries({ queryKey: ["system", "verlauf"] }); }}>
           Neu laden</Knopf>} />
       {/* laufende Tätigkeiten mit geschätztem Fortschritt (Wunsch 08.10.2026) */}
@@ -887,126 +758,147 @@ export function System() {
           {d.epm.schutz.fehlend.length ? `${d.epm.schutz.fehlend.length} Tabellen ohne Schutz vor Änderungen – „Unveränderlichkeit prüfen“ ausführen.` : ""}</Meldung>
       ) : null}
 
-      <div className="stapel grid grid-cols-2 lg:grid-cols-3 hd:grid-cols-6 gap-3" data-testid="kennzahlen">
-        <Kennzahl titel="CPU" testid="kennzahl-cpu" prozent={cpu} wert={cpu != null ? `${zahl(cpu, 0)} %` : last ? zahl(last[0]) : "—"}
-          unter={`Last ${last ? last.map((x) => zahl(x)).join(" · ") : "—"} bei ${kerne ?? "?"} Kernen`} />
-        <Kennzahl titel="Arbeitsspeicher" testid="kennzahl-ram" prozent={ram} wert={ram != null ? `${ram} %` : "—"}
-          unter={sp?.gesamt ? `${dateigroesse((sp.gesamt ?? 0) - (sp.verfuegbar ?? 0))} von ${dateigroesse(sp.gesamt)}` : undefined} />
-        <Kennzahl titel={`Platte (${daten_platte?.bezeichnung ?? "Daten"})`} testid="kennzahl-platte" prozent={platte}
-          wert={platte != null ? `${platte} %` : "—"} unter={daten_platte ? `${dateigroesse(daten_platte.frei)} frei von ${dateigroesse(daten_platte.gesamt)}` : undefined} />
-        <Kennzahl titel="Laufzeit seit Neustart" wert={dauer(laufzeit)} unter={h?.system ?? undefined} />
-        <Kennzahl titel="Ubuntu-Updates" testid="kennzahl-updates"
-          wert={updates?.verfuegbar ? zahl(updates.anzahl ?? 0) : "—"}
-          unter={updates?.verfuegbar ? <>{updates.sicherheit ? <span className="text-fehler font-medium">{updates.sicherheit} Sicherheitsupdates · </span> : null}
-            Paketlisten {relativ(updates.listen_am, true)}</> : h ? updates?.hinweis || "nicht ermittelt" : "kommt vom Systemagenten"} />
-        <Kennzahl titel="Letzte Sicherung" wert={sicherung?.letzte_am ? relativ(sicherung.letzte_am, true) : "—"}
-          unter={sicherung?.letzte_am ? <>{dateigroesse(sicherung.letzte_groesse ?? 0)} · {sicherung.anzahl} Sicherungen
-            {letzteSicherungAlt ? <span className="text-warn"> · älter als 36 h</span> : null}</> : h ? "keine Sicherung gefunden" : "kommt vom Systemagenten"} />
-      </div>
+      <Reiter label="Bereiche der Systemseite" eintraege={eintraege} wert={reiter} onWahl={setReiter} testid="system-reiter" />
 
-      {/* Karten im Raster (S16, Entwurf 2: ab 1440 px 2, ab 1920 px 3, ab 2560 px 4 Spalten); Breite und Höhe jeder
-          Karte über das Menü „⋯“ einstellbar, je Person gespeichert (Fehlerliste 02.10.2026, 4.1) */}
-      <Bereiche seite="system" spalten={SYSTEM_SPALTEN[fenster]} testid="system-karten">
-        <Bereich id="verlauf" titel="Auslastung" standard={{ breite: 5 }}><AuslastungKarte /></Bereich>
-        <Bereich id="taetigkeiten" titel="Tätigkeiten" standard={{ breite: 5 }}><Taetigkeiten daten={d} offen={offen} onWahl={setWahl} /></Bereich>
-        <Bereich id="auftraege" titel="Verlauf der Tätigkeiten" standard={{ breite: 5 }}><Auftraege liste={auftraege.data ?? []} /></Bereich>
-        <Bereich id="server" titel="Server">
-        <Karte className="px-5 py-4 flex flex-col gap-2 overflow-x-auto" data-testid="server-karte">
-          <KartenKopf titel="Server" unter={h ? `gemessen ${relativ(h.zeit, true)}` : "ohne Systemagent nur Werte aus dem Container"} />
-          <dl className="m-0">
-            <Zeile label="Rechner">{h?.rechner ?? "—"}</Zeile>
-            <Zeile label="Betriebssystem">{h?.system ?? "—"}{h?.kernel ? <span className="gedaempft"> · Kernel {h.kernel}</span> : null}</Zeile>
-            <Zeile label="Swap">{sp?.swap_gesamt ? `${dateigroesse((sp.swap_gesamt ?? 0) - (sp.swap_frei ?? 0))} von ${dateigroesse(sp.swap_gesamt)} belegt` : "keiner"}</Zeile>
-            {platten.map((p) => (
-              <Zeile key={p.pfad} label={`Platte ${p.bezeichnung}`}><span className="num">{dateigroesse(p.frei)}</span> frei von {dateigroesse(p.gesamt)}
-                <span className="gedaempft"> · {p.pfad}</span></Zeile>
-            ))}
-            {h?.groessen ? <Zeile label="Belegt durch EPM">Dokumente {dateigroesse(h.groessen.dokumente)} · Sicherungen {dateigroesse(h.groessen.sicherungen)}
-              · Image-Dateien {dateigroesse(h.groessen.images)}</Zeile> : null}
-            {h?.dienste ? <Zeile label="Dienste">{Object.entries(h.dienste).map(([n, z]) => (
-              <span key={n} className="inline-flex items-center gap-1 mr-3"><Chip art={z === "active" ? "ok" : "warn"}>{z === "active" ? "aktiv" : z}</Chip>{n}</span>))}</Zeile> : null}
-          </dl>
-          {h?.container ? (
-            <>
-              <h3 className="m-0 mt-2 text-sm font-semibold">Container</h3>
-              {h.container.verfuegbar ? (
-                <table className="tabelle" data-testid="container">
-                  <thead><tr><th className="th">Dienst</th><th className="th">Zustand</th><th className="th">Image</th></tr></thead>
-                  <tbody>{h.container.liste.map((c) => (
-                    <tr key={c.name}><td className="td font-medium">{c.dienst}</td>
-                      <td className="td"><Chip art={c.zustand === "running" && (!c.gesundheit || c.gesundheit === "healthy") ? "ok" : "fehler"}>
-                        {c.zustand === "running" ? "läuft" : c.zustand}{c.gesundheit ? ` · ${c.gesundheit === "healthy" ? "gesund" : c.gesundheit}` : ""}</Chip>
-                        <span className="text-xs gedaempft ml-1.5">{c.status}</span></td>
-                      <td className="td num text-[0.75rem]">{c.image}</td></tr>))}</tbody>
-                </table>
-              ) : <span className="text-sm gedaempft">nicht abrufbar{h.container.hinweis ? `: ${h.container.hinweis}` : ""}</span>}
-            </>
-          ) : null}
-          {updates?.verfuegbar && (updates.pakete?.length ?? 0) > 0 ? (
-            <>
-              <button type="button" className="mt-2 self-start text-sm bg-transparent border-0 p-0 cursor-pointer font-semibold flex items-center gap-1.5"
-                aria-expanded={pakete} onClick={() => setPakete(!pakete)}>
-                <Icon name={pakete ? "runter" : "pfeilRechts"} groesse={14} />Ausstehende Pakete ({updates.anzahl})
-              </button>
-              {pakete ? (
-                <table className="tabelle" data-testid="paketliste">
-                  <thead><tr><th className="th">Paket</th><th className="th">installiert</th><th className="th">neu</th><th className="th" /></tr></thead>
-                  <tbody>{updates.pakete!.map((p) => (
-                    <tr key={p.name}><td className="td num text-[0.8125rem]">{p.name}</td><td className="td num text-[0.75rem] gedaempft">{p.von || "neu"}</td>
-                      <td className="td num text-[0.75rem]">{p.nach}</td><td className="td">{p.sicherheit ? <Chip art="fehler">Sicherheit</Chip> : null}</td></tr>))}</tbody>
-                </table>
+      {reiter === "uebersicht" ? (
+        <ReiterInhalt testid="reiter-uebersicht">
+        <div className="stapel grid grid-cols-2 lg:grid-cols-3 hd:grid-cols-6 gap-3" data-testid="kennzahlen">
+          <Kennzahl titel="CPU" testid="kennzahl-cpu" prozent={cpu} wert={cpu != null ? `${zahl(cpu, 0)} %` : last ? zahl(last[0]) : "—"}
+            unter={`Last ${last ? last.map((x) => zahl(x)).join(" · ") : "—"} bei ${kerne ?? "?"} Kernen`} />
+          <Kennzahl titel="Arbeitsspeicher" testid="kennzahl-ram" prozent={ram} wert={ram != null ? `${ram} %` : "—"}
+            unter={sp?.gesamt ? `${dateigroesse((sp.gesamt ?? 0) - (sp.verfuegbar ?? 0))} von ${dateigroesse(sp.gesamt)}` : undefined} />
+          <Kennzahl titel={`Platte (${daten_platte?.bezeichnung ?? "Daten"})`} testid="kennzahl-platte" prozent={platte}
+            wert={platte != null ? `${platte} %` : "—"} unter={daten_platte ? `${dateigroesse(daten_platte.frei)} frei von ${dateigroesse(daten_platte.gesamt)}` : undefined} />
+          <Kennzahl titel="Laufzeit seit Neustart" wert={dauer(laufzeit)} unter={h?.system ?? undefined} />
+          <Kennzahl titel="Ubuntu-Updates" testid="kennzahl-updates"
+            wert={updates?.verfuegbar ? zahl(updates.anzahl ?? 0) : "—"}
+            unter={updates?.verfuegbar ? <>{updates.sicherheit ? <span className="text-fehler font-medium">{updates.sicherheit} Sicherheitsupdates · </span> : null}
+              Paketlisten {relativ(updates.listen_am, true)}</> : h ? updates?.hinweis || "nicht ermittelt" : "kommt vom Systemagenten"} />
+          <Kennzahl titel="Letzte Sicherung" wert={sicherung?.letzte_am ? relativ(sicherung.letzte_am, true) : "—"}
+            unter={sicherung?.letzte_am ? <>{dateigroesse(sicherung.letzte_groesse ?? 0)} · {sicherung.anzahl} Sicherungen
+              {letzteSicherungAlt ? <span className="text-warn"> · älter als 36 h</span> : null}</> : h ? "keine Sicherung gefunden" : "kommt vom Systemagenten"} />
+        </div>
+
+          {/* Karten im Raster (S16, Entwurf 2: ab 1440 px 2, ab 1920 px 3, ab 2560 px 4 Spalten); Breite und Höhe jeder
+              Karte über das Größen-Menü einstellbar, je Person gespeichert (Fehlerliste 02.10.2026, 4.1) */}
+          <Bereiche seite="system" spalten={SYSTEM_SPALTEN[fenster]} testid="system-karten">
+            <Bereich id="verlauf" titel="Auslastung" standard={{ breite: 5 }}><AuslastungKarte jetzt={{ cpu, ram, platte }} /></Bereich>
+            <Bereich id="server" titel="Server">
+            <Karte className="px-5 py-4 flex flex-col gap-2 overflow-x-auto" data-testid="server-karte">
+              <KartenKopf titel="Server" unter={h ? `gemessen ${relativ(h.zeit, true)}` : "ohne Systemagent nur Werte aus dem Container"} />
+              <dl className="m-0">
+                <Zeile label="Rechner">{h?.rechner ?? "—"}</Zeile>
+                <Zeile label="Betriebssystem">{h?.system ?? "—"}{h?.kernel ? <span className="gedaempft"> · Kernel {h.kernel}</span> : null}</Zeile>
+                <Zeile label="Swap">{sp?.swap_gesamt ? `${dateigroesse((sp.swap_gesamt ?? 0) - (sp.swap_frei ?? 0))} von ${dateigroesse(sp.swap_gesamt)} belegt` : "keiner"}</Zeile>
+                {platten.map((p) => (
+                  <Zeile key={p.pfad} label={`Platte ${p.bezeichnung}`}><span className="num">{dateigroesse(p.frei)}</span> frei von {dateigroesse(p.gesamt)}
+                    <span className="gedaempft"> · {p.pfad}</span></Zeile>
+                ))}
+                {h?.groessen ? <Zeile label="Belegt durch EPM">Dokumente {dateigroesse(h.groessen.dokumente)} · Sicherungen {dateigroesse(h.groessen.sicherungen)}
+                  · Image-Dateien {dateigroesse(h.groessen.images)}</Zeile> : null}
+                {h?.dienste ? <Zeile label="Dienste">{Object.entries(h.dienste).map(([n, z]) => (
+                  <span key={n} className="inline-flex items-center gap-1 mr-3"><Chip art={z === "active" ? "ok" : "warn"}>{z === "active" ? "aktiv" : z}</Chip>{n}</span>))}</Zeile> : null}
+              </dl>
+              {h?.container ? (
+                <>
+                  <h3 className="m-0 mt-2 text-sm font-semibold">Container</h3>
+                  {h.container.verfuegbar ? (
+                    <table className="tabelle" data-testid="container">
+                      <thead><tr><th className="th">Dienst</th><th className="th">Zustand</th><th className="th">Image</th></tr></thead>
+                      <tbody>{h.container.liste.map((c) => (
+                        <tr key={c.name}><td className="td font-medium">{c.dienst}</td>
+                          <td className="td"><Chip art={c.zustand === "running" && (!c.gesundheit || c.gesundheit === "healthy") ? "ok" : "fehler"}>
+                            {c.zustand === "running" ? "läuft" : c.zustand}{c.gesundheit ? ` · ${c.gesundheit === "healthy" ? "gesund" : c.gesundheit}` : ""}</Chip>
+                            <span className="text-xs gedaempft ml-1.5">{c.status}</span></td>
+                          <td className="td num text-[0.75rem]">{c.image}</td></tr>))}</tbody>
+                    </table>
+                  ) : <span className="text-sm gedaempft">nicht abrufbar{h.container.hinweis ? `: ${h.container.hinweis}` : ""}</span>}
+                </>
               ) : null}
-              {updates.zurueckgehalten?.length ? <span className="text-xs gedaempft">Zurückgehalten: {updates.zurueckgehalten.join(", ")}</span> : null}
-            </>
-          ) : null}
-        </Karte>
-        </Bereich>
-
-        <Bereich id="epm" titel="EPM">
-        <Karte className="px-5 py-4 flex flex-col gap-2 overflow-x-auto" data-testid="epm-karte">
-          <KartenKopf titel="EPM" unter={`Version ${d.epm.version}`} />
-          <dl className="m-0">
-            <Zeile label="Software">Django {d.epm.django} · Python {d.epm.python} · PostgreSQL {d.epm.datenbank.version}</Zeile>
-            <Zeile label="Datenbank"><span className="num">{dateigroesse(d.epm.datenbank.groesse)}</span> · {d.epm.datenbank.verbindungen} Verbindungen</Zeile>
-            <Zeile label="Letzte Datenbankpflege">{d.epm.datenbank.letzte_wartung ? relativ(d.epm.datenbank.letzte_wartung, true) : "—"}
-              <span className="gedaempft"> · {zahl(d.epm.datenbank.tote_zeilen)} nicht mehr benötigte Zeilen</span></Zeile>
-            <Zeile label="Migrationen">{d.epm.migrationen_offen ? <Chip art="fehler">{d.epm.migrationen_offen} fehlen</Chip> : <Chip art="ok">vollständig</Chip>}</Zeile>
-            <Zeile label="Unveränderlichkeit">{d.epm.schutz.fehlend.length ? <Chip art="fehler">{d.epm.schutz.fehlend.length} Tabellen ungeschützt</Chip>
-              : <Chip art="ok">{d.epm.schutz.vorhanden} von {d.epm.schutz.erwartet} Tabellen geschützt</Chip>}</Zeile>
-            <Zeile label="Patienten">{d.epm.patienten.in_betreuung} in Betreuung · {d.epm.patienten.abgeschlossen} abgeschlossen · {d.epm.patienten.testpatienten} Testpatienten</Zeile>
-            <Zeile label="Dokumente">{zahl(d.epm.dokumente.anzahl)} Dateien · {dateigroesse(d.epm.dokumente.groesse)}
-              {d.epm.dokumente.ungeprueft ? <span className="gedaempft"> · {d.epm.dokumente.ungeprueft} Altdokumente ungeprüft</span> : null}
-              {d.epm.dokumente.platz ? <span className="gedaempft"> · {dateigroesse(d.epm.dokumente.platz.frei)} frei</span> : null}</Zeile>
-            <Zeile label="Konten"><span data-testid="konten-zeile">{d.epm.konten.aktiv} aktiv · {d.epm.konten.admins} Admins
-              {d.epm.konten.gesperrt ? <> · <Chip art="fehler">{d.epm.konten.gesperrt} gesperrt</Chip>
-                <KontenLinks konten={d.epm.konten.gesperrt_konten} ich={ich.id} /></> : null}
-              {d.epm.konten.ohne_2fa ? <> · <Chip art={d.epm.konten.zweiter_faktor === "freiwillig" ? undefined : "warn"}>{d.epm.konten.ohne_2fa} ohne 2FA</Chip>
-                <KontenLinks konten={d.epm.konten.ohne_2fa_konten} ich={ich.id} zweifaktor /></> : null}
-              {d.epm.konten.einmal_kennwort_offen ? <> · {d.epm.konten.einmal_kennwort_offen} mit offenem Einmal-Kennwort
-                <KontenLinks konten={d.epm.konten.einmal_kennwort_konten} ich={ich.id} /></> : null}</span></Zeile>
-            <Zeile label="Zwei-Faktor-Anmeldung">{d.epm.konten.zweiter_faktor === "alle" ? "Pflicht für alle" : d.epm.konten.zweiter_faktor === "admins"
-              ? "Pflicht für Admins, sonst freiwillig" : "freiwillig"} · <Link to="/admin/benutzer#anmeldung">ändern</Link></Zeile>
-            <Zeile label="Zeitzone">{d.epm.zeitzone} · Serverzeit {h ? zeitpunkt(h.zeit) : "—"} · heute {datum(new Date())}</Zeile>
-          </dl>
-          <h3 className="m-0 mt-2 text-sm font-semibold">Größte Tabellen</h3>
-          <table className="tabelle">
-            <tbody>{d.epm.datenbank.tabellen.map((t) => (
-              <tr key={t.name}><td className="td num text-[0.75rem]">{t.name}</td><td className="td num text-right text-[0.8125rem]">{dateigroesse(t.groesse)}</td>
-                <td className="td num text-right text-[0.75rem] gedaempft">{zahl(t.zeilen)} Zeilen</td></tr>))}</tbody>
-          </table>
-        </Karte>
-        </Bereich>
-        {d.epm.texterkennung ? (
-          <Bereich id="texterkennung" titel="Texterkennung (Scans)"><TexterkennungKarte t={d.epm.texterkennung} /></Bereich>
-        ) : null}
-        <Bereich id="hinweis" titel="Hinweis an alle Benutzer"><HinweisKarte hinweis={d.hinweis} /></Bereich>
-        <Bereich id="angemeldet" titel="Angemeldet"><Angemeldet liste={d.angemeldet} /></Bereich>
-        {d.einstellungen ? (
-          <Bereich id="golive" titel="Testphase und Go-live">
-            <GoLiveKarte daten={d} laeuft={offen.has("server:datenbank_leeren")} onLeeren={() => setLeeren(true)} />
-          </Bereich>
-        ) : null}
-      </Bereiche>
+              {updates?.verfuegbar && (updates.pakete?.length ?? 0) > 0 ? (
+                <>
+                  <button type="button" className="mt-2 self-start text-sm bg-transparent border-0 p-0 cursor-pointer font-semibold flex items-center gap-1.5"
+                    aria-expanded={pakete} onClick={() => setPakete(!pakete)}>
+                    <Icon name={pakete ? "runter" : "pfeilRechts"} groesse={14} />Ausstehende Pakete ({updates.anzahl})
+                  </button>
+                  {pakete ? (
+                    <table className="tabelle" data-testid="paketliste">
+                      <thead><tr><th className="th">Paket</th><th className="th">installiert</th><th className="th">neu</th><th className="th" /></tr></thead>
+                      <tbody>{updates.pakete!.map((p) => (
+                        <tr key={p.name}><td className="td num text-[0.8125rem]">{p.name}</td><td className="td num text-[0.75rem] gedaempft">{p.von || "neu"}</td>
+                          <td className="td num text-[0.75rem]">{p.nach}</td><td className="td">{p.sicherheit ? <Chip art="fehler">Sicherheit</Chip> : null}</td></tr>))}</tbody>
+                    </table>
+                  ) : null}
+                  {updates.zurueckgehalten?.length ? <span className="text-xs gedaempft">Zurückgehalten: {updates.zurueckgehalten.join(", ")}</span> : null}
+                </>
+              ) : null}
+            </Karte>
+            </Bereich>
+            <Bereich id="epm" titel="EPM">
+            <Karte className="px-5 py-4 flex flex-col gap-2 overflow-x-auto" data-testid="epm-karte">
+              <KartenKopf titel="EPM" unter={`Version ${d.epm.version}`} />
+              <dl className="m-0">
+                <Zeile label="Software">Django {d.epm.django} · Python {d.epm.python} · PostgreSQL {d.epm.datenbank.version}</Zeile>
+                <Zeile label="Datenbank"><span className="num">{dateigroesse(d.epm.datenbank.groesse)}</span> · {d.epm.datenbank.verbindungen} Verbindungen</Zeile>
+                <Zeile label="Letzte Datenbankpflege">{d.epm.datenbank.letzte_wartung ? relativ(d.epm.datenbank.letzte_wartung, true) : "—"}
+                  <span className="gedaempft"> · {zahl(d.epm.datenbank.tote_zeilen)} nicht mehr benötigte Zeilen</span></Zeile>
+                <Zeile label="Migrationen">{d.epm.migrationen_offen ? <Chip art="fehler">{d.epm.migrationen_offen} fehlen</Chip> : <Chip art="ok">vollständig</Chip>}</Zeile>
+                <Zeile label="Unveränderlichkeit">{d.epm.schutz.fehlend.length ? <Chip art="fehler">{d.epm.schutz.fehlend.length} Tabellen ungeschützt</Chip>
+                  : <Chip art="ok">{d.epm.schutz.vorhanden} von {d.epm.schutz.erwartet} Tabellen geschützt</Chip>}</Zeile>
+                <Zeile label="Patienten">{d.epm.patienten.in_betreuung} in Betreuung · {d.epm.patienten.abgeschlossen} abgeschlossen · {d.epm.patienten.testpatienten} Testpatienten</Zeile>
+                <Zeile label="Dokumente">{zahl(d.epm.dokumente.anzahl)} Dateien · {dateigroesse(d.epm.dokumente.groesse)}
+                  {d.epm.dokumente.ungeprueft ? <span className="gedaempft"> · {d.epm.dokumente.ungeprueft} Altdokumente ungeprüft</span> : null}
+                  {d.epm.dokumente.platz ? <span className="gedaempft"> · {dateigroesse(d.epm.dokumente.platz.frei)} frei</span> : null}</Zeile>
+                <Zeile label="Konten"><span data-testid="konten-zeile">{d.epm.konten.aktiv} aktiv · {d.epm.konten.admins} Admins
+                  {d.epm.konten.gesperrt ? <> · <Chip art="fehler">{d.epm.konten.gesperrt} gesperrt</Chip>
+                    <KontenLinks konten={d.epm.konten.gesperrt_konten} ich={ich.id} /></> : null}
+                  {d.epm.konten.ohne_2fa ? <> · <Chip art={d.epm.konten.zweiter_faktor === "freiwillig" ? undefined : "warn"}>{d.epm.konten.ohne_2fa} ohne 2FA</Chip>
+                    <KontenLinks konten={d.epm.konten.ohne_2fa_konten} ich={ich.id} zweifaktor /></> : null}
+                  {d.epm.konten.einmal_kennwort_offen ? <> · {d.epm.konten.einmal_kennwort_offen} mit offenem Einmal-Passwort
+                    <KontenLinks konten={d.epm.konten.einmal_kennwort_konten} ich={ich.id} /></> : null}</span></Zeile>
+                <Zeile label="Zwei-Faktor-Anmeldung">{d.epm.konten.zweiter_faktor === "alle" ? "Pflicht für alle" : d.epm.konten.zweiter_faktor === "admins"
+                  ? "Pflicht für Admins, sonst freiwillig" : "freiwillig"} · <Link to="/admin/benutzer#anmeldung">ändern</Link></Zeile>
+                <Zeile label="Zeitzone">{d.epm.zeitzone} · Serverzeit {h ? zeitpunkt(h.zeit) : "—"} · heute {datum(new Date())}</Zeile>
+              </dl>
+              <h3 className="m-0 mt-2 text-sm font-semibold">Größte Tabellen</h3>
+              <table className="tabelle">
+                <tbody>{d.epm.datenbank.tabellen.map((t) => (
+                  <tr key={t.name}><td className="td num text-[0.75rem]">{t.name}</td><td className="td num text-right text-[0.8125rem]">{dateigroesse(t.groesse)}</td>
+                    <td className="td num text-right text-[0.75rem] gedaempft">{zahl(t.zeilen)} Zeilen</td></tr>))}</tbody>
+              </table>
+            </Karte>
+            </Bereich>
+            {d.epm.texterkennung ? (
+              <Bereich id="texterkennung" titel="Texterkennung (Scans)"><TexterkennungKarte t={d.epm.texterkennung} /></Bereich>
+            ) : null}
+          </Bereiche>
+        </ReiterInhalt>
+      ) : null}
+      {reiter === "wartung" ? (
+        <ReiterInhalt testid="reiter-wartung">
+          <Taetigkeiten daten={d} offen={offen} onWahl={setWahl} />
+          <DiensteKarte daten={d} offen={offen} />
+        </ReiterInhalt>
+      ) : null}
+      {reiter === "software" ? (
+        <ReiterInhalt testid="reiter-software">
+          <SoftwareBereich daten={d} offen={offen} onAktualisieren={() => updateAktion && setWahl({ art: "server", aktion: updateAktion })} />
+        </ReiterInhalt>
+      ) : null}
+      {reiter === "zertifikat" ? <ReiterInhalt testid="reiter-zertifikat"><ZertifikatBereich daten={d} offen={offen} /></ReiterInhalt> : null}
+      {reiter === "protokolle" ? <ReiterInhalt testid="reiter-protokolle"><ProtokolleBereich daten={d} auftraege={auftraege.data ?? []} /></ReiterInhalt> : null}
+      {reiter === "anmeldungen" ? (
+        <ReiterInhalt testid="reiter-anmeldungen">
+          <HinweisKarte hinweis={d.hinweis} />
+          <Angemeldet liste={d.angemeldet} />
+        </ReiterInhalt>
+      ) : null}
+      {reiter === "verlauf" ? <ReiterInhalt testid="reiter-verlauf"><Auftraege liste={auftraege.data ?? []} /></ReiterInhalt> : null}
+      {reiter === "testphase" && d.einstellungen ? (
+        <ReiterInhalt testid="reiter-testphase">
+          <GoLiveKarte daten={d} laeuft={offen.has("server:datenbank_leeren")} onLeeren={() => setLeeren(true)} />
+        </ReiterInhalt>
+      ) : null}
       <span className="text-xs gedaempft">Angemeldet als {ich.anzeigename}. Werte vom Server werden jede Minute aktualisiert.</span>
       <AusfuehrenDialog wahl={wahl} daten={d} onZu={() => setWahl(null)} />
       <LeerenDialog offen={leeren} daten={d} onZu={() => setLeeren(false)} />

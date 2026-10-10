@@ -1,4 +1,4 @@
-/** Entwurf 17 · Benutzer: anlegen, ändern, sperren, Einmal-Kennwort, 2FA zurücksetzen; Rechte je Gruppe einstellbar.
+/** Entwurf 17 · Benutzer: anlegen, ändern, sperren, Einmal-Passwort, 2FA zurücksetzen; Rechte je Gruppe einstellbar.
  *  Fehlerliste 02.10.2026, Punkt 6: Konten „ohne Login“ setzen und wieder einbinden (Login geben), Rolle „Keine
  *  Berechtigung“, Testbenutzer-Schalter für Betrachter, Mitarbeiter (auch erweitert) und Mediziner, Zwei-Faktor-Anmeldung freiwillig
  *  oder Pflicht (Karte „Anmeldung“). */
@@ -58,11 +58,11 @@ function Kennwortanzeige({ id, kennwort, gueltig, name, benutzername }: { id: nu
   const [blatt, setBlatt] = useState(false);
   return (
     <div className="meldung info flex flex-col gap-2" data-testid="einmal-kennwort">
-      <span className="text-[0.8125rem] font-medium">Einmal-Kennwort</span>
+      <span className="text-[0.8125rem] font-medium">Einmal-Passwort</span>
       <span className="num text-xl font-semibold tracking-[.08em]">{kennwort}</span>
       <span className="text-[0.8125rem] leading-normal">
         {gueltig ? `Gültig bis ${zeitpunkt(gueltig)}. ` : ""}Persönlich übergeben. Beim ersten Login legt {name} ein eigenes Passwort fest
-        (und richtet die Authenticator-App ein, wenn die Zwei-Faktor-Anmeldung Pflicht ist). Das Kennwort wird nur jetzt angezeigt.
+        (und richtet die Authenticator-App ein, wenn die Zwei-Faktor-Anmeldung Pflicht ist). Das Passwort wird nur jetzt angezeigt.
       </span>
       <div><Knopf klein icon="dokument" onClick={() => setBlatt(true)}>Zugangsblatt drucken</Knopf></div>
       <PdfDialog offen={blatt} onOffen={setBlatt} titel={`Zugangsblatt für ${name}`} pfad={`benutzer/${id}/zugangsblatt/`}
@@ -238,7 +238,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
       } else melden("Benutzer gespeichert.");
     },
   });
-  // Konto ohne Login wieder einbinden: Rolle wählen, Einmal-Kennwort für das Zugangsblatt
+  // Konto ohne Login wieder einbinden: Rolle wählen, Einmal-Passwort für das Zugangsblatt
   const loginGeben = useMutation({
     mutationFn: () => api<BenutzerTyp & { einmal_kennwort: string }>(`benutzer/${benutzer!.id}/login-geben/`, { body: { rolle: loginRolle } }),
     onSuccess: (b) => {
@@ -262,7 +262,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
       if (art === "kennwort" || art === "2fa") setKennwortAnzeige({ id: benutzer!.id, kennwort: String(r.einmal_kennwort), gueltig: String(r.gueltig_bis ?? "") || null });
       if (art === "testdaten") void qc.invalidateQueries({});
       if (art === "ohnelogin") { setKennwortAnzeige(null); setF((v) => ({ ...v, rolle: "keine", ist_test: false })); }
-      melden({ kennwort: "Neues Einmal-Kennwort erzeugt.", "2fa": "2FA zurückgesetzt, neues Einmal-Kennwort erzeugt.", sperren: "Benutzer gesperrt.",
+      melden({ kennwort: "Neues Einmal-Passwort erzeugt.", "2fa": "2FA zurückgesetzt, neues Einmal-Passwort erzeugt.", sperren: "Benutzer gesperrt.",
         ohnelogin: "Konto ist jetzt ohne Login und ohne Rechte.",
         ausblenden: "Testbenutzer ausgeblendet.", einblenden: "Testbenutzer wieder eingeblendet.",
         entsperren: "Benutzer entsperrt.", testdaten: `Testdaten zurückgesetzt (${r.geloescht ?? 0} gelöscht, ${r.angelegt ?? 0} angelegt).` }[art]);
@@ -273,8 +273,8 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
   const z = benutzer ? zustand(benutzer) : null;
   const name = benutzer ? benutzer.anzeigename : "die Person";
   const fragen = {
-    kennwort: ["Einmal-Kennwort erzeugen", "Das bisherige Kennwort gilt danach nicht mehr, alle Anmeldungen der Person werden beendet."],
-    "2fa": ["2FA zurücksetzen", "Authenticator, Passkeys und Notfall-Codes werden gelöscht. Mit dem neuen Einmal-Kennwort richtet die Person den zweiten Faktor neu ein."],
+    kennwort: ["Einmal-Passwort erzeugen", "Das bisherige Passwort gilt danach nicht mehr, alle Anmeldungen der Person werden beendet."],
+    "2fa": ["2FA zurücksetzen", "Authenticator, Passkeys und Notfall-Codes werden gelöscht. Mit dem neuen Einmal-Passwort richtet die Person den zweiten Faktor neu ein."],
     sperren: ["Benutzer sperren", "Die Person kann sich nicht mehr anmelden, alle Sitzungen werden beendet. Einträge bleiben zugeordnet."],
     testdaten: ["Testdaten zurücksetzen", "Alle Testpatienten (Nr. ab 9001) werden gelöscht und die Musterdaten neu angelegt. Echte Patienten bleiben unberührt."],
     ausblenden: ["Testbenutzer ausblenden", "Das Konto wird gesperrt, alle Anmeldungen werden beendet, und es erscheint in keiner Liste mehr (in der Benutzerverwaltung nur mit „Ausgeblendete zeigen“). Es wird nicht gelöscht; Einträge bleiben zugeordnet. Mit „Einblenden“ ist es wieder da."],
@@ -343,14 +343,14 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
         <span className="col-span-4 text-[0.8125rem] gedaempft">Anzeige in der Akte: <span className="text-tinte font-medium">{anzeige(f)}</span></span>
         {speichern.error && !Object.keys(fehler).length ? <Meldung art="fehler" className="col-span-4">{speichern.error.message}</Meldung> : null}
         {neu ? (
-          f.ohne_login ? <Meldung className="col-span-4">Das Konto bekommt kein Kennwort und keine Rechte. Es dient nur dazu, Einträge einer Person zuzuordnen.</Meldung>
-            : <Meldung className="col-span-4">Nach dem Anlegen erzeugt EPM ein Einmal-Kennwort. Du gibst es der Person persönlich oder als ausgedrucktes Zugangsblatt.
+          f.ohne_login ? <Meldung className="col-span-4">Das Konto bekommt kein Passwort und keine Rechte. Es dient nur dazu, Einträge einer Person zuzuordnen.</Meldung>
+            : <Meldung className="col-span-4">Nach dem Anlegen erzeugt EPM ein Einmal-Passwort. Du gibst es der Person persönlich oder als ausgedrucktes Zugangsblatt.
               Beim ersten Login legt sie ein eigenes Passwort fest; die Authenticator-App richtet sie ein, wenn die Zwei-Faktor-Anmeldung Pflicht ist –
               sonst freiwillig unter „Mein Konto“.</Meldung>
         ) : null}
         <div className="col-span-4 flex gap-2 flex-wrap items-center">
           {!neu && benutzer && !benutzer.nur_historisch && !benutzer.ausgeblendet_am ? <>
-            <Knopf onClick={() => setFrage("kennwort")}>Einmal-Kennwort erzeugen</Knopf>
+            <Knopf onClick={() => setFrage("kennwort")}>Einmal-Passwort erzeugen</Knopf>
             <Knopf onClick={() => setFrage("2fa")} disabled={!benutzer.zweiter_faktor}>2FA zurücksetzen</Knopf>
             {benutzer.gesperrt_am || !benutzer.is_active
               ? <Knopf icon="schloss" laedt={aktion.isPending && aktion.variables === "entsperren"} onClick={() => aktion.mutate("entsperren")}>Entsperren</Knopf>
@@ -361,7 +361,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
           </> : null}
           {!neu && historisch ? <Knopf icon="schloss" onClick={() => setLoginRolle("mitarbeiter")}>Login geben</Knopf> : null}
           {neu ? <Knopf className="ml-auto" onClick={() => onGewaehlt(null)}>Abbrechen</Knopf> : null}
-          <Knopf type="submit" variante="pri" className={neu ? "" : "ml-auto"} laedt={speichern.isPending}>{neu ? (f.ohne_login ? "Ohne Login anlegen" : "Anlegen und Einmal-Kennwort erzeugen") : "Speichern"}</Knopf>
+          <Knopf type="submit" variante="pri" className={neu ? "" : "ml-auto"} laedt={speichern.isPending}>{neu ? (f.ohne_login ? "Ohne Login anlegen" : "Anlegen und Einmal-Passwort erzeugen") : "Speichern"}</Knopf>
         </div>
       </form>
       <div className="meldung info flex gap-2.5 items-start text-[0.8125rem] leading-normal">
@@ -375,7 +375,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
         <Fehleranzeige fehler={aktion.error} />
       </Dialog>
       <Dialog offen={loginRolle != null} onOffen={(o) => { if (!o) { setLoginRolle(null); loginGeben.reset(); } }} titel="Login geben" breite={480}
-        beschreibung={`${name} wird wieder ein Konto zum Arbeiten: Rolle wählen, EPM erzeugt ein Einmal-Kennwort für das Zugangsblatt.`}
+        beschreibung={`${name} wird wieder ein Konto zum Arbeiten: Rolle wählen, EPM erzeugt ein Einmal-Passwort für das Zugangsblatt.`}
         fuss={<><Knopf onClick={() => setLoginRolle(null)}>Abbrechen</Knopf>
           <Knopf variante="pri" laedt={loginGeben.isPending} onClick={() => loginGeben.mutate()}>Login geben</Knopf></>}>
         <div className="flex flex-col gap-3">
