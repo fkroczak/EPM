@@ -367,3 +367,48 @@ class KeinPlanNoetig(PlanHilfen, Grundlage):
         self.freigegebener_plan()
         self.patient.refresh_from_db()
         self.assertFalse(self.patient.kein_plan)
+
+
+class PlanVorschau(PlanHilfen, Grundlage):
+    """PDF-Vorschau mit den ungespeicherten Eingaben des Editors (F181): nichts wird gespeichert."""
+
+    def test_vorschau_zeigt_eingaben_und_speichert_nichts(self):
+        import unittest
+
+        from vorlagen.tests import PDFTOTEXT, kompakt, pdf_text
+
+        c = client_fuer(self.mediziner)
+        e = self.entwurf(c)
+        self.assertEqual(c.patch(f"/api/infusionsplaene/{e['id']}/", self.plan_daten(), format="json").status_code, 200)
+        vorher = c.get(f"/api/infusionsplaene/{e['id']}/").json()
+        fassungen = Infusionsplan.history.filter(id=e["id"]).count()
+        r = c.post(f"/api/infusionsplaene/{e['id']}/vorschau/",
+                   {"aminosaeuren_g": "85", "laufzeit_h": "14", "positionen": []}, format="json")
+        self.assertEqual(r.status_code, 200, r.content[:300])
+        self.assertEqual(r["Content-Type"], "application/pdf")
+        self.assertTrue(r.content.startswith(b"%PDF"))
+        # in der Datenbank unverändert, auch keine neue Fassung im Verlauf
+        nachher = c.get(f"/api/infusionsplaene/{e['id']}/").json()
+        for feld in ("aminosaeuren_g", "laufzeit_h", "positionen", "vitamine"):
+            self.assertEqual(nachher[feld], vorher[feld], feld)
+        self.assertEqual(Infusionsplan.history.filter(id=e["id"]).count(), fassungen)
+        if not PDFTOTEXT:
+            raise unittest.SkipTest("pdftotext fehlt – Inhalt der Vorschau nicht geprüft")
+        text = kompakt(pdf_text(r.content))
+        self.assertIn("85g", text)
+        self.assertNotIn("Pantozoli.v.", text)  # Positionen der Eingabe (leer), nicht die gespeicherten
+        self.assertIn("ENTWURF", kompakt(pdf_text(r.content, roh=True)))
+
+    def test_vorschau_prueft_wie_speichern_und_nur_fuer_entwuerfe(self):
+        c = client_fuer(self.mediziner)
+        e = self.entwurf(c)
+        # gleiche Prüfung wie beim Speichern: Präparat passt nicht zum Feld
+        r = c.post(f"/api/infusionsplaene/{e['id']}/vorschau/", {"glucose_praeparat": praeparat("Glamin").id}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("glucose_praeparat", r.json())
+        # ohne Recht „Infusionspläne anlegen“ keine Vorschau
+        self.assertEqual(client_fuer(self.mitarbeiter).post(f"/api/infusionsplaene/{e['id']}/vorschau/", {},
+                                                            format="json").status_code, 403)
+        self.assertEqual(c.delete(f"/api/infusionsplaene/{e['id']}/").status_code, 204)
+        plan = self.freigegebener_plan()
+        self.assertEqual(c.post(f"/api/infusionsplaene/{plan.id}/vorschau/", {}, format="json").status_code, 400)
