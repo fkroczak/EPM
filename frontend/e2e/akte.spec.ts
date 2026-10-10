@@ -223,7 +223,7 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   await expect(neu.getByRole("textbox", { name: "Notiz" })).toContainText("Appetit schlechter");
   // Kontaktart (Klärung U6 vom 03.10.2026)
   await neu.getByLabel("Kontaktart").selectOption({ label: "Telefon (angerufen)" });
-  await neu.getByLabel("Wiedervorlage anlegen").check();
+  await neu.getByLabel(/^Wiedervorlage.*anlegen$/).check();
   // Vorgabe: Wiedervorlage in 14 Tagen (unter Vorlagen › Grenzwerte einstellbar)
   await expect(neu.getByRole("button", { name: "in 2 Wochen" })).toHaveClass(/akzent/);
   await neu.getByRole("group", { name: "Art" }).getByRole("button", { name: "Rückruf" }).click();

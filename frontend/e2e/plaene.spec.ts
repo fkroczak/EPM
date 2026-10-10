@@ -53,7 +53,7 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await editor.getByRole("button", { name: "+ Soluvit N" }).click();
   await editor.getByRole("button", { name: "+ Vitalipid adult" }).click();
   await editor.getByLabel("Laufzeit").fill("12");
-  await editor.getByTestId("infusionstage").getByLabel("PE (Mischbeutel)").fill("5");
+  await editor.getByTestId("infusionstage").getByLabel(/^PE.*\(Mischbeutel\)$/).fill("5");
   // wie auf der alten PDF: Mischbeutel = letztes Gewicht × 35 ml, Zusatzvolumen = Basislösung, Gesamtvolumen = Summe;
   // Laufzeit manuell, Rate = Gesamtvolumen ÷ Laufzeit (2.600 ÷ 12)
   await expect(editor.getByTestId("plan-mischbeutel")).toHaveText("2.100 ml");
@@ -91,19 +91,21 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(blatt).toContainText(/Laufmenge je Stunde\s+216,7\s+ml\/h/);
   await expect(blatt).toContainText("Pantozol® Kurzinfusion 1 Amp. 40 mg in 50 ml Trägerlösung · 1-0-1");
   await expect(detail.getByTestId("planvergleich")).toHaveCount(0);
-  // klein als Vorschau wie unter „Dokumente“ (Fehlerliste 02.10.2026, 1.3); ein Klick öffnet die große Ansicht
-  await expect(ansicht.getByTestId("pdf-vorschau")).toBeVisible();
-  expect((await ansicht.boundingBox())!.width).toBeLessThanOrEqual(342);
+  // seit F181 direkt neben der Liste in voller Spaltenhöhe (vorher kleine Vorschau, Fehlerliste 02.10.2026, 1.3):
+  // eine Seite ganz, ohne Klick; „Groß ansehen“ öffnet sie im Dialog, „Herunterladen“ speichert sie
+  const leser = ansicht.getByTestId("pdf-leser");
+  await expect(leser).toBeVisible();
+  expect((await ansicht.boundingBox())!.width).toBeGreaterThan(500);
   await expect(ansicht.getByTestId("pdf-seite").first()).toHaveAttribute("data-fertig", "1");
-  await ansicht.getByTestId("pdf-seite").first().click();
+  await expect(leser.getByRole("button", { name: "Ganze Seite" })).toBeVisible();
+  const [laden] = await Promise.all([page.waitForEvent("download"), ansicht.getByRole("button", { name: "Herunterladen" }).click()]);
+  expect(laden.suggestedFilename()).toMatch(/^Infusionsplan-.*-Ansicht\.pdf$/);
+  await ansicht.getByRole("button", { name: "Groß ansehen" }).click();
   const gross = page.getByRole("dialog").getByTestId("plan-gross");
   await expect(gross.getByTestId("pdf-leser").locator("canvas").first()).toBeVisible();
   await expect(gross.getByTestId("pdf-text").first()).toContainText(/Kalorien\s+1\.509/);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await ansicht.getByRole("button", { name: "Groß ansehen" }).click();
-  await expect(page.getByRole("dialog").getByTestId("pdf-leser")).toBeVisible();
-  await page.keyboard.press("Escape");
 
   // Freigeben (Recht „Pläne freigeben“)
   await detail.getByRole("button", { name: "Freigeben" }).click();
