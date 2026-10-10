@@ -66,8 +66,9 @@ AKTIONEN = {
     # /api/system/leeren/ (Bestätigungscode abtippen, Rückfrage, Auswahl der Konten), vorher immer eine Sicherung.
     "datenbank_leeren": {
         "name": "Datenbank leeren", "bestaetigung": "2fa", "sichern": True, "warnen": True, "intern": True,
-        "beschreibung": "Entfernt alle Akten, Dokumente, Versorger, Ärzte, Benutzer (außer den ausgewählten) und das "
-                        "Audit-Log. Präparate, Vorlagen und Einstellungen bleiben. Vorher automatische Sicherung.",
+        "beschreibung": "Entfernt alle Akten, Dokumente, Scans, Gelerntes der Texterkennung, Versorger, Ärzte, Benutzer "
+                        "(außer den ausgewählten) und das Audit-Log. Präparate, Vorlagen und Einstellungen bleiben. Vorher "
+                        "automatische Sicherung.",
         "hinweis": "EPM wird geleert (Ende der Testphase). Alle Anmeldungen werden beendet – bitte nichts mehr eingeben.",
     },
     "pakete_aufraeumen": {

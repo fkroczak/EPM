@@ -901,7 +901,7 @@ Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Passwort) direkt zur Person
 keine Testpatienten und Testkonten mehr entstehen. <strong>Menüpunkt „Import“ ausblenden</strong>, wenn die Altdaten
 übernommen sind – die Seite bleibt über den Reiter „Testphase“ erreichbar, der Menüpunkt lässt sich wieder einblenden.
 <strong>Datenbank leeren</strong> (nur Rolle Admin) entfernt alles aus der Testphase: alle Akten (auch echte),
-Dokumente, Versorger, Ärzte, die nicht ausgewählten Benutzer und das Audit-Log; Präparate, Auswahllisten, Vorlagen und
+Dokumente, alle Scans samt Dateien (auch nicht zugeordnete), was die Texterkennung gelernt hat, Versorger, Ärzte, die nicht ausgewählten Benutzer und das Audit-Log; Präparate, Auswahllisten, Vorlagen und
 Einstellungen bleiben. Welche Konten bleiben, wird im Dialog angehakt (das eigene bleibt immer). Bestätigt wird mit dem
 angezeigten Code zum Abtippen, Passwort, Code aus der Authenticator-App und der Rückfrage „Wollen Sie wirklich die
 Datenbank löschen?“. Vorher sichert der Server automatisch – zurück geht es nur über diese Sicherung.</p>""",

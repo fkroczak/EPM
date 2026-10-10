@@ -114,7 +114,7 @@ type LeerenKonto = { id: number; anzeigename: string; benutzername: string; roll
   eigene: boolean };
 type LeerenVorbereitung = { code: string; gueltig_bis: string; benutzer: LeerenKonto[];
   umfang: { patienten: number; testpatienten: number; kontakte: number; dokumente: number; loeschprotokoll: number; versorger: number;
-    aerzte: number; importlaeufe: number } };
+    aerzte: number; importlaeufe: number; scans?: number } };
 export type Auftrag = { id: number; kennung: string; ziel: "server" | "epm"; aktion: string; name: string;
   status: "wartet" | "laeuft" | "erledigt" | "fehler" | "abgebrochen"; status_name: string; offen: boolean;
   parameter: { minuten?: number; pruefsummen?: boolean; quelle?: string; zeilen?: number; tag?: string; dienst?: string; upload?: string; datei?: string }; angefordert_von_name: string | null; angefordert_am: string;
@@ -423,6 +423,7 @@ function LeerenDialog({ offen, daten, onZu }: { offen: boolean; daten: Uebersich
       {frage ? (
         <div className="flex flex-col gap-2" data-testid="leeren-frage">
           <Meldung art="fehler">Entfernt werden {u ? `${zahl(u.patienten)} echte Akten, ${zahl(u.testpatienten)} Testpatienten, ${zahl(u.dokumente)} Dokumente, `
+            + `${zahl(u.scans ?? 0)} Scans, was die Texterkennung gelernt hat, `
             + `${zahl(u.versorger)} Versorger, ${zahl(u.aerzte)} Ärzte und ${weg} Benutzer` : ""}. Das Audit-Log beginnt neu.</Meldung>
           <span className="text-sm">Es bleiben {behalten.size} Benutzer, Präparate, Auswahllisten, Vorlagen, Einstellungen und die Sicherungen.</span>
         </div>
@@ -431,7 +432,7 @@ function LeerenDialog({ offen, daten, onZu }: { offen: boolean; daten: Uebersich
         {vorbereiten.error ? <Meldung art="fehler">{vorbereiten.error.message}</Meldung> : !v ? <Laden /> : (
           <>
             <Meldung art="warn"><span data-testid="leeren-umfang">Entfernt werden: {zahl(v.umfang.patienten)} echte Akten, {zahl(v.umfang.testpatienten)} Testpatienten
-              ({zahl(v.umfang.kontakte)} Kontakte), {zahl(v.umfang.dokumente)} Dokumente, {zahl(v.umfang.versorger)} Versorger, {zahl(v.umfang.aerzte)} Ärzte,
+              ({zahl(v.umfang.kontakte)} Kontakte), {zahl(v.umfang.dokumente)} Dokumente, {zahl(v.umfang.scans ?? 0)} Scans (auch nicht zugeordnete), was die Texterkennung gelernt hat, {zahl(v.umfang.versorger)} Versorger, {zahl(v.umfang.aerzte)} Ärzte,
               {" "}{zahl(v.umfang.loeschprotokoll)} Einträge im Löschprotokoll, {zahl(v.umfang.importlaeufe)} Importläufe und das Audit-Log.
               Präparate, Auswahllisten, Vorlagen und Einstellungen bleiben.</span></Meldung>
             <Meldung art="info">Vorher erstellt der Server automatisch eine Sicherung. Schlägt sie fehl, wird nichts verändert. Musterdaten werden danach
