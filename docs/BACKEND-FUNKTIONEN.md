@@ -51,6 +51,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | 10.10.2026 | Vorlagen-Portal einfacher | Übersicht mit Suche, geführter Ablauf mit Live-Vorschau, Angaben per Klick, frühere Fassung wiederherstellen, als eigene Vorlage kopieren (F180). Lauf steht aus |
 | 09.10.2026 | Eigene Vorlagen | „+ Neue Vorlage“ unter Vorlagen › Dokumentvorlagen: eigene Schreiben mit E-Mail anlegen, bearbeiten, deaktivieren; in der Akte wählbar (F176). Lauf steht aus |
 | F179 | Systemverwaltung ohne SSH: Ampel, Reiter, kompakte Graphen, Sicherungen mehrfach löschen, Dienste, Versionen, Pakete, Zertifikat, Protokolle | Administration › Systemverwaltung, System, Backup | ABGESCHLOSSEN – Lauf steht aus |
+| F181 | Akte ohne Seiten-Scrollen, kompakter Kopf, Reiter nach Bedeutung, PDF neben dem Plan, Plan nach Praxisvorgabe, PDF-Vorschau mit ungespeicherten Eingaben | Patientenakte, Infusionspläne, Plan-Editor | ABGESCHLOSSEN – Lauf steht aus |
 | F01 | Sitzungsstatus und CSRF-Token | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F02 | Anmeldung mit Benutzername und Kennwort | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F03 | Zweiter Faktor bei der Anmeldung | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
@@ -3468,6 +3469,63 @@ Zielgruppe: Pflegekräfte ohne IT-Erfahrung und ein Praxismanager mit IT-Erfahru
   (PostgreSQL 16) grün, Lauf im CI steht aus.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+## Y · Akte entschlankt (10.10.2026)
+
+Wunsch: „Vor allem soll die Patientenakte deutlich entschlankt werden. Unterpunkte wie Diagnosen, Therapien und
+Empfehlungen sowie die Infusionspläne sollen einfacher erreichbar sein. Im besten Fall muss man auf der Seite nicht
+scrollen. Beim Infusionsplan sollen die PDFs einfach einsehbar sein, und die Pläne sollen sich nach den Vorgaben der
+Praxis erstellen lassen.“ Befunde, Messung vorher/nachher und Rückfragen: `docs/UI-UX-AKTE-2026-10-10.md`.
+
+### F181 Akte ohne Seiten-Scrollen, PDF neben dem Plan, Plan nach Praxisvorgabe
+- **Kopf (Ansicht „Kopfzeile“, Stufe „Alle Angaben“):** Name, Nummer, Geschlecht (Buchstabe, ausgeschrieben im Tooltip),
+  Geburtsdatum und Knöpfe in einer Zeile; vier Kennzahlen zweizeilig; Versorgung/Hinweise eine Zeile, unter 1280 px
+  hinter „Versorgung und Hinweise ▾“. Knopf **Dokument** im Kopf (vorher „⋯ › Dokument hochladen …“). Gruppen und
+  Testkennungen (`kennzahlen`, Gruppen „Ernährung“, „Versorgung“ …) unverändert. Bei 1366 × 768 endet der Kopf bei
+  258 px statt 346 px.
+- **Reiter:** Übersicht, Diagnosen, Therapie, Empfehlung, Infusionspläne, Kontakte groß; Labor, BIA, Berichte,
+  Dokumente kleiner nach einem Strich; Verlauf und Datenschutz klein am rechten Rand. Alle bleiben eigene Reiter
+  (F121); Alt+Ziffer folgt der neuen Reihenfolge.
+- **Fenster füllen (ab 1024 × 600 px):** `Seite fuellen` (Shell) begrenzt die Seite auf die Fensterhöhe; unter den
+  Reitern liegt `.akte-flaeche`, die bei Bedarf scrollt; Reiter mit zwei Spalten (`.akte-spalten`: Diagnosen,
+  Therapie, Empfehlung, Kontakte, Infusionspläne, Labor, BIA, Berichte, Dokumente, Datenschutz) scrollen ab 1280 px je
+  Spalte. Kopf und Reiter bleiben stehen. Darunter (Telefon, Tablet hochkant) scrollt die Seite wie bisher.
+- **Übersicht:** sechs Karten statt neun (Gewicht · Aktueller Infusionsplan · Diagnosen, Therapie, Empfehlung ·
+  Kontakte und Termine · Labor und BIA · Personen und Anschrift). Spalten nach der tatsächlichen Breite (1366 px: 3,
+  1920 px: 4); im Fenster zwei Reihen mit fester Höhe (`--raster-zeile` aus der verfügbaren Höhe, auf das 8-px-Raster
+  gerundet), Inhalt scrollt in der Karte. Größe je Karte weiter über das Menü (je Person); Standardhöhe im Fenster
+  1 Zeile. Gewichtsdiagramm zeichnet in der echten Größe (`GewichtsDiagramm masse`). Plan-Karte mit „PDF ansehen“ und
+  Hinweis auf einen offenen Entwurf.
+- **Akte › Infusionspläne:** PDF in voller Spaltenhöhe neben der Liste (`PdfLeser einpassen`: „Ganze Seite“, sonst auf
+  die Breite, wenn die Seite sonst unter 360 px schmal wäre), „Groß ansehen“, „Herunterladen“; Herkunft
+  (gespeicherte PDF mit Prüfsumme bzw. Ansicht mit aktiver Dokumentvorlage) darunter; Umschalter „Vergleich mit
+  Vorgänger“ mit Zahl der Änderungen.
+- **Menüpunkt Infusionspläne:** „PDF“ an jedem Plan (Entwürfe: `ansicht/`); ab 1920 px rechts neben der Tabelle.
+- **Plan-Editor:** „Mengen nach Praxisvorgabe“ (je kg des letzten Gewichts wie im Altsystem, `GET …/vorbelegung/`) auch
+  beim Folgeplan; Karte **Prüfung vor der Freigabe** (Gewicht vorhanden/≤ 3 Monate, Präparat zu jeder Menge, Ca/Mg
+  stabil, Infusionstage stimmig, Laufzeit, Protonenpumpenhemmer mit Zeiten); **PDF-Vorschau** mit den Eingaben im
+  Formular auf jeder Bildschirmgröße (neuer Plan: einmal als Entwurf gespeichert).
+- **Navigation:** Administration ab drei Seiten als Gruppe zum Aufklappen (`nav-administration`, gemerkt je Browser,
+  auf `/admin…` offen); Routen unverändert.
+- **PDF-Anzeige:** pdf.js als „legacy“-Fassung aus demselben Paket (keine neue Abhängigkeit) – mit der Standardfassung
+  blieben Seiten in nicht ganz aktuellen Browsern (Chromium 141) beim Laden stehen.
+- **Endpunkt:** `POST /api/infusionsplaene/{id}/vorschau/` – Body wie `PATCH`; nur Entwürfe (sonst 400), Recht
+  „Infusionspläne anlegen“, Akte offen; Prüfung wie beim Speichern (400 mit Feldfehlern). Die Werte werden in einer
+  Transaktion eingetragen, die PDF mit der aktiven Vorlage erzeugt (Wasserzeichen „ENTWURF“), danach wird
+  zurückgerollt – keine Änderung, keine neue Fassung im Verlauf. Antwort `application/pdf`, Kopf
+  `X-EPM-Vorlage-Version`. Keine Migration.
+- **Teststatus:** Backend `infusionen.tests.PlanVorschau` (Vorschau zeigt die Eingabe, Datenbank und Verlauf
+  unverändert, Wasserzeichen; Prüfung wie beim Speichern, ohne Recht 403, freigegebener Plan 400) – grün, alle
+  `infusionen`-Tests grün (17). Browsertests angepasst: `layout.spec.ts` (neu: 1366 × 768 und 1920 × 1080 ohne
+  Seiten-Scrollen, sechs Karten, Kopf bleibt stehen), `oberflaeche.spec.ts` (sechs Karten, Standardhöhe),
+  `plaene.spec.ts` (PDF neben der Liste, Herunterladen, Groß ansehen), `dokumente.spec.ts` (Knopf „Dokument“),
+  Administration aufklappen (`hilfen.adminNavigation` in `admin`, `system`, `aa-import`, `zz-neustart`,
+  `zzz-sicherung`, `zzzz-leeren`), Begriffe in Beschriftungen (`akte`, `oberflaeche`, `praxiswuensche`). Lokal gegen
+  Vite + Django (PostgreSQL 16, Chromium 141) grün: `layout`, `akte` (bis auf den Neustart über Docker),
+  `aktenansicht`, `plaene`, `infusionsplaene`, `mobil`, `dokumente`, `praxiswuensche`, `oberflaeche` bis auf
+  „Volle Breite: 1280 px“ (Startseite, Breite von `main` um die Scrollleiste zu klein – nicht von F181 berührt).
+  CI-Lauf steht aus.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -3576,6 +3634,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 10.10.2026 | Akte entschlankt | Akte ab 1024 × 600 px ohne Seiten-Scrollen (Kopf und Reiter bleiben stehen, Inhalt scrollt in Karte bzw. Spalte), kompakter Kopf, Reiter nach Bedeutung (Infusionspläne nach Empfehlung, Verlauf/Datenschutz klein), Übersicht mit sechs Karten in zwei Reihen, PDF des Plans in voller Höhe neben der Liste und im Menüpunkt Infusionspläne, Plan nach Praxisvorgabe je kg, Prüfung vor der Freigabe, PDF-Vorschau mit ungespeicherten Eingaben (`POST …/vorschau/`), Administration zum Aufklappen (F181). Lauf steht aus |
 | 10.10.2026 | Systemverwaltung ohne SSH | Neue Seite Systemverwaltung mit Ampel und häufigen Aufgaben; System und Backup in Reitern; Graphen klein, groß im Dialog; Sicherungen mit Mehrfachauswahl löschen; Dienste einzeln neu starten, Version zurückschalten, Update-Paket und OCR-Modelle hochladen, Paket erstellen, Zertifikat erneuern/importieren, Protokolle ansehen – alles über den Systemagenten (F179). Lauf steht aus |
 | 10.10.2026 | Vorlagen-Portal einfacher | Übersicht mit Kacheln in Alltagssprache und Suche, Liste der Dokumentvorlagen mit Zweck/Ort/Stand, geführter Ablauf Bearbeiten → Vorschau → Freigeben mit Live-Vorschau, Angaben aus der Akte per Klick als lesbare Chips, frühere Fassung ansehen/wiederherstellen, als eigene Vorlage kopieren, ▲ ▼ und „Wo benutzt“ in den Auswahllisten, Warnung beim Verlassen (F180). Lauf steht aus |
 | 10.10.2026 | Bedienung für Pflegekräfte | Nachsichtige Datums-/Uhrzeiteingabe, Fehlermeldungen mit Lösungsweg, leere Zustände mit nächstem Schritt, Hilfe „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“, weniger Fachjargon (F178, `docs/BEDIENBARKEIT-2026-10-10.md`). Lauf steht aus |
