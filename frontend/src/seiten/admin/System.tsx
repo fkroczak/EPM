@@ -30,7 +30,7 @@ import { Icon } from "@/components/ui/icon";
 import { Reiter, ReiterInhalt, useReiter } from "@/components/ui/reiter";
 import type { ReiterEintrag } from "@/components/ui/reiter";
 import { AuslastungKarte } from "./auslastung";
-import { DiensteKarte, ProtokolleBereich, SoftwareBereich, ZertifikatBereich } from "./SystemWartung";
+import { AufraeumenKarte, DiensteKarte, ProtokolleBereich, SoftwareBereich, UhrKarte, ZertifikatBereich } from "./SystemWartung";
 
 export type Platte = { pfad: string; bezeichnung: string; gesamt: number; frei: number };
 export type Speicher = { gesamt: number | null; verfuegbar: number | null; swap_gesamt: number | null; swap_frei: number | null } | null;
@@ -54,7 +54,10 @@ export type HostStatus = {
   pakete?: { erstellt: PaketDatei[]; bereit: PaketDatei[] };
   zertifikat?: { vorhanden: boolean; name?: string; ca_schluessel?: boolean; ca_download?: boolean; inhaber?: string; aussteller?: string;
     gueltig_bis?: string | null; gueltig_ab?: string | null; tage?: number; namen?: string; selbst_signiert?: boolean; eigene_ca?: boolean; hinweis?: string };
-  uhr?: { verfuegbar: boolean; synchronisiert: boolean; ntp: boolean; zeitzone: string };
+  uhr?: { verfuegbar: boolean; synchronisiert: boolean; ntp: boolean; zeitzone: string; zeit_unix?: number; server?: string[];
+    dienst?: "chrony" | "timesyncd"; zeitzonen?: string[] };
+  journal?: { verfuegbar: boolean; groesse?: number } | null;
+  image_dateien?: { datei: string; tag: string; art: "images" | "paket"; groesse: number; zeit: string; geschuetzt: boolean }[];
   ocr_vorrat?: { vorhanden: boolean; dateien: number; groesse: number; geaendert: string | null };
   werkzeuge?: { epm_update: boolean; epm_zertifikat: boolean; epm_ocr_modelle: boolean };
   protokolle?: { quelle: string; name: string }[];
@@ -111,7 +114,7 @@ type LeerenKonto = { id: number; anzeigename: string; benutzername: string; roll
   eigene: boolean };
 type LeerenVorbereitung = { code: string; gueltig_bis: string; benutzer: LeerenKonto[];
   umfang: { patienten: number; testpatienten: number; kontakte: number; dokumente: number; loeschprotokoll: number; versorger: number;
-    aerzte: number; importlaeufe: number } };
+    aerzte: number; importlaeufe: number; scans?: number } };
 export type Auftrag = { id: number; kennung: string; ziel: "server" | "epm"; aktion: string; name: string;
   status: "wartet" | "laeuft" | "erledigt" | "fehler" | "abgebrochen"; status_name: string; offen: boolean;
   parameter: { minuten?: number; pruefsummen?: boolean; quelle?: string; zeilen?: number; tag?: string; dienst?: string; upload?: string; datei?: string }; angefordert_von_name: string | null; angefordert_am: string;
@@ -420,6 +423,7 @@ function LeerenDialog({ offen, daten, onZu }: { offen: boolean; daten: Uebersich
       {frage ? (
         <div className="flex flex-col gap-2" data-testid="leeren-frage">
           <Meldung art="fehler">Entfernt werden {u ? `${zahl(u.patienten)} echte Akten, ${zahl(u.testpatienten)} Testpatienten, ${zahl(u.dokumente)} Dokumente, `
+            + `${zahl(u.scans ?? 0)} Scans, was die Texterkennung gelernt hat, `
             + `${zahl(u.versorger)} Versorger, ${zahl(u.aerzte)} Ärzte und ${weg} Benutzer` : ""}. Das Audit-Log beginnt neu.</Meldung>
           <span className="text-sm">Es bleiben {behalten.size} Benutzer, Präparate, Auswahllisten, Vorlagen, Einstellungen und die Sicherungen.</span>
         </div>
@@ -428,7 +432,7 @@ function LeerenDialog({ offen, daten, onZu }: { offen: boolean; daten: Uebersich
         {vorbereiten.error ? <Meldung art="fehler">{vorbereiten.error.message}</Meldung> : !v ? <Laden /> : (
           <>
             <Meldung art="warn"><span data-testid="leeren-umfang">Entfernt werden: {zahl(v.umfang.patienten)} echte Akten, {zahl(v.umfang.testpatienten)} Testpatienten
-              ({zahl(v.umfang.kontakte)} Kontakte), {zahl(v.umfang.dokumente)} Dokumente, {zahl(v.umfang.versorger)} Versorger, {zahl(v.umfang.aerzte)} Ärzte,
+              ({zahl(v.umfang.kontakte)} Kontakte), {zahl(v.umfang.dokumente)} Dokumente, {zahl(v.umfang.scans ?? 0)} Scans (auch nicht zugeordnete), was die Texterkennung gelernt hat, {zahl(v.umfang.versorger)} Versorger, {zahl(v.umfang.aerzte)} Ärzte,
               {" "}{zahl(v.umfang.loeschprotokoll)} Einträge im Löschprotokoll, {zahl(v.umfang.importlaeufe)} Importläufe und das Audit-Log.
               Präparate, Auswahllisten, Vorlagen und Einstellungen bleiben.</span></Meldung>
             <Meldung art="info">Vorher erstellt der Server automatisch eine Sicherung. Schlägt sie fehl, wird nichts verändert. Musterdaten werden danach
@@ -878,6 +882,10 @@ export function System() {
         <ReiterInhalt testid="reiter-wartung">
           <Taetigkeiten daten={d} offen={offen} onWahl={setWahl} />
           <DiensteKarte daten={d} offen={offen} />
+          <div className="stapel grid grid-cols-1 hd:grid-cols-2 gap-4 items-start">
+            <AufraeumenKarte daten={d} offen={offen} />
+            <UhrKarte daten={d} offen={offen} />
+          </div>
         </ReiterInhalt>
       ) : null}
       {reiter === "software" ? (

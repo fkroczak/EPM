@@ -3398,20 +3398,39 @@ Ersteinrichtung des Servers (`rollout/01…05`, `epm-git-einrichten.sh`, `epm-ze
   Mehrfach-Löschen) braucht den CI-Stack.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+- **F179l Zeitplan der nächtlichen Sicherung** (Nachtrag 10.10.2026; Backup › Sicherungen, „Zeitplan … Ändern“):
+  Uhrzeit (HH:MM) und täglich/werktags; `POST /api/backup/zeitplan/` `{"uhrzeit", "tage", "kennwort", "code"}` (Recht
+  „Sicherungen verwalten“, Passwort + 2FA). Agent `sicherung_zeitplan` schreibt das Drop-in
+  `/etc/systemd/system/epm-backup.timer.d/zeitplan.conf` (`OnCalendar=` leeren, dann `*-*-* HH:MM:00` bzw.
+  `Mon..Fri *-*-* HH:MM:00`), `systemctl daemon-reload`, Timer neu; der Status meldet den Zeitplan, die Seite zeigt
+  ihn und „nächste“. Warnung, wenn das Übertragungsfenster mehr als 3 Stunden nach der Sicherung öffnet oder kurz
+  danach endet (`sicherung.zeitplan_hinweis`, gleich im Dialog). Bleibt auch mit `--sicherung-echt` ein Probelauf.
+- **F179m Speicher aufräumen** (System › Wartung): Journal-Belegung (`journalctl --disk-usage`, alle 15 Minuten) und
+  Aufräumen mit fester Auswahl (`--vacuum-size` 100M/200M/500M/1G, `--vacuum-time` 2 Wochen bis 6 Monate; einfache
+  Rückfrage; `POST /api/system/journal/aufraeumen/`). Alte Versionen: Image-Dateien `images/epm-<TAG>.tar`, Update-Pakete
+  `images/epm-paket-<TAG>.tar` und Docker-Images `epm-backend/epm-web:<TAG>` mehrfach auswählbar löschen
+  (`POST /api/system/images/loeschen/` `{"dateien", "tags", …}`, Passwort + 2FA). Die laufende und die vorherige
+  Version (für „Zurückschalten“) sind geschützt – im Backend und im Agenten; ist die laufende Version nicht bekannt,
+  wird nichts gelöscht. Docker-Images werden ohne `-f` entfernt (ein benutztes lehnt docker ab).
+- **F179n Uhrzeit einstellen** (System › Wartung): Zeitzone (Allowlist aus `timedatectl list-timezones`), NTP an/aus,
+  bis zu 4 Zeitserver (Name oder IP, streng geprüft; für den abgeschotteten Betrieb z. B. die OPNsense) – je nach
+  Server als chrony-Quelle (`/etc/chrony/sources.d/epm.sources`, öffentliche Pools aus/wieder an) oder
+  systemd-timesyncd-Drop-in (`/etc/systemd/timesyncd.conf.d/epm.conf`), wie `rollout/01-basis.sh`; bei
+  ausgeschaltetem NTP Uhrzeit von Hand (`timedatectl set-time`) mit Warnung. Abweichung Server–Browser wird angezeigt.
+  `POST /api/system/uhr/` `{"zeitzone"?, "ntp", "server", "zeit"?, …}`, Passwort + 2FA.
+- **F179o OCR-Modelle einspielen** jetzt mit Passwort + 2FA wie das Update-Paket.
+- **Teststatus Nachtrag:** `system/test_verwaltung.py` Klasse `Nachtrag` (Prüfung der Eingaben, Rechte, Drop-ins für
+  Timer, timesyncd und chrony in eigenen Ordnern, Schutz der laufenden und vorherigen Version, echter Agent im
+  Probelauf); Browsertests `system.spec.ts` (Wartung: Journal, geschützte Versionen, Uhrzeit – lokal grün) und
+  `zzz-sicherung.spec.ts` (Zeitplan, braucht den CI-Stack). Agent Version 6.
+
 **Bewusst nicht umgesetzt (Empfehlungen):**
-- *Zeitplan der automatischen Sicherung ändern* (OnCalendar von `epm-backup.timer`): bräuchte eine geprüfte
-  Zeitangabe und `systemctl daemon-reload` aus dem Agenten; selten nötig. Empfehlung: Auswahl 01:00–05:00 als eigene
-  Agent-Aktion mit Drop-in `/etc/systemd/system/epm-backup.timer.d/zeit.conf`.
-- *Aufräumen mit Speicher-Übersicht je Verzeichnis* (Journal, alte Image-Dateien, Uploads): heute Docker- und
-  Paketreste aufräumen; Empfehlung: `journalctl --vacuum-size` und Löschen alter `images/epm-*.tar` als weitere
-  Aktionen.
 - *Protokolle ohne Patientendaten*: Container-Protokolle können in Fehlermeldungen Inhalte enthalten; sie werden
   deshalb nur auf Anforderung gelesen, nicht gespeichert und nach 1 Stunde gelöscht. Eine Maskierung (Namen,
   Geburtsdaten) wäre unzuverlässig und ist nicht eingebaut.
 - *Update-Pakete signieren*: Die Prüfsummen im Paket schützen vor Beschädigung, nicht vor einem untergeschobenen Paket.
   Schutz heute: nur mit Recht Systemverwaltung, Passwort + 2FA, SHA-256 zum Vergleich. Empfehlung: Signatur mit einem
   Schlüssel der Test-VM, den der VPS kennt.
-- *Uhrzeit/NTP einstellen*: nur angezeigt, nicht änderbar.
 
 ## X · Vorlagen-Portal einfacher (10.10.2026)
 
@@ -3775,6 +3794,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 10.10.2026 | Nachtrag Systemverwaltung | Zeitplan der nächtlichen Sicherung (Uhrzeit, täglich/werktags, Warnung zum Übertragungsfenster), Journal und alte Versionen aufräumen (laufende und vorherige geschützt), Uhrzeit mit eigenem Zeitserver einstellen, OCR-Modelle mit 2FA (F179l–F179o). Lauf steht aus |
 | 10.10.2026 | Texterkennung lernt mit | Gelernte Zuordnungen aus Korrekturen beim Übernehmen (Labor, BIA, Diagnosen, Spaltenlage je Labor; ohne Patientendaten), Anwendung vor der Ähnlichkeitssuche mit Schwelle, Bereich „Gelernte Zuordnungen“, Kennzahl „korrigiert“ (F182); Patient aus Name und Geburtsdatum vorschlagen, nur per Klick (F183); Offline-Prüfung (`docs/OFFLINE-BETRIEB-2026-10-10.md`). Lauf steht aus |
 | 10.10.2026 | Akte entschlankt | Akte ab 1024 × 600 px ohne Seiten-Scrollen (Kopf und Reiter bleiben stehen, Inhalt scrollt in Karte bzw. Spalte), kompakter Kopf, Reiter nach Bedeutung (Infusionspläne nach Empfehlung, Verlauf/Datenschutz klein), Übersicht mit sechs Karten in zwei Reihen, PDF des Plans in voller Höhe neben der Liste und im Menüpunkt Infusionspläne, Plan nach Praxisvorgabe je kg, Prüfung vor der Freigabe, PDF-Vorschau mit ungespeicherten Eingaben (`POST …/vorschau/`), Administration zum Aufklappen (F181). Lauf steht aus |
 | 10.10.2026 | Automatisierungen für die Pflege | Startseite „Heute zu tun“ mit Terminen, Rückrufen, Infoblatt, fehlenden Bestätigungen, Kontakten, Plänen, Scans und fehlenden Angaben (F184); „Terminbestätigung schicken?“ nach dem Speichern eines Praxistermins mit Vermerk am Termin (F185); fehlende Angaben als Hinweise (Hausarzt, Telefon, Gewicht, Diagnose, Termin ohne Ort), ausblendbar (F186). Lauf steht aus |

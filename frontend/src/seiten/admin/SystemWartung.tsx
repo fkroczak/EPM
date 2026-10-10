@@ -145,6 +145,154 @@ export function DiensteKarte({ daten, offen }: { daten: Uebersicht; offen: Set<s
   );
 }
 
+
+// ---------------------------------------------------------------- Aufräumen: Journal, alte Versionen (Nachtrag 10.10.2026)
+const JOURNAL_WAHL: { wert: string; text: string }[] = [
+  { wert: "groesse:100M", text: "auf 100 MB verkleinern" }, { wert: "groesse:200M", text: "auf 200 MB verkleinern" },
+  { wert: "groesse:500M", text: "auf 500 MB verkleinern" }, { wert: "groesse:1G", text: "auf 1 GB verkleinern" },
+  { wert: "zeit:2weeks", text: "älter als 2 Wochen entfernen" }, { wert: "zeit:1month", text: "älter als 1 Monat entfernen" },
+  { wert: "zeit:3months", text: "älter als 3 Monate entfernen" }, { wert: "zeit:6months", text: "älter als 6 Monate entfernen" },
+];
+
+export function AufraeumenKarte({ daten, offen }: { daten: Uebersicht; offen: Set<string> }) {
+  const h = daten.host && daten.host.aktuell ? daten.host : null;
+  const [journal, setJournal] = useState("groesse:500M");
+  const [journalFrage, setJournalFrage] = useState(false);
+  const [wahl, setWahl] = useState<Set<string>>(new Set());
+  const [loeschen, setLoeschen] = useState(false);
+  const dateien = h?.image_dateien ?? [];
+  const geschuetzt = new Set(dateien.filter((x) => x.geschuetzt).map((x) => x.tag));
+  const v = h?.versionen;
+  // Docker-Images alter Versionen (die laufende und die vorherige bleiben; zur Sicherheit auch die neueren nicht anbieten,
+  // falls die Liste der geschützten fehlt)
+  const aktivIndex = v?.liste.findIndex((x) => x.aktiv) ?? -1;
+  const alteImages = (v?.liste ?? []).filter((x, i) => aktivIndex >= 0 && i > aktivIndex + 1);
+  const ausgewaehlt = [...wahl];
+  const groesse = dateien.filter((x) => wahl.has(`datei:${x.datei}`)).reduce((n, x) => n + x.groesse, 0);
+  const umschalten = (k: string, an: boolean) => setWahl((alt) => { const n = new Set(alt); if (an) n.add(k); else n.delete(k); return n; });
+  const [art, wert] = journal.split(":");
+  return (
+    <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="aufraeumen-karte">
+      <KartenKopf titel="Speicher aufräumen" unter="Systemprotokoll (Journal) und gespeicherte alte Versionen – statt journalctl und rm per SSH." />
+      <div className="flex flex-col gap-2" data-testid="journal">
+        <span className="text-sm font-semibold">Journal{h?.journal?.verfuegbar ? <span className="font-normal gedaempft"> · belegt {dateigroesse(h.journal.groesse ?? 0)}</span> : null}</span>
+        <div className="flex gap-2 items-end flex-wrap">
+          <Feld label="Aufräumen" className="grow">
+            {(p) => <Auswahl {...p} value={journal} onChange={(e) => setJournal(e.target.value)}>
+              {JOURNAL_WAHL.map((j) => <option key={j.wert} value={j.wert}>{j.text}</option>)}</Auswahl>}
+          </Feld>
+          <Knopf disabled={!daten.agent.verzeichnis || offen.has("server:journal_aufraeumen")} laedt={offen.has("server:journal_aufraeumen")}
+            onClick={() => setJournalFrage(true)}>Journal aufräumen</Knopf>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5" data-testid="alte-versionen">
+        <span className="text-sm font-semibold">Alte Versionen</span>
+        <span className="text-xs gedaempft">Die laufende und die vorherige Version (für „Zurückschalten“) bleiben immer.</span>
+        {!h ? <span className="text-sm gedaempft">kommt vom Systemagenten</span> : !dateien.length && !alteImages.length ? <Leer>Nichts aufzuräumen.</Leer> : (
+          <div className="flex flex-col">
+            {dateien.map((x) => (
+              <label key={x.datei} className="flex items-center gap-2 text-sm py-1 border-b border-rand last:border-b-0">
+                <input type="checkbox" disabled={x.geschuetzt} checked={wahl.has(`datei:${x.datei}`)} aria-label={`${x.datei} löschen`}
+                  onChange={(e) => umschalten(`datei:${x.datei}`, e.target.checked)} />
+                <span className="num text-[0.8125rem] min-w-0 break-all grow">{x.datei}</span>
+                <span className="gedaempft num text-xs">{x.art === "paket" ? "Update-Paket" : "Image-Datei"} · {dateigroesse(x.groesse)}</span>
+                {x.geschuetzt ? <Chip art="ok">{x.tag === v?.aktiv ? "läuft" : "vorherige"}</Chip> : null}
+              </label>
+            ))}
+            {alteImages.map((x) => (
+              <label key={x.tag} className="flex items-center gap-2 text-sm py-1 border-b border-rand last:border-b-0">
+                <input type="checkbox" checked={wahl.has(`tag:${x.tag}`)} disabled={geschuetzt.has(x.tag)} aria-label={`Docker-Images ${x.tag} löschen`}
+                  onChange={(e) => umschalten(`tag:${x.tag}`, e.target.checked)} />
+                <span className="num text-[0.8125rem] grow">Docker-Images {x.tag}</span>
+                <span className="gedaempft text-xs">{x.erstellt.slice(0, 10)}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        <Knopf variante="dng" className="self-start" disabled={!wahl.size || offen.has("server:images_loeschen")} laedt={offen.has("server:images_loeschen")}
+          onClick={() => setLoeschen(true)} data-testid="versionen-loeschen">{wahl.size ? `${wahl.size} ausgewählte löschen` : "Auswahl löschen"}</Knopf>
+      </div>
+      <AuftragDialog offen={journalFrage} titel="Journal aufräumen" aktion={daten.verwaltung?.journal_aufraeumen} pfad="system/journal/aufraeumen/"
+        body={{ art, wert }} daten={daten} knopf="Aufräumen" onZu={() => setJournalFrage(false)}>
+        <Meldung art="info">{JOURNAL_WAHL.find((j) => j.wert === journal)?.text}. Ältere Einträge des Systemprotokolls sind danach weg; das Audit-Log von EPM
+          bleibt unberührt.</Meldung>
+      </AuftragDialog>
+      <AuftragDialog offen={loeschen} titel="Alte Versionen löschen" aktion={daten.verwaltung?.images_loeschen} pfad="system/images/loeschen/"
+        body={{ dateien: ausgewaehlt.filter((k) => k.startsWith("datei:")).map((k) => k.slice(6)),
+          tags: ausgewaehlt.filter((k) => k.startsWith("tag:")).map((k) => k.slice(4)) }}
+        daten={daten} knopf="Bestätigen und löschen" onZu={() => setLoeschen(false)} onFertig={() => setWahl(new Set())}>
+        <Meldung art="warn">Endgültig: {ausgewaehlt.length} Einträge{groesse ? `, zusammen ${dateigroesse(groesse)}` : ""}. Auf eine gelöschte Version lässt
+          sich nicht mehr zurückschalten.</Meldung>
+        <ul className="m-0 pl-5 text-sm">{ausgewaehlt.map((k) => <li key={k}>{k.replace(/^datei:/, "").replace(/^tag:/, "Docker-Images ")}</li>)}</ul>
+      </AuftragDialog>
+    </Karte>
+  );
+}
+
+// ---------------------------------------------------------------- Uhrzeit (Nachtrag 10.10.2026)
+const zwei = (n: number) => String(n).padStart(2, "0");
+
+export function UhrKarte({ daten, offen }: { daten: Uebersicht; offen: Set<string> }) {
+  const h = daten.host && daten.host.aktuell ? daten.host : null;
+  const u = h?.uhr;
+  const [dialog, setDialog] = useState(false);
+  const [zone, setZone] = useState("");
+  const [ntp, setNtp] = useState(true);
+  const [server, setServer] = useState("");
+  const [zeit, setZeit] = useState("");
+  // Abweichung Server – Browser (die Messung ist bis zu einer Minute alt; ihr Alter wird herausgerechnet)
+  const abweichung = u?.zeit_unix && h ? Math.round(u.zeit_unix + (h.alter_s ?? 0) - Date.now() / 1000) : null;
+  const oeffnen = () => {
+    setZone(u?.zeitzone || "Europe/Berlin"); setNtp(u?.ntp ?? true); setServer((u?.server ?? []).join(" "));
+    const d = new Date(); setZeit(`${d.getFullYear()}-${zwei(d.getMonth() + 1)}-${zwei(d.getDate())}T${zwei(d.getHours())}:${zwei(d.getMinutes())}`);
+    setDialog(true);
+  };
+  const zonen = u?.zeitzonen?.length ? u.zeitzonen : ["Europe/Berlin", "UTC"];
+  return (
+    <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="uhr-karte">
+      <KartenKopf titel="Uhrzeit" unter="Der zweite Faktor (Codes), Passkeys und Zertifikate brauchen eine richtige Uhrzeit."
+        rechts={u?.verfuegbar ? <Chip art={u.synchronisiert ? "ok" : "warn"}>{u.synchronisiert ? "synchron" : "nicht synchron"}</Chip> : null} />
+      {!u?.verfuegbar ? <span className="text-sm gedaempft">Der Stand der Uhrzeit kommt vom Systemagenten.</span> : (
+        <dl className="m-0">
+          <Zeile label="Zeitzone">{u.zeitzone || "—"}</Zeile>
+          <Zeile label="Zeitsynchronisation">{u.ntp ? "an" : "aus"} <span className="gedaempft">({u.dienst === "chrony" ? "chrony" : "systemd-timesyncd"})</span></Zeile>
+          <Zeile label="Zeitserver">{u.server?.length ? u.server.join(", ") : "Standard des Systems"}</Zeile>
+          <Zeile label="Abweichung zum Browser"><span data-testid="uhr-abweichung" className={abweichung != null && Math.abs(abweichung) > 60 ? "text-fehler font-medium" : undefined}>
+            {abweichung == null ? "—" : Math.abs(abweichung) < 2 ? "keine" : `${abweichung > 0 ? "Server vor" : "Server nach"} um ${Math.abs(abweichung)} s`}</span></Zeile>
+        </dl>
+      )}
+      {abweichung != null && Math.abs(abweichung) > 60 ? <Meldung art="fehler">Server und dieses Gerät weichen um mehr als eine Minute ab – Codes der
+        Authenticator-App können abgelehnt werden. Zeitserver prüfen (z. B. die OPNsense eintragen).</Meldung> : null}
+      <Knopf className="self-start" disabled={!daten.agent.verzeichnis || offen.has("server:uhr_einstellen")} laedt={offen.has("server:uhr_einstellen")}
+        onClick={oeffnen}>Uhrzeit einstellen</Knopf>
+      <AuftragDialog offen={dialog} titel="Uhrzeit einstellen" aktion={daten.verwaltung?.uhr_einstellen} pfad="system/uhr/"
+        body={{ zeitzone: zone || undefined, ntp, server, ...(!ntp && zeit ? { zeit: `${zeit.replace("T", " ")}:00` } : {}) }}
+        daten={daten} knopf="Bestätigen und einstellen" onZu={() => setDialog(false)}>
+        <Feld label="Zeitzone">
+          {(p) => <Auswahl {...p} value={zone} onChange={(e) => setZone(e.target.value)}>
+            {zonen.map((z) => <option key={z} value={z}>{z}</option>)}</Auswahl>}
+        </Feld>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={ntp} onChange={(e) => setNtp(e.target.checked)} />Zeitsynchronisation (NTP) an
+        </label>
+        {ntp ? (
+          <Feld label="Zeitserver" hinweis="Name oder IP-Adresse, bis zu 4, durch Leerzeichen getrennt; leer = Standard. Ohne Internet: die OPNsense eintragen.">
+            {(p) => <Eingabe {...p} spellCheck={false} placeholder="z. B. opnsense.stiftung.lan" value={server} onChange={(e) => setServer(e.target.value)} />}
+          </Feld>
+        ) : (
+          <>
+            <Meldung art="warn">Ohne Zeitsynchronisation läuft die Uhr des Servers mit der Zeit davon. Codes der Authenticator-App, Passkeys und
+              Zertifikate brauchen eine richtige Uhrzeit – bitte nur vorübergehend.</Meldung>
+            <Feld label="Uhrzeit setzen (Zeitzone des Servers)">
+              {(p) => <Eingabe {...p} type="datetime-local" value={zeit} onChange={(e) => setZeit(e.target.value)} />}
+            </Feld>
+          </>
+        )}
+      </AuftragDialog>
+    </Karte>
+  );
+}
+
 // ---------------------------------------------------------------- Hochladen in Stücken (wie bei den Sicherungen)
 type Upload = NonNullable<Uebersicht["uploads"]>[number];
 

@@ -943,7 +943,12 @@ erreichbar, deshalb vorher Eingaben speichern. Der Auftrag läuft auf dem Server
 Zwischenzeit nicht antwortet – das Ergebnis erscheint danach unter <strong>Aufträge</strong> samt Ausgabe. Geht etwas
 schief, bleibt die bisherige Version in Betrieb; über <strong>Ausgabe</strong> ist zu sehen, woran es lag.</p>
 <p><strong>Wartung › Dienste</strong>: einzelne Container (backend, web, ocr, db) neu starten, z. B. wenn die Texterkennung
-hängt. <strong>Software</strong>: die vorhandenen Versionen mit <strong>Zurückschalten</strong> (vorher automatische
+hängt. <strong>Speicher aufräumen</strong>: das Systemprotokoll (Journal) auf eine Größe oder ein Alter verkleinern
+(einfache Rückfrage) und gespeicherte alte Versionen – Image-Dateien, Update-Pakete, Docker-Images – ankreuzen und
+löschen (Passwort und Code); die laufende und die vorherige Version bleiben immer. <strong>Uhrzeit</strong>: Zeitzone,
+Zeitsynchronisation (NTP) mit eigenem Zeitserver – ohne Internet z. B. die OPNsense – oder bei ausgeschalteter
+Synchronisation die Uhrzeit von Hand; angezeigt wird auch, wie weit die Uhr des Servers von diesem Gerät abweicht. Codes
+der Authenticator-App, Passkeys und Zertifikate brauchen eine richtige Uhrzeit. <strong>Software</strong>: die vorhandenen Versionen mit <strong>Zurückschalten</strong> (vorher automatische
 Sicherung; Datenbank-Migrationen werden nicht zurückgedreht), <strong>Update-Paket einspielen</strong> (Datei der Test-VM
 hochladen statt per scp – der Server prüft Inhalt und Prüfsummen und zeigt die SHA-256 zum Vergleichen),
 <strong>Update-Paket erstellen</strong> (Test-VM; liegt danach 2 Stunden zum Herunterladen bereit) und
@@ -958,7 +963,7 @@ Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Passwort) direkt zur Person
 keine Testpatienten und Testkonten mehr entstehen. <strong>Menüpunkt „Import“ ausblenden</strong>, wenn die Altdaten
 übernommen sind – die Seite bleibt über den Reiter „Testphase“ erreichbar, der Menüpunkt lässt sich wieder einblenden.
 <strong>Datenbank leeren</strong> (nur Rolle Admin) entfernt alles aus der Testphase: alle Akten (auch echte),
-Dokumente, Versorger, Ärzte, die nicht ausgewählten Benutzer und das Audit-Log; Präparate, Auswahllisten, Vorlagen und
+Dokumente, alle Scans samt Dateien (auch nicht zugeordnete), was die Texterkennung gelernt hat, Versorger, Ärzte, die nicht ausgewählten Benutzer und das Audit-Log; Präparate, Auswahllisten, Vorlagen und
 Einstellungen bleiben. Welche Konten bleiben, wird im Dialog angehakt (das eigene bleibt immer). Bestätigt wird mit dem
 angezeigten Code zum Abtippen, Passwort, Code aus der Authenticator-App und der Rückfrage „Wollen Sie wirklich die
 Datenbank löschen?“. Vorher sichert der Server automatisch – zurück geht es nur über diese Sicherung.</p>""",
@@ -978,6 +983,9 @@ dann „N Sicherungen löschen“ – der Dialog nennt Anzahl und Größe und wa
 bestätigt wird mit Passwort und Code. Die jüngste Sicherung lässt sich nie löschen. Das Löschen ist endgültig; Kopien
 im Übertragungsziel bleiben, bis die dortige Aufbewahrung sie entfernt. Die Größe je Sicherung steht klein unter
 „Speicher“, groß per Klick.</p>
+<p><strong>Zeitplan</strong> (unter „Letzte Sicherung“, „Ändern“): Uhrzeit der automatischen Sicherung, täglich oder
+werktags; Standard täglich um 02:00. Passt die Uhrzeit nicht zum Zeitfenster der Übertragung (die neue Sicherung läge
+dann Stunden nur auf dem Server), weist der Dialog darauf hin.</p>
 <p><strong>Aufbewahrung</strong>: 7, 14 oder 30 Tage auf dem Server; ältere entfernt die nächste Sicherung. Im
 Übertragungsziel gilt eine eigene Aufbewahrung (unter „Ziel ändern“, Standard 30 Tage, auch „nie löschen“): Nach jeder
 Übertragung entfernt der Server dort ältere EPM-Sicherungen; die jüngste bleibt immer, andere Dateien im Ordner werden

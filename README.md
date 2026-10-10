@@ -34,6 +34,9 @@ gefährliche Aktionen mit Passwort und zweitem Faktor, alles im Audit-Log. SSH b
 Ersteinrichtung des Servers (`rollout/01…05`, `epm-git-einrichten.sh`, einmalig `epm-zertifikat einrichten`) und wenn
 der Systemagent selbst nicht läuft.
 
+Uhrzeit: Zeitzone, Zeitsynchronisation und eigener Zeitserver (ohne Internet z. B. die OPNsense; sonst
+`EPM_NTP_SERVER` in `/etc/epm/epm.conf` bei der Ersteinrichtung) unter Administration › System › Wartung › Uhrzeit.
+
 ## Test-VM aktualisieren
 Oder in EPM unter Administration › System: „EPM aktualisieren“ (Wartung), Versionen und „Zurückschalten“, „Update-Paket
 erstellen“ (Software).
@@ -72,7 +75,8 @@ Status, Erneuern und Importieren gehen auch in EPM unter Administration › Syst
 Einrichten der eigenen CA (`epm-zertifikat einrichten`) bleibt Teil der Ersteinrichtung per SSH.
 
 ## Datensicherung
-Täglich um 02:00 (`epm-backup.timer`), 30 Tage auf dem Server unter `/srv/epm/backup` (unter Administration › Backup
+Täglich um 02:00 (`epm-backup.timer`; Uhrzeit und „täglich/werktags“ in EPM unter Administration › Backup › Zeitplan,
+als Drop-in `epm-backup.timer.d/zeitplan.conf`), 30 Tage auf dem Server unter `/srv/epm/backup` (unter Administration › Backup
 auf 7, 14 oder 30 Tage einstellbar). Gesteuert wird alles unter
 Administration › Backup: Passwort für die Verschlüsselung festlegen und das Passwortblatt im Tresor verwahren,
 Übertragungsziel (WebDAV, z. B. Nextcloud mit App-Passwort) mit Zeitfenster, „Jetzt sichern“, Wiederherstellen (eigenes

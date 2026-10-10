@@ -122,6 +122,9 @@ urlpatterns = [
     path("api/system/zertifikat/importieren/", verwaltung.ZertifikatImportierenView.as_view()),
     path("api/system/protokolle/", verwaltung.ProtokolleView.as_view()),
     path("api/system/protokolle/<uuid:kennung>/", verwaltung.ProtokollView.as_view()),
+    path("api/system/journal/aufraeumen/", verwaltung.JournalView.as_view()),
+    path("api/system/images/loeschen/", verwaltung.ImagesLoeschenView.as_view()),
+    path("api/system/uhr/", verwaltung.UhrView.as_view()),
     # Administration › Import: Übernahme der Altdaten (nur Admin)
     path("api/altimport/", altimport.StandView.as_view()),
     path("api/altimport/dump/", altimport.DumpView.as_view()),
@@ -146,6 +149,7 @@ urlpatterns = [
     path("api/backup/auftraege/<uuid:kennung>/abbrechen/", backup.AuftragAbbrechenView.as_view()),
     path("api/backup/aufbewahrung/", backup.AufbewahrungView.as_view()),
     path("api/backup/loeschen/", backup.LoeschenView.as_view()),
+    path("api/backup/zeitplan/", backup.ZeitplanView.as_view()),
     path("api/backup/hochladen/", backup.HochladenView.as_view()),
     path("api/backup/hochladen/<str:kennung>/", backup.HochladenTeilView.as_view()),
     path("api/backup/hochladen/<str:kennung>/einlesen/", backup.EinlesenView.as_view()),

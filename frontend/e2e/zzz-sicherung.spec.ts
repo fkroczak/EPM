@@ -447,3 +447,23 @@ test("Backup: mehrere Sicherungen auswählen und löschen – die jüngste bleib
   await page.getByRole("button", { name: "Backup", exact: true }).click();
   await expect(page.getByText(/2 Sicherung\(en\) zum Löschen angefordert/).first()).toBeVisible();
 });
+
+test("Backup: Zeitplan der nächtlichen Sicherung – Uhrzeit und Tage, Warnung bei unpassendem Übertragungsfenster", async ({ page }) => {
+  // Nachtrag 10.10.2026 (F179l); der Systemagent stellt den Timer in CI nur im Probelauf um
+  await anmeldenUI(page, "e2e.admin", naechsterNotfallcode("e2e.admin"));
+  await page.goto("/admin/backup");
+  await expect(page.getByTestId("zeitplan")).toContainText("täglich 02:00");
+  await page.getByTestId("zeitplan").getByRole("button", { name: "Ändern" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Uhrzeit").fill("02:30");
+  await dialog.getByLabel("Tage").selectOption("werktags");
+  // Zeitfenster ganztägig (vorheriger Test): kein Hinweis
+  await expect(dialog.getByTestId("zeitplan-hinweis")).toHaveCount(0);
+  await dialog.getByLabel("Ihr Passwort").fill(KENNWORT);
+  await dialog.getByLabel("Code aus der Authenticator-App").fill(naechsterNotfallcode("e2e.admin"));
+  const a = await auftragDurch(page, "zeitplan/", () => dialog.getByRole("button", { name: "Bestätigen und speichern" }).click());
+  expect((await abwarten(page, a.kennung)).ergebnis).toContain("Probelauf: Zeitplan (werktags (Mo–Fr) um 02:30 Uhr)");
+  await page.goto("/admin/audit-log");
+  await page.getByRole("button", { name: "Backup", exact: true }).click();
+  await expect(page.getByText("Zeitplan der Sicherung: werktags um 02:30 Uhr", { exact: false }).first()).toBeVisible();
+});

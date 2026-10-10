@@ -424,7 +424,11 @@ class Hochladen(Backupverzeichnis):
     def test_ocr_modelle_im_probelauf(self):
         k = self.hochladen(tar_mit({"modelle.json": b"{}", "dateien/detection/v5/det.onnx": b"ONNX"}),
                            "epm-ocr-modelle-abc.tar", "ocr")
+        # Nachtrag 10.10.2026: Modelle bringen Dateien auf den Server – Passwort und 2FA wie beim Update-Paket
         r = self.a.post(f"/api/system/hochladen/{k}/einspielen/", {}, format="json")
+        self.assertEqual((r.status_code, list(r.json())), (400, ["kennwort"]))
+        r = self.a.post(f"/api/system/hochladen/{k}/einspielen/", {"kennwort": KENNWORT, "code": self.admin_codes[0]},
+                        format="json")
         self.assertEqual(r.status_code, 201, r.content)
         self.agent()
         a = Systemauftrag.objects.get(aktion="ocr_modelle")
@@ -525,3 +529,213 @@ class AgentTeile(Backupverzeichnis):
         (self.basis / "ocr-modelle" / "x").mkdir(parents=True)
         (self.basis / "ocr-modelle" / "x" / "a.onnx").write_bytes(b"abc")
         self.assertEqual((a.ocr_vorrat()["dateien"], a.ocr_vorrat()["groesse"]), (1, 3))
+
+
+
+class Nachtrag(Backupverzeichnis):
+    """Nachtrag 10.10.2026 (F179l–F179n): Zeitplan der Sicherung, Journal und alte Versionen aufräumen, Uhrzeit."""
+
+    def texte(self, gruppe):
+        return [x["beschreibung"] for x in self.a.get(f"/api/protokoll/?gruppe={gruppe}").json()["results"]]
+
+    def test_zeitplan_der_sicherung(self):
+        from . import sicherung
+
+        url = "/api/backup/zeitplan/"
+        self.assertEqual(client_fuer(self.mediziner).post(url, {"uhrzeit": "03:00"}, format="json").status_code, 403)
+        for daten, feld in (({"uhrzeit": "3:00"}, "uhrzeit"), ({"uhrzeit": "24:00"}, "uhrzeit"),
+                            ({"uhrzeit": "03:00; reboot"}, "uhrzeit"), ({"uhrzeit": "03:00", "tage": "Sat"}, "tage"),
+                            ({"uhrzeit": "03:00", "tage": "*-*-*"}, "tage")):
+            with self.subTest(daten=daten):
+                r = self.a.post(url, {**daten, "kennwort": KENNWORT, "code": self.admin_codes[0]}, format="json")
+                self.assertEqual(r.status_code, 400)
+                self.assertIn(feld, r.json())
+        self.assertEqual(list(self.a.post(url, {"uhrzeit": "03:00"}, format="json").json()), ["kennwort"])
+        r = self.a.post(url, {"uhrzeit": "03:30", "tage": "werktags", "kennwort": KENNWORT, "code": self.admin_codes[0]},
+                        format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(self.auftragsdatei()["parameter"], {"uhrzeit": "03:30", "tage": "werktags"})
+        self.assertIn("Zeitplan der Sicherung: werktags um 03:30 Uhr, mit Passwort und 2FA bestätigt", self.texte("backup"))
+        # Übersicht: Standard 02:00 täglich; Hinweis, wenn das Übertragungsfenster nicht passt
+        self.status_schreiben()          # Ziel mit Zeitfenster 02:00–05:00
+        z = self.a.get("/api/backup/").json()["zeitplan"]
+        self.assertEqual((z["uhrzeit"], z["tage"], z["hinweis"]), ("02:00", "taeglich", ""))
+        ziel = {"eingerichtet": True, "von": "02:00", "bis": "05:00"}
+        self.assertEqual(sicherung.zeitplan_hinweis("01:30", ziel), "")
+        self.assertIn("öffnet erst 21 Stunden", sicherung.zeitplan_hinweis("05:00", ziel))
+        self.assertIn("endet kurz nach", sicherung.zeitplan_hinweis("04:45", ziel))
+        self.assertEqual(sicherung.zeitplan_hinweis("12:00", {**ziel, "von": "00:00", "bis": "00:00"}), "")
+        self.assertEqual(sicherung.zeitplan_hinweis("23:30", {**ziel, "von": "23:00", "bis": "01:00"}), "")
+
+    def test_agent_zeitplan_und_uhr(self):
+        modul = agent_modul()
+        basis = Path(tempfile.mkdtemp(prefix="epm-basis-"))
+        try:
+            os.symlink(self.ordner, basis / "system")
+            a = modul.Agent(str(basis), konf=str(basis / "konf"))
+            a.systemd, a.timesyncd, a.chrony = str(basis / "systemd"), str(basis / "timesyncd.conf.d"), str(basis / "chrony")
+            aufrufe = []
+            a.befehl = lambda args, **kw: (aufrufe.append(args) or (0, ""))
+            z = []
+            self.assertEqual(a.zeitplan(), {"uhrzeit": "02:00", "tage": "taeglich", "eingestellt": False})
+            self.assertEqual(a.zeitplan_setzen("3:00", "taeglich", z.append)[0], 2)
+            self.assertEqual(a.zeitplan_setzen("03:00", "sonntags", z.append)[0], 2)
+            self.assertEqual(a.zeitplan_setzen("03:15", "werktags", z.append, simuliert=True)[0], 0)
+            self.assertFalse((basis / "systemd").exists())
+            rc, text = a.zeitplan_setzen("03:15", "werktags", z.append)
+            self.assertEqual((rc, text), (0, "Die Sicherung läuft ab jetzt werktags (Mo–Fr) um 03:15 Uhr."))
+            dropin = (basis / "systemd" / "epm-backup.timer.d" / "zeitplan.conf").read_text()
+            self.assertIn("OnCalendar=\nOnCalendar=Mon..Fri *-*-* 03:15:00\n", dropin)
+            self.assertIn(["systemctl", "daemon-reload"], aufrufe)
+            self.assertIn(["systemctl", "restart", "epm-backup.timer"], aufrufe)
+            self.assertEqual(a.zeitplan(), {"uhrzeit": "03:15", "tage": "werktags", "eingestellt": True})
+            # Uhrzeit: Zeitserver streng geprüft, nur mit NTP aus von Hand
+            for p in ({"ntp": True, "server": ["opnsense; reboot"]}, {"ntp": True, "server": ["a"] * 5},
+                      {"ntp": "ja", "server": []}, {"ntp": True, "server": [], "zeitzone": "../../etc/passwd"},
+                      {"ntp": True, "server": [], "zeit": "2026-10-10 12:00:00"},
+                      {"ntp": False, "server": [], "zeit": "2026-10-10 12:00"}):
+                with self.subTest(p=p):
+                    self.assertEqual(a.uhr_einstellen(p, z.append)[0], 2)
+            aufrufe.clear()
+            rc, text = a.uhr_einstellen({"ntp": True, "server": ["opnsense.stiftung.lan", "10.0.0.1"],
+                                         "zeitzone": "Europe/Berlin"}, z.append)
+            self.assertEqual(rc, 0, text)
+            self.assertEqual((basis / "timesyncd.conf.d" / "epm.conf").read_text(),
+                             "[Time]\nNTP=opnsense.stiftung.lan 10.0.0.1\nFallbackNTP=\n")
+            self.assertIn(["timedatectl", "set-timezone", "Europe/Berlin"], aufrufe)
+            self.assertIn(["timedatectl", "set-ntp", "true"], aufrufe)
+            self.assertEqual(a.ntp_server(), ["opnsense.stiftung.lan", "10.0.0.1"])
+            aufrufe.clear()
+            rc, _ = a.uhr_einstellen({"ntp": False, "server": [], "zeit": "2026-10-10 12:30:00"}, z.append)
+            self.assertEqual(rc, 0)
+            self.assertFalse((basis / "timesyncd.conf.d" / "epm.conf").exists())
+            self.assertEqual(aufrufe, [["timedatectl", "set-ntp", "false"], ["timedatectl", "set-time", "2026-10-10 12:30:00"]])
+            # chrony: Zeitserver in sources.d, öffentliche Pools aus und wieder an
+            (basis / "chrony" / "sources.d").mkdir(parents=True)
+            (basis / "chrony" / "chrony.conf").write_text("pool ntp.ubuntu.com iburst\n")
+            self.assertEqual(a.uhr_einstellen({"ntp": True, "server": ["10.0.0.1"]}, z.append)[0], 0)
+            self.assertEqual((basis / "chrony" / "sources.d" / "epm.sources").read_text(), "server 10.0.0.1 iburst\n")
+            self.assertEqual((basis / "chrony" / "chrony.conf").read_text(), "# pool ntp.ubuntu.com iburst\n")
+            self.assertEqual(a.uhr_einstellen({"ntp": True, "server": []}, z.append)[0], 0)
+            self.assertEqual((basis / "chrony" / "chrony.conf").read_text(), "pool ntp.ubuntu.com iburst\n")
+            # Journal: nur feste Werte
+            self.assertEqual(a.journal_aufraeumen("groesse", "1T", z.append)[0], 2)
+            self.assertEqual(a.journal_aufraeumen("zeit", "--rotate", z.append)[0], 2)
+            aufrufe.clear()
+            self.assertEqual(a.journal_aufraeumen("groesse", "500M", z.append)[0], 0)
+            self.assertEqual(aufrufe[0], ["journalctl", "--vacuum-size=500M"])
+        finally:
+            shutil.rmtree(basis, ignore_errors=True)
+
+    def test_agent_alte_versionen_loeschen(self):
+        """Die laufende und die vorherige Version bleiben immer – im Agenten geprüft, egal was der Auftrag sagt."""
+        modul = agent_modul()
+        basis = Path(tempfile.mkdtemp(prefix="epm-basis-"))
+        try:
+            os.symlink(self.ordner, basis / "system")
+            (basis / "images").mkdir()
+            for n in ("epm-0.9.3-ddddddd.tar", "epm-0.9.2-bbbbbbb.tar", "epm-0.9.1-aaaaaaa.tar", "epm-paket-0.9.1-aaaaaaa.tar",
+                      "epm-0.9.0-ccccccc.tar", "notizen.txt"):
+                (basis / "images" / n).write_bytes(b"x" * 100)
+            a = modul.Agent(str(basis))
+            versionen = {"verfuegbar": True, "aktiv": "0.9.2-bbbbbbb", "liste": [
+                {"tag": t, "erstellt": e, "backend": True, "web": True, "aktiv": t == "0.9.2-bbbbbbb", "vollstaendig": True}
+                for t, e in (("0.9.3-ddddddd", "2026-10-09"), ("0.9.2-bbbbbbb", "2026-10-08"), ("0.9.1-aaaaaaa", "2026-10-01"),
+                             ("0.9.0-ccccccc", "2026-09-20"))]}
+            a.epm_versionen = lambda: versionen
+            aufrufe = []
+            a.befehl = lambda args, **kw: (aufrufe.append(args) or (0, ""))
+            self.assertEqual(a.geschuetzte_tags(versionen), {"0.9.2-bbbbbbb", "0.9.1-aaaaaaa"})
+            liste = {e["datei"]: e["geschuetzt"] for e in a.image_dateien(versionen)}
+            self.assertEqual(liste, {"epm-0.9.3-ddddddd.tar": False, "epm-0.9.2-bbbbbbb.tar": True, "epm-0.9.1-aaaaaaa.tar": True,
+                                     "epm-paket-0.9.1-aaaaaaa.tar": True, "epm-0.9.0-ccccccc.tar": False})
+            z = []
+            for dateien, tags in ((["epm-0.9.2-bbbbbbb.tar"], []), (["epm-paket-0.9.1-aaaaaaa.tar"], []), ([], ["0.9.1-aaaaaaa"]),
+                                  (["../notizen.txt"], []), (["notizen.txt"], []), ([], ["latest"]), ([], [])):
+                with self.subTest(dateien=dateien, tags=tags):
+                    self.assertEqual(a.images_loeschen(dateien, tags, z.append)[0], 2)
+            self.assertEqual(a.images_loeschen(["epm-0.9.0-ccccccc.tar"], ["0.9.0-ccccccc"], z.append, simuliert=True)[0], 0)
+            self.assertTrue((basis / "images" / "epm-0.9.0-ccccccc.tar").exists())
+            rc, text = a.images_loeschen(["epm-0.9.0-ccccccc.tar", "epm-0.9.3-ddddddd.tar"], ["0.9.0-ccccccc"], z.append)
+            self.assertEqual(rc, 0, text)
+            self.assertEqual(sorted(p.name for p in (basis / "images").iterdir()),
+                             ["epm-0.9.1-aaaaaaa.tar", "epm-0.9.2-bbbbbbb.tar", "epm-paket-0.9.1-aaaaaaa.tar", "notizen.txt"])
+            self.assertEqual(aufrufe, [["docker", "image", "rm", "epm-backend:0.9.0-ccccccc"],
+                                       ["docker", "image", "rm", "epm-web:0.9.0-ccccccc"]])
+            # ohne Liste der Versionen: nichts
+            a.epm_versionen = lambda: {"verfuegbar": False, "aktiv": "", "liste": []}
+            self.assertEqual(a.images_loeschen(["epm-0.9.3-ddddddd.tar"], [], z.append)[0], 1)
+        finally:
+            shutil.rmtree(basis, ignore_errors=True)
+
+    def test_api_aufraeumen_und_uhr(self):
+        m = client_fuer(self.mediziner)
+        for url in ("/api/system/journal/aufraeumen/", "/api/system/images/loeschen/", "/api/system/uhr/"):
+            self.assertEqual(m.post(url, {}, format="json").status_code, 403)
+        # Journal: feste Auswahl, einfache Rückfrage (ohne Passwort)
+        url = "/api/system/journal/aufraeumen/"
+        for daten in ({"art": "groesse", "wert": "5G"}, {"art": "zeit", "wert": "1year"}, {"art": "x", "wert": "1G"}):
+            self.assertEqual(self.a.post(url, daten, format="json").status_code, 400)
+        self.assertEqual(self.a.post(url, {"art": "groesse", "wert": "200M"}, format="json").status_code, 201)
+        self.assertIn("Journal aufräumen angefordert (auf 200M)", self.texte("system"))
+        # alte Versionen: Agent muss laufen, geschützte Versionen nie
+        url = "/api/system/images/loeschen/"
+        b = {"kennwort": KENNWORT, "code": self.admin_codes[0]}
+        self.assertEqual(self.a.post(url, {**b, "dateien": ["epm-0.9.0-ccccccc.tar"]}, format="json").status_code, 409)
+        host_status_schreiben(self.ordner, image_dateien=[
+            {"datei": d, "tag": t, "groesse": 1000} for d, t in (("epm-0.9.2-bbbbbbb.tar", "0.9.2-bbbbbbb"),
+                                                                ("epm-0.9.1-aaaaaaa.tar", "0.9.1-aaaaaaa"),
+                                                                ("epm-0.9.0-ccccccc.tar", "0.9.0-ccccccc"))])
+        for daten in ({"dateien": ["epm-0.9.2-bbbbbbb.tar"]}, {"tags": ["0.9.1-aaaaaaa"]}, {"dateien": ["../x.tar"]},
+                      {"dateien": ["epm-0.9.9-eeeeeee.tar"]}, {}, {"dateien": "epm-0.9.0-ccccccc.tar"}):
+            with self.subTest(daten=daten):
+                r = self.a.post(url, {**b, **daten}, format="json")
+                self.assertEqual(r.status_code, 400, r.content)
+        r = self.a.post(url, {"dateien": ["epm-0.9.0-ccccccc.tar"], "tags": ["0.9.0-ccccccc"]}, format="json")
+        self.assertEqual(list(r.json()), ["kennwort"])
+        r = self.a.post(url, {**b, "dateien": ["epm-0.9.0-ccccccc.tar"], "tags": ["0.9.0-ccccccc"]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(Systemauftrag.objects.get(aktion="images_loeschen").parameter,
+                         {"dateien": ["epm-0.9.0-ccccccc.tar"], "tags": ["0.9.0-ccccccc"]})
+        # Uhrzeit
+        url = "/api/system/uhr/"
+        b = {"kennwort": KENNWORT, "code": self.admin_codes[1]}
+        host_status_schreiben(self.ordner, uhr={"zeitzonen": ["Europe/Berlin", "UTC"]})
+        for daten, feld in (({"ntp": "ja"}, "ntp"), ({"ntp": True, "server": ["opnsense; reboot"]}, "server"),
+                            ({"ntp": True, "server": "a b c d e"}, "server"), ({"ntp": True, "zeitzone": "Mars/Olymp"}, "zeitzone"),
+                            ({"ntp": True, "zeit": "2026-10-10 12:00:00"}, "zeit"), ({"ntp": False, "zeit": "morgen"}, "zeit")):
+            with self.subTest(daten=daten):
+                r = self.a.post(url, {**b, **daten}, format="json")
+                self.assertEqual(r.status_code, 400, r.content)
+                self.assertIn(feld, r.json())
+        r = self.a.post(url, {**b, "ntp": True, "server": "opnsense.stiftung.lan, 10.0.0.1", "zeitzone": "Europe/Berlin"},
+                        format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(Systemauftrag.objects.get(aktion="uhr_einstellen").parameter,
+                         {"ntp": True, "server": ["opnsense.stiftung.lan", "10.0.0.1"], "zeitzone": "Europe/Berlin"})
+        self.assertIn("Uhrzeit einstellen angefordert: Zeitsynchronisation an, Zeitserver opnsense.stiftung.lan, 10.0.0.1, "
+                      "Zeitzone Europe/Berlin, mit Passwort und 2FA bestätigt", self.texte("system"))
+        d = self.a.get("/api/system/uebersicht/").json()
+        self.assertEqual({k: d["verwaltung"][k]["bestaetigung"] for k in ("journal_aufraeumen", "images_loeschen",
+                                                                          "uhr_einstellen", "ocr_modelle")},
+                         {"journal_aufraeumen": "einfach", "images_loeschen": "2fa", "uhr_einstellen": "2fa", "ocr_modelle": "2fa"})
+
+    def test_echter_agent_im_probelauf(self):
+        """Backend legt ab → Agent (Probelauf) → Ergebnis: nichts verändert."""
+        self.a.post("/api/system/journal/aufraeumen/", {"art": "zeit", "wert": "1month"}, format="json")
+        self.a.post("/api/backup/zeitplan/", {"uhrzeit": "01:45", "tage": "taeglich", "kennwort": KENNWORT,
+                                              "code": self.admin_codes[0]}, format="json")
+        self.assertEqual(len(self.auftragsdateien()), 2)
+        basis = Path(tempfile.mkdtemp(prefix="epm-basis-"))
+        try:
+            os.symlink(self.ordner, basis / "system")
+            p = subprocess.run([sys.executable, str(AGENT), "auftraege", "--basis", str(basis), "--trocken"],
+                               capture_output=True, text=True, timeout=300)
+            self.assertEqual(p.returncode, 0, p.stderr)
+        finally:
+            shutil.rmtree(basis, ignore_errors=True)
+        self.a.get("/api/system/auftraege/")
+        ergebnisse = {a.aktion: (a.status, a.ergebnis, a.probelauf) for a in Systemauftrag.objects.all()}
+        self.assertEqual(ergebnisse["journal_aufraeumen"], ("erledigt", "Probelauf: Journal nicht aufgeräumt.", True))
+        self.assertEqual(ergebnisse["sicherung_zeitplan"],
+                         ("erledigt", "Probelauf: Zeitplan (täglich um 01:45 Uhr) nicht gesetzt.", True))

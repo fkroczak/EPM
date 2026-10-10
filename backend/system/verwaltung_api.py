@@ -15,6 +15,10 @@ POST   /api/system/zertifikat/erneuern/           {kennwort, code}
 POST   /api/system/zertifikat/importieren/        {zertifikat, schluessel, ca?, kennwort, code} (PEM als Text)
 POST   /api/system/protokolle/                    {quelle, zeilen} → der Agent liest das Protokoll (nur lesend)
 GET    /api/system/protokolle/<kennung>/          abgerufenes Protokoll; ?herunterladen=1 als Datei
+POST   /api/system/journal/aufraeumen/            {art: "groesse" | "zeit", wert} (feste Auswahl)
+POST   /api/system/images/loeschen/               {dateien: [...], tags: [...], kennwort, code} – laufende und vorherige
+                                                  Version bleiben immer
+POST   /api/system/uhr/                           {zeitzone?, ntp, server: [...], zeit?, kennwort, code}
 
 Schlüssel (und das Zertifikat selbst) gehen nur in die Auftragsdatei an den Server (0600, der Agent löscht sie sofort) –
 nie in die Datenbank oder das Audit-Log; dort stehen nur Inhaber, Aussteller, Ablauf und Fingerabdruck.
@@ -300,3 +304,99 @@ class ProtokollView(APIView):
         return Response({"quelle": quelle, "name": host.PROTOKOLLE.get(quelle, quelle),
                          "zeilen": a.parameter.get("zeilen"), "abgerufen_am": a.beendet_am or a.angefordert_am,
                          "text": text})
+
+
+# ------------------------------------------------------------------ Nachtrag 10.10.2026: Aufräumen und Uhrzeit
+class JournalView(APIView):
+    """Systemprotokoll (Journal) auf eine Größe oder ein Alter verkleinern (feste Auswahl), einfache Rückfrage."""
+
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        art, wert = request.data.get("art"), request.data.get("wert")
+        if not ((art == "groesse" and wert in host.JOURNAL_GROESSE) or (art == "zeit" and wert in host.JOURNAL_ZEIT)):
+            return _fehler("wert", "Bitte eine Größe (100M, 200M, 500M, 1G) oder ein Alter (2weeks, 1month, 3months, "
+                                   "6months) wählen.")
+        return auftrag_anlegen(request, "journal_aufraeumen", parameter={"art": art, "wert": wert}, objekt="Journal",
+                               protokoll_details={"journal_art": art, "wert": wert})
+
+
+def geschuetzte_tags(status_host: dict) -> set | None:
+    """Wie im Agenten: laufende Version und die nächstältere (für „Zurückschalten“)."""
+    v = (status_host or {}).get("versionen") or {}
+    if not v.get("verfuegbar") or not v.get("aktiv"):
+        return None
+    tags = [e.get("tag") for e in v.get("liste") or [] if isinstance(e, dict)]
+    geschuetzt = {v["aktiv"]}
+    if v["aktiv"] in tags:
+        i = tags.index(v["aktiv"])
+        if i + 1 < len(tags):
+            geschuetzt.add(tags[i + 1])
+    else:
+        geschuetzt.update(tags[:1])
+    return geschuetzt
+
+
+class ImagesLoeschenView(APIView):
+    """Alte Image-Dateien, Update-Pakete und Docker-Images löschen; laufende und vorherige Version nie."""
+
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        dateien, tags = request.data.get("dateien") or [], request.data.get("tags") or []
+        if not isinstance(dateien, list) or not isinstance(tags, list) or not (dateien or tags) \
+                or len(dateien) + len(tags) > 100 \
+                or any(not isinstance(d, str) or not host.IMAGE_DATEI_MUSTER.match(d) for d in dateien) \
+                or any(not isinstance(t, str) or not host.TAG_MUSTER.match(t) for t in tags) \
+                or len(set(dateien)) != len(dateien) or len(set(tags)) != len(tags):
+            return _fehler("dateien", "Bitte Dateien bzw. Versionen aus der Liste wählen.")
+        antwort = _agent_aktuell()
+        if antwort is not None:
+            return antwort
+        h = host.host_status() or {}
+        geschuetzt = geschuetzte_tags(h)
+        if geschuetzt is None:
+            return Response({"fehler": "Die laufende Version ist nicht bekannt – zur Sicherheit wird nichts gelöscht."},
+                            status=status.HTTP_409_CONFLICT)
+        betroffen = {host.IMAGE_DATEI_MUSTER.match(d).group(2) for d in dateien} | set(tags)
+        if betroffen & geschuetzt:
+            return _fehler("dateien", f"Die laufende und die vorherige Version ({', '.join(sorted(geschuetzt))}) bleiben "
+                                      "immer – bitte abwählen.")
+        vorhanden = {e.get("datei"): e for e in h.get("image_dateien") or [] if isinstance(e, dict)}
+        bekannt = {e.get("tag") for e in (h.get("versionen") or {}).get("liste") or [] if isinstance(e, dict)}
+        fehlen = [d for d in dateien if d not in vorhanden] + [t for t in tags if t not in bekannt]
+        if fehlen:
+            return _fehler("dateien", f"Nicht (mehr) vorhanden: {', '.join(fehlen[:5])}.")
+        groesse = sum(int(vorhanden[d].get("groesse") or 0) for d in dateien)
+        return auftrag_anlegen(request, "images_loeschen", parameter={"dateien": sorted(dateien), "tags": sorted(tags)},
+                               objekt="Alte Versionen",
+                               protokoll_details={"dateien": sorted(dateien), "tags": sorted(tags), "groesse": groesse})
+
+
+class UhrView(APIView):
+    """Zeitzone, Zeitsynchronisation mit eigenen Zeitservern (abgeschotteter Betrieb: z. B. die OPNsense) oder die
+    Uhrzeit von Hand. Passwort und zweiter Faktor: TOTP-Codes, Passkeys und Zertifikate hängen an der Uhrzeit."""
+
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        d = request.data
+        zone, ntp, server, zeit = d.get("zeitzone") or None, d.get("ntp"), d.get("server", []), d.get("zeit") or None
+        if not isinstance(ntp, bool):
+            return _fehler("ntp", "Bitte Zeitsynchronisation an oder aus wählen.")
+        if isinstance(server, str):
+            server = server.replace(",", " ").split()
+        if not isinstance(server, list) or len(server) > host.NTP_SERVER_MAX \
+                or any(not isinstance(s, str) or not host.NTP_SERVER_MUSTER.match(s) for s in server):
+            return _fehler("server", f"Bis zu {host.NTP_SERVER_MAX} Zeitserver als Name (z. B. opnsense.stiftung.lan) oder "
+                                     "IP-Adresse, durch Leerzeichen getrennt.")
+        zonen = ((host.host_status() or {}).get("uhr") or {}).get("zeitzonen") or []
+        if zone is not None and (not isinstance(zone, str) or not host.ZEITZONE_MUSTER.match(zone)
+                                 or (zonen and zone not in zonen)):
+            return _fehler("zeitzone", "Unbekannte Zeitzone.")
+        if zeit is not None and (ntp or not isinstance(zeit, str) or not host.ZEIT_SETZEN_MUSTER.match(zeit)):
+            return _fehler("zeit", "Die Uhrzeit lässt sich nur bei ausgeschalteter Zeitsynchronisation setzen "
+                                   "(JJJJ-MM-TT HH:MM:SS).")
+        parameter = {"ntp": ntp, "server": server, **({"zeitzone": zone} if zone else {}), **({"zeit": zeit} if zeit else {})}
+        return auftrag_anlegen(request, "uhr_einstellen", parameter=parameter, objekt="Uhrzeit des Servers",
+                               protokoll_details=parameter)

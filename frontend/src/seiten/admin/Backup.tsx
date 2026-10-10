@@ -82,6 +82,8 @@ export type Daten = {
   uploads?: Upload[];
   upload?: { teil: number; max: number };
   naechste_sicherung: string | null;
+  /** Zeitplan der nächtlichen Sicherung (Nachtrag 10.10.2026) mit Hinweis zum Übertragungsfenster */
+  zeitplan?: { uhrzeit: string; tage: "taeglich" | "werktags"; eingestellt: boolean; hinweis: string };
   nachts_fehlgeschlagen: boolean;
   gpg: boolean | null;
   auftraege: Auftrag[];
@@ -974,6 +976,60 @@ function LoeschenDialog({ offen, daten, auswahl, onZu, onFertig }: { offen: bool
   );
 }
 
+// ---------------------------------------------------------------- Zeitplan der nächtlichen Sicherung (Nachtrag 10.10.2026)
+const minuten = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+/** Wie im Backend (sicherung.zeitplan_hinweis): Passt die Uhrzeit zum Zeitfenster der Übertragung? */
+export function zeitplanHinweis(uhrzeit: string, ziel: Ziel): string {
+  if (!ziel.eingerichtet || !/^([01]\d|2[0-3]):[0-5]\d$/.test(uhrzeit) || !ziel.von || !ziel.bis) return "";
+  const s = minuten(uhrzeit), a = minuten(ziel.von), b = minuten(ziel.bis);
+  if (a === b) return "";
+  const offen = a < b ? a <= s && s < b : s >= a || s < b;
+  if (offen) return ((b - s + 1440) % 1440) >= 30 ? "" : `Das Übertragungsfenster (${ziel.von}–${ziel.bis}) endet kurz nach der Sicherung – sie wird dann meist erst im nächsten Zeitfenster übertragen.`;
+  const verzug = (a - s + 1440) % 1440;
+  return verzug <= 180 ? "" : `Das Übertragungsfenster (${ziel.von}–${ziel.bis}) öffnet erst ${Math.floor(verzug / 60)} Stunden nach der Sicherung – bis dahin liegt die neue Sicherung nur auf dem Server. Besser die Sicherung kurz vor oder im Zeitfenster.`;
+}
+
+function ZeitplanDialog({ offen, daten, onZu }: { offen: boolean; daten: Daten; onZu: () => void }) {
+  const melden = useHinweis();
+  const [uhrzeit, setUhrzeit] = useState("02:00");
+  const [tage, setTage] = useState<"taeglich" | "werktags">("taeglich");
+  const [kennwort, setKennwort] = useState("");
+  const zf = useZweiterFaktor();
+  const los = useAuftrag("backup/zeitplan/", (a) => { melden(`${a.name}: Auftrag an den Server übergeben.`); onZu(); });
+  useEffect(() => {
+    if (offen) { setUhrzeit(daten.zeitplan?.uhrzeit ?? "02:00"); setTage(daten.zeitplan?.tage ?? "taeglich"); setKennwort(""); zf.zuruecksetzen(); los.reset(); }
+  }, [offen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bestaetigt = useBestaetigt(kennwort, zf);
+  const f: Feldfehler = los.error instanceof ApiFehler ? los.error.felder : {};
+  const hinweis = zeitplanHinweis(uhrzeit, daten.ziel);
+  const absenden = () => los.mutate({ uhrzeit, tage, kennwort, ...zf.body });
+  return (
+    <Dialog offen={offen} onOffen={(o) => { if (!o) onZu(); }} titel="Zeitplan der Sicherung" breite={560}
+      beschreibung="Wann der Server Datenbank, Dokumente und Löschliste automatisch sichert. Standard: täglich um 02:00."
+      fuss={<><Knopf onClick={onZu}>Abbrechen</Knopf>
+        <Knopf variante="pri" laedt={los.isPending} disabled={!bestaetigt || !uhrzeit} onClick={absenden}>Bestätigen und speichern</Knopf></>}>
+      <form className="flex flex-col gap-3.5" onSubmit={(e) => { e.preventDefault(); if (bestaetigt) absenden(); }} data-testid="zeitplan-dialog">
+        <div className="grid grid-cols-2 gap-3">
+          <Feld label="Uhrzeit" fehler={f.uhrzeit}>
+            {(p) => <Eingabe {...p} type="time" value={uhrzeit} onChange={(e) => setUhrzeit(e.target.value)} />}
+          </Feld>
+          <Feld label="Tage" fehler={f.tage}>
+            {(p) => <Auswahl {...p} value={tage} onChange={(e) => setTage(e.target.value as "taeglich" | "werktags")}>
+              <option value="taeglich">täglich</option><option value="werktags">werktags (Mo–Fr)</option></Auswahl>}
+          </Feld>
+        </div>
+        {hinweis ? <Meldung art="warn"><span data-testid="zeitplan-hinweis">{hinweis}</span></Meldung>
+          : daten.ziel.eingerichtet ? <Meldung art="info">Passt zum Zeitfenster der Übertragung ({daten.ziel.von}–{daten.ziel.bis}).</Meldung> : null}
+        {tage === "werktags" ? <Meldung art="info">Am Wochenende wird dann nicht gesichert – nur sinnvoll, wenn dann niemand mit EPM arbeitet.</Meldung> : null}
+        <Bestaetigung kennwort={kennwort} zf={zf} onKennwort={setKennwort} fehler={f} />
+        {los.error && !Object.keys(f).length ? <Meldung art="fehler">{los.error.message}</Meldung> : null}
+        <button type="submit" hidden />
+      </form>
+    </Dialog>
+  );
+}
+
 // ---------------------------------------------------------------- Größe der Sicherungen (klein, groß im Dialog)
 function GroessenDiagramm({ daten }: { daten: Daten }) {
   const liste = [...daten.sicherungen].reverse();
@@ -998,7 +1054,8 @@ function GroessenDiagramm({ daten }: { daten: Daten }) {
 }
 
 // ---------------------------------------------------------------- Seite
-type Offen = null | "jetzt" | "passwort" | "pruefen" | "ziel" | "ziel_entfernen" | "uebertragen" | "aufbewahrung" | "hochladen" | "loeschen" | "groessen";
+type Offen = null | "jetzt" | "passwort" | "pruefen" | "ziel" | "ziel_entfernen" | "uebertragen" | "aufbewahrung" | "hochladen" | "loeschen" | "groessen"
+  | "zeitplan";
 type BackupReiter = "sicherungen" | "verschluesselung" | "uebertragung" | "taetigkeiten";
 const BACKUP_REITER: BackupReiter[] = ["sicherungen", "verschluesselung", "uebertragung", "taetigkeiten"];
 
@@ -1050,7 +1107,7 @@ export function Backup() {
   return (
     <Seite pfad={[{ text: "Administration", zu: "/admin" }, { text: "Backup" }]}>
       <Seitenkopf titel="Backup und Wiederherstellung"
-        unter={`Datenbank, Dokumente und Löschliste täglich um 02:00${d.aufbewahrung_tage ? `, ${d.aufbewahrung_tage} Tage auf dem Server` : ""}${
+        unter={`Datenbank, Dokumente und Löschliste ${d.zeitplan?.tage === "werktags" ? "werktags" : "täglich"} um ${d.zeitplan?.uhrzeit ?? "02:00"}${d.aufbewahrung_tage ? `, ${d.aufbewahrung_tage} Tage auf dem Server` : ""}${
           d.verschluesselung.eingerichtet ? ", verschlüsselt" : ""}${z.eingerichtet ? ", Kopie im Übertragungsziel" : ""}.`}
         rechts={<>
           <Knopf icon="hochladen" disabled={!d.agent.verzeichnis} onClick={() => setOffen("hochladen")}>Sicherung hochladen</Knopf>
@@ -1097,6 +1154,12 @@ export function Backup() {
                 </span>
               ) : <span className="text-[0.8125rem] gedaempft">noch keine Sicherung</span>}
               {naechste ? <span className="text-[0.8125rem] gedaempft">nächste: {naechste}</span> : null}
+              <span className="text-[0.8125rem] flex items-center gap-2 flex-wrap" data-testid="zeitplan">
+                <span>Zeitplan: <strong className="num">{d.zeitplan?.tage === "werktags" ? "werktags" : "täglich"} {d.zeitplan?.uhrzeit ?? "02:00"}</strong></span>
+                <Knopf klein disabled={!d.agent.verzeichnis || laufend.has("sicherung_zeitplan")} laedt={laufend.has("sicherung_zeitplan")}
+                  onClick={() => setOffen("zeitplan")}>Ändern</Knopf>
+              </span>
+              {d.zeitplan?.hinweis ? <span className="text-[0.8125rem] text-warn">{d.zeitplan.hinweis}</span> : null}
             </Kennzahl>
             <Kennzahl titel={z.hersteller === "nextcloud" ? "Übertragung Nextcloud" : "Übertragung"} testid="letzte-uebertragung"
               wert={z.eingerichtet ? (u.letzter_erfolg ? relativ(u.letzter_erfolg, true) : "noch nie") : "—"}>
@@ -1170,6 +1233,7 @@ export function Backup() {
       <HerunterladenDialog s={d.sicherungen.find((x) => x.stempel === laden) ?? null} daten={d} onZu={() => setLaden(null)} />
       <AufbewahrungDialog offen={offen === "aufbewahrung"} daten={d} onZu={() => setOffen(null)} />
       <HochladenDialog offen={offen === "hochladen"} daten={d} onZu={() => setOffen(null)} />
+      <ZeitplanDialog offen={offen === "zeitplan"} daten={d} onZu={() => setOffen(null)} />
       <LoeschenDialog offen={offen === "loeschen"} daten={d} auswahl={gewaehlt} onZu={() => setOffen(null)} onFertig={() => setAuswahl(new Set())} />
       <Dialog offen={offen === "groessen"} onOffen={(o) => { if (!o) setOffen(null); }} titel="Größe der Sicherungen" breite={960}
         beschreibung={`${d.sicherungen.length} Sicherungen auf dem Server, zusammen ${dateigroesse(sp.sicherungen ?? 0)}`}>
