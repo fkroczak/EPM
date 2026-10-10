@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { Auswahlwert, Praeparat } from "@/lib/typen";
 import { Chip, Eingabe, Karte, cx } from "@/components/ui/basis";
+import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { LISTEN } from "@/seiten/admin/Auswahllisten";
 import type { VorlagenUebersicht } from "@/seiten/admin/Dokumentvorlagen";
@@ -21,7 +22,7 @@ const zuBereich = (bereich: string, liste?: string) => `/admin/vorlagen?bereich=
 const KACHELN: Kachel[] = [
   { titel: "Briefe, Formulare und E-Mail-Texte", icon: "mail", ziel: DOKUMENTE_PFAD, bereich: "Dokumentvorlagen",
     wofuer: "Text und Aussehen von Briefen, E-Mails und PDFs ändern – z. B. Terminbestätigung, Infusionsplan, Datenschutz-Vordrucke.",
-    wo: "Akte › Schreiben und E-Mail, Infusionspläne, Kalender › Ankündigung",
+    wo: "Akte › Schreiben und E-Mail, Infusionspläne, Kalender › Praxis informieren",
     stichwoerter: "dokumentvorlagen brief schreiben email e-mail pdf text formular vordruck" },
   { titel: "Briefkopf und Logo", icon: "bild", ziel: zuBereich("briefkopf"), bereich: "Briefkopf und Logo",
     wofuer: "Logo, Anschrift, Telefon und Fußzeile, die oben und unten auf den PDFs stehen.",
@@ -45,7 +46,7 @@ const KACHELN: Kachel[] = [
     stichwoerter: "grenzwert frist warnung gewicht kontakt fällig wiedervorlage datenschutz aufbewahrung scan plausibel kcal" },
   { titel: "Anlagen für E-Mails", icon: "dokument", ziel: zuBereich("anlagen"), bereich: "Anlagen für E-Mails",
     wofuer: "Merkblätter als PDF, die man beim Schreiben an die E-Mail hängen kann – z. B. Leitfaden Zottentraining.",
-    wo: "Akte › Schreiben und E-Mail; Kalender › Ankündigung",
+    wo: "Akte › Schreiben und E-Mail; Kalender › Praxis informieren",
     stichwoerter: "anlage anhang merkblatt pdf leitfaden zottentraining" },
 ];
 
@@ -116,8 +117,7 @@ export function VorlagenStart() {
 
       {offen.length ? (
         <div className="meldung warn" role="status" data-testid="vorlagen-offen">
-          {/* Begriff: Entwurf */}
-          <span>Noch nicht freigegebene Änderungen an {offen.length === 1 ? "einer Vorlage" : `${offen.length} Vorlagen`}:{" "}
+          <span><Begriff name="entwurf">Noch nicht freigegebene Änderungen</Begriff> an {offen.length === 1 ? "einer Vorlage" : `${offen.length} Vorlagen`}:{" "}
             {offen.map((v, i) => <span key={v.art}>{i ? ", " : ""}<Link to={`${DOKUMENTE_PFAD}?art=${v.art}`}>{v.name}</Link></span>)}.
             {" "}Bis zum Freigeben gilt in der Praxis die bisherige Fassung.</span>
         </div>

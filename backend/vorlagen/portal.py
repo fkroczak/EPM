@@ -23,8 +23,8 @@ ARTEN = {
                            f"{SCHREIBEN_WO} – dort den Termin wählen"),
     "reisebescheinigung": ("schreiben", "Ärztliche Bescheinigung für Reisen (deutsch und englisch); das ADAC-Attest hängt "
                            "als zweite Seite an.", SCHREIBEN_WO),
-    "patientenankuendigung": ("schreiben", "Liste der Patienten, die in die Sprechstunde kommen – für die Praxis, zum Faxen "
-                              "oder per E-Mail.", "Kalender › „Ankündigung“"),
+    "patientenankuendigung": ("schreiben", "Infoblatt an die Praxis Holtmeier: alle Patienten, die in die Sprechstunde "
+                              "kommen – zum Faxen oder per E-Mail.", "Kalender › „Praxis informieren“ (Infoblatt an die Praxis)"),
     "infusionsplan": ("plaene", "Der Infusionsplan als PDF für Patient, Versorger und Pflegedienst.",
                       "Entsteht bei der Freigabe eines Plans; Akte › Infusionspläne › „PDF öffnen“"),
     "patientendatenblatt": ("plaene", "Alle wichtigen Angaben zum Patienten auf einem Blatt: Anschrift, Versorgung, "
@@ -60,7 +60,8 @@ FELD_GRUPPEN = {
     "PO4": "Infusionsplan", "Ca": "Infusionsplan", "Mg": "Infusionsplan", "Spurenelemente": "Infusionsplan",
     "Vitamine": "Infusionsplan", "Katheterblock": "Infusionsplan", "Gewicht": "Gewicht", "Bericht": "Bericht",
     "Labor": "Labor und BIA", "BIA": "Labor und BIA", "Bezugspersonen": "Datenschutz", "Aufbewahrung": "Datenschutz",
-    "Zeitraum": "Ankündigung", "Terminort": "Ankündigung", "Anzahl": "Ankündigung", "Termine": "Ankündigung",
+    "Zeitraum": "Infoblatt an die Praxis", "Terminort": "Infoblatt an die Praxis", "Anzahl": "Infoblatt an die Praxis",
+    "Termine": "Infoblatt an die Praxis",
 }
 
 # Kurze Namen der häufigsten Felder in Alltagssprache; die übrigen nehmen ihre Beschreibung aus ``felder.py``
