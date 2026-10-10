@@ -10,7 +10,6 @@ wiederherstellen) gehen wie unter Administration › System als Auftragsdatei an
 """
 import hashlib
 import hmac
-import os
 import re
 import uuid
 from datetime import timedelta
@@ -55,26 +54,11 @@ def bereitgestellt(daten=None) -> list:
 
 
 def uploads() -> list:
-    """Hochgeladene, noch nicht eingelesene Sicherungen: [{upload, name, groesse, erhalten, vollstaendig, von, …}]"""
-    ordner = host.ordner_upload()
-    liste = []
-    try:
-        namen = sorted(n for n in os.listdir(ordner) if n.endswith(".json"))
-    except OSError:
-        return liste
-    for n in namen:
-        kennung = n[:-5]
-        meta = host._lies(ordner / n)
-        if not ID_MUSTER.match(kennung) or not isinstance(meta, dict):
-            continue
-        try:
-            erhalten = os.stat(ordner / f"{kennung}.teil").st_size
-        except OSError:
-            continue
-        liste.append({"upload": kennung, "name": str(meta.get("name") or ""), "groesse": meta.get("groesse"),
-                      "erhalten": erhalten, "vollstaendig": erhalten == meta.get("groesse"),
-                      "von": str(meta.get("von") or ""), "begonnen_am": meta.get("begonnen_am")})
-    return liste
+    """Hochgeladene, noch nicht eingelesene Sicherungen: [{upload, name, groesse, erhalten, vollstaendig, von, …}]
+    (Update-Pakete und OCR-Modelle aus Administration › System stehen nicht hier)."""
+    from .hochladen import liste
+
+    return liste(("sicherung",))
 
 
 
