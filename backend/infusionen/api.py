@@ -258,6 +258,28 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
             return Response({"patient": "Patient nicht gefunden."}, status=status.HTTP_400_BAD_REQUEST)
         return Response(vorbelegung(patient))
 
+    @action(detail=False, methods=["get"])
+    def hinweise(self, request):
+        """Hinweise aus Labor und Gewicht für den Plan-Editor (F187) – nur zum Prüfen, nie eine Mengenempfehlung
+        (siehe infusionen/hinweise.py, MDR).
+
+        GET /api/infusionsplaene/hinweise/?patient=ID&plan=ID&bestandteile=natrium,kalium,…
+        ``plan``: der Entwurf (Bezug ist dann sein Vorgänger), ``bestandteile``: was im Formular gerade vorkommt
+        (sonst aus dem Entwurf bzw. dem aktuellen Plan). Unbekannte Bestandteile werden ignoriert."""
+        from .hinweise import BESTANDTEILE, hinweise
+
+        patient = patienten_fuer(request.user).filter(pk=request.query_params.get("patient") or 0).first()
+        if patient is None:
+            return Response({"patient": "Patient nicht gefunden."}, status=status.HTTP_400_BAD_REQUEST)
+        plan = None
+        if request.query_params.get("plan"):
+            plan = Infusionsplan.objects.filter(pk=request.query_params["plan"], patient=patient).first()
+            if plan is None:
+                return Response({"plan": "Plan nicht gefunden."}, status=status.HTTP_400_BAD_REQUEST)
+        roh = request.query_params.get("bestandteile")
+        bestandteile = None if roh is None else {b for b in roh.split(",") if b in BESTANDTEILE}
+        return Response(hinweise(patient, plan, bestandteile))
+
     @action(detail=True, methods=["get"])
     def vergleich(self, request, pk=None):
         return Response(self.get_object().vergleich())

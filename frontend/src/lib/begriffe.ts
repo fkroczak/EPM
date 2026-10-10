@@ -23,6 +23,9 @@ export const BEGRIFFE = {
   testpatient: "Übungsakte (Nummer ab 9001): zum Ausprobieren, zählt in keiner Statistik.",
   storniert: "Als falsch gekennzeichnet: Der Eintrag bleibt durchgestrichen sichtbar, mit Grund, Person und Zeitpunkt. "
     + "Gelöscht wird nichts.",
+  // Hinweise im Plan-Editor (F187)
+  referenzbereich: "Bereich, in dem ein Laborwert bei gesunden Menschen üblicherweise liegt – er steht auf dem "
+    + "Laborbefund. Ein Wert außerhalb ist ein Anlass zum Prüfen, keine Diagnose.",
   // Administration (Systemverwaltung ohne SSH, 10.10.2026)
   systemagent: "Kleines Programm auf dem Server, das nur eine feste Liste von Tätigkeiten ausführt (Updates, Neustart, "
     + "Sicherung …) und jede Minute den Zustand meldet. EPM selbst hat keinen Zugriff auf den Server.",

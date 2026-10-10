@@ -43,6 +43,8 @@ export type AktenKontext = {
   gewichtErfassen: (wert?: string) => void;
   /** Dialog „Stammdaten bearbeiten“ (Stift auf der Karte „Anschrift und Kontakt“, 08.10.2026) */
   stammdatenBearbeiten: () => void;
+  /** Dialog „Schreiben und E-Mail“ (z. B. „Blutuntersuchung anfordern“ aus dem Plan-Editor, F187); null ohne Recht */
+  schreibenOeffnen: (() => void) | null;
   /** Inhalt neben einer Seitenleiste oder Spalte (Ansichten „Seitenleiste“ und „Karteikarte“): Raster nach der
    *  tatsächlichen Breite statt nach der Fensterbreite */
   schmal: boolean;
@@ -583,6 +585,7 @@ export function Akte() {
     kontaktErfassen: (text?: string) => { setVorbelegt(text ?? ""); setDialog("kontakt"); },
     gewichtErfassen: (wert?: string) => { setVorbelegt(wert ?? ""); setDialog("gewicht"); },
     stammdatenBearbeiten: () => setDialog("stammdaten"),
+    schreibenOeffnen: erlaubt.schreiben ? () => setDialog("schreiben") : null,
     schmal: ansicht !== "kopfzeile",
   };
   const k = p.kopf;

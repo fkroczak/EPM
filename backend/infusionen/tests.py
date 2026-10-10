@@ -412,3 +412,116 @@ class PlanVorschau(PlanHilfen, Grundlage):
         self.assertEqual(c.delete(f"/api/infusionsplaene/{e['id']}/").status_code, 204)
         plan = self.freigegebener_plan()
         self.assertEqual(c.post(f"/api/infusionsplaene/{plan.id}/vorschau/", {}, format="json").status_code, 400)
+
+
+class PlanHinweise(PlanHilfen, Grundlage):
+    """Hinweise aus Labor und Gewicht im Plan-Editor (F187): nur zum Prüfen, nie eine Mengenempfehlung (MDR)."""
+
+    URL = "/api/infusionsplaene/hinweise/"
+
+    def gewicht(self, kg, tage_her=0, patient=None):
+        r = client_fuer(self.mitarbeiter).post("/api/gewichte/", {
+            "patient": (patient or self.patient).id, "gewicht_kg": kg,
+            "gemessen_am": str(timezone.localdate() - timedelta(days=tage_her))}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+
+    def befund(self, tage_her, werte, patient=None):
+        from stammdaten.models import Laborparameter
+
+        r = client_fuer(self.mitarbeiter).post("/api/laborbefunde/", {
+            "patient": (patient or self.patient).id, "abgenommen_am": str(timezone.localdate() - timedelta(days=tage_her)),
+            "werte": [{"parameter": Laborparameter.objects.get(name=n).id, "wert": w, "referenz_von": v, "referenz_bis": b}
+                      for n, w, v, b in werte],
+        }, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+
+    def abrufen(self, client=None, patient=None, **parameter):
+        c = client or client_fuer(self.mediziner)
+        r = c.get(self.URL, {"patient": (patient or self.patient).id, **parameter})
+        self.assertEqual(r.status_code, 200, r.content)
+        return r.json()
+
+    def test_ausserhalb_des_referenzbereichs_mit_trend_nur_fuer_bestandteile_des_plans(self):
+        self.gewicht("60.0", 1)
+        self.freigegebener_plan()  # Magnesium, Natrium, Spurenelemente und Vitamine im Plan; kein Albumin
+        # ältere Magnesiumwerte für den Verlauf, der jüngste nach dem Plan
+        self.befund(60, [("Magnesium", "0.90", "0.66", "1.07")])
+        self.befund(30, [("Magnesium", "0.75", "0.66", "1.07")])
+        self.befund(0, [("Magnesium", "0.58", "0.66", "1.07"), ("Natrium", "140", "135", "145"),
+                        ("Kupfer", "2000", "700", "1500"), ("Ferritin", "5", "30", "400"), ("Albumin", "20", "35", "52")])
+        d = self.abrufen()
+        labor = {h["parameter"]: h for h in d["hinweise"] if h["art"] == "labor"}
+        self.assertEqual(set(labor), {"Magnesium", "Kupfer"})  # Natrium im Bereich; Ferritin, Albumin nicht im Plan
+        mg = labor["Magnesium"]
+        heute = timezone.localdate()
+        self.assertEqual(mg["text"], f"Magnesium 0,58 mmol/l am {heute:%d.%m.%Y} – unter dem Referenzbereich (0,66–1,07). Bitte prüfen.")
+        self.assertEqual(mg["richtung"], "niedrig")
+        self.assertEqual(mg["trend"], "fallend")
+        self.assertEqual([float(v["wert"]) for v in mg["verlauf"]], [0.9, 0.75, 0.58])
+        self.assertEqual(labor["Kupfer"]["richtung"], "hoch")
+        self.assertEqual(labor["Kupfer"]["bestandteil"], "Spurenelemente")
+        # was im Formular gerade vorkommt, entscheidet: nur Natrium → kein Magnesium-Hinweis
+        nur_natrium = self.abrufen(bestandteile="natrium,unbekannt")
+        self.assertEqual(nur_natrium["bestandteile"], ["natrium"])
+        self.assertFalse([h for h in nur_natrium["hinweise"] if h["art"] == "labor"])
+        # mit Albumin im Formular erscheint der Albuminwert
+        self.assertIn("Albumin", [h["parameter"] for h in self.abrufen(bestandteile="albumin")["hinweise"] if h["art"] == "labor"])
+        # nie eine Mengenempfehlung: jeder Hinweis bittet ums Prüfen
+        for h in d["hinweise"]:
+            self.assertIn("prüfen", h["text"])
+            self.assertNotRegex(h["text"], r"(?i)empfehl|erhöhen auf|reduzieren auf|dosis")
+
+    def test_werte_vor_dem_letzten_plan_zaehlen_nicht(self):
+        self.befund(20, [("Magnesium", "0.50", "0.66", "1.07")])
+        self.gewicht("60.0", 1)
+        self.freigegebener_plan()
+        self.assertFalse([h for h in self.abrufen()["hinweise"] if h["art"] == "labor"])
+
+    def test_kein_labor_und_altes_labor(self):
+        d = self.abrufen()
+        alt = [h for h in d["hinweise"] if h["art"] == "labor_alt"]
+        self.assertEqual(len(alt), 1)
+        self.assertIn("Noch kein Laborbefund", alt[0]["text"])
+        self.assertIn("anlage", alt[0])  # Link „Blutuntersuchung anfordern“ (Anlage aus F174, falls vorhanden)
+        self.befund(400, [("Natrium", "140", "135", "145")])
+        alt = [h for h in self.abrufen()["hinweise"] if h["art"] == "labor_alt"]
+        self.assertIn("Laborwerte älter als 12 Monate", alt[0]["text"])
+        self.befund(10, [("Natrium", "140", "135", "145")])
+        self.assertFalse([h for h in self.abrufen()["hinweise"] if h["art"] == "labor_alt"])
+
+    def test_gewicht_deutlich_geaendert_seit_dem_plan(self):
+        self.gewicht("60.0", 10)
+        self.freigegebener_plan()
+        self.befund(0, [("Natrium", "140", "135", "145")])
+        self.assertFalse([h for h in self.abrufen()["hinweise"] if h["art"] == "gewicht"])
+        self.gewicht("57.6", 0)  # −4 %: unter der Grenze (5 %)
+        self.assertFalse([h for h in self.abrufen()["hinweise"] if h["art"] == "gewicht"])
+        self.gewicht("54.0", 0)  # −10 %
+        g = [h for h in self.abrufen()["hinweise"] if h["art"] == "gewicht"]
+        self.assertEqual(len(g), 1)
+        self.assertIn("von 60 auf 54 kg gesunken (−10 %)", g[0]["text"])
+
+    def test_statistik_der_eigenen_plaene(self):
+        self.gewicht("60.0", 1)
+        for kalium in ("40", "50", "60"):
+            self.freigegebener_plan(kalium_mmol=kalium)
+        plaene = [h for h in self.abrufen()["hinweise"] if h["art"] == "plaene"]
+        self.assertEqual([h["feld"] for h in plaene], ["kalium_mmol"])
+        self.assertIn("Kalium wurde in den letzten 3 Plänen jeweils erhöht (40 → 50 → 60 mmol)", plaene[0]["text"])
+
+    def test_rechte_und_testpatient(self):
+        from accounts.models import Rolle
+        from epm.pruefhilfen import benutzer
+
+        self.assertEqual(client_fuer(self.betrachter).get(self.URL, {"patient": self.patient.id}).status_code, 200)
+        self.assertEqual(client_fuer(benutzer("ohne", Rolle.KEINE)).get(self.URL, {"patient": self.patient.id}).status_code, 403)
+        testzugang = client_fuer(benutzer("testzugang", Rolle.MEDIZINER, ist_test=True))
+        # Testzugang sieht nur Testpatienten
+        self.assertEqual(testzugang.get(self.URL, {"patient": self.patient.id}).status_code, 400)
+        test = Patient.objects.create(nachname="Test", vorname="Tina", geburtsdatum="1970-01-01", ist_test=True)
+        self.befund(0, [("Magnesium", "0.58", "0.66", "1.07")], patient=test)
+        d = self.abrufen(client=testzugang, patient=test, bestandteile="magnesium")
+        self.assertEqual([h["parameter"] for h in d["hinweise"] if h["art"] == "labor"], ["Magnesium"])
+        # fremder Plan als Bezug → 400
+        plan = self.freigegebener_plan()
+        self.assertEqual(client_fuer(self.mediziner).get(self.URL, {"patient": test.id, "plan": plan.id}).status_code, 400)

@@ -608,6 +608,12 @@ Freigabe</strong> sagt in einfachen Worten, was noch fehlt oder nicht passt: Gew
 3 Monate, Präparat zu jeder Menge, Calcium + Magnesium stabil, Infusionstage stimmig, Laufzeit eingetragen,
 Protonenpumpenhemmer mit Zeiten. Werte außerhalb der Grenzwerte stehen darüber. <strong>Als Entwurf speichern</strong>
 macht den Plan für das Team sichtbar, noch nicht für den Versorger.</p>
+<p>Die Karte <strong>Hinweise aus Labor und Gewicht</strong> zeigt, was seit dem letzten Plan in der Akte steht:
+Laborwerte außerhalb des Referenzbereichs – nur für Bestandteile, die im Plan vorkommen (z. B. Magnesium, Kalium,
+Spurenelemente, Vitamine) – mit den letzten drei Werten, eine deutliche Gewichtsänderung, Bestandteile, die in den letzten
+drei Plänen jeweils erhöht oder verringert wurden, und ob Laborwerte fehlen oder zu alt sind (<strong>Blutuntersuchung
+anfordern</strong> öffnet „Schreiben und E-Mail“ mit der Anlage „Blutuntersuchung“). Das sind <strong>Hinweise zum
+Prüfen</strong>: EPM schlägt keine Mengen vor – die Entscheidung trifft die Ärztin bzw. der Arzt.</p>
 <p><strong>PDF-Vorschau</strong> zeigt die PDF mit genau den Werten, die gerade im Formular stehen – auch ungespeicherte;
 gespeichert wird dabei nichts (ein neuer Plan wird dafür einmal als Entwurf gespeichert). Ab 1920 px zeigt zusätzlich eine
 dritte Spalte die Vorschau des zuletzt gespeicherten Entwurfs.</p>""",
