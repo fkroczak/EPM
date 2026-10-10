@@ -52,6 +52,11 @@ async function auftragDurch(page: Page, pfad: string, klick: () => Promise<void>
   return (await r.json()) as Auftrag;
 }
 
+/** Reiter der Backup-Seite wählen (Wunsch 10.10.2026: Seite in Bereiche gegliedert) */
+async function reiter(page: Page, name: "Sicherungen" | "Verschlüsselung" | "Übertragung" | "Tätigkeiten") {
+  await page.getByTestId("backup-reiter").getByRole("tab", { name: new RegExp(`^${name}`) }).click();
+}
+
 async function jetztSichern(page: Page) {
   const a = await auftragDurch(page, "jetzt/", async () => {
     await page.getByRole("button", { name: "Jetzt sichern" }).first().click();
@@ -89,6 +94,7 @@ test("Backup: nur mit Recht „Sicherungen verwalten“; Sicherungs-Passwort fes
   await (await adminNavigation(page)).getByRole("link", { name: "Backup" }).click();
   await expect(page.getByRole("heading", { name: "Backup und Wiederherstellung", level: 1 })).toBeVisible();
   await expect(page.getByTestId("agent-fehlt")).toHaveCount(0);
+  await reiter(page, "Verschlüsselung");
   const karte = page.getByTestId("verschluesselung");
   await expect(karte).toContainText("Noch kein Sicherungs-Passwort");
   await karte.getByRole("button", { name: "Passwort festlegen" }).click();
@@ -143,6 +149,7 @@ test("Backup: „Jetzt sichern“ verschlüsselt mit dem Passwort aus der Oberfl
   execSync(`sudo sh -c 'cd ${B}/backup && sha256sum -c epm_${s.stempel}.sha256'`, { stdio: "pipe" });
 
   // Passwort prüfen (z. B. das Blatt aus dem Tresor)
+  await reiter(page, "Verschlüsselung");
   await page.getByTestId("verschluesselung").getByRole("button", { name: "Passwort prüfen" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Sicherungs-Passwort").fill(`${passwort}x`);
@@ -158,6 +165,7 @@ test("Backup: „Jetzt sichern“ verschlüsselt mit dem Passwort aus der Oberfl
 test("Backup: Übertragungsziel festlegen, Verbindung testen, von Hand und im Zeitfenster übertragen; Startseite", async ({ page, browser }) => {
   test.setTimeout(360_000);
   await page.goto("/admin/backup");
+  await reiter(page, "Übertragung");
   const karte = page.getByTestId("uebertragung");
   await expect(karte).toContainText("Noch kein Übertragungsziel");
   // Zeitfenster, das gerade nicht offen ist (in jeder Zeitzone): die Übertragung startet nicht von selbst
@@ -184,14 +192,17 @@ test("Backup: Übertragungsziel festlegen, Verbindung testen, von Hand und im Ze
   a = await auftragDurch(page, "ziel/testen/", () => karte.getByRole("button", { name: "Verbindung testen" }).click());
   expect((await abwarten(page, a.kennung)).ergebnis).toContain("Verbindung in Ordnung");
   const verschluesselt = (await stand(page)).sicherungen.find((x) => x.verschluesselt)!;
+  await reiter(page, "Sicherungen");
   await expect(page.getByTestId(`sicherung-${verschluesselt.stempel}`)).toContainText("wartet auf Zeitfenster");
 
   // von Hand: nur verschlüsselte Sicherungen, mit Prüfsummen und Angaben
+  await reiter(page, "Übertragung");
   a = await auftragDurch(page, "uebertragen/", async () => {
     await karte.getByRole("button", { name: "Jetzt übertragen" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Jetzt übertragen" }).click();
   });
   expect((await abwarten(page, a.kennung)).ergebnis).toContain("übertragen und geprüft");
+  await reiter(page, "Sicherungen");
   await expect(page.getByTestId(`sicherung-${verschluesselt.stempel}`)).toContainText("übertragen");
   const imZiel = readdirSync(join(WEBDAV, ORDNER));
   for (const datei of verschluesselt.dateien) expect(imZiel).toContain(datei);
@@ -201,6 +212,7 @@ test("Backup: Übertragungsziel festlegen, Verbindung testen, von Hand und im Ze
   expect(readFileSync(join(WEBDAV, ORDNER, db)).subarray(0, 5).toString()).not.toBe("PGDMP");
   // Aufbewahrung im Ziel (Festlegung 03.10.2026): Standard 30 Tage; ältere EPM-Sicherungen entfernt der Server dort nach
   // der nächsten Übertragung, fremde Dateien im Ordner bleiben
+  await reiter(page, "Übertragung");
   await expect(karte.getByTestId("ziel-aufbewahrung")).toHaveText("30 Tage");
   const alt = ["epm-db_2020-01-01_0200.dump.gpg", "epm_2020-01-01_0200.sha256"];
   // über WebDAV ablegen (rclone serve hält die Verzeichnisliste einige Minuten im Speicher – direkt auf die Platte
@@ -212,7 +224,9 @@ test("Backup: Übertragungsziel festlegen, Verbindung testen, von Hand und im Ze
 
   // im Zeitfenster von selbst: neue Sicherung, Zeitfenster ganztägig (Passwort für das Ziel bleibt)
   const neu = await jetztSichern(page);
+  await reiter(page, "Sicherungen");
   await expect(page.getByTestId(`sicherung-${neu.stempel}`)).toContainText("wartet auf Zeitfenster");
+  await reiter(page, "Übertragung");
   await karte.getByRole("button", { name: "Ziel ändern" }).click();
   dialog = page.getByRole("dialog");
   await expect(dialog.getByLabel("WebDAV-Adresse")).toHaveValue("http://127.0.0.1:8099");
@@ -231,6 +245,7 @@ test("Backup: Übertragungsziel festlegen, Verbindung testen, von Hand und im Ze
   expect(readdirSync(join(WEBDAV, ORDNER))).toContain("notizen.txt");
   expect(readdirSync(join(WEBDAV, ORDNER))).toContain(db);
   await page.reload();
+  await reiter(page, "Sicherungen");
   await expect(page.getByTestId(`sicherung-${neu.stempel}`)).toContainText("übertragen");
 
   // Startseite (O-07): alle sehen den Zustand, nur mit dem Recht führt er zur Seite Backup
@@ -375,11 +390,13 @@ test("Backup: Wiederherstellen mit Passwort und 2FA – Stand der Sicherung zur�
   await page.goto("/admin/backup");
   const fertig = await abwarten(page, a.kennung, 120_000);
   expect(fertig.ergebnis).toContain("Sicherung wiederhergestellt");
+  await reiter(page, "Tätigkeiten");
   const zeile = page.getByTestId("auftraege").getByRole("row", { name: /Sicherung wiederherstellen/ }).first();
   await expect(zeile).toContainText("erledigt");
   await expect(zeile).toContainText(s.stempel);
   const sicherungen = (await stand(page)).sicherungen;
   expect(sicherungen[0].art).toBe("vor_wiederherstellung");
+  await reiter(page, "Sicherungen");
   await expect(page.getByTestId(`sicherung-${sicherungen[0].stempel}`)).toContainText("Vor Wiederherstellung");
   expect((await page.request.get(`/api/benutzer/${nachher.id}/`)).status()).toBe(404);
 
@@ -388,4 +405,45 @@ test("Backup: Wiederherstellen mit Passwort und 2FA – Stand der Sicherung zur�
   await expect(page.getByText(/wiederhergestellt, alle Anmeldungen beendet – der Stand davor \(auch dieses Audit-Log\) ist in der Sicherung/).first())
     .toBeVisible();
   await expect(page.getByText("Sicherung wiederherstellen erledigt: Sicherung wiederhergestellt.", { exact: false }).first()).toBeVisible();
+});
+
+test("Backup: mehrere Sicherungen auswählen und löschen – die jüngste bleibt, Bestätigung mit Passwort und 2FA, Audit-Log", async ({ page }) => {
+  // Wunsch 10.10.2026 (F179): Mehrfachauswahl in der Liste
+  test.setTimeout(180_000);
+  await anmeldenUI(page, "e2e.admin", naechsterNotfallcode("e2e.admin"));
+  await page.goto("/admin/backup");
+  // mindestens drei Sicherungen
+  while ((await stand(page)).sicherungen.length < 3) await jetztSichern(page);
+  await page.reload();
+  const vorher = (await stand(page)).sicherungen;
+  const juengste = vorher[0];
+  const weg = vorher.slice(-2);
+  await expect(page.getByTestId(`sicherung-${juengste.stempel}`).getByRole("checkbox")).toBeDisabled();
+  await expect(page.getByTestId("auswahl-loeschen")).toBeDisabled();
+  for (const s of weg) await page.getByTestId(`waehlen-${s.stempel}`).check();
+  await expect(page.getByTestId("auswahl-leiste")).toContainText("2 ausgewählt");
+  // „alle auswählen“ nimmt alle außer der jüngsten, noch einmal: keine
+  await page.getByTestId("alle-waehlen").check();
+  await expect(page.getByTestId("auswahl-leiste")).toContainText(`${vorher.length - 1} ausgewählt`);
+  await page.getByTestId("alle-waehlen").uncheck();
+  for (const s of weg) await page.getByTestId(`waehlen-${s.stempel}`).check();
+  await page.getByTestId("auswahl-loeschen").click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("2 Sicherungen endgültig löschen?");
+  await expect(dialog).toContainText("Das ist endgültig.");
+  await expect(dialog.getByTestId("loeschen-liste").getByRole("listitem")).toHaveCount(2);
+  await dialog.getByLabel("Ihr Passwort").fill(KENNWORT);
+  await dialog.getByLabel("Code aus der Authenticator-App").fill(naechsterNotfallcode("e2e.admin"));
+  const a = await auftragDurch(page, "loeschen/", () => dialog.getByRole("button", { name: "Bestätigen und 2 löschen" }).click());
+  expect((await abwarten(page, a.kennung)).ergebnis).toContain("2 Sicherung(en) gelöscht");
+  const nachher = (await stand(page)).sicherungen.map((s) => s.stempel);
+  for (const s of weg) {
+    expect(nachher).not.toContain(s.stempel);
+    await expect(page.getByTestId(`sicherung-${s.stempel}`)).toHaveCount(0);
+    expect(execSync(`sudo sh -c 'ls ${B}/backup | grep -c ${s.stempel} || true'`).toString().trim()).toBe("0");
+  }
+  expect(nachher).toContain(juengste.stempel);
+  await page.goto("/admin/audit-log");
+  await page.getByRole("button", { name: "Backup", exact: true }).click();
+  await expect(page.getByText(/2 Sicherung\(en\) zum Löschen angefordert/).first()).toBeVisible();
 });

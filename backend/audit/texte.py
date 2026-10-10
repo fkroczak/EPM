@@ -310,6 +310,14 @@ def _backup(e, d) -> str:
     if ereignis == "heruntergeladen":
         zeit = _datum(d.get("sicherung_zeitpunkt", "")) or d.get("stempel", "")
         return f"Sicherung vom {zeit} heruntergeladen" + ("" if d.get("verschluesselt") else " (unverschlüsselt)")
+    if ereignis == "angefordert" and d.get("aktion") == "sicherung_loeschen":
+        liste = d.get("stempel") or []
+        groesse = d.get("groesse") or 0
+        return (f"{d.get('anzahl', len(liste))} Sicherung(en) zum Löschen angefordert ({', '.join(liste[:10])}"
+                f"{' …' if len(liste) > 10 else ''}; zusammen {groesse / 1024 ** 2:.0f} MB)"
+                + _bestaetigt(d))
+    if ereignis == "upload_begonnen" and d.get("upload_art") in ("paket", "ocr"):
+        return _system(e, d)
     if ereignis == "upload_begonnen":
         return f"Hochladen einer Sicherung begonnen: {d.get('datei', '')}"
     if ereignis == "upload_abgebrochen":
@@ -340,6 +348,29 @@ def _backup(e, d) -> str:
 def _system(e, d) -> str:
     name = d.get("name") or e.objekt or "Systemaktion"
     ereignis = d.get("ereignis")
+    # Wartung ohne SSH (F179)
+    aktion = d.get("aktion")
+    if ereignis == "angefordert" and aktion == "dienst_neustart":
+        return (f"Neustart des Dienstes „{d.get('dienst', '')}“ angefordert"
+                + (f", Beginn in {d['minuten']} Min." if d.get("minuten") else "") + _bestaetigt(d))
+    if ereignis == "angefordert" and aktion == "epm_zurueck":
+        return (f"Zurückschalten auf Version {d.get('tag', '')} angefordert (bisher {d.get('bisher') or '?'})"
+                + (f", Beginn in {d['minuten']} Min." if d.get("minuten") else "") + _bestaetigt(d))
+    if ereignis == "angefordert" and aktion in ("epm_paket", "ocr_modelle"):
+        return f"{name} angefordert: {d.get('datei', '')}" + _bestaetigt(d)
+    if ereignis == "angefordert" and aktion == "zertifikat_importieren":
+        return (f"Zertifikat importieren angefordert: {d.get('inhaber', '')}, ausgestellt von {d.get('aussteller', '')}"
+                + (f", gültig bis {_datum(d['gueltig_bis'])}" if d.get("gueltig_bis") else "") + _bestaetigt(d))
+    if ereignis == "angefordert" and aktion == "protokoll":
+        return f"Protokoll abgerufen: {e.objekt} (letzte {d.get('zeilen', '?')} Zeilen)"
+    if ereignis == "protokoll_heruntergeladen":
+        return f"Protokoll heruntergeladen: {e.objekt}"
+    if ereignis == "upload_begonnen":
+        return f"Hochladen begonnen ({e.objekt}): {d.get('datei', '')}"
+    if ereignis == "upload_abgebrochen":
+        return f"Hochgeladene Datei verworfen ({e.objekt}): {d.get('datei', '')}"
+    if ereignis == "paket_heruntergeladen":
+        return f"{e.objekt} heruntergeladen"
     if ereignis == "angefordert":
         teile = [f"{name} angefordert"]
         if d.get("minuten"):

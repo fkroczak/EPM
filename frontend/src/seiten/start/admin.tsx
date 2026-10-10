@@ -131,7 +131,7 @@ export function ServerKachel() {
           </>
         )}
       </KachelInhalt>
-      <KachelFuss zu="/admin/system">Zu Administration › System</KachelFuss>
+      <KachelFuss zu="/admin">Zur Systemverwaltung</KachelFuss>
     </>
   );
 }
@@ -179,8 +179,8 @@ export function UpdatesKachel() {
 
 // ---------------------------------------------------------------- Konten (S12)
 const KONTO_TEXT: Record<Konto["probleme"][number], [string, "fehler" | "warn" | undefined]> = {
-  gesperrt: ["gesperrt", "fehler"], einmal_kennwort: ["Einmal-Kennwort offen", "warn"],
-  einmal_kennwort_abgelaufen: ["Einmal-Kennwort abgelaufen", "warn"], ohne_2fa: ["ohne zweiten Faktor", "warn"],
+  gesperrt: ["gesperrt", "fehler"], einmal_kennwort: ["Einmal-Passwort offen", "warn"],
+  einmal_kennwort_abgelaufen: ["Einmal-Passwort abgelaufen", "warn"], ohne_2fa: ["ohne zweiten Faktor", "warn"],
   notfallcodes: ["Notfall-Codes knapp", undefined],
 };
 
@@ -252,7 +252,7 @@ export function AngemeldetKachel() {
           </div>
         ))}
       </KachelInhalt>
-      <KachelFuss zu="/admin/system">Alle Anmeldungen</KachelFuss>
+      <KachelFuss zu="/admin/system?reiter=anmeldungen">Alle Anmeldungen</KachelFuss>
     </>
   );
 }

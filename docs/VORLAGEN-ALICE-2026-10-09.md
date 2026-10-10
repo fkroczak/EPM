@@ -23,6 +23,8 @@ der Akte unter „Schreiben und E-Mail“ › „Eigene Vorlagen“.
 
 **Texte und Adressen ändern:** Alle vier Schreiben sind normale Dokumentvorlagen (Entwurf → Vorschau mit Testpatient →
 Veröffentlichen). Die Anschrift der Praxis Dr. Holtmeier steht als Text in den Vorlagen.
+Seit 10.10.2026 (F180) heißen die Schritte im Editor „1 · Bearbeiten → 2 · Vorschau prüfen → 3 · Freigeben“; Angaben
+wie die Briefanrede werden per Klick eingefügt, und „Als eigene Vorlage kopieren“ nimmt ein Schreiben als Grundlage.
 
 ## Rückfragen an Alice
 

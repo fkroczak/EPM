@@ -70,6 +70,8 @@ const router = createBrowserRouter([
       { path: "konto", ...seite(() => import("./seiten/Konto").then(({ Konto }) => <Konto />)) },
       { path: "design", ...seite(() => import("./seiten/Konto").then(({ Design }) => <Design />)) },
       { path: "hilfe", ...seite(() => import("./seiten/Hilfe").then(({ Hilfe }) => <Hilfe />)) },
+      // Systemverwaltung: Zustand auf einen Blick und häufige Aufgaben (Wunsch 10.10.2026, F179)
+      { path: "admin", ...seite(() => import("./seiten/admin/Verwaltung").then(({ Verwaltung }) => <MitRecht recht={["system_verwalten", "backup_verwalten"]} titel="Systemverwaltung"><Verwaltung /></MitRecht>)) },
       { path: "admin/backup", ...seite(() => import("./seiten/admin/Backup").then(({ Backup }) => <MitRecht recht="backup_verwalten" titel="Backup"><Backup /></MitRecht>)) },
       { path: "admin/benutzer", ...seite(() => import("./seiten/admin/Benutzer").then(({ Benutzer }) => <MitRecht recht="benutzer_verwalten" titel="Benutzer"><Benutzer /></MitRecht>)) },
       { path: "admin/vorlagen", ...seite(() => import("./seiten/admin/Vorlagen").then(({ Vorlagen }) => <MitRecht recht="vorlagen_pflegen" titel="Vorlagen"><Vorlagen /></MitRecht>)) },

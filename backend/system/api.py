@@ -25,12 +25,16 @@ from accounts.permissions import SystemRecht, recht
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import benutzername
 
-from . import epm_aufgaben, host
+from . import epm_aufgaben, hochladen, host
 from .models import Systemauftrag, Systemhinweis
 
 MINUTEN_ERLAUBT = (0, 5, 10, 15, 30, 60)
+# Aufträge der Wartung ohne SSH (F179, system/verwaltung_api.py) – eigene Endpunkte, eigene Bereiche der Seite
+VERWALTUNG_AKTIONEN = ("dienst_neustart", "epm_zurueck", "epm_paket", "epm_paket_erstellen", "zertifikat_erneuern",
+                       "zertifikat_importieren", "ocr_modelle", "protokoll")
 # so lange bleibt die Warnung nach dem Beginn stehen (falls der Auftrag sie nicht vorher beendet)
-WARNUNG_NACHLAUF = {"updates_installieren": 60, "server_neustart": 15, "epm_neustart": 5, "wiederherstellen": 30}
+WARNUNG_NACHLAUF = {"updates_installieren": 60, "server_neustart": 15, "epm_neustart": 5, "wiederherstellen": 30,
+                    "dienst_neustart": 5, "epm_zurueck": 15, "epm_paket": 30}
 
 
 def protokoll_art(aktion: str):
@@ -139,6 +143,13 @@ class UebersichtView(APIView):
                           "erlaubt": not a.get("recht") or request.user.hat_recht(a["recht"])}
                          for code, a in host.AKTIONEN.items() if not a.get("intern")],
             "aufgaben": [{"code": code, **a} for code, a in epm_aufgaben.AUFGABEN.items()],
+            # Wartung ohne SSH (F179): Beschreibungen und Bestätigung der eigenen Aufträge, hochgeladene Dateien
+            "verwaltung": {code: {k: v for k, v in host.AKTIONEN[code].items() if k not in ("intern", "hinweis")}
+                           for code in VERWALTUNG_AKTIONEN},
+            "uploads": hochladen.liste(("paket", "ocr")),
+            "upload": {"teil": hochladen.TEIL, "max": {a: hochladen.ARTEN[a]["max"] for a in ("paket", "ocr")}},
+            "austausch": host.ordner_download().is_dir() and host.ordner_upload().is_dir(),
+            "dienste": list(host.DIENSTE),
             "minuten": MINUTEN_ERLAUBT,
             "einstellungen": _einstellungen(),
             # „Datenbank leeren“ nur für die Rolle Admin (Festlegung 03.10.2026, U27)
@@ -294,8 +305,9 @@ def auftrag_anlegen(request, code, parameter=None, geheim=None, objekt=None, pro
         fehler = bestaetigung_pruefen(request, aktion["name"])
         if fehler:
             return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
-    if Systemauftrag.objects.filter(ziel=Systemauftrag.Ziel.SERVER, aktion=code,
-                                    status__in=[Systemauftrag.Status.WARTET, Systemauftrag.Status.LAEUFT]).exists():
+    if not aktion.get("mehrfach") and Systemauftrag.objects.filter(
+            ziel=Systemauftrag.Ziel.SERVER, aktion=code,
+            status__in=[Systemauftrag.Status.WARTET, Systemauftrag.Status.LAEUFT]).exists():
         return Response({"fehler": f"„{aktion['name']}“ ist schon beauftragt und noch nicht abgeschlossen."},
                         status=status.HTTP_409_CONFLICT)
     werte = dict(parameter or {})

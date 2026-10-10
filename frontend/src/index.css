@@ -217,7 +217,10 @@ body {
   }
   .chip svg { width: 0.75rem; height: 0.75rem; }
   /* Platzhalter in Dokumentvorlagen (Entwurf 18) */
-  .feldchip { background: #EEF0FA; color: #3A3470; border-radius: 0.1875rem; padding: 0 0.1875rem; font-family: var(--font-mono); font-size: 0.95em; }
+  /* lesbare Namen statt {{Patient.Briefanrede}} (F180); unbekannte Platzhalter rot */
+  .feldchip { background: #EEF0FA; color: #3A3470; border: 1px solid #D5D8F0; border-radius: 0.3125rem; padding: 0 0.25rem;
+    font-size: 0.95em; white-space: nowrap; }
+  .feldchip-unbekannt { background: var(--fehler-bg); color: var(--fehler); border-color: currentColor; font-family: var(--font-mono); }
   .chip.warn { background: var(--warn-bg); color: var(--warn); }
   .chip.fehler { background: var(--fehler-bg); color: var(--fehler); }
   .chip.ok { background: var(--ok-bg); color: var(--ok); }
