@@ -247,3 +247,38 @@ test("Systemverwaltung: Ampel, häufige Aufgaben, Graph im Dialog; Wartung ohne 
   await expect(page.getByTestId("protokoll-text")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("protokoll-herunterladen")).toHaveAttribute("href", /\/api\/system\/protokolle\/.+\?herunterladen=1/);
 });
+
+test("Wartung: Journal aufräumen, alte Versionen löschen (laufende und vorherige geschützt), Uhrzeit einstellen", async ({ page }) => {
+  // Nachtrag 10.10.2026 (F179m, F179n): im Probelauf des Systemagenten
+  await page.goto("/admin/system?reiter=wartung");
+  const aufraeumen = page.getByTestId("aufraeumen-karte");
+  await aufraeumen.getByLabel("Aufräumen").selectOption("zeit:3months");
+  await aufraeumen.getByRole("button", { name: "Journal aufräumen" }).click();
+  let dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("älter als 3 Monate entfernen");
+  await dialog.getByRole("button", { name: "Aufräumen" }).click();
+  await expect(dialog).toHaveCount(0);
+  // geschützte Versionen lassen sich nicht ankreuzen
+  for (const box of await aufraeumen.getByTestId("alte-versionen").getByRole("checkbox").all()) {
+    const zeile = box.locator("xpath=..");
+    if (await zeile.getByText(/läuft|vorherige/).count()) await expect(box).toBeDisabled();
+  }
+  await expect(aufraeumen.getByTestId("versionen-loeschen")).toBeDisabled();
+  // Uhrzeit: NTP mit eigenem Zeitserver, Passwort und 2FA
+  const uhr = page.getByTestId("uhr-karte");
+  await expect(uhr.getByTestId("uhr-abweichung")).not.toHaveText("—");
+  await uhr.getByRole("button", { name: "Uhrzeit einstellen" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Zeitserver").fill("opnsense; reboot");
+  await dialog.getByLabel("Ihr Passwort").fill(KENNWORT);
+  await dialog.getByLabel("Code aus der Authenticator-App").fill(naechsterNotfallcode("e2e.admin"));
+  await dialog.getByRole("button", { name: "Bestätigen und einstellen" }).click();
+  await expect(dialog).toContainText("Zeitserver als Name");
+  await dialog.getByLabel("Zeitserver").fill("opnsense.stiftung.lan 10.0.0.1");
+  await page.waitForTimeout(1200);
+  await dialog.getByRole("button", { name: "Bestätigen und einstellen" }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.getByTestId("system-reiter").getByRole("tab", { name: /^Verlauf/ }).click();
+  await expect(page.getByTestId("auftraege").getByRole("row", { name: /Uhrzeit einstellen/ }).first()).toContainText("erledigt (Probelauf)", { timeout: 30_000 });
+  await expect(page.getByTestId("auftraege").getByRole("row", { name: /Journal aufräumen/ }).first()).toContainText("erledigt (Probelauf)", { timeout: 30_000 });
+});

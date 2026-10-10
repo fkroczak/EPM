@@ -30,7 +30,7 @@ import { Icon } from "@/components/ui/icon";
 import { Reiter, ReiterInhalt, useReiter } from "@/components/ui/reiter";
 import type { ReiterEintrag } from "@/components/ui/reiter";
 import { AuslastungKarte } from "./auslastung";
-import { DiensteKarte, ProtokolleBereich, SoftwareBereich, ZertifikatBereich } from "./SystemWartung";
+import { AufraeumenKarte, DiensteKarte, ProtokolleBereich, SoftwareBereich, UhrKarte, ZertifikatBereich } from "./SystemWartung";
 
 export type Platte = { pfad: string; bezeichnung: string; gesamt: number; frei: number };
 export type Speicher = { gesamt: number | null; verfuegbar: number | null; swap_gesamt: number | null; swap_frei: number | null } | null;
@@ -54,7 +54,10 @@ export type HostStatus = {
   pakete?: { erstellt: PaketDatei[]; bereit: PaketDatei[] };
   zertifikat?: { vorhanden: boolean; name?: string; ca_schluessel?: boolean; ca_download?: boolean; inhaber?: string; aussteller?: string;
     gueltig_bis?: string | null; gueltig_ab?: string | null; tage?: number; namen?: string; selbst_signiert?: boolean; eigene_ca?: boolean; hinweis?: string };
-  uhr?: { verfuegbar: boolean; synchronisiert: boolean; ntp: boolean; zeitzone: string };
+  uhr?: { verfuegbar: boolean; synchronisiert: boolean; ntp: boolean; zeitzone: string; zeit_unix?: number; server?: string[];
+    dienst?: "chrony" | "timesyncd"; zeitzonen?: string[] };
+  journal?: { verfuegbar: boolean; groesse?: number } | null;
+  image_dateien?: { datei: string; tag: string; art: "images" | "paket"; groesse: number; zeit: string; geschuetzt: boolean }[];
   ocr_vorrat?: { vorhanden: boolean; dateien: number; groesse: number; geaendert: string | null };
   werkzeuge?: { epm_update: boolean; epm_zertifikat: boolean; epm_ocr_modelle: boolean };
   protokolle?: { quelle: string; name: string }[];
@@ -878,6 +881,10 @@ export function System() {
         <ReiterInhalt testid="reiter-wartung">
           <Taetigkeiten daten={d} offen={offen} onWahl={setWahl} />
           <DiensteKarte daten={d} offen={offen} />
+          <div className="stapel grid grid-cols-1 hd:grid-cols-2 gap-4 items-start">
+            <AufraeumenKarte daten={d} offen={offen} />
+            <UhrKarte daten={d} offen={offen} />
+          </div>
         </ReiterInhalt>
       ) : null}
       {reiter === "software" ? (

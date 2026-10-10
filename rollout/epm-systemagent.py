@@ -120,7 +120,8 @@ AKTIONEN = {
 SICHERUNG_AKTIONEN = {"sicherung", "sicherung_passwort", "sicherung_ziel", "sicherung_ziel_entfernen",
                       "sicherung_ziel_testen", "sicherung_uebertragen", "sicherung_aufbewahrung",
                       "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen", "datenbank_leeren",
-                      "sicherung_loeschen", "sicherung_zeitplan"}
+                      "sicherung_loeschen"}
+# (sicherung_zeitplan ändert systemd auf dem Server und bleibt deshalb auch mit --sicherung-echt ein Probelauf)
 # Art der Sicherung, die eine Aktion vorher erstellt
 VORHER_ART = {"updates_installieren": "vor_update", "server_neustart": "vor_aenderung",
               "wiederherstellen": "vor_wiederherstellung", "datenbank_leeren": "vor_leeren", "epm_zurueck": "vor_update"}
