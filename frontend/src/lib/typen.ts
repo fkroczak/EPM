@@ -871,16 +871,22 @@ export type ScanSeite = {
   sicherheit: number | null; unsicher: number; erkannt_am: string | null; textebene_vorhanden: boolean;
 };
 export type ScanLaborwert = {
-  parameter: number | null; parameter_name: string | null; erkannt_als: string; zuordnung: "genau" | "aehnlich" | "frei";
+  /** „gelernt“: aus Korrekturen beim Übernehmen gelernt, sicher; „gelernt_vorschlag“: erst einmal bestätigt (F182) */
+  parameter: number | null; parameter_name: string | null; erkannt_als: string;
+  zuordnung: "genau" | "aehnlich" | "frei" | "gelernt" | "gelernt_vorschlag";
   freitext_name: string; wert: string | null; wert_text: string; einheit: string; einheit_gelesen: string;
   referenz_von: string | null; referenz_bis: string | null; markierung: string; seite: number; box: number[] | null;
   zeile: string; sicherheit: number; hinweise: string[]; vorschlag: boolean;
   umrechnung?: { von: string; faktor: string; wert_gelesen: string };
+  wert_x?: number; wert_zeichen?: number;
 };
 export type ScanBiaWert = { wert: string; einheit: string; erkannt_als: string; seite: number; box: number[] | null;
-  sicherheit: number; vorschlag: boolean; hinweise?: string[] };
+  sicherheit: number; vorschlag: boolean; hinweise?: string[]; zuordnung?: "gelernt" | "gelernt_vorschlag" };
 export type ScanDiagnose = { bezeichnung: string; icd_code: string; kennzeichen: "G" | "V" | "Z" | "A"; zeile: string;
-  seite: number; box: number[] | null; sicherheit: number; vorschlag: boolean };
+  seite: number; box: number[] | null; sicherheit: number; vorschlag: boolean; erkannt_als?: string;
+  hinweise?: string[]; zuordnung?: "gelernt" | "gelernt_vorschlag";
+  /** gelernte Korrektur, erst einmal bestätigt: zum Übernehmen angeboten (F182) */
+  gelernt?: { bezeichnung: string; icd_code: string } };
 export type ScanAuswertung = {
   arten?: ("labor" | "bia" | "arztbrief")[];
   datum?: string | null; datum_quelle?: string;
@@ -892,7 +898,9 @@ export type ScanAuswertung = {
   originale?: { name: string; mime: string }[];
 };
 export type ScanVorschlag = { id: number; nummer: number; name: string; geburtsdatum: string | null; ist_test: boolean;
-  abgeschlossen: boolean; punkte: number; grund: string };
+  abgeschlossen: boolean; punkte: number; grund: string;
+  /** F183: „sicher“ = Name und Geburtsdatum erkannt; „unsicher“ nur als Hinweis */
+  stufe?: "sicher" | "wahrscheinlich" | "unsicher"; nachname?: string; vorname?: string };
 export type ScanZeile = {
   id: number; titel: string; originalname: string; mime: string; groesse: number;
   status: "wartet" | "laeuft" | "fertig" | "fehler"; fortschritt: number; schritt: string; fehler: string;
