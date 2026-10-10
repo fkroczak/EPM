@@ -11,7 +11,7 @@ const SVG_LOGO = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="600
   '<rect width="600" height="200" fill="#251F53"/><text x="24" y="120" font-size="64" fill="#E8BD76">E2E Logo</text></svg>');
 const SVG_SKRIPT = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="200"><script>alert(1)</script></svg>');
 
-test("Benutzer anlegen, Einmal-Kennwort, sperren und entsperren", async ({ page }) => {
+test("Benutzer anlegen, Einmal-Passwort, sperren und entsperren", async ({ page }) => {
   const name = eindeutig("e2e.neu");
   await page.goto("/");
   await page.getByRole("navigation", { name: "Administration" }).getByRole("link", { name: "Benutzer" }).click();
@@ -25,12 +25,12 @@ test("Benutzer anlegen, Einmal-Kennwort, sperren und entsperren", async ({ page 
   await detail.getByLabel("Benutzername").fill(name);
   await detail.getByLabel("Rolle").selectOption("mediziner");
   await expect(detail).toContainText("Anzeige in der Akte: Dr. med. H. Heilmann");
-  await detail.getByRole("button", { name: "Anlegen und Einmal-Kennwort erzeugen" }).click();
+  await detail.getByRole("button", { name: "Anlegen und Einmal-Passwort erzeugen" }).click();
   const kennwortBox = detail.getByTestId("einmal-kennwort");
   await expect(kennwortBox).toBeVisible();
   const einmal = (await kennwortBox.locator(".num").first().textContent())?.trim() ?? "";
   expect(einmal.length).toBeGreaterThan(8);
-  // Zugangsblatt (F55) mit dem angezeigten Einmal-Kennwort
+  // Zugangsblatt (F55) mit dem angezeigten Einmal-Passwort
   await kennwortBox.getByRole("button", { name: "Zugangsblatt drucken" }).click();
   await expect(page.getByTestId("pdf-dialog").getByTestId("pdf-leser").locator("canvas").first()).toBeVisible();
   await page.keyboard.press("Escape");
@@ -38,7 +38,7 @@ test("Benutzer anlegen, Einmal-Kennwort, sperren und entsperren", async ({ page 
   await expect(detail).toContainText("Einrichtung offen");
   await sitzungGilt(page, "Benutzer anlegen");
 
-  // mit dem Einmal-Kennwort beginnt die erste Anmeldung
+  // mit dem Einmal-Passwort beginnt die erste Anmeldung
   const ctx = await request.newContext({ baseURL: BASIS, ignoreHTTPSErrors: true, storageState: OHNE_ANMELDUNG });
   await ctx.get("/api/auth/status/");
   const csrf = (await ctx.storageState()).cookies.find((c) => c.name === "epm_csrf")?.value ?? "";
@@ -66,10 +66,10 @@ test("Benutzer anlegen, Einmal-Kennwort, sperren und entsperren", async ({ page 
   await expect(page.getByText("Benutzer gespeichert.")).toBeVisible();
   await expect(page.getByTestId("benutzerliste").getByRole("row").filter({ hasText: name })).toContainText("Mitarbeiter");
 
-  // neues Einmal-Kennwort
-  await detail.getByRole("button", { name: "Einmal-Kennwort erzeugen" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Einmal-Kennwort erzeugen" }).click();
-  await expect(page.getByText("Neues Einmal-Kennwort erzeugt.")).toBeVisible();
+  // neues Einmal-Passwort
+  await detail.getByRole("button", { name: "Einmal-Passwort erzeugen" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Einmal-Passwort erzeugen" }).click();
+  await expect(page.getByText("Neues Einmal-Passwort erzeugt.")).toBeVisible();
   const zweites = (await kennwortBox.locator(".num").first().textContent())?.trim() ?? "";
   expect(zweites).not.toBe(einmal);
 
@@ -261,10 +261,10 @@ test("Fünf falsche Passwörter sperren das Konto; Admin sieht den Hinweis, setz
   await expect(detail).toContainText("L. Gesperrt");
   await expect(detail).toContainText("Fehlversuche bei der Anmeldung");
 
-  // 2FA zurücksetzen (Telefon verloren): neues Einmal-Kennwort, Authenticator weg
+  // 2FA zurücksetzen (Telefon verloren): neues Einmal-Passwort, Authenticator weg
   await detail.getByRole("button", { name: "2FA zurücksetzen" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "2FA zurücksetzen" }).click();
-  await expect(page.getByText("2FA zurückgesetzt, neues Einmal-Kennwort erzeugt.")).toBeVisible();
+  await expect(page.getByText("2FA zurückgesetzt, neues Einmal-Passwort erzeugt.")).toBeVisible();
   await expect(detail.getByTestId("einmal-kennwort")).toBeVisible();
   await detail.getByRole("button", { name: "Entsperren" }).click();
   await expect(page.getByText("Benutzer entsperrt.")).toBeVisible();
@@ -337,7 +337,7 @@ test("Benutzer ohne Login: anlegen, setzen, wieder einbinden; Rolle „Keine Ber
   await expect(rechte.getByRole("columnheader", { name: "Mitarbeiter (erweitert)" })).toBeVisible();
   await expect(rechte.getByRole("checkbox", { name: "Mitarbeiter (erweitert): Infusionspläne anlegen" })).toBeChecked();
   await expect(rechte.getByRole("checkbox", { name: "Mitarbeiter: Infusionspläne anlegen", exact: true })).not.toBeChecked();
-  // ohne Login anlegen: kein Kennwort, keine Rechte
+  // ohne Login anlegen: kein Passwort, keine Rechte
   const name = eindeutig("e2e.ohne");
   await page.getByRole("button", { name: "Benutzer anlegen" }).click();
   const detail = page.getByTestId("benutzer-detail");
@@ -354,7 +354,7 @@ test("Benutzer ohne Login: anlegen, setzen, wieder einbinden; Rolle „Keine Ber
   const zeile = page.getByTestId("benutzerliste").getByRole("row").filter({ hasText: name });
   await expect(zeile).toContainText("ohne Login");
   await expect(zeile).toContainText("Keine Berechtigung");
-  // Login geben: als Mitarbeiter wieder einbinden, mit Einmal-Kennwort
+  // Login geben: als Mitarbeiter wieder einbinden, mit Einmal-Passwort
   await detail.getByRole("button", { name: "Login geben" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Rolle").selectOption("mitarbeiter");

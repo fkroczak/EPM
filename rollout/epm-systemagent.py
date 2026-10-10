@@ -19,13 +19,16 @@ Optionen: --basis DIR (statt EPM_BASE aus /etc/epm/epm.conf), --projekt NAME (Co
           --sicherung-echt (mit --trocken: Sicherung, Übertragung und Wiederherstellen trotzdem echt – CI).
 
 Sicherheit: Aus einer Auftragsdatei werden nur „aktion“ (feste Liste) und deren fest vorgesehene, geprüfte Angaben
-verwendet (Minuten, Benutzername, Stempel einer Sicherung, Sicherungs-Passwort, Übertragungsziel). Nichts davon wird
-als Befehl oder über eine Shell ausgeführt; Passwörter gehen nur in Dateien (0600, root) bzw. über die Standardeingabe
-an rclone und stehen nie in Ergebnissen oder Ausgaben. Dateien werden ohne Folgen symbolischer Links gelesen und
-nach dem Lesen sofort gelöscht.
+verwendet (Minuten, Benutzername, Stempel einer oder mehrerer Sicherungen, Sicherungs-Passwort, Übertragungsziel,
+Version, Dienst, Kennung eines Uploads, Protokoll und Zeilenzahl, Zertifikat als PEM) – jeweils gegen ein festes Muster
+bzw. eine feste Liste geprüft. Nichts davon wird als Befehl oder über eine Shell ausgeführt; Passwörter und Schlüssel
+gehen nur in Dateien (0600, root) bzw. über die Standardeingabe an rclone und stehen nie in Ergebnissen oder Ausgaben.
+Dateien werden ohne Folgen symbolischer Links gelesen und nach dem Lesen sofort gelöscht. Hochgeladene Pakete und
+Modelle werden vor der Prüfung in einen Ordner kopiert, den das Backend nicht beschreiben kann.
 """
 import argparse
 import fcntl
+from collections import deque
 import hashlib
 import json
 import os
@@ -41,7 +44,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
-VERSION = 4  # 4: Datenbank leeren (03.10.2026)
+VERSION = 5  # 5: Systemverwaltung ohne SSH (10.10.2026): Sicherungen löschen, Versionen, Pakete, Zertifikat, Protokolle
 KONF = "/etc/epm/epm.conf"
 BACKUP_SKRIPT = "/usr/local/sbin/epm-backup"
 KONF_SICHERUNG = "/etc/epm/sicherung"
@@ -96,15 +99,53 @@ AKTIONEN = {
     "wiederherstellen": ("Sicherung wiederherstellen", True),
     # Administration › System: Ende der Testphase (U27)
     "datenbank_leeren": ("Datenbank leeren", True),
+    # Systemverwaltung ohne SSH (10.10.2026, F179)
+    "sicherung_loeschen": ("Sicherungen löschen", False),
+    "dienst_neustart": ("Dienst neu starten", False),
+    "epm_zurueck": ("EPM-Version zurückschalten", True),
+    "epm_paket": ("Update-Paket einspielen", False),           # epm-update sichert selbst, bevor es umstellt
+    "epm_paket_erstellen": ("Update-Paket erstellen", False),
+    "zertifikat_erneuern": ("Zertifikat erneuern", False),
+    "zertifikat_importieren": ("Zertifikat importieren", False),
+    "ocr_modelle": ("OCR-Modelle einspielen", False),
+    "protokoll": ("Protokoll abrufen", False),
 }
 # Aktionen, die Sicherungen schreiben, übertragen oder zurückspielen – und das Leeren der Datenbank, das nur den
 # EPM-Stack betrifft: mit --sicherung-echt auch im Probelauf echt (Browsertests gegen den echten Stack)
 SICHERUNG_AKTIONEN = {"sicherung", "sicherung_passwort", "sicherung_ziel", "sicherung_ziel_entfernen",
                       "sicherung_ziel_testen", "sicherung_uebertragen", "sicherung_aufbewahrung",
-                      "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen", "datenbank_leeren"}
+                      "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen", "datenbank_leeren",
+                      "sicherung_loeschen"}
 # Art der Sicherung, die eine Aktion vorher erstellt
 VORHER_ART = {"updates_installieren": "vor_update", "server_neustart": "vor_aenderung",
-              "wiederherstellen": "vor_wiederherstellung", "datenbank_leeren": "vor_leeren"}
+              "wiederherstellen": "vor_wiederherstellung", "datenbank_leeren": "vor_leeren", "epm_zurueck": "vor_update"}
+
+# Systemverwaltung ohne SSH (10.10.2026): feste Werkzeuge auf dem Server, feste Dienste, feste Protokolle
+EPM_UPDATE = "/usr/local/sbin/epm-update"
+EPM_ZERTIFIKAT = "/usr/local/sbin/epm-zertifikat"
+EPM_OCR_MODELLE = "/usr/local/sbin/epm-ocr-modelle"
+CA_ORDNER = "/etc/epm/ca"
+LOESCHEN_MAX = 200                # Sicherungen je Auftrag „Sicherungen löschen“
+TAG_MUSTER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40}$")
+PAKET_MUSTER = re.compile(r"^epm-paket-([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})\.tar$")
+DIENSTE = ("backend", "web", "ocr", "db")
+# Protokolle (nur lesend): Quelle -> Bezeichnung. Container über docker compose logs, Dienste über journalctl,
+# das Update über seine Protokolldatei. Andere Quellen gibt es nicht.
+PROTOKOLLE = {
+    "backend": "Container backend (Django)", "web": "Container web (Nginx)", "ocr": "Container ocr (Texterkennung)",
+    "db": "Container db (PostgreSQL)", "systemagent": "Systemagent", "backup": "Nächtliche Sicherung",
+    "uebertragung": "Übertragung der Sicherungen", "update": "Letztes EPM-Update (/var/log/epm-update.log)",
+}
+PROTOKOLL_JOURNAL = {"systemagent": ["epm-systemagent.service", "epm-systemstatus.service"],
+                     "backup": ["epm-backup.service"], "uebertragung": ["epm-uebertragung.service"]}
+PROTOKOLL_ZEILEN = (100, 500, 2000)
+PROTOKOLL_STUNDEN = 1             # so lange liegt ein abgerufenes Protokoll für die Oberfläche bereit
+PROTOKOLL_MAX = 2 * 1024 * 1024   # Bytes je abgerufenem Protokoll
+PEM_MAX = 20000                   # Zeichen je PEM-Datei beim Zertifikat-Import
+# Inhalt eines Update-Pakets (epm-update --paket-erstellen) und der vorbereiteten OCR-Modelle: nur diese Namen,
+# nur Dateien und Ordner – keine Verweise, keine absoluten Pfade, kein „..“
+PAKET_INHALT = re.compile(r"^(TAG|VERSION|SHA256SUMS|images\.tar|(rollout|werkzeuge)(/[A-Za-z0-9._+-]+)*)$")
+OCR_INHALT = re.compile(r"^(modelle\.json|dateien(/[A-Za-z0-9._+-]+)*)$")
 
 APT_ENV = {"DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE": "a", "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"}
 
@@ -214,6 +255,8 @@ class Agent:
         # Austausch mit dem Backend: bereitgestellte Sicherungen (liest Nginx aus) und hochgeladene (schreibt das Backend)
         self.download = os.path.join(basis, "system", "download")
         self.upload = os.path.join(basis, "system", "upload")
+        # abgerufene Protokolle (Administration › System › Protokolle): nur für das Backend lesbar, nach 1 Stunde weg
+        self.protokolle = os.path.join(self.status, "protokolle")
         einstellungen = lese_konf()
         self.proxy = einstellungen.get("EPM_APT_PROXY", "")
         try:
@@ -417,6 +460,133 @@ class Agent:
                 else "unbekannt"
         return ergebnis
 
+    # ------------------------------------------------------------ Systemverwaltung ohne SSH: Stand (10.10.2026)
+    def epm_versionen(self):
+        """Vorhandene EPM-Versionen (Images epm-backend und epm-web) für „Zurückschalten“, die laufende aus .env."""
+        aktiv = ""
+        try:
+            with open(os.path.join(self.basis, ".env"), encoding="utf-8") as f:
+                for z in f:
+                    if z.startswith("EPM_VERSION="):
+                        aktiv = z.split("=", 1)[1].strip().strip("\"'")
+        except OSError:
+            pass
+        quelle = lese_konf().get("EPM_UPDATE_QUELLE") or "git"
+        je_tag = {}
+        for image in ("epm-backend", "epm-web"):
+            rc, aus = self.befehl(["docker", "image", "ls", image, "--format", "{{.Tag}}\t{{.CreatedAt}}"], zeitlimit=30)
+            if rc != 0:
+                return {"verfuegbar": False, "aktiv": aktiv, "quelle": quelle, "liste": [],
+                        "hinweis": (aus.strip().splitlines() or [""])[-1][:200]}
+            for z in aus.splitlines():
+                tag, _, erstellt = z.partition("\t")
+                tag = tag.strip()
+                if not TAG_MUSTER.match(tag):
+                    continue
+                e = je_tag.setdefault(tag, {"tag": tag, "erstellt": "", "backend": False, "web": False})
+                e[image[4:]] = True
+                if image == "epm-backend":
+                    e["erstellt"] = erstellt.strip()
+        liste = sorted(je_tag.values(), key=lambda e: (e["erstellt"], e["tag"]), reverse=True)[:30]
+        for e in liste:
+            e["aktiv"] = e["tag"] == aktiv
+            e["vollstaendig"] = e["backend"] and e["web"]
+        return {"verfuegbar": True, "aktiv": aktiv, "quelle": quelle, "liste": liste}
+
+    def pakete(self):
+        """Update-Pakete: erstellte unter images/, zum Herunterladen bereitgestellte unter system/download/."""
+        def liste(ordner, stunden=None):
+            ergebnis = []
+            try:
+                namen = sorted(os.listdir(ordner))
+            except OSError:
+                return ergebnis
+            for n in namen:
+                m = PAKET_MUSTER.match(n)
+                if not m:
+                    continue
+                try:
+                    info = os.lstat(os.path.join(ordner, n))
+                except OSError:
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    continue
+                e = {"tag": m.group(1), "datei": n, "groesse": info.st_size,
+                     "zeit": datetime.fromtimestamp(info.st_mtime, timezone.utc).astimezone().isoformat(timespec="seconds")}
+                if stunden:
+                    e["bis"] = datetime.fromtimestamp(info.st_mtime + stunden * 3600, timezone.utc).astimezone().isoformat(
+                        timespec="seconds")
+                ergebnis.append(e)
+            return ergebnis
+        return {"erstellt": liste(os.path.join(self.basis, "images")), "bereit": liste(self.download, BUENDEL_STUNDEN)}
+
+    def zertifikat(self):
+        """Serverzertifikat (Nginx): Name, Aussteller, Ablauf – ob eine eigene CA da ist (erneuern möglich) und ob das
+        Stammzertifikat unter /epm-ca.crt abrufbar ist."""
+        certs = os.path.join(self.basis, "nginx", "certs")
+        crt = os.path.join(certs, "epm.crt")
+        ergebnis = {"vorhanden": os.path.isfile(crt), "name": lese_konf().get("EPM_WEB_NAME", ""),
+                    "ca_schluessel": os.path.isfile(os.path.join(CA_ORDNER, "epm-ca.key")),
+                    "ca_download": os.path.isfile(os.path.join(certs, "epm-ca.crt"))}
+        if not ergebnis["vorhanden"]:
+            return ergebnis
+        rc, aus = self.befehl(["openssl", "x509", "-in", crt, "-noout", "-subject", "-issuer", "-enddate", "-startdate"],
+                              env={"LC_ALL": "C"}, zeitlimit=15)
+        if rc != 0:
+            ergebnis["hinweis"] = "Zertifikat nicht lesbar."
+            return ergebnis
+        werte = {}
+        for z in aus.splitlines():
+            k, _, v = z.partition("=")
+            werte[k.strip()] = v.strip()
+        ergebnis.update({"inhaber": werte.get("subject", ""), "aussteller": werte.get("issuer", "")})
+        for feld, schluessel in (("gueltig_bis", "notAfter"), ("gueltig_ab", "notBefore")):
+            try:
+                z = datetime.strptime(" ".join(werte.get(schluessel, "").split()), "%b %d %H:%M:%S %Y %Z")
+                ergebnis[feld] = z.replace(tzinfo=timezone.utc).astimezone().isoformat(timespec="seconds")
+            except ValueError:
+                ergebnis[feld] = None
+        if ergebnis.get("gueltig_bis"):
+            ergebnis["tage"] = int((datetime.fromisoformat(ergebnis["gueltig_bis"]) - datetime.now(timezone.utc))
+                                   .total_seconds() // 86400)
+        rc, aus = self.befehl(["openssl", "x509", "-in", crt, "-noout", "-ext", "subjectAltName"], zeitlimit=15)
+        ergebnis["namen"] = " ".join(aus.splitlines()[1:]).strip()[:500] if rc == 0 else ""
+        ergebnis["selbst_signiert"] = bool(ergebnis["inhaber"]) and ergebnis["inhaber"] == ergebnis["aussteller"]
+        ergebnis["eigene_ca"] = False
+        ca = os.path.join(CA_ORDNER, "epm-ca.crt")
+        if os.path.isfile(ca):
+            rc, _aus = self.befehl(["openssl", "verify", "-CAfile", ca, crt], zeitlimit=15)
+            ergebnis["eigene_ca"] = rc == 0
+        return ergebnis
+
+    def uhr(self):
+        rc, aus = self.befehl(["timedatectl", "show", "-p", "NTPSynchronized", "-p", "NTP", "-p", "Timezone"], zeitlimit=10)
+        werte = dict(z.split("=", 1) for z in aus.splitlines() if "=" in z) if rc == 0 else {}
+        return {"verfuegbar": rc == 0, "synchronisiert": werte.get("NTPSynchronized") == "yes",
+                "ntp": werte.get("NTP") == "yes", "zeitzone": werte.get("Timezone", "")}
+
+    def ocr_vorrat(self):
+        """Offline eingespielte Modelle der zweiten Texterkennung (epm-ocr-modelle einspielen)."""
+        ordner = os.path.join(self.basis, "ocr-modelle")
+        anzahl, groesse, neu = 0, 0, 0.0
+        for wurzel, _ordner, dateien in os.walk(ordner, followlinks=False):
+            for d in dateien:
+                try:
+                    info = os.lstat(os.path.join(wurzel, d))
+                except OSError:
+                    continue
+                anzahl += 1
+                groesse += info.st_size
+                neu = max(neu, info.st_mtime)
+        return {"vorhanden": anzahl > 0, "dateien": anzahl, "groesse": groesse,
+                "geaendert": datetime.fromtimestamp(neu, timezone.utc).astimezone().isoformat(timespec="seconds")
+                if neu else None}
+
+    @staticmethod
+    def werkzeuge():
+        return {"epm_update": os.path.exists(EPM_UPDATE), "epm_zertifikat": os.path.exists(EPM_ZERTIFIKAT),
+                "epm_ocr_modelle": os.path.exists(EPM_OCR_MODELLE)}
+
     def status_schreiben(self):
         try:
             with open("/proc/uptime") as f:
@@ -460,6 +630,14 @@ class Agent:
             "container": self.container(),
             "sicherung": self.sicherung(),
             "dienste": self.dienste(),
+            # Systemverwaltung ohne SSH (10.10.2026)
+            "versionen": self.epm_versionen(),
+            "pakete": self.pakete(),
+            "zertifikat": self.zertifikat(),
+            "uhr": self.uhr(),
+            "ocr_vorrat": self.ocr_vorrat(),
+            "werkzeuge": self.werkzeuge(),
+            "protokolle": [{"quelle": q, "name": n} for q, n in PROTOKOLLE.items()],
             "trocken": self.trocken,
         }
         self.schreibe(os.path.join(self.status, "system.json"), status)
@@ -1019,7 +1197,8 @@ class Agent:
     def austausch_aufraeumen(self):
         """Bereitgestellte Sicherungen nach 2 Stunden und liegengebliebene Uploads nach 24 Stunden entfernen."""
         jetzt = time.time()
-        for ordner, stunden in ((self.download, BUENDEL_STUNDEN), (self.upload, UPLOAD_ALT_STUNDEN)):
+        for ordner, stunden in ((self.download, BUENDEL_STUNDEN), (self.upload, UPLOAD_ALT_STUNDEN),
+                                (self.protokolle, PROTOKOLL_STUNDEN)):
             try:
                 namen = os.listdir(ordner)
             except OSError:
@@ -1701,6 +1880,11 @@ class Agent:
             if not isinstance(stempel, str) or not STEMPEL_MUSTER.match(stempel) or \
                     not any(s["stempel"] == stempel for s in self.sicherungen()):
                 return 2, f"Die Sicherung {stempel} gibt es auf dem Server nicht (mehr)."
+        if aktion == "epm_zurueck" and not t:
+            # erst prüfen, dann die Sicherung vorher – eine unbekannte Version soll nichts auslösen
+            fehler = self.zurueck_pruefen(parameter.get("tag"))
+            if fehler:
+                return 2, fehler
         vorher = None
         if vorher_sichern:
             zeile("Zuerst wird eine Sicherung erstellt.\n")
@@ -1818,6 +2002,44 @@ class Agent:
         if aktion == "datenbank_leeren":
             return self.leeren(parameter.get("behalten"), von, zeile, vorher=vorher, simuliert=t)
 
+        # Systemverwaltung ohne SSH (10.10.2026, F179)
+        if aktion == "sicherung_loeschen":
+            return self.sicherungen_loeschen(parameter.get("stempel"), zeile, simuliert=t)
+
+        if aktion == "dienst_neustart":
+            return self.dienst_neu_starten(parameter.get("dienst"), zeile, simuliert=t)
+
+        if aktion == "epm_zurueck":
+            return self.zurueckschalten(parameter.get("tag"), zeile, simuliert=t)
+
+        if aktion == "epm_paket":
+            return self.paket_einspielen(parameter.get("upload"), zeile, simuliert=t)
+
+        if aktion == "epm_paket_erstellen":
+            return self.paket_erstellen(zeile, simuliert=t)
+
+        if aktion == "zertifikat_erneuern":
+            if t:
+                zeile(f"\n(Probelauf) {EPM_ZERTIFIKAT} erneuern\n")
+                return 0, "Probelauf: Zertifikat nicht erneuert."
+            if not os.path.exists(EPM_ZERTIFIKAT):
+                return 2, "Auf diesem Server ist „epm-zertifikat“ nicht eingerichtet."
+            if not os.path.isfile(os.path.join(CA_ORDNER, "epm-ca.key")):
+                return 2, ("Es gibt keine eigene CA auf dem Server – erneuern geht nur mit ihr. Ein Zertifikat einer "
+                           "anderen CA bitte über „Zertifikat importieren“ austauschen.")
+            rc = self.schritt("Zertifikat", [EPM_ZERTIFIKAT, "erneuern"], zeile, zeitlimit=300, eingabe="")
+            return (0, "Neues Serverzertifikat ausgestellt; Nginx hat es geladen.") if rc == 0 else \
+                (rc, "Erneuern fehlgeschlagen – Ausgabe prüfen. Das bisherige Zertifikat gilt weiter.")
+
+        if aktion == "zertifikat_importieren":
+            return self.zertifikat_importieren(geheim, zeile, simuliert=t)
+
+        if aktion == "ocr_modelle":
+            return self.ocr_einspielen(parameter.get("upload"), zeile, simuliert=t)
+
+        if aktion == "protokoll":
+            return self.protokoll_abrufen(parameter.get("quelle"), parameter.get("zeilen"), auftrag_id, zeile)
+
         if aktion == "docker_aufraeumen":
             if t:
                 rc = self.schritt("Images", ["docker", "image", "ls", "--filter", "dangling=true"], zeile, zeitlimit=60)
@@ -1836,6 +2058,360 @@ class Agent:
                 else "Aufräumen fehlgeschlagen."
 
         return 2, f"{name}: nicht umgesetzt."
+
+    # ------------------------------------------------------------ Systemverwaltung ohne SSH: Aufträge (10.10.2026)
+    def sicherungen_loeschen(self, liste, zeile, simuliert=False):
+        """Ausgewählte Sicherungen aus dem Backup-Ordner löschen (Administration › Backup, Mehrfachauswahl). Gelöscht
+        werden nur Dateien, deren Name genau zu einer EPM-Sicherung mit diesem Stempel passt (dieselben Muster wie die
+        Liste) – gefunden über den Ordnerinhalt, nie über einen Pfad aus dem Auftrag. Die jüngste Sicherung bleibt
+        immer; im Übertragungsziel wird nichts gelöscht (dort gilt die eigene Aufbewahrung)."""
+        if not isinstance(liste, list) or not liste or len(liste) > LOESCHEN_MAX \
+                or any(not isinstance(s, str) or not STEMPEL_MUSTER.match(s) for s in liste) or len(set(liste)) != len(liste):
+            return 2, "Ungültige Auswahl – nichts gelöscht."
+        vorhanden = self.sicherungen()
+        bekannt = {s["stempel"]: s for s in vorhanden}
+        fehlen = [s for s in liste if s not in bekannt]
+        if fehlen:
+            return 2, f"Diese Sicherungen gibt es auf dem Server nicht (mehr): {', '.join(fehlen[:5])} – nichts gelöscht."
+        if vorhanden[0]["stempel"] in liste:
+            return 2, "Die jüngste Sicherung bleibt immer erhalten – nichts gelöscht."
+        groesse = sum(bekannt[s]["groesse"] for s in liste)
+        zeile(f"{len(liste)} Sicherung(en), zusammen {groesse} Bytes: {', '.join(sorted(liste))}\n")
+        if simuliert:
+            zeile("(Probelauf) Die Dateien würden jetzt gelöscht.\n")
+            return 0, f"Probelauf: {len(liste)} Sicherung(en) nicht gelöscht."
+        if self.uebertragung_laeuft():
+            return 1, "Gerade läuft eine Übertragung zum Ziel – bitte danach erneut löschen. Nichts gelöscht."
+        with open(os.path.join(self.backup, ".epm-backup.sperre"), "a") as sperre:
+            try:
+                fcntl.flock(sperre, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                return 1, "Gerade läuft eine Sicherung – bitte danach erneut löschen. Nichts gelöscht."
+            weg = set(liste)
+            entfernt, frei = 0, 0
+            for n in sorted(os.listdir(self.backup)):
+                m = DATEI_MUSTER.match(n)
+                st = m.group(2) if m else (NEBEN_MUSTER.match(n).group(1) if NEBEN_MUSTER.match(n) else None)
+                if st not in weg:
+                    continue
+                pfad = os.path.join(self.backup, n)
+                try:
+                    info = os.lstat(pfad)
+                    if not stat.S_ISREG(info.st_mode):
+                        zeile(f"Übersprungen (keine gewöhnliche Datei): {n}\n")
+                        continue
+                    os.unlink(pfad)
+                    entfernt += 1
+                    frei += info.st_size
+                except OSError as e:
+                    zeile(f"Nicht gelöscht: {n} ({e.strerror})\n")
+            # eine zum Herunterladen bereitgelegte Kopie gehört dazu
+            for st in weg:
+                try:
+                    os.unlink(os.path.join(self.download, f"epm-sicherung_{st}.tar"))
+                except OSError:
+                    pass
+            fcntl.flock(sperre, fcntl.LOCK_UN)
+        stand = self.uebertragung_stand()
+        for k in list(stand["uebertragen"]):
+            stand["uebertragen"][k] = {st: z for st, z in stand["uebertragen"][k].items() if st not in weg}
+        self.schreibe(self.uebertragung_pfad(), stand, modus=0o600)
+        rest = {s["stempel"] for s in self.sicherungen()} & weg
+        self.sicherung_status_schreiben()
+        zeile(f"{entfernt} Dateien gelöscht, {frei} Bytes frei.\n")
+        if rest:
+            return 1, f"Nicht alle Sicherungen ließen sich löschen ({', '.join(sorted(rest))}) – Ausgabe prüfen."
+        return 0, f"{len(liste)} Sicherung(en) gelöscht ({frei // (1024 * 1024)} MB frei)."
+
+    def dienst_neu_starten(self, dienst, zeile, simuliert=False):
+        if dienst not in DIENSTE:
+            return 2, "Unbekannter Dienst – nichts neu gestartet."
+        args = self.compose("restart", dienst)
+        if simuliert:
+            zeile(f"\n(Probelauf) {' '.join(args)}\n")
+            return 0, f"Probelauf: Dienst „{dienst}“ nicht neu gestartet."
+        rc = self.schritt("Neustart", args, zeile, cwd=self.basis, zeitlimit=600)
+        if rc == 0 and dienst in ("backend", "db"):
+            self.backend_gesund(zeile, sekunden=180)
+        return rc, f"Dienst „{dienst}“ neu gestartet." if rc == 0 else f"Neustart von „{dienst}“ fehlgeschlagen."
+
+    def zurueck_pruefen(self, tag):
+        if not isinstance(tag, str) or not TAG_MUSTER.match(tag):
+            return "Unbekannte Version – nichts umgestellt."
+        v = self.epm_versionen()
+        e = next((x for x in v["liste"] if x["tag"] == tag), None)
+        if e is None or not e["vollstaendig"]:
+            return f"Die Version {tag} ist auf dem Server nicht (vollständig) vorhanden – nichts umgestellt."
+        if e["aktiv"]:
+            return f"Die Version {tag} läuft bereits."
+        if not os.path.exists(EPM_UPDATE):
+            return "Auf diesem Server ist „epm-update“ nicht eingerichtet."
+        return None
+
+    def zurueckschalten(self, tag, zeile, simuliert=False):
+        """Auf eine frühere, noch vorhandene Version umstellen (epm-update --zurueck). Datenbank-Migrationen werden
+        dabei nicht zurückgedreht – deshalb vorher eine Sicherung (AKTIONEN: vorher sichern)."""
+        if simuliert:
+            if not isinstance(tag, str) or not TAG_MUSTER.match(tag):
+                return 2, "Unbekannte Version – nichts umgestellt."
+            zeile(f"\n(Probelauf) {EPM_UPDATE} --zurueck {tag}\n")
+            return 0, f"Probelauf: nicht auf {tag} zurückgeschaltet."
+        fehler = self.zurueck_pruefen(tag)
+        if fehler:
+            return 2, fehler
+        rc = self.schritt("Zurückschalten", [EPM_UPDATE, "--zurueck", tag], zeile, cwd=self.basis, zeitlimit=1800,
+                          eingabe="")
+        if rc == 0:
+            return 0, (f"EPM läuft jetzt mit Version {tag}. Datenbank-Migrationen wurden nicht zurückgedreht – bei "
+                       "Fehlern die Sicherung von eben wiederherstellen.")
+        return rc, "Zurückschalten fehlgeschlagen – Ausgabe prüfen."
+
+    def upload_uebernehmen(self, kennung, art, zeile):
+        """Hochgeladene Datei (Update-Paket, OCR-Modelle) aus dem Upload-Ordner in einen nur für root beschreibbaren
+        Ordner kopieren – danach kann das Backend sie nicht mehr verändern – und dabei die SHA-256 berechnen.
+        Rückgabe: (Pfad, Angaben, Fehlertext)."""
+        if not isinstance(kennung, str) or not ID_MUSTER.match(kennung):
+            return None, None, "Unbekannter Upload."
+        quelle = os.path.join(self.upload, f"{kennung}.teil")
+        neben = os.path.join(self.upload, f"{kennung}.json")
+        try:
+            fd = os.open(neben, os.O_RDONLY | os.O_NOFOLLOW)
+            with os.fdopen(fd, encoding="utf-8") as f:
+                meta = json.loads(f.read(65536))
+        except (OSError, ValueError):
+            meta = None
+        if not isinstance(meta, dict) or meta.get("art") != art:
+            return None, None, "Die hochgeladene Datei liegt nicht (mehr) auf dem Server."
+        try:
+            fd = os.open(quelle, os.O_RDONLY | os.O_NOFOLLOW)
+        except OSError:
+            return None, None, "Die hochgeladene Datei liegt nicht (mehr) auf dem Server."
+        ordner = os.path.join(self.basis, "images")
+        os.makedirs(ordner, mode=0o755, exist_ok=True)
+        ziel = os.path.join(ordner, f".eingang-{kennung}.tar")
+        h = hashlib.sha256()
+        groesse = 0
+        with os.fdopen(fd, "rb") as f:
+            info = os.fstat(f.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size != meta.get("groesse"):
+                return None, None, "Die hochgeladene Datei ist unvollständig."
+            try:
+                frei = os.statvfs(ordner)
+                if frei.f_bavail * frei.f_frsize < 2 * info.st_size + 256 * 1024 * 1024:
+                    return None, None, "Zu wenig freier Speicher auf dem Server."
+            except OSError:
+                pass
+            zfd = os.open(ziel, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(zfd, "wb") as z:
+                for block in iter(lambda: f.read(1 << 20), b""):
+                    h.update(block)
+                    z.write(block)
+                    groesse += len(block)
+        for pfad in (quelle, neben):
+            try:
+                os.unlink(pfad)
+            except OSError:
+                pass
+        name = str(meta.get("name") or "")[:200]
+        zeile(f"Datei „{name}“, {groesse} Bytes, SHA-256 {h.hexdigest()}\n")
+        return ziel, {"name": name, "groesse": groesse, "sha256": h.hexdigest()}, None
+
+    @staticmethod
+    def tar_pruefen(pfad, muster):
+        """Nur Dateien und Ordner mit erlaubten Namen (``muster``), keine Verweise, keine absoluten Pfade, kein „..“.
+        Rückgabe: (Fehlertext | None, Namen, Inhalt der kleinen Datei „TAG“)."""
+        try:
+            with tarfile.open(pfad, "r:") as tar:
+                namen, tag = set(), ""
+                for g in tar.getmembers():
+                    name = g.name[2:] if g.name.startswith("./") else g.name
+                    name = name.rstrip("/")
+                    if name in ("", "."):
+                        continue
+                    if not (g.isreg() or g.isdir()) or name.startswith("/") or ".." in name.split("/") \
+                            or not muster.match(name):
+                        return f"unerwarteter Inhalt „{name[:80]}“", None, ""
+                    namen.add(name)
+                    if name == "TAG" and g.isreg() and g.size < 200:
+                        tag = tar.extractfile(g).read().decode(errors="replace").strip()
+                return None, namen, tag
+        except (tarfile.TarError, OSError, EOFError):
+            return "kein lesbares tar-Archiv", None, ""
+
+    def paket_einspielen(self, kennung, zeile, simuliert=False):
+        """Update-Paket (epm-update --paket-erstellen auf der Test-VM) einspielen: statt scp hochgeladen, hier geprüft
+        (Inhalt, Version) und an „epm-update --paket“ übergeben, das die Prüfsummen prüft, sichert und umstellt."""
+        pfad, info, fehler = self.upload_uebernehmen(kennung, "paket", zeile)
+        if fehler:
+            return 2, fehler
+        try:
+            fehler, namen, tag = self.tar_pruefen(pfad, PAKET_INHALT)
+            if fehler:
+                return 1, f"Das ist kein Update-Paket von EPM ({fehler}). Nichts umgestellt."
+            if not {"TAG", "SHA256SUMS", "images.tar"} <= namen or not TAG_MUSTER.match(tag):
+                return 1, "Das Update-Paket ist unvollständig (Version, Prüfsummen oder Images fehlen). Nichts umgestellt."
+            zeile(f"Version {tag} · SHA-256 der Datei: {info['sha256']} (mit der Anzeige auf der Test-VM vergleichen)\n")
+            if simuliert:
+                zeile(f"\n(Probelauf) {EPM_UPDATE} --paket … --ohne-tests\n")
+                return 0, f"Probelauf: Update-Paket {tag} geprüft, nicht eingespielt."
+            if not os.path.exists(EPM_UPDATE):
+                return 2, "Auf diesem Server ist „epm-update“ nicht eingerichtet."
+            zeile("EPM wird umgestellt. Die Oberfläche ist dabei kurz nicht erreichbar; das Ergebnis steht danach hier.\n")
+            rc = self.schritt("Update-Paket", [EPM_UPDATE, "--paket", pfad, "--ohne-tests"], zeile, cwd=self.basis,
+                              zeitlimit=4 * 3600, eingabe="")
+            if rc == 0:
+                return 0, f"Update-Paket {tag} eingespielt – EPM läuft mit der neuen Version."
+            return rc, ("Einspielen fehlgeschlagen – Ausgabe oben, ausführlich in /var/log/epm-update.log. Die "
+                        "bisherige Version läuft weiter.")
+        finally:
+            try:
+                os.unlink(pfad)
+            except OSError:
+                pass
+
+    def paket_erstellen(self, zeile, simuliert=False):
+        """Update-Paket der laufenden Version erstellen (nur Test-VM mit Code aus GitHub) und für 2 Stunden zum
+        Herunterladen bereitlegen – statt es per scp abzuholen."""
+        if simuliert:
+            zeile(f"\n(Probelauf) {EPM_UPDATE} --paket-erstellen\n")
+            return 0, "Probelauf: kein Paket erstellt."
+        if not os.path.exists(EPM_UPDATE):
+            return 2, "Auf diesem Server ist „epm-update“ nicht eingerichtet."
+        rc = self.schritt("Paket", [EPM_UPDATE, "--paket-erstellen"], zeile, cwd=self.basis, zeitlimit=2 * 3600,
+                          eingabe="")
+        if rc != 0:
+            return rc, "Paket erstellen fehlgeschlagen – Ausgabe prüfen (geht nur auf der Test-VM mit Code aus GitHub)."
+        erstellt = sorted(self.pakete()["erstellt"], key=lambda p: p["zeit"], reverse=True)
+        if not erstellt:
+            return 1, "Das Paket wurde nicht gefunden."
+        p = erstellt[0]
+        self.austausch_ordner()
+        quelle = os.path.join(self.basis, "images", p["datei"])
+        ziel = os.path.join(self.download, p["datei"])
+        try:
+            frei = os.statvfs(self.download)
+            if frei.f_bavail * frei.f_frsize < p["groesse"] + 256 * 1024 * 1024:
+                return 0, f"Update-Paket {p['tag']} erstellt; zum Herunterladen ist zu wenig Speicher frei."
+        except OSError:
+            pass
+        tmp = f"{ziel}.teil"
+        try:
+            shutil.copyfile(quelle, tmp, follow_symlinks=False)
+            if os.geteuid() == 0:
+                os.chown(tmp, 0, APP_GID)
+            os.chmod(tmp, 0o640)
+            os.replace(tmp, ziel)
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+        return 0, f"Update-Paket {p['tag']} erstellt; es liegt {BUENDEL_STUNDEN} Stunden zum Herunterladen bereit."
+
+    @staticmethod
+    def pem_pruefen(text, art):
+        if not isinstance(text, str) or not text.strip() or len(text) > PEM_MAX or "\0" in text:
+            return False
+        if art == "schluessel":
+            return "-----BEGIN" in text and "PRIVATE KEY-----" in text
+        return "-----BEGIN CERTIFICATE-----" in text and "-----END CERTIFICATE-----" in text
+
+    def zertifikat_importieren(self, geheim, zeile, simuliert=False):
+        """Zertifikat einer anderen CA (z. B. der OPNsense) übernehmen: Zertifikat, Schlüssel und – falls vorhanden – das
+        CA-Zertifikat kommen nur über die Auftragsdatei (0600, sofort gelöscht), liegen hier nur kurz in einem Ordner
+        für root und gehen an „epm-zertifikat importieren“ (prüft Name, Schlüssel und Kette)."""
+        crt, key, ca = geheim.get("zertifikat"), geheim.get("schluessel"), geheim.get("ca")
+        if not self.pem_pruefen(crt, "zertifikat") or not self.pem_pruefen(key, "schluessel") \
+                or (ca and not self.pem_pruefen(ca, "zertifikat")):
+            return 2, "Zertifikat, Schlüssel oder CA-Zertifikat fehlen oder sind kein PEM – nichts geändert."
+        zeile("Zertifikat und Schlüssel (PEM) erhalten" + (", dazu das CA-Zertifikat.\n" if ca else ".\n"))
+        if simuliert:
+            zeile(f"\n(Probelauf) {EPM_ZERTIFIKAT} importieren CRT KEY{' CA' if ca else ''}\n")
+            return 0, "Probelauf: Zertifikat nicht übernommen."
+        if not os.path.exists(EPM_ZERTIFIKAT):
+            return 2, "Auf diesem Server ist „epm-zertifikat“ nicht eingerichtet."
+        ordner = tempfile.mkdtemp(prefix="epm-zertifikat-")
+        try:
+            dateien = []
+            for name, inhalt in (("epm.crt", crt), ("epm.key", key), ("ca.crt", ca)):
+                if not inhalt:
+                    continue
+                pfad = os.path.join(ordner, name)
+                fd = os.open(pfad, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(inhalt.replace("\r\n", "\n"))
+                dateien.append(pfad)
+            rc = self.schritt("Zertifikat", [EPM_ZERTIFIKAT, "importieren", *dateien], zeile, zeitlimit=300, eingabe="")
+        finally:
+            shutil.rmtree(ordner, ignore_errors=True)
+        return (0, "Zertifikat übernommen; Nginx hat es geladen.") if rc == 0 else \
+            (rc, "Übernehmen fehlgeschlagen – Ausgabe prüfen (Name, Schlüssel, Kette). Das bisherige Zertifikat gilt weiter.")
+
+    def ocr_einspielen(self, kennung, zeile, simuliert=False):
+        """Offline vorbereitete OCR-Modelle (werkzeuge/ocr-modelle.sh vorbereiten) einspielen – statt scp hochgeladen.
+        „epm-ocr-modelle einspielen“ prüft die Prüfsummen; das nächste „EPM aktualisieren“ baut sie ins Image."""
+        pfad, _info, fehler = self.upload_uebernehmen(kennung, "ocr", zeile)
+        if fehler:
+            return 2, fehler
+        try:
+            fehler, namen, _tag = self.tar_pruefen(pfad, OCR_INHALT)
+            if fehler:
+                return 1, f"Das sind keine vorbereiteten OCR-Modelle ({fehler}). Nichts eingespielt."
+            if "modelle.json" not in namen or not any(n.startswith("dateien/") for n in namen):
+                return 1, "Die Datei enthält keine Modelle (modelle.json und Ordner „dateien“ fehlen). Nichts eingespielt."
+            if simuliert:
+                zeile(f"\n(Probelauf) {EPM_OCR_MODELLE} einspielen …\n")
+                return 0, "Probelauf: OCR-Modelle geprüft, nicht eingespielt."
+            if not os.path.exists(EPM_OCR_MODELLE):
+                return 2, "Auf diesem Server ist „epm-ocr-modelle“ nicht eingerichtet (kommt mit „EPM aktualisieren“)."
+            rc = self.schritt("OCR-Modelle", [EPM_OCR_MODELLE, "einspielen", pfad], zeile, zeitlimit=1800, eingabe="")
+            if rc == 0:
+                return 0, "OCR-Modelle eingespielt. Mit „EPM aktualisieren“ baut der Server sie ins Image ein."
+            return rc, "Einspielen fehlgeschlagen – Ausgabe prüfen (Prüfsummen, passende Modell-Liste)."
+        finally:
+            try:
+                os.unlink(pfad)
+            except OSError:
+                pass
+
+    def protokoll_abrufen(self, quelle, zeilen, auftrag_id, zeile):
+        """Letzte Zeilen eines Protokolls (nur lesend, auch im Probelauf echt) in ``status/protokolle/<Auftrag>.log``
+        schreiben – nur für root und die Gruppe des Backends lesbar, nach 1 Stunde entfernt. Der Inhalt kommt nicht in
+        die Ausgabe des Auftrags und damit nicht in die Datenbank."""
+        if quelle not in PROTOKOLLE or isinstance(zeilen, bool) or zeilen not in PROTOKOLL_ZEILEN:
+            return 2, "Unbekanntes Protokoll."
+        if quelle in DIENSTE:
+            rc, text = self.befehl(self.compose("logs", "--no-color", "--timestamps", "--tail", str(zeilen), quelle),
+                                   cwd=self.basis, zeitlimit=120)
+        elif quelle in PROTOKOLL_JOURNAL:
+            args = ["journalctl", "--no-pager", "-o", "short-iso", "-n", str(zeilen)]
+            for einheit in PROTOKOLL_JOURNAL[quelle]:
+                args += ["-u", einheit]
+            rc, text = self.befehl(args, zeitlimit=120)
+        else:
+            try:
+                with open("/var/log/epm-update.log", encoding="utf-8", errors="replace") as f:
+                    rc, text = 0, "".join(deque(f, maxlen=zeilen))
+            except OSError:
+                rc, text = 1, "Es gibt noch kein Protokoll eines Updates (/var/log/epm-update.log).\n"
+        text = text[-PROTOKOLL_MAX:]
+        os.makedirs(self.protokolle, mode=0o750, exist_ok=True)
+        if os.geteuid() == 0:
+            os.chown(self.protokolle, 0, APP_GID)
+            os.chmod(self.protokolle, 0o750)
+        pfad = os.path.join(self.protokolle, f"{auftrag_id}.log")
+        tmp = f"{pfad}.tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o640)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        if os.geteuid() == 0:
+            os.chown(tmp, 0, APP_GID)
+        os.replace(tmp, pfad)
+        anzahl = text.count("\n")
+        zeile(f"{PROTOKOLLE[quelle]}: {anzahl} Zeilen abgerufen (liegt eine Stunde zum Ansehen bereit).\n")
+        if rc != 0:
+            return 1, f"{PROTOKOLLE[quelle]}: nicht vollständig lesbar (Rückgabe {rc}) – was zu lesen war, steht unten."
+        return 0, f"{PROTOKOLLE[quelle]}: {anzahl} Zeilen."
 
     def leeren(self, behalten, von, zeile, vorher=None, simuliert=False):
         """Datenbank leeren (U27): alle Akten, Dokumente, Versorger, Ärzte, nicht ausgewählte Benutzer und das Audit-Log

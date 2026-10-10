@@ -49,6 +49,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | Nr. | Funktion | Ansicht (Entwurf) | Status |
 |---|---|---|---|
 | 09.10.2026 | Eigene Vorlagen | „+ Neue Vorlage“ unter Vorlagen › Dokumentvorlagen: eigene Schreiben mit E-Mail anlegen, bearbeiten, deaktivieren; in der Akte wählbar (F176). Lauf steht aus |
+| F179 | Systemverwaltung ohne SSH: Ampel, Reiter, kompakte Graphen, Sicherungen mehrfach löschen, Dienste, Versionen, Pakete, Zertifikat, Protokolle | Administration › Systemverwaltung, System, Backup | ABGESCHLOSSEN – Lauf steht aus |
 | F01 | Sitzungsstatus und CSRF-Token | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F02 | Anmeldung mit Benutzername und Kennwort | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F03 | Zweiter Faktor bei der Anmeldung | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
@@ -3320,6 +3321,96 @@ strukturell überarbeitet und sind hier bewusst nur in Texten berührt.
   PC (1440 px) und Telefon (390 px) per Bildschirmfoto gegen die Entwicklungsumgebung geprüft. **Browsertests: Lauf steht aus.**
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+## W · Systemverwaltung ohne SSH (10.10.2026)
+
+Auftrag: „Der Praxismanager soll sich nie wieder per SSH auf den Server schalten müssen.“ Alles, was bisher nur per SSH
+ging, läuft jetzt als Auftrag über den Systemagenten (`rollout/epm-systemagent.py`, feste Allowlist `AKTIONEN`,
+Version 5) – mit Bestätigung wie unter Tätigkeiten (Rückfrage bzw. Passwort + zweiter Faktor über
+`bestaetigung_pruefen`), mit Eintrag im Audit-Log und im Probelauf (`--trocken`) simuliert. Per SSH bleibt nur die
+Ersteinrichtung des Servers (`rollout/01…05`, `epm-git-einrichten.sh`, `epm-zertifikat einrichten` für die eigene CA).
+
+### F179 Systemverwaltung: Ampel, Reiter, kompakte Graphen, Wartung ohne SSH
+- **F179a Sicherungen mit Mehrfachauswahl löschen** (Administration › Backup › Sicherungen): Checkbox je Zeile,
+  „alle auswählen“ (außer der jüngsten), Leiste „N ausgewählt · Größe“, Knopf „N Sicherungen löschen“ → Dialog mit
+  Anzahl, Größe, Liste, Hinweis „endgültig“ und Warnung, wenn Sicherungen nirgends sonst liegen (nicht übertragen /
+  kein Ziel); Bestätigung mit Passwort und 2FA. Die **jüngste Sicherung ist nie löschbar** (Backend und Agent).
+  `POST /api/backup/loeschen/` `{"stempel": [...], "kennwort", "code"}` (Recht „Sicherungen verwalten“; 1–200 Stempel,
+  Muster `JJJJ-MM-TT_HHMM[SS]`, keine Doppelten, alle bekannt, Agent muss laufen, kein Wiederherstellen offen).
+  Agent-Aktion `sicherung_loeschen`: prüft noch einmal, sucht die Dateien über den Ordnerinhalt (dieselben Muster wie
+  die Liste), löscht nur gewöhnliche Dateien (symbolische Links werden übersprungen), nimmt die Sperre der Sicherung,
+  bricht ab, solange eine Übertragung läuft, entfernt eine bereitgelegte Download-Kopie und den Übertragungsstand.
+  Audit-Log „Backup“: Stempel, Anzahl, Größe, Zahl der unverschlüsselten, bestätigt.
+- **F179b Systemverwaltung** (`/admin`, neuer Menüpunkt, Recht Systemverwaltung oder Sicherungen verwalten): Ampel für
+  Systemagent, Dienste/Container, Speicherplatz, Ubuntu-Updates (Sicherheitsupdates, Neustart nötig), Zertifikat
+  (Ablauf < 30 Tage Hinweis, < 7 Fehler, selbst signiert Hinweis), Texterkennung, Uhrzeit/NTP, letzte Sicherung,
+  Übertragung, fehlgeschlagene Aufträge in 24 h; jede Kachel führt zum passenden Reiter. Daneben „Häufige Aufgaben“
+  (Jetzt sichern, Ubuntu-Updates, EPM aktualisieren, Server neu starten, Dienste, Software, Zertifikat, Protokolle,
+  Hinweis an alle, Benutzer, Audit-Log) und die Auslastung als kleiner Verlauf.
+- **F179c Reiter statt Endlos-Seiten**: Administration › System: Übersicht · Wartung · Software · Zertifikat ·
+  Protokolle · Anmeldungen und Hinweis · Verlauf · Testphase; Administration › Backup: Sicherungen · Verschlüsselung ·
+  Übertragung · Tätigkeiten. Reiter in der Adresse (`?reiter=…`), am Telefon seitlich wischbar
+  (`components/ui/reiter.tsx`).
+- **F179d Graphen kompakt**: CPU, Arbeitsspeicher und Platte als Zahl mit kleinem Verlauf (24 h,
+  `components/ui/sparkline.tsx`); „Größer anzeigen“ bzw. Klick auf die Karte öffnet das große Diagramm mit Zeitraum
+  im Dialog (`seiten/admin/auslastung.tsx`). Backup: Größe je Sicherung als kleine Säulen, groß im Dialog.
+- **F179e Dienste einzeln neu starten** (Wartung): backend, web, ocr, db; `POST /api/system/dienste/neustart/`
+  `{"dienst", "minuten", "hinweis"?, "kennwort", "code"}`, warnt die Angemeldeten; Agent `dienst_neustart`
+  (`docker compose restart <dienst>`).
+- **F179f Version zurückschalten** (Software): Liste der vorhandenen Versionen (Images `epm-backend`/`epm-web` vom
+  Agenten im Status, laufende aus `.env`); `POST /api/system/versionen/zurueck/` `{"tag", "minuten", …}` (Muster
+  `X.Y.Z-<commit>`, muss vollständig vorhanden und nicht aktiv sein, Agent muss laufen); Agent `epm_zurueck`: vorher
+  Sicherung (`vor_update`), dann `epm-update --zurueck TAG`.
+- **F179g Update-Paket hochladen und erstellen** (Software): Hochladen in Stücken wie bei Sicherungen
+  (`system/hochladen.py`, gemeinsam für Sicherung/Paket/OCR, Arten getrennt: ein Paket lässt sich nicht als Sicherung
+  einlesen und umgekehrt); `POST /api/system/hochladen/` `{"art": "paket"|"ocr", "name", "groesse"}`, `PUT …/<upload>/
+  ?versatz=N`, `DELETE …/<upload>/`, `POST …/<upload>/einspielen/`. Agent `epm_paket`: kopiert die Datei in einen nur
+  für root beschreibbaren Ordner (das Backend kann sie danach nicht mehr ändern), berechnet die SHA-256 (steht in der
+  Ausgabe zum Vergleich mit der Test-VM), prüft das tar (nur `TAG`, `VERSION`, `SHA256SUMS`, `images.tar`,
+  `rollout/…`, `werkzeuge/…`; keine Verweise, keine absoluten Pfade, kein „..“), dann `epm-update --paket … --ohne-tests`
+  (prüft die Prüfsummen, sichert, stellt um). `epm_paket_erstellen` (`POST /api/system/pakete/erstellen/`): `epm-update
+  --paket-erstellen`, Paket 2 Stunden unter `system/download/`; `GET /api/system/pakete/<datei>/` (X-Accel, Audit-Log).
+- **F179h OCR-Modelle einspielen** (Software): Upload Art `ocr`, Agent `ocr_modelle` prüft den Inhalt (`modelle.json`,
+  `dateien/…`) und ruft `epm-ocr-modelle einspielen` auf; Vorrat auf dem Server und Stand im Image werden angezeigt.
+- **F179i Zertifikat** (Zertifikat): Inhaber, Namen, Aussteller, Ablauf, eigene CA/selbst signiert (Agent liest
+  `nginx/certs/epm.crt` mit openssl), Stammzertifikat `/epm-ca.crt` zum Herunterladen. `POST /api/system/zertifikat/
+  erneuern/` (nur mit eigener CA; `epm-zertifikat erneuern`), `POST /api/system/zertifikat/importieren/`
+  `{"zertifikat", "schluessel", "ca"?}` als PEM: Backend prüft Lesbarkeit, Schlüssel passt, Kette zur CA
+  (cryptography); Zertifikat, Schlüssel und CA nur in der Auftragsdatei (`geheim`, 0600) – im Audit-Log nur Inhaber,
+  Aussteller, Ablauf, Fingerabdruck. Agent schreibt sie in einen temporären Ordner (0700) und ruft `epm-zertifikat
+  importieren` auf.
+- **F179j Protokolle** (nur lesend): backend, web, ocr, db (`docker compose logs --tail N`), Systemagent, nächtliche
+  Sicherung, Übertragung (`journalctl -u …`), letztes Update (`/var/log/epm-update.log`); 100/500/2000 Zeilen.
+  `POST /api/system/protokolle/` `{"quelle", "zeilen"}` → Agent `protokoll` legt den Text unter
+  `status/protokolle/<Auftrag>.log` ab (0640, Gruppe des Backends, nach 1 Stunde gelöscht) – **nicht** in der
+  Datenbank; `GET /api/system/protokolle/<kennung>/` (`?herunterladen=1` als Datei, Audit-Log). Filter in der Oberfläche.
+- **F179k Status erweitert**: Versionen, Pakete, Zertifikat, Uhrzeit/NTP (`timedatectl`), OCR-Vorrat, vorhandene
+  Werkzeuge; „Neustart nötig“ und Speicher wie bisher.
+- **Begriffe**: „Passwort“ statt „Kennwort“ in den sichtbaren Texten von Benutzer, System, Backup, Startseite
+  (Administration), Hilfe Administration/Backup; Erklärungen beim Draufzeigen für Systemagent, Container, CA,
+  Update-Paket, Übertragungsziel (`lib/begriffe.ts`).
+- **Teststatus:** Backend `system/test_verwaltung.py` (Mehrfach-Löschen: Rechte, Validierung, Pfadtricks, jüngste,
+  Agent nicht erreichbar, Audit-Log; echter Agent löscht echt und folgt keinem Verweis; Probeläufe aller neuen Aktionen;
+  Uploads mit Inhaltsprüfung inkl. Verweis/„..“/fremder Datei; Zertifikat-Import ohne Schlüssel in der Datenbank;
+  Protokolle; Stand im Status) – 112 Tests `system accounts audit` lokal grün. Browsertests `system.spec.ts` (neuer
+  Test Systemverwaltung) lokal grün gegen Vite + Django + Agent im Probelauf; `zzz-sicherung.spec.ts` (neuer Test
+  Mehrfach-Löschen) braucht den CI-Stack.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+**Bewusst nicht umgesetzt (Empfehlungen):**
+- *Zeitplan der automatischen Sicherung ändern* (OnCalendar von `epm-backup.timer`): bräuchte eine geprüfte
+  Zeitangabe und `systemctl daemon-reload` aus dem Agenten; selten nötig. Empfehlung: Auswahl 01:00–05:00 als eigene
+  Agent-Aktion mit Drop-in `/etc/systemd/system/epm-backup.timer.d/zeit.conf`.
+- *Aufräumen mit Speicher-Übersicht je Verzeichnis* (Journal, alte Image-Dateien, Uploads): heute Docker- und
+  Paketreste aufräumen; Empfehlung: `journalctl --vacuum-size` und Löschen alter `images/epm-*.tar` als weitere
+  Aktionen.
+- *Protokolle ohne Patientendaten*: Container-Protokolle können in Fehlermeldungen Inhalte enthalten; sie werden
+  deshalb nur auf Anforderung gelesen, nicht gespeichert und nach 1 Stunde gelöscht. Eine Maskierung (Namen,
+  Geburtsdaten) wäre unzuverlässig und ist nicht eingebaut.
+- *Update-Pakete signieren*: Die Prüfsummen im Paket schützen vor Beschädigung, nicht vor einem untergeschobenen Paket.
+  Schutz heute: nur mit Recht Systemverwaltung, Passwort + 2FA, SHA-256 zum Vergleich. Empfehlung: Signatur mit einem
+  Schlüssel der Test-VM, den der VPS kennt.
+- *Uhrzeit/NTP einstellen*: nur angezeigt, nicht änderbar.
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -3428,6 +3519,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 10.10.2026 | Systemverwaltung ohne SSH | Neue Seite Systemverwaltung mit Ampel und häufigen Aufgaben; System und Backup in Reitern; Graphen klein, groß im Dialog; Sicherungen mit Mehrfachauswahl löschen; Dienste einzeln neu starten, Version zurückschalten, Update-Paket und OCR-Modelle hochladen, Paket erstellen, Zertifikat erneuern/importieren, Protokolle ansehen – alles über den Systemagenten (F179). Lauf steht aus |
 | 10.10.2026 | Bedienung für Pflegekräfte | Nachsichtige Datums-/Uhrzeiteingabe, Fehlermeldungen mit Lösungsweg, leere Zustände mit nächstem Schritt, Hilfe „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“, weniger Fachjargon (F178, `docs/BEDIENBARKEIT-2026-10-10.md`). Lauf steht aus |
 | 10.10.2026 | Infoblatt an die Praxis | Kalender › „Praxis informieren“: Infoblatt mit allen Terminen in der Praxis Holtmeier, Zeitraum per Knopf, Vorschau mit „neu“ und Warnung bei fehlendem Ort, nur Termine am gewählten Ort (Telefon/Video wahlweise), gemerkte Blätter ohne Namen, Erinnerung auf der Startseite, Ort im Termin vorbelegt (F177). Lauf steht aus |
 | 09.10.2026 | Schreiben mit E-Mail | Vorlagen von Alice: Patientenaufnahme, Terminbestätigung, Reisebescheinigung mit ADAC-Attest als PDF und als fertige E-Mail (.eml mit Anhang) aus der Akte (F172), Patientenankündigung aus dem Kalender (F173), Anlagen für E-Mails (F174), Fallzusammenfassung mit Gliederung (F175). Lauf steht aus |

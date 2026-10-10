@@ -17,7 +17,8 @@
   erkennt nur mit Tesseract – Administration › System zeigt es). **Offline nachreichen:** auf einem PC mit Internet
   `werkzeuge/ocr-modelle.sh vorbereiten` (Windows: `werkzeuge\ocr-modelle.ps1`) → Datei per `scp` auf die Test-VM →
   `sudo epm-ocr-modelle einspielen DATEI.tar` → `sudo epm-update` (baut das Image mit den Modellen neu;
-  `sudo epm-ocr-modelle status` zeigt den Stand)
+  `sudo epm-ocr-modelle status` zeigt den Stand) – oder in EPM unter Administration › System › Software
+  „OCR-Modelle einspielen“ (Datei hochladen statt scp) und danach „EPM aktualisieren“
   Auf Servern mit wenig RAM (unter 6 GB) arbeitet die Texterkennung automatisch im Sparmodus (kleines Zeilenmodell,
   ohne Glätten); Speichergrenze und Rechenkerne des OCR-Dienstes trägt `04-projekt.sh` einmalig nach dem Server in
   `/srv/epm/.env` ein (`EPM_OCR_SPEICHER`, `EPM_OCR_THREADS`, Modus erzwingen mit `EPM_OCR_MODUS=voll|sparsam`)
@@ -25,7 +26,17 @@
   `registry.npmjs.org` (Proxy-Freigabe); ohne Zugang die Images mit `werkzeuge/bauen.sh` auf einem anderen Rechner bauen
   und als `epm-<VERSION>.tar` mit `rollout/05-backend.sh` einspielen.
 
+## Server ohne SSH warten (10.10.2026)
+Unter **Administration › Systemverwaltung** stehen Zustand (Ampel) und die häufigen Aufgaben; alles Weitere unter
+Administration › System (Reiter Wartung, Software, Zertifikat, Protokolle) und › Backup. Updates, Neustart, Dienste,
+Zurückschalten, Update-Pakete, OCR-Modelle, Zertifikat, Protokolle und Sicherungen laufen über den Systemagenten –
+gefährliche Aktionen mit Passwort und zweitem Faktor, alles im Audit-Log. SSH braucht es nur noch für die
+Ersteinrichtung des Servers (`rollout/01…05`, `epm-git-einrichten.sh`, einmalig `epm-zertifikat einrichten`) und wenn
+der Systemagent selbst nicht läuft.
+
 ## Test-VM aktualisieren
+Oder in EPM unter Administration › System: „EPM aktualisieren“ (Wartung), Versionen und „Zurückschalten“, „Update-Paket
+erstellen“ (Software).
 ```bash
 sudo epm-update                # holen, bauen (Backend und Frontend), Backup, starten, Musterdaten, Tests
 sudo epm-update --versionen    # vorhandene Versionen
@@ -41,6 +52,9 @@ getesteten Version eine Datei `epm-paket-<TAG>.tar` (Images, Rollout-Dateien, Sy
 scp /srv/epm/images/epm-paket-<TAG>.tar epmadmin@VPS:~/      # vom PC bzw. der Test-VM
 sudo epm-update --paket ~/epm-paket-<TAG>.tar                 # auf dem VPS: prüfen, Backup, umstellen, Tests
 ```
+Oder ohne scp und SSH: auf der Test-VM unter Administration › System › Software „Update-Paket erstellen“ und
+herunterladen, auf dem VPS dort „Update-Paket einspielen“ (hochladen, SHA-256 vergleichen, mit Passwort und 2FA
+bestätigen).
 Die Konfiguration des Servers liegt in `/etc/epm/epm.conf` (nicht im Repo). Die Oberfläche ist danach unter
 `https://<EPM_WEB_NAME>/` erreichbar, die Django-Verwaltung unter `/verwaltung/` (nur Rolle Admin).
 
@@ -54,6 +68,8 @@ sudo epm-zertifikat status       # Name, Aussteller, Ablauf (Serverzertifikat 39
 Das Stammzertifikat liegt unter `https://<EPM_WEB_NAME>/epm-ca.crt` und wird einmal je PC/Telefon installiert
 (Anleitung in EPM unter Hilfe › „Passkey statt Code“). Den Namen auf der OPNsense per Unbound-Überschreibung auf die
 Server-IP zeigen lassen. Ein Zertifikat einer anderen CA (z. B. der OPNsense): `sudo epm-zertifikat importieren CRT KEY CA`.
+Status, Erneuern und Importieren gehen auch in EPM unter Administration › System › Zertifikat; nur das erstmalige
+Einrichten der eigenen CA (`epm-zertifikat einrichten`) bleibt Teil der Ersteinrichtung per SSH.
 
 ## Datensicherung
 Täglich um 02:00 (`epm-backup.timer`), 30 Tage auf dem Server unter `/srv/epm/backup` (unter Administration › Backup
@@ -62,7 +78,9 @@ Administration › Backup: Passwort für die Verschlüsselung festlegen und das 
 Übertragungsziel (WebDAV, z. B. Nextcloud mit App-Passwort) mit Zeitfenster, „Jetzt sichern“, Wiederherstellen (eigenes
 Passwort und Code aus der Authenticator-App – die Zwei-Faktor-Anmeldung ist dafür nötig), Sicherung als eine Datei herunterladen und
 wieder hochladen (z. B. von der Migrationsmaschine; Austausch über `/srv/epm/system/download` und `…/upload`). Passwort und Zugang liegen nur auf dem Server in `/etc/epm/sicherung` (root, 0600). Die Adresse des
-Ziels muss im Proxy der OPNsense freigegeben sein. Ohne EPM entschlüsseln: `gpg -d -o epm-db_….dump epm-db_….dump.gpg`.
+Ziels muss im Proxy der OPNsense freigegeben sein. Nicht mehr gebrauchte Sicherungen lassen sich in der Liste ankreuzen
+und gesammelt löschen (die jüngste bleibt immer); Protokolle der nächtlichen Sicherung und der Übertragung stehen unter
+Administration › System › Protokolle. Ohne EPM entschlüsseln: `gpg -d -o epm-db_….dump epm-db_….dump.gpg`.
 
 ## Tests
 Bei jedem Push laufen in GitHub Actions (`.github/workflows/backend.yml`):

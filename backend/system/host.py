@@ -7,13 +7,14 @@ der Agent (root, systemd) führt nur seine fest eingetragenen Aktionen aus und s
 """
 import json
 import os
+import re
 from datetime import datetime
 
 from django.conf import settings
 from django.utils import timezone
 
 # Code -> Angaben. Dieselben Aktionen stehen im Agenten (AKTIONEN); andere führt er nicht aus.
-# bestaetigung: "keine" | "einfach" (Rückfrage) | "2fa" (Admin-Kennwort und – wenn ein zweiter Faktor eingerichtet
+# bestaetigung: "keine" | "einfach" (Rückfrage) | "2fa" (Admin-Passwort und – wenn ein zweiter Faktor eingerichtet
 # ist – der Code; Festlegungen 01. und 02.10.2026)
 # sichern: der Agent erstellt vorher eine Sicherung; warnen: angemeldete Benutzer bekommen vorher einen Hinweis
 AKTIONEN = {
@@ -121,12 +122,74 @@ AKTIONEN = {
         "hinweis": "EPM wird auf eine Sicherung zurückgesetzt und ist einige Minuten nicht erreichbar. Eingaben nach dem "
                    "Zeitpunkt der Sicherung gehen verloren; danach bitte neu anmelden.",
     },
+    # ---- Systemverwaltung ohne SSH (Wunsch 10.10.2026, F179): was bisher nur per SSH ging. „intern“: nur über eigene
+    # Endpunkte mit geprüften Angaben (Stempel, Version, Dienst, Upload, Protokoll), nicht unter „Tätigkeiten“.
+    "sicherung_loeschen": {
+        "name": "Sicherungen löschen", "bestaetigung": "2fa", "recht": "backup_verwalten", "intern": True,
+        "beschreibung": "Ausgewählte Sicherungen endgültig vom Server löschen. Die jüngste Sicherung bleibt immer; im "
+                        "Übertragungsziel gilt dessen eigene Aufbewahrung.",
+    },
+    "dienst_neustart": {
+        "name": "Dienst neu starten", "bestaetigung": "2fa", "warnen": True, "intern": True,
+        "beschreibung": "Einen einzelnen Container neu starten (backend, web, ocr oder db), z. B. wenn er hängt.",
+        "hinweis": "Ein Teil von EPM wird neu gestartet und ist kurz nicht erreichbar – bitte Eingaben vorher speichern.",
+    },
+    "epm_zurueck": {
+        "name": "EPM-Version zurückschalten", "bestaetigung": "2fa", "sichern": True, "warnen": True, "intern": True,
+        "beschreibung": "Auf eine frühere, noch vorhandene Version umstellen (sudo epm-update --zurueck). Vorher "
+                        "automatische Sicherung; Datenbank-Migrationen werden nicht zurückgedreht.",
+        "hinweis": "EPM wird auf eine frühere Version umgestellt und ist kurz nicht erreichbar – bitte Eingaben vorher "
+                   "speichern.",
+    },
+    "epm_paket": {
+        "name": "Update-Paket einspielen", "bestaetigung": "2fa", "warnen": True, "intern": True,
+        "beschreibung": "Ein hochgeladenes Update-Paket der Test-VM prüfen und einspielen (sudo epm-update --paket). "
+                        "epm-update sichert vorher; geht etwas schief, läuft die bisherige Version weiter.",
+        "hinweis": "EPM wird auf einen neuen Stand gebracht. Beim Umstellen ist es kurz nicht erreichbar – bitte "
+                   "Eingaben vorher speichern.",
+    },
+    "epm_paket_erstellen": {
+        "name": "Update-Paket erstellen", "bestaetigung": "einfach", "intern": True,
+        "beschreibung": "Paket der laufenden, getesteten Version für einen Server ohne Internet (sudo epm-update "
+                        "--paket-erstellen, nur Test-VM); es liegt danach 2 Stunden zum Herunterladen bereit.",
+    },
+    "zertifikat_erneuern": {
+        "name": "Zertifikat erneuern", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Neues Serverzertifikat der eigenen CA ausstellen (sudo epm-zertifikat erneuern, 397 Tage); "
+                        "Geräte, die der CA vertrauen, merken nichts davon.",
+    },
+    "zertifikat_importieren": {
+        "name": "Zertifikat importieren", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Zertifikat einer anderen CA (z. B. der OPNsense) mit Schlüssel und CA-Zertifikat übernehmen "
+                        "(sudo epm-zertifikat importieren).",
+    },
+    "ocr_modelle": {
+        "name": "OCR-Modelle einspielen", "bestaetigung": "einfach", "intern": True,
+        "beschreibung": "Offline vorbereitete Modelle der zweiten Texterkennung prüfen und ablegen (sudo epm-ocr-modelle "
+                        "einspielen); das nächste „EPM aktualisieren“ baut sie ins Image.",
+    },
+    "protokoll": {
+        "name": "Protokoll abrufen", "bestaetigung": "keine", "intern": True, "mehrfach": True,
+        "beschreibung": "Letzte Zeilen eines Protokolls (Container, Systemagent, Sicherung, Update) – nur lesend.",
+    },
 }
 
 # Aktionen der Seite Administration › Backup (für deren Liste der Tätigkeiten)
 SICHERUNG_AKTIONEN = ("sicherung", "sicherung_passwort", "sicherung_ziel", "sicherung_ziel_entfernen",
                       "sicherung_ziel_testen", "sicherung_uebertragen", "sicherung_aufbewahrung",
-                      "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen")
+                      "sicherung_bereitstellen", "sicherung_einlesen", "wiederherstellen", "sicherung_loeschen")
+
+# Systemverwaltung ohne SSH (10.10.2026): dieselben Listen und Muster wie im Agenten (der prüft noch einmal)
+DIENSTE = ("backend", "web", "ocr", "db")
+TAG_MUSTER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40}$")
+PAKET_MUSTER = re.compile(r"^epm-paket-([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})\.tar$")
+PROTOKOLLE = {
+    "backend": "Container backend (Django)", "web": "Container web (Nginx)", "ocr": "Container ocr (Texterkennung)",
+    "db": "Container db (PostgreSQL)", "systemagent": "Systemagent", "backup": "Nächtliche Sicherung",
+    "uebertragung": "Übertragung der Sicherungen", "update": "Letztes EPM-Update (/var/log/epm-update.log)",
+}
+PROTOKOLL_ZEILEN = (100, 500, 2000)
+LOESCHEN_MAX = 200
 
 STATUS_VERALTET_S = 180   # der Agent misst jede Minute; älter heißt: Agent läuft nicht
 
@@ -145,8 +208,14 @@ def ordner_download():
 
 
 def ordner_upload():
-    """Hochgeladene Sicherungen (schreibt das Backend, der Agent liest sie ein und entfernt sie)."""
+    """Hochgeladene Sicherungen, Update-Pakete und OCR-Modelle (schreibt das Backend, der Agent übernimmt sie und
+    entfernt sie)."""
     return settings.EPM_SYSTEM / "upload"
+
+
+def protokoll_datei(auftrag):
+    """Vom Agenten abgerufenes Protokoll (``status/protokolle/<Auftrag>.log``, nach 1 Stunde entfernt)."""
+    return ordner_status() / "protokolle" / f"{auftrag.kennung.hex}.log"
 
 
 def _lies(pfad):

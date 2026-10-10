@@ -284,7 +284,7 @@ test("Nach dem Neustart: Termin im Kalender (erledigt) und Tätigkeiten der Syst
 
   const s = gemerkt("system");
   const a = await seiteAls(browser, "admin");
-  await a.page.goto("/admin/system");
+  await a.page.goto("/admin/system?reiter=verlauf");
   const zeilen = a.page.getByTestId("auftraege");
   await expect(zeilen.getByRole("row", { name: new RegExp(s.taetigkeit) }).first()).toContainText("erledigt");
   await expect(zeilen.getByRole("row", { name: /Server neu starten/ }).first()).toContainText("erledigt");
