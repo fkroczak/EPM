@@ -19,8 +19,12 @@ if [[ ! -s "$ADMIN_HOME/.ssh/authorized_keys" ]]; then
 fi
 ip -br addr show "$EPM_MGMT_IF" >/dev/null 2>&1 || { echo "ABBRUCH: Netzwerkkarte $EPM_MGMT_IF nicht gefunden."; exit 1; }
 
-apt-get update
-apt-get -y install ufw fail2ban
+if [[ "${EPM_OFFLINE:-0}" == 1 ]]; then
+  echo "==> Offline (Notfallpaket): ufw und fail2ban sind aus dem Notfallpaket installiert"
+else
+  apt-get update
+  apt-get -y install ufw fail2ban
+fi
 
 echo "==> SSH: nur Schlüssel, kein root, nur $EPM_ADMIN_USER"
 cat > /etc/ssh/sshd_config.d/10-epm.conf <<EOF

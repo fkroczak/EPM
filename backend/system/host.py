@@ -188,6 +188,13 @@ AKTIONEN = {
         "beschreibung": "Gespeicherte Image-Dateien, Update-Pakete und Docker-Images alter Versionen löschen. Die "
                         "laufende und die vorherige Version (für „Zurückschalten“) bleiben immer.",
     },
+    # ---- Notfallpaket (F188)
+    "notfallpaket": {
+        "name": "Notfallpaket erstellen", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Alles für einen Wiederaufbau ohne Internet in eine Datei: Programme (Images), Rollout-Skripte, "
+                        "Debian-Pakete, OCR-Modelle, wahlweise die jüngste Sicherung, Einstellungen ohne Passwörter, die "
+                        "CA (Schlüssel verschlüsselt) und den Notfallplan. Liegt danach 6 Stunden zum Herunterladen bereit.",
+    },
     "uhr_einstellen": {
         "name": "Uhrzeit einstellen", "bestaetigung": "2fa", "intern": True,
         "beschreibung": "Zeitzone, Zeitsynchronisation (NTP) mit eigenem Zeitserver, z. B. der OPNsense, oder die "
@@ -214,6 +221,8 @@ PROTOKOLL_ZEILEN = (100, 500, 2000)
 LOESCHEN_MAX = 200
 # Nachtrag 10.10.2026: wie im Agenten
 ZEITPLAN_TAGE = ("taeglich", "werktags")
+NOTFALL_MUSTER = re.compile(r"^epm-notfall-([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})-(\d{4}-\d{2}-\d{2}_\d{4})\.tar$")
+NOTFALL_ALT_TAGE = 30          # älter: Hinweis in der Systemverwaltung
 JOURNAL_GROESSE = ("100M", "200M", "500M", "1G")
 JOURNAL_ZEIT = ("2weeks", "1month", "3months", "6months")
 IMAGE_DATEI_MUSTER = re.compile(r"^epm-(paket-)?([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})\.tar$")

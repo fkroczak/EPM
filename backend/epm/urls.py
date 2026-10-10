@@ -125,6 +125,9 @@ urlpatterns = [
     path("api/system/journal/aufraeumen/", verwaltung.JournalView.as_view()),
     path("api/system/images/loeschen/", verwaltung.ImagesLoeschenView.as_view()),
     path("api/system/uhr/", verwaltung.UhrView.as_view()),
+    path("api/system/notfall/", verwaltung.NotfallView.as_view()),
+    path("api/system/notfall/<str:datei>/", verwaltung.NotfallDateiView.as_view()),
+    path("api/system/notfallplan/", verwaltung.NotfallplanView.as_view()),
     # Administration › Import: Übernahme der Altdaten (nur Admin)
     path("api/altimport/", altimport.StandView.as_view()),
     path("api/altimport/dump/", altimport.DumpView.as_view()),

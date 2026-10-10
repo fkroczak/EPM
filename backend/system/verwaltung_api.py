@@ -19,11 +19,15 @@ POST   /api/system/journal/aufraeumen/            {art: "groesse" | "zeit", wert
 POST   /api/system/images/loeschen/               {dateien: [...], tags: [...], kennwort, code} – laufende und vorherige
                                                   Version bleiben immer
 POST   /api/system/uhr/                           {zeitzone?, ntp, server: [...], zeit?, kennwort, code}
+POST   /api/system/notfall/                       {mit_sicherung, kennwort, code} → Notfallpaket erstellen (F188)
+GET    /api/system/notfall/<datei>/               bereitgestelltes Notfallpaket herunterladen (Audit-Log)
+GET    /api/system/notfallplan/?art=html|pdf|md      Wiederaufbau-Plan (auch mit Recht „Sicherungen verwalten“)
 
 Schlüssel (und das Zertifikat selbst) gehen nur in die Auftragsdatei an den Server (0600, der Agent löscht sie sofort) –
 nie in die Datenbank oder das Audit-Log; dort stehen nur Inhaber, Aussteller, Ablauf und Fingerabdruck.
 Protokolle legt der Agent für eine Stunde ab; sie werden nicht in der Datenbank gespeichert.
 """
+import os
 from urllib.parse import quote
 
 from django.conf import settings
@@ -400,3 +404,86 @@ class UhrView(APIView):
         parameter = {"ntp": ntp, "server": server, **({"zeitzone": zone} if zone else {}), **({"zeit": zeit} if zeit else {})}
         return auftrag_anlegen(request, "uhr_einstellen", parameter=parameter, objekt="Uhrzeit des Servers",
                                protokoll_details=parameter)
+
+
+# ------------------------------------------------------------------ Notfallpaket und Notfallplan (F188)
+class NotfallView(APIView):
+    """Notfallpaket erstellen: der Agent packt alles für einen Wiederaufbau ohne Internet in eine Datei. Mit Passwort
+    und zweitem Faktor – das Paket enthält auf Wunsch die jüngste Sicherung."""
+
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        mit_sicherung = request.data.get("mit_sicherung", True)
+        if not isinstance(mit_sicherung, bool):
+            return _fehler("mit_sicherung", "Bitte ja oder nein.")
+        antwort = _agent_aktuell()
+        if antwort is not None:
+            return antwort
+        if not host.ordner_download().is_dir():
+            return Response({"fehler": ORDNER_FEHLT}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        n = ((host.host_status() or {}).get("notfall") or {})
+        try:
+            frei = os.statvfs(host.ordner_download())
+            schaetzung = int(n.get("schaetzung") or 0)
+            if schaetzung and frei.f_bavail * frei.f_frsize < 2 * schaetzung + 512 * 1024 * 1024:
+                return Response({"fehler": f"Zu wenig freier Speicher: nötig etwa {(2 * schaetzung) // 2 ** 20 + 512} MB, "
+                                           f"frei {frei.f_bavail * frei.f_frsize // 2 ** 20} MB. Vorher aufräumen "
+                                           "(System › Wartung)."}, status=status.HTTP_409_CONFLICT)
+        except OSError:
+            pass
+        return auftrag_anlegen(request, "notfallpaket", parameter={"mit_sicherung": mit_sicherung}, objekt="Notfallpaket",
+                               protokoll_details={"mit_sicherung": mit_sicherung})
+
+
+class NotfallDateiView(APIView):
+    """Das bereitgestellte Notfallpaket ausliefern (Nginx per X-Accel-Redirect); jeder Abruf steht im Audit-Log."""
+
+    permission_classes = [SystemRecht]
+
+    def get(self, request, datei):
+        m = host.NOTFALL_MUSTER.match(datei or "")
+        pfad = host.ordner_download() / datei if m else None
+        if pfad is None or not pfad.is_file() or pfad.is_symlink():
+            return Response({"fehler": "Dieses Notfallpaket liegt nicht (mehr) zum Herunterladen bereit."},
+                            status=status.HTTP_404_NOT_FOUND)
+        protokolliere(SystemEreignis.Art.SYSTEM, request, objekt="Notfallpaket", ereignis="notfall_heruntergeladen",
+                      datei=datei, groesse=pfad.stat().st_size)
+        if settings.EPM_X_ACCEL:
+            antwort = HttpResponse(content_type="application/x-tar")
+            antwort["X-Accel-Redirect"] = "/_geschuetzt/sicherung/" + datei
+        else:
+            antwort = FileResponse(open(pfad, "rb"), content_type="application/x-tar")
+        antwort["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(datei)}"
+        antwort["Cache-Control"] = "private, no-store"
+        antwort["X-Content-Type-Options"] = "nosniff"
+        return antwort
+
+
+class NotfallplanRecht(SystemRecht):
+    """Den Plan lesen dürfen alle mit Systemverwaltung oder „Sicherungen verwalten“."""
+
+    def has_permission(self, request, view):
+        from accounts.permissions import voll_angemeldet
+
+        u = request.user
+        # wie alle Rechte: nur voll angemeldet (mit zweitem Faktor, wo verlangt)
+        return voll_angemeldet(u) and (u.hat_recht("system_verwalten") or u.hat_recht("backup_verwalten"))
+
+
+class NotfallplanView(APIView):
+    permission_classes = [NotfallplanRecht]
+
+    def get(self, request):
+        from . import notfallplan
+
+        art = request.query_params.get("art", "html")  # nicht „format“: das wertet DRF selbst aus
+        if art == "pdf":
+            antwort = HttpResponse(notfallplan.zu_pdf(), content_type="application/pdf")
+            antwort["Content-Disposition"] = "inline; filename*=UTF-8''EPM-Notfallplan.pdf"
+            return antwort
+        if art == "md":
+            antwort = HttpResponse(notfallplan.markdown(), content_type="text/markdown; charset=utf-8")
+            antwort["Content-Disposition"] = "attachment; filename*=UTF-8''NOTFALLPLAN.md"
+            return antwort
+        return Response({"html": notfallplan.zu_html()})
