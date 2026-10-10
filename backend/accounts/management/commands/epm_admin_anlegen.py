@@ -5,7 +5,7 @@ from audit.models import SystemEreignis, protokolliere
 
 
 class Command(BaseCommand):
-    help = "Legt einen Admin mit Einmal-Kennwort an (beim ersten Login: eigenes Kennwort + Authenticator)."
+    help = "Legt einen Admin mit Einmal-Passwort an (beim ersten Login: eigenes Passwort + Authenticator)."
 
     def add_arguments(self, parser):
         parser.add_argument("benutzername")
@@ -14,13 +14,13 @@ class Command(BaseCommand):
         parser.add_argument("--titel", default="")
         parser.add_argument("--kuerzel", default=None)
         parser.add_argument("--neues-kennwort", action="store_true",
-                            help="Vorhandenem Benutzer ein neues Einmal-Kennwort geben (Notfall-Zugang)")
+                            help="Vorhandenem Benutzer ein neues Einmal-Passwort geben (Notfall-Zugang)")
 
     def handle(self, *args, **opt):
         name = opt["benutzername"].strip()
         user = User.objects.filter(username=name).first()
         if user and not opt["neues_kennwort"]:
-            raise CommandError(f"Benutzer '{name}' existiert bereits (--neues-kennwort für ein neues Einmal-Kennwort).")
+            raise CommandError(f"Benutzer '{name}' existiert bereits (--neues-kennwort für ein neues Einmal-Passwort).")
         if not user:
             user = User(username=name, first_name=opt["vorname"], last_name=opt["nachname"], titel=opt["titel"],
                         kuerzel=opt["kuerzel"] or None, rolle=Rolle.ADMIN, is_superuser=True)
@@ -34,6 +34,6 @@ class Command(BaseCommand):
                       quelle="Kommandozeile")
         self.stdout.write("")
         self.stdout.write(f"  Benutzer:       {user.username} (Rolle Admin)")
-        self.stdout.write(self.style.WARNING(f"  Einmal-Kennwort: {kennwort}"))
-        self.stdout.write("  Beim ersten Login: eigenes Kennwort wählen, dann Authenticator-App einrichten.")
+        self.stdout.write(self.style.WARNING(f"  Einmal-Passwort: {kennwort}"))
+        self.stdout.write("  Beim ersten Login: eigenes Passwort wählen, dann Authenticator-App einrichten.")
         self.stdout.write("")

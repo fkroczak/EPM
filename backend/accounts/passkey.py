@@ -1,6 +1,6 @@
 """
 Passkeys (WebAuthn) als zweiter Faktor – Festlegung 08.10.2026: statt oder neben dem Code aus der Authenticator-App,
-bei der Anmeldung und bei jeder Bestätigung mit Kennwort und zweitem Faktor (endgültig löschen, Wiederherstellen,
+bei der Anmeldung und bei jeder Bestätigung mit Passwort und zweitem Faktor (endgültig löschen, Wiederherstellen,
 Updates, Import …).
 
 Ablauf (immer zwei Schritte, die Aufgabe des Servers liegt in der Sitzung und gilt einmal, 5 Minuten):
@@ -110,7 +110,7 @@ def _challenge(request, zweck: str, verbrauchen: bool) -> bytes:
 
 def optionen(request, zweck: str) -> dict:
     """Optionen für den Browser (JSON, Bytes als Base64URL). Für „anmelden“ und „bestaetigen“ nur die Passkeys dieser
-    Person (sie hat sich davor mit dem Kennwort angemeldet), für „registrieren“ ohne die schon vorhandenen."""
+    Person (sie hat sich davor mit dem Passwort angemeldet), für „registrieren“ ohne die schon vorhandenen."""
     if zweck not in ZWECKE:
         raise PasskeyFehler("Unbekannter Zweck.")
     rp = _pruefe_verfuegbar()

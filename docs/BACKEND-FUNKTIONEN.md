@@ -1167,7 +1167,7 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 - **Endpunkt:** `GET /api/protokoll/?gruppe=anmeldung,fehlversuch,benutzer,vorlage,backup,export,abschluss,dokument,datenschutz&benutzer&von&bis&search`
   → `[{id, zeitpunkt, art, art_name, gruppe, gruppe_name, beschreibung, benutzer, person, benutzername, objekt, details, ip, geraet}]`
 - **Logik:** `beschreibung` wie im Entwurf („Anmeldung mit 2FA“, „Falsches Passwort (3. Versuch)“, „5 falsche Passwörter in
-  4 Minuten, Konto gesperrt“, „Benutzer k.oezdemir angelegt (Mitarbeiter), Einmal-Kennwort erzeugt“, „Akte Weber, Anna
+  4 Minuten, Konto gesperrt“, „Benutzer k.oezdemir angelegt (Mitarbeiter), Einmal-Passwort erzeugt“, „Akte Weber, Anna
   (Nr. 0231) abgeschlossen, Anlass: verstorben“, „Grenzwert „Kontakt überfällig“ von 6 auf 12 Monate geändert“).
   Hinweis auf gesperrte Konten: F08.
 - **Validierung:** Recht „Audit-Log lesen“ (Standard: Mediziner, Admin); unbekannte Gruppe → 400.
@@ -3258,6 +3258,12 @@ strukturell überarbeitet und sind hier bewusst nur in Texten berührt.
 - **Hilfe:** neue Abschnitte „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“ ganz oben; Anmelden und
   Dokumente an die Oberfläche angeglichen („Passwort“, „Weiter“, „Neues Dokument“); zweizeilige Einträge im Inhalt der
   Hilfe überlappen nicht mehr. Aufzählungen in formatiertem Text (Notizen, Hilfe) zeigen wieder Punkte bzw. Nummern.
+- **„Passwort“ statt „Kennwort“** (Entscheidung vom 10.10.2026) in allen Texten des Backends außer `vorlagen` und
+  `infusionen` (Meldungen, Audit-Texte, Hilfe, Einrichtungsbefehle) und in der Anmeldung; Bezeichner, API-Felder,
+  Modelle und Migrationen unverändert. Administration, Akte und Zugangsblatt folgen beim Abgleich.
+- **Fachbegriffe erklärt** (Entscheidung vom 10.10.2026): Baustein `<Begriff>` (Popover von Base UI; Hover, Fokus,
+  Antippen, `aria-describedby`) mit den Texten aus `lib/begriffe.ts` (BIA, Entwurf, BMI, PE, Wiedervorlage,
+  Wiedereinbestellung, GLIM, Testpatient, storniert); eingesetzt in Patientenliste, „Kontakt erfassen“ und Scans.
 - **Teststatus:** `npm run typecheck` und `npm run build` grün; Backend-Tests `accounts` (u. a. `/api/hilfe/`) grün;
   Datums-/Uhrzeiteingabe stichprobenartig geprüft; Patientenliste, Neuer Patient, Anmeldung, Kontaktdialog und Hilfe am
   PC (1440 px) und Telefon (390 px) per Bildschirmfoto gegen die Entwicklungsumgebung geprüft. **Browsertests: Lauf steht aus.**

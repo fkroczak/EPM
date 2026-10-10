@@ -19,7 +19,7 @@ from patienten.models import Patient
 from patienten.testdaten import stammdaten_anlegen
 
 TMP = tempfile.mkdtemp(prefix="epm-test-")
-KENNWORT = "ein-sicheres-Kennwort-123"
+KENNWORT = "ein-sicheres-Passwort-123"
 
 
 def benutzer(name, rolle, ist_test=False):
@@ -31,7 +31,7 @@ def benutzer(name, rolle, ist_test=False):
 
 
 def client_fuer(user):
-    """API-Client mit vollständiger Anmeldung (Kennwort + zweiter Faktor)."""
+    """API-Client mit vollständiger Anmeldung (Passwort + zweiter Faktor)."""
     c = APIClient()
     user.is_verified = lambda: True
     c.force_authenticate(user)
@@ -49,7 +49,7 @@ def mit_zweitem_faktor(user, anzahl_codes=5) -> list[str]:
 
 
 def echte_anmeldung(user, code, kennwort=KENNWORT, browser="Mozilla/5.0 (Windows NT 10.0) Firefox/140.0"):
-    """Anmeldung über die API wie im Browser (Kennwort, dann Notfall-Code) – mit echter Sitzung."""
+    """Anmeldung über die API wie im Browser (Passwort, dann Notfall-Code) – mit echter Sitzung."""
     c = APIClient(HTTP_USER_AGENT=browser)
     r = c.post("/api/auth/anmelden/", {"benutzername": user.username, "kennwort": kennwort}, format="json")
     assert r.status_code == 200, r.content

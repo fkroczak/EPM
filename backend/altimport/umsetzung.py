@@ -330,7 +330,7 @@ class _Lauf:
                 if i in vergeben:
                     continue
                 if s.casefold() in entfernt:
-                    rest.append({"spalte": s, "art": "kennwort", "grund": "Kennwörter werden nicht übernommen (Regel 1)"})
+                    rest.append({"spalte": s, "art": "kennwort", "grund": "Passwörter werden nicht übernommen (Regel 1)"})
                 elif s.casefold() in t.ohne:
                     rest.append({"spalte": s, "art": "bekannt", "grund": t.ohne[s.casefold()]})
                 elif s.casefold() in ignoriert:
@@ -1462,8 +1462,8 @@ class _Lauf:
                                      "konten": sum(1 for b in self.e.saetze.get("benutzer", []) if not b["historisch"])}
         konten = self.e.zahlen["benutzer"]["konten"]
         if konten:
-            self.p(1, "benutzer", "info", "Konten werden ohne Kennwort angelegt; die Administration erzeugt danach "
-                                         "je Person ein Einmal-Kennwort (Benutzer › Einmal-Kennwort), dazu 2FA.", anzahl=konten)
+            self.p(1, "benutzer", "info", "Konten werden ohne Passwort angelegt; die Administration erzeugt danach "
+                                         "je Person ein Einmal-Passwort (Benutzer › Einmal-Passwort), dazu 2FA.", anzahl=konten)
         if self.e.zahlen["benutzer"]["neu"] - konten:
             self.p(8, "benutzer", "info", "Bearbeiter ohne Konto als historische Benutzer ohne Login angelegt.",
                    anzahl=self.e.zahlen["benutzer"]["neu"] - konten)

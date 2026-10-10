@@ -70,26 +70,26 @@ früheren Fassungen bleiben im <strong>Verlauf</strong> der Akte sichtbar. Es ge
 </ul>""",
     },
     {
-        "id": "anmelden", "gruppe": "erste_schritte", "titel": "Anmelden mit Kennwort und Authenticator", "rechte": [],
+        "id": "anmelden", "gruppe": "erste_schritte", "titel": "Anmelden mit Passwort und Authenticator", "rechte": [],
         "seiten": [],
         "html": """
-<p>Angemeldet wird mit Benutzername und <strong>Kennwort</strong>. Die <strong>Zwei-Faktor-Anmeldung</strong> (Code aus
+<p>Angemeldet wird mit Benutzername und <strong>Passwort</strong>. Die <strong>Zwei-Faktor-Anmeldung</strong> (Code aus
 einer Authenticator-App auf dem Telefon) ist freiwillig – die Administration kann sie für Admins oder für alle zur
 Pflicht machen. Wer sie eingerichtet hat, wird bei jeder Anmeldung nach dem Code gefragt.</p>
 <ol>
 <li>Benutzername und Passwort eingeben, <strong>Weiter</strong> wählen. Groß- und Kleinschreibung zählt; ist die
 Feststelltaste an, weist EPM darauf hin.</li>
 <li>Mit Zwei-Faktor-Anmeldung: den sechsstelligen Code aus der Authenticator-App eingeben. Er wechselt alle 30 Sekunden.</li>
-<li>Bei der ersten Anmeldung mit dem Einmal-Kennwort vom Zugangsblatt wird zuerst ein eigenes Kennwort festgelegt. Ist
+<li>Bei der ersten Anmeldung mit dem Einmal-Passwort vom Zugangsblatt wird zuerst ein eigenes Passwort festgelegt. Ist
 die Zwei-Faktor-Anmeldung Pflicht, wird danach die Authenticator-App eingerichtet (QR-Code scannen); sonst geht das
 jederzeit unter <strong>Mein Konto › Anmeldung und Sicherheit › Einrichten</strong>. Danach zeigt EPM einmalig die
 Notfall-Codes.</li>
 </ol>
-<p>Solange sie freiwillig ist, lässt sich die Zwei-Faktor-Anmeldung unter Mein Konto mit Kennwort und Code auch wieder
-ausschalten. Bestätigungen (endgültig löschen, Wiederherstellen, Updates, Sicherung, Import) verlangen immer Kennwort
+<p>Solange sie freiwillig ist, lässt sich die Zwei-Faktor-Anmeldung unter Mein Konto mit Passwort und Code auch wieder
+ausschalten. Bestätigungen (endgültig löschen, Wiederherstellen, Updates, Sicherung, Import) verlangen immer Passwort
 <strong>und</strong> Code – wer sie ausführen soll (z. B. Mediziner, Administration), muss die Zwei-Faktor-Anmeldung
 eingerichtet haben.</p>
-<p>Nach mehreren falschen Kennwörtern wird das Konto gesperrt; entsperren kann die Administration. Nach längerer
+<p>Nach mehreren falschen Passwörtern wird das Konto gesperrt; entsperren kann die Administration. Nach längerer
 Pause meldet EPM von selbst ab.</p>""",
     },
     {
@@ -153,14 +153,14 @@ sich anmeldet. <strong>Auf Standard zurücksetzen</strong> stellt alles zurück;
 führt zur Startseite im Bearbeitungsmodus.</p>""",
     },
     {
-        "id": "konto", "gruppe": "erste_schritte", "titel": "Mein Konto: Kennwort, Zwei-Faktor, Anmeldungen", "rechte": [],
+        "id": "konto", "gruppe": "erste_schritte", "titel": "Mein Konto: Passwort, Zwei-Faktor, Anmeldungen", "rechte": [],
         "seiten": ["/konto"],
         "html": """
 <p><strong>Mein Konto</strong> zeigt das eigene Profil (Name, Funktion, Kürzel, Rolle – geändert von der
 Administration) und alles zur Anmeldung. Wie EPM aussieht, steht seit dem 09.10.2026 im eigenen Menüpunkt
 <strong>Design</strong>.</p>
 <ul>
-<li><strong>Kennwort ändern</strong>: altes Kennwort, dann zweimal das neue.</li>
+<li><strong>Passwort ändern</strong>: altes Passwort, dann zweimal das neue.</li>
 <li><strong>Zwei-Faktor-Anmeldung</strong>: Authenticator-App oder Passkey einrichten, neues Gerät, Notfall-Codes; solange freiwillig auch ausschalten.</li>
 <li><strong>Anmeldungen</strong>: zeigt, wo man gerade angemeldet ist; fremde Anmeldungen lassen sich einzeln beenden.</li>
 </ul>""",
@@ -565,7 +565,7 @@ bei Bedarf korrigieren und <strong>Typ und Datum bestätigen</strong>.</p>""",
         "html": """
 <p>Liegt ein Dokument in der falschen Akte, ordnet <strong>Anderem Patienten zuordnen</strong> es mit Grund um. Beide
 Akten zeigen den Vorgang im Verlauf, ohne den jeweils anderen Patienten zu nennen.</p>
-<p>Gehört es in keine Akte, kann es <strong>endgültig gelöscht</strong> werden (nur Mediziner und Admin): mit Kennwort,
+<p>Gehört es in keine Akte, kann es <strong>endgültig gelöscht</strong> werden (nur Mediziner und Admin): mit Passwort,
 Code aus der Authenticator-App und einem Bestätigungscode. Datei, Titel und Inhalt werden entfernt; im Audit-Log bleibt
 ein neutraler Nachweis.</p>""",
     },
@@ -603,7 +603,7 @@ keiner Liste. Lesen kann sie nur, wer über Anfragen entscheidet – mit einer <
         "seiten": [],
         "html": """
 <p>Nach Ablauf der Aufbewahrungsfrist oder auf Antrag kann eine abgeschlossene Akte <strong>endgültig gelöscht</strong>
-werden – mit Kennwort, Code aus der Authenticator-App und Bestätigungscode. Es bleibt nur ein Eintrag im Löschprotokoll
+werden – mit Passwort, Code aus der Authenticator-App und Bestätigungscode. Es bleibt nur ein Eintrag im Löschprotokoll
 (Nummer, Daten der Frist, Grund, Umfang) ohne Namen und Inhalte. Wird später eine ältere Sicherung zurückgespielt,
 löscht EPM die Akte beim Start erneut.</p>""",
     },
@@ -715,7 +715,7 @@ Arzt, legt „Neuen Arzt anlegen“ ihn gleich im Dialog an.</p>""",
 <li><strong>Datensicherung</strong>: letzte Sicherung, Übertragung, Speicher; „Jetzt sichern“.</li>
 <li><strong>Server</strong> und <strong>Ubuntu-Updates</strong>: Auslastung, offene Updates; Updates installieren und
 Server neu starten – mit Passwort und 2FA, vorher automatische Sicherung, angemeldete Benutzer werden gewarnt.</li>
-<li><strong>Konten</strong>: gesperrt, Einmal-Kennwort offen, ohne zweiten Faktor, Notfall-Codes knapp.</li>
+<li><strong>Konten</strong>: gesperrt, Einmal-Passwort offen, ohne zweiten Faktor, Notfall-Codes knapp.</li>
 <li><strong>Angemeldet</strong>, <strong>Hinweis an alle</strong>, <strong>Zugriffe · 7 Tage</strong> aus dem Audit-Log
 und <strong>Testumgebung</strong>.</li>
 </ul>""",
@@ -754,14 +754,14 @@ die Bearbeiter) auch ohne Bearbeiten abschalten – die Lücken bleiben dann ste
         "id": "benutzer", "gruppe": "administration", "titel": "Benutzer und Rechte", "rechte": ["benutzer_verwalten"],
         "seiten": ["/admin/benutzer"],
         "html": """
-<p><strong>Benutzer anlegen</strong> erzeugt ein Einmal-Kennwort; das <strong>Zugangsblatt</strong> lässt sich nur
-drucken, solange das Kennwort angezeigt wird. Benutzer werden nie gelöscht, nur gesperrt. Weitere Aktionen: entsperren,
-neues Einmal-Kennwort (Kennwort vergessen), zweiten Faktor zurücksetzen (Telefon verloren).</p>
+<p><strong>Benutzer anlegen</strong> erzeugt ein Einmal-Passwort; das <strong>Zugangsblatt</strong> lässt sich nur
+drucken, solange das Passwort angezeigt wird. Benutzer werden nie gelöscht, nur gesperrt. Weitere Aktionen: entsperren,
+neues Einmal-Passwort (Passwort vergessen), zweiten Faktor zurücksetzen (Telefon verloren).</p>
 <p><strong>Ohne Login</strong>: Konten, die nur als Name für Einträge dienen (z. B. frühere Mitarbeiter oder aus dem
 Altsystem übernommen), können sich nicht anmelden und haben die Rolle <strong>Keine Berechtigung</strong> – also keine
-Rechte. Ein Konto lässt sich auf „ohne Login“ setzen (Kennwort und zweiter Faktor werden gelöscht, Einträge bleiben
+Rechte. Ein Konto lässt sich auf „ohne Login“ setzen (Passwort und zweiter Faktor werden gelöscht, Einträge bleiben
 zugeordnet) und mit <strong>Login geben</strong> wieder einbinden, z. B. als Mitarbeiter; dabei entsteht ein neues
-Einmal-Kennwort.</p>
+Einmal-Passwort.</p>
 <p><strong>Testbenutzer</strong> (Schalter im Konto, für Betrachter, Mitarbeiter, Mitarbeiter (erweitert) und Mediziner) sehen und bearbeiten
 ausschließlich Testpatienten. Nicht mehr gebrauchte Testbenutzer lassen sich <strong>ausblenden</strong> (einzeln oder
 „Alle Testbenutzer ausblenden“): gesperrt und in keiner Liste mehr, aber nicht gelöscht; „Ausgeblendete zeigen“ und
@@ -799,7 +799,7 @@ erreichbar, deshalb vorher Eingaben speichern. Der Auftrag läuft auf dem Server
 Zwischenzeit nicht antwortet – das Ergebnis erscheint danach unter <strong>Aufträge</strong> samt Ausgabe. Geht etwas
 schief, bleibt die bisherige Version in Betrieb; über <strong>Ausgabe</strong> ist zu sehen, woran es lag.</p>
 <p>Außerdem: <strong>Hinweis an alle Benutzer</strong> setzen und angemeldete Benutzer abmelden. Bei den Konten führen die
-Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Kennwort) direkt zur Person in der Benutzerverwaltung.</p>
+Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Passwort) direkt zur Person in der Benutzerverwaltung.</p>
 <p><strong>Testphase und Go-live</strong>: <strong>Musterdaten automatisch anlegen</strong> abschalten, damit beim Start
 keine Testpatienten und Testkonten mehr entstehen. <strong>Menüpunkt „Import“ ausblenden</strong>, wenn die Altdaten
 übernommen sind – die Seite bleibt über die Karte erreichbar, der Menüpunkt lässt sich wieder einblenden.

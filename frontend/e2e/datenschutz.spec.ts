@@ -207,7 +207,7 @@ test("Akte endgültig löschen: nur Mediziner, mit Kennwort, Authenticator-Code 
   await dialog.getByLabel("Code aus der Authenticator-App").fill(totpBase32(konto.geheim, Date.now() + 30_000));
   await dialog.getByLabel("Code abtippen").fill(code.toLowerCase());
   await dialog.getByRole("button", { name: "Akte endgültig löschen" }).click();
-  await expect(dialog).toContainText("Kennwort falsch.");
+  await expect(dialog).toContainText("Passwort falsch.");
   await dialog.getByLabel("Kennwort").fill(konto.kennwort);
   await dialog.getByLabel("Code aus der Authenticator-App").fill(totpBase32(konto.geheim, Date.now() + 30_000));
   await dialog.getByRole("button", { name: "Akte endgültig löschen" }).click();

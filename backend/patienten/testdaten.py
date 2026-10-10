@@ -144,7 +144,7 @@ def stammdaten_anlegen() -> dict:
 
 def testbenutzer_anlegen():
     """Legt den Testbenutzer an (Rolle Mitarbeiter – Festlegung 03.10.2026, U7; unter Benutzer auf Betrachter,
-    Mitarbeiter (erweitert) oder Mediziner umstellbar). Gibt das Einmal-Kennwort zurück, falls neu."""
+    Mitarbeiter (erweitert) oder Mediziner umstellbar). Gibt das Einmal-Passwort zurück, falls neu."""
     user, angelegt = User.objects.get_or_create(
         username=TESTBENUTZER,
         defaults={"first_name": "Tessa", "last_name": "Test", "titel": "", "kuerzel": "TT",
