@@ -763,9 +763,14 @@ und <strong>Testumgebung</strong>.</li>
         "id": "vorlagen", "gruppe": "administration", "titel": "Vorlagen: Auswahllisten, Präparate, Briefkopf",
         "rechte": ["vorlagen_pflegen"], "seiten": ["/admin/vorlagen"],
         "html": """
-<p>Unter <strong>Vorlagen</strong> pflegt man die Auswahllisten (z. B. Katheter, Dokumenttypen, Terminorte), die
-Präparate für Infusionspläne, Briefkopf und Logo sowie die Grenzwerte. Einträge werden deaktiviert statt gelöscht;
-jede Änderung steht im Audit-Log.</p>""",
+<p>Unter <strong>Vorlagen</strong> beginnt alles mit der <strong>Übersicht</strong>: je Bereich eine Kachel mit „Wofür?“
+und „Wo benutzt?“ – Briefe, Formulare und E-Mail-Texte, Briefkopf und Logo, Medikamente und Präparate, Auswahllisten
+(z. B. Katheter, Dokumenttypen, Terminorte), Labor und Diagnosen, Grenzwerte und Fristen, Anlagen für E-Mails. Das Feld
+<strong>Was möchten Sie ändern?</strong> sucht in allen Vorlagen, Listen, Präparaten und Anlagen und führt direkt hin.</p>
+<p>In den <strong>Auswahllisten</strong> steht über jeder Liste, wo sie in EPM zur Auswahl kommt. Die Reihenfolge ändern
+▲ ▼ (auch am Tablet), Ziehen am Griff oder die Pfeiltasten. Nicht mehr benötigte Einträge werden
+<strong>ausgeblendet statt gelöscht</strong>: Sie werden nicht mehr angeboten, bleiben aber dort stehen, wo sie schon
+eingetragen sind. Jede Änderung steht im Audit-Log; das „?“ neben einer Überschrift erklärt den Bereich.</p>""",
     },
     {
         "id": "grenzwerte", "gruppe": "administration", "titel": "Grenzwerte", "rechte": ["vorlagen_pflegen"], "seiten": [],
@@ -777,16 +782,27 @@ Größe und die Werte der Infusionspläne. Die Fristen des Datenschutzes ändert
 entscheidet.</p>""",
     },
     {
-        "id": "dokumentvorlagen", "gruppe": "administration", "titel": "Dokumentvorlagen", "rechte": ["vorlagen_pflegen"],
-        "seiten": ["/admin/vorlagen/dokumente"],
+        "id": "dokumentvorlagen", "gruppe": "administration", "titel": "Dokumentvorlagen (Briefe und Formulare)",
+        "rechte": ["vorlagen_pflegen"], "seiten": ["/admin/vorlagen/dokumente"],
         "html": """
-<p>Dokumentvorlagen bestimmen das Aussehen der PDFs (Infusionsplan, Patientendatenblatt, Vordrucke). Änderungen
-entstehen als <strong>Entwurf</strong>, lassen sich mit einem Testpatienten in der <strong>Vorschau</strong> prüfen und
-gelten erst nach <strong>Veröffentlichen</strong>. Frühere Versionen bleiben erhalten; jede PDF vermerkt, mit welcher
-Version sie erzeugt wurde.</p>
+<p>Dokumentvorlagen bestimmen Text und Aussehen der Briefe, E-Mails und PDFs (Schreiben an Patienten, Infusionsplan,
+Patientendatenblatt, Berichte, Unterlagen für die Sprechstunde, Vordrucke zum Datenschutz). Die Liste zeigt je Vorlage,
+wofür sie ist, wo sie in der Praxis benutzt wird und ihren Stand: <em>in Gebrauch</em>, <em>Änderungen noch nicht
+freigegeben</em> oder <em>Mustertext, noch nicht geprüft</em>.</p>
+<p>Geändert wird in drei Schritten: <strong>1 · Bearbeiten</strong> (Abschnitt im Aufbau oder auf der Seite anklicken,
+rechts ändern, „Speichern“), <strong>2 · Vorschau prüfen</strong> (die echte PDF mit einem Testpatienten, neben den
+Eigenschaften, folgt jeder Änderung) und <strong>3 · Freigeben</strong>. Erst dann gilt die neue <strong>Fassung</strong>
+für alle neuen PDFs und E-Mails; gespeicherte, noch nicht freigegebene Änderungen (der <em>Entwurf</em>) sieht in der
+Praxis niemand. Wer die Seite mit ungespeicherten Änderungen verlässt, wird gefragt.</p>
+<p><strong>Angaben aus der Akte</strong> (Anrede, Name, Termin …) fügt man per Klick aus der Liste rechts ein; im Text
+stehen sie als lesbare Kästchen wie <em>Briefanrede</em> und werden beim Erstellen durch die Daten des Patienten ersetzt.</p>
+<p><strong>Frühere Fassungen</strong> bleiben erhalten: „ansehen“ zeigt sie mit Testpatient, „wiederherstellen“
+übernimmt sie als Grundlage – in Gebrauch ist sie erst nach dem Freigeben. Jede PDF vermerkt ihre Fassung.
+<strong>+ Neue Vorlage</strong> legt ein eigenes Schreiben an; <strong>Als eigene Vorlage kopieren</strong> nimmt ein
+bestehendes Schreiben als Grundlage. Beide erscheinen in der Akte unter „Schreiben und E-Mail“ › „Eigene Vorlagen“.</p>
 <p>Die Vordrucke zum Datenschutz (Datenschutzinformation, Einwilligung, Schweigepflichtentbindung) kommen als ungeprüfte
-Entwürfe mit Lücken in [eckigen Klammern]; ihre PDFs tragen das Wasserzeichen „ENTWURF“, bis eine eigene Version
-veröffentlicht ist. Mit <strong>Entwurfsmodus ausschalten</strong> lässt sich das Wasserzeichen (und der Hinweisblock für
+Entwürfe mit Lücken in [eckigen Klammern]; ihre PDFs tragen das Wasserzeichen „ENTWURF“, bis eine eigene Fassung
+freigegeben ist. Mit <strong>Entwurfsmodus ausschalten</strong> lässt sich das Wasserzeichen (und der Hinweisblock für
 die Bearbeiter) auch ohne Bearbeiten abschalten – die Lücken bleiben dann stehen; jederzeit wieder einschaltbar.</p>""",
     },
     {

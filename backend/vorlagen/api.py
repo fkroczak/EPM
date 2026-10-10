@@ -8,6 +8,8 @@ DELETE /api/vorlagen/{art}/entwurf/           Entwurf verwerfen
 POST   /api/vorlagen/{art}/veroeffentlichen/  Entwurf wird neue aktive Version
 GET    /api/vorlagen/{art}/versionen/{n}/     Blöcke einer Version
 GET    /api/vorlagen/{art}/startvorlage/      Blöcke der mitgelieferten Startvorlage (als Grundlage für einen Entwurf)
+POST   /api/vorlagen/{art}/versionen/{n}/wiederherstellen/  frühere Fassung als Entwurf übernehmen (F180)
+POST   /api/vorlagen/{art}/duplizieren/       {"name", "beschreibung"?, "mit_termin"?} → eigene Vorlage als Kopie (F180)
 POST   /api/vorlagen/{art}/vorschau/          {"patient": ID (Testpatient), "bloecke"?} → PDF mit Wasserzeichen ENTWURF
                                               mit "ausgabe": "email" → {"betreff", "text"} der Schreiben
 
@@ -33,6 +35,7 @@ from .bloecke import MIT_EMAIL, OPTIONEN, TYPEN, pruefe_bloecke
 from .felder import FELDER, TABELLEN, Kontext
 from .models import Dokumentvorlage, EigenesSchreiben, art_name, gibt_es_art
 from .pdf import erzeuge_aus_vorlage
+from .portal import art_info, feld_info
 
 VorlagenRecht = recht("vorlagen_pflegen", lesen="vorlagen_pflegen")
 
@@ -63,6 +66,8 @@ def _uebersicht(art):
             # eigenes Schreiben (F176): Beschreibung, Termin, aktiv
             "eigen": {"beschreibung": eigen.beschreibung, "mit_termin": eigen.mit_termin, "aktiv": eigen.aktiv}
             if eigen else None,
+            # Vorlagen-Portal (F180): wofür, wo in der Praxis benutzt, Gruppe der Übersicht
+            **art_info(art, eigen.beschreibung if eigen else ""),
             "entwurf": _version(Dokumentvorlage.entwurf_von(art)), "versionen": [_version(v) for v in versionen],
             # Vordrucke: Wasserzeichen „ENTWURF“ (Startvorlage ungeprüft) und ob es manuell abgeschaltet ist (U17)
             "entwurfsmodus": {"moeglich": art in Dokumentvorlage.VORDRUCKE and aktiv.veroeffentlicht_von_id is None,
@@ -158,7 +163,8 @@ class VorlageView(APIView):
         return Response({
             **_uebersicht(art),
             "bausteine": [{"typ": k, "name": v} for k, v in TYPEN.items() if k != "email" or art in MIT_EMAIL],
-            "felder": [{"name": k, "beschreibung": f.beschreibung, "html": f.html} for k, f in FELDER[art].items()],
+            "felder": [{"name": k, "beschreibung": f.beschreibung, "html": f.html, **feld_info(k, f.beschreibung)}
+                       for k, f in FELDER[art].items()],
             "tabellen": [{"quelle": k, "name": v[0], "spalten": v[1]} for k, v in TABELLEN[art].items()],
             "optionen": {k: sorted(v) if isinstance(v, set) else "bool" for k, v in OPTIONEN.items()},
         })
@@ -268,6 +274,69 @@ class StartvorlageView(APIView):
         from .bloecke import STARTVORLAGEN
 
         return Response({"bloecke": STARTVORLAGEN[_art(art)]})
+
+
+class WiederherstellenView(APIView):
+    """Frühere Fassung wiederherstellen (F180): Ihre Blöcke werden der Entwurf (ein bestehender Entwurf wird ersetzt).
+    In Gebrauch ist sie erst nach dem Freigeben – wie jede andere Änderung; die Fassungen selbst bleiben unverändert."""
+
+    permission_classes = [VorlagenRecht]
+
+    @transaction.atomic
+    def post(self, request, art, version):
+        art = _art(art)
+        v = Dokumentvorlage.objects.filter(art=art, version=version).first()
+        if v is None:
+            raise Http404("Fassung nicht gefunden.")
+        fehler = pruefe_bloecke(art, v.bloecke)
+        if fehler:
+            # z. B. ein Datenfeld, das es nach einem Update nicht mehr gibt
+            return Response({"bloecke": fehler}, status=status.HTTP_400_BAD_REQUEST)
+        entwurf = Dokumentvorlage.objects.select_for_update().filter(art=art, status=Dokumentvorlage.Status.ENTWURF).first()
+        if entwurf is None:
+            entwurf = Dokumentvorlage(art=art, erstellt_von=request.user)
+        entwurf.bloecke = v.bloecke
+        entwurf.notiz = f"wiederhergestellt aus Fassung {v.version}"
+        entwurf.geaendert_von = request.user
+        entwurf._history_user = request.user
+        entwurf.save()
+        protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {art_name(art)}",
+                      aktion=f"Fassung {v.version} als Entwurf wiederhergestellt")
+        return Response({"ist_entwurf": True, **_version(entwurf), "bloecke": entwurf.bloecke})
+
+
+class DuplizierenView(APIView):
+    """Vorlage als Grundlage für eine eigene Vorlage kopieren (F180): ``{"name", "beschreibung"?, "mit_termin"?}``.
+    Kopiert wird die Fassung in Gebrauch; die Kopie ist sofort als Fassung 1 in Gebrauch (wie „+ Neue Vorlage“, F176).
+    Geht nur, wenn alle Datenfelder und Tabellen auch in eigenen Schreiben erlaubt sind (also bei den Schreiben)."""
+
+    permission_classes = [VorlagenRecht]
+
+    @transaction.atomic
+    def post(self, request, art):
+        from django.utils import timezone
+
+        art = _art(art)
+        quelle = Dokumentvorlage.aktive(art)
+        e = EigenesSchreiben(erstellt_von=request.user)
+        daten = {"beschreibung": "", "mit_termin": "Termin.Datum" in str(quelle.bloecke), **request.data}
+        fehler = _eigen_setzen(e, daten, neu=True)
+        if fehler:
+            return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
+        pruefung = pruefe_bloecke("eigen-kopie", quelle.bloecke)
+        if pruefung:
+            return Response({"fehler": f"„{art_name(art)}“ lässt sich nicht als eigene Vorlage kopieren: Sie enthält "
+                                       "Angaben, die es in eigenen Schreiben nicht gibt.", "bloecke": pruefung},
+                            status=status.HTTP_400_BAD_REQUEST)
+        e._history_user = request.user
+        e.save()
+        Dokumentvorlage.objects.create(art=e.schluessel, version=1, status=Dokumentvorlage.Status.AKTIV,
+                                       bloecke=quelle.bloecke, erstellt_von=request.user,
+                                       notiz=f"Kopie von „{art_name(art)}“, Fassung {quelle.version}",
+                                       veroeffentlicht_am=timezone.now(), veroeffentlicht_von=request.user)
+        protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {e.name}",
+                      aktion=f"als Kopie von „{art_name(art)}“ (Fassung {quelle.version}) angelegt")
+        return Response(_uebersicht(e.schluessel), status=status.HTTP_201_CREATED)
 
 
 def pdf_antwort(pdf: bytes, dateiname: str, inline=True) -> HttpResponse:

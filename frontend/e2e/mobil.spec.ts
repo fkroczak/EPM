@@ -149,7 +149,8 @@ test.describe("Administration am Telefon", () => {
   /** Wunsch 09.10.2026: auf Backup ragten die Tabellen über den Bildschirm, die Knöpfe lagen über dem Titel */
   test("Telefon: Tabellen werden zu Zeilen, Seitenkopf bricht um – alles passt in die Breite", async ({ page }) => {
     for (const [pfad, titel] of [["/admin/backup", "Backup und Wiederherstellung"], ["/admin/benutzer", "Benutzer"],
-      ["/admin/audit-log", "Audit-Log"], ["/admin/system", "System"], ["/admin/vorlagen", "Vorlagen"]]) {
+      ["/admin/audit-log", "Audit-Log"], ["/admin/system", "System"], ["/admin/vorlagen", "Vorlagen"],
+      ["/admin/vorlagen/dokumente", "Vorlagen"], ["/admin/vorlagen/dokumente?art=terminbestaetigung", "Vorlagen"]]) {
       await page.goto(pfad);
       const h1 = page.getByRole("heading", { level: 1, name: titel });
       await expect(h1).toBeVisible();

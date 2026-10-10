@@ -48,6 +48,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 
 | Nr. | Funktion | Ansicht (Entwurf) | Status |
 |---|---|---|---|
+| 10.10.2026 | Vorlagen-Portal einfacher | Übersicht mit Suche, geführter Ablauf mit Live-Vorschau, Angaben per Klick, frühere Fassung wiederherstellen, als eigene Vorlage kopieren (F180). Lauf steht aus |
 | 09.10.2026 | Eigene Vorlagen | „+ Neue Vorlage“ unter Vorlagen › Dokumentvorlagen: eigene Schreiben mit E-Mail anlegen, bearbeiten, deaktivieren; in der Akte wählbar (F176). Lauf steht aus |
 | F179 | Systemverwaltung ohne SSH: Ampel, Reiter, kompakte Graphen, Sicherungen mehrfach löschen, Dienste, Versionen, Pakete, Zertifikat, Protokolle | Administration › Systemverwaltung, System, Backup | ABGESCHLOSSEN – Lauf steht aus |
 | F01 | Sitzungsstatus und CSRF-Token | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
@@ -3411,6 +3412,62 @@ Ersteinrichtung des Servers (`rollout/01…05`, `epm-git-einrichten.sh`, `epm-ze
   Schlüssel der Test-VM, den der VPS kennt.
 - *Uhrzeit/NTP einstellen*: nur angezeigt, nicht änderbar.
 
+## X · Vorlagen-Portal einfacher (10.10.2026)
+
+Wunsch: „Erweitere das Vorlagen-Portal um eine intuitivere Bedienung für Praxismanager und Krankenschwestern.“
+Zielgruppe: Pflegekräfte ohne IT-Erfahrung und ein Praxismanager mit IT-Erfahrung.
+
+### F180 Vorlagen in Alltagssprache, geführter Ablauf, Angaben per Klick, frühere Fassung, Kopie
+- **Prüfung vorher (Stolperstellen):** Startseite der Vorlagen war direkt der Briefkopf; zwölf Dokumentvorlagen als
+  eine lange Knopfreihe ohne Erklärung, wofür sie sind und wo sie benutzt werden („Bericht“ und „Unterlagen für die
+  Sprechstunde“ waren gar nicht erreichbar); Begriffe Entwurf/Version/Veröffentlichen/Baustein/Datenfeld; Platzhalter
+  als `{{Patient.Briefanrede}}` in Schreibmaschinenschrift; Datenfeld einfügen ging nur nach vorherigem Klick ins
+  Textfeld, sonst passierte nichts; Vorschau nur im Dialog; „laden“ einer Version ohne Hinweis, dass danach noch
+  gespeichert und veröffentlicht werden muss; Auswahllisten ohne Hinweis, wo sie benutzt werden; Reihenfolge nur per
+  Ziehen/Tastatur (am Tablet schwer).
+- **Vorlagen › Übersicht** (neue Startseite, Adresse `/admin/vorlagen`): Kacheln „Briefe, Formulare und E-Mail-Texte“,
+  „Briefkopf und Logo“, „Medikamente und Präparate“, „Auswahllisten“, „Labor und Diagnosen“, „Grenzwerte und
+  Fristen“, „Anlagen für E-Mails“ – je mit „Wofür?“, „Wo benutzt?“ und dem Namen im Menü. **Suche** „Was möchten Sie
+  ändern?“ über Vorlagen, Listen, Präparate, Einträge und Anlagen. Hinweis auf Vorlagen mit noch nicht freigegebenen
+  Änderungen. Jeder Bereich hat eine Adresse (`?bereich=listen&liste=vitamine`), „Zurück“ im Browser funktioniert.
+- **Dokumentvorlagen:** zuerst die **Liste** aller Vorlagen nach Gruppen (Briefe und E-Mails an Patienten, Eigene
+  Vorlagen, Pläne/Berichte/Unterlagen, Vordrucke zum Datenschutz) mit Beschreibung, „Wo benutzt“ und Stand („in
+  Gebrauch · Fassung n“, „Änderungen noch nicht freigegeben“, „Mustertext, noch nicht geprüft“, „deaktiviert“);
+  Suche. Im Editor (`?art=…`) Kopf mit Name, Zweck und Ort, **geführter Ablauf** „1 · Bearbeiten → 2 · Vorschau prüfen
+  → 3 · Freigeben“; **Live-Vorschau** (echte PDF mit wählbarem Testpatienten und E-Mail-Text) in der Mitte neben den
+  Eigenschaften, folgt jeder Änderung nach 0,7 s; der Freigabe-Dialog weist darauf hin, wenn der Stand noch nicht in
+  der Vorschau zu sehen war. In der Oberfläche heißt eine Version jetzt **Fassung** und Veröffentlichen
+  **Freigeben**; Baustein/Block heißen **Abschnitt** (API und Audit-Log unverändert).
+- **Angaben aus der Akte per Klick:** Feldeinfüger mit lesbaren Namen nach Gruppen (Patient, Termin, Absender …) und
+  Suche; ein Klick fügt auch ohne vorheriges Hineinklicken ins erste Textfeld des markierten Abschnitts ein (an der
+  Schreibmarke, wenn schon hineingeklickt wurde). Platzhalter erscheinen auf der Seite und unter dem Textfeld als
+  lesbare Chips („Briefanrede“), unbekannte rot.
+- **Frühere Fassung ansehen/wiederherstellen:** „ansehen“ zeigt die PDF der Fassung mit Testpatient, „wiederherstellen“
+  übernimmt sie als gespeicherten Entwurf (Notiz „wiederhergestellt aus Fassung n“); in Gebrauch erst nach Freigeben.
+- **Als eigene Vorlage kopieren** (Schreiben außer der Patientenankündigung): neue eigene Vorlage (F176) mit Text und
+  Aufbau der Fassung in Gebrauch, sofort in der Akte wählbar; mit Termin, wenn die Vorlage Termin-Angaben benutzt.
+- **Auswahllisten:** Gliederung „Präparate für Infusionspläne“ / „Weitere Auswahllisten“, je Liste „Wo benutzt“,
+  ▲ ▼ je Zeile für Tablet und Telefon, Suche in langen Listen, „wird angeboten“/„ausgeblendet“ mit Erklärung
+  „Ausblenden statt löschen“. Kleine **„?“-Erklärungen** an Aufbau, Fassungen, Angaben und Auswahllisten.
+- **Verlassen mit ungespeicherten Änderungen** an einer Dokumentvorlage fragt nach – auch bei „Zurück“, anderer
+  Vorlage, anderer Seite (React Router `useBlocker`) und beim Schließen/Neuladen des Fensters (`beforeunload`).
+- **Nebenbei behoben:** PDF-Anzeigen zeigten „Anzeige nicht möglich: … ArrayBuffer … already detached“, wenn pdf.js
+  dieselben Daten ein zweites Mal lud (der Puffer geht an den Worker) – im Entwicklungsmodus (StrictMode) bei jeder
+  Vorschau mit `laden`; `components/PdfAnsicht.tsx` gibt pdf.js jetzt eine Kopie.
+- **Endpunkte:** `GET /api/vorlagen/` und `/api/vorlagen/{art}/` liefern zusätzlich `gruppe`, `wofuer`, `wo`, je
+  Datenfeld `bezeichnung` und `gruppe` (`vorlagen/portal.py`; `felder.py` unverändert).
+  `POST /api/vorlagen/{art}/versionen/{n}/wiederherstellen/` (ersetzt einen vorhandenen Entwurf, geprüft mit
+  `pruefe_bloecke`, Audit-Log „Fassung n als Entwurf wiederhergestellt“).
+  `POST /api/vorlagen/{art}/duplizieren/` `{"name", "beschreibung"?, "mit_termin"?}` → 201 mit der Übersicht der neuen
+  eigenen Vorlage; 400, wenn die Vorlage Datenfelder oder Tabellen enthält, die eigene Schreiben nicht kennen.
+  Keine Migration.
+- **Teststatus:** `vorlagen/test_portal.py` (5 Tests: Beschreibungen, lesbare Felder, Wiederherstellen mit Rechten und
+  Ersetzen des Entwurfs, Kopieren, Kopieren nur mit erlaubten Feldern). Browsertests angepasst
+  (`dokumentvorlagen.spec.ts`, `admin.spec.ts`, `mobil.spec.ts`, `zz-neustart.spec.ts`) und neu „Vorlagen-Portal:
+  Suche, Angabe per Klick, geführter Ablauf, frühere Fassung, Kopie als eigene Vorlage“; lokal gegen Vite + Django
+  (PostgreSQL 16) grün, Lauf im CI steht aus.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -3520,6 +3577,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | Datum | Stand | Änderung |
 |---|---|---|
 | 10.10.2026 | Systemverwaltung ohne SSH | Neue Seite Systemverwaltung mit Ampel und häufigen Aufgaben; System und Backup in Reitern; Graphen klein, groß im Dialog; Sicherungen mit Mehrfachauswahl löschen; Dienste einzeln neu starten, Version zurückschalten, Update-Paket und OCR-Modelle hochladen, Paket erstellen, Zertifikat erneuern/importieren, Protokolle ansehen – alles über den Systemagenten (F179). Lauf steht aus |
+| 10.10.2026 | Vorlagen-Portal einfacher | Übersicht mit Kacheln in Alltagssprache und Suche, Liste der Dokumentvorlagen mit Zweck/Ort/Stand, geführter Ablauf Bearbeiten → Vorschau → Freigeben mit Live-Vorschau, Angaben aus der Akte per Klick als lesbare Chips, frühere Fassung ansehen/wiederherstellen, als eigene Vorlage kopieren, ▲ ▼ und „Wo benutzt“ in den Auswahllisten, Warnung beim Verlassen (F180). Lauf steht aus |
 | 10.10.2026 | Bedienung für Pflegekräfte | Nachsichtige Datums-/Uhrzeiteingabe, Fehlermeldungen mit Lösungsweg, leere Zustände mit nächstem Schritt, Hilfe „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“, weniger Fachjargon (F178, `docs/BEDIENBARKEIT-2026-10-10.md`). Lauf steht aus |
 | 10.10.2026 | Infoblatt an die Praxis | Kalender › „Praxis informieren“: Infoblatt mit allen Terminen in der Praxis Holtmeier, Zeitraum per Knopf, Vorschau mit „neu“ und Warnung bei fehlendem Ort, nur Termine am gewählten Ort (Telefon/Video wahlweise), gemerkte Blätter ohne Namen, Erinnerung auf der Startseite, Ort im Termin vorbelegt (F177). Lauf steht aus |
 | 09.10.2026 | Schreiben mit E-Mail | Vorlagen von Alice: Patientenaufnahme, Terminbestätigung, Reisebescheinigung mit ADAC-Attest als PDF und als fertige E-Mail (.eml mit Anhang) aus der Akte (F172), Patientenankündigung aus dem Kalender (F173), Anlagen für E-Mails (F174), Fallzusammenfassung mit Gliederung (F175). Lauf steht aus |

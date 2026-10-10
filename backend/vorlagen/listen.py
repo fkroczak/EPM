@@ -320,15 +320,15 @@ def protokoll_pdf(ereignisse, filter_text="") -> bytes:
 def zugangsblatt_pdf(user, kennwort: str, adresse: str) -> bytes:
     kopf, fuss, rechts = _kopf_fuss()
     gueltig = datum(user.einmal_kennwort_gueltig_bis) if user.einmal_kennwort_gueltig_bis else "—"
-    angaben = [("Name", user.anzeigename), ("Benutzername", user.username), ("Einmal-Kennwort", kennwort),
+    angaben = [("Name", user.anzeigename), ("Benutzername", user.username), ("Einmal-Passwort", kennwort),
                ("gültig bis", gueltig), ("Adresse", adresse)]
     felder = "".join(f'<tr><td class="label" style="width:35%">{html.escape(a)}</td>'
-                     f'<td class="wert{" mono" if a in ("Benutzername", "Einmal-Kennwort") else ""}">{html.escape(b or "—")}</td></tr>'
+                     f'<td class="wert{" mono" if a in ("Benutzername", "Einmal-Passwort") else ""}">{html.escape(b or "—")}</td></tr>'
                      for a, b in angaben)
     schritte = [
         "EPM im Browser öffnen (nur im Netz der Stiftung bzw. über das VPN erreichbar) und mit Benutzername und "
-        "Einmal-Kennwort anmelden.",
-        "Ein eigenes Kennwort wählen (mindestens 12 Zeichen). Das Einmal-Kennwort gilt danach nicht mehr.",
+        "Einmal-Passwort anmelden.",
+        "Ein eigenes Passwort wählen (mindestens 12 Zeichen). Das Einmal-Passwort gilt danach nicht mehr.",
         "Die Authenticator-App auf dem Telefon öffnen (z. B. Microsoft oder Google Authenticator), den angezeigten "
         "QR-Code scannen und den 6-stelligen Code eingeben.",
         "Die 10 Notfall-Codes ausdrucken oder sicher aufbewahren. Sie ersetzen das Telefon, falls es verloren geht.",
@@ -337,7 +337,7 @@ def zugangsblatt_pdf(user, kennwort: str, adresse: str) -> bytes:
     inhalt = (kopf + _titel("Zugang zu EPM", f"erstellt {datum(timezone.localdate())}")
               + f'<div class="block"><table class="felder">{felder}</table></div>'
               + f'<div class="block"><h2>So richten Sie den Zugang ein</h2><ol class="schritte">{liste}</ol></div>'
-              + '<div class="block s-klein">Dieses Blatt enthält ein Kennwort: bitte persönlich übergeben und nach der '
+              + '<div class="block s-klein">Dieses Blatt enthält ein Passwort: bitte persönlich übergeben und nach der '
                 'ersten Anmeldung vernichten. Bei Problemen hilft die Administration.</div>'
               + "<style>.mono { font-family: 'IBM Plex Mono', 'DejaVu Sans Mono', monospace; font-size: 12pt; }"
                 " .schritte li { margin-bottom: 2mm; }</style>")

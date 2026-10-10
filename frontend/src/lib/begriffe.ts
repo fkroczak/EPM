@@ -8,6 +8,9 @@ export const BEGRIFFE = {
     + "schwachem Strom über Elektroden an Hand und Fuß.",
   entwurf: "Noch nicht freigegeben: Änderungen sind gespeichert, gelten aber erst nach „Freigeben“ bzw. "
     + "„Veröffentlichen“ und sind bis dahin nur hier sichtbar.",
+  // Vorlagen-Portal (F180): eine veröffentlichte Version einer Vorlage heißt in der Oberfläche „Fassung“
+  fassung: "Freigegebener Stand einer Vorlage. Jedes Freigeben ergibt eine neue Fassung; frühere bleiben erhalten und "
+    + "lassen sich ansehen und wiederherstellen. Jede PDF vermerkt, mit welcher Fassung sie erzeugt wurde.",
   bmi: "Body-Mass-Index: Gewicht in kg geteilt durch die Körpergröße in Metern zum Quadrat. EPM rechnet ihn aus Gewicht "
     + "und Größe der Stammdaten.",
   pe: "Parenterale Ernährung: Nährlösung über die Vene statt über den Darm – hier der Mischbeutel mit Eiweiß, Zucker "
