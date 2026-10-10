@@ -3158,6 +3158,36 @@ Hauptarbeitsplatz bleibt der PC, am Telefon Pläne schnell freigeben, kurze Blic
   mit der echten Erkennung; im Browser lokal durchgespielt.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+## V · Bedienung für Pflegekräfte (10.10.2026)
+
+Auftrag: EPM soll von Pflegekräften ohne nennenswerte IT-Erfahrung intuitiv bedient werden können. Befunde, Umsetzung
+und Empfehlungen stehen in `docs/BEDIENBARKEIT-2026-10-10.md`. Akte, Navigation und Infusionspläne werden parallel
+strukturell überarbeitet und sind hier bewusst nur in Texten berührt.
+
+### F178 Verständliche Rückmeldungen, nachsichtige Eingaben, nächste Schritte
+- **Eingaben:** Datumsfelder verstehen neben „14.03.1968“ auch „14.3.68“, „14,3,68“ (Komma vom Ziffernblock), „14/3/1968“,
+  „14-3-1968“, „14031968“, „140368“, „heute“ und „gestern“ (`eingabeDatum`, wirkt in allen Formularen). Die Uhrzeit im
+  Dialog „Kontakt erfassen“ geht auch als „10.30“, „1030“, „930“ oder „10“; ein Fehler steht jetzt am Feld Uhrzeit.
+- **Rückmeldungen:** „Kontakt erfassen“ sagt neben dem gesperrten Knopf, was fehlt („Zuerst den Patienten wählen.“ /
+  „Zum Speichern bitte eine Notiz schreiben.“). „Neuer Patient“ fasst fehlende Angaben oben zusammen, springt zum
+  ersten roten Feld und bestätigt das Anlegen mit Name und Nummer.
+- **Fehlermeldungen mit Lösungsweg:** keine Verbindung (statt der englischen Browsermeldung „Failed to fetch“), Server
+  nicht erreichbar (502/503), Zeitüberschreitung (504), Serverfehler (500), Datei zu groß (413); Anmeldung mit
+  Hinweis auf Schreibweise, Feststelltaste und Sperre nach fünf Fehlversuchen, Code mit Hinweis auf den 30-Sekunden-Wechsel;
+  Warnung bei eingeschalteter Feststelltaste im Passwortfeld. Verbindungsfehler werden wie bisher zweimal wiederholt.
+- **Leere Zustände:** Die Patientenliste ohne Treffer nennt den Suchbegriff, gibt einen Suchtipp und bietet „Alle Filter
+  entfernen“, „In abgeschlossenen Akten suchen“ und „Neuer Patient“. Die Patientenauswahl in Dialogen erklärt zu kurze
+  Eingaben und fehlende Treffer. Dokumente ohne Eintrag sagen, wie man eines ablegt; „1 Dokument“ statt „1 Dokumente“.
+- **Sprache:** „PDF/A mit unsichtbarer Textebene“, „Audit-Log“ und Programmnamen der Texterkennung (PP-OCR, Tesseract)
+  aus den Texten für die Pflege genommen (Programmnamen bleiben im Tooltip). Menüs hinter „⋯“ zeigen ihren Namen als Tooltip.
+- **Hilfe:** neue Abschnitte „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“ ganz oben; Anmelden und
+  Dokumente an die Oberfläche angeglichen („Passwort“, „Weiter“, „Neues Dokument“); zweizeilige Einträge im Inhalt der
+  Hilfe überlappen nicht mehr. Aufzählungen in formatiertem Text (Notizen, Hilfe) zeigen wieder Punkte bzw. Nummern.
+- **Teststatus:** `npm run typecheck` und `npm run build` grün; Backend-Tests `accounts` (u. a. `/api/hilfe/`) grün;
+  Datums-/Uhrzeiteingabe stichprobenartig geprüft; Patientenliste, Neuer Patient, Anmeldung, Kontaktdialog und Hilfe am
+  PC (1440 px) und Telefon (390 px) per Bildschirmfoto gegen die Entwicklungsumgebung geprüft. **Browsertests: Lauf steht aus.**
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -3264,6 +3294,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 10.10.2026 | Bedienung für Pflegekräfte | Nachsichtige Datums-/Uhrzeiteingabe, Fehlermeldungen mit Lösungsweg, leere Zustände mit nächstem Schritt, Hilfe „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“, weniger Fachjargon (F178, `docs/BEDIENBARKEIT-2026-10-10.md`). Lauf steht aus |
 | 09.10.2026 | Text erkennen in der Akte | „Text erkennen“ mit OCRmyPDF (PDF/A mit Textebene, Datei ersetzt, Art.-17-Löschung über alle Fassungen) (F170), „Werte übernehmen“ aus Akte-Dokumenten ohne neues Dokument (F171), Sparmodus mit einem Tesseract-Durchgang (F168). Lauf steht aus |
 | 09.10.2026 | Texterkennung auf kleinen Servern, Werte von Hand | Sparmodus (kleines Zeilenmodell, ohne Glätten) und Speichergrenze nach RAM, Absturzschutz mit Lebenszeichen und Sparstufen je Seite (F168); Labor/BIA immer übertragbar, Wert per Klick ins Bild, „+ Wert“, mehr BIA-Bezeichnungen (F169). Lauf steht aus |
 | 09.10.2026 | OCR-Modelle offline | `ocr-modelle.sh vorbereiten/einspielen/status`, `ocr-modelle.ps1`, `epm-update` baut die Modelle ein und meldet den Stand der Texterkennung (U67) |
