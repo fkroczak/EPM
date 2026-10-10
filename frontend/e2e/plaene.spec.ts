@@ -238,3 +238,39 @@ test("Mitarbeiter sieht Pläne, legt aber keine an", async ({ browser }) => {
   await expect(page.getByTestId("plan-detail").getByRole("button", { name: "Freigeben" })).toHaveCount(0);
   await ctx.close();
 });
+
+test("Hinweise aus Labor und Gewicht im Plan-Editor: kein Labor, Wert außerhalb des Referenzbereichs mit Verlauf (F187)", async ({ page }) => {
+  const api = await apiAls("mediziner");
+  const patient = await api.post("patienten/", { nachname: eindeutig("Hinweis"), vorname: "Hanna", geburtsdatum: "1971-03-03" });
+  await api.post("gewichte/", { patient: patient.id, gewicht_kg: "60.0", quelle: "telefonisch" });
+  await page.goto(`/patienten/${patient.id}/plaene/neu`);
+  const hinweise = page.getByTestId("plan-hinweise");
+  // noch kein Labor: Hinweis mit Weg zur Blutuntersuchung
+  await expect(hinweise).toContainText("Noch kein Laborbefund in der Akte.");
+  await hinweise.getByRole("button", { name: "Blutuntersuchung anfordern" }).click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Schreiben und E-Mail" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  // Magnesium unter dem Referenzbereich, fallend; Ferritin kommt im Plan nicht vor und bleibt außen vor
+  const parameter = await api.get("laborparameter/?aktiv=true");
+  const id = (name: string) => parameter.find((p: { name: string }) => p.name === name).id;
+  const tag = (vor: number) => new Date(Date.now() - vor * 86400000).toISOString().slice(0, 10);
+  for (const [vor, mg] of [[60, "0.90"], [30, "0.75"], [0, "0.58"]] as const) {
+    await api.post("laborbefunde/", { patient: patient.id, abgenommen_am: tag(vor), werte: [
+      { parameter: id("Magnesium"), wert: mg, referenz_von: "0.66", referenz_bis: "1.07" },
+      { parameter: id("Ferritin"), wert: "5", referenz_von: "30", referenz_bis: "400" },
+    ] });
+  }
+  await page.reload();
+  // der erste Plan ist je kg vorbelegt – Magnesium kommt also vor
+  const mg = hinweise.getByTestId("plan-hinweis").filter({ hasText: "Magnesium" });
+  await expect(mg).toContainText(/Magnesium 0,58 mmol\/l am \d{2}\.\d{2}\.\d{4} – unter dem Referenzbereich \(0,66–1,07\)\. Bitte prüfen\./);
+  await expect(mg).toContainText("Verlauf: 0,9");
+  await expect(mg).toContainText("fallend");
+  await expect(hinweise).not.toContainText("Ferritin");
+  await expect(hinweise).not.toContainText("Noch kein Laborbefund");
+  await expect(hinweise).toContainText("EPM schlägt keine Mengen vor");
+  // ohne Magnesium im Formular verschwindet der Hinweis
+  await page.getByTestId("plan-editor").getByLabel("Magnesium").fill("");
+  await expect(hinweise.getByTestId("plan-hinweis").filter({ hasText: "Magnesium" })).toHaveCount(0);
+  await api.ende();
+});

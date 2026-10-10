@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ApiFehler, api, apiDatei } from "@/lib/api";
+import { ApiFehler, abfrage, api, apiDatei } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useEinstellungen, usePraeparate } from "@/lib/daten";
@@ -19,6 +19,7 @@ import { PdfDialog } from "@/components/PdfDialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
+import { anlageOeffnen } from "@/seiten/admin/Anlagen";
 import { Editor } from "@/components/Editor";
 import { name, useAkte } from "./Akte";
 
@@ -354,6 +355,12 @@ export function PlanEditor() {
   const freiTage = zahlWert(f.freie_tage_pro_woche);
   const gewichtAlterTage = patient.kopf?.gewicht ? Math.round((Date.parse(heuteIso()) - Date.parse(patient.kopf.gewicht.am.slice(0, 10))) / 86400000) : null;
   const ohnePraeparat = MAKRO.filter((m) => zahlWert(f[m.menge]) && !f[`${m.feld}_praeparat` as AuswahlFeld]).map((m) => m.text);
+  const bestandteile = ([
+    ["natrium", zahlWert(f.natrium_mmol)], ["kalium", zahlWert(f.kalium_mmol)], ["phosphat", zahlWert(f.phosphat_mmol)],
+    ["calcium", zahlWert(f.calcium_mmol)], ["magnesium", zahlWert(f.magnesium_mmol)], ["albumin", zahlWert(f.albumin_ml)],
+    ["glucose", zahlWert(f.glucose_g)], ["lipide", zahlWert(f.lipide_g)], ["spurenelemente", f.spurenelemente ? 1 : null],
+    ["vitamine", f.vitamine.length || null],
+  ] as const).filter(([, w]) => w).map(([k]) => k as string);
   const pruefpunkte: { ok: boolean; text: string }[] = [
     gewicht == null
       ? { ok: false, text: "Kein Gewicht erfasst: Gesamtvolumen (35 ml/kg) und Rate fehlen. Bitte zuerst das Gewicht eintragen." }
@@ -593,6 +600,7 @@ export function PlanEditor() {
               title="So sieht die PDF mit den Werten aus, die gerade im Formular stehen">
               {planId || neueId ? "PDF-Vorschau" : "Speichern und PDF-Vorschau"}</Knopf>
           </Karte>
+          <HinweiseAusLabor patientId={patient.id} planId={planId ? Number(planId) : neueId} bestandteile={bestandteile} />
           {fehlerQuelle && !Object.keys(server).length ? <Meldung art="fehler">{fehlerQuelle.message}</Meldung> : null}
           {Object.keys(e).length ? <Meldung art="fehler">Bitte die markierten Felder prüfen.{e.fehler ? ` ${e.fehler}` : ""}</Meldung> : null}
           <div className="flex flex-col gap-2">
@@ -612,6 +620,74 @@ export function PlanEditor() {
       {vorschau ? <PdfDialog offen onOffen={(o) => { if (!o) setVorschau(null); }} titel={`Vorschau Infusionsplan · ${name(patient)}`}
         pfad={`infusionsplaene/${vorschau.id}/vorschau/`} body={vorschau.daten} dateiname={`Infusionsplan-${patient.nummer}-Vorschau.pdf`} /> : null}
     </form>
+  );
+}
+
+type PlanHinweis = {
+  art: "labor" | "labor_alt" | "gewicht" | "plaene"; stufe: "warn" | "info"; text: string;
+  parameter?: string; bestandteil?: string; einheit?: string; richtung?: "niedrig" | "hoch";
+  verlauf?: { am: string; wert: number | string }[]; trend?: "steigend" | "fallend" | "gleichbleibend" | "wechselnd" | null;
+  anlage?: number | null;
+};
+const TREND_TEXT: Record<string, string> = { steigend: "steigend", fallend: "fallend", gleichbleibend: "gleichbleibend", wechselnd: "schwankend" };
+
+/**
+ * Hinweise aus Labor und Gewicht (F187): Laborwerte seit dem letzten Plan außerhalb des Referenzbereichs (nur für
+ * Bestandteile, die gerade im Formular vorkommen), Verlauf der letzten drei Werte, deutliche Gewichtsänderung, wie sich
+ * die eigenen Pläne entwickelt haben, fehlendes Labor.
+ * WICHTIG: nur Hinweise zum Prüfen – EPM schlägt hier nie eine Menge vor und berechnet keine Dosis (sonst ggf.
+ * Medizinprodukt nach MDR). Texte kommen vom Server (infusionen/hinweise.py) und sind dort so formuliert.
+ */
+function HinweiseAusLabor({ patientId, planId, bestandteile }: { patientId: number; planId: number | null; bestandteile: string[] }) {
+  const { schreibenOeffnen } = useAkte();
+  const daten = useQuery({
+    queryKey: ["patient", patientId, "plan-hinweise", planId, bestandteile.join(",")],
+    queryFn: () => api<{ hinweise: PlanHinweis[]; seit: string }>(`infusionsplaene/hinweise/${abfrage({ patient: patientId, plan: planId ?? undefined, bestandteile: bestandteile.join(",") })}`),
+    placeholderData: (vorher) => vorher,
+  });
+  const liste = daten.data?.hinweise ?? [];
+  return (
+    <Karte className="px-5 py-[1.125rem] flex flex-col gap-2" data-testid="plan-hinweise">
+      <h3 className="lbl m-0">Hinweise aus Labor und Gewicht</h3>
+      <span className="text-xs gedaempft leading-normal">
+        Seit dem letzten Plan{daten.data?.seit ? ` (${datum(daten.data.seit)})` : ""}; Laborwerte nur zu Bestandteilen dieses Plans,
+        außerhalb des <Begriff name="referenzbereich">Referenzbereichs</Begriff>. Zum Prüfen – EPM schlägt keine Mengen vor.
+      </span>
+      {daten.isLoading ? <Laden /> : liste.length ? (
+        <ul className="m-0 p-0 list-none flex flex-col gap-2 text-[0.8125rem]">
+          {liste.map((h, i) => (
+            <li key={`${h.art}-${h.parameter ?? i}`} className="flex items-start gap-2 min-w-0" data-art={h.art} data-testid="plan-hinweis">
+              <span className={cx("shrink-0 mt-0.5", h.stufe === "warn" ? "text-warn" : "gedaempft")}>
+                <Icon name={h.art === "labor" ? (h.richtung === "hoch" ? "hoch" : "runter") : h.stufe === "warn" ? "warnung" : "info"} groesse={14} />
+              </span>
+              <span className="flex flex-col gap-0.5 min-w-0 [overflow-wrap:anywhere]">
+                <span>{h.text}</span>
+                {h.art === "labor" && h.verlauf && h.verlauf.length > 1 ? (
+                  <span className="gedaempft">
+                    Verlauf: {h.verlauf.map((v) => `${zahl(Number(v.wert))} (${datum(v.am).slice(0, 6)})`).join(" → ")}
+                    {h.trend ? ` · ${TREND_TEXT[h.trend] ?? h.trend}` : ""}
+                  </span>
+                ) : null}
+                {h.art === "labor_alt" ? (
+                  <span className="flex gap-3 flex-wrap">
+                    {schreibenOeffnen ? (
+                      <button type="button" className="bg-transparent border-0 p-0 text-akzent-text cursor-pointer underline"
+                        onClick={schreibenOeffnen} title="Schreiben und E-Mail öffnen – dort die Anlage „Blutuntersuchung“ anhaken">
+                        Blutuntersuchung anfordern</button>
+                    ) : null}
+                    {h.anlage ? (
+                      <button type="button" className="bg-transparent border-0 p-0 text-akzent-text cursor-pointer underline"
+                        onClick={() => void anlageOeffnen({ id: h.anlage! })}>Schreiben „Blutuntersuchung“ ansehen</button>
+                    ) : null}
+                  </span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : <span className="text-[0.8125rem] flex items-center gap-2"><span className="text-ok"><Icon name="haken" groesse={14} /></span>Keine Auffälligkeiten.</span>}
+      <Fehleranzeige fehler={daten.error} />
+    </Karte>
   );
 }
 

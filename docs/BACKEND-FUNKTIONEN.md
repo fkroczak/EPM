@@ -52,6 +52,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | 09.10.2026 | Eigene Vorlagen | „+ Neue Vorlage“ unter Vorlagen › Dokumentvorlagen: eigene Schreiben mit E-Mail anlegen, bearbeiten, deaktivieren; in der Akte wählbar (F176). Lauf steht aus |
 | F179 | Systemverwaltung ohne SSH: Ampel, Reiter, kompakte Graphen, Sicherungen mehrfach löschen, Dienste, Versionen, Pakete, Zertifikat, Protokolle | Administration › Systemverwaltung, System, Backup | ABGESCHLOSSEN – Lauf steht aus |
 | F181 | Akte ohne Seiten-Scrollen, kompakter Kopf, Reiter nach Bedeutung, PDF neben dem Plan, Plan nach Praxisvorgabe, PDF-Vorschau mit ungespeicherten Eingaben | Patientenakte, Infusionspläne, Plan-Editor | ABGESCHLOSSEN – Lauf steht aus |
+| F187 | Hinweise aus Labor und Gewicht im Plan-Editor (ohne Dosisvorschlag) | Plan-Editor | ABGESCHLOSSEN – Lauf steht aus |
 | F01 | Sitzungsstatus und CSRF-Token | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F02 | Anmeldung mit Benutzername und Kennwort | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F03 | Zweiter Faktor bei der Anmeldung | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
@@ -3684,6 +3685,49 @@ ungefragt in die Akte – am Ende entscheidet immer ein Klick der Pflegekraft. A
   Ausblenden, Filter) und `Einstellungsfelder`.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
+## AB · Hinweise im Infusionsplan (10.10.2026)
+
+Wunsch (Plan-Punkt 2, freigegeben): Beim Erstellen eines Plans soll sichtbar sein, was Labor und Gewicht seit dem
+letzten Plan sagen – sachlich und **ohne Dosisvorschlag**.
+
+> **Grenze zur Medizinprodukte-Verordnung:** Die Hinweise zeigen nur, was in der Akte steht, und bitten ums Prüfen. Sie
+> schlagen nie eine Menge vor und berechnen keine Dosis. Eine Software, die aus Patientendaten Therapiemengen ableitet,
+> wäre ggf. ein Medizinprodukt nach MDR (Regel 11). Neue Hinweise bitte ebenso formulieren („… bitte prüfen“, nie
+> „… auf x erhöhen“). So steht es auch als Kommentar in `infusionen/hinweise.py` und `PlanEditor.tsx`.
+
+### F187 Hinweise aus Labor und Gewicht im Plan-Editor
+- **Ansicht:** Plan-Editor, rechte Spalte unter „Prüfung vor der Freigabe“: Karte **Hinweise aus Labor und Gewicht**
+  (Begriff „Referenzbereich“ mit Erklärung). Am Telefon untereinander, lange Zeilen brechen um.
+  - **Laborwerte außerhalb des Referenzbereichs** seit dem letzten Plan (Tag der Freigabe des Vorgängers bzw. des
+    aktuellen Plans; ohne Plan: innerhalb „Laborbefund gilt als alt nach“), nur für Parameter, deren Bestandteil
+    gerade im Formular vorkommt: Natrium, Kalium, Phosphat, Calcium, Magnesium → gleichnamige Parameter; Humanalbumin →
+    Albumin; Glucose → Glucose; Lipide → Triglyceride; Spurenelemente → Kupfer, Zink, Selen, Mangan; Vitamine → Gruppe
+    Vitamine. Text z. B. „Magnesium 0,58 mmol/l am 02.10.2026 – unter dem Referenzbereich (0,66–1,07). Bitte prüfen.“,
+    Pfeil ↑/↓, darunter der **Verlauf der letzten drei Werte** mit Trend (steigend, fallend, gleichbleibend,
+    schwankend). Referenz aus dem Wert, sonst aus dem Katalog (U44: im Katalog meist leer).
+  - **Gewicht:** Änderung seit dem Bezugsplan (Gewicht, mit dem dessen Gesamtvolumen berechnet wurde) ab der Grenze
+    „Warnung Gewichtsverlust“ (Standard 5 %), auf- und abwärts: „… von 60 auf 54 kg gesunken (−10 %). Mengen je kg und
+    Gesamtvolumen bitte prüfen.“
+  - **Eigene Pläne:** ein Bestandteil, der in den letzten drei freigegebenen Plänen jeweils erhöht bzw. verringert
+    wurde („Kalium wurde in den letzten 3 Plänen jeweils erhöht (40 → 50 → 60 mmol) …“).
+  - **Kein bzw. altes Labor** („Laborbefund gilt als alt nach“, F120): Hinweis mit **Blutuntersuchung anfordern**
+    (öffnet „Schreiben und E-Mail“ der Akte, dort die Anlage „Blutuntersuchung“ anhaken) und **Schreiben
+    „Blutuntersuchung“ ansehen** (Anlage aus F174).
+- **Endpunkt:** `GET /api/infusionsplaene/hinweise/?patient=ID&plan=ID&bestandteile=natrium,kalium,…` →
+  `{seit, bezug, bestandteile, hinweise: [{art: labor|labor_alt|gewicht|plaene, stufe, text, …}]}`; `plan` = der
+  Entwurf (Bezug ist sein Vorgänger), `bestandteile` = was im Formular vorkommt (sonst aus Entwurf bzw. aktuellem Plan;
+  unbekannte werden ignoriert). Lesen mit „Akten lesen“; Patient außerhalb des eigenen Bereichs (z. B. Testzugang und
+  echte Akte) bzw. fremder Plan → 400. Keine Migration, keine Speicherung.
+- **Dateien:** `backend/infusionen/hinweise.py`, `infusionen/api.py`, `frontend/src/seiten/akte/PlanEditor.tsx`
+  (`HinweiseAusLabor`), `lib/begriffe.ts` (`referenzbereich`), `seiten/akte/Akte.tsx` (`schreibenOeffnen`).
+- **Teststatus:** Backend `infusionen.tests.PlanHinweise` (6 Tests: außerhalb des Referenzbereichs mit Verlauf und
+  Trend, nicht im Plan vorkommende Parameter ignoriert, Bestandteile aus dem Formular, Werte vor dem letzten Plan zählen
+  nicht, kein/altes Labor, Gewichtsänderung mit Grenze, Statistik der eigenen Pläne, Rechte, Testzugang und
+  Testpatient, keine Mengenempfehlung im Text); `manage.py test infusionen befunde patienten` grün (207). Browsertest
+  `plaene.spec.ts` „Hinweise aus Labor und Gewicht im Plan-Editor …“ lokal grün (Vite + Django, Chromium 141). CI-Lauf
+  steht aus.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
 ## Offene Backend-Funktionen
 
 Erledigt in Runde 1 (01.10.2026): O-00 Migrationen im Repo (CI), O-02 Abschluss nur Mediziner, O-03 dauerhafte Sperre,
@@ -3794,6 +3838,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 10.10.2026 | Hinweise im Infusionsplan | Plan-Editor zeigt Laborwerte außerhalb des Referenzbereichs seit dem letzten Plan (nur Bestandteile des Plans) mit Verlauf der letzten drei Werte, deutliche Gewichtsänderung, Entwicklung der eigenen Pläne und fehlendes Labor mit „Blutuntersuchung anfordern“ – nur zum Prüfen, ohne Dosisvorschlag (MDR) (F187). Lauf steht aus |
 | 10.10.2026 | Nachtrag Systemverwaltung | Zeitplan der nächtlichen Sicherung (Uhrzeit, täglich/werktags, Warnung zum Übertragungsfenster), Journal und alte Versionen aufräumen (laufende und vorherige geschützt), Uhrzeit mit eigenem Zeitserver einstellen, OCR-Modelle mit 2FA (F179l–F179o). Lauf steht aus |
 | 10.10.2026 | Texterkennung lernt mit | Gelernte Zuordnungen aus Korrekturen beim Übernehmen (Labor, BIA, Diagnosen, Spaltenlage je Labor; ohne Patientendaten), Anwendung vor der Ähnlichkeitssuche mit Schwelle, Bereich „Gelernte Zuordnungen“, Kennzahl „korrigiert“ (F182); Patient aus Name und Geburtsdatum vorschlagen, nur per Klick (F183); Offline-Prüfung (`docs/OFFLINE-BETRIEB-2026-10-10.md`). Lauf steht aus |
 | 10.10.2026 | Akte entschlankt | Akte ab 1024 × 600 px ohne Seiten-Scrollen (Kopf und Reiter bleiben stehen, Inhalt scrollt in Karte bzw. Spalte), kompakter Kopf, Reiter nach Bedeutung (Infusionspläne nach Empfehlung, Verlauf/Datenschutz klein), Übersicht mit sechs Karten in zwei Reihen, PDF des Plans in voller Höhe neben der Liste und im Menüpunkt Infusionspläne, Plan nach Praxisvorgabe je kg, Prüfung vor der Freigabe, PDF-Vorschau mit ungespeicherten Eingaben (`POST …/vorschau/`), Administration zum Aufklappen (F181). Lauf steht aus |
