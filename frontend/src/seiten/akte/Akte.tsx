@@ -1,6 +1,6 @@
 /** Entwurf 4 · Patientenakte: Kopf mit Kerndaten und Schnellaktionen, Reiter mit Zählern – in drei Ansichten je Person
  *  (Kopfzeile, Seitenleiste, Karteikarte; Wunsch 08.10.2026, siehe ./ansicht.tsx). */
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { PdfDialog } from "@/components/PdfDialog";
 import type { CSSProperties, ReactNode } from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams } from "react-router";
@@ -66,6 +66,16 @@ function Kennzahl({ titel, children, hinweis }: { titel: string; children: React
       <span className="lbl text-[0.78rem] gedaempft font-medium">{titel}</span>
       <span className="text-sm truncate">{children}</span>
     </div>
+  );
+}
+
+/** Unter 1280 px (Telefon, Tablet, kleine Fenster): Versorgung und Hinweise im Kopf erst auf Antippen */
+const SCHMALER_KOPF = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(max-width: 79.99em)") : null;
+function useSchmalerKopf(): boolean {
+  return useSyncExternalStore(
+    (melden) => { SCHMALER_KOPF?.addEventListener("change", melden); return () => SCHMALER_KOPF?.removeEventListener("change", melden); },
+    () => !!SCHMALER_KOPF?.matches,
+    () => false,
   );
 }
 
@@ -395,8 +405,8 @@ function Kopfangabe({ a }: { a: Angabe }) {
  */
 function KopfVoll({ angabe, unter, bearbeiten, mobil }: { angabe: Record<string, Angabe>; unter: Record<string, ReactNode>;
   bearbeiten?: () => void; mobil?: boolean }) {
-  // Telefon: Versorgung und Hinweise auf Antippen – sonst schöbe der Kopf die Akte eine Bildschirmhöhe nach unten
-  // (Nickelallergie und Gewichtsverlust stehen als CAVE ohnehin beim Namen)
+  // Telefon und Tablet: Versorgung und Hinweise auf Antippen – sonst schöbe der Kopf die Akte weit nach unten bzw. ließe
+  // der Übersicht im Fenster zu wenig Platz (Nickelallergie und Gewichtsverlust stehen als CAVE ohnehin beim Namen)
   const [mehr, setMehr] = useState(false);
   return (
     <div className="border-t border-rand pt-2 pb-1.5 flex flex-col gap-1.5" data-testid="kennzahlen">
@@ -472,6 +482,7 @@ export function Akte() {
   const [darstellung, darstellungAendern] = useDarstellung();
   const mobil = useMobil();
   const fhd = ab(useStufe(), "fhd");
+  const schmalerKopf = useSchmalerKopf();
   const ansicht: Aktenansicht = mobil ? "kopfzeile" : darstellung.aktenansicht;
   const [leisteZug, setLeisteZug] = useState<number | null>(null);
   // „Meine Akten“ (S05): Stern im Aktenkopf, und die Akte meldet sich einmal je Aufruf als „zuletzt geöffnet“
@@ -915,7 +926,7 @@ export function Akte() {
           {aktionen(!fhd)}
         </div>
         {k && stufe === "voll" && angabe ? (
-          <KopfVoll angabe={angabe} mobil={mobil} bearbeiten={kontext.bearbeiten ? () => setDialog("stammdaten") : undefined} unter={{
+          <KopfVoll angabe={angabe} mobil={schmalerKopf} bearbeiten={kontext.bearbeiten ? () => setDialog("stammdaten") : undefined} unter={{
             gewicht: k.bmi != null || k.gewicht ? <>{k.bmi != null ? <><Begriff name="bmi">BMI</Begriff> {zahl(k.bmi, 1)}</> : null}
               {k.bmi != null && k.gewicht ? " · " : null}{k.gewicht ? `gemessen ${datum(k.gewicht.am)}` : null}</> : undefined,
             plan: k.aktueller_plan ? `gültig ab ${datum(k.aktueller_plan.gueltig_ab)}` : undefined,

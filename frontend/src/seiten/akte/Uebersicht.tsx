@@ -142,14 +142,16 @@ function GewichtKarte({ startZeitraum = "y1", fuellen }: { startZeitraum?: Zeitr
     </span>
   );
   return (
-    <Karte className={cx("flex flex-col", fuellen ? "px-4 py-3 gap-2" : "px-4 sm:px-[1.375rem] py-4 sm:py-[1.125rem] gap-4")} data-testid="gewichtskarte">
+    <Karte className={cx("flex flex-col @container", fuellen ? "px-4 py-3 gap-2" : "px-4 sm:px-[1.375rem] py-4 sm:py-[1.125rem] gap-4")} data-testid="gewichtskarte">
       {fuellen ? (
         // Karte mit fester Höhe: Kopf in einer Zeile, damit das Diagramm Platz hat
         <div className="flex items-center justify-between gap-3 min-w-0">
           <div className="flex items-baseline gap-2.5 min-w-0">
-            <h2 className="lbl m-0 shrink-0">Gewicht</h2>{wert}{zusatz}
+            {/* schmale Karte (Tablet): Überschrift und Knopftext weichen dem Wert */}
+            <h2 className="lbl m-0 shrink-0 @max-[22rem]:sr-only">Gewicht</h2>{wert}{zusatz}
           </div>
-          {erfassen ? <Knopf klein icon="plus" className="shrink-0" onClick={() => gewichtErfassen()}>Gewicht</Knopf> : null}
+          {erfassen ? <Knopf klein icon="plus" className="shrink-0" onClick={() => gewichtErfassen()}
+            title="Gewicht erfassen"><span className="@max-[22rem]:sr-only">Gewicht</span></Knopf> : null}
         </div>
       ) : (
         <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -169,7 +171,7 @@ function GewichtKarte({ startZeitraum = "y1", fuellen }: { startZeitraum?: Zeitr
       <div className={cx("flex items-center justify-between gap-3", fuellen ? "flex-nowrap" : "flex-wrap")}>
         <Segmente label="Zeitraum" wert={zeitraum} onWahl={setZeitraum} werte={fuellen ? ZEITRAEUME_KURZ : ZEITRAEUME} />
         <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox" checked={geglaettet} onChange={(ev) => setGeglaettet(ev.target.checked)} /> Geglättet
+          <input type="checkbox" checked={geglaettet} onChange={(ev) => setGeglaettet(ev.target.checked)} /> <span className={fuellen ? "@max-[22rem]:sr-only" : undefined}>Geglättet</span>
         </label>
       </div>
       {/* nur als Warnung – die Veränderung steht ohnehin im Kopf der Akte (Wunsch 10.10.2026: weniger Infos) */}
