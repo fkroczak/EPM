@@ -363,8 +363,11 @@ class WeiterePdfs(Grundlage):
         self.assertEqual(r.status_code, 200, r.content)
         if PDFTOTEXT:
             text = pdf_text(r.content)
-            for erwartet in ["Zugang zu EPM", "zugang.test", kennwort, "Authenticator", "Notfall-Codes"]:
+            for erwartet in ["Zugang zu EPM", "zugang.test", kennwort, "Authenticator", "Notfall-Codes", "Einmal-Passwort",
+                             "Ein eigenes Passwort wählen"]:
                 self.assertIn(kompakt(erwartet), kompakt(text))
+            # sichtbar heißt es „Passwort“ (Entscheidung vom 10.10.2026)
+            self.assertNotIn("Kennwort", text)
         from accounts.models import User
 
         User.objects.filter(pk=uid).update(muss_kennwort_aendern=False)

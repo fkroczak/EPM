@@ -48,7 +48,9 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 
 | Nr. | Funktion | Ansicht (Entwurf) | Status |
 |---|---|---|---|
+| 10.10.2026 | Vorlagen-Portal einfacher | Übersicht mit Suche, geführter Ablauf mit Live-Vorschau, Angaben per Klick, frühere Fassung wiederherstellen, als eigene Vorlage kopieren (F180). Lauf steht aus |
 | 09.10.2026 | Eigene Vorlagen | „+ Neue Vorlage“ unter Vorlagen › Dokumentvorlagen: eigene Schreiben mit E-Mail anlegen, bearbeiten, deaktivieren; in der Akte wählbar (F176). Lauf steht aus |
+| F179 | Systemverwaltung ohne SSH: Ampel, Reiter, kompakte Graphen, Sicherungen mehrfach löschen, Dienste, Versionen, Pakete, Zertifikat, Protokolle | Administration › Systemverwaltung, System, Backup | ABGESCHLOSSEN – Lauf steht aus |
 | F01 | Sitzungsstatus und CSRF-Token | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F02 | Anmeldung mit Benutzername und Kennwort | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
 | F03 | Zweiter Faktor bei der Anmeldung | 1 Anmeldung | ABGESCHLOSSEN UND GETESTET |
@@ -1167,7 +1169,7 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 - **Endpunkt:** `GET /api/protokoll/?gruppe=anmeldung,fehlversuch,benutzer,vorlage,backup,export,abschluss,dokument,datenschutz&benutzer&von&bis&search`
   → `[{id, zeitpunkt, art, art_name, gruppe, gruppe_name, beschreibung, benutzer, person, benutzername, objekt, details, ip, geraet}]`
 - **Logik:** `beschreibung` wie im Entwurf („Anmeldung mit 2FA“, „Falsches Passwort (3. Versuch)“, „5 falsche Passwörter in
-  4 Minuten, Konto gesperrt“, „Benutzer k.oezdemir angelegt (Mitarbeiter), Einmal-Kennwort erzeugt“, „Akte Weber, Anna
+  4 Minuten, Konto gesperrt“, „Benutzer k.oezdemir angelegt (Mitarbeiter), Einmal-Passwort erzeugt“, „Akte Weber, Anna
   (Nr. 0231) abgeschlossen, Anlass: verstorben“, „Grenzwert „Kontakt überfällig“ von 6 auf 12 Monate geändert“).
   Hinweis auf gesperrte Konten: F08.
 - **Validierung:** Recht „Audit-Log lesen“ (Standard: Mediziner, Admin); unbekannte Gruppe → 400.
@@ -3309,9 +3311,161 @@ strukturell überarbeitet und sind hier bewusst nur in Texten berührt.
 - **Hilfe:** neue Abschnitte „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“ ganz oben; Anmelden und
   Dokumente an die Oberfläche angeglichen („Passwort“, „Weiter“, „Neues Dokument“); zweizeilige Einträge im Inhalt der
   Hilfe überlappen nicht mehr. Aufzählungen in formatiertem Text (Notizen, Hilfe) zeigen wieder Punkte bzw. Nummern.
+- **„Passwort“ statt „Kennwort“** (Entscheidung vom 10.10.2026) in allen Texten des Backends außer `vorlagen` und
+  `infusionen` (Meldungen, Audit-Texte, Hilfe, Einrichtungsbefehle) und in der Anmeldung; Bezeichner, API-Felder,
+  Modelle und Migrationen unverändert. Administration, Akte und Zugangsblatt folgen beim Abgleich.
+- **Fachbegriffe erklärt** (Entscheidung vom 10.10.2026): Baustein `<Begriff>` (Popover von Base UI; Hover, Fokus,
+  Antippen, `aria-describedby`) mit den Texten aus `lib/begriffe.ts` (BIA, Entwurf, BMI, PE, Wiedervorlage,
+  Wiedereinbestellung, GLIM, Testpatient, storniert); eingesetzt in Patientenliste, „Kontakt erfassen“ und Scans.
 - **Teststatus:** `npm run typecheck` und `npm run build` grün; Backend-Tests `accounts` (u. a. `/api/hilfe/`) grün;
   Datums-/Uhrzeiteingabe stichprobenartig geprüft; Patientenliste, Neuer Patient, Anmeldung, Kontaktdialog und Hilfe am
   PC (1440 px) und Telefon (390 px) per Bildschirmfoto gegen die Entwicklungsumgebung geprüft. **Browsertests: Lauf steht aus.**
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+## W · Systemverwaltung ohne SSH (10.10.2026)
+
+Auftrag: „Der Praxismanager soll sich nie wieder per SSH auf den Server schalten müssen.“ Alles, was bisher nur per SSH
+ging, läuft jetzt als Auftrag über den Systemagenten (`rollout/epm-systemagent.py`, feste Allowlist `AKTIONEN`,
+Version 5) – mit Bestätigung wie unter Tätigkeiten (Rückfrage bzw. Passwort + zweiter Faktor über
+`bestaetigung_pruefen`), mit Eintrag im Audit-Log und im Probelauf (`--trocken`) simuliert. Per SSH bleibt nur die
+Ersteinrichtung des Servers (`rollout/01…05`, `epm-git-einrichten.sh`, `epm-zertifikat einrichten` für die eigene CA).
+
+### F179 Systemverwaltung: Ampel, Reiter, kompakte Graphen, Wartung ohne SSH
+- **F179a Sicherungen mit Mehrfachauswahl löschen** (Administration › Backup › Sicherungen): Checkbox je Zeile,
+  „alle auswählen“ (außer der jüngsten), Leiste „N ausgewählt · Größe“, Knopf „N Sicherungen löschen“ → Dialog mit
+  Anzahl, Größe, Liste, Hinweis „endgültig“ und Warnung, wenn Sicherungen nirgends sonst liegen (nicht übertragen /
+  kein Ziel); Bestätigung mit Passwort und 2FA. Die **jüngste Sicherung ist nie löschbar** (Backend und Agent).
+  `POST /api/backup/loeschen/` `{"stempel": [...], "kennwort", "code"}` (Recht „Sicherungen verwalten“; 1–200 Stempel,
+  Muster `JJJJ-MM-TT_HHMM[SS]`, keine Doppelten, alle bekannt, Agent muss laufen, kein Wiederherstellen offen).
+  Agent-Aktion `sicherung_loeschen`: prüft noch einmal, sucht die Dateien über den Ordnerinhalt (dieselben Muster wie
+  die Liste), löscht nur gewöhnliche Dateien (symbolische Links werden übersprungen), nimmt die Sperre der Sicherung,
+  bricht ab, solange eine Übertragung läuft, entfernt eine bereitgelegte Download-Kopie und den Übertragungsstand.
+  Audit-Log „Backup“: Stempel, Anzahl, Größe, Zahl der unverschlüsselten, bestätigt.
+- **F179b Systemverwaltung** (`/admin`, neuer Menüpunkt, Recht Systemverwaltung oder Sicherungen verwalten): Ampel für
+  Systemagent, Dienste/Container, Speicherplatz, Ubuntu-Updates (Sicherheitsupdates, Neustart nötig), Zertifikat
+  (Ablauf < 30 Tage Hinweis, < 7 Fehler, selbst signiert Hinweis), Texterkennung, Uhrzeit/NTP, letzte Sicherung,
+  Übertragung, fehlgeschlagene Aufträge in 24 h; jede Kachel führt zum passenden Reiter. Daneben „Häufige Aufgaben“
+  (Jetzt sichern, Ubuntu-Updates, EPM aktualisieren, Server neu starten, Dienste, Software, Zertifikat, Protokolle,
+  Hinweis an alle, Benutzer, Audit-Log) und die Auslastung als kleiner Verlauf.
+- **F179c Reiter statt Endlos-Seiten**: Administration › System: Übersicht · Wartung · Software · Zertifikat ·
+  Protokolle · Anmeldungen und Hinweis · Verlauf · Testphase; Administration › Backup: Sicherungen · Verschlüsselung ·
+  Übertragung · Tätigkeiten. Reiter in der Adresse (`?reiter=…`), am Telefon seitlich wischbar
+  (`components/ui/reiter.tsx`).
+- **F179d Graphen kompakt**: CPU, Arbeitsspeicher und Platte als Zahl mit kleinem Verlauf (24 h,
+  `components/ui/sparkline.tsx`); „Größer anzeigen“ bzw. Klick auf die Karte öffnet das große Diagramm mit Zeitraum
+  im Dialog (`seiten/admin/auslastung.tsx`). Backup: Größe je Sicherung als kleine Säulen, groß im Dialog.
+- **F179e Dienste einzeln neu starten** (Wartung): backend, web, ocr, db; `POST /api/system/dienste/neustart/`
+  `{"dienst", "minuten", "hinweis"?, "kennwort", "code"}`, warnt die Angemeldeten; Agent `dienst_neustart`
+  (`docker compose restart <dienst>`).
+- **F179f Version zurückschalten** (Software): Liste der vorhandenen Versionen (Images `epm-backend`/`epm-web` vom
+  Agenten im Status, laufende aus `.env`); `POST /api/system/versionen/zurueck/` `{"tag", "minuten", …}` (Muster
+  `X.Y.Z-<commit>`, muss vollständig vorhanden und nicht aktiv sein, Agent muss laufen); Agent `epm_zurueck`: vorher
+  Sicherung (`vor_update`), dann `epm-update --zurueck TAG`.
+- **F179g Update-Paket hochladen und erstellen** (Software): Hochladen in Stücken wie bei Sicherungen
+  (`system/hochladen.py`, gemeinsam für Sicherung/Paket/OCR, Arten getrennt: ein Paket lässt sich nicht als Sicherung
+  einlesen und umgekehrt); `POST /api/system/hochladen/` `{"art": "paket"|"ocr", "name", "groesse"}`, `PUT …/<upload>/
+  ?versatz=N`, `DELETE …/<upload>/`, `POST …/<upload>/einspielen/`. Agent `epm_paket`: kopiert die Datei in einen nur
+  für root beschreibbaren Ordner (das Backend kann sie danach nicht mehr ändern), berechnet die SHA-256 (steht in der
+  Ausgabe zum Vergleich mit der Test-VM), prüft das tar (nur `TAG`, `VERSION`, `SHA256SUMS`, `images.tar`,
+  `rollout/…`, `werkzeuge/…`; keine Verweise, keine absoluten Pfade, kein „..“), dann `epm-update --paket … --ohne-tests`
+  (prüft die Prüfsummen, sichert, stellt um). `epm_paket_erstellen` (`POST /api/system/pakete/erstellen/`): `epm-update
+  --paket-erstellen`, Paket 2 Stunden unter `system/download/`; `GET /api/system/pakete/<datei>/` (X-Accel, Audit-Log).
+- **F179h OCR-Modelle einspielen** (Software): Upload Art `ocr`, Agent `ocr_modelle` prüft den Inhalt (`modelle.json`,
+  `dateien/…`) und ruft `epm-ocr-modelle einspielen` auf; Vorrat auf dem Server und Stand im Image werden angezeigt.
+- **F179i Zertifikat** (Zertifikat): Inhaber, Namen, Aussteller, Ablauf, eigene CA/selbst signiert (Agent liest
+  `nginx/certs/epm.crt` mit openssl), Stammzertifikat `/epm-ca.crt` zum Herunterladen. `POST /api/system/zertifikat/
+  erneuern/` (nur mit eigener CA; `epm-zertifikat erneuern`), `POST /api/system/zertifikat/importieren/`
+  `{"zertifikat", "schluessel", "ca"?}` als PEM: Backend prüft Lesbarkeit, Schlüssel passt, Kette zur CA
+  (cryptography); Zertifikat, Schlüssel und CA nur in der Auftragsdatei (`geheim`, 0600) – im Audit-Log nur Inhaber,
+  Aussteller, Ablauf, Fingerabdruck. Agent schreibt sie in einen temporären Ordner (0700) und ruft `epm-zertifikat
+  importieren` auf.
+- **F179j Protokolle** (nur lesend): backend, web, ocr, db (`docker compose logs --tail N`), Systemagent, nächtliche
+  Sicherung, Übertragung (`journalctl -u …`), letztes Update (`/var/log/epm-update.log`); 100/500/2000 Zeilen.
+  `POST /api/system/protokolle/` `{"quelle", "zeilen"}` → Agent `protokoll` legt den Text unter
+  `status/protokolle/<Auftrag>.log` ab (0640, Gruppe des Backends, nach 1 Stunde gelöscht) – **nicht** in der
+  Datenbank; `GET /api/system/protokolle/<kennung>/` (`?herunterladen=1` als Datei, Audit-Log). Filter in der Oberfläche.
+- **F179k Status erweitert**: Versionen, Pakete, Zertifikat, Uhrzeit/NTP (`timedatectl`), OCR-Vorrat, vorhandene
+  Werkzeuge; „Neustart nötig“ und Speicher wie bisher.
+- **Begriffe**: „Passwort“ statt „Kennwort“ in den sichtbaren Texten von Benutzer, System, Backup, Startseite
+  (Administration), Hilfe Administration/Backup; Erklärungen beim Draufzeigen für Systemagent, Container, CA,
+  Update-Paket, Übertragungsziel (`lib/begriffe.ts`).
+- **Teststatus:** Backend `system/test_verwaltung.py` (Mehrfach-Löschen: Rechte, Validierung, Pfadtricks, jüngste,
+  Agent nicht erreichbar, Audit-Log; echter Agent löscht echt und folgt keinem Verweis; Probeläufe aller neuen Aktionen;
+  Uploads mit Inhaltsprüfung inkl. Verweis/„..“/fremder Datei; Zertifikat-Import ohne Schlüssel in der Datenbank;
+  Protokolle; Stand im Status) – 112 Tests `system accounts audit` lokal grün. Browsertests `system.spec.ts` (neuer
+  Test Systemverwaltung) lokal grün gegen Vite + Django + Agent im Probelauf; `zzz-sicherung.spec.ts` (neuer Test
+  Mehrfach-Löschen) braucht den CI-Stack.
+- **Status:** ABGESCHLOSSEN – Lauf steht aus
+
+**Bewusst nicht umgesetzt (Empfehlungen):**
+- *Zeitplan der automatischen Sicherung ändern* (OnCalendar von `epm-backup.timer`): bräuchte eine geprüfte
+  Zeitangabe und `systemctl daemon-reload` aus dem Agenten; selten nötig. Empfehlung: Auswahl 01:00–05:00 als eigene
+  Agent-Aktion mit Drop-in `/etc/systemd/system/epm-backup.timer.d/zeit.conf`.
+- *Aufräumen mit Speicher-Übersicht je Verzeichnis* (Journal, alte Image-Dateien, Uploads): heute Docker- und
+  Paketreste aufräumen; Empfehlung: `journalctl --vacuum-size` und Löschen alter `images/epm-*.tar` als weitere
+  Aktionen.
+- *Protokolle ohne Patientendaten*: Container-Protokolle können in Fehlermeldungen Inhalte enthalten; sie werden
+  deshalb nur auf Anforderung gelesen, nicht gespeichert und nach 1 Stunde gelöscht. Eine Maskierung (Namen,
+  Geburtsdaten) wäre unzuverlässig und ist nicht eingebaut.
+- *Update-Pakete signieren*: Die Prüfsummen im Paket schützen vor Beschädigung, nicht vor einem untergeschobenen Paket.
+  Schutz heute: nur mit Recht Systemverwaltung, Passwort + 2FA, SHA-256 zum Vergleich. Empfehlung: Signatur mit einem
+  Schlüssel der Test-VM, den der VPS kennt.
+- *Uhrzeit/NTP einstellen*: nur angezeigt, nicht änderbar.
+
+## X · Vorlagen-Portal einfacher (10.10.2026)
+
+Wunsch: „Erweitere das Vorlagen-Portal um eine intuitivere Bedienung für Praxismanager und Krankenschwestern.“
+Zielgruppe: Pflegekräfte ohne IT-Erfahrung und ein Praxismanager mit IT-Erfahrung.
+
+### F180 Vorlagen in Alltagssprache, geführter Ablauf, Angaben per Klick, frühere Fassung, Kopie
+- **Prüfung vorher (Stolperstellen):** Startseite der Vorlagen war direkt der Briefkopf; zwölf Dokumentvorlagen als
+  eine lange Knopfreihe ohne Erklärung, wofür sie sind und wo sie benutzt werden („Bericht“ und „Unterlagen für die
+  Sprechstunde“ waren gar nicht erreichbar); Begriffe Entwurf/Version/Veröffentlichen/Baustein/Datenfeld; Platzhalter
+  als `{{Patient.Briefanrede}}` in Schreibmaschinenschrift; Datenfeld einfügen ging nur nach vorherigem Klick ins
+  Textfeld, sonst passierte nichts; Vorschau nur im Dialog; „laden“ einer Version ohne Hinweis, dass danach noch
+  gespeichert und veröffentlicht werden muss; Auswahllisten ohne Hinweis, wo sie benutzt werden; Reihenfolge nur per
+  Ziehen/Tastatur (am Tablet schwer).
+- **Vorlagen › Übersicht** (neue Startseite, Adresse `/admin/vorlagen`): Kacheln „Briefe, Formulare und E-Mail-Texte“,
+  „Briefkopf und Logo“, „Medikamente und Präparate“, „Auswahllisten“, „Labor und Diagnosen“, „Grenzwerte und
+  Fristen“, „Anlagen für E-Mails“ – je mit „Wofür?“, „Wo benutzt?“ und dem Namen im Menü. **Suche** „Was möchten Sie
+  ändern?“ über Vorlagen, Listen, Präparate, Einträge und Anlagen. Hinweis auf Vorlagen mit noch nicht freigegebenen
+  Änderungen. Jeder Bereich hat eine Adresse (`?bereich=listen&liste=vitamine`), „Zurück“ im Browser funktioniert.
+- **Dokumentvorlagen:** zuerst die **Liste** aller Vorlagen nach Gruppen (Briefe und E-Mails an Patienten, Eigene
+  Vorlagen, Pläne/Berichte/Unterlagen, Vordrucke zum Datenschutz) mit Beschreibung, „Wo benutzt“ und Stand („in
+  Gebrauch · Fassung n“, „Änderungen noch nicht freigegeben“, „Mustertext, noch nicht geprüft“, „deaktiviert“);
+  Suche. Im Editor (`?art=…`) Kopf mit Name, Zweck und Ort, **geführter Ablauf** „1 · Bearbeiten → 2 · Vorschau prüfen
+  → 3 · Freigeben“; **Live-Vorschau** (echte PDF mit wählbarem Testpatienten und E-Mail-Text) in der Mitte neben den
+  Eigenschaften, folgt jeder Änderung nach 0,7 s; der Freigabe-Dialog weist darauf hin, wenn der Stand noch nicht in
+  der Vorschau zu sehen war. In der Oberfläche heißt eine Version jetzt **Fassung** und Veröffentlichen
+  **Freigeben**; Baustein/Block heißen **Abschnitt** (API und Audit-Log unverändert).
+- **Angaben aus der Akte per Klick:** Feldeinfüger mit lesbaren Namen nach Gruppen (Patient, Termin, Absender …) und
+  Suche; ein Klick fügt auch ohne vorheriges Hineinklicken ins erste Textfeld des markierten Abschnitts ein (an der
+  Schreibmarke, wenn schon hineingeklickt wurde). Platzhalter erscheinen auf der Seite und unter dem Textfeld als
+  lesbare Chips („Briefanrede“), unbekannte rot.
+- **Frühere Fassung ansehen/wiederherstellen:** „ansehen“ zeigt die PDF der Fassung mit Testpatient, „wiederherstellen“
+  übernimmt sie als gespeicherten Entwurf (Notiz „wiederhergestellt aus Fassung n“); in Gebrauch erst nach Freigeben.
+- **Als eigene Vorlage kopieren** (Schreiben außer der Patientenankündigung): neue eigene Vorlage (F176) mit Text und
+  Aufbau der Fassung in Gebrauch, sofort in der Akte wählbar; mit Termin, wenn die Vorlage Termin-Angaben benutzt.
+- **Auswahllisten:** Gliederung „Präparate für Infusionspläne“ / „Weitere Auswahllisten“, je Liste „Wo benutzt“,
+  ▲ ▼ je Zeile für Tablet und Telefon, Suche in langen Listen, „wird angeboten“/„ausgeblendet“ mit Erklärung
+  „Ausblenden statt löschen“. Kleine **„?“-Erklärungen** an Aufbau, Fassungen, Angaben und Auswahllisten.
+- **Verlassen mit ungespeicherten Änderungen** an einer Dokumentvorlage fragt nach – auch bei „Zurück“, anderer
+  Vorlage, anderer Seite (React Router `useBlocker`) und beim Schließen/Neuladen des Fensters (`beforeunload`).
+- **Nebenbei behoben:** PDF-Anzeigen zeigten „Anzeige nicht möglich: … ArrayBuffer … already detached“, wenn pdf.js
+  dieselben Daten ein zweites Mal lud (der Puffer geht an den Worker) – im Entwicklungsmodus (StrictMode) bei jeder
+  Vorschau mit `laden`; `components/PdfAnsicht.tsx` gibt pdf.js jetzt eine Kopie.
+- **Endpunkte:** `GET /api/vorlagen/` und `/api/vorlagen/{art}/` liefern zusätzlich `gruppe`, `wofuer`, `wo`, je
+  Datenfeld `bezeichnung` und `gruppe` (`vorlagen/portal.py`; `felder.py` unverändert).
+  `POST /api/vorlagen/{art}/versionen/{n}/wiederherstellen/` (ersetzt einen vorhandenen Entwurf, geprüft mit
+  `pruefe_bloecke`, Audit-Log „Fassung n als Entwurf wiederhergestellt“).
+  `POST /api/vorlagen/{art}/duplizieren/` `{"name", "beschreibung"?, "mit_termin"?}` → 201 mit der Übersicht der neuen
+  eigenen Vorlage; 400, wenn die Vorlage Datenfelder oder Tabellen enthält, die eigene Schreiben nicht kennen.
+  Keine Migration.
+- **Teststatus:** `vorlagen/test_portal.py` (5 Tests: Beschreibungen, lesbare Felder, Wiederherstellen mit Rechten und
+  Ersetzen des Entwurfs, Kopieren, Kopieren nur mit erlaubten Feldern). Browsertests angepasst
+  (`dokumentvorlagen.spec.ts`, `admin.spec.ts`, `mobil.spec.ts`, `zz-neustart.spec.ts`) und neu „Vorlagen-Portal:
+  Suche, Angabe per Klick, geführter Ablauf, frühere Fassung, Kopie als eigene Vorlage“; lokal gegen Vite + Django
+  (PostgreSQL 16) grün, Lauf im CI steht aus.
 - **Status:** ABGESCHLOSSEN – Lauf steht aus
 
 ## Z · Texterkennung lernt mit (10.10.2026)
@@ -3502,6 +3656,8 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | Datum | Stand | Änderung |
 |---|---|---|
 | 10.10.2026 | Texterkennung lernt mit | Gelernte Zuordnungen aus Korrekturen beim Übernehmen (Labor, BIA, Diagnosen, Spaltenlage je Labor; ohne Patientendaten), Anwendung vor der Ähnlichkeitssuche mit Schwelle, Bereich „Gelernte Zuordnungen“, Kennzahl „korrigiert“ (F182); Patient aus Name und Geburtsdatum vorschlagen, nur per Klick (F183); Offline-Prüfung (`docs/OFFLINE-BETRIEB-2026-10-10.md`). Lauf steht aus |
+| 10.10.2026 | Systemverwaltung ohne SSH | Neue Seite Systemverwaltung mit Ampel und häufigen Aufgaben; System und Backup in Reitern; Graphen klein, groß im Dialog; Sicherungen mit Mehrfachauswahl löschen; Dienste einzeln neu starten, Version zurückschalten, Update-Paket und OCR-Modelle hochladen, Paket erstellen, Zertifikat erneuern/importieren, Protokolle ansehen – alles über den Systemagenten (F179). Lauf steht aus |
+| 10.10.2026 | Vorlagen-Portal einfacher | Übersicht mit Kacheln in Alltagssprache und Suche, Liste der Dokumentvorlagen mit Zweck/Ort/Stand, geführter Ablauf Bearbeiten → Vorschau → Freigeben mit Live-Vorschau, Angaben aus der Akte per Klick als lesbare Chips, frühere Fassung ansehen/wiederherstellen, als eigene Vorlage kopieren, ▲ ▼ und „Wo benutzt“ in den Auswahllisten, Warnung beim Verlassen (F180). Lauf steht aus |
 | 10.10.2026 | Bedienung für Pflegekräfte | Nachsichtige Datums-/Uhrzeiteingabe, Fehlermeldungen mit Lösungsweg, leere Zustände mit nächstem Schritt, Hilfe „Die wichtigsten Wege im Alltag“ und „Wenn etwas nicht klappt“, weniger Fachjargon (F178, `docs/BEDIENBARKEIT-2026-10-10.md`). Lauf steht aus |
 | 10.10.2026 | Infoblatt an die Praxis | Kalender › „Praxis informieren“: Infoblatt mit allen Terminen in der Praxis Holtmeier, Zeitraum per Knopf, Vorschau mit „neu“ und Warnung bei fehlendem Ort, nur Termine am gewählten Ort (Telefon/Video wahlweise), gemerkte Blätter ohne Namen, Erinnerung auf der Startseite, Ort im Termin vorbelegt (F177). Lauf steht aus |
 | 09.10.2026 | Schreiben mit E-Mail | Vorlagen von Alice: Patientenaufnahme, Terminbestätigung, Reisebescheinigung mit ADAC-Attest als PDF und als fertige E-Mail (.eml mit Anhang) aus der Akte (F172), Patientenankündigung aus dem Kalender (F173), Anlagen für E-Mails (F174), Fallzusammenfassung mit Gliederung (F175). Lauf steht aus |

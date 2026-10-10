@@ -25,6 +25,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { Editor } from "./Editor";
 import { PatientWahl } from "./PatientWahl";
+import { Begriff } from "@/components/ui/Begriff";
 
 export type Vorgabe = { id: number; name: string; ist_test?: boolean };
 const QUELLEN = ["telefonisch", "ambulanz", "versorger", "arztbrief"];
@@ -330,7 +331,7 @@ export function KontaktDialog({ offen, onOffen, vorgabe, text: textVorgabe }: {
           <fieldset className="m-0 border border-rand rounded-[0.625rem] px-4 py-3.5 flex flex-col gap-3">
             <label className="flex items-center gap-2.5 text-sm font-medium cursor-pointer">
               <input type="checkbox" className="!w-[1.125rem] !h-[1.125rem]" checked={mitTermin} onChange={(e) => setMitTermin(e.target.checked)} />
-              Wiedervorlage anlegen
+              <span><Begriff name="wiedervorlage">Wiedervorlage</Begriff> anlegen</span>
             </label>
             {mitTermin ? (
               <>

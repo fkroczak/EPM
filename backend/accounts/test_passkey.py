@@ -87,7 +87,7 @@ class Passkeys(Grundlage):
 
     def test_einrichten_in_mein_konto_und_anmelden(self):
         """F130/F131: Passkey unter Mein Konto einrichten (erster zweiter Faktor → Notfall-Codes), danach meldet sich
-        die Person mit Kennwort und Passkey an; der Code der App wird nicht gebraucht."""
+        die Person mit Passwort und Passkey an; der Code der App wird nicht gebraucht."""
         user = benutzer("pk_mitarbeiter", Rolle.MITARBEITER)
         c, status = anmelden_mit_kennwort(user)
         self.assertEqual(status["schritt"], "fertig")           # zweiter Faktor freiwillig
@@ -190,7 +190,7 @@ class Passkeys(Grundlage):
             self.assertIn("IP-Adresse", r.json()["fehler"])
 
     def test_bestaetigung_mit_passkey_statt_code(self):
-        """F132: Bestätigungen (hier: zweiten Faktor ausschalten) mit Kennwort und Passkey statt Code; eine Antwort für
+        """F132: Bestätigungen (hier: zweiten Faktor ausschalten) mit Passwort und Passkey statt Code; eine Antwort für
         „anmelden“ zählt dabei nicht."""
         user = benutzer("pk_bestaetigen", Rolle.MITARBEITER)
         c, _ = anmelden_mit_kennwort(user)

@@ -25,6 +25,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { ARTEN, STATUS, bisDatum, dateiname } from "./hilfen";
 import { ScanDetail } from "./ScanDetail";
 import { GelernteZuordnungen, KorrekturKennzahl } from "./Gelernt";
+import { Begriff } from "@/components/ui/Begriff";
 
 const DATEITYPEN = ".pdf,.jpg,.jpeg,.png,.tif,.tiff,.webp,.bmp,.heic,.heif,application/pdf,image/*";
 
@@ -228,7 +229,7 @@ export function Scans() {
           <Karte className="min-w-0 p-6 flex flex-col items-center gap-3 text-center" data-testid="scans-leer">
             <span className="gedaempft"><Icon name="hochladen" groesse={36} /></span>
             <p className="m-0 text-sm max-w-md">PDF, Fotos oder Scans hochladen: Die Seiten werden automatisch gerade gezogen und
-              bereinigt, der Text wird erkannt. Danach einem Patienten zuordnen – Laborwerte, BIA und Diagnosen lassen sich dabei
+              bereinigt, der Text wird erkannt. Danach einem Patienten zuordnen – Laborwerte, <Begriff name="bia">BIA</Begriff> und Diagnosen lassen sich dabei
               übernehmen – oder den Text kopieren.</p>
             {darf("scans_bearbeiten") ? <Knopf variante="pri" icon="hochladen" onClick={() => eingabe.current?.click()}>Hochladen</Knopf> : null}
             {st ? <span className="text-xs gedaempft">PDF, JPG, PNG, TIFF, WEBP, HEIC · bis {st.upload_max_mb} MB · bis {st.max_seiten} Seiten je Scan</span> : null}

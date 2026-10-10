@@ -7,6 +7,7 @@ from audit.api import SystemEreignisViewSet, TestdatenViewSet
 from system import api as system
 from altimport import api as altimport
 from system import sicherung_api as backup
+from system import verwaltung_api as verwaltung
 from infusionen.api import InfusionsplanViewSet
 from vorlagen import api as vorlagen
 from patienten.api import (
@@ -95,6 +96,8 @@ urlpatterns = [
     path("api/vorlagen/<str:art>/entwurfsmodus/", vorlagen.EntwurfsmodusView.as_view()),
     path("api/vorlagen/<str:art>/versionen/<int:version>/", vorlagen.VersionView.as_view()),
     path("api/vorlagen/<str:art>/startvorlage/", vorlagen.StartvorlageView.as_view()),
+    path("api/vorlagen/<str:art>/versionen/<int:version>/wiederherstellen/", vorlagen.WiederherstellenView.as_view()),
+    path("api/vorlagen/<str:art>/duplizieren/", vorlagen.DuplizierenView.as_view()),
     path("api/vorlagen/<str:art>/vorschau/", vorlagen.VorschauView.as_view()),
     # Administration › System (nur Admin)
     path("api/system/uebersicht/", system.UebersichtView.as_view()),
@@ -107,6 +110,18 @@ urlpatterns = [
     path("api/system/leeren/vorbereiten/", system.LeerenVorbereitenView.as_view()),
     path("api/system/leeren/", system.LeerenView.as_view()),
     path("api/system/sitzungen/<int:pk>/", system.SitzungBeendenView.as_view()),
+    # Wartung ohne SSH (F179)
+    path("api/system/dienste/neustart/", verwaltung.DienstNeustartView.as_view()),
+    path("api/system/versionen/zurueck/", verwaltung.ZurueckView.as_view()),
+    path("api/system/pakete/erstellen/", verwaltung.PaketErstellenView.as_view()),
+    path("api/system/pakete/<str:datei>/", verwaltung.PaketDateiView.as_view()),
+    path("api/system/hochladen/", verwaltung.HochladenView.as_view()),
+    path("api/system/hochladen/<str:kennung>/", verwaltung.HochladenTeilView.as_view()),
+    path("api/system/hochladen/<str:kennung>/einspielen/", verwaltung.EinspielenView.as_view()),
+    path("api/system/zertifikat/erneuern/", verwaltung.ZertifikatErneuernView.as_view()),
+    path("api/system/zertifikat/importieren/", verwaltung.ZertifikatImportierenView.as_view()),
+    path("api/system/protokolle/", verwaltung.ProtokolleView.as_view()),
+    path("api/system/protokolle/<uuid:kennung>/", verwaltung.ProtokollView.as_view()),
     # Administration › Import: Übernahme der Altdaten (nur Admin)
     path("api/altimport/", altimport.StandView.as_view()),
     path("api/altimport/dump/", altimport.DumpView.as_view()),
@@ -130,6 +145,7 @@ urlpatterns = [
     path("api/backup/uebertragen/", backup.UebertragenView.as_view()),
     path("api/backup/auftraege/<uuid:kennung>/abbrechen/", backup.AuftragAbbrechenView.as_view()),
     path("api/backup/aufbewahrung/", backup.AufbewahrungView.as_view()),
+    path("api/backup/loeschen/", backup.LoeschenView.as_view()),
     path("api/backup/hochladen/", backup.HochladenView.as_view()),
     path("api/backup/hochladen/<str:kennung>/", backup.HochladenTeilView.as_view()),
     path("api/backup/hochladen/<str:kennung>/einlesen/", backup.EinlesenView.as_view()),

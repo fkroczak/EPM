@@ -29,6 +29,7 @@ import { Icon } from "@/components/ui/icon";
 import { useHinweis } from "@/components/ui/hinweise";
 import { ARTEN, UNSICHER } from "./hilfen";
 import { PatientVorschlag } from "./PatientVorschlag";
+import { Begriff } from "@/components/ui/Begriff";
 
 export type Stelle = { seite: number; box: number[] } | null;
 /** Gewähltes Feld: Ein Klick auf ein Wort im Bild schreibt dessen Text hinein */
@@ -335,7 +336,7 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
       ) : null}
 
       {!arten.length ? (
-        <span className="text-[0.8125rem] gedaempft">Die Art des Dokuments wurde nicht erkannt. Laborbefund oder BIA-Messung lassen
+        <span className="text-[0.8125rem] gedaempft">Die Art des Dokuments wurde nicht erkannt. Laborbefund oder <Begriff name="bia">BIA</Begriff>-Messung lassen
           sich trotzdem übernehmen: Abschnitt einschalten, Feld anklicken und den Wert im Bild links anklicken.</span>
       ) : null}
 

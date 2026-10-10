@@ -490,7 +490,7 @@ export function Import() {
         rechts={<Chip art={art} data-testid="import-status">{s.status_name}</Chip>} />
       {ich.import_ausgeblendet ? (
         <Meldung art="info"><span data-testid="import-ausgeblendet">Der Menüpunkt „Import“ ist ausgeblendet. Wieder einblenden unter{" "}
-          <Link to="/admin/system">Administration › System</Link> (Karte „Testphase und Go-live“).</span></Meldung>
+          <Link to="/admin/system?reiter=testphase">Administration › System</Link> (Reiter „Testphase“).</span></Meldung>
       ) : null}
       {s.echte_akten.anzahl > 0 && (s.status === "leer" || s.status === "geladen") ? (
         <Meldung art="warn"><span data-testid="echte-akten">Im EPM gibt es {zahl(s.echte_akten.anzahl)} echte Akten (Nr. {s.echte_akten.nummern.join(", ")}{s.echte_akten.anzahl > s.echte_akten.nummern.length ? " …" : ""}).

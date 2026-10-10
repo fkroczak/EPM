@@ -1,5 +1,5 @@
 """
-Zugang direkt auf dem Server einrichten: eigenes Kennwort + Authenticator-App (QR im Terminal).
+Zugang direkt auf dem Server einrichten: eigenes Passwort + Authenticator-App (QR im Terminal).
 
 Für den ersten Admin und zum Testen, solange es noch kein Frontend gibt:
     sudo docker compose exec backend python manage.py epm_zugang_einrichten admin
@@ -19,7 +19,7 @@ from audit.models import SystemEreignis, protokolliere
 
 
 class Command(BaseCommand):
-    help = "Kennwort setzen und Authenticator-App einrichten (interaktiv, im Terminal)."
+    help = "Passwort setzen und Authenticator-App einrichten (interaktiv, im Terminal)."
 
     def add_arguments(self, parser):
         parser.add_argument("benutzername")
@@ -31,10 +31,10 @@ class Command(BaseCommand):
 
         # 1. Kennwort
         while True:
-            k1 = getpass.getpass("Neues Kennwort (mind. 12 Zeichen): ")
-            k2 = getpass.getpass("Kennwort wiederholen: ")
+            k1 = getpass.getpass("Neues Passwort (mind. 12 Zeichen): ")
+            k2 = getpass.getpass("Passwort wiederholen: ")
             if k1 != k2:
-                self.stderr.write("Kennwörter stimmen nicht überein.")
+                self.stderr.write("Passwörter stimmen nicht überein.")
                 continue
             try:
                 password_validation.validate_password(k1, user)

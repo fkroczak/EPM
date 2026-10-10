@@ -70,26 +70,26 @@ früheren Fassungen bleiben im <strong>Verlauf</strong> der Akte sichtbar. Es ge
 </ul>""",
     },
     {
-        "id": "anmelden", "gruppe": "erste_schritte", "titel": "Anmelden mit Kennwort und Authenticator", "rechte": [],
+        "id": "anmelden", "gruppe": "erste_schritte", "titel": "Anmelden mit Passwort und Authenticator", "rechte": [],
         "seiten": [],
         "html": """
-<p>Angemeldet wird mit Benutzername und <strong>Kennwort</strong>. Die <strong>Zwei-Faktor-Anmeldung</strong> (Code aus
+<p>Angemeldet wird mit Benutzername und <strong>Passwort</strong>. Die <strong>Zwei-Faktor-Anmeldung</strong> (Code aus
 einer Authenticator-App auf dem Telefon) ist freiwillig – die Administration kann sie für Admins oder für alle zur
 Pflicht machen. Wer sie eingerichtet hat, wird bei jeder Anmeldung nach dem Code gefragt.</p>
 <ol>
 <li>Benutzername und Passwort eingeben, <strong>Weiter</strong> wählen. Groß- und Kleinschreibung zählt; ist die
 Feststelltaste an, weist EPM darauf hin.</li>
 <li>Mit Zwei-Faktor-Anmeldung: den sechsstelligen Code aus der Authenticator-App eingeben. Er wechselt alle 30 Sekunden.</li>
-<li>Bei der ersten Anmeldung mit dem Einmal-Kennwort vom Zugangsblatt wird zuerst ein eigenes Kennwort festgelegt. Ist
+<li>Bei der ersten Anmeldung mit dem Einmal-Passwort vom Zugangsblatt wird zuerst ein eigenes Passwort festgelegt. Ist
 die Zwei-Faktor-Anmeldung Pflicht, wird danach die Authenticator-App eingerichtet (QR-Code scannen); sonst geht das
 jederzeit unter <strong>Mein Konto › Anmeldung und Sicherheit › Einrichten</strong>. Danach zeigt EPM einmalig die
 Notfall-Codes.</li>
 </ol>
-<p>Solange sie freiwillig ist, lässt sich die Zwei-Faktor-Anmeldung unter Mein Konto mit Kennwort und Code auch wieder
-ausschalten. Bestätigungen (endgültig löschen, Wiederherstellen, Updates, Sicherung, Import) verlangen immer Kennwort
+<p>Solange sie freiwillig ist, lässt sich die Zwei-Faktor-Anmeldung unter Mein Konto mit Passwort und Code auch wieder
+ausschalten. Bestätigungen (endgültig löschen, Wiederherstellen, Updates, Sicherung, Import) verlangen immer Passwort
 <strong>und</strong> Code – wer sie ausführen soll (z. B. Mediziner, Administration), muss die Zwei-Faktor-Anmeldung
 eingerichtet haben.</p>
-<p>Nach mehreren falschen Kennwörtern wird das Konto gesperrt; entsperren kann die Administration. Nach längerer
+<p>Nach mehreren falschen Passwörtern wird das Konto gesperrt; entsperren kann die Administration. Nach längerer
 Pause meldet EPM von selbst ab.</p>""",
     },
     {
@@ -153,14 +153,14 @@ sich anmeldet. <strong>Auf Standard zurücksetzen</strong> stellt alles zurück;
 führt zur Startseite im Bearbeitungsmodus.</p>""",
     },
     {
-        "id": "konto", "gruppe": "erste_schritte", "titel": "Mein Konto: Kennwort, Zwei-Faktor, Anmeldungen", "rechte": [],
+        "id": "konto", "gruppe": "erste_schritte", "titel": "Mein Konto: Passwort, Zwei-Faktor, Anmeldungen", "rechte": [],
         "seiten": ["/konto"],
         "html": """
 <p><strong>Mein Konto</strong> zeigt das eigene Profil (Name, Funktion, Kürzel, Rolle – geändert von der
 Administration) und alles zur Anmeldung. Wie EPM aussieht, steht seit dem 09.10.2026 im eigenen Menüpunkt
 <strong>Design</strong>.</p>
 <ul>
-<li><strong>Kennwort ändern</strong>: altes Kennwort, dann zweimal das neue.</li>
+<li><strong>Passwort ändern</strong>: altes Passwort, dann zweimal das neue.</li>
 <li><strong>Zwei-Faktor-Anmeldung</strong>: Authenticator-App oder Passkey einrichten, neues Gerät, Notfall-Codes; solange freiwillig auch ausschalten.</li>
 <li><strong>Anmeldungen</strong>: zeigt, wo man gerade angemeldet ist; fremde Anmeldungen lassen sich einzeln beenden.</li>
 </ul>""",
@@ -591,7 +591,7 @@ bei Bedarf korrigieren und <strong>Typ und Datum bestätigen</strong>.</p>""",
         "html": """
 <p>Liegt ein Dokument in der falschen Akte, ordnet <strong>Anderem Patienten zuordnen</strong> es mit Grund um. Beide
 Akten zeigen den Vorgang im Verlauf, ohne den jeweils anderen Patienten zu nennen.</p>
-<p>Gehört es in keine Akte, kann es <strong>endgültig gelöscht</strong> werden (nur Mediziner und Admin): mit Kennwort,
+<p>Gehört es in keine Akte, kann es <strong>endgültig gelöscht</strong> werden (nur Mediziner und Admin): mit Passwort,
 Code aus der Authenticator-App und einem Bestätigungscode. Datei, Titel und Inhalt werden entfernt; im Audit-Log bleibt
 ein neutraler Nachweis.</p>""",
     },
@@ -629,7 +629,7 @@ keiner Liste. Lesen kann sie nur, wer über Anfragen entscheidet – mit einer <
         "seiten": [],
         "html": """
 <p>Nach Ablauf der Aufbewahrungsfrist oder auf Antrag kann eine abgeschlossene Akte <strong>endgültig gelöscht</strong>
-werden – mit Kennwort, Code aus der Authenticator-App und Bestätigungscode. Es bleibt nur ein Eintrag im Löschprotokoll
+werden – mit Passwort, Code aus der Authenticator-App und Bestätigungscode. Es bleibt nur ein Eintrag im Löschprotokoll
 (Nummer, Daten der Frist, Grund, Umfang) ohne Namen und Inhalte. Wird später eine ältere Sicherung zurückgespielt,
 löscht EPM die Akte beim Start erneut.</p>""",
     },
@@ -756,6 +756,19 @@ Arzt, legt „Neuen Arzt anlegen“ ihn gleich im Dialog an.</p>""",
     },
     # ------------------------------------------------------------------ Administration
     {
+        "id": "systemverwaltung", "gruppe": "administration", "titel": "Systemverwaltung: Zustand auf einen Blick, ohne SSH",
+        "rechte": ["system_verwalten", "backup_verwalten"], "seiten": ["/admin"],
+        "html": """
+<p><strong>Administration › Systemverwaltung</strong> zeigt als Ampel, ob alles in Ordnung ist: Systemagent, Dienste
+(Container), Speicherplatz, Ubuntu-Updates, Zertifikat, Texterkennung, Uhrzeit, letzte Sicherung, Übertragung und
+fehlgeschlagene Aufträge. Jede Kachel führt direkt zu dem Bereich, in dem man etwas tun kann. Daneben stehen die häufigen
+Aufgaben (sichern, Updates, Neustart, Software, Zertifikat, Protokolle, Hinweis an alle, Benutzer, Audit-Log) und die
+Auslastung als kleiner Verlauf – <strong>Größer anzeigen</strong> öffnet das große Diagramm.</p>
+<p>Alles, was früher nur per SSH ging, läuft hier als Auftrag an den Systemagenten auf dem Server: nur fest eingetragene
+Tätigkeiten, Gefährliches mit Passwort und Code aus der Authenticator-App, alles im Audit-Log. Per SSH bleibt nur die
+Ersteinrichtung des Servers.</p>""",
+    },
+    {
         "id": "admin_start", "gruppe": "administration", "titel": "Startseite der Administration",
         "rechte": ["system_verwalten", "backup_verwalten", "benutzer_verwalten", "audit_lesen", "testdaten_zuruecksetzen"],
         "seiten": [],
@@ -765,7 +778,7 @@ Arzt, legt „Neuen Arzt anlegen“ ihn gleich im Dialog an.</p>""",
 <li><strong>Datensicherung</strong>: letzte Sicherung, Übertragung, Speicher; „Jetzt sichern“.</li>
 <li><strong>Server</strong> und <strong>Ubuntu-Updates</strong>: Auslastung, offene Updates; Updates installieren und
 Server neu starten – mit Passwort und 2FA, vorher automatische Sicherung, angemeldete Benutzer werden gewarnt.</li>
-<li><strong>Konten</strong>: gesperrt, Einmal-Kennwort offen, ohne zweiten Faktor, Notfall-Codes knapp.</li>
+<li><strong>Konten</strong>: gesperrt, Einmal-Passwort offen, ohne zweiten Faktor, Notfall-Codes knapp.</li>
 <li><strong>Angemeldet</strong>, <strong>Hinweis an alle</strong>, <strong>Zugriffe · 7 Tage</strong> aus dem Audit-Log
 und <strong>Testumgebung</strong>.</li>
 </ul>""",
@@ -774,9 +787,14 @@ und <strong>Testumgebung</strong>.</li>
         "id": "vorlagen", "gruppe": "administration", "titel": "Vorlagen: Auswahllisten, Präparate, Briefkopf",
         "rechte": ["vorlagen_pflegen"], "seiten": ["/admin/vorlagen"],
         "html": """
-<p>Unter <strong>Vorlagen</strong> pflegt man die Auswahllisten (z. B. Katheter, Dokumenttypen, Terminorte), die
-Präparate für Infusionspläne, Briefkopf und Logo sowie die Grenzwerte. Einträge werden deaktiviert statt gelöscht;
-jede Änderung steht im Audit-Log.</p>""",
+<p>Unter <strong>Vorlagen</strong> beginnt alles mit der <strong>Übersicht</strong>: je Bereich eine Kachel mit „Wofür?“
+und „Wo benutzt?“ – Briefe, Formulare und E-Mail-Texte, Briefkopf und Logo, Medikamente und Präparate, Auswahllisten
+(z. B. Katheter, Dokumenttypen, Terminorte), Labor und Diagnosen, Grenzwerte und Fristen, Anlagen für E-Mails. Das Feld
+<strong>Was möchten Sie ändern?</strong> sucht in allen Vorlagen, Listen, Präparaten und Anlagen und führt direkt hin.</p>
+<p>In den <strong>Auswahllisten</strong> steht über jeder Liste, wo sie in EPM zur Auswahl kommt. Die Reihenfolge ändern
+▲ ▼ (auch am Tablet), Ziehen am Griff oder die Pfeiltasten. Nicht mehr benötigte Einträge werden
+<strong>ausgeblendet statt gelöscht</strong>: Sie werden nicht mehr angeboten, bleiben aber dort stehen, wo sie schon
+eingetragen sind. Jede Änderung steht im Audit-Log; das „?“ neben einer Überschrift erklärt den Bereich.</p>""",
     },
     {
         "id": "grenzwerte", "gruppe": "administration", "titel": "Grenzwerte", "rechte": ["vorlagen_pflegen"], "seiten": [],
@@ -788,30 +806,41 @@ Größe und die Werte der Infusionspläne. Die Fristen des Datenschutzes ändert
 entscheidet.</p>""",
     },
     {
-        "id": "dokumentvorlagen", "gruppe": "administration", "titel": "Dokumentvorlagen", "rechte": ["vorlagen_pflegen"],
-        "seiten": ["/admin/vorlagen/dokumente"],
+        "id": "dokumentvorlagen", "gruppe": "administration", "titel": "Dokumentvorlagen (Briefe und Formulare)",
+        "rechte": ["vorlagen_pflegen"], "seiten": ["/admin/vorlagen/dokumente"],
         "html": """
-<p>Dokumentvorlagen bestimmen das Aussehen der PDFs (Infusionsplan, Patientendatenblatt, Vordrucke). Änderungen
-entstehen als <strong>Entwurf</strong>, lassen sich mit einem Testpatienten in der <strong>Vorschau</strong> prüfen und
-gelten erst nach <strong>Veröffentlichen</strong>. Frühere Versionen bleiben erhalten; jede PDF vermerkt, mit welcher
-Version sie erzeugt wurde.</p>
+<p>Dokumentvorlagen bestimmen Text und Aussehen der Briefe, E-Mails und PDFs (Schreiben an Patienten, Infusionsplan,
+Patientendatenblatt, Berichte, Unterlagen für die Sprechstunde, Vordrucke zum Datenschutz). Die Liste zeigt je Vorlage,
+wofür sie ist, wo sie in der Praxis benutzt wird und ihren Stand: <em>in Gebrauch</em>, <em>Änderungen noch nicht
+freigegeben</em> oder <em>Mustertext, noch nicht geprüft</em>.</p>
+<p>Geändert wird in drei Schritten: <strong>1 · Bearbeiten</strong> (Abschnitt im Aufbau oder auf der Seite anklicken,
+rechts ändern, „Speichern“), <strong>2 · Vorschau prüfen</strong> (die echte PDF mit einem Testpatienten, neben den
+Eigenschaften, folgt jeder Änderung) und <strong>3 · Freigeben</strong>. Erst dann gilt die neue <strong>Fassung</strong>
+für alle neuen PDFs und E-Mails; gespeicherte, noch nicht freigegebene Änderungen (der <em>Entwurf</em>) sieht in der
+Praxis niemand. Wer die Seite mit ungespeicherten Änderungen verlässt, wird gefragt.</p>
+<p><strong>Angaben aus der Akte</strong> (Anrede, Name, Termin …) fügt man per Klick aus der Liste rechts ein; im Text
+stehen sie als lesbare Kästchen wie <em>Briefanrede</em> und werden beim Erstellen durch die Daten des Patienten ersetzt.</p>
+<p><strong>Frühere Fassungen</strong> bleiben erhalten: „ansehen“ zeigt sie mit Testpatient, „wiederherstellen“
+übernimmt sie als Grundlage – in Gebrauch ist sie erst nach dem Freigeben. Jede PDF vermerkt ihre Fassung.
+<strong>+ Neue Vorlage</strong> legt ein eigenes Schreiben an; <strong>Als eigene Vorlage kopieren</strong> nimmt ein
+bestehendes Schreiben als Grundlage. Beide erscheinen in der Akte unter „Schreiben und E-Mail“ › „Eigene Vorlagen“.</p>
 <p>Die Vordrucke zum Datenschutz (Datenschutzinformation, Einwilligung, Schweigepflichtentbindung) kommen als ungeprüfte
-Entwürfe mit Lücken in [eckigen Klammern]; ihre PDFs tragen das Wasserzeichen „ENTWURF“, bis eine eigene Version
-veröffentlicht ist. Mit <strong>Entwurfsmodus ausschalten</strong> lässt sich das Wasserzeichen (und der Hinweisblock für
+Entwürfe mit Lücken in [eckigen Klammern]; ihre PDFs tragen das Wasserzeichen „ENTWURF“, bis eine eigene Fassung
+freigegeben ist. Mit <strong>Entwurfsmodus ausschalten</strong> lässt sich das Wasserzeichen (und der Hinweisblock für
 die Bearbeiter) auch ohne Bearbeiten abschalten – die Lücken bleiben dann stehen; jederzeit wieder einschaltbar.</p>""",
     },
     {
         "id": "benutzer", "gruppe": "administration", "titel": "Benutzer und Rechte", "rechte": ["benutzer_verwalten"],
         "seiten": ["/admin/benutzer"],
         "html": """
-<p><strong>Benutzer anlegen</strong> erzeugt ein Einmal-Kennwort; das <strong>Zugangsblatt</strong> lässt sich nur
-drucken, solange das Kennwort angezeigt wird. Benutzer werden nie gelöscht, nur gesperrt. Weitere Aktionen: entsperren,
-neues Einmal-Kennwort (Kennwort vergessen), zweiten Faktor zurücksetzen (Telefon verloren).</p>
+<p><strong>Benutzer anlegen</strong> erzeugt ein Einmal-Passwort; das <strong>Zugangsblatt</strong> lässt sich nur
+drucken, solange das Passwort angezeigt wird. Benutzer werden nie gelöscht, nur gesperrt. Weitere Aktionen: entsperren,
+neues Einmal-Passwort (Passwort vergessen), zweiten Faktor zurücksetzen (Telefon verloren).</p>
 <p><strong>Ohne Login</strong>: Konten, die nur als Name für Einträge dienen (z. B. frühere Mitarbeiter oder aus dem
 Altsystem übernommen), können sich nicht anmelden und haben die Rolle <strong>Keine Berechtigung</strong> – also keine
-Rechte. Ein Konto lässt sich auf „ohne Login“ setzen (Kennwort und zweiter Faktor werden gelöscht, Einträge bleiben
+Rechte. Ein Konto lässt sich auf „ohne Login“ setzen (Passwort und zweiter Faktor werden gelöscht, Einträge bleiben
 zugeordnet) und mit <strong>Login geben</strong> wieder einbinden, z. B. als Mitarbeiter; dabei entsteht ein neues
-Einmal-Kennwort.</p>
+Einmal-Passwort.</p>
 <p><strong>Testbenutzer</strong> (Schalter im Konto, für Betrachter, Mitarbeiter, Mitarbeiter (erweitert) und Mediziner) sehen und bearbeiten
 ausschließlich Testpatienten. Nicht mehr gebrauchte Testbenutzer lassen sich <strong>ausblenden</strong> (einzeln oder
 „Alle Testbenutzer ausblenden“): gesperrt und in keiner Liste mehr, aber nicht gelöscht; „Ausgeblendete zeigen“ und
@@ -837,8 +866,11 @@ die gefilterten Einträge aus.</p>""",
         "html": """
 <p><strong>Administration › System</strong> zeigt Auslastung (CPU, Arbeitsspeicher, Platte, Laufzeit), offene
 Ubuntu-Updates und den Verlauf der Auslastung – wählbar 1 Stunde, 3 Stunden, 24 Stunden, 7 und 14 Tage, 1 und 6 Monate
-(längere Zeiträume als Mittelwerte mit gestrichelten Spitzen). Die Karten lassen sich über <strong>⋯</strong> in Breite und
-Höhe einstellen. Von hier aus lassen sich <strong>Updates installieren</strong>,
+(längere Zeiträume als Mittelwerte mit gestrichelten Spitzen). Die Seite ist in Reiter gegliedert: <strong>Übersicht</strong> (Kennzahlen, Auslastung als kleiner Verlauf –
+<strong>Größer anzeigen</strong> öffnet das Diagramm –, Server, EPM, Texterkennung; die Karten lassen sich in Breite und
+Höhe einstellen), <strong>Wartung</strong>, <strong>Software</strong>, <strong>Zertifikat</strong>,
+<strong>Protokolle</strong>, <strong>Anmeldungen und Hinweis</strong>, <strong>Verlauf</strong> und
+<strong>Testphase</strong>. Von hier aus lassen sich <strong>Updates installieren</strong>,
 der <strong>Server neu starten</strong> und EPM neu starten – mit Passwort und Code aus der Authenticator-App
 (Zwei-Faktor-Anmeldung nötig), vorher läuft automatisch eine
 Sicherung (schlägt sie fehl, wird nichts verändert), angemeldete Benutzer werden gewarnt. Beginn sofort oder in 5 bis 60
@@ -848,11 +880,21 @@ Programmteile neu, sichert und stellt um. Das dauert je nach Server 10 bis 30 Mi
 erreichbar, deshalb vorher Eingaben speichern. Der Auftrag läuft auf dem Server weiter, auch wenn die Seite in der
 Zwischenzeit nicht antwortet – das Ergebnis erscheint danach unter <strong>Aufträge</strong> samt Ausgabe. Geht etwas
 schief, bleibt die bisherige Version in Betrieb; über <strong>Ausgabe</strong> ist zu sehen, woran es lag.</p>
+<p><strong>Wartung › Dienste</strong>: einzelne Container (backend, web, ocr, db) neu starten, z. B. wenn die Texterkennung
+hängt. <strong>Software</strong>: die vorhandenen Versionen mit <strong>Zurückschalten</strong> (vorher automatische
+Sicherung; Datenbank-Migrationen werden nicht zurückgedreht), <strong>Update-Paket einspielen</strong> (Datei der Test-VM
+hochladen statt per scp – der Server prüft Inhalt und Prüfsummen und zeigt die SHA-256 zum Vergleichen),
+<strong>Update-Paket erstellen</strong> (Test-VM; liegt danach 2 Stunden zum Herunterladen bereit) und
+<strong>OCR-Modelle einspielen</strong>. <strong>Zertifikat</strong>: Inhaber, Aussteller und Ablauf,
+<strong>Zertifikat erneuern</strong> (eigene CA), <strong>Zertifikat importieren</strong> (CRT, KEY und CA als PEM – der
+Schlüssel geht nur an den Server) und das Stammzertifikat für die Geräte. <strong>Protokolle</strong>: die letzten 100,
+500 oder 2000 Zeilen der Container, des Systemagenten, der nächtlichen Sicherung, der Übertragung oder des letzten
+Updates – filtern und herunterladen; ein Abruf liegt eine Stunde bereit und steht im Audit-Log.</p>
 <p>Außerdem: <strong>Hinweis an alle Benutzer</strong> setzen und angemeldete Benutzer abmelden. Bei den Konten führen die
-Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Kennwort) direkt zur Person in der Benutzerverwaltung.</p>
+Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Passwort) direkt zur Person in der Benutzerverwaltung.</p>
 <p><strong>Testphase und Go-live</strong>: <strong>Musterdaten automatisch anlegen</strong> abschalten, damit beim Start
 keine Testpatienten und Testkonten mehr entstehen. <strong>Menüpunkt „Import“ ausblenden</strong>, wenn die Altdaten
-übernommen sind – die Seite bleibt über die Karte erreichbar, der Menüpunkt lässt sich wieder einblenden.
+übernommen sind – die Seite bleibt über den Reiter „Testphase“ erreichbar, der Menüpunkt lässt sich wieder einblenden.
 <strong>Datenbank leeren</strong> (nur Rolle Admin) entfernt alles aus der Testphase: alle Akten (auch echte),
 Dokumente, Versorger, Ärzte, die nicht ausgewählten Benutzer und das Audit-Log; Präparate, Auswahllisten, Vorlagen und
 Einstellungen bleiben. Welche Konten bleiben, wird im Dialog angehakt (das eigene bleibt immer). Bestätigt wird mit dem
@@ -868,6 +910,12 @@ wird (das <strong>Passwortblatt</strong> gehört in den Tresor). Die Sicherungen
 WebDAV-Ordner (z. B. Nextcloud) übertragen.</p>
 <p><strong>Jetzt sichern</strong> startet eine Sicherung sofort. <strong>Wiederherstellen</strong> braucht das eigene
 Passwort und den Code aus der Authenticator-App (Zwei-Faktor-Anmeldung nötig); danach müssen sich alle neu anmelden.</p>
+<p>Die Seite hat die Reiter <strong>Sicherungen</strong>, <strong>Verschlüsselung</strong>, <strong>Übertragung</strong> und
+<strong>Tätigkeiten</strong>. <strong>Sicherungen löschen</strong>: in der Liste links ankreuzen (oder alle auf einmal),
+dann „N Sicherungen löschen“ – der Dialog nennt Anzahl und Größe und warnt, wenn eine Sicherung nirgends sonst liegt;
+bestätigt wird mit Passwort und Code. Die jüngste Sicherung lässt sich nie löschen. Das Löschen ist endgültig; Kopien
+im Übertragungsziel bleiben, bis die dortige Aufbewahrung sie entfernt. Die Größe je Sicherung steht klein unter
+„Speicher“, groß per Klick.</p>
 <p><strong>Aufbewahrung</strong>: 7, 14 oder 30 Tage auf dem Server; ältere entfernt die nächste Sicherung. Im
 Übertragungsziel gilt eine eigene Aufbewahrung (unter „Ziel ändern“, Standard 30 Tage, auch „nie löschen“): Nach jeder
 Übertragung entfernt der Server dort ältere EPM-Sicherungen; die jüngste bleibt immer, andere Dateien im Ordner werden
