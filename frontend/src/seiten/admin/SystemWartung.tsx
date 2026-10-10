@@ -293,6 +293,84 @@ export function UhrKarte({ daten, offen }: { daten: Uebersicht; offen: Set<strin
   );
 }
 
+
+// ---------------------------------------------------------------- Notfall (F188): Notfallpaket und Wiederaufbau-Plan
+export function NotfallPlan() {
+  const plan = useQuery({ queryKey: ["system", "notfallplan"], queryFn: () => api<{ html: string }>("system/notfallplan/") });
+  if (plan.error) return <Fehleranzeige fehler={plan.error} />;
+  if (!plan.data) return <Laden />;
+  // Der Plan ist eine feste Datei aus dem Code (system/notfallplan.md), serverseitig in HTML umgesetzt und escaped
+  return <div className="notfallplan text-sm leading-relaxed" data-testid="notfallplan" dangerouslySetInnerHTML={{ __html: plan.data.html }} />;
+}
+
+export function NotfallBereich({ daten, offen }: { daten: Uebersicht; offen: Set<string> }) {
+  const h = daten.host && daten.host.aktuell ? daten.host : null;
+  const n = h?.notfall;
+  const l = n?.letztes;
+  const [erstellen, setErstellen] = useState(false);
+  const [mitSicherung, setMitSicherung] = useState(true);
+  const [planOffen, setPlanOffen] = useState(false);
+  const alt = !l || Date.now() - Date.parse(l.zeit) > 30 * 86400_000;
+  const veraltet = !!l && !!h?.versionen?.aktiv && l.epm_version !== h.versionen.aktiv;
+  const laeuft = offen.has("server:notfallpaket");
+  return (
+    <div className="stapel grid grid-cols-1 hd:grid-cols-2 gap-4 items-start">
+      <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="notfall-karte">
+        <KartenKopf titel="Notfallpaket" unter="Alles, um EPM nach einem Totalausfall auf neuer Hardware ohne Internet wieder aufzubauen."
+          rechts={l ? <Chip art={alt || veraltet ? "warn" : "ok"}>{alt ? "älter als 30 Tage" : veraltet ? "ältere Version" : "aktuell"}</Chip>
+            : <Chip art="warn">noch nie erstellt</Chip>} />
+        {l ? (
+          <dl className="m-0">
+            <Zeile label="Zuletzt erstellt"><span data-testid="notfall-zuletzt">{zeitpunkt(l.zeit)}</span> · EPM {l.epm_version}</Zeile>
+            <Zeile label="Größe">{dateigroesse(l.groesse)} · {l.mit_sicherung ? `mit Sicherung ${l.sicherung}` : "ohne Sicherung"}</Zeile>
+            <Zeile label="SHA-256"><span className="num text-[0.75rem] break-all">{l.sha256}</span></Zeile>
+            {l.fehlt.length ? <Zeile label="Fehlt im Paket"><span className="text-warn">{l.fehlt.join("; ")}</span></Zeile> : null}
+          </dl>
+        ) : <Meldung art="warn">Es gibt noch kein Notfallpaket. Bitte erstellen, herunterladen und getrennt vom Server aufbewahren
+          (USB-Stick, NAS).</Meldung>}
+        {veraltet ? <Meldung art="warn">Seit dem letzten Notfallpaket wurde EPM aktualisiert – bitte neu erstellen.</Meldung> : null}
+        {n?.bereit.length ? n.bereit.map((b) => (
+          <div key={b.datei} className="flex items-center justify-between gap-3 text-sm flex-wrap" data-testid="notfall-bereit">
+            <span className="min-w-0 break-all">{b.datei} <span className="gedaempft num">· {dateigroesse(b.groesse)} · bis {uhrzeit(b.bis)} Uhr</span></span>
+            <a className="btn pri klein" href={`/api/system/notfall/${b.datei}/`} download><Icon name="herunterladen" />Herunterladen</a>
+          </div>
+        )) : null}
+        <div className="flex gap-2 flex-wrap items-center">
+          <Knopf variante={alt || veraltet ? "pri" : "sec"} icon="backup" disabled={!daten.agent.verzeichnis || laeuft} laedt={laeuft}
+            onClick={() => setErstellen(true)}>Notfallpaket erstellen</Knopf>
+          {n?.schaetzung ? <span className="text-xs gedaempft">etwa {dateigroesse(n.schaetzung)}</span> : null}
+        </div>
+        <ul className="m-0 pl-5 text-xs gedaempft flex flex-col gap-0.5">
+          <li>Enthält: Programme (Images), Rollout-Skripte, Debian-Pakete für Docker, OCR-Modelle, Einstellungen ohne Passwörter,
+            {" "}{n?.eigene_ca ? (n.passwort ? "die CA (Schlüssel verschlüsselt mit dem Sicherungs-Passwort)" : "das CA-Zertifikat (Schlüssel nur mit Sicherungs-Passwort)") : "kein CA-Schlüssel (keine eigene CA)"},
+            {" "}den Notfallplan und Prüfsummen.</li>
+          <li>Nicht enthalten: Sicherungs-Passwort (Passwortblatt im Tresor), Zugang zum Übertragungsziel; Datenbank-Passwort und
+            geheimer Schlüssel werden beim Aufbau neu erzeugt.</li>
+          <li>Nach jedem Update und mindestens alle 30 Tage neu erstellen; zwei Kopien an getrennten Orten.</li>
+        </ul>
+        <AuftragDialog offen={erstellen} titel="Notfallpaket erstellen" aktion={daten.verwaltung?.notfallpaket} pfad="system/notfall/"
+          body={{ mit_sicherung: mitSicherung }} daten={daten} knopf="Bestätigen und erstellen" onZu={() => setErstellen(false)}>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-0.5" checked={mitSicherung} onChange={(e) => setMitSicherung(e.target.checked)} />
+            <span>Jüngste Sicherung mit hineinlegen <span className="block text-xs gedaempft">verschlüsselt wie immer; weglassen, wenn die Sicherungen
+              ohnehin getrennt (NAS, Nextcloud) liegen</span></span>
+          </label>
+          <Meldung art="info">Geschätzte Größe {n?.schaetzung ? dateigroesse(n.schaetzung) : "unbekannt"}; der Server prüft vorher den freien Speicher.
+            Das Paket liegt danach 6 Stunden zum Herunterladen bereit; jeder Abruf steht im Audit-Log.</Meldung>
+        </AuftragDialog>
+      </Karte>
+      <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="notfallplan-karte">
+        <KartenKopf titel="Wiederaufbau-Plan" unter="Schritt für Schritt, auch im Notfallpaket (NOTFALLPLAN.pdf und .md)."
+          rechts={<a className="btn sec klein" href="/api/system/notfallplan/?art=pdf" target="_blank" rel="noreferrer"><Icon name="dokument" />PDF</a>} />
+        <span className="text-sm">Dauer etwa 1,5 bis 3 Stunden: Ubuntu installieren, Paket prüfen, <code>sudo ./epm-notfall-aufbau.sh</code>,
+          Sicherungs-Passwort eingeben, prüfen. Die letzte Seite ist eine Checkliste zum Ausdrucken.</span>
+        <Knopf className="self-start" onClick={() => setPlanOffen(!planOffen)} aria-expanded={planOffen}>{planOffen ? "Plan ausblenden" : "Plan hier lesen"}</Knopf>
+        {planOffen ? <div className="max-h-[40rem] overflow-y-auto border border-rand rounded-lg px-4 py-3"><NotfallPlan /></div> : null}
+      </Karte>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Hochladen in Stücken (wie bei den Sicherungen)
 type Upload = NonNullable<Uebersicht["uploads"]>[number];
 

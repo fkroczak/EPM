@@ -30,7 +30,7 @@ import { Icon } from "@/components/ui/icon";
 import { Reiter, ReiterInhalt, useReiter } from "@/components/ui/reiter";
 import type { ReiterEintrag } from "@/components/ui/reiter";
 import { AuslastungKarte } from "./auslastung";
-import { AufraeumenKarte, DiensteKarte, ProtokolleBereich, SoftwareBereich, UhrKarte, ZertifikatBereich } from "./SystemWartung";
+import { AufraeumenKarte, DiensteKarte, NotfallBereich, ProtokolleBereich, SoftwareBereich, UhrKarte, ZertifikatBereich } from "./SystemWartung";
 
 export type Platte = { pfad: string; bezeichnung: string; gesamt: number; frei: number };
 export type Speicher = { gesamt: number | null; verfuegbar: number | null; swap_gesamt: number | null; swap_frei: number | null } | null;
@@ -58,16 +58,23 @@ export type HostStatus = {
     dienst?: "chrony" | "timesyncd"; zeitzonen?: string[] };
   journal?: { verfuegbar: boolean; groesse?: number } | null;
   image_dateien?: { datei: string; tag: string; art: "images" | "paket"; groesse: number; zeit: string; geschuetzt: boolean }[];
+  /** Notfallpaket (F188) */
+  notfall?: { letztes: NotfallStand | null; bereit: { datei: string; groesse: number; bis: string }[]; schaetzung: number;
+    eigene_ca: boolean; passwort: boolean };
   ocr_vorrat?: { vorhanden: boolean; dateien: number; groesse: number; geaendert: string | null };
   werkzeuge?: { epm_update: boolean; epm_zertifikat: boolean; epm_ocr_modelle: boolean };
   protokolle?: { quelle: string; name: string }[];
 };
+export type NotfallStand = { zeit: string; epm_version: string; datei: string; groesse: number; sha256: string;
+  mit_sicherung: boolean; sicherung: string | null; fehlt: string[]; ubuntu: string };
 type PaketDatei = { tag: string; datei: string; groesse: number; zeit: string; bis?: string };
 /** Aufträge der Wartung ohne SSH (eigene Endpunkte): Bestätigung und Beschreibung vom Backend */
 export type VerwaltungAktion = { name: string; bestaetigung: "keine" | "einfach" | "2fa"; beschreibung: string; sichern?: boolean;
   warnen?: boolean; recht?: string; mehrfach?: boolean };
-export type SystemReiter = "uebersicht" | "wartung" | "software" | "zertifikat" | "protokolle" | "anmeldungen" | "verlauf" | "testphase";
-const SYSTEM_REITER: SystemReiter[] = ["uebersicht", "wartung", "software", "zertifikat", "protokolle", "anmeldungen", "verlauf", "testphase"];
+export type SystemReiter = "uebersicht" | "wartung" | "software" | "zertifikat" | "notfall" | "protokolle" | "anmeldungen" | "verlauf"
+  | "testphase";
+const SYSTEM_REITER: SystemReiter[] = ["uebersicht", "wartung", "software", "zertifikat", "notfall", "protokolle", "anmeldungen", "verlauf",
+  "testphase"];
 type Konto = { id: number; anzeigename: string; benutzername: string };
 export type Aktion = { code: string; name: string; bestaetigung: "keine" | "einfach" | "2fa"; beschreibung: string; sichern: boolean;
   warnen: boolean; erlaubt: boolean };
@@ -725,11 +732,14 @@ export function System() {
 
   const offeneFehler = (auftraege.data ?? []).filter((a) => a.status === "fehler" && Date.now() - Date.parse(a.angefordert_am) < 86400_000).length;
   const zt = h?.zertifikat?.tage;
+  const nl = h?.notfall?.letztes;
+  const notfallAlt = !!h && (!nl || Date.now() - Date.parse(nl.zeit) > 30 * 86400_000);
   const eintraege: ReiterEintrag<SystemReiter>[] = [
     { wert: "uebersicht", text: "Übersicht" },
     { wert: "wartung", text: "Wartung", zahl: h?.updates?.sicherheit || undefined, warn: true },
     { wert: "software", text: "Software" },
     { wert: "zertifikat", text: "Zertifikat", zahl: zt != null && zt < 30 ? 1 : undefined, warn: true },
+    { wert: "notfall", text: "Notfall", zahl: notfallAlt ? 1 : undefined, warn: true },
     { wert: "protokolle", text: "Protokolle" },
     { wert: "anmeldungen", text: "Anmeldungen und Hinweis", zahl: d.angemeldet.length || undefined },
     { wert: "verlauf", text: "Verlauf", zahl: offeneFehler || undefined, warn: true },
@@ -894,6 +904,7 @@ export function System() {
         </ReiterInhalt>
       ) : null}
       {reiter === "zertifikat" ? <ReiterInhalt testid="reiter-zertifikat"><ZertifikatBereich daten={d} offen={offen} /></ReiterInhalt> : null}
+      {reiter === "notfall" ? <ReiterInhalt testid="reiter-notfall"><NotfallBereich daten={d} offen={offen} /></ReiterInhalt> : null}
       {reiter === "protokolle" ? <ReiterInhalt testid="reiter-protokolle"><ProtokolleBereich daten={d} auftraege={auftraege.data ?? []} /></ReiterInhalt> : null}
       {reiter === "anmeldungen" ? (
         <ReiterInhalt testid="reiter-anmeldungen">
