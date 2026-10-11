@@ -55,7 +55,9 @@ Systemverwaltung, Backup, Benutzer, Vorlagen, Dokumentvorlagen, Audit-Log, Syste
 | Speichern auf Testpatient | ✓ | – | – | ✓ | – | – |
 | axe Seiten | ✓ | – | ✓ | ✓ | – | ✓ |
 
-Seitenaufrufe je Lauf 216 (36 × 3 Größen × 2 Firmen); Knöpfe: ERGEBNIS_KNOEPFE.
+Seitenaufrufe je Lauf 216 (36 × 3 Größen × 2 Firmen) plus 144 im Schema „Dunkel“ (Desktop und Telefon). Knöpfe im
+Abschlusslauf: 2083 Klicks, davon 801 mit Dialog oder Menü, 137 verschiedene Dialoge mit axe geprüft; kein Dialog
+ragt aus dem Fenster (auch nicht bei 390 px), keiner ohne Namen.
 
 ## Firmen
 
@@ -99,11 +101,16 @@ Seiten (36 × Desktop/Telefon × 2 Firmen = 144 Prüfungen):
 | `target-size` (Kalender „+N weitere“; Hinweis-Sprünge am Telefon) | 2 / 84 | 0 |
 | `scrollable-region-focusable` (Kachel „Datensicherung“ am Telefon) | 3 / 3 | 0 |
 | `link-in-text-block` (Datenschutz am Telefon) | 1 / 1 | 0 |
-| `region` (Ladebalken außerhalb der Landmarken, nur während eine Anfrage lief) | – | 4 / 4 → 0 (nach der letzten Korrektur, siehe Nr. 12) |
+| `region` (Ladebalken außerhalb der Landmarken, nur während eine Anfrage lief) | im Abschlusslauf 4 / 4 | 0 (Lauf „Dunkel“ nach Nr. 12) |
 
 Dialoge (jeder geöffnete Dialog einmal je Firma und Größe): vorher `aria-dialog-name` (Hinweisliste der Akte),
-`link-in-text-block` („Herunterladen“ im Dokument-Dialog), `color-contrast` im Schema „Dunkel“ (Firmenwahl) → nachher
-ERGEBNIS_DIALOGE.
+`link-in-text-block` („Herunterladen“ im Dokument-Dialog, 2×), `color-contrast` im Schema „Dunkel“ (Firmenwahl) und
+16 Klicks, die einen Dialog ohne Namen öffneten → nachher 0 Verstöße in 137 Dialogen.
+
+Schema „Dunkel“ (zusätzlicher Lauf, 36 Seiten × Desktop/Telefon × 2 Firmen): vorher `color-contrast` auf 10 Seiten
+(16 Knoten, nur DSKM: gedämpfte Schrift `#b8bac0` auf der getönten Auswahl `#4c4a5c` = 4,43:1 – gewählte Zeile in
+Benutzer, Versorger, Ärzte, Karten in Plänen, Labor, BIA) → nachher 0 (eine Seite ohne Überschrift, weil die Akte
+wegen eines 500ers der Datenbank – siehe unten – nicht lud).
 
 Anmeldung (Desktop, Tablet, Telefon): 0 Verstöße, keine Konsolenfehler.
 
@@ -121,7 +128,7 @@ Anmeldung (Desktop, Tablet, Telefon): 0 Verstöße, keine Konsolenfehler.
 | 8 | Kachel „Datensicherung“ am Telefon scrollt, ist aber nicht per Tastatur erreichbar | `KachelInhalt` wird fokussierbar, sobald der Inhalt überläuft (`seiten/start/kacheln.tsx`) |
 | 9 | Links im Fließtext ohne Unterstreichung (Tailwind setzt `text-decoration: inherit`): Datenschutz-Listen, „Herunterladen“ im Dokument-Dialog | unterstrichen (`seiten/Datenschutz.tsx`, `seiten/akte/Dokumente.tsx`) |
 | 10 | Hinweisliste der Akte („N Hinweise“) als Dialog ohne Namen | `aria-label="Hinweise zu dieser Akte"` (`components/HinweisChips.tsx`) |
-| 11 | Schema „Dunkel“: Firmenname in der gewählten Firmenwahl 4,4:1 | `.firma-wahl.an .gedaempft` in `--text2` (`index.css`) |
+| 11 | Schema „Dunkel“ (DSKM): gedämpfte Schrift auf getönter Auswahl 4,4:1 (Firmenwahl, gewählte Zeilen, Karten) | `--gedaempft` im Schema „Dunkel“ `#b8bac0` → `#bcbec4` (4,6:1) (`index.css`) |
 | 12 | Ladebalken als `progressbar` außerhalb jeder Landmarke (axe `region`) | nur noch sichtbar (`aria-hidden`); Seiten melden das Laden selbst (`components/ui/Ladebalken.tsx`) |
 | 13 | Versorger und Ärzte: 300 Zeichen ließen sich eintippen, erst das Speichern scheiterte („nicht mehr als 150 Zeichen“) | `maxLength` wie in der Datenbank (`seiten/Versorger.tsx`, `seiten/Aerzte.tsx`) |
 | 14 | Nebenwirkung der Knopfprüfung: die Darstellung von `e2e.admin` wurde auf „Dunkel“/„Karteikarte“ umgeschaltet | zurückgesetzt (`darstellung = {}`); die Knopfprüfung lässt Darstellungs-Knöpfe seither aus |
@@ -147,7 +154,7 @@ nichts ragt seitlich heraus, `data-firma` stimmt; dazu Farbe der Leiste und gela
 - Formular „Medikament“: Speichern bleibt gesperrt, bis ein Wirkstoff eingetragen ist (keine Meldung nötig);
   „Diagnose“ verlangt den ICD-Code (Pflichtfeld).
 - Nicht geprüft: zerstörende und auslösende Aktionen (siehe Vorgehen), Datei-Upload und Kamera, Passkey-Anmeldung,
-  echte Geräte (nur Emulation), Safari/Firefox, WAVE (lokal nicht erreichbar). Schema „Dunkel“: ERGEBNIS_DUNKEL.
+  echte Geräte (nur Emulation), Safari/Firefox, WAVE (lokal nicht erreichbar). Schema „Dunkel“ wurde für Seiten und Dialoge geprüft, „Hoher Kontrast“ und „Individuell“ nicht.
 
 ## Tests
 

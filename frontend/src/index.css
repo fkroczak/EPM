@@ -77,13 +77,16 @@
   --steuer-h: 2rem;
   --zelle-py: 0.375rem;
   --zeile-gap: 0.625rem;
+  /* Abstand zwischen zwei Feldern untereinander (UX-Prüfung 11.10.2026, Gesetz der Nähe): deutlich größer als die 3 px
+     zwischen Bezeichnung und Eingabe – so gehört jede Bezeichnung sichtbar zu ihrem Feld */
+  --feld-abstand: 1rem;
   font-size: 100%;   /* Grundwert aus Browser bzw. Telefon (16 px, wenn nichts eingestellt) */
   color-scheme: light;
 }
 
-:root[data-dichte="grosszuegig"] { --steuer-h: 2.25rem; --zelle-py: 0.5625rem; --zeile-gap: 0.875rem; }
-:root[data-dichte="kompakt"] { --steuer-h: 1.875rem; --zelle-py: 0.25rem; --zeile-gap: 0.5rem; }
-:root[data-dichte="sehrkompakt"] { --steuer-h: 1.625rem; --zelle-py: 2px; --zeile-gap: 0.375rem; }
+:root[data-dichte="grosszuegig"] { --steuer-h: 2.25rem; --zelle-py: 0.5625rem; --zeile-gap: 0.875rem; --feld-abstand: 1.25rem; }
+:root[data-dichte="kompakt"] { --steuer-h: 1.875rem; --zelle-py: 0.25rem; --zeile-gap: 0.5rem; --feld-abstand: 0.75rem; }
+:root[data-dichte="sehrkompakt"] { --steuer-h: 1.625rem; --zelle-py: 2px; --zeile-gap: 0.375rem; --feld-abstand: 0.625rem; }
 
 :root[data-schrift="klein"] { font-size: 92.875%; }
 :root[data-schrift="gross"] { font-size: 114.3125%; }
@@ -771,9 +774,9 @@ html:has([data-anmeldung]) { scrollbar-gutter: auto; }
 }
 
 /* Formulare im Raster (Versorger, Ärzte; Wunsch 08.10.2026): enge Zeilen, damit alles ohne Scrollen auf 1080p passt */
-.formular { column-gap: 0.625rem; row-gap: 0.5rem; }
+.formular { column-gap: 0.625rem; row-gap: 0.75rem; }  /* 12 px = 4× der Abstand Bezeichnung–Feld (UX-Prüfung 11.10.2026, vorher 8 px) */
 .formular textarea.inp { min-height: 3.25rem; }
-@media (max-width: 47.99rem) { .formular { grid-template-columns: minmax(0, 1fr) !important; } .formular > * { grid-column: 1 / -1 !important; } }
+@media (max-width: 47.99rem) { .formular { grid-template-columns: minmax(0, 1fr) !important; row-gap: var(--feld-abstand); } .formular > * { grid-column: 1 / -1 !important; } }
 
 /* Kalender (Wunsch 08.10.2026: ohne Scrollen auf 1080p): sechs Wochen füllen genau die Fensterhöhe */
 /* Seit 08.10.2026 (Entwurf): eine Werkzeugzeile, Monat füllt den Bildschirm; rechts Tag | Überfällig | Fällig.
@@ -978,6 +981,12 @@ html:has([data-anmeldung]) { scrollbar-gutter: auto; }
    min-width: 0 ragen sie im Dialog rechts heraus. */
 .feld { min-width: 0; }
 .feld > * { min-width: 0; max-width: 100%; }
+/* Gesetz der Nähe (UX-Prüfung 11.10.2026): Felder untereinander mit --feld-abstand (16 px) statt 8–14 px – zentral für
+   alle Formulare und Dialoge, deren Raster Felder direkt (oder in einer Hülle wie „Neu anlegen“) enthält. Größere
+   Abstände (gap-4 und mehr) bleiben; ohne Ebene, damit es die Hilfsklassen gap-2/gap-3/gap-y-3.5 übersteuert. */
+:is(.grid, .flex-col):has(> .feld, > :is(div, fieldset) > .feld):not(.formular, .gap-4, .gap-5, .gap-6, .gap-8, .gap-y-4, .gap-y-5, .gap-y-6) {
+  row-gap: var(--feld-abstand);
+}
 input.inp:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"]) {
   min-width: 0; max-width: 100%; display: block; -webkit-appearance: none; appearance: none;
   line-height: calc(var(--steuer-h) - 2px);

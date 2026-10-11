@@ -22,10 +22,12 @@ async function seitenDerNavigation(page: Page, akte: number) {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "Hauptnavigation" });
-  await expect(nav.getByRole("link").first()).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Ärzte" })).toBeVisible();
   const ziele = await nav.getByRole("link").evaluateAll((els) => els.map((e) => e.getAttribute("href") ?? ""));
   await page.goto(`/patienten/${akte}`);
-  const reiter = await page.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link")
+  const bereiche = page.getByRole("navigation", { name: "Aktenbereiche" });
+  await expect(bereiche.getByRole("link").nth(5)).toBeVisible();
+  const reiter = await bereiche.getByRole("link")
     .evaluateAll((els) => els.map((e) => e.getAttribute("href") ?? ""));
   return [...new Set([...ziele, "/patienten/neu", ...reiter, "/hilfe", "/design", "/konto"])].filter((z) => z.startsWith("/"));
 }
