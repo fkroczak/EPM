@@ -42,9 +42,10 @@ export function Ladebalken() {
   // alle drei Sekunden ändern daran nichts – sonst spränge die Darstellung bei jeder hin und her.
   const dauer = stufe === "laeuft" && hintergrund;
   return (
-    <div className={cx("ladebalken", stufe === "fertig" && "fertig", dauer && "dauer")} role="progressbar"
-      aria-label={dauer ? "Ein Auftrag läuft auf dem Server" : "Daten werden übertragen"}
-      aria-busy={stufe === "laeuft" || undefined} data-testid="ladebalken" data-stufe={dauer ? "dauer" : stufe}>
+    // nur zum Sehen (axe 11.10.2026: lag außerhalb jeder Landmarke); Hilfsmittel erfahren das Laden aus den Seiten
+    // selbst („… wird geladen“), ein bei jeder Anfrage auftauchender Fortschrittsbalken wäre dort nur Rauschen
+    <div className={cx("ladebalken", stufe === "fertig" && "fertig", dauer && "dauer")} aria-hidden="true"
+      data-testid="ladebalken" data-stufe={dauer ? "dauer" : stufe}>
       <div className="ladebalken-fuellung" />
     </div>
   );

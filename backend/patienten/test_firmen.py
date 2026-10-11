@@ -119,6 +119,7 @@ class Firmen(Grundlage):
 
     def test_rollen_je_firma_in_der_benutzerverwaltung(self):
         admin = benutzer("admin3", Rolle.ADMIN)
+        Mitgliedschaft.objects.create(benutzer=admin, firma=self.rg, rolle=Rolle.ADMIN)
         c = self.anmelden(admin)
         r = c.patch(f"/api/benutzer/{self.mitarbeiter.id}/", {"firmenrollen": {"dskm": "mitarbeiter", "rg": "mediziner"}},
                     format="json")
@@ -195,3 +196,28 @@ class Firmen(Grundlage):
             self.assertEqual(c.get("/api/auth/status/").json()["benutzer"]["firma"], "rg")
             self.assertEqual(c.get("/api/patienten/").status_code, 200)
         self.assertEqual(gespeichert.call_count, 0)
+
+    def test_rollen_vergibt_nur_der_admin_der_firma(self):
+        """Festlegung 11.10.2026: Rollen einer Firma vergibt nur, wer dort selbst Admin ist."""
+        nur_dskm = benutzer("admin4", Rolle.ADMIN)
+        c = self.anmelden(nur_dskm)
+        url = f"/api/benutzer/{self.mitarbeiter.id}/"
+        r = c.patch(url, {"firmenrollen": {"rg": "mediziner"}}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertIn("Regeneration Clinic", str(r.json()["firmenrollen"]))
+        # die eigene Firma geht, unveränderte Rollen der anderen Firma stören nicht
+        r = c.patch(url, {"firmenrollen": {"dskm": "mediziner", "rg": "keine"}}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        # nur RGC-Admin: keine DSKM-Rollen, aber RGC-Rollen und Anlegen mit Rolle nur in der RGC
+        nur_rg = benutzer("admin5", Rolle.KEINE)
+        Mitgliedschaft.objects.create(benutzer=nur_rg, firma=self.rg, rolle=Rolle.ADMIN)
+        c = self.anmelden(nur_rg)
+        self.assertEqual(c.patch(url, {"rolle": "admin"}, format="json").status_code, 400)
+        self.assertEqual(c.patch(url, {"firmenrollen": {"rg": "mitarbeiter"}}, format="json").status_code, 200)
+        neu = {"username": "rgneu", "first_name": "R", "last_name": "Neu", "rolle": "mitarbeiter"}
+        self.assertEqual(c.post("/api/benutzer/", neu, format="json").status_code, 400)
+        r = c.post("/api/benutzer/", {**neu, "rolle": "keine", "firmenrollen": {"rg": "mitarbeiter"}}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.json()["firmenrollen"], {"dskm": "keine", "rg": "mitarbeiter"})
+        # „ohne Login“ nimmt alle Rechte – nicht für Konten mit Rolle in einer fremden Firma
+        self.assertEqual(c.post(f"{url}ohne-login/").status_code, 403)

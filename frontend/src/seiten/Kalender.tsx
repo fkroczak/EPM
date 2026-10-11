@@ -274,7 +274,8 @@ function Monat({ von, bezug, heute, tage, feiertage, gewaehlt, onTag, onWahl, on
                       </button>
                     ) : null}
                   </div>
-                  <div className="flex flex-col gap-0.5 min-w-0">
+                  {/* 4 px Abstand: Einträge (21 px hoch) erfüllen so den Mindestabstand für Zielflächen (WCAG 2.5.8) */}
+                  <div className="flex flex-col gap-1 min-w-0">
                     {eintraege.slice(0, 3).map((e) => <EintragKnopf key={e.schluessel} e={e} heute={heute} onWahl={onWahl} />)}
                     {eintraege.length > 3 ? (
                       <button type="button" className="text-left text-[0.75rem] gedaempft bg-transparent border-0 cursor-pointer px-1.5 min-h-6"
