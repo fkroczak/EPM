@@ -140,7 +140,8 @@ export function PdfVorschau({ url, titel, hoehe = 320, laden }: { url: string; t
   const anzahl = doc?.numPages ?? 0;
   return (
     <div className="flex flex-col gap-2" data-testid="pdf-vorschau" aria-label={`Vorschau ${titel}`}>
-      <div ref={ref} className="rounded-lg border border-rand bg-fein overflow-auto p-2" style={{ height: rem(hoehe) }}>
+      {/* per Tastatur scrollbar (tabIndex): Bereiche mit eigenem Scrollbalken müssen fokussierbar sein (WCAG 2.1.1) */}
+      <div ref={ref} className="rounded-lg border border-rand bg-fein overflow-auto p-2" style={{ height: rem(hoehe) }} tabIndex={0} role="region" aria-label={`Seite der Vorschau ${titel}`}>
         {fehler ? <div className="h-full flex items-center justify-center text-sm gedaempft text-center px-4">Vorschau nicht möglich: {fehler}</div>
           : doc && breite ? <Seite doc={doc} nummer={seite} breite={breite - 16} />
           : <div className="h-full flex items-center justify-center gedaempft"><Ladekreis /></div>}
@@ -208,7 +209,7 @@ export function PdfLeser({ url, className, laden, einpassen, werkzeuge }: { url:
         {doc ? <span className="num gedaempft ml-2">{doc.numPages} {doc.numPages === 1 ? "Seite" : "Seiten"}</span> : null}
         {werkzeuge ? <span className="ml-auto flex gap-2 flex-wrap">{werkzeuge}</span> : null}
       </div>
-      <div ref={ref} className="flex-1 min-h-0 overflow-auto rounded-lg border border-rand bg-fein p-3 [scrollbar-gutter:stable]">
+      <div ref={ref} className="flex-1 min-h-0 overflow-auto rounded-lg border border-rand bg-fein p-3 [scrollbar-gutter:stable]" tabIndex={0} role="region" aria-label="PDF-Seiten">
         {fehler ? <div className="py-10 text-center text-sm gedaempft">Anzeige nicht möglich: {fehler}</div>
           : doc && breite ? (
             <div className="flex flex-col gap-3">

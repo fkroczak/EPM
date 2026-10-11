@@ -35,7 +35,7 @@ export function Begriff({ name, erklaerung, children, className }: {
       {/* immer im DOM, nur für Hilfsmittel – die sichtbare Blase unten ist für sie ausgeblendet. Per Portal außerhalb
           des Begriffs, damit die Erklärung in einer Feldbeschriftung nicht Teil des Feldnamens wird (getByLabel) */}
       {typeof document === "undefined" ? null
-        : createPortal(<span id={`${id}-erklaerung`} className="sr-only">{text}</span>, document.body)}
+        : createPortal(<span id={`${id}-erklaerung`} hidden>{text}</span>, document.body)}
       <Popover.Portal>
         <Popover.Positioner side="top" sideOffset={6} collisionPadding={8} className="z-[60]">
           <Popover.Popup role="tooltip" aria-hidden="true" initialFocus={false} finalFocus={false}

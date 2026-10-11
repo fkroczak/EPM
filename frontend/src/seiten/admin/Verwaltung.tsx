@@ -121,13 +121,13 @@ export function ampeln(sys: Uebersicht | undefined, backup: BackupDaten | undefi
 
 function Aufgabe({ icon, titel, text, children }: { icon: string; titel: string; text: string; children: ReactNode }) {
   return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-rand last:border-b-0">
+    <div className="flex items-start gap-3 py-2.5 border-b border-rand last:border-b-0 max-sm:flex-wrap">
       <span className="w-8 h-8 shrink-0 rounded-lg bg-akzent-weich text-akzent-text flex items-center justify-center"><Icon name={icon} groesse={16} /></span>
       <div className="flex flex-col gap-0.5 min-w-0 grow">
         <span className="text-sm font-medium">{titel}</span>
         <span className="text-xs gedaempft">{text}</span>
       </div>
-      <div className="flex gap-1.5 flex-wrap justify-end shrink-0">{children}</div>
+      <div className="flex gap-1.5 flex-wrap justify-end shrink-0 max-sm:basis-full max-sm:shrink">{children}</div>
     </div>
   );
 }

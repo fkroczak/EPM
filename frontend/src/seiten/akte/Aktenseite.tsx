@@ -89,7 +89,8 @@ export function Eintragsliste({ name, children, leer, testid }: {
   return (
     <div className="flex flex-col gap-1.5" role="list" aria-label={name} data-testid={testid ?? "eintragsliste"}>
       {children}
-      {leer ? <Leer>{leer}</Leer> : null}
+      {/* auch der Hinweis „keine Einträge“ als Listeneintrag – eine Liste ohne Einträge ist für Hilfsmittel fehlerhaft */}
+      {leer ? <div role="listitem"><Leer>{leer}</Leer></div> : null}
     </div>
   );
 }

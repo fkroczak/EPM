@@ -200,7 +200,7 @@ export function Karteikarte() {
           {ARTEN.map((a) => (
             <button key={a.art} type="button" className={cx("chip cursor-pointer", filter === a.art && "akzent")} aria-pressed={filter === a.art}
               onClick={() => setFilter(filter === a.art ? "" : a.art)}>
-              <span className="num font-semibold">{a.art}</span> {a.text} <span className="num opacity-70">{zahl(anzahl(a.art))}</span>
+              <span className="num font-semibold">{a.art}</span> {a.text} <span className="num opacity-85">{zahl(anzahl(a.art))}</span>
             </button>
           ))}
         </div>

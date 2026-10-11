@@ -111,7 +111,7 @@ export function HinweisChips({ hinweise, patientId, ausblendbar, onAusblenden }:
         <Chip key={h.art} art={h.stufe === "ueberfaellig" ? "fehler" : "warn"}>
           {h.text}
           {kann ? (
-            <button type="button" className="ml-1 bg-transparent border-0 p-0 cursor-pointer opacity-70 hover:opacity-100"
+            <button type="button" className="ml-0.5 -mr-1.5 -my-1 min-w-6 min-h-6 inline-flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer opacity-80 hover:opacity-100"
               aria-label={`Hinweis „${h.text}“ ausblenden`} title="Ausblenden"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); (onAusblenden ?? setDialog)(h); }}>×</button>
           ) : null}

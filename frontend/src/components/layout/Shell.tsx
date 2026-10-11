@@ -66,7 +66,7 @@ function Person({ v }: { v: boolean }) {
   const ich = useIch();
   return (
     <span className={cx("flex items-center gap-2.5 min-w-0", v ? "justify-start" : "justify-center hd:justify-start")}>
-      <span className="w-[2.125rem] h-[2.125rem] shrink-0 rounded-full bg-akzent-weich text-akzent-text flex items-center justify-center font-semibold text-[0.8125rem]">
+      <span aria-hidden="true" className="w-[2.125rem] h-[2.125rem] shrink-0 rounded-full bg-akzent-weich text-akzent-text flex items-center justify-center font-semibold text-[0.8125rem]">
         {ich.kuerzel || initialen(ich.anzeigename)}
       </span>
       <span className={cx("flex-col min-w-0 text-left", v ? "flex" : "sr-only hd:not-sr-only hd:flex")}>
@@ -110,7 +110,8 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
     <Voll.Provider value={v}>
     <aside className={cx("shrink-0 bg-flaeche border-r border-rand flex flex-col py-4 gap-5 nicht-drucken overflow-y-auto",
       v ? "w-full h-full px-3" : "w-16 hd:w-56 px-2 hd:px-2.5 sticky top-0 h-screen max-md:hidden")}
-      style={{ borderRightWidth: "var(--randbreite)" }} data-testid={v ? "schublade" : "seitenleiste"}>
+      style={{ borderRightWidth: "var(--randbreite)" }} data-testid={v ? "schublade" : "seitenleiste"}
+      aria-label="Seitenleiste">
       <div className={cx(v ? "flex" : "hidden hd:flex", "flex-col gap-2")}>
         <Logo className="w-full max-w-[12.75rem] h-[4rem] px-1.5 py-1 rounded-lg bg-white" />
         <span className="px-1 font-mono text-[0.6875rem] font-medium tracking-[.07em] uppercase gedaempft">
@@ -169,7 +170,7 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
           </button>
         </> : (
           <BaseMenu.Root>
-            <BaseMenu.Trigger className="benutzerknopf" aria-label={`Benutzermenü: ${ich.anzeigename}`} title={`${ich.anzeigename} – Hilfe, Design, Mein Konto, Abmelden`}
+            <BaseMenu.Trigger className="benutzerknopf" title={`${ich.anzeigename} – Hilfe, Design, Mein Konto, Abmelden`}
               data-testid="benutzermenue">
               <Person v={false} />
               <span className="hidden hd:inline-flex ml-auto gedaempft" aria-hidden="true"><Icon name="hoch" groesse={14} /></span>
@@ -398,7 +399,8 @@ export type Pfadteil = { text: string; zu?: string };
  *  teilen sich in Stufen auf (lib/stufen.ts). Das „?“ führt zum passenden Abschnitt der Hilfe (S15). */
 export function Seite({ pfad, children, className, fuellen }: { pfad: Pfadteil[]; children: ReactNode; className?: string;
   /** Seite füllt das Fenster und scrollt nicht als Ganzes (Patientenakte, 10.10.2026): Kopf und Reiter bleiben stehen,
-   *  gescrollt wird nur in Karten bzw. Spalten. Gilt ab 1280 × 600 px (index.css, .seite-fuellt); darunter scrollt die Seite. */
+   *  gescrollt wird nur in Karten bzw. Spalten. Gilt ab 1280 × 600 px mit Maus (index.css, .seite-fuellt); darunter und
+   *  auf Tablets scrollt die Seite. */
   fuellen?: boolean }) {
   const ich = useIch();
   const { pathname } = useLocation();

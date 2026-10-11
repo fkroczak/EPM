@@ -340,11 +340,11 @@ function VorlagenListe({ onWahl }: { onWahl: (a: Art) => void }) {
                 {eintraege.map((v) => {
                   const st = vorlageStatus(v);
                   return (
-                    <li key={v.art} className="flex">
+                    <li key={v.art} className="flex min-w-0">
                       <button type="button" onClick={() => onWahl(v.art)} data-testid="vorlage-karte"
-                        className="card flex-1 flex flex-col gap-1.5 px-4 py-3 text-left cursor-pointer border border-transparent hover:border-akzent bg-flaeche text-tinte font-[inherit]">
-                        <span className="flex items-start justify-between gap-2 w-full">
-                          <span className="font-semibold text-[0.9375rem] leading-snug">{v.name}</span>
+                        className="card flex-1 min-w-0 flex flex-col gap-1.5 px-4 py-3 text-left cursor-pointer border border-transparent hover:border-akzent bg-flaeche text-tinte font-[inherit]">
+                        <span className="flex flex-wrap items-start justify-between gap-2 w-full">
+                          <span className="font-semibold text-[0.9375rem] leading-snug min-w-0 [overflow-wrap:anywhere]">{v.name}</span>
                           <Chip art={st.art} className="shrink-0">{st.text}</Chip>
                         </span>
                         {v.wofuer ? <span className="text-[0.8438rem] leading-normal">{v.wofuer}</span> : null}

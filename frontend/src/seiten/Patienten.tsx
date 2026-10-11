@@ -348,8 +348,8 @@ export function Patienten() {
         setParams(neu);
       }}
       werte={[
-        { wert: "in_betreuung", text: <>In Betreuung <span className="num opacity-70">{z ? zahl(z.in_betreuung) : ""}</span>{testZahl(z?.testpatienten?.in_betreuung)}</> },
-        { wert: "abgeschlossen", text: <>Abgeschlossen <span className="num opacity-70">{z ? zahl(z.abgeschlossen) : ""}</span>{testZahl(z?.testpatienten?.abgeschlossen)}</> },
+        { wert: "in_betreuung", text: <>In Betreuung <span className="num opacity-70 inline-block min-w-[2ch]">{z ? zahl(z.in_betreuung) : ""}</span>{testZahl(z?.testpatienten?.in_betreuung)}</> },
+        { wert: "abgeschlossen", text: <>Abgeschlossen <span className="num opacity-70 inline-block min-w-[2ch]">{z ? zahl(z.abgeschlossen) : ""}</span>{testZahl(z?.testpatienten?.abgeschlossen)}</> },
       ]} />
   );
 
@@ -398,7 +398,7 @@ export function Patienten() {
               <button key={f.wert} type="button" aria-pressed={schnell === f.wert}
                 className={cx("chip h-[1.875rem] cursor-pointer border", schnell === f.wert ? "akzent border-akzent" : "border-rand bg-flaeche text-text2")}
                 onClick={() => setze({ schnellfilter: schnell === f.wert ? null : f.wert })}>
-                {f.text} <span className="num gedaempft">{z ? zahl(z[f.zahl]) : ""}</span>
+                {f.text} <span className="num gedaempft inline-block min-w-[2ch]">{z ? zahl(z[f.zahl]) : ""}</span>
               </button>
             ))}
           </>

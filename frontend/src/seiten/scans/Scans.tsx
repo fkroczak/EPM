@@ -182,7 +182,7 @@ export function Scans() {
                   value={suche} onChange={(e) => setSuche(e.target.value)} />
               </label>
             </div>
-            <div className="grow min-h-0 overflow-y-auto overscroll-contain" role="list" aria-label="Scans" data-testid="scanliste">
+            <div className="grow min-h-0 overflow-y-auto overscroll-contain" role={sichtbar.length ? "list" : undefined} aria-label="Scans" data-testid="scanliste">
               {sichtbar.map((s) => (
                 <div role="listitem" key={s.id} className="flex">
                   <button type="button" aria-current={s.id === gewaehltId ? "true" : undefined} onClick={() => waehlen(s.id)}

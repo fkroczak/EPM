@@ -269,7 +269,7 @@ export function PatientNeu() {
             <Abschnitt titel="Betreuung">
               <div className="col-span-2 relative">
                 {darf("versorger_pflegen") ? (
-                  <button type="button" className="absolute right-0 top-0 text-[0.8125rem] bg-transparent border-0 p-0 text-akzent-text cursor-pointer hover:underline" aria-label="Neuen Versorger anlegen"
+                  <button type="button" className="absolute right-0 top-0 text-[0.8125rem] bg-transparent border-0 p-0 text-akzent-text cursor-pointer hover:underline" aria-label="Neu anlegen: Versorger"
                     onClick={() => setSchnell("versorger")}>Neu anlegen</button>
                 ) : null}
                 <Feld label="Versorger" fehler={e.versorger}>
@@ -313,7 +313,7 @@ export function PatientNeu() {
               </fieldset>
               <div className="col-span-2 relative">
                 {darf("versorger_pflegen") ? (
-                  <button type="button" className="absolute right-0 top-0 text-[0.8125rem] bg-transparent border-0 p-0 text-akzent-text cursor-pointer hover:underline" aria-label="Neuen Arzt anlegen"
+                  <button type="button" className="absolute right-0 top-0 text-[0.8125rem] bg-transparent border-0 p-0 text-akzent-text cursor-pointer hover:underline" aria-label="Neu anlegen: Arzt"
                     onClick={() => setSchnell("arzt")}>Neu anlegen</button>
                 ) : null}
                 <Feld label="Hausarzt" fehler={e.aufnahme_hausarzt ?? e.hausarzt}

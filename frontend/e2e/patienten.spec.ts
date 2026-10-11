@@ -103,7 +103,7 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
 
   // Versorger und Arzt direkt aus dem Formular neu anlegen – im Dialog, die Seite bleibt (08.10.2026)
   const versorgerName = eindeutig("Versorger E2E");
-  await page.getByRole("button", { name: "Neuen Versorger anlegen" }).click();
+  await page.getByRole("button", { name: "Neu anlegen: Versorger" }).click();
   const vd = page.getByRole("dialog");
   await expect(vd.getByRole("heading", { name: "Neuer Versorger" })).toBeVisible();
   await vd.getByRole("button", { name: "Anlegen" }).click();
@@ -115,7 +115,7 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   await expect(page.getByLabel("Versorger", { exact: true }).locator("option:checked")).toHaveText(versorgerName);
   await expect(page.getByRole("heading", { name: "Neuer Patient" })).toBeVisible();
   const arztName = eindeutig("Dr. E2E");
-  await page.getByRole("button", { name: "Neuen Arzt anlegen" }).click();
+  await page.getByRole("button", { name: "Neu anlegen: Arzt" }).click();
   await page.getByRole("dialog").getByLabel("Name", { exact: true }).fill(arztName);
   await page.getByRole("dialog").getByRole("button", { name: "Anlegen" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);

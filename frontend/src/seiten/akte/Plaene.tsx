@@ -373,20 +373,22 @@ export function Plaene() {
         {plaene.isLoading ? <Laden /> : (
           <div className="flex flex-col gap-2" role="list" aria-label="Infusionspläne" data-testid="planliste">
             {liste.map((p) => (
-              <button key={p.id} type="button" role="listitem" aria-current={p.id === gewaehlt?.id ? "true" : undefined}
-                className={cx("card text-left px-3.5 py-3 flex flex-col gap-1 cursor-pointer border", p.id === gewaehlt?.id ? "border-akzent bg-akzent-weich" : "hover:bg-fein")}
-                onClick={() => { setParams(new URLSearchParams({ plan: String(p.id) }), { replace: true }); detailZeigen("plan-detail"); }}>
-                <span className="flex items-center justify-between gap-2"><span className="num font-medium">{datum(p.gueltig_ab)}</span><StatusChip status={p.status} /></span>
-                <span className="num text-[0.8125rem]">{zahl(p.kcal)} kcal{p.laufzeit_h != null ? ` · ${zahl(p.laufzeit_h)} h` : ""}{p.tage_pro_woche ? ` · ${p.tage_pro_woche}×/Woche` : ""}</span>
-                <span className="text-xs gedaempft">
-                  {p.status === "entwurf" ? `angelegt ${zeitpunkt(p.erstellt_am)}${p.erstellt_von_name ? ` · ${p.erstellt_von_name}` : ""}`
-                    : p.herkunft === "altsystem" ? `aus dem Altsystem · angelegt ${datum(p.erstellt_am)}${p.erstellt_von_name ? ` · ${p.erstellt_von_name}` : ""}`
-                    : p.abgeschlossen_von_name && p.freigabe_datum
-                      // außerhalb von EPM freigegeben: der Tag der Freigabe, nicht der Zeitpunkt des Abschließens
-                      ? `freigegeben ${datum(p.freigabe_datum)} · ${p.freigegeben_von_name ?? "—"} · abgeschlossen von ${p.abgeschlossen_von_name}`
-                      : `freigegeben ${zeitpunkt(p.freigegeben_am)}${p.freigegeben_von_name ? ` · ${p.freigegeben_von_name}` : ""}`}
-                </span>
-              </button>
+              <div key={p.id} role="listitem" className="flex flex-col">
+                <button type="button" aria-current={p.id === gewaehlt?.id ? "true" : undefined}
+                  className={cx("card text-left px-3.5 py-3 flex flex-col gap-1 cursor-pointer border", p.id === gewaehlt?.id ? "border-akzent bg-akzent-weich" : "hover:bg-fein")}
+                  onClick={() => { setParams(new URLSearchParams({ plan: String(p.id) }), { replace: true }); detailZeigen("plan-detail"); }}>
+                  <span className="flex items-center justify-between gap-2"><span className="num font-medium">{datum(p.gueltig_ab)}</span><StatusChip status={p.status} /></span>
+                  <span className="num text-[0.8125rem]">{zahl(p.kcal)} kcal{p.laufzeit_h != null ? ` · ${zahl(p.laufzeit_h)} h` : ""}{p.tage_pro_woche ? ` · ${p.tage_pro_woche}×/Woche` : ""}</span>
+                  <span className="text-xs gedaempft">
+                    {p.status === "entwurf" ? `angelegt ${zeitpunkt(p.erstellt_am)}${p.erstellt_von_name ? ` · ${p.erstellt_von_name}` : ""}`
+                      : p.herkunft === "altsystem" ? `aus dem Altsystem · angelegt ${datum(p.erstellt_am)}${p.erstellt_von_name ? ` · ${p.erstellt_von_name}` : ""}`
+                      : p.abgeschlossen_von_name && p.freigabe_datum
+                        // außerhalb von EPM freigegeben: der Tag der Freigabe, nicht der Zeitpunkt des Abschließens
+                        ? `freigegeben ${datum(p.freigabe_datum)} · ${p.freigegeben_von_name ?? "—"} · abgeschlossen von ${p.abgeschlossen_von_name}`
+                        : `freigegeben ${zeitpunkt(p.freigegeben_am)}${p.freigegeben_von_name ? ` · ${p.freigegeben_von_name}` : ""}`}
+                  </span>
+                </button>
+              </div>
             ))}
           </div>
         )}
