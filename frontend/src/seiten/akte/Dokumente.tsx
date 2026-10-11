@@ -378,7 +378,7 @@ function Details({ dok }: { dok: Dokument }) {
       {dok.hat_text ? <TextDialog dok={dok} offen={textOffen} onOffen={setTextOffen} /> : null}
       {istPdf(dok) ? (
         <Dialog offen={lesen} onOffen={setLesen} titel={dok.titel} breite={1100}
-          beschreibung={<>{dok.originalname} · <a href={dateiUrl(dok, false)} download>Herunterladen</a></>}>
+          beschreibung={<>{dok.originalname} · <a href={dateiUrl(dok, false)} download className="underline underline-offset-2">Herunterladen</a></>}>
           {lesen ? <PdfLeser url={dateiUrl(dok, true)} className="h-[68vh]" /> : null}
         </Dialog>
       ) : null}
