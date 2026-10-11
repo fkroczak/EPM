@@ -3973,6 +3973,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 11.10.2026 | Versionsnummer automatisch | Letzte Stelle der Version zählt je Änderung auf main hoch (`werkzeuge/version.sh`, genutzt von `epm-update`, `bauen.sh`/`bauen.ps1`, Update- und Notfallpaket); VERSION bleibt der von Hand gesetzte Grundstand (2.0.0 → 2.0.1 mit PR #45, 2.0.2 mit diesem Stand). Benutzer am Telefon: Formular direkt unter der Liste |
 | 10.10.2026 | Entscheidungen der Praxis | Tablet mit zwei Spalten und Scrollen, Mengen je kg unter Vorlagen › Grenzwerte (Migration mit den Werten des Altsystems, Historie, Audit-Log, Stand im Plan-Editor), Gewicht für den Plan nach 6 Monaten „bitte prüfen“ (einstellbar), Labor-Hinweise ab Freigabe des letzten Plans (entschieden), Laborparameter „Ohne Referenzbereich“ zum Nachtragen und Hinweis im Plan-Editor, Telefontermine bleiben vom Infoblatt aus (U72) (F190). Lauf steht aus |
 | 10.10.2026 | Version 2.0.0 | Zweite Fassung von EPM: Versionsnummer von 0.2.0 auf 2.0.0 (Festlegung Filip 10.10.2026); enthält F177–F189. Images heißen `epm-backend:2.0.0-<Commit>` |
 | 10.10.2026 | Hinweise im Infusionsplan | Plan-Editor zeigt Laborwerte außerhalb des Referenzbereichs seit dem letzten Plan (nur Bestandteile des Plans) mit Verlauf der letzten drei Werte, deutliche Gewichtsänderung, Entwicklung der eigenen Pläne und fehlendes Labor mit „Blutuntersuchung anfordern“ – nur zum Prüfen, ohne Dosisvorschlag (MDR) (F187). Lauf steht aus |

@@ -2962,9 +2962,9 @@ class Agent:
             for teil in ("rollout", "werkzeuge"):
                 if os.path.isdir(os.path.join(self.code, teil)):
                     self.ordner_kopieren(os.path.join(self.code, teil), os.path.join(arbeit, teil))
-            for datei in ("VERSION",):
-                if os.path.isfile(os.path.join(self.code, datei)):
-                    shutil.copy2(os.path.join(self.code, datei), arbeit)
+            # VERSION mit der laufenden, berechneten Nummer (werkzeuge/version.sh zählt nur mit Git hoch)
+            with open(os.path.join(arbeit, "VERSION"), "w", encoding="utf-8") as f:
+                f.write(tag.rsplit("-", 1)[0] + "\n")
             with open(os.path.join(arbeit, "TAG"), "w", encoding="utf-8") as f:
                 f.write(tag + "\n")
             aufbau = os.path.join(arbeit, "rollout", "epm-notfall-aufbau.sh")
