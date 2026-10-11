@@ -115,8 +115,9 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
       style={{ borderRightWidth: "var(--randbreite)" }} data-testid={v ? "schublade" : "seitenleiste"}
       aria-label="Seitenleiste">
       <div className={cx(v ? "flex" : "hidden hd:flex", "flex-col gap-2")}>
-        {/* RGC: Logo direkt auf der salbeigrünen Leiste (wie im Auftritt der Klinik), DSKM auf weißem Feld */}
-        <Logo className={cx("w-full max-w-[12.75rem] h-[4rem] px-1.5 py-1 rounded-lg", ich.firma !== "rg" && "bg-white")}
+        {/* RGC: Logo mittig direkt auf der salbeigrünen Leiste (wie im Auftritt der Klinik), DSKM auf weißem Feld */}
+        <Logo className={cx("w-full max-w-[12.75rem] h-[4rem] px-1.5 py-1 rounded-lg", ich.firma === "rg" ? "self-center" : "bg-white")}
+          style={ich.firma === "rg" ? { objectPosition: "center" } : undefined}
           firma={firma?.kuerzel} name={firma?.name} />
         <span className="px-1 font-mono text-[0.6875rem] font-medium tracking-[.07em] uppercase gedaempft">
           EPM · Patientenmanagement
