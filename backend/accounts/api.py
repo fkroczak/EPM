@@ -936,11 +936,22 @@ class BenutzerSerializer(serializers.ModelSerializer):
     zweiter_faktor_pflicht = serializers.SerializerMethodField()
     # Rolle je Firma (Anforderung 11.10.2026): {"dskm": "mediziner", "rg": "keine"}; DSKM = ``rolle``
     firmenrollen = serializers.SerializerMethodField()
+    # darf die anfragende Admin-Person das Konto kontoweit verwalten (sperren, Einmal-Passwort, Kontodaten …)? Nur,
+    # wer in jeder Firma mit Rolle der Person Admin ist (Festlegung 11.10.2026) – die Oberfläche sperrt sonst die Knöpfe
+    verwaltbar = serializers.SerializerMethodField()
 
     def get_firmenrollen(self, obj):
         from epm.firma import rollen_je_firma
 
         return {f.kuerzel: r for f, r in rollen_je_firma(obj).items()}
+
+    def get_verwaltbar(self, obj):
+        from epm.firma import darf_konto_verwalten
+
+        request = self.context.get("request")
+        if request is None or not getattr(obj, "pk", None):
+            return True
+        return darf_konto_verwalten(request.user, obj)[0]
 
     def _firmenrollen_eingabe(self):
         werte = self.initial_data.get("firmenrollen") if isinstance(self.initial_data, dict) else None
@@ -978,7 +989,7 @@ class BenutzerSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "username", "titel", "first_name", "last_name", "kuerzel", "funktion", "email",
-            "rolle", "firmenrollen", "ist_test", "is_active", "nur_historisch", "anzeigename", "zweiter_faktor",
+            "rolle", "firmenrollen", "verwaltbar", "ist_test", "is_active", "nur_historisch", "anzeigename", "zweiter_faktor",
             "zweiter_faktor_pflicht", "muss_kennwort_aendern", "einmal_kennwort_gueltig_bis", "gesperrt_am", "sperrgrund",
             "fehlversuche", "last_login", "date_joined", "ausgeblendet_am",
         ]
@@ -1070,6 +1081,17 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         ausgeblendete = self.action != "list" or wahr(self.request.query_params.get("ausgeblendete"))
         return sichtbare_benutzer(self.request.user, User.objects.all(), ausgeblendete=ausgeblendete)
 
+    # Felder, die das Konto als Ganzes betreffen (nicht die Rolle je Firma): ändern darf sie nur, wer in jeder Firma
+    # mit Rolle der Person Admin ist (Festlegung 11.10.2026); Rollen prüft der Serializer je Firma
+    KONTO_FELDER = ("username", "titel", "first_name", "last_name", "kuerzel", "funktion", "email", "ist_test")
+
+    def _konto_fremd(self, request, user):
+        """403-Antwort, wenn die Admin-Person das Konto nicht kontoweit verwalten darf, sonst None."""
+        from epm.firma import darf_konto_verwalten, konto_verwalten_hinweis
+
+        erlaubt, fehlend = darf_konto_verwalten(request.user, user)
+        return None if erlaubt else fehler(konto_verwalten_hinweis(fehlend), status.HTTP_403_FORBIDDEN)
+
     def _ausblenden(self, request, user):
         user.sperren("Testbenutzer ausgeblendet")
         user.ausgeblendet_am = timezone.now()
@@ -1088,17 +1110,23 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
             return fehler("Das eigene Konto kann nicht ausgeblendet werden.")
         if user.ausgeblendet_am:
             return fehler("Der Testbenutzer ist bereits ausgeblendet.")
+        if (antwort := self._konto_fremd(request, user)) is not None:
+            return antwort
         self._ausblenden(request, user)
         return Response(self.get_serializer(user).data)
 
     @action(detail=False, methods=["post"], url_path="testbenutzer-ausblenden")
     def testbenutzer_ausblenden(self, request):
-        """Alle Testbenutzer auf einmal ausblenden (außer dem eigenen Konto)."""
+        """Alle Testbenutzer auf einmal ausblenden (außer dem eigenen Konto). Testbenutzer mit Rolle in einer Firma,
+        in der die Admin-Person kein Admin ist, bleiben stehen (``uebersprungen``)."""
+        from epm.firma import darf_konto_verwalten
+
         konten = list(User.objects.filter(ist_test=True, ausgeblendet_am__isnull=True, nur_historisch=False)
                       .exclude(pk=request.user.pk))
-        for user in konten:
+        eigene = [u for u in konten if darf_konto_verwalten(request.user, u)[0]]
+        for user in eigene:
             self._ausblenden(request, user)
-        return Response({"ausgeblendet": len(konten)})
+        return Response({"ausgeblendet": len(eigene), "uebersprungen": len(konten) - len(eigene)})
 
     @action(detail=True, methods=["post"])
     def einblenden(self, request, pk=None):
@@ -1106,6 +1134,8 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user = self.get_object()
         if not user.ausgeblendet_am:
             return fehler("Der Benutzer ist nicht ausgeblendet.")
+        if (antwort := self._konto_fremd(request, user)) is not None:
+            return antwort
         user.ausgeblendet_am = None
         user.entsperren()
         user.save(update_fields=User.SPERR_FELDER + ["ausgeblendet_am"])
@@ -1228,6 +1258,16 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         if user == self.request.user and serializer.validated_data.get("ist_test") and not user.ist_test:
             raise serializers.ValidationError({"ist_test": "Das eigene Konto kann nicht zum Testbenutzer werden."})
         vorher = {f: getattr(user, f) for f in serializer.validated_data}
+        # Kontodaten (nicht die Rolle je Firma) ändert nur, wer das Konto kontoweit verwalten darf; unveränderte
+        # Felder stören nicht – die Oberfläche schickt das ganze Formular
+        if any(f in self.KONTO_FELDER and vorher[f] != v for f, v in serializer.validated_data.items()):
+            from rest_framework.exceptions import PermissionDenied
+
+            from epm.firma import darf_konto_verwalten, konto_verwalten_hinweis
+
+            erlaubt, fehlend = darf_konto_verwalten(self.request.user, user)
+            if not erlaubt:
+                raise PermissionDenied(konto_verwalten_hinweis(fehlend))
         user = serializer.save()
         geaendert = {f: [str(vorher[f]), str(getattr(user, f))] for f in vorher if vorher[f] != getattr(user, f)}
         geaendert.update(getattr(serializer, "firmen_geaendert", {}))
@@ -1238,6 +1278,8 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user = self.get_object()
         if user == request.user:
             return fehler("Das eigene Konto kann nicht gesperrt werden.")
+        if (antwort := self._konto_fremd(request, user)) is not None:
+            return antwort
         user.sperren("durch die Administration")
         user.save(update_fields=User.SPERR_FELDER)
         alle_sitzungen_beenden(user)
@@ -1251,6 +1293,8 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
             return fehler("Historische Benutzer haben keinen Zugang.")
         if user.ausgeblendet_am:
             return fehler("Der Testbenutzer ist ausgeblendet. Bitte „Einblenden“ wählen.")
+        if (antwort := self._konto_fremd(request, user)) is not None:
+            return antwort
         vorher = user.sperrgrund
         user.entsperren()
         user.save(update_fields=User.SPERR_FELDER)
@@ -1328,6 +1372,8 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user = self.get_object()
         if user.nur_historisch:
             return fehler("Historische Benutzer haben keinen Zugang.")
+        if (antwort := self._konto_fremd(request, user)) is not None:
+            return antwort
         kennwort = user.neues_einmal_kennwort()
         user.save(update_fields=User.EINMAL_FELDER)
         alle_sitzungen_beenden(user)
@@ -1344,6 +1390,8 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user = self.get_object()
         if user.nur_historisch:
             return fehler("Historische Benutzer haben keinen Zugang.")
+        if (antwort := self._konto_fremd(request, user)) is not None:
+            return antwort
         faktoren_loeschen(user)
         kennwort = user.neues_einmal_kennwort()
         user.save(update_fields=User.EINMAL_FELDER)

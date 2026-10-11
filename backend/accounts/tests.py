@@ -776,7 +776,7 @@ class TestdatenAusblenden(TestCase):
         self.assertIsNone(self.tester.ausgeblendet_am)
         # alle auf einmal
         benutzer("tester2", Rolle.BETRACHTER, ist_test=True)
-        self.assertEqual(c.post("/api/benutzer/testbenutzer-ausblenden/").json(), {"ausgeblendet": 2})
+        self.assertEqual(c.post("/api/benutzer/testbenutzer-ausblenden/").json(), {"ausgeblendet": 2, "uebersprungen": 0})
         self.assertFalse(User.objects.filter(ist_test=True, ausgeblendet_am__isnull=True).exists())
 
 

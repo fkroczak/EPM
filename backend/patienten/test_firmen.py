@@ -221,3 +221,56 @@ class Firmen(Grundlage):
         self.assertEqual(r.json()["firmenrollen"], {"dskm": "keine", "rg": "mitarbeiter"})
         # „ohne Login“ nimmt alle Rechte – nicht für Konten mit Rolle in einer fremden Firma
         self.assertEqual(c.post(f"{url}ohne-login/").status_code, 403)
+
+    def test_kontoweite_verwaltung_nur_mit_admin_in_allen_firmen(self):
+        """Festlegung 11.10.2026: sperren, Einmal-Passwort, zweiten Faktor zurücksetzen und Kontodaten ändern darf nur,
+        wer in jeder Firma Admin ist, in der die Person eine Rolle hat."""
+        nur_dskm = benutzer("admin6", Rolle.ADMIN)
+        c = self.anmelden(nur_dskm)
+        fremd = f"/api/benutzer/{self.beide.id}/"  # Betrachter DSKM, Mediziner RGC
+        eigen = f"/api/benutzer/{self.mitarbeiter.id}/"  # nur DSKM
+        for pfad in ("sperren/", "einmal-kennwort/", "2fa-zuruecksetzen/"):
+            r = c.post(fremd + pfad)
+            self.assertEqual(r.status_code, 403, (pfad, r.content))
+            self.assertIn("Regeneration Clinic", r.json()["fehler"])
+        r = c.patch(fremd, {"first_name": "Neu"}, format="json")
+        self.assertEqual(r.status_code, 403, r.content)
+        self.assertIn("Regeneration Clinic", r.json()["detail"])
+        self.beide.refresh_from_db()
+        self.assertEqual((self.beide.first_name, self.beide.gesperrt_am), ("Beide", None))
+        # unveränderte Kontodaten im Formular stören nicht, die DSKM-Rolle darf er ändern
+        r = c.patch(fremd, {"first_name": "Beide", "rolle": "mitarbeiter"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()["verwaltbar"], False)
+        self.assertFalse(c.get(fremd).json()["verwaltbar"])
+        # Konto nur in der DSKM: alles erlaubt
+        self.assertTrue(c.get(eigen).json()["verwaltbar"])
+        self.assertEqual(c.patch(eigen, {"first_name": "Neu"}, format="json").status_code, 200)
+        self.assertEqual(c.post(eigen + "einmal-kennwort/").status_code, 200)
+        self.assertEqual(c.post(eigen + "2fa-zuruecksetzen/").status_code, 200)
+        self.assertEqual(c.post(eigen + "sperren/").status_code, 200)
+        self.assertEqual(c.post(eigen + "entsperren/").status_code, 200)
+        # Testbenutzer mit RGC-Rolle bleibt beim Ausblenden aller stehen
+        tester = benutzer("tester_rg", Rolle.BETRACHTER, ist_test=True)
+        Mitgliedschaft.objects.create(benutzer=tester, firma=self.rg, rolle=Rolle.BETRACHTER)
+        tester_dskm = benutzer("tester_dskm", Rolle.BETRACHTER, ist_test=True)
+        self.assertEqual(c.post(f"/api/benutzer/{tester.id}/ausblenden/").status_code, 403)
+        r = c.post("/api/benutzer/testbenutzer-ausblenden/")
+        self.assertEqual((r.json()["ausgeblendet"], r.json()["uebersprungen"]), (1, 1))
+        tester.refresh_from_db(); tester_dskm.refresh_from_db()
+        self.assertEqual((tester.ausgeblendet_am, tester_dskm.ausgeblendet_am is not None), (None, True))
+        self.assertEqual(c.post(f"/api/benutzer/{tester_dskm.id}/einblenden/").status_code, 200)
+        # Admin in beiden Firmen darf alles
+        alles = benutzer("admin7", Rolle.ADMIN)
+        Mitgliedschaft.objects.create(benutzer=alles, firma=self.rg, rolle=Rolle.ADMIN)
+        c = self.anmelden(alles)
+        self.assertTrue(c.get(fremd).json()["verwaltbar"])
+        self.assertEqual(c.patch(fremd, {"first_name": "Neu"}, format="json").status_code, 200)
+        self.assertEqual(c.post(fremd + "einmal-kennwort/").status_code, 200)
+        self.assertEqual(c.post(fremd + "2fa-zuruecksetzen/").status_code, 200)
+        self.assertEqual(c.post(fremd + "sperren/").status_code, 200)
+        self.assertEqual(c.post(f"/api/benutzer/{tester.id}/ausblenden/").status_code, 200)
+        # ohne Rolle irgendwo (nur RGC-Rolle „keine“ nach Entzug): jeder Admin darf
+        Mitgliedschaft.objects.filter(benutzer=tester).update(rolle=Rolle.KEINE)
+        User.objects.filter(pk=tester.pk).update(rolle=Rolle.KEINE)
+        self.assertTrue(self.anmelden(nur_dskm).get(f"/api/benutzer/{tester.id}/").json()["verwaltbar"])
