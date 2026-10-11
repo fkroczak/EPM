@@ -1080,7 +1080,9 @@ ausschließlich Testpatienten. Nicht mehr gebrauchte Testbenutzer lassen sich <s
 Testpatienten und Testbenutzer überhaupt sieht.</p>
 <p><strong>Rolle je Firma:</strong> Jede Person hat eine Rolle bei der DSKM und eine bei der Regeneration Clinic
 („Rolle DSKM“, „Rolle RGC“). „Keine Berechtigung“ heißt: kein Zugang zu dieser Firma. Wer in beiden Firmen eine Rolle
-hat, schaltet unter dem Logo um; die Rechte richten sich nach der Rolle in der gerade gewählten Firma.</p>
+hat, schaltet unter dem Logo um; die Rechte richten sich nach der Rolle in der gerade gewählten Firma.
+Die Rolle in einer Firma vergibt und ändert nur, wer dort selbst <strong>Admin</strong> ist; die anderen Felder sind
+gesperrt.</p>
 <p>Unter <strong>Anmeldung</strong> legt die Administration fest, ob die Zwei-Faktor-Anmeldung freiwillig, Pflicht für
 Admins oder Pflicht für alle ist.</p>
 <p>Unter <strong>Rechte</strong> legt man je Gruppe (Betrachter, Mitarbeiter, Mediziner, Admin) fest, was erlaubt ist.

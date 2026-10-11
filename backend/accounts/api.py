@@ -1025,7 +1025,33 @@ class BenutzerSerializer(serializers.ModelSerializer):
                 if test and r not in (*TESTBENUTZER_ROLLEN, Rolle.KEINE):
                     raise serializers.ValidationError({"firmenrollen": "Testbenutzer gibt es für Betrachter, Mitarbeiter, "
                                                                        "Mitarbeiter (erweitert) und Mediziner."})
+        self._pruefe_firmenhoheit(attrs, werte or {})
         return attrs
+
+    def _pruefe_firmenhoheit(self, attrs, werte):
+        """Eine Rolle in einer Firma vergibt oder ändert nur, wer dort selbst Admin ist (Festlegung 11.10.2026)."""
+        from epm.firma import admin_firmen, rollen_je_firma
+
+        request = self.context.get("request")
+        if request is None:
+            return
+        erlaubt = admin_firmen(request.user)
+        bisher = {f.kuerzel: (f, r) for f, r in rollen_je_firma(self.instance).items()} if self.instance else {}
+        if not bisher:
+            from stammdaten.models import Firma
+
+            bisher = {f.kuerzel: (f, Rolle.KEINE) for f in Firma.objects.filter(aktiv=True)}
+        neu = {k: r for k, r in werte.items() if k != "dskm"}
+        if "rolle" in attrs:
+            neu["dskm"] = attrs["rolle"]
+        elif self.instance is None:
+            neu["dskm"] = User._meta.get_field("rolle").default
+        for kuerzel, rolle in neu.items():
+            firma, vorher = bisher.get(kuerzel, (None, Rolle.KEINE))
+            if rolle != vorher and kuerzel not in erlaubt:
+                name = firma.name if firma else kuerzel
+                feld = "rolle" if kuerzel == "dskm" else "firmenrollen"
+                raise serializers.ValidationError({feld: f"Die Rolle bei {name} vergibt nur ein Admin dieser Firma."})
 
 
 class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.CreateModelMixin,
@@ -1093,12 +1119,15 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
             # nur als Name für Einträge (z. B. frühere Mitarbeiter): ohne Kennwort, ohne Rechte
             user = User(**{**s.validated_data, "nur_historisch": True})
             user.save()
+            s._firmenrollen_speichern(user)
             protokolliere(SystemEreignis.Art.BENUTZER_ANGELEGT, request, objekt=user.username, rolle=user.rolle,
                           ohne_login=True)
             return Response(self.get_serializer(user).data, status=status.HTTP_201_CREATED)
         user = User(**s.validated_data)
         kennwort = user.neues_einmal_kennwort()
         user.save()
+        # Rollen in weiteren Firmen (der Serializer legt das Konto hier nicht selbst an)
+        s._firmenrollen_speichern(user)
         protokolliere(SystemEreignis.Art.BENUTZER_ANGELEGT, request, objekt=user.username, rolle=user.rolle,
                       einmal_kennwort_gueltig_bis=user.einmal_kennwort_gueltig_bis.isoformat())
         daten = self.get_serializer(user).data
@@ -1239,6 +1268,13 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
             return fehler("Das eigene Konto kann nicht auf „ohne Login“ gesetzt werden.")
         if user.nur_historisch:
             return fehler("Das Konto ist bereits ohne Login.")
+        from epm.firma import admin_firmen, mitgliedschaften
+
+        fremd = [f.name for f in mitgliedschaften(user) if f.kuerzel not in admin_firmen(request.user)]
+        if fremd:
+            return fehler(f"Das Konto hat auch eine Rolle bei {', '.join(fremd)}. „Ohne Login“ setzt dort ebenfalls "
+                          "alle Rechte zurück – das darf nur, wer in jeder dieser Firmen Admin ist.",
+                          status.HTTP_403_FORBIDDEN)
         vorher = user.rolle
         user.nur_historisch = True
         user.gesperrt_am = None
@@ -1263,11 +1299,23 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         rolle = request.data.get("rolle") or Rolle.MITARBEITER
         if rolle not in Rolle.values:
             return Response({"rolle": "Unbekannte Rolle."}, status=status.HTTP_400_BAD_REQUEST)
+        # die Rolle gilt in der Firma, in der die Admin-Person gerade arbeitet – und nur, wenn sie dort Admin ist
+        from epm.firma import admin_firmen
+
+        from .models import Mitgliedschaft
+
+        firma = getattr(request.user, "firma", None)
+        kuerzel = firma.kuerzel if firma else "dskm"
+        if kuerzel not in admin_firmen(request.user):
+            return fehler("Die Rolle in dieser Firma vergibt nur ein Admin dieser Firma.", status.HTTP_403_FORBIDDEN)
         user.nur_historisch = False
-        user.rolle = rolle
+        if kuerzel == "dskm":
+            user.rolle = rolle
         user.entsperren()
         kennwort = user.neues_einmal_kennwort()
         user.save()
+        if kuerzel != "dskm":
+            Mitgliedschaft.objects.update_or_create(benutzer=user, firma=firma, defaults={"rolle": rolle})
         protokolliere(SystemEreignis.Art.BENUTZER_GEAENDERT, request, objekt=user.username, login_gegeben=True,
                       rolle=rolle, einmal_kennwort_gueltig_bis=user.einmal_kennwort_gueltig_bis.isoformat())
         daten = self.get_serializer(user).data

@@ -233,11 +233,20 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
   // Rolle je Firma (Anforderung 11.10.2026): DSKM wie bisher „Rolle“, weitere Firmen darunter
   const alleFirmen = ich.alle_firmen ?? [];
   const weitereFirmen = alleFirmen.filter((x) => x.kuerzel !== "dskm");
+  // Rollen einer Firma vergibt nur, wer dort selbst Admin ist (Festlegung 11.10.2026)
+  const adminIn = new Set((ich.firmen ?? []).filter((x) => x.rolle === "admin").map((x) => x.kuerzel));
+  const darfFirma = (kuerzel: string) => alleFirmen.length < 2 || adminIn.has(kuerzel);
+  const nurAdminHinweis = (kuerzel: string) => `nur ein Admin der ${alleFirmen.find((x) => x.kuerzel === kuerzel)?.kurzname ?? kuerzel} ändert diese Rolle`;
   const start = (): Formular => benutzer ? {
     titel: benutzer.titel, first_name: benutzer.first_name, last_name: benutzer.last_name, kuerzel: benutzer.kuerzel ?? "",
     funktion: benutzer.funktion, username: benutzer.username, rolle: benutzer.rolle, ist_test: benutzer.ist_test, ohne_login: false,
     firmenrollen: Object.fromEntries(Object.entries(benutzer.firmenrollen ?? {}).filter(([k]) => k !== "dskm")),
-  } : { ...LEER };
+  } : {
+    // neu: Rolle nur in der Firma, für die gerade gearbeitet wird (dort ist die Person Admin)
+    ...LEER,
+    rolle: darfFirma("dskm") && (ich.firma ?? "dskm") === "dskm" ? LEER.rolle : "keine",
+    firmenrollen: Object.fromEntries(weitereFirmen.map((x) => [x.kuerzel, x.kuerzel === ich.firma && darfFirma(x.kuerzel) ? LEER.rolle : "keine"])),
+  };
   const [f, setF] = useState<Formular>(start);
   const kennwort = kennwortAnzeige && benutzer && kennwortAnzeige.id === benutzer.id ? kennwortAnzeige : null;
   const [frage, setFrage] = useState<"" | "kennwort" | "2fa" | "sperren" | "testdaten" | "ohnelogin" | "ausblenden">("");
@@ -352,15 +361,15 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
           data-testid="berechtigungen">
           <legend className="lbl px-1.5">Berechtigungen{weitereFirmen.length ? " je Firma" : ""}</legend>
           <Feld label={weitereFirmen.length ? `Rolle ${alleFirmen.find((x) => x.kuerzel === "dskm")?.kurzname ?? "DSKM"}` : "Rolle"} fehler={fehler.rolle}
-            hinweis={ohneLogin ? "ohne Login: keine Rechte" : undefined}>
-            {(p) => <Auswahl {...p} value={ohneLogin ? "keine" : f.rolle} disabled={ohneLogin} data-testid="rolle-dskm"
+            hinweis={ohneLogin ? "ohne Login: keine Rechte" : !darfFirma("dskm") ? nurAdminHinweis("dskm") : undefined}>
+            {(p) => <Auswahl {...p} value={ohneLogin ? "keine" : f.rolle} disabled={ohneLogin || !darfFirma("dskm")} data-testid="rolle-dskm"
               onChange={(e) => setF({ ...f, rolle: e.target.value, ist_test: TESTBENUTZER_ROLLEN.includes(e.target.value) ? f.ist_test : false })}>
               {Object.entries(ROLLEN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Auswahl>}
           </Feld>
           {weitereFirmen.map((firma) => (
             <Feld key={firma.kuerzel} label={`Rolle ${firma.kurzname}`} fehler={fehler.firmenrollen}
-              hinweis={ohneLogin ? undefined : `bei ${firma.name}; „Keine Berechtigung“ = kein Zugang`}>
-              {(p) => <Auswahl {...p} value={ohneLogin ? "keine" : f.firmenrollen[firma.kuerzel] ?? "keine"} disabled={ohneLogin}
+              hinweis={ohneLogin ? undefined : !darfFirma(firma.kuerzel) ? nurAdminHinweis(firma.kuerzel) : `bei ${firma.name}; „Keine Berechtigung“ = kein Zugang`}>
+              {(p) => <Auswahl {...p} value={ohneLogin ? "keine" : f.firmenrollen[firma.kuerzel] ?? "keine"} disabled={ohneLogin || !darfFirma(firma.kuerzel)}
                 data-testid={`rolle-${firma.kuerzel}`}
                 onChange={(e) => setF({ ...f, firmenrollen: { ...f.firmenrollen, [firma.kuerzel]: e.target.value } })}>
                 {Object.entries(ROLLEN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Auswahl>}

@@ -59,6 +59,14 @@ def mitgliedschaften(user) -> dict:
     return {f: r for f, r in rollen_je_firma(user).items() if r != Rolle.KEINE}
 
 
+def admin_firmen(user) -> set[str]:
+    """Kürzel der Firmen, in denen die Person Admin ist. Rollen in einer Firma vergibt nur ein Admin dieser Firma
+    (Festlegung 11.10.2026)."""
+    from accounts.models import Rolle
+
+    return {f.kuerzel for f, r in mitgliedschaften(user).items() if r == Rolle.ADMIN}
+
+
 def wirksame_rolle(user) -> str | None:
     """Rolle, nach der sich die Rechte gerade richten: die Rolle in der aktiven Firma, sonst ``User.rolle``."""
     if user is None:
