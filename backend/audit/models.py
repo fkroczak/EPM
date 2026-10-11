@@ -25,6 +25,8 @@ class SystemEreignis(models.Model):
         ZWEITER_FAKTOR_ZURUECKGESETZT = "2fa_zurueckgesetzt", "2FA zurückgesetzt"
         AKTE_ABGESCHLOSSEN = "akte_abgeschlossen", "Akte abgeschlossen"
         AKTE_GEOEFFNET = "akte_geoeffnet", "Akte wieder geöffnet"
+        # Anforderung 11.10.2026: Akte einer weiteren Firma zugeordnet bzw. aus einer Firma genommen
+        AKTE_FIRMEN = "akte_firmen", "Zuordnung einer Akte zu Firmen geändert"
         PLAN_FREIGEGEBEN = "plan_freigegeben", "Infusionsplan freigegeben"
         BERICHT_FREIGEGEBEN = "bericht_freigegeben", "Bericht freigegeben"
         SPRECHSTUNDE_ERZEUGT = "sprechstunde_erzeugt", "Unterlagen für die Sprechstunde erzeugt"

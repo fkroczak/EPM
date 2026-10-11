@@ -127,7 +127,27 @@ def fehler(text, code=status.HTTP_400_BAD_REQUEST, **extra):
     return Response({"fehler": text, **extra}, status=code)
 
 
+def firmen_daten(user):
+    """Firmen mit Zugang (Umschalter oben links) und die aktive (Anforderung 11.10.2026)."""
+    from epm.firma import mitgliedschaften, waehle
+    from stammdaten.models import Firma
+
+    if not hasattr(user, "firma"):
+        waehle(user)
+    return {
+        "firma": user.firma.kuerzel if user.firma else None,
+        "firmen": [{"kuerzel": f.kuerzel, "name": f.name, "kurzname": f.kurzname, "rolle": r, "altdaten": f.altdaten}
+                   for f, r in mitgliedschaften(user).items()],
+        # alle aktiven Firmen (Auswahl, welchen Firmen eine Akte zugeordnet ist)
+        "alle_firmen": [{"kuerzel": f.kuerzel, "name": f.name, "kurzname": f.kurzname}
+                        for f in Firma.objects.filter(aktiv=True).order_by("reihenfolge", "id")],
+    }
+
+
 def ich_daten(user):
+    from epm.firma import wirksame_rolle
+
+    firmen = firmen_daten(user)
     return {
         "id": user.id,
         "benutzername": user.username,
@@ -137,7 +157,9 @@ def ich_daten(user):
         "nachname": user.last_name,
         "kuerzel": user.kuerzel,
         "funktion": user.funktion,
-        "rolle": user.rolle,
+        # Rolle in der aktiven Firma (11.10.2026); die Rollen je Firma stehen unter ``firmen``
+        "rolle": wirksame_rolle(user),
+        **firmen,
         "ist_test": user.ist_test,
         "darstellung": user.darstellung,
         "startseite": {**(user.startseite or {}), "karten": startseite_karten(user)},
@@ -190,6 +212,21 @@ class OffenerView(APIView):
 
     permission_classes = [AllowAny]
     throttle_scope = "anmeldung"
+
+
+class FirmaView(APIView):
+    """Firma wechseln (Umschalter oben links, Anforderung 11.10.2026): ``{"firma": "rg"}``. Nur Firmen, in denen die
+    Person Zugang hat; die Wahl gilt für diese Sitzung. Antwort wie ``/api/auth/status/``."""
+
+    def post(self, request):
+        from epm.firma import SITZUNG, mitgliedschaften, waehle
+
+        kuerzel = str((request.data if isinstance(request.data, dict) else {}).get("firma") or "")
+        if kuerzel not in {f.kuerzel for f in mitgliedschaften(request.user)}:
+            return fehler("Für diese Firma hast du keinen Zugang.", status.HTTP_403_FORBIDDEN)
+        request.session[SITZUNG] = kuerzel
+        waehle(request.user, kuerzel)
+        return status_antwort(request)
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
@@ -859,12 +896,51 @@ class BenutzerSerializer(serializers.ModelSerializer):
     anzeigename = serializers.CharField(read_only=True)
     zweiter_faktor = serializers.SerializerMethodField()
     zweiter_faktor_pflicht = serializers.SerializerMethodField()
+    # Rolle je Firma (Anforderung 11.10.2026): {"dskm": "mediziner", "rg": "keine"}; DSKM = ``rolle``
+    firmenrollen = serializers.SerializerMethodField()
+
+    def get_firmenrollen(self, obj):
+        from epm.firma import rollen_je_firma
+
+        return {f.kuerzel: r for f, r in rollen_je_firma(obj).items()}
+
+    def _firmenrollen_eingabe(self):
+        werte = self.initial_data.get("firmenrollen") if isinstance(self.initial_data, dict) else None
+        return werte if isinstance(werte, dict) else None
+
+    def _firmenrollen_speichern(self, user):
+        from stammdaten.models import Firma
+
+        from .models import Mitgliedschaft
+
+        werte = self._firmenrollen_eingabe()
+        if not werte:
+            return {}
+        geaendert = {}
+        for firma in Firma.objects.filter(kuerzel__in=list(werte)).exclude(kuerzel="dskm"):
+            m, _ = Mitgliedschaft.objects.get_or_create(benutzer=user, firma=firma)
+            if m.rolle != werte[firma.kuerzel]:
+                geaendert[f"rolle_{firma.kuerzel}"] = [m.rolle, werte[firma.kuerzel]]
+                m.rolle = werte[firma.kuerzel]
+                m._history_user = self.context["request"].user if "request" in self.context else None
+                m.save()
+        return geaendert
+
+    def create(self, validated_data):
+        user = super().create(validated_data)
+        self.firmen_geaendert = self._firmenrollen_speichern(user)
+        return user
+
+    def update(self, instance, validated_data):
+        user = super().update(instance, validated_data)
+        self.firmen_geaendert = self._firmenrollen_speichern(user)
+        return user
 
     class Meta:
         model = User
         fields = [
             "id", "username", "titel", "first_name", "last_name", "kuerzel", "funktion", "email",
-            "rolle", "ist_test", "is_active", "nur_historisch", "anzeigename", "zweiter_faktor",
+            "rolle", "firmenrollen", "ist_test", "is_active", "nur_historisch", "anzeigename", "zweiter_faktor",
             "zweiter_faktor_pflicht", "muss_kennwort_aendern", "einmal_kennwort_gueltig_bis", "gesperrt_am", "sperrgrund",
             "fehlversuche", "last_login", "date_joined", "ausgeblendet_am",
         ]
@@ -893,6 +969,24 @@ class BenutzerSerializer(serializers.ModelSerializer):
         elif test and rolle not in TESTBENUTZER_ROLLEN:
             raise serializers.ValidationError({"ist_test": "Testbenutzer gibt es für Betrachter, Mitarbeiter, Mitarbeiter (erweitert) und "
                                                            "Mediziner."})
+        # Rollen in weiteren Firmen (11.10.2026); die DSKM-Rolle kommt als ``rolle``
+        werte = self._firmenrollen_eingabe()
+        if werte:
+            from stammdaten.models import Firma
+
+            if "dskm" in werte:
+                attrs["rolle"] = rolle = werte["dskm"]
+            bekannt = set(Firma.objects.values_list("kuerzel", flat=True))
+            for k, r in werte.items():
+                if k not in bekannt:
+                    raise serializers.ValidationError({"firmenrollen": f"Unbekannte Firma: {k}."})
+                if r not in Rolle.values:
+                    raise serializers.ValidationError({"firmenrollen": f"Unbekannte Rolle: {r}."})
+                if konto is not None and konto.nur_historisch and r != Rolle.KEINE:
+                    raise serializers.ValidationError({"firmenrollen": "Ohne Login hat das Konto keine Rechte."})
+                if test and r not in (*TESTBENUTZER_ROLLEN, Rolle.KEINE):
+                    raise serializers.ValidationError({"firmenrollen": "Testbenutzer gibt es für Betrachter, Mitarbeiter, "
+                                                                       "Mitarbeiter (erweitert) und Mediziner."})
         return attrs
 
 
@@ -1069,6 +1163,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         vorher = {f: getattr(user, f) for f in serializer.validated_data}
         user = serializer.save()
         geaendert = {f: [str(vorher[f]), str(getattr(user, f))] for f in vorher if vorher[f] != getattr(user, f)}
+        geaendert.update(getattr(serializer, "firmen_geaendert", {}))
         protokolliere(SystemEreignis.Art.BENUTZER_GEAENDERT, self.request, objekt=user.username, aenderungen=geaendert)
 
     @action(detail=True, methods=["post"])

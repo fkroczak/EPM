@@ -562,6 +562,28 @@ def _eigene_startvorlage_zu(art):
     return eigene_startvorlage(e.name if e else "Titel")
 
 
+FIRMEN = [
+    {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF},
+    {"id": "titel", "typ": "titel", "bezeichnung": "Titel",
+     "text": "Einwilligung in den Austausch meiner Daten zwischen DSKM und Regeneration Clinic"},
+    HINWEIS_VORLAGE,
+    PATIENT_BLOCK,
+    _abschnitt("einwilligung", "Einwilligung",
+               "Ich werde sowohl von der Deutschen Stiftung Krankheitsbedingte Mangelernährung (DSKM) als auch von der "
+               "Regeneration Clinic (RG) betreut. Ich willige ein, dass beide meine Akte gemeinsam führen: Stammdaten, "
+               "Kontakte, Gewichte, Termine, Befunde, Infusionspläne, Berichte und Dokumente sind für die "
+               "Mitarbeitenden beider Einrichtungen sichtbar, soweit sie für meine Betreuung zuständig sind.\n\n"
+               "[Zweck des Austauschs und ggf. Einschränkungen eintragen]"),
+    _abschnitt("widerruf", "Freiwilligkeit und Widerruf",
+               "Diese Einwilligung ist freiwillig. Ich kann sie jederzeit mit Wirkung für die Zukunft widerrufen; danach "
+               "führt nur noch eine der beiden Einrichtungen meine Akte. Die Rechtmäßigkeit der bis zum Widerruf "
+               "erfolgten Verarbeitung bleibt davon unberührt (Art. 7 Abs. 3 DSGVO).\n"
+               "[eintragen: an wen der Widerruf zu richten ist]"),
+    {"id": "unterschrift", "typ": "unterschrift", "bezeichnung": "Unterschrift",
+     "linie": "Ort, Datum, Unterschrift Patient/in oder gesetzliche Vertretung", "optionen": {"nicht_teilen": True}},
+    {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
+]
+
 # Startvorlagen. Patientendatenblatt: Aufbau wie im Entwurf „EPM Oberfläche“ (Dokumentvorlagen).
 STARTVORLAGEN = {
     "patientenaufnahme": PATIENTENAUFNAHME,
@@ -571,6 +593,7 @@ STARTVORLAGEN = {
     "datenschutzinformation": DATENSCHUTZINFORMATION,
     "einwilligung": EINWILLIGUNG,
     "schweigepflichtentbindung": SCHWEIGEPFLICHTENTBINDUNG,
+    "firmen": FIRMEN,
     # Aufbau wie die bisherige PDF des Altsystems (EPM_infuPDF.php mit fpdf_layout.php), moderner gesetzt
     # (Festlegung 01.10.2026); Freigabevermerk statt eingescannter Unterschrift
     "infusionsplan": [

@@ -15,6 +15,7 @@ import { Eingabe, Feld, Fehleranzeige, Knopf, Meldung } from "@/components/ui/ba
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Editor, Richtext } from "@/components/Editor";
+import { FirmaMarke } from "@/components/FirmenWahl";
 import { useAkte } from "./Akte";
 import { Abschnitt, Aktenseite, Detail, Eintrag, Eintragsliste, Wertetabelle, useWahl } from "./Aktenseite";
 import { AlterHinweis } from "./Befunde";
@@ -158,7 +159,7 @@ export function Bia() {
           <Eintragsliste name="BIA-Messungen" leer={liste.length ? undefined : "Noch keine BIA-Messung erfasst."}>
             {liste.map((m) => (
               <Eintrag key={m.id} aktiv={gewaehlt?.id === m.id} onWahl={() => setWahl(String(m.id))}
-                datum={datum(m.gemessen_am)}
+                datum={<>{datum(m.gemessen_am)}<FirmaMarke kurz={m.firma_kurz} className="ml-1.5" /></>}
                 zeile={m.bcm_kg != null ? `BCM ${zahl(m.bcm_kg, 1)} kg` : "ohne BCM"}
                 unten={m.gewicht_kg != null ? `${zahl(m.gewicht_kg, 1)} kg` : ""} />
             ))}

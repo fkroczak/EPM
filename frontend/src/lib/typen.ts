@@ -46,9 +46,16 @@ export type Ich = {
   rechte: Recht[];
   /** Admins: Patientendaten nur bei Testpatienten schreiben (echte Akten nur lesen) */
   schreibt_nur_testpatienten: boolean;
+  /** aktive Firma (Umschalter unter dem Logo, Anforderung 11.10.2026) und alle Firmen mit Zugang samt Rolle */
+  firma?: string;
+  firmen?: FirmaZugang[];
+  alle_firmen?: Firma[];
   /** Menüpunkt „Import“ nach der Übernahme ausgeblendet (Administration › System, Festlegung 03.10.2026, U32) */
   import_ausgeblendet?: boolean;
 };
+
+export type Firma = { kuerzel: string; name: string; kurzname: string };
+export type FirmaZugang = { kuerzel: string; name: string; kurzname: string; rolle: Ich["rolle"]; altdaten: boolean };
 
 /** Breite in Spalten des Rasters (1–5), Höhe in Rasterzeilen (0 = automatisch nach Inhalt, sonst 1–4) */
 export type Bereichsgroesse = { breite: number; hoehe: number };
@@ -148,6 +155,8 @@ export type PatientZeile = {
   abgeschlossen_am: string | null;
   abschluss_anlass: string;
   ist_test: boolean;
+  /** Firmen der Akte (Kürzel, 11.10.2026) */
+  firmen?: string[];
   /** Verarbeitung eingeschränkt (Art. 18 DSGVO): nur sichtbar, solange die eigene Einsicht läuft */
   ist_eingeschraenkt: boolean;
   kennzahlen: Kennzahlen | null;
@@ -158,14 +167,17 @@ export type PatientZeile = {
 export type Aufbewahrung = { jahre: number; beginn: string | null; regulaer_bis: string | null; verlaengert_bis: string | null;
   grund: string; bis: string | null; abgelaufen: boolean };
 
-export type ErklaerungsArt = "datenschutzinformation" | "einwilligung" | "schweigepflichtentbindung";
+export type ErklaerungsArt = "datenschutzinformation" | "einwilligung" | "schweigepflichtentbindung" | "firmen";
 export const ERKLAERUNGEN: Record<ErklaerungsArt, string> = {
   datenschutzinformation: "Datenschutzinformation",
   einwilligung: "Einwilligung in die Datenverarbeitung",
   schweigepflichtentbindung: "Schweigepflichtentbindung",
+  // Voraussetzung, damit DSKM und Regeneration Clinic eine Akte gemeinsam führen (11.10.2026)
+  firmen: "Einwilligung Austausch DSKM und Regeneration Clinic",
 };
 export const ERKLAERUNGEN_KURZ: Record<ErklaerungsArt, string> = {
   datenschutzinformation: "Datenschutzinformation", einwilligung: "Einwilligung", schweigepflichtentbindung: "Schweigepflichtentbindung",
+  firmen: "Einwilligung Firmen",
 };
 export type ErklaerungsStand = { status: "nicht_erfasst" | "liegt_vor" | "widerrufen"; am: string | null; id: number | null };
 
@@ -269,6 +281,9 @@ export type Patient = {
   ist_test: boolean;
   ist_eingeschraenkt: boolean;
   eingeschraenkt_am: string | null;
+  /** Firmen der Akte (Kürzel, 11.10.2026) und ob die Einwilligung zum Austausch zwischen ihnen vorliegt */
+  firmen?: string[];
+  firmen_einwilligung?: boolean;
   /** nur bei abgeschlossenen Akten */
   aufbewahrung: Aufbewahrung | null;
   angelegt_am: string;
@@ -365,6 +380,8 @@ export type Termin = {
   bestaetigung_weg?: "" | "telefonisch" | "persoenlich" | "anderweitig";
   /** nur bei Praxisterminen: ``angebot`` = „Terminbestätigung schicken?“ anbieten bzw. „Bestätigung fehlt“ zeigen */
   bestaetigung?: { angebot: boolean; email: boolean; anrede: string } | null;
+  /** Firma, in der erfasst (11.10.2026) */
+  firma_kurz?: string | null;
 };
 
 export const TERMINARTEN: Record<string, string> = {
@@ -384,6 +401,7 @@ export type Gewicht = {
   notiz: string;
   erfasst_am: string;
   erfasst_von_name: string | null;
+  firma_kurz?: string | null;
 };
 
 export const GEWICHTSQUELLEN: Record<string, string> = {
@@ -407,6 +425,7 @@ export type Kontakt = {
   storniert_von_name: string | null;
   storno_grund: string;
   termine: { id: number; art: string; faellig_am: string; uhrzeit: string | null; ort: string | null; erledigt: boolean }[];
+  firma_kurz?: string | null;
 };
 
 export type Auswahlwert = { id: number; liste: string; wert: string; reihenfolge: number; aktiv: boolean };
@@ -486,6 +505,7 @@ export type PatientArzt = {
   aktiv: boolean;
   angelegt_am: string;
   angelegt_von_name: string | null;
+  firma_kurz?: string | null;
 };
 
 /** Bezugsperson (Mutter, Vater, Betreuer/in …) */
@@ -506,6 +526,7 @@ export type Bezugsperson = {
   aktiv: boolean;
   angelegt_am: string;
   angelegt_von_name: string | null;
+  firma_kurz?: string | null;
 };
 
 export type Dokument = {
@@ -532,6 +553,7 @@ export type Dokument = {
   erkennung?: { id: number; status: "wartet" | "laeuft" | "fertig" | "fehler"; schritt: string; fehler: string;
     angefordert_am: string; beendet_am: string | null; seiten: number | null } | null;
   text_erkennbar?: { moeglich: boolean; grund: string };
+  firma_kurz?: string | null;
 };
 
 export type Plan = {
@@ -603,6 +625,7 @@ export type Plan = {
   pdf_datei: string;
   pdf_sha256: string;
   vorlage_version: number | null;
+  firma_kurz?: string | null;
 };
 
 /** Weg der Freigabe eines Plans (im System durch den Mediziner selbst oder außerhalb von EPM) */
@@ -638,6 +661,8 @@ export type Benutzer = {
   funktion: string;
   email: string;
   rolle: string;
+  /** Rolle je Firma (11.10.2026): {"dskm": "mediziner", "rg": "keine"}; die der DSKM ist ``rolle`` */
+  firmenrollen?: Record<string, string>;
   ist_test: boolean;
   is_active: boolean;
   nur_historisch: boolean;
@@ -711,11 +736,13 @@ export type Diagnose = {
   beendet_am: string | null;
   angelegt_am: string;
   angelegt_von_name: string | null;
+  firma_kurz?: string | null;
 };
 
 /** Schritt im Verlauf der Therapie (Wunsch 10.10.2026) */
 export type Therapieschritt = {
   id: number; patient: number; datum: string; text: string; aktiv: boolean; angelegt_am: string; angelegt_von_name: string | null;
+  firma_kurz?: string | null;
 };
 
 export type Diagnosevorlage = { id: number; icd_code: string; bezeichnung: string; aktiv: boolean; anzeige: string };
@@ -784,6 +811,7 @@ export type Laborbefund = {
   anzahl_werte: number;
   erfasst_am: string;
   erfasst_von_name: string | null;
+  firma_kurz?: string | null;
 };
 
 export type BiaMessung = {
@@ -803,6 +831,7 @@ export type BiaMessung = {
   gewichtsmessung: number | null;
   erfasst_am: string;
   erfasst_von_name: string | null;
+  firma_kurz?: string | null;
 };
 
 export type Bericht = {
@@ -825,6 +854,7 @@ export type Bericht = {
   dokument: number | null;
   pdf_sha256: string;
   vorlage_version: number | null;
+  firma_kurz?: string | null;
 };
 
 

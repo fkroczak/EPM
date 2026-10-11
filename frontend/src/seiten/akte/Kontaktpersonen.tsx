@@ -18,6 +18,7 @@ import { Auswahl, Chip, Eingabe, Feld, KartenKopf, Knopf, Laden, Leer, Meldung, 
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
+import { FirmaMarke } from "@/components/FirmenWahl";
 import { NeuerArztDialog } from "@/components/SchnellAnlegen";
 import { Bestaetigen } from "@/components/Bestaetigen";
 import { KarteOderAbschnitt } from "./Aktenseite";
@@ -158,6 +159,7 @@ export function AerzteKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
                   <Chip art={z.rolle === "hausarzt" ? "akzent" : "neutral"}>{z.rolle_name}</Chip>
                   {!z.aktiv ? <Chip>nicht mehr zuständig</Chip> : null}
                   {!a.aktiv ? <Chip>Arzt deaktiviert</Chip> : null}
+                  <FirmaMarke kurz={z.firma_kurz} />
                 </span>
                 <span className="text-[0.8125rem] gedaempft">{[a.praxis, a.fachrichtung, adresse].filter(Boolean).join(" · ") || "—"}</span>
                 <Kontaktzeile telefon={a.telefon} fax={a.fax} email={a.email} />
@@ -319,6 +321,7 @@ export function BezugspersonenKarte({ rahmenlos }: { rahmenlos?: boolean } = {})
                   {b.beziehung_name ? <Chip>{b.beziehung_name}</Chip> : null}
                   {b.auskunft_erlaubt ? <Chip art="ok"><Icon name="haken" />Auskunft erlaubt</Chip> : null}
                   {!b.aktiv ? <Chip>nicht mehr aktuell</Chip> : null}
+                  <FirmaMarke kurz={b.firma_kurz} />
                 </span>
                 {adresse ? <span className="text-[0.8125rem] gedaempft">{adresse}</span> : null}
                 <Kontaktzeile telefon={b.telefon} mobil={b.mobil} email={b.email} />

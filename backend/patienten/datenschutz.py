@@ -111,7 +111,7 @@ def akten_entfernen(ids: list[int]) -> None:
     from berichte.models import Bericht
     from infusionen.models import Infusionsplan, InfusionsplanPosition
 
-    from .models import Diagnose, Hinweisruhe, Therapieschritt
+    from .models import Diagnose, Hinweisruhe, PatientFirma, Therapieschritt
 
     ids = list(ids)
     eigene = eigene_dokumente(ids)
@@ -148,7 +148,8 @@ def akten_entfernen(ids: list[int]) -> None:
     bleibt = set(Dokument.objects.filter(id__in=frueher.values("id")).values_list("id", flat=True))
     frueher.exclude(id__in=bleibt).delete()
     for modell in (Gewichtsmessung, Kontakt, Termin, Infusionsplan, Bezugsperson, PatientArzt, Erklaerung,
-                   Datenschutzanfrage, Diagnose, Laborbefund, BiaMessung, Bericht, Hinweisruhe, Therapieschritt):
+                   Datenschutzanfrage, Diagnose, Laborbefund, BiaMessung, Bericht, Hinweisruhe, Therapieschritt,
+                   PatientFirma):
         modell.history.filter(patient_id__in=ids).delete()
     InfusionsplanPosition.history.filter(plan_id__in=plan_ids).delete()
     Laborwert.history.filter(befund_id__in=befund_ids).delete()

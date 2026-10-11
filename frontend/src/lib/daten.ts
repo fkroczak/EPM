@@ -65,8 +65,11 @@ export function useEinstellungen() {
 export type Absender = { name: string; strasse: string; plz: string; ort: string; telefon: string; fax: string; email: string;
   internet: string; fusszeile: string };
 export type Briefkopf = {
-  aktiv: "stiftung" | "gug";
-  absender: Record<"stiftung" | "gug", Absender>;
+  aktiv: string;
+  /** Absender je Art: "stiftung", "gug" und (seit 11.10.2026) "rg" für die Regeneration Clinic */
+  absender: Record<string, Absender>;
+  /** aktive Firma: ihr Logo und ihr Absender gelten (11.10.2026) */
+  firma?: { kuerzel: string; name: string; absender: string } | null;
   arten: { code: string; name: string }[];
   logo: { vorhanden: boolean; mime?: string; sha256?: string; breite?: number; hoehe?: number; hochgeladen_am?: string };
 };

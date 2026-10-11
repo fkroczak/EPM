@@ -122,7 +122,9 @@ class User(AbstractUser):
 
     @property
     def ist_admin(self):
-        return self.rolle == Rolle.ADMIN
+        from epm.firma import wirksame_rolle
+
+        return wirksame_rolle(self) == Rolle.ADMIN
 
     @property
     def darf_patienten_bearbeiten(self):
@@ -189,6 +191,27 @@ class Sitzung(models.Model):
 
     def __str__(self):
         return f"{self.benutzer} · {self.browser[:40]}"
+
+
+class Mitgliedschaft(models.Model):
+    """Rolle einer Person in einer weiteren Firma (Anforderung 11.10.2026). Die Rolle bei der DSKM (Hauptfirma) ist
+    ``User.rolle`` wie bisher; hier stehen nur die übrigen Firmen (Regeneration Clinic) – fehlt der Eintrag, hat die
+    Person dort keinen Zugang. Der Umschalter oben links zeigt nur Firmen mit Zugang."""
+
+    benutzer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="mitgliedschaften")
+    firma = models.ForeignKey("stammdaten.Firma", on_delete=models.PROTECT, related_name="mitgliedschaften")
+    rolle = models.CharField("Rolle", max_length=20, choices=Rolle.choices, default=Rolle.KEINE)
+    geaendert_am = models.DateTimeField(auto_now=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Mitgliedschaft"
+        verbose_name_plural = "Mitgliedschaften"
+        constraints = [models.UniqueConstraint(fields=["benutzer", "firma"], name="mitgliedschaft_einmal_je_firma")]
+
+    def __str__(self):
+        return f"{self.benutzer} · {self.firma}: {self.get_rolle_display()}"
 
 
 class Gruppenrecht(models.Model):

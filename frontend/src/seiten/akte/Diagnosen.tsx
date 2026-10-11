@@ -17,6 +17,7 @@ import type { Diagnose } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Feld, Karte, Knopf, Laden, Meldung, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
+import { FirmaMarke } from "@/components/FirmenWahl";
 import { useAkte } from "./Akte";
 import { useWahl } from "./Aktenseite";
 import { Textfassung } from "./TextKarte";
@@ -143,7 +144,9 @@ function DiagnoseZeile({ d, markiert, bearbeiten, onBearbeiten, onUmschalten, la
       <Code d={d} />
       <div className="flex flex-col gap-0.5 min-w-0">
         <span className={cx("font-medium", !d.aktiv && "line-through decoration-gedaempft")}>{d.bezeichnung}</span>
-        {unter ? <span className="text-[0.8125rem] gedaempft">{unter}</span> : null}
+        {unter || d.firma_kurz ? (
+          <span className="flex items-center gap-1.5 text-[0.8125rem] gedaempft">{unter ? <span>{unter}</span> : null}<FirmaMarke kurz={d.firma_kurz} /></span>
+        ) : null}
         {d.notiz ? <span className="text-[0.8125rem] text-text2">{d.notiz}</span> : null}
       </div>
       {bearbeiten ? (

@@ -126,7 +126,7 @@ def _diagnosen(k):
 def _absender(k):
     from stammdaten.models import Absenderangaben, Einstellungen
 
-    return k.merke("absender", lambda: Absenderangaben.alle()[Einstellungen.aktuell().absender])
+    return k.merke("absender", lambda: Absenderangaben.aktuelle())
 
 
 def _person(u):
@@ -461,6 +461,7 @@ class JeArt(dict):
 
 FELDER = {"infusionsplan": INFUSIONSPLAN, "patientendatenblatt": PATIENTENDATENBLATT,
           "datenschutzinformation": ERKLAERUNG, "einwilligung": ERKLAERUNG, "schweigepflichtentbindung": ERKLAERUNG,
+          "firmen": ERKLAERUNG,
           "bericht": BERICHT, "sprechstunde": SPRECHSTUNDE,
           "patientenaufnahme": PATIENTENAUFNAHME, "terminbestaetigung": TERMINBESTAETIGUNG,
           "reisebescheinigung": REISEBESCHEINIGUNG, "patientenankuendigung": ANKUENDIGUNG}
@@ -480,7 +481,7 @@ TABELLEN = {
     "patientendatenblatt": {
         "termine": ("Nächste offene Termine (bis zu 3)", ["Datum", "Art", "Titel", "Ort"], ["", "", "", ""]),
     },
-    "datenschutzinformation": {}, "einwilligung": {}, "schweigepflichtentbindung": {},
+    "datenschutzinformation": {}, "einwilligung": {}, "schweigepflichtentbindung": {}, "firmen": {},
     "bericht": {
         "diagnosen": ("Diagnosen mit ICD-Code", ["Diagnose", "ICD", "seit"], ["", "", ""]),
     },

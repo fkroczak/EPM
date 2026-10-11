@@ -343,6 +343,24 @@ lassen sich als PDF ausgeben, werden aber nicht mehr verändert. Wieder öffnen 
 nach einem Versehen.</p>""",
     },
     {
+        "id": "firmen", "gruppe": "patienten", "titel": "Zwei Firmen: DSKM und Regeneration Clinic",
+        "rechte": ["akten_lesen"], "seiten": [],
+        "html": """
+<p>EPM wird von der <strong>DSKM</strong> und der <strong>Regeneration Clinic (RG)</strong> genutzt. Ein Teil der
+Patienten wird von beiden betreut, die übrigen nur von einer der beiden.</p>
+<p><strong>Umschalten:</strong> Direkt unter dem Logo oben links steht der Schalter <strong>DSKM | RG</strong> (in der
+schmalen Leiste das Kürzel, am Telefon im Menü; oben im Kopf steht, für welche Firma gerade gearbeitet wird). Danach
+zeigt EPM nur die Akten dieser Firma; Logo, Briefkopf und die eigenen Rechte richten sich nach ihr. Der Schalter
+erscheint nur, wenn man in beiden Firmen eine Rolle hat.</p>
+<p><strong>Gemeinsame Akten:</strong> Im Aktenkopf zeigt der Chip <strong>DSKM · RG</strong>, wer die Akte betreut.
+An jedem Eintrag (Kontakt, Gewicht, Termin, Plan, Befund, Dokument …) steht klein, in welcher Firma er erfasst wurde.</p>
+<p><strong>Betreuende Firmen ändern:</strong> den Firmen-Chip im Aktenkopf antippen oder <em>Weitere Aktionen (⋯) ›
+Betreuende Firmen</em>. Eine zweite Firma geht nur mit der unterschriebenen <strong>Einwilligung zum Austausch</strong>:
+Datum eintragen, EPM legt die Erklärung unter <em>Datenschutz</em> an (Vordruck dort als PDF). Beim Anlegen eines neuen
+Patienten ist die Firma vorgewählt, für die gerade gearbeitet wird.</p>
+<p>Der <strong>Import aus dem Altsystem</strong> gilt nur für die DSKM; übernommene Akten gehören der DSKM.</p>""",
+    },
+    {
         "id": "neuer_patient", "gruppe": "patienten", "titel": "Neuer Patient", "rechte": ["akten_bearbeiten"],
         "seiten": ["/patienten/neu"],
         "html": """
@@ -1033,6 +1051,9 @@ ausschließlich Testpatienten. Nicht mehr gebrauchte Testbenutzer lassen sich <s
 „Alle Testbenutzer ausblenden“): gesperrt und in keiner Liste mehr, aber nicht gelöscht; „Ausgeblendete zeigen“ und
 „Einblenden“ holen sie zurück. Mit dem Recht <strong>Testdaten sehen</strong> legt man je Gruppe fest, wer
 Testpatienten und Testbenutzer überhaupt sieht.</p>
+<p><strong>Rolle je Firma:</strong> Jede Person hat eine Rolle bei der DSKM und eine bei der Regeneration Clinic
+(„Rolle DSKM“, „Rolle RG“). „Keine Berechtigung“ heißt: kein Zugang zu dieser Firma. Wer in beiden Firmen eine Rolle
+hat, schaltet unter dem Logo um; die Rechte richten sich nach der Rolle in der gerade gewählten Firma.</p>
 <p>Unter <strong>Anmeldung</strong> legt die Administration fest, ob die Zwei-Faktor-Anmeldung freiwillig, Pflicht für
 Admins oder Pflicht für alle ist.</p>
 <p>Unter <strong>Rechte</strong> legt man je Gruppe (Betrachter, Mitarbeiter, Mediziner, Admin) fest, was erlaubt ist.

@@ -78,6 +78,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django_otp.middleware.OTPMiddleware",
     "accounts.sitzungen.SitzungMiddleware",
+    # aktive Firma (DSKM bzw. Regeneration Clinic, 11.10.2026) – vor allem, was Rechte prüft
+    "epm.firma.FirmaMiddleware",
     "accounts.sitzungen.RechteStandMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

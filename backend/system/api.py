@@ -154,7 +154,7 @@ class UebersichtView(APIView):
             "minuten": MINUTEN_ERLAUBT,
             "einstellungen": _einstellungen(),
             # „Datenbank leeren“ nur für die Rolle Admin (Festlegung 03.10.2026, U27)
-            "leeren_erlaubt": request.user.rolle == "admin",
+            "leeren_erlaubt": request.user.ist_admin,
         })
 
 
@@ -208,7 +208,7 @@ class LeerenVorbereitenView(APIView):
 
         from .leeren import umfang
 
-        if request.user.rolle != "admin":
+        if not request.user.ist_admin:
             return Response({"fehler": "Die Datenbank leeren darf nur die Rolle Admin."}, status=status.HTTP_403_FORBIDDEN)
         code = "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(6))
         bis = timezone.now() + timedelta(minutes=LEEREN_MINUTEN)
@@ -234,7 +234,7 @@ class LeerenView(APIView):
 
         from accounts.models import User
 
-        if request.user.rolle != "admin":
+        if not request.user.ist_admin:
             return Response({"fehler": "Die Datenbank leeren darf nur die Rolle Admin."}, status=status.HTTP_403_FORBIDDEN)
         sitzung = request.session.get(LEEREN_SCHLUESSEL) or {}
         if not sitzung or datetime.fromisoformat(sitzung["bis"]) < timezone.now():

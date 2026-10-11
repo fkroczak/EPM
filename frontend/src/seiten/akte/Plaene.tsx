@@ -15,6 +15,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { klartext } from "@/components/Editor";
+import { FirmaMarke } from "@/components/FirmenWahl";
 import { PdfLeser } from "@/components/PdfAnsicht";
 import { name, useAkte } from "./Akte";
 
@@ -377,7 +378,7 @@ export function Plaene() {
                 <button type="button" aria-current={p.id === gewaehlt?.id ? "true" : undefined}
                   className={cx("card text-left px-3.5 py-3 flex flex-col gap-1 cursor-pointer border", p.id === gewaehlt?.id ? "border-akzent bg-akzent-weich" : "hover:bg-fein")}
                   onClick={() => { setParams(new URLSearchParams({ plan: String(p.id) }), { replace: true }); detailZeigen("plan-detail"); }}>
-                  <span className="flex items-center justify-between gap-2"><span className="num font-medium">{datum(p.gueltig_ab)}</span><StatusChip status={p.status} /></span>
+                  <span className="flex items-center justify-between gap-2"><span className="flex items-center gap-1.5"><span className="num font-medium">{datum(p.gueltig_ab)}</span><FirmaMarke kurz={p.firma_kurz} /></span><StatusChip status={p.status} /></span>
                   <span className="num text-[0.8125rem]">{zahl(p.kcal)} kcal{p.laufzeit_h != null ? ` · ${zahl(p.laufzeit_h)} h` : ""}{p.tage_pro_woche ? ` · ${p.tage_pro_woche}×/Woche` : ""}</span>
                   <span className="text-xs gedaempft">
                     {p.status === "entwurf" ? `angelegt ${zeitpunkt(p.erstellt_am)}${p.erstellt_von_name ? ` · ${p.erstellt_von_name}` : ""}`

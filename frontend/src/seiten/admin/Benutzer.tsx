@@ -33,13 +33,15 @@ type Rechte = {
   ohne_rechte?: string[];
 };
 type Formular = { titel: string; first_name: string; last_name: string; kuerzel: string; funktion: string; username: string; rolle: string;
-  ist_test: boolean; ohne_login: boolean };
+  ist_test: boolean; ohne_login: boolean;
+  /** Rollen in weiteren Firmen (11.10.2026); die der DSKM ist ``rolle`` */
+  firmenrollen: Record<string, string> };
 type Anmeldung = { zweiter_faktor: "freiwillig" | "admins" | "alle"; auswahl: { wert: string; name: string }[]; geaendert_am: string | null;
   ohne_zweiten_faktor: { id: number; anzeigename: string; rolle: string }[] };
 const TESTBENUTZER_ROLLEN = ["betrachter", "mitarbeiter", "mitarbeiter_plus", "mediziner"];
 const TITEL = ["", "Dr.", "Dr. med.", "Prof. Dr.", "Prof. Dr. med.", "Dipl.-Oec. troph."];
 const LEER: Formular = { titel: "", first_name: "", last_name: "", kuerzel: "", funktion: "", username: "", rolle: "mitarbeiter", ist_test: false,
-  ohne_login: false };
+  ohne_login: false, firmenrollen: {} };
 
 function anzeige(f: Formular) {
   const name = [f.titel, f.first_name ? `${f.first_name.trim()[0]}.` : "", f.last_name].filter(Boolean).join(" ");
@@ -202,6 +204,24 @@ function AnmeldungKarte({ onBenutzer }: { onBenutzer: (id: number) => void }) {
 
 type Kennwort = { id: number; kennwort: string; gueltig: string | null };
 
+/** Rolle in der Liste; bei mehreren Firmen je Firma mit Kürzel („DSKM Mitarbeiter“, „RG Mediziner“) */
+function RollenChips({ b }: { b: BenutzerTyp }) {
+  const alle = useIch().alle_firmen ?? [];
+  if (alle.length < 2) return <Chip art={b.rolle === "keine" ? undefined : "akzent"}>{ROLLEN[b.rolle as keyof typeof ROLLEN] ?? b.rolle}</Chip>;
+  const rollen = alle.map((x) => ({ firma: x, rolle: x.kuerzel === "dskm" ? b.rolle : b.firmenrollen?.[x.kuerzel] ?? "keine" }))
+    .filter((r) => r.rolle !== "keine");
+  if (!rollen.length) return <Chip>{ROLLEN.keine}</Chip>;
+  return (
+    <span className="inline-flex flex-col items-start gap-1">
+      {rollen.map((r) => (
+        <Chip key={r.firma.kuerzel} art="akzent" title={r.firma.name}>
+          <span className="font-mono text-[0.625rem] opacity-75">{r.firma.kurzname}</span> {ROLLEN[r.rolle as keyof typeof ROLLEN] ?? r.rolle}
+        </Chip>
+      ))}
+    </span>
+  );
+}
+
 function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige }: {
   benutzer: BenutzerTyp | null; neu: boolean; onGewaehlt: (id: number | null) => void;
   kennwortAnzeige: Kennwort | null; setKennwortAnzeige: (k: Kennwort | null) => void;
@@ -210,9 +230,13 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
   const { darf } = useAuth();
   const qc = useQueryClient();
   const melden = useHinweis();
+  // Rolle je Firma (Anforderung 11.10.2026): DSKM wie bisher „Rolle“, weitere Firmen darunter
+  const alleFirmen = ich.alle_firmen ?? [];
+  const weitereFirmen = alleFirmen.filter((x) => x.kuerzel !== "dskm");
   const start = (): Formular => benutzer ? {
     titel: benutzer.titel, first_name: benutzer.first_name, last_name: benutzer.last_name, kuerzel: benutzer.kuerzel ?? "",
     funktion: benutzer.funktion, username: benutzer.username, rolle: benutzer.rolle, ist_test: benutzer.ist_test, ohne_login: false,
+    firmenrollen: Object.fromEntries(Object.entries(benutzer.firmenrollen ?? {}).filter(([k]) => k !== "dskm")),
   } : { ...LEER };
   const [f, setF] = useState<Formular>(start);
   const kennwort = kennwortAnzeige && benutzer && kennwortAnzeige.id === benutzer.id ? kennwortAnzeige : null;
@@ -223,7 +247,9 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
   const speichern = useMutation({
     mutationFn: () => {
       // „ohne Login“ gibt es nur beim Anlegen; ein Konto ohne Login hat keine Rolle und keinen Testzugang
-      const { ohne_login, ...felder } = f;
+      const { ohne_login, firmenrollen, ...rest } = f;
+      // Rollen in weiteren Firmen nur, wenn es sie gibt und das Konto ein Login hat
+      const felder = weitereFirmen.length && !ohne_login && !benutzer?.nur_historisch ? { ...rest, firmenrollen } : rest;
       const body = neu ? (ohne_login ? { ...felder, rolle: "keine", ist_test: false, ohne_login: true } : felder)
         : benutzer!.nur_historisch ? { ...felder, rolle: undefined, ist_test: undefined } : felder;
       return neu
@@ -320,11 +346,21 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
         <Feld label="Kürzel" hinweis="erscheint an Einträgen" fehler={fehler.kuerzel}>{(p) => <Eingabe {...p} className="num" maxLength={4} value={f.kuerzel} onChange={set("kuerzel")} />}</Feld>
         <Feld label="Funktion" className="col-span-2" fehler={fehler.funktion}>{(p) => <Eingabe {...p} placeholder="z. B. Ärztin, Ernährungsberaterin" value={f.funktion} onChange={set("funktion")} />}</Feld>
         <Feld label="Benutzername" hinweis="zum Anmelden" fehler={fehler.username}>{(p) => <Eingabe {...p} className="num" autoComplete="off" value={f.username} onChange={set("username")} />}</Feld>
-        <Feld label="Rolle" fehler={fehler.rolle} hinweis={ohneLogin ? "ohne Login: keine Rechte" : undefined}>
-          {(p) => <Auswahl {...p} value={ohneLogin ? "keine" : f.rolle} disabled={ohneLogin}
+        <Feld label={weitereFirmen.length ? `Rolle ${alleFirmen.find((x) => x.kuerzel === "dskm")?.kurzname ?? "DSKM"}` : "Rolle"} fehler={fehler.rolle}
+          hinweis={ohneLogin ? "ohne Login: keine Rechte" : undefined}>
+          {(p) => <Auswahl {...p} value={ohneLogin ? "keine" : f.rolle} disabled={ohneLogin} data-testid="rolle-dskm"
             onChange={(e) => setF({ ...f, rolle: e.target.value, ist_test: TESTBENUTZER_ROLLEN.includes(e.target.value) ? f.ist_test : false })}>
             {Object.entries(ROLLEN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Auswahl>}
         </Feld>
+        {weitereFirmen.map((firma) => (
+          <Feld key={firma.kuerzel} label={`Rolle ${firma.kurzname}`} fehler={fehler.firmenrollen}
+            hinweis={ohneLogin ? undefined : `bei ${firma.name}; „Keine Berechtigung“ = kein Zugang`}>
+            {(p) => <Auswahl {...p} value={ohneLogin ? "keine" : f.firmenrollen[firma.kuerzel] ?? "keine"} disabled={ohneLogin}
+              data-testid={`rolle-${firma.kuerzel}`}
+              onChange={(e) => setF({ ...f, firmenrollen: { ...f.firmenrollen, [firma.kuerzel]: e.target.value } })}>
+              {Object.entries(ROLLEN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Auswahl>}
+          </Feld>
+        ))}
         <div className="col-span-4 flex flex-col gap-1.5">
           {neu ? (
             <label className="flex items-start gap-2 text-sm cursor-pointer">
@@ -462,7 +498,7 @@ export function Benutzer() {
                             onClick={(e) => { e.stopPropagation(); waehlen(b.id); }}>{b.anzeigename}</button>
                           <br /><span className="text-[0.8125rem] gedaempft">{b.funktion ? `${b.funktion} · ` : ""}<span className="num">{b.username}</span></span>
                         </td>
-                        <td className="td"><Chip art={b.rolle === "keine" ? undefined : "akzent"}>{ROLLEN[b.rolle] ?? b.rolle}</Chip>{b.ist_test ? <><br /><Chip art="warn" className="mt-1">Testbenutzer</Chip></> : null}</td>
+                        <td className="td"><RollenChips b={b} />{b.ist_test ? <><br /><Chip art="warn" className="mt-1">Testbenutzer</Chip></> : null}</td>
                         <td className="td text-[0.8125rem]">{b.last_login ? relativ(b.last_login, true) : "noch nie"}<br /><span className="gedaempft">2FA: {b.nur_historisch ? "—" : b.zweiter_faktor ? "aktiv" : b.zweiter_faktor_pflicht ? "nicht eingerichtet (Pflicht)" : "nicht eingerichtet"}</span></td>
                         <td className="td"><Chip art={z.art}>{z.text}</Chip></td>
                       </tr>

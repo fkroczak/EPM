@@ -11,14 +11,14 @@ from rest_framework.response import Response
 
 from accounts.permissions import BerichtFreigabeRecht
 from audit.models import SystemEreignis, protokolliere
-from epm.api_basis import ModelClean, RichText, benutzername
+from epm.api_basis import ModelClean, RichText, benutzername, FirmaFeld
 from patienten.api import AktenEintragViewSet
 from stammdaten.models import Auswahlwert
 
 from .models import Bericht
 
 
-class BerichtSerializer(ModelClean, serializers.ModelSerializer):
+class BerichtSerializer(FirmaFeld, ModelClean, serializers.ModelSerializer):
     inhalt = RichText()
     art_name = serializers.CharField(source="art.wert", read_only=True, default=None)
     status_name = serializers.CharField(source="get_status_display", read_only=True)

@@ -67,6 +67,7 @@ auth = [
     path("2fa/ausschalten/", konto.ZweiterFaktorAusschaltenView.as_view()),
     path("abmelden/", konto.AbmeldenView.as_view()),
     path("ich/", konto.IchView.as_view()),
+    path("firma/", konto.FirmaView.as_view()),
     path("notfallcodes/", konto.NotfallcodesView.as_view()),
     path("sicherheit/", konto.SicherheitView.as_view()),
     # Passkeys (Festlegung 08.10.2026)

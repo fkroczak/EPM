@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const vorher = JSON.stringify(rechteRef.current);
         const s = await pruefen();
         const b = s?.schritt === "fertig" ? s.benutzer : null;
-        if (b && JSON.stringify([b.rechte, b.schreibt_nur_testpatienten, b.ist_test, b.rolle]) !== vorher) void queryClient.invalidateQueries();
+        if (b && JSON.stringify([b.rechte, b.schreibt_nur_testpatienten, b.ist_test, b.rolle, b.firma]) !== vorher) void queryClient.invalidateQueries();
       } finally {
         laeuft = false;
       }
@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [neuLaden, queryClient]);
 
   const ich = status?.schritt === "fertig" ? status.benutzer ?? null : null;
-  rechteRef.current = ich ? [ich.rechte, ich.schreibt_nur_testpatienten, ich.ist_test, ich.rolle] : null;
+  rechteRef.current = ich ? [ich.rechte, ich.schreibt_nur_testpatienten, ich.ist_test, ich.rolle, ich.firma] : null;
   const setIch = useCallback((neu: Ich) => {
     setStatusRoh((s) => (s ? { ...s, benutzer: neu } : s));
     darstellungAnwenden(neu.darstellung);

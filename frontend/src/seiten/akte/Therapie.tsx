@@ -16,6 +16,7 @@ import { Chip, Eingabe, Feld, Karte, Knopf, Laden, Meldung, cx } from "@/compone
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
+import { FirmaMarke } from "@/components/FirmenWahl";
 import { Richtext } from "@/components/Editor";
 import { Bestaetigen } from "@/components/Bestaetigen";
 import { useAkte } from "./Akte";
@@ -151,7 +152,7 @@ function Verlauf() {
               <span className="therapie-punkt" aria-hidden="true"><span className={cx(i === 0 && "erster")} />{i < liste.length - 1 ? <i /> : null}</span>
               <span className="flex flex-col gap-0.5 min-w-0 pb-4">
                 <span>{s.text}</span>
-                <span className="text-[0.75rem] gedaempft">{s.angelegt_von_name ?? ""}</span>
+                <span className="flex items-center gap-1.5 text-[0.75rem] gedaempft"><span>{s.angelegt_von_name ?? ""}</span><FirmaMarke kurz={s.firma_kurz} /></span>
               </span>
               {bearbeiten ? (
                 <button type="button" className="btn geist icon klein !h-7 !w-7 self-start" aria-label={`„${s.text}“ entfernen`}

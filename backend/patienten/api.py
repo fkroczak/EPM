@@ -23,7 +23,7 @@ from accounts.permissions import (AbschlussRecht, AktenRecht, EintragRecht, Loes
                                   WiederOeffnenRecht, recht)
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import (ModelClean, RichText, benutzername, legt_testpatienten_an, patienten_fuer,
-                            patienten_mit_eingeschraenkten, pruefe_schreibbereich, wahr)
+                            patienten_mit_eingeschraenkten, pruefe_schreibbereich, wahr, FirmaFeld)
 from stammdaten.models import Auswahlwert
 
 from audit.bereinigung import akte_text
@@ -68,16 +68,21 @@ class PatientListSerializer(serializers.ModelSerializer):
     ist_eingeschraenkt = serializers.BooleanField(read_only=True)
     alter = serializers.SerializerMethodField()
     kennzahlen = serializers.SerializerMethodField()
+    firmen = serializers.SerializerMethodField()
 
     class Meta:
         model = Patient
         fields = [
-            "id", "nummer", "nachname", "vorname", "geburtsdatum", "alter", "ort", "katheter", "katheter_name",
+            "id", "nummer", "nachname", "vorname", "geburtsdatum", "alter", "ort", "katheter", "katheter_name", "firmen",
             "versorger", "versorger_name", "ansprechpartner", "ansprechpartner_name", "nickelallergie",
             "kein_katheter", "kein_versorger",
             "ist_abgeschlossen", "abgeschlossen_am", "abschluss_anlass", "ist_test", "ist_eingeschraenkt",
             "kennzahlen",
         ]
+
+    def get_firmen(self, obj):
+        """Kürzel der Firmen, denen die Akte gehört (11.10.2026)."""
+        return [z.firma.kuerzel for z in obj.firmenzuordnung.all()]
 
     def get_alter(self, obj):
         heute = timezone.localdate()
@@ -109,6 +114,18 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                                                    allow_null=True, write_only=True)
     aufnahme_gemessen_am = serializers.DateField(required=False, write_only=True)
     aufnahme_quelle = serializers.ChoiceField(Gewichtsmessung.Quelle.choices, required=False, write_only=True)
+    # Firmen der Akte (11.10.2026): geändert wird über POST /api/patienten/{id}/firmen/ bzw. beim Anlegen ``firmen``
+    firmen = serializers.SerializerMethodField()
+    firmen_einwilligung = serializers.SerializerMethodField()
+
+    def get_firmen(self, obj):
+        return [z.firma.kuerzel for z in obj.firmenzuordnung.select_related("firma").order_by("firma__reihenfolge")]
+
+    def get_firmen_einwilligung(self, obj):
+        from .firmen import einwilligung_liegt_vor
+
+        return einwilligung_liegt_vor(obj) if obj.pk else False
+
     # Nur beim Anlegen: Hausarzt aus der Ärzteliste (wird als Zuordnung „Hausarzt“ gespeichert)
     aufnahme_hausarzt = serializers.PrimaryKeyRelatedField(queryset=Arzt.objects.all(), required=False,
                                                            allow_null=True, write_only=True)
@@ -124,7 +141,7 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
             "diagnose", "therapie", "empfehlung", "bemerkung",
             "abgeschlossen_am", "abschluss_anlass", "abschluss_notiz", "ist_abgeschlossen", "ist_test",
             "ist_eingeschraenkt", "eingeschraenkt_am", "aufbewahrung",
-            "angelegt_am", "angelegt_von_name", "geaendert_am", "kopf",
+            "angelegt_am", "angelegt_von_name", "geaendert_am", "kopf", "firmen", "firmen_einwilligung",
             "aufnahme_gewicht_kg", "aufnahme_gemessen_am", "aufnahme_quelle", "aufnahme_hausarzt",
         ]
         read_only_fields = ["abgeschlossen_am", "abschluss_anlass", "abschluss_notiz", "angelegt_am", "geaendert_am",
@@ -393,7 +410,7 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
 
     def get_queryset(self):
         qs = patienten_fuer(self.request.user).select_related("versorger", "ansprechpartner", "katheter",
-                                                              "angelegt_von")
+                                                              "angelegt_von").prefetch_related("firmenzuordnung__firma")
         if self.action == "list":
             qs = qs.annotate(letzter_kontakt=Max("kontakte__zeitpunkt",
                                                  filter=Q(kontakte__storniert_am__isnull=True)))
@@ -461,6 +478,45 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
         if hausarzt is not None:
             PatientArzt.objects.create(patient=patient, arzt=hausarzt, rolle=PatientArzt.Rolle.HAUSARZT,
                                        angelegt_von=self.request.user)
+        # Firmen (11.10.2026): ohne Angabe die aktive; mehrere nur mit Einwilligung (Datum der Unterschrift)
+        firmen = self.request.data.get("firmen")
+        if isinstance(firmen, list) and firmen:
+            self._firmen_setzen(patient, firmen, self.request.data.get("einwilligung_am"))
+
+    def _firmen_setzen(self, patient, firmen, einwilligung):
+        from datetime import date
+
+        from .firmen import FirmenFehler, firmen_setzen
+
+        try:
+            am = date.fromisoformat(str(einwilligung)) if einwilligung else None
+        except ValueError:
+            raise serializers.ValidationError({"einwilligung_am": "Bitte ein gültiges Datum angeben."})
+        if am is not None and am > timezone.localdate():
+            raise serializers.ValidationError({"einwilligung_am": "Das Datum liegt in der Zukunft."})
+        try:
+            neu, weg = firmen_setzen(patient, [str(k) for k in firmen], self.request.user, am)
+        except FirmenFehler as f:
+            raise serializers.ValidationError({f.feld: f.text})
+        if neu or weg:
+            protokolliere(SystemEreignis.Art.AKTE_FIRMEN, self.request, objekt=akte_text(patient),
+                          hinzu=neu, entfernt=weg, patient_id=patient.id)
+        return neu, weg
+
+    @action(detail=True, methods=["post"])
+    def firmen(self, request, pk=None):
+        """Firmen der Akte setzen (Anforderung 11.10.2026): ``{"firmen": ["dskm", "rg"], "einwilligung_am"?: "JJJJ-MM-TT"}``.
+        Mehrere Firmen nur mit erfasster Einwilligung zum Austausch; Recht „Akten bearbeiten“."""
+        patient = self.get_object()
+        if not request.user.hat_recht("akten_bearbeiten"):
+            return Response({"fehler": "Dafür fehlt das Recht „Akten bearbeiten“."}, status=status.HTTP_403_FORBIDDEN)
+        pruefe_schreibbereich(request.user, patient)
+        firmen = request.data.get("firmen") if isinstance(request.data, dict) else None
+        if not isinstance(firmen, list):
+            return Response({"firmen": "Bitte die Firmen als Liste angeben."}, status=status.HTTP_400_BAD_REQUEST)
+        with transaction.atomic():
+            self._firmen_setzen(patient, firmen, request.data.get("einwilligung_am"))
+        return Response(PatientSerializer(patient, context=self.get_serializer_context()).data)
 
     @action(detail=True, methods=["get"])
     def versionen(self, request, pk=None):
@@ -1061,7 +1117,7 @@ class AktenEintragViewSet(viewsets.GenericViewSet):
         patient.pruefe_bearbeitbar()
 
 
-class GewichtSerializer(ModelClean, serializers.ModelSerializer):
+class GewichtSerializer(FirmaFeld, ModelClean, serializers.ModelSerializer):
     erfasst_von_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -1120,7 +1176,7 @@ class WiedervorlageSerializer(serializers.Serializer):
         return datum
 
 
-class KontaktSerializer(serializers.ModelSerializer):
+class KontaktSerializer(FirmaFeld, serializers.ModelSerializer):
     text = RichText(required=True, allow_blank=False)
     erfasst_von_name = serializers.SerializerMethodField()
     storniert_von_name = serializers.SerializerMethodField()
@@ -1211,7 +1267,7 @@ def bestaetigung_angaben(termin, einstellung_an: bool) -> dict:
     }
 
 
-class TerminSerializer(serializers.ModelSerializer):
+class TerminSerializer(FirmaFeld, serializers.ModelSerializer):
     ort_name = serializers.CharField(source="ort.wert", read_only=True, default=None)
     erledigt_von_name = serializers.SerializerMethodField()
     angelegt_von_name = serializers.SerializerMethodField()
@@ -1381,7 +1437,7 @@ class TerminViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.RetrieveM
         return Response(self.get_serializer(termin).data)
 
 
-class DokumentSerializer(serializers.ModelSerializer):
+class DokumentSerializer(FirmaFeld, serializers.ModelSerializer):
     hochgeladen_von_name = serializers.SerializerMethodField()
     # Scans (F163): erkannter Text vorhanden – lesen über /api/dokumente/{id}/text/
     hat_text = serializers.SerializerMethodField()
@@ -1784,7 +1840,7 @@ class _PatientFest:
         return patient
 
 
-class BezugspersonSerializer(_PatientFest, serializers.ModelSerializer):
+class BezugspersonSerializer(FirmaFeld, _PatientFest, serializers.ModelSerializer):
     beziehung_name = serializers.CharField(source="beziehung.wert", read_only=True, default=None)
     angelegt_von_name = serializers.SerializerMethodField()
 
@@ -1826,7 +1882,7 @@ class ArztKurzSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "praxis", "fachrichtung", "strasse", "plz", "ort", "telefon", "fax", "email", "aktiv"]
 
 
-class PatientArztSerializer(_PatientFest, serializers.ModelSerializer):
+class PatientArztSerializer(FirmaFeld, _PatientFest, serializers.ModelSerializer):
     arzt_daten = ArztKurzSerializer(source="arzt", read_only=True)
     rolle_name = serializers.CharField(source="get_rolle_display", read_only=True)
     angelegt_von_name = serializers.SerializerMethodField()
@@ -1872,7 +1928,7 @@ class PatientArztViewSet(_StammEintragViewSet):
         return super().get_queryset().select_related("arzt", "angelegt_von")
 
 
-class DiagnoseSerializer(ModelClean, _PatientFest, serializers.ModelSerializer):
+class DiagnoseSerializer(FirmaFeld, ModelClean, _PatientFest, serializers.ModelSerializer):
     """Diagnose mit ICD-Code und Zusatzkennzeichen (F117)."""
 
     kennzeichen_name = serializers.CharField(source="get_kennzeichen_display", read_only=True)
@@ -1924,7 +1980,7 @@ class DiagnoseViewSet(_StammEintragViewSet):
         self._in_katalog(serializer.instance)
 
 
-class TherapieschrittSerializer(_PatientFest, serializers.ModelSerializer):
+class TherapieschrittSerializer(FirmaFeld, _PatientFest, serializers.ModelSerializer):
     """Schritt im Verlauf der Therapie (Wunsch 10.10.2026)."""
 
     angelegt_von_name = serializers.SerializerMethodField()

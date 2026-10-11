@@ -19,6 +19,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Editor, Richtext } from "@/components/Editor";
 import { PdfDialog } from "@/components/PdfDialog";
 import { Bestaetigen } from "@/components/Bestaetigen";
+import { FirmaMarke } from "@/components/FirmenWahl";
 import { useAkte } from "./Akte";
 import { Aktenseite, Detail, Eintrag, Eintragsliste, useWahl } from "./Aktenseite";
 import { DiagnosenKurz } from "./Diagnosen";
@@ -246,7 +247,7 @@ export function Berichte() {
             {liste.map((b) => (
               <Eintrag key={b.id} aktiv={gewaehlt?.id === b.id} onWahl={() => setWahl(String(b.id))}
                 warnung={b.status === "entwurf"}
-                datum={datum(b.datum)}
+                datum={<>{datum(b.datum)}<FirmaMarke kurz={b.firma_kurz} className="ml-1.5" /></>}
                 merkmal={<Chip art={b.status === "freigegeben" ? "ok" : "warn"} data-testid="bericht-status">{b.status_name}</Chip>}
                 zeile={b.titel}
                 unten={[b.art_name, b.empfaenger ? `an ${b.empfaenger}` : ""].filter(Boolean).join(" · ")} />

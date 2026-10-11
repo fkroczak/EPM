@@ -30,4 +30,13 @@ for name, titel, vor, nach, kuerzel, funktion, rolle, test in KONTEN:
     for i in range(40):
         StaticToken.objects.create(device=geraet, token=f"e2e{i:04d}code")
 
+# Zwei Firmen (11.10.2026): der Testzugang arbeitet auch in der Regeneration Clinic (Umschalter, firmen.spec.ts)
+from accounts.models import Mitgliedschaft  # noqa: E402
+from stammdaten.models import Firma  # noqa: E402
+
+rg = Firma.objects.filter(kuerzel="rg").first()
+if rg:
+    Mitgliedschaft.objects.update_or_create(benutzer=User.objects.get(username="e2e.test"), firma=rg,
+                                            defaults={"rolle": Rolle.MEDIZINER})
+
 print("Testkonten angelegt:", ", ".join(k[0] for k in KONTEN))

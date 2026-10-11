@@ -6,6 +6,8 @@ import uuid
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.db.models import Max
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
@@ -274,14 +276,48 @@ def berechne_trend(messungen, e):
             "vergleich_kg": vergleich[1], "aktuell_kg": letzte_kg}
 
 
+class PatientFirma(models.Model):
+    """Eine Akte gehört einer oder beiden Firmen (Anforderung 11.10.2026). Sichtbar ist sie in jeder Firma, der sie
+    zugeordnet ist – dort mit allen Einträgen. Die zweite Firma kommt nur mit einer erfassten Einwilligung
+    (``Erklaerung.Art.FIRMEN``) dazu; wer wann zugeordnet hat, steht hier, im Verlauf und im Audit-Log."""
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="firmenzuordnung")
+    firma = models.ForeignKey("stammdaten.Firma", on_delete=models.PROTECT, related_name="+")
+    zugeordnet_am = models.DateTimeField(auto_now_add=True)
+    zugeordnet_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                       related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Zuordnung zu einer Firma"
+        verbose_name_plural = "Zuordnungen zu Firmen"
+        constraints = [models.UniqueConstraint(fields=["patient", "firma"], name="patient_einmal_je_firma")]
+
+    def __str__(self):
+        return f"{self.patient} · {self.firma}"
+
+
 class AktenEintrag(models.Model):
-    """Basis für alles, was zu einer Akte gehört: gesperrt, wenn die Akte abgeschlossen ist."""
+    """Basis für alles, was zu einer Akte gehört: gesperrt, wenn die Akte abgeschlossen ist.
+
+    Jeder Eintrag merkt sich, in welcher Firma er erfasst wurde (Anforderung 11.10.2026): Eine Akte, die DSKM und
+    Regeneration Clinic gemeinsam betreuen, zeigt beiden alles – mit der Herkunft je Eintrag."""
+
+    firma = models.ForeignKey("stammdaten.Firma", on_delete=models.PROTECT, null=True, blank=True, related_name="+",
+                              verbose_name="erfasst in Firma")
 
     class Meta:
         abstract = True
 
     def save(self, *args, **kwargs):
         self.patient.pruefe_bearbeitbar()
+        if self._state.adding and self.firma_id is None:
+            from epm.firma import aktive_firma
+
+            firma = aktive_firma()
+            if firma is not None:
+                self.firma = firma
         super().save(*args, **kwargs)
 
 
@@ -740,6 +776,8 @@ class Erklaerung(models.Model):
         DATENSCHUTZINFORMATION = "datenschutzinformation", "Datenschutzinformation"
         EINWILLIGUNG = "einwilligung", "Einwilligung in die Datenverarbeitung"
         SCHWEIGEPFLICHTENTBINDUNG = "schweigepflichtentbindung", "Schweigepflichtentbindung"
+        # Anforderung 11.10.2026: Voraussetzung, um eine Akte beiden Firmen (DSKM und RG) zuzuordnen
+        FIRMEN = "firmen", "Einwilligung Austausch zwischen DSKM und Regeneration Clinic"
 
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="erklaerungen")
     art = models.CharField(max_length=30, choices=Art.choices)
@@ -1053,3 +1091,18 @@ class Ankuendigung(models.Model):
 
     def __str__(self):
         return f"Infoblatt {self.von:%d.%m.%Y}–{self.bis:%d.%m.%Y} vom {self.erstellt_am:%d.%m.%Y}"
+
+
+@receiver(post_save, sender=Patient, dispatch_uid="patient_firma_zuordnen")
+def _neue_akte_der_firma_zuordnen(sender, instance, created, raw=False, **kwargs):
+    """Neue Akten gehören der Firma, in der sie angelegt werden (Anforderung 11.10.2026); ohne aktive Firma
+    (Altdaten-Import, Verwaltungsbefehle) der DSKM – der Import gilt nur für sie."""
+    if not created or raw:
+        return
+    from epm.firma import HAUPTFIRMA, aktive_firma
+    from stammdaten.models import Firma
+
+    firma = aktive_firma() or Firma.objects.filter(kuerzel=HAUPTFIRMA).first()
+    if firma is not None:
+        PatientFirma.objects.get_or_create(patient=instance, firma=firma,
+                                           defaults={"zugeordnet_von_id": instance.angelegt_von_id})
