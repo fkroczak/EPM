@@ -279,3 +279,21 @@ Testläufe vom 11.10.2026 (lokal, PostgreSQL 16, nacheinander):
 - Rollen einer Firma vergibt nur ein Admin dieser Firma (umgesetzt, `BenutzerSerializer._pruefe_firmenhoheit`).
 - WeasyPrint 70 eingespielt; PDF-Tests (165) grün, Infusionsplan und Medikationsplan visuell unverändert.
 - Django-Admin und API-Browseroberfläche: Standard „aus“, auf bestehenden Servern einmalig per `epm-update` abgeschaltet.
+
+## Nachtrag 11.10.2026 (SSH und Firewall aus EPM)
+
+- **SSH nur auf Zeit:** Administration › System › Zugang öffnet SSH für 1, 4 oder 8 Stunden (Passwort und zweiter Faktor,
+  Audit-Log); der Systemagent schließt es danach selbst (ufw-Regeln des SSH-Ports, `ssh.socket`/`ssh.service` aus). Notzugang:
+  Konsole des Hypervisors. Bestehende Server bleiben nach dem Update offen („dauerhaft offen (Ersteinrichtung)“), bis ein
+  Admin SSH in EPM schließt.
+- **Befund: Docker umgeht ufw.** Die ufw-Regel „HTTPS EPM“ filterte Port 443 nie wirksam (DNAT, Weiterleitung statt INPUT);
+  erreichbar war EPM von jeder Adresse, die `EPM_MGMT_IP` erreicht. Abhilfe: „Netzfilter für EPM“ (Kette `EPM-HTTPS` aus
+  `DOCKER-USER`, nur die erlaubten Netze und die Docker-Netze). Auf bestehenden Servern aus, bis ein Admin ihn einschaltet
+  (sonst könnten Geräte aus bisher stillschweigend erlaubten Netzen ausgesperrt werden); auf neuen Servern an.
+- **Erlaubte Netze:** streng geprüft (CIDR, nicht breiter als /8 bzw. /32, kein Loopback/Multicast/reserviert; SSH nie
+  0.0.0.0/0). 0.0.0.0/0 für EPM nur als ausdrückliche Wahl (Testsystem mit Zugang aus dem Internet); der Betrieb ist nur
+  aus dem internen Netz hinter dem VPN vorgesehen. Schutz vor dem Aussperren mit der Adresse, die Nginx weitergibt
+  (`X-Real-IP $remote_addr`, vom Browser nicht zu fälschen).
+- **Agent:** nur Argumentlisten, keine Shell; jede Angabe wird im Agenten noch einmal geprüft. Nicht auf einem echten
+  Server getestet (ufw, iptables, fail2ban, systemd im Test nachgebildet) – nach dem Update auf der Test-VM prüfen.
+

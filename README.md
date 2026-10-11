@@ -34,6 +34,21 @@ gefährliche Aktionen mit Passwort und zweitem Faktor, alles im Audit-Log. SSH b
 Ersteinrichtung des Servers (`rollout/01…05`, `epm-git-einrichten.sh`, einmalig `epm-zertifikat einrichten`) und wenn
 der Systemagent selbst nicht läuft.
 
+### SSH und Firewall (11.10.2026)
+SSH ist im Betrieb geschlossen. Unter **Administration › System › Zugang** öffnet ein Admin es für 1, 4 oder 8 Stunden
+(Passwort und zweiter Faktor, wahlweise nur für die eigene Adresse); danach schließt der Server es selbst. **Notzugang**
+ohne SSH: die Konsole der VM im Hypervisor (z. B. Proxmox/VirtualBox). Dort stehen auch die erlaubten Netze für EPM und
+SSH (Liste in `/etc/epm/zugang.json`), der „Netzfilter für EPM“ (Docker umgeht ufw bei Port 443), die Firewall-Regeln und
+die von Fail2ban gesperrten Adressen.
+
+- **Ersteinrichtung:** `rollout/03-security.sh` lässt SSH dauerhaft offen. Sobald EPM läuft: Administration › System ›
+  Zugang › **Jetzt schließen**. Ein erneuter Lauf von `03-security.sh` trägt die gespeicherten Netze wieder ein
+  (`epm-systemagent zugang-anwenden`) und öffnet SSH wieder dauerhaft.
+- **Bestehende Server:** nach dem Update bleibt SSH offen („dauerhaft offen (Ersteinrichtung)“) – niemand wird
+  ausgesperrt. Bitte einmal schließen; den Netzfilter für EPM nach Prüfung der Netze einschalten.
+- Gedacht ist EPM nur für das interne Netz hinter dem VPN („Nur im VPN erreichbar“). Für ein Testsystem mit Zugang aus
+  dem Internet lässt sich für EPM „Alle Adressen (0.0.0.0/0)“ eintragen; für SSH nie.
+
 Uhrzeit: Zeitzone, Zeitsynchronisation und eigener Zeitserver (ohne Internet z. B. die OPNsense; sonst
 `EPM_NTP_SERVER` in `/etc/epm/epm.conf` bei der Ersteinrichtung) unter Administration › System › Wartung › Uhrzeit.
 

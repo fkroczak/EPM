@@ -32,7 +32,10 @@ MINUTEN_ERLAUBT = (0, 5, 10, 15, 30, 60)
 # Aufträge der Wartung ohne SSH (F179, system/verwaltung_api.py) – eigene Endpunkte, eigene Bereiche der Seite
 VERWALTUNG_AKTIONEN = ("dienst_neustart", "epm_zurueck", "epm_paket", "epm_paket_erstellen", "zertifikat_erneuern",
                        "zertifikat_importieren", "ocr_modelle", "protokoll", "journal_aufraeumen", "images_loeschen",
-                       "uhr_einstellen", "notfallpaket")
+                       "uhr_einstellen", "notfallpaket",
+                       # Zugang (11.10.2026)
+                       "ssh_oeffnen", "ssh_schliessen", "netz_hinzufuegen", "netz_entfernen", "https_filter",
+                       "fail2ban_entsperren")
 # so lange bleibt die Warnung nach dem Beginn stehen (falls der Auftrag sie nicht vorher beendet)
 WARNUNG_NACHLAUF = {"updates_installieren": 60, "server_neustart": 15, "epm_neustart": 5, "wiederherstellen": 30,
                     "dienst_neustart": 5, "epm_zurueck": 15, "epm_paket": 30}
@@ -96,6 +99,22 @@ def auftraege_abgleichen():
                 hinweis_beenden(h)
 
 
+def zugang_ereignisse_uebernehmen(status_host=None):
+    """Vom Server selbst ausgeführtes (SSH nach Ablauf der Zeit geschlossen, 11.10.2026) ins Audit-Log – jedes Ereignis
+    einmal, erkannt an seiner Kennung."""
+    zugang = ((status_host if status_host is not None else host.host_status()) or {}).get("zugang") or {}
+    for e in zugang.get("ereignisse") or []:
+        kennung = e.get("id") if isinstance(e, dict) else None
+        if not isinstance(kennung, str) or not kennung.isalnum() or len(kennung) > 32:
+            continue
+        if SystemEreignis.objects.filter(art=SystemEreignis.Art.SYSTEM, details__ereignis="ssh_automatisch",
+                                         details__kennung=kennung).exists():
+            continue
+        protokolliere(SystemEreignis.Art.SYSTEM, benutzername="systemagent", objekt="SSH", ereignis="ssh_automatisch",
+                      kennung=kennung, ok=bool(e.get("ok")), bis=str(e.get("bis") or "")[:40],
+                      zeit=str(e.get("zeit") or "")[:40], ergebnis=str(e.get("text") or "")[:300])
+
+
 def bestaetigung_pruefen(request, was: str):
     """Admin-Passwort und zweiter Faktor (Authenticator, Notfall-Code oder Passkey), wie beim Wiederherstellen (F63). Ohne
     eingerichteten zweiten Faktor geht es nicht (Festlegung 03.10.2026).
@@ -129,8 +148,10 @@ class UebersichtView(APIView):
     def get(self, request):
         auftraege_abgleichen()
         ordner = host.ordner_auftraege()
+        status_host = host.host_status()
+        zugang_ereignisse_uebernehmen(status_host)
         return Response({
-            "host": host.host_status(),
+            "host": status_host,
             "container": host.container_messung(),
             "agent": {
                 "verzeichnis": ordner.is_dir(),
