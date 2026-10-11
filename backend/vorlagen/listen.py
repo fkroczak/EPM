@@ -88,6 +88,17 @@ def sprechstunde_pdf(patient) -> bytes:
     return pdf
 
 
+# --------------------------------------------------------------------------------------------- Medikationsplan
+def medikationsplan_pdf(patient) -> bytes:
+    """Medikationsplan als PDF (Wunsch 11.10.2026): Dauer- und Bedarfsmedikation mit der aktiven Vorlage."""
+    from .pdf import erzeuge_aus_vorlage, wasserzeichen_fuer
+
+    pdf, _ = erzeuge_aus_vorlage("medikationsplan", Kontext(patient=patient),
+                                 wasserzeichen=wasserzeichen_fuer(patient),
+                                 titel=f"Medikationsplan {patient.nachname}, {patient.vorname}")
+    return pdf
+
+
 # --------------------------------------------------------------------------------------------- Kopie der Akte
 def _e(wert) -> str:
     return html.escape(str(wert)) if wert not in (None, "") else "—"
@@ -153,6 +164,17 @@ def aktenkopie_pdf(patient) -> bytes:
     if schritte:
         teile.append(_abschnitt("Therapie (Verlauf)", _tabelle(["Datum", "Schritt", "Stand"], schritte,
                                                                ["24mm", None, "24mm"])))
+
+    # Medikamentenplan (Wunsch 11.10.2026): auch abgesetzte Medikamente
+    medikamente = [[_e(" ".join(t for t in (m.wirkstoff, m.staerke) if t)), _e(m.handelsname), _e(m.darreichungsform),
+                    _e(m.dosierung or ("bei Bedarf" if m.bedarf else "")), _e(m.grund), _e(datum(m.seit)),
+                    "aktuell" if m.aktiv else _e(f"abgesetzt am {datum(m.abgesetzt_am)}"
+                                                  + (f": {m.absetzgrund}" if m.absetzgrund else ""))]
+                   for m in p.medikamente.order_by("-aktiv", "bedarf", "reihenfolge", "id")]
+    if medikamente:
+        teile.append(_abschnitt("Medikamente", _tabelle(
+            ["Wirkstoff", "Handelsname", "Form", "Dosierung", "Grund", "seit", "Stand"], medikamente,
+            [None, None, "20mm", "28mm", None, "20mm", "30mm"])))
 
     for titel, text in (("Diagnose (Freitext)", p.diagnose), ("Therapie", p.therapie),
                         ("Empfehlung", p.empfehlung), ("Bemerkung", p.bemerkung)):
@@ -265,6 +287,8 @@ BEREICHE = {"stammdaten": "Stammdaten", "diagnose": "Diagnose (Text)", "therapie
             # Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
             "diagnosen": "Diagnose (ICD)", "laborbefunde": "Laborbefund", "bia_messungen": "BIA-Messung",
             "berichte": "Bericht", "therapieschritte": "Therapie (Verlauf)",
+            # Medikamentenplan (Wunsch 11.10.2026)
+            "medikamente": "Medikament",
             # Hinweise stummschalten (Wunsch 07.10.2026, F119)
             "hinweisruhe": "Hinweis stummgeschaltet"}
 

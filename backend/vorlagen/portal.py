@@ -31,6 +31,9 @@ ARTEN = {
                             "Katheter, Therapie, Gewicht.", "Akte › Weitere Aktionen (⋯) › „Akte als PDF“"),
     "sprechstunde": ("plaene", "Der aktuelle Stand für die Sprechstunde: Plan, letztes Labor, BIA und Empfehlung.",
                      "Akte › Weitere Aktionen (⋯) › „Unterlagen für die Sprechstunde“"),
+    "medikationsplan": ("plaene", "Der Medikamentenplan des Patienten zum Mitgeben: Dauer- und Bedarfsmedikation mit "
+                        "Dosierung morgens, mittags, abends und zur Nacht.",
+                        "Akte › Medikamente › „Medikationsplan als PDF“"),
     "bericht": ("plaene", "Aussehen der Berichte, z. B. Fallzusammenfassung oder Arztbrief, als PDF.",
                 "Akte › Berichte › „Freigeben“ legt die PDF in der Akte ab"),
     "datenschutzinformation": ("datenschutz", "Information zum Datenschutz zum Aushändigen an den Patienten.",
@@ -63,7 +66,7 @@ FELD_GRUPPEN = {
     "Vitamine": "Infusionsplan", "Katheterblock": "Infusionsplan", "Gewicht": "Gewicht", "Bericht": "Bericht",
     "Labor": "Labor und BIA", "BIA": "Labor und BIA", "Bezugspersonen": "Datenschutz", "Aufbewahrung": "Datenschutz",
     "Zeitraum": "Infoblatt an die Praxis", "Terminort": "Infoblatt an die Praxis", "Anzahl": "Infoblatt an die Praxis",
-    "Termine": "Infoblatt an die Praxis",
+    "Termine": "Infoblatt an die Praxis", "Medikamente": "Medikamente",
 }
 
 # Kurze Namen der häufigsten Felder in Alltagssprache; die übrigen nehmen ihre Beschreibung aus ``felder.py``

@@ -220,6 +220,10 @@ function GewichtKarte({ startZeitraum = "y1", fuellen }: { startZeitraum?: Zeitr
   );
 }
 
+function medikamenteText(anzahl: number) {
+  return anzahl ? `Medikamentenplan: ${anzahl === 1 ? "1 Medikament" : `${anzahl} Medikamente`}` : "Medikamentenplan: noch kein Medikament";
+}
+
 /** Diagnosen, Therapie und Empfehlung auf einen Blick – je ein Klick in den Reiter (Wunsch 10.10.2026: „einfacher
  *  erreichbar“). Ganz zu lesen und zu bearbeiten in den Reitern. */
 function BehandlungKarte() {
@@ -232,6 +236,10 @@ function BehandlungKarte() {
         <div className="flex items-center justify-between gap-2"><h3 className="lbl m-0 text-[0.8125rem]">Diagnosen</h3>
           <KnopfLink to={`/patienten/${patient.id}/diagnosen`} klein variante="geist" icon={icon}>Diagnosen</KnopfLink></div>
         <DiagnosenKurz patientId={patient.id} />
+        {/* Medikamentenplan (Wunsch 11.10.2026): nur die Zahl, der Plan selbst steht im Reiter */}
+        <Link to={`/patienten/${patient.id}/medikamente`} className="text-[0.8125rem] font-medium self-start" data-testid="medikamente-kurz">
+          {medikamenteText(patient.kopf?.zaehler.medikamente ?? 0)}
+        </Link>
       </section>
       <section className="karten-abschnitt flex flex-col gap-1.5 min-w-0">
         <div className="flex items-center justify-between gap-2"><h3 className="lbl m-0 text-[0.8125rem]">Therapie</h3>

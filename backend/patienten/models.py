@@ -631,6 +631,104 @@ class Diagnose(AktenEintrag):
         return self.anzeige
 
 
+class Medikament(AktenEintrag):
+    """Ein Medikament im Medikamentenplan der Akte (Wunsch 11.10.2026), aufgebaut wie der bundeseinheitliche
+    Medikationsplan: Wirkstoff, Handelsname, Stärke, Form, Dosierung morgens – mittags – abends – zur Nacht, Einheit,
+    Hinweise und Grund. Was nicht in das Schema passt („1× wöchentlich montags“), steht unter ``dosierung_frei``.
+
+    Bedarfsmedikation (``bedarf``) steht im Plan in einem eigenen Abschnitt. Nicht mehr eingenommene Medikamente
+    werden „abgesetzt“ (``aktiv = False`` mit Datum und Grund), nie gelöscht; jede Fassung steht im Verlauf der Akte."""
+
+    # Vorschläge für die Darreichungsform (Freitext bleibt erlaubt)
+    FORMEN = ("Tablette", "Filmtablette", "Kapsel", "Brausetablette", "Tropfen", "Saft", "Pulver", "Injektion",
+              "Infusion", "Pflaster", "Spray", "Zäpfchen", "Salbe")
+    # Vorschläge für die Einheit
+    EINHEITEN = ("Stück", "ml", "Tropfen", "IE", "Hub", "Beutel", "mg", "g")
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="medikamente")
+    wirkstoff = models.CharField(max_length=200)
+    handelsname = models.CharField(max_length=200, blank=True)
+    staerke = models.CharField("Stärke", max_length=60, blank=True, help_text="z. B. 40 mg")
+    darreichungsform = models.CharField(max_length=60, blank=True, help_text="z. B. Tablette, Kapsel, Tropfen")
+    morgens = models.CharField(max_length=10, blank=True, help_text="z. B. 1, ½, 0")
+    mittags = models.CharField(max_length=10, blank=True)
+    abends = models.CharField(max_length=10, blank=True)
+    nachts = models.CharField("zur Nacht", max_length=10, blank=True)
+    dosierung_frei = models.CharField("Dosierung (frei)", max_length=120, blank=True,
+                                      help_text="wenn das Schema nicht passt, z. B. „1× wöchentlich montags“")
+    einheit = models.CharField(max_length=30, blank=True, help_text="z. B. Stück, ml, Tropfen, IE, Hub")
+    bedarf = models.BooleanField("bei Bedarf", default=False)
+    hinweise = models.CharField(max_length=300, blank=True)
+    grund = models.CharField("Behandlungsgrund", max_length=200, blank=True)
+    seit = models.DateField(null=True, blank=True)
+    aktiv = models.BooleanField(default=True)
+    abgesetzt_am = models.DateField(null=True, blank=True)
+    absetzgrund = models.CharField(max_length=200, blank=True)
+    reihenfolge = models.PositiveSmallIntegerField(default=100)
+    angelegt_am = models.DateTimeField(auto_now_add=True)
+    angelegt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+
+    history = HistoricalRecords()
+
+    DOSIERFELDER = ("morgens", "mittags", "abends", "nachts")
+
+    class Meta:
+        verbose_name = "Medikament"
+        verbose_name_plural = "Medikamente"
+        ordering = ["-aktiv", "bedarf", "reihenfolge", "wirkstoff", "id"]
+        indexes = [models.Index(fields=["patient", "aktiv"], name="medikament_patient_aktiv")]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Medikamente werden nicht gelöscht, sondern abgesetzt.")
+
+    @property
+    def schema(self) -> str:
+        """„1 – 0 – 1 – 0“ wie im Medikationsplan; leer, wenn nur frei dosiert ist."""
+        werte = [getattr(self, f) for f in self.DOSIERFELDER]
+        if not any(w.strip() for w in werte):
+            return ""
+        return " – ".join((w.strip() or "0") for w in werte)
+
+    @property
+    def dosierung(self) -> str:
+        """Schema und/oder freie Dosierung in einer Zeile (Verlauf, Karteikarte)."""
+        return " · ".join(t for t in (self.schema, self.dosierung_frei.strip()) if t)
+
+    def clean(self):
+        fehler = {}
+        for feld in ("wirkstoff", "handelsname", "staerke", "darreichungsform", "dosierung_frei", "einheit",
+                     "hinweise", "grund", "absetzgrund", *self.DOSIERFELDER):
+            setattr(self, feld, (getattr(self, feld) or "").strip())
+        if not self.wirkstoff:
+            fehler["wirkstoff"] = "Bitte den Wirkstoff angeben."
+        if not self.bedarf and not self.dosierung_frei and not any(getattr(self, f) for f in self.DOSIERFELDER):
+            fehler["dosierung_frei"] = ("Bitte die Dosierung angeben (morgens, mittags, abends, zur Nacht oder frei) – "
+                                        "oder „bei Bedarf“ wählen.")
+        heute = timezone.localdate()
+        if self.seit and self.seit > heute:
+            fehler["seit"] = "Das Datum liegt in der Zukunft."
+        if not self.aktiv and self.abgesetzt_am is None:
+            self.abgesetzt_am = heute
+        if self.abgesetzt_am and self.abgesetzt_am > heute:
+            fehler["abgesetzt_am"] = "Das Datum liegt in der Zukunft."
+        if self.abgesetzt_am and self.seit and self.abgesetzt_am < self.seit:
+            fehler["abgesetzt_am"] = "Das Absetzen liegt vor dem Beginn."
+        if fehler:
+            raise ValidationError(fehler)
+
+    def save(self, *args, **kwargs):
+        # abgesetzt ohne Datum: heute; wieder angesetzt: Datum und Grund des Absetzens entfallen
+        if not self.aktiv and self.abgesetzt_am is None:
+            self.abgesetzt_am = timezone.localdate()
+        if self.aktiv:
+            self.abgesetzt_am = None
+            self.absetzgrund = ""
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return " ".join(t for t in (self.wirkstoff, self.staerke) if t)
+
+
 def dokument_pfad(patient: Patient, originalname: str) -> str:
     endung = "".join(c for c in (originalname.rsplit(".", 1)[-1] if "." in originalname else "") if c.isalnum())[:10]
     return f"{patient.nummer}/{uuid.uuid4().hex}{'.' + endung.lower() if endung else ''}"

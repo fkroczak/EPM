@@ -414,6 +414,25 @@ SPRECHSTUNDE = {
                             _bia(lambda b: b.beurteilung or None), html=True),
 }
 
+def _medikamente(k, bedarf: bool):
+    """Aktuelle Medikamente der Akte (Wunsch 11.10.2026): Dauer- bzw. Bedarfsmedikation in der Reihenfolge des Plans."""
+    if not k.patient.pk:
+        return []
+    alle = k.merke("medikamente", lambda: list(k.patient.medikamente.filter(aktiv=True)
+                                                .order_by("reihenfolge", "wirkstoff", "id")))
+    return [m for m in alle if m.bedarf == bedarf]
+
+
+# Medikationsplan (Wunsch 11.10.2026): Patient, Absender und die Medikamente als Tabellen
+MEDIKATIONSPLAN = {
+    **GEMEINSAM,
+    "Patient.Hausarzt": PATIENTENDATENBLATT["Patient.Hausarzt"],
+    "Patient.Nickelallergie": PATIENTENDATENBLATT["Patient.Nickelallergie"],
+    "Gewicht.aktuell": PATIENTENDATENBLATT["Gewicht.aktuell"],
+    "Medikamente.Anzahl": Feld("Zahl der aktuellen Medikamente (Dauer- und Bedarfsmedikation)",
+                               lambda k: str(len(_medikamente(k, False)) + len(_medikamente(k, True)))),
+}
+
 # Schreiben aus der Akte (F172)
 PATIENTENAUFNAHME = {**GEMEINSAM, **ANSCHREIBEN}
 TERMINBESTAETIGUNG = {**GEMEINSAM, **ANSCHREIBEN, **TERMIN}
@@ -462,10 +481,14 @@ class JeArt(dict):
 FELDER = {"infusionsplan": INFUSIONSPLAN, "patientendatenblatt": PATIENTENDATENBLATT,
           "datenschutzinformation": ERKLAERUNG, "einwilligung": ERKLAERUNG, "schweigepflichtentbindung": ERKLAERUNG,
           "firmen": ERKLAERUNG,
-          "bericht": BERICHT, "sprechstunde": SPRECHSTUNDE,
+          "bericht": BERICHT, "sprechstunde": SPRECHSTUNDE, "medikationsplan": MEDIKATIONSPLAN,
           "patientenaufnahme": PATIENTENAUFNAHME, "terminbestaetigung": TERMINBESTAETIGUNG,
           "reisebescheinigung": REISEBESCHEINIGUNG, "patientenankuendigung": ANKUENDIGUNG}
 FELDER = JeArt(FELDER, EIGEN)
+
+MEDIKAMENT_SPALTEN = ["Wirkstoff", "Handelsname", "Stärke", "Form", "Mo", "Mi", "Ab", "Zn", "Einheit", "Hinweise",
+                      "Grund"]
+MEDIKAMENT_AUSRICHTUNG = ["", "handel", "knapp", "form", "dosis", "dosis", "dosis", "dosis", "einheit", "", "grund"]
 
 # Tabellen mit festem Aufbau je Art (Spalten stehen fest, damit nichts Falsches gedruckt werden kann).
 # (Name, Spalten, Ausrichtung je Spalte): "zahl" rechtsbündig, "einheit" schmal und grau – wie im Laborbefund.
@@ -494,6 +517,13 @@ TABELLEN = {
                             ["Bestandteil", "Menge", "Einheit", "Präparat"], ["", "zahl", "einheit", ""]),
         "bilanz": ("Laufzeit und Volumen (Mischbeutel, Zusatzlösung, Gesamt)",
                    ["", "Mischbeutel", "Zusatzlösung", "Gesamt", ""], ["", "zahl", "zahl", "zahl", "einheit"]),
+    },
+    # Medikamentenplan (Wunsch 11.10.2026), Spalten wie im bundeseinheitlichen Medikationsplan
+    "medikationsplan": {
+        "medikamente": ("Dauermedikation (Wirkstoff, Handelsname, Stärke, Form, Mo–Mi–Ab–Zn, Einheit, Hinweise, Grund)",
+                        MEDIKAMENT_SPALTEN, MEDIKAMENT_AUSRICHTUNG),
+        "bedarfsmedikation": ("Bedarfsmedikation (wie die Dauermedikation; Dosierung je Gabe)",
+                              MEDIKAMENT_SPALTEN, MEDIKAMENT_AUSRICHTUNG),
     },
     "patientenaufnahme": {}, "terminbestaetigung": {},
     "reisebescheinigung": {
@@ -560,6 +590,14 @@ def tabellenzeilen(art: str, quelle: str, k: Kontext) -> list[list[str]]:
             return []
         eintraege = k.merke("diagnosen", lambda: list(k.patient.diagnosen.filter(aktiv=True)))
         return [[d.bezeichnung, f"{d.icd_code}{d.kennzeichen}", datum(d.seit) or "—"] for d in eintraege]
+    if quelle in ("medikamente", "bedarfsmedikation"):
+        zeilen = []
+        for m in _medikamente(k, quelle == "bedarfsmedikation"):
+            hinweise = " · ".join(t for t in (m.dosierung_frei, m.hinweise) if t)
+            zeilen.append([m.wirkstoff, m.handelsname or "—", m.staerke or "—", m.darreichungsform or "—",
+                           *((getattr(m, f) or ("0" if m.schema else "")) for f in m.DOSIERFELDER),
+                           m.einheit or "", hinweise or "—", m.grund or "—"])
+        return zeilen
     if quelle == "labor":
         if k.labor is None:
             return []

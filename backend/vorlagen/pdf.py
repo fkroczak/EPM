@@ -87,6 +87,15 @@ table { width: 100%%; border-collapse: collapse; }
 .befund td.leer { font-style: italic; }
 .befund .wert p { margin: 0 0 1mm 0; }
 .bilanz .zahl { width: 30mm; }
+/* Medikationsplan: Dosierung morgens – mittags – abends – zur Nacht schmal und mittig */
+.befund .dosis { text-align: center; width: 6mm; padding-left: 0.8mm; padding-right: 0.8mm; white-space: nowrap; }
+/* Hinweise erhalten den meisten Platz; Stärke, Form und Einheit brechen nicht um */
+.medikamente { font-size: 0.88em; }
+.medikamente td, .medikamente th { padding-left: 1.4mm; padding-right: 1.4mm; }
+.medikamente .b { width: 24mm; }
+.medikamente .handel { width: 18mm; }
+.medikamente :is(.knapp, .form, .einheit) { width: auto; white-space: nowrap; }
+.medikamente .grund { width: 18mm; }
 /* zwei Blöcke nebeneinander */
 .paar { display: flex; justify-content: space-between; align-items: flex-start; }
 .paar .b, .paar .befund .b { width: auto; white-space: nowrap; }
@@ -423,7 +432,8 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | 
             kopfzeile = "".join(f'<th class="{k.strip()}">{html.escape(s)}</th>' for s, k in zip(spalten, klassen))
             koerper = ("".join("<tr>" + "".join(zelle(z, k) for z, k in zip(zeile, klassen)) + "</tr>" for zeile in zeilen)
                        or f'<tr><td class="leer" colspan="{len(spalten)}">keine Einträge</td></tr>')
-            art_klasse = "befund bilanz" if quelle == "bilanz" else "befund"
+            art_klasse = {"bilanz": "befund bilanz", "medikamente": "befund medikamente",
+                          "bedarfsmedikation": "befund medikamente"}.get(quelle, "befund")
             teile.append(f'<div class="{_klassen(b)}{karte}">{kopf}<table class="{art_klasse}"><thead><tr>{kopfzeile}</tr></thead>'
                          f"<tbody>{koerper}</tbody></table></div>")
         elif typ == "trennlinie":

@@ -19,6 +19,8 @@ class Dokumentvorlage(models.Model):
         # Wünsche aus der Praxis vom 06.10.2026: Berichte aus der Akte (F115) und das Sprechstundenblatt (F116)
         BERICHT = "bericht", "Bericht"
         SPRECHSTUNDE = "sprechstunde", "Unterlagen für die Sprechstunde"
+        # Medikamentenplan der Akte (Wunsch 11.10.2026)
+        MEDIKATIONSPLAN = "medikationsplan", "Medikationsplan"
         # Schreiben mit E-Mail-Text (Vorlagen von Alice Hessel, 09.10.2026): aus der Akte (F172) bzw. aus dem
         # Kalender für alle Termine eines Zeitraums (F173)
         PATIENTENAUFNAHME = "patientenaufnahme", "Patientenaufnahme (benötigte Unterlagen)"

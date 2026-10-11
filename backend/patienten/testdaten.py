@@ -3,8 +3,8 @@ Musterdaten: Auswahllisten, Präparate, Testversorger, Testbenutzer und Testpati
 
 Alles ist wiederholbar (legt nur an, was fehlt). Testpatienten tragen ist_test=True und
 Nummern ab 9001, zählen in keiner Statistik und sind für den Testbenutzer die einzigen
-sichtbaren Akten. Alle Namen sind frei erfunden. Seit dem Wunsch 11.10.2026 mit Diagnosen, Laborbefunden und
-BIA-Messungen (TEST_DIAGNOSEN, TEST_LABOR, TEST_BIA).
+sichtbaren Akten. Alle Namen sind frei erfunden. Seit dem Wunsch 11.10.2026 mit Diagnosen, Medikamenten,
+Laborbefunden und BIA-Messungen (TEST_DIAGNOSEN, TEST_MEDIKAMENTE, TEST_LABOR, TEST_BIA).
 """
 import random
 from datetime import date, datetime, time, timedelta
@@ -252,6 +252,29 @@ TEST_DIAGNOSEN = {
         ("Erhebliche Energie- und Eiweißmangelernährung", "E43", "Z", 1400, "Darmfunktion wieder ausreichend", 30)],
 }
 
+# Medikamentenplan (Wunsch 11.10.2026): (Wirkstoff, Handelsname, Stärke, Form, (Mo, Mi, Ab, Zn), Dosierung frei,
+# Einheit, bei Bedarf, Hinweise, Grund, seit (Tage), abgesetzt vor (Tage) oder None, Absetzgrund)
+TEST_MEDIKAMENTE = {
+    0: [("Pantoprazol", "Pantozol", "40 mg", "Tablette", ("1", "0", "0", "0"), "", "Stück", False,
+         "30 min vor dem Frühstück", "Magenschutz", 900, None, ""),
+        ("Colecalciferol", "Dekristol", "20 000 IE", "Kapsel", ("", "", "", ""), "1× wöchentlich montags", "Stück",
+         False, "", "Vitamin-D-Mangel", 300, None, ""),
+        ("Loperamid", "Imodium akut", "2 mg", "Kapsel", ("1", "", "", ""), "", "Stück", True,
+         "nach jedem ungeformten Stuhl, höchstens 6 am Tag", "Durchfall", 800, None, ""),
+        ("Metoclopramid", "MCP", "10 mg", "Tablette", ("1", "1", "1", "0"), "", "Stück", False, "", "Übelkeit",
+         200, 60, "keine Übelkeit mehr")],
+    1: [("Budesonid", "Entocort", "3 mg", "Kapsel", ("3", "0", "0", "0"), "", "Stück", False, "", "Morbus Crohn",
+         400, None, ""),
+        ("Colestyramin", "Quantalan", "4 g", "Pulver", ("1", "0", "1", "0"), "", "Beutel", False,
+         "mit Abstand von 4 h zu anderen Medikamenten", "chologene Diarrhö", 250, None, ""),
+        ("Metamizol", "Novalgin", "500 mg", "Tropfen", ("20", "", "", ""), "", "Tropfen", True,
+         "höchstens 4× am Tag", "Schmerzen", 100, None, "")],
+    3: [("Teduglutid", "Revestive", "5 mg", "Injektion", ("", "", "", ""), "1× täglich subkutan", "", False,
+         "Injektionsstelle wechseln", "Kurzdarmsyndrom", 180, None, ""),
+        ("Pantoprazol", "Pantozol", "40 mg", "Tablette", ("1", "0", "1", "0"), "", "Stück", False, "",
+         "Hypersekretion", 1500, None, "")],
+}
+
 # Laborparameter mit üblichem Wert und Referenzbereich, wie ihn das Labor auf dem Befund angibt. Der Katalog selbst
 # bleibt ohne Referenzbereich (U44) – die Werte stehen je Zeile wie bei einem abgeschriebenen Befund.
 # Name wie im Katalog: (üblicher Wert, Referenz von, Referenz bis, Nachkommastellen)
@@ -361,6 +384,22 @@ def _diagnosen(patient, user, heute, eintraege):
         d.full_clean()
         d.save()
         Diagnosevorlage.objects.get_or_create(icd_code=d.icd_code, bezeichnung=d.bezeichnung)
+
+
+def _medikamente(patient, user, heute, eintraege):
+    """Medikamentenplan mit denselben Regeln wie über die API (``full_clean``)."""
+    from .models import Medikament
+
+    for nr, (wirkstoff, handel, staerke, form, (mo, mi, ab, zn), frei, einheit, bedarf, hinweise, grund, seit,
+             abgesetzt, absetzgrund) in enumerate(eintraege):
+        m = _nutzer(user, Medikament(
+            patient=patient, wirkstoff=wirkstoff, handelsname=handel, staerke=staerke, darreichungsform=form,
+            morgens=mo, mittags=mi, abends=ab, nachts=zn, dosierung_frei=frei, einheit=einheit, bedarf=bedarf,
+            hinweise=hinweise, grund=grund, seit=heute - timedelta(days=seit), reihenfolge=(nr + 1) * 10,
+            aktiv=abgesetzt is None, abgesetzt_am=heute - timedelta(days=abgesetzt) if abgesetzt is not None else None,
+            absetzgrund=absetzgrund, angelegt_von=user))
+        m.full_clean()
+        m.save()
 
 
 def _laborbefunde(patient, user, heute, rnd, daten):
@@ -561,6 +600,7 @@ def testpatienten_anlegen() -> int:
     for i, pat, profil in angelegt:
         token = in_firma(i)
         _diagnosen(pat, user, heute, TEST_DIAGNOSEN.get(i, []))
+        _medikamente(pat, user, heute, TEST_MEDIKAMENTE.get(i, []))
         if i in TEST_LABOR:
             _laborbefunde(pat, user, heute, rnd, TEST_LABOR[i])
         _bia_messungen(pat, user, heute, TEST_BIA.get(i, []))

@@ -35,7 +35,7 @@ from .kennzahlen import (abschluss_pruefen, befund_filter, kennzahlen, kontakt_f
                          schnellfilter, zaehler)
 from .loeschung import PLATZHALTER, schwaerze_dokument, trage_ein
 from .models import (Bezugsperson, Datenschutzanfrage, Diagnose, Dokument, DokumentVorgang, Erklaerung, Therapieschritt,
-                     Gewichtsmessung, Hinweisruhe, Kontakt, Patient, PatientArzt, Termin, dokument_pfad,
+                     Gewichtsmessung, Hinweisruhe, Kontakt, Medikament, Patient, PatientArzt, Termin, dokument_pfad,
                      plus_monate, sichtbare_termine)
 
 
@@ -221,6 +221,8 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                 "erklaerungen": obj.erklaerungen.count(),
                 # eigene Reiter seit 07.10.2026 (F121): Zähler für Diagnosen, Labor, BIA und Berichte
                 "diagnosen": obj.diagnosen.filter(aktiv=True).count(),
+                # Medikamentenplan (Wunsch 11.10.2026): Zähler der aktuell eingenommenen Medikamente
+                "medikamente": obj.medikamente.filter(aktiv=True).count(),
                 "laborbefunde": obj.laborbefunde.count(),
                 "bia_messungen": obj.bia_messungen.count(),
                 "berichte": obj.berichte.count(),
@@ -714,6 +716,19 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
             antwort["X-EPM-Dokument"] = str(abgelegt.pk)
         return antwort
 
+    @action(detail=True, methods=["get"], url_path="medikationsplan-pdf")
+    def medikationsplan_pdf(self, request, pk=None):
+        """Medikationsplan als PDF (Wunsch 11.10.2026): Dauer- und Bedarfsmedikation der Akte mit der aktiven
+        Vorlage „Medikationsplan“, auch für abgeschlossene Akten."""
+        from vorlagen.api import pdf_antwort
+        from vorlagen.listen import medikationsplan_pdf
+
+        patient = self.get_object()
+        pdf = medikationsplan_pdf(patient)
+        protokolliere(SystemEreignis.Art.EXPORT, request, objekt=akte_text(patient), was="Medikationsplan",
+                      patient_id=patient.id)
+        return pdf_antwort(pdf, f"Medikationsplan-{patient.nummer}-{timezone.localdate():%Y-%m-%d}.pdf")
+
     @action(detail=True, methods=["post"], permission_classes=[EintragRecht])
     def schreiben(self, request, pk=None):
         """Schreiben an den Patienten aus einer Dokumentvorlage (F172): Patientenaufnahme, Terminbestätigung,
@@ -792,7 +807,7 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
 
         Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, bemerkung, gewichte, kontakte, termine,
         dokumente, infusionsplaene, bezugspersonen, aerzte, erklaerungen, datenschutz, diagnosen, laborbefunde,
-        bia_messungen, berichte, hinweisruhe, therapieschritte; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
+        bia_messungen, berichte, hinweisruhe, therapieschritte, medikamente; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
         die Bereiche Stammdaten, Diagnose, Therapie, Empfehlung und Bemerkung verteilt.
         """
         patient = self.get_object()
@@ -848,6 +863,8 @@ def _aktion(name, h, aenderungen):
         return "wieder zutreffend" if h.aktiv else "nicht mehr zutreffend"
     if name == "therapieschritte" and "aktiv" in felder:
         return "wieder aufgenommen" if h.aktiv else "entfernt"
+    if name == "medikamente" and "aktiv" in felder:
+        return "wieder angesetzt" if h.aktiv else "abgesetzt"
     if name == "berichte" and "status" in felder:
         return "freigegeben" if h.status == "freigegeben" else "geändert"
     if name == "stammdaten" and "abgeschlossen_am" in felder:
@@ -940,6 +957,14 @@ def _beschreibung(name, h, aktion) -> str:
             if h.notiz:
                 teile.append(h.notiz)
             return " · ".join(teile)
+        if name == "medikamente":
+            teile = [" ".join(t for t in (h.wirkstoff, h.staerke, f"({h.handelsname})" if h.handelsname else "") if t)]
+            schema = " – ".join((w.strip() or "0") for w in (h.morgens, h.mittags, h.abends, h.nachts)) \
+                if any(w.strip() for w in (h.morgens, h.mittags, h.abends, h.nachts)) else ""
+            teile += [t for t in (schema, h.dosierung_frei, "bei Bedarf" if h.bedarf else "", h.grund) if t]
+            if not h.aktiv and h.abgesetzt_am:
+                teile.append(f"abgesetzt am {h.abgesetzt_am:%d.%m.%Y}" + (f": {h.absetzgrund}" if h.absetzgrund else ""))
+            return " · ".join(teile)
         if name == "hinweisruhe":
             wann = f"bis {h.bis:%d.%m.%Y}" if h.bis else "bis auf Weiteres (nicht mehr nötig)"
             return " · ".join(filter(None, [dict(Hinweisruhe.Art.choices).get(h.art, h.art), wann, h.grund]))
@@ -1002,6 +1027,8 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         # Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
         "diagnosen": Diagnose.history.filter(patient_id=patient.id),
         "therapieschritte": Therapieschritt.history.filter(patient_id=patient.id),
+        # Medikamentenplan (Wunsch 11.10.2026)
+        "medikamente": Medikament.history.filter(patient_id=patient.id),
         "hinweisruhe": Hinweisruhe.history.filter(patient_id=patient.id),
         "laborbefunde": Laborbefund.history.filter(patient_id=patient.id),
         "bia_messungen": BiaMessung.history.filter(patient_id=patient.id),
@@ -1978,6 +2005,83 @@ class DiagnoseViewSet(_StammEintragViewSet):
     def perform_update(self, serializer):
         super().perform_update(serializer)
         self._in_katalog(serializer.instance)
+
+
+class MedikamentSerializer(FirmaFeld, ModelClean, _PatientFest, serializers.ModelSerializer):
+    """Medikament im Medikamentenplan (Wunsch 11.10.2026). ``aktiv: false`` setzt ab (Datum heute, wenn keins
+    angegeben ist), ``aktiv: true`` setzt wieder an."""
+
+    schema = serializers.CharField(read_only=True)
+    dosierung = serializers.CharField(read_only=True)
+    angelegt_von_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Medikament
+        fields = ["id", "patient", "wirkstoff", "handelsname", "staerke", "darreichungsform", "morgens", "mittags",
+                  "abends", "nachts", "dosierung_frei", "einheit", "bedarf", "hinweise", "grund", "seit", "aktiv",
+                  "abgesetzt_am", "absetzgrund", "reihenfolge", "schema", "dosierung", "angelegt_am",
+                  "angelegt_von_name"]
+        read_only_fields = ["angelegt_am"]
+
+    def get_angelegt_von_name(self, obj):
+        return benutzername(obj.angelegt_von)
+
+    def validate(self, attrs):
+        # Freitexte getrimmt speichern (``ModelClean`` prüft nur, gespeichert wird der Serializer-Wert)
+        for feld, wert in attrs.items():
+            if isinstance(wert, str):
+                attrs[feld] = wert.strip()
+        return super().validate(attrs)
+
+
+class MedikamentViewSet(_StammEintragViewSet):
+    """Medikamentenplan eines Patienten: ``?patient=ID&aktiv=true``. Kein Löschen – Medikamente werden abgesetzt
+    (``POST …/absetzen/``) und bei Bedarf wieder angesetzt (``POST …/ansetzen/``); jede Fassung steht im Verlauf."""
+
+    model = Medikament
+    serializer_class = MedikamentSerializer
+    filterset_fields = ["patient", "aktiv", "bedarf"]
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("angelegt_von")
+
+    def _speichern(self, medikament):
+        try:
+            medikament.full_clean(exclude=["patient", "angelegt_von", "firma"])
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.message_dict)
+        medikament._history_user = self.request.user
+        medikament.save()
+        return Response(self.get_serializer(medikament).data)
+
+    @action(detail=True, methods=["post"])
+    def absetzen(self, request, pk=None):
+        """``{"absetzgrund"?, "abgesetzt_am"?: "JJJJ-MM-TT"}`` – ohne Datum gilt heute."""
+        m = self.get_object()
+        self.pruefe_patient(m.patient)
+        if not m.aktiv:
+            return Response({"fehler": "Dieses Medikament ist bereits abgesetzt."}, status=status.HTTP_400_BAD_REQUEST)
+        datum = serializers.DateField(allow_null=True, required=False)
+        try:
+            am = datum.to_internal_value(request.data["abgesetzt_am"]) if request.data.get("abgesetzt_am") else None
+        except serializers.ValidationError as e:
+            return Response({"abgesetzt_am": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+        m.aktiv = False
+        m.abgesetzt_am = am or timezone.localdate()
+        m.absetzgrund = str(request.data.get("absetzgrund") or "").strip()[:200]
+        return self._speichern(m)
+
+    @action(detail=True, methods=["post"])
+    def ansetzen(self, request, pk=None):
+        """Ein abgesetztes Medikament wieder in den Plan nehmen."""
+        m = self.get_object()
+        self.pruefe_patient(m.patient)
+        if m.aktiv:
+            return Response({"fehler": "Dieses Medikament steht bereits im Plan."}, status=status.HTTP_400_BAD_REQUEST)
+        m.aktiv = True
+        m.abgesetzt_am = None
+        m.absetzgrund = ""
+        return self._speichern(m)
 
 
 class TherapieschrittSerializer(FirmaFeld, _PatientFest, serializers.ModelSerializer):

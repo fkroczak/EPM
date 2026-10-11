@@ -72,6 +72,8 @@ class Vorlagen(Grundlage):
                          [("infusionsplan", 1, None), ("patientendatenblatt", 1, None),
                           # Wünsche aus der Praxis vom 06.10.2026 (F115, F116)
                           ("bericht", 1, None), ("sprechstunde", 1, None),
+                          # Medikamentenplan (Wunsch 11.10.2026)
+                          ("medikationsplan", 1, None),
                           # Schreiben mit E-Mail-Text (Vorlagen von Alice Hessel, 09.10.2026; F172, F173)
                           ("patientenaufnahme", 1, None), ("terminbestaetigung", 1, None),
                           ("reisebescheinigung", 1, None), ("patientenankuendigung", 1, None),

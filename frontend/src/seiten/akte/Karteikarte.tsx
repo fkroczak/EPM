@@ -12,17 +12,17 @@ import { useQuery } from "@tanstack/react-query";
 import { abfrage, alle, api } from "@/lib/api";
 import { datum, kg, uhrzeit, zahl } from "@/lib/format";
 import { GEWICHTSQUELLEN, TERMINARTEN } from "@/lib/typen";
-import type { Bericht, BiaMessung, Diagnose, Dokument, Gewicht, Kontakt, Laborbefund, Plan, Termin } from "@/lib/typen";
+import type { Bericht, BiaMessung, Diagnose, Dokument, Gewicht, Kontakt, Laborbefund, Medikament, Plan, Termin } from "@/lib/typen";
 import { Auswahl, Chip, Karte, Laden, Leer, cx } from "@/components/ui/basis";
 import { klartext } from "@/components/Editor";
 import { FirmaMarke } from "@/components/FirmenWahl";
 import { useAkte } from "./Akte";
 
-type Art = "K" | "G" | "T" | "P" | "L" | "D" | "DOK" | "B";
+type Art = "K" | "G" | "T" | "P" | "L" | "D" | "M" | "DOK" | "B";
 
 const ARTEN: { art: Art; text: string }[] = [
   { art: "K", text: "Kontakte" }, { art: "G", text: "Gewicht" }, { art: "T", text: "Termine" }, { art: "P", text: "Pläne" },
-  { art: "L", text: "Labor und BIA" }, { art: "D", text: "Diagnosen" }, { art: "DOK", text: "Dokumente" }, { art: "B", text: "Berichte" },
+  { art: "L", text: "Labor und BIA" }, { art: "D", text: "Diagnosen" }, { art: "M", text: "Medikamente" }, { art: "DOK", text: "Dokumente" }, { art: "B", text: "Berichte" },
 ];
 
 const ZEITRAEUME: Record<string, { text: string; monate: number | null }> = {
@@ -85,9 +85,10 @@ export function Karteikarte() {
   const labor = useQuery({ queryKey: schluessel("labor"), queryFn: () => api<Laborbefund[]>(`laborbefunde/?patient=${patient.id}`), ...nebenbei });
   const bia = useQuery({ queryKey: schluessel("bia"), queryFn: () => api<BiaMessung[]>(`bia-messungen/?patient=${patient.id}`), ...nebenbei });
   const diagnosen = useQuery({ queryKey: schluessel("diagnosen"), queryFn: () => api<Diagnose[]>(`diagnosen/?patient=${patient.id}`), ...nebenbei });
+  const medikamente = useQuery({ queryKey: schluessel("medikamente"), queryFn: () => api<Medikament[]>(`medikamente/?patient=${patient.id}`), ...nebenbei });
   const dokumente = useQuery({ queryKey: schluessel("dokumente"), queryFn: () => alle<Dokument>(`dokumente/${abfrage({ patient: patient.id, ausgeblendet: "false" })}`), ...nebenbei });
   const berichte = useQuery({ queryKey: schluessel("berichte"), queryFn: () => api<Bericht[]>(`berichte/?patient=${patient.id}`), ...nebenbei });
-  const quellen = [kontakte, gewichte, termine, plaene, labor, bia, diagnosen, dokumente, berichte];
+  const quellen = [kontakte, gewichte, termine, plaene, labor, bia, diagnosen, medikamente, dokumente, berichte];
   const laedt = quellen.some((q) => q.isLoading);
   const fehlen = quellen.filter((q) => q.isError).length;
 
@@ -149,6 +150,16 @@ export function Karteikarte() {
         person: d.angelegt_von_name, durchgestrichen: !d.aktiv, zu: `${basis}/diagnosen?eintrag=${d.id}`,
       });
     }
+    // Medikamentenplan (Wunsch 11.10.2026): angesetzt am „seit“-Tag, abgesetzte durchgestrichen
+    for (const m of medikamente.data ?? []) {
+      e.push({
+        schluessel: `m${m.id}`, firma: m.firma_kurz, art: "M", kuerzel: "M", wann: m.seit ?? m.angelegt_am,
+        text: `${[m.wirkstoff, m.staerke].filter(Boolean).join(" ")}${m.handelsname ? ` (${m.handelsname})` : ""}`
+          + ` · ${m.dosierung || (m.bedarf ? "bei Bedarf" : "")}${m.bedarf && m.dosierung ? " bei Bedarf" : ""}`,
+        zusatz: m.aktiv ? (m.grund || undefined) : `abgesetzt${m.abgesetzt_am ? ` am ${datum(m.abgesetzt_am)}` : ""}${m.absetzgrund ? ` – ${m.absetzgrund}` : ""}`,
+        person: m.angelegt_von_name, durchgestrichen: !m.aktiv, zu: `${basis}/medikamente?eintrag=${m.id}`,
+      });
+    }
     for (const d of dokumente.data ?? []) {
       e.push({
         schluessel: `o${d.id}`, firma: d.firma_kurz, art: "DOK", kuerzel: "DOK", wann: d.datum ?? d.hochgeladen_am,
@@ -165,7 +176,7 @@ export function Karteikarte() {
     }
     // neueste zuerst; am selben Tag Einträge mit Uhrzeit vor denen ohne
     return e.sort((a, b) => b.wann.localeCompare(a.wann));
-  }, [basis, kontakte.data, gewichte.data, termine.data, plaene.data, labor.data, bia.data, diagnosen.data, dokumente.data, berichte.data]);
+  }, [basis, kontakte.data, gewichte.data, termine.data, plaene.data, labor.data, bia.data, diagnosen.data, medikamente.data, dokumente.data, berichte.data]);
 
   const ab = grenze(ZEITRAEUME[zeitraum].monate);
   const sichtbar = eintraege.filter((e) => (!filter || e.art === filter) && (!ab || nurDatum(e.wann) >= ab));
