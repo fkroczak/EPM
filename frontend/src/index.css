@@ -9,6 +9,7 @@
 @theme inline {
   --color-grund: var(--grund);
   --color-flaeche: var(--flaeche);
+  --color-leiste: var(--leiste);
   --color-tinte: var(--tinte);
   --color-text2: var(--text2);
   --color-gedaempft: var(--gedaempft);
@@ -45,6 +46,8 @@
   /* Standard: Stiftungsfarben */
   --grund: #f3f4f6;
   --flaeche: #ffffff;
+  /* Seitenleiste, Kopfzeile und Menüleisten (je Firma eingefärbt, 11.10.2026) */
+  --leiste: var(--flaeche);
   --eingabe: #ffffff;
   --tinte: #1b1932;
   --text2: #3b3953;
@@ -112,6 +115,44 @@
   --ok-bg: #304a3c;
   --auf-ok: #1f2022;
   color-scheme: dark;
+}
+
+/* Regeneration Clinic (Wunsch 11.10.2026): eigene Farbwelt nach dem Auftritt der Klinik – Salbeigrün (#BEC9C3) für
+   Leisten und Menüs, Anthrazit (#23262B) als Akzent. So ist immer zu sehen, für welche Firma gerade gearbeitet wird.
+   Gilt für „Standard“; „Dunkel“ und „Hoher Kontrast“ bekommen eine salbeigrüne Leiste, „Individuell“ eine in der
+   gewählten Akzentfarbe getönte. */
+:root[data-firma="rg"][data-schema="standard"] {
+  --grund: #eef1ef;
+  --tinte: #23262b;
+  --text2: #3e4346;
+  --gedaempft: #575d61;
+  --rand: #cdd6d1;
+  --fein: #e3e9e5;
+  --akzent: #23262b;
+  --akzent-text: #3b4f46;
+  --akzent-hover: #0f1113;
+  --akzent-weich: #dce4df;
+  --auf-akzent: #ffffff;
+  --ladebalken: #7e9488;
+  --leiste: #bec9c3;
+}
+:root[data-firma="rg"][data-schema="dunkel"] {
+  --akzent: #c9d6cf;
+  --akzent-text: #c9d6cf;
+  --akzent-hover: #e1e9e4;
+  --akzent-weich: #3d4842;
+  --leiste: #262c29;
+  --ladebalken: #9fb4a8;
+}
+:root[data-firma="rg"][data-schema="kontrast"] { --leiste: #d3ddd8; }
+:root[data-firma="rg"][data-schema="individuell"] { --leiste: var(--akzent-weich); }
+/* auf der eingefärbten Leiste: gedämpfte Schrift dunkler (Kontrast ≥ 4,5:1), Hervorhebungen hell statt getönt */
+:root[data-firma="rg"]:not([data-schema="dunkel"]) [data-leiste] {
+  --gedaempft: #2f3437;
+  --text2: #23262b;
+  --akzent-weich: rgba(255, 255, 255, 0.7);
+  --fein: rgba(255, 255, 255, 0.45);
+  --rand: #a3b0a9;
 }
 
 :root[data-schema="kontrast"] {
@@ -262,6 +303,9 @@ body {
     border: 1px solid var(--rand); border-radius: 0.625rem; cursor: pointer; font-size: 0.875rem; background: var(--flaeche);
   }
   .firma-wahl.an { border-color: var(--akzent); background: var(--akzent-weich); }
+  .logo-dunkel { display: none; }
+  :root[data-schema="dunkel"] .logo-dunkel { display: block; }
+  :root[data-schema="dunkel"] .logo-hell { display: none; }
   .firma-marke {
     display: inline-flex; align-items: center; height: 1.125rem; padding: 0 0.3125rem; border-radius: 0.25rem; flex-shrink: 0;
     border: 1px solid var(--rand); color: var(--text2); font: 600 0.625rem/1 var(--font-mono); letter-spacing: .04em; vertical-align: middle;

@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ABGEMELDET, RECHTE_GEAENDERT, STATUS_PRUEFEN, api } from "./api";
-import { darstellungAnwenden } from "./darstellung";
+import { darstellungAnwenden, firmaAnwenden } from "./darstellung";
 import type { Ich, Recht, Status } from "./typen";
 
 type AuthWert = {
@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setStatus = useCallback((s: Status) => {
     setStatusRoh(s);
+    firmaAnwenden(s.schritt === "fertig" ? s.benutzer?.firma : null);
     darstellungAnwenden(s.schritt === "fertig" ? s.benutzer?.darstellung : null);
   }, []);
 
@@ -104,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   rechteRef.current = ich ? [ich.rechte, ich.schreibt_nur_testpatienten, ich.ist_test, ich.rolle, ich.firma] : null;
   const setIch = useCallback((neu: Ich) => {
     setStatusRoh((s) => (s ? { ...s, benutzer: neu } : s));
+    firmaAnwenden(neu.firma);
     darstellungAnwenden(neu.darstellung);
   }, []);
   const darf = useCallback((recht: Recht) => !!ich?.rechte.includes(recht), [ich]);

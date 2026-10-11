@@ -161,7 +161,7 @@ def ich_daten(user):
         "rolle": wirksame_rolle(user),
         **firmen,
         "ist_test": user.ist_test,
-        "darstellung": user.darstellung,
+        "darstellung": darstellung_fuer(user),
         "startseite": {**(user.startseite or {}), "karten": startseite_karten(user)},
         "aufteilung": user.aufteilung or {},
         "bereiche": user.bereiche or {},
@@ -572,8 +572,37 @@ class PasskeyEntfernenView(APIView):
         return Response(ich_daten(user))
 
 
-AKZENTE = ["nachtblau", "petrol", "blau", "gruen", "orange", "aubergine", "schiefer", "eigen"]
-HINTERGRUENDE = ["weissgrau", "hellgrau", "grau", "kraeftig", "blaugrau", "sand", "eigen"]
+AKZENTE = ["nachtblau", "petrol", "blau", "gruen", "orange", "aubergine", "schiefer", "anthrazit", "salbei", "eigen"]
+HINTERGRUENDE = ["weissgrau", "hellgrau", "grau", "kraeftig", "blaugrau", "sand", "salbei", "eigen"]
+# Farbeinstellungen gelten je Firma (Wunsch 11.10.2026: Regeneration Clinic in ihren eigenen Farben); Dichte, Schrift
+# und Aufbau der Akte gelten für die Person in allen Firmen. Die Farben weiterer Firmen stehen unter
+# ``darstellung["firmen"][kuerzel]``, die der DSKM wie bisher oben.
+FARBFELDER = ("schema", "auto_dunkel", "akzent", "akzent_eigen", "hintergrund", "hintergrund_eigen")
+
+
+def darstellung_fuer(user) -> dict:
+    """Darstellung in der aktiven Firma (ohne die gespeicherten Farben anderer Firmen)."""
+    gespeichert = dict(user.darstellung or {})
+    je_firma = gespeichert.pop("firmen", None) or {}
+    firma = getattr(user, "firma", None)
+    if firma is None or firma.kuerzel == "dskm":
+        return gespeichert
+    allgemein = {k: v for k, v in gespeichert.items() if k not in FARBFELDER}
+    return {**allgemein, **(je_firma.get(firma.kuerzel) or {})}
+
+
+def darstellung_speichern(user, werte: dict) -> dict:
+    """Geprüfte Darstellung speichern: Farben in der aktiven Firma, alles andere für alle Firmen."""
+    neu = dict(user.darstellung or {})
+    firma = getattr(user, "firma", None)
+    if firma is None or firma.kuerzel == "dskm":
+        neu.update(werte)
+        return neu
+    je_firma = dict(neu.get("firmen") or {})
+    je_firma[firma.kuerzel] = {k: v for k, v in werte.items() if k in FARBFELDER}
+    neu.update({k: v for k, v in werte.items() if k not in FARBFELDER})
+    neu["firmen"] = je_firma
+    return neu
 # Kacheln der Startseite (S11) in Standardreihenfolge: Standardgröße (Spalten × Zeilen im Raster) und Gruppe.
 # Klinische Kacheln sind standardmäßig für alle sichtbar außer der Rolle Admin, die Kacheln der Administration
 # (S12–S14) nur für die Rolle Admin. Jede Person kann jede Kachel ein- oder ausblenden; ob sie erscheint, entscheidet
@@ -780,7 +809,7 @@ class IchView(APIView):
         if "darstellung" in request.data:
             s = DarstellungSerializer(data=request.data["darstellung"])
             s.is_valid(raise_exception=True)
-            user.darstellung = dict(s.validated_data)
+            user.darstellung = darstellung_speichern(user, dict(s.validated_data))
             felder.append("darstellung")
         if "startseite" in request.data:
             s = StartseiteSerializer(data=request.data["startseite"])

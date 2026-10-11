@@ -1,10 +1,17 @@
-/** Logo aus „Vorlagen › Briefkopf und Logo“ – je Firma (11.10.2026). Ohne Upload: bei der DSKM das mitgelieferte
- *  Stiftungslogo, bei weiteren Firmen der Name als Schriftzug. */
+/** Logo aus „Vorlagen › Briefkopf und Logo“ – je Firma (11.10.2026). Ohne Upload das mitgelieferte Logo der Firma:
+ *  Stiftungslogo der DSKM bzw. Logo der Regeneration Clinic (in „Dunkel“ hell gezeichnet). */
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import stiftungLogo from "@/logo-stiftung.png";
+import rgcLogo from "@/logo-rgc.png";
+import rgcLogoHell from "@/logo-rgc-hell.png";
 
 export const LOGO_URL = "/api/briefkopf/logo/";
+
+const MITGELIEFERT: Record<string, { hell: string; dunkel?: string; name: string }> = {
+  dskm: { hell: stiftungLogo, name: "Deutsche Stiftung Krankheitsbedingte Mangelernährung" },
+  rg: { hell: rgcLogo, dunkel: rgcLogoHell, name: "Regeneration Clinic" },
+};
 
 export function Logo({ className, style, version, firma, name }: {
   className?: string; style?: CSSProperties; version?: string;
@@ -12,24 +19,25 @@ export function Logo({ className, style, version, firma, name }: {
   firma?: string; name?: string;
 }) {
   const [fehlt, setFehlt] = useState<string | null>(null);
-  const weitere = !!firma && firma !== "dskm";
-  if (fehlt === (firma ?? "") && weitere) {
-    return (
-      <span className={className} style={{ display: "flex", alignItems: "center", ...style }} data-testid="logo-schriftzug">
-        <span className="font-semibold text-[0.9375rem] leading-tight text-akzent-text">{name ?? firma}</span>
-      </span>
-    );
+  const eigen = MITGELIEFERT[firma ?? "dskm"] ?? MITGELIEFERT.dskm;
+  const stil = { objectFit: "contain" as const, objectPosition: "left center", ...style };
+  const alt = name ?? eigen.name;
+  if (fehlt === (firma ?? "")) {
+    // mitgeliefertes Logo; das der RGC gibt es hell (Schema „Dunkel“) und dunkel
+    return eigen.dunkel ? <>
+      <img src={eigen.hell} alt={alt} className={`${className ?? ""} logo-hell`} style={stil} />
+      <img src={eigen.dunkel} alt="" aria-hidden="true" className={`${className ?? ""} logo-dunkel`} style={stil} />
+    </> : <img src={eigen.hell} alt={alt} className={className} style={stil} />;
   }
   const teile = [firma ? `firma=${encodeURIComponent(firma)}` : "", version ? `v=${version.slice(0, 12)}` : ""].filter(Boolean);
-  const quelle = fehlt === (firma ?? "") ? stiftungLogo : `${LOGO_URL}${teile.length ? `?${teile.join("&")}` : ""}`;
   return (
     <img
       key={firma ?? ""}
-      src={quelle}
+      src={`${LOGO_URL}${teile.length ? `?${teile.join("&")}` : ""}`}
       onError={() => setFehlt(firma ?? "")}
-      alt={name ?? "Deutsche Stiftung Krankheitsbedingte Mangelernährung"}
+      alt={alt}
       className={className}
-      style={{ objectFit: "contain", objectPosition: "left center", ...style }}
+      style={stil}
     />
   );
 }

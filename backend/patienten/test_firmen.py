@@ -75,7 +75,7 @@ class Firmen(Grundlage):
         self.assertEqual(c.get(f"/api/patienten/{pid}/").json()["firmen"], ["rg"])
         r = c.post("/api/kontakte/", {"patient": self.geteilt.id, "text": "<p>Anruf</p>"}, format="json")
         self.assertEqual(r.status_code, 201, r.content)
-        self.assertEqual(r.json()["firma_kurz"], "RG")
+        self.assertEqual(r.json()["firma_kurz"], "RGC")
         self.assertEqual(Kontakt.objects.get(pk=r.json()["id"]).firma, self.rg)
 
     def test_zweite_firma_nur_mit_einwilligung(self):
@@ -151,3 +151,33 @@ class Firmen(Grundlage):
         # Zurücksetzen entfernt auch die Historie der Zuordnung
         testdaten_zuruecksetzen()
         self.assertFalse(PatientFirma.history.filter(patient_id=geteilt.id).exists())
+
+    def test_farben_je_firma(self):
+        """Design je Firma (11.10.2026): Farben getrennt, Dichte und Schrift gemeinsam; Kurzname „RGC“."""
+        c = self.anmelden(self.beide)
+        c.patch("/api/auth/ich/", {"darstellung": {"schema": "individuell", "akzent": "petrol", "dichte": "kompakt"}},
+                format="json")
+        ich = c.post("/api/auth/firma/", {"firma": "rg"}, format="json").json()["benutzer"]
+        self.assertEqual([f["kurzname"] for f in ich["firmen"]], ["DSKM", "RGC"])
+        # in der RGC noch keine eigenen Farben: Standard (= Farben der Klinik), Dichte wie in der DSKM
+        self.assertEqual((ich["darstellung"].get("schema", "standard"), ich["darstellung"]["dichte"]), ("standard", "kompakt"))
+        r = c.patch("/api/auth/ich/", {"darstellung": {"schema": "individuell", "akzent": "salbei", "hintergrund": "salbei",
+                                                       "dichte": "normal"}}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual((r.json()["darstellung"]["akzent"], r.json()["darstellung"]["dichte"]), ("salbei", "normal"))
+        self.assertNotIn("firmen", r.json()["darstellung"])
+        ich = c.post("/api/auth/firma/", {"firma": "dskm"}, format="json").json()["benutzer"]
+        self.assertEqual((ich["darstellung"]["akzent"], ich["darstellung"]["dichte"]), ("petrol", "normal"))
+
+    def test_pdf_logo_je_firma(self):
+        import base64
+
+        from epm.firma import setze_aktive_firma, zuruecksetzen
+        from vorlagen.pdf import STANDARD_LOGO, STANDARD_LOGOS, logo_data_uri
+
+        token = setze_aktive_firma(self.rg)
+        try:
+            self.assertEqual(base64.b64decode(logo_data_uri().split(",", 1)[1]), STANDARD_LOGOS["rg"].read_bytes())
+        finally:
+            zuruecksetzen(token)
+        self.assertEqual(base64.b64decode(logo_data_uri().split(",", 1)[1]), STANDARD_LOGO.read_bytes())

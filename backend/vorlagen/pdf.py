@@ -16,6 +16,7 @@ from .bloecke import PLATZHALTER
 from .felder import FELDER, TABELLEN, Fett, Kontext, tabellenspalten, tabellenzeilen
 
 STANDARD_LOGO = Path(__file__).resolve().parent / "statisch" / "logo-stiftung.png"
+STANDARD_LOGOS = {"rg": Path(__file__).resolve().parent / "statisch" / "logo-rgc.png"}
 LEER = "—"
 
 CSS = """
@@ -135,7 +136,12 @@ def logo_data_uri() -> str:
         pfad = settings.EPM_DOKUMENTE / logo.datei
         if pfad.is_file():
             return f"data:{logo.mime};base64,{base64.b64encode(pfad.read_bytes()).decode()}"
-    return "data:image/png;base64," + base64.b64encode(STANDARD_LOGO.read_bytes()).decode()
+    # ohne hochgeladenes Logo: das mitgelieferte der aktiven Firma (Regeneration Clinic: eigenes, 11.10.2026)
+    from epm.firma import aktive_firma
+
+    firma = aktive_firma()
+    standard = STANDARD_LOGOS.get(firma.kuerzel if firma else "", STANDARD_LOGO)
+    return "data:image/png;base64," + base64.b64encode(standard.read_bytes()).decode()
 
 
 def _absender():

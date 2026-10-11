@@ -32,9 +32,13 @@ test("Umschalter unter dem Logo zeigt nur die Akten der aktiven Firma", async ({
   expect(liste).toContain("Musterfrau");
   const schalter = page.getByTestId("seitenleiste").getByRole("group", { name: "Firma" });
   await expect(schalter.getByRole("button", { name: "DSKM" })).toHaveAttribute("aria-pressed", "true");
-  await schalter.getByRole("button", { name: "RG" }).click();
+  await expect(page.getByTestId("seitenleiste")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await schalter.getByRole("button", { name: "RGC" }).click();
   await expect(page.getByText("Du arbeitest jetzt für Regeneration Clinic.")).toBeVisible();
-  await expect(schalter.getByRole("button", { name: "RG" })).toHaveAttribute("aria-pressed", "true");
+  await expect(schalter.getByRole("button", { name: "RGC" })).toHaveAttribute("aria-pressed", "true");
+  // farbliche Trennung: in der RGC Leiste in Salbeigrün und Logo der Klinik
+  await expect(page.getByTestId("seitenleiste")).toHaveCSS("background-color", "rgb(190, 201, 195)");
+  await expect(page.getByTestId("seitenleiste").getByRole("img", { name: "Regeneration Clinic" }).first()).toBeVisible();
   liste = await namen(page);
   expect(liste).toContain("Mustermann");
   expect(liste).toContain("Hanna");
@@ -51,8 +55,8 @@ test("gemeinsame Akte: Firmen im Kopf und an jedem Eintrag, Auswahl mit Einwilli
   await api.ende();
 
   await page.goto(`/patienten/${geteilt.id}/kontakte`);
-  await expect(page.getByTestId("akte-firmen")).toHaveText("DSKM · RG");
-  await expect(page.getByTestId("firma-marke").filter({ hasText: "RG" }).first()).toBeVisible();
+  await expect(page.getByTestId("akte-firmen")).toHaveText("DSKM · RGC");
+  await expect(page.getByTestId("firma-marke").filter({ hasText: "RGC" }).first()).toBeVisible();
 
   // Erika Musterfrau zusätzlich der RG zuordnen: ohne Datum der Einwilligung geht es nicht
   await page.goto(`/patienten/${treffer.id}`);
@@ -73,8 +77,8 @@ test("Telefon: Umschalter in der Schublade, Firma im Kopf, nichts ragt heraus", 
   await expect(page.getByTestId("mobil-firma")).toHaveText("DSKM");
   await page.getByRole("button", { name: /Menü/ }).last().click();
   const schublade = page.getByTestId("schublade");
-  await schublade.getByRole("group", { name: "Firma" }).getByRole("button", { name: "RG" }).click();
-  await expect(page.getByTestId("mobil-firma")).toHaveText("RG");
+  await schublade.getByRole("group", { name: "Firma" }).getByRole("button", { name: "RGC" }).click();
+  await expect(page.getByTestId("mobil-firma")).toHaveText("RGC");
   const breite = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(breite).toBeLessThanOrEqual(390);
 });

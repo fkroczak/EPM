@@ -90,14 +90,28 @@ function Mini({ farben }: { farben: [string, string, string] }) {
   );
 }
 
+/** Farben je Firma (11.10.2026): „Standard“ sind die Farben der Firma; in der Regeneration Clinic schlägt „Individuell“
+ *  zuerst deren Salbeigrün vor */
+function firmenStandard(firma: string | undefined): Darstellung {
+  return firma === "rg" ? { ...STANDARD_DARSTELLUNG, akzent: "salbei", hintergrund: "salbei" } : STANDARD_DARSTELLUNG;
+}
+
+function schemata(firma: string | undefined) {
+  return firma === "rg"
+    ? SCHEMATA.map((s) => s.wert === "standard" ? { ...s, text: "Farben der Regeneration Clinic", farben: ["#EEF1EF", "#BEC9C3", "#23262B"] as [string, string, string] }
+      : s.wert === "individuell" ? { ...s, farben: ["#EEF1EF", "#FFFFFF", "#4E6358"] as [string, string, string] } : s)
+    : SCHEMATA;
+}
+
 function DarstellungKarten({ zuruecksetzenRef }: { zuruecksetzenRef: { current: (() => void) | null } }) {
   const ich = useIch();
+  const basis = firmenStandard(ich.firma);
   const { setIch } = useAuth();
   const melden = useHinweis();
   const [d, setD] = useState<Darstellung>(() => {
     // „form“ (rund/eckig, nur kurz am 08.10.2026) wird beim nächsten Speichern nicht mehr mitgeschickt
     const { form: _form, ...rest } = ich.darstellung as Partial<Darstellung> & { form?: string };
-    return { ...STANDARD_DARSTELLUNG, ...rest };
+    return { ...basis, ...rest };
   });
   const [fehler, setFehler] = useState("");
   const timer = useRef<number>(0);
@@ -129,17 +143,17 @@ function DarstellungKarten({ zuruecksetzenRef }: { zuruecksetzenRef: { current: 
     window.clearTimeout(timer.current);
     if (offen.current) void api("auth/ich/", { method: "PATCH", body: { darstellung: offen.current } }).catch(() => undefined);
   }, []);
-  zuruecksetzenRef.current = () => { aendern({ ...STANDARD_DARSTELLUNG }); melden("Darstellung zurückgesetzt."); };
+  zuruecksetzenRef.current = () => { aendern({ ...basis }); melden("Darstellung zurückgesetzt."); };
   const akzentName = d.akzent === "eigen" ? `Eigene Farbe ${d.akzent_eigen ?? ""}` : AKZENTE[d.akzent]?.[0] ?? "";
   return (
     <>
       <Karte className="px-5 py-[1.125rem] flex flex-col gap-4" data-testid="darstellung">
         <div className="flex items-baseline justify-between gap-3 flex-wrap">
-          <h2 className="lbl m-0">Darstellung</h2>
+          <h2 className="lbl m-0">Darstellung{(ich.firmen?.length ?? 0) > 1 ? ` · ${ich.firmen?.find((f) => f.kuerzel === ich.firma)?.name ?? ""}` : ""}</h2>
           <span className="text-[0.8125rem] gedaempft">Warnfarben für Gewicht, Nickelallergie und Fehler bleiben überall gleich.</span>
         </div>
         <div className="grid grid-cols-4 gap-3" role="radiogroup" aria-label="Darstellung">
-          {SCHEMATA.map((s) => (
+          {schemata(ich.firma).map((s) => (
             <button key={s.wert} type="button" role="radio" aria-checked={d.schema === s.wert} aria-label={`Darstellung ${s.titel}`}
               className={cx("card p-2.5 flex flex-col gap-2 text-left cursor-pointer border", d.schema === s.wert ? "border-akzent outline-2 outline-akzent" : "hover:bg-fein")}
               onClick={() => aendern({ schema: s.wert })}>
@@ -568,13 +582,15 @@ export function Konto() {
  * Person, an jedem PC gleich; dazu „Startseite anpassen“.
  */
 export function Design() {
+  const ich = useIch();
   const zuruecksetzen = useRef<(() => void) | null>(null);
   return (
     <Seite pfad={[{ text: "Design" }]}>
       <Seitenkopf titel="Design"
         rechts={<Knopf onClick={() => zuruecksetzen.current?.()}>Auf Standard zurücksetzen</Knopf>} />
       <div className="stapel flex flex-col gap-5 min-w-0 max-w-[68.75rem]" data-testid="design">
-        <DarstellungKarten zuruecksetzenRef={zuruecksetzen} />
+        {/* je Firma eigene Farben: beim Umschalten die Einstellungen der anderen Firma laden */}
+        <DarstellungKarten key={ich.firma ?? ""} zuruecksetzenRef={zuruecksetzen} />
         <Link to="/" state={{ anpassen: Date.now() }} className="card px-5 py-4 flex items-center justify-between no-underline text-tinte hover:bg-fein">
           <span className="font-medium">Startseite anpassen</span><span aria-hidden="true">→</span>
         </Link>
