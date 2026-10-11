@@ -133,16 +133,17 @@ class AnsprechpartnerViewSet(OhneLoeschen):
 
     @action(detail=True, methods=["post"], url_path="neu-zuordnen")
     def neu_zuordnen(self, request, pk=None):
-        """Alle Patienten dieses Ansprechpartners einem anderen desselben Versorgers zuordnen."""
-        from patienten.models import Patient
-
+        """Alle Patienten dieses Ansprechpartners (in der aktiven Firma) einem anderen desselben Versorgers zuordnen."""
         ap = self.get_object()
         ziel = Ansprechpartner.objects.filter(pk=request.data.get("ziel"), versorger=ap.versorger, aktiv=True).first()
         if ziel is None or ziel == ap:
             return Response({"ziel": "Bitte einen anderen, aktiven Ansprechpartner desselben Versorgers wählen."},
                             status=status.HTTP_400_BAD_REQUEST)
+        from epm.api_basis import patienten_fuer
+
         anzahl = 0
-        for p in Patient.objects.filter(ansprechpartner=ap, abgeschlossen_am__isnull=True):
+        # nur Akten im eigenen Bereich (Sicherheitsprüfung 11.10.2026: vorher auch die der anderen Firma)
+        for p in patienten_fuer(request.user).filter(ansprechpartner=ap, abgeschlossen_am__isnull=True):
             p.ansprechpartner = ziel
             p._history_user = request.user
             p.save()  # einzeln, damit jede Änderung im Verlauf der Akte steht
@@ -480,6 +481,10 @@ class LogoView(APIView):
         firma = Firma.objects.filter(kuerzel=request.query_params.get("firma") or "", aktiv=True).first()
         logo = Logo.aktuell(firma)
         if logo is None:
+            # Oberfläche (``?leer=1``): ohne Upload 204 statt 404 – sie zeigt dann das mitgelieferte Logo, ohne Fehler
+            # in der Browser-Konsole
+            if request.query_params.get("leer"):
+                return Response(status=status.HTTP_204_NO_CONTENT)
             raise Http404("Kein Logo hochgeladen.")
         pfad = settings.EPM_DOKUMENTE / logo.datei
         if not pfad.exists():
