@@ -37,7 +37,9 @@ def _sitzung_ab(sender, request, user, **kwargs):
 
 
 class SitzungMiddleware:
-    """Hält „zuletzt aktiv“ aktuell (höchstens einmal pro Minute ein Datenbankzugriff)."""
+    """Hält „zuletzt aktiv“ aktuell (höchstens einmal pro Minute ein Datenbankzugriff) und verlängert die Sitzung um
+    30 Minuten ab jeder Anfrage. Dabei wird nur der Ablauf geschrieben, nicht die Daten der Sitzung: Laufen zwei Anfragen
+    gleichzeitig, überschreibt die spätere so nicht, was die frühere geändert hat (z. B. die gewählte Firma)."""
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -45,7 +47,13 @@ class SitzungMiddleware:
     def __call__(self, request):
         antwort = self.get_response(request)
         user = getattr(request, "user", None)
-        schluessel = getattr(getattr(request, "session", None), "session_key", None)
+        sitzung = getattr(request, "session", None)
+        schluessel = getattr(sitzung, "session_key", None)
+        if schluessel and not sitzung.modified and antwort.status_code < 500:
+            from django.conf import settings
+
+            Session.objects.filter(session_key=schluessel, expire_date__gt=timezone.now()).update(
+                expire_date=timezone.now() + timedelta(seconds=settings.SESSION_COOKIE_AGE))
         if user is not None and user.is_authenticated and schluessel:
             grenze = timezone.now() - AKTUALISIEREN_NACH
             Sitzung.objects.filter(sitzungsschluessel=schluessel, zuletzt_am__lt=grenze).update(zuletzt_am=timezone.now())

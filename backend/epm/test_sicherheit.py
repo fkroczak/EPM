@@ -507,7 +507,8 @@ class Sitzungen(Grundlage):
         from django.conf import settings
 
         self.assertEqual(settings.SESSION_COOKIE_AGE, 30 * 60)
-        self.assertTrue(settings.SESSION_SAVE_EVERY_REQUEST and settings.SESSION_COOKIE_HTTPONLY)
+        # Ablauf je Anfrage verlängert die SitzungMiddleware; die Daten der Sitzung schreibt nur, wer sie ändert
+        self.assertTrue(not settings.SESSION_SAVE_EVERY_REQUEST and settings.SESSION_COOKIE_HTTPONLY)
         self.assertEqual((settings.SESSION_COOKIE_SAMESITE, settings.CSRF_COOKIE_SAMESITE), ("Strict", "Strict"))
         self.assertEqual(settings.X_FRAME_OPTIONS, "DENY")
         self.assertEqual(settings.EPM_LOGIN_MAX_FEHLVERSUCHE, 5)
