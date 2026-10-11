@@ -356,23 +356,23 @@ class AgentZugang(SimpleTestCase):
         self.assertEqual(stand["internet"], {"alle": True, "oeffentlich": []})
         # das Verwaltungsnetz darf weg (das Gerät im Internet bleibt über 0.0.0.0/0 erlaubt), 0.0.0.0/0 dann nicht mehr
         weg = self.a.netz_entfernen
-        self.assertEqual(weg({"dienst": "https", "netz": "192.168.56.0/24", "client_ip": "198.51.100.20"}, "admin", z.append)[0], 0)
-        self.assertEqual(weg({"dienst": "https", "netz": "0.0.0.0/0", "client_ip": "198.51.100.20"}, "admin", z.append)[0], 2)
-        hinzu({"dienst": "https", "netz": "198.51.100.20", "bezeichnung": "Admin zu Hause"}, "admin", z.append)
-        self.assertEqual(self.a.zugang_stand()["internet"]["oeffentlich"], ["198.51.100.20/32"])
-        rc, text = weg({"dienst": "https", "netz": "0.0.0.0/0", "client_ip": "198.51.100.20"}, "admin", z.append)
+        self.assertEqual(weg({"dienst": "https", "netz": "192.168.56.0/24", "client_ip": "93.184.216.34"}, "admin", z.append)[0], 0)
+        self.assertEqual(weg({"dienst": "https", "netz": "0.0.0.0/0", "client_ip": "93.184.216.34"}, "admin", z.append)[0], 2)
+        hinzu({"dienst": "https", "netz": "93.184.216.34", "bezeichnung": "Admin zu Hause"}, "admin", z.append)
+        self.assertEqual(self.a.zugang_stand()["internet"]["oeffentlich"], ["93.184.216.34/32"])
+        rc, text = weg({"dienst": "https", "netz": "0.0.0.0/0", "client_ip": "93.184.216.34"}, "admin", z.append)
         self.assertEqual(rc, 0, text)
-        self.assertIn("Ihr Gerät (198.51.100.20)",
-                      weg({"dienst": "https", "netz": "198.51.100.20/32", "client_ip": "198.51.100.20"}, "admin", z.append)[1])
+        self.assertIn("Ihr Gerät (93.184.216.34)",
+                      weg({"dienst": "https", "netz": "93.184.216.34/32", "client_ip": "93.184.216.34"}, "admin", z.append)[1])
         # SSH nur von der eigenen Adresse: andere SSH-Freigaben gehen zu, der Eintrag fällt beim Schließen weg
         self.assertEqual(self.a.ssh_oeffnen(1, "admin", z.append, nur_ip="0.0.0.0/0")[0], 2)
-        self.assertEqual(self.a.ssh_oeffnen(1, "admin", z.append, nur_ip="198.51.100.0/24")[0], 2)
-        rc, text = self.a.ssh_oeffnen(1, "admin", z.append, nur_ip="198.51.100.20/32")
+        self.assertEqual(self.a.ssh_oeffnen(1, "admin", z.append, nur_ip="93.184.216.0/24")[0], 2)
+        rc, text = self.a.ssh_oeffnen(1, "admin", z.append, nur_ip="93.184.216.34/32")
         self.assertEqual(rc, 0, text)
         ssh = [r for r in self.server.regeln if r[0].startswith("2222/")]
-        self.assertEqual([r[2] for r in ssh], ["198.51.100.20/32"])
+        self.assertEqual([r[2] for r in ssh], ["93.184.216.34/32"])
         self.assertEqual([(e["netz"], e.get("befristet")) for e in self.zustand()["netze"]["ssh"]],
-                         [("192.168.56.0/24", None), ("198.51.100.20/32", True)])
+                         [("192.168.56.0/24", None), ("93.184.216.34/32", True)])
         self.assertEqual(self.a.ssh_schliessen("admin", z.append)[0], 0)
         self.assertEqual([e["netz"] for e in self.zustand()["netze"]["ssh"]], ["192.168.56.0/24"])
 
