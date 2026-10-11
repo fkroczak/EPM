@@ -12,7 +12,7 @@ from infusionen.api import InfusionsplanViewSet
 from vorlagen import api as vorlagen
 from patienten.api import (
     BezugspersonViewSet, DiagnoseViewSet, TherapieschrittViewSet, DokumentViewSet, GewichtViewSet, KalenderViewSet, KontaktViewSet,
-    PatientArztViewSet, PatientViewSet, StartseiteViewSet, TerminViewSet,
+    MedikamentViewSet, PatientArztViewSet, PatientViewSet, StartseiteViewSet, TerminViewSet,
 )
 from hilfe import api as hilfe
 from patienten import meine_akten
@@ -36,6 +36,7 @@ router.register("dokumente", DokumentViewSet, basename="dokument")
 router.register("bezugspersonen", BezugspersonViewSet, basename="bezugsperson")
 router.register("patient-aerzte", PatientArztViewSet, basename="patientarzt")
 router.register("diagnosen", DiagnoseViewSet, basename="diagnose")
+router.register("medikamente", MedikamentViewSet, basename="medikament")
 router.register("therapieschritte", TherapieschrittViewSet, basename="therapieschritt")
 router.register("laborbefunde", LaborbefundViewSet, basename="laborbefund")
 router.register("bia-messungen", BiaMessungViewSet, basename="biamessung")

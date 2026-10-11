@@ -327,7 +327,9 @@ export type Patient = {
     zaehler: { kontakte: number; gewichte: number; dokumente: number; termine_offen: number; infusionsplaene: number;
       bezugspersonen: number; aerzte: number; erklaerungen: number;
       /** eigene Reiter seit 07.10.2026 (F121) */
-      diagnosen: number; laborbefunde: number; bia_messungen: number; berichte: number };
+      diagnosen: number; laborbefunde: number; bia_messungen: number; berichte: number;
+      /** Medikamentenplan (Wunsch 11.10.2026): aktuell eingenommene Medikamente */
+      medikamente?: number };
   } | null;
 };
 
@@ -738,6 +740,43 @@ export type Diagnose = {
   angelegt_von_name: string | null;
   firma_kurz?: string | null;
 };
+
+/** Medikament im Medikamentenplan (Wunsch 11.10.2026), aufgebaut wie der bundeseinheitliche Medikationsplan */
+export type Medikament = {
+  id: number;
+  patient: number;
+  wirkstoff: string;
+  handelsname: string;
+  staerke: string;
+  darreichungsform: string;
+  morgens: string;
+  mittags: string;
+  abends: string;
+  nachts: string;
+  /** wenn das Schema nicht passt, z. B. „1× wöchentlich montags“ */
+  dosierung_frei: string;
+  einheit: string;
+  bedarf: boolean;
+  hinweise: string;
+  grund: string;
+  seit: string | null;
+  aktiv: boolean;
+  abgesetzt_am: string | null;
+  absetzgrund: string;
+  reihenfolge: number;
+  /** „1 – 0 – 1 – 0“, leer bei nur freier Dosierung */
+  schema: string;
+  /** Schema und freie Dosierung in einer Zeile */
+  dosierung: string;
+  angelegt_am: string;
+  angelegt_von_name: string | null;
+  firma_kurz?: string | null;
+};
+
+/** Vorschläge für Darreichungsform und Einheit (Freitext bleibt erlaubt) */
+export const DARREICHUNGSFORMEN = ["Tablette", "Filmtablette", "Kapsel", "Brausetablette", "Tropfen", "Saft", "Pulver",
+  "Injektion", "Infusion", "Pflaster", "Spray", "Zäpfchen", "Salbe"];
+export const MEDIKAMENT_EINHEITEN = ["Stück", "ml", "Tropfen", "IE", "Hub", "Beutel", "mg", "g"];
 
 /** Schritt im Verlauf der Therapie (Wunsch 10.10.2026) */
 export type Therapieschritt = {

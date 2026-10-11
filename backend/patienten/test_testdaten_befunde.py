@@ -11,8 +11,9 @@ from infusionen.models import Infusionsplan
 from stammdaten.models import Diagnosevorlage
 
 from .kennzahlen import kennzahlen
-from .models import Diagnose, Gewichtsmessung, Patient
-from .testdaten import TEST_BIA, TEST_DIAGNOSEN, TEST_LABOR, TESTPATIENTEN, testdaten_zuruecksetzen, testpatienten_anlegen
+from .models import Diagnose, Gewichtsmessung, Medikament, Patient
+from .testdaten import (TEST_BIA, TEST_DIAGNOSEN, TEST_LABOR, TEST_MEDIKAMENTE, TESTPATIENTEN, testdaten_zuruecksetzen,
+                        testpatienten_anlegen)
 
 
 def testpatient(nachname) -> Patient:
@@ -41,6 +42,7 @@ class TestdatenBefunde(Grundlage):
                 self.assertEqual(p.diagnosen.count(), len(TEST_DIAGNOSEN[i]))
                 self.assertEqual(p.laborbefunde.count(), len(TEST_LABOR[i]["tage"]) if i in TEST_LABOR else 0)
                 self.assertEqual(p.bia_messungen.count(), len(TEST_BIA.get(i, [])))
+                self.assertEqual(p.medikamente.count(), len(TEST_MEDIKAMENTE.get(i, [])))
         hanna = testpatient("Test")
         self.assertEqual((hanna.laborbefunde.count(), hanna.bia_messungen.count()), (0, 0))
         self.assertTrue(hanna.diagnosen.exists())
@@ -62,6 +64,12 @@ class TestdatenBefunde(Grundlage):
         heute = timezone.localdate()
         for d in Diagnose.objects.filter(patient__ist_test=True):
             d.full_clean()
+        # Medikamentenplan (11.10.2026): Dauer- und Bedarfsmedikation, ein abgesetztes Medikament mit Datum
+        for m in Medikament.objects.filter(patient__ist_test=True):
+            m.full_clean()
+        erika = testpatient("Musterfrau").medikamente
+        self.assertEqual((erika.filter(aktiv=True, bedarf=False).count(), erika.filter(bedarf=True).count()), (2, 1))
+        self.assertEqual(erika.get(aktiv=False).abgesetzt_am, heute - timedelta(days=60))
         for b in Laborbefund.objects.filter(patient__ist_test=True):
             b.full_clean()
             self.assertLessEqual(b.abgenommen_am, heute)

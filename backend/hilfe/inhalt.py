@@ -476,6 +476,27 @@ Fassung bekommt eine Versionsnummer, frühere Fassungen bleiben lesbar.</p>
 <p>Jede Änderung steht mit Person und Zeitpunkt im Verlauf der Akte.</p>""",
     },
     {
+        "id": "medikamente", "gruppe": "patienten", "titel": "Medikamentenplan",
+        "rechte": ["akten_lesen", "akten_bearbeiten"], "seiten": ["/patienten/:id/medikamente"],
+        "html": """
+<p>Der Reiter <strong>Medikamente</strong> (gleich nach „Diagnosen“) zeigt den Medikamentenplan wie den
+bundeseinheitlichen Medikationsplan: <strong>Dauermedikation</strong> und darunter die
+<strong>Bedarfsmedikation</strong>, je mit Wirkstoff, Handelsname, Stärke, Form und Dosierung
+morgens – mittags – abends – zur Nacht (z. B. „1 – 0 – 1 – 0“).</p>
+<ul>
+<li><strong>Medikament</strong> trägt ein neues ein. Pflicht sind der Wirkstoff und eine Dosierung – oder „bei Bedarf“.
+Passt das Schema nicht (z. B. „1× wöchentlich montags“), die Dosierung im Feld <strong>Dosierung (frei)</strong>
+angeben.</li>
+<li>Der <strong>Stift</strong> ändert ein Medikament, <strong>Absetzen</strong> nimmt es aus dem Plan (mit Datum und
+auf Wunsch einem Grund). Abgesetzte Medikamente werden nicht gelöscht: Sie stehen unter „Abgesetzt“ und lassen sich
+<strong>wieder ansetzen</strong>.</li>
+<li><strong>Medikationsplan als PDF</strong> erstellt den Plan zum Mitgeben oder Faxen (Aussehen unter
+Vorlagen › Dokumentvorlagen › „Medikationsplan“).</li>
+</ul>
+<p>Eintragen und Ändern braucht das Recht „Patienten anlegen, Diagnose, Therapie, Stammdaten ändern“; jede Änderung
+steht mit Person und Zeitpunkt im Verlauf der Akte.</p>""",
+    },
+    {
         "id": "akte_abschliessen", "gruppe": "patienten", "titel": "Akte abschließen und wieder öffnen",
         "rechte": ["akten_abschliessen", "akten_wieder_oeffnen"], "seiten": [],
         "html": """

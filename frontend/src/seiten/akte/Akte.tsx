@@ -789,6 +789,8 @@ export function Akte() {
     ...(ansicht === "karteikarte" ? [{ zu: `${basis}/kartei`, text: "Karteikarte", stufe: "haupt" }] : []),
     { zu: basis, text: "Übersicht", ende: true, gruppe: "Akte", stufe: "haupt" },
     { zu: `${basis}/diagnosen`, text: "Diagnosen", zahl: k?.zaehler.diagnosen, gruppe: "Behandlung", stufe: "haupt" },
+    // Medikamentenplan (Wunsch 11.10.2026)
+    { zu: `${basis}/medikamente`, text: "Medikamente", zahl: k?.zaehler.medikamente, stufe: "haupt" },
     { zu: `${basis}/therapie`, text: "Therapie", stufe: "haupt" },
     { zu: `${basis}/empfehlung`, text: "Empfehlung", stufe: "haupt" },
     { zu: `${basis}/plaene`, text: "Infusionspläne", zahl: k?.zaehler.infusionsplaene, stufe: "haupt" },

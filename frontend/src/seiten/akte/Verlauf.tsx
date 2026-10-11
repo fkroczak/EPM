@@ -24,6 +24,8 @@ const BEREICHE: { wert: string; text: string }[] = [
   // Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
   { wert: "diagnosen", text: "Diagnosen (ICD)" }, { wert: "laborbefunde", text: "Laborbefunde" },
   { wert: "bia_messungen", text: "BIA-Messungen" }, { wert: "berichte", text: "Berichte" },
+  // Medikamentenplan (Wunsch 11.10.2026)
+  { wert: "medikamente", text: "Medikamente" },
   // weggeklickte Hinweise (F119)
   { wert: "hinweisruhe", text: "Hinweise ausgeblendet" },
 ];
@@ -34,12 +36,17 @@ const BEREICH_EINZELN: Record<string, string> = {
   hinweisruhe: "Hinweis ausgeblendet",
   // Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
   diagnosen: "Diagnose (ICD)", laborbefunde: "Laborbefund", bia_messungen: "BIA-Messung", berichte: "Bericht",
+  medikamente: "Medikament",
 };
 
 const FELDER: Record<string, string> = {
   nachname: "Nachname", vorname: "Vorname", geburtsdatum: "Geburtsdatum", geschlecht: "Geschlecht", strasse: "Straße", plz: "PLZ",
   ort: "Ort", telefon: "Telefon", telefon2: "Telefon 2", email: "E-Mail", krankenkasse: "Versicherung",
   versicherungsart: "Versicherungsart", versichertennummer: "Versichertennummer", hausarzt: "Hausarzt",
+  wirkstoff: "Wirkstoff", handelsname: "Handelsname", staerke: "Stärke", darreichungsform: "Darreichungsform",
+  morgens: "morgens", mittags: "mittags", abends: "abends", nachts: "zur Nacht", dosierung_frei: "Dosierung (frei)",
+  einheit: "Einheit", bedarf: "bei Bedarf", hinweise: "Hinweise", grund: "Grund", abgesetzt_am: "abgesetzt am",
+  absetzgrund: "Grund des Absetzens",
   icd_code: "ICD-Code", kennzeichen: "Zusatzkennzeichen", bezeichnung: "Bezeichnung", seit: "besteht seit",
   beendet_am: "beendet am", abgenommen_am: "Abnahme am", labor: "Labor", beurteilung: "Beurteilung",
   bcm_kg: "BCM (kg)", fettmasse_kg: "Fettmasse (kg)", ecw_prozent: "ECW (%)", koerperwasser_l: "Körperwasser (l)",

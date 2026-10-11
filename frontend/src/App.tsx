@@ -46,6 +46,8 @@ const router = createBrowserRouter([
           { path: "kartei", ...seite(() => import("./seiten/akte/Karteikarte").then(({ Karteikarte }) => <Karteikarte />)) },
           // eigene Reiter seit 07.10.2026 (F121); die alten Adressen leiten weiter
           { path: "diagnosen", ...seite(() => import("./seiten/akte/Diagnosen").then(({ Diagnosen }) => <Diagnosen />)) },
+          // Medikamentenplan (Wunsch 11.10.2026)
+          { path: "medikamente", ...seite(() => import("./seiten/akte/Medikamente").then(({ Medikamente }) => <Medikamente />)) },
           { path: "therapie", ...seite(() => import("./seiten/akte/Therapie").then(({ Therapie }) => <Therapie />)) },
           { path: "empfehlung", ...seite(() => import("./seiten/akte/Therapie").then(({ Empfehlung }) => <Empfehlung />)) },
           { path: "kontakte", ...seite(() => import("./seiten/akte/Kontakte").then(({ Kontakte }) => <Kontakte />)) },

@@ -738,6 +738,25 @@ STARTVORLAGEN = {
          "optionen": {"ueberschrift": True, "ausblenden_wenn_leer": True}},
         {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
     ],
+    # Medikamentenplan der Akte (Wunsch 11.10.2026): Aufbau wie der bundeseinheitliche Medikationsplan
+    "medikationsplan": [
+        {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF, "mit_linie": False},
+        {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Medikationsplan",
+         "zusatz_label": "Stand", "zusatz": "{{Heute}}", "neben_logo": True},
+        {"id": "patient", "typ": "datenfelder", "bezeichnung": "Patient", "spalten": 3, "felder": [
+            {"label": "Name", "wert": "{{Patient.Name}}"}, {"label": "geboren", "wert": "{{Patient.Geburtsdatum}}"},
+            {"label": "Patienten-Nr.", "wert": "{{Patient.Nummer}}"}]},
+        {"id": "medikamente", "typ": "tabelle", "bezeichnung": "Dauermedikation", "quelle": "medikamente",
+         "optionen": {"ueberschrift": True}},
+        {"id": "bedarf", "typ": "tabelle", "bezeichnung": "Bedarfsmedikation", "quelle": "bedarfsmedikation",
+         "optionen": {"ueberschrift": True, "ausblenden_wenn_leer": True}},
+        {"id": "hinweis", "typ": "text", "bezeichnung": "Hinweis",
+         "text": "Mo = morgens, Mi = mittags, Ab = abends, Zn = zur Nacht. Bitte nehmen Sie Ihre Medikamente wie "
+                 "angegeben ein und bringen Sie diesen Plan zu jedem Arzt- und Kliniktermin mit. Änderungen nur nach "
+                 "Rücksprache mit Ihrer Ärztin oder Ihrem Arzt.",
+         "optionen": {"nicht_teilen": True, "linie_oben": True}},
+        {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
+    ],
 }
 
 
