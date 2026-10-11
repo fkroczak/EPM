@@ -255,7 +255,7 @@ export function AusfuehrenDialog({ wahl, daten, onZu }: { wahl: Wahl | null; dat
           </label>
         ) : null}
         {wahl.art === "epm" && wahl.aufgabe.code === "alle_abmelden" ? (
-          <Meldung art="warn">{andere.length} andere Anmeldungen werden beendet. Ungespeicherte Eingaben dieser Benutzer gehen verloren.</Meldung>
+          <Meldung art="warn">{andere.length} andere Anmeldungen werden beendet. Was diese Benutzer nicht gespeichert haben, geht verloren.</Meldung>
         ) : null}
         {zfa ? (
           <>

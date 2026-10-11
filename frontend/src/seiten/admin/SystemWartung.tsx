@@ -282,8 +282,8 @@ export function UhrKarte({ daten, offen }: { daten: Uebersicht; offen: Set<strin
           </Feld>
         ) : (
           <>
-            <Meldung art="warn">Ohne Zeitsynchronisation läuft die Uhr des Servers mit der Zeit davon. Codes der Authenticator-App, Passkeys und
-              Zertifikate brauchen eine richtige Uhrzeit – bitte nur vorübergehend.</Meldung>
+            <Meldung art="warn">Ohne Zeitsynchronisation geht die Uhr des Servers mit der Zeit falsch. Codes der Authenticator-App, Passkeys und
+              Zertifikate brauchen eine richtige Uhrzeit. Bitte nur vorübergehend ausschalten.</Meldung>
             <Feld label="Uhrzeit setzen (Zeitzone des Servers)">
               {(p) => <Eingabe {...p} type="datetime-local" value={zeit} onChange={(e) => setZeit(e.target.value)} />}
             </Feld>
@@ -561,8 +561,8 @@ export function SoftwareBereich({ daten, offen, onAktualisieren }: { daten: Uebe
       </div>
       <AuftragDialog offen={!!zurueck} titel={`Auf Version ${zurueck} zurückschalten`} aktion={daten.verwaltung?.epm_zurueck}
         pfad="system/versionen/zurueck/" body={{ tag: zurueck }} daten={daten} knopf="Bestätigen und zurückschalten" onZu={() => setZurueck(null)}>
-        <Meldung art="warn">EPM läuft danach mit {zurueck} (bisher {v?.aktiv}). Datenbank-Migrationen der neueren Version bleiben –
-          startet die ältere Version damit nicht, die Sicherung von vorher wiederherstellen oder wieder aktualisieren.</Meldung>
+        <Meldung art="warn">EPM läuft danach mit {zurueck} (bisher {v?.aktiv}). Datenbank-Migrationen der neueren Version bleiben.
+          Startet die ältere Version damit nicht: die Sicherung von vorher wiederherstellen oder wieder aktualisieren.</Meldung>
       </AuftragDialog>
       <AuftragDialog offen={erstellen} titel="Update-Paket erstellen" aktion={daten.verwaltung?.epm_paket_erstellen} pfad="system/pakete/erstellen/"
         daten={daten} knopf="Paket erstellen" onZu={() => setErstellen(false)} />

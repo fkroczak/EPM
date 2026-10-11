@@ -347,7 +347,7 @@ function ZielDialog({ offen, ziel, onZu }: { offen: boolean; ziel: Ziel; onZu: (
           </Feld>
         </div>
         <Feld label="Aufbewahrung im Ziel" fehler={f.aufbewahrung_tage}
-          hinweis="Nach jeder Übertragung entfernt der Server im Ordner ältere EPM-Sicherungen; die jüngste bleibt immer, andere Dateien werden nie angefasst.">
+          hinweis="Nach jeder Übertragung löscht der Server ältere EPM-Sicherungen im Ordner. Die jüngste bleibt immer. Andere Dateien rührt er nie an.">
           {(p) => <Auswahl {...p} value={w.aufbewahrung_tage} onChange={setze("aufbewahrung_tage")}>
             {ZIEL_AUFBEWAHRUNG.map((t) => <option key={t} value={t}>{t === 0 ? "nie löschen" : `${t} Tage${t === 30 ? " (Standard)" : ""}`}</option>)}
           </Auswahl>}
@@ -823,7 +823,7 @@ function Verschluesselung({ daten, onPasswort, onPruefen }: { daten: Daten; onPa
         <p className="m-0 text-sm">Sicherungs-Passwort <strong>Nr. {aktuell.nr}</strong>, festgelegt {relativ(aktuell.gesetzt_am, true)}
           {aktuell.gesetzt_von ? ` von ${aktuell.gesetzt_von}` : ""}. Es liegt nur auf dem Server; der Ausdruck gehört in den Tresor.</p>
       ) : (
-        <Meldung art="warn">Noch kein Sicherungs-Passwort – Sicherungen sind unverschlüsselt und werden nicht übertragen.</Meldung>
+        <Meldung art="warn">Noch kein Sicherungs-Passwort. Die Sicherungen sind deshalb nicht verschlüsselt und werden nicht übertragen.</Meldung>
       )}
       {daten.gpg === false ? <Meldung art="fehler">GnuPG fehlt auf dem Server (<code>sudo apt install gnupg</code>) – ohne GnuPG wird nicht verschlüsselt.</Meldung> : null}
       {v.versionen.length ? (
