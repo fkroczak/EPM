@@ -361,6 +361,8 @@ export type Termin = {
   /** Terminbestätigung (F185): wann zuletzt als PDF oder E-Mail erstellt (beim Verschieben wieder leer) */
   bestaetigung_am?: string | null;
   bestaetigung_von_name?: string | null;
+  /** auf welchem Weg bestätigt: "" = PDF/E-Mail aus EPM, sonst telefonisch, persoenlich, anderweitig (11.10.2026) */
+  bestaetigung_weg?: "" | "telefonisch" | "persoenlich" | "anderweitig";
   /** nur bei Praxisterminen: ``angebot`` = „Terminbestätigung schicken?“ anbieten bzw. „Bestätigung fehlt“ zeigen */
   bestaetigung?: { angebot: boolean; email: boolean; anrede: string } | null;
 };

@@ -1,5 +1,5 @@
 # EPM – Images auf dem PC bauen und für die Übertragung speichern
-# Aufruf in PowerShell im Ordner mit diesem Skript:   .\bauen.ps1            (Version aus der Datei VERSION)
+# Aufruf in PowerShell im Ordner mit diesem Skript:   .\bauen.ps1            (Version wie werkzeuge/version.sh)
 #                                                      .\bauen.ps1 0.2.1      (andere Version)
 param([string]$Version = "")
 $ErrorActionPreference = "Stop"
@@ -7,7 +7,20 @@ Set-Location (Join-Path $PSScriptRoot "..")
 
 # Ohne Angabe gilt die Version des Projekts - sonst entstuende ein Paket mit einer alten Nummer, das beim
 # Einspielen eine neuere Fassung ueberschreibt (Stolperstein 06.10.2026).
-if (-not $Version) { $Version = (Get-Content "VERSION" -Raw).Trim() }
+# Grundstand aus VERSION, die letzte Stelle zaehlt je Aenderung auf main hoch (wie werkzeuge/version.sh)
+if (-not $Version) {
+    $Version = (Get-Content "VERSION" -Raw).Trim()
+    if ($Version -match '^(\d+)\.(\d+)\.(\d+)$' -and (Get-Command git -ErrorAction SilentlyContinue)) {
+        $teile = $Matches
+        if ((git rev-parse --is-shallow-repository 2>$null) -eq "false") {
+            $seit = git log -1 --first-parent --format=%H -- VERSION
+            if ($seit) {
+                $n = [int](git rev-list --count --first-parent "$seit..HEAD")
+                $Version = "$($teile[1]).$($teile[2]).$([int]$teile[3] + $n)"
+            }
+        }
+    }
+}
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "Version nicht erkannt: '$Version' (erwartet X.Y.Z)." }
 
 function Docker-Befehl {

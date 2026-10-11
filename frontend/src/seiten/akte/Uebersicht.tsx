@@ -247,7 +247,7 @@ function BehandlungKarte() {
 }
 
 export function TermineKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
-  const { patient, erfassen, terminAnlegen } = useAkte();
+  const { patient, erfassen, terminAnlegen, terminOeffnen } = useAkte();
   const [bearbeiten, setBearbeiten] = useState<Termin | null>(null);
   useOhneRechtSchliessen(erfassen, () => setBearbeiten(null));
   const neuLaden = useAkteNeuLaden();
@@ -276,7 +276,8 @@ export function TermineKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
               {erfassen ? (
                 <button type="button" className="bg-transparent border-0 p-0 text-left truncate cursor-pointer text-akzent-text"
                   title="Termin bearbeiten" onClick={() => setBearbeiten(t)}>{t.titel}</button>
-              ) : <span className="truncate">{t.titel}</span>}
+              ) : <button type="button" className="bg-transparent border-0 p-0 text-left truncate cursor-pointer text-akzent-text"
+                title="Im Kalender zeigen" onClick={() => terminOeffnen(t.id)}>{t.titel}</button>}
             </li>
           ))}
         </ul>

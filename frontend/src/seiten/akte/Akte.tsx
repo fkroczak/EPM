@@ -20,6 +20,7 @@ import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
 import { HinweisChips, HinweisChipsKompakt } from "@/components/HinweisChips";
+import type { AktenAktion } from "@/lib/sprungziele";
 import { GewichtDialog, KontaktDialog } from "@/components/Schnellerfassung";
 import { useAktenAblage } from "@/components/AktenAblage";
 import type { Aktenansicht } from "@/lib/darstellung";
@@ -38,6 +39,8 @@ export type AktenKontext = {
   terminAnlegen: () => void;
   /** offenen Termin ändern (Karteikarte, 08.10.2026) */
   terminAendern: (t: Termin) => void;
+  /** Termin per Nummer öffnen (Wunsch 11.10.2026): Dialog „Termin bearbeiten“, ohne Recht bzw. erledigt im Kalender */
+  terminOeffnen: (id: number) => void;
   /** Dialoge „Kontakt erfassen“ / „Gewicht erfassen“ wie im Aktenkopf (F149) */
   kontaktErfassen: (text?: string) => void;
   gewichtErfassen: (wert?: string) => void;
@@ -537,6 +540,35 @@ export function Akte() {
       .then(() => qc.invalidateQueries({ queryKey: ["meine-akten"] }))
       .catch(() => undefined); // nur ein Lesezeichen: scheitert es, bleibt die Akte trotzdem offen
   }, [p, qc]);
+  // Sprung von einem offenen Punkt oder Termin (lib/sprungziele.ts, Wunsch 11.10.2026): passenden Dialog öffnen bzw. an die
+  // Karte der Übersicht scrollen – einmal je Klick (``zeit``)
+  const sprung = location.state as { oeffnen?: AktenAktion; termin?: number; zeit?: number } | null;
+  const erledigterSprung = useRef<number | undefined>(undefined);
+  const terminOeffnen = (id: number) => {
+    void api<Termin>(`termine/${id}/`).then((t) => {
+      if (p && !p.ist_abgeschlossen && !t.erledigt_am && darfBei("eintraege_erfassen", p)) setAenderTermin(t);
+      else navigate(`/kalender?ansicht=woche&datum=${t.faellig_am}`);
+    }).catch(() => melden("Der Termin ließ sich nicht öffnen.", "fehler"));
+  };
+  useEffect(() => {
+    if (!p || !sprung?.zeit || erledigterSprung.current === sprung.zeit) return;
+    erledigterSprung.current = sprung.zeit;
+    const schreiben = !p.ist_abgeschlossen;
+    const zeigen = (testid: string) => {
+      let versuche = 0;
+      const suchen = () => {
+        const el = document.querySelector<HTMLElement>(`[data-testid="${testid}"]`);
+        if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+        if (++versuche < 40) window.setTimeout(suchen, 50);
+      };
+      suchen();
+    };
+    if (sprung.oeffnen === "stammdaten" && schreiben && darfBei("akten_bearbeiten", p)) setDialog("stammdaten");
+    else if (sprung.oeffnen === "gewicht" && schreiben && darfBei("eintraege_erfassen", p)) { setVorbelegt(""); setDialog("gewicht"); }
+    else if (sprung.oeffnen === "gewichtsverlauf") zeigen("gewichtskarte");
+    else if (sprung.oeffnen === "termine") zeigen("aktentermine");
+    if (sprung.termin) terminOeffnen(sprung.termin);
+  }, [p, sprung, darfBei]);
   // Fenster, deren Recht wegfällt, verschwinden und bleiben zu – auch wenn das Recht später zurückkommt
   const offenBei = (recht: Recht) => !!p && !p.ist_abgeschlossen && darfBei(recht, p);
   const erlaubt: Record<typeof dialog, boolean> = {
@@ -587,6 +619,7 @@ export function Akte() {
     planen: offen && darfBei("plaene_anlegen", p),
     terminAnlegen: () => setDialog("termin"),
     terminAendern: (t: Termin) => setAenderTermin(t),
+    terminOeffnen,
     kontaktErfassen: (text?: string) => { setVorbelegt(text ?? ""); setDialog("kontakt"); },
     gewichtErfassen: (wert?: string) => { setVorbelegt(wert ?? ""); setDialog("gewicht"); },
     stammdatenBearbeiten: () => setDialog("stammdaten"),
@@ -627,10 +660,16 @@ export function Akte() {
       {hinweiseImKopf ? null : <HinweisChipsKompakt hinweise={k?.hinweise ?? []} patientId={p.id} ausblendbar={kontext.bearbeiten} />}
     </>
   );
-  // CAVE: Nickelallergie und Gewichtsverlust stehen in jeder Ansicht direkt beim Namen
-  const cave = p.nickelallergie === "ja" || trend?.warnung ? (
+  // CAVE: Nickelallergie und Gewichtsverlust stehen in jeder Ansicht direkt beim Namen; ebenso eine noch nicht erfasste
+  // Nickelallergie (wichtig wegen des Katheters, Wunsch 11.10.2026) – mit Recht zum Bearbeiten öffnet sie die Stammdaten
+  const nickelFehlt = p.nickelallergie === "unbekannt";
+  const cave = p.nickelallergie === "ja" || nickelFehlt || trend?.warnung ? (
     <span className="inline-flex items-center gap-1.5 flex-wrap" data-testid="cave">
       {p.nickelallergie === "ja" ? <Chip art="fehler">Nickelallergie</Chip> : null}
+      {nickelFehlt ? (kontext.bearbeiten
+        ? <button type="button" className="chip warn cursor-pointer" onClick={() => setDialog("stammdaten")}
+            title="Wichtig wegen des Katheters – jetzt in den Stammdaten erfassen" data-testid="nickel-fehlt">Nickelallergie nicht erfasst</button>
+        : <Chip art="warn" title="Wichtig wegen des Katheters" data-testid="nickel-fehlt">Nickelallergie nicht erfasst</Chip>) : null}
       {trend?.warnung ? <Chip art="warn" title={`seit ${datum(trend.von)}`}>Gewicht {richtung(Number(trend.prozent))} {prozent(trend.prozent, false)}</Chip> : null}
     </span>
   ) : null;
@@ -699,7 +738,10 @@ export function Akte() {
       titel: "Hausarzt", hinweis: k.hausarzt ? [k.hausarzt.name, k.hausarzt.telefon].filter(Boolean).join(" · ") : undefined,
       inhalt: k.hausarzt ? <>{k.hausarzt.name}{k.hausarzt.telefon ? <> · <span className="num">{k.hausarzt.telefon}</span></> : null}</> : "—",
     },
-    termin: { titel: "Nächster Termin", hinweis: terminText, inhalt: terminText ?? "—" },
+    // Klick öffnet den Termin (ohne Recht: Kalender), Wunsch 11.10.2026
+    termin: { titel: "Nächster Termin", hinweis: terminText, inhalt: terminText && k.naechster_termin ? (
+      <button type="button" className="termin-sprung text-akzent-text" title="Termin öffnen" data-testid="kopf-termin"
+        onClick={() => terminOeffnen(k.naechster_termin!.id)}>{terminText}</button>) : "—" },
     kontakt: { titel: "Letzter Kontakt", inhalt: k.letzter_kontakt ? <span className="num">{datum(k.letzter_kontakt)}</span> : "—" },
     telefon: {
       titel: "Telefon", hinweis: [p.telefon, p.telefon2].filter(Boolean).join(" · ") || undefined,
@@ -944,7 +986,10 @@ export function Akte() {
             gewicht: k.bmi != null || k.gewicht ? <>{k.bmi != null ? <><Begriff name="bmi">BMI</Begriff> {zahl(k.bmi, 1)}</> : null}
               {k.bmi != null && k.gewicht ? " · " : null}{k.gewicht ? `gemessen ${datum(k.gewicht.am)}` : null}</> : undefined,
             plan: k.aktueller_plan ? `gültig ab ${datum(k.aktueller_plan.gueltig_ab)}` : undefined,
-            terminWann: k.naechster_termin ? terminZeit(k.naechster_termin.faellig_am, k.naechster_termin.uhrzeit) : undefined,
+            terminWann: k.naechster_termin ? (
+              <button type="button" className="termin-sprung text-akzent-text" title="Termin öffnen" data-testid="kopf-termin"
+                onClick={() => terminOeffnen(k.naechster_termin!.id)}>{terminZeit(k.naechster_termin.faellig_am, k.naechster_termin.uhrzeit)}</button>
+            ) : undefined,
             terminWo: k.naechster_termin ? k.naechster_termin.ort ?? TERMINARTEN[k.naechster_termin.art] : undefined,
             kontakt: k.letzter_kontakt ? vorTagen(k.letzter_kontakt) : undefined,
           }} />

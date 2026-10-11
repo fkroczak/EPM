@@ -406,6 +406,16 @@ class Termin(AktenEintrag):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
     )
 
+    class Bestaetigungsweg(models.TextChoices):
+        SCHREIBEN = "", "PDF oder E-Mail aus EPM"
+        TELEFONISCH = "telefonisch", "telefonisch"
+        PERSOENLICH = "persoenlich", "persönlich"
+        ANDERWEITIG = "anderweitig", "anderweitig"
+
+    # Wunsch 11.10.2026: „Bestätigung fehlt“ wegklicken, wenn der Termin schon auf anderem Weg bestätigt ist
+    bestaetigung_weg = models.CharField("Terminbestätigung auf welchem Weg", max_length=12, blank=True, default="",
+                                        choices=Bestaetigungsweg.choices)
+
     history = HistoricalRecords()
 
     class Meta:

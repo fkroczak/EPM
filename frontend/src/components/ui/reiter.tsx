@@ -58,7 +58,7 @@ export function Reiter<T extends string>({ label, eintraege, wert, onWahl, testi
               (ev.currentTarget.parentElement?.querySelector(`#${CSS.escape(`${id}-${n.wert}`)}`) as HTMLElement | null)?.focus();
             }}>
             {e.text}
-            {e.zahl ? <span className={cx("chip h-5 px-1.5 text-[0.6875rem]", e.warn ? "warn" : undefined)}>{e.zahl}</span> : null}
+            {e.zahl ? <span className={cx("chip h-5 min-h-5 px-1.5 text-[0.6875rem]", e.warn ? "warn" : undefined)}>{e.zahl}</span> : null}
           </button>
         ))}
       </div>

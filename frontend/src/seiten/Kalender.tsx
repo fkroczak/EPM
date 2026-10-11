@@ -154,13 +154,14 @@ function EintragKnopf({ e, heute, onWahl, voll }: { e: Eintrag; heute: string; o
       {t ? (
         <>
           <span className={cx("num shrink-0", !voll && "opacity-90")}>{t.uhrzeit ? uhrzeit(t.uhrzeit) : voll ? "ganztägig" : ""}</span>
-          <span className="truncate min-w-0"><span className="font-medium">{t.patient_name}</span>{voll ? <> · {t.titel}</> : null}</span>
+          {/* ausführlich (Liste, Telefon): umbrechen statt über den Rand ragen (Prüfung 11.10.2026) */}
+          <span className={voll ? "min-w-0 max-w-full [overflow-wrap:anywhere]" : "truncate min-w-0"}><span className="font-medium">{t.patient_name}</span>{voll ? <> · {t.titel}</> : null}</span>
           {voll ? <span className="text-[0.75rem] opacity-90">{TERMINARTEN[t.art]}{t.ort_name ? ` · ${t.ort_name}` : ""}{t.patient_ist_test ? " · Test" : ""}</span> : null}
         </>
       ) : f ? (
         <>
           <Icon name={f.art === "plan" ? "tropfen" : "telefon"} groesse={12} className="shrink-0 self-center" />
-          <span className="truncate min-w-0"><span className="font-medium">{f.name}</span>{voll ? <> · {f.art === "plan" ? "Plan prüfen" : "Kontakt fällig"}</> : null}</span>
+          <span className={voll ? "min-w-0 max-w-full [overflow-wrap:anywhere]" : "truncate min-w-0"}><span className="font-medium">{f.name}</span>{voll ? <> · {f.art === "plan" ? "Plan prüfen" : "Kontakt fällig"}</> : null}</span>
         </>
       ) : null}
     </button>
@@ -585,13 +586,13 @@ export function Kalender() {
 
       {mobil ? (
         <Karte className="flex flex-col min-w-0 overflow-hidden" data-testid="kalender-stufe">
-          <div role="group" aria-label="Tag wählen" className="grid grid-cols-7 gap-1 p-2" data-testid="kalender-woche">
+          <div role="group" aria-label="Tag wählen" className="grid grid-cols-7 gap-0.5 min-[22rem]:gap-1 p-1.5 min-[22rem]:p-2" data-testid="kalender-woche">
             {Array.from({ length: 7 }, (_, i) => plus(montag(gewaehlt), i)).map((d, i) => {
               const n = (tage.get(d) ?? []).length;
               const an = d === gewaehlt;
               return (
                 <button key={d} type="button" aria-pressed={an} data-testid={`tag-${d}`} onClick={() => tagWaehlen(d)} title={feiertage.get(d)}
-                  className={cx("flex flex-col items-center gap-0.5 rounded-[0.625rem] border-0 py-1.5 cursor-pointer",
+                  className={cx("flex flex-col items-center gap-0.5 rounded-[0.625rem] border-0 py-1.5 px-0 min-w-0 cursor-pointer",
                     an ? "bg-akzent text-auf-akzent" : d === heute ? "bg-akzent-weich text-akzent-text" : "bg-transparent text-tinte",
                     feiertage.get(d) && !an && "text-fehler")}>
                   <span className="text-xs">{WOCHENTAGE[i]}</span>

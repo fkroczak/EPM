@@ -103,6 +103,7 @@ paket_erstellen() {
   schritt "Paket für Version $tag (Commit $commit)"
   git -C "$CODE" archive "$commit" rollout werkzeuge/epm-update.sh VERSION | tar -x -C "$tmp"
   echo "$tag" > "$tmp/TAG"
+  echo "${tag%-*}" > "$tmp/VERSION"   # berechnete Nummer (ohne Git auf dem VPS nicht mehr ableitbar)
   docker save "epm-backend:$tag" "epm-web:$tag" -o "$tmp/images.tar"
   (cd "$tmp" && find . -type f ! -name SHA256SUMS -printf '%P\n' | sort | xargs sha256sum > SHA256SUMS)
   local ziel="$B/images/epm-paket-$tag.tar"
@@ -180,7 +181,9 @@ git -C "$CODE" fetch --quiet origin
 ALT="$(git -C "$CODE" rev-parse --short HEAD)"
 git -C "$CODE" reset --quiet --hard origin/main
 NEU="$(git -C "$CODE" rev-parse --short HEAD)"
-TAG="$(tr -d '[:space:]' < "$CODE/VERSION")-$NEU"
+# Versionsnummer zählt mit jeder Änderung auf main hoch (werkzeuge/version.sh); ältere Stände ohne das Skript: VERSION
+if [[ -x "$CODE/werkzeuge/version.sh" ]]; then VER="$("$CODE/werkzeuge/version.sh" "$CODE")"; else VER="$(tr -d '[:space:]' < "$CODE/VERSION")"; fi
+TAG="$VER-$NEU"
 if [[ "$ALT" != "$NEU" ]]; then
   git -C "$CODE" log --oneline "$ALT..$NEU" | sed 's/^/   /'
 else

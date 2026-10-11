@@ -15,6 +15,7 @@ import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Fehleranzeige, Karte, KnopfLink, Knopf, Laden, Leer, Seitenkopf, Segmente, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
 import { HinweisChips } from "@/components/HinweisChips";
+import { hinweisZiel, terminZiel } from "@/lib/sprungziele";
 import { Begriff } from "@/components/ui/Begriff";
 
 type Zaehler = { in_betreuung: number; abgeschlossen: number; mit_hinweisen: number; gewichtsverlust: number; termin_woche: number };
@@ -100,10 +101,16 @@ function Spalte({ feld, sortierung, onSortieren, children, rechts, breite }: {
 
 function Hinweise({ p }: { p: PatientZeile }) {
   const { darfBei } = useAuth();
+  const navigate = useNavigate();
   return (
     <span className="inline-flex gap-1.5 flex-wrap">
       {p.nickelallergie === "ja" ? <Chip art="fehler">Nickelallergie</Chip> : null}
-      {p.nickelallergie === "unbekannt" ? <Chip title="Nickelallergie nicht erfasst">Nickel ?</Chip> : null}
+      {/* wie die übrigen offenen Aufgaben (Wunsch 11.10.2026, vorher grau „Nickel ?“) – ohne „×“: wichtig wegen des
+          Katheters, verschwindet erst, wenn die Angabe in der Akte erfasst ist */}
+      {p.nickelallergie === "unbekannt" ? <Chip art="warn" data-testid="nickel-fehlt">
+        <button type="button" className="hinweis-sprung" title="Wichtig wegen des Katheters – jetzt in den Stammdaten erfassen"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); const z = hinweisZiel(p.id, "nickelallergie"); navigate(z.pfad, { state: z.state }); }}>
+          Nickelallergie nicht erfasst</button></Chip> : null}
       {/* Kontakt fällig in zwei Stufen (S04): überfällig rot, bald fällig gelb.
           Jeder Hinweis lässt sich mit „×“ wegklicken (F119). */}
       <HinweisChips hinweise={p.kennzahlen?.hinweise ?? []} patientId={p.id}
@@ -112,13 +119,17 @@ function Hinweise({ p }: { p: PatientZeile }) {
   );
 }
 
+/** Nächster Termin; ein Klick öffnet ihn in der Akte (Wunsch 11.10.2026) */
 function NaechsterTermin({ p }: { p: PatientZeile }) {
+  const navigate = useNavigate();
   const t = p.kennzahlen?.naechster_termin;
   if (!t) return <span className="gedaempft">—</span>;
   return (
-    <span className={cx("text-[0.8125rem]", t.faellig_am < heuteIso() && "text-fehler")} title={t.titel}>
-      {terminZeit(t.faellig_am, t.uhrzeit)}<br /><span className="gedaempft">{TERMINARTEN[t.art] ?? t.art}</span>
-    </span>
+    <button type="button" className={cx("termin-sprung text-[0.8125rem]", t.faellig_am < heuteIso() && "text-fehler")}
+      title={`${t.titel} – Termin öffnen`} data-testid="naechster-termin"
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); const z = terminZiel(p.id, t.id); navigate(z.pfad, { state: z.state }); }}>
+      <span>{terminZeit(t.faellig_am, t.uhrzeit)}</span><br /><span className="gedaempft">{TERMINARTEN[t.art] ?? t.art}</span>
+    </button>
   );
 }
 

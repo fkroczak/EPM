@@ -38,16 +38,28 @@ function istPdf(dok: Dokument) {
   return dok.mime === "application/pdf";
 }
 
-function Vorschau({ dok }: { dok: Dokument }) {
+/** Vorschau; Antippen öffnet das Dokument in voller Größe wie „Öffnen“ (Wunsch 11.10.2026) */
+function Vorschau({ dok, onOeffnen }: { dok: Dokument; onOeffnen: () => void }) {
   if (dok.mime.startsWith("image/")) {
-    return <img src={dateiUrl(dok, true)} alt={dok.titel} className="w-full max-h-[20rem] object-contain rounded-lg border border-rand bg-fein" />;
+    return (
+      <button type="button" className="vorschau-oeffnen" onClick={onOeffnen} title="In voller Größe öffnen" data-testid="vorschau-oeffnen">
+        <img src={dateiUrl(dok, true)} alt={dok.titel} className="w-full max-h-[20rem] object-contain rounded-lg border border-rand bg-fein" />
+      </button>
+    );
   }
   if (istPdf(dok)) {
     // eigene Anzeige statt PDF-Programm des Browsers (Adobe Reader blendet dort eine schwarze Leiste ein)
-    return <PdfVorschau url={dateiUrl(dok, true)} titel={dok.titel} />;
+    return <PdfVorschau url={dateiUrl(dok, true)} titel={dok.titel} onOeffnen={onOeffnen} />;
   }
   if (dok.mime.startsWith("text/")) {
-    return <iframe title={`Vorschau ${dok.titel}`} src={dateiUrl(dok, true)} className="w-full h-[20rem] rounded-lg border border-rand bg-white" />;
+    return (
+      <div className="relative">
+        <iframe title={`Vorschau ${dok.titel}`} src={dateiUrl(dok, true)} className="w-full h-[20rem] rounded-lg border border-rand bg-white" />
+        {/* ein Rahmen schluckt Klicks – darüber eine unsichtbare Fläche zum Öffnen */}
+        <button type="button" className="absolute inset-0 bg-transparent border-0 cursor-zoom-in" onClick={onOeffnen}
+          aria-label={`${dok.titel} in voller Größe öffnen`} data-testid="vorschau-oeffnen" />
+      </div>
+    );
   }
   return <div className="h-[7.5rem] flex items-center justify-center text-sm gedaempft border border-dashed border-rand rounded-lg">Keine Vorschau</div>;
 }
@@ -319,7 +331,7 @@ function Details({ dok }: { dok: Dokument }) {
   return (
     <div className="flex flex-col gap-3" data-testid="dokument-details">
       <span className="text-[0.8125rem] font-medium gedaempft">Vorschau</span>
-      <Vorschau dok={dok} />
+      <Vorschau dok={dok} onOeffnen={() => (istPdf(dok) ? setLesen(true) : window.open(dateiUrl(dok, true), "_blank", "noopener"))} />
       <span className="font-medium break-words">{dok.titel}</span>
       {!dok.typ_geprueft && erfassen ? (
         <div className="meldung warn flex gap-2 items-start text-[0.8125rem]"><Icon name="warnung" /><span>Aus dem Altsystem übernommen. Bitte Typ und Datum prüfen.</span></div>

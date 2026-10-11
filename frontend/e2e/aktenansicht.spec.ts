@@ -79,10 +79,10 @@ test("Aktenansicht: Kopfzeile in Stufen, Seitenleiste mit Breite, Karteikarte mi
   await page.goto(akte);
   await expect(page.getByTestId("akte-ansicht")).toHaveAttribute("data-ansicht", "seitenleiste");
   const leiste = page.getByTestId("aktenkopf");
-  await expect(leiste.getByRole("button", { name: "Kontakt" })).toBeVisible();
+  await expect(leiste.getByRole("button", { name: "Kontakt", exact: true })).toBeVisible();
   await expect(leiste.getByRole("heading", { name: `${nachname}, Vera` })).toBeVisible();
   // Knöpfe stehen über dem Namen
-  const knopfY = (await leiste.getByRole("button", { name: "Gewicht" }).boundingBox())!.y;
+  const knopfY = (await leiste.getByRole("button", { name: "Gewicht", exact: true }).boundingBox())!.y;
   expect(knopfY).toBeLessThan((await leiste.getByRole("heading", { name: `${nachname}, Vera` }).boundingBox())!.y);
   await expect(page.getByTestId("kennzahlen").getByRole("group", { name: "Versorgung" })).toBeVisible();
   const reiter = page.getByTestId("senkrechte-reiter");

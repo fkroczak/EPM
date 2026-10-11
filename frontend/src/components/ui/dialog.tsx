@@ -60,7 +60,8 @@ export type MenuEintrag = { text: ReactNode; onClick: () => void; gefaehrlich?: 
 export function Menue({ label, eintraege, ausloeser }: { label: string; eintraege: MenuEintrag[]; ausloeser?: ReactNode }) {
   return (
     <BaseMenu.Root>
-      <BaseMenu.Trigger className="btn sec icon" aria-label={label} title={label}>
+      {/* mit eigenem Auslöser (Text) ein normaler kleiner Knopf, sonst „⋯“ */}
+      <BaseMenu.Trigger className={ausloeser ? "btn sec klein" : "btn sec icon"} aria-label={ausloeser ? undefined : label} title={label}>
         {ausloeser ?? <Icon name="mehr" />}
       </BaseMenu.Trigger>
       <BaseMenu.Portal>

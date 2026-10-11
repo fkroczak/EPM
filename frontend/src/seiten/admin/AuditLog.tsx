@@ -80,7 +80,7 @@ export function AuditLog() {
             <Link to={`/admin/benutzer?id=${g.id}`}>Zum Benutzer</Link></span>
         </div>
       ))}
-      <Karte className="overflow-hidden">
+      <Karte className="overflow-x-auto">
         {liste.isLoading ? <Laden /> : (
           <table className="tabelle" data-testid="auditlog" aria-busy={liste.isFetching || undefined}>
             <thead><tr><th className="th w-[9.375rem]">Zeitpunkt</th><th className="th">Person</th><th className="th">Art</th><th className="th">Details</th><th className="th">Gerät / Adresse</th></tr></thead>

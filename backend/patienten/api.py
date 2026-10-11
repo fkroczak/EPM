@@ -755,8 +755,9 @@ def _bestaetigung_vermerken(user, termin):
         return
     termin.bestaetigung_am = timezone.now()
     termin.bestaetigung_von = user
+    termin.bestaetigung_weg = ""
     termin._history_user = user
-    termin.save(update_fields=["bestaetigung_am", "bestaetigung_von"])
+    termin.save(update_fields=["bestaetigung_am", "bestaetigung_von", "bestaetigung_weg"])
 
 
 def _aktion(name, h, aenderungen):
@@ -770,9 +771,10 @@ def _aktion(name, h, aenderungen):
         return "storniert"
     if name == "termine" and "erledigt_am" in felder:
         return "erledigt"
-    if name == "termine" and "bestaetigung_am" in felder and felder <= {"bestaetigung_am", "bestaetigung_von"} \
-            and h.bestaetigung_am:
-        return "Terminbestätigung erstellt"  # F185
+    if name == "termine" and "bestaetigung_am" in felder \
+            and felder <= {"bestaetigung_am", "bestaetigung_von", "bestaetigung_weg"} and h.bestaetigung_am:
+        # F185; ohne PDF/E-Mail auf anderem Weg bestätigt (Wunsch 11.10.2026)
+        return f"Terminbestätigung {h.get_bestaetigung_weg_display()}" if h.bestaetigung_weg else "Terminbestätigung erstellt"
     if name == "infusionsplaene" and "status" in felder:
         if h.status == "aktuell" and h.abgeschlossen_von_id:
             # der Mediziner hat außerhalb von EPM freigegeben; die eintragende Person hat nur abgeschlossen
@@ -1219,9 +1221,9 @@ class TerminSerializer(serializers.ModelSerializer):
         fields = ["id", "patient", "patient_name", "patient_ist_test", "art", "ort", "ort_name", "faellig_am", "uhrzeit", "bei", "titel",
                   "notiz", "kontakt", "erledigt_am", "erledigt_von_name", "angelegt_am", "angelegt_von_name",
                   "ausgeblendet", "ausgeblendet_bis", "ausgeblendet_dauerhaft", "ausblende_grund", "ausgeblendet_am",
-                  "ausgeblendet_von_name", "bestaetigung_am", "bestaetigung_von_name", "bestaetigung"]
+                  "ausgeblendet_von_name", "bestaetigung_am", "bestaetigung_von_name", "bestaetigung_weg", "bestaetigung"]
         read_only_fields = ["erledigt_am", "angelegt_am", "ausgeblendet_bis", "ausgeblendet_dauerhaft", "ausblende_grund",
-                            "ausgeblendet_am", "bestaetigung_am"]
+                            "ausgeblendet_am", "bestaetigung_am", "bestaetigung_weg"]
 
     ausgeblendet = serializers.BooleanField(source="ist_ausgeblendet", read_only=True)
     ausgeblendet_von_name = serializers.SerializerMethodField()
@@ -1249,6 +1251,7 @@ class TerminSerializer(serializers.ModelSerializer):
                 f in validated_data and validated_data[f] != getattr(instance, f) for f in ("faellig_am", "uhrzeit", "ort")):
             validated_data["bestaetigung_am"] = None
             validated_data["bestaetigung_von"] = None
+            validated_data["bestaetigung_weg"] = ""
         return super().update(instance, validated_data)
 
     def get_ausgeblendet_von_name(self, obj):
@@ -1320,6 +1323,25 @@ class TerminViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.RetrieveM
         if termin.erledigt_am:
             return Response({"fehler": "Termin ist bereits erledigt."}, status=status.HTTP_400_BAD_REQUEST)
         termin.erledigen(request.user)
+        return Response(self.get_serializer(termin).data)
+
+    @action(detail=True, methods=["post"])
+    def bestaetigt(self, request, pk=None):
+        """Terminbestätigung schon erledigt (Wunsch 11.10.2026): ``{"weg": "telefonisch"|"persoenlich"|"anderweitig"}``
+        vermerkt die Bestätigung ohne PDF oder E-Mail – „Bestätigung fehlt“ verschwindet. Recht wie beim Abhaken; nur
+        offene Termine; steht im Verlauf der Akte. Verschiebt man den Termin, fehlt die Bestätigung wieder."""
+        termin = self.get_object()
+        self.pruefe_patient(termin.patient)
+        weg = str((request.data if isinstance(request.data, dict) else {}).get("weg") or "")
+        if weg not in {"telefonisch", "persoenlich", "anderweitig"}:
+            return Response({"weg": "Bitte telefonisch, persönlich oder anderweitig wählen."}, status=status.HTTP_400_BAD_REQUEST)
+        if termin.erledigt_am:
+            return Response({"fehler": "Termin ist bereits erledigt."}, status=status.HTTP_400_BAD_REQUEST)
+        termin.bestaetigung_am = timezone.now()
+        termin.bestaetigung_von = request.user
+        termin.bestaetigung_weg = weg
+        termin._history_user = request.user
+        termin.save(update_fields=["bestaetigung_am", "bestaetigung_von", "bestaetigung_weg"])
         return Response(self.get_serializer(termin).data)
 
     @action(detail=True, methods=["post"])
