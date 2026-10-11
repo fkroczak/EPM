@@ -10,3 +10,5 @@ backend/dokumente/
 # OCR-Modelle, offline vorbereitet (werkzeuge/ocr-modelle.sh) – kommen nicht ins Repo
 backend/scans/modelle/dateien/
 epm-ocr-modelle-*.tar
+# Sitzung von werkzeuge/hilfe-bilder.mjs (Anmeldecookie)
+werkzeuge/.hilfe-bilder-sitzung.json
