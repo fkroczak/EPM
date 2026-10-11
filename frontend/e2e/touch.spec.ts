@@ -82,3 +82,20 @@ test.describe("Telefon 320 px (Finger)", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   });
 });
+
+test.describe("Telefon 390 px: Benutzer bearbeiten", () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, storageState: zustand("admin") });
+
+  test("Formular steht unter der Liste und kommt nach dem Antippen in den Blick (Fehlermeldung 11.10.2026)", async ({ page }) => {
+    await page.goto("/admin/benutzer");
+    const zeile = page.getByTestId("benutzerliste").getByRole("row").filter({ hasText: "e2e.mitarbeiter" });
+    await zeile.getByRole("button").first().click();
+    const detail = page.getByTestId("benutzer-detail");
+    await expect(detail).toContainText("S. Mitarbeit");
+    await expect(detail).toBeInViewport();
+    // vor Anmeldung und Rechten, nicht mehr ganz unten
+    const formular = (await detail.boundingBox())!;
+    const rechte = (await page.getByTestId("rechte").boundingBox())!;
+    expect(formular.y).toBeLessThan(rechte.y);
+  });
+});

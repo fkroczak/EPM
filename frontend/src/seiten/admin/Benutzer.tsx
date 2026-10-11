@@ -10,6 +10,7 @@ import { ApiFehler, STATUS_PRUEFEN, alle, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuth, useIch } from "@/lib/auth";
 import { relativ, zeitpunkt } from "@/lib/format";
+import { detailZeigen } from "@/lib/stufen";
 import { ROLLEN } from "@/lib/typen";
 import type { Benutzer as BenutzerTyp } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
@@ -284,7 +285,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
   const ohneLogin = neu ? f.ohne_login : historisch;
   const testMoeglich = !ohneLogin && TESTBENUTZER_ROLLEN.includes(f.rolle) && benutzer?.id !== ich.id;
   return (
-    <Karte className="px-5 py-[1.125rem] flex flex-col gap-4 min-w-0" data-testid="benutzer-detail">
+    <Karte className="px-5 py-[1.125rem] flex flex-col gap-4 min-w-0 scroll-mt-20" data-testid="benutzer-detail">
       <div className="flex items-center gap-2.5 flex-wrap">
         <h2 className="m-0 text-lg font-semibold">{neu ? "Neuer Benutzer" : name}</h2>
         {z ? <Chip art={z.art}>{z.art === "ok" ? <Icon name="haken" /> : z.art === "fehler" ? <Icon name="schloss" /> : null}{z.text}</Chip> : null}
@@ -422,6 +423,9 @@ export function Benutzer() {
     if (hash === "#anmeldung" && liste.data) document.getElementById("anmeldung")?.scrollIntoView({ block: "start" });
   }, [hash, liste.data]);
   const aktiv = neu ? null : benutzer.find((b) => b.id === gewaehlt) ?? benutzer[0] ?? null;
+  // unter 1280 px steht das Formular unter der Liste: nach dem Antippen dorthin scrollen (Fehlermeldung 11.10.2026:
+  // „am Telefon muss ich ganz nach unten scrollen“)
+  const waehlen = (id: number) => { setNeu(false); setGewaehlt(id); detailZeigen("benutzer-detail"); };
   return (
     <Seite pfad={[{ text: "Administration" }, { text: "Benutzer" }]}>
       <Seitenkopf titel="Benutzer" unter="Wer darf was im EPM. Benutzer werden nie gelöscht, nur gesperrt, damit ihre Einträge zuordenbar bleiben."
@@ -430,7 +434,7 @@ export function Benutzer() {
             <input type="checkbox" checked={mitAusgeblendeten} onChange={(e) => setMitAusgeblendeten(e.target.checked)} />Ausgeblendete zeigen
           </label>
           {sichtbareTester.length ? <Knopf onClick={() => { ausblenden.reset(); setAlleAusblenden(true); }}>Alle Testbenutzer ausblenden</Knopf> : null}
-          <Knopf variante="pri" icon="plus" onClick={() => setNeu(true)}>Benutzer anlegen</Knopf></>} />
+          <Knopf variante="pri" icon="plus" onClick={() => { setNeu(true); detailZeigen("benutzer-detail"); }}>Benutzer anlegen</Knopf></>} />
       <Dialog offen={alleAusblenden} onOffen={setAlleAusblenden} titel="Alle Testbenutzer ausblenden" breite={520}
         beschreibung="Alle Konten mit Testzugang werden gesperrt, ihre Anmeldungen beendet, und sie erscheinen in keiner Liste mehr. Nichts wird gelöscht; einzeln wieder einblendbar."
         fuss={<><Knopf onClick={() => setAlleAusblenden(false)}>Abbrechen</Knopf>
@@ -440,9 +444,10 @@ export function Benutzer() {
           <Fehleranzeige fehler={ausblenden.error} />
         </div>
       </Dialog>
+      {/* unter 1280 px: Liste, dann das gewählte Konto, dann Anmeldung und Rechte (vorher stand das Formular ganz unten) */}
       <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 items-start">
-        <div className="stapel flex flex-col gap-5 min-w-0">
-          <Karte className="overflow-x-auto">
+        <div className="stapel flex flex-col gap-5 min-w-0 max-xl:contents">
+          <Karte className="overflow-x-auto max-xl:order-1">
             {liste.isLoading ? <Laden /> : (
               <table className="tabelle" data-testid="benutzerliste">
                 <thead><tr><th className="th w-12"><span className="sr-only">Kürzel</span></th><th className="th">Name</th><th className="th">Rolle</th><th className="th">Anmeldung</th><th className="th">Status</th></tr></thead>
@@ -450,11 +455,11 @@ export function Benutzer() {
                   {benutzer.map((b) => {
                     const z = zustand(b);
                     return (
-                      <tr key={b.id} className={cx("cursor-pointer", aktiv?.id === b.id && "gewaehlt")} onClick={() => { setNeu(false); setGewaehlt(b.id); }}>
+                      <tr key={b.id} className={cx("cursor-pointer", aktiv?.id === b.id && "gewaehlt")} onClick={() => waehlen(b.id)}>
                         <td className="td"><span className="w-8 h-8 rounded-full bg-akzent-weich text-akzent-text inline-flex items-center justify-center text-xs font-semibold">{b.kuerzel || "—"}</span></td>
                         <td className="td">
                           <button type="button" className="bg-transparent border-0 p-0 font-medium text-akzent-text cursor-pointer text-left"
-                            onClick={(e) => { e.stopPropagation(); setNeu(false); setGewaehlt(b.id); }}>{b.anzeigename}</button>
+                            onClick={(e) => { e.stopPropagation(); waehlen(b.id); }}>{b.anzeigename}</button>
                           <br /><span className="text-[0.8125rem] gedaempft">{b.funktion ? `${b.funktion} · ` : ""}<span className="num">{b.username}</span></span>
                         </td>
                         <td className="td"><Chip art={b.rolle === "keine" ? undefined : "akzent"}>{ROLLEN[b.rolle] ?? b.rolle}</Chip>{b.ist_test ? <><br /><Chip art="warn" className="mt-1">Testbenutzer</Chip></> : null}</td>
@@ -468,11 +473,15 @@ export function Benutzer() {
             )}
             <Fehleranzeige fehler={liste.error} />
           </Karte>
-          <AnmeldungKarte onBenutzer={(id) => { setNeu(false); setGewaehlt(id); }} />
-          <RechteMatrix />
+          <div className="stapel flex flex-col gap-5 min-w-0 max-xl:order-3">
+            <AnmeldungKarte onBenutzer={waehlen} />
+            <RechteMatrix />
+          </div>
         </div>
-        {aktiv || neu ? <Detail benutzer={aktiv} neu={neu} onGewaehlt={(id) => { setNeu(false); setGewaehlt(id); }}
-          kennwortAnzeige={kennwort} setKennwortAnzeige={setKennwort} /> : null}
+        {aktiv || neu ? <div className="min-w-0 max-xl:order-2">
+          <Detail benutzer={aktiv} neu={neu} onGewaehlt={(id) => { setNeu(false); setGewaehlt(id); }}
+            kennwortAnzeige={kennwort} setKennwortAnzeige={setKennwort} />
+        </div> : null}
       </div>
     </Seite>
   );
