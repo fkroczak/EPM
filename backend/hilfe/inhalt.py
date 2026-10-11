@@ -149,7 +149,9 @@ vergeben (z. B. „iPhone“), bestätigen. Am besten auf PC <em>und</em> Telefo
 zweiten Faktor hatte, bekommt dabei Notfall-Codes.</p>
 <p><strong>Voraussetzung:</strong> EPM über den Namen aufrufen (z. B. <code>https://epm.stiftung.lan/</code>), nicht über
 die IP-Adresse, und das Stammzertifikat der Stiftung einmal auf dem Gerät installieren:
-<a href="/epm-ca.crt">Stammzertifikat herunterladen</a>.</p>
+<a href="/epm-ca.crt">Stammzertifikat herunterladen</a> (für iPhone/iPad als Profil:
+<a href="/epm-ca.mobileconfig">Profil laden</a>). Beides gibt es auch unter <em>Mein Konto › Gerät einrichten</em> mit
+Anleitung für das jeweilige Gerät und auf der Anmeldeseite unter „Dieses Gerät einrichten“.</p>
 <ul>
 <li><strong>Windows:</strong> Datei öffnen › Zertifikat installieren › Lokaler Computer › „Vertrauenswürdige
 Stammzertifizierungsstellen“.</li>
