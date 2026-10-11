@@ -339,7 +339,9 @@ class PatientFilter(filters.FilterSet):
         if wert == "altdokumente":
             return qs.filter(id__in=Dokument.objects.filter(typ_geprueft=False, ausgeblendet=False).values("patient_id"))
         if wert == "nickelallergie":
-            return qs.filter(nickelallergie=Patient.Nickelallergie.UNBEKANNT)
+            from .kennzahlen import nickel_offen
+
+            return nickel_offen(qs)
         if wert == "kein_versorger":
             # „kein Versorger“ (bewusst keiner) ist kein offener Punkt
             return qs.filter(versorger__isnull=True, kein_versorger=False)

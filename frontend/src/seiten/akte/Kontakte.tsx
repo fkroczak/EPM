@@ -14,7 +14,7 @@ import { useAuswahl } from "@/lib/daten";
 import { useVersorgerListe } from "@/lib/daten";
 import { datum, eingabeDatum, heuteIso, terminZeit, uhrzeit, zeitpunkt } from "@/lib/format";
 import { TERMINARTEN } from "@/lib/typen";
-import type { Kontakt } from "@/lib/typen";
+import type { Bezugsperson, Kontakt } from "@/lib/typen";
 import { Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog, Menue } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
@@ -71,6 +71,13 @@ function Erreichbarkeit() {
   const v = (versorger.data ?? []).find((x) => x.id === p.versorger);
   const ap = v?.ansprechpartner.find((a) => a.id === p.ansprechpartner);
   const arzt = p.kopf?.hausarzt;
+  // Bezugspersonen mit Auskunftserlaubnis (Schweigepflichtentbindung) gehören dazu (Wunsch 11.10.2026); dieselbe Abfrage
+  // wie die Karte „Bezugspersonen“, also ohne zusätzliche Last
+  const personen = useQuery({
+    queryKey: ["patient", p.id, "bezugspersonen"],
+    queryFn: () => api<Bezugsperson[]>(`bezugspersonen/${abfrage({ patient: p.id })}`),
+  });
+  const auskunft = (personen.data ?? []).filter((b) => b.aktiv && b.auskunft_erlaubt && (b.telefon || b.mobil));
   const fehlt = [!p.email ? "keine E-Mail" : "", !arzt ? "kein Hausarzt" : ""].filter(Boolean).join(" · ");
   return (
     <Karte className="px-5 py-4 flex flex-col gap-1" data-testid="erreichbarkeit">
@@ -80,8 +87,14 @@ function Erreichbarkeit() {
       {v?.telefon ? <Nummer wer={v.name} zusatz="Versorger" nummer={v.telefon} /> : null}
       {ap && (ap.telefon || ap.mobil) ? <Nummer wer={ap.name} zusatz="Ansprechpartner" nummer={ap.telefon || ap.mobil} /> : null}
       {arzt?.telefon ? <Nummer wer={arzt.name} zusatz="Hausarzt" nummer={arzt.telefon} /> : null}
+      {auskunft.map((b) => (
+        <div key={b.id} data-testid="erreichbarkeit-bezugsperson">
+          <Nummer wer={b.name} zusatz={[b.beziehung_name, "Auskunft erlaubt"].filter(Boolean).join(" · ")} nummer={b.telefon || b.mobil} />
+          {b.telefon && b.mobil ? <Nummer wer={b.name} zusatz="Mobil" nummer={b.mobil} /> : null}
+        </div>
+      ))}
       {p.email ? <a href={`mailto:${p.email}`} className="text-sm truncate py-1.5">{p.email}</a> : null}
-      {!p.telefon && !p.telefon2 && !v?.telefon ? <span className="text-sm gedaempft">Keine Telefonnummer eingetragen.</span> : null}
+      {!p.telefon && !p.telefon2 && !v?.telefon && !auskunft.length ? <span className="text-sm gedaempft">Keine Telefonnummer eingetragen.</span> : null}
       {fehlt ? <span className="text-[0.8125rem] gedaempft pt-1">{fehlt}</span> : null}
     </Karte>
   );

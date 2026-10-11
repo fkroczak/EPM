@@ -934,6 +934,8 @@ class Hinweisruhe(models.Model):
         GEWICHT_FEHLT = "gewicht_fehlt", "Kein aktuelles Gewicht"
         DIAGNOSE = "diagnose", "Keine Diagnose"
         TERMIN_ORT = "termin_ort", "Praxistermin ohne Ort"
+        # Wunsch 11.10.2026: wegklickbar wie die übrigen (nicht jeder Patient hat einen Katheter)
+        NICKELALLERGIE = "nickelallergie", "Nickelallergie nicht erfasst"
 
     FRISTEN = (3, 6, 12)
 

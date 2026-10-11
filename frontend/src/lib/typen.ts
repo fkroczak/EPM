@@ -831,7 +831,9 @@ export type Bericht = {
 // ================================================================= Hinweise stummschalten (07.10.2026, F119)
 export type HinweisArt = "gewicht" | "plan" | "ohne_plan" | "versorger" | "kontakt" | "labor" | "bia"
   // fehlende Angaben (F186)
-  | "hausarzt" | "telefon" | "gewicht_fehlt" | "diagnose" | "termin_ort";
+  | "hausarzt" | "telefon" | "gewicht_fehlt" | "diagnose" | "termin_ort"
+  // wegklickbar wie die übrigen (Wunsch 11.10.2026)
+  | "nickelallergie";
 
 /** Fristen, die beim Wegklicken zur Wahl stehen; „nicht mehr nötig“ ist die vierte Möglichkeit */
 export const RUHE_FRISTEN = [3, 6, 12] as const;
