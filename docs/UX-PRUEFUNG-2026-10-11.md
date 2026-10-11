@@ -242,9 +242,12 @@ gleich geblieben. Die Tests prüfen Titel und IDs, nicht den Fließtext. Der HTM
 | Server: Einschränkung nur bei abgeschlossener Akte (`backend/patienten/datenschutz.py`) | 53,5 | 65,1 | 9,5 → 6,7 |
 | Server: Ansprechpartner passt nicht (`backend/patienten/models.py`) | 37,5 | 41,5 | jetzt mit Handlung: „Bitte einen passenden wählen.“ |
 
-Gegen die Tests geprüft: Alle Ausgangstexte wurden in `backend/**/test*.py` und `frontend/e2e` gesucht. Nur
-„Noch kein Sicherungs-Passwort“ wird geprüft (`e2e/zzz-sicherung.spec.ts`). Dieser Satzanfang bleibt wörtlich
-erhalten. `patienten/test_datenschutz.py` prüft nur, dass „Freigabevermerk“ vorkommt, und das tut es weiterhin.
+Gegen die Tests geprüft: Alle Ausgangstexte wurden in `backend/**/test*.py` und `frontend/e2e` gesucht.
+
+- „Noch kein Sicherungs-Passwort“ (`e2e/zzz-sicherung.spec.ts`): Dieser Satzanfang bleibt wörtlich erhalten.
+- „Freigabevermerk“ (`patienten/test_datenschutz.py`): Das Wort kommt weiterhin vor.
+- „abgeschlossene Akten“ (`patienten/test_datenschutz.py`, Zeile 342): Der Test wurde angepasst und prüft jetzt
+  „abgeschlossene Akte“.
 
 Bewusst nicht geändert:
 
@@ -262,7 +265,11 @@ Bewusst nicht geändert:
 ## 4. Tests
 
 - `npx tsc --noEmit -p .` (frontend): ohne Fehler.
-- `manage.py test --noinput hilfe infusionen patienten` (DB `epm_ux`): siehe Ergebnis im Bericht an den Auftraggeber.
+- `manage.py test --noinput hilfe infusionen patienten` (DB `epm_ux`): 229 Tests, 1 Fehlschlag.
+  `patienten.test_datenschutz…test_loeschung_wird_eingeschraenkt_statt_geloescht` prüfte den Teiltext
+  „abgeschlossene Akten“ der alten Meldung. Der Test wurde an die neue Meldung angepasst und prüft jetzt
+  „abgeschlossene Akte“ (`backend/patienten/test_datenschutz.py`, Zeile 342).
+- Danach `manage.py test --noinput patienten.test_datenschutz hilfe`: 18 Tests, OK.
 - Ablauf „Neuer Patient“ mit eigenem Playwright-Skript nachgestellt, ohne `e2e.sh` und ohne angelegten Patienten:
   1. Pflichtfehler erscheinen.
   2. Der Bereich „Weitere Angaben“ ist zu Beginn zu.
