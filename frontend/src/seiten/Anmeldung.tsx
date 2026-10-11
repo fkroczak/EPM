@@ -11,6 +11,7 @@ import type { Status } from "@/lib/typen";
 import { Eingabe, Feld, Knopf, Meldung, Segmente } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
 import { EpmMarke, EpmSymbol } from "@/components/layout/EpmMarke";
+import { Stammzertifikat } from "@/components/Stammzertifikat";
 
 /** Neutrale Anmeldeseite (Wunsch 11.10.2026): EPM wird von DSKM und Regeneration Clinic genutzt – vor der Anmeldung
  *  steht deshalb keine Firma im Vordergrund, sondern das System. Ruhige Fläche in Schiefer-Petrol, Pulslinie, Leitsatz;
@@ -73,6 +74,11 @@ function Rahmen({ children }: { children: ReactNode }) {
           <Icon name="schloss" groesse={14} className="mt-[0.1875rem] shrink-0" />
           <span>Nur im VPN erreichbar. Nach 30 Minuten ohne Aktivität wirst du abgemeldet.</span>
         </div>
+        {/* Stammzertifikat schon vor der Anmeldung (Gerät einrichten, 11.10.2026); ohne eigene CA leer */}
+        <details className="text-[0.8125rem] gedaempft [&:not(:has([data-testid=stammzertifikat]))]:hidden" data-testid="anmeldung-zertifikat">
+          <summary className="cursor-pointer">Dieses Gerät einrichten (Stammzertifikat)</summary>
+          <Stammzertifikat kompakt className="mt-2" />
+        </details>
         {firmen.length ? <span className="md:hidden text-xs gedaempft">Gemeinsam genutzt von {firmen.map((f) => f.kurzname).join(" · ")}</span> : null}
       </main>
     </div>

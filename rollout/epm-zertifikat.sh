@@ -40,8 +40,39 @@ pruefe_name() {
   fi
 }
 
+# Profil für iPhone/iPad mit dem Stammzertifikat (öffentlich, ohne Schlüssel): https://<Name>/epm-ca.mobileconfig
+profil_schreiben() {
+  [[ -s "$CERTS/epm-ca.crt" ]] || { rm -f "$CERTS/epm-ca.mobileconfig"; return 0; }
+  local der uuid1 uuid2
+  der=$(openssl x509 -in "$CERTS/epm-ca.crt" -outform der | base64 -w0)
+  uuid1=$(cat /proc/sys/kernel/random/uuid); uuid2=$(cat /proc/sys/kernel/random/uuid)
+  cat > "$CERTS/epm-ca.mobileconfig" <<PROFIL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>PayloadContent</key><array><dict>
+    <key>PayloadCertificateFileName</key><string>epm-ca.crt</string>
+    <key>PayloadContent</key><data>$der</data>
+    <key>PayloadDisplayName</key><string>EPM Stammzertifikat</string>
+    <key>PayloadIdentifier</key><string>epm.stammzertifikat.$uuid2</string>
+    <key>PayloadType</key><string>com.apple.security.root</string>
+    <key>PayloadUUID</key><string>$uuid2</string>
+    <key>PayloadVersion</key><integer>1</integer>
+  </dict></array>
+  <key>PayloadDescription</key><string>Stammzertifikat für EPM ($NAME) – nötig für Passkeys und eine Verbindung ohne Warnung.</string>
+  <key>PayloadDisplayName</key><string>EPM Stammzertifikat</string>
+  <key>PayloadIdentifier</key><string>epm.profil.$uuid1</string>
+  <key>PayloadType</key><string>Configuration</string>
+  <key>PayloadUUID</key><string>$uuid1</string>
+  <key>PayloadVersion</key><integer>1</integer>
+</dict></plist>
+PROFIL
+  chmod 0444 "$CERTS/epm-ca.mobileconfig"
+}
+
 nginx_neu_laden() {
-  chown 101:101 "$CERTS"/epm.crt "$CERTS"/epm.key "$CERTS"/epm-ca.crt 2>/dev/null || true
+  profil_schreiben
+  chown 101:101 "$CERTS"/epm.crt "$CERTS"/epm.key "$CERTS"/epm-ca.crt "$CERTS"/epm-ca.mobileconfig 2>/dev/null || true
   chmod 0400 "$CERTS/epm.key"; chmod 0444 "$CERTS/epm.crt"; [[ -f "$CERTS/epm-ca.crt" ]] && chmod 0444 "$CERTS/epm-ca.crt"
   if (cd "$B" && docker compose ps --status running -q web 2>/dev/null | grep -q .); then
     (cd "$B" && docker compose exec -T web nginx -s reload) && echo "   Nginx hat das neue Zertifikat geladen."

@@ -68,7 +68,10 @@ Geräte vertrauen – nicht über die IP-Adresse. Dafür gibt es eine eigene CA 
 sudo epm-zertifikat einrichten   # CA + Serverzertifikat für EPM_WEB_NAME, Nginx lädt neu
 sudo epm-zertifikat status       # Name, Aussteller, Ablauf (Serverzertifikat 397 Tage: jährlich „erneuern“)
 ```
-Das Stammzertifikat liegt unter `https://<EPM_WEB_NAME>/epm-ca.crt` und wird einmal je PC/Telefon installiert
+Das Stammzertifikat liegt unter `https://<EPM_WEB_NAME>/epm-ca.crt` (für iPhone/iPad als Profil
+`/epm-ca.mobileconfig`, schreibt `epm-zertifikat` bei jedem Einrichten/Erneuern/Importieren; auf bestehenden Servern
+einmal `sudo epm-zertifikat erneuern` bzw. `importieren`, sonst baut der Browser das Profil selbst) und wird einmal je
+PC/Telefon installiert – zum Herunterladen für alle unter Mein Konto › Gerät einrichten und auf der Anmeldeseite
 (Anleitung in EPM unter Hilfe › „Passkey statt Code“). Den Namen auf der OPNsense per Unbound-Überschreibung auf die
 Server-IP zeigen lassen. Ein Zertifikat einer anderen CA (z. B. der OPNsense): `sudo epm-zertifikat importieren CRT KEY CA`.
 Status, Erneuern und Importieren gehen auch in EPM unter Administration › System › Zertifikat; nur das erstmalige

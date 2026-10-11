@@ -17,6 +17,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { useZweiterFaktor } from "@/components/ZweiterFaktor";
+import { Stammzertifikat } from "@/components/Stammzertifikat";
 import type { PasskeyEintrag } from "@/lib/typen";
 import { AuthenticatorEinrichten, NotfallcodesAnzeige, PasskeyEinrichten } from "./Anmeldung";
 
@@ -413,6 +414,14 @@ function PasskeyUmbenennen({ passkey }: { passkey: PasskeyEintrag }) {
   </>;
 }
 
+function GeraetKarte() {
+  return (
+    <Karte className="px-5 py-[1.125rem] flex flex-col gap-3 empty:hidden" data-testid="geraet-einrichten">
+      <Stammzertifikat titel="Gerät einrichten" />
+    </Karte>
+  );
+}
+
 function SicherheitKarte() {
   const [dialog, setDialog] = useState<"" | "kennwort" | "geraet" | "codes" | "aus" | "passkey">("");
   const [entfernen, setEntfernen] = useState<PasskeyEintrag | null>(null);
@@ -571,6 +580,8 @@ export function Konto() {
         </div>
         <div className="stapel flex flex-col gap-5 min-w-0">
           <SicherheitKarte />
+          {/* Stammzertifikat für jedes Gerät (11.10.2026); ohne eigene CA auf dem Server leer */}
+          <GeraetKarte />
         </div>
       </div>
     </Seite>

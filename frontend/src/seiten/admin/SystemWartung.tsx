@@ -4,6 +4,7 @@
  * erstellen, OCR-Modelle einspielen, Zertifikat erneuern oder importieren, Protokolle ansehen. Alles als Auftrag an den
  * Systemagenten (feste Liste), gefährliches mit Passwort und zweitem Faktor, alles im Audit-Log.
  */
+import { Stammzertifikat } from "@/components/Stammzertifikat";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -629,14 +630,10 @@ export function ZertifikatBereich({ daten, offen }: { daten: Uebersicht; offen: 
         </div>
       </Karte>
       <Karte className="px-5 py-4 flex flex-col gap-2 text-sm">
-        <KartenKopf titel="Stammzertifikat auf Geräten" />
-        <p className="m-0">Einmal je PC und Telefon installieren: <a href="/epm-ca.crt" download>epm-ca.crt herunterladen</a>, dann</p>
-        <ul className="m-0 pl-5 flex flex-col gap-1">
-          <li>Windows: Doppelklick › Zertifikat installieren › Lokaler Computer › „Vertrauenswürdige Stammzertifizierungsstellen“</li>
-          <li>iPhone: Profil laden › Einstellungen › Allgemein › VPN und Geräteverwaltung › installieren; danach unter Info ›
-            Zertifikatsvertrauenseinstellungen einschalten</li>
-          <li>Android: Einstellungen › Sicherheit › Verschlüsselung und Anmeldedaten › Zertifikat installieren › CA-Zertifikat</li>
-        </ul>
+        <KartenKopf titel="Stammzertifikat auf Geräten" unter="Jede Person kann es auch selbst unter Mein Konto und auf der Anmeldeseite laden." />
+        {/* Download und Anleitung wie unter Mein Konto (11.10.2026) */}
+        <Stammzertifikat />
+        {!z?.ca_download ? <span className="gedaempft">Ohne eigene CA auf dem Server gibt es kein Stammzertifikat zum Herunterladen.</span> : null}
         <span className="text-xs gedaempft">Ausführlich in der Hilfe unter „Passkey statt Code“. Erneuern ändert nichts an den Geräten, solange die CA dieselbe bleibt.</span>
       </Karte>
       <AuftragDialog offen={erneuern} titel="Zertifikat erneuern" aktion={daten.verwaltung?.zertifikat_erneuern} pfad="system/zertifikat/erneuern/"
