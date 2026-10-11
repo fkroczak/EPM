@@ -303,6 +303,7 @@ body {
     border: 1px solid var(--rand); border-radius: 0.625rem; cursor: pointer; font-size: 0.875rem; background: var(--flaeche);
   }
   .firma-wahl.an { border-color: var(--akzent); background: var(--akzent-weich); }
+  .firma-wahl.an .gedaempft { color: var(--text2); } /* Kontrast auf dem getönten Feld (Dunkel: 4,4 → über 4,5) */
   .logo-dunkel { display: none; }
   :root[data-schema="dunkel"] .logo-dunkel { display: block; }
   :root[data-schema="dunkel"] .logo-hell { display: none; }

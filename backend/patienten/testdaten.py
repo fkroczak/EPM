@@ -238,18 +238,23 @@ TEST_DIAGNOSEN = {
     1: [("Crohn-Krankheit des Dünndarmes", "K50.0", "G", 9000, "mehrere Resektionen", None),
         ("Kurzdarmsyndrom", "K91.2", "G", 1800, "", None),
         ("Erhebliche Energie- und Eiweißmangelernährung", "E43", "G", 120, "", None),
-        ("Infektion durch Katheter", "T82.7", "G", 260, "Portinfektion, Port belassen", 200)],
+        ("Infektion durch Katheter", "T82.7", "G", 260, "Portinfektion, Port belassen", 200),
+        ("Vitamin-D-Mangel", "E55.9", "G", 300, "", None)],
     2: [("Chronische intestinale Pseudoobstruktion", "K59.8", "G", 3000, "", None),
         ("Mäßige Energie- und Eiweißmangelernährung", "E44.0", "G", 900, "", None),
-        ("Osteoporose", "M81.99", "V", 100, "Knochendichtemessung angefordert", None)],
+        ("Osteoporose", "M81.99", "V", 100, "Knochendichtemessung angefordert", None),
+        ("Gastroösophageale Refluxkrankheit", "K21.9", "G", 700, "", None)],
     3: [("Kurzdarmsyndrom", "K91.2", "G", 1500, "", None),
         ("Strahlenenteritis", "K52.0", "G", 1600, "nach Bestrahlung im Becken", None),
         ("Hypertriglyzeridämie", "E78.1", "G", 150, "", None),
-        ("Chronische Nierenkrankheit, Stadium 3", "N18.3", "V", 60, "", None)],
+        ("Chronische Nierenkrankheit, Stadium 3", "N18.3", "V", 60, "", None),
+        ("Eisenmangelanämie", "D50.9", "G", 200, "Eisen i. v. alle 3 Monate", None)],
     4: [("Crohn-Krankheit des Dünndarmes", "K50.0", "G", 9000, "", None),
-        ("Mangelernährung", "E46", "V", 30, "Erstvorstellung, Labor und BIA folgen", None)],
+        ("Mangelernährung", "E46", "V", 30, "Erstvorstellung, Labor und BIA folgen", None),
+        ("Anämie", "D64.9", "V", 30, "Blutbild beim Hausarzt, Befund angefordert", None)],
     5: [("Motilitätsstörung des Dünndarms", "K59.8", "G", 1400, "", None),
-        ("Erhebliche Energie- und Eiweißmangelernährung", "E43", "Z", 1400, "Darmfunktion wieder ausreichend", 30)],
+        ("Erhebliche Energie- und Eiweißmangelernährung", "E43", "Z", 1400, "Darmfunktion wieder ausreichend", 30),
+        ("Eisenmangelanämie", "D50.9", "Z", 1300, "ausgeglichen", 200)],
 }
 
 # Medikamentenplan (Wunsch 11.10.2026): (Wirkstoff, Handelsname, Stärke, Form, (Mo, Mi, Ab, Zn), Dosierung frei,
@@ -268,11 +273,35 @@ TEST_MEDIKAMENTE = {
         ("Colestyramin", "Quantalan", "4 g", "Pulver", ("1", "0", "1", "0"), "", "Beutel", False,
          "mit Abstand von 4 h zu anderen Medikamenten", "chologene Diarrhö", 250, None, ""),
         ("Metamizol", "Novalgin", "500 mg", "Tropfen", ("20", "", "", ""), "", "Tropfen", True,
-         "höchstens 4× am Tag", "Schmerzen", 100, None, "")],
+         "höchstens 4× am Tag", "Schmerzen", 100, None, ""),
+        ("Colecalciferol", "Vigantol", "1000 IE", "Tablette", ("1", "0", "0", "0"), "", "Stück", False, "",
+         "Vitamin-D-Mangel", 300, None, ""),
+        ("Prednisolon", "Decortin H", "20 mg", "Tablette", ("1", "0", "0", "0"), "", "Stück", False,
+         "ausschleichen nach Plan", "Crohn-Schub", 500, 330, "Schub abgeklungen")],
+    2: [("Prucaloprid", "Resolor", "2 mg", "Tablette", ("1", "0", "0", "0"), "", "Stück", False, "", "Motilitätsstörung",
+         600, None, ""),
+        ("Esomeprazol", "Nexium", "20 mg", "Tablette", ("1", "0", "0", "0"), "", "Stück", False,
+         "vor dem Frühstück", "Reflux", 700, None, ""),
+        ("Calciumcarbonat + Colecalciferol", "Calcimagon-D3", "500 mg/400 IE", "Kautablette", ("1", "0", "1", "0"), "",
+         "Stück", False, "", "Osteoporose-Prophylaxe", 100, None, ""),
+        ("Macrogol", "Movicol", "13,8 g", "Pulver", ("1", "", "", ""), "", "Beutel", True,
+         "in 125 ml Wasser auflösen", "Verstopfung", 600, None, "")],
     3: [("Teduglutid", "Revestive", "5 mg", "Injektion", ("", "", "", ""), "1× täglich subkutan", "", False,
          "Injektionsstelle wechseln", "Kurzdarmsyndrom", 180, None, ""),
         ("Pantoprazol", "Pantozol", "40 mg", "Tablette", ("1", "0", "1", "0"), "", "Stück", False, "",
-         "Hypersekretion", 1500, None, "")],
+         "Hypersekretion", 1500, None, ""),
+        ("Eisen(III)-carboxymaltose", "Ferinject", "500 mg", "Infusion", ("", "", "", ""), "alle 3 Monate in der Praxis",
+         "", False, "nächste Gabe laut Termin", "Eisenmangelanämie", 200, None, ""),
+        ("Fenofibrat", "Lipidil", "145 mg", "Tablette", ("0", "0", "1", "0"), "", "Stück", False, "",
+         "Hypertriglyzeridämie", 150, None, "")],
+    4: [("Mesalazin", "Pentasa", "1 g", "Retardtablette", ("2", "0", "2", "0"), "", "Stück", False, "unzerkaut",
+         "Morbus Crohn", 2000, None, ""),
+        ("Folsäure", "Folsan", "5 mg", "Tablette", ("1", "0", "0", "0"), "", "Stück", False, "", "Folsäuremangel",
+         30, None, "")],
+    5: [("Pantoprazol", "Pantozol", "20 mg", "Tablette", ("1", "0", "0", "0"), "", "Stück", False, "", "Magenschutz",
+         1400, 40, "Betreuung beendet, weiter über Hausarzt"),
+        ("Loperamid", "Imodium akut", "2 mg", "Kapsel", ("1", "", "", ""), "", "Stück", True, "", "Durchfall",
+         1400, 40, "nicht mehr nötig")],
 }
 
 # Laborparameter mit üblichem Wert und Referenzbereich, wie ihn das Labor auf dem Befund angibt. Der Katalog selbst
@@ -304,15 +333,17 @@ TEST_LABOR = {
     0: {"tage": [365, 182, 91, 0], "erweitert": {0, 3}, "labor": "Testlabor Münster (fiktiv)",
         "abweichend": {"Magnesium": [0.84, 0.79, 0.71, 0.58], "Ferritin": [45, None, 31, 22]},
         "beurteilung": "<p>Magnesium erniedrigt und fallend, Ferritin erniedrigt – bitte prüfen (Testdaten).</p>"},
-    1: {"tage": [120, 60, 0], "erweitert": {2}, "labor": "Testlabor Münster (fiktiv)",
-        "abweichend": {"Kalium": [3.9, 3.6, 3.2], "Albumin": [36, 33, 29], "CRP": [4.0, 9.5, 14.2]},
-        "freitext": [(2, "Calprotectin im Stuhl", None, "> 500", "µg/g")],
+    1: {"tage": [365, 120, 60, 0], "erweitert": {0, 3}, "labor": "Testlabor Münster (fiktiv)",
+        "abweichend": {"Kalium": [4.1, 3.9, 3.6, 3.2], "Albumin": [39, 36, 33, 29], "CRP": [2.5, 4.0, 9.5, 14.2],
+                       "Calcidiol (25-Hydroxy-Vitamin D)": [16, None, None, 27]},
+        "freitext": [(0, "Calprotectin im Stuhl", None, "180", "µg/g"), (3, "Calprotectin im Stuhl", None, "> 500", "µg/g")],
         "beurteilung": "<p>Kalium und Albumin fallend, CRP steigend – Entzündungsaktivität (Testdaten).</p>"},
     2: {"tage": [540, 450], "erweitert": {1}, "labor": "Kliniklabor Test (fiktiv)",
         "abweichend": {"Triglyceride": [165, 210], "Gamma-GT": [45, 68], "Calcidiol (25-Hydroxy-Vitamin D)": [None, 18]},
         "beurteilung": "<p>Triglyceride und γ-GT erhöht, Vitamin-D-Mangel (Testdaten).</p>"},
-    3: {"tage": [200, 20], "erweitert": {1}, "labor": "Testlabor Münster (fiktiv)",
-        "abweichend": {"Triglyceride": [140, 185], "Kreatinin": [1.0, 1.3]},
+    3: {"tage": [400, 200, 20], "erweitert": {0, 2}, "labor": "Testlabor Münster (fiktiv)",
+        "abweichend": {"Triglyceride": [130, 140, 185], "Kreatinin": [0.95, 1.0, 1.3], "Ferritin": [18, None, 64],
+                       "Hämoglobin": [10.9, 11.6, 12.4]},
         "beurteilung": "<p>Triglyceride und Kreatinin erhöht (Testdaten).</p>"},
     5: {"tage": [400, 120], "erweitert": set(), "labor": "Testlabor Münster (fiktiv)", "abweichend": {},
         "beurteilung": "<p>Unauffällig (Testdaten).</p>"},
@@ -322,11 +353,46 @@ TEST_LABOR = {
 # Gewichtsverlauf. Profil „abnahme“: BCM fällt, ECW steigt.
 TEST_BIA = {
     0: [(400, 0.36, 0.28, 46.0), (210, 0.37, 0.27, 45.5), (30, 0.37, 0.27, 45.0)],
-    1: [(300, 0.38, 0.22, 44.0), (120, 0.35, 0.20, 47.5), (10, 0.31, 0.18, 51.0)],
+    1: [(500, 0.40, 0.23, 43.5), (300, 0.38, 0.22, 44.0), (120, 0.35, 0.20, 47.5), (10, 0.31, 0.18, 51.0)],
     2: [(250, 0.30, 0.20, 50.0), (60, 0.33, 0.23, 47.0)],
     3: [(500, 0.40, 0.22, 44.5)],
     5: [(200, 0.39, 0.24, 44.0)],
 }
+
+
+# Therapie je Testpatient (Wunsch 11.10.2026): was aktuell gilt (Text der Akte) und der Verlauf als Schritte
+# (vor Tagen, Text) – Reiter Therapie.
+TEST_THERAPIE = {
+    0: ("Heimparenterale Ernährung 7×/Woche über Port, 12 h nachts; zusätzlich Trinknahrung 2×/Tag.",
+        [(2600, "Dünndarmresektion nach Mesenterialinfarkt"), (2550, "Beginn HPE 7×/Woche"),
+         (900, "Umstellung auf Mischbeutel mit Olivenöl-Lipiden"), (400, "Eisen i. v. bei Anämie"),
+         (90, "Laufzeit von 14 auf 12 h verkürzt")]),
+    1: ("Heimparenterale Ernährung 6×/Woche über Hickman, Budesonid; Ernährungsberatung monatlich.",
+        [(1800, "Beginn HPE nach dritter Resektion"), (500, "Crohn-Schub: Prednisolon"),
+         (330, "Prednisolon ausgeschlichen, Budesonid weiter"), (260, "Portinfektion – Antibiose, Port belassen"),
+         (120, "Erhöhung auf 6×/Woche wegen Gewichtsverlust")]),
+    2: ("Parenterale Ernährung 5×/Woche über Broviac, Prokinetikum; orale Kost nach Verträglichkeit.",
+        [(3000, "Diagnose CIPO, Beginn Prokinetika"), (900, "Beginn parenterale Ernährung 3×/Woche"),
+         (450, "Steigerung auf 5×/Woche"), (100, "Calcium und Vitamin D bei Verdacht auf Osteoporose")]),
+    3: ("Heimparenterale Ernährung 7×/Woche über PICC; Teduglutid seit sechs Monaten.",
+        [(1600, "Bestrahlung im Becken, danach Strahlenenteritis"), (1500, "Beginn HPE 7×/Woche"),
+         (180, "Beginn Teduglutid"), (150, "Lipide reduziert wegen Triglyceriden")]),
+    4: ("Erstvorstellung: Ernährungsanamnese, Trinknahrung 2×/Tag; Entscheidung über parenterale Ernährung nach Labor "
+        "und BIA.",
+        [(30, "Erstvorstellung in der Sprechstunde"), (28, "Trinknahrung 2×/Tag begonnen")]),
+    5: ("Parenterale Ernährung beendet, Darmfunktion ausreichend; Nachsorge über den Hausarzt.",
+        [(1400, "Beginn parenterale Ernährung 5×/Woche"), (600, "Reduktion auf 3×/Woche"),
+         (60, "Auslassversuch erfolgreich"), (40, "Parenterale Ernährung beendet")]),
+}
+
+
+def _therapie(patient, user, heute, schritte):
+    """Verlauf der Therapie (Reiter Therapie) wie über die Akte."""
+    from .models import Therapieschritt
+
+    for tage, text in schritte:
+        _nutzer(user, Therapieschritt(patient=patient, datum=heute - timedelta(days=tage), text=text,
+                                      angelegt_von=user)).save()
 
 
 def _nutzer(user, obj):
@@ -537,9 +603,7 @@ def testpatienten_anlegen() -> int:
             versorger=(v1, v2)[vi], ansprechpartner=ansprech[ap], katheter=katheter.get(kath), nickelallergie=nickel,
             strasse=f"Teststraße {i + 1}", plz="48341", ort="Altenberge", telefon="0000 000000",
             diagnose=DIAGNOSEN[i % len(DIAGNOSEN)],
-            therapie=f"<p><strong>Aktuell:</strong> parenterale Ernährung 7×/Woche über {kath}.</p>"
-                     f"<p><strong>Verlauf:</strong></p><ul><li>{(heute - timedelta(days=700)):%d.%m.%Y} Beginn HPE</li>"
-                     f"<li>{(heute - timedelta(days=200)):%d.%m.%Y} Umstellung Lipide</li></ul>",
+            therapie=f"<p><strong>Aktuell:</strong> {TEST_THERAPIE[i][0]}</p>",
             empfehlung="<p>Gewichtskontrolle alle 4 Wochen (Testdaten).</p>",
             ist_test=True, angelegt_von=user,
         ))
@@ -601,6 +665,7 @@ def testpatienten_anlegen() -> int:
         token = in_firma(i)
         _diagnosen(pat, user, heute, TEST_DIAGNOSEN.get(i, []))
         _medikamente(pat, user, heute, TEST_MEDIKAMENTE.get(i, []))
+        _therapie(pat, user, heute, TEST_THERAPIE[i][1])
         if i in TEST_LABOR:
             _laborbefunde(pat, user, heute, rnd, TEST_LABOR[i])
         _bia_messungen(pat, user, heute, TEST_BIA.get(i, []))
