@@ -4,12 +4,14 @@
  * gesperrte Adressen. Alles als Auftrag an den Systemagenten, mit der Bestätigung, die das Backend verlangt.
  */
 import { useState } from "react";
+import type { ReactNode } from "react";
+import { useIch } from "@/lib/auth";
 import { Auswahl, Chip, Eingabe, Feld, Karte, KartenKopf, Knopf, Leer, Meldung } from "@/components/ui/basis";
 import { zeitpunkt } from "@/lib/format";
 import { AuftragDialog } from "./SystemWartung";
 import type { Uebersicht } from "./System";
 
-type Netz = { netz: string; bezeichnung: string; seit?: string | null; von?: string };
+type Netz = { netz: string; bezeichnung: string; seit?: string | null; von?: string; befristet?: boolean };
 type Regel = { ziel: string; port: string; proto: string; aktion: string; von: string; schnittstelle: string; v6: boolean;
   kommentar: string };
 export type ZugangStand = {
@@ -19,6 +21,7 @@ export type ZugangStand = {
   stunden?: number[]; max?: number;
   netze?: { https: Netz[]; ssh: Netz[] };
   https_filter?: { an: boolean; aktiv: boolean; moeglich: boolean };
+  internet?: { alle: boolean; oeffentlich: string[] };
   ereignisse?: { id: string; zeit: string; ok: boolean; bis?: string; text: string }[];
   firewall?: { verfuegbar: boolean; aktiv: boolean; standard: Record<string, string>; regeln: Regel[]; hinweis?: string };
   fail2ban?: { verfuegbar: boolean; jails: { name: string; gesperrt: string[]; anzahl: number; gesamt?: number; fehlversuche?: number }[];
@@ -42,7 +45,7 @@ export function imNetz(ip: string | null | undefined, netz: string): boolean {
   return Math.floor(a / 2 ** (32 - l)) * 2 ** (32 - l) === (b & maske) >>> 0;
 }
 
-function Zeile({ label, children }: { label: string; children: React.ReactNode }) {
+function Zeile({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[minmax(7.5rem,36%)_1fr] gap-3 py-1 text-sm border-b border-rand last:border-b-0">
       <dt className="gedaempft">{label}</dt>
@@ -54,7 +57,9 @@ function Zeile({ label, children }: { label: string; children: React.ReactNode }
 // ---------------------------------------------------------------- SSH
 function SshKarte({ daten, z, offen }: { daten: Uebersicht; z: ZugangStand; offen: Set<string> }) {
   const [oeffnen, setOeffnen] = useState<number | null>(null);
+  const [nurEigene, setNurEigene] = useState(false);
   const [schliessen, setSchliessen] = useState(false);
+  const eigeneIp = daten.angemeldet.find((x) => x.eigene)?.ip ?? null;
   const s = z.ssh;
   const netze = z.netze?.ssh ?? [];
   const laeuft = offen.has("server:ssh_oeffnen") || offen.has("server:ssh_schliessen");
@@ -80,8 +85,8 @@ function SshKarte({ daten, z, offen }: { daten: Uebersicht; z: ZugangStand; offe
       ) : null}
       <div className="flex flex-wrap gap-2">
         {(z.stunden ?? [1, 4, 8]).map((h) => (
-          <Knopf key={h} disabled={!daten.agent.verzeichnis || laeuft || !netze.length} laedt={offen.has("server:ssh_oeffnen") && h === oeffnen}
-            onClick={() => setOeffnen(h)} data-testid={`ssh-oeffnen-${h}`}>Für {h} h öffnen</Knopf>
+          <Knopf key={h} disabled={!daten.agent.verzeichnis || laeuft || (!netze.length && !eigeneIp)} laedt={offen.has("server:ssh_oeffnen") && h === oeffnen}
+            onClick={() => { setNurEigene(!netze.length); setOeffnen(h); }} data-testid={`ssh-oeffnen-${h}`}>Für {h} h öffnen</Knopf>
         ))}
         <Knopf variante="dng" disabled={!daten.agent.verzeichnis || laeuft || s?.zustand === "geschlossen" && !s.abweichung && !s.regeln}
           laedt={offen.has("server:ssh_schliessen")} onClick={() => setSchliessen(true)} data-testid="ssh-schliessen">Jetzt schließen</Knopf>
@@ -94,9 +99,15 @@ function SshKarte({ daten, z, offen }: { daten: Uebersicht; z: ZugangStand; offe
         </ul>
       ) : null}
       <AuftragDialog offen={oeffnen != null} titel={`SSH für ${oeffnen} Stunde${oeffnen === 1 ? "" : "n"} öffnen`} aktion={daten.verwaltung?.ssh_oeffnen}
-        pfad="system/zugang/ssh/oeffnen/" body={{ stunden: oeffnen }} daten={daten} knopf="Bestätigen und öffnen" onZu={() => setOeffnen(null)}>
-        <Meldung art="info">SSH ist danach {oeffnen} Stunde{oeffnen === 1 ? "" : "n"} lang aus diesen Netzen erreichbar: {netze.map((n) => `${n.netz} (${n.bezeichnung})`).join(", ")}.
-          Dann schließt der Server es von selbst.</Meldung>
+        pfad="system/zugang/ssh/oeffnen/" body={{ stunden: oeffnen, nur_eigene_adresse: nurEigene }} daten={daten} knopf="Bestätigen und öffnen"
+        onZu={() => setOeffnen(null)}>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={nurEigene} disabled={!eigeneIp || !netze.length} onChange={(e) => setNurEigene(e.target.checked)}
+            data-testid="ssh-nur-eigene" />
+          <span>Nur von meiner aktuellen Adresse ({eigeneIp ?? "unbekannt"}). Der Eintrag gilt nur für diese Öffnung.</span>
+        </label>
+        <Meldung art="info">SSH ist danach {oeffnen} Stunde{oeffnen === 1 ? "" : "n"} lang erreichbar von: {nurEigene ? eigeneIp
+          : netze.map((n) => `${n.netz} (${n.bezeichnung})`).join(", ")}. Dann schließt der Server es von selbst.</Meldung>
       </AuftragDialog>
       <AuftragDialog offen={schliessen} titel="SSH jetzt schließen" aktion={daten.verwaltung?.ssh_schliessen} pfad="system/zugang/ssh/schliessen/"
         daten={daten} knopf="Schließen" onZu={() => setSchliessen(false)}>
@@ -121,7 +132,8 @@ function NetzListe({ dienst, liste, eigeneIp, onEntfernen, sperre }: { dienst: D
           <div key={n.netz} className="flex items-center gap-2 py-1.5 border-b border-rand last:border-b-0 flex-wrap">
             <div className="flex flex-col min-w-0 grow">
               <span className="num text-[0.8125rem] break-all">{n.netz}{eigenes ? <Chip art="akzent" className="ml-2">Ihr Gerät</Chip> : null}</span>
-              <span className="text-xs gedaempft break-words">{n.bezeichnung}{grund ? ` · ${grund}` : ""}</span>
+              <span className="text-xs gedaempft break-words">{n.netz === "0.0.0.0/0" ? "alle Adressen · " : ""}{n.bezeichnung}
+                {n.befristet ? " · nur diese Öffnung" : ""}{grund ? ` · ${grund}` : ""}</span>
             </div>
             <Knopf klein variante="dng" disabled={sperre || !!grund} onClick={() => onEntfernen(n)}
               aria-label={`${n.netz} für ${DIENST_NAME[dienst]} entfernen`}>Entfernen</Knopf>
@@ -137,6 +149,9 @@ function NetzeKarte({ daten, z, offen }: { daten: Uebersicht; z: ZugangStand; of
   const [dienst, setDienst] = useState<Dienst>("https");
   const [netz, setNetz] = useState("");
   const [bezeichnung, setBezeichnung] = useState("");
+  const [internet, setInternet] = useState(false);
+  const [eigene, setEigene] = useState(false);
+  const ich = useIch();
   const [weg, setWeg] = useState<{ dienst: Dienst; netz: Netz } | null>(null);
   const [filter, setFilter] = useState<boolean | null>(null);
   const eigeneIp = daten.angemeldet.find((s) => s.eigene)?.ip ?? null;
@@ -146,7 +161,7 @@ function NetzeKarte({ daten, z, offen }: { daten: Uebersicht; z: ZugangStand; of
   return (
     <Karte className="px-5 py-4 flex flex-col gap-3 min-w-0" data-testid="netze-karte">
       <KartenKopf titel="Erlaubte Netze" unter={`Aus diesen Netzen sind EPM und SSH erreichbar (je bis zu ${z.max ?? 20}). Ihr Gerät: ${eigeneIp ?? "unbekannt"}.`}
-        rechts={<Knopf klein icon="plus" disabled={sperre} onClick={() => { setDienst("https"); setNetz(""); setBezeichnung(""); setNeu(true); }}
+        rechts={<Knopf klein icon="plus" disabled={sperre} onClick={() => { setDienst("https"); setNetz(""); setBezeichnung(""); setInternet(false); setEigene(false); setNeu(true); }}
           data-testid="netz-neu">Netz hinzufügen</Knopf>} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {(["https", "ssh"] as Dienst[]).map((d) => (
@@ -168,16 +183,29 @@ function NetzeKarte({ daten, z, offen }: { daten: Uebersicht; z: ZugangStand; of
           {f?.an ? "Netzfilter ausschalten" : "Netzfilter einschalten"}</Knopf>
       </div>
       <AuftragDialog offen={neu} titel="Netz hinzufügen" aktion={daten.verwaltung?.netz_hinzufuegen} pfad="system/zugang/netze/"
-        body={{ dienst, netz: netz.trim(), bezeichnung: bezeichnung.trim() }} daten={daten} knopf="Bestätigen und hinzufügen" onZu={() => setNeu(false)}>
+        body={{ dienst, netz: internet && dienst === "https" ? "0.0.0.0/0" : netz.trim(), bezeichnung: bezeichnung.trim(),
+          ...(internet && dienst === "https" ? { internet: true } : {}), ...(eigene && dienst === "ssh" && netz === eigeneIp ? { eigene_adresse: true } : {}) }}
+        daten={daten} knopf="Bestätigen und hinzufügen" onZu={() => setNeu(false)}>
         <Feld label="Für">
-          {(p) => <Auswahl {...p} value={dienst} onChange={(e) => setDienst(e.target.value as Dienst)}>
+          {(p) => <Auswahl {...p} value={dienst} onChange={(e) => { setDienst(e.target.value as Dienst); setInternet(false); setEigene(false); }}>
             <option value="https">EPM (HTTPS)</option><option value="ssh">SSH</option></Auswahl>}
         </Feld>
-        <Feld label="Netz oder Adresse" pflicht hinweis={dienst === "https" ? "IPv4, z. B. 192.168.20.0/24 oder 10.8.0.5. Höchstens /8."
+        {dienst === "https" ? (
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1" checked={internet} data-testid="netz-internet"
+              onChange={(e) => { setInternet(e.target.checked); if (e.target.checked && !bezeichnung) setBezeichnung("Internet (alle Adressen)"); }} />
+            <span>Alle Adressen (0.0.0.0/0), z. B. für ein Testsystem. Im Betrieb nur die Netze hinter dem VPN eintragen.</span>
+          </label>
+        ) : eigeneIp ? (
+          <Knopf klein className="self-start" onClick={() => { setNetz(eigeneIp); setEigene(true);
+            setBezeichnung(`Admin ${ich.benutzername} ${new Date().toLocaleDateString("de-DE")}`.replace(/[^0-9A-Za-zÄÖÜäöüß .,:()/_+-]/g, "").slice(0, 40)); }}
+            data-testid="netz-eigene-adresse">Meine aktuelle Adresse ({eigeneIp})</Knopf>
+        ) : null}
+        {internet && dienst === "https" ? null : <Feld label="Netz oder Adresse" pflicht hinweis={dienst === "https" ? "IPv4, z. B. 192.168.20.0/24 oder 10.8.0.5. Höchstens /8."
           : "IPv4 oder IPv6, z. B. 10.8.0.0/24 oder fd00:1::/64. Höchstens /8 bzw. /32."}>
           {(p) => <Eingabe {...p} spellCheck={false} autoComplete="off" inputMode="text" placeholder="192.168.20.0/24" value={netz}
             onChange={(e) => setNetz(e.target.value)} />}
-        </Feld>
+        </Feld>}
         <Feld label="Bezeichnung" pflicht hinweis="z. B. Praxisnetz 2 oder VPN">
           {(p) => <Eingabe {...p} maxLength={40} value={bezeichnung} onChange={(e) => setBezeichnung(e.target.value)} />}
         </Feld>
@@ -214,20 +242,13 @@ function FirewallKarte({ z }: { z: ZugangStand }) {
           </dl>
           {!fw.regeln.length ? <Leer>Keine Regeln.</Leer> : (
             <>
-              <table className="tabelle max-sm:hidden" data-testid="firewall-tabelle">
+              <table className="tabelle" data-testid="firewall-tabelle">
                 <thead><tr><th className="th">Aktion</th><th className="th">Port</th><th className="th">Von</th><th className="th">Kommentar</th></tr></thead>
                 <tbody>{fw.regeln.map((r, i) => (
-                  <tr key={i}><td className="td text-[0.8125rem]">{r.aktion}</td>
+                  <tr key={i}><td className="td text-[0.8125rem] whitespace-nowrap">{r.aktion}</td>
                     <td className="td num text-[0.8125rem]">{r.ziel}{r.v6 ? " (IPv6)" : ""}{r.schnittstelle ? <span className="gedaempft"> · {r.schnittstelle}</span> : null}</td>
-                    <td className="td num text-[0.8125rem] break-all">{r.von}</td><td className="td text-[0.8125rem] break-words">{r.kommentar}</td></tr>))}</tbody>
+                    <td className="td num text-[0.8125rem] [overflow-wrap:anywhere]">{r.von}</td><td className="td text-[0.8125rem] break-words">{r.kommentar}</td></tr>))}</tbody>
               </table>
-              <ul className="m-0 p-0 list-none flex flex-col sm:hidden" data-testid="firewall-liste">
-                {fw.regeln.map((r, i) => (
-                  <li key={i} className="py-1.5 border-b border-rand last:border-b-0 text-sm min-w-0">
-                    <span className="font-medium">{r.aktion}</span> <span className="num break-all">{r.ziel}{r.v6 ? " (IPv6)" : ""}</span>
-                    <span className="block text-xs gedaempft break-all">von {r.von}{r.schnittstelle ? ` · ${r.schnittstelle}` : ""}{r.kommentar ? ` · ${r.kommentar}` : ""}</span>
-                  </li>))}
-              </ul>
             </>
           )}
         </>

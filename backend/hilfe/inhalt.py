@@ -1169,7 +1169,7 @@ die gefilterten Einträge aus.</p>""",
         "html": """
 <p><strong>Administration › System</strong> zeigt den Zustand des Servers. Die Seite hat diese Reiter:
 <strong>Übersicht</strong>, <strong>Wartung</strong>, <strong>Software</strong>, <strong>Zertifikat</strong>,
-<strong>Protokolle</strong>, <strong>Anmeldungen und Hinweis</strong>, <strong>Verlauf</strong> und
+<strong>Zugang</strong>, <strong>Notfall</strong>, <strong>Protokolle</strong>, <strong>Anmeldungen und Hinweis</strong>, <strong>Verlauf</strong> und
 <strong>Testphase</strong>.</p>
 <p><strong>Übersicht</strong></p>
 <ul>
@@ -1225,6 +1225,23 @@ Prüfsummen. Er zeigt die SHA-256 zum Vergleichen.</li>
 <li><strong>Zertifikat erneuern</strong> (eigene CA).</li>
 <li><strong>Zertifikat importieren</strong>: CRT, KEY und CA als PEM. Der Schlüssel geht nur an den Server.</li>
 <li>Das Stammzertifikat für die Geräte.</li>
+</ul>
+<p><strong>Zugang</strong>: SSH, erlaubte Netze, Firewall und Fail2ban.</p>
+<ul>
+<li><strong>SSH</strong> ist im Betrieb geschlossen. Für Arbeiten am Server öffnen Sie es für 1, 4 oder 8 Stunden. Das
+braucht Passwort und Code. Danach schließt der Server SSH von selbst. <strong>Jetzt schließen</strong> beendet es sofort;
+bestehende Verbindungen laufen weiter, bis sie enden.</li>
+<li>Auf Wunsch gilt eine Öffnung nur für die aktuelle Adresse Ihres Geräts. Dieser Eintrag fällt beim Schließen weg.</li>
+<li>Steht dort <strong>dauerhaft offen (Ersteinrichtung)</strong>, ist SSH seit der Einrichtung offen. Schließen Sie es
+und öffnen Sie es danach nur noch auf Zeit.</li>
+<li>Notzugang ohne SSH: die Konsole der VM im Hypervisor.</li>
+<li><strong>Erlaubte Netze</strong>: aus welchen Netzen EPM (HTTPS) und SSH erreichbar sind, je mit Bezeichnung, bis zu 20.
+Für SSH gibt es <strong>Meine aktuelle Adresse</strong>. Das letzte Netz für EPM und das Netz Ihres Geräts lassen sich
+nicht entfernen – so sperren Sie sich nicht aus.</li>
+<li><strong>Netzfilter für EPM</strong>: Docker umgeht die Firewall des Servers. Erst mit dem Netzfilter ist EPM nur aus
+den erlaubten Netzen erreichbar.</li>
+<li><strong>Firewall-Regeln</strong> und <strong>Gesperrte Adressen (Fail2ban)</strong> zeigen den Stand des Servers. Eine
+gesperrte Adresse lässt sich mit <strong>Entsperren</strong> freigeben.</li>
 </ul>
 <p><strong>Protokolle</strong>: die letzten 100, 500 oder 2000 Zeilen der Container, des Systemagenten, der nächtlichen
 Sicherung, der Übertragung oder des letzten Updates. Sie lassen sich filtern und herunterladen. Ein Abruf liegt eine

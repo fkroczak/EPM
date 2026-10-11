@@ -362,8 +362,8 @@ class AgentZugang(SimpleTestCase):
         self.assertEqual(self.a.zugang_stand()["internet"]["oeffentlich"], ["93.184.216.34/32"])
         rc, text = weg({"dienst": "https", "netz": "0.0.0.0/0", "client_ip": "93.184.216.34"}, "admin", z.append)
         self.assertEqual(rc, 0, text)
-        self.assertIn("Ihr Gerät (93.184.216.34)",
-                      weg({"dienst": "https", "netz": "93.184.216.34/32", "client_ip": "93.184.216.34"}, "admin", z.append)[1])
+        self.assertEqual(weg({"dienst": "https", "netz": "93.184.216.34/32", "client_ip": "93.184.216.34"}, "admin",
+                             z.append)[0], 2)
         # SSH nur von der eigenen Adresse: andere SSH-Freigaben gehen zu, der Eintrag fällt beim Schließen weg
         self.assertEqual(self.a.ssh_oeffnen(1, "admin", z.append, nur_ip="0.0.0.0/0")[0], 2)
         self.assertEqual(self.a.ssh_oeffnen(1, "admin", z.append, nur_ip="93.184.216.0/24")[0], 2)
