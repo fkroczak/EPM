@@ -1203,6 +1203,8 @@ hängt.</li>
 <li><strong>Speicher aufräumen</strong>: Das Systemprotokoll (Journal) auf eine Größe oder ein Alter verkleinern; dafür
 gibt es eine einfache Rückfrage. Gespeicherte alte Versionen ankreuzen und löschen: Image-Dateien, Update-Pakete,
 Docker-Images. Das braucht Passwort und Code. Die laufende und die vorherige Version bleiben immer.</li>
+<li><strong>Technische Verwaltung</strong>: Django-Admin und API-Ansicht im Browser für 1 oder 8 Stunden einschalten,
+z. B. zur Fehlersuche. Danach sind sie von selbst wieder aus. „Jetzt ausschalten“ beendet sofort.</li>
 <li><strong>Uhrzeit</strong>: Zeitzone und Zeitsynchronisation (NTP) mit eigenem Zeitserver einstellen, ohne Internet
 z. B. die OPNsense. Ist die Synchronisation aus, lässt sich die Uhrzeit von Hand setzen. Angezeigt wird auch, wie weit
 die Uhr des Servers von diesem Gerät abweicht. Codes der Authenticator-App, Passkeys und Zertifikate brauchen eine

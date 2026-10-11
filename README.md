@@ -59,9 +59,10 @@ Oder ohne scp und SSH: auf der Test-VM unter Administration › System › Softw
 herunterladen, auf dem VPS dort „Update-Paket einspielen“ (hochladen, SHA-256 vergleichen, mit Passwort und 2FA
 bestätigen).
 Die Konfiguration des Servers liegt in `/etc/epm/epm.conf` (nicht im Repo). Die Oberfläche ist danach unter
-`https://<EPM_WEB_NAME>/` erreichbar, die Django-Verwaltung unter `/verwaltung/` (nur Rolle Admin) gibt es nur noch,
-wenn `EPM_DJANGO_ADMIN=1` in `/srv/epm/backend.env` steht – seit der Sicherheitsprüfung vom 11.10.2026 ist sie wie die
-API-Browseroberfläche (`EPM_API_BROWSABLE`) aus; `epm-update` schaltet beides auf bestehenden Servern einmalig ab.
+`https://<EPM_WEB_NAME>/` erreichbar, die Django-Verwaltung unter `/verwaltung/` (nur Rolle Admin) und die API-Ansicht im Browser sind standardmäßig aus.
+Zur Fehlersuche schaltet ein Admin sie unter Administration › System › Wartung › „Technische Verwaltung“ für 1 oder
+8 Stunden ein (danach von selbst aus, Eintrag im Audit-Log). `EPM_DJANGO_ADMIN=0/1` bzw. `EPM_API_BROWSABLE=0/1` in
+`/srv/epm/backend.env` legen sie fest; `epm-update` entfernt die Werte einmalig, damit der Schalter gilt.
 
 ## Zertifikat und Passkeys
 Passkeys (zweiter Faktor mit Fingerabdruck, Gesicht oder PIN) gehen nur über einen Namen mit einem Zertifikat, dem die

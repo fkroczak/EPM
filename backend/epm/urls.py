@@ -122,6 +122,7 @@ urlpatterns = [
     path("api/system/hochladen/<str:kennung>/einspielen/", verwaltung.EinspielenView.as_view()),
     path("api/system/zertifikat/erneuern/", verwaltung.ZertifikatErneuernView.as_view()),
     path("api/system/zertifikat/importieren/", verwaltung.ZertifikatImportierenView.as_view()),
+    path("api/system/technik/", verwaltung.TechnikView.as_view()),
     path("api/system/protokolle/", verwaltung.ProtokolleView.as_view()),
     path("api/system/protokolle/<uuid:kennung>/", verwaltung.ProtokollView.as_view()),
     path("api/system/journal/aufraeumen/", verwaltung.JournalView.as_view()),
@@ -171,11 +172,11 @@ urlpatterns = [
     path("api/", include(router.urls)),
 ]
 
-if settings.EPM_DJANGO_ADMIN:
-    from django.contrib import admin
-    from django_otp.admin import OTPAdminSite
+# Django-Admin: erreichbar nur, solange der Schalter an ist (epm.technik.TechnikMiddleware)
+from django.contrib import admin  # noqa: E402
+from django_otp.admin import OTPAdminSite  # noqa: E402
 
-    admin.site.__class__ = OTPAdminSite  # Django-Admin nur mit Authenticator-Code
-    admin.site.site_header = "EPM Verwaltung"
-    admin.site.site_title = "EPM"
-    urlpatterns.append(path("verwaltung/", admin.site.urls))
+admin.site.__class__ = OTPAdminSite  # Django-Admin nur mit Authenticator-Code
+admin.site.site_header = "EPM Verwaltung"
+admin.site.site_title = "EPM"
+urlpatterns.append(path("verwaltung/", admin.site.urls))

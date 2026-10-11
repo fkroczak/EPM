@@ -42,24 +42,19 @@ chown "$EPM_APP_UID:101" "$B/system/upload"; chmod 0770 "$B/system/upload"
 echo "==> Projektdateien kopieren"
 install -m 0644 projekt/compose.yaml projekt/compose.smoke.yaml "$B/"
 install -m 0644 projekt/nginx/rauchtest.conf projekt/nginx/epm.conf "$B/nginx/"
-if [[ ! -f "$B/backend.env" ]] || ! grep -q EPM_DJANGO_ADMIN "$B/backend.env"; then
+# neu anlegen nur ohne Datei oder bei einer sehr alten (ohne EPM_DJANGO_ADMIN und ohne Markierung des Schalters)
+if [[ ! -f "$B/backend.env" ]] || ! grep -qE "^EPM_DJANGO_ADMIN=|^# epm: verwaltung-schalter" "$B/backend.env"; then
   [[ -f "$B/backend.env" ]] && cp "$B/backend.env" "$B/backend.env.alt"
   sed -e "s/epm\.test/$EPM_WEB_NAME/g" projekt/backend.env.beispiel > "$B/backend.env"
   chmod 0600 "$B/backend.env"
 fi
-# Sicherheitsprüfung 11.10.2026: Django-Admin und API-Browseroberfläche auf bestehenden Servern einmalig abschalten
-# (das Frontend braucht beides nicht). Die Markierung verhindert, dass ein späteres bewusstes Einschalten bei jedem
-# Update wieder überschrieben wird.
-if ! grep -q "^# epm: verwaltung-aus" "$B/backend.env"; then
-  for schalter in EPM_DJANGO_ADMIN EPM_API_BROWSABLE; do
-    if grep -q "^$schalter=" "$B/backend.env"; then
-      sed -i -E "s/^$schalter=.*/$schalter=0/" "$B/backend.env"
-    else
-      echo "$schalter=0" >> "$B/backend.env"
-    fi
-  done
-  echo "# epm: verwaltung-aus (Django-Admin und API-Browseroberfläche abgeschaltet, 11.10.2026)" >> "$B/backend.env"
-  echo "   Django-Admin und API-Browseroberfläche abgeschaltet (backend.env)"
+# Django-Admin und API-Browseroberfläche schaltet seit 11.10.2026 ein Admin unter Administration › System für begrenzte
+# Zeit ein (Standard: aus). Feste Werte aus backend.env würden den Schalter überstimmen – deshalb einmalig entfernen
+# (auch die vom Update kurz zuvor gesetzten „=0“). Wer sie danach bewusst wieder einträgt, behält sie.
+if ! grep -q "^# epm: verwaltung-schalter" "$B/backend.env"; then
+  sed -i -E '/^EPM_DJANGO_ADMIN=/d; /^EPM_API_BROWSABLE=/d; /^# epm: verwaltung-aus/d' "$B/backend.env"
+  echo "# epm: verwaltung-schalter (Django-Admin und API-Ansicht: Schalter unter Administration › System, 11.10.2026)" >> "$B/backend.env"
+  echo "   Django-Admin und API-Browseroberfläche: jetzt per Schalter in EPM (Standard aus)"
 fi
 # Zugriff auch über die IP der Verwaltungskarte (das Zertifikat enthält sie): Django muss sie als Host und Herkunft kennen,
 # sonst weist es jede Anfrage mit 400 (Host) bzw. 403 (CSRF) ab. Ergänzt nur, was fehlt; eigene Einträge bleiben.

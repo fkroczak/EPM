@@ -39,9 +39,11 @@ SECRET_KEY = geheimnis("DJANGO_SECRET_KEY", "nur-fuer-entwicklung-unsicher" if D
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "")
 
-# Django-Admin (/verwaltung/) nur noch bei Bedarf (Sicherheitsprüfung 11.10.2026: standardmäßig aus; das Frontend
-# braucht ihn nicht). Einschalten mit EPM_DJANGO_ADMIN=1 in /srv/epm/backend.env.
-EPM_DJANGO_ADMIN = env_bool("EPM_DJANGO_ADMIN", False)
+# Django-Admin (/verwaltung/) und API-Browseroberfläche: standardmäßig aus (Sicherheitsprüfung 11.10.2026), ein Admin
+# schaltet beide unter Administration › System für eine begrenzte Zeit ein (epm/technik.py). EPM_DJANGO_ADMIN=0/1 bzw.
+# EPM_API_BROWSABLE=0/1 in /srv/epm/backend.env legen sie fest – dann gilt der Schalter nicht.
+EPM_DJANGO_ADMIN = None if env("EPM_DJANGO_ADMIN", "") == "" else env_bool("EPM_DJANGO_ADMIN")
+EPM_API_BROWSABLE = None if env("EPM_API_BROWSABLE", "") == "" else env_bool("EPM_API_BROWSABLE")
 
 INSTALLED_APPS = [
     "django.contrib.auth",
@@ -68,8 +70,7 @@ INSTALLED_APPS = [
     "hilfe",
     "scans",
 ]
-if EPM_DJANGO_ADMIN:
-    INSTALLED_APPS.insert(0, "django.contrib.admin")
+INSTALLED_APPS.insert(0, "django.contrib.admin")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -81,6 +82,8 @@ MIDDLEWARE = [
     "accounts.sitzungen.SitzungMiddleware",
     # aktive Firma (DSKM bzw. Regeneration Clinic, 11.10.2026) – vor allem, was Rechte prüft
     "epm.firma.FirmaMiddleware",
+    # /verwaltung/ nur, solange der Schalter an ist (sonst 404)
+    "epm.technik.TechnikMiddleware",
     "accounts.sitzungen.RechteStandMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -113,7 +116,8 @@ DATABASES = {
         "NAME": env("DB_NAME", "epm"),
         "USER": env("DB_USER", "epm"),
         "PASSWORD": geheimnis("DB_PASSWORD", "epm" if DEBUG else None),
-        "CONN_MAX_AGE": 60,
+        # Entwicklung (runserver, ein Thread je Anfrage): DB_CONN_MAX_AGE=0, sonst gehen PostgreSQL die Verbindungen aus
+        "CONN_MAX_AGE": int(env("DB_CONN_MAX_AGE", "60")),
         "CONN_HEALTH_CHECKS": True,
         "ATOMIC_REQUESTS": True,
     }
@@ -207,8 +211,10 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "epm.pagination.Seiten",
     "PAGE_SIZE": 50,
-    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"]
-    + (["rest_framework.renderers.BrowsableAPIRenderer"] if env_bool("EPM_API_BROWSABLE", False) else []),
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer",
+                                 "rest_framework.renderers.BrowsableAPIRenderer"],
+    # die Browseroberfläche nur, solange der Schalter an ist (epm/technik.py)
+    "DEFAULT_CONTENT_NEGOTIATION_CLASS": "epm.technik.Verhandlung",
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
     "DEFAULT_THROTTLE_RATES": {"anmeldung": "30/min"},
     "COERCE_DECIMAL_TO_STRING": False,
