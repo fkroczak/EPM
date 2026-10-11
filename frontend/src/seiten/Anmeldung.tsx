@@ -21,7 +21,7 @@ function Rahmen({ children }: { children: ReactNode }) {
   const firmen = status?.organisation?.firmen ?? [];
   return (
     // neutraler Akzent (Schiefer-Petrol) statt der Farben einer Firma
-    <div className="min-h-screen flex bg-flaeche" style={{ "--akzent": "#24353D", "--akzent-hover": "#1B262D",
+    <div className="min-h-dvh flex bg-flaeche" data-anmeldung style={{ "--akzent": "#24353D", "--akzent-hover": "#1B262D",
       "--akzent-text": "#2A4F57", "--akzent-weich": "#E3ECEB", "--ladebalken": "#5E9C93" } as CSSProperties}>
       <div aria-hidden="true" className="relative grow overflow-hidden hidden md:flex"
         style={{ background: "linear-gradient(160deg, #1B262D 0%, #22333B 55%, #2A3F47 100%)" }}>

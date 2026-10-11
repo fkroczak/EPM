@@ -337,7 +337,8 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
           </div>
         </div>
       ) : null}
-      <form className="grid grid-cols-4 gap-3" onSubmit={(e) => { e.preventDefault(); speichern.mutate(); }}>
+      <form className="grid grid-cols-2 sm:grid-cols-4 gap-3" onSubmit={(e) => { e.preventDefault(); speichern.mutate(); }}>
+        <h3 className="col-span-full lbl m-0">Benutzerdaten</h3>
         <Feld label="Titel" fehler={fehler.titel}>
           {(p) => <Auswahl {...p} value={f.titel} onChange={set("titel")}>{TITEL.concat(TITEL.includes(f.titel) ? [] : [f.titel]).map((t) => <option key={t} value={t}>{t || "—"}</option>)}</Auswahl>}
         </Feld>
@@ -346,46 +347,51 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
         <Feld label="Kürzel" hinweis="erscheint an Einträgen" fehler={fehler.kuerzel}>{(p) => <Eingabe {...p} className="num" maxLength={4} value={f.kuerzel} onChange={set("kuerzel")} />}</Feld>
         <Feld label="Funktion" className="col-span-2" fehler={fehler.funktion}>{(p) => <Eingabe {...p} placeholder="z. B. Ärztin, Ernährungsberaterin" value={f.funktion} onChange={set("funktion")} />}</Feld>
         <Feld label="Benutzername" hinweis="zum Anmelden" fehler={fehler.username}>{(p) => <Eingabe {...p} className="num" autoComplete="off" value={f.username} onChange={set("username")} />}</Feld>
-        <Feld label={weitereFirmen.length ? `Rolle ${alleFirmen.find((x) => x.kuerzel === "dskm")?.kurzname ?? "DSKM"}` : "Rolle"} fehler={fehler.rolle}
-          hinweis={ohneLogin ? "ohne Login: keine Rechte" : undefined}>
-          {(p) => <Auswahl {...p} value={ohneLogin ? "keine" : f.rolle} disabled={ohneLogin} data-testid="rolle-dskm"
-            onChange={(e) => setF({ ...f, rolle: e.target.value, ist_test: TESTBENUTZER_ROLLEN.includes(e.target.value) ? f.ist_test : false })}>
-            {Object.entries(ROLLEN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Auswahl>}
-        </Feld>
-        {weitereFirmen.map((firma) => (
-          <Feld key={firma.kuerzel} label={`Rolle ${firma.kurzname}`} fehler={fehler.firmenrollen}
-            hinweis={ohneLogin ? undefined : `bei ${firma.name}; „Keine Berechtigung“ = kein Zugang`}>
-            {(p) => <Auswahl {...p} value={ohneLogin ? "keine" : f.firmenrollen[firma.kuerzel] ?? "keine"} disabled={ohneLogin}
-              data-testid={`rolle-${firma.kuerzel}`}
-              onChange={(e) => setF({ ...f, firmenrollen: { ...f.firmenrollen, [firma.kuerzel]: e.target.value } })}>
+        {/* Berechtigungen optisch getrennt von den Benutzerdaten (Wunsch 11.10.2026); am Telefon jede Rolle in voller Breite */}
+        <fieldset className="col-span-full m-0 mt-1 rounded-lg border border-rand bg-fein px-3 sm:px-4 pt-1 pb-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0"
+          data-testid="berechtigungen">
+          <legend className="lbl px-1.5">Berechtigungen{weitereFirmen.length ? " je Firma" : ""}</legend>
+          <Feld label={weitereFirmen.length ? `Rolle ${alleFirmen.find((x) => x.kuerzel === "dskm")?.kurzname ?? "DSKM"}` : "Rolle"} fehler={fehler.rolle}
+            hinweis={ohneLogin ? "ohne Login: keine Rechte" : undefined}>
+            {(p) => <Auswahl {...p} value={ohneLogin ? "keine" : f.rolle} disabled={ohneLogin} data-testid="rolle-dskm"
+              onChange={(e) => setF({ ...f, rolle: e.target.value, ist_test: TESTBENUTZER_ROLLEN.includes(e.target.value) ? f.ist_test : false })}>
               {Object.entries(ROLLEN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Auswahl>}
           </Feld>
-        ))}
-        <div className="col-span-4 flex flex-col gap-1.5">
-          {neu ? (
-            <label className="flex items-start gap-2 text-sm cursor-pointer">
-              <input type="checkbox" className="mt-1" checked={f.ohne_login} onChange={(e) => setF({ ...f, ohne_login: e.target.checked })} />
-              <span>Ohne Login anlegen<br /><span className="text-[0.8125rem] gedaempft">Nur als Name für Einträge (z. B. frühere Mitarbeiter): kein Passwort,
-                keine Rechte. Ein Login lässt sich später geben.</span></span>
+          {weitereFirmen.map((firma) => (
+            <Feld key={firma.kuerzel} label={`Rolle ${firma.kurzname}`} fehler={fehler.firmenrollen}
+              hinweis={ohneLogin ? undefined : `bei ${firma.name}; „Keine Berechtigung“ = kein Zugang`}>
+              {(p) => <Auswahl {...p} value={ohneLogin ? "keine" : f.firmenrollen[firma.kuerzel] ?? "keine"} disabled={ohneLogin}
+                data-testid={`rolle-${firma.kuerzel}`}
+                onChange={(e) => setF({ ...f, firmenrollen: { ...f.firmenrollen, [firma.kuerzel]: e.target.value } })}>
+                {Object.entries(ROLLEN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Auswahl>}
+            </Feld>
+          ))}
+          <div className="col-span-full flex flex-col gap-1.5">
+            {neu ? (
+              <label className="flex items-start gap-2 text-sm cursor-pointer">
+                <input type="checkbox" className="mt-1" checked={f.ohne_login} onChange={(e) => setF({ ...f, ohne_login: e.target.checked })} />
+                <span>Ohne Login anlegen<br /><span className="text-[0.8125rem] gedaempft">Nur als Name für Einträge (z. B. frühere Mitarbeiter): kein Passwort,
+                  keine Rechte. Ein Login lässt sich später geben.</span></span>
+              </label>
+            ) : null}
+            <label className={cx("flex items-start gap-2 text-sm", testMoeglich ? "cursor-pointer" : "opacity-60")}>
+              <input type="checkbox" className="mt-1" checked={f.ist_test && !ohneLogin} disabled={!testMoeglich && !f.ist_test}
+                onChange={(e) => setF({ ...f, ist_test: e.target.checked })} />
+              <span>Testbenutzer<br /><span className="text-[0.8125rem] gedaempft">Sieht und bearbeitet ausschließlich Testpatienten – für Schulungen und zum
+                Ausprobieren. Möglich für Betrachter, Mitarbeiter, Mitarbeiter (erweitert) und Mediziner{benutzer?.id === ich.id ? "; nicht für das eigene Konto" : ""}.</span>
+                {fehler.ist_test ? <><br /><span className="fehlertext" role="alert">{fehler.ist_test}</span></> : null}</span>
             </label>
-          ) : null}
-          <label className={cx("flex items-start gap-2 text-sm", testMoeglich ? "cursor-pointer" : "opacity-60")}>
-            <input type="checkbox" className="mt-1" checked={f.ist_test && !ohneLogin} disabled={!testMoeglich && !f.ist_test}
-              onChange={(e) => setF({ ...f, ist_test: e.target.checked })} />
-            <span>Testbenutzer<br /><span className="text-[0.8125rem] gedaempft">Sieht und bearbeitet ausschließlich Testpatienten – für Schulungen und zum
-              Ausprobieren. Möglich für Betrachter, Mitarbeiter, Mitarbeiter (erweitert) und Mediziner{benutzer?.id === ich.id ? "; nicht für das eigene Konto" : ""}.</span>
-              {fehler.ist_test ? <><br /><span className="fehlertext" role="alert">{fehler.ist_test}</span></> : null}</span>
-          </label>
-        </div>
-        <span className="col-span-4 text-[0.8125rem] gedaempft">Anzeige in der Akte: <span className="text-tinte font-medium">{anzeige(f)}</span></span>
-        {speichern.error && !Object.keys(fehler).length ? <Meldung art="fehler" className="col-span-4">{speichern.error.message}</Meldung> : null}
+          </div>
+        </fieldset>
+        <span className="col-span-full text-[0.8125rem] gedaempft">Anzeige in der Akte: <span className="text-tinte font-medium">{anzeige(f)}</span></span>
+        {speichern.error && !Object.keys(fehler).length ? <Meldung art="fehler" className="col-span-full">{speichern.error.message}</Meldung> : null}
         {neu ? (
-          f.ohne_login ? <Meldung className="col-span-4">Das Konto bekommt kein Passwort und keine Rechte. Es dient nur dazu, Einträge einer Person zuzuordnen.</Meldung>
-            : <Meldung className="col-span-4">Nach dem Anlegen erzeugt EPM ein Einmal-Passwort. Du gibst es der Person persönlich oder als ausgedrucktes Zugangsblatt.
+          f.ohne_login ? <Meldung className="col-span-full">Das Konto bekommt kein Passwort und keine Rechte. Es dient nur dazu, Einträge einer Person zuzuordnen.</Meldung>
+            : <Meldung className="col-span-full">Nach dem Anlegen erzeugt EPM ein Einmal-Passwort. Du gibst es der Person persönlich oder als ausgedrucktes Zugangsblatt.
               Beim ersten Login legt sie ein eigenes Passwort fest; die Authenticator-App richtet sie ein, wenn die Zwei-Faktor-Anmeldung Pflicht ist –
               sonst freiwillig unter „Mein Konto“.</Meldung>
         ) : null}
-        <div className="col-span-4 flex gap-2 flex-wrap items-center">
+        <div className="col-span-full flex gap-2 flex-wrap items-center">
           {!neu && benutzer && !benutzer.nur_historisch && !benutzer.ausgeblendet_am ? <>
             <Knopf onClick={() => setFrage("kennwort")}>Einmal-Passwort erzeugen</Knopf>
             <Knopf onClick={() => setFrage("2fa")} disabled={!benutzer.zweiter_faktor}>2FA zurücksetzen</Knopf>
