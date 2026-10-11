@@ -118,9 +118,9 @@ test("Musterdaten: BIA-Messungen zu mehreren Zeitpunkten", async ({ page }) => {
   await expect(detail).toContainText("51,0 %");
   await expect(detail).toContainText("BCM vermindert, ECW erhöht");
   await expect(page.getByTestId("alter-bia")).toContainText(/Letzte Erfassung \d{2}\.\d{2}\.\d{4}/);
-  // die älteste Messung: ECW noch 44,0 %
+  // die älteste Messung: ECW noch 43,5 %
   await messungen.last().getByRole("button").click();
-  await expect(page.getByTestId("bia-detail")).toContainText("44,0 %");
+  await expect(page.getByTestId("bia-detail")).toContainText("43,5 %");
 
   // Probe, Jonas: eine alte Messung – Hinweis „älter als 12 Monate“
   const jonas = await testpatient("Probe", "Jonas");

@@ -132,6 +132,8 @@ Anmeldung (Desktop, Tablet, Telefon): 0 Verstöße, keine Konsolenfehler.
 | 12 | Ladebalken als `progressbar` außerhalb jeder Landmarke (axe `region`) | nur noch sichtbar (`aria-hidden`); Seiten melden das Laden selbst (`components/ui/Ladebalken.tsx`) |
 | 13 | Versorger und Ärzte: 300 Zeichen ließen sich eintippen, erst das Speichern scheiterte („nicht mehr als 150 Zeichen“) | `maxLength` wie in der Datenbank (`seiten/Versorger.tsx`, `seiten/Aerzte.tsx`) |
 | 14 | Nebenwirkung der Knopfprüfung: die Darstellung von `e2e.admin` wurde auf „Dunkel“/„Karteikarte“ umgeschaltet | zurückgesetzt (`darstellung = {}`); die Knopfprüfung lässt Darstellungs-Knöpfe seither aus |
+| 15 | Ein einzelner 500er oder Netzfehler beim Abruf von `/api/auth/status/` zeigte die **Anmeldeseite**, obwohl die Sitzung galt (beobachtet während der Datenbank-Engpässe, siehe unten) | Bei Serverfehler (≥ 500) oder fehlender Verbindung bis zu drei Versuche (1,5 s, 3 s), erst dann die Anmeldung (`lib/auth.tsx`) |
+| 16 | Neue Karte „Technische Verwaltung“ (System › Wartung): Link „Django-Admin öffnen“ im Text nicht unterstrichen (axe `link-in-text-block`) | unterstrichen (`components/TechnikKarte.tsx`); Karte in beiden Firmen bei 1440 und 390 px geprüft, „Für 1 Stunde einschalten“ und „Jetzt ausschalten“ geklickt – danach wieder aus, keine Konsolenfehler, nichts ragt heraus |
 
 Neuer Regressionstest: `e2e/audit-firmen.spec.ts` – in beiden Firmen jede Seite der Navigation, „Neuer Patient“, jeder
 Reiter der gemeinsamen Akte, Hilfe, Design und Konto bei 1440 und 390 px: keine Konsolenfehler, keine Anfrage ≥ 400,
@@ -142,10 +144,16 @@ nichts ragt seitlich heraus, `data-firma` stimmt; dazu Farbe der Leiste und gela
 - **500er im Entwicklungsbetrieb** (verstreut, u. a. `scans/stand`, `protokoll`, `auswahlwerte`): alle 94 waren
   „too many clients“ von PostgreSQL. Der Entwicklungsserver startet je Anfrage einen Thread, jeder hält mit
   `CONN_MAX_AGE = 60` eine eigene Verbindung (bis zu 85 gleichzeitig bei max. 100), parallel liefen die Tests der
-  Sicherheitsprüfung. Kein Fehler der Seiten; im Betrieb (feste Worker) nicht zu erwarten. Vorschlag für die
-  Entwicklung: `CONN_MAX_AGE = 0` unter `runserver`. Einzelne 500er/`ECONNREFUSED` stammen zudem von Neustarts des
+  Sicherheitsprüfung. Kein Fehler der Seiten; im Betrieb (feste Worker) nicht zu erwarten. Inzwischen liest
+  `settings.py` `DB_CONN_MAX_AGE`; die Entwicklungsumgebung setzt 0 – nach dem Neustart blieb die Zahl der
+  Verbindungen bei 0–3. Einzelne 500er/`ECONNREFUSED` stammen zudem von Neustarts des
   Entwicklungsservers während der Änderungen der Sicherheitsprüfung; jede betroffene Aktion (Merkliste, Versorgung,
   Bezugsperson, Termin) wurde danach einzeln wiederholt – ohne Fehler.
+- **Gemeinsames Datenverzeichnis**: Die Backend-Tests schrieben offenbar in dasselbe `EPM_DOKUMENTE` wie der
+  Entwicklungsstand. Um 19:23 wurden die PDFs der Musterakte 9002 ersetzt; Dokument und Infusionsplan zeigten danach auf
+  eine gelöschte Datei (`/api/dokumente/…/datei/` → 500 `FileNotFoundError` im Entwicklungspfad ohne X-Accel, Plan-PDF
+  → 404). Behoben durch Zurücksetzen der Testdaten (`testdaten_zuruecksetzen`, nur Testpatienten; neue IDs). Im Betrieb
+  liefert Nginx die Datei aus (dort 404).
 - Patienten am Telefon, nur für Konten, die Testpatienten sehen (Admin, Testzugang): Layout-Verschiebung 0,16, weil
   „· zusätzlich N Testpatienten …“ nach dem Laden in eine zweite Zeile umbricht. Für die Praxis ohne Wirkung.
 - Schublade in einem schmalen Desktop-Fenster (< 768 px, Scrollleiste mit fester Breite): 15 px Abstand rechts, weil
@@ -158,4 +166,22 @@ nichts ragt seitlich heraus, `data-firma` stimmt; dazu Farbe der Leiste und gela
 
 ## Tests
 
-ERGEBNIS_TESTS
+- `npx tsc --noEmit -p .`: ohne Fehler; `npm run build`: ohne Fehler. Backend: `stammdaten.tests` (`test_logo`) grün.
+- Neuer Test `e2e/audit-firmen.spec.ts`: 2/2 bestanden (nach Neustart des Entwicklungsservers mit
+  `DB_CONN_MAX_AGE=0`; vorher scheiterte er nur an den 500ern der Datenbank bzw. an der fehlenden Musterakten-PDF).
+- Lauf 1 (16 Dateien: audit-firmen, firmen, medikamente, touch, mobil, layout, dokumente, pdf-ausgaben, plaene,
+  kalender, datenschutz, patienten, versorger, start, admin, akte): 65 bestanden, 14 fehlgeschlagen – zum Großteil
+  Datenbank-Engpass und der erste Stand des neuen Tests.
+- Lauf 2 (audit-firmen, firmen, medikamente, touch, mobil, layout, dokumente, pdf-ausgaben, plaene, kalender, start,
+  versorger): 46 bestanden, 4 fehlgeschlagen.
+- Lauf 3 nach Neustart des Servers (audit-firmen, start, patienten, datenschutz, admin, akte): 29 bestanden,
+  8 fehlgeschlagen. Keiner der Fehlschläge berührt die geänderten Stellen:
+  - nur im Docker-Stack lauffähig (`stackNeuStarten`/`docker compose exec`): `akte.spec.ts:208`, `start.spec.ts:54`,
+    `datenschutz.spec.ts:310`, `versorger.spec.ts:7` (der Teil vor dem Neustart, mit den neuen `maxLength`, lief durch);
+  - Stand der lokalen Datenbank: `admin.spec.ts:14` („Kürzel HH existiert bereits“ aus früheren Läufen),
+    `datenschutz.spec.ts:237` (Dokumentvorlage „Infusionsplan“ ohne Datenfeld „Freigabevermerk“),
+    `datenschutz.spec.ts:19` und `start.spec.ts:182` (neue Akte nicht auf der ersten Seite der sehr vollen Liste);
+  - `patienten.spec.ts:98`: `getByLabel("Name", { exact: true })` findet das Feld im Dialog „Neuer Versorger“
+    schon vor jeder Eingabe nicht (Beschriftung „Name *“) – der Test, nicht die Oberfläche; unverändert gelassen.
+- Konsolenausgaben, Messwerte und Bildschirmfotos der Prüfung lagen nur im Arbeitsverzeichnis; die Prüfskripte
+  (`e2e/_audit/`) sind wieder entfernt.

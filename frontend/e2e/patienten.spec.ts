@@ -108,7 +108,7 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   await expect(vd.getByRole("heading", { name: "Neuer Versorger" })).toBeVisible();
   await vd.getByRole("button", { name: "Anlegen" }).click();
   await expect(vd.getByText("Bitte einen Namen eingeben.")).toBeVisible();
-  await vd.getByLabel("Name", { exact: true }).fill(versorgerName);
+  await vd.getByRole("textbox", { name: /^Name\s*\*?$/ }).fill(versorgerName);
   await vd.getByLabel("Ort").fill("Münster");
   await vd.getByRole("button", { name: "Anlegen" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -116,7 +116,7 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   await expect(page.getByRole("heading", { name: "Neuer Patient" })).toBeVisible();
   const arztName = eindeutig("Dr. E2E");
   await page.getByRole("button", { name: "Neu anlegen: Arzt" }).click();
-  await page.getByRole("dialog").getByLabel("Name", { exact: true }).fill(arztName);
+  await page.getByRole("dialog").getByRole("textbox", { name: /^Name\s*\*?$/ }).fill(arztName);
   await page.getByRole("dialog").getByRole("button", { name: "Anlegen" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByLabel("Hausarzt").locator("option:checked")).toHaveText(arztName);
