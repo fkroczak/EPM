@@ -11,16 +11,23 @@ Aktionen aus und schreibt Status und Ergebnisse nach ``<EPM_BASE>/system/status/
     epm-systemagent auftraege   wartende Aufträge ausführen (systemd-Pfad-Einheit, sobald eine Datei da ist)
     epm-systemagent uebertragen verschlüsselte Sicherungen zum Ziel übertragen (vom Status-Lauf angestoßen)
     epm-systemagent schleife    Status und Aufträge fortlaufend (Browsertests in CI, ohne systemd)
+    epm-systemagent zugang-anwenden [--ersteinrichtung]
+                                erlaubte Netze und Netzfilter nach „ufw --force reset“ wieder eintragen (03-security.sh)
 
 Optionen: --basis DIR (statt EPM_BASE aus /etc/epm/epm.conf), --projekt NAME (Compose-Projekt),
           --konf DIR (Passwort und Übertragungsziel der Sicherungen, Standard /etc/epm/sicherung),
           --backup-skript DATEI (Standard /usr/local/sbin/epm-backup),
           --trocken (nichts verändern: Updates, Neustart, Sicherung und Aufräumen nur simulieren),
-          --sicherung-echt (mit --trocken: Sicherung, Übertragung und Wiederherstellen trotzdem echt – CI).
+          --sicherung-echt (mit --trocken: Sicherung, Übertragung und Wiederherstellen trotzdem echt – CI),
+          --einstellungen DATEI (statt /etc/epm/epm.conf; zugang.json liegt daneben).
+
+Zugang (11.10.2026): SSH ist im Betrieb aus und wird in EPM für 1, 4 oder 8 Stunden geöffnet; der Status-Lauf schließt
+es danach von selbst. Erlaubte Netze für EPM (HTTPS) und SSH, Stand von ufw und Fail2ban. Siehe „Zugang“ unten.
 
 Sicherheit: Aus einer Auftragsdatei werden nur „aktion“ (feste Liste) und deren fest vorgesehene, geprüfte Angaben
 verwendet (Minuten, Benutzername, Stempel einer oder mehrerer Sicherungen, Sicherungs-Passwort, Übertragungsziel,
-Version, Dienst, Kennung eines Uploads, Protokoll und Zeilenzahl, Zertifikat als PEM) – jeweils gegen ein festes Muster
+Version, Dienst, Kennung eines Uploads, Protokoll und Zeilenzahl, Zertifikat als PEM, Stunden, Netz und Bezeichnung,
+Jail und IP-Adresse) – jeweils gegen ein festes Muster
 bzw. eine feste Liste geprüft. Nichts davon wird als Befehl oder über eine Shell ausgeführt; Passwörter und Schlüssel
 gehen nur in Dateien (0600, root) bzw. über die Standardeingabe an rclone und stehen nie in Ergebnissen oder Ausgaben.
 Dateien werden ohne Folgen symbolischer Links gelesen und nach dem Lesen sofort gelöscht. Hochgeladene Pakete und
@@ -30,6 +37,7 @@ import argparse
 import fcntl
 from collections import deque
 import hashlib
+import ipaddress
 import json
 import os
 import re
@@ -44,7 +52,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
-VERSION = 7  # 5: Systemverwaltung ohne SSH (10.10.2026); 6: Zeitplan, Aufräumen, Uhrzeit; 7: Notfallpaket (F188)
+VERSION = 8  # 5: Systemverwaltung ohne SSH (10.10.2026); 6: Zeitplan, Aufräumen, Uhrzeit; 7: Notfallpaket (F188);
+#              8: Zugang – SSH auf Zeit, erlaubte Netze, Firewall, Fail2ban (11.10.2026)
 KONF = "/etc/epm/epm.conf"
 BACKUP_SKRIPT = "/usr/local/sbin/epm-backup"
 KONF_SICHERUNG = "/etc/epm/sicherung"
@@ -116,6 +125,13 @@ AKTIONEN = {
     "uhr_einstellen": ("Uhrzeit einstellen", False),
     # Notfallpaket für den Wiederaufbau ohne Internet (F188)
     "notfallpaket": ("Notfallpaket erstellen", False),
+    # Zugang: SSH auf Zeit, erlaubte Netze, Fail2ban (11.10.2026)
+    "ssh_oeffnen": ("SSH öffnen", False),
+    "ssh_schliessen": ("SSH schließen", False),
+    "netz_hinzufuegen": ("Erlaubtes Netz hinzufügen", False),
+    "netz_entfernen": ("Erlaubtes Netz entfernen", False),
+    "https_filter": ("Netzfilter für EPM schalten", False),
+    "fail2ban_entsperren": ("Gesperrte Adresse freigeben", False),
 }
 # Aktionen, die Sicherungen schreiben, übertragen oder zurückspielen – und das Leeren der Datenbank, das nur den
 # EPM-Stack betrifft: mit --sicherung-echt auch im Probelauf echt (Browsertests gegen den echten Stack)
@@ -181,8 +197,25 @@ PAKETNAME_MUSTER = re.compile(r"^[a-z0-9][a-z0-9+.-]{0,100}$")
 IMAGE_NAME_MUSTER = re.compile(r"^[a-z0-9][a-z0-9._/-]{0,200}:[A-Za-z0-9._-]{1,128}$")
 # Abschrift von /etc/epm/epm.conf: nur Einstellungen, nie etwas, das nach Zugangsdaten aussieht
 KONF_GEHEIM = re.compile(r"PASS|SECRET|TOKEN|SCHLUESSEL|KEY|KENNWORT", re.I)
+# Zugang (11.10.2026): SSH nur auf Zeit, erlaubte Netze für EPM (HTTPS) und SSH, Firewall- und Fail2ban-Stand.
+# Die Liste der Netze und der Zustand von SSH stehen in zugang.json neben /etc/epm/epm.conf (nur root schreibt).
+SSH_STUNDEN = (1, 4, 8)
+NETZE_MAX = 20                    # je Dienst
+NETZ_DIENSTE = {"https": "EPM (HTTPS)", "ssh": "SSH"}
+HTTPS_PORT = 443
+# Docker umgeht ufw bei veröffentlichten Ports (DNAT, FORWARD statt INPUT). Wirksam filtert deshalb erst diese Kette,
+# in die DOCKER-USER die Verbindungen zu EPM_MGMT_IP:443 schickt (Schalter „Netzfilter für EPM“).
+HTTPS_KETTE = "EPM-HTTPS"
+BEZEICHNUNG_MUSTER = re.compile(r"^[0-9A-Za-zÄÖÜäöüß][0-9A-Za-zÄÖÜäöüß .,:()/_+-]{0,39}$")
+NETZ_ZEICHEN = re.compile(r"^[0-9A-Fa-f.:/]{2,49}$")
+SCHNITTSTELLE_MUSTER = re.compile(r"^[A-Za-z0-9_.-]{1,15}$")
+JAIL_MUSTER = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+# Zeile aus „ufw status verbose|numbered“ (LC_ALL=C): [Nr] Ziel  Aktion  Von  # Kommentar
+UFW_REGEL = re.compile(r"^(?:\[\s*(\d+)\]\s*)?(\S.*?)\s{2,}((?:ALLOW|DENY|REJECT|LIMIT)(?: (?:IN|OUT|FWD))?)\s+(\S.*?)"
+                       r"(?:\s+# ?(.*))?$")
+C_ENV = {"LC_ALL": "C", "LANG": "C"}
 
-APT_ENV = {"DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE": "a", "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"}
+APT_ENV ={"DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE": "a", "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"}
 
 
 def stempel_zeit(stempel):
@@ -275,6 +308,90 @@ def naechstes_fenster(von, bis, jetzt=None):
     return beginn
 
 
+# ------------------------------------------------------------ Zugang: Prüfungen (dieselben stehen in backend/system/host.py)
+def netz_pruefen(text, dienst):
+    """Erlaubtes Quellnetz prüfen und vereinheitlichen: IPv4/IPv6 als Netz (CIDR) oder einzelne Adresse. Nicht erlaubt:
+    alles (0.0.0.0/0, ::/0), breiter als /8 (IPv4) bzw. /32 (IPv6), Loopback, Multicast, reservierte Bereiche. Für EPM
+    (HTTPS) nur IPv4 – EPM lauscht nur auf EPM_MGMT_IP. Rückgabe (Fehler | None, Netz | None)."""
+    if dienst not in NETZ_DIENSTE:
+        return "Unbekannter Dienst.", None
+    if not isinstance(text, str) or not NETZ_ZEICHEN.match(text.strip()):
+        return "Bitte ein Netz (z. B. 192.168.10.0/24) oder eine IP-Adresse angeben.", None
+    try:
+        netz = ipaddress.ip_network(text.strip(), strict=False)
+    except ValueError:
+        return "Bitte ein Netz (z. B. 192.168.10.0/24) oder eine IP-Adresse angeben.", None
+    if (netz.version == 4 and netz.prefixlen < 8) or (netz.version == 6 and netz.prefixlen < 32):
+        return "Das Netz ist zu groß: höchstens /8 bei IPv4 und /32 bei IPv6.", None
+    if netz.is_loopback or netz.is_multicast or netz.is_reserved or netz.network_address.is_unspecified:
+        return "Dieses Netz ist nicht erlaubt (Loopback, Multicast oder reserviert).", None
+    if dienst == "https" and netz.version != 4:
+        return "EPM ist nur über IPv4 erreichbar (EPM_MGMT_IP). Bitte ein IPv4-Netz angeben.", None
+    return None, str(netz)
+
+
+def ip_pruefen(text):
+    """Einzelne IP-Adresse (z. B. die des anfragenden Geräts) oder None; IPv4 in IPv6 („::ffff:…“) als IPv4."""
+    if not isinstance(text, str) or len(text) > 45:
+        return None
+    try:
+        ip = ipaddress.ip_address(text.strip())
+    except ValueError:
+        return None
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return ip
+
+
+def ufw_kommentar(praefix, bezeichnung):
+    """Kommentar einer ufw-Regel: nur ASCII (ufw speichert ihn in user.rules), erkennbar am Präfix „EPM …“."""
+    text = str(bezeichnung or "")
+    for a, b in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("Ä", "Ae"), ("Ö", "Oe"), ("Ü", "Ue"), ("ß", "ss")):
+        text = text.replace(a, b)
+    text = re.sub(r"[^A-Za-z0-9 .,:()/_+-]", "", text)
+    return f"{praefix} {text}".strip()[:60]
+
+
+def ufw_regeln(text):
+    """Regeln aus „ufw status verbose“ bzw. „ufw status numbered“ (LC_ALL=C) als Liste."""
+    regeln = []
+    for z in (text or "").splitlines():
+        m = UFW_REGEL.match(z.rstrip())
+        if not m:
+            continue
+        nr, ziel, aktion, von, kommentar = m.groups()
+        v6 = "(v6)" in ziel or "(v6)" in von
+        ziel, von = ziel.replace(" (v6)", "").strip(), von.replace(" (v6)", "").strip()
+        schnittstelle = ""
+        m_on = re.search(r" on (\S+)$", ziel)
+        if m_on:
+            schnittstelle, ziel = m_on.group(1), ziel[:m_on.start()].strip()
+        m_port = re.search(r"(?:^|\s)(\d+(?::\d+)?)(?:/(tcp|udp))?$", ziel)
+        regeln.append({"nr": int(nr) if nr else None, "ziel": ziel, "port": m_port.group(1) if m_port else "",
+                       "proto": (m_port.group(2) or "") if m_port else "", "aktion": aktion, "von": von,
+                       "schnittstelle": schnittstelle, "v6": v6, "kommentar": (kommentar or "").strip()[:100]})
+    return regeln
+
+
+def regel_netz(regel):
+    """Quellnetz einer ufw-Regel („Anywhere“ = alles) oder None."""
+    if regel["von"] == "Anywhere":
+        return ipaddress.ip_network("::/0" if regel["v6"] else "0.0.0.0/0")
+    try:
+        return ipaddress.ip_network(regel["von"].split()[0], strict=False)
+    except ValueError:
+        return None
+
+
+def regel_erlaubt_port(regel, port):
+    """Erlaubt die Regel eingehend den TCP-Port (auch über das Anwendungsprofil „OpenSSH“ bei Port 22)?"""
+    if not regel["aktion"].startswith(("ALLOW", "LIMIT")) or regel["aktion"].endswith(("OUT", "FWD")):
+        return False
+    if regel["ziel"].startswith("OpenSSH"):
+        return port == 22
+    return regel["port"] == str(port) and regel["proto"] in ("", "tcp")
+
+
 class Agent:
     def __init__(self, basis, projekt=None, trocken=False, konf=None, backup_skript=None, sicherung_echt=False):
         self.basis = basis
@@ -300,6 +417,10 @@ class Agent:
         self.code = "/srv/epm-code"
         self.ca_ordner = CA_ORDNER
         self.konf_datei = KONF
+        # Zugang (11.10.2026): Zustand von SSH und erlaubte Netze (Standard: zugang.json neben epm.conf); Einheiten von
+        # systemd (ssh.socket gibt es ab Ubuntu 22.10)
+        self.zugang_datei = None
+        self.systemd_lib = ("/usr/lib/systemd/system", "/lib/systemd/system")
         einstellungen = lese_konf()
         self.proxy = einstellungen.get("EPM_APT_PROXY", "")
         try:
@@ -753,6 +874,16 @@ class Agent:
                 neustart_pakete = sorted(set(f.read().split()))
         except OSError:
             pass
+        # Zugang: abgelaufenes SSH schließen, Netzfilter für EPM nach Neustart/Docker-Neustart wieder einhängen
+        try:
+            self.ssh_ablauf_pruefen()
+            self.https_filter_pruefen()
+        except Exception as e:  # noqa: BLE001 – der Status soll trotzdem stehen
+            print(f"Zugang: {e}", file=sys.stderr)
+        try:
+            zugang = self.zugang_stand()
+        except Exception as e:  # noqa: BLE001
+            zugang = {"fehler": str(e)[:300]}
         status = {
             "version": VERSION,
             "zeit": jetzt_iso(),
@@ -784,7 +915,8 @@ class Agent:
             "journal": self.journal(),
             "image_dateien": self.image_dateien(),
             "notfall": self.notfall_stand(),
-            "protokolle": [{"quelle": q, "name": n} for q, n in PROTOKOLLE.items()],
+            "zugang": zugang,
+            "protokolle":[{"quelle": q, "name": n} for q, n in PROTOKOLLE.items()],
             "trocken": self.trocken,
         }
         self.schreibe(os.path.join(self.status, "system.json"), status)
@@ -2201,6 +2333,25 @@ class Agent:
         if aktion == "uhr_einstellen":
             return self.uhr_einstellen(parameter, zeile, simuliert=t)
 
+        # Zugang (11.10.2026)
+        if aktion == "ssh_oeffnen":
+            return self.ssh_oeffnen(parameter.get("stunden"), von, zeile, simuliert=t)
+
+        if aktion == "ssh_schliessen":
+            return self.ssh_schliessen(von, zeile, simuliert=t)
+
+        if aktion == "netz_hinzufuegen":
+            return self.netz_hinzufuegen(parameter, von, zeile, simuliert=t)
+
+        if aktion == "netz_entfernen":
+            return self.netz_entfernen(parameter, von, zeile, simuliert=t)
+
+        if aktion == "https_filter":
+            return self.https_filter_schalten(parameter, von, zeile, simuliert=t)
+
+        if aktion == "fail2ban_entsperren":
+            return self.fail2ban_entsperren(parameter.get("jail"), parameter.get("ip"), zeile, simuliert=t)
+
         if aktion == "protokoll":
             return self.protokoll_abrufen(parameter.get("quelle"), parameter.get("zeilen"), auftrag_id, zeile)
 
@@ -2756,6 +2907,483 @@ class Agent:
                    else "Zeitsynchronisation aus" + (f", Uhrzeit auf {zeit} gesetzt" if zeit else "")) + \
             (f"; Zeitzone {zone}" if zone else "") + "."
 
+    # ------------------------------------------------------------ Zugang: SSH auf Zeit, erlaubte Netze (11.10.2026)
+    # SSH ist im Betrieb aus und wird in EPM für 1, 4 oder 8 Stunden geöffnet; danach schließt der Status-Lauf (jede
+    # Minute) es von selbst. Notzugang ist die Konsole des Hypervisors. Server, die vor dieser Version eingerichtet
+    # wurden, behalten SSH („dauerhaft offen (Ersteinrichtung)“), bis jemand es in EPM schließt – niemand wird durch
+    # ein Update ausgesperrt. Alle Befehle als Liste, nie über eine Shell; Netze, Ports und Namen sind vorher geprüft.
+    def zugang_pfad(self):
+        return self.zugang_datei or os.path.join(os.path.dirname(self.konf_datei) or ".", "zugang.json")
+
+    def einstellung(self, name, standard=""):
+        return lese_konf(self.konf_datei).get(name) or standard
+
+    def ssh_port(self):
+        try:
+            port = int(self.einstellung("EPM_SSH_PORT", "22"))
+        except ValueError:
+            return 22
+        return port if 1 <= port <= 65535 else 22
+
+    def mgmt_if(self):
+        wert = self.einstellung("EPM_MGMT_IF")
+        return wert if SCHNITTSTELLE_MUSTER.match(wert) else ""
+
+    def mgmt_ip(self):
+        ip = ip_pruefen(self.einstellung("EPM_MGMT_IP"))
+        return str(ip) if ip is not None and ip.version == 4 else ""
+
+    def docker_netze(self):
+        """Eigene Docker-Netze (rollout/02-docker.sh): Container dürfen EPM über EPM_MGMT_IP erreichen."""
+        netze = []
+        for name, standard in (("EPM_DOCKER_BIP", "10.231.0.1/24"), ("EPM_DOCKER_POOL", "10.231.16.0/20")):
+            try:
+                n = ipaddress.ip_network(self.einstellung(name, standard), strict=False)
+            except ValueError:
+                continue
+            if n.version == 4 and str(n) not in netze:
+                netze.append(str(n))
+        return netze
+
+    def ssh_einheiten(self):
+        """ssh.socket (Socket-Aktivierung, Ubuntu ab 22.10) und ssh.service – beide schalten, sonst nimmt der Socket
+        weiter Verbindungen an."""
+        socket = any(os.path.exists(os.path.join(d, "ssh.socket")) for d in self.systemd_lib)
+        return ["ssh.socket", "ssh.service"] if socket else ["ssh.service"]
+
+    def ssh_dienst_aktiv(self):
+        rc, aus = self.befehl(["systemctl", "is-active", *self.ssh_einheiten()], zeitlimit=10)
+        return any(z.strip() in ("active", "activating", "listening") for z in aus.splitlines())
+
+    def zugang_lesen(self):
+        """(Zustand, gespeichert). Ohne zugang.json (Server vor dieser Version, Ersteinrichtung): Netze aus epm.conf
+        (EPM_MGMT_NET), SSH „dauerhaft“, wenn der Dienst läuft – so wird niemand ausgesperrt."""
+        d = self.lies(self.zugang_pfad())
+        if isinstance(d, dict) and isinstance(d.get("netze"), dict) and isinstance(d.get("ssh"), dict):
+            netze = {}
+            for dienst in NETZ_DIENSTE:
+                liste = []
+                for e in d["netze"].get(dienst) or []:
+                    if not isinstance(e, dict):
+                        continue
+                    fehler, netz = netz_pruefen(e.get("netz"), dienst)
+                    if fehler or any(x["netz"] == netz for x in liste):
+                        continue
+                    liste.append({"netz": netz, "bezeichnung": str(e.get("bezeichnung") or "")[:40],
+                                  "seit": e.get("seit") if isinstance(e.get("seit"), str) else None,
+                                  "von": str(e.get("von") or "")[:150]})
+                netze[dienst] = liste[:NETZE_MAX]
+            s = d["ssh"]
+            zustand = s.get("zustand") if s.get("zustand") in ("offen", "dauerhaft", "geschlossen") else "dauerhaft"
+            bis = s.get("bis") if zustand == "offen" and zeit_aus(s.get("bis")) else None
+            if zustand == "offen" and not bis:
+                zustand = "dauerhaft"   # unlesbares Ende: nicht raten, nichts schließen
+            ereignisse = [e for e in d.get("ereignisse") or [] if isinstance(e, dict)][-10:]
+            return {"version": 1, "netze": netze,
+                    "ssh": {"zustand": zustand, "bis": bis, "seit": s.get("seit") if isinstance(s.get("seit"), str) else None,
+                            "von": str(s.get("von") or "")[:150]},
+                    "https_filter": d.get("https_filter") is True, "ereignisse": ereignisse}, True
+        netze = {"https": [], "ssh": []}
+        for dienst in NETZ_DIENSTE:
+            fehler, netz = netz_pruefen(self.einstellung("EPM_MGMT_NET"), dienst)
+            if not fehler:
+                netze[dienst].append({"netz": netz, "bezeichnung": "Verwaltungsnetz", "seit": None, "von": "epm.conf"})
+        return {"version": 1, "netze": netze,
+                "ssh": {"zustand": "dauerhaft" if self.ssh_dienst_aktiv() else "geschlossen", "bis": None, "seit": None,
+                        "von": ""},
+                "https_filter": False, "ereignisse": []}, False
+
+    def zugang_speichern(self, z):
+        pfad = self.zugang_pfad()
+        os.makedirs(os.path.dirname(pfad) or ".", mode=0o755, exist_ok=True)
+        self.schreibe(pfad, z, modus=0o644)
+
+    def ufw_erlauben(self, netz, port, kommentar):
+        args = ["ufw", "allow"]
+        if self.mgmt_if():
+            args += ["in", "on", self.mgmt_if()]
+        return args + ["from", netz, "to", "any", "port", str(port), "proto", "tcp", "comment", kommentar]
+
+    def ufw_loeschen(self, passt, zeile, simuliert=False):
+        """ufw-Regeln löschen, auf die ``passt`` zutrifft – nach Nummer, von hinten (die Nummern davor bleiben gleich).
+        Rückgabe (Rückgabewert, Anzahl)."""
+        if simuliert:
+            zeile("(Probelauf) ufw status numbered; passende Regeln mit „ufw --force delete <Nr>“ löschen\n")
+            return 0, 0
+        rc, aus = self.befehl(["ufw", "status", "numbered"], env=C_ENV, zeitlimit=30)
+        if rc != 0:
+            zeile(f"$ ufw status numbered\n{aus[-500:]}→ ufw: Rückgabe {rc}\n")
+            return rc, 0
+        treffer = sorted({r["nr"] for r in ufw_regeln(aus) if r["nr"] and passt(r)}, reverse=True)
+        fehler = 0
+        for nr in treffer:
+            if self.schritt("ufw", ["ufw", "--force", "delete", str(nr)], zeile, env=C_ENV, zeitlimit=60) != 0:
+                fehler += 1
+        return (1 if fehler else 0), len(treffer)
+
+    def ssh_regel(self, regel, port=None):
+        return regel_erlaubt_port(regel, port or self.ssh_port())
+
+    def ssh_oeffnen_befehle(self, z):
+        port = self.ssh_port()
+        befehle = [self.ufw_erlauben(e["netz"], port, ufw_kommentar("EPM SSH", e["bezeichnung"])) for e in z["netze"]["ssh"]]
+        return befehle + [["systemctl", "enable", "--now", *self.ssh_einheiten()]]
+
+    def ssh_oeffnen(self, stunden, von, zeile, simuliert=False):
+        if isinstance(stunden, bool) or stunden not in SSH_STUNDEN:
+            return 2, "Bitte 1, 4 oder 8 Stunden wählen – SSH nicht geöffnet."
+        z, _ = self.zugang_lesen()
+        if not z["netze"]["ssh"]:
+            return 2, "Es ist kein Netz für SSH eingetragen. Bitte zuerst unter „Erlaubte Netze“ eines hinzufügen."
+        bis = datetime.now(timezone.utc).astimezone() + timedelta(hours=stunden)
+        bis_text = bis.strftime("%d.%m.%Y %H:%M")
+        befehle = self.ssh_oeffnen_befehle(z)
+        zeile(f"SSH (Port {self.ssh_port()}) für {stunden} Stunde(n) öffnen, bis {bis_text} Uhr. Erlaubt: "
+              f"{', '.join(e['netz'] for e in z['netze']['ssh'])}\n")
+        if simuliert:
+            for args in befehle:
+                zeile(f"(Probelauf) {' '.join(args)}\n")
+            return 0, "Probelauf: SSH nicht geöffnet."
+        fehler = sum(1 for args in befehle if self.schritt("SSH öffnen", args, zeile, env=C_ENV, zeitlimit=120) != 0)
+        # auch bei Fehlern das Ende eintragen: dann schließt der Server zur Zeit, was sich geöffnet hat
+        z["ssh"] = {"zustand": "offen", "bis": bis.isoformat(timespec="seconds"), "seit": jetzt_iso(), "von": von}
+        self.zugang_speichern(z)
+        if fehler:
+            return 1, (f"{fehler} Schritt(e) sind fehlgeschlagen – Ausgabe prüfen. SSH wird trotzdem um {bis_text} Uhr "
+                       "geschlossen.")
+        return 0, f"SSH ist bis {bis_text} Uhr offen. Danach schließt der Server es von selbst."
+
+    def ssh_schliessen(self, von, zeile, simuliert=False):
+        """ufw-Regeln für den SSH-Port löschen, ssh.socket/ssh.service stoppen und abschalten. Mehrfach ausführbar.
+        Bestehende Sitzungen laufen weiter (ssh.service: KillMode=process), bis sie enden."""
+        einheiten = self.ssh_einheiten()
+        port = self.ssh_port()
+        zeile(f"SSH (Port {port}) schließen: Firewall-Regeln löschen, {' und '.join(einheiten)} stoppen.\n")
+        if simuliert:
+            self.ufw_loeschen(lambda r: self.ssh_regel(r, port), zeile, simuliert=True)
+            zeile(f"(Probelauf) systemctl disable --now {' '.join(einheiten)}\n")
+            return 0, "Probelauf: SSH nicht geschlossen."
+        rc_ufw, anzahl = self.ufw_loeschen(lambda r: self.ssh_regel(r, port), zeile)
+        rc_dienst = self.schritt("SSH-Dienst", ["systemctl", "disable", "--now", *einheiten], zeile, zeitlimit=120)
+        if rc_ufw or rc_dienst:
+            return 1, "SSH ließ sich nicht vollständig schließen – Ausgabe prüfen."
+        z, _ = self.zugang_lesen()
+        z["ssh"] = {"zustand": "geschlossen", "bis": None, "seit": jetzt_iso(), "von": von}
+        self.zugang_speichern(z)
+        return 0, (f"SSH ist geschlossen ({anzahl} Firewall-Regel(n) entfernt, Dienst aus). Bestehende Verbindungen laufen "
+                   "weiter, bis sie enden.")
+
+    def ssh_ablauf_pruefen(self, jetzt=None):
+        """Im Status-Lauf (jede Minute, auch gleich nach dem Start des Servers): abgelaufenes SSH schließen. Das Ereignis
+        steht in zugang.json; das Backend übernimmt es ins Audit-Log. Schlägt das Schließen fehl, versucht es der nächste
+        Lauf erneut (ein Fehler je Ablauf im Audit-Log)."""
+        if self.trocken or not os.path.exists(self.zugang_pfad()):
+            return None
+        z, _ = self.zugang_lesen()
+        s = z["ssh"]
+        bis = zeit_aus(s.get("bis"))
+        if s["zustand"] != "offen" or bis is None:
+            return None
+        if bis.tzinfo is None:
+            bis = bis.astimezone()
+        if bis > (jetzt or datetime.now(timezone.utc)):
+            return None
+        protokoll = []
+        rc, text = self.ssh_schliessen("automatisch", protokoll.append)
+        z, _ = self.zugang_lesen()
+        letztes = (z["ereignisse"] or [{}])[-1]
+        if rc == 0 or not (letztes.get("bis") == s["bis"] and not letztes.get("ok")):
+            z["ereignisse"] = z["ereignisse"][-9:] + [{"id": os.urandom(8).hex(), "zeit": jetzt_iso(), "art": "abgelaufen",
+                                                        "ok": rc == 0, "bis": s["bis"], "text": text[:300]}]
+            self.zugang_speichern(z)
+        print(f"SSH: Zeit abgelaufen ({s['bis']}) – {text}\n{''.join(protokoll)[-2000:]}", file=sys.stderr)
+        return rc, text
+
+    # -------- erlaubte Netze
+    def netz_hinzufuegen(self, p, von, zeile, simuliert=False):
+        dienst = p.get("dienst")
+        fehler, netz = netz_pruefen(p.get("netz"), dienst)
+        if fehler:
+            return 2, f"{fehler} Nichts geändert."
+        bezeichnung = p.get("bezeichnung")
+        if not isinstance(bezeichnung, str) or not BEZEICHNUNG_MUSTER.match(bezeichnung.strip()):
+            return 2, "Bitte eine Bezeichnung angeben (bis 40 Zeichen, z. B. „Praxisnetz 2“). Nichts geändert."
+        bezeichnung = bezeichnung.strip()
+        z, _ = self.zugang_lesen()
+        liste = z["netze"][dienst]
+        if any(e["netz"] == netz for e in liste):
+            return 2, f"{netz} ist für {NETZ_DIENSTE[dienst]} schon eingetragen."
+        if len(liste) >= NETZE_MAX:
+            return 2, f"Für {NETZ_DIENSTE[dienst]} sind schon {NETZE_MAX} Netze eingetragen. Bitte erst eines entfernen."
+        befehle = []
+        if dienst == "https":
+            befehle.append(self.ufw_erlauben(netz, HTTPS_PORT, ufw_kommentar("EPM HTTPS", bezeichnung)))
+        elif z["ssh"]["zustand"] in ("offen", "dauerhaft"):
+            befehle.append(self.ufw_erlauben(netz, self.ssh_port(), ufw_kommentar("EPM SSH", bezeichnung)))
+        zeile(f"{NETZ_DIENSTE[dienst]}: {netz} („{bezeichnung}“) erlauben.\n")
+        if simuliert:
+            for args in befehle:
+                zeile(f"(Probelauf) {' '.join(args)}\n")
+            return 0, "Probelauf: Netz nicht eingetragen."
+        liste.append({"netz": netz, "bezeichnung": bezeichnung, "seit": jetzt_iso(), "von": von})
+        self.zugang_speichern(z)
+        fehler = sum(1 for args in befehle if self.schritt("ufw", args, zeile, env=C_ENV, zeitlimit=60) != 0)
+        if dienst == "https" and z["https_filter"]:
+            fehler += self.https_filter_anwenden(z, zeile)
+        if fehler:
+            return 1, f"{netz} ist eingetragen, aber die Firewall hat es nicht vollständig übernommen – Ausgabe prüfen."
+        zusatz = "" if dienst == "https" or befehle else " Es gilt beim nächsten Öffnen von SSH."
+        return 0, f"{netz} („{bezeichnung}“) ist für {NETZ_DIENSTE[dienst]} erlaubt.{zusatz}"
+
+    def netz_entfernen(self, p, von, zeile, simuliert=False):
+        """Netz entfernen. Für EPM (HTTPS) mit Schutz vor dem Aussperren: nie das letzte Netz und nie das Netz, über das
+        das anfragende Gerät EPM erreicht (seine Adresse gibt das Backend mit)."""
+        dienst = p.get("dienst")
+        fehler, netz = netz_pruefen(p.get("netz"), dienst)
+        if fehler:
+            return 2, f"{fehler} Nichts geändert."
+        z, _ = self.zugang_lesen()
+        liste = z["netze"][dienst]
+        eintrag = next((e for e in liste if e["netz"] == netz), None)
+        if eintrag is None:
+            return 2, f"{netz} ist für {NETZ_DIENSTE[dienst]} nicht eingetragen."
+        rest = [e for e in liste if e is not eintrag]
+        weg = ipaddress.ip_network(netz)
+        if dienst == "https":
+            if not rest:
+                return 2, "Das letzte Netz für EPM bleibt – sonst wäre EPM von nirgends mehr erreichbar."
+            ip = ip_pruefen(p.get("client_ip"))
+            if ip is None:
+                return 2, "Die Adresse des anfragenden Geräts fehlt – zur Sicherheit bleibt das Netz."
+            if ip in weg and not any(ip in ipaddress.ip_network(e["netz"]) for e in rest):
+                return 2, (f"Ihr Gerät ({ip}) erreicht EPM über {netz}. Dieses Netz bleibt, sonst sperren Sie sich aus. "
+                           "Bitte von einem Gerät in einem anderen erlaubten Netz entfernen.")
+            port = HTTPS_PORT
+        else:
+            port = self.ssh_port() if z["ssh"]["zustand"] in ("offen", "dauerhaft") else None
+
+        def passt(r):
+            return regel_erlaubt_port(r, port) and regel_netz(r) == weg
+
+        zeile(f"{NETZ_DIENSTE[dienst]}: {netz} („{eintrag['bezeichnung']}“) entfernen.\n")
+        if simuliert:
+            if port:
+                self.ufw_loeschen(passt, zeile, simuliert=True)
+            return 0, "Probelauf: Netz nicht entfernt."
+        z["netze"][dienst] = rest
+        self.zugang_speichern(z)
+        rc, anzahl = self.ufw_loeschen(passt, zeile) if port else (0, 0)
+        fehler = 1 if rc else 0
+        if dienst == "https" and z["https_filter"]:
+            fehler += self.https_filter_anwenden(z, zeile)
+        if fehler:
+            return 1, f"{netz} ist ausgetragen, aber die Firewall hat es nicht vollständig übernommen – Ausgabe prüfen."
+        return 0, f"{netz} ist für {NETZ_DIENSTE[dienst]} nicht mehr erlaubt ({anzahl} Firewall-Regel(n) entfernt)."
+
+    # -------- Netzfilter für EPM (Docker umgeht ufw)
+    def https_sprung(self):
+        return ["-p", "tcp", "-m", "conntrack", "--ctorigdst", self.mgmt_ip(), "--ctorigdstport", str(HTTPS_PORT),
+                "--ctdir", "ORIGINAL", "-j", HTTPS_KETTE]
+
+    def https_filter_befehle(self, z):
+        """Kette EPM-HTTPS neu füllen: Docker-Netze und erlaubte Netze dürfen, alles andere wird verworfen."""
+        befehle = [["iptables", "-w", "-F", HTTPS_KETTE]]
+        for netz in self.docker_netze() + [e["netz"] for e in z["netze"]["https"]]:
+            befehle.append(["iptables", "-w", "-A", HTTPS_KETTE, "-s", netz, "-j", "RETURN"])
+        return befehle + [["iptables", "-w", "-A", HTTPS_KETTE, "-j", "DROP"]]
+
+    def https_filter_anwenden(self, z, zeile):
+        """Kette anlegen bzw. neu füllen und aus DOCKER-USER anspringen. Schlägt ein Schritt vor dem Verwerfen fehl,
+        bleibt die Kette offen (lieber zu viel erlaubt als ausgesperrt). Rückgabe: Anzahl Fehler."""
+        if not self.mgmt_ip():
+            zeile("EPM_MGMT_IP fehlt in /etc/epm/epm.conf – Netzfilter nicht möglich.\n")
+            return 1
+        for kette in ("DOCKER-USER", HTTPS_KETTE):
+            if self.befehl(["iptables", "-w", "-S", kette], zeitlimit=30)[0] != 0:
+                if self.schritt("iptables", ["iptables", "-w", "-N", kette], zeile, zeitlimit=30) != 0:
+                    return 1
+        befehle = self.https_filter_befehle(z)
+        for args in befehle[:-1]:
+            if self.schritt("iptables", args, zeile, zeitlimit=30) != 0:
+                zeile("Netzfilter nicht vollständig – zur Sicherheit wird nichts verworfen.\n")
+                return 1
+        fehler = 0 if self.schritt("iptables", befehle[-1], zeile, zeitlimit=30) == 0 else 1
+        if self.befehl(["iptables", "-w", "-C", "DOCKER-USER", *self.https_sprung()], zeitlimit=30)[0] != 0:
+            if self.schritt("iptables", ["iptables", "-w", "-I", "DOCKER-USER", "1", *self.https_sprung()], zeile,
+                            zeitlimit=30) != 0:
+                fehler += 1
+        return fehler
+
+    def https_filter_entfernen(self, zeile):
+        fehler = 0
+        if self.mgmt_ip():
+            for _ in range(5):   # mehrfach eingehängt (z. B. von Hand): alle Sprünge entfernen
+                if self.befehl(["iptables", "-w", "-C", "DOCKER-USER", *self.https_sprung()], zeitlimit=30)[0] != 0:
+                    break
+                if self.schritt("iptables", ["iptables", "-w", "-D", "DOCKER-USER", *self.https_sprung()], zeile,
+                                zeitlimit=30) != 0:
+                    fehler += 1
+                    break
+        if self.befehl(["iptables", "-w", "-S", HTTPS_KETTE], zeitlimit=30)[0] == 0:
+            for args in (["iptables", "-w", "-F", HTTPS_KETTE], ["iptables", "-w", "-X", HTTPS_KETTE]):
+                if self.schritt("iptables", args, zeile, zeitlimit=30) != 0:
+                    fehler += 1
+        return fehler
+
+    def https_filter_aktiv(self):
+        if not self.mgmt_ip():
+            return False
+        if self.befehl(["iptables", "-w", "-C", "DOCKER-USER", *self.https_sprung()], zeitlimit=30)[0] != 0:
+            return False
+        rc, aus = self.befehl(["iptables", "-w", "-S", HTTPS_KETTE], zeitlimit=30)
+        return rc == 0 and f"-A {HTTPS_KETTE} -j DROP" in aus
+
+    def https_filter_pruefen(self):
+        """iptables-Regeln überstehen keinen Neustart: im Status-Lauf wieder einhängen, wenn der Filter an ist."""
+        if self.trocken or not os.path.exists(self.zugang_pfad()):
+            return
+        z, _ = self.zugang_lesen()
+        if z["https_filter"] and not self.https_filter_aktiv():
+            protokoll = []
+            fehler = self.https_filter_anwenden(z, protokoll.append)
+            print(f"Netzfilter für EPM wieder eingehängt ({fehler} Fehler)\n{''.join(protokoll)[-2000:]}", file=sys.stderr)
+
+    def https_filter_schalten(self, p, von, zeile, simuliert=False):
+        an = p.get("an")
+        if not isinstance(an, bool):
+            return 2, "Bitte an oder aus wählen – nichts geändert."
+        z, _ = self.zugang_lesen()
+        if an:
+            if not self.mgmt_ip():
+                return 2, "EPM_MGMT_IP fehlt in /etc/epm/epm.conf – der Netzfilter ist nicht möglich."
+            ip = ip_pruefen(p.get("client_ip"))
+            if ip is None:
+                return 2, "Die Adresse des anfragenden Geräts fehlt – zur Sicherheit bleibt der Filter aus."
+            if not any(ip in ipaddress.ip_network(e["netz"]) for e in z["netze"]["https"]):
+                return 2, (f"Ihr Gerät ({ip}) ist in keinem erlaubten Netz für EPM. Der Filter würde Sie aussperren – "
+                           "bitte zuerst Ihr Netz eintragen.")
+        zeile(f"Netzfilter für EPM {'einschalten' if an else 'ausschalten'}.\n")
+        if simuliert:
+            for args in (self.https_filter_befehle(z) + [["iptables", "-w", "-I", "DOCKER-USER", "1", *self.https_sprung()]]
+                         if an else [["iptables", "-w", "-D", "DOCKER-USER", *self.https_sprung()],
+                                     ["iptables", "-w", "-X", HTTPS_KETTE]]):
+                zeile(f"(Probelauf) {' '.join(args)}\n")
+            return 0, "Probelauf: Netzfilter nicht geändert."
+        z["https_filter"] = an
+        self.zugang_speichern(z)
+        fehler = self.https_filter_anwenden(z, zeile) if an else self.https_filter_entfernen(zeile)
+        if fehler:
+            return 1, "Der Netzfilter ist nicht vollständig übernommen – Ausgabe prüfen."
+        return 0, ("Netzfilter an: EPM ist nur noch aus den erlaubten Netzen erreichbar." if an
+                   else "Netzfilter aus: EPM ist aus jedem Netz erreichbar, das den Server erreicht.")
+
+    def zugang_anwenden(self, ersteinrichtung, zeile):
+        """Für rollout/03-security.sh (nach „ufw --force reset“): gespeicherte Netze wieder eintragen. Die Liste für EPM
+        gilt: andere Regeln für Port 443 werden entfernt. Bei der Ersteinrichtung bleibt SSH dauerhaft offen, bis es in EPM
+        geschlossen wird; auf einem neuen Server (noch kein EPM) ist der Netzfilter gleich an."""
+        z, gespeichert = self.zugang_lesen()
+        if ersteinrichtung:
+            z["ssh"] = {"zustand": "dauerhaft", "bis": None, "seit": jetzt_iso(), "von": "ersteinrichtung"}
+            if not gespeichert and not os.path.exists(os.path.join(self.basis, ".env")) and self.mgmt_ip():
+                z["https_filter"] = True
+        fehler = 0
+        erlaubt = {ipaddress.ip_network(e["netz"]) for e in z["netze"]["https"]}
+        for e in z["netze"]["https"]:
+            fehler += self.schritt("ufw", self.ufw_erlauben(e["netz"], HTTPS_PORT, ufw_kommentar("EPM HTTPS", e["bezeichnung"])),
+                                   zeile, env=C_ENV, zeitlimit=60) != 0
+        if erlaubt:
+            fehler += self.ufw_loeschen(lambda r: regel_erlaubt_port(r, HTTPS_PORT) and regel_netz(r) not in erlaubt,
+                                        zeile)[0] != 0
+        if z["ssh"]["zustand"] in ("offen", "dauerhaft"):
+            for e in z["netze"]["ssh"]:
+                fehler += self.schritt("ufw", self.ufw_erlauben(e["netz"], self.ssh_port(),
+                                                                ufw_kommentar("EPM SSH", e["bezeichnung"])),
+                                       zeile, env=C_ENV, zeitlimit=60) != 0
+        self.zugang_speichern(z)
+        fehler += self.https_filter_anwenden(z, zeile) if z["https_filter"] else self.https_filter_entfernen(zeile)
+        return fehler
+
+    # -------- Stand für Administration › System › Zugang (nur lesend)
+    def firewall_stand(self):
+        rc, aus = self.befehl(["ufw", "status", "verbose"], env=C_ENV, zeitlimit=30)
+        if rc != 0:
+            return {"verfuegbar": False, "aktiv": False, "standard": {}, "regeln": [],
+                    "hinweis": (aus.strip().splitlines() or [""])[-1][:200]}
+        standard = {}
+        m = re.search(r"^Default: (.*)$", aus, re.M)
+        for wert, richtung in re.findall(r"(\w+) \((incoming|outgoing|routed)\)", m.group(1) if m else ""):
+            standard[{"incoming": "eingehend", "outgoing": "ausgehend", "routed": "weitergeleitet"}[richtung]] = wert
+        return {"verfuegbar": True, "aktiv": bool(re.search(r"^Status: active", aus, re.M)), "standard": standard,
+                "regeln": [{k: v for k, v in r.items() if k != "nr"} for r in ufw_regeln(aus)][:100]}
+
+    def fail2ban_stand(self):
+        rc, aus = self.befehl(["fail2ban-client", "status"], env=C_ENV, zeitlimit=20)
+        if rc != 0:
+            return {"verfuegbar": False, "jails": [], "hinweis": (aus.strip().splitlines() or [""])[-1][:200]}
+        m = re.search(r"Jail list:\s*(.*)$", aus, re.M)
+        namen = [j.strip() for j in (m.group(1) if m else "").split(",") if JAIL_MUSTER.match(j.strip())][:20]
+        jails = []
+        for name in namen:
+            rc, text = self.befehl(["fail2ban-client", "status", name], env=C_ENV, zeitlimit=20)
+            if rc != 0:
+                continue
+
+            def wert(feld, text=text):
+                treffer = re.search(rf"{feld}:[ \t]*(.*)$", text, re.M)
+                return treffer.group(1).strip() if treffer else ""
+
+            def anzahl(feld):
+                try:
+                    return int(wert(feld) or 0)
+                except ValueError:
+                    return 0
+
+            gesperrt = [str(ip_pruefen(x)) for x in wert("Banned IP list").split() if ip_pruefen(x) is not None][:200]
+            jails.append({"name": name, "gesperrt": gesperrt, "anzahl": anzahl("Currently banned"),
+                          "gesamt": anzahl("Total banned"), "fehlversuche": anzahl("Currently failed")})
+        return {"verfuegbar": True, "jails": jails}
+
+    def zugang_stand(self):
+        z, gespeichert = self.zugang_lesen()
+        port = self.ssh_port()
+        fw = self.firewall_stand()
+        regeln = [r for r in fw["regeln"] if regel_erlaubt_port(r, port)]
+        aktiv = self.ssh_dienst_aktiv()
+        return {
+            "gespeichert": gespeichert,
+            "ssh": {**z["ssh"], "port": port, "dienst_aktiv": aktiv, "regeln": len(regeln),
+                    # weicht der Server vom gespeicherten Zustand ab (z. B. von Hand geändert)?
+                    "abweichung": (z["ssh"]["zustand"] == "geschlossen" and aktiv)},
+            "stunden": list(SSH_STUNDEN), "max": NETZE_MAX,
+            "netze": z["netze"],
+            "https_filter": {"an": z["https_filter"], "aktiv": self.https_filter_aktiv(), "moeglich": bool(self.mgmt_ip())},
+            "ereignisse": z["ereignisse"],
+            "firewall": fw,
+            "fail2ban": self.fail2ban_stand(),
+        }
+
+    def fail2ban_entsperren(self, jail, ip, zeile, simuliert=False):
+        if not isinstance(jail, str) or not JAIL_MUSTER.match(jail):
+            return 2, "Unbekannter Jail – nichts freigegeben."
+        adresse = ip_pruefen(ip)
+        if adresse is None:
+            return 2, "Ungültige IP-Adresse – nichts freigegeben."
+        args = ["fail2ban-client", "set", jail, "unbanip", str(adresse)]
+        if simuliert:
+            zeile(f"(Probelauf) {' '.join(args)}\n")
+            return 0, "Probelauf: Adresse nicht freigegeben."
+        stand = self.fail2ban_stand()
+        if not stand["verfuegbar"]:
+            return 1, "Fail2ban antwortet nicht – nichts freigegeben."
+        j = next((x for x in stand["jails"] if x["name"] == jail), None)
+        if j is None:
+            return 2, f"Den Jail „{jail}“ gibt es nicht – nichts freigegeben."
+        if str(adresse) not in j["gesperrt"]:
+            return 0, f"{adresse} ist in „{jail}“ nicht (mehr) gesperrt."
+        rc = self.schritt("Fail2ban", args, zeile, env=C_ENV, zeitlimit=60)
+        return (0, f"{adresse} ist in „{jail}“ wieder freigegeben.") if rc == 0 else \
+            (rc, "Freigeben fehlgeschlagen – Ausgabe prüfen.")
+
     # ------------------------------------------------------------ Notfallpaket (F188)
     def laufende_version(self):
         try:
@@ -2889,7 +3517,9 @@ class Agent:
                                                                      "aufbewahrung_tage")} if ziel_angaben else None,
             "uebertragungsziel_passwort": "nicht im Paket – neu eingeben (z. B. neues App-Passwort der Nextcloud)",
             "zeitserver": self.ntp_server(),
-            "sicherungs_passwort": "nicht im Paket – Passwortblatt im Tresor",
+            # Zugang (11.10.2026): zum Nachtragen in Administration › System › Zugang auf dem neuen Server
+            "erlaubte_netze": self.zugang_lesen()[0]["netze"],
+            "sicherungs_passwort":"nicht im Paket – Passwortblatt im Tresor",
         }
         self.schreibe(os.path.join(ziel, "einstellungen.json"), einstellungen)
 
@@ -3140,7 +3770,8 @@ def teile_host(url):
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("befehl", choices=["status", "auftraege", "uebertragen", "schleife", "notfall-einspielen"])
+    p.add_argument("befehl", choices=["status", "auftraege", "uebertragen", "schleife", "notfall-einspielen",
+                                      "zugang-anwenden"])
     p.add_argument("datei", nargs="?", help="notfall-einspielen: die Sicherung (epm-sicherung_<Zeitpunkt>.tar)")
     p.add_argument("--basis")
     p.add_argument("--projekt")
@@ -3148,11 +3779,19 @@ def main(argv=None):
     p.add_argument("--backup-skript")
     p.add_argument("--trocken", action="store_true")
     p.add_argument("--sicherung-echt", action="store_true")
+    p.add_argument("--einstellungen", help="epm.conf (Standard /etc/epm/epm.conf); zugang.json liegt daneben")
+    p.add_argument("--zugang", help="zugang.json (Standard: neben der epm.conf)")
+    p.add_argument("--ersteinrichtung", action="store_true",
+                   help="zugang-anwenden aus rollout/03-security.sh: SSH bleibt dauerhaft offen, bis es in EPM schließt")
     a = p.parse_args(argv)
-    basis = a.basis or lese_konf().get("EPM_BASE") or "/srv/epm"
+    basis = a.basis or lese_konf(a.einstellungen or KONF).get("EPM_BASE") or "/srv/epm"
     trocken = a.trocken or os.environ.get("EPM_SYSTEM_TROCKEN") == "1"
     agent = Agent(basis, projekt=a.projekt, trocken=trocken, konf=a.konf, backup_skript=a.backup_skript,
                   sicherung_echt=a.sicherung_echt)
+    if a.einstellungen:
+        agent.konf_datei = a.einstellungen
+    if a.zugang:
+        agent.zugang_datei = a.zugang
     if a.befehl == "status":
         agent.status_schreiben()
     elif a.befehl == "auftraege":
@@ -3168,6 +3807,14 @@ def main(argv=None):
         rc, text = agent.notfall_einspielen(a.datei, passwort or None, lambda t: sys.stdout.write(t))
         print(text)
         return rc
+    elif a.befehl == "zugang-anwenden":
+        # rollout/03-security.sh nach „ufw --force reset“: gespeicherte Netze und Netzfilter wieder eintragen
+        if agent.trocken:
+            print("zugang-anwenden ändert die Firewall und läuft nicht im Probelauf.")
+            return 2
+        fehler = agent.zugang_anwenden(a.ersteinrichtung, lambda t: sys.stdout.write(t))
+        print(f"Zugang angewendet ({fehler} Fehler): {agent.zugang_pfad()}")
+        return 1 if fehler else 0
     elif a.befehl == "uebertragen":
         rc, text = agent.uebertragen(lambda t: sys.stdout.write(t))
         print(text)

@@ -381,6 +381,24 @@ def _system(e, d) -> str:
     if ereignis == "angefordert" and aktion == "notfallpaket":
         return ("Notfallpaket angefordert (" + ("mit" if d.get("mit_sicherung") else "ohne") + " jüngste Sicherung)"
                 + _bestaetigt(d))
+    # Zugang (11.10.2026)
+    dienste = {"https": "EPM (HTTPS)", "ssh": "SSH"}
+    if ereignis == "angefordert" and aktion == "ssh_oeffnen":
+        return f"SSH für {d.get('stunden', '?')} Stunde(n) öffnen angefordert" + _bestaetigt(d)
+    if ereignis == "angefordert" and aktion == "netz_hinzufuegen":
+        return (f"Erlaubtes Netz für {dienste.get(d.get('dienst'), '?')} hinzufügen angefordert: {d.get('netz', '')} "
+                f"(„{d.get('bezeichnung', '')}“)" + _bestaetigt(d))
+    if ereignis == "angefordert" and aktion == "netz_entfernen":
+        return (f"Erlaubtes Netz für {dienste.get(d.get('dienst'), '?')} entfernen angefordert: {d.get('netz', '')}"
+                + (f" („{d['bezeichnung']}“)" if d.get("bezeichnung") else "") + _bestaetigt(d))
+    if ereignis == "angefordert" and aktion == "https_filter":
+        return f"Netzfilter für EPM {'einschalten' if d.get('an') else 'ausschalten'} angefordert" + _bestaetigt(d)
+    if ereignis == "angefordert" and aktion == "fail2ban_entsperren":
+        return f"Gesperrte Adresse {d.get('ip', '')} freigeben angefordert (Fail2ban, Jail {d.get('jail', '')})"
+    if ereignis == "ssh_automatisch":
+        return ("SSH nach Ablauf der Zeit vom Server geschlossen" if d.get("ok")
+                else "SSH nach Ablauf der Zeit nicht vollständig geschlossen – der Server versucht es weiter") + (
+            f": {d['ergebnis']}" if d.get("ergebnis") else "")
     if ereignis == "notfall_heruntergeladen":
         return f"Notfallpaket heruntergeladen: {d.get('datei', '')}"
     if ereignis == "angefordert" and aktion == "protokoll":

@@ -54,8 +54,15 @@ ufw allow in on "$EPM_MGMT_IF" from "$EPM_MGMT_NET" to any port "$EPM_SSH_PORT" 
 ufw allow in on "$EPM_MGMT_IF" from "$EPM_MGMT_NET" to any port 443 proto tcp comment 'HTTPS EPM'
 ufw logging low
 ufw --force enable
+# Erlaubte Netze aus EPM (Administration › System › Zugang, /etc/epm/zugang.json) wieder eintragen – ein erneuter Lauf
+# dieses Skripts verliert sie so nicht. SSH bleibt für die Einrichtung dauerhaft offen. Im Betrieb in EPM schließen und
+# nur noch auf Zeit öffnen (README, „SSH und Firewall“). Auf einem neuen Server ist der Netzfilter für EPM gleich an.
+install -d -m 0755 /etc/epm
+python3 ./epm-systemagent.py zugang-anwenden --ersteinrichtung --einstellungen "$KONF" --zugang /etc/epm/zugang.json \
+  --basis "$EPM_BASE" || echo "WARNUNG: Erlaubte Netze aus EPM nicht vollständig übernommen – Ausgabe oben prüfen."
 # Wichtig: Docker umgeht UFW bei veröffentlichten Ports. Deshalb bindet die
-# Compose-Datei Port 443 ausschließlich an $EPM_MGMT_IP.
+# Compose-Datei Port 443 ausschließlich an $EPM_MGMT_IP. Welche Netze EPM wirklich erreichen, regelt der
+# „Netzfilter für EPM“ (Kette EPM-HTTPS aus DOCKER-USER, Administration › System › Zugang).
 
 echo "==> Fail2ban für SSH"
 cat > /etc/fail2ban/jail.d/epm.local <<'EOF'
@@ -97,3 +104,6 @@ ufw status verbose
 echo
 echo "Fertig. JETZT in einem ZWEITEN Fenster testen: ssh $EPM_ADMIN_USER@$EPM_MGMT_IP"
 echo "Erst wenn das klappt, dieses Fenster schließen."
+echo
+echo "SSH bleibt für die Einrichtung dauerhaft offen. Wenn EPM läuft: Administration › System › Zugang › „Jetzt schließen“."
+echo "Danach SSH dort nur noch für 1, 4 oder 8 Stunden öffnen. Notzugang: Konsole des Hypervisors."

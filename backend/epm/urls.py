@@ -131,6 +131,13 @@ urlpatterns = [
     path("api/system/notfall/", verwaltung.NotfallView.as_view()),
     path("api/system/notfall/<str:datei>/", verwaltung.NotfallDateiView.as_view()),
     path("api/system/notfallplan/", verwaltung.NotfallplanView.as_view()),
+    # Zugang: SSH auf Zeit, erlaubte Netze, Fail2ban (11.10.2026)
+    path("api/system/zugang/ssh/oeffnen/", verwaltung.SshOeffnenView.as_view()),
+    path("api/system/zugang/ssh/schliessen/", verwaltung.SshSchliessenView.as_view()),
+    path("api/system/zugang/netze/", verwaltung.NetzHinzufuegenView.as_view()),
+    path("api/system/zugang/netze/entfernen/", verwaltung.NetzEntfernenView.as_view()),
+    path("api/system/zugang/filter/", verwaltung.HttpsFilterView.as_view()),
+    path("api/system/zugang/entsperren/", verwaltung.EntsperrenView.as_view()),
     # Administration › Import: Übernahme der Altdaten (nur Admin)
     path("api/altimport/", altimport.StandView.as_view()),
     path("api/altimport/dump/", altimport.DumpView.as_view()),

@@ -5,6 +5,7 @@ Der Container hat keinen Zugriff auf den Server. Aufträge werden als JSON-Datei
 der Agent (root, systemd) führt nur seine fest eingetragenen Aktionen aus und schreibt Status und Ergebnisse nach
 ``EPM_SYSTEM/status/`` (im Container nur lesbar). Fehlt der Agent, misst das Backend, was es aus dem Container sieht.
 """
+import ipaddress
 import json
 import os
 import re
@@ -200,6 +201,34 @@ AKTIONEN = {
         "beschreibung": "Zeitzone, Zeitsynchronisation (NTP) mit eigenem Zeitserver, z. B. der OPNsense, oder die "
                         "Uhrzeit von Hand.",
     },
+    # ---- Zugang (Wunsch 11.10.2026): SSH nur auf Zeit, erlaubte Netze, Fail2ban (system/verwaltung_api.py)
+    "ssh_oeffnen": {
+        "name": "SSH öffnen", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "SSH für 1, 4 oder 8 Stunden aus den erlaubten Netzen öffnen. Danach schließt der Server es von "
+                        "selbst. Notzugang ohne SSH: die Konsole des Hypervisors.",
+    },
+    "ssh_schliessen": {
+        "name": "SSH schließen", "bestaetigung": "einfach", "intern": True,
+        "beschreibung": "SSH sofort schließen: Firewall-Regeln entfernen, Dienst stoppen. Bestehende Verbindungen laufen "
+                        "weiter, bis sie enden.",
+    },
+    "netz_hinzufuegen": {
+        "name": "Erlaubtes Netz hinzufügen", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Ein Netz oder eine Adresse für EPM (HTTPS) oder SSH erlauben.",
+    },
+    "netz_entfernen": {
+        "name": "Erlaubtes Netz entfernen", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Ein erlaubtes Netz austragen. Das letzte Netz für EPM und das Netz Ihres Geräts bleiben.",
+    },
+    "https_filter": {
+        "name": "Netzfilter für EPM schalten", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "EPM nur aus den erlaubten Netzen erreichbar machen (Docker umgeht die normale Firewall) oder den "
+                        "Filter ausschalten.",
+    },
+    "fail2ban_entsperren": {
+        "name": "Gesperrte Adresse freigeben", "bestaetigung": "einfach", "intern": True,
+        "beschreibung": "Eine von Fail2ban gesperrte Adresse sofort wieder zulassen.",
+    },
 }
 
 # Aktionen der Seite Administration › Backup (für deren Liste der Tätigkeiten)
@@ -231,6 +260,45 @@ NTP_SERVER_MUSTER = re.compile(r"^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A
                                r"[A-Za-z0-9])?$|^[0-9a-fA-F:]{2,39}$")
 NTP_SERVER_MAX = 4
 ZEIT_SETZEN_MUSTER = re.compile(r"^20[2-9][0-9]-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01]) ([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$")
+
+# Zugang (11.10.2026): dieselben Prüfungen wie im Agenten (rollout/epm-systemagent.py: netz_pruefen, ip_pruefen)
+SSH_STUNDEN = (1, 4, 8)
+NETZE_MAX = 20
+NETZ_DIENSTE = {"https": "EPM (HTTPS)", "ssh": "SSH"}
+BEZEICHNUNG_MUSTER = re.compile(r"^[0-9A-Za-zÄÖÜäöüß][0-9A-Za-zÄÖÜäöüß .,:()/_+-]{0,39}$")
+NETZ_ZEICHEN = re.compile(r"^[0-9A-Fa-f.:/]{2,49}$")
+JAIL_MUSTER = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+
+
+def netz_pruefen(text, dienst):
+    """(Fehler | None, vereinheitlichtes Netz | None). Nicht erlaubt: alles, breiter als /8 (IPv4) bzw. /32 (IPv6),
+    Loopback, Multicast, reservierte Bereiche; für EPM (HTTPS) nur IPv4 – EPM lauscht nur auf EPM_MGMT_IP."""
+    if dienst not in NETZ_DIENSTE:
+        return "Unbekannter Dienst.", None
+    if not isinstance(text, str) or not NETZ_ZEICHEN.match(text.strip()):
+        return "Bitte ein Netz (z. B. 192.168.10.0/24) oder eine IP-Adresse angeben.", None
+    try:
+        netz = ipaddress.ip_network(text.strip(), strict=False)
+    except ValueError:
+        return "Bitte ein Netz (z. B. 192.168.10.0/24) oder eine IP-Adresse angeben.", None
+    if (netz.version == 4 and netz.prefixlen < 8) or (netz.version == 6 and netz.prefixlen < 32):
+        return "Das Netz ist zu groß: höchstens /8 bei IPv4 und /32 bei IPv6.", None
+    if netz.is_loopback or netz.is_multicast or netz.is_reserved or netz.network_address.is_unspecified:
+        return "Dieses Netz ist nicht erlaubt (Loopback, Multicast oder reserviert).", None
+    if dienst == "https" and netz.version != 4:
+        return "EPM ist nur über IPv4 erreichbar (EPM_MGMT_IP). Bitte ein IPv4-Netz angeben.", None
+    return None, str(netz)
+
+
+def ip_pruefen(text):
+    if not isinstance(text, str) or len(text) > 45:
+        return None
+    try:
+        ip = ipaddress.ip_address(text.strip())
+    except ValueError:
+        return None
+    return ip.ipv4_mapped if ip.version == 6 and ip.ipv4_mapped else ip
+
 
 STATUS_VERALTET_S = 180   # der Agent misst jede Minute; älter heißt: Agent läuft nicht
 

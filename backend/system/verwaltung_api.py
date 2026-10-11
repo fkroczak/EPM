@@ -22,6 +22,12 @@ POST   /api/system/uhr/                           {zeitzone?, ntp, server: [...]
 POST   /api/system/notfall/                       {mit_sicherung, kennwort, code} → Notfallpaket erstellen (F188)
 GET    /api/system/notfall/<datei>/               bereitgestelltes Notfallpaket herunterladen (Audit-Log)
 GET    /api/system/notfallplan/?art=html|pdf|md      Wiederaufbau-Plan (auch mit Recht „Sicherungen verwalten“)
+POST   /api/system/zugang/ssh/oeffnen/            {stunden: 1|4|8, kennwort, code} → SSH auf Zeit öffnen (11.10.2026)
+POST   /api/system/zugang/ssh/schliessen/         SSH sofort schließen
+POST   /api/system/zugang/netze/                  {dienst: "https"|"ssh", netz, bezeichnung, kennwort, code}
+POST   /api/system/zugang/netze/entfernen/        {dienst, netz, kennwort, code} – nie das letzte HTTPS-Netz, nie das eigene
+POST   /api/system/zugang/filter/                 {an, kennwort, code} → Netzfilter für EPM (DOCKER-USER)
+POST   /api/system/zugang/entsperren/             {jail, ip} → von Fail2ban gesperrte Adresse freigeben
 
 Schlüssel (und das Zertifikat selbst) gehen nur in die Auftragsdatei an den Server (0600, der Agent löscht sie sofort) –
 nie in die Datenbank oder das Audit-Log; dort stehen nur Inhaber, Aussteller, Ablauf und Fingerabdruck.
@@ -525,3 +531,167 @@ class TechnikView(APIView):
         protokolliere(SystemEreignis.Art.SYSTEM, request, objekt="Technische Verwaltung (Django-Admin, API-Ansicht)",
                       an=bool(stunden), stunden=stunden)
         return Response(self._stand())
+
+
+# ------------------------------------------------------------------ Zugang: SSH auf Zeit, erlaubte Netze, Fail2ban
+# Wunsch 11.10.2026. SSH ist im Betrieb aus; ein Admin öffnet es für 1, 4 oder 8 Stunden, danach schließt der Server es
+# von selbst. Die erlaubten Netze für EPM (HTTPS) und SSH, den Stand von ufw und Fail2ban meldet der Agent im Status
+# (host.zugang). Alles geht als Auftrag an den Agenten, der jede Angabe noch einmal prüft.
+def _zugang():
+    z = (host.host_status() or {}).get("zugang")
+    return z if isinstance(z, dict) else {}
+
+
+def _netze(zugang, dienst):
+    liste = (zugang.get("netze") or {}).get(dienst) if isinstance(zugang.get("netze"), dict) else None
+    return [e for e in liste or [] if isinstance(e, dict) and isinstance(e.get("netz"), str)]
+
+
+def _enthalten(ip, netz: str) -> bool:
+    import ipaddress
+
+    try:
+        return ip in ipaddress.ip_network(netz)
+    except ValueError:
+        return False
+
+
+class SshOeffnenView(APIView):
+    """POST {stunden: 1 | 4 | 8, kennwort, code} – SSH aus den erlaubten Netzen öffnen, danach schließt es sich selbst."""
+
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        stunden = request.data.get("stunden")
+        if isinstance(stunden, bool) or stunden not in host.SSH_STUNDEN:
+            return _fehler("stunden", "Bitte 1, 4 oder 8 Stunden wählen.")
+        z = _zugang()
+        if z.get("netze") is not None and not _netze(z, "ssh"):
+            return _fehler("stunden", "Es ist kein Netz für SSH eingetragen. Bitte zuerst unter „Erlaubte Netze“ eines "
+                                      "hinzufügen.")
+        return auftrag_anlegen(request, "ssh_oeffnen", parameter={"stunden": stunden}, objekt="SSH",
+                               protokoll_details={"stunden": stunden})
+
+
+class SshSchliessenView(APIView):
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        return auftrag_anlegen(request, "ssh_schliessen", objekt="SSH")
+
+
+class NetzHinzufuegenView(APIView):
+    """POST {dienst: "https" | "ssh", netz, bezeichnung, kennwort, code}"""
+
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        dienst = request.data.get("dienst")
+        if dienst not in host.NETZ_DIENSTE:
+            return _fehler("dienst", "Bitte EPM (HTTPS) oder SSH wählen.")
+        fehler, netz = host.netz_pruefen(request.data.get("netz"), dienst)
+        if fehler:
+            return _fehler("netz", fehler)
+        bezeichnung = request.data.get("bezeichnung")
+        if not isinstance(bezeichnung, str) or not host.BEZEICHNUNG_MUSTER.match(bezeichnung.strip()):
+            return _fehler("bezeichnung", "Bitte eine Bezeichnung angeben: bis 40 Zeichen, Buchstaben, Ziffern und . , : ( ) "
+                                          "/ _ + - (z. B. „Praxisnetz 2“).")
+        bezeichnung = bezeichnung.strip()
+        liste = _netze(_zugang(), dienst)
+        if any(e["netz"] == netz for e in liste):
+            return _fehler("netz", f"{netz} ist schon eingetragen.")
+        if len(liste) >= host.NETZE_MAX:
+            return _fehler("netz", f"Es sind schon {host.NETZE_MAX} Netze eingetragen. Bitte erst eines entfernen.")
+        parameter = {"dienst": dienst, "netz": netz, "bezeichnung": bezeichnung}
+        return auftrag_anlegen(request, "netz_hinzufuegen", parameter=parameter,
+                               objekt=f"{host.NETZ_DIENSTE[dienst]}: {netz}", protokoll_details=parameter)
+
+
+class NetzEntfernenView(APIView):
+    """POST {dienst, netz, kennwort, code}. Für EPM (HTTPS) mit Schutz vor dem Aussperren: nie das letzte Netz und nie
+    das Netz, über das dieses Gerät EPM erreicht. Die Adresse des Geräts geht mit an den Agenten, der noch einmal prüft."""
+
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        from audit.models import client_ip
+
+        dienst = request.data.get("dienst")
+        if dienst not in host.NETZ_DIENSTE:
+            return _fehler("dienst", "Bitte EPM (HTTPS) oder SSH wählen.")
+        fehler, netz = host.netz_pruefen(request.data.get("netz"), dienst)
+        if fehler:
+            return _fehler("netz", fehler)
+        antwort = _agent_aktuell()
+        if antwort is not None:
+            return antwort
+        liste = _netze(_zugang(), dienst)
+        eintrag = next((e for e in liste if e["netz"] == netz), None)
+        if eintrag is None:
+            return _fehler("netz", f"{netz} ist nicht eingetragen.")
+        ip_text = client_ip(request) or ""
+        parameter = {"dienst": dienst, "netz": netz}
+        if dienst == "https":
+            rest = [e for e in liste if e is not eintrag]
+            if not rest:
+                return _fehler("netz", "Das letzte Netz für EPM bleibt – sonst wäre EPM von nirgends mehr erreichbar.")
+            ip = host.ip_pruefen(ip_text)
+            if ip is None:
+                return _fehler("netz", "Die Adresse dieses Geräts ist nicht bekannt – zur Sicherheit bleibt das Netz.")
+            if _enthalten(ip, netz) and not any(_enthalten(ip, e["netz"]) for e in rest):
+                return _fehler("netz", f"Ihr Gerät ({ip}) erreicht EPM über {netz}. Dieses Netz bleibt, sonst sperren Sie "
+                                       "sich aus.")
+            parameter["client_ip"] = str(ip)
+        return auftrag_anlegen(request, "netz_entfernen", parameter=parameter,
+                               objekt=f"{host.NETZ_DIENSTE[dienst]}: {netz}",
+                               protokoll_details={"dienst": dienst, "netz": netz,
+                                                  "bezeichnung": str(eintrag.get("bezeichnung") or "")[:40]})
+
+
+class HttpsFilterView(APIView):
+    """POST {an: true | false, kennwort, code} – EPM nur aus den erlaubten Netzen erreichbar (Docker umgeht ufw; der
+    Agent filtert über die Kette DOCKER-USER). Einschalten nur, wenn dieses Gerät in einem erlaubten Netz ist."""
+
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        from audit.models import client_ip
+
+        an = request.data.get("an")
+        if not isinstance(an, bool):
+            return _fehler("an", "Bitte an oder aus wählen.")
+        antwort = _agent_aktuell()
+        if antwort is not None:
+            return antwort
+        z = _zugang()
+        parameter = {"an": an}
+        if an:
+            if not (z.get("https_filter") or {}).get("moeglich"):
+                return _fehler("an", "Auf dem Server fehlt EPM_MGMT_IP in /etc/epm/epm.conf – der Netzfilter ist nicht "
+                                     "möglich.")
+            ip = host.ip_pruefen(client_ip(request) or "")
+            if ip is None or not any(_enthalten(ip, e["netz"]) for e in _netze(z, "https")):
+                return _fehler("an", f"Ihr Gerät ({ip or 'unbekannt'}) ist in keinem erlaubten Netz für EPM. Der Filter "
+                                     "würde Sie aussperren – bitte zuerst Ihr Netz eintragen.")
+            parameter["client_ip"] = str(ip)
+        return auftrag_anlegen(request, "https_filter", parameter=parameter, objekt="Netzfilter für EPM",
+                               protokoll_details={"an": an})
+
+
+class EntsperrenView(APIView):
+    """POST {jail, ip} – eine von Fail2ban gesperrte Adresse freigeben (einfache Rückfrage)."""
+
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        jail, ip_text = request.data.get("jail"), request.data.get("ip")
+        if not isinstance(jail, str) or not host.JAIL_MUSTER.match(jail):
+            return _fehler("jail", "Unbekannter Jail.")
+        jails = ((_zugang().get("fail2ban") or {}).get("jails")) or []
+        if not any(isinstance(j, dict) and j.get("name") == jail for j in jails):
+            return _fehler("jail", f"Den Jail „{jail}“ meldet der Server nicht.")
+        ip = host.ip_pruefen(ip_text)
+        if ip is None:
+            return _fehler("ip", "Bitte eine gültige IP-Adresse angeben.")
+        return auftrag_anlegen(request, "fail2ban_entsperren", parameter={"jail": jail, "ip": str(ip)},
+                               objekt=f"Fail2ban {jail}: {ip}", protokoll_details={"jail": jail, "ip": str(ip)})
