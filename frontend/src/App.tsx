@@ -33,6 +33,8 @@ function seite(laden: () => Promise<ReactNode>) {
 const router = createBrowserRouter([
   {
     element: <Shell />,
+    // erste Seite wird noch geladen (sonst Warnung „No HydrateFallback element“ in der Konsole)
+    hydrateFallbackElement: <Laden text="EPM wird geladen …" />,
     children: [
       { index: true, element: <Start /> },
       { path: "patienten", ...seite(() => import("./seiten/Patienten").then(({ Patienten }) => <Patienten />)) },

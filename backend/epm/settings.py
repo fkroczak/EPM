@@ -162,7 +162,9 @@ FILE_UPLOAD_PERMISSIONS = 0o640
 
 # Sitzung: 30 Minuten ohne Aktivität, dann neu anmelden
 SESSION_COOKIE_AGE = int(env("EPM_SITZUNG_MINUTEN", "30")) * 60
-SESSION_SAVE_EVERY_REQUEST = True
+# Jede Anfrage verlängert die Sitzung – aber nur ihren Ablauf (accounts.sitzungen.SitzungMiddleware). Würde jede Anfrage
+# die ganze Sitzung speichern, überschriebe eine langsame ältere Anfrage z. B. den Wechsel der Firma (11.10.2026).
+SESSION_SAVE_EVERY_REQUEST = False
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Strict"

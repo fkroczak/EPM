@@ -19,7 +19,7 @@ from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
-from accounts.permissions import nur_recht
+from accounts.permissions import nur_recht, voll_angemeldet
 from audit.models import SystemEreignis, protokolliere
 from audit.bereinigung import akte_text
 from epm.api_basis import benutzername, patienten_fuer, pruefe_schreibbereich
@@ -41,7 +41,8 @@ class GelerntRecht(permissions.BasePermission):
 
     def has_permission(self, request, view):
         u = request.user
-        if not (u and u.is_authenticated and (u.hat_recht("scans_bearbeiten") or u.hat_recht("vorlagen_pflegen"))):
+        # vollständige Anmeldung wie überall (Sicherheitsprüfung 11.10.2026: vorher genügte das Passwort allein)
+        if not (voll_angemeldet(u) and (u.hat_recht("scans_bearbeiten") or u.hat_recht("vorlagen_pflegen"))):
             return False
         return request.method in permissions.SAFE_METHODS or not getattr(u, "ist_test", False)
 

@@ -64,7 +64,7 @@ class MeineAktenView(APIView):
 class MerkenView(APIView):
     permission_classes = [nur_recht("akten_lesen")]
 
-    def post(self, request):
+    def post(self, request, patient=None):  # die Akte steht im Inhalt; ``patient`` aus dem Pfad gilt nur für DELETE
         patient = _patient(request)
         if patient is None:
             return Response({"patient": "Akte nicht gefunden."}, status=status.HTTP_400_BAD_REQUEST)
@@ -74,7 +74,9 @@ class MerkenView(APIView):
         Merkeintrag.objects.get_or_create(benutzer=request.user, patient=patient, art=Merkeintrag.Art.MERKLISTE)
         return Response(meine_akten(request.user), status=status.HTTP_201_CREATED)
 
-    def delete(self, request, patient):
+    def delete(self, request, patient=None):
+        if patient is None:  # DELETE ohne Akte (/api/meine-akten/merken/) – vorher ein Serverfehler
+            return Response({"patient": "Akte nicht gefunden."}, status=status.HTTP_400_BAD_REQUEST)
         Merkeintrag.objects.filter(benutzer=request.user, patient_id=patient, art=Merkeintrag.Art.MERKLISTE).delete()
         return Response(meine_akten(request.user))
 

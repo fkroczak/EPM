@@ -115,15 +115,14 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
       style={{ borderRightWidth: "var(--randbreite)" }} data-testid={v ? "schublade" : "seitenleiste"}
       aria-label="Seitenleiste">
       <div className={cx(v ? "flex" : "hidden hd:flex", "flex-col gap-2")}>
-        {/* RGC: Logo mittig direkt auf der salbeigrünen Leiste (wie im Auftritt der Klinik), DSKM auf weißem Feld */}
-        <Logo className={cx("w-full max-w-[12.75rem] h-[4rem] px-1.5 py-1 rounded-lg", ich.firma === "rg" ? "self-center" : "bg-white")}
-          style={ich.firma === "rg" ? { objectPosition: "center" } : undefined}
-          firma={firma?.kuerzel} name={firma?.name} />
-        <span className="px-1 font-mono text-[0.6875rem] font-medium tracking-[.07em] uppercase gedaempft">
+        {/* Logo, Name und Umschalter mittig (Wunsch 11.10.2026); RGC direkt auf der salbeigrünen Leiste, DSKM auf weißem Feld */}
+        <Logo className={cx("w-full max-w-[12.75rem] h-[4rem] px-1.5 py-1 rounded-lg self-center", ich.firma !== "rg" && "bg-white")}
+          style={{ objectPosition: "center" }} firma={firma?.kuerzel} name={firma?.name} />
+        <span className="px-1 text-center font-mono text-[0.6875rem] font-medium tracking-[.07em] uppercase gedaempft">
           EPM · Patientenmanagement
         </span>
         {/* Umschalter zwischen den Firmen direkt unter dem Logo (Anforderung 11.10.2026) */}
-        <FirmenSchalter className="max-w-[12.75rem]" />
+        <FirmenSchalter className="max-w-[12.75rem] self-center" />
       </div>
       {v ? null : <span className="hd:hidden self-center font-mono text-xs font-semibold tracking-[.07em] text-akzent-text" title="EPM · Patientenmanagement">EPM</span>}
       {v ? null : <FirmenSchalter schmal className="hd:hidden" />}
@@ -245,7 +244,8 @@ function MobilLeiste() {
       <BaseDialog.Root open={menue} onOpenChange={setMenue}>
         <BaseDialog.Portal>
           <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/35" />
-          <BaseDialog.Popup data-leiste className="fixed inset-y-0 left-0 z-50 w-[min(20rem,86vw)] bg-leiste shadow-xl pt-[env(safe-area-inset-top)]">
+          {/* von rechts, auf der Seite des Knopfs „Menü“ (Daumen bleibt rechts, Wunsch 11.10.2026) */}
+          <BaseDialog.Popup data-leiste data-testid="mobil-schublade" className="fixed inset-y-0 right-0 z-50 w-[min(20rem,86vw)] bg-leiste shadow-xl border-l border-rand pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             <BaseDialog.Title className="sr-only">Menü</BaseDialog.Title>
             <BaseDialog.Close className="btn geist icon absolute right-2 top-[calc(env(safe-area-inset-top)+0.5rem)] z-10" aria-label="Menü schließen">
               <Icon name="x" />

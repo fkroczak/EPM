@@ -26,7 +26,7 @@ const SEITENGROESSE = 50;
 
 /** „+6 Test“ neben dem Zähler, wenn Testpatienten sichtbar sind. */
 function testZahl(n: number | undefined) {
-  return n ? <span className="num opacity-70 text-[0.75rem] ml-1" title={`${n} Testpatienten, nicht mitgezählt`}>+{n} Test</span> : null;
+  return n ? <span className="num opacity-80 text-[0.75rem] ml-1" title={`${n} Testpatienten, nicht mitgezählt`}>+{n} Test</span> : null;
 }
 
 const SCHNELLFILTER: { wert: string; text: string; zahl: keyof Zaehler }[] = [
@@ -352,8 +352,8 @@ export function Patienten() {
         setParams(neu);
       }}
       werte={[
-        { wert: "in_betreuung", text: <>In Betreuung <span className="num opacity-70 inline-block min-w-[2ch]">{z ? zahl(z.in_betreuung) : ""}</span>{testZahl(z?.testpatienten?.in_betreuung)}</> },
-        { wert: "abgeschlossen", text: <>Abgeschlossen <span className="num opacity-70 inline-block min-w-[2ch]">{z ? zahl(z.abgeschlossen) : ""}</span>{testZahl(z?.testpatienten?.abgeschlossen)}</> },
+        { wert: "in_betreuung", text: <>In Betreuung <span className="num opacity-80 inline-block min-w-[2ch]">{z ? zahl(z.in_betreuung) : ""}</span>{testZahl(z?.testpatienten?.in_betreuung)}</> },
+        { wert: "abgeschlossen", text: <>Abgeschlossen <span className="num opacity-80 inline-block min-w-[2ch]">{z ? zahl(z.abgeschlossen) : ""}</span>{testZahl(z?.testpatienten?.abgeschlossen)}</> },
       ]} />
   );
 

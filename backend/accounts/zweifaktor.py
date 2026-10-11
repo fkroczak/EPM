@@ -50,7 +50,17 @@ def pflicht(user) -> bool:
     wert = regel()
     if wert == Anmelderegeln.ZweiterFaktor.ALLE:
         return True
-    return wert == Anmelderegeln.ZweiterFaktor.ADMINS and getattr(user, "rolle", None) == Rolle.ADMIN
+    return wert == Anmelderegeln.ZweiterFaktor.ADMINS and ist_admin_in_einer_firma(user)
+
+
+def ist_admin_in_einer_firma(user) -> bool:
+    """Admin bei der DSKM (``rolle``) oder in einer weiteren Firma (``Mitgliedschaft``). Sicherheitsprüfung 11.10.2026:
+    Vorher galt „Pflicht für Admins“ nur für die DSKM-Rolle – ein Admin nur der Regeneration Clinic blieb ohne."""
+    from .models import Mitgliedschaft
+
+    if getattr(user, "rolle", None) == Rolle.ADMIN:
+        return True
+    return bool(getattr(user, "pk", None)) and Mitgliedschaft.objects.filter(benutzer=user, rolle=Rolle.ADMIN).exists()
 
 
 def code_gueltig(user, code: str, notfallcodes: bool = True) -> bool:

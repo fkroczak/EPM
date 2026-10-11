@@ -156,6 +156,7 @@ class BriefkopfUndLogo(Grundlage):
 
         anonym = APIClient()
         self.assertEqual(anonym.get("/api/briefkopf/logo/").status_code, 404)
+        self.assertEqual(anonym.get("/api/briefkopf/logo/?leer=1").status_code, 204)  # Oberfläche: ohne Fehler in der Konsole
         a = client_fuer(self.admin)
 
         def hochladen(name, inhalt, client=a):

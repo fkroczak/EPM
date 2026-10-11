@@ -128,13 +128,19 @@ hr { border: 0; border-top: 0.6pt solid #c9c8d4; margin: 0 0 3.5mm 0; }
 """
 
 
-def nur_eingebettet(url, *args, **kwargs):
-    """URL-Fetcher für WeasyPrint: nur data:-URLs, keine Netzwerk- oder Dateizugriffe."""
-    if not url.startswith("data:"):
-        raise ValueError("Externe Ressourcen sind in EPM-PDFs nicht erlaubt.")
-    from weasyprint import default_url_fetcher
+def nur_eingebettet():
+    """URL-Fetcher für WeasyPrint: nur data:-URLs, keine Netzwerk- oder Dateizugriffe (file://, http://, …).
 
-    return default_url_fetcher(url)
+    Als ``URLFetcher`` (WeasyPrint ≥ 68): ``default_url_fetcher`` ist veraltet und fehlt ab WeasyPrint 70."""
+    from weasyprint.urls import URLFetcher
+
+    class NurEingebettet(URLFetcher):
+        def fetch(self, url, headers=None):
+            if not str(url).startswith("data:"):
+                raise ValueError("Externe Ressourcen sind in EPM-PDFs nicht erlaubt.")
+            return super().fetch(url, headers)
+
+    return NurEingebettet(allowed_protocols={"data"}, allow_redirects=False)
 
 
 def logo_data_uri() -> str:
@@ -176,7 +182,9 @@ def briefkopf_html(absender_zeigen=True, linienfarbe="#251F53", falzmarken=False
 
 def _css_string(text: str) -> str:
     """CSS-Zeichenkette; Zeilenumbrüche als \\A (mit white-space: pre in der Fußzeile)."""
-    return '"' + text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\A ") + '"'
+    # „<“ als CSS-Escape: sonst beendet „</style>“ in einem Wert (z. B. Name in der Fußzeile) den Stilblock und der
+    # Rest stünde als HTML im PDF (Sicherheitsprüfung 11.10.2026)
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\A ").replace("<", "\\3C ") + '"'
 
 
 def fusszeile_css(text: str | None) -> str:
@@ -470,7 +478,7 @@ def seite(titel: str, inhalt: str, fusszeile: str | None = None, wasserzeichen: 
 def html_zu_pdf(dokument_html: str) -> bytes:
     from weasyprint import HTML
 
-    return HTML(string=dokument_html, url_fetcher=nur_eingebettet).write_pdf()
+    return HTML(string=dokument_html, url_fetcher=nur_eingebettet()).write_pdf()
 
 
 def wasserzeichen_fuer(patient, plan=None, vorschau=False) -> str | None:

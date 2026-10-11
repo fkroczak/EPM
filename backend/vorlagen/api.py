@@ -430,7 +430,9 @@ def _vorschau_ankuendigung(patient, benutzer):
 
     von = timezone.localdate()
     bis = von + timedelta(days=14)
-    termine = list(Termin.objects.filter(patient__ist_test=True, faellig_am__range=(von, bis))
+    # nur Testpatienten im eigenen Bereich (aktive Firma, Sicherheitsprüfung 11.10.2026)
+    termine = list(Termin.objects.filter(patient__in=patienten_fuer(benutzer), patient__ist_test=True,
+                                         faellig_am__range=(von, bis))
                    .select_related("patient", "ort").order_by("faellig_am", "uhrzeit", "id")[:40])
     return Kontext(patient=None, zeitraum=(von, bis), termine=termine, benutzer=benutzer)
 

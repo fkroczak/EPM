@@ -170,10 +170,12 @@ class Sitzungen(TestCase):
         from django.contrib.sessions.models import Session
         from django.utils import timezone
 
-        self.assertEqual((settings.SESSION_COOKIE_AGE, settings.SESSION_SAVE_EVERY_REQUEST), (30 * 60, True))
+        self.assertEqual(settings.SESSION_COOKIE_AGE, 30 * 60)
         c = echte_anmeldung(self.user, self.codes[0])
-        self.assertEqual(c.get("/api/patienten/").status_code, 200)
         schluessel = c.session.session_key
+        # jede Anfrage verlängert (SitzungMiddleware), auch ohne Änderung der Sitzung
+        Session.objects.filter(session_key=schluessel).update(expire_date=timezone.now() + timedelta(minutes=5))
+        self.assertEqual(c.get("/api/patienten/").status_code, 200)
         ablauf = Session.objects.get(session_key=schluessel).expire_date
         self.assertGreater(ablauf, timezone.now() + timedelta(minutes=29))
         Session.objects.filter(session_key=schluessel).update(expire_date=timezone.now() - timedelta(seconds=1))

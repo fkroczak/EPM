@@ -115,17 +115,18 @@ def betrifft(e, ids: dict, nummern: set) -> int | None:
     return None
 
 
-def verbergen(eintraege, verborgen: dict):
+def verbergen(eintraege, verborgen: dict, hinweis: str = "Verarbeitung eingeschränkt"):
     """Einträge zu Akten mit eingeschränkter Verarbeitung für Personen ohne Einsichtsrecht: Der Eintrag bleibt
     sichtbar (wer, wann, welche Art), Name, Titel und Freitext nicht. ``verborgen``: {interne Kennung: Nummer}.
-    Ändert nur die übergebenen Objekte im Speicher, nichts in der Datenbank."""
+    Ebenso für Akten außerhalb des eigenen Bereichs (andere Firma, ``hinweis``). Ändert nur die übergebenen Objekte
+    im Speicher, nichts in der Datenbank."""
     if not verborgen:
         return eintraege
     nummern = set(verborgen.values())
     for e in eintraege:
         nummer = betrifft(e, verborgen, nummern)
         if nummer is not None:
-            e.objekt = f"Akte Nr. {nummer} (Verarbeitung eingeschränkt)"
+            e.objekt = f"Akte Nr. {nummer} ({hinweis})"
             e.details = {**{k: v for k, v in (e.details or {}).items() if k in BLEIBT}, "verborgen": True}
     return eintraege
 

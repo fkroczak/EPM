@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.db.models import Q
 from django.utils import timezone
 from django_filters import rest_framework as filters
 from rest_framework import mixins, serializers, viewsets
@@ -82,6 +83,21 @@ class SystemEreignisViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vi
                                          .exclude(id__in=sichtbar).values_list("id", "nummer"))
         return self._verborgen_cache
 
+    # Akten außerhalb des eigenen Bereichs (Sicherheitsprüfung 11.10.2026): Wer in der Regeneration Clinic das
+    # Audit-Log liest, sieht die Einträge zu Akten, die nur der DSKM gehören (und umgekehrt), ohne Namen und Inhalt –
+    # wie bei eingeschränkten Akten. Ebenso Testpatienten für Personen ohne „Testdaten sehen“.
+    def _fremde(self) -> dict:
+        if not hasattr(self, "_fremde_cache"):
+            from epm.api_basis import patienten_fuer
+            from patienten.models import Patient
+
+            eigene = patienten_fuer(self.request.user, eingeschraenkte=True).values("id")
+            self._fremde_cache = dict(Patient.objects.exclude(id__in=eigene).values_list("id", "nummer"))
+        return self._fremde_cache
+
+    def _bereinigt(self, eintraege):
+        return verbergen(verbergen(eintraege, self._verborgen()), self._fremde(), "andere Firma")
+
     def filter_queryset(self, queryset):
         qs = super().filter_queryset(queryset)
         if self.request.query_params.get("search"):
@@ -89,18 +105,24 @@ class SystemEreignisViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vi
             # ohne diesen Schlüssel fallen (NULL)
             for pid, nummer in self._verborgen().items():
                 qs = qs.exclude(id__in=SystemEreignis.objects.filter(akte_bedingung(pid, nummer)).values("id"))
+            fremde = self._fremde()
+            if fremde:
+                nummern = "|".join(str(n) for n in sorted(set(fremde.values())))
+                treffer = (Q(details__patient_id__in=list(fremde)) | Q(details__nach_id__in=list(fremde))
+                           | Q(objekt__regex=rf"(\(Nr\. ({nummern})\)|/ Patient ({nummern}))$"))
+                qs = qs.exclude(id__in=SystemEreignis.objects.filter(treffer).values("id"))
         return qs
 
     def list(self, request, *args, **kwargs):
         qs = self.filter_queryset(self.get_queryset())
         seite = self.paginate_queryset(qs)
-        eintraege = verbergen(list(seite if seite is not None else qs), self._verborgen())
+        eintraege = self._bereinigt(list(seite if seite is not None else qs))
         daten = self.get_serializer(eintraege, many=True).data
         return self.get_paginated_response(daten) if seite is not None else Response(daten)
 
     def retrieve(self, request, *args, **kwargs):
         e = self.get_object()
-        verbergen([e], self._verborgen())
+        self._bereinigt([e])
         return Response(self.get_serializer(e).data)
 
     @action(detail=False, methods=["get"])
@@ -141,7 +163,7 @@ class SystemEreignisViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, vi
             teile.append(f"Art {p.get('gruppe')}")
         if p.get("search"):
             teile.append(f"Suche „{p.get('search')}“")
-        pdf = protokoll_pdf(verbergen(list(qs), self._verborgen()), " · ".join(teile))
+        pdf = protokoll_pdf(self._bereinigt(list(qs)), " · ".join(teile))
         protokolliere(SystemEreignis.Art.EXPORT, request, objekt=" · ".join(teile) or "alle Einträge", was="Audit-Log")
         return pdf_antwort(pdf, f"Audit-Log-{timezone.localdate():%Y-%m-%d}.pdf")
 

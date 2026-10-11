@@ -181,3 +181,17 @@ class Firmen(Grundlage):
         finally:
             zuruecksetzen(token)
         self.assertEqual(base64.b64decode(logo_data_uri().split(",", 1)[1]), STANDARD_LOGO.read_bytes())
+
+    def test_firmenwahl_ueberlebt_gleichzeitige_anfragen(self):
+        """Eine ältere, später fertige Anfrage darf den Wechsel der Firma nicht zurücknehmen (Sitzung nur bei Änderung
+        speichern, 11.10.2026)."""
+        from unittest import mock
+
+        from django.contrib.sessions.backends.db import SessionStore
+
+        c = self.anmelden(self.beide)
+        c.post("/api/auth/firma/", {"firma": "rg"}, format="json")
+        with mock.patch.object(SessionStore, "save", autospec=True, side_effect=SessionStore.save) as gespeichert:
+            self.assertEqual(c.get("/api/auth/status/").json()["benutzer"]["firma"], "rg")
+            self.assertEqual(c.get("/api/patienten/").status_code, 200)
+        self.assertEqual(gespeichert.call_count, 0)

@@ -311,7 +311,11 @@ class KennwortView(OffenerView):
             if not zweiter_faktor_erfuellt(user):
                 return fehler("Anmeldung mit zweitem Faktor erforderlich.", status.HTTP_403_FORBIDDEN)
             if not user.check_password(str(request.data.get("alt", ""))):
-                return fehler("Bisheriges Passwort ist falsch.")
+                # zählt wie ein Fehlversuch bei der Anmeldung (Sicherheitsprüfung 11.10.2026): sonst ließe sich das
+                # Passwort mit einer übernommenen Sitzung hier beliebig oft probieren
+                protokolliere(SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request, grund="bestaetigung",
+                              was="Passwort ändern")
+                return bestaetigung_fehlgeschlagen(request, "kennwort_aendern") or fehler("Bisheriges Passwort ist falsch.")
         neu = str(request.data.get("neu", ""))
         if user.check_password(neu):
             return fehler("Das neue Passwort muss sich vom bisherigen unterscheiden.")

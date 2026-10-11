@@ -59,13 +59,13 @@ function useDokument(url: string, laden?: () => Promise<Uint8Array>) {
         enableXfa: false,
       }).promise;
       if (aktiv) setDoc(geladen);
-      else void geladen.destroy();
+      else void geladen.loadingTask.destroy();
     })().catch((e: unknown) => {
       if (aktiv) setFehler(e instanceof Error ? e.message : "Die PDF konnte nicht gelesen werden.");
     });
     return () => {
       aktiv = false;
-      if (geladen) void geladen.destroy();
+      if (geladen) void geladen.loadingTask.destroy();
     };
   }, [url]);
   return { doc, fehler };

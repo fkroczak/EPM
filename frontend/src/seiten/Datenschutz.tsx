@@ -94,7 +94,7 @@ export function Datenschutz() {
                     <tr key={a.id}>
                       <td className="td"><Chip art={a.ueberfaellig ? "fehler" : "warn"}>{a.ueberfaellig ? "überfällig seit" : "bis"} {datum(a.frist_bis)}{a.frist_verlaengert ? " (verlängert)" : ""}</Chip></td>
                       <td className="td">{a.art_name}{a.gestellt_von ? <span className="gedaempft"> · {a.gestellt_von}</span> : null}</td>
-                      <td className="td"><Link to={`/patienten/${a.patient}/datenschutz`} className="font-medium no-underline">{a.patient_name}</Link>{" "}
+                      <td className="td"><Link to={`/patienten/${a.patient}/datenschutz`} className="font-medium">{a.patient_name}</Link>{" "}
                         <span className="num gedaempft">Nr. {nummer(a.patient_nummer)}</span> <Test ja={a.patient_ist_test} />
                         {a.patient_eingeschraenkt ? <> <Chip art="warn">eingeschränkt</Chip></> : null}</td>
                       <td className="td num">{datum(a.eingegangen_am)}</td>
@@ -142,7 +142,7 @@ export function Datenschutz() {
                 <tbody>
                   {d.aufbewahrung_abgelaufen.map((p) => (
                     <tr key={p.id}>
-                      <td className="td"><Link to={`/patienten/${p.id}/datenschutz`} className="font-medium no-underline">{p.name ?? "Akte"}</Link>{" "}
+                      <td className="td"><Link to={`/patienten/${p.id}/datenschutz`} className="font-medium">{p.name ?? "Akte"}</Link>{" "}
                         <span className="num gedaempft">Nr. {nummer(p.nummer)}</span> <Test ja={p.ist_test} />
                         {p.eingeschraenkt ? <> <Chip art="warn">eingeschränkt</Chip></> : null}</td>
                       <td className="td num">{datum(p.abgeschlossen_am)}</td>
@@ -160,7 +160,7 @@ export function Datenschutz() {
                 <tbody>
                   {d.eingeschraenkt.map((p) => (
                     <tr key={p.id}>
-                      <td className="td"><Link to={`/patienten/${p.id}`} className="font-medium no-underline">{p.name ?? "Akte"}</Link>{" "}
+                      <td className="td"><Link to={`/patienten/${p.id}`} className="font-medium">{p.name ?? "Akte"}</Link>{" "}
                         <span className="num gedaempft">Nr. {nummer(p.nummer)}</span> <Test ja={p.ist_test} /></td>
                       <td className="td num">{datum(p.am)}</td>
                       <td className="td text-sm">{p.grund ?? <span className="gedaempft">—</span>}{p.von ? <span className="gedaempft"> · {p.von}</span> : null}</td>
