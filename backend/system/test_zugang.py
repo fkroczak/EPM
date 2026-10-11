@@ -162,7 +162,8 @@ class AgentZugang(SimpleTestCase):
             ("192.168.10.0/24", "https"): "192.168.10.0/24", ("192.168.10.7/24", "https"): "192.168.10.0/24",
             ("10.8.0.5", "ssh"): "10.8.0.5/32", ("10.0.0.0/8", "https"): "10.0.0.0/8",
             ("fd00:1:2::/48", "ssh"): "fd00:1:2::/48", ("2001:db8::/32", "ssh"): "2001:db8::/32",
-            ("0.0.0.0/0", "https"): None, ("::/0", "ssh"): None, ("10.0.0.0/7", "ssh"): None, ("2001:db8::/31", "ssh"): None,
+            ("0.0.0.0/0", "https"): "0.0.0.0/0", ("0.0.0.0/0", "ssh"): None, ("::/0", "https"): None,
+            ("::/0", "ssh"): None, ("0.0.0.0/1", "https"): None, ("10.0.0.0/7", "ssh"): None, ("2001:db8::/31", "ssh"): None,
             ("0.0.0.0/8", "ssh"): None, ("127.0.0.0/8", "ssh"): None, ("224.0.0.0/8", "ssh"): None,
             ("fd00::/48", "https"): None, ("192.168.1.0/24; reboot", "ssh"): None, ("", "ssh"): None, (None, "ssh"): None,
             ("192.168.1.0/24", "smtp"): None, ("300.1.1.1", "ssh"): None,
@@ -339,6 +340,41 @@ class AgentZugang(SimpleTestCase):
         # SSH-Netz entfernen braucht keine Adresse; das letzte darf weg (SSH öffnet dann nicht)
         rc, text = weg({"dienst": "ssh", "netz": "10.9.0.0/16"}, "admin", z.append)
         self.assertEqual(rc, 0, text)
+
+    def test_aus_dem_internet_und_eigene_adresse(self):
+        """Nachtrag 11.10.2026: EPM aus dem Internet nur ausdrücklich (0.0.0.0/0, nie für SSH); SSH nur von der eigenen
+        Adresse, befristet für diese Öffnung."""
+        z = []
+        hinzu = self.a.netz_hinzufuegen
+        p = {"dienst": "https", "netz": "0.0.0.0/0", "bezeichnung": "Internet (alle Adressen)"}
+        self.assertIn("ausdrücklicher Bestätigung", hinzu(p, "admin", z.append)[1])
+        self.assertEqual(hinzu({**p, "dienst": "ssh", "internet": True}, "admin", z.append)[0], 2)
+        rc, text = hinzu({**p, "internet": True}, "admin", z.append)
+        self.assertEqual(rc, 0, text)
+        self.assertIn(("443/tcp on enp0s8", "ALLOW IN", "0.0.0.0/0", "EPM HTTPS Internet (alle Adressen)"), self.server.regeln)
+        stand = self.a.zugang_stand()
+        self.assertEqual(stand["internet"], {"alle": True, "oeffentlich": []})
+        # das Verwaltungsnetz darf weg (das Gerät im Internet bleibt über 0.0.0.0/0 erlaubt), 0.0.0.0/0 dann nicht mehr
+        weg = self.a.netz_entfernen
+        self.assertEqual(weg({"dienst": "https", "netz": "192.168.56.0/24", "client_ip": "198.51.100.20"}, "admin", z.append)[0], 0)
+        self.assertEqual(weg({"dienst": "https", "netz": "0.0.0.0/0", "client_ip": "198.51.100.20"}, "admin", z.append)[0], 2)
+        hinzu({"dienst": "https", "netz": "198.51.100.20", "bezeichnung": "Admin zu Hause"}, "admin", z.append)
+        self.assertEqual(self.a.zugang_stand()["internet"]["oeffentlich"], ["198.51.100.20/32"])
+        rc, text = weg({"dienst": "https", "netz": "0.0.0.0/0", "client_ip": "198.51.100.20"}, "admin", z.append)
+        self.assertEqual(rc, 0, text)
+        self.assertIn("Ihr Gerät (198.51.100.20)",
+                      weg({"dienst": "https", "netz": "198.51.100.20/32", "client_ip": "198.51.100.20"}, "admin", z.append)[1])
+        # SSH nur von der eigenen Adresse: andere SSH-Freigaben gehen zu, der Eintrag fällt beim Schließen weg
+        self.assertEqual(self.a.ssh_oeffnen(1, "admin", z.append, nur_ip="0.0.0.0/0")[0], 2)
+        self.assertEqual(self.a.ssh_oeffnen(1, "admin", z.append, nur_ip="198.51.100.0/24")[0], 2)
+        rc, text = self.a.ssh_oeffnen(1, "admin", z.append, nur_ip="198.51.100.20/32")
+        self.assertEqual(rc, 0, text)
+        ssh = [r for r in self.server.regeln if r[0].startswith("2222/")]
+        self.assertEqual([r[2] for r in ssh], ["198.51.100.20/32"])
+        self.assertEqual([(e["netz"], e.get("befristet")) for e in self.zustand()["netze"]["ssh"]],
+                         [("192.168.56.0/24", None), ("198.51.100.20/32", True)])
+        self.assertEqual(self.a.ssh_schliessen("admin", z.append)[0], 0)
+        self.assertEqual([e["netz"] for e in self.zustand()["netze"]["ssh"]], ["192.168.56.0/24"])
 
     def test_netzfilter_fuer_epm(self):
         z = []
@@ -565,6 +601,41 @@ class ZugangApi(Systemverzeichnis):
         r = entfernen("192.168.56.0/24", "192.168.56.30", dienst="ssh", code=3)
         self.assertEqual(r.status_code, 201, r.content)
         self.assertEqual(self.auftragsdatei()["parameter"], {"dienst": "ssh", "netz": "192.168.56.0/24"})
+
+    def test_internet_und_eigene_adresse(self):
+        self.status()
+        b = {"kennwort": KENNWORT, "code": self.admin_codes[0]}
+        url = "/api/system/zugang/netze/"
+        r = self.a.post(url, {**b, "dienst": "https", "netz": "0.0.0.0/0", "bezeichnung": "Internet"}, format="json")
+        self.assertIn("ausdrücklich", r.json()["netz"])
+        for dienst, netz in (("ssh", "0.0.0.0/0"), ("ssh", "::/0"), ("https", "::/0")):
+            r = self.a.post(url, {**b, "dienst": dienst, "netz": netz, "bezeichnung": "x", "internet": True}, format="json")
+            self.assertEqual(r.status_code, 400, (dienst, netz))
+        r = self.a.post(url, {**b, "dienst": "https", "netz": "0.0.0.0/0", "bezeichnung": "Internet", "internet": True},
+                        format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(self.auftragsdatei()["parameter"]["internet"], True)
+        self.assertIn("Erlaubtes Netz für EPM (HTTPS) hinzufügen angefordert: 0.0.0.0/0 („Internet“) – EPM aus dem ganzen "
+                      "Internet erreichbar, mit Passwort und 2FA bestätigt", self.texte())
+        Systemauftrag.objects.all().delete()
+        for p in (self.ordner / "auftraege").glob("*.json"):
+            p.unlink()
+        # eigene Adresse (wie Nginx sie weitergibt) für SSH
+        self.assertEqual(self.a.post(url, {**b, "dienst": "https", "eigene_adresse": True, "bezeichnung": "x"},
+                                     format="json").status_code, 400)
+        r = self.a.post(url, {"dienst": "ssh", "eigene_adresse": True, "netz": "10.0.0.0/8", "bezeichnung": "Admin admin",
+                              "kennwort": KENNWORT, "code": self.admin_codes[1]}, format="json", HTTP_X_REAL_IP="198.51.100.20")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(self.auftragsdatei()["parameter"]["netz"], "198.51.100.20/32")
+        Systemauftrag.objects.all().delete()
+        for p in (self.ordner / "auftraege").glob("*.json"):
+            p.unlink()
+        r = self.a.post("/api/system/zugang/ssh/oeffnen/", {"stunden": 1, "nur_eigene_adresse": True, "kennwort": KENNWORT,
+                                                            "code": self.admin_codes[2]}, format="json",
+                        REMOTE_ADDR="2001:db8::7")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(self.auftragsdatei()["parameter"], {"stunden": 1, "nur_ip": "2001:db8::7/128"})
+        self.assertIn("SSH für 1 Stunde(n) öffnen angefordert, nur von 2001:db8::7/128 (nur diese Öffnung)", self.texte()[0])
 
     def test_netzfilter_und_entsperren(self):
         self.status()

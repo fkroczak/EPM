@@ -265,13 +265,15 @@ ZEIT_SETZEN_MUSTER = re.compile(r"^20[2-9][0-9]-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9
 SSH_STUNDEN = (1, 4, 8)
 NETZE_MAX = 20
 NETZ_DIENSTE = {"https": "EPM (HTTPS)", "ssh": "SSH"}
+INTERNET = "0.0.0.0/0"
 BEZEICHNUNG_MUSTER = re.compile(r"^[0-9A-Za-zÄÖÜäöüß][0-9A-Za-zÄÖÜäöüß .,:()/_+-]{0,39}$")
 NETZ_ZEICHEN = re.compile(r"^[0-9A-Fa-f.:/]{2,49}$")
 JAIL_MUSTER = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
 
 def netz_pruefen(text, dienst):
-    """(Fehler | None, vereinheitlichtes Netz | None). Nicht erlaubt: alles, breiter als /8 (IPv4) bzw. /32 (IPv6),
+    """(Fehler | None, vereinheitlichtes Netz | None). Nicht erlaubt: alles (Ausnahme: 0.0.0.0/0 für EPM als
+    ausdrückliche Wahl „aus dem Internet“; für SSH nie), breiter als /8 (IPv4) bzw. /32 (IPv6),
     Loopback, Multicast, reservierte Bereiche; für EPM (HTTPS) nur IPv4 – EPM lauscht nur auf EPM_MGMT_IP."""
     if dienst not in NETZ_DIENSTE:
         return "Unbekannter Dienst.", None
@@ -281,6 +283,8 @@ def netz_pruefen(text, dienst):
         netz = ipaddress.ip_network(text.strip(), strict=False)
     except ValueError:
         return "Bitte ein Netz (z. B. 192.168.10.0/24) oder eine IP-Adresse angeben.", None
+    if dienst == "https" and str(netz) == INTERNET:
+        return None, INTERNET          # „aus dem Internet (alle Adressen)“: nur für EPM, nur ausdrücklich gewählt
     if (netz.version == 4 and netz.prefixlen < 8) or (netz.version == 6 and netz.prefixlen < 32):
         return "Das Netz ist zu groß: höchstens /8 bei IPv4 und /32 bei IPv6.", None
     if netz.is_loopback or netz.is_multicast or netz.is_reserved or netz.network_address.is_unspecified:

@@ -22,9 +22,9 @@ POST   /api/system/uhr/                           {zeitzone?, ntp, server: [...]
 POST   /api/system/notfall/                       {mit_sicherung, kennwort, code} → Notfallpaket erstellen (F188)
 GET    /api/system/notfall/<datei>/               bereitgestelltes Notfallpaket herunterladen (Audit-Log)
 GET    /api/system/notfallplan/?art=html|pdf|md      Wiederaufbau-Plan (auch mit Recht „Sicherungen verwalten“)
-POST   /api/system/zugang/ssh/oeffnen/            {stunden: 1|4|8, kennwort, code} → SSH auf Zeit öffnen (11.10.2026)
+POST   /api/system/zugang/ssh/oeffnen/            {stunden: 1|4|8, nur_eigene_adresse?, kennwort, code} → SSH auf Zeit
 POST   /api/system/zugang/ssh/schliessen/         SSH sofort schließen
-POST   /api/system/zugang/netze/                  {dienst: "https"|"ssh", netz, bezeichnung, kennwort, code}
+POST   /api/system/zugang/netze/                  {dienst: "https"|"ssh", netz, bezeichnung, internet?, eigene_adresse?, …}
 POST   /api/system/zugang/netze/entfernen/        {dienst, netz, kennwort, code} – nie das letzte HTTPS-Netz, nie das eigene
 POST   /api/system/zugang/filter/                 {an, kennwort, code} → Netzfilter für EPM (DOCKER-USER)
 POST   /api/system/zugang/entsperren/             {jail, ip} → von Fail2ban gesperrte Adresse freigeben
@@ -556,8 +556,20 @@ def _enthalten(ip, netz: str) -> bool:
         return False
 
 
+def _eigene_adresse(request):
+    """Adresse dieses Geräts als Netz (/32 bzw. /128) – so, wie Nginx sie weitergibt (X-Real-IP = $remote_addr; ein vom
+    Browser gesetzter Kopf wird dort überschrieben). (Fehler | None, Netz | None)"""
+    from audit.models import client_ip
+
+    ip = host.ip_pruefen(client_ip(request) or "")
+    if ip is None:
+        return "Die Adresse dieses Geräts ist nicht bekannt.", None
+    return host.netz_pruefen(str(ip), "ssh")
+
+
 class SshOeffnenView(APIView):
-    """POST {stunden: 1 | 4 | 8, kennwort, code} – SSH aus den erlaubten Netzen öffnen, danach schließt es sich selbst."""
+    """POST {stunden: 1 | 4 | 8, nur_eigene_adresse?, kennwort, code} – SSH aus den erlaubten Netzen öffnen (oder nur von
+    der Adresse dieses Geräts, befristet für diese Öffnung), danach schließt es sich selbst."""
 
     permission_classes = [SystemRecht]
 
@@ -565,12 +577,21 @@ class SshOeffnenView(APIView):
         stunden = request.data.get("stunden")
         if isinstance(stunden, bool) or stunden not in host.SSH_STUNDEN:
             return _fehler("stunden", "Bitte 1, 4 oder 8 Stunden wählen.")
-        z = _zugang()
-        if z.get("netze") is not None and not _netze(z, "ssh"):
-            return _fehler("stunden", "Es ist kein Netz für SSH eingetragen. Bitte zuerst unter „Erlaubte Netze“ eines "
-                                      "hinzufügen.")
-        return auftrag_anlegen(request, "ssh_oeffnen", parameter={"stunden": stunden}, objekt="SSH",
-                               protokoll_details={"stunden": stunden})
+        nur_eigene = request.data.get("nur_eigene_adresse", False)
+        if not isinstance(nur_eigene, bool):
+            return _fehler("nur_eigene_adresse", "Bitte ja oder nein.")
+        parameter = {"stunden": stunden}
+        if nur_eigene:
+            fehler, netz = _eigene_adresse(request)
+            if fehler:
+                return _fehler("nur_eigene_adresse", fehler)
+            parameter["nur_ip"] = netz
+        else:
+            z = _zugang()
+            if z.get("netze") is not None and not _netze(z, "ssh"):
+                return _fehler("stunden", "Es ist kein Netz für SSH eingetragen. Bitte zuerst unter „Erlaubte Netze“ eines "
+                                          "hinzufügen oder nur die eigene Adresse freigeben.")
+        return auftrag_anlegen(request, "ssh_oeffnen", parameter=parameter, objekt="SSH", protokoll_details=parameter)
 
 
 class SshSchliessenView(APIView):
@@ -581,7 +602,9 @@ class SshSchliessenView(APIView):
 
 
 class NetzHinzufuegenView(APIView):
-    """POST {dienst: "https" | "ssh", netz, bezeichnung, kennwort, code}"""
+    """POST {dienst: "https" | "ssh", netz, bezeichnung, internet?, eigene_adresse?, kennwort, code}.
+    ``internet: true`` bestätigt 0.0.0.0/0 für EPM (aus dem ganzen Internet, Nachtrag 11.10.2026); für SSH gibt es das nie.
+    ``eigene_adresse: true`` (nur SSH) trägt die Adresse dieses Geräts als /32 bzw. /128 ein."""
 
     permission_classes = [SystemRecht]
 
@@ -589,9 +612,17 @@ class NetzHinzufuegenView(APIView):
         dienst = request.data.get("dienst")
         if dienst not in host.NETZ_DIENSTE:
             return _fehler("dienst", "Bitte EPM (HTTPS) oder SSH wählen.")
-        fehler, netz = host.netz_pruefen(request.data.get("netz"), dienst)
+        if request.data.get("eigene_adresse") is True:
+            if dienst != "ssh":
+                return _fehler("eigene_adresse", "Die eigene Adresse lässt sich hier nur für SSH eintragen.")
+            fehler, netz = _eigene_adresse(request)
+        else:
+            fehler, netz = host.netz_pruefen(request.data.get("netz"), dienst)
         if fehler:
             return _fehler("netz", fehler)
+        internet = netz == host.INTERNET
+        if internet and request.data.get("internet") is not True:
+            return _fehler("netz", "Zugriff aus dem ganzen Internet bitte ausdrücklich bestätigen.")
         bezeichnung = request.data.get("bezeichnung")
         if not isinstance(bezeichnung, str) or not host.BEZEICHNUNG_MUSTER.match(bezeichnung.strip()):
             return _fehler("bezeichnung", "Bitte eine Bezeichnung angeben: bis 40 Zeichen, Buchstaben, Ziffern und . , : ( ) "
@@ -602,7 +633,7 @@ class NetzHinzufuegenView(APIView):
             return _fehler("netz", f"{netz} ist schon eingetragen.")
         if len(liste) >= host.NETZE_MAX:
             return _fehler("netz", f"Es sind schon {host.NETZE_MAX} Netze eingetragen. Bitte erst eines entfernen.")
-        parameter = {"dienst": dienst, "netz": netz, "bezeichnung": bezeichnung}
+        parameter = {"dienst": dienst, "netz": netz, "bezeichnung": bezeichnung, **({"internet": True} if internet else {})}
         return auftrag_anlegen(request, "netz_hinzufuegen", parameter=parameter,
                                objekt=f"{host.NETZ_DIENSTE[dienst]}: {netz}", protokoll_details=parameter)
 

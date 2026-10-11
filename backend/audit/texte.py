@@ -384,10 +384,12 @@ def _system(e, d) -> str:
     # Zugang (11.10.2026)
     dienste = {"https": "EPM (HTTPS)", "ssh": "SSH"}
     if ereignis == "angefordert" and aktion == "ssh_oeffnen":
-        return f"SSH für {d.get('stunden', '?')} Stunde(n) öffnen angefordert" + _bestaetigt(d)
+        return (f"SSH für {d.get('stunden', '?')} Stunde(n) öffnen angefordert"
+                + (f", nur von {d['nur_ip']} (nur diese Öffnung)" if d.get("nur_ip") else "") + _bestaetigt(d))
     if ereignis == "angefordert" and aktion == "netz_hinzufuegen":
         return (f"Erlaubtes Netz für {dienste.get(d.get('dienst'), '?')} hinzufügen angefordert: {d.get('netz', '')} "
-                f"(„{d.get('bezeichnung', '')}“)" + _bestaetigt(d))
+                f"(„{d.get('bezeichnung', '')}“)" + (" – EPM aus dem ganzen Internet erreichbar" if d.get("internet") else "")
+                + _bestaetigt(d))
     if ereignis == "angefordert" and aktion == "netz_entfernen":
         return (f"Erlaubtes Netz für {dienste.get(d.get('dienst'), '?')} entfernen angefordert: {d.get('netz', '')}"
                 + (f" („{d['bezeichnung']}“)" if d.get("bezeichnung") else "") + _bestaetigt(d))

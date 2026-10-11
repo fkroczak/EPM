@@ -202,6 +202,8 @@ KONF_GEHEIM = re.compile(r"PASS|SECRET|TOKEN|SCHLUESSEL|KEY|KENNWORT", re.I)
 SSH_STUNDEN = (1, 4, 8)
 NETZE_MAX = 20                    # je Dienst
 NETZ_DIENSTE = {"https": "EPM (HTTPS)", "ssh": "SSH"}
+# Zugriff aus dem Internet (Nachtrag 11.10.2026): nur für EPM und nur ausdrücklich gewählt; für SSH nie
+INTERNET = "0.0.0.0/0"
 HTTPS_PORT = 443
 # Docker umgeht ufw bei veröffentlichten Ports (DNAT, FORWARD statt INPUT). Wirksam filtert deshalb erst diese Kette,
 # in die DOCKER-USER die Verbindungen zu EPM_MGMT_IP:443 schickt (Schalter „Netzfilter für EPM“).
@@ -311,7 +313,7 @@ def naechstes_fenster(von, bis, jetzt=None):
 # ------------------------------------------------------------ Zugang: Prüfungen (dieselben stehen in backend/system/host.py)
 def netz_pruefen(text, dienst):
     """Erlaubtes Quellnetz prüfen und vereinheitlichen: IPv4/IPv6 als Netz (CIDR) oder einzelne Adresse. Nicht erlaubt:
-    alles (0.0.0.0/0, ::/0), breiter als /8 (IPv4) bzw. /32 (IPv6), Loopback, Multicast, reservierte Bereiche. Für EPM
+    alles (0.0.0.0/0, ::/0 – Ausnahme: 0.0.0.0/0 für EPM als ausdrückliche Wahl „aus dem Internet“), breiter als /8 (IPv4) bzw. /32 (IPv6), Loopback, Multicast, reservierte Bereiche. Für EPM
     (HTTPS) nur IPv4 – EPM lauscht nur auf EPM_MGMT_IP. Rückgabe (Fehler | None, Netz | None)."""
     if dienst not in NETZ_DIENSTE:
         return "Unbekannter Dienst.", None
@@ -321,6 +323,8 @@ def netz_pruefen(text, dienst):
         netz = ipaddress.ip_network(text.strip(), strict=False)
     except ValueError:
         return "Bitte ein Netz (z. B. 192.168.10.0/24) oder eine IP-Adresse angeben.", None
+    if dienst == "https" and str(netz) == INTERNET:
+        return None, INTERNET          # „aus dem Internet (alle Adressen)“: nur für EPM, nur ausdrücklich gewählt
     if (netz.version == 4 and netz.prefixlen < 8) or (netz.version == 6 and netz.prefixlen < 32):
         return "Das Netz ist zu groß: höchstens /8 bei IPv4 und /32 bei IPv6.", None
     if netz.is_loopback or netz.is_multicast or netz.is_reserved or netz.network_address.is_unspecified:
@@ -2335,7 +2339,7 @@ class Agent:
 
         # Zugang (11.10.2026)
         if aktion == "ssh_oeffnen":
-            return self.ssh_oeffnen(parameter.get("stunden"), von, zeile, simuliert=t)
+            return self.ssh_oeffnen(parameter.get("stunden"), von, zeile, simuliert=t, nur_ip=parameter.get("nur_ip"))
 
         if aktion == "ssh_schliessen":
             return self.ssh_schliessen(von, zeile, simuliert=t)
@@ -2971,7 +2975,9 @@ class Agent:
                         continue
                     liste.append({"netz": netz, "bezeichnung": str(e.get("bezeichnung") or "")[:40],
                                   "seit": e.get("seit") if isinstance(e.get("seit"), str) else None,
-                                  "von": str(e.get("von") or "")[:150]})
+                                  "von": str(e.get("von") or "")[:150],
+                                  # nur für eine Öffnung von SSH (eigene Adresse): fällt beim Schließen weg
+                                  **({"befristet": True} if dienst == "ssh" and e.get("befristet") is True else {})})
                 netze[dienst] = liste[:NETZE_MAX]
             s = d["ssh"]
             zustand = s.get("zustand") if s.get("zustand") in ("offen", "dauerhaft", "geschlossen") else "dauerhaft"
@@ -3029,23 +3035,45 @@ class Agent:
         befehle = [self.ufw_erlauben(e["netz"], port, ufw_kommentar("EPM SSH", e["bezeichnung"])) for e in z["netze"]["ssh"]]
         return befehle + [["systemctl", "enable", "--now", *self.ssh_einheiten()]]
 
-    def ssh_oeffnen(self, stunden, von, zeile, simuliert=False):
+    def ssh_oeffnen(self, stunden, von, zeile, simuliert=False, nur_ip=None):
+        """``nur_ip``: nur von dieser Adresse (die des anfragenden Geräts, als /32 bzw. /128) – als befristeter Eintrag
+        der SSH-Liste, der beim Schließen wieder wegfällt; die übrigen Netze bleiben dann zu."""
         if isinstance(stunden, bool) or stunden not in SSH_STUNDEN:
             return 2, "Bitte 1, 4 oder 8 Stunden wählen – SSH nicht geöffnet."
         z, _ = self.zugang_lesen()
-        if not z["netze"]["ssh"]:
+        if nur_ip is not None:
+            fehler, netz = netz_pruefen(nur_ip, "ssh")
+            if fehler or "/" not in netz or netz.split("/")[1] not in ("32", "128"):
+                return 2, "Ungültige Adresse für SSH – SSH nicht geöffnet."
+            eintrag = next((e for e in z["netze"]["ssh"] if e["netz"] == netz), None)
+            if eintrag is None:
+                if len(z["netze"]["ssh"]) >= NETZE_MAX:
+                    return 2, f"Für SSH sind schon {NETZE_MAX} Netze eingetragen. Bitte erst eines entfernen."
+                eintrag = {"netz": netz, "bezeichnung": f"{von or 'Admin'} (nur diese Öffnung)"[:40], "seit": jetzt_iso(),
+                           "von": von, "befristet": True}
+            freigabe = {**z, "netze": {**z["netze"], "ssh": [eintrag]}}
+        else:
+            freigabe = z
+        if not freigabe["netze"]["ssh"]:
             return 2, "Es ist kein Netz für SSH eingetragen. Bitte zuerst unter „Erlaubte Netze“ eines hinzufügen."
         bis = datetime.now(timezone.utc).astimezone() + timedelta(hours=stunden)
         bis_text = bis.strftime("%d.%m.%Y %H:%M")
-        befehle = self.ssh_oeffnen_befehle(z)
+        befehle = self.ssh_oeffnen_befehle(freigabe)
         zeile(f"SSH (Port {self.ssh_port()}) für {stunden} Stunde(n) öffnen, bis {bis_text} Uhr. Erlaubt: "
-              f"{', '.join(e['netz'] for e in z['netze']['ssh'])}\n")
+              f"{', '.join(e['netz'] for e in freigabe['netze']['ssh'])}\n")
         if simuliert:
             for args in befehle:
                 zeile(f"(Probelauf) {' '.join(args)}\n")
             return 0, "Probelauf: SSH nicht geöffnet."
-        fehler = sum(1 for args in befehle if self.schritt("SSH öffnen", args, zeile, env=C_ENV, zeitlimit=120) != 0)
+        fehler = 0
+        if nur_ip is not None:
+            # schon offen für andere Netze: diese Freigaben zuerst entfernen – danach gilt nur die eine Adresse
+            nur = ipaddress.ip_network(eintrag["netz"])
+            fehler += self.ufw_loeschen(lambda r: self.ssh_regel(r) and regel_netz(r) != nur, zeile)[0] != 0
+        fehler += sum(1 for args in befehle if self.schritt("SSH öffnen", args, zeile, env=C_ENV, zeitlimit=120) != 0)
         # auch bei Fehlern das Ende eintragen: dann schließt der Server zur Zeit, was sich geöffnet hat
+        if nur_ip is not None and eintrag not in z["netze"]["ssh"]:
+            z["netze"]["ssh"].append(eintrag)
         z["ssh"] = {"zustand": "offen", "bis": bis.isoformat(timespec="seconds"), "seit": jetzt_iso(), "von": von}
         self.zugang_speichern(z)
         if fehler:
@@ -3069,6 +3097,7 @@ class Agent:
             return 1, "SSH ließ sich nicht vollständig schließen – Ausgabe prüfen."
         z, _ = self.zugang_lesen()
         z["ssh"] = {"zustand": "geschlossen", "bis": None, "seit": jetzt_iso(), "von": von}
+        z["netze"]["ssh"] = [e for e in z["netze"]["ssh"] if not e.get("befristet")]
         self.zugang_speichern(z)
         return 0, (f"SSH ist geschlossen ({anzahl} Firewall-Regel(n) entfernt, Dienst aus). Bestehende Verbindungen laufen "
                    "weiter, bis sie enden.")
@@ -3109,6 +3138,8 @@ class Agent:
         if not isinstance(bezeichnung, str) or not BEZEICHNUNG_MUSTER.match(bezeichnung.strip()):
             return 2, "Bitte eine Bezeichnung angeben (bis 40 Zeichen, z. B. „Praxisnetz 2“). Nichts geändert."
         bezeichnung = bezeichnung.strip()
+        if netz == INTERNET and p.get("internet") is not True:
+            return 2, "Zugriff aus dem ganzen Internet nur mit ausdrücklicher Bestätigung – nichts geändert."
         z, _ = self.zugang_lesen()
         liste = z["netze"][dienst]
         if any(e["netz"] == netz for e in liste):
@@ -3357,6 +3388,10 @@ class Agent:
             "stunden": list(SSH_STUNDEN), "max": NETZE_MAX,
             "netze": z["netze"],
             "https_filter": {"an": z["https_filter"], "aktiv": self.https_filter_aktiv(), "moeglich": bool(self.mgmt_ip())},
+            # aus dem Internet erreichbar: 0.0.0.0/0 erlaubt bzw. öffentliche Adressen in der Liste für EPM
+            "internet": {"alle": any(e["netz"] == INTERNET for e in z["netze"]["https"]),
+                         "oeffentlich": [e["netz"] for e in z["netze"]["https"]
+                                         if e["netz"] != INTERNET and not ipaddress.ip_network(e["netz"]).is_private]},
             "ereignisse": z["ereignisse"],
             "firewall": fw,
             "fail2ban": self.fail2ban_stand(),
