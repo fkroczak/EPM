@@ -289,6 +289,28 @@ class Terminbestaetigung(Grundlage):
         self.assertIsNone(r.json()["bestaetigung_am"])
         self.assertTrue(r.json()["bestaetigung"]["angebot"])
 
+    def test_schon_bestaetigt_ohne_schreiben(self):
+        """Wunsch 11.10.2026: „Bestätigung fehlt“ wegklicken, wenn telefonisch o. ä. bestätigt."""
+        t = self.neu()
+        self.assertEqual(self.c.post(f"/api/termine/{t['id']}/bestaetigt/", {"weg": "per Brieftaube"}, format="json").status_code, 400)
+        r = self.c.post(f"/api/termine/{t['id']}/bestaetigt/", {"weg": "telefonisch"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIsNotNone(r.json()["bestaetigung_am"])
+        self.assertEqual(r.json()["bestaetigung_weg"], "telefonisch")
+        self.assertEqual(r.json()["bestaetigung_von_name"], "M. Tester")
+        verlauf = self.c.get(f"/api/patienten/{self.p.id}/verlauf/", {"bereich": "termine"}).json()
+        self.assertTrue(any(e.get("aktion") == "Terminbestätigung telefonisch" for e in verlauf), verlauf[:3])
+        # Startseite: nicht mehr unter „Bestätigung fehlt“
+        tl = self.c.get("/api/startseite/").json()["tagesliste"]
+        self.assertNotIn(t["id"], [x["id"] for x in tl["bestaetigung_fehlt"]])
+        # verschoben: fehlt wieder, Weg zurückgesetzt
+        r = self.c.patch(f"/api/termine/{t['id']}/", {"uhrzeit": "12:00"}, format="json")
+        self.assertIsNone(r.json()["bestaetigung_am"])
+        self.assertEqual(r.json()["bestaetigung_weg"], "")
+        # Betrachter darf nicht
+        self.assertEqual(client_fuer(self.betrachter).post(f"/api/termine/{t['id']}/bestaetigt/", {"weg": "telefonisch"},
+                                                           format="json").status_code, 403)
+
     def test_admin_bei_echter_akte_ohne_vermerk(self):
         t = self.neu()
         r = client_fuer(self.admin).post(f"/api/patienten/{self.p.id}/schreiben/",

@@ -53,7 +53,7 @@ test("Gewicht erfassen, Plausibilität, korrigieren, Zeitraum", async ({ page })
   await expect(karte.getByTestId("aktuelles-gewicht")).toHaveText("61,0 kg");
 
   // Schnellaktion „Gewicht“ öffnet den Dialog wie „Termin“ (Wunsch 08.10.2026) – Patient ist vorgegeben
-  await page.getByTestId("aktenkopf").getByRole("button", { name: "Gewicht" }).click();
+  await page.getByTestId("aktenkopf").getByRole("button", { name: "Gewicht", exact: true }).click();
   const gd = page.getByRole("dialog");
   await expect(gd.getByRole("heading", { name: "Gewicht erfassen" })).toBeVisible();
   await expect(gd).toContainText(p.name);
@@ -209,7 +209,7 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   const p = await neuerPatient();
   await oeffnen(page, p.id);
   // Schnellaktion „Kontakt“ öffnet den Dialog wie „Termin“ (Wunsch 08.10.2026)
-  await page.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt" }).click();
+  await page.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt", exact: true }).click();
   await expect(page.getByRole("dialog").getByRole("heading", { name: "Kontakt erfassen" })).toBeVisible();
   await expect(page.getByRole("dialog")).toContainText(p.name);
   await page.getByRole("dialog").getByRole("button", { name: "Abbrechen" }).click();
@@ -289,7 +289,7 @@ test("Kontakt mit Wiedervorlage erfassen, suchen, stornieren", async ({ page }) 
   expect([geaendert.titel, geaendert.uhrzeit]).toEqual(["Rückruf Trinkmenge", "11:15:00"]);
 
   // Praxistermin mit Terminort aus der pflegbaren Liste
-  await page.getByTestId("aktenkopf").getByRole("button", { name: "Termin" }).click();
+  await page.getByTestId("aktenkopf").getByRole("button", { name: "Termin", exact: true }).click();
   const pt = page.getByRole("dialog");
   await pt.getByLabel("Art", { exact: true }).selectOption("praxistermin");
   await pt.getByLabel("Ort").selectOption({ label: "Praxis Dr. Holtmeier" });
@@ -355,7 +355,7 @@ test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen 
   await ad.getByLabel("Notiz").fill("Darmfunktion ausreichend");
   await ad.getByRole("button", { name: "Akte abschließen" }).click();
   await expect(page.getByText(/Akte abgeschlossen am .* Therapie beendet/)).toBeVisible();
-  await expect(page.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt" })).toHaveCount(0);
+  await expect(page.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt", exact: true })).toHaveCount(0);
 
   // danach nur lesbar, in der Liste unter „Abgeschlossen“
   await page.reload();
@@ -372,7 +372,7 @@ test("Stammdaten bearbeiten, Akte abschließen (Mitarbeiter) und wieder öffnen 
   await ap.getByRole("dialog").getByRole("button", { name: "Wieder öffnen" }).click();
   await expect(ap.getByText("Akte wieder geöffnet.")).toBeVisible();
   // echte Akte: für den Admin weiter nur lesbar
-  await expect(ap.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt" })).toHaveCount(0);
+  await expect(ap.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt", exact: true })).toHaveCount(0);
   await adm.close();
 
   const api = await apiAls("mitarbeiter");

@@ -7,11 +7,13 @@
  * merkt sich der Termin das („Bestätigung erstellt am …“); verschiebt man ihn, fehlt sie wieder.
  * Das Angebot lässt sich unter Vorlagen › Grenzwerte abschalten.
  */
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import { datum, terminZeit, uhrzeit } from "@/lib/format";
 import type { Termin } from "@/lib/typen";
 import { Chip, Knopf, Meldung } from "@/components/ui/basis";
-import { Dialog } from "@/components/ui/dialog";
+import { Dialog, Menue } from "@/components/ui/dialog";
+import { useHinweis } from "@/components/ui/hinweise";
 import { SchreibenDialog } from "@/components/SchreibenDialog";
 
 /** Braucht dieser Termin noch eine Bestätigung? (Praxistermin, Angebot an, noch keine erstellt) */
@@ -23,13 +25,17 @@ function wo(t: Termin) {
   return t.ort_name || t.bei || "Praxistermin";
 }
 
-/** „Bestätigung erstellt am 10.10.“ bzw. „Bestätigung fehlt“ – nur bei Praxisterminen, sonst nichts */
+const WEGE = { telefonisch: "telefonisch", persoenlich: "persönlich", anderweitig: "anderweitig" } as const;
+
+/** „Bestätigung erstellt am 10.10.“ bzw. „Bestätigt telefonisch am 10.10.“ bzw. „Bestätigung fehlt“ – nur bei
+ *  Praxisterminen, sonst nichts */
 export function BestaetigungChip({ termin }: { termin: Termin }) {
   if (termin.bestaetigung_am) {
+    const weg = termin.bestaetigung_weg ? WEGE[termin.bestaetigung_weg] : "";
     return (
-      <Chip art="ok" title={`Terminbestätigung erstellt am ${datum(termin.bestaetigung_am)} um ${uhrzeit(termin.bestaetigung_am)}`
+      <Chip art="ok" title={`Terminbestätigung ${weg || "erstellt"} am ${datum(termin.bestaetigung_am)} um ${uhrzeit(termin.bestaetigung_am)}`
         + (termin.bestaetigung_von_name ? ` von ${termin.bestaetigung_von_name}` : "")} data-testid="bestaetigung-erstellt">
-        Bestätigung erstellt am {datum(termin.bestaetigung_am).slice(0, 6)}
+        {weg ? `Bestätigt ${weg} am` : "Bestätigung erstellt am"} {datum(termin.bestaetigung_am).slice(0, 6)}
       </Chip>
     );
   }
@@ -77,5 +83,27 @@ export function BestaetigungDialog({ termin, offen, onOffen }: { termin: Termin 
           <BestaetigungChip termin={termin} />
         </div>
       } />
+  );
+}
+
+/** „Schon bestätigt …“ (Wunsch 11.10.2026): „Bestätigung fehlt“ wegklicken, wenn der Termin schon telefonisch,
+ *  persönlich oder anderweitig bestätigt ist – vermerkt am Termin (Person, Zeitpunkt, Weg), steht im Verlauf. */
+export function SchonBestaetigt({ termin, onFertig }: { termin: Termin; onFertig?: (t: Termin) => void }) {
+  const qc = useQueryClient();
+  const melden = useHinweis();
+  const vermerken = useMutation({
+    mutationFn: (weg: keyof typeof WEGE) => api<Termin>(`termine/${termin.id}/bestaetigt/`, { body: { weg } }),
+    onSuccess: (t) => {
+      for (const k of [["startseite"], ["termine"], ["kalender"], ["patient", t.patient]]) void qc.invalidateQueries({ queryKey: k });
+      melden(`Terminbestätigung vermerkt (${WEGE[t.bestaetigung_weg as keyof typeof WEGE] ?? "anderweitig"}).`);
+      onFertig?.(t);
+    },
+    onError: (e) => melden(e.message, "fehler"),
+  });
+  return (
+    <Menue label={`Schon bestätigt: ${termin.patient_name}`} ausloeser={<>Schon bestätigt …</>}
+      eintraege={(Object.keys(WEGE) as (keyof typeof WEGE)[]).map((w) => ({
+        text: `${WEGE[w].charAt(0).toUpperCase()}${WEGE[w].slice(1)} bestätigt`, onClick: () => vermerken.mutate(w),
+      }))} />
   );
 }

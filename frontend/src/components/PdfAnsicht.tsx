@@ -132,7 +132,10 @@ function useBreite() {
 }
 
 /** Kleine Vorschau: eine Seite, blättern. */
-export function PdfVorschau({ url, titel, hoehe = 320, laden }: { url: string; titel: string; hoehe?: number; laden?: () => Promise<Uint8Array> }) {
+export function PdfVorschau({ url, titel, hoehe = 320, laden, onOeffnen }: { url: string; titel: string; hoehe?: number;
+  laden?: () => Promise<Uint8Array>;
+  /** Antippen der Seite öffnet das Dokument groß (Akte › Dokumente, Wunsch 11.10.2026) */
+  onOeffnen?: () => void }) {
   const { doc, fehler } = useDokument(url, laden);
   const [seite, setSeite] = useState(1);
   const { ref, breite } = useBreite();
@@ -143,7 +146,10 @@ export function PdfVorschau({ url, titel, hoehe = 320, laden }: { url: string; t
       {/* per Tastatur scrollbar (tabIndex): Bereiche mit eigenem Scrollbalken müssen fokussierbar sein (WCAG 2.1.1) */}
       <div ref={ref} className="rounded-lg border border-rand bg-fein overflow-auto p-2" style={{ height: rem(hoehe) }} tabIndex={0} role="region" aria-label={`Seite der Vorschau ${titel}`}>
         {fehler ? <div className="h-full flex items-center justify-center text-sm gedaempft text-center px-4">Vorschau nicht möglich: {fehler}</div>
-          : doc && breite ? <Seite doc={doc} nummer={seite} breite={breite - 16} />
+          : doc && breite ? (onOeffnen
+            ? <button type="button" className="vorschau-oeffnen" onClick={onOeffnen} title="In voller Größe öffnen" data-testid="vorschau-oeffnen">
+                <Seite doc={doc} nummer={seite} breite={breite - 16} /></button>
+            : <Seite doc={doc} nummer={seite} breite={breite - 16} />)
           : <div className="h-full flex items-center justify-center gedaempft"><Ladekreis /></div>}
       </div>
       {anzahl > 1 ? (

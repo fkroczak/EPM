@@ -293,9 +293,9 @@ test("Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten", async
   const kopf = page.getByTestId("aktenkopf");
   // keine Hinweise auf fehlende Rechte, nur keine Aktionen
   await expect(kopf.getByText("nur lesen")).toHaveCount(0);
-  await expect(kopf.getByRole("button", { name: "Kontakt" })).toHaveCount(0);
+  await expect(kopf.getByRole("button", { name: "Kontakt", exact: true })).toHaveCount(0);
   await expect(kopf.getByRole("button", { name: "Neuer Plan" })).toHaveCount(0);
-  await expect(page.getByTestId("gewichtskarte").getByRole("button", { name: "Gewicht" })).toHaveCount(0);
+  await expect(page.getByTestId("gewichtskarte").getByRole("button", { name: "Gewicht", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Weitere Aktionen" }).click();
   await expect(page.getByRole("menuitem", { name: "Stammdaten bearbeiten" })).toHaveCount(0);
   // Ausnahme (Fehlerliste 02.10.2026, 6.3): Akten abschließen dürfen Admins auch bei echten Patienten
@@ -325,7 +325,7 @@ test("Admin: echte Akten nur lesen, Testpatienten anlegen und bearbeiten", async
   await expect(page).toHaveURL(/\/patienten\/\d+$/);
   const id = Number(page.url().split("/").pop());
   await expect(kopf.getByText("Testpatient")).toBeVisible();
-  await kopf.getByRole("button", { name: "Kontakt" }).click();
+  await kopf.getByRole("button", { name: "Kontakt", exact: true }).click();
   const neu = page.getByRole("dialog");
   await neu.getByRole("textbox", { name: "Notiz" }).fill("Testkontakt der Administration");
   await neu.getByRole("button", { name: "Speichern", exact: true }).click();
@@ -512,8 +512,8 @@ test("Recht während der Sitzung entzogen: Aktion verschwindet ohne neue Anmeldu
     ohne.mitarbeiter.eintraege_erfassen = false;
     await admin.put("rechte/", { matrix: ohne });
     await mp.getByRole("navigation", { name: "Aktenbereiche" }).getByRole("link", { name: "Verlauf" }).click();
-    await expect(mp.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt" })).toHaveCount(0);
-    await expect(mp.getByTestId("aktenkopf").getByRole("button", { name: "Gewicht" })).toHaveCount(0);
+    await expect(mp.getByTestId("aktenkopf").getByRole("button", { name: "Kontakt", exact: true })).toHaveCount(0);
+    await expect(mp.getByTestId("aktenkopf").getByRole("button", { name: "Gewicht", exact: true })).toHaveCount(0);
   } finally {
     try {
       await admin.put("rechte/", { matrix: await standardMatrix() });

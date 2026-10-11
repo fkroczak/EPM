@@ -88,15 +88,19 @@ function Erreichbarkeit() {
 }
 
 function NaechsteWiedervorlage() {
-  const { patient } = useAkte();
+  const { patient, terminOeffnen } = useAkte();
   const t = patient.kopf?.naechster_termin;
   return (
     <Karte className="px-5 py-4 flex flex-col gap-1">
       <h2 className="lbl m-0 mb-1">Nächster Termin</h2>
-      {t ? <>
-        <span className="text-lg font-semibold">{terminZeit(t.faellig_am, t.uhrzeit)}</span>
-        <span className="text-[0.8125rem] gedaempft">{[t.titel, t.ort ?? TERMINARTEN[t.art]].filter(Boolean).join(" · ")}</span>
-      </> : <span className="text-sm gedaempft">Kein offener Termin.</span>}
+      {/* Klick öffnet den Termin (ohne Recht: Kalender an diesem Tag), Wunsch 11.10.2026 */}
+      {t ? (
+        <button type="button" className="termin-sprung flex flex-col gap-1 min-w-0" title="Termin öffnen" data-testid="naechster-termin"
+          onClick={() => terminOeffnen(t.id)}>
+          <span className="text-lg font-semibold text-akzent-text">{terminZeit(t.faellig_am, t.uhrzeit)}</span>
+          <span className="text-[0.8125rem] gedaempft">{[t.titel, t.ort ?? TERMINARTEN[t.art]].filter(Boolean).join(" · ")}</span>
+        </button>
+      ) : <span className="text-sm gedaempft">Kein offener Termin.</span>}
     </Karte>
   );
 }
@@ -189,6 +193,7 @@ const MONAT = new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" 
 /** Ein Kontakt in der Zeitleiste */
 function KontaktZeile({ k, markiert, onStorno }: { k: Kontakt; markiert: boolean; onStorno?: () => void }) {
   const ref = useRef<HTMLLIElement>(null);
+  const { terminOeffnen } = useAkte();
   useEffect(() => { if (markiert) ref.current?.scrollIntoView({ block: "center", behavior: "smooth" }); }, [markiert]);
   const d = new Date(k.zeitpunkt);
   return (
@@ -209,8 +214,11 @@ function KontaktZeile({ k, markiert, onStorno }: { k: Kontakt; markiert: boolean
         {k.termine.length ? (
           <span className="flex gap-1.5 flex-wrap">
             {k.termine.map((x) => (
-              <Chip key={x.id} art={x.erledigt ? "ok" : "akzent"}><Icon name="kalender" groesse={12} />
-                {TERMINARTEN[x.art]}{x.ort ? ` · ${x.ort}` : ""} · {terminZeit(x.faellig_am, x.uhrzeit)}{x.erledigt ? " · erledigt" : ""}</Chip>
+              <button key={x.id} type="button" className={cx("chip cursor-pointer text-left", x.erledigt ? "ok" : "akzent")}
+                title="Termin öffnen" data-testid="kontakt-termin" onClick={() => terminOeffnen(x.id)}>
+                <Icon name="kalender" groesse={12} />
+                <span>{TERMINARTEN[x.art]}{x.ort ? ` · ${x.ort}` : ""} · {terminZeit(x.faellig_am, x.uhrzeit)}{x.erledigt ? " · erledigt" : ""}</span>
+              </button>
             ))}
           </span>
         ) : null}

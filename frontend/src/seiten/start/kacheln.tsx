@@ -1,7 +1,8 @@
 /** Kacheln der Startseite für die Arbeit mit den Akten (S03–S07, S09, S10; Entwurf 2). */
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
+import { terminZiel } from "@/lib/sprungziele";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
@@ -91,6 +92,7 @@ function Wochenstreifen({ woche, tag, onTag }: { woche: Startdaten["woche"]; tag
 
 export function TermineKachel({ daten, breit }: { daten: Startdaten; breit: boolean }) {
   const { darf, darfBei } = useAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState<"heute" | "woche" | "ueber">("heute");
   const [tag, setTag] = useState<string | null>(null);
   const [dialog, setDialog] = useState(false);
@@ -140,8 +142,12 @@ export function TermineKachel({ daten, breit }: { daten: Startdaten; breit: bool
             </span>
           );
           const text = fertig ? <span className="gedaempft line-through">{t.patient_name} · {t.titel}</span> : (
-            <span className="min-w-0"><Link to={`/patienten/${t.patient}`} className="font-medium no-underline">{t.patient_name}</Link>{" "}
-              <span className="text-text2">· {t.titel}{t.notiz ? ` – ${t.notiz}` : ""}</span></span>
+            // Klick öffnet den Termin in der Akte (Wunsch 11.10.2026: direkt zur Stelle)
+            <span className="min-w-0"><Link to={`/patienten/${t.patient}`} className="font-medium no-underline" title="Termin in der Akte öffnen"
+              onClick={(e) => { e.preventDefault(); const z = terminZiel(t.patient, t.id); navigate(z.pfad, { state: z.state }); }}>{t.patient_name}</Link>{" "}
+              <button type="button" className="termin-sprung text-text2" title="Termin in der Akte öffnen" data-testid="termin-oeffnen"
+                onClick={() => { const z = terminZiel(t.patient, t.id); navigate(z.pfad, { state: z.state }); }}>
+                · {t.titel}{t.notiz ? ` – ${t.notiz}` : ""}</button></span>
           );
           return breit ? (
             <div key={t.id} className="grid grid-cols-[1.75rem_8rem_10.5rem_minmax(0,1fr)] items-center gap-3 py-[0.5625rem] border-b border-rand last:border-b-0">

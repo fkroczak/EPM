@@ -3,7 +3,7 @@
  *  Touch-Ereignissen (CDP), nicht mit dem Mausrad. */
 import { expect, test } from "@playwright/test";
 import type { CDPSession, Page } from "@playwright/test";
-import { apiAls, eindeutig, zustand } from "./hilfen";
+import { apiAls, eindeutig, einfachePdf, zustand } from "./hilfen";
 
 /** Mit dem Finger von (x, y) 200 px nach oben wischen (Inhalt scrollt nach unten) – zweimal, wie ein Mensch es täte:
  *  Chrome bindet eine Geste an den Bereich, in dem sie beginnt. */
@@ -117,5 +117,88 @@ test.describe("Telefon 390 px: Nickelallergie nicht erfasst", () => {
     await api.ende();
     await page.reload();
     await expect(page.getByTestId("nickel-fehlt")).toHaveCount(0);
+  });
+});
+
+test.describe("Telefon 390 px: offene Punkte und Termine führen zur Stelle", () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, storageState: zustand("mediziner") });
+
+  test("Klick auf Hinweis bzw. Termin in der Patientenliste (Wunsch 11.10.2026)", async ({ page }) => {
+    const api = await apiAls("mediziner");
+    const nachname = eindeutig("Sprungtest");
+    const p = await api.post("patienten/", { nachname, vorname: "Sina", geburtsdatum: "1971-07-07" });
+    const morgen = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    await api.post("termine/", { patient: p.id, art: "rueckruf", faellig_am: morgen, uhrzeit: null, titel: "Sprung prüfen", notiz: "", ort: null });
+    await api.ende();
+    const liste = page.getByTestId("patientenliste");
+
+    // „Kein Laborbefund“ → Reiter Labor
+    await page.goto(`/patienten?suche=${nachname}`);
+    await liste.getByTestId("hinweis-labor").click();
+    await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}/labor`));
+
+    // „Nickelallergie nicht erfasst“ → Stammdaten offen
+    await page.goto(`/patienten?suche=${nachname}`);
+    await liste.getByTestId("nickel-fehlt").getByRole("button").click();
+    await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}$`));
+    await expect(page.getByRole("dialog")).toContainText("Nickelallergie");
+
+    // nächster Termin → Termin offen zum Bearbeiten
+    await page.goto(`/patienten?suche=${nachname}`);
+    await liste.getByTestId("naechster-termin").click();
+    const dialog = page.getByRole("dialog", { name: "Termin bearbeiten" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel("Titel")).toHaveValue("Sprung prüfen");
+  });
+});
+
+test.describe("Telefon 390 px: Termine und Vorschau in der Akte führen zum Dialog", () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, storageState: zustand("mediziner") });
+
+  test("Nächster Termin (Kontakte, Aktenkopf) öffnet den Termin, Vorschau öffnet das Dokument groß (Wunsch 11.10.2026)", async ({ page }) => {
+    const api = await apiAls("mediziner");
+    const p = await api.post("patienten/", { nachname: eindeutig("Verweistest"), vorname: "Vera", geburtsdatum: "1969-09-09" });
+    const morgen = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    await api.post("termine/", { patient: p.id, art: "praxistermin", faellig_am: morgen, uhrzeit: "10:30", titel: "Kontrolltermin", notiz: "", ort: null });
+    const hoch = await api.roh.post("/api/dokumente/", { headers: await api.kopf(),
+      multipart: { patient: String(p.id), titel: "Arztbrief Vorschau", datei: { name: "brief.pdf", mimeType: "application/pdf", buffer: einfachePdf(["Seite eins"]) } } });
+    expect(hoch.status()).toBe(201);
+    await api.ende();
+
+    // Reiter Kontakte: Karte „Nächster Termin“
+    await page.goto(`/patienten/${p.id}/kontakte`);
+    await page.getByTestId("naechster-termin").click();
+    const termin = page.getByRole("dialog", { name: "Termin bearbeiten" });
+    await expect(termin.getByLabel("Titel")).toHaveValue("Kontrolltermin");
+    await page.keyboard.press("Escape");
+    await expect(termin).toHaveCount(0);
+
+    // Dokumente: Antippen der Vorschau öffnet das Dokument groß
+    await page.goto(`/patienten/${p.id}/dokumente`);
+    await page.getByTestId("dokumentliste").getByText("Arztbrief Vorschau").click();
+    await page.getByTestId("dokument-details").getByTestId("vorschau-oeffnen").click();
+    await expect(page.getByRole("dialog", { name: "Arztbrief Vorschau" })).toBeVisible();
+  });
+});
+
+test.describe("Telefon 390 px: Terminbestätigung schon erledigt", () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, storageState: zustand("mediziner") });
+
+  test("„Bestätigung fehlt“ lässt sich als telefonisch bestätigt wegklicken (Wunsch 11.10.2026)", async ({ page }) => {
+    const api = await apiAls("mediziner");
+    const p = await api.post("patienten/", { nachname: eindeutig("Bestaetigt"), vorname: "Berta", geburtsdatum: "1958-08-08",
+      geschlecht: "w", email: "berta@example.org" });
+    const inEinerWoche = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+    await api.post("termine/", { patient: p.id, art: "praxistermin", faellig_am: inEinerWoche, uhrzeit: "17:15", titel: "Praxistermin", notiz: "", ort: null });
+    await api.ende();
+    await page.goto(`/patienten/${p.id}/kontakte`);
+    await page.getByTestId("naechster-termin").click();
+    const dialog = page.getByRole("dialog", { name: "Termin bearbeiten" });
+    await expect(dialog.getByTestId("bestaetigung-fehlt")).toBeVisible();
+    await dialog.getByRole("button", { name: "Schon bestätigt …" }).click();
+    await page.getByRole("menuitem", { name: "Telefonisch bestätigt" }).click();
+    await expect(dialog).toHaveCount(0);
+    await page.getByTestId("naechster-termin").click();
+    await expect(page.getByRole("dialog", { name: "Termin bearbeiten" }).getByTestId("bestaetigung-erstellt")).toContainText("Bestätigt telefonisch");
   });
 });

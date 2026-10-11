@@ -6,6 +6,7 @@
  * Festgehalten wird das mit Grund, Person und Zeitpunkt; es steht im Verlauf der Akte.
  */
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { abfrage, alle, api } from "@/lib/api";
 import { RUHE_FRISTEN } from "@/lib/typen";
@@ -17,6 +18,7 @@ import { Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, Meldung, 
 import { Icon } from "@/components/ui/icon";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
+import { hinweisZiel } from "@/lib/sprungziele";
 
 export type Hinweis = { art: HinweisArt; text: string; stufe?: Kontaktstufe };
 
@@ -96,12 +98,16 @@ export function RuheDialog({ patientId, hinweis, termin, offen, onOffen }: {
   );
 }
 
-/** Chips der Hinweise; mit ``patientId`` und Recht lässt sich jeder einzeln wegklicken. */
-export function HinweisChips({ hinweise, patientId, ausblendbar, onAusblenden }: {
+/** Chips der Hinweise; mit ``patientId`` führt ein Klick auf den Text an die Stelle, an der er erledigt wird
+ *  (lib/sprungziele.ts, Wunsch 11.10.2026), und mit Recht lässt sich jeder einzeln wegklicken. */
+export function HinweisChips({ hinweise, patientId, ausblendbar, onAusblenden, onSprung }: {
   hinweise: Hinweis[]; patientId?: number; ausblendbar?: boolean;
   /** „×“ meldet den Hinweis nach außen, statt den Dialog selbst zu öffnen (z. B. aus einer aufgeklappten Liste) */
   onAusblenden?: (h: Hinweis) => void;
+  /** nach dem Sprung (z. B. aufgeklappte Liste schließen) */
+  onSprung?: () => void;
 }) {
+  const navigate = useNavigate();
   const [eigenerDialog, setDialog] = useState<Hinweis | null>(null);
   const dialog = onAusblenden ? null : eigenerDialog;
   const kann = !!patientId && !!ausblendbar;
@@ -109,7 +115,15 @@ export function HinweisChips({ hinweise, patientId, ausblendbar, onAusblenden }:
     <>
       {hinweise.map((h) => (
         <Chip key={h.art} art={h.stufe === "ueberfaellig" ? "fehler" : "warn"}>
-          {h.text}
+          {patientId ? (() => {
+            const ziel = hinweisZiel(patientId, h.art);
+            return (
+              <button type="button" className="hinweis-sprung" title={ziel.titel} data-testid={`hinweis-${h.art}`}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSprung?.(); navigate(ziel.pfad, { state: { ...ziel.state, zeit: Date.now() } }); }}>
+                {h.text}
+              </button>
+            );
+          })() : h.text}
           {kann ? (
             <button type="button" className="ml-0.5 -mr-1.5 -my-1 min-w-6 min-h-6 inline-flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer opacity-80 hover:opacity-100"
               aria-label={`Hinweis „${h.text}“ ausblenden`} title="Ausblenden"
@@ -149,11 +163,11 @@ export function HinweisChipsKompakt({ hinweise, patientId, ausblendbar }: {
       <Popover.Portal>
         <Popover.Positioner side="bottom" align="start" sideOffset={6} collisionPadding={8} className="z-50">
           <Popover.Popup className="card p-3 flex flex-col gap-2 max-w-[min(26rem,calc(100vw-1rem))] outline-none" data-testid="hinweise-liste">
-            <span className="text-xs gedaempft">Hinweise zu dieser Akte{ausblendbar ? " – „×“ blendet einen Hinweis für eine Weile aus" : ""}</span>
+            <span className="text-xs gedaempft">Hinweise zu dieser Akte – Klick führt zur Stelle{ausblendbar ? ", „×“ blendet einen Hinweis für eine Weile aus" : ""}</span>
             <div className="flex flex-wrap gap-1.5">
               {/* der Dialog „Ausblenden“ hängt außerhalb der Liste – sonst schlösse er mit ihr */}
               <HinweisChips hinweise={sortiert} patientId={patientId} ausblendbar={ausblendbar}
-                onAusblenden={(h) => { setOffen(false); setDialog(h); }} />
+                onAusblenden={(h) => { setOffen(false); setDialog(h); }} onSprung={() => setOffen(false)} />
             </div>
           </Popover.Popup>
         </Popover.Positioner>

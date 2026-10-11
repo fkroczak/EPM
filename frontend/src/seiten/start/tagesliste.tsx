@@ -10,11 +10,12 @@
  */
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { datum, terminZeit } from "@/lib/format";
+import { terminZiel } from "@/lib/sprungziele";
 import { TERMINARTEN } from "@/lib/typen";
 import type { ScansStand, Termin } from "@/lib/typen";
 import { Chip, Knopf, KnopfLink, cx } from "@/components/ui/basis";
@@ -23,7 +24,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { AnkuendigungDialog } from "@/components/AnkuendigungDialog";
 import { TerminDialog } from "@/components/TerminDialog";
-import { BestaetigungDialog } from "@/components/TerminBestaetigung";
+import { BestaetigungDialog, SchonBestaetigt } from "@/components/TerminBestaetigung";
 import type { LueckenArt, Startdaten } from "./daten";
 
 /** Wie viele Einträge eine Gruppe aufgeklappt zeigt, bevor „… weitere“ zum Ziel führt */
@@ -78,12 +79,16 @@ function Punkt({ icon, art, text, unter, anzahl, zu, aktion, children, testid }:
 function TerminZeile({ t, aktion, zeit = "uhr" }: { t: Termin; aktion?: ReactNode; zeit?: "uhr" | "datum" }) {
   const wann = zeit === "uhr" ? (t.uhrzeit ? t.uhrzeit.slice(0, 5) : "ganztägig") : terminZeit(t.faellig_am, t.uhrzeit);
   const wo = t.art === "praxistermin" ? (t.ort_name || t.bei || "Ort fehlt") : TERMINARTEN[t.art];
+  const navigate = useNavigate();
+  // Klick öffnet den Termin in der Akte (Wunsch 11.10.2026: direkt zur Stelle)
+  const oeffnen = (e: { preventDefault: () => void }) => { e.preventDefault(); const z = terminZiel(t.patient, t.id); navigate(z.pfad, { state: z.state }); };
   return (
     <li className="flex items-center gap-x-3 gap-y-1 py-1.5 flex-wrap text-[0.875rem]" data-testid="heute-zu-tun-termin">
       <span className={cx("num text-text2 shrink-0 whitespace-nowrap", zeit === "uhr" ? "w-[4.5rem]" : "w-[8.5rem]")}>{wann}</span>
       <span className="min-w-0 grow flex flex-col gap-px">
-        <Link to={`/patienten/${t.patient}`} className="font-medium no-underline truncate">{t.patient_name}</Link>
-        <span className="text-[0.78125rem] gedaempft truncate">{wo}{t.titel && t.titel !== TERMINARTEN[t.art] ? ` · ${t.titel}` : ""}</span>
+        <Link to={`/patienten/${t.patient}`} className="font-medium no-underline truncate" title="Termin in der Akte öffnen" onClick={oeffnen}>{t.patient_name}</Link>
+        <button type="button" className="termin-sprung text-[0.78125rem] gedaempft truncate" title="Termin in der Akte öffnen" onClick={oeffnen}>
+          {wo}{t.titel && t.titel !== TERMINARTEN[t.art] ? ` · ${t.titel}` : ""}</button>
       </span>
       {aktion ? <span className="ml-auto">{aktion}</span> : null}
     </li>
@@ -174,9 +179,10 @@ export function Tagesliste({ d }: { d: Startdaten }) {
       <Punkt key="bestaetigung" icon="mail" testid="tl-bestaetigung" anzahl={n}
         text={`Terminbestätigung fehlt bei ${mehrzahl(n, "Praxistermin", "Praxisterminen")}`} unter="in den nächsten zwei Wochen">
         {tl.bestaetigung_fehlt.slice(0, HOECHSTENS).map((t) => (
-          <TerminZeile key={t.id} t={t} zeit="datum" aktion={
+          <TerminZeile key={t.id} t={t} zeit="datum" aktion={<span className="flex flex-wrap gap-1.5 justify-end">
             <Knopf klein icon="mail" onClick={() => setBestaetigen(t)} aria-label={`Bestätigung vorbereiten: ${t.patient_name}`}>
-              Bestätigung vorbereiten</Knopf>} />
+              Bestätigung vorbereiten</Knopf>
+            <SchonBestaetigt termin={t} /></span>} />
         ))}
         <Weitere n={n - HOECHSTENS} zu="/kalender?ansicht=liste" text="im Kalender" />
       </Punkt>,

@@ -13,7 +13,7 @@ import { Auswahl, Eingabe, Feld, Knopf, Meldung, Textfeld } from "@/components/u
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { PatientWahl } from "./PatientWahl";
-import { BestaetigungAngebot, BestaetigungChip, BestaetigungDialog, bestaetigungFehlt } from "./TerminBestaetigung";
+import { BestaetigungAngebot, BestaetigungChip, BestaetigungDialog, SchonBestaetigt, bestaetigungFehlt } from "./TerminBestaetigung";
 
 export function TerminDialog({ offen, onOffen, patientId, patientName, termin, datum, mitAkte }: {
   offen: boolean; onOffen: (o: boolean) => void; patientId?: number; patientName?: string;
@@ -147,6 +147,7 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin, d
             {termin.bestaetigung_am && termin.bestaetigung_von_name ? <span className="gedaempft">von {termin.bestaetigung_von_name}</span> : null}
             <Knopf klein icon="mail" onClick={() => { onOffen(false); setBestaetigen(termin); }}>
               {termin.bestaetigung_am ? "Erneut erstellen" : "Bestätigung erstellen"}</Knopf>
+            {!termin.bestaetigung_am ? <SchonBestaetigt termin={termin} onFertig={() => onOffen(false)} /> : null}
           </div>
         ) : null}
         {termin ? <span className="col-span-2 text-[0.8125rem] gedaempft" data-testid="termin-angelegt">
