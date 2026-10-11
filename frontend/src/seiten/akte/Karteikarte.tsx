@@ -15,6 +15,7 @@ import { GEWICHTSQUELLEN, TERMINARTEN } from "@/lib/typen";
 import type { Bericht, BiaMessung, Diagnose, Dokument, Gewicht, Kontakt, Laborbefund, Plan, Termin } from "@/lib/typen";
 import { Auswahl, Chip, Karte, Laden, Leer, cx } from "@/components/ui/basis";
 import { klartext } from "@/components/Editor";
+import { FirmaMarke } from "@/components/FirmenWahl";
 import { useAkte } from "./Akte";
 
 type Art = "K" | "G" | "T" | "P" | "L" | "D" | "DOK" | "B";
@@ -43,6 +44,7 @@ type Eintrag = {
   text: string;
   zusatz?: string;
   person: string | null;
+  firma?: string | null;
   durchgestrichen?: boolean;
   zu: string;
   /** offener Termin: Klick öffnet „Termin bearbeiten“ statt die Seite zu wechseln */
@@ -93,7 +95,7 @@ export function Karteikarte() {
     const e: Eintrag[] = [];
     for (const k of kontakte.data ?? []) {
       e.push({
-        schluessel: `k${k.id}`, art: "K", kuerzel: "K", wann: k.zeitpunkt, zeit: uhrzeit(k.zeitpunkt),
+        schluessel: `k${k.id}`, firma: k.firma_kurz, art: "K", kuerzel: "K", wann: k.zeitpunkt, zeit: uhrzeit(k.zeitpunkt),
         text: `${k.art_name ? `${k.art_name}: ` : ""}${klartext(k.text)}`,
         zusatz: k.storniert_am ? `storniert${k.storno_grund ? ` – ${k.storno_grund}` : ""}` : undefined,
         person: k.erfasst_von_name, durchgestrichen: !!k.storniert_am, zu: `${basis}/kontakte?kontakt=${k.id}`,
@@ -101,7 +103,7 @@ export function Karteikarte() {
     }
     for (const g of gewichte.data ?? []) {
       e.push({
-        schluessel: `g${g.id}`, art: "G", kuerzel: "G", wann: g.gemessen_am,
+        schluessel: `g${g.id}`, firma: g.firma_kurz, art: "G", kuerzel: "G", wann: g.gemessen_am,
         text: `${kg(g.gewicht_kg)}${g.datum_ungenau ? " (Datum ungefähr)" : ""} · ${GEWICHTSQUELLEN[g.quelle] ?? g.quelle}`,
         zusatz: g.notiz || undefined, person: g.erfasst_von_name, zu: basis,
       });
@@ -109,7 +111,7 @@ export function Karteikarte() {
     for (const t of termine.data ?? []) {
       const wv = t.art === "wiedervorlage" || t.art === "rueckruf";
       e.push({
-        schluessel: `t${t.id}`, art: "T", kuerzel: wv ? "WV" : "T", wann: t.faellig_am, zeit: t.uhrzeit ? t.uhrzeit.slice(0, 5) : undefined,
+        schluessel: `t${t.id}`, firma: t.firma_kurz, art: "T", kuerzel: wv ? "WV" : "T", wann: t.faellig_am, zeit: t.uhrzeit ? t.uhrzeit.slice(0, 5) : undefined,
         text: `${TERMINARTEN[t.art] ?? t.art}${t.titel ? `: ${t.titel}` : ""}${t.ort_name ? ` · ${t.ort_name}` : ""}`,
         zusatz: t.erledigt_am ? `erledigt am ${datum(t.erledigt_am)}` : t.ausgeblendet ? "offen · ausgeblendet" : "offen",
         person: t.angelegt_von_name, zu: basis, termin: t.erledigt_am ? undefined : t,
@@ -118,7 +120,7 @@ export function Karteikarte() {
     for (const pl of plaene.data ?? []) {
       const status = pl.status === "entwurf" ? "Entwurf" : pl.status === "aktuell" ? "aktuell" : "abgelöst";
       e.push({
-        schluessel: `p${pl.id}`, art: "P", kuerzel: "P", wann: pl.gueltig_ab,
+        schluessel: `p${pl.id}`, firma: pl.firma_kurz, art: "P", kuerzel: "P", wann: pl.gueltig_ab,
         text: `Infusionsplan ab ${datum(pl.gueltig_ab)} · ${zahl(pl.kcal)} kcal${pl.gesamtvolumen_ml ? ` · ${zahl(pl.gesamtvolumen_ml)} ml` : ""}${pl.laufzeit_h ? ` · ${zahl(pl.laufzeit_h)} h` : ""}`,
         zusatz: pl.freigegeben_von_name ? `${status} · freigegeben von ${pl.freigegeben_von_name}` : status,
         person: pl.freigegeben_von_name, zu: `${basis}/plaene?plan=${pl.id}`,
@@ -126,7 +128,7 @@ export function Karteikarte() {
     }
     for (const l of labor.data ?? []) {
       e.push({
-        schluessel: `l${l.id}`, art: "L", kuerzel: "L", wann: l.abgenommen_am,
+        schluessel: `l${l.id}`, firma: l.firma_kurz, art: "L", kuerzel: "L", wann: l.abgenommen_am,
         text: `Labor${l.labor ? ` ${l.labor}` : ""}: ${zahl(l.anzahl_werte)} Werte`,
         zusatz: l.beurteilung ? klartext(l.beurteilung) : undefined, person: l.erfasst_von_name, zu: `${basis}/labor?befund=${l.id}`,
       });
@@ -135,13 +137,13 @@ export function Karteikarte() {
       const werte = [b.bcm_kg != null ? `BCM ${zahl(b.bcm_kg, 1)} kg` : "", b.fettmasse_kg != null ? `Fettmasse ${zahl(b.fettmasse_kg, 1)} kg` : "",
         b.ecw_prozent != null ? `ECW ${zahl(b.ecw_prozent, 1)} %` : ""].filter(Boolean).join(" · ");
       e.push({
-        schluessel: `b${b.id}`, art: "L", kuerzel: "BIA", wann: b.gemessen_am, text: `BIA-Messung${werte ? `: ${werte}` : ""}`,
+        schluessel: `b${b.id}`, firma: b.firma_kurz, art: "L", kuerzel: "BIA", wann: b.gemessen_am, text: `BIA-Messung${werte ? `: ${werte}` : ""}`,
         zusatz: b.beurteilung ? klartext(b.beurteilung) : undefined, person: b.erfasst_von_name, zu: `${basis}/bia?messung=${b.id}`,
       });
     }
     for (const d of diagnosen.data ?? []) {
       e.push({
-        schluessel: `d${d.id}`, art: "D", kuerzel: "D", wann: d.seit ?? d.angelegt_am,
+        schluessel: `d${d.id}`, firma: d.firma_kurz, art: "D", kuerzel: "D", wann: d.seit ?? d.angelegt_am,
         text: d.anzeige || [d.icd_code, d.bezeichnung].filter(Boolean).join(" "),
         zusatz: d.aktiv ? undefined : `beendet${d.beendet_am ? ` am ${datum(d.beendet_am)}` : ""}`,
         person: d.angelegt_von_name, durchgestrichen: !d.aktiv, zu: `${basis}/diagnosen?eintrag=${d.id}`,
@@ -149,14 +151,14 @@ export function Karteikarte() {
     }
     for (const d of dokumente.data ?? []) {
       e.push({
-        schluessel: `o${d.id}`, art: "DOK", kuerzel: "DOK", wann: d.datum ?? d.hochgeladen_am,
+        schluessel: `o${d.id}`, firma: d.firma_kurz, art: "DOK", kuerzel: "DOK", wann: d.datum ?? d.hochgeladen_am,
         text: `${d.typ_name ?? "Dokument"}: ${d.titel || d.originalname}`, zusatz: d.notiz || undefined,
         person: d.hochgeladen_von_name, zu: `${basis}/dokumente?dokument=${d.id}`,
       });
     }
     for (const b of berichte.data ?? []) {
       e.push({
-        schluessel: `r${b.id}`, art: "B", kuerzel: "B", wann: b.datum,
+        schluessel: `r${b.id}`, firma: b.firma_kurz, art: "B", kuerzel: "B", wann: b.datum,
         text: `${b.art_name ?? "Bericht"}: ${b.titel}${b.empfaenger ? ` · an ${b.empfaenger}` : ""}`, zusatz: b.status_name,
         person: b.freigegeben_von_name ?? b.erstellt_von_name, zu: `${basis}/berichte?bericht=${b.id}`,
       });
@@ -243,7 +245,7 @@ export function Karteikarte() {
                   </tr>
                 ) : null,
                 <tr key={e.schluessel} data-testid="karteieintrag" data-art={e.art} className="cursor-pointer" onClick={() => (e.termin && erfassen ? terminAendern(e.termin) : navigate(e.zu))}>
-                  <td className="td num whitespace-nowrap w-[1%] pl-4 align-top">{datum(nurDatum(e.wann))}{e.zeit ? <span className="gedaempft"> {e.zeit}</span> : null}</td>
+                  <td className="td num whitespace-nowrap w-[1%] pl-4 align-top">{datum(nurDatum(e.wann))}{e.zeit ? <span className="gedaempft"> {e.zeit}</span> : null}<FirmaMarke kurz={e.firma} className="ml-1.5" /></td>
                   <td className="td w-[1%] align-top"><Chip className={cx("num font-semibold justify-center min-w-[2.75rem]", `kartei-${e.art}`)}>{e.kuerzel}</Chip></td>
                   <td className="td align-top">
                     <span className={cx(e.durchgestrichen && "line-through gedaempft")}>{e.text}</span>

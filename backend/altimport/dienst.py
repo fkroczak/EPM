@@ -29,6 +29,7 @@ from django.db.models import ProtectedError, RestrictedError
 from django.utils import timezone
 
 from accounts.models import User
+from stammdaten.models import Firma
 from audit.bereinigung import akte_entfernen as protokoll_entfernen
 from audit.models import SystemEreignis, protokolliere
 from audit.schutz import wartungsmodus
@@ -311,6 +312,7 @@ class _Schreiber:
         self.s = e.saetze
         self.benutzer = benutzer
         self.jetzt = timezone.now()
+        self.dskm = Firma.objects.get(kuerzel="dskm")  # Altdaten nur für die DSKM (11.10.2026)
         self.neu = {"benutzer": {}, "versorger": {}, "ansprechpartner": {}, "auswahlwerte": {}, "praeparate": {}}
         self.objekte = []
         self.personen = {}
@@ -410,6 +412,10 @@ class _Schreiber:
             objs.append(p)
         Patient.objects.bulk_create(objs, batch_size=200)
         Patient.history.bulk_history_create(objs, batch_size=200)
+        # Altdaten gehören der DSKM (Anforderung 11.10.2026: Import nur für die DSKM); ohne Signal wegen bulk_create
+        from patienten.models import PatientFirma
+
+        PatientFirma.objects.bulk_create([PatientFirma(patient_id=p.id, firma=self.dskm) for p in objs], batch_size=500)
         self.akte = {p.nummer: p.id for p in objs}
         for p, s in zip(objs, self.s.get("patienten", [])):
             self.merke(O.PATIENT, p, s["alt"])
@@ -418,7 +424,8 @@ class _Schreiber:
 
     def gewichte(self):
         saetze = self.s.get("gewichte", [])
-        objs = [Gewichtsmessung(patient_id=self.akte[s["patient"]], gewicht_kg=s["gewicht_kg"], gemessen_am=s["gemessen_am"],
+        objs = [Gewichtsmessung(patient_id=self.akte[s["patient"]], firma=self.dskm, gewicht_kg=s["gewicht_kg"],
+                                gemessen_am=s["gemessen_am"],
                                 datum_ungenau=True, quelle=Gewichtsmessung.Quelle.ALTSYSTEM,
                                 erfasst_von_id=self.kennung(s["bearbeiter"], "benutzer")) for s in saetze]
         Gewichtsmessung.objects.bulk_create(objs, batch_size=1000)
@@ -431,7 +438,7 @@ class _Schreiber:
 
     def kontakte(self):
         saetze = self.s.get("kontakte", [])
-        objs = [Kontakt(patient_id=self.akte[s["patient"]], zeitpunkt=_zeit(s["zeit"]), text=_html(s["text"]),
+        objs = [Kontakt(patient_id=self.akte[s["patient"]], firma=self.dskm, zeitpunkt=_zeit(s["zeit"]), text=_html(s["text"]),
                         erfasst_von_id=self.kennung(s["bearbeiter"], "benutzer")) for s in saetze]
         Kontakt.objects.bulk_create(objs, batch_size=500)
         for o, s in zip(objs, saetze):
@@ -452,7 +459,7 @@ class _Schreiber:
         objs = []
         for s in saetze:
             plan = Infusionsplan(
-                patient_id=self.akte[s["patient"]], status=s["status"], gueltig_ab=s["gueltig_ab"],
+                patient_id=self.akte[s["patient"]], firma=self.dskm, status=s["status"], gueltig_ab=s["gueltig_ab"],
                 herkunft=Infusionsplan.Herkunft.ALTSYSTEM, erstellt_von_id=self.kennung(s["ersteller"], "benutzer"),
                 bemerkung=_html(s["bemerkung"] + "".join(s["bemerkung_extras"])),
                 **{f: s[f] for f in self.PLANFELDER},
@@ -943,7 +950,7 @@ def dokumente_uebernehmen(benutzer, request=None, max_dateien=200, max_bytes=256
             titel = unterpfad.with_suffix("").as_posix() or name
             if reparatur is not None and W.VERDACHT.search(titel):
                 titel = reparatur(titel)   # Regel 3 gilt auch für Dateinamen (der Originalname bleibt, wie er war)
-            d = Dokument(patient_id=patient_id, typ=typ, titel=titel[:200],
+            d = Dokument(patient_id=patient_id, firma=Firma.objects.get(kuerzel="dskm"), typ=typ, titel=titel[:200],
                          datum=datum, datei=datei, originalname=name[:255], mime=mime, groesse=groesse, sha256=sha,
                          herkunft=Dokument.Herkunft.ALTSYSTEM, datum_quelle=quelle, typ_geprueft=False)
             d._history_user, d._change_reason = None, GRUND

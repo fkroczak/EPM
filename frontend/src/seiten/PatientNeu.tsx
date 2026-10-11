@@ -15,6 +15,7 @@ import { Auswahl, Chip, Eingabe, Feld, Karte, Knopf, KnopfLink, Meldung, Textfel
 import { Icon } from "@/components/ui/icon";
 import { useHinweis } from "@/components/ui/hinweise";
 import { NeuerArztDialog, NeuerVersorgerDialog } from "@/components/SchnellAnlegen";
+import { FirmenWahl, firmenDaten, useAlleFirmen } from "@/components/FirmenWahl";
 
 type Formular = {
   nachname: string; vorname: string; geschlecht: string; geburtsdatum: string; groesse: string; gewicht: string;
@@ -67,8 +68,12 @@ export function PatientNeu() {
   const [lokal, setLokal] = useState<Feldfehler>({});
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { darf } = useAuth();
+  const { darf, ich } = useAuth();
   const melden = useHinweis();
+  // betreuende Firmen (11.10.2026): vorgewählt die, für die gerade gearbeitet wird
+  const alleFirmen = useAlleFirmen();
+  const [firmen, setFirmen] = useState<string[]>(ich?.firma ? [ich.firma] : []);
+  const [einwilligung, setEinwilligung] = useState("");
   const formular = useRef<HTMLFormElement>(null);
   const setze = (feld: keyof Formular) => (e: { target: { value: string } }) => setF((alt) => ({ ...alt, [feld]: e.target.value }));
 
@@ -119,6 +124,8 @@ export function PatientNeu() {
     if (gewicht === "ungueltig") fehler.aufnahme_gewicht_kg = "Bitte eine Zahl eingeben, z. B. 54,6.";
     const gemessen = f.gemessen_am.trim() ? eingabeDatum(f.gemessen_am) : null;
     if (gewicht && f.gemessen_am.trim() && !gemessen) fehler.aufnahme_gemessen_am = "Bitte als TT.MM.JJJJ eingeben.";
+    const zuordnung = alleFirmen.length > 1 ? firmenDaten(firmen, einwilligung) : null;
+    if (zuordnung && "fehler" in zuordnung) Object.assign(fehler, zuordnung.fehler);
     setLokal(fehler);
     if (Object.keys(fehler).length) {
       // das erste fehlende Feld in den Blick holen – im langen Formular steht es sonst womöglich außerhalb des Bildschirms
@@ -157,6 +164,7 @@ export function PatientNeu() {
       diagnose: alsHtml(f.diagnose),
       ...(gewicht ? { aufnahme_gewicht_kg: gewicht, aufnahme_gemessen_am: gemessen ?? heuteIso() } : {}),
       ...(test ? { testpatient: true } : {}),
+      ...(zuordnung && "daten" in zuordnung ? zuordnung.daten : {}),
     });
   };
 
@@ -230,6 +238,15 @@ export function PatientNeu() {
                 {(p) => <Eingabe {...p} className="num" placeholder="TT.MM.JJJJ" value={f.gemessen_am} onChange={setze("gemessen_am")} />}
               </Feld>
             </Abschnitt>
+
+            {alleFirmen.length > 1 ? (
+              <Abschnitt titel="Betreuende Firma">
+                <div className="col-span-full">
+                  <FirmenWahl wert={firmen} onWert={setFirmen} einwilligung={einwilligung} onEinwilligung={setEinwilligung}
+                    fehler={{ firmen: e.firmen, einwilligung_am: e.einwilligung_am }} />
+                </div>
+              </Abschnitt>
+            ) : null}
 
             <Abschnitt titel="Anschrift und Erreichbarkeit">
               <Feld label="Straße und Hausnummer" className="col-span-2" fehler={e.strasse}>

@@ -22,6 +22,7 @@ import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { Richtext } from "@/components/Editor";
 import { useWiedervorlageTage } from "@/components/Schnellerfassung";
+import { FirmaMarke } from "@/components/FirmenWahl";
 import { useAkte } from "./Akte";
 import { useWahl } from "./Aktenseite";
 
@@ -221,6 +222,7 @@ function KontaktZeile({ k, markiert, onStorno }: { k: Kontakt; markiert: boolean
           {k.storniert_am ? <Chip art="fehler"><Begriff name="storniert">storniert</Begriff></Chip> : null}
           {k.art_name ? <Chip data-testid="kontaktart">{k.art_name}</Chip> : null}
           <span>{k.erfasst_von_name ?? ""}</span>
+          <FirmaMarke kurz={k.firma_kurz} />
           <span className="sr-only">{datum(k.zeitpunkt)}</span>
         </span>
         <Richtext html={k.text} className={cx("text-sm", k.storniert_am && "line-through opacity-60")} />

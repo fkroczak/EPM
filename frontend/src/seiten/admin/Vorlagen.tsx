@@ -33,17 +33,21 @@ const ABSENDER_FELDER: { k: keyof Absender; label: string; span: number; num?: b
 
 function BriefkopfBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
   const briefkopf = useBriefkopf();
+  // Briefkopf und Logo je Firma (11.10.2026): eine weitere Firma hat einen festen eigenen Absender
+  const firma = briefkopf.data?.firma;
+  const fest = firma && firma.kuerzel !== "dskm" && firma.absender ? firma.absender : null;
   const qc = useQueryClient();
   const melden = useHinweis();
-  const [aktiv, setAktiv] = useState<"stiftung" | "gug">("stiftung");
+  const [aktiv, setAktiv] = useState<string>("stiftung");
   const [absender, setAbsender] = useState<Briefkopf["absender"] | null>(null);
   const [logoFehler, setLogoFehler] = useState("");
   const datei = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (briefkopf.data && !absender) { setAktiv(briefkopf.data.aktiv); setAbsender(structuredClone(briefkopf.data.absender)); }
+    if (briefkopf.data && !absender) { setAktiv(fest ?? briefkopf.data.aktiv); setAbsender(structuredClone(briefkopf.data.absender)); }
   }, [briefkopf.data, absender]);
   const speichern = useMutation({
-    mutationFn: () => api<Briefkopf>("briefkopf/", { method: "PATCH", body: { aktiv, absender } }),
+    // weitere Firma: nur ihr eigener Absender; die Wahl Stiftung/GuG gilt für die DSKM
+    mutationFn: () => api<Briefkopf>("briefkopf/", { method: "PATCH", body: fest ? { absender: { [fest]: absender![fest] } } : { aktiv, absender } }),
     onSuccess: (b) => { qc.setQueryData(["briefkopf"], b); setAbsender(structuredClone(b.absender)); melden("Briefkopf gespeichert."); },
   });
   speichernRef.current = () => speichern.mutate();
@@ -60,9 +64,9 @@ function BriefkopfBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
     <div className="stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_26.25rem] gap-5 items-start">
       <div className="flex flex-col gap-4 min-w-0">
         <Karte className="px-5 py-[1.125rem] flex flex-col gap-3" data-testid="logo">
-          <h2 className="lbl m-0">Logo</h2>
+          <h2 className="lbl m-0">Logo{firma && (briefkopf.data.arten.length > 2 || fest) ? ` · ${firma.name}` : ""}</h2>
           <div className="flex items-center gap-5 flex-wrap">
-            <Logo className="h-[4.5rem] w-[15rem] border border-rand rounded-lg p-1.5 bg-white" version={version} />
+            <Logo className="h-[4.5rem] w-[15rem] border border-rand rounded-lg p-1.5 bg-white" version={version} firma={firma?.kuerzel} name={firma?.name} />
             <div className="flex flex-col gap-1.5">
               <Knopf icon="hochladen" laedt={hochladen.isPending} onClick={() => datei.current?.click()}>Neues Logo hochladen</Knopf>
               <span className="text-xs gedaempft">PNG oder SVG, quer, mind. 600 px breit</span>
@@ -72,17 +76,21 @@ function BriefkopfBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
           </div>
           {logoFehler ? <Meldung art="fehler">{logoFehler}</Meldung> : null}
           {briefkopf.data.logo.vorhanden ? <span className="text-xs gedaempft">{briefkopf.data.logo.mime === "image/svg+xml" ? "SVG" : `PNG ${briefkopf.data.logo.breite} × ${briefkopf.data.logo.hoehe} px`} · <a href={`${LOGO_URL}?v=${version?.slice(0, 12)}`} target="_blank" rel="noopener">öffnen</a></span>
-            : <span className="text-xs gedaempft">Noch kein eigenes Logo hochgeladen – angezeigt wird das mitgelieferte Stiftungslogo.</span>}
+            : <span className="text-xs gedaempft">{fest ? `Noch kein Logo für ${firma!.name} hochgeladen – angezeigt wird der Name.`
+              : "Noch kein eigenes Logo hochgeladen – angezeigt wird das mitgelieferte Stiftungslogo."}</span>}
         </Karte>
         <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5" data-testid="absender">
-          <h2 className="lbl m-0">Absender auf Infusionsplänen und PDFs</h2>
-          <div role="radiogroup" aria-label="Absender" className="flex gap-5">
-            {briefkopf.data.arten.map((x) => (
-              <label key={x.code} className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="radio" name="absender" checked={aktiv === x.code} onChange={() => setAktiv(x.code as "stiftung" | "gug")} />{x.name}
-              </label>
-            ))}
-          </div>
+          <h2 className="lbl m-0">Absender auf Infusionsplänen und PDFs{fest ? ` · ${firma!.name}` : ""}</h2>
+          {fest ? null : (
+            <div role="radiogroup" aria-label="Absender" className="flex gap-5 flex-wrap">
+              {/* der Absender einer weiteren Firma (z. B. Regeneration Clinic) wird in deren Firma gepflegt */}
+              {briefkopf.data.arten.filter((x) => x.code === "stiftung" || x.code === "gug").map((x) => (
+                <label key={x.code} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="radio" name="absender" checked={aktiv === x.code} onChange={() => setAktiv(x.code)} />{x.name}
+                </label>
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-4 gap-3">
             {ABSENDER_FELDER.map((x) => (
               <Feld key={x.k} label={x.label} className={x.span === 4 ? "col-span-4" : x.span === 2 ? "col-span-2" : undefined} fehler={f[`absender.${aktiv}.${x.k}`]}>
@@ -90,7 +98,8 @@ function BriefkopfBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
               </Feld>
             ))}
           </div>
-          <span className="text-xs gedaempft">Beide Absender bleiben gespeichert; ausgewählt wird, welcher auf neuen PDFs steht.</span>
+          <span className="text-xs gedaempft">{fest ? `Steht auf allen PDFs, die in der ${firma!.name} erstellt werden.`
+            : "Beide Absender bleiben gespeichert; ausgewählt wird, welcher auf neuen PDFs steht."}</span>
           {speichern.error && !Object.keys(f).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
         </Karte>
       </div>
@@ -98,7 +107,7 @@ function BriefkopfBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
         <h2 className="lbl m-0">Vorschau Briefkopf</h2>
         <div className="pdf-blatt px-6 py-5 flex flex-col gap-3 text-[#1b1932]" data-testid="briefkopf-vorschau">
           <div className="flex items-start justify-between gap-4">
-            <Logo className="h-[3rem] w-[10rem] min-w-0 shrink" version={version} />
+            <Logo className="h-[3rem] w-[10rem] min-w-0 shrink" version={version} firma={firma?.kuerzel} name={firma?.name} />
             <div className="flex flex-col items-end text-right text-[0.625rem] leading-snug min-w-0 [overflow-wrap:anywhere]">
               <span>{a.strasse} · {a.plz} {a.ort}</span>
               {a.telefon ? <span>Tel. {a.telefon}</span> : null}
@@ -282,7 +291,8 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
         {datenschutz ? null : <span className="text-[0.8125rem] gedaempft" data-testid="datenschutz-nur-lesen">Diese Werte ändert, wer über Datenschutz-Anfragen entscheidet (Benutzer › Rechte).</span>}
         <fieldset className="border-0 p-0 m-0 flex flex-col gap-1.5">
           <legend className="text-sm font-medium mb-1.5">Erklärungen, die in jeder Akte vorliegen sollen</legend>
-          {(Object.keys(ERKLAERUNGEN) as ErklaerungsArt[]).map((art) => (
+          {/* die Einwilligung zum Austausch zwischen den Firmen braucht nur eine Akte beider Firmen – keine Pflicht für alle */}
+          {(Object.keys(ERKLAERUNGEN) as ErklaerungsArt[]).filter((art) => art !== "firmen").map((art) => (
             <label key={art} className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={pflicht.includes(art)} disabled={!datenschutz}
                 onChange={(e) => setPflicht(e.target.checked ? [...pflicht, art] : pflicht.filter((x) => x !== art))} />

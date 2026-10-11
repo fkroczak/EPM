@@ -177,7 +177,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
     case "briefkopf":
       return (
         <div className={cx("flex justify-between items-end pb-2", b.mit_linie !== false && "border-b-2")} style={{ borderColor: /^#[0-9a-f]{6}$/i.test(b.linienfarbe ?? "") ? b.linienfarbe : "#251F53" }}>
-          <Logo className="w-[9.375rem] h-[3.3125rem]" version={briefkopf.data?.logo.sha256} />
+          <Logo className="w-[9.375rem] h-[3.3125rem]" version={briefkopf.data?.logo.sha256} firma={briefkopf.data?.firma?.kuerzel} name={briefkopf.data?.firma?.name} />
           {b.absender !== false ? <div className="flex flex-col items-end text-[0.9em] text-[#555]">
             {a ? <><span>{a.strasse} · {a.plz} {a.ort}</span><span>Tel. {a.telefon}</span><span>{a.email}</span></> : null}
           </div> : null}

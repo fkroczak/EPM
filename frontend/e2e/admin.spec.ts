@@ -23,7 +23,7 @@ test("Benutzer anlegen, Einmal-Passwort, sperren und entsperren", async ({ page 
   await detail.getByLabel("Kürzel").fill("HH");
   await detail.getByLabel("Funktion").fill("Ärztin");
   await detail.getByLabel("Benutzername").fill(name);
-  await detail.getByLabel("Rolle").selectOption("mediziner");
+  await detail.getByTestId("rolle-dskm").selectOption("mediziner");
   await expect(detail).toContainText("Anzeige in der Akte: Dr. med. H. Heilmann");
   await detail.getByRole("button", { name: "Anlegen und Einmal-Passwort erzeugen" }).click();
   const kennwortBox = detail.getByTestId("einmal-kennwort");
@@ -61,7 +61,7 @@ test("Benutzer anlegen, Einmal-Passwort, sperren und entsperren", async ({ page 
 
   // ändern: Funktion und Rolle
   await detail.getByLabel("Funktion").fill("Oberärztin");
-  await detail.getByLabel("Rolle").selectOption("mitarbeiter");
+  await detail.getByTestId("rolle-dskm").selectOption("mitarbeiter");
   await detail.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Benutzer gespeichert.")).toBeVisible();
   await expect(page.getByTestId("benutzerliste").getByRole("row").filter({ hasText: name })).toContainText("Mitarbeiter");
@@ -354,8 +354,8 @@ test("Benutzer ohne Login: anlegen, setzen, wieder einbinden; Rolle „Keine Ber
   await detail.getByLabel("Nachname").fill("Ohnelogin");
   await detail.getByLabel("Benutzername").fill(name);
   await detail.getByRole("checkbox", { name: /Ohne Login anlegen/ }).check();
-  await expect(detail.getByLabel("Rolle")).toHaveValue("keine");
-  await expect(detail.getByLabel("Rolle")).toBeDisabled();
+  await expect(detail.getByTestId("rolle-dskm")).toHaveValue("keine");
+  await expect(detail.getByTestId("rolle-dskm")).toBeDisabled();
   await detail.getByRole("button", { name: "Ohne Login anlegen" }).click();
   await expect(page.getByText("Benutzer ohne Login angelegt.")).toBeVisible();
   await expect(detail.getByTestId("einmal-kennwort")).toHaveCount(0);
@@ -381,10 +381,10 @@ test("Benutzer ohne Login: anlegen, setzen, wieder einbinden; Rolle „Keine Ber
   const konto = (await admin.get(`benutzer/?search=${name}`)).results[0];
   expect([konto.rolle, konto.ist_test, konto.nur_historisch]).toEqual(["mitarbeiter", true, false]);
   // Admins können keine Testbenutzer sein
-  await detail.getByLabel("Rolle").selectOption("admin");
+  await detail.getByTestId("rolle-dskm").selectOption("admin");
   await expect(detail.getByRole("checkbox", { name: /Testbenutzer/ })).not.toBeChecked();
   await expect(detail.getByRole("checkbox", { name: /Testbenutzer/ })).toBeDisabled();
-  await detail.getByLabel("Rolle").selectOption("mitarbeiter");
+  await detail.getByTestId("rolle-dskm").selectOption("mitarbeiter");
   await detail.getByRole("checkbox", { name: /Testbenutzer/ }).uncheck();
   await detail.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Benutzer gespeichert.").last()).toBeVisible();
@@ -452,7 +452,8 @@ test("Testdaten auf Ausgangsstand zurücksetzen (nur Testpatienten)", async ({ p
   await expect(detail).toContainText("Testbenutzer:");
   await detail.getByRole("button", { name: "Testdaten auf Ausgangsstand zurücksetzen" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Testdaten zurücksetzen" }).click();
-  await expect(page.getByText(/Testdaten zurückgesetzt \(\d+ gelöscht, 6 angelegt\)/)).toBeVisible();
+  // Musterdaten mit Plan-PDFs, Labor und BIA: dauert einige Sekunden
+  await expect(page.getByText(/Testdaten zurückgesetzt \(\d+ gelöscht, 6 angelegt\)/)).toBeVisible({ timeout: 45_000 });
   expect((await admin.get("patienten/?test=ohne&seitengroesse=1")).count).toBe(echte);
   expect((await admin.get("patienten/?test=nur&seitengroesse=50")).results.map((p: { nachname: string }) => p.nachname).sort())
     .toEqual(["Beispiel", "Demo", "Musterfrau", "Mustermann", "Probe", "Test"]);

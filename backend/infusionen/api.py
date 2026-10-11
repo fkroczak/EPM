@@ -12,7 +12,7 @@ from rest_framework.response import Response
 
 from accounts.permissions import FreigabeRecht, PlanAbschlussRecht, PlanRecht, recht
 from audit.models import SystemEreignis, protokolliere
-from epm.api_basis import ModelClean, RichText, benutzername, patienten_fuer, pruefe_schreibbereich
+from epm.api_basis import ModelClean, RichText, benutzername, patienten_fuer, pruefe_schreibbereich, FirmaFeld
 from stammdaten.models import Praeparat
 
 from .models import Infusionsplan, InfusionsplanPosition, vorbelegung
@@ -40,7 +40,7 @@ PRAEPARAT_FELDER = {
 }
 
 
-class InfusionsplanSerializer(ModelClean, serializers.ModelSerializer):
+class InfusionsplanSerializer(FirmaFeld, ModelClean, serializers.ModelSerializer):
     positionen = PositionSerializer(many=True, required=False)
     vitamine = serializers.PrimaryKeyRelatedField(
         many=True, required=False, queryset=Praeparat.objects.filter(kategorie=Praeparat.Kategorie.VITAMINE)
@@ -381,7 +381,10 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
         from accounts.models import Rolle, User
 
         patient = patienten_fuer(request.user).filter(pk=request.query_params.get("patient") or 0).first()
-        qs = User.objects.filter(rolle=Rolle.MEDIZINER, is_active=True, nur_historisch=False)
+        from epm.firma import benutzer_mit_rolle
+
+        # Mediziner der aktiven Firma (11.10.2026)
+        qs = benutzer_mit_rolle(User.objects.filter(is_active=True, nur_historisch=False), Rolle.MEDIZINER)
         if patient is None or not patient.ist_test:
             qs = qs.filter(ist_test=False)
         return Response([{"id": u.id, "name": benutzername(u)} for u in qs if u.hat_recht("plaene_freigeben")])

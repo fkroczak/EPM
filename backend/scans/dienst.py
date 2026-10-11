@@ -132,6 +132,9 @@ def sichtbare_scans(user):
 
     # Arbeitskopien von Akte-Dokumenten (F171) nur für Personen, die die Akte sehen (z. B. nicht bei Einschränkung)
     qs = Scan.objects.filter(Q(quelldokument__isnull=True) | Q(quelldokument__patient__in=patienten_fuer(user)))
+    firma = getattr(user, "firma", None)
+    if firma is not None:  # Eingang der aktiven Firma (11.10.2026); ältere Scans ohne Firma gehören der DSKM
+        qs = qs.filter(Q(firma=firma) | Q(firma__isnull=True) if firma.kuerzel == "dskm" else Q(firma=firma))
     if getattr(user, "ist_test", False):
         return qs.filter(ist_test=True)
     if not sieht_testdaten(user):
@@ -203,6 +206,7 @@ def neuer_scan(dateien: list, benutzer, titel: str = "") -> Scan:
             mime=arten[0], groesse=gesamt, sha256=summen[0] if len(summen) == 1 else hashlib.sha256(
                 "".join(summen).encode()).hexdigest(),
             ordner=ordner, hochgeladen_von=benutzer, ist_test=bool(getattr(benutzer, "ist_test", False)),
+            firma=getattr(benutzer, "firma", None),
             laeuft_ab_am=jetzt + timedelta(days=e.scans_frist_tage),
             auswertung={"originale": [{"name": n[:200], "mime": m} for n, m in zip(namen, arten)]},
         )

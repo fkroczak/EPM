@@ -24,6 +24,8 @@ class Scan(models.Model):
 
     titel = models.CharField(max_length=200)
     originalname = models.CharField(max_length=255)
+    # Eingang je Firma (11.10.2026): sieht nur die Firma, in der hochgeladen wurde
+    firma = models.ForeignKey("stammdaten.Firma", on_delete=models.PROTECT, null=True, blank=True, related_name="+")
     mime = models.CharField(max_length=100)
     groesse = models.PositiveBigIntegerField(help_text="Größe der hochgeladenen Datei in Bytes")
     sha256 = models.CharField(max_length=64)

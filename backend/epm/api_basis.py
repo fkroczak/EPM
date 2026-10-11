@@ -45,6 +45,10 @@ def patienten_fuer(user, eingeschraenkte: bool = False):
     elif not sieht_testdaten(user):
         # ohne Recht „Testdaten sehen“ gibt es Testpatienten nicht (Festlegung 03.10.2026)
         qs = qs.filter(ist_test=False)
+    # nur Akten der aktiven Firma (DSKM bzw. Regeneration Clinic, 11.10.2026); ohne Firmen wie bisher
+    firma = getattr(user, "firma", None)
+    if firma is not None:
+        qs = qs.filter(firmenzuordnung__firma=firma)
     if not eingeschraenkte:
         einsicht = Akteneinsicht.objects.filter(benutzer_id=getattr(user, "pk", None), bis__gt=timezone.now())
         qs = qs.filter(Q(eingeschraenkt_am__isnull=True) | Q(id__in=einsicht.values("patient_id")))
@@ -160,3 +164,26 @@ class ModelClean:
 
 def benutzername(user):
     return user.anzeigename if user else None
+
+
+class FirmaFeld:
+    """Für Serializer von Einträgen einer Akte: ``firma_kurz`` – in welcher Firma der Eintrag erfasst wurde
+    (Anforderung 11.10.2026; z. B. „RG“ in einer Akte, die DSKM und Regeneration Clinic gemeinsam betreuen)."""
+
+    def get_field_names(self, declared_fields, info):
+        return [*super().get_field_names(declared_fields, info), "firma_kurz"]
+
+    def build_unknown_field(self, field_name, model_class):
+        if field_name == "firma_kurz":
+            return serializers.SerializerMethodField, {}
+        return super().build_unknown_field(field_name, model_class)
+
+    def get_firma_kurz(self, obj):
+        if not getattr(obj, "firma_id", None):
+            return None
+        namen = self.context.setdefault("_firmen_kurz", {}) if isinstance(self.context, dict) else {}
+        if not namen:
+            from stammdaten.models import Firma
+
+            namen.update(Firma.objects.values_list("id", "kurzname"))
+        return namen.get(obj.firma_id)

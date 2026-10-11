@@ -60,7 +60,9 @@ class _Recht(Angemeldet):
                 # gemeinsame Listen (Versorger, Ärzte, Auswahllisten): jeder Angemeldete – außer „Keine Berechtigung“
                 from .rechte import OHNE_RECHTE
 
-                return request.user.rolle not in OHNE_RECHTE
+                from epm.firma import wirksame_rolle
+
+                return wirksame_rolle(request.user) not in OHNE_RECHTE
             return request.user.hat_recht(self.lesen)
         return request.user.hat_recht(self.schreiben)
 

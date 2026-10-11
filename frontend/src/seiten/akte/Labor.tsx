@@ -17,6 +17,7 @@ import { Eingabe, Feld, Fehleranzeige, Knopf, Laden, Meldung, cx } from "@/compo
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Editor, Richtext } from "@/components/Editor";
+import { FirmaMarke } from "@/components/FirmenWahl";
 import { useAkte } from "./Akte";
 import { Abschnitt, Aktenseite, Detail, Eintrag, Eintragsliste, useWahl } from "./Aktenseite";
 import { AlterHinweis } from "./Befunde";
@@ -240,7 +241,7 @@ export function Labor() {
         <Eintragsliste name="Laborbefunde" leer={liste.length ? undefined : "Noch kein Laborbefund erfasst."}>
           {liste.map((b) => (
             <Eintrag key={b.id} aktiv={gewaehlt?.id === b.id} onWahl={() => setWahl(String(b.id))}
-              datum={datum(b.abgenommen_am)}
+              datum={<>{datum(b.abgenommen_am)}<FirmaMarke kurz={b.firma_kurz} className="ml-1.5" /></>}
               merkmal={<span className="num text-xs gedaempft">{b.anzahl_werte}</span>}
               zeile={b.labor || "Labor nicht angegeben"}
               unten={b.erfasst_von_name ?? ""} />

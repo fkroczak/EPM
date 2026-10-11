@@ -322,12 +322,55 @@ def vorgabe_fehler(werte: dict) -> dict:
     return fehler
 
 
+class Firma(models.Model):
+    """Firma, die EPM nutzt (Anforderung 11.10.2026): Deutsche Stiftung Krankheitsbedingte Mangelernährung (DSKM) und
+    Regeneration Clinic (RG). Patienten gehören einer oder beiden Firmen (``patienten.PatientFirma``), Mitarbeiter haben
+    je Firma eine Rolle (``accounts.Mitgliedschaft``). Oben links in der Seitenleiste wird zwischen den Firmen
+    umgeschaltet; Liste, Startseite, Kalender, Statistiken zeigen dann nur die Patienten dieser Firma.
+
+    Je Firma: Logo, Briefkopf (``absender``) und Dokumentvorlagen. Gemeinsam: Versorger, Ärzte, Präparate,
+    Laborparameter, Auswahllisten und Grenzwerte."""
+
+    DSKM = "dskm"
+    RG = "rg"
+
+    kuerzel = models.SlugField("Kürzel", max_length=10, unique=True)
+    name = models.CharField("Name", max_length=200)
+    kurzname = models.CharField("Kurzname", max_length=40, help_text="im Umschalter, z. B. „DSKM“")
+    # Briefkopf: DSKM nutzt den in den Einstellungen gewählten Absender (Stiftung bzw. gUG), RG einen eigenen
+    absender = models.CharField("Briefkopf", max_length=10, blank=True,
+                                help_text="leer = Absender aus den Einstellungen (Stiftung bzw. gUG)")
+    # Altdaten-Import (MS-Access-Dump) gilt nur für diese Firma (Anforderung 11.10.2026: nur DSKM)
+    altdaten = models.BooleanField("Altdaten-Import", default=False)
+    reihenfolge = models.PositiveSmallIntegerField(default=0)
+    aktiv = models.BooleanField(default=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Firma"
+        verbose_name_plural = "Firmen"
+        ordering = ["reihenfolge", "id"]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Firmen werden nicht gelöscht.")
+
+    def __str__(self):
+        return self.kurzname
+
+    @classmethod
+    def dskm(cls):
+        return cls.objects.get(kuerzel=cls.DSKM)
+
+
 class Einstellungen(models.Model):
     """Genau ein Datensatz (pk=1): Absender, Warnschwellen, Plausibilitätsgrenzen, Fristen des Datenschutzes."""
 
     class Absender(models.TextChoices):
         STIFTUNG = "stiftung", "Stiftung"
         GUG = "gug", "gUG"
+        # Briefkopf der Regeneration Clinic (Anforderung 11.10.2026, ``Firma.absender``)
+        RG = "rg", "Regeneration Clinic"
 
     absender = models.CharField("Absender", max_length=10, choices=Absender.choices, default=Absender.STIFTUNG)
 
@@ -511,6 +554,7 @@ class Absenderangaben(models.Model):
             "fusszeile": "rechtsfähige gemeinnützige und mildtätige Stiftung",
         },
         Einstellungen.Absender.GUG: {},
+        Einstellungen.Absender.RG: {"name": "Regeneration Clinic"},
     }
 
     class Meta:
@@ -523,6 +567,15 @@ class Absenderangaben(models.Model):
 
     def __str__(self):
         return f"{self.get_art_display()}: {self.name}"
+
+    @classmethod
+    def aktuelle(cls, firma=None):
+        """Briefkopf der Firma (ohne Angabe: der aktiven, 11.10.2026): RG eigener, DSKM wie in den Einstellungen."""
+        from epm.firma import aktive_firma
+
+        firma = firma or aktive_firma()
+        art = (firma.absender if firma is not None and firma.absender else None) or Einstellungen.aktuell().absender
+        return cls.alle()[art]
 
     @classmethod
     def alle(cls) -> dict:
@@ -543,6 +596,8 @@ class Logo(models.Model):
     hoehe = models.PositiveIntegerField(null=True, blank=True, editable=False)
     hochgeladen_am = models.DateTimeField(auto_now_add=True)
     hochgeladen_von = models.ForeignKey("accounts.User", on_delete=models.PROTECT, null=True, related_name="+")
+    # je Firma ein Logo (Anforderung 11.10.2026); leer = Logo der DSKM aus der Zeit vor den Firmen
+    firma = models.ForeignKey(Firma, on_delete=models.PROTECT, null=True, blank=True, related_name="logos")
 
     class Meta:
         verbose_name = "Logo"
@@ -553,5 +608,14 @@ class Logo(models.Model):
         raise PermissionError("Logos werden nicht gelöscht.")
 
     @classmethod
-    def aktuell(cls):
-        return cls.objects.first()
+    def aktuell(cls, firma=None):
+        """Neuestes Logo der Firma (ohne Angabe: der gerade aktiven); für die DSKM zählen auch Logos ohne Firma."""
+        from epm.firma import aktive_firma
+
+        firma = firma or aktive_firma()
+        if firma is None:
+            return cls.objects.first()
+        qs = cls.objects.filter(firma=firma)
+        if firma.kuerzel == Firma.DSKM:
+            qs = cls.objects.filter(models.Q(firma=firma) | models.Q(firma__isnull=True))
+        return qs.first()

@@ -31,6 +31,8 @@ class Dokumentvorlage(models.Model):
         DATENSCHUTZINFORMATION = "datenschutzinformation", "Datenschutzinformation"
         EINWILLIGUNG = "einwilligung", "Einwilligung in die Datenverarbeitung"
         SCHWEIGEPFLICHTENTBINDUNG = "schweigepflichtentbindung", "Schweigepflichtentbindung"
+        # zwei Firmen (11.10.2026): Voraussetzung, um eine Akte der DSKM und der Regeneration Clinic zuzuordnen
+        FIRMEN = "firmen", "Einwilligung Austausch zwischen DSKM und Regeneration Clinic"
 
     class Status(models.TextChoices):
         ENTWURF = "entwurf", "Entwurf"
@@ -111,7 +113,7 @@ class Dokumentvorlage(models.Model):
         return v
 
     # Vordrucke zum Datenschutz: mitgelieferte Startvorlagen sind ungeprüfte Entwürfe (U17)
-    VORDRUCKE = ("datenschutzinformation", "einwilligung", "schweigepflichtentbindung")
+    VORDRUCKE = ("datenschutzinformation", "einwilligung", "schweigepflichtentbindung", "firmen")
 
     @property
     def im_entwurfsmodus(self) -> bool:

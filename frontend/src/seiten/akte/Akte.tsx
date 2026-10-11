@@ -20,6 +20,7 @@ import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
 import { HinweisChips, HinweisChipsKompakt } from "@/components/HinweisChips";
+import { AkteGeteilt, FirmenChip, FirmenDialog, useAlleFirmen } from "@/components/FirmenWahl";
 import type { AktenAktion } from "@/lib/sprungziele";
 import { GewichtDialog, KontaktDialog } from "@/components/Schnellerfassung";
 import { useAktenAblage } from "@/components/AktenAblage";
@@ -479,7 +480,8 @@ export function Akte() {
   const pid = Number(id);
   const { darf, darfBei } = useAuth();
   const navigate = useNavigate();
-  const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "kontakt" | "gewicht" | "pdf" | "sprechstunde" | "schreiben">("");
+  const alleFirmen = useAlleFirmen();
+  const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "kontakt" | "gewicht" | "pdf" | "sprechstunde" | "schreiben" | "firmen">("");
   // Vorbelegung aus der Kürzelzeile (Karteikarte: „K Text“, „G 54,6“)
   const [vorbelegt, setVorbelegt] = useState("");
   const [aenderTermin, setAenderTermin] = useState<Termin | null>(null);
@@ -576,6 +578,7 @@ export function Akte() {
     pdf: true,
     sprechstunde: true,
     stammdaten: offenBei("akten_bearbeiten"),
+    firmen: offenBei("akten_bearbeiten"),
     abschluss: offenBei("akten_abschliessen"),
     oeffnen: !!p && p.ist_abgeschlossen && darf("akten_wieder_oeffnen"),
     termin: offenBei("eintraege_erfassen"),
@@ -644,6 +647,8 @@ export function Akte() {
   const status = (
     <>
       {p.ist_test ? <Chip art="warn"><Begriff name="testpatient">Testpatient</Begriff></Chip> : null}
+      {/* betreuende Firmen (11.10.2026); antippen öffnet die Auswahl */}
+      <FirmenChip patient={p} onKlick={kontext.bearbeiten ? () => setDialog("firmen") : undefined} />
       {p.ist_abgeschlossen ? <Chip>abgeschlossen</Chip> : null}
       {p.ist_eingeschraenkt ? <Chip art="warn"><Icon name="schloss" />Verarbeitung eingeschränkt</Chip> : null}
       {/* Erklärungen zum Datenschutz: nachgehalten wie die Nickelallergie – fehlt eine, steht es hier */}
@@ -691,6 +696,7 @@ export function Akte() {
         : <Knopf klein={klein} icon="tropfen" title="Neuer Plan (P)" onClick={() => navigate(`${basis}/plaene/neu`)}>Neuer Plan</Knopf>) : null}
       <Menue label="Weitere Aktionen" eintraege={[
         ...(kontext.bearbeiten ? [{ text: "Stammdaten bearbeiten", onClick: () => setDialog("stammdaten") }] : []),
+        ...(kontext.bearbeiten && alleFirmen.length > 1 ? [{ text: "Betreuende Firmen …", onClick: () => setDialog("firmen") }] : []),
         { text: "Akte als PDF", onClick: () => setDialog("pdf") },
         // Unterlagen für die Sprechstunde (F116): der aktuellste Stand aller Bereiche auf einem Blatt
         { text: "Unterlagen für die Sprechstunde", onClick: () => setDialog("sprechstunde") },
@@ -857,6 +863,7 @@ export function Akte() {
   const dialoge = (
     <>
       {kontext.bearbeiten ? <StammdatenDialog patient={p} offen={dialog === "stammdaten"} onOffen={(o) => setDialog(o ? "stammdaten" : "")} /> : null}
+      {kontext.bearbeiten && alleFirmen.length > 1 ? <FirmenDialog patient={p} offen={dialog === "firmen"} onOffen={(o) => setDialog(o ? "firmen" : "")} /> : null}
       {/* Dialoge nur mit Recht: entzieht die Administration ein Recht, verschwindet auch ein offener Dialog */}
       {erlaubt.abschluss ? <AbschlussDialog patient={p} offen={dialog === "abschluss"} onOffen={(o) => setDialog(o ? "abschluss" : "")} /> : null}
       {erlaubt.oeffnen ? <WiederOeffnenDialog patient={p} offen={dialog === "oeffnen"} onOffen={(o) => setDialog(o ? "oeffnen" : "")} /> : null}
@@ -920,7 +927,7 @@ export function Akte() {
             </nav>
             <div className="akte-leiste-flaeche stapel min-w-0 flex flex-col gap-4 md:gap-5">
               {meldungen}
-              <Outlet context={kontext} />
+              <AkteGeteilt.Provider value={(p.firmen?.length ?? 0) > 1}><Outlet context={kontext} /></AkteGeteilt.Provider>
             </div>
           </div>
         </div>
@@ -953,7 +960,7 @@ export function Akte() {
         {meldungen}
         {reiterWaagerecht}
         <div className="akte-kartei" data-testid="akte-ansicht" data-ansicht="karteikarte">
-          <div className="stapel min-w-0 flex flex-col gap-4 md:gap-5"><Outlet context={kontext} /></div>
+          <div className="stapel min-w-0 flex flex-col gap-4 md:gap-5"><AkteGeteilt.Provider value={(p.firmen?.length ?? 0) > 1}><Outlet context={kontext} /></AkteGeteilt.Provider></div>
           <aside className="akte-kartei-spalte" aria-label="Angaben zur Akte">
             <Karte className="px-4 py-4" data-testid="kennzahlen"><Gruppen gruppen={gruppen} art="leiste" /></Karte>
           </aside>
@@ -1003,7 +1010,7 @@ export function Akte() {
       </Karte>
       {meldungen}
       {reiterWaagerecht}
-      <div className="akte-flaeche" data-testid="akte-flaeche"><Outlet context={kontext} /></div>
+      <div className="akte-flaeche" data-testid="akte-flaeche"><AkteGeteilt.Provider value={(p.firmen?.length ?? 0) > 1}><Outlet context={kontext} /></AkteGeteilt.Provider></div>
       {dialoge}
     </Seite>
   );

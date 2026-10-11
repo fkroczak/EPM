@@ -19,6 +19,7 @@ import { useMobil } from "@/lib/stufen";
 import { Ladebalken } from "@/components/ui/Ladebalken";
 import { Chip, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
+import { FirmenSchalter } from "./FirmenSchalter";
 import { Logo } from "./logo";
 
 /** In der Schublade am Telefon stehen die Texte immer neben den Symbolen */
@@ -96,6 +97,7 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
     darf("altdaten_importieren") && !ich.import_ausgeblendet ? <NavEintrag key="i" zu="/admin/import" icon="hochladen" text="Import" /> : null,
   ].filter(Boolean);
   const v = !!schublade;
+  const firma = ich.firmen?.find((f) => f.kuerzel === ich.firma);
   // Administration aufgeklappt: gemerkt je Browser; auf einer Seite der Administration immer offen
   const { pathname } = useLocation();
   const [adminGemerkt, setAdminGemerkt] = useState(() => {
@@ -113,12 +115,15 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
       style={{ borderRightWidth: "var(--randbreite)" }} data-testid={v ? "schublade" : "seitenleiste"}
       aria-label="Seitenleiste">
       <div className={cx(v ? "flex" : "hidden hd:flex", "flex-col gap-2")}>
-        <Logo className="w-full max-w-[12.75rem] h-[4rem] px-1.5 py-1 rounded-lg bg-white" />
+        <Logo className="w-full max-w-[12.75rem] h-[4rem] px-1.5 py-1 rounded-lg bg-white" firma={firma?.kuerzel} name={firma?.name} />
         <span className="px-1 font-mono text-[0.6875rem] font-medium tracking-[.07em] uppercase gedaempft">
           EPM · Patientenmanagement
         </span>
+        {/* Umschalter zwischen den Firmen direkt unter dem Logo (Anforderung 11.10.2026) */}
+        <FirmenSchalter className="max-w-[12.75rem]" />
       </div>
       {v ? null : <span className="hd:hidden self-center font-mono text-xs font-semibold tracking-[.07em] text-akzent-text" title="EPM · Patientenmanagement">EPM</span>}
+      {v ? null : <FirmenSchalter schmal className="hd:hidden" />}
       <nav aria-label="Hauptnavigation" className="flex flex-col gap-0.5">
         <NavEintrag zu="/" icon="start" text="Start" ende />
         {darf("akten_lesen") ? <NavEintrag zu="/patienten" icon="patienten" text="Patienten" /> : null}
@@ -422,6 +427,7 @@ export function Seite({ pfad, children, className, fuellen }: { pfad: Pfadteil[]
           ) : <span className="w-2 shrink-0" />}
           <span className="grow min-w-0 truncate font-semibold text-[0.9375rem]" aria-current="page">{pfad[pfad.length - 1]?.text}</span>
           {ich.ist_test ? <Chip art="warn">Test</Chip> : null}
+          {(ich.firmen?.length ?? 0) > 1 ? <Chip data-testid="mobil-firma">{ich.firmen?.find((f) => f.kuerzel === ich.firma)?.kurzname}</Chip> : null}
           <button type="button" className="btn icon geist shrink-0" aria-label="Patient suchen" aria-expanded={suchen}
             onClick={() => setSuchen((s) => !s)} data-testid="mobil-suche"><Icon name={suchen ? "x" : "suche"} groesse={20} /></button>
           {pathname !== "/hilfe" ? (

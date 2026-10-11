@@ -157,12 +157,19 @@ def rechte_fuer(user) -> frozenset:
     Änderungen der Administration sofort gelten)."""
     if user is None or not getattr(user, "is_authenticated", False):
         return frozenset()
-    if user.rolle in OHNE_RECHTE or getattr(user, "nur_historisch", False):
+    from epm.firma import wirksame_rolle
+
+    rolle = wirksame_rolle(user)  # Rolle in der aktiven Firma (11.10.2026)
+    if rolle in OHNE_RECHTE or getattr(user, "nur_historisch", False):
         return frozenset()
-    werte = matrix().get(user.rolle, {})
+    werte = matrix().get(rolle, {})
     rechte = {code for code, erlaubt in werte.items() if erlaubt}
     if getattr(user, "ist_test", False):
         rechte -= NUR_ECHTE_BENUTZER
+    # Altdaten-Import nur in der Firma, der die Altdaten gehören (DSKM, Anforderung 11.10.2026)
+    firma = getattr(user, "firma", None)
+    if firma is not None and not firma.altdaten:
+        rechte.discard("altdaten_importieren")
     return frozenset(rechte)
 
 
@@ -177,7 +184,9 @@ def sieht_testdaten(user) -> bool:
 
 def schreibt_nur_testpatienten(user) -> bool:
     """Admins: Patientendaten nur bei Testpatienten schreiben (echte Akten nur lesen)."""
-    return getattr(user, "rolle", None) in NUR_TESTPATIENTEN_SCHREIBEN
+    from epm.firma import wirksame_rolle
+
+    return wirksame_rolle(user) in NUR_TESTPATIENTEN_SCHREIBEN
 
 
 def rechte_stand(user) -> str:
@@ -186,6 +195,8 @@ def rechte_stand(user) -> str:
     nicht mehr erlaubte Aktionen aus – ohne neue Anmeldung."""
     import hashlib
 
+    firma = getattr(user, "firma", None)
     teile = sorted(rechte_fuer(user)) + [f"nur_test={schreibt_nur_testpatienten(user)}",
-                                         f"ist_test={getattr(user, 'ist_test', False)}"]
+                                         f"ist_test={getattr(user, 'ist_test', False)}",
+                                         f"firma={firma.kuerzel if firma else ''}"]
     return hashlib.sha256("|".join(teile).encode()).hexdigest()[:12]

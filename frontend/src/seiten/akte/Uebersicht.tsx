@@ -18,6 +18,7 @@ import { GewichtsDiagramm, imZeitraum } from "@/components/GewichtsDiagramm";
 import type { Zeitraum } from "@/components/GewichtsDiagramm";
 import { Richtext, klartext } from "@/components/Editor";
 import { TerminDialog } from "@/components/TerminDialog";
+import { FirmaMarke } from "@/components/FirmenWahl";
 import { useAkte } from "./Akte";
 import { BefundeKurz } from "./Befunde";
 import { DiagnosenKurz } from "./Diagnosen";
@@ -204,7 +205,7 @@ function GewichtKarte({ startZeitraum = "y1", fuellen }: { startZeitraum?: Zeitr
           <tbody>
             {alleWerte.map((g) => (
               <tr key={g.id}>
-                <td className="td num">{datum(g.gemessen_am)}{g.datum_ungenau ? <span className="gedaempft"> (ungefähr)</span> : null}</td>
+                <td className="td num">{datum(g.gemessen_am)}{g.datum_ungenau ? <span className="gedaempft"> (ungefähr)</span> : null}<FirmaMarke kurz={g.firma_kurz} className="ml-1.5" /></td>
                 <td className="td num text-right">{kg(g.gewicht_kg)}</td>
                 <td className="td">{GEWICHTSQUELLEN[g.quelle] ?? g.quelle}{g.notiz ? <span className="gedaempft"> · {g.notiz}</span> : null}</td>
                 <td className="td text-[0.8125rem] gedaempft">{zeitpunkt(g.erfasst_am)}{g.erfasst_von_name ? ` · ${g.erfasst_von_name}` : ""}</td>
@@ -273,6 +274,7 @@ export function TermineKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
               ) : null}
               <span className={cx("num w-[6.5rem] shrink-0 text-[0.84rem]", t.faellig_am < heuteIso() && "text-fehler")}>{terminZeit(t.faellig_am, t.uhrzeit)}</span>
               <Chip>{t.ort_name ?? TERMINARTEN[t.art]}</Chip>
+              <FirmaMarke kurz={t.firma_kurz} />
               {erfassen ? (
                 <button type="button" className="bg-transparent border-0 p-0 text-left truncate cursor-pointer text-akzent-text"
                   title="Termin bearbeiten" onClick={() => setBearbeiten(t)}>{t.titel}</button>
@@ -315,7 +317,7 @@ function PlanKarte() {
             {" · "}Rate <span className="num">{plan.data?.rate_ml_h != null ? `${zahl(plan.data.rate_ml_h)} ml/h` : "—"}</span>
           </span>
           <span className="text-[0.8125rem] gedaempft">
-            gültig ab {datum(aktuell.gueltig_ab)}
+            gültig ab {datum(aktuell.gueltig_ab)}<FirmaMarke kurz={plan.data?.firma_kurz} className="ml-1.5" />
             {plan.data?.freigegeben_am
               ? ` · Freigegeben ${plan.data.abgeschlossen_von_name && plan.data.freigabe_datum ? datum(plan.data.freigabe_datum) : zeitpunkt(plan.data.freigegeben_am)}${plan.data.freigegeben_von_name ? ` · ${plan.data.freigegeben_von_name}` : ""}`
               : ""}
@@ -355,7 +357,7 @@ function KontakteKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
         <ul className="m-0 p-0 list-none flex flex-col gap-3">
           {liste.map((k) => (
             <li key={k.id} className={cx("flex flex-col gap-1 text-sm", k.storniert_am && "opacity-60")}>
-              <span className="flex gap-2 text-[0.8125rem] gedaempft"><span className="num">{datum(k.zeitpunkt)}, {uhrzeit(k.zeitpunkt)}</span><span>{k.erfasst_von_name}</span>{k.art_name ? <span>· {k.art_name}</span> : null}{k.storniert_am ? <Chip>storniert</Chip> : null}</span>
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.8125rem] gedaempft"><span className="num whitespace-nowrap">{datum(k.zeitpunkt)}, {uhrzeit(k.zeitpunkt)}</span><span className="whitespace-nowrap">{k.erfasst_von_name}</span><FirmaMarke kurz={k.firma_kurz} />{k.art_name ? <span className="whitespace-nowrap">· {k.art_name}</span> : null}{k.storniert_am ? <Chip>storniert</Chip> : null}</span>
               <span className={cx("line-clamp-2", k.storniert_am && "line-through")}>{klartext(k.text)}</span>
             </li>
           ))}

@@ -8,6 +8,7 @@ import { useAuswahl } from "@/lib/daten";
 import { dateigroesse, datum, eingabeDatum, zeitpunkt } from "@/lib/format";
 import type { Dokument, PatientZeile } from "@/lib/typen";
 import { useAuth } from "@/lib/auth";
+import { FirmaMarke } from "@/components/FirmenWahl";
 import { PatientWahl } from "@/components/PatientWahl";
 import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
 import { useZweiterFaktor } from "@/components/ZweiterFaktor";
@@ -500,7 +501,7 @@ export function Dokumente() {
                       {d.hat_text ? <Chip className="ml-2" title="Text erkannt – durchsuchbar">Text</Chip> : null}
                     </td>
                     <td className="td"><span className="inline-flex items-center gap-2">{d.typ_name ?? "—"}{!d.typ_geprueft ? <Chip art="warn">Typ prüfen</Chip> : null}</span></td>
-                    <td className="td num">{datum(d.datum)}</td>
+                    <td className="td num whitespace-nowrap">{datum(d.datum)}<FirmaMarke kurz={d.firma_kurz} className="ml-1.5" /></td>
                     <td className="td num text-right">{dateigroesse(d.groesse)}</td>
                     <td className="td">{d.herkunft === "altsystem" ? "Import" : d.herkunft === "system" ? "EPM" : d.hochgeladen_von_name ?? "—"}</td>
                   </tr>

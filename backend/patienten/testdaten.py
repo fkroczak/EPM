@@ -214,6 +214,11 @@ TESTPATIENTEN = [
     ("Demo", "Karl", date(1958, 5, 17), "m", Decimal("172"), 1, "Frau Probe", "Port", "nein", "abgeschlossen"),
 ]
 
+# Zwei Firmen (11.10.2026): gemeinsame Akten mit Einwilligung – Max Mustermann aufgenommen bei der DSKM (ein Kontakt
+# aus der RG), Hanna Test aufgenommen bei der Regeneration Clinic (Einträge aus der RG, ein Kontakt aus der DSKM).
+# Alle anderen nur DSKM; so bleiben alle Musterakten für DSKM-Konten sichtbar.
+TEST_FIRMEN = {1: ("dskm", "rg"), 4: ("rg", "dskm")}
+
 DIAGNOSEN = [
     "<p><strong>Kurzdarmsyndrom</strong> nach ausgedehnter Dünndarmresektion (Testdaten).</p>"
     "<p>Restdünndarmlänge ca. 80 cm, Colon in Kontinuität.</p>",
@@ -471,8 +476,23 @@ def testpatienten_anlegen() -> int:
             qs = qs.filter(konzentration=konz)
         return qs.first()
 
+    from epm.firma import setze_aktive_firma, zuruecksetzen
+    from stammdaten.models import Firma
+
+    firmen = {f.kuerzel: f for f in Firma.objects.all()}
+    # der Testbenutzer arbeitet auch in der Regeneration Clinic, um den Umschalter auszuprobieren
+    if "rg" in firmen:
+        from accounts.models import Mitgliedschaft
+
+        Mitgliedschaft.objects.get_or_create(benutzer=user, firma=firmen["rg"], defaults={"rolle": Rolle.MITARBEITER})
+
+    def in_firma(i):
+        """Einträge in der ersten Firma der Akte erfassen (Akte und Einträge vermerken sie)."""
+        return setze_aktive_firma(firmen.get(TEST_FIRMEN.get(i, ("dskm",))[0]))
+
     angelegt = []
     for i, (nach, vor, geb, geschl, groesse, vi, ap, kath, nickel, profil) in enumerate(TESTPATIENTEN):
+        token = in_firma(i)
         pat = _nutzer(user, Patient(
             nachname=nach, vorname=vor, geburtsdatum=geb, geschlecht=geschl, groesse_cm=groesse,
             versorger=(v1, v2)[vi], ansprechpartner=ansprech[ap], katheter=katheter.get(kath), nickelallergie=nickel,
@@ -522,11 +542,24 @@ def testpatienten_anlegen() -> int:
         if i == 0:
             _beispieldokument(pat, user, doktyp)
             _beispieldokument(pat, None, sonstiges, altsystem=True)
+        if len(TEST_FIRMEN.get(i, ())) > 1:
+            from .firmen import firmen_setzen
+
+            firmen_setzen(pat, list(TEST_FIRMEN[i]), user, einwilligung_am=heute - timedelta(days=60))
+            # ein Kontakt aus der zweiten Firma: in der gemeinsamen Akte steht an jedem Eintrag, wo er erfasst wurde
+            zweite = setze_aktive_firma(firmen[TEST_FIRMEN[i][1]])
+            von = "der Regeneration Clinic" if TEST_FIRMEN[i][1] == "rg" else "der DSKM"
+            _nutzer(user, Kontakt(patient=pat, art=art, zeitpunkt=timezone.now() - timedelta(days=2),
+                                  text=f"<p>Rückfrage {von} zur Infusionsdauer (Testdaten).</p>",
+                                  erfasst_von=user)).save()
+            zuruecksetzen(zweite)
+        zuruecksetzen(token)
         angelegt.append((i, pat, profil))
 
     # Diagnosen, Labor und BIA (Wunsch 11.10.2026) erst nach allen Akten: So bleiben Gewichte, Kontakte und Pläne der
     # bisherigen Musterdaten trotz desselben Zufallsgenerators unverändert.
     for i, pat, profil in angelegt:
+        token = in_firma(i)
         _diagnosen(pat, user, heute, TEST_DIAGNOSEN.get(i, []))
         if i in TEST_LABOR:
             _laborbefunde(pat, user, heute, rnd, TEST_LABOR[i])
@@ -537,6 +570,7 @@ def testpatienten_anlegen() -> int:
             pat.abschluss_anlass = Patient.Abschlussanlass.THERAPIE_BEENDET
             pat.abschluss_notiz = "Darmfunktion ausreichend, HPE beendet (Testdaten)."
             _nutzer(user, pat).save()
+        zuruecksetzen(token)
     return len(TESTPATIENTEN)
 
 

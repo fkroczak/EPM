@@ -39,6 +39,8 @@ ARTEN = {
                      "Akte › Datenschutz › „Vordruck als PDF“"),
     "schweigepflichtentbindung": ("datenschutz", "Entbindung von der Schweigepflicht (z. B. gegenüber Hausarzt oder "
                                   "Versorger) zum Unterschreiben.", "Akte › Datenschutz › „Vordruck als PDF“"),
+    "firmen": ("datenschutz", "Einwilligung, dass DSKM und Regeneration Clinic die Akte gemeinsam führen, zum "
+               "Unterschreiben.", "Akte › Datenschutz › „Vordruck als PDF“"),
 }
 
 

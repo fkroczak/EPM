@@ -363,10 +363,16 @@ class AbsenderSerializer(serializers.ModelSerializer):
 
 
 def briefkopf_daten():
+    from epm.firma import aktive_firma
+
     e = Einstellungen.aktuell()
     logo = Logo.aktuell()
+    firma = aktive_firma()
     return {
         "aktiv": e.absender,
+        # je Firma (11.10.2026): welcher Briefkopf und welches Logo gerade gelten
+        "firma": {"kuerzel": firma.kuerzel, "name": firma.name, "absender": firma.absender or e.absender}
+        if firma else None,
         "absender": {art: AbsenderSerializer(obj).data for art, obj in Absenderangaben.alle().items()},
         "arten": [{"code": c, "name": n} for c, n in Einstellungen.Absender.choices],
         "logo": {"vorhanden": logo is not None, "mime": logo.mime, "sha256": logo.sha256, "breite": logo.breite,
@@ -454,7 +460,8 @@ def _svg_pruefen(inhalt: bytes) -> str | None:
 
 
 class LogoView(APIView):
-    """GET: das aktuelle Logo (öffentlich, auch für die Anmeldeseite). POST: neues Logo (PNG oder SVG)."""
+    """GET: das aktuelle Logo (öffentlich, auch für die Anmeldeseite). POST: neues Logo (PNG oder SVG).
+    Je Firma (11.10.2026): das Logo der aktiven Firma bzw. ``?firma=rg``; hochgeladen wird für die aktive Firma."""
 
     permission_classes = [StammdatenRecht]
     MAX_BYTES = 2 * 1024 * 1024
@@ -468,7 +475,10 @@ class LogoView(APIView):
         from django.conf import settings
         from django.http import FileResponse, Http404
 
-        logo = Logo.aktuell()
+        from stammdaten.models import Firma
+
+        firma = Firma.objects.filter(kuerzel=request.query_params.get("firma") or "", aktiv=True).first()
+        logo = Logo.aktuell(firma)
         if logo is None:
             raise Http404("Kein Logo hochgeladen.")
         pfad = settings.EPM_DOKUMENTE / logo.datei
@@ -510,8 +520,11 @@ class LogoView(APIView):
             mime, endung = "image/svg+xml", "svg"
         else:
             return Response({"datei": "Erlaubt sind PNG und SVG."}, status=status.HTTP_400_BAD_REQUEST)
+        from epm.firma import aktive_firma
+
+        firma = aktive_firma()
         sha = hashlib.sha256(inhalt).hexdigest()
-        relativ = f"_system/logo-{sha[:16]}.{endung}"
+        relativ = f"_system/logo-{f'{firma.kuerzel}-' if firma else ''}{sha[:16]}.{endung}"
         ziel = settings.EPM_DOKUMENTE / relativ
         ziel.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
         if not ziel.exists():
@@ -523,7 +536,7 @@ class LogoView(APIView):
         logo = Logo.objects.filter(datei=relativ).first()
         if logo is None:
             logo = Logo.objects.create(datei=relativ, mime=mime, sha256=sha, breite=breite, hoehe=hoehe,
-                                       hochgeladen_von=request.user)
+                                       hochgeladen_von=request.user, firma=firma)
         else:  # dasselbe Logo erneut: wieder als aktuelles markieren
             Logo.objects.filter(pk=logo.pk).update(hochgeladen_am=timezone.now(), hochgeladen_von=request.user)
         protokolliere(SystemEreignis.Art.VORLAGE, request, objekt="Logo", aktion="Logo hochgeladen", sha256=sha,

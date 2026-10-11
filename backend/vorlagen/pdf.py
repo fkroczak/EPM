@@ -141,7 +141,7 @@ def logo_data_uri() -> str:
 def _absender():
     from stammdaten.models import Absenderangaben, Einstellungen
 
-    return Absenderangaben.alle()[Einstellungen.aktuell().absender]
+    return Absenderangaben.aktuelle()  # je Firma (11.10.2026)
 
 
 def briefkopf_html(absender_zeigen=True, linienfarbe="#251F53", falzmarken=False, linie=True, rechts_html=None) -> str:

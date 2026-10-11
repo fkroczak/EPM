@@ -959,7 +959,8 @@ class Testdaten(TestCase):
         call_command("epm_musterdaten", stdout=io.StringIO())
         tester = User.objects.get(username="test")
         tester.muss_kennwort_aendern = False  # Einmal-Kennwort gilt hier als bereits ersetzt
-        self.assertEqual(Erklaerung.objects.filter(patient__ist_test=True).count(), 6)
+        # 6 Erklärungen zum Datenschutz und je Akte beider Firmen die Einwilligung zum Austausch (11.10.2026)
+        self.assertEqual(Erklaerung.objects.filter(patient__ist_test=True).count(), 8)
         self.assertEqual(client_fuer(tester).get("/api/startseite/").json()["pruefen"]["erklaerungen_fehlen"], 4)
         dok = Dokument.objects.filter(patient__ist_test=True, herkunft="upload").first()
         ziel = Patient.objects.filter(ist_test=True).exclude(pk=dok.patient_id).first()
@@ -967,5 +968,5 @@ class Testdaten(TestCase):
                                        grund="Test", person=tester)
         self.assertEqual(testdaten_zuruecksetzen(), {"geloescht": 6, "angelegt": 6})
         self.assertEqual(DokumentVorgang.objects.count(), 0)
-        self.assertEqual(Erklaerung.objects.count(), 6)
-        self.assertEqual(Erklaerung.history.count(), 6)
+        self.assertEqual(Erklaerung.objects.count(), 8)
+        self.assertEqual(Erklaerung.history.count(), 8)

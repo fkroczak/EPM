@@ -9,7 +9,7 @@ from rest_framework import mixins, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from epm.api_basis import ModelClean, RichText, benutzername, patienten_fuer
+from epm.api_basis import ModelClean, RichText, benutzername, patienten_fuer, FirmaFeld
 from patienten.api import AktenEintragViewSet
 from stammdaten.models import Laborparameter
 
@@ -37,7 +37,7 @@ class LaborwertSerializer(ModelClean, serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
-class LaborbefundSerializer(ModelClean, _PatientFest, serializers.ModelSerializer):
+class LaborbefundSerializer(FirmaFeld, ModelClean, _PatientFest, serializers.ModelSerializer):
     werte = LaborwertSerializer(many=True, required=False)
     beurteilung = RichText()
     erfasst_von_name = serializers.SerializerMethodField()
@@ -147,7 +147,7 @@ class LaborbefundViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retr
         })
 
 
-class BiaMessungSerializer(ModelClean, _PatientFest, serializers.ModelSerializer):
+class BiaMessungSerializer(FirmaFeld, ModelClean, _PatientFest, serializers.ModelSerializer):
     beurteilung = RichText()
     erfasst_von_name = serializers.SerializerMethodField()
     bmi_berechnet = serializers.DecimalField(max_digits=4, decimal_places=1, read_only=True)

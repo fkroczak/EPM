@@ -423,8 +423,12 @@ class Infusionsplan(AktenEintrag):
 
         if not benutzer.hat_recht("plaene_abschliessen"):
             raise PermissionError("Dafür fehlt das Recht „Infusionspläne nach Freigabe abschließen“.")
+        from epm.firma import aktive_firma, als_in_firma, wirksame_rolle
+
         fehler = {}
-        if (mediziner is None or mediziner.rolle != Rolle.MEDIZINER or not mediziner.is_active
+        if mediziner is not None:
+            als_in_firma(mediziner, aktive_firma())  # Rolle in der aktiven Firma (11.10.2026)
+        if (mediziner is None or wirksame_rolle(mediziner) != Rolle.MEDIZINER or not mediziner.is_active
                 or not mediziner.hat_recht("plaene_freigeben")
                 or (mediziner.ist_test and not self.patient.ist_test)):
             fehler["freigegeben_von"] = "Bitte den Mediziner wählen, der den Plan freigegeben hat."
