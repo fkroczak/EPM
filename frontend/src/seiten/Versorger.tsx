@@ -22,6 +22,8 @@ import { useMobil } from "@/lib/stufen";
 import { useHinweis } from "@/components/ui/hinweise";
 
 const VERSORGER_FELDER = ["name", "strasse", "plz", "ort", "telefon", "fax", "email", "notiz"] as const;
+// Längen wie in der Datenbank: Eingabe endet dort, statt erst beim Speichern zu scheitern (Prüfung 11.10.2026)
+const MAX_LAENGE: Record<string, number> = { name: 150, strasse: 150, plz: 10, ort: 100, telefon: 50, fax: 50, email: 254 };
 type VersorgerFormular = Record<(typeof VERSORGER_FELDER)[number], string>;
 const LEER_V: VersorgerFormular = { name: "", strasse: "", plz: "", ort: "", telefon: "", fax: "", email: "", notiz: "" };
 const AP_FELDER = ["name", "zustaendigkeit", "telefon", "mobil", "email", "notiz"] as const;
@@ -269,7 +271,7 @@ export function Versorger() {
   // 6-spaltiges Raster (Wunsch 08.10.2026: auf einem 1080p-Bildschirm ohne Scrollen): Angabe ``spalten`` von 6
   const feld = (k: (typeof VERSORGER_FELDER)[number], label: string, extra?: { num?: boolean; spalten?: number; typ?: string }) => (
     <Feld label={label} className={SPALTEN[extra?.spalten ?? 3]} fehler={fehler[k]} pflicht={k === "name"}>
-      {(p) => <Eingabe {...p} className={extra?.num ? "num" : undefined} type={extra?.typ} value={f[k]}
+      {(p) => <Eingabe {...p} className={extra?.num ? "num" : undefined} type={extra?.typ} value={f[k]} maxLength={MAX_LAENGE[k]}
         onChange={(e) => setF({ ...f, [k]: e.target.value })} />}
     </Feld>
   );
