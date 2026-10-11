@@ -189,8 +189,13 @@ def organisation():
     """Name und Anschrift des aktiven Absenders – für die Anmeldeseite (öffentlich, keine Patientendaten)."""
     from stammdaten.models import Absenderangaben, Einstellungen
 
+    from stammdaten.models import Firma
+
     a = Absenderangaben.alle()[Einstellungen.aktuell().absender]
-    return {"name": a.name, "anschrift": " · ".join(t for t in (a.strasse, f"{a.plz} {a.ort}".strip()) if t)}
+    return {"name": a.name, "anschrift": " · ".join(t for t in (a.strasse, f"{a.plz} {a.ort}".strip()) if t),
+            # neutrale Anmeldeseite (11.10.2026): welche Einrichtungen EPM gemeinsam nutzen
+            "firmen": [{"kurzname": f.kurzname, "name": f.name}
+                       for f in Firma.objects.filter(aktiv=True).order_by("reihenfolge", "id")]}
 
 
 def status_antwort(request, **extra):

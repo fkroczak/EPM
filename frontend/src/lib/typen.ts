@@ -65,7 +65,7 @@ export type Schritt = "anmelden" | "kennwort_aendern" | "2fa_einrichten" | "2fa"
 export type Status = {
   schritt: Schritt;
   benutzer?: Ich;
-  organisation?: { name: string; anschrift: string };
+  organisation?: { name: string; anschrift: string; firmen?: { kurzname: string; name: string }[] };
   notfallcodes?: string[];
   /** Passkeys auf diesem Server möglich? (nur über den Namen mit Zertifikat der eigenen CA) */
   passkey?: { verfuegbar: boolean; rp_id: string; grund: string };
