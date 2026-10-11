@@ -49,6 +49,9 @@ export const AKZENTE: Record<string, [string, string]> = {
   orange: ["Stiftungsorange", "#ED6D3C"],
   aubergine: ["Aubergine", "#5B2A5E"],
   schiefer: ["Schiefer", "#3F4A56"],
+  // Farben der Regeneration Clinic (11.10.2026)
+  anthrazit: ["Anthrazit (RGC)", "#23262B"],
+  salbei: ["Salbeigrün (RGC)", "#4E6358"],
 };
 
 export const HINTERGRUENDE: Record<string, [string, string]> = {
@@ -58,6 +61,7 @@ export const HINTERGRUENDE: Record<string, [string, string]> = {
   kraeftig: ["Kräftig", "#E0E1E7"],
   blaugrau: ["Blaugrau", "#EAF0F2"],
   sand: ["Sand", "#F3F1EC"],
+  salbei: ["Salbei (RGC)", "#EEF1EF"],
 };
 
 export const INK = "#1B1932";
@@ -141,6 +145,13 @@ export function individuelleFarben(d: Darstellung): Record<string, string> {
 
 const INDIVIDUELL_VARIABLEN = ["--akzent", "--akzent-text", "--akzent-hover", "--akzent-weich", "--auf-akzent", "--grund",
   "--tinte", "--text2", "--gedaempft", "--rand", "--fein", "--ladebalken"];
+
+/** Firma, für die gerade gearbeitet wird: färbt Leisten und Menüs („Standard“ = Farben der Firma, 11.10.2026) */
+export function firmaAnwenden(kuerzel: string | null | undefined) {
+  if (typeof document === "undefined") return;
+  if (kuerzel) document.documentElement.dataset.firma = kuerzel;
+  else delete document.documentElement.dataset.firma;
+}
 
 let dunkelAbfrage: MediaQueryList | null = null;
 let aktuell: Darstellung = STANDARD_DARSTELLUNG;

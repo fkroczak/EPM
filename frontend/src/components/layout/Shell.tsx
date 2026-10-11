@@ -110,12 +110,14 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
   };
   return (
     <Voll.Provider value={v}>
-    <aside className={cx("shrink-0 bg-flaeche border-r border-rand flex flex-col py-4 gap-5 nicht-drucken overflow-y-auto",
+    <aside data-leiste className={cx("shrink-0 bg-leiste border-r border-rand flex flex-col py-4 gap-5 nicht-drucken overflow-y-auto",
       v ? "w-full h-full px-3" : "w-16 hd:w-56 px-2 hd:px-2.5 sticky top-0 h-screen max-md:hidden")}
       style={{ borderRightWidth: "var(--randbreite)" }} data-testid={v ? "schublade" : "seitenleiste"}
       aria-label="Seitenleiste">
       <div className={cx(v ? "flex" : "hidden hd:flex", "flex-col gap-2")}>
-        <Logo className="w-full max-w-[12.75rem] h-[4rem] px-1.5 py-1 rounded-lg bg-white" firma={firma?.kuerzel} name={firma?.name} />
+        {/* RGC: Logo direkt auf der salbeigrünen Leiste (wie im Auftritt der Klinik), DSKM auf weißem Feld */}
+        <Logo className={cx("w-full max-w-[12.75rem] h-[4rem] px-1.5 py-1 rounded-lg", ich.firma !== "rg" && "bg-white")}
+          firma={firma?.kuerzel} name={firma?.name} />
         <span className="px-1 font-mono text-[0.6875rem] font-medium tracking-[.07em] uppercase gedaempft">
           EPM · Patientenmanagement
         </span>
@@ -226,7 +228,7 @@ function MobilLeiste() {
   return (
     <>
       <nav aria-label="Hauptnavigation (Telefon)" data-testid="mobil-leiste"
-        className="nicht-drucken fixed bottom-0 inset-x-0 z-30 bg-flaeche border-t border-rand grid grid-cols-5 pb-[env(safe-area-inset-bottom)]">
+        data-leiste className="nicht-drucken fixed bottom-0 inset-x-0 z-30 bg-leiste border-t border-rand grid grid-cols-5 pb-[env(safe-area-inset-bottom)]">
         {eintrag("/", "start", "Start", true)}
         {darf("akten_lesen") ? eintrag("/patienten", "patienten", "Patienten") : <span />}
         {darf("eintraege_erfassen") ? (
@@ -242,7 +244,7 @@ function MobilLeiste() {
       <BaseDialog.Root open={menue} onOpenChange={setMenue}>
         <BaseDialog.Portal>
           <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/35" />
-          <BaseDialog.Popup className="fixed inset-y-0 left-0 z-50 w-[min(20rem,86vw)] bg-flaeche shadow-xl pt-[env(safe-area-inset-top)]">
+          <BaseDialog.Popup data-leiste className="fixed inset-y-0 left-0 z-50 w-[min(20rem,86vw)] bg-leiste shadow-xl pt-[env(safe-area-inset-top)]">
             <BaseDialog.Title className="sr-only">Menü</BaseDialog.Title>
             <BaseDialog.Close className="btn geist icon absolute right-2 top-[calc(env(safe-area-inset-top)+0.5rem)] z-10" aria-label="Menü schließen">
               <Icon name="x" />
@@ -419,7 +421,7 @@ export function Seite({ pfad, children, className, fuellen }: { pfad: Pfadteil[]
   const zurueck = [...pfad].slice(0, -1).reverse().find((t) => t.zu);
   return (
     <div className={cx("grow min-w-0 flex flex-col min-h-screen", fuellen && "seite-fuellt")}>
-      {mobil ? <header className="sticky top-0 z-20 shrink-0 bg-flaeche border-b border-rand nicht-drucken pt-[env(safe-area-inset-top)]"
+      {mobil ? <header data-leiste className="sticky top-0 z-20 shrink-0 bg-leiste border-b border-rand nicht-drucken pt-[env(safe-area-inset-top)]"
         data-testid="mobil-kopf">
         <div className="h-14 flex items-center gap-1 px-2">
           {zurueck ? (
@@ -437,7 +439,7 @@ export function Seite({ pfad, children, className, fuellen }: { pfad: Pfadteil[]
         </div>
         {suchen ? <div className="px-3 pb-3"><Suche vollbreit onFertig={() => setSuchen(false)} /></div> : null}
       </header> : null}
-      {mobil ? null : <header className="h-[3.75rem] shrink-0 flex items-center justify-between gap-6 px-4 bg-flaeche border-b border-rand nicht-drucken">
+      {mobil ? null : <header data-leiste className="h-[3.75rem] shrink-0 flex items-center justify-between gap-6 px-4 bg-leiste border-b border-rand nicht-drucken">
         <nav aria-label="Pfad" className="flex items-center gap-2.5 text-sm min-w-0">
           {pfad.map((t, i) => (
             <span key={i} className="flex items-center gap-2.5 min-w-0">
