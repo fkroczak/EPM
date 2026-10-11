@@ -47,6 +47,20 @@ if [[ ! -f "$B/backend.env" ]] || ! grep -q EPM_DJANGO_ADMIN "$B/backend.env"; t
   sed -e "s/epm\.test/$EPM_WEB_NAME/g" projekt/backend.env.beispiel > "$B/backend.env"
   chmod 0600 "$B/backend.env"
 fi
+# Sicherheitsprüfung 11.10.2026: Django-Admin und API-Browseroberfläche auf bestehenden Servern einmalig abschalten
+# (das Frontend braucht beides nicht). Die Markierung verhindert, dass ein späteres bewusstes Einschalten bei jedem
+# Update wieder überschrieben wird.
+if ! grep -q "^# epm: verwaltung-aus" "$B/backend.env"; then
+  for schalter in EPM_DJANGO_ADMIN EPM_API_BROWSABLE; do
+    if grep -q "^$schalter=" "$B/backend.env"; then
+      sed -i -E "s/^$schalter=.*/$schalter=0/" "$B/backend.env"
+    else
+      echo "$schalter=0" >> "$B/backend.env"
+    fi
+  done
+  echo "# epm: verwaltung-aus (Django-Admin und API-Browseroberfläche abgeschaltet, 11.10.2026)" >> "$B/backend.env"
+  echo "   Django-Admin und API-Browseroberfläche abgeschaltet (backend.env)"
+fi
 # Zugriff auch über die IP der Verwaltungskarte (das Zertifikat enthält sie): Django muss sie als Host und Herkunft kennen,
 # sonst weist es jede Anfrage mit 400 (Host) bzw. 403 (CSRF) ab. Ergänzt nur, was fehlt; eigene Einträge bleiben.
 if ! grep -qE "^DJANGO_ALLOWED_HOSTS=(.*,)?$EPM_MGMT_IP(,|$)" "$B/backend.env"; then

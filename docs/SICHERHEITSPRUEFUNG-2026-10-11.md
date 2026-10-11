@@ -215,7 +215,7 @@ ist das alte Cookie wertlos. Sperre, neues Einmal-Passwort und Passwortwechsel b
 | M1 | mittel | Audit-Log zeigt Namen von Patienten der anderen Firma | behoben | `audit/api.py`, `audit/bereinigung.py` |
 | M2 | mittel | Scans/Gelerntes ohne zweiten Faktor erreichbar (lesen und ändern) | behoben | `scans/api.py` |
 | M3 | mittel | HTML-Einschleusung in PDF-Fußzeilen über `</style>` | behoben | `vorlagen/pdf.py` |
-| M4 | mittel | WeasyPrint CVE-2026-106443 (EPS → Ghostscript) über SVG-Logo bzw. M3 erreichbar | entschärft (Pillow ohne EPS, nur `data:`); Update auf 70 offen | `epm/sanitize.py`, `vorlagen/apps.py`, `vorlagen/pdf.py` |
+| M4 | mittel | WeasyPrint CVE-2026-106443 (EPS → Ghostscript) über SVG-Logo bzw. M3 erreichbar | behoben: WeasyPrint 70 (`requirements.txt` `>=70,<71`), zusätzlich Pillow ohne EPS und nur `data:` | `requirements.txt`, `epm/sanitize.py`, `vorlagen/apps.py`, `vorlagen/pdf.py` |
 | N1 | niedrig | „Ansprechpartner neu zuordnen“ ändert Akten der anderen Firma | behoben | `stammdaten/api.py` |
 | N2 | niedrig | „2FA Pflicht für Admins“ übersah Admins weiterer Firmen | behoben | `accounts/zweifaktor.py` |
 | N3 | niedrig | „Passwort ändern“ ohne Sperre nach Fehlversuchen | behoben | `accounts/api.py` |
@@ -258,7 +258,7 @@ Testläufe vom 11.10.2026 (lokal, PostgreSQL 16, nacheinander):
 **Technisch noch zu tun:**
 
 6. WeasyPrint auf 70 heben (`weasyprint>=70,<71`), vorher die PDF-Ausgaben (Plan, Arztbrief, Aktenkopie) einmal ansehen.
-7. Auf bestehenden Servern `EPM_DJANGO_ADMIN=0` und `EPM_API_BROWSABLE=0` in `/srv/epm/backend.env` setzen.
+7. ~~Auf bestehenden Servern `EPM_DJANGO_ADMIN=0` und `EPM_API_BROWSABLE=0` setzen~~ – erledigt: Standard ist jetzt „aus“ (`epm/settings.py`), `epm-update` (`rollout/04-projekt.sh`) schaltet beides auf bestehenden Servern einmalig ab (Markierung `# epm: verwaltung-aus` in `backend.env`).
 8. Nginx-Konfiguration nach dem Update mit `nginx -t` prüfen.
 9. Docker-Images regelmäßig neu bauen und scannen (z. B. `trivy image epm-backend:<Version>`), Basis-Images
    möglichst mit Digest festhalten, damit ein Bau nachvollziehbar ist.
@@ -272,3 +272,10 @@ Testläufe vom 11.10.2026 (lokal, PostgreSQL 16, nacheinander):
     eigener Anmeldung, eine Wiederherstellung zur Probe.
 13. Rechte der Dateien unter `/srv/epm/secrets/` und `/srv/epm/backend.env` (nur root), Betriebssystem-Updates,
     Aufbewahrung der Protokolle.
+
+## Nachtrag 11.10.2026 (Entscheidungen)
+
+- Zweiter Faktor bleibt freiwillig (Festlegung).
+- Rollen einer Firma vergibt nur ein Admin dieser Firma (umgesetzt, `BenutzerSerializer._pruefe_firmenhoheit`).
+- WeasyPrint 70 eingespielt; PDF-Tests (165) grün, Infusionsplan und Medikationsplan visuell unverändert.
+- Django-Admin und API-Browseroberfläche: Standard „aus“, auf bestehenden Servern einmalig per `epm-update` abgeschaltet.

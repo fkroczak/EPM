@@ -74,6 +74,8 @@ export function PatientNeu() {
   const alleFirmen = useAlleFirmen();
   const [firmen, setFirmen] = useState<string[]>(ich?.firma ? [ich.firma] : []);
   const [einwilligung, setEinwilligung] = useState("");
+  // Hick (UX-Prüfung 11.10.2026): seltene Angaben zugeklappt – öffnet sich von selbst, wenn dort ein Fehler steht
+  const [mehr, setMehr] = useState(false);
   const formular = useRef<HTMLFormElement>(null);
   const setze = (feld: keyof Formular) => (e: { target: { value: string } }) => setF((alt) => ({ ...alt, [feld]: e.target.value }));
 
@@ -172,6 +174,9 @@ export function PatientNeu() {
   const e: Feldfehler = { ...server, ...lokal };
   const ohneFeld = anlegen.error && !Object.keys(server).length;
   const fehlerzahl = Object.keys(e).length;
+  const MEHR: (keyof Formular)[] = ["telefon2", "email", "versicherungsart", "krankenkasse", "versichertennummer"];
+  const mehrFehler = MEHR.some((k) => e[k]);
+  const mehrAusgefuellt = MEHR.filter((k) => f[k].trim()).length;
 
   // ohne Recht gibt es diese Seite nicht (Festlegung 01.10.2026: Nicht Erlaubtes wird nicht gezeigt)
   if (!darf("akten_bearbeiten")) return <Navigate to="/patienten" replace />;
@@ -261,26 +266,37 @@ export function PatientNeu() {
               <Feld label="Telefon" className="col-span-2" fehler={e.telefon}>
                 {(p) => <Eingabe {...p} className="num" type="tel" value={f.telefon} onChange={setze("telefon")} autoComplete="off" />}
               </Feld>
-              <Feld label="Telefon 2" className="col-span-2" fehler={e.telefon2}>
-                {(p) => <Eingabe {...p} className="num" type="tel" value={f.telefon2} onChange={setze("telefon2")} autoComplete="off" />}
-              </Feld>
-              <Feld label="E-Mail" className="col-span-2" fehler={e.email}>
-                {(p) => <Eingabe {...p} type="email" value={f.email} onChange={setze("email")} autoComplete="off" />}
-              </Feld>
-              {/* Versichertendaten (F118) */}
-              <Feld label="Versicherungsart" className="col-span-2" fehler={e.versicherungsart}>
-                {(p) => (
-                  <Auswahl {...p} value={f.versicherungsart} onChange={setze("versicherungsart")}>
-                    {Object.entries(VERSICHERUNGSARTEN).map(([k, text]) => <option key={k} value={k}>{text}</option>)}
-                  </Auswahl>
-                )}
-              </Feld>
-              <Feld label="Versicherung" className="col-span-2" fehler={e.krankenkasse}>
-                {(p) => <Eingabe {...p} value={f.krankenkasse} onChange={setze("krankenkasse")} autoComplete="off" maxLength={100} />}
-              </Feld>
-              <Feld label="Versichertennummer" className="col-span-2" fehler={e.versichertennummer}>
-                {(p) => <Eingabe {...p} className="num" value={f.versichertennummer} onChange={setze("versichertennummer")} autoComplete="off" maxLength={50} />}
-              </Feld>
+              {/* Hick (UX-Prüfung 11.10.2026): Zweittelefon, E-Mail und Versicherung sind beim Anlegen selten zur Hand –
+                  zugeklappt, damit die Seite mit den wichtigen Feldern beginnt; ausgefüllte Angaben zählt die Zeile */}
+              <details className="col-span-full" open={mehr || mehrFehler} onToggle={(ev) => setMehr(ev.currentTarget.open)}
+                data-testid="neu-weitere-angaben">
+                <summary className="cursor-pointer select-none text-sm font-medium text-akzent-text py-1">
+                  Weitere Angaben: Telefon 2, E-Mail, Versicherung
+                  <span className="gedaempft font-normal">{mehrAusgefuellt ? ` (${mehrAusgefuellt} ausgefüllt)` : " (optional)"}</span>
+                </summary>
+                <div className="grid grid-cols-2 md:grid-cols-4 fhd:grid-cols-6 qhd:grid-cols-8 gap-x-3 md:gap-x-4 gap-y-3.5 items-start pt-3">
+                  <Feld label="Telefon 2" className="col-span-2" fehler={e.telefon2}>
+                    {(p) => <Eingabe {...p} className="num" type="tel" value={f.telefon2} onChange={setze("telefon2")} autoComplete="off" />}
+                  </Feld>
+                  <Feld label="E-Mail" className="col-span-2" fehler={e.email}>
+                    {(p) => <Eingabe {...p} type="email" value={f.email} onChange={setze("email")} autoComplete="off" />}
+                  </Feld>
+                  {/* Versichertendaten (F118) */}
+                  <Feld label="Versicherungsart" className="col-span-2" fehler={e.versicherungsart}>
+                    {(p) => (
+                      <Auswahl {...p} value={f.versicherungsart} onChange={setze("versicherungsart")}>
+                        {Object.entries(VERSICHERUNGSARTEN).map(([k, text]) => <option key={k} value={k}>{text}</option>)}
+                      </Auswahl>
+                    )}
+                  </Feld>
+                  <Feld label="Versicherung" className="col-span-2" fehler={e.krankenkasse}>
+                    {(p) => <Eingabe {...p} value={f.krankenkasse} onChange={setze("krankenkasse")} autoComplete="off" maxLength={100} />}
+                  </Feld>
+                  <Feld label="Versichertennummer" className="col-span-2" fehler={e.versichertennummer}>
+                    {(p) => <Eingabe {...p} className="num" value={f.versichertennummer} onChange={setze("versichertennummer")} autoComplete="off" maxLength={50} />}
+                  </Feld>
+                </div>
+              </details>
             </Abschnitt>
 
             <Abschnitt titel="Betreuung">
@@ -319,8 +335,9 @@ export function PatientNeu() {
                 )}
               </Feld>
               <fieldset className="col-span-2 border-0 p-0 m-0 flex flex-col gap-2">
-                <legend className="text-sm font-medium mb-2">Nickelallergie</legend>
-                <div className="flex gap-5 h-9 items-center">
+                <legend className="text-sm font-medium mb-0.5">Nickelallergie</legend>
+                {/* Gesetz der Nähe: Optionen direkt unter der Frage (vorher 16 px Abstand, UX-Prüfung 11.10.2026) */}
+                <div className="flex gap-5 py-1 items-center">
                   {["ja", "nein", "unbekannt"].map((w) => (
                     <label key={w} className="flex items-center gap-2 text-sm cursor-pointer">
                       <input type="radio" name="nickelallergie" value={w} checked={f.nickelallergie === w} onChange={setze("nickelallergie")} /> {w}
@@ -350,7 +367,7 @@ export function PatientNeu() {
               </Feld>
             </Abschnitt>
 
-            <Karte className="px-5 py-[1.125rem] flex flex-col gap-3">
+            <Karte className="px-5 py-[1.125rem] flex flex-col gap-1.5">
               <label htmlFor="neu-diagnose" className="lbl">Diagnose (optional, später in der Akte ergänzbar)</label>
               <Textfeld id="neu-diagnose" rows={3} placeholder="z. B. Kurzdarmsyndrom nach Dünndarmresektion …"
                 value={f.diagnose} onChange={setze("diagnose")} aria-invalid={e.diagnose ? true : undefined} />
@@ -387,6 +404,11 @@ export function PatientNeu() {
               <span className="text-[0.8125rem] gedaempft"><span className="text-fehler">*</span> Pflichtfelder: Nachname, Vorname, Geburtsdatum</span>
             </Karte>
           </aside>
+        </div>
+        {/* am Telefon steht „Anlegen“ auch am Ende des langen Formulars – kein Zurückscrollen (UX-Prüfung 11.10.2026) */}
+        <div className="md:hidden flex justify-end gap-3 flex-wrap" data-testid="neu-unten">
+          <KnopfLink to="/patienten">Abbrechen</KnopfLink>
+          <Knopf type="submit" variante="pri" laedt={anlegen.isPending}>Anlegen und Akte öffnen</Knopf>
         </div>
       </form>
       {/* außerhalb des Formulars: sonst würde „Anlegen“ im Dialog auch den Patienten absenden */}
