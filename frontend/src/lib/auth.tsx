@@ -2,7 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ABGEMELDET, RECHTE_GEAENDERT, STATUS_PRUEFEN, api } from "./api";
+import { ABGEMELDET, ApiFehler, RECHTE_GEAENDERT, STATUS_PRUEFEN, api } from "./api";
 import { darstellungAnwenden, firmaAnwenden } from "./darstellung";
 import type { Ich, Recht, Status } from "./typen";
 
@@ -40,13 +40,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const neuLaden = useCallback(async () => {
-    try {
-      setStatus(await api<Status>("auth/status/", { ohneAbmeldeSignal: true }));
-    } catch {
-      setStatusRoh({ schritt: "anmelden" });
-    } finally {
-      setLaedt(false);
+    // Serverfehler oder kein Netz sind keine Abmeldung (Prüfung 11.10.2026: ein einzelner 500er zeigte die
+    // Anmeldung, obwohl die Sitzung galt) – erst nach drei Versuchen die Anmeldung zeigen
+    for (let versuch = 1; ; versuch++) {
+      try {
+        setStatus(await api<Status>("auth/status/", { ohneAbmeldeSignal: true }));
+        break;
+      } catch (e) {
+        const voruebergehend = !(e instanceof ApiFehler) || e.status === 0 || e.status >= 500;
+        if (!voruebergehend || versuch >= 3) {
+          setStatusRoh({ schritt: "anmelden" });
+          break;
+        }
+        await new Promise((weiter) => window.setTimeout(weiter, 1500 * versuch));
+      }
     }
+    setLaedt(false);
   }, [setStatus]);
 
   useEffect(() => {
