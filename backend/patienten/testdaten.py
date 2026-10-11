@@ -3,7 +3,8 @@ Musterdaten: Auswahllisten, Präparate, Testversorger, Testbenutzer und Testpati
 
 Alles ist wiederholbar (legt nur an, was fehlt). Testpatienten tragen ist_test=True und
 Nummern ab 9001, zählen in keiner Statistik und sind für den Testbenutzer die einzigen
-sichtbaren Akten. Alle Namen sind frei erfunden.
+sichtbaren Akten. Alle Namen sind frei erfunden. Seit dem Wunsch 11.10.2026 mit Diagnosen, Laborbefunden und
+BIA-Messungen (TEST_DIAGNOSEN, TEST_LABOR, TEST_BIA).
 """
 import random
 from datetime import date, datetime, time, timedelta
@@ -220,6 +221,85 @@ DIAGNOSEN = [
     "<p>Mangelernährung bei Motilitätsstörung (Testdaten).</p>",
 ]
 
+# Befunde der Testpatienten (Wunsch 11.10.2026): Diagnosen mit ICD-Code, Laborbefunde und BIA-Messungen, damit Reiter,
+# Hinweise („Kein Laborbefund“, „Labor älter als …“, „BIA älter als …“) und der Plan-Editor (Werte außerhalb des
+# Referenzbereichs mit Verlauf) ohne Handarbeit zu prüfen sind. Schlüssel = Index in TESTPATIENTEN.
+# Diagnosen: (Bezeichnung, ICD-Code, Kennzeichen, besteht seit (Tage), Notiz, beendet vor (Tage) oder None)
+TEST_DIAGNOSEN = {
+    0: [("Kurzdarmsyndrom", "K91.2", "G", 2600, "Restdünndarm ca. 80 cm, Colon in Kontinuität", None),
+        ("Mesenterialinfarkt mit Dünndarmresektion", "K55.0", "Z", 2650, "", None),
+        ("Eisenmangelanämie", "D50.9", "G", 400, "", None),
+        ("Störung des Magnesiumstoffwechsels", "E83.4", "V", 20, "Kontrolle im nächsten Labor", None)],
+    1: [("Crohn-Krankheit des Dünndarmes", "K50.0", "G", 9000, "mehrere Resektionen", None),
+        ("Kurzdarmsyndrom", "K91.2", "G", 1800, "", None),
+        ("Erhebliche Energie- und Eiweißmangelernährung", "E43", "G", 120, "", None),
+        ("Infektion durch Katheter", "T82.7", "G", 260, "Portinfektion, Port belassen", 200)],
+    2: [("Chronische intestinale Pseudoobstruktion", "K59.8", "G", 3000, "", None),
+        ("Mäßige Energie- und Eiweißmangelernährung", "E44.0", "G", 900, "", None),
+        ("Osteoporose", "M81.99", "V", 100, "Knochendichtemessung angefordert", None)],
+    3: [("Kurzdarmsyndrom", "K91.2", "G", 1500, "", None),
+        ("Strahlenenteritis", "K52.0", "G", 1600, "nach Bestrahlung im Becken", None),
+        ("Hypertriglyzeridämie", "E78.1", "G", 150, "", None),
+        ("Chronische Nierenkrankheit, Stadium 3", "N18.3", "V", 60, "", None)],
+    4: [("Crohn-Krankheit des Dünndarmes", "K50.0", "G", 9000, "", None),
+        ("Mangelernährung", "E46", "V", 30, "Erstvorstellung, Labor und BIA folgen", None)],
+    5: [("Motilitätsstörung des Dünndarms", "K59.8", "G", 1400, "", None),
+        ("Erhebliche Energie- und Eiweißmangelernährung", "E43", "Z", 1400, "Darmfunktion wieder ausreichend", 30)],
+}
+
+# Laborparameter mit üblichem Wert und Referenzbereich, wie ihn das Labor auf dem Befund angibt. Der Katalog selbst
+# bleibt ohne Referenzbereich (U44) – die Werte stehen je Zeile wie bei einem abgeschriebenen Befund.
+# Name wie im Katalog: (üblicher Wert, Referenz von, Referenz bis, Nachkommastellen)
+LABORWERTE = {
+    "Natrium": (139, "135", "145", 0), "Kalium": (4.2, "3.5", "5.1", 1), "Calcium": (2.30, "2.15", "2.55", 2),
+    "Magnesium": (0.85, "0.66", "1.07", 2), "Phosphat": (1.10, "0.87", "1.45", 2), "Chlorid": (102, "98", "107", 0),
+    "Kreatinin": (0.85, "0.5", "1.1", 2), "Harnstoff": (30, "17", "43", 0),
+    "GPT (ALT)": (24, "0", "35", 0), "GOT (AST)": (22, "0", "35", 0), "Gamma-GT": (28, "0", "40", 0),
+    "ALKP": (80, "35", "105", 0), "Bilirubin gesamt": (0.6, "0.1", "1.2", 1),
+    "Albumin": (41, "35", "52", 0), "CRP": (2.0, "0", "5", 1), "Triglyceride": (120, "0", "150", 0),
+    "Glucose": (95, "70", "110", 0), "Hämoglobin": (13.4, "12.0", "16.0", 1), "Leukozyten": (6.5, "4.0", "10.0", 1),
+    "Thrombozyten": (250, "150", "400", 0),
+    # nur im erweiterten Befund (Spurenelemente, Vitamine, Eisen)
+    "Ferritin": (90, "30", "300", 0), "Zink": (850, "700", "1200", 0), "Selen": (95, "70", "150", 0),
+    "Kupfer": (1000, "700", "1400", 0), "Vitamin B12": (420, "190", "900", 0), "Folsäure": (8.0, "3.0", "17.0", 1),
+    "Calcidiol (25-Hydroxy-Vitamin D)": (34, "30", "100", 0),
+}
+LABOR_ERWEITERT = {"Ferritin", "Zink", "Selen", "Kupfer", "Vitamin B12", "Folsäure", "Calcidiol (25-Hydroxy-Vitamin D)"}
+
+# Laborbefunde je Testpatient: Abnahme vor (Tagen), älteste zuerst; „erweitert“ = Befunde mit Spurenelementen und
+# Vitaminen; „abweichend“ = feste Werte je Befund (None = üblicher Wert), bewusst teils außerhalb der Referenz.
+# Neuester Befund „vor 0 Tagen“: Hinweise im Plan-Editor zählen ab der Freigabe des letzten Plans (F190), und die
+# Pläne der Musterdaten sind heute freigegeben.
+# Profil 4 (neu) bleibt ohne Labor und BIA → Hinweise „Kein Laborbefund“ / „Keine BIA-Messung“;
+# Profil 2 hat nur alte Befunde → „Labor älter als 12 Mon.“; Profil 3 eine alte BIA → „BIA älter als 12 Mon.“
+TEST_LABOR = {
+    0: {"tage": [365, 182, 91, 0], "erweitert": {0, 3}, "labor": "Testlabor Münster (fiktiv)",
+        "abweichend": {"Magnesium": [0.84, 0.79, 0.71, 0.58], "Ferritin": [45, None, 31, 22]},
+        "beurteilung": "<p>Magnesium erniedrigt und fallend, Ferritin erniedrigt – bitte prüfen (Testdaten).</p>"},
+    1: {"tage": [120, 60, 0], "erweitert": {2}, "labor": "Testlabor Münster (fiktiv)",
+        "abweichend": {"Kalium": [3.9, 3.6, 3.2], "Albumin": [36, 33, 29], "CRP": [4.0, 9.5, 14.2]},
+        "freitext": [(2, "Calprotectin im Stuhl", None, "> 500", "µg/g")],
+        "beurteilung": "<p>Kalium und Albumin fallend, CRP steigend – Entzündungsaktivität (Testdaten).</p>"},
+    2: {"tage": [540, 450], "erweitert": {1}, "labor": "Kliniklabor Test (fiktiv)",
+        "abweichend": {"Triglyceride": [165, 210], "Gamma-GT": [45, 68], "Calcidiol (25-Hydroxy-Vitamin D)": [None, 18]},
+        "beurteilung": "<p>Triglyceride und γ-GT erhöht, Vitamin-D-Mangel (Testdaten).</p>"},
+    3: {"tage": [200, 20], "erweitert": {1}, "labor": "Testlabor Münster (fiktiv)",
+        "abweichend": {"Triglyceride": [140, 185], "Kreatinin": [1.0, 1.3]},
+        "beurteilung": "<p>Triglyceride und Kreatinin erhöht (Testdaten).</p>"},
+    5: {"tage": [400, 120], "erweitert": set(), "labor": "Testlabor Münster (fiktiv)", "abweichend": {},
+        "beurteilung": "<p>Unauffällig (Testdaten).</p>"},
+}
+
+# BIA-Messungen je Testpatient: (vor Tagen, Anteil BCM, Anteil Fettmasse, ECW %); das Gewicht kommt aus dem
+# Gewichtsverlauf. Profil „abnahme“: BCM fällt, ECW steigt.
+TEST_BIA = {
+    0: [(400, 0.36, 0.28, 46.0), (210, 0.37, 0.27, 45.5), (30, 0.37, 0.27, 45.0)],
+    1: [(300, 0.38, 0.22, 44.0), (120, 0.35, 0.20, 47.5), (10, 0.31, 0.18, 51.0)],
+    2: [(250, 0.30, 0.20, 50.0), (60, 0.33, 0.23, 47.0)],
+    3: [(500, 0.40, 0.22, 44.5)],
+    5: [(200, 0.39, 0.24, 44.0)],
+}
+
 
 def _nutzer(user, obj):
     obj._history_user = user  # Bearbeiter in der Historie
@@ -259,6 +339,87 @@ def _kontakte(patient, user, heute, rnd, art):
         k.save()
         kontakte.append(k)
     return kontakte
+
+
+def _diagnosen(patient, user, heute, eintraege):
+    """Diagnosen mit denselben Regeln wie über die API (``full_clean``); neue Kombinationen wandern wie dort in die
+    Liste unter Vorlagen › Diagnosen (U53)."""
+    from stammdaten.models import Diagnosevorlage
+
+    from .models import Diagnose
+
+    for nr, (bezeichnung, icd, kennzeichen, seit, notiz, beendet) in enumerate(eintraege):
+        d = _nutzer(user, Diagnose(
+            patient=patient, bezeichnung=bezeichnung, icd_code=icd, kennzeichen=kennzeichen,
+            seit=heute - timedelta(days=seit), notiz=notiz, reihenfolge=(nr + 1) * 10, aktiv=beendet is None,
+            beendet_am=heute - timedelta(days=beendet) if beendet is not None else None, angelegt_von=user))
+        d.full_clean()
+        d.save()
+        Diagnosevorlage.objects.get_or_create(icd_code=d.icd_code, bezeichnung=d.bezeichnung)
+
+
+def _laborbefunde(patient, user, heute, rnd, daten):
+    """Laborbefunde wie über die Maske: Parameter aus dem Katalog (nur aktive), Einheit aus dem Katalog,
+    Referenzbereich je Zeile; Werte ohne feste Abweichung schwanken leicht innerhalb der Referenz."""
+    from befunde.models import Laborbefund, Laborwert
+
+    katalog = {p.name: p for p in Laborparameter.objects.filter(aktiv=True, name__in=LABORWERTE)}
+    anzahl = len(daten["tage"])
+    for nr, tage in enumerate(daten["tage"]):
+        neuester = nr == anzahl - 1
+        befund = _nutzer(user, Laborbefund(
+            patient=patient, abgenommen_am=heute - timedelta(days=tage), labor=daten["labor"],
+            beurteilung=daten["beurteilung"] if neuester else "", erfasst_von=user))
+        befund.full_clean()
+        befund.save()
+        zeilen = []
+        for name, (ueblich, von, bis, stellen) in LABORWERTE.items():
+            fest = daten["abweichend"].get(name, [None] * anzahl)[nr]
+            if name not in katalog or (fest is None and name in LABOR_ERWEITERT and nr not in daten["erweitert"]):
+                continue
+            von, bis = Decimal(von), Decimal(bis)
+            if fest is None:
+                wert = min(max(Decimal(str(round(ueblich * rnd.uniform(0.94, 1.06), stellen))), von), bis)
+            else:
+                wert = Decimal(str(fest))
+            p = katalog[name]
+            zeilen.append(Laborwert(befund=befund, parameter=p, wert=wert, einheit=p.einheit,
+                                    referenz_von=von, referenz_bis=bis))
+        for befund_nr, name, wert, wert_text, einheit in daten.get("freitext", []):
+            if befund_nr == nr:
+                zeilen.append(Laborwert(befund=befund, freitext_name=name, wert=wert, wert_text=wert_text,
+                                        einheit=einheit))
+        for i, zeile in enumerate(zeilen):
+            zeile.reihenfolge = i
+            zeile.full_clean()
+            _nutzer(user, zeile).save()
+
+
+def _bia_messungen(patient, user, heute, messungen):
+    """BIA-Messungen mit dem Gewicht aus dem Gewichtsverlauf (ohne Übernahme in den Verlauf – sonst änderten sich
+    Trend und Gewichtshinweise der Musterdaten); Plausibilität wie über die API (``full_clean``)."""
+    from befunde.models import BiaMessung
+
+    for tage, bcm, fett, ecw in messungen:
+        tag = heute - timedelta(days=tage)
+        gewicht = (Gewichtsmessung.objects.filter(patient=patient, gemessen_am__lte=tag)
+                   .order_by("-gemessen_am", "-id").values_list("gewicht_kg", flat=True).first()
+                   or patient.gewichte.order_by("gemessen_am", "id").values_list("gewicht_kg", flat=True).first())
+        if gewicht is None:
+            continue
+        zehntel = Decimal("0.1")
+        fettmasse = (gewicht * Decimal(str(fett))).quantize(zehntel)
+        meter = patient.groesse_cm / Decimal(100)
+        m = _nutzer(user, BiaMessung(
+            patient=patient, gemessen_am=tag, gewicht_kg=gewicht, bcm_kg=(gewicht * Decimal(str(bcm))).quantize(zehntel),
+            fettmasse_kg=fettmasse, ecw_prozent=Decimal(str(ecw)),
+            koerperwasser_l=((gewicht - fettmasse) * Decimal("0.73")).quantize(zehntel),
+            bmi=(gewicht / (meter * meter)).quantize(zehntel),
+            beurteilung="<p>BCM vermindert, ECW erhöht – Hinweis auf Mangelernährung (Testdaten).</p>" if ecw >= 50
+            else "<p>Körperzusammensetzung stabil (Testdaten).</p>",
+            erfasst_von=user))
+        m.full_clean()
+        m.save()
 
 
 def _plan(patient, user, p, gueltig_ab, glucose, aa, lipide, freigeben=True):
@@ -310,6 +471,7 @@ def testpatienten_anlegen() -> int:
             qs = qs.filter(konzentration=konz)
         return qs.first()
 
+    angelegt = []
     for i, (nach, vor, geb, geschl, groesse, vi, ap, kath, nickel, profil) in enumerate(TESTPATIENTEN):
         pat = _nutzer(user, Patient(
             nachname=nach, vorname=vor, geburtsdatum=geb, geschlecht=geschl, groesse_cm=groesse,
@@ -360,7 +522,16 @@ def testpatienten_anlegen() -> int:
         if i == 0:
             _beispieldokument(pat, user, doktyp)
             _beispieldokument(pat, None, sonstiges, altsystem=True)
+        angelegt.append((i, pat, profil))
 
+    # Diagnosen, Labor und BIA (Wunsch 11.10.2026) erst nach allen Akten: So bleiben Gewichte, Kontakte und Pläne der
+    # bisherigen Musterdaten trotz desselben Zufallsgenerators unverändert.
+    for i, pat, profil in angelegt:
+        _diagnosen(pat, user, heute, TEST_DIAGNOSEN.get(i, []))
+        if i in TEST_LABOR:
+            _laborbefunde(pat, user, heute, rnd, TEST_LABOR[i])
+        _bia_messungen(pat, user, heute, TEST_BIA.get(i, []))
+        # abgeschlossen erst danach – eine abgeschlossene Akte nimmt keine Einträge mehr an
         if profil == "abgeschlossen":
             pat.abgeschlossen_am = heute - timedelta(days=30)
             pat.abschluss_anlass = Patient.Abschlussanlass.THERAPIE_BEENDET
