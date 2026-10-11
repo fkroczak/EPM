@@ -5,7 +5,9 @@ Regeln, die Lücken in den Akten finden – nur Akten in Betreuung, ohne Testpat
 
 - ``hausarzt``: kein Arzt zugeordnet (Reiter „Ärzte“) und auch kein Hausarzt im alten Freitextfeld;
 - ``telefon``: weder Telefon noch Telefon 2 in den Stammdaten und keine Kontaktperson mit Telefon oder Mobilnummer;
-- ``gewicht_fehlt``: keine Gewichtsmessung in den letzten X Monaten (Vorlagen › Grenzwerte), auch nie gewogen;
+- ``gewicht_fehlt``: keine Gewichtsmessung in den letzten X Monaten (Vorlagen › Grenzwerte), auch nie gewogen – bei
+  einer neuen Akte erst X Monate nach dem Anlegen (Wunsch 11.10.2026: „frisch angelegt, trotzdem ‚kein Gewicht seit
+  3 Monaten‘“);
 - ``diagnose``: keine aktive Diagnose im Reiter „Diagnosen“ und das Feld „Diagnose“ ist leer;
 - ``termin_ort``: ein offener Praxistermin in den nächsten Wochen ohne Ort – er fehlte sonst auf dem Infoblatt an die
   Praxis (F177). Wie dort zählt das nur, wenn es den Terminort der Praxis gibt (``infoblatt.praxisort``).
@@ -82,14 +84,15 @@ def luecken(patient_ids, e=None) -> dict:
     mit_diagnose = set(Diagnose.objects.filter(patient_id__in=ids, aktiv=True).values_list("patient_id", flat=True))
     ohne_ort = set(ort_termine(ids).values_list("patient_id", flat=True))
     ergebnis = {}
-    for pid, hausarzt, telefon, telefon2, diagnose in (Patient.objects.filter(id__in=ids).values_list(
-            "id", "hausarzt", "telefon", "telefon2", "diagnose")):
+    for pid, hausarzt, telefon, telefon2, diagnose, angelegt in (Patient.objects.filter(id__in=ids).values_list(
+            "id", "hausarzt", "telefon", "telefon2", "diagnose", "angelegt_am")):
         arten = []
         if pid not in mit_arzt and not hausarzt.strip():
             arten.append("hausarzt")
         if not telefon.strip() and not telefon2.strip() and pid not in mit_telefon_person:
             arten.append("telefon")
-        if pid not in mit_gewicht:
+        # neue Akte: die Frist läuft ab dem Anlegen
+        if pid not in mit_gewicht and (angelegt is None or timezone.localdate(angelegt) < grenze):
             arten.append("gewicht_fehlt")
         if pid not in mit_diagnose and _leer(diagnose):
             arten.append("diagnose")

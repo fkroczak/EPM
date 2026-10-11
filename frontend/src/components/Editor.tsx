@@ -57,7 +57,7 @@ export function Richtext({ html, className, leer = "—" }: { html: string; clas
 
 /** Text ohne Formatierung (für kurze Vorschauen) */
 export function klartext(html: string): string {
-  const d = document.createElement("div");
-  d.innerHTML = html;
-  return (d.textContent ?? "").replace(/\s+/g, " ").trim();
+  // Eigenes, inaktives Dokument: Bilder darin (Hilfe, Wunsch 11.10.2026) werden fürs Durchsuchen nicht geladen
+  const d = new DOMParser().parseFromString(html, "text/html");
+  return (d.body.textContent ?? "").replace(/\s+/g, " ").trim();
 }

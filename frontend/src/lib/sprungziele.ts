@@ -12,7 +12,7 @@ export type Sprungziel = { pfad: string; state: { oeffnen?: AktenAktion; termin?
 
 type Ziel = { reiter: string; oeffnen?: AktenAktion; titel: string };
 
-const ZIELE: Record<HinweisArt | "nickelallergie", Ziel> = {
+const ZIELE: Record<HinweisArt, Ziel> = {
   gewicht: { reiter: "", oeffnen: "gewichtsverlauf", titel: "Gewichtsverlauf ansehen" },
   gewicht_fehlt: { reiter: "", oeffnen: "gewicht", titel: "Gewicht erfassen" },
   plan: { reiter: "plaene", titel: "Zu den Infusionsplänen" },
@@ -20,7 +20,7 @@ const ZIELE: Record<HinweisArt | "nickelallergie", Ziel> = {
   versorger: { reiter: "", oeffnen: "stammdaten", titel: "Versorger in den Stammdaten erfassen" },
   hausarzt: { reiter: "", oeffnen: "stammdaten", titel: "Hausarzt in den Stammdaten erfassen" },
   telefon: { reiter: "", oeffnen: "stammdaten", titel: "Telefon in den Stammdaten erfassen" },
-  nickelallergie: { reiter: "", oeffnen: "stammdaten", titel: "Nickelallergie in den Stammdaten erfassen" },
+  nickelallergie: { reiter: "", oeffnen: "stammdaten", titel: "Wichtig wegen des Katheters – in den Stammdaten erfassen" },
   kontakt: { reiter: "kontakte", titel: "Zu den Kontakten" },
   labor: { reiter: "labor", titel: "Zum Labor" },
   bia: { reiter: "bia", titel: "Zur BIA" },
@@ -28,7 +28,7 @@ const ZIELE: Record<HinweisArt | "nickelallergie", Ziel> = {
   termin_ort: { reiter: "", oeffnen: "termine", titel: "Zu den Terminen" },
 };
 
-export function hinweisZiel(patientId: number, art: HinweisArt | "nickelallergie"): Sprungziel & { titel: string } {
+export function hinweisZiel(patientId: number, art: HinweisArt): Sprungziel & { titel: string } {
   const z = ZIELE[art] ?? { reiter: "", titel: "Akte öffnen" };
   return {
     pfad: `/patienten/${patientId}${z.reiter ? `/${z.reiter}` : ""}`,

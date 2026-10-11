@@ -6,7 +6,38 @@ Jeder Abschnitt nennt die Rechte, von denen mindestens eines nötig ist (leer = 
 nur Abschnitte zu dem, was die Person tatsächlich darf (Rechte je Gruppe, F66; nicht Erlaubtes ist ausgeblendet, F71).
 ``seiten`` ordnet Adressen der Oberfläche einem Abschnitt zu: das „?“ in der Kopfzeile springt dorthin
 (``:id`` steht für eine Nummer, die längste passende Adresse gewinnt).
+
+Bilder (Wunsch 11.10.2026: „Hilfe mit Screenshots und kurzen animierten GIFs“): Bildschirmfotos und kurze GIFs liegen im
+Frontend unter ``frontend/public/hilfe-bilder/`` und werden mit ``node werkzeuge/hilfe-bilder.mjs`` aus der laufenden
+Anwendung neu erzeugt (nur Testpatienten). ``_bild`` bzw. ``_film`` setzen das HTML; Breite und Höhe sind die Maße der
+Datei (Telefonbilder in halber Größe, sie sind doppelt aufgelöst) – ``patienten.test_startseite.Hilfe`` prüft, dass
+jede Datei da ist und die Maße passen.
 """
+from html import escape
+
+BILDER = "/hilfe-bilder/"
+
+
+def _figur(datei: str, bild: str, unterschrift: str, telefon: bool) -> str:
+    """PC-Bilder führen per Klick zur Datei in voller Größe (am Telefon sind sie sonst zu klein zum Lesen)"""
+    if telefon:
+        return f'\n<figure class="hilfe-bild telefon">{bild}<figcaption>{unterschrift}</figcaption></figure>'
+    return (f'\n<figure class="hilfe-bild"><a href="{BILDER}{datei}" target="_blank" rel="noopener" '
+            f'title="Bild groß ansehen">{bild}</a><figcaption>{unterschrift}</figcaption></figure>')
+
+
+def _bild(datei: str, alt: str, unterschrift: str, breite: int, hoehe: int, telefon: bool = False) -> str:
+    """Bildschirmfoto mit Bildunterschrift"""
+    bild = f'<img src="{BILDER}{datei}" alt="{escape(alt)}" loading="lazy" width="{breite}" height="{hoehe}">'
+    return _figur(datei, bild, unterschrift, telefon)
+
+
+def _film(name: str, alt: str, unterschrift: str, breite: int, hoehe: int, telefon: bool = False) -> str:
+    """Kurzes GIF (läuft in Schleife); wer „Bewegung reduzieren“ eingestellt hat, sieht stattdessen das Standbild"""
+    bild = (f'<picture><source media="(prefers-reduced-motion: reduce)" srcset="{BILDER}{name}-standbild.png">'
+            f'<img src="{BILDER}{name}.gif" alt="{escape(alt)}" loading="lazy" width="{breite}" height="{hoehe}"></picture>')
+    return _figur(f"{name}.gif", bild, unterschrift, telefon)
+
 
 GRUPPEN = [
     ("erste_schritte", "Erste Schritte"),
@@ -33,7 +64,7 @@ ABSCHNITTE = [
 genau zu dieser Seite.</p>
 <ul>
 <li><strong>Patient suchen:</strong> ins Suchfeld oben tippen (Name, Teil des Namens, Nummer oder Geburtsdatum) und den
-Treffer anklicken. Schneller: <strong>Strg K</strong>. Am Telefon die Lupe oben.</li>
+Treffer anklicken (Bild unten). Schneller: <strong>Strg K</strong>. Am Telefon die Lupe oben.</li>
 <li><strong>Telefonat oder Gespräch festhalten:</strong> in der Akte <strong>Kontakt</strong>, auf der Startseite
 <strong>Kontakt erfassen</strong>. Notiz schreiben, <strong>Speichern</strong>. Gewicht und Wiedervorlage lassen sich im
 selben Fenster mit erfassen.</li>
@@ -46,7 +77,10 @@ Wiedervorlagen“).</li>
 Vorname und Geburtsdatum.</li>
 </ul>
 <p>Nach jedem Speichern erscheint oben kurz eine <strong>grüne</strong> Bestätigung. Eine <strong>rote</strong> Meldung
-bleibt länger stehen und sagt, was fehlt; mit dem × lässt sie sich schließen.</p>""",
+bleibt länger stehen und sagt, was fehlt; mit dem × lässt sie sich schließen.</p>""" + _film(
+            "patient-suchen", "Ablauf: Ins Suchfeld oben „Beisp“ tippen, der Treffer „Beispiel, Paula“ erscheint darunter, "
+            "ein Klick darauf öffnet ihre Akte.", "Patient suchen: Name tippen, Treffer anklicken – die Akte öffnet sich.",
+            960, 243),
     },
     {
         "id": "wenn_es_hakt", "gruppe": "erste_schritte", "titel": "Wenn etwas nicht klappt", "rechte": [], "seiten": [],
@@ -140,6 +174,14 @@ Plan, Versorger und den nächsten Termin, die Reiter lassen sich seitlich wische
 offenen Akte gleich für diesen Patienten.</li>
 <li>Alles Übrige steht unter <strong>Menü</strong>.</li>
 </ul>
+<p><strong>Offene Punkte führen zur Stelle:</strong> Hinweise wie „Nickelallergie nicht erfasst“ oder der nächste Termin
+in der Patientenliste lassen sich antippen – EPM öffnet gleich das passende Fenster.</p>""" + _bild(
+            "telefon-akte.png", "Akte am Telefon: oben Name und Hinweise, darunter die Knöpfe Kontakt, Gewicht, Termin, "
+            "Dokument und Neuer Plan, darunter Gewicht, Infusionsplan, nächster Termin und letzter Kontakt.",
+            "Die Akte am Telefon: Hinweise, Knöpfe und die wichtigsten Zahlen oben.", 390, 484, telefon=True) + _film(
+            "telefon-offener-punkt", "Ablauf am Telefon: In der Patientenliste den Hinweis „Nickelallergie nicht erfasst“ "
+            "antippen, EPM öffnet die Stammdaten mit dem Feld Nickelallergie.",
+            "Hinweis antippen – EPM öffnet die Stelle, an der die Angabe fehlt.", 390, 844, telefon=True) + """
 <p>Anmelden am Telefon am einfachsten mit einem Passkey (siehe „Passkey statt Code“).</p>""",
     },
     {
@@ -170,7 +212,9 @@ Administration) und alles zur Anmeldung. Wie EPM aussieht, steht seit dem 09.10.
         "seiten": ["/hilfe"],
         "html": """
 <p>Die Hilfe zeigt nur Abschnitte zu dem, was du in EPM tun darfst. Das <strong>?</strong> oben rechts auf jeder Seite
-springt zum passenden Abschnitt. Die Suche findet Wörter in Titeln, Texten und Ergänzungen.</p>
+springt zum passenden Abschnitt. Die Suche findet Wörter in Titeln, Texten und Ergänzungen.</p>""" + _bild(
+            "hilfe-knopf.png", "Kopfzeile von EPM: rechts neben dem Suchfeld das Fragezeichen, rot umrandet.",
+            "Das <strong>?</strong> oben rechts öffnet die Hilfe zur Seite, auf der man gerade ist.", 602, 130) + """
 <p>Die Texte mit dem Zeichen <strong>mitgeliefert</strong> kommen mit EPM und passen immer zur installierten Version.
 Wer das Recht „Vorlagen pflegen“ hat, kann unter jedem Abschnitt eine <strong>Ergänzung der Stiftung</strong> schreiben,
 z. B. interne Abläufe oder Telefonnummern. Jede Änderung steht mit Person und Zeitpunkt in der Historie und im
@@ -195,7 +239,11 @@ der Verweis unten führt zur vollständigen Liste.</p>
         "rechte": ["akten_lesen"], "seiten": ["/"],
         "html": """
 <p>Ganz oben auf der Startseite steht <strong>Heute zu tun</strong>: eine kurze Liste, das Wichtigste zuerst, jeweils mit
-Anzahl. Ein Klick auf eine Zeile führt direkt hin.</p>
+Anzahl. Ein Klick auf eine Zeile führt direkt hin.</p>""" + _bild(
+            "startseite-heute-zu-tun.png", "Startseite: oben das Datum und die Knöpfe Kontakt erfassen (rot umrandet), "
+            "Gewicht und Termin; darunter die Liste Heute zu tun mit fälligen Rückrufen, fehlender Terminbestätigung, "
+            "Patienten ohne Kontakt und einem Infusionsplan zur Prüfung.",
+            "Startseite mit „Heute zu tun“. Oben die Knöpfe für Kontakt, Gewicht und Termin.", 1283, 637) + """
 <ul>
 <li><strong>Termine heute</strong> mit Uhrzeit, Patient und Ort; das Kästchen „erledigt“ hakt ab.</li>
 <li><strong>Rückrufe und Wiedervorlagen</strong>, die heute fällig oder schon überfällig sind – ebenfalls zum Abhaken.</li>
@@ -260,7 +308,10 @@ Gewicht, aktuellen Plan, nächsten Termin und <strong>wem Auskunft gegeben werde
 <li>Notiz eintragen und, wenn bekannt, die <strong>Kontaktart</strong> wählen (Telefon, persönlich, E-Mail …). Auf Wunsch
 <strong>Gewicht mit erfassen</strong> und eine <strong>Wiedervorlage</strong> anlegen.</li>
 <li><strong>Speichern</strong>.</li>
-</ol>
+</ol>""" + _bild(
+            "kontakt-erfassen-fenster.png", "Fenster Kontakt erfassen: oben Patient und der Kasten Aus der Akte, darunter "
+            "Datum, Uhrzeit, Kontaktart und das Feld für die Notiz, unten Gewicht mit erfassen, Wiedervorlage anlegen und "
+            "Speichern.", "Das Fenster „Kontakt erfassen“ – von der Startseite und aus der Akte gleich.", 720, 800) + """
 <p>Kontakt und Gewicht werden nacheinander gespeichert. Scheitert das Gewicht (z. B. unplausibler Wert), bleibt der
 Kontakt gespeichert; EPM sagt das deutlich und lässt das Gewicht korrigieren und erneut speichern.</p>""",
     },
@@ -272,7 +323,9 @@ Kontakt gespeichert; EPM sagt das deutlich und lässt das Gewicht korrigieren un
 <p>Die Liste zeigt Patienten <strong>in Betreuung</strong> oder <strong>abgeschlossene</strong> Akten. Es gibt
 <strong>ein</strong> Suchfeld: das oben in der Kopfzeile (Strg K). Auf der Patientenliste filtert es direkt die Liste
 (Name, Nummer oder Geburtsdatum; der Begriff steht als Chip bei den Filtern), auf allen anderen Seiten schlägt es
-Patienten zum Öffnen vor.</p>
+Patienten zum Öffnen vor.</p>""" + _bild(
+            "patient-suchen.png", "Suchfeld oben rechts mit dem Begriff „Beisp“, darunter der Treffer 9003 Beispiel, Paula "
+            "mit Geburtsdatum.", "Schon ein Teil des Namens reicht; ein Klick auf den Treffer öffnet die Akte.", 806, 200) + """
 <ul>
 <li>Filter nach Versorger, Ansprechpartner und Katheter; Schnellfilter „Nur mit Hinweisen“, „Gewichtsverlust“,
 „Termin diese Woche“.</li>
@@ -312,7 +365,12 @@ stehen, der neue Eintrag ist gleich ausgewählt.</p>
 <strong>Gewicht</strong> (mit Trend und BMI), <strong>Infusionsplan</strong>, <strong>nächster Termin</strong>,
 <strong>letzter Kontakt</strong> – und eine Zeile mit Versorger, Ansprechpartner, Hausarzt, Katheter, Nickelallergie und
 <strong>Auskunft an</strong> (Personen mit Schweigepflichtentbindung). Auf dem Tablet und am Telefon steht diese Zeile hinter
-<strong>Versorgung und Hinweise</strong>. Fehlt eine Erklärung zum Datenschutz, steht ein Hinweis neben dem Namen.</p>
+<strong>Versorgung und Hinweise</strong>. Fehlt eine Erklärung zum Datenschutz, steht ein Hinweis neben dem Namen.</p>""" + _bild(
+            "akte-kopf.png", "Aktenkopf von Beispiel, Paula: neben dem Namen die Hinweise 3 Erklärungen fehlen, 2 Hinweise "
+            "(rot umrandet) und Nickelallergie; darunter die Knöpfe Kontakt, Gewicht, Termin, Dokument, Neuer Plan und "
+            "weitere Aktionen; darunter Gewicht, Infusionsplan, nächster Termin, letzter Kontakt sowie Versorger, Hausarzt "
+            "und Auskunft an.", "Der Aktenkopf: Hinweise neben dem Namen, Knöpfe für die tägliche Arbeit, die wichtigsten "
+            "Zahlen.", 1275, 247) + """
 <p>Die Knöpfe im Kopf: <strong>Kontakt</strong>, <strong>Gewicht</strong>, <strong>Termin</strong> und
 <strong>Dokument</strong> öffnen jeweils denselben Dialog bzw. die Dateiauswahl (die Seite bleibt, wo sie ist);
 <strong>Neuer Plan</strong> – oder <strong>Entwurf fortsetzen</strong>, wenn es schon einen Entwurf gibt. Unter
@@ -465,7 +523,9 @@ in der Übersicht, „K Text“ in der Kürzelzeile der Karteikarte, die Taste <
 wählen. Vorgeschlagen wird eine Wiedervorlage in 14 Tagen (einstellbar unter Vorlagen › Grenzwerte); Datum, Uhrzeit
 und Art lassen sich ändern. Sie erscheint auf der Startseite und im Kalender.</li>
 <li><strong>Speichern</strong> (oder Strg Enter). Erfasst-von trägt EPM selbst ein.</li>
-</ol>
+</ol>""" + _film(
+            "kontakt-erfassen", "Ablauf in der Akte: Knopf Kontakt im Aktenkopf, das Fenster Kontakt erfassen öffnet sich, "
+            "Notiz eintragen, unten Speichern.", "Kontakt erfassen: Kontakt – Notiz schreiben – Speichern.", 960, 737) + """
 <p>Vor einer Auskunft am Telefon im Aktenkopf unter <strong>Auskunft an</strong> nachsehen, wem Auskunft gegeben werden
 darf. Termine der Akte stehen in der Übersicht und im Kalender.</p>""",
     },
@@ -486,7 +546,10 @@ Terminort) und <strong>Sonstiges</strong>. Ohne Uhrzeit gilt ein Termin als ganz
 <p><strong>Neuer Termin</strong> über <strong>Termin</strong> in der Akte (Taste <strong>T</strong>), auf der Startseite,
 im Kalender oder beim Kontakt. Offene Termine öffnet ein Klick (Titel in der Übersicht, Eintrag im Kalender oder in der
 Karteikarte) gleich in <strong>Termin bearbeiten</strong> – dort auch <strong>Erledigt</strong> und
-<strong>Akte öffnen</strong>. Auf Startseite und Übersicht hakt das Kästchen einen Termin als erledigt ab.</p>""",
+<strong>Akte öffnen</strong>. Auf Startseite und Übersicht hakt das Kästchen einen Termin als erledigt ab.</p>""" + _bild(
+            "termin-anlegen-fenster.png", "Fenster Neuer Termin für Beispiel, Paula: Art (Rückruf), Ort, Datum, Uhrzeit "
+            "(leer bedeutet ganztägig), Titel und Notiz, unten Abbrechen und Speichern.",
+            "Neuer Termin: Art und Datum wählen, ohne Uhrzeit ist er ganztägig.", 520, 532),
     },
     {
         "id": "terminbestaetigung", "gruppe": "kontakte", "titel": "Terminbestätigung nach dem Speichern",
@@ -516,6 +579,10 @@ erstellt. Ob die Frage erscheint, stellt ein, wer Vorlagen pflegt (Vorlagen › 
 erreicht wird (Grenzwerte unter Vorlagen › Grenzwerte).</li>
 <li><strong>Plan prüfen</strong>, wenn der aktuelle Infusionsplan älter wird als eingestellt.</li>
 </ul>
+""" + _bild(
+            "kalender.png", "Kalender im Oktober als Monatsansicht mit farbigen Terminen; rechts die Reiter Tag, Überfällig "
+            "und Fällig mit den Terminen des gewählten Tages und der nächsten 7 Tage.",
+            "Kalender: links der Monat, rechts der gewählte Tag und die nächsten 7 Tage.", 1100, 598) + """
 <p>Ein Klick auf einen offenen Termin öffnet <strong>Termin bearbeiten</strong> (mit Erledigt und Akte öffnen);
 Fälligkeiten und Erledigtes öffnen eine Ansicht. Das <strong>×</strong> an einem Eintrag blendet ihn aus – wie die
 Hinweise in der Akte für 3, 6 oder 12 Monate oder als „nicht mehr nötig“, mit Grund.</p>
@@ -559,7 +626,10 @@ Vorlagen › Dokumentvorlagen › „Patientenankündigung“.</p>""",
 <p><strong>Gewicht</strong> im Aktenkopf, <strong>+ Gewicht</strong> auf der Karte „Gewichtsverlauf“, „G 54,6“ in der
 Kürzelzeile, die Taste <strong>G</strong> oder <strong>Gewicht</strong> auf der Startseite öffnen denselben Dialog:
 Gewicht, Quelle (telefonisch, Ambulanz, Versorger, Arztbrief) und Messdatum eintragen, <strong>Speichern</strong>. Beim
-Kontakt geht es mit „Gewicht mit erfassen“ in einem Schritt, bei der BIA-Messung ebenso.</p>
+Kontakt geht es mit „Gewicht mit erfassen“ in einem Schritt, bei der BIA-Messung ebenso.</p>""" + _bild(
+            "gewicht-erfassen-fenster.png", "Fenster Gewicht erfassen: Feld Gewicht mit 57,4 kg (rot umrandet), Quelle "
+            "telefonisch, Messdatum; darunter die Veränderung zur letzten Messung, unten Speichern.",
+            "Gewicht erfassen: Wert eintragen – EPM zeigt gleich die Veränderung zur letzten Messung.", 640, 507) + """
 <p>Unplausible Werte (außerhalb der Grenzwerte) und Daten in der Zukunft werden abgewiesen. Eine falsche Messung wird
 mit <strong>Bearbeiten</strong> berichtigt – die letzte direkt per Klick auf den Wert oder „Bearbeiten“ auf der Karte,
 ältere unter <strong>Messwerte anzeigen</strong>; die bisherige Fassung bleibt im Verlauf sichtbar.</p>""",
@@ -584,7 +654,10 @@ ob sie unverändert ist.</p>
 <p>Die <strong>PDF</strong> steht direkt neben der Liste der Pläne, so hoch wie das Fenster: eine ganze Seite auf einen
 Blick (<strong>Ganze Seite</strong>; − und + vergrößern auf die Breite). <strong>Groß ansehen</strong> öffnet sie im
 Fenster, <strong>Herunterladen</strong> speichert sie. Entwürfe zeigen die Ansicht mit der aktiven Dokumentvorlage und dem
-Wasserzeichen „ENTWURF“.</p>
+Wasserzeichen „ENTWURF“.</p>""" + _bild(
+            "infusionsplan-ansehen.png", "Reiter Infusionspläne der Akte: links die Liste der Pläne, neueste oben "
+            "(aktuell gültig, abgelöst), rechts der aktuelle Plan mit PDF öffnen, Ansicht wie PDF und Vergleich mit "
+            "Vorgänger.", "Infusionspläne in der Akte: links die Pläne, rechts der gewählte Plan als PDF.", 1302, 430) + """
 <p>Der Menüpunkt <strong>Infusionspläne</strong> zeigt die Pläne aller Patienten: zur Freigabe, aktuell und älter als
 eingestellt. Beim Überfahren des Status steht die Frist, ab der ein Plan als alt gilt. <strong>PDF</strong> gibt es an
 jedem Plan (auch an Entwürfen); ab 1920 Bildpunkten Breite erscheint sie rechts neben der Liste, sonst im Fenster.</p>
@@ -626,7 +699,12 @@ dritte Spalte die Vorschau des zuletzt gespeicherten Entwurfs.</p>""",
         "id": "plan_freigeben", "gruppe": "plaene", "titel": "Plan freigeben", "rechte": ["plaene_freigeben"], "seiten": [],
         "html": """
 <p><strong>Speichern und freigeben</strong> macht den Plan zum aktuellen Plan. Dabei wird die PDF mit der aktiven
-Dokumentvorlage erzeugt und mit Prüfsumme gespeichert; der vorherige Plan bleibt im Verlauf erhalten.</p>""",
+Dokumentvorlage erzeugt und mit Prüfsumme gespeichert; der vorherige Plan bleibt im Verlauf erhalten.</p>
+<p>Ein gespeicherter Entwurf steht im Reiter Infusionspläne der Akte (oder unter <strong>Infusionspläne › Zur
+Freigabe</strong>): prüfen und oben rechts <strong>Freigeben</strong>.</p>""" + _bild(
+            "infusionsplan-freigeben.png", "Entwurf eines Infusionsplans mit den Knöpfen Bearbeiten, Verwerfen und "
+            "Freigeben (rot umrandet), darunter die Ansicht wie PDF.",
+            "Entwurf prüfen und oben rechts freigeben.", 971, 400),
     },
     {
         "id": "plan_abschliessen", "gruppe": "plaene", "titel": "Plan nach Freigabe abschließen",
@@ -644,7 +722,10 @@ der Freigabe und der Nachweis (z. B. die E-Mail als PDF).</p>""",
 <p>Im Reiter <strong>Dokumente</strong> liegen Arztbriefe, Befunde, Erklärungen und erzeugte PDFs. Ablegen mit
 <strong>Neues Dokument</strong> (PDF, Bild oder Text, höchstens 50 MB) – oder die Datei einfach auf die geöffnete Akte
 ziehen; im Aktenkopf geht es auch über <strong>Weitere Aktionen › Dokument hochladen</strong>. Danach rechts Typ, Titel
-und Dokumentdatum ergänzen und <strong>Speichern</strong>. EPM schlägt das Datum aus der Datei vor.</p>
+und Dokumentdatum ergänzen und <strong>Speichern</strong>. EPM schlägt das Datum aus der Datei vor.</p>""" + _bild(
+            "dokumente-hochladen.png", "Reiter Dokumente: oben die Fläche zum Hineinziehen mit dem Knopf Neues Dokument "
+            "(rot umrandet), darunter die Liste der Dokumente, rechts die Vorschau des gewählten Dokuments.",
+            "Dokumente: Datei hineinziehen oder „Neues Dokument“; rechts die Vorschau.", 1302, 428) + """
 <p>Die Suche über der Liste findet Wörter in Titel und Notiz und – nach <strong>Text erkennen</strong> – auch im
 Inhalt eines gescannten Briefs.</p>
 <p>Dokumente werden in EPM angezeigt, ohne das PDF-Programm des PCs. Ausgeblendete Dokumente sind nicht gelöscht.</p>""",

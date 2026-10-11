@@ -5,7 +5,7 @@
 | `backend/` | Django-Backend (siehe `backend/README.md`) |
 | `frontend/` | Oberfläche: React, TypeScript, Vite, Tailwind, Base UI (Bausteine im Stil von shadcn/ui), TipTap; Browsertests in `frontend/e2e/` (Playwright) |
 | `rollout/` | Server-Einrichtung: `01-basis.sh` … `05-backend.sh`, Compose, Nginx |
-| `werkzeuge/` | `epm-update.sh` (Update in einem Schritt), `ci-stack.sh` (kompletter Stack für die Browsertests), `epm-git-einrichten.sh`, `bauen.sh`/`bauen.ps1` |
+| `werkzeuge/` | `epm-update.sh` (Update in einem Schritt), `ci-stack.sh` (kompletter Stack für die Browsertests), `epm-git-einrichten.sh`, `bauen.sh`/`bauen.ps1`, `hilfe-bilder.mjs` (Bilder der Hilfe) |
 | `docs/BACKEND-FUNKTIONEN.md` | Nachweis aller Funktionen mit API-Verträgen, Tests und Status |
 | `VERSION` | Grundstand der Versionsnummer (X.Y.Z). Die letzte Stelle zählt automatisch je Änderung auf main hoch (`werkzeuge/version.sh`: 2.0.0 + 3 Merges = 2.0.3); neue Funktionen bzw. Hauptversion: VERSION von Hand auf 2.1.0 bzw. 3.0.0 setzen, die Zählung beginnt neu. Die Images heißen `epm-backend:<Version>-<Commit>` und `epm-web:<Version>-<Commit>` |
 
@@ -94,6 +94,25 @@ verschlüsselt), `SHA256SUMS`, `INHALT.json` und den Plan. Nach jedem Update und
 zwei Kopien getrennt lagern. Aufbau auf frischem Ubuntu Server: auspacken, im Ordner `sudo ./epm-notfall-aufbau.sh`
 (`--probelauf` zeigt nur, was geschähe); die Rollout-Skripte laufen dabei mit `EPM_OFFLINE=1`. Plan:
 [`docs/NOTFALLPLAN.md`](docs/NOTFALLPLAN.md).
+
+## Bilder der Hilfe (11.10.2026)
+Die Hilfe zeigt Bildschirmfotos und kurze GIFs (Wunsch 11.10.2026). Sie liegen in `frontend/public/hilfe-bilder/`
+(Auslieferung unter `/hilfe-bilder/…`, im Image mit dabei) und stehen in `backend/hilfe/inhalt.py`. Neu erzeugen, z. B.
+nach Änderungen an der Oberfläche – EPM muss laufen (Entwicklung: Vite auf 127.0.0.1:5173 mit Django):
+
+```bash
+cd frontend && npm ci && cd ..                       # Playwright aus frontend/node_modules
+EPM_KENNWORT=… [EPM_CODE=…] node werkzeuge/hilfe-bilder.mjs          # alle Bilder
+node werkzeuge/hilfe-bilder.mjs kontakt telefon                      # nur Bilder mit diesen Namen
+```
+
+Angemeldet wird mit einem **Testbenutzer** (Vorgabe `hilfe.bilder`, Rolle Mediziner), der nur die Testpatienten sieht –
+das Werkzeug bricht bei anderen Konten ab. Die Sitzung bleibt in `werkzeuge/.hilfe-bilder-sitzung.json` (nicht im Repo).
+Weitere Einstellungen: `EPM_URL` (Vorgabe `http://127.0.0.1:5173`), `EPM_BENUTZER`, `EPM_CHROMIUM` (Vorgabe
+`/opt/pw-browsers/chromium`, leer = Chromium von Playwright), `EPM_PYTHON` (Python mit Pillow für GIFs und Verkleinern,
+`werkzeuge/hilfe-gif.py`). Gespeichert wird nichts: Fenster werden nur geöffnet und mit Escape verworfen. Am Ende steht
+eine Liste mit Größe und Maßen; ändern sich Maße, `width`/`height` in `inhalt.py` anpassen – der Test
+`patienten.test_startseite.Hilfe` prüft Dateien, Alternativtexte und Seitenverhältnisse.
 
 ## Tests
 Bei jedem Push laufen in GitHub Actions (`.github/workflows/backend.yml`):

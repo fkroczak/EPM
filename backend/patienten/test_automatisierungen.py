@@ -24,11 +24,17 @@ def vollstaendig(**felder) -> Patient:
     return p
 
 
+def alt_anlegen():
+    """Akten gelten als länger bestehend – sonst zählt die Frist „kein Gewicht“ erst ab dem Anlegen (11.10.2026)."""
+    Patient.objects.update(angelegt_am=timezone.now() - timedelta(days=365))
+
+
 class FehlendeAngaben(Grundlage):
     """F186: je Regel ein Test; abgeschlossene Akten und Testpatienten bleiben außen vor."""
 
     def setUp(self):
         self.voll = vollstaendig()
+        alt_anlegen()
 
     def arten(self, p):
         return luecken([p.id]).get(p.id, [])
@@ -68,6 +74,33 @@ class FehlendeAngaben(Grundlage):
         self.assertIn("gewicht_fehlt", self.arten(self.voll))  # Standard: 3 Monate
         Einstellungen.objects.filter(pk=1).update(gewicht_fehlt_monate=6)
         self.assertNotIn("gewicht_fehlt", self.arten(self.voll))
+
+    def test_neue_akte_gewicht_erst_nach_frist(self):
+        """Wunsch 11.10.2026: frisch angelegt und noch nie gewogen – kein „Kein Gewicht seit 3 Mon.“."""
+        neu = Patient.objects.create(nachname="Neu", vorname="Nina", geburtsdatum="1970-01-01")
+        self.assertNotIn("gewicht_fehlt", self.arten(neu))
+        Patient.objects.filter(pk=neu.pk).update(angelegt_am=timezone.now() - timedelta(days=100))
+        self.assertIn("gewicht_fehlt", self.arten(neu))
+
+    def test_nickelallergie_hinweis_wegklickbar_ohne_katheter_keiner(self):
+        """Wunsch 11.10.2026: „Nickelallergie nicht erfasst“ wie die übrigen Hinweise – mit „×“, ohne Katheter keiner."""
+        c = client_fuer(self.mitarbeiter)
+
+        def hinweise():
+            return [h["art"] for h in c.get(f"/api/patienten/{self.voll.id}/").json()["kopf"]["hinweise"]]
+
+        self.assertIn("nickelallergie", hinweise())  # Standard: unbekannt
+        self.assertEqual(c.post(f"/api/patienten/{self.voll.id}/hinweis-ruhe/", {"art": "nickelallergie", "monate": 3},
+                                format="json").status_code, 201)
+        self.assertNotIn("nickelallergie", hinweise())
+        # Prüfliste der Startseite und Filter der Liste zählen weggeklickte nicht
+        self.assertNotIn(self.voll.id, [p["id"] for p in c.get("/api/patienten/", {"pruefen": "nickelallergie"}).json()["results"]])
+        Hinweisruhe.objects.filter(patient=self.voll).update(aufgehoben_am=timezone.now())
+        self.assertIn("nickelallergie", hinweise())
+        Patient.objects.filter(pk=self.voll.pk).update(kein_katheter=True)
+        self.assertNotIn("nickelallergie", hinweise())
+        Patient.objects.filter(pk=self.voll.pk).update(kein_katheter=False, nickelallergie="nein")
+        self.assertNotIn("nickelallergie", hinweise())
 
     def test_diagnose(self):
         Diagnose.objects.filter(patient=self.voll).update(aktiv=False)
@@ -165,6 +198,7 @@ class Tagesliste(Grundlage):
                                                     abschluss_anlass=Patient.Abschlussanlass.THERAPIE_BEENDET)
         Infusionsplan.objects.create(patient=cls.voll, gueltig_ab=heute, status=Infusionsplan.Status.ENTWURF)
         Infusionsplan.objects.create(patient=cls.test, gueltig_ab=heute, status=Infusionsplan.Status.ENTWURF)
+        alt_anlegen()
 
     def liste(self, user=None):
         r = client_fuer(user or self.mitarbeiter).get("/api/startseite/")

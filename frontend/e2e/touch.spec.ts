@@ -103,20 +103,25 @@ test.describe("Telefon 390 px: Benutzer bearbeiten", () => {
 test.describe("Telefon 390 px: Nickelallergie nicht erfasst", () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, storageState: zustand("mediziner") });
 
-  test("Hinweis wie die anderen offenen Aufgaben, in Liste und Aktenkopf; erfasst → weg (Wunsch 11.10.2026)", async ({ page }) => {
+  test("Hinweis wie die übrigen offenen Aufgaben, wegklickbar; ohne Katheter keiner; erfasst → weg (Wunsch 11.10.2026)", async ({ page }) => {
     const api = await apiAls("mediziner");
     const nachname = eindeutig("Nickeltest");
     const p = await api.post("patienten/", { nachname, vorname: "Nora", geburtsdatum: "1966-06-06" });
+    const ohne = await api.post("patienten/", { nachname: `${nachname}Ohne`, vorname: "Olaf", geburtsdatum: "1966-06-06", kein_katheter: true });
     await page.goto(`/patienten?suche=${nachname}`);
-    const chip = page.getByTestId("patientenliste").getByTestId("nickel-fehlt");
-    await expect(chip).toHaveText("Nickelallergie nicht erfasst");
-    await expect(chip).toHaveClass(/warn/);
-    await page.goto(`/patienten/${p.id}`);
-    await expect(page.getByTestId("cave").getByTestId("nickel-fehlt")).toBeVisible();
-    await api.patch(`patienten/${p.id}/`, { nickelallergie: "nein" });
+    const liste = page.getByTestId("patientenliste");
+    const karte = liste.getByRole("listitem").filter({ hasText: `${nachname}, Nora` });
+    await expect(karte.getByTestId("hinweis-nickelallergie")).toHaveText("Nickelallergie nicht erfasst");
+    // ohne Katheter: kein Hinweis
+    await expect(liste.getByRole("listitem").filter({ hasText: "Olaf" }).getByTestId("hinweis-nickelallergie")).toHaveCount(0);
+    // wegklicken wie die übrigen Hinweise
+    await karte.getByRole("button", { name: "Hinweis „Nickelallergie nicht erfasst“ ausblenden" }).click();
+    const dialog = page.getByRole("dialog", { name: "Hinweis ausblenden" });
+    await dialog.getByRole("button", { name: "Ausblenden" }).click();
+    await expect(karte.getByTestId("hinweis-nickelallergie")).toHaveCount(0);
+    // erfasst → auch ohne Ausblenden weg
+    await api.patch(`patienten/${ohne.id}/`, { nickelallergie: "nein" });
     await api.ende();
-    await page.reload();
-    await expect(page.getByTestId("nickel-fehlt")).toHaveCount(0);
   });
 });
 
@@ -139,7 +144,7 @@ test.describe("Telefon 390 px: offene Punkte und Termine führen zur Stelle", ()
 
     // „Nickelallergie nicht erfasst“ → Stammdaten offen
     await page.goto(`/patienten?suche=${nachname}`);
-    await liste.getByTestId("nickel-fehlt").getByRole("button").click();
+    await liste.getByTestId("hinweis-nickelallergie").click();
     await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}$`));
     await expect(page.getByRole("dialog")).toContainText("Nickelallergie");
 
@@ -200,5 +205,24 @@ test.describe("Telefon 390 px: Terminbestätigung schon erledigt", () => {
     await expect(dialog).toHaveCount(0);
     await page.getByTestId("naechster-termin").click();
     await expect(page.getByRole("dialog", { name: "Termin bearbeiten" }).getByTestId("bestaetigung-erstellt")).toContainText("Bestätigt telefonisch");
+  });
+});
+
+test.describe("Telefon 390 px: Erreichbarkeit mit Bezugspersonen", () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, storageState: zustand("mediziner") });
+
+  test("Bezugspersonen mit Auskunftserlaubnis stehen unter Kontakte › Erreichbarkeit (Wunsch 11.10.2026)", async ({ page }) => {
+    const api = await apiAls("mediziner");
+    const p = await api.post("patienten/", { nachname: eindeutig("Erreichbar"), vorname: "Eva", geburtsdatum: "1950-05-05" });
+    await api.post("bezugspersonen/", { patient: p.id, name: "Klaus Auskunft", telefon: "0251 123456", auskunft_erlaubt: true });
+    await api.post("bezugspersonen/", { patient: p.id, name: "Karl Ohne", telefon: "0251 999999", auskunft_erlaubt: false });
+    await api.ende();
+    await page.goto(`/patienten/${p.id}/kontakte`);
+    const karte = page.getByTestId("erreichbarkeit");
+    await expect(karte.getByTestId("erreichbarkeit-bezugsperson")).toHaveCount(1);
+    await expect(karte).toContainText("Klaus Auskunft");
+    await expect(karte).toContainText("Auskunft erlaubt");
+    await expect(karte).not.toContainText("Karl Ohne");
+    await expect(karte.getByRole("link", { name: /Klaus Auskunft/ })).toHaveAttribute("href", "tel:0251123456");
   });
 });

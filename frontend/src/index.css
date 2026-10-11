@@ -296,6 +296,21 @@ body {
   .richtext ol { list-style: decimal; }
   .richtext li { margin: 0.125rem 0; }
   .richtext > :last-child { margin-bottom: 0; }
+  /* Bilder in der Hilfe (Wunsch 11.10.2026): Bildschirmfotos und kurze GIFs aus frontend/public/hilfe-bilder/.
+     Nie breiter als der Text (am Telefon also volle Breite), Telefonbilder schmal und mittig. GIFs stehen in <picture>:
+     bei „Bewegung reduzieren“ zeigt der Browser das Standbild. */
+  .hilfe-text .hilfe-bild { margin: 0.75rem 0 1.125rem; display: flex; flex-direction: column; gap: 0.375rem; }
+  .hilfe-text .hilfe-bild picture { display: block; }
+  /* PC-Bilder: Klick öffnet die Datei in voller Größe (neuer Tab) */
+  .hilfe-text .hilfe-bild > a { display: block; align-self: flex-start; max-width: 100%; cursor: zoom-in; border-radius: 0.625rem; }
+  .hilfe-text .hilfe-bild > a:focus-visible { outline: 2px solid var(--akzent); outline-offset: 2px; }
+  .hilfe-text .hilfe-bild img {
+    display: block; max-width: 100%; height: auto; border: 1px solid var(--rand); border-radius: 0.625rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); background: #ffffff;
+  }
+  .hilfe-text .hilfe-bild figcaption { font-size: 0.8125rem; line-height: 1.45; color: var(--gedaempft); }
+  .hilfe-text .hilfe-bild.telefon { max-width: 20rem; margin-left: auto; margin-right: auto; align-items: center; text-align: center; }
+  .hilfe-text .hilfe-bild.telefon img { border-radius: 1rem; }
   /* Wiederaufbau-Plan (F188), serverseitig aus Markdown */
   .notfallplan h1 { font-size: 1.125rem; font-weight: 600; margin: 0 0 0.5rem; }
   .notfallplan h2 { font-size: 1rem; font-weight: 600; margin: 1rem 0 0.375rem; }
@@ -928,5 +943,6 @@ input.inp:is([type="date"], [type="time"])::-webkit-datetime-edit { padding: 0; 
 
 /* Karten mit eigenem Scroll- bzw. Abschneidebereich sind Bezugsrahmen für absolut gesetzte Kinder (z. B. Text nur für
    Bildschirmleser in Tabellenzellen) – sonst bezogen sich diese auf die Seite und machten sie am Tablet breiter
-   (Prüfung 11.10.2026: Infusionspläne 1288 statt 768 px) */
-.card:is(.overflow-x-auto, .overflow-auto, .overflow-hidden) { position: relative; }
+   (Prüfung 11.10.2026: Infusionspläne 1288 statt 768 px). Nicht für Karten, die selbst fest bzw. absolut liegen: Fenster
+   (.dialog-popup ist eine Karte mit overflow-auto) rutschten sonst ans Seitenende (Wunsch 11.10.2026, Hilfe-Bilder) */
+.card:is(.overflow-x-auto, .overflow-auto, .overflow-hidden):not(.fixed, .absolute, .sticky) { position: relative; }

@@ -162,6 +162,10 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
                 hinweise.append({"art": "ohne_plan", "text": "Kein Infusionsplan"})
         if not p.versorger_id and not p.kein_versorger:  # „kein Versorger“ ist bewusst so erfasst
             hinweise.append({"art": "versorger", "text": "Versorger nicht erfasst"})
+        # Nickelallergie offen (wichtig wegen des Katheters): Hinweis wie die übrigen, mit „×“ wegklickbar; ohne Katheter
+        # entfällt er (Wunsch 11.10.2026)
+        if p.nickelallergie == Patient.Nickelallergie.UNBEKANNT and not p.kein_katheter and p.id in in_betreuung:
+            hinweise.append({"art": "nickelallergie", "text": "Nickelallergie nicht erfasst"})
         letzter = kontakte.get(p.id)
         stufe = kontaktstufe(letzter, grenzen)
         if stufe:
@@ -296,6 +300,17 @@ def _mit_hinweis(patienten_qs, art: str) -> int:
                if any(h["art"] == art for h in k["hinweise"]))
 
 
+def nickel_offen(qs):
+    """Akten mit offener Angabe zur Nickelallergie: nicht erfasst, mit Katheter (bzw. ohne „kein Katheter“) und der
+    Hinweis nicht weggeklickt (Wunsch 11.10.2026) – Startseite „Nach und nach prüfen“ und Patientenliste ``?pruefen=``."""
+    from .models import Hinweisruhe
+
+    heute = timezone.localdate()
+    ruht = Hinweisruhe.objects.filter(art=Hinweisruhe.Art.NICKELALLERGIE, aufgehoben_am__isnull=True) \
+        .filter(Q(bis__isnull=True) | Q(bis__gte=heute)).values("patient_id")
+    return qs.filter(nickelallergie=Patient.Nickelallergie.UNBEKANNT, kein_katheter=False).exclude(id__in=ruht)
+
+
 def pruefliste(patienten_qs) -> dict:
     """„Nach und nach prüfen“ auf der Startseite (Entwurf 2)."""
     from .models import Datenschutzanfrage, Dokument
@@ -308,7 +323,7 @@ def pruefliste(patienten_qs) -> dict:
     return {
         "altdokumente": altdokumente.filter(typ_geprueft=False).count(),
         "altdokumente_gesamt": altdokumente.filter(Q(typ_geprueft=False) | Q(herkunft=Dokument.Herkunft.ALTSYSTEM)).count(),
-        "nickelallergie_unbekannt": offen.filter(nickelallergie=Patient.Nickelallergie.UNBEKANNT).count(),
+        "nickelallergie_unbekannt": nickel_offen(offen).count(),
         "kein_versorger": offen.filter(versorger__isnull=True, kein_versorger=False).count(),
         # Akten in Betreuung ohne freigegebenen Infusionsplan, ohne Bestätigung „kein Plan nötig“
         "ohne_plan": ohne_plan(offen).count(),

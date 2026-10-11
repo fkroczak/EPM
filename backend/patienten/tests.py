@@ -389,6 +389,8 @@ class Patientenliste(Grundlage):
         Patient.objects.filter(pk=cls.stabil.pk).update(kein_plan=True)
         # Testpatient: in der Liste mit Filter „test=ohne“ ausblendbar, zählt in keiner Statistik
         cls.testpat = Patient.objects.create(nachname="Test", vorname="T", geburtsdatum="1970-01-01", ist_test=True)
+        # länger bestehende Akten: „kein Gewicht“ zählt erst X Monate nach dem Anlegen (11.10.2026)
+        Patient.objects.update(angelegt_am=timezone.now() - timedelta(days=365))
 
     def test_liste_mit_kennzahlen(self):
         r = client_fuer(self.mitarbeiter).get("/api/patienten/?status=in_betreuung&test=ohne").json()
@@ -400,14 +402,14 @@ class Patientenliste(Grundlage):
         # seit F120 hat jede Akte in Betreuung ohne Befunde zusätzlich „labor“ und „bia“, seit F186 die fehlenden
         # Angaben (hier ohne Hausarzt, Telefon und Diagnose; das Gewicht ist aktuell)
         self.assertEqual([h["art"] for h in v["hinweise"]],
-                         ["gewicht", "ohne_plan", "labor", "bia", "hausarzt", "telefon", "diagnose"])
+                         ["gewicht", "ohne_plan", "nickelallergie", "labor", "bia", "hausarzt", "telefon", "diagnose"])
         s = zeilen[self.stabil.id]["kennzahlen"]
         self.assertEqual(s["trend"]["richtung"], "flat")
         self.assertTrue(s["termin_woche"])
-        self.assertEqual([h["art"] for h in s["hinweise"]], ["labor", "bia", "hausarzt", "telefon", "diagnose"])
+        self.assertEqual([h["art"] for h in s["hinweise"]], ["nickelallergie", "labor", "bia", "hausarzt", "telefon", "diagnose"])
         ohne = zeilen[self.patient.id]["kennzahlen"]
         self.assertEqual({h["art"] for h in ohne["hinweise"]},
-                         {"versorger", "kontakt", "ohne_plan", "labor", "bia", "hausarzt", "telefon", "gewicht_fehlt",
+                         {"versorger", "nickelallergie", "kontakt", "ohne_plan", "labor", "bia", "hausarzt", "telefon", "gewicht_fehlt",
                           "diagnose"})
         self.assertIsNone(ohne["gewicht"])
         # Standard-Reihenfolge: letzter Kontakt, neueste zuerst; ohne Kontakt ans Ende
