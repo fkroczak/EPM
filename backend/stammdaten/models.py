@@ -520,6 +520,10 @@ class Einstellungen(models.Model):
     def delete(self, *args, **kwargs):
         raise PermissionError("Einstellungen können nicht gelöscht werden.")
 
+    # Django-Admin (/verwaltung/) und API-Browseroberfläche: an bis zu diesem Zeitpunkt (Schalter unter
+    # Administration › System, 11.10.2026); leer = aus
+    technik_bis = models.DateTimeField("Technische Verwaltung an bis", null=True, blank=True)
+
     @classmethod
     def aktuell(cls) -> "Einstellungen":
         obj, _ = cls.objects.get_or_create(pk=1)

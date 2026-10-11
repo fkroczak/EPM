@@ -4,6 +4,7 @@
  * Server) und für das EPM (direkt im Backend); Hinweis an alle Benutzer; angemeldete Benutzer; Verlauf der Aufträge.
  * Update und Neustart: Bestätigung mit Admin-Passwort und 2FA, vorher automatische Sicherung, Benutzer werden gewarnt.
  */
+import { TechnikKarte } from "@/components/TechnikKarte";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
@@ -895,6 +896,8 @@ export function System() {
           <div className="stapel grid grid-cols-1 hd:grid-cols-2 gap-4 items-start">
             <AufraeumenKarte daten={d} offen={offen} />
             <UhrKarte daten={d} offen={offen} />
+            {/* Django-Admin und API-Ansicht nur auf Zeit (11.10.2026) */}
+            <TechnikKarte />
           </div>
         </ReiterInhalt>
       ) : null}

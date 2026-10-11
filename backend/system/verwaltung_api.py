@@ -487,3 +487,41 @@ class NotfallplanView(APIView):
             antwort["Content-Disposition"] = "attachment; filename*=UTF-8''NOTFALLPLAN.md"
             return antwort
         return Response({"html": notfallplan.zu_html()})
+
+
+# ------------------------------------------------------------------ Technische Verwaltung (Django-Admin, API-Ansicht)
+class TechnikView(APIView):
+    """GET Stand; PUT ``{"stunden": 0 | 1 | 8}`` – Django-Admin und API-Browseroberfläche für eine begrenzte Zeit
+    einschalten bzw. sofort ausschalten (Wunsch 11.10.2026). Jede Änderung steht im Audit-Log."""
+
+    permission_classes = [SystemRecht]
+
+    def _stand(self):
+        from epm import technik
+
+        technik.vergessen()
+        bis = technik.technik_bis()
+        return {"an": technik.geschaltet(), "bis": bis if technik.geschaltet() else None,
+                "django_admin": technik.django_admin_an(), "api_ansicht": technik.api_ansicht_an(),
+                "fest": {"django_admin": settings.EPM_DJANGO_ADMIN, "api_ansicht": settings.EPM_API_BROWSABLE}}
+
+    def get(self, request):
+        return Response(self._stand())
+
+    def put(self, request):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from stammdaten.models import Einstellungen
+
+        stunden = request.data.get("stunden")
+        if isinstance(stunden, bool) or stunden not in (0, 1, 8):
+            return Response({"stunden": "Bitte 0 (aus), 1 oder 8 Stunden wählen."}, status=status.HTTP_400_BAD_REQUEST)
+        e = Einstellungen.aktuell()
+        e.technik_bis = timezone.now() + timedelta(hours=stunden) if stunden else None
+        e._history_user = request.user
+        e.save(update_fields=["technik_bis"])
+        protokolliere(SystemEreignis.Art.SYSTEM, request, objekt="Technische Verwaltung (Django-Admin, API-Ansicht)",
+                      an=bool(stunden), stunden=stunden)
+        return Response(self._stand())
