@@ -99,3 +99,23 @@ test.describe("Telefon 390 px: Benutzer bearbeiten", () => {
     expect(formular.y).toBeLessThan(rechte.y);
   });
 });
+
+test.describe("Telefon 390 px: Nickelallergie nicht erfasst", () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, storageState: zustand("mediziner") });
+
+  test("Hinweis wie die anderen offenen Aufgaben, in Liste und Aktenkopf; erfasst → weg (Wunsch 11.10.2026)", async ({ page }) => {
+    const api = await apiAls("mediziner");
+    const nachname = eindeutig("Nickeltest");
+    const p = await api.post("patienten/", { nachname, vorname: "Nora", geburtsdatum: "1966-06-06" });
+    await page.goto(`/patienten?suche=${nachname}`);
+    const chip = page.getByTestId("patientenliste").getByTestId("nickel-fehlt");
+    await expect(chip).toHaveText("Nickelallergie nicht erfasst");
+    await expect(chip).toHaveClass(/warn/);
+    await page.goto(`/patienten/${p.id}`);
+    await expect(page.getByTestId("cave").getByTestId("nickel-fehlt")).toBeVisible();
+    await api.patch(`patienten/${p.id}/`, { nickelallergie: "nein" });
+    await api.ende();
+    await page.reload();
+    await expect(page.getByTestId("nickel-fehlt")).toHaveCount(0);
+  });
+});

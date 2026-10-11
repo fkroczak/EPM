@@ -103,7 +103,10 @@ function Hinweise({ p }: { p: PatientZeile }) {
   return (
     <span className="inline-flex gap-1.5 flex-wrap">
       {p.nickelallergie === "ja" ? <Chip art="fehler">Nickelallergie</Chip> : null}
-      {p.nickelallergie === "unbekannt" ? <Chip title="Nickelallergie nicht erfasst">Nickel ?</Chip> : null}
+      {/* wie die übrigen offenen Aufgaben (Wunsch 11.10.2026, vorher grau „Nickel ?“) – ohne „×“: wichtig wegen des
+          Katheters, verschwindet erst, wenn die Angabe in der Akte erfasst ist */}
+      {p.nickelallergie === "unbekannt" ? <Chip art="warn" title="Wichtig wegen des Katheters – in der Akte unter Stammdaten erfassen"
+        data-testid="nickel-fehlt">Nickelallergie nicht erfasst</Chip> : null}
       {/* Kontakt fällig in zwei Stufen (S04): überfällig rot, bald fällig gelb.
           Jeder Hinweis lässt sich mit „×“ wegklicken (F119). */}
       <HinweisChips hinweise={p.kennzahlen?.hinweise ?? []} patientId={p.id}

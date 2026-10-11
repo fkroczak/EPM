@@ -627,10 +627,16 @@ export function Akte() {
       {hinweiseImKopf ? null : <HinweisChipsKompakt hinweise={k?.hinweise ?? []} patientId={p.id} ausblendbar={kontext.bearbeiten} />}
     </>
   );
-  // CAVE: Nickelallergie und Gewichtsverlust stehen in jeder Ansicht direkt beim Namen
-  const cave = p.nickelallergie === "ja" || trend?.warnung ? (
+  // CAVE: Nickelallergie und Gewichtsverlust stehen in jeder Ansicht direkt beim Namen; ebenso eine noch nicht erfasste
+  // Nickelallergie (wichtig wegen des Katheters, Wunsch 11.10.2026) – mit Recht zum Bearbeiten öffnet sie die Stammdaten
+  const nickelFehlt = p.nickelallergie === "unbekannt";
+  const cave = p.nickelallergie === "ja" || nickelFehlt || trend?.warnung ? (
     <span className="inline-flex items-center gap-1.5 flex-wrap" data-testid="cave">
       {p.nickelallergie === "ja" ? <Chip art="fehler">Nickelallergie</Chip> : null}
+      {nickelFehlt ? (kontext.bearbeiten
+        ? <button type="button" className="chip warn cursor-pointer" onClick={() => setDialog("stammdaten")}
+            title="Wichtig wegen des Katheters – jetzt in den Stammdaten erfassen" data-testid="nickel-fehlt">Nickelallergie nicht erfasst</button>
+        : <Chip art="warn" title="Wichtig wegen des Katheters" data-testid="nickel-fehlt">Nickelallergie nicht erfasst</Chip>) : null}
       {trend?.warnung ? <Chip art="warn" title={`seit ${datum(trend.von)}`}>Gewicht {richtung(Number(trend.prozent))} {prozent(trend.prozent, false)}</Chip> : null}
     </span>
   ) : null;
