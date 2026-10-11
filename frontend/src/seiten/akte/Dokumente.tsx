@@ -189,7 +189,7 @@ function TextDialog({ dok, offen, onOffen }: { dok: Dokument; offen: boolean; on
     <Dialog offen={offen} onOffen={onOffen} titel={`Erkannter Text: ${dok.titel}`} breite={900}
       beschreibung={text.data ? `erkannt am ${zeitpunkt(text.data.erkannt_am)}${text.data.verfahren ? ` · ${text.data.verfahren}` : ""}${text.data.sicherheit != null ? ` · ${Math.round(text.data.sicherheit * 100)} % sicher` : ""}` : undefined}
       fuss={<><Knopf icon="kopieren" disabled={!text.data} onClick={() => void kopieren()}>Kopieren</Knopf><Knopf onClick={() => onOffen(false)}>Schließen</Knopf></>}>
-      {text.isLoading ? <Laden /> : <pre className="m-0 font-mono text-[0.8125rem] whitespace-pre-wrap break-words max-h-[60vh] overflow-auto border border-rand rounded-lg p-3"
+      {text.isLoading ? <Laden /> : <pre tabIndex={0} className="m-0 font-mono text-[0.8125rem] whitespace-pre-wrap break-words max-h-[60vh] overflow-auto border border-rand rounded-lg p-3"
         data-testid="dokument-text">{text.data?.text}</pre>}
       <Fehleranzeige fehler={text.error} />
     </Dialog>

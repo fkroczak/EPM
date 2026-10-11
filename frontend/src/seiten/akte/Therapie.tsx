@@ -196,7 +196,7 @@ function Seitenspalte({ feld }: { feld: Textfeld }) {
           <h2 className="lbl m-0">{TITEL[anderes]}</h2>
           <Link to={`${basis}/${anderes}`} className="text-sm font-medium">Öffnen</Link>
         </div>
-        <div className="max-h-48 overflow-auto"><Richtext html={patient[anderes]} className="text-sm" leer={`Noch keine ${TITEL[anderes]} eingetragen.`} /></div>
+        <div className="max-h-48 overflow-auto" tabIndex={0} role="region" aria-label={TITEL[anderes]}><Richtext html={patient[anderes]} className="text-sm" leer={`Noch keine ${TITEL[anderes]} eingetragen.`} /></div>
       </Karte>
       <Karte className="px-5 py-4 flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">

@@ -192,7 +192,7 @@ export function Infusionsplaene() {
               <tr>
                 <th className="th">Nr.</th><th className="th">Patient</th><th className="th">Status</th><th className="th">gültig ab</th>
                 <th className="th text-right">Energie</th><th className="th">Infusion</th>
-                <th className="th">Erstellt</th><th className="th">Freigegeben</th><th className="th" />
+                <th className="th">Erstellt</th><th className="th">Freigegeben</th><th className="th"><span className="sr-only">Aktionen</span></th>
               </tr>
             </thead>
             <tbody>

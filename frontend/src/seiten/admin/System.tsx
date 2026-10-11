@@ -871,7 +871,7 @@ export function System() {
                   {d.epm.konten.einmal_kennwort_offen ? <> · {d.epm.konten.einmal_kennwort_offen} mit offenem Einmal-Passwort
                     <KontenLinks konten={d.epm.konten.einmal_kennwort_konten} ich={ich.id} /></> : null}</span></Zeile>
                 <Zeile label="Zwei-Faktor-Anmeldung">{d.epm.konten.zweiter_faktor === "alle" ? "Pflicht für alle" : d.epm.konten.zweiter_faktor === "admins"
-                  ? "Pflicht für Admins, sonst freiwillig" : "freiwillig"} · <Link to="/admin/benutzer#anmeldung">ändern</Link></Zeile>
+                  ? "Pflicht für Admins, sonst freiwillig" : "freiwillig"} · <Link to="/admin/benutzer#anmeldung" className="underline">ändern</Link></Zeile>
                 <Zeile label="Zeitzone">{d.epm.zeitzone} · Serverzeit {h ? zeitpunkt(h.zeit) : "—"} · heute {datum(new Date())}</Zeile>
               </dl>
               <h3 className="m-0 mt-2 text-sm font-semibold">Größte Tabellen</h3>

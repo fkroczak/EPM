@@ -187,7 +187,7 @@ export function Tagesliste({ d }: { d: Startdaten }) {
       <Punkt key="kontakt" icon="sprechblase" art="fehler" testid="tl-kontakt" anzahl={tl.kontakt_ueberfaellig}
         text={`${mehrzahl(tl.kontakt_ueberfaellig, "Patient", "Patienten")} ohne Kontakt seit über ${tl.kontakt_monate} Monaten`}
         unter={<><Begriff name="wiedereinbestellung">Wiedereinbestellung</Begriff> fällig: kein Termin geplant – anrufen oder Termin anlegen</>}
-        aktion={<KnopfLink klein to="/patienten?pruefen=wiedereinbestellung" aria-label="Wiedereinbestellung: zur Patientenliste">
+        aktion={<KnopfLink klein to="/patienten?pruefen=wiedereinbestellung" aria-label="Zur Liste: Wiedereinbestellung fällig">
           Zur Liste</KnopfLink>} />,
     );
   }

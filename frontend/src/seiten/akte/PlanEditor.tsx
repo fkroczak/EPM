@@ -403,7 +403,7 @@ export function PlanEditor() {
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div className="flex flex-col gap-1">
           <span className="text-sm gedaempft">
-            <Link to={`/patienten/${patient.id}`} className="no-underline">{name(patient)}</Link> · Nr. {nummer(patient.nummer)}
+            <Link to={`/patienten/${patient.id}`} className="underline">{name(patient)}</Link> · Nr. {nummer(patient.nummer)}
             {patient.kopf?.gewicht ? ` · ${kg(patient.kopf.gewicht.kg)} am ${datum(patient.kopf.gewicht.am)}` : ""}
           </span>
           <h2 className="m-0 text-[1.625rem] font-semibold">{planId ? "Entwurf bearbeiten" : "Neuer Infusionsplan"}</h2>

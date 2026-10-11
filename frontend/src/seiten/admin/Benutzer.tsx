@@ -107,7 +107,7 @@ function RechteMatrix() {
         </div>
       </div>
       <table className="tabelle">
-        <thead><tr><th className="th" />{rollen.map((r) => <th key={r.code} className="th text-center">{r.name}</th>)}</tr></thead>
+        <thead><tr><th className="th"><span className="sr-only">Recht</span></th>{rollen.map((r) => <th key={r.code} className="th text-center">{r.name}</th>)}</tr></thead>
         <tbody>
           {d.rechte.map((x) => (
             <tr key={x.code}>
@@ -445,7 +445,7 @@ export function Benutzer() {
           <Karte className="overflow-x-auto">
             {liste.isLoading ? <Laden /> : (
               <table className="tabelle" data-testid="benutzerliste">
-                <thead><tr><th className="th w-12" /><th className="th">Name</th><th className="th">Rolle</th><th className="th">Anmeldung</th><th className="th">Status</th></tr></thead>
+                <thead><tr><th className="th w-12"><span className="sr-only">Kürzel</span></th><th className="th">Name</th><th className="th">Rolle</th><th className="th">Anmeldung</th><th className="th">Status</th></tr></thead>
                 <tbody>
                   {benutzer.map((b) => {
                     const z = zustand(b);

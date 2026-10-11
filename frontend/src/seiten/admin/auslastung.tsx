@@ -108,7 +108,7 @@ function VerlaufDiagramm({ verlauf }: { verlauf: Verlauf }) {
         <span className="gedaempft">Werte in %{mittel ? ` · Mittel über ${mittel}` : ""}</span>
       </div>
       <div ref={rahmen} className="relative grow" style={{ minHeight: Math.round(Math.min(300, Math.max(180, B * 0.2))) }}>
-        <svg ref={flaeche} viewBox={`0 0 ${B} ${H}`} className="absolute inset-0 w-full h-full touch-none" role="img"
+        <svg ref={flaeche} viewBox={`0 0 ${B} ${H}`} className="absolute inset-0 w-full h-full touch-pan-y" role="img"
           aria-label={letzte ? `Auslastung, ${verlauf.name}: CPU zuletzt ${wert(letzte, iCpu)}, Arbeitsspeicher ${wert(letzte, iRam)}`
             : `Auslastung, ${verlauf.name}: noch keine Messwerte`}
           onPointerMove={bewegen} onPointerLeave={() => setZeiger(null)}>

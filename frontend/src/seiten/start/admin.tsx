@@ -21,19 +21,14 @@ import type { Sitzung, Uebersicht, Wahl } from "@/seiten/admin/System";
 import { Rueckfrage, systemdZeit } from "@/seiten/admin/Backup";
 import type { Daten as BackupDaten } from "@/seiten/admin/Backup";
 import { KachelFuss, KachelInhalt, KachelKopf } from "./kacheln";
+import { useKonten } from "./konten";
+import type { Konto } from "./konten";
 
-export type Konto = { id: number; benutzername: string; anzeigename: string; rolle: string;
-  probleme: ("gesperrt" | "einmal_kennwort" | "einmal_kennwort_abgelaufen" | "ohne_2fa" | "notfallcodes")[];
-  gesperrt_am: string | null; sperrgrund: string; fehlversuche: number; einmal_kennwort_gueltig_bis: string | null;
-  notfallcodes_uebrig: number; notfallcodes_gesamt: number };
+export type { Konto } from "./konten";
 
 export function useSystem(aktiv: boolean) {
   return useQuery({ queryKey: ["system", "uebersicht"], queryFn: () => api<Uebersicht>("system/uebersicht/"), refetchInterval: 60_000,
     enabled: aktiv });
-}
-
-export function useKonten(aktiv: boolean) {
-  return useQuery({ queryKey: ["benutzer", "konten"], queryFn: () => api<Konto[]>("benutzer/konten/"), enabled: aktiv, refetchInterval: 60_000 });
 }
 
 function Messung({ label, prozent, text }: { label: string; prozent: number | null; text: ReactNode }) {

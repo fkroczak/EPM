@@ -431,7 +431,7 @@ function spaltenFuerBreite(px: number): number {
 }
 
 /** Fensterstufe, ab der die Akte das Fenster füllt (index.css, .seite-fuellt) */
-const FUELLT = "(min-width: 80rem) and (min-height: 37.5rem)";
+const FUELLT = "(min-width: 80rem) and (min-height: 37.5rem) and (pointer: fine)";
 /** Kleinste sinnvolle Höhe einer Kartenzeile; darunter scrollt die Fläche statt die Karten zu quetschen */
 const MIN_ZEILE = 170;
 

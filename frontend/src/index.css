@@ -841,12 +841,15 @@ html { scrollbar-gutter: stable; }
 /* Patientenakte ohne Seiten-Scrollen (Wunsch 10.10.2026, F181): ab 1280 × 600 px füllt die Akte das Fenster (Tablet
    1024 × 768: zwei breite Spalten mit Seiten-Scrollen, Entscheidung der Praxis 10.10.2026, F190). Kopf und
    Reiter bleiben stehen; gescrollt wird in der Fläche darunter, in zweispaltigen Reitern je Spalte und in der Übersicht
-   je Karte. Darunter (Telefon, Tablet hochkant) scrollt die Seite wie bisher. */
+   je Karte. Darunter (Telefon, Tablet hochkant) scrollt die Seite wie bisher.
+   Nur mit Maus bzw. Touchpad (pointer: fine): Auf großen Tablets (1280 × 800, 1366 × 1024) ließ sich die Akte sonst
+   über Kopf und Reiter nicht wischen – die Seite wirkte eingefroren (Fehlermeldung 11.10.2026). Dort scrollt die
+   Seite wie auf dem kleineren Tablet. Gleiche Abfrage in seiten/akte/Uebersicht.tsx (FUELLT). */
 .akte-flaeche { display: flex; flex-direction: column; gap: var(--abstand); min-width: 0; }
 /* Scrollbereiche halten auch absolut gesetzte Kinder (z. B. Text nur für Bildschirmleser) – sonst verlängern diese die
    Seite und es entsteht doch wieder ein Seiten-Scrollbalken */
 .seite-fuellt .akte-flaeche, .seite-fuellt .akte-spalten > *, .bereich.fest > .card { position: relative; }
-@media (min-width: 80rem) and (min-height: 37.5rem) {
+@media (min-width: 80rem) and (min-height: 37.5rem) and (pointer: fine) {
   .seite-fuellt { height: 100vh; height: 100dvh; min-height: 0 !important; overflow: hidden; }
   .seite-fuellt > main.seite-inhalt { min-height: 0; overflow: hidden; }
   .seite-fuellt .akte-flaeche {
@@ -856,7 +859,7 @@ html { scrollbar-gutter: stable; }
   }
 }
 /* zweispaltige Reiter (Liste | Eintrag, Text | Seitenleiste): ab 1280 px scrollt jede Spalte für sich */
-@media (min-width: 80rem) and (min-height: 37.5rem) {
+@media (min-width: 80rem) and (min-height: 37.5rem) and (pointer: fine) {
   .seite-fuellt .akte-flaeche:has(> .akte-spalten) { overflow: hidden; }
   .seite-fuellt .akte-spalten { flex: 1 1 auto; min-height: 0; height: 100%; align-items: stretch !important; align-content: stretch; }
   .seite-fuellt .akte-spalten > * {
@@ -876,3 +879,31 @@ html { scrollbar-gutter: stable; }
 .gewicht-fuellen { flex: 1 1 0; min-height: 7rem; display: flex; overflow: hidden; position: relative; }
 .gewicht-fuellen > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .karten-abschnitt + .karten-abschnitt { border-top: 1px solid var(--rand); padding-top: 0.75rem; }
+
+/* Touch-Geräte (Fehlermeldung 11.10.2026: „auf einigen Flächen lässt sich das Bild nicht bewegen, wie eingefroren“):
+   Innere Scrollbereiche (Kacheln der Startseite, Karten fester Höhe, Listen, Spalten) hielten das Wischen mit
+   overscroll-behavior: contain fest – war der Bereich am Ende, lief die Seite nicht weiter. Mit Finger reicht das
+   Wischen am Ende eines Bereichs an die Seite weiter; mit der Maus bleibt das Mausrad im Bereich. */
+@media (pointer: coarse) {
+  .kachel > .kachel-inhalt, .kachel > .contents > .kachel-inhalt, .bereich.fest > .card, .overscroll-contain,
+  .seite-fuellt .akte-flaeche, .seite-fuellt .akte-spalten > * { overscroll-behavior: auto; }
+  /* angeheftete Spalten mit eigener Höhe (Listen, Seitenleisten) nicht festhalten: auf dem Tablet scrollt die Seite */
+  .stamm-liste, .kalender-seite, .akte-leiste-kopf, .akte-kartei-spalte { overscroll-behavior: auto; }
+}
+
+/* Felder nie breiter als ihre Spalte (Fehlermeldung 11.10.2026: „bei der Terminbuchung ragen Elemente rechts heraus“):
+   Datum und Uhrzeit haben in Safari (iPhone, iPad) eine feste Mindestbreite und ignorieren width: 100 % – ohne
+   min-width: 0 ragen sie im Dialog rechts heraus. */
+.feld { min-width: 0; }
+.feld > * { min-width: 0; max-width: 100%; }
+input.inp:is([type="date"], [type="time"], [type="datetime-local"], [type="month"], [type="week"]) {
+  min-width: 0; max-width: 100%; display: block; -webkit-appearance: none; appearance: none;
+  line-height: calc(var(--steuer-h) - 2px);
+}
+input.inp::-webkit-date-and-time-value { text-align: left; min-height: 1.25em; }
+input.inp:is([type="date"], [type="time"])::-webkit-datetime-edit { padding: 0; }
+
+/* Umschalter mit vielen Einträgen (Vorlagen: Übersicht … Anlagen für E-Mails; System: Wartung … Testphase) brechen
+   auch auf dem Tablet um, statt die Seite zu verbreitern (Prüfung 11.10.2026: Tablet hochkant 1007 px statt 768 px).
+   Reiterleisten (nav.segmente) wischen am Telefon weiterhin seitlich (Regel oben mit !important). */
+.segmente { max-width: 100%; flex-wrap: wrap; }

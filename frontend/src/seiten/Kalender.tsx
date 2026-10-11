@@ -153,9 +153,9 @@ function EintragKnopf({ e, heute, onWahl, voll }: { e: Eintrag; heute: string; o
         voll && "py-1.5 px-2 text-[0.8125rem] flex-col items-start gap-0.5")}>
       {t ? (
         <>
-          <span className={cx("num shrink-0", !voll && "opacity-80")}>{t.uhrzeit ? uhrzeit(t.uhrzeit) : voll ? "ganztägig" : ""}</span>
+          <span className={cx("num shrink-0", !voll && "opacity-90")}>{t.uhrzeit ? uhrzeit(t.uhrzeit) : voll ? "ganztägig" : ""}</span>
           <span className="truncate min-w-0"><span className="font-medium">{t.patient_name}</span>{voll ? <> · {t.titel}</> : null}</span>
-          {voll ? <span className="text-[0.75rem] opacity-80">{TERMINARTEN[t.art]}{t.ort_name ? ` · ${t.ort_name}` : ""}{t.patient_ist_test ? " · Test" : ""}</span> : null}
+          {voll ? <span className="text-[0.75rem] opacity-90">{TERMINARTEN[t.art]}{t.ort_name ? ` · ${t.ort_name}` : ""}{t.patient_ist_test ? " · Test" : ""}</span> : null}
         </>
       ) : f ? (
         <>
@@ -166,7 +166,7 @@ function EintragKnopf({ e, heute, onWahl, voll }: { e: Eintrag; heute: string; o
     </button>
     {kann ? (
       <button type="button" data-testid="eintrag-ausblenden" aria-label="Ausblenden" title={`Ausblenden … (${beschriftung(e)})`}
-        className="shrink-0 px-1.5 bg-transparent border-0 cursor-pointer text-inherit opacity-60 hover:opacity-100 leading-none text-[0.9375rem]"
+        className="shrink-0 min-w-6 min-h-6 px-1.5 bg-transparent border-0 cursor-pointer text-inherit opacity-75 hover:opacity-100 leading-none text-[0.9375rem]"
         onClick={(ev) => { ev.stopPropagation(); ausblenden!(e); }}>×</button>
     ) : null}
     </div>
@@ -558,7 +558,7 @@ export function Kalender() {
     <Seite pfad={[{ text: "Kalender" }]}>
       {/* eine Zeile (Entwurf 08.10.2026): Titel, Blättern, Monat; rechts Ansicht, „Anzeigen ▾“ und „+ Termin“ */}
       <div className="seitenkopf flex items-center gap-x-2.5 gap-y-2 flex-wrap">
-        <h1 className="m-0 text-[1.25rem] leading-tight font-semibold whitespace-nowrap mr-1.5 max-md:hidden">Kalender</h1>
+        <h1 className="m-0 text-[1.25rem] leading-tight font-semibold whitespace-nowrap mr-1.5 max-md:sr-only">Kalender</h1>
         <Knopf className="icon" aria-label="Zurück" onClick={() => blaettern(-1)}><Icon name="pfeilLinks" /></Knopf>
         {!mobil ? <Knopf onClick={heuteWaehlen}>Heute</Knopf> : null}
         <Knopf className="icon" aria-label="Weiter" onClick={() => blaettern(1)}><Icon name="pfeilRechts" /></Knopf>

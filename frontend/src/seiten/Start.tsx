@@ -3,7 +3,7 @@
  * je Fensterbreite), „Startseite anpassen“ mit Ziehen und Einrasten, Schnellerfassung, Kacheln der Administration.
  * Größe, Reihenfolge und Sichtbarkeit je Person (PATCH /api/auth/ich/ {startseite}).
  */
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -24,8 +24,19 @@ import type { Vorgabe } from "@/components/Schnellerfassung";
 import type { Startdaten } from "./start/daten";
 import { Tagesliste } from "./start/tagesliste";
 import { AktivKachel, GewichtKachel, MeineKachel, PlaeneKachel, PruefenKachel, TermineKachel, WiederKachel } from "./start/kacheln";
-import { AngemeldetKachel, HinweisKachel, KontenKachel, ServerKachel, SicherungKachel, TestKachel, UpdatesKachel, ZugriffeKachel,
-  useKonten } from "./start/admin";
+import { useKonten } from "./start/konten";
+
+/** Kacheln der Administration erst laden, wenn sie gebraucht werden: Sie bringen Teile der Seiten Backup und System
+ *  mit (Lighthouse 11.10.2026: rund ein Viertel des ersten Pakets, das Pflegekräfte und Ärzte nie brauchen). */
+const adminKacheln = () => import("./start/admin");
+const SicherungKachel = lazy(() => adminKacheln().then((m) => ({ default: m.SicherungKachel })));
+const ServerKachel = lazy(() => adminKacheln().then((m) => ({ default: m.ServerKachel })));
+const UpdatesKachel = lazy(() => adminKacheln().then((m) => ({ default: m.UpdatesKachel })));
+const KontenKachel = lazy(() => adminKacheln().then((m) => ({ default: m.KontenKachel })));
+const AngemeldetKachel = lazy(() => adminKacheln().then((m) => ({ default: m.AngemeldetKachel })));
+const HinweisKachel = lazy(() => adminKacheln().then((m) => ({ default: m.HinweisKachel })));
+const ZugriffeKachel = lazy(() => adminKacheln().then((m) => ({ default: m.ZugriffeKachel })));
+const TestKachel = lazy(() => adminKacheln().then((m) => ({ default: m.TestKachel })));
 
 /** Titel und nötiges Recht je Kachel (ohne Recht erscheint sie weder auf der Seite noch unter „Ausgeblendet“) */
 const KACHELN: Record<KartenId, { titel: string; recht: Recht }> = {
@@ -347,9 +358,9 @@ export function Start() {
   const inhalt = (k: Karte): ReactNode => {
     const breit = Math.min(k.breite, spalten) === 2;
     if (["sicherung", "server", "updates", "konten", "angemeldet", "hinweis", "zugriffe", "testumgebung"].includes(k.id)) {
-      return k.id === "sicherung" ? <SicherungKachel /> : k.id === "server" ? <ServerKachel /> : k.id === "updates" ? <UpdatesKachel />
+      return <Suspense fallback={<Laden />}>{k.id === "sicherung" ? <SicherungKachel /> : k.id === "server" ? <ServerKachel /> : k.id === "updates" ? <UpdatesKachel />
         : k.id === "konten" ? <KontenKachel /> : k.id === "angemeldet" ? <AngemeldetKachel /> : k.id === "hinweis" ? <HinweisKachel />
-        : k.id === "zugriffe" ? <ZugriffeKachel /> : <TestKachel />;
+        : k.id === "zugriffe" ? <ZugriffeKachel /> : <TestKachel />}</Suspense>;
     }
     if (k.id === "meine") return <MeineKachel />;
     if (!d) return daten.error ? <div className="p-5"><Fehleranzeige fehler={daten.error} /></div> : <Laden />;
@@ -383,7 +394,7 @@ export function Start() {
             <span className="text-sm gedaempft" data-testid="start-zahlen">
               <span className="num">{d.termine.heute.length}</span> offene Termine heute · <span className="num">{d.termine.ueberfaellig.length}</span> überfällig
             </span>
-          ) : null}
+          ) : daten.isLoading ? <span className="text-sm" aria-hidden="true">{"\u00a0"}</span> : null /* Platz halten: sonst springt die Seite (Lighthouse CLS) */}
         </div>
         <div className="flex items-center gap-2.5 flex-wrap">
           {d?.sicherung ? <BackupStatus s={d.sicherung} verweis={darf("backup_verwalten")} />

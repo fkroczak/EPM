@@ -25,11 +25,13 @@ export function PatientWahl({ id, wert, onWahl, fehler, test, ohne }: {
   });
   if (wert) {
     return (
-      <div className="flex items-center gap-3 text-sm">
-        <span className="num gedaempft">{nummer(wert.nummer)}</span>
-        <span className="font-medium">{wert.nachname}, {wert.vorname}</span>
-        <span className="gedaempft">{datum(wert.geburtsdatum)}</span>
-        <Knopf klein variante="geist" onClick={() => onWahl(null)}>ändern</Knopf>
+      // lange Namen brechen um, „ändern“ bleibt rechts im Feld (am Telefon ragte der Knopf sonst aus dem Dialog)
+      <div className="flex items-center gap-3 text-sm min-w-0">
+        <span className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 min-w-0 grow">
+          <span className="font-medium min-w-0 [overflow-wrap:anywhere]">{wert.nachname}, {wert.vorname}</span>
+          <span className="gedaempft whitespace-nowrap"><span className="num">{nummer(wert.nummer)}</span> · {datum(wert.geburtsdatum)}</span>
+        </span>
+        <Knopf klein variante="geist" className="shrink-0" onClick={() => onWahl(null)}>ändern</Knopf>
       </div>
     );
   }
@@ -42,11 +44,11 @@ export function PatientWahl({ id, wert, onWahl, fehler, test, ohne }: {
           {(treffer.data?.results ?? []).filter((p) => p.id !== ohne).map((p) => (
             <li key={p.id}>
               <button type="button" role="option" aria-selected={false}
-                className={cx("w-full text-left px-3 py-2 text-sm flex gap-3 bg-transparent border-0 cursor-pointer hover:bg-fein")}
+                className={cx("w-full text-left px-3 py-2 text-sm flex flex-wrap items-baseline gap-x-3 gap-y-0.5 bg-transparent border-0 cursor-pointer hover:bg-fein")}
                 onClick={() => onWahl(p)}>
                 <span className="num gedaempft">{nummer(p.nummer)}</span>
-                <span className="font-medium">{p.nachname}, {p.vorname}</span>
-                <span className="gedaempft">{datum(p.geburtsdatum)}</span>
+                <span className="font-medium min-w-0 [overflow-wrap:anywhere]">{p.nachname}, {p.vorname}</span>
+                <span className="gedaempft whitespace-nowrap">{datum(p.geburtsdatum)}</span>
               </button>
             </li>
           ))}
