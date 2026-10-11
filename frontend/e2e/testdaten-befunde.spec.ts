@@ -43,10 +43,10 @@ test("Musterdaten: Diagnosen mit ICD-Code, auch beendete", async ({ page }) => {
   await expect(verdacht).toContainText("V – Verdacht auf");
   await expect(zeilen.filter({ hasText: "Mesenterialinfarkt" })).toContainText("K55.0Z");
 
-  // Mustermann: drei zutreffende, eine beendete (Infektion durch Katheter) unter „beendete anzeigen“
+  // Mustermann: vier zutreffende, eine beendete (Infektion durch Katheter) unter „beendete anzeigen“
   const max = await testpatient("Mustermann", "Max");
   await oeffnen(page, max.id, "/diagnosen");
-  await expect(liste.getByTestId("diagnose-zeile")).toHaveCount(3);
+  await expect(liste.getByTestId("diagnose-zeile")).toHaveCount(4);
   await expect(liste).not.toContainText("T82.7");
   await liste.getByRole("button", { name: "1 beendete anzeigen" }).click();
   const beendet = liste.getByTestId("diagnose-zeile").filter({ hasText: "Infektion durch Katheter" });
@@ -110,7 +110,7 @@ test("Musterdaten: BIA-Messungen zu mehreren Zeitpunkten", async ({ page }) => {
   const max = await testpatient("Mustermann", "Max");
   await oeffnen(page, max.id, "/bia");
   const messungen = page.getByRole("list", { name: "BIA-Messungen" }).getByRole("listitem");
-  await expect(messungen).toHaveCount(3);
+  await expect(messungen).toHaveCount(4);
   await expect(messungen.first()).toContainText(/BCM \d+,\d kg/);
   const detail = page.getByTestId("bia-detail");
   await expect(detail).toContainText(/BIA-Messung vom \d{2}\.\d{2}\.\d{4}/);
@@ -150,7 +150,7 @@ test("Musterdaten: Testpatient ohne Labor und BIA zeigt die Hinweise", async ({ 
   await expect(page.getByTestId("bia-detail")).toHaveCount(0);
   // Diagnosen hat sie trotzdem
   await oeffnen(page, hanna.id, "/diagnosen");
-  await expect(page.getByTestId("diagnoseliste").getByTestId("diagnose-zeile")).toHaveCount(2);
+  await expect(page.getByTestId("diagnoseliste").getByTestId("diagnose-zeile")).toHaveCount(3);
 
   // in der Patientenliste dieselben Hinweise
   await page.goto("/patienten?suche=Hanna");

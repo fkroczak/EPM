@@ -12,8 +12,8 @@ from stammdaten.models import Diagnosevorlage
 
 from .kennzahlen import kennzahlen
 from .models import Diagnose, Gewichtsmessung, Medikament, Patient
-from .testdaten import (TEST_BIA, TEST_DIAGNOSEN, TEST_LABOR, TEST_MEDIKAMENTE, TESTPATIENTEN, testdaten_zuruecksetzen,
-                        testpatienten_anlegen)
+from .testdaten import (TEST_BIA, TEST_DIAGNOSEN, TEST_LABOR, TEST_MEDIKAMENTE, TEST_THERAPIE, TESTPATIENTEN,
+                        testdaten_zuruecksetzen, testpatienten_anlegen)
 
 
 def testpatient(nachname) -> Patient:
@@ -43,6 +43,9 @@ class TestdatenBefunde(Grundlage):
                 self.assertEqual(p.laborbefunde.count(), len(TEST_LABOR[i]["tage"]) if i in TEST_LABOR else 0)
                 self.assertEqual(p.bia_messungen.count(), len(TEST_BIA.get(i, [])))
                 self.assertEqual(p.medikamente.count(), len(TEST_MEDIKAMENTE.get(i, [])))
+                # Therapie: Text „Aktuell“ und Verlauf in Schritten (11.10.2026)
+                self.assertEqual(p.therapieschritte.count(), len(TEST_THERAPIE[i][1]))
+                self.assertIn(TEST_THERAPIE[i][0], p.therapie)
         hanna = testpatient("Test")
         self.assertEqual((hanna.laborbefunde.count(), hanna.bia_messungen.count()), (0, 0))
         self.assertTrue(hanna.diagnosen.exists())
@@ -143,7 +146,7 @@ class TestdatenBefunde(Grundlage):
         verlauf = c.get(f"/api/laborbefunde/verlauf/?patient={erika.id}&parameter={mg['parameter']}").json()
         self.assertEqual([p["wert"] for p in verlauf["punkte"]], [0.84, 0.79, 0.71, 0.58])
         bia = c.get(f"/api/bia-messungen/?patient={max_.id}").json()
-        self.assertEqual(len(bia), 3)
+        self.assertEqual(len(bia), len(TEST_BIA[1]))
         # Verlauf beim Profil „abnahme“: BCM fällt, ECW steigt
         self.assertLess(bia[0]["bcm_kg"], bia[-1]["bcm_kg"])
         self.assertGreater(bia[0]["ecw_prozent"], bia[-1]["ecw_prozent"])
