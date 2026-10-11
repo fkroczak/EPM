@@ -439,10 +439,11 @@ function AkteLoeschenDialog({ patient, offen, onOffen }: { patient: Patient; off
         <Knopf variante="dng" laedt={loeschen.isPending} onClick={() => loeschen.mutate()}
           disabled={!vorbereiten.data || grund.trim().length < 10 || !zweiterFaktor || !kennwort || !zf.bereit || bestaetigung.trim().length < 6}>Akte endgültig löschen</Knopf></>}>
       <div className="flex flex-col gap-3" data-testid="akte-loeschen">
-        <Meldung art="fehler">Die Akte wird mit allen Einträgen, Infusionsplänen, Dokumenten und ihrem gesamten Verlauf
-          unwiederbringlich gelöscht. Es bleiben das Löschprotokoll (Patientennummer, Daten zu Abschluss und Frist, Rechtsgrund,
-          Ihr Grund, Umfang in Zahlen – kein Name) und die Einträge im Audit-Log ohne Namen und Inhalte. Ältere Sicherungen enthalten die Akte noch bis zu ihrem Ablauf; nach
-          einer Wiederherstellung wird sie automatisch erneut gelöscht.</Meldung>
+        <Meldung art="fehler">Die Akte wird unwiederbringlich gelöscht: mit allen Einträgen, Infusionsplänen, Dokumenten und
+          dem gesamten Verlauf. Es bleibt das Löschprotokoll ohne Namen: Patientennummer, Daten zu Abschluss und Frist,
+          Rechtsgrund, Ihr Grund und der Umfang in Zahlen. Auch die Einträge im Audit-Log bleiben, ohne Namen und Inhalte.
+          Ältere Sicherungen enthalten die Akte noch bis zu ihrem Ablauf. Nach einer Wiederherstellung wird sie automatisch
+          erneut gelöscht.</Meldung>
         {vorbereiten.data ? <Meldung art={vorbereiten.data.loeschen.rechtsgrund === "frist" ? "info" : "warn"}>{vorbereiten.data.loeschen.hinweis}</Meldung> : null}
         {u ? (
           <span className="text-[0.8125rem] gedaempft" data-testid="loesch-umfang">

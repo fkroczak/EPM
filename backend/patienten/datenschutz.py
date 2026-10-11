@@ -555,8 +555,8 @@ def einschraenken(patient, benutzer, grund: str, request=None):
     from django.core.exceptions import ValidationError
 
     if not patient.ist_abgeschlossen:
-        raise ValidationError({"fehler": "Nur abgeschlossene Akten können eingeschränkt werden – in einer laufenden "
-                                         "Betreuung wird die Akte gebraucht. Bitte die Akte zuerst abschließen."})
+        raise ValidationError({"fehler": "Nur eine abgeschlossene Akte lässt sich einschränken. Solange die Betreuung "
+                                         "läuft, wird die Akte gebraucht. Bitte die Akte zuerst abschließen."})
     if patient.ist_eingeschraenkt:
         raise ValidationError({"fehler": "Die Verarbeitung dieser Akte ist bereits eingeschränkt."})
     patient.eingeschraenkt_am = timezone.now()

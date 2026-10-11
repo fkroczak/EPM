@@ -454,9 +454,9 @@ class Infusionsplan(AktenEintrag):
 
         vorlage = json.dumps(Dokumentvorlage.aktive("infusionsplan").bloecke, ensure_ascii=False)
         if not re.search(r"\{\{\s*Plan\.Freigabevermerk\s*\}\}", vorlage):
-            raise ValidationError({"fehler": "Die Dokumentvorlage „Infusionsplan“ enthält das Datenfeld „Freigabevermerk“ "
-                                             "nicht. Ohne es nennt die PDF nicht, wer den Plan abgeschlossen hat. Bitte "
-                                             "unter Vorlagen › Dokumentvorlagen ergänzen und veröffentlichen."})
+            raise ValidationError({"fehler": "In der Dokumentvorlage „Infusionsplan“ fehlt das Datenfeld „Freigabevermerk“. "
+                                             "Ohne dieses Feld steht auf der PDF nicht, wer den Plan abgeschlossen hat. "
+                                             "Bitte unter Vorlagen › Dokumentvorlagen ergänzen und veröffentlichen."})
         self._freigabe(mediziner=mediziner, abschliessend=benutzer, weg=weg, datum=datum, nachweis=nachweis)
 
     def _freigabe(self, mediziner, abschliessend, weg, datum, nachweis):

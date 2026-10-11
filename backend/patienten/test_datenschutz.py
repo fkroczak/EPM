@@ -339,7 +339,7 @@ class Anfragen(DatenschutzGrundlage):
         # in laufender Betreuung nicht möglich
         r = m.post(url, daten, format="json")
         self.assertEqual(r.status_code, 400, r.content)
-        self.assertIn("abgeschlossene Akten", str(r.json()))
+        self.assertIn("abgeschlossene Akte", str(r.json()))
         self.assertTrue(Datenschutzanfrage.objects.get(pk=a["id"]).ist_offen)
         self.abschliessen()
         # die Anfrage zu einer abgeschlossenen Akte steht weiter auf der Startseite – mit dem Hinweis „überfällig“

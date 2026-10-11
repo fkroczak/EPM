@@ -107,23 +107,23 @@ früheren Fassungen bleiben im <strong>Verlauf</strong> der Akte sichtbar. Es ge
         "id": "anmelden", "gruppe": "erste_schritte", "titel": "Anmelden mit Passwort und Authenticator", "rechte": [],
         "seiten": [],
         "html": """
-<p>Angemeldet wird mit Benutzername und <strong>Passwort</strong>. Die <strong>Zwei-Faktor-Anmeldung</strong> (Code aus
-einer Authenticator-App auf dem Telefon) ist freiwillig – die Administration kann sie für Admins oder für alle zur
-Pflicht machen. Wer sie eingerichtet hat, wird bei jeder Anmeldung nach dem Code gefragt.</p>
+<p>Angemeldet wird mit Benutzername und <strong>Passwort</strong>. Die <strong>Zwei-Faktor-Anmeldung</strong> ist
+freiwillig. Dabei kommt ein Code aus einer Authenticator-App auf dem Telefon dazu. Die Administration kann sie für Admins
+oder für alle zur Pflicht machen. Wer sie eingerichtet hat, gibt bei jeder Anmeldung den Code ein.</p>
 <ol>
-<li>Benutzername und Passwort eingeben, <strong>Weiter</strong> wählen. Groß- und Kleinschreibung zählt; ist die
+<li>Benutzername und Passwort eingeben, <strong>Weiter</strong> wählen. Groß- und Kleinschreibung zählt. Ist die
 Feststelltaste an, weist EPM darauf hin.</li>
 <li>Mit Zwei-Faktor-Anmeldung: den sechsstelligen Code aus der Authenticator-App eingeben. Er wechselt alle 30 Sekunden.</li>
-<li>Bei der ersten Anmeldung mit dem Einmal-Passwort vom Zugangsblatt wird zuerst ein eigenes Passwort festgelegt. Ist
-die Zwei-Faktor-Anmeldung Pflicht, wird danach die Authenticator-App eingerichtet (QR-Code scannen); sonst geht das
-jederzeit unter <strong>Mein Konto › Anmeldung und Sicherheit › Einrichten</strong>. Danach zeigt EPM einmalig die
-Notfall-Codes.</li>
+<li>Erste Anmeldung: Mit dem Einmal-Passwort vom Zugangsblatt anmelden und ein eigenes Passwort festlegen. Ist die
+Zwei-Faktor-Anmeldung Pflicht, folgt die Authenticator-App (QR-Code scannen). Sonst geht das jederzeit unter
+<strong>Mein Konto › Anmeldung und Sicherheit › Einrichten</strong>. Danach zeigt EPM einmalig die Notfall-Codes.</li>
 </ol>
-<p>Solange sie freiwillig ist, lässt sich die Zwei-Faktor-Anmeldung unter Mein Konto mit Passwort und Code auch wieder
-ausschalten. Bestätigungen (endgültig löschen, Wiederherstellen, Updates, Sicherung, Import) verlangen immer Passwort
-<strong>und</strong> Code – wer sie ausführen soll (z. B. Mediziner, Administration), muss die Zwei-Faktor-Anmeldung
-eingerichtet haben.</p>
-<p>Nach mehreren falschen Passwörtern wird das Konto gesperrt; entsperren kann die Administration. Nach längerer
+<p>Solange sie freiwillig ist, lässt sich die Zwei-Faktor-Anmeldung unter Mein Konto wieder ausschalten. Dafür braucht
+es Passwort und Code.</p>
+<p>Manche Bestätigungen verlangen immer Passwort <strong>und</strong> Code: endgültig löschen, Wiederherstellen,
+Updates, Sicherung und Import. Wer sie ausführen soll (z. B. Mediziner, Administration), muss die
+Zwei-Faktor-Anmeldung eingerichtet haben.</p>
+<p>Nach mehreren falschen Passwörtern wird das Konto gesperrt. Entsperren kann die Administration. Nach längerer
 Pause meldet EPM von selbst ab.</p>""",
     },
     {
@@ -140,18 +140,27 @@ Zugangsblatt aus.</p>""",
         "id": "passkey", "gruppe": "erste_schritte", "titel": "Passkey statt Code (PC und Telefon)", "rechte": [],
         "seiten": [],
         "html": """
-<p>Ein <strong>Passkey</strong> ersetzt den Code aus der Authenticator-App: Nach dem Passwort bestätigt man die
-Anmeldung mit Fingerabdruck, Gesicht oder der PIN des Geräts (Windows Hello, iPhone, Android, Passwortmanager). Er gilt
-auch für alle Bestätigungen mit zweitem Faktor (endgültig löschen, Wiederherstellen, Updates, Import …). Der Code aus
-der App und die Notfall-Codes bleiben daneben gültig.</p>
-<p><strong>Einrichten:</strong> Mein Konto › Anmeldung und Sicherheit › <strong>Passkey hinzufügen</strong>, Namen
-vergeben (z. B. „iPhone“), bestätigen. Am besten auf PC <em>und</em> Telefon je einen anlegen. Wer noch keinen
-zweiten Faktor hatte, bekommt dabei Notfall-Codes.</p>
-<p><strong>Voraussetzung:</strong> EPM über den Namen aufrufen (z. B. <code>https://epm.stiftung.lan/</code>), nicht über
-die IP-Adresse, und das Stammzertifikat der Stiftung einmal auf dem Gerät installieren:
-<a href="/epm-ca.crt">Stammzertifikat herunterladen</a> (für iPhone/iPad als Profil:
-<a href="/epm-ca.mobileconfig">Profil laden</a>). Beides gibt es auch unter <em>Mein Konto › Gerät einrichten</em> mit
-Anleitung für das jeweilige Gerät und auf der Anmeldeseite unter „Dieses Gerät einrichten“.</p>
+<p>Ein <strong>Passkey</strong> ersetzt den Code aus der Authenticator-App. Nach dem Passwort bestätigt man die
+Anmeldung mit Fingerabdruck, Gesicht oder der PIN des Geräts. Das geht mit Windows Hello, iPhone, Android oder einem
+Passwortmanager.</p>
+<p>Der Passkey gilt auch für alle Bestätigungen mit zweitem Faktor (endgültig löschen, Wiederherstellen, Updates,
+Import …). Der Code aus der App und die Notfall-Codes bleiben daneben gültig.</p>
+<p><strong>Einrichten:</strong></p>
+<ol>
+<li>Mein Konto › Anmeldung und Sicherheit › <strong>Passkey hinzufügen</strong> wählen.</li>
+<li>Einen Namen vergeben (z. B. „iPhone“) und bestätigen.</li>
+</ol>
+<p>Am besten legt man auf PC <em>und</em> Telefon je einen an. Wer noch keinen zweiten Faktor hatte, bekommt dabei
+Notfall-Codes.</p>
+<p><strong>Voraussetzung:</strong></p>
+<ul>
+<li>EPM über den Namen aufrufen (z. B. <code>https://epm.stiftung.lan/</code>), nicht über die IP-Adresse.</li>
+<li>Das Stammzertifikat der Stiftung einmal auf dem Gerät installieren:
+<a href="/epm-ca.crt">Stammzertifikat herunterladen</a>. Für iPhone und iPad gibt es ein Profil:
+<a href="/epm-ca.mobileconfig">Profil laden</a>.</li>
+</ul>
+<p>Beides gibt es auch unter <em>Mein Konto › Gerät einrichten</em>, mit Anleitung für das jeweilige Gerät. Auf der
+Anmeldeseite steht es unter „Dieses Gerät einrichten“.</p>
 <ul>
 <li><strong>Windows:</strong> Datei öffnen › Zertifikat installieren › Lokaler Computer › „Vertrauenswürdige
 Stammzertifizierungsstellen“.</li>
@@ -160,8 +169,8 @@ installieren; danach Einstellungen › Allgemein › Info › Zertifikatsvertrau
 <li><strong>Android:</strong> Einstellungen › Sicherheit › Weitere Einstellungen › Verschlüsselung und Anmeldedaten ›
 Zertifikat installieren › CA-Zertifikat.</li>
 </ul>
-<p>Gerät verloren? Den Passkey unter Mein Konto entfernen (von einem anderen Gerät aus) oder die Administration setzt
-den zweiten Faktor zurück.</p>""",
+<p><strong>Gerät verloren?</strong> Den Passkey von einem anderen Gerät aus unter Mein Konto entfernen. Oder die
+Administration setzt den zweiten Faktor zurück.</p>""",
     },
     {
         "id": "telefon", "gruppe": "erste_schritte", "titel": "EPM am Telefon", "rechte": [], "seiten": [],
@@ -190,11 +199,15 @@ in der Patientenliste lassen sich antippen – EPM öffnet gleich das passende F
         "id": "design", "gruppe": "erste_schritte", "titel": "Design: Farben, Dichte, Aufbau der Akte", "rechte": [],
         "seiten": ["/design"],
         "html": """
-<p>Unter <strong>Design</strong> (Menü unten links bei deinem Namen) stellt jede Person für sich ein, wie EPM aussieht:
-Farbschema (auch hoher Kontrast und dunkel), Akzentfarbe, Hintergrund, Dichte, Schriftgröße und Schriftstärke sowie den
-Aufbau der Patientenakte (Kopfzeile, Seitenleiste oder Karteikarte). Die Einstellungen gelten an jedem PC, an dem man
-sich anmeldet. <strong>Auf Standard zurücksetzen</strong> stellt alles zurück; <strong>Startseite anpassen</strong>
-führt zur Startseite im Bearbeitungsmodus.</p>""",
+<p>Unter <strong>Design</strong> stellt jede Person für sich ein, wie EPM aussieht. Design steht im Menü unten links bei
+deinem Namen. Einstellbar sind:</p>
+<ul>
+<li>Farbschema (auch hoher Kontrast und dunkel), Akzentfarbe und Hintergrund,</li>
+<li>Dichte, Schriftgröße und Schriftstärke,</li>
+<li>Aufbau der Patientenakte: Kopfzeile, Seitenleiste oder Karteikarte.</li>
+</ul>
+<p>Die Einstellungen gelten an jedem PC, an dem man sich anmeldet. <strong>Auf Standard zurücksetzen</strong> stellt
+alles zurück. <strong>Startseite anpassen</strong> führt zur Startseite im Bearbeitungsmodus.</p>""",
     },
     {
         "id": "konto", "gruppe": "erste_schritte", "titel": "Mein Konto: Passwort, Zwei-Faktor, Anmeldungen", "rechte": [],
@@ -425,23 +438,36 @@ zählt sie unter „Heute zu tun“ zusammen.</p>""",
         "id": "schreiben", "gruppe": "patienten", "titel": "Schreiben und E-Mail: Aufnahme, Terminbestätigung, Reise",
         "rechte": ["eintraege_erfassen"], "seiten": [],
         "html": """
-<p>In der Akte unter <strong>Weitere Aktionen › Schreiben und E-Mail …</strong> entstehen aus den Dokumentvorlagen
-<strong>Patientenaufnahme</strong> (welche Unterlagen wir brauchen), <strong>Terminbestätigung</strong> (Termin wählen;
-Praxis Dr. Holtmeier, Gesundheitskarte mitbringen, keine Überweisung nötig) und <strong>Reisebescheinigung</strong>
-(Briefkopf Dr. Holtmeier, deutsch und englisch, mit dem ärztlichen Attest des ADAC als zweiter Seite).</p>
+<p>In der Akte unter <strong>Weitere Aktionen › Schreiben und E-Mail …</strong> entstehen Schreiben aus den
+Dokumentvorlagen:</p>
+<ul>
+<li><strong>Patientenaufnahme</strong>: welche Unterlagen wir brauchen.</li>
+<li><strong>Terminbestätigung</strong>: Termin wählen. Inhalt: Praxis Dr. Holtmeier, Gesundheitskarte mitbringen,
+keine Überweisung nötig.</li>
+<li><strong>Reisebescheinigung</strong>: Briefkopf Dr. Holtmeier, deutsch und englisch. Die zweite Seite ist das
+ärztliche Attest des ADAC.</li>
+</ul>
+<p>Danach:</p>
 <ul>
 <li><strong>PDF ansehen / herunterladen</strong> – zum Drucken, Faxen oder Ablegen.</li>
-<li><strong>E-Mail vorbereiten</strong> lädt eine Datei <em>.eml</em>. Ein Doppelklick öffnet sie in Outlook als fertigen
-Entwurf mit Empfänger, Betreff, Text und der PDF im Anhang – prüfen und senden. Empfänger, Betreff und Text lassen sich
-vorher im Dialog ändern; <strong>Weitere Anlagen</strong> (z. B. Leitfaden Zottentraining) werden mit angehängt.</li>
+<li><strong>E-Mail vorbereiten</strong> lädt eine Datei <em>.eml</em>. Ein Doppelklick öffnet sie in Outlook als
+fertigen Entwurf. Empfänger, Betreff, Text und die PDF im Anhang sind schon drin – prüfen und senden.</li>
+<li>Empfänger, Betreff und Text lassen sich vorher im Dialog ändern. <strong>Weitere Anlagen</strong> (z. B. Leitfaden
+Zottentraining) werden mit angehängt.</li>
 <li>Auf Wunsch wird die PDF als Dokument „Schreiben“ in der Akte abgelegt.</li>
 </ul>
-<p>Das <strong>Infoblatt an die Praxis</strong> mit allen Patienten der nächsten Sprechstunden entsteht im
+<p>Das <strong>Infoblatt an die Praxis</strong> nennt alle Patienten der nächsten Sprechstunden. Es entsteht im
 <strong>Kalender › Praxis informieren</strong> (siehe „Infoblatt an die Praxis“).</p>
-<p>Texte ändern: Vorlagen › Dokumentvorlagen; Betreff und Text der E-Mail stehen dort im Baustein <strong>E-Mail</strong>.
-Eigene Schreiben (z. B. an Hausärzte) legt <strong>+ Neue Vorlage</strong> unter Vorlagen › Dokumentvorlagen an; sie
-erscheinen danach hier unter „Eigene Vorlagen“. Anlagen hochladen: Vorlagen › Anlagen für E-Mails. Für eine <strong>Fallzusammenfassung</strong> im Reiter Berichte die
-Berichtsart „Fallzusammenfassung“ wählen und <strong>Gliederung einfügen</strong>.</p>""",
+<p><strong>Texte ändern und eigene Vorlagen:</strong></p>
+<ul>
+<li>Die Texte stehen unter Vorlagen › Dokumentvorlagen. Betreff und Text der E-Mail stehen dort im Baustein
+<strong>E-Mail</strong>.</li>
+<li>Eigene Schreiben (z. B. an Hausärzte) legt <strong>+ Neue Vorlage</strong> unter Vorlagen › Dokumentvorlagen an. Sie
+erscheinen danach hier unter „Eigene Vorlagen“.</li>
+<li>Anlagen hochladen: Vorlagen › Anlagen für E-Mails.</li>
+<li><strong>Fallzusammenfassung</strong>: im Reiter Berichte die Berichtsart „Fallzusammenfassung“ wählen und
+<strong>Gliederung einfügen</strong>.</li>
+</ul>""",
     },
     {
         "id": "spalten", "gruppe": "patienten", "titel": "Karten vergrößern und Spalten verbreitern", "rechte": [], "seiten": [],
@@ -465,16 +491,24 @@ Ansicht „Seitenleiste“ der Akte die Breite der Leiste.</p>
         "id": "stammdaten", "gruppe": "patienten", "titel": "Stammdaten, Diagnose und Therapie ändern",
         "rechte": ["akten_bearbeiten"], "seiten": ["/patienten/:id/therapie", "/patienten/:id/empfehlung", "/patienten/:id/diagnosen"],
         "html": """
-<p>Stammdaten (Name, Anschrift, Telefon und Telefon 2, Versicherungsart, Versicherung und Versichertennummer, Versorger,
-Katheter, Nickelallergie …) ändert <strong>Bearbeiten</strong> auf der Karte „Anschrift und Kontakt“ der Übersicht –
-oder <strong>Weitere Aktionen › Stammdaten bearbeiten</strong> im Aktenkopf.</p>
-<p>Die Diagnoseliste mit ICD-Code und die Notizen stehen im Reiter <strong>Diagnosen</strong>. Kennzeichen: gesichert
-(G), Verdacht (V), Zustand nach (Z), Ausschluss (A). <strong>Beenden</strong> fragt nach; beendete Diagnosen bleiben
-unter „beendete anzeigen“ erhalten und lassen sich wieder als aktuell eintragen.</p>
-<p><strong>Therapie</strong> und <strong>Empfehlung</strong> (aus der letzten Sprechstunde; sie steht auch auf den
-Unterlagen für die Sprechstunde) haben je einen Reiter: links die Fassungen, rechts der Text. Erst wird gelesen,
-<strong>Bearbeiten</strong> öffnet den Editor, <strong>Abbrechen</strong> verwirft die Eingabe. Jede gespeicherte
-Fassung bekommt eine Versionsnummer, frühere Fassungen bleiben lesbar.</p>
+<p><strong>Stammdaten</strong> sind Name, Anschrift, Telefon und Telefon 2, Versicherungsart, Versicherung und
+Versichertennummer, Versorger, Katheter, Nickelallergie und mehr. Es gibt zwei Wege, sie zu ändern:</p>
+<ul>
+<li><strong>Bearbeiten</strong> auf der Karte „Anschrift und Kontakt“ der Übersicht,</li>
+<li><strong>Weitere Aktionen › Stammdaten bearbeiten</strong> im Aktenkopf.</li>
+</ul>
+<p><strong>Diagnosen:</strong> Die Diagnoseliste mit ICD-Code und die Notizen stehen im Reiter
+<strong>Diagnosen</strong>. Die Kennzeichen sind gesichert (G), Verdacht (V), Zustand nach (Z) und Ausschluss (A).
+<strong>Beenden</strong> fragt nach. Beendete Diagnosen bleiben unter „beendete anzeigen“ erhalten. Man kann sie
+wieder als aktuell eintragen.</p>
+<p><strong>Therapie</strong> und <strong>Empfehlung</strong> haben je einen eigenen Reiter. Die Empfehlung stammt aus
+der letzten Sprechstunde. Sie steht auch auf den Unterlagen für die Sprechstunde.</p>
+<ul>
+<li>Links stehen die Fassungen, rechts der Text.</li>
+<li>Zuerst wird gelesen. <strong>Bearbeiten</strong> öffnet den Editor, <strong>Abbrechen</strong> verwirft die
+Eingabe.</li>
+<li>Jede gespeicherte Fassung bekommt eine Versionsnummer. Frühere Fassungen bleiben lesbar.</li>
+</ul>
 <p>Jede Änderung steht mit Person und Zeitpunkt im Verlauf der Akte.</p>""",
     },
     {
@@ -668,25 +702,40 @@ Vorlagen › Dokumentvorlagen › „Patientenankündigung“.</p>""",
         "id": "gewicht", "gruppe": "gewicht", "titel": "Gewicht eintragen und korrigieren", "rechte": ["eintraege_erfassen"],
         "seiten": [],
         "html": """
-<p><strong>Gewicht</strong> im Aktenkopf, <strong>+ Gewicht</strong> auf der Karte „Gewichtsverlauf“, „G 54,6“ in der
-Kürzelzeile, die Taste <strong>G</strong> oder <strong>Gewicht</strong> auf der Startseite öffnen denselben Dialog:
-Gewicht, Quelle (telefonisch, Ambulanz, Versorger, Arztbrief) und Messdatum eintragen, <strong>Speichern</strong>. Beim
-Kontakt geht es mit „Gewicht mit erfassen“ in einem Schritt, bei der BIA-Messung ebenso.</p>""" + _bild(
+<p>Diese Wege öffnen denselben Dialog:</p>
+<ul>
+<li><strong>Gewicht</strong> im Aktenkopf,</li>
+<li><strong>+ Gewicht</strong> auf der Karte „Gewichtsverlauf“,</li>
+<li>„G 54,6“ in der Kürzelzeile oder die Taste <strong>G</strong>,</li>
+<li><strong>Gewicht</strong> auf der Startseite.</li>
+</ul>
+<p>Im Dialog Gewicht, Quelle (telefonisch, Ambulanz, Versorger, Arztbrief) und Messdatum eintragen. Dann
+<strong>Speichern</strong>. Beim Kontakt geht es in einem Schritt mit „Gewicht mit erfassen“. Bei der BIA-Messung
+ebenso.</p>""" + _bild(
             "gewicht-erfassen-fenster.png", "Fenster Gewicht erfassen: Feld Gewicht mit 57,4 kg (rot umrandet), Quelle "
             "telefonisch, Messdatum; darunter die Veränderung zur letzten Messung, unten Speichern.",
             "Gewicht erfassen: Wert eintragen – EPM zeigt gleich die Veränderung zur letzten Messung.", 640, 507) + """
-<p>Unplausible Werte (außerhalb der Grenzwerte) und Daten in der Zukunft werden abgewiesen. Eine falsche Messung wird
-mit <strong>Bearbeiten</strong> berichtigt – die letzte direkt per Klick auf den Wert oder „Bearbeiten“ auf der Karte,
-ältere unter <strong>Messwerte anzeigen</strong>; die bisherige Fassung bleibt im Verlauf sichtbar.</p>""",
+<p>Unplausible Werte (außerhalb der Grenzwerte) und Daten in der Zukunft weist EPM ab.</p>
+<p>Eine falsche Messung berichtigt <strong>Bearbeiten</strong>:</p>
+<ul>
+<li>die letzte direkt per Klick auf den Wert oder mit „Bearbeiten“ auf der Karte,</li>
+<li>ältere unter <strong>Messwerte anzeigen</strong>.</li>
+</ul>
+<p>Die bisherige Fassung bleibt im Verlauf sichtbar.</p>""",
     },
     {
         "id": "gewicht_verlauf", "gruppe": "gewicht", "titel": "Gewichtsverlauf und Warnung", "rechte": ["akten_lesen"],
         "seiten": [],
         "html": """
-<p>Das Diagramm zeigt die Messwerte über 12 Monate, 3 Jahre, 5 Jahre oder alle, wahlweise geglättet. Verliert ein
-Patient mehr als den eingestellten Anteil in der eingestellten Zeit (Standard: mehr als 5 % in 3 Monaten), erscheint
-eine Warnung in der Akte, in der Patientenliste und auf der Startseite unter „Auffällige Gewichte“ – dort mit einem
-kleinen Verlauf der letzten 6 Monate in echten Zeitabständen.</p>""",
+<p>Das Diagramm zeigt die Messwerte über 12 Monate, 3 Jahre, 5 Jahre oder alle. Auf Wunsch ist die Kurve geglättet.</p>
+<p>Verliert ein Patient zu viel Gewicht, warnt EPM. Die Grenze ist der eingestellte Anteil in der eingestellten Zeit.
+Standard: mehr als 5 % in 3 Monaten. Die Warnung erscheint an drei Stellen:</p>
+<ul>
+<li>in der Akte,</li>
+<li>in der Patientenliste,</li>
+<li>auf der Startseite unter „Auffällige Gewichte“. Dort steht auch ein kleiner Verlauf der letzten 6 Monate in echten
+Zeitabständen.</li>
+</ul>""",
     },
     # ------------------------------------------------------------------ Infusionspläne
     {
@@ -798,11 +847,15 @@ ein neutraler Nachweis.</p>""",
         "id": "erklaerungen", "gruppe": "datenschutz", "titel": "Erklärungen erfassen",
         "rechte": ["datenschutz_bearbeiten"], "seiten": ["/patienten/:id/datenschutz"],
         "html": """
-<p>Datenschutzinformation, Einwilligung und Schweigepflichtentbindung werden im Reiter <strong>Datenschutz</strong> der
-Akte nachgehalten. <strong>Vordruck als PDF</strong> ausdrucken, unterschreiben lassen, mit Datum
-<strong>erfassen</strong> – auf Wunsch mit Scan. Ein Widerruf wird mit <strong>Widerruf eintragen</strong>
-festgehalten.</p>
-<p>Fehlt eine der Erklärungen, die vorliegen sollen, steht ein Hinweis im Aktenkopf und unter „Nach und nach prüfen“.</p>""",
+<p>Im Reiter <strong>Datenschutz</strong> der Akte werden drei Erklärungen nachgehalten: Datenschutzinformation,
+Einwilligung und Schweigepflichtentbindung.</p>
+<ol>
+<li><strong>Vordruck als PDF</strong> ausdrucken.</li>
+<li>Unterschreiben lassen.</li>
+<li>Mit Datum <strong>erfassen</strong>, auf Wunsch mit Scan.</li>
+</ol>
+<p>Einen Widerruf hält <strong>Widerruf eintragen</strong> fest.</p>
+<p>Fehlt eine Erklärung, die vorliegen soll? Dann steht ein Hinweis im Aktenkopf und unter „Nach und nach prüfen“.</p>""",
     },
     {
         "id": "anfragen", "gruppe": "datenschutz", "titel": "Anfragen betroffener Personen",
@@ -826,10 +879,12 @@ keiner Liste. Lesen kann sie nur, wer über Anfragen entscheidet – mit einer <
         "id": "loeschen", "gruppe": "datenschutz", "titel": "Akte endgültig löschen", "rechte": ["akten_loeschen"],
         "seiten": [],
         "html": """
-<p>Nach Ablauf der Aufbewahrungsfrist oder auf Antrag kann eine abgeschlossene Akte <strong>endgültig gelöscht</strong>
-werden – mit Passwort, Code aus der Authenticator-App und Bestätigungscode. Es bleibt nur ein Eintrag im Löschprotokoll
-(Nummer, Daten der Frist, Grund, Umfang) ohne Namen und Inhalte. Wird später eine ältere Sicherung zurückgespielt,
-löscht EPM die Akte beim Start erneut.</p>""",
+<p>Eine abgeschlossene Akte lässt sich <strong>endgültig löschen</strong>. Das geht nach Ablauf der Aufbewahrungsfrist
+oder auf Antrag.</p>
+<p>Bestätigt wird mit Passwort, Code aus der Authenticator-App und Bestätigungscode.</p>
+<p>Danach bleibt nur ein Eintrag im Löschprotokoll: Nummer, Daten der Frist, Grund und Umfang. Namen und Inhalte stehen
+dort nicht.</p>
+<p>Wird später eine ältere Sicherung zurückgespielt, löscht EPM die Akte beim Start erneut.</p>""",
     },
     # ------------------------------------------------------------------ Versorger und Ärzte
     # ------------------------------------------------------------------ Scans und Texterkennung (F160 ff.)
@@ -991,28 +1046,39 @@ Arzt, legt „Neuen Arzt anlegen“ ihn gleich im Dialog an.</p>""",
         "id": "systemverwaltung", "gruppe": "administration", "titel": "Systemverwaltung: Zustand auf einen Blick, ohne SSH",
         "rechte": ["system_verwalten", "backup_verwalten"], "seiten": ["/admin"],
         "html": """
-<p><strong>Administration › Systemverwaltung</strong> zeigt als Ampel, ob alles in Ordnung ist: Systemagent, Dienste
-(Container), Speicherplatz, Ubuntu-Updates, Zertifikat, Texterkennung, Uhrzeit, letzte Sicherung, Übertragung und
-fehlgeschlagene Aufträge. Jede Kachel führt direkt zu dem Bereich, in dem man etwas tun kann. Daneben stehen die häufigen
-Aufgaben (sichern, Updates, Neustart, Software, Zertifikat, Protokolle, Hinweis an alle, Benutzer, Audit-Log) und die
-Auslastung als kleiner Verlauf – <strong>Größer anzeigen</strong> öffnet das große Diagramm.</p>
-<p>Alles, was früher nur per SSH ging, läuft hier als Auftrag an den Systemagenten auf dem Server: nur fest eingetragene
-Tätigkeiten, Gefährliches mit Passwort und Code aus der Authenticator-App, alles im Audit-Log. Per SSH bleibt nur die
-Ersteinrichtung des Servers.</p>""",
+<p><strong>Administration › Systemverwaltung</strong> zeigt mit einer Ampel, ob alles in Ordnung ist. Geprüft
+werden:</p>
+<ul>
+<li>Systemagent, Dienste (Container) und Speicherplatz,</li>
+<li>Ubuntu-Updates, Zertifikat, Texterkennung und Uhrzeit,</li>
+<li>letzte Sicherung, Übertragung und fehlgeschlagene Aufträge.</li>
+</ul>
+<p>Jede Kachel führt direkt zu dem Bereich, in dem man etwas tun kann. Daneben stehen die häufigen Aufgaben: sichern,
+Updates, Neustart, Software, Zertifikat, Protokolle, Hinweis an alle, Benutzer und Audit-Log. Die Auslastung steht als
+kleiner Verlauf daneben. <strong>Größer anzeigen</strong> öffnet das große Diagramm.</p>
+<p>Was früher nur per SSH ging, läuft hier als Auftrag an den Systemagenten auf dem Server. Dabei gilt:</p>
+<ul>
+<li>Es gibt nur fest eingetragene Tätigkeiten.</li>
+<li>Gefährliches braucht Passwort und Code aus der Authenticator-App.</li>
+<li>Alles steht im Audit-Log.</li>
+</ul>
+<p>Per SSH bleibt nur die Ersteinrichtung des Servers.</p>""",
     },
     {
         "id": "admin_start", "gruppe": "administration", "titel": "Startseite der Administration",
         "rechte": ["system_verwalten", "backup_verwalten", "benutzer_verwalten", "audit_lesen", "testdaten_zuruecksetzen"],
         "seiten": [],
         "html": """
-<p>Für die Administration zeigt die Startseite eigene Kacheln – jeweils nur mit dem passenden Recht:</p>
+<p>Für die Administration zeigt die Startseite eigene Kacheln. Jede Kachel erscheint nur mit dem passenden Recht.</p>
 <ul>
-<li><strong>Datensicherung</strong>: letzte Sicherung, Übertragung, Speicher; „Jetzt sichern“.</li>
-<li><strong>Server</strong> und <strong>Ubuntu-Updates</strong>: Auslastung, offene Updates; Updates installieren und
-Server neu starten – mit Passwort und 2FA, vorher automatische Sicherung, angemeldete Benutzer werden gewarnt.</li>
-<li><strong>Konten</strong>: gesperrt, Einmal-Passwort offen, ohne zweiten Faktor, Notfall-Codes knapp.</li>
-<li><strong>Angemeldet</strong>, <strong>Hinweis an alle</strong>, <strong>Zugriffe · 7 Tage</strong> aus dem Audit-Log
-und <strong>Testumgebung</strong>.</li>
+<li><strong>Datensicherung</strong>: letzte Sicherung, Übertragung und Speicher. Dazu der Knopf „Jetzt sichern“.</li>
+<li><strong>Server</strong> und <strong>Ubuntu-Updates</strong>: Auslastung und offene Updates. Hier lassen sich Updates
+installieren und der Server neu starten. Das braucht Passwort und 2FA. Vorher sichert EPM automatisch, und angemeldete
+Benutzer werden gewarnt.</li>
+<li><strong>Konten</strong>: wer gesperrt ist, ein offenes Einmal-Passwort hat, keinen zweiten Faktor hat oder kaum
+noch Notfall-Codes.</li>
+<li><strong>Angemeldet</strong>, <strong>Hinweis an alle</strong> und <strong>Testumgebung</strong>.</li>
+<li><strong>Zugriffe · 7 Tage</strong>: Zahlen aus dem Audit-Log.</li>
 </ul>""",
     },
     {
@@ -1101,47 +1167,83 @@ die gefilterten Einträge aus.</p>""",
         "id": "system", "gruppe": "administration", "titel": "System: Server, Updates, Neustart",
         "rechte": ["system_verwalten"], "seiten": ["/admin/system"],
         "html": """
-<p><strong>Administration › System</strong> zeigt Auslastung (CPU, Arbeitsspeicher, Platte, Laufzeit), offene
-Ubuntu-Updates und den Verlauf der Auslastung – wählbar 1 Stunde, 3 Stunden, 24 Stunden, 7 und 14 Tage, 1 und 6 Monate
-(längere Zeiträume als Mittelwerte mit gestrichelten Spitzen). Die Seite ist in Reiter gegliedert: <strong>Übersicht</strong> (Kennzahlen, Auslastung als kleiner Verlauf –
-<strong>Größer anzeigen</strong> öffnet das Diagramm –, Server, EPM, Texterkennung; die Karten lassen sich in Breite und
-Höhe einstellen), <strong>Wartung</strong>, <strong>Software</strong>, <strong>Zertifikat</strong>,
+<p><strong>Administration › System</strong> zeigt den Zustand des Servers. Die Seite hat diese Reiter:
+<strong>Übersicht</strong>, <strong>Wartung</strong>, <strong>Software</strong>, <strong>Zertifikat</strong>,
 <strong>Protokolle</strong>, <strong>Anmeldungen und Hinweis</strong>, <strong>Verlauf</strong> und
-<strong>Testphase</strong>. Von hier aus lassen sich <strong>Updates installieren</strong>,
-der <strong>Server neu starten</strong> und EPM neu starten – mit Passwort und Code aus der Authenticator-App
-(Zwei-Faktor-Anmeldung nötig), vorher läuft automatisch eine
-Sicherung (schlägt sie fehl, wird nichts verändert), angemeldete Benutzer werden gewarnt. Beginn sofort oder in 5 bis 60
-Minuten; ein wartender Auftrag lässt sich zurückziehen.</p>
-<p><strong>EPM aktualisieren</strong> bringt EPM ohne Terminal auf einen neuen Stand: Der Server holt den Code, baut die
-Programmteile neu, sichert und stellt um. Das dauert je nach Server 10 bis 30 Minuten; beim Umstellen ist EPM kurz nicht
-erreichbar, deshalb vorher Eingaben speichern. Der Auftrag läuft auf dem Server weiter, auch wenn die Seite in der
-Zwischenzeit nicht antwortet – das Ergebnis erscheint danach unter <strong>Aufträge</strong> samt Ausgabe. Geht etwas
-schief, bleibt die bisherige Version in Betrieb; über <strong>Ausgabe</strong> ist zu sehen, woran es lag.</p>
-<p><strong>Wartung › Dienste</strong>: einzelne Container (backend, web, ocr, db) neu starten, z. B. wenn die Texterkennung
-hängt. <strong>Speicher aufräumen</strong>: das Systemprotokoll (Journal) auf eine Größe oder ein Alter verkleinern
-(einfache Rückfrage) und gespeicherte alte Versionen – Image-Dateien, Update-Pakete, Docker-Images – ankreuzen und
-löschen (Passwort und Code); die laufende und die vorherige Version bleiben immer. <strong>Uhrzeit</strong>: Zeitzone,
-Zeitsynchronisation (NTP) mit eigenem Zeitserver – ohne Internet z. B. die OPNsense – oder bei ausgeschalteter
-Synchronisation die Uhrzeit von Hand; angezeigt wird auch, wie weit die Uhr des Servers von diesem Gerät abweicht. Codes
-der Authenticator-App, Passkeys und Zertifikate brauchen eine richtige Uhrzeit. <strong>Software</strong>: die vorhandenen Versionen mit <strong>Zurückschalten</strong> (vorher automatische
-Sicherung; Datenbank-Migrationen werden nicht zurückgedreht), <strong>Update-Paket einspielen</strong> (Datei der Test-VM
-hochladen statt per scp – der Server prüft Inhalt und Prüfsummen und zeigt die SHA-256 zum Vergleichen),
-<strong>Update-Paket erstellen</strong> (Test-VM; liegt danach 2 Stunden zum Herunterladen bereit) und
-<strong>OCR-Modelle einspielen</strong>. <strong>Zertifikat</strong>: Inhaber, Aussteller und Ablauf,
-<strong>Zertifikat erneuern</strong> (eigene CA), <strong>Zertifikat importieren</strong> (CRT, KEY und CA als PEM – der
-Schlüssel geht nur an den Server) und das Stammzertifikat für die Geräte. <strong>Protokolle</strong>: die letzten 100,
-500 oder 2000 Zeilen der Container, des Systemagenten, der nächtlichen Sicherung, der Übertragung oder des letzten
-Updates – filtern und herunterladen; ein Abruf liegt eine Stunde bereit und steht im Audit-Log.</p>
-<p>Außerdem: <strong>Hinweis an alle Benutzer</strong> setzen und angemeldete Benutzer abmelden. Bei den Konten führen die
-Namen (gesperrt, ohne zweiten Faktor, offenes Einmal-Passwort) direkt zur Person in der Benutzerverwaltung.</p>
-<p><strong>Testphase und Go-live</strong>: <strong>Musterdaten automatisch anlegen</strong> abschalten, damit beim Start
-keine Testpatienten und Testkonten mehr entstehen. <strong>Menüpunkt „Import“ ausblenden</strong>, wenn die Altdaten
-übernommen sind – die Seite bleibt über den Reiter „Testphase“ erreichbar, der Menüpunkt lässt sich wieder einblenden.
-<strong>Datenbank leeren</strong> (nur Rolle Admin) entfernt alles aus der Testphase: alle Akten (auch echte),
-Dokumente, alle Scans samt Dateien (auch nicht zugeordnete), was die Texterkennung gelernt hat, Versorger, Ärzte, die nicht ausgewählten Benutzer und das Audit-Log; Präparate, Auswahllisten, Vorlagen und
-Einstellungen bleiben. Welche Konten bleiben, wird im Dialog angehakt (das eigene bleibt immer). Bestätigt wird mit dem
-angezeigten Code zum Abtippen, Passwort, Code aus der Authenticator-App und der Rückfrage „Wollen Sie wirklich die
-Datenbank löschen?“. Vorher sichert der Server automatisch – zurück geht es nur über diese Sicherung.</p>""",
+<strong>Testphase</strong>.</p>
+<p><strong>Übersicht</strong></p>
+<ul>
+<li>Auslastung (CPU, Arbeitsspeicher, Platte, Laufzeit) und offene Ubuntu-Updates.</li>
+<li>Kennzahlen, Server, EPM und Texterkennung. Die Karten lassen sich in Breite und Höhe einstellen.</li>
+<li>Die Auslastung als kleiner Verlauf. <strong>Größer anzeigen</strong> öffnet das Diagramm. Wählbar sind 1, 3 und
+24 Stunden, 7 und 14 Tage sowie 1 und 6 Monate. Längere Zeiträume zeigen Mittelwerte mit gestrichelten Spitzen.</li>
+</ul>
+<p><strong>Updates und Neustart</strong></p>
+<ul>
+<li>Von hier aus lassen sich <strong>Updates installieren</strong>, der <strong>Server neu starten</strong> und EPM neu
+starten.</li>
+<li>Dafür braucht es Passwort und Code aus der Authenticator-App (Zwei-Faktor-Anmeldung nötig).</li>
+<li>Vorher läuft automatisch eine Sicherung. Schlägt sie fehl, wird nichts verändert.</li>
+<li>Angemeldete Benutzer werden gewarnt. Beginn sofort oder in 5 bis 60 Minuten. Ein wartender Auftrag lässt sich
+zurückziehen.</li>
+</ul>
+<p><strong>EPM aktualisieren</strong> bringt EPM ohne Terminal auf einen neuen Stand:</p>
+<ul>
+<li>Der Server holt den Code, baut die Programmteile neu, sichert und stellt um.</li>
+<li>Das dauert je nach Server 10 bis 30 Minuten. Beim Umstellen ist EPM kurz nicht erreichbar. Deshalb vorher Eingaben
+speichern.</li>
+<li>Der Auftrag läuft auf dem Server weiter, auch wenn die Seite zwischendurch nicht antwortet. Das Ergebnis erscheint
+danach unter <strong>Aufträge</strong> samt Ausgabe.</li>
+<li>Geht etwas schief, bleibt die bisherige Version in Betrieb. Unter <strong>Ausgabe</strong> steht, woran es lag.</li>
+</ul>
+<p><strong>Wartung</strong></p>
+<ul>
+<li><strong>Dienste</strong>: einzelne Container (backend, web, ocr, db) neu starten, z. B. wenn die Texterkennung
+hängt.</li>
+<li><strong>Speicher aufräumen</strong>: Das Systemprotokoll (Journal) auf eine Größe oder ein Alter verkleinern; dafür
+gibt es eine einfache Rückfrage. Gespeicherte alte Versionen ankreuzen und löschen: Image-Dateien, Update-Pakete,
+Docker-Images. Das braucht Passwort und Code. Die laufende und die vorherige Version bleiben immer.</li>
+<li><strong>Uhrzeit</strong>: Zeitzone und Zeitsynchronisation (NTP) mit eigenem Zeitserver einstellen, ohne Internet
+z. B. die OPNsense. Ist die Synchronisation aus, lässt sich die Uhrzeit von Hand setzen. Angezeigt wird auch, wie weit
+die Uhr des Servers von diesem Gerät abweicht. Codes der Authenticator-App, Passkeys und Zertifikate brauchen eine
+richtige Uhrzeit.</li>
+</ul>
+<p><strong>Software</strong></p>
+<ul>
+<li>Die vorhandenen Versionen mit <strong>Zurückschalten</strong>. Vorher sichert EPM automatisch.
+Datenbank-Migrationen werden nicht zurückgedreht.</li>
+<li><strong>Update-Paket einspielen</strong>: die Datei der Test-VM hochladen statt per scp. Der Server prüft Inhalt und
+Prüfsummen. Er zeigt die SHA-256 zum Vergleichen.</li>
+<li><strong>Update-Paket erstellen</strong> (Test-VM): Es liegt danach 2 Stunden zum Herunterladen bereit.</li>
+<li><strong>OCR-Modelle einspielen</strong>.</li>
+</ul>
+<p><strong>Zertifikat</strong></p>
+<ul>
+<li>Inhaber, Aussteller und Ablauf.</li>
+<li><strong>Zertifikat erneuern</strong> (eigene CA).</li>
+<li><strong>Zertifikat importieren</strong>: CRT, KEY und CA als PEM. Der Schlüssel geht nur an den Server.</li>
+<li>Das Stammzertifikat für die Geräte.</li>
+</ul>
+<p><strong>Protokolle</strong>: die letzten 100, 500 oder 2000 Zeilen der Container, des Systemagenten, der nächtlichen
+Sicherung, der Übertragung oder des letzten Updates. Sie lassen sich filtern und herunterladen. Ein Abruf liegt eine
+Stunde bereit und steht im Audit-Log.</p>
+<p><strong>Außerdem:</strong> einen <strong>Hinweis an alle Benutzer</strong> setzen und angemeldete Benutzer abmelden.
+Bei den Konten führen die Namen direkt zur Person in der Benutzerverwaltung (gesperrt, ohne zweiten Faktor, offenes
+Einmal-Passwort).</p>
+<p><strong>Testphase und Go-live</strong></p>
+<ul>
+<li><strong>Musterdaten automatisch anlegen</strong> abschalten. Dann entstehen beim Start keine Testpatienten und
+Testkonten mehr.</li>
+<li><strong>Menüpunkt „Import“ ausblenden</strong>, wenn die Altdaten übernommen sind. Die Seite bleibt über den Reiter
+„Testphase“ erreichbar. Der Menüpunkt lässt sich wieder einblenden.</li>
+<li><strong>Datenbank leeren</strong> (nur Rolle Admin) entfernt alles aus der Testphase. Das sind alle Akten (auch
+echte), Dokumente, alle Scans samt Dateien (auch nicht zugeordnete), was die Texterkennung gelernt hat, Versorger, Ärzte,
+die nicht ausgewählten Benutzer und das Audit-Log. Präparate, Auswahllisten, Vorlagen und Einstellungen bleiben.</li>
+<li>Welche Konten bleiben, wird im Dialog angehakt. Das eigene Konto bleibt immer.</li>
+<li>Bestätigt wird mit dem angezeigten Code zum Abtippen, mit Passwort und mit dem Code aus der Authenticator-App. Dazu
+kommt die Rückfrage „Wollen Sie wirklich die Datenbank löschen?“.</li>
+<li>Vorher sichert der Server automatisch. Zurück geht es nur über diese Sicherung.</li>
+</ul>""",
     },
     {
         "id": "backup", "gruppe": "administration", "titel": "Datensicherung", "rechte": ["backup_verwalten"],
@@ -1206,8 +1308,14 @@ unverändert.</p>""",
         "id": "import", "gruppe": "administration", "titel": "Altdaten übernehmen", "rechte": ["altdaten_importieren"],
         "seiten": ["/admin/import"],
         "html": """
-<p>Der Import übernimmt Akten aus dem Altsystem: Dump laden, Zuordnungen pflegen, <strong>Probelauf</strong> prüfen,
-importieren. Ein Import lässt sich zurücknehmen, solange die Übernahme nicht abgeschlossen ist. Übernommene Dokumente
-stehen danach unter „Altdokumente prüfen“.</p>""",
+<p>Der Import übernimmt Akten aus dem Altsystem. So geht es:</p>
+<ol>
+<li><strong>Dump laden</strong>.</li>
+<li><strong>Zuordnungen</strong> pflegen.</li>
+<li>Den <strong>Probelauf</strong> prüfen.</li>
+<li><strong>Importieren</strong>.</li>
+</ol>
+<p>Bis die Übernahme abgeschlossen ist, lässt sich ein Import zurücknehmen. Übernommene Dokumente stehen danach unter
+„Altdokumente prüfen“.</p>""",
     },
 ]

@@ -211,7 +211,7 @@ export function WiederKachel({ daten, onKontakt, onTermin }: { daten: Startdaten
     <>
       <KachelKopf id="wieder" titel="Wiedereinbestellung fällig" unter="Kein Kontakt und kein Termin geplant" />
       <KachelInhalt testid="wiedereinbestellung">
-        {gesamt === 0 ? <Leer>Niemand fällig – alle haben einen aktuellen Kontakt oder einen geplanten Termin.</Leer> : null}
+        {gesamt === 0 ? <Leer>Niemand ist fällig. Alle haben einen aktuellen Kontakt oder einen geplanten Termin.</Leer> : null}
         {w.anzahl_ueberfaellig ? (
           <>
             <span className="flex justify-between items-center pt-1 text-[0.78125rem] font-semibold text-fehler">

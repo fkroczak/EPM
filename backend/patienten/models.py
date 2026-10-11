@@ -205,7 +205,8 @@ class Patient(models.Model):
         if self.groesse_cm is not None and not (e.groesse_min_cm <= self.groesse_cm <= e.groesse_max_cm):
             raise ValidationError({"groesse_cm": f"Größe muss zwischen {e.groesse_min_cm} und {e.groesse_max_cm} cm liegen."})
         if self.ansprechpartner_id and self.ansprechpartner.versorger_id != self.versorger_id:
-            raise ValidationError({"ansprechpartner": "Ansprechpartner gehört nicht zum gewählten Versorger."})
+            raise ValidationError({"ansprechpartner": "Dieser Ansprechpartner gehört nicht zum gewählten Versorger. "
+                                                      "Bitte einen passenden wählen."})
         if self.geburtsdatum and self.geburtsdatum > timezone.localdate():
             raise ValidationError({"geburtsdatum": "Geburtsdatum liegt in der Zukunft."})
         if self.kein_katheter and self.katheter_id:
