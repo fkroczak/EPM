@@ -757,6 +757,8 @@ main.seite-inhalt.akte-voll { padding: 0 !important; gap: 0 !important; }
    - Innenabstand der Karten einheitlich 16 px seitlich, 12 px oben/unten (vorher 18–22 px) – ohne Ebene, damit es die
      gleichlautenden Hilfsklassen an allen Karten übersteuert */
 html { scrollbar-gutter: stable; }
+/* Anmeldung: passt immer ins Fenster – ohne reservierte Scrollleiste (Wunsch 11.10.2026: „warum scrollbar?“) */
+html:has([data-anmeldung]) { scrollbar-gutter: auto; }
 .seitenkopf { min-height: var(--steuer-h); }
 .seitenkopf-unter { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seitenkopf-unter > * { display: inline !important; max-width: none !important; }
