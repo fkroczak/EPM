@@ -36,7 +36,8 @@ function Messung({ label, prozent, text }: { label: string; prozent: number | nu
   return (
     <div className="flex flex-col gap-1">
       <div className="flex justify-between text-[0.8125rem] text-text2"><span>{label}</span><span className="num">{text}</span></div>
-      <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={prozent ?? undefined}
+      <div role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={prozent ?? 0}
+        aria-valuetext={prozent == null ? "keine Messung" : undefined}
         className="h-1.5 rounded-full bg-fein overflow-hidden">
         <div className={cx("h-full rounded-full", s === "ok" ? "bg-akzent" : s === "warn" ? "bg-warn" : "bg-fehler")}
           style={{ width: `${Math.min(100, Math.max(2, prozent ?? 0))}%` }} />

@@ -215,7 +215,7 @@ function RollenChips({ b }: { b: BenutzerTyp }) {
     <span className="inline-flex flex-col items-start gap-1">
       {rollen.map((r) => (
         <Chip key={r.firma.kuerzel} art="akzent" title={r.firma.name}>
-          <span className="font-mono text-[0.625rem] opacity-75">{r.firma.kurzname}</span> {ROLLEN[r.rolle as keyof typeof ROLLEN] ?? r.rolle}
+          <span className="font-mono text-[0.625rem]">{r.firma.kurzname}</span> {ROLLEN[r.rolle as keyof typeof ROLLEN] ?? r.rolle}
         </Chip>
       ))}
     </span>

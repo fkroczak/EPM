@@ -162,7 +162,8 @@ export function HinweisChipsKompakt({ hinweise, patientId, ausblendbar }: {
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Positioner side="bottom" align="start" sideOffset={6} collisionPadding={8} className="z-50">
-          <Popover.Popup className="card p-3 flex flex-col gap-2 max-w-[min(26rem,calc(100vw-1rem))] outline-none" data-testid="hinweise-liste">
+          <Popover.Popup className="card p-3 flex flex-col gap-2 max-w-[min(26rem,calc(100vw-1rem))] outline-none" data-testid="hinweise-liste"
+            aria-label="Hinweise zu dieser Akte">
             <span className="text-xs gedaempft">Hinweise zu dieser Akte – Klick führt zur Stelle{ausblendbar ? ", „×“ blendet einen Hinweis für eine Weile aus" : ""}</span>
             <div className="flex flex-wrap gap-1.5">
               {/* der Dialog „Ausblenden“ hängt außerhalb der Liste – sonst schlösse er mit ihr */}

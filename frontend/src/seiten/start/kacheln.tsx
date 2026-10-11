@@ -1,5 +1,5 @@
 /** Kacheln der Startseite für die Arbeit mit den Akten (S03–S07, S09, S10; Entwurf 2). */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import { terminZiel } from "@/lib/sprungziele";
@@ -31,7 +31,21 @@ export function KachelKopf({ id, titel, rechts, unter }: { id: string; titel: Re
 
 /** Inhalt: scrollt in der Kachel, wenn er nicht passt (Festlegung 01.10.2026) */
 export function KachelInhalt({ children, className, testid }: { children: ReactNode; className?: string; testid?: string }) {
-  return <div className={cx("kachel-inhalt px-5 pb-3", className)} data-testid={testid}>{children}</div>;
+  // scrollt der Inhalt, ist die Fläche mit der Tastatur erreichbar (Pfeiltasten), auch ohne Knopf darin (axe 11.10.2026)
+  const ref = useRef<HTMLDivElement>(null);
+  const [rollt, setRollt] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const pruefen = () => setRollt(el.scrollHeight > el.clientHeight + 1);
+    const groesse = new ResizeObserver(pruefen);
+    groesse.observe(el);
+    const inhalt = new MutationObserver(pruefen);
+    inhalt.observe(el, { childList: true, subtree: true });
+    pruefen();
+    return () => { groesse.disconnect(); inhalt.disconnect(); };
+  }, []);
+  return <div ref={ref} className={cx("kachel-inhalt px-5 pb-3", className)} data-testid={testid} tabIndex={rollt ? 0 : undefined}>{children}</div>;
 }
 
 export function KachelFuss({ zu, children }: { zu: string; children: ReactNode }) {

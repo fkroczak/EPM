@@ -130,7 +130,7 @@ export function Infusionsplaene() {
   const z = daten.data?.zaehler;
   const grenze = daten.data?.grenze_monate ?? 12;
   const zeilen = daten.data?.ergebnisse ?? [];
-  const anzahl = (g: Gruppe) => <span className="num opacity-70">{z ? z[g] : "…"}</span>;
+  const anzahl = (g: Gruppe) => <span className="num opacity-80">{z ? z[g] : "…"}</span>;
   const mobil = useMobil();
   const seitlich = ab(useStufe(), "fhd");
   const infusion = (p: Zeile) => [p.laufzeit_h ? `${zahl(p.laufzeit_h)} h` : null, p.rate_ml_h ? `${zahl(p.rate_ml_h)} ml/h` : null,

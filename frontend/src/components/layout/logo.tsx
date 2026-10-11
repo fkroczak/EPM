@@ -29,7 +29,8 @@ export function Logo({ className, style, version, firma, name }: {
       <img src={eigen.dunkel} alt="" aria-hidden="true" className={`${className ?? ""} logo-dunkel`} style={stil} />
     </> : <img src={eigen.hell} alt={alt} className={className} style={stil} />;
   }
-  const teile = [firma ? `firma=${encodeURIComponent(firma)}` : "", version ? `v=${version.slice(0, 12)}` : ""].filter(Boolean);
+  // leer=1: ohne Upload antwortet der Server mit 204 (onError, kein 404 in der Konsole)
+  const teile = [firma ? `firma=${encodeURIComponent(firma)}` : "", version ? `v=${version.slice(0, 12)}` : "", "leer=1"].filter(Boolean);
   return (
     <img
       key={firma ?? ""}
