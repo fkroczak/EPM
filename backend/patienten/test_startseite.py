@@ -365,3 +365,40 @@ class Hilfe(Grundlage):
             self.assertTrue(set(a["rechte"]) <= set(CODES), a["id"])
             self.assertTrue(a["html"].strip().startswith("<"), a["id"])
             self.assertLessEqual(len(a["id"]), 60)
+
+    def test_bilder_vorhanden_und_beschrieben(self):
+        """Bilder der Hilfe (Wunsch 11.10.2026): jede Datei liegt im Frontend, hat einen Alternativtext und Breite/Höhe
+        im Seitenverhältnis der Datei (Telefonbilder sind doppelt aufgelöst, daher nur das Verhältnis); zu jedem GIF
+        gibt es ein Standbild für „Bewegung reduzieren“."""
+        import re
+        from pathlib import Path
+
+        from django.conf import settings
+        from PIL import Image
+
+        from hilfe.inhalt import ABSCHNITTE
+
+        ordner = Path(settings.BASE_DIR).parent / "frontend" / "public" / "hilfe-bilder"
+        if not ordner.is_dir():
+            self.skipTest("frontend/public/hilfe-bilder fehlt (Backend ohne Frontend ausgecheckt)")
+        bilder = [(a["id"], m) for a in ABSCHNITTE for m in re.finditer(r"<img ([^>]*)>", a["html"])]
+        self.assertGreaterEqual(len(bilder), 10)
+        benutzt = set()
+        for abschnitt, m in bilder:
+            attr = dict(re.findall(r'(\w+)="([^"]*)"', m.group(1)))
+            datei = ordner / attr["src"].removeprefix("/hilfe-bilder/")
+            benutzt.add(datei.name)
+            self.assertTrue(attr["src"].startswith("/hilfe-bilder/") and datei.is_file(), f"{abschnitt}: {attr['src']}")
+            self.assertGreater(len(attr.get("alt", "")), 20, f"{abschnitt}: {datei.name} ohne Alternativtext")
+            self.assertEqual(attr.get("loading"), "lazy", datei.name)
+            with Image.open(datei) as b:
+                verhaeltnis = b.width / b.height
+            self.assertAlmostEqual(int(attr["width"]) / int(attr["height"]), verhaeltnis, delta=0.02 * verhaeltnis,
+                                   msg=f"{abschnitt}: {datei.name} – width/height passen nicht zur Datei")
+            if datei.suffix == ".gif":
+                standbild = datei.with_name(f"{datei.stem}-standbild.png")
+                self.assertTrue(standbild.is_file(), standbild.name)
+                self.assertIn(f'srcset="/hilfe-bilder/{standbild.name}"', m.string, abschnitt)
+                benutzt.add(standbild.name)
+        # keine verwaisten Dateien, die nur Platz im Image belegen
+        self.assertEqual(sorted(p.name for p in ordner.iterdir()), sorted(benutzt))
