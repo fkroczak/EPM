@@ -3,52 +3,77 @@
  * eigenes Passwort festlegen → Authenticator einrichten → Notfall-Codes notieren.
  */
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import type { CSSProperties, FormEvent, ReactNode } from "react";
 import { ApiFehler, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { PasskeyVorrat, geraetename, passkeyBenutzen, passkeyErstellen, passkeyHindernis } from "@/lib/passkey";
 import type { Status } from "@/lib/typen";
 import { Eingabe, Feld, Knopf, Meldung, Segmente } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
-import { Logo } from "@/components/layout/logo";
+import { EpmMarke, EpmSymbol } from "@/components/layout/EpmMarke";
 
+/** Neutrale Anmeldeseite (Wunsch 11.10.2026): EPM wird von DSKM und Regeneration Clinic genutzt – vor der Anmeldung
+ *  steht deshalb keine Firma im Vordergrund, sondern das System. Ruhige Fläche in Schiefer-Petrol, Pulslinie, Leitsatz;
+ *  unten die Einrichtungen, die EPM gemeinsam nutzen. Logo und Farben der Firma erscheinen nach der Anmeldung. */
 function Rahmen({ children }: { children: ReactNode }) {
   const { status } = useAuth();
-  const org = status?.organisation;
+  const firmen = status?.organisation?.firmen ?? [];
   return (
-    <div className="min-h-screen flex bg-flaeche">
-      <div aria-hidden="true" className="relative grow overflow-hidden hidden md:flex" style={{ background: "#251F53" }}>
-        <div className="w-16 shrink-0" style={{ background: "#ED6D3C" }} />
-        <svg viewBox="0 0 880 960" preserveAspectRatio="xMaxYMax slice" className="absolute left-16 top-0 h-full w-[calc(100%-4rem)]">
-          <circle cx="690" cy="720" r="330" fill="none" stroke="#E8BD76" strokeOpacity=".18" strokeWidth="2" />
-          <circle cx="690" cy="720" r="260" fill="none" stroke="#E8BD76" strokeOpacity=".32" strokeWidth="2" />
-          <circle cx="690" cy="720" r="236" fill="none" stroke="#E8BD76" strokeOpacity=".32" strokeWidth="1" strokeDasharray="2 9" />
-          <circle cx="690" cy="720" r="190" fill="#E8BD76" fillOpacity=".10" />
-          <circle cx="690" cy="720" r="120" fill="none" stroke="#E8BD76" strokeOpacity=".45" strokeWidth="2" />
+    // neutraler Akzent (Schiefer-Petrol) statt der Farben einer Firma
+    <div className="min-h-screen flex bg-flaeche" style={{ "--akzent": "#24353D", "--akzent-hover": "#1B262D",
+      "--akzent-text": "#2A4F57", "--akzent-weich": "#E3ECEB", "--ladebalken": "#5E9C93" } as CSSProperties}>
+      <div aria-hidden="true" className="relative grow overflow-hidden hidden md:flex"
+        style={{ background: "linear-gradient(160deg, #1B262D 0%, #22333B 55%, #2A3F47 100%)" }}>
+        <svg viewBox="0 0 880 960" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full">
+          <defs>
+            <pattern id="punkte" width="28" height="28" patternUnits="userSpaceOnUse">
+              <circle cx="2" cy="2" r="1.2" fill="#9CC9C1" fillOpacity=".10" />
+            </pattern>
+            <linearGradient id="puls" x1="0" x2="1">
+              <stop offset="0" stopColor="#9CC9C1" stopOpacity="0" />
+              <stop offset=".35" stopColor="#9CC9C1" stopOpacity=".55" />
+              <stop offset="1" stopColor="#9CC9C1" stopOpacity=".15" />
+            </linearGradient>
+          </defs>
+          <rect width="880" height="960" fill="url(#punkte)" />
+          <circle cx="740" cy="160" r="260" fill="#9CC9C1" fillOpacity=".04" />
+          <circle cx="740" cy="160" r="170" fill="none" stroke="#9CC9C1" strokeOpacity=".12" strokeWidth="1.5" />
+        </svg>
+        {/* Pulslinie im unteren Drittel, unabhängig vom Seitenverhältnis unter dem Leitsatz */}
+        <svg viewBox="0 0 880 200" preserveAspectRatio="none" className="absolute inset-x-0 bottom-[16%] h-[9rem] w-full">
+          <path d="M0 110 H300 l22 -40 l30 110 l34 -150 l28 104 l16 -24 H880" fill="none" stroke="url(#puls)"
+            strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         </svg>
         <div className="relative flex flex-col justify-between px-[4.5rem] py-16 w-full">
-          <span className="font-mono text-xs font-medium uppercase tracking-[.12em]" style={{ color: "#E8BD76" }}>
-            EPM · Elektronisches Patientenmanagement
-          </span>
+          <div className="flex items-center gap-3">
+            <EpmSymbol groesse={36} hell />
+            <span className="font-mono text-xs font-medium uppercase tracking-[.14em]" style={{ color: "#9CC9C1" }}>
+              EPM · Elektronisches Patientenmanagement
+            </span>
+          </div>
           <div className="flex flex-col gap-[1.125rem] max-w-[35rem]">
-            <span className="font-serif italic text-[3.5rem] leading-[1.1] tracking-[-.01em]" style={{ color: "#F6F4FB" }}>
+            <span className="font-serif italic text-[3.25rem] leading-[1.1] tracking-[-.01em]" style={{ color: "#F1F5F4" }}>
               Salus aegroti<br />suprema lex
             </span>
-            <span className="w-14 h-[0.1875rem] rounded-sm" style={{ background: "#ED6D3C" }} />
-            <span className="text-lg leading-normal" style={{ color: "#CFCBEA" }}>Das Wohl des Kranken ist oberstes Gesetz.</span>
+            <span className="w-14 h-[0.1875rem] rounded-sm" style={{ background: "#9CC9C1" }} />
+            <span className="text-lg leading-normal" style={{ color: "#C9D6D3" }}>Das Wohl des Kranken ist oberstes Gesetz.</span>
           </div>
-          <span className="text-[0.8125rem] leading-normal max-w-[26.25rem]" style={{ color: "#A7A2CC" }}>
-            {[org?.name, org?.anschrift].filter(Boolean).join(" · ")}
-          </span>
+          {firmen.length ? (
+            <div className="flex flex-col gap-2 text-[0.8125rem] leading-normal" style={{ color: "#A9BCB8" }}>
+              <span className="font-mono text-[0.6875rem] uppercase tracking-[.12em]" style={{ color: "#7F9894" }}>Gemeinsam genutzt von</span>
+              <span>{firmen.map((f) => f.name).join(" · ")}</span>
+            </div>
+          ) : <span />}
         </div>
       </div>
-      <main className="w-full md:w-[33.75rem] shrink-0 px-4 sm:px-6 md:px-[4.5rem] py-8 sm:py-16 flex flex-col justify-center gap-6 sm:gap-7 bg-flaeche">
-        <Logo className="w-[24.75rem] max-w-full h-[6rem] sm:h-[8.75rem]" />
+      <main className="w-full md:w-[33.75rem] shrink-0 px-4 sm:px-6 md:px-[4.5rem] py-8 sm:py-16 flex flex-col justify-center gap-6 sm:gap-8 bg-flaeche">
+        <EpmMarke />
         {children}
         <div className="flex items-start gap-2 text-[0.8125rem] leading-normal gedaempft">
           <Icon name="schloss" groesse={14} className="mt-[0.1875rem] shrink-0" />
           <span>Nur im VPN erreichbar. Nach 30 Minuten ohne Aktivität wirst du abgemeldet.</span>
         </div>
+        {firmen.length ? <span className="md:hidden text-xs gedaempft">Gemeinsam genutzt von {firmen.map((f) => f.kurzname).join(" · ")}</span> : null}
       </main>
     </div>
   );
