@@ -141,9 +141,13 @@ class Firmen(Grundlage):
         geteilt = Patient.objects.get(ist_test=True, nachname="Mustermann")
         self.assertEqual(sorted(geteilt.firmenzuordnung.values_list("firma__kuerzel", flat=True)), ["dskm", "rg"])
         self.assertEqual(set(Kontakt.objects.filter(patient=geteilt).values_list("firma__kuerzel", flat=True)), {"dskm", "rg"})
-        nur_rg = Patient.objects.get(ist_test=True, nachname="Test")
-        self.assertEqual(list(nur_rg.firmenzuordnung.values_list("firma__kuerzel", flat=True)), ["rg"])
-        self.assertEqual(set(Kontakt.objects.filter(patient=nur_rg).values_list("firma__kuerzel", flat=True)), {"rg"})
+        aus_rg = Patient.objects.get(ist_test=True, nachname="Test")
+        self.assertEqual(sorted(aus_rg.firmenzuordnung.values_list("firma__kuerzel", flat=True)), ["dskm", "rg"])
+        kontakte = list(Kontakt.objects.filter(patient=aus_rg).values_list("firma__kuerzel", flat=True))
+        self.assertEqual((kontakte.count("rg") > 1, kontakte.count("dskm")), (True, 1))
+        self.assertTrue(Patient.objects.filter(ist_test=True, nachname="Musterfrau",
+                                               firmenzuordnung__firma__kuerzel="dskm").exclude(
+                                                   firmenzuordnung__firma__kuerzel="rg").exists())
         # Zurücksetzen entfernt auch die Historie der Zuordnung
         testdaten_zuruecksetzen()
         self.assertFalse(PatientFirma.history.filter(patient_id=geteilt.id).exists())

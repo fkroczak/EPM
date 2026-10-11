@@ -214,9 +214,10 @@ TESTPATIENTEN = [
     ("Demo", "Karl", date(1958, 5, 17), "m", Decimal("172"), 1, "Frau Probe", "Port", "nein", "abgeschlossen"),
 ]
 
-# Zwei Firmen (11.10.2026): Max Mustermann wird von DSKM und Regeneration Clinic betreut (mit Einwilligung),
-# Hanna Test nur von der Regeneration Clinic; alle anderen nur von der DSKM.
-TEST_FIRMEN = {1: ("dskm", "rg"), 4: ("rg",)}
+# Zwei Firmen (11.10.2026): gemeinsame Akten mit Einwilligung – Max Mustermann aufgenommen bei der DSKM (ein Kontakt
+# aus der RG), Hanna Test aufgenommen bei der Regeneration Clinic (Einträge aus der RG, ein Kontakt aus der DSKM).
+# Alle anderen nur DSKM; so bleiben alle Musterakten für DSKM-Konten sichtbar.
+TEST_FIRMEN = {1: ("dskm", "rg"), 4: ("rg", "dskm")}
 
 DIAGNOSEN = [
     "<p><strong>Kurzdarmsyndrom</strong> nach ausgedehnter Dünndarmresektion (Testdaten).</p>"
@@ -547,8 +548,9 @@ def testpatienten_anlegen() -> int:
             firmen_setzen(pat, list(TEST_FIRMEN[i]), user, einwilligung_am=heute - timedelta(days=60))
             # ein Kontakt aus der zweiten Firma: in der gemeinsamen Akte steht an jedem Eintrag, wo er erfasst wurde
             zweite = setze_aktive_firma(firmen[TEST_FIRMEN[i][1]])
+            von = "der Regeneration Clinic" if TEST_FIRMEN[i][1] == "rg" else "der DSKM"
             _nutzer(user, Kontakt(patient=pat, art=art, zeitpunkt=timezone.now() - timedelta(days=2),
-                                  text="<p>Rückfrage der Regeneration Clinic zur Infusionsdauer (Testdaten).</p>",
+                                  text=f"<p>Rückfrage {von} zur Infusionsdauer (Testdaten).</p>",
                                   erfasst_von=user)).save()
             zuruecksetzen(zweite)
         zuruecksetzen(token)

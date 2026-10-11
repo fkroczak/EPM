@@ -2,7 +2,7 @@
  * Zwei Firmen in einem EPM (Anforderung 11.10.2026): DSKM und Regeneration Clinic. Umschalter unter dem Logo, Akten nur
  * der aktiven Firma, gemeinsame Akte mit Firma an jedem Eintrag, Auswahl der betreuenden Firmen mit Einwilligung.
  *
- * Musterdaten: Max Mustermann gehört beiden Firmen, Hanna Test nur der RG, alle anderen nur der DSKM.
+ * Musterdaten: Max Mustermann und Hanna Test gehören beiden Firmen, alle anderen nur der DSKM.
  * Der Testzugang (e2e.test) ist in beiden Firmen Mediziner (vorbereiten.py). Am Ende steht er wieder in der DSKM.
  */
 import { expect, test } from "@playwright/test";
@@ -30,7 +30,6 @@ test("Umschalter unter dem Logo zeigt nur die Akten der aktiven Firma", async ({
   let liste = await namen(page);
   expect(liste).toContain("Mustermann");
   expect(liste).toContain("Musterfrau");
-  expect(liste).not.toContain("Hanna");
   const schalter = page.getByTestId("seitenleiste").getByRole("group", { name: "Firma" });
   await expect(schalter.getByRole("button", { name: "DSKM" })).toHaveAttribute("aria-pressed", "true");
   await schalter.getByRole("button", { name: "RG" }).click();
