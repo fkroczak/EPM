@@ -30,7 +30,7 @@ export function TechnikKarte() {
       <KartenKopf titel="Technische Verwaltung" unter="Django-Admin und API-Ansicht im Browser – nur zur Fehlersuche. Danach schaltet EPM sie von selbst aus."
         rechts={s ? <Chip art={s.django_admin || s.api_ansicht ? "warn" : "ok"}>{s.django_admin || s.api_ansicht ? "an" : "aus"}</Chip> : null} />
       {s?.an && s.bis ? <span className="text-sm">An bis <strong>{zeitpunkt(s.bis)}</strong>.{" "}
-        {s.django_admin ? <a href="/verwaltung/" target="_blank" rel="noopener">Django-Admin öffnen</a> : null}</span> : null}
+        {s.django_admin ? <a href="/verwaltung/" target="_blank" rel="noopener" className="underline underline-offset-2">Django-Admin öffnen</a> : null}</span> : null}
       {fest ? <Meldung art="warn">Die Server-Konfiguration legt fest: Django-Admin {s!.django_admin ? "an" : "aus"}, API-Ansicht {s!.api_ansicht ? "an" : "aus"}
         (EPM_DJANGO_ADMIN / EPM_API_BROWSABLE in backend.env). Der Schalter wirkt dann nicht.</Meldung> : null}
       <div className="flex gap-2 flex-wrap">
