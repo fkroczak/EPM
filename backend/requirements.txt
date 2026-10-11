@@ -10,7 +10,7 @@ ftfy>=6.3,<7                 # Altdaten-Import: doppelt kodierte Umlaute reparie
 qrcode>=8.2,<9
 webauthn>=2.8,<3            # Passkeys (WebAuthn) als zweiter Faktor; 2.x stabil, 3.0 erst seit 09/2026
 gunicorn>=26,<27
-weasyprint>=68,<70           # PDF-Erzeugung (offline, braucht Pango aus dem Image); ab 68 wegen URLFetcher (vorlagen/pdf.py)
+weasyprint>=70,<71          # PDF-Erzeugung (offline, braucht Pango aus dem Image); 70 schließt CVE-2026-106443 (Sicherheitsprüfung 11.10.2026)
 pypdf>=6.0,<7               # Reisebescheinigung: ärztliches Attest des ADAC ausfüllen und anhängen (F172)
 # Scans und Texterkennung (F160 ff.): Bildaufbereitung, zweite Erkennung (PP-OCRv5 als ONNX), PDF lesen und schreiben
 numpy>=2.5,<3

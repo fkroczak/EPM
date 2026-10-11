@@ -39,8 +39,9 @@ SECRET_KEY = geheimnis("DJANGO_SECRET_KEY", "nur-fuer-entwicklung-unsicher" if D
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "")
 
-# Django-Admin (/verwaltung/) nur zum Prüfen der Daten, bis das Frontend steht.
-EPM_DJANGO_ADMIN = env_bool("EPM_DJANGO_ADMIN", True)
+# Django-Admin (/verwaltung/) nur noch bei Bedarf (Sicherheitsprüfung 11.10.2026: standardmäßig aus; das Frontend
+# braucht ihn nicht). Einschalten mit EPM_DJANGO_ADMIN=1 in /srv/epm/backend.env.
+EPM_DJANGO_ADMIN = env_bool("EPM_DJANGO_ADMIN", False)
 
 INSTALLED_APPS = [
     "django.contrib.auth",
@@ -207,7 +208,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "epm.pagination.Seiten",
     "PAGE_SIZE": 50,
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"]
-    + (["rest_framework.renderers.BrowsableAPIRenderer"] if env_bool("EPM_API_BROWSABLE", True) else []),
+    + (["rest_framework.renderers.BrowsableAPIRenderer"] if env_bool("EPM_API_BROWSABLE", False) else []),
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
     "DEFAULT_THROTTLE_RATES": {"anmeldung": "30/min"},
     "COERCE_DECIMAL_TO_STRING": False,
