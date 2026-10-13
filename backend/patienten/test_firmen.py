@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from django.utils import timezone
 
-from accounts.models import Mitgliedschaft, Rolle
+from accounts.models import Mitgliedschaft, Rolle, User
 from audit.models import SystemEreignis
 from epm.pruefhilfen import Grundlage, benutzer, echte_anmeldung, mit_zweitem_faktor
 from stammdaten.models import Firma, Logo
