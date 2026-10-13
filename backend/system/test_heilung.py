@@ -261,9 +261,11 @@ class AgentHeilung(SimpleTestCase):
     def test_version_bestaetigen_und_schalten(self):
         z = []
         self.env(NEU, GUT)
+        (self.basis / "system" / "rueckfall.json").write_text('{"id": "x"}')
         self.assertEqual(self.a.version_bestaetigen(z.append), (0, f"Version {NEU} ist jetzt die gute Version – auf sie fällt die "
                                                                     "Selbstheilung zurück."))
         self.assertEqual(self.a.env_lesen()["EPM_VERSION_GUT"], NEU)
+        self.assertFalse((self.basis / "system" / "rueckfall.json").exists())
         self.assertEqual((self.basis / ".env").read_text().count("EPM_VERSION_GUT="), 1)
         self.assertEqual(self.a.version_bestaetigen(z.append, simuliert=True)[1], f"Probelauf: {NEU} nicht als gute Version eingetragen.")
         self.docker.images.discard(NEU)

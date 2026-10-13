@@ -98,6 +98,7 @@ version_vorhanden() { docker image inspect "epm-backend:$1" >/dev/null 2>&1 && d
 
 gut_setzen() {
   env_setzen EPM_VERSION_GUT "$1"
+  rm -f "$B/system/rueckfall.json"    # ein früherer Rückfall ist damit erledigt
   echo "   Gute Version: $1"
 }
 # Die gute Version, auf die ein fehlgeschlagener Start zurückfällt: EPM_VERSION_GUT, sonst die bisher laufende –

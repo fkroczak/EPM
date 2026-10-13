@@ -3700,6 +3700,10 @@ class Agent:
         if v.get("verfuegbar") and (e is None or not e["vollstaendig"]):
             return 2, f"Die Images der laufenden Version {aktiv} sind nicht vollständig vorhanden – nichts bestätigt."
         self.env_setzen("EPM_VERSION_GUT", aktiv)
+        try:
+            os.unlink(self.heilung_pfad(RUECKFALL_DATEI))     # ein früherer Rückfall ist damit erledigt
+        except FileNotFoundError:
+            pass
         zeile(f"EPM_VERSION_GUT={aktiv}\n")
         return 0, f"Version {aktiv} ist jetzt die gute Version – auf sie fällt die Selbstheilung zurück."
 
