@@ -68,9 +68,7 @@ class Vorlagen(Grundlage):
                 self.assertEqual(pruefe_bloecke(art, bloecke), [])
         r = client_fuer(self.admin).get("/api/vorlagen/")
         self.assertEqual(r.status_code, 200, r.content)
-        # ohne aktive Firma (Tests, Befehle) erscheinen auch die Vorlagen der Regeneration Clinic (Oktober 2026)
-        self.assertEqual([(v["art"], v["aktiv"]["version"], v["entwurf"]) for v in r.json()
-                          if not v["art"].startswith("rgc_")],
+        self.assertEqual([(v["art"], v["aktiv"]["version"], v["entwurf"]) for v in r.json()],
                          [("infusionsplan", 1, None), ("patientendatenblatt", 1, None),
                           # Wünsche aus der Praxis vom 06.10.2026 (F115, F116)
                           ("bericht", 1, None), ("sprechstunde", 1, None),
@@ -452,8 +450,8 @@ class VorlagenJeFirma(Grundlage):
         self.assertEqual((r.status_code, r.json()["firma"]["eigene"], r.json()["aktiv"]["firma"]), (200, False, None))
         self.assertEqual(Dokumentvorlage.objects.filter(art="einwilligung", firma=self.rg, status="abgeloest").count(), 2)
         self.assertEqual(Dokumentvorlage.aktive("einwilligung", firma=self.rg).version, 1)
-        # Konstanten je Firma: eigene Schreiben bleiben gemeinsam, nur mit mehreren Firmen
-        self.assertEqual(c.post("/api/vorlagen/rgc_anlage_k/firma/", {"eigene": True}, format="json").status_code, 400)
+        # eigene Schreiben haben ihre Firma selbst: keine eigene Fassung je Firma
+        self.assertEqual(c.post("/api/vorlagen/eigen-rgc-f11/firma/", {"eigene": True}, format="json").status_code, 400)
 
     def test_entwurfsmodus_je_firma(self):
         c = self.anmelden("rg")
@@ -470,51 +468,6 @@ class VorlagenJeFirma(Grundlage):
         # beim Ablegen der eigenen Vorlage entfällt der Eintrag
         c.post("/api/vorlagen/einwilligung/firma/", {"eigene": False}, format="json")
         self.assertEqual(Einstellungen.aktuell().vordrucke_ohne_entwurf, [])
-
-    def test_rgc_vorlagen_nur_in_der_regeneration_clinic(self):
-        from vorlagen.felder import RGC_ARTEN
-
-        c = self.anmelden("dskm")
-        arten = [v["art"] for v in c.get("/api/vorlagen/").json()]
-        self.assertFalse([a for a in arten if a.startswith("rgc_")])
-        self.assertEqual(c.get("/api/vorlagen/rgc_erklaerung_at/").status_code, 404)
-        self.assertEqual(c.get(f"/api/patienten/{self.patient.id}/erklaerung-pdf/?art=rgc_erklaerung_at").status_code, 400)
-        self.assertEqual(c.get(f"/api/patienten/{self.patient.id}/datenschutz/").json()["vordrucke"], [])
-        self.assertFalse(Dokumentvorlage.objects.filter(art__startswith="rgc_").exists())
-        c = self.anmelden("rg")
-        liste = {v["art"]: v for v in c.get("/api/vorlagen/").json()}
-        self.assertEqual([a for a in liste if a.startswith("rgc_")], list(RGC_ARTEN))
-        v = liste["rgc_erklaerung_at"]
-        self.assertEqual((v["gruppe"], v["aktiv"]["firma"], v["firma"]["gebunden"], v["firma"]["moeglich"],
-                          v["entwurfsmodus"]["aktiv"]), ("rgc", "rg", True, False, True))
-        self.assertEqual(v["name"], "Patientenerklärung Österreich (Stundung)")
-        self.assertTrue(Dokumentvorlage.objects.filter(art="rgc_erklaerung_at", firma=self.rg, status="aktiv").exists())
-        vordrucke = c.get(f"/api/patienten/{self.rg_patient.id}/datenschutz/").json()["vordrucke"]
-        self.assertEqual([v["art"] for v in vordrucke], list(RGC_ARTEN))
-        self.assertTrue(all(v["entwurf"] and v["version"] == 1 for v in vordrucke))
-        # PDF jeder Vorlage für einen Patienten der RGC, wörtlich aus der Word-Vorlage, mit Wasserzeichen
-        for art in RGC_ARTEN:
-            with self.subTest(art=art):
-                r = c.get(f"/api/patienten/{self.rg_patient.id}/erklaerung-pdf/?art={art}")
-                self.assertEqual((r.status_code, r["X-EPM-Vorlage-Entwurf"]), (200, "1"), r.content[:200])
-                self.assertTrue(r.content.startswith(b"%PDF"))
-        if PDFTOTEXT:
-            r = c.get(f"/api/patienten/{self.rg_patient.id}/erklaerung-pdf/?art=rgc_erklaerung_at")
-            self.assertIn("ENTWURF", wasserzeichen(r.content))
-            text = kompakt(pdf_text(r.content))
-            for erwartet in ["Patientenerklärung bei Aufnahme", "Vorlage 01 · Version 6 · Stand 10/2026",
-                             "Klinik, Karla", "01.01.1970", "1234 010170", "Leistungserbringerin",
-                             "Regeneration Clinic SIA · Jāņa Asara iela 3", "Was die Stundung für Sie bedeutet",
-                             "Rechtsstellung der Klinik im Überblick", "12. Stundung des erwarteten Kassenanteils",
-                             "Unterschrift Patient/in – Zedent/in (vollständig lesbar)"]:
-                self.assertIn(kompakt(erwartet), text, erwartet)
-        # Entwurfsmodus abschalten gilt für die Vorlage der RGC
-        r = c.post("/api/vorlagen/rgc_erklaerung_at/entwurfsmodus/", {"aus": True}, format="json")
-        self.assertEqual((r.status_code, r.json()["entwurfsmodus"]["aktiv"]), (200, False))
-        r = c.get(f"/api/patienten/{self.rg_patient.id}/erklaerung-pdf/?art=rgc_erklaerung_at")
-        self.assertEqual(r["X-EPM-Vorlage-Entwurf"], "0")
-        if PDFTOTEXT:
-            self.assertNotIn("Hinweis zur Vorlage", pdf_text(r.content))
 
     def test_medikationsplan_im_querformat(self):
         c = self.anmelden("dskm")

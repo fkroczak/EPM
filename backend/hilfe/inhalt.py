@@ -1141,19 +1141,18 @@ Text bekommen, wechseln Sie oben links in diese Firma und wählen im Editor <str
 Die Kopie der gemeinsamen Fassung ist sofort in Gebrauch, und Entwurf, Vorschau, Freigeben und Fassungen gelten ab
 dann nur noch für diese Firma; die andere Firma nutzt weiter die gemeinsame Vorlage. Die Liste und der Kopf des
 Editors zeigen, ob Sie gerade die gemeinsame oder die eigene Vorlage bearbeiten. <strong>Eigene Vorlage
-entfernen</strong> legt sie wieder ab (die Fassungen bleiben als abgelöst erhalten). Eigene Schreiben sind immer
-gemeinsam.</p>
+entfernen</strong> legt sie wieder ab (die Fassungen bleiben als abgelöst erhalten). Eigene Schreiben gehören
+entweder allen Firmen oder fest einer Firma.</p>
 <p><strong>Querformat:</strong> Bei Vorlagen mit breiten Tabellen (z. B. Medikationsplan) wählen Sie über der Seite
 <em>Hochformat</em> oder <em>Querformat</em>; das Seitenformat wird mit der Fassung gespeichert. Der Medikationsplan
 kommt im Querformat, damit Hinweise und Grund Platz haben; Falzmarken gibt es nur im Hochformat.</p>
-<p><strong>Regeneration Clinic – Patientenerklärungen und Vereinbarungen:</strong> In der Firma RGC stehen zusätzlich
-die zwölf Word-Vorlagen der Klinik (Patientenerklärungen Österreich/GKV/BG-UV/PKV/Zusatzversicherung,
-Schweigepflichtentbindung, Aufklärung Operation und Anästhesie, ÖGK-Vereinbarungen, Anlage K, Anwaltsvollmacht;
-Revision 3, Oktober 2026) wörtlich als Vorlagen bereit – nur dort, die DSKM sieht sie nicht. EPM setzt Name,
-Geburtsdatum, Anschrift, Versicherung und Versichertennummer ein; alle übrigen Felder und Ankreuzkästchen werden auf
-dem Ausdruck von Hand ausgefüllt. Gedruckt werden sie in der Akte unter Datenschutz › „Vordrucke der Regeneration
-Clinic“; sie werden dort nicht nachgehalten (keine Pflicht-Erklärungen). Bis die Praxis jede Vorlage einmal freigegeben
-hat, tragen die PDFs das Wasserzeichen „ENTWURF“ – wie bei den übrigen Vordrucken abschaltbar.</p>""",
+<p><strong>Vorlagen der Regeneration Clinic:</strong> In der Firma RGC stehen zusätzlich ihre Word-Vorlagen als eigene
+Schreiben bereit – nur dort, die DSKM sieht sie nicht. Unter „Anforderungen“ stehen Labor, Bildgebung und
+Funktionsdiagnostik. Unter „Aufklärungen, Erklärungen und Abrechnung“ stehen die Patientenerklärungen, die
+Schweigepflichtentbindung, die Aufklärungen zu Operation und Anästhesie, die ÖGK-Formulare, Anlage K und die
+Anwaltsvollmacht. EPM setzt Name, Geburtsdatum, Anschrift, Versicherung und Versichertennummer ein. Alles andere wird
+auf dem Ausdruck von Hand ausgefüllt. Gedruckt werden sie in der Akte über Weitere Aktionen (⋯) › „Schreiben und
+E-Mail …“.</p>""",
     },
     {
         "id": "benutzer", "gruppe": "administration", "titel": "Benutzer und Rechte", "rechte": ["benutzer_verwalten"],

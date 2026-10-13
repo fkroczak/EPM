@@ -1,0 +1,197 @@
+{
+ "quelle": "12_Anwaltsvollmacht_Erstattungsverfahren",
+ "name": "Vollmacht zur anwaltlichen Vertretung",
+ "gruppe": "formulare",
+ "beschreibung": "Gesonderte Prozess- und Verfahrensvollmacht – Erstattungs-, Widerspruchs- und Klageverfahren",
+ "datei": "12_Anwaltsvollmacht_Erstattungsverfahren_V1.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": false,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Vollmacht zur anwaltlichen Vertretung"
+  },
+  {
+   "id": "b3",
+   "typ": "text",
+   "bezeichnung": "Stand der Vorlage",
+   "text": "Gesonderte Prozess- und Verfahrensvollmacht – Erstattungs-, Widerspruchs- und Klageverfahren\nDiese Vollmacht trennt die rechtliche Vertretung von der administrativen Abwicklung durch die Klinik. Sie wird von der versicherten Person erteilt; den Rechtsanwalt wählt und beauftragt die Regeneration Clinic SIA im eigenen wirtschaftlichen Interesse und auf eigene Kosten (Ziffer 3). Der Name des Rechtsanwalts wird bei Mandatierung eingetragen; bis dahin bleibt die Vollmacht als Blankovollmacht beim Patienten und bei der Klinik hinterlegt.\nVorlage 12 · Version 1 · Stand 10/2026 · Anlage zu den Vorlagen 01–05, 09 und 10",
+   "optionen": {
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "b4",
+   "typ": "datenfelder",
+   "bezeichnung": "Angaben",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Vollmachtgeber/in (Name, Vorname, Geburtsdatum)",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Anschrift",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Versicherungsträger / Versicherer, Versicherungs-Nr.",
+     "wert": "{{Patient.Versichertennummer}}"
+    },
+    {
+     "label": "Bezug: Patientenerklärung / Vereinbarung vom",
+     "wert": "☐ 01 ☐ 02 ☐ 03 ☐ 04 ☐ 05 ☐ 09 ☐ 10 – Datum: ______________"
+    },
+    {
+     "label": "Behandlungsfall ab (Aufnahmedatum)",
+     "wert": "____________________"
+    },
+    {
+     "label": "Bevollmächtigte/r Rechtsanwalt / Rechtsanwältin (Name, Kanzlei, Anschrift)",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Zulassung",
+     "wert": "☐ Deutschland (Rechtsanwaltskammer ______________) ☐ Österreich (Rechtsanwaltskammer ______________)"
+    }
+   ]
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "text": "Ich bevollmächtige den/die oben bezeichnete/n Rechtsanwalt/Rechtsanwältin, mich in der Angelegenheit Kostenerstattung / Kostenübernahme für die Behandlung in der Regeneration Clinic SIA, Rīga gegenüber dem oben bezeichneten Versicherungsträger bzw. Versicherer, dessen ärztlichen und prüfenden Diensten sowie vor allen Behörden und Gerichten außergerichtlich und gerichtlich zu vertreten.",
+   "bezeichnung": "1. Gegenstand",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": "Die Vollmacht umfasst insbesondere:\n– Deutschland: die Vertretung im Verwaltungs- und Widerspruchsverfahren (§ 13 SGB X, §§ 83 ff. SGG) sowie vor dem Sozialgericht, Landessozialgericht und Bundessozialgericht (§ 73 SGG); bei privaten Versicherern die Vertretung vor den ordentlichen Gerichten aller Instanzen und vor dem Ombudsmann Private Kranken- und Pflegeversicherung;\n– Österreich: die Vertretung im Verfahren vor dem Krankenversicherungsträger (§ 10 AVG) sowie die Erhebung der Bescheidklage (§ 67 Abs. 2 ASGG) und der Säumnisklage (§ 67 Abs. 1 Z 2 ASGG) und die Vertretung vor dem Arbeits- und Sozialgericht, dem Oberlandesgericht und dem Obersten Gerichtshof (§ 40 ASGG, § 8 RAO);\n– die Einlegung und Rücknahme von Rechtsbehelfen und Rechtsmitteln; Antrags-, Verzichts-, Anerkenntnis-, Vergleichs- und Erledigungserklärungen – ein Vergleich oder Verzicht über den Erstattungsanspruch bedarf meiner vorherigen Zustimmung in Textform;\n– die Entgegennahme von Zustellungen, Bescheiden, Schriftsätzen und Urteilen;\n– die Empfangnahme von Geldleistungen, erstatteten Beträgen und festgesetzten Kosten mit der Maßgabe, dass Erstattungsbeträge nach Maßgabe der in Bezug genommenen Patientenerklärung an die Regeneration Clinic SIA bzw. an mich auszukehren sind;\n– die Akteneinsicht, die Einholung von Auskünften, medizinischen Unterlagen und Gutachten;\n– die Erteilung von Untervollmachten (Terminsvertretung, Substitution).",
+   "bezeichnung": "2. Umfang",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "Das Mandat wird von der Regeneration Clinic SIA erteilt und vergütet. Ich schulde dem/der Bevollmächtigten kein Honorar und keine Auslagen; ein Vergütungsanspruch gegen mich wird ausgeschlossen. Gerichts- und Sachverständigenkosten, die nicht vom Versicherungsträger bzw. Versicherer zu tragen sind, übernimmt die Klinik, soweit sie das Verfahren veranlasst hat. Vom Gegner erstattete Kosten stehen der Klinik zu, soweit sie diese getragen hat.",
+   "bezeichnung": "3. Kosten",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "Ich entbinde die behandelnden Ärztinnen und Ärzte sowie das Personal der Regeneration Clinic SIA und der eingebundenen Kooperationspartner gegenüber dem/der Bevollmächtigten und dessen/deren Kanzleimitarbeitern von der Verschwiegenheitspflicht, soweit dies zur Mandatsführung erforderlich ist; im Übrigen gilt die Schweigepflichtentbindung nach Vorlage 06. Der/die Bevollmächtigte verarbeitet meine Daten als eigenständig Verantwortliche/r nach Art. 6 Abs. 1 lit. b und f, Art. 9 Abs. 2 lit. f DSGVO.",
+   "bezeichnung": "4. Schweigepflichtentbindung und Datenschutz",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "text",
+   "text": "Der/die Bevollmächtigte informiert mich und die Regeneration Clinic SIA über wesentliche Verfahrensschritte, Fristen und Entscheidungen. Ich kann diese Vollmacht jederzeit mit Wirkung für die Zukunft widerrufen; der Widerruf ist dem/der Bevollmächtigten und der Klinik mitzuteilen und beendet zugleich die Stundung nach der in Bezug genommenen Patientenerklärung, soweit dort vorgesehen. Die Vollmacht gilt, soweit gesetzlich zulässig, über meinen Tod hinaus (§§ 168, 672 BGB; für angefangene Geschäfte § 1022 ABGB) und für Folge- und Nachverfahren (Kostenfestsetzung, Vollstreckung).",
+   "bezeichnung": "5. Weisungen, Information, Widerruf",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b10",
+   "typ": "text",
+   "text": "☐ Ich habe diese Vollmacht gelesen und verstanden; mir ist bekannt, dass die Klinik den Rechtsanwalt auswählt und bezahlt und dass ich die Vollmacht jederzeit widerrufen kann.\n☐ Ich habe ein Exemplar dieser Vollmacht erhalten.",
+   "bezeichnung": "6. Erklärung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b11",
+   "typ": "text",
+   "text": "Bei gesetzlicher Vertretung (Eltern, Betreuer/in bzw. Erwachsenenvertreter/in – Nachweis beifügen) ist die zweite Zeile auszufüllen.",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b12",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Ort, Datum",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b13",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift Vollmachtgeber/in (vollständig lesbar)",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b14",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Name der gesetzlich vertretungsberechtigten Person",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b15",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift der gesetzlich vertretungsberechtigten Person",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b16",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Rīga, Datum – Mandatserteilung durch die Regeneration Clinic SIA (Name, Unterschrift)",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b17",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Annahme des Mandats – Rechtsanwalt / Rechtsanwältin (Datum, Unterschrift, Stempel)",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b18",
+   "typ": "text",
+   "text": "Regeneration Clinic SIA · Vorlage 12 · Vollmacht zur anwaltlichen Vertretung · Version 1 · Stand 10/2026",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b19",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

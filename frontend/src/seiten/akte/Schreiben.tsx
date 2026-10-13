@@ -10,7 +10,7 @@ import { TERMINARTEN } from "@/lib/typen";
 import { Auswahl, Eingabe, Feld } from "@/components/ui/basis";
 import { SchreibenDialog } from "@/components/SchreibenDialog";
 
-type Schreiben = { art: string; name: string; beschreibung: string; termin: boolean; eigen: boolean };
+type Schreiben = { art: string; name: string; beschreibung: string; termin: boolean; eigen: boolean; gruppe_name?: string };
 
 export function SchreibenAusAkte({ patient, offen, onOffen }: { patient: Patient; offen: boolean; onOffen: (o: boolean) => void }) {
   const qc = useQueryClient();
@@ -49,11 +49,13 @@ export function SchreibenAusAkte({ patient, offen, onOffen }: { patient: Patient
           {(p) => (
             <Auswahl {...p} value={art} onChange={(e) => setArt(e.target.value)}>
               {(schreiben.data ?? []).filter((s) => !s.eigen).map((s) => <option key={s.art} value={s.art}>{s.name}</option>)}
-              {schreiben.data?.some((s) => s.eigen) ? (
-                <optgroup label="Eigene Vorlagen">
-                  {schreiben.data.filter((s) => s.eigen).map((s) => <option key={s.art} value={s.art}>{s.name}</option>)}
+              {/* eigene Vorlagen nach Gruppe (z. B. Anforderungen und Formulare der RGC, 13.10.2026) */}
+              {[...new Set((schreiben.data ?? []).filter((s) => s.eigen).map((s) => s.gruppe_name ?? "Eigene Vorlagen"))].map((g) => (
+                <optgroup key={g} label={g}>
+                  {(schreiben.data ?? []).filter((s) => s.eigen && (s.gruppe_name ?? "Eigene Vorlagen") === g)
+                    .map((s) => <option key={s.art} value={s.art}>{s.name}</option>)}
                 </optgroup>
-              ) : null}
+              ))}
             </Auswahl>
           )}
         </Feld>

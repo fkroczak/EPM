@@ -307,7 +307,7 @@ class DatenschutzAktionen:
     @action(detail=True, methods=["get"])
     def datenschutz(self, request, pk=None):
         """Stand für den Reiter „Datenschutz“: Aufbewahrung, Einschränkung, Erklärungen, Anfragen, Kopien, Löschen."""
-        from vorlagen.models import Dokumentvorlage, art_name, art_sichtbar
+        from vorlagen.models import Dokumentvorlage
 
         from .datenschutz_api import DatenschutzanfrageSerializer, ErklaerungSerializer
 
@@ -320,13 +320,6 @@ class DatenschutzAktionen:
         for art in Erklaerung.Art.values:
             v = Dokumentvorlage.aktive(art)  # in der aktiven Firma deren Vorlage (11.10.2026)
             vorlagen[art] = {"version": v.version, "entwurf": v.im_entwurfsmodus}
-        # weitere Vordrucke der aktiven Firma (Patientenerklärungen der RGC, 13.10.2026): keine Pflicht-Erklärungen,
-        # nur zum Ausdrucken über „erklaerung-pdf“
-        vordrucke = []
-        for art in Dokumentvorlage.VORDRUCKE:
-            if art not in Erklaerung.Art.values and art_sichtbar(art):
-                v = Dokumentvorlage.aktive(art)
-                vordrucke.append({"art": art, "name": art_name(art), "version": v.version, "entwurf": v.im_entwurfsmodus})
         kontext = self.get_serializer_context()
         return Response({
             "aufbewahrung": patient.aufbewahrung(),
@@ -338,7 +331,6 @@ class DatenschutzAktionen:
             "stand": stand_daten(patient),
             "pflicht": Einstellungen.aktuell().pflicht_erklaerungen,
             "vorlagen": vorlagen,
-            "vordrucke": vordrucke,
             "anfragen": DatenschutzanfrageSerializer(
                 patient.datenschutzanfragen.select_related("patient", "erfasst_von", "erledigt_von"),
                 many=True, context=kontext).data,
@@ -471,7 +463,7 @@ class DatenschutzAktionen:
         from vorlagen.pdf import erzeuge_aus_vorlage, wasserzeichen_fuer
 
         art = request.query_params.get("art")
-        # auch die weiteren Vordrucke der aktiven Firma (Patientenerklärungen der RGC, 13.10.2026)
+        # auch weitere Vordrucke der aktiven Firma (``art_sichtbar``)
         erlaubt = [a for a in Dokumentvorlage.VORDRUCKE if art_sichtbar(a)]
         if art not in erlaubt:
             return Response({"art": f"Erlaubt: {', '.join(erlaubt)}."}, status=status.HTTP_400_BAD_REQUEST)

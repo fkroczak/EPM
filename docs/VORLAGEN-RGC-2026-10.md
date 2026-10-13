@@ -1,34 +1,40 @@
 # Vorlagen der Regeneration Clinic in EPM (Oktober 2026)
 
-Stand 13.10.2026. Die Regeneration Clinic SIA hat zwölf Word-Vorlagen geliefert (Revision 3 vom 12.10.2026, Review und
-Änderungsprotokoll als Vorlage 00). Sie sind in EPM als Dokumentvorlagen der Firma **RGC** hinterlegt – nur dort
-sichtbar, die DSKM sieht sie nicht. Gepflegt werden sie unter Vorlagen › Dokumentvorlagen (Gruppe „Regeneration
-Clinic – Patientenerklärungen und Vereinbarungen“), gedruckt in der Akte unter Datenschutz › „Vordrucke der
-Regeneration Clinic“.
+Stand 14.10.2026. Die Regeneration Clinic SIA hat ihre Word-Vorlagen geliefert: 14 Anforderungen (Labor, Bildgebung,
+Funktionsdiagnostik) und zwölf Formulare (Revision 3 vom 12.10.2026, Review und Änderungsprotokoll als Vorlage 00).
+Alle sind in EPM als **eigene Schreiben der Firma RGC** hinterlegt – nur dort sichtbar, die DSKM sieht sie nicht.
+Gepflegt werden sie unter Vorlagen › Dokumentvorlagen, gedruckt in der Akte über Weitere Aktionen (⋯) › „Schreiben und
+E-Mail …“.
 
-## Übernommene Dokumente
+Umgesetzt werden die Word-Dateien mit `werkzeuge/rgc-vorlagen.py` nach `backend/vorlagen/statisch/rgc/`. Die
+Datenmigrationen `vorlagen/0007_rgc_vorlagen` und `0010_rgc_vorlagen_ergaenzt` legen daraus die eigenen Schreiben an,
+jedes nur einmal (Kennung `mitgeliefert`). Danach werden sie wie jede eigene Vorlage gepflegt.
 
-| Nr. | Dokument (Word-Datei) | Version · Stand | Art in EPM |
-|---|---|---|---|
-| 01 | Patientenerklärung Österreich (ÖGK/SVS/BVAEB/KFA), Stundung – `01_Patientenerklaerung_AT_OEGK_Stundung_V6.docx` | V6 · 10/2026 | `rgc_erklaerung_at` |
-| 02 | Patientenerklärung Deutschland GKV, Stundung – `02_Patientenerklaerung_GKV_DE_Stundung_V5.docx` | V5 · 10/2026 | `rgc_erklaerung_gkv` |
-| 03 | Patientenerklärung Deutschland BG/UV – `03_Patientenerklaerung_BG_UV_DE_V5.docx` | V5 · 10/2026 | `rgc_erklaerung_bguv` |
-| 04 | Patientenerklärung Deutschland PKV, Stundung – `04_Patientenerklaerung_PKV_DE_Stundung_V5.docx` | V5 · 10/2026 | `rgc_erklaerung_pkv` |
-| 05 | Patientenerklärung Stationäre Zusatzversicherung – `05_Patientenerklaerung_Zusatzversicherung_DE_V5.docx` | V5 · 10/2026 | `rgc_erklaerung_zusatz` |
-| 06 | Schweigepflichtentbindung allgemein – `06_Schweigepflichtentbindung_allgemein_V6.docx` | V6 · 10/2026 | `rgc_schweigepflicht` |
-| 07 | Aufklärung Operation DE/LV (Grundbogen) – `07_Aufklaerung_Operation_Universal_DE-LV_V3.docx` | V3 · 10/2026 | `rgc_aufklaerung_op` |
-| 08 | Aufklärung Anästhesie DE/LV – `08_Aufklaerung_Anaesthesie_Universal_DE-LV_V3.docx` | V3 · 10/2026 | `rgc_aufklaerung_anaesthesie` |
-| 09 | Vergütungs- und Rückerstattungsvereinbarung ÖGK (Selbstzahler) – `09_Rueckerstattung_Selbstzahler_OEGK_V3.docx` | V3 · 10/2026 | `rgc_vereinbarung_oegk` |
-| 10 | Abtretungs- und Bevollmächtigungserklärung ÖGK mit Vorauszahlung – `10_Abtretung_formal_OEGK_mit_Vorauszahlung_V4.docx` | V4 · 10/2026 | `rgc_abtretung_oegk` |
-| 11 | Anlage K – Kostenvoranschlag, Erstattungsprognose, Patienteninformation – `11_Anlage_K_Kostenvoranschlag_Erstattungsprognose_V2.docx` | V2 · 10/2026 | `rgc_anlage_k` |
-| 12 | Vollmacht zur anwaltlichen Vertretung (Blankovollmacht, DE/AT) – `12_Anwaltsvollmacht_Erstattungsverfahren_V1.docx` | V1 · 10/2026 | `rgc_anwaltsvollmacht` |
+## Formulare (Gruppe „Aufklärungen, Erklärungen und Abrechnung“)
 
-Die Texte sind wörtlich übernommen (`backend/vorlagen/rgc_import.py` liest die Word-Dateien ohne Umformulierung
-und schreibt `backend/vorlagen/statisch/rgc/<art>.json`). Jede Vorlage beginnt mit Briefkopf, Titel und der Zeile
-„Vorlage NN · Version · Stand“; Überschriften, Kästen, Aufzählungen, Ankreuzkästchen, Tabellen („Rechtsstellung der
-Klinik im Überblick“, Kostenaufstellung A–F, Anamnesefragen) und Unterschriftszeilen folgen dem Original. Die
-zweisprachigen Bögen 07 und 08 enthalten beide Sprachfassungen in der Reihenfolge der Vorlage. Die Schweigepflichtentbindung
-der RGC (06) ersetzt nicht den Vordruck „Schweigepflichtentbindung“ von EPM; beides steht in der RGC zur Verfügung.
+| Nr. | Dokument (Word-Datei) | Version |
+|---|---|---|
+| 01 | Patientenerklärung Österreich (ÖGK/SVS/BVAEB/KFA), Stundung – `01_Patientenerklaerung_AT_OEGK_Stundung_V6.docx` | V6 |
+| 02 | Patientenerklärung Deutschland GKV, Stundung – `02_Patientenerklaerung_GKV_DE_Stundung_V5.docx` | V5 |
+| 03 | Patientenerklärung Deutschland BG/UV – `03_Patientenerklaerung_BG_UV_DE_V5.docx` | V5 |
+| 04 | Patientenerklärung Deutschland PKV, Stundung – `04_Patientenerklaerung_PKV_DE_Stundung_V5.docx` | V5 |
+| 05 | Patientenerklärung stationäre Zusatzversicherung – `05_Patientenerklaerung_Zusatzversicherung_DE_V5.docx` | V5 |
+| 06 | Schweigepflichtentbindung allgemein – `06_Schweigepflichtentbindung_allgemein_V6.docx` | V6 |
+| 07 | Aufklärung Operation DE/LV (Grundbogen) – `07_Aufklaerung_Operation_Universal_DE-LV_V3.docx` | V3 |
+| 08 | Aufklärung Anästhesie DE/LV – `08_Aufklaerung_Anaesthesie_Universal_DE-LV_V3.docx` | V3 |
+| 09 | Rückerstattung Selbstzahler ÖGK – `09_Rueckerstattung_Selbstzahler_OEGK_V3.docx` | V3 |
+| 10 | Abtretung ÖGK mit Vorauszahlung – `10_Abtretung_formal_OEGK_mit_Vorauszahlung_V4.docx` | V4 |
+| 11 | Anlage K – Kostenvoranschlag und Erstattungsprognose – `11_Anlage_K_Kostenvoranschlag_Erstattungsprognose_V2.docx` | V2 |
+| 12 | Vollmacht zur anwaltlichen Vertretung – `12_Anwaltsvollmacht_Erstattungsverfahren_V1.docx` | V1 |
+
+## Anforderungen (Gruppe „Anforderungen: Labor, Bildgebung, Funktionsdiagnostik“)
+
+Laboranforderungen 01–10 (Basislabor, Gerinnung und Thrombophilie, Mikronährstoffe, Endokrinologie, Diabetologie,
+Immunologie, Allergologie, Mastzellaktivierung, Rheumatologie, Onkologie und Tumormarker), MRT- und
+Röntgen-Anforderung, Echokardiographie sowie EKG und Funktionsdiagnostik (`RC_Vorlage_01` bis `RC_Vorlage_14`).
+
+Die Schweigepflichtentbindung der RGC (06) ersetzt nicht den Vordruck „Schweigepflichtentbindung“ von EPM unter Akte ›
+Datenschutz; beides steht in der RGC zur Verfügung.
 
 ## Was EPM ausfüllt
 
@@ -44,11 +50,10 @@ Anamnesefragen, Verfahren), die Beträge der Anlage K (EPM hat keine Kostendaten
 Diagnose-/Eingriffsbeschreibungen der Aufklärungsbögen, Name und Kanzlei des Rechtsanwalts (Vorlage 12) sowie
 Ort, Datum und Unterschriften.
 
-## Entwurfsmodus
+## Freigabe
 
-Wie die übrigen Vordrucke tragen die PDFs das Wasserzeichen „ENTWURF“, bis die Praxis jede Vorlage unter Vorlagen ›
-Dokumentvorlagen einmal geprüft und freigegeben hat (oder den Entwurfsmodus für die Vorlage ausschaltet). Die Vorlagen
-sind nicht Pflicht-Erklärungen und werden in der Akte nicht nachgehalten.
+Die mitgelieferten Fassungen sind sofort in Gebrauch (Fassung 1). Vor dem Einsatz mit echten Patienten sollte die
+Klinik jede Vorlage unter Vorlagen › Dokumentvorlagen prüfen; die offenen Punkte des Reviews stehen unten.
 
 ## Noch zu entscheiden (Abschnitt 6 des Reviews der Klinik)
 

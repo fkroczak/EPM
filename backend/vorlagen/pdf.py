@@ -119,6 +119,8 @@ hr { border: 0; border-top: 0.6pt solid #c9c8d4; margin: 0 0 3.5mm 0; }
 .fett { font-weight: 600; } .kursiv { font-style: italic; }
 .a-mitte { text-align: center; } .a-rechts { text-align: right; }
 .zusammen { break-inside: avoid; }
+.sp-2 .karten-inhalt, .sp-2:not(.karte) { column-count: 2; column-gap: 6mm; }
+.sp-3 .karten-inhalt, .sp-3:not(.karte) { column-count: 3; column-gap: 5mm; }
 .umbruch { break-before: page; }
 .wasserzeichen { position: fixed; top: %(wasserzeichen_oben)smm; left: 0; right: 0; text-align: center; font-size: 80pt; font-weight: 700;
                  letter-spacing: .12em; color: rgba(0, 0, 0, .07); transform: rotate(-30deg); }
@@ -292,6 +294,8 @@ def _klassen(b) -> str:
         k.append("zusammen")
     if o.get("linie_oben"):
         k.append("linie-oben")
+    if o.get("spalten") in (2, 3):
+        k.append(f"sp-{o['spalten']}")
     return " ".join(k)
 
 

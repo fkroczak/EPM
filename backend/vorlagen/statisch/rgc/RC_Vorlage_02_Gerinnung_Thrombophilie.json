@@ -1,0 +1,119 @@
+{
+ "quelle": "RC_Vorlage_02_Gerinnung_Thrombophilie",
+ "name": "Laboranforderung Gerinnung und Thrombophilie",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)",
+ "datei": "RC_Vorlage_02_Gerinnung_Thrombophilie.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Koagulācija un trombofīlija / Gerinnung & Thrombophilie",
+   "zusatz": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)"
+  },
+  {
+   "id": "b3",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient un nosūtījums / Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Uzvārds, vārds / Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Dzimšanas datums / Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Adrese / Adresse",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Pacienta ID / Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Datums / laiks / Datum / Uhrzeit",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Nosūtošais ārsts / Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nodaļa / Station",
+     "wert": "____________________"
+    },
+    {
+     "label": "Steidzamība / Dringlichkeit",
+     "wert": "☐ STAT ☐ rutīna / Routine"
+    }
+   ]
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "bezeichnung": "Klīniskā informācija / jautājums · Klinische Angaben / Fragestellung",
+   "text": "\n\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "bezeichnung": "Hinweis",
+   "text": "Lūdzu atzīmēt katru vēlamo izmeklējumu atsevišķi. · Bitte jede gewünschte Untersuchung einzeln ankreuzen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": "☐ Retikulocīti / Retikulozyten\n☐ Haptoglobīns / Haptoglobin\n☐ Eritropoetīns / Erythropoetin\n☐ Tiešais antiglobulīna tests (Kumbs) / dir. Coombs\n☐ Netiešais antiglobulīna tests / indir. Coombs\n☐ Homocisteīns / Homocystein",
+   "bezeichnung": "Paplašināta hematoloģija / Erweiterte Hämatologie",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "☐ Protrombīna laiks (Kvika) / INR\n☐ aPTT\n☐ Trombīna laiks (TZ) / Thrombinzeit\n☐ Fibrinogēns / Fibrinogen\n☐ D-dimēri / D-Dimere\n☐ Antitrombīns III\n☐ Proteīns C / Protein C\n☐ Proteīns S / Protein S\n☐ APC rezistence / APC-Resistenz\n☐ Faktora V Leidena mutācija / Faktor-V-Leiden\n☐ Protrombīna mutācija (G20210A)\n☐ Lupus antikoagulants\n☐ vWF antigēns / vWF-Antigen\n☐ vWF aktivitāte / vWF-Aktivität\n☐ Faktors II\n☐ Faktors V\n☐ Faktors VII\n☐ Faktors VIII\n☐ Faktors IX\n☐ Faktors X\n☐ Faktors XI\n☐ Faktors XIII\n☐ Trombocītu funkcija / Thrombozytenfunktion",
+   "bezeichnung": "Koagulācija (pilnīga) / Gerinnung (vollständig)",
+   "optionen": {
+    "spalten": 3,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "☐ Kardiolipīna AV IgG / Cardiolipin-AK IgG\n☐ Kardiolipīna AV IgM / Cardiolipin-AK IgM\n☐ Anti-β2-glikoproteīns I IgG\n☐ Anti-β2-glikoproteīns I IgM",
+   "bezeichnung": "Antifosfolipīdu antivielas / Antiphospholipid-Antikörper",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

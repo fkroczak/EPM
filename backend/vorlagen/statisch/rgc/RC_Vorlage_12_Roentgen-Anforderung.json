@@ -1,0 +1,148 @@
+{
+ "quelle": "RC_Vorlage_12_Roentgen-Anforderung",
+ "name": "Röntgen-Anforderung",
+ "gruppe": "anforderungen",
+ "beschreibung": "Rentgena nosūtījums · Röntgen-Anforderung — visi apvidi (LV / DE)",
+ "datei": "RC_Vorlage_12_Roentgen-Anforderung.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Rentgenoloģiskais izmeklējums / Röntgen-Anforderung",
+   "zusatz": "Rentgena nosūtījums · Röntgen-Anforderung — visi apvidi (LV / DE)"
+  },
+  {
+   "id": "b3",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient un nosūtījums / Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Uzvārds, vārds / Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Dzimšanas datums / Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Adrese / Adresse",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Pacienta ID / Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Datums / laiks / Datum / Uhrzeit",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Nosūtošais ārsts / Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nodaļa / Station",
+     "wert": "____________________"
+    },
+    {
+     "label": "Steidzamība / Dringlichkeit",
+     "wert": "☐ STAT ☐ rutīna / Routine"
+    }
+   ]
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "bezeichnung": "Klīniskā informācija / jautājums · Klinische Angaben / Fragestellung",
+   "text": "\n\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "bezeichnung": "Hinweis",
+   "text": "Lūdzu atzīmēt katru vēlamo izmeklējumu atsevišķi. · Bitte jede gewünschte Untersuchung einzeln ankreuzen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": "☐ Krūškurvis: p.a. + sānu / Thorax: p.a. + seitlich\n☐ Krūškurvis guļus / Thorax liegend\n☐ Vēdera pārskats stāvus / Abdomen stehend\n☐ Vēdera pārskats guļus / Abdomen liegend",
+   "bezeichnung": "Krūškurvis / vēders / Thorax / Abdomen",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "☐ Galvaskauss / Schädel\n☐ Deguna blakusdobumi / NNH\n☐ Kakla daļa (HWS) / Halswirbelsäule\n☐ Krūšu daļa (BWS) / Brustwirbelsäule\n☐ Jostas daļa (LWS) / Lendenwirbelsäule\n☐ Iegurnis / Becken\n☐ Krustu kauls / Sakrum\n☐ Krūšu kauls / Sternum",
+   "bezeichnung": "Galva / mugurkauls / Schädel / Wirbelsäule",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "Plecs / Schulter: ☐ labā / rechts ☐ kreisā / links\nAugšdelms / Oberarm: ☐ labā / rechts ☐ kreisā / links\nElkonis / Ellenbogen: ☐ labā / rechts ☐ kreisā / links\nApakšdelms / Unterarm: ☐ labā / rechts ☐ kreisā / links\nPlauksta / Hand: ☐ labā / rechts ☐ kreisā / links\nPirksti / Finger: ☐ labā / rechts ☐ kreisā / links",
+   "bezeichnung": "Augšējā ekstremitāte — norādīt pusi / Obere Extremität — Seite angeben",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "text",
+   "text": "Gūža / Hüfte: ☐ labā / rechts ☐ kreisā / links\nAugšstilbs / Oberschenkel: ☐ labā / rechts ☐ kreisā / links\nCelis / Knie: ☐ labā / rechts ☐ kreisā / links\nApakšstilbs / Unterschenkel: ☐ labā / rechts ☐ kreisā / links\nPotīte / Sprunggelenk: ☐ labā / rechts ☐ kreisā / links\nPēda / Fuß: ☐ labā / rechts ☐ kreisā / links",
+   "bezeichnung": "Apakšējā ekstremitāte — norādīt pusi / Untere Extremität — Seite angeben",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b10",
+   "typ": "text",
+   "text": "☐ Mammogrāfija / Mammographie\n☐ Visas kājas uzņēmums / Ganzbeinaufnahme\n☐ Viss mugurkauls (EOS) / Ganzwirbelsäule (EOS)\n☐ i.v. urogrāfija / i.v.-Urogramm\n☐ Kontrasta klizma / Kolon-Kontrasteinlauf\n☐ Kuņģa-zarnu pasāža / Magen-Darm-Passage",
+   "bezeichnung": "Speciāli izmeklējumi / Spezialaufnahmen",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b11",
+   "typ": "text",
+   "bezeichnung": "Projekcijas / puse / norādes / Projektionen / Seite / Hinweise",
+   "text": "\n\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b12",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

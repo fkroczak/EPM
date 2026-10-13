@@ -32,7 +32,7 @@ def medikationsplan_quer(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("vorlagen", "0006_firma_ausrichtung_rgc"),
+        ("vorlagen", "0008_firma_ausrichtung"),
     ]
 
     operations = [

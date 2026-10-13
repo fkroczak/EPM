@@ -1,7 +1,7 @@
 """Dokumentvorlagen je Firma (Festlegung „Gemischt“, 11.10.2026): ``firma`` leer = gemeinsame Vorlage, gesetzt = eigene
 Vorlage dieser Firma; Entwurf, aktive Fassung und Versionsnummern gelten je (Art, Firma). Seitenformat ``ausrichtung``
-(Medikationsplan im Querformat, 13.10.2026; Umstellung der Startvorlage in 0007). Die Vorlagen der Regeneration
-Clinic (Arten ``rgc_…``) entstehen beim ersten Aufruf aus ihren Startvorlagen (``statisch/rgc``)."""
+(Medikationsplan im Querformat, 13.10.2026; Umstellung der Startvorlage in 0009). Die Vorlagen der Regeneration
+Clinic sind eigene Schreiben der Firma RGC (``vorlagen.rgc``)."""
 import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("stammdaten", "0023_technik_bis"),
-        ("vorlagen", "0005_eigene_schreiben"),
+        ("vorlagen", "0007_rgc_vorlagen"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

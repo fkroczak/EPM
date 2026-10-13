@@ -1,0 +1,116 @@
+{
+ "quelle": "RC_Vorlage_05_Diabetologie",
+ "name": "Laboranforderung Diabetologie",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)",
+ "datei": "RC_Vorlage_05_Diabetologie.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Diabetoloģija / Diabetologie",
+   "zusatz": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)"
+  },
+  {
+   "id": "b3",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient un nosūtījums / Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Uzvārds, vārds / Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Dzimšanas datums / Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Adrese / Adresse",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Pacienta ID / Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Datums / laiks / Datum / Uhrzeit",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Nosūtošais ārsts / Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nodaļa / Station",
+     "wert": "____________________"
+    },
+    {
+     "label": "Steidzamība / Dringlichkeit",
+     "wert": "☐ STAT ☐ rutīna / Routine"
+    }
+   ]
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "bezeichnung": "Klīniskā informācija / jautājums · Klinische Angaben / Fragestellung",
+   "text": "\n\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "bezeichnung": "Hinweis",
+   "text": "Lūdzu atzīmēt katru vēlamo izmeklējumu atsevišķi. · Bitte jede gewünschte Untersuchung einzeln ankreuzen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": "☐ Izmeklējums (LV / DE) — Materiāls / norāde · Material / Hinweis\n☐ Glikoze tukšā dūšā / Nüchternglukose (Plasma) — tukšā dūšā / nüchtern\n☐ Gadījuma glikoze / Gelegenheitsglukose\n☐ Perorālais glikozes tolerances tests (OGTT) 75 g / oGTT 75 g — 0 / 60 / 120 min\n☐ HbA1c / HbA1c\n☐ Fruktozamīns / Fructosamin\n☐ C-peptīds (tukšā dūšā) / C-Peptid (nüchtern) — tukšā dūšā / nüchtern\n☐ C-peptīds pēc stimulācijas / C-Peptid (stimuliert) — OGTT laikā / im oGTT\n☐ Insulīns (tukšā dūšā) / Insulin (nüchtern) — tukšā dūšā / nüchtern\n☐ Proinsulīns / Proinsulin\n☐ HOMA-IR (insulīna rezistence) / HOMA-IR — glikoze + insulīns tukšā dūšā\n☐ β-hidroksibutirāts (ketonvielas) / β-Hydroxybutyrat (Ketone)\n☐ Laktāts / Laktat — īpaša mēģene / spez. Röhrchen",
+   "bezeichnung": "Glikozes vielmaiņa / Glukosestoffwechsel",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "☐ Izmeklējums (LV / DE) — Materiāls / norāde · Material / Hinweis\n☐ GAD antivielas (GADA) / GAD-Antikörper\n☐ IA-2 antivielas (IA-2A) / IA-2-Antikörper\n☐ ZnT8 antivielas / ZnT8-Antikörper\n☐ Saliņu šūnu antivielas (ICA) / Inselzell-Antikörper (ICA)\n☐ Insulīna autoantivielas (IAA) / Insulin-Autoantikörper (IAA)",
+   "bezeichnung": "Diabēta autoantivielas (1. tips / LADA) / Diabetes-Autoantikörper (Typ 1 / LADA)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "☐ Izmeklējums (LV / DE) — Materiāls / norāde · Material / Hinweis\n☐ Mikroalbuminūrija (albumīna/kreatinīna attiecība) / Mikroalbuminurie (ACR) — urīnā / im Urin\n☐ Kreatinīns + eGFR / Kreatinin + eGFR\n☐ Lipīdu profils / Lipidprofil — skat. pamata laboratoriju / siehe Basislabor",
+   "bezeichnung": "Vēlīnās komplikācijas / kontrole / Folgeschäden / Monitoring",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

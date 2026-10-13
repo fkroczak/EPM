@@ -1,0 +1,109 @@
+{
+ "quelle": "RC_Vorlage_03_Mikronaehrstoffe",
+ "name": "Laboranforderung Mikronährstoffe",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)",
+ "datei": "RC_Vorlage_03_Mikronaehrstoffe.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Mikroelementi un vitamīni / Mikronährstoffe (Vitamine & Spurenelemente)",
+   "zusatz": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)"
+  },
+  {
+   "id": "b3",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient un nosūtījums / Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Uzvārds, vārds / Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Dzimšanas datums / Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Adrese / Adresse",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Pacienta ID / Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Datums / laiks / Datum / Uhrzeit",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Nosūtošais ārsts / Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nodaļa / Station",
+     "wert": "____________________"
+    },
+    {
+     "label": "Steidzamība / Dringlichkeit",
+     "wert": "☐ STAT ☐ rutīna / Routine"
+    }
+   ]
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "bezeichnung": "Klīniskā informācija / jautājums · Klinische Angaben / Fragestellung",
+   "text": "\n\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "bezeichnung": "Hinweis",
+   "text": "Lūdzu atzīmēt katru vēlamo izmeklējumu atsevišķi. · Bitte jede gewünschte Untersuchung einzeln ankreuzen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": "☐ B1 (tiamīns) / Thiamin\n☐ B2 (riboflavīns) / Riboflavin\n☐ B6 (piridoksīns) / Pyridoxin\n☐ B12 / Holotranskobalamīns\n☐ Folskābe (B9) / Folsäure\n☐ B3 (niacīns) / Niacin\n☐ B5 (pantotēnskābe) / Pantothensäure\n☐ B7 (biotīns) / Biotin\n☐ C vitamīns / Vitamin C\n☐ 25-OH D vitamīns / Vitamin D\n☐ A vitamīns (retinols) / Vitamin A\n☐ E vitamīns (tokoferols) / Vitamin E\n☐ K vitamīns / Vitamin K",
+   "bezeichnung": "Vitamīni / Vitamine",
+   "optionen": {
+    "spalten": 3,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "☐ Dzelzs / Eisen\n☐ Ferritīns / Ferritin\n☐ Transferīns / Transferrin\n☐ Transferīna piesātinājums / Transferrinsätt.\n☐ Šķīstošais transf. receptors (sTfR)\n☐ Cinks / Zink\n☐ Varš / Kupfer\n☐ Ceruloplazmīns / Coeruloplasmin\n☐ Selēns / Selen\n☐ Mangāns / Mangan\n☐ Molibdēns / Molybdän\n☐ Hroms / Chrom\n☐ Jods / Jod\n☐ Magnijs / Magnesium\n☐ Kalcijs / Kalzium\n☐ Fosfāts / Phosphat",
+   "bezeichnung": "Mikroelementi / Spurenelemente",
+   "optionen": {
+    "spalten": 3,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

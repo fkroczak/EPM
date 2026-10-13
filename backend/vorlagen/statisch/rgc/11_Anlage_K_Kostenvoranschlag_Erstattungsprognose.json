@@ -1,0 +1,185 @@
+{
+ "quelle": "11_Anlage_K_Kostenvoranschlag_Erstattungsprognose",
+ "name": "Anlage K – Kostenvoranschlag und Erstattungsprognose",
+ "gruppe": "formulare",
+ "beschreibung": "Verbindliche Kostenübersicht zu den Patientenerklärungen und Vereinbarungen der Regeneration Clinic SIA",
+ "datei": "11_Anlage_K_Kostenvoranschlag_Erstattungsprognose_V2.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": false,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Anlage K – Kostenvoranschlag, Erstattungsprognose und Patienteninformation",
+   "zusatz": "Verbindliche Kostenübersicht zu den Patientenerklärungen und Vereinbarungen der Regeneration Clinic SIA"
+  },
+  {
+   "id": "b3",
+   "typ": "text",
+   "bezeichnung": "Stand der Vorlage",
+   "text": "Vorlage 11 · Version 2 · Stand 10/2026 · Anlage zu den Vorlagen 01–05, 09 und 10",
+   "optionen": {
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "b4",
+   "typ": "datenfelder",
+   "bezeichnung": "Angaben",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Patient/in (Name, Vorname, Geburtsdatum)",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Bezugsdokument",
+     "wert": "☐ 01 AT/ÖGK ☐ 02 GKV ☐ 03 BG/UV ☐ 04 PKV ☐ 05 Zusatzversicherung ☐ 09 ÖGK Selbstzahler ☐ 10 ÖGK Abtretung"
+    },
+    {
+     "label": "Versicherungsträger / Versicherer",
+     "wert": "____________________"
+    },
+    {
+     "label": "Diagnose (ICD-10) / geplante Behandlung",
+     "wert": "{{Patient.Diagnosen}}"
+    },
+    {
+     "label": "Behandlungskategorie",
+     "wert": "☐ ambulant ☐ tagesklinisch ☐ stationär (mindestens eine Übernachtung)"
+    },
+    {
+     "label": "Vorabgenehmigung / Zustimmung / Vorabauskunft",
+     "wert": "☐ nicht erforderlich ☐ beantragt am ________ ☐ erteilt am ________ ☐ abgelehnt am ________"
+    },
+    {
+     "label": "Kostenvoranschlag Nr. / Datum",
+     "wert": "____________________"
+    }
+   ]
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "text": "Was kostet meine Behandlung? Das Behandlungshonorar der Klinik beträgt den in Zeile A genannten Betrag; es richtet sich nach dem Kostenvoranschlag und nicht nach deutschen oder österreichischen Gebührenordnungen.\n\nWas bezahlt meine Versicherung möglicherweise? Die Klinik erwartet die in Zeile C genannte Erstattung. Diese Zahl ist eine Prognose auf der in Ziffer 3 offengelegten Grundlage; verbindlich entscheidet allein Ihr Versicherungsträger bzw. Versicherer.\n\nWas muss ich selbst bezahlen? Den Eigenanteil in Zeile D zahlen Sie vor Behandlungsbeginn. Der gestundete Betrag in Zeile E wird nur fällig, soweit die Erstattung ausbleibt.\n\nWas geschieht bei Ablehnung? Im ungünstigsten Fall (vollständige Ablehnung) kommt höchstens der Betrag in Zeile F auf Sie zu – nicht mehr. Wir bieten Ihnen dann eine Ratenvereinbarung an; Verfahrens- und Anwaltskosten eines von der Klinik veranlassten Verfahrens trägt die Klinik.",
+   "bezeichnung": "1. In vier Sätzen: Was Sie wissen müssen",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": " — Position — Betrag\nA — Gesamthonorar der Behandlung laut Kostenvoranschlag (einschließlich Kooperationsklinik, Anästhesie, Implantate, Unterbringung) — EUR ______________\nA1 — davon nicht erstattungsfähige Komfort-, Transfer- und Zusatzleistungen — EUR ______________\nB — Voraussichtlich erstattungsfähige Leistungen (Honorar abzüglich A1) — EUR ______________\nC — Erwartete Versicherungsleistung (Prognose nach Ziffer 3) — EUR ______________\nD — Vom Patienten vor Behandlungsbeginn zu zahlender Eigenanteil (A − C, gegebenenfalls zuzüglich Sicherheitsabschlag nach Ziffer 3) — EUR ______________\nE — Gestundeter Rechnungsbetrag (entspricht C; nur bei Stundungsmodell) — EUR ______________\nF — Maximal mögliche zusätzliche Zahlungspflicht bei vollständiger Ablehnung (= E) — EUR ______________",
+   "bezeichnung": "2. Kostenaufstellung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "Bei Selbstzahlermodellen (Vorlage 09) entfällt Zeile E; Zeile D entspricht dann Zeile A, und Zeile C gibt die voraussichtliche Rückerstattung an.",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "☐ Österreich, § 131 ASVG: 80 % des Vertragspartnertarifs der ÖGK für vergleichbare Leistungen (Honorarordnung / LKF-Punktwert); zugrunde gelegte Positionen: ______________________________________________\n☐ Österreich, § 7b Abs. 6 SV-EG: Erstattung bis zur Höhe der Inlandskosten bei erteilter Vorabgenehmigung; zugrunde gelegte Inlandskosten: ______________________________\n☐ Deutschland, § 13 Abs. 4/5 SGB V: inländische Sachleistungsvergütung (EBM bzw. DRG ______________) abzüglich satzungsmäßigem Verwaltungskostenabschlag von ______ %\n☐ Deutschland, SGB VII: Kostenübernahme laut schriftlicher Zusage des UV-Trägers vom __________ / UV-GOÄ-Bewertung\n☐ PKV / Zusatzversicherung: Tarifbedingungen des Versicherers (Tarif ______________), Vorabauskunft nach § 192 Abs. 8 VVG vom __________; GOÄ-analoge Bewertung: Faktor ______\n☐ Unsicherheitsfaktoren (bitte benennen; Sicherheitsabschlag auf C: ______ %): ______________________________",
+   "bezeichnung": "3. Grundlage der Erstattungsschätzung (von der Klinik auszufüllen)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "text",
+   "text": "Ärztliche Grundleistung / Operation\n☐ Kostenträger 1 ☐ Kostenträger 2 (z. B. Zusatzversicherung) ☐ Patient/in\n\nAnästhesie\n☐ Kostenträger 1 ☐ Kostenträger 2 (z. B. Zusatzversicherung) ☐ Patient/in\n\nUnterbringung / Pflege / Kooperationsklinik\n☐ Kostenträger 1 ☐ Kostenträger 2 (z. B. Zusatzversicherung) ☐ Patient/in\n\nWahlärztliche Leistungen (behandelnder Arzt: ______________)\n☐ Kostenträger 1 ☐ Kostenträger 2 (z. B. Zusatzversicherung) ☐ Patient/in\n\nEin-/Zweibettzimmer, Komfortleistungen\n☐ Kostenträger 1 ☐ Kostenträger 2 (z. B. Zusatzversicherung) ☐ Patient/in\n\nImplantate / Fremdmaterial\n☐ Kostenträger 1 ☐ Kostenträger 2 (z. B. Zusatzversicherung) ☐ Patient/in\n\nDiagnostik (Bildgebung, Labor)\n☐ Kostenträger 1 ☐ Kostenträger 2 (z. B. Zusatzversicherung) ☐ Patient/in\n\nNachsorge / Telemedizin\n☐ Kostenträger 1 ☐ Kostenträger 2 (z. B. Zusatzversicherung) ☐ Patient/in",
+   "bezeichnung": "4. Abrechnungsmatrix bei mehreren Kostenträgern",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b10",
+   "typ": "text",
+   "text": "Jede Leistung wird genau einem Kostenträger zugeordnet; eine Doppelabrechnung ist ausgeschlossen. Die Hauptrechnung weist die Blöcke getrennt aus.",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b11",
+   "typ": "text",
+   "text": "☐ Versicherungsstatus und zuständiger Träger geprüft (Versichertennachweis liegt vor)\n☐ Medizinische Indikation dokumentiert; Leistung gehört dem Grunde nach zum Leistungsumfang des Kostenträgers\n☐ Einstufung ambulant / stationär nach dem Recht des Kostenträgers dokumentiert\n☐ Erforderlichkeit einer Vorabgenehmigung / Zustimmung / Kostenübernahme geprüft; bei elektiven Eingriffen Behandlungsbeginn erst nach Vorliegen der Entscheidung oder nach dokumentiertem Verzicht des Patienten (Ziffer 6)\n☐ Abtretbarkeit bzw. Zustimmungserfordernis im konkreten Vertrag / Trägerrecht geprüft\n☐ Abrechnungsmodell festgelegt: ☐ Stundung ☐ Vorauszahlung Eigenanteil ☐ Selbstzahler mit Rückerstattung",
+   "bezeichnung": "5. Versicherungsrechtliche Vorprüfung (von der Klinik auszufüllen)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b12",
+   "typ": "text",
+   "text": "☐ Ich habe die Kostenaufstellung und die Grundlage der Erstattungsschätzung verstanden. Mir ist bekannt, dass die Beträge in den Zeilen C bis F Prognosen sind und die Entscheidung allein beim Kostenträger liegt.\n☐ Mir ist bekannt, dass im Fall der vollständigen Ablehnung höchstens der Betrag in Zeile F auf mich zukommt und die Klinik mir dann eine Ratenvereinbarung anbietet.\n☐ ☐ Ich wünsche den Behandlungsbeginn erst nach Vorliegen der Vorabgenehmigung / Zustimmung. ☐ Ich wünsche den Behandlungsbeginn vor der Entscheidung und übernehme das damit verbundene Erstattungsrisiko in Höhe von Zeile F.\n☐ Ich habe ein Exemplar dieser Anlage erhalten.",
+   "bezeichnung": "6. Erklärung des/der Patient/in",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b13",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Ort, Datum",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b14",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift Patient/in",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b15",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Rīga, Datum",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b16",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Für die Regeneration Clinic SIA (Name, Unterschrift)",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b17",
+   "typ": "text",
+   "text": "Regeneration Clinic SIA · Vorlage 11 · Anlage K – Kostenvoranschlag und Erstattungsprognose · Version 2 · Stand 10/2026",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b18",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

@@ -1,0 +1,420 @@
+{
+ "quelle": "05_Patientenerklaerung_Zusatzversicherung_DE",
+ "name": "Patientenerklärung stationäre Zusatzversicherung",
+ "gruppe": "formulare",
+ "beschreibung": "Wahlleistungen · Krankenhaustagegeld · Behandlung in Lettland (EU)",
+ "datei": "05_Patientenerklaerung_Zusatzversicherung_DE_V5.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": false,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Patientenerklärung – Stationäre Zusatzversicherung"
+  },
+  {
+   "id": "b3",
+   "typ": "text",
+   "bezeichnung": "Stand der Vorlage",
+   "text": "Wahlleistungen · Krankenhaustagegeld · Behandlung in Lettland (EU)\nAbtretung · Zahlungsanweisung · Stundung · Schweigepflichtentbindung · Vollmacht · Datenschutz – Ergänzung zur Erklärung gegenüber der Primärversicherung\nVorlage 05 · Version 5 · Stand 10/2026 · Anlagen: K (Vorlage 11), Anwaltsvollmacht (Vorlage 12), Schweigepflichtentbindung (Vorlage 06)",
+   "optionen": {
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "text": "Regeneration Clinic SIA · Jāņa Asara iela 3 · LV-1009 Rīga · Lettland · Postanschrift: Gertrudes iela 53-7 · LV-1011 Rīga\n\nIn Lettland zugelassene Ārstniecības iestāde · Health Institution Code 001000289 · Reg.-Nr. 40203593175 · info@regeneration-clinic.eu · +371 28717452\n\nVertretungsberechtigt: Prof. Dr. Markus Masin, Director",
+   "bezeichnung": "Leistungserbringerin",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "text": "Ob und in welchem Umfang Ihre Krankenhaus-Zusatzversicherung eine Behandlung in Lettland deckt, richtet sich allein nach Ihrem konkreten Tarif. Wir prüfen das vor der Behandlung mit Ihnen, rechnen die versicherten Wahlleistungen nach Abtretung unmittelbar mit Ihrem Zusatzversicherer ab und stunden Ihnen diesen Anteil bis zur Erstattung (Ziffer 9). Sollte der Versicherer nicht oder nur teilweise erstatten, bieten wir Ihnen eine Ratenvereinbarung an; Ihre maximale Belastung ist in der Anlage K beziffert.\n– Vor der Behandlung holen wir die schriftliche Bestätigung Ihres Versicherers ein, dass die Klinik bzw. die Kooperationsklinik als Krankenhaus im Sinne Ihres Tarifs anerkannt wird und welche Leistungen gedeckt sind.\n– Sieht Ihr Tarif für den Fall, dass Wahlleistungen im Ausland nicht in vergleichbarer Form erbracht werden können, ein Krankenhaustagegeld vor, unterstützen wir Sie bei dessen Beantragung; ohne eine solche Tarifregelung besteht kein Ersatzanspruch.\n– Keine Doppelverrechnung: Es wird eine medizinische Hauptrechnung gestellt; die versicherten Wahlleistungsanteile werden getrennt ausgewiesen.\n– Bei Auseinandersetzungen mit dem Versicherer setzen wir Ihre Ansprüche durch; Anwalts- und Verfahrenskosten trägt die Klinik (Ziffer 6.2).\nDie genaue Aufteilung – was die Kasse voraussichtlich zahlt, was Sie selbst zahlen und was gestundet wird – finden Sie in der Anlage K, die Sie vor der Unterschrift erhalten.",
+   "bezeichnung": "So nutzen Sie Ihre Zusatzversicherung bei einer Behandlung in Lettland",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "bezeichnung": "Was die Stundung für Sie bedeutet",
+   "text": "Was die Stundung für Sie bedeutet",
+   "optionen": {
+    "fett": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "datenfelder",
+   "bezeichnung": "Patientendaten und Versicherungen",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Versicherte Person (Patient/in)",
+     "wert": "____________________"
+    },
+    {
+     "label": "Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Anschrift",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Versicherungsnehmer/in (falls abweichend)",
+     "wert": "____________________"
+    },
+    {
+     "label": "Primärversicherung",
+     "wert": "☐ GKV: ______________________ ☐ PKV-Volltarif: ______________________"
+    },
+    {
+     "label": "Primärversicherungs-Nr.",
+     "wert": "{{Patient.Versichertennummer}}"
+    },
+    {
+     "label": "Stationäre Zusatzversicherung (Name, Anschrift)",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Versicherungsschein-Nr.",
+     "wert": "____________________"
+    },
+    {
+     "label": "Tarif (z. B. Chefarzt, Ein-/Zweibettzimmer, Tagegeld)",
+     "wert": "____________________"
+    },
+    {
+     "label": "Bestätigung des Zusatzversicherers (Krankenhausstatus, Deckung, Tagegeld)",
+     "wert": "☐ beantragt am: __________ ☐ erteilt am: __________ ☐ Tagegeldregelung im Tarif: ☐ ja ☐ nein"
+    },
+    {
+     "label": "Wahlärztliche Leistungen – behandelnde/r Ärztin/Arzt und vereinbartes Honorar",
+     "wert": "____________________"
+    },
+    {
+     "label": "Aufnahmedatum / Beginn der Behandlung in der EU",
+     "wert": "____________________"
+    },
+    {
+     "label": "Kooperations-/Infrastrukturpartner (falls eingesetzt)",
+     "wert": "____________________"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "☐ Wahlärztliche Leistungen durch die oben namentlich benannte Ärztin / den oben namentlich benannten Arzt zum vereinbarten Honorar\n☐ Unterkunft im Einbettzimmer\n☐ Unterkunft im Zweibettzimmer\n☐ Ambulante Operation, die eine stationäre Behandlung ersetzt (privatärztlich)\n☐ Vor- und nachstationäre privatärztliche Leistungen\n☐ Krankenhaustagegeld als Ersatzleistung (Ziffer 3)\n☐ Sonstige tariflich versicherte Mehrleistungen: ____________________________________",
+   "bezeichnung": "Im Versicherungsfall in Anspruch genommene Leistungen (Zutreffendes ankreuzen)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "text",
+   "text": "Erfasst sind alle medizinisch notwendigen ambulanten, tagesklinischen, stationsersetzenden und – soweit medizinisch erforderlich und gesondert dokumentiert – stationären Leistungen der Regeneration Clinic SIA in Lettland einschließlich Diagnostik (z. B. MRT, CT, Labor, Elektrophysiologie), Telemedizin und Nachsorge, soweit sie mit diesem Behandlungsfall in ursächlichem Zusammenhang stehen.\n\nWerden Kooperations- oder Infrastrukturpartner eingesetzt (z. B. AIWA Clinic, Rīga: OP-Saal, stationäre Infrastruktur, Pflege, Unterbringung), verbleiben medizinische Verantwortung, Indikationsstellung, Dokumentation und Abrechnung bei der Regeneration Clinic SIA.",
+   "bezeichnung": "Behandlungsrahmen",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b10",
+   "typ": "text",
+   "text": "Diese Erklärung gilt ausschließlich für die stationäre Zusatzversicherung. Die Erstattung der medizinischen Grundleistungen erfolgt über die Primärversicherung auf Grundlage der dort gesondert abgegebenen Patientenerklärung (Vorlage 02 für die GKV nach § 13 SGB V bzw. Vorlage 04 für die PKV nach § 192 VVG). Gegenstand dieser Erklärung sind tarifliche Wahl- und Zusatzleistungen sowie gegebenenfalls das Krankenhaustagegeld.\n\nHauptrechnungsprinzip: Es wird eine medizinische Hauptrechnung gestellt; die versicherten Wahlleistungs- und Tagegeldanteile werden gegenüber dem Zusatzversicherer gesondert ausgewiesen und plausibilisiert (Anlage zur Hauptrechnung). Eine Leistung wird nur einmal abgerechnet.\n\nKrankenhausbegriff: Zusatztarife setzen in der Regel eine stationäre Heilbehandlung in einem Krankenhaus voraus, das unter ständiger ärztlicher Leitung steht, über ausreichende diagnostische und therapeutische Möglichkeiten verfügt und Krankengeschichten führt (§ 4 Abs. 4 MB/KK). Ob die konkrete Einrichtung nach den Versicherungsbedingungen anerkannt wird, entscheidet der Versicherer; die Klinik holt vor der Behandlung dessen schriftliche Bestätigung ein und dokumentiert das Ergebnis in der Anlage K.",
+   "bezeichnung": "1. Verhältnis zur Primärversicherung (keine Doppelverrechnung)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b11",
+   "typ": "text",
+   "text": "Ich, der/die unterzeichnende Versicherte bzw. Versicherungsnehmer/in, trete hiermit meine gegenwärtigen und zukünftigen Erstattungsansprüche aus der oben bezeichneten stationären Zusatzversicherung aus diesem Behandlungsfall in Höhe der jeweiligen Rechnungsforderungen an die Regeneration Clinic SIA ab (§ 398 BGB). Erfasst sind insbesondere:\n– wahlärztliche Leistungen der namentlich vereinbarten Ärztin / des namentlich vereinbarten Arztes;\n– Unterkunft im Ein- oder Zweibettzimmer entsprechend Tarif;\n– ambulante Operationen, die eine stationäre Behandlung ersetzen, in privatärztlicher Abrechnung;\n– vor- und nachstationäre privatärztliche Leistungen;\n– Krankenhaustagegeld als Ersatzleistung, soweit tariflich vorgesehen und gesondert abgetreten (Ziffer 3);\n– sonstige tariflich versicherte stationäre Mehrleistungen (Komfort-, Service-, Begleitpersonenleistungen);\n– unmittelbar damit verbundene Diagnostik, soweit tariflich erstattungsfähig.\nDie Klinik nimmt die Abtretung an und ist berechtigt, die Ansprüche im eigenen Namen gegenüber dem Zusatzversicherer geltend zu machen, Zahlungen entgegenzunehmen und alle erforderlichen Erklärungen abzugeben.\n\nAbtretungsverbote in Versicherungsbedingungen: Für ab dem 1. Oktober 2021 geschlossene Verbraucherverträge ist ein formularmäßiger Abtretungsausschluss für Geldansprüche nach § 308 Nr. 9 lit. a BGB unwirksam, soweit kein schutzwürdiges Interesse des Verwenders entgegensteht; für ältere Verträge gilt die Inhaltskontrolle nach § 307 BGB. Wird die Abtretung nicht anerkannt, gelten Zahlungsanweisung (Ziffer 4) und Vollmacht (Ziffer 6) als Auffangregelung.",
+   "bezeichnung": "2. Abtretung der Erstattungsansprüche (§§ 398 ff. BGB)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b12",
+   "typ": "text",
+   "text": "Viele stationäre Zusatztarife sehen für den Fall, dass die versicherten Wahlleistungen im Ausland nicht in vergleichbarer Form in Anspruch genommen werden können, ersatzweise die Zahlung eines tariflichen Krankenhaustagegeldes vor. Die konkrete Regelung ergibt sich aus Versicherungsschein und Tarifbedingungen. Das Krankenhaustagegeld ist eine vereinbarte Summenleistung und keine Erstattung konkreter Behandlungskosten. Es wird deshalb nur abgetreten, wenn ich dies hier gesondert erkläre: ☐ Ich trete meinen tariflichen Tagegeldanspruch aus diesem Behandlungsfall bis zur Höhe der offenen Rechnungsforderung an die Regeneration Clinic SIA ab. ☐ Ich behalte den Tagegeldanspruch; die Klinik unterstützt lediglich die Beantragung. Die Klinik beantragt das Tagegeld unter Vorlage der Aufenthaltsbescheinigung mit Diagnose und Aufenthaltsdauer.\n\nVorabprüfung empfohlen: Auf Wunsch holt die Klinik vor der Behandlung beim Zusatzversicherer eine Auskunft darüber ein, ob die geplanten Wahlleistungen erstattet werden oder das Tagegeld zur Anwendung kommt.",
+   "bezeichnung": "3. Krankenhaustagegeld als Ersatzleistung bei Auslandsbehandlung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b13",
+   "typ": "text",
+   "text": "Hilfsweise – für den Fall, dass die Abtretung nicht anerkannt wird – weise ich den Zusatzversicherer an, jeden Erstattungsbetrag mit schuldbefreiender Wirkung unmittelbar an die Regeneration Clinic SIA zu zahlen:\n\nIBAN: LV51HABA0551058193764 · BIC/SWIFT: HABALV22 · Empfängerin: Regeneration Clinic SIA, Jāņa Asara iela 3, LV-1009 Rīga\n\nVerwendungszweck: Erstattung Zusatzversicherung – Wahlleistungen bzw. Krankenhaustagegeld, Versicherte/r [Name, Versicherungsschein-Nr.], Behandlungsfall ab [Aufnahmedatum]\n\nDie Rechnungslegung erfolgt in deutscher Sprache, medizinisch nachvollziehbar, mit ICD-10-Kodierung und – soweit sachgerecht – in einer an die GOÄ angelehnten Form; Wahlleistungs- und Tagegeldanteile werden gesondert ausgewiesen.",
+   "bezeichnung": "4. Zahlungsanweisung (Direktzahlung an die Klinik)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b14",
+   "typ": "text",
+   "text": "Für die Direktabrechnung müssen dem Zusatzversicherer Diagnose- und Aufenthaltsdaten übermittelt werden; ohne ausdrückliche Entbindung von der Schweigepflicht wäre die Abtretung unwirksam (BGH, Urteil vom 10.07.1991 – VIII ZR 296/90, BGHZ 115, 123).\n\nIch entbinde die behandelnden Ärztinnen und Ärzte sowie das Personal der Regeneration Clinic SIA und der eingebundenen Kooperationspartner von der Verschwiegenheitspflicht nach lettischem Recht (Pacientu tiesību likums, Ārstniecības likums) und – soweit deutsche Behandler einbezogen sind – von der ärztlichen Schweigepflicht nach § 203 StGB und § 9 MBO-Ä gegenüber dem oben bezeichneten Zusatzversicherer, seinen ärztlichen Diensten, Sachbearbeitern und Rechnungsprüfdiensten sowie gegenüber der Rechtsabteilung der Klinik und den von ihr nach Ziffer 6.2 beauftragten Rechtsanwälten. Die Entbindung ist auf diesen Behandlungsfall beschränkt (§ 213 VVG); ein Widerruf ist jederzeit in Textform mit Wirkung für die Zukunft möglich. Die gesonderte Schweigepflichtentbindung der Klinik (Vorlage 06) bleibt unberührt.",
+   "bezeichnung": "5. Schweigepflichtentbindung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b15",
+   "typ": "text",
+   "bezeichnung": "6. Vollmacht zur Durchsetzung",
+   "text": "6. Vollmacht zur Durchsetzung",
+   "optionen": {
+    "fett": true
+   }
+  },
+  {
+   "id": "b16",
+   "typ": "text",
+   "text": "Ergänzend zur Abtretung bevollmächtige ich die Regeneration Clinic SIA, vertreten durch ihren Director Prof. Dr. Markus Masin, mich gegenüber dem Zusatzversicherer – einschließlich seines ärztlichen Dienstes, der Rechnungsprüfung und der Sachbearbeitung – zu vertreten. Die Vollmacht umfasst insbesondere die Einholung von Vorabauskünften, die außergerichtliche Geltendmachung der Erstattungs- und Tagegeldansprüche, den Schriftverkehr und Datenaustausch, die Entgegennahme von Leistungsentscheidungen sowie die Empfangnahme von Erstattungsbeträgen.\n\nAbgrenzung zur Rechtsdienstleistung: Die Klinik macht die an sie abgetretenen Ansprüche in eigener Angelegenheit geltend und übernimmt im Übrigen die administrative Abwicklung (Antragstellung, Zusammenstellung medizinischer Unterlagen, Akteneinsicht, Entgegennahme von Bescheiden). Die rechtliche Vertretung im Widerspruchs- und Klageverfahren erfolgt ausschließlich durch einen zugelassenen Rechtsanwalt aufgrund gesonderter Anwaltsvollmacht (Vorlage 12), die ich mit dieser Erklärung erteile (§§ 2, 3 RDG; § 13 Abs. 5 SGB X; § 73 Abs. 2 SGG).",
+   "bezeichnung": "6.1 Bevollmächtigung der Klinik",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b17",
+   "typ": "text",
+   "text": "Die gerichtliche Geltendmachung und jede über die Abrechnungskorrespondenz hinausgehende rechtliche Vertretung erfolgen ausschließlich durch einen zugelassenen Rechtsanwalt (§§ 2, 3 RDG), den die Regeneration Clinic SIA im Bedarfsfall auswählt, mandatiert und vergütet; hierzu erteile ich die gesonderte Anwaltsvollmacht nach Vorlage 12. Die Anwaltsvollmacht umfasst die Erhebung von Leistungs- und Feststellungsklagen vor den ordentlichen Gerichten, die Anrufung des PKV-Ombudsmanns, Antrags-, Vergleichs- und Erledigungserklärungen, die Entgegennahme von Zustellungen und Urteilen, die Empfangnahme von Geldleistungen und festgesetzten Kosten sowie die Bestellung von Unterbevollmächtigten.\n\nSämtliche Anwalts- und Gerichtskosten trägt die Klinik im eigenen wirtschaftlichen Interesse; eine Kosten- oder Honorarbelastung des Patienten ist ausgeschlossen. Im Obsiegensfall sind die Kosten vom Versicherer zu erstatten (§ 91 ZPO) und fließen an die Klinik zurück.",
+   "bezeichnung": "6.2 Anwaltliche Vertretung – gesonderte Anwaltsvollmacht, auf Kosten der Klinik",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b18",
+   "typ": "text",
+   "text": "Die Vollmachten nach Ziffer 6.1 und 6.2 bleiben bis zum schriftlichen Widerruf gegenüber dem jeweils Bevollmächtigten in Kraft. Sie erlöschen nicht mit meinem Tod (§§ 168, 672 BGB) und gelten über den Abschluss des Verfahrens hinaus für Folge- und Nachverfahren (z. B. Kostenfestsetzung, Vollstreckung).",
+   "bezeichnung": "6.3 Reichweite, Bestand und Widerruf der Vollmachten",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b19",
+   "typ": "text",
+   "text": "Ich willige ein, dass die Regeneration Clinic SIA und ein nach Ziffer 6.2 mandatierter Rechtsanwalt zur Abrechnung und Rechtsdurchsetzung kommunizieren und Daten austauschen dürfen mit:\n– dem Zusatzversicherer einschließlich seiner ärztlichen Dienste und Sachbearbeitung;\n– Vor- und Mitbehandlern, Radiologien und Laboren;\n– Kooperations- und Infrastrukturkliniken (z. B. AIWA Clinic, Rīga);\n– autorisierten Übersetzungs- und IT-Dienstleistern (z. B. PACS-, Upload-Portale);\n– Zivilgerichten, dem PKV-Ombudsmann, Behörden und sonstigen verfahrensbeteiligten Stellen.\nKommunikationswege. Standard sind die sicheren Wege (Brief, TLS-verschlüsselte E-Mail mit kennwortgeschützten Anhängen, gesicherte Portale wie PACS- oder KIM-Upload, Telefon nach Identitätsprüfung); hierfür ist keine Einwilligung erforderlich. Zusätzliche Wege nutzt die Klinik nur mit meiner freiwilligen, jederzeit formlos widerruflichen Zustimmung (bitte ankreuzen):",
+   "bezeichnung": "7. Mitteilungs- und Kommunikationsbefugnis",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b20",
+   "typ": "text",
+   "text": "☐ E-Mail ohne Verschlüsselung\n☐ Telefax (unverschlüsselt)\n☐ Ende-zu-Ende-verschlüsselter Messenger (z. B. Signal)",
+   "bezeichnung": "Text",
+   "optionen": {
+    "spalten": 3
+   }
+  },
+  {
+   "id": "b21",
+   "typ": "text",
+   "text": "Bei unverschlüsselter Übermittlung verbleibt ein technisches Restrisiko der Kenntnisnahme durch Dritte (Art. 32 DSGVO). Die Einzelheiten – einschließlich der Auswahl der Empfängergruppen – regelt die Schweigepflichtentbindung (Vorlage 06).",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b22",
+   "typ": "text",
+   "text": "Systematik: Dieser Abschnitt ist eine Information nach Art. 13 DSGVO und setzt keine Einwilligung voraus. Die Entbindung von der ärztlichen Schweigepflicht erfolgt gesondert (Vorlage 06); die Freigabe zusätzlicher Kommunikationswege ist eine freiwillige, jederzeit widerrufliche Zustimmung (vorstehende Ziffer).\n\nSoweit die Verarbeitung zur Behandlung, Abrechnung, Erfüllung gesetzlicher Pflichten oder zur Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen erforderlich ist, beruht sie nicht auf widerruflicher Einwilligung, sondern auf den nachstehenden gesetzlichen Rechtsgrundlagen. Die Angaben dienen zugleich der Information nach Art. 13 DSGVO.",
+   "bezeichnung": "8. Datenschutzinformation (Art. 13 DSGVO)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b23",
+   "typ": "datenfelder",
+   "bezeichnung": "Angaben",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Verantwortliche",
+     "wert": "Regeneration Clinic SIA (Kontaktdaten siehe oben); Datenschutzkontakt: info@regeneration-clinic.eu"
+    },
+    {
+     "label": "Datenarten",
+     "wert": "Ident-, Versicherungs- und Kontaktdaten; Gesundheitsdaten (Diagnosen, Befunde, Bildgebung, OP- und Leistungsdaten); Aufenthaltsdauer und Wahlleistungsinanspruchnahme; Abrechnungs- und Erstattungsdaten; Übersetzungen"
+    },
+    {
+     "label": "Zwecke",
+     "wert": "Behandlung und Organisation; Erstattung und Abrechnung; Rechtsdurchsetzung einschließlich anwaltlicher Vertretung; Qualitätssicherung; gesetzliche Aufbewahrung"
+    },
+    {
+     "label": "Rechtsgrundlagen",
+     "wert": "Art. 6 Abs. 1 lit. b, c und f DSGVO; Art. 9 Abs. 2 lit. f und h DSGVO; ergänzend Art. 9 Abs. 2 lit. a DSGVO; Fizisko personu datu apstrādes likums (LV); §§ 192, 213 VVG; § 630f BGB"
+    },
+    {
+     "label": "Empfänger",
+     "wert": "Zusatzversicherer und dessen ärztliche Dienste; nach Ziffer 6.2 mandatierter Rechtsanwalt; Gerichte; die in Ziffer 7 genannten Partner und Dienstleister"
+    },
+    {
+     "label": "Speicherdauer",
+     "wert": "Medizinische Dokumentation nach den gesetzlichen Aufbewahrungsfristen (in der Regel mindestens 10 Jahre, vgl. § 630f Abs. 3 BGB); abrechnungs- und verfahrensrelevante Unterlagen bis zum rechtskräftigen Abschluss"
+    },
+    {
+     "label": "Betroffenenrechte",
+     "wert": "Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch, Datenübertragbarkeit; Widerruf einer Einwilligung mit Wirkung für die Zukunft; Beschwerde bei der Datu valsts inspekcija (Rīga) oder einer deutschen Datenschutzaufsichtsbehörde"
+    }
+   ]
+  },
+  {
+   "id": "b24",
+   "typ": "text",
+   "text": "Die Regeneration Clinic SIA stundet nach medizinischer und wirtschaftlicher Einzelfallprüfung denjenigen Teil der Behandlungskosten, dessen Erstattung bei dem Zusatzversicherer nach den Tarifbedingungen (Wahlleistungen oder Krankenhaustagegeld) geltend gemacht wird, bis zur Entscheidung von dem Zusatzversicherer bzw. bis zum rechtskräftigen Abschluss eines Streitverfahrens vor den Zivilgerichten, längstens jedoch für 24 Monate ab Rechnungsdatum, sofern nicht schriftlich etwas anderes vereinbart wird. Die Stundung ist zinsfrei.\n\nUmfang der Stundung. Gestundet wird ausschließlich der erwartete Erstattungsanteil. Wird im Ergebnis nur teilweise oder gar nicht erstattet, wird der nicht gedeckte Anteil mit Zugang der Entscheidung bzw. mit rechtskräftigem Verfahrensabschluss zur Zahlung fällig. Die Klinik wird in diesem Fall eine angemessene Zahlungsregelung anbieten (Ratenvereinbarung, Stundungsverlängerung oder teilweiser Verzicht aus Kulanz); eine solche Sonderregelung bedarf der Textform. Die maximale zusätzliche Zahlungspflicht ist in der Anlage K beziffert; das endgültige Erstattungsrisiko verbleibt beim Patienten.\n\nEigenanteile. Nicht Gegenstand der Stundung sind tarifliche Selbstbehalte, nicht versicherte Mehrleistungen und Verwaltungsgebühren; sie werden gesondert ausgewiesen und sind nach Maßgabe des Kostenvoranschlags bzw. der Rechnung fällig. Über ihre voraussichtliche Höhe wird der/die Patient/in vor Behandlungsbeginn schriftlich informiert.\n\nMitwirkung. Der/die Patient/in erhält die Vollmachten aufrecht, gibt die zur Antragstellung, Widerspruchs- und Klageführung erforderlichen Erklärungen ab und legt die benötigten Unterlagen vor. Ein Widerruf der Vollmachten oder eine unterbliebene Mitwirkung, die das Erstattungsverfahren vereitelt, beendet die Stundung; der gestundete Betrag wird dann nach schriftlicher Mahnung mit einer Frist von 30 Tagen fällig.\n\nDie zivilrechtliche Zahlungspflicht aus dem Behandlungsvertrag bleibt durch die Stundung dem Grunde nach unberührt; sie wird lediglich zeitlich modifiziert. Der/die Patient/in ist damit einer wirksamen Honorarverbindlichkeit ausgesetzt, die Grundlage des Erstattungs- bzw. Freistellungsanspruchs ist.\n\nAnlage K – Kostenvoranschlag und Erstattungsprognose. Die Höhe des Behandlungshonorars, der voraussichtlich erstattungsfähigen Leistungen, der erwarteten Versicherungsleistung, des vorab zu zahlenden Eigenanteils, des gestundeten Betrags und meiner maximalen zusätzlichen Zahlungspflicht ergibt sich aus der Anlage K (Vorlage 11), die mir vor Unterzeichnung ausgehändigt wurde und Bestandteil dieser Erklärung ist. Die Klinik hat darin die Grundlage ihrer Erstattungsschätzung offengelegt.\n\nWeiterleitung. Zahlt der Zusatzversicherer trotz Abtretung und Zahlungsanweisung an mich, verpflichte ich mich, den Betrag unverzüglich, spätestens binnen 14 Tagen, bis zur Höhe der offenen Forderung an die Regeneration Clinic SIA weiterzuleiten.",
+   "bezeichnung": "9. Stundung des erwarteten Erstattungsanteils",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b25",
+   "typ": "text",
+   "text": "Diese Erklärung gilt ab dem Aufnahmedatum für den gesamten Behandlungsfall (einschließlich Aufenthalten in Kooperationskliniken sowie vor- und nachstationärer Folgebehandlungen) für zunächst zwölf Monate und verlängert sich um jeweils zwölf Monate, solange die Behandlung oder das Erstattungs- bzw. Rechtsdurchsetzungsverfahren anhängig ist.\n\nEinwilligungen und Vollmachten können jederzeit schriftlich oder in Textform mit Wirkung für die Zukunft widerrufen werden. Bereits beauftragte oder erbrachte Leistungen, entstandene Zahlungs- und Weiterleitungspflichten sowie gesetzliche Aufbewahrungspflichten bleiben unberührt.\n\nAuf das Behandlungsverhältnis mit der Regeneration Clinic SIA als in Lettland zugelassener Ārstniecības iestāde findet lettisches Recht Anwendung; für die Ansprüche gegen den deutschen Leistungsträger bzw. Versicherer gilt deutsches Recht. Sollte eine Bestimmung dieser Erklärung unwirksam sein oder werden, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt; an die Stelle der unwirksamen Bestimmung tritt die Regelung, die ihrem wirtschaftlichen Zweck am nächsten kommt (§ 139 BGB).",
+   "bezeichnung": "10. Geltungsdauer, Widerruf, anwendbares Recht, salvatorische Klausel",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b26",
+   "typ": "text",
+   "text": "☐ Ich habe diese Erklärung gelesen und verstanden; meine Fragen wurden beantwortet.\n☐ Ich wurde darauf hingewiesen, dass Erstattung und Tagegeld vom Tarifumfang und von der Auslandsgeltung meines Tarifs abhängen und dass nicht erstattete Beträge von mir zu tragen sind.\n☐ Ich habe die Anlage K (Kostenvoranschlag, Erstattungsprognose und Abrechnungsmatrix) erhalten und die darin bezifferte maximale zusätzliche Zahlungspflicht zur Kenntnis genommen; bei einer Ablehnung bietet mir die Klinik eine Ratenvereinbarung an.\n☐ Ich habe ein Exemplar dieser Erklärung erhalten.",
+   "bezeichnung": "11. Erklärung des/der Patient/in",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b27",
+   "typ": "text",
+   "text": "Ist der/die Versicherungsnehmer/in nicht mit der versicherten Person identisch, ist die zweite Zeile auszufüllen. Bei gesetzlicher Vertretung (Eltern, Betreuer/in – Nachweis beifügen) ist die dritte Zeile auszufüllen.",
+   "bezeichnung": "Unterschriften",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b28",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Ort, Datum",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b29",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift versicherte Person (Patient/in)",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b30",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Name Versicherungsnehmer/in (falls abweichend)",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b31",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift Versicherungsnehmer/in",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b32",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Name der gesetzlich vertretungsberechtigten Person",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b33",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift der gesetzlich vertretungsberechtigten Person",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b34",
+   "typ": "text",
+   "text": "Annahme und Gegenzeichnung durch die Klinik – die Regeneration Clinic SIA nimmt die Abtretung und Vollmacht an und bestätigt die vereinbarte Stundung.",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b35",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Rīga, Datum",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b36",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Für die Regeneration Clinic SIA – Prof. Dr. Markus Masin, Director, oder bevollmächtigte Vertretung (Name, Unterschrift, Stempel)",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b37",
+   "typ": "text",
+   "text": "Hinweis zur Beifügung: Diese unterzeichnete Erklärung ist allen Korrespondenzen und Anträgen gegenüber dem Zusatzversicherer als Anlage 1 (Abtretung, Zahlungsanweisung, Vollmacht, Schweigepflichtentbindung, Stundungsvereinbarung) beizufügen.\n\nRegeneration Clinic SIA · Vorlage 05 · Patientenerklärung Stationäre Zusatzversicherung · Version 5 · Stand 10/2026",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b38",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

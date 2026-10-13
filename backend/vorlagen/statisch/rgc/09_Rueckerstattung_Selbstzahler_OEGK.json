@@ -1,49 +1,36 @@
 {
- "art": "rgc_vereinbarung_oegk",
- "titel": "Vergütungs- und Rückerstattungsvereinbarung",
- "vorlage": "Vorlage 09 · Version 3 · Stand 10/2026",
+ "quelle": "09_Rueckerstattung_Selbstzahler_OEGK",
+ "name": "Rückerstattung Selbstzahler ÖGK",
+ "gruppe": "formulare",
+ "beschreibung": "Selbstzahler/in mit nachgelagerter Kostenerstattung – Versicherte der ÖGK (Österreich)",
+ "datei": "09_Rueckerstattung_Selbstzahler_OEGK_V3.docx",
  "bloecke": [
   {
-   "id": "briefkopf",
+   "id": "b1",
    "typ": "briefkopf",
    "bezeichnung": "Briefkopf",
-   "absender": true,
-   "linienfarbe": "#B9C6C3",
+   "absender": false,
    "falzmarken": false
   },
   {
-   "id": "titel",
+   "id": "b2",
    "typ": "titel",
    "bezeichnung": "Titel",
-   "text": "Vergütungs- und Rückerstattungsvereinbarung",
-   "zusatz_label": "",
-   "zusatz": "Vorlage 09 · Version 3 · Stand 10/2026"
+   "text": "Vergütungs- und Rückerstattungsvereinbarung"
   },
   {
-   "id": "untertitel",
+   "id": "b3",
    "typ": "text",
-   "bezeichnung": "Untertitel",
-   "text": "Selbstzahler/in mit nachgelagerter Kostenerstattung – Versicherte der ÖGK (Österreich)\nDirektzahlung · Geltendmachung nach § 131 ASVG durch die Klinik als Bevollmächtigte · Rückerstattungszusage\nAnlagen: K (Vorlage 11), Anwaltsvollmacht (Vorlage 12), Schweigepflichtentbindung (Vorlage 06)",
+   "bezeichnung": "Stand der Vorlage",
+   "text": "Selbstzahler/in mit nachgelagerter Kostenerstattung – Versicherte der ÖGK (Österreich)\nDirektzahlung · Geltendmachung nach § 131 ASVG durch die Klinik als Bevollmächtigte · Rückerstattungszusage\nParteien der Vereinbarung\nPatient/in (Versicherte/r der ÖGK)\nVorlage 09 · Version 3 · Stand 10/2026 · Anlagen: K (Vorlage 11), Anwaltsvollmacht (Vorlage 12), Schweigepflichtentbindung (Vorlage 06)",
    "optionen": {
-    "fett": true,
     "schrift": "klein"
    }
   },
   {
-   "id": "hinweis",
-   "typ": "text",
-   "bezeichnung": "Hinweis zur Vorlage – entfällt nach dem Freigeben",
-   "text": "Diese Vorlage ist aus der Word-Vorlage Vorlage 09 · Version 3 · Stand 10/2026 · Anlagen: K (Vorlage 11), Anwaltsvollmacht (Vorlage 12), Schweigepflichtentbindung (Vorlage 06) der Regeneration Clinic SIA übernommen. Angaben aus der Akte (Name, Geburtsdatum, Anschrift, Versicherung) setzt EPM ein; alle übrigen Felder und Ankreuzkästchen werden von Hand ausgefüllt. Bis die Vorlage hier einmal geprüft und freigegeben ist, tragen die PDFs das Wasserzeichen „ENTWURF“.",
-   "optionen": {
-    "ueberschrift": true,
-    "kursiv": true,
-    "schrift": "klein"
-   }
-  },
-  {
-   "id": "felder-1",
+   "id": "b4",
    "typ": "datenfelder",
-   "bezeichnung": "Patient/in (Versicherte/r der ÖGK)",
+   "bezeichnung": "Angaben",
    "spalten": 1,
    "felder": [
     {
@@ -64,23 +51,20 @@
     },
     {
      "label": "Sozialversicherungsnummer (10-stellig)",
-     "wert": " "
+     "wert": "{{Patient.Versichertennummer}}"
     },
     {
      "label": "E-Mail (bevorzugter Kommunikationsweg)",
-     "wert": " "
+     "wert": "{{Patient.E-Mail}}"
     },
     {
      "label": "Telefon / Mobil",
-     "wert": " "
+     "wert": "{{Patient.Telefon}}"
     }
-   ],
-   "optionen": {
-    "ueberschrift": true
-   }
+   ]
   },
   {
-   "id": "felder-2",
+   "id": "b5",
    "typ": "datenfelder",
    "bezeichnung": "Leistungserbringerin (Klinik)",
    "spalten": 1,
@@ -115,7 +99,7 @@
    }
   },
   {
-   "id": "felder-3",
+   "id": "b6",
    "typ": "datenfelder",
    "bezeichnung": "Gegenstand der Behandlung",
    "spalten": 1,
@@ -126,15 +110,15 @@
     },
     {
      "label": "Geplante Behandlung",
-     "wert": " "
+     "wert": "____________________"
     },
     {
      "label": "Geplanter Termin",
-     "wert": " "
+     "wert": "____________________"
     },
     {
      "label": "Behandlungskategorie",
-     "wert": "☐ ambulant   ☐ tagesklinisch (ohne Übernachtung)   ☐ stationär (mindestens eine Übernachtung)"
+     "wert": "☐ ambulant ☐ tagesklinisch (ohne Übernachtung) ☐ stationär (mindestens eine Übernachtung)"
     },
     {
      "label": "Behandlungsmitgliedstaat",
@@ -142,7 +126,7 @@
     },
     {
      "label": "Kostenvoranschlag vom / Honorar (EUR)",
-     "wert": " "
+     "wert": "____________________"
     }
    ],
    "optionen": {
@@ -150,99 +134,126 @@
    }
   },
   {
-   "id": "abschnitt-4",
+   "id": "b7",
    "typ": "text",
-   "bezeichnung": "Präambel",
    "text": "Der/die Patient/in nimmt eine ärztlich indizierte Behandlung bei der Klinik in der Republik Lettland als Selbstzahler/in in Anspruch und begleicht die Behandlungsrechnung unmittelbar. Als Versicherte/r der ÖGK kann nach § 131 ASVG (Kostenerstattung in Höhe von 80 % des Betrages, der bei Inanspruchnahme eines Vertragspartners aufzuwenden gewesen wäre), nach den Satzungs- und Krankenordnungsbestimmungen der ÖGK sowie nach Art. 7 RL 2011/24/EU ein Anspruch auf Kostenerstattung bestehen; Bestand und Höhe unterliegen der Prüfung durch den Versicherungsträger. Die Klinik übernimmt als Serviceleistung die vollständige Abwicklung des Erstattungsverfahrens gegenüber der ÖGK im Namen des/der Versicherten und verpflichtet sich, bei ihr eingehende Erstattungsbeträge an den/die Patient/in weiterzuleiten – begrenzt auf den tatsächlich gezahlten Betrag.\n\nDieses Modell ist die alternative Abwicklungsform zur Inkassozession mit Stundung (Vorlage 01), wenn der Versicherungsträger eine saldierte Honorarnote verlangt oder die Zustimmung zur Übertragung nach § 98 Abs. 2 ASVG nicht erteilt. Auch bei vollständiger Vorleistung bleiben Erstattungsfähigkeit, Leistungsumfang und medizinische Notwendigkeit der Prüfung durch den Versicherungsträger vorbehalten.",
+   "bezeichnung": "Präambel",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-5",
+   "id": "b8",
    "typ": "text",
-   "bezeichnung": "§ 1 Vergütung und Direktzahlung",
    "text": "(1) Der/die Patient/in schuldet der Klinik das vereinbarte Behandlungshonorar gemäß gesondertem Kostenvoranschlag bzw. Behandlungsvertrag. Die Zahlung ist vor Behandlungsbeginn, spätestens am Behandlungstag fällig, sofern nicht schriftlich etwas anderes vereinbart ist.\n\n(2) Nach vollständiger Zahlung stellt die Klinik eine saldierte Honorarnote (Rechnung mit Zahlungsbestätigung) mit detaillierter Leistungsaufstellung, Diagnosen (ICD-10) und – auf Wunsch – deutschsprachigen Behandlungsunterlagen aus. Die saldierte Honorarnote ist wesentliche Grundlage für die Geltendmachung der Kostenerstattung nach § 131 ASVG; weitere medizinische und versicherungsrechtliche Nachweise können erforderlich sein.\n\n(3) Die Zahlungspflicht des/der Patient/in besteht unabhängig von Bestand, Höhe und Durchsetzbarkeit des Kostenerstattungsanspruchs gegen die ÖGK.\n\n(4) Terminverschiebung, Absage, Abbruch. Wird die Behandlung aus medizinischen Gründen oder durch die Klinik abgesagt oder verschoben, wird eine geleistete Zahlung binnen 14 Tagen vollständig zurückerstattet bzw. auf den neuen Termin angerechnet. Sagt der/die Patient/in ohne medizinischen Grund später als sieben Tage vor dem Termin ab, kann die Klinik nachweislich entstandene, nicht anderweitig verwertbare Aufwendungen (z. B. bestellte Implantate, reservierte OP-Kapazität) einbehalten, höchstens jedoch 20 % des Honorars. Bei medizinisch notwendigem Abbruch werden nur die bis dahin erbrachten Leistungen abgerechnet; der Rest wird zurückerstattet.\n\n(5) Hinweis zur Erstattungshöhe. Der/die Patient/in wurde darauf hingewiesen, dass die ÖGK nach § 131 ASVG höchstens 80 % des Vertragspartnertarifs erstattet und dieser Tarif regelmäßig deutlich niedriger ist als das Behandlungshonorar. Die Erstattung wird daher regelmäßig erheblich unter dem gezahlten Betrag liegen; ein Eigenanteil verbleibt beim/bei der Patient/in. Eine Vollerstattung wird von der Klinik weder zugesagt noch geschuldet. Der OGH hat die 80 %-Regel als unionsrechtskonform bestätigt (OGH 26.02.2021, 10 ObS 142/20k). Die voraussichtliche Rückerstattung ist in der Anlage K beziffert.\n\nAnlage K – Kostenvoranschlag und Erstattungsprognose. Die Höhe des Behandlungshonorars, der voraussichtlich erstattungsfähigen Leistungen, der erwarteten Versicherungsleistung, des vorab zu zahlenden Eigenanteils, des gestundeten Betrags und meiner maximalen zusätzlichen Zahlungspflicht ergibt sich aus der Anlage K (Vorlage 11), die mir vor Unterzeichnung ausgehändigt wurde und Bestandteil dieser Erklärung ist. Die Klinik hat darin die Grundlage ihrer Erstattungsschätzung offengelegt.",
+   "bezeichnung": "§ 1 Vergütung und Direktzahlung",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-6",
+   "id": "b9",
    "typ": "text",
+   "text": "(1) Der/die Patient/in bevollmächtigt die Klinik, vertreten durch ihren Director Prof. Dr. Markus Masin, den Kostenerstattungsanspruch nach § 131 ASVG und der RL 2011/24/EU im Namen des/der Versicherten gegenüber der ÖGK umfassend geltend zu machen. Sämtliche Anträge und Schriftsätze werden im Namen des/der Versicherten eingebracht; die Klinik tritt ausschließlich als Bevollmächtigte auf. Die Vollmacht umfasst:\n– Einreichung des Kostenerstattungsantrags samt saldierter Honorarnote und medizinischer Dokumentation;\n– Beantragung einer Vorabgenehmigung nach § 7b Abs. 4 SV-EG bei Krankenhausbehandlungen mit mindestens einer Übernachtung und bei aufwändigen Behandlungen – vor Behandlungsbeginn;\n– Korrespondenz mit der ÖGK, ihren Landesstellen, dem chef- und kontrollärztlichen Dienst sowie der nationalen Kontaktstelle für grenzüberschreitende Gesundheitsversorgung;\n– Entgegennahme von Bescheiden, Erledigungen und Zahlungen (Empfangs- und Zustellvollmacht);\n– Mandatierung eines österreichischen Rechtsanwalts für Bescheid- und Säumnisklage (§ 67 ASGG) aufgrund der gesonderten Anwaltsvollmacht nach Vorlage 12 – gerichtliche Schritte nur nach vorheriger Abstimmung mit dem/der Patient/in.\nAbgrenzung zur berufsmäßigen Parteienvertretung: Die Klinik macht die ihr abgetretenen Ansprüche in eigener Angelegenheit geltend und übernimmt im Übrigen die administrative Abwicklung (Antragstellung, Zusammenstellung medizinischer Unterlagen, Akteneinsicht, Entgegennahme von Bescheiden) als Bevollmächtigte nach § 10 AVG. Die rechtliche Vertretung in Verfahren vor dem Versicherungsträger, soweit sie über die Antragstellung hinausgeht, sowie vor dem Arbeits- und Sozialgericht erfolgt ausschließlich durch einen österreichischen Rechtsanwalt aufgrund gesonderter Anwaltsvollmacht (Vorlage 12), die ich mit dieser Erklärung erteile (§ 8 RAO; § 40 ASGG).\n\n(2) Die Verfahrensabwicklung erfolgt als Serviceleistung ohne gesondertes Entgelt. Kosten eines von der Klinik beauftragten Rechtsanwalts trägt die Klinik; sonstige externe Kosten (insbesondere Gerichts- und Sachverständigenkosten, soweit sie nicht vom Versicherungsträger zu tragen sind) werden nur nach vorheriger schriftlicher Vereinbarung der Parteien ausgelöst. Versicherte tragen im sozialgerichtlichen Verfahren grundsätzlich kein Kostenrisiko gegenüber dem Versicherungsträger (§ 77 ASGG).\n\n(3) Die Klinik schuldet ein sorgfältiges Tätigwerden nach dem Stand der Rechtslage, jedoch keinen Erstattungserfolg. Über Bestand und Höhe des Anspruchs entscheidet allein die ÖGK bzw. das zuständige Gericht.\n\n(4) Die Vollmacht gilt bis zur vollständigen Abwicklung des Erstattungsverfahrens und kann jederzeit schriftlich widerrufen werden; bereits entstandene Rechte und Pflichten bleiben unberührt. Eigene Rechtshandlungen des/der Patient/in in derselben Angelegenheit sind der Klinik unverzüglich anzuzeigen.",
    "bezeichnung": "§ 2 Geltendmachung der Kostenerstattung durch die Klinik",
-   "text": "(1) Der/die Patient/in bevollmächtigt die Klinik, vertreten durch ihren Director Prof. Dr. Markus Masin, den Kostenerstattungsanspruch nach § 131 ASVG und der RL 2011/24/EU im Namen des/der Versicherten gegenüber der ÖGK umfassend geltend zu machen. Sämtliche Anträge und Schriftsätze werden im Namen des/der Versicherten eingebracht; die Klinik tritt ausschließlich als Bevollmächtigte auf. Die Vollmacht umfasst:\n–  Einreichung des Kostenerstattungsantrags samt saldierter Honorarnote und medizinischer Dokumentation;\n–  Beantragung einer Vorabgenehmigung nach § 7b Abs. 4 SV-EG bei Krankenhausbehandlungen mit mindestens einer Übernachtung und bei aufwändigen Behandlungen – vor Behandlungsbeginn;\n–  Korrespondenz mit der ÖGK, ihren Landesstellen, dem chef- und kontrollärztlichen Dienst sowie der nationalen Kontaktstelle für grenzüberschreitende Gesundheitsversorgung;\n–  Entgegennahme von Bescheiden, Erledigungen und Zahlungen (Empfangs- und Zustellvollmacht);\n–  Mandatierung eines österreichischen Rechtsanwalts für Bescheid- und Säumnisklage (§ 67 ASGG) aufgrund der gesonderten Anwaltsvollmacht nach Vorlage 12 – gerichtliche Schritte nur nach vorheriger Abstimmung mit dem/der Patient/in.\n\nAbgrenzung zur berufsmäßigen Parteienvertretung: Die Klinik macht die ihr abgetretenen Ansprüche in eigener Angelegenheit geltend und übernimmt im Übrigen die administrative Abwicklung (Antragstellung, Zusammenstellung medizinischer Unterlagen, Akteneinsicht, Entgegennahme von Bescheiden) als Bevollmächtigte nach § 10 AVG. Die rechtliche Vertretung in Verfahren vor dem Versicherungsträger, soweit sie über die Antragstellung hinausgeht, sowie vor dem Arbeits- und Sozialgericht erfolgt ausschließlich durch einen österreichischen Rechtsanwalt aufgrund gesonderter Anwaltsvollmacht (Vorlage 12), die ich mit dieser Erklärung erteile (§ 8 RAO; § 40 ASGG).\n\n(2) Die Verfahrensabwicklung erfolgt als Serviceleistung ohne gesondertes Entgelt. Kosten eines von der Klinik beauftragten Rechtsanwalts trägt die Klinik; sonstige externe Kosten (insbesondere Gerichts- und Sachverständigenkosten, soweit sie nicht vom Versicherungsträger zu tragen sind) werden nur nach vorheriger schriftlicher Vereinbarung der Parteien ausgelöst. Versicherte tragen im sozialgerichtlichen Verfahren grundsätzlich kein Kostenrisiko gegenüber dem Versicherungsträger (§ 77 ASGG).\n\n(3) Die Klinik schuldet ein sorgfältiges Tätigwerden nach dem Stand der Rechtslage, jedoch keinen Erstattungserfolg. Über Bestand und Höhe des Anspruchs entscheidet allein die ÖGK bzw. das zuständige Gericht.\n\n(4) Die Vollmacht gilt bis zur vollständigen Abwicklung des Erstattungsverfahrens und kann jederzeit schriftlich widerrufen werden; bereits entstandene Rechte und Pflichten bleiben unberührt. Eigene Rechtshandlungen des/der Patient/in in derselben Angelegenheit sind der Klinik unverzüglich anzuzeigen.",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-7",
+   "id": "b10",
    "typ": "text",
+   "text": "(1) Weiterleitungspflicht. Erstattungsbeträge, die die ÖGK aufgrund der Empfangsvollmacht an die Klinik leistet, leitet die Klinik binnen 14 Tagen ab Zahlungseingang auf das vom/von der Patient/in benannte Konto weiter. Die Weiterleitung erfolgt nach eindeutiger Zuordnung des Zahlungseingangs zum Behandlungsfall.\n\n(2) Höhenbegrenzung, Teilzahlungen, Korrekturen. Die Weiterleitung ist der Höhe nach auf den Betrag begrenzt, den der/die Patient/in an die Klinik tatsächlich gezahlt hat. Gehen mehrere Erstattungszahlungen ein (z. B. Teilbeträge, Nachzahlungen nach Klage), wird jede binnen 14 Tagen nach Eingang weitergeleitet, bis die Obergrenze erreicht ist. Fordert die ÖGK einen Betrag zurück, erstattet der/die Patient/in den weitergeleiteten Anteil binnen 14 Tagen an die Klinik; irrtümliche Fehlzahlungen werden beiderseits unverzüglich ausgeglichen. Eine Aufrechnung mit anderen Forderungen der Klinik erfolgt nur, soweit diese fällig, unbestritten oder rechtskräftig festgestellt sind.\n\n(3) Direktzahlung an den/die Patient/in. Leistet die ÖGK die Erstattung unmittelbar an den/die Patient/in, verbleibt dieser Betrag beim/bei der Patient/in; eine Zahlungspflicht der Klinik besteht insoweit nicht.\n\n(4) Kein Erstattungsfall. Lehnt die ÖGK die Erstattung bestandskräftig oder rechtskräftig ab oder bleibt das Verfahren endgültig erfolglos, besteht keine Rückzahlungspflicht der Klinik; das gezahlte Behandlungshonorar verbleibt bei der Klinik (§ 1 Abs. 3).\n\n(5) Abrechnungstransparenz und Kontrolle. Die Klinik informiert den/die Patient/in unaufgefordert und binnen fünf Werktagen über jeden Zahlungseingang (Datum, Betrag, Zuordnung), über den Verfahrensstand und den Inhalt ergangener Bescheide und übermittelt mit jeder Weiterleitung eine Abrechnung. Der/die Patient/in kann jederzeit Einsicht in die Zahlungs- und Bescheidunterlagen verlangen; die Bescheide der ÖGK werden ihm/ihr im Original bzw. als vollständige Kopie zugeleitet.\n\nKonto des/der Patient/in für die Weiterleitung: IBAN ______________________________ BIC __________ Kontoinhaber/in ______________________",
    "bezeichnung": "§ 3 Rückerstattungszusage der Klinik",
-   "text": "(1) Weiterleitungspflicht. Erstattungsbeträge, die die ÖGK aufgrund der Empfangsvollmacht an die Klinik leistet, leitet die Klinik binnen 14 Tagen ab Zahlungseingang auf das vom/von der Patient/in benannte Konto weiter. Die Weiterleitung erfolgt nach eindeutiger Zuordnung des Zahlungseingangs zum Behandlungsfall.\n\n(2) Höhenbegrenzung, Teilzahlungen, Korrekturen. Die Weiterleitung ist der Höhe nach auf den Betrag begrenzt, den der/die Patient/in an die Klinik tatsächlich gezahlt hat. Gehen mehrere Erstattungszahlungen ein (z. B. Teilbeträge, Nachzahlungen nach Klage), wird jede binnen 14 Tagen nach Eingang weitergeleitet, bis die Obergrenze erreicht ist. Fordert die ÖGK einen Betrag zurück, erstattet der/die Patient/in den weitergeleiteten Anteil binnen 14 Tagen an die Klinik; irrtümliche Fehlzahlungen werden beiderseits unverzüglich ausgeglichen. Eine Aufrechnung mit anderen Forderungen der Klinik erfolgt nur, soweit diese fällig, unbestritten oder rechtskräftig festgestellt sind.\n\n(3) Direktzahlung an den/die Patient/in. Leistet die ÖGK die Erstattung unmittelbar an den/die Patient/in, verbleibt dieser Betrag beim/bei der Patient/in; eine Zahlungspflicht der Klinik besteht insoweit nicht.\n\n(4) Kein Erstattungsfall. Lehnt die ÖGK die Erstattung bestandskräftig oder rechtskräftig ab oder bleibt das Verfahren endgültig erfolglos, besteht keine Rückzahlungspflicht der Klinik; das gezahlte Behandlungshonorar verbleibt bei der Klinik (§ 1 Abs. 3).\n\n(5) Abrechnungstransparenz und Kontrolle. Die Klinik informiert den/die Patient/in unaufgefordert und binnen fünf Werktagen über jeden Zahlungseingang (Datum, Betrag, Zuordnung), über den Verfahrensstand und den Inhalt ergangener Bescheide und übermittelt mit jeder Weiterleitung eine Abrechnung. Der/die Patient/in kann jederzeit Einsicht in die Zahlungs- und Bescheidunterlagen verlangen; die Bescheide der ÖGK werden ihm/ihr im Original bzw. als vollständige Kopie zugeleitet.\n\nKonto des/der Patient/in für die Weiterleitung: IBAN ______________________________  BIC __________  Kontoinhaber/in ______________________",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-8",
+   "id": "b11",
    "typ": "text",
    "bezeichnung": "§ 4 Rechtsgrundlagen (Übersicht)",
-   "text": "A. Österreichisches Sozialversicherungsrecht\n–  § 131 ASVG – Kostenerstattung bei Inanspruchnahme von Nicht-Vertragspartnern (80 % des Vertragspartnertarifs); Parallelbestimmungen des GSVG, BSVG und B-KUVG\n–  § 98 ASVG – Beschränkungen der Übertragung, Verpfändung und Pfändung von Leistungsansprüchen; Zustimmung des Versicherungsträgers (Abs. 2)\n–  § 7b SV-EG – Umsetzung der RL 2011/24/EU; Vorabgenehmigung (Abs. 4) und besondere Kostenerstattung (Abs. 6)\n–  §§ 65, 67, 77 ASGG – Rechtsweg in Sozialrechtssachen; Klagefrist vier Wochen (§ 67 Abs. 2); Säumnisklage nach drei Monaten in der Krankenversicherung (§ 67 Abs. 1 Z 2)\n–  §§ 1392 ff. ABGB – Zession\n\nB. Unionsrecht\n–  Art. 7 RL 2011/24/EU – Grundsatz der Kostenerstattung grenzüberschreitender Gesundheitsversorgung\n–  Art. 8 Abs. 5 und 6 RL 2011/24/EU – Grenzen der Vorabgenehmigung; individuelle Begründungspflicht\n–  Art. 20 VO (EG) 883/2004 – Sachleistungsaushilfe bei geplanten Auslandsbehandlungen (Formular S2)\n–  Art. 56 AEUV – Dienstleistungsfreiheit\n\nC. Rechtsprechung\n–  OGH 28.07.2020, 10 ObS 43/20a (Krankenhausbehandlung mit Übernachtung; Vorabgenehmigung nach § 7b SV-EG)\n–  OGH 26.02.2021, 10 ObS 142/20k (80 %-Regel des § 131 ASVG unionsrechtskonform)\n–  EuGH 28.04.1998, C-158/96 (Kohll) und C-120/95 (Decker); EuGH 12.07.2001, C-157/99 (Smits und Peerbooms); EuGH 13.05.2003, C-385/99 (Müller-Fauré und van Riet); EuGH 05.10.2010, C-173/09 (Elchinov); EuGH 09.10.2014, C-268/13 (Petru); EuGH 04.09.2025, C-489/23 (Grenzen der Vorabgenehmigung; Erstattung bei Dringlichkeit)",
+   "text": "§ 4 Rechtsgrundlagen (Übersicht)",
+   "optionen": {
+    "fett": true
+   }
+  },
+  {
+   "id": "b12",
+   "typ": "text",
+   "text": "– § 131 ASVG – Kostenerstattung bei Inanspruchnahme von Nicht-Vertragspartnern (80 % des Vertragspartnertarifs); Parallelbestimmungen des GSVG, BSVG und B-KUVG\n– § 98 ASVG – Beschränkungen der Übertragung, Verpfändung und Pfändung von Leistungsansprüchen; Zustimmung des Versicherungsträgers (Abs. 2)\n– § 7b SV-EG – Umsetzung der RL 2011/24/EU; Vorabgenehmigung (Abs. 4) und besondere Kostenerstattung (Abs. 6)\n– §§ 65, 67, 77 ASGG – Rechtsweg in Sozialrechtssachen; Klagefrist vier Wochen (§ 67 Abs. 2); Säumnisklage nach drei Monaten in der Krankenversicherung (§ 67 Abs. 1 Z 2)\n– §§ 1392 ff. ABGB – Zession",
+   "bezeichnung": "A. Österreichisches Sozialversicherungsrecht",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-9",
+   "id": "b13",
    "typ": "text",
-   "bezeichnung": "§ 5 Datenverarbeitung (DSGVO)",
+   "text": "– Art. 7 RL 2011/24/EU – Grundsatz der Kostenerstattung grenzüberschreitender Gesundheitsversorgung\n– Art. 8 Abs. 5 und 6 RL 2011/24/EU – Grenzen der Vorabgenehmigung; individuelle Begründungspflicht\n– Art. 20 VO (EG) 883/2004 – Sachleistungsaushilfe bei geplanten Auslandsbehandlungen (Formular S2)\n– Art. 56 AEUV – Dienstleistungsfreiheit",
+   "bezeichnung": "B. Unionsrecht",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b14",
+   "typ": "text",
+   "text": "– OGH 28.07.2020, 10 ObS 43/20a (Krankenhausbehandlung mit Übernachtung; Vorabgenehmigung nach § 7b SV-EG)\n– OGH 26.02.2021, 10 ObS 142/20k (80 %-Regel des § 131 ASVG unionsrechtskonform)\n– EuGH 28.04.1998, C-158/96 (Kohll) und C-120/95 (Decker); EuGH 12.07.2001, C-157/99 (Smits und Peerbooms); EuGH 13.05.2003, C-385/99 (Müller-Fauré und van Riet); EuGH 05.10.2010, C-173/09 (Elchinov); EuGH 09.10.2014, C-268/13 (Petru); EuGH 04.09.2025, C-489/23 (Grenzen der Vorabgenehmigung; Erstattung bei Dringlichkeit)",
+   "bezeichnung": "C. Rechtsprechung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b15",
+   "typ": "text",
    "text": "(1) Die Klinik verarbeitet die für Abrechnung, Geltendmachung und Rechtsdurchsetzung erforderlichen personenbezogenen Daten – Identifikations-, Versicherungs- und Kontaktdaten, Diagnosen, Befunde, OP-Berichte, Leistungs- und Rechnungsdaten – und übermittelt sie an die ÖGK, deren chef- und kontrollärztlichen Dienst, mandatierte Rechtsvertreter, Sachverständige und zuständige Gerichte.\n\n(2) Rechtsgrundlagen: Art. 6 Abs. 1 lit. b, c und f sowie Art. 9 Abs. 2 lit. f und h DSGVO; ergänzend und hilfsweise die Einwilligung nach Art. 9 Abs. 2 lit. a DSGVO, die jederzeit mit Wirkung für die Zukunft widerrufen werden kann (Art. 7 Abs. 3 DSGVO). Der Widerruf berührt weder die Rechtmäßigkeit der bis dahin erfolgten Verarbeitung noch Verarbeitungen, die zur Vertragsabwicklung, zur Erfüllung gesetzlicher Pflichten oder zur Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen erforderlich sind; er kann die weitere Verfahrensführung durch die Klinik unmöglich machen.\n\n(3) Information nach Art. 13 DSGVO: Verantwortliche ist die Regeneration Clinic SIA (info@regeneration-clinic.eu). Die medizinische Dokumentation wird nach den gesetzlichen Fristen (in der Regel mindestens 10 Jahre), verfahrensrelevante Unterlagen bis zum rechtskräftigen Abschluss aufbewahrt. Es bestehen die Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit sowie auf Beschwerde bei der Datu valsts inspekcija (Rīga) oder der österreichischen Datenschutzbehörde. Die ärztliche Verschwiegenheit nach lettischem Recht wird durch die gesonderte Schweigepflichtentbindung (Vorlage 06) aufgehoben, die Bestandteil dieser Vereinbarung ist.",
+   "bezeichnung": "§ 5 Datenverarbeitung (DSGVO)",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-10",
+   "id": "b16",
    "typ": "text",
-   "bezeichnung": "§ 6 Kommunikation und Zustellungen",
    "text": "(1) Bevorzugter Kommunikationsweg E-Mail. Die Kommunikation zwischen den Parteien und die Übermittlung von Verfahrensunterlagen (Anträge, Bescheide und Erledigungen der ÖGK, Rechnungen, medizinische Unterlagen) erfolgt bevorzugt per E-Mail – seitens der Klinik über info@regeneration-clinic.eu, seitens des/der Patient/in über die oben angegebene E-Mail-Adresse.\n\n(2) Einwilligung in unverschlüsselte E-Mail-Kommunikation. Der/die Patient/in wurde darauf hingewiesen, dass unverschlüsselte E-Mails keine vollständige Vertraulichkeit gewährleisten, und willigt in die Übermittlung – auch von Gesundheitsdaten – auf diesem Weg ausdrücklich ein (Art. 6 Abs. 1 lit. a, Art. 9 Abs. 2 lit. a DSGVO). Auf Wunsch erfolgt die Übermittlung verschlüsselt bzw. passwortgeschützt oder per Briefpost. Diese Einwilligung ist jederzeit mit Wirkung für die Zukunft widerrufbar; ab Widerruf erfolgt die Kommunikation per Briefpost.\n\n(3) Weitere Kommunikationswege. Briefpost an die angegebenen Anschriften, Telefon (+371 28717452) sowie Video-/Telefonsprechstunde nach Terminvereinbarung. Messenger-Dienste werden nur nach gesonderter schriftlicher Vereinbarung und ausschließlich Ende-zu-Ende-verschlüsselt genutzt.\n\n(4) Keine Notfallkommunikation per E-Mail. Medizinische Notfälle und dringende Beschwerden sind unverzüglich telefonisch oder über den örtlichen Notruf bzw. die nächstgelegene Notaufnahme zu melden.\n\n(5) Form von Erklärungen. Soweit diese Vereinbarung Schriftform vorsieht (insbesondere für den Widerruf), genügt die Übermittlung der eigenhändig unterschriebenen Erklärung als Scan im E-Mail-Anhang.\n\n(6) Zustellungen der ÖGK. Erledigungen und Bescheide der ÖGK, die der Klinik aufgrund der Empfangs- und Zustellvollmacht zugehen, leitet diese dem/der Patient/in unverzüglich, spätestens binnen fünf Werktagen, bevorzugt per E-Mail weiter; die Klinik weist dabei auf laufende Fristen (insbesondere die vierwöchige Klagefrist nach § 67 Abs. 2 ASGG) hin.\n\n(7) Aktualität der Kontaktdaten. Änderungen der Kontaktdaten sind der jeweils anderen Partei unverzüglich mitzuteilen. Erklärungen gelten als zugegangen, wenn sie an die zuletzt bekanntgegebene E-Mail-Adresse bzw. Anschrift übermittelt wurden.",
+   "bezeichnung": "§ 6 Kommunikation und Zustellungen",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-11",
+   "id": "b17",
    "typ": "text",
-   "bezeichnung": "§ 7 Schlussbestimmungen",
    "text": "(1) Auf den Erstattungsanspruch gegen die ÖGK findet österreichisches Recht Anwendung (Rechtsweg: ASGG). Auf den Behandlungsvertrag und diese Vereinbarung findet lettisches Recht Anwendung, da die Klinik eine in Lettland zugelassene Ārstniecības iestāde ist; zwingende Verbraucherschutzvorschriften am Wohnsitz des/der Patient/in bleiben unberührt (Art. 6 Rom-I-VO).\n\n(2) Belehrung zur Vorabgenehmigung. Bei Krankenhausbehandlungen mit mindestens einer Übernachtung und bei aufwändigen Behandlungen im Sinne des § 7b Abs. 4 SV-EG ist die Vorabgenehmigung vor Behandlungsbeginn einzuholen; andernfalls kann die Erstattung für diesen Anteil auf das Niveau des § 131 ASVG beschränkt sein oder entfallen (OGH 28.07.2020, 10 ObS 43/20a). Ambulante und tagesklinische Leistungen bedürfen regelmäßig keiner Vorabgenehmigung; Erstattungsfähigkeit und Höhe bleiben der Prüfung durch die ÖGK vorbehalten.\n\n(3) Schriftform und salvatorische Klausel. Änderungen und Ergänzungen bedürfen der Schriftform. Die Unwirksamkeit einzelner Bestimmungen lässt die Wirksamkeit der übrigen unberührt.\n\n(4) Aushändigung. Der/die Patient/in bestätigt den Erhalt eines Exemplars dieser Vereinbarung; ein weiteres Exemplar dient der Vorlage bei der ÖGK.",
+   "bezeichnung": "§ 7 Schlussbestimmungen",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-12",
+   "id": "b18",
    "typ": "text",
+   "text": "Ort: Rīga, Republik Lettland Datum: ______________________",
    "bezeichnung": "Unterschriften",
-   "text": "Ort: Rīga, Republik Lettland    Datum: ______________________",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "unterschrift-13",
+   "id": "b19",
    "typ": "unterschrift",
-   "bezeichnung": "Patient/in (Versicherte/r der ÖGK)",
+   "bezeichnung": "Unterschrift",
    "linie": "Patient/in (Versicherte/r der ÖGK)",
    "optionen": {
     "nicht_teilen": true
    }
   },
   {
-   "id": "unterschrift-14",
+   "id": "b20",
    "typ": "unterschrift",
-   "bezeichnung": "Für die Regeneration Clinic SIA – Prof. Dr. Markus Masin, Director, oder bevollmächtigte Vertretung (Name, Unterschrift, Stempel)",
+   "bezeichnung": "Unterschrift",
    "linie": "Für die Regeneration Clinic SIA – Prof. Dr. Markus Masin, Director, oder bevollmächtigte Vertretung (Name, Unterschrift, Stempel)",
    "optionen": {
     "nicht_teilen": true,
@@ -250,30 +261,35 @@
    }
   },
   {
-   "id": "unterschrift-15",
+   "id": "b21",
    "typ": "unterschrift",
-   "bezeichnung": "Bei gesetzlicher Vertretung: Name und Unterschrift der vertretungsberechtigten Person (Nachweis beifügen)",
+   "bezeichnung": "Unterschrift",
    "linie": "Bei gesetzlicher Vertretung: Name und Unterschrift der vertretungsberechtigten Person (Nachweis beifügen)",
    "optionen": {
     "nicht_teilen": true
    }
   },
   {
-   "id": "kasten-16",
+   "id": "b22",
    "typ": "text",
+   "text": "– Sie begleichen die Behandlungsrechnung direkt bei der Klinik und erhalten eine saldierte Honorarnote.\n– Die Klinik reicht den Kostenerstattungsantrag nach § 131 ASVG in Ihrem Namen bei der ÖGK ein und führt das gesamte Verfahren – ohne gesondertes Entgelt.\n– Zahlt die ÖGK an die Klinik, erhalten Sie den Betrag binnen 14 Tagen weitergeleitet, höchstens in Höhe Ihrer Zahlung. Zahlt die ÖGK direkt an Sie, verbleibt der Betrag bei Ihnen.\n– Bei Krankenhausbehandlungen mit Übernachtung ist vor Behandlungsbeginn die Vorabgenehmigung nach § 7b SV-EG erforderlich – die Klinik bereitet den Antrag für Sie vor.",
    "bezeichnung": "Zusammenfassung des Ablaufs für Patientinnen und Patienten",
-   "text": "–  Sie begleichen die Behandlungsrechnung direkt bei der Klinik und erhalten eine saldierte Honorarnote.\n–  Die Klinik reicht den Kostenerstattungsantrag nach § 131 ASVG in Ihrem Namen bei der ÖGK ein und führt das gesamte Verfahren – ohne gesondertes Entgelt.\n–  Zahlt die ÖGK an die Klinik, erhalten Sie den Betrag binnen 14 Tagen weitergeleitet, höchstens in Höhe Ihrer Zahlung. Zahlt die ÖGK direkt an Sie, verbleibt der Betrag bei Ihnen.\n–  Bei Krankenhausbehandlungen mit Übernachtung ist vor Behandlungsbeginn die Vorabgenehmigung nach § 7b SV-EG erforderlich – die Klinik bereitet den Antrag für Sie vor.",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "fusszeile",
+   "id": "b23",
+   "typ": "text",
+   "text": "Regeneration Clinic SIA · Vorlage 09 · Vergütungs- und Rückerstattungsvereinbarung ÖGK (Selbstzahler) · Version 3 · Stand 10/2026",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b24",
    "typ": "fusszeile",
    "bezeichnung": "Fußzeile",
-   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}} · {{Absender.E-Mail}}\nRegeneration Clinic SIA · Vorlage 09 · Vergütungs- und Rückerstattungsvereinbarung ÖGK (Selbstzahler) · Version 3 · Stand 10/2026",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
    "rechts": "{Seite}/{Seiten}"
   }
- ],
- "quelle": "09_Rueckerstattung_Selbstzahler_OEGK_V3.docx"
+ ]
 }

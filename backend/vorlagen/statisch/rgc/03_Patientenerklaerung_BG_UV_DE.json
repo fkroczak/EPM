@@ -1,96 +1,61 @@
 {
- "art": "rgc_erklaerung_bguv",
- "titel": "Patientenerklärung bei Aufnahme (Deutschland – BG / Unfallkasse)",
- "vorlage": "Vorlage 03 · Version 5 · Stand 10/2026",
+ "quelle": "03_Patientenerklaerung_BG_UV_DE",
+ "name": "Patientenerklärung Deutschland BG/UV",
+ "gruppe": "formulare",
+ "beschreibung": "Gesetzliche Unfallversicherung · Arbeitsunfall / Berufskrankheit · Behandlung in Lettland (EU)",
+ "datei": "03_Patientenerklaerung_BG_UV_DE_V5.docx",
  "bloecke": [
   {
-   "id": "briefkopf",
+   "id": "b1",
    "typ": "briefkopf",
    "bezeichnung": "Briefkopf",
-   "absender": true,
-   "linienfarbe": "#B9C6C3",
+   "absender": false,
    "falzmarken": false
   },
   {
-   "id": "titel",
+   "id": "b2",
    "typ": "titel",
    "bezeichnung": "Titel",
-   "text": "Patientenerklärung bei Aufnahme (Deutschland – BG / Unfallkasse)",
-   "zusatz_label": "",
-   "zusatz": "Vorlage 03 · Version 5 · Stand 10/2026"
+   "text": "Patientenerklärung bei Aufnahme (Deutschland – BG / Unfallkasse)"
   },
   {
-   "id": "untertitel",
+   "id": "b3",
    "typ": "text",
-   "bezeichnung": "Untertitel",
-   "text": "Gesetzliche Unfallversicherung · Arbeitsunfall / Berufskrankheit · Behandlung in Lettland (EU)\nAbtretung · Zahlungsanweisung · Verfahrensvollmacht · Stundung · Schweigepflichtentbindung · Datenschutz\nAnlagen: K (Vorlage 11), Anwaltsvollmacht (Vorlage 12), Schweigepflichtentbindung (Vorlage 06)",
+   "bezeichnung": "Stand der Vorlage",
+   "text": "Gesetzliche Unfallversicherung · Arbeitsunfall / Berufskrankheit · Behandlung in Lettland (EU)\nAbtretung · Zahlungsanweisung · Verfahrensvollmacht · Stundung · Schweigepflichtentbindung · Datenschutz\nVorlage 03 · Version 5 · Stand 10/2026 · Anlagen: K (Vorlage 11), Anwaltsvollmacht (Vorlage 12), Schweigepflichtentbindung (Vorlage 06)",
    "optionen": {
-    "fett": true,
     "schrift": "klein"
    }
   },
   {
-   "id": "hinweis",
+   "id": "b4",
    "typ": "text",
-   "bezeichnung": "Hinweis zur Vorlage – entfällt nach dem Freigeben",
-   "text": "Diese Vorlage ist aus der Word-Vorlage Vorlage 03 · Version 5 · Stand 10/2026 · Anlagen: K (Vorlage 11), Anwaltsvollmacht (Vorlage 12), Schweigepflichtentbindung (Vorlage 06) der Regeneration Clinic SIA übernommen. Angaben aus der Akte (Name, Geburtsdatum, Anschrift, Versicherung) setzt EPM ein; alle übrigen Felder und Ankreuzkästchen werden von Hand ausgefüllt. Bis die Vorlage hier einmal geprüft und freigegeben ist, tragen die PDFs das Wasserzeichen „ENTWURF“.",
-   "optionen": {
-    "ueberschrift": true,
-    "kursiv": true,
-    "schrift": "klein"
-   }
-  },
-  {
-   "id": "kasten-1",
-   "typ": "text",
-   "bezeichnung": "Leistungserbringerin",
    "text": "Regeneration Clinic SIA · Jāņa Asara iela 3 · LV-1009 Rīga · Lettland · Postanschrift: Gertrudes iela 53-7 · LV-1011 Rīga\n\nIn Lettland zugelassene Ārstniecības iestāde · Health Institution Code 001000289 · Reg.-Nr. 40203593175 · info@regeneration-clinic.eu · +371 28717452\n\nVertretungsberechtigt: Prof. Dr. Markus Masin, Director",
+   "bezeichnung": "Leistungserbringerin",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "kasten-2",
+   "id": "b5",
    "typ": "text",
-   "bezeichnung": "Der sichere Weg: Wir holen die Kostenübernahme Ihres Unfallversicherungsträgers für Sie ein",
    "text": "Bei Arbeitsunfällen und Berufskrankheiten ist der übliche und sicherste Weg die Kostenübernahme durch den Unfallversicherungsträger, der das Heilverfahren steuert (§§ 26 ff., 34 SGB VII). Wir beantragen die Kostenübernahme für Sie, stimmen uns mit dem Durchgangsarzt ab und beginnen elektive Behandlungen erst, wenn die schriftliche Kostenübernahmeerklärung (oder die Sachleistungsaushilfe über die DVUA) vorliegt – so bleibt Ihr Kostenrisiko von vornherein klein. Eine eigenständig organisierte Auslandsbehandlung begründet dagegen keinen automatischen Erstattungsanspruch. Für medizinische Notfälle (Ziffer 6) und für einen noch nicht beschiedenen Anteil gilt die Stundung nach Ziffer 13; Anwalts- und Verfahrenskosten trägt die Klinik (Ziffer 4.2). Sollte der Träger dennoch ablehnen, finden wir gemeinsam eine Lösung – fällig wird höchstens der in der Anlage K bezifferte Betrag, und wir bieten Ihnen eine Ratenvereinbarung an.",
+   "bezeichnung": "Der sichere Weg: Wir holen die Kostenübernahme Ihres Unfallversicherungsträgers für Sie ein",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "felder-3",
-   "typ": "datenfelder",
+   "id": "b6",
+   "typ": "text",
    "bezeichnung": "Was die Stundung für Sie bedeutet",
-   "spalten": 1,
-   "felder": [
-    {
-     "label": "Keine Vorkasse",
-     "wert": "Sie zahlen den erwarteten Erstattungsanteil nicht vorab. Die Klinik trägt die Vorfinanzierung zinsfrei, bis der UV-Träger entschieden hat (Ziffer 13)."
-    },
-    {
-     "label": "Wir führen das Verfahren",
-     "wert": "Antragstellung und Durchsetzung übernimmt die Klinik. Anwalts- und Gerichtskosten eines von ihr veranlassten Verfahrens trägt die Klinik (Ziffer 4.2) – auf Sie kommen hieraus keine Kosten zu."
-    },
-    {
-     "label": "Klarheit vorab",
-     "wert": "In der Anlage K sehen Sie vor der Unterschrift, was voraussichtlich erstattet wird, was Sie selbst zahlen und was gestundet wird – einschließlich Ihrer maximalen zusätzlichen Zahlungspflicht."
-    },
-    {
-     "label": "Falls nicht erstattet wird",
-     "wert": "Der nicht gedeckte Betrag wird mit der Entscheidung bzw. dem rechtskräftigen Verfahrensabschluss fällig; das endgültige Erstattungsrisiko verbleibt insoweit bei Ihnen. Die Klinik bietet Ihnen in diesem Fall eine Ratenvereinbarung an und sucht mit Ihnen eine tragfähige Lösung."
-    },
-    {
-     "label": "Ihre Obergrenze",
-     "wert": "Mehr als der in der Anlage K bezifferte Höchstbetrag kommt nicht auf Sie zu."
-    }
-   ],
+   "text": "Was die Stundung für Sie bedeutet",
    "optionen": {
-    "ueberschrift": true
+    "fett": true
    }
   },
   {
-   "id": "felder-4",
+   "id": "b7",
    "typ": "datenfelder",
    "bezeichnung": "Patientendaten und Versicherungsfall",
    "spalten": 1,
@@ -109,47 +74,47 @@
     },
     {
      "label": "UV-Träger (Berufsgenossenschaft / Unfallkasse), Anschrift",
-     "wert": " "
+     "wert": "{{Patient.Anschrift}}"
     },
     {
      "label": "Aktenzeichen des UV-Trägers (falls bekannt)",
-     "wert": " "
+     "wert": "____________________"
     },
     {
      "label": "Unfallereignis (Datum, Ort) / Berufskrankheit",
-     "wert": " "
+     "wert": "____________________"
     },
     {
      "label": "Kurzbeschreibung des Unfallhergangs / der BK",
-     "wert": " "
+     "wert": "____________________"
     },
     {
      "label": "Arbeitgeber / Unternehmen (Unfallanzeige § 193 SGB VII)",
-     "wert": " "
+     "wert": "____________________"
     },
     {
      "label": "Durchgangsarzt / erstbehandelnde Ärztin bzw. Arzt",
-     "wert": " "
+     "wert": "____________________"
     },
     {
      "label": "Aufnahmedatum / Beginn der Behandlung in der EU",
-     "wert": " "
+     "wert": "____________________"
     },
     {
      "label": "Geplante Versorgungsform",
-     "wert": "☐ ambulant   ☐ tagesklinisch   ☐ stationär (mindestens eine Übernachtung)"
+     "wert": "☐ ambulant ☐ tagesklinisch ☐ stationär (mindestens eine Übernachtung)"
     },
     {
      "label": "Kostenübernahme / Genehmigung des UV-Trägers",
-     "wert": "☐ beantragt am: __________   ☐ schriftlich erteilt am: __________ (Az. __________)   ☐ abgelehnt am: __________   ☐ Notfall – Dringlichkeit dokumentiert"
+     "wert": "☐ beantragt am: __________ ☐ schriftlich erteilt am: __________ (Az. __________) ☐ abgelehnt am: __________ ☐ Notfall – Dringlichkeit dokumentiert"
     },
     {
      "label": "Abstimmung mit dem Durchgangsarzt / Reha-Management",
-     "wert": "☐ erfolgt am: __________   ☐ Überweisung / Verlegungsauftrag liegt vor   ☐ nicht erforderlich (Begründung: __________)"
+     "wert": "☐ erfolgt am: __________ ☐ Überweisung / Verlegungsauftrag liegt vor ☐ nicht erforderlich (Begründung: __________)"
     },
     {
      "label": "Kooperations-/Infrastrukturpartner (falls eingesetzt)",
-     "wert": " "
+     "wert": "____________________"
     }
    ],
    "optionen": {
@@ -157,135 +122,156 @@
    }
   },
   {
-   "id": "abschnitt-5",
+   "id": "b8",
    "typ": "text",
-   "bezeichnung": "Behandlungsrahmen",
    "text": "Erfasst sind alle medizinisch notwendigen ambulanten, tagesklinischen, stationsersetzenden und – soweit medizinisch erforderlich und gesondert dokumentiert – stationären Heilbehandlungen der Regeneration Clinic SIA in Lettland einschließlich Diagnostik (z. B. MRT, CT, Labor, Elektrophysiologie, Sonographie), konservativer und operativer Therapie, Telemedizin und Nachsorge, soweit sie mit diesem Arbeitsunfall oder dieser Berufskrankheit in ursächlichem Zusammenhang stehen.\n\nWerden Kooperations- oder Infrastrukturpartner eingesetzt (z. B. AIWA Clinic, Rīga), verbleiben medizinische Verantwortung, Indikationsstellung, Dokumentation und Abrechnung bei der Regeneration Clinic SIA.",
+   "bezeichnung": "Behandlungsrahmen",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-6",
+   "id": "b9",
    "typ": "text",
-   "bezeichnung": "1. Rechtlicher Rahmen der gesetzlichen Unfallversicherung",
    "text": "Das Heilverfahren der gesetzlichen Unfallversicherung beruht auf dem Sachleistungsprinzip (§§ 26, 27, 28 SGB VII). Die unfallmedizinische Versorgung wird nach § 34 SGB VII über das Netz der von den UV-Trägern beteiligten Ärzte und Krankenhäuser (Durchgangsärzte, BG-Kliniken, Vertrag Ärzte/Unfallversicherungsträger nach § 34 Abs. 3 SGB VII) sichergestellt. Die Regeneration Clinic SIA ist in dieses inländische Netz nicht eingebunden.\n\nFür die grenzüberschreitende Versorgung im EU-Ausland gelten die Koordinierungsregeln der VO (EG) 883/2004 (Art. 36 – Sach- und Geldleistungen bei Arbeitsunfällen und Berufskrankheiten; Art. 37 – Transportkosten) sowie subsidiär die RL 2011/24/EU. Regelweg ist die Sachleistungsaushilfe über die Deutsche Verbindungsstelle Unfallversicherung – Ausland (DVUA bei der DGUV): Der zuständige deutsche UV-Träger gewährt die Heilbehandlung im Ausland; die Abrechnung erfolgt zwischen den Trägern.\n\nEine Selbstbeschaffung mit anschließender Kostenerstattung ist im UV-Recht die Ausnahme und setzt regelmäßig eine vorherige Befassung des UV-Trägers oder einen anerkannten Ausnahmefall (Dringlichkeit, Systemversagen, rechtswidrige Ablehnung) voraus. Die nachfolgenden Regelungen tragen beiden Konstellationen Rechnung.",
+   "bezeichnung": "1. Rechtlicher Rahmen der gesetzlichen Unfallversicherung",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-7",
+   "id": "b10",
    "typ": "text",
+   "text": "Ich weise den oben benannten UV-Träger an, Kostenübernahme- und Erstattungsbeträge aus diesem Versicherungsfall mit schuldbefreiender Wirkung unmittelbar an die Regeneration Clinic SIA zu leisten:\n\nIBAN: LV51HABA0551058193764 · BIC/SWIFT: HABALV22 · Empfängerin: Regeneration Clinic SIA, Jāņa Asara iela 3, LV-1009 Rīga\n\nVerwendungszweck: Heilbehandlung UV/BG – EU-Behandlung, Versicherungsfall vom [Unfalldatum], Az. [Aktenzeichen], Versicherte/r [Name]\n\nDie Rechnungslegung erfolgt in deutscher Sprache, in einer an die UV-GOÄ bzw. den Vertrag Ärzte/Unfallversicherungsträger angelehnten Form, mit ICD-10-Kodierung, Diagnose-, Verlaufs- und Befundberichten sowie Bildgebung.",
    "bezeichnung": "2. Zahlungsanweisung (Direktzahlung mit schuldbefreiender Wirkung)",
-   "text": "Ich weise den oben benannten UV-Träger an, Kostenübernahme- und Erstattungsbeträge aus diesem Versicherungsfall mit schuldbefreiender Wirkung unmittelbar an die Regeneration Clinic SIA zu leisten:\nIBAN: LV51HABA0551058193764 · BIC/SWIFT: HABALV22 · Empfängerin: Regeneration Clinic SIA, Jāņa Asara iela 3, LV-1009 Rīga\n\nVerwendungszweck: Heilbehandlung UV/BG – EU-Behandlung, Versicherungsfall vom [Unfalldatum], Az. [Aktenzeichen], Versicherte/r [Name]\n\nDie Rechnungslegung erfolgt in deutscher Sprache, in einer an die UV-GOÄ bzw. den Vertrag Ärzte/Unfallversicherungsträger angelehnten Form, mit ICD-10-Kodierung, Diagnose-, Verlaufs- und Befundberichten sowie Bildgebung.",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-8",
+   "id": "b11",
    "typ": "text",
-   "bezeichnung": "3. Sicherungsabtretung der Geldleistungsansprüche (§ 53 Abs. 2 Nr. 1 SGB I · §§ 398 ff. BGB)",
    "text": "Ich trete hiermit sicherungshalber meine Geld-Erstattungsansprüche gegen den oben benannten UV-Träger aus sämtlichen Leistungen dieses Versicherungsfalls ab dem Aufnahmedatum – einschließlich der unmittelbar zusammenhängenden vor- und nachstationären Maßnahmen, der Diagnostik, der Aufenthalte in Kooperations- oder Infrastrukturkliniken und der Telemedizin – in Höhe der jeweiligen Rechnungsforderungen an die Regeneration Clinic SIA ab, soweit und sobald diese Ansprüche entstehen und abtretbar sind. Die Abtretung dient der Sicherung und Erfüllung der Vorleistung, die die Klinik mir durch die Stundung gewährt (§ 53 Abs. 2 Nr. 1 SGB I). Die Klinik nimmt die Abtretung an.\n\nAusdrücklich ausgenommen sind Sach- und Dienstleistungsansprüche (§ 53 Abs. 1 SGB I) sowie Ansprüche auf Verletztengeld und Verletztenrente; diese sind nicht Gegenstand dieser Erklärung.\n\nHinweis: Diese Abtretung begründet keine Vorkassepflicht. Soweit die Rechnung infolge der Stundung noch nicht beglichen ist, wird der Anspruch als Anspruch auf Kostenübernahme bzw. Freistellung von der Honorarverbindlichkeit (Zahlung unmittelbar an die Klinik) geltend gemacht.",
+   "bezeichnung": "3. Sicherungsabtretung der Geldleistungsansprüche (§ 53 Abs. 2 Nr. 1 SGB I · §§ 398 ff. BGB)",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "felder-9",
-   "typ": "datenfelder",
+   "id": "b12",
+   "typ": "text",
+   "text": "Instrument — Wirkung — Voraussetzung / Grenze\nSicherungsabtretung (Ziffer 3) — Klinik wird Inhaberin des Zahlungsanspruchs auf festgestellte Geld-Erstattungsbeträge — Nur abtretbare Geldleistungsansprüche (§ 53 Abs. 2 Nr. 1 SGB I); Sachleistungs-, Verletztengeld- und Rentenansprüche ausgenommen\nKostenübernahmeerklärung des UV-Trägers — Träger zahlt unmittelbar an die Klinik (Sachleistung) — Setzt Anerkennung des Versicherungsfalls und Zustimmung des Trägers voraus – Regelweg\nZahlungsanweisung (Ziffer 2) — Träger darf mit schuldbefreiender Wirkung an die Klinik zahlen — Keine Zahlungspflicht des Trägers gegenüber der Klinik\nVerfahrensvollmacht (Ziffer 4.1) — Klinik handelt administrativ im Namen des Versicherten (§ 13 SGB X) — Keine Rechtsdienstleistung; Widerspruch und Klage nur durch Rechtsanwalt (Ziffer 4.2)",
    "bezeichnung": "Rechtsstellung der Klinik im Überblick",
-   "spalten": 1,
-   "felder": [
-    {
-     "label": "Sicherungsabtretung (Ziffer 3)",
-     "wert": "Wirkung: Klinik wird Inhaberin des Zahlungsanspruchs auf festgestellte Geld-Erstattungsbeträge\nVoraussetzung / Grenze: Nur abtretbare Geldleistungsansprüche (§ 53 Abs. 2 Nr. 1 SGB I); Sachleistungs-, Verletztengeld- und Rentenansprüche ausgenommen"
-    },
-    {
-     "label": "Kostenübernahmeerklärung des UV-Trägers",
-     "wert": "Wirkung: Träger zahlt unmittelbar an die Klinik (Sachleistung)\nVoraussetzung / Grenze: Setzt Anerkennung des Versicherungsfalls und Zustimmung des Trägers voraus – Regelweg"
-    },
-    {
-     "label": "Zahlungsanweisung (Ziffer 2)",
-     "wert": "Wirkung: Träger darf mit schuldbefreiender Wirkung an die Klinik zahlen\nVoraussetzung / Grenze: Keine Zahlungspflicht des Trägers gegenüber der Klinik"
-    },
-    {
-     "label": "Verfahrensvollmacht (Ziffer 4.1)",
-     "wert": "Wirkung: Klinik handelt administrativ im Namen des Versicherten (§ 13 SGB X)\nVoraussetzung / Grenze: Keine Rechtsdienstleistung; Widerspruch und Klage nur durch Rechtsanwalt (Ziffer 4.2)"
-    }
-   ],
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-10",
+   "id": "b13",
    "typ": "text",
-   "bezeichnung": "3. Sicherungsabtretung der Geldleistungsansprüche (§ 53 Abs. 2 Nr. 1 SGB I · §§ 398 ff. BGB) (Fortsetzung)",
-   "text": "Die Zahlungsanweisung verpflichtet den Träger bzw. Versicherer nicht zur Zahlung an die Klinik; sie erlaubt ihm lediglich, mit schuldbefreiender Wirkung an die Klinik zu leisten. Eine Einziehungsermächtigung oder Empfangsvollmacht verschafft der Klinik keine eigene Gläubigerstellung. Die Weiterleitungspflicht des Patienten bleibt daher in allen Konstellationen die tragende Sicherung."
+   "text": "Die Zahlungsanweisung verpflichtet den Träger bzw. Versicherer nicht zur Zahlung an die Klinik; sie erlaubt ihm lediglich, mit schuldbefreiender Wirkung an die Klinik zu leisten. Eine Einziehungsermächtigung oder Empfangsvollmacht verschafft der Klinik keine eigene Gläubigerstellung. Die Weiterleitungspflicht des Patienten bleibt daher in allen Konstellationen die tragende Sicherung.",
+   "bezeichnung": "Text"
   },
   {
-   "id": "abschnitt-11",
+   "id": "b14",
    "typ": "text",
+   "text": "Vorbemerkung: Nach der Rechtsprechung des Bundessozialgerichts (BSG, Urteil vom 18.07.2006 – B 1 KR 24/05 R, BSGE 97, 6) verbleibt die Befugnis, einen Erstattungsanspruch im Verwaltungs- und Gerichtsverfahren feststellen zu lassen, trotz Abtretung beim Versicherten; die Begründung aus dem höchstpersönlichen Charakter sozialrechtlicher Ansprüche (§§ 53, 54 SGB I) gilt buchübergreifend und damit auch für Ansprüche nach dem SGB VII. Die folgende Vollmacht ist daher erforderlich.",
    "bezeichnung": "4. Prozessführungs- und Verfahrensvollmacht",
-   "text": "Vorbemerkung: Nach der Rechtsprechung des Bundessozialgerichts (BSG, Urteil vom 18.07.2006 – B 1 KR 24/05 R, BSGE 97, 6) verbleibt die Befugnis, einen Erstattungsanspruch im Verwaltungs- und Gerichtsverfahren feststellen zu lassen, trotz Abtretung beim Versicherten; die Begründung aus dem höchstpersönlichen Charakter sozialrechtlicher Ansprüche (§§ 53, 54 SGB I) gilt buchübergreifend und damit auch für Ansprüche nach dem SGB VII. Die folgende Vollmacht ist daher erforderlich.\n\n4.1 Vollmacht für die administrative Abwicklung\nIch bevollmächtige die Regeneration Clinic SIA, vertreten durch ihren Director Prof. Dr. Markus Masin, die Angelegenheit dieses Versicherungsfalls gegenüber dem UV-Träger, dessen beratenden Ärzten und Reha-Managern, dem Durchgangsarzt und der DVUA/DGUV administrativ in meinem Namen abzuwickeln (§ 13 SGB X). Die Vollmacht umfasst:\n–  Anträge auf Anerkennung des Versicherungsfalls, auf Heilbehandlung, auf Sachleistungsaushilfe nach Art. 36 VO (EG) 883/2004 (Formular DA1) sowie auf Kostenübernahme und Kostenerstattung einschließlich Vorlage der medizinischen Unterlagen;\n–  die Entgegennahme von Bescheiden, Schriftsätzen und sonstigen Erklärungen (Zustellvollmacht) mit Weiterleitung an mich binnen fünf Werktagen unter Hinweis auf laufende Fristen;\n–  die Einholung von Auskünften, medizinischen Unterlagen und Gutachten sowie die Akteneinsicht nach § 25 SGB X;\n–  die Mandatierung eines Rechtsanwalts nach Maßgabe der Ziffer 4.2 – auf Kosten der Klinik.\n\nAbgrenzung zur Rechtsdienstleistung: Die Klinik macht die an sie abgetretenen Ansprüche in eigener Angelegenheit geltend und übernimmt im Übrigen die administrative Abwicklung (Antragstellung, Zusammenstellung medizinischer Unterlagen, Akteneinsicht, Entgegennahme von Bescheiden). Die rechtliche Vertretung im Widerspruchs- und Klageverfahren erfolgt ausschließlich durch einen zugelassenen Rechtsanwalt aufgrund gesonderter Anwaltsvollmacht (Vorlage 12), die ich mit dieser Erklärung erteile (§§ 2, 3 RDG; § 13 Abs. 5 SGB X; § 73 Abs. 2 SGG).\n\n4.2 Anwaltliche Vertretung – gesonderte Anwaltsvollmacht, auf Kosten der Klinik\nWiderspruchsverfahren, Klagen und jede über die Antragstellung hinausgehende rechtliche Vertretung in Bezug auf meine Ansprüche aus diesem Versicherungsfall erfolgen ausschließlich durch einen zugelassenen Rechtsanwalt (§ 73 Abs. 2 SGG; §§ 2, 3 RDG), den die Regeneration Clinic SIA im Bedarfsfall auswählt, mandatiert und vergütet. Hierzu erteile ich die gesonderte Anwaltsvollmacht nach Vorlage 12, die dieser Erklärung beiliegt; der Name des Rechtsanwalts wird bei Mandatierung eingetragen. Die Anwaltsvollmacht umfasst insbesondere:\n–  die Einlegung sämtlicher Rechtsbehelfe und Rechtsmittel sowie die Vertretung in allen Instanzen (Sozialgericht, Landessozialgericht, Bundessozialgericht);\n–  Antrags-, Verzichts-, Anerkenntnis-, Vergleichs- und Erledigungserklärungen;\n–  die Entgegennahme von Zustellungen, Bescheiden und Urteilen;\n–  die Empfangnahme von Geldleistungen, insbesondere von dem UV-Träger erstatteter Beträge und festgesetzter Kosten;\n–  die Bestellung von Unterbevollmächtigten (etwa für Terminsvertretungen); Vergleich und Verzicht nur mit meiner Zustimmung in Textform.\n\nKosten der anwaltlichen Vertretung – keine Belastung für Sie: Die Regeneration Clinic SIA mandatiert den Rechtsanwalt im eigenen wirtschaftlichen Interesse zur Durchsetzung der an sie abgetretenen Ansprüche. Sämtliche Anwaltskosten trägt die Klinik; eine Honorarbelastung des Patienten ist ausgeschlossen. Das sozialgerichtliche Verfahren ist für Versicherte gerichtskostenfrei (§ 183 SGG); im Obsiegensfall sind die notwendigen Kosten des Vorverfahrens von dem UV-Träger zu erstatten (§ 63 SGB X) und fließen an die Klinik zurück.\n\n4.3 Schweigepflichtentbindung gegenüber dem mandatierten Rechtsanwalt\nIch entbinde die behandelnden Ärztinnen und Ärzte sowie das Personal der Regeneration Clinic SIA und der eingebundenen Kooperationspartner von der Verschwiegenheitspflicht nach lettischem Recht (Pacientu tiesību likums, Ārstniecības likums) und – soweit deutsche Behandler einbezogen sind – von der ärztlichen Schweigepflicht nach § 203 StGB und § 9 MBO-Ä gegenüber dem nach Ziffer 4.2 mandatierten Rechtsanwalt und dessen Kanzleimitarbeitern, soweit dies zur Durchsetzung der Ansprüche aus diesem Behandlungsfall erforderlich ist. Die Auskunfts- und Berichtspflichten der behandelnden Ärzte gegenüber dem UV-Träger nach §§ 201, 203 SGB VII bleiben unberührt. Die gesonderte Schweigepflichtentbindung der Klinik (Vorlage 06) bleibt unberührt.\n\n4.4 Reichweite, Bestand und Widerruf der Vollmachten\nDie Vollmachten nach Ziffer 4.1 und 4.2 bleiben bis zum schriftlichen Widerruf gegenüber dem jeweils Bevollmächtigten in Kraft. Sie erlöschen nicht mit meinem Tod (§§ 168, 672 BGB) und gelten über den Abschluss des Verfahrens hinaus für Folge- und Nachverfahren (z. B. Kostenfestsetzung, Vollstreckung, Verfahren zu Verletztenrente und Verschlimmerungsanträgen).",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-12",
+   "id": "b15",
    "typ": "text",
+   "text": "Ich bevollmächtige die Regeneration Clinic SIA, vertreten durch ihren Director Prof. Dr. Markus Masin, die Angelegenheit dieses Versicherungsfalls gegenüber dem UV-Träger, dessen beratenden Ärzten und Reha-Managern, dem Durchgangsarzt und der DVUA/DGUV administrativ in meinem Namen abzuwickeln (§ 13 SGB X). Die Vollmacht umfasst:\n– Anträge auf Anerkennung des Versicherungsfalls, auf Heilbehandlung, auf Sachleistungsaushilfe nach Art. 36 VO (EG) 883/2004 (Formular DA1) sowie auf Kostenübernahme und Kostenerstattung einschließlich Vorlage der medizinischen Unterlagen;\n– die Entgegennahme von Bescheiden, Schriftsätzen und sonstigen Erklärungen (Zustellvollmacht) mit Weiterleitung an mich binnen fünf Werktagen unter Hinweis auf laufende Fristen;\n– die Einholung von Auskünften, medizinischen Unterlagen und Gutachten sowie die Akteneinsicht nach § 25 SGB X;\n– die Mandatierung eines Rechtsanwalts nach Maßgabe der Ziffer 4.2 – auf Kosten der Klinik.\nAbgrenzung zur Rechtsdienstleistung: Die Klinik macht die an sie abgetretenen Ansprüche in eigener Angelegenheit geltend und übernimmt im Übrigen die administrative Abwicklung (Antragstellung, Zusammenstellung medizinischer Unterlagen, Akteneinsicht, Entgegennahme von Bescheiden). Die rechtliche Vertretung im Widerspruchs- und Klageverfahren erfolgt ausschließlich durch einen zugelassenen Rechtsanwalt aufgrund gesonderter Anwaltsvollmacht (Vorlage 12), die ich mit dieser Erklärung erteile (§§ 2, 3 RDG; § 13 Abs. 5 SGB X; § 73 Abs. 2 SGG).",
+   "bezeichnung": "4.1 Vollmacht für die administrative Abwicklung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b16",
+   "typ": "text",
+   "text": "Widerspruchsverfahren, Klagen und jede über die Antragstellung hinausgehende rechtliche Vertretung in Bezug auf meine Ansprüche aus diesem Versicherungsfall erfolgen ausschließlich durch einen zugelassenen Rechtsanwalt (§ 73 Abs. 2 SGG; §§ 2, 3 RDG), den die Regeneration Clinic SIA im Bedarfsfall auswählt, mandatiert und vergütet. Hierzu erteile ich die gesonderte Anwaltsvollmacht nach Vorlage 12, die dieser Erklärung beiliegt; der Name des Rechtsanwalts wird bei Mandatierung eingetragen. Die Anwaltsvollmacht umfasst insbesondere:\n– die Einlegung sämtlicher Rechtsbehelfe und Rechtsmittel sowie die Vertretung in allen Instanzen (Sozialgericht, Landessozialgericht, Bundessozialgericht);\n– Antrags-, Verzichts-, Anerkenntnis-, Vergleichs- und Erledigungserklärungen;\n– die Entgegennahme von Zustellungen, Bescheiden und Urteilen;\n– die Empfangnahme von Geldleistungen, insbesondere von dem UV-Träger erstatteter Beträge und festgesetzter Kosten;\n– die Bestellung von Unterbevollmächtigten (etwa für Terminsvertretungen); Vergleich und Verzicht nur mit meiner Zustimmung in Textform.\nKosten der anwaltlichen Vertretung – keine Belastung für Sie: Die Regeneration Clinic SIA mandatiert den Rechtsanwalt im eigenen wirtschaftlichen Interesse zur Durchsetzung der an sie abgetretenen Ansprüche. Sämtliche Anwaltskosten trägt die Klinik; eine Honorarbelastung des Patienten ist ausgeschlossen. Das sozialgerichtliche Verfahren ist für Versicherte gerichtskostenfrei (§ 183 SGG); im Obsiegensfall sind die notwendigen Kosten des Vorverfahrens von dem UV-Träger zu erstatten (§ 63 SGB X) und fließen an die Klinik zurück.",
+   "bezeichnung": "4.2 Anwaltliche Vertretung – gesonderte Anwaltsvollmacht, auf Kosten der Klinik",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b17",
+   "typ": "text",
+   "text": "Ich entbinde die behandelnden Ärztinnen und Ärzte sowie das Personal der Regeneration Clinic SIA und der eingebundenen Kooperationspartner von der Verschwiegenheitspflicht nach lettischem Recht (Pacientu tiesību likums, Ārstniecības likums) und – soweit deutsche Behandler einbezogen sind – von der ärztlichen Schweigepflicht nach § 203 StGB und § 9 MBO-Ä gegenüber dem nach Ziffer 4.2 mandatierten Rechtsanwalt und dessen Kanzleimitarbeitern, soweit dies zur Durchsetzung der Ansprüche aus diesem Behandlungsfall erforderlich ist. Die Auskunfts- und Berichtspflichten der behandelnden Ärzte gegenüber dem UV-Träger nach §§ 201, 203 SGB VII bleiben unberührt. Die gesonderte Schweigepflichtentbindung der Klinik (Vorlage 06) bleibt unberührt.",
+   "bezeichnung": "4.3 Schweigepflichtentbindung gegenüber dem mandatierten Rechtsanwalt",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b18",
+   "typ": "text",
+   "text": "Die Vollmachten nach Ziffer 4.1 und 4.2 bleiben bis zum schriftlichen Widerruf gegenüber dem jeweils Bevollmächtigten in Kraft. Sie erlöschen nicht mit meinem Tod (§§ 168, 672 BGB) und gelten über den Abschluss des Verfahrens hinaus für Folge- und Nachverfahren (z. B. Kostenfestsetzung, Vollstreckung, Verfahren zu Verletztenrente und Verschlimmerungsanträgen).",
+   "bezeichnung": "4.4 Reichweite, Bestand und Widerruf der Vollmachten",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b19",
+   "typ": "text",
+   "text": "– Nationales UV-Recht: §§ 26, 27, 28, 34, 193, 201, 203 SGB VII; Vertrag Ärzte/Unfallversicherungsträger (§ 34 Abs. 3 SGB VII); UV-GOÄ.\n– EU-Koordinierungsrecht: Art. 36, 37 VO (EG) 883/2004; VO (EG) 987/2009.\n– Patientenmobilität: Art. 7, 8 RL 2011/24/EU (subsidiär).\n– Primärrecht und Rechtsprechung: Art. 56 AEUV; EuGH C-158/96 (Kohll), C-120/95 (Decker); EuGH 04.09.2025, C-489/23 (Grenzen der Vorabgenehmigung, Erstattung bei Dringlichkeit).\n– Abtretung und Vollmacht: §§ 53, 54 SGB I; §§ 164 ff., 168, 398 ff., 672 BGB; § 13 SGB X; BSG 18.07.2006, B 1 KR 24/05 R.",
    "bezeichnung": "5. Rechtsgrundlagen im Überblick",
-   "text": "–  Nationales UV-Recht: §§ 26, 27, 28, 34, 193, 201, 203 SGB VII; Vertrag Ärzte/Unfallversicherungsträger (§ 34 Abs. 3 SGB VII); UV-GOÄ.\n–  EU-Koordinierungsrecht: Art. 36, 37 VO (EG) 883/2004; VO (EG) 987/2009.\n–  Patientenmobilität: Art. 7, 8 RL 2011/24/EU (subsidiär).\n–  Primärrecht und Rechtsprechung: Art. 56 AEUV; EuGH C-158/96 (Kohll), C-120/95 (Decker); EuGH 04.09.2025, C-489/23 (Grenzen der Vorabgenehmigung, Erstattung bei Dringlichkeit).\n–  Abtretung und Vollmacht: §§ 53, 54 SGB I; §§ 164 ff., 168, 398 ff., 672 BGB; § 13 SGB X; BSG 18.07.2006, B 1 KR 24/05 R.",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-13",
+   "id": "b20",
    "typ": "text",
-   "bezeichnung": "6. Kostenübernahme, Steuerung des Heilverfahrens, Behandlungsbeginn und Notfälle",
    "text": "Ich beantrage die Kostenübernahme durch den UV-Träger ohne Vorkasse. Elektive Behandlungen beginnen erst, wenn die schriftliche Kostenübernahmeerklärung des UV-Trägers bzw. die Sachleistungsaushilfe über die DVUA vorliegt oder ich in der Anlage K dokumentiert erklärt habe, die Behandlung vor der Entscheidung auf eigenes Erstattungsrisiko beginnen zu wollen. Die Klinik stimmt Diagnostik, Behandlungsplan und Nachbehandlung mit dem Durchgangsarzt bzw. dem Reha-Management des UV-Trägers ab und übermittelt diesem die erforderlichen Berichte (§§ 201, 203 SGB VII).\n\nNotfälle. Bei medizinischer Dringlichkeit, die ein Abwarten der Entscheidung nicht zulässt, kann mit Diagnostik und Behandlung begonnen werden; der UV-Träger wird unverzüglich informiert, die Dringlichkeit wird nachvollziehbar dokumentiert und die Abrechnung erfolgt nach Zustimmung bzw. nachträglicher Anerkennung.\n\nFolgemaßnahmen. Nachbehandlungen, Rehabilitation und weitere Operationen sind gesondert zu beantragen; die Zuständigkeit richtet sich nach der Steuerung des Heilverfahrens durch den UV-Träger. Diese Erklärung erstreckt sich auf Folgemaßnahmen nur, soweit der UV-Träger ihre Durchführung bei der Regeneration Clinic SIA genehmigt hat.",
+   "bezeichnung": "6. Kostenübernahme, Steuerung des Heilverfahrens, Behandlungsbeginn und Notfälle",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-14",
+   "id": "b21",
    "typ": "text",
+   "text": "Ich willige ein, dass die Regeneration Clinic SIA und ein nach Ziffer 4.2 mandatierter Rechtsanwalt zur Heilbehandlung, Abrechnung und Rechtsdurchsetzung kommunizieren und Daten austauschen dürfen mit:\n– dem UV-Träger einschließlich seiner beauftragten ärztlichen und prüfenden Stellen (beratende Ärzte, Reha-Manager);\n– der DVUA/DGUV sowie ausländischen Verbindungsstellen;\n– dem Durchgangsarzt, dem Arbeitgeber (soweit für die Unfallanzeige erforderlich) sowie Vor- und Mitbehandlern, Radiologien und Laboren;\n– Kooperations- und Infrastrukturkliniken (z. B. AIWA Clinic, Rīga);\n– autorisierten Übersetzungs- und IT-Dienstleistern (z. B. PACS-, KIM-, Upload-Portale);\n– Sozialgerichten, Behörden und sonstigen verfahrensbeteiligten Stellen.\nKommunikationswege. Standard sind die sicheren Wege (Brief, TLS-verschlüsselte E-Mail mit kennwortgeschützten Anhängen, gesicherte Portale wie PACS- oder KIM-Upload, Telefon nach Identitätsprüfung); hierfür ist keine Einwilligung erforderlich. Zusätzliche Wege nutzt die Klinik nur mit meiner freiwilligen, jederzeit formlos widerruflichen Zustimmung (bitte ankreuzen):",
    "bezeichnung": "7. Mitteilungs- und Kommunikationsbefugnis",
-   "text": "Ich willige ein, dass die Regeneration Clinic SIA und ein nach Ziffer 4.2 mandatierter Rechtsanwalt zur Heilbehandlung, Abrechnung und Rechtsdurchsetzung kommunizieren und Daten austauschen dürfen mit:\n–  dem UV-Träger einschließlich seiner beauftragten ärztlichen und prüfenden Stellen (beratende Ärzte, Reha-Manager);\n–  der DVUA/DGUV sowie ausländischen Verbindungsstellen;\n–  dem Durchgangsarzt, dem Arbeitgeber (soweit für die Unfallanzeige erforderlich) sowie Vor- und Mitbehandlern, Radiologien und Laboren;\n–  Kooperations- und Infrastrukturkliniken (z. B. AIWA Clinic, Rīga);\n–  autorisierten Übersetzungs- und IT-Dienstleistern (z. B. PACS-, KIM-, Upload-Portale);\n–  Sozialgerichten, Behörden und sonstigen verfahrensbeteiligten Stellen.\n\nKommunikationswege. Standard sind die sicheren Wege (Brief, TLS-verschlüsselte E-Mail mit kennwortgeschützten Anhängen, gesicherte Portale wie PACS- oder KIM-Upload, Telefon nach Identitätsprüfung); hierfür ist keine Einwilligung erforderlich. Zusätzliche Wege nutzt die Klinik nur mit meiner freiwilligen, jederzeit formlos widerruflichen Zustimmung (bitte ankreuzen):",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "text-15",
+   "id": "b22",
    "typ": "text",
-   "bezeichnung": "7. Mitteilungs- und Kommunikationsbefugnis – Tabelle",
-   "text": "☐ E-Mail ohne Verschlüsselung\n☐ Telefax (unverschlüsselt)\n☐ Ende-zu-Ende-verschlüsselter Messenger (z. B. Signal)"
+   "text": "☐ E-Mail ohne Verschlüsselung\n☐ Telefax (unverschlüsselt)\n☐ Ende-zu-Ende-verschlüsselter Messenger (z. B. Signal)",
+   "bezeichnung": "Text",
+   "optionen": {
+    "spalten": 3
+   }
   },
   {
-   "id": "abschnitt-16",
+   "id": "b23",
    "typ": "text",
-   "bezeichnung": "7. Mitteilungs- und Kommunikationsbefugnis (Fortsetzung)",
-   "text": "Bei unverschlüsselter Übermittlung verbleibt ein technisches Restrisiko der Kenntnisnahme durch Dritte (Art. 32 DSGVO). Die Einzelheiten – einschließlich der Auswahl der Empfängergruppen – regelt die Schweigepflichtentbindung (Vorlage 06)."
+   "text": "Bei unverschlüsselter Übermittlung verbleibt ein technisches Restrisiko der Kenntnisnahme durch Dritte (Art. 32 DSGVO). Die Einzelheiten – einschließlich der Auswahl der Empfängergruppen – regelt die Schweigepflichtentbindung (Vorlage 06).",
+   "bezeichnung": "Text"
   },
   {
-   "id": "abschnitt-17",
+   "id": "b24",
    "typ": "text",
-   "bezeichnung": "8. Datenschutzinformation (Art. 13 DSGVO · § 201 SGB VII)",
    "text": "Systematik: Dieser Abschnitt ist eine Information nach Art. 13 DSGVO und setzt keine Einwilligung voraus. Die Entbindung von der ärztlichen Schweigepflicht erfolgt gesondert (Vorlage 06); die Freigabe zusätzlicher Kommunikationswege ist eine freiwillige, jederzeit widerrufliche Zustimmung (vorstehende Ziffer).\n\nSoweit die Verarbeitung zur Behandlung, Abrechnung, Erfüllung gesetzlicher Pflichten oder zur Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen erforderlich ist, beruht sie nicht auf widerruflicher Einwilligung, sondern auf den nachstehenden gesetzlichen Rechtsgrundlagen. Die Angaben dienen zugleich der Information nach Art. 13 DSGVO.",
+   "bezeichnung": "8. Datenschutzinformation (Art. 13 DSGVO · § 201 SGB VII)",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "felder-18",
+   "id": "b25",
    "typ": "datenfelder",
-   "bezeichnung": "8. Datenschutzinformation (Art. 13 DSGVO · § 201 SGB VII) – Tabelle",
+   "bezeichnung": "Angaben",
    "spalten": 1,
    "felder": [
     {
@@ -319,81 +305,81 @@
    ]
   },
   {
-   "id": "abschnitt-19",
+   "id": "b26",
    "typ": "text",
-   "bezeichnung": "9. Mitwirkungspflichten und Unterlagen",
    "text": "Ich verpflichte mich, sämtliche zur Aufklärung des Versicherungsfalls erforderlichen Angaben zu machen (Unfallhergang, Vorerkrankungen, Vor- und Mitbehandler, D-Arzt-Berichte, Unfallanzeige des Unternehmers nach § 193 SGB VII) und an Antrags-, Widerspruchs- und Klageverfahren mitzuwirken. Die Regeneration Clinic SIA und ein nach Ziffer 4.2 mandatierter Rechtsanwalt dürfen Befunde, D-Arzt-Berichte und Reha-Akten unmittelbar bei Vorbehandlern und Kooperationskliniken anfordern.",
+   "bezeichnung": "9. Mitwirkungspflichten und Unterlagen",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-20",
+   "id": "b27",
    "typ": "text",
-   "bezeichnung": "10. Weiterleitungspflicht",
    "text": "Zahlt der UV-Träger trotz Zahlungsanweisung unmittelbar an mich, verpflichte ich mich, den Betrag unverzüglich, spätestens binnen 14 Tagen, bis zur Höhe der offenen Forderung an die Regeneration Clinic SIA weiterzuleiten und die hierfür erforderlichen Informationen bereitzustellen.",
+   "bezeichnung": "10. Weiterleitungspflicht",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-21",
+   "id": "b28",
    "typ": "text",
-   "bezeichnung": "11. Leistungsumfang und Kooperationsmodell",
    "text": "Erfasst sind Konsultationen, Diagnostik, konservative Therapie und – falls indiziert – operative und stationäre Leistungen. Stationäre Fälle können im Kooperationsmodell mit zugelassenen Kliniken in Lettland durchgeführt werden; Indikationsstellung, medizinische Leitung, Dokumentation und Abrechnung verbleiben bei der Regeneration Clinic SIA.",
+   "bezeichnung": "11. Leistungsumfang und Kooperationsmodell",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-22",
+   "id": "b29",
    "typ": "text",
-   "bezeichnung": "12. Geltungsdauer, Widerruf, anwendbares Recht, salvatorische Klausel",
    "text": "Diese Erklärung gilt ab dem Aufnahmedatum für den gesamten Versicherungsfall (einschließlich Reha-Maßnahmen und Verschlimmerungen) (einschließlich Aufenthalten in Kooperationskliniken sowie vor- und nachstationärer Folgebehandlungen) für zunächst zwölf Monate und verlängert sich um jeweils zwölf Monate, solange die Behandlung oder das Erstattungs- bzw. Rechtsdurchsetzungsverfahren anhängig ist.\n\nEinwilligungen und Vollmachten können jederzeit schriftlich oder in Textform mit Wirkung für die Zukunft widerrufen werden. Bereits beauftragte oder erbrachte Leistungen, entstandene Zahlungs- und Weiterleitungspflichten sowie gesetzliche Aufbewahrungspflichten bleiben unberührt.\n\nAuf das Behandlungsverhältnis mit der Regeneration Clinic SIA als in Lettland zugelassener Ārstniecības iestāde findet lettisches Recht Anwendung; für die Ansprüche gegen den deutschen Leistungsträger bzw. Versicherer gilt deutsches Recht. Sollte eine Bestimmung dieser Erklärung unwirksam sein oder werden, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt; an die Stelle der unwirksamen Bestimmung tritt die Regelung, die ihrem wirtschaftlichen Zweck am nächsten kommt (§ 139 BGB).",
+   "bezeichnung": "12. Geltungsdauer, Widerruf, anwendbares Recht, salvatorische Klausel",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-23",
+   "id": "b30",
    "typ": "text",
-   "bezeichnung": "13. Stundung des erwarteten Erstattungsanteils",
    "text": "Die Regeneration Clinic SIA stundet nach medizinischer und wirtschaftlicher Einzelfallprüfung denjenigen Teil der Behandlungskosten, dessen Erstattung bei dem UV-Träger nach §§ 26 ff. SGB VII in Verbindung mit Art. 36 VO (EG) 883/2004 geltend gemacht wird, bis zur Entscheidung von dem UV-Träger bzw. bis zum rechtskräftigen Abschluss eines Widerspruchs- oder sozialgerichtlichen Verfahrens, längstens jedoch für 24 Monate ab Rechnungsdatum, sofern nicht schriftlich etwas anderes vereinbart wird. Die Stundung ist zinsfrei.\n\nUmfang der Stundung. Gestundet wird ausschließlich der erwartete Erstattungsanteil. Wird im Ergebnis nur teilweise oder gar nicht erstattet, wird der nicht gedeckte Anteil mit Zugang der Entscheidung bzw. mit rechtskräftigem Verfahrensabschluss zur Zahlung fällig. Die Klinik wird in diesem Fall eine angemessene Zahlungsregelung anbieten (Ratenvereinbarung, Stundungsverlängerung oder teilweiser Verzicht aus Kulanz); eine solche Sonderregelung bedarf der Textform. Die maximale zusätzliche Zahlungspflicht ist in der Anlage K beziffert; das endgültige Erstattungsrisiko verbleibt beim Patienten.\n\nEigenanteile. Nicht Gegenstand der Stundung sind nicht vom UV-Träger übernommene Komfort-, Transfer- und Zusatzleistungen sowie Leistungen, die nicht in ursächlichem Zusammenhang mit dem Versicherungsfall stehen; sie werden gesondert ausgewiesen und sind nach Maßgabe des Kostenvoranschlags bzw. der Rechnung fällig. Über ihre voraussichtliche Höhe wird der/die Patient/in vor Behandlungsbeginn schriftlich informiert.\n\nMitwirkung. Der/die Patient/in erhält die Vollmachten aufrecht, gibt die zur Antragstellung, Widerspruchs- und Klageführung erforderlichen Erklärungen ab und legt die benötigten Unterlagen vor. Ein Widerruf der Vollmachten oder eine unterbliebene Mitwirkung, die das Erstattungsverfahren vereitelt, beendet die Stundung; der gestundete Betrag wird dann nach schriftlicher Mahnung mit einer Frist von 30 Tagen fällig.\n\nDie zivilrechtliche Zahlungspflicht aus dem Behandlungsvertrag bleibt durch die Stundung dem Grunde nach unberührt; sie wird lediglich zeitlich modifiziert. Der/die Patient/in ist damit einer wirksamen Honorarverbindlichkeit ausgesetzt, die Grundlage des Erstattungs- bzw. Freistellungsanspruchs ist.\n\nAnlage K – Kostenvoranschlag und Erstattungsprognose. Die Höhe des Behandlungshonorars, der voraussichtlich erstattungsfähigen Leistungen, der erwarteten Versicherungsleistung, des vorab zu zahlenden Eigenanteils, des gestundeten Betrags und meiner maximalen zusätzlichen Zahlungspflicht ergibt sich aus der Anlage K (Vorlage 11), die mir vor Unterzeichnung ausgehändigt wurde und Bestandteil dieser Erklärung ist. Die Klinik hat darin die Grundlage ihrer Erstattungsschätzung offengelegt.",
+   "bezeichnung": "13. Stundung des erwarteten Erstattungsanteils",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "text-24",
+   "id": "b31",
    "typ": "text",
+   "text": "☐ Ich habe diese Erklärung gelesen und verstanden; meine Fragen wurden beantwortet.\n☐ Ich wurde darüber informiert, dass die Kostenübernahme durch den UV-Träger von der Anerkennung des Versicherungsfalls und von dessen Zustimmung abhängt und dass nicht übernommene Kosten von mir zu tragen sind.\n☐ Ich habe die Anlage K (Kostenvoranschlag und Erstattungsprognose) erhalten und die darin bezifferte maximale zusätzliche Zahlungspflicht zur Kenntnis genommen; bei einer Ablehnung bietet mir die Klinik eine Ratenvereinbarung an.\n☐ Ich habe ein Exemplar dieser Erklärung erhalten.",
    "bezeichnung": "14. Erklärung des/der Patient/in",
-   "text": "☐  Ich habe diese Erklärung gelesen und verstanden; meine Fragen wurden beantwortet.\n☐  Ich wurde darüber informiert, dass die Kostenübernahme durch den UV-Träger von der Anerkennung des Versicherungsfalls und von dessen Zustimmung abhängt und dass nicht übernommene Kosten von mir zu tragen sind.\n☐  Ich habe die Anlage K (Kostenvoranschlag und Erstattungsprognose) erhalten und die darin bezifferte maximale zusätzliche Zahlungspflicht zur Kenntnis genommen; bei einer Ablehnung bietet mir die Klinik eine Ratenvereinbarung an.\n☐  Ich habe ein Exemplar dieser Erklärung erhalten.",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "abschnitt-25",
+   "id": "b32",
    "typ": "text",
-   "bezeichnung": "Unterschriften",
    "text": "Bei gesetzlicher Vertretung ist die zweite Zeile auszufüllen (Eltern, Betreuer/in bzw. Erwachsenenvertreter/in mit entsprechendem Aufgabenkreis – Vollmacht, Betreuerausweis oder Bestellungsurkunde beifügen).",
+   "bezeichnung": "Unterschriften",
    "optionen": {
     "ueberschrift": true
    }
   },
   {
-   "id": "unterschrift-26",
+   "id": "b33",
    "typ": "unterschrift",
-   "bezeichnung": "Ort, Datum",
+   "bezeichnung": "Unterschrift",
    "linie": "Ort, Datum",
    "optionen": {
     "nicht_teilen": true
    }
   },
   {
-   "id": "unterschrift-27",
+   "id": "b34",
    "typ": "unterschrift",
-   "bezeichnung": "Unterschrift Patient/in (vollständig lesbar)",
+   "bezeichnung": "Unterschrift",
    "linie": "Unterschrift Patient/in (vollständig lesbar)",
    "optionen": {
     "nicht_teilen": true,
@@ -401,18 +387,18 @@
    }
   },
   {
-   "id": "unterschrift-28",
+   "id": "b35",
    "typ": "unterschrift",
-   "bezeichnung": "Name der gesetzlich vertretungsberechtigten Person (Druckbuchstaben)",
+   "bezeichnung": "Unterschrift",
    "linie": "Name der gesetzlich vertretungsberechtigten Person (Druckbuchstaben)",
    "optionen": {
     "nicht_teilen": true
    }
   },
   {
-   "id": "unterschrift-29",
+   "id": "b36",
    "typ": "unterschrift",
-   "bezeichnung": "Unterschrift der gesetzlich vertretungsberechtigten Person",
+   "bezeichnung": "Unterschrift",
    "linie": "Unterschrift der gesetzlich vertretungsberechtigten Person",
    "optionen": {
     "nicht_teilen": true,
@@ -420,24 +406,24 @@
    }
   },
   {
-   "id": "abschnitt-30",
+   "id": "b37",
    "typ": "text",
-   "bezeichnung": "Unterschriften (Fortsetzung)",
-   "text": "Annahme und Gegenzeichnung durch die Klinik – die Regeneration Clinic SIA nimmt die Abtretung bzw. Vollmacht an und bestätigt die vereinbarten Stundungs- und Kostenregelungen."
+   "text": "Annahme und Gegenzeichnung durch die Klinik – die Regeneration Clinic SIA nimmt die Abtretung bzw. Vollmacht an und bestätigt die vereinbarten Stundungs- und Kostenregelungen.",
+   "bezeichnung": "Text"
   },
   {
-   "id": "unterschrift-31",
+   "id": "b38",
    "typ": "unterschrift",
-   "bezeichnung": "Rīga, Datum",
+   "bezeichnung": "Unterschrift",
    "linie": "Rīga, Datum",
    "optionen": {
     "nicht_teilen": true
    }
   },
   {
-   "id": "unterschrift-32",
+   "id": "b39",
    "typ": "unterschrift",
-   "bezeichnung": "Für die Regeneration Clinic SIA – Prof. Dr. Markus Masin, Director, oder bevollmächtigte Vertretung (Name, Unterschrift, Stempel)",
+   "bezeichnung": "Unterschrift",
    "linie": "Für die Regeneration Clinic SIA – Prof. Dr. Markus Masin, Director, oder bevollmächtigte Vertretung (Name, Unterschrift, Stempel)",
    "optionen": {
     "nicht_teilen": true,
@@ -445,18 +431,17 @@
    }
   },
   {
-   "id": "abschnitt-33",
+   "id": "b40",
    "typ": "text",
-   "bezeichnung": "Unterschriften (Fortsetzung)",
-   "text": "Telefon / E-Mail für Rückfragen (optional): __________________________________________________\n\nHinweis zur Beifügung: Diese unterzeichnete Erklärung ist allen Anträgen, Widersprüchen und Schriftsätzen an den UV-Träger sowie an die DVUA/DGUV als Anlage 1 (Bevollmächtigung, Abtretung, Zahlungsanweisung, Stundungsvereinbarung, Schweigepflichtentbindung) beizufügen; alle Eingaben erfolgen im Namen der versicherten Person."
+   "text": "Telefon / E-Mail für Rückfragen (optional): __________________________________________________\n\nHinweis zur Beifügung: Diese unterzeichnete Erklärung ist allen Anträgen, Widersprüchen und Schriftsätzen an den UV-Träger sowie an die DVUA/DGUV als Anlage 1 (Bevollmächtigung, Abtretung, Zahlungsanweisung, Stundungsvereinbarung, Schweigepflichtentbindung) beizufügen; alle Eingaben erfolgen im Namen der versicherten Person.\n\nRegeneration Clinic SIA · Vorlage 03 · Patientenerklärung Deutschland BG/UV · Version 5 · Stand 10/2026",
+   "bezeichnung": "Text"
   },
   {
-   "id": "fusszeile",
+   "id": "b41",
    "typ": "fusszeile",
    "bezeichnung": "Fußzeile",
-   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}} · {{Absender.E-Mail}}\nRegeneration Clinic SIA · Vorlage 03 · Patientenerklärung Deutschland BG/UV · Version 5 · Stand 10/2026",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
    "rechts": "{Seite}/{Seiten}"
   }
- ],
- "quelle": "03_Patientenerklaerung_BG_UV_DE_V5.docx"
+ ]
 }

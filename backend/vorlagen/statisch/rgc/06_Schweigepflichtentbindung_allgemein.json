@@ -1,0 +1,272 @@
+{
+ "quelle": "06_Schweigepflichtentbindung_allgemein",
+ "name": "Schweigepflichtentbindung RGC (Versicherungen)",
+ "gruppe": "formulare",
+ "beschreibung": "Datenschutzfreigabe · Kommunikationsfreigabe · ergänzende Verfahrensvollmacht",
+ "datei": "06_Schweigepflichtentbindung_allgemein_V6.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": false,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Erklärung zur Entbindung von der ärztlichen Schweigepflicht",
+   "zusatz": "Datenschutzfreigabe · Kommunikationsfreigabe · ergänzende Verfahrensvollmacht · Anlage zur Patienten- bzw. Abtretungserklärung (Vorlagen 01–05, 09, 10)"
+  },
+  {
+   "id": "b3",
+   "typ": "text",
+   "bezeichnung": "Stand der Vorlage",
+   "text": "Vorlage 06 · Version 6 · Stand 10/2026",
+   "optionen": {
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "text": "Regeneration Clinic SIA · Jāņa Asara iela 3 · LV-1009 Rīga · Lettland · Postanschrift: Gertrudes iela 53-7 · LV-1011 Rīga\n\nIn Lettland zugelassene Ārstniecības iestāde · Health Institution Code 001000289 · Reg.-Nr. 40203593175 · info@regeneration-clinic.eu · +371 28717452\n\nVertretungsberechtigt: Prof. Dr. Markus Masin, Director\n\nSind an dem Behandlungsfall Kooperationskliniken beteiligt (z. B. AIWA Clinic, Rīga), gilt diese Erklärung auch für deren ärztliches und sonstiges medizinisches Personal.",
+   "bezeichnung": "Leistungserbringerin",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient/in und Bezugsdokument",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Patient/in – Versicherte/r (Name, Vorname)",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Anschrift",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Versicherung(en) / Leistungsträger",
+     "wert": "{{Patient.Versicherung}}"
+    },
+    {
+     "label": "Versicherungs-Nr.",
+     "wert": "{{Patient.Versichertennummer}}"
+    },
+    {
+     "label": "Bezug: Patienten-/Abtretungserklärung vom",
+     "wert": "____________________"
+    },
+    {
+     "label": "Behandlungsfall ab (Aufnahmedatum)",
+     "wert": "____________________"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": "Damit die Regeneration Clinic SIA Behandlungsdaten an Versicherungen und die weiteren nachstehend benannten Stellen weitergeben darf – etwa zur Klärung der Erstattungsfähigkeit oder zur Direktabrechnung –, bedarf es der ausdrücklichen Entbindung von der ärztlichen Verschwiegenheitspflicht. Mit der Unterschrift schafft der/die Patient/in die Grundlage dafür, dass die Erstattung wirksam und ohne vermeidbare Rückfragen durchgesetzt werden kann.\n\nPauschale, unbegrenzte Schweigepflichtentbindungen (Generalermächtigungen) sind unzulässig; dem Betroffenen muss die Möglichkeit informationellen Selbstschutzes verbleiben (BVerfG, Beschluss vom 23.10.2006 – 1 BvR 2027/02). Die nachstehende Erklärung ist deshalb nach Adressaten, Zwecken und Datenumfang konkret bestimmt; über die Kommunikationswege behält der/die Patient/in durch ein jederzeitiges Widerspruchsrecht die Steuerung.",
+   "bezeichnung": "1. Vorbemerkung und rechtliche Notwendigkeit",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "Die Regeneration Clinic SIA ist eine in der Republik Lettland zugelassene Ārstniecības iestāde (Health Institution Code 001000289). Auf das Behandlungsverhältnis, die ärztliche Verschwiegenheit und diese Erklärung findet daher lettisches Recht Anwendung, insbesondere der Pacientu tiesību likums (Patientenrechtegesetz; Vertraulichkeit und Schutz der Patientendaten, 10. pants) und der Ārstniecības likums (Gesetz über die medizinische Behandlung).\n\nFür die Verarbeitung personenbezogener Daten gilt die unmittelbar anwendbare Datenschutz-Grundverordnung (VDAR/DSGVO) in Verbindung mit dem lettischen Fizisko personu datu apstrādes likums. Die Verweise auf deutsche und österreichische Vorschriften betreffen ausschließlich die dort ansässigen Leistungsträger, Versicherer und Gerichte, gegenüber denen Ansprüche geltend gemacht werden; sie ändern nichts an der Maßgeblichkeit lettischen Rechts für die Klinik und ihr Personal.",
+   "bezeichnung": "2. Anwendbares Recht",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "Ich entbinde hiermit die Regeneration Clinic SIA sowie deren ärztliches und nichtärztliches Personal – einschließlich des ärztlichen Personals etwaiger am Behandlungsfall beteiligter Kooperationskliniken – von der Vertraulichkeits- und Verschwiegenheitspflicht nach lettischem Recht (Pacientu tiesību likums, Ārstniecības likums). Soweit deutsche oder österreichische Behandler einbezogen sind, gilt die Entbindung ergänzend von der ärztlichen Schweigepflicht nach § 203 StGB und § 9 MBO-Ä (Deutschland) bzw. § 54 ÄrzteG 1998 (Österreich).",
+   "bezeichnung": "3. Entbindung von der Verschwiegenheits- und Schweigepflicht",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "text",
+   "text": "Die Entbindung gilt nur gegenüber den nachstehend angekreuzten Empfängergruppen – und auch dort nur, soweit die Stelle für den Behandlungsfall zuständig oder in ihn einbezogen ist. Nicht angekreuzte Gruppen erhalten keine Daten. Die Klinik kreuzt die für das gewählte Abrechnungsmodell erforderlichen Gruppen vor; der/die Patient/in kann jede Gruppe streichen.",
+   "bezeichnung": "3.1 Adressaten der Entbindung (Auswahl durch den/die Patient/in)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b10",
+   "typ": "text",
+   "text": "☐ Kostenträger des Behandlungsfalls (eine Gruppe): ☐ gesetzliche Krankenkasse einschließlich Medizinischer Dienst ☐ privater Krankenversicherer einschließlich ärztlicher Dienste und Rechnungsprüfung ☐ Unfallversicherungsträger und DVUA/DGUV ☐ österreichischer Krankenversicherungsträger einschließlich chef- und kontrollärztlichem Dienst\n☐ Stationäre Zusatzversicherung einschließlich ärztlicher Dienste und Rechnungsprüfung\n☐ Beihilfestelle, sofern Beihilfeberechtigung besteht\n☐ Nationale Kontaktstellen für die grenzüberschreitende Gesundheitsversorgung\n☐ Vor-, Mit- und Nachbehandler, Radiologien, Labore, soweit in den Behandlungsfall einbezogen\n☐ Rechtsabteilung der Klinik sowie ein von der Klinik mandatierter Rechtsanwalt (Vorlage 12) und dessen Kanzleimitarbeiter\n☐ Gerichte, soweit Ansprüche gerichtlich geltend gemacht werden\n☐ Auftragsverarbeiter der Klinik (Übersetzungs- und IT-Dienstleister, Art. 28 DSGVO) – nur technische Verarbeitung ohne eigene Nutzung",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b11",
+   "typ": "text",
+   "text": "– Klärung des Versicherungsfalls und der Erstattungsfähigkeit der Behandlung einschließlich Vorabgenehmigung und Vorabauskunft;\n– Geltendmachung und Durchsetzung von Erstattungs-, Kostenübernahme- und Tagegeldansprüchen;\n– Beantwortung medizinischer Rückfragen der Leistungsträger und ihrer ärztlichen Dienste;\n– außergerichtliche und gerichtliche Vertretung im Erstattungsverfahren;\n– Plausibilisierung der Abrechnung gegenüber Rechnungsprüfdiensten;\n– Behandlungskoordination mit Vor-, Mit- und Nachbehandlern.",
+   "bezeichnung": "3.2 Zwecke der Entbindung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b12",
+   "typ": "text",
+   "text": "Die Entbindung erstreckt sich auf folgende Datenarten, soweit sie für die unter Ziffer 3.2 genannten Zwecke erforderlich sind:\n– Diagnose-, Befund- und Verlaufsdaten zum konkreten Behandlungsfall;\n– Operations- und Eingriffsprotokolle, Anästhesieprotokolle;\n– bildgebende Diagnostik (MRT, CT, Röntgen, Sonographie) und Befundberichte;\n– Anamnese-, Untersuchungs- und Aufklärungsdokumentation;\n– Rechnungen, Kostenvoranschläge, Leistungsverzeichnisse und ICD-10-/OPS-Kodierung;\n– Korrespondenz mit Vor- und Mitbehandlern, soweit für die Erstattungsentscheidung relevant.\nBegrenzung und Datenminimierung: Die Entbindung umfasst nicht die Offenbarung anderer Behandlungsverhältnisse, früherer Erkrankungen oder Befunde, die für die Erstattungsentscheidung im vorliegenden Behandlungsfall nicht unmittelbar erheblich sind, es sei denn, der/die Patient/in willigt im Einzelfall gesondert ein. Die Klinik übermittelt an jeden Empfänger nur diejenigen Unterlagen, die dieser für das konkrete Verfahren benötigt (Art. 5 Abs. 1 lit. c DSGVO); vollständige OP- und Anästhesieprotokolle werden nur auf begründete Anforderung des ärztlichen Dienstes übermittelt, Rechnungsprüfdienste erhalten keine über Diagnose, Leistung und Aufenthalt hinausgehenden Befunde.",
+   "bezeichnung": "3.3 Umfang der freigegebenen Daten",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b13",
+   "typ": "text",
+   "text": "Zwei Ebenen: Die Entbindung von der Schweigepflicht (Ziffer 3) hebt das berufsrechtliche und strafrechtliche Offenbarungsverbot auf; sie ist keine datenschutzrechtliche Einwilligung. Die Zulässigkeit der Datenverarbeitung richtet sich gesondert nach der DSGVO; die hierfür maßgebliche Information nach Art. 13 DSGVO enthält die in Bezug genommene Patientenerklärung. Nur soweit eine Verarbeitung weder vertraglich noch gesetzlich geboten ist, beruht sie auf der freiwilligen Einwilligung nach Ziffer 5.\n\nDie Verarbeitung und Übermittlung der Gesundheitsdaten zu den unter Ziffer 3.2 genannten Zwecken beruht auf Art. 9 Abs. 2 lit. h und f sowie Art. 6 Abs. 1 lit. b, c und f VDAR/DSGVO (medizinische Versorgung, Erfüllung rechtlicher Pflichten, Geltendmachung und Verteidigung von Rechtsansprüchen). Ergänzend und hilfsweise erkläre ich meine Einwilligung nach Art. 9 Abs. 2 lit. a VDAR/DSGVO. Der Schutz der Patientendaten richtet sich daneben nach dem Fizisko personu datu apstrādes likums. Die Datenschutzinformation nach Art. 13 DSGVO ist Bestandteil der in Bezug genommenen Patientenerklärung.",
+   "bezeichnung": "4. Datenschutzrechtliche Grundlage – Abgrenzung zur Schweigepflichtentbindung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b14",
+   "typ": "text",
+   "text": "Standard (keine Einwilligung erforderlich). Die Regeneration Clinic SIA kommuniziert mit den unter Ziffer 3.1 freigegebenen Empfängern und mit dem/der Patient/in über die nachstehenden sicheren Wege; Grundlage sind der Behandlungs- bzw. Abtretungsvertrag und die Geltendmachung von Rechtsansprüchen (Art. 6 Abs. 1 lit. b und f, Art. 9 Abs. 2 lit. f und h, Art. 32 VDAR/DSGVO):\n– postalische Übermittlung (Brief, Einschreiben);\n– E-Mail mit Transportverschlüsselung (TLS) und kennwortgeschützten Anhängen bei Gesundheitsdaten;\n– sichere elektronische Fachdienste (KIM, beA, verschlüsseltes Patientenportal, PACS-Upload) und verschlüsselte Datenräume / kennwortgeschützte Downloadlinks;\n– telefonische Auskunft an den/die Patient/in nach Identitätsprüfung.\nZusätzliche Wege (nur mit ausdrücklicher, freiwilliger Zustimmung – Opt-in). Die folgenden Wege nutzt die Klinik nur, wenn sie hier angekreuzt sind. Die Zustimmung ist freiwillig, keine Voraussetzung für Behandlung oder Abrechnung und jederzeit formlos widerruflich (Art. 7 Abs. 3 DSGVO):",
+   "bezeichnung": "5. Kommunikationswege – sicherer Standard und freiwillige Zusatzfreigabe",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b15",
+   "typ": "text",
+   "text": "☐ E-Mail ohne Verschlüsselung (auch für Gesundheitsdaten)\n☐ Telefax (unverschlüsselt)\n☐ Kurznachricht / Messenger – nur Ende-zu-Ende-verschlüsselte Dienste (z. B. Signal); keine Befunde über WhatsApp\n☐ Telefonische Auskunft an von mir benannte Bezugspersonen: ______________________________",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b16",
+   "typ": "text",
+   "text": "Hinweis: Bei unverschlüsselter Übermittlung verbleibt ein technisch bedingtes Restrisiko der Kenntnisnahme durch Dritte. Die Klinik bietet stets den sicheren Standardweg an; für den Übertragungsweg als solchen haftet sie bei zugestimmter unverschlüsselter Übermittlung nur bei Vorsatz und grober Fahrlässigkeit.",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b17",
+   "typ": "text",
+   "text": "______________________________________________________________________\nDiese Regelung ist – ebenso wie die Entbindung von der Verschwiegenheitspflicht – jederzeit mit Wirkung für die Zukunft widerruflich (Ziffer 7). Auswahl der Empfänger, sicherer Standardweg und Opt-in für zusätzliche Wege wahren den Gedanken des informationellen Selbstschutzes (BVerfG, Beschluss vom 23.10.2006 – 1 BvR 2027/02).",
+   "bezeichnung": "Darüber hinaus ausdrücklich ausgeschlossene Kommunikationswege oder Empfänger:",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b18",
+   "typ": "text",
+   "text": "Soweit nicht bereits in der in Bezug genommenen Patienten-/Abtretungserklärung enthalten, bevollmächtige ich die Regeneration Clinic SIA, vertreten durch ihren Director Prof. Dr. Markus Masin,\n– alle für Abrechnung oder rechtliche Durchsetzung relevanten Unterlagen (Arztberichte, OP-Protokolle, Rechnungen, Kostenvoranschläge, Korrespondenz) über die freigegebenen Kommunikationswege an die Leistungsträger oder deren beauftragte Stellen zu übermitteln, dort zu erörtern und Rückfragen zu beantworten;\n– im eigenen Namen aufgrund der Abtretung oder in meinem Namen aufgrund Vollmacht zu handeln;\n– im Bedarfsfall einen Rechtsanwalt ihrer Wahl in meinem Namen mit der außergerichtlichen und gerichtlichen Geltendmachung zu beauftragen; sämtliche Anwaltskosten trägt die Klinik im eigenen wirtschaftlichen Interesse, eine Honorarbelastung des Patienten ist ausgeschlossen.",
+   "bezeichnung": "6. Ergänzende Verfahrensvollmacht",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b19",
+   "typ": "text",
+   "text": "Geltungsdauer. Diese Erklärung gilt bis zum vollständigen Abschluss aller Erstattungs-, Klage-, Vollstreckungs- und Folgeverfahren, die mit dem oben bezeichneten Behandlungsfall zusammenhängen.\n\nWiderruf. Die Entbindung von der Verschwiegenheitspflicht, die datenschutzrechtliche Einwilligung und die Regelung zu den Kommunikationswegen können jederzeit – ganz oder in Bezug auf einzelne Wege oder Empfänger – formlos (mündlich, telefonisch, per E-Mail oder schriftlich) gegenüber der Regeneration Clinic SIA mit Wirkung für die Zukunft widerrufen werden; die Klinik bestätigt den Widerruf in Textform. Bereits übermittelte Daten und auf der bisherigen Erklärung beruhende Handlungen bleiben unberührt. Mir ist bekannt, dass ein Widerruf die Direktabrechnung und die weitere Verfahrensführung durch die Klinik unmöglich machen kann.\n\nFortgeltung nach dem Tod. Die Verschwiegenheitspflicht wirkt über den Tod hinaus fort. Soweit gesetzlich zulässig, gilt diese Entbindung für bereits anhängige Abrechnungs- und Erstattungsverfahren fort, sofern keine entgegenstehenden Erklärungen der Erben oder Rechtsnachfolger vorliegen.",
+   "bezeichnung": "7. Geltung, Widerruf und Reichweite",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b20",
+   "typ": "text",
+   "text": "– Lettisches Recht (maßgeblich): Pacientu tiesību likums (Vertraulichkeit, Schutz der Patientendaten – 10. pants); Ārstniecības likums (ärztliche Verschwiegenheit); Fizisko personu datu apstrādes likums.\n– Unionsrecht: VDAR/DSGVO – Art. 6 Abs. 1 lit. b, c, f; Art. 9 Abs. 2 lit. a, f, h; Art. 13; Art. 28; Art. 32.\n– Ergänzend gegenüber deutschen und österreichischen Leistungsträgern bzw. Behandlern: § 203 StGB, § 9 MBO-Ä, §§ 630a ff. BGB, § 398 BGB, § 213 VVG (DE); § 54 ÄrzteG 1998, § 121 StGB (AT).\n– Rechtsprechung: BVerfG, Beschluss vom 23.10.2006 – 1 BvR 2027/02 (Bestimmtheit von Schweigepflichtentbindungen); BGH, Urteil vom 10.07.1991 – VIII ZR 296/90 (Abtretung ärztlicher Honorarforderungen nur mit Einwilligung).",
+   "bezeichnung": "8. Rechtsgrundlagen im Überblick",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b21",
+   "typ": "text",
+   "text": "☐ Ich habe diese Erklärung gelesen und verstanden; ich weiß, dass ich einzelne Empfänger oder Kommunikationswege ausschließen und die Erklärung jederzeit formlos widerrufen kann; die von mir freigegebenen Empfängergruppen und Kommunikationswege habe ich selbst angekreuzt bzw. geprüft.\n☐ Ich habe ein Exemplar dieser Erklärung erhalten.",
+   "bezeichnung": "Erklärung und Unterschriften",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b22",
+   "typ": "text",
+   "text": "Bei gesetzlicher Vertretung (Eltern, Betreuer/in bzw. Erwachsenenvertreter/in – Vollmacht oder Bestellungsurkunde beifügen) ist die zweite Zeile auszufüllen.",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b23",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Ort, Datum",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b24",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift Patient/in – Versicherte/r (vollständig lesbar)",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b25",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Name der gesetzlich vertretungsberechtigten Person",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b26",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift der gesetzlich vertretungsberechtigten Person",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b27",
+   "typ": "text",
+   "text": "Hinweis: Diese Erklärung ist allen Antrags-, Schrift- und Klageunterlagen gegenüber den unter Ziffer 3.1 benannten Adressaten als Anlage beizufügen. Sie ergänzt und konkretisiert die Schweigepflichtentbindung in der in Bezug genommenen Patienten-/Abtretungserklärung.\n\nRegeneration Clinic SIA · Vorlage 06 · Schweigepflichtentbindung allgemein · Version 6 · Stand 10/2026",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b28",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

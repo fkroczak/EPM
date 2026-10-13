@@ -1,0 +1,472 @@
+{
+ "quelle": "01_Patientenerklaerung_AT_OEGK_Stundung",
+ "name": "Patientenerklärung Österreich (Stundung)",
+ "gruppe": "formulare",
+ "beschreibung": "Krankenversicherungsträger ÖGK · SVS · BVAEB · KFA · Behandlung in Lettland (EU)",
+ "datei": "01_Patientenerklaerung_AT_OEGK_Stundung_V6.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": false,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Patientenerklärung bei Aufnahme (Österreich)"
+  },
+  {
+   "id": "b3",
+   "typ": "text",
+   "bezeichnung": "Stand der Vorlage",
+   "text": "Krankenversicherungsträger ÖGK · SVS · BVAEB · KFA · Behandlung in Lettland (EU)\nStundung des erwarteten Kassenanteils · Inkassozession · Zahlungsanweisung · Vollmachten · Schweigepflichtentbindung · Datenschutz\nVorlage 01 · Version 6 · Stand 10/2026 · Anlagen: K (Vorlage 11), Anwaltsvollmacht (Vorlage 12), Schweigepflichtentbindung (Vorlage 06)",
+   "optionen": {
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "text": "Regeneration Clinic SIA · Jāņa Asara iela 3 · LV-1009 Rīga · Lettland · Postanschrift: Gertrudes iela 53-7 · LV-1011 Rīga\n\nIn Lettland zugelassene Ārstniecības iestāde · Health Institution Code 001000289 · Reg.-Nr. 40203593175 · info@regeneration-clinic.eu · +371 28717452\n\nVertretungsberechtigt: Prof. Dr. Markus Masin, Director",
+   "bezeichnung": "Leistungserbringerin",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "text": "Eine Behandlung im EU-Ausland soll Sie nicht mit einer Vorfinanzierung belasten. Die Regeneration Clinic SIA trägt daher das Vorfinanzierungsrisiko für denjenigen Teil der Behandlungskosten, dessen Erstattung wir bei Ihrem österreichischen Krankenversicherungsträger beantragen.\n\nKonkret bedeutet das:\n– Der erwartete Erstattungsanteil wird gestundet, bis Ihr Versicherungsträger entschieden hat (Ziffer 12).\n– Wir führen das Erstattungsverfahren für Sie und in Ihrem Namen; sämtliche Anwalts- und Verfahrenskosten trägt die Klinik (Ziffer 4.2).\n– Zahlt der Träger unmittelbar an Sie, leiten Sie den Betrag bis zur Höhe der offenen Forderung an uns weiter (Ziffer 10).\n– Eigenanteile bleiben Ihre vertragliche Zahlungspflicht: Die gesetzliche Kostenerstattung ist auf 80 % des österreichischen Vertragspartnertarifs begrenzt (§ 131 Abs. 1 ASVG); die Differenz zum Behandlungshonorar sowie nicht erstattungsfähige Komfort- und Zusatzleistungen tragen Sie selbst. Über die voraussichtliche Höhe informieren wir Sie vor Behandlungsbeginn schriftlich in der Anlage K.\n– Sollte der Träger nicht oder nur teilweise erstatten, lassen wir Sie damit nicht allein: Der nicht gedeckte Betrag wird dann fällig – höchstens in der in der Anlage K bezifferten Höhe – und wir bieten Ihnen eine Ratenvereinbarung an.\nDie genaue Aufteilung – was die Kasse voraussichtlich zahlt, was Sie selbst zahlen und was gestundet wird – finden Sie in der Anlage K, die Sie vor der Unterschrift erhalten.",
+   "bezeichnung": "Unser Versprechen an Sie: Sie zahlen den erwarteten Kassenanteil nicht vorab",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "bezeichnung": "Was die Stundung für Sie bedeutet",
+   "text": "Was die Stundung für Sie bedeutet",
+   "optionen": {
+    "fett": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "datenfelder",
+   "bezeichnung": "Patientendaten und Versicherung",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Anschrift (Österreich)",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Krankenversicherungsträger",
+     "wert": "☐ ÖGK (Landesstelle: ____________) ☐ SVS ☐ BVAEB ☐ KFA ____________"
+    },
+    {
+     "label": "Versicherungsnummer (SV-Nr.)",
+     "wert": "{{Patient.Versichertennummer}}"
+    },
+    {
+     "label": "Aufnahmedatum / Beginn der Behandlung in der EU",
+     "wert": "____________________"
+    },
+    {
+     "label": "Geplante Versorgungsform",
+     "wert": "☐ ambulant ☐ tagesklinisch (ohne Übernachtung) ☐ stationär (mindestens eine Übernachtung)"
+    },
+    {
+     "label": "Vorabgenehmigung (§ 7b Abs. 4 SV-EG)",
+     "wert": "☐ beantragt am: __________ ☐ erteilt am: __________ ☐ nicht erforderlich"
+    },
+    {
+     "label": "Kooperations-/Infrastrukturpartner (falls eingesetzt)",
+     "wert": "____________________"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "Erstattungsschienen. Je nach Behandlungsart kommt die allgemeine Kostenerstattung nach § 131 ASVG oder die besondere Kostenerstattung nach § 7b SV-EG in Betracht. Die Klinik prüft die rechtlich verfügbaren Erstattungswege und stimmt den geeigneten Weg mit Ihnen ab; welcher Weg eröffnet ist, entscheidet der Versicherungsträger.\n\nVorabgenehmigung. Für Krankenhausbehandlungen mit mindestens einer Übernachtung und für bestimmte hochspezialisierte Leistungen sieht § 7b Abs. 4 SV-EG eine Vorabgenehmigung vor. Wir stellen den Antrag rechtzeitig und vorsorglich für Sie. Ein Antrag garantiert keine Genehmigung; elektive genehmigungspflichtige Eingriffe beginnen deshalb grundsätzlich erst, wenn die Entscheidung vorliegt (Ziffer 6).\n\nZustimmungserfordernis. Die Übertragung Ihres Erstattungsanspruchs auf die Klinik bedarf nach § 98 Abs. 2 ASVG der Zustimmung Ihres Versicherungsträgers. Diese beantragen wir mit dieser Erklärung. Wird sie nicht erteilt, greift die Auffangregelung in Ziffer 3.4; für Sie ändert sich praktisch nichts.",
+   "bezeichnung": "Drei Besonderheiten des österreichischen Rechts – und warum sie für Sie unproblematisch sind",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "text",
+   "text": "Erfasst sind alle medizinisch notwendigen ambulanten, tagesklinischen, stationsersetzenden und – soweit medizinisch erforderlich und gesondert dokumentiert – stationären Leistungen der Regeneration Clinic SIA in Lettland einschließlich Diagnostik (z. B. MRT, CT, Labor, Elektrophysiologie), Telemedizin und Nachsorge, soweit sie mit diesem Behandlungsfall in ursächlichem Zusammenhang stehen.\n\nWerden Kooperations- oder Infrastrukturpartner eingesetzt (z. B. AIWA Clinic, Rīga: OP-Saal, stationäre Infrastruktur, Pflege, Unterbringung), verbleiben medizinische Verantwortung, Indikationsstellung, Dokumentation und Abrechnung bei der Regeneration Clinic SIA.",
+   "bezeichnung": "Behandlungsrahmen",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b10",
+   "typ": "text",
+   "text": "Das österreichische Sachleistungssystem wird im Inland durch Vertragspartner und Vertragseinrichtungen der Versicherungsträger erfüllt (§§ 131, 150 ASVG). Die Regeneration Clinic SIA ist in dieses Vertragsnetz nicht eingebunden. Für die grenzüberschreitende Versorgung im EU-/EWR-Raum bestehen zwei Erstattungsschienen:\n– Schiene 1 – Allgemeine Kostenerstattung nach § 131 ASVG (in Verbindung mit Art. 7 RL 2011/24/EU): Erstattung von 80 % des Betrages, der bei Inanspruchnahme eines entsprechenden Vertragspartners im Inland aufzuwenden gewesen wäre, ohne Vorabgenehmigung. Der OGH hat diese 80 %-Regel als unionsrechtskonform bestätigt (OGH 26.02.2021, 10 ObS 142/20k).\n– Schiene 2 – Besondere Kostenerstattung nach § 7b Abs. 6 SV-EG: Erstattung bis zur Höhe der Kosten, die im Inland entstanden wären, in den Fällen des § 7b Abs. 4 SV-EG (Krankenhausbehandlung mit mindestens einer Übernachtung, aufwändige Behandlungen) – mit Vorabgenehmigung. Eine Vorabgenehmigung darf nicht verweigert werden, wenn die Behandlung im Inland nicht innerhalb eines medizinisch vertretbaren Zeitraums erbracht werden kann (Art. 8 Abs. 5 RL 2011/24/EU; OGH 28.07.2020, 10 ObS 43/20a).\nDie Erstattung ist stets durch die tatsächlich entstandenen Kosten begrenzt. Ergänzend kann bei Krankenhausbehandlung das Sachleistungsverfahren nach Art. 20 VO (EG) 883/2004 (Formular S2) beantragt werden.",
+   "bezeichnung": "1. Rechtlicher Rahmen (Österreich / EU)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b11",
+   "typ": "text",
+   "text": "Ich weise den oben benannten Krankenversicherungsträger an, jeden Erstattungsbetrag aus diesem Behandlungsfall mit schuldbefreiender Wirkung unmittelbar an die Regeneration Clinic SIA zu leisten, soweit dies sozialversicherungsrechtlich zulässig ist. Ein Anerkenntnis des Trägers über die Erstattungspflicht hinaus ist damit nicht verbunden.\n\nIBAN: LV51HABA0551058193764 · BIC/SWIFT: HABALV22 · Empfängerin: Regeneration Clinic SIA, Jāņa Asara iela 3, LV-1009 Rīga\n\nVerwendungszweck: Kostenerstattung § 131 ASVG bzw. § 7b SV-EG – Behandlungsfall ab [Aufnahmedatum], Versicherte/r [Name, SV-Nr.]\n\nDie Rechnungslegung erfolgt in deutscher Sprache, medizinisch nachvollziehbar, mit Diagnose-, Leistungs-, Verlaufs- und Befunddokumentation, ICD-10-Kodierung sowie – soweit sachgerecht – einer LKF- bzw. honorarordnungsanalogen Leistungszuordnung zur Plausibilisierung der Erstattung.",
+   "bezeichnung": "2. Zahlungsanweisung (Direktzahlung an die Klinik)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b12",
+   "typ": "text",
+   "text": "Dogmatische Grundlage: Eine gewillkürte Prozessstandschaft ist dem österreichischen Recht fremd. Die Übertragung erfolgt daher als Inkassozession nach §§ 1392 ff. ABGB: Die Zessionarin wird Gläubigerin, ist aber verpflichtet, eingehobene Beträge nach Abzug der Klinikforderung an den Zedenten abzuführen.",
+   "bezeichnung": "3. Inkassozession (echte Abtretung mit Inkassocharakter)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b13",
+   "typ": "text",
+   "text": "Ich, der/die unterzeichnende Versicherte (Zedent/in), trete hiermit inkassoweise meine Geld-Erstattungsansprüche gegen den oben benannten Krankenversicherungsträger aus sämtlichen Leistungen dieses Behandlungsfalls (ab Aufnahmedatum) – einschließlich der unmittelbar zusammenhängenden vor- und nachstationären Maßnahmen, der Diagnostik, der Aufenthalte in Kooperations- oder Infrastrukturkliniken und der Telemedizin – in Höhe der jeweiligen Rechnungsforderungen an die Regeneration Clinic SIA (Zessionarin) ab, soweit und sobald diese Ansprüche nach österreichischem Recht entstehen und rechtswirksam übertragbar sind. Die Zessionarin nimmt die Abtretung an.\n\nAusdrücklich ausgenommen sind nicht auf Geldleistungen gerichtete Ansprüche und Anwartschaften; diese sind nach § 98 Abs. 3 ASVG unübertragbar.",
+   "bezeichnung": "3.1 Erklärung der Inkassozession",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b14",
+   "typ": "text",
+   "text": "Die Regeneration Clinic SIA führt eingehobene Beträge, soweit sie die offene Rechnungsforderung übersteigen, binnen 14 Tagen nach Zuordnung des Zahlungseingangs an den/die Versicherte/n ab und legt über die Verrechnung auf Verlangen jederzeit Rechnung.",
+   "bezeichnung": "3.2 Abführungspflicht und Rechnungslegung der Zessionarin",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b15",
+   "typ": "text",
+   "text": "Ich beantrage beim oben benannten Krankenversicherungsträger ausdrücklich die Zustimmung zur Übertragung meiner Geld-Erstattungsansprüche an die Regeneration Clinic SIA nach Maßgabe der Ziffer 3.1. Die Übertragung liegt in meinem Interesse (§ 98 Abs. 2 ASVG): Sie erspart mir die Vorfinanzierung der Behandlung, vermeidet eine Kreditaufnahme und vereinfacht die Abwicklung.",
+   "bezeichnung": "3.3 Antrag auf Zustimmung gemäß § 98 Abs. 2 ASVG",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b16",
+   "typ": "text",
+   "text": "Erteilt der Krankenversicherungsträger die Zustimmung nach § 98 Abs. 2 ASVG nicht, gilt anstelle der Inkassozession die Zahlungsanweisung nach Ziffer 2 in Verbindung mit der Vollmacht nach Ziffer 4 (Geltendmachung im Namen des/der Versicherten durch die Klinik bzw. den von ihr mandatierten Rechtsanwalt) sowie der Weiterleitungspflicht nach Ziffer 10. Der/die Versicherte bleibt in diesem Fall materiell anspruchsberechtigt; die Direktzahlung an die Klinik erfolgt im Wege der Anweisung.",
+   "bezeichnung": "3.4 Auffangregelung bei Versagung der Zustimmung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b17",
+   "typ": "text",
+   "text": "Mir ist bekannt, dass der Versicherungsträger für die Kostenerstattung regelmäßig eine saldierte (bezahlte) Honorarnote verlangt. Die Klinik stellt die Honorarnote über die erbrachten Leistungen aus; die Stundung nach Ziffer 12 lässt Bestand und Fälligkeit meiner Zahlungsverbindlichkeit dem Grunde nach unberührt und verschiebt lediglich den Zahlungszeitpunkt. Besteht der Träger auf dem Nachweis der Bezahlung, werden wir einvernehmlich auf das Direktzahlungsmodell mit Rückerstattungszusage (Vergütungs- und Rückerstattungsvereinbarung der Klinik, Vorlage 09) übergehen. Der Übergang erfolgt durch schriftliche Ergänzungsvereinbarung binnen 14 Tagen nach Mitteilung des Trägers; die Zahlung des Honorars wird dann mit einer Frist von 30 Tagen fällig, Ziffer 12 bleibt bis dahin anwendbar, und die Klinik führt das Erstattungsverfahren nach Vorlage 09 ohne gesondertes Entgelt weiter.",
+   "bezeichnung": "3.5 Nachweis der Kostentragung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b18",
+   "typ": "text",
+   "text": "Instrument — Wirkung — Voraussetzung / Grenze\nInkassozession (Ziffer 3.1) — Klinik wird Gläubigerin des Erstattungsanspruchs; Abführungspflicht für Überschüsse — Zustimmung des Trägers nach § 98 Abs. 2 ASVG (Antrag Ziffer 3.3); ohne Zustimmung unwirksam\nZahlungsanweisung (Ziffer 2) — Träger darf mit schuldbefreiender Wirkung an die Klinik zahlen — Keine Zahlungspflicht des Trägers gegenüber der Klinik; wirkt nur, wenn der Träger ihr folgt\nVerfahrensvollmacht (Ziffer 4.1) — Klinik handelt administrativ im Namen des Versicherten — Keine eigene Gläubigerstellung; rechtliche Vertretung nur durch Rechtsanwalt (Ziffer 4.2)\nWeiterleitungspflicht (Ziffer 10) — Patient gibt direkt erhaltene Erstattungen an die Klinik weiter — Schuldrechtliche Pflicht des Patienten; tragende Sicherung bei Versagung der Zustimmung",
+   "bezeichnung": "Rechtsstellung der Klinik im Überblick",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b19",
+   "typ": "text",
+   "text": "Die Zahlungsanweisung verpflichtet den Träger bzw. Versicherer nicht zur Zahlung an die Klinik; sie erlaubt ihm lediglich, mit schuldbefreiender Wirkung an die Klinik zu leisten. Eine Einziehungsermächtigung oder Empfangsvollmacht verschafft der Klinik keine eigene Gläubigerstellung. Die Weiterleitungspflicht des Patienten bleibt daher in allen Konstellationen die tragende Sicherung.",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b20",
+   "typ": "text",
+   "text": "Vorbemerkung: Das Verfahren in Sozialrechtssachen folgt dem Grundsatz der sukzessiven Kompetenz (§ 65 ASGG). Über den Erstattungsanspruch entscheidet zunächst der Versicherungsträger mit Bescheid; gegen den Bescheid ist binnen vier Wochen ab Zustellung Klage beim Arbeits- und Sozialgericht zu erheben (§ 67 Abs. 2 ASGG). Bleibt der Träger in Angelegenheiten der Krankenversicherung länger als drei Monate säumig, ist die Säumnisklage möglich (§ 67 Abs. 1 Z 2 ASGG). Ein Widerspruchsverfahren wie im deutschen Recht gibt es nicht.",
+   "bezeichnung": "4. Vollmacht zur Geltendmachung im Verwaltungs- und Gerichtsverfahren",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b21",
+   "typ": "text",
+   "text": "Ich bevollmächtige die Regeneration Clinic SIA, vertreten durch ihren Director Prof. Dr. Markus Masin, die Erstattungsangelegenheit dieses Behandlungsfalls gegenüber dem Krankenversicherungsträger, dem chef- und kontrollärztlichen Dienst und der nationalen Kontaktstelle für grenzüberschreitende Gesundheitsversorgung administrativ in meinem Namen abzuwickeln (§ 10 AVG). Die Vollmacht umfasst:\n– Anträge auf Vorabgenehmigung nach § 7b Abs. 4 SV-EG, auf Kostenerstattung nach § 131 ASVG bzw. § 7b Abs. 6 SV-EG sowie auf Ausstellung des Formulars S2 (Art. 20 VO (EG) 883/2004);\n– Einwendungen, Stellungnahmen und Urkundenvorlagen im Verwaltungsverfahren des Trägers;\n– Akteneinsicht sowie Einholung von Auskünften, medizinischen Unterlagen und Gutachten;\n– Entgegennahme von Bescheiden und Erledigungen (Zustellvollmacht) mit Weiterleitung an mich binnen fünf Werktagen unter Hinweis auf laufende Fristen;\n– die Mandatierung eines Rechtsanwalts nach Maßgabe der Ziffer 4.2 – auf Kosten der Klinik.\nAbgrenzung zur berufsmäßigen Parteienvertretung: Die Klinik macht die ihr abgetretenen Ansprüche in eigener Angelegenheit geltend und übernimmt im Übrigen die administrative Abwicklung (Antragstellung, Zusammenstellung medizinischer Unterlagen, Akteneinsicht, Entgegennahme von Bescheiden) als Bevollmächtigte nach § 10 AVG. Die rechtliche Vertretung in Verfahren vor dem Versicherungsträger, soweit sie über die Antragstellung hinausgeht, sowie vor dem Arbeits- und Sozialgericht erfolgt ausschließlich durch einen österreichischen Rechtsanwalt aufgrund gesonderter Anwaltsvollmacht (Vorlage 12), die ich mit dieser Erklärung erteile (§ 8 RAO; § 40 ASGG).",
+   "bezeichnung": "4.1 Vollmacht für die administrative Abwicklung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b22",
+   "typ": "text",
+   "text": "Einwendungen gegen Entscheidungen des Trägers, Bescheid- und Säumnisklagen sowie jede über die Antragstellung hinausgehende rechtliche Vertretung erfolgen ausschließlich durch einen österreichischen Rechtsanwalt, den die Regeneration Clinic SIA im Bedarfsfall auswählt, mandatiert und vergütet. Hierzu erteile ich die gesonderte Anwaltsvollmacht nach Vorlage 12, die dieser Erklärung beiliegt; der Name des Rechtsanwalts wird bei Mandatierung eingetragen. Die Anwaltsvollmacht umfasst insbesondere die Vertretung\n– vor dem Krankenversicherungsträger im Verwaltungsverfahren;\n– vor dem Arbeits- und Sozialgericht (Bescheidklage binnen vier Wochen, § 67 Abs. 2 ASGG; Säumnisklage, § 67 Abs. 1 Z 2 ASGG), vor dem Oberlandesgericht und dem Obersten Gerichtshof;\n– für Antrags-, Verzichts-, Anerkenntnis-, Vergleichs- und Erledigungserklärungen;\n– für die Entgegennahme von Bescheiden, Schriftsätzen, Zustellungen und Urteilen;\n– für die Empfangnahme von Geldleistungen, Kostenersätzen und Erstattungen;\n– mit Substitutionsbefugnis (z. B. für Verhandlungstermine); Vergleich und Verzicht nur mit meiner Zustimmung in Textform.\nKosten der anwaltlichen Vertretung – keine Belastung für Sie: Die Regeneration Clinic SIA mandatiert den Rechtsanwalt im eigenen wirtschaftlichen Interesse. Sämtliche Anwaltskosten trägt die Klinik; eine Honorarbelastung des Patienten ist ausgeschlossen. Versicherte tragen im sozialgerichtlichen Verfahren ohnehin grundsätzlich kein Kostenrisiko gegenüber dem Versicherungsträger (§ 77 ASGG).",
+   "bezeichnung": "4.2 Anwaltliche Vertretung – gesonderte Anwaltsvollmacht, auf Kosten der Klinik",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b23",
+   "typ": "text",
+   "text": "Ich entbinde die behandelnden Ärztinnen und Ärzte sowie das Personal der Regeneration Clinic SIA und der eingebundenen Kooperationspartner von der Verschwiegenheitspflicht nach lettischem Recht (Pacientu tiesību likums, Ārstniecības likums) und – soweit österreichische Behandler einbezogen sind – nach § 54 ÄrzteG 1998 und § 121 StGB gegenüber dem nach Ziffer 4.2 mandatierten Rechtsanwalt und dessen Kanzleimitarbeitern, soweit dies zur Durchsetzung der Erstattungsansprüche erforderlich ist. Die gesonderte Schweigepflichtentbindung der Klinik (Vorlage 06) bleibt unberührt.",
+   "bezeichnung": "4.3 Entbindung von der ärztlichen Verschwiegenheitspflicht",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b24",
+   "typ": "text",
+   "text": "Die Vollmachten nach Ziffer 4.1 und 4.2 bleiben bis zum schriftlichen Widerruf gegenüber der Klinik bzw. dem Rechtsanwalt in Kraft. Sie gelten, soweit gesetzlich zulässig, auch nach dem Tod des/der Versicherten für bereits anhängige Abrechnungs-, Erstattungs- und Abwicklungsfragen fort, sofern keine entgegenstehenden Erklärungen der Rechtsnachfolger vorliegen.",
+   "bezeichnung": "4.4 Reichweite, Bestand und Widerruf",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b25",
+   "typ": "text",
+   "text": "– Österreichisches Sozialversicherungsrecht: §§ 98, 131, 150 ASVG sowie die Parallelbestimmungen des GSVG, BSVG und B-KUVG; § 7b SV-EG (Umsetzung der RL 2011/24/EU); §§ 65, 67, 77 ASGG.\n– EU-Koordinierungsrecht: VO (EG) 883/2004 (Art. 19, 20); VO (EG) 987/2009.\n– Patientenmobilität: RL 2011/24/EU (Art. 7, 8).\n– Primärrecht und Rechtsprechung: Art. 56 AEUV; EuGH C-158/96 (Kohll), C-120/95 (Decker); EuGH 04.09.2025, C-489/23 (Vorabgenehmigung bei Dringlichkeit); OGH 28.07.2020, 10 ObS 43/20a; OGH 26.02.2021, 10 ObS 142/20k.\n– Zession: §§ 1392 ff. ABGB (Inkassozession).",
+   "bezeichnung": "5. Rechtsgrundlagen im Überblick",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b26",
+   "typ": "text",
+   "text": "Soweit für die geplante Behandlung eine Vorabgenehmigung nach § 7b Abs. 4 SV-EG erforderlich oder zweckmäßig sein kann, stellt die Klinik vor Behandlungsbeginn einen entsprechenden Antrag beim zuständigen Träger. Die Antragstellung erfolgt vorsorglich, soweit die Genehmigungspflicht nicht eindeutig ausgeschlossen werden kann; ein Anerkenntnis der Genehmigungspflicht ist damit nicht verbunden. Elektive genehmigungspflichtige Eingriffe beginnen erst, wenn die Entscheidung des Trägers vorliegt oder ich in der Anlage K dokumentiert erklärt habe, die Behandlung vor der Entscheidung auf eigenes Erstattungsrisiko beginnen zu wollen.\n\nKann aus medizinischen Gründen eine Entscheidung über die Vorabgenehmigung nicht abgewartet werden, dokumentiert die Klinik die Dringlichkeit nachvollziehbar; der Erstattungsanspruch bleibt in diesem Fall nach der Rechtsprechung des EuGH (C-489/23) jedenfalls in Höhe des inländischen Erstattungsniveaus erhalten.",
+   "bezeichnung": "6. Vorabgenehmigung, Behandlungsbeginn und Dringlichkeit",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b27",
+   "typ": "text",
+   "text": "Ich willige ein, dass die Regeneration Clinic SIA und ein nach Ziffer 4.2 mandatierter Rechtsanwalt zur Behandlung, Abrechnung und Rechtsdurchsetzung kommunizieren und Daten austauschen dürfen mit:\n– dem zuständigen Krankenversicherungsträger (ÖGK, SVS, BVAEB, KFA) einschließlich chef- und kontrollärztlichem Dienst und Gutachterstellen sowie der nationalen Kontaktstelle für grenzüberschreitende Gesundheitsversorgung;\n– Vor- und Mitbehandlern, Radiologien, Laboren und niedergelassenen Fachärzten;\n– Kooperations- und Infrastrukturkliniken (z. B. AIWA Clinic, Rīga);\n– autorisierten Übersetzungs- und IT-Dienstleistern (z. B. PACS-, Upload-Portale);\n– Arbeits- und Sozialgerichten, Behörden und sonstigen verfahrensbeteiligten Stellen.\nKommunikationswege. Standard sind die sicheren Wege (Brief, TLS-verschlüsselte E-Mail mit kennwortgeschützten Anhängen, gesicherte Portale wie PACS- oder KIM-Upload, Telefon nach Identitätsprüfung); hierfür ist keine Einwilligung erforderlich. Zusätzliche Wege nutzt die Klinik nur mit meiner freiwilligen, jederzeit formlos widerruflichen Zustimmung (bitte ankreuzen):",
+   "bezeichnung": "7. Mitteilungs- und Kommunikationsbefugnis",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b28",
+   "typ": "text",
+   "text": "☐ E-Mail ohne Verschlüsselung\n☐ Telefax (unverschlüsselt)\n☐ Ende-zu-Ende-verschlüsselter Messenger (z. B. Signal)",
+   "bezeichnung": "Text",
+   "optionen": {
+    "spalten": 3
+   }
+  },
+  {
+   "id": "b29",
+   "typ": "text",
+   "text": "Bei unverschlüsselter Übermittlung verbleibt ein technisches Restrisiko der Kenntnisnahme durch Dritte (Art. 32 DSGVO). Die Einzelheiten – einschließlich der Auswahl der Empfängergruppen – regelt die Schweigepflichtentbindung (Vorlage 06).",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b30",
+   "typ": "text",
+   "text": "Systematik: Dieser Abschnitt ist eine Information nach Art. 13 DSGVO und setzt keine Einwilligung voraus. Die Entbindung von der ärztlichen Schweigepflicht erfolgt gesondert (Vorlage 06); die Freigabe zusätzlicher Kommunikationswege ist eine freiwillige, jederzeit widerrufliche Zustimmung (vorstehende Ziffer).\n\nSoweit die Verarbeitung zur Behandlung, Abrechnung, Erfüllung gesetzlicher Pflichten oder zur Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen erforderlich ist, beruht sie nicht auf widerruflicher Einwilligung, sondern auf den nachstehenden gesetzlichen Rechtsgrundlagen.",
+   "bezeichnung": "8. Datenschutzinformation (Art. 13 DSGVO)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b31",
+   "typ": "datenfelder",
+   "bezeichnung": "Angaben",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Verantwortliche",
+     "wert": "Regeneration Clinic SIA (Kontaktdaten siehe oben); Datenschutzkontakt: info@regeneration-clinic.eu"
+    },
+    {
+     "label": "Datenarten",
+     "wert": "Ident-, Versicherungs- und Kontaktdaten; Gesundheitsdaten (Diagnosen, Befunde, Bildgebung, OP- und Leistungsdaten); Abrechnungs- und Erstattungsdaten; Übersetzungen"
+    },
+    {
+     "label": "Zwecke",
+     "wert": "Behandlung und Organisation; Erstattung und Abrechnung; Rechtsdurchsetzung einschließlich anwaltlicher Vertretung; Qualitätssicherung; gesetzliche Aufbewahrung"
+    },
+    {
+     "label": "Rechtsgrundlagen",
+     "wert": "Art. 6 Abs. 1 lit. b, c und f DSGVO; Art. 9 Abs. 2 lit. f und h DSGVO; ergänzend Art. 9 Abs. 2 lit. a DSGVO; Fizisko personu datu apstrādes likums (LV); DSG (AT); ASVG; SV-EG"
+    },
+    {
+     "label": "Empfänger",
+     "wert": "Krankenversicherungsträger und sein chef- und kontrollärztlicher Dienst; nationale Kontaktstelle; nach Ziffer 4.2 mandatierter Rechtsanwalt; Gerichte; die in Ziffer 7 genannten Partner und Dienstleister"
+    },
+    {
+     "label": "Speicherdauer",
+     "wert": "Medizinische Dokumentation nach den gesetzlichen Aufbewahrungsfristen (in der Regel mindestens 10 Jahre); abrechnungs- und verfahrensrelevante Unterlagen bis zum rechtskräftigen Abschluss"
+    },
+    {
+     "label": "Betroffenenrechte",
+     "wert": "Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch, Datenübertragbarkeit; Widerruf einer Einwilligung mit Wirkung für die Zukunft; Beschwerde bei der Datu valsts inspekcija (Rīga) oder der österreichischen Datenschutzbehörde"
+    }
+   ]
+  },
+  {
+   "id": "b32",
+   "typ": "text",
+   "text": "Ich verpflichte mich, e-card-Daten, Versicherungsnachweise und relevante Vorbefunde zeitnah bereitzustellen und an Antragstellung, Bescheiderwirkung, Klageführung und Durchsetzung mitzuwirken. Die Regeneration Clinic SIA und ein nach Ziffer 4.2 mandatierter Rechtsanwalt dürfen Befunde unmittelbar bei Vorbehandlern und Kooperationskliniken anfordern.",
+   "bezeichnung": "9. Mitwirkungspflichten und Unterlagen",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b33",
+   "typ": "text",
+   "text": "Leistet der Krankenversicherungsträger trotz Zahlungsanweisung unmittelbar an mich, verpflichte ich mich, den Betrag unverzüglich, spätestens binnen 14 Tagen, bis zur Höhe der offenen Forderung an die Regeneration Clinic SIA weiterzuleiten und die hierfür erforderlichen Informationen bereitzustellen.",
+   "bezeichnung": "10. Weiterleitungspflicht",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b34",
+   "typ": "text",
+   "text": "Diese Erklärung gilt ab dem Aufnahmedatum für den gesamten Behandlungsfall (einschließlich Aufenthalten in Kooperationskliniken sowie vor- und nachstationärer Folgebehandlungen) für zunächst zwölf Monate und verlängert sich um jeweils zwölf Monate, solange die Behandlung oder das Erstattungs- bzw. Rechtsdurchsetzungsverfahren anhängig ist.\n\nEinwilligungen und Vollmachten können jederzeit schriftlich oder in Textform mit Wirkung für die Zukunft widerrufen werden. Bereits beauftragte oder erbrachte Leistungen, entstandene Zahlungs- und Weiterleitungspflichten sowie gesetzliche Aufbewahrungspflichten bleiben unberührt.\n\nAuf den Erstattungsanspruch gegen den Versicherungsträger findet österreichisches Recht Anwendung; zuständig ist das nach §§ 7, 65 ASGG berufene Arbeits- und Sozialgericht. Auf das Behandlungsverhältnis mit der Regeneration Clinic SIA als in Lettland zugelassener Ārstniecības iestāde findet lettisches Recht Anwendung. Sollte eine Bestimmung dieser Erklärung unwirksam sein oder werden, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt; an die Stelle der unwirksamen Bestimmung tritt die Regelung, die ihrem wirtschaftlichen Zweck am nächsten kommt.",
+   "bezeichnung": "11. Geltungsdauer, Widerruf, anwendbares Recht, salvatorische Klausel",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b35",
+   "typ": "text",
+   "text": "Anlage K – Kostenvoranschlag und Erstattungsprognose. Die Höhe des Behandlungshonorars, der voraussichtlich erstattungsfähigen Leistungen, der erwarteten Versicherungsleistung, des vorab zu zahlenden Eigenanteils, des gestundeten Betrags und meiner maximalen zusätzlichen Zahlungspflicht ergibt sich aus der Anlage K (Vorlage 11), die mir vor Unterzeichnung ausgehändigt wurde und Bestandteil dieser Erklärung ist. Die Klinik hat darin die Grundlage ihrer Erstattungsschätzung offengelegt.\n\nDie Regeneration Clinic SIA stundet nach medizinischer und wirtschaftlicher Einzelfallprüfung denjenigen Teil der Behandlungskosten, für den eine Erstattung durch den österreichischen Krankenversicherungsträger nach § 131 ASVG, § 7b SV-EG oder auf sonstiger gesetzlicher Grundlage beantragt wird, bis zur Entscheidung des Versicherungsträgers bzw. bis zum rechtskräftigen Abschluss eines Erstattungs- oder sozialgerichtlichen Verfahrens, längstens jedoch für 24 Monate ab Rechnungsdatum, sofern nicht schriftlich etwas anderes vereinbart wird. Die Stundung ist zinsfrei.\n\nUmfang der Stundung. Gestundet wird ausschließlich der vom Versicherungsträger erwartete Erstattungsanteil. Erstattet der Träger im Ergebnis nur teilweise oder gar nicht, wird der nicht gedeckte Anteil mit Zugang der Entscheidung bzw. mit rechtskräftigem Verfahrensabschluss zur Zahlung fällig. Die Klinik wird in diesem Fall eine angemessene Zahlungsregelung anbieten (Ratenvereinbarung, Stundungsverlängerung oder teilweiser Verzicht aus Kulanz); eine solche Sonderregelung bedarf der Schriftform.\n\nEigenanteile. Der gesetzliche Selbstbehalt (20 % des Vertragspartnertarifs), die Differenz zwischen Vertragspartnertarif und Behandlungshonorar sowie nicht erstattungsfähige Komfort-, Transfer- und Zusatzleistungen sind nicht Gegenstand der Stundung; sie werden gesondert ausgewiesen und sind nach Maßgabe des Kostenvoranschlags bzw. der Rechnung fällig. Über ihre voraussichtliche Höhe wird der/die Patient/in vor Behandlungsbeginn schriftlich informiert.\n\nMitwirkung. Der/die Patient/in erhält die Vollmachten aufrecht, gibt die zur Antragstellung, Bescheiderwirkung und Klageführung erforderlichen Erklärungen ab und legt die benötigten Unterlagen vor. Ein Widerruf der Vollmachten oder eine unterbliebene Mitwirkung, die das Erstattungsverfahren vereitelt, beendet die Stundung; der gestundete Betrag wird dann nach schriftlicher Mahnung mit einer Frist von 30 Tagen fällig.\n\nDie zivilrechtliche Zahlungspflicht aus dem Behandlungsvertrag bleibt durch die Stundung dem Grunde nach unberührt; sie wird lediglich zeitlich modifiziert.",
+   "bezeichnung": "12. Stundung des erwarteten Kassenanteils",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b36",
+   "typ": "text",
+   "text": "☐ Ich habe diese Erklärung gelesen und verstanden; meine Fragen wurden beantwortet.\n☐ Ich wurde über die 80 %-Begrenzung der Kostenerstattung (§ 131 ASVG), die mögliche Vorabgenehmigungspflicht (§ 7b SV-EG) und die voraussichtliche Höhe meines Eigenanteils informiert.\n☐ Ich habe die Anlage K (Kostenvoranschlag und Erstattungsprognose) erhalten und die darin bezifferte maximale zusätzliche Zahlungspflicht zur Kenntnis genommen; bei einer Ablehnung bietet mir die Klinik eine Ratenvereinbarung an.\n☐ Ich habe ein Exemplar dieser Erklärung erhalten.",
+   "bezeichnung": "13. Erklärung des/der Patient/in",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b37",
+   "typ": "text",
+   "text": "Bei gesetzlicher Vertretung ist die zweite Zeile auszufüllen (Eltern, Betreuer/in bzw. Erwachsenenvertreter/in mit entsprechendem Aufgabenkreis – Vollmacht, Betreuerausweis oder Bestellungsurkunde beifügen).",
+   "bezeichnung": "Unterschriften",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b38",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Ort, Datum",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b39",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift Patient/in – Zedent/in (vollständig lesbar)",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b40",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Name der gesetzlich vertretungsberechtigten Person (Druckbuchstaben)",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b41",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift der gesetzlich vertretungsberechtigten Person",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b42",
+   "typ": "text",
+   "text": "Annahme und Gegenzeichnung durch die Klinik – die Regeneration Clinic SIA nimmt die Abtretung bzw. Vollmacht an und bestätigt die vereinbarten Stundungs- und Kostenregelungen.",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b43",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Rīga, Datum",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b44",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Für die Regeneration Clinic SIA – Prof. Dr. Markus Masin, Director, oder bevollmächtigte Vertretung (Name, Unterschrift, Stempel)",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b45",
+   "typ": "text",
+   "text": "Telefon / E-Mail für Rückfragen (optional): __________________________________________________\n\nHinweis zur Beifügung: Diese unterzeichnete Erklärung ist allen Anträgen, Eingaben und Klagen an den Krankenversicherungsträger bzw. das Arbeits- und Sozialgericht als Anlage 1 (Inkassozession, Zahlungsanweisung, Bevollmächtigung, Stundungsvereinbarung, Schweigepflichtentbindung) beizufügen.\n\nRegeneration Clinic SIA · Vorlage 01 · Patientenerklärung Österreich (ÖGK/SVS/BVAEB/KFA) · Version 6 · Stand 10/2026",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b46",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

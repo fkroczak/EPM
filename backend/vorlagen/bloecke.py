@@ -4,11 +4,9 @@ Ein Block ist ein JSON-Objekt ``{"id", "typ", "bezeichnung", "optionen", …}``.
 ``{{Feldname}}`` im Text und müssen aus der festen Liste der Art stammen (``felder.FELDER``).
 In der Fußzeile stehen zusätzlich ``{Seite}`` und ``{Seiten}``.
 """
-import json
 import re
-from pathlib import Path
 
-from .felder import FELDER, RGC_ARTEN, TABELLEN, JeArt, ist_eigen
+from .felder import FELDER, TABELLEN, JeArt, ist_eigen
 
 PLATZHALTER = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
 ID_MUSTER = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
@@ -38,6 +36,8 @@ OPTIONEN = {
     "linie_oben": bool,  # dünne Linie über dem Block (z. B. Freigabevermerk wie „validiert von“ im Laborbefund)
     # neben den vorherigen Block setzen; Wert = Breite dieses Blocks, der vorherige erhält den Rest
     "neben_vorherigem": {"drittel", "haelfte", "zwei_drittel"},
+    # Text in 2 oder 3 Spalten setzen, z. B. Ankreuzlisten der Laboranforderungen (RGC-Vorlagen, 13.10.2026)
+    "spalten": {2, 3},
 }
 NEBENEINANDER = {"text", "datenfelder", "tabelle", "unterschrift"}
 DARSTELLUNGEN = {"paare", "befund"}
@@ -184,7 +184,7 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
             erlaubt |= {"felder", "linie"}
             if b.get("felder"):
                 _eintraege(art, b.get("felder"), name, fehler)
-            _text(b.get("linie"), f"{name} (Linie)", fehler, laenge=160)
+            _text(b.get("linie"), f"{name} (Linie)", fehler, laenge=200)
         elif typ == "tabelle":
             erlaubt |= {"quelle"}
             if b.get("quelle") not in TABELLEN[art]:
@@ -762,12 +762,6 @@ STARTVORLAGEN = {
     ],
 }
 
-
-# Patientenerklärungen der Regeneration Clinic (Word-Vorlagen 01–12, Revision 3, Oktober 2026), mit ``rgc_import.py``
-# wörtlich in Blöcke übertragen; nur in der Firma RGC (``models.NUR_FIRMA``)
-_RGC_ORDNER = Path(__file__).resolve().parent / "statisch" / "rgc"
-RGC_VORLAGEN = {art: json.loads((_RGC_ORDNER / f"{art}.json").read_text(encoding="utf-8")) for art in RGC_ARTEN}
-STARTVORLAGEN.update({art: daten["bloecke"] for art, daten in RGC_VORLAGEN.items()})
 
 # Seitenformat der Startvorlagen; alles andere Hochformat (13.10.2026)
 STARTAUSRICHTUNG = {"medikationsplan": "quer"}

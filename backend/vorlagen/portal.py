@@ -10,10 +10,11 @@ from .felder import ist_eigen
 GRUPPEN = {
     "schreiben": "Briefe und E-Mails an Patienten",
     "eigen": "Eigene Vorlagen",
+    # mitgelieferte Vorlagen der Regeneration Clinic (13.10.2026)
+    "anforderungen": "Anforderungen: Labor, Bildgebung, Funktionsdiagnostik",
+    "formulare": "Aufklärungen, Erklärungen und Abrechnung",
     "plaene": "Pläne, Berichte und Unterlagen",
     "datenschutz": "Vordrucke zum Datenschutz",
-    # Word-Vorlagen 01–12 der Regeneration Clinic SIA (Revision 3, Oktober 2026), nur in der Firma RGC
-    "rgc": "Regeneration Clinic – Patientenerklärungen und Vereinbarungen",
 }
 
 SCHREIBEN_WO = "Akte › Weitere Aktionen (⋯) › „Schreiben und E-Mail …“"
@@ -46,49 +47,14 @@ ARTEN = {
                                   "Versorger) zum Unterschreiben.", "Akte › Datenschutz › „Vordruck als PDF“"),
     "firmen": ("datenschutz", "Einwilligung, dass DSKM und Regeneration Clinic die Akte gemeinsam führen, zum "
                "Unterschreiben.", "Akte › Datenschutz › „Vordruck als PDF“"),
-    "rgc_erklaerung_at": ("rgc", "Vorlage 01: Patientenerklärung bei Aufnahme für österreichisch Versicherte (ÖGK, SVS, "
-                          "BVAEB, KFA) – Stundung des Kassenanteils, Inkassozession, Zahlungsanweisung, Vollmachten.",
-                          "Akte › Datenschutz › „Vordrucke der Regeneration Clinic“"),
-    "rgc_erklaerung_gkv": ("rgc", "Vorlage 02: Patientenerklärung bei Aufnahme für gesetzlich Versicherte in Deutschland "
-                           "(GKV) – Stundung des Erstattungsanteils, Abtretung, Vollmachten.",
-                           "Akte › Datenschutz › „Vordrucke der Regeneration Clinic“"),
-    "rgc_erklaerung_bguv": ("rgc", "Vorlage 03: Patientenerklärung bei Aufnahme nach Arbeitsunfall oder Berufskrankheit "
-                            "(BG/UV, Deutschland) – Kostenübernahme, Abtretung, Vollmachten.",
-                            "Akte › Datenschutz › „Vordrucke der Regeneration Clinic“"),
-    "rgc_erklaerung_pkv": ("rgc", "Vorlage 04: Patientenerklärung bei Aufnahme für privat Versicherte in Deutschland "
-                           "(PKV) – Stundung, Abtretung, Vollmachten.",
-                           "Akte › Datenschutz › „Vordrucke der Regeneration Clinic“"),
-    "rgc_erklaerung_zusatz": ("rgc", "Vorlage 05: Patientenerklärung bei stationärer Zusatzversicherung (Deutschland) – "
-                              "Tagegeld, Abtretung, Vollmachten.",
-                              "Akte › Datenschutz › „Vordrucke der Regeneration Clinic“"),
-    "rgc_schweigepflicht": ("rgc", "Vorlage 06: Entbindung von der ärztlichen Schweigepflicht mit ankreuzbaren "
-                            "Empfängergruppen, Kommunikationswegen und Verfahrensvollmacht (Anlage zu 01–05, 09, 10).",
-                            "Akte › Datenschutz › „Vordrucke der Regeneration Clinic“"),
-    "rgc_aufklaerung_op": ("rgc", "Vorlage 07: Aufklärung und Einwilligung zur Operation, deutsch und lettisch – "
-                           "Grundbogen, nur gültig mit eingriffsspezifischer Ergänzung.",
-                           "Akte › Datenschutz › „Vordrucke der Regeneration Clinic“"),
-    "rgc_aufklaerung_anaesthesie": ("rgc", "Vorlage 08: Aufklärung und Einwilligung zur Anästhesie, deutsch und "
-                                    "lettisch, mit präanästhesiologischem Befundblock.",
-                                    "Akte › Datenschutz › „Vordrucke der Regeneration Clinic“"),
-    "rgc_vereinbarung_oegk": ("rgc", "Vorlage 09: Vergütungs- und Rückerstattungsvereinbarung für Selbstzahler mit "
-                              "österreichischem Versicherungsträger (ÖGK).",
-                              "Akte › Datenschutz › „Vordrucke der Regeneration Clinic“"),
-    "rgc_abtretung_oegk": ("rgc", "Vorlage 10: Abtretungs- und Bevollmächtigungserklärung ÖGK mit Vorauszahlung des "
-                           "Eigenanteils.", "Akte › Datenschutz › „Vordrucke der Regeneration Clinic“"),
-    "rgc_anlage_k": ("rgc", "Vorlage 11: Anlage K – Kostenvoranschlag, Erstattungsprognose (Tabelle A–F), "
-                     "Abrechnungsmatrix, Vorprüfung und Patienteninformation; Beträge von Hand eintragen.",
-                     "Akte › Datenschutz › „Vordrucke der Regeneration Clinic“"),
-    "rgc_anwaltsvollmacht": ("rgc", "Vorlage 12: Vollmacht zur anwaltlichen Vertretung im Erstattungs-, Widerspruchs- "
-                             "und Klageverfahren (Deutschland/Österreich); Name der Kanzlei wird eingetragen.",
-                             "Akte › Datenschutz › „Vordrucke der Regeneration Clinic“"),
 }
 
 
-def art_info(art: str, beschreibung: str = "") -> dict:
-    """``{"gruppe", "wofuer", "wo"}`` für die Übersicht; eigene Schreiben mit ihrer Beschreibung (F176)."""
+def art_info(art: str, beschreibung: str = "", gruppe: str | None = None) -> dict:
+    """``{"gruppe", "wofuer", "wo"}`` für die Übersicht; eigene Schreiben mit ihrer Beschreibung (F176) und Gruppe."""
     if ist_eigen(art):
-        return {"gruppe": "eigen", "wofuer": beschreibung or "Eigenes Schreiben an den Patienten mit E-Mail-Text.",
-                "wo": f"{SCHREIBEN_WO} › „Eigene Vorlagen“"}
+        return {"gruppe": gruppe if gruppe in GRUPPEN else "eigen", "wofuer": beschreibung or "Eigenes Schreiben an den Patienten mit E-Mail-Text.",
+                "wo": f"{SCHREIBEN_WO} › „{GRUPPEN.get(gruppe) or GRUPPEN['eigen']}“"}
     gruppe, wofuer, wo = ARTEN.get(art, ("plaene", "", ""))
     return {"gruppe": gruppe, "wofuer": wofuer, "wo": wo}
 

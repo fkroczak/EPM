@@ -342,6 +342,7 @@ schritt() {{ echo "==> $*"; }}
 source <(sed -n '/^alte_entfernen()/,/^while \\[\\[ \\$# -gt 0/p' "{REPO}/werkzeuge/epm-update.sh" | sed '$ d')
 umstellen_oder_zurueck {NEU} {GUT}; echo "rc=$?"
 echo "env=$(env_wert EPM_VERSION) gut=$(env_wert EPM_VERSION_GUT)"
+cp "$B/system/rueckfall.json" "{h}/markierung.json"
 echo {NEU} >> "{h}/gesund"
 umstellen_oder_zurueck {NEU} {GUT}; echo "rc=$?"
 ERGEBNIS=""; abschliessen {NEU} {GUT}; echo "rc=$? gut=$(env_wert EPM_VERSION_GUT) $ERGEBNIS"
@@ -351,7 +352,8 @@ ERGEBNIS=""; abschliessen {NEU} {GUT}; echo "rc=$? gut=$(env_wert EPM_VERSION_GU
             self.assertIn(f"ABBRUCH: Neue Version {NEU} startet nicht – zurück auf {GUT} (läuft wieder).", p.stdout)
             self.assertIn("Datenbank-Migrationen der neuen Version wurden nicht zurückgedreht", p.stdout)
             self.assertIn(f"rc=1\nenv={GUT} gut={GUT}\n", p.stdout)
-            m = json.loads((h / "B" / "system" / "rueckfall.json").read_text())
+            m = json.loads((h / "markierung.json").read_text())
+            self.assertFalse((h / "B" / "system" / "rueckfall.json").exists())   # neue gute Version: Rückfall erledigt
             self.assertEqual((m["von"], m["nach"], m["ok"], m["quelle"]), (NEU, GUT, True, "epm-update"))
             self.assertIn(f"   Gute Version: {NEU}\n", p.stdout)
             self.assertTrue(p.stdout.endswith(f"rc=0 gut={NEU} Tests übersprungen\n"), p.stdout)

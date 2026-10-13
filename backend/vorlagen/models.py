@@ -7,8 +7,8 @@ nächste Version; die bisherige wird „abgelöst“ und bleibt erhalten. Veröf
 
 Vorlagen je Firma (Festlegung „Gemischt“, 11.10.2026): Ohne ``firma`` ist eine Vorlage gemeinsam. Eine Firma kann je
 Art eine eigene Vorlage anlegen (Kopie der gemeinsamen); dann gelten Entwurf, Fassungen und Veröffentlichen für
-ihre Vorlage, und ``aktive()`` liefert in dieser Firma ihre aktive Fassung, sonst die gemeinsame. Die Vorlagen der
-Regeneration Clinic (``NUR_FIRMA``, Patientenerklärungen vom Oktober 2026) gehören fest zu dieser Firma.
+ihre Vorlage, und ``aktive()`` liefert in dieser Firma ihre aktive Fassung, sonst die gemeinsame. Die Word-Vorlagen der
+Regeneration Clinic sind eigene Schreiben der Firma RGC (``vorlagen.rgc``).
 """
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -40,20 +40,6 @@ class Dokumentvorlage(models.Model):
         SCHWEIGEPFLICHTENTBINDUNG = "schweigepflichtentbindung", "Schweigepflichtentbindung"
         # zwei Firmen (11.10.2026): Voraussetzung, um eine Akte der DSKM und der Regeneration Clinic zuzuordnen
         FIRMEN = "firmen", "Einwilligung Austausch zwischen DSKM und Regeneration Clinic"
-        # Patientenerklärungen und Vereinbarungen der Regeneration Clinic SIA (Word-Vorlagen 01–12, Revision 3,
-        # Oktober 2026): nur in der Firma RGC (``NUR_FIRMA``), Vordrucke aus Akte › Datenschutz
-        RGC_ERKLAERUNG_AT = "rgc_erklaerung_at", "Patientenerklärung Österreich (Stundung)"
-        RGC_ERKLAERUNG_GKV = "rgc_erklaerung_gkv", "Patientenerklärung Deutschland GKV (Stundung)"
-        RGC_ERKLAERUNG_BGUV = "rgc_erklaerung_bguv", "Patientenerklärung Deutschland BG/UV"
-        RGC_ERKLAERUNG_PKV = "rgc_erklaerung_pkv", "Patientenerklärung Deutschland PKV (Stundung)"
-        RGC_ERKLAERUNG_ZUSATZ = "rgc_erklaerung_zusatz", "Patientenerklärung Stationäre Zusatzversicherung"
-        RGC_SCHWEIGEPFLICHT = "rgc_schweigepflicht", "Schweigepflichtentbindung (RGC)"
-        RGC_AUFKLAERUNG_OP = "rgc_aufklaerung_op", "Aufklärung Operation (Grundbogen, DE/LV)"
-        RGC_AUFKLAERUNG_ANAESTHESIE = "rgc_aufklaerung_anaesthesie", "Aufklärung Anästhesie (DE/LV)"
-        RGC_VEREINBARUNG_OEGK = "rgc_vereinbarung_oegk", "Vergütungs- und Rückerstattungsvereinbarung ÖGK (Selbstzahler)"
-        RGC_ABTRETUNG_OEGK = "rgc_abtretung_oegk", "Abtretungs- und Bevollmächtigungserklärung ÖGK mit Vorauszahlung"
-        RGC_ANLAGE_K = "rgc_anlage_k", "Anlage K – Kostenvoranschlag, Erstattungsprognose, Patienteninformation"
-        RGC_ANWALTSVOLLMACHT = "rgc_anwaltsvollmacht", "Vollmacht zur anwaltlichen Vertretung (DE/AT)"
 
     class Ausrichtung(models.TextChoices):
         HOCH = "hoch", "Hochformat"
@@ -209,9 +195,8 @@ class Dokumentvorlage(models.Model):
                 abgeloest += 1
             return abgeloest
 
-    # Vordrucke zum Datenschutz (und die Erklärungen der RGC): mitgelieferte Startvorlagen sind ungeprüfte Entwürfe (U17)
-    VORDRUCKE = ("datenschutzinformation", "einwilligung", "schweigepflichtentbindung", "firmen",
-                 *(a for a in Art.values if a.startswith("rgc_")))
+    # Vordrucke zum Datenschutz: mitgelieferte Startvorlagen sind ungeprüfte Entwürfe (U17)
+    VORDRUCKE = ("datenschutzinformation", "einwilligung", "schweigepflichtentbindung", "firmen")
 
     @property
     def entwurfsmodus_schluessel(self) -> str:
@@ -253,8 +238,9 @@ class Dokumentvorlage(models.Model):
         return self
 
 
-# Vorlagen, die fest zu einer Firma gehören (Kürzel): die Patientenerklärungen der Regeneration Clinic
-NUR_FIRMA = {a: "rg" for a in Dokumentvorlage.Art.values if a.startswith("rgc_")}
+# Arten, die fest zu einer Firma gehören (Art → Kürzel). Derzeit keine: die Vorlagen der Regeneration Clinic sind eigene
+# Schreiben der Firma RGC (``EigenesSchreiben.firma``, ``vorlagen.rgc``).
+NUR_FIRMA: dict[str, str] = {}
 
 
 def firma_der_art(art: str, firma=None):
@@ -294,7 +280,7 @@ def art_name(art: str) -> str:
 
 def gibt_es_art(art) -> bool:
     return isinstance(art, str) and (art in Dokumentvorlage.Art.values
-                                     or EigenesSchreiben.objects.filter(schluessel=art).exists())
+                                     or EigenesSchreiben.sichtbare().filter(schluessel=art).exists())
 
 
 class EigenesSchreiben(models.Model):
@@ -307,11 +293,28 @@ class EigenesSchreiben(models.Model):
     beschreibung = models.CharField(max_length=300, blank=True)
     mit_termin = models.BooleanField("Termin wählen", default=False)
     aktiv = models.BooleanField(default=True)
+    # Vorlagen einer Firma (RGC-Vorlagen, 13.10.2026): nur in dieser Firma sichtbar; leer = in allen Firmen
+    firma = models.ForeignKey("stammdaten.Firma", on_delete=models.PROTECT, null=True, blank=True,
+                              related_name="eigene_schreiben")
+    # Gruppe in der Übersicht und in der Akte (``portal.GRUPPEN``), z. B. „anforderungen“ für Labor und Bildgebung
+    gruppe = models.CharField(max_length=20, default="eigen")
+    # mitgelieferte Vorlagen (z. B. „rgc-labor-01“): Kennung der Quelle, damit sie nur einmal angelegt werden
+    mitgeliefert = models.CharField(max_length=40, unique=True, null=True, blank=True, editable=False)
     erstellt_am = models.DateTimeField(auto_now_add=True)
     erstellt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
                                      related_name="+")
 
     history = HistoricalRecords()
+
+    @classmethod
+    def sichtbare(cls, firma=None):
+        """Eigene Schreiben der aktiven Firma und die ohne Firma. Ohne aktive Firma (Befehle, Hintergrund) gilt wie bei
+        den Akten die Hauptfirma (DSKM)."""
+        from epm.firma import HAUPTFIRMA, aktive_firma
+
+        firma = firma or aktive_firma()
+        eigene = models.Q(firma=firma) if firma is not None else models.Q(firma__kuerzel=HAUPTFIRMA)
+        return cls.objects.filter(eigene | models.Q(firma__isnull=True))
 
     class Meta:
         verbose_name = "Eigenes Schreiben"

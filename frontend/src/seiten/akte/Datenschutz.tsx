@@ -193,24 +193,6 @@ function ErklaerungenKarte({ daten, patient, darf }: { daten: AktenDatenschutz; 
           </table>
         </details>
       ) : null}
-      {daten.vordrucke?.length ? (
-        <div className="flex flex-col gap-1.5 pt-1 border-t border-rand" data-testid="vordrucke-firma">
-          <span className="lbl text-[0.8125rem]">Vordrucke der Regeneration Clinic</span>
-          <span className="text-[0.8125rem] gedaempft">Patientenerklärungen und Vereinbarungen (Word-Vorlagen 01–12, Oktober 2026) mit den Angaben
-            aus der Akte – zum Ausdrucken und Ausfüllen; sie werden hier nicht nachgehalten.</span>
-          <ul className="m-0 p-0 list-none flex flex-col">
-            {daten.vordrucke.map((v) => (
-              <li key={v.art} className="flex items-center justify-between gap-3 flex-wrap py-2 border-b border-rand last:border-b-0" data-testid={`vordruck-${v.art}`}>
-                <span className="flex flex-col gap-0.5 min-w-0">
-                  <span className="font-medium text-sm">{v.name}</span>
-                  <span className="text-[0.75rem] gedaempft">Fassung {v.version}{v.entwurf ? " · noch nicht geprüft, Wasserzeichen „ENTWURF“" : ""}</span>
-                </span>
-                <Knopf klein icon="dokument" onClick={() => setPdf({ art: v.art, name: v.name })}>Vordruck als PDF</Knopf>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
       {pdf ? (
         <PdfDialog offen onOffen={(o) => { if (!o) setPdf(null); }} titel={`${pdf.name} · ${name(patient)}`}
           pfad={`patienten/${patient.id}/erklaerung-pdf/?art=${pdf.art}`} dateiname={`${pdf.name}-${patient.nummer}.pdf`} />
