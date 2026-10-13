@@ -46,7 +46,7 @@ def schreiben_aus_akte(art) -> dict | None:
         return AUS_DER_AKTE[art]
     from .models import EigenesSchreiben
 
-    e = EigenesSchreiben.objects.filter(schluessel=art, aktiv=True).first() if isinstance(art, str) else None
+    e = EigenesSchreiben.sichtbare().filter(schluessel=art, aktiv=True).first() if isinstance(art, str) else None
     return {"termin": e.mit_termin, "beschreibung": e.beschreibung} if e else None
 
 

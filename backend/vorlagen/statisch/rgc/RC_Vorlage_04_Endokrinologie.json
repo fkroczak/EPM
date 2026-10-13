@@ -1,0 +1,152 @@
+{
+ "quelle": "RC_Vorlage_04_Endokrinologie",
+ "name": "Laboranforderung Endokrinologie",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)",
+ "datei": "RC_Vorlage_04_Endokrinologie.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Endokrinoloģija / Endokrinologie",
+   "zusatz": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)"
+  },
+  {
+   "id": "b3",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient un nosūtījums / Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Uzvārds, vārds / Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Dzimšanas datums / Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Adrese / Adresse",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Pacienta ID / Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Datums / laiks / Datum / Uhrzeit",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Nosūtošais ārsts / Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nodaļa / Station",
+     "wert": "____________________"
+    },
+    {
+     "label": "Steidzamība / Dringlichkeit",
+     "wert": "☐ STAT ☐ rutīna / Routine"
+    }
+   ]
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "bezeichnung": "Klīniskā informācija / jautājums · Klinische Angaben / Fragestellung",
+   "text": "\n\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "bezeichnung": "Hinweis",
+   "text": "Lūdzu atzīmēt katru vēlamo izmeklējumu atsevišķi. · Bitte jede gewünschte Untersuchung einzeln ankreuzen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": "☐ Izmeklējums (LV / DE) — Materiāls / norāde · Material / Hinweis\n☐ TSH / TSH\n☐ fT3 / fT3\n☐ fT4 / fT4\n☐ Reversais T3 (rT3) / reverse T3 (rT3)\n☐ TPO antivielas / TPO-Antikörper\n☐ Tireoglobulīna antivielas (Tg-Ak) / Thyreoglobulin-Antikörper\n☐ TSH receptoru antivielas (TRAk) / TSH-Rezeptor-Antikörper (TRAk)\n☐ Tireoglobulīns / Thyreoglobulin\n☐ Kalcitonīns / Calcitonin",
+   "bezeichnung": "Vairogdziedzeris / Schilddrüse",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "☐ Izmeklējums (LV / DE) — Materiāls / norāde · Material / Hinweis\n☐ Parathormons (intaktais PTH) / Parathormon (intakt)\n☐ 25-OH D vitamīns / 25-OH-Vitamin D\n☐ 1,25-(OH)₂ D vitamīns / 1,25-(OH)₂-Vitamin D\n☐ Kalcijs kopējais / Kalzium gesamt\n☐ Kalcijs jonizētais / Kalzium ionisiert — īpaša pirmsanalītika / spez. Präanalytik\n☐ Fosfāts / Phosphat\n☐ Osteokalcīns / Osteocalcin\n☐ β-CrossLaps (CTX) / β-CrossLaps (CTX)\n☐ Kaulu sārmainā fosfatāze / Knochen-AP (ossäre AP)",
+   "bezeichnung": "Epitēlijķermenīši / kauli / minerālvielas / Nebenschilddrüse / Knochen / Mineral",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "☐ Izmeklējums (LV / DE) — Materiāls / norāde · Material / Hinweis\n☐ Kortizols (no rīta) / Cortisol (morgens) — plkst. 8:00 / 8 Uhr\n☐ Kortizola diennakts profils / Cortisol-Tagesprofil\n☐ Siekalu kortizols / Speichelcortisol — vakarā / abends\n☐ ACTH / ACTH — atdzesēts, EDTA / gekühlt\n☐ DHEA-S / DHEA-S\n☐ Aldosterons / Aldosteron\n☐ Renīns (tiešais) / Renin (direkt)\n☐ Aldosterona/renīna attiecība (ARR) / Aldosteron-Renin-Quotient\n☐ Metanefrīni (plazmā) / Metanephrine (Plasma)\n☐ Normetanefrīni (plazmā) / Normetanephrine (Plasma)\n☐ Metanefrīni (24 h urīnā) / Metanephrine (24-h-Urin) — 24 h urīns / 24-h-Urin\n☐ Katecholamīni (24 h urīnā) / Katecholamine (24-h-Urin) — 24 h urīns / 24-h-Urin\n☐ 17-OH-progesterons / 17-OH-Progesteron\n☐ Androstendions / Androstendion",
+   "bezeichnung": "Virsnieres / Nebenniere",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "text",
+   "text": "☐ Izmeklējums (LV / DE) — Materiāls / norāde · Material / Hinweis\n☐ Prolaktīns / Prolaktin\n☐ Makroprolaktīns / Makroprolaktin — ja prolaktīns paaugstināts\n☐ IGF-1 / IGF-1\n☐ STH / augšanas hormons (bazālais) / STH / GH (basal)\n☐ LH / LH\n☐ FSH / FSH\n☐ ACTH / ACTH — atdzesēts / gekühlt\n☐ Kopeptīns (ADH) / Copeptin (ADH)",
+   "bezeichnung": "Hipofīze / Hypophyse",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b10",
+   "typ": "text",
+   "text": "☐ Izmeklējums (LV / DE) — Materiāls / norāde · Material / Hinweis\n☐ LH / LH\n☐ FSH / FSH\n☐ Estradiols / Estradiol\n☐ Progesterons / Progesteron\n☐ Testosterons kopējais / Testosteron gesamt\n☐ Testosterons brīvais / Testosteron frei\n☐ SHBG / SHBG\n☐ DHEA-S / DHEA-S\n☐ AMH (anti-Millera hormons) / AMH\n☐ 17-OH-progesterons / 17-OH-Progesteron\n☐ Androstendions / Androstendion\n☐ Dihidrotestosterons (DHT) / Dihydrotestosteron (DHT)\n☐ β-HCG / β-HCG",
+   "bezeichnung": "Dzimumhormoni / Gonaden / Sexualhormone",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b11",
+   "typ": "text",
+   "text": "☐ Izmeklējums (LV / DE) — Materiāls / norāde · Material / Hinweis\n☐ Hromogranīns A (CgA) / Chromogranin A\n☐ Gastrīns / Gastrin — tukšā dūšā / nüchtern\n☐ Serotonīns / Serotonin\n☐ 5-HIES (24 h urīnā) / 5-HIES (24-h-Urin) — 24 h urīns / 24-h-Urin",
+   "bezeichnung": "Neiroendokrīni marķieri / Neuroendokrine Marker",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b12",
+   "typ": "text",
+   "text": "– Funkcionālie testi (deksametazona tests, stimulācija) jāsaskaņo atsevišķi. / Funktionsteste (Dexamethason-Hemmtest, Stimulation) gesondert vereinbaren.\n– Daudzi hormoni jānosaka no rīta un/vai atbilstošā cikla dienā. / Viele Hormone morgens und/oder zyklusgerecht abnehmen.",
+   "bezeichnung": "Piezīmes · Hinweise",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b13",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

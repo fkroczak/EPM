@@ -38,7 +38,7 @@ const mitEmailArt = (art: Art) => SCHREIBEN_FEST.includes(art) || istEigen(art);
 type Optionen = {
   schrift?: "klein" | "normal" | "gross"; ausrichtung?: "links" | "mitte" | "rechts"; fett?: boolean; kursiv?: boolean;
   ausblenden_wenn_leer?: boolean; nicht_teilen?: boolean; ueberschrift?: boolean; linie_oben?: boolean;
-  neben_vorherigem?: Breite;
+  neben_vorherigem?: Breite; spalten?: 2 | 3;
 };
 type Breite = "drittel" | "haelfte" | "zwei_drittel";
 type Eintrag = { label: string; wert: string };
@@ -63,7 +63,7 @@ type Uebersicht = { art: Art; name: string; aktiv: Version; entwurf: Version | n
   /** Vorlagen-Portal (F180): Gruppe der Liste, wofür die Vorlage ist und wo sie in der Praxis benutzt wird */
   gruppe?: Gruppe; wofuer?: string; wo?: string };
 export type VorlagenUebersicht = Uebersicht;
-type Gruppe = "schreiben" | "eigen" | "plaene" | "datenschutz";
+type Gruppe = "schreiben" | "eigen" | "anforderungen" | "formulare" | "plaene" | "datenschutz";
 type Datenfeld = { name: string; beschreibung: string; html: boolean; bezeichnung?: string; gruppe?: string };
 type Aufbau = Uebersicht & {
   bausteine: { typ: string; name: string }[];
@@ -192,7 +192,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
         </div>
       );
     case "text":
-      return <div className={cx("text-[1em] leading-relaxed", karte, b.optionen?.linie_oben && "border-t border-[#c9c8d4] pt-1", stil(b.optionen))}>{kopf}<MitFeldern text={b.text} /></div>;
+      return <div className={cx("text-[1em] leading-relaxed", karte, b.optionen?.linie_oben && "border-t border-[#c9c8d4] pt-1", stil(b.optionen))}>{kopf}<div className={b.optionen?.spalten === 3 ? "columns-3 gap-3" : b.optionen?.spalten === 2 ? "columns-2 gap-4" : undefined}><MitFeldern text={b.text} /></div></div>;
     case "kopfkarte":
       return (
         <div className={stil(b.optionen)}>{kopf}<div className="border border-[#d9d8e3] rounded-md px-2.5 py-2 text-[1em]">
@@ -285,6 +285,9 @@ const GRUPPEN: { gruppe: Gruppe; titel: string; leer?: string }[] = [
   { gruppe: "schreiben", titel: "Briefe und E-Mails an Patienten" },
   { gruppe: "eigen", titel: "Eigene Vorlagen",
     leer: "Noch keine eigenen Vorlagen. „+ Neue Vorlage“ legt z. B. ein Schreiben an Hausärzte an; „Als eigene Vorlage kopieren“ im Editor nimmt ein bestehendes Schreiben als Grundlage." },
+  // mitgelieferte Vorlagen der Regeneration Clinic (13.10.2026), nur in der Firma RGC sichtbar
+  { gruppe: "anforderungen", titel: "Anforderungen: Labor, Bildgebung, Funktionsdiagnostik" },
+  { gruppe: "formulare", titel: "Aufklärungen, Erklärungen und Abrechnung" },
   { gruppe: "plaene", titel: "Pläne, Berichte und Unterlagen" },
   { gruppe: "datenschutz", titel: "Vordrucke zum Datenschutz" },
 ];
@@ -945,6 +948,10 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
       {["text", "datenfelder", "tabelle"].includes(b.typ) ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!o.ausblenden_wenn_leer} onChange={(e) => aendereOptionen({ ausblenden_wenn_leer: e.target.checked })} />Ausblenden, wenn leer</label> : null}
       {!["fusszeile", "seitenumbruch", "email"].includes(b.typ) ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!o.nicht_teilen} onChange={(e) => aendereOptionen({ nicht_teilen: e.target.checked })} />Nicht über Seitenumbruch teilen</label> : null}
       {textartig && b.typ !== "fusszeile" ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!o.linie_oben} onChange={(e) => aendereOptionen({ linie_oben: e.target.checked })} />Linie darüber</label> : null}
+      {b.typ === "text" ? (
+        <Segmente label="Spalten" wert={String(o.spalten ?? 1)} onWahl={(w) => aendereOptionen({ spalten: w === "1" ? undefined : Number(w) as 2 | 3 })}
+          werte={[{ wert: "1", text: "1" }, { wert: "2", text: "2" }, { wert: "3", text: "3" }]} />
+      ) : null}
       {NEBENEINANDER.includes(b.typ) ? (
         <Feld label="Neben dem vorherigen Block">{(p) => <Auswahl {...p} value={o.neben_vorherigem ?? ""} onChange={(e) => aendereOptionen({ neben_vorherigem: (e.target.value || undefined) as Breite | undefined })}>
           <option value="">nein, darunter</option>

@@ -1,0 +1,201 @@
+{
+ "quelle": "RC_Vorlage_11_MRT-Anforderung",
+ "name": "MRT-Anforderung",
+ "gruppe": "anforderungen",
+ "beschreibung": "MR nosūtījums · MRT-Anforderung — visi apvidi (LV / DE)",
+ "datei": "RC_Vorlage_11_MRT-Anforderung.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Magnētiskās rezonanses izmeklējums / MRT-Anforderung",
+   "zusatz": "MR nosūtījums · MRT-Anforderung — visi apvidi (LV / DE)"
+  },
+  {
+   "id": "b3",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient un nosūtījums / Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Uzvārds, vārds / Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Dzimšanas datums / Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Adrese / Adresse",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Pacienta ID / Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Datums / laiks / Datum / Uhrzeit",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Nosūtošais ārsts / Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nodaļa / Station",
+     "wert": "____________________"
+    },
+    {
+     "label": "Steidzamība / Dringlichkeit",
+     "wert": "☐ STAT ☐ rutīna / Routine"
+    }
+   ]
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "bezeichnung": "Klīniskā informācija / jautājums · Klinische Angaben / Fragestellung",
+   "text": "\n\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "bezeichnung": "Hinweis",
+   "text": "Lūdzu atzīmēt katru vēlamo izmeklējumu atsevišķi. · Bitte jede gewünschte Untersuchung einzeln ankreuzen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": "☐ Galvas smadzenes / Gehirn\n☐ Hipofīze / Hypophyse\n☐ Iekšējā auss / Innenohr\n☐ Orbīta / Orbita\n☐ Deguna blakusdobumi / NNH",
+   "bezeichnung": "Galva / neiroloģija / Kopf / Neuro",
+   "optionen": {
+    "spalten": 3,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "☐ Kakla mīkstie audi / Halsweichteile\n☐ Vairogdziedzeris / Schilddrüse",
+   "bezeichnung": "Kakls / Hals",
+   "optionen": {
+    "spalten": 3,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "☐ Kakla daļa (HWS) / Halswirbelsäule\n☐ Krūšu daļa (BWS) / Brustwirbelsäule\n☐ Jostas daļa (LWS) / Lendenwirbelsäule\n☐ Krustu-zarnu locītavas (ISG) / Sakroiliakalgelenke\n☐ Viss mugurkauls / Ganze Wirbelsäule",
+   "bezeichnung": "Mugurkauls / Wirbelsäule",
+   "optionen": {
+    "spalten": 3,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "text",
+   "text": "☐ Sirds — kardiālā MR / Herz\n☐ Videne / Mediastinum\n☐ Krūts / Mamma\n☐ Plaušas / Lunge",
+   "bezeichnung": "Krūškurvis / Thorax",
+   "optionen": {
+    "spalten": 3,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b10",
+   "typ": "text",
+   "text": "☐ Augšvēders / Oberbauch\n☐ Aknas / Leber\n☐ MRCP (žults ceļi) / MRCP (Gallenwege)\n☐ Nieres / Nieren\n☐ Virsnieres / Nebennieren\n☐ Aizkuņģa dziedzeris / Pankreas",
+   "bezeichnung": "Vēders / Abdomen",
+   "optionen": {
+    "spalten": 3,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b11",
+   "typ": "text",
+   "text": "☐ Mazais iegurnis / kleines Becken\n☐ Prostata\n☐ Ginekoloģija / Gynäkologie\n☐ MR enterogrāfija (Sellink)",
+   "bezeichnung": "Iegurnis / Becken",
+   "optionen": {
+    "spalten": 3,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b12",
+   "typ": "text",
+   "text": "Plecs / Schulter: ☐ labā / rechts ☐ kreisā / links\nElkonis / Ellenbogen: ☐ labā / rechts ☐ kreisā / links\nPlauksta / Hand: ☐ labā / rechts ☐ kreisā / links\nGūža / Hüfte: ☐ labā / rechts ☐ kreisā / links\nCelis / Knie: ☐ labā / rechts ☐ kreisā / links\nPotīte–pēda / Sprunggelenk-Fuß: ☐ labā / rechts ☐ kreisā / links",
+   "bezeichnung": "Balsta-kustību sistēma — norādīt pusi / Muskuloskelettal — Seite angeben",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b13",
+   "typ": "text",
+   "text": "☐ Iegurnis–krustu kauls / Becken-Sakrum",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b14",
+   "typ": "text",
+   "text": "☐ Intrakraniāli / intrakraniell\n☐ Kakla artērijas / Halsgefäße\n☐ Aorta\n☐ Nieru artērijas / Nierenarterien\n☐ Iegurņa–kāju / Becken-Bein",
+   "bezeichnung": "Asinsvadi (MR-angiogrāfija) / Gefäße (MR-Angiographie)",
+   "optionen": {
+    "spalten": 3,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b15",
+   "typ": "text",
+   "text": "☐ Visa ķermeņa MR / Ganzkörper-MRT",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b16",
+   "typ": "text",
+   "text": "☐ Bez kontrastvielas / ohne Kontrastmittel\n☐ Ar kontrastvielu (pēc eGFR) / mit Kontrastmittel (nach eGFR)",
+   "bezeichnung": "Kontrastviela / Kontrastmittel",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b17",
+   "typ": "text",
+   "text": "☐ Sirds ritma stimulators / defibrilators? / Herzschrittmacher / Defibrillator?\n☐ Metāla implanti / svešķermeņi? / Metallimplantate / Fremdkörper?\n☐ Klaustrofobija? / Klaustrophobie?\n☐ Nieru funkcija (eGFR) zināma? / Nierenfunktion (eGFR) bekannt?\n☐ Ķermeņa svars / iekārta pārbaudīts? / Körpergewicht / Gerät geprüft?\n☐ Grūtniecība? / Schwangerschaft?",
+   "bezeichnung": "MR drošības kontrolsaraksts / MRT-Sicherheitscheckliste",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b18",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

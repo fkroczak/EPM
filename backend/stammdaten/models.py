@@ -558,7 +558,12 @@ class Absenderangaben(models.Model):
             "fusszeile": "rechtsfähige gemeinnützige und mildtätige Stiftung",
         },
         Einstellungen.Absender.GUG: {},
-        Einstellungen.Absender.RG: {"name": "Regeneration Clinic"},
+        # aus den Vorlagen der Regeneration Clinic (13.10.2026, ``vorlagen.rgc``)
+        Einstellungen.Absender.RG: {
+            "name": "Regeneration Clinic SIA", "strasse": "Jāņa Asara iela 3", "plz": "LV-1009", "ort": "Rīga",
+            "telefon": "+371 28717452", "email": "info@regeneration-clinic.eu",
+            "fusszeile": "Ārstniecības iestāde · Health Institution Code 001000289 · Reg.-Nr. 40203593175",
+        },
     }
 
     class Meta:
