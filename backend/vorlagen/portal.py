@@ -10,6 +10,9 @@ from .felder import ist_eigen
 GRUPPEN = {
     "schreiben": "Briefe und E-Mails an Patienten",
     "eigen": "Eigene Vorlagen",
+    # mitgelieferte Vorlagen der Regeneration Clinic (13.10.2026)
+    "anforderungen": "Anforderungen: Labor, Bildgebung, Funktionsdiagnostik",
+    "formulare": "Aufklärungen, Erklärungen und Abrechnung",
     "plaene": "Pläne, Berichte und Unterlagen",
     "datenschutz": "Vordrucke zum Datenschutz",
 }
@@ -47,11 +50,11 @@ ARTEN = {
 }
 
 
-def art_info(art: str, beschreibung: str = "") -> dict:
-    """``{"gruppe", "wofuer", "wo"}`` für die Übersicht; eigene Schreiben mit ihrer Beschreibung (F176)."""
+def art_info(art: str, beschreibung: str = "", gruppe: str | None = None) -> dict:
+    """``{"gruppe", "wofuer", "wo"}`` für die Übersicht; eigene Schreiben mit ihrer Beschreibung (F176) und Gruppe."""
     if ist_eigen(art):
-        return {"gruppe": "eigen", "wofuer": beschreibung or "Eigenes Schreiben an den Patienten mit E-Mail-Text.",
-                "wo": f"{SCHREIBEN_WO} › „Eigene Vorlagen“"}
+        return {"gruppe": gruppe if gruppe in GRUPPEN else "eigen", "wofuer": beschreibung or "Eigenes Schreiben an den Patienten mit E-Mail-Text.",
+                "wo": f"{SCHREIBEN_WO} › „{GRUPPEN.get(gruppe) or GRUPPEN['eigen']}“"}
     gruppe, wofuer, wo = ARTEN.get(art, ("plaene", "", ""))
     return {"gruppe": gruppe, "wofuer": wofuer, "wo": wo}
 

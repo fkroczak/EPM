@@ -1,0 +1,116 @@
+{
+ "quelle": "RC_Vorlage_08_Mastzellaktivierung_MCAS",
+ "name": "Laboranforderung Mastzellaktivierung (MCAS)",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)",
+ "datei": "RC_Vorlage_08_Mastzellaktivierung_MCAS_1.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Tuklo šūnu aktivācijas diagnostika (MCAS) / Mastzellaktivierungsdiagnostik (MCAS)",
+   "zusatz": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)"
+  },
+  {
+   "id": "b3",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient un nosūtījums / Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Uzvārds, vārds / Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Dzimšanas datums / Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Adrese / Adresse",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Pacienta ID / Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Datums / laiks / Datum / Uhrzeit",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Nosūtošais ārsts / Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nodaļa / Station",
+     "wert": "____________________"
+    },
+    {
+     "label": "Steidzamība / Dringlichkeit",
+     "wert": "☐ STAT ☐ rutīna / Routine"
+    }
+   ]
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "bezeichnung": "Klīniskā informācija / jautājums · Klinische Angaben / Fragestellung",
+   "text": "\n\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "bezeichnung": "Hinweis",
+   "text": "Lūdzu atzīmēt katru vēlamo izmeklējumu atsevišķi. · Bitte jede gewünschte Untersuchung einzeln ankreuzen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": "☐ Izmeklējums (LV / DE) — Materiāls / norāde · Material / Hinweis\n☐ Triptāze — bazālā (stabilā fāzē) / Tryptase (basal, stabile Phase) — tukšā dūšā, bez lēkmes / nüchtern, symptomfrei\n☐ Triptāze — lēkmes laikā / Tryptase (im Schub) — 1–4 h pēc simptomiem / 1–4 h nach Symptombeginn\n☐ Histamīns (plazmā) / Histamin (Plasma) — atdzesēts/sasaldēts / gekühlt, gefroren\n☐ Diaminooksidāze (DAO) / Diaminoxidase (DAO)\n☐ Hromogranīns A (CgA) / Chromogranin A — bez PPI ietekmes / ohne PPI-Einfluss\n☐ Prostaglandīns D2 (plazmā) / Prostaglandin D2 (Plasma) — atdzesēts / gekühlt\n☐ Kopējais IgE / Gesamt-IgE\n☐ Eozinofīlie (dif. asins ainā) / Eosinophile (Diff-BB)",
+   "bezeichnung": "Serums / asinis / Serum / Blut",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "☐ Izmeklējums (LV / DE) — Materiāls / norāde · Material / Hinweis\n☐ N-metilhistamīns (urīnā) / N-Methylhistamin (Urin) — 24 h urīns, atdzesēts / gekühlt\n☐ 11β-prostaglandīns F2α (urīnā) / 11β-Prostaglandin F2α (Urin) — 24 h urīns / 24-h-Urin\n☐ Leikotriēns E4 / LTE4 (urīnā) / Leukotrien E4 (Urin) — 24 h urīns / 24-h-Urin",
+   "bezeichnung": "Urīns (24 h, atdzesēts) / Urin (24 h, gekühlt)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "– Lēkmes paraugu ņemt 1–4 h laikā un salīdzināt ar bazālo triptāzi. / Schubprobe innerhalb 1–4 h abnehmen und mit Basal-Tryptase vergleichen.\n– Aktivāciju apstiprina triptāzes pieaugums ≥ 20 % + 2 ng/ml. / Aktivierung bestätigt: Tryptase-Anstieg ≥ 20 % + 2 ng/ml.\n– Ņemt vērā antihistamīnu / PPI ietekmi; ievērot atdzesēšanu/sasaldēšanu. / Einfluss von Antihistaminika / PPI beachten; Kühl-/Gefrierkette einhalten.",
+   "bezeichnung": "Piezīmes par pirmsanalītiku · Hinweise zur Präanalytik",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

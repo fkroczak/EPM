@@ -1,0 +1,129 @@
+{
+ "quelle": "RC_Vorlage_01_Basislabor",
+ "name": "Laboranforderung Basislabor",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)",
+ "datei": "RC_Vorlage_01_Basislabor.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Pamata laboratorija / Basislabor",
+   "zusatz": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)"
+  },
+  {
+   "id": "b3",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient un nosūtījums / Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Uzvārds, vārds / Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Dzimšanas datums / Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Adrese / Adresse",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Pacienta ID / Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Datums / laiks / Datum / Uhrzeit",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Nosūtošais ārsts / Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nodaļa / Station",
+     "wert": "____________________"
+    },
+    {
+     "label": "Steidzamība / Dringlichkeit",
+     "wert": "☐ STAT ☐ rutīna / Routine"
+    }
+   ]
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "bezeichnung": "Klīniskā informācija / jautājums · Klinische Angaben / Fragestellung",
+   "text": "\n\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "bezeichnung": "Hinweis",
+   "text": "Lūdzu atzīmēt katru vēlamo izmeklējumu atsevišķi. · Bitte jede gewünschte Untersuchung einzeln ankreuzen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": "☐ Mazā asins aina / Kleines Blutbild\n☐ Lielā asins aina (diferenciālā) / Großes Blutbild\n☐ Retikulocīti / Retikulozyten\n☐ EGĀ (BSG) / Blutsenkung",
+   "bezeichnung": "Hematoloģija / Hämatologie",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "☐ Nātrijs / Natrium\n☐ Kālijs / Kalium\n☐ Kalcijs / Kalzium\n☐ Magnijs / Magnesium\n☐ Fosfāts / Phosphat\n☐ Hlorīds / Chlorid\n☐ Kreatinīns + eGFR\n☐ Urīnviela / Harnstoff\n☐ Urīnskābe / Harnsäure\n☐ ASAT / GOT\n☐ ALAT / GPT\n☐ Gamma-GT\n☐ Sārmainā fosfatāze / AP\n☐ Bilirubīns kopējais / gesamt\n☐ Bilirubīns tiešais / direkt\n☐ LDH\n☐ Lipāze / Lipase\n☐ Amilāze / Amylase\n☐ Kopolbaltums / Gesamteiweiß\n☐ Albumīns / Albumin\n☐ Glikoze / Glukose\n☐ HbA1c\n☐ Kopējais holesterīns / Gesamtcholesterin\n☐ LDL holesterīns / LDL\n☐ HDL holesterīns / HDL\n☐ Triglicerīdi / Triglyzeride\n☐ CRP\n☐ Prokalcitonīns (PCT)\n☐ TSH",
+   "bezeichnung": "Klīniskā ķīmija / Klinische Chemie",
+   "optionen": {
+    "spalten": 3,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "☐ Protrombīna laiks (Kvika) / INR\n☐ aPTT\n☐ Fibrinogēns / Fibrinogen\n☐ D-dimēri / D-Dimere",
+   "bezeichnung": "Koagulācija (pamata) / Gerinnung (Basis)",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "text",
+   "text": "☐ Urīna analīze (strīpu tests) / Urinstatus\n☐ Urīna nogulsnes / Sediment\n☐ Albumīna/kreatinīna attiecība / ACR",
+   "bezeichnung": "Urīns / Urin",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b10",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

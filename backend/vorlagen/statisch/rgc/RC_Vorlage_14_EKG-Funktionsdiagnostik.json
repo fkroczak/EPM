@@ -1,0 +1,109 @@
+{
+ "quelle": "RC_Vorlage_14_EKG-Funktionsdiagnostik",
+ "name": "EKG und Funktionsdiagnostik",
+ "gruppe": "anforderungen",
+ "beschreibung": "Klīnikas veidlapa · Klinikvorlage (LV / DE)",
+ "datei": "RC_Vorlage_14_EKG-Funktionsdiagnostik.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "EKG / funkcionālā diagnostika / EKG / Funktionsdiagnostik",
+   "zusatz": "Klīnikas veidlapa · Klinikvorlage (LV / DE)"
+  },
+  {
+   "id": "b3",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient un nosūtījums / Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Uzvārds, vārds / Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Dzimšanas datums / Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Adrese / Adresse",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Pacienta ID / Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Datums / laiks / Datum / Uhrzeit",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Nosūtošais ārsts / Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nodaļa / Station",
+     "wert": "____________________"
+    },
+    {
+     "label": "Steidzamība / Dringlichkeit",
+     "wert": "☐ STAT ☐ rutīna / Routine"
+    }
+   ]
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "bezeichnung": "Klīniskā informācija / jautājums · Klinische Angaben / Fragestellung",
+   "text": "\n\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "bezeichnung": "Hinweis",
+   "text": "Lūdzu atzīmēt katru vēlamo izmeklējumu atsevišķi. · Bitte jede gewünschte Untersuchung einzeln ankreuzen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": "☐ 12 novadījumu miera EKG / 12-Kanal-Ruhe-EKG\n☐ Slodzes EKG (ergometrija) / Belastungs-EKG\n☐ Holtera EKG 24 h / Langzeit-EKG 24 h\n☐ Holtera EKG 48 / 72 h / Langzeit-EKG 48/72 h\n☐ Ilgstoša asinsspiediena mērīšana (24 h) / Langzeit-RR\n☐ Ritma josla / Rhythmusstreifen\n☐ Ortostāzes tests / Kipptisch (Schellong)",
+   "bezeichnung": "Izmeklējums / Untersuchung",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "☐ Ritms / aritmija / Rhythmus / Arrhythmie\n☐ Priekškambaru mirdzēšana / Vorhofflimmern\n☐ Išēmija / koronārā sirds slimība / Ischämie / KHK\n☐ Kreisā kambara hipertrofija / LV-Hypertrophie\n☐ Vadīšanas traucējumi / blokāde / Reizleitung / Block\n☐ QT intervāls / QT-Intervall\n☐ Elektrokardiostimulatora kontrole / Schrittmacherkontrolle\n☐ Sinkopes / kritiena cēlonis / Synkopenabklärung\n☐ Slodzes tolerance / AT reakcija / Belastbarkeit / RR-Verhalten",
+   "bezeichnung": "Klīniskie jautājumi / Fragestellungen",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

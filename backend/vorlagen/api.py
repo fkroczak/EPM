@@ -30,6 +30,7 @@ from rest_framework.views import APIView
 from accounts.permissions import recht
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import benutzername, patienten_fuer
+from epm.firma import aktive_firma
 
 from .bloecke import MIT_EMAIL, OPTIONEN, TYPEN, pruefe_bloecke
 from .felder import FELDER, TABELLEN, Kontext
@@ -67,7 +68,7 @@ def _uebersicht(art):
             "eigen": {"beschreibung": eigen.beschreibung, "mit_termin": eigen.mit_termin, "aktiv": eigen.aktiv}
             if eigen else None,
             # Vorlagen-Portal (F180): wofür, wo in der Praxis benutzt, Gruppe der Übersicht
-            **art_info(art, eigen.beschreibung if eigen else ""),
+            **art_info(art, eigen.beschreibung if eigen else "", eigen.gruppe if eigen else None),
             "entwurf": _version(Dokumentvorlage.entwurf_von(art)), "versionen": [_version(v) for v in versionen],
             # Vordrucke: Wasserzeichen „ENTWURF“ (Startvorlage ungeprüft) und ob es manuell abgeschaltet ist (U17)
             "entwurfsmodus": {"moeglich": art in Dokumentvorlage.VORDRUCKE and aktiv.veroeffentlicht_von_id is None,
@@ -79,14 +80,14 @@ class VorlagenView(APIView):
     permission_classes = [VorlagenRecht]
 
     def get(self, request):
-        arten = [*Dokumentvorlage.Art.values, *EigenesSchreiben.objects.values_list("schluessel", flat=True)]
+        arten = [*Dokumentvorlage.Art.values, *EigenesSchreiben.sichtbare().values_list("schluessel", flat=True)]
         return Response([_uebersicht(a) for a in arten])
 
     @transaction.atomic
     def post(self, request):
         """Eigenes Schreiben anlegen (F176): ``{"name", "beschreibung"?, "mit_termin"?}``. Die Startvorlage (Brief an
         den Patienten mit E-Mail) wird gleich als Version 1 aktiv und kann danach bearbeitet werden."""
-        e = EigenesSchreiben(erstellt_von=request.user)
+        e = EigenesSchreiben(erstellt_von=request.user, firma=aktive_firma())
         fehler = _eigen_setzen(e, request.data, neu=True)
         if fehler:
             return Response(fehler, status=status.HTTP_400_BAD_REQUEST)
@@ -127,7 +128,7 @@ class EigenesSchreibenView(APIView):
     permission_classes = [VorlagenRecht]
 
     def patch(self, request, art):
-        e = EigenesSchreiben.objects.filter(schluessel=art).first()
+        e = EigenesSchreiben.sichtbare().filter(schluessel=art).first()
         if e is None:
             raise Http404("Kein eigenes Schreiben.")
         fehler = _eigen_setzen(e, request.data)
@@ -150,8 +151,11 @@ class SchreibenListeView(APIView):
 
         liste = [{"art": a, "name": art_name(a), "beschreibung": v["beschreibung"], "termin": v["termin"], "eigen": False}
                  for a, v in AUS_DER_AKTE.items()]
+        from .portal import GRUPPEN
+
         liste += [{"art": e.schluessel, "name": e.name, "beschreibung": e.beschreibung, "termin": e.mit_termin,
-                   "eigen": True} for e in EigenesSchreiben.objects.filter(aktiv=True)]
+                   "eigen": True, "gruppe": e.gruppe, "gruppe_name": GRUPPEN.get(e.gruppe, GRUPPEN["eigen"])}
+                  for e in EigenesSchreiben.sichtbare().filter(aktiv=True).order_by("gruppe", "name")]
         return Response(liste)
 
 
@@ -318,7 +322,7 @@ class DuplizierenView(APIView):
 
         art = _art(art)
         quelle = Dokumentvorlage.aktive(art)
-        e = EigenesSchreiben(erstellt_von=request.user)
+        e = EigenesSchreiben(erstellt_von=request.user, firma=aktive_firma())
         daten = {"beschreibung": "", "mit_termin": "Termin.Datum" in str(quelle.bloecke), **request.data}
         fehler = _eigen_setzen(e, daten, neu=True)
         if fehler:

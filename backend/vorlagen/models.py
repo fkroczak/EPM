@@ -159,7 +159,7 @@ def art_name(art: str) -> str:
 
 def gibt_es_art(art) -> bool:
     return isinstance(art, str) and (art in Dokumentvorlage.Art.values
-                                     or EigenesSchreiben.objects.filter(schluessel=art).exists())
+                                     or EigenesSchreiben.sichtbare().filter(schluessel=art).exists())
 
 
 class EigenesSchreiben(models.Model):
@@ -172,11 +172,28 @@ class EigenesSchreiben(models.Model):
     beschreibung = models.CharField(max_length=300, blank=True)
     mit_termin = models.BooleanField("Termin wählen", default=False)
     aktiv = models.BooleanField(default=True)
+    # Vorlagen einer Firma (RGC-Vorlagen, 13.10.2026): nur in dieser Firma sichtbar; leer = in allen Firmen
+    firma = models.ForeignKey("stammdaten.Firma", on_delete=models.PROTECT, null=True, blank=True,
+                              related_name="eigene_schreiben")
+    # Gruppe in der Übersicht und in der Akte (``portal.GRUPPEN``), z. B. „anforderungen“ für Labor und Bildgebung
+    gruppe = models.CharField(max_length=20, default="eigen")
+    # mitgelieferte Vorlagen (z. B. „rgc-labor-01“): Kennung der Quelle, damit sie nur einmal angelegt werden
+    mitgeliefert = models.CharField(max_length=40, unique=True, null=True, blank=True, editable=False)
     erstellt_am = models.DateTimeField(auto_now_add=True)
     erstellt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
                                      related_name="+")
 
     history = HistoricalRecords()
+
+    @classmethod
+    def sichtbare(cls, firma=None):
+        """Eigene Schreiben der aktiven Firma und die ohne Firma. Ohne aktive Firma (Befehle, Hintergrund) gilt wie bei
+        den Akten die Hauptfirma (DSKM)."""
+        from epm.firma import HAUPTFIRMA, aktive_firma
+
+        firma = firma or aktive_firma()
+        eigene = models.Q(firma=firma) if firma is not None else models.Q(firma__kuerzel=HAUPTFIRMA)
+        return cls.objects.filter(eigene | models.Q(firma__isnull=True))
 
     class Meta:
         verbose_name = "Eigenes Schreiben"

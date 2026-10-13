@@ -36,6 +36,8 @@ OPTIONEN = {
     "linie_oben": bool,  # dünne Linie über dem Block (z. B. Freigabevermerk wie „validiert von“ im Laborbefund)
     # neben den vorherigen Block setzen; Wert = Breite dieses Blocks, der vorherige erhält den Rest
     "neben_vorherigem": {"drittel", "haelfte", "zwei_drittel"},
+    # Text in 2 oder 3 Spalten setzen, z. B. Ankreuzlisten der Laboranforderungen (RGC-Vorlagen, 13.10.2026)
+    "spalten": {2, 3},
 }
 NEBENEINANDER = {"text", "datenfelder", "tabelle", "unterschrift"}
 DARSTELLUNGEN = {"paare", "befund"}
@@ -111,7 +113,7 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
         if not isinstance(b.get("id"), str) or not ID_MUSTER.match(b["id"]) or b["id"] in ids:
             fehler.append(f"{name}: fehlende oder doppelte Kennung.")
         ids.add(b.get("id"))
-        _text(b.get("bezeichnung"), f"{name} (Bezeichnung)", fehler, laenge=80)
+        _text(b.get("bezeichnung"), f"{name} (Bezeichnung)", fehler, laenge=160)
         optionen = b.get("optionen", {})
         if not isinstance(optionen, dict):
             fehler.append(f"{name}: Optionen ungültig.")
@@ -182,7 +184,7 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
             erlaubt |= {"felder", "linie"}
             if b.get("felder"):
                 _eintraege(art, b.get("felder"), name, fehler)
-            _text(b.get("linie"), f"{name} (Linie)", fehler, laenge=80)
+            _text(b.get("linie"), f"{name} (Linie)", fehler, laenge=200)
         elif typ == "tabelle":
             erlaubt |= {"quelle"}
             if b.get("quelle") not in TABELLEN[art]:

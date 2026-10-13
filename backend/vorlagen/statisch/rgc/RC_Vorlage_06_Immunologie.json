@@ -1,0 +1,119 @@
+{
+ "quelle": "RC_Vorlage_06_Immunologie",
+ "name": "Laboranforderung Immunologie",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)",
+ "datei": "RC_Vorlage_06_Immunologie.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Imunoloģija / Immunologie",
+   "zusatz": "Laboratorijas nosūtījums · Laboranforderung — klīnikas veidlapa (LV / DE)"
+  },
+  {
+   "id": "b3",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient un nosūtījums / Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Uzvārds, vārds / Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Dzimšanas datums / Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Adrese / Adresse",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Pacienta ID / Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Datums / laiks / Datum / Uhrzeit",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Nosūtošais ārsts / Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nodaļa / Station",
+     "wert": "____________________"
+    },
+    {
+     "label": "Steidzamība / Dringlichkeit",
+     "wert": "☐ STAT ☐ rutīna / Routine"
+    }
+   ]
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "bezeichnung": "Klīniskā informācija / jautājums · Klinische Angaben / Fragestellung",
+   "text": "\n\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "bezeichnung": "Hinweis",
+   "text": "Lūdzu atzīmēt katru vēlamo izmeklējumu atsevišķi. · Bitte jede gewünschte Untersuchung einzeln ankreuzen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": "☐ IgG\n☐ IgA\n☐ IgM\n☐ IgE (kopējais) / Gesamt-IgE\n☐ IgD\n☐ IgG apakšklases 1–4 / IgG-Subklassen 1–4",
+   "bezeichnung": "Imūnglobulīni / Immunglobuline",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "☐ Komplements C3 / Komplement C3\n☐ Komplements C4 / Komplement C4\n☐ CH50\n☐ C1 inhibitors / C1-Inhibitor",
+   "bezeichnung": "Komplements / Komplement",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "☐ Limfocītu apakšpopulācijas (CD3/CD4/CD8/CD19/CD16+56)\n☐ Brīvās vieglās ķēdes κ / freie Leichtketten κ\n☐ Brīvās vieglās ķēdes λ / freie Leichtketten λ\n☐ κ/λ attiecība / κ-λ-Quotient\n☐ Imunfiksācija / Immunfixation\n☐ β2-mikroglobulīns / β2-Mikroglobulin",
+   "bezeichnung": "Šūnu imunitāte / paraproteīni / Zelluläre Immunität / Paraproteine",
+   "optionen": {
+    "spalten": 2,
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}
