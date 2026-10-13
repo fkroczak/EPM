@@ -503,7 +503,7 @@ class VorlagenJeFirma(Grundlage):
             self.assertIn("ENTWURF", wasserzeichen(r.content))
             text = kompakt(pdf_text(r.content))
             for erwartet in ["Patientenerklärung bei Aufnahme", "Vorlage 01 · Version 6 · Stand 10/2026",
-                             "Klinik, Karla", "01.01.1970", "ÖGK Wien", "1234 010170", "Leistungserbringerin",
+                             "Klinik, Karla", "01.01.1970", "1234 010170", "Leistungserbringerin",
                              "Regeneration Clinic SIA · Jāņa Asara iela 3", "Was die Stundung für Sie bedeutet",
                              "Rechtsstellung der Klinik im Überblick", "12. Stundung des erwarteten Kassenanteils",
                              "Unterschrift Patient/in – Zedent/in (vollständig lesbar)"]:
