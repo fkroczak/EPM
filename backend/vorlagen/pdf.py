@@ -97,7 +97,7 @@ table { width: 100%%; border-collapse: collapse; }
 .medikamente :is(.knapp, .form, .einheit) { width: auto; white-space: nowrap; }
 .medikamente .grund { width: 18mm; }
 /* zwei Blöcke nebeneinander */
-.paar { display: flex; justify-content: space-between; align-items: flex-start; }
+.paar { display: flex; justify-content: space-between; align-items: flex-start; break-inside: avoid; }
 .paar .b, .paar .befund .b { width: auto; white-space: nowrap; }
 /* Kopfkarte wie der Kopf der Akte in EPM */
 .kopfkarte { border: 0.6pt solid #d9d8e3; border-radius: 2mm; padding: 2.3mm 3.5mm 2mm; }
@@ -259,8 +259,9 @@ class Ersetzer:
         return "<br>".join(ausgabe), gesehen and alle_leer
 
     def text(self, text: str) -> str:
-        """Nur Text (Fußzeile): Platzhalter ohne HTML einsetzen."""
-        return PLATZHALTER.sub(lambda m: str(self.wert(m.group(1).strip())[0] or ""), text or "")
+        """Nur Text (Fußzeile): Platzhalter ohne HTML einsetzen; Trennpunkte um leere Werte entfallen."""
+        ersetzt = PLATZHALTER.sub(lambda m: str(self.wert(m.group(1).strip())[0] or ""), text or "")
+        return "\n".join(_trenner(z) for z in ersetzt.split("\n"))
 
     @staticmethod
     def _statisch(t: str) -> str:

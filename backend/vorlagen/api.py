@@ -10,8 +10,14 @@ GET    /api/vorlagen/{art}/versionen/{n}/     Blöcke einer Version
 GET    /api/vorlagen/{art}/startvorlage/      Blöcke der mitgelieferten Startvorlage (als Grundlage für einen Entwurf)
 POST   /api/vorlagen/{art}/versionen/{n}/wiederherstellen/  frühere Fassung als Entwurf übernehmen (F180)
 POST   /api/vorlagen/{art}/duplizieren/       {"name", "beschreibung"?, "mit_termin"?} → eigene Vorlage als Kopie (F180)
-POST   /api/vorlagen/{art}/vorschau/          {"patient": ID (Testpatient), "bloecke"?} → PDF mit Wasserzeichen ENTWURF
-                                              mit "ausgabe": "email" → {"betreff", "text"} der Schreiben
+POST   /api/vorlagen/{art}/vorschau/          {"patient": ID (Testpatient), "bloecke"?, "ausrichtung"?} → PDF mit
+                                              Wasserzeichen ENTWURF; mit "ausgabe": "email" → {"betreff", "text"}
+POST   /api/vorlagen/{art}/firma/             {"eigene": true|false} → eigene Vorlage der aktiven Firma anlegen (Kopie
+                                              der gemeinsamen) bzw. ablegen (wieder die gemeinsame nutzen)
+
+Vorlagen je Firma (11.10.2026): Alle Aufrufe gelten für die Vorlage, die in der aktiven Firma gilt – ihre eigene,
+wenn sie eine hat, sonst die gemeinsame (``Dokumentvorlage.zustaendig``). Der Entwurf speichert auch das Seitenformat
+(``ausrichtung`` hoch/quer, 13.10.2026).
 
 Anlagen für die E-Mails der Schreiben (F174):
 GET    /api/anlagen/                          aktive Anlagen (alle mit ?alle=1, nur mit „Vorlagen pflegen“)
@@ -31,9 +37,9 @@ from accounts.permissions import recht
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import benutzername, patienten_fuer
 
-from .bloecke import MIT_EMAIL, OPTIONEN, TYPEN, pruefe_bloecke
-from .felder import FELDER, TABELLEN, Kontext
-from .models import Dokumentvorlage, EigenesSchreiben, art_name, gibt_es_art
+from .bloecke import MIT_EMAIL, OPTIONEN, QUERFORMAT, TYPEN, pruefe_bloecke
+from .felder import FELDER, TABELLEN, Kontext, ist_eigen
+from .models import NUR_FIRMA, Dokumentvorlage, EigenesSchreiben, art_name, art_sichtbar, gibt_es_art
 from .pdf import erzeuge_aus_vorlage
 from .portal import art_info, feld_info
 
@@ -41,7 +47,7 @@ VorlagenRecht = recht("vorlagen_pflegen", lesen="vorlagen_pflegen")
 
 
 def _art(art):
-    if not gibt_es_art(art):
+    if not gibt_es_art(art) or not art_sichtbar(art):
         raise Http404("Unbekannte Vorlagenart.")
     return art
 
@@ -49,15 +55,38 @@ def _art(art):
 def _version(v: Dokumentvorlage | None):
     if v is None:
         return None
-    return {"id": v.id, "version": v.version, "status": v.status, "notiz": v.notiz,
+    return {"id": v.id, "version": v.version, "status": v.status, "notiz": v.notiz, "ausrichtung": v.ausrichtung,
+            "firma": v.firma.kuerzel if v.firma_id else None,
             "erstellt_am": v.erstellt_am, "geaendert_am": v.geaendert_am,
             "geaendert_von": benutzername(v.geaendert_von or v.erstellt_von),
             "veroeffentlicht_am": v.veroeffentlicht_am, "veroeffentlicht_von": benutzername(v.veroeffentlicht_von)}
 
 
+def _ausrichtung(daten, sonst: str) -> str:
+    """Seitenformat aus der Anfrage (hoch/quer), ohne Angabe wie bisher; ungültig → ValueError."""
+    wert = daten.get("ausrichtung", sonst)
+    if wert not in Dokumentvorlage.Ausrichtung.values:
+        raise ValueError("Bitte „hoch“ oder „quer“.")
+    return wert
+
+
+def _firma_info(art, ziel) -> dict:
+    """Vorlagen je Firma (11.10.2026): nutzt die aktive Firma die gemeinsame Vorlage oder ihre eigene?"""
+    from epm.firma import aktive_firma
+    from stammdaten.models import Firma
+
+    firma = aktive_firma()
+    mehrere = Firma.objects.filter(aktiv=True).count() > 1
+    return {"aktiv": firma.kuerzel if firma else None, "name": firma.kurzname if firma else None,
+            "mehrere": mehrere, "eigene": ziel is not None, "gebunden": art in NUR_FIRMA,
+            # eigene Vorlage anlegen/ablegen: nur mit mehreren Firmen, nicht bei fest zugeordneten oder eigenen Schreiben
+            "moeglich": mehrere and firma is not None and art not in NUR_FIRMA and not ist_eigen(art)}
+
+
 def _uebersicht(art):
     aktiv = Dokumentvorlage.aktive(art)
-    versionen = Dokumentvorlage.objects.filter(art=art).exclude(status=Dokumentvorlage.Status.ENTWURF) \
+    ziel = Dokumentvorlage.zustaendig(art)
+    versionen = Dokumentvorlage.objects.filter(art=art, firma=ziel).exclude(status=Dokumentvorlage.Status.ENTWURF) \
         .select_related("veroeffentlicht_von").order_by("-version")
     from stammdaten.models import Einstellungen
 
@@ -69,17 +98,21 @@ def _uebersicht(art):
             # Vorlagen-Portal (F180): wofür, wo in der Praxis benutzt, Gruppe der Übersicht
             **art_info(art, eigen.beschreibung if eigen else ""),
             "entwurf": _version(Dokumentvorlage.entwurf_von(art)), "versionen": [_version(v) for v in versionen],
+            "firma": _firma_info(art, ziel),
+            # Seitenformat (13.10.2026): das der aktiven Fassung; der Editor bietet Querformat bei breiten Tabellen an
+            "ausrichtung": aktiv.ausrichtung, "querformat_moeglich": art in QUERFORMAT,
             # Vordrucke: Wasserzeichen „ENTWURF“ (Startvorlage ungeprüft) und ob es manuell abgeschaltet ist (U17)
             "entwurfsmodus": {"moeglich": art in Dokumentvorlage.VORDRUCKE and aktiv.veroeffentlicht_von_id is None,
                               "aktiv": aktiv.im_entwurfsmodus,
-                              "aus": art in (Einstellungen.aktuell().vordrucke_ohne_entwurf or [])}}
+                              "aus": aktiv.entwurfsmodus_schluessel in (Einstellungen.aktuell().vordrucke_ohne_entwurf or [])}}
 
 
 class VorlagenView(APIView):
     permission_classes = [VorlagenRecht]
 
     def get(self, request):
-        arten = [*Dokumentvorlage.Art.values, *EigenesSchreiben.objects.values_list("schluessel", flat=True)]
+        arten = [*(a for a in Dokumentvorlage.Art.values if art_sichtbar(a)),
+                 *EigenesSchreiben.objects.values_list("schluessel", flat=True)]
         return Response([_uebersicht(a) for a in arten])
 
     @transaction.atomic
@@ -187,16 +220,23 @@ class EntwurfView(APIView):
         fehler = pruefe_bloecke(art, bloecke)
         if fehler:
             return Response({"bloecke": fehler}, status=status.HTTP_400_BAD_REQUEST)
-        entwurf = Dokumentvorlage.objects.select_for_update().filter(art=art, status=Dokumentvorlage.Status.ENTWURF).first()
+        ziel = Dokumentvorlage.zustaendig(art)
+        entwurf = Dokumentvorlage.objects.select_for_update().filter(art=art, firma=ziel,
+                                                                     status=Dokumentvorlage.Status.ENTWURF).first()
         neu = entwurf is None
         if neu:
-            entwurf = Dokumentvorlage(art=art, erstellt_von=request.user)
+            entwurf = Dokumentvorlage(art=art, firma=ziel, erstellt_von=request.user,
+                                      ausrichtung=Dokumentvorlage.aktive(art).ausrichtung)
+        try:
+            entwurf.ausrichtung = _ausrichtung(request.data, entwurf.ausrichtung)
+        except ValueError as e:
+            return Response({"ausrichtung": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         entwurf.bloecke = bloecke
         entwurf.geaendert_von = request.user
         entwurf._history_user = request.user
         entwurf.save()
         if neu:
-            protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {entwurf.get_art_display()}",
+            protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {entwurf}",
                           aktion="Entwurf angelegt")
         return Response({"ist_entwurf": True, **_version(entwurf), "bloecke": entwurf.bloecke})
 
@@ -230,7 +270,8 @@ class EntwurfsmodusView(APIView):
         if not isinstance(aus, bool):
             return Response({"aus": "Bitte true oder false."}, status=status.HTTP_400_BAD_REQUEST)
         e = Einstellungen.aktuell()
-        liste = [a for a in (e.vordrucke_ohne_entwurf or []) if a != art] + ([art] if aus else [])
+        schluessel = Dokumentvorlage.aktive(art).entwurfsmodus_schluessel  # je Firma, wenn sie eine eigene hat
+        liste = [a for a in (e.vordrucke_ohne_entwurf or []) if a != schluessel] + ([schluessel] if aus else [])
         if sorted(liste) != sorted(e.vordrucke_ohne_entwurf or []):
             e.vordrucke_ohne_entwurf = sorted(liste)
             e._history_user = request.user
@@ -250,7 +291,7 @@ class VeroeffentlichenView(APIView):
             return Response({"fehler": "Es gibt keinen Entwurf zum Veröffentlichen."}, status=status.HTTP_400_BAD_REQUEST)
         entwurf._history_user = request.user
         entwurf.veroeffentlichen(request.user)
-        protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {entwurf.get_art_display()}",
+        protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {entwurf}",
                       aktion=f"Version {entwurf.version} veröffentlicht")
         return Response(_uebersicht(art))
 
@@ -260,7 +301,7 @@ class VersionView(APIView):
 
     def get(self, request, art, version):
         art = _art(art)
-        v = Dokumentvorlage.objects.filter(art=art, version=version).first()
+        v = Dokumentvorlage.objects.filter(art=art, firma=Dokumentvorlage.zustaendig(art), version=version).first()
         if v is None:
             raise Http404("Version nicht gefunden.")
         return Response({**_version(v), "bloecke": v.bloecke})
@@ -285,17 +326,20 @@ class WiederherstellenView(APIView):
     @transaction.atomic
     def post(self, request, art, version):
         art = _art(art)
-        v = Dokumentvorlage.objects.filter(art=art, version=version).first()
+        ziel = Dokumentvorlage.zustaendig(art)
+        v = Dokumentvorlage.objects.filter(art=art, firma=ziel, version=version).first()
         if v is None:
             raise Http404("Fassung nicht gefunden.")
         fehler = pruefe_bloecke(art, v.bloecke)
         if fehler:
             # z. B. ein Datenfeld, das es nach einem Update nicht mehr gibt
             return Response({"bloecke": fehler}, status=status.HTTP_400_BAD_REQUEST)
-        entwurf = Dokumentvorlage.objects.select_for_update().filter(art=art, status=Dokumentvorlage.Status.ENTWURF).first()
+        entwurf = Dokumentvorlage.objects.select_for_update().filter(art=art, firma=ziel,
+                                                                     status=Dokumentvorlage.Status.ENTWURF).first()
         if entwurf is None:
-            entwurf = Dokumentvorlage(art=art, erstellt_von=request.user)
+            entwurf = Dokumentvorlage(art=art, firma=ziel, erstellt_von=request.user)
         entwurf.bloecke = v.bloecke
+        entwurf.ausrichtung = v.ausrichtung
         entwurf.notiz = f"wiederhergestellt aus Fassung {v.version}"
         entwurf.geaendert_von = request.user
         entwurf._history_user = request.user
@@ -331,12 +375,52 @@ class DuplizierenView(APIView):
         e._history_user = request.user
         e.save()
         Dokumentvorlage.objects.create(art=e.schluessel, version=1, status=Dokumentvorlage.Status.AKTIV,
-                                       bloecke=quelle.bloecke, erstellt_von=request.user,
+                                       bloecke=quelle.bloecke, ausrichtung=quelle.ausrichtung, erstellt_von=request.user,
                                        notiz=f"Kopie von „{art_name(art)}“, Fassung {quelle.version}",
                                        veroeffentlicht_am=timezone.now(), veroeffentlicht_von=request.user)
         protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {e.name}",
                       aktion=f"als Kopie von „{art_name(art)}“ (Fassung {quelle.version}) angelegt")
         return Response(_uebersicht(e.schluessel), status=status.HTTP_201_CREATED)
+
+
+class FirmaVorlageView(APIView):
+    """Eigene Vorlage der aktiven Firma (Festlegung „Gemischt“, 11.10.2026): ``POST {"eigene": true}`` legt sie als
+    Kopie der gemeinsamen aktiven Fassung an (sofort in Gebrauch, Fassungen zählen je Firma); ``{"eigene": false}``
+    legt sie ab (aktive Fassung abgelöst, Entwurf verworfen) – es gilt wieder die gemeinsame Vorlage."""
+
+    permission_classes = [VorlagenRecht]
+
+    def post(self, request, art):
+        from django.core.exceptions import ValidationError
+
+        from epm.firma import aktive_firma
+        from stammdaten.models import Einstellungen
+
+        art = _art(art)
+        firma = aktive_firma()
+        eigene = request.data.get("eigene")
+        if not isinstance(eigene, bool):
+            return Response({"eigene": "Bitte true oder false."}, status=status.HTTP_400_BAD_REQUEST)
+        if firma is None or art in NUR_FIRMA or ist_eigen(art):
+            return Response({"fehler": "Für diese Vorlage gibt es keine Vorlage je Firma."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        try:
+            if eigene:
+                v = Dokumentvorlage.eigene_anlegen(art, firma, request.user)
+                aktion = f"eigene Vorlage für {firma.kurzname} angelegt (Fassung {v.version})"
+            else:
+                anzahl = Dokumentvorlage.eigene_entfernen(art, firma)
+                aktion = f"eigene Vorlage für {firma.kurzname} abgelegt ({anzahl} Fassung abgelöst)"
+                e = Einstellungen.aktuell()
+                schluessel = f"{art}@{firma.kuerzel}"
+                if schluessel in (e.vordrucke_ohne_entwurf or []):
+                    e.vordrucke_ohne_entwurf = [a for a in e.vordrucke_ohne_entwurf if a != schluessel]
+                    e._history_user = request.user
+                    e.save()
+        except ValidationError as e:
+            return Response({"fehler": " ".join(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+        protokolliere(SystemEreignis.Art.VORLAGE, request, objekt=f"Dokumentvorlage {art_name(art)}", aktion=aktion)
+        return Response(_uebersicht(art))
 
 
 def pdf_antwort(pdf: bytes, dateiname: str, inline=True) -> HttpResponse:
@@ -360,12 +444,16 @@ class VorschauView(APIView):
         if patient is None:
             return Response({"patient": "Bitte einen Testpatienten wählen."}, status=status.HTTP_400_BAD_REQUEST)
         bloecke = request.data.get("bloecke")
+        quelle = Dokumentvorlage.entwurf_von(art) or Dokumentvorlage.aktive(art)
         if bloecke is None:
-            quelle = Dokumentvorlage.entwurf_von(art) or Dokumentvorlage.aktive(art)
             bloecke = quelle.bloecke
         fehler = pruefe_bloecke(art, bloecke)
         if fehler:
             return Response({"bloecke": fehler}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            ausrichtung = _ausrichtung(request.data, quelle.ausrichtung)
+        except ValueError as e:
+            return Response({"ausrichtung": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         from infusionen.models import Infusionsplan
 
         plan = Infusionsplan.objects.filter(patient=patient, status=Infusionsplan.Status.AKTUELL).first()
@@ -398,7 +486,7 @@ class VorschauView(APIView):
 
             return Response(email_aus_vorlage(art, kontext, bloecke) or {"betreff": "", "text": ""})
         pdf, _ = erzeuge_aus_vorlage(art, kontext, bloecke=bloecke, wasserzeichen="ENTWURF",
-                                     titel=f"Vorschau {art_name(art)}")
+                                     titel=f"Vorschau {art_name(art)}", ausrichtung=ausrichtung)
         if art == Dokumentvorlage.Art.REISEBESCHEINIGUNG:
             from .schreiben import anhaengen, reise_attest
 

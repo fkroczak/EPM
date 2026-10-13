@@ -1,19 +1,10 @@
 """Dokumentvorlagen je Firma (Festlegung „Gemischt“, 11.10.2026): ``firma`` leer = gemeinsame Vorlage, gesetzt = eigene
 Vorlage dieser Firma; Entwurf, aktive Fassung und Versionsnummern gelten je (Art, Firma). Seitenformat ``ausrichtung``
-(Medikationsplan im Querformat, 13.10.2026): Die mitgelieferte Startvorlage „Medikationsplan“ wird, solange sie
-nie von einem Menschen veröffentlicht wurde, auf Querformat umgestellt (Falzmarken aus). Die Vorlagen der
-Regeneration Clinic (Arten ``rgc_…``) entstehen beim ersten Aufruf aus ihren Startvorlagen (``statisch/rgc``)."""
+(Medikationsplan im Querformat, 13.10.2026; Umstellung der Startvorlage in 0007). Die Vorlagen der Regeneration
+Clinic (Arten ``rgc_…``) entstehen beim ersten Aufruf aus ihren Startvorlagen (``statisch/rgc``)."""
 import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
-
-
-def medikationsplan_quer(apps, schema_editor):
-    Vorlage = apps.get_model("vorlagen", "Dokumentvorlage")
-    for v in Vorlage.objects.filter(art="medikationsplan", status="aktiv", veroeffentlicht_von__isnull=True):
-        bloecke = [{**b, "falzmarken": False} if isinstance(b, dict) and b.get("typ") == "briefkopf" else b
-                   for b in v.bloecke]
-        Vorlage.objects.filter(pk=v.pk).update(ausrichtung="quer", bloecke=bloecke)
 
 
 class Migration(migrations.Migration):
@@ -104,5 +95,4 @@ class Migration(migrations.Migration):
                 nulls_distinct=False,
             ),
         ),
-        migrations.RunPython(medikationsplan_quer, migrations.RunPython.noop),
     ]

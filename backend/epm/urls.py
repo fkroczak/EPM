@@ -100,6 +100,7 @@ urlpatterns = [
     path("api/vorlagen/<str:art>/startvorlage/", vorlagen.StartvorlageView.as_view()),
     path("api/vorlagen/<str:art>/versionen/<int:version>/wiederherstellen/", vorlagen.WiederherstellenView.as_view()),
     path("api/vorlagen/<str:art>/duplizieren/", vorlagen.DuplizierenView.as_view()),
+    path("api/vorlagen/<str:art>/firma/", vorlagen.FirmaVorlageView.as_view()),
     path("api/vorlagen/<str:art>/vorschau/", vorlagen.VorschauView.as_view()),
     # Administration › System (nur Admin)
     path("api/system/uebersicht/", system.UebersichtView.as_view()),
