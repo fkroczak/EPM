@@ -1,5 +1,6 @@
 /** Entwurf 10 · Verlauf: jede Fassung aller Einträge der Akte, unveränderlich, gefiltert nach Bereich und Person. */
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import { PdfDialog } from "@/components/PdfDialog";
 import { useQuery } from "@tanstack/react-query";
 import { abfrage, api } from "@/lib/api";
@@ -119,7 +120,12 @@ function useWertAnzeige() {
 
 export function Verlauf() {
   const { patient } = useAkte();
-  const [bereich, setBereich] = useState("");
+  // Bereich aus der Adresse („?bereich=diagnosen“ vom Knopf „Historie“ im Reiter Diagnosen); danach nur noch die Auswahl
+  const [params] = useSearchParams();
+  const [bereich, setBereich] = useState(() => {
+    const b = params.get("bereich") ?? "";
+    return BEREICHE.some((x) => x.wert === b) ? b : "";
+  });
   const [person, setPerson] = useState("");
   const [pdf, setPdf] = useState(false);
   const anzeige = useWertAnzeige();

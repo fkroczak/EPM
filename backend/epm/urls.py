@@ -138,6 +138,9 @@ urlpatterns = [
     path("api/system/zugang/netze/entfernen/", verwaltung.NetzEntfernenView.as_view()),
     path("api/system/zugang/filter/", verwaltung.HttpsFilterView.as_view()),
     path("api/system/zugang/entsperren/", verwaltung.EntsperrenView.as_view()),
+    # Selbstheilung (13.10.2026)
+    path("api/system/heilung/bestaetigen/", verwaltung.HeilungBestaetigenView.as_view()),
+    path("api/system/heilung/schalten/", verwaltung.HeilungSchaltenView.as_view()),
     # Administration › Import: Übernahme der Altdaten (nur Admin)
     path("api/altimport/", altimport.StandView.as_view()),
     path("api/altimport/dump/", altimport.DumpView.as_view()),

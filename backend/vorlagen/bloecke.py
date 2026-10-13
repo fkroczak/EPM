@@ -4,9 +4,11 @@ Ein Block ist ein JSON-Objekt ``{"id", "typ", "bezeichnung", "optionen", …}``.
 ``{{Feldname}}`` im Text und müssen aus der festen Liste der Art stammen (``felder.FELDER``).
 In der Fußzeile stehen zusätzlich ``{Seite}`` und ``{Seiten}``.
 """
+import json
 import re
+from pathlib import Path
 
-from .felder import FELDER, TABELLEN, JeArt, ist_eigen
+from .felder import FELDER, RGC_ARTEN, TABELLEN, JeArt, ist_eigen
 
 PLATZHALTER = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
 ID_MUSTER = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
@@ -48,7 +50,7 @@ class _MitEmail(set):
 
 MIT_EMAIL = _MitEmail({"patientenaufnahme", "terminbestaetigung", "reisebescheinigung", "patientenankuendigung"})
 MAX_FELDER = 30
-MAX_TEXT = 4000
+MAX_TEXT = 6000  # die Abschnitte der Patientenerklärungen der RGC haben bis zu 5000 Zeichen
 
 
 def platzhalter(text: str) -> list[str]:
@@ -111,7 +113,7 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
         if not isinstance(b.get("id"), str) or not ID_MUSTER.match(b["id"]) or b["id"] in ids:
             fehler.append(f"{name}: fehlende oder doppelte Kennung.")
         ids.add(b.get("id"))
-        _text(b.get("bezeichnung"), f"{name} (Bezeichnung)", fehler, laenge=80)
+        _text(b.get("bezeichnung"), f"{name} (Bezeichnung)", fehler, laenge=160)
         optionen = b.get("optionen", {})
         if not isinstance(optionen, dict):
             fehler.append(f"{name}: Optionen ungültig.")
@@ -182,7 +184,7 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
             erlaubt |= {"felder", "linie"}
             if b.get("felder"):
                 _eintraege(art, b.get("felder"), name, fehler)
-            _text(b.get("linie"), f"{name} (Linie)", fehler, laenge=80)
+            _text(b.get("linie"), f"{name} (Linie)", fehler, laenge=160)
         elif typ == "tabelle":
             erlaubt |= {"quelle"}
             if b.get("quelle") not in TABELLEN[art]:
@@ -738,9 +740,10 @@ STARTVORLAGEN = {
          "optionen": {"ueberschrift": True, "ausblenden_wenn_leer": True}},
         {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
     ],
-    # Medikamentenplan der Akte (Wunsch 11.10.2026): Aufbau wie der bundeseinheitliche Medikationsplan
+    # Medikamentenplan der Akte (Wunsch 11.10.2026): Aufbau wie der bundeseinheitliche Medikationsplan – im
+    # Querformat (``STARTAUSRICHTUNG``, 13.10.2026), damit Hinweise und Grund Platz haben; ohne Falzmarken
     "medikationsplan": [
-        {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF, "mit_linie": False},
+        {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF, "falzmarken": False, "mit_linie": False},
         {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Medikationsplan",
          "zusatz_label": "Stand", "zusatz": "{{Heute}}", "neben_logo": True},
         {"id": "patient", "typ": "datenfelder", "bezeichnung": "Patient", "spalten": 3, "felder": [
@@ -758,6 +761,18 @@ STARTVORLAGEN = {
         {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
     ],
 }
+
+
+# Patientenerklärungen der Regeneration Clinic (Word-Vorlagen 01–12, Revision 3, Oktober 2026), mit ``rgc_import.py``
+# wörtlich in Blöcke übertragen; nur in der Firma RGC (``models.NUR_FIRMA``)
+_RGC_ORDNER = Path(__file__).resolve().parent / "statisch" / "rgc"
+RGC_VORLAGEN = {art: json.loads((_RGC_ORDNER / f"{art}.json").read_text(encoding="utf-8")) for art in RGC_ARTEN}
+STARTVORLAGEN.update({art: daten["bloecke"] for art, daten in RGC_VORLAGEN.items()})
+
+# Seitenformat der Startvorlagen; alles andere Hochformat (13.10.2026)
+STARTAUSRICHTUNG = {"medikationsplan": "quer"}
+# Arten, bei denen der Editor das Querformat anbietet (breite Tabellen)
+QUERFORMAT = {"medikationsplan", "sprechstunde", "patientendatenblatt"}
 
 
 class _Startvorlagen(JeArt):

@@ -229,13 +229,13 @@ class Firmen(Grundlage):
         c = self.anmelden(nur_dskm)
         fremd = f"/api/benutzer/{self.beide.id}/"  # Betrachter DSKM, Mediziner RGC
         eigen = f"/api/benutzer/{self.mitarbeiter.id}/"  # nur DSKM
-        for pfad in ("sperren/", "einmal-kennwort/", "2fa-zuruecksetzen/"):
+        for pfad in ("sperren/", "entsperren/", "einmal-kennwort/", "2fa-zuruecksetzen/"):
             r = c.post(fremd + pfad)
             self.assertEqual(r.status_code, 403, (pfad, r.content))
             self.assertIn("Regeneration Clinic", r.json()["fehler"])
         r = c.patch(fremd, {"first_name": "Neu"}, format="json")
         self.assertEqual(r.status_code, 403, r.content)
-        self.assertIn("Regeneration Clinic", r.json()["detail"])
+        self.assertIn("Regeneration Clinic", r.json()["fehler"])
         self.beide.refresh_from_db()
         self.assertEqual((self.beide.first_name, self.beide.gesperrt_am), ("Beide", None))
         # unveränderte Kontodaten im Formular stören nicht, die DSKM-Rolle darf er ändern

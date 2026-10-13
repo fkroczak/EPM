@@ -31,7 +31,7 @@ import { Icon } from "@/components/ui/icon";
 import { Reiter, ReiterInhalt, useReiter } from "@/components/ui/reiter";
 import type { ReiterEintrag } from "@/components/ui/reiter";
 import { AuslastungKarte } from "./auslastung";
-import { AufraeumenKarte, DiensteKarte, NotfallBereich, ProtokolleBereich, SoftwareBereich, UhrKarte, ZertifikatBereich } from "./SystemWartung";
+import { AufraeumenKarte, DiensteKarte, HeilungKarte, NotfallBereich, ProtokolleBereich, SoftwareBereich, UhrKarte, ZertifikatBereich } from "./SystemWartung";
 import { ZugangBereich } from "./SystemZugang";
 import type { ZugangStand } from "./SystemZugang";
 
@@ -69,6 +69,17 @@ export type HostStatus = {
   protokolle?: { quelle: string; name: string }[];
   /** Zugang: SSH auf Zeit, erlaubte Netze, Firewall, Fail2ban (11.10.2026) */
   zugang?: ZugangStand;
+  /** Selbstheilung (13.10.2026): Wächter im Status-Lauf des Systemagenten */
+  heilung?: HeilungStand;
+};
+export type HeilungAktion = { id: string; zeit: string; dienst: string; art: "start" | "neustart" | "rueckfall" | "aufraeumen"; befehl: string;
+  ok: boolean; rueckgabe: number; text: string; ausgabe: string; probelauf: boolean };
+export type HeilungStand = {
+  an: boolean; aktiv: boolean; grund: string | null; laufend?: string; gut?: string; gut_vorhanden?: boolean; gut_ist_laufend?: boolean;
+  update_laeuft?: boolean; rueckfall_moeglich?: boolean; rueckfall_versucht?: string;
+  rueckfall?: { id: string; zeit: string; quelle: string; von: string; nach: string; ok: boolean; grund: string } | null;
+  platte?: { id: string; pfad: string; bezeichnung: string; frei: number; gesamt: number } | null;
+  zaehler?: Record<string, number>; aktionen?: HeilungAktion[];
 };
 export type NotfallStand = { zeit: string; epm_version: string; datei: string; groesse: number; sha256: string;
   mit_sicherung: boolean; sicherung: string | null; fehlt: string[]; ubuntu: string };
@@ -739,9 +750,11 @@ export function System() {
   const zt = h?.zertifikat?.tage;
   const nl = h?.notfall?.letztes;
   const notfallAlt = !!h && (!nl || Date.now() - Date.parse(nl.zeit) > 30 * 86400_000);
+  // Selbstheilung aus oder zurückgeschaltet: als Hinweis am Reiter Wartung
+  const heilungWarnung = !!h?.heilung && (!h.heilung.an || !!h.heilung.rueckfall) ? 1 : 0;
   const eintraege: ReiterEintrag<SystemReiter>[] = [
     { wert: "uebersicht", text: "Übersicht" },
-    { wert: "wartung", text: "Wartung", zahl: h?.updates?.sicherheit || undefined, warn: true },
+    { wert: "wartung", text: "Wartung", zahl: (h?.updates?.sicherheit || 0) + heilungWarnung || undefined, warn: true },
     { wert: "software", text: "Software" },
     { wert: "zertifikat", text: "Zertifikat", zahl: zt != null && zt < 30 ? 1 : undefined, warn: true },
     // SSH dauerhaft offen (Ersteinrichtung): als Hinweis am Reiter
@@ -899,6 +912,7 @@ export function System() {
         <ReiterInhalt testid="reiter-wartung">
           <Taetigkeiten daten={d} offen={offen} onWahl={setWahl} />
           <DiensteKarte daten={d} offen={offen} />
+          <HeilungKarte daten={d} offen={offen} />
           <div className="stapel grid grid-cols-1 hd:grid-cols-2 gap-4 items-start">
             <AufraeumenKarte daten={d} offen={offen} />
             <UhrKarte daten={d} offen={offen} />

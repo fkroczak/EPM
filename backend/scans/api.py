@@ -6,6 +6,7 @@ Recht „Scans: hochladen, erkennen, zuordnen“ für alles; Zuordnen zusätzlic
 from __future__ import annotations
 
 import html
+import logging
 import re
 from urllib.parse import quote
 
@@ -31,6 +32,7 @@ from .models import GelernteZuordnung, Scan, ScanSeite
 
 A = SystemEreignis.Art
 ScansRecht = nur_recht("scans_bearbeiten")
+logger = logging.getLogger(__name__)
 
 
 class GelerntRecht(permissions.BasePermission):
@@ -175,7 +177,8 @@ class ScanViewSet(viewsets.GenericViewSet):
     def _scan(self, pk, bearbeitbar=False) -> Scan:
         scan = self.get_queryset().filter(pk=pk).first()
         if scan is None:
-            raise serializers.ValidationError({"fehler": "Diesen Scan gibt es nicht (mehr)."})
+            # 404 (nicht 400): die Oberfläche hört dann auf, nach dem Stand zu fragen (zugeordnet, gelöscht, abgelaufen)
+            raise _NichtGefunden("Diesen Scan gibt es nicht mehr – er wurde zugeordnet, gelöscht oder ist abgelaufen.")
         if bearbeitbar and not scan.bearbeitbar:
             raise _Konflikt("Der Scan wird gerade erkannt. Bitte einen Moment warten.")
         return scan
@@ -183,7 +186,7 @@ class ScanViewSet(viewsets.GenericViewSet):
     def _seite(self, scan: Scan, sid) -> ScanSeite:
         seite = scan.seiten.filter(pk=sid).first()
         if seite is None:
-            raise serializers.ValidationError({"fehler": "Diese Seite gibt es nicht (mehr)."})
+            raise _NichtGefunden("Diese Seite gibt es nicht (mehr).")
         return seite
 
     # ------------------------------------------------------------ Liste, Hochladen, Ändern, Löschen
@@ -204,6 +207,11 @@ class ScanViewSet(viewsets.GenericViewSet):
             scan = dienst.neuer_scan(dateien, request.user, titel)
         except dienst.ScanFehler as fehler:
             return _fehler(str(fehler), feld="datei")
+        except OSError as fehler:
+            # Ordner nicht beschreibbar oder Platte voll (Kundenmeldung 13.10.2026: Fehler beim Hochladen) – kein 500
+            logger.error("Scan konnte nicht gespeichert werden: %s", fehler)
+            return _fehler("Der Scan konnte nicht gespeichert werden (Speicherordner nicht beschreibbar oder voll). "
+                           "Bitte der Administration Bescheid geben.", status.HTTP_503_SERVICE_UNAVAILABLE)
         protokolliere(A.SCAN, request, objekt=str(scan), aktion="hochgeladen", scan=scan.pk, dateien=len(dateien),
                       groesse=scan.groesse, sha256=scan.sha256)
         return Response(ScanSerializer(scan, context={"request": request}).data, status=status.HTTP_201_CREATED)
@@ -211,7 +219,7 @@ class ScanViewSet(viewsets.GenericViewSet):
     def retrieve(self, request, pk=None):
         scan = self._scan(pk)
         daten = ScanSerializer(scan, context={"request": request}).data
-        daten["vorschlaege"] = dienst.patient_vorschlaege(scan, request.user) if scan.status == Scan.Status.FERTIG else []
+        daten["vorschlaege"] = _vorschlaege(scan, request.user)
         return Response(daten)
 
     def partial_update(self, request, pk=None):
@@ -240,9 +248,13 @@ class ScanViewSet(viewsets.GenericViewSet):
         daten.update({"frist_tage": e.scans_frist_tage, "hoechst_tage": e.scans_hoechst_tage,
                       "verlaengerung_tage": e.scans_verlaengerung_tage, "max_mb": e.scans_max_mb,
                       "max_seiten": settings.EPM_SCANS_MAX_SEITEN, "upload_max_mb": settings.EPM_UPLOAD_MAX_MB})
+        # läuft der OCR-Dienst (Lebenszeichen jünger als drei Minuten)? None = noch nie gelaufen. Die Oberfläche
+        # erklärt damit, warum Scans in der Warteschlange bleiben (Kundenmeldung 13.10.2026)
+        d = dienst.dienst_stand()
+        daten["dienst_laeuft"] = None if d is None else bool(d.get("laeuft"))
         if str(request.query_params.get("verfahren", "")) == "1":
             daten["verfahren"] = dienst.verfahren()
-            daten["dienst"] = dienst.dienst_stand()
+            daten["dienst"] = d
         return Response(daten)
 
     # ------------------------------------------------------------ Gelernte Zuordnungen und Kennzahl (F182)
@@ -357,12 +369,14 @@ class ScanViewSet(viewsets.GenericViewSet):
             neu = dienst.bereich_lesen(scan, seite, request.data.get("box"))
         except BereichFehler as fehler:
             return _fehler(str(fehler), feld="box")
+        except dienst.ScanFehler as fehler:
+            return _fehler(str(fehler))
         except (OSError, RuntimeError):
             return _fehler("Der Bereich konnte nicht gelesen werden (Texterkennung nicht bereit). Bitte später noch "
                            "einmal versuchen oder den Wert eintippen.", status.HTTP_503_SERVICE_UNAVAILABLE)
         scan.refresh_from_db()
         daten = ScanSerializer(scan, context={"request": request}).data
-        daten["vorschlaege"] = dienst.patient_vorschlaege(scan, request.user)
+        daten["vorschlaege"] = _vorschlaege(scan, request.user)
         return Response({"scan": daten, "neu": neu})
 
     @action(detail=False, methods=["get"])
@@ -417,7 +431,11 @@ class ScanViewSet(viewsets.GenericViewSet):
         if not pfad.is_file():
             return _fehler("Die Bilddatei fehlt.", status.HTTP_404_NOT_FOUND)
         mime = "image/png" if name.endswith(".png") else "image/jpeg"
-        antwort = FileResponse(open(pfad, "rb"), content_type=mime)
+        try:
+            datei = open(pfad, "rb")
+        except OSError:
+            return _fehler("Die Bilddatei lässt sich nicht lesen.", status.HTTP_404_NOT_FOUND)
+        antwort = FileResponse(datei, content_type=mime)
         # Name der Datei wechselt mit jeder neuen Aufbereitung – darf im Browser zwischengespeichert werden
         antwort["Cache-Control"] = "private, max-age=3600"
         antwort["X-Content-Type-Options"] = "nosniff"
@@ -434,7 +452,10 @@ class ScanViewSet(viewsets.GenericViewSet):
         roh = request.data.get("einstellungen")
         if not isinstance(roh, dict):
             return _fehler("Bitte Einstellungen angeben.", feld="einstellungen")
-        neu = SeitenEinstellungen.aus_json(roh).als_json()
+        try:
+            neu = SeitenEinstellungen.aus_json(roh).als_json()
+        except (TypeError, ValueError, KeyError, AttributeError):
+            return _fehler("Die Einstellungen sind ungültig.", feld="einstellungen")
         neu["textebene"] = roh.get("textebene", True) is not False
         with transaction.atomic():
             ScanSeite.objects.filter(pk=seite.pk).update(einstellungen=neu, status=ScanSeite.Status.WARTET,
@@ -459,6 +480,10 @@ class ScanViewSet(viewsets.GenericViewSet):
             bild, mime = dienst.vorschau(seite, roh)
         except dienst.ScanFehler as fehler:
             return _fehler(str(fehler))
+        except Exception as fehler:  # noqa: BLE001 – OpenCV-Fehler, ungültige Werte: die Vorschau ist nur eine Hilfe
+            logger.warning("Vorschau für Seite %s fehlgeschlagen: %s", seite.pk, fehler)
+            return _fehler("Die Vorschau ließ sich mit diesen Einstellungen nicht erstellen. Bitte Werte ändern oder "
+                           "die Seite ohne Vorschau speichern.")
         antwort = HttpResponse(bild, content_type=mime)
         antwort["Cache-Control"] = "no-store"
         antwort["X-Content-Type-Options"] = "nosniff"
@@ -621,10 +646,17 @@ class ScanViewSet(viewsets.GenericViewSet):
         seiten = []
         for s in scan.seiten.order_by("nr", "id"):
             if s.status != ScanSeite.Status.FERTIG or not s.bild:
-                raise serializers.ValidationError({"fehler": f"Seite {s.nr} ist nicht erkannt."})
-            bild = dienst.lade_bild(s.datei(s.bild), grau=s.bild.endswith(".png") or
-                                    (s.einstellungen or {}).get("modus", "graustufen") != "farbe")
+                raise serializers.ValidationError({"fehler": f"Seite {s.nr} ist nicht erkannt. Bitte „Alle Seiten neu "
+                                                   "erkennen“ wählen oder die Seite entfernen."})
+            try:
+                bild = dienst.lade_bild(s.datei(s.bild), grau=s.bild.endswith(".png") or
+                                        (s.einstellungen or {}).get("modus", "graustufen") != "farbe")
+            except (dienst.ScanFehler, OSError):
+                raise serializers.ValidationError({"fehler": f"Die Bilddatei von Seite {s.nr} fehlt oder ist beschädigt. "
+                                                   "Bitte „Alle Seiten neu erkennen“ wählen."})
             seiten.append((bild, s.ergebnis))
+        if not seiten:
+            raise serializers.ValidationError({"fehler": "Der Scan hat keine Seiten."})
         return pdf.erstellen(seiten, scan.titel)
 
     @action(detail=True, methods=["get"])
@@ -700,6 +732,24 @@ class _Konflikt(serializers.ValidationError):
 
     def __init__(self, text):
         super().__init__({"fehler": text})
+
+
+class _NichtGefunden(serializers.ValidationError):
+    status_code = status.HTTP_404_NOT_FOUND
+
+    def __init__(self, text):
+        super().__init__({"fehler": text})
+
+
+def _vorschlaege(scan: Scan, user) -> list:
+    """Patientenvorschläge (F183) – nur eine Hilfe: ein Fehler darin darf das Öffnen des Scans nicht verhindern."""
+    if scan.status != Scan.Status.FERTIG:
+        return []
+    try:
+        return dienst.patient_vorschlaege(scan, user)
+    except Exception as fehler:  # noqa: BLE001
+        logger.warning("Patientenvorschläge für Scan %s fehlgeschlagen: %s", scan.pk, fehler)
+        return []
 
 
 # ---------------------------------------------------------------- Zuordnen (eigene Funktion, weil umfangreich)

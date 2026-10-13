@@ -1006,6 +1006,8 @@ export type ScansStand = {
   offen: number; laufend: number; in_arbeit: number; wartend: number; abbrueche: number; fehler: number; gesamt: number; laeuft_bald_ab: number; belegt: number; grenze: number;
   prozent: number; anzahl_grenze: number; anzahl_alle: number; frist_tage: number; hoechst_tage: number;
   verlaengerung_tage: number; max_mb: number; max_seiten: number; upload_max_mb: number;
+  /** läuft der OCR-Dienst (Lebenszeichen jünger als drei Minuten)? null = noch nie gelaufen */
+  dienst_laeuft?: boolean | null;
   verfahren?: { tesseract: { bereit: boolean; text: string }; ocrmypdf?: { bereit: boolean; text: string }; paddle: { bereit: boolean; glaetten: boolean; text: string; sparsam?: boolean; speicher_mb?: number | null } };
   dienst?: { gestartet: string; lebenszeichen: string; laeuft: boolean; bearbeitet: number; threads: string;
     /** Speicher des Containers „ocr“ in Bytes (cgroup v2), Höchststand seit dem Start */

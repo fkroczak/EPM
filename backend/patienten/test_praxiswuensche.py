@@ -66,6 +66,29 @@ class DiagnosenTest(Grundlage):
     def test_betrachter_darf_nicht_eintragen(self):
         self.assertEqual(self.anlegen(client_fuer(self.betrachter)).status_code, 403)
 
+    def test_korrektur_steht_mit_alt_und_neu_im_verlauf(self):
+        """Kundenfrage 13.10.2026: Wird ein ICD-Code korrigiert, zeigt der Verlauf der Akte alten und neuen Wert,
+        wer und wann – wie bei jedem anderen Eintrag."""
+        d = self.anlegen().json()
+        c = client_fuer(self.mediziner)
+        r = c.patch(f"/api/diagnosen/{d['id']}/", {"icd_code": "K91.1", "kennzeichen": "V", "seit": "2024-03-01"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        r = client_fuer(self.betrachter).get(f"/api/patienten/{self.patient.id}/verlauf/?bereich=diagnosen")
+        self.assertEqual(r.status_code, 200, r.content)
+        eintraege = r.json()
+        self.assertEqual([e["art"] for e in eintraege], ["geändert", "angelegt"])
+        korrektur = eintraege[0]
+        self.assertEqual((korrektur["person"], korrektur["aktion"]), ("M. Tester", "geändert"))
+        self.assertTrue(korrektur["zeitpunkt"])
+        self.assertEqual({a["feld"]: (a["alt"], a["neu"]) for a in korrektur["aenderungen"]},
+                         {"icd_code": ("K91.2", "K91.1"), "kennzeichen": ("G", "V"), "seit": ("", "2024-03-01")})
+        self.assertEqual(korrektur["beschreibung"], "Kurzdarmsyndrom [K91.1V] · seit 01.03.2024")
+        # Beenden steht fachlich benannt im Verlauf
+        c.patch(f"/api/diagnosen/{d['id']}/", {"aktiv": False}, format="json")
+        eintraege = client_fuer(self.betrachter).get(f"/api/patienten/{self.patient.id}/verlauf/?bereich=diagnosen").json()
+        self.assertEqual(eintraege[0]["aktion"], "nicht mehr zutreffend")
+        self.assertIn({"feld": "aktiv", "alt": "True", "neu": "False"}, eintraege[0]["aenderungen"])
+
 
 class VersichertendatenTest(Grundlage):
     def test_art_versicherung_und_nummer(self):

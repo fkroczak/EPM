@@ -20,7 +20,7 @@ STANDARD_LOGOS = {"rg": Path(__file__).resolve().parent / "statisch" / "logo-rgc
 LEER = "—"
 
 CSS = """
-@page { size: A4; margin: 15mm 17mm %(unten)smm 17mm;
+@page { size: A4 %(format)s; margin: 15mm 17mm %(unten)smm 17mm;
   @bottom-left { content: %(fusszeile)s; white-space: pre; vertical-align: top; padding-top: 4mm;
                  font-family: "IBM Plex Sans", "DejaVu Sans", sans-serif; font-size: 7pt; line-height: 1.45; color: #00325a;
                  width: 150mm; }
@@ -120,8 +120,10 @@ hr { border: 0; border-top: 0.6pt solid #c9c8d4; margin: 0 0 3.5mm 0; }
 .a-mitte { text-align: center; } .a-rechts { text-align: right; }
 .zusammen { break-inside: avoid; }
 .umbruch { break-before: page; }
-.wasserzeichen { position: fixed; top: 105mm; left: 0; right: 0; text-align: center; font-size: 80pt; font-weight: 700;
+.wasserzeichen { position: fixed; top: %(wasserzeichen_oben)smm; left: 0; right: 0; text-align: center; font-size: 80pt; font-weight: 700;
                  letter-spacing: .12em; color: rgba(0, 0, 0, .07); transform: rotate(-30deg); }
+/* Querformat (Medikationsplan, 13.10.2026): Hinweise und Grund bekommen die Breite, die Dosierung bleibt schmal */
+.quer .medikamente .b { width: 38mm; } .quer .medikamente .handel { width: 30mm; } .quer .medikamente .grund { width: 40mm; }
 .richtext ul, .richtext ol { margin: 0 0 1mm 0; padding-left: 5mm; }
 .richtext h1, .richtext h2, .richtext h3 { font-size: 10pt; margin: 1.5mm 0 1mm 0; text-transform: none; color: #1b1932;
                                           letter-spacing: 0; }
@@ -377,8 +379,8 @@ def _titel_html(ersetze, b) -> str:
     return f"<h1>{titel}</h1>{zusatz}"
 
 
-def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | None, str | None]:
-    """→ (Inhalt als HTML, Fußzeilentext links, Fußzeile rechts)."""
+def bloecke_html(art: str, bloecke: list, kontext: Kontext, quer=False) -> tuple[str, str | None, str | None]:
+    """→ (Inhalt als HTML, Fußzeilentext links, Fußzeile rechts). ``quer``: Querformat, ohne Falzmarken."""
     ersetze = Ersetzer(art, kontext)
     teile, fuss, rechts = [], None, None
     # Titel „neben dem Logo“: steht rechts im Briefkopf statt in einer eigenen Zeile
@@ -396,7 +398,7 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | 
                 if titel_neben else ""
             klasse = f"kopftitel {schrift}".strip()
             neben = f'<div class="{klasse}">{_titel_html(ersetze, titel_neben)}</div>' if titel_neben else None
-            teile.append(f'<div class="{_klassen(b)}">{briefkopf_html(b.get("absender", True), b.get("linienfarbe"), b.get("falzmarken", False), b.get("mit_linie", True), neben)}</div>')
+            teile.append(f'<div class="{_klassen(b)}">{briefkopf_html(b.get("absender", True), b.get("linienfarbe"), b.get("falzmarken", False) and not quer, b.get("mit_linie", True), neben)}</div>')
         elif typ == "zweispaltig":
             links, _ = ersetze.zeilen(b.get("links", ""))
             # eigener Name: „rechts“ ist die rechte Fußzeile (ohne Fußzeilen-Block stand sonst die rechte Spalte unten)
@@ -465,14 +467,15 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext) -> tuple[str, str | 
 
 
 def seite(titel: str, inhalt: str, fusszeile: str | None = None, wasserzeichen: str | None = None,
-          rechts: str | None = "{Seite}/{Seiten}") -> str:
+          rechts: str | None = "{Seite}/{Seiten}", quer=False) -> str:
     zeichen = f'<div class="wasserzeichen">{html.escape(wasserzeichen)}</div>' if wasserzeichen else ""
     zeilen = (fusszeile or "").count("\n") + 1 if fusszeile else 1
     css = CSS % {"fusszeile": fusszeile_css(fusszeile), "rechts": fusszeile_css(rechts),
-                 "unten": f"{max(18, 10 + 3.6 * zeilen):.0f}"}
+                 "unten": f"{max(18, 10 + 3.6 * zeilen):.0f}", "format": "landscape" if quer else "portrait",
+                 "wasserzeichen_oben": "60" if quer else "105"}
     return (f'<!doctype html><html lang="de"><head><meta charset="utf-8"><title>{html.escape(titel)}</title>'
             f'<meta name="author" content="EPM"><style>{css}</style></head>'
-            f"<body>{zeichen}{inhalt}</body></html>")
+            f'<body class="{"quer" if quer else "hoch"}">{zeichen}{inhalt}</body></html>')
 
 
 def html_zu_pdf(dokument_html: str) -> bytes:
@@ -490,16 +493,24 @@ def wasserzeichen_fuer(patient, plan=None, vorschau=False) -> str | None:
 
 
 def erzeuge_aus_vorlage(art: str, kontext: Kontext, vorlage=None, bloecke=None, wasserzeichen=None,
-                        titel: str = "") -> tuple[bytes, int | None]:
-    """PDF aus der aktiven (oder übergebenen) Vorlage. → (PDF, Vorlagenversion)."""
+                        titel: str = "", ausrichtung: str | None = None) -> tuple[bytes, int | None]:
+    """PDF aus der aktiven (oder übergebenen) Vorlage – in der aktiven Firma deren Vorlage. → (PDF, Vorlagenversion).
+    ``ausrichtung`` („hoch“/„quer“) ohne Angabe wie die Vorlage; eigene Blöcke ohne Vorlage nehmen das Format der
+    aktiven Vorlage der Art."""
     from .models import Dokumentvorlage, art_name
 
-    if bloecke is None:
-        vorlage = vorlage or Dokumentvorlage.aktive(art)
+    eigene = bloecke is not None
+    version = vorlage.version if vorlage is not None else None
+    if vorlage is None and (not eigene or ausrichtung is None):
+        vorlage = Dokumentvorlage.aktive(art)
+        if not eigene:
+            version = vorlage.version
+    if not eigene:
         bloecke = vorlage.bloecke
-    inhalt, fuss, rechts = bloecke_html(art, bloecke, kontext)
-    pdf = html_zu_pdf(seite(titel or art_name(art), inhalt, fuss, wasserzeichen, rechts))
-    return pdf, (vorlage.version if vorlage is not None else None)
+    quer = (ausrichtung or vorlage.ausrichtung) == Dokumentvorlage.Ausrichtung.QUER
+    inhalt, fuss, rechts = bloecke_html(art, bloecke, kontext, quer=quer)
+    pdf = html_zu_pdf(seite(titel or art_name(art), inhalt, fuss, wasserzeichen, rechts, quer=quer))
+    return pdf, version
 
 
 def sha256(daten: bytes) -> str:

@@ -397,6 +397,24 @@ def _system(e, d) -> str:
         return f"Netzfilter für EPM {'einschalten' if d.get('an') else 'ausschalten'} angefordert" + _bestaetigt(d)
     if ereignis == "angefordert" and aktion == "fail2ban_entsperren":
         return f"Gesperrte Adresse {d.get('ip', '')} freigeben angefordert (Fail2ban, Jail {d.get('jail', '')})"
+    # Selbstheilung (13.10.2026)
+    if ereignis == "angefordert" and aktion == "version_bestaetigen":
+        return f"Version {d.get('tag', '')} als gute Version bestätigen angefordert" + (f" (bisher {d['bisher']})" if d.get("bisher") else "")
+    if ereignis == "angefordert" and aktion == "heilung_schalten":
+        return f"Selbstheilung {'einschalten' if d.get('an') else 'ausschalten'} angefordert"
+    if ereignis == "heilung":
+        arten = {"start": "gestartet", "neustart": "neu gestartet", "rueckfall": "Rückfall auf die gute Version angestoßen",
+                 "aufraeumen": "aufgeräumt"}
+        return (f"Selbstheilung{' (Probelauf)' if d.get('probelauf') else ''}: {d.get('dienst', '')} "
+                f"{arten.get(d.get('heilung_art'), d.get('heilung_art', ''))}" + ("" if d.get("ok") else " – fehlgeschlagen")
+                + (f": {d['text']}" if d.get("text") else ""))
+    if ereignis == "heilung_rueckfall":
+        if d.get("nach") and d.get("ok"):
+            return f"Selbstheilung: EPM auf Version {d['nach']} zurückgeschaltet, weil {d.get('von', '?')} nicht startete"
+        return (f"Selbstheilung: Version {d.get('von', '?')} startet nicht; Zurückschalten "
+                + (f"auf {d['nach']} fehlgeschlagen" if d.get("nach") else "nicht möglich (keine andere Version)"))
+    if ereignis == "heilung_platte":
+        return f"Selbstheilung: Platte {e.objekt.replace('Platte ', '')} fast voll ({d.get('pfad', '')}) – hängende Images entfernt, Hinweis an alle"
     if ereignis == "ssh_automatisch":
         return ("SSH nach Ablauf der Zeit vom Server geschlossen" if d.get("ok")
                 else "SSH nach Ablauf der Zeit nicht vollständig geschlossen – der Server versucht es weiter") + (

@@ -156,6 +156,15 @@ systemctl enable --now epm-backup.timer
 echo "==> Autostart des EPM-Stacks (epm.service, „EPM-Server Aufbau“ B4)"
 # Startet „docker compose up“ beim Booten und fährt EPM beim Herunterfahren geordnet herunter. Welche Compose-Datei
 # und Version gilt, steht in $B/.env (epm-update schreibt sie).
+# Selbstheilung (13.10.2026): Schlägt der Start fehl (Docker noch nicht bereit, Netz zu spät), versucht systemd es alle
+# 20 s erneut, ohne Obergrenze. Restart= ist bei Type=oneshot erst ab systemd 253 (Ubuntu 24.04) erlaubt – ältere
+# Versionen lehnen die Einheit sonst ab; dort bleibt der Wächter des Systemagenten (jede Minute) der zweite Versuch.
+SYSTEMD_VERSION="$(systemctl --version | head -n1 | awk '{print $2}')"
+if [[ "${SYSTEMD_VERSION:-0}" =~ ^[0-9]+$ ]] && (( SYSTEMD_VERSION >= 253 )); then
+  EPM_RESTART=$'Restart=on-failure\nRestartSec=20'
+else
+  EPM_RESTART="# Restart=on-failure braucht systemd >= 253 (hier $SYSTEMD_VERSION); der Systemagent startet den Stack nach"
+fi
 cat > /etc/systemd/system/epm.service <<EOF
 [Unit]
 Description=EPM Anwendung (Docker Compose)
@@ -163,6 +172,7 @@ Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
 ConditionPathExists=$B/.env
+StartLimitIntervalSec=0
 
 [Service]
 Type=oneshot
@@ -172,6 +182,7 @@ ExecStart=/usr/bin/docker compose up -d --remove-orphans
 ExecStop=/usr/bin/docker compose down
 ExecReload=/usr/bin/docker compose up -d --remove-orphans
 TimeoutStartSec=300
+$EPM_RESTART
 
 [Install]
 WantedBy=multi-user.target
@@ -181,9 +192,11 @@ systemctl enable epm.service >/dev/null
 
 echo "==> Systemagent (Administration › System und › Backup: Auslastung, Updates, Neustart, Sicherungen)"
 install -m 0750 epm-systemagent.py /usr/local/sbin/epm-systemagent
+# Der Status-Lauf ist zugleich der Wächter der Selbstheilung (13.10.2026) – eigener Timer, unabhängig von epm.service,
+# damit er auch läuft, wenn der Stack nicht hochkam. Status und Eingriffe: journalctl -u epm-systemstatus.service
 cat > /etc/systemd/system/epm-systemstatus.service <<'EOF'
 [Unit]
-Description=EPM Systemstatus messen (Auslastung, Updates, Container, Sicherung)
+Description=EPM Systemstatus messen und Selbstheilung (Auslastung, Updates, Container, Sicherung)
 After=docker.service
 [Service]
 Type=oneshot
@@ -192,7 +205,7 @@ Nice=10
 EOF
 cat > /etc/systemd/system/epm-systemstatus.timer <<'EOF'
 [Unit]
-Description=EPM Systemstatus jede Minute
+Description=EPM Systemstatus und Selbstheilung jede Minute
 [Timer]
 OnBootSec=30s
 OnUnitActiveSec=60s

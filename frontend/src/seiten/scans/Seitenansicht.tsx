@@ -32,6 +32,10 @@ export function Seitenansicht({ scanId, seite, markiert, unsicher = true, bereic
 }) {
   const svg = useRef<SVGSVGElement>(null);
   const [ziehen, setZiehen] = useState<Rahmen | null>(null);
+  // Bild nicht ladbar (Datei fehlt, Seite gerade neu aufbereitet): Hinweis statt eines leeren Rahmens
+  const [bildFehlt, setBildFehlt] = useState<string | null>(null);
+  const bild = bildUrl(scanId, seite, original ? "roh" : "bild");
+  if (bildFehlt && bildFehlt !== bild) setBildFehlt(null);
   const e = hatErgebnis(seite.ergebnis) ? seite.ergebnis : null;
   const breite = e?.breite || seite.breite || 1;
   const hoehe = e?.hoehe || seite.hoehe || 1;
@@ -51,9 +55,17 @@ export function Seitenansicht({ scanId, seite, markiert, unsicher = true, bereic
       </div>
     );
   }
+  if (bildFehlt === bild) {
+    return (
+      <div className="w-full aspect-[1/1.414] rounded-md border border-dashed border-rand bg-fein flex items-center justify-center text-sm gedaempft text-center px-4"
+        data-testid="scan-seite" data-bild-fehlt="1">
+        Das Bild von Seite {seite.nr} ließ sich nicht laden. Bitte die Seite neu laden oder „Alle Seiten neu erkennen“ wählen.
+      </div>
+    );
+  }
   return (
     <div className="relative w-full select-none" data-testid="scan-seite" data-seite={seite.nr}>
-      <img src={bildUrl(scanId, seite, original ? "roh" : "bild")} alt={`Seite ${seite.nr}${original ? " (Original)" : ""}`}
+      <img src={bild} alt={`Seite ${seite.nr}${original ? " (Original)" : ""}`} onError={() => setBildFehlt(bild)}
         className="block w-full h-auto rounded-md border border-rand bg-white" draggable={false} />
       {original ? null : (
         <svg ref={svg} viewBox={`0 0 ${breite} ${hoehe}`} preserveAspectRatio="none"

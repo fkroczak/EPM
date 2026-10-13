@@ -28,6 +28,8 @@ POST   /api/system/zugang/netze/                  {dienst: "https"|"ssh", netz, 
 POST   /api/system/zugang/netze/entfernen/        {dienst, netz, kennwort, code} – nie das letzte HTTPS-Netz, nie das eigene
 POST   /api/system/zugang/filter/                 {an, kennwort, code} → Netzfilter für EPM (DOCKER-USER)
 POST   /api/system/zugang/entsperren/             {jail, ip} → von Fail2ban gesperrte Adresse freigeben
+POST   /api/system/heilung/bestaetigen/           laufende Version als gute Version eintragen (Selbstheilung, 13.10.2026)
+POST   /api/system/heilung/schalten/              {an: true|false} → Wächter der Selbstheilung ein- oder ausschalten
 
 Schlüssel (und das Zertifikat selbst) gehen nur in die Auftragsdatei an den Server (0600, der Agent löscht sie sofort) –
 nie in die Datenbank oder das Audit-Log; dort stehen nur Inhaber, Aussteller, Ablauf und Fingerabdruck.
@@ -344,6 +346,10 @@ def geschuetzte_tags(status_host: dict) -> set | None:
             geschuetzt.add(tags[i + 1])
     else:
         geschuetzt.update(tags[:1])
+    # Selbstheilung: die gute Version (Rückfall) bleibt ebenfalls
+    gut = ((status_host or {}).get("heilung") or {}).get("gut")
+    if isinstance(gut, str) and host.TAG_MUSTER.match(gut):
+        geschuetzt.add(gut)
     return geschuetzt
 
 
@@ -726,3 +732,29 @@ class EntsperrenView(APIView):
             return _fehler("ip", "Bitte eine gültige IP-Adresse angeben.")
         return auftrag_anlegen(request, "fail2ban_entsperren", parameter={"jail": jail, "ip": str(ip)},
                                objekt=f"Fail2ban {jail}: {ip}", protokoll_details={"jail": jail, "ip": str(ip)})
+
+
+# ------------------------------------------------------------------ Selbstheilung (13.10.2026)
+# Der Wächter läuft im Status-Lauf des Systemagenten (rollout/epm-systemagent.py, heilung_pruefen); seinen Stand meldet
+# er unter host.heilung. Hier nur die beiden Eingriffe aus der Oberfläche, beide als Auftrag mit einfacher Rückfrage.
+class HeilungBestaetigenView(APIView):
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        h = (host.host_status() or {}).get("heilung") or {}
+        laufend = h.get("laufend") if isinstance(h.get("laufend"), str) else ""
+        if laufend and h.get("gut") == laufend:
+            return _fehler("fehler", f"Die laufende Version {laufend} ist schon die gute Version.", status.HTTP_409_CONFLICT)
+        return auftrag_anlegen(request, "version_bestaetigen", objekt=f"EPM-Version {laufend or '?'}",
+                               protokoll_details={"tag": laufend, "bisher": h.get("gut") or ""})
+
+
+class HeilungSchaltenView(APIView):
+    permission_classes = [SystemRecht]
+
+    def post(self, request):
+        an = request.data.get("an")
+        if not isinstance(an, bool):
+            return _fehler("an", "Bitte ein- oder ausschalten angeben.")
+        return auftrag_anlegen(request, "heilung_schalten", parameter={"an": an}, objekt="Selbstheilung",
+                               protokoll_details={"an": an})

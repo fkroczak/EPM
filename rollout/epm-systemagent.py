@@ -7,7 +7,7 @@ Das Backend läuft im Container ohne Zugriff auf den Server. Es legt Aufträge a
 Aktionen aus und schreibt Status und Ergebnisse nach ``<EPM_BASE>/system/status/`` (für den Container nur lesbar).
 
     epm-systemagent status      Auslastung, Updates, Container, Sicherungen messen (Timer, jede Minute); stößt im
-                                Zeitfenster die Übertragung der Sicherungen an
+                                Zeitfenster die Übertragung der Sicherungen an; Wächter der Selbstheilung (siehe unten)
     epm-systemagent auftraege   wartende Aufträge ausführen (systemd-Pfad-Einheit, sobald eine Datei da ist)
     epm-systemagent uebertragen verschlüsselte Sicherungen zum Ziel übertragen (vom Status-Lauf angestoßen)
     epm-systemagent schleife    Status und Aufträge fortlaufend (Browsertests in CI, ohne systemd)
@@ -23,6 +23,15 @@ Optionen: --basis DIR (statt EPM_BASE aus /etc/epm/epm.conf), --projekt NAME (Co
 
 Zugang (11.10.2026): SSH ist im Betrieb aus und wird in EPM für 1, 4 oder 8 Stunden geöffnet; der Status-Lauf schließt
 es danach von selbst. Erlaubte Netze für EPM (HTTPS) und SSH, Stand von ufw und Fail2ban. Siehe „Zugang“ unten.
+
+Selbstheilung (13.10.2026): Der Status-Lauf wacht über die vier Dienste des Stacks. Ein fehlender oder beendeter
+Container wird mit „docker compose up -d“ gestartet, ein dreimal in Folge ungesunder neu gestartet (höchstens einmal je
+Dienst in 5 Minuten). Bleibt das Backend nach drei Neustarts in 30 Minuten ungesund und ist eine andere „gute Version“
+(EPM_VERSION_GUT in .env, von epm-update bestätigt) vorhanden, schaltet der Wächter über epm-update auf sie zurück und
+hinterlässt in system/rueckfall.json eine Markierung, aus der das Backend einen Hinweis an alle Benutzer macht. Wird die
+Platte knapp, räumt er nur Gefahrloses weg (hängende Images). Zustand: system/heilung.json; die Datei system/heilung-aus
+schaltet den Wächter ab (für Wartung von Hand); während epm-update läuft (system/update-laeuft) und während eines
+Auftrags hält er still. Jeder Eingriff steht im Journal und – über den Status – im Audit-Log.
 
 Sicherheit: Aus einer Auftragsdatei werden nur „aktion“ (feste Liste) und deren fest vorgesehene, geprüfte Angaben
 verwendet (Minuten, Benutzername, Stempel einer oder mehrerer Sicherungen, Sicherungs-Passwort, Übertragungsziel,
@@ -52,8 +61,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
-VERSION = 8  # 5: Systemverwaltung ohne SSH (10.10.2026); 6: Zeitplan, Aufräumen, Uhrzeit; 7: Notfallpaket (F188);
-#              8: Zugang – SSH auf Zeit, erlaubte Netze, Firewall, Fail2ban (11.10.2026)
+VERSION = 9  # 5: Systemverwaltung ohne SSH (10.10.2026); 6: Zeitplan, Aufräumen, Uhrzeit; 7: Notfallpaket (F188);
+#              8: Zugang – SSH auf Zeit, erlaubte Netze, Firewall, Fail2ban (11.10.2026); 9: Selbstheilung (13.10.2026)
 KONF = "/etc/epm/epm.conf"
 BACKUP_SKRIPT = "/usr/local/sbin/epm-backup"
 KONF_SICHERUNG = "/etc/epm/sicherung"
@@ -132,6 +141,9 @@ AKTIONEN = {
     "netz_entfernen": ("Erlaubtes Netz entfernen", False),
     "https_filter": ("Netzfilter für EPM schalten", False),
     "fail2ban_entsperren": ("Gesperrte Adresse freigeben", False),
+    # Selbstheilung (13.10.2026)
+    "version_bestaetigen": ("Als gute Version bestätigen", False),
+    "heilung_schalten": ("Selbstheilung ein- oder ausschalten", False),
 }
 # Aktionen, die Sicherungen schreiben, übertragen oder zurückspielen – und das Leeren der Datenbank, das nur den
 # EPM-Stack betrifft: mit --sicherung-echt auch im Probelauf echt (Browsertests gegen den echten Stack)
@@ -153,6 +165,22 @@ LOESCHEN_MAX = 200                # Sicherungen je Auftrag „Sicherungen lösch
 TAG_MUSTER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40}$")
 PAKET_MUSTER = re.compile(r"^epm-paket-([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})\.tar$")
 DIENSTE = ("backend", "web", "ocr", "db")
+# Selbstheilung (13.10.2026): Dateien unter <EPM_BASE>/system, Schwellen des Wächters
+HEILUNG_DATEI = "heilung.json"
+HEILUNG_AUS = "heilung-aus"
+RUECKFALL_DATEI = "rueckfall.json"
+UPDATE_LAEUFT = "update-laeuft"
+HEILUNG_UNGESUND = 3              # Läufe in Folge „unhealthy“ (oder „restarting“), dann Neustart
+HEILUNG_PAUSE_S = 5 * 60          # höchstens ein Start/Neustart je Dienst in dieser Zeit
+HEILUNG_RUECKFALL_NEUSTARTS = 3   # Backend-Neustarte in HEILUNG_RUECKFALL_FENSTER_S, dann zurück auf die gute Version
+HEILUNG_RUECKFALL_FENSTER_S = 30 * 60
+HEILUNG_PLATTE_MIN_BYTES = 1024 ** 3
+HEILUNG_PLATTE_MIN_ANTEIL = 0.05
+HEILUNG_PRUNE_PAUSE_S = 3600
+HEILUNG_BOOT_S = 120              # nach dem Booten erst epm.service wirken lassen
+HEILUNG_ZEITLIMIT = 55            # je Befehl, damit der Status-Lauf (jede Minute) nicht hängt
+HEILUNG_AKTIONEN_MAX = 30
+UPDATE_LAEUFT_MAX_S = 4 * 3600    # ältere Markierung: epm-update ist abgestürzt, der Wächter arbeitet wieder
 # Protokolle (nur lesend): Quelle -> Bezeichnung. Container über docker compose logs, Dienste über journalctl,
 # das Update über seine Protokolldatei. Andere Quellen gibt es nicht.
 PROTOKOLLE = {
@@ -254,6 +282,14 @@ def im_ziel_veraltet(namen, tage, jetzt=None):
 
 def jetzt_iso():
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+
+
+def zeit_unix(text):
+    """ISO-Zeit → Sekunden seit 1970 (0, wenn unlesbar)"""
+    try:
+        return datetime.fromisoformat(text).timestamp()
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def zeit_aus(text):
@@ -796,6 +832,9 @@ class Agent:
                 geschuetzt.add(tags[i + 1])
         else:
             geschuetzt.update(tags[:1])
+        gut = self.env_lesen().get("EPM_VERSION_GUT", "")
+        if TAG_MUSTER.match(gut):
+            geschuetzt.add(gut)
         return geschuetzt
 
     def image_dateien(self, versionen=None):
@@ -888,6 +927,13 @@ class Agent:
             zugang = self.zugang_stand()
         except Exception as e:  # noqa: BLE001
             zugang = {"fehler": str(e)[:300]}
+        container = self.container()
+        versionen = self.epm_versionen()
+        try:
+            heilung = self.heilung_pruefen(container, platten, versionen, laufzeit)
+        except Exception as e:  # noqa: BLE001 – der Status soll trotzdem stehen
+            print(f"Selbstheilung: {e}", file=sys.stderr)
+            heilung = {"an": self.heilung_an(), "aktiv": False, "grund": f"Fehler: {str(e)[:200]}"}
         status = {
             "version": VERSION,
             "zeit": jetzt_iso(),
@@ -906,11 +952,11 @@ class Agent:
             "updates": self.updates(),
             "neustart_noetig": os.path.exists("/var/run/reboot-required"),
             "neustart_pakete": neustart_pakete,
-            "container": self.container(),
+            "container": container,
             "sicherung": self.sicherung(),
             "dienste": self.dienste(),
             # Systemverwaltung ohne SSH (10.10.2026)
-            "versionen": self.epm_versionen(),
+            "versionen": versionen,
             "pakete": self.pakete(),
             "zertifikat": self.zertifikat(),
             "uhr": self.uhr(),
@@ -920,6 +966,7 @@ class Agent:
             "image_dateien": self.image_dateien(),
             "notfall": self.notfall_stand(),
             "zugang": zugang,
+            "heilung": heilung,
             "protokolle":[{"quelle": q, "name": n} for q, n in PROTOKOLLE.items()],
             "trocken": self.trocken,
         }
@@ -2356,6 +2403,12 @@ class Agent:
         if aktion == "fail2ban_entsperren":
             return self.fail2ban_entsperren(parameter.get("jail"), parameter.get("ip"), zeile, simuliert=t)
 
+        if aktion == "version_bestaetigen":
+            return self.version_bestaetigen(zeile, simuliert=t)
+
+        if aktion == "heilung_schalten":
+            return self.heilung_schalten(parameter.get("an"), zeile, simuliert=t)
+
         if aktion == "protokoll":
             return self.protokoll_abrufen(parameter.get("quelle"), parameter.get("zeilen"), auftrag_id, zeile)
 
@@ -2815,7 +2868,7 @@ class Agent:
             return 1, "Die laufende Version ist nicht zu ermitteln – zur Sicherheit wird nichts gelöscht."
         betroffen = sorted({IMAGE_DATEI_MUSTER.match(d).group(2) for d in dateien} | set(tags))
         if betroffen and set(betroffen) & geschuetzt:
-            return 2, (f"Die laufende und die vorherige Version ({', '.join(sorted(geschuetzt))}) bleiben immer – "
+            return 2, (f"Die laufende, die vorherige und die gute Version ({', '.join(sorted(geschuetzt))}) bleiben immer – "
                        "nichts gelöscht.")
         vorhanden = {e["datei"] for e in self.image_dateien(v)}
         bekannt = {e["tag"] for e in v["liste"]}
@@ -3418,6 +3471,255 @@ class Agent:
         rc = self.schritt("Fail2ban", args, zeile, env=C_ENV, zeitlimit=60)
         return (0, f"{adresse} ist in „{jail}“ wieder freigegeben.") if rc == 0 else \
             (rc, "Freigeben fehlgeschlagen – Ausgabe prüfen.")
+
+    # ------------------------------------------------------------ Selbstheilung (13.10.2026)
+    def env_lesen(self):
+        werte = {}
+        try:
+            with open(os.path.join(self.basis, ".env"), encoding="utf-8") as f:
+                for z in f:
+                    m = re.match(r'^([A-Z_][A-Z0-9_]*)=["\']?([^"\'#\n]*)', z)
+                    if m:
+                        werte[m.group(1)] = m.group(2).strip()
+        except OSError:
+            pass
+        return werte
+
+    def env_setzen(self, name, wert):
+        pfad = os.path.join(self.basis, ".env")
+        try:
+            with open(pfad, encoding="utf-8") as f:
+                zeilen = f.read().splitlines()
+        except OSError:
+            zeilen = []
+        neu, gesetzt = [], False
+        for z in zeilen:
+            if z.startswith(f"{name}="):
+                if not gesetzt:
+                    neu.append(f"{name}={wert}")
+                    gesetzt = True
+            else:
+                neu.append(z)
+        if not gesetzt:
+            neu.append(f"{name}={wert}")
+        tmp = f"{pfad}.tmp{os.getpid()}"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write("\n".join(neu) + "\n")
+        os.replace(tmp, pfad)
+
+    def heilung_pfad(self, name):
+        return os.path.join(self.basis, "system", name)
+
+    def heilung_an(self):
+        return not os.path.exists(self.heilung_pfad(HEILUNG_AUS))
+
+    def update_laeuft(self):
+        try:
+            return time.time() - os.stat(self.heilung_pfad(UPDATE_LAEUFT)).st_mtime < UPDATE_LAEUFT_MAX_S
+        except OSError:
+            return False
+
+    def auftrag_laeuft(self):
+        """Hält gerade ein Agent (auch dieser selbst, nach einem Auftrag) die Auftragssperre?"""
+        try:
+            with open(os.path.join(self.status, ".sperre"), "a") as sperre:
+                try:
+                    fcntl.flock(sperre, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except OSError:
+                    return True
+                fcntl.flock(sperre, fcntl.LOCK_UN)
+        except OSError:
+            pass
+        return False
+
+    def rueckfall_lesen(self):
+        d = self.lies(self.heilung_pfad(RUECKFALL_DATEI))
+        return d if isinstance(d, dict) and isinstance(d.get("id"), str) else None
+
+    def rueckfall_markieren(self, von, nach, grund, ok, quelle="systemagent"):
+        daten = {"id": os.urandom(8).hex(), "zeit": jetzt_iso(), "quelle": quelle, "von": von, "nach": nach, "ok": ok,
+                 "grund": grund}
+        os.makedirs(self.heilung_pfad(""), mode=0o755, exist_ok=True)
+        self.schreibe(self.heilung_pfad(RUECKFALL_DATEI), daten)
+        return daten
+
+    def heilung_befehl(self, zustand, dienst, art, args, text, jetzt=None):
+        """Einen Eingriff ausführen (im Probelauf nur vermerken), im Zustand festhalten und ins Journal schreiben."""
+        jetzt = jetzt or time.time()
+        if self.trocken:
+            rc, aus = 0, ""
+        else:
+            rc, aus = self.befehl(args, cwd=self.basis, zeitlimit=HEILUNG_ZEITLIMIT)
+        eintrag = {"id": os.urandom(8).hex(), "zeit": datetime.fromtimestamp(jetzt, timezone.utc).astimezone().isoformat(
+            timespec="seconds"), "dienst": dienst, "art": art, "befehl": " ".join(args), "ok": rc == 0, "rueckgabe": rc,
+            "text": text, "ausgabe": (aus or "").strip()[-400:], "probelauf": self.trocken}
+        zustand.setdefault("aktionen", []).append(eintrag)
+        zustand["aktionen"] = zustand["aktionen"][-HEILUNG_AKTIONEN_MAX:]
+        zustand.setdefault("zuletzt", {})[f"{art}:{dienst}"] = jetzt
+        print(f"Selbstheilung{' (Probelauf)' if self.trocken else ''}: {text} – {' '.join(args)}"
+              f"{'' if rc == 0 else f' → Rückgabe {rc}'}")
+        return rc
+
+    def heilung_pruefen(self, container, platten, versionen, laufzeit, jetzt=None):
+        """Wächter im Status-Lauf: fehlende Container starten, ungesunde neu starten, Backend notfalls auf die gute
+        Version zurückschalten, knappe Platte melden und Gefahrloses aufräumen. Liefert die Kurzfassung für den Status."""
+        jetzt = jetzt or time.time()
+        pfad = self.heilung_pfad(HEILUNG_DATEI)
+        zustand = self.lies(pfad) or {}
+        zustand = zustand if isinstance(zustand, dict) else {}
+        zaehler = zustand.get("zaehler") if isinstance(zustand.get("zaehler"), dict) else {}
+        zuletzt = zustand.get("zuletzt") if isinstance(zustand.get("zuletzt"), dict) else {}
+        zustand["zaehler"], zustand["zuletzt"] = zaehler, zuletzt
+        zustand.setdefault("aktionen", [])
+        env = self.env_lesen()
+        aktiv, gut = env.get("EPM_VERSION", ""), env.get("EPM_VERSION_GUT", "")
+        gut_vorhanden = any(e["tag"] == gut and e["vollstaendig"] for e in (versionen or {}).get("liste") or [])
+        ergebnis = {
+            "an": self.heilung_an(), "aktiv": False, "grund": None, "laufend": aktiv, "gut": gut,
+            "gut_vorhanden": gut_vorhanden, "gut_ist_laufend": bool(gut) and gut == aktiv,
+            "update_laeuft": self.update_laeuft(), "rueckfall": self.rueckfall_lesen(), "platte": None,
+            "zaehler": {}, "aktionen": [], "rueckfall_moeglich": False,
+        }
+        if not ergebnis["an"]:
+            ergebnis["grund"] = "ausgeschaltet (Datei system/heilung-aus)"
+        elif env.get("COMPOSE_FILE", "compose.yaml") != "compose.yaml" or not aktiv:
+            ergebnis["grund"] = "EPM-Stack ist nicht aktiv (Rauchtest oder keine .env)"
+        elif ergebnis["update_laeuft"]:
+            ergebnis["grund"] = "epm-update läuft"
+        elif self.auftrag_laeuft():
+            ergebnis["grund"] = "ein Auftrag läuft"
+        elif laufzeit is not None and laufzeit < HEILUNG_BOOT_S:
+            ergebnis["grund"] = "Server ist gerade gestartet"
+        elif not (container or {}).get("verfuegbar"):
+            ergebnis["grund"] = "Container nicht abrufbar"
+        if ergebnis["grund"] is None:
+            ergebnis["aktiv"] = True
+            self.heilung_dienste(zustand, container, aktiv, gut, gut_vorhanden, ergebnis, jetzt)
+            self.heilung_platte(zustand, platten, ergebnis, jetzt)
+        ergebnis["zaehler"] = {d: n for d, n in zaehler.items() if n}
+        ergebnis["aktionen"] = list(reversed(zustand["aktionen"][-10:]))
+        ergebnis["rueckfall_versucht"] = zustand.get("rueckfall_versucht") or ""
+        zustand["zeit"] = jetzt_iso()
+        os.makedirs(self.heilung_pfad(""), mode=0o755, exist_ok=True)
+        self.schreibe(pfad, zustand)
+        return ergebnis
+
+    def heilung_dienste(self, zustand, container, aktiv, gut, gut_vorhanden, ergebnis, jetzt):
+        zaehler, zuletzt = zustand["zaehler"], zustand["zuletzt"]
+        je_dienst = {c.get("dienst"): c for c in container.get("liste") or []}
+        fehlend, ungesund = [], []
+        for dienst in DIENSTE:
+            c = je_dienst.get(dienst)
+            if c is None or c.get("zustand") in ("exited", "dead", "created", "removing"):
+                fehlend.append(dienst)
+                zaehler[dienst] = 0
+            elif c.get("zustand") == "restarting" or (c.get("zustand") == "running" and c.get("gesundheit") == "unhealthy"):
+                zaehler[dienst] = zaehler.get(dienst, 0) + 1
+                if zaehler[dienst] >= HEILUNG_UNGESUND:
+                    ungesund.append(dienst)
+            else:
+                zaehler[dienst] = 0
+
+        def pause_vorbei(art, dienst):
+            return jetzt - zuletzt.get(f"{art}:{dienst}", 0) >= HEILUNG_PAUSE_S
+
+        starten = [d for d in fehlend if pause_vorbei("start", d)]
+        if starten:
+            self.heilung_befehl(zustand, ",".join(starten), "start", self.compose("up", "-d", "--no-recreate", *starten),
+                                f"Container {', '.join(starten)} fehlt oder ist beendet – wird gestartet", jetzt)
+            for d in starten:
+                zuletzt[f"start:{d}"] = jetzt
+        # höchstens ein Neustart je Lauf (Zeitbudget des Status-Laufs); db zuerst, weil die anderen von ihr abhängen
+        for dienst in sorted(ungesund, key=DIENSTE[::-1].index):
+            if not pause_vorbei("neustart", dienst):
+                continue
+            if dienst == "backend":
+                neustarts = [e for e in zustand["aktionen"] if e.get("dienst") == "backend" and e.get("art") == "neustart"
+                             and jetzt - zeit_unix(e.get("zeit")) <= HEILUNG_RUECKFALL_FENSTER_S]
+                ergebnis["rueckfall_moeglich"] = bool(gut and gut != aktiv and gut_vorhanden and os.path.exists(EPM_UPDATE))
+                if len(neustarts) >= HEILUNG_RUECKFALL_NEUSTARTS:
+                    if ergebnis["rueckfall_moeglich"] and zustand.get("rueckfall_versucht") != aktiv:
+                        self.heilung_rueckfall(zustand, aktiv, gut, ergebnis, jetzt)
+                        break
+                    if not ergebnis["rueckfall_moeglich"]:
+                        ergebnis["grund"] = (f"Backend bleibt nach {len(neustarts)} Neustarten ungesund; keine andere gute "
+                                             "Version zum Zurückschalten vorhanden")
+                    elif zustand.get("rueckfall_versucht") == aktiv:
+                        ergebnis["grund"] = f"Rückfall von {aktiv} wurde schon versucht – bitte von Hand prüfen"
+                    break
+            self.heilung_befehl(zustand, dienst, "neustart", self.compose("restart", dienst),
+                                f"Container {dienst} ist seit {zaehler[dienst]} Messungen ungesund – wird neu gestartet", jetzt)
+            zaehler[dienst] = 0
+            break
+
+    def heilung_rueckfall(self, zustand, aktiv, gut, ergebnis, jetzt):
+        """Backend bleibt ungesund: über epm-update (losgelöst, systemd-run) auf die gute Version zurück. Die Markierung
+        liest das Backend aus dem Status und macht daraus den Hinweis an alle Benutzer."""
+        zustand["rueckfall_versucht"] = aktiv
+        grund = f"Backend der Version {aktiv} startet nicht (nach {HEILUNG_RUECKFALL_NEUSTARTS} Neustarten ungesund)"
+        if not self.trocken:
+            ergebnis["rueckfall"] = self.rueckfall_markieren(aktiv, gut, grund, True)
+        args = ["systemd-run", "--unit", "epm-heilung-rueckfall", "--collect", "--quiet", "--no-block",
+                "--property", "WorkingDirectory=" + self.basis, EPM_UPDATE, "--zurueck", gut]
+        rc = self.heilung_befehl(zustand, "backend", "rueckfall", args, f"{grund} – zurück auf die gute Version {gut}", jetzt)
+        if rc != 0 and not self.trocken:
+            ergebnis["rueckfall"] = self.rueckfall_markieren(aktiv, gut, grund + "; Zurückschalten ließ sich nicht starten",
+                                                            False)
+
+    def heilung_platte(self, zustand, platten, ergebnis, jetzt):
+        knapp = None
+        for p in platten or []:
+            if p.get("bezeichnung") not in ("EPM-Daten", "Docker", "System") or not p.get("gesamt"):
+                continue
+            if p["frei"] < HEILUNG_PLATTE_MIN_BYTES or p["frei"] / p["gesamt"] < HEILUNG_PLATTE_MIN_ANTEIL:
+                knapp = p
+                break
+        if knapp is None:
+            zustand.pop("platte_id", None)
+            return
+        tag = datetime.fromtimestamp(jetzt, timezone.utc).astimezone().strftime("%Y%m%d")
+        if not str(zustand.get("platte_id", "")).startswith(tag):
+            zustand["platte_id"] = f"{tag}{os.urandom(4).hex()}"
+        ergebnis["platte"] = {"id": zustand["platte_id"], "pfad": knapp["pfad"], "bezeichnung": knapp["bezeichnung"],
+                              "frei": knapp["frei"], "gesamt": knapp["gesamt"]}
+        if jetzt - zustand["zuletzt"].get("aufraeumen:docker", 0) >= HEILUNG_PRUNE_PAUSE_S:
+            self.heilung_befehl(zustand, "docker", "aufraeumen", ["docker", "image", "prune", "-f"],
+                                f"Platte {knapp['bezeichnung']} ({knapp['pfad']}) fast voll – hängende Images werden entfernt", jetzt)
+
+    def version_bestaetigen(self, zeile, simuliert=False):
+        aktiv = self.laufende_version()
+        if not TAG_MUSTER.match(aktiv or ""):
+            return 2, "Es läuft keine EPM-Version (Rauchtest?) – nichts bestätigt."
+        if simuliert:
+            zeile(f"\n(Probelauf) EPM_VERSION_GUT={aktiv} in {self.basis}/.env\n")
+            return 0, f"Probelauf: {aktiv} nicht als gute Version eingetragen."
+        v = self.epm_versionen()
+        e = next((x for x in v["liste"] if x["tag"] == aktiv), None)
+        if v.get("verfuegbar") and (e is None or not e["vollstaendig"]):
+            return 2, f"Die Images der laufenden Version {aktiv} sind nicht vollständig vorhanden – nichts bestätigt."
+        self.env_setzen("EPM_VERSION_GUT", aktiv)
+        zeile(f"EPM_VERSION_GUT={aktiv}\n")
+        return 0, f"Version {aktiv} ist jetzt die gute Version – auf sie fällt die Selbstheilung zurück."
+
+    def heilung_schalten(self, an, zeile, simuliert=False):
+        if not isinstance(an, bool):
+            return 2, "Bitte ein- oder ausschalten angeben – nichts geändert."
+        pfad = self.heilung_pfad(HEILUNG_AUS)
+        if simuliert:
+            zeile(f"\n(Probelauf) {'rm' if an else 'touch'} {pfad}\n")
+            return 0, f"Probelauf: Selbstheilung nicht {'ein' if an else 'aus'}geschaltet."
+        if an:
+            try:
+                os.unlink(pfad)
+            except FileNotFoundError:
+                pass
+            return 0, "Selbstheilung eingeschaltet – der Server startet ausgefallene Dienste wieder von selbst."
+        os.makedirs(self.heilung_pfad(""), mode=0o755, exist_ok=True)
+        with open(pfad, "w", encoding="utf-8") as f:
+            f.write(jetzt_iso() + "\n")
+        return 0, ("Selbstheilung ausgeschaltet – bis zum Einschalten startet der Server keine Dienste von selbst neu "
+                   "(für Wartung von Hand).")
 
     # ------------------------------------------------------------ Notfallpaket (F188)
     def laufende_version(self):

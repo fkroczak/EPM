@@ -1261,13 +1261,12 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         # Kontodaten (nicht die Rolle je Firma) ändert nur, wer das Konto kontoweit verwalten darf; unveränderte
         # Felder stören nicht – die Oberfläche schickt das ganze Formular
         if any(f in self.KONTO_FELDER and vorher[f] != v for f, v in serializer.validated_data.items()):
-            from rest_framework.exceptions import PermissionDenied
-
             from epm.firma import darf_konto_verwalten, konto_verwalten_hinweis
 
             erlaubt, fehlend = darf_konto_verwalten(self.request.user, user)
             if not erlaubt:
-                raise PermissionDenied(konto_verwalten_hinweis(fehlend))
+                # PermissionError → 403 {"fehler": …} wie bei den Aktionen (epm.api_basis.exception_handler)
+                raise PermissionError(konto_verwalten_hinweis(fehlend))
         user = serializer.save()
         geaendert = {f: [str(vorher[f]), str(getattr(user, f))] for f in vorher if vorher[f] != getattr(user, f)}
         geaendert.update(getattr(serializer, "firmen_geaendert", {}))

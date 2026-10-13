@@ -229,6 +229,17 @@ AKTIONEN = {
         "name": "Gesperrte Adresse freigeben", "bestaetigung": "einfach", "intern": True,
         "beschreibung": "Eine von Fail2ban gesperrte Adresse sofort wieder zulassen.",
     },
+    # ---- Selbstheilung (13.10.2026)
+    "version_bestaetigen": {
+        "name": "Als gute Version bestätigen", "bestaetigung": "einfach", "intern": True,
+        "beschreibung": "Die laufende Version als „gute Version“ eintragen (EPM_VERSION_GUT). Auf sie schaltet die "
+                        "Selbstheilung zurück, wenn eine neuere nicht startet; ihre Images bleiben beim Aufräumen.",
+    },
+    "heilung_schalten": {
+        "name": "Selbstheilung ein- oder ausschalten", "bestaetigung": "einfach", "intern": True,
+        "beschreibung": "Ausgeschaltet startet der Server keine Dienste von selbst neu und schaltet keine Version zurück – "
+                        "für Wartung von Hand. Bitte danach wieder einschalten.",
+    },
 }
 
 # Aktionen der Seite Administration › Backup (für deren Liste der Tätigkeiten)
@@ -260,6 +271,9 @@ NTP_SERVER_MUSTER = re.compile(r"^(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A
                                r"[A-Za-z0-9])?$|^[0-9a-fA-F:]{2,39}$")
 NTP_SERVER_MAX = 4
 ZEIT_SETZEN_MUSTER = re.compile(r"^20[2-9][0-9]-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01]) ([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$")
+
+# Selbstheilung (13.10.2026): so lange steht der Hinweis zur knappen Platte, wenn ihn niemand vorher beendet
+HEILUNG_PLATTE_HINWEIS_STUNDEN = 24
 
 # Zugang (11.10.2026): dieselben Prüfungen wie im Agenten (rollout/epm-systemagent.py: netz_pruefen, ip_pruefen)
 SSH_STUNDEN = (1, 4, 8)

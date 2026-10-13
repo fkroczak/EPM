@@ -13,6 +13,14 @@
 # Überall:
 #   sudo epm-update --zurueck TAG       auf eine frühere Version zurückschalten (z. B. 0.1.1-3fa2c1d)
 #   sudo epm-update --versionen         vorhandene Versionen anzeigen
+#   sudo epm-update --gut [TAG]         die laufende (oder genannte) Version als „gute Version“ bestätigen
+#
+# Selbstheilung (13.10.2026): In $B/.env steht neben EPM_VERSION die zuletzt bewährte Version EPM_VERSION_GUT. Ein Update
+# merkt sich vorher die laufende Version und erhebt die neue erst zur guten, wenn das Backend gesund ist, die
+# Musterdaten stimmen und – wenn sie laufen – die Tests bestanden sind. Startet die neue Version nicht, schaltet das
+# Skript selbst auf die gute zurück und hinterlässt in $B/system/rueckfall.json eine Markierung, die der Systemagent
+# als Hinweis in EPM anzeigt. Während des Laufs liegt $B/system/update-laeuft, damit der Wächter des Systemagenten
+# nicht dazwischenfunkt.
 #
 # Die Ausgaben der Bauschritte stehen in /var/log/epm-update.log (je Lauf neu). Bricht ein Schritt ab, nennt das
 # Skript Schritt, Zeile und Exitcode und zeigt die letzten Zeilen des Protokolls. Wird der Lauf vom Kernel
@@ -48,7 +56,11 @@ abbruch() {
     echo "   Letzte Zeilen aus $PROTOKOLL:"
     tail -n 25 "$PROTOKOLL" | sed 's/^/   /'
   fi
-  echo "Nichts wurde umgestellt; die laufende Version bleibt unverändert."
+  if [[ "${UMGESTELLT:-0}" == 1 ]]; then
+    echo "EPM läuft mit $(env_wert EPM_VERSION); gute Version (Rückfall): $(env_wert EPM_VERSION_GUT)."
+  else
+    echo "Nichts wurde umgestellt; die laufende Version bleibt unverändert."
+  fi
   exit "$code"
 }
 trap 'abbruch $? $LINENO "$BASH_COMMAND"' ERR
@@ -60,12 +72,15 @@ alte_entfernen() {
   # „Die neuesten N behalten, den Rest löschen“. Bewusst ohne ``ls … | grep … | tail …``: Trifft das Muster
   # nichts (oder filtert grep alles weg), scheitert die Pipeline, und ``set -e`` mit ``pipefail`` beendete den
   # Lauf an dieser Stelle stumm – das war die Ursache des Abbruchs vom 07.10.2026.
+  # ``ohne``: Teilstrings (durch Leerzeichen getrennt) – passende Dateien zählen nicht und bleiben (Pakete, gute Version)
   local behalten="$1" ohne="$2"; shift 2
-  local datei
+  local datei muster uebergehen
   local -a kandidaten=() sortiert=()
   for datei in "$@"; do
     [[ -f "$datei" ]] || continue                  # unaufgelöstes Muster: es gibt keine solche Datei
-    if [[ -n "$ohne" && "$datei" == *"$ohne"* ]]; then continue; fi
+    uebergehen=0
+    for muster in $ohne; do [[ "$datei" == *"$muster"* ]] && uebergehen=1; done
+    (( uebergehen )) && continue
     kandidaten+=("$datei")
   done
   (( ${#kandidaten[@]} > behalten )) || return 0
@@ -74,10 +89,45 @@ alte_entfernen() {
   rm -f -- "${sortiert[@]:behalten}"
 }
 
+env_wert() { grep "^$1=" "$B/.env" 2>/dev/null | head -n1 | cut -d= -f2- | tr -d '"' ; }
+env_setzen() {
+  # Schlüssel in $B/.env setzen oder anhängen (ohne sed-Sonderzeichen im Wert: Tags bestehen aus Ziffern, Punkt, Minus, hex)
+  if grep -q "^$1=" "$B/.env" 2>/dev/null; then sed -i "s/^$1=.*/$1=$2/" "$B/.env"; else echo "$1=$2" >> "$B/.env"; fi
+}
+version_vorhanden() { docker image inspect "epm-backend:$1" >/dev/null 2>&1 && docker image inspect "epm-web:$1" >/dev/null 2>&1; }
+
+gut_setzen() {
+  env_setzen EPM_VERSION_GUT "$1"
+  echo "   Gute Version: $1"
+}
+# Die gute Version, auf die ein fehlgeschlagener Start zurückfällt: EPM_VERSION_GUT, sonst die bisher laufende –
+# jeweils nur, wenn beide Images noch da sind.
+rueckfall_ziel() {
+  local gut; gut="$(env_wert EPM_VERSION_GUT)"
+  local kandidat
+  for kandidat in "$gut" "$1"; do
+    [[ -n "$kandidat" && "$kandidat" != "$2" ]] || continue
+    version_vorhanden "$kandidat" && { echo "$kandidat"; return 0; }
+  done
+  return 1
+}
+
+# Markierung für den Systemagenten (Status „Selbstheilung“, Hinweis an alle Benutzer): wer, wann, von, nach, warum
+rueckfall_markieren() {
+  local von="$1" nach="$2" grund="$3" ok="$4"
+  install -d -m 0755 "$B/system"
+  printf '{"id": "%s", "zeit": "%s", "quelle": "epm-update", "von": "%s", "nach": "%s", "ok": %s, "grund": "%s"}\n' \
+    "$(date +%s)$$" "$(date -Iseconds)" "$von" "$nach" "$ok" "$grund" > "$B/system/rueckfall.json.tmp"
+  chmod 0644 "$B/system/rueckfall.json.tmp"; mv "$B/system/rueckfall.json.tmp" "$B/system/rueckfall.json"
+}
+update_laeuft_setzen() { install -d -m 0755 "$B/system"; echo "$$ $(date -Iseconds) $1" > "$B/system/update-laeuft"; }
+TMP=""
+aufraeumen_exit() { rm -f "$B/system/update-laeuft"; [[ -n "$TMP" ]] && rm -rf "$TMP"; return 0; }
+
 starte_version() {
   local tag="$1"
   sed -i -e 's/^COMPOSE_FILE=.*/COMPOSE_FILE=compose.yaml/' -e "s/^EPM_VERSION=.*/EPM_VERSION=$tag/" "$B/.env"
-  (cd "$B" && docker compose up -d --remove-orphans)
+  (cd "$B" && docker compose up -d --remove-orphans) || return 1
   schritt "Warte auf das Backend"
   local status=""
   for _ in $(seq 1 60); do
@@ -86,8 +136,64 @@ starte_version() {
     sleep 3
   done
   echo "Backend startet nicht. Letzte Meldungen:"
-  (cd "$B" && docker compose logs --tail 40 backend)
+  (cd "$B" && docker compose logs --tail 40 backend) || true
   return 1
+}
+
+# Neue Version starten; startet sie nicht, von selbst auf die gute Version zurück (Festlegung 13.10.2026).
+# Aufruf unter ``if``: ein Fehlschlag löst nicht den ERR-Trap aus, sondern den Rückfall hier.
+umstellen_oder_zurueck() {
+  local tag="$1" vorher="$2"
+  if starte_version "$tag"; then return 0; fi
+  local ziel
+  if ! ziel="$(rueckfall_ziel "$vorher" "$tag")"; then
+    rueckfall_markieren "$tag" "" "Version $tag startet nicht; keine andere Version mit beiden Images vorhanden" false
+    echo
+    echo "ABBRUCH: Neue Version $tag startet nicht – und es gibt keine frühere Version zum Zurückschalten."
+    echo "   Protokoll: $PROTOKOLL · Container: docker compose logs backend"
+    return 1
+  fi
+  schritt "Zurück auf die gute Version $ziel"
+  local ok=true
+  starte_version "$ziel" || ok=false
+  rueckfall_markieren "$tag" "$ziel" "Version $tag startet nicht (Backend nach 180 s nicht gesund)" "$ok"
+  echo
+  if [[ "$ok" == true ]]; then
+    echo "ABBRUCH: Neue Version $tag startet nicht – zurück auf $ziel (läuft wieder)."
+  else
+    echo "ABBRUCH: Neue Version $tag startet nicht – und auch $ziel startet nicht. Bitte: docker compose logs backend"
+  fi
+  echo "   Datenbank-Migrationen der neuen Version wurden nicht zurückgedreht; läuft $ziel damit nicht sauber, die"
+  echo "   Sicherung von vor dem Update wiederherstellen (Administration › Backup). Fehlerursache: $PROTOKOLL,"
+  echo "   Administration › System › Protokolle › „Container backend“."
+  return 1
+}
+
+# Nach dem Start: Musterdaten, Tests; erst danach wird die neue Version zur guten (nur wenn alles bestand)
+abschliessen() {
+  local tag="$1" vorher="$2"
+  schritt "Musterdaten prüfen"
+  if ! (cd "$B" && docker compose exec -T backend python manage.py epm_musterdaten); then
+    echo "Musterdaten fehlgeschlagen – $tag läuft, bleibt aber unbestätigt (gute Version weiterhin $(env_wert EPM_VERSION_GUT))."
+    ERGEBNIS="MUSTERDATEN FEHLGESCHLAGEN"
+    return 1
+  fi
+  if [[ $TESTS -eq 1 ]]; then
+    schritt "Tests (eigene Test-Datenbank, echte Daten bleiben unberührt)"
+    LOG=/var/log/epm-tests.log
+    # ``</dev/null``: Ohne das hängt die Standardeingabe am Terminal – in die Zwischenablage geratener Text landete
+    # dann im laufenden Testcontainer und ein darin enthaltenes Strg-C brach den Lauf ab (Stolperstein 06.10.2026).
+    if (cd "$B" && docker compose run --rm -T backend python manage.py test) </dev/null >"$LOG" 2>&1; then
+      ERGEBNIS="Tests OK"
+    else
+      ERGEBNIS="TESTS FEHLGESCHLAGEN – Ausgabe oben, vollständig in $LOG"
+    fi
+    grep -v " WARNING django.request: " "$LOG" | tail -25
+    [[ "$ERGEBNIS" == "Tests OK" ]] || { echo "   $tag bleibt unbestätigt; gute Version weiterhin $(env_wert EPM_VERSION_GUT)."; return 0; }
+  else
+    ERGEBNIS="Tests übersprungen"
+  fi
+  gut_setzen "$tag"
 }
 
 paket_erstellen() {
@@ -121,14 +227,22 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --versionen)
       docker image ls epm-backend --format '{{.Tag}}\t{{.CreatedSince}}'
-      echo "aktiv: $(grep ^EPM_VERSION= "$B/.env" | cut -d= -f2)"
+      echo "aktiv: $(env_wert EPM_VERSION)"
+      echo "gut:   $(env_wert EPM_VERSION_GUT)"
       exit 0 ;;
     --zurueck)
       TAG="${2:?Version angeben, siehe: sudo epm-update --versionen}"
       docker image inspect "epm-backend:$TAG" >/dev/null || { echo "Version $TAG nicht vorhanden."; exit 1; }
       docker image inspect "epm-web:$TAG" >/dev/null || { echo "Frontend-Image epm-web:$TAG fehlt."; exit 1; }
-      starte_version "$TAG"
+      update_laeuft_setzen "zurueck $TAG"; trap aufraeumen_exit EXIT
+      if ! starte_version "$TAG"; then echo "ABBRUCH: $TAG startet nicht (Backend nicht gesund)."; exit 1; fi
       echo "Zurückgeschaltet auf $TAG. Achtung: Datenbank-Migrationen werden dabei nicht zurückgedreht."
+      exit 0 ;;
+    --gut)
+      TAG="${2:-$(env_wert EPM_VERSION)}"
+      [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40}$ ]] || { echo "Version „$TAG“ nicht erkannt."; exit 1; }
+      version_vorhanden "$TAG" || { echo "Version $TAG ist nicht (vollständig) vorhanden."; exit 1; }
+      gut_setzen "$TAG"
       exit 0 ;;
     --paket-erstellen) paket_erstellen; exit 0 ;;
     --paket) PAKET="${2:?Paketdatei angeben, z. B. sudo epm-update --paket ~/epm-paket-2.0.0-1a2b3c4.tar}"; shift ;;
@@ -149,7 +263,7 @@ if [[ -n "$PAKET" ]]; then
   schritt "Paket prüfen"
   echo "   SHA-256: $(sha256sum "$PAKET" | cut -d' ' -f1)  (mit der Anzeige auf der Test-VM vergleichen)"
   TMP="$(mktemp -d)"
-  trap 'rm -rf "$TMP"' EXIT
+  trap aufraeumen_exit EXIT
   tar -C "$TMP" -xf "$PAKET"
   (cd "$TMP" && sha256sum --quiet -c SHA256SUMS) || { echo "ABBRUCH: Paket beschädigt. Nichts wurde umgestellt."; exit 1; }
   TAG="$(tr -d '[:space:]' < "$TMP/TAG")"
@@ -167,7 +281,7 @@ if [[ -n "$PAKET" ]]; then
   schritt "Images laden (epm-backend:$TAG, epm-web:$TAG)"
   docker load -i "$TMP/images.tar" | sed 's/^/   /'
   install -m 0600 "$TMP/images.tar" "$B/images/epm-$TAG.tar"
-  alte_entfernen 5 /epm-paket- "$B"/images/epm-*.tar
+  alte_entfernen 5 "/epm-paket- $(env_wert EPM_VERSION_GUT)" "$B"/images/epm-*.tar
 else
   # ------------------------------------------------------------ von GitHub holen und bauen (Test-VM)
   if [[ "$QUELLE" == "paket" ]]; then
@@ -237,12 +351,17 @@ else
   docker build -t "epm-web:$TAG" "$CODE/frontend" >>"$PROTOKOLL" 2>&1
   docker save "epm-backend:$TAG" "epm-web:$TAG" -o "$B/images/epm-$TAG.tar"
   chmod 0600 "$B/images/epm-$TAG.tar"
-  # nur die letzten 5 Image-Dateien behalten (Update-Pakete für den VPS: die letzten 3)
-  alte_entfernen 5 /epm-paket- "$B"/images/epm-*.tar
+  # nur die letzten 5 Image-Dateien behalten (Update-Pakete für den VPS: die letzten 3); die gute Version immer
+  alte_entfernen 5 "/epm-paket- $(env_wert EPM_VERSION_GUT)" "$B"/images/epm-*.tar
   alte_entfernen 3 "" "$B"/images/epm-paket-*.tar
 fi
 
 fi
+
+VORHER="$(env_wert EPM_VERSION)"
+# Erstes Update mit Selbstheilung: die bisher laufende Version gilt als gut, wenn ihre Images noch da sind
+if [[ -z "$(env_wert EPM_VERSION_GUT)" && -n "$VORHER" ]] && version_vorhanden "$VORHER"; then gut_setzen "$VORHER"; fi
+update_laeuft_setzen "update $TAG"; trap aufraeumen_exit EXIT
 
 schritt "Backup vor dem Umstellen"
 if (cd "$B" && docker compose ps --status running -q db | grep -q .); then
@@ -250,29 +369,18 @@ if (cd "$B" && docker compose ps --status running -q db | grep -q .); then
 fi
 
 schritt "Version $TAG starten (Migrationen laufen automatisch)"
-starte_version "$TAG"
+if ! umstellen_oder_zurueck "$TAG" "$VORHER"; then exit 1; fi
+UMGESTELLT=1
 
-schritt "Musterdaten prüfen"
-(cd "$B" && docker compose exec -T backend python manage.py epm_musterdaten)
-
-if [[ $TESTS -eq 1 ]]; then
-  schritt "Tests (eigene Test-Datenbank, echte Daten bleiben unberührt)"
-  LOG=/var/log/epm-tests.log
-  # ``</dev/null``: Ohne das hängt die Standardeingabe am Terminal – in die Zwischenablage geratener Text landete
-  # dann im laufenden Testcontainer und ein darin enthaltenes Strg-C brach den Lauf ab (Stolperstein 06.10.2026).
-  if (cd "$B" && docker compose run --rm -T backend python manage.py test) </dev/null >"$LOG" 2>&1; then
-    ERGEBNIS="Tests OK"
-  else
-    ERGEBNIS="TESTS FEHLGESCHLAGEN – Ausgabe oben, vollständig in $LOG"
-  fi
-  grep -v " WARNING django.request: " "$LOG" | tail -25
-else
-  ERGEBNIS="Tests übersprungen"
-fi
+ERGEBNIS=""
+abschliessen "$TAG" "$VORHER" || true
 
 echo
 echo "────────────────────────────────────────────"
 echo " EPM $TAG läuft – $ERGEBNIS"
+echo " Gute Version (Rückfall der Selbstheilung): $(env_wert EPM_VERSION_GUT)"
 echo " https://$EPM_WEB_NAME/"
 echo " Zurück auf die vorige Version: sudo epm-update --versionen"
 echo "────────────────────────────────────────────"
+[[ "$ERGEBNIS" == "MUSTERDATEN FEHLGESCHLAGEN" ]] && exit 1
+exit 0

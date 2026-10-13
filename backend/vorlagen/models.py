@@ -3,7 +3,12 @@ Datenschutz (Datenschutzinformation, Einwilligung, Schweigepflichtentbindung) au
 
 Je Art gibt es höchstens einen Entwurf und genau eine aktive Version. Veröffentlichen macht aus dem Entwurf die
 nächste Version; die bisherige wird „abgelöst“ und bleibt erhalten. Veröffentlichte Versionen sind unveränderlich
-(Modell und Datenbank-Trigger), damit jede gespeicherte PDF auf ihre Vorlagenversion zurückgeführt werden kann.
+(Modell), damit jede gespeicherte PDF auf ihre Vorlagenversion zurückgeführt werden kann.
+
+Vorlagen je Firma (Festlegung „Gemischt“, 11.10.2026): Ohne ``firma`` ist eine Vorlage gemeinsam. Eine Firma kann je
+Art eine eigene Vorlage anlegen (Kopie der gemeinsamen); dann gelten Entwurf, Fassungen und Veröffentlichen für
+ihre Vorlage, und ``aktive()`` liefert in dieser Firma ihre aktive Fassung, sonst die gemeinsame. Die Vorlagen der
+Regeneration Clinic (``NUR_FIRMA``, Patientenerklärungen vom Oktober 2026) gehören fest zu dieser Firma.
 """
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -35,6 +40,24 @@ class Dokumentvorlage(models.Model):
         SCHWEIGEPFLICHTENTBINDUNG = "schweigepflichtentbindung", "Schweigepflichtentbindung"
         # zwei Firmen (11.10.2026): Voraussetzung, um eine Akte der DSKM und der Regeneration Clinic zuzuordnen
         FIRMEN = "firmen", "Einwilligung Austausch zwischen DSKM und Regeneration Clinic"
+        # Patientenerklärungen und Vereinbarungen der Regeneration Clinic SIA (Word-Vorlagen 01–12, Revision 3,
+        # Oktober 2026): nur in der Firma RGC (``NUR_FIRMA``), Vordrucke aus Akte › Datenschutz
+        RGC_ERKLAERUNG_AT = "rgc_erklaerung_at", "Patientenerklärung Österreich (Stundung)"
+        RGC_ERKLAERUNG_GKV = "rgc_erklaerung_gkv", "Patientenerklärung Deutschland GKV (Stundung)"
+        RGC_ERKLAERUNG_BGUV = "rgc_erklaerung_bguv", "Patientenerklärung Deutschland BG/UV"
+        RGC_ERKLAERUNG_PKV = "rgc_erklaerung_pkv", "Patientenerklärung Deutschland PKV (Stundung)"
+        RGC_ERKLAERUNG_ZUSATZ = "rgc_erklaerung_zusatz", "Patientenerklärung Stationäre Zusatzversicherung"
+        RGC_SCHWEIGEPFLICHT = "rgc_schweigepflicht", "Schweigepflichtentbindung (RGC)"
+        RGC_AUFKLAERUNG_OP = "rgc_aufklaerung_op", "Aufklärung Operation (Grundbogen, DE/LV)"
+        RGC_AUFKLAERUNG_ANAESTHESIE = "rgc_aufklaerung_anaesthesie", "Aufklärung Anästhesie (DE/LV)"
+        RGC_VEREINBARUNG_OEGK = "rgc_vereinbarung_oegk", "Vergütungs- und Rückerstattungsvereinbarung ÖGK (Selbstzahler)"
+        RGC_ABTRETUNG_OEGK = "rgc_abtretung_oegk", "Abtretungs- und Bevollmächtigungserklärung ÖGK mit Vorauszahlung"
+        RGC_ANLAGE_K = "rgc_anlage_k", "Anlage K – Kostenvoranschlag, Erstattungsprognose, Patienteninformation"
+        RGC_ANWALTSVOLLMACHT = "rgc_anwaltsvollmacht", "Vollmacht zur anwaltlichen Vertretung (DE/AT)"
+
+    class Ausrichtung(models.TextChoices):
+        HOCH = "hoch", "Hochformat"
+        QUER = "quer", "Querformat"
 
     class Status(models.TextChoices):
         ENTWURF = "entwurf", "Entwurf"
@@ -43,7 +66,12 @@ class Dokumentvorlage(models.Model):
 
     # feste Arten (``Art``) oder eigene Schreiben „eigen-…“ (F176, ``EigenesSchreiben``) – daher ohne choices
     art = models.CharField(max_length=30)
+    # leer = gemeinsame Vorlage; gesetzt = eigene Vorlage dieser Firma (11.10.2026)
+    firma = models.ForeignKey("stammdaten.Firma", on_delete=models.PROTECT, null=True, blank=True,
+                              related_name="dokumentvorlagen")
     version = models.PositiveIntegerField(null=True, blank=True, help_text="leer beim Entwurf")
+    # Seitenformat der PDF (Medikationsplan im Querformat, 13.10.2026)
+    ausrichtung = models.CharField(max_length=4, choices=Ausrichtung.choices, default=Ausrichtung.HOCH)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.ENTWURF)
     bloecke = models.JSONField(default=list)
     notiz = models.CharField(max_length=200, blank=True, help_text="z. B. „Startvorlage nach Entwurf“")
@@ -64,16 +92,21 @@ class Dokumentvorlage(models.Model):
         verbose_name_plural = "Dokumentvorlagen"
         ordering = ["art", "-version"]
         constraints = [
-            models.UniqueConstraint(fields=["art"], condition=models.Q(status="entwurf"), name="ein_entwurf_je_art"),
-            models.UniqueConstraint(fields=["art"], condition=models.Q(status="aktiv"), name="eine_aktive_je_art"),
-            models.UniqueConstraint(fields=["art", "version"], name="version_je_art_eindeutig"),
+            # je Art und Firma (gemeinsam = NULL, zählt hier wie ein Wert) ein Entwurf, eine aktive, eindeutige Versionen
+            models.UniqueConstraint(fields=["art", "firma"], condition=models.Q(status="entwurf"),
+                                    nulls_distinct=False, name="ein_entwurf_je_art"),
+            models.UniqueConstraint(fields=["art", "firma"], condition=models.Q(status="aktiv"),
+                                    nulls_distinct=False, name="eine_aktive_je_art"),
+            models.UniqueConstraint(fields=["art", "firma", "version"], nulls_distinct=False,
+                                    name="version_je_art_eindeutig"),
             models.CheckConstraint(name="version_nur_veroeffentlicht",
                                    condition=models.Q(status="entwurf", version__isnull=True)
                                    | (~models.Q(status="entwurf") & models.Q(version__isnull=False))),
         ]
 
     def __str__(self):
-        return f"{self.get_art_display()} {'Entwurf' if self.version is None else f'v{self.version}'}"
+        firma = f" ({self.firma.kurzname})" if self.firma_id else ""
+        return f"{self.get_art_display()}{firma} {'Entwurf' if self.version is None else f'v{self.version}'}"
 
     def get_art_display(self) -> str:
         return art_name(self.art)
@@ -100,22 +133,90 @@ class Dokumentvorlage(models.Model):
 
     # --- Abläufe ---
     @classmethod
-    def aktive(cls, art: str) -> "Dokumentvorlage":
-        """Die aktive Version; gibt es noch keine, wird die Startvorlage nach dem Entwurf als v1 angelegt."""
-        v = cls.objects.filter(art=art, status=cls.Status.AKTIV).first()
+    def aktive(cls, art: str, firma=None) -> "Dokumentvorlage":
+        """Die aktive Version für die Firma (ohne Angabe: die aktive Firma der Anfrage): ihre eigene, sonst die
+        gemeinsame. Gibt es noch keine, wird die Startvorlage nach dem Entwurf als v1 angelegt – bei Vorlagen, die
+        fest zu einer Firma gehören (``NUR_FIRMA``), als Vorlage dieser Firma."""
+        firma = firma_der_art(art, firma)
+        if firma is not None:
+            v = cls.objects.filter(art=art, firma=firma, status=cls.Status.AKTIV).first()
+            if v is not None:
+                return v
+        return cls._aktive_oder_start(art, firma if art in NUR_FIRMA else None)
+
+    @classmethod
+    def gemeinsame(cls, art: str) -> "Dokumentvorlage":
+        """Die gemeinsame aktive Version (unabhängig von der Firma)."""
+        return cls._aktive_oder_start(art, None)
+
+    @classmethod
+    def _aktive_oder_start(cls, art: str, ziel) -> "Dokumentvorlage":
+        v = cls.objects.filter(art=art, firma=ziel, status=cls.Status.AKTIV).first()
         if v is None:
-            from .bloecke import STARTVORLAGEN
+            from .bloecke import STARTAUSRICHTUNG, STARTVORLAGEN
 
             with transaction.atomic():
-                v = cls.objects.select_for_update().filter(art=art, status=cls.Status.AKTIV).first()
+                v = cls.objects.select_for_update().filter(art=art, firma=ziel, status=cls.Status.AKTIV).first()
                 if v is None:
-                    v = cls.objects.create(art=art, version=1, status=cls.Status.AKTIV,
+                    v = cls.objects.create(art=art, firma=ziel, version=1, status=cls.Status.AKTIV,
                                            bloecke=STARTVORLAGEN[art], notiz="Startvorlage nach Entwurf",
+                                           ausrichtung=STARTAUSRICHTUNG.get(art, cls.Ausrichtung.HOCH),
                                            veroeffentlicht_am=timezone.now())
         return v
 
-    # Vordrucke zum Datenschutz: mitgelieferte Startvorlagen sind ungeprüfte Entwürfe (U17)
-    VORDRUCKE = ("datenschutzinformation", "einwilligung", "schweigepflichtentbindung", "firmen")
+    @classmethod
+    def zustaendig(cls, art: str, firma=None):
+        """Welche Vorlage gilt beim Bearbeiten in der Firma: ihre eigene (→ die Firma), sonst die gemeinsame
+        (→ ``None``). Vorlagen, die fest zu einer Firma gehören, immer diese Firma."""
+        firma = firma_der_art(art, firma)
+        if firma is None:
+            return None
+        if art in NUR_FIRMA or cls.objects.filter(art=art, firma=firma, status=cls.Status.AKTIV).exists():
+            return firma
+        return None
+
+    @classmethod
+    def eigene_anlegen(cls, art: str, firma, benutzer) -> "Dokumentvorlage":
+        """Eigene Vorlage der Firma als Kopie der gemeinsamen aktiven Fassung – sofort in Gebrauch. Hat die Firma
+        schon einmal eine eigene gehabt (abgelöst), zählt die Fassung weiter."""
+        if art in NUR_FIRMA:
+            raise ValidationError("Diese Vorlage gehört fest zur Firma.")
+        with transaction.atomic():
+            eigene = cls.objects.filter(art=art, firma=firma, status=cls.Status.AKTIV).first()
+            if eigene is not None:
+                return eigene
+            quelle = cls.gemeinsame(art)
+            hoechste = cls.objects.filter(art=art, firma=firma).aggregate(m=models.Max("version"))["m"] or 0
+            # Wasserzeichen „ENTWURF“ bleibt, solange die Kopie eine ungeprüfte Startvorlage ist (veroeffentlicht_von)
+            return cls.objects.create(art=art, firma=firma, version=hoechste + 1, status=cls.Status.AKTIV,
+                                      bloecke=quelle.bloecke, ausrichtung=quelle.ausrichtung, erstellt_von=benutzer,
+                                      notiz=f"Kopie der gemeinsamen Vorlage, Fassung {quelle.version}",
+                                      veroeffentlicht_am=timezone.now(), veroeffentlicht_von=quelle.veroeffentlicht_von)
+
+    @classmethod
+    def eigene_entfernen(cls, art: str, firma) -> int:
+        """Eigene Vorlage der Firma ablegen (aktive Fassung abgelöst, Entwurf verworfen) – es gilt wieder die
+        gemeinsame. Die Fassungen bleiben erhalten. → Zahl der abgelösten Fassungen."""
+        if art in NUR_FIRMA:
+            raise ValidationError("Diese Vorlage gehört fest zur Firma.")
+        with transaction.atomic():
+            for entwurf in cls.objects.filter(art=art, firma=firma, status=cls.Status.ENTWURF):
+                entwurf.delete()
+            abgeloest = 0
+            for v in cls.objects.select_for_update().filter(art=art, firma=firma, status=cls.Status.AKTIV):
+                v.status = cls.Status.ABGELOEST
+                v.save(update_fields=["status"])
+                abgeloest += 1
+            return abgeloest
+
+    # Vordrucke zum Datenschutz (und die Erklärungen der RGC): mitgelieferte Startvorlagen sind ungeprüfte Entwürfe (U17)
+    VORDRUCKE = ("datenschutzinformation", "einwilligung", "schweigepflichtentbindung", "firmen",
+                 *(a for a in Art.values if a.startswith("rgc_")))
+
+    @property
+    def entwurfsmodus_schluessel(self) -> str:
+        """Eintrag in ``Einstellungen.vordrucke_ohne_entwurf``: die Art, bei einer eigenen Vorlage „art@firma“."""
+        return f"{self.art}@{self.firma.kuerzel}" if self.firma_id else self.art
 
     @property
     def im_entwurfsmodus(self) -> bool:
@@ -125,19 +226,22 @@ class Dokumentvorlage(models.Model):
 
         if self.art not in self.VORDRUCKE or self.veroeffentlicht_von_id is not None:
             return False
-        return self.art not in (Einstellungen.aktuell().vordrucke_ohne_entwurf or [])
+        return self.entwurfsmodus_schluessel not in (Einstellungen.aktuell().vordrucke_ohne_entwurf or [])
 
     @classmethod
-    def entwurf_von(cls, art: str):
-        return cls.objects.filter(art=art, status=cls.Status.ENTWURF).first()
+    def entwurf_von(cls, art: str, firma=None):
+        """Der Entwurf der Vorlage, die in der Firma gilt (``zustaendig``)."""
+        return cls.objects.filter(art=art, firma=cls.zustaendig(art, firma), status=cls.Status.ENTWURF).first()
 
     @transaction.atomic
     def veroeffentlichen(self, benutzer) -> "Dokumentvorlage":
         if self.status != self.Status.ENTWURF:
             raise ValidationError("Nur ein Entwurf kann veröffentlicht werden.")
         self.full_clean()
-        alt = Dokumentvorlage.objects.select_for_update().filter(art=self.art, status=self.Status.AKTIV).first()
-        hoechste = Dokumentvorlage.objects.filter(art=self.art).aggregate(m=models.Max("version"))["m"] or 0
+        alt = Dokumentvorlage.objects.select_for_update().filter(art=self.art, firma=self.firma,
+                                                                 status=self.Status.AKTIV).first()
+        hoechste = Dokumentvorlage.objects.filter(art=self.art, firma=self.firma) \
+            .aggregate(m=models.Max("version"))["m"] or 0
         if alt:
             alt.status = self.Status.ABGELOEST
             alt.save(update_fields=["status"])
@@ -147,6 +251,37 @@ class Dokumentvorlage(models.Model):
         self.veroeffentlicht_von = benutzer
         super().save()  # letzter Schreibvorgang, danach unveränderlich
         return self
+
+
+# Vorlagen, die fest zu einer Firma gehören (Kürzel): die Patientenerklärungen der Regeneration Clinic
+NUR_FIRMA = {a: "rg" for a in Dokumentvorlage.Art.values if a.startswith("rgc_")}
+
+
+def firma_der_art(art: str, firma=None):
+    """Firma, deren Vorlage gilt: bei fest zugeordneten Arten diese, sonst die übergebene bzw. aktive Firma."""
+    from epm.firma import aktive_firma
+
+    if art in NUR_FIRMA:
+        from stammdaten.models import Firma
+
+        return Firma.objects.get(kuerzel=NUR_FIRMA[art])
+    return firma or aktive_firma()
+
+
+def art_sichtbar(art: str, firma=None) -> bool:
+    """Erscheint die Art in der Firma (ohne aktive Firma: überall)? Die RGC-Vorlagen nur in der RGC."""
+    from epm.firma import aktive_firma
+
+    firma = firma or aktive_firma()
+    return art not in NUR_FIRMA or firma is None or firma.kuerzel == NUR_FIRMA[art]
+
+
+def vordruck_schluessel_gueltig(schluessel) -> bool:
+    """Eintrag in ``Einstellungen.vordrucke_ohne_entwurf``: Art eines Vordrucks, bei einer eigenen Vorlage „art@firma“."""
+    if not isinstance(schluessel, str):
+        return False
+    art, _, firma = schluessel.partition("@")
+    return art in Dokumentvorlage.VORDRUCKE and (not firma or firma.isalnum())
 
 
 def art_name(art: str) -> str:

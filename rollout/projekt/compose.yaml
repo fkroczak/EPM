@@ -1,5 +1,7 @@
 # EPM – Betrieb: Datenbank, Backend (Django), Texterkennung (OCR-Dienst), Webserver (Nginx)
 # Aktivieren: in .env  COMPOSE_FILE=compose.yaml
+# Selbstheilung (13.10.2026): restart: unless-stopped und Healthchecks je Dienst; der Systemagent startet im Status-Lauf
+# fehlende Container, startet dauerhaft ungesunde neu und fällt notfalls auf EPM_VERSION_GUT (.env) zurück.
 name: epm
 
 services:
@@ -129,6 +131,12 @@ services:
     tmpfs: [/tmp]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
+    # Selbstheilung (13.10.2026): nimmt Nginx noch Verbindungen an? (ohne TLS-Prüfung – busybox nc ist im Image)
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8443 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 networks:
   intern:

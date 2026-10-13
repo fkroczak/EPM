@@ -1,0 +1,360 @@
+{
+ "art": "rgc_aufklaerung_op",
+ "titel": "Aufklärung und Einwilligung zur Operation",
+ "vorlage": "Vorlage 07 · Version 3 · Stand 10/2026",
+ "bloecke": [
+  {
+   "id": "briefkopf",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "linienfarbe": "#B9C6C3",
+   "falzmarken": false
+  },
+  {
+   "id": "titel",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Aufklärung und Einwilligung zur Operation",
+   "zusatz_label": "",
+   "zusatz": "Vorlage 07 · Version 3 · Stand 10/2026"
+  },
+  {
+   "id": "untertitel",
+   "typ": "text",
+   "bezeichnung": "Untertitel",
+   "text": "Informētā piekrišana operācijai\nUniversalvorlage · alle operativen Eingriffe · Universāla veidlapa · visas ķirurģiskās operācijas\nGrundbogen – nur gültig mit eingriffsspezifischer Ergänzung (Ziffer 7) / Pamatveidlapa – derīga tikai ar specifisko papildinājumu (7. punkts)",
+   "optionen": {
+    "fett": true,
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "hinweis",
+   "typ": "text",
+   "bezeichnung": "Hinweis zur Vorlage – entfällt nach dem Freigeben",
+   "text": "Diese Vorlage ist aus der Word-Vorlage Vorlage 07 · Version 3 · Stand 10/2026 · Grundbogen – nur gültig mit eingriffsspezifischer Ergänzung (Ziffer 7) / Pamatveidlapa – derīga tikai ar specifisko papildinājumu (7. punkts) der Regeneration Clinic SIA übernommen. Angaben aus der Akte (Name, Geburtsdatum, Anschrift, Versicherung) setzt EPM ein; alle übrigen Felder und Ankreuzkästchen werden von Hand ausgefüllt. Bis die Vorlage hier einmal geprüft und freigegeben ist, tragen die PDFs das Wasserzeichen „ENTWURF“.",
+   "optionen": {
+    "ueberschrift": true,
+    "kursiv": true,
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "felder-1",
+   "typ": "datenfelder",
+   "bezeichnung": "Patientendaten",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Patient/-in · Pacients(-e)",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Geburtsdatum · Dzimšanas datums",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Diagnose (ICD-10) · Diagnoze (SSK-10)",
+     "wert": "{{Patient.Diagnosen}}"
+    },
+    {
+     "label": "Geplanter Eingriff · Plānotā operācija",
+     "wert": " "
+    },
+    {
+     "label": "Seite / Lokalisation · Puse / lokalizācija",
+     "wert": "☐ links / kreisā   ☐ rechts / labā   ☐ beidseits / abpusēji   ☐ nicht zutreffend / neattiecas\nLokalisation / Lokalizācija: ____________________________  ☐ OP-Seite markiert / puse atzīmēta"
+    },
+    {
+     "label": "Operateur/-in · Operējošais ārsts (ķirurgs)",
+     "wert": " "
+    },
+    {
+     "label": "Anästhesieform · Anestēzijas veids",
+     "wert": "☐ Allgemeinanästhesie / vispārējā   ☐ Regional / reģionālā   ☐ Lokal / vietējā   ☐ Sedierung / sedācija\n(gesonderte Anästhesie-Aufklärung, Vorlage 08 / atsevišķa anestēzijas veidlapa)"
+    },
+    {
+     "label": "Ort · Vieta",
+     "wert": "☐ Regeneration Clinic SIA, Jāņa Asara iela 3, Rīga   ☐ Kooperationsklinik / Sadarbības klīnika: ________________"
+    },
+    {
+     "label": "OP-Datum · Operācijas datums",
+     "wert": "__________________   ☐ ambulant / ambulatori   ☐ stationär / stacionāri, voraussichtlich / paredzams ______ Tage / dienas"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "kasten-2",
+   "typ": "text",
+   "bezeichnung": "Hinweis",
+   "text": "Diese Aufklärung dient Ihrer umfassenden Information und Ihrer freiwilligen, informierten Entscheidung (Pacientu tiesību likums, 4. un 6. pants). Bitte lesen Sie den gesamten Bogen sorgfältig, kreuzen Sie Zutreffendes an, füllen Sie die Anamnese vollständig und wahrheitsgemäß aus (15. pants) und stellen Sie alle Fragen, bevor Sie unterschreiben. Die Betäubung ist in einem gesonderten Anästhesie-Aufklärungsbogen beschrieben.\n\nŠī informācija ir paredzēta jūsu pilnīgai informēšanai un brīvprātīgam, informētam lēmumam (Pacientu tiesību likuma 4. un 6. pants). Lūdzu, rūpīgi izlasiet visu veidlapu, atzīmējiet atbilstošo, aizpildiet anamnēzi pilnīgi un patiesi (15. pants) un uzdodiet visus jautājumus pirms parakstīšanas. Anestēzija ir aprakstīta atsevišķā veidlapā.\n\nDieser Grundbogen ersetzt nicht die eingriffsspezifische Aufklärung. Die Ziffern 1, 2, 5, 7 und 9 müssen vom aufklärenden Arzt individuell ausgefüllt sein; für häufige Eingriffe ist der fachspezifische Zusatzbogen beizufügen. Ohne diese Angaben ist die Einwilligung unvollständig.\n\nŠī pamatveidlapa neaizstāj specifisko informēšanu par konkrēto operāciju. 1., 2., 5., 7. un 9. punkts ārstam jāaizpilda individuāli; biežāk veiktajām operācijām jāpievieno specialitātes papildveidlapa. Bez šīm ziņām piekrišana nav pilnīga.",
+   "optionen": {
+    "kursiv": true
+   }
+  },
+  {
+   "id": "abschnitt-3",
+   "typ": "text",
+   "bezeichnung": "1. Diagnose und Ausgangsbefund · Diagnoze un sākotnējais stāvoklis",
+   "text": "Ihre Erkrankung / Ihr Befund wurde Ihnen im Gespräch erläutert. Zusammenfassung (vom Arzt auszufüllen):\nJūsu slimība / atradne tika izskaidrota sarunā. Kopsavilkums (aizpilda ārsts):\n______________________________________________________________________\n______________________________________________________________________\n______________________________________________________________________",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-4",
+   "typ": "text",
+   "bezeichnung": "2. Art, Zweck und Ziel des Eingriffs · Iejaukšanās veids, mērķis un nolūks",
+   "text": "Geplanter Eingriff und Behandlungsziel (vom Arzt auszufüllen; ggf. Skizze beifügen):\nPlānotā operācija un ārstēšanas mērķis (aizpilda ārsts; ja nepieciešams, pievienot skici):\n______________________________________________________________________\n______________________________________________________________________\n______________________________________________________________________\n______________________________________________________________________",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-5",
+   "typ": "text",
+   "bezeichnung": "3. Vorbereitung und Voruntersuchungen · Sagatavošanās un izmeklējumi",
+   "text": "Vor dem Eingriff erfolgen Anamnese und körperliche Untersuchung; je nach Eingriff und Gesundheitszustand werden Laborwerte (einschließlich Gerinnung), EKG, Bildgebung oder weitere Untersuchungen veranlasst. Bitte legen Sie Vorbefunde, Medikamentenlisten und Allergiepässe vor und geben Sie alle Medikamente – insbesondere blutverdünnende Mittel – sowie Allergien und Vorerkrankungen an. Bei fieberhaften Infekten in den Tagen vor der Operation informieren Sie uns bitte umgehend.\n\nPirms operācijas tiek veikta anamnēze un fiziska izmeklēšana; atkarībā no operācijas un veselības stāvokļa tiek noteikti laboratorijas rādītāji (ieskaitot asins recēšanu), EKG, attēldiagnostika vai citi izmeklējumi. Lūdzu, uzrādiet iepriekšējos izmeklējumus, medikamentu sarakstus un alerģiju pases un norādiet visus medikamentus – īpaši asins šķidrinātājus –, kā arī alerģijas un blakusslimības. Drudža vai infekcijas gadījumā dienās pirms operācijas nekavējoties informējiet mūs.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-6",
+   "typ": "text",
+   "bezeichnung": "4. Ablauf des Eingriffs · Operācijas norise",
+   "text": "Der Eingriff erfolgt in der oben angegebenen Betäubung. Nach Lagerung, Hautdesinfektion und sterilem Abdecken wird der Eingriff wie unter Ziffer 2 beschrieben durchgeführt; anschließend werden die Wunden schichtweise verschlossen (Naht, Klammern oder Kleber), ggf. Drainagen eingelegt und ein Verband angelegt. Voraussichtliche Dauer: etwa ______ Minuten. Besonderheiten (Zugangsweg, Implantate, Fremdmaterial, Drainagen, Katheter):\nOperācija tiek veikta iepriekš norādītajā anestēzijā. Pēc pozicionēšanas, ādas dezinfekcijas un sterilas pārklāšanas operācija tiek veikta, kā aprakstīts 2. punktā; pēc tam brūces tiek slēgtas pa slāņiem (šuves, skavas vai līme), vajadzības gadījumā ievietotas drenas un uzlikts pārsējs. Paredzamais ilgums: apmēram ______ minūtes. Norises īpatnības (pieejas ceļš, implanti, svešmateriāls, drenas, katetri):\n______________________________________________________________________\n______________________________________________________________________",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-7",
+   "typ": "text",
+   "bezeichnung": "5. Erfolgsaussichten · Sagaidāmais rezultāts",
+   "text": "Ein bestimmter Behandlungserfolg – insbesondere ein bestimmtes funktionelles oder kosmetisches Ergebnis – kann nicht garantiert werden. Der Heilungsverlauf hängt von Grunderkrankung, Begleiterkrankungen, Alter, Wundheilung und Ihrer Mitwirkung (Nachsorge, Schonung, Nikotinverzicht) ab. Zusätzliche Behandlungen oder Folgeeingriffe können erforderlich werden. Individuelle Prognose (vom Arzt auszufüllen):\nNoteiktu ārstēšanas rezultātu – īpaši noteiktu funkcionālu vai kosmētisku rezultātu – nevar garantēt. Dzīšanas gaita ir atkarīga no pamatslimības, blakusslimībām, vecuma, brūču dzīšanas un jūsu līdzdalības (pēcaprūpe, saudzēšana, atteikšanās no smēķēšanas). Var būt nepieciešama papildu ārstēšana vai atkārtotas operācijas. Individuālā prognoze (aizpilda ārsts):\n______________________________________________________________________\n______________________________________________________________________",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-8",
+   "typ": "text",
+   "bezeichnung": "6. Allgemeine Risiken jedes operativen Eingriffs · Vispārējie jebkuras operācijas riski",
+   "text": "Häufigkeiten / Biežums: sehr häufig / ļoti bieži (≥ 1:10) · häufig / bieži (1:10–1:100) · gelegentlich / reizēm (1:100–1:1 000) · selten / reti (1:1 000–1:10 000) · sehr selten / ļoti reti (< 1:10 000)\n\nTrotz größter Sorgfalt können bei jedem operativen Eingriff Komplikationen auftreten, die weitere Maßnahmen, Folgeeingriffe oder eine Verlängerung des Aufenthalts erfordern und in seltenen Fällen bleibende Schäden hinterlassen oder lebensbedrohlich sein können.\n\nNeraugoties uz vislielāko rūpību, jebkuras operācijas laikā var rasties komplikācijas, kas prasa turpmākus pasākumus, atkārtotas operācijas vai uzturēšanās pagarināšanu un retos gadījumos var atstāt paliekošas sekas vai būt dzīvībai bīstamas.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "text-9",
+   "typ": "text",
+   "bezeichnung": "6. Allgemeine Risiken jedes operativen Eingriffs · Vispārējie jebkuras operācijas riski – Tabelle",
+   "text": "Allgemeine Komplikationen · Vispārējās komplikācijas\n• Blutung, Nachblutung, Bluterguss (häufig, meist harmlos); Bluttransfusion oder Nachoperation (selten)\n• Asiņošana, pēcoperācijas asiņošana, hematoma (bieži, parasti nekaitīga); asins pārliešana vai atkārtota operācija (reti)\n• Wundinfektion, Abszess, Fistel (gelegentlich)\n• Brūces infekcija, abscess, fistula (reizēm)\n• Wundheilungsstörung, Wundrandnekrose, Wunddehiszenz (gelegentlich)\n• Brūces dzīšanas traucējumi, malu nekroze, brūces atvēršanās (reizēm)\n• Verbreiterte, wulstige, schmerzhafte oder kosmetisch störende Narbe, Keloid (gelegentlich)\n• Paplašināta, izcelta, sāpīga vai kosmētiski traucējoša rēta, keloīds (reizēm)\n• Verletzung benachbarter Strukturen: Nerven, Gefäße, Sehnen, Muskeln, Organe (gelegentlich bis selten)\n• Blakus struktūru bojājums: nervi, asinsvadi, cīpslas, muskuļi, orgāni (reizēm līdz reti)\n• Nervenschädigung mit Taubheit, Missempfindungen, Schmerzen oder Lähmung – vorübergehend (gelegentlich) oder dauerhaft (selten)\n• Nervu bojājums ar nejutīgumu, parestēzijām, sāpēm vai paralīzi – pārejošs (reizēm) vai pastāvīgs (reti)\n• Thrombose, Lungenembolie trotz Prophylaxe (selten)\n• Tromboze, plaušu embolija, neraugoties uz profilaksi (reti)\n• Allergische / Unverträglichkeitsreaktion auf Medikamente, Nahtmaterial, Desinfektionsmittel, Latex, Kontrastmittel (selten) bis Anaphylaxie (sehr selten)\n• Alerģiska / nepanesamības reakcija uz medikamentiem, šuvju materiālu, dezinfekcijas līdzekļiem, lateksu, kontrastvielu (reti) līdz anafilaksei (ļoti reti)\n• Lagerungsbedingte Druck-/Nervenschäden, Haut- und Weichteilschäden (selten)\n• Ar pozicionēšanu saistīti spiediena/nervu bojājumi, ādas un mīksto audu bojājumi (reti)\n• Verbrennungen durch Elektrokoagulation oder Desinfektionsmittel (sehr selten)\n• Apdegumi elektrokoagulācijas vai dezinfekcijas līdzekļu dēļ (ļoti reti)\n• Fadenreaktion, Fremdkörpergranulom, Implantatunverträglichkeit/-lockerung (selten)\n• Reakcija uz šuvēm, svešķermeņa granuloma, implanta nepanesamība/vaļīgums (reti)\n• Chronische Schmerzen, komplexes regionales Schmerzsyndrom (CRPS) (selten)\n• Hroniskas sāpes, komplekss reģionālais sāpju sindroms (CRPS) (reti)\n• Bewegungseinschränkung, Kraftminderung, Funktionsverlust (gelegentlich)\n• Kustību ierobežojums, spēka samazinājums, funkcijas zudums (reizēm)\n• Pigmentveränderungen der Haut, Haarverlust im Narbenbereich (gelegentlich)\n• Ādas pigmentācijas izmaiņas, matu zudums rētas zonā (reizēm)\n• Übertragung von Infektionen (Hepatitis, HIV) durch Blutprodukte (sehr selten)\n• Infekciju (hepatīts, HIV) pārnešana ar asins produktiem (ļoti reti)\n• Lebensbedrohliche Komplikationen, Organversagen, Tod (sehr selten)\n• Dzīvībai bīstamas komplikācijas, orgānu mazspēja, nāve (ļoti reti)"
+  },
+  {
+   "id": "abschnitt-10",
+   "typ": "text",
+   "bezeichnung": "7. Spezifische und individuelle Risiken dieses Eingriffs · Šīs operācijas specifiskie un individuālie riski",
+   "text": "Vom Arzt auszufüllen – a) eingriffsspezifische Komplikationen mit Häufigkeitsangabe (ggf. fachspezifischen Zusatzbogen beifügen) und b) patientenspezifische Risikoerhöhungen (Voroperationen, anatomische Besonderheiten, Antikoagulation und Begleiterkrankungen, Infektionsrisiken, drohende neurologische oder funktionelle Schäden, Besonderheiten der Befunde):\nAizpilda ārsts – a) ar operāciju saistītās komplikācijas ar biežuma norādi (ja nepieciešams, pievieno specialitātes papildveidlapu) un b) pacienta individuālie riska faktori (iepriekšējas operācijas, anatomiskas īpatnības, antikoagulācija un blakusslimības, infekcijas risks, iespējami neiroloģiski vai funkcionāli bojājumi, atradnes īpatnības):\n______________________________________________________________________\n______________________________________________________________________\n______________________________________________________________________\n______________________________________________________________________\n______________________________________________________________________\n☐ Fachspezifischer Zusatzbogen beigefügt / Specialitātes papildveidlapa pievienota: ______________________________",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-11",
+   "typ": "text",
+   "bezeichnung": "8. Mögliche Erweiterung oder Änderung des Eingriffs · Iespējama operācijas apjoma paplašināšana vai maiņa",
+   "text": "Zeigen sich während der Operation unerwartete Befunde, kann eine Erweiterung oder Änderung des Eingriffs medizinisch notwendig werden (z. B. größere Gewebeentfernung, Wechsel des Operationsverfahrens, zusätzliche Maßnahmen, Umstieg von minimalinvasivem auf offenes Vorgehen). Sofern ein Abbruch und ein späterer Zweiteingriff zumutbar sind, wird zuvor Rücksprache mit Ihnen gehalten. In folgende Erweiterungen willige ich ausdrücklich nicht ein:\nJa operācijas laikā konstatē negaidītus atradumus, var būt medicīniski nepieciešama operācijas apjoma paplašināšana vai maiņa (piem., lielāka audu izņemšana, operācijas metodes maiņa, papildu pasākumi, pāreja no minimāli invazīvas uz atvērtu metodi). Ja operācijas pārtraukšana un vēlāka atkārtota operācija ir pieņemama, iepriekš tiks veikta saskaņošana ar jums. Šādām paplašināšanām es nepārprotami nepiekrītu:\n______________________________________________________________________",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-12",
+   "typ": "text",
+   "bezeichnung": "9. Behandlungsalternativen · Ārstēšanas alternatīvas",
+   "text": "Als Alternativen kommen – je nach Befund – konservative Behandlung (Abwarten, Medikamente, Physiotherapie, Injektionen, Verbände), andere operative Verfahren oder der Verzicht auf eine Behandlung in Betracht. Nutzen, Grenzen und Risiken der für Sie in Frage kommenden Alternativen wurden besprochen. Vom Arzt zu dokumentieren: ☐ konservative Behandlung   ☐ anderes operatives Verfahren   ☐ Verzicht auf Behandlung – jeweils mit Begründung, weshalb der vorgeschlagene Eingriff empfohlen wird:\nKā alternatīvas – atkarībā no atradnes – var apsvērt konservatīvu ārstēšanu (nogaidīšana, medikamenti, fizioterapija, injekcijas, pārsēji), citas ķirurģiskas metodes vai atteikšanos no ārstēšanas. Jums piemēroto alternatīvu ieguvumi, ierobežojumi un riski tika pārrunāti (papildina ārsts):\n______________________________________________________________________\n______________________________________________________________________",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-13",
+   "typ": "text",
+   "bezeichnung": "10. Verhalten vor dem Eingriff · Rīcība pirms operācijas",
+   "text": "Bitte halten Sie die Nüchternheitsvorgaben (siehe Anästhesie-Aufklärung) ein und pausieren Sie blutverdünnende Medikamente ausschließlich nach ärztlicher Anordnung. Nikotinverzicht mindestens vier Wochen vor und nach dem Eingriff verbessert die Wundheilung. Am OP-Tag bitte duschen; keine Cremes, Make-up oder Nagellack verwenden; Schmuck, Piercings, Kontaktlinsen, Hörgeräte und herausnehmbaren Zahnersatz ablegen. Bei Fieber, Infekt, Hautentzündung im OP-Gebiet oder neuen Beschwerden informieren Sie uns bitte vorab.\n\nLūdzu, ievērojiet atturēšanās no ēšanas norādījumus (skatīt anestēzijas veidlapu) un pārtrauciet asins šķidrinātājus tikai pēc ārsta norādījuma. Atteikšanās no smēķēšanas vismaz četras nedēļas pirms un pēc operācijas uzlabo brūču dzīšanu. Operācijas dienā, lūdzu, nomazgājieties dušā; nelietojiet krēmus, kosmētiku vai nagu laku; noņemiet rotaslietas, pīrsingus, kontaktlēcas, dzirdes aparātus un izņemamās zobu protēzes. Drudža, infekcijas, ādas iekaisuma operācijas zonā vai jaunu sūdzību gadījumā, lūdzu, informējiet mūs iepriekš.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-14",
+   "typ": "text",
+   "bezeichnung": "11. Verhalten nach dem Eingriff · Rīcība pēc operācijas",
+   "text": "Bitte halten Sie die Anweisungen zu Schonung, Belastung, Hochlagerung, Verbandwechsel, Wundpflege und Medikamenteneinnahme (Schmerzmittel, Thromboseprophylaxe, Antibiotika) ein und nehmen Sie die vereinbarten Nachkontrollen und das Entfernen von Fäden/Klammern wahr. Nach Regionalanästhesie oder Sedierung am selben Tag kein Fahrzeug führen. Bei starken oder zunehmenden Schmerzen, Schwellung, Rötung, Überwärmung, Nachblutung, Fieber über 38,5 °C, Taubheit, Bewegungsverlust, Atemnot oder Wadenschmerzen nehmen Sie bitte umgehend Kontakt mit uns auf (+371 28717452) oder wählen Sie den Notruf 112 bzw. 113 (Rettungsdienst).\n\nLūdzu, ievērojiet norādījumus par saudzēšanu, slodzi, pacelšanu, pārsēju maiņu, brūces kopšanu un medikamentu lietošanu (pretsāpju līdzekļi, trombozes profilakse, antibiotikas) un ierodieties uz nozīmētajām kontrolēm un šuvju/skavu noņemšanu. Pēc reģionālās anestēzijas vai sedācijas tajā pašā dienā nevadiet transportlīdzekli. Stipru vai pieaugošu sāpju, pietūkuma, apsārtuma, karstuma, asiņošanas, drudža virs 38,5 °C, nejutīguma, kustību zuduma, elpas trūkuma vai sāpju ikros gadījumā nekavējoties sazinieties ar mums (+371 28717452) vai zvaniet 112 / 113.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-15",
+   "typ": "text",
+   "bezeichnung": "12. Fragen zur Krankengeschichte (Anamnese) · Jautājumi par veselības vēsturi (anamnēze)",
+   "text": "Bitte ankreuzen und bei „Ja“ unten erläutern. / Lūdzu, atzīmējiet un pie „Jā“ paskaidrojiet zemāk.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "text-16",
+   "typ": "text",
+   "bezeichnung": "12. Fragen zur Krankengeschichte (Anamnese) · Jautājumi par veselības vēsturi (anamnēze) – Tabelle",
+   "text": "Allergien / Unverträglichkeiten (Medikamente, Antibiotika, Pflaster, Latex, Desinfektionsmittel, Metalle, Kontrastmittel) · Alerģijas / nepanesamība (medikamenti, antibiotikas, plāksteri, latekss, dezinfekcijas līdzekļi, metāli, kontrastvielas):  ☐ Ja / Jā   ☐ Nein / Nē\nEinnahme blutverdünnender Medikamente (ASS, Clopidogrel, Marcumar/Warfarin, DOAK, Heparin) · Asins šķidrinātāju lietošana (aspirīns, klopidogrels, varfarīns, DOAK, heparīns):  ☐ Ja / Jā   ☐ Nein / Nē\nBlutgerinnungsstörung / erhöhte Blutungsneigung (auch in der Familie) · Asins recēšanas traucējumi / paaugstināta asiņošanas tendence (arī ģimenē):  ☐ Ja / Jā   ☐ Nein / Nē\nThrombose / Lungenembolie in der Vorgeschichte, Krampfadern · Tromboze / plaušu embolija anamnēzē, varikozas vēnas:  ☐ Ja / Jā   ☐ Nein / Nē\nHerz-/Kreislauferkrankungen, Herzschrittmacher / ICD, Herzklappenersatz · Sirds/asinsrites slimības, elektrokardiostimulators / ICD, sirds vārstuļa protēze:  ☐ Ja / Jā   ☐ Nein / Nē\nLungenerkrankungen (Asthma, COPD), Schlafapnoe · Plaušu slimības (astma, HOPS), miega apnoja:  ☐ Ja / Jā   ☐ Nein / Nē\nDiabetes mellitus · Cukura diabēts:  ☐ Ja / Jā   ☐ Nein / Nē\nNieren- oder Lebererkrankung · Nieru vai aknu slimība:  ☐ Ja / Jā   ☐ Nein / Nē\nFrühere Wundheilungsstörungen, Keloide / wulstige Narben · Iepriekšēji brūču dzīšanas traucējumi, keloīdi / izceltas rētas:  ☐ Ja / Jā   ☐ Nein / Nē\nImmunschwäche / Einnahme von Kortison, Immunsuppressiva, Chemotherapie · Imūndeficīts / kortikosteroīdu, imūnsupresantu, ķīmijterapijas lietošana:  ☐ Ja / Jā   ☐ Nein / Nē\nInfektionskrankheiten (Hepatitis, HIV, MRSA, Tuberkulose) · Infekcijas slimības (hepatīts, HIV, MRSA, tuberkuloze):  ☐ Ja / Jā   ☐ Nein / Nē\nDurchblutungsstörungen / Nervenschäden / Lähmungen im OP-Gebiet · Asinsrites traucējumi / nervu bojājumi / paralīze operācijas zonā:  ☐ Ja / Jā   ☐ Nein / Nē\nFrühere Operationen im OP-Gebiet / Implantate, Metall im Körper · Iepriekšējas operācijas operācijas zonā / implanti, metāls ķermenī:  ☐ Ja / Jā   ☐ Nein / Nē\nNeurologische oder psychische Erkrankung · Neiroloģiska vai psihiska slimība:  ☐ Ja / Jā   ☐ Nein / Nē\nRegelmäßige Medikamenteneinnahme (bitte unten auflisten) · Regulāra medikamentu lietošana (lūdzu, uzskaitiet zemāk):  ☐ Ja / Jā   ☐ Nein / Nē\nRauchen / Alkohol / Drogen · Smēķēšana / alkohols / narkotikas:  ☐ Ja / Jā   ☐ Nein / Nē\nSchwangerschaft / Stillzeit · Grūtniecība / barošana ar krūti:  ☐ Ja / Jā   ☐ Nein / Nē\nAktueller Infekt, Fieber, Hautveränderung im OP-Gebiet · Pašreizēja infekcija, drudzis, ādas izmaiņas operācijas zonā:  ☐ Ja / Jā   ☐ Nein / Nē"
+  },
+  {
+   "id": "abschnitt-17",
+   "typ": "text",
+   "bezeichnung": "12. Fragen zur Krankengeschichte (Anamnese) · Jautājumi par veselības vēsturi (anamnēze) (Fortsetzung)",
+   "text": "Wenn „Ja“: bitte erläutern (Medikament, Dosis, Erkrankung, Zeitpunkt):\nJa „Jā“: lūdzu, paskaidrojiet (medikaments, deva, slimība, laiks):\n______________________________________________________________________\n______________________________________________________________________\n______________________________________________________________________"
+  },
+  {
+   "id": "text-18",
+   "typ": "text",
+   "bezeichnung": "13. Gewebeuntersuchung, Bilddokumentation, Blutprodukte · Audu izmeklēšana, attēlu dokumentācija, asins produkti",
+   "text": "☐  Ich willige ein, dass entnommenes Gewebe feingeweblich (histologisch) untersucht und anschließend fachgerecht entsorgt bzw. für die gesetzlich vorgesehene Dauer aufbewahrt wird.\n     Es piekrītu, ka izņemtie audi tiek histoloģiski izmeklēti un pēc tam atbilstoši utilizēti vai uzglabāti likumā noteikto laiku.\n☐  Ich willige in die medizinische Foto-/Bild- und Videodokumentation zu Behandlungs-, Verlaufs- und Qualitätssicherungszwecken ein (keine Veröffentlichung; Speicherung in der Patientenakte).\n     Es piekrītu medicīniskai foto/attēlu un video dokumentācijai ārstēšanas, norises un kvalitātes nodrošināšanas vajadzībām (bez publicēšanas; glabāšana pacienta kartē).\n☐  Ich willige in die anonymisierte Verwendung von Bildmaterial für Lehre und Fortbildung ein (freiwillig, keine Voraussetzung für die Behandlung).\n     Es piekrītu attēlu materiāla anonimizētai izmantošanai mācību un tālākizglītības vajadzībām (brīvprātīgi, nav ārstēšanas priekšnoteikums).\n☐  Ich willige in die Gabe von Blut und Blutbestandteilen (Transfusion) ein, falls dies medizinisch notwendig wird; über die Risiken (Unverträglichkeit, Infektionsübertragung – sehr selten) wurde ich informiert.   ☐ Ich lehne Bluttransfusionen ab.\n     Es piekrītu asins un asins komponentu pārliešanai (transfūzijai), ja tā kļūst medicīniski nepieciešama; esmu informēts(-a) par riskiem (nepanesamība, infekciju pārnešana – ļoti reti).   ☐ Es atsakos no asins pārliešanas.\n☐  Ich willige in die Verwendung von Implantaten / Fremdmaterial ein, soweit unter Ziffer 4 angegeben, und wurde über Art, Hersteller und Implantatpass informiert.\n     Es piekrītu implantu / svešmateriāla izmantošanai, kā norādīts 4. punktā, un esmu informēts(-a) par veidu, ražotāju un implanta pasi.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-19",
+   "typ": "text",
+   "bezeichnung": "14. Datenschutz und ärztliche Schweigepflicht · Datu aizsardzība un ārsta noslēpums",
+   "text": "Ihre Gesundheitsdaten werden vertraulich nach der Datenschutz-Grundverordnung (VDAR/DSGVO), dem lettischen Fizisko personu datu apstrādes likums und dem Pacientu tiesību likums verarbeitet und in Ihrer Patientenakte für die gesetzlich vorgeschriebene Dauer aufbewahrt. Die Regeneration Clinic SIA ist eine in Lettland zugelassene Ārstniecības iestāde; das Behandlungsverhältnis unterliegt lettischem Recht. Für die Weitergabe an Ihren Krankenversicherungsträger oder andere Stellen bedarf es Ihrer gesonderten Schweigepflichtentbindung (Vorlage 06).\n\nJūsu veselības dati tiek apstrādāti konfidenciāli saskaņā ar Vispārīgo datu aizsardzības regulu (VDAR), Fizisko personu datu apstrādes likumu un Pacientu tiesību likumu un glabāti jūsu pacienta kartē likumā noteikto laiku. Regeneration Clinic SIA ir Latvijā reģistrēta ārstniecības iestāde; ārstniecības attiecībām piemērojami Latvijas Republikas tiesību akti. Datu nodošanai jūsu veselības apdrošinātājam vai citām iestādēm nepieciešama jūsu atsevišķa atļauja ārsta noslēpuma atcelšanai.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-20",
+   "typ": "text",
+   "bezeichnung": "15. Ihre Fragen / Anmerkungen · Jūsu jautājumi / piezīmes",
+   "text": "______________________________________________________________________\n______________________________________________________________________\n______________________________________________________________________",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "text-21",
+   "typ": "text",
+   "bezeichnung": "16. Einwilligungserklärung · Piekrišanas apliecinājums",
+   "text": "☐  Ich wurde über Diagnose, Art, Zweck und Ziel des Eingriffs, den Ablauf, die zu erwartenden Vorteile, die allgemeinen und eingriffsspezifischen Risiken, mögliche Folgen und Behandlungsalternativen in einem persönlichen Gespräch verständlich mündlich und ergänzend durch diesen Bogen schriftlich aufgeklärt.\n     Personiskā sarunā esmu saprotamā veidā mutiski un papildus ar šo veidlapu rakstiski informēts(-a) par diagnozi, iejaukšanās veidu, mērķi, norisi, gaidāmo ieguvumu, vispārējiem un specifiskajiem riskiem, iespējamām sekām un ārstēšanas alternatīvām.\n☐  Ich hatte ausreichend Gelegenheit, Fragen zu stellen; alle meine Fragen wurden vollständig und verständlich beantwortet (Pacientu tiesību likums, 6. panta 1. daļa).\n     Man bija pietiekama iespēja uzdot jautājumus; uz visiem jautājumiem tika pilnībā un saprotami atbildēts (Pacientu tiesību likuma 6. panta 1. daļa).\n☐  Ich hatte ausreichend Bedenkzeit und fühle mich ausreichend informiert; ich benötige keine weitere Bedenkzeit.\n     Man bija pietiekams laiks pārdomām, un jūtos pietiekami informēts(-a); man nav nepieciešams papildu laiks pārdomām.\n☐  Die Angaben zu meiner Krankengeschichte (Anamnese) und Medikation sind vollständig und wahrheitsgemäß (15. pants).\n     Mana sniegtā informācija par veselības vēsturi (anamnēzi) un medikamentiem ir pilnīga un patiesa (15. pants).\n☐  Ich willige in den unter Ziffer 2 beschriebenen Eingriff an der angegebenen Seite / Lokalisation ein.\n     Es piekrītu 2. punktā aprakstītajai operācijai norādītajā pusē / lokalizācijā.\n☐  Ich willige in medizinisch notwendige Erweiterungen oder Änderungen des Eingriffs während der Operation ein, soweit ich diese unter Ziffer 8 nicht ausgeschlossen habe.\n     Es piekrītu medicīniski nepieciešamai operācijas apjoma paplašināšanai vai izmaiņām operācijas laikā, ciktāl neesmu tās izslēdzis(-usi) 8. punktā.\n☐  Ich bin damit einverstanden, dass der Eingriff durch den genannten Operateur oder – bei Verhinderung – durch eine gleichwertig qualifizierte Ärztin / einen gleichwertig qualifizierten Arzt der Klinik durchgeführt wird.   ☐ Ich bestehe auf dem genannten Operateur.\n     Es piekrītu, ka operāciju veic norādītais ķirurgs vai – tā prombūtnes gadījumā – līdzvērtīgi kvalificēts klīnikas ārsts.   ☐ Es pieprasu norādīto ķirurgu.\n☐  Ich weiß, dass ich diese Einwilligung jederzeit ohne Angabe von Gründen und ohne Nachteile für meine weitere Behandlung widerrufen kann (Pacientu tiesību likums, 6. panta 3. daļa).\n     Es zinu, ka varu šo piekrišanu atsaukt jebkurā laikā bez pamatojuma un bez sekām manai turpmākajai ārstēšanai (Pacientu tiesību likuma 6. panta 3. daļa).",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "kasten-22",
+   "typ": "text",
+   "bezeichnung": "Hinweis",
+   "text": "Sprache des persönlichen Aufklärungsgesprächs · Personiskās sarunas valoda: ☐ Deutsch / Vācu   ☐ Lettisch / Latviešu   ☐ Englisch / Angļu   ☐ Sonstige / cita: __________\n\nDolmetscher · Tulks: ☐ nicht erforderlich – Patient/in versteht die Gesprächssprache / nav nepieciešams   ☐ hinzugezogen / pieaicināts: ____________________________ (Name, Unterschrift unten)\n\nBogensprache · Veidlapas valoda: Der/die Patient/in bestätigt, die ☐ deutsche ☐ lettische Fassung dieses Bogens gelesen und verstanden zu haben / Pacients apstiprina, ka ir izlasījis un sapratis veidlapas ☐ vācu ☐ latviešu versiju.",
+   "optionen": {
+    "kursiv": true
+   }
+  },
+  {
+   "id": "kasten-23",
+   "typ": "text",
+   "bezeichnung": "☐ Nicht-Einwilligung / Ablehnung · Nepiekrišana / Atteikums",
+   "text": "Ich wurde vollständig aufgeklärt, lehne den vorgeschlagenen Eingriff / das Verfahren jedoch (derzeit) ab. Über die möglichen gesundheitlichen Folgen der Ablehnung wurde ich informiert (Pacientu tiesību likums, 6. panta 3. un 5. daļa).\n\nEsmu pilnībā informēts(-a), taču (pagaidām) atsakos no piedāvātās operācijas / procedūras. Esmu informēts(-a) par atteikuma iespējamām sekām veselībai (Pacientu tiesību likuma 6. panta 3. un 5. daļa).\n\nDatum, Unterschrift Patient/-in / Datums, pacienta(-es) paraksts: ______________________________________",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "unterschrift-24",
+   "typ": "unterschrift",
+   "bezeichnung": "Ort, Datum, Uhrzeit · Vieta, datums, laiks",
+   "linie": "Ort, Datum, Uhrzeit · Vieta, datums, laiks",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "unterschrift-25",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift Patient/-in · Pacienta(-es) paraksts",
+   "linie": "Unterschrift Patient/-in · Pacienta(-es) paraksts",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "unterschrift-26",
+   "typ": "unterschrift",
+   "bezeichnung": "Gesetzliche/-r Vertreter/-in (Name, Unterschrift) – bei Minderjährigen bzw. Vertretung · Likumiskais pārstāvis (vārds, paraksts) – nepilngadīgiem / pārstāvības ",
+   "linie": "Gesetzliche/-r Vertreter/-in (Name, Unterschrift) – bei Minderjährigen bzw. Vertretung · Likumiskais pārstāvis (vārds, paraksts) – nepilngadīgiem / pārstāvības ",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "unterschrift-27",
+   "typ": "unterschrift",
+   "bezeichnung": "Aufklärende/-r Ärztin/Arzt (Name in Druckbuchstaben, Unterschrift, Stempel) · Ārsts, kas sniedza informāciju (vārds drukātiem burtiem, paraksts, zīmogs)",
+   "linie": "Aufklärende/-r Ärztin/Arzt (Name in Druckbuchstaben, Unterschrift, Stempel) · Ārsts, kas sniedza informāciju (vārds drukātiem burtiem, paraksts, zīmogs)",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "unterschrift-28",
+   "typ": "unterschrift",
+   "bezeichnung": "Ggf. Dolmetscher/-in (Name, Unterschrift) · Tulks (ja nepieciešams; vārds, paraksts)",
+   "linie": "Ggf. Dolmetscher/-in (Name, Unterschrift) · Tulks (ja nepieciešams; vārds, paraksts)",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "unterschrift-29",
+   "typ": "unterschrift",
+   "bezeichnung": "Zweitunterschrift / Zeuge (optional) · Otrs paraksts / liecinieks (pēc izvēles)",
+   "linie": "Zweitunterschrift / Zeuge (optional) · Otrs paraksts / liecinieks (pēc izvēles)",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "kasten-30",
+   "typ": "text",
+   "bezeichnung": "Vermerke der aufklärenden Ärztin / des aufklärenden Arztes · Ārsta, kas sniedza informāciju, piezīmes",
+   "text": "Aufklärungsgespräch am / Pārrunu datums: ______________   Uhrzeit / Laiks: ________   Dauer / Ilgums: ______ Min.\n☐ Diagnose, Art, Zweck und Ablauf erläutert; Seite/Lokalisation markiert und bestätigt (diagnoze, veids, mērķis un norise izskaidroti; puse/lokalizācija atzīmēta un apstiprināta)\n☐ Allgemeine und eingriffsspezifische Risiken sowie Alternativen besprochen (vispārējie un specifiskie riski, kā arī alternatīvas pārrunāti)\n☐ Individuelle Risikofaktoren berücksichtigt (Anamnese, Medikation, Gerinnung) (ņemti vērā individuālie riska faktori: anamnēze, medikācija, asins recēšana)\n☐ Fragen beantwortet, Bedenkzeit gewährt; Aufklärung rechtzeitig vor dem Eingriff (atbildēts uz jautājumiem, dots laiks pārdomām; informācija sniegta savlaicīgi pirms operācijas)\n☐ Kopie des Aufklärungsbogens ausgehändigt (veidlapas kopija izsniegta pacientam)\n\nBesondere individuelle Risiken / patientenbezogene Hinweise · Individuālie riski / piezīmes par pacientu:\n______________________________________________________________________\n______________________________________________________________________\n______________________________________________________________________\nEinwilligungsfähigkeit geprüft / Rīcībspēja izvērtēta: ☐ ja / jā   ☐ nein – gesetzliche Vertretung / nē – likumiskais pārstāvis",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-31",
+   "typ": "text",
+   "bezeichnung": "16. Einwilligungserklärung · Piekrišanas apliecinājums (Fortsetzung)",
+   "text": "Rechtsgrundlagen / Tiesiskais pamats: Pacientu tiesību likums (Patientenrechtegesetz der Republik Lettland) – 4. pants (tiesības uz informāciju), 6. pants (piekrišana ārstniecībai vai atteikšanās no tās), 7. un 13. pants (pārstāvība, nepilngadīgie), 10. pants (pacienta datu aizsardzība), 15. pants (pacienta pienākumi); Ārstniecības likums; Vispārīgā datu aizsardzības regula (VDAR/DSGVO) i. V. m. Fizisko personu datu apstrādes likums. Für die Regeneration Clinic SIA als in Lettland zugelassene Ārstniecības iestāde gilt lettisches Recht. / Regeneration Clinic SIA kā Latvijā reģistrētai ārstniecības iestādei piemērojami Latvijas Republikas tiesību akti."
+  },
+  {
+   "id": "fusszeile",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}} · {{Absender.E-Mail}}\nRegeneration Clinic SIA · Vorlage 07 · Aufklärung Operation DE/LV · Version 3 · Stand 10/2026",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ],
+ "quelle": "07_Aufklaerung_Operation_Universal_DE-LV_V3.docx"
+}

@@ -121,14 +121,18 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
       onOffen(false);
     },
   });
-  const absenden = () => {
+  const pruefen = (w: typeof f) => {
     const fehler: Feldfehler = {};
+    if (!w.nachname.trim()) fehler.nachname = "Bitte Nachnamen eingeben.";
+    if (!w.vorname.trim()) fehler.vorname = "Bitte Vornamen eingeben.";
+    if (!eingabeDatum(w.geburtsdatum)) fehler.geburtsdatum = "Bitte als TT.MM.JJJJ eingeben.";
+    if (eingabeZahl(w.groesse) === "ungueltig") fehler.groesse_cm = "Bitte eine Zahl eingeben.";
+    return fehler;
+  };
+  const absenden = () => {
+    const fehler = pruefen(f);
     const geb = eingabeDatum(f.geburtsdatum);
-    if (!f.nachname.trim()) fehler.nachname = "Bitte Nachnamen eingeben.";
-    if (!f.vorname.trim()) fehler.vorname = "Bitte Vornamen eingeben.";
-    if (!geb) fehler.geburtsdatum = "Bitte als TT.MM.JJJJ eingeben.";
     const groesse = eingabeZahl(f.groesse);
-    if (groesse === "ungueltig") fehler.groesse_cm = "Bitte eine Zahl eingeben.";
     setLokal(fehler);
     if (Object.keys(fehler).length) return;
     speichern.mutate({
@@ -147,7 +151,12 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
     });
   };
   const e: Feldfehler = { ...(speichern.error instanceof ApiFehler ? speichern.error.felder : {}), ...lokal };
-  const set = (k: keyof ReturnType<typeof start>) => (ev: { target: { value: string } }) => setF((a) => ({ ...a, [k]: ev.target.value }));
+  const set = (k: keyof ReturnType<typeof start>) => (ev: { target: { value: string } }) => {
+    const neu = { ...f, [k]: ev.target.value };
+    setF(neu);
+    // ein behobener Fehler verschwindet sofort, neue erst beim nächsten „Speichern“
+    if (Object.keys(lokal).length) setLokal(Object.fromEntries(Object.entries(pruefen(neu)).filter(([s]) => s in lokal)));
+  };
   return (
     <Dialog offen={offen} onOffen={onOffen} titel="Stammdaten bearbeiten" breite={760}
       beschreibung="Jede Änderung steht mit Person und Zeitpunkt im Verlauf der Akte."

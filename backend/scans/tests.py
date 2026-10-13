@@ -826,3 +826,92 @@ class ScansApiTest(Grundlage):
     def tearDownClass(cls):
         super().tearDownClass()
         shutil.rmtree(SCANS, ignore_errors=True)
+
+
+# ======================================================================= Fehlerpfade (Kundenmeldung 13.10.2026)
+@override_settings(EPM_SCANS=SCANS)
+class FehlerpfadeTest(Grundlage):
+    """Jeder Fehler beim Anklicken kommt als verständliche Meldung (``{"fehler": …}``) zurück, nie als 500 –
+    auch ohne OCR-Dienst, ohne Seiten, bei fehlenden Bilddateien."""
+
+    def hochladen(self):
+        c = client_fuer(self.mitarbeiter)
+        inhalt = testbilder.png(testbilder.seite(testbilder.LABOR), verkleinern=0.5)
+        r = c.post("/api/scans/", {"dateien": [SimpleUploadedFile("befund.png", inhalt)]}, format="multipart")
+        self.assertEqual(r.status_code, 201, r.content)
+        return c, Scan.objects.get(pk=r.json()["id"])
+
+    def test_unbekannter_scan_ist_404_mit_text(self):
+        c = client_fuer(self.mitarbeiter)
+        for pfad in ("", "pdf/", "textdatei/", "seiten/1/bild/?art=bild"):
+            r = c.get(f"/api/scans/999999/{pfad}")
+            self.assertEqual(r.status_code, 404, (pfad, r.content))
+            self.assertIn("nicht mehr", r.json()["fehler"])
+        self.assertEqual(c.post("/api/scans/999999/erneut/").status_code, 404)
+        c, scan = self.hochladen()
+        r = c.get(f"/api/scans/{scan.pk}/seiten/999999/bild/")
+        self.assertEqual((r.status_code, r.json()["fehler"]), (404, "Diese Seite gibt es (noch) nicht."))
+
+    def test_speicherordner_nicht_beschreibbar(self):
+        from unittest import mock
+
+        c = client_fuer(self.mitarbeiter)
+        with mock.patch.object(dienst, "neuer_scan", side_effect=PermissionError("read-only")):
+            r = c.post("/api/scans/", {"dateien": [SimpleUploadedFile("b.png", b"\x89PNG\r\n\x1a\n" + b"x" * 40)]},
+                       format="multipart")
+        self.assertEqual(r.status_code, 503, r.content)
+        self.assertIn("nicht beschreibbar", r.json()["fehler"])
+
+    def test_scan_ohne_seiten_oeffnen_und_stand_ohne_dienst(self):
+        """Direkt nach dem Hochladen (OCR-Dienst noch nicht dran): Öffnen klappt, keine Seiten, ``dienst_laeuft`` None."""
+        c, scan = self.hochladen()
+        r = c.get(f"/api/scans/{scan.pk}/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual((r.json()["status"], r.json()["seiten"], r.json()["vorschlaege"]), ("wartet", [], []))
+        stand = c.get("/api/scans/stand/").json()
+        self.assertIn("dienst_laeuft", stand)
+        self.assertIsNone(stand["dienst_laeuft"])
+        # noch nicht erkannt: PDF und Zuordnen sagen das, kein 500
+        r = c.get(f"/api/scans/{scan.pk}/pdf/")
+        self.assertEqual((r.status_code, r.json()["fehler"]), (400, "Der Scan ist noch nicht erkannt."))
+        r = c.post(f"/api/scans/{scan.pk}/zuordnen/", {"patient": self.patient.id}, format="json")
+        self.assertEqual((r.status_code, r.json()["fehler"]), (400, "Der Scan ist noch nicht erkannt."))
+
+    def test_fehlende_bilddatei_bei_pdf_und_zuordnen(self):
+        c, scan = self.hochladen()
+        seite = ScanSeite.objects.create(scan=scan, nr=1, status=ScanSeite.Status.FERTIG, roh="roh-1.jpg",
+                                         bild="seite-1.jpg", grau="grau-1.png", breite=100, hoehe=100, ergebnis=_seite("Natrium 140"))
+        Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.FERTIG, text="Natrium 140")
+        # Bild der Seite gibt es nicht
+        r = c.get(f"/api/scans/{scan.pk}/seiten/{seite.pk}/bild/?art=bild")
+        self.assertEqual((r.status_code, r.json()["fehler"]), (404, "Die Bilddatei fehlt."))
+        self.assertEqual(c.get(f"/api/scans/{scan.pk}/seiten/{seite.pk}/bild/?art=klein").status_code, 404)
+        r = c.get(f"/api/scans/{scan.pk}/pdf/")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertIn("Bilddatei von Seite 1 fehlt", r.json()["fehler"])
+        r = c.post(f"/api/scans/{scan.pk}/zuordnen/", {"patient": self.patient.id, "titel": "Befund"}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertIn("Bilddatei von Seite 1 fehlt", r.json()["fehler"])
+        self.assertEqual(Dokument.objects.count(), 0)
+        self.assertTrue(Scan.objects.filter(pk=scan.pk).exists())
+        # Vorschau ohne Rohbild
+        r = c.post(f"/api/scans/{scan.pk}/seiten/{seite.pk}/vorschau/", {"einstellungen": {}}, format="json")
+        self.assertEqual((r.status_code, r.json()["fehler"]), (400, "Bilddatei der Seite fehlt oder ist beschädigt."))
+        # ungültige Einstellungen beim Speichern
+        r = c.patch(f"/api/scans/{scan.pk}/seiten/{seite.pk}/", {"einstellungen": {"ecken": [["a", 1], [1, 1], [1, 1], [1, 1]]}},
+                    format="json")
+        self.assertEqual((r.status_code, r.json()["einstellungen"]), (400, "Die Einstellungen sind ungültig."))
+
+    def test_vorschlaege_und_vorschau_stoeren_nicht(self):
+        from unittest import mock
+
+        c, scan = self.hochladen()
+        Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.FERTIG)
+        with mock.patch.object(dienst, "patient_vorschlaege", side_effect=KeyError("kaputt")):
+            r = c.get(f"/api/scans/{scan.pk}/")
+        self.assertEqual((r.status_code, r.json()["vorschlaege"]), (200, []))
+        seite = ScanSeite.objects.create(scan=scan, nr=1, roh="roh-1.jpg")
+        with mock.patch.object(dienst, "vorschau", side_effect=RuntimeError("cv2")):
+            r = c.post(f"/api/scans/{scan.pk}/seiten/{seite.pk}/vorschau/", {"einstellungen": {}}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertIn("Vorschau", r.json()["fehler"])

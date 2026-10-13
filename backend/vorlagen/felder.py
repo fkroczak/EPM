@@ -478,9 +478,15 @@ class JeArt(dict):
         return super().__contains__(art) or ist_eigen(art)
 
 
+# Patientenerklärungen der Regeneration Clinic (Vorlagen 01–12, Oktober 2026): Angaben zur Person wie die Erklärungen
+RGC_ARTEN = ("rgc_erklaerung_at", "rgc_erklaerung_gkv", "rgc_erklaerung_bguv", "rgc_erklaerung_pkv",
+             "rgc_erklaerung_zusatz", "rgc_schweigepflicht", "rgc_aufklaerung_op", "rgc_aufklaerung_anaesthesie",
+             "rgc_vereinbarung_oegk", "rgc_abtretung_oegk", "rgc_anlage_k", "rgc_anwaltsvollmacht")
+RGC_ERKLAERUNG = {**ERKLAERUNG, "Patient.Diagnosen": GEMEINSAM["Patient.Diagnosen"]}
+
 FELDER = {"infusionsplan": INFUSIONSPLAN, "patientendatenblatt": PATIENTENDATENBLATT,
           "datenschutzinformation": ERKLAERUNG, "einwilligung": ERKLAERUNG, "schweigepflichtentbindung": ERKLAERUNG,
-          "firmen": ERKLAERUNG,
+          "firmen": ERKLAERUNG, **{a: RGC_ERKLAERUNG for a in RGC_ARTEN},
           "bericht": BERICHT, "sprechstunde": SPRECHSTUNDE, "medikationsplan": MEDIKATIONSPLAN,
           "patientenaufnahme": PATIENTENAUFNAHME, "terminbestaetigung": TERMINBESTAETIGUNG,
           "reisebescheinigung": REISEBESCHEINIGUNG, "patientenankuendigung": ANKUENDIGUNG}
@@ -505,6 +511,7 @@ TABELLEN = {
         "termine": ("Nächste offene Termine (bis zu 3)", ["Datum", "Art", "Titel", "Ort"], ["", "", "", ""]),
     },
     "datenschutzinformation": {}, "einwilligung": {}, "schweigepflichtentbindung": {}, "firmen": {},
+    **{a: {} for a in RGC_ARTEN},
     "bericht": {
         "diagnosen": ("Diagnosen mit ICD-Code", ["Diagnose", "ICD", "seit"], ["", "", ""]),
     },

@@ -35,7 +35,9 @@ VERWALTUNG_AKTIONEN = ("dienst_neustart", "epm_zurueck", "epm_paket", "epm_paket
                        "uhr_einstellen", "notfallpaket",
                        # Zugang (11.10.2026)
                        "ssh_oeffnen", "ssh_schliessen", "netz_hinzufuegen", "netz_entfernen", "https_filter",
-                       "fail2ban_entsperren")
+                       "fail2ban_entsperren",
+                       # Selbstheilung (13.10.2026)
+                       "version_bestaetigen", "heilung_schalten")
 # so lange bleibt die Warnung nach dem Beginn stehen (falls der Auftrag sie nicht vorher beendet)
 WARNUNG_NACHLAUF = {"updates_installieren": 60, "server_neustart": 15, "epm_neustart": 5, "wiederherstellen": 30,
                     "dienst_neustart": 5, "epm_zurueck": 15, "epm_paket": 30}
@@ -115,6 +117,69 @@ def zugang_ereignisse_uebernehmen(status_host=None):
                       zeit=str(e.get("zeit") or "")[:40], ergebnis=str(e.get("text") or "")[:300])
 
 
+def _hinweis_vom_server(text, stunden=None):
+    """Hinweis an alle Benutzer, den der Server selbst auslöst (ohne anlegenden Benutzer); ein aktiver Hinweis eines
+    Admins bleibt – der Server drängt sich nicht vor."""
+    if Systemhinweis.aktiv() is not None:
+        return None
+    return Systemhinweis.objects.create(text=text[:500], art=Systemhinweis.Art.WARNUNG, angelegt_von=None,
+                                        gueltig_bis=timezone.now() + timedelta(hours=stunden) if stunden else None)
+
+
+def heilung_ereignisse_uebernehmen(status_host=None):
+    """Eingriffe der Selbstheilung (13.10.2026) aus dem Status ins Audit-Log, jeden einmal (Kennung); ein Rückfall auf
+    die gute Version und eine knappe Platte zusätzlich als Hinweis an alle Benutzer."""
+    heilung = ((status_host if status_host is not None else host.host_status()) or {}).get("heilung") or {}
+    if not isinstance(heilung, dict):
+        return
+
+    def neu(ereignis, kennung):
+        if not isinstance(kennung, str) or not kennung.isalnum() or len(kennung) > 32:
+            return False
+        return not SystemEreignis.objects.filter(art=SystemEreignis.Art.SYSTEM, details__ereignis=ereignis,
+                                                 details__kennung=kennung).exists()
+
+    for e in heilung.get("aktionen") or []:
+        if not isinstance(e, dict) or not neu("heilung", e.get("id")):
+            continue
+        protokolliere(SystemEreignis.Art.SYSTEM, benutzername="systemagent", objekt=f"Selbstheilung: {e.get('dienst', '')}"[:200],
+                      ereignis="heilung", kennung=e["id"], dienst=str(e.get("dienst") or "")[:40], heilung_art=str(e.get("art") or "")[:20],
+                      ok=bool(e.get("ok")), zeit=str(e.get("zeit") or "")[:40], text=str(e.get("text") or "")[:300],
+                      probelauf=bool(e.get("probelauf")))
+    r = heilung.get("rueckfall")
+    if isinstance(r, dict) and neu("heilung_rueckfall", r.get("id")):
+        von, nach = str(r.get("von") or "?")[:60], str(r.get("nach") or "")[:60]
+        protokolliere(SystemEreignis.Art.SYSTEM, benutzername="systemagent", objekt="EPM-Version", ereignis="heilung_rueckfall",
+                      kennung=r["id"], von=von, nach=nach, ok=bool(r.get("ok")), quelle=str(r.get("quelle") or "")[:20],
+                      grund=str(r.get("grund") or "")[:300], zeit=str(r.get("zeit") or "")[:40])
+        if nach and r.get("ok"):
+            text = (f"EPM wurde auf Version {nach} zurückgeschaltet, weil {von} nicht startete. Datenbank-Migrationen der "
+                    f"neuen Version wurden nicht zurückgedreht. Nächste Schritte für die Administration: System › Protokolle "
+                    f"(Container backend, Update) ansehen; läuft {nach} nicht sauber, die Sicherung von vor dem Update "
+                    f"wiederherstellen; den Fehler beheben und erneut aktualisieren.")
+        elif nach:
+            text = (f"EPM-Version {von} startet nicht, und das Zurückschalten auf {nach} ist fehlgeschlagen. Administration: "
+                    f"System › Protokolle ansehen, notfalls per Konsole „sudo epm-update --versionen“ und „--zurueck“ "
+                    f"(Notfallplan Teil E).")
+        else:
+            text = (f"EPM-Version {von} startet nicht, und es gibt keine andere Version zum Zurückschalten. Administration: "
+                    f"System › Protokolle ansehen; notfalls Sicherung wiederherstellen (Notfallplan Teil E).")
+        _hinweis_vom_server(text)
+    p = heilung.get("platte")
+    if isinstance(p, dict) and neu("heilung_platte", p.get("id")):
+        from django.template.defaultfilters import filesizeformat
+
+        frei, gesamt = p.get("frei"), p.get("gesamt")
+        groesse = f"{filesizeformat(frei)} frei von {filesizeformat(gesamt)}" if isinstance(frei, int) and isinstance(gesamt, int) \
+            else "weniger als 1 GB oder 5 % frei"
+        protokolliere(SystemEreignis.Art.SYSTEM, benutzername="systemagent", objekt=f"Platte {p.get('bezeichnung', '')}"[:200],
+                      ereignis="heilung_platte", kennung=p["id"], pfad=str(p.get("pfad") or "")[:200], frei=frei, gesamt=gesamt)
+        _hinweis_vom_server(f"Die Platte des Servers ({p.get('bezeichnung', '')}, {p.get('pfad', '')}) ist fast voll: {groesse}. "
+                            "Der Server hat nicht mehr benötigte Docker-Images entfernt. Administration: unter System › Wartung › "
+                            "Speicher aufräumen alte Versionen und das Journal entfernen, unter Backup alte Sicherungen löschen.",
+                            stunden=host.HEILUNG_PLATTE_HINWEIS_STUNDEN)
+
+
 def bestaetigung_pruefen(request, was: str):
     """Admin-Passwort und zweiter Faktor (Authenticator, Notfall-Code oder Passkey), wie beim Wiederherstellen (F63). Ohne
     eingerichteten zweiten Faktor geht es nicht (Festlegung 03.10.2026).
@@ -150,6 +215,7 @@ class UebersichtView(APIView):
         ordner = host.ordner_auftraege()
         status_host = host.host_status()
         zugang_ereignisse_uebernehmen(status_host)
+        heilung_ereignisse_uebernehmen(status_host)
         return Response({
             "host": status_host,
             "container": host.container_messung(),
@@ -428,6 +494,12 @@ class HinweisView(APIView):
     permission_classes = [recht("system_verwalten", lesen=None)]
 
     def get(self, request):
+        # Hinweise des Servers selbst (Rückfall, Platte) sollen alle Benutzer bald sehen, nicht erst, wenn ein Admin die
+        # Systemseite öffnet: beim Abruf des Banners den Status des Agenten übernehmen (nur eine kleine Datei lesen)
+        try:
+            heilung_ereignisse_uebernehmen()
+        except Exception:  # noqa: BLE001 – der Banner darf daran nie scheitern
+            pass
         return Response({"hinweis": hinweis_daten(Systemhinweis.aktiv())})
 
     def post(self, request):

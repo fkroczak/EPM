@@ -50,7 +50,8 @@ class Systemauftrag(models.Model):
 
 
 class Systemhinweis(models.Model):
-    """Hinweis an alle angemeldeten Benutzer, z. B. vor Updates oder einem Neustart des Servers."""
+    """Hinweis an alle angemeldeten Benutzer, z. B. vor Updates oder einem Neustart des Servers. Ohne ``angelegt_von``
+    stammt er vom Server selbst (Selbstheilung: Rückfall auf die gute Version, knappe Platte)."""
 
     class Art(models.TextChoices):
         INFO = "info", "Information"
@@ -60,7 +61,8 @@ class Systemhinweis(models.Model):
     art = models.CharField(max_length=10, choices=Art.choices, default=Art.WARNUNG)
     gueltig_bis = models.DateTimeField(null=True, blank=True)
     auftrag = models.ForeignKey(Systemauftrag, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
-    angelegt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    angelegt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+", null=True,
+                                     blank=True)
     angelegt_am = models.DateTimeField(auto_now_add=True)
     beendet_am = models.DateTimeField(null=True, blank=True)
     beendet_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,

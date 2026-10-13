@@ -1,0 +1,370 @@
+{
+ "art": "rgc_abtretung_oegk",
+ "titel": "Abtretungs- und Bevollmächtigungserklärung",
+ "vorlage": "Vorlage 10 · Version 4 · Stand 10/2026",
+ "bloecke": [
+  {
+   "id": "briefkopf",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "linienfarbe": "#B9C6C3",
+   "falzmarken": false
+  },
+  {
+   "id": "titel",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Abtretungs- und Bevollmächtigungserklärung",
+   "zusatz_label": "",
+   "zusatz": "Vorlage 10 · Version 4 · Stand 10/2026"
+  },
+  {
+   "id": "untertitel",
+   "typ": "text",
+   "bezeichnung": "Untertitel",
+   "text": "für Versicherte der Österreichischen Gesundheitskasse (ÖGK) – mit Vorauszahlung des Eigenanteils\nauf Grundlage des § 131 ASVG und der RL 2011/24/EU in Verbindung mit §§ 1392 ff. ABGB, unter Berücksichtigung der Schranken des § 98 ASVG\nAnlagen: K (Vorlage 11), Anwaltsvollmacht (Vorlage 12), Schweigepflichtentbindung (Vorlage 06)",
+   "optionen": {
+    "fett": true,
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "hinweis",
+   "typ": "text",
+   "bezeichnung": "Hinweis zur Vorlage – entfällt nach dem Freigeben",
+   "text": "Diese Vorlage ist aus der Word-Vorlage Vorlage 10 · Version 4 · Stand 10/2026 · Anlagen: K (Vorlage 11), Anwaltsvollmacht (Vorlage 12), Schweigepflichtentbindung (Vorlage 06) der Regeneration Clinic SIA übernommen. Angaben aus der Akte (Name, Geburtsdatum, Anschrift, Versicherung) setzt EPM ein; alle übrigen Felder und Ankreuzkästchen werden von Hand ausgefüllt. Bis die Vorlage hier einmal geprüft und freigegeben ist, tragen die PDFs das Wasserzeichen „ENTWURF“.",
+   "optionen": {
+    "ueberschrift": true,
+    "kursiv": true,
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "kasten-1",
+   "typ": "text",
+   "bezeichnung": "Das Wichtigste vorab",
+   "text": "–  Nicht vorfinanziert werden muss ausschließlich der erwartete Erstattungsanteil der ÖGK (§ 1); den voraussichtlichen Eigenanteil zahlen Sie vor Behandlungsbeginn (§ 2 Abs. 2).\n–  Ihre Obergrenze: Erstattet die ÖGK nicht oder nur teilweise, bleibt das Behandlungshonorar von Ihnen zu tragen (§ 2 Abs. 4) – höchstens jedoch in der in der Anlage K bezifferten Höhe; die Klinik bietet Ihnen in diesem Fall eine Ratenvereinbarung an.\n–  Die Abtretung wirkt nur mit Zustimmung der ÖGK (§ 98 Abs. 2 ASVG); ohne Zustimmung gelten die Auffangregelungen (§ 1 Abs. 3, §§ 4, 5) oder der Übergang auf das Selbstzahlermodell (§ 2 Abs. 5).",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "felder-2",
+   "typ": "datenfelder",
+   "bezeichnung": "Was die Stundung für Sie bedeutet",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Keine Vorkasse",
+     "wert": "Sie zahlen den erwarteten Erstattungsanteil nicht vorab. Die Klinik trägt die Vorfinanzierung zinsfrei, bis die ÖGK entschieden hat (§ 2 Abs. 4)."
+    },
+    {
+     "label": "Wir führen das Verfahren",
+     "wert": "Antragstellung und Durchsetzung übernimmt die Klinik. Anwalts- und Gerichtskosten eines von ihr veranlassten Verfahrens trägt die Klinik (§ 5) – auf Sie kommen hieraus keine Kosten zu."
+    },
+    {
+     "label": "Klarheit vorab",
+     "wert": "In der Anlage K sehen Sie vor der Unterschrift, was voraussichtlich erstattet wird, was Sie selbst zahlen und was gestundet wird – einschließlich Ihrer maximalen zusätzlichen Zahlungspflicht."
+    },
+    {
+     "label": "Falls nicht erstattet wird",
+     "wert": "Der nicht gedeckte Betrag wird mit der Entscheidung bzw. dem rechtskräftigen Verfahrensabschluss fällig; das endgültige Erstattungsrisiko verbleibt insoweit bei Ihnen. Die Klinik bietet Ihnen in diesem Fall eine Ratenvereinbarung an und sucht mit Ihnen eine tragfähige Lösung."
+    },
+    {
+     "label": "Ihre Obergrenze",
+     "wert": "Mehr als der in der Anlage K bezifferte Höchstbetrag kommt nicht auf Sie zu."
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "felder-3",
+   "typ": "datenfelder",
+   "bezeichnung": "Zedent/in (Patient/in, Versicherte/r der ÖGK)",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Anschrift",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Versicherungsträger",
+     "wert": "Österreichische Gesundheitskasse (ÖGK), Landesstelle: ______________________"
+    },
+    {
+     "label": "Sozialversicherungsnummer (10-stellig)",
+     "wert": " "
+    },
+    {
+     "label": "E-Mail (bevorzugter Kommunikationsweg)",
+     "wert": " "
+    },
+    {
+     "label": "Telefon / Mobil",
+     "wert": " "
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "felder-4",
+   "typ": "datenfelder",
+   "bezeichnung": "Zessionarin (Leistungserbringerin)",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Firmenbezeichnung",
+     "wert": "Regeneration Clinic SIA"
+    },
+    {
+     "label": "Sitz / Behandlungsadresse",
+     "wert": "Jāņa Asara iela 3, LV-1009 Rīga, Republik Lettland"
+    },
+    {
+     "label": "Postanschrift",
+     "wert": "Gertrudes iela 53-7, LV-1011 Rīga, Republik Lettland"
+    },
+    {
+     "label": "Registrierungsnummer",
+     "wert": "40203593175 (Unternehmensregister der Republik Lettland)"
+    },
+    {
+     "label": "Gesundheitseinrichtungscode",
+     "wert": "001000289 (Veselības inspekcija – Gesundheitsinspektion der Republik Lettland)"
+    },
+    {
+     "label": "Vertretungsberechtigt",
+     "wert": "Prof. Dr. Markus Masin, Director"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "felder-5",
+   "typ": "datenfelder",
+   "bezeichnung": "Gegenstand der Behandlung",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Diagnose (ICD-10)",
+     "wert": "{{Patient.Diagnosen}}"
+    },
+    {
+     "label": "Geplante Behandlung",
+     "wert": " "
+    },
+    {
+     "label": "Geplanter Termin",
+     "wert": " "
+    },
+    {
+     "label": "Behandlungskategorie",
+     "wert": "☐ ambulant   ☐ tagesklinisch (ohne Übernachtung)   ☐ stationär (mindestens eine Übernachtung)"
+    },
+    {
+     "label": "Behandlungsmitgliedstaat",
+     "wert": "Republik Lettland (EU-Mitgliedstaat)"
+    },
+    {
+     "label": "Kostenvoranschlag vom / Honorar (EUR)",
+     "wert": " "
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-6",
+   "typ": "text",
+   "bezeichnung": "Präambel",
+   "text": "Der/die Zedent/in nimmt im Rahmen der grenzüberschreitenden Gesundheitsversorgung gemäß RL 2011/24/EU eine ärztlich indizierte Behandlung in der Republik Lettland in Anspruch. Als Versicherte/r der ÖGK kann dem Grunde nach ein Anspruch auf Kostenerstattung nach § 131 ASVG (80 % des Betrages, der bei Inanspruchnahme eines Vertragspartners der ÖGK aufzuwenden gewesen wäre), nach den Satzungs- und Krankenordnungsbestimmungen der ÖGK sowie nach den unionsrechtlichen Erstattungsregeln (Art. 7 RL 2011/24/EU; Art. 20 VO (EG) 883/2004) bestehen; Bestand und Höhe unterliegen der Prüfung durch den Versicherungsträger.\n\nDie Parteien beabsichtigen, die Abwicklung dieses Erstattungsanspruchs auf die Zessionarin zu übertragen. Ihnen ist bekannt, dass die Übertragung von Geldleistungsansprüchen gegen österreichische Sozialversicherungsträger den Beschränkungen des § 98 ASVG unterliegt und außerhalb der Fälle des § 98 Abs. 1 ASVG der Zustimmung des Versicherungsträgers bedarf (§ 98 Abs. 2 ASVG). Diese Vereinbarung ist daher mehrstufig ausgestaltet: als Abtretung unter dem Vorbehalt der Zustimmung, hilfsweise als Einziehungsermächtigung mit Zahlungsanweisung und Empfangsvollmacht. Die Übertragung erspart dem/der Zedent/in die Vorfinanzierung des erwarteten Erstattungsanteils; der Eigenanteil bleibt davon unberührt.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-7",
+   "typ": "text",
+   "bezeichnung": "§ 1 Abtretung – Antrag auf Zustimmung – hilfsweise Einziehungsermächtigung",
+   "text": "(1) Der/die Zedent/in tritt den aus der oben bezeichneten Behandlung und den mit ihr medizinisch unmittelbar zusammenhängenden Folgebehandlungen resultierenden Anspruch auf Kostenerstattung nach § 131 ASVG und der RL 2011/24/EU gegen die ÖGK in Höhe der Behandlungsforderung an die Zessionarin ab, soweit der Versicherungsträger der Übertragung nach § 98 Abs. 2 ASVG zustimmt oder die Übertragung anerkennt. Die Zessionarin nimmt die Abtretung an.\n\n(2) Antrag auf Zustimmung. Der/die Zedent/in beantragt hiermit bei der ÖGK die Zustimmung zur Übertragung nach § 98 Abs. 2 ASVG. Die Übertragung liegt im Interesse des/der Anspruchsberechtigten, weil sie die Vorfinanzierung des Erstattungsanteils erspart, eine Kreditaufnahme vermeidet und die Abwicklung vereinfacht.\n\n(3) Hilfsweise – für den Fall, dass die Abtretung mangels Zustimmung ganz oder teilweise nicht wirksam wird – erteilt der/die Zedent/in der Zessionarin eine Einziehungsermächtigung, die bis zum vollständigen Ausgleich der Behandlungsforderung gilt: Die Zessionarin ist berechtigt, den Erstattungsanspruch im Namen und für Rechnung des/der Zedent/in bei der ÖGK geltend zu machen und einzuziehen.\n\n(4) Abtretung bzw. Einziehungsermächtigung umfassen auch akzessorische Ansprüche, insbesondere gesetzliche Verzugszinsen und Kostenersatzansprüche aus Einspruchs-, Beschwerde- und Klageverfahren, soweit solche Ansprüche bestehen oder zugesprochen werden. Nicht auf Geldleistungen gerichtete Ansprüche und Anwartschaften sind ausgenommen (§ 98 Abs. 3 ASVG).\n\n(5) Anspruchsumfang und Deckungslücke. Der Erstattungsanspruch nach § 131 ASVG ist auf 80 % des Vertragspartnertarifs begrenzt (OGH 26.02.2021, 10 ObS 142/20k). Daraus ergibt sich eine strukturelle Deckungslücke, die vom/von der Zedent/in zu tragen und nicht Gegenstand dieser Abtretung ist: (i) der gesetzliche Selbstbehalt von 20 % des Vertragspartnertarifs sowie (ii) die Differenz zwischen dem Behandlungshonorar der Zessionarin und dem regelmäßig niedrigeren Vertragspartnertarif. Die verbindliche Höhe der Erstattung wird erst durch den Bescheid der ÖGK festgelegt.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-8",
+   "typ": "text",
+   "bezeichnung": "§ 2 Eigenanteil und Vorauszahlung",
+   "text": "(1) Grundsatz. Da die ÖGK höchstens 80 % des Vertragspartnertarifs erstattet (§ 1 Abs. 5), verbleibt stets ein vom/von der Zedent/in zu tragender Eigenanteil. Dieser ist unabhängig von Bestand, Höhe und Zeitpunkt der Kostenerstattung geschuldet.\n\n(2) Vorauszahlung vor Behandlungsbeginn. Der/die Zedent/in überweist den im Kostenvoranschlag ausgewiesenen voraussichtlichen Eigenanteil in Höhe von EUR ______________ vor Behandlungsbeginn, spätestens am Behandlungstag, auf das Konto der Zessionarin (IBAN LV51HABA0551058193764, BIC HABALV22). Die Zessionarin kann die Durchführung der Behandlung vom vorherigen Eingang dieses Betrages abhängig machen. Der endgültige Eigenanteil steht erst nach Vorliegen des ÖGK-Bescheides fest (Abs. 3).\n\n(3) Endabrechnung. Nach Vorliegen des ÖGK-Bescheides erstellt die Zessionarin eine Zwischen- bzw. Endabrechnung, die das Honorar, die Vorauszahlung, die vereinnahmten Erstattungsbeträge, noch anhängige Verfahren (Klage, Säumnisklage) und etwaige Rückforderungen der ÖGK ausweist. Solange ein Verfahren anhängig ist, bleibt der streitige Anteil gestundet (Abs. 4). Übersteigt der vereinnahmte Erstattungsbetrag zusammen mit der Vorauszahlung das Honorar, wird der Überschuss binnen 14 Tagen an den/die Zedent/in erstattet. Ein Restbetrag zu Lasten des/der Zedent/in wird mit Zugang der Endabrechnung zur Zahlung fällig; die Zessionarin bietet auf Wunsch eine Ratenvereinbarung an. Nachträgliche Korrekturen werden beiderseits binnen 14 Tagen ausgeglichen.\n\n(4) Ausbleibende Erstattung. Bleibt die Kostenerstattung ganz oder teilweise aus, verbleibt es bei der Zahlungspflicht des/der Zedent/in in Höhe des vollen Behandlungshonorars; die Vorauszahlung wird angerechnet. Der Erstattungsanteil wird bis zur Entscheidung der ÖGK bzw. bis zum rechtskräftigen Verfahrensabschluss, längstens für 24 Monate ab Rechnungsdatum, zinsfrei gestundet.\n\n(5) Übergang auf das Selbstzahlermodell. Verlangt die ÖGK für die Erstattung eine saldierte Honorarnote oder versagt sie die Zustimmung nach § 98 Abs. 2 ASVG, informiert die Zessionarin den/die Zedent/in binnen fünf Werktagen in Textform. Der Übergang auf das Direktzahlungsmodell mit Rückerstattungszusage (Vorlage 09) erfolgt durch Ergänzungsvereinbarung, die beide Parteien binnen 14 Tagen unterzeichnen; bis dahin bleibt diese Vereinbarung einschließlich der Stundung nach Abs. 4 in Kraft. Mit dem Übergang wird der gestundete Erstattungsanteil mit einer Frist von 30 Tagen zur Zahlung fällig, die Vorauszahlung wird angerechnet, die Zessionarin stellt die saldierte Honorarnote aus und führt das Erstattungsverfahren nach Vorlage 09 ohne gesondertes Entgelt weiter. Kommt die Ergänzungsvereinbarung nicht zustande, gelten die Auffangregelungen nach § 1 Abs. 3 und §§ 4, 5 fort.\n\nAnlage K – Kostenvoranschlag und Erstattungsprognose. Die Höhe des Behandlungshonorars, der voraussichtlich erstattungsfähigen Leistungen, der erwarteten Versicherungsleistung, des vorab zu zahlenden Eigenanteils, des gestundeten Betrags und meiner maximalen zusätzlichen Zahlungspflicht ergibt sich aus der Anlage K (Vorlage 11), die mir vor Unterzeichnung ausgehändigt wurde und Bestandteil dieser Erklärung ist. Die Klinik hat darin die Grundlage ihrer Erstattungsschätzung offengelegt.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "felder-9",
+   "typ": "datenfelder",
+   "bezeichnung": "Rechtsstellung der Klinik im Überblick",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Abtretung (§ 1 Abs. 1)",
+     "wert": "Wirkung: Zessionarin wird Gläubigerin des Erstattungsanspruchs\nVoraussetzung / Grenze: Zustimmung der ÖGK nach § 98 Abs. 2 ASVG (Antrag § 1 Abs. 2); ohne Zustimmung unwirksam"
+    },
+    {
+     "label": "Einziehungsermächtigung (§ 1 Abs. 3)",
+     "wert": "Wirkung: Zessionarin zieht im Namen und für Rechnung des Zedenten ein\nVoraussetzung / Grenze: Keine eigene Gläubigerstellung; Träger kann Zahlung an den Zedenten vorziehen"
+    },
+    {
+     "label": "Zahlungsanweisung / Empfangsvollmacht (§ 4)",
+     "wert": "Wirkung: ÖGK darf mit schuldbefreiender Wirkung an die Zessionarin zahlen\nVoraussetzung / Grenze: Keine Zahlungspflicht der ÖGK gegenüber der Zessionarin; Herausgabepflicht des Zedenten (§ 4 Abs. 3) als Sicherung"
+    },
+    {
+     "label": "Verfahrensvollmacht (§ 5)",
+     "wert": "Wirkung: Zessionarin wickelt das Verfahren administrativ ab (§ 10 AVG)\nVoraussetzung / Grenze: Rechtliche Vertretung und Klage nur durch Rechtsanwalt (Vorlage 12)"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-10",
+   "typ": "text",
+   "bezeichnung": "§ 2 Eigenanteil und Vorauszahlung (Fortsetzung)",
+   "text": "Die Zahlungsanweisung verpflichtet den Träger bzw. Versicherer nicht zur Zahlung an die Klinik; sie erlaubt ihm lediglich, mit schuldbefreiender Wirkung an die Klinik zu leisten. Eine Einziehungsermächtigung oder Empfangsvollmacht verschafft der Klinik keine eigene Gläubigerstellung. Die Weiterleitungspflicht des Patienten bleibt daher in allen Konstellationen die tragende Sicherung."
+  },
+  {
+   "id": "abschnitt-11",
+   "typ": "text",
+   "bezeichnung": "§ 3 Rechtsgrundlagen",
+   "text": "A. Österreichisches Sozialversicherungsrecht\n–  § 131 ASVG – Kostenerstattung bei Inanspruchnahme von Nicht-Vertragspartnern (80 % des Vertragspartnertarifs); Parallelbestimmungen des GSVG, BSVG und B-KUVG\n–  § 98 ASVG – Beschränkungen der Übertragung, Verpfändung und Pfändung von Leistungsansprüchen; Zustimmung des Versicherungsträgers (Abs. 2)\n–  § 7b SV-EG – Umsetzung der RL 2011/24/EU; Vorabgenehmigung (Abs. 4) und besondere Kostenerstattung (Abs. 6)\n–  §§ 65, 67, 77 ASGG – Rechtsweg in Sozialrechtssachen; Klagefrist vier Wochen (§ 67 Abs. 2); Säumnisklage nach drei Monaten in der Krankenversicherung (§ 67 Abs. 1 Z 2)\n–  §§ 1392 ff. ABGB – Zession\n\nB. Unionsrecht\n–  Art. 7 RL 2011/24/EU – Grundsatz der Kostenerstattung grenzüberschreitender Gesundheitsversorgung\n–  Art. 8 Abs. 5 und 6 RL 2011/24/EU – Grenzen der Vorabgenehmigung; individuelle Begründungspflicht\n–  Art. 20 VO (EG) 883/2004 – Sachleistungsaushilfe bei geplanten Auslandsbehandlungen (Formular S2)\n–  Art. 56 AEUV – Dienstleistungsfreiheit\n\nC. Rechtsprechung\n–  OGH 28.07.2020, 10 ObS 43/20a (Krankenhausbehandlung mit Übernachtung; Vorabgenehmigung nach § 7b SV-EG)\n–  OGH 26.02.2021, 10 ObS 142/20k (80 %-Regel des § 131 ASVG unionsrechtskonform)\n–  EuGH 28.04.1998, C-158/96 (Kohll) und C-120/95 (Decker); EuGH 12.07.2001, C-157/99 (Smits und Peerbooms); EuGH 13.05.2003, C-385/99 (Müller-Fauré und van Riet); EuGH 05.10.2010, C-173/09 (Elchinov); EuGH 09.10.2014, C-268/13 (Petru); EuGH 04.09.2025, C-489/23 (Grenzen der Vorabgenehmigung; Erstattung bei Dringlichkeit)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-12",
+   "typ": "text",
+   "bezeichnung": "§ 4 Zahlungsanweisung und Empfangsvollmacht",
+   "text": "(1) Der/die Zedent/in ersucht und weist die ÖGK an, sämtliche aus dem Erstattungsanspruch geschuldeten Zahlungen mit schuldbefreiender Wirkung auf das von der Zessionarin bekanntgegebene Konto zu leisten, soweit dies sozialversicherungsrechtlich zulässig ist. Die Zahlungsanweisung gilt bis zum vollständigen Ausgleich der Behandlungsforderung.\n\n(2) Die Zessionarin ist zur Entgegennahme der Erstattungsbeträge sowie aller Bescheide, Erledigungen und Erklärungen der ÖGK bevollmächtigt (Empfangs- und Zustellvollmacht).\n\n(3) Leistet die ÖGK dessen ungeachtet unmittelbar an den/die Zedent/in, ist der empfangene Betrag binnen 14 Tagen an die Zessionarin herauszugeben, soweit die Behandlungsrechnung noch nicht beglichen ist.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-13",
+   "typ": "text",
+   "bezeichnung": "§ 5 Vollmacht zur Geltendmachung und Verfahrensführung",
+   "text": "(1) Der/die Zedent/in bevollmächtigt die Zessionarin, vertreten durch ihren Director Prof. Dr. Markus Masin, den Erstattungsanspruch im Namen des/der Versicherten umfassend geltend zu machen. Sämtliche Anträge, Einsprüche und Rechtsmittel werden im Namen des/der Versicherten eingebracht; die Zessionarin tritt als Bevollmächtigte auf. Die Vollmacht umfasst insbesondere:\n–  Antragstellung auf Kostenerstattung nach § 131 ASVG samt Vorlage der Honorarnote und medizinischen Unterlagen;\n–  Beantragung einer Vorabgenehmigung nach § 7b Abs. 4 SV-EG bei Krankenhausbehandlungen mit mindestens einer Übernachtung und bei aufwändigen Behandlungen – vor Behandlungsbeginn;\n–  Korrespondenz mit der ÖGK, ihren Landesstellen, dem chef- und kontrollärztlichen Dienst sowie der nationalen Kontaktstelle für grenzüberschreitende Gesundheitsversorgung;\n–  Mandatierung eines österreichischen Rechtsanwalts für Bescheid- und Säumnisklage (§ 67 ASGG) aufgrund der gesonderten Anwaltsvollmacht nach Vorlage 12 – gerichtliche Schritte nur nach vorheriger Abstimmung mit dem/der Zedent/in; die Anwaltskosten trägt die Zessionarin;\n–  Abschluss von Vergleichen bis zur Höhe des Erstattungsanspruchs nur mit Zustimmung des/der Zedent/in in Textform.\n\nAbgrenzung zur berufsmäßigen Parteienvertretung: Die Klinik macht die ihr abgetretenen Ansprüche in eigener Angelegenheit geltend und übernimmt im Übrigen die administrative Abwicklung (Antragstellung, Zusammenstellung medizinischer Unterlagen, Akteneinsicht, Entgegennahme von Bescheiden) als Bevollmächtigte nach § 10 AVG. Die rechtliche Vertretung in Verfahren vor dem Versicherungsträger, soweit sie über die Antragstellung hinausgeht, sowie vor dem Arbeits- und Sozialgericht erfolgt ausschließlich durch einen österreichischen Rechtsanwalt aufgrund gesonderter Anwaltsvollmacht (Vorlage 12), die ich mit dieser Erklärung erteile (§ 8 RAO; § 40 ASGG).\n\n(2) Die Vollmacht gilt bis zur vollständigen Abwicklung des Erstattungsverfahrens und kann jederzeit schriftlich widerrufen werden; bereits entstandene Zahlungs- und Herausgabepflichten bleiben unberührt. Sie berechtigt zur Erteilung von Untervollmachten. Eigene Rechtshandlungen des/der Zedent/in in derselben Angelegenheit sind der Zessionarin unverzüglich anzuzeigen.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-14",
+   "typ": "text",
+   "bezeichnung": "§ 6 Datenverarbeitung (DSGVO)",
+   "text": "(1) Die Klinik verarbeitet die für Abrechnung, Geltendmachung und Rechtsdurchsetzung erforderlichen personenbezogenen Daten – Identifikations-, Versicherungs- und Kontaktdaten, Diagnosen, Befunde, OP-Berichte, Leistungs- und Rechnungsdaten – und übermittelt sie an die ÖGK, deren chef- und kontrollärztlichen Dienst, mandatierte Rechtsvertreter, Sachverständige und zuständige Gerichte.\n\n(2) Rechtsgrundlagen: Art. 6 Abs. 1 lit. b, c und f sowie Art. 9 Abs. 2 lit. f und h DSGVO; ergänzend und hilfsweise die Einwilligung nach Art. 9 Abs. 2 lit. a DSGVO, die jederzeit mit Wirkung für die Zukunft widerrufen werden kann (Art. 7 Abs. 3 DSGVO). Der Widerruf berührt weder die Rechtmäßigkeit der bis dahin erfolgten Verarbeitung noch Verarbeitungen, die zur Vertragsabwicklung, zur Erfüllung gesetzlicher Pflichten oder zur Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen erforderlich sind; er kann die weitere Verfahrensführung durch die Klinik unmöglich machen.\n\n(3) Information nach Art. 13 DSGVO: Verantwortliche ist die Regeneration Clinic SIA (info@regeneration-clinic.eu). Die medizinische Dokumentation wird nach den gesetzlichen Fristen (in der Regel mindestens 10 Jahre), verfahrensrelevante Unterlagen bis zum rechtskräftigen Abschluss aufbewahrt. Es bestehen die Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit sowie auf Beschwerde bei der Datu valsts inspekcija (Rīga) oder der österreichischen Datenschutzbehörde. Die ärztliche Verschwiegenheit nach lettischem Recht wird durch die gesonderte Schweigepflichtentbindung (Vorlage 06) aufgehoben, die Bestandteil dieser Vereinbarung ist.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-15",
+   "typ": "text",
+   "bezeichnung": "§ 7 Kommunikation und Zustellungen",
+   "text": "(1) Bevorzugter Kommunikationsweg E-Mail. Die Kommunikation zwischen den Parteien und die Übermittlung von Verfahrensunterlagen (Anträge, Bescheide und Erledigungen der ÖGK, Rechnungen, medizinische Unterlagen) erfolgt bevorzugt per E-Mail – seitens der Klinik über info@regeneration-clinic.eu, seitens des/der Zedent/in über die oben angegebene E-Mail-Adresse.\n\n(2) Einwilligung in unverschlüsselte E-Mail-Kommunikation. Der/die Zedent/in wurde darauf hingewiesen, dass unverschlüsselte E-Mails keine vollständige Vertraulichkeit gewährleisten, und willigt in die Übermittlung – auch von Gesundheitsdaten – auf diesem Weg ausdrücklich ein (Art. 6 Abs. 1 lit. a, Art. 9 Abs. 2 lit. a DSGVO). Auf Wunsch erfolgt die Übermittlung verschlüsselt bzw. passwortgeschützt oder per Briefpost. Diese Einwilligung ist jederzeit mit Wirkung für die Zukunft widerrufbar; ab Widerruf erfolgt die Kommunikation per Briefpost.\n\n(3) Weitere Kommunikationswege. Briefpost an die angegebenen Anschriften, Telefon (+371 28717452) sowie Video-/Telefonsprechstunde nach Terminvereinbarung. Messenger-Dienste werden nur nach gesonderter schriftlicher Vereinbarung und ausschließlich Ende-zu-Ende-verschlüsselt genutzt.\n\n(4) Keine Notfallkommunikation per E-Mail. Medizinische Notfälle und dringende Beschwerden sind unverzüglich telefonisch oder über den örtlichen Notruf bzw. die nächstgelegene Notaufnahme zu melden.\n\n(5) Form von Erklärungen. Soweit diese Vereinbarung Schriftform vorsieht (insbesondere für den Widerruf), genügt die Übermittlung der eigenhändig unterschriebenen Erklärung als Scan im E-Mail-Anhang.\n\n(6) Zustellungen der ÖGK. Erledigungen und Bescheide der ÖGK, die der Klinik aufgrund der Empfangs- und Zustellvollmacht zugehen, leitet diese dem/der Zedent/in unverzüglich, spätestens binnen fünf Werktagen, bevorzugt per E-Mail weiter; die Klinik weist dabei auf laufende Fristen (insbesondere die vierwöchige Klagefrist nach § 67 Abs. 2 ASGG) hin.\n\n(7) Aktualität der Kontaktdaten. Änderungen der Kontaktdaten sind der jeweils anderen Partei unverzüglich mitzuteilen. Erklärungen gelten als zugegangen, wenn sie an die zuletzt bekanntgegebene E-Mail-Adresse bzw. Anschrift übermittelt wurden.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-16",
+   "typ": "text",
+   "bezeichnung": "§ 8 Geltungsdauer, Schriftform, salvatorische Klausel",
+   "text": "(1) Diese Vereinbarung wird mit Unterzeichnung wirksam und gilt bis zur vollständigen Abwicklung des Erstattungsverfahrens und des Behandlungsentgelts.\n\n(2) Form. Änderungen und Ergänzungen dieser Vereinbarung sowie der Widerruf bedürfen der Textform (z. B. E-Mail); eine strengere Form wird nicht verlangt. Mündliche Nebenabreden bestehen nicht.\n\n(3) Salvatorische Klausel. Sollte eine Bestimmung unwirksam sein oder werden – insbesondere die Abtretung nach § 1 Abs. 1 wegen § 98 ASVG –, bleibt die Wirksamkeit der übrigen Bestimmungen, namentlich der Einziehungsermächtigung, der Zahlungsanweisung und der Vollmacht, unberührt.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-17",
+   "typ": "text",
+   "bezeichnung": "§ 9 Anwendbares Recht und Belehrungen",
+   "text": "(1) Auf den Erstattungsanspruch gegen die ÖGK findet österreichisches Recht Anwendung; der Rechtsweg richtet sich nach dem ASGG. Auf das Verhältnis zwischen Zedent/in und Zessionarin findet lettisches Recht Anwendung, da die Zessionarin eine in Lettland zugelassene Ārstniecības iestāde ist; zwingende Verbraucherschutzvorschriften am Wohnsitz des/der Zedent/in bleiben unberührt (Art. 6 Rom-I-VO).\n\n(2) Belehrung zu § 98 ASVG. Der/die Zedent/in wurde darüber belehrt, dass Geldleistungsansprüche gegen österreichische Sozialversicherungsträger nur eingeschränkt übertragbar sind und die Wirksamkeit der Abtretung von der Zustimmung des Versicherungsträgers abhängt. Für diesen Fall greifen die hilfsweisen Regelungen dieser Vereinbarung (§ 1 Abs. 3, §§ 4 und 5).\n\n(3) Belehrung zur Vorabgenehmigung. Bei Krankenhausbehandlungen mit mindestens einer Übernachtung und bei aufwändigen Behandlungen im Sinne des § 7b Abs. 4 SV-EG ist die Vorabgenehmigung vor Behandlungsbeginn bei der ÖGK zu beantragen; andernfalls kann die Erstattung für diesen Anteil auf das Niveau des § 131 ASVG beschränkt sein oder entfallen (OGH 28.07.2020, 10 ObS 43/20a). Ambulante und tagesklinische Behandlungen bedürfen regelmäßig keiner Vorabgenehmigung; Erstattungsfähigkeit und Höhe bleiben der Prüfung durch die ÖGK vorbehalten.\n\n(4) Belehrung zur Deckungslücke. Der/die Zedent/in wurde über die 80 %-Begrenzung und die Differenz zwischen Vertragspartnertarif und Behandlungshonorar sowie über die voraussichtliche Höhe des Eigenanteils laut Kostenvoranschlag informiert.\n\n(5) Aushändigung. Der/die Zedent/in bestätigt den Erhalt eines Exemplars dieser Erklärung. Ein weiteres Exemplar dient der Vorlage bei der ÖGK; die Schweigepflichtentbindung (Vorlage 06) wird beigefügt.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "abschnitt-18",
+   "typ": "text",
+   "bezeichnung": "Unterschriften",
+   "text": "Ort: Rīga, Republik Lettland    Datum: ______________________",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "unterschrift-19",
+   "typ": "unterschrift",
+   "bezeichnung": "Zedent/in (Patient/in, Versicherte/r der ÖGK)",
+   "linie": "Zedent/in (Patient/in, Versicherte/r der ÖGK)",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "unterschrift-20",
+   "typ": "unterschrift",
+   "bezeichnung": "Für die Regeneration Clinic SIA – Prof. Dr. Markus Masin, Director, oder bevollmächtigte Vertretung (Name, Unterschrift, Stempel)",
+   "linie": "Für die Regeneration Clinic SIA – Prof. Dr. Markus Masin, Director, oder bevollmächtigte Vertretung (Name, Unterschrift, Stempel)",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "unterschrift-21",
+   "typ": "unterschrift",
+   "bezeichnung": "Bei gesetzlicher Vertretung: Name und Unterschrift der vertretungsberechtigten Person (Nachweis beifügen)",
+   "linie": "Bei gesetzlicher Vertretung: Name und Unterschrift der vertretungsberechtigten Person (Nachweis beifügen)",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "kasten-22",
+   "typ": "text",
+   "bezeichnung": "Hinweis zur Vorlage bei der ÖGK",
+   "text": "Diese Erklärung wird der ÖGK zusammen mit dem Kostenerstattungsantrag und der Honorarnote vorgelegt. Sie enthält den Antrag auf Zustimmung zur Übertragung nach § 98 Abs. 2 ASVG, die Zahlungsanweisung des/der Versicherten, Erstattungsbeträge auf das von der Regeneration Clinic SIA benannte Konto zu leisten, soweit dies sozialversicherungsrechtlich zulässig ist, sowie die Empfangs- und Zustellvollmacht der Klinik für Erledigungen in dieser Angelegenheit.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "fusszeile",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}} · {{Absender.E-Mail}}\nRegeneration Clinic SIA · Vorlage 10 · Abtretungs- und Bevollmächtigungserklärung ÖGK mit Vorauszahlung · Version 4 · Stand 10/2026",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ],
+ "quelle": "10_Abtretung_formal_OEGK_mit_Vorauszahlung_V4.docx"
+}
