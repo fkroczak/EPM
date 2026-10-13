@@ -1178,7 +1178,9 @@ Liste mehr, aber nicht gelöscht. „Ausgeblendete zeigen“ und „Einblenden�
 <p><strong>Rolle je Firma:</strong> Jede Person hat zwei Rollen: eine bei der DSKM und eine bei der Regeneration Clinic
 („Rolle DSKM“, „Rolle RGC“). „Keine Berechtigung“ heißt: kein Zugang zu dieser Firma. Wer in beiden Firmen eine Rolle
 hat, schaltet unter dem Logo um. Die Rechte richten sich nach der Rolle in der gerade gewählten Firma. Die Rolle in
-einer Firma vergibt und ändert nur, wer dort selbst <strong>Admin</strong> ist. Die anderen Felder sind gesperrt.</p>
+einer Firma vergibt und ändert nur, wer dort selbst <strong>Admin</strong> ist. Die anderen Felder sind gesperrt.
+Sperren, Einmal-Passwort, zweiten Faktor zurücksetzen, Aus- und Einblenden und die Kontodaten ändern darf nur, wer in
+jeder Firma der Person Admin ist. Konten ohne Rolle darf jeder Admin verwalten.</p>
 <p>Unter <strong>Anmeldung</strong> legt die Administration die Zwei-Faktor-Anmeldung fest: freiwillig, Pflicht für
 Admins oder Pflicht für alle.</p>
 <p>Unter <strong>Rechte</strong> legt man je Gruppe fest, was erlaubt ist: Betrachter, Mitarbeiter, Mediziner, Admin.
