@@ -31,7 +31,9 @@ type Art = "infusionsplan" | "patientendatenblatt" | "datenschutzinformation" | 
   // Schreiben mit E-Mail (Vorlagen von Alice Hessel, 09.10.2026; F172, F173)
   | "patientenaufnahme" | "terminbestaetigung" | "reisebescheinigung" | "patientenankuendigung"
   // eigene Schreiben, unter Vorlagen angelegt (F176)
-  | `eigen-${string}`;
+  | `eigen-${string}`
+  // Patientenerklärungen der Regeneration Clinic (Oktober 2026), nur in der Firma RGC
+  | `rgc_${string}`;
 const SCHREIBEN_FEST: Art[] = ["patientenaufnahme", "terminbestaetigung", "reisebescheinigung", "patientenankuendigung"];
 const istEigen = (art: Art) => art.startsWith("eigen-");
 const mitEmailArt = (art: Art) => SCHREIBEN_FEST.includes(art) || istEigen(art);
@@ -51,11 +53,17 @@ export type Block = {
   /** Block „E-Mail“ der Schreiben (F172): steht nicht auf der PDF */
   betreff?: string;
 };
+type Ausrichtung = "hoch" | "quer";
 type Version = {
   id: number; version: number | null; status: "entwurf" | "aktiv" | "abgeloest"; notiz: string; erstellt_am: string;
   geaendert_am: string; geaendert_von: string | null; veroeffentlicht_am: string | null; veroeffentlicht_von: string | null;
+  /** Seitenformat der Fassung (13.10.2026) und Firma einer eigenen Vorlage (leer = gemeinsam, 11.10.2026) */
+  ausrichtung?: Ausrichtung; firma?: string | null;
 };
+/** Vorlagen je Firma (11.10.2026): nutzt die aktive Firma die gemeinsame Vorlage oder ihre eigene? */
+type FirmaInfo = { aktiv: string | null; name: string | null; mehrere: boolean; eigene: boolean; gebunden: boolean; moeglich: boolean };
 type Uebersicht = { art: Art; name: string; aktiv: Version; entwurf: Version | null; versionen: Version[];
+  firma?: FirmaInfo; ausrichtung?: Ausrichtung; querformat_moeglich?: boolean;
   /** Vordrucke: Wasserzeichen „ENTWURF“ der Startvorlage, manuell abschaltbar (U17) */
   entwurfsmodus?: { moeglich: boolean; aktiv: boolean; aus: boolean };
   /** eigenes Schreiben (F176) */
@@ -63,7 +71,7 @@ type Uebersicht = { art: Art; name: string; aktiv: Version; entwurf: Version | n
   /** Vorlagen-Portal (F180): Gruppe der Liste, wofür die Vorlage ist und wo sie in der Praxis benutzt wird */
   gruppe?: Gruppe; wofuer?: string; wo?: string };
 export type VorlagenUebersicht = Uebersicht;
-type Gruppe = "schreiben" | "eigen" | "plaene" | "datenschutz";
+type Gruppe = "schreiben" | "eigen" | "plaene" | "datenschutz" | "rgc";
 type Datenfeld = { name: string; beschreibung: string; html: boolean; bezeichnung?: string; gruppe?: string };
 type Aufbau = Uebersicht & {
   bausteine: { typ: string; name: string }[];
@@ -71,6 +79,7 @@ type Aufbau = Uebersicht & {
   tabellen: { quelle: string; name: string; spalten: string[] }[];
 };
 type Entwurf = Version & { ist_entwurf: boolean; grundlage?: number; bloecke: Block[] };
+const istRgc = (art: Art) => art.startsWith("rgc_");
 
 const TYPNAME: Record<string, string> = {
   briefkopf: "Briefkopf", titel: "Titel", text: "Text", zweispaltig: "Zwei Spalten", datenfelder: "Datenfelder", tabelle: "Tabelle", trennlinie: "Trennlinie",
@@ -287,7 +296,16 @@ const GRUPPEN: { gruppe: Gruppe; titel: string; leer?: string }[] = [
     leer: "Noch keine eigenen Vorlagen. „+ Neue Vorlage“ legt z. B. ein Schreiben an Hausärzte an; „Als eigene Vorlage kopieren“ im Editor nimmt ein bestehendes Schreiben als Grundlage." },
   { gruppe: "plaene", titel: "Pläne, Berichte und Unterlagen" },
   { gruppe: "datenschutz", titel: "Vordrucke zum Datenschutz" },
+  { gruppe: "rgc", titel: "Regeneration Clinic – Patientenerklärungen und Vereinbarungen" },
 ];
+
+/** Gemeinsame oder eigene Vorlage der aktiven Firma (nur mit mehreren Firmen) */
+function FirmaChip({ f }: { f?: FirmaInfo }) {
+  if (!f || !f.mehrere) return null;
+  if (f.gebunden) return <Chip art="neutral" title="Diese Vorlage gehört fest zu dieser Firma">nur {f.name}</Chip>;
+  return f.eigene ? <Chip art="akzent" title={`Eigene Vorlage der ${f.name}; die anderen Firmen nutzen die gemeinsame`}>eigene Vorlage {f.name}</Chip>
+    : <Chip art="neutral" title="Gilt in allen Firmen, solange keine eigene Vorlage angelegt ist">gemeinsam</Chip>;
+}
 
 /** Stand einer Vorlage in Alltagssprache (Liste und Kopf des Editors) */
 export function vorlageStatus(u: Uebersicht): { text: string; art: "ok" | "warn" | "neutral" } {
@@ -345,7 +363,7 @@ function VorlagenListe({ onWahl }: { onWahl: (a: Art) => void }) {
                         className="card flex-1 min-w-0 flex flex-col gap-1.5 px-4 py-3 text-left cursor-pointer border border-transparent hover:border-akzent bg-flaeche text-tinte font-[inherit]">
                         <span className="flex flex-wrap items-start justify-between gap-2 w-full">
                           <span className="font-semibold text-[0.9375rem] leading-snug min-w-0 [overflow-wrap:anywhere]">{v.name}</span>
-                          <Chip art={st.art} className="shrink-0">{st.text}</Chip>
+                          <span className="flex gap-1.5 shrink-0"><FirmaChip f={v.firma} /><Chip art={st.art}>{st.text}</Chip></span>
                         </span>
                         {v.wofuer ? <span className="text-[0.8438rem] leading-normal">{v.wofuer}</span> : null}
                         {v.wo ? <span className="text-[0.7812rem] gedaempft leading-normal"><strong className="font-medium text-text2">Wo benutzt:</strong> {v.wo}</span> : null}
@@ -387,6 +405,21 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
   // eigene Schreiben (F176) und Kopie als eigene Vorlage (F180)
   const [eigenAendern, setEigenAendern] = useState(false);
   const [kopieren, setKopieren] = useState(false);
+  // Seitenformat des Entwurfs (13.10.2026) – wird mit den Blöcken gespeichert
+  const [ausrichtung, setAusrichtung] = useState<Ausrichtung | null>(null);
+  // eigene Vorlage der aktiven Firma anlegen bzw. ablegen (11.10.2026)
+  const [firmaFrage, setFirmaFrage] = useState<"anlegen" | "entfernen" | null>(null);
+  const firmaM = useMutation({
+    mutationFn: (eigene: boolean) => api<Uebersicht>(`vorlagen/${art}/firma/`, { body: { eigene } }),
+    onSuccess: (u) => {
+      setFirmaFrage(null);
+      setBloecke(null);
+      setAusrichtung(null);
+      void qc.invalidateQueries({ queryKey: ["vorlagen"] });
+      melden(u.firma?.eigene ? `Eigene Vorlage für ${u.firma.name} angelegt – Änderungen hier gelten nur dort.`
+        : `Eigene Vorlage abgelegt. ${u.firma?.name ?? "Die Firma"} nutzt wieder die gemeinsame Vorlage (Fassung ${u.aktiv.version}).`);
+    },
+  });
   // Entwurfsmodus der Vordrucke manuell aus- bzw. wieder einschalten (Festlegung 03.10.2026, U17)
   const modus = useMutation({
     mutationFn: (aus: boolean) => api<Uebersicht>(`vorlagen/${art}/entwurfsmodus/`, { body: { aus } }),
@@ -407,21 +440,27 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
   useEffect(() => {
     if (entwurf.data && bloecke === null) {
       setBloecke(structuredClone(entwurf.data.bloecke));
-      setGeladen(JSON.stringify(entwurf.data.bloecke));
+      setAusrichtung(entwurf.data.ausrichtung ?? "hoch");
+      setGeladen(JSON.stringify({ bloecke: entwurf.data.bloecke, ausrichtung: entwurf.data.ausrichtung ?? "hoch" }));
       setAuswahl(entwurf.data.bloecke[0]?.id ?? null);
     }
   }, [entwurf.data, bloecke]);
 
-  const neuLaden = (b: Block[]) => { setBloecke(structuredClone(b)); setGeladen(JSON.stringify(b)); };
-  const geaendert = bloecke !== null && JSON.stringify(bloecke) !== geladen;
+  const neuLaden = (b: Block[], a?: Ausrichtung) => {
+    setBloecke(structuredClone(b));
+    const neu = a ?? ausrichtung ?? "hoch";
+    setAusrichtung(neu);
+    setGeladen(JSON.stringify({ bloecke: b, ausrichtung: neu }));
+  };
+  const geaendert = bloecke !== null && JSON.stringify({ bloecke, ausrichtung: ausrichtung ?? "hoch" }) !== geladen;
   useEffect(() => { onGeaendert(geaendert); }, [geaendert, onGeaendert]);
   useEffect(() => () => onGeaendert(false), [onGeaendert]);
   const felderNach = useMemo(() => new Map((aufbau.data?.felder ?? []).map((f) => [f.name, f])), [aufbau.data]);
 
   const speichern = useMutation({
-    mutationFn: () => api<Entwurf>(`vorlagen/${art}/entwurf/`, { method: "PUT", body: { bloecke } }),
+    mutationFn: () => api<Entwurf>(`vorlagen/${art}/entwurf/`, { method: "PUT", body: { bloecke, ausrichtung } }),
     onSuccess: (e) => {
-      neuLaden(e.bloecke);
+      neuLaden(e.bloecke, e.ausrichtung);
       qc.setQueryData(["vorlagen", art, "entwurf"], e);
       void qc.invalidateQueries({ queryKey: ["vorlagen", art], exact: true });
       void qc.invalidateQueries({ queryKey: ["vorlagen", "liste"] });
@@ -430,7 +469,7 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
   });
   const freigeben = useMutation({
     mutationFn: async () => {
-      if (geaendert || !entwurf.data?.ist_entwurf) await api(`vorlagen/${art}/entwurf/`, { method: "PUT", body: { bloecke } });
+      if (geaendert || !entwurf.data?.ist_entwurf) await api(`vorlagen/${art}/entwurf/`, { method: "PUT", body: { bloecke, ausrichtung } });
       return api<Uebersicht>(`vorlagen/${art}/veroeffentlichen/`, { method: "POST" });
     },
     onSuccess: (u) => {
@@ -455,7 +494,7 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
     onSuccess: (e, v) => {
       setWiederherstellen(null);
       setFassung(null);
-      neuLaden(e.bloecke);
+      neuLaden(e.bloecke, e.ausrichtung);
       setAuswahl(e.bloecke[0]?.id ?? null);
       qc.setQueryData(["vorlagen", art, "entwurf"], e);
       void qc.invalidateQueries({ queryKey: ["vorlagen", art], exact: true });
@@ -529,7 +568,7 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
   const fehlerListe = serverFehler ? (Array.isArray((serverFehler.daten as { bloecke?: string[] })?.bloecke)
     ? (serverFehler.daten as { bloecke: string[] }).bloecke : [serverFehler.message]) : [];
   const freigebbar = geaendert || entwurf.data.ist_entwurf;
-  const stand = JSON.stringify(bloecke);
+  const stand = JSON.stringify({ bloecke, ausrichtung });
   const naechste = Math.max(0, ...a.versionen.map((v) => v.version ?? 0)) + 1;
   const verInfo = geaendert ? "Ungespeicherte Änderungen"
     : entwurf.data.ist_entwurf ? "Gespeichert, noch nicht freigegeben"
@@ -571,15 +610,25 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
               className="self-start inline-flex items-center gap-1 bg-transparent border-0 p-0 cursor-pointer text-[0.8125rem] text-akzent-text font-[inherit]">
               <Icon name="zurueck" /> Alle Vorlagen</button>
             <h2 className="m-0 text-[1.125rem] font-semibold flex items-center gap-2 flex-wrap" data-testid="vorlage-name">
-              {a.name} <Chip art={vorlageStatus(a).art}>{vorlageStatus(a).text}</Chip></h2>
+              {a.name} <Chip art={vorlageStatus(a).art}>{vorlageStatus(a).text}</Chip><FirmaChip f={a.firma} /></h2>
             {a.wofuer ? <span className="text-sm">{a.wofuer}</span> : null}
             {a.wo ? <span className="text-[0.8125rem] gedaempft"><strong className="font-medium text-text2">Wo benutzt:</strong> {a.wo}</span> : null}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {a.eigen ? <Knopf klein icon="stift" onClick={() => setEigenAendern(true)}>Name und Einstellungen</Knopf> : null}
             {kopierbar(art) ? <Knopf klein icon="kopieren" onClick={() => setKopieren(true)}>Als eigene Vorlage kopieren</Knopf> : null}
+            {a.firma?.moeglich ? (a.firma.eigene
+              ? <Knopf klein onClick={() => { firmaM.reset(); setFirmaFrage("entfernen"); }} data-testid="firma-entfernen">Eigene Vorlage entfernen</Knopf>
+              : <Knopf klein onClick={() => { firmaM.reset(); setFirmaFrage("anlegen"); }} data-testid="firma-anlegen">Eigene Vorlage für {a.firma.name} anlegen</Knopf>) : null}
           </div>
         </div>
+        {a.firma?.mehrere && !a.firma.gebunden ? (
+          <span className="text-[0.8125rem] gedaempft" data-testid="firma-hinweis">
+            {a.firma.eigene
+              ? `Sie bearbeiten die eigene Vorlage der ${a.firma.name}. Die anderen Firmen nutzen weiter die gemeinsame Vorlage.`
+              : `Diese Vorlage ist gemeinsam: Was Sie hier ändern und freigeben, gilt in allen Firmen. Soll nur die ${a.firma.name} etwas anderes bekommen, legen Sie eine eigene Vorlage an (Kopie der gemeinsamen).`}
+          </span>
+        ) : null}
         <ol className="m-0 p-0 list-none flex gap-2 flex-wrap" aria-label="So ändern Sie eine Vorlage" data-testid="schritte">
           {schrittKnopf(1, "1 · Bearbeiten", "Text und Aufbau ändern, dann „Speichern“", () => setAnsicht("seite"), { aktiv: schritt === 1 })}
           {schrittKnopf(2, "2 · Vorschau prüfen", "So sieht es mit einem Testpatienten aus", () => setAnsicht("vorschau"),
@@ -599,9 +648,12 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
             <Knopf klein laedt={modus.isPending} onClick={() => modus.mutate(false)}>Entwurfsmodus wieder einschalten</Knopf></span></Meldung>
         ) : (
           <Meldung art="warn"><span className="flex items-start justify-between gap-3 flex-wrap">
-            <span data-testid="vorlage-ungeprueft">Diese Vorlage ist der mitgelieferte <Begriff name="entwurf">Entwurf</Begriff>: Stellen in [eckigen Klammern]
+            <span data-testid="vorlage-ungeprueft">{istRgc(art)
+              ? <>Diese Vorlage ist aus der Word-Vorlage der Regeneration Clinic übernommen (Revision 3, Oktober 2026) und hier noch
+                nicht bestätigt. Bis sie einmal geprüft und freigegeben ist, tragen die PDFs in den Akten das Wasserzeichen „ENTWURF“.</>
+              : <>Diese Vorlage ist der mitgelieferte <Begriff name="entwurf">Entwurf</Begriff>: Stellen in [eckigen Klammern]
               sind von der Stiftung auszufüllen, der Text ist rechtlich zu prüfen. Bis sie hier bearbeitet und freigegeben ist,
-              tragen die PDFs in den Akten das Wasserzeichen „ENTWURF“.</span>
+              tragen die PDFs in den Akten das Wasserzeichen „ENTWURF“.</>}</span>
             <Knopf klein onClick={() => { modus.reset(); setModusFrage(true); }}>Entwurfsmodus ausschalten</Knopf></span></Meldung>
         )
       ) : null}
@@ -614,6 +666,21 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
             wenn die Stiftung den Vordruck so verwenden will. Die Änderung steht im Audit-Log; jederzeit wieder einschaltbar.</Meldung>
           <Fehleranzeige fehler={modus.error} />
         </div>
+      </Dialog>
+      <Dialog offen={firmaFrage === "anlegen"} onOffen={(o) => { if (!o) setFirmaFrage(null); }} titel={`Eigene Vorlage für ${a.firma?.name ?? ""} anlegen`} breite={540}
+        beschreibung={`Kopie der gemeinsamen Vorlage (Fassung ${a.aktiv.version}), sofort in Gebrauch – nur in der ${a.firma?.name ?? "Firma"}. Die anderen Firmen nutzen weiter die gemeinsame Vorlage.`}
+        fuss={<><Knopf onClick={() => setFirmaFrage(null)}>Abbrechen</Knopf>
+          <Knopf variante="pri" laedt={firmaM.isPending} onClick={() => firmaM.mutate(true)}>Eigene Vorlage anlegen</Knopf></>}>
+        <div className="flex flex-col gap-3">
+          {geaendert || entwurf.data.ist_entwurf ? <Meldung art="warn">Nicht freigegebene Änderungen an der gemeinsamen Vorlage bleiben dort; die Kopie startet mit der freigegebenen Fassung.</Meldung> : null}
+          <Fehleranzeige fehler={firmaM.error} />
+        </div>
+      </Dialog>
+      <Dialog offen={firmaFrage === "entfernen"} onOffen={(o) => { if (!o) setFirmaFrage(null); }} titel="Eigene Vorlage entfernen" breite={540}
+        beschreibung={`Die ${a.firma?.name ?? "Firma"} nutzt danach wieder die gemeinsame Vorlage. Die eigenen Fassungen bleiben abgelöst erhalten; ein nicht freigegebener Entwurf wird verworfen.`}
+        fuss={<><Knopf onClick={() => setFirmaFrage(null)}>Abbrechen</Knopf>
+          <Knopf variante="dng" laedt={firmaM.isPending} onClick={() => firmaM.mutate(false)}>Entfernen</Knopf></>}>
+        <Fehleranzeige fehler={firmaM.error} />
       </Dialog>
       {fehlerListe.length ? <Meldung art="fehler"><ul className="m-0 pl-4" data-testid="vorlage-fehler">{fehlerListe.map((f) => <li key={f}>{f}</li>)}</ul></Meldung> : null}
 
@@ -675,11 +742,18 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
         </aside>
 
         <div className="flex flex-col gap-2.5 min-w-0">
-          <Segmente label="Ansicht" wert={ansicht} onWahl={setAnsicht} className="self-start"
-            werte={[{ wert: "seite", text: "Seite bearbeiten" }, { wert: "vorschau", text: "Vorschau mit Testpatient" }]} />
+          <div className="flex items-center gap-3 flex-wrap">
+            <Segmente label="Ansicht" wert={ansicht} onWahl={setAnsicht} className="self-start"
+              werte={[{ wert: "seite", text: "Seite bearbeiten" }, { wert: "vorschau", text: "Vorschau mit Testpatient" }]} />
+            {a.querformat_moeglich ? (
+              <Segmente label="Seitenformat" wert={ausrichtung ?? "hoch"} onWahl={(w) => setAusrichtung(w)} className="self-start"
+                werte={[{ wert: "hoch", text: "Hochformat" }, { wert: "quer", text: "Querformat" }]} />
+            ) : null}
+          </div>
           {ansicht === "seite" ? (
             <div className="py-6 bg-[#E6E5EE] rounded-xl overflow-auto min-w-0" data-testid="vorlage-seite">
-              <div className="w-[35rem] min-h-[49.5rem] mx-auto px-[2.375rem] py-[2.125rem] bg-white text-[#1a1a1a] shadow-md flex flex-col gap-2.5">
+              <div className={cx("mx-auto px-[2.375rem] py-[2.125rem] bg-white text-[#1a1a1a] shadow-md flex flex-col gap-2.5",
+                ausrichtung === "quer" ? "w-[49.5rem] min-h-[35rem]" : "w-[35rem] min-h-[49.5rem]")}>
                 {gruppen.map((g) => g.length === 1 ? rahmen(bloecke[g[0]], g[0]) : (
                   <div key={`paar-${bloecke[g[0]].id}`} className="flex justify-between items-start" data-testid="nebeneinander">
                     {g.map((i, j) => <div key={bloecke[i].id} style={{ width: `${breitenFuer(g.map((x) => bloecke[x]))[j]}%` }}>{rahmen(bloecke[i], i)}</div>)}
@@ -687,7 +761,7 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
                 ))}
               </div>
             </div>
-          ) : <LiveVorschau art={art} bloecke={bloecke} onGeprueft={setGeprueft} />}
+          ) : <LiveVorschau art={art} bloecke={bloecke} ausrichtung={ausrichtung ?? "hoch"} onGeprueft={setGeprueft} />}
         </div>
 
         <aside className="flex flex-col gap-3.5 min-w-0">
@@ -1037,15 +1111,15 @@ type Testpatient = { id: number; nachname: string; vorname: string; nummer: numb
 
 /** Vorschau mit Testpatient als echte PDF (F180: neben dem Editor statt im Dialog). Folgt dem Stand im Editor – auch
  *  ungespeichert – kurz nach jeder Änderung; ``onGeprueft`` meldet, welcher Stand zu sehen war. */
-function LiveVorschau({ art, bloecke, onGeprueft, hoehe = "h-[72vh]" }: {
-  art: Art; bloecke: Block[]; onGeprueft?: (stand: string) => void; hoehe?: string;
+function LiveVorschau({ art, bloecke, ausrichtung, onGeprueft, hoehe = "h-[72vh]" }: {
+  art: Art; bloecke: Block[]; ausrichtung?: Ausrichtung; onGeprueft?: (stand: string) => void; hoehe?: string;
 }) {
   const patienten = useQuery({
     queryKey: ["patienten", "testpatienten"],
     queryFn: () => api<Seitenliste<Testpatient>>(`patienten/${abfrage({ test: "nur", seitengroesse: 50 })}`),
   });
   const [patient, setPatient] = useState("");
-  const stand = useMemo(() => JSON.stringify(bloecke), [bloecke]);
+  const stand = useMemo(() => JSON.stringify({ bloecke, ausrichtung }), [bloecke, ausrichtung]);
   const [schluessel, setSchluessel] = useState(stand);
   useEffect(() => {
     if (stand === schluessel) return;
@@ -1057,14 +1131,14 @@ function LiveVorschau({ art, bloecke, onGeprueft, hoehe = "h-[72vh]" }: {
   }, [patienten.data, patient]);
   const pdf = useQuery({
     queryKey: ["vorlagen", art, "vorschau", patient, schluessel],
-    queryFn: () => apiDatei(`vorlagen/${art}/vorschau/`, { method: "POST", body: { patient: Number(patient), bloecke: JSON.parse(schluessel) } }),
+    queryFn: () => apiDatei(`vorlagen/${art}/vorschau/`, { method: "POST", body: { patient: Number(patient), ...JSON.parse(schluessel) } }),
     enabled: !!patient, gcTime: 0, retry: false, placeholderData: keepPreviousData,
   });
   const mitEmail = mitEmailArt(art) && bloecke.some((b) => b.typ === "email");
   const mail = useQuery({
     queryKey: ["vorlagen", art, "vorschau-mail", patient, schluessel],
     queryFn: () => api<{ betreff: string; text: string }>(`vorlagen/${art}/vorschau/`, { body: { patient: Number(patient),
-      bloecke: JSON.parse(schluessel), ausgabe: "email" } }),
+      ...JSON.parse(schluessel), ausgabe: "email" } }),
     enabled: mitEmail && !!patient, gcTime: 0, retry: false, placeholderData: keepPreviousData,
   });
   const aktuell = !!pdf.data && !pdf.isPlaceholderData && !pdf.isFetching && schluessel === stand;
@@ -1114,7 +1188,7 @@ function FassungDialog({ art, version, onZu, onWiederherstellen }: {
       fuss={<><Knopf onClick={onZu}>Schließen</Knopf>
         {onWiederherstellen && version !== null ? <Knopf variante="pri" onClick={() => onWiederherstellen(version)}>Diese Fassung wiederherstellen</Knopf> : null}</>}>
       <Fehleranzeige fehler={v.error} />
-      {v.data ? <LiveVorschau art={art} bloecke={v.data.bloecke} hoehe="h-[60vh]" /> : <Laden />}
+      {v.data ? <LiveVorschau art={art} bloecke={v.data.bloecke} ausrichtung={v.data.ausrichtung} hoehe="h-[60vh]" /> : <Laden />}
     </Dialog>
   );
 }
