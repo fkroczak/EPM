@@ -26,15 +26,30 @@ class DiagnosenTest(Grundlage):
 
     def test_katalog_waechst_mit(self):
         """Die Liste im Hintergrund füllt sich beim Eintragen von allein (U53)."""
+        vorher = set(Diagnosevorlage.objects.values_list("icd_code", "bezeichnung"))
         self.anlegen()
         self.anlegen(bezeichnung="Osteoporose", icd_code="M81.99", kennzeichen="G")
         self.assertEqual(
-            sorted(Diagnosevorlage.objects.values_list("icd_code", "bezeichnung")),
+            sorted(set(Diagnosevorlage.objects.values_list("icd_code", "bezeichnung")) - vorher),
             [("K91.2", "Kurzdarmsyndrom"), ("M81.99", "Osteoporose")],
         )
         # dieselbe Diagnose erneut erzeugt keinen zweiten Katalogeintrag
         self.anlegen()
-        self.assertEqual(Diagnosevorlage.objects.count(), 2)
+        self.assertEqual(Diagnosevorlage.objects.count(), len(vorher) + 2)
+
+    def test_icd_liste_der_praxis_ist_hinterlegt(self):
+        """Die ICD-10-GM-Liste der Praxis (13.10.2026) steht als Vorlage bereit, Diabetes fünfstellig."""
+        import importlib
+
+        liste = importlib.import_module("stammdaten.migrations.0024_icd_katalog").eintraege()
+        self.assertEqual(len(liste), 5 * 22 + 55)
+        self.assertEqual(len(set(liste)), len(liste))
+        for code, name in liste:
+            Diagnosevorlage(icd_code=code, bezeichnung=name).clean()  # Format wie beim Eintragen
+        katalog = set(Diagnosevorlage.objects.values_list("icd_code", "bezeichnung"))
+        self.assertTrue(set(liste) <= katalog)
+        for code in ("E11.90", "E11.91", "E10.74", "E14.75", "K91.2", "M85.55", "E58", "I89.01"):
+            self.assertIn(code, {c for c, _ in katalog})
 
     def test_icd_format_wird_geprueft(self):
         for falsch in ("K912", "91.2", "K91.222", "Kurzdarm"):
