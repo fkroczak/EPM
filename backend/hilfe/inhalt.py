@@ -1213,9 +1213,18 @@ danach unter <strong>Aufträge</strong> samt Ausgabe.</li>
 <ul>
 <li><strong>Dienste</strong>: einzelne Container (backend, web, ocr, db) neu starten, z. B. wenn die Texterkennung
 hängt.</li>
+<li><strong>Selbstheilung</strong>: Der Server startet ausgefallene Dienste von selbst wieder und startet dreimal in Folge
+ungesunde neu (höchstens einmal in 5 Minuten). Startet eine neue Version nicht – beim Update oder nach drei vergeblichen
+Neustarts des Backends – schaltet er auf die <strong>gute Version</strong> zurück und zeigt oben auf jeder Seite einen
+Hinweis mit den nächsten Schritten. Wird die Platte knapp, meldet er es und entfernt nur hängende Docker-Images. Die Karte
+zeigt die laufende und die gute Version und die letzten Eingriffe (vollständig im Audit-Log unter „systemagent“).
+<strong>Als gute Version bestätigen</strong> trägt die laufende Version als Rückfall ein – sinnvoll nach einigen Tagen
+ohne Probleme; ein Update tut das selbst, wenn Musterdaten und Tests bestanden sind. <strong>Selbstheilung
+ausschalten</strong> nur für Wartung von Hand, danach wieder einschalten. Sehen Sie im Browser „EPM startet gerade neu“,
+läuft gerade ein Neustart, Update oder Rückfall; die Seite lädt sich alle 30 Sekunden neu.</li>
 <li><strong>Speicher aufräumen</strong>: Das Systemprotokoll (Journal) auf eine Größe oder ein Alter verkleinern; dafür
 gibt es eine einfache Rückfrage. Gespeicherte alte Versionen ankreuzen und löschen: Image-Dateien, Update-Pakete,
-Docker-Images. Das braucht Passwort und Code. Die laufende und die vorherige Version bleiben immer.</li>
+Docker-Images. Das braucht Passwort und Code. Die laufende, die vorherige und die gute Version bleiben immer.</li>
 <li><strong>Technische Verwaltung</strong>: Django-Admin und API-Ansicht im Browser für 1 oder 8 Stunden einschalten,
 z. B. zur Fehlersuche. Danach sind sie von selbst wieder aus. „Jetzt ausschalten“ beendet sofort.</li>
 <li><strong>Uhrzeit</strong>: Zeitzone und Zeitsynchronisation (NTP) mit eigenem Zeitserver einstellen, ohne Internet

@@ -139,7 +139,8 @@ function WiderrufDialog({ erklaerung, patient, offen, onOffen }: {
 }
 
 function ErklaerungenKarte({ daten, patient, darf }: { daten: AktenDatenschutz; patient: Patient; darf: boolean }) {
-  const [pdf, setPdf] = useState<ErklaerungsArt | null>(null);
+  // Vordruck als PDF: die Erklärungen und die weiteren Vordrucke der Firma (Regeneration Clinic, 13.10.2026)
+  const [pdf, setPdf] = useState<{ art: string; name: string } | null>(null);
   const [erfassen, setErfassen] = useState<ErklaerungsArt | null>(null);
   const [widerruf, setWiderruf] = useState<Erklaerung | null>(null);
   return (
@@ -166,7 +167,7 @@ function ErklaerungenKarte({ daten, patient, darf }: { daten: AktenDatenschutz; 
                 </span>
               </div>
               <div className="flex gap-2 flex-wrap">
-                <Knopf klein icon="dokument" onClick={() => setPdf(art)}>Vordruck als PDF</Knopf>
+                <Knopf klein icon="dokument" onClick={() => setPdf({ art, name: ERKLAERUNGEN[art] })}>Vordruck als PDF</Knopf>
                 {darf ? <Knopf klein icon="plus" onClick={() => setErfassen(art)}>Erfassen</Knopf> : null}
                 {darf && aktuell && s.status === "liegt_vor" ? <Knopf klein onClick={() => setWiderruf(aktuell)}>Widerruf eintragen</Knopf> : null}
               </div>
@@ -192,9 +193,27 @@ function ErklaerungenKarte({ daten, patient, darf }: { daten: AktenDatenschutz; 
           </table>
         </details>
       ) : null}
+      {daten.vordrucke?.length ? (
+        <div className="flex flex-col gap-1.5 pt-1 border-t border-rand" data-testid="vordrucke-firma">
+          <span className="lbl text-[0.8125rem]">Vordrucke der Regeneration Clinic</span>
+          <span className="text-[0.8125rem] gedaempft">Patientenerklärungen und Vereinbarungen (Word-Vorlagen 01–12, Oktober 2026) mit den Angaben
+            aus der Akte – zum Ausdrucken und Ausfüllen; sie werden hier nicht nachgehalten.</span>
+          <ul className="m-0 p-0 list-none flex flex-col">
+            {daten.vordrucke.map((v) => (
+              <li key={v.art} className="flex items-center justify-between gap-3 flex-wrap py-2 border-b border-rand last:border-b-0" data-testid={`vordruck-${v.art}`}>
+                <span className="flex flex-col gap-0.5 min-w-0">
+                  <span className="font-medium text-sm">{v.name}</span>
+                  <span className="text-[0.75rem] gedaempft">Fassung {v.version}{v.entwurf ? " · noch nicht geprüft, Wasserzeichen „ENTWURF“" : ""}</span>
+                </span>
+                <Knopf klein icon="dokument" onClick={() => setPdf({ art: v.art, name: v.name })}>Vordruck als PDF</Knopf>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {pdf ? (
-        <PdfDialog offen onOffen={(o) => { if (!o) setPdf(null); }} titel={`${ERKLAERUNGEN[pdf]} · ${name(patient)}`}
-          pfad={`patienten/${patient.id}/erklaerung-pdf/?art=${pdf}`} dateiname={`${ERKLAERUNGEN[pdf]}-${patient.nummer}.pdf`} />
+        <PdfDialog offen onOffen={(o) => { if (!o) setPdf(null); }} titel={`${pdf.name} · ${name(patient)}`}
+          pfad={`patienten/${patient.id}/erklaerung-pdf/?art=${pdf.art}`} dateiname={`${pdf.name}-${patient.nummer}.pdf`} />
       ) : null}
       {ARTEN.some((a) => daten.vorlagen[a].entwurf) ? (
         <div className="meldung warn flex gap-2 items-start text-[0.8125rem]" data-testid="vorlage-entwurf">

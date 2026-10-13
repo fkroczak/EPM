@@ -195,7 +195,22 @@ Kein Neuaufbau nötig – alles in der Oberfläche:
 4. **Daten sind falsch oder gelöscht:** Administration › Backup › Sicherungen › „Wiederherstellen“ bei der
    passenden Sicherung (Passwort und Code; vorher sichert der Server den jetzigen Stand).
 
-Kommt man nicht mehr in die Oberfläche: per SSH `sudo epm-update --versionen` und `sudo epm-update --zurueck <Version>`.
+Vieles davon erledigt der Server selbst (**Selbstheilung**, System › Wartung › Selbstheilung):
+
+- **Automatischer Rückfall:** Startet eine neue Version nicht, schaltet der Server von selbst auf die „gute Version“
+  zurück – beim Update sofort, im Betrieb nach drei vergeblichen Neustarts des Backends. Oben auf jeder Seite steht dann
+  „EPM wurde auf Version … zurückgeschaltet, weil … nicht startete“. Dann: Protokolle ansehen (Container backend,
+  Update); läuft die gute Version nicht sauber, weil die neue Version die Datenbank schon umgebaut hat, die Sicherung
+  von vor dem Update wiederherstellen; den Fehler beheben und erneut aktualisieren.
+- **Gute Version bestätigen:** Läuft eine Version einige Tage ohne Probleme, unter Selbstheilung „Als gute Version
+  bestätigen“ (ein Update tut das selbst, wenn Musterdaten und Tests bestanden sind). Ihre Images bleiben immer.
+- **Selbstheilung ausschalten:** Nur für Wartung von Hand (Container bewusst anhalten): Knopf „Selbstheilung
+  ausschalten“ – danach wieder einschalten, sonst startet der Server nichts mehr von selbst neu.
+- **Wartungsseite:** Zeigt der Browser „EPM startet gerade neu“, läuft gerade ein Neustart, Update oder Rückfall; die
+  Seite lädt sich alle 30 Sekunden neu. Bleibt sie länger als 10 Minuten stehen: Protokolle ansehen.
+
+Kommt man nicht mehr in die Oberfläche: per SSH `sudo epm-update --versionen` und `sudo epm-update --zurueck <Version>`
+(`sudo epm-update --gut` bestätigt die laufende Version; `touch /srv/epm/system/heilung-aus` hält die Selbstheilung an).
 
 ## Teil F · Wenn nur die Datenbank kaputt ist
 

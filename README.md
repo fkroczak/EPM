@@ -52,6 +52,31 @@ die von Fail2ban gesperrten Adressen.
 Uhrzeit: Zeitzone, Zeitsynchronisation und eigener Zeitserver (ohne Internet z. B. die OPNsense; sonst
 `EPM_NTP_SERVER` in `/etc/epm/epm.conf` bei der Ersteinrichtung) unter Administration › System › Wartung › Uhrzeit.
 
+## Selbstheilung (13.10.2026)
+Der Server hält EPM ohne Eingriff am Laufen; Stand und Eingriffe unter **Administration › System › Wartung ›
+Selbstheilung** (Audit-Log: Benutzer „systemagent“).
+
+- **Gute Version:** `epm-update` merkt sich in `/srv/epm/.env` neben `EPM_VERSION` die zuletzt bewährte Version
+  `EPM_VERSION_GUT`. Eine neue Version wird erst zur guten, wenn das Backend gesund ist, die Musterdaten stimmen und
+  – wenn sie laufen – die Tests bestanden sind; ihre Images bleiben beim Aufräumen immer erhalten. Von Hand:
+  `sudo epm-update --gut [TAG]` oder in EPM „Als gute Version bestätigen“.
+- **Rückfall beim Update:** Startet die neue Version nicht (Backend nach 3 Minuten nicht gesund), zeigt `epm-update` die
+  Container-Meldungen, schaltet selbst auf die gute Version zurück und bricht mit einer klaren Meldung ab; gleiches
+  gilt für `--paket`. Datenbank-Migrationen werden dabei nicht zurückgedreht – läuft die gute Version damit nicht sauber,
+  die Sicherung von vor dem Update wiederherstellen. Die Markierung `system/rueckfall.json` wird in EPM zum Hinweis an
+  alle Benutzer.
+- **Wächter jede Minute** (im Status-Lauf des Systemagenten, Zustand in `system/heilung.json`): fehlender oder
+  beendeter Container → `docker compose up -d`; dreimal in Folge „unhealthy“ → `docker compose restart` (höchstens
+  einmal je Dienst in 5 Minuten); Backend nach 3 Neustarts in 30 Minuten weiter ungesund und eine andere gute Version
+  vorhanden → `epm-update --zurueck` auf die gute Version mit Hinweis an alle; Platte unter 1 GB oder 5 % frei → Hinweis
+  und nur `docker image prune` (hängende Images). Während `epm-update` läuft (`system/update-laeuft`), während eines
+  Auftrags und in den ersten zwei Minuten nach dem Booten hält er still.
+- **Ausschalten für Wartung von Hand:** Knopf in EPM oder `touch /srv/epm/system/heilung-aus`; danach wieder einschalten.
+- **Boot:** `epm.service` versucht den Start bei Fehlschlag alle 20 s erneut (ab systemd 253); der Status-Timer läuft
+  unabhängig davon.
+- **Wartungsseite:** Antwortet das Backend nicht (502/503/504), zeigt Nginx `wartung.html` („EPM startet gerade neu“,
+  lädt alle 30 s neu); `/api/`-Anfragen bekommen JSON `{"fehler": …}`, das die Oberfläche als Meldung zeigt.
+
 ## Test-VM aktualisieren
 Oder in EPM unter Administration › System: „EPM aktualisieren“ (Wartung), Versionen und „Zurückschalten“, „Update-Paket
 erstellen“ (Software).
@@ -59,6 +84,7 @@ erstellen“ (Software).
 sudo epm-update                # holen, bauen (Backend und Frontend), Backup, starten, Musterdaten, Tests
 sudo epm-update --versionen    # vorhandene Versionen
 sudo epm-update --zurueck TAG  # zurückschalten (beide Images)
+sudo epm-update --gut [TAG]    # laufende (oder genannte) Version als gute Version bestätigen (Selbstheilung)
 sudo epm-update --paket-erstellen  # Update-Paket der laufenden, getesteten Version für den VPS
 ```
 

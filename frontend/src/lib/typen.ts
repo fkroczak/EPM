@@ -216,6 +216,8 @@ export type AktenDatenschutz = {
   stand: Record<ErklaerungsArt, ErklaerungsStand>;
   pflicht: ErklaerungsArt[];
   vorlagen: Record<ErklaerungsArt, { version: number; entwurf: boolean }>;
+  /** weitere Vordrucke der aktiven Firma (Patientenerklärungen der Regeneration Clinic, 13.10.2026): nur zum Drucken */
+  vordrucke?: { art: string; name: string; version: number; entwurf: boolean }[];
   anfragen: Datenschutzanfrage[];
   kopien: { zeitpunkt: string; person: string | null }[];
   loeschen: Loeschpruefung;
