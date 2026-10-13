@@ -850,7 +850,7 @@ class FehlerpfadeTest(Grundlage):
         self.assertEqual(c.post("/api/scans/999999/erneut/").status_code, 404)
         c, scan = self.hochladen()
         r = c.get(f"/api/scans/{scan.pk}/seiten/999999/bild/")
-        self.assertEqual((r.status_code, r.json()["fehler"]), (404, "Diese Seite gibt es (noch) nicht."))
+        self.assertEqual((r.status_code, r.json()["fehler"]), (404, "Diese Seite gibt es nicht (mehr)."))
 
     def test_speicherordner_nicht_beschreibbar(self):
         from unittest import mock
