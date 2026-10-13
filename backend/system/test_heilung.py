@@ -119,6 +119,7 @@ class AgentHeilung(SimpleTestCase):
         e = self.lauf()
         self.assertEqual(self.docker.befehle("up"), ["docker compose up -d --no-recreate ocr web"])
         self.assertEqual([(x["dienst"], x["art"], x["ok"]) for x in e["aktionen"]], [("ocr,web", "start", True)])
+        self.assertEqual(self.docker.container["web"]["zustand"], "running")
         # Pause: nicht noch einmal innerhalb von 5 Minuten, danach wieder
         self.docker.container["ocr"] = {"zustand": "exited", "gesundheit": ""}
         self.lauf(minuten=2)
@@ -182,13 +183,14 @@ class AgentHeilung(SimpleTestCase):
         self.assertEqual(json.loads((self.basis / "system" / "rueckfall.json").read_text())["id"], e["rueckfall"]["id"])
         self.assertEqual(e["aktionen"][0]["art"], "rueckfall")
         self.assertEqual(e["rueckfall_versucht"], NEU)
-        # nicht noch einmal für dieselbe Version
+        self.assertIn("schon versucht", e["grund"])
+        # nicht noch einmal für dieselbe Version: später wieder ein gewöhnlicher Neustart, kein zweiter Rückfall
         with mock.patch.object(self.modul, "EPM_UPDATE", sys.executable):
             for m in (31, 32, 33):
                 self.docker.container["backend"]["gesundheit"] = "unhealthy"
-                e = self.lauf(minuten=m)
+                self.lauf(minuten=m)
         self.assertEqual(len(self.docker.befehle("systemd-run", alle=True)), 1)
-        self.assertIn("schon versucht", e["grund"])
+        self.assertEqual(len(self.docker.befehle("restart", alle=True)), 4)
 
     def test_kein_rueckfall_wenn_gut_gleich_laufend(self):
         with mock.patch.object(self.modul, "EPM_UPDATE", sys.executable):
@@ -349,7 +351,7 @@ ERGEBNIS=""; abschliessen {NEU} {GUT}; echo "rc=$? gut=$(env_wert EPM_VERSION_GU
             self.assertIn(f"rc=1\nenv={GUT} gut={GUT}\n", p.stdout)
             m = json.loads((h / "B" / "system" / "rueckfall.json").read_text())
             self.assertEqual((m["von"], m["nach"], m["ok"], m["quelle"]), (NEU, GUT, True, "epm-update"))
-            self.assertIn(f"rc=0\n   Gute Version: {NEU}\n", p.stdout)
+            self.assertIn(f"   Gute Version: {NEU}\n", p.stdout)
             self.assertTrue(p.stdout.endswith(f"rc=0 gut={NEU} Tests übersprungen\n"), p.stdout)
         finally:
             shutil.rmtree(h, ignore_errors=True)

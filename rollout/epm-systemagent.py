@@ -166,6 +166,7 @@ TAG_MUSTER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40}$")
 PAKET_MUSTER = re.compile(r"^epm-paket-([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})\.tar$")
 DIENSTE = ("backend", "web", "ocr", "db")
 # Selbstheilung (13.10.2026): Dateien unter <EPM_BASE>/system, Schwellen des Wächters
+HEILUNG_REIHENFOLGE = ("db", "backend", "ocr", "web")   # Start und Neustart in dieser Reihenfolge (Abhängigkeiten)
 HEILUNG_DATEI = "heilung.json"
 HEILUNG_AUS = "heilung-aus"
 RUECKFALL_DATEI = "rueckfall.json"
@@ -3609,7 +3610,7 @@ class Agent:
         zaehler, zuletzt = zustand["zaehler"], zustand["zuletzt"]
         je_dienst = {c.get("dienst"): c for c in container.get("liste") or []}
         fehlend, ungesund = [], []
-        for dienst in DIENSTE:
+        for dienst in HEILUNG_REIHENFOLGE:
             c = je_dienst.get(dienst)
             if c is None or c.get("zustand") in ("exited", "dead", "created", "removing"):
                 fehlend.append(dienst)
@@ -3631,7 +3632,7 @@ class Agent:
             for d in starten:
                 zuletzt[f"start:{d}"] = jetzt
         # höchstens ein Neustart je Lauf (Zeitbudget des Status-Laufs); db zuerst, weil die anderen von ihr abhängen
-        for dienst in sorted(ungesund, key=DIENSTE[::-1].index):
+        for dienst in ungesund:
             if not pause_vorbei("neustart", dienst):
                 continue
             if dienst == "backend":
