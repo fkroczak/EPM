@@ -139,7 +139,8 @@ function WiderrufDialog({ erklaerung, patient, offen, onOffen }: {
 }
 
 function ErklaerungenKarte({ daten, patient, darf }: { daten: AktenDatenschutz; patient: Patient; darf: boolean }) {
-  const [pdf, setPdf] = useState<ErklaerungsArt | null>(null);
+  // Vordruck als PDF: die Erklärungen und die weiteren Vordrucke der Firma (Regeneration Clinic, 13.10.2026)
+  const [pdf, setPdf] = useState<{ art: string; name: string } | null>(null);
   const [erfassen, setErfassen] = useState<ErklaerungsArt | null>(null);
   const [widerruf, setWiderruf] = useState<Erklaerung | null>(null);
   return (
@@ -166,7 +167,7 @@ function ErklaerungenKarte({ daten, patient, darf }: { daten: AktenDatenschutz; 
                 </span>
               </div>
               <div className="flex gap-2 flex-wrap">
-                <Knopf klein icon="dokument" onClick={() => setPdf(art)}>Vordruck als PDF</Knopf>
+                <Knopf klein icon="dokument" onClick={() => setPdf({ art, name: ERKLAERUNGEN[art] })}>Vordruck als PDF</Knopf>
                 {darf ? <Knopf klein icon="plus" onClick={() => setErfassen(art)}>Erfassen</Knopf> : null}
                 {darf && aktuell && s.status === "liegt_vor" ? <Knopf klein onClick={() => setWiderruf(aktuell)}>Widerruf eintragen</Knopf> : null}
               </div>
@@ -193,8 +194,8 @@ function ErklaerungenKarte({ daten, patient, darf }: { daten: AktenDatenschutz; 
         </details>
       ) : null}
       {pdf ? (
-        <PdfDialog offen onOffen={(o) => { if (!o) setPdf(null); }} titel={`${ERKLAERUNGEN[pdf]} · ${name(patient)}`}
-          pfad={`patienten/${patient.id}/erklaerung-pdf/?art=${pdf}`} dateiname={`${ERKLAERUNGEN[pdf]}-${patient.nummer}.pdf`} />
+        <PdfDialog offen onOffen={(o) => { if (!o) setPdf(null); }} titel={`${pdf.name} · ${name(patient)}`}
+          pfad={`patienten/${patient.id}/erklaerung-pdf/?art=${pdf.art}`} dateiname={`${pdf.name}-${patient.nummer}.pdf`} />
       ) : null}
       {ARTEN.some((a) => daten.vorlagen[a].entwurf) ? (
         <div className="meldung warn flex gap-2 items-start text-[0.8125rem]" data-testid="vorlage-entwurf">

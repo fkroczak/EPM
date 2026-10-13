@@ -1,0 +1,453 @@
+{
+ "quelle": "04_Patientenerklaerung_PKV_DE_Stundung",
+ "name": "Patientenerklärung Deutschland PKV (Stundung)",
+ "gruppe": "formulare",
+ "beschreibung": "Private Krankenversicherung · Behandlung in Lettland (EU) · § 192 VVG · MB/KK",
+ "datei": "04_Patientenerklaerung_PKV_DE_Stundung_V5.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": false,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Patientenerklärung bei Aufnahme (Deutschland – PKV)"
+  },
+  {
+   "id": "b3",
+   "typ": "text",
+   "bezeichnung": "Stand der Vorlage",
+   "text": "Private Krankenversicherung · Behandlung in Lettland (EU) · § 192 VVG · MB/KK\nStundung des erwarteten Erstattungsanteils · Abtretung · Zahlungsanweisung · Schweigepflichtentbindung · Vollmacht · Datenschutz\nVorlage 04 · Version 5 · Stand 10/2026 · Anlagen: K (Vorlage 11), Anwaltsvollmacht (Vorlage 12), Schweigepflichtentbindung (Vorlage 06)",
+   "optionen": {
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "text": "Regeneration Clinic SIA · Jāņa Asara iela 3 · LV-1009 Rīga · Lettland · Postanschrift: Gertrudes iela 53-7 · LV-1011 Rīga\n\nIn Lettland zugelassene Ārstniecības iestāde · Health Institution Code 001000289 · Reg.-Nr. 40203593175 · info@regeneration-clinic.eu · +371 28717452\n\nVertretungsberechtigt: Prof. Dr. Markus Masin, Director",
+   "bezeichnung": "Leistungserbringerin",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "text": "Als Privatversicherte/r haben Sie nach § 192 Abs. 1 VVG in Verbindung mit Ihren Tarifbedingungen einen vertraglichen Anspruch auf Erstattung der Aufwendungen für medizinisch notwendige Heilbehandlung. Maßgeblich ist ausschließlich Ihr konkreter Versicherungsvertrag; die Musterbedingungen (§ 1 Abs. 4 MB/KK: Heilbehandlung in Europa) dienen nur der Orientierung, Tarif und Vertrag können abweichen. Wir prüfen Auslandsgeltung und Abtretbarkeit anhand Ihrer Unterlagen, tragen das Vorfinanzierungsrisiko und rechnen nach Abtretung unmittelbar mit Ihrem Versicherer ab.\n\nKonkret bedeutet das:\n– Der erwartete Erstattungsanteil wird gestundet, bis Ihr Versicherer entschieden hat (Ziffer 9).\n– Auf Wunsch holen wir vor der Behandlung die Auskunft nach § 192 Abs. 8 VVG ein – Klarheit über den Versicherungsschutz im Voraus.\n– Bei Auseinandersetzungen mit dem Versicherer setzen wir Ihre Ansprüche durch; Anwalts- und Verfahrenskosten trägt die Klinik (Ziffer 5.2).\n– Selbstbehalte, tarifliche Eigenanteile und ein nicht gedeckter Restbetrag bleiben Ihre vertragliche Zahlungspflicht; über die voraussichtliche Höhe informieren wir Sie vor Behandlungsbeginn schriftlich in der Anlage K.\n– Sollte der Versicherer nicht oder nur teilweise erstatten, lassen wir Sie damit nicht allein: Der nicht gedeckte Betrag wird dann fällig – höchstens in der in der Anlage K bezifferten Höhe – und wir bieten Ihnen eine Ratenvereinbarung an.\nDie genaue Aufteilung – was die Kasse voraussichtlich zahlt, was Sie selbst zahlen und was gestundet wird – finden Sie in der Anlage K, die Sie vor der Unterschrift erhalten.",
+   "bezeichnung": "Unser Versprechen an Sie: Sie zahlen den erwarteten Erstattungsanteil Ihrer PKV nicht vorab",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "bezeichnung": "Was die Stundung für Sie bedeutet",
+   "text": "Was die Stundung für Sie bedeutet",
+   "optionen": {
+    "fett": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "datenfelder",
+   "bezeichnung": "Patientendaten und Versicherung",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Versicherte Person (Patient/in)",
+     "wert": "____________________"
+    },
+    {
+     "label": "Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Anschrift",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Versicherungsnehmer/in (falls abweichend)",
+     "wert": "____________________"
+    },
+    {
+     "label": "Private Krankenversicherung (Name, Anschrift)",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Versicherungsschein-Nr.",
+     "wert": "____________________"
+    },
+    {
+     "label": "Tarif / Tarifstufe",
+     "wert": "____________________"
+    },
+    {
+     "label": "Beihilfeberechtigung",
+     "wert": "☐ nein ☐ ja – Beihilfestelle: ______________________ Bemessungssatz: ______ %"
+    },
+    {
+     "label": "Auskunft nach § 192 Abs. 8 VVG",
+     "wert": "☐ gewünscht ☐ eingeholt am: __________ ☐ nicht gewünscht ☐ Kostenzusage des Versicherers liegt vor (Datum: __________)"
+    },
+    {
+     "label": "Prüfung Auslandsgeltung / Abtretbarkeit im konkreten Tarif (von der Klinik)",
+     "wert": "☐ geprüft am: __________ Ergebnis: ______________________"
+    },
+    {
+     "label": "Aufnahmedatum / Beginn der Behandlung in der EU",
+     "wert": "____________________"
+    },
+    {
+     "label": "Geplante Versorgungsform",
+     "wert": "☐ ambulant ☐ tagesklinisch ☐ stationär (mindestens eine Übernachtung)"
+    },
+    {
+     "label": "Kooperations-/Infrastrukturpartner (falls eingesetzt)",
+     "wert": "____________________"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "Erfasst sind alle medizinisch notwendigen ambulanten, tagesklinischen, stationsersetzenden und – soweit medizinisch erforderlich und gesondert dokumentiert – stationären Leistungen der Regeneration Clinic SIA in Lettland einschließlich Diagnostik (z. B. MRT, CT, Labor, Elektrophysiologie), Telemedizin und Nachsorge, soweit sie mit diesem Behandlungsfall in ursächlichem Zusammenhang stehen.\n\nWerden Kooperations- oder Infrastrukturpartner eingesetzt (z. B. AIWA Clinic, Rīga: OP-Saal, stationäre Infrastruktur, Pflege, Unterbringung), verbleiben medizinische Verantwortung, Indikationsstellung, Dokumentation und Abrechnung bei der Regeneration Clinic SIA.",
+   "bezeichnung": "Behandlungsrahmen",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "text",
+   "text": "Für Privatversicherte gilt das Kostenerstattungsprinzip nach § 192 Abs. 1 VVG in Verbindung mit den Allgemeinen Versicherungsbedingungen (MB/KK) und den Tarifbedingungen: Der Versicherer erstattet die Aufwendungen für medizinisch notwendige Heilbehandlung wegen Krankheit oder Unfallfolgen im vereinbarten Tarifumfang. Der Versicherungsschutz umfasst nach § 1 Abs. 4 MB/KK Heilbehandlung in Europa; das Sachleistungsprinzip des SGB V ist auf private Versicherungsverhältnisse nicht anwendbar.\n\nAuskunft vor Behandlungsbeginn (§ 192 Abs. 8 VVG). Übersteigen die voraussichtlichen Kosten der Heilbehandlung 2.000 Euro, kann der Versicherungsnehmer vor Beginn in Textform Auskunft über den Umfang des Versicherungsschutzes verlangen; der Versicherer hat binnen vier Wochen, bei Dringlichkeit binnen zwei Wochen, zu antworten. Die Auskunft ist eine Wissenserklärung über den Versicherungsschutz; sie ersetzt die spätere Leistungsprüfung nicht und begründet für sich keinen Anspruch. Eine ausdrückliche, auf den konkreten Behandlungsplan bezogene Kostenzusage des Versicherers ist dagegen als Schuldanerkenntnis bindend. Die Klinik dokumentiert in der Anlage K, ob eine Auskunft oder eine Kostenzusage vorliegt.",
+   "bezeichnung": "1. Rechtlicher Rahmen (PKV / EU)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b10",
+   "typ": "text",
+   "text": "Ich, der/die unterzeichnende Versicherte bzw. Versicherungsnehmer/in, trete hiermit meine gegenwärtigen und zukünftigen Ansprüche auf Kostenerstattung gegen die oben bezeichnete private Krankenversicherung aus sämtlichen Leistungen dieses Behandlungsfalls (ab Aufnahmedatum), erbracht durch die Regeneration Clinic SIA und deren unmittelbar einbezogene Kooperations- und Diagnostikpartner, in Höhe der jeweiligen Rechnungsforderungen an die Regeneration Clinic SIA ab (§ 398 BGB). Die Klinik nimmt die Abtretung an. Sie ist berechtigt, die abgetretenen Ansprüche im eigenen Namen gegenüber dem Versicherer geltend zu machen, Zahlungen entgegenzunehmen und alle hierfür erforderlichen Erklärungen abzugeben, einschließlich der gerichtlichen Geltendmachung.\n\nIst der/die Versicherungsnehmer/in nicht mit der versicherten Person identisch (z. B. mitversicherte Kinder), erklärt der/die Versicherungsnehmer/in durch Unterzeichnung dieser Erklärung sein/ihr Einverständnis und tritt seine/ihre eigenen Erstattungsansprüche aus diesem Behandlungsfall in gleicher Weise ab. Die Abtretung wird von derjenigen Person erklärt, der der Erstattungsanspruch nach dem Versicherungsvertrag zusteht; bei Zweifeln ist die Unterschrift beider Personen einzuholen.\n\nAbtretungsverbote in Versicherungsbedingungen: Die Musterbedingungen sehen vor, dass Ansprüche auf Versicherungsleistungen weder abgetreten noch verpfändet werden können (§ 6 Abs. 6 MB/KK). Für ab dem 1. Oktober 2021 geschlossene Verbraucherverträge ist ein formularmäßiger Abtretungsausschluss für Geldansprüche nach § 308 Nr. 9 lit. a BGB unwirksam, soweit kein schutzwürdiges Interesse des Verwenders entgegensteht; für ältere Verträge gilt die Inhaltskontrolle nach § 307 BGB. Für den Fall, dass die Abtretung gleichwohl nicht anerkannt wird, gelten die Zahlungsanweisung (Ziffer 3) und die Vollmacht (Ziffer 5) als Auffangregelung.\n\nGerichtsstand: Der Wahlgerichtsstand am Wohnsitz des Versicherungsnehmers (§ 215 VVG) bleibt für eigene Klagen des Versicherungsnehmers erhalten. Klagt die Klinik als Zessionarin aus abgetretenem Recht, gilt der allgemeine Gerichtsstand des Versicherers (§§ 12, 17 ZPO).",
+   "bezeichnung": "2. Abtretung der Erstattungsansprüche (§§ 398 ff. BGB)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b11",
+   "typ": "text",
+   "text": "Hilfsweise – für den Fall, dass die Abtretung nicht anerkannt wird – weise ich den Versicherer an, jeden Erstattungsbetrag aus diesem Behandlungsfall mit schuldbefreiender Wirkung unmittelbar an die Regeneration Clinic SIA zu zahlen:\n\nIBAN: LV51HABA0551058193764 · BIC/SWIFT: HABALV22 · Empfängerin: Regeneration Clinic SIA, Jāņa Asara iela 3, LV-1009 Rīga\n\nVerwendungszweck: Erstattung PKV § 192 VVG – Behandlungsfall ab [Aufnahmedatum], Versicherte/r [Name, Versicherungsschein-Nr.]\n\nDie Rechnungslegung erfolgt in deutscher Sprache und – soweit für die jeweilige Leistung sachgerecht – in einer an die GOÄ angelehnten Form, mit ICD-10-Kodierung, Diagnose-, Verlaufs- und Befundberichten sowie Bildgebung. Nicht erstattungsfähige Leistungen werden gesondert ausgewiesen. Das Honorar der Klinik beruht auf dem lettischen Behandlungsvertrag und dem Kostenvoranschlag (Anlage K); die GOÄ-analoge Darstellung dient allein der Plausibilisierung gegenüber dem Versicherer und begründet keine Abrechnung nach deutschem Gebührenrecht.",
+   "bezeichnung": "3. Zahlungsanweisung (Direktzahlung an die Klinik)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b12",
+   "typ": "text",
+   "text": "Instrument — Wirkung — Voraussetzung / Grenze\nAbtretung (Ziffer 2) — Klinik wird Gläubigerin des Erstattungsanspruchs — Abtretbarkeit nach dem konkreten Vertrag; bei wirksamem Abtretungsverbot (§ 6 Abs. 6 MB/KK, § 308 Nr. 9 BGB) unwirksam\nZahlungsanweisung (Ziffer 3) — Versicherer darf mit schuldbefreiender Wirkung an die Klinik zahlen — Keine Zahlungspflicht des Versicherers gegenüber der Klinik\nVollmacht (Ziffer 5.1) — Klinik führt Abrechnungskorrespondenz im Namen des Versicherungsnehmers — Keine Rechtsdienstleistung; Klage nur durch Rechtsanwalt (Ziffer 5.2)\nWeiterleitungspflicht (Ziffer 8) — Patient gibt direkt erhaltene Erstattungen an die Klinik weiter — Schuldrechtliche Pflicht des Patienten",
+   "bezeichnung": "Rechtsstellung der Klinik im Überblick",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b13",
+   "typ": "text",
+   "text": "Die Zahlungsanweisung verpflichtet den Träger bzw. Versicherer nicht zur Zahlung an die Klinik; sie erlaubt ihm lediglich, mit schuldbefreiender Wirkung an die Klinik zu leisten. Eine Einziehungsermächtigung oder Empfangsvollmacht verschafft der Klinik keine eigene Gläubigerstellung. Die Weiterleitungspflicht des Patienten bleibt daher in allen Konstellationen die tragende Sicherung.",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b14",
+   "typ": "text",
+   "text": "Warum diese Erklärung notwendig ist: Für die Direktabrechnung müssen der Versicherung Diagnose-, Behandlungs- und Befunddaten übermittelt werden. Ohne ausdrückliche Entbindung von der Schweigepflicht wäre die Abtretung einer ärztlichen Honorarforderung unwirksam (BGH, Urteil vom 10.07.1991 – VIII ZR 296/90, BGHZ 115, 123).",
+   "bezeichnung": "4. Schweigepflichtentbindung (Voraussetzung der Direktabrechnung)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b15",
+   "typ": "text",
+   "text": "Ich entbinde die behandelnden Ärztinnen und Ärzte sowie das Personal der Regeneration Clinic SIA und der eingebundenen Kooperationspartner von der Verschwiegenheitspflicht nach lettischem Recht (Pacientu tiesību likums, Ārstniecības likums) und – soweit deutsche Behandler einbezogen sind – von der ärztlichen Schweigepflicht nach § 203 StGB und § 9 MBO-Ä gegenüber:\n– der oben bezeichneten privaten Krankenversicherung einschließlich ihrer ärztlichen Dienste, Gutachterstellen, Leistungsabteilungen und Rechnungsprüfdienste;\n– der Beihilfestelle, sofern Beihilfeberechtigung besteht;\n– vom Versicherer beauftragten externen medizinischen Gutachtern.",
+   "bezeichnung": "4.1 Entbindung gegenüber dem Versicherer und seinen Stellen",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b16",
+   "typ": "text",
+   "text": "Die Entbindung gilt ebenso gegenüber der Rechtsabteilung der Klinik und den von ihr nach Ziffer 5.2 beauftragten Rechtsanwälten, soweit dies zur außergerichtlichen oder gerichtlichen Geltendmachung der Erstattungsansprüche erforderlich ist.",
+   "bezeichnung": "4.2 Entbindung gegenüber Rechtsberatern",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b17",
+   "typ": "text",
+   "text": "Die Entbindung ist auf Tatsachen, Befunde und Behandlungsdaten dieses konkreten Behandlungsfalls beschränkt. Sie umfasst andere Behandlungsverhältnisse oder vorbestehende Erkrankungen nur, soweit diese für die Erstattungsentscheidung unmittelbar erheblich sind (§ 213 VVG). Ein Widerruf ist jederzeit in Textform mit Wirkung für die Zukunft möglich; bereits übermittelte Daten bleiben unberührt. Die gesonderte Schweigepflichtentbindung der Klinik (Vorlage 06) bleibt unberührt.",
+   "bezeichnung": "4.3 Reichweite und Widerruf",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b18",
+   "typ": "text",
+   "bezeichnung": "5. Vollmacht zur außergerichtlichen und gerichtlichen Durchsetzung",
+   "text": "5. Vollmacht zur außergerichtlichen und gerichtlichen Durchsetzung",
+   "optionen": {
+    "fett": true
+   }
+  },
+  {
+   "id": "b19",
+   "typ": "text",
+   "text": "Ergänzend zur Abtretung bevollmächtige ich die Regeneration Clinic SIA, vertreten durch ihren Director Prof. Dr. Markus Masin, mich in allen Angelegenheiten dieses Behandlungsfalls gegenüber dem Versicherer – einschließlich seines ärztlichen Dienstes, der Leistungsabteilung und der Beihilfestelle – zu vertreten. Die Vollmacht umfasst insbesondere:\n– die Einholung der Auskunft nach § 192 Abs. 8 VVG;\n– die außergerichtliche Geltendmachung der Erstattungsansprüche, Schriftverkehr, Telefonate und Datenaustausch;\n– die Entgegennahme von Leistungsentscheidungen, Schriftsätzen und sonstigen Erklärungen;\n– die Empfangnahme von Erstattungsbeträgen;\n– die Mandatierung eines Rechtsanwalts nach Maßgabe der Ziffer 5.2 – auf Kosten der Klinik.\nAbgrenzung zur Rechtsdienstleistung: Die Klinik macht die an sie abgetretenen Ansprüche in eigener Angelegenheit geltend und übernimmt im Übrigen die administrative Abwicklung (Antragstellung, Zusammenstellung medizinischer Unterlagen, Akteneinsicht, Entgegennahme von Bescheiden). Die rechtliche Vertretung im Widerspruchs- und Klageverfahren erfolgt ausschließlich durch einen zugelassenen Rechtsanwalt aufgrund gesonderter Anwaltsvollmacht (Vorlage 12), die ich mit dieser Erklärung erteile (§§ 2, 3 RDG; § 13 Abs. 5 SGB X; § 73 Abs. 2 SGG).",
+   "bezeichnung": "5.1 Bevollmächtigung der Klinik",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b20",
+   "typ": "text",
+   "text": "Die gerichtliche Geltendmachung meiner Erstattungsansprüche und jede über die Abrechnungskorrespondenz hinausgehende rechtliche Vertretung erfolgen ausschließlich durch einen zugelassenen Rechtsanwalt (§§ 2, 3 RDG), den die Regeneration Clinic SIA im Bedarfsfall auswählt, mandatiert und vergütet. Hierzu erteile ich die gesonderte Anwaltsvollmacht nach Vorlage 12, die dieser Erklärung beiliegt; der Name des Rechtsanwalts wird bei Mandatierung eingetragen. Die Anwaltsvollmacht umfasst insbesondere:\n– die Erhebung von Leistungs- und Feststellungsklagen vor den ordentlichen Gerichten (Amts-/Landgericht, Oberlandesgericht, Bundesgerichtshof) sowie die Anrufung des Ombudsmanns Private Kranken- und Pflegeversicherung;\n– Antrags-, Verzichts-, Anerkenntnis-, Vergleichs- und Erledigungserklärungen;\n– die Entgegennahme von Zustellungen und Urteilen;\n– die Empfangnahme von Geldleistungen, insbesondere erstatteter Beträge und festgesetzter Kosten;\n– die Bestellung von Unterbevollmächtigten (etwa für Terminsvertretungen); Vergleich und Verzicht nur mit meiner Zustimmung in Textform.\nKosten der anwaltlichen Vertretung – keine Belastung für Sie: Die Regeneration Clinic SIA mandatiert den Rechtsanwalt im eigenen wirtschaftlichen Interesse zur Durchsetzung der an sie abgetretenen Ansprüche. Sämtliche Anwalts- und Gerichtskosten trägt die Klinik; eine Honorar- oder Kostenbelastung des Patienten ist ausgeschlossen. Im Obsiegensfall sind die Kosten vom Versicherer zu erstatten (§ 91 ZPO) und fließen an die Klinik zurück.",
+   "bezeichnung": "5.2 Anwaltliche Vertretung – gesonderte Anwaltsvollmacht, auf Kosten der Klinik",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b21",
+   "typ": "text",
+   "text": "Die Vollmachten nach Ziffer 5.1 und 5.2 bleiben bis zum schriftlichen Widerruf gegenüber dem jeweils Bevollmächtigten in Kraft. Sie erlöschen nicht mit meinem Tod (§§ 168, 672 BGB) und gelten über den Abschluss des Verfahrens hinaus für Folge- und Nachverfahren (z. B. Kostenfestsetzung, Vollstreckung).",
+   "bezeichnung": "5.3 Reichweite, Bestand und Widerruf der Vollmachten",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b22",
+   "typ": "text",
+   "text": "Ich willige ein, dass die Regeneration Clinic SIA und ein nach Ziffer 5.2 mandatierter Rechtsanwalt zur Behandlung, Abrechnung und Rechtsdurchsetzung kommunizieren und Daten austauschen dürfen mit:\n– dem oben bezeichneten Versicherer einschließlich seiner ärztlichen Dienste, Gutachterstellen und Sachbearbeitung;\n– der Beihilfestelle, sofern Beihilfeberechtigung besteht;\n– Vor- und Mitbehandlern, Radiologien und Laboren;\n– Kooperations- und Infrastrukturkliniken (z. B. AIWA Clinic, Rīga);\n– autorisierten Übersetzungs- und IT-Dienstleistern (z. B. PACS-, Upload-Portale);\n– Zivilgerichten, dem PKV-Ombudsmann, Behörden und sonstigen verfahrensbeteiligten Stellen.\nKommunikationswege. Standard sind die sicheren Wege (Brief, TLS-verschlüsselte E-Mail mit kennwortgeschützten Anhängen, gesicherte Portale wie PACS- oder KIM-Upload, Telefon nach Identitätsprüfung); hierfür ist keine Einwilligung erforderlich. Zusätzliche Wege nutzt die Klinik nur mit meiner freiwilligen, jederzeit formlos widerruflichen Zustimmung (bitte ankreuzen):",
+   "bezeichnung": "6. Mitteilungs- und Kommunikationsbefugnis",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b23",
+   "typ": "text",
+   "text": "☐ E-Mail ohne Verschlüsselung\n☐ Telefax (unverschlüsselt)\n☐ Ende-zu-Ende-verschlüsselter Messenger (z. B. Signal)",
+   "bezeichnung": "Text",
+   "optionen": {
+    "spalten": 3
+   }
+  },
+  {
+   "id": "b24",
+   "typ": "text",
+   "text": "Bei unverschlüsselter Übermittlung verbleibt ein technisches Restrisiko der Kenntnisnahme durch Dritte (Art. 32 DSGVO). Die Einzelheiten – einschließlich der Auswahl der Empfängergruppen – regelt die Schweigepflichtentbindung (Vorlage 06).",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b25",
+   "typ": "text",
+   "text": "Systematik: Dieser Abschnitt ist eine Information nach Art. 13 DSGVO und setzt keine Einwilligung voraus. Die Entbindung von der ärztlichen Schweigepflicht erfolgt gesondert (Vorlage 06); die Freigabe zusätzlicher Kommunikationswege ist eine freiwillige, jederzeit widerrufliche Zustimmung (vorstehende Ziffer).\n\nSoweit die Verarbeitung zur Behandlung, Abrechnung, Erfüllung gesetzlicher Pflichten oder zur Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen erforderlich ist, beruht sie nicht auf widerruflicher Einwilligung, sondern auf den nachstehenden gesetzlichen Rechtsgrundlagen. Die Angaben dienen zugleich der Information nach Art. 13 DSGVO.",
+   "bezeichnung": "7. Datenschutzinformation (Art. 13 DSGVO)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b26",
+   "typ": "datenfelder",
+   "bezeichnung": "Angaben",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Verantwortliche",
+     "wert": "Regeneration Clinic SIA (Kontaktdaten siehe oben); Datenschutzkontakt: info@regeneration-clinic.eu"
+    },
+    {
+     "label": "Datenarten",
+     "wert": "Ident-, Versicherungs- und Kontaktdaten; Gesundheitsdaten (Diagnosen, Befunde, Bildgebung, OP- und Leistungsdaten); Abrechnungs- und Erstattungsdaten; Übersetzungen"
+    },
+    {
+     "label": "Zwecke",
+     "wert": "Behandlung und Organisation; Erstattung und Abrechnung; Rechtsdurchsetzung einschließlich anwaltlicher Vertretung; Qualitätssicherung; gesetzliche Aufbewahrung"
+    },
+    {
+     "label": "Rechtsgrundlagen",
+     "wert": "Art. 6 Abs. 1 lit. b, c und f DSGVO; Art. 9 Abs. 2 lit. f und h DSGVO; ergänzend Art. 9 Abs. 2 lit. a DSGVO; Fizisko personu datu apstrādes likums (LV); §§ 192, 213 VVG; § 630f BGB"
+    },
+    {
+     "label": "Empfänger",
+     "wert": "Versicherer und dessen ärztliche Dienste; ggf. Beihilfestelle; nach Ziffer 5.2 mandatierter Rechtsanwalt; Gerichte; die in Ziffer 6 genannten Partner und Dienstleister"
+    },
+    {
+     "label": "Speicherdauer",
+     "wert": "Medizinische Dokumentation nach den gesetzlichen Aufbewahrungsfristen (in der Regel mindestens 10 Jahre, vgl. § 630f Abs. 3 BGB); abrechnungs- und verfahrensrelevante Unterlagen bis zum rechtskräftigen Abschluss"
+    },
+    {
+     "label": "Betroffenenrechte",
+     "wert": "Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch, Datenübertragbarkeit; Widerruf einer Einwilligung mit Wirkung für die Zukunft; Beschwerde bei der Datu valsts inspekcija (Rīga) oder einer deutschen Datenschutzaufsichtsbehörde"
+    }
+   ]
+  },
+  {
+   "id": "b27",
+   "typ": "text",
+   "text": "Mitwirkung. Ich verpflichte mich, die zur Erstattung erforderlichen Unterlagen (Versicherungsschein, Tarifbedingungen, ggf. Beihilfebescheid, Vorbehandlungsunterlagen) zeitnah bereitzustellen und an der Geltendmachung und Durchsetzung der Erstattungsansprüche mitzuwirken.\n\nWeiterleitung. Zahlt der Versicherer trotz Abtretung und Zahlungsanweisung an mich, verpflichte ich mich, den Betrag unverzüglich, spätestens binnen 14 Tagen, bis zur Höhe der offenen Forderung an die Regeneration Clinic SIA weiterzuleiten.",
+   "bezeichnung": "8. Mitwirkungspflichten und Weiterleitung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b28",
+   "typ": "text",
+   "text": "Die Regeneration Clinic SIA stundet nach medizinischer und wirtschaftlicher Einzelfallprüfung denjenigen Teil der Behandlungskosten, dessen Erstattung bei der privaten Krankenversicherung nach § 192 VVG und den Tarifbedingungen geltend gemacht wird, bis zur Entscheidung von der privaten Krankenversicherung bzw. bis zum rechtskräftigen Abschluss eines Streitverfahrens vor den Zivilgerichten, längstens jedoch für 24 Monate ab Rechnungsdatum, sofern nicht schriftlich etwas anderes vereinbart wird. Die Stundung ist zinsfrei.\n\nUmfang der Stundung. Gestundet wird ausschließlich der erwartete Erstattungsanteil. Wird im Ergebnis nur teilweise oder gar nicht erstattet, wird der nicht gedeckte Anteil mit Zugang der Entscheidung bzw. mit rechtskräftigem Verfahrensabschluss zur Zahlung fällig. Die Klinik wird in diesem Fall eine angemessene Zahlungsregelung anbieten (Ratenvereinbarung, Stundungsverlängerung oder teilweiser Verzicht aus Kulanz); eine solche Sonderregelung bedarf der Textform. Die maximale zusätzliche Zahlungspflicht ist in der Anlage K beziffert; das endgültige Erstattungsrisiko verbleibt beim Patienten.\n\nEigenanteile. Nicht Gegenstand der Stundung sind tarifliche Selbstbehalte und Eigenanteile, Kürzungen wegen Tarifausschlüssen oder abweichender Beurteilung der medizinischen Notwendigkeit, nicht erstattungsfähige Komfort-, Transfer- und Zusatzleistungen sowie Verwaltungsgebühren; sie werden gesondert ausgewiesen und sind nach Maßgabe des Kostenvoranschlags bzw. der Rechnung fällig. Über ihre voraussichtliche Höhe wird der/die Patient/in vor Behandlungsbeginn schriftlich informiert.\n\nMitwirkung. Der/die Patient/in erhält die Vollmachten aufrecht, gibt die zur Antragstellung, Widerspruchs- und Klageführung erforderlichen Erklärungen ab und legt die benötigten Unterlagen vor. Ein Widerruf der Vollmachten oder eine unterbliebene Mitwirkung, die das Erstattungsverfahren vereitelt, beendet die Stundung; der gestundete Betrag wird dann nach schriftlicher Mahnung mit einer Frist von 30 Tagen fällig.\n\nDie zivilrechtliche Zahlungspflicht aus dem Behandlungsvertrag bleibt durch die Stundung dem Grunde nach unberührt; sie wird lediglich zeitlich modifiziert. Der/die Patient/in ist damit einer wirksamen Honorarverbindlichkeit ausgesetzt, die Grundlage des Erstattungs- bzw. Freistellungsanspruchs ist.\n\nAnlage K – Kostenvoranschlag und Erstattungsprognose. Die Höhe des Behandlungshonorars, der voraussichtlich erstattungsfähigen Leistungen, der erwarteten Versicherungsleistung, des vorab zu zahlenden Eigenanteils, des gestundeten Betrags und meiner maximalen zusätzlichen Zahlungspflicht ergibt sich aus der Anlage K (Vorlage 11), die mir vor Unterzeichnung ausgehändigt wurde und Bestandteil dieser Erklärung ist. Die Klinik hat darin die Grundlage ihrer Erstattungsschätzung offengelegt.",
+   "bezeichnung": "9. Stundung des erwarteten Erstattungsanteils",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b29",
+   "typ": "text",
+   "text": "Diese Erklärung gilt ab dem Aufnahmedatum für den gesamten Behandlungsfall (einschließlich Aufenthalten in Kooperationskliniken sowie vor- und nachstationärer Folgebehandlungen) für zunächst zwölf Monate und verlängert sich um jeweils zwölf Monate, solange die Behandlung oder das Erstattungs- bzw. Rechtsdurchsetzungsverfahren anhängig ist.\n\nEinwilligungen und Vollmachten können jederzeit schriftlich oder in Textform mit Wirkung für die Zukunft widerrufen werden. Bereits beauftragte oder erbrachte Leistungen, entstandene Zahlungs- und Weiterleitungspflichten sowie gesetzliche Aufbewahrungspflichten bleiben unberührt.\n\nAuf das Behandlungsverhältnis mit der Regeneration Clinic SIA als in Lettland zugelassener Ārstniecības iestāde findet lettisches Recht Anwendung; für die Ansprüche gegen den deutschen Leistungsträger bzw. Versicherer gilt deutsches Recht. Sollte eine Bestimmung dieser Erklärung unwirksam sein oder werden, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt; an die Stelle der unwirksamen Bestimmung tritt die Regelung, die ihrem wirtschaftlichen Zweck am nächsten kommt (§ 139 BGB).",
+   "bezeichnung": "10. Geltungsdauer, Widerruf, anwendbares Recht, salvatorische Klausel",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b30",
+   "typ": "text",
+   "text": "☐ Ich habe diese Erklärung gelesen und verstanden; meine Fragen wurden beantwortet.\n☐ Ich wurde darauf hingewiesen, dass die Erstattung vom Tarifumfang und von der Beurteilung der medizinischen Notwendigkeit durch den Versicherer abhängt und dass nicht erstattete Beträge von mir zu tragen sind.\n☐ Ich habe die Anlage K (Kostenvoranschlag und Erstattungsprognose) erhalten und die darin bezifferte maximale zusätzliche Zahlungspflicht zur Kenntnis genommen; bei einer Ablehnung bietet mir die Klinik eine Ratenvereinbarung an.\n☐ Ich habe ein Exemplar dieser Erklärung erhalten.",
+   "bezeichnung": "11. Erklärung des/der Patient/in",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b31",
+   "typ": "text",
+   "text": "Ist der/die Versicherungsnehmer/in nicht mit der versicherten Person identisch, ist die zweite Zeile auszufüllen. Bei gesetzlicher Vertretung (Eltern, Betreuer/in – Nachweis beifügen) ist die dritte Zeile auszufüllen.",
+   "bezeichnung": "Unterschriften",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b32",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Ort, Datum",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b33",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift versicherte Person (Patient/in)",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b34",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Name Versicherungsnehmer/in (falls abweichend)",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b35",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift Versicherungsnehmer/in",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b36",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Name der gesetzlich vertretungsberechtigten Person",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b37",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift der gesetzlich vertretungsberechtigten Person",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b38",
+   "typ": "text",
+   "text": "Annahme und Gegenzeichnung durch die Klinik – die Regeneration Clinic SIA nimmt die Abtretung und Vollmacht an und bestätigt die vereinbarte Stundung.",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b39",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Rīga, Datum",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b40",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Für die Regeneration Clinic SIA – Prof. Dr. Markus Masin, Director, oder bevollmächtigte Vertretung (Name, Unterschrift, Stempel)",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b41",
+   "typ": "text",
+   "text": "Telefon / E-Mail für Rückfragen (optional): __________________________________________________\n\nHinweis zur Beifügung: Diese unterzeichnete Erklärung ist allen Anträgen, Korrespondenzen und Klagen gegenüber dem Versicherer als Anlage 1 (Abtretung, Zahlungsanweisung, Vollmacht, Schweigepflichtentbindung, Stundungsvereinbarung) beizufügen.\n\nRegeneration Clinic SIA · Vorlage 04 · Patientenerklärung Deutschland PKV · Version 5 · Stand 10/2026",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b42",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

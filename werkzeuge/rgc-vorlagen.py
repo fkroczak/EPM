@@ -48,6 +48,14 @@ VORLAGEN = {
     "08_Aufklaerung_Anaesthesie_Universal_DE-LV": ("Aufklärung Anästhesie (DE/LV)", "formulare"),
     "09_Rueckerstattung_Selbstzahler_OEGK": ("Rückerstattung Selbstzahler ÖGK", "formulare"),
     "10_Abtretung_formal_OEGK_mit_Vorauszahlung": ("Abtretung ÖGK mit Vorauszahlung", "formulare"),
+    "01_Patientenerklaerung_AT_OEGK_Stundung": ("Patientenerklärung Österreich (Stundung)", "formulare"),
+    "02_Patientenerklaerung_GKV_DE_Stundung": ("Patientenerklärung Deutschland GKV (Stundung)", "formulare"),
+    "03_Patientenerklaerung_BG_UV_DE": ("Patientenerklärung Deutschland BG/UV", "formulare"),
+    "04_Patientenerklaerung_PKV_DE_Stundung": ("Patientenerklärung Deutschland PKV (Stundung)", "formulare"),
+    "05_Patientenerklaerung_Zusatzversicherung_DE": ("Patientenerklärung stationäre Zusatzversicherung", "formulare"),
+    "11_Anlage_K_Kostenvoranschlag_Erstattungsprognose": ("Anlage K – Kostenvoranschlag und Erstattungsprognose",
+                                                          "formulare"),
+    "12_Anwaltsvollmacht_Erstattungsverfahren": ("Vollmacht zur anwaltlichen Vertretung", "formulare"),
 }
 
 # Bezeichnung im Formular → Datenfeld (erste passende Regel gilt)

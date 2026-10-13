@@ -42,13 +42,14 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin, d
   const [angebot, setAngebot] = useState<Termin | null>(null);
   const [bestaetigen, setBestaetigen] = useState<Termin | null>(null);
   useEffect(() => {
-    if (offen && termin) {
+    if (!offen) return;
+    if (termin) {
       setArt(termin.art); setOrt(termin.ort ? String(termin.ort) : ""); setFaellig(termin.faellig_am);
       setUhr(termin.uhrzeit ? termin.uhrzeit.slice(0, 5) : ""); setTitel(termin.titel); setNotiz(termin.notiz);
+    } else {
+      // „Neuer Termin“ beginnt leer – auch nach einem abgebrochenen Ändern oder einem früheren Anlegen
+      setPatient(null); setArt("rueckruf"); setOrt(""); setFaellig(datum || heuteIso()); setUhr(""); setTitel(""); setNotiz("");
     }
-  }, [offen, termin]);
-  useEffect(() => {
-    if (offen && !termin && datum) setFaellig(datum);
   }, [offen, termin, datum]);
   const speichern = useMutation({
     mutationFn: () => {
@@ -91,6 +92,8 @@ export function TerminDialog({ offen, onOffen, patientId, patientName, termin, d
       onOffen(false);
     },
   });
+  const { reset } = speichern;
+  useEffect(() => { if (offen) reset(); }, [offen, reset]);
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   const bestaetigung = termin && termin.art === "praxistermin" && (termin.bestaetigung_am || bestaetigungFehlt(termin));
   return (

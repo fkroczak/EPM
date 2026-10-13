@@ -216,6 +216,7 @@ export type AktenDatenschutz = {
   stand: Record<ErklaerungsArt, ErklaerungsStand>;
   pflicht: ErklaerungsArt[];
   vorlagen: Record<ErklaerungsArt, { version: number; entwurf: boolean }>;
+  /** weitere Vordrucke der aktiven Firma (Patientenerklärungen der Regeneration Clinic, 13.10.2026): nur zum Drucken */
   anfragen: Datenschutzanfrage[];
   kopien: { zeitpunkt: string; person: string | null }[];
   loeschen: Loeschpruefung;
@@ -665,6 +666,9 @@ export type Benutzer = {
   rolle: string;
   /** Rolle je Firma (11.10.2026): {"dskm": "mediziner", "rg": "keine"}; die der DSKM ist ``rolle`` */
   firmenrollen?: Record<string, string>;
+  /** darf die angemeldete Admin-Person das Konto kontoweit verwalten (sperren, Einmal-Passwort, Kontodaten)? Nur, wer in
+   *  jeder Firma mit Rolle der Person Admin ist (Festlegung 11.10.2026); fehlt bei älteren Antworten → erlaubt */
+  verwaltbar?: boolean;
   ist_test: boolean;
   is_active: boolean;
   nur_historisch: boolean;
@@ -1003,6 +1007,8 @@ export type ScansStand = {
   offen: number; laufend: number; in_arbeit: number; wartend: number; abbrueche: number; fehler: number; gesamt: number; laeuft_bald_ab: number; belegt: number; grenze: number;
   prozent: number; anzahl_grenze: number; anzahl_alle: number; frist_tage: number; hoechst_tage: number;
   verlaengerung_tage: number; max_mb: number; max_seiten: number; upload_max_mb: number;
+  /** läuft der OCR-Dienst (Lebenszeichen jünger als drei Minuten)? null = noch nie gelaufen */
+  dienst_laeuft?: boolean | null;
   verfahren?: { tesseract: { bereit: boolean; text: string }; ocrmypdf?: { bereit: boolean; text: string }; paddle: { bereit: boolean; glaetten: boolean; text: string; sparsam?: boolean; speicher_mb?: number | null } };
   dienst?: { gestartet: string; lebenszeichen: string; laeuft: boolean; bearbeitet: number; threads: string;
     /** Speicher des Containers „ocr“ in Bytes (cgroup v2), Höchststand seit dem Start */

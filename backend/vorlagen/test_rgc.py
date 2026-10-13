@@ -24,11 +24,13 @@ class RgcVorlagenTest(Grundlage):
 
     def test_alle_vorlagen_angelegt_und_gueltig(self):
         quellen = vorlagen()
-        self.assertEqual(len(quellen), 19)
+        self.assertEqual(len(quellen), 26)
         rgc = EigenesSchreiben.objects.filter(firma=self.rg)
-        self.assertEqual(rgc.count(), 19)
+        self.assertEqual(rgc.count(), 26)
         self.assertEqual(rgc.filter(gruppe="anforderungen").count(), 14)
-        self.assertEqual(rgc.filter(gruppe="formulare").count(), 5)
+        # Formulare 01–12 (Patientenerklärungen, Schweigepflicht, Aufklärungen, ÖGK, Anlage K, Anwaltsvollmacht)
+        self.assertEqual(sorted(rgc.filter(gruppe="formulare").values_list("schluessel", flat=True)),
+                         [f"eigen-rgc-f{n:02d}" for n in range(1, 13)])
         for e in rgc:
             v = Dokumentvorlage.objects.get(art=e.schluessel, status="aktiv")
             self.assertEqual(pruefe_bloecke(e.schluessel, v.bloecke), [], e.name)
@@ -64,6 +66,10 @@ class RgcVorlagenTest(Grundlage):
                 self.assertIn(kompakt(erwartet), text)
             pdf, _ = erzeuge_aus_vorlage("eigen-rgc-f07", Kontext(patient=p), titel="Aufklärung")
             self.assertIn(kompakt("16. Einwilligungserklärung · Piekrišanas apliecinājums"), kompakt(pdf_text(pdf)))
+            for art, erwartet in (("eigen-rgc-f01", "Bērziņa, Ilze"), ("eigen-rgc-f11", "Anlage K"),
+                                  ("eigen-rgc-f12", "Vollmacht")):
+                pdf, _ = erzeuge_aus_vorlage(art, Kontext(patient=p), titel=art)
+                self.assertIn(kompakt(erwartet), kompakt(pdf_text(pdf)), art)
         finally:
             zuruecksetzen(token)
 

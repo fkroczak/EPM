@@ -50,7 +50,7 @@ class _MitEmail(set):
 
 MIT_EMAIL = _MitEmail({"patientenaufnahme", "terminbestaetigung", "reisebescheinigung", "patientenankuendigung"})
 MAX_FELDER = 30
-MAX_TEXT = 4000
+MAX_TEXT = 6000  # die Abschnitte der Patientenerklärungen der RGC haben bis zu 5000 Zeichen
 
 
 def platzhalter(text: str) -> list[str]:
@@ -740,9 +740,10 @@ STARTVORLAGEN = {
          "optionen": {"ueberschrift": True, "ausblenden_wenn_leer": True}},
         {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
     ],
-    # Medikamentenplan der Akte (Wunsch 11.10.2026): Aufbau wie der bundeseinheitliche Medikationsplan
+    # Medikamentenplan der Akte (Wunsch 11.10.2026): Aufbau wie der bundeseinheitliche Medikationsplan – im
+    # Querformat (``STARTAUSRICHTUNG``, 13.10.2026), damit Hinweise und Grund Platz haben; ohne Falzmarken
     "medikationsplan": [
-        {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF, "mit_linie": False},
+        {"id": "briefkopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", **KOPF, "falzmarken": False, "mit_linie": False},
         {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "Medikationsplan",
          "zusatz_label": "Stand", "zusatz": "{{Heute}}", "neben_logo": True},
         {"id": "patient", "typ": "datenfelder", "bezeichnung": "Patient", "spalten": 3, "felder": [
@@ -760,6 +761,12 @@ STARTVORLAGEN = {
         {"id": "fusszeile", "typ": "fusszeile", "bezeichnung": "Fußzeile", **FUSS},
     ],
 }
+
+
+# Seitenformat der Startvorlagen; alles andere Hochformat (13.10.2026)
+STARTAUSRICHTUNG = {"medikationsplan": "quer"}
+# Arten, bei denen der Editor das Querformat anbietet (breite Tabellen)
+QUERFORMAT = {"medikationsplan", "sprechstunde", "patientendatenblatt"}
 
 
 class _Startvorlagen(JeArt):

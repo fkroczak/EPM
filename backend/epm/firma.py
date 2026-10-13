@@ -67,6 +67,27 @@ def admin_firmen(user) -> set[str]:
     return {f.kuerzel for f, r in mitgliedschaften(user).items() if r == Rolle.ADMIN}
 
 
+def darf_konto_verwalten(admin, user) -> tuple[bool, list]:
+    """Kontoweite Verwaltung (sperren, Einmal-Passwort, zweiten Faktor zurücksetzen, aus- und einblenden, Kontodaten
+    wie Name oder Benutzername ändern) darf nur, wer in **jeder** Firma Admin ist, in der die Person eine Rolle hat
+    (Festlegung 11.10.2026) – sonst könnte ein Admin der einen Firma Konten der anderen aussperren. Ohne Rolle in
+    irgendeiner Firma (ohne Login oder überall „Keine Berechtigung“) darf jeder Admin.
+
+    Liefert ``(erlaubt, fehlende Firmen)``; die fehlenden Firmen sind die, in denen die Person eine Rolle hat, die
+    Admin-Person aber kein Admin ist (für den Hinweis in der Antwort)."""
+    erlaubt = admin_firmen(admin)
+    fehlend = [f for f in mitgliedschaften(user) if f.kuerzel not in erlaubt]
+    return (not fehlend, fehlend)
+
+
+def konto_verwalten_hinweis(fehlend) -> str:
+    """Text der 403-Antwort, wenn ``darf_konto_verwalten`` verneint."""
+    namen = ", ".join(f.name for f in fehlend)
+    return (f"Dieses Konto hat auch eine Rolle bei {namen}. Das darf nur, wer dort ebenfalls Admin ist."
+            if len(fehlend) == 1 else
+            f"Dieses Konto hat auch Rollen bei {namen}. Das darf nur, wer dort ebenfalls Admin ist.")
+
+
 def wirksame_rolle(user) -> str | None:
     """Rolle, nach der sich die Rechte gerade richten: die Rolle in der aktiven Firma, sonst ``User.rolle``."""
     if user is None:

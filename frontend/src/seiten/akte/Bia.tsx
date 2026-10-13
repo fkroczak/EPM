@@ -5,7 +5,7 @@
  * Feld für die Beurteilung. Das Gewicht kann auf Wunsch gleich in den Gewichtsverlauf übernommen werden.
  */
 import { Begriff } from "@/components/ui/Begriff";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
@@ -44,6 +44,8 @@ function BiaDialog({ messung, offen, onOffen }: { messung: BiaMessung | null; of
     setUebernehmen(!messung);
     setStand((s) => s + 1);
   }
+  // geschlossen: beim nächsten Öffnen neu vorbelegen (sonst stünde die zuletzt erfasste Messung noch drin)
+  if (!offen && gesetzt) setGesetzt("");
   const setz = (k: string) => (e: { target: { value: string } }) => setF2((w) => ({ ...w, [k]: e.target.value }));
   const zahlOderNull = (t: string) => (t.trim() ? t.trim().replace(",", ".") : null);
   const bmiVorschlag = useMemo(() => {
@@ -75,6 +77,8 @@ function BiaDialog({ messung, offen, onOffen }: { messung: BiaMessung | null; of
     },
   });
   const fe: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
+  const { reset } = speichern;
+  useEffect(() => { if (offen) reset(); }, [offen, reset]);
   const felder: [string, string, string][] = [
     ["gewicht_kg", "Gewicht", "kg"], ["bcm_kg", "BCM", "kg"], ["fettmasse_kg", "Fettmasse", "kg"],
     ["ecw_prozent", "ECW – extrazelluläres Wasser", "%"], ["koerperwasser_l", "Körperwasser", "l"], ["bmi", "BMI", ""],

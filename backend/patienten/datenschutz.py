@@ -318,7 +318,7 @@ class DatenschutzAktionen:
             return self._verschlossen(patient)  # auch Erklärungen und Anfragen sind Inhalt der Akte
         vorlagen = {}
         for art in Erklaerung.Art.values:
-            v = Dokumentvorlage.aktive(art)
+            v = Dokumentvorlage.aktive(art)  # in der aktiven Firma deren Vorlage (11.10.2026)
             vorlagen[art] = {"version": v.version, "entwurf": v.im_entwurfsmodus}
         kontext = self.get_serializer_context()
         return Response({
@@ -459,16 +459,18 @@ class DatenschutzAktionen:
         Startvorlage nicht geprüft und veröffentlicht ist, trägt die PDF das Wasserzeichen „ENTWURF“."""
         from vorlagen.api import pdf_antwort
         from vorlagen.felder import Kontext
-        from vorlagen.models import Dokumentvorlage
+        from vorlagen.models import Dokumentvorlage, art_name, art_sichtbar
         from vorlagen.pdf import erzeuge_aus_vorlage, wasserzeichen_fuer
 
         art = request.query_params.get("art")
-        if art not in Erklaerung.Art.values:
-            return Response({"art": f"Erlaubt: {', '.join(Erklaerung.Art.values)}."}, status=status.HTTP_400_BAD_REQUEST)
+        # auch weitere Vordrucke der aktiven Firma (``art_sichtbar``)
+        erlaubt = [a for a in Dokumentvorlage.VORDRUCKE if art_sichtbar(a)]
+        if art not in erlaubt:
+            return Response({"art": f"Erlaubt: {', '.join(erlaubt)}."}, status=status.HTTP_400_BAD_REQUEST)
         patient = self.get_object()
-        vorlage = Dokumentvorlage.aktive(art)
+        vorlage = Dokumentvorlage.aktive(art)  # in der aktiven Firma deren Vorlage (11.10.2026)
         entwurf = vorlage.im_entwurfsmodus
-        name = Erklaerung.Art(art).label
+        name = art_name(art)
         # Entwurfsmodus manuell aus (U17): ohne Wasserzeichen und ohne den Hinweisblock der Startvorlage („Diese Vorlage
         # ist ein Entwurf …“), der sich an die Bearbeiter richtet und auf dem Blatt des Patienten nichts zu suchen hat
         bloecke = None
@@ -476,7 +478,8 @@ class DatenschutzAktionen:
             bloecke = [b for b in vorlage.bloecke if b.get("id") != "hinweis"]
         pdf, version = erzeuge_aus_vorlage(art, Kontext(patient=patient), vorlage=vorlage, bloecke=bloecke,
                                            wasserzeichen="ENTWURF" if entwurf else wasserzeichen_fuer(patient),
-                                           titel=f"{name} – {patient.nachname}, {patient.vorname}")
+                                           titel=f"{name} – {patient.nachname}, {patient.vorname}",
+                                           ausrichtung=vorlage.ausrichtung)
         protokolliere(SystemEreignis.Art.EXPORT, request, objekt=akte_text(patient), was=name, patient_id=patient.id)
         antwort = pdf_antwort(pdf, f"{_dateiname(name)}-{patient.nummer}.pdf")
         antwort["X-EPM-Vorlage-Version"] = str(version or "")

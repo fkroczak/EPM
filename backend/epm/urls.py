@@ -100,6 +100,7 @@ urlpatterns = [
     path("api/vorlagen/<str:art>/startvorlage/", vorlagen.StartvorlageView.as_view()),
     path("api/vorlagen/<str:art>/versionen/<int:version>/wiederherstellen/", vorlagen.WiederherstellenView.as_view()),
     path("api/vorlagen/<str:art>/duplizieren/", vorlagen.DuplizierenView.as_view()),
+    path("api/vorlagen/<str:art>/firma/", vorlagen.FirmaVorlageView.as_view()),
     path("api/vorlagen/<str:art>/vorschau/", vorlagen.VorschauView.as_view()),
     # Administration › System (nur Admin)
     path("api/system/uebersicht/", system.UebersichtView.as_view()),
@@ -138,6 +139,9 @@ urlpatterns = [
     path("api/system/zugang/netze/entfernen/", verwaltung.NetzEntfernenView.as_view()),
     path("api/system/zugang/filter/", verwaltung.HttpsFilterView.as_view()),
     path("api/system/zugang/entsperren/", verwaltung.EntsperrenView.as_view()),
+    # Selbstheilung (13.10.2026)
+    path("api/system/heilung/bestaetigen/", verwaltung.HeilungBestaetigenView.as_view()),
+    path("api/system/heilung/schalten/", verwaltung.HeilungSchaltenView.as_view()),
     # Administration › Import: Übernahme der Altdaten (nur Admin)
     path("api/altimport/", altimport.StandView.as_view()),
     path("api/altimport/dump/", altimport.DumpView.as_view()),

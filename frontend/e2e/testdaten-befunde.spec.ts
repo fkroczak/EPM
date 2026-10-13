@@ -43,6 +43,21 @@ test("Musterdaten: Diagnosen mit ICD-Code, auch beendete", async ({ page }) => {
   await expect(verdacht).toContainText("V – Verdacht auf");
   await expect(zeilen.filter({ hasText: "Mesenterialinfarkt" })).toContainText("K55.0Z");
 
+  // „Neue Diagnose“ zeigt leere Felder, auch nachdem zuvor eine andere Diagnose zum Bearbeiten offen war (Fehler 13.10.2026)
+  await zeilen.first().getByRole("button", { name: /bearbeiten$/ }).click();
+  await expect(page.getByLabel("ICD-Code")).toHaveValue("K91.2");
+  await page.getByRole("button", { name: "Abbrechen" }).click();
+  await liste.getByRole("button", { name: "Neue Diagnose" }).click();
+  await expect(page.getByLabel("ICD-Code")).toHaveValue("");
+  await expect(page.getByPlaceholder("z. B. Kurzdarmsyndrom")).toHaveValue("");
+  await page.getByRole("button", { name: "Abbrechen" }).click();
+  // „Historie“ öffnet den Verlauf der Akte, auf Diagnosen gefiltert (Kundenfrage 13.10.2026: Korrekturen nachvollziehen)
+  await zeilen.first().getByRole("link", { name: /Historie$/ }).click();
+  await expect(page).toHaveURL(/\/verlauf\?bereich=diagnosen/);
+  await expect(page.getByTestId("verlauf-bereich")).toHaveValue("diagnosen");
+  await expect(page.getByTestId("verlauf").getByRole("row").filter({ hasText: "Diagnose (ICD)" }).first()).toBeVisible();
+  await oeffnen(page, erika.id, "/diagnosen");
+
   // Mustermann: vier zutreffende, eine beendete (Infektion durch Katheter) unter „beendete anzeigen“
   const max = await testpatient("Mustermann", "Max");
   await oeffnen(page, max.id, "/diagnosen");

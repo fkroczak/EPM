@@ -19,7 +19,7 @@ import { Icon } from "@/components/ui/icon";
 import { Begriff } from "@/components/ui/Begriff";
 import { ZweiFaktorFehlt } from "@/components/ZweiFaktorFehlt";
 import { useZweiterFaktor } from "@/components/ZweiterFaktor";
-import type { Auftrag, Uebersicht, VerwaltungAktion } from "./System";
+import type { Auftrag, HeilungAktion, Uebersicht, VerwaltungAktion } from "./System";
 
 const warten = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -146,6 +146,77 @@ export function DiensteKarte({ daten, offen }: { daten: Uebersicht; offen: Set<s
   );
 }
 
+
+// ---------------------------------------------------------------- Selbstheilung (13.10.2026)
+const HEILUNG_ART: Record<HeilungAktion["art"], string> = { start: "gestartet", neustart: "neu gestartet", rueckfall: "zurückgeschaltet", aufraeumen: "aufgeräumt" };
+
+/** Nur lesen, zwei Eingriffe: die laufende Version als gute bestätigen, den Wächter für Wartung von Hand abschalten. */
+export function HeilungKarte({ daten, offen }: { daten: Uebersicht; offen: Set<string> }) {
+  const h = daten.host && daten.host.aktuell ? daten.host : null;
+  const s = h?.heilung;
+  const [bestaetigen, setBestaetigen] = useState(false);
+  const [schalten, setSchalten] = useState<boolean | null>(null);
+  const laufend = s?.laufend || daten.epm.version;
+  const an = s?.an ?? true;
+  return (
+    <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="heilung-karte">
+      <KartenKopf titel="Selbstheilung" unter="Der Server startet ausgefallene Dienste von selbst wieder und fällt auf die gute Version zurück, wenn eine neue nicht startet."
+        rechts={s ? <Chip art={!an ? "warn" : s.aktiv ? "ok" : undefined}>{!an ? "ausgeschaltet" : s.aktiv ? "wacht" : "wartet"}</Chip> : null} />
+      {!s ? <span className="text-sm gedaempft">Der Stand kommt vom Systemagenten (ab Agent-Version 9).</span> : (
+        <>
+          {!an ? <Meldung art="warn">Die Selbstheilung ist ausgeschaltet (Wartung von Hand). Bis zum Einschalten startet der Server keine Dienste von selbst neu.</Meldung>
+            : s.grund ? <span className="text-sm gedaempft">Gerade nicht aktiv: {s.grund}.</span> : null}
+          {s.rueckfall ? (
+            <Meldung art={s.rueckfall.ok && s.rueckfall.nach ? "warn" : "fehler"}>
+              {s.rueckfall.ok && s.rueckfall.nach ? <>Zurückgeschaltet auf <span className="num">{s.rueckfall.nach}</span>, weil <span className="num">{s.rueckfall.von}</span> nicht startete</>
+                : <>Version <span className="num">{s.rueckfall.von}</span> startet nicht{s.rueckfall.nach ? <>; Zurückschalten auf <span className="num">{s.rueckfall.nach}</span> fehlgeschlagen</> : " – keine andere Version vorhanden"}</>}
+              {" "}({relativ(s.rueckfall.zeit, true)}, {s.rueckfall.quelle === "epm-update" ? "beim Update" : "durch den Wächter"}). {s.rueckfall.grund}.
+              Datenbank-Migrationen wurden nicht zurückgedreht – Protokolle prüfen, notfalls die Sicherung von vor dem Update wiederherstellen.
+            </Meldung>
+          ) : null}
+          {s.platte ? <Meldung art="warn">Platte {s.platte.bezeichnung} ({s.platte.pfad}) fast voll: {dateigroesse(s.platte.frei)} frei von {dateigroesse(s.platte.gesamt)}.
+            Unter „Speicher aufräumen“ alte Versionen und das Journal entfernen.</Meldung> : null}
+          <dl className="m-0">
+            <Zeile label="Laufende Version"><span className="num">{laufend}</span>{s.gut_ist_laufend ? <Chip art="ok" className="ml-2">gute Version</Chip> : null}</Zeile>
+            <Zeile label="Gute Version">{s.gut ? <><span className="num">{s.gut}</span>{s.gut_vorhanden === false ? <Chip art="warn" className="ml-2">Images fehlen</Chip> : null}</>
+              : <span className="gedaempft">noch keine – nach dem nächsten Update oder unten bestätigen</span>}</Zeile>
+            <Zeile label="Regeln">Fehlender Container → starten · 3× in Folge ungesund → neu starten (höchstens einmal je 5 Minuten) · Backend nach 3 Neustarts in 30 Minuten
+              weiter ungesund → zurück auf die gute Version · Platte unter 1 GB oder 5 % → Hinweis, hängende Images entfernen</Zeile>
+            {s.zaehler && Object.keys(s.zaehler).length ? <Zeile label="Ungesund seit">{Object.entries(s.zaehler).map(([d, n]) => `${d}: ${n} Messungen`).join(" · ")}</Zeile> : null}
+          </dl>
+          {s.aktionen?.length ? (
+            <div className="flex flex-col gap-1" data-testid="heilung-aktionen">
+              <span className="text-sm font-semibold">Letzte Eingriffe</span>
+              {s.aktionen.slice(0, 6).map((a) => (
+                <div key={a.id} className="flex items-start gap-2 text-[0.8125rem] flex-wrap">
+                  <span className="gedaempft num whitespace-nowrap">{zeitpunkt(a.zeit)}</span>
+                  <Chip art={a.ok ? "ok" : "fehler"}>{a.dienst} {HEILUNG_ART[a.art] ?? a.art}{a.probelauf ? " (Probelauf)" : ""}</Chip>
+                  <span className="min-w-0">{a.text}</span>
+                </div>
+              ))}
+              <span className="text-xs gedaempft">Vollständig im Audit-Log (Gruppe „System“, Benutzer „systemagent“).</span>
+            </div>
+          ) : <span className="text-xs gedaempft">Bisher keine Eingriffe.</span>}
+        </>
+      )}
+      <div className="flex gap-2 flex-wrap">
+        <Knopf disabled={!daten.agent.verzeichnis || !s || !!s.gut_ist_laufend || offen.has("server:version_bestaetigen")} laedt={offen.has("server:version_bestaetigen")}
+          onClick={() => setBestaetigen(true)}>Als gute Version bestätigen</Knopf>
+        <Knopf variante={an ? "dng" : "pri"} disabled={!daten.agent.verzeichnis || !s || offen.has("server:heilung_schalten")} laedt={offen.has("server:heilung_schalten")}
+          onClick={() => setSchalten(!an)}>{an ? "Selbstheilung ausschalten" : "Selbstheilung einschalten"}</Knopf>
+      </div>
+      <AuftragDialog offen={bestaetigen} titel={`Version ${laufend} als gute Version bestätigen`} aktion={daten.verwaltung?.version_bestaetigen}
+        pfad="system/heilung/bestaetigen/" daten={daten} knopf="Bestätigen" onZu={() => setBestaetigen(false)}>
+        <Meldung art="info">Auf <span className="num">{laufend}</span> fällt die Selbstheilung zurück, wenn eine neuere Version nicht startet{s?.gut ? <>; bisher <span className="num">{s.gut}</span></> : null}.
+          Sinnvoll, wenn die Version einige Tage ohne Probleme gelaufen ist.</Meldung>
+      </AuftragDialog>
+      <AuftragDialog offen={schalten !== null} titel={schalten ? "Selbstheilung einschalten" : "Selbstheilung ausschalten"} aktion={daten.verwaltung?.heilung_schalten}
+        pfad="system/heilung/schalten/" body={{ an: !!schalten }} daten={daten} knopf={schalten ? "Einschalten" : "Ausschalten"} onZu={() => setSchalten(null)}>
+        {schalten === false ? <Meldung art="warn">Nur für Wartung von Hand (z. B. Container bewusst anhalten). Der Server startet dann nichts von selbst neu – bitte danach wieder einschalten.</Meldung> : null}
+      </AuftragDialog>
+    </Karte>
+  );
+}
 
 // ---------------------------------------------------------------- Aufräumen: Journal, alte Versionen (Nachtrag 10.10.2026)
 const JOURNAL_WAHL: { wert: string; text: string }[] = [
@@ -525,13 +596,14 @@ export function SoftwareBereich({ daten, offen, onAktualisieren }: { daten: Uebe
               <tr key={x.tag} data-testid={`version-${x.tag}`}>
                 <td className="td num text-[0.8125rem]">{x.tag}</td>
                 <td className="td text-[0.8125rem] gedaempft">{x.erstellt.slice(0, 16)}</td>
-                <td className="td text-right">{x.aktiv ? <Chip art="ok">läuft</Chip> : !x.vollstaendig ? <Chip>unvollständig</Chip>
+                <td className="td text-right">{x.tag === h?.heilung?.gut ? <Chip className="mr-1.5" title="gute Version: Rückfall der Selbstheilung">gut</Chip> : null}
+                  {x.aktiv ? <Chip art="ok">läuft</Chip> : !x.vollstaendig ? <Chip>unvollständig</Chip>
                   : <Knopf klein disabled={offen.has("server:epm_zurueck")} onClick={() => setZurueck(x.tag)} aria-label={`Auf ${x.tag} zurückschalten`}>Zurückschalten</Knopf>}</td>
               </tr>))}</tbody>
           </table>
         )}
-        <span className="text-xs gedaempft">Der Server behält die Images der letzten Versionen. Zurückschalten dreht Datenbank-Migrationen nicht zurück –
-          deshalb sichert der Server vorher.</span>
+        <span className="text-xs gedaempft">Der Server behält die Images der letzten Versionen und immer die gute Version („gut“, Rückfall der Selbstheilung).
+          Zurückschalten dreht Datenbank-Migrationen nicht zurück – deshalb sichert der Server vorher.</span>
       </Karte>
 
       <div className="flex flex-col gap-4">

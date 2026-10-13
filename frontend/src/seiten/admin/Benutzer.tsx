@@ -317,6 +317,14 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
     ohnelogin: ["Auf „ohne Login“ setzen", "Die Person kann sich nicht mehr anmelden und hat keine Rechte mehr (Rolle „Keine Berechtigung“). Passwort, Authenticator, Passkeys und Notfall-Codes werden gelöscht, alle Sitzungen beendet. Ihre Einträge bleiben ihr zugeordnet. Mit „Login geben“ lässt sie sich später wieder einbinden."],
   } as const;
   const historisch = !!benutzer?.nur_historisch;
+  // kontoweite Aktionen (sperren, Einmal-Passwort, 2FA, aus-/einblenden, Kontodaten) nur, wenn die Admin-Person in jeder
+  // Firma mit Rolle der Person Admin ist (Festlegung 11.10.2026); die Rollen je Firma bleiben davon unberührt
+  const verwaltbar = neu || benutzer?.verwaltbar !== false;
+  const fremdeFirmen = verwaltbar || !benutzer ? [] : alleFirmen
+    .filter((x) => !adminIn.has(x.kuerzel) && (x.kuerzel === "dskm" ? benutzer.rolle : benutzer.firmenrollen?.[x.kuerzel] ?? "keine") !== "keine")
+    .map((x) => x.name);
+  const nurVerwaltbar = verwaltbar ? undefined
+    : `Dieses Konto hat auch eine Rolle bei ${fremdeFirmen.join(", ") || "einer anderen Firma"}. Das darf nur, wer dort ebenfalls Admin ist.`;
   const ohneLogin = neu ? f.ohne_login : historisch;
   const testMoeglich = !ohneLogin && TESTBENUTZER_ROLLEN.includes(f.rolle) && benutzer?.id !== ich.id;
   return (
@@ -330,11 +338,12 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
         <Meldung><span data-testid="ohne-login-hinweis">Ohne Login: nur als Name, damit Einträge dieser Person zugeordnet bleiben (z. B. aus dem Altsystem
           übernommen oder frühere Mitarbeiter). Kann sich nicht anmelden und hat keine Rechte. Mit „Login geben“ wird daraus wieder ein Konto zum Arbeiten.</span></Meldung>
       ) : null}
+      {!verwaltbar ? <Meldung><span data-testid="nur-rolle-hinweis">{nurVerwaltbar} Hier lässt sich nur die Rolle in der eigenen Firma ändern.</span></Meldung> : null}
       {kennwort ? <Kennwortanzeige id={kennwort.id} kennwort={kennwort.kennwort} gueltig={kennwort.gueltig} name={name} benutzername={benutzer?.username ?? ""} /> : null}
       {benutzer?.ausgeblendet_am ? (
         <Meldung><span className="flex items-center justify-between gap-3 flex-wrap" data-testid="ausgeblendet-hinweis">
           <span>Ausgeblendet am {zeitpunkt(benutzer.ausgeblendet_am)}: gesperrt und in keiner Liste sichtbar.</span>
-          <Knopf klein laedt={aktion.isPending && aktion.variables === "einblenden"} onClick={() => aktion.mutate("einblenden")}>Einblenden</Knopf></span></Meldung>
+          <Knopf klein disabled={!verwaltbar} title={nurVerwaltbar} laedt={aktion.isPending && aktion.variables === "einblenden"} onClick={() => aktion.mutate("einblenden")}>Einblenden</Knopf></span></Meldung>
       ) : null}
       {benutzer?.ist_test && !benutzer.ausgeblendet_am ? (
         <div className="meldung warn flex flex-col gap-2 text-[0.8125rem]">
@@ -342,7 +351,7 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
             Hinweis „Testzugang“. Für Schulungen und zum Durchklicken nach jedem Update.</span>
           <div className="flex gap-2 flex-wrap">
             {darf("testdaten_zuruecksetzen") ? <Knopf klein onClick={() => setFrage("testdaten")}>Testdaten auf Ausgangsstand zurücksetzen</Knopf> : null}
-            {benutzer.id !== ich.id ? <Knopf klein onClick={() => setFrage("ausblenden")}>Testbenutzer ausblenden</Knopf> : null}
+            {benutzer.id !== ich.id ? <Knopf klein disabled={!verwaltbar} title={nurVerwaltbar} onClick={() => setFrage("ausblenden")}>Testbenutzer ausblenden</Knopf> : null}
           </div>
         </div>
       ) : null}
@@ -402,13 +411,15 @@ function Detail({ benutzer, neu, onGewaehlt, kennwortAnzeige, setKennwortAnzeige
         ) : null}
         <div className="col-span-full flex gap-2 flex-wrap items-center">
           {!neu && benutzer && !benutzer.nur_historisch && !benutzer.ausgeblendet_am ? <>
-            <Knopf onClick={() => setFrage("kennwort")}>Einmal-Passwort erzeugen</Knopf>
-            <Knopf onClick={() => setFrage("2fa")} disabled={!benutzer.zweiter_faktor}>2FA zurücksetzen</Knopf>
+            <Knopf disabled={!verwaltbar} title={nurVerwaltbar} onClick={() => setFrage("kennwort")}>Einmal-Passwort erzeugen</Knopf>
+            <Knopf onClick={() => setFrage("2fa")} disabled={!benutzer.zweiter_faktor || !verwaltbar} title={nurVerwaltbar}>2FA zurücksetzen</Knopf>
             {benutzer.gesperrt_am || !benutzer.is_active
-              ? <Knopf icon="schloss" laedt={aktion.isPending && aktion.variables === "entsperren"} onClick={() => aktion.mutate("entsperren")}>Entsperren</Knopf>
-              : <Knopf icon="schloss" disabled={benutzer.id === ich.id} title={benutzer.id === ich.id ? "Das eigene Konto kann nicht gesperrt werden." : undefined}
+              ? <Knopf icon="schloss" disabled={!verwaltbar} title={nurVerwaltbar} laedt={aktion.isPending && aktion.variables === "entsperren"} onClick={() => aktion.mutate("entsperren")}>Entsperren</Knopf>
+              : <Knopf icon="schloss" disabled={benutzer.id === ich.id || !verwaltbar}
+                  title={benutzer.id === ich.id ? "Das eigene Konto kann nicht gesperrt werden." : nurVerwaltbar}
                   onClick={() => setFrage("sperren")}>Sperren</Knopf>}
-            <Knopf disabled={benutzer.id === ich.id} title={benutzer.id === ich.id ? "Das eigene Konto kann nicht auf „ohne Login“ gesetzt werden." : undefined}
+            <Knopf disabled={benutzer.id === ich.id || !verwaltbar}
+              title={benutzer.id === ich.id ? "Das eigene Konto kann nicht auf „ohne Login“ gesetzt werden." : nurVerwaltbar}
               onClick={() => setFrage("ohnelogin")}>Auf „ohne Login“ setzen</Knopf>
           </> : null}
           {!neu && historisch ? <Knopf icon="schloss" onClick={() => setLoginRolle("mitarbeiter")}>Login geben</Knopf> : null}
@@ -462,11 +473,12 @@ export function Benutzer() {
   const ich = useIch();
   const sichtbareTester = benutzer.filter((b) => b.ist_test && !b.ausgeblendet_am && b.id !== ich.id);
   const ausblenden = useMutation({
-    mutationFn: () => api<{ ausgeblendet: number }>("benutzer/testbenutzer-ausblenden/", { method: "POST" }),
+    mutationFn: () => api<{ ausgeblendet: number; uebersprungen?: number }>("benutzer/testbenutzer-ausblenden/", { method: "POST" }),
     onSuccess: (r) => {
       void qc.invalidateQueries({ queryKey: ["benutzer"] });
       setAlleAusblenden(false);
-      melden(`${r.ausgeblendet} Testbenutzer ausgeblendet.`);
+      // Testbenutzer mit Rolle in einer Firma, in der man kein Admin ist, bleiben stehen
+      melden(`${r.ausgeblendet} Testbenutzer ausgeblendet.${r.uebersprungen ? ` ${r.uebersprungen} übersprungen (Rolle in einer anderen Firma).` : ""}`);
     },
   });
   const { hash } = useLocation();

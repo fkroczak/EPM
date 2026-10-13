@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "epm",  # Fehlertexte der API (epm/fehlertexte.py)
     "rest_framework",
     "django_filters",
     "django_otp",

@@ -129,11 +129,15 @@ Pause meldet EPM von selbst ab.</p>""",
     {
         "id": "notfallcodes", "gruppe": "erste_schritte", "titel": "Notfall-Codes", "rechte": [], "seiten": [],
         "html": """
-<p>Notfall-Codes ersetzen den Code aus der Authenticator-App, wenn das Telefon nicht zur Hand ist. Jeder Code gilt
-<strong>genau einmal</strong>. Bitte ausdrucken und sicher aufbewahren, nicht auf dem Telefon speichern.</p>
-<p>Sind nur noch wenige Codes übrig, erscheint auf der Startseite ein Hinweis. Neue Codes gibt es unter
-<strong>Mein Konto › Anmeldung und Sicherheit</strong>; die alten werden dabei ungültig.</p>
-<p>Telefon verloren und keine Codes mehr? Dann setzt die Administration den zweiten Faktor zurück und gibt ein neues
+<p>Notfall-Codes ersetzen den Code aus der Authenticator-App. Sie helfen, wenn das Telefon nicht zur Hand ist. Jeder
+Code gilt <strong>genau einmal</strong>.</p>
+<ul>
+<li><strong>Ausdrucken</strong> und sicher aufbewahren – nicht auf dem Telefon speichern.</li>
+<li>Sind nur noch wenige Codes übrig, zeigt die Startseite einen Hinweis.</li>
+<li><strong>Neue Codes</strong> gibt es unter <strong>Mein Konto › Anmeldung und Sicherheit</strong>. Die alten werden
+dabei ungültig.</li>
+</ul>
+<p>Telefon verloren und keine Codes mehr? Dann setzt die Administration den zweiten Faktor zurück. Sie gibt ein neues
 Zugangsblatt aus.</p>""",
     },
     {
@@ -652,24 +656,29 @@ erstellt. Ob die Frage erscheint, stellt ein, wer Vorlagen pflegt (Vorlagen › 
         "id": "kalender", "gruppe": "kontakte", "titel": "Kalender", "rechte": ["akten_lesen"], "seiten": ["/kalender"],
         "html": """
 <p>Der Kalender zeigt alle Termine aller Patienten als <strong>Monat</strong>, <strong>Woche</strong> oder
-<strong>Liste</strong>, dazu Feiertage (bundesweit und NRW) und berechnete Fälligkeiten:</p>
+<strong>Liste</strong>. Dazu kommen Feiertage (bundesweit und NRW) und berechnete Fälligkeiten:</p>
 <ul>
-<li><strong>Kontakt bald fällig</strong> und <strong>Kontakt überfällig</strong> – je Akte am Tag, an dem die Stufe
-erreicht wird (Grenzwerte unter Vorlagen › Grenzwerte).</li>
+<li><strong>Kontakt bald fällig</strong> und <strong>Kontakt überfällig</strong> – je Akte, sobald die Stufe erreicht
+ist. Die Grenzwerte stehen unter Vorlagen › Grenzwerte.</li>
 <li><strong>Plan prüfen</strong>, wenn der aktuelle Infusionsplan älter wird als eingestellt.</li>
 </ul>
 """ + _bild(
             "kalender.png", "Kalender im Oktober als Monatsansicht mit farbigen Terminen; rechts die Reiter Tag, Überfällig "
             "und Fällig mit den Terminen des gewählten Tages und der nächsten 7 Tage.",
             "Kalender: links der Monat, rechts der gewählte Tag und die nächsten 7 Tage.", 1100, 598) + """
-<p>Ein Klick auf einen offenen Termin öffnet <strong>Termin bearbeiten</strong> (mit Erledigt und Akte öffnen);
-Fälligkeiten und Erledigtes öffnen eine Ansicht. Das <strong>×</strong> an einem Eintrag blendet ihn aus – wie die
-Hinweise in der Akte für 3, 6 oder 12 Monate oder als „nicht mehr nötig“, mit Grund.</p>
-<p><strong>Anzeigen ▾</strong> wählt die Arten (Praxistermine, Rückrufe, Wiedervorlagen, Sonstiges, Kontakt fällig,
-Plan prüfen) und ob Erledigte erscheinen – mit der Legende der Farben. Rechts (Tablet: darunter) stehen drei Reiter:
-<strong>Tag</strong> (gewählter Tag und die nächsten 7 Tage, „+ Termin am …“), <strong>Überfällig</strong> (offene
-Termine, Kontakt überfällig, Plan prüfen) und <strong>Fällig</strong> (Kontakt bald fällig). Am Telefon zeigt ein
-Wochenband die Tage; darunter Tag, Überfällig und Woche.</p>""",
+<p><strong>Termin öffnen:</strong> Ein Klick auf einen offenen Termin öffnet <strong>Termin bearbeiten</strong> – mit
+„Erledigt“ und „Akte öffnen“. Fälligkeiten und Erledigtes öffnen eine Ansicht.</p>
+<p><strong>Eintrag ausblenden:</strong> Das <strong>×</strong> an einem Eintrag blendet ihn aus – wie die Hinweise in
+der Akte: für 3, 6 oder 12 Monate oder als „nicht mehr nötig“, jeweils mit Grund.</p>
+<p><strong>Anzeigen ▾</strong> wählt die Arten: Praxistermine, Rückrufe, Wiedervorlagen, Sonstiges, Kontakt fällig und
+Plan prüfen. Dort steht auch, ob Erledigte erscheinen, und die Legende der Farben.</p>
+<p>Rechts (Tablet: darunter) stehen drei Reiter:</p>
+<ul>
+<li><strong>Tag</strong> – der gewählte Tag und die nächsten 7 Tage, mit „+ Termin am …“.</li>
+<li><strong>Überfällig</strong> – offene Termine, Kontakt überfällig und Plan prüfen.</li>
+<li><strong>Fällig</strong> – Kontakt bald fällig.</li>
+</ul>
+<p>Am Telefon zeigt ein Wochenband die Tage. Darunter stehen Tag, Überfällig und Woche.</p>""",
     },
     {
         "id": "infoblatt", "gruppe": "kontakte", "titel": "Infoblatt an die Praxis (alle Termine bei Dr. Holtmeier)",
@@ -1125,35 +1134,59 @@ bestehendes Schreiben als Grundlage. Beide erscheinen in der Akte unter „Schre
 <p>Die Vordrucke zum Datenschutz (Datenschutzinformation, Einwilligung, Schweigepflichtentbindung) kommen als ungeprüfte
 Entwürfe mit Lücken in [eckigen Klammern]; ihre PDFs tragen das Wasserzeichen „ENTWURF“, bis eine eigene Fassung
 freigegeben ist. Mit <strong>Entwurfsmodus ausschalten</strong> lässt sich das Wasserzeichen (und der Hinweisblock für
-die Bearbeiter) auch ohne Bearbeiten abschalten – die Lücken bleiben dann stehen; jederzeit wieder einschaltbar.</p>""",
+die Bearbeiter) auch ohne Bearbeiten abschalten – die Lücken bleiben dann stehen; jederzeit wieder einschaltbar.</p>
+<p><strong>Vorlagen je Firma:</strong> Alle Vorlagen sind zunächst <em>gemeinsam</em> – was Sie freigeben, gilt bei der
+DSKM und bei der Regeneration Clinic (Logo und Briefkopf kommen ohnehin je Firma). Soll eine Firma einen anderen
+Text bekommen, wechseln Sie oben links in diese Firma und wählen im Editor <strong>Eigene Vorlage für … anlegen</strong>:
+Die Kopie der gemeinsamen Fassung ist sofort in Gebrauch, und Entwurf, Vorschau, Freigeben und Fassungen gelten ab
+dann nur noch für diese Firma; die andere Firma nutzt weiter die gemeinsame Vorlage. Die Liste und der Kopf des
+Editors zeigen, ob Sie gerade die gemeinsame oder die eigene Vorlage bearbeiten. <strong>Eigene Vorlage
+entfernen</strong> legt sie wieder ab (die Fassungen bleiben als abgelöst erhalten). Eigene Schreiben gehören
+entweder allen Firmen oder fest einer Firma.</p>
+<p><strong>Querformat:</strong> Bei Vorlagen mit breiten Tabellen (z. B. Medikationsplan) wählen Sie über der Seite
+<em>Hochformat</em> oder <em>Querformat</em>; das Seitenformat wird mit der Fassung gespeichert. Der Medikationsplan
+kommt im Querformat, damit Hinweise und Grund Platz haben; Falzmarken gibt es nur im Hochformat.</p>
+<p><strong>Vorlagen der Regeneration Clinic:</strong> In der Firma RGC stehen zusätzlich ihre Word-Vorlagen als eigene
+Schreiben bereit – nur dort, die DSKM sieht sie nicht. Unter „Anforderungen“ stehen Labor, Bildgebung und
+Funktionsdiagnostik. Unter „Aufklärungen, Erklärungen und Abrechnung“ stehen die Patientenerklärungen, die
+Schweigepflichtentbindung, die Aufklärungen zu Operation und Anästhesie, die ÖGK-Formulare, Anlage K und die
+Anwaltsvollmacht. EPM setzt Name, Geburtsdatum, Anschrift, Versicherung und Versichertennummer ein. Alles andere wird
+auf dem Ausdruck von Hand ausgefüllt. Gedruckt werden sie in der Akte über Weitere Aktionen (⋯) › „Schreiben und
+E-Mail …“.</p>""",
     },
     {
         "id": "benutzer", "gruppe": "administration", "titel": "Benutzer und Rechte", "rechte": ["benutzer_verwalten"],
         "seiten": ["/admin/benutzer"],
         "html": """
-<p><strong>Benutzer anlegen</strong> erzeugt ein Einmal-Passwort; das <strong>Zugangsblatt</strong> lässt sich nur
-drucken, solange das Passwort angezeigt wird. Benutzer werden nie gelöscht, nur gesperrt. Weitere Aktionen: entsperren,
-neues Einmal-Passwort (Passwort vergessen), zweiten Faktor zurücksetzen (Telefon verloren).</p>
-<p><strong>Ohne Login</strong>: Konten, die nur als Name für Einträge dienen (z. B. frühere Mitarbeiter oder aus dem
-Altsystem übernommen), können sich nicht anmelden und haben die Rolle <strong>Keine Berechtigung</strong> – also keine
-Rechte. Ein Konto lässt sich auf „ohne Login“ setzen (Passwort und zweiter Faktor werden gelöscht, Einträge bleiben
-zugeordnet) und mit <strong>Login geben</strong> wieder einbinden, z. B. als Mitarbeiter; dabei entsteht ein neues
-Einmal-Passwort.</p>
-<p><strong>Testbenutzer</strong> (Schalter im Konto, für Betrachter, Mitarbeiter, Mitarbeiter (erweitert) und Mediziner) sehen und bearbeiten
-ausschließlich Testpatienten. Nicht mehr gebrauchte Testbenutzer lassen sich <strong>ausblenden</strong> (einzeln oder
-„Alle Testbenutzer ausblenden“): gesperrt und in keiner Liste mehr, aber nicht gelöscht; „Ausgeblendete zeigen“ und
-„Einblenden“ holen sie zurück. Mit dem Recht <strong>Testdaten sehen</strong> legt man je Gruppe fest, wer
-Testpatienten und Testbenutzer überhaupt sieht.</p>
-<p><strong>Rolle je Firma:</strong> Jede Person hat eine Rolle bei der DSKM und eine bei der Regeneration Clinic
+<p><strong>Benutzer anlegen</strong> erzeugt ein Einmal-Passwort. Das <strong>Zugangsblatt</strong> lässt sich nur
+drucken, solange das Passwort angezeigt wird. Benutzer werden nie gelöscht, nur gesperrt. Weitere Aktionen:</p>
+<ul>
+<li><strong>Entsperren</strong>.</li>
+<li><strong>Neues Einmal-Passwort</strong> – wenn das Passwort vergessen wurde.</li>
+<li><strong>Zweiten Faktor zurücksetzen</strong> – wenn das Telefon verloren ist.</li>
+</ul>
+<p><strong>Ohne Login:</strong> Manche Konten dienen nur als Name für Einträge. Beispiele: frühere Mitarbeiter oder
+Personen aus dem Altsystem. Sie können sich nicht anmelden und haben die Rolle <strong>Keine Berechtigung</strong> –
+also keine Rechte. Ein Konto lässt sich auf „ohne Login“ setzen: Passwort und zweiter Faktor werden gelöscht, die
+Einträge bleiben zugeordnet. <strong>Login geben</strong> bindet es wieder ein, z. B. als Mitarbeiter. Dabei entsteht
+ein neues Einmal-Passwort.</p>
+<p><strong>Testbenutzer</strong> sehen und bearbeiten ausschließlich Testpatienten. Der Schalter steht im Konto – für
+Betrachter, Mitarbeiter, Mitarbeiter (erweitert) und Mediziner. Nicht mehr gebrauchte Testbenutzer lassen sich
+<strong>ausblenden</strong>, einzeln oder mit „Alle Testbenutzer ausblenden“. Sie sind dann gesperrt und in keiner
+Liste mehr, aber nicht gelöscht. „Ausgeblendete zeigen“ und „Einblenden“ holen sie zurück. Das Recht
+<strong>Testdaten sehen</strong> legt je Gruppe fest, wer Testpatienten und Testbenutzer überhaupt sieht.</p>
+<p><strong>Rolle je Firma:</strong> Jede Person hat zwei Rollen: eine bei der DSKM und eine bei der Regeneration Clinic
 („Rolle DSKM“, „Rolle RGC“). „Keine Berechtigung“ heißt: kein Zugang zu dieser Firma. Wer in beiden Firmen eine Rolle
-hat, schaltet unter dem Logo um; die Rechte richten sich nach der Rolle in der gerade gewählten Firma.
-Die Rolle in einer Firma vergibt und ändert nur, wer dort selbst <strong>Admin</strong> ist; die anderen Felder sind
-gesperrt.</p>
-<p>Unter <strong>Anmeldung</strong> legt die Administration fest, ob die Zwei-Faktor-Anmeldung freiwillig, Pflicht für
-Admins oder Pflicht für alle ist.</p>
-<p>Unter <strong>Rechte</strong> legt man je Gruppe (Betrachter, Mitarbeiter, Mediziner, Admin) fest, was erlaubt ist.
-Änderungen gelten sofort; nicht Erlaubtes wird in der Oberfläche ausgeblendet. Admins schreiben Patientendaten nur bei
-Testpatienten – ausgenommen Akten abschließen, Dokumente einem anderen Patienten zuordnen und endgültig löschen.</p>""",
+hat, schaltet unter dem Logo um. Die Rechte richten sich nach der Rolle in der gerade gewählten Firma. Die Rolle in
+einer Firma vergibt und ändert nur, wer dort selbst <strong>Admin</strong> ist. Die anderen Felder sind gesperrt.
+Sperren, Einmal-Passwort, zweiten Faktor zurücksetzen, Aus- und Einblenden und die Kontodaten ändern darf nur, wer in
+jeder Firma der Person Admin ist. Konten ohne Rolle darf jeder Admin verwalten.</p>
+<p>Unter <strong>Anmeldung</strong> legt die Administration die Zwei-Faktor-Anmeldung fest: freiwillig, Pflicht für
+Admins oder Pflicht für alle.</p>
+<p>Unter <strong>Rechte</strong> legt man je Gruppe fest, was erlaubt ist: Betrachter, Mitarbeiter, Mediziner, Admin.
+Änderungen gelten sofort. Nicht Erlaubtes wird in der Oberfläche ausgeblendet. Admins schreiben Patientendaten nur bei
+Testpatienten. Ausgenommen sind: Akten abschließen, Dokumente einem anderen Patienten zuordnen und endgültig
+löschen.</p>""",
     },
     {
         "id": "audit", "gruppe": "administration", "titel": "Audit-Log", "rechte": ["audit_lesen"],
@@ -1200,9 +1233,18 @@ danach unter <strong>Aufträge</strong> samt Ausgabe.</li>
 <ul>
 <li><strong>Dienste</strong>: einzelne Container (backend, web, ocr, db) neu starten, z. B. wenn die Texterkennung
 hängt.</li>
+<li><strong>Selbstheilung</strong>: Der Server startet ausgefallene Dienste von selbst wieder und startet dreimal in Folge
+ungesunde neu (höchstens einmal in 5 Minuten). Startet eine neue Version nicht – beim Update oder nach drei vergeblichen
+Neustarts des Backends – schaltet er auf die <strong>gute Version</strong> zurück und zeigt oben auf jeder Seite einen
+Hinweis mit den nächsten Schritten. Wird die Platte knapp, meldet er es und entfernt nur hängende Docker-Images. Die Karte
+zeigt die laufende und die gute Version und die letzten Eingriffe (vollständig im Audit-Log unter „systemagent“).
+<strong>Als gute Version bestätigen</strong> trägt die laufende Version als Rückfall ein – sinnvoll nach einigen Tagen
+ohne Probleme; ein Update tut das selbst, wenn Musterdaten und Tests bestanden sind. <strong>Selbstheilung
+ausschalten</strong> nur für Wartung von Hand, danach wieder einschalten. Sehen Sie im Browser „EPM startet gerade neu“,
+läuft gerade ein Neustart, Update oder Rückfall; die Seite lädt sich alle 30 Sekunden neu.</li>
 <li><strong>Speicher aufräumen</strong>: Das Systemprotokoll (Journal) auf eine Größe oder ein Alter verkleinern; dafür
 gibt es eine einfache Rückfrage. Gespeicherte alte Versionen ankreuzen und löschen: Image-Dateien, Update-Pakete,
-Docker-Images. Das braucht Passwort und Code. Die laufende und die vorherige Version bleiben immer.</li>
+Docker-Images. Das braucht Passwort und Code. Die laufende, die vorherige und die gute Version bleiben immer.</li>
 <li><strong>Technische Verwaltung</strong>: Django-Admin und API-Ansicht im Browser für 1 oder 8 Stunden einschalten,
 z. B. zur Fehlersuche. Danach sind sie von selbst wieder aus. „Jetzt ausschalten“ beendet sofort.</li>
 <li><strong>Uhrzeit</strong>: Zeitzone und Zeitsynchronisation (NTP) mit eigenem Zeitserver einstellen, ohne Internet

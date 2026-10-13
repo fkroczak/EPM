@@ -14,7 +14,7 @@ import { useDiagnoseliste } from "@/lib/daten";
 import { datum, eingabeDatum } from "@/lib/format";
 import { DIAGNOSE_KENNZEICHEN } from "@/lib/typen";
 import type { Diagnose } from "@/lib/typen";
-import { Auswahl, Chip, Eingabe, Feld, Karte, Knopf, Laden, Meldung, cx } from "@/components/ui/basis";
+import { Auswahl, Chip, Eingabe, Feld, Karte, Knopf, KnopfLink, Laden, Meldung, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { FirmaMarke } from "@/components/FirmenWahl";
@@ -132,8 +132,10 @@ function Code({ d }: { d: Diagnose }) {
 }
 
 /** Eine Zeile der Diagnoseliste: Code, Bezeichnung, darunter seit/Notiz; rechts die Aktionen */
-function DiagnoseZeile({ d, markiert, bearbeiten, onBearbeiten, onUmschalten, laedt }: {
+function DiagnoseZeile({ d, markiert, bearbeiten, onBearbeiten, onUmschalten, laedt, verlauf }: {
   d: Diagnose; markiert: boolean; bearbeiten: boolean; onBearbeiten: () => void; onUmschalten: () => void; laedt: boolean;
+  /** Adresse des Verlaufs der Akte, auf Diagnosen gefiltert (Kundenfrage 13.10.2026: Korrekturen nachvollziehen) */
+  verlauf: string;
 }) {
   const ref = useRef<HTMLLIElement>(null);
   useEffect(() => { if (markiert) ref.current?.scrollIntoView({ block: "center", behavior: "smooth" }); }, [markiert]);
@@ -149,14 +151,16 @@ function DiagnoseZeile({ d, markiert, bearbeiten, onBearbeiten, onUmschalten, la
         ) : null}
         {d.notiz ? <span className="text-[0.8125rem] text-text2">{d.notiz}</span> : null}
       </div>
-      {bearbeiten ? (
-        <div className="flex items-center gap-1 justify-end">
+      <div className="flex items-center gap-1 justify-end">
+        <KnopfLink klein variante="geist" icon="uhr" to={verlauf} aria-label={`${d.bezeichnung}: Historie`}
+          title="Alle Änderungen dieser Diagnosen im Verlauf der Akte (alter und neuer Wert, wer, wann)">Historie</KnopfLink>
+        {bearbeiten ? <>
           <Knopf klein variante="geist" icon="stift" onClick={onBearbeiten} aria-label={`${d.bezeichnung} bearbeiten`} title="Bearbeiten" />
           {d.aktiv
             ? <Knopf klein variante="geist" onClick={onUmschalten} aria-label={`${d.bezeichnung} beenden`}>Beenden</Knopf>
             : <Knopf klein laedt={laedt} onClick={onUmschalten} aria-label={`${d.bezeichnung} wieder aktuell`}>Wieder aktuell</Knopf>}
-        </div>
-      ) : <span />}
+        </> : null}
+      </div>
     </li>
   );
 }
@@ -171,7 +175,11 @@ export function Diagnosen() {
   const qc = useQueryClient();
   const melden = useHinweis();
   const [wahl] = useWahl("eintrag");
-  const [dialog, setDialog] = useState<{ offen: boolean; diagnose: Diagnose | null }>({ offen: false, diagnose: null });
+  // „nr“ zählt jedes Öffnen: der Dialog wird damit neu aufgebaut und zeigt bei „Neu“ nicht die zuletzt gespeicherten
+  // Werte (Fehler 13.10.2026)
+  const [dialog, setDialog] = useState<{ offen: boolean; diagnose: Diagnose | null; nr: number }>({ offen: false, diagnose: null, nr: 0 });
+  const oeffnen = (diagnose: Diagnose | null) => setDialog((d) => ({ offen: true, diagnose, nr: d.nr + 1 }));
+  const verlauf = `/patienten/${patient.id}/verlauf?bereich=diagnosen`;
   const [beendeteAn, setBeendete] = useState(false);
   const [beenden, setBeenden] = useState<Diagnose | null>(null);
 
@@ -196,7 +204,7 @@ export function Diagnosen() {
   const zeigeBeendete = beendeteAn || beendete.some((d) => String(d.id) === wahl);
   const zeile = (d: Diagnose) => (
     <DiagnoseZeile key={d.id} d={d} markiert={String(d.id) === wahl} bearbeiten={bearbeiten}
-      onBearbeiten={() => setDialog({ offen: true, diagnose: d })} laedt={umschalten.isPending}
+      onBearbeiten={() => oeffnen(d)} laedt={umschalten.isPending} verlauf={verlauf}
       onUmschalten={() => { umschalten.reset(); if (d.aktiv) setBeenden(d); else umschalten.mutate(d); }} />
   );
 
@@ -208,7 +216,7 @@ export function Diagnosen() {
           <h2 className="lbl m-0 text-[0.9375rem] flex items-center gap-2">
             Diagnosen{offene.length ? <Chip>{offene.length}</Chip> : null}
           </h2>
-          {bearbeiten ? <Knopf variante="pri" icon="plus" onClick={() => setDialog({ offen: true, diagnose: null })}>Neue Diagnose</Knopf> : null}
+          {bearbeiten ? <Knopf variante="pri" icon="plus" onClick={() => oeffnen(null)}>Neue Diagnose</Knopf> : null}
         </div>
         {diagnosen.isPending ? <Laden /> : offene.length ? (
           <ul className="m-0 p-0 list-none">{offene.map(zeile)}</ul>
@@ -231,7 +239,7 @@ export function Diagnosen() {
     {bearbeiten ? <Bestaetigen offen={!!beenden} onOffen={(o) => { if (!o) setBeenden(null); }} titel="Diagnose beenden" knopf="Beenden"
       text={<>„{beenden?.bezeichnung}“ trifft nicht mehr zu. Sie bleibt unter „beendete anzeigen“ sichtbar und lässt sich wieder als aktuell eintragen.</>}
       laedt={umschalten.isPending} fehler={umschalten.error} onJa={() => beenden && umschalten.mutate(beenden)} /> : null}
-    {bearbeiten ? <DiagnoseDialog diagnose={dialog.diagnose} offen={dialog.offen}
+    {bearbeiten ? <DiagnoseDialog key={dialog.nr} diagnose={dialog.diagnose} offen={dialog.offen}
       onOffen={(o) => setDialog((d) => ({ ...d, offen: o }))} /> : null}
     </>
   );

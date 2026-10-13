@@ -16,7 +16,7 @@ class PortalTest(Grundlage):
         for art in Dokumentvorlage.Art.values:
             self.assertTrue(liste[art]["wofuer"], art)
             self.assertTrue(liste[art]["wo"], art)
-            self.assertIn(liste[art]["gruppe"], {"schreiben", "plaene", "datenschutz"}, art)
+            self.assertIn(liste[art]["gruppe"], {"schreiben", "plaene", "datenschutz", "rgc"}, art)
         self.assertIn("Schreiben und E-Mail", liste["terminbestaetigung"]["wo"])
         self.assertIn("Kalender", liste["patientenankuendigung"]["wo"])
         self.assertEqual(liste["einwilligung"]["gruppe"], "datenschutz")

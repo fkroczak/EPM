@@ -4,10 +4,10 @@
  */
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, apiDatei } from "@/lib/api";
+import { ApiFehler, api, apiDatei } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { datum, zahl, zeitpunkt } from "@/lib/format";
-import type { Scan, ScanVorschlag, ScanZeile } from "@/lib/typen";
+import type { Scan, ScanVorschlag, ScanZeile, ScansStand } from "@/lib/typen";
 import { Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Segmente, cx } from "@/components/ui/basis";
 import { Dialog, Menue } from "@/components/ui/dialog";
 import type { MenuEintrag } from "@/components/ui/dialog";
@@ -88,9 +88,13 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
   const scan = useQuery({
     queryKey: ["scan", id],
     queryFn: () => api<Scan>(`scans/${id}/`),
-    refetchInterval: (q) => (q.state.data && ["wartet", "laeuft"].includes(q.state.data.status) ? 1500 : false),
+    // nach einem Fehler (Scan zugeordnet, gelöscht, abgelaufen) nicht weiter fragen – sonst alle 1,5 s ein Fehler
+    refetchInterval: (q) => (!q.state.error && q.state.data && ["wartet", "laeuft"].includes(q.state.data.status) ? 1500 : false),
   });
   const s = scan.data;
+  // läuft der OCR-Dienst? Sonst bleibt ein Scan in der Warteschlange – das soll die Seite sagen, statt endlos zu warten
+  const stand = useQuery({ queryKey: ["scans", "stand"], queryFn: () => api<ScansStand>("scans/stand/"), refetchInterval: 60_000 });
+  const dienstAus = stand.data ? stand.data.dienst_laeuft !== true : false;
   const [seiteIndex, setSeiteIndex] = useState(0);
   const [ansicht, setAnsicht] = useState<"seite" | "alle">("alle");
   const [zuordnen, setZuordnen] = useState(false);
@@ -125,6 +129,9 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
   // Liste aktualisieren, sobald die Erkennung fertig ist
   const status = s?.status;
   useEffect(() => { if (status) void qc.invalidateQueries({ queryKey: ["scans"] }); }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Scan nicht mehr da (404): Liste neu laden, damit er verschwindet
+  const weg404 = scan.error instanceof ApiFehler && scan.error.status === 404;
+  useEffect(() => { if (weg404) void qc.invalidateQueries({ queryKey: ["scans", "liste"] }); }, [weg404]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const neu = (daten: Scan) => {
     qc.setQueryData(["scan", id], daten);
@@ -169,7 +176,14 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
   });
 
   if (scan.isLoading) return <Karte className="min-w-0"><Laden /></Karte>;
-  if (!s) return <Karte className="min-w-0 p-4"><Fehleranzeige fehler={scan.error ?? "Nicht gefunden."} /></Karte>;
+  if (!s) {
+    return (
+      <Karte className="min-w-0 p-4 flex flex-col gap-3" data-testid="scan-detail-fehler">
+        <Fehleranzeige fehler={scan.error ?? "Diesen Scan gibt es nicht mehr."} />
+        <div><Knopf onClick={onWeg}>Zur Liste</Knopf></div>
+      </Karte>
+    );
+  }
 
   const seite = s.seiten[Math.min(seiteIndex, Math.max(0, s.seiten.length - 1))];
   const laeuft = s.status === "wartet" || s.status === "laeuft";
@@ -234,6 +248,23 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
           {s.verfahren.every((v) => v === "textebene") ? "Text aus der PDF übernommen" : "Text automatisch erkannt – bitte prüfen"}</span> : null}
       </div>
       {laeuft ? <Fortschritt scan={s} /> : null}
+      {scan.error && !scan.isFetching ? (
+        <div className="px-4 sm:px-5 py-3 border-b border-rand">
+          <Meldung art={weg404 ? "info" : "fehler"}><span className="flex items-center gap-3 flex-wrap" data-testid="scan-stand-fehler">
+            {weg404 ? "Dieser Scan ist nicht mehr da – er wurde zugeordnet, gelöscht oder ist abgelaufen." : `Der Stand ließ sich nicht abrufen: ${scan.error.message}`}
+            {weg404 ? <Knopf klein onClick={onWeg}>Zur Liste</Knopf> : <Knopf klein onClick={() => void scan.refetch()}>Noch einmal</Knopf>}
+          </span></Meldung>
+        </div>
+      ) : null}
+      {laeuft && dienstAus ? (
+        <div className="px-4 sm:px-5 py-3 border-b border-rand">
+          <Meldung art="warn"><span data-testid="dienst-hinweis">
+            {stand.data?.dienst_laeuft === null
+              ? "Die Texterkennung hat sich noch nie gemeldet. Der Scan bleibt in der Warteschlange, bis der Dienst „ocr“ läuft – bitte der Administration Bescheid geben."
+              : "Die Texterkennung meldet sich seit einigen Minuten nicht (Dienst „ocr“ nicht erreichbar oder überlastet). Der Scan bleibt in der Warteschlange und wird erkannt, sobald der Dienst wieder läuft."}
+          </span></Meldung>
+        </div>
+      ) : null}
       {fertig && !zuordnen && !s.quelle && darf("eintraege_erfassen") && s.vorschlaege?.length ? (
         <div className="px-4 sm:px-5 py-3 border-b border-rand">
           <PatientVorschlag vorschlaege={s.vorschlaege} knopf="Übernehmen und zuordnen"
@@ -321,7 +352,7 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
                 ))}
               </div>
             ) : null}
-            {seite.info.foto || seite.info.ecken_quelle ? (
+            {seite.info?.foto || seite.info?.ecken_quelle ? (
               <span className="text-xs gedaempft">
                 {[seite.info.ecken_quelle === "auto" ? "Blatt automatisch gefunden und entzerrt" : seite.info.ecken_quelle === "hand" ? "Ecken von Hand gesetzt" : "",
                   seite.info.geglaettet ? "geglättet" : "", seite.info.drehung ? `um ${seite.info.drehung}° gedreht` : "",
@@ -329,7 +360,7 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
                   seite.info.entrauscht ? "Rauschen entfernt" : ""].filter(Boolean).join(" · ")}
               </span>
             ) : null}
-            {seite.info.sparstufe ? (
+            {seite.info?.sparstufe ? (
               <span className="text-xs text-warn" data-testid="seite-sparsam">
                 <span title={seite.info.sparstufe >= 2 ? "nur mit Tesseract erkannt" : "sparsam erkannt (ohne Glätten, kleinere Zeilensuche)"}>
                   Vereinfacht erkannt</span>
@@ -380,7 +411,12 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
             )}
           </div>
         </div>
-      ) : laeuft ? null : <div className="p-5"><Meldung art="info">Keine Seiten.</Meldung></div>}
+      ) : laeuft ? null : (
+        <div className="p-5"><Meldung art="info"><span className="flex items-center gap-3 flex-wrap">
+          {s.status === "fehler" ? "Die Seiten konnten nicht angelegt werden (Datei nicht lesbar?)." : "Dieser Scan hat keine Seiten."}
+          <Knopf klein onClick={() => aktion.mutate({ pfad: "erneut/" })}>Erneut versuchen</Knopf>
+        </span></Meldung></div>
+      )}
 
       {seite ? <SeiteBearbeiten scan={s} seite={seite} offen={bearbeiten} onOffen={setBearbeiten} /> : null}
       <Dialog offen={!!bereich} onOffen={(o) => { if (!o) setBereich(null); }} titel="Bereich neu erkennen" breite={460}

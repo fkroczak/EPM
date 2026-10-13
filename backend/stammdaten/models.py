@@ -512,8 +512,11 @@ class Einstellungen(models.Model):
                 or any(a not in ERKLAERUNGSARTEN for a in self.pflicht_erklaerungen)
                 or len(set(self.pflicht_erklaerungen)) != len(self.pflicht_erklaerungen)):
             raise ValidationError({"pflicht_erklaerungen": "Unbekannte Erklärung."})
-        if not isinstance(self.vordrucke_ohne_entwurf, list) or any(a not in ERKLAERUNGSARTEN
-                                                                    for a in self.vordrucke_ohne_entwurf):
+        from vorlagen.models import vordruck_schluessel_gueltig
+
+        # alle Vordrucke (auch „firmen“ und die der RGC), bei eigener Vorlage einer Firma „art@firma“ (13.10.2026)
+        if not isinstance(self.vordrucke_ohne_entwurf, list) or not all(vordruck_schluessel_gueltig(a)
+                                                                        for a in self.vordrucke_ohne_entwurf):
             raise ValidationError({"vordrucke_ohne_entwurf": "Unbekannter Vordruck."})
         super().save(*args, **kwargs)
 

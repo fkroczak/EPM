@@ -5,7 +5,7 @@
  * abgelegt, und der Bericht ist danach unveränderlich – eine Korrektur ist ein neuer Bericht.
  */
 import { Begriff } from "@/components/ui/Begriff";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
@@ -98,6 +98,8 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
     setInhalt(bericht?.inhalt ?? "");
     setStand((s) => s + 1);
   }
+  // geschlossen: beim nächsten Öffnen neu vorbelegen (sonst stünde der zuletzt bearbeitete Bericht noch drin)
+  if (!offen && gesetzt) setGesetzt("");
 
   const speichern = useMutation({
     mutationFn: () => {
@@ -116,6 +118,8 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
     },
   });
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
+  const { reset } = speichern;
+  useEffect(() => { if (offen) reset(); }, [offen, reset]);
   const istFall = arten.data?.find((a) => String(a.id) === art)?.wert === "Fallzusammenfassung";
   const gliederung = () => {
     const leer = !inhalt.replace(/<[^>]+>/g, "").trim();

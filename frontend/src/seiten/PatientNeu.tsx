@@ -35,6 +35,26 @@ const LEER: Formular = {
 /** Wert der Auswahl „kein“ (bewusst keiner) bei Versorger und Katheter */
 const KEIN = "kein";
 
+/** Welches Formularfeld zu einem Fehlerschlüssel gehört (sonst gleichnamig) */
+const FELD_ZU_FEHLER: Partial<Record<string, keyof Formular>> = { groesse_cm: "groesse", aufnahme_gewicht_kg: "gewicht", aufnahme_gemessen_am: "gemessen_am" };
+
+/** Prüfung vor dem Absenden – dieselbe läuft bei jeder Eingabe, damit ein behobener Fehler sofort verschwindet */
+function pruefen(f: Formular, firmen: string[], einwilligung: string, mehrereFirmen: boolean): Feldfehler {
+  const fehler: Feldfehler = {};
+  const geb = eingabeDatum(f.geburtsdatum);
+  if (!f.nachname.trim()) fehler.nachname = "Bitte Nachnamen eingeben.";
+  if (!f.vorname.trim()) fehler.vorname = "Bitte Vornamen eingeben.";
+  if (!geb) fehler.geburtsdatum = f.geburtsdatum.trim() ? "Bitte als TT.MM.JJJJ eingeben." : "Bitte Geburtsdatum eingeben.";
+  const groesse = eingabeZahl(f.groesse);
+  if (groesse === "ungueltig") fehler.groesse_cm = "Bitte eine Zahl eingeben, z. B. 168.";
+  const gewicht = eingabeZahl(f.gewicht);
+  if (gewicht === "ungueltig") fehler.aufnahme_gewicht_kg = "Bitte eine Zahl eingeben, z. B. 54,6.";
+  if (gewicht && f.gemessen_am.trim() && !eingabeDatum(f.gemessen_am)) fehler.aufnahme_gemessen_am = "Bitte als TT.MM.JJJJ eingeben.";
+  const zuordnung = mehrereFirmen ? firmenDaten(firmen, einwilligung) : null;
+  if (zuordnung && "fehler" in zuordnung) Object.assign(fehler, zuordnung.fehler);
+  return fehler;
+}
+
 /** Klartext der Diagnose als einfaches HTML für das Rich-Text-Feld der Akte */
 function alsHtml(text: string): string {
   const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -66,6 +86,8 @@ export function PatientNeu() {
   // Arzt/Versorger anlegen, ohne die Seite zu verlassen (Vorschlag „Weniger Wege“, 08.10.2026)
   const [schnell, setSchnell] = useState<"" | "arzt" | "versorger">("");
   const [lokal, setLokal] = useState<Feldfehler>({});
+  // Fehler vom Server gelten, bis das Feld geändert wird (Pflichtfeld-Fehler verschwinden sofort, 13.10.2026)
+  const [server, setServer] = useState<Feldfehler>({});
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { darf, ich } = useAuth();
@@ -77,8 +99,6 @@ export function PatientNeu() {
   // Hick (UX-Prüfung 11.10.2026): seltene Angaben zugeklappt – öffnet sich von selbst, wenn dort ein Fehler steht
   const [mehr, setMehr] = useState(false);
   const formular = useRef<HTMLFormElement>(null);
-  const setze = (feld: keyof Formular) => (e: { target: { value: string } }) => setF((alt) => ({ ...alt, [feld]: e.target.value }));
-
   // Testpatient (Fehlerliste 02.10.2026, 6.4): Mitarbeiter und Mediziner können beim Anlegen einen Testpatienten wählen –
   // z. B. um Infusionspläne auszuprobieren. Testbenutzer und Admins legen immer Testpatienten an (testpatient_fest).
   const [test, setTest] = useState(false);
@@ -105,8 +125,25 @@ export function PatientNeu() {
   });
   const aehnlich = (doppelte.data ?? []).filter((p) => !andere.includes(p.id));
 
+  // Bei jeder Eingabe: behobene Fehler sofort ausblenden, neue erst beim nächsten „Anlegen“ (sonst meckert jedes Feld beim Tippen)
+  useEffect(() => {
+    const neu = pruefen(f, firmen, einwilligung, alleFirmen.length > 1);
+    setLokal((alt) => {
+      const bleibt = Object.fromEntries(Object.keys(alt).filter((k) => k in neu).map((k) => [k, neu[k]]));
+      return Object.keys(bleibt).length === Object.keys(alt).length && Object.keys(bleibt).every((k) => bleibt[k] === alt[k]) ? alt : bleibt;
+    });
+  }, [f, firmen, einwilligung, alleFirmen.length]);
+  const setze = (feld: keyof Formular) => (e: { target: { value: string } }) => {
+    setF((alt) => ({ ...alt, [feld]: e.target.value }));
+    setServer((alt) => {
+      const weg = Object.keys(alt).filter((k) => (FELD_ZU_FEHLER[k] ?? k) === feld);
+      return weg.length ? Object.fromEntries(Object.entries(alt).filter(([k]) => !weg.includes(k))) : alt;
+    });
+  };
+
   const anlegen = useMutation({
     mutationFn: (daten: Record<string, unknown>) => api<Patient>("patienten/", { body: daten }),
+    onError: (fehler) => setServer(fehler instanceof ApiFehler ? fehler.felder : {}),
     onSuccess: (p) => {
       void qc.invalidateQueries({ queryKey: ["patienten"] });
       void qc.invalidateQueries({ queryKey: ["startseite"] });
@@ -116,19 +153,13 @@ export function PatientNeu() {
   });
 
   const absenden = () => {
-    const fehler: Feldfehler = {};
-    if (!f.nachname.trim()) fehler.nachname = "Bitte Nachnamen eingeben.";
-    if (!f.vorname.trim()) fehler.vorname = "Bitte Vornamen eingeben.";
-    if (!geb) fehler.geburtsdatum = f.geburtsdatum.trim() ? "Bitte als TT.MM.JJJJ eingeben." : "Bitte Geburtsdatum eingeben.";
+    const fehler = pruefen(f, firmen, einwilligung, alleFirmen.length > 1);
     const groesse = eingabeZahl(f.groesse);
-    if (groesse === "ungueltig") fehler.groesse_cm = "Bitte eine Zahl eingeben, z. B. 168.";
     const gewicht = eingabeZahl(f.gewicht);
-    if (gewicht === "ungueltig") fehler.aufnahme_gewicht_kg = "Bitte eine Zahl eingeben, z. B. 54,6.";
     const gemessen = f.gemessen_am.trim() ? eingabeDatum(f.gemessen_am) : null;
-    if (gewicht && f.gemessen_am.trim() && !gemessen) fehler.aufnahme_gemessen_am = "Bitte als TT.MM.JJJJ eingeben.";
     const zuordnung = alleFirmen.length > 1 ? firmenDaten(firmen, einwilligung) : null;
-    if (zuordnung && "fehler" in zuordnung) Object.assign(fehler, zuordnung.fehler);
     setLokal(fehler);
+    setServer({});
     if (Object.keys(fehler).length) {
       // das erste fehlende Feld in den Blick holen – im langen Formular steht es sonst womöglich außerhalb des Bildschirms
       window.setTimeout(() => {
@@ -170,9 +201,8 @@ export function PatientNeu() {
     });
   };
 
-  const server: Feldfehler = anlegen.error instanceof ApiFehler ? anlegen.error.felder : {};
   const e: Feldfehler = { ...server, ...lokal };
-  const ohneFeld = anlegen.error && !Object.keys(server).length;
+  const ohneFeld = anlegen.error && !(anlegen.error instanceof ApiFehler && Object.keys(anlegen.error.felder).length);
   const fehlerzahl = Object.keys(e).length;
   const MEHR: (keyof Formular)[] = ["telefon2", "email", "versicherungsart", "krankenkasse", "versichertennummer"];
   const mehrFehler = MEHR.some((k) => e[k]);

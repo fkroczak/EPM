@@ -124,6 +124,9 @@ export function ServerKachel() {
               text={platte ? `${anteil(platte.gesamt - platte.frei, platte.gesamt)} %` : "—"} />
             <span className="text-[0.78125rem] gedaempft">läuft seit {dauer(h?.laufzeit_s ?? d.container.laufzeit_s)}
               {h ? ` · gemessen ${relativ(h.zeit, true)}` : " · ohne Systemagent nur Werte aus dem Container"}</span>
+            {/* Selbstheilung (13.10.2026): nur, wenn etwas zu tun ist */}
+            {h?.heilung && !h.heilung.an ? <Chip art="warn" className="self-start" data-testid="heilung-aus">Selbstheilung ausgeschaltet</Chip> : null}
+            {h?.heilung?.rueckfall ? <Chip art="fehler" className="self-start" data-testid="heilung-rueckfall">Auf Version {h.heilung.rueckfall.nach || "?"} zurückgeschaltet</Chip> : null}
           </>
         )}
       </KachelInhalt>

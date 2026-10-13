@@ -53,6 +53,8 @@ function AnlegenDialog<T extends { id: number; name: string }>({ offen, onOffen,
       onOffen(false);
     },
   });
+  const { reset } = speichern;
+  useEffect(() => { if (offen) reset(); }, [offen, reset]);
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
     <Dialog offen={offen} onOffen={onOffen} titel={titel} breite={680}
@@ -67,7 +69,7 @@ function AnlegenDialog<T extends { id: number; name: string }>({ offen, onOffen,
           <Feld key={d.k} label={d.label} pflicht={d.pflicht} fehler={f[d.k]}
             className={BREITE[d.breite]}>
             {(p) => <Eingabe {...p} type={d.typ} placeholder={d.platzhalter} autoFocus={d.k === "name"} value={w[d.k]}
-              onChange={(e) => setW({ ...w, [d.k]: e.target.value })} />}
+              onChange={(e) => { setW({ ...w, [d.k]: e.target.value }); if (f[d.k]) reset(); }} />}
           </Feld>
         ))}
         {speichern.error && !Object.keys(f).length ? <Meldung art="fehler" className="sm:col-span-8">{speichern.error.message}</Meldung> : null}
