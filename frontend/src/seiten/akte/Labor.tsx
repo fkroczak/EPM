@@ -5,7 +5,7 @@
  * eingetragen wird nur der gemessene Wert. Zeilen ohne Wert werden nicht gespeichert. Für alles, was nicht im
  * Katalog steht (Tumormarker, genetische Parameter), gibt es freie Zeilen.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
@@ -76,6 +76,8 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
     setFrei(freie);
     setStand((s) => s + 1);
   }
+  // geschlossen: beim nächsten Öffnen neu vorbelegen (sonst stünde der zuletzt erfasste Befund noch drin)
+  if (!offen && gesetzt) setGesetzt("");
 
   const gruppen = useMemo(() => {
     const nach: Record<string, Laborparameter[]> = {};
@@ -112,6 +114,8 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
     },
   });
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
+  const { reset } = speichern;
+  useEffect(() => { if (offen) reset(); }, [offen, reset]);
 
   return (
     <Dialog offen={offen} onOffen={onOffen} breite={900}

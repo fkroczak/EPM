@@ -75,6 +75,8 @@ function ArztZuordnungDialog({ zuordnung, offen, onOffen }: { zuordnung: Patient
   });
   const [frage, setFrage] = useState(false);
   useEffect(() => { if (!offen) setFrage(false); }, [offen]);
+  const { reset } = speichern;
+  useEffect(() => { if (offen) reset(); }, [offen, reset]);
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
     <Dialog offen={offen} onOffen={onOffen} breite={560}
@@ -217,6 +219,8 @@ function BezugspersonDialog({ person, offen, onOffen }: { person: Bezugsperson |
   });
   const [frage, setFrage] = useState(false);
   useEffect(() => { if (!offen) setFrage(false); }, [offen]);
+  const { reset } = speichern;
+  useEffect(() => { if (offen) reset(); }, [offen, reset]);
   const fe: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   const feld = (k: (typeof BP_FELDER)[number], label: string, extra?: { num?: boolean; span?: boolean; typ?: string }) => (
     <Feld label={label} className={extra?.span ? "col-span-2" : undefined} fehler={fe[k]} pflicht={k === "name"}>

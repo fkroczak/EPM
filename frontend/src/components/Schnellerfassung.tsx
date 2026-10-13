@@ -257,6 +257,8 @@ export function KontaktDialog({ offen, onOffen, vorgabe, text: textVorgabe }: {
       onOffen(false);
     },
   });
+  const { reset } = speichern;
+  useEffect(() => { if (offen) reset(); }, [offen, reset]);
   const server: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   const f: Feldfehler = { ...server, ...lokal };
   const nurGewichtOffen = !!gespeichert && mitGewicht;
@@ -393,6 +395,8 @@ export function GewichtDialog({ offen, onOffen, vorgabe, wert: wertVorgabe }: {
     },
     onSuccess: (g) => { neuLaden(pid ?? undefined); melden(`Gewicht ${kg(g.gewicht_kg)} für ${name} gespeichert.`); onOffen(false); },
   });
+  const { reset } = speichern;
+  useEffect(() => { if (offen) reset(); }, [offen, reset]);
   const f: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
     <Dialog offen={offen} onOffen={onOffen} titel="Gewicht erfassen" breite={640}

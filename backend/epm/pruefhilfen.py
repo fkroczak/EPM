@@ -8,6 +8,7 @@ import tempfile
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
@@ -69,6 +70,12 @@ class Grundlage(TestCase):
         cls.admin = benutzer("admin", Rolle.ADMIN)
         cls.patient = Patient.objects.create(nachname="Echt", vorname="Anna",
                                              geburtsdatum=timezone.localdate() - timedelta(days=20000))
+
+    def setUp(self):
+        super().setUp()
+        # Drosselung der Anmeldung (30/min, im Cache) zurücksetzen – sonst scheitern lange Läufe mit vielen echten
+        # Anmeldungen an 429; der Cache hält sonst nichts (locmem, nur die DRF-Drosselung)
+        cache.clear()
 
     def neuer_kontakt(self, client=None, patient=None, **extra):
         c = client or client_fuer(self.mitarbeiter)
