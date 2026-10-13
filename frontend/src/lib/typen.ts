@@ -665,6 +665,9 @@ export type Benutzer = {
   rolle: string;
   /** Rolle je Firma (11.10.2026): {"dskm": "mediziner", "rg": "keine"}; die der DSKM ist ``rolle`` */
   firmenrollen?: Record<string, string>;
+  /** darf die angemeldete Admin-Person das Konto kontoweit verwalten (sperren, Einmal-Passwort, Kontodaten)? Nur, wer in
+   *  jeder Firma mit Rolle der Person Admin ist (Festlegung 11.10.2026); fehlt bei älteren Antworten → erlaubt */
+  verwaltbar?: boolean;
   ist_test: boolean;
   is_active: boolean;
   nur_historisch: boolean;
