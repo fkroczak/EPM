@@ -1,0 +1,202 @@
+{
+ "quelle": "RC_Labor_MAL-02A",
+ "name": "Laborprofil MAL-02A – Fettmalabsorption",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboranforderung Malabsorption – Steatorrhoe, Gewichtsverlust, niedriges Gesamtcholesterin, pathologische Elastase",
+ "datei": "4a2067d0-Laborprofile_Malabsorption_IT-Integration_RC.docx",
+ "bloecke": [
+  {
+   "id": "kopf",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "titel",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "MAL-02A · Fettmalabsorption (Stufe 2)",
+   "zusatz": "Laboranforderung · Laborprofile Malabsorption V1.0"
+  },
+  {
+   "id": "patient",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Versicherung",
+     "wert": "{{Patient.Versicherung}}"
+    },
+    {
+     "label": "Datum",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Abnahme (Uhrzeit)",
+     "wert": "____________________"
+    },
+    {
+     "label": "Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Abnahme durch",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nüchtern",
+     "wert": "☐ ja  ☐ nein"
+    },
+    {
+     "label": "Dringlichkeit",
+     "wert": "☐ Routine  ☐ eilig"
+    }
+   ]
+  },
+  {
+   "id": "indikation",
+   "typ": "text",
+   "bezeichnung": "Indikation und Klinische Angaben",
+   "text": "Indikation: Steatorrhoe, Gewichtsverlust, niedriges Gesamtcholesterin, pathologische Elastase\nInhalt: Vitamin A, Vitamin E, Vitamin-K-Status, Parathormon, Lipidstatus\n\nFragestellung:\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "roehrchen",
+   "typ": "text",
+   "bezeichnung": "Röhrchen und Material (Übersicht)",
+   "text": "☒ Serum, lichtgeschützt – Pflicht: 2A.1, 2A.2\n☒ Serum – Pflicht: 2A.5; optional: 2A.3\n☒ EDTA-Plasma, gekühlt – Pflicht: 2A.4\n☒ Serum, nüchtern – Pflicht: 2A.6",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m1",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Serum, lichtgeschützt",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 2A.1 Vitamin A (Retinol)",
+     "wert": "Pflicht · LOINC 2923-1 · Unter Inflammation erniedrigt (Regel R1)"
+    },
+    {
+     "label": "☒ 2A.2 Vitamin E (α-Tocopherol)",
+     "wert": "Pflicht · LOINC 1823-4 · Bei Dyslipidämie auf Gesamtlipide beziehen"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m2",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Serum",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☐ 2A.3 PIVKA-II (Protein induced by vitamin K absence)",
+     "wert": "optional · LOINC im Laborkatalog prüfen · Nur bei spezieller Fragestellung; INR aus MAL-01 als Standardparameter"
+    },
+    {
+     "label": "☒ 2A.5 Gesamtcholesterin",
+     "wert": "Pflicht · LOINC 2093-3 · Niedrige Werte als orientierender Hinweis auf das Ausmaß der Fettassimilationsstörung"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m3",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: EDTA-Plasma, gekühlt",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 2A.4 Parathormon, intakt",
+     "wert": "Pflicht · LOINC 2731-8 · Sekundärer Hyperparathyreoidismus bei Vitamin-D-Mangel oder Hypokalzämie (Regel R7)"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m4",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Serum, nüchtern",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 2A.6 Triglyceride",
+     "wert": "Pflicht · LOINC 2571-8"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "legende",
+   "typ": "text",
+   "bezeichnung": "Legende",
+   "text": "☒ Pflichtparameter des Profils (angekreuzt) · ☐ optional – bei Bedarf ankreuzen · ☐ Reflex – nur bei Erfüllung der genannten Regel, wird vom Labor nachgefordert. LOINC als Zuordnungsvorschlag; „im Laborkatalog prüfen“ = Code beim beauftragten Labor zuordnen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "praeanalytik",
+   "typ": "text",
+   "bezeichnung": "Pflichthinweise zur Präanalytik",
+   "text": "Lichtempfindliche Vitamine: Röhrchen lichtgeschützt abnehmen und transportieren.\nGekühlte Proben (EDTA-Plasma, gekühlt): sofort kühlen und gekühlt transportieren.\nNüchternabnahme erforderlich für: 2A.6.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "regeln",
+   "typ": "text",
+   "bezeichnung": "Reflexregeln und Befundhinweise",
+   "text": "R1 – Wenn: CRP oberhalb des Referenzbereichs in derselben Anforderung → sTfR (1.26) als Reflex anfordern; Ferritin, Zink, Vitamin A, Selen und Albumin mit Hinweistext „unter Inflammation eingeschränkt beurteilbar“ befunden\nR5 – Wenn: Pankreas-Elastase-1 unter 200 µg/g → Hinweistext „exokrine Pankreasinsuffizienz wahrscheinlich; unter 100 µg/g schwer“; bei dokumentiert wässrigem Stuhl Wiederholung aus geformtem Stuhl vorschlagen; MAL-02A auslösen\nR7 – Wenn: 25-OH-Vitamin D unter 50 nmol/L (20 ng/mL) oder korrigiertes Calcium unterhalb des Referenzbereichs → Parathormon (2A.4) als Reflex anfordern\nR8 – Wenn: Gesamtcholesterin niedrig (laborspezifisch) oder dokumentierte Steatorrhoe → MAL-02A zur Anforderung vorschlagen",
+   "optionen": {
+    "ueberschrift": true,
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "unterschrift",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Datum, Unterschrift anfordernder Arzt",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "fuss",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

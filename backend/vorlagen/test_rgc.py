@@ -24,10 +24,14 @@ class RgcVorlagenTest(Grundlage):
 
     def test_alle_vorlagen_angelegt_und_gueltig(self):
         quellen = vorlagen()
-        self.assertEqual(len(quellen), 26)
+        self.assertEqual(len(quellen), 35)
         rgc = EigenesSchreiben.objects.filter(firma=self.rg)
-        self.assertEqual(rgc.count(), 26)
-        self.assertEqual(rgc.filter(gruppe="anforderungen").count(), 14)
+        self.assertEqual(rgc.count(), 35)
+        # 14 Anforderungen der RGC und 9 Bögen der Laborprofile Malabsorption (Übersicht, MAL-01 bis MAL-06)
+        self.assertEqual(rgc.filter(gruppe="anforderungen").count(), 23)
+        self.assertEqual(sorted(rgc.filter(schluessel__startswith="eigen-rgc-mal").values_list("schluessel", flat=True)),
+                         ["eigen-rgc-mal00", "eigen-rgc-mal01", "eigen-rgc-mal02a", "eigen-rgc-mal02b",
+                          "eigen-rgc-mal02c", "eigen-rgc-mal03", "eigen-rgc-mal04", "eigen-rgc-mal05", "eigen-rgc-mal06"])
         # Formulare 01–12 (Patientenerklärungen, Schweigepflicht, Aufklärungen, ÖGK, Anlage K, Anwaltsvollmacht)
         self.assertEqual(sorted(rgc.filter(gruppe="formulare").values_list("schluessel", flat=True)),
                          [f"eigen-rgc-f{n:02d}" for n in range(1, 13)])
@@ -70,6 +74,53 @@ class RgcVorlagenTest(Grundlage):
                                   ("eigen-rgc-f12", "Vollmacht")):
                 pdf, _ = erzeuge_aus_vorlage(art, Kontext(patient=p), titel=art)
                 self.assertIn(kompakt(erwartet), kompakt(pdf_text(pdf)), art)
+        finally:
+            zuruecksetzen(token)
+
+    def test_laborprofile_malabsorption(self):
+        """Laborprofile Malabsorption (14.10.2026): jeder Parameter des Dokuments steht mit Material auf dem Bogen."""
+        import json
+
+        from .rgc import ORDNER
+
+        daten = json.loads((ORDNER.parent / "laborprofile-malabsorption.json").read_text(encoding="utf-8"))
+        self.assertEqual([p["id"] for p in daten["profile"]],
+                         ["MAL-01", "MAL-02A", "MAL-02B", "MAL-02C", "MAL-03A", "MAL-03B", "MAL-03C", "MAL-03D",
+                          "MAL-04", "MAL-05", "MAL-06"])
+        self.assertEqual(len(daten["parameter"]), 71)
+        self.assertEqual([r["id"] for r in daten["regeln"]], [f"R{n}" for n in range(1, 12)])
+        boegen = {v["quelle"]: json.dumps(v["bloecke"], ensure_ascii=False) for v in vorlagen()
+                  if v["quelle"].startswith("RC_Labor_MAL-")}
+        for p in daten["parameter"]:
+            if p["nr"] in ("5.1", "6.6"):  # dynamisch bzw. Pflichthinweis, kein eigener Eintrag
+                continue
+            bogen = boegen["RC_Labor_MAL-03" if p["profil"].startswith("MAL-03") else f"RC_Labor_{p['profil']}"]
+            self.assertIn(f" {p['nr']} ", bogen, p["nr"])
+            if p["material"] not in ("berechnet", "–", "Funktionsdiagnostik", "nuklearmedizinisch (extern)",
+                                     "gemäß ESPEN-HPN"):  # ohne Röhrchen: eigene Überschrift statt Material
+                self.assertIn(p["material"], bogen, p["nr"])
+        # Pflichtparameter angekreuzt, optionale und Reflexe zum Ankreuzen; Reflex aus anderem Profil mit Röhrchen
+        mal01 = boegen["RC_Labor_MAL-01"]
+        for erwartet in ("☒ 1.32 Zink", "☐ 1.05 Präalbumin", "☐ 1.26 Löslicher Transferrinrezeptor",
+                         "☐ 2A.4 Parathormon, intakt", "Röhrchen / Material: Serum (Spurenelement-Röhrchen)",
+                         "Röhrchen / Material: EDTA-Plasma, gekühlt", "Patient unter glutenhaltiger Kost?"):
+            self.assertIn(erwartet, mal01)
+        # MAL-04 = Pflichtparameter von MAL-01, MAL-02A und MAL-02B
+        for nr in ("1.01", "2A.4", "2B.7"):
+            self.assertIn(f" {nr} ", boegen["RC_Labor_MAL-04"])
+        token = setze_aktive_firma(self.rg)
+        try:
+            p = Patient.objects.create(nachname="Kalniņa", vorname="Anna", geschlecht="w", nummer=815,
+                                       geburtsdatum=date(1981, 2, 1))
+            PatientFirma.objects.filter(patient=p).update(firma=self.rg)
+            for art, erwartet in (("eigen-rgc-mal01", ["Kalniņa, Anna", "MAL-01 · Basisprofil Malabsorption",
+                                                       "Citratplasma", "1.20 INR (Quick)", "Regeneration Clinic SIA"]),
+                                  ("eigen-rgc-mal06", ["Thiaminsubstitution", "NaF-Plasma"]),
+                                  ("eigen-rgc-mal00", ["Profilübersicht", "R11"])):
+                pdf, _ = erzeuge_aus_vorlage(art, Kontext(patient=p), titel=art)
+                text = kompakt(pdf_text(pdf))
+                for e in erwartet:
+                    self.assertIn(kompakt(e), text, art)
         finally:
             zuruecksetzen(token)
 

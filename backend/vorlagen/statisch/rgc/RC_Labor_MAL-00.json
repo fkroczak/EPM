@@ -1,0 +1,139 @@
+{
+ "quelle": "RC_Labor_MAL-00",
+ "name": "Laborprofile Malabsorption – Übersicht und Regelwerk",
+ "gruppe": "anforderungen",
+ "beschreibung": "Übersicht der Profile MAL-01 bis MAL-06, Reflexregeln R1–R11 und Monitoring-Intervalle (Nachschlagen, Aushang)",
+ "datei": "4a2067d0-Laborprofile_Malabsorption_IT-Integration_RC.docx",
+ "bloecke": [
+  {
+   "id": "kopf",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "titel",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "Laborprofile Malabsorption",
+   "zusatz": "Übersicht, Regelwerk und Monitoring · Dokumentversion 1.0"
+  },
+  {
+   "id": "zweck",
+   "typ": "text",
+   "bezeichnung": "Stufenkonzept",
+   "text": "Stufe 1: Basisprofil bei jedem Verdacht (MAL-01). Stufe 2: gezielte Erweiterung bei Fettmalabsorption (MAL-02A), ausgeprägter oder langdauernder Malabsorption (MAL-02B) und Kurzdarmsyndrom/Darmversagen (MAL-02C). Stufe 3: ursachenbezogene Zusatzdiagnostik (MAL-03A–D). Bei gesicherter Diagnose: Initialpanel MAL-04, Verlauf MAL-05, Refeeding-Monitoring MAL-06.\nLOINC-Codes sind Zuordnungsvorschläge; „prüfen“ sowie Einheiten und Referenzbereiche vor Produktivsetzung gegen den Katalog des beauftragten Labors abgleichen.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "profile",
+   "typ": "datenfelder",
+   "bezeichnung": "Profilübersicht",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "MAL-01 · Basisprofil Malabsorption (Stufe 1)",
+     "wert": "Auslöser: Jeder klinische Verdacht auf Malabsorption oder Maldigestion · Inhalt: Blutbild, CRP, Proteinstatus, Elektrolyte, Nieren-/Leberfunktion, Gerinnung, Glukose/HbA1c, TSH, Eisenstatus, B12/Folat, Vitamin D, Zink, Zöliakie-Serologie"
+    },
+    {
+     "label": "MAL-02A · Fettmalabsorption (Stufe 2)",
+     "wert": "Auslöser: Steatorrhoe, Gewichtsverlust, niedriges Gesamtcholesterin, pathologische Elastase · Inhalt: Vitamin A, Vitamin E, Vitamin-K-Status, Parathormon, Lipidstatus"
+    },
+    {
+     "label": "MAL-02B · Ausgeprägte oder langdauernde Malabsorption (Stufe 2)",
+     "wert": "Auslöser: Kurzdarmsyndrom, ausgedehnte Dünndarmresektion, chronisches Darmversagen, Zustand nach bariatrischer Operation · Inhalt: Selen, Kupfer/Ceruloplasmin, Vitamin B1, Vitamin B6; optional Vitamin C, Mangan"
+    },
+    {
+     "label": "MAL-02C · Kurzdarmsyndrom / Darmversagen – Spezialparameter (Stufe 2)",
+     "wert": "Auslöser: Kurzdarmsyndrom, Verdacht auf Darmversagen, Gallensäureverlust, erhaltenes Kolon · Inhalt: Citrullin, C4 oder SeHCAT, Oxalat im 24-h-Urin"
+    },
+    {
+     "label": "MAL-03A · Exokrine Pankreasinsuffizienz (Stufe 3)",
+     "wert": "Auslöser: Steatorrhoe, Pankreasanamnese · Inhalt: Pankreas-Elastase-1 im Stuhl; optional quantitative Stuhlfettbestimmung"
+    },
+    {
+     "label": "MAL-03B · Chronisch-entzündliche Darmerkrankung (Stufe 3)",
+     "wert": "Auslöser: Diarrhoe, Blutabgang, erhöhtes CRP · Inhalt: Fäkales Calprotectin"
+    },
+    {
+     "label": "MAL-03C · Dünndarmfehlbesiedlung und Kohlenhydratmalabsorption (Stufe 3)",
+     "wert": "Auslöser: Blähungen, Diarrhoe, Zustand nach Resektion, Motilitätsstörung · Inhalt: Glukose-/Laktulose-H2/CH4-Atemtest; Laktose-/Fruktose-H2-Atemtest"
+    },
+    {
+     "label": "MAL-03D · Infektiöse Ursachen und Proteinverlustenteropathie (Stufe 3)",
+     "wert": "Auslöser: Reise-/Expositionsanamnese, Hypalbuminämie ohne Erklärung · Inhalt: Stuhlmikrobiologie, Giardia-Antigen, α1-Antitrypsin-Clearance im Stuhl"
+    },
+    {
+     "label": "MAL-04 · Initialpanel bei bekanntem Malabsorptionssyndrom / chronischer intestinaler Insuffizienz",
+     "wert": "Auslöser: Gesicherte Diagnose, Erstvorstellung, Übernahme in die Betreuung · Inhalt: Kombination MAL-01 + MAL-02A + MAL-02B (Vollpanel)"
+    },
+    {
+     "label": "MAL-05 · Monitoring bei chronischer intestinaler Insuffizienz",
+     "wert": "Auslöser: Verlaufskontrolle nach Initialpanel · Inhalt: Pathologische Parameter aus MAL-04, Knochenstoffwechsel; Intervallsteuerung nach Abschnitt 5"
+    },
+    {
+     "label": "MAL-06 · Refeeding-Monitoring",
+     "wert": "Auslöser: Refeeding-Risiko nach NICE-/ESPEN-Kriterien vor Beginn einer Ernährungstherapie · Inhalt: Phosphat, Kalium, Magnesium, Natrium, Glukose; Thiaminsubstitution als Pflichthinweis"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "regeln",
+   "typ": "text",
+   "bezeichnung": "Regelwerk: Reflexanforderungen und Interpretationshinweise",
+   "text": "R1 – Wenn: CRP oberhalb des Referenzbereichs in derselben Anforderung → sTfR (1.26) als Reflex anfordern; Ferritin, Zink, Vitamin A, Selen und Albumin mit Hinweistext „unter Inflammation eingeschränkt beurteilbar“ befunden (Begründung: Akute-Phase-Reaktion verändert Ferritin (↑), Zink, Vitamin A, Selen und Albumin (↓) unabhängig vom Versorgungsstatus)\nR2 – Wenn: Vitamin B12 im laborspezifischen Graubereich → Holotranscobalamin (1.29) und/oder Methylmalonsäure (1.30) als Reflex anfordern (Begründung: Serum-B12 allein hat im Graubereich unzureichende Sensitivität für einen funktionellen Mangel)\nR3 – Wenn: Gesamt-IgA unterhalb des Referenzbereichs → tTG-IgG und DGP-IgG (1.35) als Reflex anfordern; tTG-IgA mit Hinweis „bei IgA-Mangel nicht verwertbar“ befunden (Begründung: IgA-basierte Zöliakie-Serologie ist bei IgA-Mangel falsch negativ)\nR4 – Wenn: Albumin unter 40 g/L → Albuminkorrigiertes Calcium berechnen und ausweisen: Ca (mmol/L) + 0,02 × (40 − Albumin g/L) (Begründung: Hypalbuminämie senkt das Gesamtcalcium bei normalem ionisierten Calcium)\nR5 – Wenn: Pankreas-Elastase-1 unter 200 µg/g → Hinweistext „exokrine Pankreasinsuffizienz wahrscheinlich; unter 100 µg/g schwer“; bei dokumentiert wässrigem Stuhl Wiederholung aus geformtem Stuhl vorschlagen; MAL-02A auslösen (Begründung: Verdünnungsartefakt bei wässrigem Stuhl; Fettmalabsorption bei relevanter Insuffizienz zu erwarten)\nR6 – Wenn: Calprotectin oberhalb des laborspezifischen Cut-offs → Hinweistext „endoskopische Abklärung erwägen“ (Begründung: Erhöhtes Calprotectin spricht für eine entzündliche Darmerkrankung)\nR7 – Wenn: 25-OH-Vitamin D unter 50 nmol/L (20 ng/mL) oder korrigiertes Calcium unterhalb des Referenzbereichs → Parathormon (2A.4) als Reflex anfordern (Begründung: Erfassung eines sekundären Hyperparathyreoidismus)\nR8 – Wenn: Gesamtcholesterin niedrig (laborspezifisch) oder dokumentierte Steatorrhoe → MAL-02A zur Anforderung vorschlagen (Begründung: Hinweis auf Fettmalabsorption mit Risiko für Mangel an fettlöslichen Vitaminen)\nR9 – Wenn: Refeeding-Risiko erfüllt (NICE: BMI unter 16 kg/m², Gewichtsverlust über 15 % in 3–6 Monaten, Nahrungskarenz über 10 Tage, oder niedriges Kalium/Phosphat/Magnesium vor Beginn; alternativ zwei Kriterien aus BMI unter 18,5 kg/m², Gewichtsverlust über 10 %, Nahrungskarenz über 5 Tage, Alkoholabusus oder einschlägige Medikation) → MAL-06 vor Beginn der Ernährungstherapie und täglich für drei Tage anlegen; Pflichthinweis Thiaminsubstitution anzeigen (Begründung: Prävention des Refeeding-Syndroms)\nR10 – Wenn: Diagnose Kurzdarmsyndrom, chronisches Darmversagen oder Zustand nach bariatrischer Operation im Patientenstamm → MAL-04 bei Erstvorstellung vorschlagen; MAL-02C ergänzen; Monitoring-Plan MAL-05 nach Abschnitt 5 aktivieren (Begründung: Strukturierte Initialerhebung und Verlaufskontrolle bei etablierter Diagnose)\nR11 – Wenn: Anforderung von tTG-IgA (1.33) → Pflichtabfrage „Patient unter glutenhaltiger Kost?“; bei Nein Hinweistext und Anforderung nur mit Begründung (Begründung: Serologie ist unter glutenfreier Kost falsch negativ)",
+   "optionen": {
+    "ueberschrift": true,
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "intervalle",
+   "typ": "datenfelder",
+   "bezeichnung": "Monitoring-Intervalle",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Pathologische Parameter nach Substitutionsbeginn",
+     "wert": "4–8 Wochen · Betroffene Parameter · MAL-05 (dynamisch)"
+    },
+    {
+     "label": "Nach Stabilisierung",
+     "wert": "3–6 Monate · Betroffene Parameter · MAL-05 (dynamisch)"
+    },
+    {
+     "label": "Langzeitverlauf bei chronischer intestinaler Insuffizienz",
+     "wert": "mindestens jährlich; häufiger bei hoher Verlustsituation oder parenteraler Ernährung · Vollpanel MAL-04 sowie Knochenstoffwechsel · MAL-04, MAL-05"
+    },
+    {
+     "label": "Knochengesundheit",
+     "wert": "jährlich; DXA periodisch · Parathormon, alkalische Phosphatase, Calcium, Phosphat, 25-OH-Vitamin D · MAL-05 (5.2)"
+    },
+    {
+     "label": "Parenterale Ernährung",
+     "wert": "gemäß ESPEN-HPN-Empfehlungen · Erweiterte Überwachung · MAL-05 (5.3)"
+    },
+    {
+     "label": "Refeeding-Phase",
+     "wert": "vor Beginn, dann täglich für drei Tage, anschließend nach klinischem Verlauf · Phosphat, Kalium, Magnesium, Natrium, Glukose · MAL-06"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "fuss",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

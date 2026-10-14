@@ -1169,9 +1169,10 @@ entweder allen Firmen oder fest einer Firma.</p>
 kommt im Querformat, damit Hinweise und Grund Platz haben; Falzmarken gibt es nur im Hochformat.</p>
 <p><strong>Vorlagen der Regeneration Clinic:</strong> In der Firma RGC stehen zusätzlich ihre Word-Vorlagen als eigene
 Schreiben bereit – nur dort, die DSKM sieht sie nicht. Unter „Anforderungen“ stehen Labor, Bildgebung und
-Funktionsdiagnostik. Unter „Aufklärungen, Erklärungen und Abrechnung“ stehen die Patientenerklärungen, die
-Schweigepflichtentbindung, die Aufklärungen zu Operation und Anästhesie, die ÖGK-Formulare, Anlage K und die
-Anwaltsvollmacht. EPM setzt Name, Geburtsdatum, Anschrift, Versicherung und Versichertennummer ein. Alles andere wird
+Funktionsdiagnostik, dazu die Laborprofile Malabsorption MAL-01 bis MAL-06 mit Übersicht und Regelwerk – nach
+Röhrchen geordnet, Pflichtparameter schon angekreuzt. Unter „Aufklärungen, Erklärungen und Abrechnung“ stehen die
+Patientenerklärungen, die Schweigepflichtentbindung, die Aufklärungen zu Operation und Anästhesie, die
+ÖGK-Formulare, Anlage K und die Anwaltsvollmacht. EPM setzt Name, Geburtsdatum, Anschrift, Versicherung und Versichertennummer ein. Alles andere wird
 auf dem Ausdruck von Hand ausgefüllt. Gedruckt werden sie in der Akte über Weitere Aktionen (⋯) › „Schreiben und
 E-Mail …“.</p>""",
     },

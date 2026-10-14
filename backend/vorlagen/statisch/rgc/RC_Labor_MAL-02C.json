@@ -1,0 +1,194 @@
+{
+ "quelle": "RC_Labor_MAL-02C",
+ "name": "Laborprofil MAL-02C – Kurzdarmsyndrom / Darmversagen",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboranforderung Malabsorption – Kurzdarmsyndrom, Verdacht auf Darmversagen, Gallensäureverlust, erhaltenes Kolon",
+ "datei": "4a2067d0-Laborprofile_Malabsorption_IT-Integration_RC.docx",
+ "bloecke": [
+  {
+   "id": "kopf",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "titel",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "MAL-02C · Kurzdarmsyndrom / Darmversagen – Spezialparameter (Stufe 2)",
+   "zusatz": "Laboranforderung · Laborprofile Malabsorption V1.0"
+  },
+  {
+   "id": "patient",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Versicherung",
+     "wert": "{{Patient.Versicherung}}"
+    },
+    {
+     "label": "Datum",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Abnahme (Uhrzeit)",
+     "wert": "____________________"
+    },
+    {
+     "label": "Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Abnahme durch",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nüchtern",
+     "wert": "☐ ja  ☐ nein"
+    },
+    {
+     "label": "Dringlichkeit",
+     "wert": "☐ Routine  ☐ eilig"
+    }
+   ]
+  },
+  {
+   "id": "indikation",
+   "typ": "text",
+   "bezeichnung": "Indikation und Klinische Angaben",
+   "text": "Indikation: Kurzdarmsyndrom, Verdacht auf Darmversagen, Gallensäureverlust, erhaltenes Kolon\nInhalt: Citrullin, C4 oder SeHCAT, Oxalat im 24-h-Urin\n\nFragestellung:\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "roehrchen",
+   "typ": "text",
+   "bezeichnung": "Röhrchen und Material (Übersicht)",
+   "text": "☒ Plasma, nüchtern – Pflicht: 2C.1\n☐ Serum, nüchtern – optional: 2C.2\n☒ 24-h-Sammelurin, angesäuert – Pflicht: 2C.4",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m1",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Plasma, nüchtern",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 2C.1 Citrullin",
+     "wert": "Pflicht · LOINC im Laborkatalog prüfen · Marker der funktionellen Enterozytenmasse; bei Niereninsuffizienz erhöht"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m2",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Serum, nüchtern",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☐ 2C.2 7α-Hydroxy-4-cholesten-3-on (C4)",
+     "wert": "optional · LOINC im Laborkatalog prüfen · Gallensäureverlustsyndrom; Alternative zu 2C.3"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m3",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: 24-h-Sammelurin, angesäuert",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 2C.4 Oxalat im 24-h-Urin",
+     "wert": "Pflicht · LOINC im Laborkatalog prüfen · Nur bei erhaltenem Kolon (enterale Hyperoxalurie, Nephrolithiasisrisiko)"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m4",
+   "typ": "datenfelder",
+   "bezeichnung": "Nuklearmedizinisch, extern (Konsil)",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☐ 2C.3 SeHCAT-Test",
+     "wert": "optional · Funktionsuntersuchung; Anforderung über Konsil, kein Laborparameter"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "legende",
+   "typ": "text",
+   "bezeichnung": "Legende",
+   "text": "☒ Pflichtparameter des Profils (angekreuzt) · ☐ optional – bei Bedarf ankreuzen · ☐ Reflex – nur bei Erfüllung der genannten Regel, wird vom Labor nachgefordert. LOINC als Zuordnungsvorschlag; „im Laborkatalog prüfen“ = Code beim beauftragten Labor zuordnen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "praeanalytik",
+   "typ": "text",
+   "bezeichnung": "Pflichthinweise zur Präanalytik",
+   "text": "Nüchternabnahme erforderlich für: 2C.1, 2C.2.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "regeln",
+   "typ": "text",
+   "bezeichnung": "Reflexregeln und Befundhinweise",
+   "text": "R10 – Wenn: Diagnose Kurzdarmsyndrom, chronisches Darmversagen oder Zustand nach bariatrischer Operation im Patientenstamm → MAL-04 bei Erstvorstellung vorschlagen; MAL-02C ergänzen; Monitoring-Plan MAL-05 nach Abschnitt 5 aktivieren",
+   "optionen": {
+    "ueberschrift": true,
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "unterschrift",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Datum, Unterschrift anfordernder Arzt",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "fuss",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

@@ -1,5 +1,6 @@
 """Mitgelieferte Vorlagen der Regeneration Clinic (13.10.2026): Laboranforderungen, Bildgebung, Funktionsdiagnostik,
-Aufklärungen, Schweigepflichtentbindung und ÖGK-Formulare.
+Aufklärungen, Schweigepflichtentbindung und ÖGK-Formulare; dazu die Laborprofile Malabsorption MAL-01 bis MAL-06
+(14.10.2026, ``werkzeuge/rgc-laborprofile.py``, Datenmigration ``0011_rgc_laborprofile``).
 
 Die Word-Dateien der RGC hat ``werkzeuge/rgc-vorlagen.py`` in Blöcke umgesetzt (``statisch/rgc/*.json``). Die
 Datenmigration ``0007_rgc_vorlagen`` legt sie einmal als eigene Schreiben der Firma RGC an (Fassung 1 in Gebrauch);
@@ -25,7 +26,10 @@ def vorlagen() -> list[dict]:
 
 
 def schluessel(quelle: str) -> str:
-    """„RC_Vorlage_04_Endokrinologie“ → „eigen-rgc-a04“, „07_Aufklaerung_…“ → „eigen-rgc-f07“."""
+    """„RC_Vorlage_04_Endokrinologie“ → „eigen-rgc-a04“, „07_Aufklaerung_…“ → „eigen-rgc-f07“,
+    „RC_Labor_MAL-02A“ (Laborprofile Malabsorption) → „eigen-rgc-mal02a“."""
+    if quelle.startswith("RC_Labor_MAL-"):
+        return f"eigen-rgc-mal{quelle.removeprefix('RC_Labor_MAL-').lower()}"
     if quelle.startswith("RC_Vorlage_"):
         return f"eigen-rgc-a{quelle.split('_')[2]}"
     return f"eigen-rgc-f{quelle.split('_')[0]}"

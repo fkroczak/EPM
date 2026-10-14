@@ -1,0 +1,174 @@
+{
+ "quelle": "RC_Labor_MAL-05",
+ "name": "Laborprofil MAL-05 – Monitoring chronische intestinale Insuffizienz",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboranforderung Malabsorption – Verlaufskontrolle nach Initialpanel",
+ "datei": "4a2067d0-Laborprofile_Malabsorption_IT-Integration_RC.docx",
+ "bloecke": [
+  {
+   "id": "kopf",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "titel",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "MAL-05 · Monitoring bei chronischer intestinaler Insuffizienz",
+   "zusatz": "Laboranforderung · Laborprofile Malabsorption V1.0"
+  },
+  {
+   "id": "patient",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Versicherung",
+     "wert": "{{Patient.Versicherung}}"
+    },
+    {
+     "label": "Datum",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Abnahme (Uhrzeit)",
+     "wert": "____________________"
+    },
+    {
+     "label": "Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Abnahme durch",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nüchtern",
+     "wert": "☐ ja  ☐ nein"
+    },
+    {
+     "label": "Dringlichkeit",
+     "wert": "☐ Routine  ☐ eilig"
+    }
+   ]
+  },
+  {
+   "id": "indikation",
+   "typ": "text",
+   "bezeichnung": "Indikation und Klinische Angaben",
+   "text": "Indikation: Verlaufskontrolle nach Initialpanel\nInhalt: Pathologische Parameter aus MAL-04, Knochenstoffwechsel; Intervallsteuerung nach Abschnitt 5\n\nFragestellung:\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "dynamisch",
+   "typ": "text",
+   "bezeichnung": "5.1 Pathologische Parameter aus MAL-04 (dynamisch)",
+   "text": "Zuletzt pathologische Parameter eintragen (Material wie Ursprungsparameter, Intervall nach Monitoring-Plan):\n☐ ________________________________________\n☐ ________________________________________\n☐ ________________________________________\n☐ ________________________________________\n☐ ________________________________________\n☐ ________________________________________",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "intervalle",
+   "typ": "text",
+   "bezeichnung": "Monitoring-Intervalle",
+   "text": "Pathologische Parameter nach Substitutionsbeginn: 4–8 Wochen – Betroffene Parameter – Profil MAL-05 (dynamisch)\nNach Stabilisierung: 3–6 Monate – Betroffene Parameter – Profil MAL-05 (dynamisch)\nLangzeitverlauf bei chronischer intestinaler Insuffizienz: mindestens jährlich; häufiger bei hoher Verlustsituation oder parenteraler Ernährung – Vollpanel MAL-04 sowie Knochenstoffwechsel – Profil MAL-04, MAL-05\nKnochengesundheit: jährlich; DXA periodisch – Parathormon, alkalische Phosphatase, Calcium, Phosphat, 25-OH-Vitamin D – Profil MAL-05 (5.2)\nParenterale Ernährung: gemäß ESPEN-HPN-Empfehlungen – Erweiterte Überwachung – Profil MAL-05 (5.3)\nRefeeding-Phase: vor Beginn, dann täglich für drei Tage, anschließend nach klinischem Verlauf – Phosphat, Kalium, Magnesium, Natrium, Glukose – Profil MAL-06",
+   "optionen": {
+    "ueberschrift": true,
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "roehrchen",
+   "typ": "text",
+   "bezeichnung": "Röhrchen und Material (Übersicht)",
+   "text": "☒ Serum / EDTA-Plasma – Pflicht: 5.2",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m1",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Serum / EDTA-Plasma",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 5.2 Knochenstoffwechsel",
+     "wert": "Parathormon, alkalische Phosphatase, Calcium (korrigiert), Phosphat, 25-OH-Vitamin D · Pflicht · LOINC 2731-8, 6768-6, 17861-6, 14879-1, 1989-3 · Jährlich; Knochendichtemessung (DXA) als nicht-laborchemische Ergänzung periodisch erwägen"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m2",
+   "typ": "datenfelder",
+   "bezeichnung": "Nach ESPEN-HPN-Empfehlungen",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☐ 5.3 Erweiterte Überwachung unter parenteraler Ernährung",
+     "wert": "optional · Spurenelemente, Vitamine, Leberwerte, Triglyceride, Katheterassoziierte Parameter nach ESPEN-HPN-Empfehlungen"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "legende",
+   "typ": "text",
+   "bezeichnung": "Legende",
+   "text": "☒ Pflichtparameter des Profils (angekreuzt) · ☐ optional – bei Bedarf ankreuzen · ☐ Reflex – nur bei Erfüllung der genannten Regel, wird vom Labor nachgefordert. LOINC als Zuordnungsvorschlag; „im Laborkatalog prüfen“ = Code beim beauftragten Labor zuordnen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "regeln",
+   "typ": "text",
+   "bezeichnung": "Reflexregeln und Befundhinweise",
+   "text": "R10 – Wenn: Diagnose Kurzdarmsyndrom, chronisches Darmversagen oder Zustand nach bariatrischer Operation im Patientenstamm → MAL-04 bei Erstvorstellung vorschlagen; MAL-02C ergänzen; Monitoring-Plan MAL-05 nach Abschnitt 5 aktivieren",
+   "optionen": {
+    "ueberschrift": true,
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "unterschrift",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Datum, Unterschrift anfordernder Arzt",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "fuss",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

@@ -36,6 +36,42 @@ Röntgen-Anforderung, Echokardiographie sowie EKG und Funktionsdiagnostik (`RC_V
 Die Schweigepflichtentbindung der RGC (06) ersetzt nicht den Vordruck „Schweigepflichtentbindung“ von EPM unter Akte ›
 Datenschutz; beides steht in der RGC zur Verfügung.
 
+## Laborprofile Malabsorption (14.10.2026)
+
+Grundlage: „Laborprofile Malabsorption – Strukturierte Anforderungsprofile zur Integration in die Klinik-IT“
+(Regeneration Clinic SIA, Dokumentversion 1.0, Status Entwurf zur Freigabe). Für Patienten der Stiftung, die in der
+Klinik abgenommen werden, auf dem Briefkopf der Klinik. In der Gruppe „Anforderungen“ stehen neun Bögen:
+
+| Kennung | Bogen | Inhalt |
+|---|---|---|
+| `eigen-rgc-mal00` | Laborprofile Malabsorption – Übersicht und Regelwerk | Profilübersicht, Regeln R1–R11, Monitoring-Intervalle |
+| `eigen-rgc-mal01` | MAL-01 Basisprofil Malabsorption (Stufe 1) | 1.01–1.35 |
+| `eigen-rgc-mal02a` | MAL-02A Fettmalabsorption (Stufe 2) | 2A.1–2A.6 |
+| `eigen-rgc-mal02b` | MAL-02B Ausgeprägte oder langdauernde Malabsorption (Stufe 2) | 2B.1–2B.7 |
+| `eigen-rgc-mal02c` | MAL-02C Kurzdarmsyndrom / Darmversagen (Stufe 2) | 2C.1–2C.4 |
+| `eigen-rgc-mal03` | MAL-03 Ursachenbezogene Zusatzdiagnostik (Stufe 3) | Teilprofile 03A–03D zum Ankreuzen |
+| `eigen-rgc-mal04` | MAL-04 Initialpanel (Vollpanel) | MAL-01 + MAL-02A + MAL-02B, MAL-02C ankreuzbar (R10) |
+| `eigen-rgc-mal05` | MAL-05 Monitoring chronische intestinale Insuffizienz | 5.1 zum Eintragen, 5.2, 5.3, Intervalle |
+| `eigen-rgc-mal06` | MAL-06 Refeeding-Monitoring | 6.1–6.5, Pflichthinweis Thiamin, Abnahmezeitpunkte |
+
+Aufbau jedes Bogens: Patient und Anforderung (Abnahmezeit, Arzt, nüchtern, Dringlichkeit) · Indikation und
+Fragestellung · **Röhrchen und Material (Übersicht)** – je Röhrchen die Parameter-Nummern nach Pflicht, optional und
+Reflex · je Röhrchen/Material die Parameter mit Status, LOINC und Hinweis · Legende · Pflichthinweise zur Präanalytik ·
+Reflexregeln des Profils · Unterschrift. Pflichtparameter sind angekreuzt (☒), optionale und Reflexparameter zum
+Ankreuzen (☐); bei MAL-03 wird zuerst das Teilprofil gewählt. Material und LOINC stehen genau wie im Dokument, auch
+„prüfen“ (als „im Laborkatalog prüfen“). Reflexparameter aus einem anderen Profil stehen mit ihrem Röhrchen auf dem
+Bogen, wenn ein Parameter des Bogens die Regel auslöst (MAL-01: Parathormon 2A.4 nach R7, EDTA-Plasma, gekühlt).
+
+Die Inhalte stehen zusätzlich strukturiert in `backend/vorlagen/statisch/laborprofile-malabsorption.json` (je
+Parameter: Profil, Nr., Parameter, Material, LOINC, Status, Regelbezug, Hinweis – die Felder aus Abschnitt 6). Eine
+neue Fassung des Dokuments: `python3 werkzeuge/rgc-laborprofile.py LABORPROFILE.docx`, dann eine weitere
+Datenmigration; bereits angelegte Bögen ändert sie nicht (dann unter Vorlagen › Dokumentvorlagen eine neue Fassung).
+
+Noch offen (laut Dokument vor Produktivsetzung): LOINC-Codes, Einheiten und Referenzbereiche gegen den Katalog des
+beauftragten Labors abgleichen; Röhrchenfarben und Abnahmemengen nennt das Dokument nicht – sie hängen vom
+Röhrchensystem des Labors ab und können je Bogen in der Vorlage ergänzt werden. Die Reflexregeln stehen als Hinweise
+auf dem Bogen; automatisch nachgefordert wird in EPM nichts (EPM hat keine Laborschnittstelle).
+
 ## Was EPM ausfüllt
 
 Aus der Akte eingesetzt werden: Name, Geburtsdatum, Anschrift, Versicherung (Feld „Versicherung/Krankenkasse“ der Akte),
