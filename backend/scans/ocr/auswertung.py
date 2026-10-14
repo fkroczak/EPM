@@ -888,19 +888,105 @@ ABSCHNITTE = {
 }
 
 
-def diagnosen(reihen: list[list[T]], gelernt: Gelerntes | None = None, quelle: str = "") -> list[dict]:
-    aus, gesehen = [], set()
+def _kennzeichen(text: str) -> str:
+    """„V. a.“, „Z. n.“, „Ausschluss“ am Anfang → V, Z, A; sonst gesichert."""
+    n = norm(text)
+    if n.startswith(("v a ", "va ", "verdacht")):
+        return "V"
+    if n.startswith(("z n ", "zn ", "zustand nach")):
+        return "Z"
+    if n.startswith(("ausschluss", "ausschl", "a v ")):
+        return "A"
+    return "G"
+
+
+_PRAEFIX = re.compile(r"^(?:v\.?\s*a\.?|verdacht\s+auf|z\.?\s*n\.?|zustand\s+nach|ausschluss(?:\s+von)?|ausschl\.?|"
+                      r"a\.\s*v\.)\s*:?\s+", re.I)
+_AUFZAEHLUNG = re.compile(r"^(?:\s*(?:[\-–•*·]+|\d{1,2}[.)]|[a-z][.)]))+\s*")
+_MESSWERT = re.compile(r"\d\s*(?:kg|g|mg|µg|ug|ng|mmol|µmol|umol|mol|l|ml|dl|cm|mm|m|%|kcal|u|iu|ie)(?:/|\b|²|$)",
+                       re.I)
+_FUELLWORT = {"bei", "mit", "und", "oder", "der", "die", "das", "des", "den", "dem", "von", "vom", "nach", "im", "in",
+              "am", "an", "auf", "zu", "zur", "zum", "ohne", "bzw", "sowie", "nicht", "naeher", "bezeichnet"}
+
+
+def _woerter(text: str) -> list[str]:
+    return [w for w in norm(text).split() if w not in _FUELLWORT and (len(w) >= 3 or w.isdigit())]
+
+
+def _gleich(a: str, b: str) -> bool:
+    if a == b:
+        return True
+    if a.isdigit() or b.isdigit():
+        return False
+    return (min(len(a), len(b)) >= 5 and abstand(a, b) <= 1) or (min(len(a), len(b)) >= 8 and abstand(a, b) <= 2)
+
+
+def diagnoseliste_vorbereiten(liste: list | None) -> list[tuple[str, str, list[list[str]]]]:
+    """(ICD-Code, Bezeichnung) der Liste unter Vorlagen › Diagnosen → mit Wortlisten je Schreibweise: „Neurodermitis
+    (atopisches Ekzem)“ zählt als „Neurodermitis“ und als „atopisches Ekzem“, „A / B“ als A und als B."""
+    aus = []
+    for code, bez in liste or []:
+        if not code or not bez:
+            continue
+        teile = [bez, re.sub(r"\([^)]*\)", " ", bez)] + re.findall(r"\(([^)]*)\)", bez)
+        teile += [t for t in re.split(r"\s+/\s+|\(|\)", bez) if t.strip()]
+        varianten = []
+        for t in teile:
+            w = _woerter(t)
+            if w and w not in varianten:
+                varianten.append(w)
+        if varianten:
+            aus.append((code, bez, varianten))
+    return aus
+
+
+def aus_liste(text: str, liste: list) -> tuple[str, str, float] | None:
+    """Bester Eintrag der Diagnoseliste zum Freitext: (Code, Bezeichnung, Übereinstimmung 0–1).
+
+    Übereinstimmung = gleiche Wörter (kleine Lesefehler zählen mit) geteilt durch die Wortzahl der längeren Seite –
+    „Kurzdarmsyndrom“ passt zu „Kurzdarmsyndrom“ mit 1, „Kurzdarmsyndrom nach Resektion“ mit 0,33."""
+    tw = _woerter(text)
+    if not tw:
+        return None
+    bester, rang = None, None
+    for code, bez, varianten in liste:
+        n = norm(bez)
+        # bei Gleichstand die unspezifische Form („Diabetes mellitus Typ 2“ → „ohne Komplikationen, nicht entgleist“,
+        # nicht „mit Koma“), sonst die kürzere Bezeichnung
+        allgemein = sum(t in n for t in ("ohne komplikation", "nicht naeher bez", "nicht entgleist"))
+        for vw in varianten:
+            gleich = sum(1 for w in tw if any(_gleich(w, v) for v in vw))
+            wert = round(gleich / max(len(tw), len(vw)), 2)
+            r = (wert, allgemein, -len(bez))
+            if wert > 0 and (rang is None or r > rang):
+                bester, rang = (code, bez, wert), r
+    return bester
+
+
+LISTE_SICHER = 1.0
+LISTE_AEHNLICH = 0.6
+
+
+def diagnosen(reihen: list[list[T]], gelernt: Gelerntes | None = None, quelle: str = "",
+              liste: list | None = None) -> list[dict]:
+    """Diagnosen des Briefs: zuerst alle Zeilen mit ICD-Code, dahinter (Kundenwunsch 14.10.2026: „PDF-Dokumente
+    enthalten keine ICD-Diagnosen, nur Freitext“) die Zeilen unter „Diagnosen:“ ohne Code. Für diese kommt der Code
+    aus dem Gelernten oder aus der Liste unter Vorlagen › Diagnosen; ohne Treffer bleibt er leer und muss vor dem
+    Übernehmen ergänzt werden – der ICD-Code bleibt Pflicht. ``liste`` wie ``diagnoseliste_vorbereiten`` sie
+    liefert."""
+    aus, gesehen, mit_code = [], set(), set()
     for r in reihen:
         zeile = _text(r)
         for m in _ICD.finditer(zeile):
             code = m.group(1)
-            if code in gesehen:
-                continue
             davor = zeile[max(0, m.start() - 6): m.start()]
             # „Vitamin B12“, „Raum C12“: ein Code ohne Punkt zählt nur in Klammern, nach „ICD“ oder mit Kennzeichen
             if "." not in code and not m.group(3) and not re.search(r"(\(|\[|icd[-\s:]*|code[\s:]*)$", davor, re.I):
                 continue
             if re.search(r"vitamin\s*$", zeile[: m.start()], re.I):
+                continue
+            mit_code.add(id(r))
+            if code in gesehen:
                 continue
             vor = zeile[: m.start()]
             # Text vor dem Code auf derselben Zeile (ohne Aufzählungszeichen und Klammer)
@@ -910,17 +996,7 @@ def diagnosen(reihen: list[list[T]], gelernt: Gelerntes | None = None, quelle: s
                 text = re.sub(r"^[\s:)\]\-–]+", "", zeile[m.end():]).strip()
             if len(text) < 3 or not re.search(r"[A-Za-zÄÖÜäöü]{3}", text):
                 continue
-            kennzeichen = m.group(3)
-            if not kennzeichen:
-                n = norm(text)
-                if n.startswith(("v a ", "va ", "verdacht")):
-                    kennzeichen = "V"
-                elif n.startswith(("z n ", "zn ", "zustand nach")):
-                    kennzeichen = "Z"
-                elif n.startswith(("ausschluss", "ausschl", "a v ")):
-                    kennzeichen = "A"
-                else:
-                    kennzeichen = "G"
+            kennzeichen = m.group(3) or _kennzeichen(text)
             if gelernt and gelernt.ignoriert(quelle, norm(text)):
                 continue  # „falsch erkannt – gehört nicht dazu“ (F189)
             gesehen.add(code)
@@ -942,14 +1018,89 @@ def diagnosen(reihen: list[list[T]], gelernt: Gelerntes | None = None, quelle: s
                     eintrag["hinweise"].append(f"gelernt, erst {gl.bestaetigt}-mal korrigiert: „{gl.ziel_text[:80]}“"
                                                f" ({gl.ziel}) – bitte prüfen")
             aus.append(eintrag)
+    aus += _freitext_diagnosen(reihen, mit_code, gesehen, gelernt, quelle, liste or [])
     return aus
 
 
-def abschnitte(reihen: list[list[T]]) -> dict:
-    """Überschriften wie „Diagnosen:“, „Therapie:“, „Procedere:“ und der Text darunter bis zur nächsten."""
-    aus: dict[str, list[str]] = {}
+def _freitext_zeilen(reihen: list[list[T]], mit_code: set) -> list[tuple[str, list[T]]]:
+    """Zeilen unter „Diagnosen:“ ohne ICD-Code, umbrochene Zeilen wieder zusammengesetzt."""
+    zeilen: list[tuple[str, list[T]]] = []
+    vorige = -2
+    for art, woerter, text, nr in _abschnitt_zeilen(reihen):
+        roh = text.strip()
+        if art != "diagnosen" or not roh or id(reihen[nr]) in mit_code:
+            continue
+        if zeilen and nr == vorige + 1:
+            alt, alt_w = zeilen[-1]
+            # „Kurzdarm-“ / „syndrom“ und klein Weitergeschriebenes bzw. „… bei“ / „Dünndarmresektion“
+            if alt.endswith("-") and roh[:1].islower():
+                zeilen[-1], vorige = (alt[:-1] + roh, alt_w + woerter), nr
+                continue
+            if roh[:1].islower() or re.search(r"(,|\bbei|\bmit|\bund|\bnach|\bdurch|\bdes|\bder)$", alt, re.I):
+                zeilen[-1], vorige = (f"{alt} {roh}", alt_w + woerter), nr
+                continue
+        zeilen.append((roh, woerter))
+        vorige = nr
+    return zeilen
+
+
+def _freitext_diagnosen(reihen, mit_code, gesehen, gelernt, quelle, liste) -> list[dict]:
+    aus, texte = [], set()
+    for roh, r in _freitext_zeilen(reihen, mit_code):
+        text = _AUFZAEHLUNG.sub("", roh).strip().rstrip(".,;:").strip()
+        if len(text) < 3 or not re.search(r"[A-Za-zÄÖÜäöü]{3}", text):
+            continue
+        # Fließtext („Die Patientin stellte sich …“) und Messwerte („Körpergewicht 58,4 kg“) sind keine Diagnosen
+        if len(text.split()) > 14 or re.match(r"^(seite|page)\s+\d", text, re.I) or _MESSWERT.search(text):
+            continue
+        if gelernt and gelernt.ignoriert(quelle, norm(text)):
+            continue  # „falsch erkannt – gehört nicht dazu“ (F189)
+        if norm(text) in texte:
+            continue
+        texte.add(norm(text))
+        kennzeichen = _kennzeichen(text)
+        ohne = _PRAEFIX.sub("", text).strip() or text
+        eintrag = {"bezeichnung": ohne[:200], "icd_code": "", "kennzeichen": kennzeichen, "erkannt_als": text[:200],
+                   "erkannt_code": "", "zeile": roh[:200], "seite": r[0].seite if r else 0,
+                   "box": _rahmen(list(r)), "sicherheit": round(min((t.c for t in r), default=0), 3),
+                   "vorschlag": False, "freitext": True, "hinweise": []}
+        gl = gelernt.finden("diagnose", quelle, norm(text)) if gelernt else None
+        if gl is not None and gl.ziel_text and gl.ziel:
+            if gl.sicher:
+                eintrag.update(bezeichnung=gl.ziel_text[:200], icd_code=gl.ziel, zuordnung="gelernt", vorschlag=True)
+                eintrag["hinweise"].append(f"ohne ICD-Code im Brief; gelernt, so schon {gl.bestaetigt}-mal zugeordnet")
+            else:
+                eintrag["zuordnung"] = "gelernt_vorschlag"
+                eintrag["gelernt"] = {"bezeichnung": gl.ziel_text[:200], "icd_code": gl.ziel}
+                eintrag["hinweise"].append(f"gelernt, erst {gl.bestaetigt}-mal zugeordnet: „{gl.ziel_text[:80]}“"
+                                           f" ({gl.ziel}) – bitte prüfen")
+        if not eintrag["icd_code"]:
+            t = aus_liste(ohne, liste)
+            if t and t[2] >= LISTE_SICHER:
+                eintrag.update(bezeichnung=t[1][:200], icd_code=t[0], zuordnung="liste",
+                               vorschlag="gelernt" not in eintrag)
+                eintrag["hinweise"].append(f"ohne ICD-Code im Brief; Code aus der Diagnoseliste: {t[1][:80]} ({t[0]})"
+                                           f" – bitte prüfen")
+            elif t and t[2] >= LISTE_AEHNLICH:
+                eintrag.update(icd_code=t[0], zuordnung="liste_vorschlag")
+                eintrag["hinweise"].append(f"ohne ICD-Code im Brief; ähnlich in der Diagnoseliste: {t[1][:80]} ({t[0]})"
+                                           f" – bitte prüfen")
+            elif "gelernt" not in eintrag:
+                eintrag["hinweise"].append("ohne ICD-Code im Brief und nicht in der Diagnoseliste – bitte ICD-Code "
+                                           "ergänzen")
+        if eintrag["icd_code"] and eintrag["icd_code"] in gesehen and eintrag.get("zuordnung") != "gelernt":
+            continue  # steht schon mit Code im Brief
+        if eintrag["icd_code"]:
+            gesehen.add(eintrag["icd_code"])
+        aus.append(eintrag)
+    return aus
+
+
+def _abschnitt_zeilen(reihen: list[list[T]]):
+    """Je Zeile unter einer bekannten Überschrift (Abschnitt, Wörter, Text, Nummer der Reihe) – für ``abschnitte``
+    und die Diagnosen ohne ICD-Code. „Diagnosen: Kurzdarmsyndrom“ liefert den Rest hinter der Überschrift."""
     aktuell = None
-    for r in reihen:
+    for nr, r in enumerate(reihen):
         zeile = _text(r).strip()
         kopf = re.match(r"^([A-Za-zÄÖÜäöüß ./-]{3,40}?)\s*:\s*(.*)$", zeile)
         gefunden = None
@@ -965,9 +1116,11 @@ def abschnitte(reihen: list[list[T]]) -> dict:
             kopf = None
         if gefunden:
             aktuell = gefunden
-            aus.setdefault(aktuell, [])
             if kopf and kopf.group(2).strip():
-                aus[aktuell].append(kopf.group(2).strip())
+                k = next((i for i, t in enumerate(r) if ":" in t.text), len(r) - 1)
+                yield aktuell, r[k + 1:] or r, kopf.group(2).strip(), nr
+            else:
+                yield aktuell, [], "", nr
             continue
         if aktuell is None:
             continue
@@ -978,7 +1131,16 @@ def abschnitte(reihen: list[list[T]]) -> dict:
         if re.match(r"^[A-ZÄÖÜ][A-Za-zÄÖÜäöüß ./-]{2,40}:\s*$", zeile):
             aktuell = None
             continue
-        aus[aktuell].append(zeile)
+        yield aktuell, r, zeile, nr
+
+
+def abschnitte(reihen: list[list[T]]) -> dict:
+    """Überschriften wie „Diagnosen:“, „Therapie:“, „Procedere:“ und der Text darunter bis zur nächsten."""
+    aus: dict[str, list[str]] = {}
+    for art, _, text, _ in _abschnitt_zeilen(reihen):
+        aus.setdefault(art, [])
+        if text:
+            aus[art].append(text)
     return {k: "\n".join(v).strip() for k, v in aus.items() if "\n".join(v).strip()}
 
 
@@ -1051,9 +1213,10 @@ def etikett_an(reihen: list[list[T]], seite: int, box) -> str:
 
 # ---------------------------------------------------------------- Gesamtauswertung
 def auswerten(seiten: list[dict], parameter: list[dict], heute: date | None = None,
-              gelernt: Gelerntes | None = None, zusatz: list | None = None) -> dict:
+              gelernt: Gelerntes | None = None, zusatz: list | None = None, diagnoseliste: list | None = None) -> dict:
     """``zusatz``: aus markierten Bereichen nachgelesene Reihen (F189) als [(Seitenindex, Ergebnis-JSON, Bereich)] –
-    sie kommen hinter alle anderen Reihen, damit die Nummern der übrigen Vorschläge gleich bleiben."""
+    sie kommen hinter alle anderen Reihen, damit die Nummern der übrigen Vorschläge gleich bleiben.
+    ``diagnoseliste``: [(ICD-Code, Bezeichnung)] aus Vorlagen › Diagnosen für Diagnosen ohne Code im Brief."""
     reihen = reihen_aus(seiten)
     for nr, d, bereich in zusatz or []:
         reihen += reihen_der_seite(d, nr, bereich)
@@ -1062,7 +1225,7 @@ def auswerten(seiten: list[dict], parameter: list[dict], heute: date | None = No
     q = norm(absender)[:150]
     werte = laborwerte(reihen, parameter, gelernt, q)
     bia = bia_werte(reihen, gelernt, q)
-    dg = diagnosen(reihen, gelernt, q)
+    dg = diagnosen(reihen, gelernt, q, diagnoseliste_vorbereiten(diagnoseliste))
     ab = abschnitte(reihen)
     arten = []
     if sum(1 for w in werte if w["parameter"]) >= 3:

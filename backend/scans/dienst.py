@@ -535,6 +535,13 @@ def katalog() -> list[dict]:
                                                                  "suchbegriffe"))
 
 
+def diagnoseliste() -> list[tuple[str, str]]:
+    """Liste unter Vorlagen › Diagnosen: ICD-Code für Diagnosen, die im Brief ohne Code stehen."""
+    from stammdaten.models import Diagnosevorlage
+
+    return list(Diagnosevorlage.objects.filter(aktiv=True).values_list("icd_code", "bezeichnung"))
+
+
 def auswerten(scan: Scan):
     """Gesamttext, Kennzahlen und Werte aus allen Seiten (auch nach jeder Änderung einer Seite)."""
     seiten = list(scan.seiten.order_by("nr", "id"))
@@ -555,7 +562,8 @@ def auswerten(scan: Scan):
     originale_info = alt.get("originale", [])
     from . import lernen
 
-    a = auswertung.auswerten(ergebnisse, katalog(), timezone.localdate(), lernen.gelerntes(), zusatz_reihen(seiten))
+    a = auswertung.auswerten(ergebnisse, katalog(), timezone.localdate(), lernen.gelerntes(), zusatz_reihen(seiten),
+                             diagnoseliste())
     a["originale"] = originale_info
     _verworfen_uebernehmen(alt, a)
     scan.auswertung = a

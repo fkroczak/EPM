@@ -981,7 +981,11 @@ Ein Klick auf eine Zeile zeigt die Stelle im Bild. Unsicher gelesene oder unplau
 <strong>nicht vorgewählt</strong>. Abnahmedatum und Labor werden vorbelegt.</li>
 <li><strong>BIA-Messung</strong>: Gewicht, BCM, Fettmasse, ECW, Körperwasser, BMI; weitere Werte des Protokolls
 (z. B. Phasenwinkel) kommen in die Beurteilung. Das Gewicht kann zugleich in den Gewichtsverlauf.</li>
-<li><strong>Diagnosen mit ICD-Code</strong> (z. B. „K91.2 G“) aus Arztbriefen; „V.a.“ wird zu V, „Z.n.“ zu Z.</li>
+<li><strong>Diagnosen</strong> aus Arztbriefen, mit ICD-Code (z. B. „K91.2 G“) oder als Freitext unter „Diagnosen:“;
+„V.a.“ wird zu V, „Z.n.“ zu Z. Steht im Brief kein Code, schlägt EPM ihn aus dem Gelernten oder der Liste unter
+<strong>Vorlagen › Labor und Diagnosen</strong> vor (Marke „Liste“, bei nur ähnlichem Eintrag „Liste?“ – bitte prüfen).
+Ohne Treffer bleibt das Feld leer und die Diagnose ist nicht angehakt: Der ICD-Code ist Pflicht, also ergänzen oder
+den Haken weglassen. Ergänzte Codes lernt EPM für den nächsten Brief.</li>
 <li><strong>Texte</strong>: Abschnitte wie „Diagnosen:“, „Therapie:“, „Procedere:“ lassen sich an die Textfelder der Akte
 anhängen – mit Quelle und Datum.</li>
 </ul>

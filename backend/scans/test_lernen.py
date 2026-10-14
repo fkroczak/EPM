@@ -100,6 +100,11 @@ class AnwendenTest(SimpleTestCase):
         d = auswertung.auswerten([brief], KATALOG_BEISPIEL, gelernt=g)["diagnosen"][0]
         self.assertEqual(d["bezeichnung"], "Kurzdarmsyndorm")   # nur Vorschlag
         self.assertEqual(d["gelernt"]["bezeichnung"], "Kurzdarmsyndrom")
+        # Diagnose ohne Code im Brief: der gelernte Code wird eingesetzt
+        brief = _seite("Klinikum Beispielstadt", "Diagnosen:", "- Kurzdarmsyndrom")
+        g = _gelernt(("diagnose", "", "kurzdarmsyndrom", "K91.2", "Kurzdarmsyndrom", 2))
+        d = auswertung.auswerten([brief], KATALOG_BEISPIEL, gelernt=g)["diagnosen"][0]
+        self.assertEqual((d["icd_code"], d["zuordnung"], d["vorschlag"]), ("K91.2", "gelernt", True))
 
     def test_spaltenlage_je_labor(self):
         # Zwei Werte – zu wenige, um die Spalte selbst zu finden; mit der gelernten Lage wird „118.69“ als ↑18.69 gelesen
@@ -285,6 +290,27 @@ class LernenTest(Grundlage):
         z = {k.art: (k.uebernommen, k.korrigiert) for k in KorrekturZaehler.objects.all()}
         self.assertEqual(z["bia"], (2, 1))
         self.assertEqual(z["diagnose"], (1, 1))
+
+    def test_diagnose_ohne_code_lernen(self):
+        """Steht im Brief kein Code, wird der ergänzte Code gelernt und beim nächsten Brief eingesetzt."""
+        c = client_fuer(self.mediziner)
+        scan = _scan(self.mediziner, "Klinikum Beispielstadt", "Diagnosen:", "- Lipödem Stadium II")
+        # nicht in der Diagnoseliste
+        d = scan.auswertung["diagnosen"][0]
+        self.assertEqual((d["icd_code"], d["vorschlag"]), ("", False))
+        # ohne Code nimmt die Akte die Diagnose nicht an
+        r = c.post(f"/api/scans/{scan.id}/zuordnen/", {
+            "patient": self.testpatient.id, "titel": "Brief", "herkunft": {"diagnosen": [0]},
+            "diagnosen": [{"bezeichnung": "Lipödem Stadium II", "icd_code": "", "kennzeichen": "G"}]}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        r = c.post(f"/api/scans/{scan.id}/zuordnen/", {
+            "patient": self.testpatient.id, "titel": "Brief", "herkunft": {"diagnosen": [0]},
+            "diagnosen": [{"bezeichnung": "Lipödem Stadium II", "icd_code": "E88.21", "kennzeichen": "G"}]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        g = GelernteZuordnung.objects.get(art="diagnose", quelle="", erkannt="lipoedem stadium ii")
+        self.assertEqual((g.ziel, g.ziel_text), ("E88.21", "Lipödem Stadium II"))
+        neu = _scan(self.mediziner, "Klinikum Beispielstadt", "Diagnosen:", "- Lipödem Stadium II")
+        self.assertEqual(neu.auswertung["diagnosen"][0]["icd_code"], "E88.21")
 
     def test_kennzahl(self):
         scan = _scan(self.mitarbeiter, *self.ZEILEN)

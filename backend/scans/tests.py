@@ -313,14 +313,49 @@ class AuswertungTest(SimpleTestCase):
         a = auswertung.auswerten([seite], KATALOG_BEISPIEL)
         self.assertIn("arztbrief", a["arten"])
         self.assertEqual(a["datum"], "2026-08-15")
-        d = {x["icd_code"]: x for x in a["diagnosen"]}
+        d = {x["icd_code"]: x for x in a["diagnosen"] if not x.get("freitext")}
         self.assertEqual(set(d), {"K91.2", "E55.9", "Z90.4"})  # „Vitamin B12“ ist kein ICD-Code
+        # … steht aber unter „Diagnosen:“: Vorschlag ohne Code, nicht angehakt (Code ist Pflicht)
+        ohne = [x for x in a["diagnosen"] if x.get("freitext")]
+        self.assertEqual([(x["bezeichnung"], x["icd_code"], x["vorschlag"]) for x in ohne],
+                         [("Vitamin B12 niedrig", "", False)])
         self.assertEqual(d["K91.2"]["kennzeichen"], "G")
         self.assertEqual(d["E55.9"]["kennzeichen"], "V")
         self.assertEqual(d["Z90.4"]["kennzeichen"], "Z")
         self.assertTrue(d["K91.2"]["bezeichnung"].startswith("Kurzdarmsyndrom"))
         self.assertIn("Parenterale", a["abschnitte"]["therapie"])
         self.assertEqual(a["patient"]["geburtsdaten"], ["1961-03-14"])
+
+    def test_arztbrief_diagnosen_ohne_icd(self):
+        """PDF-Briefe nennen Diagnosen oft nur im Freitext (Kundenwunsch 14.10.2026): jede Zeile unter „Diagnosen:“
+        wird ein Vorschlag, der Code kommt aus der Diagnoseliste; ohne Treffer bleibt er leer und nicht angehakt."""
+        liste = [("E06.3", "Hashimoto-Thyreoiditis"), ("L20.9", "Neurodermitis (atopisches Ekzem)"),
+                 ("E87.6", "Hypokaliämie"), ("M54.5", "Chronische Rückenschmerzen / Kreuzschmerz"),
+                 ("J45.9", "Asthma bronchiale"), ("E11.00", "Diabetes mellitus Typ 2, mit Koma, nicht entgleist"),
+                 ("E11.90", "Diabetes mellitus Typ 2, ohne Komplikationen, nicht entgleist")]
+        seite = _seite("Klinikum Beispielstadt", "Sehr geehrte Frau Kollegin,", "Diagnosen: Hashimoto-Thyreodiitis",
+                       "1. Kurzdarmsyndrom nach Dünndarm-", "resektion", "- V.a. Hypokaliämie", "- Neurodermitis",
+                       "- Asthma bronchiale (J45.9)", "- Asthma bronchiale", "- Kreuzschmerz",
+                       "- Diabetes mellitus Typ 2", "Körpergewicht 58,4 kg", "Therapie:", "Parenterale Ernährung.",
+                       "Mit freundlichen Grüßen")
+        a = auswertung.auswerten([seite], KATALOG_BEISPIEL, diagnoseliste=liste)
+        d = [(x["bezeichnung"], x["icd_code"], x["kennzeichen"], x.get("zuordnung"), x["vorschlag"])
+             for x in a["diagnosen"]]
+        self.assertEqual(d, [
+            ("Asthma bronchiale", "J45.9", "G", None, True),              # mit Code im Brief, steht vorn
+            ("Hashimoto-Thyreoiditis", "E06.3", "G", "liste", True),      # Lesefehler, Liste korrigiert
+            ("Kurzdarmsyndrom nach Dünndarmresektion", "", "G", None, False),   # umbrochen, nicht in der Liste
+            ("Hypokaliämie", "E87.6", "V", "liste", True),
+            ("Neurodermitis (atopisches Ekzem)", "L20.9", "G", "liste", True),
+            ("Chronische Rückenschmerzen / Kreuzschmerz", "M54.5", "G", "liste", True),
+            ("Diabetes mellitus Typ 2", "E11.90", "G", "liste_vorschlag", False),   # nur ähnlich: prüfen
+        ])
+        self.assertTrue(all(x["hinweise"] for x in a["diagnosen"][1:]))
+        # ohne Liste: alle Freitextzeilen ohne Code, keine angehakt
+        ohne = auswertung.auswerten([seite], KATALOG_BEISPIEL)["diagnosen"][1:]
+        self.assertTrue(ohne and all(x["icd_code"] == "" and not x["vorschlag"] for x in ohne))
+        # der Freitext bleibt zusätzlich als Text für die Notizen
+        self.assertIn("Kreuzschmerz", a["abschnitte"]["diagnosen"])
 
     def test_tesseract_zeile_uebereinander_wird_geteilt(self):
         """Fasst Tesseract übereinander stehende Wörter zu einer Zeile zusammen, werden daraus wieder Zeilen;

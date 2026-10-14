@@ -402,7 +402,7 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
                       <span>Erkannt als {arten.map((a) => ARTEN[a] ?? a).join(" und ")}
                         {s.auswertung.datum ? ` vom ${datum(s.auswertung.datum)}` : ""}
                         {s.auswertung.labor?.werte.length ? ` · ${s.auswertung.labor.werte.filter((w) => w.vorschlag).length} Laborwerte` : ""}
-                        {s.auswertung.diagnosen?.length ? ` · ${s.auswertung.diagnosen.length} Diagnosen mit ICD-Code` : ""}.</span>
+                        {s.auswertung.diagnosen?.length ? ` · ${s.auswertung.diagnosen.length} Diagnosen` : ""}.</span>
                       {darf("eintraege_erfassen") ? <Knopf klein onClick={() => setZuordnen(true)}>Zuordnen und Werte übernehmen</Knopf> : null}
                     </span>
                   </Meldung>
