@@ -24,7 +24,7 @@ import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useAuswahl, useLaborparameter } from "@/lib/daten";
+import { useAuswahl, useDiagnoseliste, useLaborparameter } from "@/lib/daten";
 import { datum, eingabeZahl, nummer } from "@/lib/format";
 import type { PatientZeile, Scan, ScanBiaWert, ScanDiagnose, ScanLaborwert, ScanVorschlag } from "@/lib/typen";
 import { PatientWahl } from "@/components/PatientWahl";
@@ -49,6 +49,15 @@ type LaborZeile = { an: boolean; parameter: number | null; freitext_name: string
   index: number | null };
 
 function GelerntChip({ zuordnung }: { zuordnung?: string }) {
+  if (zuordnung === "liste" || zuordnung === "liste_vorschlag") {
+    // Diagnose ohne Code im Brief: Code aus Vorlagen › Diagnosen (Kundenwunsch 14.10.2026)
+    return (
+      <Chip art={zuordnung === "liste" ? "akzent" : "warn"} className="ml-1" data-testid="chip-liste"
+        title={zuordnung === "liste" ? "ohne ICD-Code im Brief – Code aus der Diagnoseliste" : "ohne ICD-Code im Brief – ähnlicher Eintrag der Diagnoseliste, bitte prüfen"}>
+        Liste{zuordnung === "liste_vorschlag" ? "?" : ""}
+      </Chip>
+    );
+  }
   if (zuordnung !== "gelernt" && zuordnung !== "gelernt_vorschlag") return null;
   return (
     <Chip art={zuordnung === "gelernt" ? "akzent" : "warn"} className="ml-1" data-testid="chip-gelernt"
@@ -231,6 +240,14 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
   const gewaehlteWerte = werte.filter((w) => w.an && (w.wert.trim() || w.wert_text.trim()) && (w.parameter || w.freitext_name.trim()));
   const biaGewaehlt = BIA_FELDER.filter(([k]) => bia[k]?.trim());
   const diagnosenGewaehlt = diagnosen.filter((d) => d.an);
+  // der ICD-Code ist Pflicht: angehakte Diagnosen ohne Code (Freitext im Brief) halten das Übernehmen an
+  const diagnosenOhneCode = diagnosenGewaehlt.filter((d) => !d.icd_code.trim());
+  const diagnoseliste = useDiagnoseliste();
+  /** Bezeichnung geändert: aus der Diagnoseliste gewählt → Code gleich mit übernehmen */
+  const bezeichnungSetzen = (i: number, text: string) => {
+    const treffer = (diagnoseliste.data ?? []).find((v) => v.bezeichnung === text);
+    setDiagnosen(diagnosen.map((x, j) => (j === i ? { ...x, bezeichnung: text, ...(treffer ? { icd_code: treffer.icd_code } : {}) } : x)));
+  };
   const texteGewaehlt = TEXTFELDER.filter(([k]) => texte[k].an && texte[k].text.trim());
   const etwasGewaehlt = (laborAn && gewaehlteWerte.length > 0) || (biaAn && biaGewaehlt.length > 0)
     || diagnosenGewaehlt.length > 0 || texteGewaehlt.length > 0;
@@ -543,18 +560,21 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
       )}
 
       {diagnosen.length ? (
-        <Abschnitt titel="Diagnosen mit ICD-Code übernehmen" an={diagnosenGewaehlt.length > 0}
+        <Abschnitt titel="Diagnosen übernehmen" an={diagnosenGewaehlt.length > 0}
           onAn={(an) => setDiagnosen(diagnosen.map((d) => ({ ...d, an })))} testid="zuordnen-diagnosen"
           zahl={darfAkte ? `${diagnosenGewaehlt.length} von ${diagnosen.length}` : "nur mit Recht „Akten bearbeiten“"}>
           <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
             {diagnosen.map((d, i) => (
-              <li key={d.icd_code} className="flex items-start gap-2 text-sm" onClick={() => onStelle(d.box ? { seite: d.seite, box: d.box } : null)}>
+              <li key={d.index} className="flex flex-wrap items-start gap-2 text-sm" data-testid="zuordnen-diagnose"
+                onClick={() => onStelle(d.box ? { seite: d.seite, box: d.box } : null)}>
                 <input type="checkbox" className="mt-1" checked={d.an} disabled={!darfAkte}
                   onChange={(e) => setDiagnosen(diagnosen.map((x, j) => (j === i ? { ...x, an: e.target.checked } : x)))} />
-                <Eingabe value={d.bezeichnung} aria-label="Bezeichnung" className="grow min-w-0"
-                  onChange={(e) => setDiagnosen(diagnosen.map((x, j) => (j === i ? { ...x, bezeichnung: e.target.value } : x)))} />
-                <Eingabe value={d.icd_code} aria-label="ICD-Code" className="num w-20"
-                  onChange={(e) => setDiagnosen(diagnosen.map((x, j) => (j === i ? { ...x, icd_code: e.target.value } : x)))} />
+                <Eingabe value={d.bezeichnung} aria-label="Bezeichnung" className="grow min-w-0 basis-40" list="zuordnen-diagnoseliste"
+                  onChange={(e) => bezeichnungSetzen(i, e.target.value)} />
+                <Eingabe value={d.icd_code} aria-label="ICD-Code" className="num w-20" placeholder="ICD" maxLength={10}
+                  aria-invalid={d.an && !d.icd_code.trim() ? true : undefined}
+                  title={d.icd_code.trim() ? undefined : "ICD-Code ist Pflicht – ergänzen oder Haken entfernen"}
+                  onChange={(e) => setDiagnosen(diagnosen.map((x, j) => (j === i ? { ...x, icd_code: e.target.value.toUpperCase() } : x)))} />
                 <Auswahl value={d.kennzeichen} aria-label="Zusatzkennzeichen" className="w-20"
                   onChange={(e) => setDiagnosen(diagnosen.map((x, j) => (j === i ? { ...x, kennzeichen: e.target.value as ScanDiagnose["kennzeichen"] } : x)))}>
                   <option value="G">G</option><option value="V">V</option><option value="Z">Z</option><option value="A">A</option>
@@ -567,9 +587,21 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
                     „{d.gelernt.bezeichnung}“?
                   </Knopf>
                 ) : null}
+                {d.freitext && d.hinweise?.length ? (
+                  <span className={cx("basis-full pl-6 text-xs", d.icd_code.trim() ? "gedaempft" : "text-warn")}>{d.hinweise.join(" · ")}</span>
+                ) : null}
               </li>
             ))}
           </ul>
+          <datalist id="zuordnen-diagnoseliste">
+            {(diagnoseliste.data ?? []).map((v) => <option key={v.id} value={v.bezeichnung}>{v.icd_code}</option>)}
+          </datalist>
+          {diagnosenOhneCode.length ? (
+            <Meldung art="warn" data-testid="zuordnen-diagnosen-ohne-code">
+              Ohne ICD-Code: {diagnosenOhneCode.map((d) => d.bezeichnung || "ohne Bezeichnung").join(", ")}. Bitte den Code
+              ergänzen oder den Haken entfernen – ohne Code wird keine Diagnose übernommen.
+            </Meldung>
+          ) : null}
           {fehler.diagnosen || Object.keys(fehler).some((k) => k.startsWith("diagnosen")) ? (
             <Meldung art="fehler">{Object.entries(fehler).filter(([k]) => k.startsWith("diagnosen")).map(([, v]) => v).join(" · ")}</Meldung>
           ) : null}
@@ -598,7 +630,7 @@ export function Zuordnen({ scan, onStelle, onFertig, onAbbrechen, ziel = null, o
       <div className="flex justify-end gap-2 flex-wrap sticky bottom-0 bg-flaeche py-2 border-t border-rand">
         <Knopf onClick={onAbbrechen}>Abbrechen</Knopf>
         <Knopf variante="pri" icon="haken" laedt={zuordnen.isPending}
-          disabled={!darfZuordnen || (quelle ? !etwasGewaehlt : !titel.trim())}
+          disabled={!darfZuordnen || (quelle ? !etwasGewaehlt : !titel.trim()) || diagnosenOhneCode.length > 0}
           onClick={() => zuordnen.mutate()} data-testid="zuordnen-speichern">
           {quelle ? "Übernehmen" : "In die Akte legen"}{gewaehlteWerte.length && laborAn ? ` + ${gewaehlteWerte.length} Laborwerte` : ""}
           {biaAn && biaGewaehlt.length ? " + BIA" : ""}{diagnosenGewaehlt.length ? ` + ${diagnosenGewaehlt.length} Diagnosen` : ""}

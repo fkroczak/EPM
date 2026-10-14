@@ -1013,7 +1013,9 @@ export type ScanBiaWert = { wert: string; einheit: string; erkannt_als: string; 
   verworfen?: string };
 export type ScanDiagnose = { bezeichnung: string; icd_code: string; kennzeichen: "G" | "V" | "Z" | "A"; zeile: string;
   seite: number; box: number[] | null; sicherheit: number; vorschlag: boolean; erkannt_als?: string;
-  hinweise?: string[]; zuordnung?: "gelernt" | "gelernt_vorschlag";
+  hinweise?: string[]; zuordnung?: "gelernt" | "gelernt_vorschlag" | "liste" | "liste_vorschlag";
+  /** im Brief ohne ICD-Code (Freitext unter „Diagnosen:“); Code aus Gelerntem oder Diagnoseliste, sonst leer */
+  freitext?: boolean;
   /** gelernte Korrektur, erst einmal bestätigt: zum Übernehmen angeboten (F182) */
   gelernt?: { bezeichnung: string; icd_code: string }; verworfen?: string };
 export type ScanAuswertung = {
