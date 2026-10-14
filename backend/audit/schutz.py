@@ -120,6 +120,35 @@ END;
 $$ LANGUAGE plpgsql;
 """
 
+# Korrespondenz (14.10.2026): Entwurf frei; freigegeben nur noch einmal „versendet“ (Weg, Datum, Notiz), sonst nichts
+KORRESPONDENZ_SQL = r"""
+CREATE OR REPLACE FUNCTION epm_korrespondenz_schutz() RETURNS trigger AS $$
+DECLARE
+    versand text[] := ARRAY['status', 'versendet_am', 'versandweg', 'versand_notiz', 'versendet_von_id',
+                            'versand_erfasst_am', 'geaendert_am'];
+BEGIN
+    IF coalesce(current_setting('epm.wartung', true), '') = 'on' THEN
+        RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    END IF;
+    IF TG_OP = 'DELETE' THEN
+        IF OLD.status <> 'entwurf' THEN
+            RAISE EXCEPTION 'EPM: freigegebene Schreiben können nicht gelöscht werden'
+                USING ERRCODE = 'insufficient_privilege';
+        END IF;
+        RETURN OLD;
+    END IF;
+    IF OLD.status = 'entwurf' THEN
+        RETURN NEW;  -- Entwurf: frei bearbeitbar, auch die Freigabe selbst
+    END IF;
+    IF OLD.status = 'freigegeben' AND NEW.status = 'versendet'
+       AND (to_jsonb(NEW) - versand) = (to_jsonb(OLD) - versand) THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'EPM: freigegebene Schreiben sind unveränderlich' USING ERRCODE = 'insufficient_privilege';
+END;
+$$ LANGUAGE plpgsql;
+"""
+
 VORLAGE_SQL = r"""
 CREATE OR REPLACE FUNCTION epm_vorlage_schutz() RETURNS trigger AS $$
 BEGIN
@@ -163,6 +192,7 @@ SONDERREGELN = {
     "infusionen_infusionsplan": "epm_plan_schutz",
     "vorlagen_dokumentvorlage": "epm_vorlage_schutz",
     "berichte_bericht": "epm_bericht_schutz",
+    "korrespondenz_schreiben": "epm_korrespondenz_schutz",
 }
 # Zuordnungstabellen von Plänen: auch INSERT prüfen
 ZUORDNUNG = {"infusionen_infusionsplan_vitamine": "epm_plan_zuordnung_schutz"}
@@ -190,6 +220,7 @@ def installiere_trigger(using="default", **kwargs):
         c.execute(VITAMINE_SQL)
         c.execute(VORLAGE_SQL)
         c.execute(BERICHT_SQL)
+        c.execute(KORRESPONDENZ_SQL)
         vorhandene = set(conn.introspection.table_names(c))
         ziele = {t: "epm_nur_anfuegen" for t in _historientabellen(c) + NUR_ANFUEGEN_FEST}
         ziele.update(SONDERREGELN)

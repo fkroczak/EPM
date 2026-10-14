@@ -70,6 +70,8 @@ FELD_GRUPPEN = {
     "Labor": "Labor und BIA", "BIA": "Labor und BIA", "Bezugspersonen": "Datenschutz", "Aufbewahrung": "Datenschutz",
     "Zeitraum": "Infoblatt an die Praxis", "Terminort": "Infoblatt an die Praxis", "Anzahl": "Infoblatt an die Praxis",
     "Termine": "Infoblatt an die Praxis", "Medikamente": "Medikamente",
+    # Korrespondenz (14.10.2026): Betreff, Empfänger und Freitext des abgelegten Schreibens
+    "Schreiben": "Schreiben (Korrespondenz)",
 }
 
 # Kurze Namen der häufigsten Felder in Alltagssprache; die übrigen nehmen ihre Beschreibung aus ``felder.py``

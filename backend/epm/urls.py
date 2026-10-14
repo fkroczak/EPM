@@ -23,6 +23,7 @@ from stammdaten.api import (
 )
 from befunde.api import BiaMessungViewSet, LaborbefundViewSet
 from berichte.api import BerichtViewSet
+from korrespondenz.api import SchreibenViewSet
 from scans.api import ScanViewSet
 
 router = DefaultRouter()
@@ -41,6 +42,7 @@ router.register("therapieschritte", TherapieschrittViewSet, basename="therapiesc
 router.register("laborbefunde", LaborbefundViewSet, basename="laborbefund")
 router.register("bia-messungen", BiaMessungViewSet, basename="biamessung")
 router.register("berichte", BerichtViewSet, basename="bericht")
+router.register("korrespondenz", SchreibenViewSet, basename="korrespondenz")
 router.register("erklaerungen", ErklaerungViewSet, basename="erklaerung")
 router.register("datenschutzanfragen", DatenschutzanfrageViewSet, basename="datenschutzanfrage")
 router.register("datenschutz", DatenschutzViewSet, basename="datenschutz")

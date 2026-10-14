@@ -21,7 +21,7 @@ type AuthWert = {
 
 /** Rechte, die Patientendaten verändern (siehe backend/accounts/rechte.py) */
 const PATIENTENDATEN: Recht[] = ["eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
-  "plaene_abschliessen", "datenschutz_bearbeiten", "datenschutz_entscheiden"];
+  "plaene_abschliessen", "datenschutz_bearbeiten", "datenschutz_entscheiden", "schreiben_freigeben"];
 // Auch bei echten Akten dürfen Admins (Festlegungen 02.10.2026): endgültig löschen (dokumente_loeschen, akten_loeschen),
 // Dokumente einem anderen Patienten zuordnen (dokumente_umhaengen) und Akten abschließen (akten_abschliessen)
 

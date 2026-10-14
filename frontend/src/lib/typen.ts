@@ -7,7 +7,7 @@ export type Recht =
   | "datenschutz_bearbeiten" | "datenschutz_entscheiden" | "akten_loeschen"
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
   | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "testdaten_sehen" | "system_verwalten"
-  | "altdaten_importieren" | "berichte_freigeben" | "scans_bearbeiten";
+  | "altdaten_importieren" | "berichte_freigeben" | "scans_bearbeiten" | "schreiben_freigeben";
 
 /** Kacheln der Startseite (S11): klinische und – mit dem jeweiligen Recht – die der Administration (S12–S14) */
 export type KartenId =
@@ -330,7 +330,9 @@ export type Patient = {
       /** eigene Reiter seit 07.10.2026 (F121) */
       diagnosen: number; laborbefunde: number; bia_messungen: number; berichte: number;
       /** Medikamentenplan (Wunsch 11.10.2026): aktuell eingenommene Medikamente */
-      medikamente?: number };
+      medikamente?: number;
+      /** Korrespondenz (14.10.2026): alle Schreiben der Akte */
+      korrespondenz?: number };
   } | null;
 };
 
@@ -875,6 +877,43 @@ export type BiaMessung = {
   erfasst_am: string;
   erfasst_von_name: string | null;
   firma_kurz?: string | null;
+};
+
+/** Schreiben im Reiter „Korrespondenz“ (14.10.2026): Entwurf → freigegeben → versendet */
+export type Korrespondenzschreiben = {
+  id: number;
+  patient: number;
+  status: "entwurf" | "freigegeben" | "versendet";
+  status_name: string;
+  /** Schlüssel der Dokumentvorlage (feste Schreiben oder „eigen-…“) */
+  vorlage: string;
+  vorlage_name: string;
+  vorlage_version: number | null;
+  titel: string;
+  empfaenger: string;
+  text: string;
+  termin: number | null;
+  termin_text: string | null;
+  optionen: { attest?: boolean; tage?: number };
+  kopie_von: number | null;
+  erstellt_am: string;
+  erstellt_von_name: string | null;
+  freigegeben_am: string | null;
+  freigegeben_von_name: string | null;
+  freigabevermerk: string | null;
+  dokument: number | null;
+  pdf_sha256: string;
+  versendet_am: string | null;
+  versandweg: "" | "post" | "email" | "fax" | "persoenlich" | "portal" | "sonstiges";
+  versandweg_name: string;
+  versand_notiz: string;
+  versendet_von_name: string | null;
+  versand_erfasst_am: string | null;
+  firma_kurz?: string | null;
+};
+
+export const VERSANDWEGE: Record<Exclude<Korrespondenzschreiben["versandweg"], "">, string> = {
+  post: "Post", email: "E-Mail", fax: "Fax", persoenlich: "persönlich übergeben", portal: "Portal", sonstiges: "anderer Weg",
 };
 
 export type Bericht = {

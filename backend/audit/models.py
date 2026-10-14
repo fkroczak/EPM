@@ -29,6 +29,8 @@ class SystemEreignis(models.Model):
         AKTE_FIRMEN = "akte_firmen", "Zuordnung einer Akte zu Firmen geändert"
         PLAN_FREIGEGEBEN = "plan_freigegeben", "Infusionsplan freigegeben"
         BERICHT_FREIGEGEBEN = "bericht_freigegeben", "Bericht freigegeben"
+        # Korrespondenz der Akte (14.10.2026): Schreiben freigegeben, versendet, Entwurf gelöscht, PDF geöffnet
+        KORRESPONDENZ = "korrespondenz", "Korrespondenz"
         SPRECHSTUNDE_ERZEUGT = "sprechstunde_erzeugt", "Unterlagen für die Sprechstunde erzeugt"
         STAMMDATEN = "stammdaten", "Stammdaten geändert"
         VORLAGE = "vorlage", "Vorlage geändert"

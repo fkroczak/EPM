@@ -25,6 +25,7 @@ const BEREICHE: { wert: string; text: string }[] = [
   // Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
   { wert: "diagnosen", text: "Diagnosen (ICD)" }, { wert: "laborbefunde", text: "Laborbefunde" },
   { wert: "bia_messungen", text: "BIA-Messungen" }, { wert: "berichte", text: "Berichte" },
+  { wert: "korrespondenz", text: "Korrespondenz" },
   // Medikamentenplan (Wunsch 11.10.2026)
   { wert: "medikamente", text: "Medikamente" },
   // weggeklickte Hinweise (F119)
@@ -36,7 +37,7 @@ const BEREICH_EINZELN: Record<string, string> = {
   aerzte: "Arzt", bezugspersonen: "Bezugsperson", erklaerungen: "Erklärung", datenschutz: "Datenschutz-Anfrage",
   hinweisruhe: "Hinweis ausgeblendet",
   // Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
-  diagnosen: "Diagnose (ICD)", laborbefunde: "Laborbefund", bia_messungen: "BIA-Messung", berichte: "Bericht",
+  diagnosen: "Diagnose (ICD)", laborbefunde: "Laborbefund", bia_messungen: "BIA-Messung", berichte: "Bericht", korrespondenz: "Schreiben",
   medikamente: "Medikament",
 };
 
@@ -72,6 +73,9 @@ const FELDER: Record<string, string> = {
   gesamtvolumen_ml: "Gesamtvolumen (ml)", volumen_gewicht_kg: "Gewicht für das Gesamtvolumen (kg)",
   // Datenschutz
   aufbewahrung_bis: "Aufbewahrung verlängert bis", aufbewahrung_grund: "Grund der längeren Aufbewahrung",
+  // Korrespondenz (14.10.2026)
+  vorlage: "Vorlage", vorlage_name: "Name der Vorlage", termin: "Termin", optionen: "Angaben",
+  versendet_am: "versendet am", versandweg: "Versandweg", versand_notiz: "Notiz zum Versand", pdf_sha256: "Prüfsumme der PDF",
   eingeschraenkt_am: "Verarbeitung eingeschränkt am", einschraenkung_grund: "Grund der Einschränkung",
   erteilt_am: "erteilt am", widerrufen_am: "widerrufen am", widerruf_notiz: "Notiz zum Widerruf", dokument: "Dokument (Scan)",
   vorlage_version: "Stand der Vorlage", eingegangen_am: "eingegangen am", gestellt_von: "gestellt von", inhalt: "Inhalt",

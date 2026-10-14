@@ -88,6 +88,7 @@ def umfang(patient) -> dict:
         "diagnosen": patient.diagnosen.count(), "laborbefunde": patient.laborbefunde.count(),
         "bia_messungen": patient.bia_messungen.count(), "berichte": patient.berichte.count(),
         "therapieschritte": patient.therapieschritte.count(), "medikamente": patient.medikamente.count(),
+        "korrespondenz": patient.korrespondenz.count(),
     }
 
 
@@ -110,6 +111,7 @@ def akten_entfernen(ids: list[int]) -> None:
     from befunde.models import BiaMessung, Laborbefund, Laborwert
     from berichte.models import Bericht
     from infusionen.models import Infusionsplan, InfusionsplanPosition
+    from korrespondenz.models import Schreiben
 
     from .models import Diagnose, Hinweisruhe, Medikament, PatientFirma, Therapieschritt
 
@@ -137,6 +139,8 @@ def akten_entfernen(ids: list[int]) -> None:
     # Die freigegebene PDF eines Berichts ist ein Dokument der Akte (PROTECT): erst den Verweis lösen,
     # sonst hält der Bericht das Dokument und damit die ganze Akte fest (F115).
     Bericht.objects.filter(patient_id__in=ids).update(dokument=None)
+    # ebenso die freigegebene PDF eines Schreibens der Korrespondenz (14.10.2026)
+    Schreiben.objects.filter(patient_id__in=ids).update(dokument=None)
     Patient.objects.filter(id__in=ids).delete()
     # Historie. Dokumente dieser Akten verlieren ALLE früheren Fassungen – auch die aus der Zeit, in der sie
     # (falsch zugeordnet) in einer anderen Akte lagen; dort bleibt nur der neutrale Vorgang. Dokumente, die
@@ -149,7 +153,7 @@ def akten_entfernen(ids: list[int]) -> None:
     frueher.exclude(id__in=bleibt).delete()
     for modell in (Gewichtsmessung, Kontakt, Termin, Infusionsplan, Bezugsperson, PatientArzt, Erklaerung,
                    Datenschutzanfrage, Diagnose, Laborbefund, BiaMessung, Bericht, Hinweisruhe, Therapieschritt,
-                   PatientFirma, Medikament):
+                   PatientFirma, Medikament, Schreiben):
         modell.history.filter(patient_id__in=ids).delete()
     InfusionsplanPosition.history.filter(plan_id__in=plan_ids).delete()
     Laborwert.history.filter(befund_id__in=befund_ids).delete()

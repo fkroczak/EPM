@@ -34,6 +34,8 @@ class Kontext:
     terminort: object = None
     termine: list = None
     benutzer: object = None
+    # Schreiben aus dem Reiter „Korrespondenz“ (14.10.2026): Betreff, Empfänger, Freitext, Freigabe
+    schreiben: object = None
 
     def __post_init__(self):
         self.heute = self.heute or timezone.localdate()
@@ -433,10 +435,97 @@ MEDIKATIONSPLAN = {
                                lambda k: str(len(_medikamente(k, False)) + len(_medikamente(k, True)))),
 }
 
+def aktueller_plan(k):
+    """Der Plan des Kontexts, sonst der aktuelle (freigegebene) Infusionsplan der Akte (Korrespondenz, 14.10.2026)."""
+    if k.plan is not None:
+        return k.plan
+    if not k.patient.pk:
+        return None
+    return k.merke("aktueller_plan", lambda: k.patient.infusionsplaene.filter(status="aktuell").first())
+
+
+def _mit_aktuellem_plan(feld: Feld) -> Feld:
+    """Feld des Infusionsplans für Schreiben: ohne Plan im Kontext gilt der aktuelle Plan der Akte."""
+    from dataclasses import replace
+
+    def wert(k):
+        plan = aktueller_plan(k)
+        if plan is None:
+            return None
+        if k.plan is plan:
+            return feld.wert(k)
+        return feld.wert(k.merke("plan_kontext", lambda: replace(k, plan=plan)))
+
+    return Feld(feld.beschreibung, wert, feld.html)
+
+
+def _medikamente_text(k) -> str | None:
+    """Medikationsplan als Text, ein Medikament je Zeile: „Pantoprazol 40 mg (Pantozol) · 1-0-0-0 Tbl. · Magen“."""
+    def zeile(m):
+        name = " ".join(t for t in (m.wirkstoff, m.staerke, f"({m.handelsname})" if m.handelsname else "") if t)
+        dosis = " ".join(t for t in (m.schema, m.einheit) if t) if m.schema else ""
+        return " · ".join(t for t in (name, m.darreichungsform, dosis, m.dosierung_frei, m.hinweise, m.grund) if t)
+
+    dauer = [zeile(m) for m in _medikamente(k, False)]
+    bedarf = [zeile(m) for m in _medikamente(k, True)]
+    teile = dauer + (["Bei Bedarf:", *bedarf] if bedarf else [])
+    return "\n".join(teile) or None
+
+
+def _schreiben(funktion):
+    return lambda k: funktion(k.schreiben) if k.schreiben is not None else None
+
+
+def _plan_kurz(p) -> str | None:
+    """„gültig ab 01.10.2026 · 1.480 kcal · 2.500 ml · 12 h“"""
+    teile = [f"gültig ab {datum(p.gueltig_ab)}"]
+    if p.kcal:
+        teile.append(_zahl(p.kcal, "kcal"))
+    if p.volumen_summe_ml:
+        teile.append(_zahl(p.volumen_summe_ml, "ml"))
+    if p.laufzeit_h:
+        teile.append(_zahl(p.laufzeit_h, "h"))
+    if p.tage_pro_woche:
+        teile.append(_zahl(p.tage_pro_woche, "× pro Woche"))
+    return " · ".join(t for t in teile if t)
+
+
+# Korrespondenz (Wunsch der Praxis, 14.10.2026): Schreiben übernehmen Diagnosen, Gewicht, Medikation und den aktuellen
+# Infusionsplan der Akte; dazu Betreff, Empfänger und Freitext des in der Akte abgelegten Schreibens
+KORRESPONDENZ = {
+    "Patient.Diagnosen": GEMEINSAM["Patient.Diagnosen"],
+    "Patient.Hausarzt": PATIENTENDATENBLATT["Patient.Hausarzt"],
+    "Gewicht.aktuell": PATIENTENDATENBLATT["Gewicht.aktuell"],
+    "Gewicht.kg": Feld("letztes Gewicht ohne Datum (z. B. 61,2 kg)",
+                       lambda k: _zahl(_letztes_gewicht(k).gewicht_kg, "kg") if _letztes_gewicht(k) else None),
+    "Gewicht.Datum": Feld("Datum der letzten Gewichtsmessung",
+                          lambda k: datum(_letztes_gewicht(k).gemessen_am) if _letztes_gewicht(k) else None),
+    "Gewicht.BMI": PATIENTENDATENBLATT["Gewicht.BMI"],
+    "Gewicht.Trend": PATIENTENDATENBLATT["Gewicht.Trend"],
+    "Medikamente.Liste": Feld("Medikationsplan als Text, ein Medikament je Zeile (Dauer- und Bedarfsmedikation)",
+                              _medikamente_text),
+    "Plan.Kurz": Feld("aktueller Infusionsplan in einer Zeile (gültig ab, kcal, Volumen, Laufzeit, Tage)",
+                      lambda k: _plan_kurz(aktueller_plan(k)) if aktueller_plan(k) is not None else None),
+    **{name: _mit_aktuellem_plan(INFUSIONSPLAN[name]) for name in (
+        "Plan.gültig_ab", "Plan.kcal", "Plan.ml", "Plan.Mischbeutel", "Plan.Zusatzvolumen", "Plan.Stunden", "Plan.Rate",
+        "Plan.Tage_pro_Woche", "Plan.Zusatz_pro_Woche", "Plan.Infusionsfreie_Tage",
+        "Plan.Protonenpumpenhemmer_Anordnung", "Plan.freigegeben_datum", "Plan.freigegeben_von", "Plan.Bemerkung",
+        "Basis.Präparat", "Basis.ml", "Glucose.Präparat", "Glucose.g", "Amino.Präparat", "Amino.g", "Lipide.Präparat",
+        "Lipide.g", "Albumin.Präparat", "Albumin.ml", "Na", "K", "PO4", "Ca", "Mg", "Spurenelemente", "Vitamine",
+        "Katheterblock")},
+    "Schreiben.Betreff": Feld("Betreff des Schreibens (Reiter Korrespondenz)", _schreiben(lambda s: s.titel or None)),
+    "Schreiben.Empfänger": Feld("Empfänger des Schreibens (Reiter Korrespondenz)",
+                                _schreiben(lambda s: s.empfaenger or None)),
+    "Schreiben.Text": Feld("Freitext des Schreibens (Reiter Korrespondenz); fehlt das Feld in der Vorlage, steht der "
+                           "Text vor dem Gruß", _schreiben(lambda s: s.text or None)),
+    "Schreiben.Freigabevermerk": Feld("Freigabevermerk: wer das Schreiben freigegeben hat und wann",
+                                      _schreiben(lambda s: s.freigabevermerk)),
+}
+
 # Schreiben aus der Akte (F172)
-PATIENTENAUFNAHME = {**GEMEINSAM, **ANSCHREIBEN}
-TERMINBESTAETIGUNG = {**GEMEINSAM, **ANSCHREIBEN, **TERMIN}
-REISEBESCHEINIGUNG = {**GEMEINSAM, **ANSCHREIBEN, "Patient.Diagnosen": GEMEINSAM["Patient.Diagnosen"]}
+PATIENTENAUFNAHME = {**GEMEINSAM, **ANSCHREIBEN, **KORRESPONDENZ}
+TERMINBESTAETIGUNG = {**GEMEINSAM, **ANSCHREIBEN, **TERMIN, **KORRESPONDENZ}
+REISEBESCHEINIGUNG = {**GEMEINSAM, **ANSCHREIBEN, **KORRESPONDENZ}
 
 # Patientenankündigung (F173): ohne Patient – Absender, Datum, Zeitraum und Terminort
 ANKUENDIGUNG = {
@@ -455,7 +544,7 @@ ANKUENDIGUNG = {
 # Eigene Schreiben (F176): unter Vorlagen › Dokumentvorlagen angelegt, Kennung „eigen-…“. Sie haben alle dieselben
 # Datenfelder: Patient, Anrede, Absender und – wenn beim Erzeugen ein Termin gewählt ist – den Termin.
 EIGEN_PRAEFIX = "eigen-"
-EIGEN = {**GEMEINSAM, **ANSCHREIBEN, **TERMIN}
+EIGEN = {**GEMEINSAM, **ANSCHREIBEN, **TERMIN, **KORRESPONDENZ}
 
 
 def ist_eigen(art) -> bool:
@@ -534,7 +623,17 @@ TABELLEN = {
                          ["Tag", "Uhrzeit", "Patient", "Hinweis"], ["", "", "", ""]),
     },
 }
-TABELLEN = JeArt(TABELLEN, {"diagnosen": ("Diagnosen mit ICD-Code", ["Diagnose", "ICD", "seit"], ["", "", ""])})
+# Tabellen der Schreiben (feste und eigene): Diagnosen, Medikation und Zusammensetzung des aktuellen Plans (14.10.2026)
+SCHREIBEN_TABELLEN = {
+    "diagnosen": ("Diagnosen mit ICD-Code", ["Diagnose", "ICD", "seit"], ["", "", ""]),
+    "medikamente": TABELLEN["medikationsplan"]["medikamente"],
+    "bedarfsmedikation": TABELLEN["medikationsplan"]["bedarfsmedikation"],
+    "zusammensetzung": ("Zusammensetzung des aktuellen Infusionsplans",
+                        ["Bestandteil", "Menge", "Einheit", "Präparat"], ["", "zahl", "einheit", ""]),
+}
+for _art in ("patientenaufnahme", "terminbestaetigung", "reisebescheinigung"):
+    TABELLEN[_art] = {**SCHREIBEN_TABELLEN, **TABELLEN[_art]}
+TABELLEN = JeArt(TABELLEN, SCHREIBEN_TABELLEN)
 
 
 class Fett(str):
@@ -555,9 +654,9 @@ def _zahl_ohne(wert):
 
 def tabellenzeilen(art: str, quelle: str, k: Kontext) -> list[list[str]]:
     if quelle == "zusammensetzung":
-        if k.plan is None:
+        p = aktueller_plan(k)  # in Schreiben: der aktuelle Plan der Akte
+        if p is None:
             return []
-        p = k.plan
         zeilen = [
             ("Basislösung", p.basis_praeparat if p.basis_praeparat_id else None, p.basis_ml, "ml"),
             ("Glucose", p.glucose_praeparat if p.glucose_praeparat_id else None, p.glucose_g, "g"),
