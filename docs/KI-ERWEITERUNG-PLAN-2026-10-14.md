@@ -7,6 +7,20 @@ prüft, korrigiert und übernimmt. Ausschließlich lokale Modelle, kein Netz nac
 
 ---
 
+## 0. Entscheidungen vom 14.10.2026 (Antworten auf die offenen Fragen)
+
+| Frage | Entscheidung | Folge für den Plan |
+|---|---|---|
+| F1 Hardware | Heutiger VPS: 2 Kerne, 4 GB. Für die KI wird aufgerüstet auf **4–8 Kerne, 16–32 GB RAM, keine GPU** | KI läuft auf demselben (aufgerüsteten) Server wie EPM. Der KI-Dienst startet nur, wenn mindestens 12 GB RAM und 4 Kerne erkannt werden; darunter bleibt er aus, EPM läuft unverändert. Ressourcenschutz gegenüber EPM/Datenbank ist Pflicht (5.7) |
+| F2 Modell | Vision-Modell **4B**, einmaliger Download auf einem PC mit Internet ist erlaubt | Wichtig: **„Qwen3.5-OCR“ ist laut Recherche ein gehostetes Modell von Alibaba Cloud (Model Studio, nur per API)** – scheidet aus (Cloud). Verwendet wird das offene, multimodale **Qwen3.5-4B** (lokal, GGUF + Vision-Projektor für llama.cpp). Lizenz der Gewichte prüfe ich vor dem Einspielen an der offiziellen Modellkarte. Phase 0 vergleicht 4B Q4/Q8 und zum Vergleich 9B Q4 (passt bei 16–32 GB, ist langsamer, laut Praxisberichten bei OCR deutlich zuverlässiger; kleine Modelle neigen dazu, zusammenzufassen statt abzuschreiben → strenge Prompts und Abgleich mit der klassischen OCR) |
+| F4 Uhrzeit | Optionales Feld `abgenommen_um` an `Laborbefund`; oft nicht dokumentiert | Verknüpfung arbeitet mit Uhrzeit, wenn vorhanden, sonst auf Tagesebene; Hinweise ohne Uhrzeit sind höchstens „wahrscheinlich“ |
+| F5 Quellen | **Alle Dokumente der Patienten in den Akten, nur lesend**; eigener KI-Bereich; Übernahme durch Mitarbeiter. Menge unbekannt, **fortlaufend** | Die Queue füllt sich aus `patienten.Dokument` (neue Dokumente sofort vormerken, Altbestand schrittweise, neueste zuerst). Kein eigener Ablageordner nötig. Fortschritt „x von y Dokumenten gelesen“ in der Administration |
+| F7 Rechte | **Jeder Mitarbeiter** darf prüfen und übernehmen, jeweils mit passendem Firmenrecht: DSKM nur DSKM, RGC nur RGC | `ki_ansehen`/`ki_pruefen`/`ki_uebernehmen` standardmäßig ab Rolle mitarbeiter; jeder Vorgang trägt die Firma des Dokuments, Listen und Übernahme streng nach aktiver Firma gefiltert; Übernahme zusätzlich nur mit dem jeweiligen Akten-Recht (Infusionspläne: `plaene_anlegen`) |
+| F8 Historische Infusionspläne | **Beides**: Übernahme als abgelöster Altsystem-Plan und Grundlage für Hinweise | Hinweise nutzen sowohl übernommene Pläne (gesichert) als auch noch nicht übernommene KI-Vorschläge (höchstens wahrscheinlich) |
+| F9 Training | **Optional, nachts ohne GPU, ggf. am Wochenende, wenn niemand angemeldet ist** | Machbar ist auf CPU nur ein **kleines LoRA-Training des Text-/Extraktionsteils** (Bildteil eingefroren) mit wenigen hundert korrigierten Beispielen je Lauf; ein Lauf kann ein Wochenende dauern. Hauptweg der Verbesserung bleibt ohne Training: korrigierte Beispiele als Muster im Prompt, Regeln, „Gelernt“. Trainingslauf als eigener Container (nicht der Produktiv-Dienst), startet nur im Trainingsfenster und nur, wenn keine Sitzung aktiv ist (`accounts.Sitzung`), bricht bei Anmeldung ab und setzt später fort; Ergebnis ist eine neue Modellversion „in Evaluation“, nie automatisch aktiv. Rechtsgrundlage und zuständige Person für den Datenschutz bleiben offen → Training bleibt gesperrt, bis ein Admin die Rechtsgrundlagen-Prüfung in EPM dokumentiert hat |
+| F10 Berichte | egal | Erst Laborzusammenfassung und Infusionsübersicht; Entwürfe als `Bericht` im Status Entwurf im Reiter „Berichte“, gekennzeichnet „KI-Entwurf“ |
+| F3, F6, F11–F13 | nicht beantwortet | Vorschläge aus Abschnitt 4 gelten: Menüpunkt + Akte-Reiter, Pause während der Sicherung, Pflegebericht als Dokumenttyp, Verschlüsselung der KI-Zwischendaten (Dokumente generell separat) |
+
 ## 1. Verständnis des Auftrags
 
 Eine lokale KI-Erweiterung, die nachts (Standard 21:00–07:00, Europe/Berlin) Unterlagen aus einer Eingangsqueue
