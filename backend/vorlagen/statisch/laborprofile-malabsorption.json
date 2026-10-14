@@ -1,0 +1,980 @@
+{
+ "titel": "Laborprofile Malabsorption – Strukturierte Anforderungsprofile",
+ "version": "1.0",
+ "quelle": "Laborprofile Malabsorption, Dokumentversion 1.0 (Regeneration Clinic SIA, 14.10.2026)",
+ "datei": "4a2067d0-Laborprofile_Malabsorption_IT-Integration_RC.docx",
+ "status_legende": {
+  "P": "Pflicht",
+  "O": "optional",
+  "R": "Reflex"
+ },
+ "hinweis": "LOINC-Codes sind Zuordnungsvorschläge; „prüfen“ sowie Einheiten und Referenzbereiche vor Produktivsetzung gegen den Katalog des beauftragten Labors abgleichen.",
+ "profile": [
+  {
+   "id": "MAL-01",
+   "bezeichnung": "Basisprofil Malabsorption (Stufe 1)",
+   "stufe": 1,
+   "indikation": "Jeder klinische Verdacht auf Malabsorption oder Maldigestion",
+   "inhalt": "Blutbild, CRP, Proteinstatus, Elektrolyte, Nieren-/Leberfunktion, Gerinnung, Glukose/HbA1c, TSH, Eisenstatus, B12/Folat, Vitamin D, Zink, Zöliakie-Serologie",
+   "regeln": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R7",
+    "R11"
+   ]
+  },
+  {
+   "id": "MAL-02A",
+   "bezeichnung": "Fettmalabsorption (Stufe 2)",
+   "stufe": 2,
+   "indikation": "Steatorrhoe, Gewichtsverlust, niedriges Gesamtcholesterin, pathologische Elastase",
+   "inhalt": "Vitamin A, Vitamin E, Vitamin-K-Status, Parathormon, Lipidstatus",
+   "regeln": [
+    "R1",
+    "R5",
+    "R7",
+    "R8"
+   ]
+  },
+  {
+   "id": "MAL-02B",
+   "bezeichnung": "Ausgeprägte oder langdauernde Malabsorption (Stufe 2)",
+   "stufe": 2,
+   "indikation": "Kurzdarmsyndrom, ausgedehnte Dünndarmresektion, chronisches Darmversagen, Zustand nach bariatrischer Operation",
+   "inhalt": "Selen, Kupfer/Ceruloplasmin, Vitamin B1, Vitamin B6; optional Vitamin C, Mangan",
+   "regeln": [
+    "R1"
+   ]
+  },
+  {
+   "id": "MAL-02C",
+   "bezeichnung": "Kurzdarmsyndrom / Darmversagen – Spezialparameter (Stufe 2)",
+   "stufe": 2,
+   "indikation": "Kurzdarmsyndrom, Verdacht auf Darmversagen, Gallensäureverlust, erhaltenes Kolon",
+   "inhalt": "Citrullin, C4 oder SeHCAT, Oxalat im 24-h-Urin",
+   "regeln": [
+    "R10"
+   ]
+  },
+  {
+   "id": "MAL-03A",
+   "bezeichnung": "Exokrine Pankreasinsuffizienz (Stufe 3)",
+   "stufe": 3,
+   "indikation": "Steatorrhoe, Pankreasanamnese",
+   "inhalt": "Pankreas-Elastase-1 im Stuhl; optional quantitative Stuhlfettbestimmung",
+   "regeln": [
+    "R5"
+   ]
+  },
+  {
+   "id": "MAL-03B",
+   "bezeichnung": "Chronisch-entzündliche Darmerkrankung (Stufe 3)",
+   "stufe": 3,
+   "indikation": "Diarrhoe, Blutabgang, erhöhtes CRP",
+   "inhalt": "Fäkales Calprotectin",
+   "regeln": [
+    "R6"
+   ]
+  },
+  {
+   "id": "MAL-03C",
+   "bezeichnung": "Dünndarmfehlbesiedlung und Kohlenhydratmalabsorption (Stufe 3)",
+   "stufe": 3,
+   "indikation": "Blähungen, Diarrhoe, Zustand nach Resektion, Motilitätsstörung",
+   "inhalt": "Glukose-/Laktulose-H2/CH4-Atemtest; Laktose-/Fruktose-H2-Atemtest",
+   "regeln": []
+  },
+  {
+   "id": "MAL-03D",
+   "bezeichnung": "Infektiöse Ursachen und Proteinverlustenteropathie (Stufe 3)",
+   "stufe": 3,
+   "indikation": "Reise-/Expositionsanamnese, Hypalbuminämie ohne Erklärung",
+   "inhalt": "Stuhlmikrobiologie, Giardia-Antigen, α1-Antitrypsin-Clearance im Stuhl",
+   "regeln": []
+  },
+  {
+   "id": "MAL-04",
+   "bezeichnung": "Initialpanel bei bekanntem Malabsorptionssyndrom / chronischer intestinaler Insuffizienz",
+   "stufe": null,
+   "indikation": "Gesicherte Diagnose, Erstvorstellung, Übernahme in die Betreuung",
+   "inhalt": "Kombination MAL-01 + MAL-02A + MAL-02B (Vollpanel)",
+   "regeln": [
+    "R10"
+   ]
+  },
+  {
+   "id": "MAL-05",
+   "bezeichnung": "Monitoring bei chronischer intestinaler Insuffizienz",
+   "stufe": null,
+   "indikation": "Verlaufskontrolle nach Initialpanel",
+   "inhalt": "Pathologische Parameter aus MAL-04, Knochenstoffwechsel; Intervallsteuerung nach Abschnitt 5",
+   "regeln": [
+    "R10"
+   ]
+  },
+  {
+   "id": "MAL-06",
+   "bezeichnung": "Refeeding-Monitoring",
+   "stufe": null,
+   "indikation": "Refeeding-Risiko nach NICE-/ESPEN-Kriterien vor Beginn einer Ernährungstherapie",
+   "inhalt": "Phosphat, Kalium, Magnesium, Natrium, Glukose; Thiaminsubstitution als Pflichthinweis",
+   "regeln": [
+    "R9"
+   ]
+  }
+ ],
+ "parameter": [
+  {
+   "profil": "MAL-01",
+   "nr": "1.01",
+   "parameter": "Blutbild mit Erythrozytenindizes (MCV, MCH) und Differenzialblutbild",
+   "material": "EDTA-Blut",
+   "loinc": "57021-8",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "MCV erhöht: Hinweis auf B12-/Folatmangel; MCV erniedrigt: Eisenmangel; Kombination möglich (dimorphes Bild)"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.02",
+   "parameter": "CRP",
+   "material": "Serum",
+   "loinc": "1988-5",
+   "status": "P",
+   "regeln": [
+    "R1"
+   ],
+   "hinweis": "Obligat parallel zu jeder Mikronährstoffbestimmung; steuert Regel R1"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.03",
+   "parameter": "Albumin",
+   "material": "Serum",
+   "loinc": "1751-7",
+   "status": "P",
+   "regeln": [
+    "R4"
+   ],
+   "hinweis": "Negatives Akute-Phase-Protein; kein spezifischer Ernährungsmarker; steuert Regel R4"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.04",
+   "parameter": "Gesamtprotein",
+   "material": "Serum",
+   "loinc": "2885-2",
+   "status": "P",
+   "regeln": [],
+   "hinweis": ""
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.05",
+   "parameter": "Präalbumin (Transthyretin)",
+   "material": "Serum",
+   "loinc": "14338-8",
+   "status": "O",
+   "regeln": [],
+   "hinweis": "Nur in Zusammenschau mit CRP beurteilen"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.06",
+   "parameter": "Natrium",
+   "material": "Serum",
+   "loinc": "2951-2",
+   "status": "P",
+   "regeln": [],
+   "hinweis": ""
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.07",
+   "parameter": "Kalium",
+   "material": "Serum",
+   "loinc": "2823-3",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Hämolyse vermeiden"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.08",
+   "parameter": "Chlorid",
+   "material": "Serum",
+   "loinc": "2075-0",
+   "status": "P",
+   "regeln": [],
+   "hinweis": ""
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.09",
+   "parameter": "Calcium, gesamt (albuminkorrigiert ausweisen)",
+   "material": "Serum",
+   "loinc": "17861-6",
+   "status": "P",
+   "regeln": [
+    "R4"
+   ],
+   "hinweis": "Korrektur nach Regel R4; alternativ ionisiertes Calcium (1995-0, anaerob, Heparin-Vollblut)"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.10",
+   "parameter": "Magnesium",
+   "material": "Serum",
+   "loinc": "2601-3",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Hypomagnesiämie bei Diarrhoe und PPI-Therapie häufig"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.11",
+   "parameter": "Phosphat",
+   "material": "Serum",
+   "loinc": "14879-1",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Refeeding-Leitparameter"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.12",
+   "parameter": "Kreatinin",
+   "material": "Serum",
+   "loinc": "2160-0",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Bei reduzierter Muskelmasse falsch niedrig; eGFR entsprechend einschränkend beurteilen"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.13",
+   "parameter": "Harnstoff",
+   "material": "Serum",
+   "loinc": "prüfen",
+   "status": "P",
+   "regeln": [],
+   "hinweis": ""
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.14",
+   "parameter": "eGFR (CKD-EPI 2021)",
+   "material": "berechnet",
+   "loinc": "98979-8",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Rechenwert aus 1.12"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.15",
+   "parameter": "AST",
+   "material": "Serum",
+   "loinc": "1920-8",
+   "status": "P",
+   "regeln": [],
+   "hinweis": ""
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.16",
+   "parameter": "ALT",
+   "material": "Serum",
+   "loinc": "1742-6",
+   "status": "P",
+   "regeln": [],
+   "hinweis": ""
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.17",
+   "parameter": "GGT",
+   "material": "Serum",
+   "loinc": "2324-2",
+   "status": "P",
+   "regeln": [],
+   "hinweis": ""
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.18",
+   "parameter": "Alkalische Phosphatase",
+   "material": "Serum",
+   "loinc": "6768-6",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Erhöhung auch bei Osteomalazie (Vitamin-D-Mangel)"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.19",
+   "parameter": "Bilirubin, gesamt",
+   "material": "Serum",
+   "loinc": "1975-2",
+   "status": "P",
+   "regeln": [],
+   "hinweis": ""
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.20",
+   "parameter": "INR (Quick)",
+   "material": "Citratplasma",
+   "loinc": "6301-6",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Orientierender Vitamin-K-Parameter; Quick-Wert 5894-1"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.21",
+   "parameter": "Glukose, nüchtern",
+   "material": "NaF-Plasma",
+   "loinc": "2345-7",
+   "status": "P",
+   "regeln": [],
+   "hinweis": ""
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.22",
+   "parameter": "HbA1c",
+   "material": "EDTA-Blut",
+   "loinc": "4548-4",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Bei Anämie und Hämoglobinopathien eingeschränkt verwertbar"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.23",
+   "parameter": "TSH",
+   "material": "Serum",
+   "loinc": "3016-3",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Ausschluss Hyperthyreose bei ungewolltem Gewichtsverlust"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.24",
+   "parameter": "Ferritin",
+   "material": "Serum",
+   "loinc": "2276-4",
+   "status": "P",
+   "regeln": [
+    "R1"
+   ],
+   "hinweis": "Akute-Phase-Protein; unter Inflammation falsch normal (Regel R1)"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.25",
+   "parameter": "Transferrinsättigung",
+   "material": "Serum",
+   "loinc": "2502-3",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Nüchternabnahme; Transferrin 3034-6"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.26",
+   "parameter": "Löslicher Transferrinrezeptor (sTfR)",
+   "material": "Serum",
+   "loinc": "30248-9",
+   "status": "R",
+   "regeln": [
+    "R1"
+   ],
+   "hinweis": "Reflex bei erhöhtem CRP (Regel R1); ggf. sTfR/log-Ferritin-Index"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.27",
+   "parameter": "Vitamin B12",
+   "material": "Serum",
+   "loinc": "2132-9",
+   "status": "P",
+   "regeln": [
+    "R2"
+   ],
+   "hinweis": "Obligat nach ileozökaler Resektion, bei Crohn des terminalen Ileums, nach bariatrischer Operation; steuert Regel R2"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.28",
+   "parameter": "Folat (Serum)",
+   "material": "Serum",
+   "loinc": "2284-8",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Alternativ oder ergänzend Erythrozytenfolat (EDTA-Blut, Code prüfen)"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.29",
+   "parameter": "Holotranscobalamin",
+   "material": "Serum",
+   "loinc": "prüfen",
+   "status": "R",
+   "regeln": [
+    "R2"
+   ],
+   "hinweis": "Reflex bei grenzwertigem B12 (Regel R2)"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.30",
+   "parameter": "Methylmalonsäure",
+   "material": "Serum",
+   "loinc": "13964-2",
+   "status": "R",
+   "regeln": [
+    "R2"
+   ],
+   "hinweis": "Reflex bei grenzwertigem B12 (Regel R2); bei Niereninsuffizienz erhöht"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.31",
+   "parameter": "25-OH-Vitamin D",
+   "material": "Serum",
+   "loinc": "1989-3",
+   "status": "P",
+   "regeln": [
+    "R7"
+   ],
+   "hinweis": "Steuert Regel R7"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.32",
+   "parameter": "Zink",
+   "material": "Serum (Spurenelement-Röhrchen)",
+   "loinc": "5763-8",
+   "status": "P",
+   "regeln": [
+    "R1"
+   ],
+   "hinweis": "Hämolyse vermeiden; unter Inflammation und Hypalbuminämie falsch niedrig (Regel R1)"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.33",
+   "parameter": "Gewebstransglutaminase-IgA (tTG-IgA)",
+   "material": "Serum",
+   "loinc": "31017-7",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Nur unter glutenhaltiger Kost aussagekräftig; Pflichthinweis bei Anforderung"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.34",
+   "parameter": "Gesamt-IgA",
+   "material": "Serum",
+   "loinc": "2458-8",
+   "status": "P",
+   "regeln": [
+    "R3"
+   ],
+   "hinweis": "Steuert Regel R3"
+  },
+  {
+   "profil": "MAL-01",
+   "nr": "1.35",
+   "parameter": "tTG-IgG und deamidierte Gliadinpeptide-IgG",
+   "material": "Serum",
+   "loinc": "31018-5 / prüfen",
+   "status": "R",
+   "regeln": [
+    "R3"
+   ],
+   "hinweis": "Reflex bei IgA-Mangel (Regel R3)"
+  },
+  {
+   "profil": "MAL-02A",
+   "nr": "2A.1",
+   "parameter": "Vitamin A (Retinol)",
+   "material": "Serum, lichtgeschützt",
+   "loinc": "2923-1",
+   "status": "P",
+   "regeln": [
+    "R1"
+   ],
+   "hinweis": "Unter Inflammation erniedrigt (Regel R1)"
+  },
+  {
+   "profil": "MAL-02A",
+   "nr": "2A.2",
+   "parameter": "Vitamin E (α-Tocopherol)",
+   "material": "Serum, lichtgeschützt",
+   "loinc": "1823-4",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Bei Dyslipidämie auf Gesamtlipide beziehen"
+  },
+  {
+   "profil": "MAL-02A",
+   "nr": "2A.3",
+   "parameter": "PIVKA-II (Protein induced by vitamin K absence)",
+   "material": "Serum",
+   "loinc": "prüfen",
+   "status": "O",
+   "regeln": [],
+   "hinweis": "Nur bei spezieller Fragestellung; INR aus MAL-01 als Standardparameter"
+  },
+  {
+   "profil": "MAL-02A",
+   "nr": "2A.4",
+   "parameter": "Parathormon, intakt",
+   "material": "EDTA-Plasma, gekühlt",
+   "loinc": "2731-8",
+   "status": "P",
+   "regeln": [
+    "R7"
+   ],
+   "hinweis": "Sekundärer Hyperparathyreoidismus bei Vitamin-D-Mangel oder Hypokalzämie (Regel R7)"
+  },
+  {
+   "profil": "MAL-02A",
+   "nr": "2A.5",
+   "parameter": "Gesamtcholesterin",
+   "material": "Serum",
+   "loinc": "2093-3",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Niedrige Werte als orientierender Hinweis auf das Ausmaß der Fettassimilationsstörung"
+  },
+  {
+   "profil": "MAL-02A",
+   "nr": "2A.6",
+   "parameter": "Triglyceride",
+   "material": "Serum, nüchtern",
+   "loinc": "2571-8",
+   "status": "P",
+   "regeln": [],
+   "hinweis": ""
+  },
+  {
+   "profil": "MAL-02B",
+   "nr": "2B.1",
+   "parameter": "Selen",
+   "material": "Serum (Spurenelement-Röhrchen)",
+   "loinc": "5724-0",
+   "status": "P",
+   "regeln": [
+    "R1"
+   ],
+   "hinweis": "Unter Inflammation erniedrigt (Regel R1)"
+  },
+  {
+   "profil": "MAL-02B",
+   "nr": "2B.2",
+   "parameter": "Kupfer",
+   "material": "Serum (Spurenelement-Röhrchen)",
+   "loinc": "5631-7",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Gemeinsam mit Ceruloplasmin beurteilen; Kupfermangel insbesondere nach bariatrischer Operation und unter Zinksubstitution"
+  },
+  {
+   "profil": "MAL-02B",
+   "nr": "2B.3",
+   "parameter": "Ceruloplasmin",
+   "material": "Serum",
+   "loinc": "2064-4",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Positives Akute-Phase-Protein"
+  },
+  {
+   "profil": "MAL-02B",
+   "nr": "2B.4",
+   "parameter": "Vitamin B1 (Thiamindiphosphat)",
+   "material": "EDTA-Vollblut, lichtgeschützt",
+   "loinc": "prüfen",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Vollblutbestimmung; Serum-Thiamin ungeeignet"
+  },
+  {
+   "profil": "MAL-02B",
+   "nr": "2B.5",
+   "parameter": "Vitamin B6 (Pyridoxal-5-phosphat)",
+   "material": "EDTA-Plasma, lichtgeschützt",
+   "loinc": "prüfen",
+   "status": "P",
+   "regeln": [],
+   "hinweis": ""
+  },
+  {
+   "profil": "MAL-02B",
+   "nr": "2B.6",
+   "parameter": "Vitamin C (Ascorbat)",
+   "material": "Heparin-/EDTA-Plasma, sofort gekühlt, lichtgeschützt",
+   "loinc": "prüfen",
+   "status": "O",
+   "regeln": [],
+   "hinweis": "Nur bei entsprechender Anamnese; strenge Präanalytik"
+  },
+  {
+   "profil": "MAL-02B",
+   "nr": "2B.7",
+   "parameter": "Mangan",
+   "material": "EDTA-Vollblut (Spurenelement-Röhrchen)",
+   "loinc": "prüfen",
+   "status": "O",
+   "regeln": [],
+   "hinweis": "Vor allem unter langfristiger parenteraler Ernährung relevant"
+  },
+  {
+   "profil": "MAL-02C",
+   "nr": "2C.1",
+   "parameter": "Citrullin",
+   "material": "Plasma, nüchtern",
+   "loinc": "prüfen",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Marker der funktionellen Enterozytenmasse; bei Niereninsuffizienz erhöht"
+  },
+  {
+   "profil": "MAL-02C",
+   "nr": "2C.2",
+   "parameter": "7α-Hydroxy-4-cholesten-3-on (C4)",
+   "material": "Serum, nüchtern",
+   "loinc": "prüfen",
+   "status": "O",
+   "regeln": [],
+   "hinweis": "Gallensäureverlustsyndrom; Alternative zu 2C.3"
+  },
+  {
+   "profil": "MAL-02C",
+   "nr": "2C.3",
+   "parameter": "SeHCAT-Test",
+   "material": "nuklearmedizinisch (extern)",
+   "loinc": "–",
+   "status": "O",
+   "regeln": [],
+   "hinweis": "Funktionsuntersuchung; Anforderung über Konsil, kein Laborparameter"
+  },
+  {
+   "profil": "MAL-02C",
+   "nr": "2C.4",
+   "parameter": "Oxalat im 24-h-Urin",
+   "material": "24-h-Sammelurin, angesäuert",
+   "loinc": "prüfen",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Nur bei erhaltenem Kolon (enterale Hyperoxalurie, Nephrolithiasisrisiko)"
+  },
+  {
+   "profil": "MAL-03A",
+   "nr": "3A.1",
+   "parameter": "Pankreas-Elastase-1",
+   "material": "Stuhl (geformt)",
+   "loinc": "25907-7",
+   "status": "P",
+   "regeln": [
+    "R5"
+   ],
+   "hinweis": "Wässriger Stuhl verdünnungsbedingt falsch niedrig (Regel R5)"
+  },
+  {
+   "profil": "MAL-03A",
+   "nr": "3A.2",
+   "parameter": "Stuhlfett, quantitativ (72 h)",
+   "material": "Stuhlsammlung 72 h",
+   "loinc": "prüfen",
+   "status": "O",
+   "regeln": [],
+   "hinweis": "Nur bei fortbestehender Unklarheit; definierte Fettzufuhr während der Sammlung"
+  },
+  {
+   "profil": "MAL-03B",
+   "nr": "3B.1",
+   "parameter": "Calprotectin",
+   "material": "Stuhl",
+   "loinc": "38445-3",
+   "status": "P",
+   "regeln": [
+    "R6"
+   ],
+   "hinweis": "Steuert Regel R6"
+  },
+  {
+   "profil": "MAL-03C",
+   "nr": "3C.1",
+   "parameter": "Glukose-H2/CH4-Atemtest",
+   "material": "Funktionsdiagnostik",
+   "loinc": "–",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Dünndarmfehlbesiedlung; Limitationen (Sensitivität, Vorbereitung) beachten"
+  },
+  {
+   "profil": "MAL-03C",
+   "nr": "3C.2",
+   "parameter": "Laktulose-H2/CH4-Atemtest",
+   "material": "Funktionsdiagnostik",
+   "loinc": "–",
+   "status": "O",
+   "regeln": [],
+   "hinweis": "Alternative zu 3C.1; Orozökaltransit beeinflusst Ergebnis"
+  },
+  {
+   "profil": "MAL-03C",
+   "nr": "3C.3",
+   "parameter": "Laktose-H2-Atemtest",
+   "material": "Funktionsdiagnostik",
+   "loinc": "–",
+   "status": "O",
+   "regeln": [],
+   "hinweis": "Kohlenhydratmalabsorption"
+  },
+  {
+   "profil": "MAL-03C",
+   "nr": "3C.4",
+   "parameter": "Fruktose-H2-Atemtest",
+   "material": "Funktionsdiagnostik",
+   "loinc": "–",
+   "status": "O",
+   "regeln": [],
+   "hinweis": "Kohlenhydratmalabsorption"
+  },
+  {
+   "profil": "MAL-03D",
+   "nr": "3D.1",
+   "parameter": "Stuhlmikrobiologie (Kultur / PCR-Panel)",
+   "material": "Stuhl",
+   "loinc": "–",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Nach Reise- und Expositionsanamnese; Panelinhalt laborabhängig"
+  },
+  {
+   "profil": "MAL-03D",
+   "nr": "3D.2",
+   "parameter": "Giardia-lamblia-Antigen",
+   "material": "Stuhl",
+   "loinc": "prüfen",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Ggf. im PCR-Panel enthalten"
+  },
+  {
+   "profil": "MAL-03D",
+   "nr": "3D.3",
+   "parameter": "α1-Antitrypsin-Clearance",
+   "material": "Stuhl (24 h) und Serum",
+   "loinc": "prüfen",
+   "status": "O",
+   "regeln": [],
+   "hinweis": "Proteinverlustenteropathie; Serumwert zeitgleich erforderlich"
+  },
+  {
+   "profil": "MAL-05",
+   "nr": "5.1",
+   "parameter": "Pathologische Parameter aus MAL-04",
+   "material": "wie Ursprungsparameter",
+   "loinc": "wie Ursprungsparameter",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Dynamische Zusammenstellung aus den zuletzt pathologischen Werten; Intervall nach Abschnitt 5"
+  },
+  {
+   "profil": "MAL-05",
+   "nr": "5.2",
+   "parameter": "Knochenstoffwechsel: Parathormon, alkalische Phosphatase, Calcium (korrigiert), Phosphat, 25-OH-Vitamin D",
+   "material": "Serum / EDTA-Plasma",
+   "loinc": "2731-8, 6768-6, 17861-6, 14879-1, 1989-3",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Jährlich; Knochendichtemessung (DXA) als nicht-laborchemische Ergänzung periodisch erwägen"
+  },
+  {
+   "profil": "MAL-05",
+   "nr": "5.3",
+   "parameter": "Erweiterte Überwachung unter parenteraler Ernährung",
+   "material": "gemäß ESPEN-HPN",
+   "loinc": "–",
+   "status": "O",
+   "regeln": [],
+   "hinweis": "Spurenelemente, Vitamine, Leberwerte, Triglyceride, Katheterassoziierte Parameter nach ESPEN-HPN-Empfehlungen"
+  },
+  {
+   "profil": "MAL-06",
+   "nr": "6.1",
+   "parameter": "Phosphat",
+   "material": "Serum",
+   "loinc": "14879-1",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Vor Kostaufbau und täglich in den ersten drei Tagen; Leitparameter"
+  },
+  {
+   "profil": "MAL-06",
+   "nr": "6.2",
+   "parameter": "Kalium",
+   "material": "Serum",
+   "loinc": "2823-3",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "wie 6.1"
+  },
+  {
+   "profil": "MAL-06",
+   "nr": "6.3",
+   "parameter": "Magnesium",
+   "material": "Serum",
+   "loinc": "2601-3",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "wie 6.1"
+  },
+  {
+   "profil": "MAL-06",
+   "nr": "6.4",
+   "parameter": "Natrium",
+   "material": "Serum",
+   "loinc": "2951-2",
+   "status": "P",
+   "regeln": [],
+   "hinweis": "Flüssigkeitsbilanz / Ödemneigung"
+  },
+  {
+   "profil": "MAL-06",
+   "nr": "6.5",
+   "parameter": "Glukose",
+   "material": "NaF-Plasma",
+   "loinc": "2345-7",
+   "status": "P",
+   "regeln": [],
+   "hinweis": ""
+  },
+  {
+   "profil": "MAL-06",
+   "nr": "6.6",
+   "parameter": "Thiaminsubstitution (Pflichthinweis, kein Laborparameter)",
+   "material": "–",
+   "loinc": "–",
+   "status": "",
+   "regeln": [],
+   "hinweis": "Bei Risikokonstellation vor der ersten Nährstoffzufuhr; Bestimmung von 2B.4 optional, Substitution darf nicht auf das Ergebnis warten"
+  }
+ ],
+ "regeln": [
+  {
+   "id": "R1",
+   "ausloeser": "CRP oberhalb des Referenzbereichs in derselben Anforderung",
+   "aktion": "sTfR (1.26) als Reflex anfordern; Ferritin, Zink, Vitamin A, Selen und Albumin mit Hinweistext „unter Inflammation eingeschränkt beurteilbar“ befunden",
+   "begruendung": "Akute-Phase-Reaktion verändert Ferritin (↑), Zink, Vitamin A, Selen und Albumin (↓) unabhängig vom Versorgungsstatus"
+  },
+  {
+   "id": "R2",
+   "ausloeser": "Vitamin B12 im laborspezifischen Graubereich",
+   "aktion": "Holotranscobalamin (1.29) und/oder Methylmalonsäure (1.30) als Reflex anfordern",
+   "begruendung": "Serum-B12 allein hat im Graubereich unzureichende Sensitivität für einen funktionellen Mangel"
+  },
+  {
+   "id": "R3",
+   "ausloeser": "Gesamt-IgA unterhalb des Referenzbereichs",
+   "aktion": "tTG-IgG und DGP-IgG (1.35) als Reflex anfordern; tTG-IgA mit Hinweis „bei IgA-Mangel nicht verwertbar“ befunden",
+   "begruendung": "IgA-basierte Zöliakie-Serologie ist bei IgA-Mangel falsch negativ"
+  },
+  {
+   "id": "R4",
+   "ausloeser": "Albumin unter 40 g/L",
+   "aktion": "Albuminkorrigiertes Calcium berechnen und ausweisen: Ca (mmol/L) + 0,02 × (40 − Albumin g/L)",
+   "begruendung": "Hypalbuminämie senkt das Gesamtcalcium bei normalem ionisierten Calcium"
+  },
+  {
+   "id": "R5",
+   "ausloeser": "Pankreas-Elastase-1 unter 200 µg/g",
+   "aktion": "Hinweistext „exokrine Pankreasinsuffizienz wahrscheinlich; unter 100 µg/g schwer“; bei dokumentiert wässrigem Stuhl Wiederholung aus geformtem Stuhl vorschlagen; MAL-02A auslösen",
+   "begruendung": "Verdünnungsartefakt bei wässrigem Stuhl; Fettmalabsorption bei relevanter Insuffizienz zu erwarten"
+  },
+  {
+   "id": "R6",
+   "ausloeser": "Calprotectin oberhalb des laborspezifischen Cut-offs",
+   "aktion": "Hinweistext „endoskopische Abklärung erwägen“",
+   "begruendung": "Erhöhtes Calprotectin spricht für eine entzündliche Darmerkrankung"
+  },
+  {
+   "id": "R7",
+   "ausloeser": "25-OH-Vitamin D unter 50 nmol/L (20 ng/mL) oder korrigiertes Calcium unterhalb des Referenzbereichs",
+   "aktion": "Parathormon (2A.4) als Reflex anfordern",
+   "begruendung": "Erfassung eines sekundären Hyperparathyreoidismus"
+  },
+  {
+   "id": "R8",
+   "ausloeser": "Gesamtcholesterin niedrig (laborspezifisch) oder dokumentierte Steatorrhoe",
+   "aktion": "MAL-02A zur Anforderung vorschlagen",
+   "begruendung": "Hinweis auf Fettmalabsorption mit Risiko für Mangel an fettlöslichen Vitaminen"
+  },
+  {
+   "id": "R9",
+   "ausloeser": "Refeeding-Risiko erfüllt (NICE: BMI unter 16 kg/m², Gewichtsverlust über 15 % in 3–6 Monaten, Nahrungskarenz über 10 Tage, oder niedriges Kalium/Phosphat/Magnesium vor Beginn; alternativ zwei Kriterien aus BMI unter 18,5 kg/m², Gewichtsverlust über 10 %, Nahrungskarenz über 5 Tage, Alkoholabusus oder einschlägige Medikation)",
+   "aktion": "MAL-06 vor Beginn der Ernährungstherapie und täglich für drei Tage anlegen; Pflichthinweis Thiaminsubstitution anzeigen",
+   "begruendung": "Prävention des Refeeding-Syndroms"
+  },
+  {
+   "id": "R10",
+   "ausloeser": "Diagnose Kurzdarmsyndrom, chronisches Darmversagen oder Zustand nach bariatrischer Operation im Patientenstamm",
+   "aktion": "MAL-04 bei Erstvorstellung vorschlagen; MAL-02C ergänzen; Monitoring-Plan MAL-05 nach Abschnitt 5 aktivieren",
+   "begruendung": "Strukturierte Initialerhebung und Verlaufskontrolle bei etablierter Diagnose"
+  },
+  {
+   "id": "R11",
+   "ausloeser": "Anforderung von tTG-IgA (1.33)",
+   "aktion": "Pflichtabfrage „Patient unter glutenhaltiger Kost?“; bei Nein Hinweistext und Anforderung nur mit Begründung",
+   "begruendung": "Serologie ist unter glutenfreier Kost falsch negativ"
+  }
+ ],
+ "intervalle": [
+  {
+   "situation": "Pathologische Parameter nach Substitutionsbeginn",
+   "intervall": "4–8 Wochen",
+   "umfang": "Betroffene Parameter",
+   "profil": "MAL-05 (dynamisch)"
+  },
+  {
+   "situation": "Nach Stabilisierung",
+   "intervall": "3–6 Monate",
+   "umfang": "Betroffene Parameter",
+   "profil": "MAL-05 (dynamisch)"
+  },
+  {
+   "situation": "Langzeitverlauf bei chronischer intestinaler Insuffizienz",
+   "intervall": "mindestens jährlich; häufiger bei hoher Verlustsituation oder parenteraler Ernährung",
+   "umfang": "Vollpanel MAL-04 sowie Knochenstoffwechsel",
+   "profil": "MAL-04, MAL-05"
+  },
+  {
+   "situation": "Knochengesundheit",
+   "intervall": "jährlich; DXA periodisch",
+   "umfang": "Parathormon, alkalische Phosphatase, Calcium, Phosphat, 25-OH-Vitamin D",
+   "profil": "MAL-05 (5.2)"
+  },
+  {
+   "situation": "Parenterale Ernährung",
+   "intervall": "gemäß ESPEN-HPN-Empfehlungen",
+   "umfang": "Erweiterte Überwachung",
+   "profil": "MAL-05 (5.3)"
+  },
+  {
+   "situation": "Refeeding-Phase",
+   "intervall": "vor Beginn, dann täglich für drei Tage, anschließend nach klinischem Verlauf",
+   "umfang": "Phosphat, Kalium, Magnesium, Natrium, Glukose",
+   "profil": "MAL-06"
+  }
+ ]
+}

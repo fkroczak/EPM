@@ -1,0 +1,355 @@
+{
+ "quelle": "RC_Labor_MAL-01",
+ "name": "Laborprofil MAL-01 – Basisprofil Malabsorption",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboranforderung Malabsorption – Jeder klinische Verdacht auf Malabsorption oder Maldigestion",
+ "datei": "4a2067d0-Laborprofile_Malabsorption_IT-Integration_RC.docx",
+ "bloecke": [
+  {
+   "id": "kopf",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "titel",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "MAL-01 · Basisprofil Malabsorption (Stufe 1)",
+   "zusatz": "Laboranforderung · Laborprofile Malabsorption V1.0"
+  },
+  {
+   "id": "patient",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Versicherung",
+     "wert": "{{Patient.Versicherung}}"
+    },
+    {
+     "label": "Datum",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Abnahme (Uhrzeit)",
+     "wert": "____________________"
+    },
+    {
+     "label": "Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Abnahme durch",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nüchtern",
+     "wert": "☐ ja  ☐ nein"
+    },
+    {
+     "label": "Dringlichkeit",
+     "wert": "☐ Routine  ☐ eilig"
+    }
+   ]
+  },
+  {
+   "id": "indikation",
+   "typ": "text",
+   "bezeichnung": "Indikation und Klinische Angaben",
+   "text": "Indikation: Jeder klinische Verdacht auf Malabsorption oder Maldigestion\nInhalt: Blutbild, CRP, Proteinstatus, Elektrolyte, Nieren-/Leberfunktion, Gerinnung, Glukose/HbA1c, TSH, Eisenstatus, B12/Folat, Vitamin D, Zink, Zöliakie-Serologie\n\nFragestellung:\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "roehrchen",
+   "typ": "text",
+   "bezeichnung": "Röhrchen und Material (Übersicht)",
+   "text": "☒ EDTA-Blut – Pflicht: 1.01, 1.22\n☒ Serum – Pflicht: 1.02, 1.03, 1.04, 1.06, 1.07, 1.08, 1.09, 1.10, 1.11, 1.12, 1.13, 1.15, 1.16, 1.17, 1.18, 1.19, 1.23, 1.24, 1.25, 1.27, 1.28, 1.31, 1.33, 1.34; optional: 1.05; Reflex: 1.26, 1.29, 1.30, 1.35\n☒ Citratplasma – Pflicht: 1.20\n☒ NaF-Plasma – Pflicht: 1.21\n☒ Serum (Spurenelement-Röhrchen) – Pflicht: 1.32\n☐ EDTA-Plasma, gekühlt – Reflex: 2A.4",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m1",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: EDTA-Blut",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 1.01 Blutbild mit Erythrozytenindizes (MCV, MCH) und Differenzialblutbild",
+     "wert": "Pflicht · LOINC 57021-8 · MCV erhöht: Hinweis auf B12-/Folatmangel; MCV erniedrigt: Eisenmangel; Kombination möglich (dimorphes Bild)"
+    },
+    {
+     "label": "☒ 1.22 HbA1c",
+     "wert": "Pflicht · LOINC 4548-4 · Bei Anämie und Hämoglobinopathien eingeschränkt verwertbar"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m2",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Serum",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 1.02 CRP",
+     "wert": "Pflicht · LOINC 1988-5 · Obligat parallel zu jeder Mikronährstoffbestimmung; steuert Regel R1"
+    },
+    {
+     "label": "☒ 1.03 Albumin",
+     "wert": "Pflicht · LOINC 1751-7 · Negatives Akute-Phase-Protein; kein spezifischer Ernährungsmarker; steuert Regel R4"
+    },
+    {
+     "label": "☒ 1.04 Gesamtprotein",
+     "wert": "Pflicht · LOINC 2885-2"
+    },
+    {
+     "label": "☐ 1.05 Präalbumin (Transthyretin)",
+     "wert": "optional · LOINC 14338-8 · Nur in Zusammenschau mit CRP beurteilen"
+    },
+    {
+     "label": "☒ 1.06 Natrium",
+     "wert": "Pflicht · LOINC 2951-2"
+    },
+    {
+     "label": "☒ 1.07 Kalium",
+     "wert": "Pflicht · LOINC 2823-3 · Hämolyse vermeiden"
+    },
+    {
+     "label": "☒ 1.08 Chlorid",
+     "wert": "Pflicht · LOINC 2075-0"
+    },
+    {
+     "label": "☒ 1.09 Calcium, gesamt (albuminkorrigiert ausweisen)",
+     "wert": "Pflicht · LOINC 17861-6 · Korrektur nach Regel R4; alternativ ionisiertes Calcium (1995-0, anaerob, Heparin-Vollblut)"
+    },
+    {
+     "label": "☒ 1.10 Magnesium",
+     "wert": "Pflicht · LOINC 2601-3 · Hypomagnesiämie bei Diarrhoe und PPI-Therapie häufig"
+    },
+    {
+     "label": "☒ 1.11 Phosphat",
+     "wert": "Pflicht · LOINC 14879-1 · Refeeding-Leitparameter"
+    },
+    {
+     "label": "☒ 1.12 Kreatinin",
+     "wert": "Pflicht · LOINC 2160-0 · Bei reduzierter Muskelmasse falsch niedrig; eGFR entsprechend einschränkend beurteilen"
+    },
+    {
+     "label": "☒ 1.13 Harnstoff",
+     "wert": "Pflicht · LOINC im Laborkatalog prüfen"
+    },
+    {
+     "label": "☒ 1.15 AST",
+     "wert": "Pflicht · LOINC 1920-8"
+    },
+    {
+     "label": "☒ 1.16 ALT",
+     "wert": "Pflicht · LOINC 1742-6"
+    },
+    {
+     "label": "☒ 1.17 GGT",
+     "wert": "Pflicht · LOINC 2324-2"
+    },
+    {
+     "label": "☒ 1.18 Alkalische Phosphatase",
+     "wert": "Pflicht · LOINC 6768-6 · Erhöhung auch bei Osteomalazie (Vitamin-D-Mangel)"
+    },
+    {
+     "label": "☒ 1.19 Bilirubin, gesamt",
+     "wert": "Pflicht · LOINC 1975-2"
+    },
+    {
+     "label": "☒ 1.23 TSH",
+     "wert": "Pflicht · LOINC 3016-3 · Ausschluss Hyperthyreose bei ungewolltem Gewichtsverlust"
+    },
+    {
+     "label": "☒ 1.24 Ferritin",
+     "wert": "Pflicht · LOINC 2276-4 · Akute-Phase-Protein; unter Inflammation falsch normal (Regel R1)"
+    },
+    {
+     "label": "☒ 1.25 Transferrinsättigung",
+     "wert": "Pflicht · LOINC 2502-3 · Nüchternabnahme; Transferrin 3034-6"
+    },
+    {
+     "label": "☐ 1.26 Löslicher Transferrinrezeptor (sTfR)",
+     "wert": "Reflex (Regel R1) · LOINC 30248-9 · Reflex bei erhöhtem CRP (Regel R1); ggf. sTfR/log-Ferritin-Index"
+    },
+    {
+     "label": "☒ 1.27 Vitamin B12",
+     "wert": "Pflicht · LOINC 2132-9 · Obligat nach ileozökaler Resektion, bei Crohn des terminalen Ileums, nach bariatrischer Operation; steuert Regel R2"
+    },
+    {
+     "label": "☒ 1.28 Folat (Serum)",
+     "wert": "Pflicht · LOINC 2284-8 · Alternativ oder ergänzend Erythrozytenfolat (EDTA-Blut, Code prüfen)"
+    },
+    {
+     "label": "☐ 1.29 Holotranscobalamin",
+     "wert": "Reflex (Regel R2) · LOINC im Laborkatalog prüfen · Reflex bei grenzwertigem B12 (Regel R2)"
+    },
+    {
+     "label": "☐ 1.30 Methylmalonsäure",
+     "wert": "Reflex (Regel R2) · LOINC 13964-2 · Reflex bei grenzwertigem B12 (Regel R2); bei Niereninsuffizienz erhöht"
+    },
+    {
+     "label": "☒ 1.31 25-OH-Vitamin D",
+     "wert": "Pflicht · LOINC 1989-3 · Steuert Regel R7"
+    },
+    {
+     "label": "☒ 1.33 Gewebstransglutaminase-IgA (tTG-IgA)",
+     "wert": "Pflicht · LOINC 31017-7 · Nur unter glutenhaltiger Kost aussagekräftig; Pflichthinweis bei Anforderung"
+    },
+    {
+     "label": "☒ 1.34 Gesamt-IgA",
+     "wert": "Pflicht · LOINC 2458-8 · Steuert Regel R3"
+    },
+    {
+     "label": "☐ 1.35 tTG-IgG und deamidierte Gliadinpeptide-IgG",
+     "wert": "Reflex (Regel R3) · LOINC 31018-5 / im Laborkatalog prüfen · Reflex bei IgA-Mangel (Regel R3)"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m3",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Citratplasma",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 1.20 INR (Quick)",
+     "wert": "Pflicht · LOINC 6301-6 · Orientierender Vitamin-K-Parameter; Quick-Wert 5894-1"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m4",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: NaF-Plasma",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 1.21 Glukose, nüchtern",
+     "wert": "Pflicht · LOINC 2345-7"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m5",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Serum (Spurenelement-Röhrchen)",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 1.32 Zink",
+     "wert": "Pflicht · LOINC 5763-8 · Hämolyse vermeiden; unter Inflammation und Hypalbuminämie falsch niedrig (Regel R1)"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m6",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: EDTA-Plasma, gekühlt",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☐ 2A.4 Parathormon, intakt",
+     "wert": "Reflex (Regel R7) · LOINC 2731-8 · aus MAL-02A; Sekundärer Hyperparathyreoidismus bei Vitamin-D-Mangel oder Hypokalzämie (Regel R7)"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m7",
+   "typ": "datenfelder",
+   "bezeichnung": "Rechenwert (kein Röhrchen)",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 1.14 eGFR (CKD-EPI 2021)",
+     "wert": "Pflicht · LOINC 98979-8 · Rechenwert aus 1.12"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "legende",
+   "typ": "text",
+   "bezeichnung": "Legende",
+   "text": "☒ Pflichtparameter des Profils (angekreuzt) · ☐ optional – bei Bedarf ankreuzen · ☐ Reflex – nur bei Erfüllung der genannten Regel, wird vom Labor nachgefordert. LOINC als Zuordnungsvorschlag; „im Laborkatalog prüfen“ = Code beim beauftragten Labor zuordnen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "praeanalytik",
+   "typ": "text",
+   "bezeichnung": "Pflichthinweise zur Präanalytik",
+   "text": "tTG-IgA (1.33): Patient unter glutenhaltiger Kost?  ☐ ja  ☐ nein – bei Nein nur mit Begründung anfordern (Serologie unter glutenfreier Kost falsch negativ, Regel R11). Begründung: ____________________\nSpurenelemente: eigenes Spurenelement-Röhrchen verwenden, Hämolyse vermeiden.\nGekühlte Proben (EDTA-Plasma, gekühlt): sofort kühlen und gekühlt transportieren.\nNüchternabnahme erforderlich für: 1.21, 1.25.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "regeln",
+   "typ": "text",
+   "bezeichnung": "Reflexregeln und Befundhinweise",
+   "text": "R1 – Wenn: CRP oberhalb des Referenzbereichs in derselben Anforderung → sTfR (1.26) als Reflex anfordern; Ferritin, Zink, Vitamin A, Selen und Albumin mit Hinweistext „unter Inflammation eingeschränkt beurteilbar“ befunden\nR2 – Wenn: Vitamin B12 im laborspezifischen Graubereich → Holotranscobalamin (1.29) und/oder Methylmalonsäure (1.30) als Reflex anfordern\nR3 – Wenn: Gesamt-IgA unterhalb des Referenzbereichs → tTG-IgG und DGP-IgG (1.35) als Reflex anfordern; tTG-IgA mit Hinweis „bei IgA-Mangel nicht verwertbar“ befunden\nR4 – Wenn: Albumin unter 40 g/L → Albuminkorrigiertes Calcium berechnen und ausweisen: Ca (mmol/L) + 0,02 × (40 − Albumin g/L)\nR7 – Wenn: 25-OH-Vitamin D unter 50 nmol/L (20 ng/mL) oder korrigiertes Calcium unterhalb des Referenzbereichs → Parathormon (2A.4) als Reflex anfordern\nR11 – Wenn: Anforderung von tTG-IgA (1.33) → Pflichtabfrage „Patient unter glutenhaltiger Kost?“; bei Nein Hinweistext und Anforderung nur mit Begründung",
+   "optionen": {
+    "ueberschrift": true,
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "unterschrift",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Datum, Unterschrift anfordernder Arzt",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "fuss",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

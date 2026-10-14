@@ -1,0 +1,240 @@
+{
+ "quelle": "RC_Labor_MAL-03",
+ "name": "Laborprofil MAL-03 – Ursachenbezogene Zusatzdiagnostik",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboranforderung Malabsorption – Pankreas, CED, Dünndarmfehlbesiedlung/Kohlenhydrate, Infektion und Proteinverlust (MAL-03A–D)",
+ "datei": "4a2067d0-Laborprofile_Malabsorption_IT-Integration_RC.docx",
+ "bloecke": [
+  {
+   "id": "kopf",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "titel",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "MAL-03 · Ursachenbezogene Zusatzdiagnostik (Stufe 3)",
+   "zusatz": "Laboranforderung · Laborprofile Malabsorption V1.0"
+  },
+  {
+   "id": "patient",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Versicherung",
+     "wert": "{{Patient.Versicherung}}"
+    },
+    {
+     "label": "Datum",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Abnahme (Uhrzeit)",
+     "wert": "____________________"
+    },
+    {
+     "label": "Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Abnahme durch",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nüchtern",
+     "wert": "☐ ja  ☐ nein"
+    },
+    {
+     "label": "Dringlichkeit",
+     "wert": "☐ Routine  ☐ eilig"
+    }
+   ]
+  },
+  {
+   "id": "indikation",
+   "typ": "text",
+   "bezeichnung": "Indikation und Klinische Angaben",
+   "text": "☐ MAL-03A · Exokrine Pankreasinsuffizienz (Stufe 3) – Steatorrhoe, Pankreasanamnese\n☐ MAL-03B · Chronisch-entzündliche Darmerkrankung (Stufe 3) – Diarrhoe, Blutabgang, erhöhtes CRP\n☐ MAL-03C · Dünndarmfehlbesiedlung und Kohlenhydratmalabsorption (Stufe 3) – Blähungen, Diarrhoe, Zustand nach Resektion, Motilitätsstörung\n☐ MAL-03D · Infektiöse Ursachen und Proteinverlustenteropathie (Stufe 3) – Reise-/Expositionsanamnese, Hypalbuminämie ohne Erklärung\n\nFragestellung:\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "roehrchen",
+   "typ": "text",
+   "bezeichnung": "Röhrchen und Material (Übersicht)",
+   "text": "☐ Stuhl (geformt) – Pflicht: 3A.1\n☐ Stuhlsammlung 72 h – optional: 3A.2\n☐ Stuhl – Pflicht: 3B.1, 3D.1, 3D.2\n☐ Stuhl (24 h) und Serum – optional: 3D.3",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "mal03am1",
+   "typ": "datenfelder",
+   "bezeichnung": "MAL-03A · Exokrine Pankreasinsuffizienz (Stufe 3) – Röhrchen / Material: Stuhl (geformt)",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☐ 3A.1 Pankreas-Elastase-1",
+     "wert": "Pflicht · LOINC 25907-7 · Wässriger Stuhl verdünnungsbedingt falsch niedrig (Regel R5)"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "mal03am2",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Stuhlsammlung 72 h",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☐ 3A.2 Stuhlfett, quantitativ (72 h)",
+     "wert": "optional · LOINC im Laborkatalog prüfen · Nur bei fortbestehender Unklarheit; definierte Fettzufuhr während der Sammlung"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "mal03bm1",
+   "typ": "datenfelder",
+   "bezeichnung": "MAL-03B · Chronisch-entzündliche Darmerkrankung (Stufe 3) – Röhrchen / Material: Stuhl",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☐ 3B.1 Calprotectin",
+     "wert": "Pflicht · LOINC 38445-3 · Steuert Regel R6"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "mal03cm1",
+   "typ": "datenfelder",
+   "bezeichnung": "MAL-03C · Dünndarmfehlbesiedlung und Kohlenhydratmalabsorption (Stufe 3) – Funktionsdiagnostik (keine Probe)",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☐ 3C.1 Glukose-H2/CH4-Atemtest",
+     "wert": "Pflicht · Dünndarmfehlbesiedlung; Limitationen (Sensitivität, Vorbereitung) beachten"
+    },
+    {
+     "label": "☐ 3C.2 Laktulose-H2/CH4-Atemtest",
+     "wert": "optional · Alternative zu 3C.1; Orozökaltransit beeinflusst Ergebnis"
+    },
+    {
+     "label": "☐ 3C.3 Laktose-H2-Atemtest",
+     "wert": "optional · Kohlenhydratmalabsorption"
+    },
+    {
+     "label": "☐ 3C.4 Fruktose-H2-Atemtest",
+     "wert": "optional · Kohlenhydratmalabsorption"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "mal03dm1",
+   "typ": "datenfelder",
+   "bezeichnung": "MAL-03D · Infektiöse Ursachen und Proteinverlustenteropathie (Stufe 3) – Röhrchen / Material: Stuhl",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☐ 3D.1 Stuhlmikrobiologie (Kultur / PCR-Panel)",
+     "wert": "Pflicht · Nach Reise- und Expositionsanamnese; Panelinhalt laborabhängig"
+    },
+    {
+     "label": "☐ 3D.2 Giardia-lamblia-Antigen",
+     "wert": "Pflicht · LOINC im Laborkatalog prüfen · Ggf. im PCR-Panel enthalten"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "mal03dm2",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Stuhl (24 h) und Serum",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☐ 3D.3 α1-Antitrypsin-Clearance",
+     "wert": "optional · LOINC im Laborkatalog prüfen · Proteinverlustenteropathie; Serumwert zeitgleich erforderlich"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "legende",
+   "typ": "text",
+   "bezeichnung": "Legende",
+   "text": "Teilprofil oben wählen, dann dessen Parameter ankreuzen: Pflicht = Pflichtparameter des Teilprofils · ☐ optional – bei Bedarf ankreuzen · ☐ Reflex – nur bei Erfüllung der genannten Regel, wird vom Labor nachgefordert. LOINC als Zuordnungsvorschlag; „im Laborkatalog prüfen“ = Code beim beauftragten Labor zuordnen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "praeanalytik",
+   "typ": "text",
+   "bezeichnung": "Pflichthinweise zur Präanalytik",
+   "text": "Pankreas-Elastase-1 (3A.1): aus geformtem Stuhl – wässriger Stuhl ist verdünnungsbedingt falsch niedrig (R5).",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "regeln",
+   "typ": "text",
+   "bezeichnung": "Reflexregeln und Befundhinweise",
+   "text": "R5 – Wenn: Pankreas-Elastase-1 unter 200 µg/g → Hinweistext „exokrine Pankreasinsuffizienz wahrscheinlich; unter 100 µg/g schwer“; bei dokumentiert wässrigem Stuhl Wiederholung aus geformtem Stuhl vorschlagen; MAL-02A auslösen\nR6 – Wenn: Calprotectin oberhalb des laborspezifischen Cut-offs → Hinweistext „endoskopische Abklärung erwägen“",
+   "optionen": {
+    "ueberschrift": true,
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "unterschrift",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Datum, Unterschrift anfordernder Arzt",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "fuss",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

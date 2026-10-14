@@ -1,0 +1,228 @@
+{
+ "quelle": "RC_Labor_MAL-02B",
+ "name": "Laborprofil MAL-02B – Ausgeprägte oder langdauernde Malabsorption",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboranforderung Malabsorption – Kurzdarmsyndrom, ausgedehnte Dünndarmresektion, chronisches Darmversagen, Zustand nach bariatrischer Operation",
+ "datei": "4a2067d0-Laborprofile_Malabsorption_IT-Integration_RC.docx",
+ "bloecke": [
+  {
+   "id": "kopf",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "titel",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "MAL-02B · Ausgeprägte oder langdauernde Malabsorption (Stufe 2)",
+   "zusatz": "Laboranforderung · Laborprofile Malabsorption V1.0"
+  },
+  {
+   "id": "patient",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Versicherung",
+     "wert": "{{Patient.Versicherung}}"
+    },
+    {
+     "label": "Datum",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Abnahme (Uhrzeit)",
+     "wert": "____________________"
+    },
+    {
+     "label": "Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Abnahme durch",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nüchtern",
+     "wert": "☐ ja  ☐ nein"
+    },
+    {
+     "label": "Dringlichkeit",
+     "wert": "☐ Routine  ☐ eilig"
+    }
+   ]
+  },
+  {
+   "id": "indikation",
+   "typ": "text",
+   "bezeichnung": "Indikation und Klinische Angaben",
+   "text": "Indikation: Kurzdarmsyndrom, ausgedehnte Dünndarmresektion, chronisches Darmversagen, Zustand nach bariatrischer Operation\nInhalt: Selen, Kupfer/Ceruloplasmin, Vitamin B1, Vitamin B6; optional Vitamin C, Mangan\n\nFragestellung:\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "roehrchen",
+   "typ": "text",
+   "bezeichnung": "Röhrchen und Material (Übersicht)",
+   "text": "☒ Serum (Spurenelement-Röhrchen) – Pflicht: 2B.1, 2B.2\n☒ Serum – Pflicht: 2B.3\n☒ EDTA-Vollblut, lichtgeschützt – Pflicht: 2B.4\n☒ EDTA-Plasma, lichtgeschützt – Pflicht: 2B.5\n☐ Heparin-/EDTA-Plasma, sofort gekühlt, lichtgeschützt – optional: 2B.6\n☐ EDTA-Vollblut (Spurenelement-Röhrchen) – optional: 2B.7",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m1",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Serum (Spurenelement-Röhrchen)",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 2B.1 Selen",
+     "wert": "Pflicht · LOINC 5724-0 · Unter Inflammation erniedrigt (Regel R1)"
+    },
+    {
+     "label": "☒ 2B.2 Kupfer",
+     "wert": "Pflicht · LOINC 5631-7 · Gemeinsam mit Ceruloplasmin beurteilen; Kupfermangel insbesondere nach bariatrischer Operation und unter Zinksubstitution"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m2",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Serum",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 2B.3 Ceruloplasmin",
+     "wert": "Pflicht · LOINC 2064-4 · Positives Akute-Phase-Protein"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m3",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: EDTA-Vollblut, lichtgeschützt",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 2B.4 Vitamin B1 (Thiamindiphosphat)",
+     "wert": "Pflicht · LOINC im Laborkatalog prüfen · Vollblutbestimmung; Serum-Thiamin ungeeignet"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m4",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: EDTA-Plasma, lichtgeschützt",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 2B.5 Vitamin B6 (Pyridoxal-5-phosphat)",
+     "wert": "Pflicht · LOINC im Laborkatalog prüfen"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m5",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Heparin-/EDTA-Plasma, sofort gekühlt, lichtgeschützt",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☐ 2B.6 Vitamin C (Ascorbat)",
+     "wert": "optional · LOINC im Laborkatalog prüfen · Nur bei entsprechender Anamnese; strenge Präanalytik"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m6",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: EDTA-Vollblut (Spurenelement-Röhrchen)",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☐ 2B.7 Mangan",
+     "wert": "optional · LOINC im Laborkatalog prüfen · Vor allem unter langfristiger parenteraler Ernährung relevant"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "legende",
+   "typ": "text",
+   "bezeichnung": "Legende",
+   "text": "☒ Pflichtparameter des Profils (angekreuzt) · ☐ optional – bei Bedarf ankreuzen · ☐ Reflex – nur bei Erfüllung der genannten Regel, wird vom Labor nachgefordert. LOINC als Zuordnungsvorschlag; „im Laborkatalog prüfen“ = Code beim beauftragten Labor zuordnen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "praeanalytik",
+   "typ": "text",
+   "bezeichnung": "Pflichthinweise zur Präanalytik",
+   "text": "Spurenelemente: eigenes Spurenelement-Röhrchen verwenden, Hämolyse vermeiden.\nLichtempfindliche Vitamine: Röhrchen lichtgeschützt abnehmen und transportieren.\nGekühlte Proben (Heparin-/EDTA-Plasma, sofort gekühlt, lichtgeschützt): sofort kühlen und gekühlt transportieren.",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "regeln",
+   "typ": "text",
+   "bezeichnung": "Reflexregeln und Befundhinweise",
+   "text": "R1 – Wenn: CRP oberhalb des Referenzbereichs in derselben Anforderung → sTfR (1.26) als Reflex anfordern; Ferritin, Zink, Vitamin A, Selen und Albumin mit Hinweistext „unter Inflammation eingeschränkt beurteilbar“ befunden",
+   "optionen": {
+    "ueberschrift": true,
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "unterschrift",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Datum, Unterschrift anfordernder Arzt",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "fuss",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

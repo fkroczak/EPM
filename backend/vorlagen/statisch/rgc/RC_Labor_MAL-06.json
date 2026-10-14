@@ -1,0 +1,186 @@
+{
+ "quelle": "RC_Labor_MAL-06",
+ "name": "Laborprofil MAL-06 – Refeeding-Monitoring",
+ "gruppe": "anforderungen",
+ "beschreibung": "Laboranforderung Malabsorption – Refeeding-Risiko nach NICE-/ESPEN-Kriterien vor Beginn einer Ernährungstherapie",
+ "datei": "4a2067d0-Laborprofile_Malabsorption_IT-Integration_RC.docx",
+ "bloecke": [
+  {
+   "id": "kopf",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": true,
+   "falzmarken": false
+  },
+  {
+   "id": "titel",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "MAL-06 · Refeeding-Monitoring",
+   "zusatz": "Laboranforderung · Laborprofile Malabsorption V1.0"
+  },
+  {
+   "id": "patient",
+   "typ": "datenfelder",
+   "bezeichnung": "Patient und Anforderung",
+   "spalten": 2,
+   "felder": [
+    {
+     "label": "Name, Vorname",
+     "wert": "{{Patient.Name}}"
+    },
+    {
+     "label": "Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Patienten-ID",
+     "wert": "{{Patient.Nummer}}"
+    },
+    {
+     "label": "Versicherung",
+     "wert": "{{Patient.Versicherung}}"
+    },
+    {
+     "label": "Datum",
+     "wert": "{{Heute}}"
+    },
+    {
+     "label": "Abnahme (Uhrzeit)",
+     "wert": "____________________"
+    },
+    {
+     "label": "Anfordernder Arzt",
+     "wert": "____________________"
+    },
+    {
+     "label": "Abnahme durch",
+     "wert": "____________________"
+    },
+    {
+     "label": "Nüchtern",
+     "wert": "☐ ja  ☐ nein"
+    },
+    {
+     "label": "Dringlichkeit",
+     "wert": "☐ Routine  ☐ eilig"
+    }
+   ]
+  },
+  {
+   "id": "indikation",
+   "typ": "text",
+   "bezeichnung": "Indikation und Klinische Angaben",
+   "text": "Indikation: Refeeding-Risiko nach NICE-/ESPEN-Kriterien vor Beginn einer Ernährungstherapie\nInhalt: Phosphat, Kalium, Magnesium, Natrium, Glukose; Thiaminsubstitution als Pflichthinweis\n\nFragestellung:\n\n",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "thiamin",
+   "typ": "text",
+   "bezeichnung": "Pflichthinweis Thiaminsubstitution",
+   "text": "Bei Risikokonstellation vor der ersten Nährstoffzufuhr; Bestimmung von 2B.4 optional, Substitution darf nicht auf das Ergebnis warten\n☐ Thiamin vor der ersten Nährstoffzufuhr gegeben – Datum/Uhrzeit: ____________________",
+   "optionen": {
+    "ueberschrift": true,
+    "fett": true
+   }
+  },
+  {
+   "id": "abnahmen",
+   "typ": "text",
+   "bezeichnung": "Abnahmezeitpunkte",
+   "text": "Vor Kostaufbau und täglich in den ersten drei Tagen, anschließend nach klinischem Verlauf.\n☐ vor Beginn   ☐ Tag 1   ☐ Tag 2   ☐ Tag 3   ☐ weitere: ____________________",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "roehrchen",
+   "typ": "text",
+   "bezeichnung": "Röhrchen und Material (Übersicht)",
+   "text": "☒ Serum – Pflicht: 6.1, 6.2, 6.3, 6.4\n☒ NaF-Plasma – Pflicht: 6.5",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m1",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: Serum",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 6.1 Phosphat",
+     "wert": "Pflicht · LOINC 14879-1 · Vor Kostaufbau und täglich in den ersten drei Tagen; Leitparameter"
+    },
+    {
+     "label": "☒ 6.2 Kalium",
+     "wert": "Pflicht · LOINC 2823-3 · wie 6.1"
+    },
+    {
+     "label": "☒ 6.3 Magnesium",
+     "wert": "Pflicht · LOINC 2601-3 · wie 6.1"
+    },
+    {
+     "label": "☒ 6.4 Natrium",
+     "wert": "Pflicht · LOINC 2951-2 · Flüssigkeitsbilanz / Ödemneigung"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "m2",
+   "typ": "datenfelder",
+   "bezeichnung": "Röhrchen / Material: NaF-Plasma",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "☒ 6.5 Glukose",
+     "wert": "Pflicht · LOINC 2345-7"
+    }
+   ],
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "legende",
+   "typ": "text",
+   "bezeichnung": "Legende",
+   "text": "☒ Pflichtparameter des Profils (angekreuzt) · ☐ optional – bei Bedarf ankreuzen · ☐ Reflex – nur bei Erfüllung der genannten Regel, wird vom Labor nachgefordert. LOINC als Zuordnungsvorschlag; „im Laborkatalog prüfen“ = Code beim beauftragten Labor zuordnen.",
+   "optionen": {
+    "schrift": "klein",
+    "kursiv": true
+   }
+  },
+  {
+   "id": "regeln",
+   "typ": "text",
+   "bezeichnung": "Reflexregeln und Befundhinweise",
+   "text": "R9 – Wenn: Refeeding-Risiko erfüllt (NICE: BMI unter 16 kg/m², Gewichtsverlust über 15 % in 3–6 Monaten, Nahrungskarenz über 10 Tage, oder niedriges Kalium/Phosphat/Magnesium vor Beginn; alternativ zwei Kriterien aus BMI unter 18,5 kg/m², Gewichtsverlust über 10 %, Nahrungskarenz über 5 Tage, Alkoholabusus oder einschlägige Medikation) → MAL-06 vor Beginn der Ernährungstherapie und täglich für drei Tage anlegen; Pflichthinweis Thiaminsubstitution anzeigen",
+   "optionen": {
+    "ueberschrift": true,
+    "schrift": "klein"
+   }
+  },
+  {
+   "id": "unterschrift",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Datum, Unterschrift anfordernder Arzt",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "fuss",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}
