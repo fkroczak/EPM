@@ -16,7 +16,7 @@
 import { Fragment, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { createPortal } from "react-dom";
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type { CSSProperties, ComponentType, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api, apiDatei } from "@/lib/api";
 import type { Seite as Seitenliste } from "@/lib/api";
@@ -37,6 +37,7 @@ import {
   setzeRaster, vonBis, ziehRand, zeilen,
 } from "./vorlagenRaster";
 import type { Bandform, Ziel } from "./vorlagenRaster";
+import type { AngabenZiel, Beschriftung, TextMitAngabenProps } from "@/components/TextMitAngaben";
 
 type Art = "infusionsplan" | "patientendatenblatt" | "datenschutzinformation" | "einwilligung" | "schweigepflichtentbindung"
   // Schreiben mit E-Mail (Vorlagen von Alice Hessel, 09.10.2026; F172, F173)
@@ -303,7 +304,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
     case "email":
       return (
         <div className="border border-dashed border-[#9a98b3] rounded-md px-2 py-1.5 text-[0.95em] bg-[#f7f7fb]">
-          <div className="text-[0.85em] text-[#5d5b72] mb-0.5">E-Mail (nicht auf der PDF)</div>
+          <div className="text-[0.85em] text-[#5d5b72] mb-0.5">E-Mail (nicht auf der PDF) · Doppelklick zum Bearbeiten</div>
           <div className="font-semibold"><MitFeldern text={b.betreff} /></div>
           <div className="line-clamp-6"><MitFeldern text={b.text} /></div>
         </div>
@@ -650,6 +651,8 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
   const [zieht, setZieht] = useState<string | null>(null);
   const [anzeige, setAnzeige] = useState<{ ziel: Ziel; top: number; left: number; width: number; height: number } | null>(null);
   const [rasterZeigen, setRasterZeigen] = useState(true);
+  // E-Mail der Schreiben im eigenen Fenster bearbeiten (14.10.2026)
+  const [emailFenster, setEmailFenster] = useState(false);
   const inhaltRef = useRef<HTMLDivElement>(null);
   const gezogen = useRef(false);
   if (aufbau.error || entwurf.error) {
@@ -818,9 +821,9 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
   const rahmen = (b: Block, i: number) => (
     <div key={b.id} role="button" tabIndex={0} aria-label={`Block ${b.bezeichnung || TYPNAME[b.typ]}`} data-block={b.id}
       onClick={() => waehleBlock(b.id)} onKeyDown={(e) => { if (e.key === "Enter" && bearbeitet !== b.id) waehleBlock(b.id); }}
-      onDoubleClick={() => { if (schreibbar(b)) { waehleBlock(b.id); setBearbeitet(b.id); } }}
+      onDoubleClick={() => { if (schreibbar(b)) { waehleBlock(b.id); setBearbeitet(b.id); } else if (b.typ === "email") { waehleBlock(b.id); setEmailFenster(true); } }}
       onPointerDown={(e) => { if (e.pointerType === "mouse" && !fest(b)) ziehStart(e, { id: b.id }); }}
-      title={schreibbar(b) ? "Ziehen zum Verschieben · Doppelklick zum Schreiben" : "Ziehen zum Verschieben"}
+      title={schreibbar(b) ? "Ziehen zum Verschieben · Doppelklick zum Schreiben" : b.typ === "email" ? "Doppelklick: E-Mail bearbeiten" : "Ziehen zum Verschieben"}
       className={cx("relative px-2 py-1.5 rounded", bearbeitet === b.id ? "cursor-text" : "cursor-grab", zieht === b.id && "opacity-40",
         b.id === auswahl ? "outline outline-2 outline-[#251F53]" : "hover:outline hover:outline-1 hover:outline-[#c9c8d4]")}>
       {b.id === auswahl ? <>
@@ -1067,6 +1070,10 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
                   Für Pläne und Vordrucke, die nicht verschickt werden (z. B. den Infusionsplan), ausgeschaltet lassen.</Erklaerung>
               </span>
             ) : null}
+            {bloecke.some((b) => b.typ === "email") ? (
+              <Knopf klein icon="stift" data-testid="email-bearbeiten" onClick={() => { const e = bloecke.find((b) => b.typ === "email"); if (e) waehleBlock(e.id); setEmailFenster(true); }}>
+                E-Mail bearbeiten</Knopf>
+            ) : null}
             {ansicht === "seite" ? (
               <label className="flex items-center gap-2 text-[0.8438rem]">
                 <input type="checkbox" checked={rasterZeigen} onChange={(e) => setRasterZeigen(e.target.checked)} />Raster zeigen</label>
@@ -1150,6 +1157,10 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
           <Fehleranzeige fehler={wiederherstellenM.error} />
         </div>
       </Dialog>
+      {emailFenster && bloecke.some((b) => b.typ === "email") ? (
+        <EmailFenster art={art} bloecke={bloecke} ausrichtung={ausrichtung ?? "hoch"} felder={a.felder} onZu={() => setEmailFenster(false)}
+          onUebernehmen={(neu) => { const e = bloecke.find((b) => b.typ === "email"); if (e) aendereBlock(e.id, neu); setEmailFenster(false); }} />
+      ) : null}
       <FassungDialog art={art} version={fassung} onZu={() => setFassung(null)}
         onWiederherstellen={a.versionen.find((v) => v.version === fassung)?.status === "aktiv" && !a.entwurf ? undefined
           : (v) => { wiederherstellenM.reset(); setWiederherstellen(v); }} />
@@ -1285,6 +1296,7 @@ function BlockEigenschaften({ b, vorher, aufbau, aendere, aendereOptionen, fokus
       </> : null}
       {b.typ === "text" || b.typ === "fusszeile" ? <FeldText label="Text" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} mehrzeilig /> : null}
       {b.typ === "email" ? <>
+        <span className="text-[0.75rem] gedaempft">Bequemer: „E-Mail bearbeiten“ über der Seite oder Doppelklick auf die E-Mail öffnet ein großes Fenster.</span>
         <FeldText label="Betreff" wert={b.betreff ?? ""} onWert={(w) => aendere({ betreff: w })} fokus={fokus} />
         <FeldText label="Text" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} mehrzeilig />
       </> : null}
@@ -1392,6 +1404,111 @@ function BlockEigenschaften({ b, vorher, aufbau, aendere, aendereOptionen, fokus
       ) : null}
       {imRaster(b) ? <RasterWahl b={b} vorher={vorher} aendere={aendere} /> : null}
     </Karte>
+  );
+}
+
+/** TextMitAngaben (TipTap) erst laden, wenn das Fenster aufgeht – wie components/Editor.tsx ohne Suspense */
+let textMitAngaben: ComponentType<TextMitAngabenProps> | null = null;
+let textMitAngabenLaden: Promise<ComponentType<TextMitAngabenProps>> | null = null;
+function useTextMitAngaben() {
+  const [k, setK] = useState(() => textMitAngaben);
+  useEffect(() => {
+    if (k) return;
+    textMitAngabenLaden ??= import("@/components/TextMitAngaben").then((m) => (textMitAngaben = m.default));
+    void textMitAngabenLaden.then((x) => setK(() => x));
+  }, [k]);
+  return k;
+}
+
+/** E-Mail der Schreiben bearbeiten wie in Word: Betreff und Text mit Angaben als Chips, Vorschau mit Testpatient */
+function EmailFenster({ art, bloecke, ausrichtung, felder, onZu, onUebernehmen }: {
+  art: Art; bloecke: Block[]; ausrichtung: Ausrichtung; felder: Datenfeld[]; onZu: () => void;
+  onUebernehmen: (neu: { betreff: string; text: string }) => void;
+}) {
+  const block = bloecke.find((b) => b.typ === "email")!;
+  const [betreff, setBetreff] = useState(block.betreff ?? "");
+  const [text, setText] = useState(block.text ?? "");
+  const [ansicht, setAnsicht] = useState<"schreiben" | "vorschau">("schreiben");
+  const ziel = useRef<AngabenZiel | null>(null);
+  const Feld_ = useTextMitAngaben();
+  const nachName = useMemo(() => new Map(felder.map((f) => [f.name, f])), [felder]);
+  const beschrifte = (name: string): Beschriftung => {
+    const f = nachName.get(name);
+    return f ? { text: f.bezeichnung ?? name, titel: `{{${name}}} · ${f.beschreibung}`, unbekannt: false }
+      : { text: `${name}?`, titel: `Unbekannte Angabe {{${name}}} – bitte aus der Liste einfügen`, unbekannt: true };
+  };
+  const geaendert = betreff !== (block.betreff ?? "") || text !== (block.text ?? "");
+  const vorschauBloecke = useMemo(() => bloecke.map((b) => (b.id === block.id ? { ...b, betreff, text } : b)), [bloecke, block.id, betreff, text]);
+  return (
+    <Dialog offen onOffen={(o) => { if (!o) onZu(); }} titel="E-Mail bearbeiten" breite={1080}
+      beschreibung="So kommt die E-Mail beim Patienten an, die PDF des Schreibens hängt an. Angaben aus der Akte rechts anklicken – sie werden beim Erstellen eingesetzt. Im Dialog „Schreiben und E-Mail“ lässt sich der Text vor dem Versand noch anpassen."
+      fuss={<><Knopf onClick={onZu}>Abbrechen</Knopf>
+        <Knopf variante="pri" icon="haken" disabled={!geaendert} onClick={() => onUebernehmen({ betreff, text })}>Übernehmen</Knopf></>}>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_17rem] gap-4" data-testid="email-fenster">
+        <div className="flex flex-col gap-2 min-w-0">
+          <Segmente label="Ansicht der E-Mail" wert={ansicht} onWahl={setAnsicht} className="self-start"
+            werte={[{ wert: "schreiben", text: "Schreiben" }, { wert: "vorschau", text: "Vorschau mit Testpatient" }]} />
+          {ansicht === "schreiben" ? (
+            <div className="border border-rand rounded-lg bg-white text-[#1a1a1a] shadow-sm overflow-hidden">
+              <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-center border-b border-rand text-[0.875rem]">
+                <span className="px-3 py-2 gedaempft">An</span>
+                <span className="px-3 py-2 gedaempft italic">E-Mail-Adresse aus der Akte</span>
+              </div>
+              <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-center border-b border-rand text-[0.875rem]">
+                <span className="px-3 py-2 gedaempft">Betreff</span>
+                {Feld_ ? <Feld_ label="Betreff" wert={betreff} onWert={setBetreff} beschrifte={beschrifte} einzeilig className="px-3 py-2 font-medium"
+                  onFokus={(z) => { ziel.current = z; }} /> : <span className="px-3 py-2"><Ladekreis groesse={12} /></span>}
+              </div>
+              <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-center border-b border-rand text-[0.8125rem]">
+                <span className="px-3 py-1.5 gedaempft">Anlage</span>
+                <span className="px-3 py-1.5 flex items-center gap-1.5"><Icon name="dokument" /> PDF des Schreibens</span>
+              </div>
+              {/* der Text scrollt im Fenster, damit „Übernehmen“ sichtbar bleibt */}
+              <div className="max-h-[48vh] overflow-y-auto">
+                {Feld_ ? <Feld_ label="Text der E-Mail" wert={text} onWert={setText} beschrifte={beschrifte} autofokus minHoehe={280}
+                  className="px-5 py-4 text-[0.9375rem] font-[inherit] [&_.ProseMirror]:outline-none" onFokus={(z) => { ziel.current = z; }} /> : <Laden />}
+              </div>
+            </div>
+          ) : <EmailVorschau art={art} bloecke={vorschauBloecke} ausrichtung={ausrichtung} />}
+          <span className="text-[0.75rem] gedaempft">Die E-Mail geht als reiner Text – ohne Fett oder Farben –, damit sie in jedem Postfach gleich aussieht.
+            Leerzeilen und Absätze bleiben erhalten.</span>
+        </div>
+        <Feldeinfueger felder={felder} onWahl={(name) => { setAnsicht("schreiben"); ziel.current?.einfuegen(name); }} />
+      </div>
+    </Dialog>
+  );
+}
+
+/** Betreff und Text der E-Mail mit einem Testpatienten, wie im Dialog „Schreiben und E-Mail“ */
+function EmailVorschau({ art, bloecke, ausrichtung }: { art: Art; bloecke: Block[]; ausrichtung: Ausrichtung }) {
+  const patienten = useQuery({
+    queryKey: ["patienten", "testpatienten"],
+    queryFn: () => api<Seitenliste<Testpatient>>(`patienten/${abfrage({ test: "nur", seitengroesse: 50 })}`),
+  });
+  const [patient, setPatient] = useState("");
+  useEffect(() => {
+    if (!patient && patienten.data?.results[0]) setPatient(String(patienten.data.results[0].id));
+  }, [patienten.data, patient]);
+  const mail = useQuery({
+    queryKey: ["vorlagen", art, "vorschau-mail", patient, JSON.stringify(bloecke)],
+    queryFn: () => api<{ betreff: string; text: string }>(`vorlagen/${art}/vorschau/`, { body: { patient: Number(patient), bloecke, ausrichtung, ausgabe: "email" } }),
+    enabled: !!patient, gcTime: 0, retry: false,
+  });
+  return (
+    <div className="flex flex-col gap-2" data-testid="email-vorschau">
+      <Feld label="Testpatient" className="max-w-[20rem]">{(p) => (
+        <Auswahl {...p} value={patient} onChange={(e) => setPatient(e.target.value)}>
+          {(patienten.data?.results ?? []).map((t) => <option key={t.id} value={t.id}>{t.nachname}, {t.vorname} · Nr. {t.nummer}</option>)}
+        </Auswahl>
+      )}</Feld>
+      <Fehleranzeige fehler={mail.error} />
+      {mail.data ? (
+        <div className="border border-rand rounded-lg bg-white text-[#1a1a1a] px-5 py-4 text-[0.9375rem]">
+          <div className="font-semibold mb-3">{mail.data.betreff}</div>
+          <div className="whitespace-pre-wrap leading-relaxed">{mail.data.text}</div>
+        </div>
+      ) : mail.isFetching ? <Laden text="Vorschau wird erstellt …" /> : null}
+    </div>
   );
 }
 
