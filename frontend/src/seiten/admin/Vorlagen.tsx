@@ -29,6 +29,8 @@ const ABSENDER_FELDER: { k: keyof Absender; label: string; span: number; num?: b
   { k: "name", label: "Name", span: 4 }, { k: "strasse", label: "Straße", span: 2 }, { k: "plz", label: "PLZ", span: 1, num: true },
   { k: "ort", label: "Ort", span: 1 }, { k: "telefon", label: "Telefon", span: 2, num: true }, { k: "fax", label: "Fax", span: 2, num: true },
   { k: "email", label: "E-Mail", span: 2 }, { k: "internet", label: "Internet", span: 2 }, { k: "fusszeile", label: "Fußzeile", span: 4 },
+  // in der Fußzeile der Dokumentvorlagen als „Vorstand“ und „Spendenkonto“ (14.10.2026)
+  { k: "vorstand", label: "Vorstand", span: 4 }, { k: "bankverbindung", label: "Bankverbindung (Spendenkonto)", span: 4 },
 ];
 
 function BriefkopfBereich({ speichernRef }: { speichernRef: SpeichernRef }) {

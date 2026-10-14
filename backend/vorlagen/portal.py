@@ -118,6 +118,8 @@ BEZEICHNUNG = {
     "Absender.E-Mail": "E-Mail",
     "Absender.Internet": "Internetadresse",
     "Absender.Fußzeile": "Fußzeile",
+    "Absender.Vorstand": "Vorstand",
+    "Absender.Bankverbindung": "Bankverbindung",
     "Versorger.Firma": "Versorger",
     "Versorger.Telefon": "Telefon des Versorgers",
     "Ansprechpartner.Name": "Ansprechpartner",

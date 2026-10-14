@@ -16,7 +16,7 @@
 import { Fragment, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { createPortal } from "react-dom";
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type { CSSProperties, ComponentType, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api, apiDatei } from "@/lib/api";
 import type { Seite as Seitenliste } from "@/lib/api";
@@ -37,6 +37,7 @@ import {
   setzeRaster, vonBis, ziehRand, zeilen,
 } from "./vorlagenRaster";
 import type { Bandform, Ziel } from "./vorlagenRaster";
+import type { AngabenZiel, Beschriftung, TextMitAngabenProps } from "@/components/TextMitAngaben";
 
 type Art = "infusionsplan" | "patientendatenblatt" | "datenschutzinformation" | "einwilligung" | "schweigepflichtentbindung"
   // Schreiben mit E-Mail (Vorlagen von Alice Hessel, 09.10.2026; F172, F173)
@@ -68,6 +69,8 @@ export type Block = {
   /** Kopfband des Briefkopfs (14.10.2026) */
   kopfband?: Bandform | ""; bandfarbe?: string; textfarbe?: string; bandhoehe_mm?: number; band_seiten?: "alle" | "erste";
   logo_rechts?: boolean; fussband?: boolean;
+  /** Fußzeile mit eigenem Band (14.10.2026); Farben in bandfarbe/textfarbe */
+  band?: Bandform | "";
   /** Anschriftfeld nach DIN 5008: Form A/B, Rücksendeangabe (Anschrift in text, Informationsblock in rechts) */
   form?: "A" | "B"; ruecksendung?: string;
 };
@@ -117,7 +120,7 @@ const HINWEIS: Record<string, string> = {
   seitenumbruch: "Alles danach beginnt auf einer neuen Seite.",
   email: "Betreff und Text der E-Mail, mit der das Schreiben verschickt wird (die PDF hängt an). Steht nicht auf der PDF; im Dialog vor dem Versand änderbar.",
   anschriftfeld: "Für den Fensterumschlag: Rücksendeangabe und Anschrift links, Informationsblock rechts – an den festen Stellen nach DIN 5008 auf der ersten Seite. Der Text beginnt darunter.",
-  fusszeile: "Steht auf jeder Seite unten (bis 8 Zeilen links, rechts z. B. die Seitenzahl). {Seite} und {Seiten} werden zur Seitenzahl.",
+  fusszeile: "Steht auf jeder Seite unten, auf Wunsch auf einem eigenen farbigen Band (bis 8 Zeilen links, rechts z. B. die Seitenzahl). {Seite} und {Seiten} werden zur Seitenzahl.",
 };
 /** Bausteine aus dem Entwurf; Briefkopf, Titel und Fußzeile gibt es je Vorlage einmal */
 const BAUSTEINE = ["text", "zweispaltig", "datenfelder", "tabelle", "kopfkarte", "trennlinie", "leerraum", "unterschrift", "seitenumbruch", "titel", "briefkopf", "fusszeile", "email"];
@@ -240,7 +243,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
         </div></div>
       );
     case "fusszeile":
-      return <div className="flex justify-between gap-3 text-[0.8em] text-[#00325a] leading-snug"><span><MitFeldern text={b.text} /></span><span><MitFeldern text={b.rechts} /></span></div>;
+      return <div className={cx("flex justify-between gap-3 text-[0.8em] leading-snug", !b.band && "text-[#00325a]")}><span><MitFeldern text={b.text} /></span><span><MitFeldern text={b.rechts} /></span></div>;
     case "zweispaltig":
       return (
         <div className={cx("flex justify-between gap-4 text-[1em]", stil(b.optionen))}>
@@ -301,7 +304,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
     case "email":
       return (
         <div className="border border-dashed border-[#9a98b3] rounded-md px-2 py-1.5 text-[0.95em] bg-[#f7f7fb]">
-          <div className="text-[0.85em] text-[#5d5b72] mb-0.5">E-Mail (nicht auf der PDF)</div>
+          <div className="text-[0.85em] text-[#5d5b72] mb-0.5">E-Mail (nicht auf der PDF) · Doppelklick zum Bearbeiten</div>
           <div className="font-semibold"><MitFeldern text={b.betreff} /></div>
           <div className="line-clamp-6"><MitFeldern text={b.text} /></div>
         </div>
@@ -648,6 +651,8 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
   const [zieht, setZieht] = useState<string | null>(null);
   const [anzeige, setAnzeige] = useState<{ ziel: Ziel; top: number; left: number; width: number; height: number } | null>(null);
   const [rasterZeigen, setRasterZeigen] = useState(true);
+  // E-Mail der Schreiben im eigenen Fenster bearbeiten (14.10.2026)
+  const [emailFenster, setEmailFenster] = useState(false);
   const inhaltRef = useRef<HTMLDivElement>(null);
   const gezogen = useRef(false);
   if (aufbau.error || entwurf.error) {
@@ -806,16 +811,19 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
   const din = !quer ? dinBlock : undefined;
   const seiteMm = quer ? { b: 297, h: 210 } : { b: 210, h: 297 };
   const oben = band ? (band.bandhoehe_mm ?? 38) + BAND_ABSTAND : RAND_OBEN;
-  const unten = Math.max(18, 10 + 3.6 * ((bloecke.find((b) => b.typ === "fusszeile")?.text ?? "").split("\n").length));
-  // Kopfband und Anschriftfeld stehen an festen Stellen der Seite, nicht im Textfluss
-  const fest = (b: Block) => (b === band) || (b === din);
+  const fussBlock = bloecke.find((b) => b.typ === "fusszeile");
+  const unten = Math.max(18, 10 + 3.6 * ((fussBlock?.text ?? "").split("\n").length));
+  // Fußband: eigenes der Fußzeile, sonst (ältere Angabe) das des Kopfbands
+  const fussband: Block | null = fussBlock?.band ? { ...fussBlock, kopfband: fussBlock.band } : band?.fussband ? band : null;
+  // Kopfband, Anschriftfeld und Fußzeile stehen an festen Stellen der Seite, nicht im Textfluss
+  const fest = (b: Block) => (b === band) || (b === din) || (b === fussBlock);
   const schreibbar = (b: Block) => b.typ === "text" || b.typ === "titel";
   const rahmen = (b: Block, i: number) => (
     <div key={b.id} role="button" tabIndex={0} aria-label={`Block ${b.bezeichnung || TYPNAME[b.typ]}`} data-block={b.id}
       onClick={() => waehleBlock(b.id)} onKeyDown={(e) => { if (e.key === "Enter" && bearbeitet !== b.id) waehleBlock(b.id); }}
-      onDoubleClick={() => { if (schreibbar(b)) { waehleBlock(b.id); setBearbeitet(b.id); } }}
+      onDoubleClick={() => { if (schreibbar(b)) { waehleBlock(b.id); setBearbeitet(b.id); } else if (b.typ === "email") { waehleBlock(b.id); setEmailFenster(true); } }}
       onPointerDown={(e) => { if (e.pointerType === "mouse" && !fest(b)) ziehStart(e, { id: b.id }); }}
-      title={schreibbar(b) ? "Ziehen zum Verschieben · Doppelklick zum Schreiben" : "Ziehen zum Verschieben"}
+      title={schreibbar(b) ? "Ziehen zum Verschieben · Doppelklick zum Schreiben" : b.typ === "email" ? "Doppelklick: E-Mail bearbeiten" : "Ziehen zum Verschieben"}
       className={cx("relative px-2 py-1.5 rounded", bearbeitet === b.id ? "cursor-text" : "cursor-grab", zieht === b.id && "opacity-40",
         b.id === auswahl ? "outline outline-2 outline-[#251F53]" : "hover:outline hover:outline-1 hover:outline-[#c9c8d4]")}>
       {b.id === auswahl ? <>
@@ -1062,6 +1070,10 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
                   Für Pläne und Vordrucke, die nicht verschickt werden (z. B. den Infusionsplan), ausgeschaltet lassen.</Erklaerung>
               </span>
             ) : null}
+            {bloecke.some((b) => b.typ === "email") ? (
+              <Knopf klein icon="stift" data-testid="email-bearbeiten" onClick={() => { const e = bloecke.find((b) => b.typ === "email"); if (e) waehleBlock(e.id); setEmailFenster(true); }}>
+                E-Mail bearbeiten</Knopf>
+            ) : null}
             {ansicht === "seite" ? (
               <label className="flex items-center gap-2 text-[0.8438rem]">
                 <input type="checkbox" checked={rasterZeigen} onChange={(e) => setRasterZeigen(e.target.checked)} />Raster zeigen</label>
@@ -1074,10 +1086,12 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
             <div className="py-6 bg-[#E6E5EE] rounded-xl overflow-auto min-w-0" data-testid="vorlage-seite">
               <div className="relative mx-auto bg-white text-[#1a1a1a] shadow-md"
                 style={{ width: seiteMm.b * MM, minHeight: seiteMm.h * MM,
-                  padding: `${oben * MM}px ${RAND_LINKS * MM}px ${(band?.fussband ? unten + 6 : unten) * MM}px` }}>
+                  padding: `${oben * MM}px ${RAND_LINKS * MM}px ${(fussband ? unten + 6 : unten) * MM}px` }}>
                 {band ? festerRahmen(band, <KopfbandAnsicht b={band} breite={seiteMm.b} />, { top: 0, left: 0 }, "kopfband") : null}
-                {band?.fussband ? <div className="absolute bottom-0 left-0 pointer-events-none" data-testid="fussband">
-                  <BandFlaeche b={band} breite={seiteMm.b} hoehe={unten + 4} fuss /></div> : null}
+                {fussband ? <div className="absolute bottom-0 left-0 pointer-events-none" data-testid="fussband">
+                  <BandFlaeche b={fussband} breite={seiteMm.b} hoehe={unten + 4} fuss /></div> : null}
+                {fussBlock ? festerRahmen(fussBlock, <div style={{ fontSize: 10, color: fussband?.textfarbe }}><BlockAnsicht b={fussBlock} tabellen={a.tabellen} /></div>,
+                  { top: `calc(100% - ${(unten - 4) * MM + 4}px)`, left: RAND_LINKS * MM - 4, right: RAND_LINKS * MM - 4, padding: 4 }, "fusszeile") : null}
                 {din ? <>
                   {festerRahmen(din, <AnschriftfeldAnsicht b={din} />, { top: DIN[din.form ?? "B"].oben * MM, left: DIN_LINKS * MM,
                     width: DIN_BREITE * MM, height: DIN_HOEHE * MM }, "anschriftfeld")}
@@ -1143,6 +1157,10 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
           <Fehleranzeige fehler={wiederherstellenM.error} />
         </div>
       </Dialog>
+      {emailFenster && bloecke.some((b) => b.typ === "email") ? (
+        <EmailFenster art={art} bloecke={bloecke} ausrichtung={ausrichtung ?? "hoch"} felder={a.felder} onZu={() => setEmailFenster(false)}
+          onUebernehmen={(neu) => { const e = bloecke.find((b) => b.typ === "email"); if (e) aendereBlock(e.id, neu); setEmailFenster(false); }} />
+      ) : null}
       <FassungDialog art={art} version={fassung} onZu={() => setFassung(null)}
         onWiederherstellen={a.versionen.find((v) => v.version === fassung)?.status === "aktiv" && !a.entwurf ? undefined
           : (v) => { wiederherstellenM.reset(); setWiederherstellen(v); }} />
@@ -1278,10 +1296,14 @@ function BlockEigenschaften({ b, vorher, aufbau, aendere, aendereOptionen, fokus
       </> : null}
       {b.typ === "text" || b.typ === "fusszeile" ? <FeldText label="Text" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} mehrzeilig /> : null}
       {b.typ === "email" ? <>
+        <span className="text-[0.75rem] gedaempft">Bequemer: „E-Mail bearbeiten“ über der Seite oder Doppelklick auf die E-Mail öffnet ein großes Fenster.</span>
         <FeldText label="Betreff" wert={b.betreff ?? ""} onWert={(w) => aendere({ betreff: w })} fokus={fokus} />
         <FeldText label="Text" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} mehrzeilig />
       </> : null}
-      {b.typ === "fusszeile" ? <FeldText label="Rechts" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} /> : null}
+      {b.typ === "fusszeile" ? <>
+        <FeldText label="Rechts" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} />
+        <FusszeileWahl b={b} aendere={aendere} felder={aufbau.felder} />
+      </> : null}
       {b.typ === "zweispaltig" ? <>
         <FeldText label="Links" wert={b.links ?? ""} onWert={(w) => aendere({ links: w })} fokus={fokus} mehrzeilig />
         <FeldText label="Rechts" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} mehrzeilig />
@@ -1385,10 +1407,134 @@ function BlockEigenschaften({ b, vorher, aufbau, aendere, aendereOptionen, fokus
   );
 }
 
+/** TextMitAngaben (TipTap) erst laden, wenn das Fenster aufgeht – wie components/Editor.tsx ohne Suspense */
+let textMitAngaben: ComponentType<TextMitAngabenProps> | null = null;
+let textMitAngabenLaden: Promise<ComponentType<TextMitAngabenProps>> | null = null;
+function useTextMitAngaben() {
+  const [k, setK] = useState(() => textMitAngaben);
+  useEffect(() => {
+    if (k) return;
+    textMitAngabenLaden ??= import("@/components/TextMitAngaben").then((m) => (textMitAngaben = m.default));
+    void textMitAngabenLaden.then((x) => setK(() => x));
+  }, [k]);
+  return k;
+}
+
+/** E-Mail der Schreiben bearbeiten wie in Word: Betreff und Text mit Angaben als Chips, Vorschau mit Testpatient */
+function EmailFenster({ art, bloecke, ausrichtung, felder, onZu, onUebernehmen }: {
+  art: Art; bloecke: Block[]; ausrichtung: Ausrichtung; felder: Datenfeld[]; onZu: () => void;
+  onUebernehmen: (neu: { betreff: string; text: string }) => void;
+}) {
+  const block = bloecke.find((b) => b.typ === "email")!;
+  const [betreff, setBetreff] = useState(block.betreff ?? "");
+  const [text, setText] = useState(block.text ?? "");
+  const [ansicht, setAnsicht] = useState<"schreiben" | "vorschau">("schreiben");
+  const ziel = useRef<AngabenZiel | null>(null);
+  const Feld_ = useTextMitAngaben();
+  const nachName = useMemo(() => new Map(felder.map((f) => [f.name, f])), [felder]);
+  const beschrifte = (name: string): Beschriftung => {
+    const f = nachName.get(name);
+    return f ? { text: f.bezeichnung ?? name, titel: `{{${name}}} · ${f.beschreibung}`, unbekannt: false }
+      : { text: `${name}?`, titel: `Unbekannte Angabe {{${name}}} – bitte aus der Liste einfügen`, unbekannt: true };
+  };
+  const geaendert = betreff !== (block.betreff ?? "") || text !== (block.text ?? "");
+  const vorschauBloecke = useMemo(() => bloecke.map((b) => (b.id === block.id ? { ...b, betreff, text } : b)), [bloecke, block.id, betreff, text]);
+  return (
+    <Dialog offen onOffen={(o) => { if (!o) onZu(); }} titel="E-Mail bearbeiten" breite={1080}
+      beschreibung="So kommt die E-Mail beim Patienten an, die PDF des Schreibens hängt an. Angaben aus der Akte rechts anklicken – sie werden beim Erstellen eingesetzt. Im Dialog „Schreiben und E-Mail“ lässt sich der Text vor dem Versand noch anpassen."
+      fuss={<><Knopf onClick={onZu}>Abbrechen</Knopf>
+        <Knopf variante="pri" icon="haken" disabled={!geaendert} onClick={() => onUebernehmen({ betreff, text })}>Übernehmen</Knopf></>}>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_17rem] gap-4" data-testid="email-fenster">
+        <div className="flex flex-col gap-2 min-w-0">
+          <Segmente label="Ansicht der E-Mail" wert={ansicht} onWahl={setAnsicht} className="self-start"
+            werte={[{ wert: "schreiben", text: "Schreiben" }, { wert: "vorschau", text: "Vorschau mit Testpatient" }]} />
+          {ansicht === "schreiben" ? (
+            <div className="border border-rand rounded-lg bg-white text-[#1a1a1a] shadow-sm overflow-hidden">
+              <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-center border-b border-rand text-[0.875rem]">
+                <span className="px-3 py-2 gedaempft">An</span>
+                <span className="px-3 py-2 gedaempft italic">E-Mail-Adresse aus der Akte</span>
+              </div>
+              <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-center border-b border-rand text-[0.875rem]">
+                <span className="px-3 py-2 gedaempft">Betreff</span>
+                {Feld_ ? <Feld_ label="Betreff" wert={betreff} onWert={setBetreff} beschrifte={beschrifte} einzeilig className="px-3 py-2 font-medium"
+                  onFokus={(z) => { ziel.current = z; }} /> : <span className="px-3 py-2"><Ladekreis groesse={12} /></span>}
+              </div>
+              <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-center border-b border-rand text-[0.8125rem]">
+                <span className="px-3 py-1.5 gedaempft">Anlage</span>
+                <span className="px-3 py-1.5 flex items-center gap-1.5"><Icon name="dokument" /> PDF des Schreibens</span>
+              </div>
+              {/* der Text scrollt im Fenster, damit „Übernehmen“ sichtbar bleibt */}
+              <div className="max-h-[48vh] overflow-y-auto">
+                {Feld_ ? <Feld_ label="Text der E-Mail" wert={text} onWert={setText} beschrifte={beschrifte} autofokus minHoehe={280}
+                  className="px-5 py-4 text-[0.9375rem] font-[inherit] [&_.ProseMirror]:outline-none" onFokus={(z) => { ziel.current = z; }} /> : <Laden />}
+              </div>
+            </div>
+          ) : <EmailVorschau art={art} bloecke={vorschauBloecke} ausrichtung={ausrichtung} />}
+          <span className="text-[0.75rem] gedaempft">Die E-Mail geht als reiner Text – ohne Fett oder Farben –, damit sie in jedem Postfach gleich aussieht.
+            Leerzeilen und Absätze bleiben erhalten.</span>
+        </div>
+        <Feldeinfueger felder={felder} onWahl={(name) => { setAnsicht("schreiben"); ziel.current?.einfuegen(name); }} />
+      </div>
+    </Dialog>
+  );
+}
+
+/** Betreff und Text der E-Mail mit einem Testpatienten, wie im Dialog „Schreiben und E-Mail“ */
+function EmailVorschau({ art, bloecke, ausrichtung }: { art: Art; bloecke: Block[]; ausrichtung: Ausrichtung }) {
+  const patienten = useQuery({
+    queryKey: ["patienten", "testpatienten"],
+    queryFn: () => api<Seitenliste<Testpatient>>(`patienten/${abfrage({ test: "nur", seitengroesse: 50 })}`),
+  });
+  const [patient, setPatient] = useState("");
+  useEffect(() => {
+    if (!patient && patienten.data?.results[0]) setPatient(String(patienten.data.results[0].id));
+  }, [patienten.data, patient]);
+  const mail = useQuery({
+    queryKey: ["vorlagen", art, "vorschau-mail", patient, JSON.stringify(bloecke)],
+    queryFn: () => api<{ betreff: string; text: string }>(`vorlagen/${art}/vorschau/`, { body: { patient: Number(patient), bloecke, ausrichtung, ausgabe: "email" } }),
+    enabled: !!patient, gcTime: 0, retry: false,
+  });
+  return (
+    <div className="flex flex-col gap-2" data-testid="email-vorschau">
+      <Feld label="Testpatient" className="max-w-[20rem]">{(p) => (
+        <Auswahl {...p} value={patient} onChange={(e) => setPatient(e.target.value)}>
+          {(patienten.data?.results ?? []).map((t) => <option key={t.id} value={t.id}>{t.nachname}, {t.vorname} · Nr. {t.nummer}</option>)}
+        </Auswahl>
+      )}</Feld>
+      <Fehleranzeige fehler={mail.error} />
+      {mail.data ? (
+        <div className="border border-rand rounded-lg bg-white text-[#1a1a1a] px-5 py-4 text-[0.9375rem]">
+          <div className="font-semibold mb-3">{mail.data.betreff}</div>
+          <div className="whitespace-pre-wrap leading-relaxed">{mail.data.text}</div>
+        </div>
+      ) : mail.isFetching ? <Laden text="Vorschau wird erstellt …" /> : null}
+    </div>
+  );
+}
+
 /** Kopfband frei gestalten: Form, Farben, Höhe, Seiten, Logo rechts, Fußband */
 function KopfbandWahl({ b, aendere }: { b: Block; aendere: (n: Partial<Block>) => void }) {
   const hoehe = b.bandhoehe_mm ?? 38;
-  const farbe = (label: string, wert: string, onWert: (w: string) => void, vorschlaege: string[]) => (
+  return (
+    <div className="flex flex-col gap-2.5" data-testid="kopfband-wahl">
+      <FormWahl wert={b.kopfband ?? ""} farbe={b.bandfarbe ?? "#BDC9C2"} onWert={(w) => aendere({ kopfband: w })} />
+      <FarbWahl label="Farbe des Bands" wert={b.bandfarbe ?? "#BDC9C2"} onWert={(w) => aendere({ bandfarbe: w })} vorschlaege={BANDFARBEN} />
+      <FarbWahl label="Schriftfarbe" wert={b.textfarbe ?? "#23272C"} onWert={(w) => aendere({ textfarbe: w })} vorschlaege={["#23272C", "#FFFFFF", "#251F53"]} />
+      <label className="flex flex-col gap-1 text-[0.8125rem]">Höhe: {hoehe} mm
+        <input type="range" min={20} max={80} step={1} value={hoehe} aria-label="Höhe des Bands" onChange={(e) => aendere({ bandhoehe_mm: Number(e.target.value) })} />
+      </label>
+      <Segmente label="Band auf" wert={b.band_seiten ?? "alle"} onWahl={(w) => aendere({ band_seiten: w })} className="self-start"
+        werte={[{ wert: "alle", text: "jeder Seite" }, { wert: "erste", text: "nur der ersten Seite" }]} />
+      <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.logo_rechts} onChange={(e) => aendere({ logo_rechts: e.target.checked })} />Logo rechts, Absender links</label>
+      {b.fussband ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked onChange={() => aendere({ fussband: false })} />Fußband in derselben Farbe</label>
+        : <span className="text-[0.75rem] gedaempft">Ein Band unten gestalten Sie beim Abschnitt „Fußzeile“.</span>}
+    </div>
+  );
+}
+
+/** Farbe aus Vorschlägen oder frei wählen */
+function FarbWahl({ label, wert, onWert, vorschlaege }: { label: string; wert: string; onWert: (w: string) => void; vorschlaege: string[] }) {
+  return (
     <div className="flex flex-col gap-1" role="group" aria-label={label}>
       <span className="text-[0.8125rem]">{label}</span>
       <div className="flex items-center gap-1.5 flex-wrap">
@@ -1401,31 +1547,57 @@ function KopfbandWahl({ b, aendere }: { b: Block; aendere: (n: Partial<Block>) =
       </div>
     </div>
   );
+}
+
+/** Form der Kante eines Bands (oben beim Fußband gespiegelt) */
+function FormWahl({ wert, farbe, onWert, fuss }: { wert: string; farbe: string; onWert: (w: Bandform) => void; fuss?: boolean }) {
   return (
-    <div className="flex flex-col gap-2.5" data-testid="kopfband-wahl">
-      <div className="flex flex-col gap-1" role="group" aria-label="Form des Bands">
-        <span className="text-[0.8125rem]">Form der Unterkante</span>
-        <div className="grid grid-cols-4 gap-1">
-          {FORMEN.map((f) => (
-            <button key={f.wert} type="button" aria-pressed={b.kopfband === f.wert} onClick={() => aendere({ kopfband: f.wert })}
-              className={cx("flex flex-col items-center gap-0.5 p-1 rounded-md border text-[0.7188rem] cursor-pointer",
-                b.kopfband === f.wert ? "border-akzent bg-akzent-weich text-akzent-text" : "border-rand bg-flaeche")}>
-              <svg viewBox="0 0 210 50" className="w-full h-5" preserveAspectRatio="none" aria-hidden>
-                <path fill={b.bandfarbe ?? "#BDC9C2"} d={bandPfad(f.wert, 210, 40, 10)} /></svg>
-              {f.text}
-            </button>
-          ))}
-        </div>
+    <div className="flex flex-col gap-1" role="group" aria-label="Form des Bands">
+      <span className="text-[0.8125rem]">{fuss ? "Form der Oberkante" : "Form der Unterkante"}</span>
+      <div className="grid grid-cols-4 gap-1">
+        {FORMEN.map((f) => (
+          <button key={f.wert} type="button" aria-pressed={wert === f.wert} onClick={() => onWert(f.wert)}
+            className={cx("flex flex-col items-center gap-0.5 p-1 rounded-md border text-[0.7188rem] cursor-pointer",
+              wert === f.wert ? "border-akzent bg-akzent-weich text-akzent-text" : "border-rand bg-flaeche")}>
+            <svg viewBox="0 0 210 50" className="w-full h-5" preserveAspectRatio="none" aria-hidden>
+              <path fill={farbe} d={bandPfad(f.wert, 210, 40, 10)} transform={fuss ? "translate(0 50) scale(1 -1)" : undefined} /></svg>
+            {f.text}
+          </button>
+        ))}
       </div>
-      {farbe("Farbe des Bands", b.bandfarbe ?? "#BDC9C2", (w) => aendere({ bandfarbe: w }), BANDFARBEN)}
-      {farbe("Schriftfarbe", b.textfarbe ?? "#23272C", (w) => aendere({ textfarbe: w }), ["#23272C", "#FFFFFF", "#251F53"])}
-      <label className="flex flex-col gap-1 text-[0.8125rem]">Höhe: {hoehe} mm
-        <input type="range" min={20} max={80} step={1} value={hoehe} aria-label="Höhe des Bands" onChange={(e) => aendere({ bandhoehe_mm: Number(e.target.value) })} />
-      </label>
-      <Segmente label="Band auf" wert={b.band_seiten ?? "alle"} onWahl={(w) => aendere({ band_seiten: w })} className="self-start"
-        werte={[{ wert: "alle", text: "jeder Seite" }, { wert: "erste", text: "nur der ersten Seite" }]} />
-      <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.logo_rechts} onChange={(e) => aendere({ logo_rechts: e.target.checked })} />Logo rechts, Absender links</label>
-      <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.fussband} onChange={(e) => aendere({ fussband: e.target.checked })} />Fußband in derselben Farbe (Fußzeile steht darauf)</label>
+    </div>
+  );
+}
+
+/** Fußzeile frei gestalten wie die Kopfzeile: eigenes Band, Farben, Zeilen für Vorstand und Bankverbindung */
+function FusszeileWahl({ b, aendere, felder }: { b: Block; aendere: (n: Partial<Block>) => void; felder: Datenfeld[] }) {
+  const text = b.text ?? "";
+  const zeile = (feld: string, label: string) => {
+    if (!felder.some((f) => f.name === feld)) return null;
+    const muster = new RegExp(`\\{\\{\\s*${feld.replace(".", "\\.")}\\s*\\}\\}`);
+    const an = muster.test(text);
+    return (
+      <label key={feld} className="flex items-center gap-2 text-[0.8438rem]">
+        <input type="checkbox" checked={an} disabled={!an && text.split("\n").length >= 8}
+          onChange={(e) => aendere({ text: e.target.checked ? `${text}${text ? "\n" : ""}${label}: {{${feld}}}`
+            : text.split("\n").filter((z) => !muster.test(z)).join("\n") })} />Zeile „{label}“</label>
+    );
+  };
+  return (
+    <div className="flex flex-col gap-2.5" data-testid="fusszeile-wahl">
+      <div className="flex flex-col gap-1.5">
+        {zeile("Absender.Vorstand", "Vorstand")}
+        {zeile("Absender.Bankverbindung", "Spendenkonto")}
+        <span className="text-[0.75rem] gedaempft">Vorstand und Bankverbindung pflegen Sie zentral unter Vorlagen › Briefkopf und Logo.</span>
+      </div>
+      <Segmente label="Gestaltung der Fußzeile" wert={b.band ? "band" : "text"} className="self-start"
+        onWahl={(w) => aendere(w === "band" ? { band: "welle", bandfarbe: b.bandfarbe ?? "#BDC9C2", textfarbe: b.textfarbe ?? "#23272C" } : { band: "" })}
+        werte={[{ wert: "text", text: "Nur Text" }, { wert: "band", text: "Farbiges Band" }]} />
+      {b.band ? <>
+        <FormWahl wert={b.band} farbe={b.bandfarbe ?? "#BDC9C2"} onWert={(w) => aendere({ band: w })} fuss />
+        <FarbWahl label="Farbe des Bands" wert={b.bandfarbe ?? "#BDC9C2"} onWert={(w) => aendere({ bandfarbe: w })} vorschlaege={BANDFARBEN} />
+        <FarbWahl label="Schriftfarbe" wert={b.textfarbe ?? "#23272C"} onWert={(w) => aendere({ textfarbe: w })} vorschlaege={["#23272C", "#FFFFFF", "#251F53"]} />
+      </> : null}
     </div>
   );
 }

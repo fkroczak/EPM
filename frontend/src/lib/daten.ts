@@ -63,7 +63,7 @@ export function useEinstellungen() {
 }
 
 export type Absender = { name: string; strasse: string; plz: string; ort: string; telefon: string; fax: string; email: string;
-  internet: string; fusszeile: string };
+  internet: string; fusszeile: string; vorstand: string; bankverbindung: string };
 export type Briefkopf = {
   aktiv: string;
   /** Absender je Art: "stiftung", "gug" und (seit 11.10.2026) "rg" für die Regeneration Clinic */

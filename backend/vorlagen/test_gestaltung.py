@@ -186,3 +186,24 @@ class AnschriftfeldTest(TestCase):
         quer = bloecke_html("patientenaufnahme", b, self.k, quer=True)[0]
         self.assertNotIn("din-bereich", quer)
         self.assertIn("Musterweg 5", quer)
+
+
+class FusszeileTest(TestCase):
+    """Fußzeile mit eigenem Band wie die Kopfzeile (14.10.2026)."""
+
+    def test_eigenes_band(self):
+        k = Kontext(patient=Patient(nachname="Muster", vorname="Erika"), heute=date(2026, 10, 14))
+        fuss = {"id": "f", "typ": "fusszeile", "text": "{{Absender.Name}}\nVorstand: {{Absender.Vorstand}}",
+                "rechts": "{Seite}/{Seiten}", "band": "bogen", "bandfarbe": "#251F53", "textfarbe": "#FFFFFF"}
+        b = [{"id": "k", "typ": "briefkopf"}, text("t", "Inhalt"), fuss]
+        self.assertEqual(pruefe_bloecke("eigen-x", b), [])
+        self.assertTrue(any("Form des Bands" in f for f in pruefe_bloecke("eigen-x", [{**fuss, "band": "zacken"}])))
+        self.assertTrue(any("Schriftfarbe" in f for f in pruefe_bloecke("eigen-x", [{**fuss, "textfarbe": "weiß"}])))
+        inhalt, f, r = bloecke_html("eigen-x", b, k)
+        self.assertIn('class="fussband"', inhalt)
+        self.assertIn('fill="#251F53"', inhalt)
+        self.assertIn("color: #FFFFFF", inhalt)
+        pdf = html_zu_pdf(seite("x", inhalt, f, None, r))
+        self.assertIn("Vorstand:", pdf_text(pdf))
+        # ohne Band: kein Fußband
+        self.assertNotIn('class="fussband"', bloecke_html("eigen-x", [*b[:2], {**fuss, "band": ""}], k)[0])

@@ -354,7 +354,8 @@ class EinstellungenView(APIView):
 
 
 # ================================================================= Briefkopf und Logo (Entwurf 18)
-ABSENDER_FELDER = ["name", "strasse", "plz", "ort", "telefon", "fax", "email", "internet", "fusszeile"]
+ABSENDER_FELDER = ["name", "strasse", "plz", "ort", "telefon", "fax", "email", "internet", "fusszeile", "vorstand",
+                   "bankverbindung"]
 
 
 class AbsenderSerializer(serializers.ModelSerializer):

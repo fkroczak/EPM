@@ -324,9 +324,15 @@ class Ersetzer:
         return "<br>".join(ausgabe), gesehen and alle_leer
 
     def text(self, text: str) -> str:
-        """Nur Text (Fußzeile): Platzhalter ohne HTML einsetzen; Trennpunkte um leere Werte entfallen."""
-        ersetzt = PLATZHALTER.sub(lambda m: str(self.wert(m.group(1).strip())[0] or ""), text or "")
-        return "\n".join(_trenner(z) for z in ersetzt.split("\n"))
+        """Nur Text (Fußzeile): Platzhalter ohne HTML einsetzen; Trennpunkte um leere Werte entfallen, ebenso Zeilen,
+        deren Angaben alle leer sind (z. B. „Vorstand: {{Absender.Vorstand}}“ ohne Vorstand)."""
+        zeilen = []
+        for zeile in (text or "").split("\n"):
+            werte = [self.wert(m.group(1).strip())[0] for m in PLATZHALTER.finditer(zeile)]
+            if werte and not any(werte):
+                continue
+            zeilen.append(_trenner(PLATZHALTER.sub(lambda m: str(self.wert(m.group(1).strip())[0] or ""), zeile)))
+        return "\n".join(zeilen)
 
     @staticmethod
     def _statisch(t: str) -> str:
@@ -494,7 +500,7 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext, quer=False) -> tuple
                 band_css, band = kopfband_html({**b, "falzmarken": falz}, quer, neben)
                 css.append(band_css)
                 teile.append(f'<div class="{_klassen(b)}">{band}</div>')
-                if b.get("fussband"):
+                if b.get("fussband") and fussband is None:
                     fussband = b
             else:
                 teile.append(f'<div class="{_klassen(b)}">{briefkopf_html(b.get("absender", True), b.get("linienfarbe"), falz, b.get("mit_linie", True), neben)}</div>')
@@ -570,6 +576,8 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext, quer=False) -> tuple
         elif typ == "seitenumbruch":
             teile.append('<div class="umbruch"></div>')
         elif typ == "fusszeile":
+            if b.get("band") in gestaltung.FORMEN:  # eigenes Band der Fußzeile (vor dem Fußband des Kopfs)
+                fussband = {"kopfband": b["band"], "bandfarbe": b.get("bandfarbe"), "textfarbe": b.get("textfarbe")}
             fuss = ersetze.text(b.get("text", ""))
             rechts = ersetze.text(b.get("rechts", ""))
         raster = None

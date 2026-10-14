@@ -196,7 +196,8 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
             for feld in ("text", "zusatz"):
                 _felder_pruefen(art, b.get(feld), name, fehler)
         elif typ in ("text", "fusszeile"):
-            erlaubt |= {"text"} | ({"rechts"} if typ == "fusszeile" else set())
+            # Fußzeile: eigenes farbiges Band wie das Kopfband (14.10.2026)
+            erlaubt |= {"text"} | ({"rechts", "band", "bandfarbe", "textfarbe"} if typ == "fusszeile" else set())
             _text(b.get("text"), f"{name} (Text)", fehler, pflicht=typ == "text")
             _felder_pruefen(art, b.get("text"), name, fehler)
             if typ == "fusszeile":
@@ -204,6 +205,11 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
                 _felder_pruefen(art, b.get("rechts"), name, fehler)
                 if (b.get("text") or "").count("\n") > 7:
                     fehler.append(f"{name}: höchstens 8 Zeilen.")
+                if b.get("band", "") not in ("", *gestaltung.FORMEN):
+                    fehler.append(f"{name}: Form des Bands unbekannt. Möglich: {', '.join(gestaltung.FORMEN)}.")
+                for k, text in (("bandfarbe", "Farbe des Bands"), ("textfarbe", "Schriftfarbe")):
+                    if k in b and not (isinstance(b[k], str) and FARBE.match(b[k])):
+                        fehler.append(f"{name}: {text} als #RRGGBB angeben.")
         elif typ == "kopfkarte":
             # wie der Kopf der Akte in EPM: Name groß, darunter eine Zeile, rechts ein kleiner Text, unten Kennzahlen
             erlaubt |= {"text", "untertitel", "rechts", "felder"}
@@ -285,8 +291,8 @@ KOPF = {"absender": False, "linienfarbe": "#EE8D4D", "falzmarken": True}
 FUSS = {
     "text": "{{Absender.Name}}\n{{Absender.Straße}} · {{Absender.PLZ_Ort}} · {{Absender.Internet}}\n"
             "Telefon {{Absender.Telefon}} · Fax {{Absender.Fax}} · {{Absender.E-Mail}}\n"
-            "Vorstand: Prof. Dr. Markus Masin; Prof. Dr. Till Zech, LL.M.\n"
-            "Spendenkonto: DKM Darlehnskasse Münster eG · DE71 4006 0265 0017 8247 00 · BIC GENODEM1DKM",
+            "Vorstand: {{Absender.Vorstand}}\n"
+            "Spendenkonto: {{Absender.Bankverbindung}}",
     "rechts": "{Seite}/{Seiten}",
 }
 
