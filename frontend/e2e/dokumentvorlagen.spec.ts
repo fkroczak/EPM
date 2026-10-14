@@ -249,9 +249,16 @@ test("Gestaltung am Raster: ziehen, einrasten, Breite ziehen, direkt schreiben, 
   await eig.getByRole("group", { name: "Form des Bands" }).getByRole("button", { name: "Bogen" }).click();
   await eig.getByRole("button", { name: "Farbe des Bands #251F53" }).click();
   await eig.getByRole("button", { name: "Schriftfarbe #FFFFFF" }).click();
-  await eig.getByLabel("Fußband in derselben Farbe").check();
   await expect(seite.getByTestId("kopfband").locator("path")).toHaveAttribute("fill", "#251F53");
-  await expect(seite.getByTestId("fussband")).toBeVisible();
+
+  // Fußzeile eigens gestalten wie die Kopfzeile: Band in eigener Farbe, Zeile „Vorstand“ per Schalter
+  await seite.getByTestId("fusszeile").click();
+  await eig.getByRole("group", { name: "Gestaltung der Fußzeile" }).getByRole("button", { name: "Farbiges Band" }).click();
+  await eig.getByRole("group", { name: "Form des Bands" }).getByRole("button", { name: "Wellig" }).click();
+  await eig.getByRole("button", { name: "Farbe des Bands #EE8D4D" }).click();
+  await expect(seite.getByTestId("fussband").locator("path")).toHaveAttribute("fill", "#EE8D4D");
+  await eig.getByLabel("Zeile „Vorstand“").check();
+  await expect(seite.getByTestId("fusszeile").locator(".feldchip", { hasText: "Vorstand" })).toBeVisible();
 
   // „Einleitung“ am rechten Rand auf die halbe Breite ziehen: rastet an Spalte 3 ein
   const einleitung = seite.getByRole("button", { name: "Block Einleitung" });
@@ -301,7 +308,9 @@ test("Gestaltung am Raster: ziehen, einrasten, Breite ziehen, direkt schreiben, 
   await expect(page.getByText("Gespeichert. In der Praxis gilt weiter")).toBeVisible();
   const entwurf = await api.get("vorlagen/terminbestaetigung/entwurf/");
   const nach = Object.fromEntries(entwurf.bloecke.map((b: { id: string }) => [b.id, b]));
-  expect(nach.briefkopf).toMatchObject({ kopfband: "bogen", bandfarbe: "#251F53", textfarbe: "#FFFFFF", fussband: true });
+  expect(nach.briefkopf).toMatchObject({ kopfband: "bogen", bandfarbe: "#251F53", textfarbe: "#FFFFFF" });
+  expect(nach.fusszeile).toMatchObject({ band: "welle", bandfarbe: "#EE8D4D" });
+  expect(nach.fusszeile.text).toContain("Vorstand: {{Absender.Vorstand}}");
   expect(nach["anschriftfeld-1"]).toMatchObject({ typ: "anschriftfeld", form: "B" });
   expect(nach.einleitung.optionen).toMatchObject({ raster_von: 1, raster_bis: 3 });
   expect(nach.hinweis.optionen).toMatchObject({ raster_von: 4, raster_bis: 6, neben_vorherigem: "raster" });

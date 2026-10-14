@@ -549,6 +549,9 @@ class Absenderangaben(models.Model):
     email = models.CharField("E-Mail", max_length=150, blank=True)
     internet = models.CharField("Internet", max_length=150, blank=True)
     fusszeile = models.CharField("Fußzeile", max_length=300, blank=True)
+    # in der Fußzeile der Vorlagen als {{Absender.Vorstand}} und {{Absender.Bankverbindung}} (14.10.2026)
+    vorstand = models.CharField("Vorstand", max_length=300, blank=True)
+    bankverbindung = models.CharField("Bankverbindung", max_length=300, blank=True)
 
     history = HistoricalRecords()
 
@@ -559,6 +562,8 @@ class Absenderangaben(models.Model):
             "plz": "48341", "ort": "Altenberge", "telefon": "0251 98 11 400", "fax": "0251 98 11 4019",
             "email": "kontakt@dsgme.org", "internet": "www.dsgme.org",
             "fusszeile": "rechtsfähige gemeinnützige und mildtätige Stiftung",
+            "vorstand": "Prof. Dr. Markus Masin; Prof. Dr. Till Zech, LL.M.",
+            "bankverbindung": "DKM Darlehnskasse Münster eG · DE71 4006 0265 0017 8247 00 · BIC GENODEM1DKM",
         },
         Einstellungen.Absender.GUG: {},
         # aus den Vorlagen der Regeneration Clinic (13.10.2026, ``vorlagen.rgc``)

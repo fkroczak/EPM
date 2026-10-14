@@ -177,3 +177,49 @@ class MigrationMitSchutzTest(Grundlage):
             migration.umstellen(apps, editor)
         v = Dokumentvorlage.objects.get(art="eigen-rgc-mal01", status="aktiv")
         self.assertTrue(any(b.get("briefpapier") == "rgc" for b in v.bloecke))
+
+    def test_0013_vorstand_und_bank_aus_dem_briefkopf(self):
+        """Vorstand und Spendenkonto (14.10.2026): fester Text der Fußzeile → Angaben aus „Briefkopf und Logo“;
+        aus einer freigegebenen Fassung wird eine neue, die bisherige bleibt abgelöst; „freigegeben von“ bleibt."""
+        from importlib import import_module
+
+        from django.db import connection
+        from django.db.migrations.executor import MigrationExecutor
+
+        from audit.schutz import installiere_trigger
+        from stammdaten.models import Absenderangaben
+
+        alt = ("{{Absender.Name}}\nVorstand: Prof. Dr. Markus Masin; Prof. Dr. Till Zech, LL.M.\n"
+               "Spendenkonto: DKM Darlehnskasse Münster eG · DE71 4006 0265 0017 8247 00 · BIC GENODEM1DKM")
+        aktiv = Dokumentvorlage.aktive("einwilligung")
+        bloecke = [b for b in aktiv.bloecke if b.get("typ") != "fusszeile"]
+        bloecke.append({"id": "fuss", "typ": "fusszeile", "text": alt, "rechts": "{Seite}/{Seiten}"})
+        installiere_trigger()
+        with connection.cursor() as c:  # Ausgangslage herstellen: kurz Wartungsmodus, danach wieder geschützt
+            c.execute("SET LOCAL epm.wartung = 'on'")
+            Dokumentvorlage.objects.filter(pk=aktiv.pk).update(bloecke=bloecke, veroeffentlicht_von=self.admin)
+            c.execute("SET LOCAL epm.wartung = ''")
+        migration = import_module("vorlagen.migrations.0013_fusszeile_vorstand_bank")
+        apps = MigrationExecutor(connection).loader.project_state([("vorlagen", "0012_rgc_laborprofile_briefpapier"),
+                                                                   ("stammdaten", "0025_absender_vorstand_bank")]).apps
+        with connection.schema_editor(atomic=True) as editor:
+            migration.umstellen(apps, editor)
+        neu = Dokumentvorlage.aktive("einwilligung")
+        self.assertEqual(neu.version, aktiv.version + 1)
+        self.assertEqual(neu.veroeffentlicht_von, self.admin)
+        self.assertEqual(Dokumentvorlage.objects.get(pk=aktiv.pk).status, "abgeloest")
+        fuss = next(b for b in neu.bloecke if b["typ"] == "fusszeile")
+        self.assertEqual(fuss["text"], "{{Absender.Name}}\nVorstand: {{Absender.Vorstand}}\n"
+                                       "Spendenkonto: {{Absender.Bankverbindung}}")
+        self.assertEqual(pruefe_bloecke("einwilligung", neu.bloecke), [])
+        # im PDF aus den Absenderangaben; ohne Vorstand entfällt die ganze Zeile
+        p = Patient(nachname="A", vorname="B")
+        a = Absenderangaben.aktuelle()
+        _, text, _ = bloecke_html("einwilligung", neu.bloecke, Kontext(patient=p))
+        self.assertIn("Vorstand: Prof. Dr. Markus Masin", text)
+        self.assertIn("DE71 4006 0265 0017 8247 00", text)
+        a.vorstand, a.bankverbindung = "", "Sparkasse · DE00 1234"
+        a.save()
+        _, text, _ = bloecke_html("einwilligung", neu.bloecke, Kontext(patient=p))
+        self.assertNotIn("Vorstand", text)
+        self.assertIn("Spendenkonto: Sparkasse · DE00 1234", text)

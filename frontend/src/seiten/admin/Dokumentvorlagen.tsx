@@ -68,6 +68,8 @@ export type Block = {
   /** Kopfband des Briefkopfs (14.10.2026) */
   kopfband?: Bandform | ""; bandfarbe?: string; textfarbe?: string; bandhoehe_mm?: number; band_seiten?: "alle" | "erste";
   logo_rechts?: boolean; fussband?: boolean;
+  /** Fußzeile mit eigenem Band (14.10.2026); Farben in bandfarbe/textfarbe */
+  band?: Bandform | "";
   /** Anschriftfeld nach DIN 5008: Form A/B, Rücksendeangabe (Anschrift in text, Informationsblock in rechts) */
   form?: "A" | "B"; ruecksendung?: string;
 };
@@ -117,7 +119,7 @@ const HINWEIS: Record<string, string> = {
   seitenumbruch: "Alles danach beginnt auf einer neuen Seite.",
   email: "Betreff und Text der E-Mail, mit der das Schreiben verschickt wird (die PDF hängt an). Steht nicht auf der PDF; im Dialog vor dem Versand änderbar.",
   anschriftfeld: "Für den Fensterumschlag: Rücksendeangabe und Anschrift links, Informationsblock rechts – an den festen Stellen nach DIN 5008 auf der ersten Seite. Der Text beginnt darunter.",
-  fusszeile: "Steht auf jeder Seite unten (bis 8 Zeilen links, rechts z. B. die Seitenzahl). {Seite} und {Seiten} werden zur Seitenzahl.",
+  fusszeile: "Steht auf jeder Seite unten, auf Wunsch auf einem eigenen farbigen Band (bis 8 Zeilen links, rechts z. B. die Seitenzahl). {Seite} und {Seiten} werden zur Seitenzahl.",
 };
 /** Bausteine aus dem Entwurf; Briefkopf, Titel und Fußzeile gibt es je Vorlage einmal */
 const BAUSTEINE = ["text", "zweispaltig", "datenfelder", "tabelle", "kopfkarte", "trennlinie", "leerraum", "unterschrift", "seitenumbruch", "titel", "briefkopf", "fusszeile", "email"];
@@ -240,7 +242,7 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
         </div></div>
       );
     case "fusszeile":
-      return <div className="flex justify-between gap-3 text-[0.8em] text-[#00325a] leading-snug"><span><MitFeldern text={b.text} /></span><span><MitFeldern text={b.rechts} /></span></div>;
+      return <div className={cx("flex justify-between gap-3 text-[0.8em] leading-snug", !b.band && "text-[#00325a]")}><span><MitFeldern text={b.text} /></span><span><MitFeldern text={b.rechts} /></span></div>;
     case "zweispaltig":
       return (
         <div className={cx("flex justify-between gap-4 text-[1em]", stil(b.optionen))}>
@@ -806,9 +808,12 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
   const din = !quer ? dinBlock : undefined;
   const seiteMm = quer ? { b: 297, h: 210 } : { b: 210, h: 297 };
   const oben = band ? (band.bandhoehe_mm ?? 38) + BAND_ABSTAND : RAND_OBEN;
-  const unten = Math.max(18, 10 + 3.6 * ((bloecke.find((b) => b.typ === "fusszeile")?.text ?? "").split("\n").length));
-  // Kopfband und Anschriftfeld stehen an festen Stellen der Seite, nicht im Textfluss
-  const fest = (b: Block) => (b === band) || (b === din);
+  const fussBlock = bloecke.find((b) => b.typ === "fusszeile");
+  const unten = Math.max(18, 10 + 3.6 * ((fussBlock?.text ?? "").split("\n").length));
+  // Fußband: eigenes der Fußzeile, sonst (ältere Angabe) das des Kopfbands
+  const fussband: Block | null = fussBlock?.band ? { ...fussBlock, kopfband: fussBlock.band } : band?.fussband ? band : null;
+  // Kopfband, Anschriftfeld und Fußzeile stehen an festen Stellen der Seite, nicht im Textfluss
+  const fest = (b: Block) => (b === band) || (b === din) || (b === fussBlock);
   const schreibbar = (b: Block) => b.typ === "text" || b.typ === "titel";
   const rahmen = (b: Block, i: number) => (
     <div key={b.id} role="button" tabIndex={0} aria-label={`Block ${b.bezeichnung || TYPNAME[b.typ]}`} data-block={b.id}
@@ -1074,10 +1079,12 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
             <div className="py-6 bg-[#E6E5EE] rounded-xl overflow-auto min-w-0" data-testid="vorlage-seite">
               <div className="relative mx-auto bg-white text-[#1a1a1a] shadow-md"
                 style={{ width: seiteMm.b * MM, minHeight: seiteMm.h * MM,
-                  padding: `${oben * MM}px ${RAND_LINKS * MM}px ${(band?.fussband ? unten + 6 : unten) * MM}px` }}>
+                  padding: `${oben * MM}px ${RAND_LINKS * MM}px ${(fussband ? unten + 6 : unten) * MM}px` }}>
                 {band ? festerRahmen(band, <KopfbandAnsicht b={band} breite={seiteMm.b} />, { top: 0, left: 0 }, "kopfband") : null}
-                {band?.fussband ? <div className="absolute bottom-0 left-0 pointer-events-none" data-testid="fussband">
-                  <BandFlaeche b={band} breite={seiteMm.b} hoehe={unten + 4} fuss /></div> : null}
+                {fussband ? <div className="absolute bottom-0 left-0 pointer-events-none" data-testid="fussband">
+                  <BandFlaeche b={fussband} breite={seiteMm.b} hoehe={unten + 4} fuss /></div> : null}
+                {fussBlock ? festerRahmen(fussBlock, <div style={{ fontSize: 10, color: fussband?.textfarbe }}><BlockAnsicht b={fussBlock} tabellen={a.tabellen} /></div>,
+                  { top: `calc(100% - ${(unten - 4) * MM + 4}px)`, left: RAND_LINKS * MM - 4, right: RAND_LINKS * MM - 4, padding: 4 }, "fusszeile") : null}
                 {din ? <>
                   {festerRahmen(din, <AnschriftfeldAnsicht b={din} />, { top: DIN[din.form ?? "B"].oben * MM, left: DIN_LINKS * MM,
                     width: DIN_BREITE * MM, height: DIN_HOEHE * MM }, "anschriftfeld")}
@@ -1281,7 +1288,10 @@ function BlockEigenschaften({ b, vorher, aufbau, aendere, aendereOptionen, fokus
         <FeldText label="Betreff" wert={b.betreff ?? ""} onWert={(w) => aendere({ betreff: w })} fokus={fokus} />
         <FeldText label="Text" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} mehrzeilig />
       </> : null}
-      {b.typ === "fusszeile" ? <FeldText label="Rechts" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} /> : null}
+      {b.typ === "fusszeile" ? <>
+        <FeldText label="Rechts" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} />
+        <FusszeileWahl b={b} aendere={aendere} felder={aufbau.felder} />
+      </> : null}
       {b.typ === "zweispaltig" ? <>
         <FeldText label="Links" wert={b.links ?? ""} onWert={(w) => aendere({ links: w })} fokus={fokus} mehrzeilig />
         <FeldText label="Rechts" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} mehrzeilig />
@@ -1388,7 +1398,26 @@ function BlockEigenschaften({ b, vorher, aufbau, aendere, aendereOptionen, fokus
 /** Kopfband frei gestalten: Form, Farben, Höhe, Seiten, Logo rechts, Fußband */
 function KopfbandWahl({ b, aendere }: { b: Block; aendere: (n: Partial<Block>) => void }) {
   const hoehe = b.bandhoehe_mm ?? 38;
-  const farbe = (label: string, wert: string, onWert: (w: string) => void, vorschlaege: string[]) => (
+  return (
+    <div className="flex flex-col gap-2.5" data-testid="kopfband-wahl">
+      <FormWahl wert={b.kopfband ?? ""} farbe={b.bandfarbe ?? "#BDC9C2"} onWert={(w) => aendere({ kopfband: w })} />
+      <FarbWahl label="Farbe des Bands" wert={b.bandfarbe ?? "#BDC9C2"} onWert={(w) => aendere({ bandfarbe: w })} vorschlaege={BANDFARBEN} />
+      <FarbWahl label="Schriftfarbe" wert={b.textfarbe ?? "#23272C"} onWert={(w) => aendere({ textfarbe: w })} vorschlaege={["#23272C", "#FFFFFF", "#251F53"]} />
+      <label className="flex flex-col gap-1 text-[0.8125rem]">Höhe: {hoehe} mm
+        <input type="range" min={20} max={80} step={1} value={hoehe} aria-label="Höhe des Bands" onChange={(e) => aendere({ bandhoehe_mm: Number(e.target.value) })} />
+      </label>
+      <Segmente label="Band auf" wert={b.band_seiten ?? "alle"} onWahl={(w) => aendere({ band_seiten: w })} className="self-start"
+        werte={[{ wert: "alle", text: "jeder Seite" }, { wert: "erste", text: "nur der ersten Seite" }]} />
+      <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.logo_rechts} onChange={(e) => aendere({ logo_rechts: e.target.checked })} />Logo rechts, Absender links</label>
+      {b.fussband ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked onChange={() => aendere({ fussband: false })} />Fußband in derselben Farbe</label>
+        : <span className="text-[0.75rem] gedaempft">Ein Band unten gestalten Sie beim Abschnitt „Fußzeile“.</span>}
+    </div>
+  );
+}
+
+/** Farbe aus Vorschlägen oder frei wählen */
+function FarbWahl({ label, wert, onWert, vorschlaege }: { label: string; wert: string; onWert: (w: string) => void; vorschlaege: string[] }) {
+  return (
     <div className="flex flex-col gap-1" role="group" aria-label={label}>
       <span className="text-[0.8125rem]">{label}</span>
       <div className="flex items-center gap-1.5 flex-wrap">
@@ -1401,31 +1430,57 @@ function KopfbandWahl({ b, aendere }: { b: Block; aendere: (n: Partial<Block>) =
       </div>
     </div>
   );
+}
+
+/** Form der Kante eines Bands (oben beim Fußband gespiegelt) */
+function FormWahl({ wert, farbe, onWert, fuss }: { wert: string; farbe: string; onWert: (w: Bandform) => void; fuss?: boolean }) {
   return (
-    <div className="flex flex-col gap-2.5" data-testid="kopfband-wahl">
-      <div className="flex flex-col gap-1" role="group" aria-label="Form des Bands">
-        <span className="text-[0.8125rem]">Form der Unterkante</span>
-        <div className="grid grid-cols-4 gap-1">
-          {FORMEN.map((f) => (
-            <button key={f.wert} type="button" aria-pressed={b.kopfband === f.wert} onClick={() => aendere({ kopfband: f.wert })}
-              className={cx("flex flex-col items-center gap-0.5 p-1 rounded-md border text-[0.7188rem] cursor-pointer",
-                b.kopfband === f.wert ? "border-akzent bg-akzent-weich text-akzent-text" : "border-rand bg-flaeche")}>
-              <svg viewBox="0 0 210 50" className="w-full h-5" preserveAspectRatio="none" aria-hidden>
-                <path fill={b.bandfarbe ?? "#BDC9C2"} d={bandPfad(f.wert, 210, 40, 10)} /></svg>
-              {f.text}
-            </button>
-          ))}
-        </div>
+    <div className="flex flex-col gap-1" role="group" aria-label="Form des Bands">
+      <span className="text-[0.8125rem]">{fuss ? "Form der Oberkante" : "Form der Unterkante"}</span>
+      <div className="grid grid-cols-4 gap-1">
+        {FORMEN.map((f) => (
+          <button key={f.wert} type="button" aria-pressed={wert === f.wert} onClick={() => onWert(f.wert)}
+            className={cx("flex flex-col items-center gap-0.5 p-1 rounded-md border text-[0.7188rem] cursor-pointer",
+              wert === f.wert ? "border-akzent bg-akzent-weich text-akzent-text" : "border-rand bg-flaeche")}>
+            <svg viewBox="0 0 210 50" className="w-full h-5" preserveAspectRatio="none" aria-hidden>
+              <path fill={farbe} d={bandPfad(f.wert, 210, 40, 10)} transform={fuss ? "translate(0 50) scale(1 -1)" : undefined} /></svg>
+            {f.text}
+          </button>
+        ))}
       </div>
-      {farbe("Farbe des Bands", b.bandfarbe ?? "#BDC9C2", (w) => aendere({ bandfarbe: w }), BANDFARBEN)}
-      {farbe("Schriftfarbe", b.textfarbe ?? "#23272C", (w) => aendere({ textfarbe: w }), ["#23272C", "#FFFFFF", "#251F53"])}
-      <label className="flex flex-col gap-1 text-[0.8125rem]">Höhe: {hoehe} mm
-        <input type="range" min={20} max={80} step={1} value={hoehe} aria-label="Höhe des Bands" onChange={(e) => aendere({ bandhoehe_mm: Number(e.target.value) })} />
-      </label>
-      <Segmente label="Band auf" wert={b.band_seiten ?? "alle"} onWahl={(w) => aendere({ band_seiten: w })} className="self-start"
-        werte={[{ wert: "alle", text: "jeder Seite" }, { wert: "erste", text: "nur der ersten Seite" }]} />
-      <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.logo_rechts} onChange={(e) => aendere({ logo_rechts: e.target.checked })} />Logo rechts, Absender links</label>
-      <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.fussband} onChange={(e) => aendere({ fussband: e.target.checked })} />Fußband in derselben Farbe (Fußzeile steht darauf)</label>
+    </div>
+  );
+}
+
+/** Fußzeile frei gestalten wie die Kopfzeile: eigenes Band, Farben, Zeilen für Vorstand und Bankverbindung */
+function FusszeileWahl({ b, aendere, felder }: { b: Block; aendere: (n: Partial<Block>) => void; felder: Datenfeld[] }) {
+  const text = b.text ?? "";
+  const zeile = (feld: string, label: string) => {
+    if (!felder.some((f) => f.name === feld)) return null;
+    const muster = new RegExp(`\\{\\{\\s*${feld.replace(".", "\\.")}\\s*\\}\\}`);
+    const an = muster.test(text);
+    return (
+      <label key={feld} className="flex items-center gap-2 text-[0.8438rem]">
+        <input type="checkbox" checked={an} disabled={!an && text.split("\n").length >= 8}
+          onChange={(e) => aendere({ text: e.target.checked ? `${text}${text ? "\n" : ""}${label}: {{${feld}}}`
+            : text.split("\n").filter((z) => !muster.test(z)).join("\n") })} />Zeile „{label}“</label>
+    );
+  };
+  return (
+    <div className="flex flex-col gap-2.5" data-testid="fusszeile-wahl">
+      <div className="flex flex-col gap-1.5">
+        {zeile("Absender.Vorstand", "Vorstand")}
+        {zeile("Absender.Bankverbindung", "Spendenkonto")}
+        <span className="text-[0.75rem] gedaempft">Vorstand und Bankverbindung pflegen Sie zentral unter Vorlagen › Briefkopf und Logo.</span>
+      </div>
+      <Segmente label="Gestaltung der Fußzeile" wert={b.band ? "band" : "text"} className="self-start"
+        onWahl={(w) => aendere(w === "band" ? { band: "welle", bandfarbe: b.bandfarbe ?? "#BDC9C2", textfarbe: b.textfarbe ?? "#23272C" } : { band: "" })}
+        werte={[{ wert: "text", text: "Nur Text" }, { wert: "band", text: "Farbiges Band" }]} />
+      {b.band ? <>
+        <FormWahl wert={b.band} farbe={b.bandfarbe ?? "#BDC9C2"} onWert={(w) => aendere({ band: w })} fuss />
+        <FarbWahl label="Farbe des Bands" wert={b.bandfarbe ?? "#BDC9C2"} onWert={(w) => aendere({ bandfarbe: w })} vorschlaege={BANDFARBEN} />
+        <FarbWahl label="Schriftfarbe" wert={b.textfarbe ?? "#23272C"} onWert={(w) => aendere({ textfarbe: w })} vorschlaege={["#23272C", "#FFFFFF", "#251F53"]} />
+      </> : null}
     </div>
   );
 }

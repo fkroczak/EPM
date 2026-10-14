@@ -190,6 +190,9 @@ GEMEINSAM = {
     "Absender.Telefon": Feld("Telefon des Absenders", lambda k: _absender(k).telefon or None),
     "Absender.E-Mail": Feld("E-Mail des Absenders", lambda k: _absender(k).email or None),
     "Absender.Fußzeile": Feld("Fußzeile des Absenders", lambda k: _absender(k).fusszeile or None),
+    "Absender.Vorstand": Feld("Vorstand des Absenders (Vorlagen › Briefkopf)", lambda k: _absender(k).vorstand or None),
+    "Absender.Bankverbindung": Feld("Bankverbindung bzw. Spendenkonto des Absenders",
+                                    lambda k: _absender(k).bankverbindung or None),
 }
 
 def _je_geschlecht(weiblich, maennlich, sonst):
