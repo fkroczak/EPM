@@ -9,6 +9,13 @@ from django.db import migrations
 def umstellen(apps, schema_editor):
     from vorlagen.rgc import schluessel, vorlagen
 
+    # Freigegebene Fassungen sind per Trigger unveränderlich (audit/schutz.py, epm_vorlage_schutz). Auf einer frischen
+    # Datenbank fehlt der Trigger beim ersten migrate noch, auf dem Server nicht: ohne Wartungsmodus brach migrate dort
+    # ab und das Backend startete nicht (Rückfall 2.0.26 → 2.0.24, 14.10.2026). Daher wie patienten/0020 nur für diese
+    # eine Transaktion im Wartungsmodus.
+    if schema_editor.connection.vendor == "postgresql":
+        schema_editor.execute("SET LOCAL epm.wartung = 'on'")
+
     Dokumentvorlage = apps.get_model("vorlagen", "Dokumentvorlage")
     for v in vorlagen():
         if not v["quelle"].startswith("RC_Labor_MAL-"):
