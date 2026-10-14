@@ -7,11 +7,16 @@
  * der geführte Ablauf „1 Bearbeiten → 2 Vorschau prüfen → 3 Freigeben“, Live-Vorschau mit Testpatient neben den
  * Eigenschaften, Angaben aus der Akte per Klick aus einer lesbaren Liste, frühere Fassung ansehen/wiederherstellen,
  * „Als eigene Vorlage kopieren“. In der Oberfläche heißt eine Version „Fassung“ und Veröffentlichen „Freigeben“.
+ *
+ * Freie Gestaltung am Raster (14.10.2026): Blöcke mit der Maus auf der Seite verschieben und an 6 Spalten einrasten,
+ * am Rand breiter oder schmaler ziehen, Bausteine aus der Leiste auf die Seite ziehen, Text per Doppelklick direkt auf
+ * der Seite schreiben; Kopfband in Farbe und Form (eckig, schräg, wellig, Bogen) mit Fußband; Anschriftfeld nach
+ * DIN 5008 für den Fensterumschlag per Schalter (vorlagenRaster.ts).
  */
 import { Fragment, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { createPortal } from "react-dom";
-import type { ReactNode } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, api, apiDatei } from "@/lib/api";
 import type { Seite as Seitenliste } from "@/lib/api";
@@ -26,6 +31,12 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
 import { useSortierbar, verschiebe } from "@/components/ui/sortierbar";
 import { PdfLeser } from "@/components/PdfAnsicht";
+import {
+  BAND_ABSTAND, BANDFARBEN, DIN, DIN_BREITE, DIN_HOEHE, DIN_INFO_BREITE, DIN_INFO_LINKS, DIN_LINKS, FORMEN, MM, RAND_LINKS,
+  RAND_OBEN, SPALTE, SPALTEN, bandPfad, freierPlatz, imRaster, insRaster, ordne, rasterBreite, rasterLinks, schwung, setze,
+  setzeRaster, vonBis, ziehRand, zeilen,
+} from "./vorlagenRaster";
+import type { Bandform, Ziel } from "./vorlagenRaster";
 
 type Art = "infusionsplan" | "patientendatenblatt" | "datenschutzinformation" | "einwilligung" | "schweigepflichtentbindung"
   // Schreiben mit E-Mail (Vorlagen von Alice Hessel, 09.10.2026; F172, F173)
@@ -38,9 +49,11 @@ const mitEmailArt = (art: Art) => SCHREIBEN_FEST.includes(art) || istEigen(art);
 type Optionen = {
   schrift?: "klein" | "normal" | "gross"; ausrichtung?: "links" | "mitte" | "rechts"; fett?: boolean; kursiv?: boolean;
   ausblenden_wenn_leer?: boolean; nicht_teilen?: boolean; ueberschrift?: boolean; linie_oben?: boolean;
-  neben_vorherigem?: Breite; spalten?: 2 | 3;
+  /** „raster“: in der Zeile des vorherigen Blocks; Drittel/Hälfte/zwei Drittel nur noch in älteren Vorlagen */
+  neben_vorherigem?: "drittel" | "haelfte" | "zwei_drittel" | "raster"; spalten?: 2 | 3;
+  /** 6-Spalten-Raster: von Spalte … bis Spalte (ohne Angabe die ganze Breite) */
+  raster_von?: number; raster_bis?: number;
 };
-type Breite = "drittel" | "haelfte" | "zwei_drittel";
 type Eintrag = { label: string; wert: string };
 export type Block = {
   id: string; typ: string; bezeichnung?: string; optionen?: Optionen;
@@ -52,6 +65,11 @@ export type Block = {
   untertitel?: string; darstellung?: "paare" | "befund"; spaltenkoepfe?: boolean; neben_logo?: boolean;
   /** Block „E-Mail“ der Schreiben (F172): steht nicht auf der PDF */
   betreff?: string;
+  /** Kopfband des Briefkopfs (14.10.2026) */
+  kopfband?: Bandform | ""; bandfarbe?: string; textfarbe?: string; bandhoehe_mm?: number; band_seiten?: "alle" | "erste";
+  logo_rechts?: boolean; fussband?: boolean;
+  /** Anschriftfeld nach DIN 5008: Form A/B, Rücksendeangabe (Anschrift in text, Informationsblock in rechts) */
+  form?: "A" | "B"; ruecksendung?: string;
 };
 type Ausrichtung = "hoch" | "quer";
 type Version = {
@@ -83,7 +101,7 @@ type Entwurf = Version & { ist_entwurf: boolean; grundlage?: number; bloecke: Bl
 const TYPNAME: Record<string, string> = {
   briefkopf: "Briefkopf", titel: "Titel", text: "Text", zweispaltig: "Zwei Spalten", datenfelder: "Datenfelder", tabelle: "Tabelle", trennlinie: "Trennlinie",
   leerraum: "Leerraum", unterschrift: "Unterschrift", seitenumbruch: "Seitenumbruch", fusszeile: "Fußzeile", kopfkarte: "Kopfkarte",
-  email: "E-Mail",
+  email: "E-Mail", anschriftfeld: "Anschriftfeld (DIN 5008)",
 };
 const HINWEIS: Record<string, string> = {
   briefkopf: "Logo (und auf Wunsch Absender) aus „Briefkopf und Logo“, auf Wunsch darunter eine farbige Linie; Falzmarken am linken Rand.",
@@ -98,27 +116,12 @@ const HINWEIS: Record<string, string> = {
   unterschrift: "Angaben zur Freigabe und eine Linie für die Unterschrift.",
   seitenumbruch: "Alles danach beginnt auf einer neuen Seite.",
   email: "Betreff und Text der E-Mail, mit der das Schreiben verschickt wird (die PDF hängt an). Steht nicht auf der PDF; im Dialog vor dem Versand änderbar.",
+  anschriftfeld: "Für den Fensterumschlag: Rücksendeangabe und Anschrift links, Informationsblock rechts – an den festen Stellen nach DIN 5008 auf der ersten Seite. Der Text beginnt darunter.",
   fusszeile: "Steht auf jeder Seite unten (bis 8 Zeilen links, rechts z. B. die Seitenzahl). {Seite} und {Seiten} werden zur Seitenzahl.",
 };
 /** Bausteine aus dem Entwurf; Briefkopf, Titel und Fußzeile gibt es je Vorlage einmal */
 const BAUSTEINE = ["text", "zweispaltig", "datenfelder", "tabelle", "kopfkarte", "trennlinie", "leerraum", "unterschrift", "seitenumbruch", "titel", "briefkopf", "fusszeile", "email"];
-/** Diese Blöcke lassen sich neben den vorherigen setzen (wie auf dem Server geprüft) */
-const NEBENEINANDER = ["text", "datenfelder", "tabelle", "unterschrift"];
-const BREITE: Record<Breite, number> = { drittel: 34, haelfte: 48.5, zwei_drittel: 63 };
-const BREITE_TEXT: Record<Breite, string> = { drittel: "ein Drittel", haelfte: "die Hälfte", zwei_drittel: "zwei Drittel" };
 const PLATZHALTER = /\{\{\s*([^{}]+?)\s*\}\}/g;
-
-/** Breiten in % wie auf dem Server (pdf._nebeneinander): die rechten Blöcke nach Wahl, der erste den Rest */
-function breitenFuer(gruppe: Block[]): number[] {
-  const abstand = 4;
-  let rechts = gruppe.slice(1).map((b) => BREITE[b.optionen?.neben_vorherigem ?? "haelfte"]);
-  let erste = 100 - rechts.reduce((x, y) => x + y, 0) - abstand * (gruppe.length - 1);
-  if (erste < 15) {
-    rechts = rechts.map(() => (100 - abstand * (gruppe.length - 1)) / gruppe.length);
-    erste = rechts[0];
-  }
-  return [erste, ...rechts];
-}
 
 function neueId(typ: string, bloecke: Block[]): string {
   let i = 1;
@@ -140,6 +143,19 @@ function neuerBlock(typ: string, bloecke: Block[], tabellen: Aufbau["tabellen"])
   if (typ === "leerraum") b.hoehe_mm = 6;
   if (typ === "email") Object.assign(b, { betreff: "Betreff", text: "{{Patient.Briefanrede}},\n\n" });
   return b;
+}
+
+/** Anschriftfeld nach DIN 5008 mit den Angaben, die es in dieser Vorlage gibt */
+function neuesAnschriftfeld(bloecke: Block[], felder: Datenfeld[]): Block {
+  const da = (n: string) => felder.some((f) => f.name === n);
+  const nur = (...namen: string[]) => namen.filter(da).map((n) => `{{${n}}}`);
+  const name = da("Patient.Vorname_Name") ? ["{{Patient.Vorname_Name}}"] : nur("Patient.Name");
+  return {
+    id: neueId("anschriftfeld", bloecke), typ: "anschriftfeld", bezeichnung: "Anschriftfeld", form: "B", falzmarken: true,
+    ruecksendung: nur("Absender.Name", "Absender.Straße", "Absender.PLZ_Ort").join(" · "),
+    text: [...name, ...nur("Patient.Straße", "Patient.PLZ_Ort")].join("\n") || "Empfänger",
+    rechts: da("Heute") ? "Datum: {{Heute}}" : "",
+  };
 }
 
 /** Lesbare Namen der erlaubten Datenfelder (F180): Platzhalter erscheinen als „Briefanrede“ statt Patient.Briefanrede */
@@ -290,11 +306,118 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
           <div className="line-clamp-6"><MitFeldern text={b.text} /></div>
         </div>
       );
+    case "anschriftfeld": // im Querformat ohne feste Stelle, die Anschrift steht im Textfluss
+      return <div className="text-[1em]"><MitFeldern text={b.text} /></div>;
     case "seitenumbruch":
       return <div className="text-center text-[0.9em] text-[#888] border-t border-dashed border-[#bbb] pt-0.5">Seitenumbruch</div>;
     default:
       return null;
   }
+}
+
+/** Farbige Fläche des Kopf- oder Fußbands (gespiegelt unten), Maße in mm wie in der PDF */
+function BandFlaeche({ b, breite, hoehe, fuss }: { b: Block; breite: number; hoehe: number; fuss?: boolean }) {
+  return (
+    <svg viewBox={`0 0 ${breite} ${hoehe}`} preserveAspectRatio="none" style={{ width: breite * MM, height: hoehe * MM }} className="block">
+      <path fill={b.bandfarbe ?? "#E8E6F2"} d={bandPfad(b.kopfband || "gerade", breite, hoehe, schwung(hoehe, fuss))}
+        transform={fuss ? `translate(0 ${hoehe}) scale(1 -1)` : undefined} />
+    </svg>
+  );
+}
+
+/** Kopfband mit Logo und Absender, wie es auf jeder (oder der ersten) Seite steht */
+function KopfbandAnsicht({ b, breite }: { b: Block; breite: number }) {
+  const briefkopf = useBriefkopf();
+  const a = briefkopf.data ? briefkopf.data.absender[briefkopf.data.aktiv] : null;
+  return (
+    <div className="relative">
+      <BandFlaeche b={b} breite={breite} hoehe={b.bandhoehe_mm ?? 38} />
+      <div className={cx("absolute flex justify-between items-start gap-6", b.logo_rechts && "flex-row-reverse")}
+        style={{ top: 7 * MM, left: RAND_LINKS * MM, right: RAND_LINKS * MM, color: b.textfarbe ?? "#1b1932" }}>
+        <Logo className="w-[9.375rem] h-[3.3125rem]" version={briefkopf.data?.logo.sha256} firma={briefkopf.data?.firma?.kuerzel} name={briefkopf.data?.firma?.name} />
+        {b.absender !== false && a ? (
+          <div className={cx("flex flex-col text-[0.75rem] leading-snug", b.logo_rechts ? "items-start" : "items-end")}>
+            <span>{a.strasse} · {a.plz} {a.ort}</span><span>Tel. {a.telefon}</span><span>{a.email}</span>
+          </div>
+        ) : null}
+      </div>
+      {b.band_seiten === "erste" ? <span className="absolute right-2 bottom-1 text-[0.625rem] px-1 rounded bg-white/80 text-[#3b3953]">nur erste Seite</span> : null}
+    </div>
+  );
+}
+
+/** Anschriftfeld nach DIN 5008: Rücksendeangabe oben (5 mm), Anschrift ab der Anschriftzone (nach 17,7 mm) */
+function AnschriftfeldAnsicht({ b }: { b: Block }) {
+  return (
+    <div className="h-full overflow-hidden outline outline-1 outline-dashed outline-[#9a98b3] -outline-offset-1">
+      <div className="text-[0.62rem] leading-tight text-[#3b3953] whitespace-nowrap overflow-hidden" style={{ height: 5 * MM, paddingTop: 1.5 * MM, paddingLeft: 2 }}>
+        <span className="border-b border-[#3b3953]"><MitFeldern text={b.ruecksendung} /></span>
+      </div>
+      <div className="text-[0.95em] leading-tight" style={{ paddingTop: 12.7 * MM, paddingLeft: 2 }}><MitFeldern text={b.text} /></div>
+    </div>
+  );
+}
+
+/** Text direkt auf der Seite schreiben (Doppelklick); Angaben aus der Akte setzt der Feldeinfüger an der Schreibmarke ein */
+function TextAufDerSeite({ wert, onWert, fokus, onFertig, einzeilig, gross }: {
+  wert: string; onWert: (w: string) => void; fokus: Fokus; onFertig: () => void; einzeilig?: boolean; gross?: boolean;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const einsetzen = useEinsetzen(ref, wert, onWert, fokus);
+  // ausdrücklich anmelden: ein schon fokussiertes Feld meldet beim zweiten focus() kein onFocus mehr
+  useEffect(() => { const el = ref.current; el?.focus(); el?.setSelectionRange(el.value.length, el.value.length); einsetzen.onFocus(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const el = ref.current; if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; } }, [wert]);
+  return (
+    <textarea ref={ref} aria-label="Text auf der Seite" value={wert} rows={1} onFocus={einsetzen.onFocus} onBlur={onFertig}
+      onChange={(e) => onWert(einzeilig ? e.target.value.replace(/\n/g, " ") : e.target.value)}
+      onKeyDown={(e) => { if (e.key === "Escape" || (einzeilig && e.key === "Enter")) { e.preventDefault(); onFertig(); } }}
+      className={cx("block w-full resize-none overflow-hidden border-0 outline-none bg-[#f3f2fa] rounded-sm p-0 font-[inherit] text-inherit",
+        gross ? "text-[1.6em] font-semibold" : "text-[1em] leading-relaxed")} />
+  );
+}
+
+/** Lage im 6-Spalten-Raster: Vorgaben zum Antippen, von/bis Spalte, in derselben Zeile wie der Block davor */
+function RasterWahl({ b, vorher, aendere }: { b: Block; vorher?: Block; aendere: (n: Partial<Block>) => void }) {
+  const [von, bis] = vonBis(b);
+  const neben = b.optionen?.neben_vorherigem === "raster";
+  const vorBis = vorher && imRaster(vorher) ? vonBis(vorher)[1] : SPALTEN;
+  const min = neben ? vorBis + 1 : 1;
+  const setzeLage = (v: number, bi: number, n = neben) => aendere({ optionen: setzeRaster(b, { raster_von: v, raster_bis: bi, neben_vorherigem: n ? "raster" : undefined }).optionen });
+  const vorgaben: { text: string; v: number; b: number }[] = [
+    { text: "Ganz", v: 1, b: 6 }, { text: "½ links", v: 1, b: 3 }, { text: "½ rechts", v: 4, b: 6 }, { text: "⅓ links", v: 1, b: 2 },
+    { text: "⅓ Mitte", v: 3, b: 4 }, { text: "⅓ rechts", v: 5, b: 6 }, { text: "⅔ links", v: 1, b: 4 }, { text: "⅔ rechts", v: 3, b: 6 },
+  ];
+  return (
+    <div className="flex flex-col gap-2" role="group" aria-label="Lage im Raster" data-testid="raster-wahl">
+      <span className="text-sm font-medium">Lage im Raster ({SPALTEN} Spalten)</span>
+      <div className="flex gap-[3px]" aria-hidden>
+        {Array.from({ length: SPALTEN }, (_, n) => n + 1).map((n) => (
+          <button key={n} type="button" tabIndex={-1} onClick={() => (n < von ? setzeLage(Math.max(min, n), bis) : setzeLage(von, n))}
+            title={`Spalte ${n}`} className={cx("flex-1 h-5 rounded-sm border-0 cursor-pointer", n >= von && n <= bis ? "bg-akzent" : n < min ? "bg-fein opacity-50" : "bg-fein")} />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {vorgaben.map((x) => (
+          <button key={x.text} type="button" disabled={x.v < min} onClick={() => setzeLage(x.v, x.b)} aria-pressed={x.v === von && x.b === bis}
+            className={cx("px-2 py-0.5 rounded-md border text-[0.75rem] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed",
+              x.v === von && x.b === bis ? "border-akzent bg-akzent-weich text-akzent-text" : "border-rand bg-flaeche")}>{x.text}</button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Feld label="Von Spalte">{(p) => <Auswahl {...p} value={von} onChange={(e) => setzeLage(Number(e.target.value), Math.max(bis, Number(e.target.value)))}>
+          {Array.from({ length: SPALTEN }, (_, n) => n + 1).map((n) => <option key={n} value={n} disabled={n < min}>{n}</option>)}</Auswahl>}</Feld>
+        <Feld label="Bis Spalte">{(p) => <Auswahl {...p} value={bis} onChange={(e) => setzeLage(Math.min(von, Number(e.target.value)), Number(e.target.value))}>
+          {Array.from({ length: SPALTEN }, (_, n) => n + 1).map((n) => <option key={n} value={n} disabled={n < min}>{n}</option>)}</Auswahl>}</Feld>
+      </div>
+      <label className="flex items-center gap-2 text-[0.8438rem]">
+        <input type="checkbox" checked={neben} disabled={!neben && (!vorher || !imRaster(vorher) || vorBis >= SPALTEN)}
+          onChange={(e) => {
+            if (!e.target.checked) return setzeLage(von, bis, false);
+            const v = Math.max(von, vorBis + 1);
+            setzeLage(v, Math.max(bis, v), true);
+          }} />In derselben Zeile wie der Block davor</label>
+    </div>
+  );
 }
 
 const GRUPPEN: { gruppe: Gruppe; titel: string; leer?: string }[] = [
@@ -448,14 +571,17 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
 
   useEffect(() => {
     if (entwurf.data && bloecke === null) {
-      setBloecke(structuredClone(entwurf.data.bloecke));
+      // ältere Vorlagen (Drittel/Hälfte nebeneinander) erscheinen gleich im 6-Spalten-Raster
+      const b = insRaster(entwurf.data.bloecke);
+      setBloecke(structuredClone(b));
       setAusrichtung(entwurf.data.ausrichtung ?? "hoch");
-      setGeladen(JSON.stringify({ bloecke: entwurf.data.bloecke, ausrichtung: entwurf.data.ausrichtung ?? "hoch" }));
+      setGeladen(JSON.stringify({ bloecke: b, ausrichtung: entwurf.data.ausrichtung ?? "hoch" }));
       setAuswahl(entwurf.data.bloecke[0]?.id ?? null);
     }
   }, [entwurf.data, bloecke]);
 
-  const neuLaden = (b: Block[], a?: Ausrichtung) => {
+  const neuLaden = (geladenBloecke: Block[], a?: Ausrichtung) => {
+    const b = insRaster(geladenBloecke);
     setBloecke(structuredClone(b));
     const neu = a ?? ausrichtung ?? "hoch";
     setAusrichtung(neu);
@@ -513,10 +639,17 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
   });
   const startvorlage = useMutation({
     mutationFn: () => api<{ bloecke: Block[] }>(`vorlagen/${art}/startvorlage/`),
-    onSuccess: (v) => { setBloecke(structuredClone(v.bloecke)); setAuswahl(v.bloecke[0]?.id ?? null); melden("Mitgelieferte Startvorlage als Grundlage geladen – noch nicht gespeichert."); },
+    onSuccess: (v) => { setBloecke(structuredClone(insRaster(v.bloecke))); setAuswahl(v.bloecke[0]?.id ?? null); melden("Mitgelieferte Startvorlage als Grundlage geladen – noch nicht gespeichert."); },
   });
 
-  const sort = useSortierbar(bloecke ?? [], (neu) => setBloecke(neu));
+  const sort = useSortierbar(bloecke ?? [], (neu) => setBloecke(ordne(neu)));
+  // Gestaltung am Raster (14.10.2026): Text direkt auf der Seite, Ziehen mit Anzeige des Ziels, Raster einblenden
+  const [bearbeitet, setBearbeitet] = useState<string | null>(null);
+  const [zieht, setZieht] = useState<string | null>(null);
+  const [anzeige, setAnzeige] = useState<{ ziel: Ziel; top: number; left: number; width: number; height: number } | null>(null);
+  const [rasterZeigen, setRasterZeigen] = useState(true);
+  const inhaltRef = useRef<HTMLDivElement>(null);
+  const gezogen = useRef(false);
   if (aufbau.error || entwurf.error) {
     return (
       <div className="flex flex-col gap-3 items-start">
@@ -529,7 +662,8 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
   const a = aufbau.data;
   const gewaehlt = bloecke.find((b) => b.id === auswahl) ?? null;
   const index = gewaehlt ? bloecke.indexOf(gewaehlt) : -1;
-  const aendere = (neu: Partial<Block>) => setBloecke((alt) => (alt ?? []).map((b) => (b.id === auswahl ? { ...b, ...neu } : b)));
+  const aendereBlock = (id: string, neu: Partial<Block>) => setBloecke((alt) => ordne((alt ?? []).map((b) => (b.id === id ? { ...b, ...neu } : b))));
+  const aendere = (neu: Partial<Block>) => { if (auswahl) aendereBlock(auswahl, neu); };
   const aendereOptionen = (neu: Partial<Optionen>) => aendere({ optionen: { ...gewaehlt?.optionen, ...neu } });
   const verschiebe = (i: number, nach: number) => {
     if (nach < 0 || nach >= bloecke.length) return;
@@ -538,41 +672,203 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
     neu.splice(nach, 0, x);
     setBloecke(neu);
   };
-  const entferne = (id: string) => { const neu = bloecke.filter((b) => b.id !== id); setBloecke(neu); waehleBlock(neu[0]?.id ?? null); };
+  const entferne = (id: string) => { const neu = ordne(bloecke.filter((b) => b.id !== id)); setBloecke(neu); waehleBlock(neu[0]?.id ?? null); };
+  const reihen = zeilen(bloecke);
   const hinzufuegen = (typ: string) => {
+    if (gezogen.current) return; // gerade auf die Seite gezogen
     const b = neuerBlock(typ, bloecke, a.tabellen);
-    const nach = typ === "briefkopf" ? 0 : typ === "fusszeile" || typ === "email" ? bloecke.length : index >= 0 ? index + 1 : bloecke.length;
+    // hinter die Zeile des markierten Abschnitts, damit ein Nebeneinander nicht auseinanderfällt
+    const ende = index >= 0 ? Math.max(...(reihen.find((z) => z.includes(index)) ?? [index])) + 1 : bloecke.length;
+    const nach = typ === "briefkopf" ? 0 : typ === "fusszeile" || typ === "email" ? bloecke.length : ende;
     const neu = [...bloecke];
     neu.splice(nach, 0, b);
-    setBloecke(neu);
+    setBloecke(ordne(neu));
     waehleBlock(b.id);
+  };
+  // Anschriftfeld nach DIN 5008 ein- und ausschalten: steht hinter dem Briefkopf, bringt eigene Falzmarken mit
+  const dinBlock = bloecke.find((b) => b.typ === "anschriftfeld");
+  const schalteDin = (an: boolean) => {
+    if (!an) { if (dinBlock) entferne(dinBlock.id); return; }
+    const feld = neuesAnschriftfeld(bloecke, a.felder);
+    const kopf = bloecke.findIndex((b) => b.typ === "briefkopf");
+    const neu = bloecke.map((b) => (b.typ === "briefkopf" && b.falzmarken ? { ...b, falzmarken: false } : b));
+    neu.splice(kopf + 1, 0, feld);
+    setBloecke(ordne(neu));
+    waehleBlock(feld.id);
+    // Abschnitte, die schon eine Anschrift enthalten (z. B. „Empfänger und Datum“), stünden sonst doppelt
+    const doppelt = bloecke.filter((b) => b.typ !== "briefkopf" && /\{\{\s*(Patient\.Straße|Absender\.Straße)\s*\}\}/.test(
+      [b.text, b.links, b.rechts].join(" "))).map((b) => `„${b.bezeichnung || TYPNAME[b.typ]}“`);
+    melden(doppelt.length ? `Anschriftfeld eingefügt. ${doppelt.join(", ")} ${doppelt.length > 1 ? "enthalten" : "enthält"} ebenfalls eine Anschrift – bei Bedarf entfernen.`
+      : "Anschriftfeld nach DIN 5008 eingefügt.");
+  };
+
+  /** Ziel unter dem Mauszeiger: neue Zeile zwischen zwei Zeilen oder ein freier Platz in einer Zeile */
+  const zielAn = (x: number, y: number, ziehtId: string | null, raster: boolean, breite: number) => {
+    const inhalt = inhaltRef.current;
+    if (!inhalt) return null;
+    const r0 = inhalt.getBoundingClientRect();
+    if (x < r0.left - 60 || x > r0.right + 60 || y < r0.top - 120 || y > r0.bottom + 160) return null;
+    const zeilenEl = [...inhalt.querySelectorAll<HTMLElement>("[data-zeile]")];
+    const linie = (top: number, vorId: string | null) => ({ ziel: { art: "zeile", vorId } as Ziel, top: top - r0.top - 2, left: 0, width: r0.width, height: 4 });
+    if (!zeilenEl.length) return linie(r0.top, null);
+    const prozent = ((x - r0.left) / r0.width) * 100;
+    const spalte = Math.min(SPALTEN, Math.max(1, Math.floor(prozent / (SPALTE + 2.8)) + 1));
+    for (let n = 0; n < zeilenEl.length; n += 1) {
+      const el = zeilenEl[n];
+      const r = el.getBoundingClientRect();
+      const ids = (el.dataset.zeile ?? "").split(" ");
+      const naechste = zeilenEl[n + 1]?.dataset.zeile?.split(" ")[0] ?? null;
+      if (y < r.top) return linie(r.top - 5, ids[0]);
+      if (y > r.bottom) continue;
+      const rel = (y - r.top) / Math.max(r.height, 1);
+      const mitglieder = ids.map((id) => bloecke.find((b) => b.id === id)).filter((b): b is Block => !!b);
+      const fuegbar = raster && mitglieder.every(imRaster) && mitglieder.some((b) => b.id !== ziehtId);
+      if (fuegbar && rel > 0.2 && rel < 0.8) {
+        const platz = freierPlatz(mitglieder.filter((b) => b.id !== ziehtId).map(vonBis), spalte, breite);
+        if (platz) return { ziel: { art: "neben", zeileIds: ids, von: platz[0], bis: platz[1] } as Ziel, top: r.top - r0.top,
+          height: Math.max(r.height, 24), left: (rasterLinks(platz[0]) / 100) * r0.width, width: (rasterBreite(platz[0], platz[1]) / 100) * r0.width };
+      }
+      return rel < 0.5 ? linie(r.top - 5, ids[0]) : linie(r.bottom + 5, naechste);
+    }
+    return linie(zeilenEl[zeilenEl.length - 1].getBoundingClientRect().bottom + 5, null);
+  };
+  /** Block (oder neuen Baustein) mit Maus, Stift oder Finger auf die Seite ziehen; ein Klick ohne Bewegung wählt nur */
+  const ziehStart = (e: ReactPointerEvent, quelle: { id: string } | { typ: string }) => {
+    if (e.button !== 0) return;
+    const block = "id" in quelle ? bloecke.find((b) => b.id === quelle.id) ?? null : null;
+    const typ = block?.typ ?? ("typ" in quelle ? quelle.typ : "");
+    if (block && bearbeitet === block.id) return;
+    const breite = block && imRaster(block) && block.optionen?.raster_von ? vonBis(block)[1] - vonBis(block)[0] + 1 : SPALTEN;
+    const start = { x: e.clientX, y: e.clientY };
+    let aktiv = false;
+    let letztes: Ziel | null = null;
+    const bewegen = (ev: PointerEvent) => {
+      if (!aktiv && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 6) return;
+      if (!aktiv) { aktiv = true; setZieht(block?.id ?? `neu:${typ}`); }
+      ev.preventDefault();
+      const t = zielAn(ev.clientX, ev.clientY, block?.id ?? null, imRaster({ id: "", typ }), breite);
+      letztes = t?.ziel ?? null;
+      setAnzeige(t);
+    };
+    const ende = (abbrechen: boolean) => {
+      window.removeEventListener("pointermove", bewegen);
+      window.removeEventListener("pointerup", hoch);
+      window.removeEventListener("pointercancel", abbruch);
+      setAnzeige(null);
+      setZieht(null);
+      if (!aktiv) return;
+      gezogen.current = true;
+      window.setTimeout(() => { gezogen.current = false; }, 0);
+      if (abbrechen || !letztes) return;
+      if (block) {
+        if (letztes.art === "zeile" && letztes.vorId === block.id) return;
+        setBloecke(setze(bloecke, block.id, null, letztes));
+        waehleBlock(block.id);
+      } else {
+        const neu = neuerBlock(typ, bloecke, a.tabellen);
+        setBloecke(setze(bloecke, null, neu, letztes));
+        waehleBlock(neu.id);
+      }
+    };
+    const hoch = () => ende(false);
+    const abbruch = () => ende(true);
+    window.addEventListener("pointermove", bewegen);
+    window.addEventListener("pointerup", hoch);
+    window.addEventListener("pointercancel", abbruch);
+  };
+  /** Breite am linken oder rechten Rand ziehen; rastet an den 6 Spalten ein */
+  const randStart = (e: ReactPointerEvent, id: string, seite: "links" | "rechts") => {
+    e.stopPropagation();
+    e.preventDefault();
+    setZieht("rand");
+    const bewegen = (ev: PointerEvent) => {
+      const r = inhaltRef.current?.getBoundingClientRect();
+      if (r) setBloecke((alt) => (alt ? ziehRand(alt, id, seite, ((ev.clientX - r.left) / r.width) * 100) : alt));
+    };
+    const hoch = () => {
+      window.removeEventListener("pointermove", bewegen);
+      window.removeEventListener("pointerup", hoch);
+      window.removeEventListener("pointercancel", hoch);
+      setZieht(null);
+      setBloecke((alt) => (alt ? ordne(alt) : alt));
+    };
+    window.addEventListener("pointermove", bewegen);
+    window.addEventListener("pointerup", hoch);
+    window.addEventListener("pointercancel", hoch);
   };
   const einfuegen = (name: string) => {
     if (fokus.current) fokus.current.setze(name);
     else melden(gewaehlt ? "Dieser Abschnitt hat kein Textfeld. Bitte einen Abschnitt mit Text markieren (z. B. „Text“)." : "Bitte zuerst einen Abschnitt markieren.");
   };
-  // Blöcke mit „neben dem vorherigen“ in eine Zeile setzen, wie im PDF
-  const gruppen: number[][] = [];
-  bloecke.forEach((b, i) => {
-    if (b.optionen?.neben_vorherigem && gruppen.length) gruppen[gruppen.length - 1].push(i);
-    else gruppen.push([i]);
-  });
+  const quer = ausrichtung === "quer";
+  const kopfBlock = bloecke.find((b) => b.typ === "briefkopf");
+  const band = kopfBlock && !kopfBlock.briefpapier && kopfBlock.kopfband ? kopfBlock : null;
+  const din = !quer ? dinBlock : undefined;
+  const seiteMm = quer ? { b: 297, h: 210 } : { b: 210, h: 297 };
+  const oben = band ? (band.bandhoehe_mm ?? 38) + BAND_ABSTAND : RAND_OBEN;
+  const unten = Math.max(18, 10 + 3.6 * ((bloecke.find((b) => b.typ === "fusszeile")?.text ?? "").split("\n").length));
+  // Kopfband und Anschriftfeld stehen an festen Stellen der Seite, nicht im Textfluss
+  const fest = (b: Block) => (b === band) || (b === din);
+  const schreibbar = (b: Block) => b.typ === "text" || b.typ === "titel";
   const rahmen = (b: Block, i: number) => (
-    <div key={b.id} role="button" tabIndex={0} aria-label={`Block ${b.bezeichnung || TYPNAME[b.typ]}`}
-      onClick={() => waehleBlock(b.id)} onKeyDown={(e) => { if (e.key === "Enter") waehleBlock(b.id); }}
-      className={cx("relative px-2 py-1.5 rounded cursor-pointer", b.id === auswahl ? "outline outline-2 outline-[#251F53]" : "hover:outline hover:outline-1 hover:outline-[#c9c8d4]")}>
+    <div key={b.id} role="button" tabIndex={0} aria-label={`Block ${b.bezeichnung || TYPNAME[b.typ]}`} data-block={b.id}
+      onClick={() => waehleBlock(b.id)} onKeyDown={(e) => { if (e.key === "Enter" && bearbeitet !== b.id) waehleBlock(b.id); }}
+      onDoubleClick={() => { if (schreibbar(b)) { waehleBlock(b.id); setBearbeitet(b.id); } }}
+      onPointerDown={(e) => { if (e.pointerType === "mouse" && !fest(b)) ziehStart(e, { id: b.id }); }}
+      title={schreibbar(b) ? "Ziehen zum Verschieben · Doppelklick zum Schreiben" : "Ziehen zum Verschieben"}
+      className={cx("relative px-2 py-1.5 rounded", bearbeitet === b.id ? "cursor-text" : "cursor-grab", zieht === b.id && "opacity-40",
+        b.id === auswahl ? "outline outline-2 outline-[#251F53]" : "hover:outline hover:outline-1 hover:outline-[#c9c8d4]")}>
       {b.id === auswahl ? <>
-        <span className="absolute -top-2.5 left-1.5 text-[0.625rem] bg-[#251F53] text-white px-1.5 rounded-sm">{b.bezeichnung || TYPNAME[b.typ]}</span>
+        {/* Griff: Ziehen mit Finger oder Stift (die Maus zieht am ganzen Block) */}
+        <span className="absolute -top-2.5 left-1.5 text-[0.625rem] bg-[#251F53] text-white px-1.5 rounded-sm cursor-grab touch-none select-none"
+          onPointerDown={(e) => { if (e.pointerType !== "mouse") { e.stopPropagation(); ziehStart(e, { id: b.id }); } }}>⠿ {b.bezeichnung || TYPNAME[b.typ]}</span>
+        {imRaster(b) && bearbeitet !== b.id ? (["links", "rechts"] as const).map((seite) => (
+          <span key={seite} aria-hidden onPointerDown={(e) => randStart(e, b.id, seite)} title="Ziehen: Breite im Raster ändern"
+            className={cx("absolute top-1/2 -translate-y-1/2 w-2.5 h-7 rounded-sm bg-[#251F53] cursor-ew-resize touch-none border-2 border-white",
+              seite === "links" ? "-left-1.5" : "-right-1.5")} data-testid={`rand-${seite}`} />
+        )) : null}
         <span className="absolute -top-3 right-1 flex gap-0.5">
           <button type="button" aria-label="nach oben" title="nach oben" disabled={i === 0} onClick={(e) => { e.stopPropagation(); verschiebe(i, i - 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[0.6875rem] p-0 cursor-pointer">↑</button>
           <button type="button" aria-label="nach unten" title="nach unten" disabled={i === bloecke.length - 1} onClick={(e) => { e.stopPropagation(); verschiebe(i, i + 1); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[0.6875rem] p-0 cursor-pointer">↓</button>
           <button type="button" aria-label="entfernen" title="Abschnitt entfernen" onClick={(e) => { e.stopPropagation(); entferne(b.id); }} className="w-5 h-5 border border-[#251F53] bg-white text-[#251F53] rounded text-[0.6875rem] p-0 cursor-pointer">×</button>
         </span>
       </> : null}
-      <div style={{ fontSize: SCHRIFT_PX[b.optionen?.schrift ?? "normal"] }}><BlockAnsicht b={b} tabellen={a.tabellen} /></div>
+      <div style={{ fontSize: SCHRIFT_PX[b.optionen?.schrift ?? "normal"] }}>
+        {bearbeitet === b.id && schreibbar(b)
+          ? <TextAufDerSeite wert={b.text ?? ""} onWert={(w) => aendereBlock(b.id, { text: w })} fokus={fokus} einzeilig={b.typ === "titel"}
+            onFertig={() => setBearbeitet(null)} gross={b.typ === "titel"} />
+          : <BlockAnsicht b={b} tabellen={a.tabellen} />}
+      </div>
     </div>
   );
-  const einmal = (typ: string) => ["briefkopf", "fusszeile", "email"].includes(typ) && bloecke.some((b) => b.typ === typ);
+  /** Eine Zeile der Seite: Blöcke an ihren Spalten wie im PDF (Breite und Abstand in % wie gestaltung.raster_zeile) */
+  const zeile = (z: number[]) => {
+    const ids = z.map((i) => bloecke[i].id).join(" ");
+    const imGitter = z.some((i) => imRaster(bloecke[i]) && (bloecke[i].optionen?.raster_von || bloecke[i].optionen?.raster_bis || bloecke[i].optionen?.neben_vorherigem));
+    if (!imGitter && z.length === 1) return <div key={ids} data-zeile={ids}>{rahmen(bloecke[z[0]], z[0])}</div>;
+    let rechts = 0;
+    return (
+      <div key={ids} data-zeile={ids} className="flex items-start" data-testid={z.length > 1 ? "nebeneinander" : undefined}>
+        {z.map((i) => {
+          const [von, bis] = vonBis(bloecke[i]);
+          const links = rasterLinks(von);
+          const stil = { marginLeft: `${links - rechts}%`, width: `${rasterBreite(von, bis)}%`, flex: "none" };
+          rechts = links + rasterBreite(von, bis);
+          return <div key={bloecke[i].id} style={stil}>{rahmen(bloecke[i], i)}</div>;
+        })}
+      </div>
+    );
+  };
+  const sichtbar = reihen.filter((z) => !(z.length === 1 && fest(bloecke[z[0]])));
+  const dinStelle = din ? bloecke.indexOf(din) : -1;
+  const festerRahmen = (b: Block, inhalt: ReactNode, stil: CSSProperties, testid: string) => (
+    <div role="button" tabIndex={0} aria-label={`Block ${b.bezeichnung || TYPNAME[b.typ]}`} data-testid={testid} style={stil}
+      onClick={() => waehleBlock(b.id)} onKeyDown={(e) => { if (e.key === "Enter") waehleBlock(b.id); }}
+      className={cx("absolute cursor-pointer", b.id === auswahl ? "outline outline-2 outline-[#251F53] z-10" : "hover:outline hover:outline-1 hover:outline-[#c9c8d4]")}>
+      {inhalt}
+    </div>
+  );
+  const einmal = (typ: string) => ["briefkopf", "fusszeile", "email", "anschriftfeld"].includes(typ) && bloecke.some((b) => b.typ === typ);
   const serverFehler = [speichern.error, freigeben.error, wiederherstellenM.error].find((e) => e instanceof ApiFehler) as ApiFehler | undefined;
   const fehlerListe = serverFehler ? (Array.isArray((serverFehler.daten as { bloecke?: string[] })?.bloecke)
     ? (serverFehler.daten as { bloecke: string[] }).bloecke : [serverFehler.message]) : [];
@@ -712,13 +1008,14 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
             <span className="lbl">Abschnitt hinzufügen</span>
             <div className="flex flex-wrap gap-1.5">
               {BAUSTEINE.filter((t) => a.bausteine.some((x) => x.typ === t)).map((t) => (
-                <button key={t} type="button" disabled={einmal(t)} onClick={() => hinzufuegen(t)} title={HINWEIS[t]}
-                  className="px-2.5 py-1.5 border border-dashed border-rand rounded-lg bg-flaeche text-[0.8125rem] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                <button key={t} type="button" disabled={einmal(t)} onClick={() => hinzufuegen(t)} title={`${HINWEIS[t]} – Klicken oder auf die Seite ziehen`}
+                  onPointerDown={(e) => { if (!einmal(t) && ansicht === "seite") ziehStart(e, { typ: t }); }}
+                  className="px-2.5 py-1.5 border border-dashed border-rand rounded-lg bg-flaeche text-[0.8125rem] cursor-grab touch-none disabled:opacity-50 disabled:cursor-not-allowed">
                   + {TYPNAME[t]}
                 </button>
               ))}
             </div>
-            <span className="text-xs gedaempft leading-normal">Der neue Abschnitt kommt hinter den markierten.</span>
+            <span className="text-xs gedaempft leading-normal">Ein Klick setzt den neuen Abschnitt hinter den markierten; oder auf die Seite ziehen.</span>
           </Karte>
           <Karte className="p-3.5 flex flex-col gap-1.5" data-testid="versionen">
             <span className="lbl flex items-center gap-1.5">Frühere <Begriff name="fassung">Fassungen</Begriff>
@@ -755,23 +1052,61 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
               <Segmente label="Seitenformat" wert={ausrichtung ?? "hoch"} onWahl={(w) => setAusrichtung(w)} className="self-start"
                 werte={[{ wert: "hoch", text: "Hochformat" }, { wert: "quer", text: "Querformat" }]} />
             ) : null}
+            {a.bausteine.some((x) => x.typ === "anschriftfeld") ? (
+              <span className="flex items-center gap-1.5 text-[0.8438rem]">
+                <label className="flex items-center gap-2" title={quer ? "Nur im Hochformat" : undefined}>
+                  <input type="checkbox" role="switch" checked={!!dinBlock} disabled={quer && !dinBlock} onChange={(e) => schalteDin(e.target.checked)} data-testid="din-schalter" />
+                  DIN 5008: Anschriftfeld für Fensterumschlag</label>
+                <Erklaerung titel="Anschriftfeld nach DIN 5008">Setzt Rücksendeangabe, Anschrift und Informationsblock an die festen Stellen für den
+                  Fensterumschlag (Form B: Anschrift 45 mm vom oberen Rand, Form A: 27 mm), dazu Falz- und Lochmarke. Der Text beginnt darunter.
+                  Für Pläne und Vordrucke, die nicht verschickt werden (z. B. den Infusionsplan), ausgeschaltet lassen.</Erklaerung>
+              </span>
+            ) : null}
+            {ansicht === "seite" ? (
+              <label className="flex items-center gap-2 text-[0.8438rem]">
+                <input type="checkbox" checked={rasterZeigen} onChange={(e) => setRasterZeigen(e.target.checked)} />Raster zeigen</label>
+            ) : null}
           </div>
+          {ansicht === "seite" ? <span className="text-[0.75rem] gedaempft -mt-1" data-testid="raster-hinweis">
+            Abschnitte mit der Maus verschieben – sie rasten an {SPALTEN} Spalten ein. Am Rand ziehen ändert die Breite, Doppelklick schreibt
+            direkt auf der Seite. Bausteine lassen sich aus „Abschnitt hinzufügen“ auf die Seite ziehen.</span> : null}
           {ansicht === "seite" ? (
             <div className="py-6 bg-[#E6E5EE] rounded-xl overflow-auto min-w-0" data-testid="vorlage-seite">
-              <div className={cx("mx-auto px-[2.375rem] py-[2.125rem] bg-white text-[#1a1a1a] shadow-md flex flex-col gap-2.5",
-                ausrichtung === "quer" ? "w-[49.5rem] min-h-[35rem]" : "w-[35rem] min-h-[49.5rem]")}>
-                {gruppen.map((g) => g.length === 1 ? rahmen(bloecke[g[0]], g[0]) : (
-                  <div key={`paar-${bloecke[g[0]].id}`} className="flex justify-between items-start" data-testid="nebeneinander">
-                    {g.map((i, j) => <div key={bloecke[i].id} style={{ width: `${breitenFuer(g.map((x) => bloecke[x]))[j]}%` }}>{rahmen(bloecke[i], i)}</div>)}
-                  </div>
-                ))}
+              <div className="relative mx-auto bg-white text-[#1a1a1a] shadow-md"
+                style={{ width: seiteMm.b * MM, minHeight: seiteMm.h * MM,
+                  padding: `${oben * MM}px ${RAND_LINKS * MM}px ${(band?.fussband ? unten + 6 : unten) * MM}px` }}>
+                {band ? festerRahmen(band, <KopfbandAnsicht b={band} breite={seiteMm.b} />, { top: 0, left: 0 }, "kopfband") : null}
+                {band?.fussband ? <div className="absolute bottom-0 left-0 pointer-events-none" data-testid="fussband">
+                  <BandFlaeche b={band} breite={seiteMm.b} hoehe={unten + 4} fuss /></div> : null}
+                {din ? <>
+                  {festerRahmen(din, <AnschriftfeldAnsicht b={din} />, { top: DIN[din.form ?? "B"].oben * MM, left: DIN_LINKS * MM,
+                    width: DIN_BREITE * MM, height: DIN_HOEHE * MM }, "anschriftfeld")}
+                  {din.rechts ? festerRahmen(din, <div className="text-[0.85em] leading-snug"><MitFeldern text={din.rechts} /></div>,
+                    { top: DIN[din.form ?? "B"].info_oben * MM, left: DIN_INFO_LINKS * MM, width: DIN_INFO_BREITE * MM }, "informationsblock") : null}
+                </> : null}
+                <div ref={inhaltRef} className="relative flex flex-col gap-2.5" data-testid="seiteninhalt">
+                  {rasterZeigen || zieht ? (
+                    <div aria-hidden className="absolute -top-2 -bottom-2 inset-x-0 pointer-events-none" data-testid="raster">
+                      {Array.from({ length: SPALTEN }, (_, n) => (
+                        <div key={n} className={cx("absolute top-0 bottom-0 border-x border-dashed", zieht ? "bg-[#251F53]/[0.06] border-[#251F53]/25" : "bg-[#251F53]/[0.025] border-[#251F53]/10")}
+                          style={{ left: `${rasterLinks(n + 1)}%`, width: `${SPALTE}%` }} />
+                      ))}
+                    </div>
+                  ) : null}
+                  {din ? <div className="flex flex-col gap-2.5" style={{ minHeight: Math.max(0, DIN[din.form ?? "B"].text_ab - oben) * MM }}>
+                    {sichtbar.filter((z) => z[0] < dinStelle).map(zeile)}</div> : null}
+                  {sichtbar.filter((z) => !din || z[0] > dinStelle).map(zeile)}
+                  {anzeige ? <div aria-hidden data-testid="ziel-anzeige"
+                    className={cx("absolute pointer-events-none rounded", anzeige.ziel.art === "neben" ? "border-2 border-dashed border-[#251F53] bg-[#251F53]/10" : "bg-[#251F53]")}
+                    style={{ top: anzeige.top, left: anzeige.left, width: anzeige.width, height: anzeige.height }} /> : null}
+                </div>
               </div>
             </div>
           ) : <LiveVorschau art={art} bloecke={bloecke} ausrichtung={ausrichtung ?? "hoch"} onGeprueft={setGeprueft} />}
         </div>
 
         <aside className="flex flex-col gap-3.5 min-w-0">
-          {gewaehlt ? <BlockEigenschaften key={gewaehlt.id} b={gewaehlt} aufbau={a} aendere={aendere} aendereOptionen={aendereOptionen} fokus={fokus} />
+          {gewaehlt ? <BlockEigenschaften key={gewaehlt.id} b={gewaehlt} vorher={bloecke[index - 1]} aufbau={a} aendere={aendere} aendereOptionen={aendereOptionen} fokus={fokus} />
             : <Karte className="p-4 text-sm gedaempft">Abschnitt im Aufbau oder auf der Seite anklicken.</Karte>}
           <Feldeinfueger felder={a.felder} onWahl={einfuegen} />
           <div className="flex gap-2 p-3 rounded-lg bg-fein text-[0.7812rem] leading-normal text-text2">
@@ -917,8 +1252,8 @@ function FeldText({ label, wert, onWert, fokus, mehrzeilig }: {
   );
 }
 
-function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
-  b: Block; aufbau: Aufbau; aendere: (n: Partial<Block>) => void; aendereOptionen: (n: Partial<Optionen>) => void;
+function BlockEigenschaften({ b, vorher, aufbau, aendere, aendereOptionen, fokus }: {
+  b: Block; vorher?: Block; aufbau: Aufbau; aendere: (n: Partial<Block>) => void; aendereOptionen: (n: Partial<Optionen>) => void;
   fokus: Fokus;
 }) {
   const o = b.optionen ?? {};
@@ -926,7 +1261,7 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
   const setzeEintrag = (i: number, neu: Partial<Eintrag>) => aendere({ felder: eintraege.map((e, j) => (j === i ? { ...e, ...neu } : e)) });
   // Reihenfolge der Felder: Ziehen am Griff, Pfeiltasten am Griff oder ▲ ▼
   const feldSort = useSortierbar(eintraege, (neu) => aendere({ felder: neu }));
-  const textartig = !["briefkopf", "trennlinie", "leerraum", "seitenumbruch", "email"].includes(b.typ);
+  const textartig = !["briefkopf", "trennlinie", "leerraum", "seitenumbruch", "email", "anschriftfeld"].includes(b.typ);
   return (
     <Karte className="p-4 flex flex-col gap-3" data-testid="block-eigenschaften">
       <div className="flex justify-between items-center"><span className="lbl">Abschnitt</span><Chip art="akzent">{TYPNAME[b.typ]}</Chip></div>
@@ -953,14 +1288,27 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
         <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.rechts_klein} onChange={(e) => aendere({ rechts_klein: e.target.checked })} />Rechte Spalte kleiner</label>
       </> : null}
       {b.typ === "briefkopf" ? <>
-        <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.briefpapier} onChange={(e) => aendere({ briefpapier: e.target.checked ? "rgc" : "" })} />Briefpapier der Regeneration Clinic (wie gedruckt, Bänder oben und unten auf jeder Seite)</label>
+        <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.briefpapier} onChange={(e) => aendere(e.target.checked ? { briefpapier: "rgc", kopfband: "" } : { briefpapier: "" })} />Briefpapier der Regeneration Clinic (wie gedruckt, Bänder oben und unten auf jeder Seite)</label>
         <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={b.absender !== false} onChange={(e) => aendere({ absender: e.target.checked })} />{b.briefpapier ? "Absenderzeile, Kontakt und Datum auf der ersten Seite" : "Absender neben dem Logo"}</label>
       </> : null}
       {b.typ === "briefkopf" && !b.briefpapier ? <>
+        <Segmente label="Gestaltung des Kopfs" wert={b.kopfband ? "band" : "linie"} className="self-start"
+          onWahl={(w) => aendere(w === "band" ? { kopfband: "welle", bandfarbe: b.bandfarbe ?? "#BDC9C2", textfarbe: b.textfarbe ?? "#23272C", bandhoehe_mm: b.bandhoehe_mm ?? 38 } : { kopfband: "" })}
+          werte={[{ wert: "linie", text: "Logo mit Linie" }, { wert: "band", text: "Farbiges Band" }]} />
+        {b.kopfband ? <KopfbandWahl b={b} aendere={aendere} /> : <>
+          <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={b.mit_linie !== false} onChange={(e) => aendere({ mit_linie: e.target.checked })} />Linie unter dem Logo</label>
+          {b.mit_linie !== false ? <label className="flex items-center gap-2 text-[0.8438rem]">Linienfarbe
+            <input type="color" aria-label="Linienfarbe" value={(b.linienfarbe ?? "#251F53").toLowerCase()} onChange={(e) => aendere({ linienfarbe: e.target.value.toUpperCase() })} /></label> : null}
+        </>}
         <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.falzmarken} onChange={(e) => aendere({ falzmarken: e.target.checked })} />Falzmarken am linken Rand</label>
-        <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={b.mit_linie !== false} onChange={(e) => aendere({ mit_linie: e.target.checked })} />Linie unter dem Logo</label>
-        {b.mit_linie !== false ? <label className="flex items-center gap-2 text-[0.8438rem]">Linienfarbe
-          <input type="color" aria-label="Linienfarbe" value={(b.linienfarbe ?? "#251F53").toLowerCase()} onChange={(e) => aendere({ linienfarbe: e.target.value.toUpperCase() })} /></label> : null}
+      </> : null}
+      {b.typ === "anschriftfeld" ? <>
+        <Segmente label="Form nach DIN 5008" wert={b.form ?? "B"} onWahl={(w) => aendere({ form: w })} className="self-start"
+          werte={[{ wert: "B", text: "Form B (45 mm)" }, { wert: "A", text: "Form A (27 mm)" }]} />
+        <FeldText label="Rücksendeangabe (eine Zeile)" wert={b.ruecksendung ?? ""} onWert={(w) => aendere({ ruecksendung: w })} fokus={fokus} />
+        <FeldText label="Anschrift (bis 6 Zeilen)" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} mehrzeilig />
+        <FeldText label="Informationsblock rechts" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} mehrzeilig />
+        <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={b.falzmarken !== false} onChange={(e) => aendere({ falzmarken: e.target.checked })} />Falzmarken und Lochmarke</label>
       </> : null}
       {b.typ === "kopfkarte" ? <>
         <FeldText label="Name (groß)" wert={b.text ?? ""} onWert={(w) => aendere({ text: w })} fokus={fokus} />
@@ -1026,18 +1374,59 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
       </> : null}
       {textartig && b.typ !== "fusszeile" && b.typ !== "titel" ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!o.ueberschrift} onChange={(e) => aendereOptionen({ ueberschrift: e.target.checked })} />Bezeichnung als Überschrift drucken</label> : null}
       {["text", "datenfelder", "tabelle"].includes(b.typ) ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!o.ausblenden_wenn_leer} onChange={(e) => aendereOptionen({ ausblenden_wenn_leer: e.target.checked })} />Ausblenden, wenn leer</label> : null}
-      {!["fusszeile", "seitenumbruch", "email"].includes(b.typ) ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!o.nicht_teilen} onChange={(e) => aendereOptionen({ nicht_teilen: e.target.checked })} />Nicht über Seitenumbruch teilen</label> : null}
+      {!["fusszeile", "seitenumbruch", "email", "anschriftfeld"].includes(b.typ) ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!o.nicht_teilen} onChange={(e) => aendereOptionen({ nicht_teilen: e.target.checked })} />Nicht über Seitenumbruch teilen</label> : null}
       {textartig && b.typ !== "fusszeile" ? <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!o.linie_oben} onChange={(e) => aendereOptionen({ linie_oben: e.target.checked })} />Linie darüber</label> : null}
       {b.typ === "text" ? (
         <Segmente label="Spalten" wert={String(o.spalten ?? 1)} onWahl={(w) => aendereOptionen({ spalten: w === "1" ? undefined : Number(w) as 2 | 3 })}
           werte={[{ wert: "1", text: "1" }, { wert: "2", text: "2" }, { wert: "3", text: "3" }]} />
       ) : null}
-      {NEBENEINANDER.includes(b.typ) ? (
-        <Feld label="Neben dem vorherigen Block">{(p) => <Auswahl {...p} value={o.neben_vorherigem ?? ""} onChange={(e) => aendereOptionen({ neben_vorherigem: (e.target.value || undefined) as Breite | undefined })}>
-          <option value="">nein, darunter</option>
-          {(Object.keys(BREITE_TEXT) as Breite[]).map((k) => <option key={k} value={k}>ja, dieser Block {BREITE_TEXT[k]} breit</option>)}</Auswahl>}</Feld>
-      ) : null}
+      {imRaster(b) ? <RasterWahl b={b} vorher={vorher} aendere={aendere} /> : null}
     </Karte>
+  );
+}
+
+/** Kopfband frei gestalten: Form, Farben, Höhe, Seiten, Logo rechts, Fußband */
+function KopfbandWahl({ b, aendere }: { b: Block; aendere: (n: Partial<Block>) => void }) {
+  const hoehe = b.bandhoehe_mm ?? 38;
+  const farbe = (label: string, wert: string, onWert: (w: string) => void, vorschlaege: string[]) => (
+    <div className="flex flex-col gap-1" role="group" aria-label={label}>
+      <span className="text-[0.8125rem]">{label}</span>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {vorschlaege.map((f) => (
+          <button key={f} type="button" aria-label={`${label} ${f}`} aria-pressed={wert.toUpperCase() === f} onClick={() => onWert(f)} title={f}
+            className={cx("w-6 h-6 rounded-full border cursor-pointer p-0", wert.toUpperCase() === f ? "outline outline-2 outline-offset-1 outline-akzent border-transparent" : "border-rand")}
+            style={{ background: f }} />
+        ))}
+        <input type="color" aria-label={`${label} wählen`} value={wert.toLowerCase()} onChange={(e) => onWert(e.target.value.toUpperCase())} />
+      </div>
+    </div>
+  );
+  return (
+    <div className="flex flex-col gap-2.5" data-testid="kopfband-wahl">
+      <div className="flex flex-col gap-1" role="group" aria-label="Form des Bands">
+        <span className="text-[0.8125rem]">Form der Unterkante</span>
+        <div className="grid grid-cols-4 gap-1">
+          {FORMEN.map((f) => (
+            <button key={f.wert} type="button" aria-pressed={b.kopfband === f.wert} onClick={() => aendere({ kopfband: f.wert })}
+              className={cx("flex flex-col items-center gap-0.5 p-1 rounded-md border text-[0.7188rem] cursor-pointer",
+                b.kopfband === f.wert ? "border-akzent bg-akzent-weich text-akzent-text" : "border-rand bg-flaeche")}>
+              <svg viewBox="0 0 210 50" className="w-full h-5" preserveAspectRatio="none" aria-hidden>
+                <path fill={b.bandfarbe ?? "#BDC9C2"} d={bandPfad(f.wert, 210, 40, 10)} /></svg>
+              {f.text}
+            </button>
+          ))}
+        </div>
+      </div>
+      {farbe("Farbe des Bands", b.bandfarbe ?? "#BDC9C2", (w) => aendere({ bandfarbe: w }), BANDFARBEN)}
+      {farbe("Schriftfarbe", b.textfarbe ?? "#23272C", (w) => aendere({ textfarbe: w }), ["#23272C", "#FFFFFF", "#251F53"])}
+      <label className="flex flex-col gap-1 text-[0.8125rem]">Höhe: {hoehe} mm
+        <input type="range" min={20} max={80} step={1} value={hoehe} aria-label="Höhe des Bands" onChange={(e) => aendere({ bandhoehe_mm: Number(e.target.value) })} />
+      </label>
+      <Segmente label="Band auf" wert={b.band_seiten ?? "alle"} onWahl={(w) => aendere({ band_seiten: w })} className="self-start"
+        werte={[{ wert: "alle", text: "jeder Seite" }, { wert: "erste", text: "nur der ersten Seite" }]} />
+      <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.logo_rechts} onChange={(e) => aendere({ logo_rechts: e.target.checked })} />Logo rechts, Absender links</label>
+      <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.fussband} onChange={(e) => aendere({ fussband: e.target.checked })} />Fußband in derselben Farbe (Fußzeile steht darauf)</label>
+    </div>
   );
 }
 

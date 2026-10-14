@@ -6,6 +6,7 @@ In der Fußzeile stehen zusätzlich ``{Seite}`` und ``{Seiten}``.
 """
 import re
 
+from . import gestaltung
 from .briefpapier import BRIEFPAPIERE
 from .felder import FELDER, TABELLEN, JeArt, ist_eigen
 
@@ -28,6 +29,8 @@ TYPEN = {
     "kopfkarte": "Kopfkarte",
     # Text der E-Mail zum Schreiben (F172): steht nicht auf der PDF
     "email": "E-Mail",
+    # Anschriftfeld nach DIN 5008 für den Fensterumschlag (14.10.2026), im Editor ein- und ausschaltbar
+    "anschriftfeld": "Anschriftfeld (DIN 5008)",
 }
 OPTIONEN = {
     "schrift": {"klein", "normal", "gross"},
@@ -35,12 +38,18 @@ OPTIONEN = {
     "fett": bool, "kursiv": bool, "ausblenden_wenn_leer": bool, "nicht_teilen": bool,
     "ueberschrift": bool,  # Bezeichnung als Überschrift über dem Block drucken
     "linie_oben": bool,  # dünne Linie über dem Block (z. B. Freigabevermerk wie „validiert von“ im Laborbefund)
-    # neben den vorherigen Block setzen; Wert = Breite dieses Blocks, der vorherige erhält den Rest
-    "neben_vorherigem": {"drittel", "haelfte", "zwei_drittel"},
+    # neben den vorherigen Block setzen; Wert = Breite dieses Blocks, der vorherige erhält den Rest (bis 14.10.2026),
+    # „raster“: in der Zeile des vorherigen Blocks an den Spalten raster_von … raster_bis
+    "neben_vorherigem": {"drittel", "haelfte", "zwei_drittel", "raster"},
+    # 6-Spalten-Raster (14.10.2026): von Spalte … bis Spalte, ohne Angabe die ganze Breite
+    "raster_von": set(range(1, gestaltung.SPALTEN + 1)),
+    "raster_bis": set(range(1, gestaltung.SPALTEN + 1)),
     # Text in 2 oder 3 Spalten setzen, z. B. Ankreuzlisten der Laboranforderungen (RGC-Vorlagen, 13.10.2026)
     "spalten": {2, 3},
 }
 NEBENEINANDER = {"text", "datenfelder", "tabelle", "unterschrift"}
+# diese Blöcke lassen sich im Raster schmaler setzen und nebeneinander stellen
+RASTER = NEBENEINANDER | {"titel", "kopfkarte", "zweispaltig"}
 DARSTELLUNGEN = {"paare", "befund"}
 MAX_BLOECKE = 60
 # Schreiben mit E-Mail-Text (F172, F173)
@@ -101,7 +110,9 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
         return [f"Höchstens {MAX_BLOECKE} Blöcke."]
     fehler: list[str] = []
     ids = set()
-    zaehler = {"briefkopf": 0, "fusszeile": 0, "email": 0}
+    zaehler = {"briefkopf": 0, "fusszeile": 0, "email": 0, "anschriftfeld": 0}
+    rechts_bis = 0  # rechte Spalte des vorherigen Blocks im Raster (0 = kein Rasterblock davor)
+    umbruch = False
     for nr, b in enumerate(bloecke, 1):
         if not isinstance(b, dict):
             fehler.append(f"Block {nr}: ungültig.")
@@ -121,20 +132,51 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
             optionen = {}
         for k, v in optionen.items():
             regel = OPTIONEN.get(k)
-            if regel is None or (regel is bool and not isinstance(v, bool)) or (isinstance(regel, set) and v not in regel):
+            if regel is None or (regel is bool and not isinstance(v, bool)) or (isinstance(regel, set) and (
+                    isinstance(v, bool) or v not in regel)):
                 fehler.append(f"{name}: Option „{k}“ ungültig.")
         erlaubt = {"id", "typ", "bezeichnung", "optionen"}
         if typ in zaehler:
             zaehler[typ] += 1
         if typ == "briefkopf":
-            erlaubt |= {"absender", "linienfarbe", "falzmarken", "mit_linie", "briefpapier"}
+            erlaubt |= {"absender", "linienfarbe", "falzmarken", "mit_linie", "briefpapier",
+                        # Kopfband (14.10.2026): Form, Farben, Höhe, Seiten, Logo rechts, Fußband
+                        "kopfband", "bandfarbe", "textfarbe", "bandhoehe_mm", "band_seiten", "logo_rechts", "fussband"}
             if "briefpapier" in b and b["briefpapier"] not in ("", *BRIEFPAPIERE):
                 fehler.append(f"{name}: unbekanntes Briefpapier. Möglich: {', '.join(BRIEFPAPIERE)}.")
-            for k in ("absender", "falzmarken", "mit_linie"):
+            for k in ("absender", "falzmarken", "mit_linie", "logo_rechts", "fussband"):
                 if k in b and not isinstance(b[k], bool):
                     fehler.append(f"{name}: „{k}“ ja oder nein.")
-            if "linienfarbe" in b and not (isinstance(b["linienfarbe"], str) and FARBE.match(b["linienfarbe"])):
-                fehler.append(f"{name}: Linienfarbe als #RRGGBB angeben.")
+            for k, text in (("linienfarbe", "Linienfarbe"), ("bandfarbe", "Farbe des Bands"), ("textfarbe", "Schriftfarbe")):
+                if k in b and not (isinstance(b[k], str) and FARBE.match(b[k])):
+                    fehler.append(f"{name}: {text} als #RRGGBB angeben.")
+            if b.get("kopfband", "") not in ("", *gestaltung.FORMEN):
+                fehler.append(f"{name}: Form des Kopfbands unbekannt. Möglich: {', '.join(gestaltung.FORMEN)}.")
+            elif b.get("kopfband") and b.get("briefpapier"):
+                fehler.append(f"{name}: Kopfband oder Briefpapier – bitte nur eins wählen.")
+            h = b.get("bandhoehe_mm", 38)
+            unten, oben = gestaltung.BAND_HOEHE
+            if not isinstance(h, int) or isinstance(h, bool) or not unten <= h <= oben:
+                fehler.append(f"{name}: Höhe des Kopfbands {unten} bis {oben} mm.")
+            if b.get("band_seiten", "alle") not in gestaltung.BAND_SEITEN:
+                fehler.append(f"{name}: Kopfband auf „alle“ Seiten oder nur der „erste“n.")
+        elif typ == "anschriftfeld":
+            erlaubt |= {"form", "ruecksendung", "text", "rechts", "falzmarken"}
+            if b.get("form", "B") not in gestaltung.DIN:
+                fehler.append(f"{name}: Form A oder B.")
+            if "falzmarken" in b and not isinstance(b["falzmarken"], bool):
+                fehler.append(f"{name}: „falzmarken“ ja oder nein.")
+            _text(b.get("ruecksendung"), f"{name} (Rücksendeangabe)", fehler, laenge=200)
+            _text(b.get("text"), f"{name} (Anschrift)", fehler, laenge=600)
+            _text(b.get("rechts"), f"{name} (Informationsblock)", fehler, laenge=1000)
+            for feld in ("ruecksendung", "text", "rechts"):
+                _felder_pruefen(art, b.get(feld), name, fehler)
+            if isinstance(b.get("text"), str) and b["text"].count("\n") >= gestaltung.MAX_ANSCHRIFT_ZEILEN:
+                fehler.append(f"{name}: Anschrift höchstens {gestaltung.MAX_ANSCHRIFT_ZEILEN} Zeilen.")
+            if isinstance(b.get("rechts"), str) and b["rechts"].count("\n") >= 14:
+                fehler.append(f"{name}: Informationsblock höchstens 14 Zeilen.")
+            if umbruch:
+                fehler.append(f"{name}: Das Anschriftfeld gehört auf die erste Seite (vor den ersten Seitenumbruch).")
         elif typ == "zweispaltig":
             erlaubt |= {"links", "rechts", "rechts_klein"}
             for k in ("links", "rechts"):
@@ -205,11 +247,29 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
             h = b.get("hoehe_mm", 6)
             if not isinstance(h, int) or isinstance(h, bool) or not 1 <= h <= 100:
                 fehler.append(f"{name}: Höhe 1 bis 100 mm.")
-        if optionen.get("neben_vorherigem"):
+        if typ == "seitenumbruch":
+            umbruch = True
+        von, bis = gestaltung.raster_von_bis(optionen)
+        im_raster = bool(optionen.get("raster_von") or optionen.get("raster_bis")) or optionen.get("neben_vorherigem") == "raster"
+        if im_raster and typ not in RASTER:
+            fehler.append(f"{name}: Nur Text, Titel, Zwei Spalten, Kopfkarte, Datenfelder, Tabelle und Unterschrift "
+                          f"lassen sich im Raster schmaler setzen.")
+        elif isinstance(von, int) and isinstance(bis, int) and not isinstance(von, bool) and von > bis:
+            fehler.append(f"{name}: Im Raster muss „von Spalte“ links von „bis Spalte“ liegen.")
+        if optionen.get("neben_vorherigem") == "raster":
+            if not rechts_bis:
+                fehler.append(f"{name}: „in derselben Zeile“ geht nur, wenn davor ein Block im Raster steht.")
+            elif isinstance(von, int) and von <= rechts_bis:
+                fehler.append(f"{name}: überdeckt den Block links daneben – bitte erst ab Spalte {rechts_bis + 1} "
+                              f"setzen." if rechts_bis < gestaltung.SPALTEN else
+                              f"{name}: In der Zeile ist kein Platz mehr – der Block links daneben reicht bis Spalte 6.")
+        elif optionen.get("neben_vorherigem"):
             vorher = bloecke[nr - 2] if nr > 1 and isinstance(bloecke[nr - 2], dict) else None
             if typ not in NEBENEINANDER or vorher is None or vorher.get("typ") not in NEBENEINANDER:
                 fehler.append(f"{name}: „neben dem vorherigen Block“ geht nur bei Text, Datenfeldern, Tabellen und "
                               f"Unterschrift, wenn davor ebenfalls ein solcher Block steht.")
+        rechts_bis = bis if typ in RASTER and isinstance(bis, int) and not optionen.get("neben_vorherigem") in (
+            "drittel", "haelfte", "zwei_drittel") else 0
         unbekannt = set(b) - erlaubt
         if unbekannt:
             fehler.append(f"{name}: unbekannte Angaben {', '.join(sorted(unbekannt))}.")
