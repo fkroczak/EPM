@@ -261,6 +261,14 @@ def aktenkopie_pdf(patient) -> bytes:
     if not p.berichte.exists():
         teile.append(_abschnitt("Berichte", '<div class="leer">keine Einträge</div>'))
 
+    # Korrespondenz (14.10.2026): jedes Schreiben mit Stand, Empfänger und Versand; die PDFs liegen bei den Dokumenten
+    schreiben = [[_e(datum(timezone.localtime(s.erstellt_am).date())), _e(s.titel), _e(s.vorlage_name),
+                  _e(s.empfaenger), _e(s.get_status_display()),
+                  _e(f"{datum(s.versendet_am)} · {s.get_versandweg_display()}" if s.versendet_am else "")]
+                 for s in p.korrespondenz.order_by("erstellt_am", "id")]
+    teile.append(_abschnitt("Korrespondenz", _tabelle(
+        ["angelegt", "Betreff", "Vorlage", "Empfänger", "Stand", "versendet"], schreiben)))
+
     erklaerungen = [[_e(e.get_art_display()), _e(datum(e.erteilt_am)),
                      _e(f"widerrufen am {datum(e.widerrufen_am)}" if e.widerrufen_am else "liegt vor"),
                      _e(" · ".join(t for t in (e.notiz, e.widerruf_notiz) if t))]
@@ -287,6 +295,8 @@ BEREICHE = {"stammdaten": "Stammdaten", "diagnose": "Diagnose (Text)", "therapie
             # Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
             "diagnosen": "Diagnose (ICD)", "laborbefunde": "Laborbefund", "bia_messungen": "BIA-Messung",
             "berichte": "Bericht", "therapieschritte": "Therapie (Verlauf)",
+            # Korrespondenz (14.10.2026)
+            "korrespondenz": "Schreiben",
             # Medikamentenplan (Wunsch 11.10.2026)
             "medikamente": "Medikament",
             # Hinweise stummschalten (Wunsch 07.10.2026, F119)

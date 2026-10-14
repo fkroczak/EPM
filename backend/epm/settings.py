@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "infusionen",
     "befunde",
     "berichte",
+    "korrespondenz",
     "vorlagen",
     "audit",
     "system",

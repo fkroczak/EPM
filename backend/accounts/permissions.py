@@ -105,6 +105,7 @@ DatenschutzRecht = recht("datenschutz_bearbeiten")
 DatenschutzEntscheidenRecht = recht("datenschutz_entscheiden")
 AkteLoeschenRecht = recht("akten_loeschen")
 BerichtFreigabeRecht = recht("berichte_freigeben")   # Bericht abschließen (F115)
+SchreibenFreigabeRecht = recht("schreiben_freigeben")   # Korrespondenz: Schreiben freigeben (14.10.2026)
 
 
 class DatenschutzLesen(Angemeldet):

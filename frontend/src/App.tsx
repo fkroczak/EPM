@@ -60,6 +60,7 @@ const router = createBrowserRouter([
           { path: "bia", ...seite(() => import("./seiten/akte/Bia").then(({ Bia }) => <Bia />)) },
           { path: "befunde", element: <Navigate to="../labor" replace /> },
           { path: "berichte", ...seite(() => import("./seiten/akte/Berichte").then(({ Berichte }) => <Berichte />)) },
+          { path: "korrespondenz", ...seite(() => import("./seiten/akte/Korrespondenz").then(({ Korrespondenz }) => <Korrespondenz />)) },
           { path: "dokumente", ...seite(() => import("./seiten/akte/Dokumente").then(({ Dokumente }) => <Dokumente />)) },
           { path: "datenschutz", ...seite(() => import("./seiten/akte/Datenschutz").then(({ AkteDatenschutz }) => <AkteDatenschutz />)) },
           { path: "verlauf", ...seite(() => import("./seiten/akte/Verlauf").then(({ Verlauf }) => <Verlauf />)) },

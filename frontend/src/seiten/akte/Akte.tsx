@@ -808,6 +808,8 @@ export function Akte() {
     { zu: `${basis}/labor`, text: "Labor", zahl: k?.zaehler.laborbefunde, gruppe: "Befunde und Unterlagen", stufe: "neben" },
     { zu: `${basis}/bia`, text: "BIA", zahl: k?.zaehler.bia_messungen, stufe: "neben" },
     { zu: `${basis}/berichte`, text: "Berichte", zahl: k?.zaehler.berichte, stufe: "neben" },
+    // Korrespondenz (14.10.2026): Schreiben an oder über den Patienten mit Status
+    { zu: `${basis}/korrespondenz`, text: "Korrespondenz", zahl: k?.zaehler.korrespondenz, stufe: "neben" },
     { zu: `${basis}/dokumente`, text: "Dokumente", zahl: k?.zaehler.dokumente, stufe: "neben" },
     { zu: `${basis}/verlauf`, text: "Verlauf", gruppe: "Weiteres", stufe: "ende" },
     { zu: `${basis}/datenschutz`, text: "Datenschutz", zahl: k?.datenschutz_anfragen || undefined, stufe: "ende" },

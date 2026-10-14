@@ -50,6 +50,9 @@ RECHTE = [
     ("berichte_freigeben", "Berichte freigeben",
      "einen Bericht aus der Akte abschließen; dabei entsteht die PDF und der Bericht wird unveränderlich "
      "(Standard: Mediziner, je Gruppe umstellbar – U54)"),
+    ("schreiben_freigeben", "Schreiben freigeben (Korrespondenz)",
+     "ein Schreiben der Akte freigeben; dabei entsteht die endgültige PDF und das Schreiben wird unveränderlich. "
+     "Entwürfe anlegen und den Versand vermerken darf, wer Einträge erfassen darf (Standard: Mediziner)"),
     ("akten_abschliessen", "Akten abschließen", ""),
     ("akten_wieder_oeffnen", "Abgeschlossene Akten wieder öffnen", ""),
     ("datenschutz_bearbeiten", "Datenschutz: Erklärungen und Anfragen erfassen",
@@ -87,7 +90,8 @@ _ADMIN_SPEZIAL = {"benutzer_verwalten", "akten_wieder_oeffnen", "backup_verwalte
 # Rechte, die Patientendaten verändern (Einträge, Stammdaten, Pläne, Abschluss)
 PATIENTENDATEN_SCHREIBEN = {"eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
                             "plaene_abschliessen", "akten_abschliessen", "dokumente_umhaengen",
-                            "datenschutz_bearbeiten", "datenschutz_entscheiden", "berichte_freigeben"}
+                            "datenschutz_bearbeiten", "datenschutz_entscheiden", "berichte_freigeben",
+                            "schreiben_freigeben"}
 
 # Endgültiges Löschen (F73, F80) dürfen Admins auch bei echten Akten (Festlegung 02.10.2026); die übrigen Prüfungen
 # (Frist bzw. Antrag, Kennwort + 2FA + Bestätigungscode, Audit-Log, Löschprotokoll) gelten unverändert

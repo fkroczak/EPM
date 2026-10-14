@@ -575,6 +575,27 @@ bearbeiten oder <strong>verwerfen</strong> (mit Rückfrage). Wer das Recht hat, 
 ist dann unveränderlich, seine PDF liegt bei den Dokumenten der Akte. Eine Korrektur ist ein neuer Bericht.</p>""",
     },
     {
+        "id": "korrespondenz", "gruppe": "patienten", "titel": "Korrespondenz", "rechte": ["akten_lesen"],
+        "seiten": ["/patienten/:id/korrespondenz"],
+        "html": """
+<p>Der Reiter <strong>Korrespondenz</strong> sammelt alle Schreiben an oder über den Patienten. Jedes Schreiben hat einen
+Status: <strong>Entwurf</strong>, <strong>freigegeben</strong> oder <strong>versendet</strong>. Oben filtern Sie nach
+Status.</p>
+<ol>
+<li><strong>Neues Schreiben</strong>: Vorlage wählen, Betreff, Empfänger und Freitext eintragen.</li>
+<li><strong>Vorschau</strong> zeigt die PDF. <strong>Entwurf speichern</strong> legt das Schreiben ab.</li>
+<li>Wer das Recht „Schreiben freigeben“ hat, <strong>gibt frei</strong>. Dabei entsteht die endgültige PDF.</li>
+<li><strong>Als versendet markieren</strong> hält Weg und Datum fest, z. B. Post, E-Mail oder Fax.</li>
+</ol>
+<p>Entwürfe lassen sich bearbeiten und löschen. Freigegebene Schreiben bleiben unverändert. Für eine Korrektur gibt es
+<strong>Als neuen Entwurf kopieren</strong>. Die PDF liegt zusätzlich bei den Dokumenten der Akte.</p>
+<p>Vorlagen übernehmen Daten aus der Akte: Diagnosen, Gewicht, Medikation und den aktuellen Infusionsplan. Der Freitext
+steht an der Stelle <code>{{Schreiben.Text}}</code>, sonst vor dem Gruß. <strong>Verlauf</strong> zeigt jede Änderung mit
+Person und Zeitpunkt.</p>
+<p>Im Dialog <strong>Schreiben und E-Mail</strong> legt <strong>In der Akte ablegen (Entwurf)</strong> ein Schreiben hier
+an.</p>""",
+    },
+    {
         "id": "tastatur", "gruppe": "patienten", "titel": "Tastenkürzel in der Akte", "rechte": ["akten_lesen"],
         "seiten": [],
         "html": """

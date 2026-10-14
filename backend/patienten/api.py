@@ -226,6 +226,8 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                 "laborbefunde": obj.laborbefunde.count(),
                 "bia_messungen": obj.bia_messungen.count(),
                 "berichte": obj.berichte.count(),
+                # Korrespondenz (14.10.2026): alle Schreiben der Akte
+                "korrespondenz": obj.korrespondenz.count(),
             },
         }
 
@@ -807,7 +809,7 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
 
         Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, bemerkung, gewichte, kontakte, termine,
         dokumente, infusionsplaene, bezugspersonen, aerzte, erklaerungen, datenschutz, diagnosen, laborbefunde,
-        bia_messungen, berichte, hinweisruhe, therapieschritte, medikamente; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
+        bia_messungen, berichte, korrespondenz, hinweisruhe, therapieschritte, medikamente; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
         die Bereiche Stammdaten, Diagnose, Therapie, Empfehlung und Bemerkung verteilt.
         """
         patient = self.get_object()
@@ -867,6 +869,8 @@ def _aktion(name, h, aenderungen):
         return "wieder angesetzt" if h.aktiv else "abgesetzt"
     if name == "berichte" and "status" in felder:
         return "freigegeben" if h.status == "freigegeben" else "geändert"
+    if name == "korrespondenz" and "status" in felder:
+        return {"freigegeben": "freigegeben", "versendet": "als versendet vermerkt"}.get(h.status, "geändert")
     if name == "stammdaten" and "abgeschlossen_am" in felder:
         return "abgeschlossen" if h.abgeschlossen_am else "wieder geöffnet"
     if name == "stammdaten" and "eingeschraenkt_am" in felder:
@@ -988,6 +992,10 @@ def _beschreibung(name, h, aktion) -> str:
             if h.empfaenger:
                 teile.append(f"an {h.empfaenger}")
             return " · ".join(teile)
+        if name == "korrespondenz":
+            from korrespondenz.models import verlauf_beschreibung
+
+            return verlauf_beschreibung(h)
         if name == "datenschutz":
             teile = [f"Anfrage: {dict(Datenschutzanfrage.Art.choices).get(h.art, h.art)}",
                      f"eingegangen am {h.eingegangen_am:%d.%m.%Y}"]
@@ -1012,6 +1020,7 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
     from befunde.models import BiaMessung, Laborbefund
     from berichte.models import Bericht
     from infusionen.models import Infusionsplan
+    from korrespondenz.models import Schreiben
 
     quellen = {
         "akte": Patient.history.filter(id=patient.id),
@@ -1033,6 +1042,8 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         "laborbefunde": Laborbefund.history.filter(patient_id=patient.id),
         "bia_messungen": BiaMessung.history.filter(patient_id=patient.id),
         "berichte": Bericht.history.filter(patient_id=patient.id),
+        # Korrespondenz (14.10.2026)
+        "korrespondenz": Schreiben.history.filter(patient_id=patient.id),
     }
     if bereich and bereich not in ("stammdaten", *TEXTFELDER):
         quellen = {k: v for k, v in quellen.items() if k == bereich}

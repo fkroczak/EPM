@@ -32,7 +32,7 @@ function dateinameAus(kopf: Headers, ersatz: string) {
 }
 
 export function SchreibenDialog({ offen, onOffen, titel, pfad, koerper, bereit = true, optionen, ablegen, onAbgelegt, onErzeugt,
-  ohneEmpfaenger = "In der Akte ist keine E-Mail-Adresse hinterlegt – im Entwurf eintragen." }: {
+  entwurfAblegen, ohneEmpfaenger = "In der Akte ist keine E-Mail-Adresse hinterlegt – im Entwurf eintragen." }: {
   offen: boolean;
   onOffen: (o: boolean) => void;
   titel: string;
@@ -49,6 +49,8 @@ export function SchreibenDialog({ offen, onOffen, titel, pfad, koerper, bereit =
   onAbgelegt?: () => void;
   /** nach „PDF herunterladen“ bzw. „E-Mail vorbereiten“ (z. B. Infoblatt: „zuletzt erstellt“ neu laden) */
   onErzeugt?: () => void;
+  /** „Als Entwurf in der Korrespondenz ablegen“ (Akte, 14.10.2026): Empfänger und Betreff gehen in den Entwurf */
+  entwurfAblegen?: { onAblegen: (werte: { an: string; betreff: string }) => void; laedt?: boolean };
   /** Hinweis, wenn die Vorlage keinen Empfänger vorgibt */
   ohneEmpfaenger?: string;
 }) {
@@ -151,6 +153,13 @@ export function SchreibenDialog({ offen, onOffen, titel, pfad, koerper, bereit =
             ) : null}
             {f.anlagen ? <Meldung art="fehler">{f.anlagen}</Meldung> : null}
           </> : null}
+          {entwurfAblegen && bereit && mail.data ? (
+            <div className="flex items-center gap-3 flex-wrap text-[0.8125rem]">
+              <Knopf klein icon="plus" laedt={entwurfAblegen.laedt} onClick={() => entwurfAblegen.onAblegen({ an, betreff })}
+                data-testid="als-entwurf-ablegen">In der Akte ablegen (Entwurf)</Knopf>
+              <span className="gedaempft">Legt das Schreiben im Reiter „Korrespondenz“ als Entwurf an.</span>
+            </div>
+          ) : null}
           {ablegen ? (
             <label className="flex items-center gap-2 text-[0.8438rem]">
               <input type="checkbox" checked={ablage} onChange={(e) => setAblage(e.target.checked)} />

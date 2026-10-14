@@ -143,7 +143,8 @@ export function Detail({ titel, unter, aktionen, children, testid }: {
           <span className="text-base font-semibold leading-tight">{titel}</span>
           {unter ? <span className="text-[0.8125rem] gedaempft leading-snug">{unter}</span> : null}
         </div>
-        {aktionen ? <div className="flex items-center gap-2 flex-wrap shrink-0" data-testid="detail-aktionen">{aktionen}</div> : null}
+        {/* max-w-full: viele Aktionen umbrechen in der Karte, statt am Telefon seitlich herauszuragen */}
+        {aktionen ? <div className="flex items-center gap-2 flex-wrap shrink-0 max-w-full" data-testid="detail-aktionen">{aktionen}</div> : null}
       </div>
       {children}
     </Karte>
