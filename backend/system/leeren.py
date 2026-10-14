@@ -6,8 +6,8 @@ Weg: alle Akten (echte und Testpatienten) mit Einträgen, Plänen, Dokumenten un
 Löschprotokoll und die Löschliste, Merklisten, alle Scans mit ihren Dateien (auch nicht zugeordnete – sie enthalten
 Patientendaten), was die Texterkennung gelernt hat, die gemerkten Infoblätter an die Praxis, der Stand des Altdaten-Imports, Versorger mit Ansprechpartnern, Ärzte,
 alle Benutzer außer den ausgewählten (das eigene Konto bleibt immer) und das Audit-Log.
-Bleiben: Präparate, Auswahllisten, Grenzwerte und Einstellungen, Briefkopf und Logo, Dokumentvorlagen, Rechte der
-Gruppen, Hilfe-Ergänzungen, Sicherungen. Musterdaten (Testpatienten) werden danach nicht mehr automatisch angelegt.
+Bleiben: Präparate, Auswahllisten, Grenzwerte und Einstellungen, Briefkopf und Logo, Dokumentvorlagen (wieder nur
+Fassung 1), Rechte der Gruppen, Hilfe-Ergänzungen, Sicherungen. Musterdaten (Testpatienten) werden danach nicht mehr automatisch angelegt.
 
 Ausgeführt vom Systemagenten nach einer Sicherung (``manage.py epm_datenbank_leeren``); die Oberfläche fordert vorher
 Passwort, Code der Zwei-Faktor-Anmeldung, einen abgetippten Bestätigungscode und eine ausdrückliche Rückfrage.
@@ -73,6 +73,7 @@ def datenbank_leeren(ausfuehrend, behalten: list[int]) -> dict:
     from scans import lernen
     from scans.models import Scan
     from stammdaten.models import Ansprechpartner, Arzt, Einstellungen, Versorger
+    from vorlagen.fassung1 import auf_fassung_1
 
     zahlen = umfang()
     bleiben = set(behalten or []) | {ausfuehrend.pk}
@@ -92,6 +93,8 @@ def datenbank_leeren(ausfuehrend, behalten: list[int]) -> dict:
         Importlauf.objects.all().delete()
         Alttabelle.objects.all().delete()
         Importstand.objects.all().delete()
+        # ohne Import wieder nur Fassung 1 der Dokumentvorlagen (vorlagen.fassung1)
+        auf_fassung_1()
         # gemeinsame Listen der Testphase
         for modell in (Ansprechpartner, Versorger, Arzt):
             modell.objects.all().delete()

@@ -85,6 +85,8 @@ type Version = {
 type FirmaInfo = { aktiv: string | null; name: string | null; mehrere: boolean; eigene: boolean; gebunden: boolean; moeglich: boolean };
 type Uebersicht = { art: Art; name: string; aktiv: Version; entwurf: Version | null; versionen: Version[];
   firma?: FirmaInfo; ausrichtung?: Ausrichtung; querformat_moeglich?: boolean;
+  /** vor dem Import der Altdaten ersetzt Freigeben die Fassung 1 (14.10.2026) */
+  nur_fassung_1?: boolean; naechste_fassung?: number;
   /** Vordrucke: Wasserzeichen „ENTWURF“ der Startvorlage, manuell abschaltbar (U17) */
   entwurfsmodus?: { moeglich: boolean; aktiv: boolean; aus: boolean };
   /** eigenes Schreiben (F176) */
@@ -882,7 +884,7 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
     ? (serverFehler.daten as { bloecke: string[] }).bloecke : [serverFehler.message]) : [];
   const freigebbar = geaendert || entwurf.data.ist_entwurf;
   const stand = JSON.stringify({ bloecke, ausrichtung });
-  const naechste = Math.max(0, ...a.versionen.map((v) => v.version ?? 0)) + 1;
+  const naechste = a.naechste_fassung ?? Math.max(0, ...a.versionen.map((v) => v.version ?? 0)) + 1;
   const verInfo = geaendert ? "Ungespeicherte Änderungen"
     : entwurf.data.ist_entwurf ? "Gespeichert, noch nicht freigegeben"
     : `Fassung ${a.aktiv.version} ist in Gebrauch`;
@@ -1027,7 +1029,8 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
           </Karte>
           <Karte className="p-3.5 flex flex-col gap-1.5" data-testid="versionen">
             <span className="lbl flex items-center gap-1.5">Frühere <Begriff name="fassung">Fassungen</Begriff>
-              <Erklaerung titel="Fassungen">Bei jedem Freigeben entsteht eine neue Fassung; die alten bleiben erhalten. „Ansehen“ zeigt eine
+              <Erklaerung titel="Fassungen">Bei jedem Freigeben entsteht eine neue Fassung; die alten bleiben erhalten (bis zur Übernahme der Altdaten
+                ersetzt Freigeben die Fassung 1). „Ansehen“ zeigt eine
                 Fassung mit Testpatient, „Wiederherstellen“ übernimmt sie als Grundlage – in Gebrauch ist sie erst nach dem Freigeben.
                 Jede PDF vermerkt, mit welcher Fassung sie erzeugt wurde.</Erklaerung></span>
             <ul className="m-0 p-0 list-none flex flex-col gap-1.5 text-[0.8125rem]">
@@ -1131,7 +1134,9 @@ function EditorFuerArt({ art, onArt, aktionenZiel, onGeaendert }: {
       </div>
 
       <Dialog offen={freigabeFrage} onOffen={setFreigabeFrage} titel={`${a.name}: Änderungen freigeben`} breite={540}
-        beschreibung={`Wird Fassung ${naechste} und gilt ab sofort für alle neuen PDFs${mitEmailArt(art) ? " und E-Mails" : ""}. Fassung ${a.aktiv.version} bleibt erhalten und lässt sich wiederherstellen.`}
+        beschreibung={a.nur_fassung_1
+          ? `Ersetzt Fassung 1 (bis zur Übernahme der Altdaten gibt es nur sie) und gilt ab sofort für alle neuen PDFs${mitEmailArt(art) ? " und E-Mails" : ""}.`
+          : `Wird Fassung ${naechste} und gilt ab sofort für alle neuen PDFs${mitEmailArt(art) ? " und E-Mails" : ""}. Fassung ${a.aktiv.version} bleibt erhalten und lässt sich wiederherstellen.`}
         fuss={<><Knopf onClick={() => setFreigabeFrage(false)}>Abbrechen</Knopf><Knopf variante="pri" laedt={freigeben.isPending} onClick={() => freigeben.mutate()}>Freigeben</Knopf></>}>
         <div className="flex flex-col gap-3">
           {geprueft !== stand ? (

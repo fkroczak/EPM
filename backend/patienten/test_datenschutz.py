@@ -260,11 +260,12 @@ class Erklaerungen(DatenschutzGrundlage):
         self.assertEqual(c.put("/api/vorlagen/einwilligung/entwurf/", {"bloecke": bloecke}, format="json").status_code, 200)
         self.assertEqual(c.post("/api/vorlagen/einwilligung/veroeffentlichen/").status_code, 200)
         r = c.get(url + "?art=einwilligung")
-        self.assertEqual((r["X-EPM-Vorlage-Entwurf"], r["X-EPM-Vorlage-Version"]), ("0", "2"))
+        # vor dem Import der Altdaten ersetzt Freigeben die Fassung 1 (vorlagen.fassung1)
+        self.assertEqual((r["X-EPM-Vorlage-Entwurf"], r["X-EPM-Vorlage-Version"]), ("0", "1"))
         if PDFTOTEXT:
             self.assertNotIn("ENTWURF", wasserzeichen(r.content))
         stand = c.get(f"/api/patienten/{self.patient.id}/datenschutz/").json()["vorlagen"]
-        self.assertEqual(stand["einwilligung"], {"version": 2, "entwurf": False})
+        self.assertEqual(stand["einwilligung"], {"version": 1, "entwurf": False})
         self.assertTrue(stand["datenschutzinformation"]["entwurf"])
         # Entwurfsmodus manuell ausschalten (Festlegung 03.10.2026, U17): ohne Wasserzeichen, obwohl die Startvorlage
         # aktiv ist; nur bei den Vordrucken, nur mit „Vorlagen pflegen“, im Audit-Log; wieder einschaltbar
@@ -287,7 +288,7 @@ class Erklaerungen(DatenschutzGrundlage):
         # eine neu erfasste Erklärung hält den Stand der Vorlage fest
         r = c.post("/api/erklaerungen/", {"patient": self.patient.id, "art": "einwilligung",
                                           "erteilt_am": str(timezone.localdate())}, format="json")
-        self.assertEqual(r.json()["vorlage_version"], 2)
+        self.assertEqual(r.json()["vorlage_version"], 1)
 
 
 class Anfragen(DatenschutzGrundlage):
