@@ -47,6 +47,8 @@ export type Block = {
   text?: string; zusatz_label?: string; zusatz?: string; spalten?: number; felder?: Eintrag[]; quelle?: string;
   linie?: string; hoehe_mm?: number; links?: string; rechts?: string; rechts_klein?: boolean;
   absender?: boolean; linienfarbe?: string; falzmarken?: boolean; mit_linie?: boolean;
+  /** Briefpapier einer Firma 1:1 (14.10.2026): „rgc“ = Bänder oben und unten wie auf dem Briefpapier der Klinik */
+  briefpapier?: string;
   untertitel?: string; darstellung?: "paare" | "befund"; spaltenkoepfe?: boolean; neben_logo?: boolean;
   /** Block „E-Mail“ der Schreiben (F172): steht nicht auf der PDF */
   betreff?: string;
@@ -181,6 +183,14 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
   const karte = b.optionen?.ueberschrift && b.bezeichnung ? "border border-[#d9d8e3] rounded-md px-2 py-1.5" : "";
   switch (b.typ) {
     case "briefkopf":
+      if (b.briefpapier) return (
+        <div className="-mx-2 -mt-2 px-4 pt-3 pb-5 rounded-b-[50%_1.5rem] bg-[#BDC9C2] text-[#23272C] flex justify-between items-start">
+          <Logo className="w-[9.375rem] h-[3.3125rem]" version={briefkopf.data?.logo.sha256} firma="rg" name="Regeneration Clinic" />
+          <div className="flex flex-col items-end text-[0.9em]">
+            <span className="font-semibold">Regeneration Clinic SIA</span><span>Briefpapier der Klinik (auf jeder Seite, mit Fußband)</span>
+          </div>
+        </div>
+      );
       return (
         <div className={cx("flex justify-between items-end pb-2", b.mit_linie !== false && "border-b-2")} style={{ borderColor: /^#[0-9a-f]{6}$/i.test(b.linienfarbe ?? "") ? b.linienfarbe : "#251F53" }}>
           <Logo className="w-[9.375rem] h-[3.3125rem]" version={briefkopf.data?.logo.sha256} firma={briefkopf.data?.firma?.kuerzel} name={briefkopf.data?.firma?.name} />
@@ -943,7 +953,10 @@ function BlockEigenschaften({ b, aufbau, aendere, aendereOptionen, fokus }: {
         <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.rechts_klein} onChange={(e) => aendere({ rechts_klein: e.target.checked })} />Rechte Spalte kleiner</label>
       </> : null}
       {b.typ === "briefkopf" ? <>
-        <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={b.absender !== false} onChange={(e) => aendere({ absender: e.target.checked })} />Absender neben dem Logo</label>
+        <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.briefpapier} onChange={(e) => aendere({ briefpapier: e.target.checked ? "rgc" : "" })} />Briefpapier der Regeneration Clinic (wie gedruckt, Bänder oben und unten auf jeder Seite)</label>
+        <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={b.absender !== false} onChange={(e) => aendere({ absender: e.target.checked })} />{b.briefpapier ? "Absenderzeile, Kontakt und Datum auf der ersten Seite" : "Absender neben dem Logo"}</label>
+      </> : null}
+      {b.typ === "briefkopf" && !b.briefpapier ? <>
         <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={!!b.falzmarken} onChange={(e) => aendere({ falzmarken: e.target.checked })} />Falzmarken am linken Rand</label>
         <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={b.mit_linie !== false} onChange={(e) => aendere({ mit_linie: e.target.checked })} />Linie unter dem Logo</label>
         {b.mit_linie !== false ? <label className="flex items-center gap-2 text-[0.8438rem]">Linienfarbe

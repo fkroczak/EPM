@@ -12,8 +12,10 @@ from pathlib import Path
 from django.conf import settings
 from django.core.files.base import ContentFile
 
+from . import briefpapier
 from .bloecke import PLATZHALTER
-from .felder import FELDER, TABELLEN, Fett, Kontext, tabellenspalten, tabellenzeilen
+from .briefpapier import BRIEFPAPIERE
+from .felder import FELDER, TABELLEN, Fett, Kontext, datum, tabellenspalten, tabellenzeilen
 
 STANDARD_LOGO = Path(__file__).resolve().parent / "statisch" / "logo-stiftung.png"
 STANDARD_LOGOS = {"rg": Path(__file__).resolve().parent / "statisch" / "logo-rgc.png"}
@@ -398,7 +400,14 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext, quer=False) -> tuple
         ausblenden = o.get("ausblenden_wenn_leer", False)
         kopf = f"<h2>{html.escape(b['bezeichnung'])}</h2>" if o.get("ueberschrift") and b.get("bezeichnung") else ""
         karte = " karte" if kopf else ""  # Bereich mit Überschrift als Karte wie in der Oberfläche von EPM
-        if typ == "briefkopf":
+        if typ == "briefkopf" and b.get("briefpapier") in BRIEFPAPIERE:
+            # Briefpapier der Firma 1:1 (14.10.2026): Bänder, Logo und Anschrift auf jeder Seite
+            erste = briefpapier.erste_seite_html(b["briefpapier"], datum(kontext.heute)) if b.get("absender", True) else ""
+            teile.append(f'<style>{briefpapier.css(b["briefpapier"])}</style>'
+                         f'{briefpapier.seiten_html(b["briefpapier"])}<div class="{_klassen(b)}">{erste}</div>')
+            if titel_neben is not None:
+                teile.append(f'<div class="{_klassen(titel_neben)} titel">{_titel_html(ersetze, titel_neben)}</div>')
+        elif typ == "briefkopf":
             schrift = " ".join(k for k in _klassen(titel_neben).split() if k.startswith("s-") or k in ("fett", "kursiv")) \
                 if titel_neben else ""
             klasse = f"kopftitel {schrift}".strip()

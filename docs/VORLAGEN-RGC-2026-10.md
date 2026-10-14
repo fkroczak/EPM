@@ -54,6 +54,8 @@ Klinik abgenommen werden, auf dem Briefkopf der Klinik. In der Gruppe „Anforde
 | `eigen-rgc-mal05` | MAL-05 Monitoring chronische intestinale Insuffizienz | 5.1 zum Eintragen, 5.2, 5.3, Intervalle |
 | `eigen-rgc-mal06` | MAL-06 Refeeding-Monitoring | 6.1–6.5, Pflichthinweis Thiamin, Abnahmezeitpunkte |
 
+**Briefpapier:** Die Bögen stehen auf dem Briefpapier der Klinik 1:1 wie im gelieferten Dokument – oben das salbeigrüne Band (#BDC9C2) mit Wellenkante, Logo und Anschrift (Inter), unten das Band mit Postanschrift, Registration No. und Health Institution Code, beides auf jeder Seite; auf der ersten Seite Absenderzeile, Kontakt (Prof. Dr. Markus Masin, Director) und „Riga, Datum“. Eingestellt im Baustein „Briefkopf“ (`"briefpapier": "rgc"`, im Editor „Briefpapier der Regeneration Clinic“); auch für die übrigen RGC-Vorlagen einschaltbar. Maße und Texte in `backend/vorlagen/briefpapier.py`, Schriften Inter und Carlito in `backend/schriften`.
+
 Aufbau jedes Bogens: Patient und Anforderung (Abnahmezeit, Arzt, nüchtern, Dringlichkeit) · Indikation und
 Fragestellung · **Röhrchen und Material (Übersicht)** – je Röhrchen die Parameter-Nummern nach Pflicht, optional und
 Reflex · je Röhrchen/Material die Parameter mit Status, LOINC und Hinweis · Legende · Pflichthinweise zur Präanalytik ·

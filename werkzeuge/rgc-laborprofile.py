@@ -226,7 +226,9 @@ def _regel_text(regeln, ids) -> str:
 
 def _kopf(titel: str, zusatz: str) -> list[dict]:
     return [
-        {"id": "kopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", "absender": True, "falzmarken": False},
+        # Briefpapier der Klinik 1:1 wie im gelieferten Dokument (Bänder, Logo, Anschrift, Absender und Kontakt)
+        {"id": "kopf", "typ": "briefkopf", "bezeichnung": "Briefkopf", "absender": True, "falzmarken": False,
+         "briefpapier": "rgc"},
         {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": titel, "zusatz": zusatz},
     ]
 
