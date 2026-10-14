@@ -155,3 +155,25 @@ class RgcVorlagenTest(Grundlage):
         self.assertIn("sp-3", bloecke_html("eigen-x", b, Kontext(patient=p))[0])
         b[0]["optionen"]["spalten"] = 4
         self.assertTrue(pruefe_bloecke("eigen-x", b))
+
+
+class MigrationMitSchutzTest(Grundlage):
+    """Rückfall 2.0.26 → 2.0.24 (14.10.2026): Datenmigrationen an freigegebenen Fassungen laufen auf dem Server bei
+    eingeschaltetem Schutz-Trigger (frische Test-Datenbanken haben ihn beim ersten migrate noch nicht)."""
+
+    def test_0012_bei_eingeschaltetem_trigger(self):
+        from importlib import import_module
+
+        from django.db import connection
+        from django.db.migrations.executor import MigrationExecutor
+
+        from audit.schutz import installiere_trigger
+
+        installiere_trigger()
+        migration = import_module("vorlagen.migrations.0012_rgc_laborprofile_briefpapier")
+        # Modelle im Stand der Migration (ohne die Sperre in Dokumentvorlage.save), wie beim echten migrate
+        apps = MigrationExecutor(connection).loader.project_state([("vorlagen", "0011_rgc_laborprofile")]).apps
+        with connection.schema_editor(atomic=True) as editor:
+            migration.umstellen(apps, editor)
+        v = Dokumentvorlage.objects.get(art="eigen-rgc-mal01", status="aktiv")
+        self.assertTrue(any(b.get("briefpapier") == "rgc" for b in v.bloecke))
