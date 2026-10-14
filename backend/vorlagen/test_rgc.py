@@ -113,8 +113,11 @@ class RgcVorlagenTest(Grundlage):
             p = Patient.objects.create(nachname="Kalniņa", vorname="Anna", geschlecht="w", nummer=815,
                                        geburtsdatum=date(1981, 2, 1))
             PatientFirma.objects.filter(patient=p).update(firma=self.rg)
-            for art, erwartet in (("eigen-rgc-mal01", ["Kalniņa, Anna", "MAL-01 · Basisprofil Malabsorption",
-                                                       "Citratplasma", "1.20 INR (Quick)", "Regeneration Clinic SIA"]),
+            for art, erwartet in (("eigen-rgc-mal01", ["Kalniņa, Anna", "MAL-01 · Basisprofil",
+                                                       "Citratplasma", "1.20 INR (Quick)", "Regeneration Clinic SIA",
+                                                       # Briefpapier der Klinik: Kopfband, Fußband, Kontakt
+                                                       "Jana Asara iela 3", "Registration No.: 40203593175",
+                                                       "Health Institution Code: 001000289", "Prof. Dr. Markus Masin"]),
                                   ("eigen-rgc-mal06", ["Thiaminsubstitution", "NaF-Plasma"]),
                                   ("eigen-rgc-mal00", ["Profilübersicht", "R11"])):
                 pdf, _ = erzeuge_aus_vorlage(art, Kontext(patient=p), titel=art)
@@ -123,6 +126,27 @@ class RgcVorlagenTest(Grundlage):
                     self.assertIn(kompakt(e), text, art)
         finally:
             zuruecksetzen(token)
+
+    def test_briefpapier(self):
+        """Briefpapier 1:1 (14.10.2026): Bänder auf jeder Seite, Angaben der ersten Seite nur mit Absender."""
+        p = Patient(nachname="A", vorname="B")
+        kopf = {"id": "k", "typ": "briefkopf", "briefpapier": "rgc", "absender": True}
+        text = {"id": "t", "typ": "text", "text": "Zeile\n" * 400}
+        self.assertEqual(pruefe_bloecke("eigen-x", [kopf, text]), [])
+        self.assertTrue(pruefe_bloecke("eigen-x", [{**kopf, "briefpapier": "xyz"}, text]))
+        inhalt = bloecke_html("eigen-x", [kopf, text], Kontext(patient=p, heute=date(2026, 10, 14)))[0]
+        self.assertIn('class="briefpapier"', inhalt)
+        self.assertIn("Riga, 14.10.2026", inhalt)
+        self.assertNotIn("Prof. Dr. Markus Masin",
+                         bloecke_html("eigen-x", [{**kopf, "absender": False}, text], Kontext(patient=p))[0])
+        from .pdf import html_zu_pdf, seite
+
+        seiten = pdf_text(html_zu_pdf(seite("x", inhalt))).split("\f")
+        seiten = [s for s in seiten if s.strip()]
+        self.assertGreater(len(seiten), 1)
+        for s in seiten:  # Kopf- und Fußband auf jeder Seite
+            self.assertIn("info@regeneration-clinic.eu", s)
+            self.assertIn(kompakt("Registration No.: 40203593175"), kompakt(s))
 
     def test_text_in_spalten(self):
         p = Patient(nachname="A", vorname="B")

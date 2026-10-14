@@ -6,6 +6,7 @@ In der Fußzeile stehen zusätzlich ``{Seite}`` und ``{Seiten}``.
 """
 import re
 
+from .briefpapier import BRIEFPAPIERE
 from .felder import FELDER, TABELLEN, JeArt, ist_eigen
 
 PLATZHALTER = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
@@ -126,7 +127,9 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
         if typ in zaehler:
             zaehler[typ] += 1
         if typ == "briefkopf":
-            erlaubt |= {"absender", "linienfarbe", "falzmarken", "mit_linie"}
+            erlaubt |= {"absender", "linienfarbe", "falzmarken", "mit_linie", "briefpapier"}
+            if "briefpapier" in b and b["briefpapier"] not in ("", *BRIEFPAPIERE):
+                fehler.append(f"{name}: unbekanntes Briefpapier. Möglich: {', '.join(BRIEFPAPIERE)}.")
             for k in ("absender", "falzmarken", "mit_linie"):
                 if k in b and not isinstance(b[k], bool):
                     fehler.append(f"{name}: „{k}“ ja oder nein.")

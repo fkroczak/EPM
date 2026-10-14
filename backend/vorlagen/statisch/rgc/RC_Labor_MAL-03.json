@@ -10,7 +10,8 @@
    "typ": "briefkopf",
    "bezeichnung": "Briefkopf",
    "absender": true,
-   "falzmarken": false
+   "falzmarken": false,
+   "briefpapier": "rgc"
   },
   {
    "id": "titel",
