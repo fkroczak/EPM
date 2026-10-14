@@ -12,8 +12,8 @@ from pathlib import Path
 from django.conf import settings
 from django.core.files.base import ContentFile
 
-from . import briefpapier
-from .bloecke import PLATZHALTER
+from . import briefpapier, gestaltung
+from .bloecke import PLATZHALTER, RASTER
 from .briefpapier import BRIEFPAPIERE
 from .felder import FELDER, TABELLEN, Fett, Kontext, datum, tabellenspalten, tabellenzeilen
 
@@ -100,6 +100,19 @@ table { width: 100%%; border-collapse: collapse; }
 .medikamente .grund { width: 18mm; }
 /* zwei Blöcke nebeneinander */
 .paar { display: flex; justify-content: space-between; align-items: flex-start; break-inside: avoid; }
+/* 6-Spalten-Raster (14.10.2026): jede Zelle an ihrer Spalte, Breite und Abstand in Prozent */
+.paar.raster { justify-content: flex-start; }
+.raster-zelle { flex: none; }
+/* Kopf- und Fußband (14.10.2026) */
+.kopfband, .fussband { left: -17mm; }
+.kopfband-inhalt { position: absolute; top: 7mm; left: 17mm; right: 17mm; display: flex; justify-content: space-between;
+                   align-items: flex-start; gap: 8mm; }
+.kopfband-inhalt.logo-rechts { flex-direction: row-reverse; }
+.kopfband-inhalt.logo-rechts .absender, .kopfband-inhalt.logo-rechts .kopftitel { text-align: left; }
+.kopfband-inhalt img { height: 19mm; max-width: 62mm; object-fit: contain; object-position: left top; }
+.kopfband-inhalt.logo-rechts img { object-position: right top; }
+.kopfband-inhalt .absender, .kopfband-inhalt .kopftitel span, .kopfband-inhalt .kopftitel .zusatz span { color: inherit; }
+.kopfband .marke { position: absolute; width: 2mm; height: 0; border-top: 0.2mm solid #828282; }
 .paar .b, .paar .befund .b { width: auto; white-space: nowrap; }
 /* Kopfkarte wie der Kopf der Akte in EPM */
 .kopfkarte { border: 0.6pt solid #d9d8e3; border-radius: 2mm; padding: 2.3mm 3.5mm 2mm; }
@@ -171,12 +184,16 @@ def _absender():
     return Absenderangaben.aktuelle()  # je Firma (11.10.2026)
 
 
-def briefkopf_html(absender_zeigen=True, linienfarbe="#251F53", falzmarken=False, linie=True, rechts_html=None) -> str:
+def _absender_zeilen() -> str:
     a = _absender()
     zeilen = [a.name, f"{a.strasse} · {a.plz} {a.ort}".strip(" ·"),
               " · ".join(t for t in (a.telefon and f"Tel. {a.telefon}", a.fax and f"Fax {a.fax}") if t),
               " · ".join(t for t in (a.email, a.internet) if t)]
-    absender = "<br>".join(html.escape(z) for z in zeilen if z) if absender_zeigen else ""
+    return "<br>".join(html.escape(z) for z in zeilen if z)
+
+
+def briefkopf_html(absender_zeigen=True, linienfarbe="#251F53", falzmarken=False, linie=True, rechts_html=None) -> str:
+    absender = _absender_zeilen() if absender_zeigen else ""
     rechts = rechts_html if rechts_html is not None else f'<div class="absender">{absender}</div>'
     farbe = linienfarbe if re.fullmatch(r"#[0-9A-Fa-f]{6}", linienfarbe or "") else "#251F53"
     # Falzmarken (DIN 5008, wie im Altsystem bei 99 / 148,5 / 198 mm); bezogen auf den Seitenbereich ab 15 mm Rand
@@ -184,6 +201,50 @@ def briefkopf_html(absender_zeigen=True, linienfarbe="#251F53", falzmarken=False
     klasse = "briefkopf" if linie else "briefkopf ohne-linie"
     return (f'{marken}<div class="{klasse}" style="border-color:{farbe}"><img src="{logo_data_uri()}" alt="Logo">'
             f'{rechts}</div>')
+
+
+def _farbe(wert, sonst):
+    return wert if re.fullmatch(r"#[0-9A-Fa-f]{6}", wert or "") else sonst
+
+
+def kopfband_html(b, quer=False, rechts_html=None) -> tuple[str, str]:
+    """Kopfband (14.10.2026): farbige Fläche mit Logo und Absender oben auf der Seite. → (CSS, HTML)."""
+    hoehe = b.get("bandhoehe_mm", 38)
+    breite = 297 if quer else 210
+    rand = hoehe + gestaltung.BAND_ABSTAND
+    alle = b.get("band_seiten", "alle") != "erste"
+    css = (f"@page {{ margin-top: {rand}mm; }}" if alle else f"@page :first {{ margin-top: {rand}mm; }}")
+    absender = f'<div class="absender">{_absender_zeilen()}</div>' if b.get("absender", True) else "<div></div>"
+    rechts = rechts_html if rechts_html is not None else absender
+    marken = "".join(f'<div class="marke" style="top:{y}mm;left:5mm"></div>' for y in (99, 148.5, 198)) \
+        if b.get("falzmarken") and not quer else ""
+    inhalt = (f'<div class="kopfband-inhalt{" logo-rechts" if b.get("logo_rechts") else ""}" '
+              f'style="color:{_farbe(b.get("textfarbe"), "#1b1932")}"><img src="{logo_data_uri()}" alt="Logo">{rechts}</div>')
+    band = gestaltung.band_svg(b.get("kopfband"), breite, hoehe, _farbe(b.get("bandfarbe"), "#E8E6F2"))
+    return css, (f'<div class="kopfband" style="position:{"fixed" if alle else "absolute"};top:-{rand}mm;'
+                 f'width:{breite}mm;height:{hoehe}mm">{band}{inhalt}{marken}</div>')
+
+
+def fussband_html(b, unten: float, quer=False) -> tuple[str, str]:
+    """Fußband in der Farbe des Kopfbands; die Fußzeile steht darauf. → (CSS, HTML)."""
+    breite = 297 if quer else 210
+    textfarbe = _farbe(b.get("textfarbe"), "#1b1932")
+    css = (f"@page {{ margin-bottom: {unten + 6:.0f}mm; @bottom-left {{ padding-top: 10mm; color: {textfarbe}; }} "
+           f"@bottom-right {{ padding-top: 10mm; color: {textfarbe}; }} }}")
+    band = gestaltung.band_svg(b.get("kopfband"), breite, unten + 4, _farbe(b.get("bandfarbe"), "#E8E6F2"), gespiegelt=True)
+    return css, (f'<div class="fussband" style="position:fixed;bottom:-{unten + 6:.0f}mm;width:{breite}mm;'
+                 f'height:{unten + 4:.0f}mm">{band}</div>')
+
+
+def seitenraender(bloecke: list) -> tuple[float, float]:
+    """Oberer und linker Rand der ersten Seite in mm (für Anschriftfeld und Falzmarken)."""
+    kopf = next((b for b in bloecke if isinstance(b, dict) and b.get("typ") == "briefkopf"), None)
+    if kopf and kopf.get("briefpapier") in BRIEFPAPIERE:
+        r = BRIEFPAPIERE[kopf["briefpapier"]].raender
+        return r[0], r[3]
+    if kopf and kopf.get("kopfband"):
+        return kopf.get("bandhoehe_mm", 38) + gestaltung.BAND_ABSTAND, 17
+    return 15, 17
 
 
 def _css_string(text: str) -> str:
@@ -352,28 +413,37 @@ def _kopfkarte(ersetze, b) -> str:
 BREITEN = {"drittel": 34, "haelfte": 48.5, "zwei_drittel": 63}
 
 
-def _nebeneinander(teile: list[tuple[str, str | None]]) -> str:
-    """Blöcke mit „neben_vorherigem“ mit dem Block davor in eine Zeile setzen."""
-    gruppen: list[list[tuple[str, str | None]]] = []
-    for inhalt, neben in teile:
+def _nebeneinander(teile: list[tuple[str, str | None, tuple[int, int] | None]]) -> str:
+    """Blöcke mit „neben_vorherigem“ mit dem Block davor in eine Zeile setzen; Blöcke mit Rasterangaben an ihre
+    Spalten (6-Spalten-Raster, 14.10.2026), ältere Vorlagen mit Drittel/Hälfte wie bisher."""
+    gruppen: list[list[tuple[str, str | None, tuple[int, int] | None]]] = []
+    for inhalt, neben, raster in teile:
         if neben and gruppen:
-            gruppen[-1].append((inhalt, neben))
+            gruppen[-1].append((inhalt, neben, raster))
         else:
-            gruppen.append([(inhalt, None)])
+            gruppen.append([(inhalt, None, raster)])
     ausgabe = []
     for g in gruppen:
+        alt = any(n in BREITEN for _, n, _ in g)
+        if not alt and any(r is not None for _, _, r in g):
+            zellen = [(inhalt, r or (1, gestaltung.SPALTEN)) for inhalt, _, r in g]
+            if len(zellen) == 1 and zellen[0][1] == (1, gestaltung.SPALTEN):
+                ausgabe.append(zellen[0][0])
+            else:
+                ausgabe.append(gestaltung.raster_zeile(zellen))
+            continue
         if len(g) == 1:
             ausgabe.append(g[0][0])
             continue
         abstand = 4
-        rechts = [BREITEN[n] for _, n in g[1:]]
+        rechts = [BREITEN[n] for _, n, _ in g[1:]]
         erste = 100 - sum(rechts) - abstand * (len(g) - 1)
         if erste < 15:  # zu schmal: gleich verteilen
             rechts = [(100 - abstand * (len(g) - 1)) / len(g)] * (len(g) - 1)
             erste = rechts[0]
         breiten = [erste, *rechts]
         ausgabe.append('<div class="paar">' + "".join(f'<div style="width:{w:.1f}%">{inhalt}</div>'
-                                                      for (inhalt, _), w in zip(g, breiten)) + "</div>")
+                                                      for (inhalt, _, _), w in zip(g, breiten)) + "</div>")
     return "".join(ausgabe)
 
 
@@ -393,6 +463,10 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext, quer=False) -> tuple
     # Titel „neben dem Logo“: steht rechts im Briefkopf statt in einer eigenen Zeile
     hat_kopf = any(b.get("typ") == "briefkopf" for b in bloecke)
     titel_neben = next((b for b in bloecke if b.get("typ") == "titel" and b.get("neben_logo") and hat_kopf), None)
+    # Anschriftfeld nach DIN 5008 (14.10.2026): an festen Stellen der ersten Seite, nicht im Querformat
+    din = next((b for b in bloecke if b.get("typ") == "anschriftfeld"), None) if not quer else None
+    oben, links = seitenraender(bloecke)
+    css, din_stelle, fussband = [], None, None
     for b in bloecke:
         typ = b.get("typ")
         o = b.get("optionen") or {}
@@ -402,7 +476,9 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext, quer=False) -> tuple
         karte = " karte" if kopf else ""  # Bereich mit Überschrift als Karte wie in der Oberfläche von EPM
         if typ == "briefkopf" and b.get("briefpapier") in BRIEFPAPIERE:
             # Briefpapier der Firma 1:1 (14.10.2026): Bänder, Logo und Anschrift auf jeder Seite
-            erste = briefpapier.erste_seite_html(b["briefpapier"], datum(kontext.heute)) if b.get("absender", True) else ""
+            # mit Anschriftfeld übernehmen Rücksendeangabe und Informationsblock die Angaben der ersten Seite
+            erste = briefpapier.erste_seite_html(b["briefpapier"], datum(kontext.heute)) \
+                if b.get("absender", True) and din is None else ""
             teile.append(f'<style>{briefpapier.css(b["briefpapier"])}</style>'
                          f'{briefpapier.seiten_html(b["briefpapier"])}<div class="{_klassen(b)}">{erste}</div>')
             if titel_neben is not None:
@@ -412,7 +488,28 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext, quer=False) -> tuple
                 if titel_neben else ""
             klasse = f"kopftitel {schrift}".strip()
             neben = f'<div class="{klasse}">{_titel_html(ersetze, titel_neben)}</div>' if titel_neben else None
-            teile.append(f'<div class="{_klassen(b)}">{briefkopf_html(b.get("absender", True), b.get("linienfarbe"), b.get("falzmarken", False) and not quer, b.get("mit_linie", True), neben)}</div>')
+            # die Falzmarken des Anschriftfelds (DIN 5008) ersetzen die des Briefkopfs
+            falz = b.get("falzmarken", False) and not quer and not (din and din.get("falzmarken", True))
+            if b.get("kopfband") in gestaltung.FORMEN:
+                band_css, band = kopfband_html({**b, "falzmarken": falz}, quer, neben)
+                css.append(band_css)
+                teile.append(f'<div class="{_klassen(b)}">{band}</div>')
+                if b.get("fussband"):
+                    fussband = b
+            else:
+                teile.append(f'<div class="{_klassen(b)}">{briefkopf_html(b.get("absender", True), b.get("linienfarbe"), falz, b.get("mit_linie", True), neben)}</div>')
+        elif typ == "anschriftfeld":
+            ruecksendung, _ = ersetze(b.get("ruecksendung", ""), html_erlaubt=False, leer_zeichen="")
+            anschrift, _ = ersetze.zeilen(b.get("text", ""))
+            info, _ = ersetze.zeilen(b.get("rechts", ""))
+            ruecksendung = _trenner(ruecksendung)
+            if din is None:  # Querformat: Anschrift im Textfluss
+                teile.append(f'<div class="{_klassen(b)}">{anschrift}</div>')
+            else:
+                css.append(gestaltung.din_css())
+                form = b.get("form", "B")
+                din_stelle = (len(teile), form, gestaltung.anschriftfeld_html(
+                    ruecksendung, anschrift, info, form, oben, links, b.get("falzmarken", True)))
         elif typ == "zweispaltig":
             links, _ = ersetze.zeilen(b.get("links", ""))
             # eigener Name: „rechts“ ist die rechte Fußzeile (ohne Fußzeilen-Block stand sonst die rechte Spalte unten)
@@ -475,9 +572,26 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext, quer=False) -> tuple
         elif typ == "fusszeile":
             fuss = ersetze.text(b.get("text", ""))
             rechts = ersetze.text(b.get("rechts", ""))
-        if len(teile) > anzahl:
-            teile[-1] = (teile[-1], o.get("neben_vorherigem"))
-    return _nebeneinander(teile), fuss, rechts
+        raster = None
+        if typ in RASTER and (o.get("raster_von") or o.get("raster_bis") or o.get("neben_vorherigem") == "raster"):
+            raster = gestaltung.raster_von_bis(o)
+        for j in range(anzahl, len(teile)):
+            teile[j] = (teile[j], o.get("neben_vorherigem") if j == len(teile) - 1 else None, raster)
+    if fussband is not None:
+        zeilen = fuss.count("\n") + 1 if fuss else 1
+        band_css, band = fussband_html(fussband, max(18, 10 + 3.6 * zeilen), quer)
+        css.append(band_css)
+        teile.insert(0, (band, None, None))
+        if din_stelle is not None:
+            din_stelle = (din_stelle[0] + 1, *din_stelle[1:])
+    if din_stelle is not None:
+        stelle, form, feld = din_stelle
+        inhalt = (f'<div class="din-bereich" style="min-height:{gestaltung.din_hoehe(form, oben):.2f}mm">'
+                  f"{_nebeneinander(teile[:stelle])}{feld}</div>{_nebeneinander(teile[stelle:])}")
+    else:
+        inhalt = _nebeneinander(teile)
+    stil = f"<style>{''.join(css)}</style>" if css else ""
+    return stil + inhalt, fuss, rechts
 
 
 def seite(titel: str, inhalt: str, fusszeile: str | None = None, wasserzeichen: str | None = None,

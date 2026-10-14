@@ -34,7 +34,11 @@ test("Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau, Ver
   // Aufbau wie ein Laborbefund: Mineralstoffe neben der Zusammensetzung, Kopf wie in der Akte
   await expect(editor.getByTestId("nebeneinander")).toContainText("Natrium");
   await aufbau.getByRole("button", { name: /Mineralstoffe/ }).click();
-  await expect(editor.getByTestId("block-eigenschaften").getByLabel("Neben dem vorherigen Block")).toHaveValue("drittel");
+  // ältere Vorlage „ein Drittel daneben“ erscheint im 6-Spalten-Raster: Spalte 5 bis 6, in derselben Zeile (14.10.2026)
+  const lage = editor.getByTestId("block-eigenschaften").getByTestId("raster-wahl");
+  await expect(lage.getByLabel("Von Spalte")).toHaveValue("5");
+  await expect(lage.getByLabel("Bis Spalte")).toHaveValue("6");
+  await expect(lage.getByLabel("In derselben Zeile wie der Block davor")).toBeChecked();
   await expect(editor.getByTestId("block-eigenschaften").getByLabel("Darstellung")).toHaveValue("befund");
   // Reihenfolge der Felder ändern, ohne zu löschen und neu anzulegen
   const eig = editor.getByTestId("block-eigenschaften");
@@ -218,5 +222,99 @@ test("Vorlagen-Portal: Suche, Angabe per Klick, geführter Ablauf, frühere Fass
   expect((await api.get(`vorlagen/${kopie}/entwurf/`)).bloecke).toEqual((await api.get(`vorlagen/${art}/entwurf/`)).bloecke);
   expect((await api.get("schreiben/")).map((s: { art: string }) => s.art)).toContain(kopie);
   await api.patch(`vorlagen/${kopie}/eigen/`, { aktiv: false });
+  await api.ende();
+});
+
+test("Gestaltung am Raster: ziehen, einrasten, Breite ziehen, direkt schreiben, Kopfband und DIN 5008 (14.10.2026)", async ({ page }) => {
+  const api = await apiAls("mitarbeiter");
+  await page.goto("/admin/vorlagen/dokumente?art=terminbestaetigung");
+  const editor = page.getByTestId("dokumentvorlagen");
+  const seite = editor.getByTestId("vorlage-seite");
+  const eig = editor.getByTestId("block-eigenschaften");
+  await expect(seite.getByTestId("raster")).toBeVisible();
+
+  // Anschriftfeld nach DIN 5008 per Schalter: steht an der festen Stelle (Form B: 45 mm vom oberen Rand)
+  await editor.getByTestId("din-schalter").check();
+  const feld = seite.getByTestId("anschriftfeld");
+  await expect(feld.locator(".feldchip", { hasText: "Straße" }).first()).toBeVisible();
+  await expect(eig.getByRole("group", { name: "Form nach DIN 5008" })).toBeVisible();
+  const blatt = await seite.locator("> div").boundingBox();
+  const lage = await feld.boundingBox();
+  expect(Math.round((lage!.y - blatt!.y) / (560 / 210))).toBe(45);
+  await expect(seite.getByTestId("informationsblock")).toContainText("Datum");
+
+  // Kopf als farbiges, welliges Band mit Fußband
+  await editor.getByTestId("aufbau").getByRole("button", { name: /^Briefkopf/ }).click();
+  await eig.getByRole("group", { name: "Gestaltung des Kopfs" }).getByRole("button", { name: "Farbiges Band" }).click();
+  await eig.getByRole("group", { name: "Form des Bands" }).getByRole("button", { name: "Bogen" }).click();
+  await eig.getByRole("button", { name: "Farbe des Bands #251F53" }).click();
+  await eig.getByRole("button", { name: "Schriftfarbe #FFFFFF" }).click();
+  await eig.getByLabel("Fußband in derselben Farbe").check();
+  await expect(seite.getByTestId("kopfband").locator("path")).toHaveAttribute("fill", "#251F53");
+  await expect(seite.getByTestId("fussband")).toBeVisible();
+
+  // „Einleitung“ am rechten Rand auf die halbe Breite ziehen: rastet an Spalte 3 ein
+  const einleitung = seite.getByRole("button", { name: "Block Einleitung" });
+  await einleitung.click();
+  const griff = einleitung.getByTestId("rand-rechts");
+  const g = (await griff.boundingBox())!;
+  const inhalt = (await seite.getByTestId("seiteninhalt").boundingBox())!;
+  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(inhalt.x + inhalt.width * 0.47, g.y + 5, { steps: 8 });
+  await page.mouse.up();
+  await expect(eig.getByTestId("raster-wahl").getByLabel("Bis Spalte")).toHaveValue("3");
+
+  // „Bitte mitbringen“ mit der Maus rechts neben die Einleitung ziehen: das Ziel wird angezeigt, der Block rastet ein
+  const hinweis = seite.getByRole("button", { name: "Block Bitte mitbringen" });
+  const h = (await hinweis.boundingBox())!;
+  const e = (await einleitung.boundingBox())!;
+  await page.mouse.move(h.x + 40, h.y + h.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(inhalt.x + inhalt.width * 0.8, e.y + e.height / 2, { steps: 10 });
+  await expect(seite.getByTestId("ziel-anzeige")).toBeVisible();
+  await page.mouse.up();
+  await expect(seite.getByTestId("nebeneinander").filter({ hasText: "Bitte" })).toBeVisible();
+  await expect(eig.getByTestId("raster-wahl").getByLabel("Von Spalte")).toHaveValue("4");
+  await expect(eig.getByTestId("raster-wahl").getByLabel("In derselben Zeile wie der Block davor")).toBeChecked();
+
+  // Doppelklick: Text direkt auf der Seite schreiben, Angabe aus der Akte an der Schreibmarke
+  await seite.getByRole("button", { name: "Block Absage" }).dblclick();
+  const text = seite.getByLabel("Text auf der Seite");
+  await text.fill("Absagen bitte bis ");
+  await editor.getByTestId("datenfelder").getByRole("button", { name: "Heutiges Datum einfügen" }).click();
+  await expect(text).toHaveValue("Absagen bitte bis {{Heute}}");
+  await text.press("Escape");
+  await expect(seite.getByRole("button", { name: "Block Absage" }).locator(".feldchip")).toHaveText("Heutiges Datum");
+
+  // Baustein aus der Leiste auf die Seite ziehen
+  const knopf = editor.getByTestId("bausteine").getByRole("button", { name: "+ Trennlinie" });
+  const k = (await knopf.boundingBox())!;
+  const titel = (await seite.getByRole("button", { name: "Block Titel" }).boundingBox())!;
+  await page.mouse.move(k.x + k.width / 2, k.y + k.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(titel.x + 50, titel.y + 2, { steps: 10 });
+  await page.mouse.up();
+  await expect(eig).toContainText("Trennlinie");
+
+  await page.getByRole("main").getByRole("button", { name: "Speichern", exact: true }).click();
+  await expect(page.getByText("Gespeichert. In der Praxis gilt weiter")).toBeVisible();
+  const entwurf = await api.get("vorlagen/terminbestaetigung/entwurf/");
+  const nach = Object.fromEntries(entwurf.bloecke.map((b: { id: string }) => [b.id, b]));
+  expect(nach.briefkopf).toMatchObject({ kopfband: "bogen", bandfarbe: "#251F53", textfarbe: "#FFFFFF", fussband: true });
+  expect(nach["anschriftfeld-1"]).toMatchObject({ typ: "anschriftfeld", form: "B" });
+  expect(nach.einleitung.optionen).toMatchObject({ raster_von: 1, raster_bis: 3 });
+  expect(nach.hinweis.optionen).toMatchObject({ raster_von: 4, raster_bis: 6, neben_vorherigem: "raster" });
+  expect(nach.absage.text).toBe("Absagen bitte bis {{Heute}}");
+  const ids = entwurf.bloecke.map((b: { id: string }) => b.id);
+  expect(ids.indexOf("trennlinie-1")).toBe(ids.indexOf("titel") - 1);
+
+  // die Vorschau mit Testpatient entsteht auf dem Server aus denselben Angaben
+  await editor.getByRole("button", { name: "Vorschau mit Testpatient" }).click();
+  await expect(editor.getByTestId("vorschau-stand")).toContainText("Zeigt den aktuellen Stand", { timeout: 30_000 });
+
+  // aufräumen: Entwurf verwerfen
+  const r = await api.roh.delete("/api/vorlagen/terminbestaetigung/entwurf/", { headers: await api.kopf() });
+  expect(r.status()).toBe(204);
   await api.ende();
 });
