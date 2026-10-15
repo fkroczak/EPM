@@ -18,6 +18,10 @@ if [ "${1:-server}" = "server" ]; then
     --access-logfile - \
     --access-logformat '%(h)s "%(r)s" %(s)s %(b)s %(M)sms'
 fi
+if [ "$1" = "ki" ]; then
+  # KI (Experimentell): Nachtverarbeitung und Berichtsentwürfe (eigener Container ki-worker, Datenbank-Rolle epm_ki)
+  exec python manage.py epm_ki
+fi
 if [ "$1" = "ocr" ]; then
   # Texterkennung für „Scans“ (eigener Container, gleiches Image): arbeitet die Warteschlange ab, räumt stündlich auf
   exec python manage.py epm_ocr

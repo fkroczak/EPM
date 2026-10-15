@@ -49,6 +49,7 @@ GRUPPEN = [
     ("dokumente", "Dokumente"),
     ("datenschutz", "Datenschutz"),
     ("scans", "Scans und Texterkennung"),
+    ("ki", "KI (Experimentell)"),
     ("listen", "Versorger und Ärzte"),
     ("administration", "Administration"),
 ]
@@ -917,6 +918,49 @@ dort nicht.</p>
 <p>Wird später eine ältere Sicherung zurückgespielt, löscht EPM die Akte beim Start erneut.</p>""",
     },
     # ------------------------------------------------------------------ Versorger und Ärzte
+    # ------------------------------------------------------------------ KI (Experimentell, 14.10.2026, F191)
+    {
+        "id": "ki", "gruppe": "ki", "titel": "KI (Experimentell): Vorschläge prüfen und übernehmen", "rechte": ["ki_ansehen"],
+        "seiten": ["/ki"],
+        "html": """
+<p>Nachts liest die KI – auf dem eigenen Server, ohne Internet – die Dokumente der Akten: Laborbefunde, Arztberichte,
+Infusions- und Medikationspläne, alte Scans. Sie schlägt vor, was darin steht: Dokumenttyp und -datum, Laborwerte,
+Infusionen, Medikamente, Diagnosen, eine kurze Zusammenfassung. <strong>Nichts davon steht in der Akte</strong>, bis Sie
+es prüfen und bestätigen.</p>
+<ol>
+<li>Im Menü <strong>KI (Experimentell)</strong> ein Dokument öffnen. Links steht das Original, rechts die Vorschläge.</li>
+<li>Jeden Wert mit dem Original vergleichen. Markiert sind: <strong>neu</strong>, <strong>ergänzt Vorhandenes</strong>,
+<strong>würde überschreiben</strong>, <strong>schon vorhanden</strong>, <strong>unsicher erkannt</strong> und
+<strong>niedrige OCR-Sicherheit</strong> (schlecht lesbare Seite).</li>
+<li>Falsches mit dem Stift korrigieren und die Fehlerart wählen – so wird die Erkennung messbar besser. Was nicht
+dazugehört: verwerfen (×).</li>
+<li>Richtiges freigeben (Haken). „Alle sicheren freigeben“ lässt unsichere Felder offen.</li>
+<li>Gibt es in der Akte schon einen Eintrag (z. B. derselbe Laborwert am selben Tag mit anderem Wert), bitte
+<strong>entscheiden</strong>: neu anlegen, ergänzen, ersetzen oder verwerfen. Ohne Entscheidung wird nichts
+übernommen – und nie etwas automatisch überschrieben.</li>
+<li><strong>In die Akte übernehmen</strong>: Zusammenfassung prüfen, bestätigen. Die Übernahme steht mit Ihrem Namen im
+Verlauf der Akte und im Audit-Log.</li>
+</ol>
+<p>Passt das Dokument gar nicht (falsche Akte, unbrauchbarer Scan): <strong>Ablehnen</strong> mit Grund. Das Dokument
+in der Akte bleibt unverändert. Ein Dokument sofort verarbeiten lassen (auch tagsüber): in der Akte im Reiter
+<strong>KI (Experimentell)</strong> das Dokument wählen und „Anfordern“.</p>""",
+    },
+    {
+        "id": "ki_hinweise", "gruppe": "ki", "titel": "Hinweise Labor und Infusionsplan, Berichtsentwürfe", "rechte": ["ki_ansehen"],
+        "seiten": [],
+        "html": """
+<p>Im Reiter <strong>KI (Experimentell)</strong> der Akte stehen Zusammenhänge zwischen Laborwerten und Infusionsplänen,
+z. B. „Kalium niedrig (3,1 mmol/l, 12.03.2026 06:10), anschließend Kaliumsubstitution dokumentiert“ oder „keine
+nachfolgende Kaliumsubstitution im erfassten Zeitraum erkannt“. <strong>Gesichert</strong> heißt: beide Angaben stehen
+freigegeben in der Akte, Reihenfolge und Dosisänderung sind belegt. <strong>Wahrscheinlich</strong>: mindestens eine
+Angabe ist nur ein KI-Vorschlag, die Uhrzeit fehlt oder die Dosis hat sich nicht nachweislich geändert.</p>
+<p>Die Hinweise sind <strong>Entscheidungshilfen</strong> – keine medizinische Bewertung, keine Diagnose, keine
+Empfehlung.</p>
+<p><strong>Berichtsentwurf</strong>: Berichtsart, Zeitraum und Quellen wählen, „Entwurf anfordern“. Der Entwurf entsteht
+nur aus freigegebenen Inhalten der Akte, jede Aussage mit Quellennummer. Die Gegenprüfung markiert Zahlen ohne Beleg
+und Sätze, die nach Empfehlung oder Bewertung klingen. Bearbeiten, dann „Als Bericht-Entwurf speichern“ – er liegt im
+Reiter <strong>Berichte</strong> und wird wie jeder Bericht geprüft und freigegeben.</p>""",
+    },
     # ------------------------------------------------------------------ Scans und Texterkennung (F160 ff.)
     {
         "id": "scans", "gruppe": "scans", "titel": "Scans: hochladen, erkennen, zuordnen", "rechte": ["scans_bearbeiten"],

@@ -25,6 +25,7 @@ from befunde.api import BiaMessungViewSet, LaborbefundViewSet
 from berichte.api import BerichtViewSet
 from korrespondenz.api import SchreibenViewSet
 from scans.api import ScanViewSet
+from ki import api as ki
 
 router = DefaultRouter()
 router.register("startseite", StartseiteViewSet, basename="startseite")
@@ -59,6 +60,11 @@ router.register("protokoll", SystemEreignisViewSet, basename="protokoll")
 router.register("testdaten", TestdatenViewSet, basename="testdaten")
 router.register("sitzungen", konto.SitzungenViewSet, basename="sitzung")
 router.register("scans", ScanViewSet, basename="scan")
+# KI (Experimentell, 14.10.2026)
+router.register("ki/vorgaenge", ki.KiVorgangViewSet, basename="ki-vorgang")
+router.register("ki/hinweise", ki.KiHinweisViewSet, basename="ki-hinweis")
+router.register("ki/berichte", ki.KiBerichtViewSet, basename="ki-bericht")
+router.register("ki/modelle", ki.ModelleViewSet, basename="ki-modell")
 
 auth = [
     path("status/", konto.StatusView.as_view()),
@@ -175,6 +181,12 @@ urlpatterns = [
     path("api/backup/<str:stempel>/wiederherstellen/", backup.WiederherstellenView.as_view()),
     path("api/backup/<str:stempel>/bereitstellen/", backup.BereitstellenView.as_view()),
     path("api/backup/<str:stempel>/datei/", backup.DateiView.as_view()),
+    # KI (Experimentell): Stand, Einstellungen, Qualität, Evaluation
+    path("api/ki/stand/", ki.StandView.as_view()),
+    path("api/ki/einstellungen/", ki.EinstellungenView.as_view()),
+    path("api/ki/rechtsgrundlage/", ki.RechtsgrundlageView.as_view()),
+    path("api/ki/qualitaet/", ki.QualitaetView.as_view()),
+    path("api/ki/evaluation/", ki.EvaluationView.as_view()),
     path("api/meine-akten/", meine_akten.MeineAktenView.as_view()),
     path("api/meine-akten/merken/", meine_akten.MerkenView.as_view()),
     path("api/meine-akten/merken/<int:patient>/", meine_akten.MerkenView.as_view()),
