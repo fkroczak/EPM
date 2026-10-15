@@ -2,8 +2,9 @@
 Datenschutz (Datenschutzinformation, Einwilligung, Schweigepflichtentbindung) aus Blöcken.
 
 Je Art gibt es höchstens einen Entwurf und genau eine aktive Version. Veröffentlichen macht aus dem Entwurf die
-nächste Version; die bisherige wird „abgelöst“ und bleibt erhalten. Veröffentlichte Versionen sind unveränderlich
-(Modell), damit jede gespeicherte PDF auf ihre Vorlagenversion zurückgeführt werden kann.
+nächste Version; die bisherige wird „abgelöst“ und bleibt erhalten (vor dem ersten Import der Altdaten ersetzt die
+neue stattdessen Fassung 1, ``vorlagen.fassung1``). Veröffentlichte Versionen sind unveränderlich (Modell), damit
+jede gespeicherte PDF auf ihre Vorlagenversion zurückgeführt werden kann.
 
 Vorlagen je Firma (Festlegung „Gemischt“, 11.10.2026): Ohne ``firma`` ist eine Vorlage gemeinsam. Eine Firma kann je
 Art eine eigene Vorlage anlegen (Kopie der gemeinsamen); dann gelten Entwurf, Fassungen und Veröffentlichen für
@@ -172,6 +173,7 @@ class Dokumentvorlage(models.Model):
             if eigene is not None:
                 return eigene
             quelle = cls.gemeinsame(art)
+            cls._vor_dem_import_leeren(art, firma)
             hoechste = cls.objects.filter(art=art, firma=firma).aggregate(m=models.Max("version"))["m"] or 0
             # Wasserzeichen „ENTWURF“ bleibt, solange die Kopie eine ungeprüfte Startvorlage ist (veroeffentlicht_von)
             return cls.objects.create(art=art, firma=firma, version=hoechste + 1, status=cls.Status.AKTIV,
@@ -218,11 +220,25 @@ class Dokumentvorlage(models.Model):
         """Der Entwurf der Vorlage, die in der Firma gilt (``zustaendig``)."""
         return cls.objects.filter(art=art, firma=cls.zustaendig(art, firma), status=cls.Status.ENTWURF).first()
 
+    @classmethod
+    def _vor_dem_import_leeren(cls, art: str, firma) -> None:
+        """Vor dem ersten Import gibt es nur Fassung 1 (``vorlagen.fassung1``): die freigegebenen Fassungen der Vorlage
+        entfernen, damit die neue wieder Fassung 1 wird."""
+        from audit.schutz import wartungsmodus
+
+        from .fassung1 import import_durchgefuehrt
+
+        if import_durchgefuehrt():
+            return
+        with wartungsmodus():
+            cls.objects.filter(art=art, firma=firma).exclude(status=cls.Status.ENTWURF).delete()
+
     @transaction.atomic
     def veroeffentlichen(self, benutzer) -> "Dokumentvorlage":
         if self.status != self.Status.ENTWURF:
             raise ValidationError("Nur ein Entwurf kann veröffentlicht werden.")
         self.full_clean()
+        self._vor_dem_import_leeren(self.art, self.firma)
         alt = Dokumentvorlage.objects.select_for_update().filter(art=self.art, firma=self.firma,
                                                                  status=self.Status.AKTIV).first()
         hoechste = Dokumentvorlage.objects.filter(art=self.art, firma=self.firma) \

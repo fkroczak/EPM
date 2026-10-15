@@ -40,6 +40,13 @@ def kompakt(text: str) -> str:
     return re.sub(r"\s+", "", text)
 
 
+def import_erledigt():
+    """Altdaten übernommen: ab dann zählen die Fassungen weiter (vorher nur Fassung 1, ``vorlagen.fassung1``)."""
+    from altimport.models import Importlauf
+
+    Importlauf.objects.create(art=Importlauf.Art.IMPORT, erfolgreich=True)
+
+
 class Vorlagen(Grundlage):
     def testpatient_mit_plan(self, freigeben=False):
         p = Patient(nachname="Probe", vorname="Paula", geburtsdatum=timezone.localdate() - timedelta(days=19000))
@@ -88,6 +95,7 @@ class Vorlagen(Grundlage):
         self.assertEqual(client_fuer(self.admin).get("/api/vorlagen/unbekannt/").status_code, 404)
 
     def test_entwurf_pruefen_veroeffentlichen_unveraenderlich(self):
+        import_erledigt()
         c = client_fuer(self.mitarbeiter)
         url = "/api/vorlagen/infusionsplan/entwurf/"
         start = c.get(url).json()
@@ -415,6 +423,7 @@ class VorlagenJeFirma(Grundlage):
         return "quer" if float(box.width) > float(box.height) else "hoch"
 
     def test_eigene_vorlage_der_firma_gilt_nur_dort(self):
+        import_erledigt()
         c = self.anmelden("dskm")
         d = c.get("/api/vorlagen/einwilligung/").json()
         self.assertEqual((d["firma"]["aktiv"], d["firma"]["eigene"], d["firma"]["mehrere"], d["firma"]["moeglich"]),
@@ -470,6 +479,7 @@ class VorlagenJeFirma(Grundlage):
         self.assertEqual(Einstellungen.aktuell().vordrucke_ohne_entwurf, [])
 
     def test_medikationsplan_im_querformat(self):
+        import_erledigt()
         c = self.anmelden("dskm")
         d = c.get("/api/vorlagen/medikationsplan/").json()
         self.assertEqual((d["ausrichtung"], d["querformat_moeglich"], d["aktiv"]["ausrichtung"]), ("quer", True, "quer"))
@@ -489,3 +499,73 @@ class VorlagenJeFirma(Grundlage):
         r = c.post("/api/vorlagen/medikationsplan/veroeffentlichen/")
         self.assertEqual((r.json()["aktiv"]["version"], r.json()["ausrichtung"]), (2, "hoch"))
         self.assertEqual(self.seitenformat(c.get(f"/api/patienten/{self.patient.id}/medikationsplan-pdf/").content), "hoch")
+
+
+class FassungEinsVorDemImport(Grundlage):
+    """Solange keine Altdaten übernommen wurden, hat jede Vorlage nur Fassung 1 (``vorlagen.fassung1``, 14.10.2026)."""
+
+    def freigeben(self, c, art, ohne_fusszeile=True):
+        bloecke = c.get(f"/api/vorlagen/{art}/entwurf/").json()["bloecke"]
+        if ohne_fusszeile:
+            bloecke = [b for b in bloecke if b["typ"] != "fusszeile"]
+        else:
+            bloecke = [*bloecke, {"id": "neu", "typ": "text", "text": "Neu"}]
+        self.assertEqual(c.put(f"/api/vorlagen/{art}/entwurf/", {"bloecke": bloecke}, format="json").status_code, 200)
+        r = c.post(f"/api/vorlagen/{art}/veroeffentlichen/")
+        self.assertEqual(r.status_code, 200, r.content)
+        return r.json(), bloecke
+
+    def test_freigeben_ersetzt_fassung_1(self):
+        c = client_fuer(self.mitarbeiter)
+        art = "patientenaufnahme"
+        d = c.get(f"/api/vorlagen/{art}/").json()
+        self.assertEqual((d["nur_fassung_1"], d["naechste_fassung"]), (True, 1))
+        d, bloecke = self.freigeben(c, art)
+        self.assertEqual((d["aktiv"]["version"], [(v["version"], v["status"]) for v in d["versionen"]]),
+                         (1, [(1, "aktiv")]))
+        d, bloecke = self.freigeben(c, art, ohne_fusszeile=False)
+        self.assertEqual((d["aktiv"]["version"], len(d["versionen"])), (1, 1))
+        self.assertEqual(Dokumentvorlage.aktive(art).bloecke, bloecke)
+        self.assertEqual(Dokumentvorlage.objects.filter(art=art).count(), 1)
+        # nach dem Import zählen die Fassungen weiter
+        import_erledigt()
+        d = c.get(f"/api/vorlagen/{art}/").json()
+        self.assertEqual((d["nur_fassung_1"], d["naechste_fassung"]), (False, 2))
+        d, _ = self.freigeben(c, art)
+        self.assertEqual([(v["version"], v["status"]) for v in d["versionen"]], [(2, "aktiv"), (1, "abgeloest")])
+
+    def test_eigene_vorlage_wieder_fassung_1(self):
+        from stammdaten.models import Firma
+
+        rg = Firma.objects.get(kuerzel="rg")
+        art = "einwilligung"
+        self.assertEqual(Dokumentvorlage.eigene_anlegen(art, rg, self.admin).version, 1)
+        Dokumentvorlage.eigene_entfernen(art, rg)
+        self.assertEqual(Dokumentvorlage.eigene_anlegen(art, rg, self.admin).version, 1)
+        self.assertEqual(Dokumentvorlage.objects.filter(art=art, firma=rg).count(), 1)
+
+    def test_zurueckfuehren_auf_fassung_1(self):
+        from audit.schutz import wartungsmodus
+        from patienten.models import Erklaerung
+
+        from .fassung1 import auf_fassung_1, import_durchgefuehrt
+
+        c = client_fuer(self.mitarbeiter)
+        art = "einwilligung"
+        Dokumentvorlage.aktive(art)
+        import_erledigt()
+        self.freigeben(c, art)
+        _, bloecke = self.freigeben(c, art, ohne_fusszeile=False)
+        self.assertEqual(Dokumentvorlage.aktive(art).version, 3)
+        e = Erklaerung.objects.create(patient=self.patient, art=art, erteilt_am=timezone.localdate(), vorlage_version=3)
+        # Import zurückgesetzt (wie nach „Datenbank leeren“): eine Fassung 1 mit dem Stand der aktiven
+        from altimport.models import Importlauf
+
+        Importlauf.objects.all().delete()
+        self.assertFalse(import_durchgefuehrt())
+        with wartungsmodus():
+            self.assertEqual(auf_fassung_1(), 2)
+        v = Dokumentvorlage.objects.get(art=art, firma=None)
+        self.assertEqual((v.version, v.status, v.bloecke), (1, "aktiv", bloecke))
+        e.refresh_from_db()
+        self.assertEqual(e.vorlage_version, 1)

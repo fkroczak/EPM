@@ -91,7 +91,10 @@ def _uebersicht(art):
         .select_related("veroeffentlicht_von").order_by("-version")
     from stammdaten.models import Einstellungen
 
+    from .fassung1 import import_durchgefuehrt
+
     eigen = EigenesSchreiben.objects.filter(schluessel=art).first()
+    nur_fassung_1 = not import_durchgefuehrt()
     return {"art": art, "name": art_name(art), "aktiv": _version(aktiv),
             # eigenes Schreiben (F176): Beschreibung, Termin, aktiv
             "eigen": {"beschreibung": eigen.beschreibung, "mit_termin": eigen.mit_termin, "aktiv": eigen.aktiv}
@@ -99,6 +102,9 @@ def _uebersicht(art):
             # Vorlagen-Portal (F180): wofür, wo in der Praxis benutzt, Gruppe der Übersicht
             **art_info(art, eigen.beschreibung if eigen else "", eigen.gruppe if eigen else None),
             "entwurf": _version(Dokumentvorlage.entwurf_von(art)), "versionen": [_version(v) for v in versionen],
+            # vor dem Import der Altdaten ersetzt Freigeben die Fassung 1 (vorlagen.fassung1)
+            "nur_fassung_1": nur_fassung_1,
+            "naechste_fassung": 1 if nur_fassung_1 else max([v.version for v in versionen] or [0]) + 1,
             "firma": _firma_info(art, ziel),
             # Seitenformat (13.10.2026): das der aktiven Fassung; der Editor bietet Querformat bei breiten Tabellen an
             "ausrichtung": aktiv.ausrichtung, "querformat_moeglich": art in QUERFORMAT,

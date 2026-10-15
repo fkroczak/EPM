@@ -4,6 +4,7 @@ from audit.models import SystemEreignis
 from epm.pruefhilfen import Grundlage, client_fuer
 
 from .models import Dokumentvorlage, EigenesSchreiben
+from .tests import import_erledigt
 
 
 class PortalTest(Grundlage):
@@ -36,6 +37,7 @@ class PortalTest(Grundlage):
             self.assertLessEqual(len(f["bezeichnung"]), 60, f["name"])
 
     def test_fruehere_fassung_wiederherstellen(self):
+        import_erledigt()
         art = "patientenaufnahme"
         alt = self.c.get(f"/api/vorlagen/{art}/entwurf/").json()["bloecke"]
         v1 = Dokumentvorlage.aktive(art).version
