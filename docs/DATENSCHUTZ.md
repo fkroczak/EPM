@@ -185,3 +185,26 @@ Löschungen zurück, die nach dieser Sicherung lagen.
 8. Freigabe-E-Mails für Infusionspläne: nur Patienten- und Plannummer nennen, keine Namen oder Diagnosen.
 9. Bestehende Patienten: vorhandene Einwilligungen und Schweigepflichtentbindungen nach und nach in der Akte erfassen
    (Startseite „Erklärungen fehlen“).
+
+## 7. KI (Experimentell) – Datenschutz und Sicherheit (14.10.2026)
+
+Plan und Entscheidungen: `docs/KI-ERWEITERUNG-PLAN-2026-10-14.md`; Betrieb: `docs/KI-BETRIEB.md`.
+
+| Anforderung | Umsetzung |
+|---|---|
+| Vollständig offline, keine externen Aufrufe, keine Telemetrie | Modell lokal (llama.cpp, Qwen3.5 als GGUF, offline eingespielt mit Prüfsumme). Container `ki-modell` und `ki-worker` nur im Netz `intern` (`internal: true`). Der Client (`ki/modell.py`) akzeptiert nur `http://` zu erlaubten Rechnern im internen Netz (`EPM_KI_ERLAUBTE_HOSTS`) und ignoriert Proxy-Umgebungsvariablen. Test verbietet Verbindungen nach außen (`ki/test_bausteine.py`). „Qwen3.5-OCR“ von Alibaba Cloud (nur per API) wird **nicht** verwendet |
+| Nie automatisch in die Akte | Der KI-Dienst meldet sich mit der DB-Rolle `epm_ki` an: lesen ja, schreiben nur `ki_*` und Audit-Log (anfügen). Übernahme nur im Backend, im Namen eines angemeldeten Mitarbeiters mit Recht, nach aktiver Bestätigung; Konflikte nur mit ausdrücklicher Entscheidung (Test `DbRolleTest`) |
+| Trennung Original / Rohdaten / Korrektur / Akte | Original (`patienten.Dokument`) unverändert und nur lesend eingebunden; Rohantworten `KiRohergebnis` (unveränderlich); Vorschlag `KiFeld.wert` + Korrektur `KiFeld.korrigiert` + Verlauf `KiKorrektur` (unveränderlich); Akte über die vorhandenen Modelle mit Verlauf (simple-history), Nachweis `KiUebernahme` |
+| Verschlüsselung temporärer Daten, Löschen | Zwischendateien (Seitenbilder bis zur zweiten Lesung) AES-256-GCM in `data/ki/vorgaenge/` (Schlüssel als Docker-Secret `ki_schluessel`, an Vorgang und Fassung gebunden), gelöscht nach Abschluss bzw. nach `aufbewahrung_tage` (Standard 14). Tesseract-Zwischendateien nur im RAM (`tmpfs`) |
+| Eingeschränkte und abgeschlossene Akten | Werden nicht gelesen (Art. 18 DSGVO); Vorgänge solcher Akten bleiben liegen |
+| Löschen (Art. 17) | KI-Daten hängen am Dokument bzw. an der Akte (`on_delete=CASCADE`) – auch pseudonymisierte Evaluationsfälle – und gehen beim endgültigen Löschen mit |
+| Rollen und Rechte | `ki_ansehen`, `ki_pruefen`, `ki_uebernehmen` (+ Recht der Akte), `ki_berichte` (Standard: jeder Mitarbeiter), `ki_verwalten`, `ki_training_freigeben` (Standard: Admin); je Firma (DSKM nur DSKM, RGC nur RGC) |
+| Audit | Art „KI“: jede Verarbeitung mit Modell, SHA-256 und Prompt-Fassung; Anforderung, Korrektur, Freigabe, Übernahme (mit Zielen), Ablehnung, Berichtsentwurf, Einstellungen, Modell eingespielt/evaluiert/aktiviert/gesperrt, Rechtsgrundlage, Trainingsfreigabe |
+| Berichte | nur auf Anforderung, nur aus freigegebenen Inhalten, mit Quellen, gekennzeichnet als KI-Entwurf; Gegenprüfung markiert unbelegte Zahlen/Daten und Formulierungen, die nach Empfehlung oder Diagnose klingen; nie automatisch freigegeben |
+| Hinweise Labor ↔ Infusion | regelbasiert, als Entscheidungshilfe gekennzeichnet; „gesichert“ nur bei belegter Reihenfolge und Dosisänderung aus freigegebenen Inhalten |
+| Training | gesperrt, bis die Rechtsgrundlagen-Prüfung dokumentiert ist (Passwort + 2FA); nur pseudonymisierte, einzeln freigegebene Beispiele; nie auf dem Produktivmodell; neue Version erst nach Evaluation und Freigabe durch einen Admin |
+
+**Vor dem Einsatz mit echten Daten (organisatorisch):** Eintrag im Verarbeitungsverzeichnis (Zweck: Erschließung und
+Pflege der Akte, Qualitätssicherung), Datenschutz-Folgenabschätzung (Art. 35 DSGVO – neue Technologie, Gesundheitsdaten),
+Lizenz des Modells prüfen, Information der Mitarbeiter (die Hinweise sind keine Empfehlung), zuständige Person für den
+Datenschutz benennen (laut Entscheidung 14.10.2026 noch offen).

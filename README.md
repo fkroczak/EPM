@@ -26,6 +26,24 @@
   `registry.npmjs.org` (Proxy-Freigabe); ohne Zugang die Images mit `werkzeuge/bauen.sh` auf einem anderen Rechner bauen
   und als `epm-<VERSION>.tar` mit `rollout/05-backend.sh` einspielen.
 
+## KI (Experimentell) (14.10.2026)
+Lokale, offline lauffähige KI für die Akten: liest die Dokumente der Akten nachts (Standard 21:00–07:00) nur lesend,
+erkennt Text (Tesseract/PP-OCR + Vision-Modell Qwen3.5-4B über llama.cpp, nur CPU), strukturiert Metadaten, Laborwerte,
+Infusionspläne, Medikation, Diagnosen und Texte und legt alles in die Prüf-Queue (Menü „KI (Experimentell)“). In die Akte
+kommt nur, was ein Mitarbeiter prüft und bestätigt. Dazu: Hinweise Labor ↔ Infusionsplan (Akte › KI), Berichtsentwürfe
+auf Anforderung, Qualitäts-Dashboard, Modellwechsel mit Evaluation und Rollback (Administration › KI).
+
+```bash
+werkzeuge/ki.sh vorbereiten Q4_K_M Q8_0 --mit-image   # PC mit Internet → epm-ki-modelle-<Datum>.tar
+sudo epm-ki einspielen ~/epm-ki-modelle-<Datum>.tar  # Server: Prüfsummen, Modelle, Image
+sudo epm-ki pruefen                                  # Hardware und Empfehlung
+sudo epm-ki einrichten                               # Secrets, Grenzen, compose.ki.yaml, Container, Modell
+sudo epm-ki benchmark                                # Varianten messen (nachts)
+sudo epm-ki status | aus
+```
+Unter 12 GB RAM / 4 Kernen bleibt der KI-Dienst von selbst aus. Plan: [`docs/KI-ERWEITERUNG-PLAN-2026-10-14.md`](docs/KI-ERWEITERUNG-PLAN-2026-10-14.md),
+Betrieb: [`docs/KI-BETRIEB.md`](docs/KI-BETRIEB.md), API: [`docs/KI-API.md`](docs/KI-API.md), Datenschutz: [`docs/DATENSCHUTZ.md`](docs/DATENSCHUTZ.md) § 7.
+
 ## Server ohne SSH warten (10.10.2026)
 Unter **Administration › Systemverwaltung** stehen Zustand (Ampel) und die häufigen Aufgaben; alles Weitere unter
 Administration › System (Reiter Wartung, Software, Zertifikat, Protokolle) und › Backup. Updates, Neustart, Dienste,

@@ -1,6 +1,8 @@
 # KI (Experimentell) – Verständnis, Annahmen, offene Fragen, Architektur, Plan
 
-Stand 14.10.2026 · Code-Stand `3e69983` · **Nur Planung, noch kein Code.** Die Umsetzung beginnt erst nach Freigabe.
+Stand 15.10.2026 · Planung vom 14.10.2026, Umsetzung freigegeben am 14.10.2026 („mit der Implementierung beginnen, damit
+wir auf der neuen Maschine lokal testen können“). Umsetzungsstand: Abschnitt 9. Betrieb: `docs/KI-BETRIEB.md`, API:
+`docs/KI-API.md`, Datenschutz: `docs/DATENSCHUTZ.md` § 7.
 
 Grundregel für alles Folgende: **Die KI schreibt nie selbst in die Akte.** Sie schlägt vor, ein berechtigter Mitarbeiter
 prüft, korrigiert und übernimmt. Ausschließlich lokale Modelle, kein Netz nach außen, keine Telemetrie.
@@ -332,3 +334,22 @@ Modell einspielen (Datei + SHA-256) → Status „eingespielt“ → Evaluations
 - **Halluzinationen**: kein Feld ohne Beleg im Bild/OCR-Text gilt als sicher; Zahlen werden gegen den OCR-Text
   gegengeprüft; nichts ohne Freigabe in der Akte.
 - **RAM-Konkurrenz** auf 8 GB: harte Grenzen, Tagesmodus entlädt das Modell, Pause bei knappem Speicher.
+
+## 9. Umsetzungsstand (15.10.2026)
+
+Die Ziel-VM mit mehr RAM gibt es noch nicht. Umgesetzt ist alles, was sich ohne sie bauen und prüfen lässt; die
+Messungen mit dem echten Modell stehen aus.
+
+| Phase | Stand |
+|---|---|
+| 0 – Messung | `werkzeuge/ki-pruefen.sh` (Hardware, Empfehlung), `werkzeuge/ki-benchmark.sh` + `manage.py epm_ki_benchmark` (Varianten × Quantisierung: s/Seite, Tokens/s, CER, Labor-F1, RAM-Höchststand, CPU; synthetische und eigene Seiten, großes PDF). **Läufe stehen aus** (neue VM) |
+| 1 – MVP | App `ki` (Datenmodell, Migration), Dienst `epm_ki` mit Nachtfenster, Ressourcensteuerung und Hysterese, Pause bei Sicherung, Tagesschlaf des Modells; Stufe 1 (vorhandene Texterkennung) + Stufe 2 (Qwen3.5 über llama-server, JSON-Schema), Regelprüfung, Prüf-Queue, Prüfansicht mit Original, Markierungen neu/ergänzt/überschreibt/vorhanden/unsicher/niedrige OCR, Korrektur mit Fehlerart, Freigabe, Konfliktentscheidung, bestätigte Übernahme, Ablehnen, Audit; DB-Rolle `epm_ki`; verschlüsselte Zwischendateien; `compose.ki.yaml`, `epm-ki` (vorbereiten, einspielen, einrichten, status, aus) |
+| 2 – Verknüpfung, Berichte | Regelwerk Labor ↔ Infusionsplan (gesichert/wahrscheinlich, Folgewert, Wiederholungen, Dosisänderung), Hinweise in der Akte; Berichtsentwürfe auf Anforderung mit Quellen und Gegenprüfung, Speichern als Bericht-Entwurf; Übernahme historischer Infusionspläne als abgelöste Altsystem-Pläne |
+| 3 – Qualität, Training | Qualitäts-Dashboard, Evaluationsfälle (pseudonymisiert), Evaluationslauf (nachts, Kandidat als Probe), Modell-Registry mit Aktivieren (Passwort + 2FA) und Zurückschalten, Rechtsgrundlagen-Dokumentation, Trainingsfreigabe. **Offen:** der Trainingslauf selbst (LoRA auf CPU) – erst sinnvoll, wenn das Dashboard echten Bedarf zeigt |
+| 4 – Betrieb | `docs/KI-BETRIEB.md` (Einrichten, Betrieb, Modellwahl, Rollback, Fehleranalyse, Backup), `docs/KI-API.md`, Datenschutz § 7 |
+
+Tests: 61 Backend-Tests in `backend/ki/test_*.py` (mit echter Texterkennung und einer Attrappe des Modell-Dienstes),
+Frontend typgeprüft und gebaut. Noch offen: Browsertest der neuen Seiten, Lauf mit echtem Modell auf der neuen VM.
+
+Erste Schritte auf der neuen VM: `docs/KI-BETRIEB.md` Abschnitt 2.
+
