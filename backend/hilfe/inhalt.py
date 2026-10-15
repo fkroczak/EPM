@@ -391,6 +391,11 @@ Patienten ist die Firma vorgewählt, für die gerade gearbeitet wird.</p>
 <p><strong>Neuer Patient</strong> in der Patientenliste öffnet das Formular. Pflicht sind Nachname, Vorname und
 Geburtsdatum; EPM vergibt die Patientennummer selbst und warnt, wenn es eine Akte mit gleichem Namen und Geburtsdatum
 schon gibt.</p>
+<p>Die Warnung <strong>Ähnlicher Patient vorhanden</strong> findet auch andere Schreibweisen (Müller = Mueller,
+René = Rene, Doppelnamen, „von“/„van“ …), kleine Tippfehler, vertauschte Vor- und Nachnamen und ein Geburtsdatum mit
+vertauschtem Tag und Monat; abgeschlossene Akten zählen mit. Unter jedem Treffer steht der Grund. Ist es eine andere
+Person, <strong>Nein, andere Person</strong> wählen – ein Grund ist dafür nicht nötig. Eine eingeschränkte Akte
+erscheint nur als Hinweis ohne Namen.</p>
 <p><strong>Als Testpatient anlegen</strong> (Häkchen oben) legt eine Übungsakte an, z. B. um Infusionspläne
 auszuprobieren: Nummer ab 9001, zählt in keiner Statistik. Testzugänge und Admins legen immer Testpatienten an.</p>
 <p>Gewicht bei Aufnahme, Hausarzt, Versorger, Katheter und Nickelallergie lassen sich gleich mit erfassen.

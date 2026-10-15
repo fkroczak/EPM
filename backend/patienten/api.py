@@ -538,21 +538,59 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
 
     @action(detail=False, methods=["get"])
     def doppelte(self, request):
-        """Mögliche Doppelungen vor dem Anlegen: gleiches Geburtsdatum und ähnlicher Name."""
-        geb = request.query_params.get("geburtsdatum")
+        """Mögliche Doppelungen vor dem Anlegen: gleiches Geburtsdatum und ähnlicher Name.
+
+        Erweitert 16.10.2026 (``patienten/dubletten.py``): Schreibweisen vergleichbar (Umlaute/ß, Akzente, Groß/Klein,
+        Bindestrich/Leerzeichen, Namenszusätze), Vor-/Nachname vertauscht, kleine Tippfehler, gleicher Name mit
+        vertauschtem Tag/Monat. Abgeschlossene Akten zählen mit. Jeder Treffer hat ``grund`` und ``rang`` (exakte zuerst).
+        Vorfilter per Geburtsdatum in der Datenbank, Feinvergleich in Python.
+
+        ``?hinweise=1`` liefert statt der Liste ``{"treffer": [...], "eingeschraenkt": Text|null}``: Gibt es eine
+        passende Akte, deren Verarbeitung eingeschränkt ist (Art. 18 DSGVO) und die diese Person nicht sehen darf,
+        steht dort nur ein Hinweis ohne Namen, Nummer oder sonstige Angaben."""
+        from .dubletten import EINGESCHRAENKT_HINWEIS, GRUND, bewerte, tag_monat_getauscht
+
+        mit_hinweisen = wahr(request.query_params.get("hinweise"))
+        leer = {"treffer": [], "eingeschraenkt": None} if mit_hinweisen else []
         nach = (request.query_params.get("nachname") or "").strip()
         vor = (request.query_params.get("vorname") or "").strip()
-        if not geb:
-            return Response([])
-        qs = self.get_queryset().filter(geburtsdatum=geb)
-        name = Q()
-        if nach:
-            name |= Q(nachname__istartswith=nach[:3])
-        if vor:
-            name |= Q(vorname__istartswith=vor[:3])
-        if name:
-            qs = qs.filter(name)
-        return Response(PatientListSerializer(qs[:10], many=True).data)
+        try:
+            geb = serializers.DateField().to_internal_value(request.query_params.get("geburtsdatum") or "")
+        except serializers.ValidationError:
+            return Response(leer)
+        daten = [geb]
+        getauscht = tag_monat_getauscht(geb)
+        if getauscht is not None:
+            daten.append(getauscht)
+
+        def kandidaten(qs):
+            """(Rang, Patient) aller passenden Akten, jede nur einmal (Firmen-Verknüpfung kann Zeilen doppeln)."""
+            gesehen, treffer = set(), []
+            for p in qs.filter(geburtsdatum__in=daten).order_by("nachname", "vorname", "id"):
+                if p.id in gesehen:
+                    continue
+                gesehen.add(p.id)
+                rang = bewerte(nach, vor, geb, p.nachname, p.vorname, p.geburtsdatum)
+                if rang is not None:
+                    treffer.append((rang, p))
+            return treffer
+
+        # Bereich wie überall (Testpatienten, Firma, eingeschränkte nur mit laufender Einsicht); abgeschlossene Akten
+        # sind darin enthalten – nur die Patientenliste filtert nach Status
+        treffer = sorted(kandidaten(self.get_queryset()), key=lambda t: (t[0], t[1].nachname, t[1].vorname, t[1].id))[:10]
+        zeilen = PatientListSerializer([p for _, p in treffer], many=True).data
+        for zeile, (rang, _) in zip(zeilen, treffer):
+            zeile["grund"] = GRUND[rang]
+            zeile["rang"] = rang
+        if not mit_hinweisen:
+            return Response(zeilen)
+        # eingeschränkte Akten (Art. 18), die diese Person nicht sieht: nur ein Hinweis, keine Angaben zur Akte.
+        # Bereich wie sonst auch (Testpatienten, Firma); gemeldet nur bei gleichem Geburtsdatum und passendem Namen,
+        # der Text nennt aber nur das Geburtsdatum (unklar, ob mehr gesagt werden darf → docs/BACKEND-FUNKTIONEN.md F15)
+        verborgen = patienten_fuer(request.user, eingeschraenkte=True).filter(
+            eingeschraenkt_am__isnull=False, geburtsdatum=geb).exclude(id__in=patienten_fuer(request.user).values("id"))
+        hinweis = EINGESCHRAENKT_HINWEIS if kandidaten(verborgen) else None
+        return Response({"treffer": zeilen, "eingeschraenkt": hinweis})
 
     @action(detail=True, methods=["post"], permission_classes=[AbschlussRecht])
     def abschliessen(self, request, pk=None):

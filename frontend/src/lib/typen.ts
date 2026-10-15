@@ -161,6 +161,10 @@ export type PatientZeile = {
   /** Verarbeitung eingeschränkt (Art. 18 DSGVO): nur sichtbar, solange die eigene Einsicht läuft */
   ist_eingeschraenkt: boolean;
   kennzahlen: Kennzahlen | null;
+  /** Nur Doppelungsprüfung (`patienten/doppelte/`, 16.10.2026): warum die Akte gemeldet wird, z. B. „Vor-/Nachname vertauscht“ */
+  grund?: string;
+  /** Nur Doppelungsprüfung: Rangfolge, 0 = gleicher Name und Geburtsdatum (exakte Treffer zuerst) */
+  rang?: number;
 };
 
 /** Aufbewahrungsfrist einer abgeschlossenen Akte */

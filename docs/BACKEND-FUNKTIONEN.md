@@ -79,7 +79,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F12 | Automatische Abmeldung nach 30 Minuten | alle | ABGESCHLOSSEN UND GETESTET |
 | F13 | Startseite mit Kennzahlenleiste und Kacheln (S01, S03, S06–S10) | 2 Start | ABGESCHLOSSEN UND GETESTET |
 | F14 | Patientenliste mit Filtern und Suche (Spalten je Bildschirmbreite, Vorschau ab 2560 px) | 3 Patientenliste | ABGESCHLOSSEN UND GETESTET |
-| F15 | Doppelprüfung beim Anlegen | 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
+| F15 | Doppelprüfung beim Anlegen (16.10.2026: Schreibweisen, vertauschte Namen, Tippfehler, Tag/Monat, Grund je Treffer) | 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET (Erweiterung 16.10.2026: Lauf steht aus) |
 | F16 | Patient anlegen | 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
 | F17 | Akte lesen mit Patientenkopf | 4 Patientenakte | ABGESCHLOSSEN UND GETESTET |
 | F18 | Stammdaten, Diagnose, Therapie, Empfehlung ändern | 4 Akte, 5 Diagnose und Therapie | ABGESCHLOSSEN UND GETESTET |
@@ -533,8 +533,48 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 ### F15 Doppelprüfung beim Anlegen
 - **Endpunkt:** `GET /api/patienten/doppelte/?geburtsdatum=JJJJ-MM-TT&nachname=&vorname=` → bis zu 10 Einträge wie F14
 - **Regel:** gleiches Geburtsdatum und Nach- oder Vorname beginnt mit denselben 3 Buchstaben.
+- **Erweiterung 16.10.2026** (`patienten/dubletten.py`, `PatientViewSet.doppelte`): Vorfilter in der Datenbank nur über das
+  Geburtsdatum (und das Datum mit vertauschtem Tag/Monat), Feinvergleich in Python – keine Datenbank-Erweiterung
+  (`unaccent` ist in den Migrationen nicht eingerichtet). Namen werden vergleichbar gemacht: klein, ä/ö/ü/ß → ae/oe/ue/ss,
+  Akzente entfernt (é → e), Apostrophe weg, Bindestrich/Leerzeichen trennen Namensteile, führende Namenszusätze
+  (von, van, de, der, zu …) fallen weg. Gemeldet wird, mit Rang (kleiner zuerst) und Grund im neuen Feld `grund`
+  (dazu `rang`):
+
+  | Rang | `grund` | Bedingung |
+  |---|---|---|
+  | 0 | gleicher Name und Geburtsdatum | Vor- und Nachname wörtlich gleich (Groß/Klein egal) |
+  | 1 | gleicher Name (andere Schreibweise) und Geburtsdatum | vergleichbare Schreibweise gleich („Mueller“ = „Müller“, „Bergen“ = „von Bergen“) |
+  | 2 | Vor-/Nachname vertauscht | Vor- und Nachname über Kreuz gleich (auch mit kleinem Tippfehler) |
+  | 3 | Tag/Monat vertauscht | vollständiger Name gleich, Geburtsdatum mit vertauschtem Tag und Monat (03.07. statt 07.03.) |
+  | 4 | ähnliche Schreibweise | Nach- oder Vorname mit Levenshtein-Abstand ≤ 1 (ab 8 Zeichen ≤ 2; unter 4 Zeichen nur gleich) oder ein Teil eines Doppelnamens gleich/fast gleich („Mueller“ findet „Müller-Lüdenscheidt“) |
+  | 5 | gleiches Geburtsdatum, Name beginnt gleich | bisherige Regel (3 Buchstaben), auf die vergleichbare und die wörtliche Schreibweise |
+  | 6 | gleiches Geburtsdatum | ohne Namensangabe (wie bisher) |
+
+  Höchstens 10 Treffer. **Bereich** wie bisher über `get_queryset()` → `patienten_fuer`: Testpatienten je nach Konto
+  (Testzugang nur Testpatienten, ohne „Testdaten sehen“ keine), nur Akten der aktiven Firma; **abgeschlossene Akten
+  zählen mit** (sie waren schon enthalten – nur die Patientenliste filtert nach Status) und tragen `ist_abgeschlossen`.
+  **Eingeschränkte Akten (Art. 18 DSGVO)** erscheinen nie mit Angaben, außer bei laufender eigener Einsicht. Mit
+  `?hinweise=1` lautet die Antwort `{"treffer": [...], "eingeschraenkt": "Es gibt eine eingeschränkte Akte mit gleichem
+  Geburtsdatum." | null}` – der Hinweis kommt, wenn eine für die Person verborgene eingeschränkte Akte (im Bereich
+  `patienten_fuer(user, eingeschraenkte=True)`) gleiches Geburtsdatum und einen passenden Namen (Rang 0–6) hat; er
+  enthält weder Name noch Nummer noch Kennung. Ohne `hinweise` bleibt die Antwort eine Liste (bisheriger Vertrag, nur um
+  `grund`/`rang` erweitert). Ungültiges oder fehlendes Geburtsdatum → leere Antwort (vorher Fehler bei ungültigem Datum
+  möglich).
+- **Oberfläche:** Neuer Patient fragt mit `hinweise=1`; die Warnkarte (`data-testid="doppelung"`) zeigt je Treffer den
+  Grund (`doppelung-grund`) und ggf. den Hinweis auf eine eingeschränkte Akte (`doppelung-eingeschraenkt`). Die Warnung
+  bleibt übergehbar („Nein, andere Person“) – auch der Hinweis auf die eingeschränkte Akte.
+- **Festlegung 16.10.2026 (vorher offener Punkt):** Beim Übergehen der Warnung wird **kein Grund** verlangt.
+- **Offen / zu klären:** ob der Hinweis auf eine eingeschränkte Akte (Art. 18) überhaupt erscheinen darf – er verrät,
+  dass zu diesem Geburtsdatum (und einem ähnlichen Namen) eine eingeschränkte Akte existiert; umgesetzt ist der Hinweis
+  ohne Details, wie beauftragt. Ebenfalls offen: ob die Toleranzen (Abstand, Liste der Namenszusätze) in der Praxis zu
+  viele Treffer liefern.
 - **Teststatus:** Backend-Test grün (`test_doppelte`). Browsertest grün: `patienten.spec.ts` „Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme“ (Hinweis auf Musterfrau, Erika; „Nein, andere Person“).
-- **Status:** ABGESCHLOSSEN UND GETESTET
+  Neu 16.10.2026: Backend-Tests `patienten.test_dubletten` (Normalisierung, Abstand, Rang; API: bisheriger Vertrag,
+  Umlaute/Doppelname, exakte zuerst, vertauscht, Tippfehler, Tag/Monat, abgeschlossene Akte mit Namenszusatz,
+  eingeschränkte Akte ohne Angaben bzw. mit Einsicht, Testpatienten im Bereich); Browsertest im selben Test um Grund,
+  Umlaut-/Doppelnamen-Fall und vertauschte Namen erweitert. **Lauf steht aus** (beides in der Entwicklungsumgebung nicht
+  ausführbar; nur Syntax geprüft).
+- **Status:** ABGESCHLOSSEN UND GETESTET (Erweiterung 16.10.2026: ABGESCHLOSSEN – Lauf steht aus)
 
 ### F16 Patient anlegen
 - **Ansicht:** 12 Neuer Patient
