@@ -40,7 +40,7 @@ install -d -m 0770 -o "$EPM_APP_UID" -g 101 "$B/system/upload"
 chown "$EPM_APP_UID:101" "$B/system/upload"; chmod 0770 "$B/system/upload"
 
 echo "==> Projektdateien kopieren"
-install -m 0644 projekt/compose.yaml projekt/compose.smoke.yaml "$B/"
+install -m 0644 projekt/compose.yaml projekt/compose.smoke.yaml projekt/compose.ki.yaml "$B/"
 install -m 0644 projekt/nginx/rauchtest.conf projekt/nginx/epm.conf "$B/nginx/"
 # neu anlegen nur ohne Datei oder bei einer sehr alten (ohne EPM_DJANGO_ADMIN und ohne Markierung des Schalters)
 if [[ ! -f "$B/backend.env" ]] || ! grep -qE "^EPM_DJANGO_ADMIN=|^# epm: verwaltung-schalter" "$B/backend.env"; then

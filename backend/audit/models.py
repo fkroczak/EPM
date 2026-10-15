@@ -54,6 +54,9 @@ class SystemEreignis(models.Model):
         PROTOKOLL_BEREINIGT = "protokoll_bereinigt", "Audit-Log bereinigt"
         # Scans und Texterkennung (Festlegung 08.10.2026, F160 ff.)
         SCAN = "scan", "Scan"
+        # KI (Experimentell, 14.10.2026): Verarbeitung (mit Modell und Version), Prüfung, Korrektur, Übernahme,
+        # Ablehnung, Berichtsentwurf, Einstellungen, Modellwechsel – die Aktion steht in ``details["aktion"]``
+        KI = "ki", "KI (Experimentell)"
 
     zeitpunkt = models.DateTimeField(auto_now_add=True, db_index=True)
     art = models.CharField(max_length=40, choices=Art.choices, db_index=True)

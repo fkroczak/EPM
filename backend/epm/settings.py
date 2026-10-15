@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     "altimport",
     "hilfe",
     "scans",
+    "ki",  # KI (Experimentell): lokale Erkennung, Strukturierung, Prüf-Queue (14.10.2026)
 ]
 INSTALLED_APPS.insert(0, "django.contrib.admin")
 
@@ -162,6 +163,16 @@ EPM_UPLOAD_MAX_MB = int(env("EPM_UPLOAD_MAX_MB", "50"))
 # Dokumenten der Akten. Backend (Hochladen, Zuordnen) und OCR-Dienst (Erkennen) teilen sich das Verzeichnis.
 EPM_SCANS = Path(env("EPM_SCANS", str(EPM_DOKUMENTE.parent / "scans")))
 EPM_SCANS_MAX_SEITEN = int(env("EPM_SCANS_MAX_SEITEN", "50"))
+# KI (Experimentell, 14.10.2026): Arbeitsablage des KI-Dienstes (verschlüsselte Zwischendateien, nie die Originale),
+# Adresse des lokalen Modell-Dienstes (llama-server im Netz „intern“) und erlaubte Rechnernamen – eine andere Adresse
+# wird abgewiesen, damit nie etwas den Server verlässt (ki/modell.py).
+EPM_KI = Path(env("EPM_KI", str(EPM_DOKUMENTE.parent / "ki")))
+EPM_KI_MODELL_URL = env("EPM_KI_MODELL_URL", "")
+EPM_KI_ERLAUBTE_HOSTS = [h.strip() for h in env("EPM_KI_ERLAUBTE_HOSTS", "ki-modell,epm-ki-bench,localhost,127.0.0.1").split(",")
+                         if h.strip()]
+EPM_KI_SCHLUESSEL_FILE = env("EPM_KI_SCHLUESSEL_FILE", "")
+# Modelldateien (nur lesend; offline eingespielt mit `epm-ki einspielen`) – das Backend prüft daran die SHA-256
+EPM_KI_MODELLE = Path(env("EPM_KI_MODELLE", "/data/ki-modelle"))
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 FILE_UPLOAD_TEMP_DIR = env("EPM_UPLOAD_TMP", "/tmp")

@@ -144,6 +144,14 @@ AKTIONEN = {
     # Selbstheilung (13.10.2026)
     "version_bestaetigen": ("Als gute Version bestätigen", False),
     "heilung_schalten": ("Selbstheilung ein- oder ausschalten", False),
+    # KI (Experimentell, 15.10.2026): Einrichtung und Modelle aus der Oberfläche (Administration › KI)
+    "ki_modelle": ("KI-Modelle einspielen", False),
+    "ki_modell_laden": ("KI-Modell laden", False),
+    "ki_modell_loeschen": ("KI-Modell löschen", False),
+    "ki_einrichten": ("KI einrichten bzw. starten", False),
+    "ki_aus": ("KI ausschalten", False),
+    "ki_grenzen": ("Grenzen der KI festlegen", False),
+    "ki_benchmark": ("KI-Benchmark", False),
 }
 # Aktionen, die Sicherungen schreiben, übertragen oder zurückspielen – und das Leeren der Datenbank, das nur den
 # EPM-Stack betrifft: mit --sicherung-echt auch im Probelauf echt (Browsertests gegen den echten Stack)
@@ -160,6 +168,7 @@ VORHER_ART = {"updates_installieren": "vor_update", "server_neustart": "vor_aend
 EPM_UPDATE = "/usr/local/sbin/epm-update"
 EPM_ZERTIFIKAT = "/usr/local/sbin/epm-zertifikat"
 EPM_OCR_MODELLE = "/usr/local/sbin/epm-ocr-modelle"
+EPM_KI = "/usr/local/sbin/epm-ki"
 CA_ORDNER = "/etc/epm/ca"
 LOESCHEN_MAX = 200                # Sicherungen je Auftrag „Sicherungen löschen“
 TAG_MUSTER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40}$")
@@ -199,6 +208,22 @@ PEM_MAX = 20000                   # Zeichen je PEM-Datei beim Zertifikat-Import
 # nur Dateien und Ordner – keine Verweise, keine absoluten Pfade, kein „..“
 PAKET_INHALT = re.compile(r"^(TAG|VERSION|SHA256SUMS|images\.tar|(rollout|werkzeuge)(/[A-Za-z0-9._+-]+)*)$")
 OCR_INHALT = re.compile(r"^(modelle\.json|dateien(/[A-Za-z0-9._+-]+)*)$")
+# KI (Experimentell): Modell-Paket von „epm-ki vorbereiten“ – nur Dateien ohne Unterordner
+KI_INHALT = re.compile(r"^[A-Za-z0-9._+-]{1,200}$")
+KI_DATEI = re.compile(r"^[A-Za-z0-9._-]{1,200}\.gguf$")
+# Modelle, die der Server selbst laden darf (nur mit EPM_KI_DOWNLOAD="1" bzw. auf der Test-VM): feste Liste, nie eine
+# frei eingegebene Adresse. Dieselbe Liste steht in backend/ki/katalog.py. Geladen wird vom Systemagenten (Host), nie
+# von den KI-Containern – die bleiben ohne Weg nach außen.
+KI_KATALOG = {
+    "qwen3.5-2b-q4": ("bartowski/Qwen_Qwen3.5-2B-GGUF", "Q4_K_M"),
+    "qwen3.5-2b-q8": ("bartowski/Qwen_Qwen3.5-2B-GGUF", "Q8_0"),
+    "qwen3.5-4b-q4": ("bartowski/Qwen_Qwen3.5-4B-GGUF", "Q4_K_M"),
+    "qwen3.5-4b-q8": ("bartowski/Qwen_Qwen3.5-4B-GGUF", "Q8_0"),
+    "qwen3.5-9b-q4": ("bartowski/Qwen_Qwen3.5-9B-GGUF", "Q4_K_M"),
+}
+# Grenzen in .env: Name -> (Muster, kleinster, größter Wert) – Speicher in GB („8g“), sonst Zahl
+KI_GRENZEN = {"KI_SPEICHER": ("g", 2, 256), "KI_WORKER_SPEICHER": ("g", 1, 64), "KI_THREADS": ("", 1, 256),
+              "KI_WORKER_MAX": ("", 1, 16)}
 # Zeitplan der nächtlichen Sicherung (Drop-in für epm-backup.timer): Uhrzeit HH:MM, nur diese Wochentag-Muster
 ZEITPLAN_TAGE = {"taeglich": "*-*-*", "werktags": "Mon..Fri *-*-*"}
 ZEITPLAN_STANDARD = {"uhrzeit": "02:00", "tage": "taeglich"}
@@ -966,6 +991,7 @@ class Agent:
             "journal": self.journal(),
             "image_dateien": self.image_dateien(),
             "notfall": self.notfall_stand(),
+            "ki": self.ki_stand_sicher(),
             "zugang": zugang,
             "heilung": heilung,
             "protokolle":[{"quelle": q, "name": n} for q, n in PROTOKOLLE.items()],
@@ -2370,6 +2396,9 @@ class Agent:
         if aktion == "ocr_modelle":
             return self.ocr_einspielen(parameter.get("upload"), zeile, simuliert=t)
 
+        if aktion.startswith("ki_"):
+            return self.ki_aktion(aktion, parameter, zeile, simuliert=t)
+
         if aktion == "sicherung_zeitplan":
             return self.zeitplan_setzen(parameter.get("uhrzeit"), parameter.get("tage"), zeile, simuliert=t)
 
@@ -2746,6 +2775,167 @@ class Agent:
                 os.unlink(pfad)
             except OSError:
                 pass
+
+    # ------------------------------------------------------------ KI (Experimentell, 15.10.2026)
+    def ki_stand_sicher(self):
+        try:
+            return self.ki_stand()
+        except Exception as e:  # noqa: BLE001 – der Status soll trotzdem stehen
+            return {"fehler": str(e)[:200]}
+
+    def ki_download_erlaubt(self):
+        """Modelle direkt laden nur, wo der Server ohnehin ins Netz darf: Test-VM (Updates per git) oder ausdrücklich
+        EPM_KI_DOWNLOAD="1" in epm.conf. Der VPS ohne Internet bekommt Modelle als hochgeladenes Paket."""
+        konf = lese_konf()
+        if konf.get("EPM_KI_DOWNLOAD") in ("0", "1"):
+            return konf["EPM_KI_DOWNLOAD"] == "1"
+        return (konf.get("EPM_UPDATE_QUELLE") or "git") == "git"
+
+    def ki_stand(self):
+        """Für Administration › KI: eingerichtet?, Modelldateien, Varianten, Grenzen, AVX2, Benchmarks."""
+        vorrat = os.path.join(self.basis, "ki-modelle")
+        dateien = []
+        try:
+            for n in sorted(os.listdir(vorrat)):
+                if KI_DATEI.match(n):
+                    info = os.lstat(os.path.join(vorrat, n))
+                    if stat.S_ISREG(info.st_mode):
+                        dateien.append({"datei": n, "groesse": info.st_size})
+        except OSError:
+            pass
+        varianten, v = [], {}
+        try:
+            with open(os.path.join(vorrat, "MODELLE.txt"), encoding="utf-8") as f:
+                for z in f.read().splitlines() + [""]:
+                    if not z.strip():
+                        if v.get("DATEI"):
+                            varianten.append({k.lower(): w for k, w in v.items()})
+                        v = {}
+                    elif "=" in z:
+                        k, w = z.split("=", 1)
+                        if k in ("NAME", "DATEI", "PROJEKTOR", "QUANT"):
+                            v[k] = w.strip()[:200]
+        except OSError:
+            pass
+        env = self.env_lesen()
+        aktiv = ""
+        try:
+            with open(os.path.join(self.basis, "data", "ki", "modell", "aktiv.env"), encoding="utf-8") as f:
+                aktiv = next((z.split("=", 1)[1].strip() for z in f if z.startswith("DATEI=")), "")
+        except OSError:
+            pass
+        avx2 = False
+        try:
+            with open("/proc/cpuinfo", encoding="utf-8") as f:
+                avx2 = " avx2" in next((z for z in f if z.startswith("flags")), "")
+        except OSError:
+            pass
+        benchmarks = []
+        try:
+            ordner = os.path.join(self.basis, "data", "ki")
+            benchmarks = sorted((n for n in os.listdir(ordner) if re.match(r"^benchmark-\d{8}-\d{4}\.json$", n)),
+                                reverse=True)[:10]
+        except OSError:
+            pass
+        return {"eingerichtet": os.path.exists(os.path.join(self.basis, "ki-aktiv")),
+                "werkzeug": os.path.exists(EPM_KI), "download_erlaubt": self.ki_download_erlaubt(),
+                "modelle": dateien, "varianten": varianten,
+                "aktiv_datei": aktiv or env.get("KI_MODELL_DATEI", ""),
+                "image_tag": env.get("KI_MODELL_IMAGE_TAG", ""),
+                "grenzen": {k: env.get(k, "") for k in KI_GRENZEN}, "avx2": avx2, "benchmarks": benchmarks}
+
+    def ki_aktion(self, aktion, parameter, zeile, simuliert=False):
+        if aktion == "ki_modelle":
+            return self.ki_einspielen(parameter.get("upload"), zeile, simuliert=simuliert)
+        if aktion == "ki_grenzen":
+            return self.ki_grenzen(parameter, zeile, simuliert=simuliert)
+        args, zeitlimit, text = None, 3600, ""
+        if aktion == "ki_modell_laden":
+            variante = parameter.get("variante")
+            if variante not in KI_KATALOG:
+                return 2, "Unbekannte Modellvariante."
+            if not self.ki_download_erlaubt():
+                return 2, ("Dieser Server lädt keine Modelle aus dem Internet (VPS ohne Internet). Bitte das Modell-Paket "
+                           "auf einem PC vorbereiten (werkzeuge/ki.sh vorbereiten) und hier hochladen.")
+            repo, quant = KI_KATALOG[variante]
+            args, zeitlimit, text = [EPM_KI, "laden", repo, quant], 6 * 3600, f"{repo} {quant} geladen und eingespielt."
+        elif aktion == "ki_modell_loeschen":
+            datei = parameter.get("datei")
+            if not isinstance(datei, str) or not KI_DATEI.match(datei):
+                return 2, "Unbekannte Modelldatei."
+            args, zeitlimit, text = [EPM_KI, "loeschen", datei], 300, f"{datei} gelöscht."
+        elif aktion == "ki_einrichten":
+            args, zeitlimit, text = [EPM_KI, "einrichten"], 3600, "KI eingerichtet und gestartet."
+        elif aktion == "ki_aus":
+            args, zeitlimit, text = [EPM_KI, "aus"], 600, "KI ausgeschaltet (Daten bleiben)."
+        elif aktion == "ki_benchmark":
+            args = [EPM_KI, "benchmark"] + (["--eigene"] if parameter.get("eigene") is True else [])
+            zeitlimit, text = 10 * 3600, "Benchmark fertig – Ergebnis unter Administration › KI."
+        if args is None:
+            return 2, "Unbekannte Aktion."
+        if not os.path.exists(EPM_KI):
+            return 2, "Auf diesem Server ist „epm-ki“ nicht eingerichtet (kommt mit „EPM aktualisieren“)."
+        if simuliert:
+            zeile(f"\n(Probelauf) {' '.join(args)}\n")
+            return 0, "Probelauf: nichts verändert."
+        rc = self.schritt("KI", args, zeile, cwd=self.basis, zeitlimit=zeitlimit, eingabe="")
+        return (0, text) if rc == 0 else (rc, "Fehlgeschlagen – Ausgabe prüfen.")
+
+    def ki_einspielen(self, kennung, zeile, simuliert=False):
+        """Modell-Paket (werkzeuge/ki.sh vorbereiten) statt scp hochgeladen: Inhalt prüfen, an „epm-ki einspielen“
+        übergeben (prüft die Prüfsummen, legt die Modelle ab, lädt das Image, registriert neue Varianten)."""
+        pfad, info, fehler = self.upload_uebernehmen(kennung, "ki", zeile)
+        if fehler:
+            return 2, fehler
+        try:
+            fehler, namen, _tag = self.tar_pruefen(pfad, KI_INHALT)
+            if fehler:
+                return 1, f"Das ist kein Modell-Paket für die KI ({fehler}). Nichts eingespielt."
+            if not {"SHA256SUMS", "MODELLE.txt"} <= namen or not any(n.endswith(".gguf") for n in namen):
+                return 1, "Das Modell-Paket ist unvollständig (Prüfsummen, MODELLE.txt oder Modelle fehlen)."
+            zeile(f"SHA-256 der Datei: {info['sha256']}\n")
+            if simuliert:
+                zeile(f"\n(Probelauf) {EPM_KI} einspielen …\n")
+                return 0, "Probelauf: Modell-Paket geprüft, nicht eingespielt."
+            if not os.path.exists(EPM_KI):
+                return 2, "Auf diesem Server ist „epm-ki“ nicht eingerichtet (kommt mit „EPM aktualisieren“)."
+            rc = self.schritt("KI-Modelle", [EPM_KI, "einspielen", pfad], zeile, cwd=self.basis, zeitlimit=3 * 3600,
+                              eingabe="")
+            return (0, "KI-Modelle eingespielt.") if rc == 0 else \
+                (rc, "Einspielen fehlgeschlagen – Ausgabe prüfen (Prüfsummen, freier Speicher).")
+        finally:
+            try:
+                os.unlink(pfad)
+            except OSError:
+                pass
+
+    def ki_grenzen(self, parameter, zeile, simuliert=False):
+        """Speichergrenzen, Rechenkerne und Worker der KI in .env; laufende KI-Container werden neu erstellt."""
+        neu = {}
+        for name, (einheit, unten, oben) in KI_GRENZEN.items():
+            wert = parameter.get(name)
+            if wert in (None, ""):
+                continue
+            text = str(wert).strip().lower()
+            zahl = text[:-1] if einheit and text.endswith(einheit) else text
+            if not zahl.isdigit() or not (unten <= int(zahl) <= oben):
+                return 2, f"{name}: erlaubt {unten}–{oben}{einheit}."
+            neu[name] = f"{int(zahl)}{einheit}"
+        if not neu:
+            return 2, "Keine Werte angegeben."
+        for name, wert in neu.items():
+            zeile(f"{name}={wert}\n")
+        if simuliert:
+            return 0, "Probelauf: Grenzen nicht gespeichert."
+        for name, wert in neu.items():
+            self.env_setzen(name, wert)
+        if os.path.exists(os.path.join(self.basis, "ki-aktiv")):
+            rc = self.schritt("KI neu starten", self.compose("up", "-d", "ki-modell", "ki-worker"), zeile,
+                              cwd=self.basis, zeitlimit=600)
+            if rc != 0:
+                return rc, "Grenzen gespeichert, Neustart der KI-Container fehlgeschlagen – Ausgabe prüfen."
+        return 0, "Grenzen gespeichert" + (" und KI-Container neu gestartet." if os.path.exists(
+            os.path.join(self.basis, "ki-aktiv")) else ".")
 
     def protokoll_abrufen(self, quelle, zeilen, auftrag_id, zeile):
         """Letzte Zeilen eines Protokolls (nur lesend, auch im Probelauf echt) in ``status/protokolle/<Auftrag>.log``

@@ -1,0 +1,131 @@
+# EPM – KI (Experimentell, 14.10.2026): lokales Vision-/Sprachmodell und KI-Dienst. Nur zusammen mit compose.yaml:
+#   in .env  COMPOSE_FILE=compose.yaml:compose.ki.yaml      (schreibt `sudo epm-ki einrichten`, `epm-ki aus` nimmt es heraus)
+# Ohne diese Datei läuft EPM unverändert. Alles bleibt im Netz „intern“ (internal: true) – kein Weg nach außen.
+#
+# Ressourcenschutz: harte Speichergrenzen ohne Swap, niedrige CPU-Anteile (cpu_shares) und niedrige Priorität (nice).
+# Datenbank, Backend und Webserver haben im Zweifel Vorrang. Grenzen in .env (setzt `epm-ki einrichten` nach Hardware):
+#   KI_SPEICHER (Modell-Container), KI_THREADS (Rechenkerne des Modells), KI_WORKER_SPEICHER (KI-Dienst)
+services:
+  backend:
+    # Backend: Stand des KI-Dienstes lesen, beim Modellwechsel aktiv.json schreiben, Prüfsumme der Modelldateien
+    environment:
+      EPM_KI: /data/ki
+      EPM_KI_MODELLE: /data/ki-modelle
+    volumes:
+      - ./data/ki:/data/ki
+      - ./ki-modelle:/data/ki-modelle:ro
+
+  ki-init:
+    # einmalig je Start: Datenbank-Rolle epm_ki anlegen bzw. Rechte nachziehen (nur KI-Tabellen schreiben)
+    image: epm-backend:${EPM_VERSION}
+    command: ["python", "manage.py", "epm_ki_dbrolle"]
+    restart: "no"
+    depends_on:
+      backend: { condition: service_healthy }   # Migrationen sind durch (Healthcheck aus dem Image)
+      db: { condition: service_healthy }
+    user: "10001:101"
+    env_file: backend.env
+    environment:
+      DB_HOST: db
+      DB_NAME: epm
+      DB_USER: epm
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
+      EPM_KI_DB_PASSWORD_FILE: /run/secrets/ki_db_password
+      TZ: Europe/Berlin
+    secrets: [db_password, django_secret_key, ki_db_password]
+    networks: [intern]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  ki-modell:
+    # llama.cpp (llama-server) mit Qwen3.5 – nur CPU. Das Startskript wählt das Modell (aktiv.json, probe.json),
+    # prüft die SHA-256, startet bei einem Wechsel neu und gibt tagsüber ohne Arbeit den Speicher frei (schlafen).
+    image: epm-ki-modell:${KI_MODELL_IMAGE_TAG:-lokal}
+    restart: unless-stopped
+    environment:
+      KI_THREADS: ${KI_THREADS:-4}
+      KI_KONTEXT: ${KI_KONTEXT:-16384}
+      KI_SLOTS: ${KI_SLOTS:-1}
+      KI_MODELL_DATEI: ${KI_MODELL_DATEI:-}
+      KI_PROJEKTOR_DATEI: ${KI_PROJEKTOR_DATEI:-}
+      KI_MODELL_SHA256: ${KI_MODELL_SHA256:-}
+      KI_LLAMA_ARGS: ${KI_LLAMA_ARGS:-}
+      TZ: Europe/Berlin
+    volumes:
+      - ./ki-modelle:/modelle:ro
+      - ./data/ki/modell:/steuerung:ro
+    networks: [intern]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: ${KI_SPEICHER:-8g}
+    memswap_limit: ${KI_SPEICHER:-8g}
+    cpu_shares: 256
+    healthcheck:
+      # das Startskript lebt (auch während das Modell tagsüber schläft)
+      test: ["CMD-SHELL", "test $$(( $$(date +%s) - $$(stat -c %Y /tmp/ki-modell-lebt) )) -lt 120"]
+      interval: 60s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+  ki-worker:
+    # KI-Dienst (gleiches Image wie das Backend): liest die Dokumente der Akten NUR LESEND, schreibt mit der
+    # Datenbank-Rolle epm_ki nur in die KI-Tabellen – nie in die Akte.
+    image: epm-backend:${EPM_VERSION}
+    command: ["ki"]
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+      ki-init: { condition: service_completed_successfully }
+    user: "10001:101"
+    env_file: backend.env
+    environment:
+      DB_HOST: db
+      DB_NAME: epm
+      DB_USER: epm_ki
+      DB_PASSWORD_FILE: /run/secrets/ki_db_password
+      DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
+      EPM_DOKUMENTE: /data/dokumente
+      EPM_SCANS: /data/scans
+      EPM_SYSTEM: /data/system
+      EPM_KI: /data/ki
+      EPM_KI_MODELL_URL: http://ki-modell:8080
+      EPM_KI_SCHLUESSEL_FILE: /run/secrets/ki_schluessel
+      EPM_OCR_THREADS: ${EPM_OCR_THREADS:-2}
+      KI_WORKER_MAX: ${KI_WORKER_MAX:-2}
+      KI_MIN_RAM_GB: ${KI_MIN_RAM_GB:-12}
+      KI_MIN_KERNE: ${KI_MIN_KERNE:-4}
+      KI_NICE: ${KI_NICE:-15}
+      KI_MODELL_TAGSUEBER_ENTLADEN: ${KI_MODELL_TAGSUEBER_ENTLADEN:-1}
+      EPM_VERSION: ${EPM_VERSION}
+      TZ: Europe/Berlin
+    secrets: [ki_db_password, django_secret_key, ki_schluessel]
+    volumes:
+      - ./data/dokumente:/data/dokumente:ro
+      - ./data/ki:/data/ki
+      - ./system/status:/data/system/status:ro
+    networks: [intern]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: ${KI_WORKER_SPEICHER:-3g}
+    memswap_limit: ${KI_WORKER_SPEICHER:-3g}
+    cpu_shares: 256
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time()-os.path.getmtime('/tmp/epm-ki-lebt') < 300 else 1)"]
+      interval: 60s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+
+secrets:
+  ki_db_password:
+    file: ./secrets/ki_db_password
+  ki_schluessel:
+    file: ./secrets/ki_schluessel

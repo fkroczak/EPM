@@ -46,7 +46,7 @@ class LaborbefundSerializer(FirmaFeld, ModelClean, _PatientFest, serializers.Mod
 
     class Meta:
         model = Laborbefund
-        fields = ["id", "patient", "patient_name", "abgenommen_am", "labor", "beurteilung", "dokument", "werte",
+        fields = ["id", "patient", "patient_name", "abgenommen_am", "abgenommen_um", "labor", "beurteilung", "dokument", "werte",
                   "anzahl_werte", "erfasst_am", "erfasst_von_name"]
         read_only_fields = ["erfasst_am"]
 

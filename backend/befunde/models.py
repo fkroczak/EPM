@@ -26,6 +26,8 @@ class Laborbefund(AktenEintrag):
 
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="laborbefunde")
     abgenommen_am = models.DateField("Abnahme am", default=timezone.localdate)
+    # Uhrzeit der Entnahme (14.10.2026, KI-Verknüpfung mit Infusionsplänen): optional, oft nicht dokumentiert
+    abgenommen_um = models.TimeField("Abnahme um", null=True, blank=True)
     labor = models.CharField(max_length=150, blank=True, help_text="z. B. „Labor Dr. Wagner“ oder die Klinik")
     beurteilung = models.TextField("Zusammenfassung / Beurteilung", blank=True)
     dokument = models.ForeignKey(

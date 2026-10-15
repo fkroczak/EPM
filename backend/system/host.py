@@ -171,6 +171,36 @@ AKTIONEN = {
         "beschreibung": "Offline vorbereitete Modelle der zweiten Texterkennung prüfen und ablegen (sudo epm-ocr-modelle "
                         "einspielen); das nächste „EPM aktualisieren“ baut sie ins Image.",
     },
+    # ---- KI (Experimentell, 15.10.2026): Einrichtung und Modelle aus Administration › KI (Recht „KI verwalten“)
+    "ki_modelle": {
+        "name": "KI-Modelle einspielen", "bestaetigung": "2fa", "intern": True, "recht": "ki_verwalten",
+        "beschreibung": "Hochgeladenes Modell-Paket prüfen (Prüfsummen) und ablegen (epm-ki einspielen).",
+    },
+    "ki_modell_laden": {
+        "name": "KI-Modell laden", "bestaetigung": "2fa", "intern": True, "recht": "ki_verwalten",
+        "beschreibung": "Modell aus der festen Liste direkt auf den Server laden und einspielen – nur Test-VM bzw. "
+                        "EPM_KI_DOWNLOAD=1 (epm-ki laden).",
+    },
+    "ki_modell_loeschen": {
+        "name": "KI-Modell löschen", "bestaetigung": "2fa", "intern": True, "recht": "ki_verwalten",
+        "beschreibung": "Eingespielte Modelldatei löschen (nie die aktive).",
+    },
+    "ki_einrichten": {
+        "name": "KI einrichten bzw. starten", "bestaetigung": "2fa", "intern": True, "recht": "ki_verwalten",
+        "beschreibung": "Secrets, Ordner, Grenzen nach Hardware, Container starten, Modelle registrieren (epm-ki einrichten).",
+    },
+    "ki_aus": {
+        "name": "KI ausschalten", "bestaetigung": "2fa", "intern": True, "recht": "ki_verwalten",
+        "beschreibung": "KI-Container stoppen und aus der Konfiguration nehmen; Daten bleiben (epm-ki aus).",
+    },
+    "ki_grenzen": {
+        "name": "Grenzen der KI festlegen", "bestaetigung": "einfach", "intern": True, "recht": "ki_verwalten",
+        "beschreibung": "Speichergrenzen, Rechenkerne und Worker der KI in .env; laufende KI-Container starten neu.",
+    },
+    "ki_benchmark": {
+        "name": "KI-Benchmark", "bestaetigung": "einfach", "intern": True, "recht": "ki_verwalten",
+        "beschreibung": "Alle eingespielten Modellvarianten messen (Qualität, Zeit, Speicher) – lastet die CPU voll aus.",
+    },
     "protokoll": {
         "name": "Protokoll abrufen", "bestaetigung": "keine", "intern": True, "mehrfach": True,
         "beschreibung": "Letzte Zeilen eines Protokolls (Container, Systemagent, Sicherung, Update) – nur lesend.",

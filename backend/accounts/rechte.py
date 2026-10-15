@@ -19,6 +19,10 @@ Festlegungen vom 01.10.2026:
 - Festlegung 08.10.2026 (Scans, F160): Menüpunkt „Scans“ mit eigenem Recht – Standard Mitarbeiter, Mitarbeiter
   (erweitert), Mediziner und Admin; Betrachter nicht (nicht zugeordnete Scans enthalten Patientendaten). Zuordnen
   verlangt zusätzlich „Einträge erfassen“ für die Akte (Admins wie überall nur bei Testpatienten).
+- Festlegung 14.10.2026 (KI (Experimentell)): Jeder Mitarbeiter darf KI-Ergebnisse ansehen, prüfen und in die Akte
+  übernehmen – jeweils in seiner Firma (DSKM nur DSKM, RGC nur RGC); übernehmen verlangt zusätzlich das Recht der Akte
+  (z. B. „Einträge erfassen“, bei Infusionsplänen „Infusionspläne anlegen“). KI verwalten (Zeitfenster, Grenzen,
+  Modelle) und Beispiele für das Training freigeben: Standard nur Admin, je Gruppe erteilbar.
 - Festlegung 03.10.2026: „Testdaten sehen“ (Testpatienten und Testbenutzer) je Gruppe einstellbar – ohne das Recht
   erscheinen sie nirgends. Standard: alle Rollen wie bisher; Admin fest (legt nur Testpatienten an und verlöre sonst
   alles, was er schreiben darf). Testbenutzer sehen ihre Testpatienten immer.
@@ -79,19 +83,33 @@ RECHTE = [
      "Admin, für eine Vertretung (z. B. Urlaub) je Gruppe freischaltbar"),
     ("altdaten_importieren", "Altdaten übernehmen (Import)",
      "Dump des Altsystems laden, Zuordnungen pflegen, Probelauf, Import, zurücknehmen, abschließen – nur Admin"),
+    ("ki_ansehen", "KI (Experimentell): ansehen",
+     "Prüf-Queue, Vorschläge und Hinweise der KI ansehen (nur Akten der eigenen Firma)"),
+    ("ki_pruefen", "KI (Experimentell): prüfen und korrigieren",
+     "Vorschläge korrigieren, freigeben, verwerfen, ablehnen, erneut verarbeiten lassen"),
+    ("ki_uebernehmen", "KI (Experimentell): in die Akte übernehmen",
+     "freigegebene Vorschläge in die Akte übernehmen – zusätzlich mit dem Recht der Akte (Einträge erfassen, "
+     "Infusionspläne anlegen, Diagnose ändern)"),
+    ("ki_berichte", "KI (Experimentell): Berichtsentwurf anfordern",
+     "Entwurf aus freigegebenen Akteninhalten erstellen lassen; er bleibt ein Entwurf"),
+    ("ki_verwalten", "KI (Experimentell): verwalten",
+     "Zeitfenster, Grenzen der Auslastung, Modelle einspielen, prüfen, aktivieren und zurückschalten"),
+    ("ki_training_freigeben", "KI (Experimentell): Beispiele für das Training freigeben",
+     "pseudonymisierte Beispiele für das Training freigeben, Rechtsgrundlage dokumentieren"),
 ]
 CODES = [code for code, _, _ in RECHTE]
 NAMEN = {code: name for code, name, _ in RECHTE}
 
 _ALLE = set(CODES)
 _ADMIN_SPEZIAL = {"benutzer_verwalten", "akten_wieder_oeffnen", "backup_verwalten", "testdaten_zuruecksetzen",
-                  "system_verwalten", "altdaten_importieren"}
+                  "system_verwalten", "altdaten_importieren", "ki_verwalten", "ki_training_freigeben"}
+_KI_MITARBEITER = {"ki_ansehen", "ki_pruefen", "ki_uebernehmen", "ki_berichte"}
 
 # Rechte, die Patientendaten verändern (Einträge, Stammdaten, Pläne, Abschluss)
 PATIENTENDATEN_SCHREIBEN = {"eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
                             "plaene_abschliessen", "akten_abschliessen", "dokumente_umhaengen",
                             "datenschutz_bearbeiten", "datenschutz_entscheiden", "berichte_freigeben",
-                            "schreiben_freigeben"}
+                            "schreiben_freigeben", "ki_uebernehmen"}
 
 # Endgültiges Löschen (F73, F80) dürfen Admins auch bei echten Akten (Festlegung 02.10.2026); die übrigen Prüfungen
 # (Frist bzw. Antrag, Kennwort + 2FA + Bestätigungscode, Audit-Log, Löschprotokoll) gelten unverändert
@@ -117,10 +135,11 @@ STANDARD = {
     # entscheiden, einschränken und löschen bleibt beim Mediziner
     Rolle.MITARBEITER: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
                         "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten", "plaene_abschliessen",
-                        "testdaten_sehen", "scans_bearbeiten"},
+                        "testdaten_sehen", "scans_bearbeiten"} | _KI_MITARBEITER,
     Rolle.MITARBEITER_PLUS: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
                                   "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten",
-                                  "plaene_abschliessen", "plaene_anlegen", "testdaten_sehen", "scans_bearbeiten"},
+                                  "plaene_abschliessen", "plaene_anlegen", "testdaten_sehen", "scans_bearbeiten"}
+    | _KI_MITARBEITER,
     Rolle.MEDIZINER: _ALLE - _ADMIN_SPEZIAL,
     Rolle.ADMIN: _ALLE - {c for c, rollen in NUR_ROLLEN.items() if Rolle.ADMIN not in rollen},
 }
@@ -134,7 +153,7 @@ FEST = {(Rolle.ADMIN, "benutzer_verwalten"), (Rolle.ADMIN, "akten_lesen"), (Roll
 # Testbenutzer arbeiten nur mit Testpatienten; alles, was darüber hinaus wirkt, bleibt verwehrt
 NUR_ECHTE_BENUTZER = {"versorger_pflegen", "vorlagen_pflegen", "audit_lesen", "benutzer_verwalten",
                       "backup_verwalten", "testdaten_zuruecksetzen", "akten_wieder_oeffnen", "system_verwalten",
-                      "altdaten_importieren"}
+                      "altdaten_importieren", "ki_verwalten", "ki_training_freigeben"}
 
 
 def matrix() -> dict:

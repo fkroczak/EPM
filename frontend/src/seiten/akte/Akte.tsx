@@ -812,6 +812,8 @@ export function Akte() {
     { zu: `${basis}/korrespondenz`, text: "Korrespondenz", zahl: k?.zaehler.korrespondenz, stufe: "neben" },
     { zu: `${basis}/dokumente`, text: "Dokumente", zahl: k?.zaehler.dokumente, stufe: "neben" },
     { zu: `${basis}/verlauf`, text: "Verlauf", gruppe: "Weiteres", stufe: "ende" },
+    // KI (Experimentell, 14.10.2026): nur mit Recht „KI ansehen“
+    ...(darf("ki_ansehen") ? [{ zu: `${basis}/ki`, text: "KI (Experimentell)", stufe: "ende" }] : []),
     { zu: `${basis}/datenschutz`, text: "Datenschutz", zahl: k?.datenschutz_anfragen || undefined, stufe: "ende" },
   ] as ReiterEintrag[]).map((r, i) => (i < 10 ? { ...r, kuerzel: `${r.text} (Alt+${(i + 1) % 10})` } : r));
   // Tastenkürzel in der Akte (Vorschlag „Schneller mit der Tastatur“, 08.10.2026); nicht in Eingabefeldern und nicht,

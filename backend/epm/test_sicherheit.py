@@ -269,9 +269,10 @@ class FirmenTrennung(FirmenDaten):
         self.assertIsNotNone(self.leck(kalender, [p.id for p in self.fremd]))
 
     def test_admin_der_anderen_firma(self):
-        # Benutzer, Server, Sicherung, Import: gemeinsame Verwaltung, nicht je Akte (eigene Tests)
+        # Benutzer, Server, Sicherung, Import, Modell-Pakete der KI: gemeinsame Verwaltung, nicht je Akte (eigene Tests)
         self.sweep(self.anmelden(self.rg_admin), auslassen=("api/benutzer/", "api/system/", "api/backup/",
-                                                            "api/altimport/", "api/sitzungen/", "api/rechte/"))
+                                                            "api/altimport/", "api/sitzungen/", "api/rechte/",
+                                                            "api/ki/hochladen/"))
 
     def test_dokument_hochladen_in_fremde_akte(self):
         c = self.anmelden(self.rg_mediziner)

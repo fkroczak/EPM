@@ -9,6 +9,7 @@ import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import { RECHTE_GEAENDERT, abfrage, api } from "@/lib/api";
 import type { Seite as ApiSeite } from "@/lib/api";
+import { useKiZurPruefung } from "@/lib/ki";
 import { useAuth, useIch } from "@/lib/auth";
 import { datum, initialen, nummer, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
@@ -84,6 +85,7 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
   const ich = useIch();
   const { abmelden, darf } = useAuth();
   const scansOffen = useScansOffen();
+  const kiZurPruefung = useKiZurPruefung();
   const navigate = useNavigate();
   const admin = [
     // Übersicht mit Ampel und häufigen Aufgaben (Wunsch 10.10.2026)
@@ -93,6 +95,7 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
     darf("vorlagen_pflegen") ? <NavEintrag key="v" zu="/admin/vorlagen" icon="vorlagen" text="Vorlagen" /> : null,
     darf("audit_lesen") ? <NavEintrag key="a" zu="/admin/audit-log" icon="uhr" text="Audit-Log" /> : null,
     darf("system_verwalten") ? <NavEintrag key="s" zu="/admin/system" icon="server" text="System" /> : null,
+    darf("ki_verwalten") ? <NavEintrag key="k" zu="/admin/ki" icon="stern" text="KI" /> : null,
     // nach der Übernahme unter System ausblendbar (U32); die Seite bleibt über System erreichbar
     darf("altdaten_importieren") && !ich.import_ausgeblendet ? <NavEintrag key="i" zu="/admin/import" icon="hochladen" text="Import" /> : null,
   ].filter(Boolean);
@@ -137,6 +140,8 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
         {darf("datenschutz_bearbeiten") || darf("datenschutz_entscheiden") ? <NavEintrag zu="/datenschutz" icon="schloss" text="Datenschutz" /> : null}
         {/* eigener Menüpunkt direkt nach Datenschutz (Festlegung 08.10.2026, F160 ff.) */}
         {darf("scans_bearbeiten") ? <NavEintrag zu="/scans" icon="scan" text="Scans" zahl={scansOffen} testid="nav-scans" /> : null}
+        {/* KI (Experimentell, 14.10.2026): Prüf-Queue mit Zahl der Dokumente zur Prüfung */}
+        {darf("ki_ansehen") ? <NavEintrag zu="/ki" icon="stern" text="KI (Experimentell)" zahl={kiZurPruefung} testid="nav-ki" /> : null}
       </nav>
       {admin.length ? (
         <nav aria-label="Administration" className="flex flex-col gap-0.5">

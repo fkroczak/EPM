@@ -26,6 +26,7 @@ GRUPPEN = {
     # Administration › System: Aufträge an den Server, Wartung des EPM, Hinweise an alle Benutzer
     "system": ("System", [A.SYSTEM]),
     "scan": ("Scan", [A.SCAN]),
+    "ki": ("KI", [A.KI]),
     "datenschutz": ("Datenschutz", [A.DATENSCHUTZ, A.AKTE_EINGESCHRAENKT, A.AKTE_EINSCHRAENKUNG_AUFGEHOBEN,
                                     A.AKTE_EINSICHT, A.AKTE_GELOESCHT, A.PROTOKOLL_BEREINIGT]),
 }
@@ -238,6 +239,8 @@ def beschreibung(e) -> str:
         return f"Löschen abgelehnt: {e.objekt} – {d.get('fehler', '')}"
     if art == A.SCAN:
         return _scan(e, d)
+    if art == A.KI:
+        return _ki(e, d)
     if art == A.PROTOKOLL_BEREINIGT:
         return (f"{d.get('anzahl', 0)} Einträge älter als {d.get('jahre', '?')} Jahre entfernt "
                 f"(eingestellte Aufbewahrung des Audit-Logs)")
@@ -277,6 +280,39 @@ def _scan(e, d) -> str:
     if aktion == "zusammengefuehrt":
         return f"Scan Nr. {d.get('mit', '?')} an {e.objekt} angehängt"
     return f"{e.objekt}: {aktion}"
+
+
+KI_AKTIONEN = {
+    "verarbeitet": "verarbeitet", "angefordert": "Verarbeitung angefordert", "korrigiert": "Feld korrigiert",
+    "felder_freigegeben": "Felder freigegeben", "felder_verworfen": "Felder verworfen", "felder_offen": "Felder offen",
+    "uebernommen": "in die Akte übernommen", "abgelehnt": "abgelehnt", "erneut": "erneut zur Verarbeitung",
+    "nachverarbeitung": "zur Nachverarbeitung markiert", "bericht_angefordert": "Berichtsentwurf angefordert",
+    "bericht_erstellt": "Berichtsentwurf erstellt", "bericht_gespeichert": "als Bericht-Entwurf gespeichert",
+    "bericht_verworfen": "Berichtsentwurf verworfen", "einstellungen": "Einstellungen geändert",
+    "rechtsgrundlage": "Rechtsgrundlage für das Training dokumentiert", "modell_eingespielt": "Modell eingespielt",
+    "modell_aktiviert": "Modell aktiviert", "modell_gesperrt": "Modell gesperrt",
+    "evaluation_angefordert": "Evaluation angefordert", "faelle_erzeugt": "Evaluationsfälle erzeugt",
+    "training_freigegeben": "Beispiele für das Training freigegeben",
+}
+
+
+def _ki(e, d) -> str:
+    """KI (Experimentell, 14.10.2026): mit Modell und Version, wo eines beteiligt war."""
+    aktion = d.get("aktion", "")
+    text = f"{e.objekt}: {KI_AKTIONEN.get(aktion, aktion)}"
+    if aktion == "verarbeitet":
+        text += f" ({d.get('felder', 0)} Vorschläge, {', '.join(d.get('verfahren') or [])})"
+    if aktion == "uebernommen":
+        text += f" ({len(d.get('felder') or [])} Felder)"
+    if aktion == "abgelehnt" and d.get("grund"):
+        text += f", Grund: {d['grund']}"
+    if aktion == "modell_aktiviert" and d.get("bisher"):
+        text += f" (vorher: {d['bisher']})"
+    if d.get("modell"):
+        text += f" · Modell {d['modell']}" + (f" ({d['modell_sha256'][:12]})" if d.get("modell_sha256") else "")
+    if d.get("prompt_version"):
+        text += f" · Prompt {d['prompt_version']}"
+    return text
 
 
 def _bestaetigt(d) -> str:
