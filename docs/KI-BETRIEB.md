@@ -34,6 +34,33 @@ Dateien auf dem Server (`/srv/epm`):
 
 ## 2. Einrichten (neue VM mit 16–32 GB RAM, 4–8 Kernen)
 
+### 2a. Aus der Oberfläche (Administration › KI › Einrichtung)
+
+Nach „EPM aktualisieren“ (bringt `epm-ki` und die Aktionen des Systemagenten mit) geht alles ohne SSH; Recht
+„KI verwalten“, Passwort und zweiter Faktor für Einrichten, Ausschalten, Laden, Einspielen und Löschen:
+
+1. **Stand prüfen:** Die Checkliste zeigt Systemagent, RAM, Kerne, AVX2 (sonst im Hypervisor den CPU-Typ auf „host“
+   stellen), Modelldateien und ob die KI eingerichtet ist. Vorher einen **Snapshot** der VM anlegen.
+2. **Modell wählen:** Tabelle der Modelle (Qwen3.5 2B/4B/9B in Q4_K_M bzw. Q8_0) mit Größe, nötigem RAM, Tempo und
+   Empfehlung für diesen Server. Die Liste ist fest (`backend/ki/katalog.py` = `KI_KATALOG` im Systemagenten); der
+   Server lädt nie von einer frei eingegebenen Adresse.
+   - **Server mit Internet** (Test-VM mit Updates per git, oder `EPM_KI_DOWNLOAD="1"` in `/etc/epm/epm.conf`):
+     „Auf den Server laden“ – lädt Modell, Vision-Projektor und beim ersten Mal das Image `epm-ki-modell`, prüft
+     und registriert. `EPM_KI_DOWNLOAD="0"` verbietet es auch dort.
+   - **Server ohne Internet** (VPS mit Update-Paketen): Paket auf dem PC vorbereiten
+     (`werkzeuge/ki.sh vorbereiten Q4_K_M --mit-image`) und unter „Modell-Paket hochladen“ hochladen (in Stücken,
+     setzt nach Abbrüchen fort), dann „Einspielen“.
+3. **Einrichten** – wie `epm-ki einrichten` (Secrets, Grenzen nach Hardware, `compose.ki.yaml`, Container,
+   Registrierung; die erste Variante wird aktiv). Weitere Modelle danach laden/einspielen; sie erscheinen unter
+   „Modelle“ zum Evaluieren und Aktivieren (Abschnitt 4).
+4. **Grenzen** (`KI_SPEICHER`, `KI_WORKER_SPEICHER`, `KI_THREADS`, `KI_WORKER_MAX`) ändern – die KI-Container
+   werden neu erstellt. **Benchmark** starten (läuft auf dem Server, Ergebnis als Tabelle). **Ausschalten** stoppt
+   die Container und nimmt `compose.ki.yaml` heraus; Daten und Modelle bleiben.
+5. **Löschen** nicht mehr benötigter Modelldateien (nicht das aktive). Alle Schritte stehen mit Ausgabe unter
+   „Aufträge“ und im Audit-Log (Gruppe KI).
+
+### 2b. Per SSH
+
 1. **Hardware prüfen:** `sudo epm-ki pruefen` (bzw. `werkzeuge/ki-pruefen.sh`). AVX2 muss „ja“ zeigen – sonst im
    Hypervisor den CPU-Typ auf „host“ stellen. Vorher einen **Snapshot** der VM anlegen.
 2. **Modelle vorbereiten** (PC mit Internet, einmalig erlaubt):

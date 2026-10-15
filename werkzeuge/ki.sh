@@ -14,6 +14,9 @@
 #        sudo epm-ki status            Container, Modell, Zeitfenster, Queue
 #        sudo epm-ki benchmark         Modelle/Quantisierungen messen (werkzeuge/ki-benchmark.sh)
 #        sudo epm-ki aus               KI-Container stoppen und aus der Compose-Konfiguration nehmen (Daten bleiben)
+#        sudo epm-ki laden REPO QUANT  nur Test-VM bzw. EPM_KI_DOWNLOAD="1": Modell direkt laden und einspielen
+#        sudo epm-ki loeschen DATEI    eingespielte Modelldatei löschen (nie die aktive)
+#   Alles davon geht auch aus EPM: Administration › KI › Einrichtung (über den Systemagenten).
 #
 # Die KI-Container hängen nur am Netz „intern“ ohne Weg nach außen. Unter 12 GB RAM / 4 Kernen bleibt der KI-Dienst
 # von selbst aus.
@@ -56,7 +59,7 @@ vorbereiten() {
   [[ ${#quants[@]} -gt 0 ]] || quants=(Q4_K_M Q8_0)
   command -v curl >/dev/null || fehler "curl fehlt."
   local ziel; ziel="$(mktemp -d)"
-  trap 'rm -rf "$ziel"' EXIT
+  trap "rm -rf '$ziel'" EXIT  # Wert jetzt einsetzen: beim Beenden ist die lokale Variable weg
   echo "==> Dateiliste von huggingface.co/$repo"
   local liste
   liste="$(curl -fsSL "https://huggingface.co/api/models/$repo" | grep -o '"rfilename":"[^"]*"' | cut -d'"' -f4)" \
@@ -106,7 +109,7 @@ einspielen() {
   local paket="${1:-}"
   [[ -f "$paket" ]] || fehler "Datei fehlt: sudo epm-ki einspielen ~/epm-ki-modelle-<Datum>.tar"
   local tmp; tmp="$(mktemp -d -p "$B")"
-  trap 'rm -rf "$tmp"' EXIT
+  trap "rm -rf '$tmp'" EXIT
   # nur einfache Dateinamen (kein ../, keine Links)
   if tar -tf "$paket" | grep -vE '^(\./)?[A-Za-z0-9._-]+$' | grep -vqx './'; then
     fehler "Unerwarteter Inhalt im Paket (nur Dateien ohne Unterordner erlaubt)."
@@ -129,7 +132,65 @@ einspielen() {
     env_setzen KI_MODELL_IMAGE_TAG "$(sed -n 's/^IMAGE=epm-ki-modell://p' "$tmp/IMAGE.txt")"
   done
   echo "Eingespielt nach $VORRAT:"; ls -lh "$VORRAT"/*.gguf | awk '{print "   " $5 "  " $9}'
-  echo "Weiter: sudo epm-ki einrichten   (bzw. Administration › KI › Modelle, wenn die KI schon läuft)"
+  if [[ -f "$B/ki-aktiv" ]]; then
+    registrieren 0 "$tmp/MODELLE.txt"
+    echo "Registriert – unter Administration › KI › Modelle evaluieren und aktivieren."
+  else
+    echo "Weiter: KI einrichten (Administration › KI › Einrichtung oder sudo epm-ki einrichten)"
+  fi
+}
+
+# registrieren <erste aktivieren 0|1> <MODELLE.txt>: Varianten in der Modell-Registry von EPM eintragen
+registrieren() {
+  local aktiv="$1" liste="$2" name="" datei="" projektor="" quant=""
+  while IFS= read -r zeile; do
+    case "$zeile" in
+      NAME=*) name="${zeile#NAME=}" ;;
+      DATEI=*) datei="${zeile#DATEI=}" ;;
+      PROJEKTOR=*) projektor="${zeile#PROJEKTOR=}" ;;
+      QUANT=*) quant="${zeile#QUANT=}"
+        (cd "$B" && docker compose exec -T backend python manage.py epm_ki_modell --registrieren "$datei" \
+          --projektor "$projektor" --name "$name" --quantisierung "$quant" $([[ $aktiv == 1 ]] && echo --aktivieren)) \
+          || echo "WARNUNG: $datei nicht registriert (Backend erreichbar?)"
+        aktiv=0 ;;
+    esac
+  done < "$liste"
+}
+
+# --------------------------------------------------------------------------------------------- laden (Server)
+laden() {
+  root
+  local repo="${1:-}" quant="${2:-}"
+  [[ "$repo" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ && "$quant" =~ ^[A-Za-z0-9_]+$ ]] || fehler "laden REPO QUANT"
+  local tmp; tmp="$(mktemp -d -p "$B")"
+  local mit_image=""
+  local tag; tag="$(sed -n 's/^KI_MODELL_IMAGE_TAG=//p' "$B/.env" 2>/dev/null)"
+  if [[ -z "$tag" ]] || ! docker image inspect "epm-ki-modell:$tag" >/dev/null 2>&1; then mit_image="--mit-image"; fi
+  echo "==> $repo $quant laden (Systemagent auf dem Server; die KI-Container selbst haben keinen Weg nach außen)"
+  # Zwischendateien unter /srv/epm statt /tmp (dort ist oft wenig Platz)
+  ( cd "$tmp" && TMPDIR="$tmp" vorbereiten "$quant" --repo "$repo" $mit_image ) || { rm -rf "$tmp"; fehler "Laden fehlgeschlagen."; }
+  local paket; paket="$(ls "$tmp"/epm-ki-modelle-*.tar | head -n1)"
+  ( einspielen "$paket" ) || { rm -rf "$tmp"; fehler "Einspielen fehlgeschlagen."; }
+  rm -rf "$tmp"
+}
+
+# --------------------------------------------------------------------------------------------- loeschen (Server)
+loeschen() {
+  root
+  local datei="${1:-}"
+  [[ "$datei" =~ ^[A-Za-z0-9._-]{1,200}\.gguf$ && -f "$VORRAT/$datei" ]] || fehler "Unbekannte Modelldatei: $datei"
+  local aktiv; aktiv="$(sed -n 's/^DATEI=//p' "$B/data/ki/modell/aktiv.env" 2>/dev/null)"
+  [[ -n "$aktiv" ]] || aktiv="$(sed -n 's/^KI_MODELL_DATEI=//p' "$B/.env" 2>/dev/null)"
+  [[ "$datei" != "$aktiv" ]] || fehler "$datei ist das aktive Modell – zuerst ein anderes aktivieren."
+  if grep -q "^PROJEKTOR=$datei$" "$VORRAT/MODELLE.txt" 2>/dev/null; then
+    fehler "$datei ist ein Vision-Projektor, den noch Modelle brauchen."
+  fi
+  rm -f "$VORRAT/$datei"
+  # Abschnitt der Variante aus MODELLE.txt nehmen
+  awk -v d="DATEI=$datei" 'BEGIN{RS=""; ORS="\n\n"} index($0, d"\n")==0 && $0 !~ d"$"' "$VORRAT/MODELLE.txt" > "$VORRAT/MODELLE.txt.neu" \
+    && mv "$VORRAT/MODELLE.txt.neu" "$VORRAT/MODELLE.txt"
+  (cd "$B" && docker compose exec -T backend python manage.py epm_ki_modell --entfernt "$datei" 2>/dev/null) || true
+  echo "$datei gelöscht."
 }
 
 # --------------------------------------------------------------------------------------------- einrichten (Server)
@@ -190,18 +251,7 @@ einrichten() {
   done
   [[ "$status" == "healthy" ]] || fehler "Backend wird nicht gesund – docker compose logs --tail 50 backend"
   echo "==> Modelle registrieren"
-  local aktiv=1 name quant
-  while IFS= read -r zeile; do
-    case "$zeile" in
-      NAME=*) name="${zeile#NAME=}" ;;
-      DATEI=*) datei="${zeile#DATEI=}" ;;
-      PROJEKTOR=*) projektor="${zeile#PROJEKTOR=}" ;;
-      QUANT=*) quant="${zeile#QUANT=}"
-        (cd "$B" && docker compose exec -T backend python manage.py epm_ki_modell --registrieren "$datei" \
-          --projektor "$projektor" --name "$name" --quantisierung "$quant" $([[ $aktiv == 1 ]] && echo --aktivieren))
-        aktiv=0 ;;
-    esac
-  done < "$VORRAT/MODELLE.txt"
+  registrieren 1 "$VORRAT/MODELLE.txt"
   echo
   echo "Fertig. Administration › KI zeigt Zeitfenster, Auslastung und Modelle; die Prüf-Queue steht im Menü"
   echo "„KI (Experimentell)“. Erste Nacht abwarten oder ein Dokument in der Akte ausdrücklich verarbeiten lassen."
@@ -234,6 +284,8 @@ case "${1:-}" in
   einspielen) shift; einspielen "$@" ;;
   pruefen) shift; "$CODE/werkzeuge/ki-pruefen.sh" "$@" ;;
   einrichten) einrichten ;;
+  laden) shift; laden "$@" ;;
+  loeschen) shift; loeschen "$@" ;;
   status) status ;;
   aus) aus ;;
   benchmark) shift; benchmark "$@" ;;

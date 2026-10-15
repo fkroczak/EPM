@@ -348,7 +348,7 @@ Messungen mit dem echten Modell stehen aus.
 | 3 – Qualität, Training | Qualitäts-Dashboard, Evaluationsfälle (pseudonymisiert), Evaluationslauf (nachts, Kandidat als Probe), Modell-Registry mit Aktivieren (Passwort + 2FA) und Zurückschalten, Rechtsgrundlagen-Dokumentation, Trainingsfreigabe. **Offen:** der Trainingslauf selbst (LoRA auf CPU) – erst sinnvoll, wenn das Dashboard echten Bedarf zeigt |
 | 4 – Betrieb | `docs/KI-BETRIEB.md` (Einrichten, Betrieb, Modellwahl, Rollback, Fehleranalyse, Backup), `docs/KI-API.md`, Datenschutz § 7 |
 
-Tests: 61 Backend-Tests in `backend/ki/test_*.py` (mit echter Texterkennung und einer Attrappe des Modell-Dienstes),
+Tests: 74 Backend-Tests in `backend/ki/test_*.py` (mit echter Texterkennung und einer Attrappe des Modell-Dienstes),
 Frontend typgeprüft und gebaut. Noch offen: Browsertest der neuen Seiten, Lauf mit echtem Modell auf der neuen VM.
 
 Erste Schritte auf der neuen VM: `docs/KI-BETRIEB.md` Abschnitt 2.

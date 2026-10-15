@@ -187,6 +187,12 @@ urlpatterns = [
     path("api/ki/rechtsgrundlage/", ki.RechtsgrundlageView.as_view()),
     path("api/ki/qualitaet/", ki.QualitaetView.as_view()),
     path("api/ki/evaluation/", ki.EvaluationView.as_view()),
+    # KI-Einrichtung aus der Oberfläche (15.10.2026): Aufträge an den Systemagenten, Modell-Paket hochladen
+    path("api/ki/einrichtung/", ki.EinrichtungView.as_view()),
+    path("api/ki/hochladen/", ki.KiHochladenView.as_view()),
+    path("api/ki/hochladen/<str:kennung>/", ki.KiHochladenTeilView.as_view()),
+    path("api/ki/hochladen/<str:kennung>/einspielen/", ki.KiEinspielenView.as_view()),
+    path("api/ki/benchmarks/", ki.BenchmarkView.as_view()),
     path("api/meine-akten/", meine_akten.MeineAktenView.as_view()),
     path("api/meine-akten/merken/", meine_akten.MerkenView.as_view()),
     path("api/meine-akten/merken/<int:patient>/", meine_akten.MerkenView.as_view()),

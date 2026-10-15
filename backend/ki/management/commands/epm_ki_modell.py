@@ -39,9 +39,18 @@ class Command(BaseCommand):
         parser.add_argument("--name", default="")
         parser.add_argument("--quantisierung", default="")
         parser.add_argument("--aktivieren", action="store_true")
+        parser.add_argument("--entfernt", metavar="DATEI", help="Datei wurde gelöscht: Einträge sperren")
 
     def handle(self, *args, liste=False, registrieren=None, projektor="", name="", quantisierung="",
-               aktivieren=False, **opt):
+               aktivieren=False, entfernt=None, **opt):
+        if entfernt:
+            n = (KiModellversion.objects.filter(datei=entfernt).exclude(status=KiModellversion.Status.AKTIV)
+                 .update(status=KiModellversion.Status.GESPERRT, notiz="Datei auf dem Server gelöscht"))
+            if n:
+                protokolliere(SystemEreignis.Art.KI, benutzername="epm-ki (Konsole)", objekt=entfernt,
+                              aktion="modell_gesperrt", modell=entfernt, grund="Datei gelöscht")
+            self.stdout.write(f"{n} Einträge gesperrt.")
+            return
         if liste or not registrieren:
             for mv in KiModellversion.objects.all():
                 self.stdout.write(f"{mv.pk:>3}  {mv.get_status_display():<18} {mv.name:<30} {mv.datei}  "

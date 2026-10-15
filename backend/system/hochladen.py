@@ -32,6 +32,9 @@ ARTEN = {
               "falsch": "Bitte das Update-Paket der Test-VM wählen (epm-paket-<Version>.tar)."},
     "ocr": {"endung": ".tar", "max": 4 * 1024 ** 3, "name": "OCR-Modelle",
             "falsch": "Bitte die vorbereitete Datei wählen (epm-ocr-modelle-<Revision>.tar)."},
+    # KI (Experimentell, 15.10.2026): Modell-Paket von „werkzeuge/ki.sh vorbereiten“ (mehrere Modelle + Image)
+    "ki": {"endung": ".tar", "max": 64 * 1024 ** 3, "name": "KI-Modelle",
+           "falsch": "Bitte das vorbereitete Modell-Paket wählen (epm-ki-modelle-<Datum>.tar)."},
 }
 
 

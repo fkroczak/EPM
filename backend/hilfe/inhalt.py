@@ -961,6 +961,26 @@ nur aus freigegebenen Inhalten der Akte, jede Aussage mit Quellennummer. Die Geg
 und Sätze, die nach Empfehlung oder Bewertung klingen. Bearbeiten, dann „Als Bericht-Entwurf speichern“ – er liegt im
 Reiter <strong>Berichte</strong> und wird wie jeder Bericht geprüft und freigegeben.</p>""",
     },
+    {
+        "id": "ki_einrichtung", "gruppe": "ki", "titel": "KI einrichten und Modell wählen", "rechte": ["ki_verwalten"],
+        "seiten": ["/admin/ki"],
+        "html": """
+<p>Unter <strong>Administration › KI › Einrichtung</strong> wird die KI ohne SSH eingerichtet. Die Aufträge führt der
+Systemagent auf dem Server aus; Einrichten, Ausschalten, Laden, Einspielen und Löschen verlangen Passwort und zweiten
+Faktor.</p>
+<ol>
+<li>Die <strong>Checkliste</strong> zeigt, ob der Server reicht (mindestens 12 GB RAM, 4 Kerne, AVX2) und was fehlt.</li>
+<li>Ein <strong>Modell wählen</strong>: Die Tabelle nennt Größe, nötigen Arbeitsspeicher, Tempo und die Empfehlung für
+diesen Server. Hat der Server Internet, lädt <strong>Auf den Server laden</strong> das Modell direkt. Sonst das
+Modell-Paket auf einem PC vorbereiten und unter <strong>Modell-Paket hochladen</strong> hochladen, dann
+<strong>Einspielen</strong>.</li>
+<li><strong>Einrichten</strong> startet die KI mit dem ersten Modell. Weitere Modelle erscheinen unter
+<strong>Modelle</strong>, werden dort evaluiert und mit <strong>Aktivieren</strong> gewechselt (Rückkehr zur vorherigen
+Version jederzeit).</li>
+<li><strong>Grenzen</strong> (Speicher, Rechenkerne, Worker) und <strong>Benchmark</strong> helfen, Modell und Server
+abzustimmen. <strong>Ausschalten</strong> stoppt die KI; Daten und Modelle bleiben.</li>
+</ol>""",
+    },
     # ------------------------------------------------------------------ Scans und Texterkennung (F160 ff.)
     {
         "id": "scans", "gruppe": "scans", "titel": "Scans: hochladen, erkennen, zuordnen", "rechte": ["scans_bearbeiten"],

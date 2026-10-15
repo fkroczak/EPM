@@ -16,6 +16,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { Reiter, ReiterInhalt, useReiter } from "@/components/ui/reiter";
 import { Seite } from "@/components/layout/Shell";
 import { KiStandKarte } from "../ki/KiQueue";
+import { KiEinrichtung } from "./KiEinrichtung";
 
 type Einstellungen = {
   aktiv: boolean; nacht_beginn: string; nacht_ende: string; zeitzone: string; worker_nacht: number; worker_tag: number;
@@ -38,16 +39,18 @@ type Evaluation = {
 };
 
 export function KiVerwaltung() {
-  const [reiter, setReiter] = useReiter(["stand", "einstellungen", "modelle", "training"] as const);
+  const [reiter, setReiter] = useReiter(["einrichtung", "stand", "einstellungen", "modelle", "training"] as const);
   const stand = useQuery({ queryKey: ["ki", "stand"], queryFn: () => api<KiStand>("ki/stand/"), refetchInterval: 15_000 });
   return (
     <Seite pfad={[{ text: "Administration" }, { text: "KI (Experimentell)" }]}>
       <Seitenkopf titel="KI (Experimentell)" unter="Lokale Modelle, ohne Internet – Zeitfenster, Auslastung, Modelle, Qualität" />
       <KiStandKarte stand={stand.data} />
       <Reiter label="Bereiche" wert={reiter} onWahl={setReiter} eintraege={[
-        { wert: "stand", text: "Stand" }, { wert: "einstellungen", text: "Zeitfenster und Grenzen" },
+        { wert: "einrichtung", text: "Einrichtung" }, { wert: "stand", text: "Stand" },
+        { wert: "einstellungen", text: "Zeitfenster und Grenzen" },
         { wert: "modelle", text: "Modelle" }, { wert: "training", text: "Evaluation und Training" }]} />
       <ReiterInhalt>
+        {reiter === "einrichtung" ? <KiEinrichtung /> : null}
         {reiter === "stand" ? <Stand stand={stand.data} /> : null}
         {reiter === "einstellungen" ? <EinstellungenForm /> : null}
         {reiter === "modelle" ? <Modelle /> : null}

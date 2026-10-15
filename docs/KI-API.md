@@ -56,6 +56,11 @@ angehängt (`akten_bearbeiten`), Dokumentdatum/-typ → `Dokument` (`eintraege_e
 | `POST modelle/{id}/aktivieren/` `{"kennwort", "code", "ohne_evaluation"}` | verwalten | Passwort + 2FA; bisher aktives → „vorherige Version“; schreibt `data/ki/modell/aktiv.env` |
 | `POST modelle/{id}/sperren/` | verwalten | |
 | `GET qualitaet/` | ansehen | Genauigkeit je Bereich, OCR-Fehlerrate, Fehlerarten, Verlauf je Monat, je Modell/Prompt, Sekunden je Seite |
+| `GET einrichtung/` | verwalten | Stand auf dem Server (`server`: eingerichtet, Modelldateien, Varianten, Grenzen, `download_erlaubt`), `hardware`, `katalog` (mit `passt`, `empfohlen`, `eingespielt`), `auftraege` (`ki_*`), `uploads`, `upload_max` |
+| `POST einrichtung/` `{"aktion": "einrichten" \| "aus" \| "laden" \| "loeschen" \| "grenzen" \| "benchmark", …}` | verwalten | Auftrag an den Systemagenten. `laden`: `variante` aus dem Katalog; `loeschen`: `datei` (nicht das aktive Modell); `grenzen`: `KI_SPEICHER`, `KI_WORKER_SPEICHER`, `KI_THREADS`, `KI_WORKER_MAX`; `benchmark`: `eigene`. Passwort + 2FA (`kennwort`, `code`) außer bei `grenzen` und `benchmark` |
+| `POST hochladen/` `{"name": "*.tar", "groesse"}` · `PUT hochladen/{kennung}/?versatz=` · `DELETE hochladen/{kennung}/` | verwalten | Modell-Paket in Stücken (wie Update-Paket, max. 64 GB) |
+| `POST hochladen/{kennung}/einspielen/` `{"kennwort", "code"}` | verwalten | vollständiges Paket an den Agenten (`epm-ki einspielen`) |
+| `GET benchmarks/` | verwalten | letzte 10 Benchmarks (`data/ki/benchmark-*.json`) |
 | `GET evaluation/` · `POST evaluation/` `{"aktion": "erzeugen"}` / `{"aktion": "training_freigeben", "faelle": [ids]}` | verwalten bzw. training_freigeben | Evaluationsfälle (pseudonymisiert), Läufe, Trainingsfreigabe |
 
 ## Geändert außerhalb von `/api/ki/`
@@ -63,3 +68,6 @@ angehängt (`akten_bearbeiten`), Dokumentdatum/-typ → `Dokument` (`eintraege_e
 - `GET/POST/PATCH /api/laborbefunde/`: neues optionales Feld `abgenommen_um` (Uhrzeit der Entnahme, `HH:MM:SS`).
 - `GET /api/protokoll/?gruppe=ki`: neue Gruppe „KI“ im Audit-Log.
 - `GET /api/rechte/`: sechs neue Rechte `ki_*`.
+- Systemagent: neue Aktionen `ki_modelle`, `ki_modell_laden`, `ki_modell_loeschen`, `ki_einrichten`, `ki_aus`,
+  `ki_grenzen`, `ki_benchmark` (nur über `/api/ki/einrichtung/`, nicht in Administration › System); `system.json`
+  enthält `ki`; Upload-Art `ki`.

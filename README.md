@@ -32,6 +32,8 @@ erkennt Text (Tesseract/PP-OCR + Vision-Modell Qwen3.5-4B über llama.cpp, nur C
 Infusionspläne, Medikation, Diagnosen und Texte und legt alles in die Prüf-Queue (Menü „KI (Experimentell)“). In die Akte
 kommt nur, was ein Mitarbeiter prüft und bestätigt. Dazu: Hinweise Labor ↔ Infusionsplan (Akte › KI), Berichtsentwürfe
 auf Anforderung, Qualitäts-Dashboard, Modellwechsel mit Evaluation und Rollback (Administration › KI).
+Einrichten, Modell wählen, laden bzw. hochladen, Grenzen, Benchmark und Ausschalten gehen nach „EPM aktualisieren“
+auch ohne SSH unter Administration › KI › Einrichtung.
 
 ```bash
 werkzeuge/ki.sh vorbereiten Q4_K_M Q8_0 --mit-image   # PC mit Internet → epm-ki-modelle-<Datum>.tar

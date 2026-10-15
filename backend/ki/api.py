@@ -849,3 +849,176 @@ class EvaluationView(APIView):
 
 
 DOKUMENTTYPEN = [{"wert": w, "name": n} for w, n in Dokumenttyp.choices]
+
+
+# ---------------------------------------------------------------------------------------------- Einrichtung (Server)
+# Wunsch 15.10.2026: Einrichten, Modelle wählen, laden bzw. hochladen, Grenzen, Benchmark, Ausschalten – alles aus der
+# Oberfläche statt per SSH. Ausgeführt vom Systemagenten auf dem Server (system/host.py, Aktionen „ki_*“).
+EINRICHTUNG_AKTIONEN = {"einrichten": "ki_einrichten", "aus": "ki_aus", "grenzen": "ki_grenzen",
+                        "benchmark": "ki_benchmark", "laden": "ki_modell_laden", "loeschen": "ki_modell_loeschen"}
+
+
+class EinrichtungView(APIView):
+    """``GET``: Stand auf dem Server (eingerichtet, Modelldateien, Grenzen, Hardware), Auswahl der Modelle mit
+    Empfehlung, laufende und letzte Aufträge, begonnene Uploads. ``POST {"aktion": …}``: Auftrag an den Systemagenten
+    (Passwort + zweiter Faktor für einrichten, aus, laden, löschen)."""
+
+    permission_classes = [VerwaltenRecht]
+
+    def get(self, request):
+        from system import hochladen, host
+        from system.api import AuftragSerializer, auftraege_abgleichen
+        from system.models import Systemauftrag
+
+        from .katalog import mit_hardware
+
+        auftraege_abgleichen()
+        status_ = host.host_status() or {}
+        ki = status_.get("ki") or {}
+        speicher = status_.get("speicher") or {}
+        kerne = (status_.get("cpu") or {}).get("kerne")
+        dateien = {m.get("datei", "") for m in ki.get("modelle") or []}
+        auftraege = Systemauftrag.objects.filter(ziel=Systemauftrag.Ziel.SERVER, aktion__startswith="ki_") \
+            .select_related("angefordert_von").order_by("-angefordert_am")[:15]
+        return Response({
+            "agent": {"aktuell": bool(status_.get("aktuell")), "alter_s": status_.get("alter_s")},
+            "server": ki, "hardware": {"ram": speicher.get("gesamt"), "ram_frei": speicher.get("verfuegbar"),
+                                       "kerne": kerne, "avx2": ki.get("avx2")},
+            "katalog": mit_hardware(speicher.get("gesamt"), kerne, dateien),
+            "auftraege": AuftragSerializer(auftraege, many=True).data,
+            "uploads": hochladen.liste(["ki"]),
+            "upload_max": hochladen.ARTEN["ki"]["max"],
+        })
+
+    def post(self, request):
+        from system.api import auftrag_anlegen
+
+        from .katalog import NACH_SCHLUESSEL
+
+        aktion = request.data.get("aktion")
+        code = EINRICHTUNG_AKTIONEN.get(aktion if isinstance(aktion, str) else "")
+        if code is None:
+            return _fehler(f"Erlaubt: {', '.join(EINRICHTUNG_AKTIONEN)}.", feld="aktion")
+        parameter, objekt = {}, None
+        if aktion == "laden":
+            variante = request.data.get("variante")
+            if variante not in NACH_SCHLUESSEL:
+                return _fehler("Bitte ein Modell aus der Liste wählen.", feld="variante")
+            parameter, objekt = {"variante": variante}, NACH_SCHLUESSEL[variante]["name"]
+        elif aktion == "loeschen":
+            import re
+
+            datei = str(request.data.get("datei") or "")
+            if not re.fullmatch(r"[A-Za-z0-9._-]{1,200}\.gguf", datei):
+                return _fehler("Unbekannte Modelldatei.", feld="datei")
+            aktiv = KiModellversion.aktiv()
+            if aktiv and aktiv.datei == datei:
+                return _fehler("Das ist das aktive Modell – zuerst ein anderes aktivieren.", feld="datei")
+            parameter, objekt = {"datei": datei}, datei
+        elif aktion == "grenzen":
+            for name in ("KI_SPEICHER", "KI_WORKER_SPEICHER", "KI_THREADS", "KI_WORKER_MAX"):
+                wert = request.data.get(name)
+                if wert not in (None, ""):
+                    parameter[name] = str(wert).strip()[:10]
+            if not parameter:
+                return _fehler("Bitte mindestens einen Wert angeben.")
+        elif aktion == "benchmark":
+            parameter = {"eigene": request.data.get("eigene") is True}
+        antwort = auftrag_anlegen(request, code, parameter=parameter, objekt=objekt)
+        if antwort.status_code == status.HTTP_201_CREATED:
+            protokolliere(A.KI, request, objekt=objekt or code, aktion=f"einrichtung_{aktion}", parameter=parameter)
+        return antwort
+
+
+class KiHochladenView(APIView):
+    """Modell-Paket in Stücken hochladen (wie Update-Paket und OCR-Modelle): ``POST {"name", "groesse"}``."""
+
+    permission_classes = [VerwaltenRecht]
+
+    def post(self, request):
+        from system import hochladen
+        from system.verwaltung_api import ORDNER_FEHLT
+
+        return hochladen.beginnen(request, "ki", ORDNER_FEHLT)
+
+
+class KiHochladenTeilView(APIView):
+    permission_classes = [VerwaltenRecht]
+
+    def get_parsers(self):
+        from rest_framework.parsers import JSONParser
+
+        from system import hochladen
+
+        return [hochladen.RohParser(), JSONParser()]
+
+    def put(self, request, kennung):
+        from system import hochladen
+
+        pfad, meta = hochladen.finde(kennung, ["ki"])
+        if pfad is None:
+            return _fehler("Dieser Upload ist nicht (mehr) bekannt. Bitte neu beginnen.", status.HTTP_404_NOT_FOUND)
+        return hochladen.teil_anhaengen(request, pfad, meta)
+
+    def delete(self, request, kennung):
+        from system import hochladen
+        from system.models import Systemauftrag
+
+        pfad, meta = hochladen.finde(kennung, ["ki"])
+        if pfad is None:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        if Systemauftrag.objects.filter(aktion="ki_modelle", parameter__upload=kennung,
+                                        status__in=[Systemauftrag.Status.WARTET, Systemauftrag.Status.LAEUFT]).exists():
+            return _fehler("Der Server verarbeitet diese Datei gerade.", status.HTTP_409_CONFLICT)
+        hochladen.entfernen(pfad)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class KiEinspielenView(APIView):
+    """Vollständig hochgeladenes Modell-Paket an den Systemagenten (Passwort + zweiter Faktor)."""
+
+    permission_classes = [VerwaltenRecht]
+
+    def post(self, request, kennung):
+        from system import hochladen
+        from system.api import auftrag_anlegen
+
+        pfad, meta = hochladen.finde(kennung, ["ki"])
+        if pfad is None:
+            return _fehler("Dieser Upload ist nicht (mehr) bekannt. Bitte neu beginnen.", status.HTTP_404_NOT_FOUND)
+        erhalten = pfad.stat().st_size
+        if erhalten != meta.get("groesse"):
+            return Response({"fehler": "Die Datei ist noch nicht vollständig hochgeladen.", "erhalten": erhalten},
+                            status=status.HTTP_409_CONFLICT)
+        name = str(meta.get("name") or "")
+        return auftrag_anlegen(request, "ki_modelle", parameter={"upload": kennung, "datei": name},
+                               objekt=f"KI-Modelle {name}"[:200], protokoll_details={"datei": name, "groesse": erhalten})
+
+
+class BenchmarkView(APIView):
+    """Ergebnisse des Benchmarks (``data/ki/benchmark-<Datum>.json``, geschrieben von werkzeuge/ki-benchmark.sh)."""
+
+    permission_classes = [VerwaltenRecht]
+
+    def get(self, request):
+        import json
+        import re
+
+        from django.conf import settings
+
+        aus = []
+        try:
+            namen = sorted((p for p in settings.EPM_KI.iterdir()
+                            if re.fullmatch(r"benchmark-\d{8}-\d{4}\.json", p.name)), reverse=True)[:10]
+        except OSError:
+            namen = []
+        for p in namen:
+            try:
+                varianten = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            aus.append({"datei": p.name, "zeit": p.name[10:23], "varianten": [
+                {"variante": v.get("variante"), "laden_s": v.get("laden_s"), "ram_max_gb": v.get("ram_max_gb"),
+                 "cpu_mittel": v.get("cpu_mittel"), "je_kategorie": v.get("je_kategorie") or {}}
+                for v in varianten if isinstance(v, dict)]})
+        return Response(aus)
