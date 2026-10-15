@@ -7,7 +7,8 @@ export type Recht =
   | "datenschutz_bearbeiten" | "datenschutz_entscheiden" | "akten_loeschen"
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
   | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "testdaten_sehen" | "system_verwalten"
-  | "altdaten_importieren" | "berichte_freigeben" | "scans_bearbeiten" | "schreiben_freigeben";
+  | "altdaten_importieren" | "berichte_freigeben" | "scans_bearbeiten" | "schreiben_freigeben"
+  | "ki_ansehen" | "ki_pruefen" | "ki_uebernehmen" | "ki_berichte" | "ki_verwalten" | "ki_training_freigeben";
 
 /** Kacheln der Startseite (S11): klinische und – mit dem jeweiligen Recht – die der Administration (S12–S14) */
 export type KartenId =

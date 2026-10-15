@@ -64,6 +64,8 @@ const router = createBrowserRouter([
           { path: "dokumente", ...seite(() => import("./seiten/akte/Dokumente").then(({ Dokumente }) => <Dokumente />)) },
           { path: "datenschutz", ...seite(() => import("./seiten/akte/Datenschutz").then(({ AkteDatenschutz }) => <AkteDatenschutz />)) },
           { path: "verlauf", ...seite(() => import("./seiten/akte/Verlauf").then(({ Verlauf }) => <Verlauf />)) },
+          // KI (Experimentell, 14.10.2026): Hinweise Labor ↔ Infusionsplan, Dokumente in der KI, Berichtsentwurf
+          { path: "ki", ...seite(() => import("./seiten/akte/KiAkte").then(({ KiAkte }) => <MitRecht recht="ki_ansehen"><KiAkte /></MitRecht>)) },
         ],
       },
       { path: "kalender", ...seite(() => import("./seiten/Kalender").then(({ Kalender }) => <MitRecht recht="akten_lesen" titel="Kalender"><Kalender /></MitRecht>)) },
@@ -72,6 +74,9 @@ const router = createBrowserRouter([
       { path: "aerzte", ...seite(() => import("./seiten/Aerzte").then(({ Aerzte }) => <Aerzte />)) },
       { path: "datenschutz", ...seite(() => import("./seiten/Datenschutz").then(({ Datenschutz }) => <MitRecht recht={["datenschutz_bearbeiten", "datenschutz_entscheiden"]}><Datenschutz /></MitRecht>)) },
       { path: "scans", ...seite(() => import("./seiten/scans/Scans").then(({ Scans }) => <MitRecht recht="scans_bearbeiten" titel="Scans"><Scans /></MitRecht>)) },
+      // KI (Experimentell, 14.10.2026): Prüf-Queue, Prüfansicht, Qualität
+      { path: "ki", ...seite(() => import("./seiten/ki/KiQueue").then(({ KiQueue }) => <MitRecht recht="ki_ansehen" titel="KI (Experimentell)"><KiQueue /></MitRecht>)) },
+      { path: "ki/:id", ...seite(() => import("./seiten/ki/KiPruefung").then(({ KiPruefung }) => <MitRecht recht="ki_ansehen" titel="KI (Experimentell)"><KiPruefung /></MitRecht>)) },
       { path: "konto", ...seite(() => import("./seiten/Konto").then(({ Konto }) => <Konto />)) },
       { path: "design", ...seite(() => import("./seiten/Konto").then(({ Design }) => <Design />)) },
       { path: "hilfe", ...seite(() => import("./seiten/Hilfe").then(({ Hilfe }) => <Hilfe />)) },
@@ -83,6 +88,7 @@ const router = createBrowserRouter([
       { path: "admin/vorlagen/dokumente", ...seite(() => import("./seiten/admin/Vorlagen").then(({ Vorlagen }) => <MitRecht recht="vorlagen_pflegen" titel="Dokumentvorlagen"><Vorlagen /></MitRecht>)) },
       { path: "admin/audit-log", ...seite(() => import("./seiten/admin/AuditLog").then(({ AuditLog }) => <MitRecht recht="audit_lesen" titel="Audit-Log"><AuditLog /></MitRecht>)) },
       { path: "admin/system", ...seite(() => import("./seiten/admin/System").then(({ System }) => <MitRecht recht="system_verwalten" titel="System"><System /></MitRecht>)) },
+      { path: "admin/ki", ...seite(() => import("./seiten/admin/KiVerwaltung").then(({ KiVerwaltung }) => <MitRecht recht="ki_verwalten" titel="KI (Experimentell)"><KiVerwaltung /></MitRecht>)) },
       { path: "admin/import", ...seite(() => import("./seiten/admin/import/Import").then(({ Import }) => <MitRecht recht="altdaten_importieren" titel="Import"><Import /></MitRecht>)) },
       { path: "*", element: <NichtGefunden /> },
     ],
