@@ -1,0 +1,17 @@
+# EPM – Image ki-modell: llama.cpp (llama-server, nur CPU) + Startskript. Gebaut von `epm-ki einrichten`.
+#   docker build -f Dockerfile.ki-modell --build-arg LLAMA_IMAGE=ghcr.io/ggml-org/llama.cpp:server-bNNNN -t epm-ki-modell:bNNNN .
+# Die Version von llama.cpp bitte fest angeben (Tag oder @sha256:…) – `epm-ki einrichten` merkt sich den Digest.
+# Das Image enthält keine Modelle; die liegen offline eingespielt unter /srv/epm/ki-modelle (nur lesend eingebunden).
+ARG LLAMA_IMAGE=ghcr.io/ggml-org/llama.cpp:server
+FROM ${LLAMA_IMAGE}
+COPY ki-modell-start.sh /usr/local/bin/ki-modell-start.sh
+USER root
+RUN chmod 0755 /usr/local/bin/ki-modell-start.sh \
+ && command -v llama-server >/dev/null || ln -s /app/llama-server /usr/local/bin/llama-server
+# ohne Rechte: eigener Benutzer, kein Schreiben außer /tmp (read_only + tmpfs in compose.ki.yaml)
+RUN (getent group 10002 >/dev/null || groupadd --gid 10002 kimodell) \
+ && (getent passwd 10002 >/dev/null || useradd --uid 10002 --gid 10002 --no-create-home --shell /usr/sbin/nologin kimodell)
+USER 10002:10002
+ENV LLAMA_ARG_HOST=0.0.0.0 LLAMA_ARG_PORT=8080
+HEALTHCHECK NONE
+ENTRYPOINT ["/usr/local/bin/ki-modell-start.sh"]

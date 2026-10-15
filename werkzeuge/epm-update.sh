@@ -127,7 +127,10 @@ aufraeumen_exit() { rm -f "$B/system/update-laeuft"; [[ -n "$TMP" ]] && rm -rf "
 
 starte_version() {
   local tag="$1"
-  sed -i -e 's/^COMPOSE_FILE=.*/COMPOSE_FILE=compose.yaml/' -e "s/^EPM_VERSION=.*/EPM_VERSION=$tag/" "$B/.env"
+  # KI (Experimentell, 14.10.2026): eingerichtet (Marke von `epm-ki einrichten`) → deren Container bleiben dabei
+  local dateien="compose.yaml"
+  [[ -f "$B/ki-aktiv" && -f "$B/compose.ki.yaml" ]] && dateien="compose.yaml:compose.ki.yaml"
+  sed -i -e "s/^COMPOSE_FILE=.*/COMPOSE_FILE=$dateien/" -e "s/^EPM_VERSION=.*/EPM_VERSION=$tag/" "$B/.env"
   (cd "$B" && docker compose up -d --remove-orphans) || return 1
   schritt "Warte auf das Backend"
   local status=""
@@ -309,6 +312,7 @@ schritt "Projektdateien aktualisieren (Compose, Nginx, Skripte)"
 (cd "$CODE/rollout" && ./04-projekt.sh >/dev/null)
 install -m 0750 "$CODE/werkzeuge/epm-update.sh" /usr/local/sbin/epm-update
 install -m 0750 "$CODE/werkzeuge/ocr-modelle.sh" /usr/local/sbin/epm-ocr-modelle
+install -m 0750 "$CODE/werkzeuge/ki.sh" /usr/local/sbin/epm-ki          # KI (Experimentell), 14.10.2026
 
 # OCR-Modelle (PP-OCRv5, UVDoc): offline vorbereitet und mit „epm-ocr-modelle einspielen“ abgelegt → in den
 # Bau-Kontext legen; der Bau übernimmt sie von dort statt sie von huggingface.co zu laden.

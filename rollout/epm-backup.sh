@@ -77,7 +77,13 @@ fi
 GNUPGHOME="$(mktemp -d)"
 export GNUPGHOME
 FERTIG=0
+# KI (Experimentell, 14.10.2026): Marke für den KI-Dienst – solange sie liegt, pausiert er (kein Wettlauf um CPU,
+# Speicher und Platte mit pg_dump/tar). Ältere Marken als 6 Stunden ignoriert er (abgebrochener Lauf).
+MARKE_KI="$B/system/status/backup-laeuft"
+install -d -m 0755 "$B/system/status" 2>/dev/null || true
+touch "$MARKE_KI" 2>/dev/null || true
 aufraeumen() {
+  rm -f "$MARKE_KI"
   gpgconf --homedir "$GNUPGHOME" --kill all >/dev/null 2>&1 || true
   rm -rf "$GNUPGHOME"
   rm -f "$ZIEL"/epm-*_"$STAMP".*.teil
