@@ -35,7 +35,8 @@ from .kennzahlen import (abschluss_pruefen, befund_filter, kennzahlen, kontakt_f
                          schnellfilter, zaehler)
 from .loeschung import PLATZHALTER, schwaerze_dokument, trage_ein
 from .models import (Bezugsperson, Datenschutzanfrage, Diagnose, Dokument, DokumentVorgang, Erklaerung, Therapieschritt,
-                     Gewichtsmessung, Hinweisruhe, Kontakt, Medikament, Patient, PatientArzt, Termin, dokument_pfad,
+                     Gewichtsmessung, Hinweisruhe, Katheter, KatheterKomplikation, Kontakt, Medikament, Patient,
+                     PatientArzt, Termin, dokument_pfad,
                      plus_monate, sichtbare_termine)
 
 
@@ -228,6 +229,8 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                 "berichte": obj.berichte.count(),
                 # Korrespondenz (14.10.2026): alle Schreiben der Akte
                 "korrespondenz": obj.korrespondenz.count(),
+                # Katheter-Historie (F192): erfasste Katheter (ohne zurückgenommene)
+                "katheter": obj.katheter_eintraege.filter(aktiv=True).count(),
             },
         }
 
@@ -847,7 +850,8 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
 
         Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, bemerkung, gewichte, kontakte, termine,
         dokumente, infusionsplaene, bezugspersonen, aerzte, erklaerungen, datenschutz, diagnosen, laborbefunde,
-        bia_messungen, berichte, korrespondenz, hinweisruhe, therapieschritte, medikamente; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
+        bia_messungen, berichte, korrespondenz, hinweisruhe, therapieschritte, medikamente, katheter,
+        katheter_komplikationen; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
         die Bereiche Stammdaten, Diagnose, Therapie, Empfehlung und Bemerkung verteilt.
         """
         patient = self.get_object()
@@ -905,6 +909,11 @@ def _aktion(name, h, aenderungen):
         return "wieder aufgenommen" if h.aktiv else "entfernt"
     if name == "medikamente" and "aktiv" in felder:
         return "wieder angesetzt" if h.aktiv else "abgesetzt"
+    # Katheter-Historie (F192)
+    if name in ("katheter", "katheter_komplikationen") and "aktiv" in felder:
+        return "wieder aufgenommen" if h.aktiv else "als falsch erfasst zurückgenommen"
+    if name == "katheter" and "entfernt_am" in felder:
+        return "als entfernt eingetragen" if h.entfernt_am else "wieder als liegend eingetragen"
     if name == "berichte" and "status" in felder:
         return "freigegeben" if h.status == "freigegeben" else "geändert"
     if name == "korrespondenz" and "status" in felder:
@@ -1007,6 +1016,26 @@ def _beschreibung(name, h, aktion) -> str:
             if not h.aktiv and h.abgesetzt_am:
                 teile.append(f"abgesetzt am {h.abgesetzt_am:%d.%m.%Y}" + (f": {h.absetzgrund}" if h.absetzgrund else ""))
             return " · ".join(teile)
+        if name == "katheter":
+            typ = Auswahlwert.objects.filter(pk=h.typ_id).values_list("wert", flat=True).first()
+            teile = [t for t in (typ, h.lage) if t]
+            teile.append(f"angelegt am {h.anlage_am:%d.%m.%Y}")
+            if h.entfernt_am:
+                grund = Auswahlwert.objects.filter(pk=h.entfernungsgrund_id).values_list("wert", flat=True).first()
+                teile.append(f"entfernt am {h.entfernt_am:%d.%m.%Y}" + (f" ({grund})" if grund else ""))
+            if h.notiz:
+                teile.append(h.notiz)
+            return " · ".join(teile)
+        if name == "katheter_komplikationen":
+            art = Auswahlwert.objects.filter(pk=h.art_id).values_list("wert", flat=True).first()
+            k = Katheter.history.filter(id=h.katheter_id).order_by("-history_date").first()
+            typ = Auswahlwert.objects.filter(pk=k.typ_id).values_list("wert", flat=True).first() if k else None
+            teile = [f"{art or 'Komplikation'} am {h.datum:%d.%m.%Y}"]
+            if typ and k:
+                teile.append(f"Katheter {typ} vom {k.anlage_am:%d.%m.%Y}")
+            if h.notiz:
+                teile.append(h.notiz)
+            return " · ".join(teile)
         if name == "hinweisruhe":
             wann = f"bis {h.bis:%d.%m.%Y}" if h.bis else "bis auf Weiteres (nicht mehr nötig)"
             return " · ".join(filter(None, [dict(Hinweisruhe.Art.choices).get(h.art, h.art), wann, h.grund]))
@@ -1076,6 +1105,9 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         "therapieschritte": Therapieschritt.history.filter(patient_id=patient.id),
         # Medikamentenplan (Wunsch 11.10.2026)
         "medikamente": Medikament.history.filter(patient_id=patient.id),
+        # Katheter-Historie (F192, 15.10.2026)
+        "katheter": Katheter.history.filter(patient_id=patient.id),
+        "katheter_komplikationen": KatheterKomplikation.history.filter(patient_id=patient.id),
         "hinweisruhe": Hinweisruhe.history.filter(patient_id=patient.id),
         "laborbefunde": Laborbefund.history.filter(patient_id=patient.id),
         "bia_messungen": BiaMessung.history.filter(patient_id=patient.id),
@@ -2165,6 +2197,184 @@ class TherapieschrittViewSet(_StammEintragViewSet):
 
     def get_queryset(self):
         return super().get_queryset().select_related("angelegt_von")
+
+
+# ================================================================= Katheter-Historie (F192, 15.10.2026)
+VORHERIGER_OFFEN = "Vorheriger Katheter noch nicht als entfernt eingetragen"
+
+
+def _pruefe_auswahl(wert, liste, name, instanz_wert_id=None):
+    """Wert aus der richtigen Auswahlliste; ausgeblendete Werte nur, wenn sie schon am Eintrag stehen."""
+    if wert is None:
+        return wert
+    if wert.liste != liste:
+        raise serializers.ValidationError(f"Ungültiger Wert für die Liste „{name}“.")
+    if not wert.aktiv and instanz_wert_id != wert.id:
+        raise serializers.ValidationError("Dieser Wert ist ausgeblendet und nicht mehr wählbar.")
+    return wert
+
+
+class KatheterKomplikationSerializer(FirmaFeld, ModelClean, serializers.ModelSerializer):
+    """Komplikation an einem Katheter: Datum (in der Liegezeit), Art aus der Liste „Katheter: Komplikation“, Notiz."""
+
+    art_name = serializers.CharField(source="art.wert", read_only=True, default=None)
+    ist_infektion = serializers.BooleanField(read_only=True)
+    angelegt_von_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = KatheterKomplikation
+        fields = ["id", "patient", "katheter", "datum", "art", "art_name", "ist_infektion", "notiz", "aktiv",
+                  "angelegt_am", "angelegt_von_name"]
+        read_only_fields = ["patient", "angelegt_am"]
+
+    def get_angelegt_von_name(self, obj):
+        return benutzername(obj.angelegt_von)
+
+    def get_fields(self):
+        """Nur Katheter aus Akten, die die Person sieht – sonst verrieten die Prüfungen Daten fremder Akten."""
+        felder = super().get_fields()
+        request = self.context.get("request")
+        if request is not None and "katheter" in felder and not felder["katheter"].read_only:
+            felder["katheter"].queryset = Katheter.objects.filter(patient__in=patienten_fuer(request.user))
+        return felder
+
+    def validate_katheter(self, katheter):
+        if self.instance is not None and katheter != self.instance.katheter:
+            raise serializers.ValidationError("Der Katheter einer Komplikation kann nicht getauscht werden; bitte neu "
+                                              "erfassen und die falsche zurücknehmen.")
+        if self.instance is None and not katheter.aktiv:
+            raise serializers.ValidationError("Dieser Katheter wurde als falsch erfasst zurückgenommen.")
+        return katheter
+
+    def validate_art(self, art):
+        return _pruefe_auswahl(art, Auswahlwert.Liste.KATHETER_KOMPLIKATION, "Komplikation",
+                               self.instance.art_id if self.instance else None)
+
+    def validate_notiz(self, wert):
+        return (wert or "").strip()
+
+
+class KatheterSerializer(FirmaFeld, ModelClean, _PatientFest, serializers.ModelSerializer):
+    """Ein Katheter der Akte. ``liegedauer_tage``: bis „Entfernt am“ bzw. bis heute; ``komplikationen``: alle
+    Komplikationen dieses Katheters (auch zurückgenommene, mit ``aktiv``), neueste zuerst."""
+
+    typ_name = serializers.CharField(source="typ.wert", read_only=True, default=None)
+    entfernungsgrund_name = serializers.CharField(source="entfernungsgrund.wert", read_only=True, default=None)
+    liegt = serializers.BooleanField(read_only=True)
+    liegedauer_tage = serializers.SerializerMethodField()
+    komplikationen = KatheterKomplikationSerializer(many=True, read_only=True)
+    angelegt_von_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Katheter
+        fields = ["id", "patient", "typ", "typ_name", "lage", "anlage_am", "entfernt_am", "entfernungsgrund",
+                  "entfernungsgrund_name", "notiz", "aktiv", "liegt", "liegedauer_tage", "komplikationen",
+                  "angelegt_am", "angelegt_von_name"]
+        read_only_fields = ["angelegt_am"]
+
+    def get_angelegt_von_name(self, obj):
+        return benutzername(obj.angelegt_von)
+
+    def get_liegedauer_tage(self, obj):
+        return obj.liegedauer_tage()
+
+    def validate_typ(self, typ):
+        return _pruefe_auswahl(typ, Auswahlwert.Liste.KATHETER, "Katheter", self.instance.typ_id if self.instance else None)
+
+    def validate_entfernungsgrund(self, grund):
+        return _pruefe_auswahl(grund, Auswahlwert.Liste.KATHETER_ENTFERNUNG, "Entfernungsgrund",
+                               self.instance.entfernungsgrund_id if self.instance else None)
+
+    def validate(self, attrs):
+        # Freitexte getrimmt speichern (``ModelClean`` prüft nur, gespeichert wird der Serializer-Wert)
+        for feld in ("lage", "notiz"):
+            if isinstance(attrs.get(feld), str):
+                attrs[feld] = attrs[feld].strip()
+        # ohne „Entfernt am“ kein Entfernungsgrund: wer das Datum leert, leert auch den Grund
+        if "entfernt_am" in attrs and attrs["entfernt_am"] is None and "entfernungsgrund" not in attrs:
+            attrs["entfernungsgrund"] = None
+        return super().validate(attrs)
+
+
+class KatheterViewSet(_StammEintragViewSet):
+    """Katheter-Historie eines Patienten: ``?patient=ID&aktiv=true``, neueste Anlage zuerst, mit Komplikationen.
+    Lesen mit „Akten lesen“, Schreiben mit „Akten bearbeiten“ (Admin nur bei Testpatienten, abgeschlossene Akten
+    nicht). Kein Löschen – falsch Erfasstes mit ``aktiv: false`` zurücknehmen.
+
+    ``POST`` antwortet zusätzlich mit ``kerndaten_aktualisiert`` (Typ in ``Patient.katheter`` übernommen) und
+    ``hinweise`` (z. B. „Vorheriger Katheter noch nicht als entfernt eingetragen“).
+    ``GET …/kennzahlen/?patient=ID``: aktueller Katheter mit Liegedauer, Kathetertage, Infektionen je 1000
+    Kathetertage, Hinweise (``katheter_kennzahlen``)."""
+
+    model = Katheter
+    serializer_class = KatheterSerializer
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("typ", "entfernungsgrund", "angelegt_von").prefetch_related(
+            _komplikationen_prefetch())
+
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        k = serializer.instance
+        self._kerndaten = False
+        self._hinweise = []
+        if k.entfernt_am is None and k.aktiv:
+            # Festlegung vom 16.10.2026 (Antwort des Nutzers auf die offene Frage): Ein neuer bzw. gewechselter
+            # Katheter ohne „Entfernt am“ aktualisiert das Katheterfeld der Kerndaten (Patient.katheter) und hebt
+            # „kein Katheter“ auf. Ein noch offener vorheriger Katheter wird NICHT automatisch beendet – das trägt die
+            # Pflege mit Datum und Grund selbst ein; bis dahin gibt es nur den Hinweis.
+            p = Patient.objects.get(pk=k.patient_id)  # frisch lesen: nur Katheterfeld und „kein Katheter“ ändern
+            if p.katheter_id != k.typ_id or p.kein_katheter:
+                p.katheter = k.typ
+                p.kein_katheter = False
+                p._history_user = self.request.user
+                p.save()
+                self._kerndaten = True
+            if Katheter.objects.filter(patient=p, aktiv=True, entfernt_am__isnull=True).exclude(pk=k.pk).exists():
+                self._hinweise.append(VORHERIGER_OFFEN)
+
+    def create(self, request, *args, **kwargs):
+        antwort = super().create(request, *args, **kwargs)
+        antwort.data["kerndaten_aktualisiert"] = getattr(self, "_kerndaten", False)
+        antwort.data["hinweise"] = getattr(self, "_hinweise", [])
+        return antwort
+
+    @action(detail=False, methods=["get"])
+    def kennzahlen(self, request):
+        from .models import katheter_kennzahlen
+
+        pid = request.query_params.get("patient")
+        patient = patienten_fuer(request.user).filter(pk=pid).first() if str(pid or "").isdigit() else None
+        if patient is None:
+            return Response({"patient": "Patient nicht gefunden."}, status=status.HTTP_404_NOT_FOUND)
+        daten = katheter_kennzahlen(patient)
+        # Dezimalzahl als Zahl wie die übrige API (COERCE_DECIMAL_TO_STRING = False)
+        daten["hinweise"] = [VORHERIGER_OFFEN] if daten["offen"] > 1 else []
+        return Response(daten)
+
+
+def _komplikationen_prefetch():
+    from django.db.models import Prefetch
+
+    return Prefetch("komplikationen", queryset=KatheterKomplikation.objects.select_related("art", "angelegt_von")
+                    .order_by("-datum", "-id"))
+
+
+class KatheterKomplikationViewSet(_StammEintragViewSet):
+    """Komplikationen der Katheter: ``?patient=ID`` bzw. ``?katheter=ID``. Der Patient ergibt sich aus dem Katheter.
+    Kein Löschen – ``aktiv: false`` nimmt zurück; jede Fassung steht im Verlauf der Akte."""
+
+    model = KatheterKomplikation
+    serializer_class = KatheterKomplikationSerializer
+    filterset_fields = ["patient", "katheter", "aktiv"]
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("art", "katheter", "angelegt_von")
+
+    def perform_create(self, serializer):
+        patient = serializer.validated_data["katheter"].patient
+        self.pruefe_patient(patient)
+        serializer.save(patient=patient, angelegt_von=self.request.user)
 
 
 def _zuletzt_eingetragen(patienten, anzahl=10, person=None):

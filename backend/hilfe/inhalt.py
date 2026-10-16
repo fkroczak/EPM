@@ -543,6 +543,40 @@ Vorlagen › Dokumentvorlagen › „Medikationsplan“).</li>
 steht mit Person und Zeitpunkt im Verlauf der Akte.</p>""",
     },
     {
+        # Katheter-Historie (F192, 15.10.2026)
+        "id": "katheter", "gruppe": "patienten", "titel": "Katheter-Historie",
+        "rechte": ["akten_lesen", "akten_bearbeiten"], "seiten": ["/patienten/:id/katheter"],
+        "html": """
+<p>Der Reiter <strong>Katheter</strong> (nach „Medikamente“) zeigt alle Katheter eines Patienten nacheinander auf
+einer <strong>Zeitachse</strong>: Jeder Katheter ist ein Balken von der Anlage bis zur Entfernung (ein noch liegender
+Katheter reicht bis heute), Komplikationen stehen als Markierung auf dem Balken. Am Telefon läuft die Zeitachse von
+oben nach unten. Darunter steht die Liste zum Erfassen und Bearbeiten.</p>
+<p>Oben stehen zwei Kennzahlen:</p>
+<ul>
+<li><strong>Aktueller Katheter</strong> mit Typ, Lage und Liegedauer in Tagen.</li>
+<li><strong>Infektionen je 1000 Kathetertage</strong> – die übliche Kennzahl in der heimparenteralen Ernährung.
+Gezählt werden die Komplikationen „Katheterinfektion“ (und jede andere Art mit „Infektion“ im Namen) aller Katheter,
+geteilt durch die Summe der Liegetage, mal 1000.</li>
+</ul>
+<ul>
+<li><strong>Katheter</strong> trägt einen neuen ein: Typ, Lage/Zugang (z. B. „V. subclavia rechts“), Anlagedatum,
+bei einem schon entfernten Katheter „Entfernt am“ mit Grund, dazu eine Notiz.</li>
+<li>Ein neu angelegter, noch liegender Katheter wird automatisch in die <strong>Kerndaten</strong> der Akte
+übernommen (Feld „Katheter“). Liegt laut Historie noch ein früherer Katheter, erscheint der Hinweis
+<strong>„Vorheriger Katheter noch nicht als entfernt eingetragen“</strong> – EPM beendet ihn nicht von selbst. Bitte
+dort <strong>Entfernen</strong> wählen und Datum und Grund eintragen.</li>
+<li><strong>Komplikation</strong> am Katheter erfasst Datum, Art und Notiz. Das Datum muss in der Liegezeit liegen.</li>
+<li>Der <strong>Stift</strong> ändert einen Eintrag. Falsch Erfasstes wird nicht gelöscht, sondern
+<strong>zurückgenommen</strong>: Es zählt dann in keiner Kennzahl mehr, bleibt aber im Verlauf der Akte.</li>
+<li>Steht in den Kerndaten ein Katheter, aber in der Historie noch keiner, heißt es <strong>„Anlagedatum nicht erfasst
+– bitte nachtragen“</strong>. Aus dem Altsystem gibt es nur den Katheter-Typ, kein Datum – EPM erfindet keins.</li>
+</ul>
+<p>Die Auswahllisten <strong>Entfernungsgrund</strong> und <strong>Komplikation</strong> pflegt die Administration
+unter Administration › Auswahllisten. Eintragen und Ändern braucht das Recht „Patienten anlegen, Diagnose, Therapie,
+Stammdaten ändern“; jede Änderung steht mit Person, Datum und Uhrzeit im Verlauf der Akte und in der Kopie der Akte
+(Datenschutz-Auskunft).</p>""",
+    },
+    {
         "id": "akte_abschliessen", "gruppe": "patienten", "titel": "Akte abschließen und wieder öffnen",
         "rechte": ["akten_abschliessen", "akten_wieder_oeffnen"], "seiten": [],
         "html": """

@@ -12,17 +12,17 @@ import { useQuery } from "@tanstack/react-query";
 import { abfrage, alle, api } from "@/lib/api";
 import { datum, kg, uhrzeit, zahl } from "@/lib/format";
 import { GEWICHTSQUELLEN, TERMINARTEN } from "@/lib/typen";
-import type { Bericht, BiaMessung, Diagnose, Dokument, Gewicht, Kontakt, Laborbefund, Medikament, Plan, Termin } from "@/lib/typen";
+import type { Bericht, BiaMessung, Diagnose, Dokument, Gewicht, Katheter, Kontakt, Laborbefund, Medikament, Plan, Termin } from "@/lib/typen";
 import { Auswahl, Chip, Karte, Laden, Leer, cx } from "@/components/ui/basis";
 import { klartext } from "@/components/Editor";
 import { FirmaMarke } from "@/components/FirmenWahl";
 import { useAkte } from "./Akte";
 
-type Art = "K" | "G" | "T" | "P" | "L" | "D" | "M" | "DOK" | "B";
+type Art = "K" | "G" | "T" | "P" | "L" | "D" | "M" | "KA" | "DOK" | "B";
 
 const ARTEN: { art: Art; text: string }[] = [
   { art: "K", text: "Kontakte" }, { art: "G", text: "Gewicht" }, { art: "T", text: "Termine" }, { art: "P", text: "Pläne" },
-  { art: "L", text: "Labor und BIA" }, { art: "D", text: "Diagnosen" }, { art: "M", text: "Medikamente" }, { art: "DOK", text: "Dokumente" }, { art: "B", text: "Berichte" },
+  { art: "L", text: "Labor und BIA" }, { art: "D", text: "Diagnosen" }, { art: "M", text: "Medikamente" }, { art: "KA", text: "Katheter" }, { art: "DOK", text: "Dokumente" }, { art: "B", text: "Berichte" },
 ];
 
 const ZEITRAEUME: Record<string, { text: string; monate: number | null }> = {
@@ -86,9 +86,11 @@ export function Karteikarte() {
   const bia = useQuery({ queryKey: schluessel("bia"), queryFn: () => api<BiaMessung[]>(`bia-messungen/?patient=${patient.id}`), ...nebenbei });
   const diagnosen = useQuery({ queryKey: schluessel("diagnosen"), queryFn: () => api<Diagnose[]>(`diagnosen/?patient=${patient.id}`), ...nebenbei });
   const medikamente = useQuery({ queryKey: schluessel("medikamente"), queryFn: () => api<Medikament[]>(`medikamente/?patient=${patient.id}`), ...nebenbei });
+  // Katheter-Historie (F192)
+  const katheter = useQuery({ queryKey: schluessel("katheter"), queryFn: () => api<Katheter[]>(`katheter/?patient=${patient.id}&aktiv=true`), ...nebenbei });
   const dokumente = useQuery({ queryKey: schluessel("dokumente"), queryFn: () => alle<Dokument>(`dokumente/${abfrage({ patient: patient.id, ausgeblendet: "false" })}`), ...nebenbei });
   const berichte = useQuery({ queryKey: schluessel("berichte"), queryFn: () => api<Bericht[]>(`berichte/?patient=${patient.id}`), ...nebenbei });
-  const quellen = [kontakte, gewichte, termine, plaene, labor, bia, diagnosen, medikamente, dokumente, berichte];
+  const quellen = [kontakte, gewichte, termine, plaene, labor, bia, diagnosen, medikamente, katheter, dokumente, berichte];
   const laedt = quellen.some((q) => q.isLoading);
   const fehlen = quellen.filter((q) => q.isError).length;
 
@@ -160,6 +162,29 @@ export function Karteikarte() {
         person: m.angelegt_von_name, durchgestrichen: !m.aktiv, zu: `${basis}/medikamente?eintrag=${m.id}`,
       });
     }
+    // Katheter-Historie (F192): Anlage, Entfernung und Komplikationen je als eigene Zeile am jeweiligen Tag
+    for (const k of katheter.data ?? []) {
+      const zu = `${basis}/katheter?eintrag=${k.id}`;
+      e.push({
+        schluessel: `ka${k.id}`, firma: k.firma_kurz, art: "KA", kuerzel: "KA", wann: k.anlage_am,
+        text: `Katheter angelegt: ${k.typ_name ?? ""}${k.lage ? ` · ${k.lage}` : ""}`, zusatz: k.notiz || undefined,
+        person: k.angelegt_von_name, zu,
+      });
+      if (k.entfernt_am) {
+        e.push({
+          schluessel: `kae${k.id}`, firma: k.firma_kurz, art: "KA", kuerzel: "KA", wann: k.entfernt_am,
+          text: `Katheter entfernt: ${k.typ_name ?? ""}${k.entfernungsgrund_name ? ` · ${k.entfernungsgrund_name}` : ""}`,
+          zusatz: k.liegedauer_tage != null ? `${zahl(k.liegedauer_tage)} Tage gelegen` : undefined, person: k.angelegt_von_name, zu,
+        });
+      }
+      for (const x of k.komplikationen.filter((y) => y.aktiv)) {
+        e.push({
+          schluessel: `kak${x.id}`, firma: x.firma_kurz, art: "KA", kuerzel: "KA", wann: x.datum,
+          text: `Katheter-Komplikation: ${x.art_name ?? ""} (${k.typ_name ?? "Katheter"})`, zusatz: x.notiz || undefined,
+          person: x.angelegt_von_name, zu,
+        });
+      }
+    }
     for (const d of dokumente.data ?? []) {
       e.push({
         schluessel: `o${d.id}`, firma: d.firma_kurz, art: "DOK", kuerzel: "DOK", wann: d.datum ?? d.hochgeladen_am,
@@ -176,7 +201,7 @@ export function Karteikarte() {
     }
     // neueste zuerst; am selben Tag Einträge mit Uhrzeit vor denen ohne
     return e.sort((a, b) => b.wann.localeCompare(a.wann));
-  }, [basis, kontakte.data, gewichte.data, termine.data, plaene.data, labor.data, bia.data, diagnosen.data, medikamente.data, dokumente.data, berichte.data]);
+  }, [basis, kontakte.data, gewichte.data, termine.data, plaene.data, labor.data, bia.data, diagnosen.data, medikamente.data, katheter.data, dokumente.data, berichte.data]);
 
   const ab = grenze(ZEITRAEUME[zeitraum].monate);
   const sichtbar = eintraege.filter((e) => (!filter || e.art === filter) && (!ab || nurDatum(e.wann) >= ab));

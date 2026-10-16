@@ -730,6 +730,235 @@ class Medikament(AktenEintrag):
         return " ".join(t for t in (self.wirkstoff, self.staerke) if t)
 
 
+class Katheter(AktenEintrag):
+    """Ein Katheter in der Katheter-Historie der Akte (F192, Wunsch 15.10.2026): Typ (Auswahlliste „Katheter“ wie
+    ``Patient.katheter``), Lage/Zugang, Anlagedatum, Entfernt am mit Grund (Auswahlliste „Katheter:
+    Entfernungsgrund“) und Notiz; je Katheter beliebig viele Komplikationen (``KatheterKomplikation``).
+
+    Ein noch liegender Katheter hat kein ``entfernt_am``. Falsch Erfasstes wird nicht gelöscht, sondern mit
+    ``aktiv = False`` zurückgenommen (zählt dann in keiner Kennzahl und steht nicht mehr in der Zeitachse); jede Fassung
+    steht im Verlauf der Akte.
+
+    Kerndaten (Festlegung vom 16.10.2026): Wird ein neuer Katheter ohne „Entfernt am“ angelegt, übernimmt die API
+    (``KatheterViewSet.perform_create``) seinen Typ in ``Patient.katheter`` und setzt ``kein_katheter`` zurück. Ein
+    noch offener vorheriger Katheter wird dabei NICHT automatisch beendet – es gibt nur den Hinweis „Vorheriger
+    Katheter noch nicht als entfernt eingetragen“."""
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="katheter_eintraege")
+    typ = models.ForeignKey(
+        Auswahlwert, on_delete=models.PROTECT, related_name="+", verbose_name="Katheter-Typ",
+        limit_choices_to={"liste": Auswahlwert.Liste.KATHETER},
+    )
+    lage = models.CharField("Lage/Zugang", max_length=200, blank=True, help_text="z. B. „V. subclavia rechts“")
+    anlage_am = models.DateField("Anlagedatum")
+    entfernt_am = models.DateField("Entfernt am", null=True, blank=True)
+    entfernungsgrund = models.ForeignKey(
+        Auswahlwert, on_delete=models.PROTECT, null=True, blank=True, related_name="+",
+        verbose_name="Entfernungsgrund", limit_choices_to={"liste": Auswahlwert.Liste.KATHETER_ENTFERNUNG},
+    )
+    notiz = models.CharField(max_length=500, blank=True)
+    aktiv = models.BooleanField(default=True)
+    angelegt_am = models.DateTimeField(auto_now_add=True)
+    angelegt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Katheter"
+        verbose_name_plural = "Katheter-Historie"
+        ordering = ["-anlage_am", "-id"]
+        indexes = [models.Index(fields=["patient", "anlage_am"], name="katheter_patient_anlage")]
+        constraints = [
+            models.CheckConstraint(name="katheter_entfernt_nach_anlage",
+                                   condition=models.Q(entfernt_am__isnull=True)
+                                   | models.Q(entfernt_am__gte=models.F("anlage_am"))),
+        ]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Katheter werden nicht gelöscht, sondern als falsch erfasst zurückgenommen (aktiv = False).")
+
+    @property
+    def liegt(self) -> bool:
+        return self.entfernt_am is None
+
+    def liegedauer_tage(self, heute=None) -> int | None:
+        """Liegedauer in Tagen: Entfernt am (bzw. heute) minus Anlagedatum – der Anlagetag zählt nicht mit
+        (Zählweise siehe ``katheter_kennzahlen``)."""
+        if self.anlage_am is None:
+            return None
+        ende = self.entfernt_am or heute or timezone.localdate()
+        return max(0, (ende - self.anlage_am).days)
+
+    def clean(self):
+        fehler = {}
+        self.lage = (self.lage or "").strip()
+        self.notiz = (self.notiz or "").strip()
+        heute = timezone.localdate()
+        if not self.typ_id:
+            fehler["typ"] = "Bitte den Katheter-Typ wählen."
+        elif self.typ.liste != Auswahlwert.Liste.KATHETER:
+            fehler["typ"] = "Ungültiger Wert für die Liste „Katheter“."
+        if self.anlage_am is None:
+            fehler["anlage_am"] = "Bitte das Anlagedatum angeben."
+        elif self.anlage_am > heute:
+            fehler["anlage_am"] = "Das Anlagedatum liegt in der Zukunft."
+        if self.entfernt_am is not None:
+            if self.entfernt_am > heute:
+                fehler["entfernt_am"] = "Das Datum „Entfernt am“ liegt in der Zukunft."
+            elif self.anlage_am is not None and self.entfernt_am < self.anlage_am:
+                fehler["entfernt_am"] = "„Entfernt am“ liegt vor dem Anlagedatum."
+        if self.entfernungsgrund_id:
+            if self.entfernungsgrund.liste != Auswahlwert.Liste.KATHETER_ENTFERNUNG:
+                fehler["entfernungsgrund"] = "Ungültiger Wert für die Liste „Entfernungsgrund“."
+            elif self.entfernt_am is None:
+                fehler["entfernungsgrund"] = "Ein Entfernungsgrund gehört zu einem entfernten Katheter – bitte auch " \
+                                             "„Entfernt am“ angeben."
+        # Bereits erfasste Komplikationen müssen in der (geänderten) Liegezeit bleiben
+        if self.pk and not fehler and self.anlage_am is not None:
+            ausserhalb = self.komplikationen.filter(aktiv=True).filter(
+                models.Q(datum__lt=self.anlage_am)
+                | (models.Q(datum__gt=self.entfernt_am) if self.entfernt_am else models.Q(pk__in=[]))
+            ).order_by("datum").first()
+            if ausserhalb is not None:
+                feld = "anlage_am" if ausserhalb.datum < self.anlage_am else "entfernt_am"
+                fehler[feld] = (f"Die Komplikation vom {ausserhalb.datum:%d.%m.%Y} läge dann außerhalb der Liegezeit. "
+                                "Bitte zuerst die Komplikation anpassen.")
+        if fehler:
+            raise ValidationError(fehler)
+
+    def save(self, *args, **kwargs):
+        # ohne Entfernung kein Entfernungsgrund
+        if self.entfernt_am is None:
+            self.entfernungsgrund = None
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        typ = self.typ.wert if self.typ_id else "Katheter"
+        return f"{typ} seit {self.anlage_am:%d.%m.%Y}" if self.anlage_am else typ
+
+
+class KatheterKomplikation(AktenEintrag):
+    """Komplikation an einem Katheter (F192): Datum, Art (Auswahlliste „Katheter: Komplikation“) und Notiz. Das Datum
+    liegt in der Liegezeit des Katheters. ``patient`` steht zusätzlich am Eintrag (wie an allen Einträgen der Akte:
+    Sperre abgeschlossener Akten, Verlauf, Löschen nach DSGVO). Kein Löschen – ``aktiv = False`` nimmt zurück."""
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="katheter_komplikationen")
+    katheter = models.ForeignKey(Katheter, on_delete=models.CASCADE, related_name="komplikationen")
+    datum = models.DateField()
+    art = models.ForeignKey(
+        Auswahlwert, on_delete=models.PROTECT, related_name="+", verbose_name="Art der Komplikation",
+        limit_choices_to={"liste": Auswahlwert.Liste.KATHETER_KOMPLIKATION},
+    )
+    notiz = models.CharField(max_length=500, blank=True)
+    aktiv = models.BooleanField(default=True)
+    angelegt_am = models.DateTimeField(auto_now_add=True)
+    angelegt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Katheter-Komplikation"
+        verbose_name_plural = "Katheter-Komplikationen"
+        ordering = ["-datum", "-id"]
+        indexes = [models.Index(fields=["patient", "datum"], name="katheterkompl_patient_datum")]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Komplikationen werden nicht gelöscht, sondern als falsch erfasst zurückgenommen.")
+
+    @property
+    def ist_infektion(self) -> bool:
+        return ist_infektion(self.art.wert if self.art_id else "")
+
+    def clean(self):
+        fehler = {}
+        self.notiz = (self.notiz or "").strip()
+        heute = timezone.localdate()
+        if not self.art_id:
+            fehler["art"] = "Bitte die Art der Komplikation wählen."
+        elif self.art.liste != Auswahlwert.Liste.KATHETER_KOMPLIKATION:
+            fehler["art"] = "Ungültiger Wert für die Liste „Komplikation“."
+        if self.datum is None:
+            fehler["datum"] = "Bitte das Datum angeben."
+        elif self.datum > heute:
+            fehler["datum"] = "Das Datum liegt in der Zukunft."
+        if self.katheter_id:
+            k = self.katheter
+            if self.patient_id and k.patient_id != self.patient_id:
+                fehler["katheter"] = "Dieser Katheter gehört zu einer anderen Akte."
+            elif self.datum is not None and "datum" not in fehler:
+                if self.datum < k.anlage_am:
+                    fehler["datum"] = (f"Das Datum liegt vor der Anlage des Katheters ({k.anlage_am:%d.%m.%Y}). "
+                                       "Eine Komplikation gehört in die Liegezeit.")
+                elif k.entfernt_am and self.datum > k.entfernt_am:
+                    fehler["datum"] = (f"Das Datum liegt nach der Entfernung des Katheters ({k.entfernt_am:%d.%m.%Y}). "
+                                       "Eine Komplikation gehört in die Liegezeit.")
+        elif not fehler:
+            fehler["katheter"] = "Bitte den Katheter angeben."
+        if fehler:
+            raise ValidationError(fehler)
+
+    def save(self, *args, **kwargs):
+        if self.patient_id is None and self.katheter_id:
+            self.patient_id = self.katheter.patient_id
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.art.wert if self.art_id else 'Komplikation'} am {self.datum:%d.%m.%Y}"
+
+
+def ist_infektion(art_wert: str) -> bool:
+    """Zählt eine Komplikation als Katheterinfektion (Kennzahl je 1000 Kathetertage)?
+
+    OFFEN – vom Nutzer zu bestätigen: Die Liste „Katheter: Komplikation“ ist pflegbar und hat kein eigenes Merkmal
+    „Infektion“. Gezählt wird darum jeder Wert, der „infektion“ enthält (Grundwert „Katheterinfektion“, aber auch z. B.
+    ein später angelegter Wert „Tunnelinfektion“). Wird ein Wert umbenannt, ändert sich die Kennzahl mit."""
+    return "infektion" in (art_wert or "").lower()
+
+
+def katheter_kennzahlen(patient, heute=None) -> dict:
+    """Kennzahlen der Katheter-Historie einer Akte (F192); nur aktive (nicht zurückgenommene) Einträge.
+
+    * ``aktuell``: der zuletzt angelegte noch liegende Katheter mit Liegedauer in Tagen
+    * ``offen``: Anzahl noch liegender Katheter (mehr als einer → Hinweis „Vorheriger Katheter noch nicht als entfernt
+      eingetragen“)
+    * ``kathetertage``: Summe der Liegedauern (Entfernt am bzw. heute minus Anlagedatum)
+    * ``infektionen``: Komplikationen, die als Katheterinfektion zählen (``ist_infektion``)
+    * ``infektionen_je_1000``: Infektionen / Kathetertage × 1000 (übliche Kennzahl der heimparenteralen Ernährung,
+      „CRBSI-Rate“), auf zwei Stellen gerundet; ohne Kathetertage ``None``
+    * ``anlagedatum_fehlt``: In den Kerndaten steht ein Katheter (``Patient.katheter``), die Historie ist aber leer –
+      die Oberfläche bittet dann „Anlagedatum nicht erfasst – bitte nachtragen“ (Festlegung 16.10.2026; es werden
+      keine Daten erfunden).
+
+    OFFEN – vom Nutzer zu bestätigen: Zählweise der Kathetertage. Gezählt werden die Tage zwischen Anlage und Entfernung
+    (der Anlagetag zählt nicht mit, ein am selben Tag entfernter Katheter hat 0 Tage); überlappende Katheter zählen
+    beide. Manche Register zählen jeden Kalendertag mit liegendem Katheter (dann +1 je Katheter)."""
+    from decimal import ROUND_HALF_UP
+
+    heute = heute or timezone.localdate()
+    katheter = list(patient.katheter_eintraege.filter(aktiv=True).select_related("typ").order_by("-anlage_am", "-id"))
+    offen = [k for k in katheter if k.liegt]
+    tage = sum(k.liegedauer_tage(heute) or 0 for k in katheter)
+    komplikationen = KatheterKomplikation.objects.filter(patient=patient, aktiv=True, katheter__aktiv=True) \
+        .select_related("art")
+    infektionen = sum(1 for k in komplikationen if k.ist_infektion)
+    rate = None
+    if tage > 0:
+        rate = (Decimal(infektionen) * 1000 / Decimal(tage)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    aktuell = offen[0] if offen else None
+    return {
+        "aktuell": {"id": aktuell.id, "typ": aktuell.typ.wert, "lage": aktuell.lage, "anlage_am": aktuell.anlage_am,
+                    "liegedauer_tage": aktuell.liegedauer_tage(heute)} if aktuell else None,
+        "offen": len(offen),
+        "anzahl": len(katheter),
+        "kathetertage": tage,
+        "infektionen": infektionen,
+        "infektionen_je_1000": rate,
+        "anlagedatum_fehlt": bool(patient.katheter_id) and not katheter,
+        "kerndaten_typ": patient.katheter.wert if patient.katheter_id else None,
+        "kerndaten_typ_id": patient.katheter_id,
+    }
+
+
 def dokument_pfad(patient: Patient, originalname: str) -> str:
     endung = "".join(c for c in (originalname.rsplit(".", 1)[-1] if "." in originalname else "") if c.isalnum())[:10]
     return f"{patient.nummer}/{uuid.uuid4().hex}{'.' + endung.lower() if endung else ''}"

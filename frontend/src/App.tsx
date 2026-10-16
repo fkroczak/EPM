@@ -50,6 +50,8 @@ const router = createBrowserRouter([
           { path: "diagnosen", ...seite(() => import("./seiten/akte/Diagnosen").then(({ Diagnosen }) => <Diagnosen />)) },
           // Medikamentenplan (Wunsch 11.10.2026)
           { path: "medikamente", ...seite(() => import("./seiten/akte/Medikamente").then(({ Medikamente }) => <Medikamente />)) },
+          // Katheter-Historie mit Zeitachse (F192, 15.10.2026)
+          { path: "katheter", ...seite(() => import("./seiten/akte/Katheter").then(({ Katheter }) => <Katheter />)) },
           { path: "therapie", ...seite(() => import("./seiten/akte/Therapie").then(({ Therapie }) => <Therapie />)) },
           { path: "empfehlung", ...seite(() => import("./seiten/akte/Therapie").then(({ Empfehlung }) => <Empfehlung />)) },
           { path: "kontakte", ...seite(() => import("./seiten/akte/Kontakte").then(({ Kontakte }) => <Kontakte />)) },

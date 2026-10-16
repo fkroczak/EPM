@@ -800,6 +800,8 @@ export function Akte() {
     { zu: `${basis}/diagnosen`, text: "Diagnosen", zahl: k?.zaehler.diagnosen, gruppe: "Behandlung", stufe: "haupt" },
     // Medikamentenplan (Wunsch 11.10.2026)
     { zu: `${basis}/medikamente`, text: "Medikamente", zahl: k?.zaehler.medikamente, stufe: "haupt" },
+    // Katheter-Historie (F192, 15.10.2026) – in allen drei Ansichten (Kopfzeile, Seitenleiste, Karteikarte) aus dieser Liste
+    { zu: `${basis}/katheter`, text: "Katheter", zahl: k?.zaehler.katheter, stufe: "haupt" },
     { zu: `${basis}/therapie`, text: "Therapie", stufe: "haupt" },
     { zu: `${basis}/empfehlung`, text: "Empfehlung", stufe: "haupt" },
     { zu: `${basis}/plaene`, text: "Infusionspläne", zahl: k?.zaehler.infusionsplaene, stufe: "haupt" },

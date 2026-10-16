@@ -176,6 +176,31 @@ def aktenkopie_pdf(patient) -> bytes:
             ["Wirkstoff", "Handelsname", "Form", "Dosierung", "Grund", "seit", "Stand"], medikamente,
             [None, None, "20mm", "28mm", None, "20mm", "30mm"])))
 
+    # Katheter-Historie (F192): alle Katheter mit Liegedauer und Komplikationen, auch zurückgenommene (DSGVO-Auskunft)
+    from patienten.models import katheter_kennzahlen
+
+    katheter = []
+    for k in p.katheter_eintraege.select_related("typ", "entfernungsgrund", "angelegt_von").order_by("anlage_am", "id"):
+        komplikationen = "".join(
+            f'<div class="klein">{_e(datum(x.datum))}: {_e(x.art.wert)}{(" · " + _e(x.notiz)) if x.notiz else ""}'
+            f'{"" if x.aktiv else " (als falsch erfasst zurückgenommen)"}</div>'
+            for x in k.komplikationen.select_related("art").order_by("datum", "id"))
+        stand = ("liegt" if k.liegt else _e(f"entfernt am {datum(k.entfernt_am)}"
+                                              + (f" ({k.entfernungsgrund.wert})" if k.entfernungsgrund_id else "")))
+        if not k.aktiv:
+            stand += " · als falsch erfasst zurückgenommen"
+        katheter.append([_e(k.typ.wert), _e(k.lage), _e(datum(k.anlage_am)), stand, _e(k.liegedauer_tage()),
+                         (_e(k.notiz) if k.notiz else "") + komplikationen or "—", _e(benutzername(k.angelegt_von))])
+    if katheter:
+        z = katheter_kennzahlen(p)
+        rate = (f"{z['infektionen_je_1000']} je 1000 Kathetertage".replace(".", ",")
+                if z["infektionen_je_1000"] is not None else "—")
+        teile.append(_abschnitt("Katheter-Historie", _tabelle(
+            ["Typ", "Lage/Zugang", "Anlage", "Stand", "Tage", "Notiz und Komplikationen", "erfasst von"], katheter,
+            ["22mm", "30mm", "20mm", "34mm", "12mm", None, "28mm"])
+            + _paare([("Kathetertage gesamt", _e(z["kathetertage"])), ("Katheterinfektionen", _e(z["infektionen"])),
+                      ("Infektionen je 1000 Kathetertage", _e(rate))])))
+
     for titel, text in (("Diagnose (Freitext)", p.diagnose), ("Therapie", p.therapie),
                         ("Empfehlung", p.empfehlung), ("Bemerkung", p.bemerkung)):
         if text:
@@ -299,6 +324,8 @@ BEREICHE = {"stammdaten": "Stammdaten", "diagnose": "Diagnose (Text)", "therapie
             "korrespondenz": "Schreiben",
             # Medikamentenplan (Wunsch 11.10.2026)
             "medikamente": "Medikament",
+            # Katheter-Historie (F192)
+            "katheter": "Katheter", "katheter_komplikationen": "Katheter-Komplikation",
             # Hinweise stummschalten (Wunsch 07.10.2026, F119)
             "hinweisruhe": "Hinweis stummgeschaltet"}
 
