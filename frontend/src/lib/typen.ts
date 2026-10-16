@@ -640,9 +640,18 @@ export const FREIGABEWEGE: Record<string, string> = {
 };
 
 export type Vergleich = {
+  /** der tatsächlich verglichene Plan (Name aus der Zeit, als immer mit dem Vorgänger verglichen wurde) */
   vorgaenger: { id: number; gueltig_ab: string; status: string } | null;
   zeilen: { schluessel: string; wert: string; vorher: string | null; jetzt: string | null; geaendert: boolean }[];
   anzahl_geaendert: number;
+  /** Festlegung 16.10.2026: Standard ist der letzte freigegebene Plan davor, wählbar ist jeder andere Plan des Patienten.
+   *  grund: gewaehlt (über ?mit=), letzter_freigegebener (Standard), vorgaenger (Rückfall ohne freigegebenen Plan) */
+  vergleich_mit: { id: number; gueltig_ab: string; status: Plan["status"]; text: string;
+    grund: "gewaehlt" | "letzter_freigegebener" | "vorgaenger" } | null;
+  /** Plan, mit dem ohne Auswahl verglichen wird (null: es gibt keinen) */
+  standard_id: number | null;
+  /** wählbare Pläne desselben Patienten (ohne den Plan selbst), neueste zuerst */
+  auswahl: { id: number; gueltig_ab: string; status: Plan["status"] }[];
 };
 
 export type Verlaufseintrag = {

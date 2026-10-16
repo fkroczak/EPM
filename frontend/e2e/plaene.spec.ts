@@ -151,9 +151,15 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await editor.getByRole("button", { name: "Als Entwurf speichern" }).click();
   await expect(page.getByText("Entwurf gespeichert.")).toBeVisible();
 
-  await detail.getByRole("button", { name: "Vergleich mit Vorgänger" }).click();
+  // Umschalter heißt seit 16.10.2026 „Vergleich“ (mit Zahl der Änderungen); Standard: letzter freigegebener Plan
+  await detail.getByRole("button", { name: /^Vergleich/ }).click();
   const vergleich = detail.getByTestId("planvergleich");
   await expect(vergleich).toContainText("2 Werte geändert gegenüber dem Plan vom");
+  await expect(vergleich).toContainText("(letzter freigegebener Plan davor)");
+  await expect(vergleich.getByTestId("vergleich-spalte")).toContainText("Aktuell gültig ·");
+  const vergleichMit = detail.getByLabel("Vergleichen mit:");
+  await expect(vergleichMit).toBeVisible();
+  await expect(vergleichMit.locator("option:checked")).toContainText("aktuell gültig (Standard)");
   await expect(vergleich.getByRole("row").filter({ hasText: "Aminosäuren" })).toContainText("geändert");
   await expect(vergleich.getByRole("row").filter({ hasText: "Glucose" })).not.toContainText("geändert");
 
@@ -226,6 +232,76 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await expect(page.getByTestId("plan-volumen")).toContainText("Gesamtvolumen 2.600 ml · Rate 216,7 ml/h");
   await api.ende();
   merken("plan", { patient: patient.id });
+});
+
+test("Planvergleich: Standard ist der letzte freigegebene Plan, Vergleichsplan frei wählbar (16.10.2026)", async ({ page }) => {
+  const api = await apiAls("mediziner");
+  const patient = await api.post("patienten/", { nachname: eindeutig("Vergleich"), vorname: "Vera", geburtsdatum: "1972-04-04" });
+  await api.post("gewichte/", { patient: patient.id, gewicht_kg: "60.0", quelle: "telefonisch" });
+  const praeparate: { id: number; kategorie: string; name: string }[] = await api.get("praeparate/");
+  const praeparat = (kategorie: string, name: string) => praeparate.find((x) => x.kategorie === kategorie && x.name === name)!.id;
+  const tag = (vor: number) => new Date(Date.now() - vor * 86400000).toISOString().slice(0, 10);
+  const datumDe = (iso: string) => iso.split("-").reverse().join(".");
+  // zwei freigegebene Pläne (Glucose 120 g, dann 150 g), danach ein Entwurf mit 180 g
+  const plan = async (vor: number, glucose: string, freigeben: boolean) => {
+    const e = await api.post("infusionsplaene/entwurf/", { patient: patient.id });
+    await api.patch(`infusionsplaene/${e.id}/`, {
+      gueltig_ab: tag(vor), glucose_praeparat: praeparat("glucose", "Glucose"), glucose_g: glucose,
+      aminosaeuren_praeparat: praeparat("aminosaeuren", "Glamin"), aminosaeuren_g: "70", laufzeit_h: "12",
+    });
+    if (freigeben) await api.post(`infusionsplaene/${e.id}/freigeben/`, {});
+    return e.id as number;
+  };
+  const a = await plan(60, "120", true);
+  const b = await plan(30, "150", true);
+  const e = await plan(0, "180", false);
+  // ein Plan eines anderen Patienten lässt sich nicht als Vergleich wählen
+  const fremd = await api.post("patienten/", { nachname: eindeutig("Fremd"), vorname: "Felix", geburtsdatum: "1960-01-01" });
+  const fremdPlan = await api.post("infusionsplaene/entwurf/", { patient: fremd.id });
+  const abgelehnt = await api.roh.get(`/api/infusionsplaene/${e}/vergleich/?mit=${fremdPlan.id}`);
+  expect(abgelehnt.status()).toBe(400);
+  expect((await abgelehnt.json()).mit).toContain("desselben Patienten");
+  await api.roh.delete(`/api/infusionsplaene/${fremdPlan.id}/`, { headers: await api.kopf() });
+
+  await page.goto(`/patienten/${patient.id}/plaene?plan=${e}`);
+  const detail = page.getByTestId("plan-detail");
+  await detail.getByRole("button", { name: /^Vergleich/ }).click();
+  const vergleich = detail.getByTestId("planvergleich");
+  // Standard: der letzte freigegebene Plan (b, aktuell gültig)
+  await expect(vergleich.getByTestId("vergleich-spalte")).toHaveText(`Aktuell gültig · ${datumDe(tag(30))}`);
+  await expect(vergleich).toContainText("(letzter freigegebener Plan davor)");
+  await expect(vergleich.getByRole("row").filter({ hasText: "Glucose" }).first()).toContainText("150 g");
+  const auswahl = detail.getByLabel("Vergleichen mit:");
+  await expect(auswahl.locator("option")).toHaveText([
+    `${datumDe(tag(30))} · aktuell gültig (Standard)`, `${datumDe(tag(60))} · abgelöst`,
+  ]);
+  await expect(auswahl).toHaveValue(String(b));
+  // älteren Plan wählen: Spaltenkopf, Werte und Zähler folgen der Auswahl
+  await auswahl.selectOption(String(a));
+  await expect(vergleich.getByTestId("vergleich-spalte")).toHaveText(`Abgelöst · ${datumDe(tag(60))}`);
+  await expect(vergleich).toContainText("(gewählt)");
+  await expect(vergleich.getByRole("row").filter({ hasText: "Glucose" }).first()).toContainText("120 g");
+  await expect(vergleich.getByRole("row").filter({ hasText: "Glucose" }).first()).toContainText("geändert");
+  // zurück zum Standard
+  await auswahl.selectOption(String(b));
+  await expect(vergleich.getByTestId("vergleich-spalte")).toHaveText(`Aktuell gültig · ${datumDe(tag(30))}`);
+  // ein anderer Plan in der Liste: Auswahl beginnt wieder beim Standard (für b ist das a), der Entwurf ist wählbar
+  await page.getByTestId("planliste").getByRole("button").filter({ hasText: datumDe(tag(30)) }).click();
+  await expect(vergleich.getByTestId("vergleich-spalte")).toHaveText(`Abgelöst · ${datumDe(tag(60))}`);
+  await expect(auswahl.locator("option")).toHaveText([
+    `${datumDe(tag(0))} · Entwurf`, `${datumDe(tag(60))} · abgelöst (Standard)`,
+  ]);
+
+  // Plan-Editor: Markierung gegen den letzten freigegebenen Plan (b)
+  await page.goto(`/patienten/${patient.id}/plaene/${e}/bearbeiten`);
+  const editor = page.getByTestId("plan-editor");
+  await expect(editor.getByTestId("plan-vergleichsbasis")).toContainText(`gegenüber dem letzten freigegebenen Plan vom ${datumDe(tag(30))}`);
+  await expect(editor.getByLabel("Menge Glucose in g")).toHaveClass(/border-warn/);
+  await expect(editor.getByRole("row").filter({ hasText: "Glucose" }).first()).toContainText("150");
+  await expect(editor.getByLabel("Menge Aminosäuren in g")).not.toHaveClass(/border-warn/);
+  // aufräumen: keinen offenen Entwurf zurücklassen
+  await api.roh.delete(`/api/infusionsplaene/${e}/`, { headers: await api.kopf() });
+  await api.ende();
 });
 
 test("Mitarbeiter sieht Pläne, legt aber keine an", async ({ browser }) => {

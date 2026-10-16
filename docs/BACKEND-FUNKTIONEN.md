@@ -100,7 +100,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F33 | Entwurf bearbeiten | 7 Neuer Infusionsplan | ABGESCHLOSSEN UND GETESTET |
 | F34 | Entwurf verwerfen | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
 | F35 | Plan freigeben | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
-| F36 | Vergleich mit dem Vorgänger | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
+| F36 | Vergleich mit dem letzten freigegebenen Plan, Vergleichsplan wählbar (seit 16.10.2026; vorher mit dem Vorgänger) | 8 Infusionspläne | ABGESCHLOSSEN – Lauf steht aus (Erweiterung 16.10.2026) |
 | F37 | Gespeicherte Plan-PDF öffnen mit SHA-256-Prüfung | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
 | F38 | Protonenpumpenhemmer (Pantozol®/Nexium®) im Plan | 7, 8 | ABGESCHLOSSEN UND GETESTET |
 | F39 | Gesamtvolumen, Laufzeit und Rate | 7, 8 | ABGESCHLOSSEN UND GETESTET |
@@ -782,14 +782,49 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
   Folgeplan mit markierten Änderungen, Verwerfen“ (PDF einseitig, Prüfsumme); Neustart geprüft in `zz-neustart.spec.ts` (Lauf 36921980921, Commit `ca9f858`).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
-### F36 Vergleich mit dem Vorgänger
-- **Ansicht:** 8 Infusionspläne
-- **Endpunkt:** `GET /api/infusionsplaene/{id}/vergleich/` → `{"vorgaenger": {id, gueltig_ab, status} | null, "zeilen":
-  [{"schluessel", "wert", "vorher", "jetzt", "geaendert"}], "anzahl_geaendert"}`; Zeilen in der Reihenfolge des Entwurfs
-  (Basislösung … Bemerkung), Werte als Anzeigetext („Glucose 70 % · 200 g“, „80 mmol“, „Soluvit N | Vitalipid adult“).
+### F36 Vergleich mit dem Vorgänger – seit 16.10.2026 mit dem letzten freigegebenen Plan, wählbar
+- **Ansicht:** 8 Infusionspläne (Umschalter „Ansicht wie PDF | Vergleich“ mit Zahl der Änderungen, im Vergleich die
+  Auswahl „Vergleichen mit:“), 7 Neuer Infusionsplan (Markierung und Spalte „vorher“)
+- **Festlegung 16.10.2026:** Verglichen wird standardmäßig mit dem **letzten freigegebenen Plan** (Status „aktuell“
+  oder „abgelöst“, `Infusionsplan.FREIGEGEBEN`) desselben Patienten vor diesem Plan; der Vergleichsplan ist frei wählbar.
+  Bis dahin galt `vorgaenger`. Der ist beim Anlegen eines Entwurfs der damals aktuelle Plan (`neuer_entwurf`), bei aus
+  dem Altsystem übernommenen Plänen der Plan davor nach Datum (`altimport`, kann auch ein abgelöster sein). Ein Entwurf
+  ist nie Vorgänger eines anderen EPM-Plans (es gibt höchstens einen je Patient); verworfene Entwürfe sind gelöscht und
+  tauchen nirgends auf. Ein Entwurf als Vorgänger entsteht nur bei nachgetragenen Plänen (KI-Übernahme).
+- **Regel „letzter freigegebener“** (`Infusionsplan.letzter_freigegebener`): Reihenfolge `gueltig_ab`, bei gleichem
+  Tag `freigegeben_am` (ohne Freigabe, z. B. Altsystem, davor), dann ID; der Plan selbst zählt nie. Für einen
+  **Entwurf** ist es der aktuell gültige Plan (ein Entwurf folgt immer auf die letzte Freigabe), ohne ihn der späteste
+  abgelöste. Für einen freigegebenen Plan der späteste freigegebene davor.
+- **Rückfall:** Gibt es keinen freigegebenen Plan davor, gilt wie bisher `vorgaenger` (`grund: "vorgaenger"`) – der
+  Vergleich zeigt nie weniger als vorher. Gibt es auch keinen Vorgänger: `vorgaenger: null`, die Auswahl bleibt nutzbar.
+- **Endpunkt:** `GET /api/infusionsplaene/{id}/vergleich/[?mit=<Plan-ID>]` → `{"vorgaenger": {id, gueltig_ab, status} | null,
+  "zeilen": [{"schluessel", "wert", "vorher", "jetzt", "geaendert"}], "anzahl_geaendert", "vergleich_mit": {id,
+  gueltig_ab, status, text, grund} | null, "standard_id", "auswahl": [{id, gueltig_ab, status}]}`. `vorgaenger` ist (Name
+  bleibt, kompatibel) der tatsächlich verglichene Plan, `vergleich_mit` derselbe mit Text („01.10.2026 · abgelöst“) und
+  `grund` (`letzter_freigegebener` | `vorgaenger` | `gewaehlt`), `standard_id` der Plan ohne Auswahl, `auswahl` alle
+  anderen Pläne desselben Patienten (auch der Entwurf) wie die Liste: neueste oben. Zeilen in der Reihenfolge des
+  Entwurfs (Basislösung … Bemerkung), Werte als Anzeigetext („Glucose 70 % · 200 g“, „80 mmol“, „Soluvit N | Vitalipid adult“).
+- **Validierung:** `mit` muss ein anderer Plan **desselben Patienten** sein, gesucht nur in `get_queryset()` (Bereich und
+  Rechte des Benutzers). Sonst 400 `{"mit": "Plan zum Vergleich nicht gefunden. Verglichen werden kann nur mit einem
+  anderen Plan desselben Patienten."}` (fremder oder unbekannter Plan, ohne etwas über ihn zu verraten), `{"mit": "Bitte
+  einen anderen Plan zum Vergleich wählen."}` (der Plan selbst) bzw. `{"mit": "Bitte einen Plan zum Vergleich wählen."}`
+  (keine Zahl). Leeres `mit` = Standard. Das Modell lehnt einen fremden Plan zusätzlich ab (`ValidationError`).
+- **Oberfläche:** Akte › Infusionspläne: Umschalter „Vergleich“ (bisher „Vergleich mit Vorgänger“, Zähler bleibt);
+  im Vergleich die Auswahl „Vergleichen mit:“ (vorbelegt mit dem Standard, gekennzeichnet „(Standard)“); Spaltenkopf
+  zeigt den gewählten Plan („Abgelöst · 01.09.2026“), der Satz darüber woher er kommt. Ein anderer Plan in der Liste
+  beginnt wieder beim Standard. Plan-Editor: Markierung, Spalte „vorher“, Volumen/Rate/Energie „vorher“ gegen den
+  letzten freigegebenen Plan (dieselbe Regel im Frontend), sonst den Vorgänger; Satz „Geänderte Werte gegenüber dem
+  letzten freigegebenen Plan vom … sind markiert.“ Eine Auswahl gibt es dort bewusst nicht: Im Kopf des Editors wäre
+  sie je nach Breite in eine neue Zeile gerutscht (Layoutsprung) – vermerkt im Code.
 - **Tabellen:** `infusionen_infusionsplan`, `infusionen_infusionsplan_vitamine`
-- **Teststatus:** Backend-Test grün (`test_vergleich_mit_vorgaenger`). Browsertest grün: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“ („2 Werte geändert …“).
-- **Status:** ABGESCHLOSSEN UND GETESTET
+- **Teststatus:** Backend-Tests `test_vergleich_mit_vorgaenger`, `test_vergleich_standard_ist_letzter_freigegebener`
+  (Entwurf, verworfener Entwurf, nachgetragener Plan mit Entwurf als Vorgänger), `test_vergleich_mit_gewaehltem_plan`,
+  `test_vergleich_mit_plan_eines_anderen_patienten`, `test_vergleich_ohne_freigegebenen_plan_faellt_auf_vorgaenger_zurueck`.
+  Browsertests `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“ („2 Werte
+  geändert …“, Standard in der Auswahl) und „Planvergleich: Standard ist der letzte freigegebene Plan, Vergleichsplan
+  frei wählbar (16.10.2026)“. Bis 15.10.2026 grün; die Erweiterung vom 16.10.2026 ist geschrieben, aber noch nicht
+  gelaufen (Arbeitsumgebung ohne PyPI/npm; geprüft: `python3 -m py_compile`).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus (Erweiterung 16.10.2026)
 
 ### F37 Gespeicherte Plan-PDF öffnen mit SHA-256-Prüfung
 - **Ansicht:** 8 Infusionspläne („PDF öffnen“ am freigegebenen Plan)
@@ -3657,7 +3692,7 @@ Praxis erstellen lassen.“ Befunde, Messung vorher/nachher und Rückfragen: `do
 - **Akte › Infusionspläne:** PDF in voller Spaltenhöhe neben der Liste (`PdfLeser einpassen`: „Ganze Seite“, sonst auf
   die Breite, wenn die Seite sonst unter 360 px schmal wäre), „Groß ansehen“, „Herunterladen“; Herkunft
   (gespeicherte PDF mit Prüfsumme bzw. Ansicht mit aktiver Dokumentvorlage) darunter; Umschalter „Vergleich mit
-  Vorgänger“ mit Zahl der Änderungen.
+  Vorgänger“ mit Zahl der Änderungen (seit 16.10.2026 „Vergleich“ mit wählbarem Vergleichsplan, F36).
 - **Menüpunkt Infusionspläne:** „PDF“ an jedem Plan (Entwürfe: `ansicht/`); ab 1920 px rechts neben der Tabelle.
 - **Plan-Editor:** „Mengen nach Praxisvorgabe“ (je kg des letzten Gewichts wie im Altsystem, `GET …/vorbelegung/`) auch
   beim Folgeplan; Karte **Prüfung vor der Freigabe** (Gewicht vorhanden/≤ 3 Monate, seit F190 6 Monate und einstellbar, Präparat zu jeder Menge, Ca/Mg
@@ -3986,6 +4021,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 16.10.2026 | Planvergleich wählbar (Festlegung 16.10.2026, Branch `feature/planvergleich-waehlbar`) | F36: Der Infusionsplan-Vergleich vergleicht standardmäßig mit dem letzten freigegebenen Plan vor diesem (`Infusionsplan.letzter_freigegebener`; Entwürfe und verworfene Pläne zählen nie), ohne einen solchen wie bisher mit dem Vorgänger. `GET …/vergleich/?mit=<Plan-ID>` wählt einen anderen Plan desselben Patienten (sonst 400), die Antwort hat zusätzlich `vergleich_mit`, `standard_id` und `auswahl`; `vorgaenger`, `zeilen`, `anzahl_geaendert` bleiben (`vorgaenger` = der verglichene Plan). Akte: Umschalter „Vergleich“ statt „Vergleich mit Vorgänger“, Auswahl „Vergleichen mit:“, Spaltenkopf mit dem gewählten Plan. Plan-Editor: Markierung und „vorher“ gegen den letzten freigegebenen Plan, ohne Auswahl (Layout). Hilfe angepasst. Unverändert gegen den Vorgänger: `geaenderte_felder` am Plan und der Bezug der Hinweise aus Labor und Gewicht (F187). Lauf steht aus |
 | 14.10.2026 | Scans: Diagnosen ohne ICD-Code im Brief | Kundenwunsch: PDF-Briefe nennen Diagnosen meist nur im Freitext. Jede Zeile unter „Diagnosen:“ (auch Entlassungs-, Neben-, Dauerdiagnosen, Vorerkrankungen) ohne Code wird ein eigener Vorschlag (`scans/ocr/auswertung.py`: `_freitext_diagnosen`, `freitext: true`, hinter den Diagnosen mit Code; umbrochene Zeilen zusammengesetzt, Messwerte und Fließtext ausgelassen, „V.a.“/„Z.n.“ → Kennzeichen). Code aus dem Gelernten, sonst aus Vorlagen › Diagnosen (`aus_liste`: gleiche Wörter mit kleinen Lesefehlern; 1,0 → `zuordnung: liste`, angehakt; ab 0,6 → `liste_vorschlag`, nicht angehakt; Gleichstand → unspezifische Form). Ohne Treffer bleibt der Code leer, nicht angehakt. Der ICD-Code bleibt Pflicht (Entscheidung 14.10.2026): Zuordnen sperrt „In die Akte legen“, solange eine angehakte Diagnose ohne Code ist; Bezeichnung mit Auswahlliste der Diagnoseliste setzt den Code. Ergänzte Codes werden gelernt. Der Freitext bleibt zusätzlich unter „Texte“. Tests `scans.tests.AuswertungTest.test_arztbrief_diagnosen_ohne_icd`, `scans.test_lernen` |
 | 14.10.2026 | Briefpapier der Regeneration Clinic 1:1 | Neuer Wert `briefpapier` im Baustein „Briefkopf“ (`vorlagen/briefpapier.py`, Prüfung in `bloecke.py`): Kopfband mit Wellenkante, Logo (`statisch/briefpapier/rgc-logo.png`, freigestellt) und Anschrift sowie Fußband mit Postanschrift und Registrierdaten als SVG in Seitengröße, fest positioniert und damit auf jeder Seite; Seitenränder 47/17,6/31/25 mm, Fußzeilentext links entfällt, Seitenzahl über dem Band; erste Seite mit Absenderzeile, Kontakt und „Riga, Datum“ (`absender`). Maße und Farben aus dem Briefpapier der Klinik (pt wie im Original). Schriften Inter und Carlito in `schriften/`. Laborprofile MAL-00 bis MAL-06 nutzen es; Datenmigration `vorlagen/0012_rgc_laborprofile_briefpapier` stellt unbearbeitete mitgelieferte Fassungen um. Editor: Schalter „Briefpapier der Regeneration Clinic“. Tests `vorlagen/test_rgc.py` (`test_briefpapier`). |
 | 14.10.2026 | Laborprofile Malabsorption der Regeneration Clinic | Das Dokument „Laborprofile Malabsorption – Strukturierte Anforderungsprofile zur Integration in die Klinik-IT“ (Version 1.0) als Laboranforderungen auf dem Briefkopf der Klinik: neun eigene Schreiben der Firma RGC in der Gruppe „anforderungen“ – MAL-01, MAL-02A, MAL-02B, MAL-02C, MAL-03 (A–D), MAL-04 (Vollpanel aus MAL-01, 02A, 02B), MAL-05, MAL-06 und eine Übersicht mit Regelwerk R1–R11 und Monitoring-Intervallen (Kennungen `eigen-rgc-mal00` … `eigen-rgc-mal06`). Jeder Bogen ist nach Röhrchen bzw. Material geordnet (Material genau wie im Dokument), mit Röhrchenübersicht, Status P/O/R (Pflicht angekreuzt), LOINC, Hinweis, Pflichthinweisen zur Präanalytik (glutenhaltige Kost, geformter Stuhl, Spurenelement-Röhrchen, lichtgeschützt, gekühlt, nüchtern) und den Regeln des Profils; Reflexparameter aus anderen Profilen mit ihrem Röhrchen (MAL-01: Parathormon 2A.4 nach R7). Strukturierte Daten je Parameter (Felder aus Abschnitt 6 des Dokuments) in `vorlagen/statisch/laborprofile-malabsorption.json`. Umgesetzt mit `werkzeuge/rgc-laborprofile.py DOCX`; Datenmigration `vorlagen/0011_rgc_laborprofile` (nur Fehlendes). Doku `docs/VORLAGEN-RGC-2026-10.md`. Tests `vorlagen/test_rgc.py`. |
