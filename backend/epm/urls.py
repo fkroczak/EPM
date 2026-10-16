@@ -17,6 +17,7 @@ from patienten.api import (
 )
 from hilfe import api as hilfe
 from patienten import meine_akten
+from patienten import statistik
 from patienten.datenschutz_api import DatenschutzanfrageViewSet, DatenschutzViewSet, ErklaerungViewSet
 from stammdaten.api import (
     AnsprechpartnerViewSet, ArztViewSet, AuswahlwertViewSet, BriefkopfView, DiagnosevorlageViewSet, EinstellungenView,
@@ -201,6 +202,10 @@ urlpatterns = [
     path("api/meine-akten/merken/", meine_akten.MerkenView.as_view()),
     path("api/meine-akten/merken/<int:patient>/", meine_akten.MerkenView.as_view()),
     path("api/meine-akten/geoeffnet/", meine_akten.GeoeffnetView.as_view()),
+    # Statistik (F193): anonymisierte Auswertung, Export als PDF und CSV
+    path("api/statistik/", statistik.StatistikView.as_view()),
+    path("api/statistik/pdf/", statistik.StatistikPdfView.as_view()),
+    path("api/statistik/csv/", statistik.StatistikCsvView.as_view()),
     path("api/hilfe/", hilfe.HilfeView.as_view()),
     path("api/hilfe/<slug:abschnitt>/ergaenzung/", hilfe.ErgaenzungView.as_view()),
     path("api/hilfe/<slug:abschnitt>/ergaenzung/versionen/", hilfe.VersionenView.as_view()),

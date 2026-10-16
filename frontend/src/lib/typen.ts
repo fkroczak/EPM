@@ -8,7 +8,8 @@ export type Recht =
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
   | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "testdaten_sehen" | "system_verwalten"
   | "altdaten_importieren" | "berichte_freigeben" | "scans_bearbeiten" | "schreiben_freigeben"
-  | "ki_ansehen" | "ki_pruefen" | "ki_uebernehmen" | "ki_berichte" | "ki_verwalten" | "ki_training_freigeben";
+  | "ki_ansehen" | "ki_pruefen" | "ki_uebernehmen" | "ki_berichte" | "ki_verwalten" | "ki_training_freigeben"
+  | "statistik_ansehen";
 
 /** Kacheln der Startseite (S11): klinische und – mit dem jeweiligen Recht – die der Administration (S12–S14) */
 export type KartenId =
@@ -1136,4 +1137,30 @@ export type ScansStand = {
   dienst?: { gestartet: string; lebenszeichen: string; laeuft: boolean; bearbeitet: number; threads: string;
     /** Speicher des Containers „ocr“ in Bytes (cgroup v2), Höchststand seit dem Start */
     speicher?: { belegt: number; hoechst: number | null; grenze: number | null } | null } | null;
+};
+
+/** Statistik (F193, ``GET /api/statistik/``): nur geschützte Werte – 1 bis 4 Fälle als „< 5“ (``wert`` null), im
+ *  Bestand bei einer solchen Zelle alles auf volle 5 gerundet („≈“, ``status`` „gerundet“). */
+export type StatistikZelle = { wert: number | null; anzeige: string; status: "exakt" | "klein" | "gerundet" };
+export type StatistikZeitraum = { art: "jahr" | "quartal" | "frei"; von: string; bis: string; ende: string; stichtag: string;
+  titel: string; laufend: boolean };
+export type StatistikKennzahl = "aktiv" | "betreut" | "neuaufnahmen" | "abgeschlossen" | "kontakte" | "plaene_erstellt"
+  | "plaene_freigegeben";
+export type StatistikVerteilung = "abschlussanlass" | "versorger" | "altersgruppen" | "katheter";
+export type StatistikWerte = {
+  kennzahlen: Record<StatistikKennzahl, StatistikZelle>;
+  verteilungen: Record<StatistikVerteilung, { schluessel: string; text: string; zelle: StatistikZelle }[]>;
+  gerundet: boolean;
+};
+export type Statistik = {
+  firma: { kuerzel: string; name: string; kurzname: string } | null;
+  zeitraum: StatistikZeitraum;
+  vergleich: StatistikZeitraum;
+  werte: StatistikWerte;
+  vorher: StatistikWerte;
+  kennzahlen: { schluessel: StatistikKennzahl; text: string }[];
+  verteilungen: { schluessel: StatistikVerteilung; text: string }[];
+  regel: string;
+  hinweise: string[];
+  erstellt_am: string;
 };

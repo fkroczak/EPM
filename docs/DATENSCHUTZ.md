@@ -112,6 +112,20 @@ Audit-Log nennen beide Prüfsummen. Beim endgültigen Löschen werden alle Fassu
 geführt, sodass auch eine ältere Sicherung das Dokument nicht zurückbringt. Dafür bindet der OCR-Dienst das
 Dokumentenverzeichnis ein. Ghostscript (für OCRmyPDF) steht unter AGPL – unkritisch für den Betrieb auf eigenen Servern.
 
+**Statistik (F193, 16.10.2026):** Der Menüpunkt „Statistik“ (Recht „Statistik ansehen“: Standard Mitarbeiter
+(erweitert), Mediziner, Admin; Testbenutzer nie) liefert nur **Zählungen** – keine Namen, Patientennummern, Geburtsdaten
+oder Listen von Akten, weder auf der Seite noch in PDF oder CSV. Gezählt werden nur Akten der aktiven Firma
+(Firmenumschaltung wie Patientenliste und Startseite); **Testpatienten nie**; Akten mit eingeschränkter Verarbeitung
+(Art. 18) zählen mit, erscheinen aber nicht einzeln. **Kleine Fallzahlen (k = 5):** Jede Zelle mit 1 bis 4 Fällen
+erscheint als „< 5“; der genaue Wert verlässt den Server nicht. Damit eine solche Zelle nicht über Summen
+zurückgerechnet werden kann, werden beim Bestand (aktiv, betreut, Neuaufnahmen, Abschlüsse und ihre Aufteilungen nach
+Anlass, Versorger, Alter und Katheter) **alle** Werte ab 5 auf volle 5 gerundet („≈“), sobald in einem der beiden
+gezeigten Zeiträume (Zeitraum und Vorzeitraum) eine „< 5“-Zelle vorkommt. Kontakte und Infusionspläne sind eigenständige
+Zählungen und nur nach „< 5“ geschützt. Jeder Export (PDF, CSV) steht im Audit-Log mit Zeitraum und Firma; das bloße
+Ansehen nicht. Restrisiko: Wer viele frei gewählte, sich überlappende Zeiträume abfragt, kann über Differenzen einzelne
+Ereignisse auf einen Tag eingrenzen (siehe O11). Die exportierte Datei enthält nur die angezeigten Werte; wo sie danach
+liegt, ist organisatorisch zu regeln.
+
 **Sicherungen:** Eine ältere Sicherung enthält gelöschte Akten und Dokumente noch bis zu ihrem Ablauf (30 Tage). Jede
 Löschung steht in der Löschliste (`data/loeschliste/loeschliste.jsonl`: dieselben Angaben wie im Löschprotokoll, kein
 Name); nach einer Wiederherstellung löscht das Backend beim Start alles erneut, was die Sicherung zurückgebracht hat
@@ -160,6 +174,7 @@ Löschungen zurück, die nach dieser Sicherung lagen.
 | O8 | ~~Sollen Mitarbeiter Pläne auch anlegen dürfen?~~ **Geklärt 03.10.2026** (U22) | Recht bleibt je Gruppe umstellbar; neue Rolle „Mitarbeiter (erweitert)“ (wie Mitarbeiter + Infusionspläne anlegen) | umgesetzt |
 | O10 | Heruntergeladene Sicherungen (Fehlerliste 02.10.2026, 5.1) | Eine heruntergeladene Datei liegt außerhalb des Servers; verschlüsselte bleiben verschlüsselt, eine unverschlüsselte (ohne Sicherungs-Passwort) enthält alle Daten lesbar – die Oberfläche warnt davor. Jeder Abruf steht im Audit-Log; auf dem Server liegt die Datei 2 Stunden | organisatorisch: nur verschlüsselte herunterladen, Kopien nach Gebrauch löschen |
 | O9 | Nachweis bei Freigabe per Telefon oder persönlich | bei E-Mail und schriftlich ist der Nachweis Pflicht; bei Telefon/persönlich gibt es kein Schriftstück. Der genannte Mediziner wird von EPM nicht benachrichtigt – er sieht den Plan mit Vermerk in der Akte, im Verlauf und im Audit-Log | ohne Nachweis möglich, Weg und Datum stehen im Vermerk |
+| O11 | Statistik: Reicht k = 5 mit Rundung des Bestands? Sollen frei gewählte Zeiträume eingeschränkt werden (z. B. nur ganze Monate)? | Differenzangriffe über viele, sich überlappende frei gewählte Zeiträume lassen sich mit Zellunterdrückung allein nicht ausschließen; die Stiftung bzw. der/die Datenschutzbeauftragte sollte die Regel bestätigen | k = 5, „< 5“ und Rundung des Bestands auf 5 (F193); freie Zeiträume tagesgenau; jeder Export im Audit-Log |
 
 ## 6. Vor der Inbetriebnahme (organisatorisch, nicht im Programm)
 

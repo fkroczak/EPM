@@ -463,3 +463,72 @@ def sicherungs_passwortblatt_pdf(passwort: str, nr: int, aktuell: bool, gesetzt_
           " .befehle { font-family: 'IBM Plex Mono', 'DejaVu Sans Mono', monospace; font-size: 8.5pt;"
           " white-space: pre-wrap; margin: 1mm 0; }</style>")
     return html_zu_pdf(seite("Sicherungs-Passwort", inhalt, fuss, None, rechts))
+
+
+# --------------------------------------------------------------------------------------------- F193 Statistik
+STIL_STATISTIK = """<style>
+.st-kacheln { width: 100%; border-collapse: separate; border-spacing: 2mm 2mm; }
+.st-kacheln td { border: 0.6pt solid #d9d8e3; padding: 2mm 2.5mm; vertical-align: top; width: 25%; }
+.st-kacheln td.leer-zelle { border: 0; }
+.st-kacheln .z { font-size: 15pt; font-weight: 600; }
+.st-kacheln .t { font-size: 7.5pt; color: #5d5b72; }
+.st-kacheln .v { font-size: 7pt; color: #5d5b72; margin-top: 0.5mm; }
+.st-zwei { width: 100%; border-collapse: collapse; }
+.st-zwei > tbody > tr > td { width: 50%; vertical-align: top; padding: 0 4mm 3mm 0; }
+.st-zwei > tbody > tr > td:last-child { padding-right: 0; }
+.tabelle td.r, .tabelle th.r { text-align: right; }
+.st-balken { display: inline-block; height: 2.2mm; background: #251f53; vertical-align: middle; }
+.st-hinweis { font-size: 7.5pt; color: #5d5b72; }
+</style>"""
+
+
+def statistik_pdf(daten: dict) -> bytes:
+    """Statistik als PDF (F193): Briefkopf und Fuß wie die übrigen Listen, nur die geschützten Werte aus
+    ``patienten.statistik.auswertung`` (keine Namen, Nummern, Geburtsdaten; „< 5“ und gerundete Werte wie angezeigt)."""
+    from datetime import date
+
+    kopf, fuss, rechts = _kopf_fuss()
+    z, v = daten["zeitraum"], daten["vergleich"]
+    werte, vorher = daten["werte"], daten["vorher"]
+    firma = daten["firma"]["name"] if daten["firma"] else ""
+
+    def tag(iso):
+        return datum(date.fromisoformat(iso))
+
+    kacheln = []
+    for k in daten["kennzahlen"]:
+        jetzt, alt = werte["kennzahlen"][k["schluessel"]], vorher["kennzahlen"][k["schluessel"]]
+        kacheln.append(f'<td><div class="t">{html.escape(k["text"])}</div><div class="z">{html.escape(jetzt["anzeige"])}</div>'
+                       f'<div class="v">{html.escape(v["titel"])}: {html.escape(alt["anzeige"])}</div></td>')
+    while len(kacheln) % 4:
+        kacheln.append('<td class="leer-zelle"></td>')
+    reihen = "".join("<tr>" + "".join(kacheln[i:i + 4]) + "</tr>" for i in range(0, len(kacheln), 4))
+
+    def verteilung(schluessel, text):
+        zeilen = werte["verteilungen"][schluessel]
+        alt = {r["schluessel"]: r["zelle"]["anzeige"] for r in vorher["verteilungen"][schluessel]}
+        groesster = max([r["zelle"]["wert"] or 0 for r in zeilen] + [1])
+        koerper = ""
+        for r in zeilen:
+            breite = 0 if r["zelle"]["wert"] is None else 28 * (r["zelle"]["wert"] / groesster)
+            balken = f'<span class="st-balken" style="width:{breite:.1f}mm"></span>' if breite else ""
+            koerper += (f'<tr><td>{html.escape(r["text"])}</td><td>{balken}</td>'
+                        f'<td class="r">{html.escape(r["zelle"]["anzeige"])}</td>'
+                        f'<td class="r">{html.escape(alt.get(r["schluessel"], "0"))}</td></tr>')
+        koerper = koerper or '<tr><td class="leer" colspan="4">keine Akten</td></tr>'
+        return (f'<table class="tabelle"><colgroup><col><col style="width:30mm"><col style="width:16mm">'
+                f'<col style="width:16mm"></colgroup><thead><tr><th>{html.escape(text)}</th><th></th>'
+                f'<th class="r">{html.escape(z["titel"])}</th><th class="r">{html.escape(v["titel"])}</th></tr></thead>'
+                f'<tbody>{koerper}</tbody></table>')
+
+    verteilungen = [verteilung(s["schluessel"], s["text"]) for s in daten["verteilungen"]]
+    zwei = "".join(f"<tr><td>{verteilungen[i]}</td><td>{verteilungen[i + 1] if i + 1 < len(verteilungen) else ''}</td></tr>"
+                   for i in range(0, len(verteilungen), 2))
+    hinweise = "".join(f"<li>{html.escape(h)}</li>" for h in [daten["regel"], *daten["hinweise"]])
+    inhalt = (kopf + _titel("Statistik", f"{firma} · erstellt {datum(timezone.now())}")
+              + f'<div class="block">Zeitraum <strong>{html.escape(z["titel"])}</strong> ({tag(z["von"])} – {tag(z["bis"])}, '
+                f'Stichtag {tag(z["stichtag"])}) · Vergleich: {html.escape(v["titel"])} ({tag(v["von"])} – {tag(v["bis"])})</div>'
+              + f'<div class="block"><table class="st-kacheln">{reihen}</table></div>'
+              + f'<div class="block"><table class="st-zwei">{zwei}</table></div>'
+              + f'<div class="block st-hinweis"><ul>{hinweise}</ul></div>')
+    return html_zu_pdf(seite("Statistik", inhalt + STIL_KLEIN + STIL_STATISTIK, fuss, None, rechts))
