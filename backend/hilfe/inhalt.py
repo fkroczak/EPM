@@ -46,6 +46,7 @@ GRUPPEN = [
     ("kontakte", "Kontakte und Termine"),
     ("gewicht", "Gewicht"),
     ("plaene", "Infusionspläne"),
+    ("statistik", "Statistik"),
     ("dokumente", "Dokumente"),
     ("datenschutz", "Datenschutz"),
     ("scans", "Scans und Texterkennung"),
@@ -183,7 +184,7 @@ Administration setzt den zweiten Faktor zurück.</p>""",
 <p>Der Arbeitsplatz für EPM ist der PC. Am Telefon (im VPN) geht das Wichtigste unterwegs:</p>
 <ul>
 <li><strong>Pläne freigeben:</strong> unten <strong>Pläne</strong> zeigt die Entwürfe zur Freigabe; Plan öffnen, prüfen
-(Ansicht wie PDF, Vergleich mit dem Vorgänger) und <strong>Freigeben</strong>.</li>
+(Ansicht wie PDF, Vergleich mit dem letzten freigegebenen Plan) und <strong>Freigeben</strong>.</li>
 <li><strong>Kurz nachsehen:</strong> Suche oben (Lupe) oder <strong>Patienten</strong>; der Aktenkopf zeigt Gewicht,
 Plan, Versorger und den nächsten Termin, die Reiter lassen sich seitlich wischen.</li>
 <li><strong>Notiz erfassen:</strong> <strong>＋ Notiz</strong> in der Leiste unten öffnet die Schnellerfassung – in einer
@@ -391,6 +392,11 @@ Patienten ist die Firma vorgewählt, für die gerade gearbeitet wird.</p>
 <p><strong>Neuer Patient</strong> in der Patientenliste öffnet das Formular. Pflicht sind Nachname, Vorname und
 Geburtsdatum; EPM vergibt die Patientennummer selbst und warnt, wenn es eine Akte mit gleichem Namen und Geburtsdatum
 schon gibt.</p>
+<p>Die Warnung <strong>Ähnlicher Patient vorhanden</strong> findet auch andere Schreibweisen (Müller = Mueller,
+René = Rene, Doppelnamen, „von“/„van“ …), kleine Tippfehler, vertauschte Vor- und Nachnamen und ein Geburtsdatum mit
+vertauschtem Tag und Monat; abgeschlossene Akten zählen mit. Unter jedem Treffer steht der Grund. Ist es eine andere
+Person, <strong>Nein, andere Person</strong> wählen – ein Grund ist dafür nicht nötig. Eine eingeschränkte Akte
+erscheint nur als Hinweis ohne Namen.</p>
 <p><strong>Als Testpatient anlegen</strong> (Häkchen oben) legt eine Übungsakte an, z. B. um Infusionspläne
 auszuprobieren: Nummer ab 9001, zählt in keiner Statistik. Testzugänge und Admins legen immer Testpatienten an.</p>
 <p>Gewicht bei Aufnahme, Hausarzt, Versorger, Katheter und Nickelallergie lassen sich gleich mit erfassen.
@@ -536,6 +542,40 @@ Vorlagen › Dokumentvorlagen › „Medikationsplan“).</li>
 </ul>
 <p>Eintragen und Ändern braucht das Recht „Patienten anlegen, Diagnose, Therapie, Stammdaten ändern“; jede Änderung
 steht mit Person und Zeitpunkt im Verlauf der Akte.</p>""",
+    },
+    {
+        # Katheter-Historie (F192, 15.10.2026)
+        "id": "katheter", "gruppe": "patienten", "titel": "Katheter-Historie",
+        "rechte": ["akten_lesen", "akten_bearbeiten"], "seiten": ["/patienten/:id/katheter"],
+        "html": """
+<p>Der Reiter <strong>Katheter</strong> (nach „Medikamente“) zeigt alle Katheter eines Patienten nacheinander auf
+einer <strong>Zeitachse</strong>: Jeder Katheter ist ein Balken von der Anlage bis zur Entfernung (ein noch liegender
+Katheter reicht bis heute), Komplikationen stehen als Markierung auf dem Balken. Am Telefon läuft die Zeitachse von
+oben nach unten. Darunter steht die Liste zum Erfassen und Bearbeiten.</p>
+<p>Oben stehen zwei Kennzahlen:</p>
+<ul>
+<li><strong>Aktueller Katheter</strong> mit Typ, Lage und Liegedauer in Tagen.</li>
+<li><strong>Infektionen je 1000 Kathetertage</strong> – die übliche Kennzahl in der heimparenteralen Ernährung.
+Gezählt werden die Komplikationen „Katheterinfektion“ (und jede andere Art mit „Infektion“ im Namen) aller Katheter,
+geteilt durch die Summe der Liegetage, mal 1000.</li>
+</ul>
+<ul>
+<li><strong>Katheter</strong> trägt einen neuen ein: Typ, Lage/Zugang (z. B. „V. subclavia rechts“), Anlagedatum,
+bei einem schon entfernten Katheter „Entfernt am“ mit Grund, dazu eine Notiz.</li>
+<li>Ein neu angelegter, noch liegender Katheter wird automatisch in die <strong>Kerndaten</strong> der Akte
+übernommen (Feld „Katheter“). Liegt laut Historie noch ein früherer Katheter, erscheint der Hinweis
+<strong>„Vorheriger Katheter noch nicht als entfernt eingetragen“</strong> – EPM beendet ihn nicht von selbst. Bitte
+dort <strong>Entfernen</strong> wählen und Datum und Grund eintragen.</li>
+<li><strong>Komplikation</strong> am Katheter erfasst Datum, Art und Notiz. Das Datum muss in der Liegezeit liegen.</li>
+<li>Der <strong>Stift</strong> ändert einen Eintrag. Falsch Erfasstes wird nicht gelöscht, sondern
+<strong>zurückgenommen</strong>: Es zählt dann in keiner Kennzahl mehr, bleibt aber im Verlauf der Akte.</li>
+<li>Steht in den Kerndaten ein Katheter, aber in der Historie noch keiner, heißt es <strong>„Anlagedatum nicht erfasst
+– bitte nachtragen“</strong>. Aus dem Altsystem gibt es nur den Katheter-Typ, kein Datum – EPM erfindet keins.</li>
+</ul>
+<p>Die Auswahllisten <strong>Entfernungsgrund</strong> und <strong>Komplikation</strong> pflegt die Administration
+unter Administration › Auswahllisten. Eintragen und Ändern braucht das Recht „Patienten anlegen, Diagnose, Therapie,
+Stammdaten ändern“; jede Änderung steht mit Person, Datum und Uhrzeit im Verlauf der Akte und in der Kopie der Akte
+(Datenschutz-Auskunft).</p>""",
     },
     {
         "id": "akte_abschliessen", "gruppe": "patienten", "titel": "Akte abschließen und wieder öffnen",
@@ -773,16 +813,18 @@ Zeitabständen.</li>
         "id": "plan_ansehen", "gruppe": "plaene", "titel": "Infusionspläne ansehen", "rechte": ["akten_lesen"],
         "seiten": ["/patienten/:id/plaene", "/infusionsplaene"],
         "html": """
-<p>Der Reiter <strong>Infusionspläne</strong> der Akte zeigt den aktuellen Plan, Entwürfe und frühere Pläne mit den
-Änderungen gegenüber dem Vorgänger. Ein freigegebener Plan hat eine gespeicherte PDF mit Prüfsumme; EPM prüft beim Öffnen,
-ob sie unverändert ist.</p>
+<p>Der Reiter <strong>Infusionspläne</strong> der Akte zeigt den aktuellen Plan, Entwürfe und frühere Pläne. Ein
+freigegebener Plan hat eine gespeicherte PDF mit Prüfsumme; EPM prüft beim Öffnen, ob sie unverändert ist.</p>
+<p><strong>Vergleich</strong> (die Zahl nennt die geänderten Werte) stellt alle Werte neben die eines anderen Plans.
+Standard ist der letzte freigegebene Plan davor – ein Entwurf wird also mit dem aktuell gültigen Plan verglichen.
+Unter <strong>Vergleichen mit:</strong> lässt sich jeder andere Plan desselben Patienten wählen, auch ein älterer;
+der Spaltenkopf zeigt, welcher es ist. Gibt es davor keinen freigegebenen Plan, vergleicht EPM mit dem Vorgänger.</p>
 <p>Die <strong>PDF</strong> steht direkt neben der Liste der Pläne, so hoch wie das Fenster: eine ganze Seite auf einen
 Blick (<strong>Ganze Seite</strong>; − und + vergrößern auf die Breite). <strong>Groß ansehen</strong> öffnet sie im
 Fenster, <strong>Herunterladen</strong> speichert sie. Entwürfe zeigen die Ansicht mit der aktiven Dokumentvorlage und dem
 Wasserzeichen „ENTWURF“.</p>""" + _bild(
             "infusionsplan-ansehen.png", "Reiter Infusionspläne der Akte: links die Liste der Pläne, neueste oben "
-            "(aktuell gültig, abgelöst), rechts der aktuelle Plan mit PDF öffnen, Ansicht wie PDF und Vergleich mit "
-            "Vorgänger.", "Infusionspläne in der Akte: links die Pläne, rechts der gewählte Plan als PDF.", 1302, 430) + """
+            "(aktuell gültig, abgelöst), rechts der aktuelle Plan mit PDF öffnen, Ansicht wie PDF und Vergleich.", "Infusionspläne in der Akte: links die Pläne, rechts der gewählte Plan als PDF.", 1302, 430) + """
 <p>Der Menüpunkt <strong>Infusionspläne</strong> zeigt die Pläne aller Patienten: zur Freigabe, aktuell und älter als
 eingestellt. Beim Überfahren des Status steht die Frist, ab der ein Plan als alt gilt. <strong>PDF</strong> gibt es an
 jedem Plan (auch an Entwürfen); ab 1920 Bildpunkten Breite erscheint sie rechts neben der Liste, sonst im Fenster.</p>
@@ -795,7 +837,8 @@ Bestätigung.</p>""",
         "id": "plan_anlegen", "gruppe": "plaene", "titel": "Neuen Plan anlegen", "rechte": ["plaene_anlegen"],
         "seiten": ["/patienten/:id/plaene/neu", "/patienten/:id/plaene/:id/bearbeiten"],
         "html": """
-<p><strong>Neuer Plan</strong> übernimmt die Werte des aktuellen Plans; geänderte Werte sind markiert. Beim ersten Plan
+<p><strong>Neuer Plan</strong> übernimmt die Werte des aktuellen Plans; Werte, die vom letzten freigegebenen Plan
+abweichen, sind markiert (die Spalte „vorher“ zeigt dessen Werte). Beim ersten Plan
 schlägt EPM Werte je kg Körpergewicht vor (Vorgabe der Praxis wie im Altsystem: Glucose 3,5 g, Aminosäuren 1,2 g,
 Lipide 1 g, Natrium 1,3, Kalium 0,7, Phosphat 0,3, Calcium 0,15, Magnesium 0,2 mmol je kg). <strong>Mengen nach
 Praxisvorgabe</strong> setzt diese Mengen jederzeit neu aus dem letzten Gewicht ein – Präparate und Zusätze bleiben. Die
@@ -838,6 +881,37 @@ Freigabe</strong>): prüfen und oben rechts <strong>Freigeben</strong>.</p>""" +
 <p>Hat der Mediziner einen Entwurf außerhalb von EPM freigegeben (z. B. per E-Mail), wird der Entwurf mit
 <strong>Nach Freigabe abschließen</strong> zum aktuellen Plan. Anzugeben sind wer freigegeben hat, das Datum, der Weg
 der Freigabe und der Nachweis (z. B. die E-Mail als PDF).</p>""",
+    },
+    # ------------------------------------------------------------------ Statistik (F193, Festlegung 16.10.2026)
+    {
+        "id": "statistik", "gruppe": "statistik", "titel": "Statistik für Berichte der Stiftung",
+        "rechte": ["statistik_ansehen"], "seiten": ["/statistik"],
+        "html": """
+<p>Der Menüpunkt <strong>Statistik</strong> zählt die Akten der Firma, für die Sie gerade arbeiten (Umschalter oben links),
+für einen Zeitraum: <strong>Kalenderjahr</strong> (Standard: das laufende Jahr im Vergleich zum Vorjahr),
+<strong>Quartal</strong> oder <strong>frei von–bis</strong>. Jede Zahl steht neben dem Wert des Vorzeitraums (Vorjahr,
+Vorquartal bzw. die gleich lange Spanne direkt davor).</p>
+<ul>
+<li><strong>Aktive Patienten zum Stichtag</strong> (Ende des Zeitraums, im laufenden Zeitraum heute),
+<strong>im Zeitraum betreut</strong>, <strong>Neuaufnahmen</strong> und <strong>abgeschlossene Akten</strong> nach
+Anlass (verstorben, Therapie beendet, Betreuung gewechselt).</li>
+<li>Die aktiven Patienten nach <strong>Versorger</strong>, <strong>Altersgruppe</strong> am Stichtag (0–17, 18–39,
+40–59, 60–79, 80 und älter) und <strong>Katheter</strong> (auch „kein Katheter“ und „nicht erfasst“).</li>
+<li><strong>Kontakte</strong> (ohne stornierte) sowie <strong>erstellte und freigegebene Infusionspläne</strong> im
+Zeitraum.</li>
+</ul>
+<p><strong>Datenschutz:</strong> Die Statistik zeigt keine Namen, Nummern oder Geburtsdaten. Testpatienten zählen nie.
+Akten mit eingeschränkter Verarbeitung zählen mit, erscheinen aber nie einzeln. <strong>Kleine Zahlen</strong> von 1 bis
+4 stehen als <strong>„&lt; 5“</strong> da – auf der Seite, in der PDF und in der CSV. Kommt so eine kleine Zahl bei den
+Patienten (aktiv, betreut, Neuaufnahmen, Abschlüsse und ihre Aufteilungen) vor, sind dort alle übrigen Zahlen auf volle
+5 gerundet und mit „≈“ markiert, damit sich die kleine Zahl nicht aus der Summe zurückrechnen lässt.</p>
+<p><strong>Gut zu wissen:</strong> Als Beginn der Betreuung gilt der Tag, an dem die Akte in EPM angelegt wurde. Aus dem
+Altsystem übernommene Akten zählen deshalb nicht als Neuaufnahme, sondern als schon länger betreut. Versorger und
+Katheter zeigen den heutigen Stand der Akte.</p>
+<p><strong>PDF</strong> (mit Briefkopf) und <strong>CSV</strong> (für Excel: Semikolon, Umlaute richtig) laden die
+Auswertung herunter; jeder Export steht im Audit-Log. Sehen dürfen die Statistik standardmäßig die Rollen
+<strong>Mitarbeiter (erweitert)</strong>, <strong>Mediziner</strong> und <strong>Admin</strong> (Recht „Statistik
+ansehen“, unter Administration › Benutzer › Rechte je Gruppe umstellbar); Betrachter und Mitarbeiter nicht.</p>""",
     },
     # ------------------------------------------------------------------ Dokumente
     {

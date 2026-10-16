@@ -1,5 +1,5 @@
-/** Entwurf 8 · Infusionspläne: Liste, Ansicht wie PDF, Vergleich mit Vorgänger, Freigabe, Verwerfen. */
-import { useEffect, useRef, useState } from "react";
+/** Entwurf 8 · Infusionspläne: Liste, Ansicht wie PDF, Vergleich (Standard: letzter freigegebener Plan, wählbar), Freigabe, Verwerfen. */
+import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, abfrage, alle, api, apiDatei } from "@/lib/api";
@@ -27,7 +27,7 @@ export function StatusChip({ status }: { status: Plan["status"] }) {
   return <Chip>abgelöst</Chip>;
 }
 
-function kopfText(plan: Plan) {
+function kopfText(plan: Pick<Plan, "status" | "gueltig_ab">) {
   const s = plan.status === "entwurf" ? "Entwurf" : plan.status === "aktuell" ? "Aktuell gültig" : "Abgelöst";
   return `${s} · ${datum(plan.gueltig_ab)}`;
 }
@@ -142,17 +142,29 @@ export function KeinPlanHinweis() {
   );
 }
 
+/** Wie der verglichene Plan zustande kam (Festlegung 16.10.2026) */
+const VERGLEICH_GRUND: Record<NonNullable<Vergleich["vergleich_mit"]>["grund"], string> = {
+  letzter_freigegebener: "letzter freigegebener Plan davor",
+  vorgaenger: "Vorgänger – davor gibt es keinen freigegebenen Plan",
+  gewaehlt: "gewählt",
+};
+
 function VergleichTabelle({ plan, vergleich }: { plan: Plan; vergleich: Vergleich }) {
-  if (!vergleich.vorgaenger) return <Meldung>Erster Plan dieses Patienten – es gibt keinen Vorgänger zum Vergleich.</Meldung>;
+  if (!vergleich.vorgaenger) {
+    return <Meldung>{vergleich.auswahl.length
+      ? "Vor diesem Plan gibt es keinen freigegebenen Plan. Zum Vergleich oben unter „Vergleichen mit“ einen anderen Plan wählen."
+      : "Erster Plan dieses Patienten – es gibt keinen anderen Plan zum Vergleich."}</Meldung>;
+  }
+  const mit = vergleich.vergleich_mit ?? { ...vergleich.vorgaenger, status: vergleich.vorgaenger.status as Plan["status"], grund: "vorgaenger" as const };
   return (
     <div className="flex flex-col gap-3" data-testid="planvergleich">
       <div className="text-sm">
-        <strong>{vergleich.anzahl_geaendert}</strong> {vergleich.anzahl_geaendert === 1 ? "Wert" : "Werte"} geändert gegenüber dem Plan vom {datum(vergleich.vorgaenger.gueltig_ab)}.
+        <strong>{vergleich.anzahl_geaendert}</strong> {vergleich.anzahl_geaendert === 1 ? "Wert" : "Werte"} geändert gegenüber dem Plan vom {datum(mit.gueltig_ab)} <span className="gedaempft">({VERGLEICH_GRUND[mit.grund]})</span>.
       </div>
       <Karte className="overflow-hidden">
         <table className="tabelle">
           <thead>
-            <tr><th className="th">Wert</th><th className="th">Vorher · {datum(vergleich.vorgaenger.gueltig_ab)}</th><th className="th">{kopfText(plan)}</th><th className="th" /></tr>
+            <tr><th className="th">Wert</th><th className="th" data-testid="vergleich-spalte">{kopfText(mit)}</th><th className="th">{kopfText(plan)}</th><th className="th" /></tr>
           </thead>
           <tbody>
             {vergleich.zeilen.map((z) => {
@@ -325,6 +337,9 @@ export function Plaene() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const [modus, setModus] = useState<"ansicht" | "vergleich">("ansicht");
+  // Plan, mit dem verglichen wird, je gewähltem Plan ("" = Standard: letzter freigegebener Plan davor; Festlegung 16.10.2026)
+  const [vergleichWahl, setVergleichWahl] = useState<{ plan: number; mit: string } | null>(null);
+  const vergleichMitId = useId();
   const [freigabe, setFreigabe] = useState(false);
   const [abschluss, setAbschluss] = useState(false);
   const [verwerfen, setVerwerfen] = useState(false);
@@ -337,11 +352,16 @@ export function Plaene() {
   });
   const liste = plaene.data ?? [];
   const gewaehlt = liste.find((p) => String(p.id) === params.get("plan")) ?? liste.find((p) => p.status === "entwurf") ?? liste.find((p) => p.status === "aktuell") ?? liste[0];
+  // ein anderer Plan in der Liste gewählt: wieder mit dessen Standard vergleichen
+  const vergleichMit = vergleichWahl && vergleichWahl.plan === gewaehlt?.id ? vergleichWahl.mit : "";
   const vergleich = useQuery({
-    queryKey: ["patient", patient.id, "plaene", gewaehlt?.id, "vergleich"],
-    queryFn: () => api<Vergleich>(`infusionsplaene/${gewaehlt!.id}/vergleich/`),
+    queryKey: ["patient", patient.id, "plaene", gewaehlt?.id, "vergleich", vergleichMit],
+    queryFn: () => api<Vergleich>(`infusionsplaene/${gewaehlt!.id}/vergleich/${abfrage({ mit: vergleichMit })}`),
     enabled: !!gewaehlt,
+    // beim Wechsel des Vergleichsplans bleibt die Tabelle stehen, bis die neue Antwort da ist (gleicher Plan)
+    placeholderData: (vorher, vorherigeAbfrage) => (vorherigeAbfrage?.queryKey[3] === gewaehlt?.id ? vorher : undefined),
   });
+  const vergleichDaten = vergleich.data;
   const verwerfenM = useMutation({
     mutationFn: () => api(`infusionsplaene/${gewaehlt!.id}/`, { method: "DELETE" }),
     onSuccess: () => {
@@ -428,11 +448,31 @@ export function Plaene() {
               </> : null}
             </div>
           </div>
-          <Segmente label="Darstellung" wert={modus} onWahl={setModus}
-            werte={[{ wert: "ansicht", text: "Ansicht wie PDF" }, { wert: "vergleich", text: <>Vergleich mit Vorgänger{vergleich.data?.vorgaenger ? <span className="num opacity-70">{vergleich.data.anzahl_geaendert}</span> : null}</> }]} className="self-start" />
+          <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
+            <Segmente label="Darstellung" wert={modus} onWahl={setModus}
+              werte={[{ wert: "ansicht", text: "Ansicht wie PDF" }, { wert: "vergleich", text: <>Vergleich{vergleichDaten?.vorgaenger ? <span className="num opacity-70">{vergleichDaten.anzahl_geaendert}</span> : null}</> }]} className="self-start" />
+            {modus === "vergleich" && vergleichDaten?.auswahl.length ? (
+              <span className="flex items-center gap-2" data-testid="vergleich-auswahl">
+                <label htmlFor={vergleichMitId} className="text-sm gedaempft whitespace-nowrap">Vergleichen mit:</label>
+                <Auswahl id={vergleichMitId} className="w-auto max-w-full" value={vergleichMit || String(vergleichDaten.standard_id ?? "")}
+                  onChange={(e) => setVergleichWahl({ plan: gewaehlt.id, mit: e.target.value === String(vergleichDaten.standard_id ?? "") ? "" : e.target.value })}>
+                  {vergleichDaten.standard_id == null ? <option value="">— bitte wählen —</option> : null}
+                  {vergleichDaten.auswahl.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {datum(a.gueltig_ab)} · {STATUS_TEXT[a.status]}{a.id === vergleichDaten.standard_id ? " (Standard)" : ""}
+                    </option>
+                  ))}
+                </Auswahl>
+              </span>
+            ) : null}
+          </div>
           {modus === "ansicht" ? <PlanAnsicht key={gewaehlt.id} plan={gewaehlt} />
-            : vergleich.isLoading ? <Laden /> : vergleich.data ? <VergleichTabelle plan={gewaehlt} vergleich={vergleich.data} />
-            : <Fehleranzeige fehler={vergleich.error} />}
+            : vergleich.isLoading ? <Laden /> : vergleichDaten ? <VergleichTabelle plan={gewaehlt} vergleich={vergleichDaten} />
+            : <>
+              <Fehleranzeige fehler={vergleich.error} />
+              {/* gewählter Vergleichsplan nicht (mehr) verfügbar, z. B. inzwischen verworfen: zurück zum Standard */}
+              {vergleichMit ? <Knopf className="self-start" onClick={() => setVergleichWahl(null)}>Mit dem Standard vergleichen</Knopf> : null}
+            </>}
           {freigeben ? <FreigabeDialog plan={gewaehlt} offen={freigabe} onOffen={setFreigabe} /> : null}
           {abschliessen ? <AbschliessenDialog plan={gewaehlt} offen={abschluss} onOffen={setAbschluss} /> : null}
           {gewaehlt.pdf_sha256 ? <PlanPdfDialog plan={gewaehlt} offen={pdf} onOffen={setPdf} /> : null}

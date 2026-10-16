@@ -641,6 +641,45 @@ body {
 .chip.kartei-G { background: var(--ok-bg); color: var(--ok); }
 .chip.kartei-D { background: var(--warn-bg); color: var(--warn); }
 
+/* Katheter-Historie (F192): Zeitachse mit Balken je Katheter und Markierungen für Komplikationen. Feste Zeilenhöhen,
+   damit beim Laden und Umschalten nichts springt; ruhige Farben aus den Tokens (liegt = Akzent, entfernt = gedämpft). */
+.katheter-achse { display: flex; flex-direction: column; gap: 0.375rem; }
+.katheter-zeile { display: grid; grid-template-columns: 7rem minmax(0, 1fr); align-items: center; gap: 0.75rem; min-height: 1.75rem; }
+.katheter-spur { position: relative; height: 1.75rem; border-radius: 0.375rem; background: var(--fein); }
+.katheter-balken {
+  position: absolute; top: 0.375rem; height: 1rem; padding: 0; border: 1px solid var(--rand); border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--gedaempft) 35%, var(--flaeche)); cursor: pointer;
+}
+.katheter-balken.liegt { background: var(--akzent); border-color: var(--akzent); }
+.katheter-balken.gewaehlt { outline: 2px solid var(--akzent); outline-offset: 2px; }
+.katheter-balken:focus-visible { outline: 2px solid var(--akzent); outline-offset: 2px; }
+.katheter-marke {
+  position: absolute; top: 50%; width: 0.75rem; height: 0.75rem; padding: 0; margin: 0;
+  transform: translate(-50%, -50%) rotate(45deg); border: 2px solid var(--warn); border-radius: 0.125rem;
+  background: var(--flaeche); cursor: pointer;
+}
+.katheter-marke.infektion { border-color: var(--fehler); background: var(--fehler); }
+.katheter-marke:focus-visible { outline: 2px solid var(--akzent); outline-offset: 2px; }
+.katheter-marke.legende { position: static; display: inline-block; transform: rotate(45deg); width: 0.625rem; height: 0.625rem;
+  flex: none; cursor: default; }
+.katheter-legende-balken { display: inline-block; width: 1.25rem; height: 0.625rem; border-radius: 0.1875rem; border: 1px solid var(--rand);
+  background: color-mix(in srgb, var(--gedaempft) 35%, var(--flaeche)); }
+.katheter-legende-balken.liegt { background: var(--akzent); border-color: var(--akzent); }
+.katheter-skala { position: relative; height: 1.25rem; border-top: 1px solid var(--rand); }
+.katheter-skala-marke, .katheter-heute {
+  position: absolute; top: 0.125rem; transform: translateX(-50%); font-size: 0.75rem; color: var(--gedaempft); white-space: nowrap;
+}
+.katheter-skala-marke::before, .katheter-heute::before {
+  content: ""; position: absolute; left: 50%; top: -0.375rem; height: 0.25rem; border-left: 1px solid var(--rand);
+}
+.katheter-heute { color: var(--akzent-text); font-weight: 500; }
+/* senkrecht (Telefon): je Katheter ein Strich, oben die Entfernung, unten die Anlage */
+.katheter-senkrecht { display: flex; flex-direction: column; gap: 0.75rem; }
+.katheter-senkrecht-eintrag { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr); gap: 0.75rem; align-items: stretch; }
+.katheter-senkrecht-spur { position: relative; width: 1.5rem; border-radius: 0.375rem; background: var(--fein); }
+.katheter-balken.senkrecht { top: 0.25rem; bottom: 0.25rem; left: 0.375rem; width: 0.75rem; height: auto; }
+.katheter-senkrecht-spur .katheter-marke { left: 50%; }
+
 /* Fortschritt eines Auftrags (Backup, Update; components/AuftragFortschritt.tsx): gleiche Farbe wie der Ladebalken */
 .fortschritt {
   position: relative; height: 0.5rem; border-radius: 0.25rem; overflow: hidden;
@@ -1033,3 +1072,9 @@ input.inp:is([type="date"], [type="time"])::-webkit-datetime-edit { padding: 0; 
    (Prüfung 11.10.2026: Infusionspläne 1288 statt 768 px). Nicht für Karten, die selbst fest bzw. absolut liegen: Fenster
    (.dialog-popup ist eine Karte mit overflow-auto) rutschten sonst ans Seitenende (Wunsch 11.10.2026, Hilfe-Bilder) */
 .card:is(.overflow-x-auto, .overflow-auto, .overflow-hidden):not(.fixed, .absolute, .sticky) { position: relative; }
+
+/* Statistik (F193): auf 1920 × 1080 ohne Seiten-Scrollen – die vier Diagramme teilen sich die Höhe unter den Kacheln;
+   lange Listen (viele Versorger) scrollen in ihrer Karte. Kopfzeile, Seitenkopf, Zeitraum, Kacheln und Hinweis zusammen etwa 25rem. */
+@media (min-width: 56.25rem) and (min-height: 37.5rem) and (pointer: fine) {
+  .statistik-seite .statistik-diagramme > .card { max-height: max(12rem, calc((100dvh - 25rem) / 2)); }
+}

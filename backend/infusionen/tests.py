@@ -1,5 +1,5 @@
 """Infusionspläne: Entwurf → Freigabe → unveränderlich, Vorbelegung, Vergleich (echte Datenbank)."""
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db import DatabaseError, connection, transaction
@@ -141,7 +141,127 @@ class Infusionsplaene(PlanHilfen, Grundlage):
         # erster Plan ohne Vorgänger
         v = c.get(f"/api/infusionsplaene/{alt.id}/vergleich/").json()
         self.assertIsNone(v["vorgaenger"])
+        self.assertIsNone(v["vergleich_mit"])
         self.assertEqual(v["anzahl_geaendert"], 0)
+        # wählbar bleibt der Entwurf (Festlegung 16.10.2026)
+        self.assertEqual([x["id"] for x in v["auswahl"]], [e["id"]])
+
+    def test_vergleich_standard_ist_letzter_freigegebener(self):
+        """Festlegung 16.10.2026: Ohne Auswahl wird mit dem letzten freigegebenen Plan vor diesem verglichen – nicht mit
+        einem Entwurf oder verworfenen Plan dazwischen, auch wenn der als Vorgänger eingetragen ist."""
+        heute = timezone.localdate()
+        a = self.freigegebener_plan(gueltig_ab=str(heute - timedelta(days=60)))
+        b = self.freigegebener_plan(gueltig_ab=str(heute - timedelta(days=30)), glucose_g="150")
+        c = client_fuer(self.mediziner)
+        # ein verworfener Entwurf taucht nirgends mehr auf
+        verworfen = self.entwurf(c)
+        self.assertEqual(c.delete(f"/api/infusionsplaene/{verworfen['id']}/").status_code, 204)
+        e = self.entwurf(c)
+        c.patch(f"/api/infusionsplaene/{e['id']}/", {"gueltig_ab": str(heute - timedelta(days=10)), "glucose_g": "180"},
+                format="json")
+        # nachgetragener Plan (z. B. aus dem Altsystem), dessen Vorgänger der offene Entwurf ist
+        nachgetragen = Infusionsplan.objects.create(
+            patient=self.patient, status=Infusionsplan.Status.ABGELOEST, gueltig_ab=heute - timedelta(days=5),
+            herkunft=Infusionsplan.Herkunft.ALTSYSTEM, glucose_g=Decimal("170"),
+            glucose_praeparat=praeparat("Glucose", "70 %"), vorgaenger_id=e["id"])
+
+        # Entwurf: der aktuell gültige Plan b
+        v = c.get(f"/api/infusionsplaene/{e['id']}/vergleich/").json()
+        self.assertEqual(v["vorgaenger"]["id"], b.id)
+        self.assertEqual(v["vergleich_mit"]["id"], b.id)
+        self.assertEqual(v["vergleich_mit"]["grund"], "letzter_freigegebener")
+        self.assertEqual(v["vergleich_mit"]["status"], "aktuell")
+        self.assertEqual(v["vergleich_mit"]["text"], f"{heute - timedelta(days=30):%d.%m.%Y} · aktuell")
+        self.assertEqual(v["standard_id"], b.id)
+        zeilen = {z["schluessel"]: z for z in v["zeilen"]}
+        self.assertEqual(zeilen["glucose"]["vorher"], "Glucose 70 % · 150 g")
+        self.assertEqual(zeilen["glucose"]["jetzt"], "Glucose 70 % · 180 g")
+        # Auswahl: alle anderen Pläne des Patienten, neueste oben, ohne den Plan selbst und ohne den verworfenen
+        self.assertEqual([(x["id"], x["status"]) for x in v["auswahl"]],
+                         [(nachgetragen.id, "abgeloest"), (b.id, "aktuell"), (a.id, "abgeloest")])
+
+        # nachgetragener Plan: Vorgänger ist der Entwurf – verglichen wird mit b, dem letzten freigegebenen davor
+        v = c.get(f"/api/infusionsplaene/{nachgetragen.id}/vergleich/").json()
+        self.assertEqual(v["vorgaenger"]["id"], b.id)
+        self.assertEqual(v["vergleich_mit"]["grund"], "letzter_freigegebener")
+        self.assertEqual([x["id"] for x in v["auswahl"]], [e["id"], b.id, a.id])
+
+        # freigegebener Plan b: a (der Plan selbst und spätere Pläne zählen nicht)
+        v = c.get(f"/api/infusionsplaene/{b.id}/vergleich/").json()
+        self.assertEqual((v["vorgaenger"]["id"], v["standard_id"]), (a.id, a.id))
+        self.assertEqual(v["anzahl_geaendert"], 2)  # Glucose und Energie
+
+    def test_vergleich_mit_gewaehltem_plan(self):
+        heute = timezone.localdate()
+        a = self.freigegebener_plan(gueltig_ab=str(heute - timedelta(days=60)), glucose_g="120")
+        b = self.freigegebener_plan(gueltig_ab=str(heute - timedelta(days=30)))
+        c = client_fuer(self.mediziner)
+        e = self.entwurf(c)
+        url = f"/api/infusionsplaene/{e['id']}/vergleich/"
+        v = c.get(url, {"mit": a.id}).json()
+        self.assertEqual(v["vorgaenger"]["id"], a.id)
+        self.assertEqual(v["vergleich_mit"]["id"], a.id)
+        self.assertEqual(v["vergleich_mit"]["grund"], "gewaehlt")
+        self.assertEqual(v["standard_id"], b.id)
+        zeilen = {z["schluessel"]: z for z in v["zeilen"]}
+        self.assertEqual(zeilen["glucose"]["vorher"], "Glucose 70 % · 120 g")
+        self.assertEqual(zeilen["glucose"]["jetzt"], "Glucose 70 % · 200 g")
+        self.assertTrue(zeilen["glucose"]["geaendert"])
+        # den Standard ausdrücklich zu wählen ist dasselbe wie keine Wahl
+        self.assertEqual(c.get(url, {"mit": b.id}).json()["vergleich_mit"]["grund"], "letzter_freigegebener")
+        self.assertEqual(c.get(url, {"mit": ""}).json()["vergleich_mit"]["id"], b.id)
+        # auch ein Entwurf ist wählbar: freigegebener Plan b gegen den Entwurf
+        v = c.get(f"/api/infusionsplaene/{b.id}/vergleich/", {"mit": e["id"]}).json()
+        self.assertEqual((v["vorgaenger"]["id"], v["vergleich_mit"]["status"]), (e["id"], "entwurf"))
+        self.assertEqual(v["anzahl_geaendert"], 0)
+        # nicht der Plan selbst, keine Unsinnswerte
+        for mit in (e["id"], "abc", "-1"):
+            with self.subTest(mit=mit):
+                r = c.get(url, {"mit": mit})
+                self.assertEqual(r.status_code, 400, r.content)
+                self.assertIn("mit", r.json())
+
+    def test_vergleich_mit_plan_eines_anderen_patienten(self):
+        """Ein Plan eines anderen Patienten wird nie zurückgegeben – auch nicht, wenn man seine ID kennt."""
+        b = self.freigegebener_plan()
+        anderer = Patient.objects.create(nachname="Anders", vorname="A", geburtsdatum="1966-06-06")
+        fremd = Infusionsplan.objects.create(patient=anderer, status=Infusionsplan.Status.ABGELOEST,
+                                             herkunft=Infusionsplan.Herkunft.ALTSYSTEM, glucose_g=Decimal("999"))
+        c = client_fuer(self.mediziner)
+        r = c.get(f"/api/infusionsplaene/{b.id}/vergleich/", {"mit": fremd.id})
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertEqual(r.json()["mit"], "Plan zum Vergleich nicht gefunden. Verglichen werden kann nur mit einem "
+                                          "anderen Plan desselben Patienten.")
+        self.assertNotIn("999", r.content.decode())
+        # die Auswahl enthält nur Pläne desselben Patienten
+        self.assertEqual(c.get(f"/api/infusionsplaene/{b.id}/vergleich/").json()["auswahl"], [])
+        # auch das Modell lehnt ab
+        from django.core.exceptions import ValidationError
+
+        with self.assertRaises(ValidationError):
+            b.vergleich(mit=fremd)
+
+    def test_vergleich_ohne_freigegebenen_plan_faellt_auf_vorgaenger_zurueck(self):
+        """Gibt es vor dem Plan keinen freigegebenen, gilt wie bisher der Vorgänger – der Vergleich zeigt nie weniger."""
+        c = client_fuer(self.mediziner)
+        e = self.entwurf(c)
+        c.patch(f"/api/infusionsplaene/{e['id']}/", {"glucose_g": "200",
+                                                      "glucose_praeparat": praeparat("Glucose", "70 %").id},
+                format="json")
+        frueher = Infusionsplan.objects.create(
+            patient=self.patient, status=Infusionsplan.Status.ABGELOEST, gueltig_ab=date(2020, 1, 1),
+            herkunft=Infusionsplan.Herkunft.ALTSYSTEM, glucose_g=Decimal("100"),
+            glucose_praeparat=praeparat("Glucose", "70 %"), vorgaenger_id=e["id"])
+        v = c.get(f"/api/infusionsplaene/{frueher.id}/vergleich/").json()
+        self.assertEqual(v["vorgaenger"]["id"], e["id"])
+        self.assertEqual(v["vergleich_mit"]["grund"], "vorgaenger")
+        self.assertEqual(v["standard_id"], e["id"])
+        zeilen = {z["schluessel"]: z for z in v["zeilen"]}
+        self.assertEqual((zeilen["glucose"]["vorher"], zeilen["glucose"]["jetzt"]),
+                         ("Glucose 70 % · 200 g", "Glucose 70 % · 100 g"))
+        # für den Entwurf zählt jeder freigegebene Plan (ein Entwurf folgt immer auf die letzte Freigabe)
+        v = c.get(f"/api/infusionsplaene/{e['id']}/vergleich/").json()
+        self.assertEqual((v["vorgaenger"]["id"], v["vergleich_mit"]["grund"]), (frueher.id, "letzter_freigegebener"))
 
     def test_leer_beginnen_und_vorlage(self):
         a = self.freigegebener_plan()

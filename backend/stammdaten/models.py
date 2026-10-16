@@ -16,6 +16,10 @@ class Auswahlwert(models.Model):
         BEZIEHUNG = "beziehung", "Beziehung (Bezugsperson)"
         # Wünsche aus der Praxis vom 06.10.2026: Berichte in der Akte (F115)
         BERICHTART = "berichtart", "Berichtsart"
+        # Katheter-Historie (F192, 15.10.2026): Grund der Entfernung und Art der Komplikation, pflegbar unter
+        # Administration › Auswahllisten (Grundwerte: Migration stammdaten/0026)
+        KATHETER_ENTFERNUNG = "katheter_entfernung", "Katheter: Entfernungsgrund"
+        KATHETER_KOMPLIKATION = "katheter_komplikation", "Katheter: Komplikation"
 
     liste = models.CharField(max_length=30, choices=Liste.choices)
     wert = models.CharField(max_length=100)

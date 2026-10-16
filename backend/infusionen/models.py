@@ -1,4 +1,5 @@
 """Infusionspläne: Entwurf → aktuell → abgelöst. Nach Freigabe unveränderlich."""
+from datetime import datetime, timezone as dt_timezone
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
@@ -389,19 +390,65 @@ class Infusionsplan(AktenEintrag):
             )
         return entwurf
 
-    def vergleich(self) -> dict:
-        """Alle Werte neben denen des Vorgängers (Entwurf 8 · „Vergleich mit Vorgänger“)."""
-        v = self.vorgaenger
+    # Freigegeben heißt: aktuell gültig oder abgelöst. Entwürfe sind nie freigegeben; verworfene Entwürfe sind gelöscht.
+    FREIGEGEBEN = (Status.AKTUELL, Status.ABGELOEST)
+
+    def letzter_freigegebener(self) -> "Infusionsplan | None":
+        """Der letzte freigegebene Plan desselben Patienten vor diesem Plan (Standard des Vergleichs, 16.10.2026).
+
+        Reihenfolge wie die Pläne zeitlich aufeinander folgen: ``gueltig_ab``, bei gleichem Tag der Zeitpunkt der
+        Freigabe (aus dem Altsystem übernommene Pläne haben keinen und stehen davor), zuletzt die ID. Entwürfe zählen
+        nie, verworfene Entwürfe gibt es nicht mehr, der Plan selbst zählt nie mit.
+
+        Ein Entwurf folgt immer auf die letzte Freigabe: Für ihn ist es der aktuell gültige Plan (jede Freigabe macht
+        den freigegebenen Plan zum aktuellen) – auch wenn später ein früherer Plan nachgetragen wurde (KI-Übernahme,
+        Altsystem), dessen „gültig ab“ jünger ist. Ohne aktuellen Plan der späteste abgelöste."""
+        qs = Infusionsplan.objects.filter(patient_id=self.patient_id, status__in=self.FREIGEGEBEN).exclude(pk=self.pk)
+        if self.status == self.Status.ENTWURF:
+            aktuell = qs.filter(status=self.Status.AKTUELL).first()
+            if aktuell is not None:
+                return aktuell
+            return max(qs, key=_reihenfolge, default=None)
+        grenze = _reihenfolge(self)
+        return max((p for p in qs if _reihenfolge(p) < grenze), key=_reihenfolge, default=None)
+
+    def vergleich(self, mit: "Infusionsplan | None" = None) -> dict:
+        """Alle Werte neben denen eines anderen Plans (Entwurf 8 · Vergleich).
+
+        Ohne ``mit``: der letzte freigegebene Plan vor diesem (``letzter_freigegebener``, Festlegung 16.10.2026).
+        Gibt es keinen, gilt wie bisher der ``vorgaenger`` – so zeigt der Vergleich nie weniger als vorher.
+        ``mit``: ein beliebiger anderer Plan desselben Patienten (auch ein Entwurf), vom Nutzer gewählt.
+        ``vorgaenger`` in der Antwort ist der tatsächlich verglichene Plan (Name bleibt für bestehende Aufrufer)."""
+        if mit is not None:
+            if mit.patient_id != self.patient_id:
+                raise ValidationError({"mit": "Der gewählte Plan gehört zu einem anderen Patienten."})
+            if mit.pk == self.pk:
+                raise ValidationError({"mit": "Bitte einen anderen Plan zum Vergleich wählen."})
+        standard = self.letzter_freigegebener()
+        grund_standard = "letzter_freigegebener"
+        if standard is None and self.vorgaenger_id:
+            standard, grund_standard = self.vorgaenger, "vorgaenger"
+        v = mit if mit is not None else standard
         zeilen = []
         for schluessel, bezeichnung in VERGLEICHSZEILEN:
             jetzt = _anzeige(self, schluessel)
             vorher = _anzeige(v, schluessel) if v else None
             zeilen.append({"schluessel": schluessel, "wert": bezeichnung, "vorher": vorher, "jetzt": jetzt,
                            "geaendert": v is not None and vorher != jetzt})
+        # Reihenfolge wie die Liste der Pläne in der Akte (neueste oben)
+        auswahl = (Infusionsplan.objects.filter(patient_id=self.patient_id).exclude(pk=self.pk)
+                   .order_by("-gueltig_ab", "-id").only("id", "gueltig_ab", "status"))
         return {
             "vorgaenger": {"id": v.id, "gueltig_ab": v.gueltig_ab, "status": v.status} if v else None,
             "zeilen": zeilen,
             "anzahl_geaendert": sum(z["geaendert"] for z in zeilen),
+            "vergleich_mit": {
+                "id": v.id, "gueltig_ab": v.gueltig_ab, "status": v.status, "text": _kurztext(v),
+                # gewaehlt: über ?mit=; letzter_freigegebener: Standard; vorgaenger: Rückfall ohne freigegebenen Plan
+                "grund": "gewaehlt" if mit is not None and (standard is None or mit.pk != standard.pk) else grund_standard,
+            } if v else None,
+            "standard_id": standard.id if standard else None,
+            "auswahl": [{"id": p.id, "gueltig_ab": p.gueltig_ab, "status": p.status} for p in auswahl],
         }
 
     # Wege, bei denen es ein Schriftstück gibt: Der Nachweis (z. B. die E-Mail) gehört an den Plan
@@ -576,6 +623,20 @@ def _attr(feld: str) -> str:
     fk = {"basis_praeparat", "glucose_praeparat", "aminosaeuren_praeparat", "lipide_praeparat",
           "albumin_praeparat", "katheterschutz", "spurenelemente"}
     return f"{feld}_id" if feld in fk else feld
+
+
+_FRUEHESTENS = datetime.min.replace(tzinfo=dt_timezone.utc)
+
+
+def _reihenfolge(plan):
+    """Zeitliche Reihenfolge der Pläne eines Patienten: gültig ab, dann Zeitpunkt der Freigabe (ohne Freigabe –
+    Entwurf oder aus dem Altsystem – davor), dann ID."""
+    return (plan.gueltig_ab, plan.freigegeben_am or _FRUEHESTENS, plan.pk or 0)
+
+
+def _kurztext(plan) -> str:
+    """Kurzer Text eines Plans für Auswahl und Spaltenkopf: „01.10.2026 · abgelöst“."""
+    return f"{plan.gueltig_ab:%d.%m.%Y} · {plan.get_status_display()}"
 
 
 def _positionen_signatur(plan):

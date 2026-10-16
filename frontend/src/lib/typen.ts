@@ -8,7 +8,8 @@ export type Recht =
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
   | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "testdaten_sehen" | "system_verwalten"
   | "altdaten_importieren" | "berichte_freigeben" | "scans_bearbeiten" | "schreiben_freigeben"
-  | "ki_ansehen" | "ki_pruefen" | "ki_uebernehmen" | "ki_berichte" | "ki_verwalten" | "ki_training_freigeben";
+  | "ki_ansehen" | "ki_pruefen" | "ki_uebernehmen" | "ki_berichte" | "ki_verwalten" | "ki_training_freigeben"
+  | "statistik_ansehen";
 
 /** Kacheln der Startseite (S11): klinische und – mit dem jeweiligen Recht – die der Administration (S12–S14) */
 export type KartenId =
@@ -161,6 +162,10 @@ export type PatientZeile = {
   /** Verarbeitung eingeschränkt (Art. 18 DSGVO): nur sichtbar, solange die eigene Einsicht läuft */
   ist_eingeschraenkt: boolean;
   kennzahlen: Kennzahlen | null;
+  /** Nur Doppelungsprüfung (`patienten/doppelte/`, 16.10.2026): warum die Akte gemeldet wird, z. B. „Vor-/Nachname vertauscht“ */
+  grund?: string;
+  /** Nur Doppelungsprüfung: Rangfolge, 0 = gleicher Name und Geburtsdatum (exakte Treffer zuerst) */
+  rang?: number;
 };
 
 /** Aufbewahrungsfrist einer abgeschlossenen Akte */
@@ -333,7 +338,9 @@ export type Patient = {
       /** Medikamentenplan (Wunsch 11.10.2026): aktuell eingenommene Medikamente */
       medikamente?: number;
       /** Korrespondenz (14.10.2026): alle Schreiben der Akte */
-      korrespondenz?: number };
+      korrespondenz?: number;
+      /** Katheter-Historie (F192): erfasste Katheter ohne zurückgenommene */
+      katheter?: number };
   } | null;
 };
 
@@ -640,9 +647,18 @@ export const FREIGABEWEGE: Record<string, string> = {
 };
 
 export type Vergleich = {
+  /** der tatsächlich verglichene Plan (Name aus der Zeit, als immer mit dem Vorgänger verglichen wurde) */
   vorgaenger: { id: number; gueltig_ab: string; status: string } | null;
   zeilen: { schluessel: string; wert: string; vorher: string | null; jetzt: string | null; geaendert: boolean }[];
   anzahl_geaendert: number;
+  /** Festlegung 16.10.2026: Standard ist der letzte freigegebene Plan davor, wählbar ist jeder andere Plan des Patienten.
+   *  grund: gewaehlt (über ?mit=), letzter_freigegebener (Standard), vorgaenger (Rückfall ohne freigegebenen Plan) */
+  vergleich_mit: { id: number; gueltig_ab: string; status: Plan["status"]; text: string;
+    grund: "gewaehlt" | "letzter_freigegebener" | "vorgaenger" } | null;
+  /** Plan, mit dem ohne Auswahl verglichen wird (null: es gibt keinen) */
+  standard_id: number | null;
+  /** wählbare Pläne desselben Patienten (ohne den Plan selbst), neueste zuerst */
+  auswahl: { id: number; gueltig_ab: string; status: Plan["status"] }[];
 };
 
 export type Verlaufseintrag = {
@@ -778,6 +794,72 @@ export type Medikament = {
   angelegt_am: string;
   angelegt_von_name: string | null;
   firma_kurz?: string | null;
+};
+
+/** Komplikation an einem Katheter (Katheter-Historie, F192) */
+export type KatheterKomplikation = {
+  id: number;
+  patient: number;
+  katheter: number;
+  datum: string;
+  /** Auswahlwert der Liste „katheter_komplikation“ */
+  art: number;
+  art_name: string | null;
+  /** zählt für die Kennzahl „Infektionen je 1000 Kathetertage“ */
+  ist_infektion: boolean;
+  notiz: string;
+  /** false = als falsch erfasst zurückgenommen */
+  aktiv: boolean;
+  angelegt_am: string;
+  angelegt_von_name: string | null;
+  firma_kurz?: string | null;
+};
+
+/** Katheter der Katheter-Historie (F192, 15.10.2026) */
+export type Katheter = {
+  id: number;
+  patient: number;
+  /** Auswahlwert der Liste „katheter“ (wie Patient.katheter) */
+  typ: number;
+  typ_name: string | null;
+  /** Lage/Zugang, z. B. „V. subclavia rechts“ */
+  lage: string;
+  anlage_am: string;
+  entfernt_am: string | null;
+  /** Auswahlwert der Liste „katheter_entfernung“ */
+  entfernungsgrund: number | null;
+  entfernungsgrund_name: string | null;
+  notiz: string;
+  /** false = als falsch erfasst zurückgenommen */
+  aktiv: boolean;
+  /** noch nicht entfernt */
+  liegt: boolean;
+  liegedauer_tage: number | null;
+  komplikationen: KatheterKomplikation[];
+  angelegt_am: string;
+  angelegt_von_name: string | null;
+  firma_kurz?: string | null;
+  /** nur in der Antwort auf POST: Typ in die Kerndaten (Patient.katheter) übernommen (Festlegung 16.10.2026) */
+  kerndaten_aktualisiert?: boolean;
+  /** nur in der Antwort auf POST, z. B. „Vorheriger Katheter noch nicht als entfernt eingetragen“ */
+  hinweise?: string[];
+};
+
+/** GET /api/katheter/kennzahlen/?patient=ID */
+export type KatheterKennzahlen = {
+  aktuell: { id: number; typ: string; lage: string; anlage_am: string; liegedauer_tage: number | null } | null;
+  /** Anzahl noch liegender Katheter */
+  offen: number;
+  anzahl: number;
+  kathetertage: number;
+  infektionen: number;
+  /** Infektionen je 1000 Kathetertage; null ohne Kathetertage */
+  infektionen_je_1000: number | string | null;
+  /** Kerndaten nennen einen Katheter, die Historie ist leer → „Anlagedatum nicht erfasst – bitte nachtragen“ */
+  anlagedatum_fehlt: boolean;
+  kerndaten_typ: string | null;
+  kerndaten_typ_id: number | null;
+  hinweise: string[];
 };
 
 /** Vorschläge für Darreichungsform und Einheit (Freitext bleibt erlaubt) */
@@ -1055,4 +1137,30 @@ export type ScansStand = {
   dienst?: { gestartet: string; lebenszeichen: string; laeuft: boolean; bearbeitet: number; threads: string;
     /** Speicher des Containers „ocr“ in Bytes (cgroup v2), Höchststand seit dem Start */
     speicher?: { belegt: number; hoechst: number | null; grenze: number | null } | null } | null;
+};
+
+/** Statistik (F193, ``GET /api/statistik/``): nur geschützte Werte – 1 bis 4 Fälle als „< 5“ (``wert`` null), im
+ *  Bestand bei einer solchen Zelle alles auf volle 5 gerundet („≈“, ``status`` „gerundet“). */
+export type StatistikZelle = { wert: number | null; anzeige: string; status: "exakt" | "klein" | "gerundet" };
+export type StatistikZeitraum = { art: "jahr" | "quartal" | "frei"; von: string; bis: string; ende: string; stichtag: string;
+  titel: string; laufend: boolean };
+export type StatistikKennzahl = "aktiv" | "betreut" | "neuaufnahmen" | "abgeschlossen" | "kontakte" | "plaene_erstellt"
+  | "plaene_freigegeben";
+export type StatistikVerteilung = "abschlussanlass" | "versorger" | "altersgruppen" | "katheter";
+export type StatistikWerte = {
+  kennzahlen: Record<StatistikKennzahl, StatistikZelle>;
+  verteilungen: Record<StatistikVerteilung, { schluessel: string; text: string; zelle: StatistikZelle }[]>;
+  gerundet: boolean;
+};
+export type Statistik = {
+  firma: { kuerzel: string; name: string; kurzname: string } | null;
+  zeitraum: StatistikZeitraum;
+  vergleich: StatistikZeitraum;
+  werte: StatistikWerte;
+  vorher: StatistikWerte;
+  kennzahlen: { schluessel: StatistikKennzahl; text: string }[];
+  verteilungen: { schluessel: StatistikVerteilung; text: string }[];
+  regel: string;
+  hinweise: string[];
+  erstellt_am: string;
 };

@@ -89,6 +89,9 @@ def umfang(patient) -> dict:
         "bia_messungen": patient.bia_messungen.count(), "berichte": patient.berichte.count(),
         "therapieschritte": patient.therapieschritte.count(), "medikamente": patient.medikamente.count(),
         "korrespondenz": patient.korrespondenz.count(),
+        # Katheter-Historie (F192)
+        "katheter": patient.katheter_eintraege.count(),
+        "katheter_komplikationen": patient.katheter_komplikationen.count(),
     }
 
 
@@ -113,7 +116,8 @@ def akten_entfernen(ids: list[int]) -> None:
     from infusionen.models import Infusionsplan, InfusionsplanPosition
     from korrespondenz.models import Schreiben
 
-    from .models import Diagnose, Hinweisruhe, Medikament, PatientFirma, Therapieschritt
+    from .models import (Diagnose, Hinweisruhe, Katheter, KatheterKomplikation, Medikament, PatientFirma,
+                         Therapieschritt)
 
     ids = list(ids)
     eigene = eigene_dokumente(ids)
@@ -153,7 +157,7 @@ def akten_entfernen(ids: list[int]) -> None:
     frueher.exclude(id__in=bleibt).delete()
     for modell in (Gewichtsmessung, Kontakt, Termin, Infusionsplan, Bezugsperson, PatientArzt, Erklaerung,
                    Datenschutzanfrage, Diagnose, Laborbefund, BiaMessung, Bericht, Hinweisruhe, Therapieschritt,
-                   PatientFirma, Medikament, Schreiben):
+                   PatientFirma, Medikament, Schreiben, Katheter, KatheterKomplikation):
         modell.history.filter(patient_id__in=ids).delete()
     InfusionsplanPosition.history.filter(plan_id__in=plan_ids).delete()
     Laborwert.history.filter(befund_id__in=befund_ids).delete()

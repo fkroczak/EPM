@@ -133,8 +133,31 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   await page.getByLabel("Geburtsdatum").fill("14.03.1961");
   const doppelung = page.getByTestId("doppelung");
   await expect(doppelung).toContainText("Musterfrau, Erika");
+  // Grund je Treffer (16.10.2026)
+  await expect(doppelung.getByTestId("doppelung-treffer").filter({ hasText: "Musterfrau, Erika" }).getByTestId("doppelung-grund"))
+    .toHaveText("gleicher Name und Geburtsdatum");
   await doppelung.getByRole("button", { name: "Nein, andere Person" }).click();
   await expect(doppelung).toHaveCount(0);
+
+  // Doppelung mit anderer Schreibweise (16.10.2026): „Jürgensen-Weiß“ wird mit „Juergensen“ gefunden, Vor- und
+  // Nachname vertauscht ebenfalls
+  const umlaut = eindeutig("Jürgensen");
+  const vorhanden = await apiAls("mitarbeiter");
+  const jp = await vorhanden.post("patienten/", { nachname: `${umlaut}-Weiß`, vorname: "Björn", geburtsdatum: "1937-11-23" });
+  await vorhanden.ende();
+  await page.getByLabel("Nachname").fill(umlaut.replace("ü", "ue"));
+  await page.getByLabel("Vorname").fill("Bjoern");
+  await page.getByLabel("Geburtsdatum").fill("23.11.1937");
+  // nur den eigenen Treffer prüfen – frühere Läufe auf derselben Datenbank können weitere mit gleichem Datum hinterlassen
+  const eigener = doppelung.getByTestId("doppelung-treffer").filter({ hasText: `${umlaut}-Weiß, Björn` });
+  await expect(eigener).toHaveCount(1);
+  await expect(eigener.getByTestId("doppelung-grund")).toHaveText("ähnliche Schreibweise");
+  await page.getByLabel("Nachname").fill("Björn");
+  await page.getByLabel("Vorname").fill(`${umlaut}-Weiss`);
+  await expect(eigener.getByTestId("doppelung-grund")).toHaveText("Vor-/Nachname vertauscht");
+  await expect(eigener.getByRole("link").first()).toHaveAttribute("href", `/patienten/${jp.id}`);
+  await eigener.getByRole("button", { name: "Nein, andere Person" }).click();
+  await expect(eigener).toHaveCount(0);
 
   // Prüfung im Backend: Größe außerhalb der Grenzwerte
   const nachname = eindeutig("Neumann");

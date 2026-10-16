@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ApiFehler, abfrage, api, apiDatei } from "@/lib/api";
+import { ApiFehler, abfrage, alle, api, apiDatei } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useEinstellungen, usePraeparate } from "@/lib/daten";
@@ -75,6 +75,20 @@ function ausPlan(p: Plan, gueltig?: string): Formular {
     gueltig_ab: gueltig ?? datum(p.gueltig_ab),
     positionen: (p.positionen ?? []).map((x) => ({ praeparat: String(x.praeparat), menge: x.menge != null ? zahl(x.menge) : "",
       einheit: x.einheit ?? "", haeufigkeit: x.haeufigkeit ?? "", bemerkung: x.bemerkung ?? "" })) };
+}
+
+/** Letzter freigegebener Plan für einen Entwurf – dieselbe Regel wie ``Infusionsplan.letzter_freigegebener`` im
+ *  Backend (Festlegung 16.10.2026): der aktuell gültige Plan (jede Freigabe macht den freigegebenen Plan zum aktuellen);
+ *  ohne ihn der späteste abgelöste nach „gültig ab“, bei gleichem Tag nach dem Zeitpunkt der Freigabe (ohne Freigabe,
+ *  z. B. aus dem Altsystem: davor), zuletzt nach der ID. Entwürfe zählen nie. */
+function letzterFreigegebener(plaene: Plan[]): Plan | undefined {
+  const aktuell = plaene.find((p) => p.status === "aktuell");
+  if (aktuell) return aktuell;
+  const freigabe = (p: Plan) => (p.freigegeben_am ? Date.parse(p.freigegeben_am) : -Infinity);
+  const spaeter = (a: Plan, b: Plan) => a.gueltig_ab !== b.gueltig_ab ? a.gueltig_ab > b.gueltig_ab
+    : freigabe(a) !== freigabe(b) ? freigabe(a) > freigabe(b) : a.id > b.id;
+  return plaene.filter((p) => p.status === "abgeloest")
+    .reduce<Plan | undefined>((bester, p) => (!bester || spaeter(p, bester) ? p : bester), undefined);
 }
 
 function zahlWert(t: string): number | null {
@@ -193,8 +207,20 @@ export function PlanEditor() {
   });
   const aktuellBekannt = aktuellAbfrage.isFetchedAfterMount && !aktuellAbfrage.isFetching;
   const aktuellId = aktuellBekannt ? aktuellAbfrage.data?.results[0]?.id : undefined;
-  const vorgaengerId = planId ? entwurf.data?.vorgaenger : aktuellId;
-  const vorgaenger = useQuery({ queryKey: ["plan", vorgaengerId], queryFn: () => api<Plan>(`infusionsplaene/${vorgaengerId}/`), enabled: !!vorgaengerId });
+  // Markierung und Spalte „vorher“: gegen den letzten freigegebenen Plan (Festlegung 16.10.2026, wie der Vergleich in
+  // der Akte); gibt es keinen, gegen den Vorgänger des Entwurfs. Eine Auswahl des Vergleichsplans gibt es nur in der
+  // Akte (Infusionspläne › Vergleich): Im Kopf des Editors wäre sie neben „Mengen nach Praxisvorgabe“, „Leer beginnen“
+  // und „Frühere Pläne“ je nach Breite in eine neue Zeile gerutscht (Layoutsprung) – deshalb hier nur der Standard.
+  // Eigene Abfrage ohne Zwischenspeicher: direkt nach einer Freigabe darf kein alter Stand gelten.
+  const vergleichsbasis = useQuery({
+    queryKey: ["patient", patient.id, "plaene", "vergleichsbasis"],
+    queryFn: () => alle<Plan>(`infusionsplaene/${abfrage({ patient: patient.id })}`),
+    gcTime: 0,
+  });
+  const standardPlan = vergleichsbasis.data ? letzterFreigegebener(vergleichsbasis.data) : undefined;
+  const vergleichGrund: "letzter_freigegebener" | "vorgaenger" = standardPlan ? "letzter_freigegebener" : "vorgaenger";
+  const vergleichsplan = standardPlan
+    ?? (planId && entwurf.data?.vorgaenger ? vergleichsbasis.data?.find((x) => x.id === entwurf.data!.vorgaenger) : undefined);
   const quelleId = vorlageId ?? (aktuellId ? String(aktuellId) : null);
   const quelle = useQuery({ queryKey: ["plan", quelleId], queryFn: () => api<Plan>(`infusionsplaene/${quelleId}/`), enabled: !planId && !!quelleId });
   // erster Plan: je kg Körpergewicht vorbelegt wie im Altsystem
@@ -228,7 +254,7 @@ export function PlanEditor() {
     if (!planId && !neueId && vorhanden && !speichern.isPending) navigate(`/patienten/${patient.id}/plaene/${vorhanden.id}/bearbeiten`, { replace: true });
   }, [offeneEntwuerfe.data, offeneEntwuerfe.isFetching]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const vorher = useMemo(() => (vorgaenger.data ? ausPlan(vorgaenger.data) : null), [vorgaenger.data]);
+  const vorher = useMemo(() => (vergleichsplan ? ausPlan(vergleichsplan) : null), [vergleichsplan]);
   const geaendert = (k: keyof Formular) => !!(vorher && f && k !== "gueltig_ab" && norm(f, k) !== norm(vorher, k));
 
   /** Werte des Formulars für PATCH bzw. Vorschau; Eingabefehler stehen danach in ``lokal`` */
@@ -306,7 +332,7 @@ export function PlanEditor() {
   if (patient.ist_abgeschlossen || !darfBei("plaene_anlegen", patient)) {
     return <Navigate to={`/patienten/${patient.id}/plaene`} replace />;
   }
-  if (!f || praeparate.isLoading) return <Laden />;
+  if (!f || praeparate.isLoading || vergleichsbasis.isLoading) return <Laden />;
   if (planId && entwurf.data && entwurf.data.status !== "entwurf") {
     return <Meldung art="warn">Dieser Plan ist freigegeben und unveränderlich. Bitte einen neuen Plan anlegen.</Meldung>;
   }
@@ -330,8 +356,8 @@ export function PlanEditor() {
   const zusatz = zahlWert(f.basis_ml) ?? 0;
   const summe = volumen != null ? Math.round((volumen + zusatz) * 100) / 100 : null;
   const rate = summe != null && laufzeit ? Math.round((summe / laufzeit) * 10) / 10 : null;
-  const volumenVorher = vorgaenger.data?.volumen_summe_ml ?? null;
-  const rateVorher = vorgaenger.data?.rate_ml_h ?? null;
+  const volumenVorher = vergleichsplan?.volumen_summe_ml ?? null;
+  const rateVorher = vergleichsplan?.rate_ml_h ?? null;
   const ppiMaske = zahlWert(f.pantozol_tage) ?? 0;
   const ca = zahlWert(f.calcium_mmol);
   const mg = zahlWert(f.magnesium_mmol);
@@ -408,9 +434,11 @@ export function PlanEditor() {
           </span>
           <h2 className="m-0 text-[1.625rem] font-semibold">{planId ? "Entwurf bearbeiten" : "Neuer Infusionsplan"}</h2>
           <span className="text-sm gedaempft">
-            {leerBegonnen ? "Leer begonnen. " : vorgaenger.data ? `${planId ? "Vorgänger" : vorlageId ? "Vorlage geladen, Vorgänger" : "Vorbelegt mit dem aktuellen Plan"} vom ${datum(vorgaenger.data.gueltig_ab)}. `
+            {leerBegonnen ? "Leer begonnen. "
+              : !planId && quelleId && quelle.data ? vorlageId ? `Vorlage geladen (Plan vom ${datum(quelle.data.gueltig_ab)}). ` : `Vorbelegt mit dem aktuellen Plan vom ${datum(quelle.data.gueltig_ab)}. `
+              : vergleichsplan ? ""
               : `Erster Plan dieses Patienten. ${!planId && vorbelegung.data?.werte ? `Vorbelegt je kg Körpergewicht (${kg(vorbelegung.data.gewicht_kg)}) ${vorbelegung.data.stand ? `nach Praxisvorgabe vom ${datum(vorbelegung.data.stand)}` : "wie im Altsystem"}. ` : ""}`}
-            {vorher ? <>Geänderte Werte sind <span className="bg-warn-bg border border-warn rounded px-1">markiert</span>.</> : null}
+            {vorher && vergleichsplan ? <span data-testid="plan-vergleichsbasis">Geänderte Werte gegenüber dem {vergleichGrund === "vorgaenger" ? "Vorgänger" : "letzten freigegebenen Plan"} vom {datum(vergleichsplan.gueltig_ab)} sind <span className="bg-warn-bg border border-warn rounded px-1">markiert</span>.</span> : null}
           </span>
         </div>
         <div className="flex gap-2 flex-wrap">

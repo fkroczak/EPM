@@ -111,7 +111,9 @@ export function PatientNeu() {
   const aerzte = useAerzteListe();
   const gewaehlt = (versorger.data ?? []).find((v) => String(v.id) === f.versorger);
 
-  // Doppelungsprüfung: gleiches Geburtsdatum und ähnlicher Name
+  // Doppelungsprüfung: gleiches Geburtsdatum und ähnlicher Name. Seit 16.10.2026 mit vergleichbarer Schreibweise
+  // (Umlaute, Doppelnamen, Tippfehler), vertauschten Namen bzw. Tag/Monat und Grund je Treffer; eine eingeschränkte
+  // Akte (Art. 18 DSGVO) erscheint nur als Hinweis ohne Angaben (`hinweise=1`)
   const geb = eingabeDatum(f.geburtsdatum);
   const [pruefung, setPruefung] = useState({ geb: "", nachname: "", vorname: "" });
   useEffect(() => {
@@ -120,10 +122,13 @@ export function PatientNeu() {
   }, [geb, f.nachname, f.vorname]);
   const doppelte = useQuery({
     queryKey: ["patienten", "doppelte", pruefung],
-    queryFn: () => api<PatientZeile[]>(`patienten/doppelte/${abfrage({ geburtsdatum: pruefung.geb, nachname: pruefung.nachname, vorname: pruefung.vorname })}`),
+    queryFn: () => api<{ treffer: PatientZeile[]; eingeschraenkt: string | null }>(`patienten/doppelte/${abfrage({ geburtsdatum: pruefung.geb, nachname: pruefung.nachname, vorname: pruefung.vorname, hinweise: "1" })}`),
     enabled: !!pruefung.geb && (pruefung.nachname.length >= 2 || pruefung.vorname.length >= 2),
   });
-  const aehnlich = (doppelte.data ?? []).filter((p) => !andere.includes(p.id));
+  const aehnlich = (doppelte.data?.treffer ?? []).filter((p) => !andere.includes(p.id));
+  // Hinweis auf eine eingeschränkte Akte: übergehbar wie die Treffer („Nein, andere Person“), ohne Grund (Festlegung 16.10.2026)
+  const [eingeschraenktWeg, setEingeschraenktWeg] = useState("");
+  const eingeschraenkt = doppelte.data?.eingeschraenkt && eingeschraenktWeg !== pruefung.geb ? doppelte.data.eingeschraenkt : null;
 
   // Bei jeder Eingabe: behobene Fehler sofort ausblenden, neue erst beim nächsten „Anlegen“ (sonst meckert jedes Feld beim Tippen)
   useEffect(() => {
@@ -406,17 +411,26 @@ export function PatientNeu() {
           </div>
 
           <aside className="flex flex-col gap-4">
-            {aehnlich.length ? (
+            {aehnlich.length || eingeschraenkt ? (
               <Karte className="p-4 flex flex-col gap-3 border-warn" data-testid="doppelung">
                 <div className="flex items-center gap-2 font-semibold text-warn"><Icon name="warnung" /> Ähnlicher Patient vorhanden</div>
-                <span className="text-sm text-text2 leading-normal">Gleiches Geburtsdatum und ähnlicher Name. Ist das dieselbe Person?</span>
+                <span className="text-sm text-text2 leading-normal">Gleiches oder ähnliches Geburtsdatum und ähnlicher Name. Ist das dieselbe Person?</span>
+                {eingeschraenkt ? (
+                  <div className="flex flex-col gap-2 border border-rand rounded-lg p-3" data-testid="doppelung-eingeschraenkt">
+                    <span className="text-sm">{eingeschraenkt}</span>
+                    <div className="flex gap-2 flex-wrap">
+                      <Knopf klein onClick={() => setEingeschraenktWeg(pruefung.geb)}>Nein, andere Person</Knopf>
+                    </div>
+                  </div>
+                ) : null}
                 {aehnlich.map((p) => (
-                  <div key={p.id} className="flex flex-col gap-2 border border-rand rounded-lg p-3">
+                  <div key={p.id} className="flex flex-col gap-2 border border-rand rounded-lg p-3" data-testid="doppelung-treffer">
                     <Link to={`/patienten/${p.id}`} className="flex flex-col gap-0.5 no-underline">
                       <span className="font-medium">{p.nachname}, {p.vorname}</span>
                       <span className="num text-[0.8125rem] gedaempft">
                         Nr. {nummer(p.nummer)} · geb. {datum(p.geburtsdatum)}{p.ort ? ` · ${p.ort}` : ""}{p.ist_abgeschlossen ? " · abgeschlossen" : ""}
                       </span>
+                      {p.grund ? <span className="text-[0.8125rem] text-warn" data-testid="doppelung-grund">{p.grund}</span> : null}
                     </Link>
                     <div className="flex gap-2 flex-wrap">
                       <KnopfLink to={`/patienten/${p.id}`} klein>Akte öffnen</KnopfLink>

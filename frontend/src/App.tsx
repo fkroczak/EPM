@@ -50,6 +50,8 @@ const router = createBrowserRouter([
           { path: "diagnosen", ...seite(() => import("./seiten/akte/Diagnosen").then(({ Diagnosen }) => <Diagnosen />)) },
           // Medikamentenplan (Wunsch 11.10.2026)
           { path: "medikamente", ...seite(() => import("./seiten/akte/Medikamente").then(({ Medikamente }) => <Medikamente />)) },
+          // Katheter-Historie mit Zeitachse (F192, 15.10.2026)
+          { path: "katheter", ...seite(() => import("./seiten/akte/Katheter").then(({ Katheter }) => <Katheter />)) },
           { path: "therapie", ...seite(() => import("./seiten/akte/Therapie").then(({ Therapie }) => <Therapie />)) },
           { path: "empfehlung", ...seite(() => import("./seiten/akte/Therapie").then(({ Empfehlung }) => <Empfehlung />)) },
           { path: "kontakte", ...seite(() => import("./seiten/akte/Kontakte").then(({ Kontakte }) => <Kontakte />)) },
@@ -70,6 +72,8 @@ const router = createBrowserRouter([
       },
       { path: "kalender", ...seite(() => import("./seiten/Kalender").then(({ Kalender }) => <MitRecht recht="akten_lesen" titel="Kalender"><Kalender /></MitRecht>)) },
       { path: "infusionsplaene", ...seite(() => import("./seiten/Infusionsplaene").then(({ Infusionsplaene }) => <MitRecht recht="akten_lesen" titel="Infusionspläne"><Infusionsplaene /></MitRecht>)) },
+      // Statistik (F193): anonymisierte Auswertung, nur mit „Statistik ansehen“
+      { path: "statistik", ...seite(() => import("./seiten/Statistik").then(({ Statistik }) => <MitRecht recht="statistik_ansehen" titel="Statistik"><Statistik /></MitRecht>)) },
       { path: "versorger", ...seite(() => import("./seiten/Versorger").then(({ Versorger }) => <Versorger />)) },
       { path: "aerzte", ...seite(() => import("./seiten/Aerzte").then(({ Aerzte }) => <Aerzte />)) },
       { path: "datenschutz", ...seite(() => import("./seiten/Datenschutz").then(({ Datenschutz }) => <MitRecht recht={["datenschutz_bearbeiten", "datenschutz_entscheiden"]}><Datenschutz /></MitRecht>)) },

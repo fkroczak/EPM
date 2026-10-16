@@ -79,7 +79,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F12 | Automatische Abmeldung nach 30 Minuten | alle | ABGESCHLOSSEN UND GETESTET |
 | F13 | Startseite mit Kennzahlenleiste und Kacheln (S01, S03, S06–S10) | 2 Start | ABGESCHLOSSEN UND GETESTET |
 | F14 | Patientenliste mit Filtern und Suche (Spalten je Bildschirmbreite, Vorschau ab 2560 px) | 3 Patientenliste | ABGESCHLOSSEN UND GETESTET |
-| F15 | Doppelprüfung beim Anlegen | 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
+| F15 | Doppelprüfung beim Anlegen (16.10.2026: Schreibweisen, vertauschte Namen, Tippfehler, Tag/Monat, Grund je Treffer) | 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET (Erweiterung 16.10.2026: Lauf steht aus) |
 | F16 | Patient anlegen | 12 Neuer Patient | ABGESCHLOSSEN UND GETESTET |
 | F17 | Akte lesen mit Patientenkopf | 4 Patientenakte | ABGESCHLOSSEN UND GETESTET |
 | F18 | Stammdaten, Diagnose, Therapie, Empfehlung ändern | 4 Akte, 5 Diagnose und Therapie | ABGESCHLOSSEN UND GETESTET |
@@ -100,7 +100,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F33 | Entwurf bearbeiten | 7 Neuer Infusionsplan | ABGESCHLOSSEN UND GETESTET |
 | F34 | Entwurf verwerfen | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
 | F35 | Plan freigeben | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
-| F36 | Vergleich mit dem Vorgänger | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
+| F36 | Vergleich mit dem letzten freigegebenen Plan, Vergleichsplan wählbar (seit 16.10.2026; vorher mit dem Vorgänger) | 8 Infusionspläne | ABGESCHLOSSEN – Lauf steht aus (Erweiterung 16.10.2026) |
 | F37 | Gespeicherte Plan-PDF öffnen mit SHA-256-Prüfung | 8 Infusionspläne | ABGESCHLOSSEN UND GETESTET |
 | F38 | Protonenpumpenhemmer (Pantozol®/Nexium®) im Plan | 7, 8 | ABGESCHLOSSEN UND GETESTET |
 | F39 | Gesamtvolumen, Laufzeit und Rate | 7, 8 | ABGESCHLOSSEN UND GETESTET |
@@ -533,8 +533,48 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 ### F15 Doppelprüfung beim Anlegen
 - **Endpunkt:** `GET /api/patienten/doppelte/?geburtsdatum=JJJJ-MM-TT&nachname=&vorname=` → bis zu 10 Einträge wie F14
 - **Regel:** gleiches Geburtsdatum und Nach- oder Vorname beginnt mit denselben 3 Buchstaben.
+- **Erweiterung 16.10.2026** (`patienten/dubletten.py`, `PatientViewSet.doppelte`): Vorfilter in der Datenbank nur über das
+  Geburtsdatum (und das Datum mit vertauschtem Tag/Monat), Feinvergleich in Python – keine Datenbank-Erweiterung
+  (`unaccent` ist in den Migrationen nicht eingerichtet). Namen werden vergleichbar gemacht: klein, ä/ö/ü/ß → ae/oe/ue/ss,
+  Akzente entfernt (é → e), Apostrophe weg, Bindestrich/Leerzeichen trennen Namensteile, führende Namenszusätze
+  (von, van, de, der, zu …) fallen weg. Gemeldet wird, mit Rang (kleiner zuerst) und Grund im neuen Feld `grund`
+  (dazu `rang`):
+
+  | Rang | `grund` | Bedingung |
+  |---|---|---|
+  | 0 | gleicher Name und Geburtsdatum | Vor- und Nachname wörtlich gleich (Groß/Klein egal) |
+  | 1 | gleicher Name (andere Schreibweise) und Geburtsdatum | vergleichbare Schreibweise gleich („Mueller“ = „Müller“, „Bergen“ = „von Bergen“) |
+  | 2 | Vor-/Nachname vertauscht | Vor- und Nachname über Kreuz gleich (auch mit kleinem Tippfehler) |
+  | 3 | Tag/Monat vertauscht | vollständiger Name gleich, Geburtsdatum mit vertauschtem Tag und Monat (03.07. statt 07.03.) |
+  | 4 | ähnliche Schreibweise | Nach- oder Vorname mit Levenshtein-Abstand ≤ 1 (ab 8 Zeichen ≤ 2; unter 4 Zeichen nur gleich) oder ein Teil eines Doppelnamens gleich/fast gleich („Mueller“ findet „Müller-Lüdenscheidt“) |
+  | 5 | gleiches Geburtsdatum, Name beginnt gleich | bisherige Regel (3 Buchstaben), auf die vergleichbare und die wörtliche Schreibweise |
+  | 6 | gleiches Geburtsdatum | ohne Namensangabe (wie bisher) |
+
+  Höchstens 10 Treffer. **Bereich** wie bisher über `get_queryset()` → `patienten_fuer`: Testpatienten je nach Konto
+  (Testzugang nur Testpatienten, ohne „Testdaten sehen“ keine), nur Akten der aktiven Firma; **abgeschlossene Akten
+  zählen mit** (sie waren schon enthalten – nur die Patientenliste filtert nach Status) und tragen `ist_abgeschlossen`.
+  **Eingeschränkte Akten (Art. 18 DSGVO)** erscheinen nie mit Angaben, außer bei laufender eigener Einsicht. Mit
+  `?hinweise=1` lautet die Antwort `{"treffer": [...], "eingeschraenkt": "Es gibt eine eingeschränkte Akte mit gleichem
+  Geburtsdatum." | null}` – der Hinweis kommt, wenn eine für die Person verborgene eingeschränkte Akte (im Bereich
+  `patienten_fuer(user, eingeschraenkte=True)`) gleiches Geburtsdatum und einen passenden Namen (Rang 0–6) hat; er
+  enthält weder Name noch Nummer noch Kennung. Ohne `hinweise` bleibt die Antwort eine Liste (bisheriger Vertrag, nur um
+  `grund`/`rang` erweitert). Ungültiges oder fehlendes Geburtsdatum → leere Antwort (vorher Fehler bei ungültigem Datum
+  möglich).
+- **Oberfläche:** Neuer Patient fragt mit `hinweise=1`; die Warnkarte (`data-testid="doppelung"`) zeigt je Treffer den
+  Grund (`doppelung-grund`) und ggf. den Hinweis auf eine eingeschränkte Akte (`doppelung-eingeschraenkt`). Die Warnung
+  bleibt übergehbar („Nein, andere Person“) – auch der Hinweis auf die eingeschränkte Akte.
+- **Festlegung 16.10.2026 (vorher offener Punkt):** Beim Übergehen der Warnung wird **kein Grund** verlangt.
+- **Offen / zu klären:** ob der Hinweis auf eine eingeschränkte Akte (Art. 18) überhaupt erscheinen darf – er verrät,
+  dass zu diesem Geburtsdatum (und einem ähnlichen Namen) eine eingeschränkte Akte existiert; umgesetzt ist der Hinweis
+  ohne Details, wie beauftragt. Ebenfalls offen: ob die Toleranzen (Abstand, Liste der Namenszusätze) in der Praxis zu
+  viele Treffer liefern.
 - **Teststatus:** Backend-Test grün (`test_doppelte`). Browsertest grün: `patienten.spec.ts` „Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme“ (Hinweis auf Musterfrau, Erika; „Nein, andere Person“).
-- **Status:** ABGESCHLOSSEN UND GETESTET
+  Neu 16.10.2026: Backend-Tests `patienten.test_dubletten` (Normalisierung, Abstand, Rang; API: bisheriger Vertrag,
+  Umlaute/Doppelname, exakte zuerst, vertauscht, Tippfehler, Tag/Monat, abgeschlossene Akte mit Namenszusatz,
+  eingeschränkte Akte ohne Angaben bzw. mit Einsicht, Testpatienten im Bereich); Browsertest im selben Test um Grund,
+  Umlaut-/Doppelnamen-Fall und vertauschte Namen erweitert. **Lauf steht aus** (beides in der Entwicklungsumgebung nicht
+  ausführbar; nur Syntax geprüft).
+- **Status:** ABGESCHLOSSEN UND GETESTET (Erweiterung 16.10.2026: ABGESCHLOSSEN – Lauf steht aus)
 
 ### F16 Patient anlegen
 - **Ansicht:** 12 Neuer Patient
@@ -782,14 +822,49 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
   Folgeplan mit markierten Änderungen, Verwerfen“ (PDF einseitig, Prüfsumme); Neustart geprüft in `zz-neustart.spec.ts` (Lauf 36921980921, Commit `ca9f858`).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
-### F36 Vergleich mit dem Vorgänger
-- **Ansicht:** 8 Infusionspläne
-- **Endpunkt:** `GET /api/infusionsplaene/{id}/vergleich/` → `{"vorgaenger": {id, gueltig_ab, status} | null, "zeilen":
-  [{"schluessel", "wert", "vorher", "jetzt", "geaendert"}], "anzahl_geaendert"}`; Zeilen in der Reihenfolge des Entwurfs
-  (Basislösung … Bemerkung), Werte als Anzeigetext („Glucose 70 % · 200 g“, „80 mmol“, „Soluvit N | Vitalipid adult“).
+### F36 Vergleich mit dem Vorgänger – seit 16.10.2026 mit dem letzten freigegebenen Plan, wählbar
+- **Ansicht:** 8 Infusionspläne (Umschalter „Ansicht wie PDF | Vergleich“ mit Zahl der Änderungen, im Vergleich die
+  Auswahl „Vergleichen mit:“), 7 Neuer Infusionsplan (Markierung und Spalte „vorher“)
+- **Festlegung 16.10.2026:** Verglichen wird standardmäßig mit dem **letzten freigegebenen Plan** (Status „aktuell“
+  oder „abgelöst“, `Infusionsplan.FREIGEGEBEN`) desselben Patienten vor diesem Plan; der Vergleichsplan ist frei wählbar.
+  Bis dahin galt `vorgaenger`. Der ist beim Anlegen eines Entwurfs der damals aktuelle Plan (`neuer_entwurf`), bei aus
+  dem Altsystem übernommenen Plänen der Plan davor nach Datum (`altimport`, kann auch ein abgelöster sein). Ein Entwurf
+  ist nie Vorgänger eines anderen EPM-Plans (es gibt höchstens einen je Patient); verworfene Entwürfe sind gelöscht und
+  tauchen nirgends auf. Ein Entwurf als Vorgänger entsteht nur bei nachgetragenen Plänen (KI-Übernahme).
+- **Regel „letzter freigegebener“** (`Infusionsplan.letzter_freigegebener`): Reihenfolge `gueltig_ab`, bei gleichem
+  Tag `freigegeben_am` (ohne Freigabe, z. B. Altsystem, davor), dann ID; der Plan selbst zählt nie. Für einen
+  **Entwurf** ist es der aktuell gültige Plan (ein Entwurf folgt immer auf die letzte Freigabe), ohne ihn der späteste
+  abgelöste. Für einen freigegebenen Plan der späteste freigegebene davor.
+- **Rückfall:** Gibt es keinen freigegebenen Plan davor, gilt wie bisher `vorgaenger` (`grund: "vorgaenger"`) – der
+  Vergleich zeigt nie weniger als vorher. Gibt es auch keinen Vorgänger: `vorgaenger: null`, die Auswahl bleibt nutzbar.
+- **Endpunkt:** `GET /api/infusionsplaene/{id}/vergleich/[?mit=<Plan-ID>]` → `{"vorgaenger": {id, gueltig_ab, status} | null,
+  "zeilen": [{"schluessel", "wert", "vorher", "jetzt", "geaendert"}], "anzahl_geaendert", "vergleich_mit": {id,
+  gueltig_ab, status, text, grund} | null, "standard_id", "auswahl": [{id, gueltig_ab, status}]}`. `vorgaenger` ist (Name
+  bleibt, kompatibel) der tatsächlich verglichene Plan, `vergleich_mit` derselbe mit Text („01.10.2026 · abgelöst“) und
+  `grund` (`letzter_freigegebener` | `vorgaenger` | `gewaehlt`), `standard_id` der Plan ohne Auswahl, `auswahl` alle
+  anderen Pläne desselben Patienten (auch der Entwurf) wie die Liste: neueste oben. Zeilen in der Reihenfolge des
+  Entwurfs (Basislösung … Bemerkung), Werte als Anzeigetext („Glucose 70 % · 200 g“, „80 mmol“, „Soluvit N | Vitalipid adult“).
+- **Validierung:** `mit` muss ein anderer Plan **desselben Patienten** sein, gesucht nur in `get_queryset()` (Bereich und
+  Rechte des Benutzers). Sonst 400 `{"mit": "Plan zum Vergleich nicht gefunden. Verglichen werden kann nur mit einem
+  anderen Plan desselben Patienten."}` (fremder oder unbekannter Plan, ohne etwas über ihn zu verraten), `{"mit": "Bitte
+  einen anderen Plan zum Vergleich wählen."}` (der Plan selbst) bzw. `{"mit": "Bitte einen Plan zum Vergleich wählen."}`
+  (keine Zahl). Leeres `mit` = Standard. Das Modell lehnt einen fremden Plan zusätzlich ab (`ValidationError`).
+- **Oberfläche:** Akte › Infusionspläne: Umschalter „Vergleich“ (bisher „Vergleich mit Vorgänger“, Zähler bleibt);
+  im Vergleich die Auswahl „Vergleichen mit:“ (vorbelegt mit dem Standard, gekennzeichnet „(Standard)“); Spaltenkopf
+  zeigt den gewählten Plan („Abgelöst · 01.09.2026“), der Satz darüber woher er kommt. Ein anderer Plan in der Liste
+  beginnt wieder beim Standard. Plan-Editor: Markierung, Spalte „vorher“, Volumen/Rate/Energie „vorher“ gegen den
+  letzten freigegebenen Plan (dieselbe Regel im Frontend), sonst den Vorgänger; Satz „Geänderte Werte gegenüber dem
+  letzten freigegebenen Plan vom … sind markiert.“ Eine Auswahl gibt es dort bewusst nicht: Im Kopf des Editors wäre
+  sie je nach Breite in eine neue Zeile gerutscht (Layoutsprung) – vermerkt im Code.
 - **Tabellen:** `infusionen_infusionsplan`, `infusionen_infusionsplan_vitamine`
-- **Teststatus:** Backend-Test grün (`test_vergleich_mit_vorgaenger`). Browsertest grün: `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“ („2 Werte geändert …“).
-- **Status:** ABGESCHLOSSEN UND GETESTET
+- **Teststatus:** Backend-Tests `test_vergleich_mit_vorgaenger`, `test_vergleich_standard_ist_letzter_freigegebener`
+  (Entwurf, verworfener Entwurf, nachgetragener Plan mit Entwurf als Vorgänger), `test_vergleich_mit_gewaehltem_plan`,
+  `test_vergleich_mit_plan_eines_anderen_patienten`, `test_vergleich_ohne_freigegebenen_plan_faellt_auf_vorgaenger_zurueck`.
+  Browsertests `plaene.spec.ts` „Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen“ („2 Werte
+  geändert …“, Standard in der Auswahl) und „Planvergleich: Standard ist der letzte freigegebene Plan, Vergleichsplan
+  frei wählbar (16.10.2026)“. Bis 15.10.2026 grün; die Erweiterung vom 16.10.2026 ist geschrieben, aber noch nicht
+  gelaufen (Arbeitsumgebung ohne PyPI/npm; geprüft: `python3 -m py_compile`).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus (Erweiterung 16.10.2026)
 
 ### F37 Gespeicherte Plan-PDF öffnen mit SHA-256-Prüfung
 - **Ansicht:** 8 Infusionspläne („PDF öffnen“ am freigegebenen Plan)
@@ -3657,7 +3732,7 @@ Praxis erstellen lassen.“ Befunde, Messung vorher/nachher und Rückfragen: `do
 - **Akte › Infusionspläne:** PDF in voller Spaltenhöhe neben der Liste (`PdfLeser einpassen`: „Ganze Seite“, sonst auf
   die Breite, wenn die Seite sonst unter 360 px schmal wäre), „Groß ansehen“, „Herunterladen“; Herkunft
   (gespeicherte PDF mit Prüfsumme bzw. Ansicht mit aktiver Dokumentvorlage) darunter; Umschalter „Vergleich mit
-  Vorgänger“ mit Zahl der Änderungen.
+  Vorgänger“ mit Zahl der Änderungen (seit 16.10.2026 „Vergleich“ mit wählbarem Vergleichsplan, F36).
 - **Menüpunkt Infusionspläne:** „PDF“ an jedem Plan (Entwürfe: `ansicht/`); ab 1920 px rechts neben der Tabelle.
 - **Plan-Editor:** „Mengen nach Praxisvorgabe“ (je kg des letzten Gewichts wie im Altsystem, `GET …/vorbelegung/`) auch
   beim Folgeplan; Karte **Prüfung vor der Freigabe** (Gewicht vorhanden/≤ 3 Monate, seit F190 6 Monate und einstellbar, Präparat zu jeder Menge, Ca/Mg
@@ -3986,6 +4061,8 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 16.10.2026 | Katheter-Historie (F192) | Neuer Reiter „Katheter“ mit Zeitachse, Komplikationen und Infektionen je 1000 Kathetertage; Modelle `Katheter`, `KatheterKomplikation` (Migration `patienten/0022`), Auswahllisten „Katheter: Entfernungsgrund“ und „Katheter: Komplikation“ (`stammdaten/0026`), API `/api/katheter/`, `/api/katheter-komplikationen/`. Festlegung 16.10.2026: neuer liegender Katheter aktualisiert `Patient.katheter`; vorheriger wird nicht automatisch beendet (Hinweis). Einzelheiten unter F192. |
+| 16.10.2026 | Planvergleich wählbar (Festlegung 16.10.2026, Branch `feature/planvergleich-waehlbar`) | F36: Der Infusionsplan-Vergleich vergleicht standardmäßig mit dem letzten freigegebenen Plan vor diesem (`Infusionsplan.letzter_freigegebener`; Entwürfe und verworfene Pläne zählen nie), ohne einen solchen wie bisher mit dem Vorgänger. `GET …/vergleich/?mit=<Plan-ID>` wählt einen anderen Plan desselben Patienten (sonst 400), die Antwort hat zusätzlich `vergleich_mit`, `standard_id` und `auswahl`; `vorgaenger`, `zeilen`, `anzahl_geaendert` bleiben (`vorgaenger` = der verglichene Plan). Akte: Umschalter „Vergleich“ statt „Vergleich mit Vorgänger“, Auswahl „Vergleichen mit:“, Spaltenkopf mit dem gewählten Plan. Plan-Editor: Markierung und „vorher“ gegen den letzten freigegebenen Plan, ohne Auswahl (Layout). Hilfe angepasst. Unverändert gegen den Vorgänger: `geaenderte_felder` am Plan und der Bezug der Hinweise aus Labor und Gewicht (F187). Lauf steht aus |
 | 14.10.2026 | Scans: Diagnosen ohne ICD-Code im Brief | Kundenwunsch: PDF-Briefe nennen Diagnosen meist nur im Freitext. Jede Zeile unter „Diagnosen:“ (auch Entlassungs-, Neben-, Dauerdiagnosen, Vorerkrankungen) ohne Code wird ein eigener Vorschlag (`scans/ocr/auswertung.py`: `_freitext_diagnosen`, `freitext: true`, hinter den Diagnosen mit Code; umbrochene Zeilen zusammengesetzt, Messwerte und Fließtext ausgelassen, „V.a.“/„Z.n.“ → Kennzeichen). Code aus dem Gelernten, sonst aus Vorlagen › Diagnosen (`aus_liste`: gleiche Wörter mit kleinen Lesefehlern; 1,0 → `zuordnung: liste`, angehakt; ab 0,6 → `liste_vorschlag`, nicht angehakt; Gleichstand → unspezifische Form). Ohne Treffer bleibt der Code leer, nicht angehakt. Der ICD-Code bleibt Pflicht (Entscheidung 14.10.2026): Zuordnen sperrt „In die Akte legen“, solange eine angehakte Diagnose ohne Code ist; Bezeichnung mit Auswahlliste der Diagnoseliste setzt den Code. Ergänzte Codes werden gelernt. Der Freitext bleibt zusätzlich unter „Texte“. Tests `scans.tests.AuswertungTest.test_arztbrief_diagnosen_ohne_icd`, `scans.test_lernen` |
 | 14.10.2026 | Briefpapier der Regeneration Clinic 1:1 | Neuer Wert `briefpapier` im Baustein „Briefkopf“ (`vorlagen/briefpapier.py`, Prüfung in `bloecke.py`): Kopfband mit Wellenkante, Logo (`statisch/briefpapier/rgc-logo.png`, freigestellt) und Anschrift sowie Fußband mit Postanschrift und Registrierdaten als SVG in Seitengröße, fest positioniert und damit auf jeder Seite; Seitenränder 47/17,6/31/25 mm, Fußzeilentext links entfällt, Seitenzahl über dem Band; erste Seite mit Absenderzeile, Kontakt und „Riga, Datum“ (`absender`). Maße und Farben aus dem Briefpapier der Klinik (pt wie im Original). Schriften Inter und Carlito in `schriften/`. Laborprofile MAL-00 bis MAL-06 nutzen es; Datenmigration `vorlagen/0012_rgc_laborprofile_briefpapier` stellt unbearbeitete mitgelieferte Fassungen um. Editor: Schalter „Briefpapier der Regeneration Clinic“. Tests `vorlagen/test_rgc.py` (`test_briefpapier`). |
 | 14.10.2026 | Laborprofile Malabsorption der Regeneration Clinic | Das Dokument „Laborprofile Malabsorption – Strukturierte Anforderungsprofile zur Integration in die Klinik-IT“ (Version 1.0) als Laboranforderungen auf dem Briefkopf der Klinik: neun eigene Schreiben der Firma RGC in der Gruppe „anforderungen“ – MAL-01, MAL-02A, MAL-02B, MAL-02C, MAL-03 (A–D), MAL-04 (Vollpanel aus MAL-01, 02A, 02B), MAL-05, MAL-06 und eine Übersicht mit Regelwerk R1–R11 und Monitoring-Intervallen (Kennungen `eigen-rgc-mal00` … `eigen-rgc-mal06`). Jeder Bogen ist nach Röhrchen bzw. Material geordnet (Material genau wie im Dokument), mit Röhrchenübersicht, Status P/O/R (Pflicht angekreuzt), LOINC, Hinweis, Pflichthinweisen zur Präanalytik (glutenhaltige Kost, geformter Stuhl, Spurenelement-Röhrchen, lichtgeschützt, gekühlt, nüchtern) und den Regeln des Profils; Reflexparameter aus anderen Profilen mit ihrem Röhrchen (MAL-01: Parathormon 2A.4 nach R7). Strukturierte Daten je Parameter (Felder aus Abschnitt 6 des Dokuments) in `vorlagen/statisch/laborprofile-malabsorption.json`. Umgesetzt mit `werkzeuge/rgc-laborprofile.py DOCX`; Datenmigration `vorlagen/0011_rgc_laborprofile` (nur Fehlendes). Doku `docs/VORLAGEN-RGC-2026-10.md`. Tests `vorlagen/test_rgc.py`. |
@@ -4104,3 +4181,162 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 - **Status:** TEILWEISE ABGESCHLOSSEN – Lauf mit echtem Modell und Benchmark auf der Ziel-VM stehen aus; Browsertest
   noch nicht geschrieben; Trainingslauf (LoRA auf CPU) bewusst noch nicht gebaut.
 
+### F192 Katheter-Historie je Patient mit Zeitachse und Infektionsrate
+- **Anlass:** Auftrag vom 15.10.2026; Rückfrage zur Übernahme in die Kerndaten am 16.10.2026 vom Nutzer beantwortet
+  (Festlegung siehe unten). Altdaten: Das Altsystem kennt nur den Katheter-Typ (wird wie bisher in `Patient.katheter`
+  übernommen), keine weiteren Katheterdaten – der Altdaten-Import (`backend/altimport`) bleibt unverändert.
+- **Datenmodell** (`patienten/models.py`, Migration `patienten/0022_katheter_historie`, abhängig von
+  `patienten/0021_medikamente` und `stammdaten/0026_katheter_listen`; beide von Hand geschrieben):
+  - `Katheter(AktenEintrag)`: `patient` (related_name `katheter_eintraege`), `typ` (Auswahlliste „Katheter“ wie
+    `Patient.katheter`, PROTECT), `lage` („Lage/Zugang“, Freitext 200), `anlage_am` (Pflicht), `entfernt_am` (leer =
+    liegt), `entfernungsgrund` (Auswahlliste „Katheter: Entfernungsgrund“), `notiz` (500), `aktiv` (false = als falsch
+    erfasst zurückgenommen), `angelegt_am`, `angelegt_von`, `firma`; Historie (simple_history). Constraint
+    `katheter_entfernt_nach_anlage` (Entfernt am ≥ Anlagedatum), Index `katheter_patient_anlage`. Kein Löschen.
+  - `KatheterKomplikation(AktenEintrag)`: `patient` (related_name `katheter_komplikationen`), `katheter` (related_name
+    `komplikationen`), `datum`, `art` (Auswahlliste „Katheter: Komplikation“), `notiz`, `aktiv`, `angelegt_am`,
+    `angelegt_von`, `firma`; Historie. Index `katheterkompl_patient_datum`. Kein Löschen.
+  - Auswahllisten (`stammdaten/models.py: Auswahlwert.Liste.KATHETER_ENTFERNUNG`, `KATHETER_KOMPLIKATION`, Migration
+    `stammdaten/0026_katheter_listen` mit Grundwerten): Entfernungsgrund „Wechsel, Infektion, Okklusion, Dislokation,
+    Therapie beendet, Sonstiges“; Komplikation „Katheterinfektion, Okklusion, Thrombose, Dislokation, Leckage,
+    Sonstiges“. Pflege unter Administration › Auswahllisten (`seiten/admin/Auswahllisten.tsx`), Musterdaten in
+    `patienten/testdaten.py: AUSWAHLWERTE`.
+- **Regeln** (`Katheter.clean`, `KatheterKomplikation.clean`, Serializer): keine Daten in der Zukunft; Entfernt am ≥
+  Anlagedatum; Entfernungsgrund nur mit „Entfernt am“ (wer das Datum leert, leert den Grund); Komplikationsdatum in der
+  Liegezeit (Anlage bis Entfernung bzw. heute); Anlage/Entfernung lassen sich nicht so ändern, dass eine erfasste
+  Komplikation außerhalb läge; Werte nur aus der passenden Liste, ausgeblendete nur, wenn sie schon am Eintrag stehen;
+  Patient und Katheter einer Komplikation sind nicht tauschbar. Fehlermeldungen auf Deutsch je Feld.
+- **Kerndaten (Festlegung vom 16.10.2026):** Ein neu angelegter Katheter ohne „Entfernt am“ setzt `Patient.katheter`
+  auf seinen Typ und `kein_katheter` auf false (`KatheterViewSet.perform_create`, im Verlauf mit Bearbeiter). Ein noch
+  offener vorheriger Katheter wird **nicht** automatisch beendet; die Antwort enthält dann
+  `hinweise: ["Vorheriger Katheter noch nicht als entfernt eingetragen"]`, die Oberfläche zeigt ihn als Meldung, bis
+  die Entfernung eingetragen ist. Steht in den Kerndaten ein Katheter, die Historie ist aber leer (z. B. Altdaten), zeigt
+  der Reiter „Anlagedatum nicht erfasst – bitte nachtragen“ statt einer leeren Zeitachse; es werden keine Daten
+  erfunden, es gibt keine Datenmigration.
+- **Kennzahlen** (`patienten/models.py: katheter_kennzahlen`): aktueller (zuletzt angelegter liegender) Katheter mit
+  Liegedauer in Tagen; Kathetertage = Summe (Entfernt am bzw. heute − Anlagedatum) aller aktiven Katheter;
+  Infektionen = aktive Komplikationen, deren Art „infektion“ enthält (`ist_infektion`); Infektionen je 1000
+  Kathetertage = Infektionen / Kathetertage × 1000, zwei Stellen (ohne Kathetertage `null`).
+- **API:**
+  - `GET/POST /api/katheter/` (`?patient=ID&aktiv=true`), `GET/PATCH/PUT /api/katheter/{id}/` – Felder `id, patient,
+    typ, typ_name, lage, anlage_am, entfernt_am, entfernungsgrund, entfernungsgrund_name, notiz, aktiv, liegt,
+    liegedauer_tage, komplikationen[], angelegt_am, angelegt_von_name, firma_kurz`; `POST` zusätzlich
+    `kerndaten_aktualisiert`, `hinweise`. `DELETE` → 405.
+  - `GET /api/katheter/kennzahlen/?patient=ID` → `{aktuell: {id, typ, lage, anlage_am, liegedauer_tage} | null, offen,
+    anzahl, kathetertage, infektionen, infektionen_je_1000, anlagedatum_fehlt, kerndaten_typ, kerndaten_typ_id,
+    hinweise[]}`; 404 bei fremder, eingeschränkter oder fehlender Akte.
+  - `GET/POST /api/katheter-komplikationen/` (`?patient=ID`, `?katheter=ID`, `?aktiv=`),
+    `GET/PATCH/PUT /api/katheter-komplikationen/{id}/` – Felder `id, patient (aus dem Katheter), katheter, datum, art,
+    art_name, ist_infektion, notiz, aktiv, angelegt_am, angelegt_von_name, firma_kurz`. `DELETE` → 405.
+  - Rechte wie die übrigen Einträge der Akte (`_StammEintragViewSet`): Lesen mit „Akten lesen“, Schreiben mit „Akten
+    bearbeiten“; Admin nur bei Testpatienten (`pruefe_schreibbereich`, 403); abgeschlossene Akte 409
+    (`pruefe_bearbeitbar`); eingeschränkte und fremde Akten (Firma, Testdaten) unsichtbar (`patienten_fuer`).
+  - Patientendetail: `kopf.zaehler.katheter` (aktive Katheter).
+  - Verlauf der Akte: Bereiche `katheter` und `katheter_komplikationen` (Aktionen „angelegt“, „geändert“, „als entfernt
+    eingetragen“, „wieder als liegend eingetragen“, „als falsch erfasst zurückgenommen“, „wieder aufgenommen“), auch im
+    Verlauf-PDF. Kopie der Akte (`vorlagen/listen.py: aktenkopie_pdf`, DSGVO-Auskunft): Abschnitt „Katheter-Historie“
+    mit allen Kathetern (auch zurückgenommenen), Komplikationen und Kennzahlen. Endgültiges Löschen einer Akte
+    (`akten_entfernen`) entfernt beide Modelle samt Historie; `umfang` zählt `katheter`, `katheter_komplikationen`.
+- **Oberfläche:** Reiter **Katheter** nach „Medikamente“ (`seiten/akte/Katheter.tsx`, Route `/patienten/:id/katheter`,
+  Eintrag in der gemeinsamen Reiterliste von `Akte.tsx` – damit in allen drei Aktenansichten). Kennzahlen oben (aktueller
+  Katheter mit Liegedauer, Infektionen je 1000 Kathetertage mit Erklärung, Anzahl), Hinweise, Zeitachse (ab 768 px
+  waagerecht mit Jahres-/Monatsskala und „heute“, darunter senkrecht; Balken je Katheter, Komplikationen als Raute,
+  Infektionen gefüllt), darunter Tabelle bzw. Karten mit „Komplikation“, „Entfernen“, Bearbeiten und Zurücknehmen;
+  zurückgenommene Katheter aufklappbar. Karteikarte: Art „KA“ (Anlage, Entfernung, Komplikationen). Verlauf: Bereiche
+  „Katheter“ und „Katheter-Komplikationen“. Hilfe: Abschnitt „Katheter-Historie“ (`hilfe/inhalt.py`, id `katheter`).
+- **Musterdaten:** `patienten/testdaten.py: TEST_KATHETER` (Wechsel, Infektionen, Thrombose, Leckage; Hanna Test bewusst
+  ohne Historie für den Hinweis „Anlagedatum nicht erfasst“).
+- **Teststatus:** `patienten/test_katheter.py` – `Auswahllisten` (Grundwerte, Pflege), `Anlegen` (CRUD, Entfernen,
+  kein Löschen/Zurücknehmen, Komplikationen), `Pruefungen` (Entfernt am vor Anlage, Zukunft, Pflichtfelder, falsche und
+  ausgeblendete Listenwerte, Komplikation in der Liegezeit, Liegezeit nicht an Komplikationen vorbei kürzen, Patient
+  fest), `Kerndaten` (Übernahme, Wechsel mit Hinweis ohne automatisches Beenden, entfernter Katheter ändert nichts,
+  gleicher Typ ohne Historieneintrag, Anlagedatum fehlt), `Kennzahl` (Infektionen je 1000 Kathetertage, ohne
+  Kathetertage, Infektion nach Name, nur eigene Akten), `Rechte` (Betrachter, Admin nur Testpatienten, abgeschlossen
+  409, eingeschränkt unsichtbar, Testbenutzer), `Verlauf` (Aktionen mit Person, Beschreibungen, Verlauf-PDF,
+  Aktenkopie), `Datenschutz` (Löschen samt Historie), `Testdaten`. Browsertest `frontend/e2e/katheter.spec.ts`
+  (Anlegen, Zeitachse mit Balken und Markierung, Kennzahl, Meldung außerhalb der Liegezeit, Wechsel mit Hinweis,
+  Entfernen, Verlauf, nach Neuladen; Anlagedatum nachtragen; Telefon: senkrechte Zeitachse ohne seitliches Herausragen).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus (Backend-Tests, Typprüfung und Browsertests konnten in der
+  Entwicklungsumgebung nicht laufen; die Migrationen sind von Hand geschrieben – beim ersten Lauf prüft
+  `makemigrations --check` in GitHub Actions, ob sie zum Modell passen).
+- **Offen – vom Nutzer zu bestätigen:**
+  - Zählweise der Kathetertage: Tage zwischen Anlage und Entfernung (Anlagetag zählt nicht mit, am selben Tag entfernt
+    = 0 Tage); überlappende Katheter zählen beide. Alternative: jeder Kalendertag mit liegendem Katheter (+1 je
+    Katheter).
+  - Was als „Infektion“ zählt: jede Komplikationsart mit „infektion“ im Namen (die Liste ist pflegbar und hat kein
+    eigenes Merkmal). Alternative: ein Schalter je Listenwert.
+  - Zurücknehmen eines liegenden Katheters ändert die Kerndaten nicht (`Patient.katheter` bleibt) – auch das Eintragen
+    der Entfernung des letzten Katheters setzt die Kerndaten nicht auf „kein Katheter“. Bitte bestätigen oder festlegen.
+  - Ändern des Typs eines bestehenden Katheters (PATCH) übernimmt den Typ nicht in die Kerndaten (Festlegung nennt nur
+    „neuer Katheter“ bzw. „Katheterwechsel“).
+  - Kennzahl auf der Startseite oder in Berichten (z. B. Infektionsrate über alle Patienten) ist nicht Teil dieses
+    Auftrags.
+
+### F193 Statistik – anonymisierte Auswertung für Berichte der Stiftung
+- **Anlass:** Auftrag vom 15.10.2026; Recht festgelegt am 16.10.2026.
+- **Ansicht:** Menüpunkt **Statistik** in der Hauptnavigation direkt nach „Infusionspläne“ (übrige Reihenfolge
+  unverändert), Seite `/statistik`. Zeitraum: **Kalenderjahr** (Standard: laufendes Jahr, Vergleich Vorjahr),
+  **Quartal** (Vergleich Vorquartal) oder **frei von–bis** (Vergleich: gleich lange Spanne direkt davor); die Wahl
+  steht in der Adresse. Eine Reihe Kacheln (aktiv zum Stichtag, im Zeitraum betreut, Neuaufnahmen, abgeschlossen,
+  Kontakte, Infusionspläne erstellt bzw. freigegeben) mit Wert des Vorzeitraums und Veränderung; darunter vier
+  Balkendiagramme (eigenes SVG wie `GewichtsDiagramm`/`Sparkline`, keine neue Abhängigkeit): abgeschlossen nach Anlass,
+  aktive nach Versorger, nach Altersgruppe am Stichtag (0–17, 18–39, 40–59, 60–79, 80+), nach Katheter (inkl. „kein
+  Katheter“ und „nicht erfasst“) – je Zeitraum und Vorzeitraum. Auf 1920 × 1080 ohne Seiten-Scrollen (lange Listen
+  scrollen in ihrer Karte, `index.css` `.statistik-seite`). Knöpfe **PDF** (Fenster mit Herunterladen) und **CSV**.
+- **Begriffe (nur vorhandene Felder):** Beginn der Betreuung = `Patient.angelegt_am` – ein eigenes Aufnahmedatum gibt
+  es nicht (**offen**, siehe unten). Akten aus dem Altsystem (erste Fassung der Historie mit Grund „Aus dem Altsystem
+  übernommen …“) gelten als „vor jedem Zeitraum in Betreuung“ und zählen nie als Neuaufnahme. Ende =
+  `abgeschlossen_am` mit `abschluss_anlass`. Aktiv zum Stichtag (= Ende des Zeitraums, höchstens heute): begonnen und
+  nicht bis zum Stichtag abgeschlossen. Im Zeitraum betreut: begonnen bis zum Ende, nicht vor dem Beginn abgeschlossen.
+  Versorger und Katheter: heutiger Stand der Akte (nicht der Stand am Stichtag). Kontakte: nicht storniert, `zeitpunkt`
+  im Zeitraum. Pläne erstellt: `erstellt_am`; freigegeben: `freigabe_datum`, sonst `freigegeben_am` (nicht Entwürfe;
+  übernommene Pläne ohne Freigabevermerk zählen nur als erstellt).
+- **Datenschutz:** nur Akten der aktiven Firma (`patienten_fuer(user, eingeschraenkte=True)` – wie Liste und
+  Startseite), **Testpatienten nie** (auch nicht mit „Testdaten sehen“), eingeschränkte Akten (Art. 18) gezählt, nie
+  einzeln; keine Namen, Nummern, Geburtsdaten in Antwort, PDF oder CSV.
+- **Unterdrückungsregel (k = 5):** (1) jede Zelle mit 1–4 Fällen → „< 5“, `wert: null` (0 bleibt 0); (2) enthält der
+  **Bestand** (aktiv, betreut, Neuaufnahmen, abgeschlossen und die vier Verteilungen) in Zeitraum **oder** Vorzeitraum
+  eine „< 5“-Zelle, werden in **beiden** Zeiträumen alle Bestandswerte ab 5 auf volle 5 gerundet („≈ 15“, `status:
+  gerundet`), auch Summen – so ist eine unterdrückte Zelle weder aus Summe minus Rest noch aus der Differenz zum
+  Vorzeitraum (aktiv jetzt = aktiv vorher + Neuaufnahmen − Abschlüsse) rückrechenbar; (3) Kontakte und Pläne nur nach
+  (1); (4) die Oberfläche bildet Differenzen nur aus angezeigten Werten (bei „< 5“ keine, bei gerundeten „≈“).
+  Versorger und Katheter werden nach dem angezeigten Wert sortiert, nicht nach dem genauen.
+- **Recht:** neues Recht `statistik_ansehen` „Statistik ansehen“ in der Rechte-Matrix (Administration › Benutzer ›
+  Rechte, je Gruppe umstellbar). **Festlegung 16.10.2026:** Standard für „Mitarbeiter (erweitert)“ und die höheren
+  Rollen Mediziner und Admin (Reihenfolge in `accounts.models.Rolle`: Betrachter, Mitarbeiter, Mitarbeiter (erweitert),
+  Mediziner, Admin; „Keine Berechtigung“ ohne Rechte); Betrachter und Mitarbeiter nicht. Testbenutzer nie
+  (`NUR_ECHTE_BENUTZER`, die Statistik wirkt über Testpatienten hinaus). Menüpunkt und Route nur mit dem Recht; die API
+  prüft es (`StatistikRecht = nur_recht("statistik_ansehen")`, sonst 403). **Keine Migration nötig:** Der Standard
+  steht in `accounts/rechte.py` (`STANDARD`), Abweichungen speichert `Gruppenrecht` (Feld `recht` ohne Auswahlliste).
+- **Endpunkte:** `GET /api/statistik/?art=jahr&jahr=2026 | art=quartal&jahr=2026&quartal=3 | art=frei&von=…&bis=…` →
+  `{firma, zeitraum, vergleich, werte: {kennzahlen, verteilungen, gerundet}, vorher, kennzahlen, verteilungen, regel,
+  hinweise, erstellt_am}`; je Zelle `{wert, anzeige, status: exakt|klein|gerundet}`. Fehlerhafter Zeitraum → 400
+  `{fehler}`. `GET /api/statistik/pdf/` (WeasyPrint, Briefkopf und Fuß der Vorlage „Patientendatenblatt“ wie die
+  übrigen Listen, `vorlagen/listen.py` `statistik_pdf`) und `GET /api/statistik/csv/` (Semikolon, UTF-8 mit BOM, CRLF;
+  Kopf, Kennzahlen, Verteilungen mit Vorzeitraum, Regel und Hinweise). Jeder Export: Audit-Log „Export“ (`was:
+  Statistik`, `format`, `von`, `bis`, `vergleich_von`, `vergleich_bis`, `firma`), Text „Statistik als PDF/CSV:
+  Statistik 2026 · DSKM“. Aggregation: eine Abfrage für die Akten (Werte), eine für die Herkunft aus dem Altsystem, je
+  eine bedingte Zählung für Kontakte und Pläne über beide Zeiträume.
+- **Hilfe:** neue Gruppe „Statistik“, Abschnitt `statistik` (Seite `/statistik`) mit Hinweis auf „< 5“ und Rundung.
+- **Dateien:** `backend/patienten/statistik.py` (neu), `backend/patienten/test_statistik.py` (neu),
+  `backend/epm/urls.py`, `backend/accounts/rechte.py`, `backend/accounts/permissions.py`, `backend/accounts/tests.py`
+  (Erwartung „Mitarbeiter (erweitert)“), `backend/vorlagen/listen.py` (`statistik_pdf`), `backend/hilfe/inhalt.py`,
+  `frontend/src/seiten/Statistik.tsx` (neu), `frontend/src/App.tsx`, `frontend/src/components/layout/Shell.tsx`,
+  `frontend/src/components/ui/icon.tsx` (Symbol „statistik“), `frontend/src/lib/typen.ts`, `frontend/src/index.css`,
+  `frontend/e2e/statistik.spec.ts` (neu), `docs/DATENSCHUTZ.md`.
+- **Offen – vom Nutzer zu bestätigen:**
+  - Aufnahmedatum: Es gibt kein Feld dafür; `angelegt_am` ist der Tag der Anlage in EPM. Für übernommene Akten ist der
+    Beginn unbekannt (sie zählen nie als Neuaufnahme). Soll ein Feld „aufgenommen am“ (ggf. mit Übernahme aus dem
+    Altsystem) dazukommen?
+  - Versorger und Katheter am Stichtag statt heutiger Stand (Auswertung der Historie).
+  - Laufender Zeitraum: Vergleich mit dem ganzen Vorzeitraum (umgesetzt) oder mit derselben Spanne des Vorjahres?
+  - Standard der Seite: das laufende Jahr mit Vergleich zum Vorjahr (umgesetzt).
+  - Bestätigung der Unterdrückungsregel durch die Stiftung bzw. den/die Datenschutzbeauftragte(n); Restrisiko durch
+    viele überlappende frei gewählte Zeiträume (`docs/DATENSCHUTZ.md` O11).
+- **Teststatus:** Backend `patienten.test_statistik` (Zeiträume und Vorzeiträume, ungültige Eingaben, Regel „< 5“ mit
+  Rundung auch über den Vorzeitraum, Zählungen, Testpatienten, eingeschränkte Akten ohne Einzelangaben, Altsystem-Akte,
+  Infusionspläne, Recht je Rolle inkl. Testbenutzer und Umstellen, Firmenfilter mit Umschalter, CSV-Format mit BOM und
+  Audit-Eintrag, PDF und Audit-Eintrag); `accounts.tests.MitarbeiterErweitert` angepasst. Browsertest
+  `statistik.spec.ts` (Menüpunkt nach „Infusionspläne“, Kacheln, Diagramme, 1080p ohne Scrollen, Quartal, CSV mit BOM,
+  PDF, Audit-Log, Mitarbeiter und Betrachter ohne Menüpunkt und mit 403). **Nicht gelaufen:** Django, npm und
+  Playwright waren bei der Umsetzung nicht installierbar; geprüft nur mit `python3 -m py_compile`. CI-Lauf steht aus.
+- **Status:** TEILWEISE ABGESCHLOSSEN – Lauf der Backend- und Browsertests sowie Typprüfung stehen aus

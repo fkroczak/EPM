@@ -28,6 +28,8 @@ const BEREICHE: { wert: string; text: string }[] = [
   { wert: "korrespondenz", text: "Korrespondenz" },
   // Medikamentenplan (Wunsch 11.10.2026)
   { wert: "medikamente", text: "Medikamente" },
+  // Katheter-Historie (F192)
+  { wert: "katheter", text: "Katheter" }, { wert: "katheter_komplikationen", text: "Katheter-Komplikationen" },
   // weggeklickte Hinweise (F119)
   { wert: "hinweisruhe", text: "Hinweise ausgeblendet" },
 ];
@@ -39,6 +41,8 @@ const BEREICH_EINZELN: Record<string, string> = {
   // Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
   diagnosen: "Diagnose (ICD)", laborbefunde: "Laborbefund", bia_messungen: "BIA-Messung", berichte: "Bericht", korrespondenz: "Schreiben",
   medikamente: "Medikament",
+  // Katheter-Historie (F192)
+  katheter: "Katheter", katheter_komplikationen: "Katheter-Komplikation",
 };
 
 const FELDER: Record<string, string> = {
@@ -84,6 +88,8 @@ const FELDER: Record<string, string> = {
   ausgeblendet_bis: "ausgeblendet bis", ausgeblendet_dauerhaft: "ausgeblendet (nicht mehr nötig)",
   ausblende_grund: "Grund des Ausblendens",
   freigabe_weg: "Weg der Freigabe", freigabe_datum: "Freigabe durch den Mediziner am",
+  // Katheter-Historie (F192)
+  lage: "Lage/Zugang", anlage_am: "Anlagedatum", entfernt_am: "Entfernt am", entfernungsgrund: "Entfernungsgrund",
 };
 /** technische Felder, die sich bei jeder Aktion mitändern */
 const VERBORGEN = new Set(["geaendert_am", "erfasst_am", "angelegt_am", "hochgeladen_am", "freigegeben_am", "freigegeben_von",
@@ -101,7 +107,7 @@ function useWertAnzeige() {
     if (TEXTFELDER.has(feld)) return klartext(wert) || "—";
     if (feld === "versorger") return versorger.data?.find((v) => String(v.id) === wert)?.name ?? wert;
     if (feld === "ansprechpartner") return versorger.data?.flatMap((v) => v.ansprechpartner).find((a) => String(a.id) === wert)?.name ?? wert;
-    if (["katheter", "ort", "typ", "beziehung"].includes(feld) || (feld === "art" && /^\d+$/.test(wert))) return auswahl.data?.find((a) => String(a.id) === wert)?.wert ?? wert;
+    if (["katheter", "ort", "typ", "beziehung", "entfernungsgrund"].includes(feld) || (feld === "art" && /^\d+$/.test(wert))) return auswahl.data?.find((a) => String(a.id) === wert)?.wert ?? wert;
     if (feld === "arzt") return aerzte.data?.find((a) => String(a.id) === wert)?.name ?? wert;
     if (feld === "rolle") return ARZTROLLEN[wert] ?? wert;
     if (feld.endsWith("_praeparat") || feld === "spurenelemente" || feld === "katheterschutz") return praeparate.data?.find((p) => String(p.id) === wert)?.anzeige ?? wert;
