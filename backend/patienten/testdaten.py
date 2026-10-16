@@ -4,7 +4,8 @@ Musterdaten: Auswahllisten, Präparate, Testversorger, Testbenutzer und Testpati
 Alles ist wiederholbar (legt nur an, was fehlt). Testpatienten tragen ist_test=True und
 Nummern ab 9001, zählen in keiner Statistik und sind für den Testbenutzer die einzigen
 sichtbaren Akten. Alle Namen sind frei erfunden. Seit dem Wunsch 11.10.2026 mit Diagnosen, Medikamenten,
-Laborbefunden und BIA-Messungen (TEST_DIAGNOSEN, TEST_MEDIKAMENTE, TEST_LABOR, TEST_BIA).
+Laborbefunden und BIA-Messungen (TEST_DIAGNOSEN, TEST_MEDIKAMENTE, TEST_LABOR, TEST_BIA), seit 15.10.2026 mit der
+Katheter-Historie (TEST_KATHETER, F192).
 """
 import random
 from datetime import date, datetime, time, timedelta
@@ -41,6 +42,11 @@ AUSWAHLWERTE = {
                                   "Brief/Fax", "Versorger", "Sonstiges"],
     # Berichte aus der Akte (Wunsch 06.10.2026, F115; Liste unter Vorlagen › Auswahllisten änderbar – U59)
     Auswahlwert.Liste.BERICHTART: ["Arztbrief", "Verlaufsbericht", "Stellungnahme", "Sonstiges"],
+    # Katheter-Historie (F192, 15.10.2026; dieselben Grundwerte legt die Migration stammdaten/0026 an)
+    Auswahlwert.Liste.KATHETER_ENTFERNUNG: ["Wechsel", "Infektion", "Okklusion", "Dislokation", "Therapie beendet",
+                                            "Sonstiges"],
+    Auswahlwert.Liste.KATHETER_KOMPLIKATION: ["Katheterinfektion", "Okklusion", "Thrombose", "Dislokation", "Leckage",
+                                              "Sonstiges"],
 }
 
 K = Praeparat.Kategorie
@@ -360,6 +366,27 @@ TEST_BIA = {
 }
 
 
+# Katheter-Historie (F192, 15.10.2026): (Typ, Lage/Zugang, Anlage vor Tagen, entfernt vor Tagen oder None,
+# Entfernungsgrund, Notiz, [(Komplikation vor Tagen, Art, Notiz)]). Der zuletzt angelegte liegende Katheter hat
+# denselben Typ wie die Kerndaten (TESTPATIENTEN). Hanna Test (Index 4) hat bewusst keine Historie: Dort zeigt der
+# Reiter „Katheter“ den Hinweis „Anlagedatum nicht erfasst – bitte nachtragen“ (Festlegung 16.10.2026).
+TEST_KATHETER = {
+    0: [("Port", "V. subclavia rechts", 2550, None, "", "Port-Anlage nach Dünndarmresektion",
+         [(900, "Okklusion", "mit Urokinase wieder durchgängig")])],
+    # Portinfektion vor 260 Tagen wie in Diagnosen und Therapie dieser Akte (Port belassen), Wechsel auf Hickman später
+    1: [("Port", "V. jugularis interna rechts", 1800, 120, "Wechsel", "",
+         [(610, "Okklusion", "mit Urokinase wieder durchgängig"),
+          (260, "Katheterinfektion", "Portinfektion – Antibiose, Port belassen")]),
+        ("Hickman", "V. subclavia links, getunnelt", 120, None, "", "", [])],
+    2: [("Broviac", "V. jugularis interna links, getunnelt", 900, None, "", "",
+         [(450, "Leckage", "Reparaturset, kein Wechsel nötig")])],
+    3: [("Port", "V. subclavia rechts", 1500, 210, "Wechsel", "Wechsel wegen Teduglutid-Studie auf PICC", []),
+        ("PICC", "V. basilica rechts", 200, None, "", "", [])],
+    5: [("Port", "V. subclavia rechts", 1400, 40, "Therapie beendet", "Explantation nach Ende der HPE",
+         [(800, "Katheterinfektion", "stationäre Antibiose"), (500, "Thrombose", "Antikoagulation 3 Monate")])],
+}
+
+
 # Therapie je Testpatient (Wunsch 11.10.2026): was aktuell gilt (Text der Akte) und der Verlauf als Schritte
 # (vor Tagen, Text) – Reiter Therapie.
 TEST_THERAPIE = {
@@ -466,6 +493,30 @@ def _medikamente(patient, user, heute, eintraege):
             absetzgrund=absetzgrund, angelegt_von=user))
         m.full_clean()
         m.save()
+
+
+def _katheter(patient, user, heute, eintraege):
+    """Katheter-Historie (F192) mit denselben Regeln wie über die API (``full_clean``). Die Kerndaten
+    (``Patient.katheter``) stehen schon passend in TESTPATIENTEN – die Automatik der API läuft hier nicht."""
+    from .models import Katheter, KatheterKomplikation
+
+    def wert(liste, text):
+        return Auswahlwert.objects.get(liste=liste, wert=text) if text else None
+
+    for typ, lage, anlage, entfernt, grund, notiz, komplikationen in eintraege:
+        k = _nutzer(user, Katheter(
+            patient=patient, typ=wert(Auswahlwert.Liste.KATHETER, typ), lage=lage,
+            anlage_am=heute - timedelta(days=anlage),
+            entfernt_am=heute - timedelta(days=entfernt) if entfernt is not None else None,
+            entfernungsgrund=wert(Auswahlwert.Liste.KATHETER_ENTFERNUNG, grund), notiz=notiz, angelegt_von=user))
+        k.full_clean()
+        k.save()
+        for tage, art, text in komplikationen:
+            x = _nutzer(user, KatheterKomplikation(
+                patient=patient, katheter=k, datum=heute - timedelta(days=tage),
+                art=wert(Auswahlwert.Liste.KATHETER_KOMPLIKATION, art), notiz=text, angelegt_von=user))
+            x.full_clean()
+            x.save()
 
 
 def _laborbefunde(patient, user, heute, rnd, daten):
@@ -666,6 +717,7 @@ def testpatienten_anlegen() -> int:
         _diagnosen(pat, user, heute, TEST_DIAGNOSEN.get(i, []))
         _medikamente(pat, user, heute, TEST_MEDIKAMENTE.get(i, []))
         _therapie(pat, user, heute, TEST_THERAPIE[i][1])
+        _katheter(pat, user, heute, TEST_KATHETER.get(i, []))
         if i in TEST_LABOR:
             _laborbefunde(pat, user, heute, rnd, TEST_LABOR[i])
         _bia_messungen(pat, user, heute, TEST_BIA.get(i, []))

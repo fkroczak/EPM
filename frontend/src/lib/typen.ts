@@ -333,7 +333,9 @@ export type Patient = {
       /** Medikamentenplan (Wunsch 11.10.2026): aktuell eingenommene Medikamente */
       medikamente?: number;
       /** Korrespondenz (14.10.2026): alle Schreiben der Akte */
-      korrespondenz?: number };
+      korrespondenz?: number;
+      /** Katheter-Historie (F192): erfasste Katheter ohne zurückgenommene */
+      katheter?: number };
   } | null;
 };
 
@@ -778,6 +780,72 @@ export type Medikament = {
   angelegt_am: string;
   angelegt_von_name: string | null;
   firma_kurz?: string | null;
+};
+
+/** Komplikation an einem Katheter (Katheter-Historie, F192) */
+export type KatheterKomplikation = {
+  id: number;
+  patient: number;
+  katheter: number;
+  datum: string;
+  /** Auswahlwert der Liste „katheter_komplikation“ */
+  art: number;
+  art_name: string | null;
+  /** zählt für die Kennzahl „Infektionen je 1000 Kathetertage“ */
+  ist_infektion: boolean;
+  notiz: string;
+  /** false = als falsch erfasst zurückgenommen */
+  aktiv: boolean;
+  angelegt_am: string;
+  angelegt_von_name: string | null;
+  firma_kurz?: string | null;
+};
+
+/** Katheter der Katheter-Historie (F192, 15.10.2026) */
+export type Katheter = {
+  id: number;
+  patient: number;
+  /** Auswahlwert der Liste „katheter“ (wie Patient.katheter) */
+  typ: number;
+  typ_name: string | null;
+  /** Lage/Zugang, z. B. „V. subclavia rechts“ */
+  lage: string;
+  anlage_am: string;
+  entfernt_am: string | null;
+  /** Auswahlwert der Liste „katheter_entfernung“ */
+  entfernungsgrund: number | null;
+  entfernungsgrund_name: string | null;
+  notiz: string;
+  /** false = als falsch erfasst zurückgenommen */
+  aktiv: boolean;
+  /** noch nicht entfernt */
+  liegt: boolean;
+  liegedauer_tage: number | null;
+  komplikationen: KatheterKomplikation[];
+  angelegt_am: string;
+  angelegt_von_name: string | null;
+  firma_kurz?: string | null;
+  /** nur in der Antwort auf POST: Typ in die Kerndaten (Patient.katheter) übernommen (Festlegung 16.10.2026) */
+  kerndaten_aktualisiert?: boolean;
+  /** nur in der Antwort auf POST, z. B. „Vorheriger Katheter noch nicht als entfernt eingetragen“ */
+  hinweise?: string[];
+};
+
+/** GET /api/katheter/kennzahlen/?patient=ID */
+export type KatheterKennzahlen = {
+  aktuell: { id: number; typ: string; lage: string; anlage_am: string; liegedauer_tage: number | null } | null;
+  /** Anzahl noch liegender Katheter */
+  offen: number;
+  anzahl: number;
+  kathetertage: number;
+  infektionen: number;
+  /** Infektionen je 1000 Kathetertage; null ohne Kathetertage */
+  infektionen_je_1000: number | string | null;
+  /** Kerndaten nennen einen Katheter, die Historie ist leer → „Anlagedatum nicht erfasst – bitte nachtragen“ */
+  anlagedatum_fehlt: boolean;
+  kerndaten_typ: string | null;
+  kerndaten_typ_id: number | null;
+  hinweise: string[];
 };
 
 /** Vorschläge für Darreichungsform und Einheit (Freitext bleibt erlaubt) */

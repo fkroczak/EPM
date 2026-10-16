@@ -12,7 +12,8 @@ from infusionen.api import InfusionsplanViewSet
 from vorlagen import api as vorlagen
 from patienten.api import (
     BezugspersonViewSet, DiagnoseViewSet, TherapieschrittViewSet, DokumentViewSet, GewichtViewSet, KalenderViewSet, KontaktViewSet,
-    MedikamentViewSet, PatientArztViewSet, PatientViewSet, StartseiteViewSet, TerminViewSet,
+    KatheterKomplikationViewSet, KatheterViewSet, MedikamentViewSet, PatientArztViewSet, PatientViewSet,
+    StartseiteViewSet, TerminViewSet,
 )
 from hilfe import api as hilfe
 from patienten import meine_akten
@@ -40,6 +41,9 @@ router.register("patient-aerzte", PatientArztViewSet, basename="patientarzt")
 router.register("diagnosen", DiagnoseViewSet, basename="diagnose")
 router.register("medikamente", MedikamentViewSet, basename="medikament")
 router.register("therapieschritte", TherapieschrittViewSet, basename="therapieschritt")
+# Katheter-Historie (F192, 15.10.2026)
+router.register("katheter", KatheterViewSet, basename="katheter")
+router.register("katheter-komplikationen", KatheterKomplikationViewSet, basename="katheterkomplikation")
 router.register("laborbefunde", LaborbefundViewSet, basename="laborbefund")
 router.register("bia-messungen", BiaMessungViewSet, basename="biamessung")
 router.register("berichte", BerichtViewSet, basename="bericht")

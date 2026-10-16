@@ -29,12 +29,17 @@ export const LISTEN: Liste[] = [
   { schluessel: "elektrolyte", titel: "Elektrolytzusätze", art: "praeparat", wo: `${IM_PLAN} bei den Elektrolyten.` },
   { schluessel: "medikament", titel: "Medikamente", art: "praeparat", wo: `${IM_PLAN} unter den weiteren Bestandteilen.` },
   { schluessel: "sonstiges", titel: "Sonstige Bestandteile", art: "praeparat", wo: `${IM_PLAN} unter den weiteren Bestandteilen.` },
-  { schluessel: "katheter", titel: "Katheter", art: "auswahl", wo: "Akte › Stammdaten (Katheter); steht auf dem Patientendatenblatt." },
+  { schluessel: "katheter", titel: "Katheter", art: "auswahl", wo: "Akte › Stammdaten (Katheter) und Akte › Katheter (Typ); steht auf dem Patientendatenblatt." },
   { schluessel: "terminort", titel: "Terminorte", art: "auswahl", wo: "Beim Anlegen eines Termins (Ort) und im Kalender bei der Ankündigung." },
   { schluessel: "dokumenttyp", titel: "Dokumenttypen", art: "auswahl", wo: "Beim Hochladen eines Dokuments in die Akte (Art des Dokuments)." },
   { schluessel: "kontaktart", titel: "Kontaktarten", art: "auswahl", wo: "Beim Erfassen eines Kontakts (Telefon, E-Mail, Besuch …)." },
   { schluessel: "beziehung", titel: "Beziehungen (Bezugspersonen)", art: "auswahl", wo: "Akte › Kontaktdaten › Bezugspersonen (Ehefrau, Sohn …)." },
   { schluessel: "berichtart", titel: "Berichtsarten", art: "auswahl", wo: "Akte › Berichte › „Neuer Bericht“ (Art des Berichts)." },
+  // Katheter-Historie (F192, 15.10.2026)
+  { schluessel: "katheter_entfernung", titel: "Katheter: Entfernungsgründe", art: "auswahl",
+    wo: "Akte › Katheter › „Entfernen“ bzw. „Entfernt am“ (Grund der Entfernung)." },
+  { schluessel: "katheter_komplikation", titel: "Katheter: Komplikationen", art: "auswahl",
+    wo: "Akte › Katheter › „Komplikation“ (Art). Werte mit „Infektion“ im Namen zählen für die Kennzahl „Infektionen je 1000 Kathetertage“." },
 ];
 
 const anzeige = (e: Praeparat | Auswahlwert) => ("name" in e ? e.anzeige : e.wert);

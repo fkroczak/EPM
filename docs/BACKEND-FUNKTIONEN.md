@@ -3986,6 +3986,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 16.10.2026 | Katheter-Historie (F192) | Neuer Reiter „Katheter“ mit Zeitachse, Komplikationen und Infektionen je 1000 Kathetertage; Modelle `Katheter`, `KatheterKomplikation` (Migration `patienten/0022`), Auswahllisten „Katheter: Entfernungsgrund“ und „Katheter: Komplikation“ (`stammdaten/0026`), API `/api/katheter/`, `/api/katheter-komplikationen/`. Festlegung 16.10.2026: neuer liegender Katheter aktualisiert `Patient.katheter`; vorheriger wird nicht automatisch beendet (Hinweis). Einzelheiten unter F192. |
 | 14.10.2026 | Scans: Diagnosen ohne ICD-Code im Brief | Kundenwunsch: PDF-Briefe nennen Diagnosen meist nur im Freitext. Jede Zeile unter „Diagnosen:“ (auch Entlassungs-, Neben-, Dauerdiagnosen, Vorerkrankungen) ohne Code wird ein eigener Vorschlag (`scans/ocr/auswertung.py`: `_freitext_diagnosen`, `freitext: true`, hinter den Diagnosen mit Code; umbrochene Zeilen zusammengesetzt, Messwerte und Fließtext ausgelassen, „V.a.“/„Z.n.“ → Kennzeichen). Code aus dem Gelernten, sonst aus Vorlagen › Diagnosen (`aus_liste`: gleiche Wörter mit kleinen Lesefehlern; 1,0 → `zuordnung: liste`, angehakt; ab 0,6 → `liste_vorschlag`, nicht angehakt; Gleichstand → unspezifische Form). Ohne Treffer bleibt der Code leer, nicht angehakt. Der ICD-Code bleibt Pflicht (Entscheidung 14.10.2026): Zuordnen sperrt „In die Akte legen“, solange eine angehakte Diagnose ohne Code ist; Bezeichnung mit Auswahlliste der Diagnoseliste setzt den Code. Ergänzte Codes werden gelernt. Der Freitext bleibt zusätzlich unter „Texte“. Tests `scans.tests.AuswertungTest.test_arztbrief_diagnosen_ohne_icd`, `scans.test_lernen` |
 | 14.10.2026 | Briefpapier der Regeneration Clinic 1:1 | Neuer Wert `briefpapier` im Baustein „Briefkopf“ (`vorlagen/briefpapier.py`, Prüfung in `bloecke.py`): Kopfband mit Wellenkante, Logo (`statisch/briefpapier/rgc-logo.png`, freigestellt) und Anschrift sowie Fußband mit Postanschrift und Registrierdaten als SVG in Seitengröße, fest positioniert und damit auf jeder Seite; Seitenränder 47/17,6/31/25 mm, Fußzeilentext links entfällt, Seitenzahl über dem Band; erste Seite mit Absenderzeile, Kontakt und „Riga, Datum“ (`absender`). Maße und Farben aus dem Briefpapier der Klinik (pt wie im Original). Schriften Inter und Carlito in `schriften/`. Laborprofile MAL-00 bis MAL-06 nutzen es; Datenmigration `vorlagen/0012_rgc_laborprofile_briefpapier` stellt unbearbeitete mitgelieferte Fassungen um. Editor: Schalter „Briefpapier der Regeneration Clinic“. Tests `vorlagen/test_rgc.py` (`test_briefpapier`). |
 | 14.10.2026 | Laborprofile Malabsorption der Regeneration Clinic | Das Dokument „Laborprofile Malabsorption – Strukturierte Anforderungsprofile zur Integration in die Klinik-IT“ (Version 1.0) als Laboranforderungen auf dem Briefkopf der Klinik: neun eigene Schreiben der Firma RGC in der Gruppe „anforderungen“ – MAL-01, MAL-02A, MAL-02B, MAL-02C, MAL-03 (A–D), MAL-04 (Vollpanel aus MAL-01, 02A, 02B), MAL-05, MAL-06 und eine Übersicht mit Regelwerk R1–R11 und Monitoring-Intervallen (Kennungen `eigen-rgc-mal00` … `eigen-rgc-mal06`). Jeder Bogen ist nach Röhrchen bzw. Material geordnet (Material genau wie im Dokument), mit Röhrchenübersicht, Status P/O/R (Pflicht angekreuzt), LOINC, Hinweis, Pflichthinweisen zur Präanalytik (glutenhaltige Kost, geformter Stuhl, Spurenelement-Röhrchen, lichtgeschützt, gekühlt, nüchtern) und den Regeln des Profils; Reflexparameter aus anderen Profilen mit ihrem Röhrchen (MAL-01: Parathormon 2A.4 nach R7). Strukturierte Daten je Parameter (Felder aus Abschnitt 6 des Dokuments) in `vorlagen/statisch/laborprofile-malabsorption.json`. Umgesetzt mit `werkzeuge/rgc-laborprofile.py DOCX`; Datenmigration `vorlagen/0011_rgc_laborprofile` (nur Fehlendes). Doku `docs/VORLAGEN-RGC-2026-10.md`. Tests `vorlagen/test_rgc.py`. |
@@ -4104,3 +4105,92 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 - **Status:** TEILWEISE ABGESCHLOSSEN – Lauf mit echtem Modell und Benchmark auf der Ziel-VM stehen aus; Browsertest
   noch nicht geschrieben; Trainingslauf (LoRA auf CPU) bewusst noch nicht gebaut.
 
+### F192 Katheter-Historie je Patient mit Zeitachse und Infektionsrate
+- **Anlass:** Auftrag vom 15.10.2026; Rückfrage zur Übernahme in die Kerndaten am 16.10.2026 vom Nutzer beantwortet
+  (Festlegung siehe unten). Altdaten: Das Altsystem kennt nur den Katheter-Typ (wird wie bisher in `Patient.katheter`
+  übernommen), keine weiteren Katheterdaten – der Altdaten-Import (`backend/altimport`) bleibt unverändert.
+- **Datenmodell** (`patienten/models.py`, Migration `patienten/0022_katheter_historie`, abhängig von
+  `patienten/0021_medikamente` und `stammdaten/0026_katheter_listen`; beide von Hand geschrieben):
+  - `Katheter(AktenEintrag)`: `patient` (related_name `katheter_eintraege`), `typ` (Auswahlliste „Katheter“ wie
+    `Patient.katheter`, PROTECT), `lage` („Lage/Zugang“, Freitext 200), `anlage_am` (Pflicht), `entfernt_am` (leer =
+    liegt), `entfernungsgrund` (Auswahlliste „Katheter: Entfernungsgrund“), `notiz` (500), `aktiv` (false = als falsch
+    erfasst zurückgenommen), `angelegt_am`, `angelegt_von`, `firma`; Historie (simple_history). Constraint
+    `katheter_entfernt_nach_anlage` (Entfernt am ≥ Anlagedatum), Index `katheter_patient_anlage`. Kein Löschen.
+  - `KatheterKomplikation(AktenEintrag)`: `patient` (related_name `katheter_komplikationen`), `katheter` (related_name
+    `komplikationen`), `datum`, `art` (Auswahlliste „Katheter: Komplikation“), `notiz`, `aktiv`, `angelegt_am`,
+    `angelegt_von`, `firma`; Historie. Index `katheterkompl_patient_datum`. Kein Löschen.
+  - Auswahllisten (`stammdaten/models.py: Auswahlwert.Liste.KATHETER_ENTFERNUNG`, `KATHETER_KOMPLIKATION`, Migration
+    `stammdaten/0026_katheter_listen` mit Grundwerten): Entfernungsgrund „Wechsel, Infektion, Okklusion, Dislokation,
+    Therapie beendet, Sonstiges“; Komplikation „Katheterinfektion, Okklusion, Thrombose, Dislokation, Leckage,
+    Sonstiges“. Pflege unter Administration › Auswahllisten (`seiten/admin/Auswahllisten.tsx`), Musterdaten in
+    `patienten/testdaten.py: AUSWAHLWERTE`.
+- **Regeln** (`Katheter.clean`, `KatheterKomplikation.clean`, Serializer): keine Daten in der Zukunft; Entfernt am ≥
+  Anlagedatum; Entfernungsgrund nur mit „Entfernt am“ (wer das Datum leert, leert den Grund); Komplikationsdatum in der
+  Liegezeit (Anlage bis Entfernung bzw. heute); Anlage/Entfernung lassen sich nicht so ändern, dass eine erfasste
+  Komplikation außerhalb läge; Werte nur aus der passenden Liste, ausgeblendete nur, wenn sie schon am Eintrag stehen;
+  Patient und Katheter einer Komplikation sind nicht tauschbar. Fehlermeldungen auf Deutsch je Feld.
+- **Kerndaten (Festlegung vom 16.10.2026):** Ein neu angelegter Katheter ohne „Entfernt am“ setzt `Patient.katheter`
+  auf seinen Typ und `kein_katheter` auf false (`KatheterViewSet.perform_create`, im Verlauf mit Bearbeiter). Ein noch
+  offener vorheriger Katheter wird **nicht** automatisch beendet; die Antwort enthält dann
+  `hinweise: ["Vorheriger Katheter noch nicht als entfernt eingetragen"]`, die Oberfläche zeigt ihn als Meldung, bis
+  die Entfernung eingetragen ist. Steht in den Kerndaten ein Katheter, die Historie ist aber leer (z. B. Altdaten), zeigt
+  der Reiter „Anlagedatum nicht erfasst – bitte nachtragen“ statt einer leeren Zeitachse; es werden keine Daten
+  erfunden, es gibt keine Datenmigration.
+- **Kennzahlen** (`patienten/models.py: katheter_kennzahlen`): aktueller (zuletzt angelegter liegender) Katheter mit
+  Liegedauer in Tagen; Kathetertage = Summe (Entfernt am bzw. heute − Anlagedatum) aller aktiven Katheter;
+  Infektionen = aktive Komplikationen, deren Art „infektion“ enthält (`ist_infektion`); Infektionen je 1000
+  Kathetertage = Infektionen / Kathetertage × 1000, zwei Stellen (ohne Kathetertage `null`).
+- **API:**
+  - `GET/POST /api/katheter/` (`?patient=ID&aktiv=true`), `GET/PATCH/PUT /api/katheter/{id}/` – Felder `id, patient,
+    typ, typ_name, lage, anlage_am, entfernt_am, entfernungsgrund, entfernungsgrund_name, notiz, aktiv, liegt,
+    liegedauer_tage, komplikationen[], angelegt_am, angelegt_von_name, firma_kurz`; `POST` zusätzlich
+    `kerndaten_aktualisiert`, `hinweise`. `DELETE` → 405.
+  - `GET /api/katheter/kennzahlen/?patient=ID` → `{aktuell: {id, typ, lage, anlage_am, liegedauer_tage} | null, offen,
+    anzahl, kathetertage, infektionen, infektionen_je_1000, anlagedatum_fehlt, kerndaten_typ, kerndaten_typ_id,
+    hinweise[]}`; 404 bei fremder, eingeschränkter oder fehlender Akte.
+  - `GET/POST /api/katheter-komplikationen/` (`?patient=ID`, `?katheter=ID`, `?aktiv=`),
+    `GET/PATCH/PUT /api/katheter-komplikationen/{id}/` – Felder `id, patient (aus dem Katheter), katheter, datum, art,
+    art_name, ist_infektion, notiz, aktiv, angelegt_am, angelegt_von_name, firma_kurz`. `DELETE` → 405.
+  - Rechte wie die übrigen Einträge der Akte (`_StammEintragViewSet`): Lesen mit „Akten lesen“, Schreiben mit „Akten
+    bearbeiten“; Admin nur bei Testpatienten (`pruefe_schreibbereich`, 403); abgeschlossene Akte 409
+    (`pruefe_bearbeitbar`); eingeschränkte und fremde Akten (Firma, Testdaten) unsichtbar (`patienten_fuer`).
+  - Patientendetail: `kopf.zaehler.katheter` (aktive Katheter).
+  - Verlauf der Akte: Bereiche `katheter` und `katheter_komplikationen` (Aktionen „angelegt“, „geändert“, „als entfernt
+    eingetragen“, „wieder als liegend eingetragen“, „als falsch erfasst zurückgenommen“, „wieder aufgenommen“), auch im
+    Verlauf-PDF. Kopie der Akte (`vorlagen/listen.py: aktenkopie_pdf`, DSGVO-Auskunft): Abschnitt „Katheter-Historie“
+    mit allen Kathetern (auch zurückgenommenen), Komplikationen und Kennzahlen. Endgültiges Löschen einer Akte
+    (`akten_entfernen`) entfernt beide Modelle samt Historie; `umfang` zählt `katheter`, `katheter_komplikationen`.
+- **Oberfläche:** Reiter **Katheter** nach „Medikamente“ (`seiten/akte/Katheter.tsx`, Route `/patienten/:id/katheter`,
+  Eintrag in der gemeinsamen Reiterliste von `Akte.tsx` – damit in allen drei Aktenansichten). Kennzahlen oben (aktueller
+  Katheter mit Liegedauer, Infektionen je 1000 Kathetertage mit Erklärung, Anzahl), Hinweise, Zeitachse (ab 768 px
+  waagerecht mit Jahres-/Monatsskala und „heute“, darunter senkrecht; Balken je Katheter, Komplikationen als Raute,
+  Infektionen gefüllt), darunter Tabelle bzw. Karten mit „Komplikation“, „Entfernen“, Bearbeiten und Zurücknehmen;
+  zurückgenommene Katheter aufklappbar. Karteikarte: Art „KA“ (Anlage, Entfernung, Komplikationen). Verlauf: Bereiche
+  „Katheter“ und „Katheter-Komplikationen“. Hilfe: Abschnitt „Katheter-Historie“ (`hilfe/inhalt.py`, id `katheter`).
+- **Musterdaten:** `patienten/testdaten.py: TEST_KATHETER` (Wechsel, Infektionen, Thrombose, Leckage; Hanna Test bewusst
+  ohne Historie für den Hinweis „Anlagedatum nicht erfasst“).
+- **Teststatus:** `patienten/test_katheter.py` – `Auswahllisten` (Grundwerte, Pflege), `Anlegen` (CRUD, Entfernen,
+  kein Löschen/Zurücknehmen, Komplikationen), `Pruefungen` (Entfernt am vor Anlage, Zukunft, Pflichtfelder, falsche und
+  ausgeblendete Listenwerte, Komplikation in der Liegezeit, Liegezeit nicht an Komplikationen vorbei kürzen, Patient
+  fest), `Kerndaten` (Übernahme, Wechsel mit Hinweis ohne automatisches Beenden, entfernter Katheter ändert nichts,
+  gleicher Typ ohne Historieneintrag, Anlagedatum fehlt), `Kennzahl` (Infektionen je 1000 Kathetertage, ohne
+  Kathetertage, Infektion nach Name, nur eigene Akten), `Rechte` (Betrachter, Admin nur Testpatienten, abgeschlossen
+  409, eingeschränkt unsichtbar, Testbenutzer), `Verlauf` (Aktionen mit Person, Beschreibungen, Verlauf-PDF,
+  Aktenkopie), `Datenschutz` (Löschen samt Historie), `Testdaten`. Browsertest `frontend/e2e/katheter.spec.ts`
+  (Anlegen, Zeitachse mit Balken und Markierung, Kennzahl, Meldung außerhalb der Liegezeit, Wechsel mit Hinweis,
+  Entfernen, Verlauf, nach Neuladen; Anlagedatum nachtragen; Telefon: senkrechte Zeitachse ohne seitliches Herausragen).
+- **Status:** ABGESCHLOSSEN – Lauf steht aus (Backend-Tests, Typprüfung und Browsertests konnten in der
+  Entwicklungsumgebung nicht laufen; die Migrationen sind von Hand geschrieben – beim ersten Lauf prüft
+  `makemigrations --check` in GitHub Actions, ob sie zum Modell passen).
+- **Offen – vom Nutzer zu bestätigen:**
+  - Zählweise der Kathetertage: Tage zwischen Anlage und Entfernung (Anlagetag zählt nicht mit, am selben Tag entfernt
+    = 0 Tage); überlappende Katheter zählen beide. Alternative: jeder Kalendertag mit liegendem Katheter (+1 je
+    Katheter).
+  - Was als „Infektion“ zählt: jede Komplikationsart mit „infektion“ im Namen (die Liste ist pflegbar und hat kein
+    eigenes Merkmal). Alternative: ein Schalter je Listenwert.
+  - Zurücknehmen eines liegenden Katheters ändert die Kerndaten nicht (`Patient.katheter` bleibt) – auch das Eintragen
+    der Entfernung des letzten Katheters setzt die Kerndaten nicht auf „kein Katheter“. Bitte bestätigen oder festlegen.
+  - Ändern des Typs eines bestehenden Katheters (PATCH) übernimmt den Typ nicht in die Kerndaten (Festlegung nennt nur
+    „neuer Katheter“ bzw. „Katheterwechsel“).
+  - Kennzahl auf der Startseite oder in Berichten (z. B. Infektionsrate über alle Patienten) ist nicht Teil dieses
+    Auftrags.
