@@ -141,7 +141,9 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
     POST   /api/infusionsplaene/entwurf/          {"patient": ID, "leer"?: bool, "vorlage"?: Plan-ID}
                                                   → neuer Entwurf (vorbelegt mit aktuellem Plan bzw. Vorlage)
     GET    /api/infusionsplaene/vorbelegung/?patient=ID  Werte für den ersten Plan je kg Körpergewicht (wie im Altsystem)
-    GET    /api/infusionsplaene/ID/vergleich/     alle Werte neben denen des Vorgängers
+    GET    /api/infusionsplaene/ID/vergleich/     alle Werte neben denen des letzten freigegebenen Plans davor
+                                                  (ohne einen solchen: des Vorgängers); ?mit=Plan-ID wählt einen
+                                                  anderen Plan desselben Patienten
     PATCH  /api/infusionsplaene/ID/               Entwurf bearbeiten
     POST   /api/infusionsplaene/ID/freigeben/     Entwurf wird aktueller Plan (der Mediziner gibt selbst frei)
     POST   /api/infusionsplaene/ID/abschliessen/  Entwurf wird aktueller Plan, nachdem der Mediziner außerhalb von EPM
@@ -282,7 +284,25 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
 
     @action(detail=True, methods=["get"])
     def vergleich(self, request, pk=None):
-        return Response(self.get_object().vergleich())
+        """Vergleich mit einem anderen Plan desselben Patienten (Festlegung 16.10.2026).
+
+        Ohne ``?mit=``: der letzte freigegebene Plan vor diesem (ohne einen solchen: der Vorgänger). ``?mit=<Plan-ID>``
+        wählt einen beliebigen anderen Plan desselben Patienten. Gesucht wird nur in den Plänen, die der Benutzer
+        sehen darf, und nur beim selben Patienten – ein fremder Plan ergibt 400, ohne etwas über ihn zu verraten."""
+        plan = self.get_object()
+        mit = None
+        roh = request.query_params.get("mit")
+        if roh not in (None, ""):
+            if not (str(roh).isdigit() and len(str(roh)) <= 18):  # Plan-ID (bigint), nichts anderes
+                return Response({"mit": "Bitte einen Plan zum Vergleich wählen."}, status=status.HTTP_400_BAD_REQUEST)
+            mit = self.get_queryset().filter(pk=int(roh), patient_id=plan.patient_id).first()
+            if mit is None:
+                return Response({"mit": "Plan zum Vergleich nicht gefunden. Verglichen werden kann nur mit einem "
+                                        "anderen Plan desselben Patienten."}, status=status.HTTP_400_BAD_REQUEST)
+            if mit.pk == plan.pk:
+                return Response({"mit": "Bitte einen anderen Plan zum Vergleich wählen."},
+                                status=status.HTTP_400_BAD_REQUEST)
+        return Response(plan.vergleich(mit=mit))
 
     @action(detail=True, methods=["get"])
     def pdf(self, request, pk=None):

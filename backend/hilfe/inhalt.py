@@ -183,7 +183,7 @@ Administration setzt den zweiten Faktor zurück.</p>""",
 <p>Der Arbeitsplatz für EPM ist der PC. Am Telefon (im VPN) geht das Wichtigste unterwegs:</p>
 <ul>
 <li><strong>Pläne freigeben:</strong> unten <strong>Pläne</strong> zeigt die Entwürfe zur Freigabe; Plan öffnen, prüfen
-(Ansicht wie PDF, Vergleich mit dem Vorgänger) und <strong>Freigeben</strong>.</li>
+(Ansicht wie PDF, Vergleich mit dem letzten freigegebenen Plan) und <strong>Freigeben</strong>.</li>
 <li><strong>Kurz nachsehen:</strong> Suche oben (Lupe) oder <strong>Patienten</strong>; der Aktenkopf zeigt Gewicht,
 Plan, Versorger und den nächsten Termin, die Reiter lassen sich seitlich wischen.</li>
 <li><strong>Notiz erfassen:</strong> <strong>＋ Notiz</strong> in der Leiste unten öffnet die Schnellerfassung – in einer
@@ -812,16 +812,18 @@ Zeitabständen.</li>
         "id": "plan_ansehen", "gruppe": "plaene", "titel": "Infusionspläne ansehen", "rechte": ["akten_lesen"],
         "seiten": ["/patienten/:id/plaene", "/infusionsplaene"],
         "html": """
-<p>Der Reiter <strong>Infusionspläne</strong> der Akte zeigt den aktuellen Plan, Entwürfe und frühere Pläne mit den
-Änderungen gegenüber dem Vorgänger. Ein freigegebener Plan hat eine gespeicherte PDF mit Prüfsumme; EPM prüft beim Öffnen,
-ob sie unverändert ist.</p>
+<p>Der Reiter <strong>Infusionspläne</strong> der Akte zeigt den aktuellen Plan, Entwürfe und frühere Pläne. Ein
+freigegebener Plan hat eine gespeicherte PDF mit Prüfsumme; EPM prüft beim Öffnen, ob sie unverändert ist.</p>
+<p><strong>Vergleich</strong> (die Zahl nennt die geänderten Werte) stellt alle Werte neben die eines anderen Plans.
+Standard ist der letzte freigegebene Plan davor – ein Entwurf wird also mit dem aktuell gültigen Plan verglichen.
+Unter <strong>Vergleichen mit:</strong> lässt sich jeder andere Plan desselben Patienten wählen, auch ein älterer;
+der Spaltenkopf zeigt, welcher es ist. Gibt es davor keinen freigegebenen Plan, vergleicht EPM mit dem Vorgänger.</p>
 <p>Die <strong>PDF</strong> steht direkt neben der Liste der Pläne, so hoch wie das Fenster: eine ganze Seite auf einen
 Blick (<strong>Ganze Seite</strong>; − und + vergrößern auf die Breite). <strong>Groß ansehen</strong> öffnet sie im
 Fenster, <strong>Herunterladen</strong> speichert sie. Entwürfe zeigen die Ansicht mit der aktiven Dokumentvorlage und dem
 Wasserzeichen „ENTWURF“.</p>""" + _bild(
             "infusionsplan-ansehen.png", "Reiter Infusionspläne der Akte: links die Liste der Pläne, neueste oben "
-            "(aktuell gültig, abgelöst), rechts der aktuelle Plan mit PDF öffnen, Ansicht wie PDF und Vergleich mit "
-            "Vorgänger.", "Infusionspläne in der Akte: links die Pläne, rechts der gewählte Plan als PDF.", 1302, 430) + """
+            "(aktuell gültig, abgelöst), rechts der aktuelle Plan mit PDF öffnen, Ansicht wie PDF und Vergleich.", "Infusionspläne in der Akte: links die Pläne, rechts der gewählte Plan als PDF.", 1302, 430) + """
 <p>Der Menüpunkt <strong>Infusionspläne</strong> zeigt die Pläne aller Patienten: zur Freigabe, aktuell und älter als
 eingestellt. Beim Überfahren des Status steht die Frist, ab der ein Plan als alt gilt. <strong>PDF</strong> gibt es an
 jedem Plan (auch an Entwürfen); ab 1920 Bildpunkten Breite erscheint sie rechts neben der Liste, sonst im Fenster.</p>
@@ -834,7 +836,8 @@ Bestätigung.</p>""",
         "id": "plan_anlegen", "gruppe": "plaene", "titel": "Neuen Plan anlegen", "rechte": ["plaene_anlegen"],
         "seiten": ["/patienten/:id/plaene/neu", "/patienten/:id/plaene/:id/bearbeiten"],
         "html": """
-<p><strong>Neuer Plan</strong> übernimmt die Werte des aktuellen Plans; geänderte Werte sind markiert. Beim ersten Plan
+<p><strong>Neuer Plan</strong> übernimmt die Werte des aktuellen Plans; Werte, die vom letzten freigegebenen Plan
+abweichen, sind markiert (die Spalte „vorher“ zeigt dessen Werte). Beim ersten Plan
 schlägt EPM Werte je kg Körpergewicht vor (Vorgabe der Praxis wie im Altsystem: Glucose 3,5 g, Aminosäuren 1,2 g,
 Lipide 1 g, Natrium 1,3, Kalium 0,7, Phosphat 0,3, Calcium 0,15, Magnesium 0,2 mmol je kg). <strong>Mengen nach
 Praxisvorgabe</strong> setzt diese Mengen jederzeit neu aus dem letzten Gewicht ein – Präparate und Zusätze bleiben. Die
