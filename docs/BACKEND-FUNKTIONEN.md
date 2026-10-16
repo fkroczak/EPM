@@ -4104,3 +4104,74 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 - **Status:** TEILWEISE ABGESCHLOSSEN – Lauf mit echtem Modell und Benchmark auf der Ziel-VM stehen aus; Browsertest
   noch nicht geschrieben; Trainingslauf (LoRA auf CPU) bewusst noch nicht gebaut.
 
+### F193 Statistik – anonymisierte Auswertung für Berichte der Stiftung
+- **Nummer:** Bei Beginn war F191 die höchste Nummer; F192 bleibt bewusst frei, weil parallel ein anderer Auftrag
+  ebenfalls am Ende eine Nummer anhängt (nächste freie Nummer + 1).
+- **Anlass:** Auftrag vom 15.10.2026; Recht festgelegt am 16.10.2026.
+- **Ansicht:** Menüpunkt **Statistik** in der Hauptnavigation direkt nach „Infusionspläne“ (übrige Reihenfolge
+  unverändert), Seite `/statistik`. Zeitraum: **Kalenderjahr** (Standard: laufendes Jahr, Vergleich Vorjahr),
+  **Quartal** (Vergleich Vorquartal) oder **frei von–bis** (Vergleich: gleich lange Spanne direkt davor); die Wahl
+  steht in der Adresse. Eine Reihe Kacheln (aktiv zum Stichtag, im Zeitraum betreut, Neuaufnahmen, abgeschlossen,
+  Kontakte, Infusionspläne erstellt bzw. freigegeben) mit Wert des Vorzeitraums und Veränderung; darunter vier
+  Balkendiagramme (eigenes SVG wie `GewichtsDiagramm`/`Sparkline`, keine neue Abhängigkeit): abgeschlossen nach Anlass,
+  aktive nach Versorger, nach Altersgruppe am Stichtag (0–17, 18–39, 40–59, 60–79, 80+), nach Katheter (inkl. „kein
+  Katheter“ und „nicht erfasst“) – je Zeitraum und Vorzeitraum. Auf 1920 × 1080 ohne Seiten-Scrollen (lange Listen
+  scrollen in ihrer Karte, `index.css` `.statistik-seite`). Knöpfe **PDF** (Fenster mit Herunterladen) und **CSV**.
+- **Begriffe (nur vorhandene Felder):** Beginn der Betreuung = `Patient.angelegt_am` – ein eigenes Aufnahmedatum gibt
+  es nicht (**offen**, siehe unten). Akten aus dem Altsystem (erste Fassung der Historie mit Grund „Aus dem Altsystem
+  übernommen …“) gelten als „vor jedem Zeitraum in Betreuung“ und zählen nie als Neuaufnahme. Ende =
+  `abgeschlossen_am` mit `abschluss_anlass`. Aktiv zum Stichtag (= Ende des Zeitraums, höchstens heute): begonnen und
+  nicht bis zum Stichtag abgeschlossen. Im Zeitraum betreut: begonnen bis zum Ende, nicht vor dem Beginn abgeschlossen.
+  Versorger und Katheter: heutiger Stand der Akte (nicht der Stand am Stichtag). Kontakte: nicht storniert, `zeitpunkt`
+  im Zeitraum. Pläne erstellt: `erstellt_am`; freigegeben: `freigabe_datum`, sonst `freigegeben_am` (nicht Entwürfe;
+  übernommene Pläne ohne Freigabevermerk zählen nur als erstellt).
+- **Datenschutz:** nur Akten der aktiven Firma (`patienten_fuer(user, eingeschraenkte=True)` – wie Liste und
+  Startseite), **Testpatienten nie** (auch nicht mit „Testdaten sehen“), eingeschränkte Akten (Art. 18) gezählt, nie
+  einzeln; keine Namen, Nummern, Geburtsdaten in Antwort, PDF oder CSV.
+- **Unterdrückungsregel (k = 5):** (1) jede Zelle mit 1–4 Fällen → „< 5“, `wert: null` (0 bleibt 0); (2) enthält der
+  **Bestand** (aktiv, betreut, Neuaufnahmen, abgeschlossen und die vier Verteilungen) in Zeitraum **oder** Vorzeitraum
+  eine „< 5“-Zelle, werden in **beiden** Zeiträumen alle Bestandswerte ab 5 auf volle 5 gerundet („≈ 15“, `status:
+  gerundet`), auch Summen – so ist eine unterdrückte Zelle weder aus Summe minus Rest noch aus der Differenz zum
+  Vorzeitraum (aktiv jetzt = aktiv vorher + Neuaufnahmen − Abschlüsse) rückrechenbar; (3) Kontakte und Pläne nur nach
+  (1); (4) die Oberfläche bildet Differenzen nur aus angezeigten Werten (bei „< 5“ keine, bei gerundeten „≈“).
+  Versorger und Katheter werden nach dem angezeigten Wert sortiert, nicht nach dem genauen.
+- **Recht:** neues Recht `statistik_ansehen` „Statistik ansehen“ in der Rechte-Matrix (Administration › Benutzer ›
+  Rechte, je Gruppe umstellbar). **Festlegung 16.10.2026:** Standard für „Mitarbeiter (erweitert)“ und die höheren
+  Rollen Mediziner und Admin (Reihenfolge in `accounts.models.Rolle`: Betrachter, Mitarbeiter, Mitarbeiter (erweitert),
+  Mediziner, Admin; „Keine Berechtigung“ ohne Rechte); Betrachter und Mitarbeiter nicht. Testbenutzer nie
+  (`NUR_ECHTE_BENUTZER`, die Statistik wirkt über Testpatienten hinaus). Menüpunkt und Route nur mit dem Recht; die API
+  prüft es (`StatistikRecht = nur_recht("statistik_ansehen")`, sonst 403). **Keine Migration nötig:** Der Standard
+  steht in `accounts/rechte.py` (`STANDARD`), Abweichungen speichert `Gruppenrecht` (Feld `recht` ohne Auswahlliste).
+- **Endpunkte:** `GET /api/statistik/?art=jahr&jahr=2026 | art=quartal&jahr=2026&quartal=3 | art=frei&von=…&bis=…` →
+  `{firma, zeitraum, vergleich, werte: {kennzahlen, verteilungen, gerundet}, vorher, kennzahlen, verteilungen, regel,
+  hinweise, erstellt_am}`; je Zelle `{wert, anzeige, status: exakt|klein|gerundet}`. Fehlerhafter Zeitraum → 400
+  `{fehler}`. `GET /api/statistik/pdf/` (WeasyPrint, Briefkopf und Fuß der Vorlage „Patientendatenblatt“ wie die
+  übrigen Listen, `vorlagen/listen.py` `statistik_pdf`) und `GET /api/statistik/csv/` (Semikolon, UTF-8 mit BOM, CRLF;
+  Kopf, Kennzahlen, Verteilungen mit Vorzeitraum, Regel und Hinweise). Jeder Export: Audit-Log „Export“ (`was:
+  Statistik`, `format`, `von`, `bis`, `vergleich_von`, `vergleich_bis`, `firma`), Text „Statistik als PDF/CSV:
+  Statistik 2026 · DSKM“. Aggregation: eine Abfrage für die Akten (Werte), eine für die Herkunft aus dem Altsystem, je
+  eine bedingte Zählung für Kontakte und Pläne über beide Zeiträume.
+- **Hilfe:** neue Gruppe „Statistik“, Abschnitt `statistik` (Seite `/statistik`) mit Hinweis auf „< 5“ und Rundung.
+- **Dateien:** `backend/patienten/statistik.py` (neu), `backend/patienten/test_statistik.py` (neu),
+  `backend/epm/urls.py`, `backend/accounts/rechte.py`, `backend/accounts/permissions.py`, `backend/accounts/tests.py`
+  (Erwartung „Mitarbeiter (erweitert)“), `backend/vorlagen/listen.py` (`statistik_pdf`), `backend/hilfe/inhalt.py`,
+  `frontend/src/seiten/Statistik.tsx` (neu), `frontend/src/App.tsx`, `frontend/src/components/layout/Shell.tsx`,
+  `frontend/src/components/ui/icon.tsx` (Symbol „statistik“), `frontend/src/lib/typen.ts`, `frontend/src/index.css`,
+  `frontend/e2e/statistik.spec.ts` (neu), `docs/DATENSCHUTZ.md`.
+- **Offen – vom Nutzer zu bestätigen:**
+  - Aufnahmedatum: Es gibt kein Feld dafür; `angelegt_am` ist der Tag der Anlage in EPM. Für übernommene Akten ist der
+    Beginn unbekannt (sie zählen nie als Neuaufnahme). Soll ein Feld „aufgenommen am“ (ggf. mit Übernahme aus dem
+    Altsystem) dazukommen?
+  - Versorger und Katheter am Stichtag statt heutiger Stand (Auswertung der Historie).
+  - Laufender Zeitraum: Vergleich mit dem ganzen Vorzeitraum (umgesetzt) oder mit derselben Spanne des Vorjahres?
+  - Standard der Seite: das laufende Jahr mit Vergleich zum Vorjahr (umgesetzt).
+  - Bestätigung der Unterdrückungsregel durch die Stiftung bzw. den/die Datenschutzbeauftragte(n); Restrisiko durch
+    viele überlappende frei gewählte Zeiträume (`docs/DATENSCHUTZ.md` O11).
+- **Teststatus:** Backend `patienten.test_statistik` (Zeiträume und Vorzeiträume, ungültige Eingaben, Regel „< 5“ mit
+  Rundung auch über den Vorzeitraum, Zählungen, Testpatienten, eingeschränkte Akten ohne Einzelangaben, Altsystem-Akte,
+  Infusionspläne, Recht je Rolle inkl. Testbenutzer und Umstellen, Firmenfilter mit Umschalter, CSV-Format mit BOM und
+  Audit-Eintrag, PDF und Audit-Eintrag); `accounts.tests.MitarbeiterErweitert` angepasst. Browsertest
+  `statistik.spec.ts` (Menüpunkt nach „Infusionspläne“, Kacheln, Diagramme, 1080p ohne Scrollen, Quartal, CSV mit BOM,
+  PDF, Audit-Log, Mitarbeiter und Betrachter ohne Menüpunkt und mit 403). **Nicht gelaufen:** Django, npm und
+  Playwright waren bei der Umsetzung nicht installierbar; geprüft nur mit `python3 -m py_compile`. CI-Lauf steht aus.
+- **Status:** TEILWEISE ABGESCHLOSSEN – Lauf der Backend- und Browsertests sowie Typprüfung stehen aus

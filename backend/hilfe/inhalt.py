@@ -46,6 +46,7 @@ GRUPPEN = [
     ("kontakte", "Kontakte und Termine"),
     ("gewicht", "Gewicht"),
     ("plaene", "Infusionspläne"),
+    ("statistik", "Statistik"),
     ("dokumente", "Dokumente"),
     ("datenschutz", "Datenschutz"),
     ("scans", "Scans und Texterkennung"),
@@ -838,6 +839,37 @@ Freigabe</strong>): prüfen und oben rechts <strong>Freigeben</strong>.</p>""" +
 <p>Hat der Mediziner einen Entwurf außerhalb von EPM freigegeben (z. B. per E-Mail), wird der Entwurf mit
 <strong>Nach Freigabe abschließen</strong> zum aktuellen Plan. Anzugeben sind wer freigegeben hat, das Datum, der Weg
 der Freigabe und der Nachweis (z. B. die E-Mail als PDF).</p>""",
+    },
+    # ------------------------------------------------------------------ Statistik (F193, Festlegung 16.10.2026)
+    {
+        "id": "statistik", "gruppe": "statistik", "titel": "Statistik für Berichte der Stiftung",
+        "rechte": ["statistik_ansehen"], "seiten": ["/statistik"],
+        "html": """
+<p>Der Menüpunkt <strong>Statistik</strong> zählt die Akten der Firma, für die Sie gerade arbeiten (Umschalter oben links),
+für einen Zeitraum: <strong>Kalenderjahr</strong> (Standard: das laufende Jahr im Vergleich zum Vorjahr),
+<strong>Quartal</strong> oder <strong>frei von–bis</strong>. Jede Zahl steht neben dem Wert des Vorzeitraums (Vorjahr,
+Vorquartal bzw. die gleich lange Spanne direkt davor).</p>
+<ul>
+<li><strong>Aktive Patienten zum Stichtag</strong> (Ende des Zeitraums, im laufenden Zeitraum heute),
+<strong>im Zeitraum betreut</strong>, <strong>Neuaufnahmen</strong> und <strong>abgeschlossene Akten</strong> nach
+Anlass (verstorben, Therapie beendet, Betreuung gewechselt).</li>
+<li>Die aktiven Patienten nach <strong>Versorger</strong>, <strong>Altersgruppe</strong> am Stichtag (0–17, 18–39,
+40–59, 60–79, 80 und älter) und <strong>Katheter</strong> (auch „kein Katheter“ und „nicht erfasst“).</li>
+<li><strong>Kontakte</strong> (ohne stornierte) sowie <strong>erstellte und freigegebene Infusionspläne</strong> im
+Zeitraum.</li>
+</ul>
+<p><strong>Datenschutz:</strong> Die Statistik zeigt keine Namen, Nummern oder Geburtsdaten. Testpatienten zählen nie.
+Akten mit eingeschränkter Verarbeitung zählen mit, erscheinen aber nie einzeln. <strong>Kleine Zahlen</strong> von 1 bis
+4 stehen als <strong>„&lt; 5“</strong> da – auf der Seite, in der PDF und in der CSV. Kommt so eine kleine Zahl bei den
+Patienten (aktiv, betreut, Neuaufnahmen, Abschlüsse und ihre Aufteilungen) vor, sind dort alle übrigen Zahlen auf volle
+5 gerundet und mit „≈“ markiert, damit sich die kleine Zahl nicht aus der Summe zurückrechnen lässt.</p>
+<p><strong>Gut zu wissen:</strong> Als Beginn der Betreuung gilt der Tag, an dem die Akte in EPM angelegt wurde. Aus dem
+Altsystem übernommene Akten zählen deshalb nicht als Neuaufnahme, sondern als schon länger betreut. Versorger und
+Katheter zeigen den heutigen Stand der Akte.</p>
+<p><strong>PDF</strong> (mit Briefkopf) und <strong>CSV</strong> (für Excel: Semikolon, Umlaute richtig) laden die
+Auswertung herunter; jeder Export steht im Audit-Log. Sehen dürfen die Statistik standardmäßig die Rollen
+<strong>Mitarbeiter (erweitert)</strong>, <strong>Mediziner</strong> und <strong>Admin</strong> (Recht „Statistik
+ansehen“, unter Administration › Benutzer › Rechte je Gruppe umstellbar); Betrachter und Mitarbeiter nicht.</p>""",
     },
     # ------------------------------------------------------------------ Dokumente
     {

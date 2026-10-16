@@ -23,6 +23,9 @@ Festlegungen vom 01.10.2026:
   übernehmen – jeweils in seiner Firma (DSKM nur DSKM, RGC nur RGC); übernehmen verlangt zusätzlich das Recht der Akte
   (z. B. „Einträge erfassen“, bei Infusionsplänen „Infusionspläne anlegen“). KI verwalten (Zeitfenster, Grenzen,
   Modelle) und Beispiele für das Training freigeben: Standard nur Admin, je Gruppe erteilbar.
+- Festlegung 16.10.2026 (Statistik, F193): „Statistik ansehen“ – Standard für „Mitarbeiter (erweitert)“ und die
+  höheren Rollen Mediziner und Admin; Betrachter und Mitarbeiter nicht. Je Gruppe umstellbar. Testbenutzer nie (die
+  Statistik zählt nur echte Akten, wirkt also über Testpatienten hinaus).
 - Festlegung 03.10.2026: „Testdaten sehen“ (Testpatienten und Testbenutzer) je Gruppe einstellbar – ohne das Recht
   erscheinen sie nirgends. Standard: alle Rollen wie bisher; Admin fest (legt nur Testpatienten an und verlöre sonst
   alles, was er schreiben darf). Testbenutzer sehen ihre Testpatienten immer.
@@ -71,6 +74,9 @@ RECHTE = [
      "gemeinsame Listen: Versorger mit Ansprechpartnern, Ärzte mit Kontaktdaten"),
     ("vorlagen_pflegen", "Vorlagen pflegen", "Briefkopf und Logo, Auswahllisten, Präparate, Grenzwerte"),
     ("audit_lesen", "Audit-Log lesen", ""),
+    ("statistik_ansehen", "Statistik ansehen",
+     "Menüpunkt „Statistik“: anonymisierte Auswertung der Akten der aktiven Firma mit Export als PDF und CSV – ohne "
+     "Testpatienten, kleine Zahlen (1–4) nur als „< 5“; Standard: Mitarbeiter (erweitert), Mediziner und Admin"),
     ("benutzer_verwalten", "Benutzer und Rechte verwalten",
      "Benutzer anlegen, sperren, Einmal-Passwort, 2FA zurücksetzen, Rechte der Gruppen"),
     ("backup_verwalten", "Sicherungen verwalten", "Sicherung starten, wiederherstellen"),
@@ -138,7 +144,9 @@ STANDARD = {
                         "testdaten_sehen", "scans_bearbeiten"} | _KI_MITARBEITER,
     Rolle.MITARBEITER_PLUS: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
                                   "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten",
-                                  "plaene_abschliessen", "plaene_anlegen", "testdaten_sehen", "scans_bearbeiten"}
+                                  "plaene_abschliessen", "plaene_anlegen", "testdaten_sehen", "scans_bearbeiten",
+                                  # Statistik (Festlegung 16.10.2026): ab „Mitarbeiter (erweitert)“
+                                  "statistik_ansehen"}
     | _KI_MITARBEITER,
     Rolle.MEDIZINER: _ALLE - _ADMIN_SPEZIAL,
     Rolle.ADMIN: _ALLE - {c for c, rollen in NUR_ROLLEN.items() if Rolle.ADMIN not in rollen},
@@ -153,7 +161,9 @@ FEST = {(Rolle.ADMIN, "benutzer_verwalten"), (Rolle.ADMIN, "akten_lesen"), (Roll
 # Testbenutzer arbeiten nur mit Testpatienten; alles, was darüber hinaus wirkt, bleibt verwehrt
 NUR_ECHTE_BENUTZER = {"versorger_pflegen", "vorlagen_pflegen", "audit_lesen", "benutzer_verwalten",
                       "backup_verwalten", "testdaten_zuruecksetzen", "akten_wieder_oeffnen", "system_verwalten",
-                      "altdaten_importieren", "ki_verwalten", "ki_training_freigeben"}
+                      "altdaten_importieren", "ki_verwalten", "ki_training_freigeben",
+                      # Statistik zählt nur echte Akten (F193)
+                      "statistik_ansehen"}
 
 
 def matrix() -> dict:

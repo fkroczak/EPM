@@ -134,6 +134,8 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
         {darf("akten_lesen") ? <NavEintrag zu="/patienten" icon="patienten" text="Patienten" /> : null}
         {darf("akten_lesen") ? <NavEintrag zu="/kalender" icon="kalender" text="Kalender" /> : null}
         {darf("akten_lesen") ? <NavEintrag zu="/infusionsplaene" icon="tropfen" text="Infusionspläne" /> : null}
+        {/* Statistik (F193): direkt nach Infusionspläne, nur mit „Statistik ansehen“ */}
+        {darf("statistik_ansehen") ? <NavEintrag zu="/statistik" icon="statistik" text="Statistik" testid="nav-statistik" /> : null}
         {/* Rolle „Keine Berechtigung“: keine gemeinsamen Listen */}
         {ich.rolle !== "keine" ? <NavEintrag zu="/versorger" icon="versorger" text="Versorger" /> : null}
         {ich.rolle !== "keine" ? <NavEintrag zu="/aerzte" icon="arzt" text="Ärzte" /> : null}

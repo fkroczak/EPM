@@ -789,7 +789,9 @@ class MitarbeiterErweitert(TestCase):
 
         admin = benutzer("admin", Rolle.ADMIN)
         plus = benutzer("plus", Rolle.MITARBEITER_PLUS)
-        self.assertEqual(STANDARD[Rolle.MITARBEITER_PLUS] - STANDARD[Rolle.MITARBEITER], {"plaene_anlegen"})
+        # Festlegung 16.10.2026 (F193): zusätzlich „Statistik ansehen“ ab „Mitarbeiter (erweitert)“
+        self.assertEqual(STANDARD[Rolle.MITARBEITER_PLUS] - STANDARD[Rolle.MITARBEITER],
+                         {"plaene_anlegen", "statistik_ansehen"})
         self.assertTrue(plus.hat_recht("plaene_anlegen"))
         self.assertFalse(plus.hat_recht("plaene_freigeben"))
         c = client_fuer(admin)

@@ -1033,3 +1033,9 @@ input.inp:is([type="date"], [type="time"])::-webkit-datetime-edit { padding: 0; 
    (Prüfung 11.10.2026: Infusionspläne 1288 statt 768 px). Nicht für Karten, die selbst fest bzw. absolut liegen: Fenster
    (.dialog-popup ist eine Karte mit overflow-auto) rutschten sonst ans Seitenende (Wunsch 11.10.2026, Hilfe-Bilder) */
 .card:is(.overflow-x-auto, .overflow-auto, .overflow-hidden):not(.fixed, .absolute, .sticky) { position: relative; }
+
+/* Statistik (F193): auf 1920 × 1080 ohne Seiten-Scrollen – die vier Diagramme teilen sich die Höhe unter den Kacheln;
+   lange Listen (viele Versorger) scrollen in ihrer Karte. Kopfzeile, Seitenkopf, Zeitraum, Kacheln und Hinweis zusammen etwa 25rem. */
+@media (min-width: 56.25rem) and (min-height: 37.5rem) and (pointer: fine) {
+  .statistik-seite .statistik-diagramme > .card { max-height: max(12rem, calc((100dvh - 25rem) / 2)); }
+}
