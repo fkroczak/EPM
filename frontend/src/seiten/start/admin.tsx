@@ -27,7 +27,7 @@ import type { Konto } from "./konten";
 export type { Konto } from "./konten";
 
 export function useSystem(aktiv: boolean) {
-  return useQuery({ queryKey: ["system", "uebersicht"], queryFn: () => api<Uebersicht>("system/uebersicht/"), refetchInterval: 60_000,
+  return useQuery({ queryKey: ["system", "uebersicht"], queryFn: () => api<Uebersicht>("system/uebersicht/", { hintergrund: true }), refetchInterval: 60_000,
     enabled: aktiv });
 }
 
@@ -58,7 +58,7 @@ function Feld3({ titel, wert, unter }: { titel: string; wert: ReactNode; unter?:
 
 // ---------------------------------------------------------------- Datensicherung
 export function SicherungKachel() {
-  const daten = useQuery({ queryKey: ["backup"], queryFn: () => api<BackupDaten>("backup/"), refetchInterval: 60_000, retry: false });
+  const daten = useQuery({ queryKey: ["backup"], queryFn: () => api<BackupDaten>("backup/", { hintergrund: true }), refetchInterval: 60_000, retry: false });
   const [frage, setFrage] = useState(false);
   const d = daten.data;
   const laeuft = !!d?.auftraege.some((a) => a.offen && a.aktion === "sicherung");
@@ -138,7 +138,7 @@ export function ServerKachel() {
 // ---------------------------------------------------------------- Ubuntu-Updates, Update und Neustart anstoßen (S13, S14)
 export function UpdatesKachel() {
   const daten = useSystem(true);
-  const auftraege = useQuery({ queryKey: ["system", "auftraege"], queryFn: () => api<{ aktion: string; offen: boolean }[]>("system/auftraege/"),
+  const auftraege = useQuery({ queryKey: ["system", "auftraege"], queryFn: () => api<{ aktion: string; offen: boolean }[]>("system/auftraege/", { hintergrund: true }),
     refetchInterval: 30_000 });
   const [wahl, setWahl] = useState<Wahl | null>(null);
   const d = daten.data;
@@ -307,7 +307,7 @@ export function HinweisKachel() {
 type Zusammenfassung = { tage: number; von: string; zeilen: { schluessel: string; text: string; gruppe: string; anzahl: number }[] };
 
 export function ZugriffeKachel() {
-  const daten = useQuery({ queryKey: ["protokoll", "zusammenfassung"], queryFn: () => api<Zusammenfassung>("protokoll/zusammenfassung/?tage=7"),
+  const daten = useQuery({ queryKey: ["protokoll", "zusammenfassung"], queryFn: () => api<Zusammenfassung>("protokoll/zusammenfassung/?tage=7", { hintergrund: true }),
     refetchInterval: 5 * 60_000 });
   return (
     <>

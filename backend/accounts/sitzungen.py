@@ -39,7 +39,10 @@ def _sitzung_ab(sender, request, user, **kwargs):
 class SitzungMiddleware:
     """Hält „zuletzt aktiv“ aktuell (höchstens einmal pro Minute ein Datenbankzugriff) und verlängert die Sitzung um
     30 Minuten ab jeder Anfrage. Dabei wird nur der Ablauf geschrieben, nicht die Daten der Sitzung: Laufen zwei Anfragen
-    gleichzeitig, überschreibt die spätere so nicht, was die frühere geändert hat (z. B. die gewählte Firma)."""
+    gleichzeitig, überschreibt die spätere so nicht, was die frühere geändert hat (z. B. die gewählte Firma).
+
+    Regelmäßige Abfragen im Hintergrund (Kopf ``X-EPM-Hintergrund``, siehe ``api()`` im Frontend) verlängern nichts –
+    sonst liefe die Sitzung bei offener Seite nie ab (F12: Abmeldung nach 30 Minuten ohne Bedienung)."""
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -49,6 +52,8 @@ class SitzungMiddleware:
         user = getattr(request, "user", None)
         sitzung = getattr(request, "session", None)
         schluessel = getattr(sitzung, "session_key", None)
+        if request.headers.get("X-EPM-Hintergrund"):
+            return antwort
         if schluessel and not sitzung.modified and antwort.status_code < 500:
             from django.conf import settings
 

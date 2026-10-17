@@ -25,7 +25,12 @@ def _login_failed(sender, credentials, request=None, **kwargs):
     from accounts.models import User
 
     name = str(credentials.get("username", ""))[:150]
-    bisher = (User.objects.filter(username=name, nur_historisch=False, is_active=True)
-              .values_list("fehlversuche", flat=True).first())
-    details = {"versuch": bisher + 1} if bisher is not None else {}
+    konto = User.objects.filter(username=name, nur_historisch=False, is_active=True).first()
+    details = {"versuch": konto.fehlversuche + 1} if konto is not None else {}
     protokolliere(SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request, benutzername=name, **details)
+    # Django-Verwaltung (/verwaltung/): Fehlversuche zählen wie in der App, sonst ließe sich das Passwort dort ohne
+    # Sperre ausprobieren. Die Anmeldung der App zählt selbst (accounts.api.AnmeldenView) – nicht doppelt.
+    if konto is not None and request is not None and request.path.startswith("/verwaltung/"):
+        from accounts.api import fehlversuch
+
+        fehlversuch(konto, request, "kennwort")

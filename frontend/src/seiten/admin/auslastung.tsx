@@ -24,7 +24,7 @@ const ZEITRAUM_MERKER = "epm-system-zeitraum";
 export function useVerlauf(zeitraum: Zeitraum, aktiv = true) {
   return useQuery({
     queryKey: ["system", "verlauf", zeitraum],
-    queryFn: () => api<Verlauf>(`system/verlauf/?zeitraum=${zeitraum}`),
+    queryFn: () => api<Verlauf>(`system/verlauf/?zeitraum=${zeitraum}`, { hintergrund: true }),
     refetchInterval: 60_000,
     enabled: aktiv,
     placeholderData: (vorher: Verlauf | undefined) => vorher,

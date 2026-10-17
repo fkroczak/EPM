@@ -51,7 +51,7 @@ export function KiStandKarte({ stand }: { stand?: KiStand }) {
 
 export function KiQueue() {
   const [reiter, setReiter] = useReiter(["queue", "qualitaet"] as const);
-  const stand = useQuery({ queryKey: ["ki", "stand"], queryFn: () => api<KiStand>("ki/stand/"), refetchInterval: 30_000 });
+  const stand = useQuery({ queryKey: ["ki", "stand"], queryFn: () => api<KiStand>("ki/stand/", { hintergrund: true }), refetchInterval: 30_000 });
   return (
     <Seite pfad={[{ text: "KI (Experimentell)" }]}>
       <Seitenkopf titel="KI (Experimentell)" unter="Vorschläge der lokalen KI zur Prüfung – nichts geht ohne Ihre Bestätigung in die Akte." />
@@ -75,7 +75,7 @@ function Queue() {
     konfidenz_unter: konfidenz || undefined, von: von || undefined, bis: bis || undefined, seitengroesse: anzahl };
   const liste = useQuery({
     queryKey: ["ki", "vorgaenge", werte],
-    queryFn: () => api<ApiSeite<KiVorgangKurz>>(`ki/vorgaenge/${abfrage(werte)}`),
+    queryFn: () => api<ApiSeite<KiVorgangKurz>>(`ki/vorgaenge/${abfrage(werte)}`, { hintergrund: true }),
     placeholderData: (vorher: ApiSeite<KiVorgangKurz> | undefined) => vorher,
     refetchInterval: 30_000,
   });

@@ -513,6 +513,8 @@ class Sitzungen(Grundlage):
         self.assertEqual((settings.SESSION_COOKIE_SAMESITE, settings.CSRF_COOKIE_SAMESITE), ("Strict", "Strict"))
         self.assertEqual(settings.X_FRAME_OPTIONS, "DENY")
         self.assertEqual(settings.EPM_LOGIN_MAX_FEHLVERSUCHE, 5)
+        # Drosselung der Anmeldung gemeinsam für alle Gunicorn-Prozesse
+        self.assertEqual(settings.CACHES["default"]["BACKEND"], "django.core.cache.backends.db.DatabaseCache")
 
 
 class PdfUndDateien(Grundlage):

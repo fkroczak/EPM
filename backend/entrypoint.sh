@@ -4,6 +4,7 @@
 set -e
 if [ "${1:-server}" = "server" ]; then
   python manage.py migrate --noinput
+  python manage.py createcachetable  # Drosselung der Anmeldung (CACHES in settings.py)
   # nach einer Wiederherstellung (F63): Eintrag im Audit-Log, alle Anmeldungen beenden
   python manage.py epm_wiederherstellungen_nachtragen || echo "WARNUNG: Wiederherstellungen nicht geprüft"
   # Art. 17 DSGVO: Löschungen nachholen, die eine Wiederherstellung zurückgebracht hat (sonst nichts)

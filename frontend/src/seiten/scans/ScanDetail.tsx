@@ -93,7 +93,7 @@ export function ScanDetail({ id, alle, onListe, onWeg, onZugeordnet }: {
   });
   const s = scan.data;
   // läuft der OCR-Dienst? Sonst bleibt ein Scan in der Warteschlange – das soll die Seite sagen, statt endlos zu warten
-  const stand = useQuery({ queryKey: ["scans", "stand"], queryFn: () => api<ScansStand>("scans/stand/"), refetchInterval: 60_000 });
+  const stand = useQuery({ queryKey: ["scans", "stand"], queryFn: () => api<ScansStand>("scans/stand/", { hintergrund: true }), refetchInterval: 60_000 });
   const dienstAus = stand.data ? stand.data.dienst_laeuft !== true : false;
   const [seiteIndex, setSeiteIndex] = useState(0);
   const [ansicht, setAnsicht] = useState<"seite" | "alle">("alle");

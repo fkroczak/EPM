@@ -9,5 +9,5 @@ export type Konto = { id: number; benutzername: string; anzeigename: string; rol
   notfallcodes_uebrig: number; notfallcodes_gesamt: number };
 
 export function useKonten(aktiv: boolean) {
-  return useQuery({ queryKey: ["benutzer", "konten"], queryFn: () => api<Konto[]>("benutzer/konten/"), enabled: aktiv, refetchInterval: 60_000 });
+  return useQuery({ queryKey: ["benutzer", "konten"], queryFn: () => api<Konto[]>("benutzer/konten/", { hintergrund: true }), enabled: aktiv, refetchInterval: 60_000 });
 }
