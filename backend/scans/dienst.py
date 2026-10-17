@@ -244,19 +244,40 @@ def entfernen(scan: Scan):
     transaction.on_commit(lambda: shutil.rmtree(pfad, ignore_errors=True), robust=True)
 
 
+def entfernen_wenn_ruhend(pk) -> bool:
+    """``entfernen``, aber nicht während der Erkennung: Die Zeile wird gesperrt und der Stand erneut geprüft (der
+    OCR-Dienst könnte den Scan eben geholt haben). In einer Transaktion aufrufen. → entfernt?"""
+    scan = Scan.objects.select_for_update().filter(pk=pk).exclude(status=Scan.Status.LAEUFT).first()
+    if scan is None:
+        return False
+    entfernen(scan)
+    return True
+
+
+def originale_verwerfen(scan: Scan):
+    """Nach dem Entfernen oder Abtrennen von Seiten enthielte das hochgeladene Original Seiten, die nicht mehr zum Scan
+    gehören (evtl. anderer Patienten) – es wird nicht mehr angeboten und gelöscht. In einer Transaktion aufrufen."""
+    a = dict(scan.auswertung or {})
+    a["originale"] = []
+    scan.auswertung = a
+    Scan.objects.filter(pk=scan.pk).update(auswertung=a)
+    dateien = originale(scan)
+    transaction.on_commit(lambda: [d.unlink(missing_ok=True) for d in dateien], robust=True)
+
+
 def bereinigen() -> dict:
     """Abgelaufene Scans löschen, verwaiste Verzeichnisse und Reste entfernen. Läuft stündlich im OCR-Dienst und
     höchstens einmal je Stunde beim Öffnen der Liste."""
     e = Einstellungen.aktuell()
     jetzt = timezone.now()
     ergebnis = {"abgelaufen": 0, "verwaist": 0, "reste": 0}
-    abgelaufen = list(Scan.objects.filter(laeuft_ab_am__lte=jetzt).exclude(status=Scan.Status.LAEUFT))
-    for scan in abgelaufen:
+    abgelaufen = Scan.objects.filter(laeuft_ab_am__lte=jetzt).exclude(status=Scan.Status.LAEUFT)
+    for pk in list(abgelaufen.values_list("pk", flat=True)):
         with transaction.atomic():
-            entfernen(scan)
-    ergebnis["abgelaufen"] = len(abgelaufen)
-    if abgelaufen:
-        protokolliere(A.SCAN, objekt="Scans", aktion="abgelaufen", anzahl=len(abgelaufen), tage=e.scans_frist_tage)
+            ergebnis["abgelaufen"] += entfernen_wenn_ruhend(pk)
+    if ergebnis["abgelaufen"]:
+        protokolliere(A.SCAN, objekt="Scans", aktion="abgelaufen", anzahl=ergebnis["abgelaufen"],
+                      tage=e.scans_frist_tage)
     basis = settings.EPM_SCANS
     if basis.is_dir():
         bekannt = set(Scan.objects.values_list("ordner", flat=True))
@@ -286,8 +307,8 @@ def bereinigen() -> dict:
         for scan in Scan.objects.exclude(status=Scan.Status.LAEUFT).filter(hochgeladen_am__lt=jetzt - timedelta(hours=1)):
             if not scan.pfad.is_dir():
                 with transaction.atomic():
-                    entfernen(scan)
-                ergebnis["ohne_dateien"] = ergebnis.get("ohne_dateien", 0) + 1
+                    if entfernen_wenn_ruhend(scan.pk):
+                        ergebnis["ohne_dateien"] = ergebnis.get("ohne_dateien", 0) + 1
     ergebnis["abgebrochen"] = haengende_zuruecksetzen()
     from . import dokumente
 
@@ -412,30 +433,34 @@ def _ist_grau(bild: np.ndarray) -> bool:
 
 
 # ---------------------------------------------------------------- Erkennung (nur im OCR-Dienst)
+@transaction.atomic
 def seiten_anlegen(scan: Scan) -> list[ScanSeite]:
-    """Originale → Rohbilder der Seiten (einmalig je Scan)."""
+    """Originale → Rohbilder der Seiten (einmalig je Scan). Alle oder keine: bricht eine Datei ab (beschädigt, Dienst
+    beendet), entsteht keine Seite, und der nächste Versuch beginnt von vorn."""
+    for rest in scan.pfad.glob("roh-*"):  # Bilder eines abgebrochenen Versuchs (ohne Seiten in der Datenbank)
+        rest.unlink(missing_ok=True)
     seiten = []
     nr = 0
     for datei in originale(scan):
         try:
-            _, rohseiten = laden.seiten_laden(datei.read_bytes(), max_seiten=settings.EPM_SCANS_MAX_SEITEN)
+            _, rohseiten = laden.seiten_einzeln(datei.read_bytes(), max_seiten=settings.EPM_SCANS_MAX_SEITEN)
+            for roh in rohseiten:  # eine Seite nach der anderen im Speicher
+                nr += 1
+                if nr > settings.EPM_SCANS_MAX_SEITEN:
+                    raise ScanFehler(f"Mehr als {settings.EPM_SCANS_MAX_SEITEN} Seiten in einem Scan.")
+                bild = roh.bild
+                if roh.herkunft == "pdf":
+                    if _ist_grau(bild):
+                        bild = cv2.cvtColor(bild, cv2.COLOR_BGR2GRAY)
+                    name, art = f"roh-{secrets.token_hex(6)}.png", "png"
+                else:
+                    name, art = f"roh-{secrets.token_hex(6)}.jpg", "jpg"
+                b, h = _bild_speichern(scan.pfad / name, bild, art, 93)
+                seiten.append(ScanSeite.objects.create(
+                    scan=scan, nr=nr, roh=name, roh_breite=b, roh_hoehe=h, herkunft=roh.herkunft,
+                    kamera=bool(roh.exif), dpi=roh.dpi, textebene=roh.digital, auftrag={"art": "seite"}))
         except laden.Unlesbar as fehler:
             raise ScanFehler(str(fehler)) from fehler
-        for roh in rohseiten:
-            nr += 1
-            if nr > settings.EPM_SCANS_MAX_SEITEN:
-                raise ScanFehler(f"Mehr als {settings.EPM_SCANS_MAX_SEITEN} Seiten in einem Scan.")
-            bild = roh.bild
-            if roh.herkunft == "pdf":
-                if _ist_grau(bild):
-                    bild = cv2.cvtColor(bild, cv2.COLOR_BGR2GRAY)
-                name, art = f"roh-{secrets.token_hex(6)}.png", "png"
-            else:
-                name, art = f"roh-{secrets.token_hex(6)}.jpg", "jpg"
-            b, h = _bild_speichern(scan.pfad / name, bild, art, 93)
-            seiten.append(ScanSeite.objects.create(
-                scan=scan, nr=nr, roh=name, roh_breite=b, roh_hoehe=h, herkunft=roh.herkunft,
-                kamera=bool(roh.exif), dpi=roh.dpi, textebene=roh.digital, auftrag={"art": "seite"}))
     if not seiten:
         raise ScanFehler("Die Datei enthält keine Seite.")
     return seiten
@@ -766,14 +791,15 @@ def bearbeiten(scan: Scan, paddle=None, abbrechen=lambda: False) -> Scan:
         scan.refresh_from_db()
         bereiche_nachlesen(scan)
         auswerten(scan)
-        scan.status = Scan.Status.FERTIG
-        scan.fortschritt = 100
-        scan.schritt = ""
-        scan.fehler = ""
-        scan.erkannt_am = timezone.now()
-        scan.dauer_s = round(time.monotonic() - t0, 1)
-        scan.versuche = 0
-        scan.save()
+        # nur die Felder der Erkennung: Titel und Ablauf ändert die Oberfläche währenddessen; ein inzwischen
+        # gelöschter Scan wird nicht wieder angelegt
+        Scan.objects.filter(pk=scan.pk).update(
+            text=scan.text, sicherheit=scan.sicherheit, unsicher=scan.unsicher, verfahren=scan.verfahren,
+            auswertung=scan.auswertung, dokumentdatum=scan.dokumentdatum, status=Scan.Status.FERTIG, fortschritt=100,
+            schritt="", fehler="", erkannt_am=timezone.now(), dauer_s=round(time.monotonic() - t0, 1), versuche=0)
+    except Scan.DoesNotExist:
+        log.info("%s wurde während der Erkennung gelöscht", scan)
+        return scan
     except ScanFehler as fehler:
         Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.FEHLER, fehler=str(fehler)[:1000], schritt="")
     except Exception as fehler:  # noqa: BLE001
@@ -781,7 +807,10 @@ def bearbeiten(scan: Scan, paddle=None, abbrechen=lambda: False) -> Scan:
         Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.FEHLER, schritt="",
                                                fehler=f"Die Erkennung ist fehlgeschlagen: {str(fehler)[:500]}")
     belegung_aktualisieren(scan)
-    scan.refresh_from_db()
+    try:
+        scan.refresh_from_db()
+    except Scan.DoesNotExist:
+        log.info("%s wurde während der Erkennung gelöscht", scan)
     return scan
 
 
