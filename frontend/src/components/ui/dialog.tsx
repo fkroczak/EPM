@@ -6,7 +6,7 @@ import { rem } from "@/lib/masse";
 import { cx } from "./basis";
 import { Icon } from "./icon";
 
-export function Dialog({ offen, onOffen, titel, beschreibung, children, fuss, breite = 520 }: {
+export function Dialog({ offen, onOffen, titel, beschreibung, children, fuss, breite = 520, geaendert }: {
   offen: boolean;
   onOffen: (offen: boolean) => void;
   titel: ReactNode;
@@ -14,9 +14,15 @@ export function Dialog({ offen, onOffen, titel, beschreibung, children, fuss, br
   children?: ReactNode;
   fuss?: ReactNode;
   breite?: number;
+  /** ungespeicherte Eingaben: Esc und Klick daneben fragen erst nach (sonst ginge langer Text verloren) */
+  geaendert?: boolean;
 }) {
   return (
-    <BaseDialog.Root open={offen} onOpenChange={(o) => onOffen(o)}>
+    <BaseDialog.Root open={offen} onOpenChange={(o, d) => {
+      if (!o && geaendert && (d.reason === "escape-key" || d.reason === "outside-press")
+        && !window.confirm("Ungespeicherte Änderungen verwerfen?")) { d.cancel(); return; }
+      onOffen(o);
+    }}>
       <BaseDialog.Portal>
         <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/35" />
         <BaseDialog.Popup

@@ -9,7 +9,7 @@ import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useAuswahl, useVersorgerListe } from "@/lib/daten";
-import { alter, datum, eingabeDatum, eingabeZahl, heuteIso, kg, nummer, prozent, terminZeit, zahl } from "@/lib/format";
+import { alter, datum, eingabeDatum, eingabeZahl, heuteIso, kg, nummer, prozent, tagesSchluessel, terminZeit, zahl } from "@/lib/format";
 import { ABSCHLUSSANLAESSE, ERKLAERUNGEN_KURZ, GESCHLECHTER, TERMINARTEN, VERSICHERUNGSARTEN } from "@/lib/typen";
 import type { Patient, Recht, Termin } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
@@ -385,8 +385,9 @@ function Angabezeile({ a }: { a: Angabe }) {
 }
 
 /** „heute“, „gestern“, „vor 12 Tagen“ – wie lange der letzte Kontakt her ist */
-function vorTagen(tag: string): string {
-  const tage = Math.round((new Date(heuteIso()).getTime() - new Date(tag.slice(0, 10)).getTime()) / 86400000);
+function vorTagen(zeitpunkt: string): string {
+  // Tag in Berlin, nicht in UTC (sonst hieße ein Kontakt um 00:30 „gestern“)
+  const tage = Math.round((new Date(heuteIso()).getTime() - new Date(tagesSchluessel(new Date(zeitpunkt))).getTime()) / 86400000);
   return tage <= 0 ? "heute" : tage === 1 ? "gestern" : `vor ${zahl(tage)} Tagen`;
 }
 
