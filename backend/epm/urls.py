@@ -125,6 +125,7 @@ urlpatterns = [
     path("api/system/dienste/neustart/", verwaltung.DienstNeustartView.as_view()),
     path("api/system/versionen/zurueck/", verwaltung.ZurueckView.as_view()),
     path("api/system/pakete/erstellen/", verwaltung.PaketErstellenView.as_view()),
+    path("api/system/pakete/schluessel/<str:was>/", verwaltung.PaketSchluesselView.as_view()),
     path("api/system/pakete/<str:datei>/", verwaltung.PaketDateiView.as_view()),
     path("api/system/hochladen/", verwaltung.HochladenView.as_view()),
     path("api/system/hochladen/<str:kennung>/", verwaltung.HochladenTeilView.as_view()),

@@ -155,6 +155,18 @@ AKTIONEN = {
         "beschreibung": "Paket der laufenden, getesteten Version für einen Server ohne Internet (sudo epm-update "
                         "--paket-erstellen, nur Test-VM); es liegt danach 2 Stunden zum Herunterladen bereit.",
     },
+    # Signatur der Update-Pakete (17.10.2026): Der VPS übernimmt den Schlüssel mit dem ersten gültig signierten Paket.
+    # Geht er auf der Test-VM verloren, hier zurücksetzen – der Agent löscht ihn erst nach 24 Stunden.
+    "paket_schluessel_zuruecksetzen": {
+        "name": "Paket-Schlüssel zurücksetzen", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Den gespeicherten Schlüssel für Update-Pakete löschen, z. B. wenn die Test-VM neu aufgesetzt "
+                        "wurde. Wirksam erst nach 24 Stunden (bis dahin abbrechbar, Hinweis an alle Benutzer); danach "
+                        "legt das nächste gültig signierte Paket den Schlüssel neu fest.",
+    },
+    "paket_schluessel_behalten": {
+        "name": "Zurücksetzen des Paket-Schlüssels abbrechen", "bestaetigung": "keine", "intern": True,
+        "beschreibung": "Das beantragte Zurücksetzen abbrechen; der gespeicherte Schlüssel bleibt.",
+    },
     "zertifikat_erneuern": {
         "name": "Zertifikat erneuern", "bestaetigung": "2fa", "intern": True,
         "beschreibung": "Neues Serverzertifikat der eigenen CA ausstellen (sudo epm-zertifikat erneuern, 397 Tage); "

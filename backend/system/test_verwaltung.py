@@ -574,6 +574,65 @@ class AgentTeile(Backupverzeichnis):
         eintrag = json.loads((self.ordner / "status" / "wiederherstellungen.json").read_text())[-1]
         self.assertEqual(eintrag["vorher_stempel"], "2026-10-17_120000")
 
+    def test_paket_schluessel_zuruecksetzen_erst_nach_24_stunden(self):
+        """Signatur der Update-Pakete: Übernahme vermerkt; Zurücksetzen wirkt erst nach 24 h und lässt sich abbrechen."""
+        a = self.modul.Agent(str(self.basis))
+        a.etc = str(self.basis / "etc")
+        os.makedirs(a.etc)
+        vertraut = self.basis / "etc" / "paket-vertraut.pub"
+        z = []
+        self.assertEqual(a.ausfuehren("paket_schluessel_zuruecksetzen", z.append, "d" * 32, von="admin")[0], 2)
+        vertraut.write_text("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOhO1RfWXZdftkCEHFa2fwt3lOejl2uIUIEGV9BL5HrV epm-paket\n")
+        fp = "SHA256:evVjyy6pYru60xpcZ4dS4OIiy64tvvpiKdDmOrFrLYM"   # wie ssh-keygen -lf
+        s = a.paket_schluessel()
+        self.assertEqual((s["vertraut"], s["zuruecksetzen"], s["ereignisse"][-1]["art"]), (fp, None, "uebernommen"))
+        self.assertEqual(len(a.paket_schluessel()["ereignisse"]), 1)   # nur einmal vermerkt
+        rc, text = a.ausfuehren("paket_schluessel_zuruecksetzen", z.append, "d" * 32, von="admin")
+        self.assertEqual(rc, 0)
+        self.assertIn("wirksam ab", text)
+        antrag = self.basis / "etc" / "paket-vertraut.zuruecksetzen"
+        self.assertEqual(stat.S_IMODE(antrag.stat().st_mode), 0o600)
+        self.assertIsNotNone(a.paket_schluessel()["zuruecksetzen"])
+        self.assertTrue(vertraut.exists())
+        # abbrechen: Schlüssel bleibt
+        self.assertEqual(a.ausfuehren("paket_schluessel_behalten", z.append, "d" * 32)[0], 0)
+        self.assertFalse(antrag.exists())
+        self.assertIsNone(a.paket_schluessel()["zuruecksetzen"])
+        # erneut beantragen; nach 23 h noch da, nach 24 h gelöscht
+        a.ausfuehren("paket_schluessel_zuruecksetzen", z.append, "d" * 32, von="admin")
+        jetzt = time.time()
+        with mock.patch.object(self.modul.time, "time", lambda: jetzt + 23 * 3600):
+            a.paket_schluessel()
+        self.assertTrue(vertraut.exists())
+        with mock.patch.object(self.modul.time, "time", lambda: jetzt + 24 * 3600 + 1):
+            s = a.paket_schluessel()
+        self.assertFalse(vertraut.exists() or antrag.exists())
+        self.assertEqual((s["vertraut"], s["zuruecksetzen"]), (None, None))
+        self.assertEqual((s["ereignisse"][-1]["art"], s["ereignisse"][-1]["fingerabdruck"], s["ereignisse"][-1]["von"]),
+                         ("zurueckgesetzt", fp, "admin"))
+        # ein Antrag, den das Backend schreiben könnte, liegt nicht in seinem Bereich: /etc/epm (hier etc/)
+        self.assertNotIn(str(self.ordner), str(antrag.resolve()))
+
+    def test_paket_schluessel_oberflaeche(self):
+        """Zurücksetzen nur mit Passwort + 2FA (Rolle Admin); Hinweis an alle, solange beantragt; Ereignisse ins Audit-Log."""
+        url = "/api/system/pakete/schluessel/zuruecksetzen/"
+        self.assertEqual(self.a.post(url, {}, format="json").status_code, 400)
+        r = self.a.post(url, {"kennwort": KENNWORT, "code": self.admin_codes[0]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(self.auftragsdatei()["aktion"], "paket_schluessel_zuruecksetzen")
+        self.assertEqual(self.a.post("/api/system/pakete/schluessel/behalten/").status_code, 201)
+        ab = (timezone.now() + timedelta(hours=23)).isoformat()
+        host_status_schreiben(self.ordner, paket_schluessel={
+            "vertraut": "SHA256:x", "bau": None, "zuruecksetzen": {"beantragt_am": "", "wirksam_ab": ab, "von": "admin"},
+            "ereignisse": [{"id": "ab12", "art": "uebernommen", "fingerabdruck": "SHA256:x", "zeit": ""}]})
+        h = self.a.get("/api/system/hinweis/").json()["hinweis"]
+        self.assertIn("Update-Pakete wird zurückgesetzt", h["text"])
+        self.a.get("/api/system/hinweis/")
+        self.assertEqual(SystemEreignis.objects.filter(details__ereignis="paket_schluessel").count(), 1)
+        self.assertTrue(SystemEreignis.objects.filter(objekt="Paket-Schlüssel erstmals übernommen: SHA256:x").exists())
+        host_status_schreiben(self.ordner, paket_schluessel={"vertraut": "SHA256:x", "zuruecksetzen": None, "ereignisse": []})
+        self.assertIsNone(self.a.get("/api/system/hinweis/").json()["hinweis"])
+
     def test_stand_im_status(self):
         certs = self.basis / "nginx" / "certs"
         certs.mkdir(parents=True)
