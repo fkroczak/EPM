@@ -40,7 +40,7 @@ type Evaluation = {
 
 export function KiVerwaltung() {
   const [reiter, setReiter] = useReiter(["einrichtung", "stand", "einstellungen", "modelle", "training"] as const);
-  const stand = useQuery({ queryKey: ["ki", "stand"], queryFn: () => api<KiStand>("ki/stand/"), refetchInterval: 15_000 });
+  const stand = useQuery({ queryKey: ["ki", "stand"], queryFn: () => api<KiStand>("ki/stand/", { hintergrund: true }), refetchInterval: 15_000 });
   return (
     <Seite pfad={[{ text: "Administration" }, { text: "KI (Experimentell)" }]}>
       <Seitenkopf titel="KI (Experimentell)" unter="Lokale Modelle, ohne Internet – Zeitfenster, Auslastung, Modelle, Qualität" />

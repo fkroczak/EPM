@@ -67,6 +67,12 @@ def admin_firmen(user) -> set[str]:
     return {f.kuerzel for f, r in mitgliedschaften(user).items() if r == Rolle.ADMIN}
 
 
+def admin_ueberall(user) -> bool:
+    """Admin in jeder aktiven Firma: Voraussetzung für Einstellungen, die für alle Firmen gelten (Rechte der Gruppen,
+    Anmelderegeln) – sonst änderte ein Admin der einen Firma die Rechte in der anderen."""
+    return {f.kuerzel for f in _firmen()} <= admin_firmen(user)
+
+
 def darf_konto_verwalten(admin, user) -> tuple[bool, list]:
     """Kontoweite Verwaltung (sperren, Einmal-Passwort, zweiten Faktor zurücksetzen, aus- und einblenden, Kontodaten
     wie Name oder Benutzername ändern) darf nur, wer in **jeder** Firma Admin ist, in der die Person eine Rolle hat

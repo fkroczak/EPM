@@ -15,7 +15,7 @@ type Stand = { an: boolean; bis: string | null; django_admin: boolean; api_ansic
 export function TechnikKarte() {
   const qc = useQueryClient();
   const melden = useHinweis();
-  const stand = useQuery({ queryKey: ["system", "technik"], queryFn: () => api<Stand>("system/technik/"), refetchInterval: 60_000 });
+  const stand = useQuery({ queryKey: ["system", "technik"], queryFn: () => api<Stand>("system/technik/", { hintergrund: true }), refetchInterval: 60_000 });
   const schalten = useMutation({
     mutationFn: (stunden: number) => api<Stand>("system/technik/", { method: "PUT", body: { stunden } }),
     onSuccess: (s) => {

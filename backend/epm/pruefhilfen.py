@@ -31,6 +31,17 @@ def benutzer(name, rolle, ist_test=False):
     return u
 
 
+def admin_in_allen_firmen(user):
+    """Admin auch in den weiteren Firmen – nötig für Einstellungen, die für alle Firmen gelten (z. B. Rechte der
+    Gruppen)."""
+    from accounts.models import Mitgliedschaft
+    from stammdaten.models import Firma
+
+    for firma in Firma.objects.exclude(kuerzel="dskm"):
+        Mitgliedschaft.objects.update_or_create(benutzer=user, firma=firma, defaults={"rolle": Rolle.ADMIN})
+    return user
+
+
 def client_fuer(user):
     """API-Client mit vollständiger Anmeldung (Passwort + zweiter Faktor)."""
     c = APIClient()
@@ -74,7 +85,7 @@ class Grundlage(TestCase):
     def setUp(self):
         super().setUp()
         # Drosselung der Anmeldung (30/min, im Cache) zurücksetzen – sonst scheitern lange Läufe mit vielen echten
-        # Anmeldungen an 429; der Cache hält sonst nichts (locmem, nur die DRF-Drosselung)
+        # Anmeldungen an 429; der Cache hält sonst nichts (nur die DRF-Drosselung)
         cache.clear()
 
     def neuer_kontakt(self, client=None, patient=None, **extra):

@@ -234,8 +234,9 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "epm.api_basis.exception_handler",
 }
 
-# Nur ein Prozess schreibt Cache-Werte (Drosselung); lokaler Speicher reicht.
-CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+# Drosselung der Anmeldung: in der Datenbank, damit alle Gunicorn-Prozesse gemeinsam zählen (mit lokalem Speicher
+# zählte jeder Prozess für sich). Die Tabelle legt ``createcachetable`` an (entrypoint.sh; Tests: automatisch).
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.db.DatabaseCache", "LOCATION": "epm_cache"}}
 
 LOGGING = {
     "version": 1,

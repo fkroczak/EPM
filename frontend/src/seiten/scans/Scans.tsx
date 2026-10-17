@@ -54,10 +54,10 @@ export function Scans() {
   const kamera = useRef<HTMLInputElement>(null);
   const zaehler = useRef(0);
 
-  const stand = useQuery({ queryKey: ["scans", "stand"], queryFn: () => api<ScansStand>("scans/stand/"), refetchInterval: 60_000 });
+  const stand = useQuery({ queryKey: ["scans", "stand"], queryFn: () => api<ScansStand>("scans/stand/", { hintergrund: true }), refetchInterval: 60_000 });
   const liste = useQuery({
     queryKey: ["scans", "liste"],
-    queryFn: () => api<ScanZeile[]>("scans/"),
+    queryFn: () => api<ScanZeile[]>("scans/", { hintergrund: true }),
     refetchInterval: (q) => (q.state.data?.some((s) => s.status === "wartet" || s.status === "laeuft") ? 2500 : 30_000),
   });
   const alle = liste.data ?? [];

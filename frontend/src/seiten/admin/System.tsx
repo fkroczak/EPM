@@ -696,10 +696,10 @@ function TexterkennungKarte({ t }: { t: NonNullable<Uebersicht["epm"]["texterken
 
 export function System() {
   const ich = useIch();
-  const daten = useQuery({ queryKey: ["system", "uebersicht"], queryFn: () => api<Uebersicht>("system/uebersicht/"), refetchInterval: 60_000 });
+  const daten = useQuery({ queryKey: ["system", "uebersicht"], queryFn: () => api<Uebersicht>("system/uebersicht/", { hintergrund: true }), refetchInterval: 60_000 });
   const auftraege = useQuery({
     queryKey: ["system", "auftraege"],
-    queryFn: () => api<Auftrag[]>("system/auftraege/"),
+    queryFn: () => api<Auftrag[]>("system/auftraege/", { hintergrund: true }),
     refetchInterval: (q) => ((q.state.data ?? []).some((a) => a.offen) ? 3000 : 30_000),
   });
   // Solange ein Auftrag läuft, bleibt der Ladebalken oben in Bewegung (F124)
