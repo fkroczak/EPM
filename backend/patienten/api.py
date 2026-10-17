@@ -304,6 +304,13 @@ def _datum(text: str):
 TEXTFELDER = ("diagnose", "therapie", "empfehlung", "bemerkung")
 
 
+class TextKonflikt(serializers.ValidationError):
+    status_code = status.HTTP_409_CONFLICT
+
+    def __init__(self, text):
+        super().__init__({"fehler": text})
+
+
 def feldversionen(patient, feld: str) -> list:
     """Fassungen eines Textfelds (neueste zuerst): Version, Zeitpunkt, Person, Text."""
     fassungen = []
@@ -534,7 +541,25 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
     def perform_update(self, serializer):
         pruefe_schreibbereich(self.request.user, serializer.instance)
         serializer.instance.pruefe_bearbeitbar()
+        self._pruefe_textversion(serializer.instance)
         serializer.save()
+
+    def _pruefe_textversion(self, patient):
+        """Gleichzeitig bearbeitete Texte (Therapie, Empfehlung, …): ``basis_version`` = Fassung, auf der die Änderung
+        aufbaut. Hat inzwischen jemand anderes gespeichert, wird nichts überschrieben (409)."""
+        basis = self.request.data.get("basis_version") if isinstance(self.request.data, dict) else None
+        felder = [f for f in TEXTFELDER if f in self.request.data] if basis is not None else []
+        if not felder:
+            return
+        # Sperre bis zum Ende der Anfrage: zwei gleichzeitige Speicherungen prüfen nacheinander
+        list(Patient.objects.select_for_update().filter(pk=patient.pk).values_list("pk"))
+        for feld in felder:
+            kopf = _versionskopf(patient, feld)
+            if str(kopf["version"] if kopf else 0) != str(basis):
+                wer = f" von {kopf['person']}" if kopf and kopf["person"] else ""
+                raise TextKonflikt(f"Der Text wurde inzwischen{wer} geändert (Fassung {kopf['version'] if kopf else 0}). "
+                                   "Bitte neu laden und die Änderung erneut eintragen – sonst ginge die andere Fassung "
+                                   "verloren.")
 
     @action(detail=False, methods=["get"])
     def doppelte(self, request):
@@ -571,6 +596,11 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
                 return Response({"datum": fehler_datum.detail}, status=status.HTTP_400_BAD_REQUEST)
             if datum > timezone.localdate():
                 return Response({"datum": ["Das Datum liegt in der Zukunft."]}, status=status.HTTP_400_BAD_REQUEST)
+            # sonst beginnt die Aufbewahrung zu früh und die Akte wird vorzeitig löschbar
+            angelegt = timezone.localtime(patient.angelegt_am).date()
+            if datum < angelegt:
+                return Response({"datum": [f"Das Datum liegt vor dem Anlegen der Akte ({angelegt:%d.%m.%Y})."]},
+                                status=status.HTTP_400_BAD_REQUEST)
         patient.abgeschlossen_am = datum
         patient.abschluss_anlass = anlass
         patient.abschluss_notiz = str(request.data.get("notiz", ""))[:2000]
@@ -1179,6 +1209,9 @@ class GewichtViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retrieve
     serializer_class = GewichtSerializer
     ordering_fields = ["gemessen_am"]
 
+    def get_queryset(self):
+        return super().get_queryset().select_related("erfasst_von")
+
     def perform_create(self, serializer):
         self.pruefe_patient(serializer.validated_data["patient"])
         serializer.save(erfasst_von=self.request.user)
@@ -1402,6 +1435,9 @@ class TerminViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.RetrieveM
     filterset_fields = None
     ordering_fields = ["faellig_am"]
 
+    def get_queryset(self):
+        return super().get_queryset().select_related("ort", "angelegt_von", "erledigt_von")
+
     def perform_create(self, serializer):
         self.pruefe_patient(serializer.validated_data["patient"])
         serializer.save(angelegt_von=self.request.user)
@@ -1499,15 +1535,25 @@ class DokumentSerializer(FirmaFeld, serializers.ModelSerializer):
     def get_hat_text(self, obj):
         return hasattr(obj, "erkannter_text")
 
-    def get_erkennung(self, obj):
-        from scans.dokumente import stand
+    def _vorab(self, obj):
+        """(Stand der Erkennung, ist Freigabenachweis) – in Listen einmal für alle Zeilen abgefragt, nicht je Zeile."""
+        from scans.dokumente import nachweise, staende
 
-        return stand(obj)
+        vorab = self.context.setdefault("_dokumente_vorab", {}) if isinstance(self.context, dict) else {}
+        if obj.pk not in vorab:
+            liste = self.parent.instance if isinstance(self.parent, serializers.ListSerializer) else None
+            doks = [obj, *(liste or [])]
+            st, nw = staende(doks), nachweise(doks)
+            vorab.update({d.pk: (st[d.pk], d.pk in nw) for d in doks})
+        return vorab[obj.pk]
+
+    def get_erkennung(self, obj):
+        return self._vorab(obj)[0]
 
     def get_text_erkennbar(self, obj):
         from scans.dokumente import erkennbar
 
-        grund = erkennbar(obj)
+        grund = erkennbar(obj, self._vorab(obj)[1])
         return {"moeglich": grund is None, "grund": grund or ""}
 
     def validate_typ(self, typ):
@@ -1590,13 +1636,22 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
     # Scans (F163): auch im erkannten Text suchen
     search_fields = ["titel", "originalname", "notiz", "erkannter_text__text"]
 
+    def get_queryset(self):
+        # erkannter Text nur für „hat_text“, ohne den Text selbst zu laden
+        return (super().get_queryset().select_related("typ", "hochgeladen_von", "erkannter_text")
+                .defer("erkannter_text__text"))
+
     def perform_create(self, serializer):
         patient = serializer.validated_data["patient"]
         self.pruefe_patient(patient)
         upload = serializer.validated_data.pop("datei")
         meta = speichere_datei(patient, upload, getattr(serializer, "erkannter_typ", None))
         titel = serializer.validated_data.get("titel") or upload.name
-        serializer.save(hochgeladen_von=self.request.user, titel=titel[:200], **meta)
+        try:
+            serializer.save(hochgeladen_von=self.request.user, titel=titel[:200], **meta)
+        except BaseException:
+            (settings.EPM_DOKUMENTE / meta["datei"]).unlink(missing_ok=True)  # keine verwaiste Datei
+            raise
 
     def perform_update(self, serializer):
         self.pruefe_patient(serializer.instance.patient)
@@ -1694,7 +1749,9 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
         neu_relativ = dokument_pfad(ziel, dok.originalname)
         ziel_pfad = settings.EPM_DOKUMENTE / neu_relativ
         ziel_pfad.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
-        os.replace(quelle, ziel_pfad)  # gleiches Dateisystem: atomar
+        # erst verlinken (gleiches Dateisystem: atomar), die alte Datei erst nach dem Speichern entfernen – so zeigt die
+        # Datenbank auch nach einem Absturz mittendrin auf eine vorhandene Datei
+        os.link(quelle, ziel_pfad)
         try:
             with transaction.atomic():
                 dok.patient = ziel
@@ -1716,8 +1773,9 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
                               titel=dok.titel, von=f"{alt.nachname}, {alt.vorname} (Nr. {alt.nummer})",
                               nach=f"{ziel.nachname}, {ziel.vorname} (Nr. {ziel.nummer})", grund=grund,
                               sha256=dok.sha256, patient_id=alt.id, nach_id=ziel.id)
+                transaction.on_commit(lambda: quelle.unlink(missing_ok=True), robust=True)
         except BaseException:
-            os.replace(ziel_pfad, quelle)  # Datenbank unverändert → Datei zurück
+            ziel_pfad.unlink(missing_ok=True)  # Datenbank unverändert → Datei bleibt, wo sie war
             raise
         return Response(DokumentSerializer(dok, context=self.get_serializer_context()).data)
 

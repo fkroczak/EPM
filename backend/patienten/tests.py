@@ -141,6 +141,25 @@ class Revisionssicherheit(Grundlage):
         v = c.get(f"/api/patienten/{self.patient.id}/verlauf/?person={self.mediziner.id}").json()
         self.assertEqual({e["person_id"] for e in v}, {self.mediziner.id})
 
+    def test_gleichzeitige_textaenderung_ueberschreibt_nicht(self):
+        url = f"/api/patienten/{self.patient.id}/"
+        a, b = client_fuer(self.mitarbeiter), client_fuer(self.mediziner)
+        self.assertEqual(a.patch(url, {"therapie": "<p>A</p>", "basis_version": 0}, format="json").status_code, 200)
+        # B hat noch Fassung 0 geöffnet
+        r = b.patch(url, {"therapie": "<p>B</p>", "basis_version": 0}, format="json")
+        self.assertEqual(r.status_code, 409, r.content)
+        self.assertIn("inzwischen", r.json()["fehler"])
+        self.patient.refresh_from_db()
+        self.assertEqual(self.patient.therapie, "<p>A</p>")
+        self.assertEqual(b.patch(url, {"therapie": "<p>B</p>", "basis_version": 1}, format="json").status_code, 200)
+
+    def test_aktennummer_unter_sperre(self):
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as abfragen:
+            Patient.objects.create(nachname="Neu", vorname="Nina", geburtsdatum="1990-01-01")
+        self.assertTrue(any("pg_advisory_xact_lock" in q["sql"] for q in abfragen.captured_queries))
+
     def test_versionen_der_textfelder(self):
         c = client_fuer(self.mitarbeiter)
         for text in ("<p>Kurzdarm</p>", "<p>Kurzdarm, Colon in Kontinuität</p>"):
@@ -299,6 +318,35 @@ class Akte(Grundlage):
         self.assertEqual(r.json()["mime"], "application/pdf")
         d = c.get(f"/api/dokumente/{r.json()['id']}/datei/")
         self.assertTrue(d["X-Accel-Redirect"].startswith("/_geschuetzt/dokumente/"))
+
+    def test_dokumentliste_ohne_abfragen_je_zeile(self):
+        from django.test.utils import CaptureQueriesContext
+
+        c = client_fuer(self.mitarbeiter)
+
+        def abfragen():
+            c.post("/api/dokumente/", {"patient": self.patient.id, "titel": "Brief",
+                                       "datei": SimpleUploadedFile("brief.pdf", b"%PDF-1.4 x")}, format="multipart")
+            with CaptureQueriesContext(connection) as q:
+                self.assertEqual(c.get(f"/api/dokumente/?patient={self.patient.id}").status_code, 200)
+            return len(q)
+
+        eins = abfragen()
+        abfragen()
+        self.assertEqual(abfragen(), eins)
+
+    def test_dokument_upload_fehler_hinterlaesst_keine_datei(self):
+        from unittest import mock
+
+        from django.conf import settings
+
+        vorher = set(Path(settings.EPM_DOKUMENTE).rglob("*"))
+        datei = SimpleUploadedFile("brief.pdf", b"%PDF-1.4 test", content_type="application/pdf")
+        with mock.patch.object(Dokument, "save", side_effect=DatabaseError("weg")), self.assertRaises(DatabaseError):
+            client_fuer(self.mitarbeiter).post("/api/dokumente/", {"patient": self.patient.id, "titel": "Brief",
+                                                                   "datei": datei}, format="multipart")
+        self.assertEqual({p for p in Path(settings.EPM_DOKUMENTE).rglob("*") if p.is_file()},
+                         {p for p in vorher if p.is_file()})
 
     def test_dokumenttyp_am_inhalt(self):
         c = client_fuer(self.mitarbeiter)
@@ -837,11 +885,16 @@ class FalschZugeordneteDokumente(Grundlage):
         c = client_fuer(self.mediziner)
         self.assertIn("grund", c.post(url, {"patient": self.bernd.id, "grund": ""}, format="json").json())
         self.assertIn("patient", c.post(url, {"patient": self.sabine.id, "grund": "falscher Patient"}, format="json").json())
-        r = c.post(url, {"patient": self.bernd.id, "grund": "beim falschen Patienten hochgeladen"}, format="json")
+        with self.captureOnCommitCallbacks() as nach_commit:
+            r = c.post(url, {"patient": self.bernd.id, "grund": "beim falschen Patienten hochgeladen"}, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         dok.refresh_from_db()
         self.assertEqual((dok.patient_id, dok.sha256), (self.bernd.id, sha))
         self.assertTrue(dok.pfad.is_file())
+        # die alte Datei verschwindet erst mit dem Commit
+        self.assertTrue(alter_pfad.exists())
+        for f in nach_commit:
+            f()
         self.assertFalse(alter_pfad.exists())
         self.assertTrue(dok.datei.startswith(f"{self.bernd.nummer}/"))
         # Verlauf: Sabine sieht weder Titel noch Bernd, Bernd sieht die Übernahme mit Grund
@@ -1161,6 +1214,13 @@ class HinweiseStummschalten(Grundlage):
     def test_akte_ohne_befunde_zeigt_labor_und_bia(self):
         self.assertIn("labor", self.arten())
         self.assertIn("bia", self.arten())
+
+    def test_abgeschlossene_akte_ohne_hinweise(self):
+        self.assertTrue({"versorger", "kontakt"} <= self.arten())
+        Patient.objects.filter(pk=self.p.pk).update(abgeschlossen_am=timezone.localdate(),
+                                                    abschluss_anlass=Patient.Abschlussanlass.THERAPIE_BEENDET)
+        self.p.refresh_from_db()
+        self.assertEqual(self.arten(), set())
 
     def test_wegklicken_fuer_sechs_monate(self):
         r = self.c.post(f"/api/patienten/{self.p.id}/hinweis-ruhe/",

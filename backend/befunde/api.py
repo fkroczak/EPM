@@ -195,5 +195,5 @@ class BiaMessungViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retri
         self.pruefe_patient(serializer.instance.patient)
         uebernehmen = serializer.validated_data.pop("gewicht_uebernehmen", False)
         messung = serializer.save()
-        if uebernehmen:
+        if uebernehmen or messung.gewichtsmessung_id:  # schon übernommen: Korrektur nachziehen
             messung.gewicht_uebernehmen(self.request.user)

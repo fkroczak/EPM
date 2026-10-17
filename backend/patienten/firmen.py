@@ -7,6 +7,7 @@ mit erfasst werden (Datum der Unterschrift). Jede Änderung steht im Audit-Log u
 """
 from django.db import transaction
 
+from epm.firma import mitgliedschaften
 from stammdaten.models import Firma
 
 from .models import Erklaerung, PatientFirma
@@ -42,9 +43,15 @@ def firmen_setzen(patient, kuerzel: list[str], benutzer, einwilligung_am=None) -
     bisher = set(firmen_von(patient))
     neu = [k for k in gewuenscht if k not in bisher]
     weg = [k for k in bisher if k not in gewuenscht]
-    if len(gewuenscht) > 1 and neu and not einwilligung_liegt_vor(patient):
+    # hinzufügen nur in Firmen, in denen die Person selbst Zugang hat
+    zugang = {f.kuerzel for f in mitgliedschaften(benutzer)}
+    fremd = [k for k in neu if k not in zugang]
+    if fremd:
+        raise FirmenFehler("firmen", f"Keine Berechtigung in der Firma: {', '.join(fremd)}.")
+    # jede weitere Firma braucht die Einwilligung – auch wenn die Akte dabei ganz zur anderen Firma wechselt
+    if neu and bisher and not einwilligung_liegt_vor(patient):
         if einwilligung_am is None:
-            raise FirmenFehler("einwilligung_am", "Für die Zuordnung zu mehreren Firmen fehlt die Einwilligung des "
+            raise FirmenFehler("einwilligung_am", "Für die Zuordnung zu einer weiteren Firma fehlt die Einwilligung des "
                                                   "Patienten zum Austausch zwischen den Firmen. Bitte das Datum der "
                                                   "Unterschrift angeben.")
         Erklaerung.objects.create(patient=patient, art=Erklaerung.Art.FIRMEN, erteilt_am=einwilligung_am,

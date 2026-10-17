@@ -10,6 +10,7 @@ from audit.models import SystemEreignis
 from epm.pruefhilfen import Grundlage, benutzer, echte_anmeldung, mit_zweitem_faktor
 from stammdaten.models import Firma, Logo
 
+from .firmen import firmen_von
 from .models import Erklaerung, Kontakt, Patient, PatientFirma
 
 
@@ -81,10 +82,20 @@ class Firmen(Grundlage):
     def test_zweite_firma_nur_mit_einwilligung(self):
         c = self.anmelden(self.mitarbeiter)
         url = f"/api/patienten/{self.patient.id}/firmen/"
+        # nur Firmen, in denen man selbst Zugang hat
+        heute = str(timezone.localdate())
+        r = c.post(url, {"firmen": ["dskm", "rg"], "einwilligung_am": heute}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("firmen", r.json())
+        Mitgliedschaft.objects.create(benutzer=self.mitarbeiter, firma=self.rg, rolle=Rolle.MITARBEITER)
         r = c.post(url, {"firmen": ["dskm", "rg"]}, format="json")
         self.assertEqual(r.status_code, 400)
         self.assertIn("einwilligung_am", r.json())
-        heute = str(timezone.localdate())
+        # auch der Wechsel ganz zur anderen Firma braucht die Einwilligung
+        r = c.post(url, {"firmen": ["rg"]}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("einwilligung_am", r.json())
+        self.assertEqual(firmen_von(self.patient), ["dskm"])
         r = c.post(url, {"firmen": ["dskm", "rg"], "einwilligung_am": heute}, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual((r.json()["firmen"], r.json()["firmen_einwilligung"]), (["dskm", "rg"], True))
@@ -100,6 +111,7 @@ class Firmen(Grundlage):
         self.assertEqual(c.post(url, {"firmen": ["dskm", "rg"]}, format="json").status_code, 400)
 
     def test_anlegen_fuer_beide_firmen(self):
+        Mitgliedschaft.objects.create(benutzer=self.mitarbeiter, firma=self.rg, rolle=Rolle.MITARBEITER)
         c = self.anmelden(self.mitarbeiter)
         daten = {"nachname": "Beide", "vorname": "Berta", "geburtsdatum": "1975-03-03", "firmen": ["dskm", "rg"]}
         self.assertEqual(c.post("/api/patienten/", daten, format="json").status_code, 400)

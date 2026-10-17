@@ -5,7 +5,7 @@ import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import connection, models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.db.models import Max
@@ -15,6 +15,8 @@ from simple_history.models import HistoricalRecords
 from stammdaten.models import Ansprechpartner, Arzt, Auswahlwert, Einstellungen, Versorger
 
 TESTNUMMER_AB = 9001
+# Schlüssel der Datenbanksperre beim Vergeben der Aktennummer (beliebig, nur eindeutig im EPM)
+NUMMER_SPERRE = 4711001
 
 
 class AkteGesperrt(ValidationError):
@@ -141,7 +143,14 @@ class Patient(models.Model):
 
     def save(self, *args, **kwargs):
         if self.nummer is None:
-            self.nummer = self.naechste_nummer(self.ist_test)
+            with transaction.atomic():
+                # gleichzeitig angelegte Akten (mehrere Worker) bekämen sonst dieselbe Nummer; die Sperre gilt bis
+                # zum Ende der Transaktion, also bis die Nummer gespeichert ist
+                with connection.cursor() as c:
+                    c.execute("SELECT pg_advisory_xact_lock(%s)", [NUMMER_SPERRE])
+                self.nummer = self.naechste_nummer(self.ist_test)
+                super().save(*args, **kwargs)
+            return
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):

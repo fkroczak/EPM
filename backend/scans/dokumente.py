@@ -72,8 +72,9 @@ def verfuegbar() -> tuple[bool, str]:
     return True, f"OCRmyPDF {v} · Ghostscript {g}"
 
 
-def erkennbar(dok) -> str | None:
-    """None = „Text erkennen“ ist möglich, sonst der Grund dagegen."""
+def erkennbar(dok, ist_nachweis: bool | None = None) -> str | None:
+    """None = „Text erkennen“ ist möglich, sonst der Grund dagegen. ``ist_nachweis``: schon bekannt (Listen,
+    ``nachweise``), sonst wird nachgesehen."""
     from infusionen.models import Infusionsplan
     from patienten.models import Dokument
 
@@ -81,7 +82,9 @@ def erkennbar(dok) -> str | None:
         return "Von EPM erzeugte Dokumente haben ihren Text schon."
     if dok.mime not in ERLAUBT:
         return "Nur für PDF, JPG, PNG und TIFF."
-    if Infusionsplan.objects.filter(freigabe_nachweis=dok).exists():
+    if ist_nachweis is None:
+        ist_nachweis = Infusionsplan.objects.filter(freigabe_nachweis=dok).exists()
+    if ist_nachweis:
         return "Der Nachweis der Freigabe eines Infusionsplans bleibt unverändert."
     return None
 
@@ -103,13 +106,23 @@ def anfordern(dok, benutzer) -> DokumentErkennung:
         return DokumentErkennung.objects.create(dokument=dok, angefordert_von=benutzer, sha256_vorher=dok.sha256)
 
 
-def stand(dok) -> dict | None:
-    """Letzter Auftrag des Dokuments (für die Akte)."""
-    a = DokumentErkennung.objects.filter(dokument=dok).order_by("-angefordert_am", "-id").first()
-    if a is None:
-        return None
-    return {"id": a.id, "status": a.status, "schritt": a.schritt, "fehler": a.fehler,
-            "angefordert_am": a.angefordert_am, "beendet_am": a.beendet_am, "seiten": a.seiten}
+def staende(doks) -> dict:
+    """Letzter Auftrag je Dokument (für die Akte), für alle Zeilen einer Liste mit einer Abfrage:
+    {Dokument-ID: Stand oder None}."""
+    ergebnis = {d.pk: None for d in doks}
+    for a in (DokumentErkennung.objects.filter(dokument_id__in=list(ergebnis))
+              .order_by("dokument_id", "-angefordert_am", "-id").distinct("dokument_id")):
+        ergebnis[a.dokument_id] = {"id": a.id, "status": a.status, "schritt": a.schritt, "fehler": a.fehler,
+                                   "angefordert_am": a.angefordert_am, "beendet_am": a.beendet_am, "seiten": a.seiten}
+    return ergebnis
+
+
+def nachweise(doks) -> set:
+    """IDs der Dokumente, die Nachweis der Freigabe eines Infusionsplans sind (für ``erkennbar`` in Listen)."""
+    from infusionen.models import Infusionsplan
+
+    return set(Infusionsplan.objects.filter(freigabe_nachweis__in=[d.pk for d in doks])
+               .values_list("freigabe_nachweis_id", flat=True))
 
 
 def auftrag_holen() -> DokumentErkennung | None:
