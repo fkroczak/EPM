@@ -74,9 +74,6 @@ class Rechte(Systemverzeichnis):
 
     def test_vertretung_je_gruppe_freischaltbar(self):
         """Festlegung 02.10.2026: Standard nur Admin, für eine Urlaubsvertretung jeder Gruppe erteilbar."""
-        from epm.pruefhilfen import admin_in_allen_firmen
-
-        admin_in_allen_firmen(self.admin)  # die Rechte gelten für alle Firmen
         daten = self.a.get("/api/rechte/").json()
         self.assertNotIn("system_verwalten", daten["nur_rollen"])
         self.assertFalse(daten["matrix"]["mediziner"]["system_verwalten"])

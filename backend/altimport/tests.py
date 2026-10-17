@@ -106,9 +106,6 @@ class Rechte(Basis):
         self.assertEqual(client_fuer(test_admin).get("/api/altimport/").status_code, 403)
 
     def test_anderen_rollen_nicht_erteilbar(self):
-        from epm.pruefhilfen import admin_in_allen_firmen
-
-        admin_in_allen_firmen(self.admin)  # die Rechte gelten für alle Firmen
         r = self.a.put("/api/rechte/", {"matrix": {"mediziner": {"altdaten_importieren": True}}}, format="json")
         self.assertEqual(r.status_code, 400)
         Gruppenrecht.objects.create(rolle=Rolle.MEDIZINER, recht="altdaten_importieren", erlaubt=True)
