@@ -119,6 +119,22 @@ sudo epm-update --paket ~/epm-paket-<TAG>.tar                 # auf dem VPS: pr�
 Oder ohne scp und SSH: auf der Test-VM unter Administration › System › Software „Update-Paket erstellen“ und
 herunterladen, auf dem VPS dort „Update-Paket einspielen“ (hochladen, SHA-256 vergleichen, mit Passwort und 2FA
 bestätigen).
+
+**Signatur der Update-Pakete (seit 17.10.2026).** Ein Paket bringt Skripte mit, die auf dem VPS als root laufen. Die
+Test-VM signiert deshalb die Prüfsummen jedes Pakets, der VPS prüft die Signatur, bevor er etwas auspackt oder
+ausführt. Einmal einrichten:
+```bash
+# Test-VM: Schlüsselpaar anlegen (der private Schlüssel bleibt dort, nur root)
+sudo ssh-keygen -t ed25519 -N '' -C epm-paket -f /etc/epm/paket-signatur
+sudo cat /etc/epm/paket-signatur.pub                          # eine Zeile – auf den VPS übertragen
+# VPS: öffentlichen Schlüssel ablegen (ab dann nimmt er nur noch signierte Pakete an)
+echo 'ssh-ed25519 AAAA… epm-paket' | sudo tee /etc/epm/paket-signatur.pub
+```
+Ohne `/etc/epm/paket-signatur.pub` lehnt der VPS jedes Paket ab – auch aus der Oberfläche. Nur auf dem Server selbst
+lässt sich ein unsigniertes Paket mit `sudo epm-update --paket DATEI --ohne-signatur` einspielen, nachdem die SHA-256
+mit der Anzeige der Test-VM verglichen wurde. Fehlt der Test-VM der Schlüssel, erstellt sie das Paket unsigniert (mit
+Warnung).
+
 Die Konfiguration des Servers liegt in `/etc/epm/epm.conf` (nicht im Repo). Die Oberfläche ist danach unter
 `https://<EPM_WEB_NAME>/` erreichbar, die Django-Verwaltung unter `/verwaltung/` (nur Rolle Admin) und die API-Ansicht im Browser sind standardmäßig aus.
 Zur Fehlersuche schaltet ein Admin sie unter Administration › System › Wartung › „Technische Verwaltung“ für 1 oder

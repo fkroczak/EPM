@@ -10,6 +10,13 @@
 # nur ein auf der Test-VM erstelltes Paket einspielen (per scp übertragen):
 #   sudo epm-update --paket /pfad/epm-paket-TAG.tar [--ohne-tests]
 #
+# Signatur (Audit 17.10.2026): Ein Paket bringt Skripte mit, die hier als root laufen (04-projekt.sh). Die Test-VM
+# signiert deshalb die Prüfsummen mit /etc/epm/paket-signatur (ssh-keygen -Y sign), der VPS prüft sie gegen
+# /etc/epm/paket-signatur.pub, BEVOR er etwas auspackt oder ausführt. Liegt dort kein Schlüssel, nimmt epm-update ein
+# Paket nur mit --ohne-signatur an – diesen Schalter gibt es nur auf der Kommandozeile des Servers, nie aus der
+# Oberfläche (Einrichtung: README, „VPS ohne Internet“).
+#   sudo epm-update --paket /pfad/epm-paket-TAG.tar --ohne-signatur   nur ohne Schlüssel, nach Vergleich der SHA-256
+#
 # Überall:
 #   sudo epm-update --zurueck TAG       auf eine frühere Version zurückschalten (z. B. 0.1.1-3fa2c1d)
 #   sudo epm-update --versionen         vorhandene Versionen anzeigen
@@ -36,6 +43,9 @@ B="$EPM_BASE"
 QUELLE="${EPM_UPDATE_QUELLE:-git}"
 TESTS=1
 PAKET=""
+OHNE_SIGNATUR=0
+SIGNATUR_SCHLUESSEL=/etc/epm/paket-signatur          # privat, nur auf der Test-VM
+SIGNATUR_PRUEFEN=/etc/epm/paket-signatur.pub         # öffentlich, auf dem VPS
 
 PROTOKOLL=/var/log/epm-update.log
 LETZTER_SCHRITT="Start"
@@ -216,6 +226,13 @@ paket_erstellen() {
   echo "${tag%-*}" > "$tmp/VERSION"   # berechnete Nummer (ohne Git auf dem VPS nicht mehr ableitbar)
   docker save "epm-backend:$tag" "epm-web:$tag" -o "$tmp/images.tar"
   (cd "$tmp" && find . -type f ! -name SHA256SUMS -printf '%P\n' | sort | xargs sha256sum > SHA256SUMS)
+  if [[ -f "$SIGNATUR_SCHLUESSEL" ]]; then
+    ssh-keygen -Y sign -q -f "$SIGNATUR_SCHLUESSEL" -n epm-paket "$tmp/SHA256SUMS"   # → SHA256SUMS.sig
+    echo "   Signiert mit $SIGNATUR_SCHLUESSEL"
+  else
+    echo "   WARNUNG: $SIGNATUR_SCHLUESSEL fehlt – Paket UNSIGNIERT. Der VPS nimmt es nur mit --ohne-signatur an"
+    echo "   (Schlüssel einrichten: README, „VPS ohne Internet“)."
+  fi
   local ziel="$B/images/epm-paket-$tag.tar"
   tar -C "$tmp" -cf "$ziel" .
   chmod 0644 "$ziel"
@@ -251,7 +268,8 @@ while [[ $# -gt 0 ]]; do
     --paket-erstellen) paket_erstellen; exit 0 ;;
     --paket) PAKET="${2:?Paketdatei angeben, z. B. sudo epm-update --paket ~/epm-paket-2.0.0-1a2b3c4.tar}"; shift ;;
     --ohne-tests) TESTS=0 ;;
-    *) sed -n '2,18p' "$0"; exit 1 ;;
+    --ohne-signatur) OHNE_SIGNATUR=1 ;;
+    *) sed -n '2,23p' "$0"; exit 1 ;;
   esac
   shift
 done
@@ -268,23 +286,47 @@ if [[ -n "$PAKET" ]]; then
   echo "   SHA-256: $(sha256sum "$PAKET" | cut -d' ' -f1)  (mit der Anzeige auf der Test-VM vergleichen)"
   TMP="$(mktemp -d)"
   trap aufraeumen_exit EXIT
-  tar -C "$TMP" -xf "$PAKET"
-  (cd "$TMP" && sha256sum --quiet -c SHA256SUMS) || { echo "ABBRUCH: Paket beschädigt. Nichts wurde umgestellt."; exit 1; }
-  TAG="$(tr -d '[:space:]' < "$TMP/TAG")"
+  # Erst nur Prüfsummen und Signatur auspacken und die Signatur prüfen; ab hier gilt nur diese geprüfte Liste.
+  install -d -m 0700 "$TMP/pruefung" "$TMP/paket"
+  tar -C "$TMP/pruefung" -xf "$PAKET" ./SHA256SUMS 2>/dev/null || { echo "ABBRUCH: Paket ohne Prüfsummen. Nichts wurde umgestellt."; exit 1; }
+  if [[ -f "$SIGNATUR_PRUEFEN" ]]; then
+    tar -C "$TMP/pruefung" -xf "$PAKET" ./SHA256SUMS.sig 2>/dev/null \
+      || { echo "ABBRUCH: Paket ist nicht signiert ($SIGNATUR_PRUEFEN verlangt eine Signatur). Nichts wurde umgestellt."; exit 1; }
+    printf 'epm-paket %s\n' "$(head -n1 "$SIGNATUR_PRUEFEN")" > "$TMP/pruefung/erlaubt"
+    ssh-keygen -Y verify -f "$TMP/pruefung/erlaubt" -I epm-paket -n epm-paket -s "$TMP/pruefung/SHA256SUMS.sig" \
+      < "$TMP/pruefung/SHA256SUMS" >/dev/null \
+      || { echo "ABBRUCH: Signatur des Pakets ungültig. Nichts wurde umgestellt."; exit 1; }
+    echo "   Signatur gültig ($SIGNATUR_PRUEFEN)"
+  elif [[ $OHNE_SIGNATUR -eq 1 ]]; then
+    echo "   WARNUNG: kein Schlüssel $SIGNATUR_PRUEFEN – Paket ohne Signaturprüfung (--ohne-signatur)."
+  else
+    echo "ABBRUCH: $SIGNATUR_PRUEFEN fehlt – unsignierte Pakete nur mit „sudo epm-update --paket DATEI --ohne-signatur“"
+    echo "   auf dem Server selbst (SHA-256 vorher mit der Test-VM vergleichen). Einrichtung: README, „VPS ohne Internet“."
+    exit 1
+  fi
+  tar -C "$TMP/paket" -xf "$PAKET"
+  # nur Dateien und Ordner, und jede Datei muss in der geprüften Liste stehen
+  if [[ -n "$(find "$TMP/paket" -mindepth 1 ! -type f ! -type d -print -quit)" ]] \
+     || ! diff -q <(cd "$TMP/paket" && find . -type f ! -path ./SHA256SUMS ! -path ./SHA256SUMS.sig -printf '%P\n' | sort) \
+                  <(sed 's/^[0-9a-f]\{64\}  //' "$TMP/pruefung/SHA256SUMS" | sort) >/dev/null \
+     || ! (cd "$TMP/paket" && sha256sum --quiet --strict -c "$TMP/pruefung/SHA256SUMS"); then
+    echo "ABBRUCH: Paket beschädigt oder verändert. Nichts wurde umgestellt."; exit 1
+  fi
+  TAG="$(tr -d '[:space:]' < "$TMP/paket/TAG")"
   [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40}$ ]] || { echo "ABBRUCH: Version „$TAG“ nicht erkannt."; exit 1; }
   echo "   Version $TAG, Inhalt vollständig"
 
   schritt "Projektdateien aktualisieren (Compose, Nginx, Skripte, Systemagent)"
   rm -rf "$CODE"
   install -d -m 0750 "$CODE"
-  cp -a "$TMP/rollout" "$TMP/werkzeuge" "$TMP/VERSION" "$TMP/TAG" "$CODE/"
+  cp -a "$TMP/paket/rollout" "$TMP/paket/werkzeuge" "$TMP/paket/VERSION" "$TMP/paket/TAG" "$CODE/"
   find "$CODE" -name '*.sh' -exec chmod +x {} +
   (cd "$CODE/rollout" && ./04-projekt.sh >/dev/null)
   install -m 0750 "$CODE/werkzeuge/epm-update.sh" /usr/local/sbin/epm-update
 
   schritt "Images laden (epm-backend:$TAG, epm-web:$TAG)"
-  docker load -i "$TMP/images.tar" | sed 's/^/   /'
-  install -m 0600 "$TMP/images.tar" "$B/images/epm-$TAG.tar"
+  docker load -i "$TMP/paket/images.tar" | sed 's/^/   /'
+  install -m 0600 "$TMP/paket/images.tar" "$B/images/epm-$TAG.tar"
   alte_entfernen 5 "/epm-paket- $(env_wert EPM_VERSION_GUT)" "$B"/images/epm-*.tar
 else
   # ------------------------------------------------------------ von GitHub holen und bauen (Test-VM)

@@ -435,7 +435,7 @@ class AuftragAbbrechenView(APIView):
 
 
 def auftrag_zurueckziehen(request, auftrag: Systemauftrag | None):
-    """Wartenden Auftrag zurückziehen, solange der Agent die Datei noch nicht übernommen hat."""
+    """Wartenden Auftrag zurückziehen: solange der Agent ihn nicht übernommen hat oder er in der Warnzeit wartet."""
     if auftrag is None:
         return Response({"fehler": "Auftrag nicht gefunden."}, status=status.HTTP_404_NOT_FOUND)
     if auftrag.status != Systemauftrag.Status.WARTET or not host.auftrag_zurueckziehen(auftrag):
