@@ -7,6 +7,7 @@ eine Erkennung ist dann nicht nötig und wäre nur schlechter.
 from __future__ import annotations
 
 import io
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -84,7 +85,7 @@ def _begrenzen(bild: np.ndarray, faktor_dpi: float | None) -> tuple[np.ndarray, 
     return bild, (faktor_dpi * f if faktor_dpi else None)
 
 
-def _pdf_seiten(daten: bytes, max_seiten: int) -> list[Rohseite]:
+def _pdf_seiten(daten: bytes, max_seiten: int) -> Iterator[Rohseite]:
     import pypdfium2 as pdfium
 
     try:
@@ -96,7 +97,6 @@ def _pdf_seiten(daten: bytes, max_seiten: int) -> list[Rohseite]:
             raise Unlesbar("Die PDF-Datei hat keine Seiten.")
         if len(pdf) > max_seiten:
             raise Unlesbar(f"Die PDF-Datei hat {len(pdf)} Seiten – höchstens {max_seiten} auf einmal.")
-        seiten = []
         for i in range(len(pdf)):
             seite = pdf[i]
             breite_pt, hoehe_pt = seite.get_size()
@@ -108,9 +108,8 @@ def _pdf_seiten(daten: bytes, max_seiten: int) -> list[Rohseite]:
             bgr = _pil_zu_bgr(bild)
             # gedrehte Seiten (/Rotate): die Lage der Zeichen passte nicht zum gerasterten Bild – dann erkennen
             woerter = _pdf_woerter(seite, skala, bgr.shape[0]) if seite.get_rotation() == 0 else None
-            seiten.append(Rohseite(bild=bgr, herkunft="pdf", dpi=skala * 72, digital=woerter))
             seite.close()
-        return seiten
+            yield Rohseite(bild=bgr, herkunft="pdf", dpi=skala * 72, digital=woerter)
     finally:
         pdf.close()
 
@@ -161,16 +160,30 @@ def _pdf_woerter(seite, skala: float, hoehe_px: int) -> list[list] | None:
         tp.close()
 
 
-def _bild_seiten(daten: bytes, max_seiten: int) -> list[Rohseite]:
+def _zu_gross(img: Image.Image):
+    # Pillow warnt unterhalb der doppelten Grenze nur – das Bild würde trotzdem vollständig in den Speicher geladen
+    if img.width * img.height > Image.MAX_IMAGE_PIXELS:
+        raise Unlesbar(f"Das Bild ist zu groß ({img.width} × {img.height} Pixel). Bitte mit geringerer Auflösung "
+                       "einscannen.")
+
+
+def _bild_seiten(daten: bytes, max_seiten: int) -> Iterator[Rohseite]:
     try:
         img = Image.open(io.BytesIO(daten))
+    except Image.DecompressionBombError as e:
+        raise Unlesbar("Das Bild ist zu groß. Bitte mit geringerer Auflösung einscannen.") from e
+    except Exception as e:  # noqa: BLE001
+        raise Unlesbar("Das Bild lässt sich nicht öffnen (beschädigt oder unbekanntes Format).") from e
+    _zu_gross(img)
+    try:
         img.load()
     except Exception as e:  # noqa: BLE001
         raise Unlesbar("Das Bild lässt sich nicht öffnen (beschädigt oder unbekanntes Format).") from e
-    seiten = []
+    anzahl = 0
     for nr, rahmen in enumerate(ImageSequence.Iterator(img)):
         if nr >= max_seiten:
             raise Unlesbar(f"Die Datei hat mehr als {max_seiten} Seiten.")
+        _zu_gross(rahmen)
         einzel = ImageOps.exif_transpose(rahmen.copy()) or rahmen.copy()
         dpi = None
         info_dpi = einzel.info.get("dpi") or img.info.get("dpi")
@@ -188,17 +201,24 @@ def _bild_seiten(daten: bytes, max_seiten: int) -> list[Rohseite]:
         except Exception:  # noqa: BLE001
             pass
         bgr, dpi = _begrenzen(_pil_zu_bgr(einzel), dpi)
-        seiten.append(Rohseite(bild=bgr, herkunft="bild", dpi=dpi, exif=exif))
-    if not seiten:
+        anzahl += 1
+        yield Rohseite(bild=bgr, herkunft="bild", dpi=dpi, exif=exif)
+    if not anzahl:
         raise Unlesbar("Die Datei enthält kein Bild.")
-    return seiten
 
 
-def seiten_laden(daten: bytes, max_seiten: int = 50) -> tuple[str, list[Rohseite]]:
-    """(MIME-Typ, Seiten). Wirft ``Unlesbar`` mit einer verständlichen Meldung."""
+def seiten_einzeln(daten: bytes, max_seiten: int = 50) -> tuple[str, Iterator[Rohseite]]:
+    """(MIME-Typ, Seiten eine nach der anderen – bei 50 großen Seiten wären alle zugleich mehrere GB). Wirft
+    ``Unlesbar`` mit einer verständlichen Meldung, auch erst beim Durchlaufen."""
     mime = dateityp(daten[:64])
     if mime is None:
         raise Unlesbar("Erlaubt sind PDF, JPG, PNG, TIFF, WEBP, BMP" + (" und HEIC" if HEIC else "") + ".")
     if mime == "application/pdf":
         return mime, _pdf_seiten(daten, max_seiten)
     return mime, _bild_seiten(daten, max_seiten)
+
+
+def seiten_laden(daten: bytes, max_seiten: int = 50) -> tuple[str, list[Rohseite]]:
+    """(MIME-Typ, alle Seiten als Liste). Wirft ``Unlesbar`` mit einer verständlichen Meldung."""
+    mime, seiten = seiten_einzeln(daten, max_seiten)
+    return mime, list(seiten)
