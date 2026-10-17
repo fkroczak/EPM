@@ -12,8 +12,10 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 from datetime import timedelta
 from pathlib import Path
+from unittest import mock
 
 from django.utils import timezone
 
@@ -510,6 +512,67 @@ class AgentTeile(Backupverzeichnis):
             "zertifikat": "-----BEGIN CERTIFICATE-----\nx\n-----END CERTIFICATE-----\n",
             "schluessel": "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----\n"})[1])
         self.assertIn("Unbekannte Version", echt.ausfuehren("epm_zurueck", z.append, "d" * 32, parameter={"tag": "x"})[1])
+
+    def test_warnzeit_zurueckziehen(self):
+        """Während der Warnzeit bleibt der Auftrag „wartet“ und lässt sich zurückziehen (Marke <id>.wartet)."""
+        a = self.modul.Agent(str(self.basis))
+        uhr = [time.time()]
+        for zurueckziehen in (True, False):
+            auftrag = Systemauftrag.objects.create(ziel="server", aktion="dienst_neustart", angefordert_von=self.admin)
+            kennung = auftrag.kennung.hex
+            antworten = []
+
+            def schlafen(s, auftrag=auftrag, zurueckziehen=zurueckziehen, antworten=antworten):
+                uhr[0] += s
+                if not antworten:   # beim ersten Takt: Stand prüfen, ggf. zurückziehen
+                    daten = json.loads((self.ordner / "status" / "auftraege" / f"{kennung}.json").read_text())
+                    self.assertEqual(daten["status"], "wartet")
+                    if zurueckziehen:
+                        antworten.append(self.a.post(f"/api/system/auftraege/{auftrag.kennung}/abbrechen/").status_code)
+                    else:
+                        antworten.append(None)
+
+            with mock.patch.object(self.modul.time, "time", lambda: uhr[0]), \
+                    mock.patch.object(self.modul.time, "sleep", schlafen):
+                self.assertEqual(a.warten(kennung, "dienst_neustart", 5, False), not zurueckziehen)
+            self.assertFalse((self.ordner / "auftraege" / f"{kennung}.wartet").exists())
+            if zurueckziehen:
+                self.assertEqual(antworten, [200])
+                auftrag.refresh_from_db()
+                self.assertEqual(auftrag.status, Systemauftrag.Status.ABGEBROCHEN)
+            else:
+                # der Agent hat begonnen: jetzt geht Zurückziehen nicht mehr
+                self.assertEqual(self.a.post(f"/api/system/auftraege/{auftrag.kennung}/abbrechen/").status_code, 409)
+
+    def test_wiederherstellen_sichert_erst_nach_dem_anhalten(self):
+        """Sicherung vorher erst, wenn EPM steht (keine Eingabe geht verloren); mit KI auch ki-worker anhalten/starten."""
+        a = self.modul.Agent(str(self.basis))
+        (self.basis / "ki-aktiv").touch()
+        (self.basis / "backup").mkdir()
+        st = "2026-10-01_020000"
+        (self.basis / "backup" / f"epm-db_{st}.dump").write_bytes(b"dump")
+        s = {"stempel": st, "zeitpunkt": "2026-10-01T02:00:00+02:00", "verfahren": "", "verschluesselt": False,
+             "passwort_nr": None, "dateien": [f"epm-db_{st}.dump", f"epm-dokumente_{st}.tar.gz"]}
+        ablauf = []
+
+        def schritt(titel, args, zeile, **kw):
+            ablauf.append((titel, args[-4:]))
+            if titel == "Dokumente":   # tar: ausgepackten Ordner nachstellen
+                os.makedirs(os.path.join(args[2], "dokumente"))
+            return 0
+
+        a.schritt = schritt
+        a.sicherungen = lambda: [{"stempel": "2026-10-17_120000"}, s] if ("sichern",) in ablauf else [s]
+        a.pruefsummen_pruefen = lambda *x: True
+        a.sichern = lambda *x, **kw: ablauf.append(("sichern",)) or 0
+        a.umstellen = lambda *x, **kw: ablauf.append(("umstellen",)) or (0, "ok")
+        with mock.patch.object(self.modul.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, b"", b"")):
+            self.assertEqual(a.wiederherstellen(st, "admin", "c" * 32, lambda t: None, vorher_sichern=True), (0, "ok"))
+        titel = [x[0] for x in ablauf]
+        self.assertEqual(titel[-3:], ["Anhalten", "sichern", "umstellen"])
+        self.assertEqual(ablauf[-3][1], ["backend", "ocr", "web", "ki-worker"])
+        eintrag = json.loads((self.ordner / "status" / "wiederherstellungen.json").read_text())[-1]
+        self.assertEqual(eintrag["vorher_stempel"], "2026-10-17_120000")
 
     def test_stand_im_status(self):
         certs = self.basis / "nginx" / "certs"

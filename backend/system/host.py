@@ -514,12 +514,15 @@ def auftrag_ablegen(auftrag, geheim=None):
 
 
 def auftrag_zurueckziehen(auftrag) -> bool:
-    """Nur solange der Agent die Datei noch nicht übernommen hat."""
-    try:
-        os.unlink(ordner_auftraege() / f"{auftrag.kennung.hex}.json")
-        return True
-    except OSError:
-        return False
+    """Solange der Agent die Datei noch nicht übernommen hat – oder während der Warnzeit: Dann wartet der Agent und
+    beginnt erst, wenn er die Marke ``<id>.wartet`` selbst löschen konnte. Wer sie zuerst löscht, gewinnt."""
+    for name in (f"{auftrag.kennung.hex}.json", f"{auftrag.kennung.hex}.wartet"):
+        try:
+            os.unlink(ordner_auftraege() / name)
+            return True
+        except OSError:
+            pass
+    return False
 
 
 def abgleichen(auftraege):
@@ -531,7 +534,7 @@ def abgleichen(auftraege):
         if a.ziel != Systemauftrag.Ziel.SERVER or not a.offen:
             continue
         daten = _lies(ordner_status() / "auftraege" / f"{a.kennung.hex}.json")
-        if not isinstance(daten, dict) or daten.get("status") not in ("laeuft", "erledigt", "fehler"):
+        if not isinstance(daten, dict) or daten.get("status") not in ("wartet", "laeuft", "erledigt", "fehler"):
             continue
         felder = {
             "status": daten["status"],

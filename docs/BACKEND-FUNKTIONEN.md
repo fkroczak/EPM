@@ -3383,9 +3383,10 @@ Ersteinrichtung des Servers (`rollout/01…05`, `epm-git-einrichten.sh`, `epm-ze
   einlesen und umgekehrt); `POST /api/system/hochladen/` `{"art": "paket"|"ocr", "name", "groesse"}`, `PUT …/<upload>/
   ?versatz=N`, `DELETE …/<upload>/`, `POST …/<upload>/einspielen/`. Agent `epm_paket`: kopiert die Datei in einen nur
   für root beschreibbaren Ordner (das Backend kann sie danach nicht mehr ändern), berechnet die SHA-256 (steht in der
-  Ausgabe zum Vergleich mit der Test-VM), prüft das tar (nur `TAG`, `VERSION`, `SHA256SUMS`, `images.tar`,
+  Ausgabe zum Vergleich mit der Test-VM), prüft das tar (nur `TAG`, `VERSION`, `SHA256SUMS`, `SHA256SUMS.sig`, `images.tar`,
   `rollout/…`, `werkzeuge/…`; keine Verweise, keine absoluten Pfade, kein „..“), dann `epm-update --paket … --ohne-tests`
-  (prüft die Prüfsummen, sichert, stellt um). `epm_paket_erstellen` (`POST /api/system/pakete/erstellen/`): `epm-update
+  (prüft zuerst die Signatur gegen `/etc/epm/paket-signatur.pub` – ohne Schlüssel lehnt es ab, siehe README –, dann die
+  Prüfsummen, sichert, stellt um). `epm_paket_erstellen` (`POST /api/system/pakete/erstellen/`): `epm-update
   --paket-erstellen`, Paket 2 Stunden unter `system/download/`; `GET /api/system/pakete/<datei>/` (X-Accel, Audit-Log).
 - **F179h OCR-Modelle einspielen** (Software): Upload Art `ocr`, Agent `ocr_modelle` prüft den Inhalt (`modelle.json`,
   `dateien/…`) und ruft `epm-ocr-modelle einspielen` auf; Vorrat auf dem Server und Stand im Image werden angezeigt.

@@ -117,7 +117,15 @@ sichern() {
 }
 
 sichern "$ZIEL/epm-db_$STAMP.dump" compose exec -T db pg_dump -U epm -d epm -Fc
-sichern "$ZIEL/epm-dokumente_$STAMP.tar.gz" tar -C "$B/data" -czf - dokumente
+# GNU tar endet mit 1, wenn sich eine Datei während des Lesens ändert (EPM läuft weiter) – das ist kein Abbruchgrund,
+# erst ab 2 (schwerer Fehler) bricht die Sicherung ab.
+dokumente_tar() {
+  local rc=0
+  tar -C "$B/data" -czf - dokumente || rc=$?
+  [[ $rc -eq 1 ]] && { echo "Hinweis: Dokumente haben sich während der Sicherung geändert (tar meldet 1) – gesichert ist der gelesene Stand." >&2; rc=0; }
+  return "$rc"
+}
+sichern "$ZIEL/epm-dokumente_$STAMP.tar.gz" dokumente_tar
 # Löschliste (Art. 17 DSGVO) getrennt sichern. Sie nennt Patientennummern, Zeitpunkte und den eingetragenen Grund
 # der Löschung, keine Namen (die Oberfläche bittet, keine hineinzuschreiben). Bei einer Wiederherstellung bleibt die
 # aktuelle Löschliste (data/loeschliste/) unangetastet – das Backend löscht beim Start alle Akten und Dokumente erneut,
