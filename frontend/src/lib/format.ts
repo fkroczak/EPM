@@ -59,7 +59,8 @@ export function zeitpunkt(wert: string | Date | null | undefined): string {
   return `${datum(d)}, ${uhrzeit(d)}`;
 }
 
-function tagesSchluessel(d: Date) {
+/** Kalendertag in Berlin als „2026-09-30“ */
+export function tagesSchluessel(d: Date) {
   return d.toLocaleDateString("sv-SE", { timeZone: TZ });
 }
 
@@ -174,6 +175,12 @@ export function vorZeit(wert: string | Date | null | undefined): string {
   if (monate < 12) return `vor ${String(monate).replace(".5", "½")} Monaten`;
   const jahre = Math.floor(tage / 365.25);
   return jahre === 1 ? "vor über einem Jahr" : `vor über ${jahre} Jahren`;
+}
+
+/** Klartext → HTML für den Editor: Leerzeile trennt Absätze, einfacher Umbruch wird <br> */
+export function absatz(text: string): string {
+  if (!text.trim()) return "";
+  return text.trim().split(/\n{2,}/).map((t) => `<p>${t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")}</p>`).join("");
 }
 
 /** Datum in ``tage`` Tagen als „TT.MM.JJJJ“ (Vorschläge für Wiedervorlagen) */

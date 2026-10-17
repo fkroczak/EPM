@@ -88,6 +88,7 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
   const [inhalt, setInhalt] = useState("");
   const [stand, setStand] = useState(0);
   const [gesetzt, setGesetzt] = useState("");
+  const [anfang, setAnfang] = useState("");
   const schluessel = `${bericht?.id ?? "neu"}-${offen}`;
   if (offen && gesetzt !== schluessel) {
     setGesetzt(schluessel);
@@ -96,8 +97,11 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
     setTag(datum(bericht?.datum ?? heuteIso()));
     setEmpfaenger(bericht?.empfaenger ?? "");
     setInhalt(bericht?.inhalt ?? "");
+    setAnfang(JSON.stringify([bericht?.titel ?? "", bericht?.art ? String(bericht.art) : "", datum(bericht?.datum ?? heuteIso()),
+      bericht?.empfaenger ?? "", bericht?.inhalt ?? ""]));
     setStand((s) => s + 1);
   }
+  const geaendert = JSON.stringify([titel, art, tag, empfaenger, inhalt]) !== anfang;
   // geschlossen: beim nächsten Öffnen neu vorbelegen (sonst stünde der zuletzt bearbeitete Bericht noch drin)
   if (!offen && gesetzt) setGesetzt("");
 
@@ -130,7 +134,7 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
   };
 
   return (
-    <Dialog offen={offen} onOffen={onOffen} breite={780} titel={bericht ? "Bericht bearbeiten" : "Neuer Bericht"}
+    <Dialog offen={offen} onOffen={onOffen} breite={780} titel={bericht ? "Bericht bearbeiten" : "Neuer Bericht"} geaendert={geaendert}
       beschreibung="Der Bericht bleibt Entwurf, bis er freigegeben wird. Erst dann entsteht die PDF."
       fuss={<>
         <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>

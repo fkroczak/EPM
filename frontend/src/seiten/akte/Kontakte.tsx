@@ -12,7 +12,7 @@ import type { Feldfehler, Seite as ApiSeite } from "@/lib/api";
 import { useOhneRechtSchliessen } from "@/lib/auth";
 import { useAuswahl } from "@/lib/daten";
 import { useVersorgerListe } from "@/lib/daten";
-import { datum, eingabeDatum, heuteIso, terminZeit, uhrzeit, zeitpunkt } from "@/lib/format";
+import { absatz, datum, eingabeDatum, inTagen, terminZeit, uhrzeit, zeitpunkt } from "@/lib/format";
 import { TERMINARTEN } from "@/lib/typen";
 import type { Bezugsperson, Kontakt } from "@/lib/typen";
 import { Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Textfeld, cx } from "@/components/ui/basis";
@@ -119,16 +119,6 @@ function NaechsteWiedervorlage() {
   );
 }
 
-function absatz(text: string): string {
-  return text.trim().split(/\n{2,}/).map((t) => `<p>${t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")}</p>`).join("");
-}
-
-function inTagen(tage: number) {
-  const d = new Date(`${heuteIso()}T12:00:00`);
-  d.setDate(d.getDate() + tage);
-  return datum(d.toISOString().slice(0, 10));
-}
-
 /** Schnelleingabe oben im Reiter: der häufigste Vorgang ohne Dialog (Wunsch 10.10.2026) */
 function Schnelleingabe() {
   const { patient, kontaktErfassen } = useAkte();
@@ -179,7 +169,7 @@ function Schnelleingabe() {
         <Feld label="Was wurde besprochen?" fehler={f.text}>
           {(p) => <Textfeld {...p} rows={2} value={text} onChange={(e) => setText(e.target.value)}
             placeholder="z. B. Gewicht durchgegeben, Befinden stabil …"
-            onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && text.trim()) { e.preventDefault(); speichern.mutate(); } }} />}
+            onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && text.trim()) { e.preventDefault(); if (e.repeat || speichern.isPending) return; speichern.mutate(); } }} />}
         </Feld>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div role="group" aria-label="Wiedervorlage" className="flex items-center gap-1.5 flex-wrap text-[0.8125rem]">
