@@ -192,16 +192,6 @@ def fehler(text, code=status.HTTP_400_BAD_REQUEST, **extra):
     return Response({"fehler": text, **extra}, status=code)
 
 
-def nur_admin_ueberall(request):
-    """403, wenn die Person nicht in jeder Firma Admin ist – für Einstellungen, die für alle Firmen gelten."""
-    from epm.firma import admin_ueberall
-
-    if not admin_ueberall(request.user):
-        return fehler("Das gilt für alle Firmen. Ändern darf es nur, wer in jeder Firma Admin ist.",
-                      status.HTTP_403_FORBIDDEN)
-    return None
-
-
 def firmen_daten(user):
     """Firmen mit Zugang (Umschalter oben links) und die aktive (Anforderung 11.10.2026)."""
     from epm.firma import mitgliedschaften, waehle
@@ -1236,8 +1226,6 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         (Festlegung 02.10.2026: freiwillig). ``PUT {"zweiter_faktor": "freiwillig" | "admins" | "alle"}``."""
         regeln = Anmelderegeln.aktuell()
         if request.method == "PUT":
-            if (antwort := nur_admin_ueberall(request)) is not None:
-                return antwort
             wert = request.data.get("zweiter_faktor")
             if wert not in Anmelderegeln.ZweiterFaktor.values:
                 return Response({"zweiter_faktor": "Erlaubt: freiwillig, admins, alle."},
@@ -1487,8 +1475,6 @@ class RechteView(APIView):
         from .models import Gruppenrecht
         from .rechte import CODES, FEST, NAMEN, NUR_ROLLEN, OHNE_RECHTE, matrix
 
-        if (antwort := nur_admin_ueberall(request)) is not None:
-            return antwort
         eingabe = request.data.get("matrix")
         if not isinstance(eingabe, dict):
             return fehler("Bitte die Matrix übergeben.")

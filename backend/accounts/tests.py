@@ -388,23 +388,12 @@ class RechteJeGruppe(TestCase):
         cls.betrachter = benutzer("betrachter", Rolle.BETRACHTER)
         cls.patient = Patient.objects.create(nachname="Recht", vorname="R", geburtsdatum="1970-01-01")
 
-    def test_nur_admin_aller_firmen_aendert_was_fuer_alle_gilt(self):
-        from accounts.models import Mitgliedschaft
-        from stammdaten.models import Firma
-
-        nur_dskm = benutzer("dskmadmin", Rolle.ADMIN)
-        nur_rg = benutzer("rgadmin", Rolle.KEINE)
-        Mitgliedschaft.objects.create(benutzer=nur_rg, firma=Firma.objects.get(kuerzel="rg"), rolle=Rolle.ADMIN)
-        for user in (nur_dskm, nur_rg):
-            c = client_fuer(user)
-            with self.subTest(user=user.username):
-                self.assertEqual(c.put("/api/rechte/", {"matrix": {"betrachter": {"eintraege_erfassen": True}}},
-                                       format="json").status_code, 403)
-                self.assertEqual(c.put("/api/benutzer/anmeldung/", {"zweiter_faktor": "alle"},
-                                       format="json").status_code, 403)
-        self.assertFalse(Gruppenrecht.objects.exists())
-        self.assertEqual(Anmelderegeln.aktuell().zweiter_faktor, "freiwillig")
-        self.assertEqual(client_fuer(nur_dskm).get("/api/rechte/").status_code, 200)
+    def test_admin_einer_firma_aendert_was_fuer_alle_gilt(self):
+        """Festlegung 17.10.2026: Rechte der Gruppen und Anmelderegeln ändert jeder Admin (gelten für alle Firmen)."""
+        c = client_fuer(benutzer("dskmadmin", Rolle.ADMIN))
+        self.assertEqual(c.put("/api/rechte/", {"matrix": {"betrachter": {"eintraege_erfassen": True}}},
+                               format="json").status_code, 200)
+        self.assertEqual(c.put("/api/benutzer/anmeldung/", {"zweiter_faktor": "alle"}, format="json").status_code, 200)
 
     def test_standard(self):
         r = client_fuer(self.admin).get("/api/rechte/").json()
