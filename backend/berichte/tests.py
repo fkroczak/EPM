@@ -60,6 +60,20 @@ class BerichtTest(Grundlage):
         r = c.delete(f"/api/berichte/{d['id']}/")
         self.assertEqual(r.status_code, 403, r.content)
 
+    def test_freigabe_veralteter_kopie(self):
+        """Freigegeben wird der gespeicherte Text, nicht die veraltete Kopie; eine zweite Freigabe scheitert."""
+        from django.core.exceptions import ValidationError
+
+        d = self.entwurf()
+        alt1, alt2 = Bericht.objects.get(pk=d["id"]), Bericht.objects.get(pk=d["id"])
+        client_fuer(self.mitarbeiter).patch(f"/api/berichte/{d['id']}/", {"inhalt": "<p>neu</p>"}, format="json")
+        alt1.freigeben(self.mediziner)
+        self.assertEqual(Bericht.objects.get(pk=d["id"]).inhalt, "<p>neu</p>")
+        anzahl = Dokument.objects.count()
+        with self.assertRaises(ValidationError):
+            alt2.freigeben(self.mediziner)
+        self.assertEqual(Dokument.objects.count(), anzahl)
+
     def test_trigger_schuetzt_freigegebenen_bericht(self):
         d = self.entwurf()
         client_fuer(self.mediziner).post(f"/api/berichte/{d['id']}/freigeben/")

@@ -232,12 +232,15 @@ class Infusionsplan(AktenEintrag):
         return f"Infusionsplan {self.patient.nummer} ab {self.gueltig_ab:%d.%m.%Y} ({self.get_status_display()})"
 
     # --- Regeln ---
+    @transaction.atomic
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")
         nur_status = bool(update_fields and set(update_fields) <= {"status"})
         if not nur_status:
             if self.pk:
-                alt_status = Infusionsplan.objects.filter(pk=self.pk).values_list("status", flat=True).first()
+                # unter Sperre lesen: Eine laufende Freigabe hält die Zeile; danach ist der Plan gesperrt
+                alt_status = (Infusionsplan.objects.select_for_update().filter(pk=self.pk)
+                              .values_list("status", flat=True).first())
                 if alt_status != self.Status.ENTWURF:
                     raise PermissionError("Freigegebene Pläne sind unveränderlich. Bitte einen neuen Plan anlegen.")
             if self.patient_id:
@@ -460,6 +463,10 @@ class Infusionsplan(AktenEintrag):
         self._freigabe(mediziner=mediziner, abschliessend=benutzer, weg=weg, datum=datum, nachweis=nachweis)
 
     def _freigabe(self, mediziner, abschliessend, weg, datum, nachweis):
+        # Zeile sperren und vom gespeicherten Stand ausgehen (auch Positionen/Vitamine nicht aus dem Vorab-Laden):
+        # Gleichzeitiges Bearbeiten wartet bzw. scheitert danach, eine zweite Freigabe ebenso – die PDF zeigt
+        # genau die Werte, die mit ihr gespeichert werden.
+        self.refresh_from_db(from_queryset=Infusionsplan.objects.select_for_update())
         if self.status != self.Status.ENTWURF:
             raise ValidationError("Nur Entwürfe können freigegeben werden.")
         self.patient.pruefe_bearbeitbar()

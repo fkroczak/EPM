@@ -21,6 +21,8 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from django.conf import settings
 
 KENNUNG = b"EPMKI1"
+# Der Container ki-worker bekommt statt des Django-Schlüssels nur diesen Platzhalter (rollout/projekt/compose.ki.yaml)
+PLATZHALTER_SECRET_KEY = "ki-dienst-ohne-django-schluessel"
 _schluessel_cache: dict[str, bytes] = {}
 
 
@@ -42,6 +44,8 @@ def _schluessel() -> bytes:
         if len(s) != 32:
             raise ValueError("EPM_KI_SCHLUESSEL_FILE: der Schlüssel muss 32 Bytes lang sein.")
     else:
+        if settings.SECRET_KEY == PLATZHALTER_SECRET_KEY:
+            raise ValueError("EPM_KI_SCHLUESSEL_FILE fehlt oder ist leer (`epm-ki einrichten` legt es an).")
         s = HKDF(algorithm=hashes.SHA256(), length=32, salt=b"epm-ki", info=b"arbeitsablage").derive(
             settings.SECRET_KEY.encode())
     _schluessel_cache[pfad] = s

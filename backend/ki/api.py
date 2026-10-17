@@ -29,6 +29,7 @@ from epm.pagination import Seiten
 
 from . import eingang, uebernahme
 from .pipeline import alte_felder_entfernen
+from .pruefung import PLANFELDER
 from .models import (Dokumenttyp, KiBerichtsauftrag, KiEinstellung, KiEvaluationsfall, KiEvaluationslauf, KiFeld,
                      KiHinweis, KiKorrektur, KiModellversion, KiVorgang)
 
@@ -182,12 +183,14 @@ class KiVorgangViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return vorgaenge_fuer(self.request.user).select_related("patient", "dokument", "firma", "modellversion")
 
-    def _vorgang(self, pk) -> KiVorgang:
+    def _vorgang(self, pk, sperren=False) -> KiVorgang:
         v = self.get_queryset().filter(pk=pk).first()
         if v is None:
             from rest_framework.exceptions import NotFound
 
             raise NotFound("Diesen KI-Vorgang gibt es nicht (mehr) oder er gehört nicht zu Ihrer Firma.")
+        if sperren:  # Felder ändern erst nach einer laufenden Übernahme (uebernahme.uebernehmen sperrt ebenso)
+            v.refresh_from_db(from_queryset=KiVorgang.objects.select_for_update())
         return v
 
     def _ctx(self):
@@ -261,7 +264,7 @@ class KiVorgangViewSet(viewsets.GenericViewSet):
     def feld(self, request, pk=None, fid=None):
         """Feld korrigieren (jede Änderung versioniert) oder Entscheidung bei Konflikt setzen."""
         _recht(request.user, "ki_pruefen")
-        v = self._vorgang(pk)
+        v = self._vorgang(pk, sperren=True)
         if v.status not in KiVorgang.PRUEFBAR:
             return _fehler("Dieser Vorgang ist nicht (mehr) zur Prüfung vorgelegt.")
         f = v.felder.filter(pk=fid).first()
@@ -276,6 +279,9 @@ class KiVorgangViewSet(viewsets.GenericViewSet):
                 erlaubt = FELD_SCHLUESSEL[f.gruppe] or META_SCHLUESSEL
                 if not isinstance(neu, dict) or set(neu) - erlaubt:
                     return _fehler(f"Erlaubte Angaben: {', '.join(sorted(erlaubt))}.", feld="wert")
+                pf = neu.get("planfeld")
+                if pf and (not isinstance(pf, str) or pf not in PLANFELDER):  # nie Patient, Status, Herkunft …
+                    return _fehler(f"Planfeld: erlaubt sind {', '.join(PLANFELDER)}.", feld="wert")
                 fehlerart = d.get("fehlerart") or KiKorrektur.Fehlerart.SONSTIGES
                 if fehlerart not in KiKorrektur.Fehlerart.values:
                     return _fehler("Unbekannte Fehlerart.", feld="fehlerart")
@@ -314,7 +320,7 @@ class KiVorgangViewSet(viewsets.GenericViewSet):
         """Mehrere Felder auf einmal: ``{"felder": [ids] | "alle": true, "status": "freigegeben"|"verworfen"|"offen"}``.
         „Alle“ gibt nur sicher erkannte Felder frei – unsichere bleiben offen und brauchen einen eigenen Blick."""
         _recht(request.user, "ki_pruefen")
-        v = self._vorgang(pk)
+        v = self._vorgang(pk, sperren=True)
         if v.status not in KiVorgang.PRUEFBAR:
             return _fehler("Dieser Vorgang ist nicht (mehr) zur Prüfung vorgelegt.")
         ziel = request.data.get("status") or KiFeld.Status.FREIGEGEBEN
@@ -516,6 +522,7 @@ class KiBerichtViewSet(viewsets.GenericViewSet):
         return Response(BerichtAuftragSerializer(b).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def speichern(self, request, pk=None):
         """Als Bericht-Entwurf in die Akte (Reiter „Berichte“), wahlweise mit bearbeitetem Text. Freigeben kann ihn
         danach nur, wer „Berichte freigeben“ darf – wie jeden Bericht."""
@@ -529,6 +536,10 @@ class KiBerichtViewSet(viewsets.GenericViewSet):
         b = self.get_queryset().filter(pk=pk).first()
         if b is None:
             return _fehler("Nicht gefunden.", status.HTTP_404_NOT_FOUND)
+        # sperren und Status neu lesen: Zweimal gleichzeitig „Speichern“ ergäbe sonst zwei Berichte
+        b.refresh_from_db(from_queryset=KiBerichtsauftrag.objects.select_for_update())
+        if b.status == KiBerichtsauftrag.Status.GESPEICHERT:
+            return _fehler("Der Entwurf ist schon als Bericht gespeichert.", status.HTTP_409_CONFLICT)
         if b.status != KiBerichtsauftrag.Status.FERTIG:
             return _fehler("Der Entwurf ist noch nicht fertig oder schon gespeichert.")
         pruefe_schreibbereich(request.user, b.patient)
