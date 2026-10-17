@@ -182,6 +182,8 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
                 hinweise.append({"art": "bia", "text": f"BIA älter als {e.bia_alter_warnung_monate} Mon."})
         for art in fehlend.get(p.id, []):
             hinweise.append({"art": art, "text": hinweis_text(art, e)})
+        if p.id not in in_betreuung:  # abgeschlossene Akte: kein „Kontakt überfällig“, Gewicht, Versorger, Plan
+            hinweise = []
         # weggeklickte Hinweise erscheinen nicht; sie stehen in der Akte unter „Stummgeschaltet“ (F119)
         ruht = stumm.get(p.id, set())
         unterdrueckt = [h["art"] for h in hinweise if h["art"] in ruht]

@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, ApiFehler } from "@/lib/api";
 import { datum, uhrzeit, zeitpunkt } from "@/lib/format";
 import type { Patient } from "@/lib/typen";
 import { Fehleranzeige, Knopf, Laden } from "@/components/ui/basis";
@@ -106,9 +106,16 @@ export function Textfassung({ feld, titel, hinweis, version, immerOffen, vorAkti
       vorher.current = gespeichert;
     }
   }, [gespeichert]);
+  // Fassung, auf der der Entwurf aufbaut: Hat inzwischen jemand anderes gespeichert, lehnt der Server ab (409)
+  const basis = useRef(kopf?.version ?? 0);
+  useEffect(() => {
+    if (entwurf === gespeichert) basis.current = kopf?.version ?? 0;
+  }, [entwurf, gespeichert, kopf?.version]);
 
   const speichern = useMutation({
-    mutationFn: () => api<Patient>(`patienten/${patient.id}/`, { method: "PATCH", body: { [feld]: entwurf } }),
+    mutationFn: () => api<Patient>(`patienten/${patient.id}/`, {
+      method: "PATCH", body: { [feld]: entwurf, basis_version: basis.current },
+    }),
     onSuccess: (p) => {
       qc.setQueryData(["patient", patient.id], p);
       void qc.invalidateQueries({ queryKey: ["patient", patient.id] });
@@ -118,6 +125,14 @@ export function Textfassung({ feld, titel, hinweis, version, immerOffen, vorAkti
     },
   });
   const geaendert = entwurf !== gespeichert;
+  const konflikt = speichern.error instanceof ApiFehler && speichern.error.status === 409;
+  // die andere Fassung holen und anzeigen; die eigene Änderung muss danach neu eingetragen werden
+  const neuLaden = async () => {
+    await qc.invalidateQueries({ queryKey: ["patient", patient.id] });
+    const p = qc.getQueryData<Patient>(["patient", patient.id]);
+    if (p) setEntwurf(p[feld]);
+    speichern.reset();
+  };
 
   return (
     <Detail testid={`karte-${feld}`}
@@ -140,6 +155,7 @@ export function Textfassung({ feld, titel, hinweis, version, immerOffen, vorAkti
           <Editor wert={entwurf} onAenderung={setEntwurf} label={name} hoehe={immerOffen ? 420 : 220} autofokus={!immerOffen} />
           <Fehleranzeige fehler={speichern.error} />
           <div className="flex justify-end gap-2">
+            {konflikt ? <Knopf onClick={() => void neuLaden()}>Neu laden</Knopf> : null}
             <Knopf disabled={!geaendert && immerOffen} onClick={() => { setEntwurf(gespeichert); setOffen(false); speichern.reset(); }}>Abbrechen</Knopf>
             <Knopf variante="pri" laedt={speichern.isPending} disabled={!geaendert} onClick={() => speichern.mutate()}>Speichern</Knopf>
           </div>

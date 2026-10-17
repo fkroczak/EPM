@@ -131,6 +131,15 @@ class BiaTest(Grundlage):
         self.assertEqual(messung.gewicht_kg, Decimal("62.4"))
         self.assertEqual(messung.notiz, "aus der BIA-Messung")
 
+    def test_korrektur_geht_in_den_gewichtsverlauf(self):
+        c = client_fuer(self.mitarbeiter)
+        d = c.post("/api/bia-messungen/", self.werte(), format="json").json()
+        r = c.patch(f"/api/bia-messungen/{d['id']}/", {"gewicht_kg": "61.0", "gemessen_am": "2026-09-30"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        messung = self.patient.gewichte.get()
+        self.assertEqual((messung.gewicht_kg, str(messung.gemessen_am)), (Decimal("61.0"), "2026-09-30"))
+        self.assertEqual(messung.history.first().history_user, self.mitarbeiter)
+
     def test_ohne_uebernahme_kein_gewichtseintrag(self):
         c = client_fuer(self.mitarbeiter)
         r = c.post("/api/bia-messungen/", self.werte(gewicht_uebernehmen=False), format="json")
