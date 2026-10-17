@@ -3383,10 +3383,13 @@ Ersteinrichtung des Servers (`rollout/01…05`, `epm-git-einrichten.sh`, `epm-ze
   einlesen und umgekehrt); `POST /api/system/hochladen/` `{"art": "paket"|"ocr", "name", "groesse"}`, `PUT …/<upload>/
   ?versatz=N`, `DELETE …/<upload>/`, `POST …/<upload>/einspielen/`. Agent `epm_paket`: kopiert die Datei in einen nur
   für root beschreibbaren Ordner (das Backend kann sie danach nicht mehr ändern), berechnet die SHA-256 (steht in der
-  Ausgabe zum Vergleich mit der Test-VM), prüft das tar (nur `TAG`, `VERSION`, `SHA256SUMS`, `SHA256SUMS.sig`, `images.tar`,
+  Ausgabe zum Vergleich mit der Test-VM), prüft das tar (nur `TAG`, `VERSION`, `SHA256SUMS`, `SHA256SUMS.sig`, `paket-signatur.pub`, `images.tar`,
   `rollout/…`, `werkzeuge/…`; keine Verweise, keine absoluten Pfade, kein „..“), dann `epm-update --paket … --ohne-tests`
-  (prüft zuerst die Signatur gegen `/etc/epm/paket-signatur.pub` – ohne Schlüssel lehnt es ab, siehe README –, dann die
-  Prüfsummen, sichert, stellt um). `epm_paket_erstellen` (`POST /api/system/pakete/erstellen/`): `epm-update
+  (prüft zuerst die Signatur gegen `/etc/epm/paket-vertraut.pub`; fehlt er, gegen den mitgelieferten
+  `paket-signatur.pub`, der dann übernommen wird – siehe README –, dann die Prüfsummen, sichert, stellt um).
+  `POST /api/system/pakete/schluessel/zuruecksetzen/` (Rolle Admin, Passwort + 2FA) bzw. `…/behalten/`: Agent
+  `paket_schluessel_zuruecksetzen` legt den Antrag unter `/etc/epm/paket-vertraut.zuruecksetzen` ab und löscht den
+  Schlüssel erst 24 h später (Statuslauf); bis dahin Hinweis an alle Benutzer, Ereignisse im Audit-Log (`paket_schluessel`). `epm_paket_erstellen` (`POST /api/system/pakete/erstellen/`): `epm-update
   --paket-erstellen`, Paket 2 Stunden unter `system/download/`; `GET /api/system/pakete/<datei>/` (X-Accel, Audit-Log).
 - **F179h OCR-Modelle einspielen** (Software): Upload Art `ocr`, Agent `ocr_modelle` prüft den Inhalt (`modelle.json`,
   `dateien/…`) und ruft `epm-ocr-modelle einspielen` auf; Vorrat auf dem Server und Stand im Image werden angezeigt.

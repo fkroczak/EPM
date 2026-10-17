@@ -43,6 +43,7 @@ Dateien werden ohne Folgen symbolischer Links gelesen und nach dem Lesen sofort 
 Modelle werden vor der Prüfung in einen Ordner kopiert, den das Backend nicht beschreiben kann.
 """
 import argparse
+import base64
 import fcntl
 from collections import deque
 import hashlib
@@ -152,6 +153,9 @@ AKTIONEN = {
     "ki_aus": ("KI ausschalten", False),
     "ki_grenzen": ("Grenzen der KI festlegen", False),
     "ki_benchmark": ("KI-Benchmark", False),
+    # Signatur der Update-Pakete (17.10.2026): Zurücksetzen des übernommenen Schlüssels (wirkt erst nach 24 Stunden)
+    "paket_schluessel_zuruecksetzen": ("Paket-Schlüssel zurücksetzen", False),
+    "paket_schluessel_behalten": ("Zurücksetzen des Paket-Schlüssels abbrechen", False),
 }
 # Aktionen, die Sicherungen schreiben, übertragen oder zurückspielen – und das Leeren der Datenbank, das nur den
 # EPM-Stack betrifft: mit --sicherung-echt auch im Probelauf echt (Browsertests gegen den echten Stack)
@@ -166,6 +170,12 @@ VORHER_ART = {"updates_installieren": "vor_update", "server_neustart": "vor_aend
 
 # Systemverwaltung ohne SSH (10.10.2026): feste Werkzeuge auf dem Server, feste Dienste, feste Protokolle
 EPM_UPDATE = "/usr/local/sbin/epm-update"
+# Signatur der Update-Pakete (17.10.2026, Festlegung „trust on first use“): Die Test-VM signiert mit
+# /etc/epm/paket-signatur (epm-update legt ihn beim ersten Paket an), der VPS übernimmt beim ersten gültig signierten
+# Paket dessen öffentlichen Schlüssel nach /etc/epm/paket-vertraut.pub. Zurücksetzen (Schlüssel verloren) beantragt
+# die Oberfläche; der Agent löscht den Schlüssel erst 24 Stunden danach – bis dahin sichtbar und abbrechbar.
+PAKET_SCHLUESSEL_ORDNER = "/etc/epm"
+PAKET_RUECKSETZEN_S = 24 * 3600
 EPM_ZERTIFIKAT = "/usr/local/sbin/epm-zertifikat"
 EPM_OCR_MODELLE = "/usr/local/sbin/epm-ocr-modelle"
 EPM_KI = "/usr/local/sbin/epm-ki"
@@ -206,7 +216,7 @@ PROTOKOLL_MAX = 2 * 1024 * 1024   # Bytes je abgerufenem Protokoll
 PEM_MAX = 20000                   # Zeichen je PEM-Datei beim Zertifikat-Import
 # Inhalt eines Update-Pakets (epm-update --paket-erstellen) und der vorbereiteten OCR-Modelle: nur diese Namen,
 # nur Dateien und Ordner – keine Verweise, keine absoluten Pfade, kein „..“
-PAKET_INHALT = re.compile(r"^(TAG|VERSION|SHA256SUMS(\.sig)?|images\.tar|(rollout|werkzeuge)(/[A-Za-z0-9._+-]+)*)$")
+PAKET_INHALT = re.compile(r"^(TAG|VERSION|SHA256SUMS(\.sig)?|paket-signatur\.pub|images\.tar|(rollout|werkzeuge)(/[A-Za-z0-9._+-]+)*)$")
 OCR_INHALT = re.compile(r"^(modelle\.json|dateien(/[A-Za-z0-9._+-]+)*)$")
 # KI (Experimentell): Modell-Paket von „epm-ki vorbereiten“ – nur Dateien ohne Unterordner
 KI_INHALT = re.compile(r"^[A-Za-z0-9._+-]{1,200}$")
@@ -470,6 +480,7 @@ class Agent:
         self.status = os.path.join(basis, "system", "status")
         self.ergebnisse = os.path.join(self.status, "auftraege")
         self.backup = os.path.join(basis, "backup")
+        self.etc = PAKET_SCHLUESSEL_ORDNER   # Schlüssel der Update-Pakete (in den Tests ein eigener Ordner)
         # Austausch mit dem Backend: bereitgestellte Sicherungen (liest Nginx aus) und hochgeladene (schreibt das Backend)
         self.download = os.path.join(basis, "system", "download")
         self.upload = os.path.join(basis, "system", "upload")
@@ -750,6 +761,94 @@ class Agent:
             return ergebnis
         return {"erstellt": liste(os.path.join(self.basis, "images")), "bereit": liste(self.download, BUENDEL_STUNDEN)}
 
+    @staticmethod
+    def fingerabdruck(pfad):
+        """SHA256-Fingerabdruck eines öffentlichen SSH-Schlüssels (wie ssh-keygen -l) oder None."""
+        try:
+            with open(pfad, encoding="ascii") as f:
+                blob = base64.b64decode(f.readline().split()[1], validate=True)
+        except (OSError, ValueError, IndexError):
+            return None
+        return "SHA256:" + base64.b64encode(hashlib.sha256(blob).digest()).decode().rstrip("=")
+
+    def paket_schluessel_pfade(self):
+        return (os.path.join(self.etc, "paket-vertraut.pub"), os.path.join(self.etc, "paket-vertraut.zuruecksetzen"))
+
+    def paket_schluessel_sicher(self):
+        try:
+            return self.paket_schluessel()
+        except Exception as e:  # noqa: BLE001 – der Status soll trotzdem stehen
+            return {"fehler": str(e)[:300]}
+
+    def paket_schluessel(self):
+        """Stand der Paket-Schlüssel für die Oberfläche. Nebenbei (jede Minute): ein seit 24 Stunden beantragtes
+        Zurücksetzen ausführen und einen neu übernommenen Schlüssel als Ereignis vermerken (das Backend trägt die
+        Ereignisse einmal ins Audit-Log ein)."""
+        vertraut, antrag_pfad = self.paket_schluessel_pfade()
+        antrag = self.lies(antrag_pfad)
+        if not isinstance(antrag, dict) or not isinstance(antrag.get("beantragt_am"), (int, float)):
+            antrag = None
+        pfad = os.path.join(self.status, "paket-schluessel.json")
+        stand = self.lies(pfad) or {}
+        ereignisse = [e for e in stand.get("ereignisse") or [] if isinstance(e, dict)]
+        vorher = list(ereignisse)
+        if antrag and not self.trocken and time.time() - antrag["beantragt_am"] >= PAKET_RUECKSETZEN_S:
+            ereignisse.append({"id": os.urandom(8).hex(), "art": "zurueckgesetzt", "zeit": jetzt_iso(),
+                               "fingerabdruck": self.fingerabdruck(vertraut), "von": str(antrag.get("von") or "")[:150]})
+            for p in (vertraut, antrag_pfad):
+                try:
+                    os.unlink(p)
+                except FileNotFoundError:
+                    pass
+            antrag = None
+        fp = self.fingerabdruck(vertraut)
+        if fp and fp != stand.get("bekannt"):
+            ereignisse.append({"id": os.urandom(8).hex(), "art": "uebernommen", "zeit": jetzt_iso(), "fingerabdruck": fp})
+        if ereignisse != vorher or fp != stand.get("bekannt"):
+            self.schreibe(pfad, {"bekannt": fp, "ereignisse": ereignisse[-20:]})
+
+        def iso(t):
+            return datetime.fromtimestamp(t, timezone.utc).astimezone().isoformat(timespec="seconds")
+        try:
+            seit = iso(os.stat(vertraut).st_mtime) if fp else None
+        except OSError:
+            seit = None
+        return {"vertraut": fp, "vertraut_seit": seit,
+                "bau": self.fingerabdruck(os.path.join(self.etc, "paket-signatur.pub")),
+                "zuruecksetzen": {"beantragt_am": iso(antrag["beantragt_am"]),
+                                  "wirksam_ab": iso(antrag["beantragt_am"] + PAKET_RUECKSETZEN_S),
+                                  "von": str(antrag.get("von") or "")[:150]} if antrag else None,
+                "ereignisse": ereignisse[-20:]}
+
+    def paket_schluessel_aktion(self, aktion, von, zeile, simuliert=False):
+        """Zurücksetzen beantragen bzw. abbrechen. Gelöscht wird erst 24 Stunden nach dem Antrag (paket_schluessel);
+        die Antragszeit steht unter /etc/epm, wo das Backend sie nicht ändern kann."""
+        vertraut, antrag_pfad = self.paket_schluessel_pfade()
+        antrag = self.lies(antrag_pfad)
+        if aktion == "paket_schluessel_behalten":
+            if not os.path.exists(antrag_pfad):
+                return 0, "Es war kein Zurücksetzen beantragt – der Paket-Schlüssel bleibt."
+            if simuliert:
+                return 0, "Probelauf: Zurücksetzen nicht abgebrochen."
+            try:
+                os.unlink(antrag_pfad)
+            except FileNotFoundError:
+                return 1, "Zu spät: Der Paket-Schlüssel wurde eben zurückgesetzt."
+            return 0, "Zurücksetzen abgebrochen – der Paket-Schlüssel bleibt."
+        if not os.path.exists(vertraut):
+            return 2, "Es ist kein Paket-Schlüssel gespeichert – das nächste gültig signierte Paket legt ihn fest."
+        if isinstance(antrag, dict) and isinstance(antrag.get("beantragt_am"), (int, float)):
+            ab = datetime.fromtimestamp(antrag["beantragt_am"] + PAKET_RUECKSETZEN_S).strftime("%d.%m.%Y %H:%M")
+            return 0, f"Das Zurücksetzen ist schon beantragt – wirksam ab {ab} Uhr."
+        if simuliert:
+            return 0, "Probelauf: Zurücksetzen nicht beantragt."
+        jetzt = time.time()
+        self.schreibe(antrag_pfad, {"beantragt_am": jetzt, "von": von}, modus=0o600)
+        ab = datetime.fromtimestamp(jetzt + PAKET_RUECKSETZEN_S).strftime("%d.%m.%Y %H:%M")
+        zeile(f"Fingerabdruck des gespeicherten Schlüssels: {self.fingerabdruck(vertraut)}\n")
+        return 0, (f"Zurücksetzen beantragt – wirksam ab {ab} Uhr, bis dahin unter Administration › System › Software "
+                   "abbrechbar. Danach legt das nächste gültig signierte Update-Paket den Schlüssel neu fest.")
+
     def zertifikat(self):
         """Serverzertifikat (Nginx): Name, Aussteller, Ablauf – ob eine eigene CA da ist (erneuern möglich) und ob das
         Stammzertifikat unter /epm-ca.crt abrufbar ist."""
@@ -984,6 +1083,7 @@ class Agent:
             # Systemverwaltung ohne SSH (10.10.2026)
             "versionen": versionen,
             "pakete": self.pakete(),
+            "paket_schluessel": self.paket_schluessel_sicher(),
             "zertifikat": self.zertifikat(),
             "uhr": self.uhr(),
             "ocr_vorrat": self.ocr_vorrat(),
@@ -2420,6 +2520,9 @@ class Agent:
 
         if aktion == "epm_paket":
             return self.paket_einspielen(parameter.get("upload"), zeile, simuliert=t)
+
+        if aktion in ("paket_schluessel_zuruecksetzen", "paket_schluessel_behalten"):
+            return self.paket_schluessel_aktion(aktion, von, zeile, simuliert=t)
 
         if aktion == "epm_paket_erstellen":
             return self.paket_erstellen(zeile, simuliert=t)

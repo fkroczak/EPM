@@ -55,6 +55,9 @@ export type HostStatus = {
   versionen?: { verfuegbar: boolean; aktiv: string; quelle: string; hinweis?: string;
     liste: { tag: string; erstellt: string; backend: boolean; web: boolean; aktiv: boolean; vollstaendig: boolean }[] };
   pakete?: { erstellt: PaketDatei[]; bereit: PaketDatei[] };
+  // Signatur der Update-Pakete (17.10.2026): übernommener Schlüssel (VPS), eigener Signaturschlüssel (Test-VM)
+  paket_schluessel?: { vertraut: string | null; vertraut_seit?: string | null; bau: string | null;
+    zuruecksetzen: { beantragt_am: string; wirksam_ab: string; von: string } | null; fehler?: string };
   zertifikat?: { vorhanden: boolean; name?: string; ca_schluessel?: boolean; ca_download?: boolean; inhaber?: string; aussteller?: string;
     gueltig_bis?: string | null; gueltig_ab?: string | null; tage?: number; namen?: string; selbst_signiert?: boolean; eigene_ca?: boolean; hinweis?: string };
   uhr?: { verfuegbar: boolean; synchronisiert: boolean; ntp: boolean; zeitzone: string; zeit_unix?: number; server?: string[];

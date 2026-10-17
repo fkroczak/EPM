@@ -10,12 +10,12 @@
 # nur ein auf der Test-VM erstelltes Paket einspielen (per scp übertragen):
 #   sudo epm-update --paket /pfad/epm-paket-TAG.tar [--ohne-tests]
 #
-# Signatur (Audit 17.10.2026): Ein Paket bringt Skripte mit, die hier als root laufen (04-projekt.sh). Die Test-VM
-# signiert deshalb die Prüfsummen mit /etc/epm/paket-signatur (ssh-keygen -Y sign), der VPS prüft sie gegen
-# /etc/epm/paket-signatur.pub, BEVOR er etwas auspackt oder ausführt. Liegt dort kein Schlüssel, nimmt epm-update ein
-# Paket nur mit --ohne-signatur an – diesen Schalter gibt es nur auf der Kommandozeile des Servers, nie aus der
-# Oberfläche (Einrichtung: README, „VPS ohne Internet“).
-#   sudo epm-update --paket /pfad/epm-paket-TAG.tar --ohne-signatur   nur ohne Schlüssel, nach Vergleich der SHA-256
+# Signatur (17.10.2026): Ein Paket bringt Skripte mit, die hier als root laufen (04-projekt.sh). Die Test-VM
+# signiert deshalb die Prüfsummen mit /etc/epm/paket-signatur (ssh-keygen -Y sign; beim ersten Paket von selbst
+# angelegt) und legt den öffentlichen Schlüssel bei. Der VPS prüft die Signatur, BEVOR er etwas auspackt oder ausführt:
+# gegen /etc/epm/paket-vertraut.pub, und wenn es den noch nicht gibt, gegen den mitgelieferten Schlüssel, den er dann
+# übernimmt („trust on first use“). Zurücksetzen nur aus der Oberfläche, wirksam nach 24 Stunden (Systemagent).
+#   sudo epm-update --paket DATEI --ohne-signatur   nur für alte, unsignierte Pakete, solange kein Schlüssel gespeichert ist
 #
 # Überall:
 #   sudo epm-update --zurueck TAG       auf eine frühere Version zurückschalten (z. B. 0.1.1-3fa2c1d)
@@ -45,7 +45,7 @@ TESTS=1
 PAKET=""
 OHNE_SIGNATUR=0
 SIGNATUR_SCHLUESSEL=/etc/epm/paket-signatur          # privat, nur auf der Test-VM
-SIGNATUR_PRUEFEN=/etc/epm/paket-signatur.pub         # öffentlich, auf dem VPS
+SIGNATUR_VERTRAUT=/etc/epm/paket-vertraut.pub       # auf dem VPS: beim ersten Paket übernommen
 
 PROTOKOLL=/var/log/epm-update.log
 LETZTER_SCHRITT="Start"
@@ -225,14 +225,17 @@ paket_erstellen() {
   echo "$tag" > "$tmp/TAG"
   echo "${tag%-*}" > "$tmp/VERSION"   # berechnete Nummer (ohne Git auf dem VPS nicht mehr ableitbar)
   docker save "epm-backend:$tag" "epm-web:$tag" -o "$tmp/images.tar"
-  (cd "$tmp" && find . -type f ! -name SHA256SUMS -printf '%P\n' | sort | xargs sha256sum > SHA256SUMS)
-  if [[ -f "$SIGNATUR_SCHLUESSEL" ]]; then
-    ssh-keygen -Y sign -q -f "$SIGNATUR_SCHLUESSEL" -n epm-paket "$tmp/SHA256SUMS"   # → SHA256SUMS.sig
-    echo "   Signiert mit $SIGNATUR_SCHLUESSEL"
-  else
-    echo "   WARNUNG: $SIGNATUR_SCHLUESSEL fehlt – Paket UNSIGNIERT. Der VPS nimmt es nur mit --ohne-signatur an"
-    echo "   (Schlüssel einrichten: README, „VPS ohne Internet“)."
+  if [[ ! -f "$SIGNATUR_SCHLUESSEL" ]]; then
+    (umask 077 && ssh-keygen -q -t ed25519 -N '' -C "epm-paket $(hostname)" -f "$SIGNATUR_SCHLUESSEL")
+    echo "   Signaturschlüssel angelegt: $SIGNATUR_SCHLUESSEL"
   fi
+  chmod 0600 "$SIGNATUR_SCHLUESSEL"
+  [[ -s "$SIGNATUR_SCHLUESSEL.pub" ]] || ssh-keygen -y -f "$SIGNATUR_SCHLUESSEL" > "$SIGNATUR_SCHLUESSEL.pub"
+  chmod 0644 "$SIGNATUR_SCHLUESSEL.pub"
+  cp "$SIGNATUR_SCHLUESSEL.pub" "$tmp/paket-signatur.pub"   # für das erste Paket auf einem VPS (steht in SHA256SUMS)
+  (cd "$tmp" && find . -type f ! -name SHA256SUMS -printf '%P\n' | sort | xargs sha256sum > SHA256SUMS)
+  ssh-keygen -Y sign -q -f "$SIGNATUR_SCHLUESSEL" -n epm-paket "$tmp/SHA256SUMS"   # → SHA256SUMS.sig
+  echo "   Signiert: $(ssh-keygen -lf "$SIGNATUR_SCHLUESSEL.pub" | cut -d' ' -f2)"
   local ziel="$B/images/epm-paket-$tag.tar"
   tar -C "$tmp" -cf "$ziel" .
   chmod 0644 "$ziel"
@@ -289,19 +292,33 @@ if [[ -n "$PAKET" ]]; then
   # Erst nur Prüfsummen und Signatur auspacken und die Signatur prüfen; ab hier gilt nur diese geprüfte Liste.
   install -d -m 0700 "$TMP/pruefung" "$TMP/paket"
   tar -C "$TMP/pruefung" -xf "$PAKET" ./SHA256SUMS 2>/dev/null || { echo "ABBRUCH: Paket ohne Prüfsummen. Nichts wurde umgestellt."; exit 1; }
-  if [[ -f "$SIGNATUR_PRUEFEN" ]]; then
-    tar -C "$TMP/pruefung" -xf "$PAKET" ./SHA256SUMS.sig 2>/dev/null \
-      || { echo "ABBRUCH: Paket ist nicht signiert ($SIGNATUR_PRUEFEN verlangt eine Signatur). Nichts wurde umgestellt."; exit 1; }
-    printf 'epm-paket %s\n' "$(head -n1 "$SIGNATUR_PRUEFEN")" > "$TMP/pruefung/erlaubt"
+  tar -C "$TMP/pruefung" -xf "$PAKET" ./SHA256SUMS.sig 2>/dev/null || true
+  ERSTMALS=0
+  SCHLUESSEL=""
+  if [[ -f "$SIGNATUR_VERTRAUT" ]]; then
+    SCHLUESSEL="$SIGNATUR_VERTRAUT"
+  elif [[ -s "$TMP/pruefung/SHA256SUMS.sig" ]] && tar -C "$TMP/pruefung" -xf "$PAKET" ./paket-signatur.pub 2>/dev/null; then
+    SCHLUESSEL="$TMP/pruefung/paket-signatur.pub"   # erstes Paket: noch kein Schlüssel gespeichert
+    ERSTMALS=1
+  fi
+  if [[ -n "$SCHLUESSEL" ]]; then
+    [[ -s "$TMP/pruefung/SHA256SUMS.sig" ]] \
+      || { echo "ABBRUCH: Paket ist nicht signiert (dieser Server verlangt eine Signatur). Nichts wurde umgestellt."; exit 1; }
+    printf 'epm-paket %s\n' "$(head -n1 "$SCHLUESSEL")" > "$TMP/pruefung/erlaubt"
     ssh-keygen -Y verify -f "$TMP/pruefung/erlaubt" -I epm-paket -n epm-paket -s "$TMP/pruefung/SHA256SUMS.sig" \
       < "$TMP/pruefung/SHA256SUMS" >/dev/null \
-      || { echo "ABBRUCH: Signatur des Pakets ungültig. Nichts wurde umgestellt."; exit 1; }
-    echo "   Signatur gültig ($SIGNATUR_PRUEFEN)"
+      || { echo "ABBRUCH: Signatur des Pakets ungültig (anderer Schlüssel als gespeichert? Dann Administration › System ›"
+           echo "   Software › „Paket-Schlüssel zurücksetzen“, wirksam nach 24 Stunden). Nichts wurde umgestellt."; exit 1; }
+    if [[ $ERSTMALS -eq 1 ]]; then
+      echo "   Signatur gültig (mitgelieferter Schlüssel – noch keiner gespeichert, er wird übernommen)"
+    else
+      echo "   Signatur gültig ($SIGNATUR_VERTRAUT)"
+    fi
   elif [[ $OHNE_SIGNATUR -eq 1 ]]; then
-    echo "   WARNUNG: kein Schlüssel $SIGNATUR_PRUEFEN – Paket ohne Signaturprüfung (--ohne-signatur)."
+    echo "   WARNUNG: Paket ohne Signatur, kein Schlüssel gespeichert – ohne Signaturprüfung (--ohne-signatur)."
   else
-    echo "ABBRUCH: $SIGNATUR_PRUEFEN fehlt – unsignierte Pakete nur mit „sudo epm-update --paket DATEI --ohne-signatur“"
-    echo "   auf dem Server selbst (SHA-256 vorher mit der Test-VM vergleichen). Einrichtung: README, „VPS ohne Internet“."
+    echo "ABBRUCH: Das Paket ist nicht signiert (alte Test-VM?). Bitte auf der Test-VM ein neues Paket erstellen."
+    echo "   Nur auf der Konsole und nur ohne gespeicherten Schlüssel: sudo epm-update --paket DATEI --ohne-signatur"
     exit 1
   fi
   tar -C "$TMP/paket" -xf "$PAKET"
@@ -311,6 +328,11 @@ if [[ -n "$PAKET" ]]; then
                   <(sed 's/^[0-9a-f]\{64\}  //' "$TMP/pruefung/SHA256SUMS" | sort) >/dev/null \
      || ! (cd "$TMP/paket" && sha256sum --quiet --strict -c "$TMP/pruefung/SHA256SUMS"); then
     echo "ABBRUCH: Paket beschädigt oder verändert. Nichts wurde umgestellt."; exit 1
+  fi
+  if [[ $ERSTMALS -eq 1 ]]; then
+    # geprüft: der Schlüssel steht in den signierten Prüfsummen und hat sie signiert
+    install -m 0644 "$TMP/paket/paket-signatur.pub" "$SIGNATUR_VERTRAUT"
+    echo "   Paket-Schlüssel erstmals übernommen: $(ssh-keygen -lf "$SIGNATUR_VERTRAUT" | cut -d' ' -f2)"
   fi
   TAG="$(tr -d '[:space:]' < "$TMP/paket/TAG")"
   [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40}$ ]] || { echo "ABBRUCH: Version „$TAG“ nicht erkannt."; exit 1; }
