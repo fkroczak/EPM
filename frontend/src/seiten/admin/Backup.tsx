@@ -1063,7 +1063,7 @@ export function Backup() {
   const qc = useQueryClient();
   const daten = useQuery({
     queryKey: ["backup"],
-    queryFn: () => api<Daten>("backup/"),
+    queryFn: () => api<Daten>("backup/", { hintergrund: true }),
     refetchInterval: (q) => ((q.state.data?.auftraege ?? []).some((a) => a.offen) ? 3000 : 30_000),
     retry: false,
   });

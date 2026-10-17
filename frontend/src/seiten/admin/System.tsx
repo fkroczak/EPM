@@ -55,6 +55,9 @@ export type HostStatus = {
   versionen?: { verfuegbar: boolean; aktiv: string; quelle: string; hinweis?: string;
     liste: { tag: string; erstellt: string; backend: boolean; web: boolean; aktiv: boolean; vollstaendig: boolean }[] };
   pakete?: { erstellt: PaketDatei[]; bereit: PaketDatei[] };
+  // Signatur der Update-Pakete (17.10.2026): übernommener Schlüssel (VPS), eigener Signaturschlüssel (Test-VM)
+  paket_schluessel?: { vertraut: string | null; vertraut_seit?: string | null; bau: string | null;
+    zuruecksetzen: { beantragt_am: string; wirksam_ab: string; von: string } | null; fehler?: string };
   zertifikat?: { vorhanden: boolean; name?: string; ca_schluessel?: boolean; ca_download?: boolean; inhaber?: string; aussteller?: string;
     gueltig_bis?: string | null; gueltig_ab?: string | null; tage?: number; namen?: string; selbst_signiert?: boolean; eigene_ca?: boolean; hinweis?: string };
   uhr?: { verfuegbar: boolean; synchronisiert: boolean; ntp: boolean; zeitzone: string; zeit_unix?: number; server?: string[];
@@ -696,10 +699,10 @@ function TexterkennungKarte({ t }: { t: NonNullable<Uebersicht["epm"]["texterken
 
 export function System() {
   const ich = useIch();
-  const daten = useQuery({ queryKey: ["system", "uebersicht"], queryFn: () => api<Uebersicht>("system/uebersicht/"), refetchInterval: 60_000 });
+  const daten = useQuery({ queryKey: ["system", "uebersicht"], queryFn: () => api<Uebersicht>("system/uebersicht/", { hintergrund: true }), refetchInterval: 60_000 });
   const auftraege = useQuery({
     queryKey: ["system", "auftraege"],
-    queryFn: () => api<Auftrag[]>("system/auftraege/"),
+    queryFn: () => api<Auftrag[]>("system/auftraege/", { hintergrund: true }),
     refetchInterval: (q) => ((q.state.data ?? []).some((a) => a.offen) ? 3000 : 30_000),
   });
   // Solange ein Auftrag läuft, bleibt der Ladebalken oben in Bewegung (F124)

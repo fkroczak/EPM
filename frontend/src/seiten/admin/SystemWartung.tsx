@@ -579,6 +579,8 @@ export function SoftwareBereich({ daten, offen, onAktualisieren }: { daten: Uebe
   const pakete = h?.pakete;
   const [zurueck, setZurueck] = useState<string | null>(null);
   const [erstellen, setErstellen] = useState(false);
+  const [schluessel, setSchluessel] = useState<"zuruecksetzen" | "behalten" | null>(null);
+  const ps = h?.paket_schluessel;
   const update = daten.aktionen.find((a) => a.code === "epm_update");
   const ocr = daten.epm.texterkennung?.verfahren?.paddle;
   return (
@@ -622,6 +624,23 @@ export function SoftwareBereich({ daten, offen, onAktualisieren }: { daten: Uebe
           )) : <span className="text-xs gedaempft">{pakete?.erstellt.length ? `Zuletzt erstellt: ${pakete.erstellt.map((p) => p.tag).join(", ")}. ` : ""}
             Nach dem Erstellen liegt das Paket 2 Stunden zum Herunterladen bereit.</span>}
         </Karte>
+        <Karte className="px-5 py-4 flex flex-col gap-3" data-testid="paket-schluessel-karte">
+          <KartenKopf titel="Paket-Schlüssel" unter="Update-Pakete sind signiert. Der Server ohne Internet übernimmt den Schlüssel mit dem ersten Paket und nimmt danach nur noch Pakete mit demselben Schlüssel an."
+            rechts={ps?.vertraut && !ps.zuruecksetzen && daten.leeren_erlaubt ? <Knopf variante="dng" klein disabled={offen.has("server:paket_schluessel_zuruecksetzen")}
+              onClick={() => setSchluessel("zuruecksetzen")}>Zurücksetzen</Knopf> : null} />
+          {ps?.zuruecksetzen ? (
+            <Meldung art="warn">Zurücksetzen beantragt{ps.zuruecksetzen.von ? ` von ${ps.zuruecksetzen.von}` : ""} – wirksam ab {zeitpunkt(ps.zuruecksetzen.wirksam_ab)}.
+              Danach legt das nächste Update-Paket den Schlüssel neu fest. Nicht beantragt? Sofort abbrechen.
+              <div className="mt-2"><Knopf klein disabled={offen.has("server:paket_schluessel_behalten")} onClick={() => setSchluessel("behalten")}>Zurücksetzen abbrechen</Knopf></div>
+            </Meldung>
+          ) : null}
+          <dl className="m-0">
+            <Zeile label="Gespeicherter Schlüssel">{ps?.vertraut ? <span className="num text-xs break-all">{ps.vertraut}{ps.vertraut_seit ? <span className="gedaempft"> · seit {zeitpunkt(ps.vertraut_seit)}</span> : null}</span>
+              : "noch keiner – das erste Update-Paket legt ihn fest"}</Zeile>
+            <Zeile label="Eigener Signaturschlüssel">{ps?.bau ? <span className="num text-xs break-all">{ps.bau}</span> : "keiner (wird beim ersten „Paket erstellen“ angelegt – nur Test-VM)"}</Zeile>
+          </dl>
+          <span className="text-xs gedaempft">Fingerabdrücke vergleichen: der gespeicherte Schlüssel hier muss dem Signaturschlüssel der Test-VM entsprechen.</span>
+        </Karte>
         <HochladenKarte art="ocr" titel="OCR-Modelle einspielen" testid="ocr-karte" daten={daten} offen={offen} knopf="Einspielen"
           unter="Modelle der zweiten Texterkennung (PP-OCRv5), offline vorbereitet mit werkzeuge/ocr-modelle.sh – statt scp und epm-ocr-modelle."
           hinweis="epm-ocr-modelle-<Revision>.tar · danach „EPM aktualisieren“, dann baut der Server die Modelle ins Image.">
@@ -636,6 +655,13 @@ export function SoftwareBereich({ daten, offen, onAktualisieren }: { daten: Uebe
         <Meldung art="warn">EPM läuft danach mit {zurueck} (bisher {v?.aktiv}). Datenbank-Migrationen der neueren Version bleiben.
           Startet die ältere Version damit nicht: die Sicherung von vorher wiederherstellen oder wieder aktualisieren.</Meldung>
       </AuftragDialog>
+      <AuftragDialog offen={schluessel === "zuruecksetzen"} titel="Paket-Schlüssel zurücksetzen" aktion={daten.verwaltung?.paket_schluessel_zuruecksetzen}
+        pfad="system/pakete/schluessel/zuruecksetzen/" daten={daten} knopf="Zurücksetzen beantragen" onZu={() => setSchluessel(null)}>
+        <Meldung art="warn">Nur nötig, wenn der Signaturschlüssel der Test-VM verloren ist (z. B. neu aufgesetzt). Der Server löscht den gespeicherten
+          Schlüssel erst nach 24 Stunden; bis dahin sehen alle Benutzer einen Hinweis, und das Zurücksetzen lässt sich abbrechen.</Meldung>
+      </AuftragDialog>
+      <AuftragDialog offen={schluessel === "behalten"} titel="Zurücksetzen abbrechen" aktion={daten.verwaltung?.paket_schluessel_behalten}
+        pfad="system/pakete/schluessel/behalten/" daten={daten} knopf="Abbrechen – Schlüssel behalten" onZu={() => setSchluessel(null)} />
       <AuftragDialog offen={erstellen} titel="Update-Paket erstellen" aktion={daten.verwaltung?.epm_paket_erstellen} pfad="system/pakete/erstellen/"
         daten={daten} knopf="Paket erstellen" onZu={() => setErstellen(false)} />
     </div>

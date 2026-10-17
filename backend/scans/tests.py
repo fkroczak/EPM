@@ -950,3 +950,121 @@ class FehlerpfadeTest(Grundlage):
             r = c.post(f"/api/scans/{scan.pk}/seiten/{seite.pk}/vorschau/", {"einstellungen": {}}, format="json")
         self.assertEqual(r.status_code, 400, r.content)
         self.assertIn("Vorschau", r.json()["fehler"])
+
+
+# ======================================================================= Audit 17.10.2026: Originale, Firma, Nebenläufigkeit
+@override_settings(EPM_SCANS=SCANS)
+class SeitenUndNebenlaeufigkeitTest(Grundlage):
+    """Ohne Erkennung (Seiten von Hand angelegt)."""
+
+    hochladen = FehlerpfadeTest.hochladen
+
+    def fertig_mit_seiten(self, scan, anzahl=2):
+        for nr in range(1, anzahl + 1):
+            ScanSeite.objects.create(scan=scan, nr=nr, status=ScanSeite.Status.FERTIG, roh=f"roh-{nr}.jpg",
+                                     ergebnis=_seite(f"Seite {nr}"), text=f"Seite {nr}")
+        Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.FERTIG)
+        scan.refresh_from_db()
+        return list(scan.seiten.order_by("nr"))
+
+    def test_aufteilen_verwirft_original_und_behaelt_firma(self):
+        from stammdaten.models import Firma
+
+        c, scan = self.hochladen()
+        dskm = Firma.objects.get(kuerzel="dskm")
+        Scan.objects.filter(pk=scan.pk).update(firma=dskm)
+        seiten = self.fertig_mit_seiten(scan, 3)
+        self.assertEqual(len(dienst.originale(scan)), 1)
+        with self.captureOnCommitCallbacks(execute=True):
+            r = c.post(f"/api/scans/{scan.pk}/aufteilen/", {"ab": seiten[2].pk}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        neu = Scan.objects.get(pk=r.json()["neu"])
+        self.assertEqual((neu.firma_id, neu.quelldokument_id), (dskm.pk, None))
+        scan.refresh_from_db()
+        # das Original enthielte die abgetrennte Seite – es wird nicht mehr angeboten
+        self.assertEqual((scan.auswertung["originale"], dienst.originale(scan)), ([], []))
+        # zusammenführen nur innerhalb einer Firma
+        Scan.objects.filter(pk=neu.pk).update(firma=None)
+        r = c.post(f"/api/scans/{scan.pk}/zusammenfuehren/", {"mit": neu.pk}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertIn("Firma", r.json()["mit"])
+
+    def test_seite_entfernen_verwirft_original(self):
+        c, scan = self.hochladen()
+        seiten = self.fertig_mit_seiten(scan)
+        with self.captureOnCommitCallbacks(execute=True):
+            r = c.delete(f"/api/scans/{scan.pk}/seiten/{seiten[0].pk}/entfernen/")
+        self.assertEqual(r.status_code, 200, r.content)
+        scan.refresh_from_db()
+        self.assertEqual((scan.auswertung["originale"], dienst.originale(scan)), ([], []))
+
+    def test_seiten_anlegen_alles_oder_nichts(self):
+        c = client_fuer(self.mitarbeiter)
+        gut = testbilder.png(testbilder.seite(testbilder.LABOR), verkleinern=0.3)
+        r = c.post("/api/scans/", {"dateien": [SimpleUploadedFile("a.png", gut),
+                                               SimpleUploadedFile("b.png", b"\x89PNG\r\n\x1a\n" + b"kaputt" * 10)]},
+                   format="multipart")
+        scan = Scan.objects.get(pk=r.json()["id"])
+        with self.assertRaises(dienst.ScanFehler):
+            dienst.seiten_anlegen(scan)
+        self.assertFalse(scan.seiten.exists())
+        # nächster Versuch (hier ohne die kaputte Datei): Reste des ersten Versuchs werden entfernt
+        dienst.originale(scan)[1].unlink()
+        self.assertEqual(len(dienst.seiten_anlegen(scan)), 1)
+        self.assertEqual(len(list(scan.pfad.glob("roh-*"))), 1)
+
+    def test_zuordnen_zum_zweiten_mal_ist_konflikt(self):
+        """Zwei gleichzeitige Anfragen: die zweite findet den Scan nach der gesperrten Prüfung nicht mehr."""
+        from unittest import mock
+
+        from .api import ScanViewSet
+
+        c, scan = self.hochladen()
+        self.fertig_mit_seiten(scan, 1)
+        veraltet = Scan.objects.get(pk=scan.pk)
+        Scan.objects.filter(pk=scan.pk).delete()  # die erste Anfrage war schneller
+        with mock.patch.object(ScanViewSet, "_scan", return_value=veraltet):
+            r = c.post(f"/api/scans/{scan.pk}/zuordnen/", {"patient": self.patient.id, "titel": "Befund"},
+                       format="json")
+        self.assertEqual(r.status_code, 409, r.content)
+        self.assertIn("inzwischen zugeordnet", r.json()["fehler"])
+        self.assertEqual(Dokument.objects.count(), 0)
+
+    def test_loeschen_waehrend_erkennung_und_dienst_ueberschreibt_nichts(self):
+        from unittest import mock
+
+        c, scan = self.hochladen()
+        self.fertig_mit_seiten(scan, 1)
+        Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.LAEUFT)
+        self.assertEqual(c.delete(f"/api/scans/{scan.pk}/").status_code, 409)
+        Scan.objects.filter(pk=scan.pk).update(laeuft_ab_am=timezone.now() - timedelta(minutes=1))
+        self.assertEqual(dienst.bereinigen()["abgelaufen"], 0)  # läuft gerade: bleibt
+        self.assertTrue(Scan.objects.filter(pk=scan.pk).exists())
+
+        def umbenennen(s):  # während der Erkennung in der Oberfläche umbenannt
+            Scan.objects.filter(pk=s.pk).update(titel="Neuer Titel")
+        with mock.patch.object(dienst, "auswerten", side_effect=umbenennen):
+            dienst.bearbeiten(scan)
+        scan.refresh_from_db()
+        self.assertEqual((scan.status, scan.titel), (Scan.Status.FERTIG, "Neuer Titel"))
+
+        Scan.objects.filter(pk=scan.pk).update(status=Scan.Status.LAEUFT)
+        with mock.patch.object(dienst, "auswerten", side_effect=lambda s: Scan.objects.filter(pk=s.pk).delete()):
+            dienst.bearbeiten(scan)  # gelöscht: kein Fehler, nicht wieder angelegt
+        self.assertFalse(Scan.objects.filter(pk=scan.pk).exists())
+
+
+class LadenGrenzenTest(SimpleTestCase):
+    def test_zu_grosses_bild_wird_abgewiesen(self):
+        from unittest import mock
+
+        from PIL import Image
+
+        png = testbilder.png(testbilder.seite(testbilder.LABOR), verkleinern=0.1)
+        breite, hoehe = Image.open(io.BytesIO(png)).size
+        for grenze in (breite * hoehe - 1, breite * hoehe // 3):  # knapp darüber (nur Warnung von Pillow), weit darüber
+            with mock.patch.object(Image, "MAX_IMAGE_PIXELS", grenze), self.assertRaises(laden.Unlesbar) as f:
+                laden.seiten_laden(png)
+            self.assertIn("zu groß", str(f.exception))
+        _mime, seiten = laden.seiten_einzeln(png)
+        self.assertEqual(len(list(seiten)), 1)

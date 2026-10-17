@@ -60,7 +60,7 @@ export function KiEinrichtung() {
   const qc = useQueryClient();
   const melden = useHinweis();
   const q = useQuery({
-    queryKey: ["ki", "einrichtung"], queryFn: () => api<Einrichtung>("ki/einrichtung/"),
+    queryKey: ["ki", "einrichtung"], queryFn: () => api<Einrichtung>("ki/einrichtung/", { hintergrund: true }),
     refetchInterval: (a) => ((a.state.data?.auftraege ?? []).some((x) => x.offen) ? 5000 : 30_000),
   });
   const bench = useQuery({ queryKey: ["ki", "benchmarks"], queryFn: () => api<Benchmark[]>("ki/benchmarks/") });

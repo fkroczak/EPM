@@ -117,11 +117,14 @@ class Command(BaseCommand):
                     dokumente.DokumentErkennung.objects.filter(pk=a.pk).update(schritt=text[:120],
                                                                                 lebenszeichen=timezone.now())
 
-                with dienst.herzschlag(auftrag, zusatz=lebenszeichen):
-                    fertig_a = dokumente.ausfuehren(auftrag, schritt=melden)
+                try:
+                    with dienst.herzschlag(auftrag, zusatz=lebenszeichen):
+                        fertig_a = dokumente.ausfuehren(auftrag, schritt=melden)
+                    log.info("%s: %s", fertig_a, fertig_a.get_status_display())
+                except Exception:  # noqa: BLE001 – ein Auftrag darf den Dienst nicht beenden
+                    log.exception("Auftrag %s abgebrochen", auftrag)
                 ende["scan"] = None
                 zaehler["bearbeitet"] += 1
-                log.info("%s: %s", fertig_a, fertig_a.get_status_display())
                 continue
             if scan is None:
                 if einmal:
@@ -130,11 +133,14 @@ class Command(BaseCommand):
                 continue
             log.info("Erkenne %s", scan)
             ende["scan"] = scan
-            with dienst.herzschlag(scan, zusatz=lebenszeichen):
-                fertig = dienst.bearbeiten(scan, paddle, abbrechen=lambda: ende["jetzt"])
+            try:
+                with dienst.herzschlag(scan, zusatz=lebenszeichen):
+                    fertig = dienst.bearbeiten(scan, paddle, abbrechen=lambda: ende["jetzt"])
+                log.info("%s: %s (%s s)", fertig, fertig.get_status_display(), fertig.dauer_s)
+            except Exception:  # noqa: BLE001 – z. B. Scan während der Erkennung gelöscht, Datenbank weg
+                log.exception("Erkennung von %s abgebrochen", scan)
             ende["scan"] = None
             zaehler["bearbeitet"] += 1
-            log.info("%s: %s (%s s)", fertig, fertig.get_status_display(), fertig.dauer_s)
         close_old_connections()
 
 

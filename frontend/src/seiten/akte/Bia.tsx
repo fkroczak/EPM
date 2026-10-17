@@ -31,19 +31,23 @@ function BiaDialog({ messung, offen, onOffen }: { messung: BiaMessung | null; of
   const [uebernehmen, setUebernehmen] = useState(true);
   const [stand, setStand] = useState(0);
   const [gesetzt, setGesetzt] = useState("");
+  const [anfang, setAnfang] = useState("");
   const schluessel = `${messung?.id ?? "neu"}-${offen}`;
   if (offen && gesetzt !== schluessel) {
     setGesetzt(schluessel);
-    setF2(messung ? {
+    const start = messung ? {
       gemessen_am: datum(messung.gemessen_am),
       gewicht_kg: messung.gewicht_kg?.toString() ?? "", bcm_kg: messung.bcm_kg?.toString() ?? "",
       fettmasse_kg: messung.fettmasse_kg?.toString() ?? "", ecw_prozent: messung.ecw_prozent?.toString() ?? "",
       koerperwasser_l: messung.koerperwasser_l?.toString() ?? "", bmi: messung.bmi?.toString() ?? "",
-    } : leer);
+    } : leer;
+    setF2(start);
     setBeurteilung(messung?.beurteilung ?? "");
     setUebernehmen(!messung);
+    setAnfang(JSON.stringify([start, messung?.beurteilung ?? "", !messung]));
     setStand((s) => s + 1);
   }
+  const geaendert = JSON.stringify([f2, beurteilung, uebernehmen]) !== anfang;
   // geschlossen: beim nächsten Öffnen neu vorbelegen (sonst stünde die zuletzt erfasste Messung noch drin)
   if (!offen && gesetzt) setGesetzt("");
   const setz = (k: string) => (e: { target: { value: string } }) => setF2((w) => ({ ...w, [k]: e.target.value }));
@@ -85,7 +89,7 @@ function BiaDialog({ messung, offen, onOffen }: { messung: BiaMessung | null; of
   ];
 
   return (
-    <Dialog offen={offen} onOffen={onOffen} breite={620} titel={messung ? "BIA-Messung ändern" : "Neue BIA-Messung"}
+    <Dialog offen={offen} onOffen={onOffen} breite={620} titel={messung ? "BIA-Messung ändern" : "Neue BIA-Messung"} geaendert={geaendert}
       fuss={<>
         <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
         <Knopf variante="pri" laedt={speichern.isPending} onClick={() => speichern.mutate()}>Speichern</Knopf>

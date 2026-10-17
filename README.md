@@ -119,6 +119,22 @@ sudo epm-update --paket ~/epm-paket-<TAG>.tar                 # auf dem VPS: pr�
 Oder ohne scp und SSH: auf der Test-VM unter Administration › System › Software „Update-Paket erstellen“ und
 herunterladen, auf dem VPS dort „Update-Paket einspielen“ (hochladen, SHA-256 vergleichen, mit Passwort und 2FA
 bestätigen).
+
+**Signatur der Update-Pakete (seit 17.10.2026).** Ein Paket bringt Skripte mit, die auf dem VPS als root laufen. Die
+Test-VM signiert deshalb die Prüfsummen jedes Pakets mit `/etc/epm/paket-signatur` (legt `epm-update` beim ersten
+Paket von selbst an) und legt den öffentlichen Schlüssel bei. Der VPS prüft die Signatur, bevor er etwas auspackt oder
+ausführt. Einzurichten ist nichts: Das erste gültig signierte Paket legt den Schlüssel auf dem VPS fest
+(`/etc/epm/paket-vertraut.pub`, „trust on first use“, Eintrag im Audit-Log); danach nimmt er nur noch Pakete mit
+demselben Schlüssel an. Beide Fingerabdrücke stehen unter Administration › System › Software › „Paket-Schlüssel“.
+
+Ist der Schlüssel der Test-VM verloren (neu aufgesetzt), dort „Zurücksetzen“ (Rolle Admin, Passwort und zweiter
+Faktor). Der Systemagent löscht den gespeicherten Schlüssel erst 24 Stunden später; bis dahin sehen alle Benutzer einen
+Hinweis, und „Zurücksetzen abbrechen“ behält ihn. Antrag, Abbruch und Ausführung stehen im Audit-Log. Danach legt das
+nächste Paket den Schlüssel neu fest. Restrisiko (bewusst in Kauf genommen): Wer das Backend übernimmt, kann vor dem
+ersten Paket oder nach einem nicht bemerkten Zurücksetzen ein eigenes Paket einschleusen – deshalb den Hinweis ernst
+nehmen und die Fingerabdrücke vergleichen. Alte, unsignierte Pakete nimmt der VPS nur auf der Konsole und nur ohne
+gespeicherten Schlüssel an (`sudo epm-update --paket DATEI --ohne-signatur`).
+
 Die Konfiguration des Servers liegt in `/etc/epm/epm.conf` (nicht im Repo). Die Oberfläche ist danach unter
 `https://<EPM_WEB_NAME>/` erreichbar, die Django-Verwaltung unter `/verwaltung/` (nur Rolle Admin) und die API-Ansicht im Browser sind standardmäßig aus.
 Zur Fehlersuche schaltet ein Admin sie unter Administration › System › Wartung › „Technische Verwaltung“ für 1 oder

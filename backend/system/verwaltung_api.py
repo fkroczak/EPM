@@ -6,6 +6,8 @@ Bestätigung wie unter Tätigkeiten und mit Eintrag im Audit-Log. Recht „Syste
 POST   /api/system/dienste/neustart/              {dienst, minuten, hinweis?, kennwort, code} → einen Container neu starten
 POST   /api/system/versionen/zurueck/             {tag, minuten, hinweis?, kennwort, code} → frühere Version (vorher Sicherung)
 POST   /api/system/pakete/erstellen/              Update-Paket der laufenden Version erstellen (Test-VM)
+POST   /api/system/pakete/schluessel/zuruecksetzen/ {kennwort, code} → Paket-Schlüssel nach 24 h löschen (nur Rolle Admin)
+POST   /api/system/pakete/schluessel/behalten/    beantragtes Zurücksetzen abbrechen
 GET    /api/system/pakete/<datei>/                bereitgestelltes Update-Paket herunterladen
 POST   /api/system/hochladen/                     {art: "paket" | "ocr", name, groesse} → {upload, teil}
 PUT    /api/system/hochladen/<upload>/?versatz=N  nächstes Stück (application/octet-stream)
@@ -108,6 +110,22 @@ class PaketErstellenView(APIView):
 
     def post(self, request):
         return auftrag_anlegen(request, "epm_paket_erstellen")
+
+
+class PaketSchluesselView(APIView):
+    """Signatur der Update-Pakete (17.10.2026): Zurücksetzen beantragen (der Agent löscht erst nach 24 Stunden) oder
+    abbrechen. Abbrechen ist die sichere Richtung und braucht keine Bestätigung."""
+
+    permission_classes = [SystemRecht]
+
+    def post(self, request, was):
+        if was == "zuruecksetzen":
+            if not request.user.ist_admin:
+                return _fehler("fehler", "Nur für die Rolle Admin.", status.HTTP_403_FORBIDDEN)
+            return auftrag_anlegen(request, "paket_schluessel_zuruecksetzen", objekt="Paket-Schlüssel")
+        if was == "behalten":
+            return auftrag_anlegen(request, "paket_schluessel_behalten", objekt="Paket-Schlüssel")
+        return _fehler("fehler", "Unbekannt.", status.HTTP_404_NOT_FOUND)
 
 
 class PaketDateiView(APIView):

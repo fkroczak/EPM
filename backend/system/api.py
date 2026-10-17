@@ -37,7 +37,9 @@ VERWALTUNG_AKTIONEN = ("dienst_neustart", "epm_zurueck", "epm_paket", "epm_paket
                        "ssh_oeffnen", "ssh_schliessen", "netz_hinzufuegen", "netz_entfernen", "https_filter",
                        "fail2ban_entsperren",
                        # Selbstheilung (13.10.2026)
-                       "version_bestaetigen", "heilung_schalten")
+                       "version_bestaetigen", "heilung_schalten",
+                       # Signatur der Update-Pakete (17.10.2026)
+                       "paket_schluessel_zuruecksetzen", "paket_schluessel_behalten")
 # so lange bleibt die Warnung nach dem Beginn stehen (falls der Auftrag sie nicht vorher beendet)
 WARNUNG_NACHLAUF = {"updates_installieren": 60, "server_neustart": 15, "epm_neustart": 5, "wiederherstellen": 30,
                     "dienst_neustart": 5, "epm_zurueck": 15, "epm_paket": 30}
@@ -124,6 +126,49 @@ def _hinweis_vom_server(text, stunden=None):
         return None
     return Systemhinweis.objects.create(text=text[:500], art=Systemhinweis.Art.WARNUNG, angelegt_von=None,
                                         gueltig_bis=timezone.now() + timedelta(hours=stunden) if stunden else None)
+
+
+PAKET_HINWEIS = "Sicherheit: Der Schlüssel für Update-Pakete wird zurückgesetzt"
+
+
+def paket_schluessel_uebernehmen(status_host=None):
+    """Signatur der Update-Pakete (17.10.2026): Ereignisse des Agenten (Schlüssel erstmals übernommen, nach 24 Stunden
+    zurückgesetzt) einmal ins Audit-Log; solange ein Zurücksetzen beantragt ist, ein Hinweis an alle Benutzer – er
+    endet, sobald der Agent keinen Antrag mehr meldet (abgebrochen oder ausgeführt)."""
+    s = ((status_host if status_host is not None else host.host_status()) or {}).get("paket_schluessel")
+    if not isinstance(s, dict):
+        return
+    texte = {"uebernommen": "Paket-Schlüssel erstmals übernommen", "zurueckgesetzt": "Paket-Schlüssel zurückgesetzt"}
+    for e in s.get("ereignisse") or []:
+        kennung = e.get("id") if isinstance(e, dict) else None
+        if e.get("art") not in texte or not isinstance(kennung, str) or not kennung.isalnum() or len(kennung) > 32:
+            continue
+        if SystemEreignis.objects.filter(art=SystemEreignis.Art.SYSTEM, details__ereignis="paket_schluessel",
+                                         details__kennung=kennung).exists():
+            continue
+        fp = str(e.get("fingerabdruck") or "")[:80]
+        protokolliere(SystemEreignis.Art.SYSTEM, benutzername="systemagent", objekt=f"{texte[e['art']]}: {fp}"[:200],
+                      ereignis="paket_schluessel", kennung=kennung, schluessel_art=e["art"], fingerabdruck=fp,
+                      zeit=str(e.get("zeit") or "")[:40], von=str(e.get("von") or "")[:150])
+    antrag = s.get("zuruecksetzen")
+    aktiv = Systemhinweis.aktiv()
+    if isinstance(antrag, dict):
+        ab = _zeit_lesen(antrag.get("wirksam_ab"))
+        if aktiv is None and ab is not None and ab > timezone.now():
+            Systemhinweis.objects.create(
+                text=(f"{PAKET_HINWEIS} – wirksam ab {timezone.localtime(ab):%d.%m.%Y %H:%M} Uhr. Wurde das nicht aus der "
+                      f"Administration beantragt: sofort unter Administration › System › Software abbrechen.")[:500],
+                art=Systemhinweis.Art.WARNUNG, angelegt_von=None, gueltig_bis=ab)
+    elif aktiv is not None and aktiv.text.startswith(PAKET_HINWEIS):
+        hinweis_beenden(aktiv)
+
+
+def _zeit_lesen(text):
+    from django.utils.dateparse import parse_datetime
+    try:
+        return parse_datetime(text) if isinstance(text, str) else None
+    except ValueError:
+        return None
 
 
 def heilung_ereignisse_uebernehmen(status_host=None):
@@ -216,6 +261,7 @@ class UebersichtView(APIView):
         status_host = host.host_status()
         zugang_ereignisse_uebernehmen(status_host)
         heilung_ereignisse_uebernehmen(status_host)
+        paket_schluessel_uebernehmen(status_host)
         return Response({
             "host": status_host,
             "container": host.container_messung(),
@@ -435,7 +481,7 @@ class AuftragAbbrechenView(APIView):
 
 
 def auftrag_zurueckziehen(request, auftrag: Systemauftrag | None):
-    """Wartenden Auftrag zurückziehen, solange der Agent die Datei noch nicht übernommen hat."""
+    """Wartenden Auftrag zurückziehen: solange der Agent ihn nicht übernommen hat oder er in der Warnzeit wartet."""
     if auftrag is None:
         return Response({"fehler": "Auftrag nicht gefunden."}, status=status.HTTP_404_NOT_FOUND)
     if auftrag.status != Systemauftrag.Status.WARTET or not host.auftrag_zurueckziehen(auftrag):
@@ -497,7 +543,9 @@ class HinweisView(APIView):
         # Hinweise des Servers selbst (Rückfall, Platte) sollen alle Benutzer bald sehen, nicht erst, wenn ein Admin die
         # Systemseite öffnet: beim Abruf des Banners den Status des Agenten übernehmen (nur eine kleine Datei lesen)
         try:
-            heilung_ereignisse_uebernehmen()
+            status_host = host.host_status()
+            heilung_ereignisse_uebernehmen(status_host)
+            paket_schluessel_uebernehmen(status_host)
         except Exception:  # noqa: BLE001 – der Banner darf daran nie scheitern
             pass
         return Response({"hinweis": hinweis_daten(Systemhinweis.aktiv())})

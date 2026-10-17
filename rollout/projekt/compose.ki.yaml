@@ -89,7 +89,9 @@ services:
       DB_NAME: epm
       DB_USER: epm_ki
       DB_PASSWORD_FILE: /run/secrets/ki_db_password
-      DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
+      # Der Dienst braucht den Django-Schlüssel nicht (keine Sitzungen, keine Signaturen; die Arbeitsablage hat ihr
+      # eigenes Secret ki_schluessel) – nur einen Platzhalter, siehe ki/krypto.py
+      DJANGO_SECRET_KEY: ki-dienst-ohne-django-schluessel
       EPM_DOKUMENTE: /data/dokumente
       EPM_SCANS: /data/scans
       EPM_SYSTEM: /data/system
@@ -104,7 +106,7 @@ services:
       KI_MODELL_TAGSUEBER_ENTLADEN: ${KI_MODELL_TAGSUEBER_ENTLADEN:-1}
       EPM_VERSION: ${EPM_VERSION}
       TZ: Europe/Berlin
-    secrets: [ki_db_password, django_secret_key, ki_schluessel]
+    secrets: [ki_db_password, ki_schluessel]
     volumes:
       - ./data/dokumente:/data/dokumente:ro
       - ./data/ki:/data/ki

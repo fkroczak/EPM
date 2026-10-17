@@ -12,8 +12,10 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 from datetime import timedelta
 from pathlib import Path
+from unittest import mock
 
 from django.utils import timezone
 
@@ -510,6 +512,126 @@ class AgentTeile(Backupverzeichnis):
             "zertifikat": "-----BEGIN CERTIFICATE-----\nx\n-----END CERTIFICATE-----\n",
             "schluessel": "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----\n"})[1])
         self.assertIn("Unbekannte Version", echt.ausfuehren("epm_zurueck", z.append, "d" * 32, parameter={"tag": "x"})[1])
+
+    def test_warnzeit_zurueckziehen(self):
+        """Während der Warnzeit bleibt der Auftrag „wartet“ und lässt sich zurückziehen (Marke <id>.wartet)."""
+        a = self.modul.Agent(str(self.basis))
+        uhr = [time.time()]
+        for zurueckziehen in (True, False):
+            auftrag = Systemauftrag.objects.create(ziel="server", aktion="dienst_neustart", angefordert_von=self.admin)
+            kennung = auftrag.kennung.hex
+            antworten = []
+
+            def schlafen(s, auftrag=auftrag, zurueckziehen=zurueckziehen, antworten=antworten):
+                uhr[0] += s
+                if not antworten:   # beim ersten Takt: Stand prüfen, ggf. zurückziehen
+                    daten = json.loads((self.ordner / "status" / "auftraege" / f"{kennung}.json").read_text())
+                    self.assertEqual(daten["status"], "wartet")
+                    if zurueckziehen:
+                        antworten.append(self.a.post(f"/api/system/auftraege/{auftrag.kennung}/abbrechen/").status_code)
+                    else:
+                        antworten.append(None)
+
+            with mock.patch.object(self.modul.time, "time", lambda: uhr[0]), \
+                    mock.patch.object(self.modul.time, "sleep", schlafen):
+                self.assertEqual(a.warten(kennung, "dienst_neustart", 5, False), not zurueckziehen)
+            self.assertFalse((self.ordner / "auftraege" / f"{kennung}.wartet").exists())
+            if zurueckziehen:
+                self.assertEqual(antworten, [200])
+                auftrag.refresh_from_db()
+                self.assertEqual(auftrag.status, Systemauftrag.Status.ABGEBROCHEN)
+            else:
+                # der Agent hat begonnen: jetzt geht Zurückziehen nicht mehr
+                self.assertEqual(self.a.post(f"/api/system/auftraege/{auftrag.kennung}/abbrechen/").status_code, 409)
+
+    def test_wiederherstellen_sichert_erst_nach_dem_anhalten(self):
+        """Sicherung vorher erst, wenn EPM steht (keine Eingabe geht verloren); mit KI auch ki-worker anhalten/starten."""
+        a = self.modul.Agent(str(self.basis))
+        (self.basis / "ki-aktiv").touch()
+        (self.basis / "backup").mkdir()
+        st = "2026-10-01_020000"
+        (self.basis / "backup" / f"epm-db_{st}.dump").write_bytes(b"dump")
+        s = {"stempel": st, "zeitpunkt": "2026-10-01T02:00:00+02:00", "verfahren": "", "verschluesselt": False,
+             "passwort_nr": None, "dateien": [f"epm-db_{st}.dump", f"epm-dokumente_{st}.tar.gz"]}
+        ablauf = []
+
+        def schritt(titel, args, zeile, **kw):
+            ablauf.append((titel, args[-4:]))
+            if titel == "Dokumente":   # tar: ausgepackten Ordner nachstellen
+                os.makedirs(os.path.join(args[2], "dokumente"))
+            return 0
+
+        a.schritt = schritt
+        a.sicherungen = lambda: [{"stempel": "2026-10-17_120000"}, s] if ("sichern",) in ablauf else [s]
+        a.pruefsummen_pruefen = lambda *x: True
+        a.sichern = lambda *x, **kw: ablauf.append(("sichern",)) or 0
+        a.umstellen = lambda *x, **kw: ablauf.append(("umstellen",)) or (0, "ok")
+        with mock.patch.object(self.modul.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, b"", b"")):
+            self.assertEqual(a.wiederherstellen(st, "admin", "c" * 32, lambda t: None, vorher_sichern=True), (0, "ok"))
+        titel = [x[0] for x in ablauf]
+        self.assertEqual(titel[-3:], ["Anhalten", "sichern", "umstellen"])
+        self.assertEqual(ablauf[-3][1], ["backend", "ocr", "web", "ki-worker"])
+        eintrag = json.loads((self.ordner / "status" / "wiederherstellungen.json").read_text())[-1]
+        self.assertEqual(eintrag["vorher_stempel"], "2026-10-17_120000")
+
+    def test_paket_schluessel_zuruecksetzen_erst_nach_24_stunden(self):
+        """Signatur der Update-Pakete: Übernahme vermerkt; Zurücksetzen wirkt erst nach 24 h und lässt sich abbrechen."""
+        a = self.modul.Agent(str(self.basis))
+        a.etc = str(self.basis / "etc")
+        os.makedirs(a.etc)
+        vertraut = self.basis / "etc" / "paket-vertraut.pub"
+        z = []
+        self.assertEqual(a.ausfuehren("paket_schluessel_zuruecksetzen", z.append, "d" * 32, von="admin")[0], 2)
+        vertraut.write_text("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOhO1RfWXZdftkCEHFa2fwt3lOejl2uIUIEGV9BL5HrV epm-paket\n")
+        fp = "SHA256:evVjyy6pYru60xpcZ4dS4OIiy64tvvpiKdDmOrFrLYM"   # wie ssh-keygen -lf
+        s = a.paket_schluessel()
+        self.assertEqual((s["vertraut"], s["zuruecksetzen"], s["ereignisse"][-1]["art"]), (fp, None, "uebernommen"))
+        self.assertEqual(len(a.paket_schluessel()["ereignisse"]), 1)   # nur einmal vermerkt
+        rc, text = a.ausfuehren("paket_schluessel_zuruecksetzen", z.append, "d" * 32, von="admin")
+        self.assertEqual(rc, 0)
+        self.assertIn("wirksam ab", text)
+        antrag = self.basis / "etc" / "paket-vertraut.zuruecksetzen"
+        self.assertEqual(stat.S_IMODE(antrag.stat().st_mode), 0o600)
+        self.assertIsNotNone(a.paket_schluessel()["zuruecksetzen"])
+        self.assertTrue(vertraut.exists())
+        # abbrechen: Schlüssel bleibt
+        self.assertEqual(a.ausfuehren("paket_schluessel_behalten", z.append, "d" * 32)[0], 0)
+        self.assertFalse(antrag.exists())
+        self.assertIsNone(a.paket_schluessel()["zuruecksetzen"])
+        # erneut beantragen; nach 23 h noch da, nach 24 h gelöscht
+        a.ausfuehren("paket_schluessel_zuruecksetzen", z.append, "d" * 32, von="admin")
+        jetzt = time.time()
+        with mock.patch.object(self.modul.time, "time", lambda: jetzt + 23 * 3600):
+            a.paket_schluessel()
+        self.assertTrue(vertraut.exists())
+        with mock.patch.object(self.modul.time, "time", lambda: jetzt + 24 * 3600 + 1):
+            s = a.paket_schluessel()
+        self.assertFalse(vertraut.exists() or antrag.exists())
+        self.assertEqual((s["vertraut"], s["zuruecksetzen"]), (None, None))
+        self.assertEqual((s["ereignisse"][-1]["art"], s["ereignisse"][-1]["fingerabdruck"], s["ereignisse"][-1]["von"]),
+                         ("zurueckgesetzt", fp, "admin"))
+        # ein Antrag, den das Backend schreiben könnte, liegt nicht in seinem Bereich: /etc/epm (hier etc/)
+        self.assertNotIn(str(self.ordner), str(antrag.resolve()))
+
+    def test_paket_schluessel_oberflaeche(self):
+        """Zurücksetzen nur mit Passwort + 2FA (Rolle Admin); Hinweis an alle, solange beantragt; Ereignisse ins Audit-Log."""
+        url = "/api/system/pakete/schluessel/zuruecksetzen/"
+        self.assertEqual(self.a.post(url, {}, format="json").status_code, 400)
+        r = self.a.post(url, {"kennwort": KENNWORT, "code": self.admin_codes[0]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(self.auftragsdatei()["aktion"], "paket_schluessel_zuruecksetzen")
+        self.assertEqual(self.a.post("/api/system/pakete/schluessel/behalten/").status_code, 201)
+        ab = (timezone.now() + timedelta(hours=23)).isoformat()
+        host_status_schreiben(self.ordner, paket_schluessel={
+            "vertraut": "SHA256:x", "bau": None, "zuruecksetzen": {"beantragt_am": "", "wirksam_ab": ab, "von": "admin"},
+            "ereignisse": [{"id": "ab12", "art": "uebernommen", "fingerabdruck": "SHA256:x", "zeit": ""}]})
+        h = self.a.get("/api/system/hinweis/").json()["hinweis"]
+        self.assertIn("Update-Pakete wird zurückgesetzt", h["text"])
+        self.a.get("/api/system/hinweis/")
+        self.assertEqual(SystemEreignis.objects.filter(details__ereignis="paket_schluessel").count(), 1)
+        self.assertTrue(SystemEreignis.objects.filter(objekt="Paket-Schlüssel erstmals übernommen: SHA256:x").exists())
+        host_status_schreiben(self.ordner, paket_schluessel={"vertraut": "SHA256:x", "zuruecksetzen": None, "ereignisse": []})
+        self.assertIsNone(self.a.get("/api/system/hinweis/").json()["hinweis"])
 
     def test_stand_im_status(self):
         certs = self.basis / "nginx" / "certs"

@@ -136,10 +136,10 @@ export function Verwaltung() {
   const { darf } = useAuth();
   const system = darf("system_verwalten");
   const backupRecht = darf("backup_verwalten");
-  const sys = useQuery({ queryKey: ["system", "uebersicht"], queryFn: () => api<Uebersicht>("system/uebersicht/"), refetchInterval: 60_000, enabled: system });
-  const auftraege = useQuery({ queryKey: ["system", "auftraege"], queryFn: () => api<Auftrag[]>("system/auftraege/"), enabled: system,
+  const sys = useQuery({ queryKey: ["system", "uebersicht"], queryFn: () => api<Uebersicht>("system/uebersicht/", { hintergrund: true }), refetchInterval: 60_000, enabled: system });
+  const auftraege = useQuery({ queryKey: ["system", "auftraege"], queryFn: () => api<Auftrag[]>("system/auftraege/", { hintergrund: true }), enabled: system,
     refetchInterval: (q) => ((q.state.data ?? []).some((a) => a.offen) ? 3000 : 30_000) });
-  const backup = useQuery({ queryKey: ["backup"], queryFn: () => api<BackupDaten>("backup/"), refetchInterval: 60_000, enabled: backupRecht, retry: false });
+  const backup = useQuery({ queryKey: ["backup"], queryFn: () => api<BackupDaten>("backup/", { hintergrund: true }), refetchInterval: 60_000, enabled: backupRecht, retry: false });
   const [wahl, setWahl] = useState<Wahl | null>(null);
   const [sichern, setSichern] = useState(false);
   const liste = ampeln(sys.data, backup.data, auftraege.data ?? []);

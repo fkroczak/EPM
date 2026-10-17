@@ -155,6 +155,18 @@ AKTIONEN = {
         "beschreibung": "Paket der laufenden, getesteten Version für einen Server ohne Internet (sudo epm-update "
                         "--paket-erstellen, nur Test-VM); es liegt danach 2 Stunden zum Herunterladen bereit.",
     },
+    # Signatur der Update-Pakete (17.10.2026): Der VPS übernimmt den Schlüssel mit dem ersten gültig signierten Paket.
+    # Geht er auf der Test-VM verloren, hier zurücksetzen – der Agent löscht ihn erst nach 24 Stunden.
+    "paket_schluessel_zuruecksetzen": {
+        "name": "Paket-Schlüssel zurücksetzen", "bestaetigung": "2fa", "intern": True,
+        "beschreibung": "Den gespeicherten Schlüssel für Update-Pakete löschen, z. B. wenn die Test-VM neu aufgesetzt "
+                        "wurde. Wirksam erst nach 24 Stunden (bis dahin abbrechbar, Hinweis an alle Benutzer); danach "
+                        "legt das nächste gültig signierte Paket den Schlüssel neu fest.",
+    },
+    "paket_schluessel_behalten": {
+        "name": "Zurücksetzen des Paket-Schlüssels abbrechen", "bestaetigung": "keine", "intern": True,
+        "beschreibung": "Das beantragte Zurücksetzen abbrechen; der gespeicherte Schlüssel bleibt.",
+    },
     "zertifikat_erneuern": {
         "name": "Zertifikat erneuern", "bestaetigung": "2fa", "intern": True,
         "beschreibung": "Neues Serverzertifikat der eigenen CA ausstellen (sudo epm-zertifikat erneuern, 397 Tage); "
@@ -514,12 +526,15 @@ def auftrag_ablegen(auftrag, geheim=None):
 
 
 def auftrag_zurueckziehen(auftrag) -> bool:
-    """Nur solange der Agent die Datei noch nicht übernommen hat."""
-    try:
-        os.unlink(ordner_auftraege() / f"{auftrag.kennung.hex}.json")
-        return True
-    except OSError:
-        return False
+    """Solange der Agent die Datei noch nicht übernommen hat – oder während der Warnzeit: Dann wartet der Agent und
+    beginnt erst, wenn er die Marke ``<id>.wartet`` selbst löschen konnte. Wer sie zuerst löscht, gewinnt."""
+    for name in (f"{auftrag.kennung.hex}.json", f"{auftrag.kennung.hex}.wartet"):
+        try:
+            os.unlink(ordner_auftraege() / name)
+            return True
+        except OSError:
+            pass
+    return False
 
 
 def abgleichen(auftraege):
@@ -531,7 +546,7 @@ def abgleichen(auftraege):
         if a.ziel != Systemauftrag.Ziel.SERVER or not a.offen:
             continue
         daten = _lies(ordner_status() / "auftraege" / f"{a.kennung.hex}.json")
-        if not isinstance(daten, dict) or daten.get("status") not in ("laeuft", "erledigt", "fehler"):
+        if not isinstance(daten, dict) or daten.get("status") not in ("wartet", "laeuft", "erledigt", "fehler"):
             continue
         felder = {
             "status": daten["status"],

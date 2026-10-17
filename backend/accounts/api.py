@@ -30,7 +30,7 @@ import qrcode.image.svg
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout, password_validation, update_session_auth_hash
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from django.utils.decorators import method_decorator
@@ -85,8 +85,10 @@ def naechster_schritt(request) -> str:
 
 
 def fehlversuch(user, request, art):
-    """Zählt einen Fehlversuch; beim fünften wird das Konto gesperrt (bis der Admin entsperrt)."""
-    user.fehlversuche += 1
+    """Zählt einen Fehlversuch; beim fünften wird das Konto gesperrt (bis der Admin entsperrt). Gezählt wird in der
+    Datenbank: mehrere Server-Prozesse zählen sonst jeder vom eigenen, veralteten Stand aus weiter."""
+    User.objects.filter(pk=user.pk).update(fehlversuche=F("fehlversuche") + 1)
+    user.refresh_from_db(fields=["fehlversuche"])
     if user.fehlversuche >= settings.EPM_LOGIN_MAX_FEHLVERSUCHE:
         user.sperren(f"{user.fehlversuche} Fehlversuche bei der Anmeldung")
         user.save(update_fields=User.SPERR_FELDER)
@@ -101,8 +103,18 @@ def fehlversuch(user, request, art):
         protokolliere(SystemEreignis.Art.ANMELDUNG_GESPERRT, request, benutzer=user,
                       fehlversuche=user.fehlversuche, minuten=minuten, letzter_fehler=art)
         return True
-    user.save(update_fields=["fehlversuche"])
     return False
+
+
+def rollen_entziehen(user, von):
+    """Rollen in weiteren Firmen auf „Keine Berechtigung“ (die Rolle bei der DSKM setzt ``User.save`` bei „ohne Login“
+    selbst zurück)."""
+    from .models import Mitgliedschaft
+
+    for m in Mitgliedschaft.objects.filter(benutzer=user).exclude(rolle=Rolle.KEINE):
+        m.rolle = Rolle.KEINE
+        m._history_user = von
+        m.save()
 
 
 GESPERRT_TEXT = "Das Konto ist gesperrt. Bitte an die Administration wenden."
@@ -125,6 +137,16 @@ def bestaetigung_gelungen(request):
 
 def fehler(text, code=status.HTTP_400_BAD_REQUEST, **extra):
     return Response({"fehler": text, **extra}, status=code)
+
+
+def nur_admin_ueberall(request):
+    """403, wenn die Person nicht in jeder Firma Admin ist – für Einstellungen, die für alle Firmen gelten."""
+    from epm.firma import admin_ueberall
+
+    if not admin_ueberall(request.user):
+        return fehler("Das gilt für alle Firmen. Ändern darf es nur, wer in jeder Firma Admin ist.",
+                      status.HTTP_403_FORBIDDEN)
+    return None
 
 
 def firmen_daten(user):
@@ -250,12 +272,10 @@ class AnmeldenView(OffenerView):
             return fehler("Benutzername und Passwort angeben.")
         konto = User.objects.filter(username=name, nur_historisch=False).first()
         if konto is not None and konto.ist_gesperrt:
-            # Sperre nur verraten, wenn das Kennwort stimmt (sonst wie ein normaler Fehlversuch)
-            if konto.check_password(kennwort):
-                protokolliere(SystemEreignis.Art.ANMELDUNG_GESPERRT, request, benutzer=konto, versuch_trotz_sperre=True)
-                return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
-            protokolliere(SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request, benutzername=name)
-            return fehler("Benutzername oder Passwort falsch.", status.HTTP_401_UNAUTHORIZED)
+            # gleiche Antwort mit richtigem und falschem Kennwort – das Kennwort wird gar nicht geprüft, sonst ließe es
+            # sich am gesperrten Konto ohne Grenze ausprobieren
+            protokolliere(SystemEreignis.Art.ANMELDUNG_GESPERRT, request, benutzer=konto, versuch_trotz_sperre=True)
+            return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
         user = authenticate(request, username=name, password=kennwort)  # Fehlversuch → Signal → Protokoll
         if user is None:
             if konto is not None and konto.is_active and fehlversuch(konto, request, "kennwort"):
@@ -1170,6 +1190,8 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         (Festlegung 02.10.2026: freiwillig). ``PUT {"zweiter_faktor": "freiwillig" | "admins" | "alle"}``."""
         regeln = Anmelderegeln.aktuell()
         if request.method == "PUT":
+            if (antwort := nur_admin_ueberall(request)) is not None:
+                return antwort
             wert = request.data.get("zweiter_faktor")
             if wert not in Anmelderegeln.ZweiterFaktor.values:
                 return Response({"zweiter_faktor": "Erlaubt: freiwillig, admins, alle."},
@@ -1326,6 +1348,7 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user.muss_kennwort_aendern = True
         user.einmal_kennwort_gueltig_bis = None
         user.save()
+        rollen_entziehen(user, request.user)
         faktoren_loeschen(user)
         alle_sitzungen_beenden(user)
         protokolliere(SystemEreignis.Art.BENUTZER_GEAENDERT, request, objekt=user.username, ohne_login=True,
@@ -1357,6 +1380,8 @@ class BenutzerViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.C
         user.entsperren()
         kennwort = user.neues_einmal_kennwort()
         user.save()
+        # Rollen aus der Zeit vor „ohne Login“ (oder beim Anlegen ohne Login mitgegeben) leben nicht wieder auf
+        rollen_entziehen(user, request.user)
         if kuerzel != "dskm":
             Mitgliedschaft.objects.update_or_create(benutzer=user, firma=firma, defaults={"rolle": rolle})
         protokolliere(SystemEreignis.Art.BENUTZER_GEAENDERT, request, objekt=user.username, login_gegeben=True,
@@ -1416,6 +1441,8 @@ class RechteView(APIView):
         from .models import Gruppenrecht
         from .rechte import CODES, FEST, NAMEN, NUR_ROLLEN, OHNE_RECHTE, matrix
 
+        if (antwort := nur_admin_ueberall(request)) is not None:
+            return antwort
         eingabe = request.data.get("matrix")
         if not isinstance(eingabe, dict):
             return fehler("Bitte die Matrix übergeben.")

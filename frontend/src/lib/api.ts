@@ -116,7 +116,17 @@ type Optionen = {
   ohneAbmeldeSignal?: boolean;
   /** Antwort als Blob (z. B. ein Bild); Fehler kommen weiter als JSON */
   alsBlob?: boolean;
+  /** Regelmäßige Abfrage im Hintergrund (``refetchInterval``): verlängert die Sitzung nicht, wenn seit
+   *  ``BEDIENT_FRIST`` niemand bedient hat – sonst gäbe es die Abmeldung nach 30 Minuten ohne Bedienung (F12) nie. */
+  hintergrund?: boolean;
 };
+
+/** Ein Klick löst Abfragen erst kurz danach aus (z. B. beim Öffnen einer Seite): die zählen noch als Bedienung. */
+const BEDIENT_FRIST = 10_000;
+let bedientAm = Date.now();
+for (const art of ["pointerdown", "keydown"]) {
+  window.addEventListener(art, () => { bedientAm = Date.now(); }, { capture: true, passive: true });
+}
 
 export async function api<T = unknown>(pfad: string, opt: Optionen = {}): Promise<T> {
   const method = opt.method ?? (opt.body !== undefined || opt.form || opt.roh ? "POST" : "GET");
@@ -132,6 +142,7 @@ export async function api<T = unknown>(pfad: string, opt: Optionen = {}): Promis
     body = JSON.stringify(opt.body);
   }
   if (method !== "GET") headers["X-CSRFToken"] = csrfToken();
+  if (opt.hintergrund && Date.now() - bedientAm > BEDIENT_FRIST) headers["X-EPM-Hintergrund"] = "1";
   const url = pfad.startsWith("/api/") ? pfad : `/api/${pfad.replace(/^\//, "")}`;
   const ende = anfrageBeginnt();   // Ladebalken am oberen Rand (F124)
   let antwort: Response;

@@ -181,6 +181,28 @@ def dateien_entfernen(nummer: int) -> None:
     shutil.rmtree(settings.EPM_DOKUMENTE / str(nummer), ignore_errors=True)
 
 
+def ki_vorgaenge(pid: int) -> list[int]:
+    """KI-Vorgänge der Akte – ihre Seitenbilder liegen außerhalb der Dokumente und werden mit der Akte entfernt."""
+    from django.apps import apps
+    from django.db.models import Q
+
+    if not apps.is_installed("ki"):
+        return []
+    from ki.models import KiVorgang
+
+    return list(KiVorgang.objects.filter(Q(patient_id=pid) | Q(dokument__patient_id=pid))
+                .values_list("id", flat=True).distinct())
+
+
+def ki_dateien_entfernen(vorgaenge: list[int]) -> None:
+    if not vorgaenge:
+        return
+    from ki.krypto import vorgang_aufraeumen
+
+    for vid in vorgaenge:
+        vorgang_aufraeumen(vid)
+
+
 def akte_loeschen(patient, benutzer, rechtsgrund: str, grund: str, request=None, nachgezogen: bool = False,
                   eintrag: Loeschprotokoll | None = None) -> Loeschprotokoll:
     """Akte endgültig löschen: Löschprotokoll (ohne Namen), Datenbank, Historie, Audit-Log (Namen entfernt), Dateien.
@@ -201,6 +223,7 @@ def akte_loeschen(patient, benutzer, rechtsgrund: str, grund: str, request=None,
                 akte_id=pid, nummer=nummer, ist_test=patient.ist_test, angelegt_am=patient.angelegt_am,
                 abgeschlossen_am=patient.abgeschlossen_am,
                 aufbewahrung_bis=a["bis"], rechtsgrund=rechtsgrund, grund=grund, umfang=zahlen, geloescht_von=benutzer)
+        vorgaenge = ki_vorgaenge(pid)
         akten_entfernen([pid])
         bereinigt = protokoll_entfernen(pid, nummer, sorted(eigene), namen=(patient.nachname, patient.vorname))
         protokolliere(SystemEreignis.Art.AKTE_GELOESCHT, request, benutzer=benutzer, objekt=f"Akte Nr. {nummer}",
@@ -210,6 +233,7 @@ def akte_loeschen(patient, benutzer, rechtsgrund: str, grund: str, request=None,
             zeile = _listen_eintrag(eintrag)
             transaction.on_commit(lambda: trage_ein(zeile), robust=True)
         transaction.on_commit(lambda: dateien_entfernen(nummer), robust=True)
+        transaction.on_commit(lambda: ki_dateien_entfernen(vorgaenge), robust=True)
     return eintrag
 
 

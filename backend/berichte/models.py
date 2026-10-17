@@ -62,9 +62,11 @@ class Bericht(AktenEintrag):
     def ist_entwurf(self) -> bool:
         return self.status == self.Status.ENTWURF
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
         if self.pk:
-            alt = Bericht.objects.filter(pk=self.pk).values_list("status", flat=True).first()
+            # unter Sperre lesen: Eine laufende Freigabe hält die Zeile; danach ist der Bericht gesperrt
+            alt = Bericht.objects.select_for_update().filter(pk=self.pk).values_list("status", flat=True).first()
             if alt != self.Status.ENTWURF:
                 raise PermissionError("Freigegebene Berichte sind unveränderlich. Bitte einen neuen Bericht anlegen.")
         super().save(*args, **kwargs)
@@ -90,6 +92,9 @@ class Bericht(AktenEintrag):
         """Macht aus dem Entwurf einen freigegebenen Bericht und legt die PDF als Dokument der Akte ab."""
         if not benutzer.hat_recht("berichte_freigeben"):
             raise PermissionError("Berichte freigeben darf nur, wer das Recht dazu hat.")
+        # Zeile sperren und vom gespeicherten Stand ausgehen: Die PDF zeigt genau den gespeicherten Text,
+        # gleichzeitiges Bearbeiten und eine zweite Freigabe warten bzw. scheitern.
+        self.refresh_from_db(from_queryset=Bericht.objects.select_for_update())
         if self.status != self.Status.ENTWURF:
             raise ValidationError("Nur Entwürfe können freigegeben werden.")
         self.patient.pruefe_bearbeitbar()

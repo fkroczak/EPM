@@ -232,12 +232,13 @@ class ScanViewSet(viewsets.GenericViewSet):
         return Response(ScanSerializer(scan, context={"request": request}).data)
 
     def destroy(self, request, pk=None):
-        scan = self._scan(pk)
+        scan = self._scan(pk, bearbeitbar=True)
         seiten = scan.seiten.count()
         with transaction.atomic():
             protokolliere(A.SCAN, request, objekt=str(scan), aktion="geloescht", scan=scan.pk, seiten=seiten,
                           sha256=scan.sha256)
-            dienst.entfernen(scan)
+            if not dienst.entfernen_wenn_ruhend(scan.pk):
+                raise _Konflikt("Der Scan wird gerade erkannt. Bitte einen Moment warten.")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=["get"])
@@ -521,6 +522,7 @@ class ScanViewSet(viewsets.GenericViewSet):
         dateien = [seite.roh, seite.bild, seite.grau, seite.klein]
         with transaction.atomic():
             seite.delete()
+            dienst.originale_verwerfen(scan)
             for nr, s in enumerate(scan.seiten.order_by("nr", "id"), 1):
                 if s.nr != nr:
                     ScanSeite.objects.filter(pk=s.pk).update(nr=nr)
@@ -575,7 +577,8 @@ class ScanViewSet(viewsets.GenericViewSet):
                 neu = Scan.objects.create(
                     titel=f"{scan.titel} (ab Seite {weg[0].nr})"[:200], originalname=scan.originalname,
                     mime=scan.mime, groesse=0, sha256=scan.sha256, ordner=ordner, hochgeladen_von=scan.hochgeladen_von,
-                    ist_test=scan.ist_test, laeuft_ab_am=scan.laeuft_ab_am, status=scan.status,
+                    ist_test=scan.ist_test, firma=scan.firma, quelldokument=scan.quelldokument,
+                    laeuft_ab_am=scan.laeuft_ab_am, status=scan.status,
                     verlaengert_anzahl=scan.verlaengert_anzahl, erkannt_am=scan.erkannt_am,
                     auswertung={"originale": []})
                 Scan.objects.filter(pk=neu.pk).update(hochgeladen_am=scan.hochgeladen_am)
@@ -584,6 +587,7 @@ class ScanViewSet(viewsets.GenericViewSet):
                         if name and (scan.pfad / name).is_file():
                             shutil.copy2(scan.pfad / name, ziel / name)
                     ScanSeite.objects.filter(pk=s.pk).update(scan=neu, nr=nr)
+                dienst.originale_verwerfen(scan)
                 for teil in (scan, neu):
                     teil.refresh_from_db()
                     if teil.status == Scan.Status.FERTIG:
@@ -617,6 +621,8 @@ class ScanViewSet(viewsets.GenericViewSet):
             return _fehler("Ein Scan kann nicht mit sich selbst zusammengeführt werden.", feld="mit")
         if anderer.ist_test != scan.ist_test:
             return _fehler("Scans eines Testzugangs und andere Scans werden nicht zusammengeführt.", feld="mit")
+        if anderer.firma_id != scan.firma_id or anderer.quelldokument_id != scan.quelldokument_id:
+            return _fehler("Nur Scans derselben Firma und desselben Akte-Dokuments werden zusammengeführt.", feld="mit")
         if Scan.Status.FERTIG not in (scan.status,) or anderer.status != Scan.Status.FERTIG:
             return _fehler("Beide Scans müssen erkannt sein.")
         start = scan.seiten.count()
@@ -872,6 +878,12 @@ def zuordnen(view: ScanViewSet, request, pk):
     geschrieben = []
     try:
         with transaction.atomic():
+            # zwei gleichzeitige Anfragen: die zweite wartet hier und findet den Scan dann nicht mehr (kein doppeltes
+            # Dokument, kein zweiter Patient)
+            if Scan.objects.select_for_update().filter(pk=scan.pk, status=Scan.Status.FERTIG).first() is None:
+                raise _Konflikt("Der Scan wurde inzwischen zugeordnet oder geändert. Bitte die Liste neu laden.")
+            scan.refresh_from_db()
+            originale_info = (scan.auswertung or {}).get("originale", [])
             if quelle is not None:
                 dok, weitere = quelle, []
                 titel = dok.titel

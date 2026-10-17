@@ -3,7 +3,7 @@ Aufbewahrung, Kopie der Akte, endgültiges Löschen mit Löschprotokoll, Freigab
 import io
 import json
 import zipfile
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 from django.apps import apps
@@ -43,6 +43,9 @@ class DatenschutzGrundlage(Grundlage):
     def abschliessen(self, patient=None, datum=None):
         """Akte über die API abschließen (wie in der Oberfläche; so steht der Abschluss auch im Verlauf)."""
         p = patient or self.patient
+        if datum:  # nicht vor dem Anlegen der Akte abschließbar: die Akte gibt es hier schon länger
+            Patient.objects.filter(pk=p.pk, angelegt_am__date__gt=datum).update(
+                angelegt_am=timezone.make_aware(datetime.combine(datum, time())))
         r = client_fuer(self.mitarbeiter).post(
             f"/api/patienten/{p.id}/abschliessen/",
             {"anlass": "therapie_beendet", **({"datum": str(datum)} if datum else {})}, format="json")
@@ -81,7 +84,14 @@ class Fristen(DatenschutzGrundlage):
         # vor dem letzten Kontakt (stornierte zählen nicht)
         frueh = Patient.objects.create(nachname="Frueh", vorname="Frida", geburtsdatum="1970-01-01")
         k = self.neuer_kontakt(patient=frueh)
-        frueh = self.abschliessen(frueh, datum=plus_jahre(heute, -11))
+        # vor dem Anlegen der Akte lässt sich nicht abschließen; Altdaten können so ein Datum aber mitbringen
+        r = client_fuer(self.mitarbeiter).post(f"/api/patienten/{frueh.id}/abschliessen/",
+                                               {"anlass": "therapie_beendet", "datum": str(heute - timedelta(days=1))},
+                                               format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        Patient.objects.filter(pk=frueh.pk).update(abgeschlossen_am=plus_jahre(heute, -11),
+                                                    abschluss_anlass="therapie_beendet")
+        frueh.refresh_from_db()
         a2 = frueh.aufbewahrung()
         self.assertEqual((a2["beginn"], a2["regulaer_bis"], a2["abgelaufen"]), (heute, plus_jahre(heute, 10), False))
         m = client_fuer(self.mediziner)
@@ -752,6 +762,21 @@ class AkteLoeschen(DatenschutzGrundlage):
         protokoll = m.get("/api/datenschutz/").json()["loeschprotokoll"]
         self.assertEqual([(x["nummer"], x["rechtsgrund"]) for x in protokoll], [(nummer, "antrag")])
 
+    def test_loeschen_entfernt_ki_seitenbilder(self):
+        from ki.krypto import vorgang_ordner
+        from ki.models import KiVorgang
+
+        p = Patient.objects.create(nachname="Bild", vorname="Berta", geburtsdatum="1950-01-01")
+        d = Dokument.objects.create(patient=p, titel="Scan", datei=f"{p.nummer}/scan.pdf", originalname="scan.pdf",
+                                    mime="application/pdf", groesse=1, sha256="0" * 64)
+        ordner = vorgang_ordner(KiVorgang.objects.create(dokument=d, patient=p, sha256=d.sha256).id)
+        ordner.mkdir(parents=True, exist_ok=True)
+        (ordner / "seite-1.png").write_bytes(b"Seitenbild")
+        p = self.abschliessen(p, datum=plus_jahre(timezone.localdate(), -11))
+        with self.captureOnCommitCallbacks(execute=True):
+            akte_loeschen(p, self.mediziner, "frist", "Aufbewahrungsfrist abgelaufen")
+        self.assertFalse(ordner.exists())
+
     def test_loeschen_nach_ablauf_der_frist(self):
         m = client_fuer(self.mediziner)
         heute = timezone.localdate()
@@ -784,8 +809,8 @@ class AkteLoeschen(DatenschutzGrundlage):
         Wiederherstellung; beim Start des Backends werden die Löschungen erneut vollzogen."""
         heute = timezone.localdate()
         p = Patient.objects.create(nachname="Wieder", vorname="Da", geburtsdatum="1950-01-01")
+        p = self.abschliessen(p, datum=plus_jahre(heute, -11))
         pid, nummer, angelegt = p.id, p.nummer, p.angelegt_am
-        self.abschliessen(p, datum=plus_jahre(heute, -11))
         with self.captureOnCommitCallbacks(execute=True):
             akte_loeschen(p, self.mediziner, "frist", "Aufbewahrungsfrist abgelaufen")
         self.assertEqual([(z["akte"], z["nummer"], z["rechtsgrund"]) for z in lies_akten()], [(pid, nummer, "frist")])

@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.contrib.sessions.models import Session
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 from django_otp.oath import totp
 from django_otp.plugins.otp_totp.models import TOTPDevice
@@ -13,6 +13,7 @@ from accounts.models import Anmelderegeln, Gruppenrecht, Rolle, Sitzung, User
 from audit.models import SystemEreignis
 from epm.pruefhilfen import (
     KENNWORT,
+    admin_in_allen_firmen,
     benutzer,
     client_fuer,
     echte_anmeldung,
@@ -88,10 +89,10 @@ class Anmeldung(TestCase):
         self.assertIsNotNone(self.user.gesperrt_am)
         self.assertEqual(SystemEreignis.objects.filter(art="anmeldung_fehlgeschlagen").count(), 5)
         self.assertTrue(SystemEreignis.objects.filter(art="anmeldung_gesperrt", benutzer=self.user).exists())
-        # auch das richtige Kennwort hilft nicht mehr – die Sperre wird nur dann verraten
+        # auch das richtige Kennwort hilft nicht mehr – die Antwort verrät nicht, ob das Kennwort stimmt
         r = self.anmelden(self.kennwort)
         self.assertEqual(r.status_code, 403)
-        self.assertEqual(self.anmelden("noch-falsch").status_code, 401)
+        self.assertEqual(self.anmelden("noch-falsch").json(), r.json())
         # Hinweis für den Admin; Entsperren macht die Anmeldung wieder möglich
         admin = benutzer("admin", Rolle.ADMIN)
         a = client_fuer(admin)
@@ -113,6 +114,28 @@ class Anmeldung(TestCase):
         entsperrt = a.get("/api/protokoll/?gruppe=benutzer").json()["results"][0]
         self.assertEqual(entsperrt["beschreibung"], "Benutzer neu entsperrt")
         self.assertEqual(a.get("/api/protokoll/?gruppe=unbekannt").status_code, 400)
+
+    def test_fehlversuche_zaehlen_in_der_datenbank(self):
+        """Mehrere Server-Prozesse mit je eigenem (veraltetem) Stand des Kontos zählen gemeinsam."""
+        from accounts.api import fehlversuch
+
+        a, b = User.objects.get(pk=self.user.pk), User.objects.get(pk=self.user.pk)
+        fehlversuch(a, None, "kennwort")
+        fehlversuch(b, None, "kennwort")
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.fehlversuche, 2)
+
+    @override_settings(EPM_DJANGO_ADMIN=True)
+    def test_sperre_auch_in_der_django_verwaltung(self):
+        self.anmelden("falsch")  # App: zählt genau einmal (nicht zusätzlich über das Signal)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.fehlversuche, 1)
+        c = Client()
+        for _ in range(4):
+            r = c.post("/verwaltung/login/", {"username": "neu", "password": "falsch", "otp_token": "123456"})
+            self.assertEqual(r.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.ist_gesperrt)
 
     def test_einmal_kennwort_laeuft_ab(self):
         self.user.einmal_kennwort_gueltig_bis = timezone.now() - timedelta(minutes=1)
@@ -178,6 +201,13 @@ class Sitzungen(TestCase):
         self.assertEqual(c.get("/api/patienten/").status_code, 200)
         ablauf = Session.objects.get(session_key=schluessel).expire_date
         self.assertGreater(ablauf, timezone.now() + timedelta(minutes=29))
+        # regelmäßige Abfragen im Hintergrund verlängern nicht (sonst nie eine Abmeldung bei offener Seite)
+        Session.objects.filter(session_key=schluessel).update(expire_date=timezone.now() + timedelta(minutes=5))
+        Sitzung.objects.filter(sitzungsschluessel=schluessel).update(zuletzt_am=timezone.now() - timedelta(minutes=5))
+        self.assertEqual(c.get("/api/system/hinweis/", HTTP_X_EPM_HINTERGRUND="1").status_code, 200)
+        self.assertLess(Session.objects.get(session_key=schluessel).expire_date, timezone.now() + timedelta(minutes=6))
+        self.assertLess(Sitzung.objects.get(sitzungsschluessel=schluessel).zuletzt_am,
+                        timezone.now() - timedelta(minutes=4))
         Session.objects.filter(session_key=schluessel).update(expire_date=timezone.now() - timedelta(seconds=1))
         r = c.get("/api/patienten/")
         self.assertEqual(r.status_code, 403)
@@ -318,11 +348,29 @@ class RechteJeGruppe(TestCase):
     def setUpTestData(cls):
         from patienten.models import Patient
 
-        cls.admin = benutzer("admin", Rolle.ADMIN)
+        cls.admin = admin_in_allen_firmen(benutzer("admin", Rolle.ADMIN))
         cls.mediziner = benutzer("mediziner", Rolle.MEDIZINER)
         cls.mitarbeiter = benutzer("mitarbeiter", Rolle.MITARBEITER)
         cls.betrachter = benutzer("betrachter", Rolle.BETRACHTER)
         cls.patient = Patient.objects.create(nachname="Recht", vorname="R", geburtsdatum="1970-01-01")
+
+    def test_nur_admin_aller_firmen_aendert_was_fuer_alle_gilt(self):
+        from accounts.models import Mitgliedschaft
+        from stammdaten.models import Firma
+
+        nur_dskm = benutzer("dskmadmin", Rolle.ADMIN)
+        nur_rg = benutzer("rgadmin", Rolle.KEINE)
+        Mitgliedschaft.objects.create(benutzer=nur_rg, firma=Firma.objects.get(kuerzel="rg"), rolle=Rolle.ADMIN)
+        for user in (nur_dskm, nur_rg):
+            c = client_fuer(user)
+            with self.subTest(user=user.username):
+                self.assertEqual(c.put("/api/rechte/", {"matrix": {"betrachter": {"eintraege_erfassen": True}}},
+                                       format="json").status_code, 403)
+                self.assertEqual(c.put("/api/benutzer/anmeldung/", {"zweiter_faktor": "alle"},
+                                       format="json").status_code, 403)
+        self.assertFalse(Gruppenrecht.objects.exists())
+        self.assertEqual(Anmelderegeln.aktuell().zweiter_faktor, "freiwillig")
+        self.assertEqual(client_fuer(nur_dskm).get("/api/rechte/").status_code, 200)
 
     def test_standard(self):
         r = client_fuer(self.admin).get("/api/rechte/").json()
@@ -460,7 +508,7 @@ class ZweiterFaktorFreiwillig(TestCase):
 
     def setUp(self):
         cache.clear()
-        self.admin = benutzer("admin", Rolle.ADMIN)
+        self.admin = admin_in_allen_firmen(benutzer("admin", Rolle.ADMIN))
         self.user = User(username="frei", first_name="Frieda", last_name="Frei", rolle=Rolle.MITARBEITER)
         self.einmal = self.user.neues_einmal_kennwort()
         self.user.save()
@@ -618,6 +666,21 @@ class OhneLoginUndTestbenutzer(TestCase):
         texte = [e["beschreibung"] for e in self.a.get("/api/protokoll/?gruppe=benutzer").json()["results"]]
         self.assertIn("Benutzer ehemalig auf „ohne Login“ gesetzt (keine Anmeldung, keine Rechte)", texte)
         self.assertIn("Benutzer ehemalig erhält wieder einen Login (Mitarbeiter), Einmal-Passwort erzeugt", texte)
+
+    def test_ohne_login_entzieht_rollen_in_allen_firmen(self):
+        from accounts.models import Mitgliedschaft
+        from stammdaten.models import Firma
+
+        rg = Firma.objects.get(kuerzel="rg")
+        admin_in_allen_firmen(self.admin)
+        Mitgliedschaft.objects.create(benutzer=self.user, firma=rg, rolle=Rolle.ADMIN)
+        self.assertEqual(self.a.post(f"/api/benutzer/{self.user.id}/ohne-login/").status_code, 200)
+        m = Mitgliedschaft.objects.get(benutzer=self.user, firma=rg)
+        self.assertEqual((m.rolle, m.history.first().history_user), (Rolle.KEINE, self.admin))
+        # „Login geben“ in der DSKM bringt die Admin-Rolle der Regeneration Clinic nicht zurück
+        r = self.a.post(f"/api/benutzer/{self.user.id}/login-geben/", {"rolle": "mitarbeiter"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(Mitgliedschaft.objects.get(benutzer=self.user, firma=rg).rolle, Rolle.KEINE)
 
     def test_ohne_login_anlegen(self):
         r = self.a.post("/api/benutzer/", {"username": "frueher", "first_name": "Frida", "last_name": "Früher",
@@ -787,7 +850,7 @@ class MitarbeiterErweitert(TestCase):
     def test_standard_und_umstellbar(self):
         from accounts.rechte import STANDARD, matrix
 
-        admin = benutzer("admin", Rolle.ADMIN)
+        admin = admin_in_allen_firmen(benutzer("admin", Rolle.ADMIN))
         plus = benutzer("plus", Rolle.MITARBEITER_PLUS)
         self.assertEqual(STANDARD[Rolle.MITARBEITER_PLUS] - STANDARD[Rolle.MITARBEITER], {"plaene_anlegen"})
         self.assertTrue(plus.hat_recht("plaene_anlegen"))

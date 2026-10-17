@@ -61,6 +61,7 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
   // Dialog öffnen: Felder aus dem Befund füllen (oder leeren)
   const schluessel = `${befund?.id ?? "neu"}-${offen}`;
   const [gesetzt, setGesetzt] = useState("");
+  const [anfang, setAnfang] = useState("");
   if (offen && gesetzt !== schluessel) {
     setGesetzt(schluessel);
     setAbgenommen(datum(befund?.abgenommen_am ?? heuteIso()));
@@ -74,8 +75,10 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
     }
     setWerte(ausKatalog);
     setFrei(freie);
+    setAnfang(JSON.stringify([datum(befund?.abgenommen_am ?? heuteIso()), befund?.labor ?? "", befund?.beurteilung ?? "", ausKatalog, freie]));
     setStand((s) => s + 1);
   }
+  const geaendert = JSON.stringify([abgenommen, labor, beurteilung, werte, frei]) !== anfang;
   // geschlossen: beim nächsten Öffnen neu vorbelegen (sonst stünde der zuletzt erfasste Befund noch drin)
   if (!offen && gesetzt) setGesetzt("");
 
@@ -118,7 +121,7 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
   useEffect(() => { if (offen) reset(); }, [offen, reset]);
 
   return (
-    <Dialog offen={offen} onOffen={onOffen} breite={900}
+    <Dialog offen={offen} onOffen={onOffen} breite={900} geaendert={geaendert}
       titel={befund ? "Laborbefund ändern" : "Neuer Laborbefund"}
       beschreibung="Nur den gemessenen Wert eintragen – die Einheit steht schon da. Leere Zeilen werden nicht gespeichert."
       fuss={<>

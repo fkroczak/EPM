@@ -38,5 +38,8 @@ rg = Firma.objects.filter(kuerzel="rg").first()
 if rg:
     Mitgliedschaft.objects.update_or_create(benutzer=User.objects.get(username="e2e.test"), firma=rg,
                                             defaults={"rolle": Rolle.MEDIZINER})
+    # Rechte der Gruppen und Anmelderegeln gelten für alle Firmen: ändern darf sie nur ein Admin jeder Firma
+    Mitgliedschaft.objects.update_or_create(benutzer=User.objects.get(username="e2e.admin"), firma=rg,
+                                            defaults={"rolle": Rolle.ADMIN})
 
 print("Testkonten angelegt:", ", ".join(k[0] for k in KONTEN))

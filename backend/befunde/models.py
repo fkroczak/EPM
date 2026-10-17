@@ -242,9 +242,19 @@ class BiaMessung(AktenEintrag):
             raise ValidationError(fehler)
 
     def gewicht_uebernehmen(self, benutzer):
-        """Trägt das Gewicht der Messung in den Gewichtsverlauf ein (U50) – einmalig je BIA-Messung."""
-        if self.gewichtsmessung_id or self.gewicht_kg is None:
+        """Trägt das Gewicht der Messung in den Gewichtsverlauf ein (U50) – einmalig je BIA-Messung. Ist es schon
+        eingetragen, gehen korrigiertes Gewicht und Datum in diesen Eintrag mit (Verlauf, BMI, Warnungen)."""
+        if self.gewicht_kg is None:
+            # shortcut: ein gelöschtes BIA-Gewicht bleibt im Verlauf stehen, bis es dort entfernt wird
             return self.gewichtsmessung
+        if self.gewichtsmessung_id:
+            messung = self.gewichtsmessung
+            if (messung.gewicht_kg, messung.gemessen_am) != (self.gewicht_kg, self.gemessen_am):
+                messung.gewicht_kg, messung.gemessen_am = self.gewicht_kg, self.gemessen_am
+                messung._history_user = benutzer
+                messung.full_clean()
+                messung.save()
+            return messung
         messung = Gewichtsmessung(patient=self.patient, gewicht_kg=self.gewicht_kg, gemessen_am=self.gemessen_am,
                                   quelle=Gewichtsmessung.Quelle.AMBULANZ, notiz="aus der BIA-Messung",
                                   erfasst_von=benutzer)

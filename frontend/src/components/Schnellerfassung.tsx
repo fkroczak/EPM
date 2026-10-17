@@ -15,7 +15,7 @@ import { ApiFehler, abfrage, alle, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useIch } from "@/lib/auth";
 import { useAuswahl, useEinstellungen } from "@/lib/daten";
-import { datum, eingabeDatum, eingabeUhrzeit, eingabeZahl, heuteIso, inMonaten, inTagen, kg, prozent, terminZeit, uhrzeit, vorZeit,
+import { absatz, datum, eingabeDatum, eingabeUhrzeit, eingabeZahl, heuteIso, inMonaten, inTagen, kg, prozent, terminZeit, uhrzeit, vorZeit,
   zahl } from "@/lib/format";
 import { GEWICHTSQUELLEN, TERMINARTEN } from "@/lib/typen";
 import type { Gewicht, Kontakt, Patient, PatientZeile } from "@/lib/typen";
@@ -158,11 +158,6 @@ export function useWiedervorlageTage(): number {
   return Number.isFinite(t) && t > 0 ? t : 14;
 }
 
-function absatz(text: string): string {
-  const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return esc ? `<p>${esc}</p>` : "";
-}
-
 export function KontaktDialog({ offen, onOffen, vorgabe, text: textVorgabe }: {
   offen: boolean; onOffen: (o: boolean) => void; vorgabe?: Vorgabe | null; text?: string;
 }) {
@@ -267,6 +262,7 @@ export function KontaktDialog({ offen, onOffen, vorgabe, text: textVorgabe }: {
 
   return (
     <Dialog offen={offen} onOffen={onOffen} titel="Kontakt erfassen" breite={720}
+      geaendert={!!text.replace(/<[^>]+>/g, "").trim() || !!wert.trim()}
       beschreibung="Telefonat, E-Mail oder Gespräch festhalten. Nach dem Speichern nicht mehr änderbar, nur stornierbar."
       fuss={<>
         {/* Warum „Speichern“ noch nicht geht, steht gleich daneben (Bedienung für Pflegekräfte, 10.10.2026) */}

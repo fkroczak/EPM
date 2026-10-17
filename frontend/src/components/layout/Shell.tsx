@@ -55,7 +55,7 @@ function useScansOffen(): number {
   const { darf } = useAuth();
   const stand = useQuery({
     queryKey: ["scans", "stand"],
-    queryFn: () => api<{ offen: number; laufend: number }>("scans/stand/"),
+    queryFn: () => api<{ offen: number; laufend: number }>("scans/stand/", { hintergrund: true }),
     enabled: darf("scans_bearbeiten"),
     refetchInterval: 60_000,
     staleTime: 30_000,
@@ -382,7 +382,7 @@ function Systemhinweis() {
   const [weg, setWeg] = useState<number | null>(ausgeblendeterHinweis);
   const daten = useQuery({
     queryKey: ["systemhinweis"],
-    queryFn: () => api<{ hinweis: Hinweis | null }>("system/hinweis/"),
+    queryFn: () => api<{ hinweis: Hinweis | null }>("system/hinweis/", { hintergrund: true }),
     refetchInterval: 60_000,
     refetchIntervalInBackground: true,
     staleTime: 30_000,

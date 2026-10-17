@@ -43,6 +43,7 @@ Dateien werden ohne Folgen symbolischer Links gelesen und nach dem Lesen sofort 
 Modelle werden vor der Prüfung in einen Ordner kopiert, den das Backend nicht beschreiben kann.
 """
 import argparse
+import base64
 import fcntl
 from collections import deque
 import hashlib
@@ -152,6 +153,9 @@ AKTIONEN = {
     "ki_aus": ("KI ausschalten", False),
     "ki_grenzen": ("Grenzen der KI festlegen", False),
     "ki_benchmark": ("KI-Benchmark", False),
+    # Signatur der Update-Pakete (17.10.2026): Zurücksetzen des übernommenen Schlüssels (wirkt erst nach 24 Stunden)
+    "paket_schluessel_zuruecksetzen": ("Paket-Schlüssel zurücksetzen", False),
+    "paket_schluessel_behalten": ("Zurücksetzen des Paket-Schlüssels abbrechen", False),
 }
 # Aktionen, die Sicherungen schreiben, übertragen oder zurückspielen – und das Leeren der Datenbank, das nur den
 # EPM-Stack betrifft: mit --sicherung-echt auch im Probelauf echt (Browsertests gegen den echten Stack)
@@ -166,6 +170,12 @@ VORHER_ART = {"updates_installieren": "vor_update", "server_neustart": "vor_aend
 
 # Systemverwaltung ohne SSH (10.10.2026): feste Werkzeuge auf dem Server, feste Dienste, feste Protokolle
 EPM_UPDATE = "/usr/local/sbin/epm-update"
+# Signatur der Update-Pakete (17.10.2026, Festlegung „trust on first use“): Die Test-VM signiert mit
+# /etc/epm/paket-signatur (epm-update legt ihn beim ersten Paket an), der VPS übernimmt beim ersten gültig signierten
+# Paket dessen öffentlichen Schlüssel nach /etc/epm/paket-vertraut.pub. Zurücksetzen (Schlüssel verloren) beantragt
+# die Oberfläche; der Agent löscht den Schlüssel erst 24 Stunden danach – bis dahin sichtbar und abbrechbar.
+PAKET_SCHLUESSEL_ORDNER = "/etc/epm"
+PAKET_RUECKSETZEN_S = 24 * 3600
 EPM_ZERTIFIKAT = "/usr/local/sbin/epm-zertifikat"
 EPM_OCR_MODELLE = "/usr/local/sbin/epm-ocr-modelle"
 EPM_KI = "/usr/local/sbin/epm-ki"
@@ -206,7 +216,7 @@ PROTOKOLL_MAX = 2 * 1024 * 1024   # Bytes je abgerufenem Protokoll
 PEM_MAX = 20000                   # Zeichen je PEM-Datei beim Zertifikat-Import
 # Inhalt eines Update-Pakets (epm-update --paket-erstellen) und der vorbereiteten OCR-Modelle: nur diese Namen,
 # nur Dateien und Ordner – keine Verweise, keine absoluten Pfade, kein „..“
-PAKET_INHALT = re.compile(r"^(TAG|VERSION|SHA256SUMS|images\.tar|(rollout|werkzeuge)(/[A-Za-z0-9._+-]+)*)$")
+PAKET_INHALT = re.compile(r"^(TAG|VERSION|SHA256SUMS(\.sig)?|paket-signatur\.pub|images\.tar|(rollout|werkzeuge)(/[A-Za-z0-9._+-]+)*)$")
 OCR_INHALT = re.compile(r"^(modelle\.json|dateien(/[A-Za-z0-9._+-]+)*)$")
 # KI (Experimentell): Modell-Paket von „epm-ki vorbereiten“ – nur Dateien ohne Unterordner
 KI_INHALT = re.compile(r"^[A-Za-z0-9._+-]{1,200}$")
@@ -470,6 +480,7 @@ class Agent:
         self.status = os.path.join(basis, "system", "status")
         self.ergebnisse = os.path.join(self.status, "auftraege")
         self.backup = os.path.join(basis, "backup")
+        self.etc = PAKET_SCHLUESSEL_ORDNER   # Schlüssel der Update-Pakete (in den Tests ein eigener Ordner)
         # Austausch mit dem Backend: bereitgestellte Sicherungen (liest Nginx aus) und hochgeladene (schreibt das Backend)
         self.download = os.path.join(basis, "system", "download")
         self.upload = os.path.join(basis, "system", "upload")
@@ -750,6 +761,94 @@ class Agent:
             return ergebnis
         return {"erstellt": liste(os.path.join(self.basis, "images")), "bereit": liste(self.download, BUENDEL_STUNDEN)}
 
+    @staticmethod
+    def fingerabdruck(pfad):
+        """SHA256-Fingerabdruck eines öffentlichen SSH-Schlüssels (wie ssh-keygen -l) oder None."""
+        try:
+            with open(pfad, encoding="ascii") as f:
+                blob = base64.b64decode(f.readline().split()[1], validate=True)
+        except (OSError, ValueError, IndexError):
+            return None
+        return "SHA256:" + base64.b64encode(hashlib.sha256(blob).digest()).decode().rstrip("=")
+
+    def paket_schluessel_pfade(self):
+        return (os.path.join(self.etc, "paket-vertraut.pub"), os.path.join(self.etc, "paket-vertraut.zuruecksetzen"))
+
+    def paket_schluessel_sicher(self):
+        try:
+            return self.paket_schluessel()
+        except Exception as e:  # noqa: BLE001 – der Status soll trotzdem stehen
+            return {"fehler": str(e)[:300]}
+
+    def paket_schluessel(self):
+        """Stand der Paket-Schlüssel für die Oberfläche. Nebenbei (jede Minute): ein seit 24 Stunden beantragtes
+        Zurücksetzen ausführen und einen neu übernommenen Schlüssel als Ereignis vermerken (das Backend trägt die
+        Ereignisse einmal ins Audit-Log ein)."""
+        vertraut, antrag_pfad = self.paket_schluessel_pfade()
+        antrag = self.lies(antrag_pfad)
+        if not isinstance(antrag, dict) or not isinstance(antrag.get("beantragt_am"), (int, float)):
+            antrag = None
+        pfad = os.path.join(self.status, "paket-schluessel.json")
+        stand = self.lies(pfad) or {}
+        ereignisse = [e for e in stand.get("ereignisse") or [] if isinstance(e, dict)]
+        vorher = list(ereignisse)
+        if antrag and not self.trocken and time.time() - antrag["beantragt_am"] >= PAKET_RUECKSETZEN_S:
+            ereignisse.append({"id": os.urandom(8).hex(), "art": "zurueckgesetzt", "zeit": jetzt_iso(),
+                               "fingerabdruck": self.fingerabdruck(vertraut), "von": str(antrag.get("von") or "")[:150]})
+            for p in (vertraut, antrag_pfad):
+                try:
+                    os.unlink(p)
+                except FileNotFoundError:
+                    pass
+            antrag = None
+        fp = self.fingerabdruck(vertraut)
+        if fp and fp != stand.get("bekannt"):
+            ereignisse.append({"id": os.urandom(8).hex(), "art": "uebernommen", "zeit": jetzt_iso(), "fingerabdruck": fp})
+        if ereignisse != vorher or fp != stand.get("bekannt"):
+            self.schreibe(pfad, {"bekannt": fp, "ereignisse": ereignisse[-20:]})
+
+        def iso(t):
+            return datetime.fromtimestamp(t, timezone.utc).astimezone().isoformat(timespec="seconds")
+        try:
+            seit = iso(os.stat(vertraut).st_mtime) if fp else None
+        except OSError:
+            seit = None
+        return {"vertraut": fp, "vertraut_seit": seit,
+                "bau": self.fingerabdruck(os.path.join(self.etc, "paket-signatur.pub")),
+                "zuruecksetzen": {"beantragt_am": iso(antrag["beantragt_am"]),
+                                  "wirksam_ab": iso(antrag["beantragt_am"] + PAKET_RUECKSETZEN_S),
+                                  "von": str(antrag.get("von") or "")[:150]} if antrag else None,
+                "ereignisse": ereignisse[-20:]}
+
+    def paket_schluessel_aktion(self, aktion, von, zeile, simuliert=False):
+        """Zurücksetzen beantragen bzw. abbrechen. Gelöscht wird erst 24 Stunden nach dem Antrag (paket_schluessel);
+        die Antragszeit steht unter /etc/epm, wo das Backend sie nicht ändern kann."""
+        vertraut, antrag_pfad = self.paket_schluessel_pfade()
+        antrag = self.lies(antrag_pfad)
+        if aktion == "paket_schluessel_behalten":
+            if not os.path.exists(antrag_pfad):
+                return 0, "Es war kein Zurücksetzen beantragt – der Paket-Schlüssel bleibt."
+            if simuliert:
+                return 0, "Probelauf: Zurücksetzen nicht abgebrochen."
+            try:
+                os.unlink(antrag_pfad)
+            except FileNotFoundError:
+                return 1, "Zu spät: Der Paket-Schlüssel wurde eben zurückgesetzt."
+            return 0, "Zurücksetzen abgebrochen – der Paket-Schlüssel bleibt."
+        if not os.path.exists(vertraut):
+            return 2, "Es ist kein Paket-Schlüssel gespeichert – das nächste gültig signierte Paket legt ihn fest."
+        if isinstance(antrag, dict) and isinstance(antrag.get("beantragt_am"), (int, float)):
+            ab = datetime.fromtimestamp(antrag["beantragt_am"] + PAKET_RUECKSETZEN_S).strftime("%d.%m.%Y %H:%M")
+            return 0, f"Das Zurücksetzen ist schon beantragt – wirksam ab {ab} Uhr."
+        if simuliert:
+            return 0, "Probelauf: Zurücksetzen nicht beantragt."
+        jetzt = time.time()
+        self.schreibe(antrag_pfad, {"beantragt_am": jetzt, "von": von}, modus=0o600)
+        ab = datetime.fromtimestamp(jetzt + PAKET_RUECKSETZEN_S).strftime("%d.%m.%Y %H:%M")
+        zeile(f"Fingerabdruck des gespeicherten Schlüssels: {self.fingerabdruck(vertraut)}\n")
+        return 0, (f"Zurücksetzen beantragt – wirksam ab {ab} Uhr, bis dahin unter Administration › System › Software "
+                   "abbrechbar. Danach legt das nächste gültig signierte Update-Paket den Schlüssel neu fest.")
+
     def zertifikat(self):
         """Serverzertifikat (Nginx): Name, Aussteller, Ablauf – ob eine eigene CA da ist (erneuern möglich) und ob das
         Stammzertifikat unter /epm-ca.crt abrufbar ist."""
@@ -984,6 +1083,7 @@ class Agent:
             # Systemverwaltung ohne SSH (10.10.2026)
             "versionen": versionen,
             "pakete": self.pakete(),
+            "paket_schluessel": self.paket_schluessel_sicher(),
             "zertifikat": self.zertifikat(),
             "uhr": self.uhr(),
             "ocr_vorrat": self.ocr_vorrat(),
@@ -1933,6 +2033,12 @@ class Agent:
             time.sleep(2)
         return False
 
+    def epm_dienste(self):
+        """Dienste, die data/dokumente einbinden und beim Wiederherstellen angehalten und neu gestartet werden. Der
+        KI-Dienst (ki-worker, wenn die KI eingerichtet ist) gehört dazu: Sein Bind-Mount hinge sonst am beiseitegelegten
+        alten Ordner. Sein Start zieht ki-init nach (Rechte der Rolle epm_ki, die pg_restore nicht mitbringt)."""
+        return ["backend", "ocr", "web"] + (["ki-worker"] if os.path.exists(os.path.join(self.basis, "ki-aktiv")) else [])
+
     def backend_gesund(self, zeile, sekunden=300):
         ende = time.time() + sekunden
         while time.time() < ende:
@@ -1947,11 +2053,12 @@ class Agent:
         zeile("Das Backend ist nach 5 Minuten nicht bereit.\n")
         return False
 
-    def wiederherstellen(self, stempel, von, auftrag_id, zeile, vorher=None):
-        """Sicherung zurückspielen: prüfen und entschlüsseln (EPM läuft noch), dann Backend und Webserver anhalten,
-        Datenbank in eine neue Datenbank laden und tauschen, Dokumentordner tauschen, starten. Schlägt ein Schritt nach
-        dem Anhalten fehl, wird der vorige Stand zurückgetauscht. Die Löschliste bleibt unangetastet (Art. 17 DSGVO);
-        das Backend löscht beim Start erneut, was die Sicherung zurückgebracht hat."""
+    def wiederherstellen(self, stempel, von, auftrag_id, zeile, vorher_sichern=False):
+        """Sicherung zurückspielen: prüfen und entschlüsseln (EPM läuft noch), dann EPM anhalten, den jetzigen Stand
+        sichern (``vorher_sichern``; erst nach dem Anhalten, damit keine Eingabe zwischen Sicherung und Umstellen
+        verloren geht), Datenbank in eine neue Datenbank laden und tauschen, Dokumentordner tauschen, starten. Schlägt
+        ein Schritt nach dem Anhalten fehl, wird der vorige Stand zurückgetauscht. Die Löschliste bleibt unangetastet
+        (Art. 17 DSGVO); das Backend löscht beim Start erneut, was die Sicherung zurückgebracht hat."""
         if not isinstance(stempel, str) or not STEMPEL_MUSTER.match(stempel):
             return 2, "Unbekannte Sicherung."
         s = next((x for x in self.sicherungen() if x["stempel"] == stempel), None)
@@ -1966,7 +2073,7 @@ class Agent:
         beginn = jetzt_iso()
         # vorher_stempel: die Sicherung des Stands direkt davor – Einträge danach (auch im Audit-Log) stehen dort
         protokoll = {"id": auftrag_id, "stempel": stempel, "sicherung_zeitpunkt": s["zeitpunkt"],
-                     "angefordert_von": von, "begonnen_am": beginn, "vorher_stempel": vorher}
+                     "angefordert_von": von, "begonnen_am": beginn, "vorher_stempel": None}
 
         def vermerken(zustand, text=""):
             """Eintrag in status/wiederherstellungen.json (je Auftrag einer). „umgestellt“ steht dort, BEVOR das Backend
@@ -2026,7 +2133,21 @@ class Agent:
             if s["verschluesselt"]:
                 os.unlink(tar_datei)
 
-            # 2. Umstellen (EPM ist kurz nicht erreichbar)
+            # 2. Anhalten, dann den jetzigen Stand sichern – ab hier schreibt niemand mehr, bis umgestellt ist
+            dienste = self.epm_dienste()
+            zeile(f"\nEPM anhalten ({', '.join(dienste)}) …\n")
+            self.schritt("Anhalten", self.compose("stop", *dienste), zeile, cwd=self.basis, zeitlimit=300)
+            if vorher_sichern:
+                zeile("Zuerst wird eine Sicherung des jetzigen Stands erstellt.\n")
+                if self.sichern(zeile, art=VORHER_ART["wiederherstellen"], von=von,
+                                simuliert=self.simuliert("sicherung")) != 0:
+                    self.schritt("Starten", self.compose("up", "-d", *dienste), zeile, cwd=self.basis, zeitlimit=600)
+                    self.backend_gesund(zeile)
+                    return fertig(1, "Abgebrochen: Die Sicherung vorher ist fehlgeschlagen. Es wurde nichts verändert.")
+                if not self.simuliert("sicherung"):
+                    protokoll["vorher_stempel"] = (self.sicherungen() or [{}])[0].get("stempel")
+
+            # 3. Umstellen (EPM ist kurz nicht erreichbar)
             sperre = open(os.path.join(self.backup, ".epm-backup.sperre"), "a")
             fcntl.flock(sperre, fcntl.LOCK_EX)  # keine nächtliche Sicherung mitten im Umstellen
             try:
@@ -2041,8 +2162,7 @@ class Agent:
     def umstellen(self, dump, staging, alt_dok, alt_db, zeile, vermerken=lambda *a: None):
         daten = os.path.join(self.basis, "data")
         dok = os.path.join(daten, "dokumente")
-        zeile("\nBackend und Webserver anhalten …\n")
-        self.schritt("Anhalten", self.compose("stop", "backend", "ocr", "web"), zeile, cwd=self.basis, zeitlimit=300)
+        dienste = self.epm_dienste()   # schon angehalten (wiederherstellen)
         db_getauscht = dok_getauscht = False
         try:
             if self.psql("DROP DATABASE IF EXISTS epm_wiederherstellung", zeile) != 0 or \
@@ -2051,7 +2171,8 @@ class Agent:
             zeile("Datenbank einspielen …\n")
             with open(dump, "rb") as f:
                 p = subprocess.run(self.compose("exec", "-T", "db", "pg_restore", "-U", "epm", "-d",
-                                                "epm_wiederherstellung", "--no-owner", "--role=epm", "--exit-on-error"),
+                                                "epm_wiederherstellung", "--no-owner", "--no-privileges", "--role=epm",
+                                                "--exit-on-error"),
                                    cwd=self.basis, stdin=f, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                    timeout=3 * 3600, check=False)
             zeile(p.stdout.decode(errors="replace")[-4000:])
@@ -2073,12 +2194,12 @@ class Agent:
             os.chmod(dok, modus)
             zeile("Dokumente getauscht.\n")
             vermerken("umgestellt")
-            self.schritt("Starten", self.compose("up", "-d", "backend", "ocr", "web"), zeile, cwd=self.basis, zeitlimit=600)
+            self.schritt("Starten", self.compose("up", "-d", *dienste), zeile, cwd=self.basis, zeitlimit=600)
             if not self.backend_gesund(zeile):
                 raise RuntimeError("Das Backend startet mit der wiederhergestellten Sicherung nicht.")
         except Exception as e:  # noqa: BLE001 – zurücktauschen, dann melden
             zeile(f"\nFEHLER: {e}\nVorigen Stand zurückstellen …\n")
-            self.schritt("Anhalten", self.compose("stop", "backend", "ocr", "web"), zeile, cwd=self.basis, zeitlimit=300)
+            self.schritt("Anhalten", self.compose("stop", *dienste), zeile, cwd=self.basis, zeitlimit=300)
             if db_getauscht:
                 self.umbenennen("epm", "epm_fehlgeschlagen", zeile)
                 self.umbenennen(alt_db, "epm", zeile)
@@ -2090,7 +2211,7 @@ class Agent:
             if os.path.isdir(alt_dok) and not os.path.isdir(dok):
                 os.rename(alt_dok, dok)
             vermerken("fehler", f"Wiederherstellen fehlgeschlagen ({e}) – der vorige Stand läuft weiter.")
-            self.schritt("Starten", self.compose("up", "-d", "backend", "ocr", "web"), zeile, cwd=self.basis, zeitlimit=600)
+            self.schritt("Starten", self.compose("up", "-d", *dienste), zeile, cwd=self.basis, zeitlimit=600)
             self.backend_gesund(zeile)
             return 1, f"Wiederherstellen fehlgeschlagen ({e}) – der vorige Stand läuft weiter."
         # Erfolg: den beiseitegelegten Stand entfernen (er steckt in der Sicherung, die vorher erstellt wurde)
@@ -2119,16 +2240,20 @@ class Agent:
         return daten
 
     def auftraege_ausfuehren(self):
-        """Alle wartenden Aufträge der Reihe nach (eine Sperre verhindert parallele Läufe)."""
+        """Wartende Aufträge der Reihe nach (eine Sperre verhindert parallele Läufe). Nach 10 Minuten wird nach dem
+        laufenden Auftrag aufgehört: epm-systemagent.path startet den Dienst neu, solange Aufträge liegen – so gilt
+        TimeoutStartSec (6 h) je Start und nicht für eine ganze Kette (eine Wiederherstellung brach sonst mittendrin ab)."""
         os.makedirs(self.auftraege, exist_ok=True)
+        beginn = time.monotonic()
         with open(os.path.join(self.status, ".sperre"), "w") as sperre:
             fcntl.flock(sperre, fcntl.LOCK_EX)
             while True:
                 dateien = sorted(d for d in os.listdir(self.auftraege) if d.endswith(".json"))
                 if not dateien:
                     break
-                for name in dateien:
-                    self.auftrag(os.path.join(self.auftraege, name))
+                self.auftrag(os.path.join(self.auftraege, dateien[0]))
+                if time.monotonic() - beginn > 600:
+                    break
         self.ergebnisse_aufraeumen()
 
     def auftrag_lesen(self, pfad):
@@ -2150,6 +2275,8 @@ class Agent:
         daten = self.auftrag_lesen(pfad)
         try:
             os.unlink(pfad)
+        except FileNotFoundError:
+            return   # eben zurückgezogen (das Backend hat die Datei gelöscht)
         except OSError:
             pass
         auftrag_id = (daten or {}).get("id", "")
@@ -2174,18 +2301,15 @@ class Agent:
             protokoll.append(text)
             self.ergebnis(auftrag_id, ausgabe="".join(protokoll)[-AUSGABE_MAX:])
 
-        start = jetzt_iso()
         simuliert = self.simuliert(aktion)
+        if minuten and not self.trocken and not self.warten(auftrag_id, aktion, minuten, simuliert):
+            return
+        start = jetzt_iso()
         self.ergebnis(auftrag_id, status="laeuft", aktion=aktion, begonnen_am=start, ausgabe="", ergebnis="",
                       trocken=simuliert)
-        if minuten:
+        if minuten and self.trocken:
             beginn = datetime.fromtimestamp(time.time() + minuten * 60).strftime("%H:%M")
-            if self.trocken:
-                zeile(f"Probelauf: würde {minuten} Minuten bis {beginn} Uhr warten (angemeldete Benutzer sind gewarnt).\n")
-            else:
-                self.ergebnis(auftrag_id, ergebnis=f"Beginnt um {beginn} Uhr (angemeldete Benutzer sind gewarnt).")
-                zeile(f"Warte {minuten} Minuten bis {beginn} Uhr …\n")
-                time.sleep(minuten * 60)
+            zeile(f"Probelauf: würde {minuten} Minuten bis {beginn} Uhr warten (angemeldete Benutzer sind gewarnt).\n")
         rc, kurz = 0, ""
         try:
             rc, kurz = self.ausfuehren(aktion, zeile, auftrag_id, parameter=parameter, geheim=geheim, von=von)
@@ -2199,6 +2323,28 @@ class Agent:
                 zeile(f"\nStatus konnte nicht gemessen werden: {e}\n")
         self.ergebnis(auftrag_id, status="erledigt" if rc == 0 else "fehler", rueckgabe=rc, beendet_am=jetzt_iso(),
                       ergebnis=kurz, ausgabe="".join(protokoll)[-AUSGABE_MAX:])
+
+    def warten(self, auftrag_id, aktion, minuten, simuliert, takt=5):
+        """Warnzeit vor dem Beginn. Der Auftrag bleibt „wartet“ und lässt sich zurückziehen: Das Backend löscht dazu
+        die Marke ``<id>.wartet`` im Auftragsordner. Wer sie zuerst löscht, gewinnt – das Backend (zurückgezogen) oder
+        der Agent bei Beginn (läuft); beides zugleich geht nicht. → True: beginnen, False: zurückgezogen."""
+        marke = os.path.join(self.auftraege, f"{auftrag_id}.wartet")
+        ende = time.time() + minuten * 60
+        beginn = datetime.fromtimestamp(ende).strftime("%H:%M")
+        with open(marke, "w"):
+            pass
+        self.ergebnis(auftrag_id, status="wartet", aktion=aktion, trocken=simuliert,
+                      ergebnis=f"Beginnt um {beginn} Uhr (angemeldete Benutzer sind gewarnt).",
+                      ausgabe=f"Warte {minuten} Minuten bis {beginn} Uhr …\n")
+        while time.time() < ende and os.path.exists(marke):
+            time.sleep(max(0.0, min(takt, ende - time.time())))
+        try:
+            os.unlink(marke)
+            return True
+        except FileNotFoundError:
+            self.ergebnis(auftrag_id, status="abgebrochen", beendet_am=jetzt_iso(),
+                          ergebnis="Zurückgezogen – nichts ausgeführt.")
+            return False
 
     def schritt(self, titel, args, zeile, env=None, cwd=None, zeitlimit=3600, eingabe=None):
         zeile(f"\n$ {' '.join(args)}\n")
@@ -2245,7 +2391,8 @@ class Agent:
             if fehler:
                 return 2, fehler
         vorher = None
-        if vorher_sichern:
+        # Wiederherstellen sichert selbst – erst nach dem Anhalten von EPM (sonst gingen Eingaben dazwischen verloren)
+        if vorher_sichern and aktion != "wiederherstellen":
             zeile("Zuerst wird eine Sicherung erstellt.\n")
             if self.sichern(zeile, art=VORHER_ART.get(aktion, "vor_aenderung"), von=von,
                             simuliert=self.simuliert("sicherung")) != 0:
@@ -2356,7 +2503,7 @@ class Agent:
             if t:
                 zeile(f"\n(Probelauf) Sicherung {parameter.get('stempel')} würde zurückgespielt.\n")
                 return 0, "Probelauf: nichts zurückgespielt."
-            return self.wiederherstellen(parameter.get("stempel"), von, auftrag_id, zeile, vorher=vorher)
+            return self.wiederherstellen(parameter.get("stempel"), von, auftrag_id, zeile, vorher_sichern=True)
 
         if aktion == "datenbank_leeren":
             return self.leeren(parameter.get("behalten"), von, zeile, vorher=vorher, simuliert=t)
@@ -2373,6 +2520,9 @@ class Agent:
 
         if aktion == "epm_paket":
             return self.paket_einspielen(parameter.get("upload"), zeile, simuliert=t)
+
+        if aktion in ("paket_schluessel_zuruecksetzen", "paket_schluessel_behalten"):
+            return self.paket_schluessel_aktion(aktion, von, zeile, simuliert=t)
 
         if aktion == "epm_paket_erstellen":
             return self.paket_erstellen(zeile, simuliert=t)
