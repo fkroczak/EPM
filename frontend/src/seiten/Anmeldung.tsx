@@ -95,7 +95,7 @@ function fehlertext(e: unknown) {
 
 /** Lösungsweg zur Fehlermeldung (Bedienung für Pflegekräfte, 10.10.2026): was als Nächstes zu tun ist */
 const WEITER_ANMELDEN = "Bitte Schreibweise prüfen – Groß- und Kleinschreibung zählt (Feststelltaste?). Nach fünf "
-  + "Fehlversuchen wird das Konto gesperrt; entsperren kann die Administration.";
+  + "Fehlversuchen ist die Anmeldung 15 Minuten gesperrt, nach zehn das Konto; entsperren kann es die Administration.";
 const WEITER_CODE = "Der Code wechselt alle 30 Sekunden – bitte den gerade angezeigten eingeben. Ohne Telefon geht ein Notfall-Code.";
 
 function Formular({ titel, text, onSubmit, children }: { titel: string; text?: ReactNode;

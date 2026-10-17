@@ -78,18 +78,43 @@ class Anmeldung(TestCase):
         self.assertEqual(r.json()["schritt"], "fertig")
         self.assertEqual(self.c.get("/api/auth/sicherheit/").json()["notfallcodes_uebrig"], 9)
 
-    def test_sperre_nach_fehlversuchen(self):
+    def test_sitzung_wartet_nach_fuenf_fehlversuchen(self):
+        from unittest import mock
+
         for _ in range(4):
             self.assertEqual(self.anmelden("falsch").status_code, 401)
-        r = self.anmelden("falsch")  # fünfter Fehlversuch sperrt das Konto
+        r = self.anmelden("falsch")  # fünfter Fehlversuch: diese Sitzung wartet 15 Minuten, das Konto bleibt offen
+        self.assertEqual(r.status_code, 429)
+        self.assertEqual(r.json()["wartezeit"], 15)
+        self.assertIn("15 Minuten gesperrt", r.json()["fehler"])
+        # auch mit richtigem Passwort – die Antwort verrät nichts
+        self.assertEqual(self.anmelden(self.kennwort).json(), r.json())
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_active)
+        # ein anderer Browser (neue Sitzung) kommt mit dem richtigen Passwort hinein
+        c = APIClient()
+        self.assertEqual(c.post("/api/auth/anmelden/", {"benutzername": "neu", "kennwort": self.kennwort},
+                                format="json").status_code, 200)
+        # nach 15 Minuten ist die Sitzung wieder frei
+        jetzt = __import__("time").time()
+        with mock.patch("accounts.api.time.time", return_value=jetzt + 15 * 60 + 1):
+            self.assertEqual(self.anmelden(self.kennwort).status_code, 200)
+
+    def test_sperre_nach_fehlversuchen(self):
+        for i in range(9):  # mit neuen Sitzungen weiterraten: nach je fünf wartet die Sitzung, das Konto zählt weiter
+            if i == 5:
+                self.c = APIClient()
+            self.assertEqual(self.anmelden("falsch").status_code, 429 if i == 4 else 401)
+        r = self.anmelden("falsch")  # zehnter Fehlversuch in Folge sperrt das Konto
         self.assertEqual(r.status_code, 403)
         self.assertTrue(r.json()["gesperrt"])
         self.user.refresh_from_db()
         self.assertFalse(self.user.is_active)
         self.assertIsNotNone(self.user.gesperrt_am)
-        self.assertEqual(SystemEreignis.objects.filter(art="anmeldung_fehlgeschlagen").count(), 5)
+        self.assertEqual(SystemEreignis.objects.filter(art="anmeldung_fehlgeschlagen").count(), 10)
         self.assertTrue(SystemEreignis.objects.filter(art="anmeldung_gesperrt", benutzer=self.user).exists())
         # auch das richtige Kennwort hilft nicht mehr – die Antwort verrät nicht, ob das Kennwort stimmt
+        self.c = APIClient()  # gesperrtes Konto: gleiche Antwort mit richtigem und falschem Kennwort
         r = self.anmelden(self.kennwort)
         self.assertEqual(r.status_code, 403)
         self.assertEqual(self.anmelden("noch-falsch").json(), r.json())
@@ -108,7 +133,7 @@ class Anmeldung(TestCase):
         self.assertIn("Falsches Passwort (3. Versuch)", texte)
         gesperrt = [e for e in log if e["art"] == "anmeldung_gesperrt" and "Konto gesperrt" in e["beschreibung"]]
         self.assertEqual(len(gesperrt), 1)
-        self.assertRegex(gesperrt[0]["beschreibung"], r"^5 falsche Passwörter in \d+ Minuten, Konto gesperrt$")
+        self.assertRegex(gesperrt[0]["beschreibung"], r"^10 falsche Passwörter in \d+ Minuten, Konto gesperrt$")
         self.assertEqual({e["gruppe_name"] for e in log}, {"Fehlversuch"})
         self.assertTrue(all("geraet" in e for e in log))
         entsperrt = a.get("/api/protokoll/?gruppe=benutzer").json()["results"][0]
@@ -131,9 +156,18 @@ class Anmeldung(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.fehlversuche, 1)
         c = Client()
-        for _ in range(4):
-            r = c.post("/verwaltung/login/", {"username": "neu", "password": "falsch", "otp_token": "123456"})
+        # richtiges Passwort, falscher Code zählt ebenfalls; der fünfte Fehlversuch der Sitzung führt zur Wartezeit
+        for i in range(4):
+            r = c.post("/verwaltung/login/", {"username": "neu", "password": "falsch" if i % 2 else self.kennwort,
+                                              "otp_token": "000000"})
             self.assertEqual(r.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.fehlversuche, 5)
+        r = c.post("/verwaltung/login/", {"username": "neu", "password": "falsch", "otp_token": "000000"})
+        self.assertContains(r, "Minuten gesperrt")
+        # weitere Sitzungen zählen am Konto weiter: beim zehnten Fehlversuch ist es gesperrt
+        for _ in range(4):
+            Client().post("/verwaltung/login/", {"username": "neu", "password": self.kennwort, "otp_token": "000000"})
         self.user.refresh_from_db()
         self.assertTrue(self.user.ist_gesperrt)
 

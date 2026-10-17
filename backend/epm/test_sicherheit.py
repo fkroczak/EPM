@@ -461,6 +461,14 @@ class Sitzungen(Grundlage):
         c.post("/api/auth/anmelden/", {"benutzername": "mitarbeiter", "kennwort": KENNWORT}, format="json")
         for i in range(4):
             self.assertEqual(c.post("/api/auth/2fa/", {"code": f"falsch{i}"}, format="json").status_code, 401)
+        # fünfter falscher Code: diese Sitzung wartet 15 Minuten, auch ein gültiger Code hilft dort nicht
+        self.assertEqual(c.post("/api/auth/2fa/", {"code": "falsch4"}, format="json").status_code, 429)
+        self.assertEqual(c.post("/api/auth/2fa/", {"code": codes[1]}, format="json").status_code, 429)
+        # neue Sitzung: das Konto zählt weiter, der zehnte Fehlversuch in Folge sperrt es
+        c = APIClient()
+        c.post("/api/auth/anmelden/", {"benutzername": "mitarbeiter", "kennwort": KENNWORT}, format="json")
+        for i in range(4):
+            self.assertEqual(c.post("/api/auth/2fa/", {"code": f"falsch{i}"}, format="json").status_code, 401)
         r = c.post("/api/auth/2fa/", {"code": "falsch9"}, format="json")
         self.assertEqual(r.status_code, 403)
         self.mitarbeiter.refresh_from_db()
@@ -481,7 +489,7 @@ class Sitzungen(Grundlage):
 
     def test_kennwort_aendern_zaehlt_fehlversuche(self):
         c = echte_anmeldung(self.mitarbeiter, mit_zweitem_faktor(self.mitarbeiter, 1)[0])
-        for _ in range(4):
+        for _ in range(9):
             r = c.post("/api/auth/kennwort/", {"alt": "falsch", "neu": "Ein-ganz-neues-Passwort-77"}, format="json")
             self.assertEqual(r.status_code, 400)
         r = c.post("/api/auth/kennwort/", {"alt": "falsch", "neu": "Ein-ganz-neues-Passwort-77"}, format="json")
@@ -512,7 +520,8 @@ class Sitzungen(Grundlage):
         self.assertTrue(not settings.SESSION_SAVE_EVERY_REQUEST and settings.SESSION_COOKIE_HTTPONLY)
         self.assertEqual((settings.SESSION_COOKIE_SAMESITE, settings.CSRF_COOKIE_SAMESITE), ("Strict", "Strict"))
         self.assertEqual(settings.X_FRAME_OPTIONS, "DENY")
-        self.assertEqual(settings.EPM_LOGIN_MAX_FEHLVERSUCHE, 5)
+        self.assertEqual(settings.EPM_LOGIN_MAX_FEHLVERSUCHE, 10)
+        self.assertEqual((settings.EPM_LOGIN_SITZUNG_FEHLVERSUCHE, settings.EPM_LOGIN_SITZUNG_SPERRE_MIN), (5, 15))
         # Drosselung der Anmeldung gemeinsam für alle Gunicorn-Prozesse
         self.assertEqual(settings.CACHES["default"]["BACKEND"], "django.core.cache.backends.db.DatabaseCache")
 
