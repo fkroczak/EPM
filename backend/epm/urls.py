@@ -209,6 +209,9 @@ from django.contrib import admin  # noqa: E402
 from django_otp.admin import OTPAdminSite  # noqa: E402
 
 admin.site.__class__ = OTPAdminSite  # Django-Admin nur mit Authenticator-Code
+from accounts.verwaltung import VerwaltungAnmeldung  # noqa: E402
+
+admin.site.login_form = VerwaltungAnmeldung  # Fehlversuche zählen, auch beim Code
 admin.site.site_header = "EPM Verwaltung"
 admin.site.site_title = "EPM"
 urlpatterns.append(path("verwaltung/", admin.site.urls))

@@ -24,6 +24,8 @@ Fehler werden als Antwort zurückgegeben (nicht als Exception), damit das
 Protokoll der Fehlversuche nicht mit der Transaktion zurückgerollt wird.
 """
 from io import BytesIO
+import math
+import time
 
 import qrcode
 import qrcode.image.svg
@@ -85,7 +87,7 @@ def naechster_schritt(request) -> str:
 
 
 def fehlversuch(user, request, art):
-    """Zählt einen Fehlversuch; beim fünften wird das Konto gesperrt (bis der Admin entsperrt). Gezählt wird in der
+    """Zählt einen Fehlversuch am Konto; beim zehnten in Folge wird es gesperrt (bis der Admin entsperrt). Gezählt wird in der
     Datenbank: mehrere Server-Prozesse zählen sonst jeder vom eigenen, veralteten Stand aus weiter."""
     User.objects.filter(pk=user.pk).update(fehlversuche=F("fehlversuche") + 1)
     user.refresh_from_db(fields=["fehlversuche"])
@@ -118,6 +120,57 @@ def rollen_entziehen(user, von):
 
 
 GESPERRT_TEXT = "Das Konto ist gesperrt. Bitte an die Administration wenden."
+
+# Fehlversuche je Sitzung (Browser): nach EPM_LOGIN_SITZUNG_FEHLVERSUCHE wartet die Sitzung EPM_LOGIN_SITZUNG_SPERRE_MIN
+# Minuten. Wer mit neuen Sitzungen weiterrät, stößt an die Kontosperre (``fehlversuch``).
+SITZUNG_FEHLER = "epm_fehlversuche"
+SITZUNG_SPERRE = "epm_gesperrt_bis"
+
+
+def sitzung_wartezeit(request) -> int:
+    """Minuten, die diese Sitzung nach zu vielen Fehlversuchen noch warten muss (0: frei)."""
+    bis = request.session.get(SITZUNG_SPERRE)
+    if bis and bis > time.time():
+        return math.ceil((bis - time.time()) / 60)
+    return 0
+
+
+def wartezeit_text(minuten: int) -> str:
+    return (f"Zu viele Fehlversuche. Die Anmeldung ist für {minuten} "
+            f"{'Minute' if minuten == 1 else 'Minuten'} gesperrt. Bitte danach erneut versuchen.")
+
+
+def wartezeit_antwort(minuten: int):
+    return fehler(wartezeit_text(minuten), status.HTTP_429_TOO_MANY_REQUESTS, wartezeit=minuten)
+
+
+def sitzung_fehlversuch(request) -> int:
+    """Zählt einen Fehlversuch in der Sitzung; liefert die Wartezeit in Minuten, wenn die Sitzung damit gesperrt ist."""
+    anzahl = request.session.get(SITZUNG_FEHLER, 0) + 1
+    if anzahl >= settings.EPM_LOGIN_SITZUNG_FEHLVERSUCHE:
+        request.session[SITZUNG_SPERRE] = time.time() + settings.EPM_LOGIN_SITZUNG_SPERRE_MIN * 60
+        anzahl = 0
+    request.session[SITZUNG_FEHLER] = anzahl
+    return sitzung_wartezeit(request)
+
+
+def anmeldung_fehlgeschlagen(request, konto, art, text):
+    """Antwort auf einen Fehlversuch bei der Anmeldung: Konto gesperrt (403), Sitzung muss warten (429) oder ``text``
+    (401). Mit gesperrtem Konto endet auch eine halbe Anmeldung (Passwort ja, zweiter Faktor nein)."""
+    if konto is not None and konto.is_active and fehlversuch(konto, request, art):
+        if request.user.is_authenticated:
+            logout(request)
+        return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
+    minuten = sitzung_fehlversuch(request)
+    return wartezeit_antwort(minuten) if minuten else fehler(text, status.HTTP_401_UNAUTHORIZED)
+
+
+def fehlversuche_zuruecksetzen(request, user):
+    """Nach gelungener Anmeldung: Zähler am Konto und in der Sitzung auf null."""
+    request.session.pop(SITZUNG_FEHLER, None)
+    if user.fehlversuche:
+        user.fehlversuche = 0
+        user.save(update_fields=["fehlversuche"])
 
 
 def bestaetigung_fehlgeschlagen(request, art: str):
@@ -270,6 +323,8 @@ class AnmeldenView(OffenerView):
         kennwort = str(request.data.get("kennwort", ""))
         if not name or not kennwort:
             return fehler("Benutzername und Passwort angeben.")
+        if minuten := sitzung_wartezeit(request):  # vor jeder Prüfung: verrät nichts über Konto und Passwort
+            return wartezeit_antwort(minuten)
         konto = User.objects.filter(username=name, nur_historisch=False).first()
         if konto is not None and konto.ist_gesperrt:
             # gleiche Antwort mit richtigem und falschem Kennwort – das Kennwort wird gar nicht geprüft, sonst ließe es
@@ -278,18 +333,15 @@ class AnmeldenView(OffenerView):
             return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
         user = authenticate(request, username=name, password=kennwort)  # Fehlversuch → Signal → Protokoll
         if user is None:
-            if konto is not None and konto.is_active and fehlversuch(konto, request, "kennwort"):
-                return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
-            return fehler("Benutzername oder Passwort falsch.", status.HTTP_401_UNAUTHORIZED)
+            return anmeldung_fehlgeschlagen(request, konto, "kennwort", "Benutzername oder Passwort falsch.")
         if user.einmal_kennwort_abgelaufen:
             protokolliere(SystemEreignis.Art.ANMELDUNG_FEHLGESCHLAGEN, request, benutzer=user, grund="einmal_kennwort_abgelaufen")
             return fehler("Das Einmal-Passwort ist abgelaufen. Bitte bei der Administration ein neues anfordern.",
                           status.HTTP_401_UNAUTHORIZED, abgelaufen=True)
         login(request, user)  # Sitzungs-ID wird erneuert
-        if naechster_schritt(request) == "fertig" and user.fehlversuche:
+        if naechster_schritt(request) == "fertig":
             # ohne zweiten Faktor ist die Anmeldung hier abgeschlossen (sonst setzt der Code die Fehlversuche zurück)
-            user.fehlversuche = 0
-            user.save(update_fields=["fehlversuche"])
+            fehlversuche_zuruecksetzen(request, user)
         return status_antwort(request)
 
 
@@ -298,14 +350,14 @@ class ZweiterFaktorView(OffenerView):
         user = request.user
         if not user.is_authenticated:
             return fehler("Bitte zuerst mit Passwort anmelden.", status.HTTP_401_UNAUTHORIZED)
+        if minuten := sitzung_wartezeit(request):
+            return wartezeit_antwort(minuten)
         code = str(request.data.get("code", "")).replace(" ", "")
         for geraet in [*TOTPDevice.objects.filter(user=user, confirmed=True),
                        *StaticDevice.objects.filter(user=user, confirmed=True)]:
             if geraet.verify_token(code):
                 otp_login(request, geraet)
-                if user.fehlversuche:
-                    user.fehlversuche = 0
-                    user.save(update_fields=["fehlversuche"])
+                fehlversuche_zuruecksetzen(request, user)
                 if isinstance(geraet, StaticDevice):
                     protokolliere(SystemEreignis.Art.ANMELDUNG, request, schritt="notfallcode",
                                   verbleibend=geraet.token_set.count())
@@ -313,10 +365,7 @@ class ZweiterFaktorView(OffenerView):
                     protokolliere(SystemEreignis.Art.ANMELDUNG, request, schritt="2fa")
                 return status_antwort(request)
         protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request, versuch=user.fehlversuche + 1)
-        if fehlversuch(user, request, "2fa"):
-            logout(request)
-            return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
-        return fehler("Code ungültig.", status.HTTP_401_UNAUTHORIZED)
+        return anmeldung_fehlgeschlagen(request, user, "2fa", "Code ungültig.")
 
 
 class KennwortView(OffenerView):
@@ -485,6 +534,8 @@ class PasskeyAnmeldenView(OffenerView):
         user = request.user
         if not user.is_authenticated:
             return fehler("Bitte zuerst mit Passwort anmelden.", status.HTTP_401_UNAUTHORIZED)
+        if minuten := sitzung_wartezeit(request):
+            return wartezeit_antwort(minuten)
         antwort = request.data.get("antwort")
         if not isinstance(antwort, dict):
             return fehler("Antwort des Passkeys fehlt.")
@@ -494,17 +545,12 @@ class PasskeyAnmeldenView(OffenerView):
             return fehler(str(e))
         if geraet is not None:
             otp_login(request, geraet)
-            if user.fehlversuche:
-                user.fehlversuche = 0
-                user.save(update_fields=["fehlversuche"])
+            fehlversuche_zuruecksetzen(request, user)
             protokolliere(SystemEreignis.Art.ANMELDUNG, request, schritt="passkey", passkey=geraet.name)
             return status_antwort(request)
         protokolliere(SystemEreignis.Art.ZWEITER_FAKTOR_FEHLGESCHLAGEN, request, versuch=user.fehlversuche + 1,
                       passkey=True)
-        if fehlversuch(user, request, "passkey"):
-            logout(request)
-            return fehler(GESPERRT_TEXT, status.HTTP_403_FORBIDDEN, gesperrt=True)
-        return fehler("Der Passkey wurde nicht erkannt.", status.HTTP_401_UNAUTHORIZED)
+        return anmeldung_fehlgeschlagen(request, user, "passkey", "Der Passkey wurde nicht erkannt.")
 
 
 class PasskeyRegistrierenView(OffenerView):

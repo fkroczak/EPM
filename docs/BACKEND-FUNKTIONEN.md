@@ -72,7 +72,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 | F05 | Authenticator einrichten und ersetzen | 1 Anmeldung, 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
 | F06 | Notfall-Codes neu erzeugen | 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
 | F07 | Abmelden | alle Ansichten (Seitenleiste) | ABGESCHLOSSEN UND GETESTET |
-| F08 | Konto sperren nach 5 Fehlversuchen | 1 Anmeldung, 17 Benutzer, 20 Audit-Log | ABGESCHLOSSEN UND GETESTET |
+| F08 | Wartezeit nach 5, Kontosperre nach 10 Fehlversuchen | 1 Anmeldung, 17 Benutzer, 20 Audit-Log | ABGESCHLOSSEN UND GETESTET |
 | F09 | Eigenes Profil, Darstellung, Startseite (Kacheln mit Größe) und Spaltenaufteilung speichern | 14 Mein Konto, 2 Start, alle Seiten mit Spaltenteiler | ABGESCHLOSSEN UND GETESTET |
 | F10 | Sicherheitsstatus im Konto | 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
 | F11 | Angemeldete Sitzungen anzeigen und abmelden | 14 Mein Konto | ABGESCHLOSSEN UND GETESTET |
@@ -325,7 +325,7 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 - **Validierung:** Code passt zu einem bestätigten TOTP-Gerät oder zu einem unverbrauchten Notfall-Code (wird verbraucht).
   Erfolg setzt den Fehlversuchszähler zurück; ein falscher Code zählt als Fehlversuch (F08).
 - **Tabellen:** `otp_totp_totpdevice`, `otp_static_staticdevice`, `otp_static_statictoken`, `accounts_user`, `audit_systemereignis`
-- **Fehlerfälle:** 401 nicht mit Kennwort angemeldet oder Code falsch · 403 `gesperrt` beim fünften Fehlversuch (Abmeldung) · 429
+- **Fehlerfälle:** 401 nicht mit Kennwort angemeldet oder Code falsch · 429 Wartezeit beim fünften Fehlversuch der Sitzung · 403 `gesperrt` beim zehnten am Konto (Abmeldung) · 429
 - **Testschritte:** Anmeldung mit Kennwort, dann Notfall-Code → `fertig`, danach 9 Codes übrig.
 - **Teststatus:** Backend-Tests grün (`test_erstanmeldung`, `Sitzungen.*`). Browsertests grün: `anmeldung.spec.ts` „Anmeldung mit Passwort und Code aus der Authenticator-App, Abmelden“ (Code aus der Authenticator-App),
   Notfall-Code in `global-setup.ts` und `konto.spec.ts` „Passwort ändern, Notfall-Codes neu, neues Gerät, andere Sitzung beenden“; Neustart geprüft in `zz-neustart.spec.ts` (Anmeldung mit dem Code des neuen Geräts).
@@ -377,19 +377,27 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 - **Teststatus:** Backend-Test grün (`Sitzungen.test_abmelden_entfernt_sitzung`). Browsertest grün: `anmeldung.spec.ts` „Anmeldung mit Passwort und Code aus der Authenticator-App, Abmelden“ (danach `auth/status` = `anmelden`).
 - **Status:** ABGESCHLOSSEN UND GETESTET
 
-### F08 Konto sperren nach 5 Fehlversuchen
-- **Zweck:** Schutz gegen Raten. **Beschluss (Entwurf 17, 20):** Konto bleibt gesperrt, bis der Admin entsperrt; Audit-Log
-  zeigt „5 falsche Passwörter in 4 Minuten, Konto gesperrt“ und einen Hinweis mit Link zum Benutzer.
+### F08 Wartezeit nach 5, Kontosperre nach 10 Fehlversuchen
+- **Zweck:** Schutz gegen Raten. **Beschluss (Entwurf 17, 20; geändert 17.10.2026):** Nach 5 Fehlversuchen in einer
+  Sitzung (Browser) wartet diese 15 Minuten; ein anderer Browser des echten Benutzers bleibt frei. Nach 10 Fehlversuchen in
+  Folge am Konto (über alle Sitzungen, ohne gelungene Anmeldung dazwischen) bleibt das Konto gesperrt, bis der Admin
+  entsperrt; Audit-Log zeigt „10 falsche Passwörter in n Minuten, Konto gesperrt“ und einen Hinweis mit Link zum Benutzer.
+  Gilt auch für die Django-Verwaltung (`/verwaltung/`), dort zählt auch ein richtiges Passwort mit falschem Code.
 - **Ansicht:** 1 Anmeldung, 17 Benutzer, 20 Audit-Log
-- **Endpunkte:** wirkt in F02/F03; Hinweis `GET /api/benutzer/hinweise/` → `[{id, benutzername, anzeigename, gesperrt_am,
-  sperrgrund, fehlversuche}]`; Entsperren über F53.
-- **Logik:** Zähler `fehlversuche` je Konto (falsches Kennwort und falscher 2FA-Code); beim fünften: `is_active = false`,
-  `gesperrt_am`, `sperrgrund`, alle Sitzungen beendet, Ereignis `anmeldung_gesperrt` mit Anzahl und Minuten seit dem ersten
-  gezählten Fehlversuch. Erfolgreicher zweiter Faktor setzt den Zähler zurück. Grenze `EPM_LOGIN_MAX_FEHLVERSUCHE = 5`.
+- **Endpunkte:** wirkt in F02/F03 und `/verwaltung/login/`; Hinweis `GET /api/benutzer/hinweise/` → `[{id, benutzername,
+  anzeigename, gesperrt_am, sperrgrund, fehlversuche}]`; Entsperren über F53.
+- **Logik:** Zähler in der Sitzung (`epm_fehlversuche`, Wartezeit bis `epm_gesperrt_bis`; geprüft vor Konto und Passwort,
+  verrät also nichts) und Zähler `fehlversuche` je Konto (falsches Kennwort, falscher 2FA-Code, falscher Passkey); beim
+  zehnten: `is_active = false`, `gesperrt_am`, `sperrgrund`, alle Sitzungen beendet, Ereignis `anmeldung_gesperrt` mit
+  Anzahl und Minuten seit dem ersten gezählten Fehlversuch. Gelungene Anmeldung setzt beide Zähler zurück. Grenzen
+  `EPM_LOGIN_SITZUNG_FEHLVERSUCHE = 5`, `EPM_LOGIN_SITZUNG_SPERRE_MIN = 15`, `EPM_LOGIN_MAX_FEHLVERSUCHE = 10`.
 - **Tabellen:** `accounts_user` (`fehlversuche`, `gesperrt_am`, `sperrgrund`), `audit_systemereignis`
-- **Fehlerfälle:** 403 `{"fehler": "Das Konto ist gesperrt …", "gesperrt": true}`
-- **Testschritte:** 4 × falsch → 401; 5. → 403 gesperrt; richtiges Kennwort → 403; falsches → 401; Admin entsperrt →
-  Anmeldung klappt; Audit-Log zeigt „Falsches Passwort (3. Versuch)“ und „5 falsche Passwörter in n Minuten, Konto gesperrt“.
+- **Fehlerfälle:** 429 `{"fehler": "Zu viele Fehlversuche. Die Anmeldung ist für 15 Minuten gesperrt …", "wartezeit": 15}` ·
+  403 `{"fehler": "Das Konto ist gesperrt …", "gesperrt": true}`
+- **Testschritte:** 4 × falsch → 401; 5. → 429 (auch mit richtigem Kennwort), anderer Browser kommt hinein, nach 15 Minuten
+  frei; mit neuen Sitzungen weiter bis zum 10. → 403 gesperrt; richtiges und falsches Kennwort → gleiche Antwort; Admin
+  entsperrt → Anmeldung klappt; Audit-Log zeigt „Falsches Passwort (3. Versuch)“ und „10 falsche Passwörter in n Minuten,
+  Konto gesperrt“.
 - **Teststatus:** Backend-Test grün (`Anmeldung.test_sperre_nach_fehlversuchen`). Browsertest grün: `admin.spec.ts` „Fünf falsche Passwörter sperren das Konto; Admin sieht den Hinweis, setzt 2FA zurück und entsperrt“ (Meldung an der Anmeldung, Hinweis im
   Audit-Log mit Link zum Benutzer, Entsperren); Neustart geprüft in `zz-neustart.spec.ts`.
 - **Status:** ABGESCHLOSSEN UND GETESTET

@@ -200,8 +200,11 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 
-# Anmeldung: nach 5 Fehlversuchen bleibt das Konto gesperrt, bis der Admin entsperrt
-EPM_LOGIN_MAX_FEHLVERSUCHE = 5
+# Anmeldung: nach 5 Fehlversuchen in einer Sitzung wartet diese 15 Minuten; nach 10 Fehlversuchen in Folge (über alle
+# Sitzungen, ohne gelungene Anmeldung dazwischen) bleibt das Konto gesperrt, bis der Admin entsperrt
+EPM_LOGIN_SITZUNG_FEHLVERSUCHE = 5
+EPM_LOGIN_SITZUNG_SPERRE_MIN = 15
+EPM_LOGIN_MAX_FEHLVERSUCHE = 10
 EPM_EINMAL_KENNWORT_STUNDEN = int(env("EPM_EINMAL_KENNWORT_STUNDEN", "48"))
 
 OTP_TOTP_ISSUER = env("EPM_OTP_ISSUER", "EPM")
