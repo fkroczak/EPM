@@ -325,7 +325,10 @@ def alte_felder_entfernen(v: KiVorgang):
     Qualitäts-Dashboard, übernommene unverändert."""
     offen = v.felder.filter(status__in=[KiFeld.Status.OFFEN, KiFeld.Status.FREIGEGEBEN])
     offen.filter(korrekturen__isnull=False).update(status=KiFeld.Status.VERWORFEN)
-    offen.filter(korrekturen__isnull=True).delete()
+    # ohne Kaskade auf ki_kikorrektur: Dort darf der KI-Dienst nur anfügen (ki/dbrolle.py), und diese Felder haben
+    # ohnehin keine Korrektur (kommt gleichzeitig eine hinzu, scheitert der Fremdschlüssel statt sie zu löschen)
+    weg = KiFeld.objects.filter(pk__in=list(offen.filter(korrekturen__isnull=True).values_list("pk", flat=True)))
+    weg._raw_delete(weg.db)
 
 
 def verarbeiten(vorgang: KiVorgang, rahmen: Rahmen, paddle=None) -> KiVorgang:

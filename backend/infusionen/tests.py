@@ -120,6 +120,39 @@ class Infusionsplaene(PlanHilfen, Grundlage):
                     cur.execute(sql, args)
         self.assertEqual(plan.vitamine.count(), 2)
 
+    def test_freigabe_geht_vom_gespeicherten_stand_aus(self):
+        """Veraltete Kopie (vorab geladene Positionen) darf weder PDF noch Datensatz verfälschen; zweite Freigabe scheitert."""
+        from unittest import mock
+
+        from django.core.exceptions import ValidationError
+
+        from patienten.models import Dokument
+
+        c = client_fuer(self.mediziner)
+        e = self.entwurf(c)
+        c.patch(f"/api/infusionsplaene/{e['id']}/", self.plan_daten(), format="json")
+        alt1 = Infusionsplan.objects.prefetch_related("positionen").get(pk=e["id"])
+        alt2 = Infusionsplan.objects.get(pk=e["id"])
+        list(alt1.positionen.all())
+        c.patch(f"/api/infusionsplaene/{e['id']}/", {"glucose_g": "150", "positionen": [
+            {"praeparat": praeparat("Pantozol i.v.").id, "menge": "50", "einheit": "ml"}]}, format="json")
+        gesehen = {}
+        original = Infusionsplan._pdf_ablegen
+
+        def merken(plan, benutzer):
+            gesehen["glucose_g"] = plan.glucose_g
+            gesehen["mengen"] = [p.menge for p in plan.positionen.all()]
+            return original(plan, benutzer)
+
+        with mock.patch.object(Infusionsplan, "_pdf_ablegen", merken):
+            alt1.freigeben(self.mediziner)
+        self.assertEqual(gesehen, {"glucose_g": Decimal("150"), "mengen": [Decimal("50")]})
+        self.assertEqual(Infusionsplan.objects.get(pk=e["id"]).glucose_g, Decimal("150"))
+        anzahl = Dokument.objects.filter(patient=self.patient).count()
+        with self.assertRaises(ValidationError):
+            alt2.freigeben(self.mediziner)
+        self.assertEqual(Dokument.objects.filter(patient=self.patient).count(), anzahl)
+
     def test_vergleich_mit_vorgaenger(self):
         alt = self.freigegebener_plan()
         c = client_fuer(self.mediziner)

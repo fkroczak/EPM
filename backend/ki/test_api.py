@@ -238,10 +238,46 @@ class PruefenUndUebernehmenTest(KiApiGrundlage):
         self.assertIn("KI, geprüft", plan.bemerkung)
         # zweiter Plan mit gleichem Beginn: Konflikt, Ersetzen geht bei freigegebenen Plänen nicht
         v2 = self.vorgang(nr=2)
-        f2 = self.feld(v2, "infusion", substanz="KCl", planfeld="kalium_mmol", menge="20", von="2026-03-12")
+        f2 = self.feld(v2, "infusion", substanz="KCl", planfeld="kalium_mmol", menge="20", einheit="mmol",
+                       von="2026-03-12")
         vorschau = client_fuer(self.mediziner).get(f"/api/ki/vorgaenge/{v2.pk}/vorschau/").json()[0]
         self.assertEqual((vorschau["aktion"], vorschau["optionen"]), ("konflikt", ["neu", "verwerfen"]))
         self.assertTrue(f2.pk)
+
+    def test_infusion_einheit_und_planfeld_geprueft(self):
+        """„Glucose 40 % 500 ml“ darf nicht als 500 g in den Plan; Planfelder nur aus der Liste (nie Patient/Status)."""
+        c = client_fuer(self.mediziner)
+        f = self.feld(self.v, "infusion", substanz="Glucose 40 %", planfeld="glucose_g", menge="500", einheit="ml",
+                      von="2026-03-12")
+        c.post(self.url("freigeben/"), {"felder": [f.pk]}, format="json")
+        r = c.post(self.url("uebernehmen/"), {"felder": [f.pk], "bestaetigt": True}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertIn("Einheit", r.json()["felder"][str(f.pk)])
+        self.assertFalse(Infusionsplan.objects.exists())
+        for boese in ["patient_id", "status", "herkunft", ["glucose_g"]]:
+            r = c.patch(self.url(f"felder/{f.pk}/"), {"wert": {"planfeld": boese}}, format="json")
+            self.assertEqual(r.status_code, 400, (boese, r.content))
+        r = c.patch(self.url(f"felder/{f.pk}/"), {"wert": {"menge": "200", "einheit": "g"}, "status": "freigegeben"},
+                    format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        r = c.post(self.url("uebernehmen/"), {"felder": [f.pk], "bestaetigt": True}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(Infusionsplan.objects.get(patient=self.patient).glucose_g, Decimal("200"))
+
+    def test_zweite_uebernahme_mit_veralteter_kopie_schreibt_nichts(self):
+        """Wie bei zwei gleichzeitigen Bestätigungen: Die zweite liest nach der Sperre und findet alles übernommen."""
+        from types import SimpleNamespace
+
+        from ki import uebernahme
+
+        self.c.post(self.url("freigeben/"), {"felder": [self.kalium_feld.pk]}, format="json")
+        veraltet = KiVorgang.objects.get(pk=self.v.pk)
+        r = self.c.post(self.url("uebernehmen/"), {"felder": [self.kalium_feld.pk], "bestaetigt": True}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        with self.assertRaises(uebernahme.Ungueltig):
+            uebernahme.uebernehmen(veraltet, [self.kalium_feld.pk], {}, SimpleNamespace(user=self.mitarbeiter))
+        self.assertEqual(Laborwert.objects.count(), 1)
+        self.assertEqual(KiUebernahme.objects.count(), 1)
 
     def test_medikation_diagnose_text_und_dokumentdatum(self):
         m = self.feld(self.v, "medikation", wirkstoff="Pantoprazol", staerke="40 mg", dosierung="1-0-0",
@@ -319,7 +355,8 @@ class BerichteTest(KiApiGrundlage):
         self.assertEqual(bericht.status, "entwurf")
         self.assertIn("KI-Entwurf (Experimentell)", bericht.inhalt)
         self.assertIn("Quellen", bericht.inhalt)
-        self.assertEqual(c.post(f"/api/ki/berichte/{auftrag.pk}/speichern/", {}, format="json").status_code, 400)
+        self.assertEqual(c.post(f"/api/ki/berichte/{auftrag.pk}/speichern/", {}, format="json").status_code, 409)
+        self.assertEqual(Bericht.objects.filter(patient=self.patient).count(), 1)
 
     def test_ohne_modell_und_ohne_recht(self):
         a = KiBerichtsauftrag.objects.create(patient=self.patient, art="labor", angefordert_von=self.mediziner)
@@ -450,3 +487,33 @@ class DbRolleTest(KiApiGrundlage):
                                "now(), '')", [d.pk, self.patient.pk])
             finally:
                 c.execute("RESET ROLE")
+
+    def test_ki_dienst_ohne_anmeldedaten_und_nachweise_nur_anfuegen(self):
+        from ki.dbrolle import einrichten
+        from ki.pipeline import alte_felder_entfernen
+
+        einrichten(rolle="epm_ki_test")
+        v = self.vorgang()
+        offen, korrigiert = self.feld(v), self.feld(v)
+        KiKorrektur.objects.create(feld=korrigiert, version=1, alt={}, neu={}, benutzer=self.mitarbeiter)
+        mv = KiModellversion.objects.create(name="m", datei="m.gguf", sha256="x")
+        with connection.cursor() as c:
+            c.execute("SET ROLE epm_ki_test")
+            try:
+                for anweisung in ["SELECT count(*) FROM django_session", "SELECT count(*) FROM accounts_sitzung",
+                                  "SELECT count(*) FROM otp_totp_totpdevice", "SELECT count(*) FROM otp_static_statictoken",
+                                  "UPDATE ki_kikorrektur SET kommentar = 'x'", "DELETE FROM ki_kikorrektur",
+                                  "DELETE FROM ki_kiuebernahme", "UPDATE ki_kimodellversion SET status = 'aktiv'"]:
+                    with self.subTest(anweisung), self.assertRaises(DatabaseError), transaction.atomic():
+                        with connection.cursor() as c2:
+                            c2.execute(anweisung)
+                # was der Dienst wirklich tut, geht weiter
+                with transaction.atomic():
+                    alte_felder_entfernen(v)
+                    mv.evaluation = {"faelle": 1}
+                    mv.save(update_fields=["evaluation"])
+            finally:
+                c.execute("RESET ROLE")
+        self.assertFalse(KiFeld.objects.filter(pk=offen.pk).exists())
+        self.assertEqual(KiFeld.objects.get(pk=korrigiert.pk).status, KiFeld.Status.VERWORFEN)
+        self.assertEqual(KiKorrektur.objects.count(), 1)

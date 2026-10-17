@@ -25,7 +25,7 @@ from epm.sanitize import bereinige_html
 from scans.ocr import auswertung
 
 from .models import KiFeld, KiUebernahme, KiVorgang
-from .pruefung import dezimal
+from .pruefung import EINHEIT_PLANFELD, PLANFELDER, dezimal, einheit_passt
 
 E = KiFeld.Entscheidung
 UEBERNEHMBAR_META = {"dokumentdatum", "dokumenttyp"}
@@ -126,11 +126,20 @@ def vorschau_feld(f: KiFeld, unsicher_unter: float) -> dict:
         if d is None:
             erg["fehler"] = "Beginn (gültig ab) fehlt – bitte im Feld ergänzen."
             return erg
+        planfeld = w.get("planfeld")
+        if planfeld and (not isinstance(planfeld, str) or planfeld not in PLANFELDER):
+            erg["fehler"] = "Unbekanntes Feld des Infusionsplans – bitte das Planfeld leeren."
+            return erg
+        if planfeld and dezimal(w.get("menge")) is not None and not einheit_passt(planfeld, w.get("einheit")):
+            # sonst stünde z. B. „Glucose 40 % 500 ml“ als 500 g im Plan
+            erg["fehler"] = (f"Einheit „{w.get('einheit') or '–'}“ passt nicht zum Planfeld ({EINHEIT_PLANFELD[planfeld]}) – "
+                             "bitte Menge umrechnen und Einheit korrigieren oder das Planfeld leeren.")
+            return erg
         alt = Infusionsplan.objects.filter(patient=p, gueltig_ab=d).exclude(status=Infusionsplan.Status.ENTWURF).first()
         if alt is not None:
             erg["bestehend"] = {"modell": "infusionsplan", "id": alt.pk, "gueltig_ab": d.isoformat(),
                                 "status": alt.get_status_display(),
-                                "wert": str(getattr(alt, w["planfeld"])) if w.get("planfeld") else None}
+                                "wert": str(getattr(alt, planfeld)) if planfeld else None}
             # Freigegebene Pläne sind unveränderlich: ersetzen/ergänzen geht nicht, nur zusätzlich anlegen
             erg["aktion"] = "konflikt"
             erg["optionen"] = [E.NEU, E.VERWERFEN]
@@ -221,8 +230,14 @@ def vorschau(vorgang: KiVorgang, felder: list[KiFeld] | None = None) -> list[dic
 
 
 # --------------------------------------------------------------------------------------------- Übernahme
+@transaction.atomic
 def uebernehmen(vorgang: KiVorgang, feld_ids: list[int], entscheidungen: dict, request) -> dict:
     """Übernimmt die gewählten (freigegebenen) Felder. Wirft ``Konflikt``/``Ungueltig``/``PermissionError``."""
+    # Vorgang sperren, Status und Felder erst danach lesen: Eine gleichzeitige zweite Bestätigung wartet und findet
+    # die Felder dann schon übernommen – sonst stünden Laborwerte, Medikamente und Texte doppelt in der Akte.
+    vorgang.refresh_from_db(from_queryset=KiVorgang.objects.select_for_update())
+    if vorgang.status not in KiVorgang.PRUEFBAR:
+        raise Ungueltig({"fehler": "Dieser Vorgang ist nicht (mehr) zur Prüfung vorgelegt."})
     user = request.user
     patient = vorgang.patient
     pruefe_schreibbereich(user, patient)
@@ -400,7 +415,7 @@ def _infusion(felder, vorgang, user) -> list[dict]:
             w = f.endwert
             menge = dezimal(w.get("menge"))
             feld = w.get("planfeld")
-            if feld and menge is not None and hasattr(plan, feld):
+            if feld in PLANFELDER and menge is not None:  # nur Mengenfelder – nie Patient, Status, Herkunft
                 if feld in grenzen and not (grenzen[feld][0] <= menge <= grenzen[feld][1]):
                     raise Ungueltig({str(f.pk): f"{w.get('substanz')}: {menge} liegt außerhalb der "
                                                 f"Plausibilitätsgrenzen ({grenzen[feld][0]}–{grenzen[feld][1]})."})

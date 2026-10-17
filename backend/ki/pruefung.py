@@ -37,6 +37,11 @@ EINHEIT_PLANFELD = {"kalium_mmol": "mmol", "natrium_mmol": "mmol", "phosphat_mmo
                     "albumin_ml": "ml"}
 
 
+def einheit_passt(feld: str, einheit: str | None) -> bool:
+    """Einheit gehört zum Planfeld („g“, „g/d“ zu ``glucose_g`` – nicht „ml“ oder „mg“)."""
+    return re.split(r"[/(]", str(einheit or "").lower().replace(" ", ""))[0] == EINHEIT_PLANFELD[feld]
+
+
 def planfeld(substanz: str) -> str | None:
     n = auswertung.norm(substanz).replace(" ", "")
     for feld, (_stoff, begriffe) in PLANFELDER.items():
@@ -248,7 +253,7 @@ def infusion(roh: dict, *, ocr_text: str, seite: int) -> dict:
     if feld is None:
         hinweise.append("Substanz keinem Feld des Infusionsplans zugeordnet – als Position vorgeschlagen")
         konf -= 0.1
-    elif einheit and EINHEIT_PLANFELD[feld] not in einheit.lower():
+    elif einheit and not einheit_passt(feld, einheit):
         hinweise.append(f"Einheit „{einheit}“ passt nicht zum Planfeld ({EINHEIT_PLANFELD[feld]}) – bitte umrechnen")
         konf -= 0.2
     if roh.get("menge") and not im_text(str(roh.get("menge")), ocr_text):
