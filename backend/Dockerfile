@@ -15,6 +15,12 @@ COPY scans/modelle/ /tmp/modelle/
 RUN mkdir -p /opt/ocr-modelle \
  && (python /tmp/modelle/holen.py /opt/ocr-modelle || echo "WARNUNG: PP-OCR-Modelle fehlen im Image")
 
+# Quellcode ohne den Vorrat offline eingespielter Modelle (scans/modelle/dateien, mit dem Sprachmodell für Diktate
+# ≈ 680 MB): Die Modelle kommen über die Stufe „modelle“ nach /opt/ocr-modelle, nicht ein zweites Mal nach /app
+FROM python:3.13-slim AS quelle
+COPY . /app
+RUN rm -rf /app/scans/modelle/dateien
+
 FROM python:3.13-slim
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -41,7 +47,7 @@ COPY --from=bau /opt/venv /opt/venv
 RUN /opt/venv/bin/ocrmypdf --version
 COPY --from=modelle /opt/ocr-modelle /opt/ocr-modelle
 WORKDIR /app
-COPY --chown=root:root . /app
+COPY --from=quelle --chown=root:root /app /app
 RUN sed -i "s/\r$//" /app/entrypoint.sh \
  && python -m compileall -q /app /opt/venv \
  && mkdir -p /app/staticfiles && chown 10001:10001 /app/staticfiles \

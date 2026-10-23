@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Modelle der zweiten Texterkennung (PP-OCRv5, UVDoc) offline vorbereiten und auf der Test-VM einspielen.
+# Modelle der zweiten Texterkennung (PP-OCRv5, UVDoc) und das Sprachmodell für Diktate offline vorbereiten und auf der Test-VM einspielen.
 #
 # Hintergrund: Beim Bau des Backend-Images werden die Modelle sonst von huggingface.co geladen. Hat der Server dafür
 # keine Freigabe im Proxy, entsteht das Image trotzdem – die Erkennung arbeitet dann nur mit Tesseract.
@@ -7,7 +7,7 @@
 # backend/scans/modelle/modelle.json), und die Test-VM baut sie beim nächsten Update ein.
 #
 #   1. Auf einem Rechner mit Internet (Linux, macOS, WSL; unter Windows ohne WSL: ocr-modelle.ps1):
-#        werkzeuge/ocr-modelle.sh vorbereiten                 → epm-ocr-modelle-<Revision>.tar (≈ 120 MB)
+#        werkzeuge/ocr-modelle.sh vorbereiten                 → epm-ocr-modelle-<Revision>.tar (≈ 680 MB mit dem Sprachmodell für Diktate)
 #   2. Datei auf die Test-VM kopieren:
 #        scp epm-ocr-modelle-*.tar epmadmin@TEST-VM:~/
 #   3. Auf der Test-VM:

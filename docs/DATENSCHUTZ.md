@@ -208,3 +208,16 @@ Plan und Entscheidungen: `docs/KI-ERWEITERUNG-PLAN-2026-10-14.md`; Betrieb: `doc
 Pflege der Akte, Qualitätssicherung), Datenschutz-Folgenabschätzung (Art. 35 DSGVO – neue Technologie, Gesundheitsdaten),
 Lizenz des Modells prüfen, Information der Mitarbeiter (die Hinweise sind keine Empfehlung), zuständige Person für den
 Datenschutz benennen (laut Entscheidung 14.10.2026 noch offen).
+
+## 8. Diktate (23.10.2026)
+
+| Anforderung | Umsetzung |
+|---|---|
+| Keine Sprache an Dritte | Abschrift ausschließlich auf dem eigenen Server (whisper.cpp im OCR-Dienst, Netz `intern`, ohne Weg nach außen). Die Diktierfunktionen von Chrome/Edge und die Windows-Spracheingabe (Cloud) werden **nicht** verwendet |
+| Nichts auf dem Gerät | Die Aufnahme geht nach „Zum Abschreiben senden“ direkt an den Server; im Browser bleibt sie nur bis dahin im Arbeitsspeicher. Am Handy nur über VPN |
+| Aufbewahrung | Aufnahme unter `data/scans/diktate/` (nicht in der Sicherung, Rechte 0640). Gelöscht mit der Freigabe des Berichts (dann auch die Abschrift – der Text steht im Bericht), nach der Übernahme in den Kommentar eines Infusionsplans, beim Verwerfen von Diktat oder Entwurf und mit der Akte; Kommentar-Diktate ohne Übernahme nach 3 Tagen |
+| Zugriff | Diktieren: Recht „Diktieren“ (Standard Mediziner). Nachhören, übernehmen, verwerfen: „Einträge erfassen“ (Sekretariat). Nur Akten im eigenen Bereich |
+| Nachweis | Audit-Art „Diktat“: aufgenommen (Dauer), abgeschrieben (Wortzahl, unsichere Wörter, Rechenzeit), übernommen, verworfen; der Datensatz des Diktats bleibt ohne Ton und Text |
+
+**Vor dem Einsatz (organisatorisch):** Eintrag im Verarbeitungsverzeichnis (Zweck: Erstellung von Arztbriefen und
+Berichten), Information der Mitarbeiter, dass die Abschrift Fehler enthalten kann und vor der Freigabe geprüft wird.

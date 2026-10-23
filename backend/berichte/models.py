@@ -101,6 +101,9 @@ class Bericht(AktenEintrag):
         self.full_clean()
         if not (self.inhalt or "").strip():
             raise ValidationError({"inhalt": "Ein leerer Bericht kann nicht freigegeben werden."})
+        from diktate.dienst import bei_freigabe
+
+        bei_freigabe(self)  # läuft noch eine Abschrift → warten; sonst Aufnahmen löschen
         self.status = self.Status.FREIGEGEBEN
         self.freigegeben_am = timezone.now()
         self.freigegeben_von = benutzer

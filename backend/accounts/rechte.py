@@ -26,6 +26,9 @@ Festlegungen vom 01.10.2026:
 - Festlegung 03.10.2026: „Testdaten sehen“ (Testpatienten und Testbenutzer) je Gruppe einstellbar – ohne das Recht
   erscheinen sie nirgends. Standard: alle Rollen wie bisher; Admin fest (legt nur Testpatienten an und verlöre sonst
   alles, was er schreiben darf). Testbenutzer sehen ihre Testpatienten immer.
+- Festlegung 23.10.2026 (Diktate): „Diktieren“ Standard für Mediziner (und Admin bei Testpatienten), je Gruppe
+  erteilbar. Den abgeschriebenen Text übernehmen darf, wer Einträge erfassen darf; freigeben wie bisher mit „Berichte
+  freigeben“ – wie bei Infusionsplänen jeder mit dem Recht, nicht nur wer diktiert hat.
 Für Betrachter gilt die Rollenmatrix aus dem Entwurf 17.
 
 Was nicht ausdrücklich in der Datenbank steht, kommt aus STANDARD. Testbenutzer erhalten nie
@@ -54,6 +57,9 @@ RECHTE = [
     ("berichte_freigeben", "Berichte freigeben",
      "einen Bericht aus der Akte abschließen; dabei entsteht die PDF und der Bericht wird unveränderlich "
      "(Standard: Mediziner, je Gruppe umstellbar – U54)"),
+    ("diktieren", "Diktieren",
+     "Berichte und Kommentare zu Infusionsplänen diktieren; der Server schreibt sie ab (offline). Den Text übernehmen "
+     "und fertig machen darf, wer Einträge erfassen darf (z. B. das Sekretariat). Standard: Mediziner"),
     ("schreiben_freigeben", "Schreiben freigeben (Korrespondenz)",
      "ein Schreiben der Akte freigeben; dabei entsteht die endgültige PDF und das Schreiben wird unveränderlich. "
      "Entwürfe anlegen und den Versand vermerken darf, wer Einträge erfassen darf (Standard: Mediziner)"),
@@ -109,7 +115,7 @@ _KI_MITARBEITER = {"ki_ansehen", "ki_pruefen", "ki_uebernehmen", "ki_berichte"}
 PATIENTENDATEN_SCHREIBEN = {"eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
                             "plaene_abschliessen", "akten_abschliessen", "dokumente_umhaengen",
                             "datenschutz_bearbeiten", "datenschutz_entscheiden", "berichte_freigeben",
-                            "schreiben_freigeben", "ki_uebernehmen"}
+                            "schreiben_freigeben", "ki_uebernehmen", "diktieren"}
 
 # Endgültiges Löschen (F73, F80) dürfen Admins auch bei echten Akten (Festlegung 02.10.2026); die übrigen Prüfungen
 # (Frist bzw. Antrag, Kennwort + 2FA + Bestätigungscode, Audit-Log, Löschprotokoll) gelten unverändert
