@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     "hilfe",
     "scans",
     "ki",  # KI (Experimentell): lokale Erkennung, Strukturierung, Prüf-Queue (14.10.2026)
+    "diktate",  # Diktate: Aufnahme im Browser, Abschrift offline im OCR-Dienst (23.10.2026)
 ]
 INSTALLED_APPS.insert(0, "django.contrib.admin")
 

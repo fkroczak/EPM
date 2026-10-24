@@ -18,6 +18,8 @@ from django.utils import timezone
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections
 
+from diktate import abschrift as diktat_abschrift, dienst as diktat_dienst
+from diktate.models import Diktat
 from scans import dienst, dokumente
 from scans.ocr.erkennung import verfahren_stand
 from scans.ocr.paddle import Paddle
@@ -60,7 +62,9 @@ class Command(BaseCommand):
                 ende["jetzt"] = True
                 try:
                     aktuell = ende["scan"]
-                    if isinstance(aktuell, dokumente.DokumentErkennung):
+                    if isinstance(aktuell, Diktat):
+                        diktat_dienst.geplant_beendet(aktuell)
+                    elif isinstance(aktuell, dokumente.DokumentErkennung):
                         dokumente.geplant_beendet(aktuell)
                     elif aktuell is not None:
                         dienst.geplant_beendet(aktuell)
@@ -75,6 +79,12 @@ class Command(BaseCommand):
             log.exception("PP-OCR-Modelle nicht ladbar – Erkennung nur mit Tesseract")
             paddle = None
         stand_text = verfahren_stand()
+        # Diktate (23.10.2026): Modell erst beim ersten Diktat laden, nach Leerlauf wieder freigeben
+        abschreiber = diktat_abschrift.Abschreiber()
+        bereit, grund = diktat_abschrift.bereitschaft()
+        diktat_stand = {"bereit": bereit, "grund": grund, "modell": diktat_abschrift.MODELL_NAME,
+                        "threads": diktat_abschrift.threads()}
+        log.info("Diktate: %s", "bereit" if bereit else grund)
         log.info("OCR-Dienst bereit: Tesseract %s, PP-OCR %s", stand_text["tesseract"]["text"],
                  stand_text["paddle"]["text"])
         lebt = Path(os.environ.get("EPM_OCR_LEBT", "/tmp/epm-ocr-lebt"))
@@ -92,7 +102,7 @@ class Command(BaseCommand):
                 zaehler["zuletzt_stand"] = time.monotonic()
                 stand_schreiben({"gestartet": start.isoformat(timespec="seconds"),
                                  "lebenszeichen": timezone.now().isoformat(timespec="seconds"),
-                                 "verfahren": stand_text, "bearbeitet": zaehler["bearbeitet"],
+                                 "verfahren": stand_text, "bearbeitet": zaehler["bearbeitet"], "diktat": diktat_stand,
                                  "threads": os.environ.get("EPM_OCR_THREADS", "2"), "speicher": speicher()})
 
         while not ende["jetzt"]:
@@ -102,13 +112,33 @@ class Command(BaseCommand):
                 dienst.bereinigen_hoechstens_stuendlich()
                 # nach einem Neustart (z. B. Speichergrenze erreicht): abgebrochene Aufträge sofort wieder einreihen
                 dienst.haengende_zuruecksetzen()
-                scan = dienst.auftrag_holen()
+                diktat_dienst.haengende_zuruecksetzen()
+                # Diktate „sofort“ zuerst (jemand wartet auf den Text), „nachts“ nur im Nachtfenster nach den Scans
+                diktat = diktat_dienst.auftrag_holen() if diktat_stand["bereit"] else None
+                scan = None if diktat is not None else dienst.auftrag_holen()
                 # „Text erkennen“ an Dokumenten der Akte (F170), wenn keine Scans warten
-                auftrag = None if scan is not None else dokumente.auftrag_holen()
+                auftrag = None if diktat is not None or scan is not None else dokumente.auftrag_holen()
+                if diktat is None and scan is None and auftrag is None and diktat_stand["bereit"] \
+                        and diktat_dienst.nachtfenster():
+                    diktat = diktat_dienst.auftrag_holen(nachts=True)
             except Exception:  # noqa: BLE001 – z. B. Datenbank startet noch oder Migration läuft
                 log.exception("Warteschlange nicht lesbar – neuer Versuch in 10 Sekunden")
                 time.sleep(10)
                 continue
+            if diktat is not None:
+                log.info("Schreibe ab: %s", diktat)
+                ende["scan"] = diktat
+                try:
+                    with dienst.herzschlag(diktat, zusatz=lebenszeichen):
+                        fertig_d = diktat_dienst.abschreiben(diktat, abschreiber, abbrechen=lambda: ende["jetzt"],
+                                                             lebenszeichen=lebenszeichen)
+                    log.info("%s: %s (%s s)", fertig_d, fertig_d.get_status_display(), fertig_d.rechenzeit_s)
+                except Exception:  # noqa: BLE001 – ein Diktat darf den Dienst nicht beenden
+                    log.exception("Abschrift %s abgebrochen", diktat)
+                ende["scan"] = None
+                zaehler["bearbeitet"] += 1
+                continue
+            abschreiber.freigeben_wenn_ruhig()
             if scan is None and auftrag is not None:
                 log.info("Text erkennen: %s", auftrag)
                 ende["scan"] = auftrag

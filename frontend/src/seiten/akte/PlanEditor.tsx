@@ -1,5 +1,5 @@
 /** Entwurf 7 · Neuer Infusionsplan bzw. Entwurf bearbeiten: vorbelegt, Änderungen markiert, kcal wie im Altsystem. */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,6 +21,7 @@ import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { anlageOeffnen } from "@/seiten/admin/Anlagen";
 import { Editor } from "@/components/Editor";
+import { KommentarDiktat } from "@/components/Diktat";
 import { name, useAkte } from "./Akte";
 
 const ZAHLEN = ["basis_ml", "glucose_g", "aminosaeuren_g", "lipide_g", "albumin_ml", "natrium_mmol", "kalium_mmol",
@@ -302,6 +303,10 @@ export function PlanEditor() {
     onSuccess: (v) => setVorschau(v),
   });
 
+  // diktierter Kommentar (23.10.2026) ans Ende; ein leerer Kommentar wird ersetzt
+  const kommentarDiktat = useCallback((text: string) => setF((a) => a && ({ ...a,
+    bemerkung: (a.bemerkung.replace(/<[^>]+>/g, "").trim() ? a.bemerkung : "") + text })), []);
+
   // ohne Recht bzw. bei abgeschlossener Akte gibt es den Editor nicht: zurück zu den Plänen
   if (patient.ist_abgeschlossen || !darfBei("plaene_anlegen", patient)) {
     return <Navigate to={`/patienten/${patient.id}/plaene`} replace />;
@@ -516,7 +521,11 @@ export function PlanEditor() {
             <WeitereBestandteile positionen={f.positionen} praeparate={p} fehler={e} markiert={geaendert("positionen")}
               onAendern={(positionen) => setF((a) => ({ ...a!, positionen }))} />
             <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium" id="plan-kommentar">Kommentar</span>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-sm font-medium" id="plan-kommentar">Kommentar</span>
+                {/* Diktate (23.10.2026): abgeschrieben wird sofort, der Text kommt ans Ende des Kommentars */}
+                <KommentarDiktat patientId={patient.id} onText={kommentarDiktat} />
+              </div>
               <Editor wert={f.bemerkung} onAenderung={setze("bemerkung")} label="Kommentar" werkzeuge={false} hoehe={56} />
             </div>
           </Karte>

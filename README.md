@@ -46,6 +46,16 @@ sudo epm-ki status | aus
 Unter 12 GB RAM / 4 Kernen bleibt der KI-Dienst von selbst aus. Plan: [`docs/KI-ERWEITERUNG-PLAN-2026-10-14.md`](docs/KI-ERWEITERUNG-PLAN-2026-10-14.md),
 Betrieb: [`docs/KI-BETRIEB.md`](docs/KI-BETRIEB.md), API: [`docs/KI-API.md`](docs/KI-API.md), Datenschutz: [`docs/DATENSCHUTZ.md`](docs/DATENSCHUTZ.md) § 7.
 
+## Diktate (23.10.2026)
+Im Bericht (Arztbrief, Konsultationsbericht …) und im Kommentar des Infusionsplans: **Diktat aufnehmen** → im Browser
+sprechen (PC, Mac, Handy im VPN) → „sofort“ oder „heute Nacht“, „ich selbst“ oder „Sekretariat“ → der OCR-Dienst schreibt
+offline ab (whisper.cpp, nur CPU, Modell ≈ 550 MB in `scans/modelle/modelle.json`, kommt wie die OCR-Modelle ins Image
+bzw. offline mit `werkzeuge/ocr-modelle.sh`). Nachhören mit markierten unsicheren Wörtern, „In den Text übernehmen“,
+freigeben wie bisher – die PDF hat das Layout der Stiftung, die Aufnahme wird dabei gelöscht. Abgegebene Diktate stehen
+im Menü **Diktate**. Recht „Diktieren“ (Standard Mediziner). Details: `docs/BACKEND-FUNKTIONEN.md` F192,
+`docs/DATENSCHUTZ.md` § 8. Nachtfenster `EPM_DIKTAT_NACHT=21-7`, Rechenkerne `EPM_DIKTAT_THREADS` (sonst
+`EPM_OCR_THREADS`). Der OCR-Dienst braucht dafür mindestens `EPM_OCR_SPEICHER=3g` (Server ab 6 GB RAM).
+
 ## Server ohne SSH warten (10.10.2026)
 Unter **Administration › Systemverwaltung** stehen Zustand (Ampel) und die häufigen Aufgaben; alles Weitere unter
 Administration › System (Reiter Wartung, Software, Zertifikat, Protokolle) und › Backup. Updates, Neustart, Dienste,

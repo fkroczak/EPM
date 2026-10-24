@@ -394,6 +394,12 @@ def bereinigen_hoechstens_stuendlich():
         return None
     _zuletzt_bereinigt = time.monotonic()
     try:
+        from diktate.dienst import bereinigen as diktate_bereinigen
+
+        diktate_bereinigen()
+    except Exception:  # noqa: BLE001
+        log.exception("Bereinigung der Diktate fehlgeschlagen")
+    try:
         return bereinigen()
     except Exception:  # noqa: BLE001 – Aufräumen darf nichts anderes verhindern
         log.exception("Bereinigung der Scans fehlgeschlagen")

@@ -23,6 +23,7 @@ from stammdaten.api import (
 )
 from befunde.api import BiaMessungViewSet, LaborbefundViewSet
 from berichte.api import BerichtViewSet
+from diktate.api import DiktatViewSet
 from korrespondenz.api import SchreibenViewSet
 from scans.api import ScanViewSet
 from ki import api as ki
@@ -43,6 +44,7 @@ router.register("therapieschritte", TherapieschrittViewSet, basename="therapiesc
 router.register("laborbefunde", LaborbefundViewSet, basename="laborbefund")
 router.register("bia-messungen", BiaMessungViewSet, basename="biamessung")
 router.register("berichte", BerichtViewSet, basename="bericht")
+router.register("diktate", DiktatViewSet, basename="diktat")
 router.register("korrespondenz", SchreibenViewSet, basename="korrespondenz")
 router.register("erklaerungen", ErklaerungViewSet, basename="erklaerung")
 router.register("datenschutzanfragen", DatenschutzanfrageViewSet, basename="datenschutzanfrage")

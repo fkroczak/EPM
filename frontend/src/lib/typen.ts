@@ -7,7 +7,7 @@ export type Recht =
   | "datenschutz_bearbeiten" | "datenschutz_entscheiden" | "akten_loeschen"
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
   | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "testdaten_sehen" | "system_verwalten"
-  | "altdaten_importieren" | "berichte_freigeben" | "scans_bearbeiten" | "schreiben_freigeben"
+  | "altdaten_importieren" | "berichte_freigeben" | "scans_bearbeiten" | "schreiben_freigeben" | "diktieren"
   | "ki_ansehen" | "ki_pruefen" | "ki_uebernehmen" | "ki_berichte" | "ki_verwalten" | "ki_training_freigeben";
 
 /** Kacheln der Startseite (S11): klinische und – mit dem jeweiligen Recht – die der Administration (S12–S14) */
@@ -939,6 +939,39 @@ export type Bericht = {
   vorlage_version: number | null;
   firma_kurz?: string | null;
 };
+
+// ================================================================= Diktate (23.10.2026)
+/** Wort der Abschrift: [Text mit führendem Leerzeichen, von ms, bis ms, Sicherheit 0–1] */
+export type DiktatWort = [string, number, number, number];
+export type Diktat = {
+  id: number;
+  patient: number;
+  patient_name: string;
+  patient_nummer: number;
+  bericht: number | null;
+  bericht_titel: string | null;
+  bericht_status: "entwurf" | "freigegeben" | null;
+  zweck: "bericht" | "plan";
+  status: "wartet" | "laeuft" | "fertig" | "fehler";
+  status_name: string;
+  wann: "sofort" | "nachts";
+  uebergabe: "selbst" | "sekretariat";
+  dauer_s: number;
+  text?: string;
+  woerter?: DiktatWort[];
+  unsicher: number;
+  modell: string;
+  rechenzeit_s: number | null;
+  schritt: string;
+  fehler: string;
+  erstellt_am: string;
+  erstellt_von_name: string | null;
+  abgeschrieben_am: string | null;
+  uebernommen_am: string | null;
+  uebernommen_von_name: string | null;
+  audio: boolean;
+};
+export type DiktatStand = { bereit: boolean; grund: string; dienst_laeuft: boolean; wartend: number; offen?: number };
 
 
 // ================================================================= Hinweise stummschalten (07.10.2026, F119)

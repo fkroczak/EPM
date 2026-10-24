@@ -20,6 +20,7 @@ import { Editor, Richtext } from "@/components/Editor";
 import { PdfDialog } from "@/components/PdfDialog";
 import { Bestaetigen } from "@/components/Bestaetigen";
 import { FirmaMarke } from "@/components/FirmenWahl";
+import { DiktatAufnahme, DiktatListe, useDiktate } from "@/components/Diktat";
 import { useAkte } from "./Akte";
 import { Aktenseite, Detail, Eintrag, Eintragsliste, useWahl } from "./Aktenseite";
 import { DiagnosenKurz } from "./Diagnosen";
@@ -81,6 +82,11 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
   const arten = useAuswahl("berichtart");
   const qc = useQueryClient();
   const melden = useHinweis();
+  const { darf } = useAuth();
+  // Diktat in einem neuen Bericht: Der Entwurf wird beim Senden der Aufnahme angelegt, danach wird er geändert
+  const [angelegt, setAngelegt] = useState<Bericht | null>(null);
+  const [diktatAktiv, setDiktatAktiv] = useState(false);
+  const aktuell = bericht ?? angelegt;
   const [titel, setTitel] = useState("");
   const [art, setArt] = useState("");
   const [tag, setTag] = useState(datum(heuteIso()));
@@ -92,6 +98,7 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
   const schluessel = `${bericht?.id ?? "neu"}-${offen}`;
   if (offen && gesetzt !== schluessel) {
     setGesetzt(schluessel);
+    setAngelegt(null);
     setTitel(bericht?.titel ?? "");
     setArt(bericht?.art ? String(bericht.art) : "");
     setTag(datum(bericht?.datum ?? heuteIso()));
@@ -105,19 +112,19 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
   // geschlossen: beim nächsten Öffnen neu vorbelegen (sonst stünde der zuletzt bearbeitete Bericht noch drin)
   if (!offen && gesetzt) setGesetzt("");
 
+  const koerper = () => {
+    const iso = eingabeDatum(tag);
+    if (!iso) throw new ApiFehler(400, "", null, { datum: "Bitte als TT.MM.JJJJ eingeben." });
+    return { patient: patient.id, titel: titel.trim(), art: art ? Number(art) : null, datum: iso,
+      empfaenger: empfaenger.trim(), inhalt };
+  };
   const speichern = useMutation({
-    mutationFn: () => {
-      const iso = eingabeDatum(tag);
-      if (!iso) throw new ApiFehler(400, "", null, { datum: "Bitte als TT.MM.JJJJ eingeben." });
-      const koerper = { patient: patient.id, titel: titel.trim(), art: art ? Number(art) : null, datum: iso,
-        empfaenger: empfaenger.trim(), inhalt };
-      return bericht
-        ? api<Bericht>(`berichte/${bericht.id}/`, { method: "PATCH", body: koerper })
-        : api<Bericht>("berichte/", { body: koerper });
-    },
+    mutationFn: () => aktuell
+      ? api<Bericht>(`berichte/${aktuell.id}/`, { method: "PATCH", body: koerper() })
+      : api<Bericht>("berichte/", { body: koerper() }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["berichte", patient.id] });
-      melden(bericht ? "Bericht geändert." : "Entwurf gespeichert.");
+      melden(aktuell ? "Bericht geändert." : "Entwurf gespeichert.");
       onOffen(false);
     },
   });
@@ -125,6 +132,20 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
   const { reset } = speichern;
   useEffect(() => { if (offen) reset(); }, [offen, reset]);
   const istFall = arten.data?.find((a) => String(a.id) === art)?.wert === "Fallzusammenfassung";
+  /** Vor dem ersten Diktat eines neuen Berichts: Entwurf anlegen (ohne Titel heißt er nach der Berichtsart) */
+  const entwurfFuerDiktat = async () => {
+    if (aktuell) return aktuell.id;
+    const name = titel.trim() || arten.data?.find((a) => String(a.id) === art)?.wert || `Diktat vom ${datum(heuteIso())}`;
+    if (!titel.trim()) setTitel(name);
+    const neu = await api<Bericht>("berichte/", { body: { ...koerper(), titel: name } });
+    setAngelegt(neu);
+    void qc.invalidateQueries({ queryKey: ["berichte", patient.id] });
+    return neu.id;
+  };
+  const diktatUebernehmen = (text: string) => {
+    setInhalt((alt) => (alt.replace(/<[^>]+>/g, "").trim() ? alt : "") + text);
+    setStand((x) => x + 1);
+  };
   const gliederung = () => {
     const leer = !inhalt.replace(/<[^>]+>/g, "").trim();
     if (!leer && !window.confirm("Die Gliederung vor den bisherigen Text setzen?")) return;
@@ -134,11 +155,11 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
   };
 
   return (
-    <Dialog offen={offen} onOffen={onOffen} breite={780} titel={bericht ? "Bericht bearbeiten" : "Neuer Bericht"} geaendert={geaendert}
+    <Dialog offen={offen} onOffen={onOffen} breite={780} titel={aktuell ? "Bericht bearbeiten" : "Neuer Bericht"} geaendert={geaendert || diktatAktiv}
       beschreibung="Der Bericht bleibt Entwurf, bis er freigegeben wird. Erst dann entsteht die PDF."
       fuss={<>
-        <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
-        <Knopf variante="pri" laedt={speichern.isPending} disabled={!titel.trim()}
+        <Knopf onClick={() => { if (!diktatAktiv || window.confirm("Die Aufnahme ist noch nicht gesendet. Trotzdem schließen?")) onOffen(false); }}>Abbrechen</Knopf>
+        <Knopf variante="pri" laedt={speichern.isPending} disabled={!titel.trim() || diktatAktiv}
           onClick={() => speichern.mutate()}>Entwurf speichern</Knopf>
       </>}>
       <div className="grid gap-3 sm:grid-cols-[1fr_12.5rem_10rem]">
@@ -173,6 +194,13 @@ function BerichtDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; o
         setInhalt((alt) => alt.includes(DIAGNOSEN_PLATZHALTER) ? alt.replace(DIAGNOSEN_PLATZHALTER, liste) : `${alt}<h3>Diagnosen</h3>${liste}`);
         setStand((x) => x + 1);
       }} />
+      {/* Diktate (23.10.2026): aufnehmen, abschreiben lassen, nachhören, übernehmen */}
+      {darf("diktieren") ? (
+        <DiktatAufnahme patientId={patient.id} berichtId={aktuell?.id} vorHochladen={entwurfFuerDiktat} onAktiv={setDiktatAktiv}
+          onHochgeladen={(d) => melden(d.wann === "nachts" ? "Diktat gesendet – es wird heute Nacht abgeschrieben."
+            : "Diktat gesendet – die Abschrift erscheint hier, meist nach wenigen Minuten.")} />
+      ) : null}
+      <DiktatListe berichtId={aktuell?.id} onUebernehmen={diktatUebernehmen} />
       <Feld label="Bericht" fehler={f.inhalt}>
         {() => <Editor key={stand} wert={inhalt} onAenderung={setInhalt} label="Bericht" hoehe={300} />}
       </Feld>
@@ -185,6 +213,8 @@ function FreigabeDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; 
   const { patient } = useAkte();
   const qc = useQueryClient();
   const melden = useHinweis();
+  const diktate = useDiktate(offen ? bericht?.id : null);
+  const offeneDiktate = (diktate.data ?? []).filter((d) => !d.uebernommen_am).length;
   const freigeben = useMutation({
     mutationFn: () => api<Bericht>(`berichte/${bericht!.id}/freigeben/`, { body: {} }),
     onSuccess: () => {
@@ -206,6 +236,12 @@ function FreigabeDialog({ bericht, offen, onOffen }: { bericht: Bericht | null; 
         Mit der Freigabe entsteht die PDF und wird als Dokument der Akte abgelegt. Danach lässt sich der Bericht
         nicht mehr ändern – eine Korrektur ist ein neuer Bericht.
       </Meldung>
+      {offeneDiktate ? (
+        <Meldung art="warn">
+          {offeneDiktate === 1 ? "Ein Diktat ist" : `${offeneDiktate} Diktate sind`} noch nicht in den Text übernommen.
+          Mit der Freigabe werden Aufnahmen und Abschriften gelöscht.
+        </Meldung>
+      ) : null}
       <Fehleranzeige fehler={freigeben.error} />
     </Dialog>
   );
@@ -280,6 +316,7 @@ export function Berichte() {
                 ? <Knopf klein icon="dokument" onClick={() => setPdf(gewaehlt)}>PDF ansehen</Knopf> : null}
             </>}>
             <Richtext html={gewaehlt.inhalt} leer="Noch kein Text." />
+            {entwurf ? <DiktatListe berichtId={gewaehlt.id} hinweis={erfassen ? "Übernehmen: oben „Bearbeiten“." : undefined} /> : null}
             {entwurf ? <DiagnosenImBericht patientId={patient.id} /> : null}
             {gewaehlt.freigabevermerk
               ? <p className="m-0 text-[0.8125rem] gedaempft border-t border-rand pt-2">{gewaehlt.freigabevermerk}</p> : null}

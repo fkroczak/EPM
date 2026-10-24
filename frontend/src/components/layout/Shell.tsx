@@ -22,6 +22,7 @@ import { Chip, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
 import { FirmenSchalter } from "./FirmenSchalter";
 import { Logo } from "./logo";
+import { useDiktatStand } from "@/lib/diktate";
 
 /** In der Schublade am Telefon stehen die Texte immer neben den Symbolen */
 const Voll = createContext(false);
@@ -85,6 +86,7 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
   const ich = useIch();
   const { abmelden, darf } = useAuth();
   const scansOffen = useScansOffen();
+  const diktateOffen = useDiktatStand().data?.offen ?? 0;
   const kiZurPruefung = useKiZurPruefung();
   const navigate = useNavigate();
   const admin = [
@@ -140,6 +142,9 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
         {darf("datenschutz_bearbeiten") || darf("datenschutz_entscheiden") ? <NavEintrag zu="/datenschutz" icon="schloss" text="Datenschutz" /> : null}
         {/* eigener Menüpunkt direkt nach Datenschutz (Festlegung 08.10.2026, F160 ff.) */}
         {darf("scans_bearbeiten") ? <NavEintrag zu="/scans" icon="scan" text="Scans" zahl={scansOffen} testid="nav-scans" /> : null}
+        {/* Diktate (23.10.2026): fürs Sekretariat, sobald etwas abgegeben ist; wer diktiert, sieht den Punkt immer */}
+        {darf("eintraege_erfassen") && (darf("diktieren") || diktateOffen > 0)
+          ? <NavEintrag zu="/diktate" icon="mikrofon" text="Diktate" zahl={diktateOffen} testid="nav-diktate" /> : null}
         {/* KI (Experimentell, 14.10.2026): Prüf-Queue mit Zahl der Dokumente zur Prüfung */}
         {darf("ki_ansehen") ? <NavEintrag zu="/ki" icon="stern" text="KI (Experimentell)" zahl={kiZurPruefung} testid="nav-ki" /> : null}
       </nav>

@@ -576,6 +576,29 @@ bearbeiten oder <strong>verwerfen</strong> (mit Rückfrage). Wer das Recht hat, 
 ist dann unveränderlich, seine PDF liegt bei den Dokumenten der Akte. Eine Korrektur ist ein neuer Bericht.</p>""",
     },
     {
+        "id": "diktate", "gruppe": "patienten", "titel": "Diktieren", "rechte": ["diktieren", "eintraege_erfassen"],
+        "seiten": ["/patienten/:id/berichte", "/diktate"],
+        "html": """
+<p>Berichte (z. B. Arztbrief, Konsultationsbericht) und den Kommentar eines Infusionsplans können Sie
+<strong>diktieren</strong>. Der Server schreibt die Aufnahme selbst ab – ohne Internet, nichts geht an fremde Dienste.</p>
+<ol>
+<li>Im Bericht <strong>Diktat aufnehmen</strong> wählen und sprechen. Beim ersten Mal fragt der Browser nach dem Mikrofon.
+<strong>Pause</strong> und <strong>Weiter</strong> sind jederzeit möglich, <strong>Fertig</strong> beendet die Aufnahme.</li>
+<li>Wählen: <strong>sofort</strong> (meist nach wenigen Minuten fertig) oder <strong>heute Nacht</strong> (lange Diktate),
+und wer den Text fertig macht: <strong>ich selbst</strong> oder das <strong>Sekretariat</strong>.</li>
+<li><strong>Zum Abschreiben senden</strong>. Ein neuer Bericht wird dabei als Entwurf angelegt.</li>
+<li>Ist die Abschrift da: <strong>Anhören</strong> und auf ein Wort klicken spielt ab dieser Stelle. Unsicher erkannte
+Wörter sind farbig markiert. <strong>In den Text übernehmen</strong>, korrigieren, speichern, freigeben.</li>
+</ol>
+<p>Ansagen beim Sprechen: „neuer Absatz“, „neue Zeile“, „Doppelpunkt“, „Klammer auf“ / „Klammer zu“, „Schrägstrich“.
+Satzzeichen setzt die Abschrift selbst. Unter <strong>Fachbegriffe</strong> tragen Sie Namen, Präparate und Abkürzungen
+ein, die richtig geschrieben werden sollen; Diagnosen der Akte und Präparate kennt sie schon.</p>
+<p>Das Sekretariat findet abgegebene Diktate im Menü <strong>Diktate</strong>. Mit der Freigabe des Berichts werden
+Aufnahme und Abschrift gelöscht. Beim Infusionsplan steht der diktierte Text nach der Abschrift von selbst am Ende des
+Kommentars.</p>
+<p>Am Handy geht das Diktieren nur im VPN.</p>""",
+    },
+    {
         "id": "korrespondenz", "gruppe": "patienten", "titel": "Korrespondenz", "rechte": ["akten_lesen"],
         "seiten": ["/patienten/:id/korrespondenz"],
         "html": """

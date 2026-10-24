@@ -5,7 +5,9 @@
 
 Liegen die Dateien schon neben dieser Liste in ``dateien/`` (offline vorbereitet mit ``werkzeuge/ocr-modelle.sh``;
 ``epm-update`` legt sie vor dem Bau dorthin), werden sie von dort übernommen – der Bau braucht dann keinen Zugang zu
-huggingface.co. Jede Datei wird gegen ihre Prüfsumme aus ``modelle.json`` geprüft (SHA-256, bei kleinen Textdateien die Git-Kennung);
+huggingface.co. Jede Datei wird gegen ihre Prüfsumme aus ``modelle.json`` geprüft (SHA-256, beim Sprachmodell für Diktate SHA-1 wie von
+whisper.cpp veröffentlicht, bei kleinen Textdateien die Git-Kennung); fehlt eine Datei mit ``"optional": true``, gilt der
+Vorrat trotzdem als vollständig.
 was schon vorhanden und richtig ist, wird nicht erneut geladen. Ohne Python-Pakete außer der Standardbibliothek;
 ein Proxy aus ``HTTPS_PROXY`` wird benutzt. Rückgabe 0 = alles da, 1 = etwas fehlt.
 """
@@ -23,11 +25,17 @@ VORRAT = Path(__file__).with_name("dateien")
 
 
 def pruefen(pfad: Path, eintrag: dict) -> bool:
-    if not pfad.is_file() or pfad.stat().st_size != eintrag["groesse"]:
+    if not pfad.is_file() or ("groesse" in eintrag and pfad.stat().st_size != eintrag["groesse"]):
         return False
+    if "sha256" in eintrag or "sha1" in eintrag:
+        # große Dateien (Sprachmodell für Diktate, ≈ 550 MB) stückweise prüfen statt ganz einzulesen
+        art = "sha256" if "sha256" in eintrag else "sha1"
+        h = hashlib.new(art)
+        with open(pfad, "rb") as f:
+            while teil := f.read(1 << 20):
+                h.update(teil)
+        return h.hexdigest() == eintrag[art]
     daten = pfad.read_bytes()
-    if "sha256" in eintrag:
-        return hashlib.sha256(daten).hexdigest() == eintrag["sha256"]
     kopf = f"blob {len(daten)}\0".encode()
     return hashlib.sha1(kopf + daten).hexdigest() == eintrag["git_sha1"]
 
@@ -47,8 +55,8 @@ def holen(ziel: Path, laden: bool = True) -> bool:
             print(f"übernommen {eintrag['pfad']} (offline vorbereitet)")
             continue
         if not laden:
-            print(f"FEHLT      {eintrag['pfad']}", file=sys.stderr)
-            alles_da = False
+            print(f"FEHLT      {eintrag['pfad']}{' (optional)' if eintrag.get('optional') else ''}", file=sys.stderr)
+            alles_da = alles_da and bool(eintrag.get("optional"))
             continue
         pfad.parent.mkdir(parents=True, exist_ok=True)
         url = eintrag.get("url") or liste["quelle"] + eintrag["pfad"]
@@ -66,12 +74,16 @@ def holen(ziel: Path, laden: bool = True) -> bool:
                 time.sleep(3 * versuch)
                 continue
             if pruefen(pfad, eintrag):
-                print(f"geladen    {eintrag['pfad']} ({eintrag['groesse'] / 1e6:.1f} MB)")
+                print(f"geladen    {eintrag['pfad']} ({pfad.stat().st_size / 1e6:.1f} MB)")
                 break
             print(f"Prüfsumme falsch: {eintrag['pfad']}", file=sys.stderr)
             pfad.unlink(missing_ok=True)
         else:
-            alles_da = False
+            # optionale Dateien (Sprachmodell für Diktate): Fehlen ist kein Fehler der Texterkennung
+            if eintrag.get("optional"):
+                print(f"HINWEIS: {eintrag['pfad']} fehlt (optional) – {eintrag.get('zweck', '')[:80]}", file=sys.stderr)
+            else:
+                alles_da = False
     if laden:
         (ziel / "LIZENZ.txt").write_text(liste["lizenz"] + "\n", encoding="utf-8")
     return alles_da

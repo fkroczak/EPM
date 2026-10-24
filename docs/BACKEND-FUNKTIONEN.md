@@ -48,6 +48,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 
 | Nr. | Funktion | Ansicht (Entwurf) | Status |
 |---|---|---|---|
+| 23.10.2026 | Diktate, F192: Mikrofon im Bericht (Arztbrief, Konsultationsbericht …) und im Kommentar des Infusionsplans; Aufnahme im Browser (WebM/Opus bzw. MP4/AAC, ≈ 15 MB je Stunde), Abschrift offline im OCR-Dienst mit whisper.cpp (large-v3-turbo q5_0, nur CPU), „sofort“ oder „heute Nacht“, „selbst“ oder „Sekretariat“; Nachhören mit Sprung zum Wort und markierten unsicheren Wörtern, „In den Text übernehmen“; eigene Fachbegriffe; Aufnahme wird bei der Freigabe gelöscht; Recht „Diktieren“, Audit-Art „Diktat“, Berichtsart „Konsultationsbericht“; `GET/POST /api/diktate/…` | Akte › Berichte, Infusionsplan › Kommentar, Menü „Diktate“ | TEILWEISE ABGESCHLOSSEN – 19 Backend-Tests (`backend/diktate/tests.py`, echte Abschrift nur mit Modell, z. B. in CI); im Browser mit simuliertem Mikrofon durchgespielt; Live-Mitschreiben folgt nach dem Aufrüsten (16 GB / 8 Kerne) |
 | 15.10.2026 | Neutrales Favicon: statt der Stiftungsfarben (Nachtblau, Orange, Gold) das EPM-Symbol der Anmeldeseite (Schiefer-Petrol #24353D mit weißer Pulslinie, `frontend/public/favicon.svg`); `theme-color` ebenfalls Schiefer-Petrol, Beschreibung im `index.html` ohne Firmennamen („EPM – Elektronisches Patientenmanagement“) | Browser-Tab, Lesezeichen | ABGESCHLOSSEN |
 | 15.10.2026 | KI (Experimentell), F191: lokale KI (Qwen3.5 über llama.cpp, nur CPU, offline) liest die Dokumente der Akten nachts nur lesend, erkennt und strukturiert (Dokumenttyp, Metadaten, Laborwerte, Infusionen, Medikation, Diagnosen, Texte), Regelprüfung, Prüf-Queue mit Freigabe und bestätigter Übernahme (Konflikte nur mit Entscheidung), Hinweise Labor ↔ Infusionsplan, Berichtsentwürfe auf Anforderung, Qualitäts-Dashboard, Modell-Registry mit Evaluation/Aktivierung/Rollback, Ressourcensteuerung (Nachtfenster, CPU/RAM/Last, Sicherung), DB-Rolle `epm_ki`, verschlüsselte Zwischendateien, Audit-Art „KI“; `GET/POST /api/ki/…` (docs/KI-API.md); `compose.ki.yaml`, `epm-ki`, `ki-pruefen.sh`, `ki-benchmark.sh`; Einrichtung aus der Oberfläche (Modell wählen, laden/hochladen, Grenzen, Benchmark, Ein/Aus über den Systemagenten) | Menü „KI (Experimentell)“, Akte › KI (Experimentell), Administration › KI | TEILWEISE ABGESCHLOSSEN – 74 Backend-Tests (`backend/ki/test_*.py`); Frontend gebaut und typgeprüft, Browsertest und Lauf mit echtem Modell stehen aus (Ziel-VM mit 16–32 GB noch nicht vorhanden); Training (LoRA) noch nicht gebaut |
 | 14.10.2026 | E-Mail-Vorlagen im eigenen Fenster bearbeiten: „E-Mail bearbeiten“ über der Seite oder Doppelklick auf die E-Mail öffnet ein Fenster wie ein E-Mail-Programm (An, Betreff, Anlage, Text); Angaben aus der Akte erscheinen als lesbare Chips (TipTap, `components/TextMitAngaben.tsx`, erst beim Öffnen geladen), Einfügen an der Schreibmarke, getippte `{{…}}` werden zum Chip; Vorschau mit Testpatient (`POST /api/vorlagen/{art}/vorschau/` mit `ausgabe: "email"`). Gespeichert wird weiter reiner Text – die E-Mail geht als Text | Vorlagen › Dokumentvorlagen (Schreiben) | ABGESCHLOSSEN – Browsertest `dokumentvorlagen.spec.ts` „E-Mail-Vorlage im eigenen Fenster …“ lokal grün; Lauf steht aus |
@@ -4116,3 +4117,36 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 - **Status:** TEILWEISE ABGESCHLOSSEN – Lauf mit echtem Modell und Benchmark auf der Ziel-VM stehen aus; Browsertest
   noch nicht geschrieben; Trainingslauf (LoRA auf CPU) bewusst noch nicht gebaut.
 
+### F192 Diktate – Aufnahme im Browser, Abschrift offline
+- **Anlass:** Wunsch vom 23.10.2026: Der Mediziner diktiert Pläne, Arztbriefe und Konsultationsberichte; die Texte
+  sollen im Layout der Stiftung entstehen. Festlegungen: Korrektur je nach Fall selbst oder durch das Sekretariat;
+  kurze Diktate sofort, lange über Nacht; Aufnahme bis zur Freigabe aufbewahren; nur er diktiert (Recht je Gruppe);
+  Windows-PC, Mac und Handy, nur im VPN; bei Infusionsplänen nur der Kommentar; freigeben darf wie bei
+  Infusionsplänen jeder mit dem Recht.
+- **Umfang:** App `backend/diktate` (Modell `Diktat`, `Begriffsliste`, Abschrift `abschrift.py`, Warteschlange
+  `dienst.py`, API), Abschrift im OCR-Dienst (`scans/management/commands/epm_ocr.py`: „sofort“ vor Scans, „nachts“ im
+  Nachtfenster `EPM_DIKTAT_NACHT`, Standard 21–7 Uhr, nach den Scans), Modell in `scans/modelle/modelle.json`
+  (optional – fehlt es, arbeitet die Texterkennung normal), Oberfläche `components/Diktat.tsx`, `seiten/Diktate.tsx`,
+  `seiten/akte/Berichte.tsx`, `seiten/akte/PlanEditor.tsx`.
+- **Ressourcen:** kein eigener Container; das Sprachmodell (≈ 550 MB, im Speicher ≈ 1 GB) wird erst beim ersten
+  Diktat geladen und nach 5 Minuten ohne Diktat freigegeben; Rechenkerne wie die Texterkennung (`EPM_OCR_THREADS`,
+  eigene Zahl mit `EPM_DIKTAT_THREADS`); niedrige Priorität wie der OCR-Dienst. Der OCR-Dienst braucht dafür
+  mindestens 3 GB (`EPM_OCR_SPEICHER=3g`; `04-projekt.sh` setzt unter 6 GB RAM nur 1536m) – sonst bleibt die Abschrift
+  aus und die Oberfläche nennt den Grund, statt dass der Dienst an seiner Speichergrenze abbricht.
+- **Ansagen:** „neuer Absatz“, „neue Zeile“, „Doppelpunkt“, „Klammer auf/zu“, „Schrägstrich“, „Fragezeichen“,
+  „Ausrufezeichen“. Satzzeichen setzt die Abschrift selbst („Punkt“ bleibt ein Wort).
+- **Fachbegriffe:** eigene Liste je Person (`PUT /api/diktate/begriffe/`), Name, Diagnosen der Akte und Präparate gehen
+  als Vorlage an die Abschrift (höchstens 700 Zeichen).
+- **Datenschutz:** Aufnahme unter `data/scans/diktate/` (nicht in der Sicherung, Rechte 0640, zufälliger Name),
+  gelöscht mit der Freigabe des Berichts bzw. nach der Übernahme in den Kommentar, beim Verwerfen und mit der Akte;
+  Kommentar-Diktate ohne Übernahme nach 3 Tagen; Audit-Art „Diktat“ (aufgenommen, abgeschrieben, übernommen,
+  verworfen). Siehe `docs/DATENSCHUTZ.md` § 8.
+- **API:** `POST /api/diktate/` (multipart; Recht „Diktieren“), `GET /api/diktate/?bericht=`, `GET …/offen/`
+  (Sekretariat), `GET …/{id}/audio/`, `POST …/{id}/uebernommen/`, `POST …/{id}/erneut/`, `DELETE …/{id}/`
+  (Einträge erfassen), `GET|PUT …/begriffe/`, `GET …/stand/`.
+- **Teststatus:** `diktate/tests.py` – Rechte, Prüfungen beim Hochladen, Abschrift mit Modell-Attrappe, Sekretariat,
+  Freigabe wartet auf laufende Abschrift und löscht die Aufnahme, Freigabe durch einen anderen Mediziner, Kommentar,
+  Verwerfen, Fehler und erneut, Nachtfenster, Abbruch, Aufräumen, Begriffe, Vorlage, WebM/WAV lesen, Ansagen; echte
+  Abschrift mit whisper.cpp, sobald das Modell bereitliegt (CI lädt es mit den OCR-Modellen).
+- **Status:** TEILWEISE ABGESCHLOSSEN – Qualität der Abschrift mit echten Diktaten auf dem Server prüfen; Live-
+  Mitschreiben (Text erscheint beim Sprechen) erst nach dem Aufrüsten auf 16 GB / 8 Kerne.

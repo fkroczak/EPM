@@ -1,8 +1,8 @@
-# EPM - Modelle der zweiten Texterkennung (PP-OCRv5, UVDoc) auf einem Windows-PC offline vorbereiten
+# EPM - Modelle der zweiten Texterkennung (PP-OCRv5, UVDoc) und das Sprachmodell fuer Diktate auf einem Windows-PC offline vorbereiten
 # Gegenstueck zu werkzeuge/ocr-modelle.sh vorbereiten (fuer Linux, macOS, WSL).
 #
 # Aufruf in PowerShell im Ordner mit diesem Skript:   .\ocr-modelle.ps1
-# Ergebnis: epm-ocr-modelle-<Revision>.tar im aktuellen Ordner (ca. 120 MB), geprueft gegen die Pruefsummen in
+# Ergebnis: epm-ocr-modelle-<Revision>.tar im aktuellen Ordner (ca. 680 MB mit dem Sprachmodell fuer Diktate), geprueft gegen die Pruefsummen in
 # backend\scans\modelle\modelle.json. Danach:
 #   scp .\epm-ocr-modelle-<Revision>.tar epmadmin@TEST-VM:~/
 #   auf der Test-VM:  sudo epm-ocr-modelle einspielen ~/epm-ocr-modelle-<Revision>.tar
@@ -21,9 +21,13 @@ if (-not $Ziel) { $Ziel = Join-Path (Get-Location) "epm-ocr-modelle-$Revision.ta
 
 function Pruefen([string]$Pfad, $Eintrag) {
     if (-not (Test-Path $Pfad)) { return $false }
-    if ((Get-Item $Pfad).Length -ne [int64]$Eintrag.groesse) { return $false }
+    if ($Eintrag.groesse -and (Get-Item $Pfad).Length -ne [int64]$Eintrag.groesse) { return $false }
     if ($Eintrag.sha256) {
         return (Get-FileHash $Pfad -Algorithm SHA256).Hash.ToLower() -eq $Eintrag.sha256
+    }
+    # Sprachmodell fuer Diktate: SHA-1 der Datei, wie von whisper.cpp veroeffentlicht
+    if ($Eintrag.sha1) {
+        return (Get-FileHash $Pfad -Algorithm SHA1).Hash.ToLower() -eq $Eintrag.sha1
     }
     # kleine Textdateien: Git-Kennung = SHA-1 ueber "blob <Laenge>\0" + Inhalt
     $Bytes = [IO.File]::ReadAllBytes($Pfad)
@@ -55,8 +59,12 @@ try {
             Write-Host "Pruefsumme falsch: $($Eintrag.pfad)"
             Remove-Item $Pfad -ErrorAction SilentlyContinue
         }
+        if (-not $Ok -and $Eintrag.optional) {
+            Write-Host "HINWEIS: $($Eintrag.pfad) fehlt (optional) - Diktate werden dann nicht abgeschrieben."
+            continue
+        }
         if (-not $Ok) { throw "Nicht geladen: $($Eintrag.pfad) - Zugang zu huggingface.co pruefen (Proxy?)." }
-        Write-Host ("geladen    {0} ({1:N1} MB)" -f $Eintrag.pfad, ($Eintrag.groesse / 1MB))
+        Write-Host ("geladen    {0} ({1:N1} MB)" -f $Eintrag.pfad, ((Get-Item $Pfad).Length / 1MB))
     }
     [IO.File]::WriteAllText((Join-Path $Tmp "dateien\LIZENZ.txt"), $Daten.lizenz + "`n")
     Copy-Item $Liste (Join-Path $Tmp "modelle.json")
