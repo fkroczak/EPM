@@ -56,6 +56,17 @@ im Menü **Diktate**; dort lässt sich auch ohne Akte diktieren (Patient und Ber
 `docs/DATENSCHUTZ.md` § 8. Nachtfenster `EPM_DIKTAT_NACHT=21-7`, Rechenkerne `EPM_DIKTAT_THREADS` (sonst
 `EPM_OCR_THREADS`). Der OCR-Dienst braucht dafür mindestens `EPM_OCR_SPEICHER=3g` (Server ab 6 GB RAM).
 
+## Dokumentenautomation der Regeneration Clinic (26.10.2026)
+In der Firma RGC gibt es in der Akte den Reiter **Fälle**: Ein Behandlungsfall ist die eine Datenquelle für alle
+Dokumente (Patientenerklärungen und Formulare 01–12, Zusatzbögen zu 07, OP-Bericht, Entlassungsbrief, Konsil, Rechnung –
+DE/LV/EN). Je Kostenträgertyp entsteht das Dokumentenpaket automatisch. Solange ein Dokument nicht unterschrieben bzw.
+signiert ist, lassen sich Falldaten und Rechnungspositionen ändern und die PDF neu erzeugen; jede Erzeugung ist eine
+eigene, unveränderliche Fassung. Finalisieren: elektronische Signatur (fortgeschritten, Zertifikat der Person), extern
+signierte PDF, Scan der Papierunterschrift oder ausdrücklich; finale Rechnungen werden storniert und neu erzeugt.
+Leistungskatalog, Kostenträgertypen mit Paketen, Kooperationspartner und Unterschriftsberechtigte unter
+Administration › **Fälle und Abrechnung**. Recht „Fall-Dokumente finalisieren“ (Standard Mediziner).
+Details: [`docs/DOKUMENTENAUTOMATION-RGC-2026-10.md`](docs/DOKUMENTENAUTOMATION-RGC-2026-10.md).
+
 ## Server ohne SSH warten (10.10.2026)
 Unter **Administration › Systemverwaltung** stehen Zustand (Ampel) und die häufigen Aufgaben; alles Weitere unter
 Administration › System (Reiter Wartung, Software, Zertifikat, Protokolle) und › Backup. Updates, Neustart, Dienste,

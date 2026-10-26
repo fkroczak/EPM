@@ -11,7 +11,7 @@ from django.apps import apps as django_apps
 
 # Einträge, die die Fassung ihrer Vorlage festhalten (``vorlage_version``)
 VERWEISE = (("infusionen", "Infusionsplan"), ("berichte", "Bericht"), ("korrespondenz", "Schreiben"),
-            ("patienten", "Erklaerung"))
+            ("patienten", "Erklaerung"), ("faelle", "DokumentVersion"))
 
 
 def import_durchgefuehrt(apps=None) -> bool:
@@ -29,5 +29,9 @@ def auf_fassung_1(apps=None) -> int:
     Vorlage.objects.filter(status="abgeloest").delete()
     Vorlage.objects.filter(status="aktiv").exclude(version=1).update(version=1)
     for app, modell in VERWEISE:
-        apps.get_model(app, modell).objects.filter(vorlage_version__gt=1).update(vorlage_version=1)
+        try:
+            m = apps.get_model(app, modell)
+        except LookupError:  # in älteren Migrationen gibt es das Modell noch nicht (z. B. faelle)
+            continue
+        m.objects.filter(vorlage_version__gt=1).update(vorlage_version=1)
     return entfernt

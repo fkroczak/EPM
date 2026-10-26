@@ -63,6 +63,10 @@ RECHTE = [
     ("schreiben_freigeben", "Schreiben freigeben (Korrespondenz)",
      "ein Schreiben der Akte freigeben; dabei entsteht die endgültige PDF und das Schreiben wird unveränderlich. "
      "Entwürfe anlegen und den Versand vermerken darf, wer Einträge erfassen darf (Standard: Mediziner)"),
+    ("dokumente_finalisieren", "Fall-Dokumente finalisieren, signieren, stornieren",
+     "Dokumente eines Behandlungsfalls (Rechnung, OP-Bericht, Entlassungsbrief, Konsil, Formulare) elektronisch "
+     "signieren, den Scan der Papierunterschrift hinterlegen oder finalisieren – danach unveränderlich; finale "
+     "Rechnungen stornieren. Fälle anlegen und PDFs erzeugen darf, wer Einträge erfassen darf (Standard: Mediziner)"),
     ("akten_abschliessen", "Akten abschließen", ""),
     ("akten_wieder_oeffnen", "Abgeschlossene Akten wieder öffnen", ""),
     ("datenschutz_bearbeiten", "Datenschutz: Erklärungen und Anfragen erfassen",
@@ -115,7 +119,7 @@ _KI_MITARBEITER = {"ki_ansehen", "ki_pruefen", "ki_uebernehmen", "ki_berichte"}
 PATIENTENDATEN_SCHREIBEN = {"eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
                             "plaene_abschliessen", "akten_abschliessen", "dokumente_umhaengen",
                             "datenschutz_bearbeiten", "datenschutz_entscheiden", "berichte_freigeben",
-                            "schreiben_freigeben", "ki_uebernehmen", "diktieren"}
+                            "schreiben_freigeben", "ki_uebernehmen", "diktieren", "dokumente_finalisieren"}
 
 # Endgültiges Löschen (F73, F80) dürfen Admins auch bei echten Akten (Festlegung 02.10.2026); die übrigen Prüfungen
 # (Frist bzw. Antrag, Kennwort + 2FA + Bestätigungscode, Audit-Log, Löschprotokoll) gelten unverändert

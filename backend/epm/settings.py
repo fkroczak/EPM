@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "befunde",
     "berichte",
     "korrespondenz",
+    "faelle",
     "vorlagen",
     "audit",
     "system",
@@ -248,5 +249,7 @@ LOGGING = {
     "formatters": {"kurz": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}},
     "handlers": {"konsole": {"class": "logging.StreamHandler", "formatter": "kurz"}},
     "root": {"handlers": ["konsole"], "level": env("EPM_LOGLEVEL", "INFO")},
-    "loggers": {"django.security": {"level": "WARNING"}},
+    # pyHanko meldet bei jeder Prüfung einer Signatur ohne hinterlegte Vertrauenskette einen Stacktrace (Fall-Dokumente)
+    "loggers": {"django.security": {"level": "WARNING"}, "pyhanko": {"level": "CRITICAL"},
+                "pyhanko_certvalidator": {"level": "CRITICAL"}},
 }

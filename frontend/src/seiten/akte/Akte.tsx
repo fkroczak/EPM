@@ -488,7 +488,7 @@ function Gruppen({ gruppen, art }: { gruppen: Gruppe[]; art: "kopf" | "leiste" }
 export function Akte() {
   const { id } = useParams();
   const pid = Number(id);
-  const { darf, darfBei } = useAuth();
+  const { darf, darfBei, ich } = useAuth();
   const navigate = useNavigate();
   const alleFirmen = useAlleFirmen();
   const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "kontakt" | "gewicht" | "pdf" | "sprechstunde" | "schreiben" | "firmen">("");
@@ -809,6 +809,8 @@ export function Akte() {
     { zu: `${basis}/labor`, text: "Labor", zahl: k?.zaehler.laborbefunde, gruppe: "Befunde und Unterlagen", stufe: "neben" },
     { zu: `${basis}/bia`, text: "BIA", zahl: k?.zaehler.bia_messungen, stufe: "neben" },
     { zu: `${basis}/berichte`, text: "Berichte", zahl: k?.zaehler.berichte, stufe: "neben" },
+    // Fälle (26.10.2026): nur bei der Regeneration Clinic – Behandlungsfall mit Dokumentenpaket und Rechnung
+    ...(ich?.firma === "rg" ? [{ zu: `${basis}/faelle`, text: "Fälle", zahl: k?.zaehler.faelle, stufe: "neben" }] : []),
     // Korrespondenz (14.10.2026): Schreiben an oder über den Patienten mit Status
     { zu: `${basis}/korrespondenz`, text: "Korrespondenz", zahl: k?.zaehler.korrespondenz, stufe: "neben" },
     { zu: `${basis}/dokumente`, text: "Dokumente", zahl: k?.zaehler.dokumente, stufe: "neben" },

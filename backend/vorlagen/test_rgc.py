@@ -25,7 +25,9 @@ class RgcVorlagenTest(Grundlage):
     def test_alle_vorlagen_angelegt_und_gueltig(self):
         quellen = vorlagen()
         self.assertEqual(len(quellen), 35)
-        rgc = EigenesSchreiben.objects.filter(firma=self.rg)
+        # ohne die Vorlagen der Dokumentenautomation (Fall-Dokumente, Zusatzbögen zu 07; faelle/tests.py)
+        rgc = EigenesSchreiben.objects.filter(firma=self.rg).exclude(mitgeliefert__startswith="rgc-fall-") \
+            .exclude(mitgeliefert__startswith="rgc-z07-")
         self.assertEqual(rgc.count(), 35)
         # 14 Anforderungen der RGC und 9 Bögen der Laborprofile Malabsorption (Übersicht, MAL-01 bis MAL-06)
         self.assertEqual(rgc.filter(gruppe="anforderungen").count(), 23)

@@ -149,6 +149,61 @@ END;
 $$ LANGUAGE plpgsql;
 """
 
+# Dokumentenautomation (26.10.2026): Dokumente eines Falls sind bis „final“ frei; final nur noch einmal der
+# Storno-Vermerk. Rechnungspositionen nur, solange ihre Rechnung nicht final ist (auch INSERT).
+FALL_SQL = r"""
+CREATE OR REPLACE FUNCTION epm_falldokument_schutz() RETURNS trigger AS $$
+DECLARE
+    storno text[] := ARRAY['storniert_am', 'storniert_von_id', 'storno_grund', 'geaendert_am'];
+BEGIN
+    IF coalesce(current_setting('epm.wartung', true), '') = 'on' THEN
+        RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    END IF;
+    IF TG_OP = 'DELETE' THEN
+        IF OLD.status <> 'entwurf' THEN
+            RAISE EXCEPTION 'EPM: erzeugte Dokumente eines Falls können nicht gelöscht werden'
+                USING ERRCODE = 'insufficient_privilege';
+        END IF;
+        RETURN OLD;
+    END IF;
+    IF OLD.status <> 'final' THEN
+        RETURN NEW;
+    END IF;
+    IF OLD.storniert_am IS NULL AND NEW.storniert_am IS NOT NULL
+       AND (to_jsonb(NEW) - storno) = (to_jsonb(OLD) - storno) THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'EPM: unterschriebene bzw. signierte Dokumente sind unveränderlich'
+        USING ERRCODE = 'insufficient_privilege';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION epm_rechnungsposition_schutz() RETURNS trigger AS $$
+DECLARE
+    dok_status text;
+BEGIN
+    IF coalesce(current_setting('epm.wartung', true), '') = 'on' THEN
+        RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    END IF;
+    IF TG_OP <> 'INSERT' THEN
+        SELECT status INTO dok_status FROM faelle_falldokument WHERE id = OLD.dokument_id;
+        IF dok_status = 'final' THEN
+            RAISE EXCEPTION 'EPM: Positionen einer finalen Rechnung sind unveränderlich'
+                USING ERRCODE = 'insufficient_privilege';
+        END IF;
+    END IF;
+    IF TG_OP <> 'DELETE' THEN
+        SELECT status INTO dok_status FROM faelle_falldokument WHERE id = NEW.dokument_id;
+        IF dok_status = 'final' THEN
+            RAISE EXCEPTION 'EPM: Positionen einer finalen Rechnung sind unveränderlich'
+                USING ERRCODE = 'insufficient_privilege';
+        END IF;
+    END IF;
+    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END;
+$$ LANGUAGE plpgsql;
+"""
+
 VORLAGE_SQL = r"""
 CREATE OR REPLACE FUNCTION epm_vorlage_schutz() RETURNS trigger AS $$
 BEGIN
@@ -193,10 +248,13 @@ SONDERREGELN = {
     "vorlagen_dokumentvorlage": "epm_vorlage_schutz",
     "berichte_bericht": "epm_bericht_schutz",
     "korrespondenz_schreiben": "epm_korrespondenz_schutz",
+    "faelle_falldokument": "epm_falldokument_schutz",
 }
 # Zuordnungstabellen von Plänen: auch INSERT prüfen
-ZUORDNUNG = {"infusionen_infusionsplan_vitamine": "epm_plan_zuordnung_schutz"}
-NUR_ANFUEGEN_FEST = ["audit_systemereignis", "patienten_dokumentvorgang", "patienten_loeschprotokoll"]
+ZUORDNUNG = {"infusionen_infusionsplan_vitamine": "epm_plan_zuordnung_schutz",
+             "faelle_rechnungsposition": "epm_rechnungsposition_schutz"}
+NUR_ANFUEGEN_FEST = ["audit_systemereignis", "patienten_dokumentvorgang", "patienten_loeschprotokoll",
+                     "faelle_dokumentversion"]
 
 
 def _historientabellen(cursor):
@@ -221,6 +279,7 @@ def installiere_trigger(using="default", **kwargs):
         c.execute(VORLAGE_SQL)
         c.execute(BERICHT_SQL)
         c.execute(KORRESPONDENZ_SQL)
+        c.execute(FALL_SQL)
         vorhandene = set(conn.introspection.table_names(c))
         ziele = {t: "epm_nur_anfuegen" for t in _historientabellen(c) + NUR_ANFUEGEN_FEST}
         ziele.update(SONDERREGELN)

@@ -106,5 +106,13 @@ Klinik jede Vorlage unter Vorlagen › Dokumentvorlagen prüfen; die offenen Pun
   nichtjuristische Person.
 - Rechtsprüfung: abschließende Freigabe durch je einen Fachjuristen für deutsches, österreichisches und lettisches
   Recht steht aus.
-- Eingriffsspezifische Zusatzbögen zu 07/08 (Orthopädie/Traumatologie, HNO, Adipositaschirurgie) sind laut Review der
-  nächste Schritt und nicht Teil dieser Lieferung.
+- Eingriffsspezifische Zusatzbögen zu 07 (Orthopädie/Traumatologie, HNO, Adipositas und Stoffwechselerkrankungen)
+  sind seit 26.10.2026 als standardisierter Vorschlag mitgeliefert (`eigen-rgc-z07-ortho`, `eigen-rgc-z07-hno`,
+  `eigen-rgc-z07-adipositas`, zweisprachig DE/LV) – fachärztliche Prüfung steht aus.
+
+## Dokumentenautomation (26.10.2026)
+
+Alle Vorlagen der RGC kennen zusätzlich die Datenfelder des Behandlungsfalls (`{{Fall.…}}`, `{{Rechnung.…}}`,
+`{{Dokument.…}}`, Tabellen „rechnung“ und „leistungen“). Im Fall werden sie automatisch als Paket je Kostenträgertyp
+angelegt und ausgefüllt; OP-Bericht, Entlassungsbrief, Konsiliarbericht und Rechnung gibt es je Sprache. Details:
+[`DOKUMENTENAUTOMATION-RGC-2026-10.md`](DOKUMENTENAUTOMATION-RGC-2026-10.md).

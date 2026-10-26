@@ -46,7 +46,9 @@ def schreiben_aus_akte(art) -> dict | None:
         return AUS_DER_AKTE[art]
     from .models import EigenesSchreiben
 
-    e = EigenesSchreiben.sichtbare().filter(schluessel=art, aktiv=True).first() if isinstance(art, str) else None
+    # Dokumente der Behandlungsfälle (Gruppe „fall“) entstehen nur im Fall, nicht als Schreiben der Akte
+    e = (EigenesSchreiben.sichtbare().filter(schluessel=art, aktiv=True).exclude(gruppe="fall").first()
+         if isinstance(art, str) else None)
     return {"termin": e.mit_termin, "beschreibung": e.beschreibung} if e else None
 
 

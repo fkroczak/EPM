@@ -9,6 +9,7 @@ Django 5.2 LTS · Django REST Framework · PostgreSQL 18 · django-otp (TOTP + N
 | `stammdaten` | Auswahllisten (Katheter, Dokumenttyp, Kontaktart), Versorger + Ansprechpartner, Präparate, Einstellungen |
 | `patienten` | Patient, Gewichtsmessung, Kontakt (unveränderlich, Storno), Termin, Dokument (Dateisystem + SHA-256) |
 | `infusionen` | Infusionsplan (Entwurf → aktuell → abgelöst, Vorgänger, kcal), Positionen |
+| `faelle` | Behandlungsfälle der RGC: Dokumentenpakete je Kostenträgertyp, Fassungen jeder PDF-Erzeugung, Rechnung mit Leistungskatalog, Signatur/Scan/Finalisierung, Storno, DOCX-Rundweg |
 | `audit` | Systemprotokoll, DB-Trigger (Historie/Protokoll unveränderlich), Wartungsmodus |
 
 ## API (alle unter `/api/`, Sitzung + CSRF, voll angemeldet = Kennwort + 2FA, sofern eingerichtet oder Pflicht)

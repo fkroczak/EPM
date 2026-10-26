@@ -48,6 +48,7 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 
 | Nr. | Funktion | Ansicht (Entwurf) | Status |
 |---|---|---|---|
+| 26.10.2026 | Dokumentenautomation der Regeneration Clinic, F193: Behandlungsfall als eine Datenquelle (Kostenträgertyp, Kooperationspartner, Sprache DE/LV/EN, Fachbereich, Behandlung, Texte für OP-Bericht/Entlassungsbrief/Konsil); Dokumentenpaket je Kostenträgertyp (Vorlagen 01–12, Zusatzbogen je Fachbereich, OP-Bericht, Entlassungsbrief, Rechnung); Status Entwurf → erzeugt → final; PDF jederzeit neu erzeugbar, jede Erzeugung eine unveränderliche Fassung mit Prüfsumme und Datenstand; Rechnung mit Leistungspositionen aus dem Leistungskatalog, bis zur Finalisierung änderbar, Storno + neue Rechnung; fortgeschrittene elektronische Signatur (PAdES, pyHanko), extern signierte PDF, Scan der Papierunterschrift oder Finalisieren; DOCX-Rundweg für Freitexte; Zusatzbögen Orthopädie/Traumatologie, HNO, Adipositas zu Vorlage 07; Recht „Fall-Dokumente finalisieren“. App `faelle`, Doku `docs/DOKUMENTENAUTOMATION-RGC-2026-10.md` | Akte › Fälle; Administration › Fälle und Abrechnung | TEILWEISE ABGESCHLOSSEN – Backend-Tests `faelle/tests.py`; Browsertest steht aus |
 | 26.10.2026 | Diktate, F192: „Neues Diktat“ auch im Menü „Diktate“ (Patient wählen, Berichtsart, aufnehmen – Entwurf entsteht beim Senden); Menüpunkt für alle mit Recht „Diktieren“ | Menü „Diktate“ | ABGESCHLOSSEN – Typprüfung |
 | 23.10.2026 | Diktate, F192: Mikrofon im Bericht (Arztbrief, Konsultationsbericht …) und im Kommentar des Infusionsplans; Aufnahme im Browser (WebM/Opus bzw. MP4/AAC, ≈ 15 MB je Stunde), Abschrift offline im OCR-Dienst mit whisper.cpp (large-v3-turbo q5_0, nur CPU), „sofort“ oder „heute Nacht“, „selbst“ oder „Sekretariat“; Nachhören mit Sprung zum Wort und markierten unsicheren Wörtern, „In den Text übernehmen“; eigene Fachbegriffe; Aufnahme wird bei der Freigabe gelöscht; Recht „Diktieren“, Audit-Art „Diktat“, Berichtsart „Konsultationsbericht“; `GET/POST /api/diktate/…` | Akte › Berichte, Infusionsplan › Kommentar, Menü „Diktate“ | TEILWEISE ABGESCHLOSSEN – 19 Backend-Tests (`backend/diktate/tests.py`, echte Abschrift nur mit Modell, z. B. in CI); im Browser mit simuliertem Mikrofon durchgespielt; Live-Mitschreiben folgt nach dem Aufrüsten (16 GB / 8 Kerne) |
 | 15.10.2026 | Neutrales Favicon: statt der Stiftungsfarben (Nachtblau, Orange, Gold) das EPM-Symbol der Anmeldeseite (Schiefer-Petrol #24353D mit weißer Pulslinie, `frontend/public/favicon.svg`); `theme-color` ebenfalls Schiefer-Petrol, Beschreibung im `index.html` ohne Firmennamen („EPM – Elektronisches Patientenmanagement“) | Browser-Tab, Lesezeichen | ABGESCHLOSSEN |
@@ -4151,3 +4152,35 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
   Abschrift mit whisper.cpp, sobald das Modell bereitliegt (CI lädt es mit den OCR-Modellen).
 - **Status:** TEILWEISE ABGESCHLOSSEN – Qualität der Abschrift mit echten Diktaten auf dem Server prüfen; Live-
   Mitschreiben (Text erscheint beim Sprechen) erst nach dem Aufrüsten auf 16 GB / 8 Kerne.
+
+### F193 Dokumentenautomation der Regeneration Clinic – Fall, Paket, Fassungen, Rechnung, Signatur
+- **Anlass:** Anforderungsspezifikation „Dokumentenautomation RGC“ vom 26.10.2026 (inkl. Editierbarkeit nach
+  PDF-Erzeugung): Vorlagen, Rechnung, OP-Bericht, Entlassungsbrief und Konsiliarbericht aus einem Falldatensatz – einfach,
+  flexibel, nachvollziehbar. Abnahmekriterium: Nach Erzeugung einer PDF kann der Inhalt noch geändert und die PDF neu
+  erzeugt werden; erst nach Unterschrift/Signatur ist die Fassung unveränderlich; alle Versionen sind nachvollziehbar.
+- **Umfang:** App `backend/faelle` – Modelle `Behandlungsfall`, `FallDokument` (Entwurf → erzeugt → final),
+  `DokumentVersion` (nur anfügen), `Rechnungsposition`, Stammdaten `Leistung` (Leistungskatalog), `Kostentraegertyp`
+  (mit Paketregel), `Kooperationspartner`, `Unterzeichner` (mit Zertifikat), `Zaehler` (Fall- und Rechnungsnummern);
+  `pakete.py` (Paketregeln), `erzeugung.py` (Erzeugen, Finalisieren, Signatur, Storno, DOCX), `felder.py`
+  (Platzhalter `Fall.*`, `Rechnung.*`, `Dokument.*`, `Leistungen.Summe`, Tabellen „rechnung“ und „leistungen“ in allen
+  eigenen Schreiben), `startvorlagen.py` (Fall-Dokumente je Sprache, Zusatzbögen zu 07). Datenmigration
+  `faelle/0002` (Kostenträgertypen mit Paket, Eibach/ARS/WC4/AIWA, Dr. Markus Gottwald, Prof. Dr. Markus Masin,
+  Dokumenttyp „Rechnung“, 12 Fall-Vorlagen, 3 Zusatzbögen) und `faelle/0003` (Formulare 01–12 mit Feldern des Falls,
+  nur unveränderte Vorlagen, vor dem Import in Fassung 1, danach als Fassung 2; Feldfehler der Word-Umsetzung behoben, `faelle/formulare.py`). Trigger `epm_falldokument_schutz`,
+  `epm_rechnungsposition_schutz` (auch INSERT), `faelle_dokumentversion` nur anfügen (`audit/schutz.py`).
+- **API:** `/api/faelle/` (+ `paket/`, `abschliessen/`, `wieder-oeffnen/`), `/api/falldokumente/` (+ `vorschau/`,
+  `erzeugen/`, `versionen/`, `pdf/?fassung=N`, `docx/` GET/POST, `finalisieren/`, `stornieren/`),
+  `/api/rechnungspositionen/`, `/api/leistungen/` (+ `import/`), `/api/kostentraegertypen/` (+ `optionen/`),
+  `/api/kooperationspartner/`, `/api/unterzeichner/` (+ `{id}/zertifikat/`). Rechte: Fälle und PDFs mit „Einträge
+  erfassen“, Finalisieren/Signieren/Stornieren mit „Fall-Dokumente finalisieren“ (Standard Mediziner), Stammdaten mit
+  „Vorlagen pflegen“; Admins wie überall nur bei Testpatienten.
+- **Nachvollziehbarkeit:** jede Fassung mit PDF (Dokument der Akte, bis final ausgeblendet), SHA-256 (beim Abruf
+  geprüft), Vorlagenversion, Datenstand, Person, Zeitpunkt, Grund; Audit-Art „Behandlungsfall und Dokumente“; Verlauf
+  der Akte (Bereiche „faelle“, „falldokumente“); simple-history an allen Modellen; Akte endgültig löschen entfernt Fälle,
+  Fassungen und Historie mit.
+- **Teststatus:** `faelle/tests.py` – Stammdaten und Vorlagen (gültige Blöcke), Paket je Kostenträgertyp mit
+  Zusatzbogen, OP-Bericht aus Falldaten, Rechnung änderbar bis zur Finalisierung (Abnahmekriterium), Finalisieren nur mit
+  aktueller Fassung, Storno mit neuer Rechnung, Sprachen EN/LV, Signatur mit selbst ausgestelltem Zertifikat, extern
+  signierte PDF, Scan, DOCX-Rundweg, CSV-Import, Löschen der Akte; Trigger gegen direkte Änderungen.
+- **Status:** TEILWEISE ABGESCHLOSSEN – Browsertest für Akte › Fälle fehlt; Preise, Bankverbindung der RGC,
+  fachärztliche Prüfung der Zusatzbögen und lettischen Texte stehen aus (`docs/DOKUMENTENAUTOMATION-RGC-2026-10.md`).

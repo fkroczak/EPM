@@ -14,6 +14,8 @@ GRUPPEN = {
     "anforderungen": "Anforderungen: Labor, Bildgebung, Funktionsdiagnostik",
     "formulare": "Aufklärungen, Erklärungen und Abrechnung",
     "plaene": "Pläne, Berichte und Unterlagen",
+    # Dokumente der Behandlungsfälle der RGC (26.10.2026): OP-Bericht, Entlassungsbrief, Konsil, Rechnung je Sprache
+    "fall": "Dokumente der Behandlungsfälle",
     "datenschutz": "Vordrucke zum Datenschutz",
 }
 
@@ -52,6 +54,9 @@ ARTEN = {
 
 def art_info(art: str, beschreibung: str = "", gruppe: str | None = None) -> dict:
     """``{"gruppe", "wofuer", "wo"}`` für die Übersicht; eigene Schreiben mit ihrer Beschreibung (F176) und Gruppe."""
+    if ist_eigen(art) and gruppe == "fall":
+        return {"gruppe": "fall", "wofuer": beschreibung or "Dokument eines Behandlungsfalls.",
+                "wo": "Akte › Fälle › Dokumente des Falls"}
     if ist_eigen(art):
         return {"gruppe": gruppe if gruppe in GRUPPEN else "eigen", "wofuer": beschreibung or "Eigenes Schreiben an den Patienten mit E-Mail-Text.",
                 "wo": f"{SCHREIBEN_WO} › „{GRUPPEN.get(gruppe) or GRUPPEN['eigen']}“"}
@@ -72,6 +77,8 @@ FELD_GRUPPEN = {
     "Termine": "Infoblatt an die Praxis", "Medikamente": "Medikamente",
     # Korrespondenz (14.10.2026): Betreff, Empfänger und Freitext des abgelegten Schreibens
     "Schreiben": "Schreiben (Korrespondenz)",
+    # Behandlungsfall der RGC (26.10.2026)
+    "Fall": "Behandlungsfall", "Dokument": "Behandlungsfall", "Rechnung": "Rechnung", "Leistungen": "Rechnung",
 }
 
 # Kurze Namen der häufigsten Felder in Alltagssprache; die übrigen nehmen ihre Beschreibung aus ``felder.py``

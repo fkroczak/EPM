@@ -228,6 +228,8 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                 "berichte": obj.berichte.count(),
                 # Korrespondenz (14.10.2026): alle Schreiben der Akte
                 "korrespondenz": obj.korrespondenz.count(),
+                # Behandlungsfälle der RGC (26.10.2026): offene Fälle
+                "faelle": obj.faelle.filter(status="offen").count(),
             },
         }
 
@@ -839,7 +841,7 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
 
         Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, bemerkung, gewichte, kontakte, termine,
         dokumente, infusionsplaene, bezugspersonen, aerzte, erklaerungen, datenschutz, diagnosen, laborbefunde,
-        bia_messungen, berichte, korrespondenz, hinweisruhe, therapieschritte, medikamente; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
+        bia_messungen, berichte, korrespondenz, faelle, falldokumente, hinweisruhe, therapieschritte, medikamente; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
         die Bereiche Stammdaten, Diagnose, Therapie, Empfehlung und Bemerkung verteilt.
         """
         patient = self.get_object()
@@ -1026,6 +1028,17 @@ def _beschreibung(name, h, aktion) -> str:
             from korrespondenz.models import verlauf_beschreibung
 
             return verlauf_beschreibung(h)
+        if name == "faelle":
+            return " · ".join(t for t in (f"Fall {h.nummer}", h.titel, h.eingriff) if t)
+        if name == "falldokumente":
+            from faelle.models import FallDokument
+
+            teile = [h.titel, dict(FallDokument.Status.choices).get(h.status, h.status)]
+            if h.rechnungsnummer:
+                teile.append(h.rechnungsnummer)
+            if h.storniert_am:
+                teile.append(f"storniert: {h.storno_grund}")
+            return " · ".join(t for t in teile if t)
         if name == "datenschutz":
             teile = [f"Anfrage: {dict(Datenschutzanfrage.Art.choices).get(h.art, h.art)}",
                      f"eingegangen am {h.eingegangen_am:%d.%m.%Y}"]
@@ -1052,6 +1065,8 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
     from infusionen.models import Infusionsplan
     from korrespondenz.models import Schreiben
 
+    from faelle.models import Behandlungsfall, FallDokument
+
     quellen = {
         "akte": Patient.history.filter(id=patient.id),
         "gewichte": Gewichtsmessung.history.filter(patient_id=patient.id),
@@ -1074,6 +1089,9 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         "berichte": Bericht.history.filter(patient_id=patient.id),
         # Korrespondenz (14.10.2026)
         "korrespondenz": Schreiben.history.filter(patient_id=patient.id),
+        # Behandlungsfälle und ihre Dokumente (26.10.2026)
+        "faelle": Behandlungsfall.history.filter(patient_id=patient.id),
+        "falldokumente": FallDokument.history.filter(patient_id=patient.id),
     }
     if bereich and bereich not in ("stammdaten", *TEXTFELDER):
         quellen = {k: v for k, v in quellen.items() if k == bereich}

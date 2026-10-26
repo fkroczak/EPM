@@ -59,6 +59,9 @@ class SystemEreignis(models.Model):
         KI = "ki", "KI (Experimentell)"
         # Diktate (23.10.2026): aufgenommen, abgeschrieben, übernommen, verworfen – in ``details["aktion"]``
         DIKTAT = "diktat", "Diktat"
+        # Dokumentenautomation der RGC (26.10.2026): Fall, Paket, Erzeugung, Finalisierung, Signatur, Storno, DOCX –
+        # die Aktion steht in ``details["aktion"]``
+        FALL = "fall", "Behandlungsfall und Dokumente"
 
     zeitpunkt = models.DateTimeField(auto_now_add=True, db_index=True)
     art = models.CharField(max_length=40, choices=Art.choices, db_index=True)

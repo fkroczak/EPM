@@ -89,6 +89,8 @@ def umfang(patient) -> dict:
         "bia_messungen": patient.bia_messungen.count(), "berichte": patient.berichte.count(),
         "therapieschritte": patient.therapieschritte.count(), "medikamente": patient.medikamente.count(),
         "korrespondenz": patient.korrespondenz.count(),
+        # Dokumentenautomation der RGC (26.10.2026)
+        "faelle": patient.faelle.count(),
     }
 
 
@@ -141,6 +143,16 @@ def akten_entfernen(ids: list[int]) -> None:
     Bericht.objects.filter(patient_id__in=ids).update(dokument=None)
     # ebenso die freigegebene PDF eines Schreibens der Korrespondenz (14.10.2026)
     Schreiben.objects.filter(patient_id__in=ids).update(dokument=None)
+    # Behandlungsfälle (26.10.2026): Fassungen verweisen auf Dokumente der Akte (PROTECT) – zuerst entfernen
+    from faelle.models import Behandlungsfall, DokumentVersion, FallDokument, Rechnungsposition
+
+    fall_dok_ids = set(FallDokument.objects.filter(patient_id__in=ids).values_list("id", flat=True))
+    fall_dok_ids |= set(FallDokument.history.filter(patient_id__in=ids).values_list("id", flat=True))
+    DokumentVersion.objects.filter(dokument_id__in=fall_dok_ids).delete()
+    Rechnungsposition.objects.filter(dokument_id__in=fall_dok_ids).delete()
+    FallDokument.objects.filter(id__in=fall_dok_ids).update(storno_zu=None)
+    FallDokument.objects.filter(id__in=fall_dok_ids).delete()
+    Behandlungsfall.objects.filter(patient_id__in=ids).delete()
     Patient.objects.filter(id__in=ids).delete()
     # Historie. Dokumente dieser Akten verlieren ALLE früheren Fassungen – auch die aus der Zeit, in der sie
     # (falsch zugeordnet) in einer anderen Akte lagen; dort bleibt nur der neutrale Vorgang. Dokumente, die
@@ -153,8 +165,9 @@ def akten_entfernen(ids: list[int]) -> None:
     frueher.exclude(id__in=bleibt).delete()
     for modell in (Gewichtsmessung, Kontakt, Termin, Infusionsplan, Bezugsperson, PatientArzt, Erklaerung,
                    Datenschutzanfrage, Diagnose, Laborbefund, BiaMessung, Bericht, Hinweisruhe, Therapieschritt,
-                   PatientFirma, Medikament, Schreiben):
+                   PatientFirma, Medikament, Schreiben, Behandlungsfall, FallDokument):
         modell.history.filter(patient_id__in=ids).delete()
+    Rechnungsposition.history.filter(dokument_id__in=fall_dok_ids).delete()
     InfusionsplanPosition.history.filter(plan_id__in=plan_ids).delete()
     Laborwert.history.filter(befund_id__in=befund_ids).delete()
     # Historie der Vitamin-Zuordnung (eigene Tabelle von django-simple-history, ohne Fremdschlüssel in der Datenbank)

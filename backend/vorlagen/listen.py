@@ -297,6 +297,8 @@ BEREICHE = {"stammdaten": "Stammdaten", "diagnose": "Diagnose (Text)", "therapie
             "berichte": "Bericht", "therapieschritte": "Therapie (Verlauf)",
             # Korrespondenz (14.10.2026)
             "korrespondenz": "Schreiben",
+            # Behandlungsfälle der RGC (26.10.2026)
+            "faelle": "Behandlungsfall", "falldokumente": "Dokument eines Falls",
             # Medikamentenplan (Wunsch 11.10.2026)
             "medikamente": "Medikament",
             # Hinweise stummschalten (Wunsch 07.10.2026, F119)

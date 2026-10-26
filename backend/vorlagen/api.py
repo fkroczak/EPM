@@ -194,7 +194,7 @@ class SchreibenListeView(APIView):
 
         liste += [{"art": e.schluessel, "name": e.name, "beschreibung": e.beschreibung, "termin": e.mit_termin,
                    "eigen": True, "gruppe": e.gruppe, "gruppe_name": GRUPPEN.get(e.gruppe, GRUPPEN["eigen"])}
-                  for e in EigenesSchreiben.sichtbare().filter(aktiv=True).order_by("gruppe", "name")]
+                  for e in EigenesSchreiben.sichtbare().filter(aktiv=True).exclude(gruppe="fall").order_by("gruppe", "name")]
         return Response(liste)
 
 

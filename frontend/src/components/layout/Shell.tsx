@@ -95,6 +95,8 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
     darf("backup_verwalten") ? <NavEintrag key="b" zu="/admin/backup" icon="backup" text="Backup" /> : null,
     darf("benutzer_verwalten") ? <NavEintrag key="u" zu="/admin/benutzer" icon="benutzer" text="Benutzer" /> : null,
     darf("vorlagen_pflegen") ? <NavEintrag key="v" zu="/admin/vorlagen" icon="vorlagen" text="Vorlagen" /> : null,
+    // Fälle und Abrechnung (26.10.2026): nur Regeneration Clinic
+    darf("vorlagen_pflegen") && ich.firma === "rg" ? <NavEintrag key="fa" zu="/admin/abrechnung" icon="buch" text="Fälle und Abrechnung" /> : null,
     darf("audit_lesen") ? <NavEintrag key="a" zu="/admin/audit-log" icon="uhr" text="Audit-Log" /> : null,
     darf("system_verwalten") ? <NavEintrag key="s" zu="/admin/system" icon="server" text="System" /> : null,
     darf("ki_verwalten") ? <NavEintrag key="k" zu="/admin/ki" icon="stern" text="KI" /> : null,
