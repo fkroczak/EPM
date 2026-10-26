@@ -1,11 +1,20 @@
 # EPM – Backend prüfen: bei jedem Push Tests gegen echtes PostgreSQL 18.
 # Fehlen Migrationen für geänderte Modelle, werden sie hier erzeugt und ins Repo übernommen.
+#
+# Actions-Minuten sparen (26.10.2026: das Kontingent war ab 08.10. aufgebraucht, kein Job startete mehr):
+# - reine Doku-Änderungen (docs/, *.md) lösen keinen Lauf aus
+# - ein neuer Push auf denselben Pull Request bricht den laufenden Lauf ab (auf main nie: dort werden Migrationen
+#   und das Lockfile übernommen)
+# - die Browsertests mit komplettem Stack (der längste Job) laufen nur auf main und beim manuellen Start
+#   („Run workflow“, auch für einen Branch), nicht bei jedem Push auf einen Pull Request
 name: EPM
 
 on:
   push:
     branches: [main]
+    paths-ignore: ["docs/**", "**/*.md"]
   pull_request:
+    paths-ignore: ["docs/**", "**/*.md"]
   workflow_dispatch:
 
 permissions:
@@ -13,7 +22,7 @@ permissions:
 
 concurrency:
   group: backend-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   tests:
@@ -165,7 +174,8 @@ jobs:
     name: Frontend bauen und im Browser testen (echter Stack)
     runs-on: ubuntu-24.04
     needs: tests
-    if: ${{ !cancelled() }}
+    # nur auf main und beim manuellen Start – bei Pull Requests reichen die Backend-Tests (spart die meisten Minuten)
+    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
     defaults:
       run:
         shell: bash
