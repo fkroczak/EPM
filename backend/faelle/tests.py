@@ -6,10 +6,13 @@ erzeugt werden. Erst nach Unterschrift/Signatur ist die Fassung unveränderlich.
 import datetime
 import hashlib
 import io
+import tempfile
 from decimal import Decimal
+from pathlib import Path
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError, transaction
+from django.test import override_settings
 
 from accounts.models import Rolle
 from audit.models import SystemEreignis
@@ -49,6 +52,9 @@ def p12(name="Prof. Dr. Markus Masin", kennwort="geheim") -> bytes:
                                                  serialization.BestAvailableEncryption(kennwort.encode()))
 
 
+# eigener Ordner: jede Fassung ist eine Datei – im gemeinsamen Testordner kämen sonst andere Tests durcheinander
+# (z. B. „Dokumente prüfen“, das nur die ersten 100 Dateien ohne Eintrag nennt)
+@override_settings(EPM_DOKUMENTE=Path(tempfile.mkdtemp(prefix="epm-test-faelle-")))
 class FallTest(Grundlage):
     @classmethod
     def setUpTestData(cls):
@@ -126,6 +132,9 @@ class FallTest(Grundlage):
                                                 {"paket": ["rechnung", "gibt-es-nicht", "rechnung"]}, format="json")
         self.assertEqual(r.status_code, 400)
         self.assertEqual(len(r.json()["paket"]), 2)
+        konten = client_fuer(self.mitarbeiter).get("/api/unterzeichner/konten/").json()
+        self.assertIn(self.mediziner.pk, [k["id"] for k in konten])
+        self.assertEqual(client_fuer(self.betrachter).get("/api/unterzeichner/konten/").status_code, 403)
         self.assertEqual(client_fuer(self.betrachter).patch(f"/api/kostentraegertypen/{self.gkv.pk}/",
                                                             {"name": "X"}, format="json").status_code, 403)
 

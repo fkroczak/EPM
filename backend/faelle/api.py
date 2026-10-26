@@ -134,6 +134,17 @@ class UnterzeichnerViewSet(OhneLoeschen):
             return [EintragRecht()]
         return super().get_permissions()
 
+    @action(detail=False, methods=["get"])
+    def konten(self, request):
+        """Benutzerkonten zum Verknüpfen (nur Name und ID; ohne Testbenutzer und Konten ohne Login)."""
+        from accounts.models import User
+        from epm.api_basis import sichtbare_benutzer
+
+        if not request.user.hat_recht("vorlagen_pflegen"):
+            raise PermissionError("Dafür fehlt das Recht „Vorlagen pflegen“.")
+        qs = sichtbare_benutzer(request.user, User.objects.filter(is_active=True, ist_test=False))
+        return Response([{"id": u.pk, "name": benutzername(u)} for u in qs.order_by("last_name", "first_name")])
+
     @action(detail=True, methods=["post", "delete"])
     def zertifikat(self, request, pk=None):
         """PKCS#12-Datei mit Kennwort hochladen (geprüft, Kennwort wird nicht gespeichert) bzw. entfernen."""

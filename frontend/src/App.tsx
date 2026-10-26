@@ -60,6 +60,8 @@ const router = createBrowserRouter([
           { path: "bia", ...seite(() => import("./seiten/akte/Bia").then(({ Bia }) => <Bia />)) },
           { path: "befunde", element: <Navigate to="../labor" replace /> },
           { path: "berichte", ...seite(() => import("./seiten/akte/Berichte").then(({ Berichte }) => <Berichte />)) },
+          // Fälle der Regeneration Clinic (26.10.2026): Behandlungsfall mit Dokumentenpaket und Rechnung
+          { path: "faelle", ...seite(() => import("./seiten/akte/Faelle").then(({ Faelle }) => <Faelle />)) },
           { path: "korrespondenz", ...seite(() => import("./seiten/akte/Korrespondenz").then(({ Korrespondenz }) => <Korrespondenz />)) },
           { path: "dokumente", ...seite(() => import("./seiten/akte/Dokumente").then(({ Dokumente }) => <Dokumente />)) },
           { path: "datenschutz", ...seite(() => import("./seiten/akte/Datenschutz").then(({ AkteDatenschutz }) => <AkteDatenschutz />)) },
@@ -87,6 +89,8 @@ const router = createBrowserRouter([
       { path: "admin/backup", ...seite(() => import("./seiten/admin/Backup").then(({ Backup }) => <MitRecht recht="backup_verwalten" titel="Backup"><Backup /></MitRecht>)) },
       { path: "admin/benutzer", ...seite(() => import("./seiten/admin/Benutzer").then(({ Benutzer }) => <MitRecht recht="benutzer_verwalten" titel="Benutzer"><Benutzer /></MitRecht>)) },
       { path: "admin/vorlagen", ...seite(() => import("./seiten/admin/Vorlagen").then(({ Vorlagen }) => <MitRecht recht="vorlagen_pflegen" titel="Vorlagen"><Vorlagen /></MitRecht>)) },
+      // Fälle und Abrechnung der Regeneration Clinic (26.10.2026): Leistungskatalog, Kostenträgertypen, Partner, Unterschriften
+      { path: "admin/abrechnung", ...seite(() => import("./seiten/admin/Abrechnung").then(({ Abrechnung }) => <MitRecht recht="vorlagen_pflegen" titel="Fälle und Abrechnung"><Abrechnung /></MitRecht>)) },
       { path: "admin/vorlagen/dokumente", ...seite(() => import("./seiten/admin/Vorlagen").then(({ Vorlagen }) => <MitRecht recht="vorlagen_pflegen" titel="Dokumentvorlagen"><Vorlagen /></MitRecht>)) },
       { path: "admin/audit-log", ...seite(() => import("./seiten/admin/AuditLog").then(({ AuditLog }) => <MitRecht recht="audit_lesen" titel="Audit-Log"><AuditLog /></MitRecht>)) },
       { path: "admin/system", ...seite(() => import("./seiten/admin/System").then(({ System }) => <MitRecht recht="system_verwalten" titel="System"><System /></MitRecht>)) },

@@ -106,4 +106,4 @@ Storno, DOCX-Rundweg, Sprachen, Pakete, CSV-Import und das endgültige Löschen 
   Signaturdienstes (z. B. eParaksts) wäre ein eigener Schritt und braucht Internetzugang des Servers.
 - **Zertifikate für die fortgeschrittene Signatur:** von einer Zertifizierungsstelle bzw. der eigenen Klinik-PKI;
   EPM prüft die Vertrauenskette nicht (offline), es vermerkt Aussteller und Gültigkeit.
-- Browsertest für den Reiter „Fälle“ steht aus.
+- Automatischer Browsertest (Playwright in `frontend/e2e`) für den Reiter „Fälle“ steht aus; von Hand im Browser geprüft: Fall anlegen mit Paket, Position aus dem Katalog, Rechnung erzeugen, Preis ändern („veraltet“), neu erzeugen (gleiche Nummer, Fassung 2), finalisieren.

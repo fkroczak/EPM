@@ -8,7 +8,8 @@ export type Recht =
   | "akten_abschliessen" | "akten_wieder_oeffnen" | "versorger_pflegen" | "vorlagen_pflegen" | "audit_lesen"
   | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "testdaten_sehen" | "system_verwalten"
   | "altdaten_importieren" | "berichte_freigeben" | "scans_bearbeiten" | "schreiben_freigeben" | "diktieren"
-  | "ki_ansehen" | "ki_pruefen" | "ki_uebernehmen" | "ki_berichte" | "ki_verwalten" | "ki_training_freigeben";
+  | "ki_ansehen" | "ki_pruefen" | "ki_uebernehmen" | "ki_berichte" | "ki_verwalten" | "ki_training_freigeben"
+  | "dokumente_finalisieren";
 
 /** Kacheln der Startseite (S11): klinische und – mit dem jeweiligen Recht – die der Administration (S12–S14) */
 export type KartenId =
@@ -333,7 +334,9 @@ export type Patient = {
       /** Medikamentenplan (Wunsch 11.10.2026): aktuell eingenommene Medikamente */
       medikamente?: number;
       /** Korrespondenz (14.10.2026): alle Schreiben der Akte */
-      korrespondenz?: number };
+      korrespondenz?: number;
+      /** Fälle der Regeneration Clinic (26.10.2026): offene Behandlungsfälle */
+      faelle?: number };
   } | null;
 };
 
@@ -1088,4 +1091,183 @@ export type ScansStand = {
   dienst?: { gestartet: string; lebenszeichen: string; laeuft: boolean; bearbeitet: number; threads: string;
     /** Speicher des Containers „ocr“ in Bytes (cgroup v2), Höchststand seit dem Start */
     speicher?: { belegt: number; hoechst: number | null; grenze: number | null } | null } | null;
+};
+
+// ====================================================================== Fälle und Abrechnung (RGC, 26.10.2026)
+/** Zahlen aus Decimal-Feldern kommen als JSON-Zahl; zur Sicherheit auch als Text zulassen */
+export type Dezimal = number | string;
+
+export type FallDokumentArt = "op_bericht" | "entlassbrief" | "konsil" | "rechnung" | "storno" | "vorlage";
+export type FallDokumentStatus = "entwurf" | "erzeugt" | "final";
+export type FinalWeg = "signatur" | "signatur_extern" | "scan" | "finalisiert";
+
+export type Fall = {
+  id: number;
+  patient: number;
+  nummer: string;
+  status: "offen" | "abgeschlossen";
+  status_name: string;
+  titel: string;
+  kostentraegertyp: number;
+  kostentraegertyp_name: string;
+  kostentraeger: string;
+  land: string;
+  versichertennummer: string;
+  aktenzeichen: string;
+  kooperationspartner: number | null;
+  kooperationspartner_name: string | null;
+  rechnungsempfaenger: string;
+  sprache: "de" | "lv" | "en";
+  fachbereich: "" | "orthopaedie" | "hno" | "adipositas" | "sonstige";
+  aufnahme: string | null;
+  entlassung: string | null;
+  op_datum: string | null;
+  eingriff: string;
+  diagnose: string;
+  behandelnder_arzt: number | null;
+  behandelnder_arzt_name: string | null;
+  operateur: string;
+  assistenz: string;
+  anaesthesie: string;
+  op_indikation: string;
+  op_verlauf: string;
+  op_befund: string;
+  entlass_verlauf: string;
+  entlass_befunde: string;
+  entlass_medikation: string;
+  entlass_empfehlung: string;
+  konsil_empfaenger: string;
+  konsil_fragestellung: string;
+  konsil_befund: string;
+  konsil_beurteilung: string;
+  bemerkung: string;
+  erstellt_am: string;
+  erstellt_von_name: string | null;
+  dokumente_stand: { entwurf: number; erzeugt: number; final: number };
+  firma_kurz?: string | null;
+};
+
+export type DokumentFassung = {
+  id: number;
+  nummer: number;
+  art: string;
+  art_name: string;
+  final: boolean;
+  sha256: string;
+  vorlage: string;
+  vorlage_version: number | null;
+  grund: string;
+  erzeugt_am: string;
+  erzeugt_von_name: string | null;
+  mime: string;
+};
+
+export type FallDokument = {
+  id: number;
+  patient: number;
+  fall: number;
+  art: FallDokumentArt;
+  art_name: string;
+  vorlage: string;
+  titel: string;
+  status: FallDokumentStatus;
+  status_name: string;
+  aus_paket: boolean;
+  freitext: string;
+  rechnungsnummer: string | null;
+  rechnungsdatum: string | null;
+  zahlungsziel_tage: number;
+  storno_zu: number | null;
+  storniert_am: string | null;
+  storniert_von_name: string | null;
+  storno_grund: string;
+  stornorechnung: number | null;
+  unterzeichner: number | null;
+  unterzeichner_name: string | null;
+  final_weg: FinalWeg | "";
+  final_weg_name: string;
+  final_am: string | null;
+  final_von_name: string | null;
+  erstellt_am: string;
+  versionen_anzahl: number;
+  letzte_version: DokumentFassung | null;
+  veraltet: boolean;
+  summe: string | null;
+  hat_docx: boolean;
+};
+
+export type Rechnungsposition = {
+  id: number;
+  dokument: number;
+  reihenfolge: number;
+  leistung: number | null;
+  code: string;
+  text: string;
+  datum: string | null;
+  menge: Dezimal;
+  einheit: string;
+  einzelpreis: Dezimal;
+  ust_satz: Dezimal;
+  betrag: Dezimal;
+};
+
+export type Leistung = {
+  id: number;
+  code: string;
+  bezeichnung: string;
+  bezeichnung_lv: string;
+  bezeichnung_en: string;
+  gruppe: string;
+  einheit: string;
+  preis: Dezimal;
+  ust_satz: Dezimal;
+  aktiv: boolean;
+};
+
+export type Kostentraegertyp = {
+  id: number;
+  kuerzel: string;
+  name: string;
+  land: string;
+  beschreibung: string;
+  paket: string[];
+  reihenfolge: number;
+  aktiv: boolean;
+};
+
+/** Was in ein Dokumentenpaket darf (``/kostentraegertypen/optionen/``) */
+export type PaketOption = { wert: string; name: string; gruppe: string };
+
+export type Kooperationspartner = {
+  id: number;
+  name: string;
+  kurzname: string;
+  anschrift: string;
+  kontakt: string;
+  aktiv: boolean;
+};
+
+export type Unterzeichner = {
+  id: number;
+  name: string;
+  funktion: string;
+  benutzer: number | null;
+  benutzer_name: string | null;
+  hat_zertifikat: boolean;
+  zertifikat_info: string;
+  zertifikat_bis: string | null;
+  reihenfolge: number;
+  aktiv: boolean;
+};
+
+export const FALL_SPRACHEN: Record<Fall["sprache"], string> = { de: "Deutsch", lv: "Lettisch", en: "Englisch" };
+export const FACHBEREICHE: Record<Fall["fachbereich"], string> = {
+  "": "—", orthopaedie: "Orthopädie / Traumatologie", hno: "HNO", adipositas: "Adipositas und Stoffwechselerkrankungen",
+  sonstige: "anderer Fachbereich",
+};
+export const FINAL_WEGE: Record<FinalWeg, { name: string; text: string }> = {
+  signatur: { name: "Elektronisch signieren (EPM)", text: "Mit dem eigenen Zertifikat und dessen Kennwort. Nur die unterschriftsberechtigte Person selbst." },
+  signatur_extern: { name: "Extern signierte PDF hochladen", text: "Die PDF wurde außerhalb von EPM signiert, z. B. qualifiziert." },
+  scan: { name: "Scan der Papierunterschrift hochladen", text: "Ausgedruckt, von Hand unterschrieben und eingescannt (PDF, JPG oder PNG)." },
+  finalisiert: { name: "Ohne Unterschrift finalisieren", text: "Die zuletzt erzeugte PDF gilt als endgültig." },
 };
