@@ -282,7 +282,11 @@ def verwendete_fallfelder(bloecke) -> set[str]:
 
     from vorlagen.bloecke import platzhalter
 
+    text = json.dumps(bloecke, ensure_ascii=False)
     felder = {"sprache"}
-    for name in platzhalter(json.dumps(bloecke, ensure_ascii=False)):
+    for name in platzhalter(text):
         felder.update(QUELLEN.get(name, []))
+    # Summe bzw. Tabelle der Leistungen (Anlage K, 09, 10): liest die aktuelle Rechnung des Falls
+    if "Leistungen." in text or '"quelle": "leistungen"' in text:
+        felder.add("leistungen")
     return felder

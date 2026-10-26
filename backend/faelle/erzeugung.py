@@ -8,6 +8,8 @@
 - ``stornieren``: finale Rechnung → Stornorechnung (negative Positionen) und auf Wunsch eine neue Rechnung als Entwurf.
 - ``docx_export``/``docx_import``: Freitexte zur Nachbearbeitung in Word und zurück in eine neue PDF.
 """
+import contextvars
+import functools
 import hashlib
 import io
 import json
@@ -22,6 +24,30 @@ from django.utils import timezone
 from .models import Behandlungsfall, DokumentVersion, FallDokument, Rechnungsposition, Zaehler
 
 MAX_UPLOAD = 25 * 1024 * 1024
+
+# Dateien, die im laufenden Vorgang abgelegt wurden – bei einem Fehler wieder entfernt (die Datenbank rollt zurück,
+# die Datei läge sonst ohne Eintrag im Dokumentenordner)
+_neue_dateien: contextvars.ContextVar = contextvars.ContextVar("faelle_neue_dateien", default=None)
+
+
+def _vorgang(funktion):
+    """Atomar; bei einem Fehler werden die in diesem Vorgang abgelegten Dateien gelöscht (äußerster Aufruf)."""
+    @functools.wraps(funktion)
+    def aufruf(*args, **kwargs):
+        if _neue_dateien.get() is not None:  # verschachtelt: der äußere Vorgang räumt auf
+            with transaction.atomic():
+                return funktion(*args, **kwargs)
+        token = _neue_dateien.set([])
+        try:
+            with transaction.atomic():
+                return funktion(*args, **kwargs)
+        except BaseException:
+            for pfad in _neue_dateien.get():
+                pfad.unlink(missing_ok=True)
+            raise
+        finally:
+            _neue_dateien.reset(token)
+    return aufruf
 SCAN_MIME = {"application/pdf", "image/jpeg", "image/png"}
 
 
@@ -81,6 +107,14 @@ def datenstand(dok: FallDokument) -> dict:
                                 "menge": str(x.menge), "einheit": x.einheit, "einzelpreis": str(x.einzelpreis),
                                 "ust_satz": str(x.ust_satz)} for x in dok.positionen.all()]
         daten["summen"] = {k: str(v) for k, v in dok.summen().items() if k != "ust_saetze"}
+    elif verwendet is None or "leistungen" in verwendet:
+        # Formular mit Leistungen der Rechnung (Anlage K): geänderte Rechnungspositionen machen es veraltet
+        from .felder import _aktuelle_rechnung
+
+        r = _aktuelle_rechnung(fall)
+        daten["leistungen"] = None if r is None else {
+            "rechnung": r.pk, "summe": str(r.summen()["brutto"]),
+            "positionen": [[x.code, x.text, str(x.menge), x.einheit, str(x.einzelpreis)] for x in r.positionen.all()]}
     return daten
 
 
@@ -168,6 +202,9 @@ def _ablegen(dok, daten: bytes, mime: str, dateiname: str, benutzer, sichtbar=Fa
                  notiz=f"Fall {dok.fall.nummer} · {dok.titel}"[:500], **meta)
     d.herkunft = Dokument.Herkunft.SYSTEM
     d._history_user = benutzer
+    liste = _neue_dateien.get()
+    if liste is not None:
+        liste.append(d.pfad)
     d.save()
     return d
 
@@ -185,7 +222,7 @@ def _sperren(dok) -> FallDokument:
     return FallDokument.objects.select_for_update().select_related("fall", "patient").get(pk=dok.pk)
 
 
-@transaction.atomic
+@_vorgang
 def erzeugen(dok: FallDokument, benutzer, grund: str = "", art=DokumentVersion.Art.ERZEUGT, docx=None) -> DokumentVersion:
     """Neue Fassung aus dem aktuellen Stand. Rechnungen bekommen bei der ersten Erzeugung ihre Nummer."""
     from vorlagen.pdf import wasserzeichen_fuer
@@ -206,14 +243,10 @@ def erzeugen(dok: FallDokument, benutzer, grund: str = "", art=DokumentVersion.A
     nummer = (dok.versionen.order_by("-nummer").values_list("nummer", flat=True).first() or 0) + 1
     pdf_dok = _ablegen(dok, pdf, "application/pdf", _dateiname(dok, nummer), benutzer,
                        titel=f"{dok.titel} {dok.rechnungsnummer or ''} – Fassung {nummer}".replace("  ", " "))
-    try:
-        v = _neue_version(dok, benutzer, art, pdf_dok, daten, schluessel, version, grund, docx=docx)
-        dok.status = FallDokument.Status.ERZEUGT
-        dok._history_user = benutzer
-        dok.save()
-    except BaseException:
-        pdf_dok.pfad.unlink(missing_ok=True)
-        raise
+    v = _neue_version(dok, benutzer, art, pdf_dok, daten, schluessel, version, grund, docx=docx)
+    dok.status = FallDokument.Status.ERZEUGT
+    dok._history_user = benutzer
+    dok.save()
     return v
 
 
@@ -263,16 +296,20 @@ def pruefe_signatur(pdf: bytes) -> dict:
         status = validate_pdf_signature(letzte)
     except Exception:
         raise ValidationError({"datei": "Die Signatur lässt sich nicht prüfen."})
-    if not status.intact:
+    from pyhanko.sign.validation.status import SignatureCoverageLevel
+
+    if not status.intact or status.coverage != SignatureCoverageLevel.ENTIRE_FILE:
         raise ValidationError({"datei": "Die Signatur ist beschädigt oder das Dokument wurde danach verändert."})
     zert = status.signing_cert
     return {"anzahl": len(signaturen), "unterzeichner": zert.subject.human_friendly if zert else "",
             "abdeckung": str(status.coverage.name) if status.coverage else "", "vertrauenswuerdig": bool(status.trusted)}
 
 
-@transaction.atomic
+@_vorgang
 def finalisieren(dok: FallDokument, benutzer, weg: str, unterzeichner=None, datei=None, kennwort: str = "",
                  notiz: str = "") -> DokumentVersion:
+    from vorlagen.pdf import wasserzeichen_fuer
+
     W = FallDokument.Weg
     if not benutzer.hat_recht("dokumente_finalisieren"):
         raise PermissionError("Finalisieren und signieren darf nur, wer das Recht dazu hat.")
@@ -302,7 +339,7 @@ def finalisieren(dok: FallDokument, benutzer, weg: str, unterzeichner=None, date
             # Name der Person steht auf der PDF → mit ihr neu erzeugen, dann signieren
             dok.unterzeichner = unterzeichner
             daten = {**datenstand(dok), "grundlage_fassung": letzte.nummer, "veraltet_bei_finalisierung": False}
-            pdf, _, _ = pdf_bauen(dok, benutzer)
+            pdf, _, _ = pdf_bauen(dok, benutzer, wasserzeichen=wasserzeichen_fuer(dok.patient))
         else:
             pdf = letzte.pdf.pfad.read_bytes()
             if hashlib.sha256(pdf).hexdigest() != letzte.sha256:
@@ -355,9 +392,25 @@ def _signierte_fassung(dok, inhalt: bytes) -> int:
             continue
         original = v.pdf.pfad.read_bytes()
         if inhalt.startswith(original) and len(inhalt) > len(original):
+            if not _nur_signaturen_angehaengt(original, inhalt):
+                raise ValidationError({"datei": "Die PDF wurde vor dem Signieren verändert. Bitte die aus EPM "
+                                                "heruntergeladene PDF unverändert signieren."})
             return v.nummer
     raise ValidationError({"datei": "Die signierte PDF passt zu keiner Fassung dieses Dokuments. Bitte die aus EPM "
                                     "heruntergeladene PDF signieren, ohne sie vorher zu verändern."})
+
+
+def _nur_signaturen_angehaengt(original: bytes, inhalt: bytes) -> bool:
+    """Jede Revision nach der EPM-Fassung ist eine Signatur (keine nachträgliche Änderung vor der Signatur)."""
+    from pyhanko.pdf_utils.reader import PdfFileReader
+
+    try:
+        vorher = PdfFileReader(io.BytesIO(original), strict=False).xrefs.total_revisions
+        reader = PdfFileReader(io.BytesIO(inhalt), strict=False)
+        signiert = {s.signed_revision for s in reader.embedded_signatures}
+        return all(r in signiert for r in range(vorher, reader.xrefs.total_revisions))
+    except Exception:
+        return False
 
 
 def _scan_mime(inhalt: bytes) -> str:
@@ -371,7 +424,7 @@ def _scan_mime(inhalt: bytes) -> str:
 
 
 # ====================================================================== Storno
-@transaction.atomic
+@_vorgang
 def stornieren(dok: FallDokument, benutzer, grund: str, neue_rechnung: bool = True) -> tuple:
     """Finale Rechnung stornieren: Stornorechnung mit negativen Positionen (sofort erzeugt) und – auf Wunsch – eine
     neue Rechnung als Entwurf mit denselben Positionen zur Korrektur. → (Storno, neue Rechnung oder None)."""
@@ -488,13 +541,15 @@ def docx_lesen(dok: FallDokument, inhalt: bytes) -> dict[str, str]:
     return werte
 
 
-@transaction.atomic
+@_vorgang
 def docx_import(dok: FallDokument, datei, benutzer) -> tuple[list[str], DokumentVersion]:
     """Übernimmt geänderte Freitexte aus der DOCX in Fall, Dokument und Positionen und erzeugt eine neue Fassung.
     Die hochgeladene DOCX liegt (ausgeblendet) in der Akte und hängt an der Fassung."""
     dok = _sperren(dok)
     dok.pruefe_aenderbar()
     dok.fall.pruefe_offen()
+    if dok.art == FallDokument.Art.STORNO:
+        raise ValidationError({"fehler": "Eine Stornorechnung wird nicht über DOCX geändert."})
     if datei.size > MAX_UPLOAD:
         raise ValidationError({"datei": "Die Datei ist größer als 25 MB."})
     inhalt = datei.read()

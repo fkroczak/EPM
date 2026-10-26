@@ -87,6 +87,12 @@ class UnterzeichnerSerializer(ModelClean, serializers.ModelSerializer):
     def get_benutzer_name(self, obj):
         return benutzername(obj.benutzer)
 
+    def update(self, instance, validated_data):
+        # anderes Konto: das hinterlegte Zertifikat gehört der bisherigen Person
+        if "benutzer" in validated_data and validated_data["benutzer"] != instance.benutzer:
+            instance.zertifikat, instance.zertifikat_info, instance.zertifikat_bis = None, "", None
+        return super().update(instance, validated_data)
+
 
 class LeistungSerializer(ModelClean, serializers.ModelSerializer):
     class Meta:
@@ -149,14 +155,18 @@ class UnterzeichnerViewSet(OhneLoeschen):
     def zertifikat(self, request, pk=None):
         """PKCS#12-Datei mit Kennwort hochladen (geprüft, Kennwort wird nicht gespeichert) bzw. entfernen."""
         u = self.get_object()
-        if u.benutzer_id != request.user.pk and not request.user.hat_recht("vorlagen_pflegen"):
-            raise PermissionError("Das Zertifikat hinterlegt die Person selbst oder wer Vorlagen pflegt.")
         if request.method == "DELETE":
+            if u.benutzer_id != request.user.pk and not request.user.hat_recht("vorlagen_pflegen"):
+                raise PermissionError("Das Zertifikat entfernt die Person selbst oder wer Vorlagen pflegt.")
             u.zertifikat, u.zertifikat_info, u.zertifikat_bis = None, "", None
             u.save(update_fields=["zertifikat", "zertifikat_info", "zertifikat_bis"])
             protokolliere(SystemEreignis.Art.STAMMDATEN, request, objekt=f"Unterzeichner: {u}",
                           aktion="Zertifikat entfernt")
             return Response(self.get_serializer(u).data)
+        # Hochladen nur die Person selbst – sonst könnte jemand mit eigenem Zertifikat unter fremdem Namen signieren
+        if u.benutzer_id is None or u.benutzer_id != request.user.pk:
+            raise PermissionError("Das Zertifikat hinterlegt nur die Person selbst, angemeldet mit dem verknüpften "
+                                  "Benutzerkonto.")
         datei = request.FILES.get("datei")
         if datei is None or datei.size > 1024 * 1024:
             return Response({"datei": "Bitte die PKCS#12-Datei (.p12/.pfx, höchstens 1 MB) wählen."},
@@ -435,7 +445,7 @@ class FallDokumentSerializer(FirmaFeld, serializers.ModelSerializer):
         return str(obj.summen()["brutto"]) if obj.pk and obj.ist_rechnung else None
 
     def get_hat_docx(self, obj):
-        return obj.ist_rechnung or obj.art in Behandlungsfall.FREITEXTE or obj.art == FallDokument.Art.VORLAGE
+        return obj.art == FallDokument.Art.RECHNUNG or obj.art in Behandlungsfall.FREITEXTE or obj.art == FallDokument.Art.VORLAGE
 
     def validate_fall(self, fall):
         if self.instance and fall != self.instance.fall:
@@ -507,6 +517,9 @@ class FallDokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Ret
         self.pruefe_patient(dok.patient)
         dok.pruefe_aenderbar()
         dok.fall.pruefe_offen()
+        if dok.art == FallDokument.Art.STORNO and set(serializer.validated_data) - {"unterzeichner"}:
+            raise serializers.ValidationError({"fehler": "Eine Stornorechnung wird nicht geändert – nur die "
+                                                         "unterschreibende Person lässt sich wählen."})
         dok._history_user = self.request.user
         serializer.save()
 

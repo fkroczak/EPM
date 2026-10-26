@@ -891,7 +891,7 @@ function DokumentZeile({ dok, bearbeitbar, finalisieren, stornieren, positionenO
   const menue: MenuEintrag[] = [
     ...(dok.versionen_anzahl ? [{ text: `Fassungen ansehen (${dok.versionen_anzahl})`, onClick: () => onDialog("fassungen") }] : []),
     ...(dok.versionen_anzahl ? [{ text: "Letzte Fassung öffnen", onClick: () => onDialog("pdf") }] : []),
-    ...(bearbeitbar && offen ? [{ text: "Titel, Unterschrift, Text …", onClick: () => onDialog("bearbeiten") }] : []),
+    ...(bearbeitbar && offen && dok.art !== "storno" ? [{ text: "Titel, Unterschrift, Text …", onClick: () => onDialog("bearbeiten") }] : []),
     ...(dok.hat_docx ? [{ text: "DOCX herunterladen", hinweis: "Freitexte in Word bearbeiten", onClick: () => {
       const a = document.createElement("a");
       a.href = `/api/falldokumente/${dok.id}/docx/`;
@@ -951,7 +951,7 @@ function DokumentZeile({ dok, bearbeitbar, finalisieren, stornieren, positionenO
           {menue.length ? <Menue label="Weitere Aktionen" eintraege={menue} /> : null}
         </div>
       </div>
-      {rechnung && positionenOffen ? <Positionen dok={dok} bearbeitbar={bearbeitbar && offen} /> : null}
+      {rechnung && positionenOffen ? <Positionen dok={dok} bearbeitbar={bearbeitbar && offen && dok.art !== "storno"} /> : null}
     </li>
   );
 }

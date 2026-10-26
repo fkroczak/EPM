@@ -278,6 +278,12 @@ class FallTest(Grundlage):
         # Paket legt die stornierte Rechnung nicht erneut an (es gibt schon die neue)
         self.assertEqual(client_fuer(self.mitarbeiter).post(f"/api/faelle/{f['id']}/paket/").json()["neu"], 0)
         # Stornorechnung lässt sich finalisieren; negative Mengen auf normalen Rechnungen nicht
+        # Stornorechnung spiegelt die Ausgangsrechnung: Positionen und Inhalt nicht änderbar
+        self.position(storno, self.op, erwartet=400)
+        sp = storno.positionen.first()
+        self.assertEqual(c.patch(f"/api/rechnungspositionen/{sp.pk}/", {"menge": "5"}, format="json").status_code, 400)
+        self.assertEqual(c.patch(f"/api/falldokumente/{storno.pk}/", {"freitext": "x"}, format="json").status_code, 400)
+        self.assertFalse(c.get(f"/api/falldokumente/{storno.pk}/").json()["hat_docx"])
         self.finalisieren(storno)
         self.position(neu, self.op, menge="-1", erwartet=400)
 
@@ -314,6 +320,11 @@ class FallTest(Grundlage):
         self.assertEqual(r.status_code, 200, r.content)
         self.assertTrue(r.json()["hat_zertifikat"])
         self.assertIn("Masin", r.json()["zertifikat_info"])
+        # fremdes Zertifikat hochladen: auch mit „Vorlagen pflegen“ nicht (sonst Signatur unter fremdem Namen)
+        gottwald = Unterzeichner.objects.get(name="Dr. Markus Gottwald")
+        r = client_fuer(self.mitarbeiter).post(f"/api/unterzeichner/{gottwald.pk}/zertifikat/",
+                                               {"datei": SimpleUploadedFile("g.p12", p12("Gottwald")), "kennwort": "geheim"})
+        self.assertEqual(r.status_code, 403)
         # fremdes Zertifikat hochladen darf ein Mitarbeiter mit „Vorlagen pflegen“ – signieren nur die Person selbst
         f = self.fall()
         op = self.dokument(f, "op_bericht")
@@ -343,6 +354,50 @@ class FallTest(Grundlage):
         self.assertEqual(d["final_weg"], "signatur_extern")
         v = DokumentVersion.objects.get(dokument=eb, final=True)
         self.assertEqual((v.daten["signatur"]["anzahl"], v.daten["signiert_fassung"]), (1, 1))
+
+    def test_konto_umhaengen_loescht_zertifikat(self):
+        self.masin.benutzer = self.mediziner
+        self.masin.save()
+        c = client_fuer(self.mediziner)
+        c.post(f"/api/unterzeichner/{self.masin.pk}/zertifikat/",
+               {"datei": SimpleUploadedFile("m.p12", p12()), "kennwort": "geheim"})
+        self.masin.refresh_from_db()
+        self.assertTrue(self.masin.hat_zertifikat)
+        r = client_fuer(self.mitarbeiter).patch(f"/api/unterzeichner/{self.masin.pk}/", {"benutzer": self.mitarbeiter.pk},
+                                                format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertFalse(r.json()["hat_zertifikat"])
+
+    def test_formular_veraltet_wenn_rechnung_sich_aendert(self):
+        f = self.fall()
+        r = self.dokument(f, "rechnung")
+        p = self.position(r, self.op)
+        anlage = FallDokument.objects.get(fall_id=f["id"], vorlage="eigen-rgc-f11")
+        self.erzeugen(anlage)
+        c = client_fuer(self.mitarbeiter)
+        self.assertFalse(c.get(f"/api/falldokumente/{anlage.pk}/").json()["veraltet"])
+        c.patch(f"/api/rechnungspositionen/{p['id']}/", {"menge": "2"}, format="json")
+        self.assertTrue(c.get(f"/api/falldokumente/{anlage.pk}/").json()["veraltet"])
+
+    def test_abbruch_hinterlaesst_keine_dateien(self):
+        from django.conf import settings
+        from docx import Document
+
+        f = self.fall()
+        r = self.dokument(f, "rechnung")  # ohne Positionen: Erzeugen scheitert
+        c = client_fuer(self.mitarbeiter)
+        d = Document(io.BytesIO(c.get(f"/api/falldokumente/{r.pk}/docx/").content))
+        for zeile in d.tables[0].rows:
+            if "[[freitext]]" in zeile.cells[0].text:
+                zeile.cells[1].text = "Zahlbar per Überweisung."
+        puffer = io.BytesIO()
+        d.save(puffer)
+        ordner = settings.EPM_DOKUMENTE / str(self.patient.nummer)
+        vorher = set(ordner.glob("*")) if ordner.exists() else set()
+        antwort = c.post(f"/api/falldokumente/{r.pk}/docx/", {"datei": SimpleUploadedFile("r.docx", puffer.getvalue())})
+        self.assertEqual(antwort.status_code, 400)
+        nachher = set(ordner.glob("*")) if ordner.exists() else set()
+        self.assertEqual(nachher - vorher, set())
 
     def test_scan_der_papierunterschrift(self):
         f = self.fall()

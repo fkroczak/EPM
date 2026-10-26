@@ -486,6 +486,7 @@ function UnterzeichnerDialog({ eintrag, onZu }: { eintrag: Unterzeichner | "neu"
 }
 
 function UnterschriftenBereich() {
+  const { ich } = useAuth();
   const qc = useQueryClient();
   const melden = useHinweis();
   const [dialog, setDialog] = useState<Unterzeichner | "neu" | null>(null);
@@ -501,7 +502,7 @@ function UnterschriftenBereich() {
   const abgelaufen = (u: Unterzeichner) => !!u.zertifikat_bis && new Date(u.zertifikat_bis) < new Date();
   return (
     <Karte className="p-[1.375rem] flex flex-col gap-3">
-      <KartenKopf titel="Unterschriftsberechtigte" unter="Wer Dokumente der Fälle unterschreibt. Für die elektronische Signatur braucht die Person ein Benutzerkonto und ein Zertifikat."
+      <KartenKopf titel="Unterschriftsberechtigte" unter="Wer Dokumente der Fälle unterschreibt. Für die elektronische Signatur braucht die Person ein verknüpftes Benutzerkonto; ihr Zertifikat hinterlegt sie selbst (angemeldet mit diesem Konto)."
         rechts={<Knopf klein variante="pri" icon="plus" onClick={() => setDialog("neu")} data-testid="unterzeichner-neu">Person hinzufügen</Knopf>} />
       {liste.isPending ? <Laden /> : <Fehleranzeige fehler={liste.error} />}
       {liste.isSuccess && !daten.length ? <Leer>Noch keine unterschriftsberechtigten Personen.</Leer> : null}
@@ -523,8 +524,9 @@ function UnterschriftenBereich() {
                 ) : <span className="gedaempft">keins</span>}
               </td>
               <Aktionen aktiv={u.aktiv} onBearbeiten={() => setDialog(u)} onUmschalten={() => umschalten.mutate(u)}>
-                <Knopf klein icon="hochladen" onClick={() => setZertifikat(u)} data-testid="zertifikat-hochladen">
-                  {u.hat_zertifikat ? "Zertifikat ersetzen" : "Zertifikat"}</Knopf>{" "}
+                {/* hinterlegen nur die Person selbst (mit dem verknüpften Konto) */}
+                {u.benutzer && u.benutzer === ich?.id ? <><Knopf klein icon="hochladen" onClick={() => setZertifikat(u)} data-testid="zertifikat-hochladen">
+                  {u.hat_zertifikat ? "Zertifikat ersetzen" : "Zertifikat"}</Knopf>{" "}</> : null}
                 {u.hat_zertifikat ? <><Knopf klein variante="dng" onClick={() => { zertifikatWeg.reset(); setEntfernen(u); }}>Zertifikat entfernen</Knopf>{" "}</> : null}
               </Aktionen>
             </tr>

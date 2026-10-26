@@ -458,10 +458,14 @@ class Rechnungsposition(models.Model):
         return runde((self.menge or 0) * (self.einzelpreis or 0))
 
     def _pruefe_dokument(self):
-        dok = FallDokument.objects.select_related("patient").get(pk=self.dokument_id)
+        # Zeile sperren: eine gleichzeitige Finalisierung wartet bzw. die Änderung sieht schon „final“
+        dok = FallDokument.objects.select_for_update().select_related("patient").get(pk=self.dokument_id)
         if not dok.ist_rechnung:
             raise ValidationError({"dokument": "Positionen gibt es nur an Rechnungen."})
         dok.pruefe_aenderbar()
+        if dok.art == FallDokument.Art.STORNO and dok.versionen.exists():
+            raise ValidationError({"fehler": "Die Positionen einer Stornorechnung spiegeln die stornierte Rechnung "
+                                             "und lassen sich nicht ändern."})
 
     def save(self, *args, **kwargs):
         self._pruefe_dokument()
