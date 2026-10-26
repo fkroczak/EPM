@@ -620,6 +620,45 @@ Person und Zeitpunkt.</p>
 an.</p>""",
     },
     {
+        "id": "faelle", "gruppe": "patienten", "titel": "Fälle und Dokumente (Regeneration Clinic)",
+        "rechte": ["akten_lesen"], "seiten": ["/patienten/:id/faelle"],
+        "html": """
+<p>Ein <strong>Behandlungsfall</strong> ist die eine Datenquelle für alle Dokumente einer Behandlung: Kostenträger,
+Kooperationspartner, Sprache (Deutsch, Lettisch, Englisch), Aufnahme, Eingriff, Texte für OP-Bericht, Entlassungsbrief
+und Konsil. Beim Anlegen entsteht je <strong>Kostenträgertyp</strong> automatisch das Dokumentenpaket, z. B.
+Patientenerklärung, Aufklärungen, Anlage K, OP-Bericht, Entlassungsbrief und Rechnung. Zur Aufklärung Operation kommt
+je Fachbereich der passende <strong>Zusatzbogen</strong> dazu.</p>
+<ol>
+<li>Falldaten eintragen bzw. bei der Rechnung die <strong>Leistungspositionen</strong> aus dem Leistungskatalog wählen.</li>
+<li><strong>PDF erzeugen</strong>. Jede Erzeugung ist eine neue <strong>Fassung</strong>; frühere Fassungen bleiben unter
+<strong>Fassungen</strong> abrufbar.</li>
+<li>Noch nicht unterschrieben? Dann lassen sich Falldaten, Positionen, Mengen, Preise und Texte weiter ändern. Danach
+<strong>neu erzeugen</strong> – „veraltet“ zeigt, dass sich seit der letzten PDF etwas geändert hat.</li>
+<li>Freitexte lassen sich auch in Word bearbeiten: <strong>DOCX herunterladen</strong>, ändern, <strong>DOCX
+übernehmen</strong>. EPM übernimmt die Texte in den Fall und erzeugt eine neue PDF.</li>
+<li><strong>Finalisieren</strong> (Recht „Fall-Dokumente finalisieren“): elektronisch signieren (mit dem eigenen
+Zertifikat und dessen Kennwort), extern signierte PDF hochladen, Scan der Papierunterschrift hochladen oder ohne
+Unterschrift finalisieren. Danach ist die Fassung unveränderlich und liegt bei den Dokumenten der Akte.</li>
+</ol>
+<p>Eine finale Rechnung wird nicht mehr geändert: <strong>Stornieren</strong> erzeugt eine Stornorechnung und auf Wunsch
+eine neue Rechnung als Entwurf mit denselben Positionen. Jede Erzeugung, Finalisierung und jedes Storno steht im
+Verlauf der Akte und im Audit-Log.</p>""",
+    },
+    {
+        "id": "abrechnung", "gruppe": "administration", "titel": "Fälle und Abrechnung (Regeneration Clinic)",
+        "rechte": ["vorlagen_pflegen"], "seiten": ["/admin/abrechnung"],
+        "html": """
+<p><strong>Leistungskatalog</strong>: Leistungen mit Nummer, Bezeichnung (Deutsch, Lettisch, Englisch), Einheit, Preis und
+USt. Eine Preisänderung gilt für neue Rechnungspositionen. Der ganze Katalog lässt sich als CSV einspielen (Semikolon,
+Kopfzeile <code>code;bezeichnung;bezeichnung_lv;bezeichnung_en;gruppe;einheit;preis;ust_satz</code>).</p>
+<p><strong>Kostenträgertypen</strong> legen das Dokumentenpaket fest, das ein neuer Fall bekommt.
+<strong>Kooperationspartner</strong> und <strong>Unterschriftsberechtigte</strong> sind frei erweiterbar. Für die
+elektronische Signatur hinterlegt die unterschriftsberechtigte Person ihr Zertifikat (PKCS#12, .p12/.pfx); das Kennwort
+speichert EPM nicht, es wird bei jeder Signatur eingegeben.</p>
+<p>Aufbau und Texte von OP-Bericht, Entlassungsbrief, Konsiliarbericht und Rechnung (je Sprache) und der Zusatzbögen
+pflegen Sie unter Vorlagen › Dokumentvorlagen (Gruppe „Dokumente der Behandlungsfälle“).</p>""",
+    },
+    {
         "id": "tastatur", "gruppe": "patienten", "titel": "Tastenkürzel in der Akte", "rechte": ["akten_lesen"],
         "seiten": [],
         "html": """

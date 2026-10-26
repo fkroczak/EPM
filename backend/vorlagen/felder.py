@@ -36,6 +36,9 @@ class Kontext:
     benutzer: object = None
     # Schreiben aus dem Reiter „Korrespondenz“ (14.10.2026): Betreff, Empfänger, Freitext, Freigabe
     schreiben: object = None
+    # Behandlungsfall der RGC (Dokumentenautomation, 26.10.2026): Fall und das zu erzeugende Dokument des Falls
+    fall: object = None
+    falldokument: object = None
 
     def __post_init__(self):
         self.heute = self.heute or timezone.localdate()
@@ -547,7 +550,10 @@ ANKUENDIGUNG = {
 # Eigene Schreiben (F176): unter Vorlagen › Dokumentvorlagen angelegt, Kennung „eigen-…“. Sie haben alle dieselben
 # Datenfelder: Patient, Anrede, Absender und – wenn beim Erzeugen ein Termin gewählt ist – den Termin.
 EIGEN_PRAEFIX = "eigen-"
-EIGEN = {**GEMEINSAM, **ANSCHREIBEN, **TERMIN, **KORRESPONDENZ}
+# Dazu die Angaben des Behandlungsfalls (Dokumentenautomation der RGC, 26.10.2026; ohne Fall leer)
+from faelle.felder import FELDER as _FALL_FELDER, TABELLEN as _FALL_TABELLEN  # noqa: E402
+
+EIGEN = {**GEMEINSAM, **ANSCHREIBEN, **TERMIN, **KORRESPONDENZ, **_FALL_FELDER}
 
 
 def ist_eigen(art) -> bool:
@@ -634,9 +640,10 @@ SCHREIBEN_TABELLEN = {
     "zusammensetzung": ("Zusammensetzung des aktuellen Infusionsplans",
                         ["Bestandteil", "Menge", "Einheit", "Präparat"], ["", "zahl", "einheit", ""]),
 }
+EIGEN_TABELLEN = {**SCHREIBEN_TABELLEN, **_FALL_TABELLEN}
 for _art in ("patientenaufnahme", "terminbestaetigung", "reisebescheinigung"):
     TABELLEN[_art] = {**SCHREIBEN_TABELLEN, **TABELLEN[_art]}
-TABELLEN = JeArt(TABELLEN, SCHREIBEN_TABELLEN)
+TABELLEN = JeArt(TABELLEN, EIGEN_TABELLEN)
 
 
 class Fett(str):
@@ -644,6 +651,10 @@ class Fett(str):
 
 
 def tabellenspalten(art: str, quelle: str, k: Kontext) -> list[str]:
+    if quelle in _FALL_TABELLEN:
+        from faelle.felder import spalten
+
+        return spalten(quelle, k)
     spalten = list(TABELLEN[art][quelle][1])
     if quelle == "bilanz" and k.plan is not None and k.plan.basis_praeparat_id:
         spalten[2] = f"Zusatzlösung · {k.plan.basis_praeparat}"
@@ -656,6 +667,10 @@ def _zahl_ohne(wert):
 
 
 def tabellenzeilen(art: str, quelle: str, k: Kontext) -> list[list[str]]:
+    if quelle in _FALL_TABELLEN:
+        from faelle.felder import zeilen
+
+        return zeilen(quelle, k)
     if quelle == "zusammensetzung":
         p = aktueller_plan(k)  # in Schreiben: der aktuelle Plan der Akte
         if p is None:

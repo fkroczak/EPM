@@ -23,3 +23,6 @@ pillow-heif>=1.0,<2          # HEIC/HEIF (Fotos vom iPhone)
 ocrmypdf>=16,<18             # „Text erkennen“ an Dokumenten der Akte (F170): Textebene über das Original, PDF/A
 pywhispercpp>=1.5.1,<1.6     # Diktate (23.10.2026): whisper.cpp, nur CPU, offline; Modell in scans/modelle/modelle.json
 av>=19,<20                   # Diktate: Aufnahme des Browsers (WebM/Opus, MP4/AAC vom iPhone) lesen
+# Dokumentenautomation der RGC (26.10.2026): fortgeschrittene elektronische Signatur (PAdES) und DOCX zur Nachbearbeitung
+pyhanko>=0.38,<0.39
+python-docx>=1.2,<1.3
