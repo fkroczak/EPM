@@ -20,8 +20,10 @@ Anzeige – und das Ergebnis ist nach einem Neustart von Backend und Webserver n
 `akte.spec.ts`, `start.spec.ts`, `versorger.spec.ts` und als letzte Datei `zz-neustart.spec.ts`: Sie startet die Container
 neu und prüft die Ergebnisse aller anderen Browsertests erneut über die Oberfläche.
 
-Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests. Beide laufen bei jedem Push in GitHub Actions
-(Workflow `.github/workflows/backend.yml`, Ergebnis als Kommentar am Commit):
+Teststatus-Angaben beziehen sich auf zwei Arten automatischer Tests in GitHub Actions (Workflow
+`.github/workflows/backend.yml`, Ergebnis als Kommentar am Commit). Seit 26.10.2026 sparsamer: Backend-Tests bei jedem
+Push auf einen Pull Request und auf main, Browsertests nur auf main und beim manuellen Start („Run workflow“); reine
+Doku-Änderungen lösen keinen Lauf aus, ein neuer Push auf denselben Pull Request bricht den laufenden Lauf ab.
 
 - **Backend-Tests** (`backend/*/tests.py`) gegen PostgreSQL 18: API-Aufruf → Validierung → Logik → Datenbank → Antwort,
   ohne Oberfläche. Laufen auch nach jedem `sudo epm-update` auf dem Server.
