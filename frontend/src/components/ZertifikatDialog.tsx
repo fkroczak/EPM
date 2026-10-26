@@ -9,6 +9,7 @@ import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import type { Unterzeichner } from "@/lib/typen";
 import { Eingabe, Feld, Fehleranzeige, Knopf, Meldung } from "@/components/ui/basis";
+import { DateiWahl } from "@/components/DateiWahl";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 
@@ -46,8 +47,8 @@ export function ZertifikatDialog({ person, offen, onOffen }: {
       </>}>
       <div className="flex flex-col gap-3" data-testid="zertifikat-dialog">
         <Feld label="Zertifikatsdatei (.p12 oder .pfx)" fehler={f.datei} pflicht>
-          {(p) => <input {...p} type="file" accept=".p12,.pfx,application/x-pkcs12" className="text-sm"
-            onChange={(e) => setDatei(e.target.files?.[0] ?? null)} />}
+          {(p) => <DateiWahl id={p.id} datei={datei} onDatei={setDatei} label="Zertifikatsdatei"
+            accept=".p12,.pfx,application/x-pkcs12" testid="zertifikat-datei" />}
         </Feld>
         <Feld label="Kennwort der Datei" fehler={f.kennwort}>
           {(p) => <Eingabe {...p} type="password" autoComplete="off" value={kennwort} onChange={(e) => setKennwort(e.target.value)} />}

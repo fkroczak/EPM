@@ -94,7 +94,7 @@ type Uebersicht = { art: Art; name: string; aktiv: Version; entwurf: Version | n
   /** Vorlagen-Portal (F180): Gruppe der Liste, wofür die Vorlage ist und wo sie in der Praxis benutzt wird */
   gruppe?: Gruppe; wofuer?: string; wo?: string };
 export type VorlagenUebersicht = Uebersicht;
-type Gruppe = "schreiben" | "eigen" | "anforderungen" | "formulare" | "plaene" | "datenschutz";
+type Gruppe = "schreiben" | "eigen" | "anforderungen" | "formulare" | "fall" | "plaene" | "datenschutz";
 type Datenfeld = { name: string; beschreibung: string; html: boolean; bezeichnung?: string; gruppe?: string };
 type Aufbau = Uebersicht & {
   bausteine: { typ: string; name: string }[];
@@ -432,6 +432,8 @@ const GRUPPEN: { gruppe: Gruppe; titel: string; leer?: string }[] = [
   // mitgelieferte Vorlagen der Regeneration Clinic (13.10.2026), nur in der Firma RGC sichtbar
   { gruppe: "anforderungen", titel: "Anforderungen: Labor, Bildgebung, Funktionsdiagnostik" },
   { gruppe: "formulare", titel: "Aufklärungen, Erklärungen und Abrechnung" },
+  // Dokumente der Behandlungsfälle der RGC (26.10.2026): OP-Bericht, Entlassungsbrief, Konsil, Rechnung je Sprache
+  { gruppe: "fall", titel: "Dokumente der Behandlungsfälle" },
   { gruppe: "plaene", titel: "Pläne, Berichte und Unterlagen" },
   { gruppe: "datenschutz", titel: "Vordrucke zum Datenschutz" },
 ];

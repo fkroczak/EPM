@@ -38,8 +38,12 @@ TABELLEN = {
 
 
 def sprache(k) -> str:
+    """Sprache des Falls – die Formulare der RGC (Art „vorlage“, deutsch bzw. DE/LV) immer deutsch."""
     fall = getattr(k, "fall", None)
-    return fall.sprache if fall is not None else "de"
+    dok = getattr(k, "falldokument", None)
+    if fall is None or (dok is not None and dok.art == dok.Art.VORLAGE):
+        return "de"
+    return fall.sprache
 
 
 def text(k, schluessel, **werte) -> str:
@@ -54,6 +58,19 @@ def betrag(wert, k=None) -> str | None:
     if k is not None and sprache(k) == "en":
         return s
     return s.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+# Einheiten des Leistungskatalogs (deutsch gepflegt) in der Sprache des Falls
+EINHEITEN = {"Stück": ("gab.", "pcs"), "Stunde": ("st.", "h"), "Stunden": ("st.", "h"), "Tag": ("diena", "day"),
+             "Tage": ("dienas", "days"), "Nacht": ("nakts", "night"), "Eingriff": ("operācija", "procedure"),
+             "Pauschale": ("fiksēta maksa", "flat rate"), "Sitzung": ("seanss", "session")}
+
+
+def einheit(wert: str, k) -> str:
+    s = sprache(k)
+    if s == "de" or wert not in EINHEITEN:
+        return wert
+    return EINHEITEN[wert][0 if s == "lv" else 1]
 
 
 def menge(wert) -> str:
@@ -210,7 +227,7 @@ def zeilen(quelle: str, k) -> list[list[str]]:
         d = getattr(k, "falldokument", None)
         if d is None or not d.pk or not d.ist_rechnung:
             return []
-        z = [[str(i), p.code or "—", p.text, datum(p.datum) or "—", f"{menge(p.menge)} {p.einheit}".strip(),
+        z = [[str(i), p.code or "—", p.text, datum(p.datum) or "—", f"{menge(p.menge)} {einheit(p.einheit, k)}".strip(),
               betrag(p.einzelpreis, k), betrag(p.betrag, k)]
              for i, p in enumerate(d.positionen.all(), 1)]
         s = d.summen()
@@ -230,9 +247,42 @@ def zeilen(quelle: str, k) -> list[list[str]]:
         r = _aktuelle_rechnung(fall)
         if r is None:
             return []
-        z = [[p.code or "—", p.text, f"{menge(p.menge)} {p.einheit}".strip(), betrag(p.betrag, k)]
+        z = [[p.code or "—", p.text, f"{menge(p.menge)} {einheit(p.einheit, k)}".strip(), betrag(p.betrag, k)]
              for p in r.positionen.all()]
         z.append(["", Fett({"de": "Gesamtbetrag", "lv": "Kopā", "en": "Total"}[sprache(k)]), "",
                   Fett(betrag(r.summen()["brutto"], k))])
         return z
     return []
+
+
+# Welche Felder des Falls ein Platzhalter liest – für „veraltet“: Ein Dokument gilt nur dann als veraltet, wenn sich
+# Angaben geändert haben, die seine Vorlage tatsächlich verwendet (eine Änderung am OP-Bericht betrifft die Rechnung nicht)
+QUELLEN = {
+    "Fall.Nummer": ["nummer"], "Fall.Titel": ["titel"], "Fall.Kostenträgertyp": ["kostentraegertyp_id"],
+    "Fall.Kostenträger": ["kostentraeger"], "Fall.Land": ["land", "kostentraegertyp_id"],
+    "Fall.Versichertennummer": ["versichertennummer"], "Fall.Aktenzeichen": ["aktenzeichen"],
+    "Fall.Kooperationspartner": ["kooperationspartner_id"], "Fall.Kooperationspartner_Anschrift": ["kooperationspartner_id"],
+    "Fall.Sprache": ["sprache"], "Fall.Fachbereich": ["fachbereich"], "Fall.Aufnahme": ["aufnahme"],
+    "Fall.Entlassung": ["entlassung"], "Fall.Zeitraum": ["aufnahme", "entlassung"], "Fall.OP_Datum": ["op_datum"],
+    "Fall.Eingriff": ["eingriff"], "Fall.Diagnose": ["diagnose"], "Fall.Arzt": ["behandelnder_arzt_id"],
+    "Fall.Operateur": ["operateur"], "Fall.Assistenz": ["assistenz"], "Fall.Anästhesie": ["anaesthesie"],
+    "Fall.OP_Indikation": ["op_indikation"], "Fall.OP_Verlauf": ["op_verlauf"], "Fall.OP_Befund": ["op_befund"],
+    "Fall.Verlauf": ["entlass_verlauf"], "Fall.Befunde": ["entlass_befunde"],
+    "Fall.Entlassmedikation": ["entlass_medikation"], "Fall.Empfehlung": ["entlass_empfehlung"],
+    "Fall.Konsil_an": ["konsil_empfaenger"], "Fall.Konsil_Fragestellung": ["konsil_fragestellung"],
+    "Fall.Konsil_Befund": ["konsil_befund"], "Fall.Konsil_Beurteilung": ["konsil_beurteilung"],
+    "Fall.Rechnungsempfänger": ["rechnungsempfaenger"], "Dokument.Unterzeichner": ["behandelnder_arzt_id"],
+    "Dokument.Unterzeichner_Funktion": ["behandelnder_arzt_id"],
+}
+
+
+def verwendete_fallfelder(bloecke) -> set[str]:
+    """Felder des Falls, die die Blöcke einer Vorlage über Platzhalter lesen (Sprache immer: sie wählt die Vorlage)."""
+    import json
+
+    from vorlagen.bloecke import platzhalter
+
+    felder = {"sprache"}
+    for name in platzhalter(json.dumps(bloecke, ensure_ascii=False)):
+        felder.update(QUELLEN.get(name, []))
+    return felder

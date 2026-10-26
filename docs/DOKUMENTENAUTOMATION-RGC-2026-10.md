@@ -83,6 +83,27 @@ Mitgeliefert als eigene Schreiben der RGC (pflegbar unter Vorlagen › Dokumentv
   Stoffwechselerkrankungen (`eigen-rgc-z07-adipositas`) – je geplanter Eingriff zum Ankreuzen, eingriffsspezifische
   Risiken, Verhalten danach, ergänzende Fragen, Erklärung und Unterschriften, zweisprachig DE/LV.
 
+## Formulare 01–12 aus dem Fall gefüllt
+
+Die Datenmigration `faelle/0003` (`backend/faelle/formulare.py`) gibt jeder mitgelieferten, noch unveränderten Vorlage
+01–12 die Felder des Falls – vor dem ersten Import der Altdaten in Fassung 1 (bis dahin führt EPM nur Fassung 1),
+danach als Fassung 2, Fassung 1 bleibt für bereits erzeugte PDFs erhalten; bearbeitete Vorlagen bleiben unberührt. Eingesetzt werden unter anderem Aufnahmedatum, Kooperationspartner, Kostenträger, Aktenzeichen,
+Versicherungsschein-Nr., Eingriff, Operateur und OP-Datum; in der Anlage K zusätzlich Name mit Geburtsdatum,
+Kostenvoranschlag-Nr. (Fallnummer) mit Datum, Zeile A „Gesamthonorar“ aus der aktuellen Rechnung des Falls und die
+Leistungen als Tabelle. Dabei behoben (Fehler aus der Umsetzung der Word-Dateien): Bei „Krankenkasse“, „Private
+Krankenversicherung“, „UV-Träger“, „Zusatzversicherung“ und „Rechtsanwalt“ stand die Anschrift des Patienten, bei
+„Versicherte Person“ fehlte der Name. Die Formulare bleiben deutsch (Beträge im deutschen Format), auch bei einem Fall
+in Englisch oder Lettisch. Ohne Fall (über Korrespondenz) bleiben die Fall-Felder leer („—“).
+
+## „veraltet“
+
+Ein Dokument gilt als veraltet, wenn sich seit der letzten Fassung Angaben geändert haben, die seine Vorlage
+tatsächlich verwendet (Platzhalter der aktiven Vorlage), oder Patientendaten, Dokumenttext bzw. Positionen. Eine
+Änderung am OP-Bericht macht die Rechnung also nicht veraltet.
+
+Eine extern signierte PDF muss auf einer Fassung dieses Dokuments beruhen (die Signatur wird an die unveränderte PDF
+angehängt); die signierte PDF eines anderen Dokuments wird abgelehnt.
+
 ## Abnahmekriterium
 
 > Nach Erzeugung einer PDF (insbesondere Rechnung) kann der Inhalt noch geändert und die PDF neu erzeugt werden. Erst

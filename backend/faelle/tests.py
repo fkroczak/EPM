@@ -241,6 +241,16 @@ class FallTest(Grundlage):
                                                 format="json")
         self.assertEqual(r.status_code, 200, r.content)
         self.assertIn("neu erzeugen", str(self.finalisieren(op, erwartet=400)["fehler"]))
+        # nur Angaben, die die Vorlage verwendet: der OP-Befund macht die Rechnung nicht veraltet
+        r = self.dokument(f, "rechnung")
+        self.position(r, self.op)
+        self.erzeugen(r)
+        c = client_fuer(self.mitarbeiter)
+        c.patch(f"/api/faelle/{f['id']}/", {"op_befund": "Gute Stellung, Drainage entfernt"}, format="json")
+        self.assertFalse(c.get(f"/api/falldokumente/{r.pk}/").json()["veraltet"])
+        self.assertTrue(c.get(f"/api/falldokumente/{op.pk}/").json()["veraltet"])
+        c.patch(f"/api/faelle/{f['id']}/", {"kostentraeger": "TK"}, format="json")
+        self.assertTrue(c.get(f"/api/falldokumente/{r.pk}/").json()["veraltet"])
 
     def test_storno_und_neue_rechnung(self):
         f = self.fall()
@@ -280,6 +290,12 @@ class FallTest(Grundlage):
         self.assertIn("Invoice", text)
         self.assertIn("Totalknee", kompakt(text))
         self.assertIn("8,900.00", text)
+        # Formulare der RGC bleiben deutsch: Anlage K mit Kostenträger, Kostenvoranschlag und Summe aus der Rechnung
+        anlage = FallDokument.objects.get(fall_id=f["id"], vorlage="eigen-rgc-f11")
+        self.erzeugen(anlage)
+        text = kompakt(pdf_text(self.pdf(anlage)))
+        for erwartet in ("AOKBayern", f"{f['nummer']}vom", "EUR8.900,00", "Echt,Anna,geb."):
+            self.assertIn(erwartet, text)
         f2 = self.fall(sprache="lv")
         op = self.dokument(f2, "op_bericht")
         self.erzeugen(op)
@@ -317,11 +333,16 @@ class FallTest(Grundlage):
         self.erzeugen(eb)
         ohne = SimpleUploadedFile("x.pdf", self.pdf(eb), content_type="application/pdf")
         self.assertIn("datei", self.finalisieren(eb, erwartet=400, weg="signatur_extern", datei=ohne))
-        mit = SimpleUploadedFile("x.pdf", signiert, content_type="application/pdf")
-        d = self.finalisieren(eb, weg="signatur_extern", datei=mit)
+        # signierte PDF eines anderen Dokuments: abgelehnt
+        fremd = SimpleUploadedFile("x.pdf", signiert, content_type="application/pdf")
+        self.assertIn("keiner Fassung", str(self.finalisieren(eb, erwartet=400, weg="signatur_extern", datei=fremd)))
+        # extern signiert (hier mit demselben Zertifikat): die heruntergeladene Fassung, Signatur angehängt
+        self.masin.refresh_from_db()
+        extern = erzeugung.signiere(self.pdf(eb), self.masin, "geheim", "extern")
+        d = self.finalisieren(eb, weg="signatur_extern", datei=SimpleUploadedFile("x.pdf", extern))
         self.assertEqual(d["final_weg"], "signatur_extern")
         v = DokumentVersion.objects.get(dokument=eb, final=True)
-        self.assertEqual(v.daten["signatur"]["anzahl"], 1)
+        self.assertEqual((v.daten["signatur"]["anzahl"], v.daten["signiert_fassung"]), (1, 1))
 
     def test_scan_der_papierunterschrift(self):
         f = self.fall()

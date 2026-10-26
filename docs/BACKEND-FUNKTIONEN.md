@@ -4164,7 +4164,8 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
   (Platzhalter `Fall.*`, `Rechnung.*`, `Dokument.*`, `Leistungen.Summe`, Tabellen „rechnung“ und „leistungen“ in allen
   eigenen Schreiben), `startvorlagen.py` (Fall-Dokumente je Sprache, Zusatzbögen zu 07). Datenmigration
   `faelle/0002` (Kostenträgertypen mit Paket, Eibach/ARS/WC4/AIWA, Dr. Markus Gottwald, Prof. Dr. Markus Masin,
-  Dokumenttyp „Rechnung“, 12 Fall-Vorlagen, 3 Zusatzbögen). Trigger `epm_falldokument_schutz`,
+  Dokumenttyp „Rechnung“, 12 Fall-Vorlagen, 3 Zusatzbögen) und `faelle/0003` (Formulare 01–12 mit Feldern des Falls,
+  nur unveränderte Vorlagen, vor dem Import in Fassung 1, danach als Fassung 2; Feldfehler der Word-Umsetzung behoben, `faelle/formulare.py`). Trigger `epm_falldokument_schutz`,
   `epm_rechnungsposition_schutz` (auch INSERT), `faelle_dokumentversion` nur anfügen (`audit/schutz.py`).
 - **API:** `/api/faelle/` (+ `paket/`, `abschliessen/`, `wieder-oeffnen/`), `/api/falldokumente/` (+ `vorschau/`,
   `erzeugen/`, `versionen/`, `pdf/?fassung=N`, `docx/` GET/POST, `finalisieren/`, `stornieren/`),

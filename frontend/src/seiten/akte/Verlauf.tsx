@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { abfrage, api } from "@/lib/api";
 import { useAerzteListe, usePraeparate, useVersorgerListe } from "@/lib/daten";
 import { datum, uhrzeit } from "@/lib/format";
-import { ABSCHLUSSANLAESSE, ANFRAGEARTEN, ANFRAGE_ERGEBNISSE, ARZTROLLEN, ERKLAERUNGEN, FREIGABEWEGE, GESCHLECHTER, GEWICHTSQUELLEN,
+import { ABSCHLUSSANLAESSE, ANFRAGEARTEN, ANFRAGE_ERGEBNISSE, ARZTROLLEN, ERKLAERUNGEN, FINAL_WEGE, FREIGABEWEGE, GESCHLECHTER, GEWICHTSQUELLEN,
   TERMINARTEN, ppiName, ppiZeiten } from "@/lib/typen";
 import type { Auswahlwert, Verlaufseintrag } from "@/lib/typen";
 import { Auswahl, Chip, Fehleranzeige, Karte, Knopf, Laden, Leer } from "@/components/ui/basis";
@@ -26,6 +26,8 @@ const BEREICHE: { wert: string; text: string }[] = [
   { wert: "diagnosen", text: "Diagnosen (ICD)" }, { wert: "laborbefunde", text: "Laborbefunde" },
   { wert: "bia_messungen", text: "BIA-Messungen" }, { wert: "berichte", text: "Berichte" },
   { wert: "korrespondenz", text: "Korrespondenz" },
+  // Behandlungsfälle der RGC (26.10.2026)
+  { wert: "faelle", text: "Fälle" }, { wert: "falldokumente", text: "Dokumente der Fälle" },
   // Medikamentenplan (Wunsch 11.10.2026)
   { wert: "medikamente", text: "Medikamente" },
   // weggeklickte Hinweise (F119)
@@ -38,7 +40,7 @@ const BEREICH_EINZELN: Record<string, string> = {
   hinweisruhe: "Hinweis ausgeblendet",
   // Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
   diagnosen: "Diagnose (ICD)", laborbefunde: "Laborbefund", bia_messungen: "BIA-Messung", berichte: "Bericht", korrespondenz: "Schreiben",
-  medikamente: "Medikament",
+  medikamente: "Medikament", faelle: "Fall", falldokumente: "Dokument eines Falls",
 };
 
 const FELDER: Record<string, string> = {
@@ -84,11 +86,23 @@ const FELDER: Record<string, string> = {
   ausgeblendet_bis: "ausgeblendet bis", ausgeblendet_dauerhaft: "ausgeblendet (nicht mehr nötig)",
   ausblende_grund: "Grund des Ausblendens",
   freigabe_weg: "Weg der Freigabe", freigabe_datum: "Freigabe durch den Mediziner am",
+  // Behandlungsfälle der RGC (26.10.2026)
+  kostentraegertyp: "Kostenträgertyp", kostentraeger: "Kostenträger", land: "Land", aktenzeichen: "Aktenzeichen",
+  kooperationspartner: "Kooperationspartner", rechnungsempfaenger: "Rechnungsempfänger", sprache: "Sprache",
+  fachbereich: "Fachbereich", aufnahme: "Aufnahme", entlassung: "Entlassung", op_datum: "OP-Datum", eingriff: "Eingriff",
+  behandelnder_arzt: "Behandelnder Arzt", operateur: "Operateur", assistenz: "Assistenz", anaesthesie: "Anästhesie",
+  op_indikation: "Indikation", op_verlauf: "OP-Verlauf", op_befund: "Befund / Ergebnis", entlass_verlauf: "Verlauf",
+  entlass_befunde: "Befunde", entlass_medikation: "Medikation bei Entlassung", entlass_empfehlung: "Empfehlung",
+  konsil_empfaenger: "Konsil an", konsil_fragestellung: "Fragestellung", konsil_befund: "Befund (Konsil)",
+  konsil_beurteilung: "Beurteilung (Konsil)", freitext: "Text des Dokuments", rechnungsnummer: "Rechnungsnummer",
+  rechnungsdatum: "Rechnungsdatum", zahlungsziel_tage: "Zahlungsziel (Tage)", unterzeichner: "Unterschrift",
+  final_weg: "Weg zur finalen Fassung", final_am: "final am", aus_paket: "aus dem Paket", storno_zu: "storniert Rechnung",
 };
 /** technische Felder, die sich bei jeder Aktion mitändern */
 const VERBORGEN = new Set(["geaendert_am", "erfasst_am", "angelegt_am", "hochgeladen_am", "freigegeben_am", "freigegeben_von",
   "erledigt_von", "storniert_von", "angelegt_von", "erfasst_von", "hochgeladen_von", "erstellt_von", "erstellt_am", "id",
-  "eingeschraenkt_von", "abgeschlossen_von", "ausgeblendet_am", "ausgeblendet_von", "freigabe_nachweis", "pdf_datei", "pdf_sha256"]);
+  "eingeschraenkt_von", "abgeschlossen_von", "ausgeblendet_am", "ausgeblendet_von", "freigabe_nachweis", "pdf_datei", "pdf_sha256",
+  "final_von", "fall", "nummer"]);
 const TEXTFELDER = new Set(["diagnose", "therapie", "empfehlung", "bemerkung", "text"]);
 
 function useWertAnzeige() {
@@ -96,6 +110,16 @@ function useWertAnzeige() {
   const praeparate = usePraeparate();
   const aerzte = useAerzteListe();
   const auswahl = useQuery({ queryKey: ["auswahlwerte", "alle"], queryFn: () => api<Auswahlwert[]>("auswahlwerte/"), staleTime: 5 * 60_000 });
+  // Behandlungsfälle der RGC: Namen der Stammdaten statt Nummern
+  const stamm = useQuery({
+    queryKey: ["faelle-stamm", "verlauf"], staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const namen = (l: { id: number; name: string }[]) => Object.fromEntries(l.map((x) => [String(x.id), x.name]));
+      const [k, p, u] = await Promise.all(["kostentraegertypen/", "kooperationspartner/", "unterzeichner/"]
+        .map((pfad) => api<{ id: number; name: string }[]>(pfad).catch(() => [])));
+      return { kostentraegertyp: namen(k), kooperationspartner: namen(p), unterzeichner: namen(u) } as Record<string, Record<string, string>>;
+    },
+  });
   return (feld: string, wert: string) => {
     if (wert === "" || wert === "None") return "—";
     if (TEXTFELDER.has(feld)) return klartext(wert) || "—";
@@ -111,6 +135,10 @@ function useWertAnzeige() {
     if (feld === "art") return TERMINARTEN[wert] ?? (ERKLAERUNGEN as Record<string, string>)[wert] ?? ANFRAGEARTEN[wert] ?? wert;
     if (feld === "ergebnis") return ANFRAGE_ERGEBNISSE[wert] ?? wert;
     if (feld === "freigabe_weg") return FREIGABEWEGE[wert] ?? wert;
+    if (feld === "final_weg") return (FINAL_WEGE as Record<string, { name: string }>)[wert]?.name ?? wert;
+    if (feld === "kostentraegertyp" || feld === "kooperationspartner" || feld === "behandelnder_arzt" || feld === "unterzeichner")
+      return stamm.data?.[feld === "behandelnder_arzt" ? "unterzeichner" : feld]?.[wert] ?? wert;
+    if (feld === "sprache") return ({ de: "Deutsch", lv: "Lettisch", en: "Englisch" } as Record<string, string>)[wert] ?? wert;
     if (feld === "pantozol_stufe") return ppiName(wert);
     if (feld === "pantozol_tage") return ppiZeiten(wert) || wert;
     if (wert === "True") return "ja";

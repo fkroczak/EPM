@@ -74,7 +74,7 @@ function Tabelle({ testid, kopf, children }: { testid: string; kopf: ReactNode; 
 
 function Aktionen({ aktiv, onBearbeiten, onUmschalten, children }: { aktiv: boolean; onBearbeiten: () => void; onUmschalten: () => void; children?: ReactNode }) {
   return (
-    <td className="text-right whitespace-nowrap">
+    <td className="td text-right whitespace-nowrap">
       {children}
       <Knopf klein onClick={onBearbeiten}>Bearbeiten</Knopf>{" "}
       <Knopf klein onClick={onUmschalten}>{aktiv ? "Ausblenden" : "Einblenden"}</Knopf>
@@ -84,7 +84,7 @@ function Aktionen({ aktiv, onBearbeiten, onUmschalten, children }: { aktiv: bool
 
 function Name({ text, aktiv, unter }: { text: ReactNode; aktiv: boolean; unter?: ReactNode }) {
   return (
-    <td className="break-words min-w-[12rem]">
+    <td className="td break-words min-w-[12rem]">
       <span>{text}</span>{!aktiv ? <Chip className="ml-2">ausgeblendet</Chip> : null}
       {unter ? <span className="block text-xs gedaempft">{unter}</span> : null}
     </td>
@@ -209,15 +209,15 @@ function LeistungenBereich() {
       {liste.isPending ? <Laden /> : <Fehleranzeige fehler={liste.error} />}
       {liste.isSuccess && !gefiltert.length ? <Leer>{liste.data.length ? "Keine passende Leistung." : "Noch keine Leistungen im Katalog."}</Leer> : null}
       {gefiltert.length ? (
-        <Tabelle testid="leistungen" kopf={<><th>Code</th><th>Bezeichnung</th><th>Gruppe</th><th>Einheit</th><th className="num">Preis</th><th className="num">USt.</th><th /></>}>
+        <Tabelle testid="leistungen" kopf={<><th className="th">Code</th><th className="th">Bezeichnung</th><th className="th">Gruppe</th><th className="th">Einheit</th><th className="th num text-right">Preis</th><th className="th num text-right">USt.</th><th className="th" /></>}>
           {gefiltert.map((l) => (
             <tr key={l.id} className={l.aktiv ? "" : "opacity-60"}>
-              <td className="num whitespace-nowrap">{l.code}</td>
+              <td className="td num whitespace-nowrap">{l.code}</td>
               <Name text={l.bezeichnung} aktiv={l.aktiv} unter={[l.bezeichnung_lv, l.bezeichnung_en].filter(Boolean).join(" · ") || undefined} />
-              <td>{l.gruppe || "—"}</td>
-              <td>{l.einheit || "—"}</td>
-              <td className="num whitespace-nowrap">{geld(l.preis)}</td>
-              <td className="num">{zahl(l.ust_satz)} %</td>
+              <td className="td">{l.gruppe || "—"}</td>
+              <td className="td">{l.einheit || "—"}</td>
+              <td className="td num text-right whitespace-nowrap">{geld(l.preis)}</td>
+              <td className="td num text-right">{zahl(l.ust_satz)} %</td>
               <Aktionen aktiv={l.aktiv} onBearbeiten={() => setDialog(l)} onUmschalten={() => umschalten.mutate(l)} />
             </tr>
           ))}
@@ -341,13 +341,13 @@ function KostentraegerBereich() {
       {liste.isPending ? <Laden /> : <Fehleranzeige fehler={liste.error} />}
       {liste.isSuccess && !daten.length ? <Leer>Noch keine Kostenträgertypen.</Leer> : null}
       {daten.length ? (
-        <Tabelle testid="kostentraegertypen" kopf={<><th>Name</th><th>Kürzel</th><th>Land</th><th className="num">Dokumente</th><th /></>}>
+        <Tabelle testid="kostentraegertypen" kopf={<><th className="th">Name</th><th className="th">Kürzel</th><th className="th">Land</th><th className="th num">Dokumente</th><th className="th" /></>}>
           {daten.map((t) => (
             <tr key={t.id} className={t.aktiv ? "" : "opacity-60"}>
               <Name text={t.name} aktiv={t.aktiv} unter={t.beschreibung || undefined} />
-              <td className="num">{t.kuerzel}</td>
-              <td>{t.land || "—"}</td>
-              <td className="num">{t.paket.length}</td>
+              <td className="td num">{t.kuerzel}</td>
+              <td className="td">{t.land || "—"}</td>
+              <td className="td num">{t.paket.length}</td>
               <Aktionen aktiv={t.aktiv} onBearbeiten={() => setDialog(t)} onUmschalten={() => umschalten.mutate(t)} />
             </tr>
           ))}
@@ -407,12 +407,12 @@ function PartnerBereich() {
       {liste.isPending ? <Laden /> : <Fehleranzeige fehler={liste.error} />}
       {liste.isSuccess && !daten.length ? <Leer>Noch keine Kooperationspartner.</Leer> : null}
       {daten.length ? (
-        <Tabelle testid="kooperationspartner" kopf={<><th>Name</th><th>Kurzname</th><th>Kontakt</th><th /></>}>
+        <Tabelle testid="kooperationspartner" kopf={<><th className="th">Name</th><th className="th">Kurzname</th><th className="th">Kontakt</th><th className="th" /></>}>
           {daten.map((k) => (
             <tr key={k.id} className={k.aktiv ? "" : "opacity-60"}>
               <Name text={k.name} aktiv={k.aktiv} unter={k.anschrift ? k.anschrift.split("\n").join(", ") : undefined} />
-              <td>{k.kurzname || "—"}</td>
-              <td className="break-words">{k.kontakt || "—"}</td>
+              <td className="td">{k.kurzname || "—"}</td>
+              <td className="td break-words">{k.kontakt || "—"}</td>
               <Aktionen aktiv={k.aktiv} onBearbeiten={() => setDialog(k)} onUmschalten={() => umschalten.mutate(k)} />
             </tr>
           ))}
@@ -506,12 +506,12 @@ function UnterschriftenBereich() {
       {liste.isPending ? <Laden /> : <Fehleranzeige fehler={liste.error} />}
       {liste.isSuccess && !daten.length ? <Leer>Noch keine unterschriftsberechtigten Personen.</Leer> : null}
       {daten.length ? (
-        <Tabelle testid="unterzeichner" kopf={<><th>Name</th><th>Benutzerkonto</th><th>Zertifikat</th><th /></>}>
+        <Tabelle testid="unterzeichner" kopf={<><th className="th">Name</th><th className="th">Benutzerkonto</th><th className="th">Zertifikat</th><th className="th" /></>}>
           {daten.map((u) => (
             <tr key={u.id} className={u.aktiv ? "" : "opacity-60"}>
               <Name text={u.name} aktiv={u.aktiv} unter={u.funktion || undefined} />
-              <td>{u.benutzer_name || <span className="gedaempft">—</span>}</td>
-              <td className="min-w-[12rem]">
+              <td className="td">{u.benutzer_name || <span className="gedaempft">—</span>}</td>
+              <td className="td min-w-[12rem]">
                 {u.hat_zertifikat ? (
                   <span className="flex flex-col gap-0.5">
                     <span className="flex items-center gap-1.5 flex-wrap">

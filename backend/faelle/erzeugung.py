@@ -64,8 +64,10 @@ def datenstand(dok: FallDokument) -> dict:
     """Alles, woraus die PDF entsteht (ohne Vorlage): Fall, Patient, Dokument, Positionen. Grundlage für
     „veraltet“ und für die Nachvollziehbarkeit jeder Fassung."""
     fall, p = dok.fall, dok.patient
+    verwendet = _verwendete_fallfelder(dok)
     felder = {f.attname: _wert(getattr(fall, f.attname)) for f in Behandlungsfall._meta.concrete_fields
-              if f.attname not in ("geaendert_am", "erstellt_am", "erstellt_von_id", "firma_id", "status")}
+              if f.attname not in ("geaendert_am", "erstellt_am", "erstellt_von_id", "firma_id", "status")
+              and (verwendet is None or f.attname in verwendet)}
     daten = {
         "fall": felder,
         "patient": {"name": f"{p.nachname}, {p.vorname}", "geburtsdatum": _wert(p.geburtsdatum),
@@ -80,6 +82,20 @@ def datenstand(dok: FallDokument) -> dict:
                                 "ust_satz": str(x.ust_satz)} for x in dok.positionen.all()]
         daten["summen"] = {k: str(v) for k, v in dok.summen().items() if k != "ust_saetze"}
     return daten
+
+
+def _verwendete_fallfelder(dok) -> set | None:
+    """Felder des Falls, die die aktive Vorlage des Dokuments liest – None (= alle), wenn es sie nicht gibt."""
+    from vorlagen.models import Dokumentvorlage, EigenesSchreiben
+
+    from .felder import verwendete_fallfelder
+
+    schluessel = vorlage_fuer(dok)
+    if not EigenesSchreiben.objects.filter(schluessel=schluessel).exists():
+        return None
+    aktive = Dokumentvorlage.objects.filter(art=schluessel, status=Dokumentvorlage.Status.AKTIV)
+    v = aktive.filter(firma__kuerzel="rg").first() or aktive.filter(firma__isnull=True).first()
+    return verwendete_fallfelder(v.bloecke) if v is not None else None
 
 
 def daten_hash(daten: dict) -> str:
@@ -304,6 +320,7 @@ def finalisieren(dok: FallDokument, benutzer, weg: str, unterzeichner=None, date
         if weg == W.SIGNATUR_EXTERN:
             _pdf_pruefen(inhalt)
             daten["signatur"] = pruefe_signatur(inhalt)
+            daten["signiert_fassung"] = _signierte_fassung(dok, inhalt)
             mime, art, endung, zusatz = "application/pdf", DokumentVersion.Art.SIGNATUR_EXTERN, "pdf", "signiert"
         else:
             mime = _scan_mime(inhalt)
@@ -314,8 +331,9 @@ def finalisieren(dok: FallDokument, benutzer, weg: str, unterzeichner=None, date
     else:  # ausdrücklich finalisiert: die letzte erzeugte Fassung gilt
         pdf_dok = letzte.pdf
         pdf_dok.ausgeblendet = False
+        pdf_dok.titel = f"{sichtbar_titel} (final)"[:200]
         pdf_dok._history_user = benutzer
-        pdf_dok.save(update_fields=["ausgeblendet"])
+        pdf_dok.save(update_fields=["ausgeblendet", "titel"])
         art = DokumentVersion.Art.FINALISIERT
 
     v = _neue_version(dok, benutzer, art, pdf_dok, daten, letzte.vorlage, letzte.vorlage_version, grund, final=True)
@@ -326,6 +344,20 @@ def finalisieren(dok: FallDokument, benutzer, weg: str, unterzeichner=None, date
     dok._history_user = benutzer
     dok.save()
     return v
+
+
+def _signierte_fassung(dok, inhalt: bytes) -> int:
+    """Nummer der Fassung, auf der die extern signierte PDF beruht. Signaturprogramme hängen die Signatur an die
+    unveränderte PDF an (inkrementelle Aktualisierung) – die PDF muss also mit einer Fassung dieses Dokuments beginnen.
+    Sonst gehört sie zu einem anderen Dokument (oder wurde vor dem Signieren verändert)."""
+    for v in dok.versionen.select_related("pdf").order_by("-nummer"):
+        if v.final or not v.pdf.pfad.is_file():
+            continue
+        original = v.pdf.pfad.read_bytes()
+        if inhalt.startswith(original) and len(inhalt) > len(original):
+            return v.nummer
+    raise ValidationError({"datei": "Die signierte PDF passt zu keiner Fassung dieses Dokuments. Bitte die aus EPM "
+                                    "heruntergeladene PDF signieren, ohne sie vorher zu verändern."})
 
 
 def _scan_mime(inhalt: bytes) -> str:

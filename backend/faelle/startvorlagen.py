@@ -129,8 +129,8 @@ def op_bericht(s):
 def entlassbrief(s):
     return [
         KOPF,
-        {"id": "empfaenger", "typ": "zweispaltig", "bezeichnung": "Empfänger und Datum",
-         "links": "{{Patient.Hausarzt}}", "rechts": "Rīga, {{Heute}}"},
+        {"id": "empfaenger", "typ": "text", "bezeichnung": "Empfänger", "text": "{{Patient.Hausarzt}}",
+         "optionen": {"ausblenden_wenn_leer": True}},
         _titel("entlassbrief", s),
         _patient(s, ("zeitraum", "{{Fall.Zeitraum}}"), ("eingriff", "{{Fall.Eingriff}}"),
                  ("op_datum", "{{Fall.OP_Datum}}"), ("kostentraeger", "{{Fall.Kostenträger}}")),
@@ -150,8 +150,8 @@ def entlassbrief(s):
 def konsil(s):
     return [
         KOPF,
-        {"id": "empfaenger", "typ": "zweispaltig", "bezeichnung": "Empfänger und Datum",
-         "links": "{{Fall.Konsil_an}}", "rechts": "Rīga, {{Heute}}"},
+        {"id": "empfaenger", "typ": "text", "bezeichnung": "Empfänger", "text": "{{Fall.Konsil_an}}",
+         "optionen": {"ausblenden_wenn_leer": True}},
         _titel("konsil", s),
         _patient(s, ("eingriff", "{{Fall.Eingriff}}"), ("op_datum", "{{Fall.OP_Datum}}")),
         {"id": "einleitung", "typ": "text", "bezeichnung": "Einleitung", "text": _t("konsil_einleitung", s)},
@@ -169,10 +169,10 @@ def konsil(s):
 def rechnung(s):
     return [
         KOPF,
-        {"id": "empfaenger", "typ": "zweispaltig", "bezeichnung": _t("empfaenger", s),
-         "links": "{{Fall.Rechnungsempfänger}}", "rechts": "Rīga, {{Rechnung.Datum}}"},
-        {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "{{Rechnung.Titel}} {{Rechnung.Nummer}}",
-         "zusatz": "{{Rechnung.Bezug}}"},
+        {"id": "empfaenger", "typ": "text", "bezeichnung": _t("empfaenger", s), "text": "{{Fall.Rechnungsempfänger}}"},
+        {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": "{{Rechnung.Titel}} {{Rechnung.Nummer}}"},
+        {"id": "bezug", "typ": "text", "bezeichnung": "Bezug (Storno)", "text": "{{Rechnung.Bezug}}",
+         "optionen": {"fett": True, "ausblenden_wenn_leer": True}},
         _patient(s, ("rechnungsdatum", "{{Rechnung.Datum}}"), ("zeitraum", "{{Fall.Zeitraum}}"),
                  ("eingriff", "{{Fall.Eingriff}}"), ("kostentraeger", "{{Fall.Kostenträger}}"),
                  ("versicherung", "{{Fall.Versichertennummer}}"), ("aktenzeichen", "{{Fall.Aktenzeichen}}"),
@@ -212,20 +212,20 @@ def fall_vorlagen() -> list[dict]:
 def _zusatz(kennung, titel_de, titel_lv, eingriffe, risiken, nachher, fragen):
     bloecke = [
         {**KOPF, "absender": False},
-        {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": f"Zusatzbogen {titel_de} / Papildlapa: {titel_lv}",
-         "zusatz": "Ergänzung zur Aufklärung Operation (Vorlage 07) · Papildinājums operācijas informētajai piekrišanai (veidlapa 07)"},
+        {"id": "titel", "typ": "titel", "bezeichnung": "Titel", "text": f"Zusatzbogen {titel_de}",
+         "zusatz": f"Papildlapa: {titel_lv} · zu Vorlage 07 / veidlapai 07"},
         {"id": "stand", "typ": "text", "bezeichnung": "Stand der Vorlage",
          "text": f"Zusatzbogen {kennung} zu Vorlage 07 · Version 1 · Stand 10/2026 · standardisierter Vorschlag, vor dem "
                  "Einsatz fachärztlich zu prüfen",
          "optionen": {"schrift": "klein"}},
         {"id": "patient", "typ": "datenfelder", "bezeichnung": "Patient/in · Pacients", "spalten": 2,
          "optionen": {"ueberschrift": True}, "felder": [
-             {"label": "Name · Vārds, uzvārds", "wert": "{{Patient.Name}}"},
-             {"label": "Geburtsdatum · Dzimšanas datums", "wert": "{{Patient.Geburtsdatum}}"},
-             {"label": "Patienten-ID · Pacienta ID", "wert": "{{Patient.Nummer}}"},
-             {"label": "Fall · Gadījums", "wert": "{{Fall.Nummer}}"},
-             {"label": "Geplanter Eingriff · Plānotā operācija", "wert": "{{Fall.Eingriff}}"},
-             {"label": "OP-Datum · Operācijas datums", "wert": "{{Fall.OP_Datum}}"}]},
+             {"label": "Name · Vārds", "wert": "{{Patient.Name}}"},
+             {"label": "Geb. · Dzim.", "wert": "{{Patient.Geburtsdatum}}"},
+             {"label": "Eingriff · Operācija", "wert": "{{Fall.Eingriff}}"},
+             {"label": "OP-Datum · Datums", "wert": "{{Fall.OP_Datum}}"},
+             {"label": "Patienten-ID · ID", "wert": "{{Patient.Nummer}}"},
+             {"label": "Fall · Gadījums", "wert": "{{Fall.Nummer}}"}]},
         {"id": "eingriffe", "typ": "text", "bezeichnung": "Geplanter Eingriff (ankreuzen) · Plānotā operācija (atzīmēt)",
          "text": "\n".join(f"☐ {de} · {lv}" for de, lv in eingriffe) + "\n☐ Anderer Eingriff · Cita operācija: "
                  "______________________________", "optionen": {"ueberschrift": True}},

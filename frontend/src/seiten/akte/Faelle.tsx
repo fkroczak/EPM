@@ -26,6 +26,7 @@ import { useHinweis } from "@/components/ui/hinweise";
 import { PdfDialog } from "@/components/PdfDialog";
 import { Bestaetigen } from "@/components/Bestaetigen";
 import { ZertifikatDialog } from "@/components/ZertifikatDialog";
+import { DateiWahl } from "@/components/DateiWahl";
 import { useAkte } from "./Akte";
 import { Abschnitt, Aktenseite, Detail, Eintrag, Eintragsliste, useWahl } from "./Aktenseite";
 
@@ -460,14 +461,14 @@ function FinalisierenDialog({ dok, offen, onOffen }: { dok: FallDokument | null;
 
   return (
     <>
-      <Dialog offen={offen} onOffen={onOffen} titel="Dokument finalisieren" beschreibung={dok?.titel} breite={620}
+      <Dialog offen={offen} onOffen={onOffen} titel="Dokument finalisieren" beschreibung={dok?.titel} breite={760}
         fuss={<>
           <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
           <Knopf variante="pri" icon="haken" laedt={senden.isPending} disabled={!bereit} onClick={() => senden.mutate()}
             data-testid="finalisieren-bestaetigen">{weg === "signatur" ? "Signieren" : "Finalisieren"}</Knopf>
         </>}>
         <div className="flex flex-col gap-3.5 min-w-0" data-testid="finalisieren-dialog">
-          <fieldset className="m-0 p-0 border-0 flex flex-col gap-2">
+          <fieldset className="m-0 p-0 border-0 grid gap-2 sm:grid-cols-2">
             <legend className="text-[0.8125rem] font-medium mb-1">Wie wird das Dokument final?</legend>
             {(Object.keys(FINAL_WEGE) as FinalWeg[]).map((w) => (
               <label key={w} className={cx("card px-3 py-2 flex items-start gap-2.5 cursor-pointer border", weg === w ? "border-akzent bg-akzent-weich" : "hover:bg-fein")}>
@@ -522,9 +523,9 @@ function FinalisierenDialog({ dok, offen, onOffen }: { dok: FallDokument | null;
             ) : null}
             {mitDatei ? (
               <Feld label={weg === "scan" ? "Scan (PDF, JPG oder PNG, höchstens 25 MB)" : "Signierte PDF (höchstens 25 MB)"} fehler={f.datei} pflicht>
-                {(p) => <input {...p} type="file" className="text-sm" data-testid="final-datei"
-                  accept={weg === "scan" ? ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" : ".pdf,application/pdf"}
-                  onChange={(e) => setDatei(e.target.files?.[0] ?? null)} />}
+                {(p) => <DateiWahl id={p.id} datei={datei} onDatei={setDatei} testid="final-datei"
+                  label={weg === "scan" ? "Scan wählen" : "Signierte PDF wählen"}
+                  accept={weg === "scan" ? ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" : ".pdf,application/pdf"} />}
               </Feld>
             ) : null}
             <Feld label="Notiz (freiwillig)" fehler={f.notiz} hinweis="Steht bei der finalen Fassung.">
@@ -830,23 +831,23 @@ function Positionen({ dok, bearbeitbar }: { dok: FallDokument; bearbeitbar: bool
         <div className="overflow-x-auto">
           <table className="tabelle w-full text-sm" data-testid="positionen-tabelle">
             <thead>
-              <tr><th className="num">Pos.</th><th>Code</th><th>Text</th><th>Datum</th><th className="num">Menge</th><th>Einheit</th>
-                <th className="num">Einzelpreis</th>{mitUst ? <th className="num">USt.</th> : null}<th className="num">Betrag</th>{bearbeitbar ? <th /> : null}</tr>
+              <tr><th className="th num">Pos.</th><th className="th">Code</th><th className="th">Text</th><th className="th">Datum</th><th className="th num text-right">Menge</th><th className="th">Einheit</th>
+                <th className="th num text-right">Einzelpreis</th>{mitUst ? <th className="th num text-right">USt.</th> : null}<th className="th num text-right">Betrag</th>{bearbeitbar ? <th className="th" /> : null}</tr>
             </thead>
             <tbody>
               {positionen.map((p, i) => (
                 <tr key={p.id}>
-                  <td className="num">{i + 1}</td>
-                  <td className="num whitespace-nowrap">{p.code || "—"}</td>
-                  <td className="break-words min-w-[12rem]">{p.text}</td>
-                  <td className="num whitespace-nowrap">{p.datum ? datum(p.datum) : "—"}</td>
-                  <td className="num">{zahl(p.menge)}</td>
-                  <td>{p.einheit || "—"}</td>
-                  <td className="num whitespace-nowrap">{geld(p.einzelpreis)}</td>
-                  {mitUst ? <td className="num">{zahl(p.ust_satz)} %</td> : null}
-                  <td className="num whitespace-nowrap">{geld(p.betrag)}</td>
+                  <td className="td num">{i + 1}</td>
+                  <td className="td num whitespace-nowrap">{p.code || "—"}</td>
+                  <td className="td break-words min-w-[12rem]">{p.text}</td>
+                  <td className="td num whitespace-nowrap">{p.datum ? datum(p.datum) : "—"}</td>
+                  <td className="td num text-right">{zahl(p.menge)}</td>
+                  <td className="td">{p.einheit || "—"}</td>
+                  <td className="td num text-right whitespace-nowrap">{geld(p.einzelpreis)}</td>
+                  {mitUst ? <td className="td num text-right">{zahl(p.ust_satz)} %</td> : null}
+                  <td className="td num text-right whitespace-nowrap">{geld(p.betrag)}</td>
                   {bearbeitbar ? (
-                    <td className="text-right whitespace-nowrap">
+                    <td className="td text-right whitespace-nowrap">
                       <Knopf klein onClick={() => setDialog({ offen: true, position: p })}>Bearbeiten</Knopf>{" "}
                       <Knopf klein variante="geist" aria-label={`Position ${i + 1} entfernen`} title="Entfernen" icon="x"
                         onClick={() => { loeschen.reset(); setEntfernen(p); }} />
@@ -857,11 +858,11 @@ function Positionen({ dok, bearbeitbar }: { dok: FallDokument; bearbeitbar: bool
             </tbody>
             <tfoot>
               {mitUst ? (
-                <tr><td colSpan={mitUst ? 8 : 7} className="text-right gedaempft">Netto</td><td className="num whitespace-nowrap">{geld(netto)}</td>{bearbeitbar ? <td /> : null}</tr>
+                <tr><td colSpan={mitUst ? 8 : 7} className="td text-right gedaempft">Netto</td><td className="td num text-right whitespace-nowrap">{geld(netto)}</td>{bearbeitbar ? <td className="td" /> : null}</tr>
               ) : null}
               <tr className="font-semibold">
-                <td colSpan={mitUst ? 8 : 7} className="text-right pr-3">Summe</td>
-                <td className="num whitespace-nowrap" data-testid="positionen-summe">{geld(dok.summe ?? netto)}</td>{bearbeitbar ? <td /> : null}
+                <td colSpan={mitUst ? 8 : 7} className="td text-right">Summe</td>
+                <td className="td num text-right whitespace-nowrap" data-testid="positionen-summe">{geld(dok.summe ?? netto)}</td>{bearbeitbar ? <td className="td" /> : null}
               </tr>
             </tfoot>
           </table>
