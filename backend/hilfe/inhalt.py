@@ -582,7 +582,8 @@ ist dann unveränderlich, seine PDF liegt bei den Dokumenten der Akte. Eine Korr
 <p>Berichte (z. B. Arztbrief, Konsultationsbericht) und den Kommentar eines Infusionsplans können Sie
 <strong>diktieren</strong>. Der Server schreibt die Aufnahme selbst ab – ohne Internet, nichts geht an fremde Dienste.</p>
 <ol>
-<li>Im Bericht <strong>Diktat aufnehmen</strong> wählen und sprechen. Beim ersten Mal fragt der Browser nach dem Mikrofon.
+<li>Im Bericht <strong>Diktat aufnehmen</strong> wählen und sprechen – oder im Menü <strong>Diktate</strong> unter
+<strong>Neues Diktat</strong> den Patienten und die Berichtsart wählen, ohne die Akte zu öffnen. Beim ersten Mal fragt der Browser nach dem Mikrofon.
 <strong>Pause</strong> und <strong>Weiter</strong> sind jederzeit möglich, <strong>Fertig</strong> beendet die Aufnahme.</li>
 <li>Wählen: <strong>sofort</strong> (meist nach wenigen Minuten fertig) oder <strong>heute Nacht</strong> (lange Diktate),
 und wer den Text fertig macht: <strong>ich selbst</strong> oder das <strong>Sekretariat</strong>.</li>
