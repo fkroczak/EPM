@@ -195,7 +195,8 @@ export function BegriffeDialog({ offen, onOffen }: { offen: boolean; onOffen: (o
  * und gibt seine Nummer zurück.
  */
 export function DiktatAufnahme({ patientId, zweck = "bericht", berichtId, vorHochladen, onHochgeladen, kompakt, onAktiv }: {
-  patientId: number;
+  /** null: ohne Patient aufnehmen und danach unter „Diktate“ zuordnen (27.10.2026) */
+  patientId: number | null;
   zweck?: "bericht" | "plan";
   berichtId?: number | null;
   vorHochladen?: () => Promise<number>;
@@ -218,9 +219,9 @@ export function DiktatAufnahme({ patientId, zweck = "bericht", berichtId, vorHoc
 
   const hochladen = useMutation({
     mutationFn: async (x: Aufnahme) => {
-      const bericht = zweck === "bericht" ? berichtId ?? (vorHochladen ? await vorHochladen() : null) : null;
+      const bericht = zweck === "bericht" && patientId != null ? berichtId ?? (vorHochladen ? await vorHochladen() : null) : null;
       const form = new FormData();
-      form.append("patient", String(patientId));
+      if (patientId != null) form.append("patient", String(patientId));
       if (bericht) form.append("bericht", String(bericht));
       form.append("zweck", zweck);
       form.append("wann", kompakt ? "sofort" : wann);
@@ -320,7 +321,7 @@ export function DiktatAufnahme({ patientId, zweck = "bericht", berichtId, vorHoc
 }
 
 /** Abschrift zum Nachhören: Klick auf ein Wort springt hin, das gesprochene Wort ist hervorgehoben, unsichere markiert */
-function Abschrift({ diktat }: { diktat: Diktat }) {
+export function Abschrift({ diktat }: { diktat: Diktat }) {
   const audio = useRef<HTMLAudioElement | null>(null);
   const [url, setUrl] = useState("");
   const [laedt, setLaedt] = useState(false);
@@ -395,7 +396,7 @@ function Abschrift({ diktat }: { diktat: Diktat }) {
   );
 }
 
-function statusArt(d: Diktat): "warn" | "fehler" | "ok" | "neutral" {
+export function statusArt(d: Diktat): "warn" | "fehler" | "ok" | "neutral" {
   if (d.status === "fehler") return "fehler";
   if (d.status === "fertig") return d.uebernommen_am ? "ok" : "warn";
   return "neutral";

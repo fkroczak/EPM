@@ -4157,6 +4157,11 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
   Freigabe wartet auf laufende Abschrift und löscht die Aufnahme, Freigabe durch einen anderen Mediziner, Kommentar,
   Verwerfen, Fehler und erneut, Nachtfenster, Abbruch, Aufräumen, Begriffe, Vorlage, WebM/WAV lesen, Ansagen; echte
   Abschrift mit whisper.cpp, sobald das Modell bereitliegt (CI lädt es mit den OCR-Modellen).
+- **Ohne Patient (27.10.2026, wie Scans):** `POST /api/diktate/` ohne `patient` legt ein nicht zugeordnetes Diktat an
+  (nur Zweck Bericht, ohne Bericht). `GET /api/diktate/eingang/` listet sie – eigene; mit „Einträge erfassen“ alle (Testtrennung
+  wie bei Akten). `POST /api/diktate/{id}/zuordnen/` (`patient`, `bericht` | `art`, `titel`) setzt Patient und Bericht
+  (neuer Entwurf, sonst ein vorhandener), Audit „zugeordnet“; Testzugänge nur zu Testpatienten. Übernehmen erst nach dem
+  Zuordnen. Nicht zugeordnete Diktate werden nach 7 Tagen gelöscht (stündliche Bereinigung).
 - **Status:** TEILWEISE ABGESCHLOSSEN – Qualität der Abschrift mit echten Diktaten auf dem Server prüfen; Live-
   Mitschreiben (Text erscheint beim Sprechen) erst nach dem Aufrüsten auf 16 GB / 8 Kerne.
 
