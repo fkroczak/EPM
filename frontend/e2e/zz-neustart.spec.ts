@@ -32,6 +32,7 @@ test("Vor dem Neustart: Grenzwert, Rechte, Darstellung und Startseite in der Obe
 
   await page.goto("/admin/benutzer");
   const rechte = page.getByTestId("rechte");
+  await rechte.getByRole("button", { name: "Alle aufklappen" }).click();  // Bereiche seit 27.10.2026 zugeklappt
   await rechte.getByRole("checkbox", { name: "Betrachter: Versorger, Ansprechpartner und Ärzte pflegen" }).check();
   await rechte.getByRole("button", { name: "Speichern (1)" }).click();
   await expect(page.getByText("Rechte gespeichert. Sie gelten ab sofort.")).toBeVisible();
@@ -214,6 +215,7 @@ test("Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Re
 
   // Rechte: Änderung von vor dem Neustart gilt, auch für den Betrachter
   const rechte = page.getByTestId("rechte");
+  await rechte.getByRole("button", { name: "Alle aufklappen" }).click();  // Bereiche seit 27.10.2026 zugeklappt
   await expect(rechte.getByRole("checkbox", { name: "Betrachter: Versorger, Ansprechpartner und Ärzte pflegen" })).toBeChecked();
   const b = await seiteAls(browser, "betrachter");
   await b.page.goto("/versorger");

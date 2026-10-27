@@ -57,11 +57,20 @@ test("Erster Plan, Freigabe, Folgeplan mit markierten Änderungen, Verwerfen", a
   await editor.getByTestId("infusionstage").getByLabel(/^PE.*\(Mischbeutel\)$/).fill("5");
   // wie auf der alten PDF: Mischbeutel = letztes Gewicht × 35 ml, Zusatzvolumen = Basislösung, Gesamtvolumen = Summe;
   // Laufzeit manuell, Rate = Gesamtvolumen ÷ Laufzeit (2.600 ÷ 12)
-  await expect(editor.getByTestId("plan-mischbeutel")).toHaveText("2.100 ml");
-  await expect(editor.getByTestId("plan-zusatzvolumen")).toHaveText("500 ml");
-  await expect(editor.getByTestId("plan-gesamtvolumen")).toHaveText("2.600 ml");
+  await expect(editor.getByTestId("plan-mischbeutel")).toHaveValue("");
+  await expect(editor.getByTestId("plan-volumen")).toContainText("leer = 2.100 ml (35 ml/kg × 60,0 kg)");
+  await expect(editor.getByTestId("plan-zusatzvolumen")).toHaveValue("500");
+  await expect(editor.getByTestId("plan-gesamtvolumen-wert")).toHaveText("2.600 ml");
   await expect(editor.getByTestId("plan-rate")).toHaveText("216,7 ml/h");
-  await expect(editor.getByTestId("plan-volumen-hinweis")).toContainText("35 ml/kg × 60,0 kg");
+  // alle drei Volumen auch von Hand (27.10.2026); leer = wieder berechnet
+  await editor.getByTestId("plan-mischbeutel").fill("1995");
+  await expect(editor.getByTestId("plan-gesamtvolumen-wert")).toHaveText("2.495 ml");
+  await editor.getByTestId("plan-gesamtvolumen").fill("2400");
+  await expect(editor.getByTestId("plan-gesamtvolumen-wert")).toHaveText("2.400 ml");
+  await expect(editor.getByTestId("plan-rate")).toHaveText("200 ml/h");
+  await editor.getByTestId("plan-mischbeutel").fill("");
+  await editor.getByTestId("plan-gesamtvolumen").fill("");
+  await expect(editor.getByTestId("plan-gesamtvolumen-wert")).toHaveText("2.600 ml");
   // Protonenpumpenhemmer mit den Codes des Altsystems; Zeiten morgens/mittags/abends
   await expect(editor.getByRole("checkbox", { name: "Morgens" })).toBeDisabled();
   await editor.getByLabel("Präparat (Kurzinfusion)").selectOption({ label: "Pantozol® 40 mg" });

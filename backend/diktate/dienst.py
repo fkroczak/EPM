@@ -24,6 +24,8 @@ HAENGT_NACH = timedelta(seconds=90)
 MAX_VERSUCHE = 3
 # Kommentare zu Infusionsplänen, die niemand übernommen hat, und Reste ohne Datensatz
 PLAN_AUFBEWAHREN = timedelta(days=3)
+# nicht zugeordnete Diktate (27.10.2026): so lange wie Scans ohne Zuordnung
+OHNE_ZUORDNUNG_AUFBEWAHREN = timedelta(days=7)
 MAX_DAUER_S = 60 * 60
 MAX_BYTES = 40 * 1024 * 1024
 ENDUNGEN = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "aac",
@@ -161,7 +163,7 @@ def abschreiben(d: Diktat, abschreiber, abbrechen=lambda: False, lebenszeichen=N
             rechenzeit_s=round(time.monotonic() - t0, 1), abgeschrieben_am=jetzt, schritt="",
             dauer_s=d.dauer_s or round(len(audio) / abschrift.ABTASTRATE, 1))
         protokolliere(SystemEreignis.Art.DIKTAT, benutzername="ocr", objekt=f"Diktat {d.pk}", aktion="abgeschrieben",
-                      patient=d.patient.nummer, woerter=len(woerter), unsicher=abschrift.unsichere(woerter),
+                      patient=d.patient.nummer if d.patient_id else None, woerter=len(woerter), unsicher=abschrift.unsichere(woerter),
                       rechenzeit_s=round(time.monotonic() - t0, 1))
     except abschrift.AbschriftFehler as e:
         Diktat.objects.filter(pk=d.pk).update(status=Diktat.Status.FEHLER, fehler=str(e)[:300], schritt="")
@@ -175,9 +177,12 @@ def abschreiben(d: Diktat, abschreiber, abbrechen=lambda: False, lebenszeichen=N
 
 
 def bereinigen() -> int:
-    """Stündlich: nicht übernommene Kommentar-Diktate nach 3 Tagen, Dateien ohne Datensatz nach einem Tag."""
+    """Stündlich: nicht übernommene Kommentar-Diktate nach 3 Tagen, nicht zugeordnete Diktate nach 7 Tagen (wie Scans),
+    Dateien ohne Datensatz nach einem Tag."""
     grenze = timezone.now() - PLAN_AUFBEWAHREN
     alte = list(Diktat.objects.filter(zweck=Diktat.Zweck.PLAN, erstellt_am__lt=grenze))
+    alte += list(Diktat.objects.filter(patient__isnull=True, erstellt_am__lt=timezone.now() - OHNE_ZUORDNUNG_AUFBEWAHREN)
+                 .exclude(status=Diktat.Status.LAEUFT))
     for d in alte:
         d.delete()
     ordner = diktat_ordner()

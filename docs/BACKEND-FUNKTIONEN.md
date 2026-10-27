@@ -839,7 +839,10 @@ in `docs/DATENSCHUTZ.md` und unten als U16–U24. Runde 5 schließt die Datensic
 - **Logik:** `gesamtvolumen_ml` = letztes erfasstes Gewicht (nach Messdatum) × 35 ml, auf 2 Stellen; `volumen_gewicht_kg` hält das
   verwendete Gewicht fest. Im Entwurf bei jedem Speichern neu berechnet, mit der Freigabe eingefroren (spätere Gewichte ändern
   einen freigegebenen Plan nicht). Ohne Gewicht bleiben Gesamtvolumen und Rate leer. `rate_ml_h` = Gesamtvolumen ÷ Laufzeit,
-  auf 0,1 ml/h. Beide Werte sind nicht eingebbar (nur lesend in der API). Der Editor zeigt sie schon während der Eingabe.
+  auf 0,1 ml/h. Der Editor zeigt sie schon während der Eingabe. Seit 27.10.2026 von Hand überschreibbar:
+  `mischbeutel_ml_manuell` ersetzt Gewicht × 35 ml, `gesamtvolumen_ml_manuell` ersetzt Mischbeutel + Zusatzvolumen (leer =
+  berechnet, > 0 ml, sonst 400; Anzeige im Vergleich mit „(manuell)“). Glucose braucht seitdem kein Präparat mehr (wählt die
+  Apotheke nach Stabilitätsdaten); Aminosäuren, Lipide und Humanalbumin weiterhin.
 - **Validierung:** Gesamtvolumen in den Grenzen der Einstellungen (`volumen_min_ml`/`volumen_max_ml`, Standard 0–9.000 ml),
   sonst 400 `gesamtvolumen_ml`.
 - **Anzeige:** „2.100 ml (35 ml/kg × 60 kg)“ und „175 ml/h“ in der Ansicht wie PDF und im Vergleich; Übersicht der Akte
@@ -1459,7 +1462,9 @@ gemeinsame Ärzteliste; „kein“ und „nicht erfasst“ getrennt; Bezugsperso
 
 ### F68 Ärzte eines Patienten
 - **Endpunkte:** `GET/POST /api/patient-aerzte/?patient&aktiv`, `PATCH /api/patient-aerzte/{id}/` (Rolle, Notiz, `aktiv`); 405 bei DELETE;
-  beim Anlegen eines Patienten `aufnahme_hausarzt` (Arzt-ID) → Zuordnung „Hausarzt“ in derselben Transaktion
+  beim Anlegen eines Patienten `aufnahme_hausarzt` (Arzt-ID) → Zuordnung „Hausarzt“ in derselben Transaktion; ebenso
+  `aufnahme_bezugspersonen` (Liste, höchstens 5: beziehung, name, telefon, mobil, auskunft_erlaubt …) → Bezugspersonen
+  (27.10.2026; Fehler als `aufnahme_bezugspersonen.<i>.<feld>`, dann wird nichts angelegt)
 - **Rollen:** hausarzt, facharzt, ueberweisend, klinik, sonstige; je Arzt und Rolle nur eine aktive Zuordnung (DB-Constraint)
 - **Kopf der Akte:** `kopf.hausarzt {id, name, praxis, telefon}`, `zaehler.aerzte`
 - **Validierung:** Arzt nicht tauschbar (neu zuordnen); deaktivierte Ärzte nicht neu zuordenbar; Recht „Patienten anlegen, Diagnose,
@@ -4152,6 +4157,11 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
   Freigabe wartet auf laufende Abschrift und löscht die Aufnahme, Freigabe durch einen anderen Mediziner, Kommentar,
   Verwerfen, Fehler und erneut, Nachtfenster, Abbruch, Aufräumen, Begriffe, Vorlage, WebM/WAV lesen, Ansagen; echte
   Abschrift mit whisper.cpp, sobald das Modell bereitliegt (CI lädt es mit den OCR-Modellen).
+- **Ohne Patient (27.10.2026, wie Scans):** `POST /api/diktate/` ohne `patient` legt ein nicht zugeordnetes Diktat an
+  (nur Zweck Bericht, ohne Bericht). `GET /api/diktate/eingang/` listet sie – eigene; mit „Einträge erfassen“ alle (Testtrennung
+  wie bei Akten). `POST /api/diktate/{id}/zuordnen/` (`patient`, `bericht` | `art`, `titel`) setzt Patient und Bericht
+  (neuer Entwurf, sonst ein vorhandener), Audit „zugeordnet“; Testzugänge nur zu Testpatienten. Übernehmen erst nach dem
+  Zuordnen. Nicht zugeordnete Diktate werden nach 7 Tagen gelöscht (stündliche Bereinigung).
 - **Status:** TEILWEISE ABGESCHLOSSEN – Qualität der Abschrift mit echten Diktaten auf dem Server prüfen; Live-
   Mitschreiben (Text erscheint beim Sprechen) erst nach dem Aufrüsten auf 16 GB / 8 Kerne.
 

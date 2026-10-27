@@ -153,6 +153,45 @@ class DiktatApiTest(MitAblage):
         self.assertTrue(r.json()["audio"])  # zum Nachhören bis zur Freigabe
         self.assertEqual(sekretariat.get("/api/diktate/offen/").json(), [])
 
+    def test_ohne_patient_aufnehmen_und_zuordnen(self):
+        """Wunsch 27.10.2026: unter „Diktate“ aufnehmen, danach einem Patienten zuordnen (wie Scans)."""
+        c = client_fuer(self.mediziner)
+        r = self.hochladen(patient="", uebergabe="sekretariat")
+        self.assertEqual(r.status_code, 201, r.content)
+        d = r.json()
+        self.assertEqual([d["patient"], d["patient_name"], d["bericht"]], [None, None, None])
+        self.assertEqual(self.hochladen(patient="", zweck="plan").status_code, 400)
+        # abschreiben geht auch ohne Patient (Vorlage nur mit den eigenen Begriffen)
+        fertig = dienst.abschreiben(dienst.auftrag_holen(), ErsatzAbschreiber())
+        self.assertEqual(fertig.status, "fertig", fertig.fehler)
+        # sichtbar: wer aufgenommen hat und das Sekretariat; nicht der Betrachter; noch nicht „fürs Sekretariat“
+        self.assertEqual([x["id"] for x in c.get("/api/diktate/eingang/").json()], [d["id"]])
+        sekretariat = client_fuer(self.mitarbeiter)
+        self.assertEqual([x["id"] for x in sekretariat.get("/api/diktate/eingang/").json()], [d["id"]])
+        self.assertEqual(sekretariat.get("/api/diktate/offen/").json(), [])
+        self.assertEqual(client_fuer(self.betrachter).get("/api/diktate/eingang/").json(), [])
+        self.assertEqual(c.post(f"/api/diktate/{d['id']}/uebernommen/").status_code, 400)
+        url = f"/api/diktate/{d['id']}/zuordnen/"
+        self.assertEqual(c.post(url, {}, format="json").status_code, 400)
+        r = c.post(url, {"patient": self.patient.id, "titel": "Verlaufsbericht"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        z = r.json()
+        self.assertEqual([z["patient"], z["bericht_titel"], z["bericht_status"]], [self.patient.id, "Verlaufsbericht", "entwurf"])
+        self.assertEqual(c.get("/api/diktate/eingang/").json(), [])
+        self.assertEqual([x["id"] for x in sekretariat.get("/api/diktate/offen/").json()], [d["id"]])
+        self.assertEqual(c.post(url, {"patient": self.patient.id}, format="json").status_code, 400)  # schon zugeordnet
+        # an einen vorhandenen Entwurf
+        d2 = self.hochladen(patient="").json()
+        b = self.bericht()
+        r = c.post(f"/api/diktate/{d2['id']}/zuordnen/", {"patient": self.patient.id, "bericht": b.id}, format="json")
+        self.assertEqual(r.json()["bericht"], b.id)
+        # nach 7 Tagen ohne Zuordnung weg
+        d3 = self.hochladen(patient="").json()
+        Diktat.objects.filter(pk=d3["id"]).update(erstellt_am=timezone.now() - timedelta(days=8))
+        with self.captureOnCommitCallbacks(execute=True):
+            dienst.bereinigen()
+        self.assertFalse(Diktat.objects.filter(pk=d3["id"]).exists())
+
     def test_freigabe_wartet_auf_abschrift_und_loescht_aufnahme(self):
         b = self.bericht(inhalt="<p>Text</p>")
         d = Diktat.objects.get(pk=self.hochladen(bericht=b).json()["id"])

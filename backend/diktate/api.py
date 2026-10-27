@@ -4,10 +4,14 @@
 - ``GET diktate/?patient=&bericht=&zweck=`` – lesen mit „Akten lesen“; ``GET diktate/offen/`` – Liste fürs Sekretariat
 - ``GET diktate/{id}/audio/`` – Aufnahme zum Nachhören (bis zur Freigabe)
 - ``POST diktate/{id}/uebernommen/`` – Text ist im Bericht bzw. im Kommentar; beim Kommentar wird die Aufnahme gelöscht
+- ``GET diktate/eingang/`` – noch keinem Patienten zugeordnete Diktate (eigene; mit „Einträge erfassen“ alle);
+  ``POST diktate/{id}/zuordnen/`` (patient, bericht? | art?, titel?) – Patient und Bericht (neuer Entwurf) setzen
 - ``POST diktate/{id}/erneut/`` – nach einem Fehler noch einmal abschreiben; ``DELETE diktate/{id}/`` – verwerfen
 - ``GET|PUT diktate/begriffe/`` – eigene Fachbegriffe; ``GET diktate/stand/`` – Dienst bereit, wartende Diktate
 Übernehmen, erneut abschreiben und verwerfen darf, wer Einträge erfassen darf (das Sekretariat).
 """
+from django.db import transaction
+from django.db.models import Q
 from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import mixins, serializers, status
@@ -17,7 +21,8 @@ from rest_framework.response import Response
 
 from accounts.permissions import Angemeldet, recht
 from audit.models import SystemEreignis, protokolliere
-from epm.api_basis import benutzername
+from accounts.rechte import sieht_testdaten
+from epm.api_basis import benutzername, patienten_fuer
 from patienten.api import AktenEintragViewSet
 
 from . import abschrift, dienst
@@ -31,7 +36,7 @@ class DiktatSerializer(serializers.ModelSerializer):
     erstellt_von_name = serializers.SerializerMethodField()
     uebernommen_von_name = serializers.SerializerMethodField()
     patient_name = serializers.SerializerMethodField()
-    patient_nummer = serializers.IntegerField(source="patient.nummer", read_only=True)
+    patient_nummer = serializers.IntegerField(source="patient.nummer", read_only=True, default=None)
     bericht_titel = serializers.CharField(source="bericht.titel", read_only=True, default=None)
     bericht_status = serializers.CharField(source="bericht.status", read_only=True, default=None)
     audio = serializers.SerializerMethodField()
@@ -61,7 +66,7 @@ class DiktatSerializer(serializers.ModelSerializer):
         return benutzername(obj.uebernommen_von)
 
     def get_patient_name(self, obj):
-        return f"{obj.patient.nachname}, {obj.patient.vorname}"
+        return f"{obj.patient.nachname}, {obj.patient.vorname}" if obj.patient_id else None
 
     def get_audio(self, obj):
         return bool(obj.datei)
@@ -76,6 +81,11 @@ class DiktatSerializer(serializers.ModelSerializer):
 
     def validate(self, daten):
         bericht, patient = daten.get("bericht"), daten.get("patient")
+        if patient is None:
+            # ohne Patient (27.10.2026): nur fürs spätere Zuordnen zu einem Bericht
+            if bericht is not None or daten.get("zweck", Diktat.Zweck.BERICHT) != Diktat.Zweck.BERICHT:
+                raise serializers.ValidationError({"patient": "Bitte den Patienten angeben."})
+            return daten
         if daten.get("zweck", Diktat.Zweck.BERICHT) == Diktat.Zweck.BERICHT:
             if bericht is None:
                 raise serializers.ValidationError({"bericht": "Bitte den Bericht angeben."})
@@ -104,10 +114,27 @@ class DiktatViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.RetrieveM
         return super().get_permissions()
 
     def get_queryset(self):
-        return super().get_queryset().select_related("bericht", "erstellt_von", "uebernommen_von")
+        u = self.request.user
+        ohne = Q(patient__isnull=True)
+        if not u.hat_recht("eintraege_erfassen"):
+            ohne &= Q(erstellt_von=u)  # nicht zugeordnet: die eigenen; das Sekretariat sieht alle
+        elif getattr(u, "ist_test", False):
+            ohne &= Q(erstellt_von__ist_test=True)
+        elif not sieht_testdaten(u):
+            ohne &= Q(erstellt_von__ist_test=False)
+        return (Diktat.objects.filter(Q(patient__in=patienten_fuer(u)) | ohne)
+                .select_related("patient", "bericht", "erstellt_von", "uebernommen_von"))
+
+    def _pruefe(self, d: Diktat):
+        """Ändern: mit Patient nach dessen Akte, ohne Patient wer es aufgenommen hat oder das Sekretariat."""
+        if d.patient_id:
+            self.pruefe_patient(d.patient)
+        elif d.erstellt_von_id != self.request.user.pk and not self.request.user.hat_recht("eintraege_erfassen"):
+            raise serializers.ValidationError({"fehler": "Dafür fehlt das Recht."})
 
     def perform_create(self, serializer):
-        self.pruefe_patient(serializer.validated_data["patient"])
+        if serializer.validated_data.get("patient") is not None:
+            self.pruefe_patient(serializer.validated_data["patient"])
         datei = serializer.validated_data.pop("datei")
         diktat = Diktat(**serializer.validated_data, erstellt_von=self.request.user)
         try:
@@ -116,13 +143,13 @@ class DiktatViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.RetrieveM
             raise serializers.ValidationError({"datei": str(e)}) from e
         serializer.instance = diktat
         protokolliere(SystemEreignis.Art.DIKTAT, self.request, objekt=f"Diktat {diktat.pk}", aktion="aufgenommen",
-                      patient=diktat.patient.nummer, dauer_s=round(diktat.dauer_s), wann=diktat.wann,
+                      patient=diktat.patient.nummer if diktat.patient_id else None, dauer_s=round(diktat.dauer_s), wann=diktat.wann,
                       uebergabe=diktat.uebergabe)
 
     def perform_destroy(self, instance):
-        self.pruefe_patient(instance.patient)
+        self._pruefe(instance)
         protokolliere(SystemEreignis.Art.DIKTAT, self.request, objekt=f"Diktat {instance.pk}", aktion="verworfen",
-                      patient=instance.patient.nummer)
+                      patient=instance.patient.nummer if instance.patient_id else None)
         instance.delete()
 
     @action(detail=False)
@@ -132,6 +159,55 @@ class DiktatViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.RetrieveM
                                          zweck=Diktat.Zweck.BERICHT, bericht__status="entwurf")
               .order_by("erstellt_am", "id"))
         return Response(DiktatSerializer(qs, many=True, context={**self.get_serializer_context(), "kurz": True}).data)
+
+    @action(detail=False)
+    def eingang(self, request):
+        """Noch keinem Patienten zugeordnete Diktate, neueste zuerst (wie der Eingang der Scans)."""
+        qs = self.get_queryset().filter(patient__isnull=True).order_by("-erstellt_am", "-id")
+        return Response(DiktatSerializer(qs, many=True, context=self.get_serializer_context()).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def zuordnen(self, request, pk=None):
+        """Einem Patienten zuordnen: an einen Bericht-Entwurf (``bericht``) oder an einen neuen (``art``, ``titel``)."""
+        from berichte.api import BerichtSerializer
+        from berichte.models import Bericht
+
+        d = self.get_object()
+        self._pruefe(d)
+        if d.patient_id:
+            raise serializers.ValidationError({"fehler": "Das Diktat ist schon zugeordnet."})
+        pid = str(request.data.get("patient") or "")
+        patient = patienten_fuer(request.user).filter(pk=pid).first() if pid.isdigit() else None
+        if patient is None:
+            raise serializers.ValidationError({"patient": "Bitte den Patienten wählen."})
+        self.pruefe_patient(patient)
+        if d.erstellt_von is not None and d.erstellt_von.ist_test and not patient.ist_test:
+            raise serializers.ValidationError({"patient": "Diktate eines Testzugangs lassen sich nur Testpatienten zuordnen."})
+        bid = str(request.data.get("bericht") or "")
+        if bid:
+            bericht = Bericht.objects.filter(pk=bid if bid.isdigit() else None, patient=patient).first()
+            if bericht is None:
+                raise serializers.ValidationError({"bericht": "Der Bericht gehört zu einem anderen Patienten."})
+            if not bericht.ist_entwurf:
+                raise serializers.ValidationError({"bericht": "Der Bericht ist schon freigegeben."})
+        else:
+            titel = str(request.data.get("titel") or "").strip()
+            art = request.data.get("art") or None
+            if not titel and art:
+                from stammdaten.models import Auswahlwert
+
+                titel = Auswahlwert.objects.filter(pk=art).values_list("wert", flat=True).first() or ""
+            s = BerichtSerializer(data={"patient": patient.pk, "art": art, "datum": timezone.localdate().isoformat(),
+                                        "titel": titel or f"Diktat vom {timezone.localtime(d.erstellt_am):%d.%m.%Y}",
+                                        "empfaenger": "", "inhalt": ""}, context=self.get_serializer_context())
+            s.is_valid(raise_exception=True)
+            bericht = s.save(erstellt_von=request.user)
+        Diktat.objects.filter(pk=d.pk).update(patient=patient, bericht=bericht)
+        protokolliere(SystemEreignis.Art.DIKTAT, request, objekt=f"Diktat {d.pk}", aktion="zugeordnet",
+                      patient=patient.nummer, bericht=bericht.pk)
+        d.refresh_from_db()
+        return Response(self.get_serializer(d).data)
 
     @action(detail=True)
     def audio(self, request, pk=None):
@@ -145,6 +221,8 @@ class DiktatViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.RetrieveM
     @action(detail=True, methods=["post"])
     def uebernommen(self, request, pk=None):
         d = self.get_object()
+        if not d.patient_id:
+            raise serializers.ValidationError({"fehler": "Bitte das Diktat erst einem Patienten zuordnen."})
         self.pruefe_patient(d.patient)
         if d.status != Diktat.Status.FERTIG:
             raise serializers.ValidationError({"fehler": "Das Diktat ist noch nicht abgeschrieben."})
@@ -160,7 +238,7 @@ class DiktatViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.RetrieveM
     @action(detail=True, methods=["post"])
     def erneut(self, request, pk=None):
         d = self.get_object()
-        self.pruefe_patient(d.patient)
+        self._pruefe(d)
         if d.status != Diktat.Status.FEHLER or not d.datei:
             raise serializers.ValidationError({"fehler": "Nur ein fehlgeschlagenes Diktat mit Aufnahme lässt sich "
                                                          "erneut abschreiben."})

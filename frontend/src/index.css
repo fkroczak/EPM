@@ -803,7 +803,8 @@ html:has([data-anmeldung]) { scrollbar-gutter: auto; }
 .stamm-raster { display: grid; gap: var(--abstand, 1rem); grid-template-columns: minmax(0, 1fr); align-items: start; }
 @media (min-width: 48rem) {
   .stamm-raster { grid-template-columns: 18.75rem minmax(0, 1fr); }
-  .stamm-liste { position: sticky; top: 1rem; height: calc(100vh - 8.5rem); min-height: 22rem; }
+  /* top 0: sonst sitzt die Liste 1 rem tiefer als die Details daneben (27.10.2026) */
+  .stamm-liste { position: sticky; top: 0; height: calc(100vh - 8.5rem); min-height: 22rem; }
 }
 @media (min-width: 80rem) { .stamm-raster { grid-template-columns: 21.25rem minmax(0, 1fr); } }
 @media (max-width: 47.99rem) { .stamm-liste { max-height: none; } }

@@ -14,6 +14,7 @@ test("System: Standard nur Admin, Vertretung je Gruppe freischaltbar und wieder 
   // Standard: nur Admin; für eine Urlaubsvertretung je Gruppe freischaltbar (Festlegung 02.10.2026)
   await page.goto("/admin/benutzer");
   const rechte = page.getByTestId("rechte");
+  await rechte.getByRole("button", { name: "Alle aufklappen" }).click();  // Bereiche seit 27.10.2026 zugeklappt
   await expect(rechte.getByRole("checkbox", { name: "Admin: Systemverwaltung (Server und EPM)" })).toBeChecked();
   const mediziner = rechte.getByRole("checkbox", { name: "Mediziner: Systemverwaltung (Server und EPM)" });
   await expect(mediziner).toBeEnabled();

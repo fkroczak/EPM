@@ -60,7 +60,7 @@ PLANFELDER = [
     "basis_praeparat", "basis_ml", "glucose_praeparat", "glucose_g", "aminosaeuren_praeparat", "aminosaeuren_g",
     "lipide_praeparat", "lipide_g", "albumin_praeparat", "albumin_ml",
     "natrium_mmol", "kalium_mmol", "phosphat_mmol", "calcium_mmol", "magnesium_mmol",
-    "spurenelemente", "katheterschutz", "kcal_manuell",
+    "spurenelemente", "katheterschutz", "kcal_manuell", "mischbeutel_ml_manuell", "gesamtvolumen_ml_manuell",
     "laufzeit_h", "tage_pro_woche", "zusatz_tage_pro_woche", "freie_tage_pro_woche",
     "pantozol_stufe", "pantozol_tage", "bemerkung",
 ]
@@ -124,6 +124,15 @@ class Infusionsplan(AktenEintrag):
 
     kcal_manuell = models.PositiveIntegerField(
         "kcal (manuell)", null=True, blank=True, help_text="Überschreibt die berechneten kcal"
+    )
+    # Volumen von Hand (Wunsch 27.10.2026): überschreibt Gewicht × 35 ml bzw. Mischbeutel + Zusatzvolumen
+    mischbeutel_ml_manuell = models.DecimalField(
+        "Volumen im Mischbeutel (manuell)", max_digits=7, decimal_places=2, null=True, blank=True,
+        help_text="Überschreibt Gewicht × 35 ml",
+    )
+    gesamtvolumen_ml_manuell = models.DecimalField(
+        "Gesamtvolumen (manuell)", max_digits=8, decimal_places=2, null=True, blank=True,
+        help_text="Überschreibt Mischbeutel + Zusatzvolumen",
     )
     laufzeit_h = models.DecimalField("Laufzeit (h)", max_digits=4, decimal_places=1, null=True, blank=True)
     # Infusionstage je Beutelart (Wunsch 06.10.2026, F110): unabhängig von der Zusammensetzung des Plans.
@@ -279,15 +288,21 @@ class Infusionsplan(AktenEintrag):
         return self.ca_mg_mmol <= self.ca_mg_grenze_mmol
 
     def berechne_volumen(self):
-        """Gesamtvolumen aus dem letzten erfassten Gewicht (35 ml/kg); ohne Gewicht leer."""
+        """Volumen im Mischbeutel aus dem letzten erfassten Gewicht (35 ml/kg); ohne Gewicht leer, von Hand gesetzt gilt das."""
         letztes = (Gewichtsmessung.objects.filter(patient_id=self.patient_id)
                    .order_by("-gemessen_am", "-id").values_list("gewicht_kg", flat=True).first())
         self.volumen_gewicht_kg = letztes
-        self.gesamtvolumen_ml = (letztes * ML_JE_KG).quantize(Decimal("0.01")) if letztes is not None else None
+        if self.mischbeutel_ml_manuell is not None:
+            self.gesamtvolumen_ml = Decimal(self.mischbeutel_ml_manuell).quantize(Decimal("0.01"))
+        else:
+            self.gesamtvolumen_ml = (letztes * ML_JE_KG).quantize(Decimal("0.01")) if letztes is not None else None
 
     @property
     def volumen_summe_ml(self):
-        """Gesamtvolumen wie auf der alten PDF: Volumen im Mischbeutel (Gewicht × 35 ml) + Zusatzvolumen (Basislösung)."""
+        """Gesamtvolumen wie auf der alten PDF: Volumen im Mischbeutel (Gewicht × 35 ml) + Zusatzvolumen (Basislösung);
+        von Hand gesetzt gilt das."""
+        if self.gesamtvolumen_ml_manuell is not None:
+            return Decimal(self.gesamtvolumen_ml_manuell)
         if self.gesamtvolumen_ml is None:
             return None
         return self.gesamtvolumen_ml + Decimal(self.basis_ml or 0)
@@ -307,6 +322,11 @@ class Infusionsplan(AktenEintrag):
         if self.gesamtvolumen_ml is not None and not (e.volumen_min_ml <= self.gesamtvolumen_ml <= e.volumen_max_ml):
             fehler["gesamtvolumen_ml"] = (f"Volumen im Mischbeutel {_zahl(self.gesamtvolumen_ml, 'ml')} liegt außerhalb der "
                                           f"Plausibilitätsgrenzen ({_zahl(e.volumen_min_ml)}–{_zahl(e.volumen_max_ml)} ml).")
+        for feld in ("mischbeutel_ml_manuell", "gesamtvolumen_ml_manuell"):
+            if getattr(self, feld) is not None and getattr(self, feld) <= 0:
+                fehler[feld] = "Bitte ein Volumen über 0 ml eingeben."
+        if "gesamtvolumen_ml" in fehler and self.mischbeutel_ml_manuell is not None:
+            fehler.setdefault("mischbeutel_ml_manuell", fehler["gesamtvolumen_ml"])
         if not (e.kcal_min_tag <= self.kcal <= e.kcal_max_tag):
             fehler["kcal_manuell"] = (f"{self.kcal} kcal liegen außerhalb der Plausibilitätsgrenzen "
                                       f"({e.kcal_min_tag}–{e.kcal_max_tag} kcal).")
@@ -338,7 +358,8 @@ class Infusionsplan(AktenEintrag):
             fehler["pantozol_tage"] = "Bitte die Zeiten angeben (morgens, mittags, abends)."
         if not self.pantozol_stufe and self.pantozol_tage:
             fehler["pantozol_tage"] = "Zeiten nur angeben, wenn ein Protonenpumpenhemmer gewählt ist."
-        for feld, praep in [("glucose_g", "glucose_praeparat"), ("aminosaeuren_g", "aminosaeuren_praeparat"),
+        # Glucose ohne Präparat (Wunsch 27.10.2026): das wählt die Apotheke nach Stabilitätsdaten selbst
+        for feld, praep in [("aminosaeuren_g", "aminosaeuren_praeparat"),
                             ("lipide_g", "lipide_praeparat"), ("albumin_ml", "albumin_praeparat")]:
             if getattr(self, feld) and not getattr(self, f"{praep}_id"):
                 fehler[praep] = "Bitte das Präparat auswählen."
@@ -629,10 +650,14 @@ def _anzeige(plan, schluessel):
     if schluessel == "laufzeit_h":
         return _zahl(plan.laufzeit_h, "h")
     if schluessel == "gesamtvolumen":
-        return _zahl(plan.volumen_summe_ml, "ml")
+        if plan.volumen_summe_ml is None:
+            return None
+        return _zahl(plan.volumen_summe_ml, "ml") + (" (manuell)" if plan.gesamtvolumen_ml_manuell is not None else "")
     if schluessel == "mischbeutel":
         if plan.gesamtvolumen_ml is None:
             return None
+        if plan.mischbeutel_ml_manuell is not None:
+            return f"{_zahl(plan.gesamtvolumen_ml, 'ml')} (manuell)"
         return f"{_zahl(plan.gesamtvolumen_ml, 'ml')} (35 ml/kg × {_zahl(plan.volumen_gewicht_kg, 'kg')})"
     if schluessel == "rate":
         return _zahl(plan.rate_ml_h, "ml/h")

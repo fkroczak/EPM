@@ -596,6 +596,8 @@ export type Plan = {
   vitamine: number[];
   vitamine_namen: string[];
   kcal_manuell: number | null;
+  mischbeutel_ml_manuell: number | null;
+  gesamtvolumen_ml_manuell: number | null;
   kcal_berechnet: number;
   kcal: number;
   /** berechnet wie im Altsystem: Körpergewicht × 35 ml, bei Freigabe eingefroren */
@@ -949,9 +951,10 @@ export type Bericht = {
 export type DiktatWort = [string, number, number, number];
 export type Diktat = {
   id: number;
-  patient: number;
-  patient_name: string;
-  patient_nummer: number;
+  /** null: noch keinem Patienten zugeordnet (Eingang unter „Diktate“) */
+  patient: number | null;
+  patient_name: string | null;
+  patient_nummer: number | null;
   bericht: number | null;
   bericht_titel: string | null;
   bericht_status: "entwurf" | "freigegeben" | null;

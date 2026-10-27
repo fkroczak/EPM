@@ -40,7 +40,8 @@ class Diktat(models.Model):
         SELBST = "selbst", "selbst fertig machen"
         SEKRETARIAT = "sekretariat", "ans Sekretariat"
 
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="diktate")
+    # leer = noch keinem Patienten zugeordnet (Wunsch 27.10.2026: unter „Diktate“ aufnehmen, danach zuordnen – wie Scans)
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="diktate", null=True, blank=True)
     bericht = models.ForeignKey("berichte.Bericht", on_delete=models.CASCADE, null=True, blank=True,
                                 related_name="diktate")
     zweck = models.CharField(max_length=10, choices=Zweck.choices, default=Zweck.BERICHT)

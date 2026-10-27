@@ -78,8 +78,9 @@ function Dokument({ feld }: { feld: Textfeld }) {
           </span>
         </Meldung>
       ) : null}
-      {/* Erst lesen, dann „Bearbeiten“ (08.10.2026) – nur ein leerer Text öffnet gleich den Editor */}
-      <Textfassung feld={feld} version={gewaehlt} immerOffen={!alt && !patient[feld]}
+      {/* Erst lesen, dann „Bearbeiten“ (08.10.2026) – seit 27.10.2026 auch bei leerem Text, damit Therapie, Empfehlung
+          und Befunde gleich aussehen */}
+      <Textfassung feld={feld} version={gewaehlt}
         vorAktionen={kopf && kopf.version > 1
           ? <Knopf klein icon="uhr" onClick={() => setListe(true)}>Frühere Fassungen ({kopf.version - 1})</Knopf> : null} />
       <FassungenDialog feld={feld} offen={liste} onOffen={setListe} gewaehlt={gewaehlt} onWahl={(v) => setWahl(v ? String(v) : "")} />

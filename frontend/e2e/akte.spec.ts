@@ -142,10 +142,12 @@ test("Diagnose und Therapie bearbeiten, Versionen ansehen", async ({ page }) => 
   await expect(diagnose.locator(".richtext strong")).toHaveText("Typ II");
   await expect(diagnose).toContainText("Fassung 2");
 
-  // Therapie: eigener Reiter, links die Fassungen, rechts der Text; bei leerem Text ist der Editor direkt offen (F121/F122)
+  // Therapie: eigener Reiter; auch ein leerer Text wird erst mit „Bearbeiten“ geöffnet (wie Empfehlung und Befunde, 27.10.2026)
   await oeffnen(page, p.id, "/therapie");
   const therapie = page.getByTestId("karte-therapie");
   await expect(therapie).toContainText("Noch nicht bearbeitet");
+  await expect(therapie).toContainText("Noch keine Therapie eingetragen.");
+  await therapie.getByRole("button", { name: "Bearbeiten" }).click();
   await therapie.getByRole("textbox", { name: "Therapie" }).click();
   await therapie.getByRole("button", { name: "Aufzählung" }).click();
   await page.keyboard.type("HPE 5×/Woche über Port");

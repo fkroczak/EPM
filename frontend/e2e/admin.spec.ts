@@ -89,6 +89,7 @@ test("Rechte je Gruppe: Admin erlaubt Mitarbeitern Pläne, wirkt sofort, Standar
     expect((await mitarbeiter.get("auth/ich/")).rechte).not.toContain("plaene_anlegen");
     await page.goto("/admin/benutzer");
     const rechte = page.getByTestId("rechte");
+    await rechte.getByRole("button", { name: "Alle aufklappen" }).click();  // Bereiche seit 27.10.2026 zugeklappt
     // feste Rechte lassen sich nicht entziehen
     await expect(rechte.getByRole("checkbox", { name: "Admin: Benutzer und Rechte verwalten" })).toBeDisabled();
     await rechte.getByRole("checkbox", { name: "Mitarbeiter: Infusionspläne anlegen" }).check();
@@ -340,10 +341,11 @@ test("Benutzer ohne Login: anlegen, setzen, wieder einbinden; Rolle „Keine Ber
   await page.goto("/admin/benutzer");
   // Rolle „Keine Berechtigung“ hat nie Rechte – keine Spalte in der Rechtetabelle
   const rechte = page.getByTestId("rechte");
+  await rechte.getByRole("button", { name: "Alle aufklappen" }).click();  // Bereiche seit 27.10.2026 zugeklappt
   await expect(rechte.getByRole("columnheader", { name: "Keine Berechtigung" })).toHaveCount(0);
-  await expect(rechte.getByRole("columnheader", { name: "Mitarbeiter", exact: true })).toBeVisible();
+  await expect(rechte.getByRole("columnheader", { name: "Mitarbeiter", exact: true }).first()).toBeVisible();
   // Rolle „Mitarbeiter (erweitert)“ (Festlegung 03.10.2026): eigene Spalte, Standard mit „Infusionspläne anlegen“
-  await expect(rechte.getByRole("columnheader", { name: "Mitarbeiter (erweitert)" })).toBeVisible();
+  await expect(rechte.getByRole("columnheader", { name: "Mitarbeiter (erweitert)" }).first()).toBeVisible();
   await expect(rechte.getByRole("checkbox", { name: "Mitarbeiter (erweitert): Infusionspläne anlegen" })).toBeChecked();
   await expect(rechte.getByRole("checkbox", { name: "Mitarbeiter: Infusionspläne anlegen", exact: true })).not.toBeChecked();
   // ohne Login anlegen: kein Passwort, keine Rechte
@@ -430,6 +432,7 @@ test("Testbenutzer ausblenden und wieder einblenden; Recht „Testdaten sehen“
   expect((await admin.get(`benutzer/${konto.id}/`)).is_active).toBe(true);
   // Recht „Testdaten sehen“: je Gruppe einstellbar, für Admin fest
   const rechte = page.getByTestId("rechte");
+  await rechte.getByRole("button", { name: "Alle aufklappen" }).click();  // Bereiche seit 27.10.2026 zugeklappt
   await expect(rechte.getByRole("checkbox", { name: "Admin: Testdaten sehen (Testpatienten und Testbenutzer)" })).toBeDisabled();
   await expect(rechte.getByRole("checkbox", { name: "Betrachter: Testdaten sehen (Testpatienten und Testbenutzer)" })).toBeChecked();
   // ohne das Recht sieht der Betrachter keine Testpatienten
