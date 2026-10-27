@@ -66,6 +66,7 @@ test("Import: nur für Admin – Menü, Seite und Recht nur für die Rolle Admin
   await expect(page.getByTestId("echte-akten")).toHaveCount(0);
   await page.goto("/admin/benutzer");
   const rechte = page.getByTestId("rechte");
+  await rechte.getByRole("button", { name: "Alle aufklappen" }).click();  // Bereiche seit 27.10.2026 zugeklappt
   await expect(rechte.getByRole("checkbox", { name: /^Admin: Altdaten/ })).toBeChecked();
   await expect(rechte.getByRole("checkbox", { name: /^Mediziner: Altdaten/ })).toBeDisabled();
   for (const rolle of ["mediziner", "mitarbeiter", "betrachter"] as const) {

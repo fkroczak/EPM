@@ -74,10 +74,25 @@ function Kennwortanzeige({ id, kennwort, gueltig, name, benutzername }: { id: nu
   );
 }
 
+/** Rechte in aufklappbaren Bereichen (Wunsch 27.10.2026: „wird unübersichtlich“); neue Rechte ohne Bereich unter „Weitere“ */
+const RECHTE_BEREICHE: [string, string[]][] = [
+  ["Akten und Einträge", ["akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen", "akten_wieder_oeffnen"]],
+  ["Scans und Diktate", ["scans_bearbeiten", "diktieren"]],
+  ["Infusionspläne", ["plaene_anlegen", "plaene_freigeben", "plaene_abschliessen"]],
+  ["Berichte, Schreiben, Fall-Dokumente", ["berichte_freigeben", "schreiben_freigeben", "dokumente_finalisieren"]],
+  ["Dokumente umhängen und löschen", ["dokumente_umhaengen", "dokumente_loeschen", "akten_loeschen"]],
+  ["Datenschutz", ["datenschutz_bearbeiten", "datenschutz_entscheiden"]],
+  ["Gemeinsame Listen und Vorlagen", ["versorger_pflegen", "vorlagen_pflegen"]],
+  ["KI (Experimentell)", ["ki_ansehen", "ki_pruefen", "ki_uebernehmen", "ki_berichte", "ki_verwalten", "ki_training_freigeben"]],
+  ["Verwaltung und Testdaten", ["audit_lesen", "benutzer_verwalten", "backup_verwalten", "system_verwalten", "altdaten_importieren",
+    "testdaten_sehen", "testdaten_zuruecksetzen"]],
+];
+
 function RechteMatrix() {
   const qc = useQueryClient();
   const melden = useHinweis();
   const daten = useQuery({ queryKey: ["rechte"], queryFn: () => api<Rechte>("rechte/") });
+  const [offen, setOffen] = useState<Set<string>>(new Set());
   const [m, setM] = useState<Record<string, Record<string, boolean>> | null>(null);
   useEffect(() => { if (daten.data) setM(structuredClone(daten.data.matrix)); }, [daten.data]);
   const speichern = useMutation({
@@ -90,6 +105,9 @@ function RechteMatrix() {
   // „Keine Berechtigung“ hat nie Rechte und ist nicht einstellbar – keine Spalte
   const rollen = d.rollen.filter((r) => !(d.ohne_rechte ?? []).includes(r.code) && m[r.code] && d.matrix[r.code]);
   const geaendert = rollen.reduce((n, r) => n + d.rechte.filter((x) => m[r.code][x.code] !== d.matrix[r.code][x.code]).length, 0);
+  const zugeordnet = new Set(RECHTE_BEREICHE.flatMap(([, c]) => c));
+  const bereiche = [...RECHTE_BEREICHE.map(([t, codes]) => [t, codes.map((c) => d.rechte.find((x) => x.code === c)).filter((x) => !!x)] as const),
+    ["Weitere", d.rechte.filter((x) => !zugeordnet.has(x.code))] as const].filter(([, l]) => l.length);
   const standard = () => setM({ ...m, ...Object.fromEntries(rollen.map((r) => [r.code, Object.fromEntries(d.rechte.map((x) => [x.code, (d.standard[r.code] ?? []).includes(x.code) || fest.has(`${r.code}.${x.code}`)]))])) });
   return (
     <Karte className="px-5 py-[1.125rem] flex flex-col gap-3 overflow-x-auto" data-testid="rechte">
@@ -109,31 +127,55 @@ function RechteMatrix() {
           </Knopf>
         </div>
       </div>
-      <table className="tabelle">
-        <thead><tr><th className="th"><span className="sr-only">Recht</span></th>{rollen.map((r) => <th key={r.code} className="th text-center">{r.name}</th>)}</tr></thead>
-        <tbody>
-          {d.rechte.map((x) => (
-            <tr key={x.code}>
-              <td className="td"><span className="text-sm">{x.name}</span>{x.beschreibung ? <><br /><span className="text-xs gedaempft">{x.beschreibung}</span></> : null}</td>
-              {rollen.map((r) => {
-                const istFest = fest.has(`${r.code}.${x.code}`);
-                const vorbehalten = !!d.nur_rollen[x.code] && !d.nur_rollen[x.code].includes(r.code);
-                const nurTest = d.nur_testpatienten.rollen.includes(r.code) && d.nur_testpatienten.rechte.includes(x.code);
-                const anders = m[r.code][x.code] !== d.matrix[r.code][x.code];
-                return (
-                  <td key={r.code} className={cx("td text-center", anders && "bg-warn-bg")}>
-                    <input type="checkbox" aria-label={`${r.name}: ${x.name}`} checked={m[r.code][x.code]} disabled={istFest || vorbehalten}
-                      title={istFest ? "festes Recht, damit sich die Administration nicht aussperrt"
-                        : vorbehalten ? `nur ${d.nur_rollen[x.code].map((c) => d.rollen.find((y) => y.code === c)?.name ?? c).join(", ")}` : undefined}
-                      onChange={(e) => setM({ ...m, [r.code]: { ...m[r.code], [x.code]: e.target.checked } })} />
-                    {nurTest ? <span className="block text-[0.6875rem] gedaempft leading-tight">nur Testpatienten</span> : null}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="flex gap-2 flex-wrap">
+        <Knopf klein variante="geist" onClick={() => setOffen(new Set(bereiche.map(([t]) => t)))}>Alle aufklappen</Knopf>
+        <Knopf klein variante="geist" onClick={() => setOffen(new Set())}>Alle zuklappen</Knopf>
+      </div>
+      <div className="flex flex-col gap-2">
+        {bereiche.map(([titel, liste]) => {
+          const n = rollen.reduce((z, r) => z + liste.filter((x) => m[r.code][x.code] !== d.matrix[r.code][x.code]).length, 0);
+          const auf = offen.has(titel) || n > 0;
+          return (
+            <details key={titel} open={auf} className="rounded-lg border border-rand" data-testid="rechte-bereich"
+              onToggle={(e) => { const o = e.currentTarget.open; if (o !== auf) setOffen((alt) => { const neu = new Set(alt); if (o) neu.add(titel); else neu.delete(titel); return neu; }); }}>
+              <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium flex items-center gap-2">
+                {titel}<span className="gedaempft font-normal">({liste.length})</span>
+                {n ? <span className="text-warn font-normal">· {n} geändert</span> : null}
+                <span className="ml-auto text-xs gedaempft font-normal hidden sm:inline">
+                  {rollen.map((r) => `${r.name} ${liste.filter((x) => m[r.code][x.code]).length}/${liste.length}`).join(" · ")}
+                </span>
+              </summary>
+              <div className="overflow-x-auto border-t border-rand">
+                <table className="tabelle">
+                  <thead><tr><th className="th"><span className="sr-only">Recht</span></th>{rollen.map((r) => <th key={r.code} className="th text-center w-[6.5rem]">{r.name}</th>)}</tr></thead>
+                  <tbody>
+                    {liste.map((x) => (
+                      <tr key={x.code}>
+                        <td className="td min-w-[12rem]"><span className="text-sm">{x.name}</span>{x.beschreibung ? <><br /><span className="text-xs gedaempft">{x.beschreibung}</span></> : null}</td>
+                        {rollen.map((r) => {
+                          const istFest = fest.has(`${r.code}.${x.code}`);
+                          const vorbehalten = !!d.nur_rollen[x.code] && !d.nur_rollen[x.code].includes(r.code);
+                          const nurTest = d.nur_testpatienten.rollen.includes(r.code) && d.nur_testpatienten.rechte.includes(x.code);
+                          const anders = m[r.code][x.code] !== d.matrix[r.code][x.code];
+                          return (
+                            <td key={r.code} className={cx("td text-center", anders && "bg-warn-bg")}>
+                              <input type="checkbox" aria-label={`${r.name}: ${x.name}`} checked={m[r.code][x.code]} disabled={istFest || vorbehalten}
+                                title={istFest ? "festes Recht, damit sich die Administration nicht aussperrt"
+                                  : vorbehalten ? `nur ${d.nur_rollen[x.code].map((c) => d.rollen.find((y) => y.code === c)?.name ?? c).join(", ")}` : undefined}
+                                onChange={(e) => setM({ ...m, [r.code]: { ...m[r.code], [x.code]: e.target.checked } })} />
+                              {nurTest ? <span className="block text-[0.6875rem] gedaempft leading-tight">nur Testpatienten</span> : null}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          );
+        })}
+      </div>
       <Fehleranzeige fehler={speichern.error} />
       <span className="text-xs gedaempft">Jede Änderung steht mit Person und Zeitpunkt im Audit-Log.</span>
     </Karte>
