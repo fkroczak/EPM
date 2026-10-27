@@ -1,5 +1,5 @@
 /**
- * Die Freitextfelder der Akte (Diagnose-Notizen, Therapie, Empfehlung) im Muster der übrigen Reiter (F122).
+ * Die Freitextfelder der Akte (Diagnose-Notizen, Therapie, Empfehlung, Befunde) im Muster der übrigen Reiter (F122).
  *
  * Links die Fassungen mit Datum, rechts der Text: Die aktuelle Fassung ist bearbeitbar, ältere sind nur lesbar.
  * Jede gespeicherte Fassung bleibt mit Person, Datum und Uhrzeit erhalten; gelöscht wird nichts.
@@ -19,12 +19,12 @@ import { Editor, Richtext } from "@/components/Editor";
 import { useAkte } from "./Akte";
 import { Detail, Eintrag } from "./Aktenseite";
 
-export type Textfeld = "diagnose" | "therapie" | "empfehlung" | "bemerkung";
+export type Textfeld = "diagnose" | "therapie" | "empfehlung" | "befunde" | "bemerkung";
 type Fassung = { version: number; zeitpunkt: string; person: string | null; text: string };
 type Fassungen = { feld: Textfeld; version: number; fassungen: Fassung[] };
 
 export const TITEL: Record<Textfeld, string> = {
-  diagnose: "Notizen", therapie: "Therapie", empfehlung: "Empfehlung", bemerkung: "Bemerkung",
+  diagnose: "Notizen", therapie: "Therapie", empfehlung: "Empfehlung", befunde: "Befunde", bemerkung: "Bemerkung",
 };
 
 export function useFassungen(feld: Textfeld, an = true) {

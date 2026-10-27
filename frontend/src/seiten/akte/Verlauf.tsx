@@ -17,6 +17,7 @@ import { useAkte } from "./Akte";
 const BEREICHE: { wert: string; text: string }[] = [
   { wert: "", text: "Alle" }, { wert: "stammdaten", text: "Stammdaten" }, { wert: "diagnose", text: "Diagnose" },
   { wert: "therapie", text: "Therapie" }, { wert: "therapieschritte", text: "Therapie (Verlauf)" }, { wert: "empfehlung", text: "Empfehlung" },
+  { wert: "befunde", text: "Befunde" },
   { wert: "bemerkung", text: "Bemerkung" },
   { wert: "kontakte", text: "Kontakte" },
   { wert: "gewichte", text: "Gewicht" }, { wert: "termine", text: "Termine" }, { wert: "infusionsplaene", text: "Infusionspläne" },
@@ -34,7 +35,7 @@ const BEREICHE: { wert: string; text: string }[] = [
   { wert: "hinweisruhe", text: "Hinweise ausgeblendet" },
 ];
 const BEREICH_EINZELN: Record<string, string> = {
-  stammdaten: "Stammdaten", diagnose: "Diagnose", therapie: "Therapie", empfehlung: "Empfehlung", bemerkung: "Bemerkung", kontakte: "Kontakt",
+  stammdaten: "Stammdaten", diagnose: "Diagnose", therapie: "Therapie", empfehlung: "Empfehlung", befunde: "Befunde", bemerkung: "Bemerkung", kontakte: "Kontakt",
   gewichte: "Gewicht", termine: "Termin", infusionsplaene: "Infusionsplan", dokumente: "Dokument",
   aerzte: "Arzt", bezugspersonen: "Bezugsperson", erklaerungen: "Erklärung", datenschutz: "Datenschutz-Anfrage",
   hinweisruhe: "Hinweis ausgeblendet",
@@ -61,7 +62,7 @@ const FELDER: Record<string, string> = {
   kein_versorger: "Kein Versorger", kein_plan: "Kein Infusionsplan nötig", kein_plan_grund: "Grund (kein Infusionsplan)",
   kein_plan_am: "Bestätigt am (kein Infusionsplan)", kein_plan_von: "Bestätigt von (kein Infusionsplan)", beziehung: "Beziehung", name: "Name", mobil: "Mobil",
   auskunft_erlaubt: "Auskunft erlaubt", aktiv: "aktuell", arzt: "Arzt", rolle: "Rolle", diagnose: "Diagnose", therapie: "Therapie",
-  empfehlung: "Empfehlung", bemerkung: "Bemerkung", abgeschlossen_am: "Abgeschlossen am", abschluss_anlass: "Anlass",
+  empfehlung: "Empfehlung", befunde: "Befunde", bemerkung: "Bemerkung", abgeschlossen_am: "Abgeschlossen am", abschluss_anlass: "Anlass",
   abschluss_notiz: "Notiz zum Abschluss", gewicht_kg: "Gewicht (kg)", gemessen_am: "gemessen am", datum_ungenau: "Datum ungefähr",
   quelle: "Quelle", notiz: "Notiz", text: "Text", zeitpunkt: "Zeitpunkt", storniert_am: "Storniert am", storno_grund: "Grund",
   art: "Art", faellig_am: "fällig am", uhrzeit: "Uhrzeit", titel: "Titel", bei: "bei", erledigt_am: "Erledigt am",
@@ -103,7 +104,7 @@ const VERBORGEN = new Set(["geaendert_am", "erfasst_am", "angelegt_am", "hochgel
   "erledigt_von", "storniert_von", "angelegt_von", "erfasst_von", "hochgeladen_von", "erstellt_von", "erstellt_am", "id",
   "eingeschraenkt_von", "abgeschlossen_von", "ausgeblendet_am", "ausgeblendet_von", "freigabe_nachweis", "pdf_datei", "pdf_sha256",
   "final_von", "fall", "nummer"]);
-const TEXTFELDER = new Set(["diagnose", "therapie", "empfehlung", "bemerkung", "text"]);
+const TEXTFELDER = new Set(["diagnose", "therapie", "empfehlung", "befunde", "bemerkung", "text"]);
 
 function useWertAnzeige() {
   const versorger = useVersorgerListe();
