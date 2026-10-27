@@ -177,7 +177,8 @@ def aktenkopie_pdf(patient) -> bytes:
             [None, None, "20mm", "28mm", None, "20mm", "30mm"])))
 
     for titel, text in (("Diagnose (Freitext)", p.diagnose), ("Therapie", p.therapie),
-                        ("Empfehlung", p.empfehlung), ("Bemerkung", p.bemerkung)):
+                        ("Empfehlung", p.empfehlung), ("Befunde", p.befunde),
+                        ("Bemerkung", p.bemerkung)):
         if text:
             teile.append(_abschnitt(titel, _text(text)))
 
@@ -289,7 +290,7 @@ def aktenkopie_pdf(patient) -> bytes:
 
 # --------------------------------------------------------------------------------------------- F24
 BEREICHE = {"stammdaten": "Stammdaten", "diagnose": "Diagnose (Text)", "therapie": "Therapie",
-            "empfehlung": "Empfehlung", "gewichte": "Gewicht", "kontakte": "Kontakt", "termine": "Termin",
+            "empfehlung": "Empfehlung", "befunde": "Befunde", "gewichte": "Gewicht", "kontakte": "Kontakt", "termine": "Termin",
             "dokumente": "Dokument", "infusionsplaene": "Infusionsplan", "bezugspersonen": "Bezugsperson",
             "aerzte": "Arzt", "erklaerungen": "Erklärung", "datenschutz": "Datenschutz",
             # Wünsche aus der Praxis vom 06.10.2026 (F112–F117)

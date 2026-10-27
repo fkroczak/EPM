@@ -103,6 +103,7 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
     diagnose = RichText()
     therapie = RichText()
     empfehlung = RichText()
+    befunde = RichText()
     bemerkung = RichText()
     ist_abgeschlossen = serializers.BooleanField(read_only=True)
     ist_eingeschraenkt = serializers.BooleanField(read_only=True)
@@ -138,7 +139,7 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
             "versicherungsart", "krankenkasse", "versichertennummer", "hausarzt",
             "ueberweisung_durch", "groesse_cm", "katheter", "versorger", "ansprechpartner", "nickelallergie",
             "kein_katheter", "kein_versorger",
-            "diagnose", "therapie", "empfehlung", "bemerkung",
+            "diagnose", "therapie", "empfehlung", "befunde", "bemerkung",
             "abgeschlossen_am", "abschluss_anlass", "abschluss_notiz", "ist_abgeschlossen", "ist_test",
             "ist_eingeschraenkt", "eingeschraenkt_am", "aufbewahrung",
             "angelegt_am", "angelegt_von_name", "geaendert_am", "kopf", "firmen", "firmen_einwilligung",
@@ -303,7 +304,7 @@ def _datum(text: str):
 
 
 # Bemerkung seit 03.10.2026 sichtbar (Klärung U5) – mit Versionen wie Diagnose, Therapie und Empfehlung
-TEXTFELDER = ("diagnose", "therapie", "empfehlung", "bemerkung")
+TEXTFELDER = ("diagnose", "therapie", "empfehlung", "befunde", "bemerkung")
 
 
 class TextKonflikt(serializers.ValidationError):
@@ -839,10 +840,10 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
     def verlauf(self, request, pk=None):
         """Alle Fassungen aller Einträge dieser Akte, neueste zuerst (Entwurf 10).
 
-        Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, bemerkung, gewichte, kontakte, termine,
+        Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, befunde, bemerkung, gewichte, kontakte, termine,
         dokumente, infusionsplaene, bezugspersonen, aerzte, erklaerungen, datenschutz, diagnosen, laborbefunde,
         bia_messungen, berichte, korrespondenz, faelle, falldokumente, hinweisruhe, therapieschritte, medikamente; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
-        die Bereiche Stammdaten, Diagnose, Therapie, Empfehlung und Bemerkung verteilt.
+        die Bereiche Stammdaten, Diagnose, Therapie, Empfehlung, Befunde und Bemerkung verteilt.
         """
         patient = self.get_object()
         bereich = request.query_params.get("bereich") or None

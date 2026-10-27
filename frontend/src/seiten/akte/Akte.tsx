@@ -803,6 +803,7 @@ export function Akte() {
     { zu: `${basis}/medikamente`, text: "Medikamente", zahl: k?.zaehler.medikamente, stufe: "haupt" },
     { zu: `${basis}/therapie`, text: "Therapie", stufe: "haupt" },
     { zu: `${basis}/empfehlung`, text: "Empfehlung", stufe: "haupt" },
+    { zu: `${basis}/befunde`, text: "Befunde", stufe: "haupt" },
     { zu: `${basis}/plaene`, text: "Infusionspläne", zahl: k?.zaehler.infusionsplaene, stufe: "haupt" },
     { zu: `${basis}/kontakte`, text: "Kontakte", zahl: k?.zaehler.kontakte, stufe: "haupt" },
     // Wünsche aus der Praxis vom 06.10.2026 (F112–F115)

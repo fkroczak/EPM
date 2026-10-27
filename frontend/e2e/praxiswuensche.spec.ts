@@ -235,9 +235,10 @@ test("Jeder Bereich ein eigener Reiter; die alte Adresse leitet weiter", async (
   await expect(page.getByRole("button", { name: "Neue Messung" })).toHaveCount(0);
   await reiter.getByRole("link", { name: /^BIA/ }).click();
   await expect(page.getByRole("button", { name: "Neue Messung" })).toBeVisible();
-  // der alte Weg „Labor & BIA“ landet beim Labor
-  await page.goto(`/patienten/${p.id}/befunde`);
-  await expect(page).toHaveURL(new RegExp(`/patienten/${p.id}/labor$`));
+  // „Befunde“ ist seit 27.10.2026 ein eigener Reiter wie „Empfehlung“
+  await reiter.getByRole("link", { name: /^Befunde/ }).click();
+  await expect(page.getByTestId("karte-befunde")).toBeVisible();
+  await expect(page.getByTestId("seite-therapie")).toBeVisible();
 });
 
 test("Grenze „gilt als alt“ unter Vorlagen › Grenzwerte", async ({ browser, page }) => {

@@ -494,7 +494,7 @@ Ansicht „Seitenleiste“ der Akte die Breite der Leiste.</p>
     },
     {
         "id": "stammdaten", "gruppe": "patienten", "titel": "Stammdaten, Diagnose und Therapie ändern",
-        "rechte": ["akten_bearbeiten"], "seiten": ["/patienten/:id/therapie", "/patienten/:id/empfehlung", "/patienten/:id/diagnosen"],
+        "rechte": ["akten_bearbeiten"], "seiten": ["/patienten/:id/therapie", "/patienten/:id/empfehlung", "/patienten/:id/befunde", "/patienten/:id/diagnosen"],
         "html": """
 <p><strong>Stammdaten</strong> sind Name, Anschrift, Telefon und Telefon 2, Versicherungsart, Versicherung und
 Versichertennummer, Versorger, Katheter, Nickelallergie und mehr. Es gibt zwei Wege, sie zu ändern:</p>

@@ -160,6 +160,23 @@ class Revisionssicherheit(Grundlage):
             Patient.objects.create(nachname="Neu", vorname="Nina", geburtsdatum="1990-01-01")
         self.assertTrue(any("pg_advisory_xact_lock" in q["sql"] for q in abfragen.captured_queries))
 
+    def test_befunde_mit_fassungen(self):
+        """Reiter „Befunde“ (27.10.2026): Text mit Fassungen wie die Empfehlung, gleichzeitiges Speichern abgelehnt."""
+        c = client_fuer(self.mitarbeiter)
+        url = f"/api/patienten/{self.patient.id}/"
+        self.assertEqual(c.patch(url, {"befunde": "<p>Sono: Leber unauffällig</p>", "basis_version": 0},
+                                 format="json").status_code, 200)
+        self.assertEqual(c.patch(url, {"befunde": "<p>Sono: Leber unauffällig</p><p>Gastro: o. B.</p>",
+                                       "basis_version": 1}, format="json").status_code, 200)
+        self.assertEqual(c.patch(url, {"befunde": "<p>veraltet</p>", "basis_version": 1}, format="json").status_code, 409)
+        r = c.get(f"{url}versionen/?feld=befunde").json()
+        self.assertEqual([f["version"] for f in r["fassungen"]], [2, 1])
+        akte = c.get(url).json()
+        self.assertIn("Gastro", akte["befunde"])
+        self.assertEqual(akte["kopf"]["versionen"]["befunde"]["version"], 2)
+        bereiche = {e.get("bereich") for e in c.get(f"{url}verlauf/?bereich=befunde").json()}
+        self.assertEqual(bereiche, {"befunde"})
+
     def test_versionen_der_textfelder(self):
         c = client_fuer(self.mitarbeiter)
         for text in ("<p>Kurzdarm</p>", "<p>Kurzdarm, Colon in Kontinuität</p>"):

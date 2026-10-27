@@ -1,5 +1,6 @@
 /**
- * Reiter „Therapie“ und „Empfehlung“ (Aufteilung 07.10.2026, F121/F122; neu gestaltet 10.10.2026).
+ * Reiter „Therapie“, „Empfehlung“ und „Befunde“ (Aufteilung 07.10.2026, F121/F122; neu gestaltet 10.10.2026;
+ * Befunde seit 27.10.2026).
  *
  * Statt einer Spalte „Fassungen“ steht der Text als lesbares Dokument vorn; frühere Fassungen öffnet ein Knopf.
  * Bei der Therapie steht darunter der Verlauf als eigene Einträge mit Datum (Beginn HPE, Umstellung Lipide …),
@@ -229,4 +230,9 @@ export function Therapie() {
 
 export function Empfehlung() {
   return <Textseite feld="empfehlung" testid="empfehlung" />;
+}
+
+// Reiter „Befunde“ (27.10.2026): aufgebaut wie die Empfehlung, rechts daneben die Therapie
+export function Befunde() {
+  return <Textseite feld="befunde" testid="befunde" />;
 }

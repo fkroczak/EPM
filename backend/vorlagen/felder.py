@@ -316,6 +316,7 @@ PATIENTENDATENBLATT = {
     "Patient.Nickelallergie": Feld("Nickelallergie", lambda k: k.patient.get_nickelallergie_display()),
     "Patient.Therapie": Feld("Therapie (formatiert)", lambda k: k.patient.therapie or None, html=True),
     "Patient.Empfehlung": Feld("Empfehlung (formatiert)", lambda k: k.patient.empfehlung or None, html=True),
+    "Patient.Befunde": Feld("Befunde (formatiert)", lambda k: k.patient.befunde or None, html=True),
     "Gewicht.aktuell": Feld("letztes Gewicht mit Datum",
                             lambda k: f"{_zahl(_letztes_gewicht(k).gewicht_kg, 'kg')} am {datum(_letztes_gewicht(k).gemessen_am)}"
                             if _letztes_gewicht(k) else None),
@@ -391,6 +392,7 @@ SPRECHSTUNDE = {
     "Patient.Nickelallergie": PATIENTENDATENBLATT["Patient.Nickelallergie"],
     "Patient.Therapie": PATIENTENDATENBLATT["Patient.Therapie"],
     "Patient.Empfehlung": PATIENTENDATENBLATT["Patient.Empfehlung"],
+    "Patient.Befunde": PATIENTENDATENBLATT["Patient.Befunde"],
     "Gewicht.aktuell": PATIENTENDATENBLATT["Gewicht.aktuell"],
     "Gewicht.BMI": PATIENTENDATENBLATT["Gewicht.BMI"],
     "Gewicht.Trend": PATIENTENDATENBLATT["Gewicht.Trend"],

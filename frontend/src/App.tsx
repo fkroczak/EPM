@@ -52,13 +52,14 @@ const router = createBrowserRouter([
           { path: "medikamente", ...seite(() => import("./seiten/akte/Medikamente").then(({ Medikamente }) => <Medikamente />)) },
           { path: "therapie", ...seite(() => import("./seiten/akte/Therapie").then(({ Therapie }) => <Therapie />)) },
           { path: "empfehlung", ...seite(() => import("./seiten/akte/Therapie").then(({ Empfehlung }) => <Empfehlung />)) },
+          // Reiter „Befunde“ (27.10.2026); die Adresse leitete vorher auf „Labor“ weiter
+          { path: "befunde", ...seite(() => import("./seiten/akte/Therapie").then(({ Befunde }) => <Befunde />)) },
           { path: "kontakte", ...seite(() => import("./seiten/akte/Kontakte").then(({ Kontakte }) => <Kontakte />)) },
           { path: "plaene", ...seite(() => import("./seiten/akte/Plaene").then(({ Plaene }) => <Plaene />)) },
           { path: "plaene/neu", ...seite(() => import("./seiten/akte/PlanEditor").then(({ PlanEditor }) => <PlanEditor />)) },
           { path: "plaene/:planId/bearbeiten", ...seite(() => import("./seiten/akte/PlanEditor").then(({ PlanEditor }) => <PlanEditor key="bearbeiten" />)) },
           { path: "labor", ...seite(() => import("./seiten/akte/Labor").then(({ Labor }) => <Labor />)) },
           { path: "bia", ...seite(() => import("./seiten/akte/Bia").then(({ Bia }) => <Bia />)) },
-          { path: "befunde", element: <Navigate to="../labor" replace /> },
           { path: "berichte", ...seite(() => import("./seiten/akte/Berichte").then(({ Berichte }) => <Berichte />)) },
           // Fälle der Regeneration Clinic (26.10.2026): Behandlungsfall mit Dokumentenpaket und Rechnung
           { path: "faelle", ...seite(() => import("./seiten/akte/Faelle").then(({ Faelle }) => <Faelle />)) },

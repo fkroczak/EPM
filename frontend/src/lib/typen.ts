@@ -276,6 +276,7 @@ export type Patient = {
   diagnose: string;
   therapie: string;
   empfehlung: string;
+  befunde: string;
   bemerkung: string;
   abgeschlossen_am: string | null;
   abschluss_anlass: string;
@@ -319,7 +320,7 @@ export type Patient = {
     naechster_termin: {
       id: number; art: string; titel: string; faellig_am: string; uhrzeit: string | null; ort: string | null; bei: string;
     } | null;
-    versionen: Record<"diagnose" | "therapie" | "empfehlung" | "bemerkung", Versionskopf>;
+    versionen: Record<"diagnose" | "therapie" | "empfehlung" | "befunde" | "bemerkung", Versionskopf>;
     /** Hinweise wie in der Patientenliste, dazu fehlende Angaben (F186); ausgeblendete unter ``hinweise_stumm`` */
     hinweise?: { art: HinweisArt; text: string; stufe?: Kontaktstufe }[];
     hinweise_stumm?: HinweisArt[];

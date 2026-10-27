@@ -95,6 +95,8 @@ class Patient(models.Model):
     diagnose = models.TextField(blank=True)
     therapie = models.TextField(blank=True, help_text="Aktuelle Therapie und Therapieverlauf")
     empfehlung = models.TextField(blank=True)
+    # Reiter „Befunde“ (27.10.2026): Befunde als formatierter Text mit Fassungen wie die Empfehlung
+    befunde = models.TextField(blank=True)
     bemerkung = models.TextField(blank=True)
 
     abgeschlossen_am = models.DateField(null=True, blank=True)
