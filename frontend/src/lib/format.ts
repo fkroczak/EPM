@@ -12,6 +12,14 @@ export function zahl(wert: number | string | null | undefined, stellen?: number)
   });
 }
 
+/** Zahl für ein Eingabefeld: Komma, ohne Tausenderpunkt (sonst liest ``eingabeZahl`` „2.233“ als 2,233) */
+export function eingabeText(wert: number | string | null | undefined): string {
+  if (wert === null || wert === undefined || wert === "") return "";
+  const n = typeof wert === "string" ? Number(wert) : wert;
+  if (Number.isNaN(n)) return String(wert);
+  return n.toLocaleString("de-DE", { maximumFractionDigits: 2, useGrouping: false });
+}
+
 export function kg(wert: number | string | null | undefined): string {
   return wert === null || wert === undefined || wert === "" ? "—" : `${zahl(wert, 1)} kg`;
 }

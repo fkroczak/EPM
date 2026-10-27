@@ -596,6 +596,8 @@ export type Plan = {
   vitamine: number[];
   vitamine_namen: string[];
   kcal_manuell: number | null;
+  mischbeutel_ml_manuell: number | null;
+  gesamtvolumen_ml_manuell: number | null;
   kcal_berechnet: number;
   kcal: number;
   /** berechnet wie im Altsystem: Körpergewicht × 35 ml, bei Freigabe eingefroren */

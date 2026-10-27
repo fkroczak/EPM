@@ -247,6 +247,33 @@ class Infusionsplaene(PlanHilfen, Grundlage):
         self.assertEqual(zeilen["pantozol"]["jetzt"], "Pantozol® 20 mg · morgens, mittags, abends")
         self.assertEqual(zeilen["pantozol"]["vorher"], "Pantozol® 40 mg · morgens, abends")
 
+    def test_volumen_von_hand_und_glucose_ohne_praeparat(self):
+        """Wunsch 27.10.2026: Mischbeutel und Gesamtvolumen von Hand; Glucose braucht kein Präparat (wählt die Apotheke)."""
+        c = client_fuer(self.mediziner)
+        client_fuer(self.mitarbeiter).post("/api/gewichte/", {"patient": self.patient.id, "gewicht_kg": "60.0"}, format="json")
+        e = self.entwurf(c)
+        url = f"/api/infusionsplaene/{e['id']}/"
+        daten = {**self.plan_daten(), "glucose_praeparat": None, "mischbeutel_ml_manuell": "1995"}
+        r = c.patch(url, daten, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        p = r.json()
+        self.assertEqual([p["glucose_praeparat"], p["glucose_g"]], [None, 200])
+        # 1.995 + 500 = 2.495 ml; Rate 2.495 ÷ 12 = 207,9
+        self.assertEqual([p["gesamtvolumen_ml"], p["volumen_summe_ml"], p["rate_ml_h"]], [1995, 2495, 207.9])
+        zeilen = {z["schluessel"]: z for z in c.get(url + "vergleich/").json()["zeilen"]}
+        self.assertEqual(zeilen["mischbeutel"]["jetzt"], "1.995 ml (manuell)")
+        r = c.patch(url, {"gesamtvolumen_ml_manuell": "2400"}, format="json")
+        self.assertEqual([r.json()["volumen_summe_ml"], r.json()["rate_ml_h"]], [2400, 200])
+        for feld in ("mischbeutel_ml_manuell", "gesamtvolumen_ml_manuell"):
+            with self.subTest(feld=feld):
+                r = c.patch(url, {feld: "0"}, format="json")
+                self.assertEqual(r.status_code, 400, r.content)
+                self.assertIn(feld, r.json())
+        # leer = wieder berechnet
+        r = c.patch(url, {"mischbeutel_ml_manuell": None, "gesamtvolumen_ml_manuell": None}, format="json")
+        self.assertEqual([r.json()["gesamtvolumen_ml"], r.json()["volumen_summe_ml"]], [2100, 2600])
+        self.assertEqual(c.post(url + "freigeben/").status_code, 200)
+
     def test_berechnung_wie_im_altsystem(self):
         """Festlegung 01.10.2026: Lipide 9,15 kcal/g, Humanalbumin in ml ohne Energie; Ca + Mg ≤ Gesamtvolumen ÷ 100;
         erster Plan je kg Körpergewicht vorbelegt."""

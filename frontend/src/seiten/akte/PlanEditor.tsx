@@ -7,7 +7,7 @@ import { ApiFehler, abfrage, api, apiDatei } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useEinstellungen, usePraeparate } from "@/lib/daten";
-import { datum, eingabeDatum, eingabeZahl, heuteIso, kg, nummer, uhrzeit, zahl } from "@/lib/format";
+import { datum, eingabeDatum, eingabeText, eingabeZahl, heuteIso, kg, nummer, uhrzeit, zahl } from "@/lib/format";
 import { useStufe } from "@/lib/stufen";
 import type { Stufe } from "@/lib/stufen";
 import { PPI_ZEITEN, PROTONENPUMPENHEMMER, ppiZeiten } from "@/lib/typen";
@@ -26,7 +26,7 @@ import { name, useAkte } from "./Akte";
 
 const ZAHLEN = ["basis_ml", "glucose_g", "aminosaeuren_g", "lipide_g", "albumin_ml", "natrium_mmol", "kalium_mmol",
   "phosphat_mmol", "calcium_mmol", "magnesium_mmol", "laufzeit_h", "tage_pro_woche", "zusatz_tage_pro_woche",
-  "freie_tage_pro_woche", "pantozol_tage", "kcal_manuell"] as const;
+  "freie_tage_pro_woche", "pantozol_tage", "kcal_manuell", "mischbeutel_ml_manuell", "gesamtvolumen_ml_manuell"] as const;
 const AUSWAHL = ["basis_praeparat", "glucose_praeparat", "aminosaeuren_praeparat", "lipide_praeparat", "albumin_praeparat",
   "spurenelemente", "katheterschutz"] as const;
 type ZahlFeld = (typeof ZAHLEN)[number];
@@ -70,11 +70,11 @@ function leer(): Formular {
 
 function ausPlan(p: Plan, gueltig?: string): Formular {
   const f = leer();
-  for (const k of ZAHLEN) f[k] = p[k] != null ? zahl(p[k] as number) : "";
+  for (const k of ZAHLEN) f[k] = p[k] != null ? eingabeText(p[k] as number) : "";
   for (const k of AUSWAHL) f[k] = p[k] != null ? String(p[k]) : "";
   return { ...f, vitamine: [...p.vitamine], bemerkung: p.bemerkung, pantozol_stufe: String(p.pantozol_stufe ?? 0),
     gueltig_ab: gueltig ?? datum(p.gueltig_ab),
-    positionen: (p.positionen ?? []).map((x) => ({ praeparat: String(x.praeparat), menge: x.menge != null ? zahl(x.menge) : "",
+    positionen: (p.positionen ?? []).map((x) => ({ praeparat: String(x.praeparat), menge: x.menge != null ? eingabeText(x.menge) : "",
       einheit: x.einheit ?? "", haeufigkeit: x.haeufigkeit ?? "", bemerkung: x.bemerkung ?? "" })) };
 }
 
@@ -214,7 +214,7 @@ export function PlanEditor() {
     if (quelleId) { if (quelle.data) setF(ausPlan(quelle.data, datum(heuteIso()))); return; }
     if (!ersterPlan || !vorbelegung.isFetchedAfterMount || vorbelegung.isFetching) return;
     const werte = vorbelegung.data?.werte;
-    setF(werte ? { ...leer(), ...Object.fromEntries(Object.entries(werte).map(([k, v]) => [k, zahl(v)])) } : leer());
+    setF(werte ? { ...leer(), ...Object.fromEntries(Object.entries(werte).map(([k, v]) => [k, eingabeText(v)])) } : leer());
   }, [f, planId, entwurf.data, vorlageId, aktuellBekannt, quelleId, quelle.data, ersterPlan, vorbelegung.data, vorbelegung.isFetching, vorbelegung.isFetchedAfterMount]);
 
   // höchstens ein Entwurf je Patient: einen vorhandenen Entwurf bearbeiten statt einen zweiten anzulegen
@@ -328,12 +328,17 @@ export function PlanEditor() {
   const kcal = kcalManuell ?? kcalBerechnet;
   const kcalVorher = vorher ? zahlWert(vorher.kcal_manuell) ?? kcalRoh(vorher) : null;
   const gewicht = patient.kopf?.gewicht ? Number(patient.kopf.gewicht.kg) : null;
-  // Gesamtvolumen aus dem letzten Gewicht (der Server rechnet beim Speichern genauso und friert es bei Freigabe ein); Laufzeit manuell
-  const volumen = gewicht != null ? Math.round(gewicht * ML_JE_KG * 100) / 100 : null;
+  // Volumen im Mischbeutel aus dem letzten Gewicht (der Server rechnet beim Speichern genauso und friert es bei Freigabe ein);
+  // von Hand eingetragen gilt der eingetragene Wert (Wunsch 27.10.2026), ebenso beim Gesamtvolumen
+  const volumenBerechnet = gewicht != null ? Math.round(gewicht * ML_JE_KG * 100) / 100 : null;
+  const mischbeutelManuell = zahlWert(f.mischbeutel_ml_manuell);
+  const volumen = mischbeutelManuell ?? volumenBerechnet;
   const laufzeit = zahlWert(f.laufzeit_h);
   // Gesamtvolumen wie auf der alten PDF: Mischbeutel + Zusatzvolumen (Basislösung); die Rate wird aus der Summe berechnet
   const zusatz = zahlWert(f.basis_ml) ?? 0;
-  const summe = volumen != null ? Math.round((volumen + zusatz) * 100) / 100 : null;
+  const summeBerechnet = volumen != null ? Math.round((volumen + zusatz) * 100) / 100 : null;
+  const summeManuell = zahlWert(f.gesamtvolumen_ml_manuell);
+  const summe = summeManuell ?? summeBerechnet;
   const rate = summe != null && laufzeit ? Math.round((summe / laufzeit) * 10) / 10 : null;
   const volumenVorher = vorgaenger.data?.volumen_summe_ml ?? null;
   const rateVorher = vorgaenger.data?.rate_ml_h ?? null;
@@ -367,7 +372,8 @@ export function PlanEditor() {
   // Entscheidung der Praxis 10.10.2026: nach 6 Monaten „bitte prüfen“ (Vorlagen › Grenzwerte, F190)
   const gewichtGrenzeMonate = Number(es?.plan_gewicht_alter_monate ?? 6);
   const gewichtAlterTage = patient.kopf?.gewicht ? Math.round((Date.parse(heuteIso()) - Date.parse(patient.kopf.gewicht.am.slice(0, 10))) / 86400000) : null;
-  const ohnePraeparat = MAKRO.filter((m) => zahlWert(f[m.menge]) && !f[`${m.feld}_praeparat` as AuswahlFeld]).map((m) => m.text);
+  // Glucose ohne Präparat (Wunsch 27.10.2026): das wählt die Apotheke nach Stabilitätsdaten selbst
+  const ohnePraeparat = MAKRO.filter((m) => m.feld !== "glucose" && zahlWert(f[m.menge]) && !f[`${m.feld}_praeparat` as AuswahlFeld]).map((m) => m.text);
   const bestandteile = ([
     ["natrium", zahlWert(f.natrium_mmol)], ["kalium", zahlWert(f.kalium_mmol)], ["phosphat", zahlWert(f.phosphat_mmol)],
     ["calcium", zahlWert(f.calcium_mmol)], ["magnesium", zahlWert(f.magnesium_mmol)], ["albumin", zahlWert(f.albumin_ml)],
@@ -376,12 +382,13 @@ export function PlanEditor() {
   ] as const).filter(([, w]) => w).map(([k]) => k as string);
   const pruefpunkte: { ok: boolean; text: string }[] = [
     gewicht == null
-      ? { ok: false, text: "Kein Gewicht erfasst: Gesamtvolumen (35 ml/kg) und Rate fehlen. Bitte zuerst das Gewicht eintragen." }
+      ? { ok: mischbeutelManuell != null, text: mischbeutelManuell != null ? "Kein Gewicht erfasst; Volumen im Mischbeutel von Hand eingetragen."
+        : "Kein Gewicht erfasst: Volumen im Mischbeutel (35 ml/kg) und Rate fehlen. Bitte das Gewicht oder das Volumen eintragen." }
       : { ok: gewichtAlterTage == null || gewichtAlterTage <= gewichtGrenzeMonate * 30,
         text: `Gewicht ${kg(gewicht)} vom ${datum(patient.kopf!.gewicht!.am)}${gewichtAlterTage != null && gewichtAlterTage > gewichtGrenzeMonate * 30 ? ` – älter als ${gewichtGrenzeMonate} Monate, bitte prüfen` : ""}.` },
     ohnePraeparat.length
       ? { ok: false, text: `Präparat fehlt bei ${ohnePraeparat.join(", ")}.` }
-      : { ok: true, text: "Zu jeder Menge ist ein Präparat gewählt." },
+      : { ok: true, text: "Zu jeder Menge ist ein Präparat gewählt (Glucose wählt die Apotheke)." },
     caMgStabil === false
       ? { ok: false, text: `Mischung instabil: Calcium + Magnesium ${zahl(caMg)} mmol, erlaubt sind ${zahl(caMgGrenze)} mmol. Calcium oder Magnesium verringern.` }
       : { ok: true, text: caMgStabil == null ? "Stabilität Calcium + Magnesium: noch nicht prüfbar." : "Calcium + Magnesium stabil." },
@@ -396,10 +403,10 @@ export function PlanEditor() {
     ...(f.pantozol_stufe !== "0" && !ppiMaske ? [{ ok: false, text: "Protonenpumpenhemmer gewählt, aber keine Zeit (morgens, mittags, abends)." }] : []),
   ];
   const vitamineListe = p.filter((x) => x.kategorie === "vitamine");
-  const zahlFeld = (k: ZahlFeld, label: ReactNode, einheit: string, extra?: ReactNode) => (
+  const zahlFeld = (k: ZahlFeld, label: ReactNode, einheit: string, extra?: ReactNode, platzhalter?: string, testid?: string) => (
     <Feld label={label} fehler={e[k]} hinweis={extra}>
       {(pp) => <Einheit einheit={einheit}><Eingabe {...pp} className={cx("num pr-14", geaendert(k) && "border-warn bg-warn-bg")} value={f[k]}
-        onChange={(ev) => setze(k)(ev.target.value)} inputMode="decimal" /></Einheit>}
+        onChange={(ev) => setze(k)(ev.target.value)} inputMode="decimal" placeholder={platzhalter} data-testid={testid} /></Einheit>}
     </Feld>
   );
 
@@ -423,7 +430,7 @@ export function PlanEditor() {
           {vorbelegung.data?.werte ? (
             <span className="flex items-center gap-2 flex-wrap">
               <Knopf icon="waage" title={`Je kg Körpergewicht (${kg(vorbelegung.data.gewicht_kg)}): ${JE_KG_TEXT.map(([k, t, e]) => `${t} ${zahl(Number(vorbelegung.data!.je_kg[k] ?? 0))} ${e}`).join(" · ")}`}
-                onClick={() => setF((a) => ({ ...a!, ...Object.fromEntries(Object.entries(vorbelegung.data!.werte!).map(([k, v]) => [k, zahl(Number(v))])) }))}>
+                onClick={() => setF((a) => ({ ...a!, ...Object.fromEntries(Object.entries(vorbelegung.data!.werte!).map(([k, v]) => [k, eingabeText(Number(v))])) }))}>
                 Mengen nach Praxisvorgabe</Knopf>
               <span className="text-xs gedaempft" data-testid="praxisvorgabe-stand">{vorbelegung.data.stand
                 ? `nach Praxisvorgabe vom ${datum(vorbelegung.data.stand)}` : "Startwerte wie im Altsystem"}</span>
@@ -545,27 +552,30 @@ export function PlanEditor() {
               {zahlFeld("zusatz_tage_pro_woche", "Zusatzvolumen", "×")}
               {zahlFeld("freie_tage_pro_woche", "Infusionsfrei", "Tg")}
             </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-sm" data-testid="plan-volumen">
-              <span className="gedaempft">Volumen im Mischbeutel</span>
-              <span className="num text-right" data-testid="plan-mischbeutel">{volumen != null ? `${zahl(volumen)} ml` : "—"}</span>
-              <span className="gedaempft">Zusatzvolumen (Basislösung)</span>
-              <span className="num text-right" data-testid="plan-zusatzvolumen">{`${zahl(zusatz)} ml`}</span>
-              <span className="gedaempft font-medium">Gesamtvolumen</span>
-              <span className="num text-right font-medium" data-testid="plan-gesamtvolumen">
-                {summe != null ? `${zahl(summe)} ml` : "—"}
-                {volumenVorher != null && summe != null && Math.abs(volumenVorher - summe) >= 0.01 ? <span className="text-warn"> vorher {zahl(volumenVorher)} ml</span> : null}
-              </span>
-              <span className="gedaempft">Rate</span>
-              <span className="num text-right" data-testid="plan-rate">
-                {rate != null ? `${zahl(rate)} ml/h` : "—"}
-                {rateVorher != null && rate != null && Math.abs(rateVorher - rate) >= 0.05 ? <span className="text-warn"> vorher {zahl(rateVorher)} ml/h</span> : null}
-              </span>
+            {/* Volumen (Wunsch 27.10.2026): alle drei Werte eintragbar; leer = berechnet */}
+            <div className="flex flex-col gap-3 text-sm" data-testid="plan-volumen">
+              {zahlFeld("mischbeutel_ml_manuell", "Volumen im Mischbeutel", "ml", mischbeutelManuell != null
+                ? (volumenBerechnet != null ? `berechnet wären ${zahl(volumenBerechnet)} ml` : "von Hand eingetragen")
+                : volumenBerechnet != null ? `leer = ${zahl(volumenBerechnet)} ml (${ML_JE_KG} ml/kg × ${kg(gewicht)})` : "leer = 35 ml/kg, sobald ein Gewicht erfasst ist",
+                volumenBerechnet != null ? zahl(volumenBerechnet) : undefined, "plan-mischbeutel")}
+              {zahlFeld("basis_ml", "Zusatzvolumen (Basislösung)", "ml", undefined, undefined, "plan-zusatzvolumen")}
+              {zahlFeld("gesamtvolumen_ml_manuell", <span className="font-medium">Gesamtvolumen</span>, "ml", <>
+                {summeManuell != null ? (summeBerechnet != null ? `berechnet wären ${zahl(summeBerechnet)} ml` : "von Hand eingetragen") : "leer = Mischbeutel + Zusatzvolumen"}
+                {volumenVorher != null && summe != null && Math.abs(volumenVorher - summe) >= 0.01 ? <span className="text-warn"> · vorher {zahl(volumenVorher)} ml</span> : null}
+              </>, summeBerechnet != null ? zahl(summeBerechnet) : undefined, "plan-gesamtvolumen")}
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3">
+                <span className="gedaempft">Gesamtvolumen</span>
+                <span className="num text-right font-medium" data-testid="plan-gesamtvolumen-wert">{summe != null ? `${zahl(summe)} ml` : "—"}</span>
+                <span className="gedaempft">Rate</span>
+                <span className="num text-right" data-testid="plan-rate">
+                  {rate != null ? `${zahl(rate)} ml/h` : "—"}
+                  {rateVorher != null && rate != null && Math.abs(rateVorher - rate) >= 0.05 ? <span className="text-warn"> vorher {zahl(rateVorher)} ml/h</span> : null}
+                </span>
+              </div>
             </div>
             <span className={cx("text-xs", e.gesamtvolumen_ml ? "fehlertext" : "gedaempft")} role={e.gesamtvolumen_ml ? "alert" : undefined}
               data-testid="plan-volumen-hinweis">
-              {e.gesamtvolumen_ml ?? (gewicht != null
-                ? `Mischbeutel: ${ML_JE_KG} ml/kg × ${kg(gewicht)} (letztes Gewicht). Rate = Gesamtvolumen ÷ Laufzeit. Bei Freigabe festgeschrieben.`
-                : "Kein Gewicht erfasst: Volumen und Rate werden berechnet, sobald ein Gewicht eingetragen ist.")}
+              {e.gesamtvolumen_ml ?? "Rate = Gesamtvolumen ÷ Laufzeit. Bei Freigabe festgeschrieben."}
             </span>
           </Karte>
           <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5">
