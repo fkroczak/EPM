@@ -728,6 +728,26 @@ class Kontaktdaten(Grundlage):
         self.assertEqual(werte, ["Mutter", "Vater", "Ehepartner/in", "Kind", "Betreuer/in (gesetzlich)",
                                  "Pflegedienst", "Sonstige"])
 
+    def test_bezugsperson_gleich_beim_anlegen(self):
+        """Wunsch 27.10.2026: Bezugsperson schon beim Anlegen des Patienten, nicht als „Telefon 2“."""
+        c = client_fuer(self.mitarbeiter)
+        partnerin = wert(Auswahlwert.Liste.BEZIEHUNG, "Ehepartner/in")
+        daten = {"nachname": "Wolf", "vorname": "Paul", "geburtsdatum": "1985-01-10"}
+        # Fehler in der Person: nichts wird angelegt
+        r = c.post("/api/patienten/", {**daten, "aufnahme_bezugspersonen": [{"name": " "}]}, format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertIn("aufnahme_bezugspersonen.0.name", r.json())
+        self.assertFalse(Patient.objects.filter(nachname="Wolf").exists())
+        r = c.post("/api/patienten/", {**daten, "aufnahme_bezugspersonen": [
+            {"beziehung": partnerin.id, "name": "Sonja Raum", "mobil": "01758664587", "auskunft_erlaubt": True}]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        pid = r.json()["id"]
+        bp = c.get(f"/api/bezugspersonen/?patient={pid}").json()
+        self.assertEqual([(b["beziehung_name"], b["name"], b["mobil"], b["auskunft_erlaubt"]) for b in bp],
+                         [("Ehepartner/in", "Sonja Raum", "01758664587", True)])
+        r = c.patch(f"/api/patienten/{pid}/", {"aufnahme_bezugspersonen": [{"name": "X"}]}, format="json")
+        self.assertEqual(r.status_code, 400)
+
     def test_bezugspersonen_anlegen_aendern_nicht_loeschen(self):
         c = client_fuer(self.mitarbeiter)
         mutter = wert(Auswahlwert.Liste.BEZIEHUNG, "Mutter")

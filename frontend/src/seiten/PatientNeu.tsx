@@ -35,12 +35,22 @@ const LEER: Formular = {
 /** Wert der Auswahl „kein“ (bewusst keiner) bei Versorger und Katheter */
 const KEIN = "kein";
 
+/** Bezugsperson gleich beim Anlegen (Wunsch 27.10.2026) – statt Angehörige unter „Telefon 2“ einzutragen */
+type Person = { beziehung: string; name: string; telefon: string; mobil: string; auskunft_erlaubt: boolean };
+const LEERE_PERSON: Person = { beziehung: "", name: "", telefon: "", mobil: "", auskunft_erlaubt: false };
+const PERSON_FELDER: (keyof Person)[] = ["beziehung", "telefon", "mobil"];
+/** Eine Zeile zählt, sobald etwas außer dem Haken eingetragen ist */
+const personAusgefuellt = (x: Person) => [x.name, ...PERSON_FELDER.map((k) => String(x[k]))].some((t) => t.trim());
+
 /** Welches Formularfeld zu einem Fehlerschlüssel gehört (sonst gleichnamig) */
 const FELD_ZU_FEHLER: Partial<Record<string, keyof Formular>> = { groesse_cm: "groesse", aufnahme_gewicht_kg: "gewicht", aufnahme_gemessen_am: "gemessen_am" };
 
 /** Prüfung vor dem Absenden – dieselbe läuft bei jeder Eingabe, damit ein behobener Fehler sofort verschwindet */
-function pruefen(f: Formular, firmen: string[], einwilligung: string, mehrereFirmen: boolean): Feldfehler {
+function pruefen(f: Formular, firmen: string[], einwilligung: string, mehrereFirmen: boolean, personen: Person[]): Feldfehler {
   const fehler: Feldfehler = {};
+  personen.forEach((x, i) => {
+    if (personAusgefuellt(x) && !x.name.trim()) fehler[`aufnahme_bezugspersonen.${i}.name`] = "Bitte einen Namen eingeben.";
+  });
   const geb = eingabeDatum(f.geburtsdatum);
   if (!f.nachname.trim()) fehler.nachname = "Bitte Nachnamen eingeben.";
   if (!f.vorname.trim()) fehler.vorname = "Bitte Vornamen eingeben.";
@@ -85,6 +95,11 @@ export function PatientNeu() {
   const [andere, setAndere] = useState<number[]>([]);
   // Arzt/Versorger anlegen, ohne die Seite zu verlassen (Vorschlag „Weniger Wege“, 08.10.2026)
   const [schnell, setSchnell] = useState<"" | "arzt" | "versorger">("");
+  const [personen, setPersonen] = useState<Person[]>([{ ...LEERE_PERSON }]);
+  const setzePerson = (i: number, neu: Partial<Person>) => {
+    setPersonen((alt) => alt.map((x, j) => (j === i ? { ...x, ...neu } : x)));
+    setServer((alt) => Object.fromEntries(Object.entries(alt).filter(([k]) => !k.startsWith(`aufnahme_bezugspersonen.${i}.`))));
+  };
   const [lokal, setLokal] = useState<Feldfehler>({});
   // Fehler vom Server gelten, bis das Feld geändert wird (Pflichtfeld-Fehler verschwinden sofort, 13.10.2026)
   const [server, setServer] = useState<Feldfehler>({});
@@ -108,6 +123,7 @@ export function PatientNeu() {
   });
   const versorger = useVersorgerListe();
   const katheter = useAuswahl("katheter");
+  const beziehungen = useAuswahl("beziehung");
   const aerzte = useAerzteListe();
   const gewaehlt = (versorger.data ?? []).find((v) => String(v.id) === f.versorger);
 
@@ -127,12 +143,12 @@ export function PatientNeu() {
 
   // Bei jeder Eingabe: behobene Fehler sofort ausblenden, neue erst beim nächsten „Anlegen“ (sonst meckert jedes Feld beim Tippen)
   useEffect(() => {
-    const neu = pruefen(f, firmen, einwilligung, alleFirmen.length > 1);
+    const neu = pruefen(f, firmen, einwilligung, alleFirmen.length > 1, personen);
     setLokal((alt) => {
       const bleibt = Object.fromEntries(Object.keys(alt).filter((k) => k in neu).map((k) => [k, neu[k]]));
       return Object.keys(bleibt).length === Object.keys(alt).length && Object.keys(bleibt).every((k) => bleibt[k] === alt[k]) ? alt : bleibt;
     });
-  }, [f, firmen, einwilligung, alleFirmen.length]);
+  }, [f, firmen, einwilligung, alleFirmen.length, personen]);
   const setze = (feld: keyof Formular) => (e: { target: { value: string } }) => {
     setF((alt) => ({ ...alt, [feld]: e.target.value }));
     setServer((alt) => {
@@ -153,7 +169,7 @@ export function PatientNeu() {
   });
 
   const absenden = () => {
-    const fehler = pruefen(f, firmen, einwilligung, alleFirmen.length > 1);
+    const fehler = pruefen(f, firmen, einwilligung, alleFirmen.length > 1, personen);
     const groesse = eingabeZahl(f.groesse);
     const gewicht = eingabeZahl(f.gewicht);
     const gemessen = f.gemessen_am.trim() ? eingabeDatum(f.gemessen_am) : null;
@@ -193,6 +209,9 @@ export function PatientNeu() {
       nickelallergie: f.nickelallergie,
       // Hausarzt aus der gemeinsamen Ärzteliste (wird als Zuordnung „Hausarzt“ gespeichert)
       ...(f.hausarzt ? { aufnahme_hausarzt: Number(f.hausarzt) } : {}),
+      aufnahme_bezugspersonen: personen.filter(personAusgefuellt).map((x) => ({
+        beziehung: x.beziehung ? Number(x.beziehung) : null, name: x.name.trim(), telefon: x.telefon.trim(),
+        mobil: x.mobil.trim(), auskunft_erlaubt: x.auskunft_erlaubt })),
       ueberweisung_durch: f.ueberweisung_durch.trim(),
       diagnose: alsHtml(f.diagnose),
       ...(gewicht ? { aufnahme_gewicht_kg: gewicht, aufnahme_gemessen_am: gemessen ?? heuteIso() } : {}),
@@ -305,7 +324,7 @@ export function PatientNeu() {
                   <span className="gedaempft font-normal">{mehrAusgefuellt ? ` (${mehrAusgefuellt} ausgefüllt)` : " (optional)"}</span>
                 </summary>
                 <div className="grid grid-cols-2 md:grid-cols-4 fhd:grid-cols-6 qhd:grid-cols-8 gap-x-3 md:gap-x-4 gap-y-3.5 items-start pt-3">
-                  <Feld label="Telefon 2" className="col-span-2" fehler={e.telefon2}>
+                  <Feld label="Telefon 2" className="col-span-2" fehler={e.telefon2} hinweis="des Patienten; Angehörige unten unter „Bezugspersonen“">
                     {(p) => <Eingabe {...p} className="num" type="tel" value={f.telefon2} onChange={setze("telefon2")} autoComplete="off" />}
                   </Feld>
                   <Feld label="E-Mail" className="col-span-2" fehler={e.email}>
@@ -381,7 +400,7 @@ export function PatientNeu() {
                     onClick={() => setSchnell("arzt")}>Neu anlegen</button>
                 ) : null}
                 <Feld label="Hausarzt" fehler={e.aufnahme_hausarzt ?? e.hausarzt}
-                  hinweis="aus der Ärzteliste; weitere Ärzte und Bezugspersonen danach in der Akte">
+                  hinweis="aus der Ärzteliste; weitere Ärzte danach in der Akte">
                   {(p) => (
                     <Auswahl {...p} value={f.hausarzt} onChange={setze("hausarzt")}>
                       <option value="">— nicht erfasst —</option>
@@ -396,6 +415,48 @@ export function PatientNeu() {
                 {(p) => <Eingabe {...p} placeholder="z. B. Klinik, Praxis Dr. Holtmeier" value={f.ueberweisung_durch} onChange={setze("ueberweisung_durch")} />}
               </Feld>
             </Abschnitt>
+
+            {/* Bezugspersonen gleich beim Anlegen (Wunsch 27.10.2026): Lebensgefährtin & Co. nicht mehr unter „Telefon 2“ */}
+            <Karte className="px-5 py-[1.125rem] flex flex-col gap-3.5" data-testid="neu-bezugspersonen">
+              <h2 className="lbl m-0">Bezugspersonen <span className="gedaempft font-normal">(optional)</span></h2>
+              {personen.map((x, i) => {
+                const fe = (k: string) => e[`aufnahme_bezugspersonen.${i}.${k}`];
+                const nr = personen.length > 1 ? ` ${i + 1}` : "";
+                return (
+                  <div key={i} className="grid grid-cols-2 md:grid-cols-4 fhd:grid-cols-6 gap-x-3 md:gap-x-4 gap-y-3.5 items-start" role="group" aria-label={`Bezugsperson${nr}`}>
+                    <Feld label={`Beziehung${nr}`} fehler={fe("beziehung")}>
+                      {(p) => (
+                        <Auswahl {...p} value={x.beziehung} onChange={(ev) => setzePerson(i, { beziehung: ev.target.value })}>
+                          <option value="">—</option>
+                          {(beziehungen.data ?? []).map((b) => <option key={b.id} value={b.id}>{b.wert}</option>)}
+                        </Auswahl>
+                      )}
+                    </Feld>
+                    <Feld label={`Name${nr}`} fehler={fe("name")}>
+                      {(p) => <Eingabe {...p} value={x.name} maxLength={150} autoComplete="off" placeholder="z. B. Sonja Raum" onChange={(ev) => setzePerson(i, { name: ev.target.value })} />}
+                    </Feld>
+                    <Feld label={`Telefon${nr ? ` Bezugsperson${nr}` : " Bezugsperson"}`} fehler={fe("telefon")}>
+                      {(p) => <Eingabe {...p} className="num" type="tel" maxLength={50} autoComplete="off" value={x.telefon} onChange={(ev) => setzePerson(i, { telefon: ev.target.value })} />}
+                    </Feld>
+                    <Feld label={`Mobil${nr ? ` Bezugsperson${nr}` : " Bezugsperson"}`} fehler={fe("mobil")}>
+                      {(p) => <Eingabe {...p} className="num" type="tel" maxLength={50} autoComplete="off" value={x.mobil} onChange={(ev) => setzePerson(i, { mobil: ev.target.value })} />}
+                    </Feld>
+                    <div className="col-span-2 flex items-center gap-4 flex-wrap md:col-span-4 fhd:col-span-2 fhd:pt-6">
+                      <label className="flex items-center gap-2 text-sm cursor-pointer" title="Schweigepflichtentbindung liegt vor">
+                        <input type="checkbox" checked={x.auskunft_erlaubt} onChange={(ev) => setzePerson(i, { auskunft_erlaubt: ev.target.checked })} />
+                        Auskunft erlaubt (Schweigepflichtentbindung)
+                      </label>
+                      {personen.length > 1 ? (
+                        <Knopf klein variante="geist" icon="x" onClick={() => setPersonen((alt) => alt.filter((_, j) => j !== i))}>Entfernen</Knopf>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+              {personen.length < 5 ? (
+                <Knopf klein icon="plus" className="self-start" onClick={() => setPersonen((alt) => [...alt, { ...LEERE_PERSON }])}>Weitere Bezugsperson</Knopf>
+              ) : null}
+            </Karte>
 
             <Karte className="px-5 py-[1.125rem] flex flex-col gap-1.5">
               <label htmlFor="neu-diagnose" className="lbl">Diagnose (optional, später in der Akte ergänzbar)</label>

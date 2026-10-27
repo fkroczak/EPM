@@ -150,6 +150,14 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   await page.getByLabel("Hausarzt").selectOption({ label: "Dr. med. Anna Hausmann (fiktiv) (Altenberge)" });
   await page.getByLabel("Diagnose").fill("Kurzdarmsyndrom (E2E)");
   await page.getByLabel("Überweisung / Kontaktaufnahme durch").fill("Praxis Dr. Holtmeier");
+  // Bezugsperson gleich beim Anlegen (27.10.2026) statt als „Telefon 2“
+  const personen = page.getByTestId("neu-bezugspersonen");
+  await personen.getByLabel("Beziehung").selectOption({ label: "Ehepartner/in" });
+  await personen.getByLabel("Mobil Bezugsperson").fill("0000 777777");
+  await page.getByRole("button", { name: "Anlegen und Akte öffnen" }).click();
+  await expect(personen.getByText("Bitte einen Namen eingeben.")).toBeVisible();
+  await personen.getByLabel("Name").fill("Sonja Beispiel");
+  await personen.getByRole("checkbox", { name: /Auskunft erlaubt/ }).check();
   await page.getByRole("button", { name: "Anlegen und Akte öffnen" }).click();
   await expect(page.getByText(/Größe muss zwischen/)).toBeVisible();
   await page.getByLabel("Größe").fill("168");
@@ -171,6 +179,9 @@ test("Neuer Patient: Prüfung, Doppelung, Anlegen mit Gewicht bei Aufnahme", asy
   expect(p.ueberweisung_durch).toBe("Praxis Dr. Holtmeier");
   const gewichte = await api.get(`gewichte/?patient=${id}`);
   expect(gewichte.results.map((g: { gewicht_kg: number }) => g.gewicht_kg)).toEqual([61.4]);
+  const bp = await api.get(`bezugspersonen/?patient=${id}`);
+  expect(bp.map((b: { beziehung_name: string; name: string; mobil: string; auskunft_erlaubt: boolean }) =>
+    [b.beziehung_name, b.name, b.mobil, b.auskunft_erlaubt])).toEqual([["Ehepartner/in", "Sonja Beispiel", "0000 777777", true]]);
   await api.ende();
 
   // erscheint in der Liste

@@ -185,7 +185,7 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
         <Feld label="PLZ" fehler={e.plz}>{(p) => <Eingabe {...p} className="num" value={f.plz} onChange={set("plz")} />}</Feld>
         <Feld label="Ort" fehler={e.ort}>{(p) => <Eingabe {...p} value={f.ort} onChange={set("ort")} />}</Feld>
         <Feld label="Telefon" className="col-span-2" fehler={e.telefon}>{(p) => <Eingabe {...p} className="num" value={f.telefon} onChange={set("telefon")} />}</Feld>
-        <Feld label="Telefon 2" className="col-span-2" fehler={e.telefon2}>{(p) => <Eingabe {...p} className="num" value={f.telefon2} onChange={set("telefon2")} />}</Feld>
+        <Feld label="Telefon 2" className="col-span-2" fehler={e.telefon2} hinweis="des Patienten; Angehörige in der Übersicht unter „Bezugspersonen“">{(p) => <Eingabe {...p} className="num" value={f.telefon2} onChange={set("telefon2")} />}</Feld>
         <Feld label="E-Mail" className="col-span-2" fehler={e.email}>{(p) => <Eingabe {...p} type="email" value={f.email} onChange={set("email")} />}</Feld>
         <Feld label="Versicherungsart" className="col-span-2" fehler={e.versicherungsart}>
           {(p) => (

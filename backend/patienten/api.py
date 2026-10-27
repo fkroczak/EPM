@@ -130,6 +130,9 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
     # Nur beim Anlegen: Hausarzt aus der Ärzteliste (wird als Zuordnung „Hausarzt“ gespeichert)
     aufnahme_hausarzt = serializers.PrimaryKeyRelatedField(queryset=Arzt.objects.all(), required=False,
                                                            allow_null=True, write_only=True)
+    # Nur beim Anlegen (Wunsch 27.10.2026): Bezugspersonen gleich mit erfassen statt als „Telefon 2“
+    aufnahme_bezugspersonen = serializers.ListField(child=serializers.DictField(), required=False, write_only=True,
+                                                    max_length=5)
 
     class Meta:
         model = Patient
@@ -144,6 +147,7 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
             "ist_eingeschraenkt", "eingeschraenkt_am", "aufbewahrung",
             "angelegt_am", "angelegt_von_name", "geaendert_am", "kopf", "firmen", "firmen_einwilligung",
             "aufnahme_gewicht_kg", "aufnahme_gemessen_am", "aufnahme_quelle", "aufnahme_hausarzt",
+            "aufnahme_bezugspersonen",
         ]
         read_only_fields = ["abgeschlossen_am", "abschluss_anlass", "abschluss_notiz", "angelegt_am", "geaendert_am",
                             "eingeschraenkt_am"]
@@ -246,6 +250,20 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
             if not hausarzt.aktiv:
                 raise serializers.ValidationError({"aufnahme_hausarzt": "Dieser Arzt ist deaktiviert."})
             self.aufnahme_hausarzt = hausarzt
+        personen = attrs.pop("aufnahme_bezugspersonen", None) or []
+        if personen and self.instance is not None:
+            raise serializers.ValidationError({"aufnahme_bezugspersonen": "Nur beim Anlegen möglich; danach unter „Kontaktpersonen“."})
+        self.aufnahme_bezugspersonen = []
+        fehler = {}
+        for i, daten in enumerate(personen):
+            s = BezugspersonSerializer(data={k: v for k, v in daten.items() if k != "patient"}, context=self.context)
+            s.fields["patient"].required = False
+            if s.is_valid():
+                self.aufnahme_bezugspersonen.append(s.validated_data)
+            else:
+                fehler.update({f"aufnahme_bezugspersonen.{i}.{k}": v for k, v in s.errors.items()})
+        if fehler:
+            raise serializers.ValidationError(fehler)
         # Wer einen Katheter bzw. Versorger wählt, hebt „kein“ auf (und umgekehrt leert „kein“ die Auswahl nicht stillschweigend)
         if attrs.get("katheter") is not None and "kein_katheter" not in attrs:
             attrs["kein_katheter"] = False
@@ -492,6 +510,8 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
         if hausarzt is not None:
             PatientArzt.objects.create(patient=patient, arzt=hausarzt, rolle=PatientArzt.Rolle.HAUSARZT,
                                        angelegt_von=self.request.user)
+        for daten in getattr(serializer, "aufnahme_bezugspersonen", []):
+            Bezugsperson.objects.create(**{**daten, "patient": patient, "angelegt_von": self.request.user})
         # Firmen (11.10.2026): ohne Angabe die aktive; mehrere nur mit Einwilligung (Datum der Unterschrift)
         firmen = self.request.data.get("firmen")
         if isinstance(firmen, list) and firmen:
