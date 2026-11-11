@@ -15,7 +15,7 @@ jedes nur einmal (Kennung `mitgeliefert`). Danach werden sie wie jede eigene Vor
 | Nr. | Dokument (Word-Datei) | Version |
 |---|---|---|
 | 01 | Patientenerklärung Österreich (ÖGK/SVS/BVAEB/KFA), Stundung – `01_Patientenerklaerung_AT_OEGK_Stundung_V6.docx` | V6 |
-| 02 | Patientenerklärung Deutschland GKV, Stundung – `02_Patientenerklaerung_GKV_DE_Stundung_V5.docx` | V5 |
+| 02 | Patientenerklärung Deutschland GKV, ambulant und tagesstationär – `Vorlage_Patientenerklaerung_GKV_ambulant_tagesstationaer.docx` (ersetzt seit 11.11.2026 die Fassung „Stundung“ V5; Datenmigration `vorlagen/0015_rgc_gkv_ambulant`) | 11.11.2026 |
 | 03 | Patientenerklärung Deutschland BG/UV – `03_Patientenerklaerung_BG_UV_DE_V5.docx` | V5 |
 | 04 | Patientenerklärung Deutschland PKV, Stundung – `04_Patientenerklaerung_PKV_DE_Stundung_V5.docx` | V5 |
 | 05 | Patientenerklärung stationäre Zusatzversicherung – `05_Patientenerklaerung_Zusatzversicherung_DE_V5.docx` | V5 |
