@@ -24,6 +24,8 @@ Django 5.2 LTS · Django REST Framework · PostgreSQL 18 · django-otp (TOTP + N
 ## Befehle (im Container: `sudo docker compose exec backend python manage.py …`)
 - `epm_musterdaten [--nur-stammdaten] [--zuruecksetzen]`
 - `epm_admin_anlegen <name> --vorname … --nachname …` · `epm_zugang_einrichten <name>` (Kennwort + QR im Terminal)
+- `epm_firmenadmin <name> <firma>` – Rolle Admin in einer Firma (z. B. `epm_firmenadmin admin rg`): den ersten Admin
+  einer Firma kann niemand in der Oberfläche ernennen, weil dort nur ein Admin der Firma deren Rollen vergibt; steht im Audit-Log
 - `epm_trigger` (Schutz-Trigger neu setzen; läuft sonst automatisch nach `migrate`)
 - Tests: `sudo docker compose run --rm backend python manage.py test`
 
