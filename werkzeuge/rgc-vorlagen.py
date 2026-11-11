@@ -49,7 +49,8 @@ VORLAGEN = {
     "09_Rueckerstattung_Selbstzahler_OEGK": ("Rückerstattung Selbstzahler ÖGK", "formulare"),
     "10_Abtretung_formal_OEGK_mit_Vorauszahlung": ("Abtretung ÖGK mit Vorauszahlung", "formulare"),
     "01_Patientenerklaerung_AT_OEGK_Stundung": ("Patientenerklärung Österreich (Stundung)", "formulare"),
-    "02_Patientenerklaerung_GKV_DE_Stundung": ("Patientenerklärung Deutschland GKV (Stundung)", "formulare"),
+    "02_Patientenerklaerung_GKV_ambulant": ("Patientenerklärung Deutschland GKV (ambulant/tagesstationär)",
+                                            "formulare"),
     "03_Patientenerklaerung_BG_UV_DE": ("Patientenerklärung Deutschland BG/UV", "formulare"),
     "04_Patientenerklaerung_PKV_DE_Stundung": ("Patientenerklärung Deutschland PKV (Stundung)", "formulare"),
     "05_Patientenerklaerung_Zusatzversicherung_DE": ("Patientenerklärung stationäre Zusatzversicherung", "formulare"),
@@ -259,6 +260,17 @@ def tabelle(b: Bloecke, t: Table, anforderung: bool):
                     angaben["optionen"]["neben_vorherigem"] = "haelfte"
                 b.neu("unterschrift", **angaben)
                 erste = False
+        return
+
+    # Unterschriften ohne Schreiblinie im Text (Linie als Zellrahmen): eine Zeile mit „Unterschrift …“
+    if len(zeilen) == 1 and any("Unterschrift" in x for x in alle) and not any(BOX in x for x in alle):
+        b.abschluss()
+        for i, x in enumerate(x for x in alle if x):
+            angaben = {"bezeichnung": "Unterschrift", "linie": x.replace("\n", ", ")[:200],
+                       "optionen": {"nicht_teilen": True}}
+            if i:
+                angaben["optionen"]["neben_vorherigem"] = "haelfte"
+            b.neu("unterschrift", **angaben)
         return
 
     kopfzeile = all(ist_fett(p) for z in zeilen[0] for p in absaetze(z)) and any(absaetze(z) for z in zeilen[0])

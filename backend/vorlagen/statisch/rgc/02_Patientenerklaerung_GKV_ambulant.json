@@ -1,0 +1,158 @@
+{
+ "quelle": "02_Patientenerklaerung_GKV_ambulant",
+ "name": "Patientenerklärung Deutschland GKV (ambulant/tagesstationär)",
+ "gruppe": "formulare",
+ "beschreibung": "Ambulante Versorgung und tagesstationäre Operation in Lettland · § 13 Abs. 4 SGB V · Art. 7 RL 2011/24/EU · Einwilligung · Abtretung · Vollmacht · Schweigepflichtentbindung · Datenschutz",
+ "datei": "02_Patientenerklaerung_GKV_ambulant.docx",
+ "bloecke": [
+  {
+   "id": "b1",
+   "typ": "briefkopf",
+   "bezeichnung": "Briefkopf",
+   "absender": false,
+   "falzmarken": false
+  },
+  {
+   "id": "b2",
+   "typ": "titel",
+   "bezeichnung": "Titel",
+   "text": "PATIENTENERKLÄRUNG — GESETZLICHE KRANKENVERSICHERUNG",
+   "zusatz": "Ambulante Versorgung und tagesstationäre Operation in Lettland · § 13 Abs. 4 SGB V · Art. 7 RL 2011/24/EU · Einwilligung · Abtretung · Vollmacht · Schweigepflichtentbindung · Datenschutz"
+  },
+  {
+   "id": "b3",
+   "typ": "datenfelder",
+   "bezeichnung": "Angaben",
+   "spalten": 1,
+   "felder": [
+    {
+     "label": "Unterzeichnende/r (Versicherte/r)",
+     "wert": "____________________________________________"
+    },
+    {
+     "label": "Geburtsdatum",
+     "wert": "{{Patient.Geburtsdatum}}"
+    },
+    {
+     "label": "Anschrift",
+     "wert": "{{Patient.Anschrift}}"
+    },
+    {
+     "label": "Krankenkasse / Versichertennummer",
+     "wert": "{{Patient.Versichertennummer}}"
+    },
+    {
+     "label": "Behandlungsanlass",
+     "wert": "____________________________________________ (ICD-10: ________)"
+    },
+    {
+     "label": "Versorgungsform",
+     "wert": "ambulante Diagnostik und Versorgung; operative Behandlung tagesstationär ohne Übernachtung"
+    },
+    {
+     "label": "Behandelnder Facharzt",
+     "wert": "____________________________________________"
+    },
+    {
+     "label": "Hausarzt (für Befundübermittlung)",
+     "wert": "__________________________________________"
+    }
+   ]
+  },
+  {
+   "id": "b4",
+   "typ": "text",
+   "text": "Die/der Unterzeichnende beauftragt die Regeneration Clinic SIA – Fachklinik für Orthopädie und Unfallchirurgie mit Ambulanzzulassung, eine nach lettischem Recht zugelassene Heilbehandlungseinrichtung (ārstniecības iestāde) mit Sitz in Rīga – mit der Diagnostik, der ambulanten Versorgung und der tagesstationären operativen Behandlung der vorstehend bezeichneten Erkrankung einschließlich der erforderlichen Vor- und Nachsorge. Die Behandlung erfolgt durch den vorstehend benannten Facharzt der Klinik. Zu diesem Zweck erteilt sie/er die nachstehenden Einwilligungen, Abtretungen und Vollmachten.\n\nIch willige in die Behandlung in Lettland ein. Mir ist bekannt, dass sie nach den dort geltenden berufs- und patientenrechtlichen Vorschriften (Ārstniecības likums, Pacientu tiesību likums) erfolgt; die fernmedizinische Erstbeurteilung meiner Befunde anhand der übermittelten Unterlagen ist vorausgegangen und wird durch die klinische Untersuchung ergänzt. Die Versorgung ist als ambulante beziehungsweise tagesstationäre Leistung ohne Übernachtung geplant; sie unterfällt damit § 13 Abs. 4 SGB V und Art. 7 RL 2011/24/EU und bedarf keiner vorherigen Zustimmung meiner Krankenkasse. Sollte sich für eine einzelne Leistung eine stationäre Einstufung nach § 39 SGB V ergeben, beantragt die Klinik vorsorglich die Zustimmung nach § 13 Abs. 5 SGB V, bevor diese Leistung begonnen wird.",
+   "bezeichnung": "§ 1 Gegenstand und Zweck",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b5",
+   "typ": "text",
+   "text": "(1) Erstattungsanspruch. Als gesetzlich Versicherte/r habe ich gegen meine Krankenkasse Anspruch auf Erstattung der Kosten dieser Behandlung bis zur Höhe der Vergütung, die bei Erbringung als Sachleistung im Inland angefallen wäre, abzüglich eines satzungsmäßigen Abschlags für Verwaltungskosten (§ 13 Abs. 4 SGB V). Die Klinik rechnet in deutscher Sprache, mit ICD-10- und OPS-Kodierung sowie Befundberichten ab, damit die Krankenkasse die Leistungen auf ihren Maßstab abbilden kann.\n\n(2) Abtretung erfüllungshalber. Ich trete meinen Geld-Erstattungsanspruch gegen meine Krankenkasse aus sämtlichen Leistungen dieses Behandlungsfalls – Diagnostik, Operation, Anästhesie, Nachsorge und Handtherapie – in Höhe der jeweiligen Rechnungsforderungen erfüllungshalber an die Regeneration Clinic SIA ab (§ 53 Abs. 2 Nr. 1 SGB I; §§ 398 ff. BGB). Die Klinik nimmt die Abtretung an und zieht den Erstattungsbetrag unmittelbar bei meiner Krankenkasse ein; den erwarteten Erstattungsanteil zahle ich nicht vorab. Sach- und Dienstleistungsansprüche sind von der Abtretung ausgenommen (§ 53 Abs. 1 SGB I).\n\n(3) Zahlungsanweisung. Ich weise meine Krankenkasse an, jeden Erstattungsbetrag aus diesem Behandlungsfall mit schuldbefreiender Wirkung unmittelbar an die Regeneration Clinic SIA zu leisten: IBAN LV51HABA0551058193764 · BIC HABALV22 · Verwendungszweck „Kostenerstattung § 13 Abs. 4 SGB V, Versicherte/r [Name, Versichertennummer]“. Zahlt die Krankenkasse dennoch an mich, leite ich den Betrag binnen 14 Tagen bis zur Höhe der offenen Forderung an die Klinik weiter.\n\n(4) Eigenanteil und Bestand der Forderung. Die Differenz zwischen dem Behandlungshonorar und dem von der Krankenkasse erstatteten Betrag sowie nicht erstattungsfähige Leistungen trage ich selbst; über die voraussichtliche Höhe informiert mich die Klinik vor Behandlungsbeginn schriftlich durch Kostenvoranschlag. Meine Honorarverbindlichkeit erlischt in Höhe des Erstattungsanteils erst mit dem Zahlungseingang bei der Klinik; soweit die Krankenkasse nicht oder nur teilweise leistet, bleibt die Forderung der Klinik in dieser Höhe bestehen und wird mit Zugang der Entscheidung fällig. Die Klinik bietet mir in diesem Fall eine Ratenvereinbarung an.",
+   "bezeichnung": "§ 2 Kostenerstattung, Abtretung und Zahlungsanweisung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b6",
+   "typ": "text",
+   "text": "Ich bevollmächtige die Regeneration Clinic SIA, vertreten durch ihren Director Prof. Dr. Markus Masin, mich in allen Angelegenheiten dieses Versorgungsfalls gegenüber meiner Krankenkasse, dem Medizinischen Dienst sowie sonstigen Trägern und Behörden zu vertreten (§ 13 SGB X). Die Vollmacht umfasst insbesondere:\n\na) die Stellung von Anträgen auf Kostenerstattung nach § 13 Abs. 4 SGB V und – vorsorglich – auf Zustimmung nach § 13 Abs. 5 SGB V;\n\nb) die Einlegung und Begründung von Widersprüchen (§ 84 SGG) sowie die Vertretung im Widerspruchsverfahren (§ 78 SGG);\n\nc) die Entgegennahme von Bescheiden, Schriftsätzen und sonstigen Erklärungen (Empfangs- und Zustellvollmacht) mit Weiterleitung an mich unter Hinweis auf laufende Fristen;\n\nd) die Einholung von Auskünften, medizinischen Unterlagen und Gutachten sowie die Akteneinsicht (§ 25 SGB X).\n\nGerichtliche Schritte und die Beauftragung von Rechtsanwältinnen und Rechtsanwälten erfolgen nur nach vorheriger Abstimmung mit mir; die Kosten einer von der Klinik zur Durchsetzung der abgetretenen Ansprüche veranlassten anwaltlichen Vertretung trägt die Klinik. Die Vollmacht gilt bis zum Abschluss des Verfahrens und kann jederzeit mit Wirkung für die Zukunft widerrufen werden.",
+   "bezeichnung": "§ 3 Verfahrens- und Empfangsvollmacht",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b7",
+   "typ": "text",
+   "text": "Ich entbinde die mich behandelnden Ärztinnen und Ärzte sowie die weiteren Leistungserbringer – insbesondere meinen Hausarzt sowie die von der Klinik hinzugezogenen Partner für Radiologie, Labor, Anästhesie, Histopathologie und Handtherapie – von der ärztlichen bzw. beruflichen Schweigepflicht (§ 203 StGB) gegenüber der Regeneration Clinic SIA und der nach § 3 bevollmächtigten Stelle sowie gegenüber meiner Krankenkasse und dem Medizinischen Dienst, soweit dies zur Behandlung, zur Abrechnung und zur Durchsetzung der Erstattungsansprüche erforderlich ist. Zugleich erteile ich der Regeneration Clinic SIA meine schriftliche Einwilligung im Sinne von § 10 Abs. 2 des lettischen Patientenrechtegesetzes (Pacientu tiesību likums), meine Patientendaten – einschließlich der Fotodokumentation der Hände – an die vorgenannten Stellen weiterzugeben, und entbinde die für die Klinik tätigen Ärztinnen, Ärzte und Fachkräfte insoweit von ihrer nach lettischem Recht bestehenden Verschwiegenheitspflicht.",
+   "bezeichnung": "§ 4 Schweigepflichtentbindung",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b8",
+   "typ": "text",
+   "text": "(1) Verantwortliche: Regeneration Clinic SIA, Jāņa Asara iela 3, LV-1009 Rīga, Lettland, Reg.-Nr. 40203593175, als in Lettland zugelassene Heilbehandlungseinrichtung (Kontaktdaten siehe Briefkopf und Fußzeile). Datenarten: Identifikations-, Versicherungs- und Kontaktdaten sowie Gesundheitsdaten (Diagnosen, Befunde, Bildgebung, Fotodokumentation, Labor-, Operations- und Anästhesieunterlagen, Abrechnungs- und Verfahrensunterlagen).\n\n(2) Zwecke: Diagnostik, ambulante und tagesstationäre Behandlung einschließlich Nachsorge; Abrechnung und Kostenerstattung; Vertretung im Verwaltungs- und Widerspruchsverfahren; Rechtsdurchsetzung; Erfüllung gesetzlicher Aufbewahrungspflichten.\n\n(3) Rechtsgrundlagen: Art. 6 Abs. 1 lit. a, b und f DSGVO; Art. 9 Abs. 2 lit. a, f und h DSGVO, jeweils in Verbindung mit dem lettischen Gesetz über die Verarbeitung personenbezogener Daten natürlicher Personen (Fizisko personu datu apstrādes likums) und § 10 Pacientu tiesību likums. Für die Datenverarbeitung durch die deutschen Leistungsträger gelten ergänzend §§ 67 ff. SGB X.\n\n(4) Empfänger: meine Krankenkasse und der Medizinische Dienst; mein Hausarzt sowie die hinzugezogenen Leistungspartner; im Streitfall mandatierte Rechtsanwälte, Gerichte und Behörden. Eine Übermittlung in Staaten außerhalb der Europäischen Union findet nicht statt.\n\n(5) Speicherdauer: im Rahmen der gesetzlichen Aufbewahrungsfristen für medizinische Dokumentation nach lettischem Recht; abrechnungs- und verfahrensrelevante Unterlagen bis zum rechtskräftigen Abschluss.\n\n(6) Betroffenenrechte: Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit sowie das Recht auf Beschwerde bei einer Aufsichtsbehörde; zuständige Aufsichtsbehörde für die Klinik ist die lettische Datenschutzbehörde Datu valsts inspekcija (www.dvi.gov.lv).\n\n(7) Widerruf: Die Einwilligung ist jederzeit mit Wirkung für die Zukunft widerrufbar (Art. 7 Abs. 3 DSGVO). Der Widerruf berührt weder die Rechtmäßigkeit der bis dahin erfolgten Verarbeitung noch Verarbeitungen, die zur Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen erforderlich sind (Art. 9 Abs. 2 lit. f DSGVO). Datenschutz-Kontakt: info@regeneration-clinic.eu.",
+   "bezeichnung": "§ 5 Datenschutz (DSGVO)",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b9",
+   "typ": "text",
+   "text": "Zulässige Kommunikationswege (Nichtgewünschtes bitte streichen):\n☐ Brief ☐ Telefon ☐ E-Mail (bevorzugt) ☐ Messenger (WhatsApp/Signal) ☐ Gesicherte Portale\nEinwilligung in unverschlüsselte E-Mail- und Messenger-Kommunikation: Mir ist bekannt, dass unverschlüsselte Übermittlungen keine vollständige Vertraulichkeit gewährleisten. Ich willige in die Übermittlung – auch von Gesundheitsdaten – per E-Mail und Messenger ein (Art. 6 Abs. 1 lit. a, Art. 9 Abs. 2 lit. a DSGVO); auf Wunsch erfolgt die Übermittlung verschlüsselt bzw. passwortgeschützt oder per Briefpost. Diese Einwilligung ist jederzeit mit Wirkung für die Zukunft widerrufbar. Medizinische Notfälle sind nicht per E-Mail oder Messenger, sondern unverzüglich telefonisch bzw. über den Notruf zu melden.",
+   "bezeichnung": "§ 6 Kommunikation",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b10",
+   "typ": "text",
+   "text": "Diese Erklärung gilt ab Unterzeichnung für den gesamten vorstehend bezeichneten Versorgungsfall einschließlich Nachsorge und bleibt wirksam, solange Behandlung, Kostenerstattung, Widerspruch oder Rechtsdurchsetzung aus diesem Fall anhängig sind. Ein Widerruf ist jederzeit schriftlich mit Wirkung für die Zukunft möglich; bereits erbrachte Leistungen, entstandene Zahlungs- und Weiterleitungspflichten sowie gesetzliche Aufbewahrungspflichten bleiben unberührt. Für das Behandlungsverhältnis mit der Regeneration Clinic SIA als Heilbehandlungseinrichtung gilt lettisches Recht; für die Ansprüche gegen die deutsche Krankenkasse und das Verwaltungs- und Widerspruchsverfahren gilt deutsches Sozialrecht (SGB V, SGB X, SGG). Sollte eine Bestimmung dieser Erklärung unwirksam sein oder werden, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt.\n\nOrt / Datum: ________________________________________",
+   "bezeichnung": "§ 7 Geltungsdauer, Widerruf, anwendbares Recht, salvatorische Klausel",
+   "optionen": {
+    "ueberschrift": true
+   }
+  },
+  {
+   "id": "b11",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Unterschrift Patient/in, (Versicherte/r – vollständig lesbar)",
+   "optionen": {
+    "nicht_teilen": true
+   }
+  },
+  {
+   "id": "b12",
+   "typ": "unterschrift",
+   "bezeichnung": "Unterschrift",
+   "linie": "Prof. Dr. Markus Masin, Director, Regeneration Clinic SIA – Annahme der Abtretung",
+   "optionen": {
+    "nicht_teilen": true,
+    "neben_vorherigem": "haelfte"
+   }
+  },
+  {
+   "id": "b13",
+   "typ": "text",
+   "text": "Hinweis zur Verwendung: Diese unterzeichnete Erklärung ist allen Anträgen, Widersprüchen und Schriftsätzen an die Krankenkasse als Anlage 1 beizufügen; alle Eingaben erfolgen im Namen der versicherten Person. Eine Kopie verbleibt in der Patientenakte der Regeneration Clinic SIA.",
+   "bezeichnung": "Text"
+  },
+  {
+   "id": "b14",
+   "typ": "fusszeile",
+   "bezeichnung": "Fußzeile",
+   "text": "{{Absender.Name}} · {{Absender.Straße}} · {{Absender.PLZ_Ort}}\n{{Absender.Telefon}} · {{Absender.E-Mail}}\n{{Absender.Fußzeile}}",
+   "rechts": "{Seite}/{Seiten}"
+  }
+ ]
+}

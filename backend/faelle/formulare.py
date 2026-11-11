@@ -18,7 +18,11 @@ PARTNER = ("Kooperations-/Infrastrukturpartner", "{{Fall.Kooperationspartner}}")
 # Vorlage → [(Anfang der Feldbezeichnung, neuer Wert)] in den Datenfeldern
 FELDER = {
     "eigen-rgc-f01": [AUFNAHME, PARTNER],
-    "eigen-rgc-f02": [("Krankenkasse (Name, Anschrift)", "{{Fall.Kostenträger}}"), AUFNAHME, PARTNER],
+    # Patientenerklärung GKV ambulant/tagesstationär (ersetzt die Fassung „Stundung“ V5, 11.11.2026)
+    "eigen-rgc-f02": [("Unterzeichnende/r", "{{Patient.Name}}"),
+                      ("Krankenkasse / Versichertennummer", "{{Fall.Kostenträger}} / {{Fall.Versichertennummer}}"),
+                      ("Behandlungsanlass", "{{Fall.Diagnose}}"), ("Behandelnder Facharzt", "{{Fall.Arzt}}"),
+                      ("Hausarzt", "{{Patient.Hausarzt}}")],
     "eigen-rgc-f03": [("UV-Träger", "{{Fall.Kostenträger}}"), ("Aktenzeichen des UV-Trägers", "{{Fall.Aktenzeichen}}"),
                       AUFNAHME, PARTNER],
     "eigen-rgc-f04": [("Versicherte Person", "{{Patient.Name}}"), ("Private Krankenversicherung", "{{Fall.Kostenträger}}"),
