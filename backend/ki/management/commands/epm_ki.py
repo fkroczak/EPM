@@ -151,13 +151,15 @@ class Dienst:
             self.laufend.pop(vid)
             self.vorgaenge.pop(vid, None)
         self._modell_schlaf(e)
-        if e.parallel <= 0:
-            return
-        # KI-Chat: jemand wartet am Bildschirm – immer eine Antwort zur Zeit, auch wenn Dokumente alle Plätze belegen
-        if not any(k <= CHAT_SCHLUESSEL for k in self.laufend):
+        # KI-Chat: jemand wartet am Bildschirm – immer eine Antwort zur Zeit, auch wenn Dokumente alle Plätze belegen,
+        # und auch in einer Pause wegen Auslastung (die macht meist die KI selbst); nicht während der Sicherung, bei
+        # ausgeschalteter KI oder ohne bereites Modell
+        if self._chat_erlaubt(e) and not any(k <= CHAT_SCHLUESSEL for k in self.laufend):
             n = chat.holen()
             if n is not None:
                 self._starten(CHAT_SCHLUESSEL - n.pk, self._chat, n)
+        if e.parallel <= 0:
+            return
         # Berichtsentwürfe sind ausdrücklich angefordert: Vorrang, auch tagsüber
         if len(self.laufend) < e.parallel:
             b = dienst.bericht_holen()
@@ -176,6 +178,13 @@ class Dienst:
                 break
             self.vorgaenge[v.pk] = v
             self._starten(v.pk, self._vorgang, v)
+
+    def _chat_erlaubt(self, e: Entscheidung) -> bool:
+        if e.parallel > 0:
+            return True
+        if e.modus != "pause" or (e.last or {}).get("sicherung_laeuft"):
+            return False
+        return self.client is None or self.modell_bereit
 
     def _modell_schlaf(self, e: Entscheidung):
         """Tagsüber ohne Arbeit gibt der Modell-Container seinen Speicher frei; kommt Arbeit, wird er geweckt."""

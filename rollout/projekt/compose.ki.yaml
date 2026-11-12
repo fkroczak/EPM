@@ -48,7 +48,7 @@ services:
     environment:
       KI_THREADS: ${KI_THREADS:-4}
       KI_KONTEXT: ${KI_KONTEXT:-16384}
-      KI_SLOTS: ${KI_SLOTS:-1}
+      KI_SLOTS: ${KI_SLOTS:-2}   # 2: ein Platz bleibt für den Chat frei, solange nachts 1 Dokument läuft
       KI_MODELL_DATEI: ${KI_MODELL_DATEI:-}
       KI_PROJEKTOR_DATEI: ${KI_PROJEKTOR_DATEI:-}
       KI_MODELL_SHA256: ${KI_MODELL_SHA256:-}

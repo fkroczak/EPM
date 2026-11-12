@@ -5,6 +5,7 @@
  * Status nie nur über Farbe: jede Ampel hat Symbol und Text.
  */
 import { useState } from "react";
+import { containerBewertung } from "@/lib/container";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -55,10 +56,10 @@ export function ampeln(sys: Uebersicht | undefined, backup: BackupDaten | undefi
       wert: sys.agent.erreichbar ? "meldet sich" : "meldet sich nicht",
       text: sys.agent.erreichbar ? `zuletzt gemessen ${relativ(sys.host?.zeit, true)}${h?.trocken ? " · Probelauf" : ""}` : "Aufträge an den Server warten, bis er wieder läuft" });
     const c = h?.container;
-    const schlecht = (c?.liste ?? []).filter((x) => x.zustand !== "running" || (x.gesundheit && x.gesundheit !== "healthy"));
+    const schlecht = (c?.liste ?? []).filter((x) => !containerBewertung(x).gut);
     liste.push({ id: "dienste", titel: "Dienste", zu: "/admin/system?reiter=wartung",
       stand: !c?.verfuegbar ? "unbekannt" : schlecht.length ? "fehler" : "ok",
-      wert: !c?.verfuegbar ? "—" : schlecht.length ? `${schlecht.length} gestört` : `${c.liste.length} laufen`,
+      wert: !c?.verfuegbar ? "—" : schlecht.length ? `${schlecht.length} gestört` : `${c.liste.filter((x) => x.zustand === "running").length} laufen`,
       text: schlecht.length ? schlecht.map((x) => `${x.dienst}: ${x.zustand}${x.gesundheit ? ` (${x.gesundheit})` : ""}`).join(", ") : "Container backend, web, ocr, db" });
     const platten = h?.platten?.length ? h.platten : sys.container.platten;
     const p = platten.find((x) => x.bezeichnung === "EPM-Daten") ?? platten[0];

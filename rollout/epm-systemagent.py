@@ -680,7 +680,9 @@ class Agent:
                     pass
         for e in eintraege:
             liste.append({"dienst": e.get("Service", ""), "name": e.get("Name", ""), "zustand": e.get("State", ""),
-                          "gesundheit": e.get("Health", ""), "image": e.get("Image", ""), "status": e.get("Status", "")})
+                          "gesundheit": e.get("Health", ""), "image": e.get("Image", ""), "status": e.get("Status", ""),
+                          # Einmal-Container (ki-init): Ende mit 0 ist „erledigt“, kein Fehler
+                          "exitcode": e.get("ExitCode")})
         return {"verfuegbar": True, "liste": sorted(liste, key=lambda x: x["dienst"])}
 
     def sicherung(self):

@@ -5,6 +5,7 @@
  * Update und Neustart: Bestätigung mit Admin-Passwort und 2FA, vorher automatische Sicherung, Benutzer werden gewarnt.
  */
 import { TechnikKarte } from "@/components/TechnikKarte";
+import { containerBewertung } from "@/lib/container";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
@@ -48,7 +49,7 @@ export type HostStatus = {
     listen_am?: string | null; hinweis?: string };
   neustart_noetig?: boolean; neustart_pakete?: string[];
   container?: { verfuegbar: boolean; liste: { dienst: string; name: string; zustand: string; gesundheit: string; image: string;
-    status: string }[]; hinweis?: string };
+    status: string; exitcode?: number | null }[]; hinweis?: string };
   sicherung?: { verfuegbar: boolean; anzahl?: number; gesamt?: number; letzte_am?: string | null; letzte_groesse?: number };
   dienste?: Record<string, string>;
   // Wartung ohne SSH (F179)
@@ -844,8 +845,7 @@ export function System() {
                       <thead><tr><th className="th">Dienst</th><th className="th">Zustand</th><th className="th">Image</th></tr></thead>
                       <tbody>{h.container.liste.map((c) => (
                         <tr key={c.name}><td className="td font-medium">{c.dienst}</td>
-                          <td className="td"><Chip art={c.zustand === "running" && (!c.gesundheit || c.gesundheit === "healthy") ? "ok" : "fehler"}>
-                            {c.zustand === "running" ? "läuft" : c.zustand}{c.gesundheit ? ` · ${c.gesundheit === "healthy" ? "gesund" : c.gesundheit}` : ""}</Chip>
+                          <td className="td"><Chip art={containerBewertung(c).gut ? "ok" : "fehler"}>{containerBewertung(c).text}</Chip>
                             <span className="text-xs gedaempft ml-1.5">{c.status}</span></td>
                           <td className="td num text-[0.75rem]">{c.image}</td></tr>))}</tbody>
                     </table>

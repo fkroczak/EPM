@@ -13,6 +13,7 @@ import datetime as dt
 import logging
 import os
 import re
+import time
 
 from django.db import transaction
 from django.utils import timezone
@@ -35,6 +36,7 @@ RAHMEN = (
 MAX_ZEICHEN = 8000          # je Nachricht
 VERLAUF_ZEICHEN = 16000     # so viel Verlauf geht höchstens mit (Kontext des Modells)
 MAX_TOKENS = 1500
+ZWISCHENSTAND_S = 1.5       # so oft geht der bisher geschriebene Text in die Datenbank (Anzeige beim Schreiben)
 MAX_VERSUCHE = 3            # Modell gerade nicht erreichbar (schläft, startet neu): zurück in die Queue
 WARTEN_HOECHSTENS = dt.timedelta(minutes=15)
 
@@ -87,21 +89,31 @@ def beantworten(nachricht: KiChatNachricht, client: Client | None) -> KiChatNach
         nachricht.save(update_fields=["status", "fehler", "fertig_am"])
         return nachricht
     nachrichten = verlauf(nachricht)
+    zuletzt = [0.0]
+
+    def zwischenstand(text: str):
+        # höchstens alle 1,5 s in die Datenbank – die Oberfläche fragt ohnehin nur so oft nach
+        if time.monotonic() - zuletzt[0] >= ZWISCHENSTAND_S:
+            zuletzt[0] = time.monotonic()
+            KiChatNachricht.objects.filter(pk=nachricht.pk, status=N.Status.LAEUFT).update(
+                text=text, lebenszeichen=timezone.now())
+
     try:
         a = client.gespraech(systemanweisung(nachricht), nachrichten, max_tokens=MAX_TOKENS,
-                             temperatur=float(nachricht.temperatur))
+                             temperatur=float(nachricht.temperatur), bei_teil=zwischenstand)
     except ModellFehler as e:
         # meist vorübergehend (Modell schläft, lädt oder startet neu): zurück in die Queue, der Dienst prüft das
         # Modell neu und versucht es noch einmal – erst nach MAX_VERSUCHE als Fehler
         nachricht.versuche += 1
         nachricht.fehler = str(e)[:2000]
+        nachricht.text = ""
         if nachricht.versuche < MAX_VERSUCHE:
             nachricht.status = N.Status.WARTET
-            nachricht.save(update_fields=["versuche", "fehler", "status"])
+            nachricht.save(update_fields=["versuche", "fehler", "status", "text"])
         else:
             nachricht.status, nachricht.fertig_am = N.Status.FEHLER, timezone.now()
             nachricht.fehler = f"Das KI-Modell hat {MAX_VERSUCHE}-mal nicht geantwortet ({e})."[:2000]
-            nachricht.save(update_fields=["versuche", "fehler", "status", "fertig_am"])
+            nachricht.save(update_fields=["versuche", "fehler", "status", "fertig_am", "text"])
         raise
     eingaben = [m["content"] for m in nachrichten if m["role"] == "user"]
     nachricht.text = a.text

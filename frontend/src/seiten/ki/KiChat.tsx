@@ -34,7 +34,9 @@ export function KiChat() {
   const chat = useQuery({
     queryKey: ["ki", "chat", aktiv], enabled: aktiv !== null,
     queryFn: () => api<ChatVoll>(`ki/chats/${aktiv}/`, { hintergrund: true }),
-    refetchInterval: (q) => (q.state.data?.nachrichten.some((n) => n.status === "wartet" || n.status === "laeuft") ? 3000 : false),
+    // schreibt die KI gerade: alle 1,5 s (Text erscheint Stück für Stück), wartet sie: alle 3 s
+    refetchInterval: (q) => (q.state.data?.nachrichten.some((n) => n.status === "laeuft") ? 1500
+      : q.state.data?.nachrichten.some((n) => n.status === "wartet") ? 3000 : false),
   });
   // Standardvorlage: die erste („Medizinisch formulieren“); bei einem bestehenden Chat dessen Vorlage
   useEffect(() => {
@@ -44,7 +46,8 @@ export function KiChat() {
   const anzahl = chat.data?.nachrichten.length ?? 0;
   const wartet = !!chat.data?.nachrichten.some((n) => n.status === "wartet" || n.status === "laeuft");
   // nur im Verlauf nach unten scrollen – die Seite und das Eingabefeld bleiben stehen
-  useEffect(() => { const v = verlaufRef.current; if (v) v.scrollTop = v.scrollHeight; }, [anzahl, wartet, aktiv]);
+  const laenge = chat.data?.nachrichten.at(-1)?.text.length ?? 0;
+  useEffect(() => { const v = verlaufRef.current; if (v) v.scrollTop = v.scrollHeight; }, [anzahl, wartet, aktiv, laenge]);
   useEffect(() => { if (!wartet) void qc.invalidateQueries({ queryKey: ["ki", "chats"] }); }, [wartet, qc]);
 
   const senden = useMutation({
@@ -145,7 +148,9 @@ function Blase({ n }: { n: Nachricht }) {
     <div className={cx("flex flex-col gap-1 max-w-[52rem]", nutzer ? "self-end items-end" : "self-start")} data-testid={`ki-nachricht-${n.rolle}`}>
       <span className="text-[0.75rem] gedaempft">{nutzer ? "Sie" : `KI${n.vorlage_name ? ` · ${n.vorlage_name}` : ""}`}</span>
       <div className={cx("rounded-lg px-3 py-2 text-sm whitespace-pre-wrap", nutzer ? "bg-akzent-weich" : "bg-fein")}>
-        {n.status === "wartet" || n.status === "laeuft"
+        {n.status === "laeuft" && n.text
+          ? <>{n.text}<span className="inline-flex items-center gap-1.5 gedaempft ml-1.5 align-middle"><Ladekreis groesse={12} /></span></>
+          : n.status === "wartet" || n.status === "laeuft"
           ? <span className="inline-flex items-center gap-2 gedaempft"><Ladekreis />{n.status === "wartet" ? "wartet auf den KI-Dienst …" : "KI schreibt …"}</span>
           : n.status === "fehler" ? <span className="fehlertext">Keine Antwort: {n.fehler}</span>
           : n.text}
