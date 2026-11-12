@@ -19,10 +19,11 @@ import { LOGO_URL, Logo } from "@/components/layout/logo";
 import { DokumentvorlagenBereich } from "@/seiten/admin/Dokumentvorlagen";
 import { KatalogeBereich } from "@/seiten/admin/Kataloge";
 import { AnlagenBereich } from "@/seiten/admin/Anlagen";
+import { KiPromptsBereich } from "@/seiten/admin/KiPrompts";
 import { ListenBereich } from "@/seiten/admin/Auswahllisten";
 import { VorlagenStart } from "@/seiten/admin/VorlagenStart";
 
-type Bereich = "start" | "briefkopf" | "listen" | "kataloge" | "grenzwerte" | "anlagen" | "dokumente";
+type Bereich = "start" | "briefkopf" | "listen" | "kataloge" | "grenzwerte" | "anlagen" | "ki" | "dokumente";
 type SpeichernRef = { current: (() => void) | null };
 
 const ABSENDER_FELDER: { k: keyof Absender; label: string; span: number; num?: boolean }[] = [
@@ -371,7 +372,7 @@ function GrenzwerteBereich({ speichernRef }: { speichernRef: SpeichernRef }) {
   );
 }
 
-const BEREICHE: Bereich[] = ["start", "briefkopf", "listen", "kataloge", "grenzwerte", "anlagen", "dokumente"];
+const BEREICHE: Bereich[] = ["start", "briefkopf", "listen", "kataloge", "grenzwerte", "anlagen", "ki", "dokumente"];
 
 export function Vorlagen() {
   // Jeder Bereich hat eine Adresse (/admin/vorlagen?bereich=listen&liste=vitamine), damit die Übersicht und die Suche
@@ -413,7 +414,7 @@ export function Vorlagen() {
         werte={[{ wert: "start", text: "Übersicht" }, { wert: "dokumente", text: "Dokumentvorlagen" },
           { wert: "briefkopf", text: "Briefkopf und Logo" }, { wert: "listen", text: "Auswahllisten" },
           { wert: "kataloge", text: "Labor und Diagnosen" }, { wert: "grenzwerte", text: "Grenzwerte" },
-          { wert: "anlagen", text: "Anlagen für E-Mails" }]} />
+          { wert: "anlagen", text: "Anlagen für E-Mails" }, { wert: "ki", text: "KI-Prompts" }]} />
       {bereich === "start" ? <VorlagenStart />
         : bereich === "briefkopf" ? <BriefkopfBereich speichernRef={speichern} />
         : bereich === "listen" ? <ListenBereich liste={parameter.get("liste")}
@@ -421,6 +422,7 @@ export function Vorlagen() {
         : bereich === "kataloge" ? <KatalogeBereich />
         : bereich === "grenzwerte" ? <GrenzwerteBereich speichernRef={speichern} />
         : bereich === "anlagen" ? <AnlagenBereich />
+        : bereich === "ki" ? <KiPromptsBereich />
         : <DokumentvorlagenBereich aktionenZiel={aktionen} onGeaendert={merkeGeaendert} />}
     </Seite>
   );

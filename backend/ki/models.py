@@ -492,3 +492,79 @@ class KiEvaluationslauf(models.Model):
         verbose_name = "KI-Evaluationslauf"
         verbose_name_plural = "KI-Evaluationsläufe"
         ordering = ["-gestartet_am", "-id"]
+
+
+class KiPromptvorlage(models.Model):
+    """Vorgefertigte Anweisung für den KI-Chat (Administration › Vorlagen › KI-Prompts, Recht „Vorlagen pflegen“).
+
+    Die Anweisung kommt **hinter** den festen Rahmen aus ``ki/chat.py`` (nichts erfinden, keine Diagnose …): eine
+    Vorlage kann die Aufgabe genauer beschreiben, den Rahmen aber nicht aufheben. Feste Anweisung + niedrige
+    Temperatur = gleichbleibende Ergebnisse."""
+
+    name = models.CharField(max_length=100, unique=True)
+    beschreibung = models.CharField(max_length=300, blank=True, help_text="Wofür? – steht im Chat unter der Auswahl")
+    anweisung = models.TextField(help_text="Aufgabe an die KI (Systemanweisung, Teil 2)")
+    temperatur = models.DecimalField(max_digits=3, decimal_places=2, default=0.1,
+                                     help_text="0 = immer gleich formuliert, 1 = freier")
+    aktiv = models.BooleanField(default=True)
+    reihenfolge = models.PositiveSmallIntegerField(default=100)
+    mitgeliefert = models.BooleanField(default=False)
+    geaendert_am = models.DateTimeField(auto_now=True)
+    geaendert_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                                      related_name="+")
+
+    class Meta:
+        verbose_name = "KI-Promptvorlage"
+        verbose_name_plural = "KI-Promptvorlagen"
+        ordering = ["reihenfolge", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class KiChat(models.Model):
+    """Unterhaltung mit der KI – **nur für die Person sichtbar, die sie begonnen hat** (auch nicht für Admins)."""
+
+    benutzer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="ki_chats")
+    firma = models.ForeignKey("stammdaten.Firma", on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    titel = models.CharField(max_length=200, blank=True)
+    vorlage = models.ForeignKey(KiPromptvorlage, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    erstellt_am = models.DateTimeField(auto_now_add=True)
+    aktualisiert_am = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        verbose_name = "KI-Chat"
+        verbose_name_plural = "KI-Chats"
+        ordering = ["-aktualisiert_am", "-id"]
+
+
+class KiChatNachricht(models.Model):
+    class Rolle(models.TextChoices):
+        NUTZER = "nutzer", "Sie"
+        KI = "ki", "KI"
+
+    class Status(models.TextChoices):
+        WARTET = "wartet", "wartet auf den KI-Dienst"
+        LAEUFT = "laeuft", "wird geschrieben"
+        FERTIG = "fertig", "fertig"
+        FEHLER = "fehler", "Fehler"
+
+    chat = models.ForeignKey(KiChat, on_delete=models.CASCADE, related_name="nachrichten")
+    rolle = models.CharField(max_length=6, choices=Rolle.choices)
+    text = models.TextField(blank=True)
+    status = models.CharField(max_length=6, choices=Status.choices, default=Status.FERTIG, db_index=True)
+    vorlage_name = models.CharField(max_length=100, blank=True)
+    anweisung = models.TextField(blank=True, help_text="Anweisung der Vorlage zum Zeitpunkt der Anfrage")
+    temperatur = models.DecimalField(max_digits=3, decimal_places=2, default=0.1)
+    pruefung = models.JSONField(default=dict, blank=True, help_text="Markierungen der Gegenprüfung")
+    fehler = models.TextField(blank=True)
+    modell = models.CharField(max_length=200, blank=True)
+    dauer_s = models.FloatField(null=True, blank=True)
+    erstellt_am = models.DateTimeField(auto_now_add=True)
+    lebenszeichen = models.DateTimeField(null=True, blank=True)
+    fertig_am = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "KI-Chatnachricht"
+        verbose_name_plural = "KI-Chatnachrichten"
+        ordering = ["erstellt_am", "id"]
