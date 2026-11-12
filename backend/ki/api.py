@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections import Counter
+from decimal import Decimal
 
 from django.db import transaction
 from django.db.models import Count, Q
@@ -27,11 +28,11 @@ from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import benutzername, patienten_fuer, pruefe_schreibbereich
 from epm.pagination import Seiten
 
-from . import eingang, uebernahme
+from . import chat, eingang, uebernahme
 from .pipeline import alte_felder_entfernen
 from .pruefung import PLANFELDER
-from .models import (Dokumenttyp, KiBerichtsauftrag, KiEinstellung, KiEvaluationsfall, KiEvaluationslauf, KiFeld,
-                     KiHinweis, KiKorrektur, KiModellversion, KiVorgang)
+from .models import (Dokumenttyp, KiBerichtsauftrag, KiChat, KiChatNachricht, KiEinstellung, KiEvaluationsfall,
+                     KiEvaluationslauf, KiFeld, KiHinweis, KiKorrektur, KiModellversion, KiPromptvorlage, KiVorgang)
 
 A = SystemEreignis.Art
 S = KiVorgang.Status
@@ -575,6 +576,177 @@ class KiBerichtViewSet(viewsets.GenericViewSet):
         protokolliere(A.KI, request, objekt=f"Berichtsentwurf {b.pk}", aktion="bericht_verworfen",
                       patient_id=b.patient_id)
         return Response({"status": b.status})
+
+
+# ---------------------------------------------------------------------------------------------- KI-Chat
+class PromptvorlageSerializer(serializers.ModelSerializer):
+    geaendert_von_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = KiPromptvorlage
+        fields = ["id", "name", "beschreibung", "anweisung", "temperatur", "aktiv", "reihenfolge", "mitgeliefert",
+                  "geaendert_am", "geaendert_von_name"]
+        read_only_fields = ["mitgeliefert", "geaendert_am"]
+
+    def get_geaendert_von_name(self, obj):
+        return benutzername(obj.geaendert_von) if obj.geaendert_von_id else None
+
+    def validate_temperatur(self, wert):
+        if not (0 <= wert <= 1):
+            raise serializers.ValidationError("Erlaubt: 0–1.")
+        return wert
+
+    def validate_anweisung(self, wert):
+        if not wert.strip():
+            raise serializers.ValidationError("Bitte eine Anweisung eingeben.")
+        if len(wert) > 4000:
+            raise serializers.ValidationError("Höchstens 4000 Zeichen.")
+        return wert.strip()
+
+
+class KiPromptvorlageViewSet(viewsets.ModelViewSet):
+    """Promptvorlagen des KI-Chats: lesen mit „KI ansehen“ oder „Vorlagen pflegen“, ändern nur „Vorlagen pflegen“
+    (Administration › Vorlagen › KI-Prompts). Mitgelieferte Vorlagen lassen sich ändern und ausblenden, nicht löschen."""
+
+    permission_classes = [Angemeldet]
+    serializer_class = PromptvorlageSerializer
+    pagination_class = None
+
+    def get_queryset(self):
+        u = self.request.user
+        if not (u.hat_recht("ki_ansehen") or u.hat_recht("vorlagen_pflegen")):
+            raise PermissionError("Dafür fehlt das Recht „KI (Experimentell): ansehen“.")
+        qs = KiPromptvorlage.objects.select_related("geaendert_von")
+        if self.request.query_params.get("alle") != "1":
+            qs = qs.filter(aktiv=True)
+        return qs
+
+    def perform_create(self, serializer):
+        _recht(self.request.user, "vorlagen_pflegen")
+        v = serializer.save(geaendert_von=self.request.user)
+        protokolliere(A.KI, self.request, objekt=f"KI-Promptvorlage {v.pk}", aktion="promptvorlage_angelegt",
+                      name=v.name)
+
+    def perform_update(self, serializer):
+        _recht(self.request.user, "vorlagen_pflegen")
+        v = serializer.save(geaendert_von=self.request.user)
+        protokolliere(A.KI, self.request, objekt=f"KI-Promptvorlage {v.pk}", aktion="promptvorlage_geaendert",
+                      name=v.name, aktiv=v.aktiv)
+
+    def perform_destroy(self, instance):
+        _recht(self.request.user, "vorlagen_pflegen")
+        if instance.mitgeliefert:
+            raise serializers.ValidationError({"fehler": "Mitgelieferte Vorlagen lassen sich nur ausblenden."})
+        protokolliere(A.KI, self.request, objekt=f"KI-Promptvorlage {instance.pk}", aktion="promptvorlage_geloescht",
+                      name=instance.name)
+        instance.delete()
+
+
+class ChatNachrichtSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KiChatNachricht
+        fields = ["id", "rolle", "text", "status", "vorlage_name", "pruefung", "fehler", "modell", "dauer_s",
+                  "erstellt_am", "fertig_am"]
+
+
+class ChatSerializer(serializers.ModelSerializer):
+    vorlage_name = serializers.SerializerMethodField()
+    wartet = serializers.SerializerMethodField()
+
+    class Meta:
+        model = KiChat
+        fields = ["id", "titel", "vorlage", "vorlage_name", "erstellt_am", "aktualisiert_am", "wartet"]
+
+    def get_vorlage_name(self, obj):
+        return obj.vorlage.name if obj.vorlage_id else None
+
+    def get_wartet(self, obj):
+        return obj.nachrichten.filter(status__in=[KiChatNachricht.Status.WARTET,
+                                                  KiChatNachricht.Status.LAEUFT]).exists()
+
+
+class KiChatViewSet(viewsets.GenericViewSet):
+    """KI-Chat: ``GET/POST /api/ki/chats/``, ``GET/DELETE …/{id}/``, ``POST …/{id}/nachricht/`` {text, vorlage}.
+
+    Jede Person sieht **ausschließlich ihre eigenen** Unterhaltungen – der Filter ``benutzer=request.user`` gilt für
+    alle Rollen, auch Admins; fremde Chats antworten mit 404. Inhalte stehen nicht im Audit-Log."""
+
+    permission_classes = [AnsehenRecht]
+    serializer_class = ChatSerializer
+
+    def get_queryset(self):
+        return KiChat.objects.filter(benutzer=self.request.user).select_related("vorlage")
+
+    def _chat(self, pk) -> KiChat | None:
+        return self.get_queryset().filter(pk=pk).first()
+
+    def _antwort(self, c: KiChat):
+        return {**ChatSerializer(c).data,
+                "nachrichten": ChatNachrichtSerializer(c.nachrichten.all(), many=True).data,
+                "aufbewahrung_tage": chat.aufbewahrung_tage()}
+
+    def list(self, request):
+        return Response(ChatSerializer(self.get_queryset()[:100], many=True).data)
+
+    def retrieve(self, request, pk=None):
+        c = self._chat(pk)
+        if c is None:
+            return _fehler("Nicht gefunden.", status.HTTP_404_NOT_FOUND)
+        return Response(self._antwort(c))
+
+    def create(self, request):
+        _recht(request.user, "ki_berichte")
+        vorlage = self._vorlage(request.data.get("vorlage"))
+        c = KiChat.objects.create(benutzer=request.user, firma=getattr(request.user, "firma", None), vorlage=vorlage,
+                                  titel=str(request.data.get("titel") or "")[:200])
+        protokolliere(A.KI, request, objekt=f"KI-Chat {c.pk}", aktion="chat_begonnen")
+        return Response(self._antwort(c), status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, pk=None):
+        c = self._chat(pk)
+        if c is None:
+            return _fehler("Nicht gefunden.", status.HTTP_404_NOT_FOUND)
+        c.delete()
+        protokolliere(A.KI, request, objekt=f"KI-Chat {pk}", aktion="chat_geloescht")
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @staticmethod
+    def _vorlage(wert) -> KiPromptvorlage | None:
+        if wert in (None, ""):
+            return None
+        try:
+            return KiPromptvorlage.objects.get(pk=int(wert), aktiv=True)
+        except (KiPromptvorlage.DoesNotExist, TypeError, ValueError):
+            raise serializers.ValidationError({"vorlage": "Unbekannte oder ausgeblendete Vorlage."})
+
+    @action(detail=True, methods=["post"])
+    def nachricht(self, request, pk=None):
+        _recht(request.user, "ki_berichte")
+        text = str(request.data.get("text") or "").strip()
+        if not text:
+            return _fehler("Bitte einen Text eingeben.", feld="text")
+        if len(text) > chat.MAX_ZEICHEN:
+            return _fehler(f"Höchstens {chat.MAX_ZEICHEN} Zeichen je Nachricht.", feld="text")
+        with transaction.atomic():
+            c = self.get_queryset().select_for_update(of=("self",)).filter(pk=pk).first()
+            if c is None:
+                return _fehler("Nicht gefunden.", status.HTTP_404_NOT_FOUND)
+            if c.nachrichten.filter(status__in=[KiChatNachricht.Status.WARTET,
+                                                KiChatNachricht.Status.LAEUFT]).exists():
+                return _fehler("Die KI schreibt noch an der letzten Antwort.", status.HTTP_409_CONFLICT)
+            vorlage = self._vorlage(request.data["vorlage"]) if "vorlage" in request.data else c.vorlage
+            c.vorlage = vorlage
+            if not c.titel:
+                c.titel = " ".join(text.split())[:60]
+            c.save(update_fields=["vorlage", "titel", "aktualisiert_am"])
+            KiChatNachricht.objects.create(chat=c, rolle=KiChatNachricht.Rolle.NUTZER, text=text)
+            KiChatNachricht.objects.create(
+                chat=c, rolle=KiChatNachricht.Rolle.KI, status=KiChatNachricht.Status.WARTET,
+                vorlage_name=vorlage.name if vorlage else "", anweisung=vorlage.anweisung if vorlage else "",
+                temperatur=vorlage.temperatur if vorlage else Decimal("0.10"))
+        protokolliere(A.KI, request, objekt=f"KI-Chat {c.pk}", aktion="chat_nachricht",
+                      vorlage=vorlage.name if vorlage else "", zeichen=len(text))
+        return Response(self._antwort(c), status=status.HTTP_201_CREATED)
 
 
 # ---------------------------------------------------------------------------------------------- Administration

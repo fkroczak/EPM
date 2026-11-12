@@ -32,6 +32,8 @@ erkennt Text (Tesseract/PP-OCR + Vision-Modell Qwen3.5-4B über llama.cpp, nur C
 Infusionspläne, Medikation, Diagnosen und Texte und legt alles in die Prüf-Queue (Menü „KI (Experimentell)“). In die Akte
 kommt nur, was ein Mitarbeiter prüft und bestätigt. Dazu: Hinweise Labor ↔ Infusionsplan (Akte › KI), Berichtsentwürfe
 auf Anforderung, Qualitäts-Dashboard, Modellwechsel mit Evaluation und Rollback (Administration › KI).
+**Chat** (12.11.2026): Reiter „Chat“ im Menü KI (Experimentell) – Texte medizinisch formulieren, prüfen, kürzen …
+mit festen Promptvorlagen (Administration › Vorlagen › KI-Prompts); jede Person sieht nur ihre eigenen Chats.
 Einrichten, Modell wählen, laden bzw. hochladen, Grenzen, Benchmark und Ausschalten gehen nach „EPM aktualisieren“
 auch ohne SSH unter Administration › KI › Einrichtung.
 

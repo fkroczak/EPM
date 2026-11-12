@@ -44,6 +44,21 @@ angehängt (`akten_bearbeiten`), Dokumentdatum/-typ → `Dokument` (`eintraege_e
 | `POST berichte/{id}/speichern/` `{"text": "…", "titel": "…"}` | berichte + `eintraege_erfassen` | legt einen `Bericht` im Status Entwurf an (Kennzeichnung + Quellen im Inhalt) |
 | `POST berichte/{id}/verwerfen/` | berichte | |
 
+## KI-Chat (12.11.2026)
+
+Jede Person sieht **nur ihre eigenen** Unterhaltungen (auch Admins keine fremden; fremde → 404). Die Antwort schreibt
+der KI-Dienst (Vorrang vor Dokumenten und Berichten, auch tagsüber; nicht während einer Pause, z. B. Sicherung).
+Systemanweisung = fester Rahmen (`ki/chat.py` `RAHMEN`) + Anweisung der Promptvorlage. Unterhaltungen ohne Änderung
+werden nach `EPM_KI_CHAT_TAGE` (Standard 30) gelöscht; im Audit-Log steht nur, dass gechattet wurde, nie der Text.
+
+| Methode und Pfad | Recht | Beschreibung |
+|---|---|---|
+| `GET chats/` · `GET chats/{id}/` | ansehen | eigene Chats; Detail mit `nachrichten` (`rolle` nutzer/ki, `status` wartet/laeuft/fertig/fehler, `pruefung`: `neue_werte` = Zahlen/Daten, die in keiner Eingabe stehen, `offene_stellen` = Anzahl [?]) |
+| `POST chats/` `{"vorlage": ID, "titel": "…"}` · `DELETE chats/{id}/` | berichte · ansehen | |
+| `POST chats/{id}/nachricht/` `{"text": "…", "vorlage": ID}` | berichte | höchstens 8000 Zeichen; 409, solange die letzte Antwort noch aussteht |
+| `GET vorlagen/[?alle=1]` | ansehen oder `vorlagen_pflegen` | Promptvorlagen (`name`, `beschreibung`, `anweisung`, `temperatur` 0–1, `aktiv`, `reihenfolge`, `mitgeliefert`) |
+| `POST vorlagen/` · `PATCH vorlagen/{id}/` · `DELETE vorlagen/{id}/` | `vorlagen_pflegen` | Oberfläche: Administration › Vorlagen › KI-Prompts; mitgelieferte nur ausblenden, nicht löschen |
+
 ## Administration
 
 | Methode und Pfad | Recht | Beschreibung |

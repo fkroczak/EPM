@@ -1,5 +1,5 @@
 /**
- * Menüpunkt „KI (Experimentell)“ (Auftrag 5): Prüf-Queue aller Dokumente, die der KI-Dienst gelesen hat, mit Filtern,
+ * Menüpunkt „KI (Experimentell)“ (Auftrag 5): Prüf-Queue, Chat (nur eigene Unterhaltungen, 12.11.2026) aller Dokumente, die der KI-Dienst gelesen hat, mit Filtern,
  * Stand des Dienstes und dem Qualitäts-Dashboard aus den Korrekturen der Mitarbeiter (Auftrag 7).
  * Sichtbar ist nur, was zur aktiven Firma gehört.
  */
@@ -16,6 +16,7 @@ import { Icon } from "@/components/ui/icon";
 import { Reiter, ReiterInhalt, useReiter } from "@/components/ui/reiter";
 import { Seite } from "@/components/layout/Shell";
 import { useAuth } from "@/lib/auth";
+import { KiChat } from "@/seiten/ki/KiChat";
 
 const FILTER_STATUS: { wert: string; text: string }[] = [
   { wert: "zur_pruefung,teilweise", text: "Zur Prüfung" },
@@ -50,15 +51,15 @@ export function KiStandKarte({ stand }: { stand?: KiStand }) {
 }
 
 export function KiQueue() {
-  const [reiter, setReiter] = useReiter(["queue", "qualitaet"] as const);
+  const [reiter, setReiter] = useReiter(["queue", "chat", "qualitaet"] as const);
   const stand = useQuery({ queryKey: ["ki", "stand"], queryFn: () => api<KiStand>("ki/stand/", { hintergrund: true }), refetchInterval: 30_000 });
   return (
     <Seite pfad={[{ text: "KI (Experimentell)" }]}>
       <Seitenkopf titel="KI (Experimentell)" unter="Vorschläge der lokalen KI zur Prüfung – nichts geht ohne Ihre Bestätigung in die Akte." />
       <KiStandKarte stand={stand.data} />
       <Reiter label="Bereiche" wert={reiter} onWahl={setReiter}
-        eintraege={[{ wert: "queue", text: "Prüf-Queue" }, { wert: "qualitaet", text: "Qualität" }]} />
-      <ReiterInhalt>{reiter === "queue" ? <Queue /> : <Qualitaet />}</ReiterInhalt>
+        eintraege={[{ wert: "queue", text: "Prüf-Queue" }, { wert: "chat", text: "Chat" }, { wert: "qualitaet", text: "Qualität" }]} />
+      <ReiterInhalt>{reiter === "queue" ? <Queue /> : reiter === "chat" ? <KiChat /> : <Qualitaet />}</ReiterInhalt>
     </Seite>
   );
 }

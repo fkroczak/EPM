@@ -135,3 +135,18 @@ class Client:
             log.warning("Antwort des Modells abgeschnitten (max_tokens=%s)", max_tokens)
         return Antwort(text=text_aus.strip(), dauer_s=round(dauer, 2), modell=str(r.get("model", "")),
                        tokens=r.get("usage") or {})
+
+    def gespraech(self, system: str, nachrichten: list[dict], max_tokens: int = 1500,
+                  temperatur: float = 0.1) -> Antwort:
+        """Chat mit Verlauf: ``nachrichten`` = [{"role": "user"|"assistant", "content": str}, …] (KI-Chat)."""
+        daten = {"messages": [{"role": "system", "content": system}, *nachrichten], "temperature": temperatur,
+                 "max_tokens": max_tokens, "stream": False, "chat_template_kwargs": {"enable_thinking": False}}
+        t0 = time.monotonic()
+        r = self._anfrage("/v1/chat/completions", daten)
+        dauer = time.monotonic() - t0
+        try:
+            text_aus = r["choices"][0]["message"]["content"] or ""
+        except (KeyError, IndexError, TypeError) as e:
+            raise ModellFehler("Antwort des Modell-Dienstes ist unvollständig.") from e
+        return Antwort(text=text_aus.strip(), dauer_s=round(dauer, 2), modell=str(r.get("model", "")),
+                       tokens=r.get("usage") or {})

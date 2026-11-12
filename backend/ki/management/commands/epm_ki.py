@@ -21,13 +21,14 @@ from django.core.management.base import BaseCommand
 from django.db import close_old_connections, connection
 from django.utils import timezone
 
-from ki import berichte, dienst, eingang, evaluation, krypto, modellwahl, pipeline
+from ki import berichte, chat, dienst, eingang, evaluation, krypto, modellwahl, pipeline
 from ki.modell import Client
 from ki.models import KiEinstellung, KiEvaluationslauf, KiModellversion, KiVorgang
 from ki.steuerung import Entscheidung, Messung, Steuerung
 
 log = logging.getLogger("epm.ki")
 TAKT_S = 5
+CHAT_SCHLUESSEL = -2 * 10**9  # Schlüssel in self.laufend: Chat < Evaluation < Bericht < 0 < Vorgang
 VORMERKEN_ALLE_S = 600
 MODELL_PRUEFEN_ALLE_S = 60
 AUFRAEUMEN_ALLE_S = 3600
@@ -121,7 +122,7 @@ class Dienst:
             signal.signal(signal.SIGINT, stopp)
 
     def _noch_etwas_zu_tun(self) -> bool:
-        return KiVorgang.objects.filter(status=KiVorgang.Status.NEU).exists() or \
+        return KiVorgang.objects.filter(status=KiVorgang.Status.NEU).exists() or chat.wartet() or \
             berichte.KiBerichtsauftrag.objects.filter(status="wartet").exists()
 
     def _durchlauf(self):
@@ -131,6 +132,7 @@ class Dienst:
         if jetzt_s - self.zuletzt["aufraeumen"] > AUFRAEUMEN_ALLE_S:
             self.zuletzt["aufraeumen"] = jetzt_s
             dienst.haengende_zuruecksetzen()
+            chat.aufraeumen(dienst.HAENGT_NACH)
             offen = set(KiVorgang.objects.filter(status__in=[*KiVorgang.WARTEND, *KiVorgang.IN_ARBEIT])
                         .values_list("id", flat=True))
             krypto.aufraeumen(einst.aufbewahrung_tage, behalten=offen)
@@ -150,6 +152,11 @@ class Dienst:
         self._modell_schlaf(e)
         if e.parallel <= 0:
             return
+        # KI-Chat: jemand wartet am Bildschirm – immer eine Antwort zur Zeit, auch wenn Dokumente alle Plätze belegen
+        if not any(k <= CHAT_SCHLUESSEL for k in self.laufend):
+            n = chat.holen()
+            if n is not None:
+                self._starten(CHAT_SCHLUESSEL - n.pk, self._chat, n)
         # Berichtsentwürfe sind ausdrücklich angefordert: Vorrang, auch tagsüber
         if len(self.laufend) < e.parallel:
             b = dienst.bericht_holen()
@@ -173,7 +180,7 @@ class Dienst:
         """Tagsüber ohne Arbeit gibt der Modell-Container seinen Speicher frei; kommt Arbeit, wird er geweckt."""
         if self.client is None or os.environ.get("KI_MODELL_TAGSUEBER_ENTLADEN", "1") == "0":
             return
-        arbeit = bool(self.laufend) or e.modus == "nacht" or KiVorgang.objects.filter(
+        arbeit = bool(self.laufend) or e.modus == "nacht" or chat.wartet() or KiVorgang.objects.filter(
             status=KiVorgang.Status.NEU, prioritaet__gte=dienst.ANGEFORDERT_AB).exists() or \
             berichte.KiBerichtsauftrag.objects.filter(status="wartet").exists()
         if arbeit:
@@ -271,6 +278,21 @@ class Dienst:
                 modellwahl.probe_setzen(None)
                 self.modell_bereit = False
                 self.zuletzt["modell"] = 0.0
+            if not self.einmal:
+                connection.close()
+
+    def _chat(self, n):
+        try:
+            if self.einmal:
+                chat.beantworten(n, self.client if self.modell_bereit else None)
+            else:
+                with dienst.herzschlag(n):
+                    chat.beantworten(n, self.client if self.modell_bereit else None)
+        except Exception as e:  # noqa: BLE001
+            log.exception("KI-Chat-Antwort %s fehlgeschlagen", n.pk)
+            type(n).objects.filter(pk=n.pk).update(status="fehler", fehler=f"{type(e).__name__}: {e}"[:2000],
+                                                   fertig_am=timezone.now())
+        finally:
             if not self.einmal:
                 connection.close()
 

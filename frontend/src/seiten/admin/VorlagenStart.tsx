@@ -48,6 +48,10 @@ const KACHELN: Kachel[] = [
     wofuer: "Merkblätter als PDF, die man beim Schreiben an die E-Mail hängen kann – z. B. Leitfaden Zottentraining.",
     wo: "Akte › Schreiben und E-Mail; Kalender › Praxis informieren",
     stichwoerter: "anlage anhang merkblatt pdf leitfaden zottentraining" },
+  { titel: "KI-Prompts", icon: "stern", ziel: zuBereich("ki"), bereich: "KI-Prompts",
+    wofuer: "Feste Anweisungen für den KI-Chat – z. B. medizinisch formulieren, Rechtschreibung prüfen, Arztbrief-Abschnitt, für Patienten verständlich.",
+    wo: "KI (Experimentell) › Chat",
+    stichwoerter: "ki prompt chat formulieren anweisung künstliche intelligenz textprüfung bericht" },
 ];
 
 type Anlage = { id: number; name: string; beschreibung: string; aktiv: boolean };

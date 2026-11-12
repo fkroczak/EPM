@@ -76,6 +76,8 @@ router.register("ki/vorgaenge", ki.KiVorgangViewSet, basename="ki-vorgang")
 router.register("ki/hinweise", ki.KiHinweisViewSet, basename="ki-hinweis")
 router.register("ki/berichte", ki.KiBerichtViewSet, basename="ki-bericht")
 router.register("ki/modelle", ki.ModelleViewSet, basename="ki-modell")
+router.register("ki/vorlagen", ki.KiPromptvorlageViewSet, basename="ki-vorlage")
+router.register("ki/chats", ki.KiChatViewSet, basename="ki-chat")
 
 auth = [
     path("status/", konto.StatusView.as_view()),
