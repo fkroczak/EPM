@@ -33,7 +33,8 @@ Infusionspläne, Medikation, Diagnosen und Texte und legt alles in die Prüf-Que
 kommt nur, was ein Mitarbeiter prüft und bestätigt. Dazu: Hinweise Labor ↔ Infusionsplan (Akte › KI), Berichtsentwürfe
 auf Anforderung, Qualitäts-Dashboard, Modellwechsel mit Evaluation und Rollback (Administration › KI).
 **Chat** (12.11.2026): Reiter „Chat“ im Menü KI (Experimentell) – Texte medizinisch formulieren, prüfen, kürzen …
-mit festen Promptvorlagen (Administration › Vorlagen › KI-Prompts); jede Person sieht nur ihre eigenen Chats.
+mit festen Promptvorlagen (Administration › Vorlagen › KI-Prompts); jede Person sieht nur ihre eigenen Chats. Tagsüber wartet die KI nur auf Eingaben: das Modell bleibt
+geladen, der Chat hat Vorrang, Hintergrundarbeit nur im Nachtfenster.
 Einrichten, Modell wählen, laden bzw. hochladen, Grenzen, Benchmark und Ausschalten gehen nach „EPM aktualisieren“
 auch ohne SSH unter Administration › KI › Einrichtung.
 

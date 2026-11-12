@@ -13,7 +13,7 @@ selbst in die Akte. Übernommen wird nur, was ein Mitarbeiter prüft und ausdrü
 
 | Container | Image | Aufgabe | Netz | Schreibt |
 |---|---|---|---|---|
-| `ki-modell` | `epm-ki-modell:<Tag>` (llama.cpp `llama-server`, nur CPU) | Qwen3.5 (Bilder + Text); Startskript wählt Modell, prüft SHA-256, schläft tagsüber | `intern` | nichts (read-only, `/tmp` im RAM) |
+| `ki-modell` | `epm-ki-modell:<Tag>` (llama.cpp `llama-server`, nur CPU) | Qwen3.5 (Bilder + Text); Startskript wählt Modell, prüft SHA-256, bleibt tagsüber für den Chat geladen | `intern` | nichts (read-only, `/tmp` im RAM) |
 | `ki-worker` | `epm-backend` (Befehl `ki`) | Nachtverarbeitung, Berichtsentwürfe, Steuerung nach Zeitfenster und Auslastung | `intern` | nur KI-Tabellen (DB-Rolle `epm_ki`) und `data/ki` |
 | `ki-init` | `epm-backend` | einmalig je Start: DB-Rolle `epm_ki` anlegen/nachziehen | `intern` | Rechte der Rolle |
 | `backend` | wie bisher | API, Prüfansicht, **Übernahme in die Akte** (im Namen des Mitarbeiters) | `intern` | wie bisher |
@@ -86,10 +86,12 @@ EPM läuft unverändert. `KI_HARDWARE_PRUEFEN=0` in `.env` schaltet die Prüfung
 - **Nachtfenster** (Standard 21:00–07:00, Europe/Berlin): Der Dienst merkt alle 10 Minuten neue Dokumente vor (neue
   zuerst, dann der Altbestand, jüngste zuerst) und verarbeitet sie. Um 07:00 werden laufende Dokumente nach der
   aktuellen Seite zurückgestellt und in der nächsten Nacht dort fortgesetzt.
-- **Tagsüber** nur ausdrücklich Angefordertes (Akte › KI › „Dokument jetzt verarbeiten lassen“, „Erneut verarbeiten“,
-  Berichtsentwürfe) – einer nach dem anderen. Nach 30 Minuten ohne Arbeit beendet der Modell-Container llama-server
-  und gibt den Speicher frei (`KI_MODELL_TAGSUEBER_ENTLADEN=0` schaltet das ab); bei neuer Arbeit lädt er wieder
-  (ein bis zwei Minuten).
+- **Tagsüber** wartet die KI auf die Mitarbeiter: keine Hintergrundarbeit, nur Chat und ausdrücklich Angefordertes
+  (Akte › KI › „Dokument jetzt verarbeiten lassen“, „Erneut verarbeiten“, Berichtsentwürfe) – einer nach dem anderen.
+  Der **Chat hat Vorrang**: Solange eine Antwort aussteht, startet nichts Neues, ein angefordertes Dokument pausiert
+  nach der aktuellen Seite und setzt danach dort fort. Das Modell bleibt dafür tagsüber geladen (12.11.2026);
+  `KI_MODELL_TAGSUEBER_ENTLADEN=1` in `.env` gibt den Speicher wie früher nach 30 Minuten ohne Arbeit frei
+  (`KI_MODELL_SCHLAFEN_NACH_MIN`), der erste Chat danach wartet dann ein bis zwei Minuten.
 - **Pausen:** während der Sicherung (Marke `system/status/backup-laeuft`), bei zu wenig freiem RAM, zu hoher CPU oder
   Systemlast (Grenzen in Administration › KI), tagsüber solange Scans warten. Hysterese: weiter erst deutlich unter
   den Grenzen. Knapp darunter arbeitet er „sparsam“ (ein Auftrag, kleinere Bilder, keine zweite Lesung).

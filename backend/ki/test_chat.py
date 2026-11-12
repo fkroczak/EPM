@@ -179,6 +179,19 @@ class ChatInPauseTest(Grundlage):
         d.entscheidung = Entscheidung("aus", 0, True, grund="aus")
         self.assertEqual(d._abbrechen(v), "aus")
 
+    def test_tagsueber_hat_der_chat_vorrang(self):
+        from types import SimpleNamespace
+        from ki.management.commands.epm_ki import Dienst
+        from ki.steuerung import Entscheidung
+
+        d, v = Dienst(), SimpleNamespace(prioritaet=10)  # angefordert
+        d.entscheidung = Entscheidung("tag", 1, True)
+        self.assertIsNone(d._abbrechen(v))
+        d.chat_aktiv = True
+        self.assertEqual(d._abbrechen(v), "Chat hat tagsüber Vorrang")
+        d.entscheidung = Entscheidung("nacht", 1, False)
+        self.assertIsNone(d._abbrechen(v))
+
 
 @override_settings(EPM_KI=Path(KI_TMP))
 class GeradeInArbeitTest(Grundlage):

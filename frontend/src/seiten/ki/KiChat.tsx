@@ -134,7 +134,7 @@ function WarteHinweis({ stand }: { stand?: KiStand }) {
   const e = d?.entscheidung;
   const text = !d || !d.laeuft ? "Der KI-Dienst meldet sich gerade nicht – die Antwort kommt, sobald er wieder läuft."
     : e?.modus === "aus" ? "Die KI ist ausgeschaltet (Administration › KI) – es kommt keine Antwort."
-    : d.modell.eingerichtet && !d.modell.bereit ? "Das KI-Modell wird gerade geladen (tagsüber schläft es, wenn eine Weile niemand die KI nutzt). Das dauert meist 1–2 Minuten."
+    : d.modell.eingerichtet && !d.modell.bereit ? "Das KI-Modell wird gerade geladen (nach einem Neustart oder Modellwechsel). Das dauert meist 1–2 Minuten."
     : e?.modus === "pause" ? `Pause${e.grund ? ` – ${e.grund}` : ""}. Die Antwort kommt danach.`
     : "";
   return text ? <span className="text-[0.8125rem] gedaempft self-start" data-testid="ki-chat-warten">{text} Nach 15 Minuten ohne Antwort wird abgebrochen.</span> : null;

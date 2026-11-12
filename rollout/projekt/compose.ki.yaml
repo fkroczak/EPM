@@ -105,7 +105,7 @@ services:
       KI_MIN_RAM_GB: ${KI_MIN_RAM_GB:-12}
       KI_MIN_KERNE: ${KI_MIN_KERNE:-4}
       KI_NICE: ${KI_NICE:-15}
-      KI_MODELL_TAGSUEBER_ENTLADEN: ${KI_MODELL_TAGSUEBER_ENTLADEN:-1}
+      KI_MODELL_TAGSUEBER_ENTLADEN: ${KI_MODELL_TAGSUEBER_ENTLADEN:-0}
       EPM_VERSION: ${EPM_VERSION}
       TZ: Europe/Berlin
     secrets: [ki_db_password, ki_schluessel]
