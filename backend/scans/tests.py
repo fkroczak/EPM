@@ -246,6 +246,24 @@ class AuswertungTest(SimpleTestCase):
         self.assertEqual([x["wert"] for x in a["labor"]["werte"] if x["parameter_name"] == "Kalium"], ["4.6", "1"])
         self.assertEqual(w["Albumin"]["wert"], "45.8")
 
+    def test_referenzbereich_vor_dem_wert(self):
+        """Spaltenfolge „Ref.-Bereich – Einheit – Wert“: der Wert steht hinten, nicht die untere Referenzgrenze."""
+        katalog = KATALOG_BEISPIEL + [
+            {"id": 8, "name": "Hämoglobin", "kurzname": "Hb", "einheit": "g/dl", "gruppe": "blutbild",
+             "suchbegriffe": ""},
+            {"id": 9, "name": "Leukozyten", "kurzname": "", "einheit": "/nl", "gruppe": "blutbild", "suchbegriffe": ""},
+            {"id": 10, "name": "CRP", "kurzname": "", "einheit": "mg/l", "gruppe": "entzuendung",
+             "suchbegriffe": "C-reaktives Protein"}]
+        seite = _seite("Labor Klinik", "Hämoglobin i.B. (EDTA) 7,40 - 10,70 mmol/L 6.50.",
+                       "Leukozyten i.B. (EDTA) 3,8 - 9,8 GPt/L 6.00", "C-reaktives Protein i.S. < 5.0 mg/L 13.9↑",
+                       "Natrium 138 mmol/l 135 - 145")
+        w = {v["parameter_name"]: v for v in auswertung.auswerten([seite], katalog)["labor"]["werte"]}
+        self.assertEqual(w["Hämoglobin"]["umrechnung"]["wert_gelesen"], "6.5")
+        self.assertEqual(w["Hämoglobin"]["markierung"], "↓")
+        self.assertEqual((w["Leukozyten"]["wert"], w["Leukozyten"]["referenz_von"]), ("6", "3.8"))
+        self.assertEqual((w["CRP"]["wert"], w["CRP"]["referenz_bis"]), ("13.9", "5"))
+        self.assertEqual((w["Natrium"]["wert"], w["Natrium"]["referenz_von"]), ("138", "135"))
+
     def test_ausstehend_erlaeuterung_und_referenz_an_der_einheit(self):
         """„folgt“ wird nicht vorgewählt; „Vitamin D-Mangel: < 50“ (Beurteilungsstufe) ist kein Wert;
         „ml/min/1.73qm> 60“: das Zeichen des Referenzbereichs klebt an der Einheit."""
