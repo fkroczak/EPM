@@ -22,7 +22,7 @@ from django.db import close_old_connections, connection
 from django.utils import timezone
 
 from ki import berichte, chat, dienst, eingang, evaluation, krypto, modellwahl, pipeline
-from ki.modell import Client
+from ki.modell import Client, ModellFehler
 from ki.models import KiEinstellung, KiEvaluationslauf, KiModellversion, KiVorgang
 from ki.steuerung import Entscheidung, Messung, Steuerung
 
@@ -144,6 +144,7 @@ class Dienst:
             if einst.aktiv:
                 eingang.vormerken(500)
 
+        chat.zu_lange_wartend()
         e = self._entscheiden(einst)
         self.entscheidung = e
         for vid in [v for v, t in self.laufend.items() if not t.is_alive()]:
@@ -288,6 +289,11 @@ class Dienst:
             else:
                 with dienst.herzschlag(n):
                     chat.beantworten(n, self.client if self.modell_bereit else None)
+        except ModellFehler as e:
+            # Modell weg (schläft, startet neu, abgestürzt): erst wieder arbeiten, wenn es sich als bereit meldet
+            log.warning("KI-Chat-Antwort %s: Modell nicht erreichbar (%s)", n.pk, e)
+            self.modell_bereit = False
+            self.zuletzt["modell"] = 0.0
         except Exception as e:  # noqa: BLE001
             log.exception("KI-Chat-Antwort %s fehlgeschlagen", n.pk)
             type(n).objects.filter(pk=n.pk).update(status="fehler", fehler=f"{type(e).__name__}: {e}"[:2000],

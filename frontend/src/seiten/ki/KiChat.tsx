@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiFehler, api } from "@/lib/api";
 import { zeitpunkt } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
+import type { KiStand } from "@/lib/ki";
 import { Auswahl, Chip, Fehleranzeige, Karte, Knopf, Ladekreis, Leer, Meldung, Textfeld, cx } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
 
@@ -26,7 +27,8 @@ export function KiChat() {
   const [aktiv, setAktiv] = useState<number | null>(null);
   const [text, setText] = useState("");
   const [vorlage, setVorlage] = useState<string>("");
-  const ende = useRef<HTMLDivElement>(null);
+  const verlaufRef = useRef<HTMLDivElement>(null);
+  const stand = useQuery({ queryKey: ["ki", "stand"], queryFn: () => api<KiStand>("ki/stand/", { hintergrund: true }), refetchInterval: 30_000 });
   const vorlagen = useQuery({ queryKey: ["ki", "vorlagen"], queryFn: () => api<KiPromptvorlage[]>("ki/vorlagen/") });
   const liste = useQuery({ queryKey: ["ki", "chats"], queryFn: () => api<ChatKurz[]>("ki/chats/") });
   const chat = useQuery({
@@ -41,7 +43,8 @@ export function KiChat() {
   useEffect(() => { if (chat.data?.vorlage) setVorlage(String(chat.data.vorlage)); }, [chat.data?.id]);
   const anzahl = chat.data?.nachrichten.length ?? 0;
   const wartet = !!chat.data?.nachrichten.some((n) => n.status === "wartet" || n.status === "laeuft");
-  useEffect(() => { ende.current?.scrollIntoView({ block: "end" }); }, [anzahl, wartet]);
+  // nur im Verlauf nach unten scrollen – die Seite und das Eingabefeld bleiben stehen
+  useEffect(() => { const v = verlaufRef.current; if (v) v.scrollTop = v.scrollHeight; }, [anzahl, wartet, aktiv]);
   useEffect(() => { if (!wartet) void qc.invalidateQueries({ queryKey: ["ki", "chats"] }); }, [wartet, qc]);
 
   const senden = useMutation({
@@ -66,7 +69,7 @@ export function KiChat() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)] gap-4 items-start" data-testid="ki-chat">
-      <Karte className="flex flex-col gap-2 p-3">
+      <Karte className="flex flex-col gap-2 p-3 lg:max-h-[calc(100dvh-14rem)] overflow-y-auto">
         <Knopf variante="pri" icon="plus" onClick={() => { setAktiv(null); setText(""); senden.reset(); }}>Neuer Chat</Knopf>
         <span className="text-xs gedaempft">Nur Sie sehen Ihre Chats.</span>
         <ul className="m-0 p-0 list-none flex flex-col gap-0.5" aria-label="Meine Chats">
@@ -83,19 +86,19 @@ export function KiChat() {
         {liste.data && !liste.data.length ? <span className="text-sm gedaempft">Noch keine Chats.</span> : null}
       </Karte>
 
-      <Karte className="flex flex-col gap-3 p-4 min-w-0">
-        <Meldung art="info" className="text-[0.8125rem]">
+      <Karte className="flex flex-col gap-3 p-4 min-w-0 h-[calc(100dvh-14rem)] min-h-[30rem]">
+        <Meldung art="info" className="text-[0.8125rem] shrink-0">
           Lokale KI, offline auf dem Server. Sie formuliert nur, was Sie eingeben – <strong>jede Antwort vor der Verwendung prüfen</strong>.
           Zahlen oder Daten, die nicht in Ihrem Text stehen, werden markiert.
           {chat.data ? ` Chats werden nach ${chat.data.aufbewahrung_tage} Tagen ohne Änderung gelöscht.` : ""}
         </Meldung>
-        <div className="flex flex-col gap-3 min-h-[12rem] max-h-[60vh] overflow-y-auto" aria-live="polite">
+        <div ref={verlaufRef} className="flex flex-col gap-3 flex-1 min-h-0 overflow-y-auto pr-1" aria-live="polite" data-testid="ki-chat-verlauf">
           {aktiv === null ? <Leer>Text unten eingeben, Vorlage wählen und senden.</Leer> : null}
           {chat.data?.nachrichten.map((n) => <Blase key={n.id} n={n} />)}
-          <div ref={ende} />
+          {wartet ? <WarteHinweis stand={stand.data} /> : null}
         </div>
         <Fehleranzeige fehler={chat.error} />
-        <div className="flex flex-col gap-2 border-t border-rand pt-3">
+        <div className="flex flex-col gap-2 border-t border-rand pt-3 shrink-0">
           <div className="flex items-center gap-2.5 flex-wrap">
             <label htmlFor="ki-vorlage" className="text-sm font-medium">Vorlage</label>
             <Auswahl id="ki-vorlage" className="w-[18rem]" value={vorlage} onChange={(e) => setVorlage(e.target.value)}>
@@ -103,7 +106,7 @@ export function KiChat() {
             </Auswahl>
             {gewaehlt?.beschreibung ? <span className="text-[0.8125rem] gedaempft">{gewaehlt.beschreibung}</span> : null}
           </div>
-          <Textfeld aria-label="Nachricht an die KI" rows={5} value={text} maxLength={8000} disabled={!darfSchreiben}
+          <Textfeld aria-label="Nachricht an die KI" rows={4} value={text} maxLength={8000} disabled={!darfSchreiben}
             placeholder="z. B. Stichpunkte: Pat. seit 3 Tagen Fieber 38,5, Katheter gerötet, Abstrich abgenommen"
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && text.trim() && !wartet) senden.mutate(); }} />
@@ -120,6 +123,18 @@ export function KiChat() {
       </Karte>
     </div>
   );
+}
+
+/** Warum es dauert: Modell schläft/lädt, Pause (Sicherung), Dienst aus. */
+function WarteHinweis({ stand }: { stand?: KiStand }) {
+  const d = stand?.dienst;
+  const e = d?.entscheidung;
+  const text = !d || !d.laeuft ? "Der KI-Dienst meldet sich gerade nicht – die Antwort kommt, sobald er wieder läuft."
+    : e?.modus === "aus" ? "Die KI ist ausgeschaltet (Administration › KI) – es kommt keine Antwort."
+    : d.modell.eingerichtet && !d.modell.bereit ? "Das KI-Modell wird gerade geladen (tagsüber schläft es, wenn eine Weile niemand die KI nutzt). Das dauert meist 1–2 Minuten."
+    : e?.modus === "pause" ? `Pause${e.grund ? ` – ${e.grund}` : ""}. Die Antwort kommt danach.`
+    : "";
+  return text ? <span className="text-[0.8125rem] gedaempft self-start" data-testid="ki-chat-warten">{text} Nach 15 Minuten ohne Antwort wird abgebrochen.</span> : null;
 }
 
 function Blase({ n }: { n: Nachricht }) {

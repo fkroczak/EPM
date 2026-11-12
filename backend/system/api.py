@@ -283,7 +283,7 @@ class UebersichtView(APIView):
             "uploads": hochladen.liste(("paket", "ocr")),
             "upload": {"teil": hochladen.TEIL, "max": {a: hochladen.ARTEN[a]["max"] for a in ("paket", "ocr")}},
             "austausch": host.ordner_download().is_dir() and host.ordner_upload().is_dir(),
-            "dienste": list(host.DIENSTE),
+            "dienste": list(host.DIENSTE + host.KI_DIENSTE),
             "minuten": MINUTEN_ERLAUBT,
             "einstellungen": _einstellungen(),
             # „Datenbank leeren“ nur für die Rolle Admin (Festlegung 03.10.2026, U27)

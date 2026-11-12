@@ -35,6 +35,8 @@ RAHMEN = (
 MAX_ZEICHEN = 8000          # je Nachricht
 VERLAUF_ZEICHEN = 16000     # so viel Verlauf geht höchstens mit (Kontext des Modells)
 MAX_TOKENS = 1500
+MAX_VERSUCHE = 3            # Modell gerade nicht erreichbar (schläft, startet neu): zurück in die Queue
+WARTEN_HOECHSTENS = dt.timedelta(minutes=15)
 
 
 def aufbewahrung_tage() -> int:
@@ -89,10 +91,18 @@ def beantworten(nachricht: KiChatNachricht, client: Client | None) -> KiChatNach
         a = client.gespraech(systemanweisung(nachricht), nachrichten, max_tokens=MAX_TOKENS,
                              temperatur=float(nachricht.temperatur))
     except ModellFehler as e:
-        nachricht.status, nachricht.fehler = N.Status.FEHLER, str(e)[:2000]
-        nachricht.fertig_am = timezone.now()
-        nachricht.save(update_fields=["status", "fehler", "fertig_am"])
-        return nachricht
+        # meist vorübergehend (Modell schläft, lädt oder startet neu): zurück in die Queue, der Dienst prüft das
+        # Modell neu und versucht es noch einmal – erst nach MAX_VERSUCHE als Fehler
+        nachricht.versuche += 1
+        nachricht.fehler = str(e)[:2000]
+        if nachricht.versuche < MAX_VERSUCHE:
+            nachricht.status = N.Status.WARTET
+            nachricht.save(update_fields=["versuche", "fehler", "status"])
+        else:
+            nachricht.status, nachricht.fertig_am = N.Status.FEHLER, timezone.now()
+            nachricht.fehler = f"Das KI-Modell hat {MAX_VERSUCHE}-mal nicht geantwortet ({e})."[:2000]
+            nachricht.save(update_fields=["versuche", "fehler", "status", "fertig_am"])
+        raise
     eingaben = [m["content"] for m in nachrichten if m["role"] == "user"]
     nachricht.text = a.text
     nachricht.pruefung = gegenpruefen(a.text, eingaben)
@@ -119,6 +129,15 @@ def holen() -> KiChatNachricht | None:
 
 def wartet() -> bool:
     return KiChatNachricht.objects.filter(status=N.Status.WARTET).exists()
+
+
+def zu_lange_wartend() -> int:
+    """Kommt das Modell nicht hoch (fehlt, zu wenig Speicher …), wartet niemand ewig am Bildschirm."""
+    return KiChatNachricht.objects.filter(status=N.Status.WARTET,
+                                          erstellt_am__lt=timezone.now() - WARTEN_HOECHSTENS).update(
+        status=N.Status.FEHLER, fertig_am=timezone.now(),
+        fehler=f"Das KI-Modell war {int(WARTEN_HOECHSTENS.total_seconds() // 60)} Minuten lang nicht bereit "
+               "(lädt, fehlt oder Pause, z. B. während der Sicherung). Bitte später erneut senden.")
 
 
 def aufraeumen(haengt_nach: dt.timedelta) -> int:

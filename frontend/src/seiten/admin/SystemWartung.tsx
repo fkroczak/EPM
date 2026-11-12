@@ -114,7 +114,11 @@ const DIENST_TEXT: Record<string, string> = {
   web: "Nginx – liefert die Oberfläche aus; Neustart in wenigen Sekunden",
   ocr: "Texterkennung für Scans; laufende Erkennungen beginnen danach neu",
   db: "PostgreSQL – die Datenbank; EPM ist während des Neustarts nicht erreichbar",
+  "ki-worker": "KI-Dienst – Prüf-Queue, Berichtsentwürfe, Chat; laufende Aufträge gehen danach weiter",
+  "ki-modell": "KI-Modell (llama-server) – lädt das Modell neu, dauert 1–2 Minuten; hilft, wenn der Chat nicht antwortet",
 };
+// nur anzeigen, wenn die KI eingerichtet ist (es gibt die Container)
+const NUR_WENN_DA = new Set(["ki-worker", "ki-modell"]);
 
 export function DiensteKarte({ daten, offen }: { daten: Uebersicht; offen: Set<string> }) {
   const [wahl, setWahl] = useState<string | null>(null);
@@ -122,7 +126,7 @@ export function DiensteKarte({ daten, offen }: { daten: Uebersicht; offen: Set<s
   return (
     <Karte className="px-5 py-4 flex flex-col gap-2" data-testid="dienste-karte">
       <KartenKopf titel="Dienste" unter={<>Einzelne <Begriff name="container">Container</Begriff> neu starten, z. B. wenn die Texterkennung hängt – statt „docker compose restart“ per SSH.</>} />
-      {(daten.dienste ?? []).map((d) => {
+      {(daten.dienste ?? []).filter((d) => !NUR_WENN_DA.has(d) || container.some((x) => x.dienst === d)).map((d) => {
         const c = container.find((x) => x.dienst === d);
         const gut = c && c.zustand === "running" && (!c.gesundheit || c.gesundheit === "healthy");
         return (
