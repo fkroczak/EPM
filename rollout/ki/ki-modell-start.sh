@@ -35,17 +35,17 @@ stoppen() {
 trap 'stoppen; exit 0' TERM INT
 
 pruefen() {  # Datei, erwartete SHA-256 → 0 wenn ok (Ergebnis je Datei gemerkt)
-  datei="$1"; soll="$2"
+  datei="$1"; sha_soll="$2"
   [ -f "$MODELLE/$datei" ] || { log "Modelldatei fehlt: $datei"; return 1; }
-  [ -z "$soll" ] && { log "WARNUNG: keine Prüfsumme für $datei angegeben"; return 0; }
-  [ -f "/tmp/geprueft-$soll" ] && return 0
+  [ -z "$sha_soll" ] && { log "WARNUNG: keine Prüfsumme für $datei angegeben"; return 0; }
+  [ -f "/tmp/geprueft-$sha_soll" ] && return 0
   log "prüfe SHA-256 von $datei …"
   ist=$(sha256sum "$MODELLE/$datei" | cut -d' ' -f1)
-  if [ "$ist" != "$soll" ]; then
-    log "FEHLER: Prüfsumme von $datei stimmt nicht (ist $ist, soll $soll) – Modell wird nicht geladen"
+  if [ "$ist" != "$sha_soll" ]; then
+    log "FEHLER: Prüfsumme von $datei stimmt nicht (ist $ist, soll $sha_soll) – Modell wird nicht geladen"
     return 1
   fi
-  touch "/tmp/geprueft-$soll"
+  touch "/tmp/geprueft-$sha_soll"
 }
 
 starten() {  # Datei, Projektor, Alias
