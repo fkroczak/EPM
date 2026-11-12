@@ -372,17 +372,8 @@ def aufbereiten(rohbild: np.ndarray, e: Einstellungen, *, herkunft: str = "bild"
         info["ecken"] = [[round(float(x) / w, 4), round(float(y) / h, 4)] for x, y in ordne_ecken(ecken)]
         bild = entzerren(bild, ecken)
 
-    # 2. gewellte Seite glätten (UVDoc) – automatisch nur bei Fotos
-    if glaetter is not None and (e.glaetten == "ein" or (e.glaetten == "auto" and foto)):
-        melden("Seite glätten")
-        try:
-            bild = glaetter(bild)
-            info["geglaettet"] = True
-        except Exception as fehler:  # noqa: BLE001 – Glätten ist ein Zusatz; ohne geht es weiter
-            info["geglaettet"] = False
-            info["glaetten_fehler"] = str(fehler)[:200]
-
-    # 3. Ausrichtung in 90°-Schritten
+    # 2. Ausrichtung in 90°-Schritten – vor dem Glätten: auf dem geglätteten (weicheren) Bild hielt Tesseract
+    #    ein aufrechtes Foto für kopfstehend (180°, Sicherheit 1,6; 12.11.2026). Auch PaddleOCR richtet zuerst aus.
     melden("Ausrichtung, Schräglage, Ausleuchtung")
     if e.drehung is not None:
         bild = drehen(bild, e.drehung)
@@ -397,6 +388,16 @@ def aufbereiten(rohbild: np.ndarray, e: Einstellungen, *, herkunft: str = "bild"
             info["drehung_sicherheit"] = round(ergebnis[1], 2)
         else:
             info["drehung"] = 0
+
+    # 3. gewellte Seite glätten (UVDoc) – automatisch nur bei Fotos
+    if glaetter is not None and (e.glaetten == "ein" or (e.glaetten == "auto" and foto)):
+        melden("Seite glätten")
+        try:
+            bild = glaetter(bild)
+            info["geglaettet"] = True
+        except Exception as fehler:  # noqa: BLE001 – Glätten ist ein Zusatz; ohne geht es weiter
+            info["geglaettet"] = False
+            info["glaetten_fehler"] = str(fehler)[:200]
 
     # 4. Schräglage
     if e.schraeglage == "auto":

@@ -460,7 +460,7 @@ class ErkennungTest(SimpleTestCase):
         self.assertEqual(auf.info.get("ecken_quelle"), "auto")
         text = fusion.text_aus_json(ergebnis)
         for wort in ("Laborbefund", "Natrium", "Kalium", "Magnesium", "Kreatinin", "Albumin", "Hypokaliämie"):
-            self.assertIn(wort, text)
+            self.assertIn(wort, text, auf.info)   # info: Drehung, Glätten, Ecken – zeigt, wo die Aufbereitung kippt
         a = auswertung.auswerten([ergebnis], KATALOG_BEISPIEL)
         werte = {w["parameter_name"]: w for w in a["labor"]["werte"] if w["parameter_name"]}
         self.assertEqual(werte["Natrium"]["wert"], "138")
@@ -573,7 +573,7 @@ class ScansApiTest(Grundlage):
         self.assertEqual((albumin.wert, albumin.einheit), (Decimal("34"), "g/l"))
         # Scan ist aus „Scans“ verschwunden, Dateien mit
         self.assertFalse(Scan.objects.filter(pk=scan["id"]).exists())
-        self.assertEqual(c.get(f"/api/scans/{scan['id']}/").status_code, 400)
+        self.assertEqual(c.get(f"/api/scans/{scan['id']}/").status_code, 404)
         # Dokument ist über den erkannten Text auffindbar
         r = c.get(f"/api/dokumente/?patient={self.testpatient.id}&search=Hypokali")
         self.assertEqual([x["id"] for x in r.json()["results"]], [dok.id])

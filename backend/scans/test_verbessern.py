@@ -108,14 +108,14 @@ class BereichTest(Grundlage):
         self.assertEqual(c.post(url, {"box": [0.9, 0.95, 0.5, 0.5]}, format="json").status_code, 200)
         self.assertEqual(client_fuer(self.betrachter).post(url, {"box": KALIUM_MAGNESIUM}, format="json").status_code,
                          403)
-        # Scan eines anderen Testzugangs: nicht sichtbar
+        # Scan eines anderen Testzugangs: nicht sichtbar (404 wie ein gelöschter Scan)
         tessa = benutzer("tessa", Rolle.MITARBEITER, ist_test=True)
-        self.assertEqual(client_fuer(tessa).post(url, {"box": KALIUM_MAGNESIUM}, format="json").status_code, 400)
+        self.assertEqual(client_fuer(tessa).post(url, {"box": KALIUM_MAGNESIUM}, format="json").status_code, 404)
         # fremde Seite
         anderer, andere_seite = _scan_mit_bild(self.mitarbeiter)
         r = c.post(f"/api/scans/{scan.id}/seiten/{andere_seite.id}/ausschnitt/", {"box": KALIUM_MAGNESIUM},
                    format="json")
-        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.status_code, 404)
 
     def test_bereich_wird_gelernt_und_beim_naechsten_befund_gelesen(self):
         LernEinstellung.objects.update_or_create(id=LernEinstellung.aktuell().id, defaults={"schwelle": 1})
