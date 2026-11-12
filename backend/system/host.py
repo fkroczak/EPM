@@ -292,12 +292,15 @@ SICHERUNG_AKTIONEN = ("sicherung", "sicherung_passwort", "sicherung_ziel", "sich
 
 # Systemverwaltung ohne SSH (10.10.2026): dieselben Listen und Muster wie im Agenten (der prüft noch einmal)
 DIENSTE = ("backend", "web", "ocr", "db")
+# KI (Experimentell): nur wenn eingerichtet (compose.ki.yaml) – der Agent prüft das
+KI_DIENSTE = ("ki-worker", "ki-modell")
 TAG_MUSTER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40}$")
 PAKET_MUSTER = re.compile(r"^epm-paket-([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})\.tar$")
 PROTOKOLLE = {
     "backend": "Container backend (Django)", "web": "Container web (Nginx)", "ocr": "Container ocr (Texterkennung)",
     "db": "Container db (PostgreSQL)", "systemagent": "Systemagent", "backup": "Nächtliche Sicherung",
     "uebertragung": "Übertragung der Sicherungen", "update": "Letztes EPM-Update (/var/log/epm-update.log)",
+    "ki-worker": "Container ki-worker (KI-Dienst)", "ki-modell": "Container ki-modell (KI-Modell, llama-server)",
 }
 PROTOKOLL_ZEILEN = (100, 500, 2000)
 LOESCHEN_MAX = 200

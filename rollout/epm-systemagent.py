@@ -184,6 +184,8 @@ LOESCHEN_MAX = 200                # Sicherungen je Auftrag „Sicherungen lösch
 TAG_MUSTER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40}$")
 PAKET_MUSTER = re.compile(r"^epm-paket-([0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{7,40})\.tar$")
 DIENSTE = ("backend", "web", "ocr", "db")
+# KI (Experimentell): nur wenn eingerichtet (Marke ki-aktiv, COMPOSE_FILE mit compose.ki.yaml)
+KI_DIENSTE = ("ki-worker", "ki-modell")
 # Selbstheilung (13.10.2026): Dateien unter <EPM_BASE>/system, Schwellen des Wächters
 HEILUNG_REIHENFOLGE = ("db", "backend", "ocr", "web")   # Start und Neustart in dieser Reihenfolge (Abhängigkeiten)
 HEILUNG_DATEI = "heilung.json"
@@ -207,6 +209,7 @@ PROTOKOLLE = {
     "backend": "Container backend (Django)", "web": "Container web (Nginx)", "ocr": "Container ocr (Texterkennung)",
     "db": "Container db (PostgreSQL)", "systemagent": "Systemagent", "backup": "Nächtliche Sicherung",
     "uebertragung": "Übertragung der Sicherungen", "update": "Letztes EPM-Update (/var/log/epm-update.log)",
+    "ki-worker": "Container ki-worker (KI-Dienst)", "ki-modell": "Container ki-modell (KI-Modell, llama-server)",
 }
 PROTOKOLL_JOURNAL = {"systemagent": ["epm-systemagent.service", "epm-systemstatus.service"],
                      "backup": ["epm-backup.service"], "uebertragung": ["epm-uebertragung.service"]}
@@ -2676,7 +2679,9 @@ class Agent:
         return 0, f"{len(liste)} Sicherung(en) gelöscht ({frei // (1024 * 1024)} MB frei)."
 
     def dienst_neu_starten(self, dienst, zeile, simuliert=False):
-        if dienst not in DIENSTE:
+        if dienst in KI_DIENSTE and not os.path.exists(os.path.join(self.basis, "ki-aktiv")):
+            return 2, "Die KI ist auf diesem Server nicht eingerichtet – nichts neu gestartet."
+        if dienst not in DIENSTE and dienst not in KI_DIENSTE:
             return 2, "Unbekannter Dienst – nichts neu gestartet."
         args = self.compose("restart", dienst)
         if simuliert:
@@ -3093,7 +3098,9 @@ class Agent:
         die Ausgabe des Auftrags und damit nicht in die Datenbank."""
         if quelle not in PROTOKOLLE or isinstance(zeilen, bool) or zeilen not in PROTOKOLL_ZEILEN:
             return 2, "Unbekanntes Protokoll."
-        if quelle in DIENSTE:
+        if quelle in KI_DIENSTE and not os.path.exists(os.path.join(self.basis, "ki-aktiv")):
+            return 2, "Die KI ist auf diesem Server nicht eingerichtet."
+        if quelle in DIENSTE or quelle in KI_DIENSTE:
             rc, text = self.befehl(self.compose("logs", "--no-color", "--timestamps", "--tail", str(zeilen), quelle),
                                    cwd=self.basis, zeitlimit=120)
         elif quelle in PROTOKOLL_JOURNAL:

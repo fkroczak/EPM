@@ -560,6 +560,7 @@ class KiChatNachricht(models.Model):
     fehler = models.TextField(blank=True)
     modell = models.CharField(max_length=200, blank=True)
     dauer_s = models.FloatField(null=True, blank=True)
+    versuche = models.PositiveSmallIntegerField(default=0)
     erstellt_am = models.DateTimeField(auto_now_add=True)
     lebenszeichen = models.DateTimeField(null=True, blank=True)
     fertig_am = models.DateTimeField(null=True, blank=True)

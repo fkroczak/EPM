@@ -9,7 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { abfrage, api } from "@/lib/api";
 import type { Seite as ApiSeite } from "@/lib/api";
 import { datum, zahl, zeitpunkt } from "@/lib/format";
-import { DOKUMENTTYPEN, MODUS_TEXT, STATUS_ART, STATUS_TEXT, prozentText } from "@/lib/ki";
+import { DOKUMENTTYPEN, MODUS_TEXT, STATUS_ART, STATUS_TEXT, prozentText, useKiZurPruefung } from "@/lib/ki";
 import type { KiStand, KiStatus, KiVorgangKurz } from "@/lib/ki";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Karte, KartenKopf, Knopf, Laden, Leer, Meldung, Seitenkopf } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
@@ -51,15 +51,16 @@ export function KiStandKarte({ stand }: { stand?: KiStand }) {
 }
 
 export function KiQueue() {
-  const [reiter, setReiter] = useReiter(["queue", "chat", "qualitaet"] as const);
+  const [reiter, setReiter] = useReiter(["chat", "queue", "qualitaet"] as const);
+  const zurPruefung = useKiZurPruefung();
   const stand = useQuery({ queryKey: ["ki", "stand"], queryFn: () => api<KiStand>("ki/stand/", { hintergrund: true }), refetchInterval: 30_000 });
   return (
     <Seite pfad={[{ text: "KI (Experimentell)" }]}>
       <Seitenkopf titel="KI (Experimentell)" unter="Vorschläge der lokalen KI zur Prüfung – nichts geht ohne Ihre Bestätigung in die Akte." />
       <KiStandKarte stand={stand.data} />
       <Reiter label="Bereiche" wert={reiter} onWahl={setReiter}
-        eintraege={[{ wert: "queue", text: "Prüf-Queue" }, { wert: "chat", text: "Chat" }, { wert: "qualitaet", text: "Qualität" }]} />
-      <ReiterInhalt>{reiter === "queue" ? <Queue /> : reiter === "chat" ? <KiChat /> : <Qualitaet />}</ReiterInhalt>
+        eintraege={[{ wert: "chat", text: "Chat" }, { wert: "queue", text: "Prüf-Queue", zahl: zurPruefung || undefined }, { wert: "qualitaet", text: "Qualität" }]} />
+      <ReiterInhalt>{reiter === "chat" ? <KiChat /> : reiter === "queue" ? <Queue /> : <Qualitaet />}</ReiterInhalt>
     </Seite>
   );
 }

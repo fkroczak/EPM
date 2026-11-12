@@ -70,15 +70,15 @@ export function KiPruefung() {
     onSuccess: () => { neu(); melden("Wird erneut verarbeitet – angefordert, läuft auch tagsüber."); },
   });
 
-  if (q.isLoading) return <Seite pfad={[{ text: "KI (Experimentell)", zu: "/ki" }, { text: "Prüfung" }]}><Laden /></Seite>;
-  if (!v) return <Seite pfad={[{ text: "KI (Experimentell)", zu: "/ki" }, { text: "Prüfung" }]}><Fehleranzeige fehler={q.error} /></Seite>;
+  if (q.isLoading) return <Seite pfad={[{ text: "KI (Experimentell)", zu: "/ki?reiter=queue" }, { text: "Prüfung" }]}><Laden /></Seite>;
+  if (!v) return <Seite pfad={[{ text: "KI (Experimentell)", zu: "/ki?reiter=queue" }, { text: "Prüfung" }]}><Fehleranzeige fehler={q.error} /></Seite>;
 
   const offeneFelder = v.felder.filter((f) => f.status === "offen" || f.status === "freigegeben");
   const freigegeben = v.felder.filter((f) => f.status === "freigegeben" && vorschau.get(f.id)?.aktion !== "nur_info");
   const dateiUrl = `/api/dokumente/${v.dokument}/datei/?anzeigen=1`;
 
   return (
-    <Seite pfad={[{ text: "KI (Experimentell)", zu: "/ki" }, { text: v.dokument_titel }]}>
+    <Seite pfad={[{ text: "KI (Experimentell)", zu: "/ki?reiter=queue" }, { text: v.dokument_titel }]}>
       <Seitenkopf titel={v.dokument_titel}
         unter={<>Akte <Link to={`/patienten/${v.patient}/ki`}>{v.patient_name} ({v.patient_nummer})</Link>
           {v.dokument_datum ? ` · Dokument vom ${datum(v.dokument_datum)}` : ""}{v.firma_name ? ` · ${v.firma_name}` : ""}</>}
@@ -176,8 +176,8 @@ export function KiPruefung() {
       </div>
       {bearbeiten ? <FeldDialog vorgang={v.id} feld={bearbeiten} onZu={() => setBearbeiten(null)} onFertig={neu} /> : null}
       <UebernahmeDialog offen={uebernehmen} onOffen={setUebernehmen} vorgang={v} felder={freigegeben} vorschau={vorschau}
-        onKonflikte={setKonflikte} onFertig={(stand) => { neu(); melden("In die Akte übernommen."); if (stand === "uebernommen") navigate("/ki"); }} />
-      <AblehnenDialog offen={ablehnen} onOffen={setAblehnen} vorgang={v.id} onFertig={() => { neu(); navigate("/ki"); }} />
+        onKonflikte={setKonflikte} onFertig={(stand) => { neu(); melden("In die Akte übernommen."); if (stand === "uebernommen") navigate("/ki?reiter=queue"); }} />
+      <AblehnenDialog offen={ablehnen} onOffen={setAblehnen} vorgang={v.id} onFertig={() => { neu(); navigate("/ki?reiter=queue"); }} />
     </Seite>
   );
 }

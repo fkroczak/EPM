@@ -83,6 +83,34 @@ class KiChatTest(Grundlage):
         n2 = chat.holen()
         self.assertEqual([m["role"] for m in chat.verlauf(n2)], ["user", "assistant", "user"])
 
+    def test_modell_nicht_erreichbar_wieder_in_die_queue(self):
+        from ki.modell import ModellFehler
+
+        cid = self.senden(self.mitarbeiter).json()["id"]
+        with ModellServer(status=500) as s:
+            for versuch in range(1, chat.MAX_VERSUCHE + 1):
+                n = chat.holen()
+                self.assertIsNotNone(n)
+                with self.assertRaises(ModellFehler):
+                    chat.beantworten(n, Client(s.url))
+                n.refresh_from_db()
+                self.assertEqual(n.versuche, versuch)
+                self.assertEqual(n.status, "wartet" if versuch < chat.MAX_VERSUCHE else "fehler")
+        self.assertIsNone(chat.holen())
+        self.assertEqual(N.objects.get(chat_id=cid, rolle="ki").status, "fehler")
+
+    def test_zu_lange_wartend(self):
+        import datetime as dt
+
+        from django.utils import timezone
+
+        cid = self.senden(self.mitarbeiter).json()["id"]
+        N.objects.filter(chat_id=cid).update(erstellt_am=timezone.now() - dt.timedelta(minutes=16))
+        self.assertEqual(chat.zu_lange_wartend(), 1)
+        n = N.objects.get(chat_id=cid, rolle="ki")
+        self.assertEqual(n.status, "fehler")
+        self.assertIn("nicht bereit", n.fehler)
+
     @mock.patch.dict(os.environ, {"KI_HARDWARE_PRUEFEN": "0"})
     def test_dienst_ohne_modell_meldet_fehler(self):
         from ki.management.commands.epm_ki import Dienst

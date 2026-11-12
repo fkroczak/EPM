@@ -77,8 +77,8 @@ class DienstNeustartView(APIView):
 
     def post(self, request):
         dienst = request.data.get("dienst")
-        if dienst not in host.DIENSTE:
-            return _fehler("dienst", f"Erlaubt: {', '.join(host.DIENSTE)}.")
+        if dienst not in host.DIENSTE + host.KI_DIENSTE:
+            return _fehler("dienst", f"Erlaubt: {', '.join(host.DIENSTE + host.KI_DIENSTE)}.")
         return auftrag_anlegen(request, "dienst_neustart", parameter={"dienst": dienst}, objekt=f"Dienst {dienst}",
                                protokoll_details={"dienst": dienst})
 

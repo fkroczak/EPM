@@ -254,7 +254,7 @@ class Wartung(Backupverzeichnis):
         d = self.a.get("/api/system/uebersicht/").json()
         self.assertTrue(d["verwaltung"]["epm_zurueck"]["sichern"])
         self.assertEqual(d["host"]["versionen"]["aktiv"], "0.9.2-bbbbbbb")
-        self.assertEqual(d["dienste"], ["backend", "web", "ocr", "db"])
+        self.assertEqual(d["dienste"], ["backend", "web", "ocr", "db", "ki-worker", "ki-modell"])
 
     def test_zertifikat(self):
         from cryptography import x509
