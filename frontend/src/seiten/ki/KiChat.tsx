@@ -72,7 +72,7 @@ export function KiChat() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)] gap-4 items-start" data-testid="ki-chat">
-      <Karte className="flex flex-col gap-2 p-3 lg:max-h-[calc(100dvh-14rem)] overflow-y-auto">
+      <Karte className="flex flex-col gap-2 p-3 lg:max-h-[calc(100dvh-19rem)] overflow-y-auto">
         <Knopf variante="pri" icon="plus" onClick={() => { setAktiv(null); setText(""); senden.reset(); }}>Neuer Chat</Knopf>
         <span className="text-xs gedaempft">Nur Sie sehen Ihre Chats.</span>
         <ul className="m-0 p-0 list-none flex flex-col gap-0.5" aria-label="Meine Chats">
@@ -89,7 +89,7 @@ export function KiChat() {
         {liste.data && !liste.data.length ? <span className="text-sm gedaempft">Noch keine Chats.</span> : null}
       </Karte>
 
-      <Karte className="flex flex-col gap-3 p-4 min-w-0 h-[calc(100dvh-14rem)] min-h-[30rem]">
+      <Karte className="flex flex-col gap-3 p-4 min-w-0 h-[calc(100dvh-19rem)] min-h-[26rem]">
         <Meldung art="info" className="text-[0.8125rem] shrink-0">
           Lokale KI, offline auf dem Server. Sie formuliert nur, was Sie eingeben – <strong>jede Antwort vor der Verwendung prüfen</strong>.
           Zahlen oder Daten, die nicht in Ihrem Text stehen, werden markiert.

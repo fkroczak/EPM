@@ -87,7 +87,16 @@ export type KiStand = {
   };
   queue?: { je_status: Partial<Record<KiStatus, number>>; noch_nicht_vorgemerkt: number; gesamt: number };
   modell?: { id: number; name: string } | null;
+  arbeit?: KiArbeit;
 };
+
+export type KiArbeitDokument = { id: number; dokument_titel: string; dokument_datum: string | null; patient: number;
+  patient_name: string; patient_nummer: number; schritt: string; fortschritt: number; seiten: number;
+  begonnen_am: string | null; angefordert: boolean; status: KiStatus };
+/** Was der KI-Dienst gerade tut (Übersicht); fremde Chats nur als Anzahl. */
+export type KiArbeit = { dokumente: KiArbeitDokument[]; dokumente_andere: number;
+  berichte: { id: number; art_name: string; patient: number; patient_name: string }[];
+  chats: number; chat_eigener: boolean; naechste: KiArbeitDokument[]; wartend: number; wartend_angefordert: number };
 
 /** Anzahl zur Prüfung (Menüpunkt). Ohne Recht keine Abfrage. */
 export function useKiZurPruefung(): number {

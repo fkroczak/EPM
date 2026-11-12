@@ -122,6 +122,9 @@ def beantworten(nachricht: KiChatNachricht, client: Client | None) -> KiChatNach
     nachricht.status, nachricht.fehler, nachricht.fertig_am = N.Status.FERTIG, "", timezone.now()
     nachricht.save(update_fields=["text", "pruefung", "modell", "dauer_s", "status", "fehler", "fertig_am"])
     KiChat.objects.filter(pk=nachricht.chat_id).update(aktualisiert_am=timezone.now())
+    log.info("KI-Chat-Antwort %s fertig nach %d s: %s Tokens geschrieben%s", nachricht.pk, a.dauer_s,
+             (a.tokens or {}).get("completion_tokens", "?"),
+             "" if nachricht.pruefung.get("ok") else " – Zahlen/Daten markiert")
     protokolliere(SystemEreignis.Art.KI, benutzername="ki-dienst", objekt=f"KI-Chat {nachricht.chat_id}",
                   aktion="chat_beantwortet", vorlage=nachricht.vorlage_name, dauer_s=a.dauer_s,
                   pruefung_ok=nachricht.pruefung.get("ok"))

@@ -165,3 +165,51 @@ class ChatInPauseTest(Grundlage):
         d.modell_bereit = False
         self.assertFalse(d._chat_erlaubt(Entscheidung("pause", 0, True, last={})))
         self.assertTrue(d._chat_erlaubt(Entscheidung("tag", 1, True)))
+
+
+@override_settings(EPM_KI=Path(KI_TMP))
+class GeradeInArbeitTest(Grundlage):
+    def test_dokument_schritt_und_chat_ohne_inhalt(self):
+        from django.utils import timezone
+
+        from ki.testhilfen import dokument
+        from ki.models import KiVorgang
+
+        d = dokument(self.patient, b"%PDF-1.4 x", name="Labor.pdf", mime="application/pdf")
+        v = KiVorgang.objects.create(dokument=d, patient=self.patient, firma_id=d.firma_id, sha256=d.sha256,
+                                     status="in_verarbeitung", schritt="Seite 2 von 3: Modell liest", fortschritt=55,
+                                     begonnen_am=timezone.now(), ist_test=self.patient.ist_test)
+        c = KiChat.objects.create(benutzer=self.mediziner)
+        N.objects.create(chat=c, rolle="ki", status="laeuft", text="geheim")
+        a = client_fuer(self.mitarbeiter).get("/api/ki/stand/").json()["arbeit"]
+        self.assertEqual([x["id"] for x in a["dokumente"]], [v.pk])
+        self.assertEqual((a["dokumente"][0]["schritt"], a["dokumente"][0]["fortschritt"]), ("Seite 2 von 3: Modell liest", 55))
+        self.assertEqual((a["chats"], a["chat_eigener"]), (1, False))
+        self.assertNotIn("geheim", str(a))
+        self.assertTrue(client_fuer(self.mediziner).get("/api/ki/stand/").json()["arbeit"]["chat_eigener"])
+
+    def test_protokoll_zeigt_was_bearbeitet_wird(self):
+        from ki import pipeline
+        from ki.management.commands.epm_ki import Dienst
+        from ki.models import KiVorgang
+        from ki.steuerung import Entscheidung
+        from ki.testhilfen import dokument
+
+        d = dokument(self.patient, b"%PDF-1.4 y", name="Arztbrief Anna Echt.pdf", mime="application/pdf")
+        v = KiVorgang.objects.create(dokument=d, patient=self.patient, firma_id=d.firma_id, sha256=d.sha256,
+                                     status="in_verarbeitung", ist_test=self.patient.ist_test)
+
+        def verarbeiten(vorgang, rahmen, paddle=None):
+            rahmen.schritt("Seite 1 von 1: Texterkennung", 40)
+            KiVorgang.objects.filter(pk=vorgang.pk).update(status="zur_pruefung", dokumenttyp="arztbericht")
+
+        dienst = Dienst(einmal=True)
+        dienst.entscheidung = Entscheidung("nacht", 1, False)
+        with mock.patch.object(pipeline, "verarbeiten", verarbeiten), self.assertLogs("epm.ki", "INFO") as logs:
+            dienst._vorgang(v)
+        text = "\n".join(logs.output)
+        self.assertIn(f"KI-Vorgang Nr. {v.pk} gestartet: Dokument {d.pk}, Akte Nr. {self.patient.nummer}", text)
+        self.assertIn("Seite 1 von 1: Texterkennung (40 %)", text)
+        self.assertIn("fertig nach", text)
+        self.assertIn("Typ arztbericht", text)
+        self.assertNotIn("Echt", text)  # keine Namen im Protokoll
