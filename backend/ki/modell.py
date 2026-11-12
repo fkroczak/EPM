@@ -137,16 +137,42 @@ class Client:
                        tokens=r.get("usage") or {})
 
     def gespraech(self, system: str, nachrichten: list[dict], max_tokens: int = 1500,
-                  temperatur: float = 0.1) -> Antwort:
-        """Chat mit Verlauf: ``nachrichten`` = [{"role": "user"|"assistant", "content": str}, …] (KI-Chat)."""
+                  temperatur: float = 0.1, bei_teil=None) -> Antwort:
+        """Chat mit Verlauf: ``nachrichten`` = [{"role": "user"|"assistant", "content": str}, …] (KI-Chat).
+
+        Gestreamt (Server-Sent Events): ``bei_teil(bisheriger_text)`` wird während des Schreibens aufgerufen, damit
+        die Oberfläche die Antwort Stück für Stück zeigen kann."""
         daten = {"messages": [{"role": "system", "content": system}, *nachrichten], "temperature": temperatur,
-                 "max_tokens": max_tokens, "stream": False, "chat_template_kwargs": {"enable_thinking": False}}
+                 "max_tokens": max_tokens, "stream": True, "chat_template_kwargs": {"enable_thinking": False}}
+        req = urllib.request.Request(self.url + "/v1/chat/completions", data=json.dumps(daten).encode(),
+                                     method="POST", headers={"Content-Type": "application/json"})
         t0 = time.monotonic()
-        r = self._anfrage("/v1/chat/completions", daten)
-        dauer = time.monotonic() - t0
+        teile, modell, tokens = [], "", {}
         try:
-            text_aus = r["choices"][0]["message"]["content"] or ""
-        except (KeyError, IndexError, TypeError) as e:
-            raise ModellFehler("Antwort des Modell-Dienstes ist unvollständig.") from e
-        return Antwort(text=text_aus.strip(), dauer_s=round(dauer, 2), modell=str(r.get("model", "")),
-                       tokens=r.get("usage") or {})
+            with _OEFFNER.open(req, timeout=self.zeitlimit_s) as r:
+                for roh in r:
+                    zeile = roh.decode("utf-8", "replace").strip()
+                    if not zeile.startswith("data:"):
+                        continue
+                    inhalt = zeile[5:].strip()
+                    if inhalt == "[DONE]":
+                        break
+                    try:
+                        stueck = json.loads(inhalt)
+                    except json.JSONDecodeError:
+                        continue
+                    modell = str(stueck.get("model", modell))
+                    tokens = stueck.get("usage") or tokens
+                    for wahl in stueck.get("choices") or []:
+                        neu = (wahl.get("delta") or {}).get("content") or ""
+                        if neu:
+                            teile.append(neu)
+                            if bei_teil is not None:
+                                bei_teil("".join(teile))
+        except urllib.error.HTTPError as e:
+            text = e.read().decode("utf-8", "replace")[:300]
+            raise ModellFehler(f"Modell-Dienst antwortet mit {e.code}: {text}") from e
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            raise ModellFehler(f"Modell-Dienst nicht erreichbar ({e}).") from e
+        return Antwort(text="".join(teile).strip(), dauer_s=round(time.monotonic() - t0, 2), modell=modell,
+                       tokens=tokens)

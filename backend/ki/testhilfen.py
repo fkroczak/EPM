@@ -94,8 +94,19 @@ class ModellServer:
 
             def do_POST(self):
                 laenge = int(self.headers.get("Content-Length", 0))
-                anfragen.append(json.loads(self.rfile.read(laenge)))
-                self._senden(status, antwort if status == 200 else {"error": "kaputt"})
+                daten = json.loads(self.rfile.read(laenge))
+                anfragen.append(daten)
+                if not daten.get("stream") or status != 200:
+                    self._senden(status, antwort if status == 200 else {"error": "kaputt"})
+                    return
+                # wie llama-server mit "stream": true – Server-Sent Events, Stück für Stück
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.end_headers()
+                for i in range(0, len(inhalt), 8):
+                    stueck = {"model": "probe.gguf", "choices": [{"delta": {"content": inhalt[i:i + 8]}}]}
+                    self.wfile.write(f"data: {json.dumps(stueck)}\n\n".encode())
+                self.wfile.write(b"data: [DONE]\n\n")
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.port = self.server.server_address[1]

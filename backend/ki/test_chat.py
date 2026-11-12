@@ -66,10 +66,13 @@ class KiChatTest(Grundlage):
         with ModellServer("Seit 3 Tagen Fieber bis 38,5 °C, zuletzt 39,2 °C.") as s:
             holt = chat.holen()
             self.assertEqual(holt.pk, n.pk)
-            chat.beantworten(holt, Client(s.url))
+            with mock.patch.object(chat, "ZWISCHENSTAND_S", 0):
+                chat.beantworten(holt, Client(s.url))
             gesendet = s.anfragen[0]
         n.refresh_from_db()
         self.assertEqual(n.status, "fertig", n.fehler)
+        self.assertTrue(gesendet["stream"])
+        self.assertEqual(n.text, "Seit 3 Tagen Fieber bis 38,5 °C, zuletzt 39,2 °C.")
         self.assertIn(chat.RAHMEN[:40], gesendet["messages"][0]["content"])
         self.assertIn(v.anweisung[:40], gesendet["messages"][0]["content"])
         self.assertEqual(gesendet["messages"][1], {"role": "user", "content": "pat. hat seit 3 tagen fieber 38,5"})
@@ -147,3 +150,18 @@ class KiChatTest(Grundlage):
         KiChat.objects.filter(pk=cid).update(aktualisiert_am=timezone.now() - dt.timedelta(days=31))
         chat.aufraeumen(dt.timedelta(minutes=5))
         self.assertFalse(KiChat.objects.filter(pk=cid).exists())
+
+
+class ChatInPauseTest(Grundlage):
+    def test_chat_auch_bei_last_pause_nicht_bei_sicherung(self):
+        from ki.management.commands.epm_ki import Dienst
+        from ki.steuerung import Entscheidung
+
+        d = Dienst(einmal=True)
+        d.client, d.modell_bereit = object(), True
+        self.assertTrue(d._chat_erlaubt(Entscheidung("pause", 0, True, grund="CPU 92 %", last={"sicherung_laeuft": False})))
+        self.assertFalse(d._chat_erlaubt(Entscheidung("pause", 0, True, grund="Sicherung", last={"sicherung_laeuft": True})))
+        self.assertFalse(d._chat_erlaubt(Entscheidung("aus", 0, True)))
+        d.modell_bereit = False
+        self.assertFalse(d._chat_erlaubt(Entscheidung("pause", 0, True, last={})))
+        self.assertTrue(d._chat_erlaubt(Entscheidung("tag", 1, True)))
