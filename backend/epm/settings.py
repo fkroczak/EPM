@@ -128,6 +128,7 @@ DATABASES = {
     }
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+TEST_RUNNER = "epm.testlauf.Testlauf"   # parallele Tests mit eigenen Arbeitsordnern je Prozess
 
 AUTH_USER_MODEL = "accounts.User"
 AUTH_PASSWORD_VALIDATORS = [
