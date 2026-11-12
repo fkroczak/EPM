@@ -197,7 +197,7 @@ abschliessen() {
     LOG=/var/log/epm-tests.log
     # ``</dev/null``: Ohne das hängt die Standardeingabe am Terminal – in die Zwischenablage geratener Text landete
     # dann im laufenden Testcontainer und ein darin enthaltenes Strg-C brach den Lauf ab (Stolperstein 06.10.2026).
-    if (cd "$B" && docker compose run --rm -T backend python manage.py test) </dev/null >"$LOG" 2>&1; then
+    if (cd "$B" && docker compose run --rm -T backend python manage.py test --parallel 2) </dev/null >"$LOG" 2>&1; then
       ERGEBNIS="Tests OK"
     else
       ERGEBNIS="TESTS FEHLGESCHLAGEN – Ausgabe oben, vollständig in $LOG"
