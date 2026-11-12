@@ -200,6 +200,7 @@ einrichten() {
   root
   [[ -f "$B/.env" && -f "$B/compose.yaml" ]] || fehler "EPM ist hier nicht eingerichtet ($B)."
   [[ -f "$B/compose.ki.yaml" ]] || install -m 0644 "$CODE/rollout/projekt/compose.ki.yaml" "$B/"
+  [[ -f "$B/ki-modell-start.sh" ]] || install -m 0755 "$CODE/rollout/ki/ki-modell-start.sh" "$B/"
   ls "$VORRAT"/*.gguf >/dev/null 2>&1 || fehler "Keine Modelle in $VORRAT – zuerst: sudo epm-ki einspielen DATEI"
   echo "==> Hardware"
   local json; json="$("$CODE/werkzeuge/ki-pruefen.sh" --json)"

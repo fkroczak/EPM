@@ -142,6 +142,11 @@ starte_version() {
   [[ -f "$B/ki-aktiv" && -f "$B/compose.ki.yaml" ]] && dateien="compose.yaml:compose.ki.yaml"
   sed -i -e "s/^COMPOSE_FILE=.*/COMPOSE_FILE=$dateien/" -e "s/^EPM_VERSION=.*/EPM_VERSION=$tag/" "$B/.env"
   (cd "$B" && docker compose up -d --remove-orphans) || return 1
+  # KI: Startskript von ki-modell geändert (04-projekt.sh) → Container neu starten, damit es gilt
+  if [[ "$dateien" == *compose.ki.yaml* && -f "$B/ki-modell-start.geaendert" ]]; then
+    (cd "$B" && docker compose restart ki-modell) || true
+    rm -f "$B/ki-modell-start.geaendert"
+  fi
   schritt "Warte auf das Backend"
   local status=""
   for _ in $(seq 1 60); do
