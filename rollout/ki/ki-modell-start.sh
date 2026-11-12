@@ -50,7 +50,7 @@ pruefen() {  # Datei, erwartete SHA-256 → 0 wenn ok (Ergebnis je Datei gemerkt
 
 starten() {  # Datei, Projektor, Alias
   set -- -m "$MODELLE/$1" --host 0.0.0.0 --port 8080 --alias "$3" \
-    -t "${KI_THREADS:-4}" -c "${KI_KONTEXT:-16384}" --parallel "${KI_SLOTS:-2}" \
+    -t "${KI_THREADS:-4}" -c "${KI_KONTEXT:-32768}" --parallel "${KI_SLOTS:-2}" \
     -ngl 0 --jinja ${2:+--mmproj "$MODELLE/$2"}
   # mehrere Plätze (Chat neben einem Dokument): gemeinsamer Kontextspeicher statt je Platz ein Teil – kein
   # zusätzlicher Arbeitsspeicher, jede Anfrage kann weiter den ganzen Kontext nutzen

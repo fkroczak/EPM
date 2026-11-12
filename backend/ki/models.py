@@ -564,8 +564,46 @@ class KiChatNachricht(models.Model):
     erstellt_am = models.DateTimeField(auto_now_add=True)
     lebenszeichen = models.DateTimeField(null=True, blank=True)
     fertig_am = models.DateTimeField(null=True, blank=True)
+    schritt = models.CharField(max_length=160, blank=True, help_text="was der KI-Dienst gerade tut (Dokument lesen …)")
 
     class Meta:
         verbose_name = "KI-Chatnachricht"
         verbose_name_plural = "KI-Chatnachrichten"
         ordering = ["erstellt_am", "id"]
+
+
+class KiChatAnhang(models.Model):
+    """Dokument zu einer Chatnachricht (12.11.2026): hochgeladen oder aus einer Akte gewählt, ohne Seitengrenze.
+
+    Der KI-Dienst erkennt den Text und legt ihn in ``text`` ab; eine hochgeladene Datei (``datei``) wird danach
+    gelöscht. Der Anhang geht mit dem Chat (Aufbewahrung wie der Chat), mit dem Dokument der Akte (Löschung nach
+    Art. 17 DSGVO) und mit der Akte."""
+
+    class Herkunft(models.TextChoices):
+        UPLOAD = "upload", "Hochgeladen"
+        AKTE = "akte", "Aus der Akte"
+
+    class Status(models.TextChoices):
+        WARTET = "wartet", "Text wird erkannt"
+        FERTIG = "fertig", "fertig"
+        FEHLER = "fehler", "Fehler"
+
+    nachricht = models.ForeignKey(KiChatNachricht, on_delete=models.CASCADE, related_name="anhaenge")
+    herkunft = models.CharField(max_length=6, choices=Herkunft.choices)
+    dokument = models.ForeignKey("patienten.Dokument", on_delete=models.CASCADE, null=True, blank=True, related_name="+")
+    patient = models.ForeignKey("patienten.Patient", on_delete=models.CASCADE, null=True, blank=True, related_name="+")
+    name = models.CharField(max_length=255)
+    mime = models.CharField(max_length=100, blank=True)
+    groesse = models.PositiveBigIntegerField(default=0)
+    datei = models.BinaryField(null=True, blank=True, help_text="hochgeladene Datei, bis der Text erkannt ist")
+    seiten = models.PositiveIntegerField(default=0)
+    seiten_fertig = models.PositiveIntegerField(default=0)
+    text = models.TextField(blank=True)
+    status = models.CharField(max_length=6, choices=Status.choices, default=Status.WARTET)
+    fehler = models.TextField(blank=True)
+    erstellt_am = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "KI-Chat-Anhang"
+        verbose_name_plural = "KI-Chat-Anhänge"
+        ordering = ["id"]

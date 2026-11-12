@@ -322,10 +322,10 @@ class Dienst:
         log.info("KI-Chat-Antwort %s gestartet (Vorlage „%s“, Versuch %s)", n.pk, n.vorlage_name or "–", n.versuche + 1)
         try:
             if self.einmal:
-                chat.beantworten(n, self.client if self.modell_bereit else None)
+                chat.beantworten(n, self.client if self.modell_bereit else None, paddle=self.paddle)
             else:
                 with dienst.herzschlag(n):
-                    chat.beantworten(n, self.client if self.modell_bereit else None)
+                    chat.beantworten(n, self.client if self.modell_bereit else None, paddle=self.paddle)
         except ModellFehler as e:
             # Modell weg (schläft, startet neu, abgestürzt): erst wieder arbeiten, wenn es sich als bereit meldet
             log.warning("KI-Chat-Antwort %s: Modell nicht erreichbar (%s)", n.pk, e)

@@ -16,10 +16,11 @@ from collections import Counter
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -31,7 +32,7 @@ from epm.pagination import Seiten
 from . import chat, eingang, uebernahme
 from .pipeline import alte_felder_entfernen
 from .pruefung import PLANFELDER
-from .models import (Dokumenttyp, KiBerichtsauftrag, KiChat, KiChatNachricht, KiEinstellung, KiEvaluationsfall,
+from .models import (Dokumenttyp, KiBerichtsauftrag, KiChat, KiChatAnhang, KiChatNachricht, KiEinstellung, KiEvaluationsfall,
                      KiEvaluationslauf, KiFeld, KiHinweis, KiKorrektur, KiModellversion, KiPromptvorlage, KiVorgang)
 
 A = SystemEreignis.Art
@@ -642,11 +643,22 @@ class KiPromptvorlageViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
+class ChatAnhangSerializer(serializers.ModelSerializer):
+    patient_nummer = serializers.IntegerField(source="patient.nummer", read_only=True, default=None)
+
+    class Meta:
+        model = KiChatAnhang
+        fields = ["id", "herkunft", "name", "groesse", "seiten", "seiten_fertig", "status", "fehler", "dokument",
+                  "patient", "patient_nummer"]
+
+
 class ChatNachrichtSerializer(serializers.ModelSerializer):
+    anhaenge = ChatAnhangSerializer(many=True, read_only=True)
+
     class Meta:
         model = KiChatNachricht
-        fields = ["id", "rolle", "text", "status", "vorlage_name", "pruefung", "fehler", "modell", "dauer_s",
-                  "erstellt_am", "fertig_am"]
+        fields = ["id", "rolle", "text", "status", "schritt", "vorlage_name", "pruefung", "fehler", "modell",
+                  "dauer_s", "erstellt_am", "fertig_am", "anhaenge"]
 
 
 class ChatSerializer(serializers.ModelSerializer):
@@ -666,7 +678,8 @@ class ChatSerializer(serializers.ModelSerializer):
 
 
 class KiChatViewSet(viewsets.GenericViewSet):
-    """KI-Chat: ``GET/POST /api/ki/chats/``, ``GET/DELETE …/{id}/``, ``POST …/{id}/nachricht/`` {text, vorlage}.
+    """KI-Chat: ``GET/POST /api/ki/chats/``, ``GET/DELETE …/{id}/``, ``POST …/{id}/nachricht/`` {text, vorlage,
+    dokumente: [ID aus der Akte], dateien: [Upload] (multipart)}.
 
     Jede Person sieht **ausschließlich ihre eigenen** Unterhaltungen – der Filter ``benutzer=request.user`` gilt für
     alle Rollen, auch Admins; fremde Chats antworten mit 404. Inhalte stehen nicht im Audit-Log."""
@@ -681,8 +694,10 @@ class KiChatViewSet(viewsets.GenericViewSet):
         return self.get_queryset().filter(pk=pk).first()
 
     def _antwort(self, c: KiChat):
+        nachrichten = c.nachrichten.prefetch_related(
+            Prefetch("anhaenge", KiChatAnhang.objects.defer("datei", "text").select_related("patient")))
         return {**ChatSerializer(c).data,
-                "nachrichten": ChatNachrichtSerializer(c.nachrichten.all(), many=True).data,
+                "nachrichten": ChatNachrichtSerializer(nachrichten, many=True).data,
                 "aufbewahrung_tage": chat.aufbewahrung_tage()}
 
     def list(self, request):
@@ -719,14 +734,60 @@ class KiChatViewSet(viewsets.GenericViewSet):
         except (KiPromptvorlage.DoesNotExist, TypeError, ValueError):
             raise serializers.ValidationError({"vorlage": "Unbekannte oder ausgeblendete Vorlage."})
 
-    @action(detail=True, methods=["post"])
+    @staticmethod
+    def _akten_dokumente(request) -> list:
+        """Gewählte Dokumente aus Akten – nur solche, die die Person in der Akte sehen darf."""
+        from patienten.models import Dokument
+
+        ids = request.data.getlist("dokumente") if hasattr(request.data, "getlist") else \
+            (request.data.get("dokumente") or [])
+        if not isinstance(ids, list):
+            raise serializers.ValidationError({"dokumente": "Liste von Dokumenten erwartet."})
+        firma = getattr(request.user, "firma", None)
+        aus = []
+        for wert in ids[:50]:
+            dok = Dokument.objects.filter(pk=wert, patient__in=patienten_fuer(request.user), ausgeblendet=False) \
+                .select_related("patient").first() if str(wert).isdigit() else None
+            if dok is None or (firma is not None and dok.firma_id not in (None, firma.pk)):
+                raise serializers.ValidationError({"dokumente": "Dokument nicht gefunden."})
+            if dok.mime not in eingang.LESBAR:
+                raise serializers.ValidationError(
+                    {"dokumente": f"„{dok.titel}“: dieses Dateiformat kann die Texterkennung nicht lesen."})
+            aus.append(dok)
+        return aus
+
+    @staticmethod
+    def _dateien(request) -> list:
+        from django.conf import settings
+
+        dateien = request.FILES.getlist("dateien")
+        for d in dateien:
+            if d.size > settings.EPM_UPLOAD_MAX_MB * 1024 * 1024:
+                raise serializers.ValidationError(
+                    {"dateien": f"„{d.name}“ ist größer als {settings.EPM_UPLOAD_MAX_MB} MB."})
+        if len(dateien) > 20:
+            raise serializers.ValidationError({"dateien": "Höchstens 20 Dateien je Nachricht."})
+        return dateien
+
+    @action(detail=True, methods=["post"], parser_classes=[JSONParser, MultiPartParser, FormParser])
     def nachricht(self, request, pk=None):
+        from scans.ocr.laden import dateityp
+
         _recht(request.user, "ki_berichte")
         text = str(request.data.get("text") or "").strip()
-        if not text:
-            return _fehler("Bitte einen Text eingeben.", feld="text")
+        dokumente, dateien = self._akten_dokumente(request), self._dateien(request)
+        if not text and not dokumente and not dateien:
+            return _fehler("Bitte einen Text eingeben oder ein Dokument anhängen.", feld="text")
         if len(text) > chat.MAX_ZEICHEN:
             return _fehler(f"Höchstens {chat.MAX_ZEICHEN} Zeichen je Nachricht.", feld="text")
+        hochgeladen = []
+        for d in dateien:
+            daten = d.read()
+            mime = dateityp(daten[:64])
+            if mime is None:
+                return _fehler(f"„{d.name}“: erlaubt sind PDF und Bilder (JPG, PNG, TIFF, WEBP, BMP, HEIC).",
+                               feld="dateien")
+            hochgeladen.append((d.name[:255], mime, daten))
         with transaction.atomic():
             c = self.get_queryset().select_for_update(of=("self",)).filter(pk=pk).first()
             if c is None:
@@ -737,15 +798,27 @@ class KiChatViewSet(viewsets.GenericViewSet):
             vorlage = self._vorlage(request.data["vorlage"]) if "vorlage" in request.data else c.vorlage
             c.vorlage = vorlage
             if not c.titel:
-                c.titel = " ".join(text.split())[:60]
+                namen = [n for n, _m, _d in hochgeladen] + [d.titel for d in dokumente]
+                c.titel = (" ".join(text.split()) or ", ".join(namen))[:60]
             c.save(update_fields=["vorlage", "titel", "aktualisiert_am"])
-            KiChatNachricht.objects.create(chat=c, rolle=KiChatNachricht.Rolle.NUTZER, text=text)
+            frage = KiChatNachricht.objects.create(chat=c, rolle=KiChatNachricht.Rolle.NUTZER, text=text)
+            for name, mime, daten in hochgeladen:
+                KiChatAnhang.objects.create(nachricht=frage, herkunft=KiChatAnhang.Herkunft.UPLOAD, name=name,
+                                            mime=mime, groesse=len(daten), datei=daten)
+            for dok in dokumente:
+                KiChatAnhang.objects.create(nachricht=frage, herkunft=KiChatAnhang.Herkunft.AKTE, dokument=dok,
+                                            patient=dok.patient, name=dok.titel[:255], mime=dok.mime,
+                                            groesse=dok.groesse)
             KiChatNachricht.objects.create(
                 chat=c, rolle=KiChatNachricht.Rolle.KI, status=KiChatNachricht.Status.WARTET,
                 vorlage_name=vorlage.name if vorlage else "", anweisung=vorlage.anweisung if vorlage else "",
                 temperatur=vorlage.temperatur if vorlage else Decimal("0.10"))
         protokolliere(A.KI, request, objekt=f"KI-Chat {c.pk}", aktion="chat_nachricht",
-                      vorlage=vorlage.name if vorlage else "", zeichen=len(text))
+                      vorlage=vorlage.name if vorlage else "", zeichen=len(text), dateien=len(hochgeladen))
+        # Zugriff auf Akten-Dokumente: wie jede Einsicht mit Patient und Dokument im Protokoll (ohne Inhalt)
+        for dok in dokumente:
+            protokolliere(A.KI, request, objekt=f"KI-Chat {c.pk}", aktion="chat_dokument_aus_akte",
+                          dokument=dok.pk, patient_id=dok.patient_id)
         return Response(self._antwort(c), status=status.HTTP_201_CREATED)
 
 
@@ -1135,7 +1208,7 @@ class EinrichtungView(APIView):
                 return _fehler("Das ist das aktive Modell – zuerst ein anderes aktivieren.", feld="datei")
             parameter, objekt = {"datei": datei}, datei
         elif aktion == "grenzen":
-            for name in ("KI_SPEICHER", "KI_WORKER_SPEICHER", "KI_THREADS", "KI_WORKER_MAX"):
+            for name in ("KI_SPEICHER", "KI_WORKER_SPEICHER", "KI_THREADS", "KI_WORKER_MAX", "KI_KONTEXT"):
                 wert = request.data.get(name)
                 if wert not in (None, ""):
                     parameter[name] = str(wert).strip()[:10]

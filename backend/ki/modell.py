@@ -12,6 +12,7 @@ damit nur gültiges JSON entsteht.
 import base64
 import json
 import logging
+import os
 import time
 import urllib.error
 import urllib.request
@@ -104,6 +105,30 @@ class Client:
             return {"bereit": False, "modell": "", "text": str(e)}
         namen = [m.get("id", "") for m in modelle.get("data", []) if isinstance(m, dict)]
         return {"bereit": True, "modell": namen[0] if namen else "", "text": "bereit"}
+
+    def kontext(self) -> int:
+        """Kontext des Modells in Tokens (llama-server ``/props``); sonst ``KI_KONTEXT`` bzw. 16384."""
+        try:
+            props = self._anfrage("/props", zeitlimit=10)
+            n = int((props.get("default_generation_settings") or {}).get("n_ctx") or props.get("n_ctx") or 0)
+            if n > 0:
+                return n
+        except (ModellFehler, TypeError, ValueError, AttributeError):
+            pass
+        try:
+            return max(2048, int(os.environ.get("KI_KONTEXT", "16384")))
+        except ValueError:
+            return 16384
+
+    def tokens(self, text: str) -> int:
+        """Tokens eines Textes (llama-server ``/tokenize``); ohne Antwort vorsichtig geschätzt (3 Zeichen je Token)."""
+        try:
+            r = self._anfrage("/tokenize", {"content": text}, zeitlimit=60)
+            if isinstance(r.get("tokens"), list):
+                return len(r["tokens"])
+        except (ModellFehler, AttributeError):
+            pass
+        return len(text) // 3 + 1
 
     def chat(self, system: str, text: str, bilder: list[bytes] | None = None, schema: dict | None = None,
              max_tokens: int = 1500, temperatur: float = 0.0) -> Antwort:

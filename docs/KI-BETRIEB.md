@@ -92,6 +92,12 @@ EPM läuft unverändert. `KI_HARDWARE_PRUEFEN=0` in `.env` schaltet die Prüfung
   nach der aktuellen Seite und setzt danach dort fort. Das Modell bleibt dafür tagsüber geladen (12.11.2026);
   `KI_MODELL_TAGSUEBER_ENTLADEN=1` in `.env` gibt den Speicher wie früher nach 30 Minuten ohne Arbeit frei
   (`KI_MODELL_SCHLAFEN_NACH_MIN`), der erste Chat danach wartet dann ein bis zwei Minuten.
+- **Chat mit Dokumenten:** Dateien hochladen oder aus einer Akte wählen, ohne Seitengrenze. Der Dienst erkennt den Text
+  Seite für Seite (Scans/Fotos auf der CPU etwa 10–30 s je Seite, PDF mit Textebene und schon erkannte Dokumente
+  sofort). Wie viel das Modell auf einmal liest, bestimmt **`KI_KONTEXT`** (Tokens, Standard 32768 ≈ 60–80 Seiten
+  Fließtext; Administration › KI › Einrichtung › Grenzen). Was nicht hineinpasst, liest es Teil für Teil und antwortet
+  aus den Auszügen. Mehr Kontext braucht mehr Speicher (`KI_SPEICHER` mit erhöhen) und vor allem Zeit: Das Modell liest
+  auf der CPU grob 50–200 Tokens je Sekunde, 32 000 Tokens also einige Minuten.
 - **Pausen:** während der Sicherung (Marke `system/status/backup-laeuft`), bei zu wenig freiem RAM, zu hoher CPU oder
   Systemlast (Grenzen in Administration › KI), tagsüber solange Scans warten. Hysterese: weiter erst deutlich unter
   den Grenzen. Knapp darunter arbeitet er „sparsam“ (ein Auftrag, kleinere Bilder, keine zweite Lesung).

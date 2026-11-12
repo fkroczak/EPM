@@ -67,7 +67,7 @@ class Attrappe:
 class ModellServer:
     """Echter HTTP-Server auf 127.0.0.1, der wie llama-server antwortet (für den Client-Test)."""
 
-    def __init__(self, inhalt: str = '{"dokumenttyp": "labor"}', status: int = 200):
+    def __init__(self, inhalt: str = '{"dokumenttyp": "labor"}', status: int = 200, kontext: int = 16384):
         antwort = {"choices": [{"message": {"content": inhalt}, "finish_reason": "stop"}], "model": "probe.gguf",
                    "usage": {"prompt_tokens": 10, "completion_tokens": 5}}
         anfragen = self.anfragen = []
@@ -89,12 +89,17 @@ class ModellServer:
                     self._senden(200, {"status": "ok"})
                 elif self.path == "/v1/models":
                     self._senden(200, {"data": [{"id": "probe.gguf#abc"}]})
+                elif self.path == "/props":
+                    self._senden(200, {"default_generation_settings": {"n_ctx": kontext}})
                 else:
                     self._senden(404, {})
 
             def do_POST(self):
                 laenge = int(self.headers.get("Content-Length", 0))
                 daten = json.loads(self.rfile.read(laenge))
+                if self.path == "/tokenize":  # wie llama-server; hier grob 4 Zeichen je Token
+                    self._senden(200, {"tokens": list(range(len(daten.get("content", "")) // 4 + 1))})
+                    return
                 anfragen.append(daten)
                 if not daten.get("stream") or status != 200:
                     self._senden(status, antwort if status == 200 else {"error": "kaputt"})

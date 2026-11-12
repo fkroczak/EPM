@@ -236,7 +236,7 @@ KI_KATALOG = {
 }
 # Grenzen in .env: Name -> (Muster, kleinster, größter Wert) – Speicher in GB („8g“), sonst Zahl
 KI_GRENZEN = {"KI_SPEICHER": ("g", 2, 256), "KI_WORKER_SPEICHER": ("g", 1, 64), "KI_THREADS": ("", 1, 256),
-              "KI_WORKER_MAX": ("", 1, 16)}
+              "KI_WORKER_MAX": ("", 1, 16), "KI_KONTEXT": ("", 4096, 262144)}
 # Zeitplan der nächtlichen Sicherung (Drop-in für epm-backup.timer): Uhrzeit HH:MM, nur diese Wochentag-Muster
 ZEITPLAN_TAGE = {"taeglich": "*-*-*", "werktags": "Mon..Fri *-*-*"}
 ZEITPLAN_STANDARD = {"uhrzeit": "02:00", "tage": "taeglich"}

@@ -4,7 +4,8 @@
 #
 # Ressourcenschutz: harte Speichergrenzen ohne Swap, niedrige CPU-Anteile (cpu_shares) und niedrige Priorität (nice).
 # Datenbank, Backend und Webserver haben im Zweifel Vorrang. Grenzen in .env (setzt `epm-ki einrichten` nach Hardware):
-#   KI_SPEICHER (Modell-Container), KI_THREADS (Rechenkerne des Modells), KI_WORKER_SPEICHER (KI-Dienst)
+#   KI_SPEICHER (Modell-Container), KI_THREADS (Rechenkerne des Modells), KI_WORKER_SPEICHER (KI-Dienst),
+#   KI_KONTEXT (Kontext in Tokens, Standard 32768)
 services:
   backend:
     # Backend: Stand des KI-Dienstes lesen, beim Modellwechsel aktiv.json schreiben, Prüfsumme der Modelldateien
@@ -47,7 +48,7 @@ services:
     restart: unless-stopped
     environment:
       KI_THREADS: ${KI_THREADS:-4}
-      KI_KONTEXT: ${KI_KONTEXT:-16384}
+      KI_KONTEXT: ${KI_KONTEXT:-32768}
       KI_SLOTS: ${KI_SLOTS:-2}   # 2: ein Platz bleibt für den Chat frei, solange nachts 1 Dokument läuft
       KI_MODELL_DATEI: ${KI_MODELL_DATEI:-}
       KI_PROJEKTOR_DATEI: ${KI_PROJEKTOR_DATEI:-}
@@ -99,6 +100,7 @@ services:
       EPM_SYSTEM: /data/system
       EPM_KI: /data/ki
       EPM_KI_MODELL_URL: http://ki-modell:8080
+      KI_KONTEXT: ${KI_KONTEXT:-32768}   # Chat: wie viel Text auf einmal ans Modell geht (wie beim Modell-Container)
       EPM_KI_SCHLUESSEL_FILE: /run/secrets/ki_schluessel
       EPM_OCR_THREADS: ${EPM_OCR_THREADS:-2}
       KI_WORKER_MAX: ${KI_WORKER_MAX:-2}

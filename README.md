@@ -34,7 +34,8 @@ kommt nur, was ein Mitarbeiter prüft und bestätigt. Dazu: Hinweise Labor ↔ I
 auf Anforderung, Qualitäts-Dashboard, Modellwechsel mit Evaluation und Rollback (Administration › KI).
 **Chat** (12.11.2026): Reiter „Chat“ im Menü KI (Experimentell) – Texte medizinisch formulieren, prüfen, kürzen …
 mit festen Promptvorlagen (Administration › Vorlagen › KI-Prompts); jede Person sieht nur ihre eigenen Chats. Tagsüber wartet die KI nur auf Eingaben: das Modell bleibt
-geladen, der Chat hat Vorrang, Hintergrundarbeit nur im Nachtfenster.
+geladen, der Chat hat Vorrang, Hintergrundarbeit nur im Nachtfenster. Im Chat lassen sich Dokumente hochladen oder aus
+einer Akte wählen (ohne Seitengrenze; lange Unterlagen liest die KI Teil für Teil, Kontext `KI_KONTEXT`).
 Einrichten, Modell wählen, laden bzw. hochladen, Grenzen, Benchmark und Ausschalten gehen nach „EPM aktualisieren“
 auch ohne SSH unter Administration › KI › Einrichtung.
 
