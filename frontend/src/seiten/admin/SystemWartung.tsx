@@ -5,6 +5,7 @@
  * Systemagenten (feste Liste), gefährliches mit Passwort und zweitem Faktor, alles im Audit-Log.
  */
 import { Stammzertifikat } from "@/components/Stammzertifikat";
+import { containerBewertung } from "@/lib/container";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -128,12 +129,12 @@ export function DiensteKarte({ daten, offen }: { daten: Uebersicht; offen: Set<s
       <KartenKopf titel="Dienste" unter={<>Einzelne <Begriff name="container">Container</Begriff> neu starten, z. B. wenn die Texterkennung hängt – statt „docker compose restart“ per SSH.</>} />
       {(daten.dienste ?? []).filter((d) => !NUR_WENN_DA.has(d) || container.some((x) => x.dienst === d)).map((d) => {
         const c = container.find((x) => x.dienst === d);
-        const gut = c && c.zustand === "running" && (!c.gesundheit || c.gesundheit === "healthy");
+        const b = c ? containerBewertung(c) : null;
         return (
           <div key={d} className="flex items-start justify-between gap-3 py-2 border-b border-rand last:border-b-0" data-testid={`dienst-${d}`}>
             <div className="flex flex-col gap-0.5 min-w-0">
               <span className="text-sm font-medium flex items-center gap-2 flex-wrap">{d}
-                {c ? <Chip art={gut ? "ok" : "fehler"}>{c.zustand === "running" ? "läuft" : c.zustand}{c.gesundheit ? ` · ${c.gesundheit === "healthy" ? "gesund" : c.gesundheit}` : ""}</Chip>
+                {b ? <Chip art={b.gut ? "ok" : "fehler"}>{b.text}</Chip>
                   : <Chip>Zustand unbekannt</Chip>}</span>
               <span className="text-xs gedaempft">{DIENST_TEXT[d] ?? ""}{c?.status ? ` · ${c.status}` : ""}</span>
             </div>
