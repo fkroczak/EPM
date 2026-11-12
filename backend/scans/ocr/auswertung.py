@@ -515,6 +515,41 @@ def _pfeil_als_eins(t: T, roh: str, spalten) -> bool:
     return t.box[0] < links - 0.6 * zeichen and abs(t.box[0] + eigenes - links) <= 0.5 * zeichen
 
 
+_REF_VORN = re.compile(r"(?:[<>≤≥]=?|<=|>=)\s*\d+(?:[.,]\d+)?|\d+(?:[.,]\d+)?\s*[-–—]\s*\d+(?:[.,]\d+)?")
+_WERT_HINTEN = re.compile(r"^(?:\d+(?:[.,]\d+)?)(?:\+\+|--|[HhLl+*↑↓!.,-])?$")
+
+
+def _referenz_vorn(rest: list[T]) -> list[T] | None:
+    """Spaltenfolge „Referenzbereich – Einheit – Wert“ („Hämoglobin 7,40 - 10,70 mmol/L 6.50↓“): → die Wörter in der
+    üblichen Folge „Wert – Einheit – Referenzbereich“, sonst None.
+
+    Erkannt nur, wenn die Reihe mit einer Spanne oder Grenze beginnt, danach höchstens die Einheit und dann eine
+    einfache Zahl folgt (ohne weitere Spanne dahinter). „Natrium 138 mmol/l 135 - 145“ beginnt mit einer Zahl allein
+    und bleibt unverändert."""
+    n = 0
+    for k in (3, 2, 1):
+        if k < len(rest) and _REF_VORN.fullmatch(_text(rest[:k]).strip()):
+            n = k
+            break
+    if not n:
+        return None
+    j = n
+    if j < len(rest) and E.einheit(rest[j].text) is not None:
+        j += 1
+    elif j + 1 < len(rest) and E.einheit(rest[j].text + rest[j + 1].text) is not None:
+        j += 2
+    if j >= len(rest) or not _WERT_HINTEN.match(rest[j].text.replace(" ", "")):
+        return None
+    if j + 1 < len(rest) and rest[j + 1].text in "-–—":
+        return None  # „0 - 2 /GF 0 - 5“: zwei Spannen, keine Wertespalte hinten
+    w = rest[j]
+    roh = w.text.replace(" ", "")
+    # „6.50.“/„0.33-“: ein als Punkt oder Strich gelesener Pfeil hinten – weglassen
+    if roh[-1] in ".,-":
+        w = T(roh[:-1], w.seite, w.box, min(w.c, UNSICHER - 0.05), w.bereich)
+    return [w, *rest[n:j], *rest[:n], *rest[j + 1:]]
+
+
 def laborwerte(reihen: list[list[T]], parameter: list[dict], gelernt: Gelerntes | None = None,
                quelle: str = "") -> list[dict]:
     """Zeilen eines Laborbefunds → vorgeschlagene Werte (Parameter aus dem Katalog oder Freitext).
@@ -540,7 +575,8 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict], gelernt: Gelerntes 
                                                     else r[k].text):
             continue  # Kopfzeilen mit Datum („Eingang 19.11.2024“); ein Datum beim Vorwert hinten zählt nicht
         param, art, gelernt_treffer = _suche_parameter(etikett, index, eintraege, gelernt, quelle)
-        rest = r[k:]
+        umgestellt = _referenz_vorn(r[k:])
+        rest = umgestellt or r[k:]
         # Wert
         op, wert, wert_text, flag = "", None, "", ""
         j = 0
@@ -631,6 +667,9 @@ def laborwerte(reihen: list[list[T]], parameter: list[dict], gelernt: Gelerntes 
                     flag = flag or "↓"
                 sicher = min(sicher, UNSICHER - 0.05)
                 hinweise.append(f"gelesen als „{gelesen}“ – erstes Zeichen als Pfeil (↑/↓) gewertet, bitte prüfen")
+        if umgestellt and wert is not None and not flag:
+            # Pfeil hinter dem Wert oft als „.“/„-“ gelesen oder verloren: Richtung aus dem Referenzbereich
+            flag = "↑" if ref_bis is not None and wert > ref_bis else "↓" if ref_von is not None and wert < ref_von else ""
         if op and wert is not None:
             wert_text, wert = f"{op} {m.group('zahl') if m else _dez(wert)}", None
             hinweise.append("unter bzw. über der Messgrenze – als Text übernommen")
