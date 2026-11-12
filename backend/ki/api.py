@@ -848,6 +848,41 @@ class RechtsgrundlageView(APIView):
         return Response(EinstellungSerializer(e).data)
 
 
+def _gerade_in_arbeit(user) -> dict:
+    """Was der KI-Dienst gerade tut und was als Nächstes dran ist (Übersicht „KI (Experimentell)“).
+
+    Dokumente und Berichte nur im Bereich der Person (Firma, Testdaten …); was außerhalb liegt, nur als Anzahl.
+    Chats: nur die Anzahl – und ob die eigene Antwort darunter ist; nie Inhalt oder Person fremder Chats."""
+    from .dienst import ANGEFORDERT_AB
+
+    def vorgang(v: KiVorgang) -> dict:
+        return {"id": v.id, "dokument_titel": v.dokument.titel, "dokument_datum": v.dokument.datum,
+                "patient": v.patient_id, "patient_name": f"{v.patient.nachname}, {v.patient.vorname}",
+                "patient_nummer": v.patient.nummer, "schritt": v.schritt, "fortschritt": v.fortschritt,
+                "seiten": v.seiten, "begonnen_am": v.begonnen_am, "angefordert": v.prioritaet >= ANGEFORDERT_AB,
+                "status": v.status}
+
+    sichtbar = vorgaenge_fuer(user).select_related("dokument", "patient")
+    laufend = list(sichtbar.filter(status__in=KiVorgang.IN_ARBEIT).order_by("begonnen_am", "id"))
+    alle_laufend = KiVorgang.objects.filter(status__in=KiVorgang.IN_ARBEIT).count()
+    wartend = sichtbar.filter(status=S.NEU, patient__eingeschraenkt_am__isnull=True,
+                              patient__abgeschlossen_am__isnull=True, dokument__ausgeblendet=False)
+    berichte = (KiBerichtsauftrag.objects.filter(status=KiBerichtsauftrag.Status.LAEUFT,
+                                                 patient__in=patienten_fuer(user)).select_related("patient"))
+    chats = KiChatNachricht.objects.filter(status=KiChatNachricht.Status.LAEUFT)
+    return {
+        "dokumente": [vorgang(v) for v in laufend],
+        "dokumente_andere": max(0, alle_laufend - len(laufend)),
+        "berichte": [{"id": b.id, "art_name": b.get_art_display(), "patient": b.patient_id,
+                      "patient_name": f"{b.patient.nachname}, {b.patient.vorname}"} for b in berichte],
+        "chats": chats.count(),
+        "chat_eigener": chats.filter(chat__benutzer=user).exists(),
+        "naechste": [vorgang(v) for v in wartend.order_by("-prioritaet", "id")[:3]],
+        "wartend": wartend.count(),
+        "wartend_angefordert": wartend.filter(prioritaet__gte=ANGEFORDERT_AB).count(),
+    }
+
+
 class StandView(APIView):
     """Stand des KI-Dienstes und der Queue (für die Liste und die Administration)."""
 
@@ -864,6 +899,7 @@ class StandView(APIView):
                                                      "jetzt": im_fenster(timezone.now(), e.nacht_beginn,
                                                                          e.nacht_ende, e.zeitzone)},
                  "aktiv": e.aktiv}
+        daten["arbeit"] = _gerade_in_arbeit(request.user)
         if request.user.hat_recht("ki_verwalten"):
             daten["queue"] = eingang.stand()
             mv = KiModellversion.aktiv("vision")

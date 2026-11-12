@@ -14,6 +14,7 @@ Speichern legt einen ``berichte.Bericht`` im Status „Entwurf“ an; freigeben 
 """
 import datetime as dt
 import html
+import logging
 import re
 
 from django.utils import timezone
@@ -25,6 +26,7 @@ from . import prompts
 from .modell import Client, ModellFehler
 from .models import KiBerichtsauftrag, KiModellversion
 
+log = logging.getLogger("epm.ki")
 KENNZEICHNUNG = "KI-Entwurf (Experimentell) – automatisch erstellt, nicht geprüft, nicht freigegeben."
 VERDAECHTIG = [r"\bempfehl", r"\bsollte[n]?\b", r"\braten\b", r"\bindiziert\b", r"\bratsam\b", r"\bnotwendig\b",
                r"\bverdacht auf\b", r"\bdiagnostiziert\b", r"\bwir schlagen\b", r"\bzu erwägen\b", r"\bprognose\b",
@@ -168,6 +170,8 @@ def erstellen(auftrag: KiBerichtsauftrag, client: Client | None) -> KiBerichtsau
     auftrag.status = KiBerichtsauftrag.Status.FERTIG
     auftrag.fertig_am = timezone.now()
     auftrag.save()
+    log.info("Berichtsentwurf %s fertig: %s Fakten, Gegenprüfung %s", auftrag.pk, len(fakten),
+             "ok" if auftrag.pruefung.get("ok") else "mit Markierungen")
     protokolliere(SystemEreignis.Art.KI, benutzername="ki-dienst", objekt=f"Berichtsentwurf {auftrag.pk}",
                   aktion="bericht_erstellt", patient_id=auftrag.patient_id, berichtsart=auftrag.art, fakten=len(fakten),
                   modell=mv.name if mv else "", prompt_version=prompts.PROMPT_VERSION if mv else "",

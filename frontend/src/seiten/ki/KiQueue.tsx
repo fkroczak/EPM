@@ -28,11 +28,57 @@ const FILTER_STATUS: { wert: string; text: string }[] = [
   { wert: "", text: "Alle" },
 ];
 
+/** „Gerade in Arbeit“ – Dokument, Schritt und Fortschritt statt nur der Auslastung (12.11.2026). */
+function KiArbeitZeile({ stand }: { stand: KiStand }) {
+  const a = stand.arbeit;
+  const d = stand.dienst;
+  if (!a || !d?.laeuft) return null;
+  const nichts = !a.dokumente.length && !a.dokumente_andere && !a.berichte.length && !a.chats;
+  const minuten = (seit: string | null) => (seit ? Math.max(0, Math.round((Date.now() - new Date(seit).getTime()) / 60000)) : null);
+  return (
+    <Karte className="px-4 py-3 flex flex-col gap-2 text-[0.8125rem]" data-testid="ki-arbeit">
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <strong className="text-sm">Gerade in Arbeit</strong>
+        {nichts ? <span className="gedaempft">nichts – {a.wartend ? `${zahl(a.wartend)} Dokumente warten${a.wartend_angefordert ? ` (${a.wartend_angefordert} angefordert)` : ""}` : "die Queue ist leer"}</span> : null}
+      </div>
+      {a.dokumente.map((v) => {
+        const m = minuten(v.begonnen_am);
+        return (
+          <div key={v.id} className="flex items-center gap-3 flex-wrap">
+            <Icon name="dokument" />
+            <span className="min-w-0">
+              <Link to={`/ki/${v.id}`}>{v.dokument_titel}</Link>
+              {v.dokument_datum ? <span className="gedaempft"> · {datum(v.dokument_datum)}</span> : null}
+              {" · "}<Link to={`/patienten/${v.patient}/ki`}>{v.patient_name}</Link><span className="gedaempft"> ({v.patient_nummer})</span>
+              {v.angefordert ? <Chip art="akzent" className="ml-1.5">angefordert</Chip> : null}
+            </span>
+            <span className="inline-flex items-center gap-2 ml-auto">
+              <span className="gedaempft">{v.schritt || "wird vorbereitet"}{v.seiten ? ` · ${v.seiten} Seite${v.seiten === 1 ? "" : "n"}` : ""}{m != null ? ` · seit ${m} min` : ""}</span>
+              <span className="h-2 w-28 rounded bg-fein overflow-hidden" role="progressbar" aria-valuenow={v.fortschritt} aria-valuemin={0} aria-valuemax={100} aria-label="Fortschritt">
+                <span className="block h-full bg-akzent transition-[width]" style={{ width: `${v.fortschritt}%` }} />
+              </span>
+              <span className="num w-9 text-right">{v.fortschritt} %</span>
+            </span>
+          </div>
+        );
+      })}
+      {a.dokumente_andere ? <div className="gedaempft">+ {a.dokumente_andere} Dokument{a.dokumente_andere === 1 ? "" : "e"} einer anderen Firma</div> : null}
+      {a.berichte.map((b) => <div key={`b${b.id}`} className="flex items-center gap-3"><Icon name="stift" /><span>Berichtsentwurf „{b.art_name}“ · <Link to={`/patienten/${b.patient}/ki`}>{b.patient_name}</Link></span></div>)}
+      {a.chats ? <div className="flex items-center gap-3"><Icon name="sprechblase" /><span>{a.chats === 1 ? "eine Chat-Antwort" : `${a.chats} Chat-Antworten`} wird geschrieben{a.chat_eigener ? " (Ihre)" : ""}</span></div> : null}
+      {!nichts && a.naechste.length ? (
+        <div className="gedaempft">Als Nächstes: {a.naechste.map((v, i) => <span key={v.id}>{i ? ", " : ""}<Link to={`/ki/${v.id}`}>{v.dokument_titel}</Link> ({v.patient_name}{v.angefordert ? ", angefordert" : ""})</span>)}
+          {a.wartend > a.naechste.length ? ` … insgesamt ${zahl(a.wartend)} wartend` : ""}</div>
+      ) : null}
+    </Karte>
+  );
+}
+
 export function KiStandKarte({ stand }: { stand?: KiStand }) {
   if (!stand) return null;
   const d = stand.dienst;
   const e = d?.entscheidung;
   return (
+    <>
     <Meldung art={!d?.laeuft ? "warn" : e?.modus === "pause" || e?.modus === "aus" ? "warn" : "info"} className="flex gap-2.5 items-start text-[0.8125rem]">
       <Icon name="aktivitaet" />
       <span data-testid="ki-stand">
@@ -47,13 +93,15 @@ export function KiStandKarte({ stand }: { stand?: KiStand }) {
           </>}
       </span>
     </Meldung>
+    <KiArbeitZeile stand={stand} />
+    </>
   );
 }
 
 export function KiQueue() {
   const [reiter, setReiter] = useReiter(["chat", "queue", "qualitaet"] as const);
   const zurPruefung = useKiZurPruefung();
-  const stand = useQuery({ queryKey: ["ki", "stand"], queryFn: () => api<KiStand>("ki/stand/", { hintergrund: true }), refetchInterval: 30_000 });
+  const stand = useQuery({ queryKey: ["ki", "stand"], queryFn: () => api<KiStand>("ki/stand/", { hintergrund: true }), refetchInterval: 10_000 });
   return (
     <Seite pfad={[{ text: "KI (Experimentell)" }]}>
       <Seitenkopf titel="KI (Experimentell)" unter="Vorschläge der lokalen KI zur Prüfung – nichts geht ohne Ihre Bestätigung in die Akte." />

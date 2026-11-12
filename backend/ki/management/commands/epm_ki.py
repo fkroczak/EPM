@@ -236,18 +236,28 @@ class Dienst:
         return None
 
     def _vorgang(self, v: KiVorgang):
+        # Protokoll (docker compose logs ki-worker): was bearbeitet wird – nur Nummern, keine Namen oder Inhalte
+        t0 = time.monotonic()
+        log.info("%s gestartet: Dokument %s, Akte Nr. %s, %s, Versuch %s", v, v.dokument_id, v.patient.nummer,
+                 "angefordert" if v.prioritaet >= dienst.ANGEFORDERT_AB else "Nachtverarbeitung", v.versuche)
+
+        def melden(text, prozent=None):
+            dienst.fortschritt(v, text, prozent)
+            log.info("%s: %s%s", v, text, f" ({prozent} %)" if prozent is not None else "")
+
         try:
             rahmen = pipeline.Rahmen(
                 client=self.client if self.modell_bereit else None, sparsam=self.entscheidung.sparsam,
-                abbrechen=lambda: self._abbrechen(v),
-                melden=lambda text, prozent=None: dienst.fortschritt(v, text, prozent))
+                abbrechen=lambda: self._abbrechen(v), melden=melden)
             if self.einmal:  # Lebenszeichen kommen mit jedem Fortschritt (gleicher Faden)
                 pipeline.verarbeiten(v, rahmen, paddle=self.paddle)
             else:
                 with dienst.herzschlag(v, zusatz=self._lebenszeichen):
                     pipeline.verarbeiten(v, rahmen, paddle=self.paddle)
             self.bearbeitet += 1
-            log.info("%s: %s", v, v.get_status_display())
+            v.refresh_from_db()
+            log.info("%s fertig nach %d s: %s – Typ %s, %s Seite(n), %s Vorschläge", v, time.monotonic() - t0,
+                     v.get_status_display(), v.dokumenttyp or "?", v.seiten, v.felder.count())
         except pipeline.Abgebrochen as e:
             dienst.zurueckstellen(v, str(e))
             log.info("%s zurückgestellt: %s", v, e)
@@ -292,6 +302,7 @@ class Dienst:
                 connection.close()
 
     def _chat(self, n):
+        log.info("KI-Chat-Antwort %s gestartet (Vorlage „%s“, Versuch %s)", n.pk, n.vorlage_name or "–", n.versuche + 1)
         try:
             if self.einmal:
                 chat.beantworten(n, self.client if self.modell_bereit else None)
@@ -312,6 +323,7 @@ class Dienst:
                 connection.close()
 
     def _bericht(self, b):
+        log.info("Berichtsentwurf %s gestartet: %s, Akte Nr. %s", b.pk, b.get_art_display(), b.patient.nummer)
         try:
             if self.einmal:
                 berichte.erstellen(b, self.client if self.modell_bereit else None)
