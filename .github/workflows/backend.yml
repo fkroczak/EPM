@@ -118,7 +118,7 @@ jobs:
         run: |
           set -o pipefail
           # parallel auf allen Kernen (12.11.2026: seriell ~19 min)
-          python manage.py test --parallel auto --verbosity 2 2>&1 | tee test-ausgabe.txt
+          python manage.py test --parallel auto --durations 15 --verbosity 2 2>&1 | tee test-ausgabe.txt
 
       - name: Zusammenfassung
         if: always()
