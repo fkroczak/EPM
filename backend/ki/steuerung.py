@@ -51,6 +51,7 @@ class Entscheidung:
     sparsam: bool = False
     grund: str = ""
     last: dict = field(default_factory=dict)
+    wegen_last: bool = False   # Pause wegen CPU/Speicher/Systemlast – laufende Aufträge dürfen zu Ende laufen
 
     def als_dict(self) -> dict:
         return {"modus": self.modus, "parallel": self.parallel, "nur_angefordert": self.nur_angefordert,
@@ -167,7 +168,7 @@ class Steuerung:
         zu_hoch, knapp, gruende = self._last_pruefen(einst, last)
         if zu_hoch:
             self.pausiert_wegen_last = True
-            return Entscheidung("pause", 0, True, grund="; ".join(gruende), last=info)
+            return Entscheidung("pause", 0, True, grund="; ".join(gruende), last=info, wegen_last=True)
         nacht = im_fenster(jetzt, einst.nacht_beginn, einst.nacht_ende, einst.zeitzone)
         if not nacht and scans_warten:
             return Entscheidung("pause", 0, True, grund="Scans der Mitarbeiter haben Vorrang.", last=info)

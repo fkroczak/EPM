@@ -229,7 +229,9 @@ class Dienst:
         if self.ende.is_set():
             return "KI-Dienst wird beendet"
         e = self.entscheidung
-        if e.modus in ("pause", "aus"):
+        # Last-Pause: keine neuen Aufträge, aber laufende nicht abbrechen – die Last macht meist das Modell selbst;
+        # sonst würde der Vorgang nach jedem Modellaufruf verworfen und endlos neu begonnen
+        if e.modus == "aus" or (e.modus == "pause" and not e.wegen_last):
             return e.grund or "Pause"
         if e.modus == "tag" and e.nur_angefordert and vorgang.prioritaet < dienst.ANGEFORDERT_AB and not self.einmal:
             return "Nachtfenster zu Ende"

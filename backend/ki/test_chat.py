@@ -166,6 +166,19 @@ class ChatInPauseTest(Grundlage):
         self.assertFalse(d._chat_erlaubt(Entscheidung("pause", 0, True, last={})))
         self.assertTrue(d._chat_erlaubt(Entscheidung("tag", 1, True)))
 
+    def test_last_pause_bricht_laufenden_vorgang_nicht_ab(self):
+        from types import SimpleNamespace
+        from ki.management.commands.epm_ki import Dienst
+        from ki.steuerung import Entscheidung
+
+        d, v = Dienst(einmal=True), SimpleNamespace(prioritaet=0)
+        d.entscheidung = Entscheidung("pause", 0, True, grund="CPU 74 %", wegen_last=True)
+        self.assertIsNone(d._abbrechen(v))
+        d.entscheidung = Entscheidung("pause", 0, True, grund="Die Sicherung läuft.")
+        self.assertEqual(d._abbrechen(v), "Die Sicherung läuft.")
+        d.entscheidung = Entscheidung("aus", 0, True, grund="aus")
+        self.assertEqual(d._abbrechen(v), "aus")
+
 
 @override_settings(EPM_KI=Path(KI_TMP))
 class GeradeInArbeitTest(Grundlage):
