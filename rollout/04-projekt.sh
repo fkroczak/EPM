@@ -41,6 +41,12 @@ chown "$EPM_APP_UID:101" "$B/system/upload"; chmod 0770 "$B/system/upload"
 
 echo "==> Projektdateien kopieren"
 install -m 0644 projekt/compose.yaml projekt/compose.smoke.yaml projekt/compose.ki.yaml "$B/"
+# KI: Startskript des Containers ki-modell – eingebunden statt ins Image gebaut, damit Korrekturen mit jedem Update
+# ankommen (das Image baut nur `epm-ki einrichten`). Geändert → Marke; epm-update startet ki-modell danach neu.
+if ! cmp -s ki/ki-modell-start.sh "$B/ki-modell-start.sh"; then
+  [[ -f "$B/ki-modell-start.sh" ]] && touch "$B/ki-modell-start.geaendert"
+  install -m 0755 ki/ki-modell-start.sh "$B/ki-modell-start.sh"
+fi
 install -m 0644 projekt/nginx/rauchtest.conf projekt/nginx/epm.conf "$B/nginx/"
 # neu anlegen nur ohne Datei oder bei einer sehr alten (ohne EPM_DJANGO_ADMIN und ohne Markierung des Schalters)
 if [[ ! -f "$B/backend.env" ]] || ! grep -qE "^EPM_DJANGO_ADMIN=|^# epm: verwaltung-schalter" "$B/backend.env"; then

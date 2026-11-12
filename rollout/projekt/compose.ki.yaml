@@ -57,6 +57,8 @@ services:
     volumes:
       - ./ki-modelle:/modelle:ro
       - ./data/ki/modell:/steuerung:ro
+      # Startskript vom Server (04-projekt.sh), nicht aus dem Image: Korrekturen kommen mit „EPM aktualisieren“
+      - ./ki-modell-start.sh:/usr/local/bin/ki-modell-start.sh:ro
     networks: [intern]
     read_only: true
     tmpfs: [/tmp]
