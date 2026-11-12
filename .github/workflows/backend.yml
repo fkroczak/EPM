@@ -118,7 +118,8 @@ jobs:
       - name: Tests gegen PostgreSQL
         run: |
           set -o pipefail
-          python manage.py test --verbosity 2 2>&1 | tee test-ausgabe.txt
+          # parallel auf allen Kernen (12.11.2026: seriell ~19 min)
+          python manage.py test --parallel auto --verbosity 2 2>&1 | tee test-ausgabe.txt
 
       - name: Zusammenfassung
         if: always()
