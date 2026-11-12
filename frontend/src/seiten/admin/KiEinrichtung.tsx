@@ -222,11 +222,12 @@ function Grenzen({ werte, offen, kerne, onSpeichern }: { werte: Record<string, s
     { name: "KI_THREADS", text: "Rechenkerne des Modells", hinweis: `Empfehlung: Kerne − 2${kerne ? ` = ${Math.max(1, kerne - 2)}` : ""}` },
     { name: "KI_WORKER_SPEICHER", text: "Speichergrenze KI-Dienst", hinweis: "z. B. 3g" },
     { name: "KI_WORKER_MAX", text: "Höchstens parallele Aufträge", hinweis: "Obergrenze für „parallel nachts“" },
+    { name: "KI_KONTEXT", text: "Kontext (Tokens)", hinweis: "wie viel Text das Modell auf einmal liest; Standard 32768, mehr braucht mehr Speicher" },
   ];
   return (
     <Karte className="flex flex-col gap-3">
       <KartenKopf titel="Grenzen auf dem Server" unter="Harte Grenzen der Container (in .env). Zeitfenster und Lastgrenzen: Reiter „Zeitfenster und Grenzen“." />
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {felder.map((f) => (
           <Feld key={f.name} label={f.text} hinweis={f.hinweis}>
             {(p) => <Eingabe {...p} value={w[f.name] ?? ""} onChange={(e) => setW({ ...w, [f.name]: e.target.value.trim() })} />}

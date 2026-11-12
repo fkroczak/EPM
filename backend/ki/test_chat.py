@@ -179,6 +179,19 @@ class ChatInPauseTest(Grundlage):
         d.entscheidung = Entscheidung("aus", 0, True, grund="aus")
         self.assertEqual(d._abbrechen(v), "aus")
 
+    def test_tagsueber_hat_der_chat_vorrang(self):
+        from types import SimpleNamespace
+        from ki.management.commands.epm_ki import Dienst
+        from ki.steuerung import Entscheidung
+
+        d, v = Dienst(), SimpleNamespace(prioritaet=10)  # angefordert
+        d.entscheidung = Entscheidung("tag", 1, True)
+        self.assertIsNone(d._abbrechen(v))
+        d.chat_aktiv = True
+        self.assertEqual(d._abbrechen(v), "Chat hat tagsüber Vorrang")
+        d.entscheidung = Entscheidung("nacht", 1, False)
+        self.assertIsNone(d._abbrechen(v))
+
 
 @override_settings(EPM_KI=Path(KI_TMP))
 class GeradeInArbeitTest(Grundlage):
@@ -226,3 +239,124 @@ class GeradeInArbeitTest(Grundlage):
         self.assertIn("fertig nach", text)
         self.assertIn("Typ arztbericht", text)
         self.assertNotIn("Echt", text)  # keine Namen im Protokoll
+
+
+def pdf_mit_text(*seiten: str) -> bytes:
+    """PDF mit Textebene (ohne Texterkennung lesbar)."""
+    import io
+
+    from reportlab.pdfgen import canvas
+
+    puffer = io.BytesIO()
+    c = canvas.Canvas(puffer)
+    for text in seiten:
+        for i, zeile in enumerate(text.splitlines()):
+            c.drawString(72, 760 - 16 * i, zeile)
+        c.showPage()
+    c.save()
+    return puffer.getvalue()
+
+
+@override_settings(EPM_KI=Path(KI_TMP))
+class ChatDokumenteTest(Grundlage):
+    def neuer_chat(self, user=None):
+        return client_fuer(user or self.mitarbeiter).post("/api/ki/chats/", {}, format="json").json()["id"]
+
+    def test_hochladen_ohne_seitengrenze_text_erkannt_datei_geloescht(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from ki.models import KiChatAnhang
+
+        seiten = [f"Laborbefund Seite {i}\nKalium 3,{i} mmol/l am 01.09.2026\nNatrium 138 mmol/l" for i in range(1, 13)]
+        cid = self.neuer_chat()
+        r = client_fuer(self.mitarbeiter).post(f"/api/ki/chats/{cid}/nachricht/", {
+            "text": "Welche Kaliumwerte stehen drin?",
+            "dateien": SimpleUploadedFile("labor.pdf", pdf_mit_text(*seiten), content_type="application/pdf")},
+            format="multipart")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.json()["nachrichten"][0]["anhaenge"][0]["name"], "labor.pdf")
+        n = chat.holen()
+        with ModellServer("Kalium 3,1 bis 3,12 mmol/l.") as s:
+            chat.beantworten(n, Client(s.url))
+            gesendet = s.anfragen[-1]
+        n.refresh_from_db()
+        self.assertEqual(n.status, "fertig", n.fehler)
+        a = KiChatAnhang.objects.get()
+        self.assertEqual((a.status, a.seiten), ("fertig", 12))
+        self.assertIsNone(a.datei)  # hochgeladene Datei ist nach der Erkennung weg
+        self.assertIn("Kalium\t3,7\tmmol/l", a.text)
+        letzte = gesendet["messages"][-1]["content"]
+        self.assertIn('<dokument name="labor.pdf">', letzte)
+        self.assertIn("[Seite 12]", letzte)
+        self.assertIn("Anfrage:\nWelche Kaliumwerte stehen drin?\n\n[Angehängt: labor.pdf]", letzte)
+        self.assertEqual(n.pruefung["neue_werte"], [])  # Werte aus dem Dokument gelten als Eingabe
+        e = SystemEreignis.objects.filter(details__aktion="chat_nachricht").last()
+        self.assertEqual(e.details["dateien"], 1)
+
+    def test_falsches_format(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        cid = self.neuer_chat()
+        r = client_fuer(self.mitarbeiter).post(f"/api/ki/chats/{cid}/nachricht/", {
+            "dateien": SimpleUploadedFile("notiz.txt", b"nur Text")}, format="multipart")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("notiz.txt", str(r.json()))
+
+    def test_aus_der_akte_mit_vorhandenem_text_und_protokoll(self):
+        from django.utils import timezone
+
+        from ki.models import KiChatAnhang
+        from ki.testhilfen import dokument
+        from patienten.models import DokumentText
+
+        dok = dokument(self.patient, b"%PDF-1.4 x", name="a.pdf", mime="application/pdf", titel="Entlassbrief")
+        DokumentText.objects.create(dokument=dok, text="Diagnose: Eisenmangel, Ferritin 8 ng/ml",
+                                    erkannt_am=timezone.now())
+        cid = self.neuer_chat()
+        r = client_fuer(self.mitarbeiter).post(f"/api/ki/chats/{cid}/nachricht/",
+                                              {"text": "Fasse zusammen", "dokumente": [dok.pk]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        e = SystemEreignis.objects.filter(details__aktion="chat_dokument_aus_akte").last()
+        self.assertEqual((e.details["dokument"], e.details["patient_id"]), (dok.pk, self.patient.pk))
+        with ModellServer("Eisenmangel, Ferritin 8 ng/ml.") as s:
+            chat.beantworten(chat.holen(), Client(s.url))
+            letzte = s.anfragen[-1]["messages"][-1]["content"]
+        self.assertIn("Ferritin 8 ng/ml", letzte)
+        self.assertEqual(KiChatAnhang.objects.get().status, "fertig")
+        # wird das Dokument endgültig gelöscht, geht der Auszug mit
+        dok.delete()
+        self.assertFalse(KiChatAnhang.objects.exists())
+
+    def test_akte_ohne_zugriff_nicht_waehlbar(self):
+        from ki.testhilfen import dokument
+
+        dok = dokument(self.patient, b"%PDF-1.4 x", name="a.pdf", mime="application/pdf")
+        self.patient.ist_test = False
+        cid = self.neuer_chat()
+        for wert in (dok.pk + 999, "x"):
+            r = client_fuer(self.mitarbeiter).post(f"/api/ki/chats/{cid}/nachricht/",
+                                                  {"text": "x", "dokumente": [wert]}, format="json")
+            self.assertEqual(r.status_code, 400, r.content)
+
+    def test_lange_unterlagen_teil_fuer_teil(self):
+        from ki.models import KiChatAnhang
+
+        cid = self.neuer_chat()
+        frage = client_fuer(self.mitarbeiter).post(f"/api/ki/chats/{cid}/nachricht/", {"text": "Kaliumwerte?"},
+                                                  format="json")
+        self.assertEqual(frage.status_code, 201)
+        nutzer = N.objects.get(chat_id=cid, rolle="nutzer")
+        text = "\n\n".join(f"[Seite {i}]\nKalium 3,{i % 10} mmol/l " + "Fließtext " * 300 for i in range(1, 41))
+        KiChatAnhang.objects.create(nachricht=nutzer, herkunft="upload", name="akte.pdf", status="fertig",
+                                    text=text, seiten=40, seiten_fertig=40)
+        with ModellServer("- Kalium 3,1 mmol/l (Seite 1)", kontext=8192) as s:
+            chat.beantworten(chat.holen(), Client(s.url))
+            teile = [a for a in s.anfragen if not a.get("stream")]
+            letzte = s.anfragen[-1]
+        self.assertGreater(len(teile), 3)
+        self.assertIn("Teil 1 von", teile[0]["messages"][1]["content"][0]["text"])
+        self.assertTrue(letzte["stream"])
+        self.assertIn("Auszüge aus den Unterlagen", letzte["messages"][-1]["content"])
+        self.assertLess(len(letzte["messages"][-1]["content"]) // 4, 8192)
+        n = N.objects.get(chat_id=cid, rolle="ki")
+        self.assertEqual((n.status, n.schritt), ("fertig", ""))

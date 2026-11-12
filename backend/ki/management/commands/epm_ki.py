@@ -32,7 +32,8 @@ CHAT_SCHLUESSEL = -2 * 10**9  # Schlüssel in self.laufend: Chat < Evaluation < 
 VORMERKEN_ALLE_S = 600
 MODELL_PRUEFEN_ALLE_S = 60
 AUFRAEUMEN_ALLE_S = 3600
-# Tagsüber ohne Arbeit: llama-server beenden lassen und den Speicher freigeben (KI_MODELL_TAGSUEBER_ENTLADEN=0: nie)
+# Tagsüber bleibt das Modell geladen und wartet auf den Chat (12.11.2026). KI_MODELL_TAGSUEBER_ENTLADEN=1: nach
+# KI_MODELL_SCHLAFEN_NACH_MIN ohne Arbeit llama-server beenden und den Speicher freigeben (Server mit knappem RAM)
 SCHLAFEN_NACH_S = int(os.environ.get("KI_MODELL_SCHLAFEN_NACH_MIN", "30")) * 60
 
 
@@ -83,6 +84,7 @@ class Dienst:
         self.bearbeitet = 0
         self.paddle = None
         self.letzte_arbeit = time.monotonic()
+        self.chat_aktiv = False
 
     # ------------------------------------------------------------------ Ablauf
     def laufen(self):
@@ -158,6 +160,11 @@ class Dienst:
             n = chat.holen()
             if n is not None:
                 self._starten(CHAT_SCHLUESSEL - n.pk, self._chat, n)
+        # Tagsüber wartet die KI auf die Mitarbeiter: solange eine Chat-Antwort aussteht, keine neuen Dokumente oder
+        # Berichte – der Chat bekommt die ganze Rechenleistung (laufende Dokumente pausieren nach der Seite)
+        self.chat_aktiv = any(k <= CHAT_SCHLUESSEL for k in self.laufend) or chat.wartet()
+        if e.modus != "nacht" and self.chat_aktiv and not self.einmal:
+            return
         if e.parallel <= 0:
             return
         # Berichtsentwürfe sind ausdrücklich angefordert: Vorrang, auch tagsüber
@@ -187,8 +194,14 @@ class Dienst:
         return self.client is None or self.modell_bereit
 
     def _modell_schlaf(self, e: Entscheidung):
-        """Tagsüber ohne Arbeit gibt der Modell-Container seinen Speicher frei; kommt Arbeit, wird er geweckt."""
-        if self.client is None or os.environ.get("KI_MODELL_TAGSUEBER_ENTLADEN", "1") == "0":
+        """Nur mit KI_MODELL_TAGSUEBER_ENTLADEN=1: tagsüber ohne Arbeit gibt der Modell-Container seinen Speicher frei;
+        kommt Arbeit, wird er geweckt. Sonst bleibt das Modell geladen, damit der Chat sofort antwortet."""
+        if self.client is None:
+            return
+        if os.environ.get("KI_MODELL_TAGSUEBER_ENTLADEN", "0") != "1":
+            if modellwahl.schlaeft():  # schläft noch aus der Zeit vor dem Update: wecken
+                modellwahl.schlafen(False)
+                self.zuletzt["modell"] = 0.0
             return
         arbeit = bool(self.laufend) or e.modus == "nacht" or chat.wartet() or KiVorgang.objects.filter(
             status=KiVorgang.Status.NEU, prioritaet__gte=dienst.ANGEFORDERT_AB).exists() or \
@@ -233,6 +246,8 @@ class Dienst:
         # sonst würde der Vorgang nach jedem Modellaufruf verworfen und endlos neu begonnen
         if e.modus == "aus" or (e.modus == "pause" and not e.wegen_last):
             return e.grund or "Pause"
+        if e.modus == "tag" and self.chat_aktiv and not self.einmal:
+            return "Chat hat tagsüber Vorrang"
         if e.modus == "tag" and e.nur_angefordert and vorgang.prioritaet < dienst.ANGEFORDERT_AB and not self.einmal:
             return "Nachtfenster zu Ende"
         return None
@@ -307,10 +322,10 @@ class Dienst:
         log.info("KI-Chat-Antwort %s gestartet (Vorlage „%s“, Versuch %s)", n.pk, n.vorlage_name or "–", n.versuche + 1)
         try:
             if self.einmal:
-                chat.beantworten(n, self.client if self.modell_bereit else None)
+                chat.beantworten(n, self.client if self.modell_bereit else None, paddle=self.paddle)
             else:
                 with dienst.herzschlag(n):
-                    chat.beantworten(n, self.client if self.modell_bereit else None)
+                    chat.beantworten(n, self.client if self.modell_bereit else None, paddle=self.paddle)
         except ModellFehler as e:
             # Modell weg (schläft, startet neu, abgestürzt): erst wieder arbeiten, wenn es sich als bereit meldet
             log.warning("KI-Chat-Antwort %s: Modell nicht erreichbar (%s)", n.pk, e)

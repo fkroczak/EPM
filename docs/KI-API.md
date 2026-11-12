@@ -55,7 +55,13 @@ werden nach `EPM_KI_CHAT_TAGE` (Standard 30) gelöscht; im Audit-Log steht nur, 
 |---|---|---|
 | `GET chats/` · `GET chats/{id}/` | ansehen | eigene Chats; Detail mit `nachrichten` (`rolle` nutzer/ki, `status` wartet/laeuft/fertig/fehler, `pruefung`: `neue_werte` = Zahlen/Daten, die in keiner Eingabe stehen, `offene_stellen` = Anzahl [?]) |
 | `POST chats/` `{"vorlage": ID, "titel": "…"}` · `DELETE chats/{id}/` | berichte · ansehen | |
-| `POST chats/{id}/nachricht/` `{"text": "…", "vorlage": ID}` | berichte | höchstens 8000 Zeichen; 409, solange die letzte Antwort noch aussteht |
+| `POST chats/{id}/nachricht/` `{"text": "…", "vorlage": ID, "dokumente": [ID]}` oder multipart mit `dateien` | berichte | höchstens 100 000 Zeichen; Text oder Anhang nötig. `dokumente`: Dokumente aus Akten, die die Person sehen darf (lesbar: PDF, Bilder; Protokoll `chat_dokument_aus_akte` mit Patient und Dokument). `dateien`: bis 20 Dateien je `EPM_UPLOAD_MAX_MB`, keine Seitengrenze. 409, solange die letzte Antwort noch aussteht |
+
+Anhänge (`nachrichten[].anhaenge`: `name`, `herkunft` upload/akte, `seiten`, `seiten_fertig`, `status` wartet/fertig/fehler)
+erkennt der KI-Dienst vor der Antwort (aus der Akte: schon erkannter Text wird übernommen); eine hochgeladene Datei
+wird danach gelöscht, nur der Text bleibt mit dem Chat. `schritt` der KI-Nachricht zeigt, was gerade passiert
+(„Seite 3 von 40 wird gelesen“, „Teil 2 von 5“). Passen die Unterlagen nicht in den Kontext (`KI_KONTEXT`), liest das
+Modell sie Teil für Teil und antwortet aus den Auszügen.
 | `GET vorlagen/[?alle=1]` | ansehen oder `vorlagen_pflegen` | Promptvorlagen (`name`, `beschreibung`, `anweisung`, `temperatur` 0–1, `aktiv`, `reihenfolge`, `mitgeliefert`) |
 | `POST vorlagen/` · `PATCH vorlagen/{id}/` · `DELETE vorlagen/{id}/` | `vorlagen_pflegen` | Oberfläche: Administration › Vorlagen › KI-Prompts; mitgelieferte nur ausblenden, nicht löschen |
 
