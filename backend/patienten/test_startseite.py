@@ -110,6 +110,36 @@ class Startseite(Grundlage):
                          (1, 1, 1, 0))
         self.assertTrue(all("feiertag" in w for w in woche))
 
+    def test_abfragen_wachsen_nicht_mit_den_akten(self):
+        """Startseite und Zähler der Patientenliste: vorher holte ``kennzahlen`` Nickelallergie und Katheter je Akte
+        einzeln nach (bei ~250 Akten fast 400 Abfragen)."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        def abfragen(client, url):
+            with CaptureQueriesContext(connection) as q:
+                self.assertEqual(client.get(url).status_code, 200)
+            return len(q)
+
+        def neue_akten(anzahl, **felder):
+            for i in range(anzahl):
+                Patient.objects.create(nachname=f"Neu{i}", vorname="N", geburtsdatum="1960-01-01", **felder)
+
+        tester = benutzer("tester", Rolle.MITARBEITER, ist_test=True)
+        for user, felder in ((self.mediziner, {}), (tester, {"ist_test": True})):
+            c = client_fuer(user)
+            for url in ("/api/startseite/", "/api/patienten/zaehler/"):
+                with self.subTest(user=user.username, url=url):
+                    c.get(url)  # erste Anfrage: Sitzung, tägliche Bereinigung
+                    vorher = abfragen(c, url)
+                    neue_akten(4, **felder)
+                    self.assertEqual(abfragen(c, url), vorher)
+        # die neuen Akten zählen mit (Nickelallergie ist „unbekannt“, Katheter nicht ausgeschlossen)
+        pruefen = client_fuer(self.mediziner).get("/api/startseite/").json()["pruefen"]
+        self.assertEqual(pruefen["nickelallergie_unbekannt"],
+                         Patient.objects.filter(ist_test=False, abgeschlossen_am__isnull=True,
+                                                nickelallergie=Patient.Nickelallergie.UNBEKANNT).count())
+
     def test_feiertage_im_wochenstreifen(self):
         from .api import _woche
         from datetime import date
@@ -327,6 +357,17 @@ class Hilfe(Grundlage):
         Gruppenrecht.objects.create(rolle=Rolle.MEDIZINER, recht="system_verwalten", erlaubt=True)
         self.assertIn("system", ids(self.mediziner))
         self.assertEqual(client_fuer(self.betrachter).get("/api/hilfe/").json()["darf_ergaenzen"], False)
+
+    def test_rechte_einmal_je_anfrage(self):
+        """Die Rechte werden einmal je Anfrage gelesen, nicht je Abschnitt (vorher über 60 Abfragen)."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        c = client_fuer(self.betrachter)
+        c.get("/api/hilfe/")
+        with CaptureQueriesContext(connection) as q:
+            self.assertEqual(c.get("/api/hilfe/").status_code, 200)
+        self.assertLessEqual(len(q), 20)
 
     def test_ergaenzung_mit_historie_und_audit(self):
         url = "/api/hilfe/kontakt_erfassen/ergaenzung/"

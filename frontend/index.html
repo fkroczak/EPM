@@ -8,6 +8,9 @@
     <meta name="theme-color" content="#24353d" />
     <title>EPM · Patientenmanagement</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Anmeldestatus gleich mit der Seite anfragen, parallel zum Skript (Performance-Prüfung 14.11.2026): lib/auth.tsx
+         holt dieselbe Adresse und bekommt die schon laufende Antwort, statt erst nach dem Start von React zu fragen -->
+    <link rel="preload" href="/api/auth/status/" as="fetch" crossorigin="anonymous" />
   </head>
   <body>
     <!-- sofort sichtbar, bis React übernimmt (Lighthouse 09.10.2026: erster Inhalt erst nach dem Laden des Skripts).

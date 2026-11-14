@@ -2281,7 +2281,7 @@ def _wiedereinbestellung(patienten, e, grenze=50):
     zurückliegt und für die kein offener Termin geplant ist. Längste Zeit ohne Kontakt zuerst."""
     from .kennzahlen import kontakt_grenzen, kontaktstufe
 
-    offen = kontakt_filter(patienten.filter(abgeschlossen_am__isnull=True), "wiedereinbestellung")
+    offen = kontakt_filter(patienten.filter(abgeschlossen_am__isnull=True), "wiedereinbestellung", e)
     zeilen = list(offen.annotate(letzter=Max("kontakte__zeitpunkt", filter=Q(kontakte__storniert_am__isnull=True)))
                   .order_by(F("letzter").asc(nulls_first=True), "nachname", "vorname")
                   .values("id", "nachname", "vorname", "nummer", "ist_test", "letzter"))
@@ -2392,7 +2392,9 @@ def startseite_daten(user):
     sieben_tage = termine.filter(faellig_am__gte=heute, faellig_am__lte=heute + timedelta(days=6))
 
     def t(qs):
-        return TerminSerializer(qs.order_by("faellig_am", "uhrzeit")[:100], many=True).data
+        # Einstellung zur Terminbestätigung mitgeben, sonst liest jede Liste die Einstellungen erneut
+        return TerminSerializer(qs.order_by("faellig_am", "uhrzeit")[:100], many=True,
+                                context={"_bestaetigung_an": e.terminbestaetigung_anbieten}).data
 
     werte = kennzahlen(patienten.only("id", "versorger", "kein_versorger", "nachname", "vorname", "nummer",
                                       *KENNZAHLEN_FELDER))

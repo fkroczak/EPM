@@ -14,9 +14,9 @@ from stammdaten.models import Einstellungen
 
 from .models import Gewichtsmessung, Kontakt, Patient, Termin, berechne_trend, ruhende_hinweise, sichtbare_termine
 
-TREND_SPANNE = Decimal("1.0")
+TREND_SPANNE = Decimal("1.0")  # unter ±1 % gilt das Gewicht als gleichbleibend (Pfeil →)
 # Spalten, die ``kennzahlen`` neben id/versorger/kein_versorger je Akte liest (für ``.only()`` der Aufrufer)
-KENNZAHLEN_FELDER = ("nickelallergie", "kein_katheter")  # unter ±1 % gilt das Gewicht als gleichbleibend (Pfeil →)
+KENNZAHLEN_FELDER = ("nickelallergie", "kein_katheter")
 
 
 def _deutsch(zahl: Decimal) -> str:
@@ -57,10 +57,10 @@ def kontakt_text(stufe: str, letzter, e) -> str:
     return f"Kontakt bald fällig (über {e.kontakt_bald_monate} Mon.)"
 
 
-def kontakt_filter(patienten_qs, art: str):
+def kontakt_filter(patienten_qs, art: str, e=None):
     """Patientenliste ``?pruefen=``: kein_kontakt (ab „bald fällig“, beide Stufen), kontakt_bald (nur die erste
     Stufe), kontakt_ueberfaellig, wiedereinbestellung (beide Stufen, aber ohne offenen Termin – Kachel S04)."""
-    bald, ueberfaellig = kontakt_grenzen()
+    bald, ueberfaellig = kontakt_grenzen(e)  # ``e``: schon gelesene Einstellungen (spart die Abfrage)
     gueltig = Kontakt.objects.filter(storniert_am__isnull=True)
     nach_bald = gueltig.filter(zeitpunkt__gte=bald).values("patient_id")
     nach_ueberfaellig = gueltig.filter(zeitpunkt__gte=ueberfaellig).values("patient_id")
@@ -216,7 +216,7 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
 
 def _nur_ids(patienten_qs):
     """Nur die Spalten, die ``kennzahlen`` braucht (ohne select_related der Listenansicht)."""
-    # Nickelallergie und Katheter gleich mitladen – sonst holt der Hinweis „Nickelallergie“ sie je Akte einzeln nach
+    # Nickelallergie und Katheter gleich mitladen – sonst lädt der Hinweis „Nickelallergie“ sie je Akte einzeln
     return patienten_qs.select_related(None).only("id", "versorger", "kein_versorger", *KENNZAHLEN_FELDER)
 
 
@@ -320,7 +320,8 @@ def nickel_offen(qs):
 
 def pruefliste(patienten_qs, vorab: dict | None = None) -> dict:
     """„Nach und nach prüfen“ auf der Startseite (Entwurf 2). ``vorab``: schon berechnete ``kennzahlen`` einer
-    Obermenge der offenen Akten – die Werte je Akte hängen nicht von den übrigen ab, so entfällt die zweite Berechnung."""
+    Obermenge der offenen Akten – die Werte je Akte hängen nicht von den übrigen ab, so entfällt die zweite
+    Berechnung."""
     from .models import Datenschutzanfrage, Dokument
 
     e = Einstellungen.aktuell()
@@ -344,9 +345,9 @@ def pruefliste(patienten_qs, vorab: dict | None = None) -> dict:
         # Akten in Betreuung ohne freigegebenen Infusionsplan, ohne Bestätigung „kein Plan nötig“
         "ohne_plan": ohne_plan(offen).count(),
         # Kontakt fällig in zwei Stufen (S04); „kein_kontakt“ = beide Stufen zusammen
-        "kein_kontakt": kontakt_filter(offen, "kein_kontakt").count(),
-        "kontakt_bald": kontakt_filter(offen, "kontakt_bald").count(),
-        "kontakt_ueberfaellig": kontakt_filter(offen, "kontakt_ueberfaellig").count(),
+        "kein_kontakt": kontakt_filter(offen, "kein_kontakt", e).count(),
+        "kontakt_bald": kontakt_filter(offen, "kontakt_bald", e).count(),
+        "kontakt_ueberfaellig": kontakt_filter(offen, "kontakt_ueberfaellig", e).count(),
         "kontakt_monate": e.kontakt_bald_monate,
         "kontakt_bald_monate": e.kontakt_bald_monate,
         "kontakt_ueberfaellig_monate": e.kontakt_ueberfaellig_monate,

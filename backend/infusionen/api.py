@@ -156,11 +156,15 @@ class InfusionsplanViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mix
     filterset_fields = ["patient", "status"]
 
     def get_queryset(self):
-        return (
+        qs = (
             Infusionsplan.objects.filter(patient__in=patienten_fuer(self.request.user))
             .select_related("patient", "erstellt_von", "freigegeben_von", "abgeschlossen_von", "vorgaenger")
             .prefetch_related("positionen__praeparat", "vitamine")
         )
+        if self.action in ("list", "retrieve", "update", "partial_update"):
+            # Vorgänger mit Vitaminen und Positionen für ``geaenderte_felder`` (sonst vier Abfragen je Plan)
+            qs = qs.prefetch_related("vorgaenger__vitamine", "vorgaenger__positionen")
+        return qs
 
     def perform_update(self, serializer):
         if serializer.instance.status != Infusionsplan.Status.ENTWURF:

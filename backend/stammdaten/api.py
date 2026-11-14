@@ -131,7 +131,7 @@ class AnsprechpartnerSerializer(serializers.ModelSerializer):
                   "patienten_anzahl"]
 
     def get_patienten_anzahl(self, obj):
-        vorab = getattr(obj, "_patienten_anzahl", None)  # in Listen schon mitgezählt (``_patienten_je_ansprechpartner``)
+        vorab = getattr(obj, "_patienten_anzahl", None)  # in Listen schon mitgezählt
         if vorab is not None:
             return vorab
         return obj.patienten.filter(abgeschlossen_am__isnull=True, ist_test=False).count()
