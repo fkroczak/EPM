@@ -1059,3 +1059,4 @@ input.inp:is([type="date"], [type="time"])::-webkit-datetime-edit { padding: 0; 
 @media (min-width: 90rem) { .app-skelett-leiste { width: 14rem; } }
 @media (max-width: 47.99rem) { .app-skelett-leiste { display: none; } .app-skelett-inhalt { padding: 1rem 0.75rem; } }
 .app-skelett-kopf .skelett:last-child { max-width: 55%; }
+.app-skelett-text { font: 0.875rem system-ui, sans-serif; color: var(--gedaempft); }

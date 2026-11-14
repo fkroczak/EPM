@@ -165,14 +165,14 @@ export function Laden({ text = LADEN_TEXT, zeilen = 3 }: { text?: string; zeilen
 export function AppSkelett() {
   return (
     <div className="app-skelett" role="status" data-laden>
-      <span className="sr-only">EPM wird geladen …</span>
       <div className="app-skelett-leiste" aria-hidden="true">
         <Skelett hoehe="3.5rem" />
         {Array.from({ length: 8 }, (_, i) => <Skelett key={i} hoehe="1.25rem" breite={i % 3 ? "80%" : "90%"} />)}
       </div>
-      <div className="grow min-w-0" aria-hidden="true">
-        <div className="app-skelett-kopf"><Skelett breite="6rem" /><Skelett breite="22rem" hoehe="2.25rem" /></div>
-        <div className="app-skelett-inhalt">
+      <div className="grow min-w-0">
+        {/* sichtbarer Text: Platzhalterflächen zählen für den Browser nicht als erster Inhalt (FCP) */}
+        <div className="app-skelett-kopf"><span className="app-skelett-text">EPM wird geladen …</span><Skelett breite="22rem" hoehe="2.25rem" /></div>
+        <div className="app-skelett-inhalt" aria-hidden="true">
           <Skelett breite="18rem" hoehe="1.75rem" />
           <div className="app-skelett-karten">
             {Array.from({ length: 3 }, (_, i) => (
