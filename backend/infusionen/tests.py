@@ -3,6 +3,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.db import DatabaseError, connection, transaction
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from epm.pruefhilfen import Grundlage, client_fuer
@@ -95,6 +96,32 @@ class Infusionsplaene(PlanHilfen, Grundlage):
         self.assertEqual(kopf["aktueller_plan"]["id"], e2["id"])
         self.assertEqual(float(kopf["aktueller_plan"]["laufzeit_h"]), 12.0)
         self.assertIsNone(kopf["plan_entwurf"])
+
+    def test_liste_ohne_abfragen_je_plan(self):
+        """Liste der Pläne einer Akte: „geänderte Felder“ nutzt die vorgeladenen Vitamine und Positionen (auch des
+        Vorgängers) – vorher vier Abfragen je Plan."""
+        c = client_fuer(self.mediziner)
+        url = f"/api/infusionsplaene/?patient={self.patient.id}&seitengroesse=2000"
+
+        def abfragen():
+            with CaptureQueriesContext(connection) as q:
+                r = c.get(url)
+            self.assertEqual(r.status_code, 200)
+            return len(q), r.json()["results"]
+
+        self.freigegebener_plan()
+        self.freigegebener_plan(glucose_g="150")
+        c.get(url)  # erste Anfrage der Sitzung hat eigene Abfragen (Sitzung)
+        vorher, plaene = abfragen()
+        self.assertEqual(plaene[0]["geaenderte_felder"], ["glucose_g"])
+        self.freigegebener_plan(glucose_g="150", vitamine=[praeparat("Cernevit").id])
+        pantozol = {"praeparat": praeparat("Pantozol i.v.").id, "menge": "50", "einheit": "ml"}
+        self.freigegebener_plan(glucose_g="150", vitamine=[praeparat("Cernevit").id], positionen=[pantozol])
+        nachher, plaene = abfragen()
+        self.assertEqual(len(plaene), 4)
+        self.assertEqual([p["geaenderte_felder"] for p in plaene],
+                         [["positionen"], ["vitamine"], ["glucose_g"], []])
+        self.assertEqual(nachher, vorher)
 
     def test_entwurf_verwerfen(self):
         c = client_fuer(self.mediziner)

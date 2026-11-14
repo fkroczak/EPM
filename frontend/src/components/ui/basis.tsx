@@ -132,10 +132,57 @@ export function Ladekreis({ groesse = 16 }: { groesse?: number }) {
   );
 }
 
-export function Laden({ text = "Wird geladen …" }: { text?: string }) {
+const LADEN_TEXT = "Wird geladen …";
+/** Breiten der Platzhalterzeilen: ungleich lang wie echter Text */
+const ZEILEN_BREITE = ["92%", "74%", "84%", "58%", "88%", "66%"];
+
+/** Platzhalter in der Form des Inhalts (Skelett), solange Daten laden (Performance-Prüfung 14.11.2026). */
+export function Skelett({ className, breite, hoehe }: { className?: string; breite?: string; hoehe?: string }) {
+  return <span aria-hidden="true" className={cx("skelett", className)} style={{ width: breite, height: hoehe ?? "0.875rem" }} />;
+}
+
+/**
+ * Ladezustand. Ohne eigenen Text: Platzhalterzeilen (Skelett) statt Ladekreis – die Seite steht sofort in ihrer Form da.
+ * Mit eigenem Text („PDF wird erzeugt …“): Ladekreis mit Text, weil er sagt, worauf gewartet wird.
+ */
+export function Laden({ text = LADEN_TEXT, zeilen = 3 }: { text?: string; zeilen?: number }) {
+  if (text !== LADEN_TEXT) {
+    return (
+      <div role="status" className="flex items-center gap-2 p-6 text-sm gedaempft">
+        <Ladekreis /> {text}
+      </div>
+    );
+  }
   return (
-    <div role="status" className="flex items-center gap-2 p-6 text-sm gedaempft">
-      <Ladekreis /> {text}
+    <div role="status" data-laden className="flex flex-col gap-2.5 px-1 py-3">
+      <span className="sr-only">{text}</span>
+      {Array.from({ length: zeilen }, (_, i) => <Skelett key={i} breite={ZEILEN_BREITE[i % ZEILEN_BREITE.length]} />)}
+    </div>
+  );
+}
+
+/** Gerüst der ganzen Anwendung beim ersten Laden (gleiches Bild wie in index.html, damit nichts springt). */
+export function AppSkelett() {
+  return (
+    <div className="app-skelett" role="status" data-laden>
+      <div className="app-skelett-leiste" aria-hidden="true">
+        <Skelett hoehe="3.5rem" />
+        {Array.from({ length: 8 }, (_, i) => <Skelett key={i} hoehe="1.25rem" breite={i % 3 ? "80%" : "90%"} />)}
+      </div>
+      <div className="grow min-w-0">
+        {/* sichtbarer Text: Platzhalterflächen zählen für den Browser nicht als erster Inhalt (FCP) */}
+        <div className="app-skelett-kopf"><span className="app-skelett-text">EPM wird geladen …</span><Skelett breite="22rem" hoehe="2.25rem" /></div>
+        <div className="app-skelett-inhalt" aria-hidden="true">
+          <Skelett breite="18rem" hoehe="1.75rem" />
+          <div className="app-skelett-karten">
+            {Array.from({ length: 3 }, (_, i) => (
+              <div key={i} className="app-skelett-karte">
+                <Skelett breite="45%" hoehe="1.125rem" /><Skelett breite="90%" /><Skelett breite="75%" /><Skelett breite="82%" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

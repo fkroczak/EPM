@@ -85,6 +85,26 @@ def neue_reihenfolge(request, queryset, gruppenfeld: str):
     return Response({"reihenfolge": ids})
 
 
+def _anzahl(qs, feld="pk", distinct=False):
+    """COUNT als Unterabfrage je Zeile – die Listen zählen so in einer Abfrage statt je Eintrag."""
+    from django.db.models import F, Func, IntegerField, Subquery
+    from django.db.models.functions import Coalesce
+
+    extra = {"template": "%(function)s(DISTINCT %(expressions)s)"} if distinct else {}
+    zaehlen = Func(F(feld), function="COUNT", output_field=IntegerField(), **extra)
+    return Coalesce(Subquery(qs.order_by().annotate(_n=zaehlen).values("_n")[:1]), 0)
+
+
+def _patienten_je_ansprechpartner():
+    from django.db.models import OuterRef
+
+    from patienten.models import Patient
+
+    # wie ``get_patienten_anzahl``: in Betreuung, ohne Testpatienten
+    return _anzahl(Patient.objects.filter(ansprechpartner=OuterRef("pk"), abgeschlossen_am__isnull=True,
+                                          ist_test=False))
+
+
 class AuswahlwertSerializer(serializers.ModelSerializer):
     class Meta:
         model = Auswahlwert
@@ -111,12 +131,16 @@ class AnsprechpartnerSerializer(serializers.ModelSerializer):
                   "patienten_anzahl"]
 
     def get_patienten_anzahl(self, obj):
+        vorab = getattr(obj, "_patienten_anzahl", None)  # in Listen schon mitgezählt
+        if vorab is not None:
+            return vorab
         return obj.patienten.filter(abgeschlossen_am__isnull=True, ist_test=False).count()
 
 
 class AnsprechpartnerViewSet(OhneLoeschen):
     permission_classes = [VersorgerRecht]
-    queryset = Ansprechpartner.objects.select_related("versorger")
+    queryset = Ansprechpartner.objects.select_related("versorger").annotate(
+        _patienten_anzahl=_patienten_je_ansprechpartner())
     serializer_class = AnsprechpartnerSerializer
     filterset_fields = ["versorger", "aktiv"]
     pagination_class = None
@@ -129,7 +153,7 @@ class AnsprechpartnerViewSet(OhneLoeschen):
 
         ap = self.get_object()
         qs = patienten_fuer(request.user).filter(ansprechpartner=ap, abgeschlossen_am__isnull=True)
-        return Response(PatientListSerializer(qs, many=True).data)
+        return Response(PatientListSerializer(_fuer_liste(qs), many=True).data)
 
     @action(detail=True, methods=["post"], url_path="neu-zuordnen")
     def neu_zuordnen(self, request, pk=None):
@@ -164,12 +188,30 @@ class VersorgerSerializer(serializers.ModelSerializer):
 
     def get_patienten_anzahl(self, obj):
         """„94 Patienten in Betreuung“ (Entwurf 13): ohne abgeschlossene Akten und Testpatienten."""
+        vorab = getattr(obj, "_patienten_anzahl", None)  # in der Liste schon mitgezählt
+        if vorab is not None:
+            return vorab
         return obj.patienten.filter(abgeschlossen_am__isnull=True, ist_test=False).count()
+
+
+def _versorger_mit_zahlen():
+    from django.db.models import OuterRef, Prefetch
+
+    from patienten.models import Patient
+
+    return Versorger.objects.annotate(_patienten_anzahl=_anzahl(Patient.objects.filter(
+        versorger=OuterRef("pk"), abgeschlossen_am__isnull=True, ist_test=False))).prefetch_related(
+        Prefetch("ansprechpartner", queryset=Ansprechpartner.objects.annotate(
+            _patienten_anzahl=_patienten_je_ansprechpartner())))
 
 
 class VersorgerViewSet(OhneLoeschen):
     permission_classes = [VersorgerRecht]
     queryset = Versorger.objects.prefetch_related("ansprechpartner")
+
+    def get_queryset(self):
+        # Patientenzahlen gleich mitzählen – sonst je Versorger und je Ansprechpartner eine Abfrage
+        return _versorger_mit_zahlen()
     serializer_class = VersorgerSerializer
     filterset_fields = ["aktiv"]
     search_fields = ["name", "ort"]
@@ -191,8 +233,18 @@ class ArztSerializer(serializers.ModelSerializer):
 
     def get_patienten_anzahl(self, obj):
         """Zugeordnete Patienten in Betreuung (ohne Testpatienten), wie bei den Versorgern."""
+        vorab = getattr(obj, "_patienten_anzahl", None)  # in der Liste schon mitgezählt
+        if vorab is not None:
+            return vorab
         return (obj.zuordnungen.filter(aktiv=True, patient__abgeschlossen_am__isnull=True, patient__ist_test=False)
                 .values("patient_id").distinct().count())
+
+
+def _fuer_liste(patienten_qs):
+    """Verknüpfungen für ``PatientListSerializer`` gleich mitladen – sonst je Akte fünf Abfragen (Versorger,
+    Ansprechpartner, Katheter, Firmen)."""
+    return patienten_qs.select_related("versorger", "ansprechpartner", "katheter").prefetch_related(
+        "firmenzuordnung__firma")
 
 
 class ArztViewSet(OhneLoeschen):
@@ -202,6 +254,16 @@ class ArztViewSet(OhneLoeschen):
     permission_classes = [VersorgerRecht]
     queryset = Arzt.objects.all()
     serializer_class = ArztSerializer
+
+    def get_queryset(self):
+        from django.db.models import OuterRef
+
+        from patienten.models import PatientArzt
+
+        # Patientenzahl je Arzt gleich mitzählen (wie ``ArztSerializer.get_patienten_anzahl``)
+        return Arzt.objects.annotate(_patienten_anzahl=_anzahl(
+            PatientArzt.objects.filter(arzt=OuterRef("pk"), aktiv=True, patient__abgeschlossen_am__isnull=True,
+                                       patient__ist_test=False), "patient_id", distinct=True))
     filterset_fields = ["aktiv"]
     search_fields = ["name", "praxis", "fachrichtung", "ort"]
     pagination_class = None
@@ -215,7 +277,7 @@ class ArztViewSet(OhneLoeschen):
         arzt = self.get_object()
         qs = patienten_fuer(request.user).filter(aerzte__arzt=arzt, aerzte__aktiv=True,
                                                  abgeschlossen_am__isnull=True).distinct()
-        return Response(PatientListSerializer(qs, many=True).data)
+        return Response(PatientListSerializer(_fuer_liste(qs), many=True).data)
 
 
 class PraeparatSerializer(serializers.ModelSerializer):

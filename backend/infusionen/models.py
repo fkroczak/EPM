@@ -372,7 +372,8 @@ class Infusionsplan(AktenEintrag):
             return []
         v = self.vorgaenger
         felder = [f for f in PLANFELDER if getattr(self, _attr(f)) != getattr(v, _attr(f))]
-        if self.pk and set(self.vitamine.values_list("pk", flat=True)) != set(v.vitamine.values_list("pk", flat=True)):
+        # über ``.all()``, damit vorgeladene Vitamine und Positionen (Liste der Pläne) genutzt werden
+        if self.pk and {p.pk for p in self.vitamine.all()} != {p.pk for p in v.vitamine.all()}:
             felder.append("vitamine")
         if _positionen_signatur(self) != _positionen_signatur(v):
             felder.append("positionen")
@@ -609,7 +610,7 @@ def _attr(feld: str) -> str:
 def _positionen_signatur(plan):
     return [
         (p.praeparat_id, p.menge, p.einheit, p.haeufigkeit, p.bemerkung)
-        for p in plan.positionen.order_by("reihenfolge", "id")
+        for p in plan.positionen.all()  # Standardreihenfolge: reihenfolge, id
     ]
 
 

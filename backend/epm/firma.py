@@ -50,33 +50,36 @@ def rollen_je_firma(user, firmen=None) -> dict:
     return {f: (user.rolle if f.kuerzel == HAUPTFIRMA else weitere.get(f.pk, Rolle.KEINE)) for f in firmen}
 
 
-def mitgliedschaften(user) -> dict:
+def mitgliedschaften(user, firmen=None) -> dict:
     """{Firma: Rolle} der Firmen, in denen die Person Zugang hat (Rolle nicht „Keine Berechtigung“)."""
     from accounts.models import Rolle
 
     if user is None or getattr(user, "nur_historisch", False):
         return {}
-    return {f: r for f, r in rollen_je_firma(user).items() if r != Rolle.KEINE}
+    return {f: r for f, r in rollen_je_firma(user, firmen).items() if r != Rolle.KEINE}
 
 
-def admin_firmen(user) -> set[str]:
+def admin_firmen(user, firmen=None) -> set[str]:
     """Kürzel der Firmen, in denen die Person Admin ist. Rollen in einer Firma vergibt nur ein Admin dieser Firma
     (Festlegung 11.10.2026)."""
     from accounts.models import Rolle
 
-    return {f.kuerzel for f, r in mitgliedschaften(user).items() if r == Rolle.ADMIN}
+    return {f.kuerzel for f, r in mitgliedschaften(user, firmen).items() if r == Rolle.ADMIN}
 
 
-def darf_konto_verwalten(admin, user) -> tuple[bool, list]:
+def darf_konto_verwalten(admin, user, firmen=None, erlaubt=None) -> tuple[bool, list]:
     """Kontoweite Verwaltung (sperren, Einmal-Passwort, zweiten Faktor zurücksetzen, aus- und einblenden, Kontodaten
     wie Name oder Benutzername ändern) darf nur, wer in **jeder** Firma Admin ist, in der die Person eine Rolle hat
     (Festlegung 11.10.2026) – sonst könnte ein Admin der einen Firma Konten der anderen aussperren. Ohne Rolle in
     irgendeiner Firma (ohne Login oder überall „Keine Berechtigung“) darf jeder Admin.
 
     Liefert ``(erlaubt, fehlende Firmen)``; die fehlenden Firmen sind die, in denen die Person eine Rolle hat, die
-    Admin-Person aber kein Admin ist (für den Hinweis in der Antwort)."""
-    erlaubt = admin_firmen(admin)
-    fehlend = [f for f in mitgliedschaften(user) if f.kuerzel not in erlaubt]
+    Admin-Person aber kein Admin ist (für den Hinweis in der Antwort).
+
+    ``firmen`` (aktive Firmen) und ``erlaubt`` (``admin_firmen(admin)``) lassen sich für Listen vorab ermitteln."""
+    if erlaubt is None:
+        erlaubt = admin_firmen(admin, firmen)
+    fehlend = [f for f in mitgliedschaften(user, firmen) if f.kuerzel not in erlaubt]
     return (not fehlend, fehlend)
 
 

@@ -25,7 +25,10 @@ from .models import Hilfeergaenzung
 ABSCHNITT = {a["id"]: a for a in ABSCHNITTE}
 
 
-def sichtbar(user, abschnitt) -> bool:
+def sichtbar(user, abschnitt, rechte=None) -> bool:
+    """``rechte``: schon ermittelte Rechte der Person (``rechte_fuer``) – spart je Abschnitt eine Abfrage."""
+    if rechte is not None:
+        return not abschnitt["rechte"] or any(r in rechte for r in abschnitt["rechte"])
     return not abschnitt["rechte"] or any(user.hat_recht(r) for r in abschnitt["rechte"])
 
 
@@ -57,16 +60,19 @@ class HilfeView(APIView):
     permission_classes = [Angemeldet]
 
     def get(self, request):
+        from accounts.rechte import rechte_fuer
+
         user = request.user
+        rechte = rechte_fuer(user)  # einmal je Anfrage statt je Abschnitt
         ergaenzungen = {e.abschnitt: e for e in Hilfeergaenzung.objects.all()}
         gruppen = []
         for gid, titel in GRUPPEN:
             abschnitte = [{"id": a["id"], "titel": a["titel"], "seiten": a["seiten"], "html": a["html"].strip(),
                            "ergaenzung": _ergaenzung(a["id"], ergaenzungen)}
-                          for a in ABSCHNITTE if a["gruppe"] == gid and sichtbar(user, a)]
+                          for a in ABSCHNITTE if a["gruppe"] == gid and sichtbar(user, a, rechte)]
             if abschnitte:
                 gruppen.append({"id": gid, "titel": titel, "abschnitte": abschnitte})
-        return Response({"version": settings.EPM_VERSION or None, "darf_ergaenzen": user.hat_recht("vorlagen_pflegen"),
+        return Response({"version": settings.EPM_VERSION or None, "darf_ergaenzen": "vorlagen_pflegen" in rechte,
                          "gruppen": gruppen})
 
 

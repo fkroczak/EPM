@@ -996,18 +996,30 @@ class BenutzerSerializer(serializers.ModelSerializer):
     # wer in jeder Firma mit Rolle der Person Admin ist (Festlegung 11.10.2026) – die Oberfläche sperrt sonst die Knöpfe
     verwaltbar = serializers.SerializerMethodField()
 
+    def _firmen(self):
+        """Aktive Firmen – in der Liste einmal je Antwort statt je Konto gelesen."""
+        from epm.firma import _firmen
+
+        if "_firmen" not in self.context:
+            self.context["_firmen"] = _firmen()
+        return self.context["_firmen"]
+
     def get_firmenrollen(self, obj):
         from epm.firma import rollen_je_firma
 
-        return {f.kuerzel: r for f, r in rollen_je_firma(obj).items()}
+        return {f.kuerzel: r for f, r in rollen_je_firma(obj, self._firmen()).items()}
 
     def get_verwaltbar(self, obj):
-        from epm.firma import darf_konto_verwalten
+        from epm.firma import admin_firmen, darf_konto_verwalten
 
         request = self.context.get("request")
         if request is None or not getattr(obj, "pk", None):
             return True
-        return darf_konto_verwalten(request.user, obj)[0]
+        firmen = self._firmen()
+        # Admin-Firmen der anfragenden Person ebenfalls nur einmal je Antwort
+        if "_admin_firmen" not in self.context:
+            self.context["_admin_firmen"] = admin_firmen(request.user, firmen)
+        return darf_konto_verwalten(request.user, obj, firmen, self.context["_admin_firmen"])[0]
 
     def _firmenrollen_eingabe(self):
         werte = self.initial_data.get("firmenrollen") if isinstance(self.initial_data, dict) else None

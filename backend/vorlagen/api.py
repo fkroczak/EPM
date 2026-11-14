@@ -71,47 +71,62 @@ def _ausrichtung(daten, sonst: str) -> str:
     return wert
 
 
-def _firma_info(art, ziel) -> dict:
+def _firma_info(art, ziel, mehrere=None) -> dict:
     """Vorlagen je Firma (11.10.2026): nutzt die aktive Firma die gemeinsame Vorlage oder ihre eigene?"""
     from epm.firma import aktive_firma
     from stammdaten.models import Firma
 
     firma = aktive_firma()
-    mehrere = Firma.objects.filter(aktiv=True).count() > 1
+    if mehrere is None:
+        mehrere = Firma.objects.filter(aktiv=True).count() > 1
     return {"aktiv": firma.kuerzel if firma else None, "name": firma.kurzname if firma else None,
             "mehrere": mehrere, "eigene": ziel is not None, "gebunden": art in NUR_FIRMA,
             # eigene Vorlage anlegen/ablegen: nur mit mehreren Firmen, nicht bei fest zugeordneten oder eigenen Schreiben
             "moeglich": mehrere and firma is not None and art not in NUR_FIRMA and not ist_eigen(art)}
 
 
-def _uebersicht(art):
+def _gemeinsam() -> dict:
+    """Was für alle Arten gleich ist – für die Übersicht aller Vorlagen einmal statt je Art ermittelt."""
+    from stammdaten.models import Einstellungen, Firma
+
+    from .fassung1 import import_durchgefuehrt
+
+    return {"nur_fassung_1": not import_durchgefuehrt(),
+            "mehrere": Firma.objects.filter(aktiv=True).count() > 1,
+            "ohne_entwurf": Einstellungen.aktuell().vordrucke_ohne_entwurf or [],
+            "eigene": {e.schluessel: e for e in EigenesSchreiben.objects.all()}}
+
+
+def _uebersicht(art, gemeinsam=None):
+    gemeinsam = gemeinsam or _gemeinsam()
     aktiv = Dokumentvorlage.aktive(art)
     ziel = Dokumentvorlage.zustaendig(art)
     versionen = Dokumentvorlage.objects.filter(art=art, firma=ziel).exclude(status=Dokumentvorlage.Status.ENTWURF) \
         .select_related("veroeffentlicht_von").order_by("-version")
-    from stammdaten.models import Einstellungen
-
-    from .fassung1 import import_durchgefuehrt
-
-    eigen = EigenesSchreiben.objects.filter(schluessel=art).first()
-    nur_fassung_1 = not import_durchgefuehrt()
+    eigen = gemeinsam["eigene"].get(art)
+    nur_fassung_1 = gemeinsam["nur_fassung_1"]
+    # wie ``aktiv.im_entwurfsmodus``, aber ohne die Einstellungen erneut zu lesen
+    entwurf_moeglich = art in Dokumentvorlage.VORDRUCKE and aktiv.veroeffentlicht_von_id is None
+    entwurf_aus = aktiv.entwurfsmodus_schluessel in gemeinsam["ohne_entwurf"]
     return {"art": art, "name": art_name(art), "aktiv": _version(aktiv),
             # eigenes Schreiben (F176): Beschreibung, Termin, aktiv
             "eigen": {"beschreibung": eigen.beschreibung, "mit_termin": eigen.mit_termin, "aktiv": eigen.aktiv}
             if eigen else None,
             # Vorlagen-Portal (F180): wofür, wo in der Praxis benutzt, Gruppe der Übersicht
             **art_info(art, eigen.beschreibung if eigen else "", eigen.gruppe if eigen else None),
-            "entwurf": _version(Dokumentvorlage.entwurf_von(art)), "versionen": [_version(v) for v in versionen],
+            # Entwurf der zuständigen Vorlage (wie ``Dokumentvorlage.entwurf_von``, ``ziel`` ist schon ermittelt)
+            "entwurf": _version(Dokumentvorlage.objects.filter(art=art, firma=ziel,
+                                                               status=Dokumentvorlage.Status.ENTWURF).first()),
+            "versionen": [_version(v) for v in versionen],
             # vor dem Import der Altdaten ersetzt Freigeben die Fassung 1 (vorlagen.fassung1)
             "nur_fassung_1": nur_fassung_1,
             "naechste_fassung": 1 if nur_fassung_1 else max([v.version for v in versionen] or [0]) + 1,
-            "firma": _firma_info(art, ziel),
+            "firma": _firma_info(art, ziel, gemeinsam["mehrere"]),
             # Seitenformat (13.10.2026): das der aktiven Fassung; der Editor bietet Querformat bei breiten Tabellen an
             "ausrichtung": aktiv.ausrichtung, "querformat_moeglich": art in QUERFORMAT,
             # Vordrucke: Wasserzeichen „ENTWURF“ (Startvorlage ungeprüft) und ob es manuell abgeschaltet ist (U17)
-            "entwurfsmodus": {"moeglich": art in Dokumentvorlage.VORDRUCKE and aktiv.veroeffentlicht_von_id is None,
-                              "aktiv": aktiv.im_entwurfsmodus,
-                              "aus": aktiv.entwurfsmodus_schluessel in (Einstellungen.aktuell().vordrucke_ohne_entwurf or [])}}
+            "entwurfsmodus": {"moeglich": entwurf_moeglich, "aktiv": entwurf_moeglich and not entwurf_aus,
+                              "aus": entwurf_aus}}
 
 
 class VorlagenView(APIView):
@@ -120,7 +135,8 @@ class VorlagenView(APIView):
     def get(self, request):
         arten = [*(a for a in Dokumentvorlage.Art.values if art_sichtbar(a)),
                  *EigenesSchreiben.sichtbare().values_list("schluessel", flat=True)]
-        return Response([_uebersicht(a) for a in arten])
+        gemeinsam = _gemeinsam()
+        return Response([_uebersicht(a, gemeinsam) for a in arten])
 
     @transaction.atomic
     def post(self, request):

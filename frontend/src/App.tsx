@@ -1,8 +1,9 @@
 import { createBrowserRouter, Link, Navigate, RouterProvider } from "react-router";
 import type { ReactNode } from "react";
 import { useAuth } from "./lib/auth";
+import { useVorladen } from "./lib/vorladen";
 import type { Recht } from "./lib/typen";
-import { Laden } from "./components/ui/basis";
+import { AppSkelett } from "./components/ui/basis";
 import { Seite, Shell } from "./components/layout/Shell";
 import { Anmeldung } from "./seiten/Anmeldung";
 import { Start } from "./seiten/Start";
@@ -34,7 +35,7 @@ const router = createBrowserRouter([
   {
     element: <Shell />,
     // erste Seite wird noch geladen (sonst Warnung „No HydrateFallback element“ in der Konsole)
-    hydrateFallbackElement: <Laden text="EPM wird geladen …" />,
+    hydrateFallbackElement: <AppSkelett />,
     children: [
       { index: true, element: <Start /> },
       { path: "patienten", ...seite(() => import("./seiten/Patienten").then(({ Patienten }) => <Patienten />)) },
@@ -102,9 +103,15 @@ const router = createBrowserRouter([
   },
 ]);
 
+/** Angemeldet: Seiten im Leerlauf und Akten beim Überfahren vorladen (lib/vorladen.ts) */
+function Angemeldet() {
+  useVorladen();
+  return <RouterProvider router={router} />;
+}
+
 export function App() {
   const { status, laedt } = useAuth();
-  if (laedt) return <Laden text="EPM wird geladen …" />;
+  if (laedt) return <AppSkelett />;
   if (status?.schritt !== "fertig") return <Anmeldung />;
-  return <RouterProvider router={router} />;
+  return <Angemeldet />;
 }

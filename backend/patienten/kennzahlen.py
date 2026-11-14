@@ -15,6 +15,8 @@ from stammdaten.models import Einstellungen
 from .models import Gewichtsmessung, Kontakt, Patient, Termin, berechne_trend, ruhende_hinweise, sichtbare_termine
 
 TREND_SPANNE = Decimal("1.0")  # unter ±1 % gilt das Gewicht als gleichbleibend (Pfeil →)
+# Spalten, die ``kennzahlen`` neben id/versorger/kein_versorger je Akte liest (für ``.only()`` der Aufrufer)
+KENNZAHLEN_FELDER = ("nickelallergie", "kein_katheter")
 
 
 def _deutsch(zahl: Decimal) -> str:
@@ -55,10 +57,10 @@ def kontakt_text(stufe: str, letzter, e) -> str:
     return f"Kontakt bald fällig (über {e.kontakt_bald_monate} Mon.)"
 
 
-def kontakt_filter(patienten_qs, art: str):
+def kontakt_filter(patienten_qs, art: str, e=None):
     """Patientenliste ``?pruefen=``: kein_kontakt (ab „bald fällig“, beide Stufen), kontakt_bald (nur die erste
     Stufe), kontakt_ueberfaellig, wiedereinbestellung (beide Stufen, aber ohne offenen Termin – Kachel S04)."""
-    bald, ueberfaellig = kontakt_grenzen()
+    bald, ueberfaellig = kontakt_grenzen(e)  # ``e``: schon gelesene Einstellungen (spart die Abfrage)
     gueltig = Kontakt.objects.filter(storniert_am__isnull=True)
     nach_bald = gueltig.filter(zeitpunkt__gte=bald).values("patient_id")
     nach_ueberfaellig = gueltig.filter(zeitpunkt__gte=ueberfaellig).values("patient_id")
@@ -214,7 +216,8 @@ def kennzahlen(patienten, liste: bool = False) -> dict:
 
 def _nur_ids(patienten_qs):
     """Nur die Spalten, die ``kennzahlen`` braucht (ohne select_related der Listenansicht)."""
-    return patienten_qs.select_related(None).only("id", "versorger", "kein_versorger")
+    # Nickelallergie und Katheter gleich mitladen – sonst lädt der Hinweis „Nickelallergie“ sie je Akte einzeln
+    return patienten_qs.select_related(None).only("id", "versorger", "kein_versorger", *KENNZAHLEN_FELDER)
 
 
 def schnellfilter(patienten_qs, art: str):
@@ -296,10 +299,12 @@ def befund_filter(patienten_qs, art: str):
     return qs.exclude(id__in=stumm)
 
 
-def _mit_hinweis(patienten_qs, art: str) -> int:
-    """Wie viele Akten diesen Hinweis gerade zeigen (stummgeschaltete sind schon heraus)."""
-    return sum(1 for k in kennzahlen(_nur_ids(patienten_qs)).values()
-               if any(h["art"] == art for h in k["hinweise"]))
+def _mit_hinweis(patienten_qs, art: str, werte: dict | None = None) -> int:
+    """Wie viele Akten diesen Hinweis gerade zeigen (stummgeschaltete sind schon heraus). ``werte``: schon berechnete
+    ``kennzahlen`` derselben Akten (spart die zweite Berechnung)."""
+    if werte is None:
+        werte = kennzahlen(_nur_ids(patienten_qs))
+    return sum(1 for k in werte.values() if any(h["art"] == art for h in k["hinweise"]))
 
 
 def nickel_offen(qs):
@@ -313,8 +318,10 @@ def nickel_offen(qs):
     return qs.filter(nickelallergie=Patient.Nickelallergie.UNBEKANNT, kein_katheter=False).exclude(id__in=ruht)
 
 
-def pruefliste(patienten_qs) -> dict:
-    """„Nach und nach prüfen“ auf der Startseite (Entwurf 2)."""
+def pruefliste(patienten_qs, vorab: dict | None = None) -> dict:
+    """„Nach und nach prüfen“ auf der Startseite (Entwurf 2). ``vorab``: schon berechnete ``kennzahlen`` einer
+    Obermenge der offenen Akten – die Werte je Akte hängen nicht von den übrigen ab, so entfällt die zweite
+    Berechnung."""
     from .models import Datenschutzanfrage, Dokument
 
     e = Einstellungen.aktuell()
@@ -322,6 +329,14 @@ def pruefliste(patienten_qs) -> dict:
     # Altdokumente (S09): Fortschritt „312 von 1.140 geprüft“ – alle aus dem Altsystem übernommenen Dokumente (dort
     # ohne geprüften Typ angelegt) und davon die noch offenen
     altdokumente = Dokument.objects.filter(patient__in=offen, ausgeblendet=False)
+    if vorab is not None:
+        ids = list(offen.values_list("id", flat=True))
+        werte = {pid: vorab[pid] for pid in ids if pid in vorab}
+        fehlend = [pid for pid in ids if pid not in vorab]  # inzwischen neu angelegt
+        if fehlend:
+            werte.update(kennzahlen(_nur_ids(offen.filter(id__in=fehlend))))
+    else:
+        werte = kennzahlen(_nur_ids(offen))  # einmal für „Labor“ und „BIA“
     return {
         "altdokumente": altdokumente.filter(typ_geprueft=False).count(),
         "altdokumente_gesamt": altdokumente.filter(Q(typ_geprueft=False) | Q(herkunft=Dokument.Herkunft.ALTSYSTEM)).count(),
@@ -330,16 +345,16 @@ def pruefliste(patienten_qs) -> dict:
         # Akten in Betreuung ohne freigegebenen Infusionsplan, ohne Bestätigung „kein Plan nötig“
         "ohne_plan": ohne_plan(offen).count(),
         # Kontakt fällig in zwei Stufen (S04); „kein_kontakt“ = beide Stufen zusammen
-        "kein_kontakt": kontakt_filter(offen, "kein_kontakt").count(),
-        "kontakt_bald": kontakt_filter(offen, "kontakt_bald").count(),
-        "kontakt_ueberfaellig": kontakt_filter(offen, "kontakt_ueberfaellig").count(),
+        "kein_kontakt": kontakt_filter(offen, "kein_kontakt", e).count(),
+        "kontakt_bald": kontakt_filter(offen, "kontakt_bald", e).count(),
+        "kontakt_ueberfaellig": kontakt_filter(offen, "kontakt_ueberfaellig", e).count(),
         "kontakt_monate": e.kontakt_bald_monate,
         "kontakt_bald_monate": e.kontakt_bald_monate,
         "kontakt_ueberfaellig_monate": e.kontakt_ueberfaellig_monate,
         # Datenschutz: Erklärungen nachhalten wie die Nickelallergie; lange ruhende Akten abschließen
         # Befunde zu alt oder nie erfasst (F120); stummgeschaltete zählen nicht mit (F119)
-        "labor_faellig": _mit_hinweis(offen, "labor"),
-        "bia_faellig": _mit_hinweis(offen, "bia"),
+        "labor_faellig": _mit_hinweis(offen, "labor", werte),
+        "bia_faellig": _mit_hinweis(offen, "bia", werte),
         "labor_monate": e.labor_alter_warnung_monate,
         "bia_monate": e.bia_alter_warnung_monate,
         "erklaerungen_fehlen": len(ohne_pflicht_erklaerungen(offen)),

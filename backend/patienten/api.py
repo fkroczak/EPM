@@ -30,8 +30,8 @@ from audit.bereinigung import akte_text
 from stammdaten.models import Arzt
 
 from .datenschutz import DatenschutzAktionen
-from .kennzahlen import (abschluss_pruefen, befund_filter, kennzahlen, kontakt_filter, ohne_pflicht_erklaerungen,
-                         ohne_plan, pruefliste,
+from .kennzahlen import (KENNZAHLEN_FELDER, abschluss_pruefen, befund_filter, kennzahlen, kontakt_filter,
+                         ohne_pflicht_erklaerungen, ohne_plan, pruefliste,
                          schnellfilter, zaehler)
 from .loeschung import PLATZHALTER, schwaerze_dokument, trage_ein
 from .models import (Bezugsperson, Datenschutzanfrage, Diagnose, Dokument, DokumentVorgang, Erklaerung, Therapieschritt,
@@ -171,6 +171,7 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
         plan = obj.infusionsplaene.filter(status=Infusionsplan.Status.AKTUELL).first()
         entwurf = obj.infusionsplaene.filter(status=Infusionsplan.Status.ENTWURF).order_by("-erstellt_am").first()
         termin = sichtbare_termine(obj.termine.filter(erledigt_am__isnull=True, faellig_am__gte=timezone.localdate())).first()
+        historie = _historie(obj)  # Verlauf der Akte einmal laden statt je Textfeld (Versionsangaben)
         return {
             "gewicht": {"kg": letzte.gewicht_kg, "am": letzte.gemessen_am} if letzte else None,
             "gewichtstrend": obj.gewichtstrend(),
@@ -208,7 +209,7 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                  "uhrzeit": termin.uhrzeit, "ort": termin.ort.wert if termin.ort_id else None,
                  "bei": termin.bei} if termin else None
             ),
-            "versionen": {feld: _versionskopf(obj, feld) for feld in TEXTFELDER},
+            "versionen": {feld: _versionskopf(obj, feld, historie) for feld in TEXTFELDER},
             # Hinweise wie in der Patientenliste (F119), dazu die fehlenden Angaben (F186) – zum Anzeigen mit
             # HinweisChips im Aktenkopf; ausgeblendete stehen unter ``hinweise_stumm``
             **_hinweise_kopf(obj),
@@ -332,11 +333,16 @@ class TextKonflikt(serializers.ValidationError):
         super().__init__({"fehler": text})
 
 
-def feldversionen(patient, feld: str) -> list:
-    """Fassungen eines Textfelds (neueste zuerst): Version, Zeitpunkt, Person, Text."""
+def _historie(patient) -> list:
+    return list(patient.history.order_by("history_date", "history_id").select_related("history_user"))
+
+
+def feldversionen(patient, feld: str, historie: list | None = None) -> list:
+    """Fassungen eines Textfelds (neueste zuerst): Version, Zeitpunkt, Person, Text. ``historie``: schon geladener
+    Verlauf der Akte (``_historie``), wenn mehrere Felder ausgewertet werden."""
     fassungen = []
     vorher = None
-    for h in patient.history.order_by("history_date", "history_id").select_related("history_user"):
+    for h in (historie if historie is not None else _historie(patient)):
         text = getattr(h, feld)
         if text != vorher and (text or vorher is not None):
             fassungen.append({"version": len(fassungen) + 1, "zeitpunkt": h.history_date,
@@ -345,9 +351,9 @@ def feldversionen(patient, feld: str) -> list:
     return list(reversed(fassungen))
 
 
-def _versionskopf(patient, feld):
+def _versionskopf(patient, feld, historie: list | None = None):
     """„Version 12 · geändert 12.08.2026, 15:12 von Dr. M. Berger“"""
-    fassungen = feldversionen(patient, feld)
+    fassungen = feldversionen(patient, feld, historie)
     if not fassungen:
         return None
     return {"version": fassungen[0]["version"], "zeitpunkt": fassungen[0]["zeitpunkt"], "person": fassungen[0]["person"]}
@@ -2275,7 +2281,7 @@ def _wiedereinbestellung(patienten, e, grenze=50):
     zurückliegt und für die kein offener Termin geplant ist. Längste Zeit ohne Kontakt zuerst."""
     from .kennzahlen import kontakt_grenzen, kontaktstufe
 
-    offen = kontakt_filter(patienten.filter(abgeschlossen_am__isnull=True), "wiedereinbestellung")
+    offen = kontakt_filter(patienten.filter(abgeschlossen_am__isnull=True), "wiedereinbestellung", e)
     zeilen = list(offen.annotate(letzter=Max("kontakte__zeitpunkt", filter=Q(kontakte__storniert_am__isnull=True)))
                   .order_by(F("letzter").asc(nulls_first=True), "nachname", "vorname")
                   .values("id", "nachname", "vorname", "nummer", "ist_test", "letzter"))
@@ -2386,9 +2392,12 @@ def startseite_daten(user):
     sieben_tage = termine.filter(faellig_am__gte=heute, faellig_am__lte=heute + timedelta(days=6))
 
     def t(qs):
-        return TerminSerializer(qs.order_by("faellig_am", "uhrzeit")[:100], many=True).data
+        # Einstellung zur Terminbestätigung mitgeben, sonst liest jede Liste die Einstellungen erneut
+        return TerminSerializer(qs.order_by("faellig_am", "uhrzeit")[:100], many=True,
+                                context={"_bestaetigung_an": e.terminbestaetigung_anbieten}).data
 
-    werte = kennzahlen(patienten.only("id", "versorger", "nachname", "vorname", "nummer"))
+    werte = kennzahlen(patienten.only("id", "versorger", "kein_versorger", "nachname", "vorname", "nummer",
+                                      *KENNZAHLEN_FELDER))
     gewicht_liste = {p.id: p for p in patienten.only("id", "nachname", "vorname", "nummer")}
     warnungen = sorted(
         ({"patient": pid, "name": f"{gewicht_liste[pid].nachname}, {gewicht_liste[pid].vorname}",
@@ -2414,7 +2423,8 @@ def startseite_daten(user):
                 for x in qs[:50]]
 
     statistik = patienten if user.ist_test else patienten.filter(ist_test=False)
-    pruefen = pruefliste(statistik)
+    # ``statistik`` ist eine Teilmenge von ``patienten``: deren Kennzahlen gleich mitverwenden
+    pruefen = pruefliste(statistik, vorab=werte)
     # Datenschutz-Anfragen betreffen oft abgeschlossene Akten (Löschung, Auskunft) – hier zählen alle Akten im
     # Bereich der Person, für die sie Anfragen sieht; ohne Datenschutz-Recht erscheint nichts.
     pruefen["datenschutz_anfragen"] = pruefen["datenschutz_ueberfaellig"] = 0

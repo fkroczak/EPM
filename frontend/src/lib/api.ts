@@ -119,6 +119,8 @@ type Optionen = {
   /** Regelmäßige Abfrage im Hintergrund (``refetchInterval``): verlängert die Sitzung nicht, wenn seit
    *  ``BEDIENT_FRIST`` niemand bedient hat – sonst gäbe es die Abmeldung nach 30 Minuten ohne Bedienung (F12) nie. */
   hintergrund?: boolean;
+  /** ohne Ladebalken (Vorabruf beim Überfahren eines Links, lib/vorladen.ts) */
+  still?: boolean;
 };
 
 /** Ein Klick löst Abfragen erst kurz danach aus (z. B. beim Öffnen einer Seite): die zählen noch als Bedienung. */
@@ -144,7 +146,7 @@ export async function api<T = unknown>(pfad: string, opt: Optionen = {}): Promis
   if (method !== "GET") headers["X-CSRFToken"] = csrfToken();
   if (opt.hintergrund && Date.now() - bedientAm > BEDIENT_FRIST) headers["X-EPM-Hintergrund"] = "1";
   const url = pfad.startsWith("/api/") ? pfad : `/api/${pfad.replace(/^\//, "")}`;
-  const ende = anfrageBeginnt();   // Ladebalken am oberen Rand (F124)
+  const ende = opt.still ? () => {} : anfrageBeginnt();   // Ladebalken am oberen Rand (F124)
   let antwort: Response;
   try {
     antwort = await holen(url, { method, headers, body, credentials: "same-origin", signal: opt.signal });

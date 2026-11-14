@@ -96,6 +96,77 @@ class VersorgerUndAnsprechpartner(Grundlage):
         self.assertIn("ansprechpartner", [a["feld"] for a in v[0]["aenderungen"]])
 
 
+class ListenOhneAbfragenJeZeile(Grundlage):
+    """Listen der Stammdaten und die Patienten eines Arztes bzw. Ansprechpartners: die Zahl der Datenbankabfragen
+    wächst nicht mit der Zahl der Einträge (vorher je Zeile mehrere Abfragen)."""
+
+    def _abfragen(self, client, url):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        with CaptureQueriesContext(connection) as q:
+            r = client.get(url)
+        self.assertEqual(r.status_code, 200, r.content)
+        return len(q), r.json()
+
+    def _neue_patienten(self, anzahl, **felder):
+        from patienten.models import PatientArzt
+
+        katheter = Auswahlwert.objects.filter(liste=Auswahlwert.Liste.KATHETER).first()
+        for i in range(anzahl):
+            p = Patient.objects.create(nachname=f"Liste{Patient.objects.count()}", vorname="L",
+                                       geburtsdatum="1960-01-01", katheter=katheter, versorger=self.v,
+                                       ansprechpartner=self.ap, **felder)
+            PatientArzt.objects.create(patient=p, arzt=self.arzt, rolle=PatientArzt.Rolle.HAUSARZT)
+
+    def setUp(self):
+        super().setUp()
+        from .models import Arzt
+
+        self.v = Versorger.objects.create(name="Homecare Süd")
+        self.ap = Ansprechpartner.objects.create(versorger=self.v, name="Frau Süd")
+        self.arzt = Arzt.objects.create(name="Dr. Liste")
+
+    def test_patienten_eines_arztes_und_ansprechpartners(self):
+        c = client_fuer(self.mitarbeiter)
+        c.get("/api/versorger/")  # erste Anfrage der Sitzung hat eigene Abfragen (Sitzung)
+        for url in (f"/api/aerzte/{self.arzt.id}/patienten/", f"/api/ansprechpartner/{self.ap.id}/patienten/"):
+            with self.subTest(url=url):
+                self._neue_patienten(2)
+                vorher, daten = self._abfragen(c, url)
+                self._neue_patienten(5)
+                nachher, daten2 = self._abfragen(c, url)
+                self.assertEqual(len(daten2), len(daten) + 5)
+                self.assertTrue(all(p["versorger_name"] == "Homecare Süd" and p["firmen"] for p in daten2))
+                self.assertEqual(nachher, vorher)
+
+    def test_listen_mit_patientenzahl(self):
+        c = client_fuer(self.mitarbeiter)
+        self._neue_patienten(2)
+        Patient.objects.create(nachname="Test", vorname="T", geburtsdatum="1960-01-01", versorger=self.v,
+                               ansprechpartner=self.ap, ist_test=True)  # zählt nicht mit
+        c.get("/api/versorger/")  # erste Anfrage der Sitzung hat eigene Abfragen (Sitzung)
+        zahlen = {}
+        for url in ("/api/versorger/", "/api/ansprechpartner/", "/api/aerzte/"):
+            zahlen[url] = self._abfragen(c, url)[0]
+        for url, eintrag in (("/api/versorger/", self.v), ("/api/ansprechpartner/", self.ap),
+                             ("/api/aerzte/", self.arzt)):
+            anzahl = {e["id"]: e["patienten_anzahl"] for e in self._abfragen(c, url)[1]}
+            self.assertEqual(anzahl[eintrag.id], 2, url)
+        # weitere Versorger, Ansprechpartner und Ärzte: gleich viele Abfragen
+        from .models import Arzt
+
+        for i in range(4):
+            v = Versorger.objects.create(name=f"Versorger {i}")
+            Ansprechpartner.objects.create(versorger=v, name=f"AP {i}")
+            Arzt.objects.create(name=f"Dr. {i}")
+        for url, vorher in zahlen.items():
+            with self.subTest(url=url):
+                self.assertEqual(self._abfragen(c, url)[0], vorher)
+        # Einzelansicht zählt wie bisher
+        self.assertEqual(c.get(f"/api/aerzte/{self.arzt.id}/").json()["patienten_anzahl"], 2)
+
+
 class EinstellungenPruefen(Grundlage):
     def test_grenzen_und_rechte(self):
         a = client_fuer(self.admin)
