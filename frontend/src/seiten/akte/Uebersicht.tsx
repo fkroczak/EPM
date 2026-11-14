@@ -23,6 +23,7 @@ import { useAkte } from "./Akte";
 import { BefundeKurz } from "./Befunde";
 import { DiagnosenKurz } from "./Diagnosen";
 import { StummKarte } from "@/components/HinweisChips";
+import { AkteAufEinenBlick } from "@/components/AkteAufEinenBlick";
 import { AerzteKarte, BezugspersonenKarte } from "./Kontaktpersonen";
 import { KeinPlanHinweis, PlanPdfDialog } from "./Plaene";
 import { KarteOderAbschnitt } from "./Aktenseite";
@@ -498,6 +499,8 @@ export function Uebersicht() {
   const h = fuellen ? 1 : 0;
   return (
     <div className="stapel flex flex-col gap-4 min-w-0" ref={flaeche} data-testid="akte-uebersicht" data-fuellt={fuellen ? "1" : undefined}>
+      {/* KI-Entwurf „Auf einen Blick“: was seit dem letzten Termin dazukam (14.11.2026); nur mit ki_ansehen, einklappbar */}
+      <AkteAufEinenBlick patient={patient.id} />
       {/* Weggeklickte Hinweise stehen hier und lassen sich zurückholen (Wunsch 07.10.2026, F119) */}
       <StummKarte patientId={patient.id} aenderbar={bearbeiten} />
       <ImportHinweise />
