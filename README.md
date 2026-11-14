@@ -6,6 +6,7 @@
 | `frontend/` | Oberfläche: React, TypeScript, Vite, Tailwind, Base UI (Bausteine im Stil von shadcn/ui), TipTap; Browsertests in `frontend/e2e/` (Playwright) |
 | `rollout/` | Server-Einrichtung: `01-basis.sh` … `05-backend.sh`, Compose, Nginx |
 | `werkzeuge/` | `epm-update.sh` (Update in einem Schritt), `ci-stack.sh` (kompletter Stack für die Browsertests), `epm-git-einrichten.sh`, `bauen.sh`/`bauen.ps1`, `hilfe-bilder.mjs` (Bilder der Hilfe) |
+| `docs/PERFORMANCE-PRUEFUNG-2026-11-14.md` | Ladezeiten vorher/nachher, Skelett-Platzhalter, Vorladen, weniger Datenbankabfragen; Messwerkzeuge in `werkzeuge/performance/` |
 | `docs/BACKEND-FUNKTIONEN.md` | Nachweis aller Funktionen mit API-Verträgen, Tests und Status |
 | `VERSION` | Grundstand der Versionsnummer (X.Y.Z). Die letzte Stelle zählt automatisch je Änderung auf main hoch (`werkzeuge/version.sh`: 2.0.0 + 3 Merges = 2.0.3); neue Funktionen bzw. Hauptversion: VERSION von Hand auf 2.1.0 bzw. 3.0.0 setzen, die Zählung beginnt neu. Die Images heißen `epm-backend:<Version>-<Commit>` und `epm-web:<Version>-<Commit>` |
 
