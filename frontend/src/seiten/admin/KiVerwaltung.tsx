@@ -8,7 +8,7 @@ import { ApiFehler, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { zahl, zeitpunkt } from "@/lib/format";
 import { MODUS_TEXT, STATUS_TEXT, prozentText } from "@/lib/ki";
-import type { KiStand, KiStatus } from "@/lib/ki";
+import type { KiEinstellungen, KiStand, KiStatus } from "@/lib/ki";
 import { Anzeige, Chip, Eingabe, Feld, Fehleranzeige, Karte, KartenKopf, Knopf, Laden, Leer, Meldung, Seitenkopf, Textfeld,
 } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
@@ -17,15 +17,10 @@ import { Reiter, ReiterInhalt, useReiter } from "@/components/ui/reiter";
 import { Seite } from "@/components/layout/Shell";
 import { KiStandKarte } from "../ki/KiQueue";
 import { KiEinrichtung } from "./KiEinrichtung";
+import { KiPriorisierung } from "./KiPriorisierung";
+import { KiNachtaufgaben } from "./KiNachtaufgaben";
 
-type Einstellungen = {
-  aktiv: boolean; nacht_beginn: string; nacht_ende: string; zeitzone: string; worker_nacht: number; worker_tag: number;
-  max_cpu_prozent: number; min_ram_frei_mb: number; max_last_je_kern: number; pause_bei_sicherung: boolean; altbestand_lesen: boolean;
-  max_seiten: number; bild_max_px: number; ocr_schwelle: number; feld_unsicher: number; verknuepfung_stunden: number;
-  aufbewahrung_tage: number; training_erlaubt: boolean; training_nur_wochenende: boolean; rechtsgrundlage: string;
-  rechtsgrundlage_geprueft_am: string | null; rechtsgrundlage_geprueft_von_name: string; geaendert_am: string;
-  geaendert_von_name: string; worker_max: number;
-};
+type Einstellungen = KiEinstellungen;
 type Modell = {
   id: number; name: string; rolle: string; datei: string; projektor: string; sha256: string; groesse: number; quantisierung: string;
   status: "eingespielt" | "evaluation" | "aktiv" | "vorherig" | "gesperrt"; status_name: string; notiz: string;
@@ -39,7 +34,7 @@ type Evaluation = {
 };
 
 export function KiVerwaltung() {
-  const [reiter, setReiter] = useReiter(["einrichtung", "stand", "einstellungen", "modelle", "training"] as const);
+  const [reiter, setReiter] = useReiter(["einrichtung", "stand", "einstellungen", "priorisierung", "nachtaufgaben", "modelle", "training"] as const);
   const stand = useQuery({ queryKey: ["ki", "stand"], queryFn: () => api<KiStand>("ki/stand/", { hintergrund: true }), refetchInterval: 15_000 });
   return (
     <Seite pfad={[{ text: "Administration" }, { text: "KI (Experimentell)" }]}>
@@ -48,11 +43,14 @@ export function KiVerwaltung() {
       <Reiter label="Bereiche" wert={reiter} onWahl={setReiter} eintraege={[
         { wert: "einrichtung", text: "Einrichtung" }, { wert: "stand", text: "Stand" },
         { wert: "einstellungen", text: "Zeitfenster und Grenzen" },
+        { wert: "priorisierung", text: "Priorisierung" }, { wert: "nachtaufgaben", text: "Nachtaufgaben" },
         { wert: "modelle", text: "Modelle" }, { wert: "training", text: "Evaluation und Training" }]} />
       <ReiterInhalt>
         {reiter === "einrichtung" ? <KiEinrichtung /> : null}
         {reiter === "stand" ? <Stand stand={stand.data} /> : null}
         {reiter === "einstellungen" ? <EinstellungenForm /> : null}
+        {reiter === "priorisierung" ? <KiPriorisierung /> : null}
+        {reiter === "nachtaufgaben" ? <KiNachtaufgaben /> : null}
         {reiter === "modelle" ? <Modelle /> : null}
         {reiter === "training" ? <Training /> : null}
       </ReiterInhalt>
@@ -103,7 +101,13 @@ const ZAHLFELDER: { name: keyof Einstellungen; text: string; hinweis?: string; s
   { name: "ocr_schwelle", text: "OCR-Schwelle (0–1)", hinweis: "darunter liest das Modell die Seite selbst", schritt: "0.01" },
   { name: "feld_unsicher", text: "Unsicher unter (0–1)", schritt: "0.01" },
   { name: "verknuepfung_stunden", text: "Zeitfenster Labor → Maßnahme (h)" },
+  { name: "beispiele_max", text: "Korrekturen als Beispiele", hinweis: "frühere Korrekturen gehen als Muster an das Modell; 0 = aus" },
   { name: "aufbewahrung_tage", text: "Zwischendateien löschen nach (Tagen)" },
+  { name: "diktat_nacht_beginn", text: "Diktate „heute Nacht“ ab (Stunde 0–23)", hinweis: "Nachtfenster für Diktate" },
+  { name: "diktat_nacht_ende", text: "Diktate „heute Nacht“ bis (Stunde 0–23)" },
+  { name: "chat_tage", text: "KI-Chats löschen nach (Tagen)", hinweis: "ohne Änderung seit so vielen Tagen (1–365)" },
+  { name: "zusammenfassung_ohne_termin_tage", text: "„Auf einen Blick“ ohne Termin: Zeitraum (Tage)",
+    hinweis: "wenn es keinen früheren Termin und keinen Kontakt gibt (7–730)" },
 ];
 
 function EinstellungenForm() {

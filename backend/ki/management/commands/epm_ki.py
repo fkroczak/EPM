@@ -21,14 +21,15 @@ from django.core.management.base import BaseCommand
 from django.db import close_old_connections, connection
 from django.utils import timezone
 
-from ki import berichte, chat, dienst, eingang, evaluation, krypto, modellwahl, pipeline
+from ki import aufgaben, berichte, chat, dienst, eingang, evaluation, krypto, modellwahl, pipeline, zusammenfassung
 from ki.modell import Client, ModellFehler
-from ki.models import KiEinstellung, KiEvaluationslauf, KiModellversion, KiVorgang
+from ki.models import KiEinstellung, KiEvaluationslauf, KiModellversion, KiVorgang, KiZusammenfassung
 from ki.steuerung import Entscheidung, Messung, Steuerung
 
 log = logging.getLogger("epm.ki")
 TAKT_S = 5
-CHAT_SCHLUESSEL = -2 * 10**9  # Schlüssel in self.laufend: Chat < Evaluation < Bericht < 0 < Vorgang
+CHAT_SCHLUESSEL = -2 * 10**9  # Schlüssel in self.laufend: Chat < Evaluation < Zusammenfassung < Bericht < 0 < Vorgang
+ZUSAMMENFASSUNG_SCHLUESSEL = -5 * 10**8
 VORMERKEN_ALLE_S = 600
 MODELL_PRUEFEN_ALLE_S = 60
 AUFRAEUMEN_ALLE_S = 3600
@@ -85,6 +86,7 @@ class Dienst:
         self.paddle = None
         self.letzte_arbeit = time.monotonic()
         self.chat_aktiv = False
+        self.einst: KiEinstellung | None = None
 
     # ------------------------------------------------------------------ Ablauf
     def laufen(self):
@@ -125,12 +127,13 @@ class Dienst:
 
     def _noch_etwas_zu_tun(self) -> bool:
         return KiVorgang.objects.filter(status=KiVorgang.Status.NEU).exists() or chat.wartet() or \
-            berichte.KiBerichtsauftrag.objects.filter(status="wartet").exists()
+            berichte.KiBerichtsauftrag.objects.filter(status="wartet").exists() or \
+            KiZusammenfassung.objects.filter(status=KiZusammenfassung.Status.WARTET).exists()
 
     def _durchlauf(self):
         jetzt_s = time.monotonic()
         self._lebenszeichen()
-        einst = KiEinstellung.laden()
+        einst = self.einst = KiEinstellung.laden()
         if jetzt_s - self.zuletzt["aufraeumen"] > AUFRAEUMEN_ALLE_S:
             self.zuletzt["aufraeumen"] = jetzt_s
             dienst.haengende_zuruecksetzen()
@@ -145,6 +148,9 @@ class Dienst:
             self.zuletzt["vormerken"] = jetzt_s
             if einst.aktiv:
                 eingang.vormerken(500)
+                eingang.prioritaeten_aktualisieren(einst)  # Termin-Vorrang
+        if einst.aktiv:
+            aufgaben.faellige_ausfuehren()  # Nachtaufgaben reihen nur Arbeit ein – billig, wenn nichts fällig ist
 
         chat.zu_lange_wartend()
         e = self._entscheiden(einst)
@@ -163,7 +169,7 @@ class Dienst:
         # Tagsüber wartet die KI auf die Mitarbeiter: solange eine Chat-Antwort aussteht, keine neuen Dokumente oder
         # Berichte – der Chat bekommt die ganze Rechenleistung (laufende Dokumente pausieren nach der Seite)
         self.chat_aktiv = any(k <= CHAT_SCHLUESSEL for k in self.laufend) or chat.wartet()
-        if e.modus != "nacht" and self.chat_aktiv and not self.einmal:
+        if e.modus != "nacht" and self.chat_aktiv and einst.chat_vorrang and not self.einmal:
             return
         if e.parallel <= 0:
             return
@@ -172,6 +178,11 @@ class Dienst:
             b = dienst.bericht_holen()
             if b is not None:
                 self._starten(-b.pk, self._bericht, b)
+        # „Akte auf einen Blick“: nach den Berichten, vor Evaluation und Dokumenten
+        if len(self.laufend) < e.parallel:
+            z = self._zusammenfassung_holen(e, einst)
+            if z is not None:
+                self._starten(ZUSAMMENFASSUNG_SCHLUESSEL - z.pk, self._zusammenfassung, z)
         # Evaluationslauf (Modellvergleich) nur nachts – er lädt ggf. einen Kandidaten als Probe
         if e.modus == "nacht" and not self.laufend and self.client is not None:
             lauf = KiEvaluationslauf.objects.filter(fertig_am__isnull=True).order_by("id").first()
@@ -180,11 +191,23 @@ class Dienst:
                 return
         while len(self.laufend) < e.parallel and not self.ende.is_set():
             v = dienst.auftrag_holen(nur_angefordert=e.nur_angefordert and not self.einmal,
-                                     nachverarbeitung=self.client is not None and self.modell_bereit)
+                                     nachverarbeitung=self.client is not None and self.modell_bereit,
+                                     ab=einst.prio_angefordert)
             if v is None:
                 break
             self.vorgaenge[v.pk] = v
             self._starten(v.pk, self._vorgang, v)
+
+    def _zusammenfassung_holen(self, e: Entscheidung, einst: KiEinstellung):
+        """Nachts alle; tagsüber nur angeforderte und nur mit ``zusammenfassung_tagsueber`` – die für Termine
+        vorbereiteten entstehen nur nachts."""
+        tag = e.modus != "nacht" and not self.einmal
+        if tag and not einst.zusammenfassung_tagsueber:
+            return None
+        return dienst.zusammenfassung_holen(nur_angefordert=tag)
+
+    def _angefordert_ab(self) -> int:
+        return self.einst.prio_angefordert if self.einst is not None else dienst.ANGEFORDERT_AB
 
     def _chat_erlaubt(self, e: Entscheidung) -> bool:
         if e.parallel > 0:
@@ -204,8 +227,10 @@ class Dienst:
                 self.zuletzt["modell"] = 0.0
             return
         arbeit = bool(self.laufend) or e.modus == "nacht" or chat.wartet() or KiVorgang.objects.filter(
-            status=KiVorgang.Status.NEU, prioritaet__gte=dienst.ANGEFORDERT_AB).exists() or \
-            berichte.KiBerichtsauftrag.objects.filter(status="wartet").exists()
+            status=KiVorgang.Status.NEU, prioritaet__gte=self._angefordert_ab()).exists() or \
+            berichte.KiBerichtsauftrag.objects.filter(status="wartet").exists() or \
+            KiZusammenfassung.objects.filter(status=KiZusammenfassung.Status.WARTET,
+                                             grund=KiZusammenfassung.Grund.ANGEFORDERT).exists()
         if arbeit:
             self.letzte_arbeit = time.monotonic()
             if modellwahl.schlaeft():
@@ -246,9 +271,10 @@ class Dienst:
         # sonst würde der Vorgang nach jedem Modellaufruf verworfen und endlos neu begonnen
         if e.modus == "aus" or (e.modus == "pause" and not e.wegen_last):
             return e.grund or "Pause"
-        if e.modus == "tag" and self.chat_aktiv and not self.einmal:
+        chat_vorrang = self.einst is None or self.einst.chat_vorrang
+        if e.modus == "tag" and self.chat_aktiv and chat_vorrang and not self.einmal:
             return "Chat hat tagsüber Vorrang"
-        if e.modus == "tag" and e.nur_angefordert and vorgang.prioritaet < dienst.ANGEFORDERT_AB and not self.einmal:
+        if e.modus == "tag" and e.nur_angefordert and vorgang.prioritaet < self._angefordert_ab() and not self.einmal:
             return "Nachtfenster zu Ende"
         return None
 
@@ -256,7 +282,7 @@ class Dienst:
         # Protokoll (docker compose logs ki-worker): was bearbeitet wird – nur Nummern, keine Namen oder Inhalte
         t0 = time.monotonic()
         log.info("%s gestartet: Dokument %s, Akte Nr. %s, %s, Versuch %s", v, v.dokument_id, v.patient.nummer,
-                 "angefordert" if v.prioritaet >= dienst.ANGEFORDERT_AB else "Nachtverarbeitung", v.versuche)
+                 "angefordert" if v.prioritaet >= self._angefordert_ab() else "Nachtverarbeitung", v.versuche)
 
         def melden(text, prozent=None):
             dienst.fortschritt(v, text, prozent)
@@ -350,6 +376,22 @@ class Dienst:
         except Exception as e:  # noqa: BLE001
             log.exception("Berichtsentwurf %s fehlgeschlagen", b.pk)
             type(b).objects.filter(pk=b.pk).update(status="fehler", fehler=f"{type(e).__name__}: {e}"[:2000])
+        finally:
+            if not self.einmal:
+                connection.close()
+
+    def _zusammenfassung(self, z):
+        log.info("Akte auf einen Blick %s gestartet: Akte Nr. %s (%s)", z.pk, z.patient.nummer, z.grund)
+        try:
+            if self.einmal:
+                zusammenfassung.erstellen(z, self.client if self.modell_bereit else None)
+            else:
+                with dienst.herzschlag(z):
+                    zusammenfassung.erstellen(z, self.client if self.modell_bereit else None)
+        except Exception as e:  # noqa: BLE001
+            log.exception("Akte auf einen Blick %s fehlgeschlagen", z.pk)
+            type(z).objects.filter(pk=z.pk).update(status="fehler", fehler=f"{type(e).__name__}: {e}"[:2000],
+                                                   fertig_am=timezone.now())
         finally:
             if not self.einmal:
                 connection.close()

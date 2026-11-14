@@ -11,7 +11,8 @@
   Text (wie bei den Scans; aus der Akte wird schon erkannter Text übernommen). Passt alles in den Kontext des Modells
   (``KI_KONTEXT``), liest es die Unterlagen ganz; sonst Teil für Teil: je Teil die für die Anfrage wichtigen Stellen
   wörtlich herausschreiben, dann aus diesen Auszügen antworten.
-- Unterhaltungen werden nach ``EPM_KI_CHAT_TAGE`` (Standard 30) Tagen ohne Änderung gelöscht – mit ihren Anhängen.
+- Unterhaltungen werden nach ``KiEinstellung.chat_tage`` (Administration › KI; Startwert ``EPM_KI_CHAT_TAGE``,
+  Standard 30) Tagen ohne Änderung gelöscht – mit ihren Anhängen.
 """
 import datetime as dt
 import logging
@@ -26,7 +27,7 @@ from audit.models import SystemEreignis, protokolliere
 
 from .berichte import _token
 from .modell import Client, ModellFehler
-from .models import KiChat, KiChatAnhang, KiChatNachricht, KiVorgang
+from .models import KiChat, KiChatAnhang, KiChatNachricht, KiEinstellung, KiVorgang
 
 log = logging.getLogger("epm.ki")
 N = KiChatNachricht
@@ -53,8 +54,41 @@ ZWISCHENSTAND_S = 1.5       # so oft geht der bisher geschriebene Text in die Da
 MAX_VERSUCHE = 3            # Modell gerade nicht erreichbar (schläft, startet neu): zurück in die Queue
 WARTEN_HOECHSTENS = dt.timedelta(minutes=15)
 
+# Diktat → gegliederter Bericht (14.11.2026): mitgelieferte Vorlage (Migration 0006); fehlt sie oder ist sie
+# ausgeblendet, gilt dieser Text. Wortgleich in ki/migrations/0006_korrekturbeispiele_diktat.py.
+DIKTAT_VORLAGE = "Diktat als Brief gliedern"
+DIKTAT_ANWEISUNG = (
+    "Der Nutzer gibt dir die automatische Abschrift eines ärztlichen Diktats (Spracherkennung – sie kann Hör- und "
+    "Schreibfehler enthalten) und die Berichtsart. Mache daraus einen gegliederten Entwurf dieses Berichts.\n"
+    "- Übernimm jede inhaltliche Aussage, jeden Wert, jede Einheit, jedes Datum, jede Diagnose und jede Dosierung "
+    "genau. Lasse nichts weg und füge nichts hinzu.\n"
+    "- Setze Diktieranweisungen um, statt sie abzuschreiben („Punkt“, „Komma“, „neuer Absatz“, „Doppelpunkt“), "
+    "entferne Füllwörter („äh“, „also“) und Versprecher; sagt der Arzt „streichen“ oder „nein, …“, gilt die "
+    "korrigierte Fassung.\n"
+    "- Gliedere mit Zwischenüberschriften, die zum Inhalt passen, z. B. Diagnosen, Anamnese, Befund, Therapie und "
+    "Verlauf, Medikation, Procedere – nur Abschnitte, zu denen das Diktat etwas sagt. Jede Überschrift steht allein "
+    "in einer Zeile mit „## “ davor; Aufzählungen beginnen mit „- “.\n"
+    "- Ist ein Fachbegriff offensichtlich falsch gehört und die richtige Schreibweise eindeutig, schreibe sie "
+    "richtig; sonst behalte das Wort und setze [?] dahinter.\n"
+    "- Keine Anrede, keine Grußformel, keine Vorbemerkung – nur der Berichtstext."
+)
+
+
+def html_zu_text(html_text: str) -> str:
+    """HTML aus dem Editor (Abschrift eines Diktats) → Klartext mit Absätzen für das Modell."""
+    import html
+
+    t = re.sub(r"(?i)<br\s*/?>", "\n", html_text or "")
+    t = re.sub(r"(?i)</(p|h[1-6]|li|div)>", "\n\n", t)
+    t = html.unescape(re.sub(r"<[^>]+>", "", t))
+    return re.sub(r"\n{3,}", "\n\n", t).strip()
+
 
 def aufbewahrung_tage() -> int:
+    """Einstellung ``chat_tage``; solange es keine Einstellungszeile gibt, ``EPM_KI_CHAT_TAGE`` (Startwert)."""
+    tage = KiEinstellung.objects.filter(pk=1).values_list("chat_tage", flat=True).first()
+    if tage:
+        return tage
     try:
         return max(1, int(os.environ.get("EPM_KI_CHAT_TAGE", "30")))
     except ValueError:
@@ -316,6 +350,11 @@ def beantworten(nachricht: KiChatNachricht, client: Client | None, paddle=None) 
         raise
     nachricht.text, nachricht.schritt = a.text, ""
     nachricht.pruefung = gegenpruefen(a.text, eingaben)
+    # umgekehrt: Zahlen und Daten der Anfrage, die in der Antwort fehlen (z. B. Diktat → Brief; beim Kürzen erwartet)
+    anfrage = KiChatNachricht.objects.filter(pk=frage).values_list("text", flat=True).first() or ""
+    in_antwort = _token(a.text)
+    nachricht.pruefung["fehlende_werte"] = sorted(t for t in _token(anfrage)
+                                                  if t not in in_antwort and not re.fullmatch(r"\d", t))[:30]
     nachricht.modell, nachricht.dauer_s = a.modell[:200], round(time.monotonic() - t0, 2)
     nachricht.status, nachricht.fehler, nachricht.fertig_am = N.Status.FERTIG, "", timezone.now()
     nachricht.save(update_fields=["text", "schritt", "pruefung", "modell", "dauer_s", "status", "fehler", "fertig_am"])

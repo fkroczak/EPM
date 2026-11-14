@@ -187,3 +187,47 @@ export const FELD_ANGABEN: Record<KiFeldGruppe, { name: string; text: string; br
     empfehlung: "Empfehlung" } }, { name: "text", text: "Text", breit: true }],
   meta: [{ name: "wert", text: "Wert", breit: true }],
 };
+
+/** Einstellungen des KI-Dienstes (``ki/einstellungen/``), samt Priorisierung und Zeitplänen (14.11.2026). */
+export type KiEinstellungen = {
+  aktiv: boolean; nacht_beginn: string; nacht_ende: string; zeitzone: string; worker_nacht: number; worker_tag: number;
+  max_cpu_prozent: number; min_ram_frei_mb: number; max_last_je_kern: number; pause_bei_sicherung: boolean; altbestand_lesen: boolean;
+  max_seiten: number; bild_max_px: number; ocr_schwelle: number; feld_unsicher: number; verknuepfung_stunden: number;
+  beispiele_max: number;
+  aufbewahrung_tage: number; training_erlaubt: boolean; training_nur_wochenende: boolean; rechtsgrundlage: string;
+  rechtsgrundlage_geprueft_am: string | null; rechtsgrundlage_geprueft_von_name: string; geaendert_am: string;
+  geaendert_von_name: string; worker_max: number;
+  prio_angefordert: number; prio_termin: number; termin_tage: number; prio_neu: number; neu_tage: number;
+  prio_neu_lesen: number; prio_altbestand: number; chat_vorrang: boolean; zusammenfassung_tagsueber: boolean;
+  zusammenfassung_ohne_termin_tage: number; diktat_nacht_beginn: number; diktat_nacht_ende: number; chat_tage: number;
+};
+
+/** Nachtaufgaben (Zeitplan des KI-Dienstes) */
+export type KiAufgabeArt = "zusammenfassung_termine" | "neu_lesen" | "dokumente_vormerken";
+export const AUFGABE_ARTEN: Record<KiAufgabeArt, string> = {
+  zusammenfassung_termine: "Akte auf einen Blick für Termine vorbereiten",
+  neu_lesen: "Dokumente mit aktivem Modell neu lesen",
+  dokumente_vormerken: "Dokumente vormerken (Altbestand/neue)",
+};
+export type KiNeuLesenFilter = { seit_tagen: number; dokumenttypen: string[]; nur_anderes_modell: boolean; hoechstens: number };
+export type KiAufgabeParameter = { tage_voraus?: number; altbestand?: boolean } & Partial<KiNeuLesenFilter>;
+export type KiAufgabe = {
+  id: number; name: string; art: KiAufgabeArt; art_name: string; aktiv: boolean; wochentage: number[]; uhrzeit: string;
+  parameter: KiAufgabeParameter; letzter_lauf: string | null; letztes_ergebnis: string; jetzt_angefordert: boolean;
+  naechster_lauf: string | null; geaendert_am: string; geaendert_von_name?: string;
+};
+export const WOCHENTAGE_KURZ = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+/** Prüfung eines Entwurfs gegen die Quellen (wie bei Berichten) */
+export type KiPruefung = { ok?: boolean; unbelegte_werte?: string[]; unbekannte_belege?: number[]; saetze_ohne_beleg?: string[];
+  empfehlung_oder_bewertung?: string[] };
+export type KiFakt = { nr: number; text: string; quelle: { modell: string; id: number }; datum?: string | null; link?: string | null };
+
+/** „Akte auf einen Blick“ (``ki/zusammenfassungen/``) */
+export type KiZusammenfassung = {
+  id: number; patient: number; grund: "termin" | "angefordert"; termin_datum: string | null; von: string; bis: string;
+  status: "wartet" | "laeuft" | "fertig" | "fehler"; entwurf: string; fakten: KiFakt[]; pruefung: KiPruefung | null;
+  fehler: string; modell: string | null; erstellt_am: string; fertig_am: string | null; angefordert_von_name: string;
+  /** optional: woher „von“ stammt (letzter Termin, letzter Kontakt, Standardzeitraum) */
+  von_grund?: "termin" | "kontakt" | "standard";
+};

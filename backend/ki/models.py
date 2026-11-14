@@ -56,6 +56,15 @@ class Dokumenttyp(models.TextChoices):
     SONSTIGES = "sonstiges", "Sonstiges"
 
 
+def diktat_nacht_env() -> tuple[int, int]:
+    """Nachtfenster der Diktate aus ``EPM_DIKTAT_NACHT`` („21-7“) – Startwert der Einstellung und Rückfall."""
+    try:
+        ab, bis = (int(x) for x in os.environ.get("EPM_DIKTAT_NACHT", "21-7").split("-"))
+    except ValueError:
+        return 21, 7
+    return (ab, bis) if 0 <= ab <= 23 and 0 <= bis <= 23 else (21, 7)
+
+
 class KiEinstellung(models.Model):
     """Einstellungen des KI-Dienstes (Administration › KI). Vorgaben kommen aus Umgebungsvariablen (``KI_*``), die
     Oberfläche überschreibt sie; ``KI_WORKER_MAX`` bleibt eine harte Obergrenze für die Zahl paralleler Aufträge."""
@@ -77,7 +86,32 @@ class KiEinstellung(models.Model):
     ocr_schwelle = models.FloatField(default=0.85, help_text="darunter liest das Vision-Modell die Seite selbst")
     feld_unsicher = models.FloatField(default=0.7, help_text="Felder darunter gelten als unsicher")
     verknuepfung_stunden = models.PositiveSmallIntegerField(default=48)
+    beispiele_max = models.PositiveSmallIntegerField(
+        default=12, help_text="frühere Korrekturen als Beispiele im Prompt (ki/beispiele.py); 0 = aus")
     aufbewahrung_tage = models.PositiveSmallIntegerField(default=14, help_text="Zwischendateien danach löschen")
+    # Priorisierung (14.11.2026, Administration › KI › Priorisierung): höher = früher. „Angefordert“ heißt
+    # ``prioritaet >= prio_angefordert`` – deshalb liegen alle anderen Stufen darunter (Prüfung in der API); so nimmt
+    # der Tagesbetrieb mit ``worker_tag = 0`` weiterhin nur ausdrücklich angeforderte Dokumente
+    prio_angefordert = models.PositiveSmallIntegerField(default=10,
+                                                        help_text="„jetzt verarbeiten“, „Erneut verarbeiten“")
+    prio_termin = models.PositiveSmallIntegerField(default=8, help_text="Akte mit Praxistermin in den nächsten Tagen")
+    termin_tage = models.PositiveSmallIntegerField(default=3, help_text="Vorlauf für den Termin-Vorrang; 0 = aus")
+    prio_neu = models.PositiveSmallIntegerField(default=5, help_text="neu hochgeladene Dokumente")
+    neu_tage = models.PositiveSmallIntegerField(default=7, help_text="so lange gilt ein Dokument als neu")
+    prio_neu_lesen = models.PositiveSmallIntegerField(default=3,
+                                                      help_text="„Neu lesen“ (Nachtaufgabe, Administration)")
+    prio_altbestand = models.PositiveSmallIntegerField(default=0)
+    chat_vorrang = models.BooleanField(
+        default=True, help_text="tagsüber hält ein wartender Chat alle anderen Aufträge an")
+    zusammenfassung_tagsueber = models.BooleanField(
+        default=True, help_text="„Akte auf einen Blick“ auf Anforderung auch tagsüber erstellen")
+    zusammenfassung_ohne_termin_tage = models.PositiveSmallIntegerField(
+        default=90, help_text="Zeitraum der Zusammenfassung ohne früheren Termin und ohne Kontakt")
+    # bisher nur Umgebungsvariablen (EPM_DIKTAT_NACHT, EPM_KI_CHAT_TAGE) – die bleiben Startwert bzw. Rückfall, solange
+    # es keine Einstellungszeile gibt
+    diktat_nacht_beginn = models.PositiveSmallIntegerField(default=21, help_text="Diktate „heute Nacht“ ab (Stunde)")
+    diktat_nacht_ende = models.PositiveSmallIntegerField(default=7, help_text="… bis (Stunde)")
+    chat_tage = models.PositiveSmallIntegerField(default=30, help_text="KI-Chats ohne Änderung danach löschen")
     # Training (optional, Entscheidung 14.10.2026): nur nachts/am Wochenende, nur ohne angemeldete Benutzer und erst,
     # wenn die Rechtsgrundlagen-Prüfung dokumentiert ist
     training_erlaubt = models.BooleanField(default=False)
@@ -106,7 +140,9 @@ class KiEinstellung(models.Model):
                       zeitzone=os.environ.get("KI_ZEITZONE", "Europe/Berlin"),
                       worker_nacht=_env_int("KI_WORKER_NACHT", 1), worker_tag=_env_int("KI_WORKER_TAG", 0),
                       max_cpu_prozent=_env_int("KI_MAX_CPU_PROZENT", 80),
-                      min_ram_frei_mb=_env_int("KI_MIN_RAM_FREI_MB", 1536))
+                      min_ram_frei_mb=_env_int("KI_MIN_RAM_FREI_MB", 1536),
+                      chat_tage=max(1, _env_int("EPM_KI_CHAT_TAGE", 30)))
+            obj.diktat_nacht_beginn, obj.diktat_nacht_ende = diktat_nacht_env()
             obj.save()
         return obj
 
@@ -607,3 +643,92 @@ class KiChatAnhang(models.Model):
         verbose_name = "KI-Chat-Anhang"
         verbose_name_plural = "KI-Chat-Anhänge"
         ordering = ["id"]
+
+
+def _alle_wochentage():
+    return list(range(7))
+
+
+class KiAufgabe(models.Model):
+    """Nachtaufgabe (Zeitplan, 14.11.2026, Administration › KI › Nachtaufgaben). Eine Aufgabe **reiht nur Arbeit
+    ein** – abgearbeitet wird nach Modus, Grenzen und Nachtfenster wie alles andere (``ki/aufgaben.py``)."""
+
+    class Art(models.TextChoices):
+        ZUSAMMENFASSUNG_TERMINE = "zusammenfassung_termine", "Akte auf einen Blick für die nächsten Termine"
+        NEU_LESEN = "neu_lesen", "Dokumente mit dem aktiven Modell neu lesen"
+        DOKUMENTE_VORMERKEN = "dokumente_vormerken", "Dokumente in die Queue legen"
+
+    name = models.CharField(max_length=100)
+    art = models.CharField(max_length=30, choices=Art.choices)
+    aktiv = models.BooleanField(default=True)
+    wochentage = models.JSONField(default=_alle_wochentage, help_text="0 = Montag … 6 = Sonntag")
+    uhrzeit = models.TimeField(default=dt.time(3, 0), help_text="Ortszeit (Zeitzone der KI-Einstellungen)")
+    parameter = models.JSONField(default=dict, blank=True)
+    letzter_lauf = models.DateTimeField(null=True, blank=True)
+    letztes_ergebnis = models.CharField(max_length=500, blank=True)
+    jetzt_angefordert = models.BooleanField(default=False, help_text="läuft beim nächsten Durchlauf des KI-Dienstes")
+    geaendert_am = models.DateTimeField(auto_now=True)
+    geaendert_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                      related_name="+")
+
+    class Meta:
+        verbose_name = "KI-Nachtaufgabe"
+        verbose_name_plural = "KI-Nachtaufgaben"
+        ordering = ["uhrzeit", "id"]
+
+    def __str__(self):
+        return f"KI-Aufgabe {self.pk}"
+
+
+class KiZusammenfassung(models.Model):
+    """„Akte auf einen Blick“ (14.11.2026): was seit dem letzten Praxistermin in der Akte passiert ist – Fakten aus der
+    Akte (Code), formuliert vom lokalen Modell, gegengeprüft wie der Berichtsentwurf (``ki/zusammenfassung.py``).
+    Nur Anzeige in der Übersicht der Akte, nie selbst Teil der Akte; geht mit dem Patienten (CASCADE)."""
+
+    class Grund(models.TextChoices):
+        TERMIN = "termin", "nachts für einen Termin vorbereitet"
+        ANGEFORDERT = "angefordert", "auf Anforderung"
+
+    class Status(models.TextChoices):
+        WARTET = "wartet", "wartet"
+        LAEUFT = "laeuft", "wird erstellt"
+        FERTIG = "fertig", "fertig"
+        FEHLER = "fehler", "Fehler"
+
+    class VonGrund(models.TextChoices):
+        TERMIN = "termin", "seit dem letzten Termin"
+        KONTAKT = "kontakt", "seit dem letzten Kontakt"
+        STANDARD = "standard", "fester Zeitraum (ohne Termin und Kontakt)"
+
+    OFFEN = (Status.WARTET, Status.LAEUFT)
+
+    patient = models.ForeignKey("patienten.Patient", on_delete=models.CASCADE, related_name="ki_zusammenfassungen")
+    firma = models.ForeignKey("stammdaten.Firma", on_delete=models.PROTECT, null=True, blank=True, related_name="+")
+    grund = models.CharField(max_length=12, choices=Grund.choices)
+    termin = models.ForeignKey("patienten.Termin", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    von = models.DateField(null=True, blank=True)
+    bis = models.DateField(null=True, blank=True)
+    von_grund = models.CharField(max_length=10, choices=VonGrund.choices, blank=True)
+    status = models.CharField(max_length=8, choices=Status.choices, default=Status.WARTET, db_index=True)
+    fakten = models.JSONField(default=list, blank=True, help_text="[{nr, text, quelle, datum, link}]")
+    entwurf = models.TextField(blank=True)
+    pruefung = models.JSONField(default=dict, blank=True, help_text="Markierungen der Gegenprüfung")
+    fehler = models.TextField(blank=True)
+    modellversion = models.ForeignKey(KiModellversion, on_delete=models.PROTECT, null=True, blank=True,
+                                      related_name="+")
+    prompt_version = models.CharField(max_length=20, blank=True)
+    angefordert_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+                                        related_name="+")
+    erstellt_am = models.DateTimeField(auto_now_add=True)
+    fertig_am = models.DateTimeField(null=True, blank=True)
+    lebenszeichen = models.DateTimeField(null=True, blank=True)
+    dauer_s = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "KI-Zusammenfassung (Akte auf einen Blick)"
+        verbose_name_plural = "KI-Zusammenfassungen (Akte auf einen Blick)"
+        ordering = ["-erstellt_am", "-id"]
+        indexes = [models.Index(fields=["patient", "status"], name="ki_zusammenfassung_patient")]
+
+    def __str__(self):
+        return f"Akte auf einen Blick {self.pk}"

@@ -50,6 +50,8 @@ seit `34c627d` ab dem Seiteninhalt in den Kommentar geschrieben, damit ein erneu
 
 | Nr. | Funktion | Ansicht (Entwurf) | Status |
 |---|---|---|---|
+| 14.11.2026 | KI (Experimentell), F191: **alles unter Administration › KI einstellbar** – Priorisierung (Stufen angefordert/Termin/neu/neu lesen/Altbestand, Termin-Vorrang für Akten mit Praxistermin in den nächsten Tagen, Chat-Vorrang abschaltbar), **Nachtaufgaben** mit Zeitplan (`KiAufgabe`: Wochentage, Uhrzeit, „Jetzt ausführen“; Arten „Akte auf einen Blick für die Termine“, „neu lesen“, „Dokumente vormerken“ – reihen nur Arbeit ein), **Jetzt neu lesen** mit dem aktiven Modell (übernommene/abgelehnte ausgenommen), Diktat-Nachtfenster und Chat-Aufbewahrung als Einstellung (`EPM_DIKTAT_NACHT`/`EPM_KI_CHAT_TAGE` nur noch Startwert). **Akte auf einen Blick**: was seit dem letzten Praxistermin dokumentiert wurde – Fakten aus der Akte mit Quelle und Reiter, formuliert vom lokalen Modell mit Belegen [n], Gegenprüfung wie beim Berichtsentwurf (`ki/zusammenfassung.py`, `ki/aufgaben.py`, Migration `ki/0007`; `GET/POST /api/ki/zusammenfassungen/`, `/api/ki/aufgaben/`, `POST /api/ki/vorgaenge/neu_lesen/`, Prompt-Fassung 2026-11-14.2) | Akte › Übersicht, Administration › KI › Priorisierung, Nachtaufgaben, Zeitfenster und Grenzen | TEILWEISE ABGESCHLOSSEN – 20 Backend-Tests (`ki/test_aufgaben.py`); Lauf mit echtem Modell und Browsertest stehen aus |
+| 14.11.2026 | KI (Experimentell), F191: **Korrekturen als Beispiele** – Korrekturen aus der Prüfansicht gehen bei neuen Dokumenten als kurze Liste „gelesen … → richtig …“ in den Prompt (bevorzugt vom selben Absender; nur dieselbe Firma, keine Namen, Daten oder Freitexte; Administration › KI › „Korrekturen als Beispiele“, 0 = aus; `ki/beispiele.py`, Prompt-Fassung 2026-11-14.1). **Diktat → Brief**, F192: „Mit KI gliedern“ an einem abgeschriebenen Diktat macht über den KI-Chat (Vorlage „Diktat als Brief gliedern“) einen gegliederten Entwurf; Zahlen/Daten, die nicht im Diktat stehen oder im Entwurf fehlen, sind markiert; „Entwurf in den Text übernehmen“ (`POST /api/ki/chats/diktat/`, `components/DiktatKi.tsx`) |
 | 26.10.2026 | Dokumentenautomation der Regeneration Clinic, F193: Behandlungsfall als eine Datenquelle (Kostenträgertyp, Kooperationspartner, Sprache DE/LV/EN, Fachbereich, Behandlung, Texte für OP-Bericht/Entlassungsbrief/Konsil); Dokumentenpaket je Kostenträgertyp (Vorlagen 01–12, Zusatzbogen je Fachbereich, OP-Bericht, Entlassungsbrief, Rechnung); Status Entwurf → erzeugt → final; PDF jederzeit neu erzeugbar, jede Erzeugung eine unveränderliche Fassung mit Prüfsumme und Datenstand; Rechnung mit Leistungspositionen aus dem Leistungskatalog, bis zur Finalisierung änderbar, Storno + neue Rechnung; fortgeschrittene elektronische Signatur (PAdES, pyHanko), extern signierte PDF, Scan der Papierunterschrift oder Finalisieren; DOCX-Rundweg für Freitexte; Zusatzbögen Orthopädie/Traumatologie, HNO, Adipositas zu Vorlage 07; Recht „Fall-Dokumente finalisieren“. App `faelle`, Doku `docs/DOKUMENTENAUTOMATION-RGC-2026-10.md` | Akte › Fälle; Administration › Fälle und Abrechnung | TEILWEISE ABGESCHLOSSEN – Backend-Tests `faelle/tests.py`; Browsertest steht aus |
 | 26.10.2026 | Diktate, F192: „Neues Diktat“ auch im Menü „Diktate“ (Patient wählen, Berichtsart, aufnehmen – Entwurf entsteht beim Senden); Menüpunkt für alle mit Recht „Diktieren“ | Menü „Diktate“ | ABGESCHLOSSEN – Typprüfung |
 | 23.10.2026 | Diktate, F192: Mikrofon im Bericht (Arztbrief, Konsultationsbericht …) und im Kommentar des Infusionsplans; Aufnahme im Browser (WebM/Opus bzw. MP4/AAC, ≈ 15 MB je Stunde), Abschrift offline im OCR-Dienst mit whisper.cpp (large-v3-turbo q5_0, nur CPU), „sofort“ oder „heute Nacht“, „selbst“ oder „Sekretariat“; Nachhören mit Sprung zum Wort und markierten unsicheren Wörtern, „In den Text übernehmen“; eigene Fachbegriffe; Aufnahme wird bei der Freigabe gelöscht; Recht „Diktieren“, Audit-Art „Diktat“, Berichtsart „Konsultationsbericht“; `GET/POST /api/diktate/…` | Akte › Berichte, Infusionsplan › Kommentar, Menü „Diktate“ | TEILWEISE ABGESCHLOSSEN – 19 Backend-Tests (`backend/diktate/tests.py`, echte Abschrift nur mit Modell, z. B. in CI); im Browser mit simuliertem Mikrofon durchgespielt; Live-Mitschreiben folgt nach dem Aufrüsten (16 GB / 8 Kerne) |
@@ -4123,6 +4125,18 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
   Maßnahme), `ki/test_api.py` (Rechte, Firmen, Korrektur, Konflikte 409, Ersetzen/Ergänzen, Admin nur Testpatienten,
   Infusionsplan als Altsystem-Plan, Medikation/Diagnose/Text/Datum, Berichte mit Gegenprüfung, Modellwechsel mit 2FA,
   Qualität, Evaluation, DB-Rolle).
+- **Korrekturen als Beispiele (14.11.2026):** `ki/beispiele.py` sucht vor der Extraktion korrigierte Felder früherer
+  Vorgänge (gleiche Firma, gleiche Art Übung/echt, nicht der Vorgang selbst; bevorzugt gleicher Absender) und gibt
+  höchstens `KiEinstellung.beispiele_max` (Standard 12, 0 = aus) Zeilen „gelesen … → richtig …“ mit – nur Name, Wert,
+  Einheit, Substanz, Menge, Wirkstoff, Stärke, Dosierung, Diagnose, Dokumenttyp; keine Namen, Daten, Fallnummern,
+  Kommentare. Anzahl steht am Rohergebnis (`parameter.korrekturhinweise`). Kein Training. Tests `ki/test_beispiele.py`.
+- **Priorisierung, Nachtaufgaben, Neu lesen, Akte auf einen Blick (14.11.2026):** Prioritätsstufen und Termin-Vorrang
+  aus `KiEinstellung` (`ki/eingang.py`; „angefordert“ = höchste Stufe, sonst lehnt die API ab); Nachtaufgaben
+  `KiAufgabe` prüft der KI-Dienst je Durchlauf (`ki/aufgaben.py`, Zeitzone der Einstellungen, reihen nur Arbeit ein);
+  `eingang.neu_lesen` für Aufgabe und `POST /api/ki/vorgaenge/neu_lesen/`; `KiZusammenfassung` mit eigener Queue
+  (Chat > Berichte > Zusammenfassungen > Evaluation > Dokumente; tagsüber nur angeforderte), Fakten aus der Akte mit
+  `link` auf den Reiter, Gegenprüfung `berichte.gegenpruefen`; Diktat-Nachtfenster und Chat-Aufbewahrung als
+  Einstellung (Umgebung nur Startwert/Rückfall). Tests `ki/test_aufgaben.py`; Betrieb in `docs/KI-BETRIEB.md` § 3.
 - **Status:** TEILWEISE ABGESCHLOSSEN – Lauf mit echtem Modell und Benchmark auf der Ziel-VM stehen aus; Browsertest
   noch nicht geschrieben; Trainingslauf (LoRA auf CPU) bewusst noch nicht gebaut.
 
@@ -4134,7 +4148,7 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
   Infusionsplänen jeder mit dem Recht.
 - **Umfang:** App `backend/diktate` (Modell `Diktat`, `Begriffsliste`, Abschrift `abschrift.py`, Warteschlange
   `dienst.py`, API), Abschrift im OCR-Dienst (`scans/management/commands/epm_ocr.py`: „sofort“ vor Scans, „nachts“ im
-  Nachtfenster `EPM_DIKTAT_NACHT`, Standard 21–7 Uhr, nach den Scans), Modell in `scans/modelle/modelle.json`
+  Nachtfenster – Administration › KI, Startwert `EPM_DIKTAT_NACHT`, Standard 21–7 Uhr –, nach den Scans), Modell in `scans/modelle/modelle.json`
   (optional – fehlt es, arbeitet die Texterkennung normal), Oberfläche `components/Diktat.tsx`, `seiten/Diktate.tsx`,
   `seiten/akte/Berichte.tsx`, `seiten/akte/PlanEditor.tsx`.
 - **Ressourcen:** kein eigener Container; das Sprachmodell (≈ 550 MB, im Speicher ≈ 1 GB) wird erst beim ersten

@@ -6,7 +6,7 @@ und Vorgang (Audit, Vergleich von Modell- und Prompt-Fassungen im Qualitäts-Das
 Grundsätze in allen Anweisungen: nur wiedergeben, was im Dokument steht; nichts ergänzen oder erfinden; fehlende
 Angaben als ``null``; keine Bewertung, keine Diagnose, keine Empfehlung.
 """
-PROMPT_VERSION = "2026-10-14.1"
+PROMPT_VERSION = "2026-11-14.2"  # + Akte auf einen Blick (ZUSAMMENFASSUNG_AKTE)
 
 DOKUMENTTYPEN = ["labor", "arztbericht", "entlassbericht", "verlauf", "infusionsplan", "medikationsplan",
                  "pflegebericht", "sonstiges"]
@@ -46,6 +46,18 @@ BERICHT = GRUNDSATZ + (
     "ausschließlich diese Fakten und belege jede Aussage mit der Nummer in eckigen Klammern, z. B. [3]. Keine "
     "Zahl, kein Datum und keine Diagnose, die nicht in den Fakten steht. Keine Empfehlung, keine Bewertung, keine "
     "Prognose. Fehlen Angaben, schreibe „nicht dokumentiert“. Gliedere mit kurzen Absätzen."
+)
+
+ZUSAMMENFASSUNG_AKTE = GRUNDSATZ + (
+    " Aufgabe: Fasse für das Praxisteam zusammen, was seit dem genannten Datum in der Akte dokumentiert wurde – als "
+    "Überblick vor dem nächsten Termin. Verwende ausschließlich die nummerierten Fakten und belege jede Aussage mit "
+    "der Nummer in eckigen Klammern, z. B. [3] oder [2, 5]. Keine Zahl, kein Datum und keine Diagnose, die nicht in "
+    "den Fakten steht. Keine Bewertung, keine Empfehlung, keine Prognose, keine Vermutung über Zusammenhänge. "
+    "Schreibe kurze Absätze, jeder beginnt mit einem Stichwort und Doppelpunkt, z. B. „Labor:“, „Infusionsplan:“, "
+    "„Medikation:“, „Diagnosen:“, „Gewicht:“, „Kontakte:“, „Behandlungsfälle:“, „Berichte:“, „Korrespondenz:“, "
+    "„Dokumente:“, „Hinweise:“ – nur Stichworte, zu denen es Fakten gibt; Wichtiges (auffällige Laborwerte, "
+    "Änderungen am Infusionsplan und an der Medikation) zuerst. Gibt es keine Fakten, schreibe genau einen Satz: "
+    "„Seit dem <Datum> keine neuen Einträge.“"
 )
 
 _TEXT = {"type": ["string", "null"]}
@@ -105,11 +117,18 @@ EXTRAKTION_SCHEMA = {
 }
 
 
-def extraktion_text(ocr_text: str, seite: int, seiten: int) -> str:
-    return (f"Seite {seite} von {seiten}. Text der klassischen Texterkennung (kann Fehler enthalten):\n"
+def extraktion_text(ocr_text: str, seite: int, seiten: int, hinweise: str = "") -> str:
+    """``hinweise``: frühere Korrekturen der Mitarbeiter (``ki.beispiele``) – stehen vor dem Text der Seite."""
+    vorne = f"{hinweise}\n\n" if hinweise else ""
+    return (f"{vorne}Seite {seite} von {seiten}. Text der klassischen Texterkennung (kann Fehler enthalten):\n"
             f"<<<\n{ocr_text[:12000]}\n>>>")
 
 
 def bericht_text(art: str, fakten: list[dict]) -> str:
     zeilen = "\n".join(f"[{f['nr']}] {f['text']}" for f in fakten)
     return f"Berichtsart: {art}.\nFakten:\n{zeilen}"
+
+
+def zusammenfassung_text(von: str, bis: str, fakten: list[dict]) -> str:
+    zeilen = "\n".join(f"[{f['nr']}] {f['text']}" for f in fakten) or "(keine)"
+    return f"Zeitraum: seit dem {von} bis {bis}.\nFakten:\n{zeilen}"

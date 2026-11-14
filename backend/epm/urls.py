@@ -78,6 +78,9 @@ router.register("ki/berichte", ki.KiBerichtViewSet, basename="ki-bericht")
 router.register("ki/modelle", ki.ModelleViewSet, basename="ki-modell")
 router.register("ki/vorlagen", ki.KiPromptvorlageViewSet, basename="ki-vorlage")
 router.register("ki/chats", ki.KiChatViewSet, basename="ki-chat")
+# Akte auf einen Blick, Nachtaufgaben (14.11.2026)
+router.register("ki/zusammenfassungen", ki.KiZusammenfassungViewSet, basename="ki-zusammenfassung")
+router.register("ki/aufgaben", ki.KiAufgabeViewSet, basename="ki-aufgabe")
 
 auth = [
     path("status/", konto.StatusView.as_view()),
