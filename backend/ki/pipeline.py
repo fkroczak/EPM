@@ -27,7 +27,7 @@ from django.utils import timezone
 
 from audit.models import SystemEreignis, protokolliere
 
-from . import krypto, prompts, pruefung
+from . import beispiele, krypto, prompts, pruefung
 from .modell import Client, ModellFehler
 from .models import KiEinstellung, KiFeld, KiModellversion, KiRohergebnis, KiSeite, KiVorgang
 
@@ -123,10 +123,12 @@ def _roh(vorgang, art, seite, antwort, mv, name, parameter):
                                  parameter=parameter, antwort=antwort.text[:200000], dauer_s=antwort.dauer_s)
 
 
-def stufe2(vorgang: KiVorgang, einst: KiEinstellung, rahmen: Rahmen) -> list[tuple[int, dict]]:
-    """Vision-Modell: Transkription unsicherer Seiten und Extraktion je Seite → [(Seite, JSON)]."""
+def stufe2(vorgang: KiVorgang, einst: KiEinstellung, rahmen: Rahmen, absender: str = "") -> list[tuple[int, dict]]:
+    """Vision-Modell: Transkription unsicherer Seiten und Extraktion je Seite → [(Seite, JSON)].
+    ``absender`` (aus den Regeln): wählt frühere Korrekturen desselben Absenders als Beispiele (``ki.beispiele``)."""
     client = rahmen.client
     mv, name = _modellversion()
+    hinweise, n_hinweise = beispiele.korrekturhinweise(vorgang, absender)
     ergebnisse = []
     seiten = list(vorgang.seiten_liste.all())
     for s in seiten:
@@ -148,9 +150,10 @@ def stufe2(vorgang: KiVorgang, einst: KiEinstellung, rahmen: Rahmen) -> list[tup
         rahmen.schritt(f"Seite {s.nr} von {len(seiten)}: KI strukturiert", 70 + int(20 * s.nr / len(seiten)))
         text = s.vision_text or s.text
         mit_bild = bild is not None and not (digital and not unsicher)
-        a = client.chat(prompts.EXTRAKTION, prompts.extraktion_text(text, s.nr, len(seiten)),
+        a = client.chat(prompts.EXTRAKTION, prompts.extraktion_text(text, s.nr, len(seiten), hinweise),
                         bilder=[bild] if mit_bild else None, schema=prompts.EXTRAKTION_SCHEMA, max_tokens=2500)
-        _roh(vorgang, "extraktion", s.nr, a, mv, name, {"max_tokens": 2500, "bild": mit_bild})
+        _roh(vorgang, "extraktion", s.nr, a, mv, name, {"max_tokens": 2500, "bild": mit_bild,
+                                                         "korrekturhinweise": n_hinweise})
         try:
             ergebnisse.append((s.nr, a.json()))
         except ModellFehler as e:
@@ -345,11 +348,12 @@ def verarbeiten(vorgang: KiVorgang, rahmen: Rahmen, paddle=None) -> KiVorgang:
     vorgang.save(update_fields=["status", "ocr_text", "ocr_konfidenz"])
     verfahren += sorted({v for s in seiten for v in (s.verfahren or [])})
 
+    regeln = _regeln(vorgang)  # vor Stufe 2: der Absender wählt die passenden Korrekturbeispiele
     modell_ergebnis: list[tuple[int, dict]] = []
     hinweis = ""
     if rahmen.client is not None:
         try:
-            modell_ergebnis = stufe2(vorgang, einst, rahmen)
+            modell_ergebnis = stufe2(vorgang, einst, rahmen, absender=(regeln.get("labor") or {}).get("name") or "")
             verfahren.append("vision")
         except ModellFehler as e:
             hinweis = f"KI-Stufe nicht verfügbar ({e}) – nur regelbasierte Vorschläge."
@@ -358,7 +362,6 @@ def verarbeiten(vorgang: KiVorgang, rahmen: Rahmen, paddle=None) -> KiVorgang:
         hinweis = "Kein KI-Modell eingerichtet – nur regelbasierte Vorschläge."
     rahmen.pruefe_abbruch()
     rahmen.schritt("Gegenprüfung und Vorschläge", 92)
-    regeln = _regeln(vorgang)
     verfahren.append("regeln")
     felder = felder_bilden(vorgang, modell_ergebnis, regeln)
     typ = next((f.wert.get("wert") for f in felder if f.schluessel == "dokumenttyp"), "")
@@ -373,6 +376,8 @@ def verarbeiten(vorgang: KiVorgang, rahmen: Rahmen, paddle=None) -> KiVorgang:
         vorgang.metadaten = {f.schluessel: f.wert.get("wert") for f in felder if f.gruppe == "meta"}
         if hinweis:
             vorgang.metadaten["hinweis"] = hinweis
+        if (regeln.get("labor") or {}).get("name"):  # für ki.beispiele: gleicher Absender wie bei späteren Dokumenten
+            vorgang.metadaten["absender_regeln"] = str(regeln["labor"]["name"])[:200]
         vorgang.verfahren = verfahren
         vorgang.prompt_version = prompts.PROMPT_VERSION if modell_ergebnis else ""
         vorgang.fertig_am = timezone.now()

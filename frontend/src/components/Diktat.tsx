@@ -19,6 +19,7 @@ import { Chip, Fehleranzeige, Knopf, Meldung, Segmente, Textfeld, cx } from "@/c
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
+import { DiktatKi } from "@/components/DiktatKi";
 
 const HOECHSTENS_S = 60 * 60;
 /** ab dieser Länge ist „heute Nacht“ vorgewählt (der Server bleibt tagsüber frei) */
@@ -408,9 +409,10 @@ function DiktatEintrag({ d, onUebernehmen }: { d: Diktat; onUebernehmen?: (html:
   const { darf } = useAuth();
   const [offen, setOffen] = useState(!d.uebernommen_am);
   const neu = () => void qc.invalidateQueries({ queryKey: ["diktate"] });
+  // html: die Abschrift selbst oder der gegliederte Entwurf der KI (DiktatKi)
   const uebernehmen = useMutation({
-    mutationFn: () => api<Diktat>(`diktate/${d.id}/uebernommen/`, { body: {} }),
-    onSuccess: () => { onUebernehmen?.(d.text ?? ""); neu(); melden("Diktat in den Text übernommen – bitte prüfen und speichern."); },
+    mutationFn: (_html: string) => api<Diktat>(`diktate/${d.id}/uebernommen/`, { body: {} }),
+    onSuccess: (_d, html) => { onUebernehmen?.(html); neu(); melden("Diktat in den Text übernommen – bitte prüfen und speichern."); },
   });
   const erneut = useMutation({ mutationFn: () => api<Diktat>(`diktate/${d.id}/erneut/`, { body: {} }), onSuccess: neu });
   const verwerfen = useMutation({ mutationFn: () => api(`diktate/${d.id}/`, { method: "DELETE" }), onSuccess: () => { neu(); melden("Diktat verworfen."); } });
@@ -439,11 +441,13 @@ function DiktatEintrag({ d, onUebernehmen }: { d: Diktat; onUebernehmen?: (html:
         ? "Wird heute Nacht abgeschrieben." : "Wartet auf die Abschrift – meist nach wenigen Minuten fertig.")}</span> : null}
       {d.status === "fehler" ? <Meldung art="fehler">{d.fehler}</Meldung> : null}
       {d.status === "fertig" && offen ? <Abschrift diktat={d} /> : null}
+      {d.status === "fertig" && onUebernehmen && darfAendern && darf("ki_berichte")
+        ? <DiktatKi diktatId={d.id} uebernimmt={uebernehmen.isPending} onUebernehmen={(html) => uebernehmen.mutate(html)} /> : null}
       {darfAendern ? (
         <div className="flex gap-2 flex-wrap">
           {d.status === "fertig" && onUebernehmen ? (
             <Knopf klein variante={d.uebernommen_am ? "sec" : "pri"} icon="plus" laedt={uebernehmen.isPending}
-              onClick={() => uebernehmen.mutate()} data-testid="diktat-uebernehmen">
+              onClick={() => uebernehmen.mutate(d.text ?? "")} data-testid="diktat-uebernehmen">
               {d.uebernommen_am ? "Noch einmal übernehmen" : "In den Text übernehmen"}
             </Knopf>
           ) : null}

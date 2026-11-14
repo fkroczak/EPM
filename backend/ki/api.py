@@ -769,6 +769,42 @@ class KiChatViewSet(viewsets.GenericViewSet):
             raise serializers.ValidationError({"dateien": "Höchstens 20 Dateien je Nachricht."})
         return dateien
 
+    @action(detail=False, methods=["post"])
+    def diktat(self, request):
+        """Diktat → gegliederter Bericht (14.11.2026): ``{"diktat": ID}`` legt eine eigene Unterhaltung mit der Vorlage
+        „Diktat als Brief gliedern“ an; der KI-Dienst schreibt den Entwurf wie jede Chat-Antwort (Vorrang, auch
+        tagsüber). In den Bericht kommt er erst, wenn die Person ihn in der Diktat-Liste übernimmt."""
+        from diktate.models import Diktat
+
+        _recht(request.user, "ki_berichte")
+        did = str(request.data.get("diktat") or "")
+        d = (Diktat.objects.filter(pk=did, patient__in=patienten_fuer(request.user)).select_related("bericht__art")
+             .first() if did.isdigit() else None)
+        if d is None:
+            return _fehler("Diktat nicht gefunden.", status.HTTP_404_NOT_FOUND)
+        if d.status != Diktat.Status.FERTIG or not d.text.strip():
+            return _fehler("Das Diktat ist noch nicht abgeschrieben.")
+        text = chat.html_zu_text(d.text)
+        if len(text) > chat.MAX_ZEICHEN:
+            return _fehler(f"Das Diktat ist länger als {chat.MAX_ZEICHEN} Zeichen.")
+        vorlage = KiPromptvorlage.objects.filter(name=chat.DIKTAT_VORLAGE, aktiv=True).first()
+        art = (getattr(getattr(d.bericht, "art", None), "wert", "") or "").strip() if d.bericht_id else ""
+        berichtsart = art or (d.bericht.titel if d.bericht_id else "") or "Arztbrief"
+        with transaction.atomic():
+            c = KiChat.objects.create(benutzer=request.user, firma=getattr(request.user, "firma", None),
+                                      vorlage=vorlage, titel=f"Diktat vom {timezone.localtime(d.erstellt_am):%d.%m.%Y}"
+                                                             f" → {berichtsart}"[:200])
+            KiChatNachricht.objects.create(chat=c, rolle=KiChatNachricht.Rolle.NUTZER,
+                                           text=f"Berichtsart: {berichtsart}\n\nAbschrift des Diktats:\n{text}")
+            KiChatNachricht.objects.create(
+                chat=c, rolle=KiChatNachricht.Rolle.KI, status=KiChatNachricht.Status.WARTET,
+                vorlage_name=vorlage.name if vorlage else chat.DIKTAT_VORLAGE,
+                anweisung=vorlage.anweisung if vorlage else chat.DIKTAT_ANWEISUNG,
+                temperatur=vorlage.temperatur if vorlage else Decimal("0.10"))
+        protokolliere(A.KI, request, objekt=f"KI-Chat {c.pk}", aktion="diktat_gliedern", diktat=d.pk,
+                      patient_id=d.patient_id, zeichen=len(text))
+        return Response(self._antwort(c), status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=["post"], parser_classes=[JSONParser, MultiPartParser, FormParser])
     def nachricht(self, request, pk=None):
         from scans.ocr.laden import dateityp
@@ -826,7 +862,8 @@ class KiChatViewSet(viewsets.GenericViewSet):
 EINSTELLUNG_FELDER = ["aktiv", "nacht_beginn", "nacht_ende", "zeitzone", "worker_nacht", "worker_tag",
                       "max_cpu_prozent", "min_ram_frei_mb", "max_last_je_kern", "pause_bei_sicherung",
                       "altbestand_lesen", "max_seiten", "bild_max_px", "ocr_schwelle", "feld_unsicher",
-                      "verknuepfung_stunden", "aufbewahrung_tage", "training_erlaubt", "training_nur_wochenende"]
+                      "verknuepfung_stunden", "beispiele_max", "aufbewahrung_tage", "training_erlaubt",
+                      "training_nur_wochenende"]
 
 
 class EinstellungSerializer(serializers.ModelSerializer):
@@ -862,7 +899,8 @@ class EinstellungSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         grenzen = {"worker_nacht": (1, KiEinstellung.worker_max()), "worker_tag": (0, KiEinstellung.worker_max()),
                    "max_cpu_prozent": (10, 100), "min_ram_frei_mb": (256, 65536), "max_seiten": (1, 500),
-                   "bild_max_px": (512, 4096), "verknuepfung_stunden": (1, 336), "aufbewahrung_tage": (1, 90)}
+                   "bild_max_px": (512, 4096), "verknuepfung_stunden": (1, 336), "aufbewahrung_tage": (1, 90),
+                   "beispiele_max": (0, 40)}
         fehler = {}
         for feld, (unten, oben) in grenzen.items():
             if feld in attrs and not (unten <= attrs[feld] <= oben):

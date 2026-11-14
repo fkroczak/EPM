@@ -53,8 +53,9 @@ werden nach `EPM_KI_CHAT_TAGE` (Standard 30) gelöscht; im Audit-Log steht nur, 
 
 | Methode und Pfad | Recht | Beschreibung |
 |---|---|---|
-| `GET chats/` · `GET chats/{id}/` | ansehen | eigene Chats; Detail mit `nachrichten` (`rolle` nutzer/ki, `status` wartet/laeuft/fertig/fehler, `pruefung`: `neue_werte` = Zahlen/Daten, die in keiner Eingabe stehen, `offene_stellen` = Anzahl [?]) |
+| `GET chats/` · `GET chats/{id}/` | ansehen | eigene Chats; Detail mit `nachrichten` (`rolle` nutzer/ki, `status` wartet/laeuft/fertig/fehler, `pruefung`: `neue_werte` = Zahlen/Daten, die in keiner Eingabe stehen, `fehlende_werte` = Zahlen/Daten der Anfrage, die in der Antwort fehlen, `offene_stellen` = Anzahl [?]) |
 | `POST chats/` `{"vorlage": ID, "titel": "…"}` · `DELETE chats/{id}/` | berichte · ansehen | |
+| `POST chats/diktat/` `{"diktat": ID}` | berichte | Diktat → gegliederter Bericht (14.11.2026): neue eigene Unterhaltung mit der Vorlage „Diktat als Brief gliedern“ (fehlt sie, gilt `chat.DIKTAT_ANWEISUNG`) und der Abschrift als Klartext. Nur abgeschriebene Diktate in Akten, die die Person sehen darf (sonst 400/404). Protokoll `diktat_gliedern` ohne Inhalt |
 | `POST chats/{id}/nachricht/` `{"text": "…", "vorlage": ID, "dokumente": [ID]}` oder multipart mit `dateien` | berichte | höchstens 100 000 Zeichen; Text oder Anhang nötig. `dokumente`: Dokumente aus Akten, die die Person sehen darf (lesbar: PDF, Bilder; Protokoll `chat_dokument_aus_akte` mit Patient und Dokument). `dateien`: bis 20 Dateien je `EPM_UPLOAD_MAX_MB`, keine Seitengrenze. 409, solange die letzte Antwort noch aussteht |
 
 Anhänge (`nachrichten[].anhaenge`: `name`, `herkunft` upload/akte, `seiten`, `seiten_fertig`, `status` wartet/fertig/fehler)

@@ -106,6 +106,12 @@ EPM läuft unverändert. `KI_HARDWARE_PRUEFEN=0` in `.env` schaltet die Prüfung
   der Akte.
 - **Hinweise Labor ↔ Infusionsplan:** Akte › KI. Sie werden nach jeder Verarbeitung und jeder Übernahme neu berechnet.
 - **Qualität:** Menü „KI (Experimentell)“ › Qualität.
+- **Korrekturen als Beispiele** (14.11.2026): Jede Korrektur in der Prüfansicht hilft beim nächsten Dokument – die KI
+  bekommt bis zu 12 frühere Korrekturen („gelesen Kalium 3,2 → richtig Kalium 3,4“) mit, bevorzugt vom selben Labor.
+  Darum beim Korrigieren die **Fehlerart** richtig wählen und nicht nur verwerfen. Anzahl unter Administration › KI
+  („Korrekturen als Beispiele“, 0 = aus; zum Vergleich im Qualitäts-Dashboard kurz ausschalten).
+- **Diktat → Brief:** Am abgeschriebenen Diktat im Bericht „Mit KI gliedern“ – der Entwurf läuft über den Chat
+  (Vorrang, auch tagsüber), Vorlage „Diktat als Brief gliedern“ unter Administration › Vorlagen › KI-Prompts.
 
 ## 4. Modell wählen und wechseln
 
@@ -168,6 +174,9 @@ Entscheidung 14.10.2026: optional, nachts ohne GPU, möglichst am Wochenende, we
 1. Rechtsgrundlage dokumentieren (Administration › KI › Evaluation und Training, Passwort + 2FA) – vorher bleibt
    alles gesperrt.
 2. Evaluationsfälle erzeugen, Text sichten, einzelne Fälle für das Training freigeben.
+Vor jedem Training: Erst muss sich zeigen, dass **Korrekturen als Beispiele** (Abschnitt 3), Regeln und ein
+größeres Modell bzw. Q8_0 (Abschnitt 4) nicht reichen. Ein LoRA lernt Format und Hausstil, kein medizinisches Wissen.
+
 3. Das Training selbst läuft **nicht** im Produktiv-Dienst und überschreibt nie ein Modell. Auf der CPU ist nur ein
    kleines LoRA auf den Textteil realistisch (Stunden bis ein Wochenende für einige hundert Beispiele). Ergebnis ist
    eine neue GGUF-Datei → einspielen, registrieren, evaluieren, aktivieren wie in Abschnitt 4.

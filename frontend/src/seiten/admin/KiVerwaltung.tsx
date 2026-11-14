@@ -22,6 +22,7 @@ type Einstellungen = {
   aktiv: boolean; nacht_beginn: string; nacht_ende: string; zeitzone: string; worker_nacht: number; worker_tag: number;
   max_cpu_prozent: number; min_ram_frei_mb: number; max_last_je_kern: number; pause_bei_sicherung: boolean; altbestand_lesen: boolean;
   max_seiten: number; bild_max_px: number; ocr_schwelle: number; feld_unsicher: number; verknuepfung_stunden: number;
+  beispiele_max: number;
   aufbewahrung_tage: number; training_erlaubt: boolean; training_nur_wochenende: boolean; rechtsgrundlage: string;
   rechtsgrundlage_geprueft_am: string | null; rechtsgrundlage_geprueft_von_name: string; geaendert_am: string;
   geaendert_von_name: string; worker_max: number;
@@ -103,6 +104,7 @@ const ZAHLFELDER: { name: keyof Einstellungen; text: string; hinweis?: string; s
   { name: "ocr_schwelle", text: "OCR-Schwelle (0–1)", hinweis: "darunter liest das Modell die Seite selbst", schritt: "0.01" },
   { name: "feld_unsicher", text: "Unsicher unter (0–1)", schritt: "0.01" },
   { name: "verknuepfung_stunden", text: "Zeitfenster Labor → Maßnahme (h)" },
+  { name: "beispiele_max", text: "Korrekturen als Beispiele", hinweis: "frühere Korrekturen gehen als Muster an das Modell; 0 = aus" },
   { name: "aufbewahrung_tage", text: "Zwischendateien löschen nach (Tagen)" },
 ];
 

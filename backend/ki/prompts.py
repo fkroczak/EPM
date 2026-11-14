@@ -6,7 +6,7 @@ und Vorgang (Audit, Vergleich von Modell- und Prompt-Fassungen im Qualitäts-Das
 Grundsätze in allen Anweisungen: nur wiedergeben, was im Dokument steht; nichts ergänzen oder erfinden; fehlende
 Angaben als ``null``; keine Bewertung, keine Diagnose, keine Empfehlung.
 """
-PROMPT_VERSION = "2026-10-14.1"
+PROMPT_VERSION = "2026-11-14.1"  # + Korrekturhinweise (ki/beispiele.py)
 
 DOKUMENTTYPEN = ["labor", "arztbericht", "entlassbericht", "verlauf", "infusionsplan", "medikationsplan",
                  "pflegebericht", "sonstiges"]
@@ -105,8 +105,10 @@ EXTRAKTION_SCHEMA = {
 }
 
 
-def extraktion_text(ocr_text: str, seite: int, seiten: int) -> str:
-    return (f"Seite {seite} von {seiten}. Text der klassischen Texterkennung (kann Fehler enthalten):\n"
+def extraktion_text(ocr_text: str, seite: int, seiten: int, hinweise: str = "") -> str:
+    """``hinweise``: frühere Korrekturen der Mitarbeiter (``ki.beispiele``) – stehen vor dem Text der Seite."""
+    vorne = f"{hinweise}\n\n" if hinweise else ""
+    return (f"{vorne}Seite {seite} von {seiten}. Text der klassischen Texterkennung (kann Fehler enthalten):\n"
             f"<<<\n{ocr_text[:12000]}\n>>>")
 
 

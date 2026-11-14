@@ -77,6 +77,8 @@ class KiEinstellung(models.Model):
     ocr_schwelle = models.FloatField(default=0.85, help_text="darunter liest das Vision-Modell die Seite selbst")
     feld_unsicher = models.FloatField(default=0.7, help_text="Felder darunter gelten als unsicher")
     verknuepfung_stunden = models.PositiveSmallIntegerField(default=48)
+    beispiele_max = models.PositiveSmallIntegerField(
+        default=12, help_text="frühere Korrekturen als Beispiele im Prompt (ki/beispiele.py); 0 = aus")
     aufbewahrung_tage = models.PositiveSmallIntegerField(default=14, help_text="Zwischendateien danach löschen")
     # Training (optional, Entscheidung 14.10.2026): nur nachts/am Wochenende, nur ohne angemeldete Benutzer und erst,
     # wenn die Rechtsgrundlagen-Prüfung dokumentiert ist

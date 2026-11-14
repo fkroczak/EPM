@@ -56,7 +56,8 @@ class Attrappe:
         return {"bereit": True, "modell": "attrappe.gguf#000000000000", "text": "bereit"}
 
     def chat(self, system, text, bilder=None, schema=None, max_tokens=1500, temperatur=0.0):
-        self.anfragen.append({"system": system[:40], "bilder": len(bilder or []), "schema": schema is not None})
+        self.anfragen.append({"system": system[:40], "bilder": len(bilder or []), "schema": schema is not None,
+                              "text": text})
         if schema is not None:
             return self._antwort(json.dumps(self.extraktion), 0.1, "attrappe")
         if "Berichtsentwurf" in system or "Fakten" in text:
