@@ -38,7 +38,10 @@ geladen, der Chat hat Vorrang, Hintergrundarbeit nur im Nachtfenster. Im Chat la
 einer Akte wählen (ohne Seitengrenze; lange Unterlagen liest die KI Teil für Teil, Kontext `KI_KONTEXT`).
 **Lernt aus Korrekturen** (14.11.2026): frühere Korrekturen der Prüfansicht gehen als Beispiele in den Prompt (kein
 Training; Administration › KI › „Korrekturen als Beispiele“). **Diktat → Brief**: „Mit KI gliedern“ am abgeschriebenen
-Diktat macht daraus einen gegliederten Entwurf mit Prüfmarken.
+Diktat macht daraus einen gegliederten Entwurf mit Prüfmarken. **Akte auf einen Blick**: Zusammenfassung seit dem
+letzten Termin mit Quellenmarken (nachts für die Termine von morgen vorbereitet). Unter Administration › KI sind
+jetzt auch **Priorisierung** (u. a. Vorrang für Patienten mit Termin), **Nachtaufgaben** (Zeitplan) und **Neu lesen**
+mit dem aktiven Modell einstellbar.
 Einrichten, Modell wählen, laden bzw. hochladen, Grenzen, Benchmark und Ausschalten gehen nach „EPM aktualisieren“
 auch ohne SSH unter Administration › KI › Einrichtung.
 
@@ -60,7 +63,7 @@ offline ab (whisper.cpp, nur CPU, Modell ≈ 550 MB in `scans/modelle/modelle.js
 bzw. offline mit `werkzeuge/ocr-modelle.sh`). Nachhören mit markierten unsicheren Wörtern, „In den Text übernehmen“,
 freigeben wie bisher – die PDF hat das Layout der Stiftung, die Aufnahme wird dabei gelöscht. Abgegebene Diktate stehen
 im Menü **Diktate**; dort lässt sich auch ohne Akte diktieren (Patient und Berichtsart wählen, 26.10.2026). Recht „Diktieren“ (Standard Mediziner). Details: `docs/BACKEND-FUNKTIONEN.md` F192,
-`docs/DATENSCHUTZ.md` § 8. Nachtfenster `EPM_DIKTAT_NACHT=21-7`, Rechenkerne `EPM_DIKTAT_THREADS` (sonst
+`docs/DATENSCHUTZ.md` § 8. Nachtfenster unter Administration › KI › Zeitfenster (`EPM_DIKTAT_NACHT=21-7` nur noch Startwert), Rechenkerne `EPM_DIKTAT_THREADS` (sonst
 `EPM_OCR_THREADS`). Der OCR-Dienst braucht dafür mindestens `EPM_OCR_SPEICHER=3g` (Server ab 6 GB RAM).
 
 ## Dokumentenautomation der Regeneration Clinic (26.10.2026)

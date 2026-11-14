@@ -167,6 +167,6 @@ def faellige_ausfuehren(jetzt: dt.datetime | None = None) -> int:
                                                      jetzt_angefordert=False)
         log.info("KI-Aufgabe %s (%s): %s", a.pk, a.art, ergebnis)
         protokolliere(SystemEreignis.Art.KI, benutzername="ki-dienst", objekt=f"KI-Aufgabe {a.pk}", aktion="aufgabe",
-                      art=a.art, ergebnis=ergebnis[:200], ok=ok, jetzt=kandidat.jetzt_angefordert)
+                      aufgabenart=a.art, ergebnis=ergebnis[:200], ok=ok, jetzt=kandidat.jetzt_angefordert)
         anzahl += 1
     return anzahl

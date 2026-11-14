@@ -23,6 +23,7 @@ Das Backend spricht nie selbst mit dem Modell: Verarbeitung, Berichtsentwürfe u
 | `POST vorgaenge/{id}/uebernehmen/` `{"felder": [ids], "entscheidungen": {"<id>": "neu\|ergaenzen\|ersetzen\|verwerfen"}, "bestaetigt": true}` | übernehmen + Recht der Akte | Übernahme freigegebener Felder in einer Transaktion → 201 `{"ziele": [{modell, id, aktion}], "status"}`; **409** `{"konflikte": [vorschau…]}`, wenn eine Entscheidung fehlt (nichts wird geschrieben); 400 ohne `bestaetigt` oder bei nicht freigegebenen Feldern; 403 ohne Recht bzw. als Admin bei echten Akten |
 | `POST vorgaenge/{id}/ablehnen/` `{"grund": "…"}` | prüfen | alle offenen Vorschläge verworfen, Status „Abgelehnt“ |
 | `POST vorgaenge/{id}/erneut/` `{"nachverarbeitung": false}` | prüfen | erneut verarbeiten (bzw. „zur Nachverarbeitung“ – läuft, sobald das Modell bereit ist) |
+| `POST vorgaenge/neu_lesen/` `{"vorgaenge": [ids]}` oder `{"seit_tagen": 30, "dokumenttypen": ["labor", …], "nur_anderes_modell": true, "hoechstens": 200}` | verwalten | „Jetzt neu lesen“ (14.11.2026): wie „Erneut verarbeiten“, aber mit `prio_neu_lesen` (läuft nachts) – gleiche Logik wie die Nachtaufgabe `neu_lesen` (`eingang.neu_lesen`). Nur Vorgänge der eigenen Firma; ausgenommen in Arbeit/wartend, übernommen, abgelehnt. `seit_tagen` 0–3650 (Dokument hochgeladen in den letzten n Tagen, 0 = alle), `dokumenttypen` = `KiVorgang.dokumenttyp`, `hoechstens` 1–5000. → `{"vorgemerkt": n}`; Feldfehler unter dem Feldnamen. Audit `neu_lesen` |
 
 Ziele der Übernahme und nötige Rechte: Labor → `Laborbefund`/`Laborwert` (`eintraege_erfassen`), Infusion →
 `Infusionsplan` aus dem Altsystem, Status „abgelöst“ (`plaene_anlegen`), Medikation → `Medikament` (`akten_bearbeiten`;
@@ -44,12 +45,46 @@ angehängt (`akten_bearbeiten`), Dokumentdatum/-typ → `Dokument` (`eintraege_e
 | `POST berichte/{id}/speichern/` `{"text": "…", "titel": "…"}` | berichte + `eintraege_erfassen` | legt einen `Bericht` im Status Entwurf an (Kennzeichnung + Quellen im Inhalt) |
 | `POST berichte/{id}/verwerfen/` | berichte | |
 
+## Akte auf einen Blick (14.11.2026)
+
+Was seit dem letzten Praxistermin in der Akte dokumentiert wurde – Fakten aus der Akte (Code), formuliert vom lokalen
+Modell, gegengeprüft wie der Berichtsentwurf. Sichtbar wie die Vorgänge: Akte im Bereich der Person und die
+Zusammenfassung in deren Firma angefordert bzw. ohne Firma (nachts für einen Termin vorbereitet; Firma des Termins).
+Inhalte stehen nie im Audit-Log.
+
+| Methode und Pfad | Recht | Beschreibung |
+|---|---|---|
+| `GET zusammenfassungen/?patient=ID` | ansehen | höchstens 5, neueste zuerst (400 ohne `patient`; fremde Akte → `[]`) |
+| `POST zusammenfassungen/` `{"patient": ID}` | berichte | neue auf Anforderung (`grund=angefordert`) → 201; **409**, solange für die Akte eine `wartet`/`laeuft`; 400 für unbekannte oder eingeschränkte Akte. Audit `zusammenfassung_angefordert` |
+
+Antwort je Zusammenfassung:
+
+```json
+{"id": 7, "patient": 12, "grund": "termin|angefordert", "termin_datum": "2026-11-15|null",
+ "von": "2026-10-02|null", "bis": "2026-11-14|null", "von_grund": "termin|kontakt|standard|null",
+ "status": "wartet|laeuft|fertig|fehler", "entwurf": "Labor: … [1]\n\nInfusionsplan: … [3]",
+ "fakten": [{"nr": 1, "text": "Labor 10.11.2026: Kalium 3,1 mmol/l (Referenz 3,5–5,1), unterhalb des Referenzbereichs",
+             "quelle": {"modell": "laborwert", "id": 55}, "datum": "2026-11-10", "link": "labor"}],
+ "pruefung": {"unbelegte_werte": [], "unbekannte_belege": [], "saetze_ohne_beleg": [],
+              "empfehlung_oder_bewertung": [], "ok": true},
+ "fehler": "", "modell": "Qwen3.5-4B|null", "erstellt_am": "…", "fertig_am": "…|null",
+ "angefordert_von_name": "…|null"}
+```
+
+`von`/`bis`/`von_grund` stehen fest, sobald der KI-Dienst sie erstellt (`pruefung` ist bis dahin `null`). `von` =
+letzter Praxistermin vor heute (nicht ausgeblendet; `von_grund=termin`), sonst letzter Kontakt (`kontakt`), sonst heute
+− `zusammenfassung_ohne_termin_tage` (`standard`); `bis` = heute. `link` = Reiter der Akte (`labor`, `plaene`,
+`medikamente`, `diagnosen`, `kontakte`, `dokumente`, `berichte`, `korrespondenz`, `faelle`, `bia`, `kartei` (Gewicht),
+`therapie`, `ki` (Hinweise)); `quelle.modell` z. B. `laborwert`, `infusionsplan`, `medikament`, `diagnose`,
+`behandlungsfall`, `gewichtsmessung`, `bia`, `therapieschritt`, `kontakt`, `bericht`, `schreiben`, `dokument`,
+`kihinweis`. Höchstens 150 Fakten, Wichtiges zuerst.
+
 ## KI-Chat (12.11.2026)
 
 Jede Person sieht **nur ihre eigenen** Unterhaltungen (auch Admins keine fremden; fremde → 404). Die Antwort schreibt
 der KI-Dienst (Vorrang vor Dokumenten und Berichten, auch tagsüber; nicht während einer Pause, z. B. Sicherung).
 Systemanweisung = fester Rahmen (`ki/chat.py` `RAHMEN`) + Anweisung der Promptvorlage. Unterhaltungen ohne Änderung
-werden nach `EPM_KI_CHAT_TAGE` (Standard 30) gelöscht; im Audit-Log steht nur, dass gechattet wurde, nie der Text.
+werden nach `chat_tage` (Einstellungen; Startwert `EPM_KI_CHAT_TAGE`, Standard 30) gelöscht; im Audit-Log steht nur, dass gechattet wurde, nie der Text.
 
 | Methode und Pfad | Recht | Beschreibung |
 |---|---|---|
@@ -71,8 +106,10 @@ Modell sie Teil für Teil und antwortet aus den Auszügen.
 | Methode und Pfad | Recht | Beschreibung |
 |---|---|---|
 | `GET stand/` | ansehen | `dienst` (Modus, Grund, Auslastung, Modell bereit, laufend), `nachtfenster`; mit `ki_verwalten` zusätzlich `queue` und aktives `modell` |
-| `GET/PUT einstellungen/` | verwalten | Zeitfenster, Zeitzone, Worker Tag/Nacht (≤ `KI_WORKER_MAX`), CPU-/RAM-/Lastgrenzen, Pause bei Sicherung, Altbestand, Seiten, Bildgröße, Schwellen, Verknüpfungsfenster, Aufbewahrung, Training (nur mit dokumentierter Rechtsgrundlage) |
+| `GET/PUT einstellungen/` | verwalten | Zeitfenster, Zeitzone, Worker Tag/Nacht (≤ `KI_WORKER_MAX`), CPU-/RAM-/Lastgrenzen, Pause bei Sicherung, Altbestand, Seiten, Bildgröße, Schwellen, Verknüpfungsfenster, Aufbewahrung, Training (nur mit dokumentierter Rechtsgrundlage); seit 14.11.2026 auch Priorisierung, Akte auf einen Blick, Diktat-Nachtfenster und Chat-Aufbewahrung (Tabelle unten) |
 | `POST rechtsgrundlage/` `{"rechtsgrundlage", "kennwort", "code"}` | training_freigeben | Passwort + zweiter Faktor |
+| `GET aufgaben/` · `POST aufgaben/` · `PATCH aufgaben/{id}/` · `DELETE aufgaben/{id}/` | verwalten | Nachtaufgaben (14.11.2026), siehe unten |
+| `POST aufgaben/{id}/jetzt/` | verwalten | `jetzt_angefordert = true` – läuft beim nächsten Durchlauf des KI-Dienstes (auch inaktiv) → Aufgabe |
 | `GET/POST modelle/` | verwalten | Registry; POST `{name, datei, projektor, sha256, quantisierung}` (nur Dateinamen `*.gguf`) |
 | `POST modelle/{id}/evaluieren/` | verwalten | Evaluationslauf (nachts im KI-Dienst) |
 | `POST modelle/{id}/aktivieren/` `{"kennwort", "code", "ohne_evaluation"}` | verwalten | Passwort + 2FA; bisher aktives → „vorherige Version“; schreibt `data/ki/modell/aktiv.env` |
@@ -84,6 +121,47 @@ Modell sie Teil für Teil und antwortet aus den Auszügen.
 | `POST hochladen/{kennung}/einspielen/` `{"kennwort", "code"}` | verwalten | vollständiges Paket an den Agenten (`epm-ki einspielen`) |
 | `GET benchmarks/` | verwalten | letzte 10 Benchmarks (`data/ki/benchmark-*.json`) |
 | `GET evaluation/` · `POST evaluation/` `{"aktion": "erzeugen"}` / `{"aktion": "training_freigeben", "faelle": [ids]}` | verwalten bzw. training_freigeben | Evaluationsfälle (pseudonymisiert), Läufe, Trainingsfreigabe |
+
+### Neue Einstellungen (14.11.2026)
+
+| Feld | Standard | Grenzen | Bedeutung |
+|---|---|---|---|
+| `prio_angefordert` | 10 | 0–100, **größer als alle anderen `prio_*`** | ausdrücklich angefordert („jetzt verarbeiten“, „Erneut verarbeiten“); Tagesbetrieb mit `worker_tag = 0` nimmt nur Vorgänge ab dieser Priorität. Ändert sie sich, werden wartende Vorgänge umgestellt (angeforderte bleiben angefordert, die übrigen darunter) |
+| `prio_termin` / `termin_tage` | 8 / 3 | 0–100 / 0–30 (0 = aus) | Dokumente von Akten mit Praxistermin zwischen heute und heute + `termin_tage` |
+| `prio_neu` / `neu_tage` | 5 / 7 | 0–100 / 1–90 | neu hochgeladene Dokumente |
+| `prio_neu_lesen` | 3 | 0–100 | „Neu lesen“ (Nachtaufgabe, `vorgaenge/neu_lesen/`) |
+| `prio_altbestand` | 0 | 0–100 | Altbestand |
+| `chat_vorrang` | true | | tagsüber hält ein wartender Chat alle anderen Aufträge an |
+| `zusammenfassung_tagsueber` | true | | „Akte auf einen Blick“ auf Anforderung auch tagsüber |
+| `zusammenfassung_ohne_termin_tage` | 90 | 7–730 | Zeitraum ohne früheren Termin und ohne Kontakt |
+| `diktat_nacht_beginn` / `diktat_nacht_ende` | 21 / 7 | 0–23 | Nachtfenster der Diktate „heute Nacht“ (Startwert `EPM_DIKTAT_NACHT`) |
+| `chat_tage` | 30 | 1–365 | KI-Chats ohne Änderung danach löschen (Startwert `EPM_KI_CHAT_TAGE`) |
+
+Fehlerfall wie bisher: ein fehlgeschlagener Versuch senkt die Priorität auf ≤ 0.
+
+### Nachtaufgaben (`aufgaben/`, 14.11.2026)
+
+```json
+{"id": 1, "name": "Akte auf einen Blick für die Termine von morgen", "art": "zusammenfassung_termine",
+ "art_name": "Akte auf einen Blick für die nächsten Termine", "aktiv": true, "wochentage": [0, 1, 2, 3, 4, 5, 6],
+ "uhrzeit": "03:00", "parameter": {"tage_voraus": 1}, "naechster_lauf": "2026-11-15T03:00:00+01:00|null",
+ "letzter_lauf": "…|null", "letztes_ergebnis": "12 Zusammenfassungen eingereiht", "jetzt_angefordert": false,
+ "geaendert_am": "…", "geaendert_von_name": "…|null"}
+```
+
+POST/PATCH mit `name`, `art`, `aktiv`, `wochentage` (0 = Mo … 6 = So, nicht leer), `uhrzeit` (`HH:MM`, Zeitzone der
+Einstellungen), `parameter` (fehlende mit Standard ergänzt, unbekannte entfallen). Fehler der Parameter unter
+`parameter.<feld>` (bzw. `parameter`). Arten:
+
+- `zusammenfassung_termine` `{"tage_voraus": 1}` (1–14): je Akte mit Praxistermin zwischen heute und heute + n eine
+  Zusammenfassung (`grund=termin`), sofern für diesen Termin noch keine fertige/wartende existiert.
+- `neu_lesen` `{"seit_tagen": 30, "dokumenttypen": [], "nur_anderes_modell": true, "hoechstens": 200}` – wie
+  `vorgaenge/neu_lesen/` (ohne Firmenfilter).
+- `dokumente_vormerken` `{"altbestand": true}` – Dokumente in die Queue (bis 5000 je Lauf).
+
+`naechster_lauf` kann in der Vergangenheit liegen (fällig, läuft beim nächsten Durchlauf). Eine Aufgabe, die nach ihrer
+Uhrzeit angelegt oder geändert wurde, läuft erst zum nächsten Termin. Audit: `aufgabe_angelegt`, `aufgabe_geaendert`,
+`aufgabe_geloescht`, `aufgabe_jetzt`; der KI-Dienst `aufgabe` (mit `aufgabenart`, Ergebnis ohne Inhalte).
 
 ## Geändert außerhalb von `/api/ki/`
 

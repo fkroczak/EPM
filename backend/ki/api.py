@@ -1524,18 +1524,18 @@ class KiAufgabeViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         a = serializer.save(geaendert_von=self.request.user)
-        protokolliere(A.KI, self.request, objekt=f"KI-Aufgabe {a.pk}", aktion="aufgabe_angelegt", art=a.art,
-                      name=a.name, aktiv=a.aktiv)
+        protokolliere(A.KI, self.request, objekt=f"KI-Aufgabe {a.pk}", aktion="aufgabe_angelegt",
+                      aufgabenart=a.art, name=a.name, aktiv=a.aktiv)
 
     def perform_update(self, serializer):
         a = serializer.save(geaendert_von=self.request.user)
-        protokolliere(A.KI, self.request, objekt=f"KI-Aufgabe {a.pk}", aktion="aufgabe_geaendert", art=a.art,
-                      name=a.name, aktiv=a.aktiv, wochentage=a.wochentage, uhrzeit=str(a.uhrzeit),
+        protokolliere(A.KI, self.request, objekt=f"KI-Aufgabe {a.pk}", aktion="aufgabe_geaendert",
+                      aufgabenart=a.art, name=a.name, aktiv=a.aktiv, wochentage=a.wochentage, uhrzeit=str(a.uhrzeit),
                       parameter=a.parameter)
 
     def perform_destroy(self, instance):
         protokolliere(A.KI, self.request, objekt=f"KI-Aufgabe {instance.pk}", aktion="aufgabe_geloescht",
-                      art=instance.art, name=instance.name)
+                      aufgabenart=instance.art, name=instance.name)
         instance.delete()
 
     @action(detail=True, methods=["post"])
@@ -1544,5 +1544,5 @@ class KiAufgabeViewSet(viewsets.ModelViewSet):
         # update statt save: „geändert am“ bleibt – sonst fiele der heutige Lauf zur Uhrzeit weg
         KiAufgabe.objects.filter(pk=a.pk).update(jetzt_angefordert=True)
         a.refresh_from_db()
-        protokolliere(A.KI, request, objekt=f"KI-Aufgabe {a.pk}", aktion="aufgabe_jetzt", art=a.art)
+        protokolliere(A.KI, request, objekt=f"KI-Aufgabe {a.pk}", aktion="aufgabe_jetzt", aufgabenart=a.art)
         return Response(AufgabeSerializer(a).data)

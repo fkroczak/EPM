@@ -113,6 +113,55 @@ EPM läuft unverändert. `KI_HARDWARE_PRUEFEN=0` in `.env` schaltet die Prüfung
 - **Diktat → Brief:** Am abgeschriebenen Diktat im Bericht „Mit KI gliedern“ – der Entwurf läuft über den Chat
   (Vorrang, auch tagsüber), Vorlage „Diktat als Brief gliedern“ unter Administration › Vorlagen › KI-Prompts.
 
+### Priorisierung (14.11.2026, Administration › KI › Priorisierung)
+
+Reihenfolge im KI-Dienst: **Chat > Berichtsentwürfe > Akte auf einen Blick > Evaluation > Dokumente**; die Dokumente
+nach Priorität: angefordert (10) > Akte mit Praxistermin in den nächsten `termin_tage` Tagen (8) > neu, hochgeladen
+in den letzten `neu_tage` Tagen (5) > „Neu lesen“ (3) > Altbestand (0). Alle Stufen sind einstellbar; „angefordert“
+muss die höchste bleiben (die Oberfläche lehnt anderes ab), denn tagsüber mit `worker_tag = 0` nimmt der Dienst nur
+Vorgänge ab dieser Stufe. Den Termin-Vorrang zieht der Dienst alle 10 Minuten beim Vormerken nach (hebt wartende
+Dokumente an, senkt nie). Scans der Mitarbeiter haben tagsüber weiter Vorrang (Pause). `chat_vorrang` aus: Ein
+wartender Chat hält tagsüber die übrigen Aufträge nicht mehr an.
+
+### Nachtaufgaben (Administration › KI › Nachtaufgaben)
+
+Zeitplan je Aufgabe: Wochentage, Uhrzeit (Zeitzone der KI-Einstellungen), aktiv. Der Dienst prüft in jedem Durchlauf,
+ob eine fällig ist (Uhrzeit erreicht, seitdem nicht gelaufen; „Jetzt ausführen“ beim nächsten Durchlauf). Eine Aufgabe
+**reiht nur Arbeit ein** – abgearbeitet wird nach Modus, Grenzen und Nachtfenster wie alles andere. Ist der Dienst zur
+Uhrzeit aus, holt er sie am selben Tag nach; nach der Uhrzeit angelegt oder geändert, läuft sie erst beim nächsten
+Termin. Bei ausgeschalteter KI (Hauptschalter) laufen keine Aufgaben. „Letzter Lauf“ und Ergebnis („12
+Zusammenfassungen eingereiht“) stehen in der Tabelle, jeder Lauf im Audit-Log (`aufgabe`).
+
+Mitgeliefert: „Akte auf einen Blick für die Termine von morgen“ (täglich 03:00, aktiv) und „Dokumente mit aktivem
+Modell neu lesen“ (So 01:00, **inaktiv** – nach einem Modellwechsel einschalten oder „Jetzt neu lesen“ nutzen). Dritte
+Art „Dokumente vormerken“: Altbestand nur zu bestimmten Zeiten einreihen (dann „Altbestand lesen“ ausschalten).
+
+### Neu lesen
+
+„Jetzt neu lesen“ (unter den Nachtaufgaben) bzw. die Aufgabe `neu_lesen` liest Dokumente mit dem aktiven Modell
+erneut – wie „Erneut verarbeiten“, aber mit der Priorität „Neu lesen“, also nachts. Filter: Dokumente der letzten n
+Tage, Dokumenttypen, nur mit einem anderen Modell gelesene, höchstens n. Ausgenommen: in Arbeit oder wartend,
+**übernommene und abgelehnte** (dort hat ein Mensch entschieden – nur einzeln über „Erneut verarbeiten“). Offene
+Vorschläge entfallen, korrigierte bleiben für das Qualitäts-Dashboard.
+
+### Akte auf einen Blick
+
+Karte oben in Akte › Übersicht (Recht „KI ansehen“): was seit dem letzten Praxistermin (sonst seit dem letzten
+Kontakt, sonst den letzten `zusammenfassung_ohne_termin_tage` Tagen) dokumentiert wurde – Labor (auffällige zuerst),
+Infusionspläne mit Änderungen gegenüber dem Vorgänger, Medikation, Diagnosen, Gewicht, BIA, Behandlungsfälle,
+Therapie, Kontakte, freigegebene Berichte, versendete Korrespondenz, neue Dokumente, KI-Hinweise. Die Fakten
+sammelt der Code (höchstens 150), das Modell formuliert nur und belegt jede Aussage mit [n]; die Gegenprüfung markiert
+unbelegte Zahlen, unbekannte Belege und Bewertungen wie beim Berichtsentwurf. Ohne Modell: die Fakten als Liste. Nachts
+bereitet die Nachtaufgabe die Akten der nächsten Termine vor; „Neu erstellen“ (Recht „Berichtsentwurf“) läuft tagsüber
+nur, wenn `zusammenfassung_tagsueber` an ist (sonst in der Nacht). Die Zusammenfassung ist nie Teil der Akte, ihr Inhalt
+steht nicht im Audit-Log; sie geht mit dem Patienten.
+
+### Diktat-Nachtfenster und Chat-Aufbewahrung
+
+Beides steht jetzt unter Administration › KI › Zeitfenster und Grenzen. `EPM_DIKTAT_NACHT` und `EPM_KI_CHAT_TAGE` in
+`.env` sind nur noch **Startwerte** (beim ersten Anlegen der KI-Einstellungen bzw. beim Update übernommen) und gelten
+als Rückfall, solange es keine Einstellungen gibt; danach ändert eine neue `.env` nichts mehr.
+
 ## 4. Modell wählen und wechseln
 
 Vergleichswerte aus dem Benchmark: Sekunden je Seite (Scan, Foto, großes PDF), Zeichenfehlerrate (CER), Labor-F1,
