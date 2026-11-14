@@ -13,7 +13,7 @@ import { alter, datum, eingabeDatum, eingabeZahl, heuteIso, kg, nummer, prozent,
 import { ABSCHLUSSANLAESSE, ERKLAERUNGEN_KURZ, GESCHLECHTER, TERMINARTEN, VERSICHERUNGSARTEN } from "@/lib/typen";
 import type { Patient, Recht, Termin } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
-import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Textfeld, cx } from "@/components/ui/basis";
+import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Skelett, Textfeld, cx } from "@/components/ui/basis";
 import { Dialog, Menue } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Begriff } from "@/components/ui/Begriff";
@@ -485,6 +485,33 @@ function Gruppen({ gruppen, art }: { gruppen: Gruppe[]; art: "kopf" | "leiste" }
   );
 }
 
+/** Platzhalter der Akte, solange sie lädt (Performance-Prüfung 14.11.2026): Kopf mit Name und Eckdaten, Reiter und
+ *  Karten der Übersicht – die Seite steht sofort in ihrer Form da. */
+function AkteSkelett() {
+  return (
+    <div role="status" data-laden className="flex flex-col gap-4">
+      <span className="sr-only">Wird geladen …</span>
+      <div className="app-skelett-karte" style={{ minHeight: 0 }} aria-hidden="true">
+        <div className="flex items-center gap-3"><Skelett breite="14rem" hoehe="1.5rem" /><Skelett breite="5rem" hoehe="1.25rem" /><Skelett breite="12rem" /></div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-1">
+          {Array.from({ length: 4 }, (_, i) => <div key={i} className="flex flex-col gap-2"><Skelett breite="40%" hoehe="0.75rem" /><Skelett breite="70%" hoehe="1.125rem" /></div>)}
+        </div>
+        <Skelett breite="85%" hoehe="0.75rem" />
+      </div>
+      <div className="flex gap-2 flex-wrap" aria-hidden="true">
+        {Array.from({ length: 10 }, (_, i) => <Skelett key={i} breite={i % 2 ? "5.5rem" : "4.5rem"} hoehe="1.75rem" />)}
+      </div>
+      <div className="app-skelett-karten" aria-hidden="true">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="app-skelett-karte">
+            <Skelett breite="50%" hoehe="1.125rem" /><Skelett breite="88%" /><Skelett breite="72%" /><Skelett breite="80%" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Akte() {
   const { id } = useParams();
   const pid = Number(id);
@@ -614,7 +641,7 @@ export function Akte() {
   // geladen war, wird nicht weiter gezeigt
   const gesperrt = akte.error instanceof ApiFehler && akte.error.status === 403 ? akte.error.daten as Eingeschraenkt | null : null;
   if (gesperrt?.eingeschraenkt) return <EinsichtAnsicht info={gesperrt} />;
-  if (akte.isLoading) return <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: "…" }]}><Laden /></Seite>;
+  if (akte.isLoading) return <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: "…" }]}><AkteSkelett /></Seite>;
   if (!p) {
     return (
       <Seite pfad={[{ text: "Patienten", zu: "/patienten" }, { text: "Akte" }]}>

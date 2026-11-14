@@ -234,7 +234,7 @@ export function Patienten() {
   );
   const tabelle = (
     <Karte key="tabelle" className="overflow-x-auto">
-      {liste.isLoading ? <Laden /> : (
+      {liste.isLoading ? <Laden zeilen={8} /> : (
         <table className="tabelle" aria-busy={liste.isFetching || undefined} data-testid="patientenliste">
           <thead>
             {archiv ? (
@@ -314,7 +314,7 @@ export function Patienten() {
   // Telefon (Festlegung 08.10.2026): Karten statt Tabelle – Name, Nummer, Geburtsdatum, letzter Kontakt, Termin, Hinweise
   const karten = (
     <div className="flex flex-col gap-2" key="karten">
-      {liste.isLoading ? <Laden /> : (
+      {liste.isLoading ? <Laden zeilen={8} /> : (
         <div role="list" aria-label={archiv ? "Abgeschlossene Akten" : "Patienten"} className="flex flex-col gap-2" data-testid="patientenliste">
           {(daten?.results ?? []).map((p) => (
             <div key={p.id} role="listitem" className="card flex flex-col">

@@ -1034,3 +1034,28 @@ input.inp:is([type="date"], [type="time"])::-webkit-datetime-edit { padding: 0; 
    (Prüfung 11.10.2026: Infusionspläne 1288 statt 768 px). Nicht für Karten, die selbst fest bzw. absolut liegen: Fenster
    (.dialog-popup ist eine Karte mit overflow-auto) rutschten sonst ans Seitenende (Wunsch 11.10.2026, Hilfe-Bilder) */
 .card:is(.overflow-x-auto, .overflow-auto, .overflow-hidden):not(.fixed, .absolute, .sticky) { position: relative; }
+
+/* Skelett-Platzhalter (Performance-Prüfung 14.11.2026): Solange Daten laden, steht die Form des Inhalts schon da –
+   die Seite wirkt sofort fertig und springt nicht, wenn die Daten kommen. Nur Optik; Text für Screenreader bleibt. */
+.skelett {
+  display: block;
+  border-radius: 0.3125rem;
+  background: linear-gradient(90deg, var(--fein) 0%, color-mix(in srgb, var(--fein) 35%, var(--flaeche)) 50%, var(--fein) 100%);
+  background-size: 300% 100%;
+  animation: skelett-glanz 1.4s ease-in-out infinite;
+}
+@keyframes skelett-glanz { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+@media (prefers-reduced-motion: reduce) { .skelett { animation: none; } }
+/* Gerüst der Anwendung beim allerersten Laden (index.html und App.tsx): Seitenleiste, Kopfzeile, Inhalt */
+.app-skelett { display: flex; min-height: 100vh; background: var(--grund); }
+.app-skelett-leiste { width: 4rem; flex: none; background: var(--flaeche); border-right: 1px solid var(--rand);
+  padding: 1rem 0.625rem; display: flex; flex-direction: column; gap: 0.875rem; }
+.app-skelett-kopf { height: 3.75rem; background: var(--flaeche); border-bottom: 1px solid var(--rand); display: flex;
+  align-items: center; justify-content: space-between; padding: 0 1rem; }
+.app-skelett-inhalt { padding: 1.75rem 2rem; display: flex; flex-direction: column; gap: 1.25rem; }
+.app-skelett-karten { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 1.25rem; }
+.app-skelett-karte { background: var(--flaeche); border: 1px solid var(--rand); border-radius: 0.75rem; padding: 1.25rem;
+  display: flex; flex-direction: column; gap: 0.75rem; min-height: 11rem; }
+@media (min-width: 90rem) { .app-skelett-leiste { width: 14rem; } }
+@media (max-width: 47.99rem) { .app-skelett-leiste { display: none; } .app-skelett-inhalt { padding: 1rem 0.75rem; } }
+.app-skelett-kopf .skelett:last-child { max-width: 55%; }
