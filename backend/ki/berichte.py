@@ -51,6 +51,51 @@ def _d(d: dt.date | None) -> str:
     return d.strftime("%d.%m.%Y") if d else ""
 
 
+# Bausteine der Fakten – auch für „Akte auf einen Blick“ (ki/zusammenfassung.py); der Wortlaut ist Teil der
+# Gegenprüfung, deshalb an einer Stelle
+PLAN_FELDER = [("basis_ml", "Basislösung", "ml"), ("glucose_g", "Glucose", "g"),
+               ("aminosaeuren_g", "Aminosäuren", "g"), ("lipide_g", "Lipide", "g"),
+               ("albumin_ml", "Humanalbumin", "ml"), ("natrium_mmol", "Natrium", "mmol"),
+               ("kalium_mmol", "Kalium", "mmol"), ("phosphat_mmol", "Phosphat", "mmol"),
+               ("calcium_mmol", "Calcium", "mmol"), ("magnesium_mmol", "Magnesium", "mmol"),
+               ("laufzeit_h", "Laufzeit", "h")]
+
+
+def kurz(html_text: str, n: int) -> str:
+    return re.sub(r"\s+", " ", strip_tags(html_text or "")).strip()[:n]
+
+
+def labor_zeit(befund) -> str:
+    return _d(befund.abgenommen_am) + (f" {befund.abgenommen_um:%H:%M}" if befund.abgenommen_um else "")
+
+
+def laborwert_text(w) -> str:
+    name = w.parameter.name if w.parameter_id else w.freitext_name
+    wert = _z(w.wert) if w.wert is not None else w.wert_text
+    ref = ""
+    if w.referenz_von is not None or w.referenz_bis is not None:
+        ref = f" (Referenz {_z(w.referenz_von)}–{_z(w.referenz_bis)})"
+    return f"{name} {wert} {w.einheit}{ref}".replace("  ", " ")
+
+
+def plan_teile(plan) -> list[str]:
+    return [f"{name} {_z(getattr(plan, f))} {e}" for f, name, e in PLAN_FELDER if getattr(plan, f) is not None]
+
+
+def plan_text(plan) -> str:
+    kopf = f"Infusionsplan gültig ab {_d(plan.gueltig_ab)} ({plan.get_status_display()}): "
+    return kopf + ", ".join(plan_teile(plan))
+
+
+def medikament_text(m) -> str:
+    dosis = m.dosierung_frei or "-".join(x or "0" for x in (m.morgens, m.mittags, m.abends, m.nachts))
+    return f"{m.wirkstoff} {m.staerke} {dosis}".replace("  ", " ")
+
+
+def kontakt_datum(k) -> dt.date:
+    return k.zeitpunkt.astimezone(timezone.get_current_timezone()).date()
+
+
 def fakten_sammeln(auftrag: KiBerichtsauftrag) -> list[dict]:
     from befunde.models import Laborbefund
     from infusionen.models import Infusionsplan
@@ -73,43 +118,25 @@ def fakten_sammeln(auftrag: KiBerichtsauftrag) -> list[dict]:
     if "labor" in quellen:
         for b in (Laborbefund.objects.filter(patient=p, abgenommen_am__range=(von, bis))
                   .prefetch_related("werte__parameter").order_by("abgenommen_am", "id")):
-            zeit = _d(b.abgenommen_am) + (f" {b.abgenommen_um:%H:%M}" if b.abgenommen_um else "")
+            zeit = labor_zeit(b)
             for w in b.werte.all():
-                name = w.parameter.name if w.parameter_id else w.freitext_name
-                wert = _z(w.wert) if w.wert is not None else w.wert_text
-                ref = ""
-                if w.referenz_von is not None or w.referenz_bis is not None:
-                    ref = f" (Referenz {_z(w.referenz_von)}–{_z(w.referenz_bis)})"
-                neu(f"Labor {zeit}: {name} {wert} {w.einheit}{ref}".replace("  ", " "), "laborwert", w.pk,
-                    b.abgenommen_am)
+                neu(f"Labor {zeit}: {laborwert_text(w)}", "laborwert", w.pk, b.abgenommen_am)
     if "infusion" in quellen:
-        felder = [("basis_ml", "Basislösung", "ml"), ("glucose_g", "Glucose", "g"),
-                  ("aminosaeuren_g", "Aminosäuren", "g"), ("lipide_g", "Lipide", "g"),
-                  ("albumin_ml", "Humanalbumin", "ml"), ("natrium_mmol", "Natrium", "mmol"),
-                  ("kalium_mmol", "Kalium", "mmol"), ("phosphat_mmol", "Phosphat", "mmol"),
-                  ("calcium_mmol", "Calcium", "mmol"), ("magnesium_mmol", "Magnesium", "mmol"),
-                  ("laufzeit_h", "Laufzeit", "h")]
         for plan in (Infusionsplan.objects.filter(patient=p, gueltig_ab__range=(von, bis))
                      .exclude(status=Infusionsplan.Status.ENTWURF).order_by("gueltig_ab", "id")):
-            teile = [f"{name} {_z(getattr(plan, f))} {e}" for f, name, e in felder if getattr(plan, f) is not None]
-            neu(f"Infusionsplan gültig ab {_d(plan.gueltig_ab)} ({plan.get_status_display()}): " + ", ".join(teile),
-                "infusionsplan", plan.pk, plan.gueltig_ab)
+            neu(plan_text(plan), "infusionsplan", plan.pk, plan.gueltig_ab)
     if "medikation" in quellen:
         for m in Medikament.objects.filter(patient=p).order_by("-aktiv", "reihenfolge", "id"):
             if m.seit and m.seit > bis:
                 continue
-            dosis = m.dosierung_frei or "-".join(x or "0" for x in (m.morgens, m.mittags, m.abends, m.nachts))
             status = "aktiv" if m.aktiv else f"abgesetzt {_d(m.abgesetzt_am)}".strip()
-            neu(f"Medikament: {m.wirkstoff} {m.staerke} {dosis} ({status})".replace("  ", " "), "medikament", m.pk,
-                m.seit)
+            neu(f"Medikament: {medikament_text(m)} ({status})", "medikament", m.pk, m.seit)
     if "verlauf" in quellen:
         for t in Therapieschritt.objects.filter(patient=p, aktiv=True, datum__range=(von, bis)).order_by("datum"):
             neu(f"Therapie {_d(t.datum)}: {t.text}", "therapieschritt", t.pk, t.datum)
         for k in (Kontakt.objects.filter(patient=p, storniert_am__isnull=True,
                                          zeitpunkt__date__range=(von, bis)).order_by("zeitpunkt")[:200]):
-            text = re.sub(r"\s+", " ", strip_tags(k.text)).strip()[:400]
-            neu(f"Kontakt {k.zeitpunkt.astimezone(timezone.get_current_timezone()):%d.%m.%Y}: {text}", "kontakt",
-                k.pk, k.zeitpunkt.date())
+            neu(f"Kontakt {_d(kontakt_datum(k))}: {kurz(k.text, 400)}", "kontakt", k.pk, k.zeitpunkt.date())
     return fakten
 
 
@@ -126,8 +153,9 @@ def _token(text: str) -> set[str]:
     return aus
 
 
-def gegenpruefen(entwurf: str, fakten: list[dict]) -> dict:
-    erlaubt = set()
+def gegenpruefen(entwurf: str, fakten: list[dict], *, auch_erlaubt: str = "") -> dict:
+    """``auch_erlaubt``: Text, dessen Zahlen und Daten der Entwurf zusätzlich nennen darf (z. B. der Zeitraum)."""
+    erlaubt = _token(auch_erlaubt)
     for f in fakten:
         erlaubt |= _token(f["text"])
     nummern = {f["nr"] for f in fakten}

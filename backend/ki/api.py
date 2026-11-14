@@ -32,8 +32,9 @@ from epm.pagination import Seiten
 from . import chat, eingang, uebernahme
 from .pipeline import alte_felder_entfernen
 from .pruefung import PLANFELDER
-from .models import (Dokumenttyp, KiBerichtsauftrag, KiChat, KiChatAnhang, KiChatNachricht, KiEinstellung, KiEvaluationsfall,
-                     KiEvaluationslauf, KiFeld, KiHinweis, KiKorrektur, KiModellversion, KiPromptvorlage, KiVorgang)
+from .models import (Dokumenttyp, KiAufgabe, KiBerichtsauftrag, KiChat, KiChatAnhang, KiChatNachricht, KiEinstellung,
+                     KiEvaluationsfall, KiEvaluationslauf, KiFeld, KiHinweis, KiKorrektur, KiModellversion,
+                     KiPromptvorlage, KiVorgang, KiZusammenfassung)
 
 A = SystemEreignis.Art
 S = KiVorgang.Status
@@ -404,13 +405,41 @@ class KiVorgangViewSet(viewsets.GenericViewSet):
             alte_felder_entfernen(v)
             v.seiten_liste.all().delete()
             v.status = S.NACHVERARBEITUNG if nachher else S.NEU
-            v.prioritaet, v.angefordert_von, v.angefordert_am = eingang.PRIORITAET_ANGEFORDERT, request.user, \
-                timezone.now()
+            v.prioritaet, v.angefordert_von, v.angefordert_am = KiEinstellung.laden().prio_angefordert, \
+                request.user, timezone.now()
             v.versuche, v.fehler, v.schritt, v.fortschritt = 0, "", "", 0
             v.save()
             protokolliere(A.KI, request, objekt=str(v), aktion="nachverarbeitung" if nachher else "erneut",
                           vorgang=v.pk, patient_id=v.patient_id)
         return Response({"status": v.status})
+
+    @action(detail=False, methods=["post"])
+    def neu_lesen(self, request):
+        """„Jetzt neu lesen“ (Administration › KI › Nachtaufgaben): ``{"vorgaenge": [ids]}`` oder Filter
+        ``{"seit_tagen", "dokumenttypen", "nur_anderes_modell", "hoechstens"}`` – gleiche Logik wie die Nachtaufgabe
+        ``neu_lesen`` (``eingang.neu_lesen``), nur Vorgänge der eigenen Firma. → ``{"vorgemerkt": n}``."""
+        from .aufgaben import NEU_LESEN_PARAMETER, parameter_pruefen
+
+        _recht(request.user, "ki_verwalten")
+        d = request.data if isinstance(request.data, dict) else {}
+        if "vorgaenge" in d:
+            ids = d["vorgaenge"]
+            if not isinstance(ids, list) or not ids or any(not str(i).isdigit() for i in ids):
+                return _fehler("Bitte eine Liste von Vorgängen angeben.", feld="vorgaenge")
+            ids = [int(i) for i in ids][:eingang.NEU_LESEN_MAX]
+            n = eingang.neu_lesen(vorgaenge=ids, hoechstens=len(ids), basis=vorgaenge_fuer(request.user))
+            filter_ = {"vorgaenge": len(ids)}
+        else:
+            try:
+                p = parameter_pruefen("neu_lesen", d, NEU_LESEN_PARAMETER)
+            except ValueError as e:
+                return Response({k.removeprefix("parameter."): v for k, v in e.args[0].items()},
+                                status=status.HTTP_400_BAD_REQUEST)
+            n = eingang.neu_lesen(**p, basis=vorgaenge_fuer(request.user))
+            filter_ = p
+        eingang.prioritaeten_aktualisieren()
+        protokolliere(A.KI, request, objekt="KI-Vorgänge", aktion="neu_lesen", vorgemerkt=n, **filter_)
+        return Response({"vorgemerkt": n})
 
 
 # ---------------------------------------------------------------------------------------------- Hinweise
@@ -863,7 +892,12 @@ EINSTELLUNG_FELDER = ["aktiv", "nacht_beginn", "nacht_ende", "zeitzone", "worker
                       "max_cpu_prozent", "min_ram_frei_mb", "max_last_je_kern", "pause_bei_sicherung",
                       "altbestand_lesen", "max_seiten", "bild_max_px", "ocr_schwelle", "feld_unsicher",
                       "verknuepfung_stunden", "beispiele_max", "aufbewahrung_tage", "training_erlaubt",
-                      "training_nur_wochenende"]
+                      "training_nur_wochenende",
+                      # Priorisierung, Akte auf einen Blick, Diktat-Nachtfenster, Chat-Aufbewahrung (14.11.2026)
+                      "prio_angefordert", "prio_termin", "termin_tage", "prio_neu", "neu_tage", "prio_neu_lesen",
+                      "prio_altbestand", "chat_vorrang", "zusammenfassung_tagsueber",
+                      "zusammenfassung_ohne_termin_tage", "diktat_nacht_beginn", "diktat_nacht_ende", "chat_tage"]
+PRIO_STUFEN = ["prio_termin", "prio_neu", "prio_neu_lesen", "prio_altbestand"]
 
 
 class EinstellungSerializer(serializers.ModelSerializer):
@@ -900,7 +934,10 @@ class EinstellungSerializer(serializers.ModelSerializer):
         grenzen = {"worker_nacht": (1, KiEinstellung.worker_max()), "worker_tag": (0, KiEinstellung.worker_max()),
                    "max_cpu_prozent": (10, 100), "min_ram_frei_mb": (256, 65536), "max_seiten": (1, 500),
                    "bild_max_px": (512, 4096), "verknuepfung_stunden": (1, 336), "aufbewahrung_tage": (1, 90),
-                   "beispiele_max": (0, 40)}
+                   "beispiele_max": (0, 40), "prio_angefordert": (0, 100), "prio_termin": (0, 100),
+                   "termin_tage": (0, 30), "prio_neu": (0, 100), "neu_tage": (1, 90), "prio_neu_lesen": (0, 100),
+                   "prio_altbestand": (0, 100), "zusammenfassung_ohne_termin_tage": (7, 730),
+                   "diktat_nacht_beginn": (0, 23), "diktat_nacht_ende": (0, 23), "chat_tage": (1, 365)}
         fehler = {}
         for feld, (unten, oben) in grenzen.items():
             if feld in attrs and not (unten <= attrs[feld] <= oben):
@@ -911,6 +948,17 @@ class EinstellungSerializer(serializers.ModelSerializer):
         if "max_last_je_kern" in attrs and not (0.2 <= attrs["max_last_je_kern"] <= 10):
             fehler["max_last_je_kern"] = "Erlaubt: 0,2–10."
         inst = self.instance
+        # „angefordert“ = Priorität ab prio_angefordert: jede andere Stufe muss darunter liegen, sonst nähme der
+        # Tagesbetrieb (worker_tag = 0) z. B. Dokumente mit Termin wie angeforderte
+        angefordert = attrs.get("prio_angefordert", getattr(inst, "prio_angefordert", 10))
+        if not fehler:
+            zu_hoch = [f for f in PRIO_STUFEN if attrs.get(f, getattr(inst, f, 0)) >= angefordert]
+            if zu_hoch:
+                fehler["prio_angefordert"] = "Angeforderte Dokumente brauchen die höchste Priorität (größer als alle " \
+                                             "anderen Stufen)."
+                for f in zu_hoch:
+                    if f in attrs:
+                        fehler[f] = f"Muss kleiner sein als „angefordert“ ({angefordert})."
         if attrs.get("training_erlaubt") and not (inst and inst.rechtsgrundlage_geprueft_am):
             fehler["training_erlaubt"] = "Erst die Rechtsgrundlagen-Prüfung dokumentieren."
         if fehler:
@@ -929,7 +977,13 @@ class EinstellungenView(APIView):
         s = EinstellungSerializer(e, data=request.data, partial=True)
         s.is_valid(raise_exception=True)
         geaendert = {k: str(v) for k, v in s.validated_data.items() if getattr(e, k) != v}
-        s.save(geaendert_von=request.user)
+        alt_angefordert = e.prio_angefordert
+        with transaction.atomic():
+            s.save(geaendert_von=request.user)
+            # Wartende Vorgänge an geänderte Stufen anpassen („angefordert“ bleibt, was angefordert war)
+            eingang.prioritaeten_umstellen(alt_angefordert, e)
+            if {"prio_termin", "termin_tage", "prio_angefordert"} & set(geaendert):
+                eingang.prioritaeten_aktualisieren(e)
         if geaendert:
             protokolliere(A.KI, request, objekt="KI-Einstellungen", aktion="einstellungen", geaendert=geaendert)
         return Response(EinstellungSerializer(e).data)
@@ -964,7 +1018,7 @@ def _gerade_in_arbeit(user) -> dict:
 
     Dokumente und Berichte nur im Bereich der Person (Firma, Testdaten …); was außerhalb liegt, nur als Anzahl.
     Chats: nur die Anzahl – und ob die eigene Antwort darunter ist; nie Inhalt oder Person fremder Chats."""
-    from .dienst import ANGEFORDERT_AB
+    ANGEFORDERT_AB = KiEinstellung.laden().prio_angefordert
 
     def vorgang(v: KiVorgang) -> dict:
         return {"id": v.id, "dokument_titel": v.dokument.titel, "dokument_datum": v.dokument.datum,
@@ -1352,3 +1406,143 @@ class BenchmarkView(APIView):
                  "cpu_mittel": v.get("cpu_mittel"), "je_kategorie": v.get("je_kategorie") or {}}
                 for v in varianten if isinstance(v, dict)]})
         return Response(aus)
+
+
+# ---------------------------------------------------------------------------------------------- Akte auf einen Blick
+def zusammenfassung_daten(z: KiZusammenfassung) -> dict:
+    return {"id": z.id, "patient": z.patient_id, "grund": z.grund,
+            "termin_datum": z.termin.faellig_am if z.termin_id else None, "von": z.von, "bis": z.bis,
+            "von_grund": z.von_grund or None, "status": z.status, "entwurf": z.entwurf, "fakten": z.fakten,
+            "pruefung": z.pruefung or None, "fehler": z.fehler,
+            "modell": z.modellversion.name if z.modellversion_id else None, "erstellt_am": z.erstellt_am,
+            "fertig_am": z.fertig_am, "angefordert_von_name": benutzername(z.angefordert_von)}
+
+
+class KiZusammenfassungViewSet(viewsets.GenericViewSet):
+    """„Akte auf einen Blick“ (14.11.2026): ``GET /api/ki/zusammenfassungen/?patient=ID`` (neueste zuerst, höchstens
+    5) und ``POST`` ``{"patient": ID}`` → neue Zusammenfassung auf Anforderung (409, solange eine wartet oder läuft).
+
+    Sichtbar wie die Vorgänge: Akte im Bereich der Person (Firma, Testdaten, Einschränkung) und die Zusammenfassung in
+    deren Firma angefordert oder ohne Firma (nachts für einen Termin vorbereitet). Inhalte nie ins Audit-Log."""
+
+    permission_classes = [AnsehenRecht]
+
+    def get_queryset(self):
+        qs = KiZusammenfassung.objects.filter(patient__in=patienten_fuer(self.request.user))
+        firma = getattr(self.request.user, "firma", None)
+        if firma is not None:
+            qs = qs.filter(Q(firma__isnull=True) | Q(firma=firma))
+        return qs.select_related("termin", "modellversion", "angefordert_von")
+
+    def list(self, request):
+        pid = request.query_params.get("patient", "")
+        if not pid.isdigit():
+            return _fehler("Bitte eine Akte angeben.", feld="patient")
+        qs = self.get_queryset().filter(patient_id=int(pid)).order_by("-erstellt_am", "-id")[:5]
+        return Response([zusammenfassung_daten(z) for z in qs])
+
+    def create(self, request):
+        from patienten.models import Patient
+
+        _recht(request.user, "ki_berichte")
+        pid = str(request.data.get("patient") or "")
+        with transaction.atomic():
+            # Akte sperren: zweimal gleichzeitig „Neu erstellen“ ergäbe sonst zwei wartende
+            p = (Patient.objects.select_for_update().filter(pk=pid, pk__in=patienten_fuer(request.user)).first()
+                 if pid.isdigit() else None)
+            if p is None:
+                return _fehler("Akte nicht gefunden.", feld="patient")
+            if p.eingeschraenkt_am is not None:
+                return _fehler("Die Verarbeitung dieser Akte ist eingeschränkt.", feld="patient")
+            if KiZusammenfassung.objects.filter(patient=p, status__in=KiZusammenfassung.OFFEN).exists():
+                return _fehler("Für diese Akte wird gerade eine Zusammenfassung erstellt.", status.HTTP_409_CONFLICT)
+            z = KiZusammenfassung.objects.create(patient=p, firma=getattr(request.user, "firma", None),
+                                                 grund=KiZusammenfassung.Grund.ANGEFORDERT,
+                                                 angefordert_von=request.user)
+        protokolliere(A.KI, request, objekt=f"Akte auf einen Blick {z.pk}", aktion="zusammenfassung_angefordert",
+                      patient_id=p.pk)
+        return Response(zusammenfassung_daten(self.get_queryset().get(pk=z.pk)), status=status.HTTP_201_CREATED)
+
+
+# ---------------------------------------------------------------------------------------------- Nachtaufgaben
+class AufgabeSerializer(serializers.ModelSerializer):
+    art_name = serializers.CharField(source="get_art_display", read_only=True)
+    naechster_lauf = serializers.SerializerMethodField()
+    geaendert_von_name = serializers.SerializerMethodField()
+    uhrzeit = serializers.TimeField(format="%H:%M")
+
+    class Meta:
+        model = KiAufgabe
+        fields = ["id", "name", "art", "art_name", "aktiv", "wochentage", "uhrzeit", "parameter", "naechster_lauf",
+                  "letzter_lauf", "letztes_ergebnis", "jetzt_angefordert", "geaendert_am", "geaendert_von_name"]
+        read_only_fields = ["letzter_lauf", "letztes_ergebnis", "jetzt_angefordert", "geaendert_am"]
+
+    def get_naechster_lauf(self, obj):
+        from .aufgaben import naechster_lauf
+
+        return naechster_lauf(obj)
+
+    def get_geaendert_von_name(self, obj):
+        return benutzername(obj.geaendert_von) if obj.geaendert_von_id else None
+
+    def validate_name(self, wert):
+        if not wert.strip():
+            raise serializers.ValidationError("Bitte einen Namen eingeben.")
+        return wert.strip()
+
+    def validate_wochentage(self, wert):
+        if not isinstance(wert, list) or not wert or any(isinstance(t, bool) or t not in range(7) for t in wert):
+            raise serializers.ValidationError("Mindestens ein Wochentag (0 = Montag … 6 = Sonntag).")
+        return sorted(set(wert))
+
+    def validate(self, attrs):
+        from .aufgaben import parameter_pruefen
+
+        art = attrs.get("art", getattr(self.instance, "art", None))
+        if art is None:
+            raise serializers.ValidationError({"art": "Bitte eine Art wählen."})
+        if "parameter" in attrs or "art" in attrs or self.instance is None:
+            vorher = self.instance.parameter if self.instance is not None and art == self.instance.art else {}
+            try:
+                attrs["parameter"] = parameter_pruefen(art, attrs.get("parameter", vorher))
+            except ValueError as e:
+                raise serializers.ValidationError(e.args[0])
+        return attrs
+
+
+class KiAufgabeViewSet(viewsets.ModelViewSet):
+    """Nachtaufgaben (Administration › KI): ``GET/POST /api/ki/aufgaben/``, ``PATCH/DELETE …/{id}/``,
+    ``POST …/{id}/jetzt/`` (läuft beim nächsten Durchlauf des KI-Dienstes). Recht „KI verwalten“."""
+
+    permission_classes = [VerwaltenRecht]
+    serializer_class = AufgabeSerializer
+    pagination_class = None
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    def get_queryset(self):
+        return KiAufgabe.objects.select_related("geaendert_von")
+
+    def perform_create(self, serializer):
+        a = serializer.save(geaendert_von=self.request.user)
+        protokolliere(A.KI, self.request, objekt=f"KI-Aufgabe {a.pk}", aktion="aufgabe_angelegt", art=a.art,
+                      name=a.name, aktiv=a.aktiv)
+
+    def perform_update(self, serializer):
+        a = serializer.save(geaendert_von=self.request.user)
+        protokolliere(A.KI, self.request, objekt=f"KI-Aufgabe {a.pk}", aktion="aufgabe_geaendert", art=a.art,
+                      name=a.name, aktiv=a.aktiv, wochentage=a.wochentage, uhrzeit=str(a.uhrzeit),
+                      parameter=a.parameter)
+
+    def perform_destroy(self, instance):
+        protokolliere(A.KI, self.request, objekt=f"KI-Aufgabe {instance.pk}", aktion="aufgabe_geloescht",
+                      art=instance.art, name=instance.name)
+        instance.delete()
+
+    @action(detail=True, methods=["post"])
+    def jetzt(self, request, pk=None):
+        a = self.get_object()
+        # update statt save: „geändert am“ bleibt – sonst fiele der heutige Lauf zur Uhrzeit weg
+        KiAufgabe.objects.filter(pk=a.pk).update(jetzt_angefordert=True)
+        a.refresh_from_db()
+        protokolliere(A.KI, request, objekt=f"KI-Aufgabe {a.pk}", aktion="aufgabe_jetzt", art=a.art)
+        return Response(AufgabeSerializer(a).data)

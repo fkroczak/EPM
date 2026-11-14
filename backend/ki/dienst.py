@@ -17,26 +17,33 @@ from django.db.models import F
 from django.db.models.functions import Greatest
 from django.utils import timezone
 
-from .models import KiBerichtsauftrag, KiVorgang
+from .models import KiBerichtsauftrag, KiEinstellung, KiVorgang, KiZusammenfassung
 
 log = logging.getLogger("epm.ki")
 S = KiVorgang.Status
 HAENGT_NACH = dt.timedelta(minutes=5)
 HERZSCHLAG_S = 20
 MAX_VERSUCHE = 3
-ANGEFORDERT_AB = 10
+ANGEFORDERT_AB = 10  # Standard; maßgeblich ist KiEinstellung.prio_angefordert (angefordert_ab)
 
 
-def auftrag_holen(*, nur_angefordert: bool, nachverarbeitung: bool) -> KiVorgang | None:
-    """Nächster Vorgang: angeforderte zuerst, dann neue Dokumente, dann der Altbestand.
-    ``nachverarbeitung``: auch Vorgänge, die auf das Modell gewartet haben (nur wenn es bereit ist)."""
+def angefordert_ab(einst: KiEinstellung | None = None) -> int:
+    """Ab dieser Priorität gilt ein Vorgang als ausdrücklich angefordert (läuft auch tagsüber mit ``worker_tag = 0``).
+    Alle anderen Stufen liegen darunter (``eingang.begrenzt``)."""
+    return (einst or KiEinstellung.laden()).prio_angefordert
+
+
+def auftrag_holen(*, nur_angefordert: bool, nachverarbeitung: bool, ab: int | None = None) -> KiVorgang | None:
+    """Nächster Vorgang nach Priorität (angefordert > Termin > neu > neu lesen > Altbestand, ``ki/eingang.py``).
+    ``nachverarbeitung``: auch Vorgänge, die auf das Modell gewartet haben (nur wenn es bereit ist).
+    ``ab``: Schwelle „angefordert“ (sonst aus den Einstellungen)."""
     status = [S.NEU] + ([S.NACHVERARBEITUNG] if nachverarbeitung else [])
     with transaction.atomic():
         qs = (KiVorgang.objects.select_for_update(skip_locked=True, of=("self",))
               .filter(status__in=status, patient__eingeschraenkt_am__isnull=True,
                       patient__abgeschlossen_am__isnull=True, dokument__ausgeblendet=False))
         if nur_angefordert:
-            qs = qs.filter(prioritaet__gte=ANGEFORDERT_AB)
+            qs = qs.filter(prioritaet__gte=angefordert_ab() if ab is None else ab)
         v = qs.order_by("-prioritaet", "id").first()
         if v is None:
             return None
@@ -86,6 +93,8 @@ def haengende_zuruecksetzen() -> int:
             KiVorgang.objects.filter(pk=v.pk).update(status=S.NEU, schritt="nach einem Abbruch erneut in der Queue")
     KiBerichtsauftrag.objects.filter(status=KiBerichtsauftrag.Status.LAEUFT, lebenszeichen__lt=grenze).update(
         status=KiBerichtsauftrag.Status.WARTET)
+    KiZusammenfassung.objects.filter(status=KiZusammenfassung.Status.LAEUFT, lebenszeichen__lt=grenze).update(
+        status=KiZusammenfassung.Status.WARTET)
     return anzahl
 
 
@@ -98,6 +107,25 @@ def bericht_holen() -> KiBerichtsauftrag | None:
         b.status, b.lebenszeichen = KiBerichtsauftrag.Status.LAEUFT, timezone.now()
         b.save(update_fields=["status", "lebenszeichen"])
         return b
+
+
+def zusammenfassung_holen(*, nur_angefordert: bool) -> KiZusammenfassung | None:
+    """Nächste „Akte auf einen Blick“: angeforderte vor nächtlich vorbereiteten, ältere zuerst. ``nur_angefordert``
+    (tagsüber): Zusammenfassungen für Termine entstehen nur nachts."""
+    Z = KiZusammenfassung
+    with transaction.atomic():
+        qs = (Z.objects.select_for_update(skip_locked=True, of=("self",))
+              .filter(status=Z.Status.WARTET, patient__eingeschraenkt_am__isnull=True,
+                      patient__abgeschlossen_am__isnull=True))
+        if nur_angefordert:
+            qs = qs.filter(grund=Z.Grund.ANGEFORDERT)
+        # „angefordert“ < „termin“ alphabetisch: angeforderte zuerst
+        z = qs.order_by("grund", "erstellt_am", "id").first()
+        if z is None:
+            return None
+        z.status, z.lebenszeichen = Z.Status.LAEUFT, timezone.now()
+        z.save(update_fields=["status", "lebenszeichen"])
+        return z
 
 
 class herzschlag:

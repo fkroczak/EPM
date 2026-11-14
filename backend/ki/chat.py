@@ -11,7 +11,8 @@
   Text (wie bei den Scans; aus der Akte wird schon erkannter Text übernommen). Passt alles in den Kontext des Modells
   (``KI_KONTEXT``), liest es die Unterlagen ganz; sonst Teil für Teil: je Teil die für die Anfrage wichtigen Stellen
   wörtlich herausschreiben, dann aus diesen Auszügen antworten.
-- Unterhaltungen werden nach ``EPM_KI_CHAT_TAGE`` (Standard 30) Tagen ohne Änderung gelöscht – mit ihren Anhängen.
+- Unterhaltungen werden nach ``KiEinstellung.chat_tage`` (Administration › KI; Startwert ``EPM_KI_CHAT_TAGE``,
+  Standard 30) Tagen ohne Änderung gelöscht – mit ihren Anhängen.
 """
 import datetime as dt
 import logging
@@ -26,7 +27,7 @@ from audit.models import SystemEreignis, protokolliere
 
 from .berichte import _token
 from .modell import Client, ModellFehler
-from .models import KiChat, KiChatAnhang, KiChatNachricht, KiVorgang
+from .models import KiChat, KiChatAnhang, KiChatNachricht, KiEinstellung, KiVorgang
 
 log = logging.getLogger("epm.ki")
 N = KiChatNachricht
@@ -84,6 +85,10 @@ def html_zu_text(html_text: str) -> str:
 
 
 def aufbewahrung_tage() -> int:
+    """Einstellung ``chat_tage``; solange es keine Einstellungszeile gibt, ``EPM_KI_CHAT_TAGE`` (Startwert)."""
+    tage = KiEinstellung.objects.filter(pk=1).values_list("chat_tage", flat=True).first()
+    if tage:
+        return tage
     try:
         return max(1, int(os.environ.get("EPM_KI_CHAT_TAGE", "30")))
     except ValueError:

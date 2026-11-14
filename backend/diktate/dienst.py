@@ -1,7 +1,8 @@
 """Warteschlange der Diktate – vom Backend (Hochladen, Übernehmen, Freigabe) und vom OCR-Dienst (Abschreiben).
 
 Reihenfolge im OCR-Dienst: Diktate „sofort“ vor Scans (jemand wartet auf den Text), Diktate „nachts“ nur im
-Nachtfenster (``EPM_DIKTAT_NACHT``, Standard 21–7 Uhr) und nach den Scans.
+Nachtfenster und nach den Scans. Das Nachtfenster stellt Administration › KI ein (``KiEinstellung.diktat_nacht_*``);
+``EPM_DIKTAT_NACHT`` (Standard 21–7 Uhr) ist Startwert und gilt, solange es keine Einstellungszeile gibt.
 """
 from __future__ import annotations
 
@@ -32,12 +33,17 @@ ENDUNGEN = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "m4a", "audio
             "audio/mpeg": "mp3", "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav", "video/webm": "webm"}
 
 
+def nacht_stunden() -> tuple[int, int]:
+    """(ab, bis) – aus den KI-Einstellungen; ohne Einstellungszeile aus ``EPM_DIKTAT_NACHT``. ``ki`` wird erst hier
+    geladen (kein Kreis beim Start), und die Zeile wird nie angelegt (``KiEinstellung.laden`` täte das)."""
+    from ki.models import KiEinstellung, diktat_nacht_env
+
+    zeile = KiEinstellung.objects.filter(pk=1).values_list("diktat_nacht_beginn", "diktat_nacht_ende").first()
+    return zeile if zeile is not None else diktat_nacht_env()
+
+
 def nachtfenster(jetzt=None) -> bool:
-    wert = os.environ.get("EPM_DIKTAT_NACHT", "21-7")
-    try:
-        ab, bis = (int(x) for x in wert.split("-"))
-    except ValueError:
-        ab, bis = 21, 7
+    ab, bis = nacht_stunden()
     stunde = timezone.localtime(jetzt or timezone.now()).hour
     return stunde >= ab or stunde < bis if ab > bis else ab <= stunde < bis
 
