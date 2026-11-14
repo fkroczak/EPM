@@ -145,13 +145,14 @@ function Inhalt({ z }: { z: KiZusammenfassung }) {
           <Icon name={quellenOffen ? "hoch" : "runter"} groesse={12} aria-hidden="true" />Quellen ({z.fakten.length})
         </button>
         {quellenOffen ? (
-          <ol id={listeId} className="m-0 mt-1 pl-5 flex flex-col gap-0.5">
+          <ol id={listeId} className="m-0 mt-1 pl-1 list-none flex flex-col gap-0.5">
             {z.fakten.map((f) => {
               const l = quellLink(z.patient, f);
               return (
-                <li key={f.nr} value={f.nr} className={cx(gewaehlt === f.nr && "bg-akzent-weich rounded")}>
-                  {l ? <Link to={l}>{f.text}</Link> : f.text}
-                  {f.datum ? <span className="gedaempft"> · {datum(f.datum)}</span> : null}
+                <li key={f.nr} value={f.nr} className={cx("flex gap-1.5", gewaehlt === f.nr && "bg-akzent-weich rounded")}>
+                  <span className="num gedaempft shrink-0 min-w-[2.2em] text-right">[{f.nr}]</span>
+                  <span>{l ? <Link to={l}>{f.text}</Link> : f.text}
+                  {f.datum ? <span className="gedaempft"> · {datum(f.datum)}</span> : null}</span>
                 </li>);
             })}
           </ol>) : null}
