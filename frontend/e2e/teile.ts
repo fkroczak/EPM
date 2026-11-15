@@ -18,6 +18,7 @@ export const TEILE: Record<string, string[]> = {
   "2": ["zzz-sicherung.spec.ts"],
   "3": ["audit-firmen.spec.ts"],
   "4": ["scans.spec.ts"],
+  "12": ["scans-verbessern.spec.ts"],
   "5": ["admin.spec.ts", "konto.spec.ts", "passkey.spec.ts"],
   "6": ["akte.spec.ts", "start.spec.ts"],
   "7": ["datenschutz.spec.ts", "oberflaeche.spec.ts"],

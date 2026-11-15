@@ -230,12 +230,18 @@ eine Liste mit Größe und Maßen; ändern sich Maße, `width`/`height` in `inha
 `patienten.test_startseite.Hilfe` prüft Dateien, Alternativtexte und Seitenverhältnisse.
 
 ## Tests
-Bei jedem Push laufen in GitHub Actions (`.github/workflows/backend.yml`):
-1. Backend-Tests gegen PostgreSQL 18 (`backend/*/tests.py`), fehlende Migrationen werden erzeugt und eingecheckt.
-2. Frontend: Typprüfung und Bau, danach `werkzeuge/ci-stack.sh start` (gleiche Compose-Datei, Nginx-Konfiguration und
-   Images wie auf dem Server, mit Musterdaten und Testkonten) und die Browsertests `frontend/e2e/*.spec.ts`.
+Bei jedem Push laufen in GitHub Actions (`.github/workflows/backend.yml`), alle Teile gleichzeitig auf eigenen Rechnern
+(Ziel: der ganze Lauf in unter 5 Minuten):
+1. Backend-Tests gegen PostgreSQL 18 (`backend/*/tests.py`) in 4 Teilen (`EPM_TESTTEIL=2/4`, aufgeteilt nach den
+   gemessenen Laufzeiten je Testklasse in `backend/epm/testzeiten.json`); fehlende Migrationen werden erzeugt und
+   eingecheckt. Laufzeiten neu erfassen: `python3 werkzeuge/testzeiten.py test-ausgabe-*.txt` (Ausgaben der Teile).
+2. Browsertests `frontend/e2e/*.spec.ts` (nur auf main und beim manuellen Start) in 12 Teilen (`frontend/e2e/teile.ts`),
+   jeder mit eigenem Stack aus `werkzeuge/ci-stack.sh start` (gleiche Compose-Datei, Nginx-Konfiguration und Images wie
+   auf dem Server, mit Musterdaten und Testkonten). Eine neue Spec-Datei muss dort einem Teil zugeordnet werden.
+   `zz-neustart` prüft in jedem Teil nach einem Neustart die Ergebnisse der Dateien dieses Teils.
 
-Beide Ergebnisse stehen als Kommentar am Commit.
+Am Commit steht ein Kommentar mit dem Gesamtergebnis, bei Fehlern je Teil ein Kommentar mit den Einzelheiten.
 
-Lokal mit Docker: `werkzeuge/ci-stack.sh start`, dann in `frontend/` `npm ci && npx playwright test`,
-zum Schluss `werkzeuge/ci-stack.sh stop`.
+Lokal mit Docker: `werkzeuge/ci-stack.sh start`, dann in `frontend/` `npm ci && npx playwright test` (alle Dateien
+nacheinander) oder `EPM_E2E_TEIL=3 npx playwright test` (ein Teil, frischer Stack nötig), zum Schluss
+`werkzeuge/ci-stack.sh stop`. Backend: `python manage.py test --parallel auto` (alles) bzw. mit `EPM_TESTTEIL=1/4`.

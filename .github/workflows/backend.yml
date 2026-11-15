@@ -9,7 +9,7 @@
 #   einen Branch), nicht bei jedem Push auf einen Pull Request
 #
 # Laufzeit unter 5 Minuten (15.11.2026; vorher Backend 7 min, Browsertests danach 45 min):
-# - Backend-Tests in 3 Teilen auf eigenen Rechnern (EPM_TESTTEIL, nach gemessenen Laufzeiten aufgeteilt:
+# - Backend-Tests in 4 Teilen auf eigenen Rechnern (EPM_TESTTEIL, nach gemessenen Laufzeiten aufgeteilt:
 #   backend/epm/testlauf.py), Browsertests in Teilen mit je eigenem Stack (frontend/e2e/teile.ts) – alle gleichzeitig
 # - Images der Browsertests mit Zwischenspeicher (werkzeuge/ci-bilder.hcl), Python-Umgebung zwischengespeichert,
 #   Systempakete im Hintergrund
@@ -33,13 +33,13 @@ concurrency:
 
 jobs:
   tests:
-    name: Backend-Tests ${{ matrix.teil }}/3
+    name: Backend-Tests ${{ matrix.teil }}/4
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        teil: [1, 2, 3]
+        teil: [1, 2, 3, 4]
     services:
       postgres:
         image: postgres:18-alpine
@@ -65,7 +65,7 @@ jobs:
       # „Text erkennen“ in der Akte (F170): OCRmyPDF und Ghostscript müssen im Test bereitstehen
       EPM_OCRMYPDF_PFLICHT: "1"
       EPM_OCR_PADDLE_PFLICHT: "1"
-      EPM_TESTTEIL: ${{ matrix.teil }}/3
+      EPM_TESTTEIL: ${{ matrix.teil }}/4
       PYTHONUNBUFFERED: "1"
     defaults:
       run:
@@ -160,7 +160,7 @@ jobs:
           set -o pipefail
           python manage.py check 2>&1 | tee -a ci-protokoll.txt
 
-      - name: Tests gegen PostgreSQL (Teil ${{ matrix.teil }}/3)
+      - name: Tests gegen PostgreSQL (Teil ${{ matrix.teil }}/4)
         run: |
           set -o pipefail
           # parallel auf allen Kernen (12.11.2026: seriell ~19 min); Laufzeit jedes Tests für backend/epm/testzeiten.json
@@ -170,7 +170,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "### Backend-Tests, Teil ${{ matrix.teil }}/3"
+            echo "### Backend-Tests, Teil ${{ matrix.teil }}/4"
             echo '```'
             grep -E "^Testteil " test-ausgabe.txt || true
             # ohne die Laufzeitliste aller Tests (nur die 15 längsten) und ohne die erwarteten Warnungen
@@ -193,7 +193,7 @@ jobs:
           COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           {
-            echo "**Backend-Tests Teil ${{ matrix.teil }}/3: fehlgeschlagen** (Lauf ${{ github.run_id }}${{ github.event_name == 'pull_request' && format(', Pull Request #{0}', github.event.number) || '' }})"
+            echo "**Backend-Tests Teil ${{ matrix.teil }}/4: fehlgeschlagen** (Lauf ${{ github.run_id }}${{ github.event_name == 'pull_request' && format(', Pull Request #{0}', github.event.number) || '' }})"
             echo
             echo '```'
             if [ -s test-ausgabe.txt ]; then
@@ -258,7 +258,7 @@ jobs:
           git push
 
   browser:
-    name: Browsertests ${{ matrix.teil }}/11
+    name: Browsertests ${{ matrix.teil }}/12
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     # nur auf main und beim manuellen Start – bei Pull Requests reichen die Backend-Tests (spart die meisten Minuten)
@@ -267,7 +267,7 @@ jobs:
       fail-fast: false
       matrix:
         # frontend/e2e/teile.ts – jeder Teil mit eigenem Stack
-        teil: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        teil: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     defaults:
       run:
         shell: bash
@@ -318,7 +318,7 @@ jobs:
           set -o pipefail
           werkzeuge/ci-stack.sh start 2>&1 | tee stack.txt
 
-      - name: Browsertests (Teil ${{ matrix.teil }}/11)
+      - name: Browsertests (Teil ${{ matrix.teil }}/12)
         working-directory: frontend
         env:
           EPM_CI_BASIS: /tmp/epm-ci
@@ -352,7 +352,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "### Browsertests, Teil ${{ matrix.teil }}/11"
+            echo "### Browsertests, Teil ${{ matrix.teil }}/12"
             echo '```'
             grep -E "^\s+[✓✘-] |passed|failed|skipped|flaky|did not run" e2e-ausgabe.txt | tail -80 || true
             echo '```'
@@ -372,7 +372,7 @@ jobs:
         run: |
           ende() { [ -s "$2" ] && tail -c "$1" "$2" | iconv -f utf-8 -t utf-8 -c || true; }
           {
-            echo "**Browsertests Teil ${{ matrix.teil }}/11: fehlgeschlagen** (Lauf ${{ github.run_id }})"
+            echo "**Browsertests Teil ${{ matrix.teil }}/12: fehlgeschlagen** (Lauf ${{ github.run_id }})"
             echo
             if [ -s e2e-ausgabe.txt ]; then
               echo '```'; ende 40000 e2e-ausgabe.txt; echo '```'
@@ -387,7 +387,7 @@ jobs:
           # Seitenzustand beim Fehler (error-context.md je Test) – zeigt ohne Artefakt-Download, was die Oberfläche anzeigte
           if ls frontend/test-results/*/error-context.md > /dev/null 2>&1; then
             {
-              echo "**Seitenzustand der fehlgeschlagenen Browsertests, Teil ${{ matrix.teil }}/11** (Lauf ${{ github.run_id }})"
+              echo "**Seitenzustand der fehlgeschlagenen Browsertests, Teil ${{ matrix.teil }}/12** (Lauf ${{ github.run_id }})"
               for f in frontend/test-results/*/error-context.md; do
                 echo; echo "<details><summary>$(basename "$(dirname "$f")")</summary>"; echo; echo '```'
                 # ohne die Seitenleiste (immer gleich) – sonst reicht der Platz nicht bis zum Inhalt der Seite
@@ -403,7 +403,7 @@ jobs:
             senden kontext.md
           fi
           if [ -s audit.txt ]; then
-            { echo "**Audit-Log, abgewiesene Anfragen, Fehler im Backend, Teil ${{ matrix.teil }}/11** (Lauf ${{ github.run_id }})"; echo; echo '```'
+            { echo "**Audit-Log, abgewiesene Anfragen, Fehler im Backend, Teil ${{ matrix.teil }}/12** (Lauf ${{ github.run_id }})"; echo; echo '```'
               head -c 62000 audit.txt | iconv -f utf-8 -t utf-8 -c || true; echo '```'; } > audit.md
             senden audit.md
           fi
@@ -438,8 +438,8 @@ jobs:
           {
             echo "**CI: ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && 'fehlgeschlagen' || 'erfolgreich' }}** (Lauf ${{ github.run_id }}${{ github.event_name == 'pull_request' && format(', Pull Request #{0}', github.event.number) || '' }})"
             echo
-            zeile "Backend-Tests (3 Teile)" "${{ needs.tests.result }}"
-            zeile "Browsertests (11 Teile, je eigener Stack)" "${{ needs.browser.result }}"
+            zeile "Backend-Tests (4 Teile)" "${{ needs.tests.result }}"
+            zeile "Browsertests (12 Teile, je eigener Stack)" "${{ needs.browser.result }}"
             zeile "Frontend-Lockfile" "${{ needs.lockfile.result }}"
             echo
             echo "Einzelheiten: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} – bei Fehlern je Teil ein eigener Kommentar."

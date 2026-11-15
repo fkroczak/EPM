@@ -513,11 +513,14 @@ class ScansGrundlage(GleicheSeiteEinmalErkennen, Grundlage):
         self.assertEqual(r.status_code, 201, r.content)
         return r.json()
 
-    def erkennen(self):
-        """Wie der OCR-Dienst: alle wartenden Aufträge abarbeiten."""
+    def paddle(self):
         from .ocr.paddle import Paddle
 
-        paddle = Paddle.laden()
+        return Paddle.laden()
+
+    def erkennen(self):
+        """Wie der OCR-Dienst: alle wartenden Aufträge abarbeiten."""
+        paddle = self.paddle()
         while (scan := dienst.auftrag_holen()) is not None:
             dienst.bearbeiten(scan, paddle)
 
@@ -732,6 +735,20 @@ class ScansApiTest(ScansGrundlage):
     # ---------------------------------------------------------------- Absturzschutz (09.10.2026)
 
 class ScansSeitenTest(ScansGrundlage):
+    """Seiten ordnen, neu erkennen, aufteilen, zusammenführen – mit PP-OCR im Sparmodus (kleines Zeilenmodell, ohne
+    Glätten), wie auf einem Server mit wenig Speicher. Die volle Erkennung prüfen ScansApiTest und ErkennungTest; hier
+    geht es um die Verwaltung der Seiten. Mit dem großen Modell dauerte dieser eine Test in der CI 4 Minuten
+    (fünf Erkennungen von Seiten im A4-Format, ein Thread je Testprozess)."""
+
+    _sparsam = None
+
+    def paddle(self):
+        from .ocr.paddle import Paddle, modell_ordner
+
+        if ScansSeitenTest._sparsam is None and Paddle.laden() is not None:
+            ScansSeitenTest._sparsam = Paddle(modell_ordner(), sparsam=True)
+        return ScansSeitenTest._sparsam
+
     def test_seiten_bearbeiten_aufteilen_zusammenfuehren(self):
         c = client_fuer(self.mitarbeiter)
         bilder = [testbilder.seite(testbilder.LABOR), testbilder.seite(testbilder.BRIEF),
