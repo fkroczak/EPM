@@ -18,7 +18,7 @@ from django.utils import timezone
 from accounts.models import Rolle
 from audit.models import SystemEreignis
 from befunde.models import BiaMessung, Laborbefund
-from epm.pruefhilfen import Grundlage, benutzer, client_fuer
+from epm.pruefhilfen import GleicheSeiteEinmalErkennen, Grundlage, benutzer, client_fuer
 from patienten.models import Diagnose, Dokument, DokumentText, Gewichtsmessung, Patient
 from stammdaten.models import Einstellungen
 
@@ -496,7 +496,10 @@ class ErkennungTest(SimpleTestCase):
 
 # ======================================================================= API, Dienst, Rechte
 @override_settings(EPM_SCANS=SCANS)
-class ScansApiTest(Grundlage):
+class ScansGrundlage(GleicheSeiteEinmalErkennen, Grundlage):
+    """Gemeinsames für die Scan-Tests mit Datenbank. In drei Klassen aufgeteilt (15.11.2026), damit der parallele
+    Testlauf sie auf mehrere Prozesse verteilen kann – jede Klasse läuft sonst am Stück in einem Prozess."""
+
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -521,6 +524,20 @@ class ScansApiTest(Grundlage):
     def labor_png(self, **namen):
         return testbilder.png(testbilder.seite(testbilder.LABOR, **namen), verkleinern=0.67)
 
+    def _zwei_seiten(self):
+        """Scan mit zwei Seiten, Seiten angelegt, aber noch nicht erkannt."""
+        inhalt = testbilder.pdf(testbilder.seite(testbilder.LABOR), testbilder.seite(testbilder.LABOR))
+        scan = Scan.objects.get(pk=self.hochladen(inhalt, "zwei.pdf")["id"])
+        dienst.seiten_anlegen(scan)
+        return scan
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(SCANS, ignore_errors=True)
+
+
+class ScansApiTest(ScansGrundlage):
     def test_ablauf_hochladen_erkennen_zuordnen_mit_werten(self):
         c = client_fuer(self.mitarbeiter)
         scan = self.hochladen(self.labor_png(), "Labor Muster.png")
@@ -699,6 +716,22 @@ class ScansApiTest(Grundlage):
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(r.json()["ocr_fachwoerter"], "Teduglutid\nNatrovit")
 
+    def test_unlesbare_datei_und_erneut(self):
+        c = client_fuer(self.mitarbeiter)
+        r = c.post("/api/scans/", {"dateien": [SimpleUploadedFile("x.docx", b"PK\x03\x04abc")]}, format="multipart")
+        self.assertEqual(r.status_code, 400)
+        # beschädigtes PNG: Kopf stimmt, Inhalt nicht → Fehler beim Erkennen, „erneut“ möglich
+        scan = self.hochladen(b"\x89PNG\r\n\x1a\n" + b"kaputt" * 10, "kaputt.png")
+        self.erkennen()
+        d = c.get(f"/api/scans/{scan['id']}/").json()
+        self.assertEqual(d["status"], "fehler")
+        self.assertIn("Bild", d["fehler"])
+        r = c.post(f"/api/scans/{scan['id']}/erneut/")
+        self.assertEqual(r.json()["status"], "wartet")
+
+    # ---------------------------------------------------------------- Absturzschutz (09.10.2026)
+
+class ScansSeitenTest(ScansGrundlage):
     def test_seiten_bearbeiten_aufteilen_zusammenfuehren(self):
         c = client_fuer(self.mitarbeiter)
         bilder = [testbilder.seite(testbilder.LABOR), testbilder.seite(testbilder.BRIEF),
@@ -762,27 +795,8 @@ class ScansApiTest(Grundlage):
             self.assertEqual(c.delete(f"/api/scans/{scan['id']}/").status_code, 204)
         self.assertFalse(Scan.objects.exists())
 
-    def test_unlesbare_datei_und_erneut(self):
-        c = client_fuer(self.mitarbeiter)
-        r = c.post("/api/scans/", {"dateien": [SimpleUploadedFile("x.docx", b"PK\x03\x04abc")]}, format="multipart")
-        self.assertEqual(r.status_code, 400)
-        # beschädigtes PNG: Kopf stimmt, Inhalt nicht → Fehler beim Erkennen, „erneut“ möglich
-        scan = self.hochladen(b"\x89PNG\r\n\x1a\n" + b"kaputt" * 10, "kaputt.png")
-        self.erkennen()
-        d = c.get(f"/api/scans/{scan['id']}/").json()
-        self.assertEqual(d["status"], "fehler")
-        self.assertIn("Bild", d["fehler"])
-        r = c.post(f"/api/scans/{scan['id']}/erneut/")
-        self.assertEqual(r.json()["status"], "wartet")
 
-    # ---------------------------------------------------------------- Absturzschutz (09.10.2026)
-    def _zwei_seiten(self):
-        """Scan mit zwei Seiten, Seiten angelegt, aber noch nicht erkannt."""
-        inhalt = testbilder.pdf(testbilder.seite(testbilder.LABOR), testbilder.seite(testbilder.LABOR))
-        scan = Scan.objects.get(pk=self.hochladen(inhalt, "zwei.pdf")["id"])
-        dienst.seiten_anlegen(scan)
-        return scan
-
+class ScansDienstTest(ScansGrundlage):
     def test_abgebrochener_dienst_seite_wird_sparsam_wiederholt(self):
         """Der Dienst stirbt mitten in Seite 2 (Speichergrenze): Nach 90 s ohne Lebenszeichen ist der Scan wieder in
         der Warteschlange, Seite 1 bleibt erkannt, Seite 2 wird in Sparstufe 1 erkannt."""
@@ -875,10 +889,6 @@ class ScansApiTest(Grundlage):
         self.assertGreater(scan.lebenszeichen, alt)
         self.assertEqual(dienst.haengende_zuruecksetzen(), 0)
 
-    @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
-        shutil.rmtree(SCANS, ignore_errors=True)
 
 
 # ======================================================================= Fehlerpfade (Kundenmeldung 13.10.2026)

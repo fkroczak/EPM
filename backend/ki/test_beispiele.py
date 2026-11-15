@@ -6,7 +6,7 @@ from django.test import override_settings
 
 from berichte.models import Bericht
 from diktate.models import Diktat
-from epm.pruefhilfen import Grundlage, client_fuer
+from epm.pruefhilfen import GleicheSeiteEinmalErkennen, Grundlage, client_fuer
 from ki import beispiele, chat, eingang, pipeline
 from ki.modell import Client
 from ki.models import KiChatNachricht, KiEinstellung, KiFeld, KiKorrektur, KiPromptvorlage, KiRohergebnis, KiVorgang
@@ -15,7 +15,7 @@ from stammdaten.models import Firma
 
 
 @override_settings(EPM_KI=Path(KI_TMP))
-class KorrekturBeispieleTest(Grundlage):
+class KorrekturBeispieleTest(GleicheSeiteEinmalErkennen, Grundlage):
     def setUp(self):
         super().setUp()
         self.a = self.vorgang(labor_png(nachname="Echt", vorname="Anna"))

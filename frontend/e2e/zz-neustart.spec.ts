@@ -9,8 +9,20 @@ import { expect, test } from "@playwright/test";
 import type { Browser, Page } from "@playwright/test";
 import { OHNE_ANMELDUNG, adminNavigation, apiAls, apiAnmelden, gemerkt, stackNeuStarten, totpBase32, virtuellerAuthenticator, zustand } from "./hilfen";
 import type { Rolle } from "./hilfen";
+import { laeuft } from "./teile";
 
 test.describe.configure({ mode: "serial" });
+
+/**
+ * Geteilter CI-Lauf (e2e/teile.ts, 15.11.2026): Jeder Teil prüft nach seinem Neustart die Ergebnisse genau der Dateien,
+ * die in ihm gelaufen sind – jede Prüfung steht damit in genau einem Teil. Ein Nachweis wird nur angelegt, wenn alle
+ * seine Quellen in diesem Lauf sind; im Gesamtlauf (ohne EPM_E2E_TEIL) laufen alle wie bisher.
+ */
+type Ablauf = Parameters<typeof test>[2];
+const nachweise: { quellen: string[]; titel: string; ablauf: Ablauf }[] = [];
+function nachweis(quellen: string[], titel: string, ablauf: Ablauf) {
+  nachweise.push({ quellen, titel, ablauf });
+}
 
 async function seiteAls(browser: Browser, wer: Rolle | { zustand: string }) {
   const ctx = await browser.newContext({ storageState: typeof wer === "string" ? zustand(wer) : wer.zustand, ignoreHTTPSErrors: true });
@@ -21,7 +33,7 @@ function gespeichert(page: Page, pfad: string) {
   return page.waitForResponse((a) => a.url().endsWith(`/api/${pfad}`) && a.request().method() !== "GET" && a.ok());
 }
 
-test("Vor dem Neustart: Grenzwert, Rechte, Darstellung und Startseite in der Oberfläche ändern", async ({ browser }) => {
+nachweis(["admin.spec.ts"], "Vor dem Neustart: Grenzwert und Rechte in der Oberfläche ändern", async ({ browser }) => {
   const { ctx, page } = await seiteAls(browser, "admin");
   await page.goto("/admin/vorlagen");
   await page.getByRole("button", { name: "Grenzwerte" }).click();
@@ -37,7 +49,9 @@ test("Vor dem Neustart: Grenzwert, Rechte, Darstellung und Startseite in der Obe
   await rechte.getByRole("button", { name: "Speichern (1)" }).click();
   await expect(page.getByText("Rechte gespeichert. Sie gelten ab sofort.")).toBeVisible();
   await ctx.close();
+});
 
+nachweis(["konto.spec.ts"], "Vor dem Neustart: Darstellung und Startseite in der Oberfläche ändern", async ({ browser }) => {
   const d = await seiteAls(browser, gemerkt("darstellung"));
   await d.page.goto("/design");
   let antwort = gespeichert(d.page, "auth/ich/");
@@ -64,11 +78,8 @@ test("Vor dem Neustart: Grenzwert, Rechte, Darstellung und Startseite in der Obe
   await d.ctx.close();
 });
 
-test("Neustart von Backend und Webserver", () => {
-  stackNeuStarten();
-});
 
-test("Nach dem Neustart: Akten mit Gewicht, Diagnose und Versionen, Kontakten, Termin, Abschluss und Verlauf", async ({ browser }) => {
+nachweis(["akte.spec.ts"], "Nach dem Neustart: Akten mit Gewicht, Diagnose und Versionen, Kontakten, Termin, Abschluss und Verlauf", async ({ browser }) => {
   const { ctx, page } = await seiteAls(browser, "mitarbeiter");
 
   await page.goto(`/patienten/${gemerkt("gewicht").id}`);
@@ -112,15 +123,18 @@ test("Nach dem Neustart: Akten mit Gewicht, Diagnose und Versionen, Kontakten, T
   await ctx.close();
 });
 
-test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", async ({ browser }) => {
+nachweis(["patienten.spec.ts"], "Nach dem Neustart: neuer Patient", async ({ browser }) => {
   const { ctx, page } = await seiteAls(browser, "mitarbeiter");
-
   const neu = gemerkt("neuer_patient");
   await page.goto(`/patienten?suche=${encodeURIComponent(neu.nachname)}`);
   await page.getByTestId("patientenliste").getByRole("link", { name: neu.name }).click();
   await expect(page.getByTestId("aktuelles-gewicht")).toHaveText("61,4 kg");
   await expect(page.getByTestId("kennzahlen")).toContainText("Port");
+  await ctx.close();
+});
 
+nachweis(["plaene.spec.ts"], "Nach dem Neustart: Infusionsplan mit gespeicherter PDF", async ({ browser }) => {
+  const { ctx, page } = await seiteAls(browser, "mitarbeiter");
   await page.goto(`/patienten/${gemerkt("plan").patient}/plaene`);
   await expect(page.getByTestId("planliste").getByRole("listitem")).toHaveCount(1);
   await expect(page.getByTestId("planliste")).toContainText("aktuell gültig");
@@ -136,12 +150,20 @@ test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", 
   await expect(page.getByRole("dialog").getByTestId("pdf-pruefung")).toContainText("Prüfsumme stimmt");
   await expect(page.getByRole("dialog").getByTestId("pdf-leser").locator("canvas").first()).toBeVisible();
   await page.keyboard.press("Escape");
-  // veröffentlichte Dokumentvorlage
+  await ctx.close();
+});
+
+nachweis(["dokumentvorlagen.spec.ts"], "Nach dem Neustart: veröffentlichte Dokumentvorlage", async ({ browser }) => {
+  const { ctx, page } = await seiteAls(browser, "mitarbeiter");
   await page.goto("/admin/vorlagen/dokumente?art=infusionsplan");
   await expect(page.getByTestId("vorlage-stand")).toHaveText(`Fassung ${gemerkt("vorlage").version} ist in Gebrauch`);
   await page.getByTestId("aufbau").getByRole("button", { name: /Freigabevermerk/ }).click();
   await expect(page.getByTestId("block-eigenschaften").getByLabel("Text")).toHaveValue("Rückfragen an die Stiftung, Stand {{Heute}}");
+  await ctx.close();
+});
 
+nachweis(["dokumente.spec.ts"], "Nach dem Neustart: Dokumente und Altdokument", async ({ browser }) => {
+  const { ctx, page } = await seiteAls(browser, "mitarbeiter");
   const dok = gemerkt("dokumente").id;
   await page.goto(`/patienten/${dok}/dokumente`);
   const doks = page.getByTestId("dokumentliste");
@@ -155,14 +177,6 @@ test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", 
   const datei = await page.request.get(`/api/dokumente/${brief.id}/datei/`);
   expect(await datei.text()).toBe("Arztbrief (E2E)\nAlles gut.\n");
 
-  // endgültig gelöschtes Dokument (Art. 17 DSGVO): bleibt nach dem Neustart weg, Verlauf nur mit dem Nachweis
-  const weg = gemerkt("geloescht");
-  await page.goto(`/patienten/${weg.patient}/dokumente`);
-  await expect(page.getByText("Noch keine Dokumente.")).toBeVisible();
-  await page.goto(`/patienten/${weg.patient}/verlauf`);
-  await expect(page.getByTestId("verlauf")).toContainText("Datei und Inhalt entfernt");
-  await expect(page.getByTestId("verlauf")).not.toContainText(weg.titel);
-
   await page.goto(`/patienten/${gemerkt("altdokument").patient}/dokumente`);
   const alt = page.getByTestId("dokumentliste").getByRole("row").filter({ hasText: "Altdokument aus dem bisherigen System" });
   await expect(alt).toContainText("Labor");
@@ -170,7 +184,26 @@ test("Nach dem Neustart: neuer Patient, Infusionsplan, Dokumente, Altdokument", 
   await ctx.close();
 });
 
-test("Nach dem Neustart: Datenschutz – Erklärungen, eingeschränkte und gelöschte Akte, Plan nach Freigabe", async ({ browser }) => {
+nachweis(["dokumente-falsch.spec.ts"], "Nach dem Neustart: endgültig gelöschtes Dokument bleibt weg, Audit-Log ohne Titel", async ({ browser }) => {
+  // endgültig gelöschtes Dokument (Art. 17 DSGVO): bleibt nach dem Neustart weg, Verlauf nur mit dem Nachweis
+  const { ctx, page } = await seiteAls(browser, "mitarbeiter");
+  const weg = gemerkt("geloescht");
+  await page.goto(`/patienten/${weg.patient}/dokumente`);
+  await expect(page.getByText("Noch keine Dokumente.")).toBeVisible();
+  await page.goto(`/patienten/${weg.patient}/verlauf`);
+  await expect(page.getByTestId("verlauf")).toContainText("Datei und Inhalt entfernt");
+  await expect(page.getByTestId("verlauf")).not.toContainText(weg.titel);
+  await ctx.close();
+
+  const a = await seiteAls(browser, "admin");
+  await (await adminNavigation(a.page)).getByRole("link", { name: "Audit-Log" }).click();
+  await a.page.getByRole("button", { name: "Dokument", exact: true }).click();
+  await expect(a.page.getByTestId("auditlog")).toContainText("endgültig gelöscht – Datei, Titel und Inhalt entfernt (Art. 17 DSGVO)");
+  await expect(a.page.getByTestId("auditlog")).not.toContainText(weg.titel);
+  await a.ctx.close();
+});
+
+nachweis(["datenschutz.spec.ts"], "Nach dem Neustart: Datenschutz – Erklärungen, eingeschränkte und gelöschte Akte, Plan nach Freigabe", async ({ browser }) => {
   const { ctx, page } = await seiteAls(browser, "mediziner");
   await page.goto(`/patienten/${gemerkt("erklaerung").patient}/datenschutz`);
   await expect(page.getByTestId("erklaerung-einwilligung")).toContainText("widerrufen am");
@@ -199,7 +232,7 @@ test("Nach dem Neustart: Datenschutz – Erklärungen, eingeschränkte und gelö
   await ctx.close();
 });
 
-test("Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Rechte", async ({ browser }) => {
+nachweis(["admin.spec.ts"], "Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Rechte", async ({ browser }) => {
   const { ctx, page } = await seiteAls(browser, "admin");
 
   const { name, anzeige } = gemerkt("benutzer");
@@ -228,9 +261,6 @@ test("Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Re
   await (await adminNavigation(page)).getByRole("link", { name: "Audit-Log" }).click();
   await page.getByRole("button", { name: "Benutzer", exact: true }).click();
   await expect(page.getByTestId("auditlog")).toContainText(name);
-  await page.getByRole("button", { name: "Dokument", exact: true }).click();
-  await expect(page.getByTestId("auditlog")).toContainText("endgültig gelöscht – Datei, Titel und Inhalt entfernt (Art. 17 DSGVO)");
-  await expect(page.getByTestId("auditlog")).not.toContainText(gemerkt("geloescht").titel);
 
   const { ort, vitamin } = gemerkt("vorlagen");
   await page.goto("/admin/vorlagen?bereich=briefkopf");
@@ -254,7 +284,7 @@ test("Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vorlagen, Grenzwert und Re
   await ctx.close();
 });
 
-test("Nach dem Neustart: Konto mit neuem Passwort und Gerät, Notfall-Codes, Darstellung, Startseite", async ({ browser }) => {
+nachweis(["konto.spec.ts"], "Nach dem Neustart: Konto mit neuem Passwort und Gerät, Notfall-Codes, Darstellung, Startseite", async ({ browser }) => {
   const k = gemerkt("konto");
   const anmeldung = await apiAnmelden(k.benutzername, k.kennwort, totpBase32(k.geheim));
   expect(anmeldung.schritt).toBe("fertig");
@@ -277,13 +307,15 @@ test("Nach dem Neustart: Konto mit neuem Passwort und Gerät, Notfall-Codes, Dar
   await d.ctx.close();
 });
 
-test("Nach dem Neustart: Termin im Kalender (erledigt) und Tätigkeiten der Systemverwaltung", async ({ browser }) => {
+nachweis(["kalender.spec.ts"], "Nach dem Neustart: Termin im Kalender (erledigt)", async ({ browser }) => {
   const k = gemerkt("kalender");
   const m = await seiteAls(browser, "mitarbeiter");
   await m.page.goto(`/kalender?datum=${k.datum}`);
   await expect(m.page.getByTestId(`tag-${k.datum}`).getByRole("button", { name: new RegExp(`${k.titel} \\(erledigt\\)`) })).toBeVisible();
   await m.ctx.close();
+});
 
+nachweis(["system.spec.ts"], "Nach dem Neustart: Tätigkeiten der Systemverwaltung", async ({ browser }) => {
   const s = gemerkt("system");
   const a = await seiteAls(browser, "admin");
   await a.page.goto("/admin/system?reiter=verlauf");
@@ -294,7 +326,7 @@ test("Nach dem Neustart: Termin im Kalender (erledigt) und Tätigkeiten der Syst
   await a.ctx.close();
 });
 
-test("Nach dem Neustart: Import – Dump, Zuordnungen und Läufe der Altdaten-Übernahme", async ({ browser }) => {
+nachweis(["aa-import.spec.ts", "patienten.spec.ts"], "Nach dem Neustart: Import – Dump, Zuordnungen und Läufe der Altdaten-Übernahme", async ({ browser }) => {
   const { dump } = gemerkt("import");
   const a = await seiteAls(browser, "admin");
   await a.page.goto("/admin/import");
@@ -323,7 +355,7 @@ test("Nach dem Neustart: Import – Dump, Zuordnungen und Läufe der Altdaten-Ü
   await a.ctx.close();
 });
 
-test("Nach dem Neustart: mit Passkey anmelden und mit Passkey bestätigen (Passkey entfernen)", async ({ browser }) => {
+nachweis(["passkey.spec.ts"], "Nach dem Neustart: mit Passkey anmelden und mit Passkey bestätigen (Passkey entfernen)", async ({ browser }) => {
   const k = gemerkt("passkey");
   const ctx = await browser.newContext({ storageState: OHNE_ANMELDUNG, ignoreHTTPSErrors: true });
   const page = await ctx.newPage();
@@ -347,3 +379,13 @@ test("Nach dem Neustart: mit Passkey anmelden und mit Passkey bestätigen (Passk
   await expect(page.getByTestId("passkeys")).toContainText("keiner");
   await ctx.close();
 });
+
+// Reihenfolge: Änderungen vor dem Neustart, Neustart, Prüfungen danach – nur mit den Nachweisen dieses Laufs
+const aktiv = nachweise.filter((n) => n.quellen.every(laeuft));
+for (const n of aktiv.filter((n) => n.titel.startsWith("Vor dem Neustart"))) test(n.titel, n.ablauf);
+if (aktiv.length) {
+  test("Neustart von Backend und Webserver", () => {
+    stackNeuStarten();
+  });
+}
+for (const n of aktiv.filter((n) => !n.titel.startsWith("Vor dem Neustart"))) test(n.titel, n.ablauf);
