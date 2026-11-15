@@ -23,7 +23,7 @@ import { useAkte } from "./Akte";
 import { BefundeKurz } from "./Befunde";
 import { DiagnosenKurz } from "./Diagnosen";
 import { StummKarte } from "@/components/HinweisChips";
-import { AkteAufEinenBlick } from "@/components/AkteAufEinenBlick";
+import { AkteAufEinenBlick, FUELLT } from "@/components/AkteAufEinenBlick";
 import { AerzteKarte, BezugspersonenKarte } from "./Kontaktpersonen";
 import { KeinPlanHinweis, PlanPdfDialog } from "./Plaene";
 import { KarteOderAbschnitt } from "./Aktenseite";
@@ -442,8 +442,6 @@ function spaltenFuerBreite(px: number): number {
   return px < 560 ? 1 : px < 1100 ? 2 : px < 1560 ? 3 : px < 2200 ? 4 : 5;
 }
 
-/** Fensterstufe, ab der die Akte das Fenster füllt (index.css, .seite-fuellt) */
-const FUELLT = "(min-width: 80rem) and (min-height: 37.5rem) and (pointer: fine)";
 /** Kleinste sinnvolle Höhe einer Kartenzeile; darunter scrollt die Fläche statt die Karten zu quetschen */
 const MIN_ZEILE = 170;
 

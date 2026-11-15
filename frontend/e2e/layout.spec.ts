@@ -39,6 +39,15 @@ test("Akte ohne Seiten-Scrollen (F181): 1366 × 768 und 1920 × 1080 – sechs K
     await expect(page.getByTestId("kontakte")).toBeVisible();
     expect(await page.evaluate(() => document.scrollingElement!.scrollHeight - innerHeight)).toBeLessThanOrEqual(0);
     await expect(page.getByTestId("aktenkopf")).toBeInViewport();
+    // KI-Entwurf „Auf einen Blick“ (15.11.2026): füllt die Akte das Fenster, steht er als Chip im Kopf statt als Karte
+    // über dem Raster (die Karte nahm bei 1366 × 768 die Höhe für die zweite Kartenreihe)
+    await expect(page.getByTestId("akte-uebersicht").getByTestId("akte-auf-einen-blick")).toHaveCount(0);
+    await page.getByTestId("auf-einen-blick-chip").click();
+    const blick = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "Auf einen Blick" }) });
+    await expect(blick).toContainText("KI-Entwurf");
+    await expect(blick).toContainText(/Noch keine Zusammenfassung|seit dem/);
+    await page.keyboard.press("Escape");
+    await expect(blick).toHaveCount(0);
   }
   // Akte mit vielen Hinweisen (kein Plan, kein Versorger, kein Kontakt, kein Labor, keine BIA …): im Kopf nur ein Chip
   // „N Hinweise“, der die Liste aufklappt – der Kopf bleibt ruhig und die Akte passt weiter ins Fenster
@@ -60,6 +69,9 @@ test("Akte ohne Seiten-Scrollen (F181): 1366 × 768 und 1920 × 1080 – sechs K
   await expect(page.getByTestId("aktenkopf").getByTestId("hinweise-sammel")).toContainText(/\d+ Hinweise/);
   await expect(page.getByTestId("uebersicht-stufe")).toHaveAttribute("data-spalten", "2");
   await expect(page.getByTestId("akte-uebersicht")).not.toHaveAttribute("data-fuellt", "1");
+  // ohne Füllen: „Auf einen Blick“ als Karte über dem Raster, kein Chip im Kopf
+  await expect(page.getByTestId("akte-uebersicht").getByTestId("akte-auf-einen-blick")).toBeVisible();
+  await expect(page.getByTestId("auf-einen-blick-chip")).toHaveCount(0);
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - document.scrollingElement!.clientWidth)).toBeLessThanOrEqual(0);
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.getByTestId("aktenkopf").getByTestId("hinweise-sammel").click();

@@ -20,6 +20,7 @@ import { Begriff } from "@/components/ui/Begriff";
 import { Icon } from "@/components/ui/icon";
 import { TerminDialog } from "@/components/TerminDialog";
 import { HinweisChips, HinweisChipsKompakt } from "@/components/HinweisChips";
+import { AufEinenBlickChip } from "@/components/AkteAufEinenBlick";
 import { AkteGeteilt, FirmenChip, FirmenDialog, useAlleFirmen } from "@/components/FirmenWahl";
 import type { AktenAktion } from "@/lib/sprungziele";
 import { GewichtDialog, KontaktDialog } from "@/components/Schnellerfassung";
@@ -700,6 +701,8 @@ export function Akte() {
       {/* Hinweise wie in der Patientenliste, dazu fehlende Angaben (F186); mit „×“ für 3/6/12 Monate ausblendbar (F119) */}
       {/* ruhig: ab zwei Hinweisen ein Chip „N Hinweise ▾“ (Nacharbeit F181); am Telefon stehen sie unter „Versorgung und Hinweise“ */}
       {hinweiseImKopf ? null : <HinweisChipsKompakt hinweise={k?.hinweise ?? []} patientId={p.id} ausblendbar={kontext.bearbeiten} />}
+      {/* KI-Entwurf „Auf einen Blick“: füllt die Akte das Fenster (F181), steht er hier statt als Karte über dem Raster */}
+      <AufEinenBlickChip patient={p.id} />
     </>
   );
   // CAVE: Nickelallergie und Gewichtsverlust stehen in jeder Ansicht direkt beim Namen. Eine noch nicht erfasste
