@@ -283,7 +283,7 @@ jobs:
         run: |
           {
             (cd frontend && npm ci --no-audit --no-fund && npx playwright install --with-deps chromium > /dev/null) \
-              && sudo apt-get install -y -qq gnupg rclone jq > /dev/null && rclone version | head -1 \
+              && sudo apt-get install -y -qq gnupg rclone jq > /dev/null && rclone --version > /tmp/rclone.txt && head -1 /tmp/rclone.txt \
               && echo ok > /tmp/vorbereitung.fertig || echo fehler > /tmp/vorbereitung.fertig
           } > /tmp/vorbereitung.log 2>&1 &
 

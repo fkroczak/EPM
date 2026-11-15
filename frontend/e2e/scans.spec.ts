@@ -123,7 +123,10 @@ test("Werte von Hand übertragen: BIA nicht erkannt – Feld wählen, Wert im Bi
   // F182: Kennzahl unten in der Liste, große Ansicht per Klick
   await page.getByTestId("kennzahl-korrekturen").click();
   await expect(page.getByTestId("kennzahl-gross")).toBeVisible();
-  await page.getByRole("button", { name: "Schließen" }).click();
+  // „Schließen“ im Fuß des Dialogs (daneben: das ✕ oben und „Meldung schließen“ an der Rückmeldung)
+  const gross = page.getByRole("dialog", { name: "Wie oft musste korrigiert werden?" });
+  await gross.getByRole("button").filter({ hasText: /^Schließen$/ }).click();
+  await expect(gross).toHaveCount(0);
 
   // F182: gelernt wurde „Zink → Gewicht“ und „Kreatinin → Phosphat“ (absichtlich falsch angeklickt) – sperren und löschen
   await page.getByTestId("scans-gelernt").click();
@@ -137,10 +140,12 @@ test("Werte von Hand übertragen: BIA nicht erkannt – Feld wählen, Wert im Bi
   for (const [suche, wort] of [["Phosphat", "Kreatinin"], ["Gewicht", "Zink"]]) {
     await gelernt.getByRole("searchbox").fill(suche);
     const zeilen = gelernt.getByTestId("gelernt-zeile").filter({ hasText: wort });
-    while (await zeilen.count()) {
+    for (let anzahl = await zeilen.count(); anzahl > 0; anzahl--) {
       await zeilen.first().getByTestId("gelernt-loeschen").click();
       await page.getByTestId("bestaetigen").click();
       await expect(page.getByText("Gelernte Zuordnung gelöscht.").first()).toBeVisible();
+      // erst weiter, wenn die Liste neu geladen ist – sonst trifft der nächste Klick die gerade gelöschte Zeile
+      await expect(zeilen).toHaveCount(anzahl - 1);
     }
   }
   await gelernt.getByTestId("gelernt-zurueck").click();
@@ -286,9 +291,15 @@ test("Gelernte Zuordnungen: Steuerung des Lernens (F189)", async ({ page }) => {
   const steuerung = gelernt.getByTestId("gelernt-steuerung");
   await expect(steuerung).toBeVisible();
   // Mitarbeiter pflegen Vorlagen: dürfen pausieren und die Schwelle ändern – danach wieder zurück
-  await gelernt.getByTestId("lernen-pausieren").check();
+  // Schalter folgt dem Stand des Servers (umgeschaltet nach der Antwort) – daher klicken und auf den Stand warten
+  const pausieren = gelernt.getByTestId("lernen-pausieren");
+  await pausieren.click();
+  await expect(pausieren).toBeChecked();
   await expect(page.getByText(/Lernen pausiert/).first()).toBeVisible();
-  await gelernt.getByTestId("lernen-pausieren").uncheck();
+  await expect(steuerung).toContainText("Pausiert: Neues wird nicht gelernt");
+  await pausieren.click();
+  await expect(pausieren).not.toBeChecked();
+  await expect(steuerung).not.toContainText("Pausiert:");
   await gelernt.getByTestId("lernen-schwelle").selectOption("3");
   await expect(page.getByText(/sicher ab 3 Bestätigungen/).first()).toBeVisible();
   await gelernt.getByTestId("lernen-schwelle").selectOption("2");
