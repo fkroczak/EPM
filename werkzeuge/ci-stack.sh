@@ -10,7 +10,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"
 B="${EPM_CI_BASIS:-/tmp/epm-ci}"
-TAG="${EPM_CI_TAG:-ci}"
+# Tag wie im Betrieb (X.Y.Z-Commit): nur solche Versionen erkennt der Systemagent (Software, Notfallpaket)
+TAG="${EPM_CI_TAG:-$(tr -d " \t\r\n" < VERSION)-$(git rev-parse --short=7 HEAD 2>/dev/null || echo 0000000)}"
 DOCKER="docker"; [[ $EUID -eq 0 ]] || DOCKER="sudo docker"
 # WebDAV-Ziel für die Übertragung der Sicherungen (Browsertest sicherung.spec.ts): rclone serve webdav, nur lokal
 WEBDAV="${EPM_CI_WEBDAV:-/tmp/epm-ci-webdav}"

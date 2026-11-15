@@ -287,6 +287,9 @@ jobs:
               && echo ok > /tmp/vorbereitung.fertig || echo fehler > /tmp/vorbereitung.fertig
           } > /tmp/vorbereitung.log 2>&1 &
 
+      - name: Versions-Tag der Images (wie im Betrieb X.Y.Z-Commit)
+        run: echo "EPM_CI_TAG=$(tr -d ' \t\r\n' < VERSION)-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Images bauen (Zwischenspeicher)

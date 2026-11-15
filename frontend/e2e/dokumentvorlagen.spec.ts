@@ -5,6 +5,16 @@ import { apiAls, merken, zustand } from "./hilfen";
 
 test.use({ storageState: zustand("mitarbeiter") });
 
+// Fassungen zählen erst nach dem ersten Altdaten-Import weiter (6c0eac8, vorlagen/fassung1.py); davor ersetzt Freigeben
+// die Fassung 1, und es gibt keine frühere Fassung zum Wiederherstellen. Diese Tests prüfen das Verhalten danach –
+// sie laufen daher nach „aa-import“ (gleicher Teil in e2e/teile.ts).
+test.beforeAll(async () => {
+  const api = await apiAls("mitarbeiter");
+  const uebersicht = await api.get("vorlagen/infusionsplan/");
+  await api.ende();
+  expect(uebersicht.nur_fassung_1, "Vorbedingung: Altdaten-Import (aa-import.spec.ts) ist gelaufen").toBe(false);
+});
+
 test("Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau, Veröffentlichen", async ({ page }) => {
   const api = await apiAls("mitarbeiter");
   const vorher = (await api.get("vorlagen/")).find((v: { art: string }) => v.art === "infusionsplan");
@@ -100,8 +110,9 @@ test("Dokumentvorlage Infusionsplan: Text mit Datenfeld, Prüfung, Vorschau, Ver
   await aktionen.getByRole("button", { name: "Freigeben", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText("In der Vorschau geprüft.");
   await page.getByRole("dialog").getByRole("button", { name: "Freigeben" }).click();
-  await expect(page.getByText(`Fassung ${vorher.aktiv.version + 1} freigegeben.`)).toBeVisible();
-  await expect(aktionen.getByTestId("vorlage-stand")).toHaveText(`Fassung ${vorher.aktiv.version + 1} ist in Gebrauch`);
+  expect(vorher.naechste_fassung).toBe(vorher.aktiv.version + 1);
+  await expect(page.getByText(`Fassung ${vorher.naechste_fassung} freigegeben.`)).toBeVisible();
+  await expect(aktionen.getByTestId("vorlage-stand")).toHaveText(`Fassung ${vorher.naechste_fassung} ist in Gebrauch`);
   await expect(editor.getByTestId("versionen")).toContainText(`Fassung ${vorher.aktiv.version}`);
   const nachher = (await api.get("vorlagen/")).find((v: { art: string }) => v.art === "infusionsplan");
   expect([nachher.aktiv.version, nachher.entwurf]).toEqual([vorher.aktiv.version + 1, null]);

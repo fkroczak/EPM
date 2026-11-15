@@ -21,8 +21,9 @@ export const TEILE: Record<string, string[]> = {
   "5": ["admin.spec.ts", "konto.spec.ts", "passkey.spec.ts"],
   "6": ["akte.spec.ts", "start.spec.ts"],
   "7": ["datenschutz.spec.ts", "oberflaeche.spec.ts"],
-  "8": ["aa-import.spec.ts", "patienten.spec.ts", "dokumente.spec.ts", "dokumente-falsch.spec.ts"],
-  "9": ["plaene.spec.ts", "dokumentvorlagen.spec.ts", "kalender.spec.ts"],
+  // dokumentvorlagen nach aa-import: Fassungen zählen erst nach dem Import weiter
+  "8": ["aa-import.spec.ts", "patienten.spec.ts", "dokumentvorlagen.spec.ts"],
+  "9": ["plaene.spec.ts", "dokumente.spec.ts", "dokumente-falsch.spec.ts", "kalender.spec.ts"],
   "10": ["praxiswuensche.spec.ts", "mobil.spec.ts", "touch.spec.ts", "anmeldung.spec.ts"],
   "11": ["aktenansicht.spec.ts", "versorger.spec.ts", "testdaten-befunde.spec.ts", "korrespondenz.spec.ts",
          "layout.spec.ts", "infusionsplaene.spec.ts", "pdf-ausgaben.spec.ts", "firmen.spec.ts", "medikamente.spec.ts",

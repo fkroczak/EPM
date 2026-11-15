@@ -196,6 +196,7 @@ nachweis(["dokumente-falsch.spec.ts"], "Nach dem Neustart: endgültig gelöschte
   await ctx.close();
 
   const a = await seiteAls(browser, "admin");
+  await a.page.goto("/");
   await (await adminNavigation(a.page)).getByRole("link", { name: "Audit-Log" }).click();
   await a.page.getByRole("button", { name: "Dokument", exact: true }).click();
   await expect(a.page.getByTestId("auditlog")).toContainText("endgültig gelöscht – Datei, Titel und Inhalt entfernt (Art. 17 DSGVO)");
