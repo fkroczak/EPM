@@ -290,7 +290,19 @@ jobs:
       - name: Versions-Tag der Images (wie im Betrieb X.Y.Z-Commit)
         run: echo "EPM_CI_TAG=$(tr -d ' \t\r\n' < VERSION)-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
+      # containerd als Image-Speicher: Buildx baut dann direkt in Docker (Treiber „docker“, Zwischenspeicher der Actions
+      # nutzbar) – sonst wandert jedes ~2 GB große Image als Tar-Archiv aus einem eigenen Buildx-Container (~40 s)
+      - name: Docker mit containerd-Image-Speicher
+        run: |
+          konf=/etc/docker/daemon.json
+          { sudo cat "$konf" 2>/dev/null || echo '{}'; } | jq '. + {"features": ((.features // {}) + {"containerd-snapshotter": true})}' > /tmp/daemon.json
+          sudo cp /tmp/daemon.json "$konf"
+          sudo systemctl restart docker
+          docker info -f '{{.DriverStatus}}'
+
       - uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
 
       - name: Images bauen (Zwischenspeicher)
         uses: docker/bake-action@v6

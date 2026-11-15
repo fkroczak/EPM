@@ -82,6 +82,7 @@ sed -e "s#^DJANGO_ALLOWED_HOSTS=.*#DJANGO_ALLOWED_HOSTS=localhost#" \
 cat > "$B/.env" <<EOF
 COMPOSE_FILE=compose.yaml
 EPM_BIND_IP=127.0.0.1
+EPM_OCR_THREADS=${EPM_CI_OCR_THREADS:-$(nproc)}
 EPM_VERSION=$TAG
 EOF
 chmod 0644 "$B/secrets/"*

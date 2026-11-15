@@ -287,7 +287,9 @@ nachweis(["admin.spec.ts"], "Nach dem Neustart: Benutzer, Sperre, Audit-Log, Vor
 
 nachweis(["konto.spec.ts"], "Nach dem Neustart: Konto mit neuem Passwort und Gerät, Notfall-Codes, Darstellung, Startseite", async ({ browser }) => {
   const k = gemerkt("konto");
-  const anmeldung = await apiAnmelden(k.benutzername, k.kennwort, totpBase32(k.geheim));
+  // Code des nächsten 30-s-Fensters: konto.spec.ts hat kurz vorher einen Code dieses Schlüssels benutzt (im geteilten
+  // Lauf oft im selben Fenster – django-otp lehnt ihn dann als Wiederholung ab); ±1 Fenster gilt
+  const anmeldung = await apiAnmelden(k.benutzername, k.kennwort, totpBase32(k.geheim, Date.now() + 30_000));
   expect(anmeldung.schritt).toBe("fertig");
   const ctx = await browser.newContext({ storageState: await anmeldung.ctx.storageState(), ignoreHTTPSErrors: true });
   await anmeldung.ctx.dispose();
