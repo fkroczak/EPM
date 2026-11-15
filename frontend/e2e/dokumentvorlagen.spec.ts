@@ -160,7 +160,8 @@ test("Vorlagen-Portal: Suche, Angabe per Klick, geführter Ablauf, frühere Fass
   // Übersicht in Alltagssprache mit Suche über alle Vorlagen, Listen und Präparate
   await page.goto("/admin/vorlagen");
   const start = page.getByTestId("vorlagen-start");
-  await expect(start.getByTestId("vorlagen-kachel")).toHaveCount(7);
+  await expect(start.getByTestId("vorlagen-kachel")).toHaveCount(8);  // seit fbdd90a mit „KI-Prompts“
+  await expect(start.getByRole("link", { name: /KI-Prompts/ })).toBeVisible();
   await expect(start.getByRole("link", { name: /Briefe, Formulare und E-Mail-Texte/ })).toContainText("Wo benutzt:");
   await start.getByLabel("Was möchten Sie ändern?").fill("Terminbest");
   await start.getByTestId("vorlagen-treffer").getByRole("link", { name: /Terminbestätigung Sprechstunde/ }).click();

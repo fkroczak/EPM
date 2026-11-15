@@ -248,19 +248,28 @@ test("Administration je Recht: Betrachter sieht nichts, Mitarbeiter Vorlagen, Me
   await d.close();
 });
 
-test("Fünf falsche Passwörter sperren das Konto; Admin sieht den Hinweis, setzt 2FA zurück und entsperrt", async ({ page, browser }) => {
+test("Falsche Passwörter: nach 5 wartet die Sitzung, nach 10 ist das Konto gesperrt; Admin sieht den Hinweis, setzt 2FA zurück und entsperrt", async ({ page, browser }) => {
+  // seit 87841b5: 15 Minuten Wartezeit je Sitzung nach 5 Fehlversuchen, Kontosperre nach 10 (auch über neue Sitzungen)
   const konto = await neuesKonto("mitarbeiter", "Lotte", "Gesperrt");
-  const fremd = await browser.newContext({ ignoreHTTPSErrors: true, storageState: OHNE_ANMELDUNG });
-  const fp = await fremd.newPage();
-  await fp.goto("/");
-  for (let i = 0; i < 5; i++) {
-    await fp.getByLabel("Benutzername").fill(konto.benutzername);
-    await fp.getByLabel("Passwort").fill(`falsch-${i}-falsch-falsch`);
-    await fp.getByRole("button", { name: "Weiter" }).click();
-    await expect(fp.getByRole("alert")).toBeVisible();
-  }
-  await expect(fp.getByRole("alert")).toContainText("Das Konto ist gesperrt.");
-  await fremd.close();
+  const fuenfMalFalsch = async (runde: number) => {
+    const fremd = await browser.newContext({ ignoreHTTPSErrors: true, storageState: OHNE_ANMELDUNG });
+    const fp = await fremd.newPage();
+    await fp.goto("/");
+    for (let i = 0; i < 5; i++) {
+      await fp.getByLabel("Benutzername").fill(konto.benutzername);
+      await fp.getByLabel("Passwort").fill(`falsch-${runde}-${i}-falsch-falsch`);
+      await fp.getByRole("button", { name: "Weiter" }).click();
+      await expect(fp.getByRole("alert")).toBeVisible();
+    }
+    return { fremd, fp };
+  };
+  const erste = await fuenfMalFalsch(1);
+  await expect(erste.fp.getByRole("alert")).toContainText("Zu viele Fehlversuche. Die Anmeldung ist für 15 Minuten gesperrt.");
+  await erste.fremd.close();
+  // neue Sitzung: weiterraten führt zur Kontosperre
+  const zweite = await fuenfMalFalsch(2);
+  await expect(zweite.fp.getByRole("alert")).toContainText("Das Konto ist gesperrt.");
+  await zweite.fremd.close();
 
   await page.goto("/admin/audit-log");
   await expect(page.getByTestId("sperrhinweis").filter({ hasText: konto.benutzername })).toBeVisible();
