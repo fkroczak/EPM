@@ -533,7 +533,12 @@ class DienstTagNachtTest(Grundlage):
         a = KiAufgabe.objects.get(art="zusammenfassung_termine")
         KiAufgabe.objects.filter(pk=a.pk).update(jetzt_angefordert=True)
         termin(self.patient, 1)
-        with override_settings(EPM_KI_MODELL_URL=""):
+        # Steuerung fest auf „nacht“: unter der Last der parallelen CI-Tests meldete die Messung sonst „Pause“;
+        # PP-OCR braucht dieser Test nicht (spart Speicher und Zeit)
+        nacht = Entscheidung("nacht", 1, False)
+        with override_settings(EPM_KI_MODELL_URL=""), \
+                mock.patch.object(Dienst, "_entscheiden", return_value=nacht), \
+                mock.patch("scans.ocr.paddle.Paddle.laden", side_effect=RuntimeError("im Test nicht nötig")):
             Dienst(einmal=True).laufen()
         z = Z.objects.get()
         self.assertEqual((z.grund, z.status), ("termin", "fertig"))

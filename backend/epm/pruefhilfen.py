@@ -42,10 +42,18 @@ def admin_in_allen_firmen(user):
     return user
 
 
+def _verifiziert() -> bool:
+    return True
+
+
 def client_fuer(user):
-    """API-Client mit vollständiger Anmeldung (Passwort + zweiter Faktor)."""
+    """API-Client mit vollständiger Anmeldung (Passwort + zweiter Faktor).
+
+    ``is_verified`` ist eine Funktion auf Modulebene, keine Lambda: Schlägt ein ``subTest`` im parallelen Lauf fehl,
+    überträgt Django den Testfall samt Benutzer an den Hauptprozess – eine Lambda lässt sich nicht übertragen, der
+    Runner stürzte ab und der CI-Lauf hing (15.11.2026)."""
     c = APIClient()
-    user.is_verified = lambda: True
+    user.is_verified = _verifiziert
     c.force_authenticate(user)
     return c
 
@@ -94,3 +102,20 @@ class Grundlage(TestCase):
                                       "text": "<p>Hallo <script>x</script></p>", **extra}, format="json")
         self.assertEqual(r.status_code, 201, r.content)
         return r.json()
+
+
+def abfragen_zaehlen(client, url, pruefung=None) -> tuple[int, object]:
+    """Datenbankabfragen einer GET-Anfrage → (Anzahl, Antwort). Zweimal gemessen, der kleinere Wert zählt: ein
+    einmaliger Zugriff (abgelaufener Zwischenspeicher, Sitzung) auf dem langsamen CI-Server verfälscht sonst den
+    Vergleich vorher/nachher; ein echtes N+1 bringt je weiterer Zeile Abfragen und bleibt sichtbar."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    zahlen, antwort = [], None
+    for _ in range(2):
+        with CaptureQueriesContext(connection) as q:
+            antwort = client.get(url)
+        if pruefung is not None:
+            pruefung(antwort)
+        zahlen.append(len(q))
+    return min(zahlen), antwort

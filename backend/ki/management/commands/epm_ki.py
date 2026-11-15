@@ -28,6 +28,7 @@ from ki.steuerung import Entscheidung, Messung, Steuerung
 
 log = logging.getLogger("epm.ki")
 TAKT_S = 5
+EINMAL_HOECHSTENS_S = 600  # --einmal: Sicherheitsgrenze, damit ein Test nie endlos läuft
 CHAT_SCHLUESSEL = -2 * 10**9  # Schlüssel in self.laufend: Chat < Evaluation < Zusammenfassung < Bericht < 0 < Vorgang
 ZUSAMMENFASSUNG_SCHLUESSEL = -5 * 10**8
 VORMERKEN_ALLE_S = 600
@@ -98,6 +99,7 @@ class Dienst:
         except Exception:  # noqa: BLE001 – ohne PP-OCR weiter mit Tesseract
             log.warning("PP-OCR nicht ladbar – Stufe 1 nur mit Tesseract")
         log.info("KI-Dienst bereit (Modell: %s)", self.client.url if self.client else "keins – nur Regeln")
+        beginn = time.monotonic()
         while not self.ende.is_set():
             try:
                 if not self.einmal:  # --einmal (Tests): die Verbindung gehört dem Aufrufer
@@ -110,6 +112,14 @@ class Dienst:
                 self.ende.wait(10)
                 continue
             if self.einmal and not self.laufend and not self._noch_etwas_zu_tun():
+                break
+            if self.einmal and not self.laufend and self.entscheidung.modus in ("pause", "aus"):
+                # --einmal (Tests, Fehlersuche): bei Pause oder „aus“ geschieht nichts mehr – beenden statt endlos
+                # warten (CI 15.11.2026: unter Last pausierte die Steuerung, der Testlauf hing)
+                log.warning("--einmal beendet: %s (%s)", self.entscheidung.modus, self.entscheidung.grund)
+                break
+            if self.einmal and time.monotonic() - beginn > EINMAL_HOECHSTENS_S:
+                log.warning("--einmal nach %d s abgebrochen", EINMAL_HOECHSTENS_S)
                 break
             self.ende.wait(TAKT_S)
         for t in list(self.laufend.values()):
