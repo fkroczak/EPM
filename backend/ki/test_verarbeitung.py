@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from audit.models import SystemEreignis
 from befunde.models import Laborbefund, Laborwert
-from epm.pruefhilfen import Grundlage
+from epm.pruefhilfen import GleicheSeiteEinmalErkennen, Grundlage
 from infusionen.models import Infusionsplan
 from ki import eingang, pipeline
 from ki.models import KiFeld, KiHinweis, KiRohergebnis, KiVorgang
@@ -57,7 +57,7 @@ class EingangTest(Grundlage):
 
 @skipUnless(TESSERACT, "Tesseract fehlt")
 @override_settings(EPM_KI=Path(KI_TMP))
-class VerarbeitungTest(Grundlage):
+class VerarbeitungTest(GleicheSeiteEinmalErkennen, Grundlage):
     def setUp(self):
         super().setUp()
         self.dok = dokument(self.patient, labor_png(nachname="Echt", vorname="Anna"))

@@ -23,7 +23,7 @@ from django.utils import timezone
 from accounts.models import Rolle
 from audit.models import SystemEreignis
 from befunde.models import BiaMessung, Laborbefund
-from epm.pruefhilfen import Grundlage, benutzer, client_fuer
+from epm.pruefhilfen import GleicheSeiteEinmalErkennen, Grundlage, benutzer, client_fuer
 from patienten.models import Dokument, DokumentText, Patient
 
 from . import dienst, dokumente, testbilder
@@ -261,7 +261,7 @@ class EchtesOcrmypdfTest(Basis):
         self.assertEqual(a.seiten, 2)
 
 
-class WerteUebernehmenTest(Basis):
+class WerteUebernehmenTest(GleicheSeiteEinmalErkennen, Basis):
     def test_werte_aus_akte_dokument_ohne_neues_dokument(self):
         c = client_fuer(self.mitarbeiter)
         dok = self.hochladen(testbilder.png(testbilder.seite(testbilder.LABOR), verkleinern=0.67), "labor.png",

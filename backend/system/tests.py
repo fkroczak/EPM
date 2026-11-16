@@ -437,11 +437,16 @@ class Auftraege(Systemverzeichnis):
         self.assertTrue(self.a.get("/api/system/uebersicht/").json()["agent"]["erreichbar"])
 
 
-class EpmWartung(Systemverzeichnis):
+class EpmWartungGrundlage(Systemverzeichnis):
     def aufgabe(self, code, **extra):
         r = self.a.post("/api/system/epm/", {"aufgabe": code, **extra}, format="json")
         self.assertEqual(r.status_code, 200, r.content)
         return r.json()
+
+
+class EpmWartungAlleAufgaben(EpmWartungGrundlage):
+    """Eigene Klasse (15.11.2026): „Datenbank optimieren“ wartet im Test bis zu 5 s je Tabelle, deren Ende VACUUM
+    kürzen möchte, auf die Sperren der offenen Testtransaktion – so läuft das parallel zu den übrigen Wartungstests."""
 
     def test_alle_aufgaben(self):
         for code in ("sitzungen_bereinigen", "datenbank_optimieren", "schutz_pruefen", "konfiguration_pruefen",
@@ -455,6 +460,8 @@ class EpmWartung(Systemverzeichnis):
         self.assertEqual(self.a.post("/api/system/epm/", {"aufgabe": "x"}, format="json").status_code, 400)
         self.assertEqual(SystemEreignis.objects.filter(art="system", details__ereignis="epm_aufgabe").count(), 6)
 
+
+class EpmWartung(EpmWartungGrundlage):
     def test_dokumente_pruefen_findet_fehlende_und_veraenderte(self):
         from django.conf import settings
 

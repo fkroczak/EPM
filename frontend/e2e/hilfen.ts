@@ -68,6 +68,8 @@ export async function anmeldenUI(page: Page, benutzer: string, code: string, ken
   await expect(page.getByRole("heading", { name: "Bestätigungscode" })).toBeVisible();
   await page.getByLabel("Code").fill(code);
   await page.getByRole("button", { name: "Anmelden" }).click();
+  // erst zurück, wenn die Anmeldung fertig ist – sonst trifft ein sofortiges page.goto() noch die Anmeldeseite
+  await expect(page.getByRole("navigation", { name: "Hauptnavigation" })).toBeVisible();
 }
 
 async function csrfVon(ctx: APIRequestContext): Promise<string> {

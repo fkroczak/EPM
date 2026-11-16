@@ -3,7 +3,8 @@
  * freigegebenen Inhalten der Akte, jede Aussage mit Quellenangabe [n]. Nachts für Termine vorbereitet oder auf
  * Anforderung. Gegenprüfung wie beim Berichtsentwurf: unbelegte Werte, Sätze ohne Beleg, Bewertungen markiert.
  */
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { Popover } from "@base-ui/react/popover";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,30 +35,91 @@ function quellLink(patient: number, f: KiFakt | undefined): string | null {
   return f?.link && REITER.has(f.link) ? `/patienten/${patient}/${f.link}` : null;
 }
 
-export function AkteAufEinenBlick({ patient }: { patient: number }) {
-  const { darf, ich } = useAuth();
+/** Fensterstufe, ab der die Akte das Fenster füllt (index.css, .seite-fuellt; seiten/akte/Uebersicht.tsx) */
+export const FUELLT = "(min-width: 80rem) and (min-height: 37.5rem) and (pointer: fine)";
+
+function fuelltAbonnieren(melden: () => void) {
+  const m = window.matchMedia(FUELLT);
+  m.addEventListener("change", melden);
+  return () => m.removeEventListener("change", melden);
+}
+
+/** Füllt die Akte gerade das Fenster (F181: ohne Seiten-Scrollen)? */
+export function useAkteFuellt(): boolean {
+  return useSyncExternalStore(fuelltAbonnieren, () => window.matchMedia(FUELLT).matches, () => false);
+}
+
+/** Zusammenfassungen der Akte (neueste fertige bzw. fehlgeschlagene) und „neu erstellen“ – für Karte und Chip */
+function useAufEinenBlick(patient: number, aktiv: boolean) {
+  const { darf } = useAuth();
   const qc = useQueryClient();
-  const [zu, setZu] = useState(() => zuGemerkt(ich?.id));
-  const umschalten = () => {
-    const neu = !zu;
-    setZu(neu);
-    try { window.localStorage.setItem(merkerSchluessel(ich?.id), neu ? "1" : "0"); } catch { /* ohne Speicher: nur für diese Sitzung */ }
-  };
   const q = useQuery({
     queryKey: ["ki", "zusammenfassungen", patient],
     queryFn: () => api<KiZusammenfassung[]>(`ki/zusammenfassungen/${abfrage({ patient })}`, { hintergrund: true }),
-    enabled: darf("ki_ansehen") && !zu,
+    enabled: darf("ki_ansehen") && aktiv,
     refetchInterval: (a) => ((a.state.data ?? []).some((z) => z.status === "wartet" || z.status === "laeuft") ? 3000 : false),
   });
   const neu = useMutation({
     mutationFn: () => api<KiZusammenfassung>("ki/zusammenfassungen/", { body: { patient } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ki", "zusammenfassungen", patient] }),
   });
-  if (!darf("ki_ansehen")) return null;
   const liste = q.data ?? [];
   const arbeitet = liste.some((z) => z.status === "wartet" || z.status === "laeuft");
   // gezeigt wird die neueste fertige (oder fehlgeschlagene); eine neue in Arbeit läuft daneben als Ladeanzeige
   const z = liste.find((x) => x.status === "fertig") ?? liste.find((x) => x.status === "fehler");
+  return { q, neu, arbeitet, z };
+}
+
+type Stand = ReturnType<typeof useAufEinenBlick>;
+
+function KopfZusatz({ s }: { s: Stand }) {
+  const { darf } = useAuth();
+  return (
+    <>
+      <Chip art="warn" title="Von der KI aus freigegebenen Inhalten der Akte zusammengestellt – keine Bewertung, keine Empfehlung">KI-Entwurf</Chip>
+      {s.z?.von ? <span className="text-[0.8125rem] gedaempft">{seitText(s.z)}</span> : null}
+      <span className="flex-1" />
+      {s.arbeitet ? <span className="flex items-center gap-1.5 text-[0.8125rem] gedaempft" role="status"><Ladekreis groesse={14} />wird erstellt …</span> : null}
+      {darf("ki_berichte") && s.z ? (
+        <Knopf klein variante="geist" icon="neustart" laedt={s.neu.isPending} disabled={s.arbeitet} onClick={() => s.neu.mutate()}>Neu erstellen</Knopf>) : null}
+    </>
+  );
+}
+
+function Koerper({ s, id }: { s: Stand; id: string }) {
+  const { darf } = useAuth();
+  const { q, neu, arbeitet, z } = s;
+  return (
+    <div id={id} className="flex flex-col gap-2.5 min-w-0">
+      {q.isLoading ? <div className="flex items-center gap-2 text-sm gedaempft"><Ladekreis /> Wird geladen …</div> : null}
+      {q.data && !z ? (
+        <div className="flex items-center gap-3 flex-wrap text-sm">
+          <span className="gedaempft">{arbeitet ? "Die Zusammenfassung wird im KI-Dienst erstellt – das kann einige Minuten dauern."
+            : "Noch keine Zusammenfassung für diese Akte."}</span>
+          {darf("ki_berichte") && !arbeitet ? (
+            <Knopf klein variante="pri" laedt={neu.isPending} onClick={() => neu.mutate()}>Jetzt erstellen</Knopf>) : null}
+        </div>) : null}
+      {z ? <Inhalt z={z} /> : null}
+      <Fehleranzeige fehler={q.error ?? neu.error} />
+    </div>
+  );
+}
+
+/**
+ * Karte über dem Raster der Übersicht. Füllt die Akte das Fenster (F181), steht stattdessen der Chip
+ * ``AufEinenBlickChip`` im Aktenkopf – die Karte nähme sonst die Höhe, die zwei Kartenreihen brauchen (15.11.2026).
+ */
+export function AkteAufEinenBlick({ patient }: { patient: number }) {
+  const { darf, ich } = useAuth();
+  const fuellt = useAkteFuellt();
+  const [zu, setZu] = useState(() => zuGemerkt(ich?.id));
+  const umschalten = () => {
+    const neu = !zu;
+    setZu(neu);
+    try { window.localStorage.setItem(merkerSchluessel(ich?.id), neu ? "1" : "0"); } catch { /* ohne Speicher: nur für diese Sitzung */ }
+  };
+  const s = useAufEinenBlick(patient, !zu && !fuellt);
+  if (!darf("ki_ansehen") || fuellt) return null;
   const kopfId = `auf-einen-blick-${patient}`;
   return (
     <Karte className="px-4 py-3 flex flex-col gap-2.5" data-testid="akte-auf-einen-blick" aria-labelledby={kopfId}>
@@ -67,27 +129,40 @@ export function AkteAufEinenBlick({ patient }: { patient: number }) {
           <Icon name={zu ? "runter" : "hoch"} groesse={14} aria-hidden="true" />
           <h2 id={kopfId} className="lbl m-0 text-[0.9375rem]">Auf einen Blick</h2>
         </button>
-        <Chip art="warn" title="Von der KI aus freigegebenen Inhalten der Akte zusammengestellt – keine Bewertung, keine Empfehlung">KI-Entwurf</Chip>
-        {!zu && z?.von ? <span className="text-[0.8125rem] gedaempft">{seitText(z)}</span> : null}
-        <span className="flex-1" />
-        {!zu && arbeitet ? <span className="flex items-center gap-1.5 text-[0.8125rem] gedaempft" role="status"><Ladekreis groesse={14} />wird erstellt …</span> : null}
-        {!zu && darf("ki_berichte") && z ? (
-          <Knopf klein variante="geist" icon="neustart" laedt={neu.isPending} disabled={arbeitet} onClick={() => neu.mutate()}>Neu erstellen</Knopf>) : null}
+        {zu ? <Chip art="warn">KI-Entwurf</Chip> : <KopfZusatz s={s} />}
       </div>
-      {zu ? null : (
-        <div id={`${kopfId}-inhalt`} className="flex flex-col gap-2.5 min-w-0">
-          {q.isLoading ? <div className="flex items-center gap-2 text-sm gedaempft"><Ladekreis /> Wird geladen …</div> : null}
-          {q.data && !z ? (
-            <div className="flex items-center gap-3 flex-wrap text-sm">
-              <span className="gedaempft">{arbeitet ? "Die Zusammenfassung wird im KI-Dienst erstellt – das kann einige Minuten dauern."
-                : "Noch keine Zusammenfassung für diese Akte."}</span>
-              {darf("ki_berichte") && !arbeitet ? (
-                <Knopf klein variante="pri" laedt={neu.isPending} onClick={() => neu.mutate()}>Jetzt erstellen</Knopf>) : null}
-            </div>) : null}
-          {z ? <Inhalt z={z} /> : null}
-          <Fehleranzeige fehler={q.error ?? neu.error} />
-        </div>)}
+      {zu ? null : <Koerper s={s} id={`${kopfId}-inhalt`} />}
     </Karte>
+  );
+}
+
+/** Aktenkopf, wenn die Akte das Fenster füllt: „Auf einen Blick“ als Chip, ein Klick zeigt die Zusammenfassung. */
+export function AufEinenBlickChip({ patient }: { patient: number }) {
+  const { darf } = useAuth();
+  const fuellt = useAkteFuellt();
+  const [offen, setOffen] = useState(false);
+  const s = useAufEinenBlick(patient, offen);
+  if (!darf("ki_ansehen") || !fuellt) return null;
+  const kopfId = `auf-einen-blick-chip-${patient}`;
+  return (
+    <Popover.Root open={offen} onOpenChange={setOffen}>
+      <Popover.Trigger className="chip border-0 cursor-pointer inline-flex items-center gap-1" data-testid="auf-einen-blick-chip"
+        title="KI-Entwurf: was seit dem letzten Termin dazugekommen ist">
+        <Icon name="stern" />Auf einen Blick<Icon name="runter" groesse={12} />
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner side="bottom" align="start" sideOffset={6} collisionPadding={8} className="z-50">
+          <Popover.Popup className="card p-4 flex flex-col gap-2.5 w-[min(40rem,calc(100vw-1rem))] max-h-[min(36rem,calc(100vh-8rem))] overflow-y-auto outline-none"
+            data-testid="akte-auf-einen-blick" aria-labelledby={kopfId}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 id={kopfId} className="lbl m-0 text-[0.9375rem]">Auf einen Blick</h2>
+              <KopfZusatz s={s} />
+            </div>
+            <Koerper s={s} id={`${kopfId}-inhalt`} />
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

@@ -11,6 +11,7 @@ from datetime import timedelta
 
 from django.apps import apps
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import SimpleTestCase
 from django.urls import get_resolver
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -268,12 +269,6 @@ class FirmenTrennung(FirmenDaten):
         kalender = c.get(f"/api/kalender/?von={heute - timedelta(days=200)}&bis={heute + timedelta(days=199)}")
         self.assertIsNotNone(self.leck(kalender, [p.id for p in self.fremd]))
 
-    def test_admin_der_anderen_firma(self):
-        # Benutzer, Server, Sicherung, Import, Modell-Pakete der KI: gemeinsame Verwaltung, nicht je Akte (eigene Tests)
-        self.sweep(self.anmelden(self.rg_admin), auslassen=("api/benutzer/", "api/system/", "api/backup/",
-                                                            "api/altimport/", "api/sitzungen/", "api/rechte/",
-                                                            "api/ki/hochladen/"))
-
     def test_dokument_hochladen_in_fremde_akte(self):
         c = self.anmelden(self.rg_mediziner)
         for p in self.fremd:
@@ -300,6 +295,17 @@ class FirmenTrennung(FirmenDaten):
         s.save()
         self.assertEqual(c.get("/api/auth/status/").json()["benutzer"]["firma"], "rg")
         self.assertEqual(c.get(f"/api/patienten/{self.patient.id}/").status_code, 404)
+
+
+class FirmenTrennungAdmin(FirmenDaten):
+    """Wie FirmenTrennung für den Admin der anderen Firma – eigene Klasse, damit der parallele Testlauf beide
+    Durchläufe über alle Endpunkte gleichzeitig ausführen kann (15.11.2026)."""
+
+    def test_admin_der_anderen_firma(self):
+        # Benutzer, Server, Sicherung, Import, Modell-Pakete der KI: gemeinsame Verwaltung, nicht je Akte (eigene Tests)
+        self.sweep(self.anmelden(self.rg_admin), auslassen=("api/benutzer/", "api/system/", "api/backup/",
+                                                            "api/altimport/", "api/sitzungen/", "api/rechte/",
+                                                            "api/ki/hochladen/"))
 
 
 class Rechte(Grundlage):
@@ -619,3 +625,22 @@ class PdfUndDateien(Grundlage):
         r2 = c.post("/api/auth/anmelden/", {"benutzername": "mitarbeiter", "kennwort": "x"}, format="json")
         # keine Unterscheidung zwischen unbekanntem Namen und falschem Passwort
         self.assertEqual((r.status_code, r.json()), (r2.status_code, r2.json()))
+
+
+class PasswortHashes(SimpleTestCase):
+    """Die Tests hashen mit MD5 (epm/testlauf.py) – im Betrieb muss es beim starken Django-Standard bleiben."""
+
+    def test_betrieb_nutzt_pbkdf2(self):
+        import epm.settings as betrieb
+        from django.conf import global_settings
+
+        hasher = getattr(betrieb, "PASSWORD_HASHERS", global_settings.PASSWORD_HASHERS)
+        self.assertEqual(hasher[0], "django.contrib.auth.hashers.PBKDF2PasswordHasher")
+        self.assertNotIn("MD5", " ".join(hasher))
+
+    def test_testlauf_prueft_weiter_echt(self):
+        """Auch mit dem schnellen Hasher: falsches Passwort scheitert, ein PBKDF2-Hash aus dem Betrieb gilt weiter."""
+        from django.contrib.auth.hashers import check_password, make_password
+
+        self.assertFalse(check_password("falsch", make_password(KENNWORT)))
+        self.assertTrue(check_password(KENNWORT, make_password(KENNWORT, hasher="pbkdf2_sha256")))

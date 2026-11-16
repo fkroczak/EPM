@@ -173,7 +173,10 @@ test("Volle Breite in Stufen: 1280 px", async ({ page }) => {
   await expect(page.getByTestId("raster")).toHaveAttribute("data-spalten", "2"); // SU9: 2 Spalten unter 1440 px
   const main = (await page.locator("main").boundingBox())!;
   const leiste = (await page.locator("aside").first().boundingBox())!;
-  expect(main.width).toBeGreaterThan(1280 - leiste.width - 2);
+  // Bezug ist die Breite der Seite ohne die feste Rinne der Bildlaufleiste (html { scrollbar-gutter: stable }, 026802b)
+  const seite = await page.evaluate(() => document.body.getBoundingClientRect().width);
+  expect(seite).toBeGreaterThan(1280 - 20);
+  expect(main.width).toBeGreaterThan(seite - leiste.width - 2);
   await page.goto("/patienten");
   await expect(page.getByRole("columnheader", { name: /Nächster Termin/ })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: /Katheter/ })).toHaveCount(0);

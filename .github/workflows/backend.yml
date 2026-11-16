@@ -5,8 +5,15 @@
 # - reine Doku-Änderungen (docs/, *.md) lösen keinen Lauf aus
 # - ein neuer Push auf denselben Pull Request bricht den laufenden Lauf ab (auf main nie: dort werden Migrationen
 #   und das Lockfile übernommen)
-# - die Browsertests mit komplettem Stack (der längste Job) laufen nur auf main und beim manuellen Start
-#   („Run workflow“, auch für einen Branch), nicht bei jedem Push auf einen Pull Request
+# - die Browsertests mit komplettem Stack laufen nur auf main und beim manuellen Start („Run workflow“, auch für
+#   einen Branch), nicht bei jedem Push auf einen Pull Request
+#
+# Laufzeit unter 5 Minuten (15.11.2026; vorher Backend 7 min, Browsertests danach 45 min):
+# - Backend-Tests in 4 Teilen auf eigenen Rechnern (EPM_TESTTEIL, nach gemessenen Laufzeiten aufgeteilt:
+#   backend/epm/testlauf.py), Browsertests in Teilen mit je eigenem Stack (frontend/e2e/teile.ts) – alle gleichzeitig
+# - Images der Browsertests mit Zwischenspeicher (werkzeuge/ci-bilder.hcl), Python-Umgebung zwischengespeichert,
+#   Systempakete im Hintergrund
+# - ein Kommentar am Commit mit dem Gesamtergebnis; Einzelheiten nur bei Fehlern (je Teil)
 name: EPM
 
 on:
@@ -26,10 +33,13 @@ concurrency:
 
 jobs:
   tests:
-    name: Tests mit PostgreSQL
+    name: Backend-Tests ${{ matrix.teil }}/4
     runs-on: ubuntu-24.04
-    # normal etwa 20 Minuten; ein hängender Testlauf (15.11.2026) belegte sonst bis zu 6 Stunden
-    timeout-minutes: 45
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        teil: [1, 2, 3, 4]
     services:
       postgres:
         image: postgres:18-alpine
@@ -40,7 +50,7 @@ jobs:
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U epm -d epm"
-          --health-interval 5s --health-timeout 5s --health-retries 12
+          --health-interval 2s --health-timeout 5s --health-retries 30
     env:
       DJANGO_SECRET_KEY: nur-fuer-ci-tests
       DB_HOST: localhost
@@ -55,6 +65,7 @@ jobs:
       # „Text erkennen“ in der Akte (F170): OCRmyPDF und Ghostscript müssen im Test bereitstehen
       EPM_OCRMYPDF_PFLICHT: "1"
       EPM_OCR_PADDLE_PFLICHT: "1"
+      EPM_TESTTEIL: ${{ matrix.teil }}/4
       PYTHONUNBUFFERED: "1"
     defaults:
       run:
@@ -63,17 +74,37 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Systembibliotheken für die PDF-Erzeugung und die Texterkennung (im Hintergrund)
+        run: |
+          {
+            sudo apt-get update -qq \
+              && sudo apt-get install -y -qq --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 \
+                   fonts-ibm-plex fonts-dejavu-core poppler-utils tesseract-ocr tesseract-ocr-osd ghostscript \
+              && sudo cp scans/modelle/tesseract/deu.traineddata /usr/share/tesseract-ocr/5/tessdata/ \
+              && tesseract --list-langs && echo ok > /tmp/apt.fertig || echo fehler > /tmp/apt.fertig
+          } > /tmp/apt.log 2>&1 &
+
       - uses: actions/setup-python@v7
+        id: python
         with:
           python-version: "3.13"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
 
-      - name: Systembibliotheken für die PDF-Erzeugung und die Texterkennung
+      # ganze Umgebung statt nur der Downloads: spart das Installieren (~20 s); neu bei geänderten Abhängigkeiten
+      - name: Python-Umgebung (Zwischenspeicher)
+        id: venv
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/venv
+          key: venv-${{ runner.os }}-${{ steps.python.outputs.python-version }}-${{ hashFiles('backend/requirements.txt') }}
+
+      - name: Abhängigkeiten installieren
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-ibm-plex fonts-dejavu-core poppler-utils tesseract-ocr tesseract-ocr-osd ghostscript >/dev/null
-          sudo cp scans/modelle/tesseract/deu.traineddata /usr/share/tesseract-ocr/5/tessdata/
-          tesseract --list-langs
+          if [ ! -x /home/runner/venv/bin/python ]; then
+            python -m venv /home/runner/venv
+            /home/runner/venv/bin/pip install -q -r requirements.txt
+          fi
+          echo /home/runner/venv/bin >> "$GITHUB_PATH"
+          /home/runner/venv/bin/pip freeze > /tmp/versionen.txt
 
       - name: Modelle der zweiten Texterkennung (Zwischenspeicher)
         uses: actions/cache@v4
@@ -84,10 +115,21 @@ jobs:
       - name: Modelle laden und prüfen
         run: python scans/modelle/holen.py /home/runner/ocr-modelle
 
-      - name: Abhängigkeiten installieren
-        run: pip install -r requirements.txt && pip freeze > /tmp/versionen.txt
+      # Wegwerf-Datenbank der Tests: ohne fsync (Datensicherheit bei Stromausfall ist hier ohne Belang)
+      - name: PostgreSQL für Tests einstellen
+        run: |
+          docker exec ${{ job.services.postgres.id }} psql -q -U epm -d epm \
+            -c "ALTER SYSTEM SET fsync = off" -c "ALTER SYSTEM SET synchronous_commit = off" \
+            -c "ALTER SYSTEM SET full_page_writes = off" -c "SELECT pg_reload_conf()"
+
+      - name: Systembibliotheken fertig
+        run: |
+          while [ ! -f /tmp/apt.fertig ]; do sleep 1; done
+          cat /tmp/apt.log
+          grep -qx ok /tmp/apt.fertig
 
       - name: Migrationen erzeugen, falls Modelle geändert wurden
+        if: matrix.teil == 1
         id: mig
         run: |
           set -o pipefail
@@ -98,7 +140,7 @@ jobs:
           fi
 
       - name: Neue Migrationen ins Repo übernehmen
-        if: steps.mig.outputs.neu == '1' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: matrix.teil == 1 && steps.mig.outputs.neu == '1' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           git config user.name "epm-ci"
           git config user.email "epm-ci@users.noreply.github.com"
@@ -107,28 +149,33 @@ jobs:
           git push
 
       - name: Migrationen vollständig
+        if: matrix.teil == 1
         run: |
           set -o pipefail
           python manage.py makemigrations --check --dry-run 2>&1 | tee -a ci-protokoll.txt
 
       - name: Django-Prüfung
+        if: matrix.teil == 1
         run: |
           set -o pipefail
           python manage.py check 2>&1 | tee -a ci-protokoll.txt
 
-      - name: Tests gegen PostgreSQL
+      - name: Tests gegen PostgreSQL (Teil ${{ matrix.teil }}/4)
         run: |
           set -o pipefail
-          # parallel auf allen Kernen (12.11.2026: seriell ~19 min)
-          python manage.py test --parallel auto --durations 15 --verbosity 2 2>&1 | tee test-ausgabe.txt
+          # parallel auf allen Kernen (12.11.2026: seriell ~19 min); Laufzeit jedes Tests für backend/epm/testzeiten.json
+          python manage.py test --noinput --parallel auto --timing --durations 0 --verbosity 2 2>&1 | tee test-ausgabe.txt
 
       - name: Zusammenfassung
         if: always()
         run: |
           {
-            echo "### Backend-Tests"
+            echo "### Backend-Tests, Teil ${{ matrix.teil }}/4"
             echo '```'
-            grep -v " WARNING django.request: " test-ausgabe.txt | tail -60 || true
+            grep -E "^Testteil " test-ausgabe.txt || true
+            # ohne die Laufzeitliste aller Tests (nur die 15 längsten) und ohne die erwarteten Warnungen
+            grep -v " WARNING django.request: " test-ausgabe.txt | grep -v -E " \.\.\. (ok|skipped)" \
+              | awk '/^Slowest test durations/{d=1} d && /^[0-9.]+s +test/{if (++n > 15) next} {print}' | tail -60 || true
             echo '```'
             echo "<details><summary>Paketversionen</summary>"
             echo
@@ -138,19 +185,19 @@ jobs:
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Ergebnis als Kommentar am Commit
-        if: always()
+      - name: Fehler als Kommentar am Commit
+        if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
           # bei einem Pull Request am letzten Commit des Branches (github.sha wäre der Merge-Commit)
           COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           {
-            echo "**Backend-Tests: ${{ job.status }}** (Lauf ${{ github.run_id }}${{ github.event_name == 'pull_request' && format(', Pull Request #{0}', github.event.number) || '' }})"
+            echo "**Backend-Tests Teil ${{ matrix.teil }}/4: fehlgeschlagen** (Lauf ${{ github.run_id }}${{ github.event_name == 'pull_request' && format(', Pull Request #{0}', github.event.number) || '' }})"
             echo
             echo '```'
             if [ -s test-ausgabe.txt ]; then
-              grep -v " WARNING django.request: " test-ausgabe.txt | tail -c 55000
+              grep -v " WARNING django.request: " test-ausgabe.txt | grep -v -E "^[0-9.]+s +test" | grep -v -E " \.\.\. (ok|skipped)" | tail -c 55000
             else
               echo "keine Testausgabe – Protokoll der Vorbereitung:"
               tail -c 55000 ci-protokoll.txt 2>/dev/null || true
@@ -169,87 +216,132 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: test-ausgabe
+          name: test-ausgabe-${{ matrix.teil }}
           path: backend/test-ausgabe.txt
 
-  frontend:
-    name: Frontend bauen und im Browser testen (echter Stack)
+  lockfile:
+    name: Frontend-Lockfile
     runs-on: ubuntu-24.04
-    needs: tests
-    # nur auf main und beim manuellen Start – bei Pull Requests reichen die Backend-Tests (spart die meisten Minuten)
-    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+    timeout-minutes: 10
+    if: ${{ github.event_name != 'pull_request' }}
     defaults:
       run:
         shell: bash
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v7
-        with:
-          # nach einem Push den neuesten Stand von main (inkl. Migrationen, die der Test-Job gerade erzeugt hat)
-          ref: ${{ github.event_name == 'push' && github.ref || github.sha }}
 
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
 
-      - name: Abhängigkeiten (Lockfile erzeugen bzw. bei neuen Paketen ergänzen)
+      - name: Lockfile erzeugen bzw. bei neuen Paketen ergänzen
         id: npm
-        working-directory: frontend
         run: |
-          set -o pipefail
           if [ ! -f package-lock.json ]; then
-            npm install --no-audit --no-fund 2>&1 | tee -a ../frontend-bau.txt
+            npm install --package-lock-only --no-audit --no-fund
             echo "lock=1" >> "$GITHUB_OUTPUT"
           else
             # neue Abhängigkeit in package.json: Lockfile ergänzen, bestehende Versionen bleiben fest
-            npm install --package-lock-only --no-audit --no-fund 2>&1 | tail -3 | tee -a ../frontend-bau.txt
+            npm install --package-lock-only --no-audit --no-fund 2>&1 | tail -3
             if ! git diff --quiet -- package-lock.json; then echo "lock=1" >> "$GITHUB_OUTPUT"; fi
           fi
-          npm ci --no-audit --no-fund 2>&1 | tail -5 | tee -a ../frontend-bau.txt
 
       - name: Lockfile ins Repo übernehmen
         if: steps.npm.outputs.lock == '1' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           git config user.name "epm-ci"
           git config user.email "epm-ci@users.noreply.github.com"
-          git add frontend/package-lock.json
+          git add package-lock.json
           git commit -m "Frontend: package-lock.json erzeugt/aktualisiert (CI)"
           git pull --rebase
           git push
 
-      - name: Typen prüfen und bauen
-        working-directory: frontend
-        env:
-          NO_COLOR: "1"
+  browser:
+    name: Browsertests ${{ matrix.teil }}/12
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # nur auf main und beim manuellen Start – bei Pull Requests reichen die Backend-Tests (spart die meisten Minuten)
+    if: ${{ github.event_name != 'pull_request' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # frontend/e2e/teile.ts – jeder Teil mit eigenem Stack
+        teil: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      # während die Images gebaut werden: Abhängigkeiten, Browser, Programme für Sicherung und Übertragung
+      - name: Vorbereitungen (im Hintergrund)
         run: |
-          rc=0
-          npm run build > ../bau-roh.txt 2>&1 || rc=$?
-          grep -v "dist/assets/" ../bau-roh.txt | tee -a ../frontend-bau.txt
-          exit $rc
+          {
+            (cd frontend && npm ci --no-audit --no-fund && npx playwright install --with-deps chromium > /dev/null) \
+              && sudo apt-get install -y -qq gnupg rclone jq > /dev/null && rclone --version > /tmp/rclone.txt && head -1 /tmp/rclone.txt \
+              && echo ok > /tmp/vorbereitung.fertig || echo fehler > /tmp/vorbereitung.fertig
+          } > /tmp/vorbereitung.log 2>&1 &
 
-      - name: Programme für Sicherung und Übertragung (GnuPG, rclone, jq)
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq gnupg rclone jq > /dev/null && rclone version | head -1
+      - name: Versions-Tag der Images (wie im Betrieb X.Y.Z-Commit)
+        run: echo "EPM_CI_TAG=$(tr -d ' \t\r\n' < VERSION)-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
-      - name: Stack starten (Images bauen, Musterdaten, Testkonten)
+      # containerd als Image-Speicher: Buildx baut dann direkt in Docker (Treiber „docker“, Zwischenspeicher der Actions
+      # nutzbar) – sonst wandert jedes ~2 GB große Image als Tar-Archiv aus einem eigenen Buildx-Container (~40 s)
+      - name: Docker mit containerd-Image-Speicher
+        run: |
+          konf=/etc/docker/daemon.json
+          { sudo cat "$konf" 2>/dev/null || echo '{}'; } | jq '. + {"features": ((.features // {}) + {"containerd-snapshotter": true})}' > /tmp/daemon.json
+          sudo cp /tmp/daemon.json "$konf"
+          sudo systemctl restart docker
+          docker info -f '{{.DriverStatus}}'
+
+      - uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+
+      - name: Images bauen (Zwischenspeicher)
+        uses: docker/bake-action@v6
+        with:
+          source: .
+          files: werkzeuge/ci-bilder.hcl
+          load: true
+          # Zwischenspeicher schreibt nur Teil 1 (alle Teile bauen dasselbe), gelesen wird überall
+          set: |
+            backend.cache-from=type=gha,scope=epm-backend
+            web.cache-from=type=gha,scope=epm-web
+            ${{ matrix.teil == 1 && 'backend.cache-to=type=gha,scope=epm-backend,mode=max' || '' }}
+            ${{ matrix.teil == 1 && 'web.cache-to=type=gha,scope=epm-web,mode=max' || '' }}
+
+      - name: Vorbereitungen fertig
+        run: |
+          while [ ! -f /tmp/vorbereitung.fertig ]; do sleep 1; done
+          cat /tmp/vorbereitung.log
+          grep -qx ok /tmp/vorbereitung.fertig
+
+      - name: Stack starten (Musterdaten, Testkonten)
+        env:
+          EPM_CI_OHNE_BAU: "1"
         run: |
           set -o pipefail
           werkzeuge/ci-stack.sh start 2>&1 | tee stack.txt
 
-      - name: Browser installieren
-        working-directory: frontend
-        run: npx playwright install --with-deps chromium > /dev/null
-
-      - name: Browsertests
+      - name: Browsertests (Teil ${{ matrix.teil }}/12)
         working-directory: frontend
         env:
           EPM_CI_BASIS: /tmp/epm-ci
-          # beim manuellen Start folgen Bildschirmfotos mit Musterdaten – dann die Datenbank nicht leeren
-          EPM_OHNE_LEEREN: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+          EPM_E2E_TEIL: ${{ matrix.teil }}
         run: |
           set -o pipefail
           npx playwright test 2>&1 | tee ../e2e-ausgabe.txt
 
       - name: Bildschirmfotos (nur bei manuellem Start) in den Branch „bildschirmfotos“
-        if: success() && github.event_name == 'workflow_dispatch'
+        # Teil 8 enthält den Import (Bilder des Imports) und leert die Datenbank nicht
+        if: success() && github.event_name == 'workflow_dispatch' && matrix.teil == 8
         working-directory: frontend
         env:
           EPM_BILDER: "1"
@@ -268,62 +360,101 @@ jobs:
           git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" \
             push -q -f "https://github.com/${GITHUB_REPOSITORY}.git" bildschirmfotos
 
+      - name: Zusammenfassung
+        if: always()
+        run: |
+          {
+            echo "### Browsertests, Teil ${{ matrix.teil }}/12"
+            echo '```'
+            grep -E "^\s+[✓✘-] |passed|failed|skipped|flaky|did not run" e2e-ausgabe.txt | tail -80 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Protokolle des Stacks
         if: failure()
         run: |
           werkzeuge/ci-stack.sh protokoll > audit.txt 2>&1 || true
           werkzeuge/ci-stack.sh logs > stack-logs.txt 2>&1 || true
 
-      - name: Ergebnis als Kommentar am Commit
-        if: always()
+      - name: Fehler als Kommentar am Commit
+        if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
           COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           ende() { [ -s "$2" ] && tail -c "$1" "$2" | iconv -f utf-8 -t utf-8 -c || true; }
           {
-            echo "**Frontend und Browsertests: ${{ job.status }}** (Lauf ${{ github.run_id }})"
+            echo "**Browsertests Teil ${{ matrix.teil }}/12: fehlgeschlagen** (Lauf ${{ github.run_id }})"
             echo
             if [ -s e2e-ausgabe.txt ]; then
               echo '```'; ende 40000 e2e-ausgabe.txt; echo '```'
             fi
-            if [ "${{ job.status }}" != "success" ]; then
-              echo "<details><summary>Bau</summary>"; echo; echo '```'; ende 12000 frontend-bau.txt; echo '```'; echo "</details>"
-              echo "<details><summary>Stack</summary>"; echo; echo '```'; ende 2000 stack.txt; echo; ende 4000 stack-logs.txt; echo '```'; echo "</details>"
-            fi
+            echo "<details><summary>Vorbereitung und Stack</summary>"; echo; echo '```'
+            ende 3000 /tmp/vorbereitung.log; echo; ende 2000 stack.txt; echo; ende 4000 stack-logs.txt
+            echo '```'; echo "</details>"
           } > kommentar.md
           senden() { head -c 64000 "$1" | iconv -f utf-8 -t utf-8 -c > "$1.kurz" || true
                      gh api "repos/${{ github.repository }}/commits/$COMMIT/comments" -F body=@"$1.kurz" > /dev/null; }
           senden kommentar.md
-          if [ "${{ job.status }}" != "success" ]; then
-            # Seitenzustand beim Fehler (error-context.md je Test) – zeigt ohne Artefakt-Download, was die Oberfläche anzeigte
-            if ls frontend/test-results/*/error-context.md > /dev/null 2>&1; then
-              {
-                echo "**Seitenzustand der fehlgeschlagenen Browsertests** (Lauf ${{ github.run_id }})"
-                for f in frontend/test-results/*/error-context.md; do
-                  echo; echo "<details><summary>$(basename "$(dirname "$f")")</summary>"; echo; echo '```'
-                  # ohne die Seitenleiste (immer gleich) – sonst reicht der Platz nicht bis zum Inhalt der Seite
-                  if grep -q -- '- main' "$f"; then
-                    { sed -n '1,/^# Page snapshot/p' "$f"; sed -n '/^# Page snapshot/,$p' "$f" | sed -n '/- main/,$p'; } \
-                      | head -c 14000 | iconv -f utf-8 -t utf-8 -c || true
-                  else
-                    head -c 14000 "$f" | iconv -f utf-8 -t utf-8 -c || true
-                  fi
-                  echo; echo '```'; echo "</details>"
-                done
-              } > kontext.md
-              senden kontext.md
-            fi
-            if [ -s audit.txt ]; then
-              { echo "**Audit-Log, abgewiesene Anfragen, Fehler im Backend** (Lauf ${{ github.run_id }})"; echo; echo '```'
-                head -c 62000 audit.txt | iconv -f utf-8 -t utf-8 -c || true; echo '```'; } > audit.md
-              senden audit.md
-            fi
+          # Seitenzustand beim Fehler (error-context.md je Test) – zeigt ohne Artefakt-Download, was die Oberfläche anzeigte
+          if ls frontend/test-results/*/error-context.md > /dev/null 2>&1; then
+            {
+              echo "**Seitenzustand der fehlgeschlagenen Browsertests, Teil ${{ matrix.teil }}/12** (Lauf ${{ github.run_id }})"
+              for f in frontend/test-results/*/error-context.md; do
+                echo; echo "<details><summary>$(basename "$(dirname "$f")")</summary>"; echo; echo '```'
+                # ohne die Seitenleiste (immer gleich) – sonst reicht der Platz nicht bis zum Inhalt der Seite
+                if grep -q -- '- main' "$f"; then
+                  { sed -n '1,/^# Page snapshot/p' "$f"; sed -n '/^# Page snapshot/,$p' "$f" | sed -n '/- main/,$p'; } \
+                    | head -c 14000 | iconv -f utf-8 -t utf-8 -c || true
+                else
+                  head -c 14000 "$f" | iconv -f utf-8 -t utf-8 -c || true
+                fi
+                echo; echo '```'; echo "</details>"
+              done
+            } > kontext.md
+            senden kontext.md
           fi
+          if [ -s audit.txt ]; then
+            { echo "**Audit-Log, abgewiesene Anfragen, Fehler im Backend, Teil ${{ matrix.teil }}/12** (Lauf ${{ github.run_id }})"; echo; echo '```'
+              head -c 62000 audit.txt | iconv -f utf-8 -t utf-8 -c || true; echo '```'; } > audit.md
+            senden audit.md
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: e2e-ausgabe-${{ matrix.teil }}
+          path: e2e-ausgabe.txt
+          if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: playwright-ergebnisse
+          name: playwright-ergebnisse-${{ matrix.teil }}
           path: frontend/test-results/
           if-no-files-found: ignore
+
+  ergebnis:
+    name: Ergebnis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: [tests, lockfile, browser]
+    if: ${{ always() }}
+    steps:
+      - name: Ergebnis als Kommentar am Commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          zeile() { case "$2" in success) z="✅ erfolgreich";; skipped) z="– nicht gelaufen";; cancelled) z="⏹ abgebrochen";; *) z="❌ fehlgeschlagen";; esac; echo "- $1: $z"; }
+          {
+            echo "**CI: ${{ (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) && 'fehlgeschlagen' || 'erfolgreich' }}** (Lauf ${{ github.run_id }}${{ github.event_name == 'pull_request' && format(', Pull Request #{0}', github.event.number) || '' }})"
+            echo
+            zeile "Backend-Tests (4 Teile)" "${{ needs.tests.result }}"
+            zeile "Browsertests (12 Teile, je eigener Stack)" "${{ needs.browser.result }}"
+            zeile "Frontend-Lockfile" "${{ needs.lockfile.result }}"
+            echo
+            echo "Einzelheiten: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} – bei Fehlern je Teil ein eigener Kommentar."
+          } > kommentar.md
+          gh api "repos/${{ github.repository }}/commits/$COMMIT/comments" -F body=@kommentar.md > /dev/null
+          ! grep -q "❌\|⏹" kommentar.md

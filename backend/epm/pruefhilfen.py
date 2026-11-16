@@ -119,3 +119,76 @@ def abfragen_zaehlen(client, url, pruefung=None) -> tuple[int, object]:
             pruefung(antwort)
         zahlen.append(len(q))
     return min(zahlen), antwort
+
+
+class GleicheSeiteEinmalErkennen:
+    """Texterkennung derselben Seite nur einmal je Testprozess (15.11.2026, CI-Laufzeit).
+
+    Für Tests, deren Gegenstand nicht die Erkennung selbst ist (KI-Ablauf, Scan-Dienst, Zuordnen, Werte übernehmen):
+    Sie lassen dasselbe Testbild oft mehrfach erkennen – je Seite mehrere Sekunden Tesseract und PP-OCR. Die erste
+    Erkennung eines Bildes läuft echt; jede weitere mit gleichem Bild, gleichen Einstellungen, gleicher Wörterliste,
+    gleicher Sparstufe und gleichem Verfahren bekommt eine Kopie dieses Ergebnisses. Die Fortschrittsmeldungen
+    (``schritt``) der echten Erkennung werden aufgezeichnet und bei jeder Wiederholung in derselben Folge gemeldet.
+
+    Als Mixin vor der Testklasse: ``class XTest(GleicheSeiteEinmalErkennen, Grundlage)``.
+    """
+
+    _ergebnisse: dict = {}
+
+    @staticmethod
+    def _schluessel(roh, einstellungen, woerterliste, paddle, textebene, stufe):
+        import hashlib
+        import json
+
+        liste = str(woerterliste)
+        if woerterliste and Path(liste).is_file():
+            liste = hashlib.sha256(Path(liste).read_bytes()).hexdigest()
+        return (hashlib.sha256(roh.bild.tobytes()).hexdigest(), roh.bild.shape, roh.herkunft, roh.dpi,
+                repr(roh.digital), repr(roh.exif), json.dumps(einstellungen, sort_keys=True, default=str), liste,
+                None if paddle is None else (type(paddle).__name__, id(paddle)), textebene, stufe)
+
+    @classmethod
+    def setUpClass(cls):
+        import copy
+        from unittest import mock
+
+        from scans.ocr import erkennung
+
+        echt = erkennung.seite_erkennen
+
+        def seite_erkennen(roh, einstellungen, *, woerterliste=None, paddle=None, textebene=True, stufe=0,
+                           schritt=None):
+            schluessel = cls._schluessel(roh, einstellungen, woerterliste, paddle, textebene, stufe)
+            gemerkt = GleicheSeiteEinmalErkennen._ergebnisse.get(schluessel)
+            if gemerkt is None:
+                schritte = []
+
+                def aufzeichnen(text):
+                    schritte.append(text)
+                    if schritt is not None:
+                        schritt(text)
+
+                ergebnis = echt(roh, einstellungen, woerterliste=woerterliste, paddle=paddle, textebene=textebene,
+                                stufe=stufe, schritt=aufzeichnen)
+                GleicheSeiteEinmalErkennen._ergebnisse[schluessel] = (copy.deepcopy(ergebnis), schritte)
+                return ergebnis
+            ergebnis, schritte = gemerkt
+            for text in schritte:
+                if schritt is not None:
+                    schritt(text)
+            return copy.deepcopy(ergebnis)
+
+        cls._ocr_patch = mock.patch.object(erkennung, "seite_erkennen", seite_erkennen)
+        cls._ocr_patch.start()
+        try:
+            super().setUpClass()
+        except Exception:
+            cls._ocr_patch.stop()
+            raise
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            super().tearDownClass()
+        finally:
+            cls._ocr_patch.stop()

@@ -10,7 +10,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO="$PWD"
 B="${EPM_CI_BASIS:-/tmp/epm-ci}"
-TAG="${EPM_CI_TAG:-ci}"
+# Tag wie im Betrieb (X.Y.Z-Commit): nur solche Versionen erkennt der Systemagent (Software, Notfallpaket)
+TAG="${EPM_CI_TAG:-$(tr -d " \t\r\n" < VERSION)-$(git rev-parse --short=7 HEAD 2>/dev/null || echo 0000000)}"
 DOCKER="docker"; [[ $EUID -eq 0 ]] || DOCKER="sudo docker"
 # WebDAV-Ziel für die Übertragung der Sicherungen (Browsertest sicherung.spec.ts): rclone serve webdav, nur lokal
 WEBDAV="${EPM_CI_WEBDAV:-/tmp/epm-ci-webdav}"
@@ -49,13 +50,19 @@ for e in E.objects.filter(art__in=arten).order_by('id')[:200]:
   *) sed -n 2,8p "$0"; exit 1 ;;
 esac
 
-echo "==> Images bauen (epm-backend:$TAG, epm-web:$TAG)"
-for bild in backend web; do
-  ordner=$([ "$bild" = web ] && echo frontend || echo backend)
-  if ! $DOCKER build --progress=plain -t "epm-$bild:$TAG" "$ordner" >"/tmp/bau-$bild.log" 2>&1; then
-    echo "Bau von epm-$bild fehlgeschlagen, letzte Zeilen:"; tail -80 "/tmp/bau-$bild.log"; exit 1
-  fi
-done
+if [[ -n "${EPM_CI_OHNE_BAU:-}" ]]; then
+  # CI: Images hat der Workflow schon gebaut (docker buildx bake mit Zwischenspeicher, werkzeuge/ci-bilder.hcl)
+  echo "==> Images vorhanden (epm-backend:$TAG, epm-web:$TAG)"
+  $DOCKER image inspect "epm-backend:$TAG" "epm-web:$TAG" >/dev/null
+else
+  echo "==> Images bauen (epm-backend:$TAG, epm-web:$TAG)"
+  for bild in backend web; do
+    ordner=$([ "$bild" = web ] && echo frontend || echo backend)
+    if ! $DOCKER build --progress=plain -t "epm-$bild:$TAG" "$ordner" >"/tmp/bau-$bild.log" 2>&1; then
+      echo "Bau von epm-$bild fehlgeschlagen, letzte Zeilen:"; tail -80 "/tmp/bau-$bild.log"; exit 1
+    fi
+  done
+fi
 
 echo "==> Projektverzeichnis $B"
 sudo rm -rf "$B"
@@ -75,6 +82,7 @@ sed -e "s#^DJANGO_ALLOWED_HOSTS=.*#DJANGO_ALLOWED_HOSTS=localhost#" \
 cat > "$B/.env" <<EOF
 COMPOSE_FILE=compose.yaml
 EPM_BIND_IP=127.0.0.1
+EPM_OCR_THREADS=${EPM_CI_OCR_THREADS:-$(nproc)}
 EPM_VERSION=$TAG
 EOF
 chmod 0644 "$B/secrets/"*
@@ -89,12 +97,16 @@ sudo chmod 0400 "$B/nginx/certs/epm.key"
 
 echo "==> Stack starten"
 compose up -d --quiet-pull
-for _ in $(seq 1 60); do
-  status="$($DOCKER inspect -f '{{.State.Health.Status}}' "$(compose ps -q backend)" 2>/dev/null || true)"
-  [[ "$status" == "healthy" ]] && break
-  sleep 3
+# Bereit, sobald das Backend über Nginx antwortet (Migrationen fertig). Nicht auf „healthy“ warten: Docker prüft erst
+# nach dem Intervall des Healthchecks (30 s) – das kostete in jedem CI-Teil bis zu 30 s.
+bereit=""
+for _ in $(seq 1 180); do
+  if curl -ksf https://localhost/api/auth/status/ -o /dev/null; then bereit=1; break; fi
+  laeuft="$($DOCKER inspect -f '{{.State.Running}}' "$(compose ps -aq backend)" 2>/dev/null || true)"
+  [[ "$laeuft" == "false" ]] && break
+  sleep 1
 done
-if [[ "$status" != "healthy" ]]; then
+if [[ -z "$bereit" ]]; then
   echo "Backend startet nicht:"; compose logs --tail 80 backend; exit 1
 fi
 
