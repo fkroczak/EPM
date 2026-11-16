@@ -380,6 +380,7 @@ function KontakteKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
 function StammKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
   const { patient: p, bearbeiten, stammdatenBearbeiten } = useAkte();
   const adresse = [p.strasse, [p.plz, p.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  const arzt = p.kopf?.hausarzt ?? null;
   return (
     <KarteOderAbschnitt rahmenlos={rahmenlos} testid="stammdaten"
       className="px-4 sm:px-[1.375rem] py-4 sm:py-[1.125rem] grid grid-cols-[minmax(6.25rem,max-content)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm"
@@ -397,7 +398,13 @@ function StammKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
         {[VERSICHERUNGSARTEN[p.versicherungsart] !== "nicht erfasst" ? VERSICHERUNGSARTEN[p.versicherungsart] : "",
           p.krankenkasse].filter(Boolean).join(" · ") || "—"}</span>
       <span className="gedaempft">Versichertennummer</span><span className="num" data-testid="versichertennummer">{p.versichertennummer || "—"}</span>
-      {p.hausarzt ? <><span className="gedaempft">Hausarzt</span><span title="bisheriger Freitext; Ärzte mit Kontaktdaten unter „Ärzte“">{p.hausarzt}</span></> : null}
+      {/* Hausarzt aus der Ärzteliste mit Link (Datenpflege im Menü „Freigaben“, 16.11.2026); der Freitext aus dem
+          Altbestand nur, solange er noch nicht übernommen ist */}
+      {arzt ? <><span className="gedaempft">Hausarzt</span><span data-testid="hausarzt-link">
+        <Link to={`/aerzte?id=${arzt.id}`} className="font-medium">{arzt.name}</Link>
+        {arzt.telefon ? <> · <span className="num">{arzt.telefon}</span></> : null}
+      </span></> : null}
+      {p.hausarzt ? <><span className="gedaempft">{arzt ? "Hausarzt (Freitext)" : "Hausarzt"}</span><span title="bisheriger Freitext; Ärzte mit Kontaktdaten unter „Ärzte“ – im Menü „Freigaben“ übernehmen">{p.hausarzt}</span></> : null}
       <span className="gedaempft">Überweisung</span><span>{p.ueberweisung_durch || "—"}</span>
       <span className="gedaempft">Größe</span><span className="num">{p.groesse_cm != null ? `${zahl(p.groesse_cm)} cm` : "—"}</span>
     </KarteOderAbschnitt>
@@ -411,11 +418,16 @@ function StammKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
  */
 function ImportHinweise() {
   const { patient } = useAkte();
+  const { darf } = useAuth();
   if (!klartext(patient.bemerkung).trim()) return null;
   return (
     <Karte className="p-4 flex flex-col gap-2" data-testid="import-hinweise">
       <KartenKopf titel="Hinweise aus der Altdaten-Übernahme"
-        unter="Werte, die beim Import nicht ins vorgesehene Feld passten – im Wortlaut des Altsystems." />
+        unter="Werte, die beim Import nicht ins vorgesehene Feld passten – im Wortlaut des Altsystems."
+        rechts={darf("datenpflege_freigeben")
+          ? <KnopfLink klein variante="geist" icon="haken" to={`/freigaben?patient=${patient.id}`}
+              title="Die KI bereitet vor, die Hinweise in die richtigen Felder zu übertragen – Sie geben frei">Aufräumen</KnopfLink>
+          : null} />
       <Richtext html={patient.bemerkung} className="text-sm" />
     </Karte>
   );

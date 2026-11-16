@@ -57,6 +57,27 @@ sudo epm-ki status | aus
 Unter 12 GB RAM / 4 Kernen bleibt der KI-Dienst von selbst aus. Plan: [`docs/KI-ERWEITERUNG-PLAN-2026-10-14.md`](docs/KI-ERWEITERUNG-PLAN-2026-10-14.md),
 Betrieb: [`docs/KI-BETRIEB.md`](docs/KI-BETRIEB.md), API: [`docs/KI-API.md`](docs/KI-API.md), Datenschutz: [`docs/DATENSCHUTZ.md`](docs/DATENSCHUTZ.md) § 7.
 
+## Freigaben (16.11.2026)
+Menüpunkt **Freigaben**: alles, was ein Mensch freigeben muss, an einer Stelle – Datenpflege aus dem Altbestand,
+Infusionsplan-Entwürfe (Recht „Infusionspläne freigeben“) und der Weg zur KI-Prüfung. **Datenpflege**: Regeln lesen
+Freitext der Akten (Telefon mit Namen dahinter, Hausarzt/Überweisung mit Adresse, „Hinweise aus der
+Altdaten-Übernahme“) und bereiten Schritte vor – Bezugsperson mit Beziehung und Nummer anlegen, Arzt aus der Ärzteliste
+zuordnen (vorhandener Treffer oder neu), Telefonfeld bereinigen, erledigten Hinweis entfernen. Unsichere Vorschläge
+(z. B. „Ehefrau“ nur vermutet) liest nachts das lokale KI-Modell gegen; es ändert nur den Vorschlag, nie die Akte
+(DB-Rolle `epm_ki`). Jeder Vorschlag zeigt vorher → Schritte → nachher, jeder Schritt ist abwählbar und bearbeitbar.
+**Freigeben** setzt erst nach 60 Sekunden um („Rückgängig“ bis dahin); umgesetzt wird mit den Rechten der freigebenden
+Person, im Audit-Log und im Verlauf der Akte. „Altbestand durchsuchen“ erstellt Vorschläge sofort, der OCR-Dienst
+alle 6 Stunden. Code: `backend/freigaben/`, Seite `frontend/src/seiten/Freigaben.tsx`.
+Erweiterungen (16.11.2026): **Sammelfreigabe** „Alle eindeutigen freigeben“ (nur Vorschläge ohne offene Frage, ein
+gemeinsames Rückgängig); **doppelte Ärzte zusammenführen** (gleicher Name ohne Titel, Telefon oder E-Mail; Werte je
+Feld wählbar, Zuordnungen werden umgehängt, der Rest deaktiviert); **weitere Import-Hinweise** (Größe, E-Mail,
+Name/Adresse vollständig; was kein Feld hat, kommt als Eintrag in die Karteikarte); **„+“/„INAKTIV“ im Namen**: Name
+bereinigen und Akte abschließen – Anlass und Datum aus den letzten 5 Kontakten (Regeln, nachts KI mit wörtlichem
+Zitat), Unklares wird abgefragt, ein Abschluss kommt nie in die Sammelfreigabe; **Lernen aus Korrekturen**
+(Beziehung, gewählter Arzt, abgewählte Schritte, Anlass – ab 3 gleichen Entscheidungen vorbelegt, ab 5 eindeutig).
+Neue Rechte (Benutzer › Rechte › „Freigaben und Datenpflege“, Standard ab Mitarbeiter): „Datenpflege freigeben“ und
+„Sammelfreigabe“; jeder Schritt verlangt zusätzlich sein eigenes Recht (z. B. Akten abschließen, Ärzte pflegen).
+
 ## Diktate (23.10.2026)
 Im Bericht (Arztbrief, Konsultationsbericht …) und im Kommentar des Infusionsplans: **Diktat aufnehmen** → im Browser
 sprechen (PC, Mac, Handy im VPN) → „sofort“ oder „heute Nacht“, „ich selbst“ oder „Sekretariat“ → der OCR-Dienst schreibt

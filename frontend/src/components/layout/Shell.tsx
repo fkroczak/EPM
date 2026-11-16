@@ -10,6 +10,7 @@ import { Menu as BaseMenu } from "@base-ui/react/menu";
 import { RECHTE_GEAENDERT, abfrage, api } from "@/lib/api";
 import type { Seite as ApiSeite } from "@/lib/api";
 import { useKiZurPruefung } from "@/lib/ki";
+import { useFreigabenOffen } from "@/lib/freigaben";
 import { useAuth, useIch } from "@/lib/auth";
 import { datum, initialen, nummer, zeitpunkt } from "@/lib/format";
 import { ROLLEN } from "@/lib/typen";
@@ -88,6 +89,7 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
   const scansOffen = useScansOffen();
   const diktateOffen = useDiktatStand().data?.offen ?? 0;
   const kiZurPruefung = useKiZurPruefung();
+  const freigabenOffen = useFreigabenOffen();
   const navigate = useNavigate();
   const admin = [
     // Übersicht mit Ampel und häufigen Aufgaben (Wunsch 10.10.2026)
@@ -137,6 +139,9 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
         <NavEintrag zu="/" icon="start" text="Start" ende />
         {darf("akten_lesen") ? <NavEintrag zu="/patienten" icon="patienten" text="Patienten" /> : null}
         {darf("akten_lesen") ? <NavEintrag zu="/kalender" icon="kalender" text="Kalender" /> : null}
+        {/* Freigaben (16.11.2026): alles, was freigegeben werden muss, an einer Stelle */}
+        {darf("datenpflege_freigeben") || darf("plaene_freigeben") || darf("ki_ansehen")
+          ? <NavEintrag zu="/freigaben" icon="haken" text="Freigaben" zahl={freigabenOffen} testid="nav-freigaben" /> : null}
         {darf("akten_lesen") ? <NavEintrag zu="/infusionsplaene" icon="tropfen" text="Infusionspläne" /> : null}
         {/* Rolle „Keine Berechtigung“: keine gemeinsamen Listen */}
         {ich.rolle !== "keine" ? <NavEintrag zu="/versorger" icon="versorger" text="Versorger" /> : null}

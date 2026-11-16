@@ -79,6 +79,8 @@ const router = createBrowserRouter([
       { path: "datenschutz", ...seite(() => import("./seiten/Datenschutz").then(({ Datenschutz }) => <MitRecht recht={["datenschutz_bearbeiten", "datenschutz_entscheiden"]}><Datenschutz /></MitRecht>)) },
       // Diktate fürs Sekretariat (23.10.2026)
       { path: "diktate", ...seite(() => import("./seiten/Diktate").then(({ Diktate }) => <MitRecht recht={["eintraege_erfassen", "diktieren"]} titel="Diktate"><Diktate /></MitRecht>)) },
+      // Freigaben (16.11.2026): Datenpflege-Vorschläge, Plan-Entwürfe, KI-Prüfung – mit 60 s Rückgängig
+      { path: "freigaben", ...seite(() => import("./seiten/Freigaben").then(({ Freigaben }) => <MitRecht recht={["datenpflege_freigeben", "plaene_freigeben", "ki_ansehen"]} titel="Freigaben"><Freigaben /></MitRecht>)) },
       { path: "scans", ...seite(() => import("./seiten/scans/Scans").then(({ Scans }) => <MitRecht recht="scans_bearbeiten" titel="Scans"><Scans /></MitRecht>)) },
       // KI (Experimentell, 14.10.2026): Prüf-Queue, Prüfansicht, Qualität
       { path: "ki", ...seite(() => import("./seiten/ki/KiQueue").then(({ KiQueue }) => <MitRecht recht="ki_ansehen" titel="KI (Experimentell)"><KiQueue /></MitRecht>)) },

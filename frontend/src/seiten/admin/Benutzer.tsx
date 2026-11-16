@@ -79,6 +79,8 @@ const RECHTE_BEREICHE: [string, string[]][] = [
   ["Akten und Einträge", ["akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen", "akten_wieder_oeffnen"]],
   ["Scans und Diktate", ["scans_bearbeiten", "diktieren"]],
   ["Infusionspläne", ["plaene_anlegen", "plaene_freigeben", "plaene_abschliessen"]],
+  // Menü „Freigaben“ (16.11.2026)
+  ["Freigaben und Datenpflege", ["datenpflege_freigeben", "sammelfreigabe"]],
   ["Berichte, Schreiben, Fall-Dokumente", ["berichte_freigeben", "schreiben_freigeben", "dokumente_finalisieren"]],
   ["Dokumente umhängen und löschen", ["dokumente_umhaengen", "dokumente_loeschen", "akten_loeschen"]],
   ["Datenschutz", ["datenschutz_bearbeiten", "datenschutz_entscheiden"]],

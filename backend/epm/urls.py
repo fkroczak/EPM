@@ -28,6 +28,7 @@ from korrespondenz.api import SchreibenViewSet
 from faelle import api as faelle
 from scans.api import ScanViewSet
 from ki import api as ki
+from freigaben import api as freigaben
 
 router = DefaultRouter()
 router.register("startseite", StartseiteViewSet, basename="startseite")
@@ -200,6 +201,16 @@ urlpatterns = [
     path("api/backup/<str:stempel>/datei/", backup.DateiView.as_view()),
     # KI (Experimentell): Stand, Einstellungen, Qualität, Evaluation
     path("api/ki/stand/", ki.StandView.as_view()),
+    # Menü „Freigaben“ (16.11.2026): Datenpflege-Vorschläge, Plan-Entwürfe; Freigabe mit 60 s Rückgängig
+    path("api/freigaben/", freigaben.FreigabenView.as_view()),
+    path("api/freigaben/zaehler/", freigaben.ZaehlerView.as_view()),
+    path("api/freigaben/suchen/", freigaben.SuchenView.as_view()),
+    path("api/freigaben/datenpflege/sammel/", freigaben.SammelView.as_view()),
+    path("api/freigaben/datenpflege/<int:pk>/<str:aktion>/", freigaben.DatenpflegeView.as_view()),
+    path("api/freigaben/aerzte/<int:pk>/<str:aktion>/", freigaben.AerzteView.as_view()),
+    path("api/freigaben/gruppe/<uuid:gruppe>/zuruecknehmen/", freigaben.GruppeView.as_view()),
+    path("api/freigaben/plaene/<int:pk>/freigeben/", freigaben.PlanFreigebenView.as_view()),
+    path("api/freigaben/<int:pk>/<str:aktion>/", freigaben.FreigabeView.as_view()),
     path("api/ki/einstellungen/", ki.EinstellungenView.as_view()),
     path("api/ki/rechtsgrundlage/", ki.RechtsgrundlageView.as_view()),
     path("api/ki/qualitaet/", ki.QualitaetView.as_view()),

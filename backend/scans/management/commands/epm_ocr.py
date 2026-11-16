@@ -159,6 +159,7 @@ class Command(BaseCommand):
             if scan is None:
                 if einmal:
                     break
+                freigaben_im_leerlauf()
                 time.sleep(2)
                 continue
             log.info("Erkenne %s", scan)
@@ -172,6 +173,27 @@ class Command(BaseCommand):
             ende["scan"] = None
             zaehler["bearbeitet"] += 1
         close_old_connections()
+
+
+_DATENPFLEGE_ALLE_S = 6 * 3600
+_zuletzt_datenpflege = [0.0]
+
+
+def freigaben_im_leerlauf():
+    """Menü „Freigaben“ (16.11.2026): abgelaufene 60-s-Fenster umsetzen, auch wenn niemand die Seite offen hat; alle
+    6 Stunden neue Datenpflege-Vorschläge aus Altdaten-Freitext. Fehler halten die Erkennung nie an."""
+    from freigaben import datenpflege, dienst as freigaben_dienst
+    from patienten.models import Patient
+
+    try:
+        freigaben_dienst.faellige_umsetzen()
+        if time.monotonic() - _zuletzt_datenpflege[0] > _DATENPFLEGE_ALLE_S:
+            _zuletzt_datenpflege[0] = time.monotonic()
+            n = datenpflege.alle_erstellen(Patient.objects.filter(eingeschraenkt_am__isnull=True))
+            if n:
+                log.info("Datenpflege: %s neue Vorschläge im Menü „Freigaben“", n)
+    except Exception:  # noqa: BLE001
+        log.exception("Freigaben im Leerlauf fehlgeschlagen")
 
 
 def speicher() -> dict | None:
