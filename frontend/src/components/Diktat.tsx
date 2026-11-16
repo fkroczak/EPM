@@ -38,14 +38,42 @@ function formatWaehlen(): string {
   return kandidaten.find((k) => MediaRecorder.isTypeSupported?.(k)) ?? "";
 }
 
+/** Sperrt der Server das Mikrofon (Kopf „Permissions-Policy“ in nginx/epm.conf)? Nur Chrome/Edge können das melden. */
+function serverSperrt(): boolean {
+  const fp = (document as Document & { featurePolicy?: { allowsFeature(f: string): boolean } }).featurePolicy;
+  return !!fp && !fp.allowsFeature("microphone");
+}
+
+const SERVER_GESPERRT = "Der EPM-Server sperrt das Mikrofon (Einstellung „Permissions-Policy“ im Nginx). Bitte die IT informieren.";
+const SO_ERLAUBEN = "Das Mikrofon ist für EPM gesperrt. So freigeben: links neben der Adresse auf das Schloss-Symbol klicken → "
+  + "„Mikrofon“ auf „Zulassen“ stellen → Seite neu laden.";
+
 function mikrofonFehler(e: unknown): string {
   if (!window.isSecureContext) return "Das Mikrofon geht nur über die sichere Verbindung (https).";
   const name = e instanceof DOMException ? e.name : "";
-  if (name === "NotAllowedError" || name === "SecurityError") {
-    return "Der Browser hat den Zugriff auf das Mikrofon abgelehnt. Bitte in den Einstellungen der Seite erlauben.";
-  }
+  if (name === "NotAllowedError" || name === "SecurityError") return serverSperrt() ? SERVER_GESPERRT : SO_ERLAUBEN;
   if (name === "NotFoundError") return "Kein Mikrofon gefunden. Bitte Headset anschließen.";
   return "Das Mikrofon ließ sich nicht starten.";
+}
+
+/**
+ * Prüft vorab, ob das Mikrofon benutzt werden darf, und hört auf Änderungen (wird es in den Seiteneinstellungen
+ * erlaubt, verschwindet der Hinweis von selbst). „frei“ heißt auch: der Browser fragt beim ersten Klick nach.
+ */
+function useMikrofonStatus(): string {
+  const [gesperrt, setGesperrt] = useState("");
+  useEffect(() => {
+    if (!window.isSecureContext) { setGesperrt("Das Mikrofon geht nur über die sichere Verbindung (https)."); return; }
+    if (serverSperrt()) { setGesperrt(SERVER_GESPERRT); return; }
+    let status: PermissionStatus | null = null;
+    let weg = false;
+    const setzen = () => setGesperrt(status?.state === "denied" ? SO_ERLAUBEN : "");
+    navigator.permissions?.query({ name: "microphone" as PermissionName })
+      .then((s) => { if (weg) return; status = s; setzen(); s.addEventListener("change", setzen); })
+      .catch(() => setGesperrt("")); // z. B. ältere Browser kennen die Abfrage nicht – dann fragt der Klick
+    return () => { weg = true; status?.removeEventListener("change", setzen); };
+  }, []);
+  return gesperrt;
 }
 
 type Aufnahme = { blob: Blob; dauer: number; mime: string };
@@ -208,6 +236,7 @@ export function DiktatAufnahme({ patientId, zweck = "bericht", berichtId, vorHoc
   onAktiv?: (aktiv: boolean) => void;
 }) {
   const a = useAufnahme();
+  const gesperrt = useMikrofonStatus();
   const stand = useDiktatStand();
   const qc = useQueryClient();
   const [aufnahme, setAufnahme] = useState<Aufnahme | null>(null);
@@ -263,7 +292,12 @@ export function DiktatAufnahme({ patientId, zweck = "bericht", berichtId, vorHoc
           ? <span className="text-[0.75rem] text-warn" title={stand.data?.grund}>Abschrift gerade nicht bereit – das Diktat wartet.</span>
           : <span className="text-[0.75rem] text-warn">Die Abschrift ist auf dem Server gerade nicht bereit – das Diktat
             wartet, bis sie es ist.{stand.data?.grund ? ` ${stand.data.grund}` : ""}</span>) : null}
-        {a.fehler ? <Meldung art="fehler">{a.fehler}</Meldung> : null}
+        {a.fehler || gesperrt ? (
+          <Meldung art="fehler">
+            <span data-testid="diktat-mikrofon-gesperrt">{a.fehler || gesperrt}</span>{" "}
+            <Knopf klein variante="geist" onClick={() => window.location.reload()}>Seite neu laden</Knopf>
+          </Meldung>
+        ) : null}
         <Fehleranzeige fehler={hochladen.error} />
         {!kompakt ? <BegriffeDialog offen={begriffe} onOffen={setBegriffe} /> : null}
       </div>
