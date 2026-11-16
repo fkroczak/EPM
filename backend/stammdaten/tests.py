@@ -101,13 +101,10 @@ class ListenOhneAbfragenJeZeile(Grundlage):
     wächst nicht mit der Zahl der Einträge (vorher je Zeile mehrere Abfragen)."""
 
     def _abfragen(self, client, url):
-        from django.db import connection
-        from django.test.utils import CaptureQueriesContext
+        from epm.pruefhilfen import abfragen_zaehlen
 
-        with CaptureQueriesContext(connection) as q:
-            r = client.get(url)
-        self.assertEqual(r.status_code, 200, r.content)
-        return len(q), r.json()
+        anzahl, r = abfragen_zaehlen(client, url, lambda r: self.assertEqual(r.status_code, 200, r.content))
+        return anzahl, r.json()
 
     def _neue_patienten(self, anzahl, **felder):
         from patienten.models import PatientArzt

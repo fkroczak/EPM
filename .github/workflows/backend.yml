@@ -28,6 +28,8 @@ jobs:
   tests:
     name: Tests mit PostgreSQL
     runs-on: ubuntu-24.04
+    # normal etwa 20 Minuten; ein hängender Testlauf (15.11.2026) belegte sonst bis zu 6 Stunden
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:18-alpine

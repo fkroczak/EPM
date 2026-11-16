@@ -113,13 +113,11 @@ class Startseite(Grundlage):
     def test_abfragen_wachsen_nicht_mit_den_akten(self):
         """Startseite und Zähler der Patientenliste: vorher holte ``kennzahlen`` Nickelallergie und Katheter je Akte
         einzeln nach (bei ~250 Akten fast 400 Abfragen)."""
-        from django.db import connection
-        from django.test.utils import CaptureQueriesContext
 
         def abfragen(client, url):
-            with CaptureQueriesContext(connection) as q:
-                self.assertEqual(client.get(url).status_code, 200)
-            return len(q)
+            from epm.pruefhilfen import abfragen_zaehlen
+
+            return abfragen_zaehlen(client, url, lambda r: self.assertEqual(r.status_code, 200))[0]
 
         def neue_akten(anzahl, **felder):
             for i in range(anzahl):

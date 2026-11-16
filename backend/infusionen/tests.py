@@ -3,7 +3,6 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.db import DatabaseError, connection, transaction
-from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from epm.pruefhilfen import Grundlage, client_fuer
@@ -104,10 +103,10 @@ class Infusionsplaene(PlanHilfen, Grundlage):
         url = f"/api/infusionsplaene/?patient={self.patient.id}&seitengroesse=2000"
 
         def abfragen():
-            with CaptureQueriesContext(connection) as q:
-                r = c.get(url)
-            self.assertEqual(r.status_code, 200)
-            return len(q), r.json()["results"]
+            from epm.pruefhilfen import abfragen_zaehlen
+
+            anzahl, r = abfragen_zaehlen(c, url, lambda r: self.assertEqual(r.status_code, 200))
+            return anzahl, r.json()["results"]
 
         self.freigegebener_plan()
         self.freigegebener_plan(glucose_g="150")
