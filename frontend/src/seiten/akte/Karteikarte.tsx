@@ -136,7 +136,8 @@ export function Karteikarte() {
     }
     for (const b of bia.data ?? []) {
       const werte = [b.bcm_kg != null ? `BCM ${zahl(b.bcm_kg, 1)} kg` : "", b.fettmasse_kg != null ? `Fettmasse ${zahl(b.fettmasse_kg, 1)} kg` : "",
-        b.ecw_prozent != null ? `ECW ${zahl(b.ecw_prozent, 1)} %` : ""].filter(Boolean).join(" · ");
+        b.ecw_prozent != null ? `ECW ${zahl(b.ecw_prozent, 1)} %` : "",
+        b.phasenwinkel_grad != null ? `Phasenwinkel ${zahl(b.phasenwinkel_grad, 1)}°` : ""].filter(Boolean).join(" · ");
       e.push({
         schluessel: `b${b.id}`, firma: b.firma_kurz, art: "L", kuerzel: "BIA", wann: b.gemessen_am, text: `BIA-Messung${werte ? `: ${werte}` : ""}`,
         zusatz: b.beurteilung ? klartext(b.beurteilung) : undefined, person: b.erfasst_von_name, zu: `${basis}/bia?messung=${b.id}`,

@@ -157,6 +157,20 @@ class AuswertungTest(SimpleTestCase):
         self.assertFalse(frei["vorschlag"])
         self.assertEqual(frei["wert_text"], "< 2,0")
 
+    def test_lettischer_laborbefund(self):
+        """Labore aus Lettland (Wunsch RGC 16.11.2026): Bezeichnungen mit ī, ā, š …, Datum mit Jahr vorn."""
+        seite = _seite("E. Gulbja Laboratorija", "Parauga ņemšanas datums: 2026.11.03. 08:15",
+                       "Nātrijs 139 mmol/l 136 - 145", "Kālijs 3,9 mmol/l 3,5 - 5,1",
+                       "Albumīns 38 g/l 35 - 52", "Kreatinīns 0,84 mg/dl 0,50 - 0,90", "ALAT 22 U/l < 35",
+                       "Cinks 95 µg/l 70 - 120", "Feritīns 41 µg/l")
+        a = auswertung.auswerten([seite], KATALOG_BEISPIEL)
+        self.assertEqual(a["datum"], "2026-11-03")
+        self.assertEqual(a["datum_quelle"], "abnahme")
+        self.assertEqual(a["labor"]["name"], "E. Gulbja Laboratorija")
+        werte = {w["parameter_name"]: w["wert"] for w in a["labor"]["werte"] if w["parameter_name"]}
+        self.assertEqual(werte, {"Natrium": "139", "Kalium": "3.9", "Albumin": "38", "Kreatinin": "0.84",
+                                 "GPT (ALT)": "22", "Zink": "95", "Ferritin": "41"})
+
     def test_unplausibler_wert_nicht_vorgewaehlt(self):
         a = auswertung.auswerten([_seite("Natrium 1380 mmol/l", "Kalium 4,1 mmol/l", "Albumin 40 g/l")],
                                  KATALOG_BEISPIEL)
@@ -306,7 +320,7 @@ class AuswertungTest(SimpleTestCase):
         self.assertEqual(w["ecw_prozent"]["wert"], "47.5")
         self.assertEqual(w["fettmasse_kg"]["wert"], "17.2")
         self.assertEqual(w["bcm_kg"]["wert"], "18.9")
-        self.assertEqual(a["bia"]["weitere"][0]["name"], "Phasenwinkel")
+        self.assertEqual(w["phasenwinkel_grad"]["wert"], "4.1")
 
     def test_bia_andere_geraete(self):
         """Englisches Protokoll (InBody-Art): ECW/TBW als Verhältnis, Muskelmasse unter „weitere“."""
@@ -320,7 +334,8 @@ class AuswertungTest(SimpleTestCase):
         self.assertEqual(w["fettmasse_kg"]["wert"], "21")
         self.assertEqual(w["ecw_prozent"]["wert"], "38.5")
         self.assertTrue(w["ecw_prozent"]["hinweise"])
-        self.assertEqual({x["name"] for x in a["bia"]["weitere"]}, {"Skelettmuskelmasse", "Phasenwinkel"})
+        self.assertEqual({x["name"] for x in a["bia"]["weitere"]}, {"Skelettmuskelmasse"})
+        self.assertEqual(w["phasenwinkel_grad"]["wert"], "5.2")
 
     def test_arztbrief(self):
         seite = _seite("Klinikum Beispielstadt", "Beispielstadt, den 15.08.2026", "Sehr geehrte Frau Kollegin,",

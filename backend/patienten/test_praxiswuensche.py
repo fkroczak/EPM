@@ -116,6 +116,17 @@ class VersichertendatenTest(Grundlage):
         self.assertEqual((d["versicherungsart"], d["krankenkasse"], d["versichertennummer"]),
                          ("gkv", "AOK NordWest", "A123456789"))
 
+    def test_beihilfe_und_zusatzversicherung(self):
+        """Kombinationen (Wunsch RGC 16.11.2026): privat mit Beihilfe, dazu stationäre Zusatzversicherung."""
+        r = client_fuer(self.mitarbeiter).patch(f"/api/patienten/{self.patient.id}/",
+                                                {"versicherungsart": "pkv", "beihilfe": True,
+                                                 "zusatz_stationaer": True}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual((r.json()["beihilfe"], r.json()["zusatz_stationaer"]), (True, True))
+        self.patient.refresh_from_db()
+        self.assertEqual(self.patient.versicherungsart_text(),
+                         "PKV (privat) mit Beihilfe, stationäre Zusatzversicherung")
+
     def test_unbekannte_art_abgelehnt(self):
         r = client_fuer(self.mitarbeiter).patch(f"/api/patienten/{self.patient.id}/",
                                                 {"versicherungsart": "privatpatient"}, format="json")

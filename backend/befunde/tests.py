@@ -162,6 +162,17 @@ class BiaTest(Grundlage):
         r = c.post("/api/bia-messungen/", self.werte(ecw_prozent="140.0"), format="json")
         self.assertEqual(r.status_code, 400, r.content)
 
+    def test_phasenwinkel(self):
+        """Phasenwinkel als eigenes Feld (Wunsch DSKM 16.11.2026); allein reicht er als Messwert."""
+        c = client_fuer(self.mitarbeiter)
+        r = c.post("/api/bia-messungen/", {"patient": self.patient.id, "gemessen_am": "2026-10-01",
+                                           "phasenwinkel_grad": "4.6"}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.json()["phasenwinkel_grad"], 4.6)
+        r = c.post("/api/bia-messungen/", self.werte(phasenwinkel_grad="45.0"), format="json")
+        self.assertEqual(r.status_code, 400, r.content)
+        self.assertIn("phasenwinkel_grad", r.json())
+
     def test_leere_messung_abgelehnt(self):
         c = client_fuer(self.mitarbeiter)
         r = c.post("/api/bia-messungen/", {"patient": self.patient.id, "gemessen_am": "2026-10-01"}, format="json")

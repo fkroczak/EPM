@@ -1,5 +1,5 @@
 /** Gewichtsverlauf als SVG (Entwurf 4): Messwerte, Verlauf (geglättet oder Linie), Vergleichswert. */
-import { alsDatum, datum, kg, zahl } from "@/lib/format";
+import { alsDatum, datum, kg as kgText, zahl } from "@/lib/format";
 
 export type Messpunkt = { gemessen_am: string; gewicht_kg: number | string };
 export type Zeitraum = "y1" | "y3" | "y5" | "alle";
@@ -42,7 +42,9 @@ function schritt(spanne: number) {
   return 50;
 }
 
-export function GewichtsDiagramm<T extends Messpunkt>({ werte, zeitraum, geglaettet, vergleich, beschriftung, onPunkt, masse }: {
+export function GewichtsDiagramm<T extends Messpunkt>({ werte, zeitraum, geglaettet, vergleich, beschriftung, onPunkt, masse, einheit = "kg" }: {
+  /** andere Größe als das Gewicht (BIA-Verlauf: Phasenwinkel, BCM, Fettmasse – Wunsch 16.11.2026); Wert in gewicht_kg */
+  einheit?: string;
   /** tatsächliche Größe in px (Karte mit fester Höhe, 10.10.2026): gezeichnet wird dann genau so groß, die Schrift
    *  bleibt lesbar, statt dass ein festes Seitenverhältnis verkleinert wird */
   masse?: { breite: number; hoehe: number };
@@ -54,6 +56,7 @@ export function GewichtsDiagramm<T extends Messpunkt>({ werte, zeitraum, geglaet
   vergleich?: { am: string; kg: number | string } | null;
   beschriftung: string;
 }) {
+  const kg = (v: number | string) => (einheit === "kg" ? kgText(v) : `${zahl(v, 1)}${einheit === "°" ? "" : " "}${einheit}`);
   const B = masse && masse.breite > 120 ? masse.breite : B0;
   const H = masse && masse.hoehe > 80 ? masse.hoehe : H0;
   const punkte = werte

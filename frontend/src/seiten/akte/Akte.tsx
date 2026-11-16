@@ -10,7 +10,8 @@ import type { Feldfehler } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useAuswahl, useVersorgerListe } from "@/lib/daten";
 import { alter, datum, eingabeDatum, eingabeZahl, heuteIso, kg, nummer, prozent, tagesSchluessel, terminZeit, zahl } from "@/lib/format";
-import { ABSCHLUSSANLAESSE, ERKLAERUNGEN_KURZ, GESCHLECHTER, TERMINARTEN, VERSICHERUNGSARTEN } from "@/lib/typen";
+import { ABSCHLUSSANLAESSE, ERKLAERUNGEN_KURZ, GESCHLECHTER, TERMINARTEN, VERSICHERUNGSARTEN, versicherungsartText } from "@/lib/typen";
+import { VersicherungZusatz } from "@/components/VersicherungZusatz";
 import type { Patient, Recht, Termin } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, Knopf, Laden, Meldung, Skelett, Textfeld, cx } from "@/components/ui/basis";
@@ -97,7 +98,7 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
     groesse: patient.groesse_cm != null ? zahl(patient.groesse_cm) : "", strasse: patient.strasse, plz: patient.plz, ort: patient.ort,
     telefon: patient.telefon, telefon2: patient.telefon2, email: patient.email,
     versicherungsart: patient.versicherungsart, krankenkasse: patient.krankenkasse,
-    versichertennummer: patient.versichertennummer,
+    versichertennummer: patient.versichertennummer, beihilfe: patient.beihilfe, zusatz_stationaer: patient.zusatz_stationaer,
     versorger: patient.versorger ? String(patient.versorger) : patient.kein_versorger ? KEIN : "",
     ansprechpartner: patient.ansprechpartner ? String(patient.ansprechpartner) : "",
     katheter: patient.katheter ? String(patient.katheter) : patient.kein_katheter ? KEIN : "",
@@ -142,7 +143,7 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
       telefon2: f.telefon2.trim(),
       // Versichertendaten (F118): Art, Versicherung und Versichertennummer
       versicherungsart: f.versicherungsart, krankenkasse: f.krankenkasse.trim(),
-      versichertennummer: f.versichertennummer.trim(),
+      versichertennummer: f.versichertennummer.trim(), beihilfe: f.beihilfe, zusatz_stationaer: f.zusatz_stationaer,
       // „kein“ = bewusst keiner, leer = noch nicht erfasst (Festlegung 01.10.2026)
       versorger: f.versorger && f.versorger !== KEIN ? Number(f.versorger) : null, kein_versorger: f.versorger === KEIN,
       ansprechpartner: f.ansprechpartner && f.versorger !== KEIN ? Number(f.ansprechpartner) : null,
@@ -195,6 +196,8 @@ function StammdatenDialog({ patient, offen, onOffen }: { patient: Patient; offen
             </Auswahl>
           )}
         </Feld>
+        <VersicherungZusatz beihilfe={f.beihilfe} zusatz={f.zusatz_stationaer}
+          onAenderung={(w) => setF((a) => ({ ...a, ...w }))} />
         <Feld label="Versicherung" className="col-span-2" fehler={e.krankenkasse}>{(p) => <Eingabe {...p} maxLength={100} value={f.krankenkasse} onChange={set("krankenkasse")} />}</Feld>
         <Feld label="Versichertennummer" className="col-span-2" fehler={e.versichertennummer}>{(p) => <Eingabe {...p} className="num" maxLength={50} value={f.versichertennummer} onChange={set("versichertennummer")} />}</Feld>
         <Feld label="Versorger" className="col-span-2" fehler={e.versorger}>
@@ -373,7 +376,6 @@ function Reiter({ zu, text, zahl: anzahl, ende, senkrecht, kuerzel, stufe }: Rei
 type Angabe = { titel: string; inhalt: ReactNode; hinweis?: string };
 type Gruppe = { titel: string; angaben: Angabe[]; bearbeiten?: () => void };
 
-const VERSICHERUNG_KURZ: Record<string, string> = { gkv: "GKV", pkv: "PKV", selbstzahler: "Selbstzahler", sonstige: "Sonstige" };
 
 /** Zeile in einer Gruppe: eine Zeile hoch, Langes gekürzt und ganz im Tooltip – mehr Personen ändern die Höhe nicht */
 function Angabezeile({ a }: { a: Angabe }) {
@@ -811,7 +813,7 @@ export function Akte() {
     },
     versicherung: {
       titel: "Versicherung",
-      inhalt: [VERSICHERUNG_KURZ[p.versicherungsart], p.krankenkasse].filter(Boolean).join(" · ") || "—",
+      inhalt: [versicherungsartText(p, true), p.krankenkasse].filter(Boolean).join(" · ") || "—",
     },
   } : null;
   const gruppen: Gruppe[] = angabe ? [

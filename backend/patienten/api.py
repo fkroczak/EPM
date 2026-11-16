@@ -139,7 +139,7 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
         fields = [
             "id", "nummer", "nachname", "vorname", "geburtsdatum", "geschlecht",
             "strasse", "plz", "ort", "telefon", "telefon2", "email",
-            "versicherungsart", "krankenkasse", "versichertennummer", "hausarzt",
+            "versicherungsart", "beihilfe", "zusatz_stationaer", "krankenkasse", "versichertennummer", "hausarzt",
             "ueberweisung_durch", "groesse_cm", "katheter", "versorger", "ansprechpartner", "nickelallergie",
             "kein_katheter", "kein_versorger",
             "diagnose", "therapie", "empfehlung", "befunde", "bemerkung",
@@ -1044,7 +1044,9 @@ def _beschreibung(name, h, aktion) -> str:
             werte = [(f"{_deutsch(h.gewicht_kg, 1)} kg" if h.gewicht_kg is not None else None),
                      (f"BCM {_deutsch(h.bcm_kg, 1)} kg" if h.bcm_kg is not None else None),
                      (f"Fett {_deutsch(h.fettmasse_kg, 1)} kg" if h.fettmasse_kg is not None else None),
-                     (f"ECW {_deutsch(h.ecw_prozent, 1)} %" if h.ecw_prozent is not None else None)]
+                     (f"ECW {_deutsch(h.ecw_prozent, 1)} %" if h.ecw_prozent is not None else None),
+                     (f"Phasenwinkel {_deutsch(h.phasenwinkel_grad, 1)}°" if h.phasenwinkel_grad is not None
+                      else None)]
             return " · ".join([f"gemessen am {h.gemessen_am:%d.%m.%Y}", *[w for w in werte if w]])
         if name == "berichte":
             teile = [h.titel, f"vom {h.datum:%d.%m.%Y}"]

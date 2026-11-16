@@ -170,7 +170,8 @@ def fakten_sammeln(patient, von: dt.date, bis: dt.date) -> list[dict]:
     for b in BiaMessung.objects.filter(patient=p, gemessen_am__range=r).order_by("gemessen_am", "id")[:5]:
         teile = [f"{name} {_z(getattr(b, feld))} {e}".strip() for feld, name, e in (
             ("gewicht_kg", "Gewicht", "kg"), ("bcm_kg", "BCM", "kg"), ("fettmasse_kg", "Fettmasse", "kg"),
-            ("ecw_prozent", "ECW", "%"), ("koerperwasser_l", "Körperwasser", "l"), ("bmi", "BMI", ""))
+            ("ecw_prozent", "ECW", "%"), ("koerperwasser_l", "Körperwasser", "l"), ("bmi", "BMI", ""),
+            ("phasenwinkel_grad", "Phasenwinkel", "°"))
             if getattr(b, feld) is not None]
         bia.append((f"BIA-Messung {_d(b.gemessen_am)}: " + (", ".join(teile) or "ohne Messwerte"), "bia", b.pk,
                     b.gemessen_am, "bia"))

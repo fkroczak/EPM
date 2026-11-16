@@ -47,7 +47,8 @@ const BEREICH_EINZELN: Record<string, string> = {
 const FELDER: Record<string, string> = {
   nachname: "Nachname", vorname: "Vorname", geburtsdatum: "Geburtsdatum", geschlecht: "Geschlecht", strasse: "Straße", plz: "PLZ",
   ort: "Ort", telefon: "Telefon", telefon2: "Telefon 2", email: "E-Mail", krankenkasse: "Versicherung",
-  versicherungsart: "Versicherungsart", versichertennummer: "Versichertennummer", hausarzt: "Hausarzt",
+  versicherungsart: "Versicherungsart", beihilfe: "mit Beihilfe", zusatz_stationaer: "Stationäre Zusatzversicherung",
+  phasenwinkel_grad: "Phasenwinkel (°)", versichertennummer: "Versichertennummer", hausarzt: "Hausarzt",
   wirkstoff: "Wirkstoff", handelsname: "Handelsname", staerke: "Stärke", darreichungsform: "Darreichungsform",
   morgens: "morgens", mittags: "mittags", abends: "abends", nachts: "zur Nacht", dosierung_frei: "Dosierung (frei)",
   einheit: "Einheit", bedarf: "bei Bedarf", hinweise: "Hinweise", grund: "Grund", abgesetzt_am: "abgesetzt am",

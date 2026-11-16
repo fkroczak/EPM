@@ -66,6 +66,9 @@ class Patient(models.Model):
                                         blank=True, default="")
     krankenkasse = models.CharField("Versicherung", max_length=100, blank=True)
     versichertennummer = models.CharField("Versichertennummer", max_length=50, blank=True)
+    # Kombinationen (Wunsch RGC 16.11.2026): privat mit Beihilfe, gesetzlich mit stationärer Zusatzversicherung …
+    beihilfe = models.BooleanField("mit Beihilfe", default=False)
+    zusatz_stationaer = models.BooleanField("Stationäre Zusatzversicherung", default=False)
     hausarzt = models.CharField(max_length=150, blank=True)
     ueberweisung_durch = models.CharField("Überweisung / Kontaktaufnahme durch", max_length=200, blank=True)
 
@@ -142,6 +145,15 @@ class Patient(models.Model):
 
     def __str__(self):
         return f"{self.nachname}, {self.vorname} ({self.nummer})"
+
+    def versicherungsart_text(self) -> str:
+        """„PKV (privat) mit Beihilfe, stationäre Zusatzversicherung“ – leer, wenn nichts erfasst ist."""
+        text = self.get_versicherungsart_display() if self.versicherungsart else ""
+        if self.beihilfe:
+            text = f"{text} mit Beihilfe" if text else "Beihilfe"
+        if self.zusatz_stationaer:
+            text = f"{text}, stationäre Zusatzversicherung" if text else "Stationäre Zusatzversicherung"
+        return text
 
     def save(self, *args, **kwargs):
         if self.nummer is None:

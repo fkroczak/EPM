@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { useAerzteListe, useAuswahl, useVersorgerListe } from "@/lib/daten";
 import { datum, eingabeDatum, eingabeZahl, heuteIso, nummer } from "@/lib/format";
 import { GESCHLECHTER, VERSICHERUNGSARTEN } from "@/lib/typen";
+import { VersicherungZusatz } from "@/components/VersicherungZusatz";
 import type { Patient, PatientZeile } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
 import { Auswahl, Chip, Eingabe, Feld, Karte, Knopf, KnopfLink, Meldung, Textfeld, cx } from "@/components/ui/basis";
@@ -92,6 +93,7 @@ function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) 
 
 export function PatientNeu() {
   const [f, setF] = useState<Formular>({ ...LEER, gemessen_am: datum(heuteIso()) });
+  const [zusatz, setZusatz] = useState({ beihilfe: false, zusatz_stationaer: false });
   const [andere, setAndere] = useState<number[]>([]);
   // Arzt/Versorger anlegen, ohne die Seite zu verlassen (Vorschlag „Weniger Wege“, 08.10.2026)
   const [schnell, setSchnell] = useState<"" | "arzt" | "versorger">("");
@@ -200,6 +202,7 @@ export function PatientNeu() {
       versicherungsart: f.versicherungsart,
       krankenkasse: f.krankenkasse.trim(),
       versichertennummer: f.versichertennummer.trim(),
+      ...zusatz,
       // „kein“ = bewusst keiner, leer = noch nicht erfasst (Festlegung 01.10.2026)
       versorger: f.versorger && f.versorger !== KEIN ? Number(f.versorger) : null,
       kein_versorger: f.versorger === KEIN,
@@ -338,6 +341,8 @@ export function PatientNeu() {
                       </Auswahl>
                     )}
                   </Feld>
+                  <VersicherungZusatz beihilfe={zusatz.beihilfe} zusatz={zusatz.zusatz_stationaer}
+                    onAenderung={(w) => setZusatz((z) => ({ ...z, ...w }))} />
                   <Feld label="Versicherung" className="col-span-2" fehler={e.krankenkasse}>
                     {(p) => <Eingabe {...p} value={f.krankenkasse} onChange={setze("krankenkasse")} autoComplete="off" maxLength={100} />}
                   </Feld>

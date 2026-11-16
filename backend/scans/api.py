@@ -706,7 +706,8 @@ class ScanViewSet(viewsets.GenericViewSet):
 
 
 BIA_NAMEN = {"gewicht_kg": "Gewicht (kg)", "bcm_kg": "BCM (kg)", "fettmasse_kg": "Fettmasse (kg)",
-             "ecw_prozent": "ECW (%)", "koerperwasser_l": "Körperwasser (l)", "bmi": "BMI"}
+             "ecw_prozent": "ECW (%)", "koerperwasser_l": "Körperwasser (l)", "bmi": "BMI",
+             "phasenwinkel_grad": "Phasenwinkel (°)"}
 
 
 def _gelernt_daten(g: GelernteZuordnung, schwelle: int | None = None) -> dict:
