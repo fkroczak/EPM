@@ -191,8 +191,11 @@ class SuchenView(_Basis):
                                            "freigeben“."))
         akten = self.akten()
         pid = str(request.data.get("patient") or "")
-        if pid.isdigit():
-            akten = self.akten().filter(pk=int(pid))
+        if pid:
+            akten = self.akten().filter(pk=int(pid)) if pid.isdigit() else self.akten().none()
+            if not akten.exists():
+                # fremde oder unbekannte Akte: nichts verraten, nichts protokollieren (Firmentrennung)
+                return Response({"fehler": "Akte nicht gefunden."}, status=status.HTTP_404_NOT_FOUND)
         n = datenpflege.alle_erstellen(akten)
         dubletten = aerzte.suchen() if request.user.hat_recht("versorger_pflegen") else 0
         protokolliere(SystemEreignis.Art.STAMMDATEN, request, objekt="Datenpflege", aktion="vorschlaege_erstellt",

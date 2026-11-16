@@ -404,6 +404,14 @@ class Erweiterungen(Grundlage):
         self.assertFalse(person["sicher"])  # erst ab 5 gleichen Entscheidungen eindeutig
         self.assertGreaterEqual(self.liste(c)["lernstand"]["beispiele"], 3)
 
+    def test_fremde_akte_durchsuchen_ohne_spur(self):
+        from audit.models import SystemEreignis
+
+        vorher = SystemEreignis.objects.count()
+        r = client_fuer(self.mitarbeiter).post("/api/freigaben/suchen/", {"patient": 999999}, format="json")
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(SystemEreignis.objects.count(), vorher)
+
     def test_rechte_standard_ab_mitarbeiter(self):
         from accounts.rechte import STANDARD
         from accounts.models import Rolle
