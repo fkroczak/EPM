@@ -6,7 +6,12 @@
     POST freigaben/suchen/                  Datenpflege-Vorschläge erstellen ({"patient": ID} oder alle Akten)
     POST freigaben/datenpflege/ID/freigeben/  {"schritte": [...]} → Freigabe (wird nach 60 s umgesetzt)
     POST freigaben/datenpflege/ID/verwerfen/
+    POST freigaben/datenpflege/sammel/      alle eindeutigen (ohne offene Frage) gemeinsam freigeben → {gruppe, anzahl,
+                                            uebersprungen}; ``{"ids": [...]}`` schränkt ein
+    POST freigaben/aerzte/ID/freigeben/     doppelte Ärzte zusammenführen {"ziel": ID, "werte": {...}}
+    POST freigaben/aerzte/ID/verwerfen/     „keine Dublette“ (wird nicht wieder vorgeschlagen)
     POST freigaben/plaene/ID/freigeben/     Infusionsplan-Entwurf freigeben (nach 60 s)
+    POST freigaben/gruppe/UUID/zuruecknehmen/  Sammelfreigabe zurücknehmen
     POST freigaben/ID/zuruecknehmen/        innerhalb der 60 s
     POST freigaben/ID/umsetzen/             fällige Freigaben jetzt umsetzen (die Seite ruft das nach dem Countdown)
 
@@ -24,14 +29,16 @@ from accounts.permissions import Angemeldet
 from audit.models import SystemEreignis, protokolliere
 from epm.api_basis import benutzername, patienten_fuer
 
-from . import datenpflege, dienst
-from .models import RUECKGAENGIG_S, Datenpflegevorschlag, Freigabe
+from django.db.models import Q
+
+from . import aerzte, datenpflege, dienst, lernen
+from .models import RUECKGAENGIG_S, Arztdublette, Datenpflegevorschlag, Freigabe
 
 D = Datenpflegevorschlag.Status
 
 
 def darf_freigaben(user) -> bool:
-    return any(user.hat_recht(r) for r in ("akten_bearbeiten", "plaene_freigeben", "ki_ansehen"))
+    return any(user.hat_recht(r) for r in ("datenpflege_freigeben", "plaene_freigeben", "ki_ansehen"))
 
 
 def _fehler(e) -> Response:
@@ -52,28 +59,32 @@ def _patient(p) -> dict:
 def _bestand(p) -> dict:
     """Was die Akte heute schon hat – für die Ansicht „vorher → nachher“."""
     return {
-        "felder": {f: getattr(p, f) or "" for f in datenpflege.FELDER},
+        "felder": {f: datenpflege._feldwert(p, f) for f in datenpflege.FELDER},
         "bezugspersonen": [{"id": b.id, "name": b.name, "beziehung": b.beziehung.wert if b.beziehung_id else "",
                             "telefon": b.telefon, "mobil": b.mobil}
                            for b in p.bezugspersonen.filter(aktiv=True).select_related("beziehung")],
         "aerzte": [{"id": z.id, "rolle": z.rolle, "rolle_name": z.get_rolle_display(), "name": z.arzt.name,
                     "ort": z.arzt.ort, "telefon": z.arzt.telefon}
                    for z in p.aerzte.filter(aktiv=True).select_related("arzt")],
-        "hinweise": [{"titel": h["titel"], "inhalt": h["inhalt"]} for h in datenpflege.hinweise(p.bemerkung)],
+        "hinweise": [{"titel": h["titel"], "inhalt": h["inhalt"]} for h in datenpflege.hinweise(p.bemerkung)]
+        + ([{"titel": "Bemerkung aus dem Altsystem", "inhalt": datenpflege._text(datenpflege.hinweis_rest(p.bemerkung))}]
+           if datenpflege.hinweis_rest(p.bemerkung) else []),
+        "abgeschlossen": p.ist_abgeschlossen,
     }
 
 
 def _vorschlag(v: Datenpflegevorschlag) -> dict:
     return {"id": v.id, "art": "datenpflege", "patient": _patient(v.patient), "erstellt_am": v.erstellt_am,
             "verfahren": v.verfahren, "status": v.status, "schritte": datenpflege.darstellung(v),
-            "bestand": _bestand(v.patient)}
+            "bestand": _bestand(v.patient), "eindeutig": datenpflege.eindeutig(v)}
 
 
 def _freigabe(f: Freigabe) -> dict:
     rest = (f.umsetzen_ab - timezone.now()).total_seconds()
-    titel = "Datenpflege" if f.art == Freigabe.Art.DATENPFLEGE else "Infusionsplan"
+    titel = f.get_art_display()
+    wer = f" · {f.patient.nachname}, {f.patient.vorname}" if f.patient_id else ""
     return {"id": f.id, "art": f.art, "objekt_id": f.objekt_id, "status": f.status, "status_name": f.get_status_display(),
-            "titel": f"{titel} · {f.patient.nachname}, {f.patient.vorname}", "patient_id": f.patient_id,
+            "titel": f"{titel}{wer}", "patient_id": f.patient_id, "gruppe": f.gruppe,
             "freigegeben_am": f.freigegeben_am, "umsetzen_ab": f.umsetzen_ab,
             "sekunden": max(0, round(rest)) if f.status == Freigabe.Status.WARTET else 0,
             "fehler": f.fehler, "von": benutzername(f.freigegeben_von)}
@@ -103,22 +114,42 @@ class _Basis(APIView):
         return patienten_fuer(self.request.user)
 
 
+FILTER = {
+    "alle": lambda v: True,
+    "eindeutig": lambda v: datenpflege.eindeutig(v),
+    "fragen": lambda v: not datenpflege.eindeutig(v),
+    "inaktiv": lambda v: any(s["art"] == "abschluss" for s in v.schritte),
+}
+
+
 class FreigabenView(_Basis):
     def get(self, request):
         user, akten = request.user, self.akten()
         pid = request.query_params.get("patient", "")
         if pid.isdigit():
             akten = akten.filter(pk=int(pid))
+        filter_ = request.query_params.get("filter", "alle")
+        filter_ = filter_ if filter_ in FILTER else "alle"
         wartend = set(Freigabe.objects.filter(status=Freigabe.Status.WARTET).values_list("art", "objekt_id"))
-        daten = {"rueckgaengig_s": RUECKGAENGIG_S, "datenpflege": [], "plaene": [], "ki_zur_pruefung": 0,
-                 "darf": {"datenpflege": user.hat_recht("akten_bearbeiten"),
+        daten = {"rueckgaengig_s": RUECKGAENGIG_S, "datenpflege": [], "plaene": [], "aerzte": [], "ki_zur_pruefung": 0,
+                 "filter": filter_, "zahlen": {},
+                 "darf": {"datenpflege": user.hat_recht("datenpflege_freigeben"),
+                          "sammel": user.hat_recht("sammelfreigabe") and user.hat_recht("datenpflege_freigeben"),
+                          "abschliessen": user.hat_recht("akten_abschliessen"),
                           "plaene": user.darf_plaene_freigeben, "ki": user.hat_recht("ki_ansehen"),
                           "aerzte_anlegen": user.hat_recht("versorger_pflegen")}}
         if daten["darf"]["datenpflege"]:
-            qs = (Datenpflegevorschlag.objects.filter(status=D.OFFEN, patient__in=akten)
-                  .select_related("patient").order_by("patient__nachname", "patient__vorname", "id"))
-            daten["datenpflege_gesamt"] = qs.count()
-            daten["datenpflege"] = [_vorschlag(v) for v in qs[:25] if ("datenpflege", v.id) not in wartend]
+            alle = [v for v in Datenpflegevorschlag.objects.filter(status=D.OFFEN, patient__in=akten)
+                    .select_related("patient").order_by("patient__nachname", "patient__vorname", "id")[:500]
+                    if ("datenpflege", v.id) not in wartend]
+            daten["zahlen"] = {k: sum(1 for v in alle if f(v)) for k, f in FILTER.items()}
+            gewaehlt = [v for v in alle if FILTER[filter_](v)]
+            daten["datenpflege_gesamt"] = len(gewaehlt)
+            daten["datenpflege"] = [_vorschlag(v) for v in gewaehlt[:25]]
+            daten["lernstand"] = lernen.stand()
+            if user.hat_recht("versorger_pflegen") and not pid.isdigit():
+                daten["aerzte"] = [aerzte.darstellung(d) for d in Arztdublette.objects.filter(status="offen")[:25]
+                                   if ("aerzte", d.id) not in wartend]
         if daten["darf"]["plaene"]:
             from infusionen.models import Infusionsplan
 
@@ -134,7 +165,7 @@ class FreigabenView(_Basis):
         # eigene Freigaben der letzten 10 Minuten: Countdown, Ergebnis, Fehler
         seit = timezone.now() - timezone.timedelta(minutes=10)
         daten["laufend"] = [_freigabe(f) for f in Freigabe.objects.filter(freigegeben_von=user, freigegeben_am__gte=seit)
-                            .select_related("patient", "freigegeben_von").order_by("-freigegeben_am")[:20]]
+                            .select_related("patient", "freigegeben_von").order_by("-freigegeben_am")[:200]]
         return Response(daten)
 
 
@@ -142,8 +173,10 @@ class ZaehlerView(_Basis):
     def get(self, request):
         user, akten = request.user, self.akten()
         n = 0
-        if user.hat_recht("akten_bearbeiten"):
+        if user.hat_recht("datenpflege_freigeben"):
             n += Datenpflegevorschlag.objects.filter(status=D.OFFEN, patient__in=akten).count()
+            if user.hat_recht("versorger_pflegen"):
+                n += Arztdublette.objects.filter(status="offen").count()
         if user.darf_plaene_freigeben:
             from infusionen.models import Infusionsplan
 
@@ -153,17 +186,18 @@ class ZaehlerView(_Basis):
 
 class SuchenView(_Basis):
     def post(self, request):
-        if not request.user.hat_recht("akten_bearbeiten"):
-            return _fehler(PermissionError("Dafür fehlt das Recht „Patienten anlegen, Diagnose, Therapie, Stammdaten "
-                                           "ändern“."))
+        if not request.user.hat_recht("datenpflege_freigeben"):
+            return _fehler(PermissionError("Dafür fehlt das Recht „Freigaben: Datenpflege aus dem Altbestand "
+                                           "freigeben“."))
         akten = self.akten()
         pid = str(request.data.get("patient") or "")
         if pid.isdigit():
             akten = self.akten().filter(pk=int(pid))
         n = datenpflege.alle_erstellen(akten)
+        dubletten = aerzte.suchen() if request.user.hat_recht("versorger_pflegen") else 0
         protokolliere(SystemEreignis.Art.STAMMDATEN, request, objekt="Datenpflege", aktion="vorschlaege_erstellt",
-                      anzahl=n, patient_id=int(pid) if pid.isdigit() else None)
-        return Response({"neu": n})
+                      anzahl=n, dubletten=dubletten, patient_id=int(pid) if pid.isdigit() else None)
+        return Response({"neu": n, "dubletten": dubletten})
 
 
 class DatenpflegeView(_Basis):
@@ -177,9 +211,7 @@ class DatenpflegeView(_Basis):
                                                  firma=getattr(request.user, "firma", None))
                 return Response(_freigabe(f), status=status.HTTP_201_CREATED)
             if aktion == "verwerfen":
-                if not request.user.hat_recht("akten_bearbeiten"):
-                    raise PermissionError("Dafür fehlt das Recht „Patienten anlegen, Diagnose, Therapie, Stammdaten "
-                                          "ändern“.")
+                dienst._recht(request.user, "datenpflege_freigeben")
                 if v.status != D.OFFEN:
                     raise ValidationError({"fehler": "Dieser Vorschlag ist nicht mehr offen."})
                 v.status, v.erledigt_am, v.erledigt_von = D.VERWORFEN, timezone.now(), request.user
@@ -187,6 +219,49 @@ class DatenpflegeView(_Basis):
                 protokolliere(SystemEreignis.Art.STAMMDATEN, request, objekt=f"Datenpflege {v.pk}",
                               aktion="datenpflege_verworfen", patient_id=v.patient_id)
                 return Response({"status": v.status})
+        except (ValidationError, PermissionError) as e:
+            return _fehler(e)
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+
+class SammelView(_Basis):
+    def post(self, request):
+        qs = Datenpflegevorschlag.objects.filter(status=D.OFFEN, patient__in=self.akten()).select_related("patient")
+        ids = request.data.get("ids")
+        if isinstance(ids, list):
+            qs = qs.filter(pk__in=[i for i in ids if isinstance(i, int)])
+        wartend = set(Freigabe.objects.filter(status=Freigabe.Status.WARTET, art=Freigabe.Art.DATENPFLEGE)
+                      .values_list("objekt_id", flat=True))
+        vorschlaege = [v for v in qs.order_by("patient__nachname", "id")[:200] if v.id not in wartend]
+        try:
+            gruppe, freigaben, uebersprungen = dienst.sammel_freigeben(vorschlaege, request.user,
+                                                                       firma=getattr(request.user, "firma", None))
+        except PermissionError as e:
+            return _fehler(e)
+        protokolliere(SystemEreignis.Art.STAMMDATEN, request, objekt="Datenpflege (Sammelfreigabe)",
+                      aktion="sammelfreigabe", anzahl=len(freigaben), uebersprungen=len(uebersprungen))
+        return Response({"gruppe": gruppe, "anzahl": len(freigaben),
+                         "uebersprungen": [u for u in uebersprungen if u["grund"] != "hat eine offene Frage"],
+                         "mit_frage": sum(1 for u in uebersprungen if u["grund"] == "hat eine offene Frage")},
+                        status=status.HTTP_201_CREATED)
+
+
+class AerzteView(_Basis):
+    def post(self, request, pk: int, aktion: str):
+        d = Arztdublette.objects.filter(pk=pk).first()
+        if d is None:
+            return Response({"fehler": "Vorschlag nicht gefunden."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            if aktion == "freigeben":
+                f = dienst.freigeben_aerzte(d, request.data, request.user)
+                return Response(_freigabe(f), status=status.HTTP_201_CREATED)
+            if aktion == "verwerfen":
+                dienst._recht(request.user, "versorger_pflegen")
+                if d.status != Arztdublette.Status.OFFEN:
+                    raise ValidationError({"fehler": "Dieser Vorschlag ist nicht mehr offen."})
+                d.status, d.erledigt_am, d.erledigt_von = Arztdublette.Status.VERWORFEN, timezone.now(), request.user
+                d.save(update_fields=["status", "erledigt_am", "erledigt_von"])
+                return Response({"status": d.status})
         except (ValidationError, PermissionError) as e:
             return _fehler(e)
         return Response(status=status.HTTP_404_NOT_FOUND)
@@ -206,9 +281,19 @@ class PlanFreigebenView(_Basis):
         return Response(_freigabe(f), status=status.HTTP_201_CREATED)
 
 
+class GruppeView(_Basis):
+    def post(self, request, gruppe: str):
+        try:
+            n = dienst.gruppe_zuruecknehmen(gruppe, request.user)
+        except (ValidationError, PermissionError) as e:
+            return _fehler(e)
+        return Response({"zurueckgenommen": n})
+
+
 class FreigabeView(_Basis):
     def post(self, request, pk: int, aktion: str):
-        f = Freigabe.objects.filter(pk=pk, patient__in=self.akten()).select_related("patient").first()
+        f = (Freigabe.objects.filter(pk=pk).filter(Q(patient__in=self.akten()) | Q(patient__isnull=True))
+             .select_related("patient").first())
         if f is None:
             return Response({"fehler": "Freigabe nicht gefunden."}, status=status.HTTP_404_NOT_FOUND)
         try:
@@ -220,4 +305,3 @@ class FreigabeView(_Basis):
             return _fehler(e)
         f.refresh_from_db()
         return Response(_freigabe(f))
-

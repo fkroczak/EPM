@@ -10,12 +10,17 @@ export type ArztTreffer = { id: number; name: string; praxis: string; ort: strin
   telefon: string; email: string };
 
 type SchrittBasis = { id: string; an: boolean; quelle: string; auszug: string; sicher: boolean; hinweis: string;
-  abhaengig_von: string[] };
+  abhaengig_von: string[]; lernen?: Record<string, string> };
+export type Anlass = "verstorben" | "therapie_beendet" | "betreuung_gewechselt";
+export type AbschlussWerte = { anlass: Anlass | ""; datum: string; notiz: string };
+export type Beleg = { id: number; zeitpunkt: string; text: string; anlass: Anlass | "" };
 export type Schritt =
   | (SchrittBasis & { art: "arzt"; rolle: string; werte: ArztWerte; arzt_wahl: number | "neu" | "auto"; treffer: ArztTreffer[] })
   | (SchrittBasis & { art: "bezugsperson"; werte: PersonWerte })
   | (SchrittBasis & { art: "feld"; feld: string; label: string; alt: string; neu: string })
-  | (SchrittBasis & { art: "hinweis"; titel: string; text: string });
+  | (SchrittBasis & { art: "hinweis"; titel: string; text: string; rest?: boolean })
+  | (SchrittBasis & { art: "kontakt"; werte: { text: string } })
+  | (SchrittBasis & { art: "abschluss"; werte: AbschlussWerte; belege: Beleg[]; frage: string; marker: string });
 
 export type PatientKurz = { id: number; nummer: number; name: string; geburtsdatum: string; geschlecht: string };
 
@@ -23,11 +28,22 @@ export type Datenpflege = {
   id: number; art: "datenpflege"; patient: PatientKurz; erstellt_am: string; verfahren: string; status: string;
   schritte: Schritt[];
   bestand: {
-    felder: Record<"telefon" | "telefon2" | "email" | "hausarzt" | "ueberweisung_durch", string>;
+    felder: Record<"telefon" | "telefon2" | "email" | "hausarzt" | "ueberweisung_durch" | "nachname" | "vorname"
+      | "strasse" | "plz" | "ort" | "groesse_cm", string>;
     bezugspersonen: { id: number; name: string; beziehung: string; telefon: string; mobil: string }[];
     aerzte: { id: number; rolle: string; rolle_name: string; name: string; ort: string; telefon: string }[];
     hinweise: { titel: string; inhalt: string }[];
+    abgeschlossen: boolean;
   };
+  /** ohne offene Frage – kommt in die Sammelfreigabe */
+  eindeutig: boolean;
+};
+
+export type ArztFeld = "name" | "praxis" | "fachrichtung" | "strasse" | "plz" | "ort" | "telefon" | "fax" | "email";
+export type Arztdublette = {
+  id: number; art: "aerzte"; gruende: string[]; erstellt_am: string;
+  aerzte: ({ id: number; patienten: number; aktiv: boolean } & Record<ArztFeld, string>)[];
+  ziel: number | null; werte: Record<ArztFeld, string>; felder: Record<ArztFeld, string>; aktuell: boolean;
 };
 
 export type PlanEntwurf = {
@@ -37,16 +53,20 @@ export type PlanEntwurf = {
 };
 
 export type LaufendeFreigabe = {
-  id: number; art: "datenpflege" | "infusionsplan"; objekt_id: number; status: "wartet" | "umgesetzt" | "zurueck" | "fehler";
+  id: number; art: "datenpflege" | "infusionsplan" | "aerzte"; gruppe: string; objekt_id: number; status: "wartet" | "umgesetzt" | "zurueck" | "fehler";
   status_name: string; titel: string; patient_id: number; freigegeben_am: string; umsetzen_ab: string; sekunden: number;
   fehler: string; von: string;
 };
 
+export type Filter = "alle" | "eindeutig" | "fragen" | "inaktiv";
+
 export type FreigabenDaten = {
   rueckgaengig_s: number;
   datenpflege: Datenpflege[]; datenpflege_gesamt?: number; plaene: PlanEntwurf[]; ki_zur_pruefung: number;
+  aerzte: Arztdublette[]; filter: Filter; zahlen: Partial<Record<Filter, number>>;
+  lernstand?: { beispiele: number; regeln: number };
   laufend: LaufendeFreigabe[];
-  darf: { datenpflege: boolean; plaene: boolean; ki: boolean; aerzte_anlegen: boolean };
+  darf: { datenpflege: boolean; sammel: boolean; abschliessen: boolean; plaene: boolean; ki: boolean; aerzte_anlegen: boolean };
 };
 
 /** Zahl offener Freigaben für das Menü (einmal je Minute; setzt nebenbei fällige Freigaben um) */
@@ -55,7 +75,7 @@ export function useFreigabenOffen(): number {
   const q = useQuery({
     queryKey: ["freigaben", "zaehler"],
     queryFn: () => api<{ offen: number }>("freigaben/zaehler/", { hintergrund: true }),
-    enabled: darf("akten_bearbeiten") || darf("plaene_freigeben"),
+    enabled: darf("datenpflege_freigeben") || darf("plaene_freigeben"),
     staleTime: 60_000,
     refetchInterval: 60_000,
   });

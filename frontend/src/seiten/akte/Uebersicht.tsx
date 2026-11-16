@@ -424,7 +424,7 @@ function ImportHinweise() {
     <Karte className="p-4 flex flex-col gap-2" data-testid="import-hinweise">
       <KartenKopf titel="Hinweise aus der Altdaten-Übernahme"
         unter="Werte, die beim Import nicht ins vorgesehene Feld passten – im Wortlaut des Altsystems."
-        rechts={darf("akten_bearbeiten")
+        rechts={darf("datenpflege_freigeben")
           ? <KnopfLink klein variante="geist" icon="haken" to={`/freigaben?patient=${patient.id}`}
               title="Die KI bereitet vor, die Hinweise in die richtigen Felder zu übertragen – Sie geben frei">Aufräumen</KnopfLink>
           : null} />

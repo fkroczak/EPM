@@ -140,7 +140,7 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
         {darf("akten_lesen") ? <NavEintrag zu="/patienten" icon="patienten" text="Patienten" /> : null}
         {darf("akten_lesen") ? <NavEintrag zu="/kalender" icon="kalender" text="Kalender" /> : null}
         {/* Freigaben (16.11.2026): alles, was freigegeben werden muss, an einer Stelle */}
-        {darf("akten_bearbeiten") || darf("plaene_freigeben") || darf("ki_ansehen")
+        {darf("datenpflege_freigeben") || darf("plaene_freigeben") || darf("ki_ansehen")
           ? <NavEintrag zu="/freigaben" icon="haken" text="Freigaben" zahl={freigabenOffen} testid="nav-freigaben" /> : null}
         {darf("akten_lesen") ? <NavEintrag zu="/infusionsplaene" icon="tropfen" text="Infusionspläne" /> : null}
         {/* Rolle „Keine Berechtigung“: keine gemeinsamen Listen */}

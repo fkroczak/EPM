@@ -9,7 +9,7 @@ export type Recht =
   | "benutzer_verwalten" | "backup_verwalten" | "testdaten_zuruecksetzen" | "testdaten_sehen" | "system_verwalten"
   | "altdaten_importieren" | "berichte_freigeben" | "scans_bearbeiten" | "schreiben_freigeben" | "diktieren"
   | "ki_ansehen" | "ki_pruefen" | "ki_uebernehmen" | "ki_berichte" | "ki_verwalten" | "ki_training_freigeben"
-  | "dokumente_finalisieren";
+  | "dokumente_finalisieren" | "datenpflege_freigeben" | "sammelfreigabe";
 
 /** Kacheln der Startseite (S11): klinische und – mit dem jeweiligen Recht – die der Administration (S12–S14) */
 export type KartenId =

@@ -93,6 +93,13 @@ RECHTE = [
      "Admin, für eine Vertretung (z. B. Urlaub) je Gruppe freischaltbar"),
     ("altdaten_importieren", "Altdaten übernehmen (Import)",
      "Dump des Altsystems laden, Zuordnungen pflegen, Probelauf, Import, zurücknehmen, abschließen – nur Admin"),
+    ("datenpflege_freigeben", "Freigaben: Datenpflege aus dem Altbestand freigeben",
+     "Menü „Freigaben“: von Regeln und KI vorbereitete Nachpflege prüfen, anpassen und freigeben (Bezugspersonen, "
+     "Ärzte zuordnen, Felder bereinigen, Hinweise aus der Übernahme einordnen) – zusätzlich mit dem Recht für den "
+     "jeweiligen Schritt (z. B. Akten abschließen, Ärzte pflegen). Standard: ab Mitarbeiter"),
+    ("sammelfreigabe", "Freigaben: mehrere eindeutige Vorschläge auf einmal freigeben",
+     "„Alle eindeutigen freigeben“ – nur Vorschläge ohne offene Frage; 60 Sekunden zum Zurücknehmen für alle "
+     "gemeinsam. Standard: ab Mitarbeiter"),
     ("ki_ansehen", "KI (Experimentell): ansehen",
      "Prüf-Queue, Vorschläge und Hinweise der KI ansehen (nur Akten der eigenen Firma)"),
     ("ki_pruefen", "KI (Experimentell): prüfen und korrigieren",
@@ -114,12 +121,15 @@ _ALLE = set(CODES)
 _ADMIN_SPEZIAL = {"benutzer_verwalten", "akten_wieder_oeffnen", "backup_verwalten", "testdaten_zuruecksetzen",
                   "system_verwalten", "altdaten_importieren", "ki_verwalten", "ki_training_freigeben"}
 _KI_MITARBEITER = {"ki_ansehen", "ki_pruefen", "ki_uebernehmen", "ki_berichte"}
+# Menü „Freigaben“ (16.11.2026): Nachpflege des Altbestands ab Mitarbeiter
+_FREIGABEN_MITARBEITER = {"datenpflege_freigeben", "sammelfreigabe"}
 
 # Rechte, die Patientendaten verändern (Einträge, Stammdaten, Pläne, Abschluss)
 PATIENTENDATEN_SCHREIBEN = {"eintraege_erfassen", "akten_bearbeiten", "plaene_anlegen", "plaene_freigeben",
                             "plaene_abschliessen", "akten_abschliessen", "dokumente_umhaengen",
                             "datenschutz_bearbeiten", "datenschutz_entscheiden", "berichte_freigeben",
-                            "schreiben_freigeben", "ki_uebernehmen", "diktieren", "dokumente_finalisieren"}
+                            "schreiben_freigeben", "ki_uebernehmen", "diktieren", "dokumente_finalisieren",
+                            "datenpflege_freigeben", "sammelfreigabe"}
 
 # Endgültiges Löschen (F73, F80) dürfen Admins auch bei echten Akten (Festlegung 02.10.2026); die übrigen Prüfungen
 # (Frist bzw. Antrag, Kennwort + 2FA + Bestätigungscode, Audit-Log, Löschprotokoll) gelten unverändert
@@ -145,11 +155,11 @@ STANDARD = {
     # entscheiden, einschränken und löschen bleibt beim Mediziner
     Rolle.MITARBEITER: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
                         "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten", "plaene_abschliessen",
-                        "testdaten_sehen", "scans_bearbeiten"} | _KI_MITARBEITER,
+                        "testdaten_sehen", "scans_bearbeiten"} | _KI_MITARBEITER | _FREIGABEN_MITARBEITER,
     Rolle.MITARBEITER_PLUS: {"akten_lesen", "eintraege_erfassen", "akten_bearbeiten", "akten_abschliessen",
                                   "versorger_pflegen", "vorlagen_pflegen", "datenschutz_bearbeiten",
                                   "plaene_abschliessen", "plaene_anlegen", "testdaten_sehen", "scans_bearbeiten"}
-    | _KI_MITARBEITER,
+    | _KI_MITARBEITER | _FREIGABEN_MITARBEITER,
     Rolle.MEDIZINER: _ALLE - _ADMIN_SPEZIAL,
     Rolle.ADMIN: _ALLE - {c for c, rollen in NUR_ROLLEN.items() if Rolle.ADMIN not in rollen},
 }

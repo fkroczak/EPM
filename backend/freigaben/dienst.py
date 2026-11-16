@@ -7,6 +7,7 @@ die freigegeben hat.
 """
 from __future__ import annotations
 
+import copy
 import datetime as dt
 import logging
 
@@ -16,8 +17,10 @@ from django.utils import timezone
 
 from audit.models import SystemEreignis, protokolliere
 
-from . import datenpflege
-from .models import RUECKGAENGIG_S, Datenpflegevorschlag, Freigabe
+import uuid
+
+from . import aerzte, datenpflege
+from .models import RUECKGAENGIG_S, Arztdublette, Datenpflegevorschlag, Freigabe
 
 log = logging.getLogger("epm.freigaben")
 F = Freigabe.Art
@@ -27,7 +30,14 @@ def _wartende(art: str, objekt_id: int) -> bool:
     return Freigabe.objects.filter(art=art, objekt_id=objekt_id, status=Freigabe.Status.WARTET).exists()
 
 
-def freigeben_datenpflege(v: Datenpflegevorschlag, eingabe, user, firma=None) -> Freigabe:
+def _recht(user, code: str):
+    from accounts.rechte import NAMEN
+
+    if not user.hat_recht(code):
+        raise PermissionError(f"Dafür fehlt das Recht „{NAMEN[code]}“.")
+
+
+def freigeben_datenpflege(v: Datenpflegevorschlag, eingabe, user, firma=None, gruppe: str = "") -> Freigabe:
     """Schritte prüfen (Werte, Rechte, Stand) und die Freigabe vormerken. Wirft ``ValidationError``/``PermissionError``."""
     from epm.api_basis import pruefe_schreibbereich
 
@@ -35,8 +45,7 @@ def freigeben_datenpflege(v: Datenpflegevorschlag, eingabe, user, firma=None) ->
         raise ValidationError({"fehler": "Dieser Vorschlag ist nicht mehr offen."})
     if _wartende(F.DATENPFLEGE, v.pk):
         raise ValidationError({"fehler": "Dieser Vorschlag ist schon freigegeben und wird gleich umgesetzt."})
-    if not user.hat_recht("akten_bearbeiten"):
-        raise PermissionError("Dafür fehlt das Recht „Patienten anlegen, Diagnose, Therapie, Stammdaten ändern“.")
+    _recht(user, "datenpflege_freigeben")
     pruefe_schreibbereich(user, v.patient)
     v.patient.pruefe_bearbeitbar()
     schritte = datenpflege.schritte_uebernehmen(v, eingabe)
@@ -44,12 +53,45 @@ def freigeben_datenpflege(v: Datenpflegevorschlag, eingabe, user, firma=None) ->
     # sofort – nicht erst nach 60 Sekunden, wenn die Person schon weitergeklickt hat
     try:
         with transaction.atomic():
-            datenpflege.umsetzen(Datenpflegevorschlag.objects.get(pk=v.pk), schritte, user)
+            datenpflege.umsetzen(Datenpflegevorschlag.objects.get(pk=v.pk), copy.deepcopy(schritte), user)
             raise _Probe()
     except _Probe:
         pass
-    return Freigabe.objects.create(art=F.DATENPFLEGE, objekt_id=v.pk, patient=v.patient, firma=firma,
+    return Freigabe.objects.create(art=F.DATENPFLEGE, objekt_id=v.pk, patient=v.patient, firma=firma, gruppe=gruppe,
                                    daten={"schritte": schritte}, freigegeben_von=user,
+                                   umsetzen_ab=timezone.now() + dt.timedelta(seconds=RUECKGAENGIG_S))
+
+
+def sammel_freigeben(vorschlaege, user, firma=None) -> tuple[str, list[Freigabe], list[dict]]:
+    """„Alle eindeutigen freigeben“: jeder Vorschlag ohne offene Frage wird wie einzeln geprüft und vorgemerkt; alle
+    teilen sich ein Rückgängig-Fenster (``gruppe``). → (gruppe, Freigaben, übersprungene mit Grund)."""
+    _recht(user, "sammelfreigabe")
+    _recht(user, "datenpflege_freigeben")
+    gruppe, freigaben, uebersprungen = str(uuid.uuid4()), [], []
+    for v in vorschlaege:
+        name = f"{v.patient.nachname}, {v.patient.vorname}"
+        if not datenpflege.eindeutig(v):
+            uebersprungen.append({"id": v.pk, "patient": name, "grund": "hat eine offene Frage"})
+            continue
+        try:
+            with transaction.atomic():
+                freigaben.append(freigeben_datenpflege(v, [], user, firma=firma, gruppe=gruppe))
+        except (ValidationError, PermissionError) as e:
+            uebersprungen.append({"id": v.pk, "patient": name, "grund": _meldung(e)})
+    if freigaben:
+        Freigabe.objects.filter(gruppe=gruppe).update(umsetzen_ab=timezone.now() + dt.timedelta(seconds=RUECKGAENGIG_S))
+    return gruppe, freigaben, uebersprungen
+
+
+def freigeben_aerzte(d: Arztdublette, eingabe, user) -> Freigabe:
+    _recht(user, "datenpflege_freigeben")
+    _recht(user, "versorger_pflegen")
+    if d.status != Arztdublette.Status.OFFEN:
+        raise ValidationError({"fehler": "Dieser Vorschlag ist nicht mehr offen."})
+    if _wartende(F.AERZTE, d.pk):
+        raise ValidationError({"fehler": "Schon freigegeben – wird gleich umgesetzt."})
+    daten = aerzte.uebernehmen(d, eingabe)
+    return Freigabe.objects.create(art=F.AERZTE, objekt_id=d.pk, patient=None, daten=daten, freigegeben_von=user,
                                    umsetzen_ab=timezone.now() + dt.timedelta(seconds=RUECKGAENGIG_S))
 
 
@@ -73,6 +115,17 @@ def freigeben_plan(plan, user, firma=None) -> Freigabe:
                                    umsetzen_ab=timezone.now() + dt.timedelta(seconds=RUECKGAENGIG_S))
 
 
+def gruppe_zuruecknehmen(gruppe: str, user) -> int:
+    """Sammelfreigabe zurücknehmen: alle noch wartenden der Gruppe; → Zahl."""
+    n = 0
+    for f in Freigabe.objects.filter(gruppe=gruppe, status=Freigabe.Status.WARTET):
+        zuruecknehmen(f, user)
+        n += 1
+    if not n:
+        raise ValidationError({"fehler": "Nichts mehr zurückzunehmen – die Freigaben sind schon umgesetzt."})
+    return n
+
+
 def zuruecknehmen(f: Freigabe, user) -> Freigabe:
     """Nur die Person, die freigegeben hat, und nur solange die Freigabe noch nicht umgesetzt ist."""
     with transaction.atomic():
@@ -94,6 +147,12 @@ def _ausfuehren(f: Freigabe):
         protokolliere(SystemEreignis.Art.STAMMDATEN, benutzer=user, objekt=f"Datenpflege {v.pk} / Patient "
                       f"{v.patient.nummer}", aktion="datenpflege_umgesetzt", patient_id=v.patient_id,
                       schritte=len(ergebnis))
+    elif f.art == F.AERZTE:
+        d = Arztdublette.objects.get(pk=f.objekt_id)
+        ergebnis = aerzte.umsetzen(d, f.daten, user)
+        protokolliere(SystemEreignis.Art.STAMMDATEN, benutzer=user, objekt=f"Ärzte zusammengeführt (Nr. {ergebnis['ziel']})",
+                      aktion="aerzte_zusammengefuehrt", deaktiviert=ergebnis["deaktiviert"],
+                      zuordnungen=ergebnis["zuordnungen"])
     elif f.art == F.INFUSIONSPLAN:
         from infusionen.models import Infusionsplan
 
@@ -130,8 +189,9 @@ def faellige_umsetzen(jetzt: dt.datetime | None = None) -> int:
                     log.exception("Freigabe %s nicht umgesetzt", f.pk)
                 f.status, f.fehler = Freigabe.Status.FEHLER, _meldung(e)
                 if isinstance(e, datenpflege.Veraltet):
-                    Datenpflegevorschlag.objects.filter(pk=f.objekt_id, status="offen").update(
-                        status=Datenpflegevorschlag.Status.VERALTET, erledigt_am=timezone.now())
+                    modell = Arztdublette if f.art == F.AERZTE else Datenpflegevorschlag
+                    modell.objects.filter(pk=f.objekt_id, status="offen").update(status="veraltet",
+                                                                                 erledigt_am=timezone.now())
             finally:
                 zuruecksetzen(token)
             f.erledigt_am = timezone.now()
