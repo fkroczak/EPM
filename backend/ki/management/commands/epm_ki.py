@@ -31,6 +31,7 @@ TAKT_S = 5
 EINMAL_HOECHSTENS_S = 600  # --einmal: Sicherheitsgrenze, damit ein Test nie endlos läuft
 CHAT_SCHLUESSEL = -2 * 10**9  # Schlüssel in self.laufend: Chat < Evaluation < Zusammenfassung < Bericht < 0 < Vorgang
 ZUSAMMENFASSUNG_SCHLUESSEL = -5 * 10**8
+DATENPFLEGE_SCHLUESSEL = -15 * 10**8  # Menü „Freigaben“: unsichere Datenpflege-Vorschläge gegenlesen (nachts, einer)
 VORMERKEN_ALLE_S = 600
 MODELL_PRUEFEN_ALLE_S = 60
 AUFRAEUMEN_ALLE_S = 3600
@@ -193,6 +194,14 @@ class Dienst:
             z = self._zusammenfassung_holen(e, einst)
             if z is not None:
                 self._starten(ZUSAMMENFASSUNG_SCHLUESSEL - z.pk, self._zusammenfassung, z)
+        # Datenpflege (Menü „Freigaben“): unsichere Vorschläge nachts vom Modell gegenlesen lassen – kurz, einer zur Zeit
+        if e.modus == "nacht" and len(self.laufend) < e.parallel and DATENPFLEGE_SCHLUESSEL not in self.laufend \
+                and self.client is not None and self.modell_bereit:
+            from freigaben import datenpflege
+
+            d = datenpflege.ki_holen()
+            if d is not None:
+                self._starten(DATENPFLEGE_SCHLUESSEL, self._datenpflege, d)
         # Evaluationslauf (Modellvergleich) nur nachts – er lädt ggf. einen Kandidaten als Probe
         if e.modus == "nacht" and not self.laufend and self.client is not None:
             lauf = KiEvaluationslauf.objects.filter(fertig_am__isnull=True).order_by("id").first()
@@ -402,6 +411,20 @@ class Dienst:
             log.exception("Akte auf einen Blick %s fehlgeschlagen", z.pk)
             type(z).objects.filter(pk=z.pk).update(status="fehler", fehler=f"{type(e).__name__}: {e}"[:2000],
                                                    fertig_am=timezone.now())
+        finally:
+            if not self.einmal:
+                connection.close()
+
+    def _datenpflege(self, d):
+        from freigaben import datenpflege
+        from freigaben.models import Datenpflegevorschlag
+
+        log.info("Datenpflege %s: KI liest gegen (Akte Nr. %s)", d.pk, d.patient.nummer)
+        try:
+            datenpflege.ki_pruefen(d, self.client if self.modell_bereit else None)
+        except Exception:  # noqa: BLE001 – ein Vorschlag darf den Dienst nicht anhalten
+            log.exception("Datenpflege %s: Gegenlesen fehlgeschlagen", d.pk)
+            Datenpflegevorschlag.objects.filter(pk=d.pk).update(ki_offen=False)
         finally:
             if not self.einmal:
                 connection.close()

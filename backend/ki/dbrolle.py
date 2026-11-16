@@ -17,7 +17,10 @@ SCHREIBEN_PRAEFIX = "ki_"
 NUR_ANFUEGEN = ["audit_systemereignis", "ki_kirohergebnis", "ki_kikorrektur", "ki_kiuebernahme"]
 # Modell-Registry: Der Dienst trägt nur das Ergebnis eines Evaluationslaufs ein (ki/evaluation.py) – aktivieren,
 # sperren und registrieren bleibt dem Backend
-NUR_SPALTEN = {"ki_kimodellversion": ["evaluation"]}
+# Menü „Freigaben“ (16.11.2026): Der Dienst liest unsichere Datenpflege-Vorschläge gegen und ändert nur den Vorschlag
+# selbst – angelegt, freigegeben und umgesetzt wird er vom Backend
+NUR_SPALTEN = {"ki_kimodellversion": ["evaluation"],
+               "freigaben_datenpflegevorschlag": ["schritte", "verfahren", "ki_offen"]}
 # Anmeldedaten braucht der Dienst nicht: Sitzungen, zweiter Faktor (TOTP-/Notfallcodes, Passkeys)
 NICHT_LESEN = ["django_session", "accounts_sitzung", "accounts_passkey"]
 NICHT_LESEN_PRAEFIX = "otp_"
