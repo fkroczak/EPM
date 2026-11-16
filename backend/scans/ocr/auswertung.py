@@ -93,6 +93,70 @@ SYNONYME = {
     "ft3": ["ft3", "freies t3"],
     "ft4": ["ft4", "freies t4"],
 }
+# Lettische Bezeichnungen (Wunsch RGC 16.11.2026: Labore aus Lettland), so wie ``norm`` sie schreibt: ohne Akzente
+# („Kreatinīns“ → „kreatinins“), Wortfolge wie auf den Befunden der großen Labore
+LETTISCH = {
+    "gpt alt": ["alanina aminotransferaze", "alaninaminotransferaze"],
+    "got ast": ["aspartata aminotransferaze", "aspartataminotransferaze"],
+    "gamma gt": ["gamma glutamiltransferaze", "gamma glutamiltranspeptidaze", "gamma glutamil transferaze"],
+    "alkp": ["sarmaina fosfataze", "sarma fosfataze", "sarmaina fosfataze alp"],
+    "bilirubin gesamt": ["kopejais bilirubins", "bilirubins kopejais", "bilirubins", "kopeja bilirubina"],
+    "bilirubin direkt": ["tiesais bilirubins", "bilirubins tiesais", "konjugetais bilirubins"],
+    "bilirubin indirekt": ["netiesais bilirubins", "bilirubins netiesais"],
+    "kreatinin": ["kreatinins", "kreatinins seruma", "kreatinins serums"],
+    "gfr ckd epi": ["aprekinatais gfr ckd epi", "egfr ckd epi formula", "glomerulu filtracijas atrums ckd epi"],
+    "gfr": ["glomerulu filtracijas atrums", "aprekinatais gfr"],
+    "harnstoff": ["urinviela", "urinvielas"],
+    "harnsaeure": ["urinskabe"],
+    "cystatin c": ["cistatins c", "cistatins"],
+    "eisen": ["dzelzs", "dzelzs seruma", "dzelzs serums"],
+    "ferritin": ["feritins"],
+    "transferrin": ["transferins"],
+    "transferrinsaettigung": ["transferina piesatinajums", "transferina piesatinajuma koeficients"],
+    "triglyceride": ["trigliceridi"],
+    "albumin": ["albumins"],
+    "gesamteiweiss": ["kopejais olbaltums", "olbaltums kopejais", "kopejais proteins", "kopeja olbaltuma"],
+    "crp": ["c reaktivais olbaltums", "c reaktivais proteins", "c reaktiva olbaltuma"],
+    "natrium": ["natrijs"],
+    "kalium": ["kalijs"],
+    "calcium": ["kalcijs", "kalcijs kopejais", "kopejais kalcijs"],
+    "magnesium": ["magnijs"],
+    "phosphat": ["fosfors", "fosfats", "fosfati", "neorganiskais fosfors"],
+    "chlorid": ["hloridi", "hlorids", "hlors"],
+    "kupfer": ["vars"],
+    "zink": ["cinks"],
+    "selen": ["selens"],
+    "mangan": ["mangans"],
+    "leukozyten": ["leikociti", "leukociti"],
+    "erythrozyten": ["eritrociti"],
+    "haemoglobin": ["hemoglobins"],
+    "haematokrit": ["hematokrits"],
+    "thrombozyten": ["trombociti"],
+    "lymphozyten": ["limfociti"],
+    "vitamin a": ["a vitamins", "retinols"],
+    "vitamin b1": ["b1 vitamins", "tiamins"],
+    "vitamin b2": ["b2 vitamins", "riboflavins"],
+    "vitamin b6": ["b6 vitamins", "piridoksins"],
+    "vitamin b12": ["b12 vitamins", "kobalamins", "cianokobalamins"],
+    "folsaeure": ["folskabe", "folati"],
+    "vitamin k1": ["k1 vitamins"],
+    "vitamin e": ["e vitamins", "tokoferols"],
+    "vitamin d": ["d vitamins"],
+    "calcidiol 25 hydroxy vitamin d": ["25 oh d vitamins", "25 hidroksi d vitamins", "d vitamins 25 oh",
+                                        "25 oh vitamins d"],
+    "parathormon": ["parathormons", "paratireoidais hormons"],
+    "amylase": ["amilaze", "alfa amilaze"],
+    "lipase": ["lipaze"],
+    "c peptid": ["c peptids"],
+    "hba1c": ["glikozilets hemoglobins", "glikets hemoglobins"],
+    "glucose": ["glikoze", "glikoze plazma", "glikoze tuksa duka"],
+    "insulin": ["insulins"],
+    "tsh basal": ["tireotropais hormons"],
+    "ft3": ["brivais t3"],
+    "ft4": ["brivais t4"],
+}
+for _n, _begriffe in LETTISCH.items():
+    SYNONYME[_n] = SYNONYME[_n] + _begriffe
 
 # Schlüssel für Umrechnung und Plausibilität (einheiten.MOLMASSE / PLAUSIBEL) je Katalogname
 STOFF = {
@@ -187,10 +251,14 @@ class Gelerntes:
 
 
 def norm(text: str) -> str:
-    """Für Vergleiche: klein, Umlaute als ae/oe/ue, ß als ss, γ als g, nur Buchstaben und Ziffern."""
+    """Für Vergleiche: klein, Umlaute als ae/oe/ue, ß als ss, γ als g, nur Buchstaben und Ziffern.
+
+    Andere Akzente fallen weg (lettische Labore, Wunsch RGC 16.11.2026: „Hemoglobīns“ → „hemoglobins“) – vorher
+    trennten sie das Wort wie ein Satzzeichen."""
     t = unicodedata.normalize("NFKC", text or "").lower()
     t = (t.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss").replace("γ", "g")
          .replace("µ", "u").replace("μ", "u"))
+    t = "".join(z for z in unicodedata.normalize("NFKD", t) if not unicodedata.combining(z))
     t = re.sub(r"[^a-z0-9]+", " ", t)
     return re.sub(r"\s+", " ", t).strip()
 
@@ -260,13 +328,25 @@ def _text(ts: list[T]) -> str:
 
 # ---------------------------------------------------------------- Datum
 _DATUM = re.compile(r"(?<!\d)(\d{1,2})\s?[.\-/]\s?(\d{1,2})\s?[.\-/]\s?(\d{4}|\d{2})(?!\d)")
+# Jahr vorn („2026.11.03.“ auf lettischen Befunden, „2026-11-03“)
+_DATUM_JMT = re.compile(r"(?<!\d)(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})(?!\d)")
+
+
+def _datum_treffer(text: str):
+    """→ (Tag, Monat, Jahr, Treffer) des ersten Datums im Text, gleich in welcher Schreibweise."""
+    a, b = _DATUM.search(text), _DATUM_JMT.search(text)
+    if b and (not a or b.start() <= a.start()):
+        return int(b.group(3)), int(b.group(2)), int(b.group(1)), b
+    if a:
+        return int(a.group(1)), int(a.group(2)), int(a.group(3)), a
+    return None
 
 
 def datum_aus(text: str) -> date | None:
-    m = _DATUM.search(text)
-    if not m:
+    treffer = _datum_treffer(text)
+    if not treffer:
         return None
-    t, mo, j = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    t, mo, j, _m = treffer
     if j < 100:
         j += 2000 if j <= (date.today().year % 100) + 1 else 1900
     try:
@@ -276,8 +356,9 @@ def datum_aus(text: str) -> date | None:
 
 
 def alle_daten(text: str) -> list[date]:
+    treffer = sorted([*_DATUM.finditer(text), *_DATUM_JMT.finditer(text)], key=lambda m: m.start())
     aus = []
-    for m in _DATUM.finditer(text):
+    for m in treffer:
         d = datum_aus(m.group(0))
         if d:
             aus.append(d)
@@ -286,9 +367,10 @@ def alle_daten(text: str) -> list[date]:
 
 DATUM_SCHLUESSEL = [
     ("abnahme", ["abnahme", "abgenommen", "entnahme", "probenentnahme", "blutentnahme", "entnommen", "abnahmedatum",
-                 "entnahmedatum"]),
+                 "entnahmedatum", "ņemšanas", "nemsanas", "ņemts"]),
     ("messung", ["datum der messung", "messdatum", "messung vom", "gemessen am", "untersuchungsdatum"]),
-    ("befund", ["befund vom", "befunddatum", "befundet", "ausgang", "druckdatum", "validiert"]),
+    ("befund", ["befund vom", "befunddatum", "befundet", "ausgang", "druckdatum", "validiert", "apstiprināts",
+                "izdrukāts", "rezultātu datums"]),
     ("eingang", ["eingang", "eingangsdatum", "auftragseingang"]),
     ("brief", [" den ", "datum"]),
 ]
@@ -782,7 +864,7 @@ def labor_name(reihen: list[list[T]]) -> str:
     for r in reihen[:8]:
         t = _text(r)
         if re.search(r"\b(labor|mvz|medizinisches versorgungszentrum|klinik|klinikum|krankenhaus|praxis|"
-                     r"laboratorium|diagnostik)\b", t, re.I):
+                     r"laboratorium|diagnostik|laboratorija|laboratorijas|slimn[iī]ca|kl[iī]nika)\b", t, re.I):
             return re.split(r"\s[-–]\s|\t", t)[0][:150].strip()
     return ""
 
@@ -805,10 +887,11 @@ BIA_FELDER = {
                          "gesamtkoerperwasser tbw"], ["l"]),
     "bmi": (["bmi", "body mass index", "koerpermassenindex", "body mass index bmi", "bmi body mass index"],
             ["kg/m²", ""]),
+    # Phasenwinkel als eigenes Feld (Wunsch DSKM 16.11.2026; vorher nur unter „weitere“)
+    "phasenwinkel_grad": (["phasenwinkel", "phase angle", "phi", "pa", "pha", "phasenwinkel 50 khz",
+                           "phase angle 50 khz", "phasenwinkel phi", "phasenwinkel pa", "fazes lenkis"], ["°", ""]),
 }
 BIA_WEITERE = {
-    "Phasenwinkel": ["phasenwinkel", "phase angle", "phi", "pa", "pha", "phasenwinkel 50 khz", "phase angle 50 khz",
-                     "phasenwinkel phi", "phasenwinkel pa"],
     "Magermasse": ["magermasse", "ffm", "fettfreie masse", "lean body mass", "lbm", "fat free mass", "ffm fettfreie masse",
                    "fettfreie masse ffm", "lean mass"],
     "Skelettmuskelmasse": ["skelettmuskelmasse", "smm", "skeletal muscle mass", "muskelmasse", "muscle mass"],

@@ -19,6 +19,6 @@ class LaborbefundAdmin(SimpleHistoryAdmin):
 
 @admin.register(BiaMessung)
 class BiaMessungAdmin(SimpleHistoryAdmin):
-    list_display = ("patient", "gemessen_am", "gewicht_kg", "bcm_kg", "fettmasse_kg", "bmi")
+    list_display = ("patient", "gemessen_am", "gewicht_kg", "bcm_kg", "fettmasse_kg", "phasenwinkel_grad", "bmi")
     list_filter = ("gemessen_am",)
     search_fields = ("patient__nachname", "patient__vorname")

@@ -1,8 +1,9 @@
 /**
  * Reiter „BIA“ (Wunsch aus der Praxis vom 06.10.2026, F114; eigener Reiter seit 07.10.2026, F121).
  *
- * Vorgefertigte Maske für die Körperzusammensetzung: Gewicht, BCM, Fettmasse, ECW, Körperwasser und BMI, dazu ein
- * Feld für die Beurteilung. Das Gewicht kann auf Wunsch gleich in den Gewichtsverlauf übernommen werden.
+ * Vorgefertigte Maske für die Körperzusammensetzung: Gewicht, BCM, Fettmasse, ECW, Körperwasser, BMI und Phasenwinkel,
+ * dazu ein Feld für die Beurteilung. Das Gewicht kann auf Wunsch gleich in den Gewichtsverlauf übernommen werden.
+ * Ab zwei Messungen zeigt „Verlauf“ Phasenwinkel, BCM und Fettmasse wie das Gewicht (Wunsch DSKM 16.11.2026).
  */
 import { Begriff } from "@/components/ui/Begriff";
 import { useEffect, useMemo, useState } from "react";
@@ -11,7 +12,8 @@ import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { datum, eingabeDatum, heuteIso, zahl } from "@/lib/format";
 import type { BiaMessung } from "@/lib/typen";
-import { Eingabe, Feld, Fehleranzeige, Knopf, Meldung } from "@/components/ui/basis";
+import { Eingabe, Feld, Fehleranzeige, Karte, Knopf, Meldung, Segmente } from "@/components/ui/basis";
+import { GewichtsDiagramm } from "@/components/GewichtsDiagramm";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Editor, Richtext } from "@/components/Editor";
@@ -25,7 +27,7 @@ function BiaDialog({ messung, offen, onOffen }: { messung: BiaMessung | null; of
   const qc = useQueryClient();
   const melden = useHinweis();
   const leer = { gemessen_am: datum(heuteIso()), gewicht_kg: "", bcm_kg: "", fettmasse_kg: "", ecw_prozent: "",
-    koerperwasser_l: "", bmi: "" };
+    koerperwasser_l: "", bmi: "", phasenwinkel_grad: "" };
   const [f2, setF2] = useState<Record<string, string>>(leer);
   const [beurteilung, setBeurteilung] = useState("");
   const [uebernehmen, setUebernehmen] = useState(true);
@@ -40,6 +42,7 @@ function BiaDialog({ messung, offen, onOffen }: { messung: BiaMessung | null; of
       gewicht_kg: messung.gewicht_kg?.toString() ?? "", bcm_kg: messung.bcm_kg?.toString() ?? "",
       fettmasse_kg: messung.fettmasse_kg?.toString() ?? "", ecw_prozent: messung.ecw_prozent?.toString() ?? "",
       koerperwasser_l: messung.koerperwasser_l?.toString() ?? "", bmi: messung.bmi?.toString() ?? "",
+      phasenwinkel_grad: messung.phasenwinkel_grad?.toString() ?? "",
     } : leer;
     setF2(start);
     setBeurteilung(messung?.beurteilung ?? "");
@@ -68,6 +71,7 @@ function BiaDialog({ messung, offen, onOffen }: { messung: BiaMessung | null; of
         gewicht_kg: zahlOderNull(f2.gewicht_kg), bcm_kg: zahlOderNull(f2.bcm_kg),
         fettmasse_kg: zahlOderNull(f2.fettmasse_kg), ecw_prozent: zahlOderNull(f2.ecw_prozent),
         koerperwasser_l: zahlOderNull(f2.koerperwasser_l), bmi: zahlOderNull(f2.bmi),
+        phasenwinkel_grad: zahlOderNull(f2.phasenwinkel_grad),
       };
       return messung
         ? api<BiaMessung>(`bia-messungen/${messung.id}/`, { method: "PATCH", body: koerper })
@@ -86,6 +90,7 @@ function BiaDialog({ messung, offen, onOffen }: { messung: BiaMessung | null; of
   const felder: [string, string, string][] = [
     ["gewicht_kg", "Gewicht", "kg"], ["bcm_kg", "BCM", "kg"], ["fettmasse_kg", "Fettmasse", "kg"],
     ["ecw_prozent", "ECW – extrazelluläres Wasser", "%"], ["koerperwasser_l", "Körperwasser", "l"], ["bmi", "BMI", ""],
+    ["phasenwinkel_grad", "Phasenwinkel", "°"],
   ];
 
   return (
@@ -134,9 +139,37 @@ function BiaDetail({ m, onAendern, aenderbar }: { m: BiaMessung; onAendern: () =
         ["ECW (extrazelluläres Wasser)", wert(m.ecw_prozent, "%")],
         ["Körperwasser", wert(m.koerperwasser_l, "l")],
         ["BMI", wert(m.bmi, "")],
+        ["Phasenwinkel", m.phasenwinkel_grad != null ? `${zahl(m.phasenwinkel_grad, 1)}°` : "—"],
       ]} />
       {m.beurteilung ? <Abschnitt titel="Beurteilung"><Richtext html={m.beurteilung} className="text-sm" /></Abschnitt> : null}
     </Detail>
+  );
+}
+
+// ================================================================= Verlauf
+type Groesse = "phasenwinkel_grad" | "bcm_kg" | "fettmasse_kg";
+const GROESSEN: { wert: Groesse; text: string; einheit: string }[] = [
+  { wert: "phasenwinkel_grad", text: "Phasenwinkel", einheit: "°" },
+  { wert: "bcm_kg", text: "BCM", einheit: "kg" },
+  { wert: "fettmasse_kg", text: "Fettmasse", einheit: "kg" },
+];
+
+/** Verlauf einer BIA-Größe über alle Messungen – gezeichnet wie der Gewichtsverlauf; Klick auf einen Punkt wählt die
+ *  Messung. */
+function BiaVerlauf({ liste, onWahl }: { liste: BiaMessung[]; onWahl: (m: BiaMessung) => void }) {
+  const [groesse, setGroesse] = useState<Groesse>("phasenwinkel_grad");
+  const g = GROESSEN.find((x) => x.wert === groesse)!;
+  const punkte = liste.filter((m) => m[groesse] != null)
+    .map((m) => ({ gemessen_am: m.gemessen_am, gewicht_kg: m[groesse] as number, m }));
+  return (
+    <Karte className="p-4 flex flex-col gap-3 min-w-0" data-testid="bia-verlauf">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <span className="text-base font-semibold leading-tight">Verlauf</span>
+        <Segmente label="Wert im Verlauf" wert={groesse} onWahl={setGroesse} werte={GROESSEN} />
+      </div>
+      <GewichtsDiagramm werte={punkte} zeitraum="alle" geglaettet={false} einheit={g.einheit}
+        beschriftung={`${g.text} im Verlauf`} onPunkt={(p) => onWahl(p.m)} />
+    </Karte>
   );
 }
 
@@ -173,9 +206,10 @@ export function Bia() {
             ))}
           </Eintragsliste>
         }
-        detail={gewaehlt
-          ? <BiaDetail m={gewaehlt} aenderbar={erfassen} onAendern={() => setDialog({ offen: true, messung: gewaehlt })} />
-          : null}
+        detail={gewaehlt ? <div className="flex flex-col gap-[var(--abstand)] min-w-0">
+          <BiaDetail m={gewaehlt} aenderbar={erfassen} onAendern={() => setDialog({ offen: true, messung: gewaehlt })} />
+          {liste.length >= 2 ? <BiaVerlauf liste={liste} onWahl={(m) => setWahl(String(m.id))} /> : null}
+        </div> : null}
         leer="Links eine Messung wählen."
       />
       {erfassen ? <BiaDialog messung={dialog.messung} offen={dialog.offen}

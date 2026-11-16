@@ -179,9 +179,8 @@ GEMEINSAM = {
     "Patient.Diagnose": Feld("Diagnose (formatiert)", lambda k: k.patient.diagnose or None, html=True),
     "Patient.Diagnosen": Feld("Diagnoseliste mit ICD-Code, eine je Zeile (z. B. Kurzdarmsyndrom [K91.2G])",
                               lambda k: _diagnosen(k)),
-    "Patient.Versicherungsart": Feld("GKV / PKV / Selbstzahler",
-                                     lambda k: k.patient.get_versicherungsart_display()
-                                     if k.patient.versicherungsart else None),
+    "Patient.Versicherungsart": Feld("GKV / PKV / Selbstzahler, ggf. mit Beihilfe und stationärer Zusatzversicherung",
+                                     lambda k: k.patient.versicherungsart_text() or None),
     "Patient.Versicherung": Feld("Name der Versicherung", lambda k: k.patient.krankenkasse or None),
     "Patient.Versichertennummer": Feld("Versichertennummer", lambda k: k.patient.versichertennummer or None),
     "Absender.Name": Feld("Name des Absenders (Vorlagen › Briefkopf)", lambda k: _absender(k).name or None),
@@ -420,6 +419,7 @@ SPRECHSTUNDE = {
     "BIA.ECW": Feld("BIA: extrazelluläres Wasser", _bia(lambda b: _zahl(b.ecw_prozent, "%"))),
     "BIA.Körperwasser": Feld("BIA: Körperwasser", _bia(lambda b: _zahl(b.koerperwasser_l, "l"))),
     "BIA.BMI": Feld("BIA: BMI", _bia(lambda b: _zahl(b.bmi))),
+    "BIA.Phasenwinkel": Feld("BIA: Phasenwinkel", _bia(lambda b: _zahl(b.phasenwinkel_grad, "°"))),
     "BIA.Beurteilung": Feld("Beurteilung der letzten BIA-Messung (formatiert)",
                             _bia(lambda b: b.beurteilung or None), html=True),
 }
@@ -734,7 +734,8 @@ def tabellenzeilen(art: str, quelle: str, k: Kontext) -> list[list[str]]:
         b = k.bia
         zeilen = [("Gewicht", b.gewicht_kg, "kg"), ("BCM", b.bcm_kg, "kg"), ("Fettmasse", b.fettmasse_kg, "kg"),
                   ("Magermasse", b.magermasse_kg, "kg"), ("ECW (extrazelluläres Wasser)", b.ecw_prozent, "%"),
-                  ("Körperwasser", b.koerperwasser_l, "l"), ("BMI", b.bmi, "")]
+                  ("Körperwasser", b.koerperwasser_l, "l"), ("BMI", b.bmi, ""),
+                  ("Phasenwinkel", b.phasenwinkel_grad, "°")]
         return [[name, _zahl(wert), einheit] for name, wert, einheit in zeilen if wert is not None]
     if quelle == "ankuendigung":
         zeilen, vorher = [], None

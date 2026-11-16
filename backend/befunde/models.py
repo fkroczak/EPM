@@ -160,7 +160,7 @@ class BiaMessung(AktenEintrag):
     """Körperzusammensetzung aus der BIA-Messung (F114).
 
     Werte wie von Alice genannt: Gewicht, BCM, Fettmasse, extrazelluläres Wasser (ECW) in Prozent,
-    Körperwasser in Litern, BMI – dazu ein Feld für die Beurteilung.
+    Körperwasser in Litern, BMI, Phasenwinkel – dazu ein Feld für die Beurteilung.
 
     Der BMI kommt vom Gerät und wird deshalb eingetragen; ``bmi_berechnet`` zeigt daneben, was sich aus
     Gewicht und hinterlegter Größe ergibt (U49)."""
@@ -174,6 +174,8 @@ class BiaMessung(AktenEintrag):
                                       null=True, blank=True)
     koerperwasser_l = models.DecimalField("Körperwasser (l)", max_digits=5, decimal_places=1, null=True, blank=True)
     bmi = models.DecimalField("BMI", max_digits=4, decimal_places=1, null=True, blank=True)
+    # Phasenwinkel (Wunsch DSKM 16.11.2026): wichtigster Verlaufswert neben BCM und Fettmasse
+    phasenwinkel_grad = models.DecimalField("Phasenwinkel (°)", max_digits=4, decimal_places=1, null=True, blank=True)
     beurteilung = models.TextField("Zusammenfassung / Beurteilung", blank=True)
     dokument = models.ForeignKey(
         "patienten.Dokument", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
@@ -225,6 +227,8 @@ class BiaMessung(AktenEintrag):
             fehler["gewicht_kg"] = (f"Gewicht muss zwischen {e.gewicht_min_kg} und {e.gewicht_max_kg} kg liegen.")
         if self.ecw_prozent is not None and not (Decimal(0) < self.ecw_prozent <= Decimal(100)):
             fehler["ecw_prozent"] = "ECW ist ein Anteil zwischen 0 und 100 %."
+        if self.phasenwinkel_grad is not None and not (Decimal(0) < self.phasenwinkel_grad <= Decimal(20)):
+            fehler["phasenwinkel_grad"] = "Der Phasenwinkel liegt zwischen 0 und 20°."
         if (self.gewicht_kg is not None and self.fettmasse_kg is not None
                 and self.fettmasse_kg > self.gewicht_kg):
             fehler["fettmasse_kg"] = "Die Fettmasse kann nicht größer als das Gewicht sein."
@@ -234,7 +238,8 @@ class BiaMessung(AktenEintrag):
                 and self.koerperwasser_l > self.gewicht_kg):
             fehler["koerperwasser_l"] = "Das Körperwasser kann nicht mehr Liter haben als das Gewicht Kilogramm."
         if not any(getattr(self, f) is not None for f in
-                   ("gewicht_kg", "bcm_kg", "fettmasse_kg", "ecw_prozent", "koerperwasser_l", "bmi")):
+                   ("gewicht_kg", "bcm_kg", "fettmasse_kg", "ecw_prozent", "koerperwasser_l", "bmi",
+                    "phasenwinkel_grad")):
             fehler["fehler"] = "Bitte mindestens einen Messwert eintragen."
         if self.dokument_id and self.dokument.patient_id != self.patient_id:
             fehler["dokument"] = "Das Dokument gehört zu einer anderen Akte."

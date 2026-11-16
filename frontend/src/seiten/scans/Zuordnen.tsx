@@ -76,6 +76,7 @@ function alsWahl(v: ScanVorschlag): Wahl {
 const BIA_FELDER: [keyof NonNullable<Scan["auswertung"]["bia"]>["werte"], string, string][] = [
   ["gewicht_kg", "Gewicht", "kg"], ["bcm_kg", "BCM", "kg"], ["fettmasse_kg", "Fettmasse", "kg"],
   ["ecw_prozent", "ECW", "%"], ["koerperwasser_l", "Körperwasser", "l"], ["bmi", "BMI", "kg/m²"],
+  ["phasenwinkel_grad", "Phasenwinkel", "°"],
 ];
 
 const TEXTFELDER = [["diagnose", "Diagnose (Freitext)"], ["therapie", "Therapie"], ["empfehlung", "Empfehlung"]] as const;

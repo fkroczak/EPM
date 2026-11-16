@@ -158,7 +158,7 @@ class BiaMessungSerializer(FirmaFeld, ModelClean, _PatientFest, serializers.Mode
     class Meta:
         model = BiaMessung
         fields = ["id", "patient", "gemessen_am", "gewicht_kg", "bcm_kg", "fettmasse_kg", "ecw_prozent",
-                  "koerperwasser_l", "bmi", "bmi_berechnet", "magermasse_kg", "beurteilung", "dokument",
+                  "koerperwasser_l", "bmi", "phasenwinkel_grad", "bmi_berechnet", "magermasse_kg", "beurteilung", "dokument",
                   "gewichtsmessung", "gewicht_uebernehmen", "erfasst_am", "erfasst_von_name"]
         read_only_fields = ["erfasst_am", "gewichtsmessung"]
 

@@ -139,7 +139,7 @@ def aktenkopie_pdf(patient) -> bytes:
         ("Geburtsdatum", _e(datum(p.geburtsdatum))), ("Geschlecht", _e(p.get_geschlecht_display() if p.geschlecht else "")),
         ("Anschrift", _e(", ".join(t for t in (p.strasse, f"{p.plz} {p.ort}".strip()) if t))),
         ("Telefon", _e(p.telefon)), ("Telefon 2", _e(p.telefon2)), ("E-Mail", _e(p.email)),
-        ("Versicherungsart", _e(p.get_versicherungsart_display() if p.versicherungsart else "")),
+        ("Versicherungsart", _e(p.versicherungsart_text())),
         ("Versicherung", _e(p.krankenkasse)), ("Versichertennummer", _e(p.versichertennummer)),
         ("Hausarzt", _e(hausarzt.arzt if hausarzt else p.hausarzt)),
         ("Überweisung / Kontaktaufnahme durch", _e(p.ueberweisung_durch)),
@@ -247,11 +247,12 @@ def aktenkopie_pdf(patient) -> bytes:
         teile.append(_abschnitt("Laborbefunde", '<div class="leer">keine Einträge</div>'))
 
     bia = [[_e(datum(b.gemessen_am)), _e(b.gewicht_kg), _e(b.bcm_kg), _e(b.fettmasse_kg), _e(b.ecw_prozent),
-            _e(b.koerperwasser_l), _e(b.bmi), _text(b.beurteilung) if b.beurteilung else "—"]
+            _e(b.koerperwasser_l), _e(b.bmi), _e(b.phasenwinkel_grad), _text(b.beurteilung) if b.beurteilung else "—"]
            for b in p.bia_messungen.order_by("gemessen_am", "id")]
     teile.append(_abschnitt("BIA-Messungen", _tabelle(
-        ["Datum", "Gewicht (kg)", "BCM (kg)", "Fettmasse (kg)", "ECW (%)", "Körperwasser (l)", "BMI", "Beurteilung"],
-        bia, ["22mm", "20mm", "18mm", "22mm", "16mm", "24mm", "14mm", None])))
+        ["Datum", "Gewicht (kg)", "BCM (kg)", "Fettmasse (kg)", "ECW (%)", "Körperwasser (l)", "BMI", "Phasenw. (°)",
+         "Beurteilung"],
+        bia, ["22mm", "20mm", "18mm", "22mm", "16mm", "24mm", "14mm", "18mm", None])))
 
     for b in p.berichte.select_related("art", "erstellt_von", "freigegeben_von").order_by("datum", "id"):
         kopfzeilen = [("Art", _e(b.art.wert if b.art_id else "")), ("Datum", _e(datum(b.datum))),

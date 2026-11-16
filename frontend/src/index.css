@@ -944,10 +944,13 @@ html:has([data-anmeldung]) { scrollbar-gutter: auto; }
     margin: -0.25rem; padding: 0.25rem;
   }
 }
-/* zweispaltige Reiter (Liste | Eintrag, Text | Seitenleiste): ab 1280 px scrollt jede Spalte für sich */
+/* zweispaltige Reiter (Liste | Eintrag, Text | Seitenleiste): ab 1280 px scrollt jede Spalte für sich.
+   Safari (Fehlermeldung RGC 16.11.2026, Mac: „23 von 33 Dokumenten, kein Scrollen“): „height: 100%“ einer Fläche, deren
+   Höhe nur aus dem Flex-Layout kommt, rechnet WebKit als „auto“ – das Raster wuchs auf volle Länge und wurde von der
+   Fläche (overflow: hidden) abgeschnitten. Höhe deshalb allein über flex-basis 0, Zeilen ohne Mindesthöhe. */
 @media (min-width: 80rem) and (min-height: 37.5rem) and (pointer: fine) {
   .seite-fuellt .akte-flaeche:has(> .akte-spalten) { overflow: hidden; }
-  .seite-fuellt .akte-spalten { flex: 1 1 auto; min-height: 0; height: 100%; align-items: stretch !important; align-content: stretch; }
+  .seite-fuellt .akte-spalten { flex: 1 1 0; min-height: 0; grid-auto-rows: minmax(0, 1fr); align-items: stretch !important; align-content: stretch; }
   .seite-fuellt .akte-spalten > * {
     min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: -0.25rem; padding: 0.25rem;
   }

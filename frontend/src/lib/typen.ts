@@ -261,6 +261,9 @@ export type Patient = {
   email: string;
   /** Versichertendaten (F118): Art, Name der Versicherung („krankenkasse“) und Versichertennummer */
   versicherungsart: "" | "gkv" | "pkv" | "selbstzahler" | "sonstige";
+  /** Kombinationen (Wunsch 16.11.2026): mit Beihilfe, stationäre Zusatzversicherung */
+  beihilfe: boolean;
+  zusatz_stationaer: boolean;
   krankenkasse: string;
   versichertennummer: string;
   hausarzt: string;
@@ -728,6 +731,16 @@ export const VERSICHERUNGSARTEN: Record<string, string> = {
   sonstige: "Sonstige",
 };
 
+const VERSICHERUNG_KURZ: Record<string, string> = { gkv: "GKV", pkv: "PKV", selbstzahler: "Selbstzahler", sonstige: "Sonstige" };
+
+/** „PKV (privat) mit Beihilfe, stationäre Zusatzversicherung“ – wie Patient.versicherungsart_text() im Backend */
+export function versicherungsartText(p: { versicherungsart: string; beihilfe?: boolean; zusatz_stationaer?: boolean }, kurz = false): string {
+  let text = p.versicherungsart ? (kurz ? VERSICHERUNG_KURZ : VERSICHERUNGSARTEN)[p.versicherungsart] ?? "" : "";
+  if (p.beihilfe) text = text ? `${text} mit Beihilfe` : "Beihilfe";
+  if (p.zusatz_stationaer) text = text ? `${text}, ${kurz ? "stat. Zusatz" : "stationäre Zusatzversicherung"}` : "Stationäre Zusatzversicherung";
+  return text;
+}
+
 /** Zusatzkennzeichen der Diagnose: G gesichert, V Verdacht, Z Zustand nach, A Ausschluss (F117) */
 export const DIAGNOSE_KENNZEICHEN: Record<string, string> = {
   G: "G – gesichert",
@@ -876,6 +889,7 @@ export type BiaMessung = {
   ecw_prozent: number | null;
   koerperwasser_l: number | null;
   bmi: number | null;
+  phasenwinkel_grad: number | null;
   bmi_berechnet: number | null;
   magermasse_kg: number | null;
   beurteilung: string;
@@ -1063,7 +1077,7 @@ export type ScanAuswertung = {
   arten?: ("labor" | "bia" | "arztbrief")[];
   datum?: string | null; datum_quelle?: string;
   labor?: { name: string; werte: ScanLaborwert[] };
-  bia?: { werte: Partial<Record<"gewicht_kg" | "bcm_kg" | "fettmasse_kg" | "ecw_prozent" | "koerperwasser_l" | "bmi", ScanBiaWert>>;
+  bia?: { werte: Partial<Record<"gewicht_kg" | "bcm_kg" | "fettmasse_kg" | "ecw_prozent" | "koerperwasser_l" | "bmi" | "phasenwinkel_grad", ScanBiaWert>>;
     weitere: { name: string; wert: string; einheit: string; seite: number; box: number[] | null }[] };
   diagnosen?: ScanDiagnose[];
   abschnitte?: Partial<Record<"diagnosen" | "anamnese" | "befund" | "therapie" | "verlauf" | "procedere", string>>;

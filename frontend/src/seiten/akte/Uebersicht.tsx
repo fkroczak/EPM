@@ -8,7 +8,7 @@ import type { Feldfehler, Seite as ApiSeite } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useEinstellungen } from "@/lib/daten";
 import { datum, eingabeDatum, eingabeZahl, heuteIso, kg, prozent, terminZeit, uhrzeit, zahl, zeitpunkt } from "@/lib/format";
-import { GEWICHTSQUELLEN, TERMINARTEN, VERSICHERUNGSARTEN } from "@/lib/typen";
+import { GEWICHTSQUELLEN, TERMINARTEN, versicherungsartText } from "@/lib/typen";
 import type { Gewicht, Kontakt, Plan, Termin } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Feld, Karte, KartenKopf, Knopf, KnopfLink, Laden, Leer, Meldung, Segmente, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
@@ -395,8 +395,7 @@ function StammKarte({ rahmenlos }: { rahmenlos?: boolean } = {}) {
       <span className="gedaempft">Telefon 2</span><span className="num" data-testid="telefon2">{p.telefon2 || "—"}</span>
       <span className="gedaempft">E-Mail</span><span className="truncate">{p.email || "—"}</span>
       <span className="gedaempft">Versicherung</span><span data-testid="krankenkasse">
-        {[VERSICHERUNGSARTEN[p.versicherungsart] !== "nicht erfasst" ? VERSICHERUNGSARTEN[p.versicherungsart] : "",
-          p.krankenkasse].filter(Boolean).join(" · ") || "—"}</span>
+        {[versicherungsartText(p), p.krankenkasse].filter(Boolean).join(" · ") || "—"}</span>
       <span className="gedaempft">Versichertennummer</span><span className="num" data-testid="versichertennummer">{p.versichertennummer || "—"}</span>
       {/* Hausarzt aus der Ärzteliste mit Link (Datenpflege im Menü „Freigaben“, 16.11.2026); der Freitext aus dem
           Altbestand nur, solange er noch nicht übernommen ist */}
