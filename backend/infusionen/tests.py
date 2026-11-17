@@ -379,6 +379,18 @@ class Infusionsplaene(PlanHilfen, Grundlage):
         self.assertEqual(c.patch(f"/api/infusionsplaene/{e['id']}/", {"kcal_manuell": 1800}, format="json").json()["kcal"], 1800)
         self.assertEqual(c.patch(f"/api/infusionsplaene/{e['id']}/", {"kcal_manuell": 433564}, format="json").status_code, 400)
 
+    def test_tage_pro_woche_null_und_bereich(self):
+        # Fehler 17.11.2026: „0 × Zusatzvolumen“ verletzte die Check-Constraint und ergab 500 (auch in der Vorschau)
+        c = client_fuer(self.mediziner)
+        e = self.entwurf(c)
+        r = c.patch(f"/api/infusionsplaene/{e['id']}/", {"zusatz_tage_pro_woche": 0}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIsNone(r.json()["zusatz_tage_pro_woche"])
+        for feld, wert in (("zusatz_tage_pro_woche", 8), ("tage_pro_woche", 0), ("freie_tage_pro_woche", 7)):
+            r = c.patch(f"/api/infusionsplaene/{e['id']}/", {feld: wert}, format="json")
+            self.assertEqual(r.status_code, 400, (feld, r.content))
+            self.assertIn(feld, r.content.decode())
+
     def test_abgeschlossene_akte(self):
         self.freigegebener_plan()
         self.patient.abgeschlossen_am = timezone.localdate() - timedelta(days=1)

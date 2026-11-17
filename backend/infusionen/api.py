@@ -18,6 +18,9 @@ from stammdaten.models import Praeparat
 from .models import Infusionsplan, InfusionsplanPosition, vorbelegung
 
 
+TAGE_BEREICHE = {"tage_pro_woche": (1, 7), "zusatz_tage_pro_woche": (1, 7), "freie_tage_pro_woche": (0, 6)}
+
+
 class PositionSerializer(serializers.ModelSerializer):
     praeparat_name = serializers.CharField(source="praeparat.__str__", read_only=True)
     kategorie = serializers.CharField(source="praeparat.kategorie", read_only=True)
@@ -103,6 +106,14 @@ class InfusionsplanSerializer(FirmaFeld, ModelClean, serializers.ModelSerializer
         return f"{obj.patient.nachname}, {obj.patient.vorname}"
 
     def validate(self, attrs):
+        # „0 × Zusatzvolumen“ heißt kein Zusatzvolumen (Fehler 17.11.2026: 0 verletzte die Check-Constraint → 500)
+        if attrs.get("zusatz_tage_pro_woche") == 0:
+            attrs["zusatz_tage_pro_woche"] = None
+        # Bereiche wie die Check-Constraints im Modell, damit ein Tippfehler 400 statt 500 ergibt
+        for feld, (unten, oben) in TAGE_BEREICHE.items():
+            wert = attrs.get(feld)
+            if wert is not None and not unten <= wert <= oben:
+                raise serializers.ValidationError({feld: f"Bitte {unten} bis {oben} eingeben."})
         for feld, kategorie in PRAEPARAT_FELDER.items():
             p = attrs.get(feld)
             if p is not None and p.kategorie != kategorie:
