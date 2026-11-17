@@ -16,6 +16,7 @@ import type { Anlass, ArztFeld, Arztdublette, ArztWerte, Datenpflege, Filter, Fr
 import { Auswahl, Chip, Eingabe, Fehleranzeige, Karte, KartenKopf, Knopf, KnopfLink, Laden, Leer, Meldung, Seitenkopf, Segmente, Textfeld, cx } from "@/components/ui/basis";
 import { useHinweis } from "@/components/ui/hinweise";
 import { Icon } from "@/components/ui/icon";
+import { Seite } from "@/components/layout/Shell";
 
 const ROLLEN: Record<string, string> = {
   hausarzt: "Hausarzt", facharzt: "Facharzt", ueberweisend: "Überweisend", klinik: "Klinik", sonstige: "Sonstige",
@@ -89,6 +90,8 @@ export function Freigaben() {
   const eindeutige = d?.zahlen.eindeutig ?? 0;
   const setzeFilter = (f: Filter) => setParams((alt) => { const n = new URLSearchParams(alt); if (f === "alle") n.delete("filter"); else n.set("filter", f); return n; });
   return (
+    // im Seitenrahmen (Kopfzeile, <main>) wie jede Seite – ohne ihn fehlten Pfad, Suche und Hilfe (Browsertest audit-firmen)
+    <Seite pfad={[{ text: "Freigaben" }]}>
     <div className="flex flex-col gap-4 min-w-0" data-testid="seite-freigaben">
       <Seitenkopf titel="Freigaben"
         unter="Vorschläge prüfen, bei Bedarf anpassen und mit einem Klick freigeben – 60 Sekunden lang lässt sich jede Freigabe zurücknehmen."
@@ -165,6 +168,7 @@ export function Freigaben() {
         {!anzahl && !d.ki_zur_pruefung && !d.darf.datenpflege ? <Karte className="p-4"><Leer>Nichts freizugeben.</Leer></Karte> : null}
       </> : null}
     </div>
+    </Seite>
   );
 }
 
