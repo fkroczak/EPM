@@ -404,6 +404,19 @@ function Details({ dok }: { dok: Dokument }) {
   );
 }
 
+/** Seitenwechsel der Dokumentliste (Wunsch RGC 18.11.2026: auf dem Mac waren nur 11 von 33 Dokumenten zu sehen) */
+const PRO_SEITE = [10, 20, 50, 0] as const;  // 0 = alle
+const PRO_SEITE_SCHLUESSEL = "epm.dokumente.proSeite";
+
+function gemerktProSeite(): number {
+  try {
+    const w = Number(localStorage.getItem(PRO_SEITE_SCHLUESSEL));
+    return (PRO_SEITE as readonly number[]).includes(w) && localStorage.getItem(PRO_SEITE_SCHLUESSEL) !== null ? w : 20;
+  } catch {
+    return 20;
+  }
+}
+
 type Hochladen = { name: string; status: "laeuft" | "ok" | "fehler"; meldung?: string };
 
 export function Dokumente() {
@@ -426,6 +439,26 @@ export function Dokumente() {
   });
   const liste = dokumente.data ?? [];
   const aktiv = liste.find((d) => d.id === gewaehlt) ?? liste[0];
+  const [proSeite, setProSeite] = useState(gemerktProSeite);
+  const [seite, setSeite] = useState(1);
+  const seiten = proSeite ? Math.max(1, Math.ceil(liste.length / proSeite)) : 1;
+  const aktuelleSeite = Math.min(seite, seiten);
+  const sichtbar = proSeite ? liste.slice((aktuelleSeite - 1) * proSeite, aktuelleSeite * proSeite) : liste;
+  // neue Suche oder Filter: zurück auf Seite 1
+  useEffect(() => setSeite(1), [begriff, ausgeblendete]);
+  // ausgewähltes Dokument (z. B. ?dokument= oder nach dem Hochladen) auf seiner Seite zeigen
+  useEffect(() => {
+    if (!proSeite || gewaehlt == null) return;
+    const i = liste.findIndex((d) => d.id === gewaehlt);
+    if (i >= 0) setSeite(Math.floor(i / proSeite) + 1);
+  }, [gewaehlt, proSeite, dokumente.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const proSeiteAendern = (w: number) => {
+    setProSeite(w);
+    setSeite(1);
+    try { localStorage.setItem(PRO_SEITE_SCHLUESSEL, String(w)); } catch { /* ohne Speicher: nur für diese Ansicht */ }
+  };
+  const von = liste.length ? (proSeite ? (aktuelleSeite - 1) * proSeite + 1 : 1) : 0;
+  const bis = proSeite ? Math.min(aktuelleSeite * proSeite, liste.length) : liste.length;
 
   const hochladen = async (dateien: FileList | File[]) => {
     for (const datei of Array.from(dateien)) {
@@ -476,7 +509,7 @@ export function Dokumente() {
           </ul>
         ) : null}
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <span className="lbl">{liste.length} {liste.length === 1 ? "Dokument" : "Dokumente"}</span>
+          <span className="lbl" data-testid="dokumente-anzahl">{seiten > 1 ? `${von}–${bis} von ${liste.length} Dokumenten` : `${liste.length} ${liste.length === 1 ? "Dokument" : "Dokumente"}`}</span>
           <label className="relative block grow max-w-sm">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
             <input className="inp pl-[2.125rem]" type="search" aria-label="Dokumente durchsuchen" placeholder="Suchen in Titel, Notiz und erkanntem Text"
@@ -486,12 +519,31 @@ export function Dokumente() {
             <input type="checkbox" checked={ausgeblendete} onChange={(e) => setAusgeblendete(e.target.checked)} /> Ausgeblendete anzeigen
           </label>
         </div>
-        <Karte className="overflow-hidden">
+        {/* Seitenwechsel über der Liste: bleibt sichtbar, auch wenn unten etwas abgeschnitten würde */}
+        {liste.length > PRO_SEITE[0] ? (
+          <div className="flex items-center justify-between gap-3 flex-wrap text-sm" data-testid="dokumente-seiten">
+            <label className="flex items-center gap-2">
+              <span className="gedaempft">Pro Seite</span>
+              <select className="inp w-auto py-1" value={proSeite} onChange={(e) => proSeiteAendern(Number(e.target.value))} aria-label="Dokumente pro Seite">
+                {PRO_SEITE.map((w) => <option key={w} value={w}>{w || "Alle"}</option>)}
+              </select>
+            </label>
+            {seiten > 1 ? (
+              <div className="flex items-center gap-2">
+                <Knopf klein disabled={aktuelleSeite <= 1} onClick={() => setSeite(aktuelleSeite - 1)}>Zurück</Knopf>
+                <span className="num" aria-live="polite">Seite {aktuelleSeite} von {seiten}</span>
+                <Knopf klein disabled={aktuelleSeite >= seiten} onClick={() => setSeite(aktuelleSeite + 1)}>Weiter</Knopf>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {/* eigener Scrollbereich: wird die Karte in der Spalte kürzer als die Tabelle, scrollt sie statt abzuschneiden */}
+        <Karte className="overflow-auto min-h-0">
           {dokumente.isLoading ? <Laden /> : (
             <table className="tabelle" data-testid="dokumentliste">
               <thead><tr><th className="th">Dokument</th><th className="th">Typ</th><th className="th">Datum</th><th className="th text-right">Größe</th><th className="th">Von</th></tr></thead>
               <tbody>
-                {liste.map((d) => (
+                {sichtbar.map((d) => (
                   <tr key={d.id} className={cx(d.id === aktiv?.id && "gewaehlt", d.ausgeblendet && "opacity-60")}>
                     <td className="td">
                       <button type="button" className="bg-transparent border-0 p-0 cursor-pointer text-left inline-flex items-center gap-2 font-medium text-akzent-text"
