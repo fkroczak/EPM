@@ -207,3 +207,21 @@ class FusszeileTest(TestCase):
         self.assertIn("Vorstand:", pdf_text(pdf))
         # ohne Band: kein Fußband
         self.assertNotIn('class="fussband"', bloecke_html("eigen-x", [*b[:2], {**fuss, "band": ""}], k)[0])
+
+
+class BriefkopfTextTest(TestCase):
+    """Eigener Absendertext im Briefkopf je Vorlage (18.11.2026)."""
+
+    def test_eigener_text(self):
+        k = Kontext(patient=Patient(nachname="Muster", vorname="Erika"), heute=date(2026, 11, 18))
+        for kopf in ({"id": "k", "typ": "briefkopf"}, {"id": "k", "typ": "briefkopf", "kopfband": "welle"}):
+            b = [{**kopf, "rechts": "Rīga, Brīvības iela 1\n<b>Tel.</b> +371 1234"}, text("t", "Inhalt")]
+            self.assertEqual(pruefe_bloecke("patientenaufnahme", b), [])
+            inhalt = bloecke_html("patientenaufnahme", b, k)[0]
+            self.assertIn("Rīga, Brīvības iela 1<br>&lt;b&gt;Tel.&lt;/b&gt; +371 1234", inhalt)
+            # ohne Absender: kein Text
+            self.assertNotIn("Rīga", bloecke_html("patientenaufnahme", [{**b[0], "absender": False}, b[1]], k)[0])
+        self.assertTrue(any("Absendertext höchstens 8 Zeilen" in f for f in pruefe_bloecke(
+            "patientenaufnahme", [{"id": "k", "typ": "briefkopf", "rechts": "a\n" * 9}])))
+        self.assertTrue(any("unbekanntes Datenfeld" in f for f in pruefe_bloecke(
+            "patientenaufnahme", [{"id": "k", "typ": "briefkopf", "rechts": "{{Gibtsnicht}}"}])))

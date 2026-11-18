@@ -141,7 +141,13 @@ def pruefe_bloecke(art: str, bloecke) -> list[str]:
         if typ == "briefkopf":
             erlaubt |= {"absender", "linienfarbe", "falzmarken", "mit_linie", "briefpapier",
                         # Kopfband (14.10.2026): Form, Farben, Höhe, Seiten, Logo rechts, Fußband
-                        "kopfband", "bandfarbe", "textfarbe", "bandhoehe_mm", "band_seiten", "logo_rechts", "fussband"}
+                        "kopfband", "bandfarbe", "textfarbe", "bandhoehe_mm", "band_seiten", "logo_rechts", "fussband",
+                        # eigener Absendertext je Vorlage statt der Angaben aus „Briefkopf und Logo“ (18.11.2026)
+                        "rechts"}
+            _text(b.get("rechts"), f"{name} (Absendertext)", fehler, laenge=600)
+            _felder_pruefen(art, b.get("rechts"), name, fehler)
+            if isinstance(b.get("rechts"), str) and b["rechts"].count("\n") >= 8:
+                fehler.append(f"{name}: Absendertext höchstens 8 Zeilen.")
             if "briefpapier" in b and b["briefpapier"] not in ("", *BRIEFPAPIERE):
                 fehler.append(f"{name}: unbekanntes Briefpapier. Möglich: {', '.join(BRIEFPAPIERE)}.")
             for k in ("absender", "falzmarken", "mit_linie", "logo_rechts", "fussband"):

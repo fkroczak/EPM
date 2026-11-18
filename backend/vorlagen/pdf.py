@@ -494,6 +494,10 @@ def bloecke_html(art: str, bloecke: list, kontext: Kontext, quer=False) -> tuple
                 if titel_neben else ""
             klasse = f"kopftitel {schrift}".strip()
             neben = f'<div class="{klasse}">{_titel_html(ersetze, titel_neben)}</div>' if titel_neben else None
+            # eigener Absendertext der Vorlage (18.11.2026) statt der Angaben aus „Briefkopf und Logo“
+            if neben is None and b.get("absender", True) and (b.get("rechts") or "").strip():
+                eigen, _ = ersetze.zeilen(b["rechts"])
+                neben = f'<div class="absender">{eigen}</div>'
             # die Falzmarken des Anschriftfelds (DIN 5008) ersetzen die des Briefkopfs
             falz = b.get("falzmarken", False) and not quer and not (din and din.get("falzmarken", True))
             if b.get("kopfband") in gestaltung.FORMEN:
