@@ -351,6 +351,8 @@ test("E-Mail-Vorlage im eigenen Fenster bearbeiten: Angaben als Chips, Vorschau 
   await expect(text).not.toContainText("{{");
   // am Ende weiterschreiben und eine Angabe an der Schreibmarke einsetzen
   await text.click();
+  // erst tippen, wenn der Editor den Fokus hat – sonst geht Strg+Ende ins Leere und der Text landet an der Klickstelle
+  await expect(text).toBeFocused();
   await page.keyboard.press("Control+End");
   await page.keyboard.press("Enter");
   await page.keyboard.type("Stand: ");
@@ -362,6 +364,7 @@ test("E-Mail-Vorlage im eigenen Fenster bearbeiten: Angaben als Chips, Vorschau 
   // Betreff einzeilig
   const betreff = fenster.getByRole("textbox", { name: "Betreff" });
   await betreff.click();
+  await expect(betreff).toBeFocused();
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await page.keyboard.type(" (neu)");
