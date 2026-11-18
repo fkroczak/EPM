@@ -215,8 +215,9 @@ function BlockAnsicht({ b, tabellen }: { b: Block; tabellen: Aufbau["tabellen"] 
       return (
         <div className={cx("flex justify-between items-end pb-2", b.mit_linie !== false && "border-b-2")} style={{ borderColor: /^#[0-9a-f]{6}$/i.test(b.linienfarbe ?? "") ? b.linienfarbe : "#251F53" }}>
           <Logo className="w-[9.375rem] h-[3.3125rem]" version={briefkopf.data?.logo.sha256} firma={briefkopf.data?.firma?.kuerzel} name={briefkopf.data?.firma?.name} />
-          {b.absender !== false ? <div className="flex flex-col items-end text-[0.9em] text-[#555]">
-            {a ? <><span>{a.strasse} · {a.plz} {a.ort}</span><span>Tel. {a.telefon}</span><span>{a.email}</span></> : null}
+          {b.absender !== false ? <div className="flex flex-col items-end text-right text-[0.9em] text-[#555]" data-testid="briefkopf-absender">
+            {b.rechts?.trim() ? <span><MitFeldern text={b.rechts} /></span>
+              : a ? <><span>{a.strasse} · {a.plz} {a.ort}</span><span>Tel. {a.telefon}</span><span>{a.email}</span></> : null}
           </div> : null}
         </div>
       );
@@ -340,9 +341,10 @@ function KopfbandAnsicht({ b, breite }: { b: Block; breite: number }) {
       <div className={cx("absolute flex justify-between items-start gap-6", b.logo_rechts && "flex-row-reverse")}
         style={{ top: 7 * MM, left: RAND_LINKS * MM, right: RAND_LINKS * MM, color: b.textfarbe ?? "#1b1932" }}>
         <Logo className="w-[9.375rem] h-[3.3125rem]" version={briefkopf.data?.logo.sha256} firma={briefkopf.data?.firma?.kuerzel} name={briefkopf.data?.firma?.name} />
-        {b.absender !== false && a ? (
-          <div className={cx("flex flex-col text-[0.75rem] leading-snug", b.logo_rechts ? "items-start" : "items-end")}>
-            <span>{a.strasse} · {a.plz} {a.ort}</span><span>Tel. {a.telefon}</span><span>{a.email}</span>
+        {b.absender !== false && (a || b.rechts?.trim()) ? (
+          <div className={cx("flex flex-col text-[0.75rem] leading-snug", b.logo_rechts ? "items-start" : "items-end text-right")}>
+            {b.rechts?.trim() ? <span><MitFeldern text={b.rechts} /></span>
+              : a ? <><span>{a.strasse} · {a.plz} {a.ort}</span><span>Tel. {a.telefon}</span><span>{a.email}</span></> : null}
           </div>
         ) : null}
       </div>
@@ -1324,6 +1326,7 @@ function BlockEigenschaften({ b, vorher, aufbau, aendere, aendereOptionen, fokus
         <Segmente label="Gestaltung des Kopfs" wert={b.kopfband ? "band" : "linie"} className="self-start"
           onWahl={(w) => aendere(w === "band" ? { kopfband: "welle", bandfarbe: b.bandfarbe ?? "#BDC9C2", textfarbe: b.textfarbe ?? "#23272C", bandhoehe_mm: b.bandhoehe_mm ?? 38 } : { kopfband: "" })}
           werte={[{ wert: "linie", text: "Logo mit Linie" }, { wert: "band", text: "Farbiges Band" }]} />
+        {b.absender !== false ? <AbsenderText b={b} aendere={aendere} fokus={fokus} /> : null}
         {b.kopfband ? <KopfbandWahl b={b} aendere={aendere} /> : <>
           <label className="flex items-center gap-2 text-[0.8438rem]"><input type="checkbox" checked={b.mit_linie !== false} onChange={(e) => aendere({ mit_linie: e.target.checked })} />Linie unter dem Logo</label>
           {b.mit_linie !== false ? <label className="flex items-center gap-2 text-[0.8438rem]">Linienfarbe
@@ -1520,6 +1523,23 @@ function EmailVorschau({ art, bloecke, ausrichtung }: { art: Art; bloecke: Block
 }
 
 /** Kopfband frei gestalten: Form, Farben, Höhe, Seiten, Logo rechts, Fußband */
+/** Absendertext im Briefkopf je Vorlage (18.11.2026): leer = Angaben aus „Briefkopf und Logo“ */
+function AbsenderText({ b, aendere, fokus }: { b: Block; aendere: (n: Partial<Block>) => void; fokus: Fokus }) {
+  const briefkopf = useBriefkopf();
+  const a = briefkopf.data ? briefkopf.data.absender[briefkopf.data.aktiv] : null;
+  const eigen = b.rechts !== undefined;
+  return (
+    <div className="flex flex-col gap-2" data-testid="briefkopf-text">
+      <label className="flex items-center gap-2 text-[0.8438rem]">
+        <input type="checkbox" checked={eigen} onChange={(e) => aendere({
+          rechts: e.target.checked ? (a ? `${a.strasse} · ${a.plz} ${a.ort}\nTel. ${a.telefon}\n${a.email}` : "{{Absender.Straße}}") : undefined,
+        })} />Eigener Text rechts im Briefkopf</label>
+      {eigen ? <FeldText label="Text rechts (bis 8 Zeilen)" wert={b.rechts ?? ""} onWert={(w) => aendere({ rechts: w })} fokus={fokus} mehrzeilig />
+        : <span className="text-[0.75rem] gedaempft">Sonst stehen hier die Angaben aus Vorlagen › Briefkopf und Logo.</span>}
+    </div>
+  );
+}
+
 function KopfbandWahl({ b, aendere }: { b: Block; aendere: (n: Partial<Block>) => void }) {
   const hoehe = b.bandhoehe_mm ?? 38;
   return (

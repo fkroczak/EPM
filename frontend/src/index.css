@@ -954,6 +954,10 @@ html:has([data-anmeldung]) { scrollbar-gutter: auto; }
   .seite-fuellt .akte-spalten > * {
     min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: -0.25rem; padding: 0.25rem;
   }
+  /* Fehlermeldung RGC 18.11.2026 („Ich kann nicht alle Dokumente sehen“, 15 von 33): Karten mit overflow: hidden haben
+     in einer Flex-Spalte die Mindesthöhe 0 und schrumpften auf die Spaltenhöhe – die Tabelle wurde abgeschnitten, statt
+     dass die Spalte scrollt. Inhalt einer scrollenden Spalte schrumpft deshalb nie. */
+  .seite-fuellt .akte-spalten > * > * { flex-shrink: 0; }
 }
 
 /* Reiter der Akte: Hauptbereiche vorn, Befunde und Unterlagen danach, Verlauf und Datenschutz klein am Ende */
