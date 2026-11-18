@@ -186,11 +186,22 @@ class Laborparameter(models.Model):
         SCHILDDRUESE = "schilddruese", "Schilddrüse"
         TUMORMARKER = "tumormarker", "Tumormarker"
         GENETIK = "genetik", "Genetische Parameter"
+        # weitere Gruppen für die Parameter der RGC-Laboranforderungen (Dreisprachigkeit, 18.11.2026)
+        GERINNUNG = "gerinnung", "Gerinnung"
+        HORMONE = "hormone", "Hormone"
+        IMMUNOLOGIE = "immunologie", "Immunologie und Autoantikörper"
+        ALLERGOLOGIE = "allergologie", "Allergologie und Mastzellen"
+        URIN_STUHL = "urin_stuhl", "Urin und Stuhl"
         SONSTIGES = "sonstiges", "Weitere Parameter"
 
     gruppe = models.CharField(max_length=30, choices=Gruppe.choices)
     name = models.CharField(max_length=150)
     kurzname = models.CharField(max_length=60, blank=True, help_text="für enge Spalten, z. B. „GPT“")
+    # Dreisprachigkeit der RGC (18.11.2026): ``name`` ist die deutsche Bezeichnung; Englisch und Lettisch daneben.
+    # Werte hängen am Parameter, nicht am Namen – „Fosfors“ und „Phosphat“ sind derselbe Wert. Die Texterkennung
+    # (Scans, KI) sucht unter allen drei Namen.
+    name_en = models.CharField("Name (Englisch)", max_length=150, blank=True)
+    name_lv = models.CharField("Name (Lettisch)", max_length=150, blank=True)
     # Scans (F166): weitere Schreibweisen, unter denen Labore den Wert drucken („ALAT“, „Krea“) – kommagetrennt.
     # Die üblichen Schreibweisen kennt die Werterkennung schon (scans/ocr/auswertung.py, SYNONYME).
     suchbegriffe = models.CharField("Suchbegriffe für Scans", max_length=300, blank=True,
@@ -225,6 +236,10 @@ class Laborparameter(models.Model):
         if (self.referenz_von is not None and self.referenz_bis is not None
                 and self.referenz_von > self.referenz_bis):
             raise ValidationError({"referenz_bis": "„Referenz bis“ muss größer oder gleich „Referenz von“ sein."})
+
+    def name_in(self, sprache: str) -> str:
+        """Bezeichnung in „de“, „en“ oder „lv“ – fehlt die Übersetzung, die deutsche."""
+        return {"en": self.name_en, "lv": self.name_lv}.get(sprache) or self.name
 
     def __str__(self):
         return f"{self.name} ({self.einheit})" if self.einheit else self.name

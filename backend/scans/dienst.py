@@ -563,7 +563,7 @@ def katalog() -> list[dict]:
     from stammdaten.models import Laborparameter
 
     return list(Laborparameter.objects.filter(aktiv=True).values("id", "name", "kurzname", "einheit", "gruppe",
-                                                                 "suchbegriffe"))
+                                                                 "suchbegriffe", "name_en", "name_lv"))
 
 
 def diagnoseliste() -> list[tuple[str, str]]:

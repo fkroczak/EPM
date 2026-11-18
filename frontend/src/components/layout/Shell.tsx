@@ -22,6 +22,8 @@ import { Ladebalken } from "@/components/ui/Ladebalken";
 import { Chip, cx } from "@/components/ui/basis";
 import { Icon } from "@/components/ui/icon";
 import { FirmenSchalter } from "./FirmenSchalter";
+import { SprachSchalter } from "./SprachSchalter";
+import { useSpracheImDokument, useT } from "@/lib/sprache";
 import { Logo } from "./logo";
 import { useDiktatStand } from "@/lib/diktate";
 
@@ -38,6 +40,8 @@ function NavEintrag({ zu, icon, text, ende, zahl, testid }: { zu: string; icon: 
   zahl?: number; testid?: string }) {
   // schmale Leiste (nur Symbole): jeder Eintrag gleich groß und das Symbol mittig (Wunsch 08.10.2026)
   const voll = useContext(Voll);
+  const t = useT();
+  text = t(text);
   const titel = zahl ? `${text} (${zahl})` : text;
   return (
     <NavLink to={zu} end={ende} title={titel} className={({ isActive }) => cx("nav", !voll && "nav-symbol", isActive && "aktiv", "relative")}
@@ -68,6 +72,7 @@ function useScansOffen(): number {
 /** Angemeldete Person unten in der Seitenleiste: Kürzel im Kreis, Name und Rolle */
 function Person({ v }: { v: boolean }) {
   const ich = useIch();
+  const t = useT();
   return (
     <span className={cx("flex items-center gap-2.5 min-w-0", v ? "justify-start" : "justify-center hd:justify-start")}>
       <span aria-hidden="true" className="w-[2.125rem] h-[2.125rem] shrink-0 rounded-full bg-akzent-weich text-akzent-text flex items-center justify-center font-semibold text-[0.8125rem]">
@@ -75,7 +80,7 @@ function Person({ v }: { v: boolean }) {
       </span>
       <span className={cx("flex-col min-w-0 text-left", v ? "flex" : "sr-only hd:not-sr-only hd:flex")}>
         <span className="text-sm font-medium truncate text-tinte" data-testid={v ? undefined : "angemeldet-als"}>{ich.anzeigename}</span>
-        <span className="text-xs gedaempft">{ROLLEN[ich.rolle]}{ich.ist_test ? " · Testzugang" : ""}</span>
+        <span className="text-xs gedaempft">{t(ROLLEN[ich.rolle] ?? "")}{ich.ist_test ? ` · ${t("Testzugang")}` : ""}</span>
       </span>
     </span>
   );
@@ -91,6 +96,8 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
   const kiZurPruefung = useKiZurPruefung();
   const freigabenOffen = useFreigabenOffen();
   const navigate = useNavigate();
+  const t = useT();
+  useSpracheImDokument();
   const admin = [
     // Übersicht mit Ampel und häufigen Aufgaben (Wunsch 10.10.2026)
     darf("system_verwalten") || darf("backup_verwalten") ? <NavEintrag key="sv" zu="/admin" icon="aktivitaet" text="Systemverwaltung" ende /> : null,
@@ -122,20 +129,20 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
     <aside data-leiste className={cx("shrink-0 bg-leiste border-r border-rand flex flex-col py-4 gap-5 nicht-drucken overflow-y-auto",
       v ? "w-full h-full px-3" : "w-16 hd:w-56 px-2 hd:px-2.5 sticky top-0 h-screen max-md:hidden")}
       style={{ borderRightWidth: "var(--randbreite)" }} data-testid={v ? "schublade" : "seitenleiste"}
-      aria-label="Seitenleiste">
+      aria-label={t("Seitenleiste")}>
       <div className={cx(v ? "flex" : "hidden hd:flex", "flex-col gap-2")}>
         {/* Logo, Name und Umschalter mittig (Wunsch 11.10.2026); RGC direkt auf der salbeigrünen Leiste, DSKM auf weißem Feld */}
         <Logo className={cx("w-full max-w-[12.75rem] h-[4rem] px-1.5 py-1 rounded-lg self-center", ich.firma !== "rg" && "bg-white")}
           style={{ objectPosition: "center" }} firma={firma?.kuerzel} name={firma?.name} />
         <span className="px-1 text-center font-mono text-[0.6875rem] font-medium tracking-[.07em] uppercase gedaempft">
-          EPM · Patientenmanagement
+          {t("EPM · Patientenmanagement")}
         </span>
         {/* Umschalter zwischen den Firmen direkt unter dem Logo (Anforderung 11.10.2026) */}
         <FirmenSchalter className="max-w-[12.75rem] self-center" />
       </div>
-      {v ? null : <span className="hd:hidden self-center font-mono text-xs font-semibold tracking-[.07em] text-akzent-text" title="EPM · Patientenmanagement">EPM</span>}
+      {v ? null : <span className="hd:hidden self-center font-mono text-xs font-semibold tracking-[.07em] text-akzent-text" title={t("EPM · Patientenmanagement")}>EPM</span>}
       {v ? null : <FirmenSchalter schmal className="hd:hidden" />}
-      <nav aria-label="Hauptnavigation" className="flex flex-col gap-0.5">
+      <nav aria-label={t("Hauptnavigation")} className="flex flex-col gap-0.5">
         <NavEintrag zu="/" icon="start" text="Start" ende />
         {darf("akten_lesen") ? <NavEintrag zu="/patienten" icon="patienten" text="Patienten" /> : null}
         {darf("akten_lesen") ? <NavEintrag zu="/kalender" icon="kalender" text="Kalender" /> : null}
@@ -156,20 +163,20 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
         {darf("ki_ansehen") ? <NavEintrag zu="/ki" icon="stern" text="KI (Experimentell)" zahl={kiZurPruefung} testid="nav-ki" /> : null}
       </nav>
       {admin.length ? (
-        <nav aria-label="Administration" className="flex flex-col gap-0.5">
+        <nav aria-label={t("Administration")} className="flex flex-col gap-0.5">
           {/* Wer viele Verwaltungsseiten hat (Praxismanagement), sieht sie als eine Gruppe zum Aufklappen – die
               tägliche Arbeit steht oben ohne Ablenkung (Wunsch 10.10.2026, F181). Bis zu zwei Punkte (Vorlagen,
               Audit-Log) bleiben offen; in der Schublade am Telefon und auf Seiten der Administration ist sie offen. */}
           {!v && admin.length > 2 ? (
             <button type="button" className={cx("nav nav-symbol hd:!justify-start border-0 bg-transparent cursor-pointer w-full", adminOffen && "text-tinte")}
-              aria-expanded={adminOffen} title={adminOffen ? "Administration einklappen" : `Administration (${admin.length} Seiten)`}
+              aria-expanded={adminOffen} title={adminOffen ? t("Administration einklappen") : `${t("Administration")} (${admin.length})`}
               onClick={() => adminUmschalten(!adminOffen)} data-testid="nav-administration">
               <Icon name="zahnrad" groesse={18} />
-              <span className="sr-only hd:not-sr-only">Administration</span>
+              <span className="sr-only hd:not-sr-only">{t("Administration")}</span>
               <span className="hidden hd:inline-flex ml-auto gedaempft" aria-hidden="true"><Icon name={adminOffen ? "hoch" : "runter"} groesse={14} /></span>
             </button>
           ) : <>
-            <div className={cx("px-2 h-8 items-center text-xs font-medium gedaempft", v ? "flex" : "hidden hd:flex")}>Administration</div>
+            <div className={cx("px-2 h-8 items-center text-xs font-medium gedaempft", v ? "flex" : "hidden hd:flex")}>{t("Administration")}</div>
             {v ? null : <div className="hd:hidden border-t border-rand my-1" aria-hidden="true" />}
           </>}
           {v || admin.length <= 2 || adminOffen ? <div className={cx("flex flex-col gap-0.5", !v && admin.length > 2 && "hd:pl-2")}>{admin}</div> : null}
@@ -180,21 +187,21 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
       <div className={cx("mt-auto flex flex-col gap-2.5 border-t border-rand pt-3.5", v ? "px-1.5" : "hd:px-1.5")}>
         {v ? <>
           <Person v />
-          <NavLink to="/hilfe" title="Hilfe" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
-            <Icon name="hilfe" /> <NavText>Hilfe</NavText>
+          <NavLink to="/hilfe" title={t("Hilfe")} className={({ isActive }) => cx("nav", isActive && "aktiv")}>
+            <Icon name="hilfe" /> <NavText>{t("Hilfe")}</NavText>
           </NavLink>
-          <NavLink to="/design" title="Design" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
-            <Icon name="design" /> <NavText>Design</NavText>
+          <NavLink to="/design" title={t("Design")} className={({ isActive }) => cx("nav", isActive && "aktiv")}>
+            <Icon name="design" /> <NavText>{t("Design")}</NavText>
           </NavLink>
-          <NavLink to="/konto" title="Mein Konto" className={({ isActive }) => cx("nav", isActive && "aktiv")}>
-            <Icon name="konto" /> <NavText>Mein Konto</NavText>
+          <NavLink to="/konto" title={t("Mein Konto")} className={({ isActive }) => cx("nav", isActive && "aktiv")}>
+            <Icon name="konto" /> <NavText>{t("Mein Konto")}</NavText>
           </NavLink>
-          <button type="button" title="Abmelden" className="nav border-0 bg-transparent cursor-pointer text-left" onClick={() => void abmelden()}>
-            <Icon name="abmelden" /> <NavText>Abmelden</NavText>
+          <button type="button" title={t("Abmelden")} className="nav border-0 bg-transparent cursor-pointer text-left" onClick={() => void abmelden()}>
+            <Icon name="abmelden" /> <NavText>{t("Abmelden")}</NavText>
           </button>
         </> : (
           <BaseMenu.Root>
-            <BaseMenu.Trigger className="benutzerknopf" title={`${ich.anzeigename} – Hilfe, Design, Mein Konto, Abmelden`}
+            <BaseMenu.Trigger className="benutzerknopf" title={`${ich.anzeigename} – ${["Hilfe", "Design", "Mein Konto", "Abmelden"].map(t).join(", ")}`}
               data-testid="benutzermenue">
               <Person v={false} />
               <span className="hidden hd:inline-flex ml-auto gedaempft" aria-hidden="true"><Icon name="hoch" groesse={14} /></span>
@@ -210,7 +217,7 @@ function Seitenleiste({ schublade }: { schublade?: boolean }) {
                     { text: "Abmelden", icon: "abmelden", tun: () => void abmelden() },
                   ].map((e) => (
                     <BaseMenu.Item key={e.text} onClick={e.tun} className="nav cursor-pointer outline-none data-[highlighted]:bg-fein data-[highlighted]:text-tinte">
-                      <Icon name={e.icon} groesse={18} />{e.text}
+                      <Icon name={e.icon} groesse={18} />{t(e.text)}
                     </BaseMenu.Item>
                   ))}
                 </BaseMenu.Popup>
@@ -231,6 +238,7 @@ function MobilLeiste() {
   const qc = useQueryClient();
   const [menue, setMenue] = useState(false);
   const [notiz, setNotiz] = useState<{ vorgabe: Vorgabe | null } | null>(null);
+  const t = useT();
   useEffect(() => setMenue(false), [pathname]);
   const notizOeffnen = () => {
     const id = Number(pathname.match(/^\/patienten\/(\d+)/)?.[1] ?? 0);
@@ -239,23 +247,23 @@ function MobilLeiste() {
   };
   const eintrag = (zu: string, icon: string, text: string, ende?: boolean) => (
     <NavLink to={zu} end={ende} className={({ isActive }) => cx("mobil-nav", isActive && "aktiv")}>
-      <Icon name={icon} groesse={22} /><span>{text}</span>
+      <Icon name={icon} groesse={22} /><span>{t(text)}</span>
     </NavLink>
   );
   return (
     <>
-      <nav aria-label="Hauptnavigation (Telefon)" data-testid="mobil-leiste"
+      <nav aria-label={t("Hauptnavigation")} data-testid="mobil-leiste"
         data-leiste className="nicht-drucken fixed bottom-0 inset-x-0 z-30 bg-leiste border-t border-rand grid grid-cols-5 pb-[env(safe-area-inset-bottom)]">
         {eintrag("/", "start", "Start", true)}
         {darf("akten_lesen") ? eintrag("/patienten", "patienten", "Patienten") : <span />}
         {darf("eintraege_erfassen") ? (
           <button type="button" className="mobil-nav" onClick={notizOeffnen} data-testid="mobil-notiz">
-            <span className="mobil-plus"><Icon name="plus" groesse={22} /></span><span>Notiz</span>
+            <span className="mobil-plus"><Icon name="plus" groesse={22} /></span><span>{t("Notiz")}</span>
           </button>
         ) : <span />}
         {darf("akten_lesen") ? eintrag("/infusionsplaene?gruppe=entwuerfe", "tropfen", "Pläne") : <span />}
         <button type="button" className="mobil-nav" onClick={() => setMenue(true)} aria-haspopup="dialog" data-testid="mobil-menue">
-          <Icon name="menue" groesse={22} /><span>Menü</span>
+          <Icon name="menue" groesse={22} /><span>{t("Menü")}</span>
         </button>
       </nav>
       <BaseDialog.Root open={menue} onOpenChange={setMenue}>
@@ -263,8 +271,8 @@ function MobilLeiste() {
           <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/35" />
           {/* von rechts, auf der Seite des Knopfs „Menü“ (Daumen bleibt rechts, Wunsch 11.10.2026) */}
           <BaseDialog.Popup data-leiste data-testid="mobil-schublade" className="fixed inset-y-0 right-0 z-50 w-[min(20rem,86vw)] bg-leiste shadow-xl border-l border-rand pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-            <BaseDialog.Title className="sr-only">Menü</BaseDialog.Title>
-            <BaseDialog.Close className="btn geist icon absolute right-2 top-[calc(env(safe-area-inset-top)+0.5rem)] z-10" aria-label="Menü schließen">
+            <BaseDialog.Title className="sr-only">{t("Menü")}</BaseDialog.Title>
+            <BaseDialog.Close className="btn geist icon absolute right-2 top-[calc(env(safe-area-inset-top)+0.5rem)] z-10" aria-label={t("Menü schließen")}>
               <Icon name="x" />
             </BaseDialog.Close>
             <Seitenleiste schublade />
@@ -289,6 +297,7 @@ function Suche({ vollbreit, onFertig }: { vollbreit?: boolean; onFertig?: () => 
   const feld = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { darf } = useAuth();
+  const t = useT();
   const begriff = text.trim();
   const treffer = useQuery({
     queryKey: ["suche", begriff],
@@ -345,7 +354,7 @@ function Suche({ vollbreit, onFertig }: { vollbreit?: boolean; onFertig?: () => 
         aria-expanded={listenModus ? undefined : offen && begriff.length >= 2}
         aria-controls={listenModus ? undefined : "suche-ergebnisse"}
         aria-label={listenModus ? "Liste filtern" : "Suchen"}
-        placeholder={listenModus ? "Liste filtern: Name, Nr. oder Geburtsdatum" : "Patient suchen: Name, Nr. oder Geburtsdatum"}
+        placeholder={t(listenModus ? "Liste filtern: Name, Nr. oder Geburtsdatum" : "Patient suchen: Name, Nr. oder Geburtsdatum")}
         value={text}
         onChange={(e) => { setText(e.target.value); setOffen(true); }}
         autoFocus={vollbreit}
@@ -431,9 +440,13 @@ export function Seite({ pfad, children, className, fuellen }: { pfad: Pfadteil[]
   const { pathname } = useLocation();
   const [suchen, setSuchen] = useState(false);
   const mobil = useMobil();
+  // Seitentitel in der gewählten Sprache (RGC, 18.11.2026); Namen und Nummern bleiben, wie sie sind
+  const t = useT();
+  pfad = pfad.map((teil) => ({ ...teil, text: t(teil.text) }));
+  const titel = pfad[pfad.length - 1]?.text ?? t("Start");
   useEffect(() => {
-    document.title = `${pfad[pfad.length - 1]?.text ?? "Start"} · EPM`;
-  }, [pfad]);
+    document.title = `${titel} · EPM`;
+  }, [titel]);
   useEffect(() => setSuchen(false), [pathname]);
   // Telefon: nur der letzte Teil des Pfads, davor ein Schritt zurück
   const zurueck = [...pfad].slice(0, -1).reverse().find((t) => t.zu);
@@ -443,15 +456,16 @@ export function Seite({ pfad, children, className, fuellen }: { pfad: Pfadteil[]
         data-testid="mobil-kopf">
         <div className="h-14 flex items-center gap-1 px-2">
           {zurueck ? (
-            <Link to={zurueck.zu!} className="btn icon geist shrink-0" aria-label={`Zurück: ${zurueck.text}`}><Icon name="zurueck" groesse={20} /></Link>
+            <Link to={zurueck.zu!} className="btn icon geist shrink-0" aria-label={`${t("Zurück")}: ${zurueck.text}`}><Icon name="zurueck" groesse={20} /></Link>
           ) : <span className="w-2 shrink-0" />}
           <span className="grow min-w-0 truncate font-semibold text-[0.9375rem]" aria-current="page">{pfad[pfad.length - 1]?.text}</span>
-          {ich.ist_test ? <Chip art="warn">Test</Chip> : null}
+          {ich.ist_test ? <Chip art="warn">{t("Test")}</Chip> : null}
           {(ich.firmen?.length ?? 0) > 1 ? <Chip data-testid="mobil-firma">{ich.firmen?.find((f) => f.kuerzel === ich.firma)?.kurzname}</Chip> : null}
-          <button type="button" className="btn icon geist shrink-0" aria-label="Patient suchen" aria-expanded={suchen}
+          <SprachSchalter className="shrink-0" />
+          <button type="button" className="btn icon geist shrink-0" aria-label={t("Patient suchen")} aria-expanded={suchen}
             onClick={() => setSuchen((s) => !s)} data-testid="mobil-suche"><Icon name={suchen ? "x" : "suche"} groesse={20} /></button>
           {pathname !== "/hilfe" ? (
-            <Link to={`/hilfe?seite=${encodeURIComponent(pathname)}`} className="btn icon geist shrink-0" aria-label="Hilfe zu dieser Seite">
+            <Link to={`/hilfe?seite=${encodeURIComponent(pathname)}`} className="btn icon geist shrink-0" aria-label={t("Hilfe zu dieser Seite")}>
               <Icon name="hilfe" groesse={20} /></Link>
           ) : null}
         </div>
@@ -470,10 +484,11 @@ export function Seite({ pfad, children, className, fuellen }: { pfad: Pfadteil[]
         <div className="flex items-center gap-2.5">
           <Suche />
           {pathname !== "/hilfe" ? (
-            <Link to={`/hilfe?seite=${encodeURIComponent(pathname)}`} className="btn icon geist" aria-label="Hilfe zu dieser Seite"
-              title="Hilfe zu dieser Seite" data-testid="hilfe-zur-seite"><Icon name="hilfe" groesse={20} /></Link>
+            <Link to={`/hilfe?seite=${encodeURIComponent(pathname)}`} className="btn icon geist" aria-label={t("Hilfe zu dieser Seite")}
+              title={t("Hilfe zu dieser Seite")} data-testid="hilfe-zur-seite"><Icon name="hilfe" groesse={20} /></Link>
           ) : null}
-          {ich.ist_test ? <Chip art="warn" data-testid="testzugang">Testzugang</Chip> : null}
+          <SprachSchalter />
+          {ich.ist_test ? <Chip art="warn" data-testid="testzugang">{t("Testzugang")}</Chip> : null}
         </div>
       </header>}
       <Systemhinweis />

@@ -17,6 +17,8 @@ import { Auswahl, Chip, Eingabe, Feld, Fehleranzeige, Karte, KartenKopf, Knopf, 
   from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
 import { useHinweis } from "@/components/ui/hinweise";
+import { useIch } from "@/lib/auth";
+import { LaborImportDialog, herunterladen } from "./LaborImport";
 
 // ================================================================= Laborparameter
 
@@ -36,21 +38,21 @@ function ParameterDialog({ eintrag, gruppe, onZu }: {
   const qc = useQueryClient();
   const melden = useHinweis();
   const vorhanden = eintrag && eintrag !== "neu" ? eintrag : null;
-  const [f, setF] = useState({ name: "", kurzname: "", einheit: "", referenz_von: "", referenz_bis: "", gruppe, suchbegriffe: "" });
+  const [f, setF] = useState({ name: "", name_en: "", name_lv: "", kurzname: "", einheit: "", referenz_von: "", referenz_bis: "", gruppe, suchbegriffe: "" });
   const [gesetzt, setGesetzt] = useState<unknown>(undefined);
   if (eintrag && gesetzt !== eintrag) {
     setGesetzt(eintrag);
     setF(vorhanden
-      ? { name: vorhanden.name, kurzname: vorhanden.kurzname, einheit: vorhanden.einheit,
+      ? { name: vorhanden.name, name_en: vorhanden.name_en ?? "", name_lv: vorhanden.name_lv ?? "", kurzname: vorhanden.kurzname, einheit: vorhanden.einheit,
           referenz_von: vorhanden.referenz_von != null ? zahl(vorhanden.referenz_von) : "",
           referenz_bis: vorhanden.referenz_bis != null ? zahl(vorhanden.referenz_bis) : "", gruppe: vorhanden.gruppe,
           suchbegriffe: vorhanden.suchbegriffe ?? "" }
-      : { name: "", kurzname: "", einheit: "", referenz_von: "", referenz_bis: "", gruppe, suchbegriffe: "" });
+      : { name: "", name_en: "", name_lv: "", kurzname: "", einheit: "", referenz_von: "", referenz_bis: "", gruppe, suchbegriffe: "" });
   }
   const zahlOderNull = (t: string) => (t.trim() ? t.trim().replace(",", ".") : null);
   const speichern = useMutation({
     mutationFn: () => {
-      const daten = { gruppe: f.gruppe, name: f.name.trim(), kurzname: f.kurzname.trim(), einheit: f.einheit.trim(),
+      const daten = { gruppe: f.gruppe, name: f.name.trim(), name_en: f.name_en.trim(), name_lv: f.name_lv.trim(), kurzname: f.kurzname.trim(), einheit: f.einheit.trim(),
         referenz_von: zahlOderNull(f.referenz_von), referenz_bis: zahlOderNull(f.referenz_bis), suchbegriffe: f.suchbegriffe };
       return vorhanden
         ? api(`laborparameter/${vorhanden.id}/`, { method: "PATCH", body: daten })
@@ -78,7 +80,11 @@ function ParameterDialog({ eintrag, gruppe, onZu }: {
             </Auswahl>
           )}
         </Feld>
-        <Feld label="Name" fehler={e.name} pflicht>{(p) => <Eingabe {...p} value={f.name} maxLength={150} onChange={setz("name")} autoFocus />}</Feld>
+        <Feld label="Name (Deutsch)" fehler={e.name} pflicht>{(p) => <Eingabe {...p} value={f.name} maxLength={150} onChange={setz("name")} autoFocus />}</Feld>
+        <Feld label="Name (Englisch)" fehler={e.name_en}>{(p) => <Eingabe {...p} value={f.name_en} maxLength={150} onChange={setz("name_en")} />}</Feld>
+        <Feld label="Name (Lettisch)" fehler={e.name_lv} hinweis="z. B. „Fosfors“ – derselbe Wert wie „Phosphat“">
+          {(p) => <Eingabe {...p} value={f.name_lv} maxLength={150} onChange={setz("name_lv")} />}
+        </Feld>
         <Feld label="Kurzname" hinweis="für enge Spalten, z. B. GPT" fehler={e.kurzname}>
           {(p) => <Eingabe {...p} value={f.kurzname} maxLength={60} onChange={setz("kurzname")} />}
         </Feld>
@@ -104,6 +110,8 @@ function LaborparameterBereich() {
   const [params] = useSearchParams();
   const [gruppe, setGruppe] = useState(params.get("labor") === OHNE_REFERENZ ? OHNE_REFERENZ : "transaminasen");
   const [dialog, setDialog] = useState<Laborparameter | "neu" | null>(null);
+  const [importQuelle, setImportQuelle] = useState<"datei" | "vorlagen" | null>(null);
+  const ich = useIch();
   const qc = useQueryClient();
   const melden = useHinweis();
   const liste = useQuery({ queryKey: ["laborparameter", false], queryFn: () => api<Laborparameter[]>("laborparameter/") });
@@ -139,6 +147,19 @@ function LaborparameterBereich() {
             </button>
           );
         })}
+        {/* Dreisprachigkeit (18.11.2026): Katalog als CSV, Import mit Vorschau, Parameter aus den RGC-Vorlagen */}
+        <h3 className="lbl m-0 mt-3 mb-1">Deutsch · Englisch · Lettisch</h3>
+        <Knopf klein icon="herunterladen" className="justify-start"
+          onClick={() => herunterladen("laborparameter/export/", "laborparameter.csv").catch((er: Error) => melden(er.message, "fehler"))}>
+          Exportieren (CSV)</Knopf>
+        <Knopf klein icon="hochladen" className="justify-start" onClick={() => setImportQuelle("datei")}>Importieren (CSV)</Knopf>
+        {ich.firma === "rg" ? <>
+          <Knopf klein icon="vorlagen" className="justify-start" onClick={() => setImportQuelle("vorlagen")}
+            data-testid="labor-aus-vorlagen">Aus RGC-Vorlagen übernehmen</Knopf>
+          <Knopf klein icon="herunterladen" className="justify-start"
+            onClick={() => herunterladen("laborparameter/aus-vorlagen/?als=csv", "laborparameter-aus-rgc-vorlagen.csv").catch((er: Error) => melden(er.message, "fehler"))}>
+            RGC-Vorlagen exportieren (CSV)</Knopf>
+        </> : null}
       </Karte>
       <Karte className="p-[1.375rem] flex flex-col gap-3">
         <KartenKopf titel={gruppe === OHNE_REFERENZ ? `${ohneReferenz.length} Laborwerte ohne Referenzbereich` : LABORGRUPPEN[gruppe]}
@@ -154,12 +175,14 @@ function LaborparameterBereich() {
         {gefiltert.length ? (
           <div className="overflow-x-auto">
             <table className="tabelle w-full" data-testid="laborparameter">
-              <thead><tr><th>Name</th><th>Kurz</th><th>Einheit</th><th>Referenz</th><th className="num">in Befunden</th><th /></tr></thead>
+              <thead><tr><th>Name</th><th>Englisch</th><th>Lettisch</th><th>Kurz</th><th>Einheit</th><th>Referenz</th><th className="num">in Befunden</th><th /></tr></thead>
               <tbody>
                 {gefiltert.map((p) => (
                   <tr key={p.id} className={p.aktiv ? "" : "opacity-60"}>
                     <td>{p.name}{!p.aktiv ? <Chip className="ml-2">ausgeblendet</Chip> : null}
                       {gruppe === OHNE_REFERENZ && rangPlan(p) <= FUER_PLAENE.length ? <Chip art="akzent" className="ml-2">Infusionsplan</Chip> : null}</td>
+                    <td>{p.name_en || "—"}</td>
+                    <td>{p.name_lv || "—"}</td>
                     <td>{p.kurzname || "—"}</td>
                     <td>{p.einheit || "—"}</td>
                     <td className="num">
@@ -179,6 +202,7 @@ function LaborparameterBereich() {
         ) : null}
       </Karte>
       <ParameterDialog eintrag={dialog} gruppe={dialogGruppe} onZu={() => setDialog(null)} />
+      <LaborImportDialog quelle={importQuelle} onZu={() => setImportQuelle(null)} />
     </div>
   );
 }

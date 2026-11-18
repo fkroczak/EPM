@@ -1,5 +1,6 @@
 /** Kacheln der Startseite für die Arbeit mit den Akten (S03–S07, S09, S10; Entwurf 2). */
 import { useEffect, useRef, useState } from "react";
+import { useT } from "@/lib/sprache";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import { terminZiel } from "@/lib/sprungziele";
@@ -18,6 +19,10 @@ import type { MeineAkte, MeineAkten, Startdaten, Wiedereintrag, Zuletzt } from "
 
 // ---------------------------------------------------------------- Bausteine einer Kachel
 export function KachelKopf({ id, titel, rechts, unter }: { id: string; titel: ReactNode; rechts?: ReactNode; unter?: ReactNode }) {
+  // Titel in der gewählten Sprache (RGC, 18.11.2026)
+  const t = useT();
+  if (typeof titel === "string") titel = t(titel);
+  if (typeof unter === "string") unter = t(unter);
   return (
     <div className="flex justify-between items-start gap-x-3 gap-y-2 flex-wrap px-5 pt-4 pb-2 shrink-0">
       <div className="flex flex-col gap-0.5 min-w-0">

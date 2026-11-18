@@ -227,6 +227,7 @@ def ich_daten(user):
         **firmen,
         "ist_test": user.ist_test,
         "darstellung": darstellung_fuer(user),
+        "sprache": user.sprache or "de",
         "startseite": {**(user.startseite or {}), "karten": startseite_karten(user)},
         "aufteilung": user.aufteilung or {},
         "bereiche": user.bereiche or {},
@@ -871,6 +872,11 @@ class IchView(APIView):
     def patch(self, request):
         user = request.user
         felder = []
+        if "sprache" in request.data:
+            if request.data["sprache"] not in ("de", "en", "lv"):
+                raise serializers.ValidationError({"sprache": "Deutsch (de), Englisch (en) oder Lettisch (lv)."})
+            user.sprache = request.data["sprache"]
+            felder.append("sprache")
         if "darstellung" in request.data:
             s = DarstellungSerializer(data=request.data["darstellung"])
             s.is_valid(raise_exception=True)

@@ -176,9 +176,12 @@ STOFF = {
     "tsh basal": "tsh", "ft3": "ft3", "ft4": "ft4",
 }
 
-AUSSTEHEND = {"folgt", "s u", "siehe unten", "n b", "nb", "kommt", "in arbeit", "ausstehend"}
+# lettisch „Rezultāts sekos“ (Ergebnis folgt), englisch „to follow“/„pending“ (Dreisprachigkeit RGC, 18.11.2026)
+AUSSTEHEND = {"folgt", "s u", "siehe unten", "n b", "nb", "kommt", "in arbeit", "ausstehend", "rezultats sekos",
+              "rezultats", "sekos", "to follow", "result to follow", "pending"}
 TEXTWERTE = {"negativ", "positiv", "neg", "pos", "n b", "nb", "nicht nachweisbar", "nachweisbar", "folgt", "s u",
-             "siehe unten", "normal", "unauffaellig", "kein", "keine"}
+             "siehe unten", "normal", "unauffaellig", "kein", "keine", "negativs", "pozitivs", "negative", "positive",
+             "rezultats sekos", "rezultats", "sekos", "pending", "not detected", "nav konstatets"}
 
 
 # ---------------------------------------------------------------- Gelerntes (F182)
@@ -430,12 +433,20 @@ class Katalogeintrag:
 def katalog_index(parameter: list[dict]) -> tuple[dict[str, list[Katalogeintrag]], list[Katalogeintrag]]:
     """Katalog (aktive Laborparameter) → Index normalisierter Begriffe."""
     eintraege, index = [], {}
+    woerterbuch = _woerterbuch()
     for p in parameter:
         n = norm(p["name"])
         begriffe = {n}
         if p.get("kurzname"):
             begriffe.add(norm(p["kurzname"]))
         begriffe.update(SYNONYME.get(n, []))
+        # Dreisprachigkeit (RGC, 18.11.2026): englischer und lettischer Name des Parameters und die Schreibweisen aus
+        # dem Wörterbuch (stammdaten/laborbegriffe.py) – lettische Befunde treffen so den deutschen Parameter, ohne
+        # dass dafür ein eigener Parameter angelegt werden muss
+        for feld in ("name_en", "name_lv"):
+            if p.get(feld):
+                begriffe.add(norm(p[feld]))
+        begriffe.update(woerterbuch.get(n, ()))
         for b in re.split(r"[;,\n]", p.get("suchbegriffe") or ""):
             if b.strip():
                 begriffe.add(norm(b))
@@ -445,7 +456,30 @@ def katalog_index(parameter: list[dict]) -> tuple[dict[str, list[Katalogeintrag]
         eintraege.append(e)
         for b in begriffe:
             index.setdefault(b, []).append(e)
+    # Namen eigener Parameter des Wörterbuchs, die (noch) nicht im Katalog stehen: leere Liste = „bekannt, aber nicht
+    # im Katalog“ – sonst träfe „Calcium ionisiert“/„Kalcijs jonizētais“ über den Wortanfang das Calcium
+    im_katalog = {norm(p["name"]) for p in parameter}
+    for n, namen in woerterbuch.items():
+        if n not in im_katalog:
+            for b in namen:
+                index.setdefault(b, [])
     return index, eintraege
+
+
+_WOERTERBUCH: dict[str, set[str]] | None = None
+
+
+def _woerterbuch() -> dict[str, set[str]]:
+    """Normalisierter deutscher Name → alle Namen und Schreibweisen des Wörterbuchs (DE, EN, LV, weitere)."""
+    global _WOERTERBUCH
+    if _WOERTERBUCH is None:
+        from stammdaten.laborbegriffe import eintraege
+
+        _WOERTERBUCH = {}
+        for e in eintraege():
+            namen = {e["name"], e["name_en"], e["name_lv"], *e["weitere"]}
+            _WOERTERBUCH.setdefault(norm(e["name"]), set()).update(norm(x) for x in namen if x)
+    return _WOERTERBUCH
 
 
 def _ist_wert(t: str) -> bool:
@@ -481,13 +515,17 @@ def _suche_katalog(label: str, n: str, index) -> tuple[Katalogeintrag | None, st
     """→ (Parameter, „genau“ | „aehnlich“ | „“) allein aus Katalog, Synonymen und Suchbegriffen."""
     if n in index and len(index[n]) == 1:
         return index[n][0], "genau"
+    if n in index and not index[n]:
+        return None, ""  # eigener Parameter des Wörterbuchs, nicht im Katalog
     # ohne Zusätze in Klammern oder am Ende („Kreatinin (enzym.)“, „Albumin i.S.“)
     teile = n.split()
     for k in range(len(teile) - 1, 0, -1):
         kurz = " ".join(teile[:k])
         if kurz in index and len(index[kurz]) == 1 and len(kurz) >= 2:
-            # kurze Kürzel („k“, „na“) nur, wenn sie das ganze Etikett sind
-            if len(kurz) <= 3 and k < len(teile):
+            # kurze Kürzel („k“, „na“) nur, wenn sie das ganze Etikett sind – Ausnahme: dreibuchstabiges Kürzel in
+            # Großbuchstaben, dahinter eine abgekürzte Erläuterung mit Punkten wie auf lettischen Befunden
+            # („MCV Eritroc.vid.tilp.“, „MCH Vid.Hb saturs er.“)
+            if len(kurz) <= 3 and k < len(teile) and not _kuerzel_mit_erlaeuterung(label, k):
                 continue
             return index[kurz][0], "genau"
     bester = _aehnlich(n, index)
@@ -506,6 +544,12 @@ def _suche_katalog(label: str, n: str, index) -> tuple[Katalogeintrag | None, st
             if bester:
                 return bester, "aehnlich"
     return None, ""
+
+
+def _kuerzel_mit_erlaeuterung(label: str, k: int) -> bool:
+    woerter = label.strip().split()
+    return (k == 1 and len(woerter) > 1 and len(woerter[0]) == 3 and woerter[0].isalpha() and woerter[0].isupper()
+            and "." in " ".join(woerter[1:]))
 
 
 def _aehnlich(n: str, index) -> Katalogeintrag | None:
