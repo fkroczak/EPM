@@ -61,6 +61,9 @@ class User(AbstractUser):
     ausgeblendet_am = models.DateTimeField("Ausgeblendet am", null=True, blank=True)
     sperrgrund = models.CharField("Sperrgrund", max_length=200, blank=True)
     darstellung = models.JSONField("Darstellung", default=dict, blank=True)
+    # Sprache der Oberfläche (Dreisprachigkeit der RGC, 18.11.2026): gilt in der Firma RGC, sonst immer Deutsch
+    sprache = models.CharField("Sprache", max_length=2, default="de",
+                               choices=[("de", "Deutsch"), ("en", "English"), ("lv", "Latviešu")])
     startseite = models.JSONField("Startseite (Karten)", default=dict, blank=True)
     # Spaltenteiler je Seite und Fensterstufe (S17): {"akte_uebersicht@fhd": [0.6667], …}
     aufteilung = models.JSONField("Aufteilung der Seiten", default=dict, blank=True)

@@ -1,6 +1,7 @@
 /** Entwurf 18 · Vorlagen: Übersicht mit Suche (F180), Briefkopf und Logo, Grenzwerte; Auswahllisten und Präparate in
  *  Auswahllisten.tsx, Dokumentvorlagen in Dokumentvorlagen.tsx. */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useT } from "@/lib/sprache";
 import { useBlocker, useLocation, useNavigate, useSearchParams } from "react-router";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -386,6 +387,7 @@ export function Vorlagen() {
   const speichern = useRef<(() => void) | null>(null);
   const [aktionen, setAktionen] = useState<HTMLElement | null>(null);
   const dokUngespeichert = useRef(false);
+  const t = useT();
   const merkeGeaendert = useCallback((g: boolean) => { dokUngespeichert.current = g; }, []);
   // Warnung beim Verlassen mit ungespeicherten Änderungen an einer Dokumentvorlage: in EPM (andere Seite, anderer
   // Bereich, andere Vorlage, „Zurück“) und beim Schließen oder Neuladen des Browserfensters
@@ -407,14 +409,14 @@ export function Vorlagen() {
   };
   return (
     <Seite pfad={[{ text: "Administration" }, { text: "Vorlagen" }]}>
-      <Seitenkopf titel="Vorlagen" unter="Was in EPM zur Auswahl steht und wie Briefe, E-Mails und PDFs aussehen. Jede Änderung steht im Audit-Log."
+      <Seitenkopf titel={t("Vorlagen")} unter={t("Was in EPM zur Auswahl steht und wie Briefe, E-Mails und PDFs aussehen. Jede Änderung steht im Audit-Log.")}
         rechts={bereich === "dokumente" ? <div ref={setAktionen} className="flex items-center gap-2.5 flex-wrap" />
-          : bereich === "briefkopf" || bereich === "grenzwerte" ? <Knopf variante="pri" onClick={() => speichern.current?.()}>Speichern</Knopf> : null} />
-      <Segmente label="Bereich" wert={bereich} onWahl={waehle} className="self-start"
-        werte={[{ wert: "start", text: "Übersicht" }, { wert: "dokumente", text: "Dokumentvorlagen" },
+          : bereich === "briefkopf" || bereich === "grenzwerte" ? <Knopf variante="pri" onClick={() => speichern.current?.()}>{t("Speichern")}</Knopf> : null} />
+      <Segmente label={t("Bereich")} wert={bereich} onWahl={waehle} className="self-start"
+        werte={([{ wert: "start", text: "Übersicht" }, { wert: "dokumente", text: "Dokumentvorlagen" },
           { wert: "briefkopf", text: "Briefkopf und Logo" }, { wert: "listen", text: "Auswahllisten" },
           { wert: "kataloge", text: "Labor und Diagnosen" }, { wert: "grenzwerte", text: "Grenzwerte" },
-          { wert: "anlagen", text: "Anlagen für E-Mails" }, { wert: "ki", text: "KI-Prompts" }]} />
+          { wert: "anlagen", text: "Anlagen für E-Mails" }, { wert: "ki", text: "KI-Prompts" }] as { wert: Bereich; text: string }[]).map((w) => ({ ...w, text: t(w.text) }))} />
       {bereich === "start" ? <VorlagenStart />
         : bereich === "briefkopf" ? <BriefkopfBereich speichernRef={speichern} />
         : bereich === "listen" ? <ListenBereich liste={parameter.get("liste")}

@@ -54,6 +54,8 @@ export type Ich = {
   alle_firmen?: Firma[];
   /** Menüpunkt „Import“ nach der Übernahme ausgeblendet (Administration › System, Festlegung 03.10.2026, U32) */
   import_ausgeblendet?: boolean;
+  /** Sprache der Oberfläche (nur in der RGC wirksam, 18.11.2026) */
+  sprache?: "de" | "en" | "lv";
 };
 
 export type Firma = { kuerzel: string; name: string; kurzname: string };
@@ -827,6 +829,12 @@ export const LABORGRUPPEN: Record<string, string> = {
   schilddruese: "Schilddrüse",
   tumormarker: "Tumormarker",
   genetik: "Genetische Parameter",
+  // weitere Gruppen für die Parameter der RGC-Laboranforderungen (Dreisprachigkeit, 18.11.2026)
+  gerinnung: "Gerinnung",
+  hormone: "Hormone",
+  immunologie: "Immunologie und Autoantikörper",
+  allergologie: "Allergologie und Mastzellen",
+  urin_stuhl: "Urin und Stuhl",
   sonstiges: "Weitere Parameter",
 };
 
@@ -834,7 +842,10 @@ export type Laborparameter = {
   id: number;
   gruppe: string;
   gruppe_name: string;
+  /** deutscher Name; Englisch und Lettisch daneben (leer = keine Übersetzung) */
   name: string;
+  name_en?: string;
+  name_lv?: string;
   kurzname: string;
   einheit: string;
   referenz_von: number | null;

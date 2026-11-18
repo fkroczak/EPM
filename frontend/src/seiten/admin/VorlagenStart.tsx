@@ -4,6 +4,7 @@
  * Präparate und Anlagen. Die Kacheln und Treffer sind Links (Adresse mit ?bereich=…), damit „Zurück“ funktioniert.
  */
 import { useMemo, useState } from "react";
+import { useT } from "@/lib/sprache";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -60,6 +61,7 @@ type Treffer = { schluessel: string; titel: string; art: string; hinweis?: strin
 const klein = (s: string) => s.toLocaleLowerCase("de");
 
 export function VorlagenStart() {
+  const t = useT();
   const [suche, setSuche] = useState("");
   const vorlagen = useQuery({ queryKey: ["vorlagen", "liste"], queryFn: () => api<VorlagenUebersicht[]>("vorlagen/") });
   const aktivSuche = suche.trim().length >= 2;
@@ -137,7 +139,7 @@ export function VorlagenStart() {
                   "hover:border-akzent hover:shadow-md focus-visible:outline-2 focus-visible:outline-akzent")}>
                 <span className="flex items-center gap-2.5">
                   <span className="w-8 h-8 rounded-lg bg-akzent-weich text-akzent-text inline-flex items-center justify-center shrink-0"><Icon name={k.icon} /></span>
-                  <span className="text-[1rem] font-semibold leading-snug">{k.titel}</span>
+                  <span className="text-[1rem] font-semibold leading-snug">{t(k.titel)}</span>
                   {zahl ? <Chip className="ml-auto">{zahl} Vorlagen</Chip> : null}
                 </span>
                 <span className="text-sm leading-normal">{k.wofuer}</span>

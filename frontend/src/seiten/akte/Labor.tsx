@@ -11,7 +11,7 @@ import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useLaborparameter } from "@/lib/daten";
 import { datum, eingabeDatum, heuteIso, zahl } from "@/lib/format";
-import { LABORGRUPPEN } from "@/lib/typen";
+import { useLaborNamen, useLaborText } from "@/lib/labor";
 import type { Laborbefund, Laborparameter, Laborwert } from "@/lib/typen";
 import { Eingabe, Feld, Fehleranzeige, Knopf, Laden, Meldung, cx } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
@@ -49,6 +49,8 @@ function referenzText(w: { referenz_von: number | null; referenz_bis: number | n
 function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; offen: boolean; onOffen: (o: boolean) => void }) {
   const { patient } = useAkte();
   const katalog = useLaborparameter();
+  const namen = useLaborNamen();
+  const lt = useLaborText();
   const qc = useQueryClient();
   const melden = useHinweis();
   const [abgenommen, setAbgenommen] = useState(datum(heuteIso()));
@@ -93,7 +95,7 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
   const speichern = useMutation({
     mutationFn: () => {
       const iso = eingabeDatum(abgenommen);
-      if (!iso) throw new ApiFehler(400, "", null, { abgenommen_am: "Bitte als TT.MM.JJJJ eingeben." });
+      if (!iso) throw new ApiFehler(400, "", null, { abgenommen_am: lt("Bitte als TT.MM.JJJJ eingeben.") });
       const zeilen: Record<string, unknown>[] = [];
       for (const p of katalog.data ?? []) {
         const text = (werte[p.id] ?? "").trim();
@@ -112,7 +114,7 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["laborbefunde", patient.id] });
       void qc.invalidateQueries({ queryKey: ["patient", patient.id] });
-      melden(befund ? "Laborbefund geändert." : "Laborbefund gespeichert.");
+      melden(lt(befund ? "Laborbefund geändert." : "Laborbefund gespeichert."));
       onOffen(false);
     },
   });
@@ -122,34 +124,34 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
 
   return (
     <Dialog offen={offen} onOffen={onOffen} breite={900} geaendert={geaendert}
-      titel={befund ? "Laborbefund ändern" : "Neuer Laborbefund"}
-      beschreibung="Nur den gemessenen Wert eintragen – die Einheit steht schon da. Leere Zeilen werden nicht gespeichert."
+      titel={lt(befund ? "Laborbefund ändern" : "Neuer Laborbefund")}
+      beschreibung={lt("Nur den gemessenen Wert eintragen – die Einheit steht schon da. Leere Zeilen werden nicht gespeichert.")}
       fuss={<>
-        <Knopf onClick={() => onOffen(false)}>Abbrechen</Knopf>
+        <Knopf onClick={() => onOffen(false)}>{lt("Abbrechen")}</Knopf>
         <Knopf variante="pri" laedt={speichern.isPending} disabled={!anzahl} onClick={() => speichern.mutate()}>
-          Speichern{anzahl ? <span className="num opacity-80"> ({anzahl} {anzahl === 1 ? "Wert" : "Werte"})</span> : null}
+          {lt("Speichern")}{anzahl ? <span className="num opacity-80"> ({anzahl} {lt(anzahl === 1 ? "Wert" : "Werte")})</span> : null}
         </Knopf>
       </>}>
       <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
-        <Feld label="Abnahme am" fehler={f.abgenommen_am} pflicht>
+        <Feld label={lt("Abnahme am")} fehler={f.abgenommen_am} pflicht>
           {(p) => <Eingabe {...p} className="num" value={abgenommen} onChange={(e) => setAbgenommen(e.target.value)} />}
         </Feld>
-        <Feld label="Labor" fehler={f.labor}>
-          {(p) => <Eingabe {...p} value={labor} maxLength={150} placeholder="z. B. Labor Dr. Wagner"
+        <Feld label={lt("Labor")} fehler={f.labor}>
+          {(p) => <Eingabe {...p} value={labor} maxLength={150} placeholder={lt("z. B. Labor Dr. Wagner")}
             onChange={(e) => setLabor(e.target.value)} />}
         </Feld>
       </div>
 
-      {katalog.isPending ? <Laden text="Parameter werden geladen …" /> : null}
+      {katalog.isPending ? <Laden text={lt("Parameter werden geladen …")} /> : null}
       <div className="flex flex-col gap-4" data-testid="labor-maske">
         {gruppen.map(([gruppe, liste]) => (
           <section key={gruppe} className="flex flex-col gap-1.5">
-            <h3 className="lbl m-0 text-[0.8125rem]">{LABORGRUPPEN[gruppe] ?? gruppe}</h3>
+            <h3 className="lbl m-0 text-[0.8125rem]">{namen.gruppe(gruppe)}</h3>
             <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
               {liste.map((p) => (
                 <label key={p.id} className="grid grid-cols-[1fr_5.25rem_auto] items-center gap-2 text-sm">
-                  <span className="truncate" title={p.name}>{p.name}</span>
-                  <Eingabe className="num klein" inputMode="decimal" aria-label={p.name}
+                  <span className="truncate" title={namen.parameter(p) === p.name ? p.name : `${namen.parameter(p)} · ${p.name}`}>{namen.parameter(p)}</span>
+                  <Eingabe className="num klein" inputMode="decimal" aria-label={namen.parameter(p)}
                     value={werte[p.id] ?? ""} onChange={(e) => setWerte((w) => ({ ...w, [p.id]: e.target.value }))} />
                   <span className="gedaempft text-[0.75rem] w-[4.5rem]">{p.einheit}</span>
                 </label>
@@ -161,7 +163,7 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
 
       {/* Weitere Parameter: Tumormarker, genetische Parameter … (nicht im Katalog) */}
       <section className="flex flex-col gap-2" data-testid="weitere-parameter">
-        <h3 className="lbl m-0 text-[0.8125rem]">Weitere Parameter</h3>
+        <h3 className="lbl m-0 text-[0.8125rem]">{lt("Weitere Parameter")}</h3>
         {frei.map((z, i) => (
           <div key={i} className="grid grid-cols-[1fr_6rem_6rem_1fr_auto] items-center gap-2">
             <Eingabe aria-label={`Parameter ${i + 1}`} placeholder="z. B. CA 19-9" value={z.freitext_name}
@@ -176,11 +178,11 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
               onClick={() => setFrei((l) => l.filter((_, j) => j !== i))} />
           </div>
         ))}
-        <Knopf klein className="self-start" onClick={() => setFrei((l) => [...l, leereZeile()])}>Parameter hinzufügen</Knopf>
+        <Knopf klein className="self-start" onClick={() => setFrei((l) => [...l, leereZeile()])}>{lt("Parameter hinzufügen")}</Knopf>
       </section>
 
-      <Feld label="Zusammenfassung / Beurteilung">
-        {() => <Editor key={stand} wert={beurteilung} onAenderung={setBeurteilung} label="Beurteilung" hoehe={96} />}
+      <Feld label={lt("Zusammenfassung / Beurteilung")}>
+        {() => <Editor key={stand} wert={beurteilung} onAenderung={setBeurteilung} label={lt("Beurteilung")} hoehe={96} />}
       </Feld>
       {speichern.error && !Object.keys(f).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
       {Object.entries(f).filter(([k]) => k !== "abgenommen_am" && k !== "labor").map(([k, v]) =>
@@ -191,6 +193,8 @@ function BefundDialog({ befund, offen, onOffen }: { befund: Laborbefund | null; 
 
 /** Der gewählte Befund rechts: die Werte nach Gruppen, darunter die Beurteilung. */
 function BefundDetail({ befund, onAendern, aenderbar }: { befund: Laborbefund; onAendern: () => void; aenderbar: boolean }) {
+  const namen = useLaborNamen();
+  const lt = useLaborText();
   const nachGruppe = useMemo(() => {
     const nach: Record<string, Laborwert[]> = {};
     for (const w of befund.werte) (nach[w.gruppe ?? "sonstiges"] ??= []).push(w);
@@ -198,25 +202,25 @@ function BefundDetail({ befund, onAendern, aenderbar }: { befund: Laborbefund; o
   }, [befund.werte]);
   return (
     <Detail testid="labor-detail"
-      titel={<>Laborbefund vom <span className="num">{datum(befund.abgenommen_am)}</span></>}
-      unter={[befund.labor, `${befund.anzahl_werte} Werte`, befund.erfasst_von_name].filter(Boolean).join(" · ")}
-      aktionen={aenderbar ? <Knopf klein icon="stift" onClick={onAendern}>Bearbeiten</Knopf> : undefined}>
+      titel={<>{lt("Laborbefund vom")} <span className="num">{datum(befund.abgenommen_am)}</span></>}
+      unter={[befund.labor, `${befund.anzahl_werte} ${lt("Werte")}`, befund.erfasst_von_name].filter(Boolean).join(" · ")}
+      aktionen={aenderbar ? <Knopf klein icon="stift" onClick={onAendern}>{lt("Bearbeiten")}</Knopf> : undefined}>
       {nachGruppe.map(([gruppe, liste]) => (
-        <Abschnitt key={gruppe} titel={LABORGRUPPEN[gruppe] ?? "Weitere Parameter"}>
+        <Abschnitt key={gruppe} titel={namen.gruppe(gruppe)}>
           <div className="grid gap-x-5 sm:grid-cols-2 lg:grid-cols-3">
             {liste.map((w, i) => (
               <div key={w.id ?? i} className="grid grid-cols-[1fr_auto_auto] items-baseline gap-2 text-sm border-b border-rand py-1">
-                <span className="truncate" title={w.bezeichnung}>{w.bezeichnung}</span>
+                <span className="truncate" title={w.bezeichnung}>{namen.wert(w)}</span>
                 <span className={cx("num", w.ausserhalb && "font-semibold text-warn")}>{anzeigeWert(w)}</span>
                 <span className="gedaempft text-[0.75rem] w-[3.625rem]">{w.einheit}</span>
                 {w.ausserhalb ? <span className="col-span-3 text-[0.75rem] gedaempft">
-                  {w.ausserhalb === "hoch" ? "über" : "unter"} Referenz {referenzText(w)}</span> : null}
+                  {lt(w.ausserhalb === "hoch" ? "über" : "unter")} {lt("Referenz")} {referenzText(w)}</span> : null}
               </div>
             ))}
           </div>
         </Abschnitt>
       ))}
-      {befund.beurteilung ? <Abschnitt titel="Beurteilung"><Richtext html={befund.beurteilung} className="text-sm" /></Abschnitt> : null}
+      {befund.beurteilung ? <Abschnitt titel={lt("Beurteilung")}><Richtext html={befund.beurteilung} className="text-sm" /></Abschnitt> : null}
     </Detail>
   );
 }
@@ -224,6 +228,7 @@ function BefundDetail({ befund, onAendern, aenderbar }: { befund: Laborbefund; o
 // ================================================================= Seite
 export function Labor() {
   const { patient, erfassen } = useAkte();
+  const lt = useLaborText();
   const [wahl, setWahl] = useWahl("befund");
   const [dialog, setDialog] = useState<{ offen: boolean; befund: Laborbefund | null }>({ offen: false, befund: null });
   const befunde = useQuery({
@@ -236,21 +241,21 @@ export function Labor() {
     <>
     <Aktenseite
       testid="labor"
-      titel={liste.length === 1 ? "Laborbefund" : "Laborbefunde"}
+      titel={lt(liste.length === 1 ? "Laborbefund" : "Laborbefunde")}
       anzahl={liste.length}
       laedt={befunde.isPending}
       aktion={erfassen
-        ? <Knopf variante="pri" icon="plus" onClick={() => setDialog({ offen: true, befund: null })}>Neuer Laborbefund</Knopf>
+        ? <Knopf variante="pri" icon="plus" onClick={() => setDialog({ offen: true, befund: null })}>{lt("Neuer Laborbefund")}</Knopf>
         : undefined}
       kopfrechts={<><Fehleranzeige fehler={befunde.error} />
         <AlterHinweis art="labor" am={liste[0]?.abgenommen_am} was="Laborbefund" /></>}
       liste={
-        <Eintragsliste name="Laborbefunde" leer={liste.length ? undefined : "Noch kein Laborbefund erfasst."}>
+        <Eintragsliste name="Laborbefunde" leer={liste.length ? undefined : lt("Noch kein Laborbefund erfasst.")}>
           {liste.map((b) => (
             <Eintrag key={b.id} aktiv={gewaehlt?.id === b.id} onWahl={() => setWahl(String(b.id))}
               datum={<>{datum(b.abgenommen_am)}<FirmaMarke kurz={b.firma_kurz} className="ml-1.5" /></>}
               merkmal={<span className="num text-xs gedaempft">{b.anzahl_werte}</span>}
-              zeile={b.labor || "Labor nicht angegeben"}
+              zeile={b.labor || lt("Labor nicht angegeben")}
               unten={b.erfasst_von_name ?? ""} />
           ))}
         </Eintragsliste>
@@ -259,7 +264,7 @@ export function Labor() {
         ? <BefundDetail befund={gewaehlt} aenderbar={erfassen}
             onAendern={() => setDialog({ offen: true, befund: gewaehlt })} />
         : null}
-      leer="Links einen Befund wählen."
+      leer={lt("Links einen Befund wählen.")}
     />
     {erfassen ? <BefundDialog befund={dialog.befund} offen={dialog.offen}
       onOffen={(o) => setDialog((d) => ({ ...d, offen: o }))} /> : null}

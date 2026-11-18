@@ -30,6 +30,7 @@ import type { Aktenansicht } from "@/lib/darstellung";
 import { ab, useMobil, useStufe } from "@/lib/stufen";
 import { Kopfgriff, Leistengriff, useDarstellung } from "./ansicht";
 import { SchreibenAusAkte } from "./Schreiben";
+import { useT } from "@/lib/sprache";
 
 export type AktenKontext = {
   patient: Patient;
@@ -521,6 +522,7 @@ export function Akte() {
   const { darf, darfBei, ich } = useAuth();
   const navigate = useNavigate();
   const alleFirmen = useAlleFirmen();
+  const t = useT();
   const [dialog, setDialog] = useState<"" | "stammdaten" | "abschluss" | "oeffnen" | "termin" | "kontakt" | "gewicht" | "pdf" | "sprechstunde" | "schreiben" | "firmen">("");
   // Vorbelegung aus der Kürzelzeile (Karteikarte: „K Text“, „G 54,6“)
   const [vorbelegt, setVorbelegt] = useState("");
@@ -745,7 +747,7 @@ export function Akte() {
         ...(erlaubt.schreiben ? [{ text: "Schreiben und E-Mail …", onClick: () => setDialog("schreiben") }] : []),
         ...(erlaubt.abschluss ? [{ text: "Akte abschließen", onClick: () => setDialog("abschluss"), gefaehrlich: true }] : []),
         ...(erlaubt.oeffnen ? [{ text: "Akte wieder öffnen", onClick: () => setDialog("oeffnen") }] : []),
-      ]} />
+      ].map((e) => ({ ...e, text: t(e.text) }))} />
     </div>
   );
 
@@ -770,8 +772,8 @@ export function Akte() {
       inhalt: k.aktueller_plan ? `${zahl(k.aktueller_plan.kcal)} kcal${k.aktueller_plan.laufzeit_h ? ` · ${zahl(k.aktueller_plan.laufzeit_h)} h` : ""}`
         : k.kein_plan ? <span className="gedaempft">nicht nötig</span> : "—",
     },
-    katheter: { titel: "Katheter", hinweis: k.katheter ?? undefined, inhalt: k.katheter ?? <span className="gedaempft">nicht erfasst</span> },
-    versorger: { titel: "Versorger", hinweis: k.versorger ?? undefined, inhalt: k.versorger ?? <span className="gedaempft">nicht erfasst</span> },
+    katheter: { titel: "Katheter", hinweis: k.katheter ?? undefined, inhalt: k.katheter ?? <span className="gedaempft">{t("nicht erfasst")}</span> },
+    versorger: { titel: "Versorger", hinweis: k.versorger ?? undefined, inhalt: k.versorger ?? <span className="gedaempft">{t("nicht erfasst")}</span> },
     ansprechpartner: {
       titel: "Ansprechpartner",
       hinweis: k.ansprechpartner ? [k.ansprechpartner, k.ansprechpartner_telefon].filter(Boolean).join(" · ") : undefined,
@@ -816,13 +818,15 @@ export function Akte() {
       inhalt: [versicherungsartText(p, true), p.krankenkasse].filter(Boolean).join(" · ") || "—",
     },
   } : null;
+  // Beschriftungen in der gewählten Sprache (RGC, 18.11.2026)
+  if (angabe) for (const a of Object.values(angabe)) a.titel = t(a.titel);
   const gruppen: Gruppe[] = angabe ? [
     { titel: "Ernährung", angaben: [angabe.gewicht, angabe.bmi, angabe.plan, angabe.katheter] },
     { titel: "Versorgung", angaben: [angabe.versorger, angabe.ansprechpartner, angabe.hausarzt],
       bearbeiten: kontext.bearbeiten ? () => setDialog("stammdaten") : undefined },
     { titel: "Termine und Kontakt", angaben: [angabe.termin, angabe.kontakt, angabe.telefon] },
     { titel: "Hinweise und Auskunft", angaben: [angabe.nickel, angabe.auskunft, angabe.versicherung] },
-  ] : [];
+  ].map((g) => ({ ...g, titel: t(g.titel) })) : [];
 
   // Reihenfolge (Wunsch 10.10.2026): Diagnosen, Therapie, Empfehlung und Infusionspläne direkt nach der Übersicht –
   // ein Klick, ohne Suchen; Befunde und Unterlagen danach; Verlauf und Datenschutz (selten) klein am Ende. Jeder
@@ -851,7 +855,8 @@ export function Akte() {
     // KI (Experimentell, 14.10.2026): nur mit Recht „KI ansehen“
     ...(darf("ki_ansehen") ? [{ zu: `${basis}/ki`, text: "KI (Experimentell)", stufe: "ende" }] : []),
     { zu: `${basis}/datenschutz`, text: "Datenschutz", zahl: k?.datenschutz_anfragen || undefined, stufe: "ende" },
-  ] as ReiterEintrag[]).map((r, i) => (i < 10 ? { ...r, kuerzel: `${r.text} (Alt+${(i + 1) % 10})` } : r));
+  ] as ReiterEintrag[]).map((r) => ({ ...r, text: t(r.text), gruppe: r.gruppe ? t(r.gruppe) : undefined }))
+    .map((r, i) => (i < 10 ? { ...r, kuerzel: `${r.text} (Alt+${(i + 1) % 10})` } : r));
   // Tastenkürzel in der Akte (Vorschlag „Schneller mit der Tastatur“, 08.10.2026); nicht in Eingabefeldern und nicht,
   // solange ein Dialog offen ist
   tasten.current = (e: KeyboardEvent) => {
@@ -882,7 +887,7 @@ export function Akte() {
   // Jeder Bereich ein eigener Reiter (Wunsch 07.10.2026, F121); bei schmalem Fenster umbrechen die Reiter, am
   // Telefon lassen sie sich seitlich wischen (der aktive bleibt im Blick)
   const reiterWaagerecht = (
-    <nav aria-label="Aktenbereiche" className="segmente akte-reiter self-start flex-wrap h-auto relative shrink-0" ref={reiterLeiste}>
+    <nav aria-label={t("Aktenbereiche")} className="segmente akte-reiter self-start flex-wrap h-auto relative shrink-0" ref={reiterLeiste}>
       {reiter.map((r, i) => (
         <Fragment key={r.zu}>
           {i > 0 && r.stufe === "neben" && reiter[i - 1].stufe === "haupt" ? <span className="reiter-trenner" aria-hidden="true" /> : null}
@@ -966,7 +971,7 @@ export function Akte() {
           <Leistengriff breite={darstellung.aktenleiste_breite} onBreite={(px) => darstellungAendern({ aktenleiste_breite: px })}
             onZiehen={setLeisteZug} />
           <div className="akte-leiste-inhalt">
-            <nav aria-label="Aktenbereiche" className="akte-vreiter" data-testid="senkrechte-reiter">
+            <nav aria-label={t("Aktenbereiche")} className="akte-vreiter" data-testid="senkrechte-reiter">
               <div className="akte-vreiter-innen">
                 {reiter.map((r) => (
                   <Fragment key={r.zu}>

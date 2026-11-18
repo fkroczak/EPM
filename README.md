@@ -57,6 +57,18 @@ sudo epm-ki status | aus
 Unter 12 GB RAM / 4 Kernen bleibt der KI-Dienst von selbst aus. Plan: [`docs/KI-ERWEITERUNG-PLAN-2026-10-14.md`](docs/KI-ERWEITERUNG-PLAN-2026-10-14.md),
 Betrieb: [`docs/KI-BETRIEB.md`](docs/KI-BETRIEB.md), API: [`docs/KI-API.md`](docs/KI-API.md), Datenschutz: [`docs/DATENSCHUTZ.md`](docs/DATENSCHUTZ.md) § 7.
 
+## Dreisprachigkeit der Regeneration Clinic (18.11.2026)
+In der Firma RGC lässt sich die Oberfläche mit den **Flaggen in der Kopfzeile** auf Deutsch, Englisch oder Lettisch
+umstellen (gespeichert im Benutzerkonto, `ich.sprache`; die DSKM bleibt deutsch). Übersetzt sind bisher Menü, Seitentitel,
+Reiter der Akte und alles rund ums Labor; weitere Bereiche folgen schrittweise (`frontend/src/lib/uebersetzungen.ts`,
+deutscher Text = Schlüssel). **Laborparameter** haben neben dem deutschen Namen einen englischen und lettischen
+(`name_en`, `name_lv`); Werte hängen am Parameter, nicht am Namen – „Fosfors“ und „Phosphat“ sind derselbe Wert.
+Scans und KI erkennen lettische und englische Befunde über alle drei Namen und das Wörterbuch
+`backend/stammdaten/laborbegriffe.py` (z. B. „Hemoglobīns“, „MCV Eritroc.vid.tilp.“ → vorhandener deutscher Parameter,
+ohne neue Parameter). Unter Vorlagen › Laborparameter: **Exportieren/Importieren (CSV)** mit Vorschau und
+**Aus RGC-Vorlagen übernehmen** (alle Ankreuzzeilen der Laboranforderungen und -profile; neue Parameter nur nach
+Anhaken). Details: [`docs/DREISPRACHIGKEIT-RGC-2026-11.md`](docs/DREISPRACHIGKEIT-RGC-2026-11.md).
+
 ## Freigaben (16.11.2026)
 Menüpunkt **Freigaben**: alles, was ein Mensch freigeben muss, an einer Stelle – Datenpflege aus dem Altbestand,
 Infusionsplan-Entwürfe (Recht „Infusionspläne freigeben“) und der Weg zur KI-Prüfung. **Datenpflege**: Regeln lesen

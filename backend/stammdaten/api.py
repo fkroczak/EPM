@@ -619,8 +619,8 @@ class LaborparameterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Laborparameter
-        fields = ["id", "gruppe", "gruppe_name", "name", "kurzname", "einheit", "referenz_von", "referenz_bis",
-                  "reihenfolge", "aktiv", "in_befunden", "suchbegriffe"]
+        fields = ["id", "gruppe", "gruppe_name", "name", "name_en", "name_lv", "kurzname", "einheit", "referenz_von",
+                  "referenz_bis", "reihenfolge", "aktiv", "in_befunden", "suchbegriffe"]
 
     def validate_suchbegriffe(self, wert):
         teile = [t.strip() for t in re.split(r"[;,\n]", wert or "") if t.strip()]
@@ -646,7 +646,7 @@ class LaborparameterViewSet(OhneLoeschen):
     queryset = Laborparameter.objects.all()
     serializer_class = LaborparameterSerializer
     filterset_fields = ["gruppe", "aktiv"]
-    search_fields = ["name", "kurzname"]
+    search_fields = ["name", "name_en", "name_lv", "kurzname"]
     pagination_class = None
 
     def get_queryset(self):
@@ -657,6 +657,82 @@ class LaborparameterViewSet(OhneLoeschen):
     @action(detail=False, methods=["post"])
     def reihenfolge(self, request):
         return neue_reihenfolge(request, Laborparameter.objects.all(), "gruppe")
+
+    # ---------------------------------------------------- Dreisprachigkeit (RGC, 18.11.2026): Export und Import
+    def _darf_pflegen(self, request):
+        if "vorlagen_pflegen" not in (request.user.rechte or []):
+            return Response({"fehler": "Dafür fehlt das Recht „Vorlagen pflegen“."}, status=status.HTTP_403_FORBIDDEN)
+        return None
+
+    @action(detail=False, methods=["get"])
+    def export(self, request):
+        """Ganzer Katalog als CSV (Deutsch, Englisch, Lettisch) zum Bearbeiten und erneuten Import."""
+        from django.http import HttpResponse
+
+        from . import labor_sprachen
+
+        if (verboten := self._darf_pflegen(request)) is not None:
+            return verboten
+        antwort = HttpResponse(labor_sprachen.export_csv(Laborparameter.objects.order_by("gruppe", "reihenfolge", "name")),
+                               content_type="text/csv; charset=utf-8")
+        antwort["Content-Disposition"] = f'attachment; filename="laborparameter-{timezone.localdate():%Y-%m-%d}.csv"'
+        protokolliere(SystemEreignis.Art.STAMMDATEN, request, objekt="Laborparameter", aktion="exportiert")
+        return antwort
+
+    @action(detail=False, methods=["get"], url_path="aus-vorlagen")
+    def aus_vorlagen(self, request):
+        """Parameter aus allen Laboranforderungen und Laborprofilen der RGC – Vorschau (JSON) oder ``?format=csv``."""
+        from django.http import HttpResponse
+
+        from . import labor_sprachen
+
+        if (verboten := self._darf_pflegen(request)) is not None:
+            return verboten
+        zeilen = labor_sprachen.aus_vorlagen()
+        if request.query_params.get("als") == "csv":
+            antwort = HttpResponse(labor_sprachen.zeilen_csv(zeilen), content_type="text/csv; charset=utf-8")
+            antwort["Content-Disposition"] = 'attachment; filename="laborparameter-aus-rgc-vorlagen.csv"'
+            return antwort
+        return Response({"zeilen": labor_sprachen.vorschau(zeilen)})
+
+    @action(detail=False, methods=["post"], url_path="import")
+    def importieren(self, request):
+        """Import mit Vorschau: ``datei`` (CSV) oder ``zeilen`` (JSON); ``uebernehmen`` = true legt an bzw. ergänzt
+        nur die übergebenen Zeilen, sonst nur Vorschau."""
+        import json
+
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from django.db import transaction
+
+        from . import labor_sprachen
+
+        try:
+            if "datei" in request.FILES:
+                datei = request.FILES["datei"]
+                if datei.size > 2 * 1024 * 1024:
+                    return Response({"fehler": "Die Datei ist zu groß (höchstens 2 MB)."}, status=status.HTTP_400_BAD_REQUEST)
+                zeilen = labor_sprachen.lies_csv(datei.read())
+            else:
+                zeilen = request.data.get("zeilen")
+                if isinstance(zeilen, str):
+                    zeilen = json.loads(zeilen)
+                if not isinstance(zeilen, list) or not all(isinstance(z, dict) for z in zeilen):
+                    return Response({"fehler": "Bitte eine CSV-Datei oder Zeilen übergeben."},
+                                    status=status.HTTP_400_BAD_REQUEST)
+            uebernehmen = str(request.data.get("uebernehmen", "")).lower() in ("1", "true", "ja")
+            if not uebernehmen:
+                return Response({"zeilen": labor_sprachen.vorschau(zeilen)})
+            with transaction.atomic():
+                ergebnis = labor_sprachen.uebernehmen(zeilen)
+        except labor_sprachen.ImportFehler as e:
+            return Response({"fehler": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except DjangoValidationError as e:
+            return Response({"fehler": "; ".join(e.messages)}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError:  # auch json.JSONDecodeError
+            return Response({"fehler": "Die Daten ließen sich nicht lesen."}, status=status.HTTP_400_BAD_REQUEST)
+        protokolliere(SystemEreignis.Art.STAMMDATEN, request, objekt="Laborparameter", aktion="importiert",
+                      ergaenzt=len(ergebnis["ergaenzt"]), neu=len(ergebnis["neu"]))
+        return Response(ergebnis)
 
 
 class DiagnosevorlageSerializer(serializers.ModelSerializer):
