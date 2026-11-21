@@ -13,7 +13,7 @@ import { ApiFehler, abfrage, alle, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuswahl, useDiagnoseliste, useOpsliste } from "@/lib/daten";
 import { datum, eingabeDatum } from "@/lib/format";
-import { DIAGNOSE_KENNZEICHEN, EINGRIFF_STATUS } from "@/lib/typen";
+import { EINGRIFF_STATUS } from "@/lib/typen";
 import type { Dokument, Eingriff } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Feld, Knopf, KnopfLink, Meldung } from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
@@ -53,7 +53,8 @@ function EingriffDialog({ eingriff, offen, onOffen, onGespeichert }: {
   const [am, setAm] = useState(eingriff?.datum ? datum(eingriff.datum) : "");
   const [diagnose, setDiagnose] = useState(eingriff?.diagnose_bezeichnung ?? "");
   const [icd, setIcd] = useState(eingriff?.icd_code ?? "");
-  const [kennzeichen, setKennzeichen] = useState(eingriff?.kennzeichen ?? "G");
+  // Festlegung 21.11.2026 (U77): immer „G – gesichert“
+  const kennzeichen = "G";
   const [status, setStatus] = useState<Eingriff["status"]>(eingriff?.status ?? "beantragt");
   const [genehmigtAm, setGenehmigtAm] = useState(eingriff?.genehmigt_am ? datum(eingriff.genehmigt_am) : "");
   const [genehmigung, setGenehmigung] = useState(eingriff?.genehmigung ?? "");
@@ -81,7 +82,7 @@ function EingriffDialog({ eingriff, offen, onOffen, onGespeichert }: {
         return d;
       };
       const koerper = { patient: patient.id, art, bezeichnung: bezeichnung.trim(), ops_codes: opsCodes.trim(),
-        datum: iso("datum", am), diagnose_bezeichnung: diagnose.trim(), icd_code: icd.trim().toUpperCase(), kennzeichen,
+        datum: iso("datum", am), diagnose_bezeichnung: diagnose.trim(), icd_code: icd.trim().toUpperCase(),
         status, genehmigt_am: iso("genehmigt_am", genehmigtAm), genehmigung: genehmigung.trim(),
         dokument: dokument ? Number(dokument) : null, notiz: notiz.trim() };
       return eingriff
@@ -152,19 +153,10 @@ function EingriffDialog({ eingriff, offen, onOffen, onGespeichert }: {
           </datalist>
         </>}
       </Feld>
-      <div className="grid gap-3 sm:grid-cols-[8.75rem_1fr]">
-        <Feld label="ICD-Code" fehler={f.icd_code} pflicht>
-          {(p) => <Eingabe {...p} className="num" value={icd} maxLength={10} placeholder="K91.2"
-            onChange={(e) => setIcd(e.target.value.toUpperCase())} />}
-        </Feld>
-        <Feld label="Zusatzkennzeichen" fehler={f.kennzeichen} pflicht>
-          {(p) => (
-            <Auswahl {...p} value={kennzeichen} onChange={(e) => setKennzeichen(e.target.value as Eingriff["kennzeichen"])}>
-              {Object.entries(DIAGNOSE_KENNZEICHEN).map(([k, text]) => <option key={k} value={k}>{text}</option>)}
-            </Auswahl>
-          )}
-        </Feld>
-      </div>
+      <Feld label="ICD-Code" fehler={f.icd_code} pflicht hinweis="Kommt als „G – gesichert“ in die Diagnoseliste.">
+        {(p) => <Eingabe {...p} className="num w-[8.75rem]" value={icd} maxLength={10} placeholder="K91.2"
+          onChange={(e) => setIcd(e.target.value.toUpperCase())} />}
+      </Feld>
       <div className="grid gap-3 sm:grid-cols-[10rem_10rem_1fr]">
         <Feld label="Stand" fehler={f.status} pflicht>
           {(p) => (

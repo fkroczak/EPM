@@ -525,11 +525,10 @@ Eingabe.</li>
 <p>In der <strong>Regeneration Clinic</strong> hat die Akte zusätzliche Reiter. In der DSKM gibt es sie nicht.</p>
 <ul>
 <li><strong>Eingriffe</strong>: durchgeführte oder geplante Therapie bzw. Operation mit <strong>OPS-Code</strong>
-(mehrere mit Komma, z. B. „5-455.01, 5-469.20“) und der zugehörigen <strong>Diagnose mit ICD-Code</strong> und
-Zusatzkennzeichen. Der Stand geht von <em>beantragt</em> über <em>genehmigt</em> zu <em>durchgeführt</em> (oder
+(mehrere mit Komma, z. B. „5-455.01, 5-469.20“) und der zugehörigen <strong>Diagnose mit ICD-Code</strong>. Der Stand geht von <em>beantragt</em> über <em>genehmigt</em> zu <em>durchgeführt</em> (oder
 <em>abgelehnt</em>).</li>
 <li>Sobald ein Eingriff <strong>genehmigt</strong> oder als <strong>durchgeführt</strong> eingetragen ist, steht seine
-Diagnose automatisch im Reiter <strong>Diagnosen</strong>. Gibt es dort schon eine zutreffende Diagnose mit demselben
+Diagnose automatisch im Reiter <strong>Diagnosen</strong> – immer als „G – gesichert“. Gibt es dort schon eine zutreffende Diagnose mit demselben
 ICD-Code, wird sie verknüpft statt doppelt angelegt. Ein abgelehnter Eingriff bringt keine Diagnose.</li>
 <li><strong>Entfernen</strong> nimmt einen falschen Eintrag aus der Liste; er bleibt im Verlauf. Eine schon übernommene
 Diagnose bleibt dabei stehen – sie wird bei Bedarf im Reiter „Diagnosen“ beendet.</li>

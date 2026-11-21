@@ -2172,7 +2172,8 @@ class EingriffSerializer(FirmaFeld, ModelClean, _PatientFest, serializers.ModelS
                   "kennzeichen", "kennzeichen_name", "status", "status_name", "datum", "genehmigt_am", "genehmigung",
                   "notiz", "diagnose", "diagnose_anzeige", "dokument", "dokument_titel", "aktiv", "angelegt_am",
                   "angelegt_von_name"]
-        read_only_fields = ["angelegt_am", "diagnose"]
+        # Festlegung 21.11.2026 (U77): die Diagnose eines Eingriffs kommt immer als „G – gesichert“ in die Liste
+        read_only_fields = ["angelegt_am", "diagnose", "kennzeichen"]
 
     def get_angelegt_von_name(self, obj):
         return benutzername(obj.angelegt_von)

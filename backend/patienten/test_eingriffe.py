@@ -67,13 +67,15 @@ class EingriffeTest(Grundlage):
         # die Diagnose steht auch im Verlauf der Diagnosen
         self.assertTrue(c.get(f"/api/patienten/{self.patient.id}/verlauf/?bereich=diagnosen").json())
 
-    def test_durchgefuehrt_direkt_und_kennzeichen(self):
+    def test_durchgefuehrt_direkt_immer_gesichert(self):
+        """Festlegung 21.11.2026 (U77): die Diagnose kommt immer als „G – gesichert“ in die Liste."""
         gestern = (timezone.localdate() - timedelta(days=1)).isoformat()
         r = self.anlegen(status="durchgefuehrt", datum=gestern, icd_code="Z90.4", kennzeichen="Z",
                          diagnose_bezeichnung="Verlust von Teilen des Verdauungstraktes")
         self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.json()["kennzeichen"], "G")
         d = Diagnose.objects.get(pk=r.json()["diagnose"])
-        self.assertEqual((d.kennzeichen, d.seit.isoformat()), ("Z", gestern))
+        self.assertEqual((d.kennzeichen, d.seit.isoformat()), ("G", gestern))
 
     def test_abgelehnt_und_entfernt_ohne_diagnose(self):
         self.assertEqual(self.anlegen(status="abgelehnt").status_code, 201)

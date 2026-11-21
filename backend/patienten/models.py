@@ -813,7 +813,8 @@ class Eingriff(AktenEintrag):
     art = models.CharField(max_length=15, choices=Art.choices, default=Art.OPERATION)
     bezeichnung = models.CharField(max_length=200, help_text="z. B. „Dünndarmresektion“")
     ops_codes = models.CharField("OPS-Codes", max_length=200, blank=True, help_text="z. B. „5-455.01, 5-469.20“")
-    # Diagnose, die mit der Genehmigung in die Diagnoseliste wandert
+    # Diagnose, die mit der Genehmigung in die Diagnoseliste wandert – immer als „G – gesichert“ (Festlegung
+    # 21.11.2026, U77); das Feld bleibt für die Historie und spätere Wünsche
     icd_code = models.CharField("ICD-Code", max_length=10, help_text="z. B. K91.2")
     diagnose_bezeichnung = models.CharField("Diagnose", max_length=200)
     kennzeichen = models.CharField("Zusatzkennzeichen der Diagnose", max_length=1, choices=Diagnose.Kennzeichen.choices,
