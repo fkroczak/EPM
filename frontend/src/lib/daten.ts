@@ -1,7 +1,7 @@
 /** Gemeinsame Abfragen (Stammdaten werden selten geändert und dürfen länger im Zwischenspeicher bleiben). */
 import { useQuery } from "@tanstack/react-query";
 import { abfrage, api } from "./api";
-import type { Arzt, Auswahlwert, Diagnosevorlage, Einstellungen, Laborparameter, Praeparat, Versorger } from "./typen";
+import type { Arzt, Auswahlwert, Diagnosevorlage, Einstellungen, Laborparameter, Opsvorlage, Praeparat, Versorger } from "./typen";
 
 export function useAuswahl(liste: string, nurAktiv = true) {
   return useQuery({
@@ -33,6 +33,15 @@ export function useDiagnoseliste(nurAktiv = true) {
   return useQuery({
     queryKey: ["diagnoseliste", nurAktiv],
     queryFn: () => api<Diagnosevorlage[]>(`diagnoseliste/${abfrage({ aktiv: nurAktiv ? "true" : undefined })}`),
+    staleTime: 60_000,
+  });
+}
+
+/** OPS-Liste (RGC, 21.11.2026) – Vorschläge beim Eintragen eines Eingriffs */
+export function useOpsliste(nurAktiv = true) {
+  return useQuery({
+    queryKey: ["opsliste", nurAktiv],
+    queryFn: () => api<Opsvorlage[]>(`opsliste/${abfrage({ aktiv: nurAktiv ? "true" : undefined })}`),
     staleTime: 60_000,
   });
 }

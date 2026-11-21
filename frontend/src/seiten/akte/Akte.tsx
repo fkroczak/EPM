@@ -10,7 +10,7 @@ import type { Feldfehler } from "@/lib/api";
 import { useAuth, useOhneRechtSchliessen } from "@/lib/auth";
 import { useAuswahl, useVersorgerListe } from "@/lib/daten";
 import { alter, datum, eingabeDatum, eingabeZahl, heuteIso, kg, nummer, prozent, tagesSchluessel, terminZeit, zahl } from "@/lib/format";
-import { ABSCHLUSSANLAESSE, ERKLAERUNGEN_KURZ, GESCHLECHTER, TERMINARTEN, VERSICHERUNGSARTEN, versicherungsartText } from "@/lib/typen";
+import { ABSCHLUSSANLAESSE, DOKUMENT_REITER, ERKLAERUNGEN_KURZ, GESCHLECHTER, TERMINARTEN, VERSICHERUNGSARTEN, versicherungsartText } from "@/lib/typen";
 import { VersicherungZusatz } from "@/components/VersicherungZusatz";
 import type { Patient, Recht, Termin } from "@/lib/typen";
 import { Seite } from "@/components/layout/Shell";
@@ -831,6 +831,8 @@ export function Akte() {
   // Reihenfolge (Wunsch 10.10.2026): Diagnosen, Therapie, Empfehlung und Infusionspläne direkt nach der Übersicht –
   // ein Klick, ohne Suchen; Befunde und Unterlagen danach; Verlauf und Datenschutz (selten) klein am Ende. Jeder
   // Bereich bleibt ein eigener Reiter (F121).
+  // Regeneration Clinic: eigene Reiter (Fälle seit 26.10.2026; Eingriffe und Dokumenttypen seit 21.11.2026)
+  const rgc = ich?.firma === "rg";
   const reiter: ReiterEintrag[] = ([
     ...(ansicht === "karteikarte" ? [{ zu: `${basis}/kartei`, text: "Karteikarte", stufe: "haupt" }] : []),
     { zu: basis, text: "Übersicht", ende: true, gruppe: "Akte", stufe: "haupt" },
@@ -838,6 +840,8 @@ export function Akte() {
     // Medikamentenplan (Wunsch 11.10.2026)
     { zu: `${basis}/medikamente`, text: "Medikamente", zahl: k?.zaehler.medikamente, stufe: "haupt" },
     { zu: `${basis}/therapie`, text: "Therapie", stufe: "haupt" },
+    // Eingriffe (RGC, 21.11.2026): Therapie oder Operation mit OPS- und ICD-Code
+    ...(rgc ? [{ zu: `${basis}/eingriffe`, text: "Eingriffe", zahl: k?.zaehler.eingriffe, stufe: "haupt" }] : []),
     { zu: `${basis}/empfehlung`, text: "Empfehlung", stufe: "haupt" },
     { zu: `${basis}/befunde`, text: "Befunde", stufe: "haupt" },
     { zu: `${basis}/plaene`, text: "Infusionspläne", zahl: k?.zaehler.infusionsplaene, stufe: "haupt" },
@@ -847,7 +851,11 @@ export function Akte() {
     { zu: `${basis}/bia`, text: "BIA", zahl: k?.zaehler.bia_messungen, stufe: "neben" },
     { zu: `${basis}/berichte`, text: "Berichte", zahl: k?.zaehler.berichte, stufe: "neben" },
     // Fälle (26.10.2026): nur bei der Regeneration Clinic – Behandlungsfall mit Dokumentenpaket und Rechnung
-    ...(ich?.firma === "rg" ? [{ zu: `${basis}/faelle`, text: "Fälle", zahl: k?.zaehler.faelle, stufe: "neben" }] : []),
+    ...(rgc ? [{ zu: `${basis}/faelle`, text: "Fälle", zahl: k?.zaehler.faelle, stufe: "neben" }] : []),
+    // eigene Reiter je Dokumenttyp (RGC, 21.11.2026): OP-Berichte, Röntgen, Überweisungen, Einweisungen
+    ...(rgc ? ([["op-berichte", "op_bericht"], ["roentgen", "radiologie"], ["ueberweisungen", "ueberweisung"],
+      ["einweisungen", "einweisung"]] as const).map(([pfad, art]) => ({
+      zu: `${basis}/${pfad}`, text: DOKUMENT_REITER[art].reiter, zahl: k?.zaehler.dokumentarten?.[art], stufe: "neben" })) : []),
     // Korrespondenz (14.10.2026): Schreiben an oder über den Patienten mit Status
     { zu: `${basis}/korrespondenz`, text: "Korrespondenz", zahl: k?.zaehler.korrespondenz, stufe: "neben" },
     { zu: `${basis}/dokumente`, text: "Dokumente", zahl: k?.zaehler.dokumente, stufe: "neben" },

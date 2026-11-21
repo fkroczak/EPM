@@ -342,7 +342,9 @@ export type Patient = {
       /** Korrespondenz (14.10.2026): alle Schreiben der Akte */
       korrespondenz?: number;
       /** Fälle der Regeneration Clinic (26.10.2026): offene Behandlungsfälle */
-      faelle?: number };
+      faelle?: number;
+      /** eigene Reiter der RGC (21.11.2026): Eingriffe (nicht entfernte) und Dokumente je Kennung des Dokumenttyps */
+      eingriffe?: number; dokumentarten?: Record<string, number> };
   } | null;
 };
 
@@ -443,7 +445,9 @@ export type Kontakt = {
   firma_kurz?: string | null;
 };
 
-export type Auswahlwert = { id: number; liste: string; wert: string; reihenfolge: number; aktiv: boolean };
+export type Auswahlwert = { id: number; liste: string; wert: string; reihenfolge: number; aktiv: boolean;
+  /** feste Kennung, an der ein Reiter hängt (z. B. „op_bericht“, RGC 21.11.2026); sonst leer */
+  kennung?: string };
 
 export type Praeparat = {
   id: number;
@@ -769,6 +773,51 @@ export type Diagnose = {
   firma_kurz?: string | null;
 };
 
+/** Dokumenttypen mit eigenem Reiter (RGC, 21.11.2026): Kennung → Name im Reiter und im Text */
+export const DOKUMENT_REITER: Record<string, { reiter: string; einzahl: string; mehrzahl: string; knopf: string }> = {
+  op_bericht: { reiter: "OP-Berichte", einzahl: "OP-Bericht", mehrzahl: "OP-Berichte", knopf: "Neuer OP-Bericht" },
+  radiologie: { reiter: "Röntgen", einzahl: "Röntgen- bzw. radiologischer Befund", mehrzahl: "Röntgen- und radiologische Befunde",
+    knopf: "Neuer Röntgenbefund" },
+  ueberweisung: { reiter: "Überweisungen", einzahl: "Überweisung", mehrzahl: "Überweisungen", knopf: "Neue Überweisung" },
+  einweisung: { reiter: "Einweisungen", einzahl: "stationäre Einweisung", mehrzahl: "stationäre Einweisungen", knopf: "Neue Einweisung" },
+};
+
+/** Ablauf eines Eingriffs (RGC, 21.11.2026); ab „genehmigt“ steht die Diagnose in der Diagnoseliste */
+export const EINGRIFF_STATUS: Record<Eingriff["status"], string> = {
+  beantragt: "beantragt",
+  genehmigt: "genehmigt",
+  durchgefuehrt: "durchgeführt",
+  abgelehnt: "abgelehnt",
+};
+
+/** Durchgeführte Therapie oder Operation mit OPS- und ICD-Code (RGC, 21.11.2026) */
+export type Eingriff = {
+  id: number;
+  patient: number;
+  art: "operation" | "therapie";
+  art_name: string;
+  bezeichnung: string;
+  ops_codes: string;
+  icd_code: string;
+  diagnose_bezeichnung: string;
+  kennzeichen: "G" | "V" | "Z" | "A";
+  kennzeichen_name: string;
+  status: "beantragt" | "genehmigt" | "durchgefuehrt" | "abgelehnt";
+  status_name: string;
+  datum: string | null;
+  genehmigt_am: string | null;
+  genehmigung: string;
+  notiz: string;
+  diagnose: number | null;
+  diagnose_anzeige: string | null;
+  dokument: number | null;
+  dokument_titel: string | null;
+  aktiv: boolean;
+  angelegt_am: string;
+  angelegt_von_name: string | null;
+  firma_kurz?: string | null;
+};
+
 /** Medikament im Medikamentenplan (Wunsch 11.10.2026), aufgebaut wie der bundeseinheitliche Medikationsplan */
 export type Medikament = {
   id: number;
@@ -813,6 +862,8 @@ export type Therapieschritt = {
 };
 
 export type Diagnosevorlage = { id: number; icd_code: string; bezeichnung: string; aktiv: boolean; anzeige: string };
+/** OPS-Liste (RGC, 21.11.2026): wächst beim Eintragen von Eingriffen */
+export type Opsvorlage = { id: number; ops_code: string; bezeichnung: string; aktiv: boolean; anzeige: string };
 
 export const LABORGRUPPEN: Record<string, string> = {
   transaminasen: "Transaminasen",

@@ -4005,11 +4005,14 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
 | U73 | In welchem Rhythmus und wie viele Tage vorher soll das Infoblatt verschickt werden (Rückfrage an Alice)? | F177 | wöchentlich (nächste Woche Mo–So), Erinnerung 3 Tage vorher; unter Vorlagen › Grenzwerte änderbar |
 | U74 | ~~„Datenbank leeren“ soll auch die gelernten Zuordnungen und die Kennzahl leeren: `scans.lernen.leeren()` steht bereit, der Aufruf in `system/leeren.py` (`datenbank_leeren`, plus `umfang`) gehört zu einem anderen Auftrag und fehlt noch. Ebenso entfernt das Leeren keine nicht zugeordneten Scans (`scans.Scan` mit Dateien unter `EPM_SCANS`, enthalten Patientendaten; sie laufen erst nach der Aufbewahrungsfrist ab)~~ **Erledigt 10.10.2026:** `datenbank_leeren` entfernt alle Scans samt Dateien (der Stand des OCR-Dienstes in `.dienst` bleibt) und ruft `scans.lernen.leeren()` auf; `umfang` zählt die Scans; Test `system/test_leeren.py` | F182 | – |
 | U75 | Gelernte Zuordnungen sind laut Auftrag auch für „Vorlagen pflegen“ gedacht; die API lässt das zu, in der Oberfläche liegt der Bereich aber unter Scans (Route und Menü nur mit Recht „Scans“). Ein Link unter Vorlagen › Labor wäre der Weg für Rollen ohne „Scans“ | F182 | Standardrollen haben beide Rechte; Link unter Vorlagen nicht gesetzt (anderer Auftrag) |
+| U76 | Wer **genehmigt** einen Eingriff – die Krankenkasse (Kostenübernahme, in EPM nur eingetragen) oder ein Mediziner in EPM (eigenes Recht wie bei Berichten)? | F194 | Genehmigung wird eingetragen (Datum, Kostenträger/Aktenzeichen) mit dem Recht „Patienten anlegen, Diagnose, Therapie, Stammdaten ändern“ |
+| U77 | Mit welchem **Zusatzkennzeichen** kommt die Diagnose eines Eingriffs in die Liste – G (gesichert) oder nach der OP Z (Zustand nach)? | F194 | je Eingriff wählbar, vorbelegt G |
 
 ## Änderungsprotokoll
 
 | Datum | Stand | Änderung |
 |---|---|---|
+| 21.11.2026 | Eigene Reiter der RGC | Wunsch der Klinik (Sprachnachricht 21.11.2026): Reiter „Eingriffe“ mit OPS- und ICD-Code, Diagnose wandert mit der Genehmigung in die Diagnoseliste; Reiter OP-Berichte, Röntgen, Überweisungen, Einweisungen (Dokumenttypen mit fester Kennung); OPS-Liste unter Vorlagen; OP-Bericht eines Falls bekommt den Typ „OP-Bericht“ (F194, U76, U77) |
 | 14.10.2026 | Scans: Diagnosen ohne ICD-Code im Brief | Kundenwunsch: PDF-Briefe nennen Diagnosen meist nur im Freitext. Jede Zeile unter „Diagnosen:“ (auch Entlassungs-, Neben-, Dauerdiagnosen, Vorerkrankungen) ohne Code wird ein eigener Vorschlag (`scans/ocr/auswertung.py`: `_freitext_diagnosen`, `freitext: true`, hinter den Diagnosen mit Code; umbrochene Zeilen zusammengesetzt, Messwerte und Fließtext ausgelassen, „V.a.“/„Z.n.“ → Kennzeichen). Code aus dem Gelernten, sonst aus Vorlagen › Diagnosen (`aus_liste`: gleiche Wörter mit kleinen Lesefehlern; 1,0 → `zuordnung: liste`, angehakt; ab 0,6 → `liste_vorschlag`, nicht angehakt; Gleichstand → unspezifische Form). Ohne Treffer bleibt der Code leer, nicht angehakt. Der ICD-Code bleibt Pflicht (Entscheidung 14.10.2026): Zuordnen sperrt „In die Akte legen“, solange eine angehakte Diagnose ohne Code ist; Bezeichnung mit Auswahlliste der Diagnoseliste setzt den Code. Ergänzte Codes werden gelernt. Der Freitext bleibt zusätzlich unter „Texte“. Tests `scans.tests.AuswertungTest.test_arztbrief_diagnosen_ohne_icd`, `scans.test_lernen` |
 | 14.10.2026 | Briefpapier der Regeneration Clinic 1:1 | Neuer Wert `briefpapier` im Baustein „Briefkopf“ (`vorlagen/briefpapier.py`, Prüfung in `bloecke.py`): Kopfband mit Wellenkante, Logo (`statisch/briefpapier/rgc-logo.png`, freigestellt) und Anschrift sowie Fußband mit Postanschrift und Registrierdaten als SVG in Seitengröße, fest positioniert und damit auf jeder Seite; Seitenränder 47/17,6/31/25 mm, Fußzeilentext links entfällt, Seitenzahl über dem Band; erste Seite mit Absenderzeile, Kontakt und „Riga, Datum“ (`absender`). Maße und Farben aus dem Briefpapier der Klinik (pt wie im Original). Schriften Inter und Carlito in `schriften/`. Laborprofile MAL-00 bis MAL-06 nutzen es; Datenmigration `vorlagen/0012_rgc_laborprofile_briefpapier` stellt unbearbeitete mitgelieferte Fassungen um. Editor: Schalter „Briefpapier der Regeneration Clinic“. Tests `vorlagen/test_rgc.py` (`test_briefpapier`). |
 | 14.10.2026 | Laborprofile Malabsorption der Regeneration Clinic | Das Dokument „Laborprofile Malabsorption – Strukturierte Anforderungsprofile zur Integration in die Klinik-IT“ (Version 1.0) als Laboranforderungen auf dem Briefkopf der Klinik: neun eigene Schreiben der Firma RGC in der Gruppe „anforderungen“ – MAL-01, MAL-02A, MAL-02B, MAL-02C, MAL-03 (A–D), MAL-04 (Vollpanel aus MAL-01, 02A, 02B), MAL-05, MAL-06 und eine Übersicht mit Regelwerk R1–R11 und Monitoring-Intervallen (Kennungen `eigen-rgc-mal00` … `eigen-rgc-mal06`). Jeder Bogen ist nach Röhrchen bzw. Material geordnet (Material genau wie im Dokument), mit Röhrchenübersicht, Status P/O/R (Pflicht angekreuzt), LOINC, Hinweis, Pflichthinweisen zur Präanalytik (glutenhaltige Kost, geformter Stuhl, Spurenelement-Röhrchen, lichtgeschützt, gekühlt, nüchtern) und den Regeln des Profils; Reflexparameter aus anderen Profilen mit ihrem Röhrchen (MAL-01: Parathormon 2A.4 nach R7). Strukturierte Daten je Parameter (Felder aus Abschnitt 6 des Dokuments) in `vorlagen/statisch/laborprofile-malabsorption.json`. Umgesetzt mit `werkzeuge/rgc-laborprofile.py DOCX`; Datenmigration `vorlagen/0011_rgc_laborprofile` (nur Fehlendes). Doku `docs/VORLAGEN-RGC-2026-10.md`. Tests `vorlagen/test_rgc.py`. |
@@ -4210,3 +4213,42 @@ Erledigt nach der Gegenprüfung vom 02.10.2026: O-27 abgebrochene Sicherung hint
   signierte PDF, Scan, DOCX-Rundweg, CSV-Import, Löschen der Akte; Trigger gegen direkte Änderungen.
 - **Status:** TEILWEISE ABGESCHLOSSEN – Browsertest für Akte › Fälle fehlt; Preise, Bankverbindung der RGC,
   fachärztliche Prüfung der Zusatzbögen und lettischen Texte stehen aus (`docs/DOKUMENTENAUTOMATION-RGC-2026-10.md`).
+
+### F194 Eigene Reiter der Regeneration Clinic: Eingriffe und Dokumente je Typ
+- **Anlass:** Wunsch der Klinik vom 21.11.2026 (Sprachnachricht und Nachricht): Unterlagen besser sortieren –
+  OP-Bericht, Röntgen/radiologischer Bericht, Überweisung, stationäre Einweisung; „In einer Spalte durchgeführte
+  Therapie/Operation, … ICD-Code und OPS eintragen und automatisch in die Diagnosen übernehmen. Sobald genehmigt.“
+  Festlegung: „Für RGC eigene Reiter.“
+- **Reiter (nur in der Firma RGC):** „Eingriffe“ nach „Therapie“; „OP-Berichte“, „Röntgen“, „Überweisungen“,
+  „Einweisungen“ in der Gruppe Befunde und Unterlagen, je mit Zähler. In der DSKM unverändert.
+- **Dokumenttypen:** `Auswahlwert.kennung` (fest, nicht über die API änderbar, eindeutig je Liste). Datenmigration
+  `stammdaten/0029_dokumenttypen_rgc`: `op_bericht` „OP-Bericht“, `radiologie` „Röntgen / Radiologie“, `ueberweisung`
+  „Überweisung“, `einweisung` „Stationäre Einweisung“ – ein schon vorhandener Typ gleichen Namens (z. B. „Röntgen“)
+  bekommt die Kennung statt eines zweiten Eintrags. Name unter Vorlagen › Auswahllisten frei änderbar. Die Reiter
+  zeigen die Dokumente dieses Typs (`GET /api/dokumente/?patient&typ`), Hochladen setzt den Typ; Zähler im Aktenkopf
+  `zaehler.dokumentarten`. Der finale OP-Bericht eines Behandlungsfalls wird als Typ „OP-Bericht“ abgelegt.
+- **Eingriffe:** Modell `patienten.Eingriff` (Art Operation/Therapie, Bezeichnung, OPS-Codes, ICD-Code, Diagnose,
+  Zusatzkennzeichen, Stand beantragt → genehmigt → durchgeführt bzw. abgelehnt, Datum, genehmigt am, Genehmigung,
+  Notiz, Dokument z. B. OP-Bericht, aktiv), mit Historie. `GET/POST /api/eingriffe/?patient&aktiv&status`,
+  `PATCH /api/eingriffe/{id}/`; kein Löschen (405), „Entfernen“ = `aktiv: false`. Prüfung: OPS-Format
+  `5-455.01` (mehrere mit Komma, einheitlich kleingeschrieben), ICD wie bei den Diagnosen, Dokument derselben Akte,
+  durchgeführt nicht in der Zukunft. Datum der Genehmigung bzw. des Eingriffs wird beim Statuswechsel vorbelegt.
+- **Übernahme in die Diagnosen:** ab „genehmigt“ oder „durchgeführt“ einmal je Eingriff
+  (`Eingriff.diagnose_uebernehmen`): zutreffende Diagnose mit gleichem ICD-Code wird verknüpft, sonst neu angelegt
+  (Notiz „aus Eingriff: …“, „seit“ = Datum des Eingriffs) und in die Diagnoseliste aufgenommen. Abgelehnte und
+  entfernte Eingriffe übernehmen nichts; eine übernommene Diagnose bleibt beim Entfernen stehen.
+- **OPS-Liste:** `stammdaten.Opsvorlage`, `GET/POST/PATCH /api/opsliste/`, wächst mit (nur Eingriffe mit genau einem
+  Code); Vorlagen › Labor und Diagnosen › „OPS (Eingriffe)“ (gemeinsame Ansicht mit der Diagnoseliste).
+- **Weiteres:** Verlauf der Akte (Bereich `eingriffe`, Aktionen genehmigt/durchgeführt/„Diagnose übernommen“/entfernt),
+  Kopie der Akte (Art. 15), endgültiges Löschen der Akte entfernt Eingriffe samt Historie, Umhängen eines Dokuments
+  löst die Verknüpfung, Übersetzungen der Reiter (EN/LV), Hilfe „Eingriffe und eigene Dokument-Reiter“.
+- **Tabellen:** `patienten_eingriff` (+ Historie), `stammdaten_opsvorlage` (+ Historie), Feld `kennung` in
+  `stammdaten_auswahlwert`; Migrationen `patienten/0024`, `stammdaten/0028`, `stammdaten/0029`.
+- **Teststatus:** Backend `patienten/test_eingriffe.py` (14 Tests: OPS-Format, beantragt ohne Diagnose, Übernahme mit
+  Genehmigung und Verknüpfung, durchgeführt direkt mit Kennzeichen Z, abgelehnt/entfernt ohne Diagnose, Prüfungen,
+  OPS-Liste, Dokument derselben Akte, Rechte, Löschen der Akte, Kopie der Akte, Dokumenttypen mit Kennung, Hochladen mit
+  Zähler, Datenmigration nutzt vorhandenen Typ) grün. Browsertest `e2e/rgc-reiter.spec.ts` (Teil 10) grün gegen
+  Django-Entwicklungsserver und Vite; im CI-Stack steht der Lauf aus.
+- **Offen:** U76 (wer genehmigt), U77 (Kennzeichen). Erkennung der neuen Typen in „Scans“ (Vorschlag des Typs beim
+  Zuordnen) ist nicht Teil dieses Schritts.
+- **Status:** ABGESCHLOSSEN – CI-Lauf steht aus

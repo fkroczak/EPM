@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from accounts.permissions import StammdatenRecht, VersorgerRecht
 from audit.models import SystemEreignis, protokolliere
 
-from .models import (Absenderangaben, Ansprechpartner, Arzt, Auswahlwert, Diagnosevorlage, Einstellungen,
+from .models import (Absenderangaben, Ansprechpartner, Arzt, Auswahlwert, Diagnosevorlage, Einstellungen, Opsvorlage,
                      Laborparameter, Logo, Praeparat, Versorger)
 
 
@@ -108,7 +108,8 @@ def _patienten_je_ansprechpartner():
 class AuswahlwertSerializer(serializers.ModelSerializer):
     class Meta:
         model = Auswahlwert
-        fields = ["id", "liste", "wert", "reihenfolge", "aktiv"]
+        fields = ["id", "liste", "wert", "reihenfolge", "aktiv", "kennung"]
+        read_only_fields = ["kennung"]
 
 
 class AuswahlwertViewSet(OhneLoeschen):
@@ -755,6 +756,39 @@ class DiagnosevorlageSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(e.message_dict if hasattr(e, "error_dict") else {"fehler": e.messages})
         attrs["icd_code"] = eintrag.icd_code
         return attrs
+
+
+class OpsvorlageSerializer(serializers.ModelSerializer):
+    anzeige = serializers.CharField(source="__str__", read_only=True)
+
+    class Meta:
+        model = Opsvorlage
+        fields = ["id", "ops_code", "bezeichnung", "aktiv", "anzeige", "angelegt_am"]
+        read_only_fields = ["angelegt_am"]
+
+    def validate(self, attrs):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        eintrag = self.instance or Opsvorlage()
+        for feld, wert in attrs.items():
+            setattr(eintrag, feld, wert)
+        try:
+            eintrag.clean()
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.message_dict if hasattr(e, "error_dict") else {"fehler": e.messages})
+        attrs["ops_code"] = eintrag.ops_code
+        return attrs
+
+
+class OpsvorlageViewSet(OhneLoeschen):
+    """Die Liste der Prozeduren mit OPS-Code (RGC, 21.11.2026). Sie wächst beim Eintragen eines Eingriffs von allein
+    mit; hier wird sie korrigiert und ausgeblendet."""
+
+    queryset = Opsvorlage.objects.all()
+    serializer_class = OpsvorlageSerializer
+    filterset_fields = ["aktiv"]
+    search_fields = ["bezeichnung", "ops_code"]
+    pagination_class = None
 
 
 class DiagnosevorlageViewSet(OhneLoeschen):

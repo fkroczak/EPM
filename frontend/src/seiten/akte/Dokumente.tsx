@@ -6,6 +6,7 @@ import { ApiFehler, abfrage, alle, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { useAuswahl } from "@/lib/daten";
 import { dateigroesse, datum, eingabeDatum, zeitpunkt } from "@/lib/format";
+import { DOKUMENT_REITER } from "@/lib/typen";
 import type { Dokument, PatientZeile } from "@/lib/typen";
 import { useAuth } from "@/lib/auth";
 import { FirmaMarke } from "@/components/FirmenWahl";
@@ -419,8 +420,19 @@ function gemerktProSeite(): number {
 
 type Hochladen = { name: string; status: "laeuft" | "ok" | "fehler"; meldung?: string };
 
-export function Dokumente() {
+
+/**
+ * Reiter „Dokumente“ – oder, mit ``art`` (Kennung des Dokumenttyps), ein eigener Reiter der RGC nur mit diesem Typ
+ * (OP-Berichte, Röntgen, Überweisungen, Einweisungen; 21.11.2026): dieselbe Liste, gefiltert, und neue Dateien
+ * bekommen den Typ gleich mit.
+ */
+export function Dokumente({ art }: { art?: string } = {}) {
   const { patient, erfassen } = useAkte();
+  const typen = useAuswahl("dokumenttyp", false);
+  const typ = art ? (typen.data ?? []).find((t) => t.kennung === art) : undefined;
+  const reiter = art ? DOKUMENT_REITER[art] : undefined;
+  // Typ (noch) nicht geladen oder unter Vorlagen › Auswahllisten entfernt: keine ungefilterte Liste zeigen
+  const typFehlt = !!art && !typ;
   // ?dokument=ID (z. B. aus der Karteikarte) wählt das Dokument vor
   const [params] = useSearchParams();
   const [gewaehlt, setGewaehlt] = useState<number | null>(() => Number(params.get("dokument")) || null);
@@ -433,9 +445,10 @@ export function Dokumente() {
   const eingabe = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
   const dokumente = useQuery({
-    queryKey: ["patient", patient.id, "dokumente", ausgeblendete, begriff],
-    queryFn: () => alle<Dokument>(`dokumente/${abfrage({ patient: patient.id, ausgeblendet: ausgeblendete ? undefined : "false", search: begriff.length >= 2 ? begriff : undefined })}`),
+    queryKey: ["patient", patient.id, "dokumente", ausgeblendete, begriff, ...(typ ? [typ.id] : [])],
+    queryFn: () => alle<Dokument>(`dokumente/${abfrage({ patient: patient.id, ausgeblendet: ausgeblendete ? undefined : "false", search: begriff.length >= 2 ? begriff : undefined, typ: typ?.id })}`),
     placeholderData: (vorher) => vorher,
+    enabled: !typFehlt,
   });
   const liste = dokumente.data ?? [];
   const aktiv = liste.find((d) => d.id === gewaehlt) ?? liste[0];
@@ -467,6 +480,7 @@ export function Dokumente() {
       form.append("patient", String(patient.id));
       form.append("datei", datei);
       form.append("titel", datei.name.replace(/\.[^.]+$/, ""));
+      if (typ) form.append("typ", String(typ.id));
       try {
         const neu = await api<Dokument>("dokumente/", { form });
         setUploads((u) => u.map((x) => (x.name === datei.name ? { ...x, status: "ok" } : x)));
@@ -479,8 +493,14 @@ export function Dokumente() {
     void qc.invalidateQueries({ queryKey: ["patient", patient.id] });
   };
 
+  if (typFehlt) {
+    if (typen.isPending) return <Laden />;
+    return <Meldung art="warn">Der Dokumenttyp für diesen Reiter fehlt. Bitte unter Vorlagen › Auswahllisten › Dokumenttyp
+      prüfen, ob er ausgeblendet ist, oder EPM aktualisieren.</Meldung>;
+  }
   return (
-    <div className="akte-spalten stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_21.25rem] fhd:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
+    <div className="akte-spalten stapel grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_21.25rem] fhd:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start"
+      data-testid={art ? `dokumente-${art}` : undefined}>
       <div className="flex flex-col gap-4 min-w-0">
         {erfassen ? (
           <div
@@ -491,7 +511,7 @@ export function Dokumente() {
             data-testid="ablage">
             <Icon name="hochladen" groesse={20} />
             <span>Dateien hierher (oder irgendwo auf die Akte) ziehen oder</span>
-            <Knopf variante="pri" icon="plus" onClick={() => eingabe.current?.click()}>Neues Dokument</Knopf>
+            <Knopf variante="pri" icon="plus" onClick={() => eingabe.current?.click()}>{reiter ? reiter.knopf : "Neues Dokument"}</Knopf>
             <span className="gedaempft text-[0.8125rem]">PDF, JPG, PNG, TXT · max. 50 MB</span>
             <input ref={eingabe} type="file" multiple hidden aria-label="Dateien hochladen" accept=".pdf,.jpg,.jpeg,.png,.txt,application/pdf,image/jpeg,image/png,text/plain"
               onChange={(e) => { if (e.target.files?.length) void hochladen(e.target.files); e.target.value = ""; }} />
@@ -509,7 +529,7 @@ export function Dokumente() {
           </ul>
         ) : null}
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <span className="lbl" data-testid="dokumente-anzahl">{seiten > 1 ? `${von}–${bis} von ${liste.length} Dokumenten` : `${liste.length} ${liste.length === 1 ? "Dokument" : "Dokumente"}`}</span>
+          <span className="lbl" data-testid="dokumente-anzahl">{seiten > 1 ? `${von}–${bis} von ${liste.length} Dokumenten` : `${liste.length} ${liste.length === 1 ? (reiter ? reiter.einzahl : "Dokument") : (reiter ? reiter.mehrzahl : "Dokumente")}`}</span>
           <label className="relative block grow max-w-sm">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 gedaempft pointer-events-none"><Icon name="suche" /></span>
             <input className="inp pl-[2.125rem]" type="search" aria-label="Dokumente durchsuchen" placeholder="Suchen in Titel, Notiz und erkanntem Text"
@@ -561,10 +581,11 @@ export function Dokumente() {
               </tbody>
             </table>
           )}
-          {dokumente.data && !liste.length ? <Leer>{begriff.length >= 2 ? "Kein Dokument gefunden." : "Noch keine Dokumente."}
+          {dokumente.data && !liste.length ? <Leer>{begriff.length >= 2 ? "Kein Dokument gefunden." : reiter ? `Noch keine ${reiter.mehrzahl}.` : "Noch keine Dokumente."}
             {/* nächster Schritt statt leerer Fläche (Bedienung für Pflegekräfte, 10.10.2026) */}
             {begriff.length >= 2 ? <><br />Anderes Suchwort versuchen oder „Ausgeblendete anzeigen“ anhaken.</>
-              : erfassen ? <><br />Brief oder Befund mit „Neues Dokument“ auswählen oder die Datei oben in das Feld ziehen.</> : null}</Leer> : null}
+              : erfassen ? <><br />{reiter ? `Datei mit „${reiter.knopf}“ auswählen oder oben in das Feld ziehen – sie bekommt den Typ „${typ?.wert}“.`
+                : "Brief oder Befund mit „Neues Dokument“ auswählen oder die Datei oben in das Feld ziehen."}</> : null}</Leer> : null}
           <Fehleranzeige fehler={dokumente.error} />
         </Karte>
       </div>
