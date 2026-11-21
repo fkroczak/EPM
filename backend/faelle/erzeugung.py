@@ -197,6 +197,9 @@ def _ablegen(dok, daten: bytes, mime: str, dateiname: str, benutzer, sichtbar=Fa
     meta = speichere_datei(dok.patient, ContentFile(daten, name=dateiname), mime)
     typ_wert = "Rechnung" if dok.ist_rechnung else "Bericht"
     typ = Auswahlwert.objects.filter(liste=Auswahlwert.Liste.DOKUMENTTYP, wert=typ_wert).first()
+    if dok.art == "op_bericht":
+        # eigener Reiter „OP-Berichte“ der RGC (21.11.2026): der OP-Bericht des Falls steht dort mit
+        typ = Auswahlwert.objects.filter(liste=Auswahlwert.Liste.DOKUMENTTYP, kennung="op_bericht").first() or typ
     d = Dokument(patient=dok.patient, typ=typ, titel=(titel or dok.titel)[:200], datum=timezone.localdate(),
                  hochgeladen_von=benutzer, datum_quelle=Dokument.DatumQuelle.EINGABE, ausgeblendet=not sichtbar,
                  notiz=f"Fall {dok.fall.nummer} · {dok.titel}"[:500], **meta)

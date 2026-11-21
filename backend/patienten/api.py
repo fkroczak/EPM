@@ -8,7 +8,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import F, Max, Q
+from django.db.models import Count, F, Max, Q
 from django.http import FileResponse, HttpResponse
 from django.utils import timezone
 from django_filters import rest_framework as filters
@@ -34,7 +34,7 @@ from .kennzahlen import (KENNZAHLEN_FELDER, abschluss_pruefen, befund_filter, ke
                          ohne_pflicht_erklaerungen, ohne_plan, pruefliste,
                          schnellfilter, zaehler)
 from .loeschung import PLATZHALTER, schwaerze_dokument, trage_ein
-from .models import (Bezugsperson, Datenschutzanfrage, Diagnose, Dokument, DokumentVorgang, Erklaerung, Therapieschritt,
+from .models import (Bezugsperson, Datenschutzanfrage, Diagnose, Dokument, DokumentVorgang, Eingriff, Erklaerung, Therapieschritt,
                      Gewichtsmessung, Hinweisruhe, Kontakt, Medikament, Patient, PatientArzt, Termin, dokument_pfad,
                      plus_monate, sichtbare_termine)
 
@@ -236,6 +236,11 @@ class PatientSerializer(ModelClean, serializers.ModelSerializer):
                 "korrespondenz": obj.korrespondenz.count(),
                 # Behandlungsfälle der RGC (26.10.2026): offene Fälle
                 "faelle": obj.faelle.filter(status="offen").count(),
+                # eigene Reiter der RGC (21.11.2026): Eingriffe und Dokumente je Dokumenttyp mit Kennung
+                "eingriffe": obj.eingriffe.filter(aktiv=True).count(),
+                "dokumentarten": dict(obj.dokumente.filter(ausgeblendet=False).exclude(typ__kennung="")
+                                      .exclude(typ__isnull=True).values("typ__kennung")
+                                      .annotate(n=Count("id")).values_list("typ__kennung", "n")),
             },
         }
 
@@ -868,7 +873,8 @@ class PatientViewSet(DatenschutzAktionen, mixins.ListModelMixin, mixins.Retrieve
 
         Filter ``bereich``: stammdaten, diagnose, therapie, empfehlung, befunde, bemerkung, gewichte, kontakte, termine,
         dokumente, infusionsplaene, bezugspersonen, aerzte, erklaerungen, datenschutz, diagnosen, laborbefunde,
-        bia_messungen, berichte, korrespondenz, faelle, falldokumente, hinweisruhe, therapieschritte, medikamente; ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
+        bia_messungen, berichte, korrespondenz, faelle, falldokumente, hinweisruhe, therapieschritte, medikamente, eingriffe;
+        ``person``: Benutzer-ID. Änderungen an der Akte werden nach Feld auf
         die Bereiche Stammdaten, Diagnose, Therapie, Empfehlung, Befunde und Bemerkung verteilt.
         """
         patient = self.get_object()
@@ -926,6 +932,13 @@ def _aktion(name, h, aenderungen):
         return "wieder aufgenommen" if h.aktiv else "entfernt"
     if name == "medikamente" and "aktiv" in felder:
         return "wieder angesetzt" if h.aktiv else "abgesetzt"
+    if name == "eingriffe" and "aktiv" in felder:
+        return "wieder aufgenommen" if h.aktiv else "entfernt"
+    if name == "eingriffe" and "status" in felder:
+        return h.get_status_display()
+    if name == "eingriffe" and not felder and h.diagnose_id:
+        # die Verknüpfung (nicht editierbar) zeigt der Vergleich der Fassungen nicht an
+        return "Diagnose übernommen"
     if name == "berichte" and "status" in felder:
         return "freigegeben" if h.status == "freigegeben" else "geändert"
     if name == "korrespondenz" and "status" in felder:
@@ -1017,6 +1030,18 @@ def _beschreibung(name, h, aktion) -> str:
             teile = [f"{h.bezeichnung} [{h.icd_code}{h.kennzeichen}]"]
             if h.seit:
                 teile.append(f"seit {h.seit:%d.%m.%Y}")
+            if h.notiz:
+                teile.append(h.notiz)
+            return " · ".join(teile)
+        if name == "eingriffe":
+            teile = [f"{dict(Eingriff.Art.choices).get(h.art, h.art)}: {h.bezeichnung}"]
+            if h.ops_codes:
+                teile.append(f"OPS {h.ops_codes}")
+            teile.append(f"{h.diagnose_bezeichnung} [{h.icd_code}{h.kennzeichen}]")
+            teile.append(dict(Eingriff.Status.choices).get(h.status, h.status)
+                         + (f" am {h.datum:%d.%m.%Y}" if h.datum else ""))
+            if h.genehmigung:
+                teile.append(f"Genehmigung: {h.genehmigung}")
             if h.notiz:
                 teile.append(h.notiz)
             return " · ".join(teile)
@@ -1112,6 +1137,8 @@ def verlauf_eintraege(patient, bereich=None, person=None, grenze=500):
         "therapieschritte": Therapieschritt.history.filter(patient_id=patient.id),
         # Medikamentenplan (Wunsch 11.10.2026)
         "medikamente": Medikament.history.filter(patient_id=patient.id),
+        # Eingriffe der RGC (21.11.2026)
+        "eingriffe": Eingriff.history.filter(patient_id=patient.id),
         "hinweisruhe": Hinweisruhe.history.filter(patient_id=patient.id),
         "laborbefunde": Laborbefund.history.filter(patient_id=patient.id),
         "bia_messungen": BiaMessung.history.filter(patient_id=patient.id),
@@ -1813,6 +1840,12 @@ class DokumentViewSet(AktenEintragViewSet, mixins.ListModelMixin, mixins.Retriev
                     erklaerung._history_user = request.user
                     erklaerung._change_reason = "Verknüpftes Dokument einer anderen Akte zugeordnet"
                     erklaerung.save()
+                # ebenso der OP-Bericht an einem Eingriff (RGC, 21.11.2026)
+                for eingriff in Eingriff.objects.filter(dokument=dok):
+                    eingriff.dokument = None
+                    eingriff._history_user = request.user
+                    eingriff._change_reason = "Verknüpftes Dokument einer anderen Akte zugeordnet"
+                    eingriff.save()
                 DokumentVorgang.objects.create(art=DokumentVorgang.Art.UMGEHAENGT, dokument_id=dok.id, von_patient=alt,
                                                nach_patient=ziel, grund=grund, person=request.user, sha256=dok.sha256,
                                                datei=neu_relativ)
@@ -2121,6 +2154,88 @@ class DiagnoseViewSet(_StammEintragViewSet):
     def perform_update(self, serializer):
         super().perform_update(serializer)
         self._in_katalog(serializer.instance)
+
+
+class EingriffSerializer(FirmaFeld, ModelClean, _PatientFest, serializers.ModelSerializer):
+    """Durchgeführte Therapie oder Operation mit OPS- und ICD-Code (RGC, 21.11.2026)."""
+
+    art_name = serializers.CharField(source="get_art_display", read_only=True)
+    status_name = serializers.CharField(source="get_status_display", read_only=True)
+    kennzeichen_name = serializers.CharField(source="get_kennzeichen_display", read_only=True)
+    diagnose_anzeige = serializers.CharField(source="diagnose.anzeige", read_only=True, default=None)
+    dokument_titel = serializers.CharField(source="dokument.titel", read_only=True, default=None)
+    angelegt_von_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Eingriff
+        fields = ["id", "patient", "art", "art_name", "bezeichnung", "ops_codes", "icd_code", "diagnose_bezeichnung",
+                  "kennzeichen", "kennzeichen_name", "status", "status_name", "datum", "genehmigt_am", "genehmigung",
+                  "notiz", "diagnose", "diagnose_anzeige", "dokument", "dokument_titel", "aktiv", "angelegt_am",
+                  "angelegt_von_name"]
+        # Festlegung 21.11.2026 (U77): die Diagnose eines Eingriffs kommt immer als „G – gesichert“ in die Liste
+        read_only_fields = ["angelegt_am", "diagnose", "kennzeichen"]
+
+    def get_angelegt_von_name(self, obj):
+        return benutzername(obj.angelegt_von)
+
+    def validate_bezeichnung(self, wert):
+        return wert.strip()
+
+    def validate_diagnose_bezeichnung(self, wert):
+        return wert.strip()
+
+    def validate_icd_code(self, wert):
+        return (wert or "").strip().upper()
+
+    def validate_ops_codes(self, wert):
+        """„5-455.01; 5-469.20“ einheitlich speichern; ungültige Codes meldet ``Eingriff.clean``."""
+        from stammdaten.models import ops_codes_ordnen
+
+        geordnet, falsch = ops_codes_ordnen(wert)
+        return wert if falsch else geordnet
+
+    def validate(self, attrs):
+        # Datum der Genehmigung bzw. des Eingriffs vorbelegen, wenn der Status gesetzt wird und keins angegeben ist
+        status = attrs.get("status", self.instance.status if self.instance else Eingriff.Status.BEANTRAGT)
+        alt = self.instance.status if self.instance else None
+        heute = timezone.localdate()
+        if status != alt:
+            if status in Eingriff.UEBERNAHME and not attrs.get("genehmigt_am", getattr(self.instance, "genehmigt_am", None)):
+                attrs["genehmigt_am"] = heute
+            if status == Eingriff.Status.DURCHGEFUEHRT and not attrs.get("datum", getattr(self.instance, "datum", None)):
+                attrs["datum"] = heute
+        return super().validate(attrs)
+
+
+class EingriffViewSet(_StammEintragViewSet):
+    """Eingriffe eines Patienten (RGC, 21.11.2026): ``?patient=ID&aktiv=true``. Kein Löschen – ``aktiv: false``.
+
+    Mit ``status`` „genehmigt“ oder „durchgefuehrt“ steht die Diagnose des Eingriffs in der Diagnoseliste der Akte
+    (``Eingriff.diagnose_uebernehmen``); neue OPS-Codes mit Bezeichnung wandern in die OPS-Liste unter Vorlagen."""
+
+    model = Eingriff
+    serializer_class = EingriffSerializer
+    filterset_fields = ["patient", "aktiv", "status"]
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("angelegt_von", "diagnose", "dokument")
+
+    def _nachher(self, eingriff):
+        from stammdaten.models import Opsvorlage
+
+        eingriff.diagnose_uebernehmen(self.request.user)
+        codes = [c for c in eingriff.ops_codes.split(", ") if c]
+        if len(codes) == 1:
+            # nur eindeutige Paare wandern in die Liste: bei mehreren Codes passt die eine Bezeichnung nicht zu jedem
+            Opsvorlage.objects.get_or_create(ops_code=codes[0], bezeichnung=eingriff.bezeichnung)
+
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        self._nachher(serializer.instance)
+
+    def perform_update(self, serializer):
+        super().perform_update(serializer)
+        self._nachher(serializer.instance)
 
 
 class MedikamentSerializer(FirmaFeld, ModelClean, _PatientFest, serializers.ModelSerializer):

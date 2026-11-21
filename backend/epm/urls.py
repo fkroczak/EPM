@@ -11,7 +11,7 @@ from system import verwaltung_api as verwaltung
 from infusionen.api import InfusionsplanViewSet
 from vorlagen import api as vorlagen
 from patienten.api import (
-    BezugspersonViewSet, DiagnoseViewSet, TherapieschrittViewSet, DokumentViewSet, GewichtViewSet, KalenderViewSet, KontaktViewSet,
+    BezugspersonViewSet, DiagnoseViewSet, EingriffViewSet, TherapieschrittViewSet, DokumentViewSet, GewichtViewSet, KalenderViewSet, KontaktViewSet,
     MedikamentViewSet, PatientArztViewSet, PatientViewSet, StartseiteViewSet, TerminViewSet,
 )
 from hilfe import api as hilfe
@@ -19,7 +19,7 @@ from patienten import meine_akten
 from patienten.datenschutz_api import DatenschutzanfrageViewSet, DatenschutzViewSet, ErklaerungViewSet
 from stammdaten.api import (
     AnsprechpartnerViewSet, ArztViewSet, AuswahlwertViewSet, BriefkopfView, DiagnosevorlageViewSet, EinstellungenView,
-    LaborparameterViewSet, LogoView, PraeparatViewSet, VersorgerViewSet,
+    LaborparameterViewSet, LogoView, OpsvorlageViewSet, PraeparatViewSet, VersorgerViewSet,
 )
 from befunde.api import BiaMessungViewSet, LaborbefundViewSet
 from berichte.api import BerichtViewSet
@@ -42,6 +42,7 @@ router.register("bezugspersonen", BezugspersonViewSet, basename="bezugsperson")
 router.register("patient-aerzte", PatientArztViewSet, basename="patientarzt")
 router.register("diagnosen", DiagnoseViewSet, basename="diagnose")
 router.register("medikamente", MedikamentViewSet, basename="medikament")
+router.register("eingriffe", EingriffViewSet, basename="eingriff")
 router.register("therapieschritte", TherapieschrittViewSet, basename="therapieschritt")
 router.register("laborbefunde", LaborbefundViewSet, basename="laborbefund")
 router.register("bia-messungen", BiaMessungViewSet, basename="biamessung")
@@ -66,6 +67,8 @@ router.register("aerzte", ArztViewSet, basename="arzt")
 router.register("praeparate", PraeparatViewSet, basename="praeparat")
 router.register("laborparameter", LaborparameterViewSet, basename="laborparameter")
 router.register("diagnoseliste", DiagnosevorlageViewSet, basename="diagnosevorlage")
+# Eingriffe und OPS-Liste der RGC (21.11.2026)
+router.register("opsliste", OpsvorlageViewSet, basename="opsvorlage")
 router.register("auswahlwerte", AuswahlwertViewSet, basename="auswahlwert")
 router.register("benutzer", konto.BenutzerViewSet, basename="benutzer")
 router.register("protokoll", SystemEreignisViewSet, basename="protokoll")

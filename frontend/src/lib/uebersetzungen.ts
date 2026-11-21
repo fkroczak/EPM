@@ -76,6 +76,12 @@ export const UEBERSETZUNGEN: Record<string, { en: string; lv: string }> = {
   "BIA": { en: "BIA", lv: "BIA" },
   "Berichte": { en: "Reports", lv: "Izraksti" },
   "Fälle": { en: "Cases", lv: "Gadījumi" },
+  // eigene Reiter der RGC (21.11.2026)
+  "Eingriffe": { en: "Procedures", lv: "Procedūras" },
+  "OP-Berichte": { en: "Surgery reports", lv: "Operāciju protokoli" },
+  "Röntgen": { en: "X-ray", lv: "Rentgens" },
+  "Überweisungen": { en: "Referrals", lv: "Nosūtījumi" },
+  "Einweisungen": { en: "Admissions", lv: "Stacionēšanas nosūtījumi" },
   "Korrespondenz": { en: "Correspondence", lv: "Sarakste" },
   "Dokumente": { en: "Documents", lv: "Dokumenti" },
   "Weiteres": { en: "More", lv: "Citi" },

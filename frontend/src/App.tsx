@@ -64,6 +64,12 @@ const router = createBrowserRouter([
           { path: "berichte", ...seite(() => import("./seiten/akte/Berichte").then(({ Berichte }) => <Berichte />)) },
           // Fälle der Regeneration Clinic (26.10.2026): Behandlungsfall mit Dokumentenpaket und Rechnung
           { path: "faelle", ...seite(() => import("./seiten/akte/Faelle").then(({ Faelle }) => <Faelle />)) },
+          // eigene Reiter der Regeneration Clinic (21.11.2026): Eingriffe und Dokumente je Dokumenttyp
+          { path: "eingriffe", ...seite(() => import("./seiten/akte/Eingriffe").then(({ Eingriffe }) => <Eingriffe />)) },
+          { path: "op-berichte", ...seite(() => import("./seiten/akte/Dokumente").then(({ Dokumente }) => <Dokumente key="op_bericht" art="op_bericht" />)) },
+          { path: "roentgen", ...seite(() => import("./seiten/akte/Dokumente").then(({ Dokumente }) => <Dokumente key="radiologie" art="radiologie" />)) },
+          { path: "ueberweisungen", ...seite(() => import("./seiten/akte/Dokumente").then(({ Dokumente }) => <Dokumente key="ueberweisung" art="ueberweisung" />)) },
+          { path: "einweisungen", ...seite(() => import("./seiten/akte/Dokumente").then(({ Dokumente }) => <Dokumente key="einweisung" art="einweisung" />)) },
           { path: "korrespondenz", ...seite(() => import("./seiten/akte/Korrespondenz").then(({ Korrespondenz }) => <Korrespondenz />)) },
           { path: "dokumente", ...seite(() => import("./seiten/akte/Dokumente").then(({ Dokumente }) => <Dokumente />)) },
           { path: "datenschutz", ...seite(() => import("./seiten/akte/Datenschutz").then(({ AkteDatenschutz }) => <AkteDatenschutz />)) },

@@ -21,6 +21,9 @@ class Auswahlwert(models.Model):
     wert = models.CharField(max_length=100)
     reihenfolge = models.PositiveSmallIntegerField(default=100)
     aktiv = models.BooleanField(default=True)
+    # Feste Kennung für Werte, an denen ein Programmteil hängt (Wunsch RGC 21.11.2026: eigene Reiter je Dokumenttyp).
+    # Der angezeigte Wert bleibt unter Vorlagen › Auswahllisten frei änderbar; der Reiter findet ihn über die Kennung.
+    kennung = models.SlugField(max_length=30, blank=True, editable=False)
 
     history = HistoricalRecords()
 
@@ -28,7 +31,9 @@ class Auswahlwert(models.Model):
         verbose_name = "Auswahlwert"
         verbose_name_plural = "Auswahlwerte"
         ordering = ["liste", "reihenfolge", "wert"]
-        constraints = [models.UniqueConstraint(fields=["liste", "wert"], name="auswahlwert_eindeutig")]
+        constraints = [models.UniqueConstraint(fields=["liste", "wert"], name="auswahlwert_eindeutig"),
+                       models.UniqueConstraint(fields=["liste", "kennung"], condition=~models.Q(kennung=""),
+                                               name="auswahlwert_kennung_eindeutig")]
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Auswahlwerte werden nicht gelöscht, nur deaktiviert.")
@@ -285,6 +290,61 @@ class Diagnosevorlage(models.Model):
 
     def __str__(self):
         return f"{self.bezeichnung} [{self.icd_code}]"
+
+
+# OPS-Code (Operationen- und Prozedurenschlüssel), z. B. „5-455.01“, „8-831.0“, „5-46a.1“: Kapitel, Bindestrich, drei
+# Stellen, bei Bedarf Punkt und ein bis zwei Stellen. Buchstaben schreibt der OPS klein (Wunsch RGC 21.11.2026).
+OPS_MUSTER = r"^\d-\d{2}[0-9a-z](\.[0-9a-z]{1,2})?$"
+
+
+def ops_codes_ordnen(text: str) -> tuple[str, list[str]]:
+    """„5-455.01; 5-469.20“ → („5-455.01, 5-469.20“, [ungültige Codes]). Trenner: Komma, Semikolon, Leerzeichen."""
+    import re
+
+    codes, falsch = [], []
+    for c in re.split(r"[,;\s]+", (text or "").strip().lower()):
+        if not c:
+            continue
+        if not re.match(OPS_MUSTER, c):
+            falsch.append(c)
+        elif c not in codes:
+            codes.append(c)
+    return ", ".join(codes), falsch
+
+
+class Opsvorlage(models.Model):
+    """Liste der Prozeduren mit OPS-Code (Wunsch RGC 21.11.2026), gebaut wie die Diagnoseliste: Beim Eintragen eines
+    Eingriffs wird daraus vorgeschlagen; eine neue Kombination aus Code und Bezeichnung wandert hinein. Korrigiert und
+    ausgeblendet wird sie unter Vorlagen › Labor und Diagnosen."""
+
+    ops_code = models.CharField("OPS-Code", max_length=12, db_index=True, help_text="z. B. 5-455.01")
+    bezeichnung = models.CharField(max_length=200)
+    aktiv = models.BooleanField(default=True)
+    angelegt_am = models.DateTimeField(auto_now_add=True)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Prozedur (OPS-Liste)"
+        verbose_name_plural = "Prozeduren (OPS-Liste)"
+        ordering = ["bezeichnung", "ops_code"]
+        constraints = [models.UniqueConstraint(fields=["ops_code", "bezeichnung"], name="opsvorlage_eindeutig")]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Prozeduren der Liste werden nicht gelöscht, nur deaktiviert.")
+
+    def clean(self):
+        import re
+
+        self.ops_code = (self.ops_code or "").strip().lower()
+        if not re.match(OPS_MUSTER, self.ops_code):
+            raise ValidationError({"ops_code": "OPS-Code wie „5-455.01“ angeben (Ziffer, Bindestrich, drei Stellen, "
+                                               "bei Bedarf Punkt und ein bis zwei Stellen)."})
+        if not (self.bezeichnung or "").strip():
+            raise ValidationError({"bezeichnung": "Bitte die Bezeichnung angeben."})
+
+    def __str__(self):
+        return f"{self.bezeichnung} [{self.ops_code}]"
 
 
 # Erklärungen, die bei jeder Akte in Betreuung vorliegen sollen (Schlüssel wie ``patienten.Erklaerung.Art``).

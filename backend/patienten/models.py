@@ -787,6 +787,118 @@ class Therapieschritt(AktenEintrag):
         return f"{self.datum}: {self.text}"
 
 
+class Eingriff(AktenEintrag):
+    """Durchgeführte Therapie oder Operation mit OPS- und ICD-Code (Wunsch der RGC, 21.11.2026).
+
+    Ablauf: beantragt → genehmigt → durchgeführt (oder abgelehnt). Sobald der Eingriff genehmigt oder als durchgeführt
+    eingetragen ist, steht seine Diagnose (ICD-Code, Bezeichnung, Zusatzkennzeichen) in der Diagnoseliste der Akte –
+    gibt es dort schon eine zutreffende Diagnose mit diesem Code, wird sie verknüpft statt doppelt angelegt
+    (``diagnose``). Die OPS-Codes bleiben am Eingriff. Nichts wird gelöscht: ein falscher Eintrag wird mit
+    ``aktiv = False`` entfernt und bleibt im Verlauf; die übernommene Diagnose bleibt dabei stehen."""
+
+    class Art(models.TextChoices):
+        OPERATION = "operation", "Operation"
+        THERAPIE = "therapie", "Therapie"
+
+    class Status(models.TextChoices):
+        BEANTRAGT = "beantragt", "beantragt"
+        GENEHMIGT = "genehmigt", "genehmigt"
+        DURCHGEFUEHRT = "durchgefuehrt", "durchgeführt"
+        ABGELEHNT = "abgelehnt", "abgelehnt"
+
+    # Mit diesen Stufen steht die Diagnose in der Diagnoseliste
+    UEBERNAHME = (Status.GENEHMIGT, Status.DURCHGEFUEHRT)
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="eingriffe")
+    art = models.CharField(max_length=15, choices=Art.choices, default=Art.OPERATION)
+    bezeichnung = models.CharField(max_length=200, help_text="z. B. „Dünndarmresektion“")
+    ops_codes = models.CharField("OPS-Codes", max_length=200, blank=True, help_text="z. B. „5-455.01, 5-469.20“")
+    # Diagnose, die mit der Genehmigung in die Diagnoseliste wandert – immer als „G – gesichert“ (Festlegung
+    # 21.11.2026, U77); das Feld bleibt für die Historie und spätere Wünsche
+    icd_code = models.CharField("ICD-Code", max_length=10, help_text="z. B. K91.2")
+    diagnose_bezeichnung = models.CharField("Diagnose", max_length=200)
+    kennzeichen = models.CharField("Zusatzkennzeichen der Diagnose", max_length=1, choices=Diagnose.Kennzeichen.choices,
+                                   default=Diagnose.Kennzeichen.GESICHERT)
+    status = models.CharField(max_length=15, choices=Status.choices, default=Status.BEANTRAGT)
+    datum = models.DateField("geplant bzw. durchgeführt am", null=True, blank=True)
+    genehmigt_am = models.DateField(null=True, blank=True)
+    genehmigung = models.CharField("Genehmigung (Kostenträger, Aktenzeichen)", max_length=200, blank=True)
+    notiz = models.CharField(max_length=300, blank=True)
+    diagnose = models.ForeignKey(Diagnose, on_delete=models.SET_NULL, null=True, blank=True, related_name="eingriffe",
+                                 editable=False)
+    dokument = models.ForeignKey("Dokument", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+                                 help_text="z. B. der OP-Bericht")
+    aktiv = models.BooleanField(default=True)
+    angelegt_am = models.DateTimeField(auto_now_add=True)
+    angelegt_von = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "Eingriff"
+        verbose_name_plural = "Eingriffe (Therapie und Operation)"
+        ordering = ["-aktiv", models.F("datum").desc(nulls_first=True), "-id"]
+        indexes = [models.Index(fields=["patient", "aktiv"], name="eingriff_patient_aktiv")]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionError("Eingriffe werden nicht gelöscht, sondern entfernt (aktiv = False).")
+
+    def __str__(self):
+        return self.bezeichnung
+
+    def clean(self):
+        import re
+
+        from stammdaten.models import ICD_MUSTER, ops_codes_ordnen
+
+        self.icd_code = (self.icd_code or "").strip().upper()
+        self.ops_codes, falsch = ops_codes_ordnen(self.ops_codes)
+        fehler = {}
+        if not (self.bezeichnung or "").strip():
+            fehler["bezeichnung"] = "Bitte angeben, welche Therapie oder Operation."
+        if falsch:
+            fehler["ops_codes"] = (f"Kein gültiger OPS-Code: {', '.join(falsch)}. Bitte wie „5-455.01“ angeben, mehrere "
+                                   "mit Komma getrennt.")
+        if not re.match(ICD_MUSTER, self.icd_code):
+            fehler["icd_code"] = ("ICD-Code wie „K91.2“ angeben (Buchstabe, zwei Ziffern, bei Bedarf Punkt und "
+                                  "ein bis zwei Stellen).")
+        if not (self.diagnose_bezeichnung or "").strip():
+            fehler["diagnose_bezeichnung"] = "Bitte die Diagnose angeben, die mit der Genehmigung übernommen wird."
+        if self.kennzeichen not in Diagnose.Kennzeichen.values:
+            fehler["kennzeichen"] = "Bitte G (gesichert), V (Verdacht), Z (Zustand nach) oder A (Ausschluss) wählen."
+        heute = timezone.localdate()
+        if self.genehmigt_am and self.genehmigt_am > heute:
+            fehler["genehmigt_am"] = "Das Datum liegt in der Zukunft."
+        if self.status == self.Status.DURCHGEFUEHRT and self.datum and self.datum > heute:
+            fehler["datum"] = "Ein durchgeführter Eingriff kann nicht in der Zukunft liegen."
+        if self.dokument_id and self.dokument.patient_id != self.patient_id:
+            fehler["dokument"] = "Das Dokument gehört zu einer anderen Akte."
+        if fehler:
+            raise ValidationError(fehler)
+
+    def diagnose_uebernehmen(self, user) -> Diagnose | None:
+        """Ab „genehmigt“: Diagnose in die Liste der Akte (einmal je Eingriff). Eine zutreffende Diagnose mit demselben
+        ICD-Code wird verknüpft statt doppelt angelegt. → die verknüpfte Diagnose oder None."""
+        from stammdaten.models import Diagnosevorlage
+
+        if self.status not in self.UEBERNAHME or not self.aktiv or self.diagnose_id:
+            return None
+        d = self.patient.diagnosen.filter(icd_code=self.icd_code, aktiv=True).order_by("id").first()
+        if d is None:
+            d = Diagnose(patient=self.patient, bezeichnung=self.diagnose_bezeichnung.strip()[:200],
+                         icd_code=self.icd_code, kennzeichen=self.kennzeichen, angelegt_von=user,
+                         seit=self.datum if self.datum and self.datum <= timezone.localdate() else None,
+                         notiz=f"aus Eingriff: {self.bezeichnung}"[:300], firma_id=self.firma_id)
+            d.full_clean(exclude=["patient", "angelegt_von", "firma"])
+            d._history_user = user
+            d.save()
+            Diagnosevorlage.objects.get_or_create(icd_code=d.icd_code, bezeichnung=d.bezeichnung)
+        self.diagnose = d
+        self._history_user = user
+        self.save(update_fields=["diagnose"])
+        return d
+
+
 class Dokument(AktenEintrag):
     """Datei im Dateisystem (EPM_DOKUMENTE/<nummer>/...), Metadaten und Prüfsumme in der DB."""
 

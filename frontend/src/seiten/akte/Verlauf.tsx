@@ -31,6 +31,8 @@ const BEREICHE: { wert: string; text: string }[] = [
   { wert: "faelle", text: "Fälle" }, { wert: "falldokumente", text: "Dokumente der Fälle" },
   // Medikamentenplan (Wunsch 11.10.2026)
   { wert: "medikamente", text: "Medikamente" },
+  // Eingriffe der RGC (21.11.2026)
+  { wert: "eingriffe", text: "Eingriffe" },
   // weggeklickte Hinweise (F119)
   { wert: "hinweisruhe", text: "Hinweise ausgeblendet" },
 ];
@@ -41,7 +43,7 @@ const BEREICH_EINZELN: Record<string, string> = {
   hinweisruhe: "Hinweis ausgeblendet",
   // Wünsche aus der Praxis vom 06.10.2026 (F112–F117)
   diagnosen: "Diagnose (ICD)", laborbefunde: "Laborbefund", bia_messungen: "BIA-Messung", berichte: "Bericht", korrespondenz: "Schreiben",
-  medikamente: "Medikament", faelle: "Fall", falldokumente: "Dokument eines Falls",
+  medikamente: "Medikament", faelle: "Fall", falldokumente: "Dokument eines Falls", eingriffe: "Eingriff",
 };
 
 const FELDER: Record<string, string> = {

@@ -91,6 +91,8 @@ def umfang(patient) -> dict:
         "korrespondenz": patient.korrespondenz.count(),
         # Dokumentenautomation der RGC (26.10.2026)
         "faelle": patient.faelle.count(),
+        # Eingriffe der RGC (21.11.2026)
+        "eingriffe": patient.eingriffe.count(),
     }
 
 
@@ -115,7 +117,7 @@ def akten_entfernen(ids: list[int]) -> None:
     from infusionen.models import Infusionsplan, InfusionsplanPosition
     from korrespondenz.models import Schreiben
 
-    from .models import Diagnose, Hinweisruhe, Medikament, PatientFirma, Therapieschritt
+    from .models import Diagnose, Eingriff, Hinweisruhe, Medikament, PatientFirma, Therapieschritt
 
     ids = list(ids)
     eigene = eigene_dokumente(ids)
@@ -165,7 +167,7 @@ def akten_entfernen(ids: list[int]) -> None:
     frueher.exclude(id__in=bleibt).delete()
     for modell in (Gewichtsmessung, Kontakt, Termin, Infusionsplan, Bezugsperson, PatientArzt, Erklaerung,
                    Datenschutzanfrage, Diagnose, Laborbefund, BiaMessung, Bericht, Hinweisruhe, Therapieschritt,
-                   PatientFirma, Medikament, Schreiben, Behandlungsfall, FallDokument):
+                   PatientFirma, Medikament, Schreiben, Behandlungsfall, FallDokument, Eingriff):
         modell.history.filter(patient_id__in=ids).delete()
     Rechnungsposition.history.filter(dokument_id__in=fall_dok_ids).delete()
     InfusionsplanPosition.history.filter(plan_id__in=plan_ids).delete()

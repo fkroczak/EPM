@@ -176,6 +176,16 @@ def aktenkopie_pdf(patient) -> bytes:
             ["Wirkstoff", "Handelsname", "Form", "Dosierung", "Grund", "seit", "Stand"], medikamente,
             [None, None, "20mm", "28mm", None, "20mm", "30mm"])))
 
+    # Eingriffe der RGC (21.11.2026): Therapie oder Operation mit OPS- und ICD-Code
+    eingriffe = [[_e(e.get_art_display()), _e(e.bezeichnung), _e(e.ops_codes), _e(f"{e.icd_code}{e.kennzeichen}"),
+                  _e(e.get_status_display() + (f" {datum(e.datum)}" if e.datum else "")),
+                  _e(" · ".join(t for t in (e.genehmigung, e.notiz, "" if e.aktiv else "entfernt") if t))]
+                 for e in p.eingriffe.order_by("datum", "id")]
+    if eingriffe:
+        teile.append(_abschnitt("Eingriffe (Therapie und Operation)", _tabelle(
+            ["Art", "Eingriff", "OPS", "ICD", "Stand", "Genehmigung, Notiz"], eingriffe,
+            ["20mm", None, "26mm", "18mm", "30mm", None])))
+
     for titel, text in (("Diagnose (Freitext)", p.diagnose), ("Therapie", p.therapie),
                         ("Empfehlung", p.empfehlung), ("Befunde", p.befunde),
                         ("Bemerkung", p.bemerkung)):
@@ -303,6 +313,8 @@ BEREICHE = {"stammdaten": "Stammdaten", "diagnose": "Diagnose (Text)", "therapie
             "faelle": "Behandlungsfall", "falldokumente": "Dokument eines Falls",
             # Medikamentenplan (Wunsch 11.10.2026)
             "medikamente": "Medikament",
+            # Eingriffe der RGC (21.11.2026)
+            "eingriffe": "Eingriff",
             # Hinweise stummschalten (Wunsch 07.10.2026, F119)
             "hinweisruhe": "Hinweis stummgeschaltet"}
 

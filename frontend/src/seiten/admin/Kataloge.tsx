@@ -12,7 +12,7 @@ import { ApiFehler, api } from "@/lib/api";
 import type { Feldfehler } from "@/lib/api";
 import { zahl } from "@/lib/format";
 import { LABORGRUPPEN } from "@/lib/typen";
-import type { Diagnosevorlage, Laborparameter } from "@/lib/typen";
+import type { Laborparameter } from "@/lib/typen";
 import { Auswahl, Chip, Eingabe, Feld, Fehleranzeige, Karte, KartenKopf, Knopf, Laden, Leer, Meldung, Segmente }
   from "@/components/ui/basis";
 import { Dialog } from "@/components/ui/dialog";
@@ -207,28 +207,49 @@ function LaborparameterBereich() {
   );
 }
 
-// ================================================================= Diagnoseliste
-function DiagnoseEintragDialog({ eintrag, onZu }: { eintrag: Diagnosevorlage | "neu" | null; onZu: () => void }) {
+// ================================================================= Diagnoseliste und OPS-Liste
+/** Eine Liste „Bezeichnung + Code“ im Hintergrund: Diagnosen mit ICD-Code (F117) und Prozeduren mit OPS-Code (RGC,
+ * 21.11.2026). Beide wachsen beim Eintragen in einer Akte von allein mit; hier werden sie korrigiert und ausgeblendet. */
+type CodeEintrag = { id: number; bezeichnung: string; aktiv: boolean } & ({ icd_code: string } | { ops_code: string });
+type CodeListe = {
+  pfad: "diagnoseliste" | "opsliste"; feld: "icd_code" | "ops_code"; code: string; beispiel: string; name: string;
+  titel: string; hinzufuegen: string; dialogHinweis?: string; testid: string;
+  /** ICD groß, OPS klein (so schreibt es der OPS) */
+  schreibweise: (text: string) => string;
+};
+const LISTEN: Record<"diagnosen" | "ops", CodeListe> = {
+  diagnosen: { pfad: "diagnoseliste", feld: "icd_code", code: "ICD-Code", beispiel: "K91.2", name: "Diagnose",
+    titel: "Diagnosen mit ICD-Code", hinzufuegen: "Diagnose hinzufügen", testid: "diagnoseliste-verwaltung",
+    dialogHinweis: "Das Zusatzkennzeichen (G/V/Z/A) gehört zur einzelnen Diagnose in der Akte, nicht in die Liste.",
+    schreibweise: (t) => t.toUpperCase() },
+  ops: { pfad: "opsliste", feld: "ops_code", code: "OPS-Code", beispiel: "5-455.01", name: "Prozedur",
+    titel: "Prozeduren mit OPS-Code", hinzufuegen: "Prozedur hinzufügen", testid: "opsliste-verwaltung",
+    dialogHinweis: "Wächst beim Eintragen eines Eingriffs (Reiter „Eingriffe“ der Regeneration Clinic) mit.",
+    schreibweise: (t) => t.toLowerCase() },
+};
+const codeVon = (l: CodeListe, d: CodeEintrag) => (d as Record<string, unknown>)[l.feld] as string;
+
+function CodeEintragDialog({ l, eintrag, onZu }: { l: CodeListe; eintrag: CodeEintrag | "neu" | null; onZu: () => void }) {
   const qc = useQueryClient();
   const melden = useHinweis();
   const vorhanden = eintrag && eintrag !== "neu" ? eintrag : null;
   const [bezeichnung, setBezeichnung] = useState("");
-  const [icd, setIcd] = useState("");
+  const [code, setCode] = useState("");
   const [gesetzt, setGesetzt] = useState<unknown>(undefined);
   if (eintrag && gesetzt !== eintrag) {
     setGesetzt(eintrag);
     setBezeichnung(vorhanden?.bezeichnung ?? "");
-    setIcd(vorhanden?.icd_code ?? "");
+    setCode(vorhanden ? codeVon(l, vorhanden) : "");
   }
   const speichern = useMutation({
     mutationFn: () => {
-      const daten = { bezeichnung: bezeichnung.trim(), icd_code: icd.trim().toUpperCase() };
+      const daten = { bezeichnung: bezeichnung.trim(), [l.feld]: l.schreibweise(code.trim()) };
       return vorhanden
-        ? api(`diagnoseliste/${vorhanden.id}/`, { method: "PATCH", body: daten })
-        : api("diagnoseliste/", { body: daten });
+        ? api(`${l.pfad}/${vorhanden.id}/`, { method: "PATCH", body: daten })
+        : api(`${l.pfad}/`, { body: daten });
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["diagnoseliste"] });
+      void qc.invalidateQueries({ queryKey: [l.pfad] });
       melden("Gespeichert.");
       onZu();
     },
@@ -236,57 +257,57 @@ function DiagnoseEintragDialog({ eintrag, onZu }: { eintrag: Diagnosevorlage | "
   const e: Feldfehler = speichern.error instanceof ApiFehler ? speichern.error.felder : {};
   return (
     <Dialog offen={!!eintrag} onOffen={(o) => { if (!o) onZu(); }} breite={520}
-      titel={vorhanden ? "Diagnose bearbeiten" : "Neue Diagnose in der Liste"}
-      beschreibung="Das Zusatzkennzeichen (G/V/Z/A) gehört zur einzelnen Diagnose in der Akte, nicht in die Liste."
+      titel={vorhanden ? `${l.name} bearbeiten` : `Neue ${l.name} in der Liste`}
+      beschreibung={l.dialogHinweis}
       fuss={<><Knopf onClick={onZu}>Abbrechen</Knopf>
-        <Knopf variante="pri" laedt={speichern.isPending} disabled={!bezeichnung.trim() || !icd.trim()}
+        <Knopf variante="pri" laedt={speichern.isPending} disabled={!bezeichnung.trim() || !code.trim()}
           onClick={() => speichern.mutate()}>Speichern</Knopf></>}>
       <Feld label="Bezeichnung" fehler={e.bezeichnung} pflicht>
         {(p) => <Eingabe {...p} value={bezeichnung} maxLength={200} onChange={(ev) => setBezeichnung(ev.target.value)} autoFocus />}
       </Feld>
-      <Feld label="ICD-Code" fehler={e.icd_code} hinweis="z. B. K91.2" pflicht>
-        {(p) => <Eingabe {...p} className="num w-[10rem]" value={icd} maxLength={10}
-          onChange={(ev) => setIcd(ev.target.value.toUpperCase())} />}
+      <Feld label={l.code} fehler={e[l.feld]} hinweis={`z. B. ${l.beispiel}`} pflicht>
+        {(p) => <Eingabe {...p} className="num w-[10rem]" value={code} maxLength={12}
+          onChange={(ev) => setCode(l.schreibweise(ev.target.value))} />}
       </Feld>
       {speichern.error && !Object.keys(e).length ? <Meldung art="fehler">{speichern.error.message}</Meldung> : null}
     </Dialog>
   );
 }
 
-function DiagnosenBereich() {
+function CodeListeBereich({ l }: { l: CodeListe }) {
   const [suche, setSuche] = useState("");
-  const [dialog, setDialog] = useState<Diagnosevorlage | "neu" | null>(null);
+  const [dialog, setDialog] = useState<CodeEintrag | "neu" | null>(null);
   const qc = useQueryClient();
   const melden = useHinweis();
-  const liste = useQuery({ queryKey: ["diagnoseliste", false], queryFn: () => api<Diagnosevorlage[]>("diagnoseliste/") });
+  const liste = useQuery({ queryKey: [l.pfad, false], queryFn: () => api<CodeEintrag[]>(`${l.pfad}/`) });
   const umschalten = useMutation({
-    mutationFn: (d: Diagnosevorlage) => api(`diagnoseliste/${d.id}/`, { method: "PATCH", body: { aktiv: !d.aktiv } }),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["diagnoseliste"] }); melden("Gespeichert."); },
+    mutationFn: (d: CodeEintrag) => api(`${l.pfad}/${d.id}/`, { method: "PATCH", body: { aktiv: !d.aktiv } }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: [l.pfad] }); melden("Gespeichert."); },
     onError: (e) => melden(e.message, "fehler"),
   });
   const gefiltert = (liste.data ?? []).filter((d) =>
-    !suche.trim() || `${d.bezeichnung} ${d.icd_code}`.toLowerCase().includes(suche.trim().toLowerCase()));
+    !suche.trim() || `${d.bezeichnung} ${codeVon(l, d)}`.toLowerCase().includes(suche.trim().toLowerCase()));
 
   return (
     <Karte className="p-[1.375rem] flex flex-col gap-3">
-      <KartenKopf titel="Diagnosen mit ICD-Code"
+      <KartenKopf titel={l.titel}
         unter="Wächst beim Eintragen in einer Akte von allein mit; hier wird sie korrigiert und ausgeblendet."
         rechts={<>
           <Eingabe aria-label="Suchen" className="w-[13.75rem]" placeholder="Suchen …" value={suche}
             onChange={(e) => setSuche(e.target.value)} />
-          <Knopf klein variante="pri" onClick={() => setDialog("neu")}>Diagnose hinzufügen</Knopf>
+          <Knopf klein variante="pri" onClick={() => setDialog("neu")}>{l.hinzufuegen}</Knopf>
         </>} />
       {liste.isPending ? <Laden /> : <Fehleranzeige fehler={liste.error} />}
       {gefiltert.length === 0 && !liste.isPending ? <Leer>Keine Einträge.</Leer> : null}
       {gefiltert.length ? (
         <div className="overflow-x-auto">
-          <table className="tabelle w-full" data-testid="diagnoseliste-verwaltung">
-            <thead><tr><th>Diagnose</th><th>ICD</th><th /></tr></thead>
+          <table className="tabelle w-full" data-testid={l.testid}>
+            <thead><tr><th>{l.name}</th><th>{l.code.replace("-Code", "")}</th><th /></tr></thead>
             <tbody>
               {gefiltert.map((d) => (
                 <tr key={d.id} className={d.aktiv ? "" : "opacity-60"}>
                   <td>{d.bezeichnung}{!d.aktiv ? <Chip className="ml-2">ausgeblendet</Chip> : null}</td>
-                  <td className="num">{d.icd_code}</td>
+                  <td className="num">{codeVon(l, d)}</td>
                   <td className="text-right whitespace-nowrap">
                     <Knopf klein onClick={() => setDialog(d)}>Bearbeiten</Knopf>{" "}
                     <Knopf klein onClick={() => umschalten.mutate(d)}>{d.aktiv ? "Ausblenden" : "Einblenden"}</Knopf>
@@ -297,19 +318,20 @@ function DiagnosenBereich() {
           </table>
         </div>
       ) : null}
-      <DiagnoseEintragDialog eintrag={dialog} onZu={() => setDialog(null)} />
+      <CodeEintragDialog l={l} eintrag={dialog} onZu={() => setDialog(null)} />
     </Karte>
   );
 }
 
 export function KatalogeBereich() {
-  const [teil, setTeil] = useState<"labor" | "diagnosen">("labor");
+  const [teil, setTeil] = useState<"labor" | "diagnosen" | "ops">("labor");
   // Hinweis „N Laborwerte ohne Referenzbereich“ (F190) steht in LaborparameterBereich
   return (
     <div className="flex flex-col gap-4">
       <Segmente label="Katalog" wert={teil} onWahl={setTeil} className="self-start"
-        werte={[{ wert: "labor", text: "Laborparameter" }, { wert: "diagnosen", text: "Diagnosen" }]} />
-      {teil === "labor" ? <LaborparameterBereich /> : <DiagnosenBereich />}
+        werte={[{ wert: "labor", text: "Laborparameter" }, { wert: "diagnosen", text: "Diagnosen" },
+          { wert: "ops", text: "OPS (Eingriffe)" }]} />
+      {teil === "labor" ? <LaborparameterBereich /> : <CodeListeBereich key={teil} l={LISTEN[teil]} />}
     </div>
   );
 }
